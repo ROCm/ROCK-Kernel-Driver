@@ -73,6 +73,7 @@ static int max_sg_segs;
 static int try_direct_io = TRY_DIRECT_IO;
 static int try_rdio = TRUE;
 static int try_wdio = TRUE;
+static int blocking_open = 1;
 
 static int st_dev_max;
 static int st_nr_dev;
@@ -93,6 +94,8 @@ module_param_named(max_sg_segs, max_sg_segs, int, 0);
 MODULE_PARM_DESC(max_sg_segs, "Maximum number of scatter/gather segments to use (256)");
 module_param_named(try_direct_io, try_direct_io, int, 0);
 MODULE_PARM_DESC(try_direct_io, "Try direct I/O between user buffer and tape drive (1)");
+module_param_named(blocking_open, blocking_open, int, 0);
+MODULE_PARM_DESC(blocking_open, "Block in open if not ready an no O_NONBLOCK (0)");
 
 /* Extra parameters for testing */
 module_param_named(try_rdio, try_rdio, int, 0);
@@ -117,6 +120,9 @@ static struct st_dev_parm {
 	},
 	{
 		"try_direct_io", &try_direct_io
+	},
+	{
+		"blocking_open", &blocking_open
 	}
 };
 #endif
@@ -819,7 +825,7 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 	saved_cleaning = STp->cleaning_req;
 	STp->cleaning_req = 0;
 
-	do_wait = ((filp->f_flags & O_NONBLOCK) == 0);
+	do_wait = (blocking_open && (filp->f_flags & O_NONBLOCK) == 0);
 	retval = test_ready(STp, do_wait);
 
 	if (retval < 0)
@@ -1055,7 +1061,8 @@ static int st_open(struct inode *inode, struct file *filp)
 	retval = check_tape(STp, filp);
 	if (retval < 0)
 		goto err_out;
-	if ((filp->f_flags & O_NONBLOCK) == 0 &&
+	if (blocking_open &&
+	    (filp->f_flags & O_NONBLOCK) == 0 &&
 	    retval != CHKRES_READY) {
 		retval = (-EIO);
 		goto err_out;
