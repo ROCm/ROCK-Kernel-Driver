@@ -142,7 +142,6 @@ static inline unsigned long get_page_cache_size(void)
 static inline void ___add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index)
 {
-	list_add(&page->list, &mapping->clean_pages);
 	page->mapping = mapping;
 	page->index = index;
 
