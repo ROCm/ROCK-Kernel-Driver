@@ -55,7 +55,7 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
 MODULE_LICENSE("GPL");
 
-#define EDD_VERSION "0.08 2003-Jan-07"
+#define EDD_VERSION "0.09 2003-Jan-22"
 #define EDD_DEVICE_NAME_SIZE 16
 #define REPORT_URL "http://domsch.com/linux/edd30/results.html"
 
@@ -76,6 +76,7 @@ struct edd_attribute {
 static int edd_dev_is_type(struct edd_device *edev, const char *type);
 static struct pci_dev *edd_get_pci_dev(struct edd_device *edev);
 static struct scsi_device *edd_find_matching_scsi_device(struct edd_device *edev);
+static int kernel_has_scsi(void);
 
 static struct edd_device *edd_devices[EDDMAXNR];
 
@@ -338,7 +339,7 @@ edd_show_raw_data(struct edd_device *edev, char *buf)
 		}
 	}
 
-	if (found_pci && edd_dev_is_type(edev, "SCSI")) {
+	if (found_pci && kernel_has_scsi() && edd_dev_is_type(edev, "SCSI")) {
 		sd = edd_find_matching_scsi_device(edev);
 		if (!sd) {
 			p += snprintf(p, left, "Error: BIOS says this is a SCSI device, but\n");
@@ -650,6 +651,16 @@ edd_create_symlink_to_pcidev(struct edd_device *edev)
 	return sysfs_create_link(&edev->kobj,&pci_dev->dev.kobj,"pci_dev");
 }
 
+/*
+ * FIXME - as of 15-Jan-2003, there are some non-"scsi_device"s on the
+ * scsi_bus list.  The following functions could possibly mis-access
+ * memory in that case.  This is actually a problem with the SCSI
+ * layer, which is being addressed there.  Until then, don't use the
+ * SCSI functions.
+ */
+
+#undef CONFIG_SCSI
+#undef CONFIG_SCSI_MODULE
 #if defined(CONFIG_SCSI) || defined(CONFIG_SCSI_MODULE)
 
 struct edd_match_data {
@@ -728,8 +739,17 @@ edd_create_symlink_to_scsidev(struct edd_device *edev)
 	return rc;
 }
 
+static int kernel_has_scsi(void)
+{
+	return 1;
+}
 
 #else
+static int kernel_has_scsi(void)
+{
+	return 0;
+}
+
 static struct scsi_device *
 edd_find_matching_scsi_device(struct edd_device *edev)
 {
@@ -763,16 +783,7 @@ static void edd_populate_dir(struct edd_device * edev)
 	
 	if (!error) {
 		edd_create_symlink_to_pcidev(edev);
-
-		/* FIXME - as of 15-Jan-2003, there are some
-		   non-"scsi_device"s on the scsi_bus list.  The following
-		   function could possibly mis-access memory in that
-		   case.  This is actually a problem with the SCSI
-		   layer, which is being addressed there.  Until then,
-		   don't call this function.
-		   		   
-		   edd_create_symlink_to_scsidev(edev);
-		*/
+		edd_create_symlink_to_scsidev(edev);
 	}
 }
 
