@@ -392,3 +392,26 @@ CONFIG_ETRAX_RESCUE_SER2
 CONFIG_ETRAX_RESCUE_SER3
   Use serial port 3 as the rescue port.
 
+CONFIG_ETRAX_POWERBUTTON_BIT
+  Configure where power button is connected.
+
+CONFIG_ETRAX_ROOT_DEVICE
+  Specifies the device that should be mounted as root file system
+  when booting from flash. The axisflashmap driver adds an additional
+  mtd partition for the appended root file system image, so this option
+  should normally be the mtdblock device for the partition after the
+  last partition in the partition table.
+
+CONFIG_ETRAX_SHUTDOWN_BIT
+  Configure what pin on CSPO-port that is used for controlling power
+  supply.
+
+CONFIG_ETRAX_SOFT_SHUTDOWN
+  Enable this if Etrax is used with a power-supply that can be turned
+  off and on with PS_ON signal. Gives the possibility to detect
+  powerbutton and then do a power off after unmounting disks.
+
+CONFIG_ETRAX_WATCHDOG_NICE_DOGGY
+  By enabling this you make sure that the watchdog does not bite while
+  printing oopses. Recommended for development systems but not for
+  production releases.
