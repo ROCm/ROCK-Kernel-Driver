@@ -156,37 +156,35 @@ struct pbstats pbstats;
  * Pagebuf hashing
  */
 
-/* This structure must be a power of 2 long for the hash to work */
+#define NBITS	8
+#define NHASH	(1<<NBITS)
+
 typedef struct {
 	struct list_head	pb_hash;
 	int			pb_count;
 	spinlock_t		pb_hash_lock;
 } pb_hash_t;
 
-static pb_hash_t	*pbhash;
-static unsigned int	pb_hash_mask;
-static unsigned int	pb_hash_shift;
-static unsigned int	pb_order;
+STATIC pb_hash_t	pbhash[NHASH];
 #define pb_hash(pb)	&pbhash[pb->pb_hash_index]
 
-/*
- * This hash is the same one as used on the Linux buffer cache,
- * see fs/buffer.c
- */
-
-#define _hashfn(dev,block)      \
-        ((((dev)<<(pb_hash_shift - 6)) ^ ((dev)<<(pb_hash_shift - 9))) ^ \
-         (((block)<<(pb_hash_shift - 6)) ^ ((block) >> 13) ^ \
-          ((block) << (pb_hash_shift - 12))))
-
-static inline int
+STATIC int
 _bhash(
 	dev_t		dev,
 	loff_t		base)
 {
+	int		bit, hval;
+
 	base >>= 9;
-	
-	return (_hashfn(dev, base) & pb_hash_mask);
+	/*
+	 * dev_t is 16 bits, loff_t is always 64 bits
+	 */
+	base ^= dev;
+	for (bit = hval = 0; base != 0 && bit < sizeof(base) * 8; bit += NBITS) {
+		hval ^= (int)base & (NHASH-1);
+		base >>= NBITS;
+	}
+	return hval;
 }
 
 /*
@@ -1869,39 +1867,7 @@ pagebuf_shaker(void)
 int __init
 pagebuf_init(void)
 {
-	int		order, mempages, i;
-	unsigned int	nr_hash;
-	extern int	xfs_physmem;
-
-	mempages = xfs_physmem >>= 16;
-	mempages *= sizeof(pb_hash_t);
-	for (order = 0; (1 << order) < mempages; order++)
-		;
-
-	if (order > 3) order = 3;	/* cap us at 2K buckets */
-
-	do {
-		unsigned long tmp;
-
-		nr_hash = (PAGE_SIZE << order) / sizeof(pb_hash_t);	
-		nr_hash = 1 << (ffs(nr_hash) - 1);
-		pb_hash_mask =  (nr_hash - 1);
-		tmp = nr_hash;
-		pb_hash_shift = 0;
-		while((tmp >>= 1UL) != 0UL)
-			pb_hash_shift++;
-
-		pbhash = (pb_hash_t *)
-			__get_free_pages(GFP_KERNEL, order);
-		pb_order = order;
-	} while (pbhash == NULL && --order > 0);
-	printk("pagebuf cache hash table entries: %d (order: %d, %ld bytes)\n",
-		nr_hash, order, (PAGE_SIZE << order));
-
-	for(i = 0; i < nr_hash; i++) {
-		spin_lock_init(&pbhash[i].pb_hash_lock);
-		INIT_LIST_HEAD(&pbhash[i].pb_hash);
-	} 
+	int			i;
 
 	pagebuf_table_header = register_sysctl_table(pagebuf_root_table, 1);
 
@@ -1917,6 +1883,11 @@ pagebuf_init(void)
 		printk("pagebuf: couldn't init pagebuf cache\n");
 		pagebuf_terminate();
 		return -ENOMEM;
+	}
+
+	for (i = 0; i < NHASH; i++) {
+		spin_lock_init(&pbhash[i].pb_hash_lock);
+		INIT_LIST_HEAD(&pbhash[i].pb_hash);
 	}
 
 #ifdef PAGEBUF_TRACE
@@ -1945,7 +1916,6 @@ pagebuf_terminate(void)
 
 	kmem_cache_destroy(pagebuf_cache);
 	kmem_shake_deregister(pagebuf_shaker);
-	free_pages((unsigned long)pbhash, pb_order);
 
 	unregister_sysctl_table(pagebuf_table_header);
 #ifdef	CONFIG_PROC_FS
