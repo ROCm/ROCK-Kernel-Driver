@@ -710,9 +710,9 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
-		pSMB->OldFileName[name_len] = 0;	/* pad */
+		pSMB->OldFileName[name_len] = 0x04;	/* pad */
 	/* protocol requires ASCII signature byte on Unicode string */
-		pSMB->OldFileName[name_len + 1] = 0x04;
+		pSMB->OldFileName[name_len + 1] = 0x00;
 		name_len2 =
 		    cifs_strtoUCS((wchar_t *) & pSMB->
 				  OldFileName[name_len + 2], toName, 530,
