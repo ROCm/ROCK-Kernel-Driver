@@ -358,7 +358,7 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 
 	if (cflag & CRTSCTS) {
 		i = usb_control_msg (serial->dev, usb_sndctrlpipe (serial->dev, 0),
-				     VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST_TYPE,
+				     VENDOR_WRITE_REQUEST, VENDOR_WRITE_REQUEST_TYPE,
 				     0x0, 0x41, NULL, 0, 100);
 		dbg ("0x40:0x1:0x0:0x41  %d", i);
 	}
