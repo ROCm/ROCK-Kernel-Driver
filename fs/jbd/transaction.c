@@ -740,7 +740,7 @@ int journal_get_write_access (handle_t *handle, struct buffer_head *bh)
  *
  * Call this if you create a new bh.
  */
-int journal_get_create_access (handle_t *handle, struct buffer_head *bh) 
+int journal_get_create_access(handle_t *handle, struct buffer_head *bh) 
 {
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
@@ -755,14 +755,18 @@ int journal_get_create_access (handle_t *handle, struct buffer_head *bh)
 	err = 0;
 	
 	JBUFFER_TRACE(jh, "entry");
-	/* The buffer may already belong to this transaction due to
-	 * pre-zeroing in the filesystem's new_block code.  It may also
-	 * be on the previous, committing transaction's lists, but it
-	 * HAS to be in Forget state in that case: the transaction must
-	 * have deleted the buffer for it to be reused here. */
+	/*
+	 * The buffer may already belong to this transaction due to pre-zeroing
+	 * in the filesystem's new_block code.  It may also be on the previous,
+	 * committing transaction's lists, but it HAS to be in Forget state in
+	 * that case: the transaction must have deleted the buffer for it to be
+	 * reused here.
+	 */
+	jbd_lock_bh_state(bh);
+	spin_lock(&journal_datalist_lock);
 	J_ASSERT_JH(jh, (jh->b_transaction == transaction ||
-			 jh->b_transaction == NULL ||
-			 (jh->b_transaction == journal->j_committing_transaction &&
+		jh->b_transaction == NULL ||
+		(jh->b_transaction == journal->j_committing_transaction &&
 			  jh->b_jlist == BJ_Forget)));
 
 	J_ASSERT_JH(jh, jh->b_next_transaction == NULL);
@@ -771,7 +775,6 @@ int journal_get_create_access (handle_t *handle, struct buffer_head *bh)
 	J_ASSERT_JH(jh, handle->h_buffer_credits > 0);
 	handle->h_buffer_credits--;
 
-	spin_lock(&journal_datalist_lock);
 	if (jh->b_transaction == NULL) {
 		jh->b_transaction = transaction;
 		JBUFFER_TRACE(jh, "file as BJ_Reserved");
@@ -781,6 +784,7 @@ int journal_get_create_access (handle_t *handle, struct buffer_head *bh)
 		jh->b_next_transaction = transaction;
 	}
 	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(bh);
 
 	/*
 	 * akpm: I added this.  ext3_alloc_branch can pick up new indirect
@@ -799,10 +803,9 @@ out:
 	return err;
 }
 
-
-
 /**
- * int journal_get_undo_access() -  Notify intent to modify metadata with non-rewindable consequences
+ * int journal_get_undo_access() -  Notify intent to modify metadata with
+ *     non-rewindable consequences
  * @handle: transaction
  * @bh: buffer to undo
  * 
@@ -932,6 +935,7 @@ int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
 	 * never, ever allow this to happen: there's nothing we can do
 	 * about it in this layer.
 	 */
+	jbd_lock_bh_state(bh);
 	spin_lock(&journal_datalist_lock);
 	if (jh->b_transaction) {
 		JBUFFER_TRACE(jh, "has transaction");
@@ -986,10 +990,12 @@ int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
 			 * commit to never terminate.
 			 */
 			if (buffer_dirty(bh)) {
-				atomic_inc(&bh->b_count);
+				get_bh(bh);
 				spin_unlock(&journal_datalist_lock);
+				jbd_unlock_bh_state(bh);
 				need_brelse = 1;
 				sync_dirty_buffer(bh);
+				jbd_lock_bh_state(bh);
 				spin_lock(&journal_datalist_lock);
 				/* The buffer may become locked again at any
 				   time if it is redirtied */
@@ -1025,6 +1031,7 @@ int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
 	}
 no_journal:
 	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(bh);
 	if (need_brelse) {
 		BUFFER_TRACE(bh, "brelse");
 		__brelse(bh);
@@ -1053,7 +1060,7 @@ no_journal:
  * buffer: that only gets done when the old transaction finally
  * completes its commit.
  */
-int journal_dirty_metadata (handle_t *handle, struct buffer_head *bh)
+int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 {
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
@@ -1113,7 +1120,7 @@ out_unlock:
  * journaling component to decide after the write access is returned
  * that global state has changed and the update is no longer required.  */
 
-void journal_release_buffer (handle_t *handle, struct buffer_head *bh)
+void journal_release_buffer(handle_t *handle, struct buffer_head *bh)
 {
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
@@ -1126,6 +1133,7 @@ void journal_release_buffer (handle_t *handle, struct buffer_head *bh)
 	 * transaction, then it is safe to release it.  In all other
 	 * cases, just leave the buffer as it is. */
 
+	jbd_lock_bh_state(bh);
 	spin_lock(&journal_datalist_lock);
 	if (jh->b_jlist == BJ_Reserved && jh->b_transaction == transaction &&
 	    !buffer_jbddirty(jh2bh(jh))) {
@@ -1134,6 +1142,7 @@ void journal_release_buffer (handle_t *handle, struct buffer_head *bh)
 		__journal_refile_buffer(jh);
 	}
 	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(bh);
 
 	JBUFFER_TRACE(jh, "exit");
 	unlock_journal(journal);
@@ -1235,66 +1244,6 @@ not_jbd:
 	__brelse(bh);
 	return;
 }
-
-#if 0	/* Unused */
-/*
- * journal_sync_buffer: flush a potentially-journaled buffer to disk.
- *
- * Used for O_SYNC filesystem operations.  If the buffer is journaled,
- * we need to complete the O_SYNC by waiting for the transaction to
- * complete.  It is an error to call journal_sync_buffer before
- * journal_stop!
- */
-
-void journal_sync_buffer(struct buffer_head *bh)
-{
-	transaction_t *transaction;
-	journal_t *journal;
-	long sequence;
-	struct journal_head *jh;
-
-	/* If the buffer isn't journaled, this is easy: just sync it to
-	 * disk.  */
-	BUFFER_TRACE(bh, "entry");
-
-	spin_lock(&journal_datalist_lock);
-	if (!buffer_jbd(bh)) {
-		spin_unlock(&journal_datalist_lock);
-		return;
-	}
-	jh = bh2jh(bh);
-	if (jh->b_transaction == NULL) {
-		/* If the buffer has already been journaled, then this
-		 * is a noop. */
-		if (jh->b_cp_transaction == NULL) {
-			spin_unlock(&journal_datalist_lock);
-			return;
-		}
-		atomic_inc(&bh->b_count);
-		spin_unlock(&journal_datalist_lock);
-		sync_dirty_buffer(bh);
-		__brelse(bh);
-		goto out;
-	}
-	
-	/* Otherwise, just wait until the transaction is synced to disk. */
-	transaction = jh->b_transaction;
-	journal = transaction->t_journal;
-	sequence = transaction->t_tid;
-	spin_unlock(&journal_datalist_lock);
-
-	jbd_debug(2, "requesting commit for jh %p\n", jh);
-	log_start_commit (journal, transaction);
-	
-	while (tid_gt(sequence, journal->j_commit_sequence)) {
-		wake_up(&journal->j_wait_done_commit);
-		sleep_on(&journal->j_wait_done_commit);
-	}
-	JBUFFER_TRACE(jh, "exit");
-out:
-	return;
-}
-#endif
 
 /**
  * void journal_callback_set() -  Register a callback function for this handle.
@@ -1584,15 +1533,13 @@ void journal_unfile_buffer(struct journal_head *jh)
  * One could use journal_datalist_lock to get unracy access to a
  * per-journal lock.
  *
- * Called with journal_datalist_lock held.
+ * Called under jbd_lock_bh_state(bh)
  *
  * Returns non-zero iff we were able to free the journal_head.
  */
 static inline int __journal_try_to_free_buffer(struct buffer_head *bh)
 {
 	struct journal_head *jh;
-
-	assert_spin_locked(&journal_datalist_lock);
 
 	jh = bh2jh(bh);
 
@@ -1602,6 +1549,7 @@ static inline int __journal_try_to_free_buffer(struct buffer_head *bh)
 	if (jh->b_next_transaction != 0)
 		goto out;
 
+	spin_lock(&journal_datalist_lock);
 	if (jh->b_transaction != 0 && jh->b_cp_transaction == 0) {
 		if (jh->b_jlist == BJ_SyncData) {
 			/* A written-back ordered data buffer */
@@ -1620,6 +1568,7 @@ static inline int __journal_try_to_free_buffer(struct buffer_head *bh)
 			__brelse(bh);
 		}
 	}
+	spin_unlock(&journal_datalist_lock);
 	return !buffer_jbd(bh);
 
 out:
@@ -1672,14 +1621,14 @@ int journal_try_to_free_buffers(journal_t *journal,
 
 	head = page_buffers(page);
 	bh = head;
-	spin_lock(&journal_datalist_lock);
 	do {
+		jbd_lock_bh_state(bh);
 		if (buffer_jbd(bh) && !__journal_try_to_free_buffer(bh)) {
-			spin_unlock(&journal_datalist_lock);
+			jbd_unlock_bh_state(bh);
 			goto busy;
 		}
+		jbd_unlock_bh_state(bh);
 	} while ((bh = bh->b_this_page) != head);
-	spin_unlock(&journal_datalist_lock);
 	ret = try_to_free_buffers(page);
 busy:
 	return ret;
@@ -1692,28 +1641,29 @@ busy:
  * this transaction commits.  If the buffer isn't on a checkpoint list, we
  * release it.
  * Returns non-zero if JBD no longer has an interest in the buffer.
+ *
+ * Called under journal_datalist_lock.
+ *
+ * Called under jbd_lock_bh_state(bh).
  */
-static int dispose_buffer(struct journal_head *jh,
-		transaction_t *transaction)
+static int __dispose_buffer(struct journal_head *jh, transaction_t *transaction)
 {
 	int may_free = 1;
 	struct buffer_head *bh = jh2bh(jh);
 
-	spin_lock(&journal_datalist_lock);
 	__journal_unfile_buffer(jh);
 	jh->b_transaction = 0;
 
 	if (jh->b_cp_transaction) {
 		JBUFFER_TRACE(jh, "on running+cp transaction");
 		__journal_file_buffer(jh, transaction, BJ_Forget);
-		clear_bit(BH_JBDDirty, &bh->b_state);
+		clear_buffer_jbddirty(bh);
 		may_free = 0;
 	} else {
 		JBUFFER_TRACE(jh, "on running transaction");
 		journal_remove_journal_head(bh);
 		__brelse(bh);
 	}
-	spin_unlock(&journal_datalist_lock);
 	return may_free;
 }
 
@@ -1769,6 +1719,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	transaction_t *transaction;
 	struct journal_head *jh;
 	int may_free = 1;
+	int ret;
 
 	BUFFER_TRACE(bh, "entry");
 
@@ -1778,8 +1729,10 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	 * page lock. --sct */
 
 	if (!buffer_jbd(bh))
-		goto zap_buffer;
+		goto zap_buffer_unlocked;
 
+	jbd_lock_bh_state(bh);
+	spin_lock(&journal_datalist_lock);
 	jh = bh2jh(bh);
 	transaction = jh->b_transaction;
 	if (transaction == NULL) {
@@ -1806,8 +1759,11 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 			 * committed, the buffer won't be needed any
 			 * longer. */
 			JBUFFER_TRACE(jh, "checkpointed: add to BJ_Forget");
-			return dispose_buffer(jh,
+			ret = __dispose_buffer(jh,
 					journal->j_running_transaction);
+			spin_unlock(&journal_datalist_lock);
+			jbd_unlock_bh_state(bh);
+			return ret;
 		} else {
 			/* There is no currently-running transaction. So the
 			 * orphan record which we wrote for this file must have
@@ -1815,12 +1771,15 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 			 * the committing transaction, if it exists. */
 			if (journal->j_committing_transaction) {
 				JBUFFER_TRACE(jh, "give to committing trans");
-				return dispose_buffer(jh,
+				ret = __dispose_buffer(jh,
 					journal->j_committing_transaction);
+				spin_unlock(&journal_datalist_lock);
+				jbd_unlock_bh_state(bh);
+				return ret;
 			} else {
 				/* The orphan record's transaction has
 				 * committed.  We can cleanse this buffer */
-				clear_bit(BH_JBDDirty, &bh->b_state);
+				clear_buffer_jbddirty(bh);
 				goto zap_buffer;
 			}
 		}
@@ -1836,6 +1795,8 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 					journal->j_running_transaction);
 			jh->b_next_transaction = NULL;
 		}
+		spin_unlock(&journal_datalist_lock);
+		jbd_unlock_bh_state(bh);
 		return 0;
 	} else {
 		/* Good, the buffer belongs to the running transaction.
@@ -1845,10 +1806,13 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 		 * i_size already for this truncate so recovery will not
 		 * expose the disk blocks we are discarding here.) */
 		J_ASSERT_JH(jh, transaction == journal->j_running_transaction);
-		may_free = dispose_buffer(jh, transaction);
+		may_free = __dispose_buffer(jh, transaction);
 	}
 
-zap_buffer:	
+zap_buffer:
+	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(bh);
+zap_buffer_unlocked:
 	clear_buffer_dirty(bh);
 	J_ASSERT_BH(bh, !buffer_jbddirty(bh));
 	clear_buffer_mapped(bh);
@@ -2007,6 +1971,7 @@ void journal_file_buffer(struct journal_head *jh,
 void __journal_refile_buffer(struct journal_head *jh)
 {
 	int was_dirty;
+	struct buffer_head *bh = jh2bh(jh);
 
 	assert_spin_locked(&journal_datalist_lock);
 
@@ -2017,10 +1982,12 @@ void __journal_refile_buffer(struct journal_head *jh)
 		return;
 	}
 	
-	/* It has been modified by a later transaction: add it to the
-	 * new transaction's metadata list. */
+	/*
+	 * It has been modified by a later transaction: add it to the new
+	 * transaction's metadata list.
+	 */
 
-	was_dirty = test_clear_buffer_jbddirty(jh2bh(jh));
+	was_dirty = test_clear_buffer_jbddirty(bh);
 	__journal_unfile_buffer(jh);
 	jh->b_transaction = jh->b_next_transaction;
 	jh->b_next_transaction = NULL;
@@ -2028,7 +1995,7 @@ void __journal_refile_buffer(struct journal_head *jh)
 	J_ASSERT_JH(jh, jh->b_transaction->t_state == T_RUNNING);
 
 	if (was_dirty)
-		set_buffer_jbddirty(jh2bh(jh));
+		set_buffer_jbddirty(bh);
 }
 
 /*

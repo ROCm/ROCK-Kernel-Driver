@@ -50,6 +50,7 @@ static inline void __buffer_unlink(struct journal_head *jh)
  * Try to release a checkpointed buffer from its transaction.
  * Returns 1 if we released it.
  * Requires journal_datalist_lock
+ * Called under jbd_lock_bh_state(jh2bh(jh)), and drops it
  */
 static int __try_to_free_cp_buf(struct journal_head *jh)
 {
@@ -59,10 +60,13 @@ static int __try_to_free_cp_buf(struct journal_head *jh)
 	if (jh->b_jlist == BJ_None && !buffer_locked(bh) && !buffer_dirty(bh)) {
 		JBUFFER_TRACE(jh, "remove from checkpoint list");
 		__journal_remove_checkpoint(jh);
+		jbd_unlock_bh_state(bh);
 		journal_remove_journal_head(bh);
 		BUFFER_TRACE(bh, "release");
 		__brelse(bh);
 		ret = 1;
+	} else {
+		jbd_unlock_bh_state(bh);
 	}
 	return ret;
 }
@@ -90,6 +94,20 @@ void log_wait_for_space(journal_t *journal, int nblocks)
 		}
 		up(&journal->j_checkpoint_sem);
 	}
+}
+
+/*
+ * We were unable to perform jbd_trylock_bh_state() inside
+ * journal_datalist_lock.  The caller must restart a list walk.  Wait for
+ * someone else to run jbd_unlock_bh_state().
+ */
+static void jbd_sync_bh(journal_t *journal, struct buffer_head *bh)
+{
+	get_bh(bh);
+	spin_unlock(&journal_datalist_lock);
+	jbd_lock_bh_state(bh);
+	jbd_unlock_bh_state(bh);
+	put_bh(bh);
 }
 
 /*
@@ -131,12 +149,21 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 			__brelse(bh);
 			goto out_return_1;
 		}
-		
+
+		/*
+		 * This is foul
+		 */
+		if (!jbd_trylock_bh_state(bh)) {
+			jbd_sync_bh(journal, bh);
+			goto out_return_1;
+		}
+
 		if (jh->b_transaction != NULL) {
 			transaction_t *transaction = jh->b_transaction;
 			tid_t tid = transaction->t_tid;
 
 			spin_unlock(&journal_datalist_lock);
+			jbd_unlock_bh_state(bh);
 			log_start_commit(journal, transaction);
 			unlock_journal(journal);
 			log_wait_commit(journal, tid);
@@ -156,11 +183,13 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 		if (!buffer_dirty(bh) && !buffer_jbddirty(bh)) {
 			BUFFER_TRACE(bh, "remove from checkpoint");
 			__journal_remove_checkpoint(jh);
+			jbd_unlock_bh_state(bh);
 			journal_remove_journal_head(bh);
 			__brelse(bh);
 			ret = 1;
+		} else {
+			jbd_unlock_bh_state(bh);
 		}
-		
 		jh = next_jh;
 	} while (jh != last_jh);
 
@@ -197,6 +226,7 @@ static void __flush_batch(struct buffer_head **bhs, int *batch_count)
  * scan of the checkpoint list.  
  *
  * Called with journal_datalist_lock held.
+ * Called under jbd_lock_bh_state(jh2bh(jh)), and drops it
  */
 static int __flush_buffer(journal_t *journal, struct journal_head *jh,
 			struct buffer_head **bhs, int *batch_count,
@@ -216,10 +246,11 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
 		 * disk, as that would break recoverability.  
 		 */
 		BUFFER_TRACE(bh, "queue");
-		atomic_inc(&bh->b_count);
-		J_ASSERT_BH(bh, !test_bit(BH_JWrite, &bh->b_state));
-		set_bit(BH_JWrite, &bh->b_state);
+		get_bh(bh);
+		J_ASSERT_BH(bh, !buffer_jwrite(bh));
+		set_buffer_jwrite(bh);
 		bhs[*batch_count] = bh;
+		jbd_unlock_bh_state(bh);
 		(*batch_count)++;
 		if (*batch_count == NR_BATCH) {
 			__flush_batch(bhs, batch_count);
@@ -302,8 +333,16 @@ repeat:
 		last_jh = jh->b_cpprev;
 		next_jh = jh;
 		do {
+			struct buffer_head *bh;
+
 			jh = next_jh;
 			next_jh = jh->b_cpnext;
+			bh = jh2bh(jh);
+			if (!jbd_trylock_bh_state(bh)) {
+				jbd_sync_bh(journal, bh);
+				spin_lock(&journal_datalist_lock);
+				break;
+			}
 			retry = __flush_buffer(journal, jh, bhs, &batch_count,
 						&drop_count);
 		} while (jh != last_jh && !retry);
@@ -439,10 +478,13 @@ int __journal_clean_checkpoint_list(journal_t *journal)
 		if (jh) {
 			struct journal_head *last_jh = jh->b_cpprev;
 			struct journal_head *next_jh = jh;
+
 			do {
 				jh = next_jh;
 				next_jh = jh->b_cpnext;
-				ret += __try_to_free_cp_buf(jh);
+				/* Use trylock because of the ranknig */
+				if (jbd_trylock_bh_state(jh2bh(jh)))
+					ret += __try_to_free_cp_buf(jh);
 			} while (jh != last_jh);
 		}
 	} while (transaction != last_transaction);

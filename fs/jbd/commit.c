@@ -465,9 +465,10 @@ start_journal_io:
 	 * akpm: these are BJ_IO, and journal_datalist_lock is not needed.
 	 * See __journal_try_to_free_buffer.
 	 */
- wait_for_iobuf:
+wait_for_iobuf:
 	while (commit_transaction->t_iobuf_list != NULL) {
 		struct buffer_head *bh;
+
 		jh = commit_transaction->t_iobuf_list->b_tprev;
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
@@ -479,7 +480,7 @@ start_journal_io:
 			goto wait_for_iobuf;
 		}
 
-		clear_bit(BH_JWrite, &jh2bh(jh)->b_state);
+		clear_buffer_jwrite(bh);
 
 		JBUFFER_TRACE(jh, "ph4: unfile after journal write");
 		journal_unfile_buffer(jh);
@@ -495,7 +496,6 @@ start_journal_io:
 		 * ->t_iobuf_list should contain only dummy buffer_heads
 		 * which were created by journal_write_metadata_buffer().
 		 */
-		bh = jh2bh(jh);
 		BUFFER_TRACE(bh, "dumping temporary bh");
 		journal_put_journal_head(jh);
 		__brelse(bh);
@@ -637,6 +637,8 @@ skip_commit: /* The journal should be unlocked by now. */
 		struct buffer_head *bh;
 
 		jh = commit_transaction->t_forget;
+		bh = jh2bh(jh);
+		jbd_lock_bh_state(bh);
 		J_ASSERT_JH(jh,	jh->b_transaction == commit_transaction ||
 			jh->b_transaction == journal->j_running_transaction);
 
@@ -650,7 +652,6 @@ skip_commit: /* The journal should be unlocked by now. */
 		 *
 		 * Otherwise, we can just throw away the frozen data now.
 		 */
-		jbd_lock_bh_state(jh2bh(jh));
 		if (jh->b_committed_data) {
 			kfree(jh->b_committed_data);
 			jh->b_committed_data = NULL;
@@ -676,7 +677,6 @@ skip_commit: /* The journal should be unlocked by now. */
 		 * by journal_forget, it may no longer be dirty and
 		 * there's no point in keeping a checkpoint record for
 		 * it. */
-		bh = jh2bh(jh);
 
 		/* A buffer which has been freed while still being
 		 * journaled by a previous transaction may end up still

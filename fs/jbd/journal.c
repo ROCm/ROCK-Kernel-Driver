@@ -259,56 +259,6 @@ static void journal_kill_thread(journal_t *journal)
 	}
 }
 
-#if 0
-
-This is no longer needed - we do it in commit quite efficiently.
-Note that if this function is resurrected, the loop needs to
-be reorganised into the next_jh/last_jh algorithm.
-
-/*
- * journal_clean_data_list: cleanup after data IO.
- *
- * Once the IO system has finished writing the buffers on the transaction's
- * data list, we can remove those buffers from the list.  This function
- * scans the list for such buffers and removes them cleanly.
- *
- * We assume that the journal is already locked.
- * We are called with journal_datalist_lock held.
- *
- * AKPM: This function looks inefficient.  Approximately O(n^2)
- * for potentially thousands of buffers.  It no longer shows on profiles
- * because these buffers are mainly dropped in journal_commit_transaction().
- */
-
-void __journal_clean_data_list(transaction_t *transaction)
-{
-	struct journal_head *jh, *next;
-
-	assert_spin_locked(&journal_datalist_lock);
-
-restart:
-	jh = transaction->t_sync_datalist;
-	if (!jh)
-		goto out;
-	do {
-		next = jh->b_tnext;
-		if (!buffer_locked(jh2bh(jh)) && !buffer_dirty(jh2bh(jh))) {
-			struct buffer_head *bh = jh2bh(jh);
-			BUFFER_TRACE(bh, "data writeout complete: unfile");
-			__journal_unfile_buffer(jh);
-			jh->b_transaction = NULL;
-			journal_remove_journal_head(bh);
-			__brelse(bh);
-			goto restart;
-		}
-		jh = next;
-	} while (transaction->t_sync_datalist &&
-			jh != transaction->t_sync_datalist);
-out:
-	return;
-}
-#endif
-
 /*
  * journal_write_metadata_buffer: write a metadata buffer to the journal.
  *
