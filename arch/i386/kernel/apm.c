@@ -571,9 +571,10 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 {
 	APM_DECL_SEGS
 	unsigned long		flags;
-	int			cpu = smp_processor_id();
+	int			cpu;
 	struct desc_struct	save_desc_40;
 
+	cpu = get_cpu();
 	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
 	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
 
@@ -599,6 +600,7 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	APM_DO_RESTORE_SEGS;
 	local_irq_restore(flags);
 	cpu_gdt_table[cpu][0x40 / 8] = save_desc_40;
+	put_cpu();
 	return *eax & 0xff;
 }
 
@@ -618,12 +620,13 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 
 static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 {
-	u8		error;
+	u8			error;
 	APM_DECL_SEGS
-	unsigned long	flags;
-	int			cpu = smp_processor_id();
+	unsigned long		flags;
+	int			cpu;
 	struct desc_struct	save_desc_40;
 
+	cpu = get_cpu();
 	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
 	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
 
@@ -653,6 +656,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	APM_DO_RESTORE_SEGS;
 	local_irq_restore(flags);
 	cpu_gdt_table[smp_processor_id()][0x40 / 8] = save_desc_40;
+	put_cpu();
 	return error;
 }
 
@@ -864,7 +868,7 @@ recalc:
 			case 1: apm_idle_done = 1;
 				break;
 			default: /* BIOS refused */
-				;
+				break;
 			}
 		}
 		if (original_pm_idle)
@@ -879,14 +883,6 @@ recalc:
 	if (apm_idle_done)
 		apm_do_busy();
 }
-
-#ifdef CONFIG_SMP
-static int apm_magic(void * unused)
-{
-	while (1)
-		schedule();
-}
-#endif
 
 /**
  *	apm_power_off	-	ask the BIOS to power off
@@ -915,10 +911,11 @@ static void apm_power_off(void)
 	 */
 #ifdef CONFIG_SMP
 	/* Some bioses don't like being called from CPU != 0 */
-	while (smp_processor_id() != 0) {
-		kernel_thread(apm_magic, NULL,
-			CLONE_FS | CLONE_FILES | CLONE_SIGHAND | SIGCHLD);
+	if (smp_processor_id() != 0) {
+		current->cpus_allowed = 1;
 		schedule();
+		if (unlikely(smp_processor_id() != 0))
+			BUG();
 	}
 #endif
 	if (apm_info.realmode_power_off)
@@ -1688,6 +1685,21 @@ static int apm(void *unused)
 	current->flags |= PF_IOTHREAD;
 	sigfillset(&current->blocked);
 
+#ifdef CONFIG_SMP
+	/* 2002/08/01 - WT
+	 * This is to avoid random crashes at boot time during initialization
+	 * on SMP systems in case of "apm=power-off" mode. Seen on ASUS A7M266D.
+	 * Some bioses don't like being called from CPU != 0.
+	 * Method suggested by Ingo Molnar.
+	 */
+	if (smp_processor_id() != 0) {
+		current->cpus_allowed = 1;
+		schedule();
+		if (unlikely(smp_processor_id() != 0))
+			BUG();
+	}
+#endif
+
 	if (apm_info.connection_version == 0) {
 		apm_info.connection_version = apm_info.bios.version;
 		if (apm_info.connection_version > 0x100) {
@@ -1734,7 +1746,7 @@ static int apm(void *unused)
 		}
 	}
 
-	if (debug && (num_online_cpus() == 1)) {
+	if (debug) {
 		error = apm_get_power_status(&bx, &cx, &dx);
 		if (error)
 			printk(KERN_INFO "apm: power status not available\n");
@@ -1937,9 +1949,6 @@ static int __init apm_init(void)
 	 * that extends up to the end of page zero (that we have reserved).
 	 * This is for buggy BIOS's that refer to (real mode) segment 0x40
 	 * even though they are called in protected mode.
-	 *
-	 * NOTE: on SMP we call into the APM BIOS only on CPU#0, so it's
-	 * enough to modify CPU#0's GDT.
 	 */
 	set_base(bad_bios_desc, __va((unsigned long)0x40 << 4));
 	_set_limit((char *)&bad_bios_desc, 4095 - (0x40 << 4));
