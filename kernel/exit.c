@@ -308,6 +308,7 @@ void daemonize(const char *name, ...)
 
 	va_start(args, name);
 	vsnprintf(current->comm, sizeof(current->comm), name, args);
+	va_end(args);
 
 	/*
 	 * If we were started as result of loading a module, close all of the
