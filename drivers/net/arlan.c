@@ -2014,32 +2014,24 @@ int init_module(void)
 	ARLAN_DEBUG_ENTRY("init_module");
 
 	if (channelSet != channelSetUNKNOWN || channelNumber != channelNumberUNKNOWN || systemId != systemIdUNKNOWN)
-	{
-		printk(KERN_WARNING "arlan: wrong module params for multiple devices\n ");
-		return -1;
-	}
+		return -EINVAL;
+
 	numDevices = arlan_find_devices();
 	if (numDevices == 0)
-	{
-		printk(KERN_ERR "arlan: no devices found \n");
-		return -1;
-	}
+		return -ENODEV;
 
 	siteName = kmalloc(100, GFP_KERNEL);
 	if(siteName==NULL)
-	{
-		printk(KERN_ERR "arlan: No memory for site name.\n");
-		return -1;
-	}
+		return -ENOMEM;
+
 	for (i = 0; i < numDevices && i < MAX_ARLANS; i++)
 	{
 		if (!arlan_allocate_device(i, NULL))
-			return -1;
+			return -ENOMEM;
+
 		if (arlan_device[i] == NULL)
-		{
-			printk(KERN_CRIT "arlan: Not Enough memory \n");
-			return -1;
-		}
+			return -ENOMEM;
+
 		if (probe)
 			arlan_probe_everywhere(arlan_device[i]);
 //		arlan_command(arlan_device[i], ARLAN_COMMAND_POWERDOWN );
