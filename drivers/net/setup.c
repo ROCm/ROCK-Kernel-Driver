@@ -17,8 +17,6 @@ extern int sdla_setup(void);
 extern int sdla_c_setup(void); 
 extern int lmc_setup(void);
 
-extern int madgemc_probe(void);
-
 /*
  *	Devices in this list must do new style probing. That is they must
  *	allocate their own device objects and do their own bus scans.
@@ -50,14 +48,6 @@ static struct net_probe pci_probes[] __initdata = {
 #if defined(CONFIG_LANMEDIA)
 	{lmc_setup, 0},
 #endif
-	 
-/*
- *	Token Ring Drivers
- */  
-#ifdef CONFIG_MADGEMC
-	{madgemc_probe, 0},
-#endif
- 
 	{NULL, 0},
 };
 

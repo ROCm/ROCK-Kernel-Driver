@@ -130,5 +130,7 @@ static int __init init(void)
 	return(0);
 }
 
+PROVIDES_CONNTRACK(tftp);
+
 module_init(init);
 module_exit(fini);
