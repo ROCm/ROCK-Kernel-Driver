@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#128 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#129 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -1211,7 +1211,8 @@ void	ahd_platform_set_tags(struct ahd_softc *ahd,
 int	ahd_platform_abort_scbs(struct ahd_softc *ahd, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
-void	ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
+AIC_LINUX_IRQRETURN_T
+	ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
 void	ahd_platform_flushwork(struct ahd_softc *ahd);
 int	ahd_softc_comp(struct ahd_softc *, struct ahd_softc *);
 void	ahd_done(struct ahd_softc*, struct scb*);

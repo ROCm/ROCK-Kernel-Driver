@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#45 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#46 $
  *
  * $FreeBSD$
  */
@@ -805,7 +805,7 @@ ahd_get_sense_bufaddr(struct ahd_softc *ahd, struct scb *scb)
 static __inline void	ahd_sync_qoutfifo(struct ahd_softc *ahd, int op);
 static __inline void	ahd_sync_tqinfifo(struct ahd_softc *ahd, int op);
 static __inline u_int	ahd_check_cmdcmpltqueues(struct ahd_softc *ahd);
-static __inline void	ahd_intr(struct ahd_softc *ahd);
+static __inline int	ahd_intr(struct ahd_softc *ahd);
 
 static __inline void
 ahd_sync_qoutfifo(struct ahd_softc *ahd, int op)
@@ -864,7 +864,7 @@ ahd_check_cmdcmpltqueues(struct ahd_softc *ahd)
 /*
  * Catch an interrupt from the adapter
  */
-static __inline void
+static __inline int
 ahd_intr(struct ahd_softc *ahd)
 {
 	u_int	intstat;
@@ -876,7 +876,7 @@ ahd_intr(struct ahd_softc *ahd)
 		 * so just return.  This is likely just a shared
 		 * interrupt.
 		 */
-		return;
+		return (0);
 	}
 
 	/*
@@ -924,28 +924,28 @@ ahd_intr(struct ahd_softc *ahd)
 #endif
 	}
 
-	if (intstat == 0xFF && (ahd->features & AHD_REMOVABLE) != 0)
-		/* Hot eject */
-		return;
-
 	if ((intstat & INT_PEND) == 0)
-		return;
+		return (0);
 
-	if (intstat & HWERRINT) {
+	/*
+	 * Handle statuses that may invalidate our cached
+	 * copy of INTSTAT separately.
+	 */
+	if (intstat == 0xFF && (ahd->features & AHD_REMOVABLE) != 0) {
+		/* Hot eject.  Do nothing */
+	} else if (intstat & HWERRINT) {
 		ahd_handle_hwerrint(ahd);
-		return;
-	}
-
-	if ((intstat & (PCIINT|SPLTINT)) != 0) {
+	} else if ((intstat & (PCIINT|SPLTINT)) != 0) {
 		ahd->bus_intr(ahd);
-		return;
+	} else {
+
+		if ((intstat & SEQINT) != 0)
+			ahd_handle_seqint(ahd, intstat);
+
+		if ((intstat & SCSIINT) != 0)
+			ahd_handle_scsiint(ahd, intstat);
 	}
-
-	if ((intstat & SEQINT) != 0)
-		ahd_handle_seqint(ahd, intstat);
-
-	if ((intstat & SCSIINT) != 0)
-		ahd_handle_scsiint(ahd, intstat);
+	return (1);
 }
 
 #endif  /* _AIC79XX_INLINE_H_ */

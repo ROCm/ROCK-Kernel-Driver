@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#217 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#218 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -3877,21 +3877,21 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 /*
  * SCSI controller interrupt handler.
  */
-irqreturn_t
+AIC_LINUX_IRQRETURN_T
 ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct	ahc_softc *ahc;
 	u_long	flags;
+	int	ours;
 
 	ahc = (struct ahc_softc *) dev_id;
 	ahc_lock(ahc, &flags); 
-	ahc_intr(ahc);
+	ours = ahc_intr(ahc);
 	if (ahc_linux_next_device_to_run(ahc) != NULL)
 		ahc_schedule_runq(ahc);
 	ahc_linux_run_complete_queue(ahc);
 	ahc_unlock(ahc, &flags);
-	/* FIXME! Was it really ours? */
-	return IRQ_HANDLED;
+	AIC_LINUX_IRQRETURN(ours);
 }
 
 void
