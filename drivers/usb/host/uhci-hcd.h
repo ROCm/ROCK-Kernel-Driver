@@ -81,7 +81,8 @@ struct uhci_frame_list {
 
 struct urb_priv;
 
-/* One role of a QH is to hold a queue of TDs for some endpoint.  Each QH is
+/*
+ * One role of a QH is to hold a queue of TDs for some endpoint.  Each QH is
  * used with one URB, and qh->element (updated by the HC) is either:
  *   - the next unprocessed TD for the URB, or
  *   - UHCI_PTR_TERM (when there's no more traffic for this endpoint), or
@@ -194,85 +195,63 @@ struct uhci_td {
 } __attribute__((aligned(16)));
 
 /*
- * There are various standard queues. We set up several different
- * queues for each of the three basic queue types: interrupt,
- * control, and bulk.
+ * The UHCI driver places Interrupt, Control and Bulk into QH's both
+ * to group together TD's for one transfer, and also to faciliate queuing
+ * of URB's. To make it easy to insert entries into the schedule, we have
+ * a skeleton of QH's for each predefined Interrupt latency, low speed
+ * control, high speed control and terminating QH (see explanation for
+ * the terminating QH below).
  *
- *  - There are various different interrupt latencies: ranging from
- *    every other USB frame (2 ms apart) to every 256 USB frames (ie
- *    256 ms apart). Make your choice according to how obnoxious you
- *    want to be on the wire, vs how critical latency is for you.
- *  - The control list is done every frame.
- *  - There are 4 bulk lists, so that up to four devices can have a
- *    bulk list of their own and when run concurrently all four lists
- *    will be be serviced.
+ * When we want to add a new QH, we add it to the end of the list for the
+ * skeleton QH.
  *
- * This is a bit misleading, there are various interrupt latencies, but they
- * vary a bit, interrupt2 isn't exactly 2ms, it can vary up to 4ms since the
- * other queues can "override" it. interrupt4 can vary up to 8ms, etc. Minor
- * problem
+ * For instance, the queue can look like this:
  *
- * In the case of the root hub, these QH's are just head's of qh's. Don't
- * be scared, it kinda makes sense. Look at this wonderful picture care of
- * Linus:
+ * skel int128 QH
+ * dev 1 interrupt QH
+ * dev 5 interrupt QH
+ * skel int64 QH
+ * skel int32 QH
+ * ...
+ * skel int1 QH
+ * skel low speed control QH
+ * dev 5 control QH
+ * skel high speed control QH
+ * skel bulk QH
+ * dev 1 bulk QH
+ * dev 2 bulk QH
+ * skel terminating QH
  *
- *  generic-  ->  dev1-  ->  generic-  ->  dev1-  ->  control-  ->  bulk- -> ...
- *   iso-QH      iso-QH       irq-QH      irq-QH        QH           QH
- *      |           |            |           |           |            |
- *     End     dev1-iso-TD1     End     dev1-irq-TD1    ...          ... 
- *                  |
- *             dev1-iso-TD2
- *                  |
- *                ....
+ * The terminating QH is used for 2 reasons:
+ * - To place a terminating TD which is used to workaround a PIIX bug
+ *   (see Intel errata for explanation)
+ * - To loop back to the high speed control queue for full speed bandwidth
+ *   reclamation
  *
- * This may vary a bit (the UHCI docs don't explicitly say you can put iso
- * transfers in QH's and all of their pictures don't have that either) but
- * other than that, that is what we're doing now
- *
- * And now we don't put Iso transfers in QH's, so we don't waste one on it
- * --jerdfelt
- *
- * To keep with Linus' nomenclature, this is called the QH skeleton. These
- * labels (below) are only signficant to the root hub's QH's
- *
- *
- * NOTE:  That ASCII art doesn't match the current (August 2002) code, in
- * more ways than just not using QHs for ISO.
- *
- * NOTE:  Another way to look at the UHCI schedules is to compare them to what
- * other host controller interfaces use.  EHCI, OHCI, and UHCI all have tables
- * of transfers that the controller scans, frame by frame, and which hold the
- * scheduled periodic transfers.  The key differences are that UHCI
- *
- *   (a) puts control and bulk transfers into that same table; the others
- *       have separate data structures for non-periodic transfers.
- *   (b) lets QHs be linked from TDs, not just other QHs, since they don't
- *       hold endpoint data.  this driver chooses to use one QH per URB.
- *   (c) needs more TDs, since it uses one per packet.  the data toggle
- *       is stored in those TDs, along with all other endpoint state.
+ * Isochronous transfers are stored before the start of the skeleton
+ * schedule and don't use QH's. While the UHCI spec doesn't forbid the
+ * use of QH's for Isochronous, it doesn't use them either. Since we don't
+ * need to use them either, we follow the spec diagrams in hope that it'll
+ * be more compatible with future UHCI implementations.
  */
 
-#define UHCI_NUM_SKELTD		10
-#define skel_int1_td		skeltd[0]
-#define skel_int2_td		skeltd[1]
-#define skel_int4_td		skeltd[2]
-#define skel_int8_td		skeltd[3]
-#define skel_int16_td		skeltd[4]
-#define skel_int32_td		skeltd[5]
-#define skel_int64_td		skeltd[6]
-#define skel_int128_td		skeltd[7]
-#define skel_int256_td		skeltd[8]
-#define skel_term_td		skeltd[9]	/* To work around PIIX UHCI bug */
-
-#define UHCI_NUM_SKELQH		4
-#define skel_ls_control_qh	skelqh[0]
-#define skel_hs_control_qh	skelqh[1]
-#define skel_bulk_qh		skelqh[2]
-#define skel_term_qh		skelqh[3]
+#define UHCI_NUM_SKELQH		12
+#define skel_int128_qh		skelqh[0]
+#define skel_int64_qh		skelqh[1]
+#define skel_int32_qh		skelqh[2]
+#define skel_int16_qh		skelqh[3]
+#define skel_int8_qh		skelqh[4]
+#define skel_int4_qh		skelqh[5]
+#define skel_int2_qh		skelqh[6]
+#define skel_int1_qh		skelqh[7]
+#define skel_ls_control_qh	skelqh[8]
+#define skel_hs_control_qh	skelqh[9]
+#define skel_bulk_qh		skelqh[10]
+#define skel_term_qh		skelqh[11]
 
 /*
- * Search tree for determining where <interval> fits in the
- * skelqh[] skeleton.
+ * Search tree for determining where <interval> fits in the skelqh[]
+ * skeleton.
  *
  * An interrupt request should be placed into the slowest skelqh[]
  * which meets the interval/period/frequency requirement.
@@ -280,32 +259,27 @@ struct uhci_td {
  *
  * For a given <interval>, this function returns the appropriate/matching
  * skelqh[] index value.
- *
- * NOTE: For UHCI, we don't really need int256_qh since the maximum interval
- * is 255 ms.  However, we do need an int1_qh since 1 is a valid interval
- * and we should meet that frequency when requested to do so.
- * This will require some change(s) to the UHCI skeleton.
  */
 static inline int __interval_to_skel(int interval)
 {
 	if (interval < 16) {
 		if (interval < 4) {
 			if (interval < 2)
-				return 0;	/* int1 for 0-1 ms */
-			return 1;		/* int2 for 2-3 ms */
+				return 7;	/* int1 for 0-1 ms */
+			return 6;		/* int2 for 2-3 ms */
 		}
 		if (interval < 8)
-			return 2;		/* int4 for 4-7 ms */
-		return 3;			/* int8 for 8-15 ms */
+			return 5;		/* int4 for 4-7 ms */
+		return 4;			/* int8 for 8-15 ms */
 	}
 	if (interval < 64) {
 		if (interval < 32)
-			return 4;		/* int16 for 16-31 ms */
-		return 5;			/* int32 for 32-63 ms */
+			return 3;		/* int16 for 16-31 ms */
+		return 2;			/* int32 for 32-63 ms */
 	}
 	if (interval < 128)
-		return 6;			/* int64 for 64-127 ms */
-	return 7;				/* int128 for 128-255 ms (Max.) */
+		return 1;			/* int64 for 64-127 ms */
+	return 0;				/* int128 for 128-255 ms (Max.) */
 }
 
 #define hcd_to_uhci(hcd_ptr) container_of(hcd_ptr, struct uhci_hcd, hcd)
@@ -332,7 +306,7 @@ struct uhci_hcd {
 
 	struct usb_bus *bus;
 
-	struct uhci_td *skeltd[UHCI_NUM_SKELTD];	/* Skeleton TD's */
+	struct uhci_td *term_td;	/* Terminating TD, see UHCI bug */
 	struct uhci_qh *skelqh[UHCI_NUM_SKELQH];	/* Skeleton QH's */
 
 	spinlock_t frame_list_lock;
