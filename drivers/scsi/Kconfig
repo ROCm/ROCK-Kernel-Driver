@@ -1563,7 +1563,7 @@ config OKTAGON_SCSI
 	  If you have the BSC Oktagon SCSI disk controller for the Amiga, say
 	  Y to this question.  If you're in doubt about whether you have one,
 	  see the picture at
-	  <http://amiga.multigraph.com/photos/oktagon.html>.
+	  <http://amiga.resource.cx/exp/search.pl?product=oktagon>.
 
 config ATARI_SCSI
 	tristate "Atari native SCSI support"

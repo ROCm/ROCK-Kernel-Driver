@@ -525,7 +525,15 @@ struct aac_driver_ident
 	char *	vname;
 	char *	model;
 	u16	channels;
+	int	quirks;
 };
+/*
+ * Some adapter firmware needs communication memory 
+ * below 2gig. This tells the init function to set the
+ * dma mask such that fib memory will be allocated where the
+ * adapter firmware can get to it.
+ */
+#define AAC_QUIRK_31BIT	1
 
 /*
  *	The adapter interface specs all queues to be located in the same
