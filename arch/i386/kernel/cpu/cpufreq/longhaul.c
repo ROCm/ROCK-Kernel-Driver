@@ -43,10 +43,14 @@ static int vrmrev;
 static int dont_scale_voltage;
 static int debug;
 
-static void dprintk(const char *msg, ...)
+static void dprintk(const char *fmt, ...)
 {
-	if (debug == 1)
-		printk(msg);
+	va_list args;
+	if (debug == 0)
+		return;
+	va_start(args, fmt);
+	printk(fmt, args);
+	va_end(args);
 }
 
 
