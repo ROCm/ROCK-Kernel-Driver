@@ -116,10 +116,5 @@ extern void ia64_slave_init_handler(void);
 extern void ia64_mca_cmc_vector_setup(void);
 extern int  ia64_mca_check_errors(void);
 
-#if defined(IA64_MCA_DEBUG_INFO)
-# define IA64_MCA_DEBUG(fmt...)	printk(fmt)
-#else
-# define IA64_MCA_DEBUG(fmt...)
-#endif
 #endif /* !__ASSEMBLY__ */
 #endif /* _ASM_IA64_MCA_H */
