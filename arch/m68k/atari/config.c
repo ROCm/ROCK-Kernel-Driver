@@ -39,7 +39,6 @@
 #include <asm/atariints.h>
 #include <asm/atari_stram.h>
 #include <asm/system.h>
-#include <asm/keyboard.h>
 #include <asm/machdep.h>
 #include <asm/hwtest.h>
 #include <asm/io.h>
@@ -59,12 +58,6 @@ extern void atari_floppy_setup(char *, int *);
 static void atari_get_model(char *model);
 static int atari_get_hardware_list(char *buffer);
 
-/* atari specific keyboard functions */
-extern int atari_keyb_init(void);
-extern int atari_kbdrate (struct kbd_repeat *);
-extern int atari_kbd_translate(unsigned char keycode, unsigned char *keycodep,
-			       char raw_mode);
-extern void atari_kbd_leds (unsigned int);
 /* atari specific irq functions */
 extern void atari_init_IRQ (void);
 extern int atari_request_irq (unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
@@ -73,7 +66,6 @@ extern void atari_free_irq (unsigned int irq, void *dev_id);
 extern void atari_enable_irq (unsigned int);
 extern void atari_disable_irq (unsigned int);
 extern int show_atari_interrupts (struct seq_file *, void *);
-extern void atari_mksound( unsigned int count, unsigned int ticks );
 #ifdef CONFIG_HEARTBEAT
 static void atari_heartbeat( int on );
 #endif
@@ -88,18 +80,6 @@ extern int atari_tt_set_clock_mmss (unsigned long);
 
 /* atari specific debug functions (in debug.c) */
 extern void atari_debug_init(void);
-
-#ifdef CONFIG_MAGIC_SYSRQ
-static char atari_sysrq_xlate[128] =
-	"\000\0331234567890-=\177\t"					/* 0x00 - 0x0f */
-	"qwertyuiop[]\r\000as"							/* 0x10 - 0x1f */
-	"dfghjkl;'`\000\\zxcv"							/* 0x20 - 0x2f */
-	"bnm,./\000\000\000 \000\201\202\203\204\205"	/* 0x30 - 0x3f */
-	"\206\207\210\211\212\000\000\000\000\000-\000\000\000+\000"/* 0x40 - 0x4f */
-	"\000\000\000\177\000\000\000\000\000\000\000\000\000\000\000\000" /* 0x50 - 0x5f */
-	"\000\000\000()/*789456123"						/* 0x60 - 0x6f */
-	"0.\r\000\000\000\000\000\000\000\000\000\000\000\000\000";	/* 0x70 - 0x7f */
-#endif
 
 
 /* I've moved hwreg_present() and hwreg_present_bywrite() out into
@@ -254,12 +234,6 @@ void __init config_atari(void)
                                            to 4GB. */
 
     mach_sched_init      = atari_sched_init;
-#ifdef CONFIG_VT
-    mach_keyb_init       = atari_keyb_init;
-    mach_kbdrate         = atari_kbdrate;
-    mach_kbd_translate   = atari_kbd_translate;
-    mach_kbd_leds        = atari_kbd_leds;
-#endif
     mach_init_IRQ        = atari_init_IRQ;
     mach_request_irq     = atari_request_irq;
     mach_free_irq        = atari_free_irq;
@@ -277,15 +251,8 @@ void __init config_atari(void)
     conswitchp	         = &dummy_con;
 #endif
     mach_max_dma_address = 0xffffff;
-#ifdef CONFIG_VT
-    kd_mksound		 = atari_mksound;
-#endif
-#ifdef CONFIG_MAGIC_SYSRQ
-    SYSRQ_KEY            = 0xff;
-    mach_sysrq_key = 98;          /* HELP */
-    mach_sysrq_shift_state = 8;   /* Alt */
-    mach_sysrq_shift_mask = 0xff; /* all modifiers except CapsLock */
-    mach_sysrq_xlate = atari_sysrq_xlate;
+#ifdef CONFIG_INPUT_M68K_BEEP
+    mach_beep          = atari_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT
     mach_heartbeat = atari_heartbeat;

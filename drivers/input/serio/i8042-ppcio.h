@@ -14,6 +14,7 @@
 
 #define I8042_KBD_PHYS_DESC "walnutps2/serio0"
 #define I8042_AUX_PHYS_DESC "walnutps2/serio1"
+#define I8042_MUX_PHYS_DESC "walnutps2/serio%d"
 
 extern void *kb_cs;
 extern void *kb_data;
@@ -34,18 +35,17 @@ static inline int i8042_read_status(void)
 static inline void i8042_write_data(int val)
 {
 	writeb(val, kb_data);
-	return;
 }
 
 static inline void i8042_write_command(int val)
 {
 	writeb(val, kb_cs);
-	return;
 }
 
 static inline int i8042_platform_init(void)
 {
-	return 1;
+	i8042_reset = 1;
+	return 0;
 }
 
 static inline void i8042_platform_exit(void)
@@ -59,6 +59,7 @@ static inline void i8042_platform_exit(void)
 
 #define I8042_KBD_PHYS_DESC "spruceps2/serio0"
 #define I8042_AUX_PHYS_DESC "spruceps2/serio1"
+#define I8042_MUX_PHYS_DESC "spruceps2/serio%d"
 
 #define I8042_COMMAND_REG 0xff810000
 #define I8042_DATA_REG 0xff810001
@@ -109,18 +110,17 @@ static inline int i8042_read_status(void)
 static inline void i8042_write_data(int val)
 {
 	*((unsigned char *)0xff810000) = (char)val;
-	return;
 }
 
 static inline void i8042_write_command(int val)
 {
 	*((unsigned char *)0xff810001) = (char)val;
-	return;
 }
 
 static inline int i8042_platform_init(void)
 {
-	return 1;
+	i8042_reset = 1;
+	return 0;
 }
 
 static inline void i8042_platform_exit(void)

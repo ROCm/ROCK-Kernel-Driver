@@ -2,6 +2,7 @@
 #define __LINUX_KEYBOARD_H
 
 #include <linux/wait.h>
+#include <linux/input.h>
 
 #define KG_SHIFT	0
 #define KG_CTRL		2
@@ -15,9 +16,9 @@
 
 #define NR_SHIFT	9
 
-#define NR_KEYS		128
+#define NR_KEYS		(KEY_MAX+1)
 #define MAX_NR_KEYMAPS	256
-/* This means 64Kb if all keymaps are allocated. Only the superuser
+/* This means 128Kb if all keymaps are allocated. Only the superuser
 	may increase the number of keymaps beyond MAX_NR_OF_USER_KEYMAPS. */
 #define MAX_NR_OF_USER_KEYMAPS 256 	/* should be at least 7 */
 

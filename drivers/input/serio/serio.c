@@ -37,6 +37,7 @@
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
 #include <linux/suspend.h>
+#include <linux/slab.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Serio abstraction core");
@@ -51,19 +52,27 @@ EXPORT_SYMBOL(serio_open);
 EXPORT_SYMBOL(serio_close);
 EXPORT_SYMBOL(serio_rescan);
 
-static struct serio *serio_list;
-static struct serio_dev *serio_dev;
+struct serio_event {
+	int type;
+	struct serio *serio;
+	struct list_head node;
+};
+
+static LIST_HEAD(serio_list);
+static LIST_HEAD(serio_dev_list);
+static LIST_HEAD(serio_event_list);
 static int serio_pid;
 
 static void serio_find_dev(struct serio *serio)
 {
-        struct serio_dev *dev = serio_dev;
+	struct serio_dev *dev;
 
-        while (dev && !serio->dev) {
+	list_for_each_entry(dev, &serio_dev_list, node) {
+		if (serio->dev)
+			break;
 		if (dev->connect)
-                	dev->connect(serio, dev);
-                dev = dev->next;
-        }
+			dev->connect(serio, dev);
+	}
 }
 
 #define SERIO_RESCAN	1
@@ -73,17 +82,23 @@ static DECLARE_COMPLETION(serio_exited);
 
 void serio_handle_events(void)
 {
-	struct serio *serio = serio_list;
+	struct list_head *node, *next;
+	struct serio_event *event;
 
-	while (serio) {
-		if (serio->event & SERIO_RESCAN) {
-			if (serio->dev && serio->dev->disconnect)
-				serio->dev->disconnect(serio);
-			serio_find_dev(serio);
+	list_for_each_safe(node, next, &serio_event_list) {
+		event = container_of(node, struct serio_event, node);	
+
+		switch (event->type) {
+			case SERIO_RESCAN :
+				if (event->serio->dev && event->serio->dev->disconnect)
+					event->serio->dev->disconnect(event->serio);
+				serio_find_dev(event->serio);
+				break;
+			default:
+				break;
 		}
-
-		serio->event = 0;
-		serio = serio->next;
+		list_del_init(node);
+		kfree(event);
 	}
 }
 
@@ -95,7 +110,7 @@ static int serio_thread(void *nothing)
 
 	do {
 		serio_handle_events();
-		interruptible_sleep_on(&serio_wait); 
+		wait_event_interruptible(serio_wait, !list_empty(&serio_event_list)); 
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
 	} while (!signal_pending(current));
@@ -108,7 +123,15 @@ static int serio_thread(void *nothing)
 
 void serio_rescan(struct serio *serio)
 {
-	serio->event |= SERIO_RESCAN;
+	struct serio_event *event;
+
+	if (!(event = kmalloc(sizeof(struct serio_event), GFP_ATOMIC)))
+		return;
+
+	event->type = SERIO_RESCAN;
+	event->serio = serio;
+
+	list_add_tail(&event->node, &serio_event_list);
 	wake_up(&serio_wait);
 }
 
@@ -122,49 +145,36 @@ void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags
 
 void serio_register_port(struct serio *serio)
 {
-	serio->next = serio_list;	
-	serio_list = serio;
+	list_add_tail(&serio->node, &serio_list);
 	serio_find_dev(serio);
 }
 
 void serio_unregister_port(struct serio *serio)
 {
-        struct serio **serioptr = &serio_list;
-
-        while (*serioptr && (*serioptr != serio)) serioptr = &((*serioptr)->next);
-        *serioptr = (*serioptr)->next;
-
+	list_del_init(&serio->node);
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);
 }
 
 void serio_register_device(struct serio_dev *dev)
 {
-	struct serio *serio = serio_list;
-
-	dev->next = serio_dev;	
-	serio_dev = dev;
-
-	while (serio) {
+	struct serio *serio;
+	list_add_tail(&dev->node, &serio_dev_list);
+	list_for_each_entry(serio, &serio_list, node)
 		if (!serio->dev && dev->connect)
 			dev->connect(serio, dev);
-		serio = serio->next;
-	}
 }
 
 void serio_unregister_device(struct serio_dev *dev)
 {
-        struct serio_dev **devptr = &serio_dev;
-	struct serio *serio = serio_list;
+	struct serio *serio;
 
-        while (*devptr && (*devptr != dev)) devptr = &((*devptr)->next);
-        *devptr = (*devptr)->next;
+	list_del_init(&dev->node);
 
-	while (serio) {
+	list_for_each_entry(serio, &serio_list, node) {
 		if (serio->dev == dev && dev->disconnect)
 			dev->disconnect(serio);
 		serio_find_dev(serio);
-		serio = serio->next;
 	}
 }
 

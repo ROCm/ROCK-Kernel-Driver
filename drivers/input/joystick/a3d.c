@@ -300,6 +300,8 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 		a3d->length = 33;
 
+		init_input_dev(&a3d->dev);
+
 		a3d->dev.evbit[0] |= BIT(EV_ABS) | BIT(EV_KEY) | BIT(EV_REL);
 		a3d->dev.relbit[0] |= BIT(REL_X) | BIT(REL_Y);
 		a3d->dev.absbit[0] |= BIT(ABS_X) | BIT(ABS_Y) | BIT(ABS_THROTTLE) | BIT(ABS_RUDDER)
@@ -327,6 +329,8 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	} else {
 		a3d->length = 29;
+
+		init_input_dev(&a3d->dev);
 
 		a3d->dev.evbit[0] |= BIT(EV_KEY) | BIT(EV_REL);
 		a3d->dev.relbit[0] |= BIT(REL_X) | BIT(REL_Y);

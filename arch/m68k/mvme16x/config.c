@@ -49,12 +49,9 @@ static void mvme16x_get_model(char *model);
 static int  mvme16x_get_hardware_list(char *buffer);
 extern int  mvme16x_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
 extern void mvme16x_sched_init(void (*handler)(int, void *, struct pt_regs *));
-extern int  mvme16x_keyb_init(void);
-extern int  mvme16x_kbdrate (struct kbd_repeat *);
 extern unsigned long mvme16x_gettimeoffset (void);
 extern int mvme16x_hwclk (int, struct rtc_time *);
 extern int mvme16x_set_clock_mmss (unsigned long);
-extern void mvme16x_mksound( unsigned int count, unsigned int ticks );
 extern void mvme16x_reset (void);
 extern void mvme16x_waitbut(void);
 
@@ -75,15 +72,6 @@ int mvme16x_parse_bootinfo(const struct bi_record *bi)
 		return 0;
 	else
 		return 1;
-}
-
-int mvme16x_kbdrate (struct kbd_repeat *k)
-{
-	return 0;
-}
-
-void mvme16x_mksound( unsigned int count, unsigned int ticks )
-{
 }
 
 void mvme16x_reset()
@@ -144,17 +132,10 @@ void __init config_mvme16x(void)
 
     mach_max_dma_address = 0xffffffff;
     mach_sched_init      = mvme16x_sched_init;
-#ifdef CONFIG_VT
-    mach_keyb_init       = mvme16x_keyb_init;
-    mach_kbdrate         = mvme16x_kbdrate;
-#endif
     mach_init_IRQ        = mvme16x_init_IRQ;
     mach_gettimeoffset   = mvme16x_gettimeoffset;
     mach_hwclk           = mvme16x_hwclk;
     mach_set_clock_mmss	 = mvme16x_set_clock_mmss;
-#ifdef CONFIG_VT
-/*  kd_mksound           = mvme16x_mksound; */
-#endif
     mach_reset		 = mvme16x_reset;
     mach_free_irq	 = mvme16x_free_irq;
     mach_process_int	 = mvme16x_process_int;
@@ -297,11 +278,6 @@ int mvme16x_hwclk(int op, struct rtc_time *t)
 }
 
 int mvme16x_set_clock_mmss (unsigned long nowtime)
-{
-	return 0;
-}
-
-int mvme16x_keyb_init (void)
 {
 	return 0;
 }

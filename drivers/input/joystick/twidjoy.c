@@ -198,6 +198,7 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
 
 	sprintf(twidjoy->phys, "%s/input0", serio->phys);
 
+	init_input_dev(&twidjoy->dev);
 	twidjoy->dev.name = twidjoy_name;
 	twidjoy->dev.phys = twidjoy->phys;
 	twidjoy->dev.id.bustype = BUS_RS232;
@@ -224,7 +225,6 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
 	}
 
 	twidjoy->dev.private = twidjoy;
-	
 	serio->private = twidjoy;
 
 	if (serio_open(serio, dev)) {

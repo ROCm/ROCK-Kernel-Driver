@@ -1,31 +1,13 @@
 /*
- * $Id: gameport.c,v 1.18 2002/01/22 20:41:14 vojtech Exp $
- *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
- */
-
-/*
  * Generic gameport layer
+ *
+ * Copyright (c) 1999-2002 Vojtech Pavlik
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #include <asm/io.h>
@@ -51,9 +33,8 @@ EXPORT_SYMBOL(gameport_close);
 EXPORT_SYMBOL(gameport_rescan);
 EXPORT_SYMBOL(gameport_cooked_read);
 
-static struct gameport *gameport_list;
-static struct gameport_dev *gameport_dev;
-
+static LIST_HEAD(gameport_list);
+static LIST_HEAD(gameport_dev_list);
 
 #ifdef __i386__
 
@@ -122,12 +103,13 @@ static int gameport_measure_speed(struct gameport *gameport)
 
 static void gameport_find_dev(struct gameport *gameport)
 {
-        struct gameport_dev *dev = gameport_dev;
+        struct gameport_dev *dev;
 
-        while (dev && !gameport->dev) {
+        list_for_each_entry(dev, &gameport_dev_list, node) {
+		if (gameport->dev)
+			break;
 		if (dev->connect)
                 	dev->connect(gameport, dev);
-                dev = dev->next;
         }
 }
 
@@ -139,52 +121,37 @@ void gameport_rescan(struct gameport *gameport)
 
 void gameport_register_port(struct gameport *gameport)
 {
-	gameport->next = gameport_list;	
-	gameport_list = gameport;
-
+	list_add_tail(&gameport->node, &gameport_list);
 	gameport->speed = gameport_measure_speed(gameport);
-
 	gameport_find_dev(gameport);
 }
 
 void gameport_unregister_port(struct gameport *gameport)
 {
-        struct gameport **gameportptr = &gameport_list;
-
-        while (*gameportptr && (*gameportptr != gameport)) gameportptr = &((*gameportptr)->next);
-        *gameportptr = (*gameportptr)->next;
-
+	list_del_init(&gameport->node);
 	if (gameport->dev && gameport->dev->disconnect)
 		gameport->dev->disconnect(gameport);
 }
 
 void gameport_register_device(struct gameport_dev *dev)
 {
-	struct gameport *gameport = gameport_list;
+	struct gameport *gameport;
 
-	dev->next = gameport_dev;	
-	gameport_dev = dev;
-
-	while (gameport) {
+	list_add_tail(&dev->node, &gameport_dev_list);
+	list_for_each_entry(gameport, &gameport_list, node)
 		if (!gameport->dev && dev->connect)
 			dev->connect(gameport, dev);
-		gameport = gameport->next;
-	}
 }
 
 void gameport_unregister_device(struct gameport_dev *dev)
 {
-        struct gameport_dev **devptr = &gameport_dev;
-	struct gameport *gameport = gameport_list;
+	struct gameport *gameport;
 
-        while (*devptr && (*devptr != dev)) devptr = &((*devptr)->next);
-        *devptr = (*devptr)->next;
-
-	while (gameport) {
+	list_del_init(&dev->node);
+	list_for_each_entry(gameport, &gameport_list, node) {
 		if (gameport->dev == dev && dev->disconnect)
 			dev->disconnect(gameport);
 		gameport_find_dev(gameport);
-		gameport = gameport->next;
 	}
 }
 
@@ -209,5 +176,6 @@ int gameport_open(struct gameport *gameport, struct gameport_dev *dev, int mode)
 void gameport_close(struct gameport *gameport)
 {
 	gameport->dev = NULL;
-	if (gameport->close) gameport->close(gameport);
+	if (gameport->close)
+		gameport->close(gameport);
 }

@@ -13,6 +13,7 @@
 
 #define I8042_KBD_PHYS_DESC "isa0060/serio0"
 #define I8042_AUX_PHYS_DESC "isa0060/serio1"
+#define I8042_MUX_PHYS_DESC "isa0060/serio%d"
 
 /*
  * IRQs.
@@ -64,9 +65,13 @@ static inline int i8042_platform_init(void)
  */
 #if !defined(__i386__) && !defined(__sh__) && !defined(__alpha__) && !defined(__x86_64__)
 	if (!request_region(I8042_DATA_REG, 16, "i8042"))
-		return 0;
+		return -1;
 #endif
-	return 1;
+
+#if !defined(__i386__) && !defined(__x86_64__)
+        i8042_reset = 1;
+#endif
+	return 0;
 }
 
 static inline void i8042_platform_exit(void)

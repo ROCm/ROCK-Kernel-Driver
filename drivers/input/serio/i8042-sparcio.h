@@ -11,6 +11,7 @@ static int i8042_aux_irq = -1;
 
 #define I8042_KBD_PHYS_DESC "sparcps2/serio0"
 #define I8042_AUX_PHYS_DESC "sparcps2/serio1"
+#define I8042_MUX_PHYS_DESC "sparcps2/serio%d"
 
 static unsigned long kbd_iobase;
 
@@ -50,14 +51,14 @@ static int i8042_platform_init(void)
 	len = prom_getproperty(prom_root_node, "name", prop, sizeof(prop));
 	if (len < 0) {
 		printk("i8042: Cannot get name property of root OBP node.\n");
-		return 0;
+		return -1;
 	}
 	if (strncmp(prop, "SUNW,JavaStation-1", len) == 0) {
 		/* Hardcoded values for MrCoffee.  */
 		i8042_kbd_irq = i8042_aux_irq = 13 | 0x20;
 		kbd_iobase = (unsigned long) ioremap(0x71300060, 8);
 		if (!kbd_iobase)
-			return 0;
+			return -1;
 	} else {
 		struct linux_ebus *ebus;
 		struct linux_ebus_device *edev;
@@ -69,7 +70,7 @@ static int i8042_platform_init(void)
 					goto edev_found;
 			}
 		}
-		return 0;
+		return -1;
 
 	edev_found:
 		for_each_edevchild(edev, child) {
@@ -87,11 +88,13 @@ static int i8042_platform_init(void)
 		    i8042_aux_irq == -1) {
 			printk("i8042: Error, 8042 device lacks both kbd and "
 			       "mouse nodes.\n");
-			return 0;
+			return -1;
 		}
 	}
 
-	return 1;
+	i8042_reset = 1;
+
+	return 0;
 }
 
 static inline void i8042_platform_exit(void)

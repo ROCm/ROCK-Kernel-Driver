@@ -45,8 +45,6 @@ static void mvme147_get_model(char *model);
 static int  mvme147_get_hardware_list(char *buffer);
 extern int mvme147_request_irq (unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
 extern void mvme147_sched_init(void (*handler)(int, void *, struct pt_regs *));
-extern int mvme147_keyb_init(void);
-extern int mvme147_kbdrate (struct kbd_repeat *);
 extern unsigned long mvme147_gettimeoffset (void);
 extern int mvme147_hwclk (int, struct rtc_time *);
 extern int mvme147_set_clock_mmss (unsigned long);
@@ -68,11 +66,6 @@ int mvme147_parse_bootinfo(const struct bi_record *bi)
 		return 0;
 	else
 		return 1;
-}
-
-int mvme147_kbdrate (struct kbd_repeat *k)
-{
-	return 0;
 }
 
 void mvme147_reset()
@@ -102,10 +95,6 @@ void __init config_mvme147(void)
 {
 	mach_max_dma_address	= 0x01000000;
 	mach_sched_init		= mvme147_sched_init;
-#ifdef CONFIG_VT
-	mach_keyb_init		= mvme147_keyb_init;
-	mach_kbdrate		= mvme147_kbdrate;
-#endif
 	mach_init_IRQ		= mvme147_init_IRQ;
 	mach_gettimeoffset	= mvme147_gettimeoffset;
 	mach_hwclk		= mvme147_hwclk;

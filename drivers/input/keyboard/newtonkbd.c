@@ -93,11 +93,11 @@ void nkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	nkbd->serio = serio;
 
+	init_input_dev(&nkbd->dev);
 	nkbd->dev.keycode = nkbd->keycode;
 	nkbd->dev.keycodesize = sizeof(unsigned char);
 	nkbd->dev.keycodemax = ARRAY_SIZE(nkbd_keycode);
 	nkbd->dev.private = nkbd;
-
 	serio->private = nkbd;
 
 	if (serio_open(serio, dev)) {

@@ -169,6 +169,7 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 
 	sprintf(magellan->phys, "%s/input0", serio->phys);
 
+	init_input_dev(&magellan->dev);
 	magellan->dev.private = magellan;
 	magellan->dev.name = magellan_name;
 	magellan->dev.phys = magellan->phys;
@@ -187,6 +188,7 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 	input_register_device(&magellan->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", magellan_name, serio->phys);
+
 }
 
 /*
