@@ -13,7 +13,7 @@
 #error "This file should not be used when CONFIG_ITANIUM or CONFIG_MCKINLEY is defined"
 #endif
 
-static pfm_reg_desc_t pmc_gen_desc[PMU_MAX_PMCS]={
+static pfm_reg_desc_t pfm_gen_pmc_desc[PMU_MAX_PMCS]={
 /* pmc0  */ { PFM_REG_CONTROL , 0, 0x1UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc1  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc2  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
@@ -25,7 +25,7 @@ static pfm_reg_desc_t pmc_gen_desc[PMU_MAX_PMCS]={
 	    { PFM_REG_END     , 0, 0x0UL, -1UL, NULL, NULL, {0,}, {0,}}, /* end marker */
 };
 
-static pfm_reg_desc_t pmd_gen_desc[PMU_MAX_PMDS]={
+static pfm_reg_desc_t pfm_gen_pmd_desc[PMU_MAX_PMDS]={
 /* pmd0  */ { PFM_REG_NOTIMPL , 0, 0x0UL, -1UL, NULL, NULL, {0,}, {0,}},
 /* pmd1  */ { PFM_REG_NOTIMPL , 0, 0x0UL, -1UL, NULL, NULL, {0,}, {0,}},
 /* pmd2  */ { PFM_REG_NOTIMPL , 0, 0x0UL, -1UL, NULL, NULL, {0,}, {0,}},

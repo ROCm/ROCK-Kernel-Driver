@@ -705,7 +705,6 @@ pfm_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 static inline unsigned long
 pfm_protect_ctx_ctxsw(pfm_context_t *x)
 {
-	unsigned long f;
 	spin_lock_irq(&(x)->ctx_lock);
 	return 0UL;
 }
@@ -6500,13 +6499,11 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	ia64_psr(regs)->pp = ia64_psr(regs)->up = 0;
 	ia64_psr(regs)->sp = 1;
 }
-
-#else /* !CONFIG_PERFMON */
+#else  /* !CONFIG_PERFMON */
 asmlinkage long
-sys_perfmonctl (pfm_ctxid_t ctxid, int cmd, void *req, int count, long arg5, long arg6,
-		long arg7, long arg8, long stack)
+sys_perfmonctl (int fd, int cmd, void *arg, int count, long arg5, long arg6, long arg7,
+		long arg8, long stack)
 {
 	return -ENOSYS;
 }
-
-#endif /* !CONFIG_PERFMON */
+#endif /* CONFIG_PERFMON */
