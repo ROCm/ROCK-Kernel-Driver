@@ -1608,13 +1608,10 @@ static void del_airo_dev( struct net_device *dev );
 void stop_airo_card( struct net_device *dev, int freeres )
 {
 	struct airo_info *ai = dev->priv;
-	flush_scheduled_work();
 	disable_interrupts(ai);
 	free_irq( dev->irq, dev );
-	if (ai->flash)
-		kfree(ai->flash);
-	if (ai->rssi)
-		kfree(ai->rssi);
+	if (auto_wep)
+		del_timer_sync(&ai->timer);
 	takedown_proc_entry( dev, ai );
 	if (ai->registered) {
 		unregister_netdev( dev );
@@ -1625,7 +1622,11 @@ void stop_airo_card( struct net_device *dev, int freeres )
 		}
 		ai->registered = 0;
 	}
-	if (auto_wep) del_timer_sync(&ai->timer);
+	flush_scheduled_work();
+	if (ai->flash)
+		kfree(ai->flash);
+	if (ai->rssi)
+		kfree(ai->rssi);
 	if (freeres) {
 		/* PCMCIA frees this stuff, so only for PCI and ISA */
 	        release_region( dev->base_addr, 64 );
