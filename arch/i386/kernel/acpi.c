@@ -48,6 +48,10 @@
 
 #define PREFIX			"ACPI: "
 
+extern struct acpi_boot_flags	acpi_boot;
+
+int				acpi_mp_config = 0;
+
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -104,13 +108,15 @@ static int total_cpus __initdata = 0;
 
 /* From mpparse.c */
 extern void __init MP_processor_info(struct mpc_config_processor *);
+extern void __init MP_ioapic_info (struct mpc_config_ioapic *);
+extern void __init MP_lintsrc_info(struct mpc_config_lintsrc *);
 
 int __init
 acpi_parse_lapic (
 	acpi_table_entry_header *header)
 {
 	struct acpi_table_lapic	*cpu = NULL;
-	struct mpc_config_processor proc_entry;
+	struct mpc_config_processor processor;
 
 	cpu = (struct acpi_table_lapic*) header;
 	if (!cpu)
@@ -134,21 +140,21 @@ acpi_parse_lapic (
 	 * the processor ID.  Processor features aren't present in
 	 * the table.
 	 */
-	proc_entry.mpc_type = MP_PROCESSOR;
-	proc_entry.mpc_apicid = cpu->id;
-	proc_entry.mpc_cpuflag = CPU_ENABLED;
+	processor.mpc_type = MP_PROCESSOR;
+	processor.mpc_apicid = cpu->id;
+	processor.mpc_cpuflag = CPU_ENABLED;
 	if (cpu->id == boot_cpu_physical_apicid) {
 		/* TBD: Circular reference trying to establish BSP */
-		proc_entry.mpc_cpuflag |= CPU_BOOTPROCESSOR;
+		processor.mpc_cpuflag |= CPU_BOOTPROCESSOR;
 	}
-	proc_entry.mpc_cpufeature = (boot_cpu_data.x86 << 8)
+	processor.mpc_cpufeature = (boot_cpu_data.x86 << 8)
 		| (boot_cpu_data.x86_model << 4) | boot_cpu_data.x86_mask;
-	proc_entry.mpc_featureflag = boot_cpu_data.x86_capability[0];
-	proc_entry.mpc_reserved[0] = 0;
-	proc_entry.mpc_reserved[1] = 0;
-	proc_entry.mpc_apicver = 0x10;	/* integrated APIC */
+	processor.mpc_featureflag = boot_cpu_data.x86_capability[0];
+	processor.mpc_reserved[0] = 0;
+	processor.mpc_reserved[1] = 0;
+	processor.mpc_apicver = 0x10;	/* Integrated APIC */
 
-	MP_processor_info(&proc_entry);
+	MP_processor_info(&processor);
 
 	total_cpus++;
 
@@ -184,7 +190,7 @@ acpi_parse_lapic_nmi (
 
 	acpi_table_print_madt_entry(header);
 
-	/* TBD: Support local APIC NMI entries */
+	/* TBD: Support lapic_nmi entries */
 
 	return 0;
 }
@@ -199,17 +205,101 @@ acpi_parse_ioapic (
 	acpi_table_entry_header *header)
 {
 	struct acpi_table_ioapic *ioapic = NULL;
-	
+	/*
+	struct mpc_config_ioapic mp_ioapic;
+	struct IO_APIC_reg_01	reg_01;
+	*/
+
 	ioapic = (struct acpi_table_ioapic*) header;
 	if (!ioapic)
+		return -EINVAL;
+ 
+	acpi_table_print_madt_entry(header);
+ 
+	/*
+	 * Cobble up an entry for the IOAPIC (just as we do for LAPIC entries).
+	 * Note that we aren't doing anything with ioapic->vector, and 
+	 * mpc_apicver gets read directly from ioapic.
+	 */
+
+	/*
+	 * TBD: Complete I/O APIC support.
+	 *
+	mp_ioapic.mpc_type = MP_IOAPIC;
+	mp_ioapic.mpc_apicid = ioapic->id;
+	mp_ioapic.mpc_flags = MPC_APIC_USABLE;
+	mp_ioapic.mpc_apicaddr = ioapic->address;
+	set_fixmap_nocache(nr_ioapics + FIX_IO_APIC_BASE_0,
+		mp_ioapic.mpc_apicaddr);
+
+	printk("mapped IOAPIC to %08lx (%08lx)\n",
+		__fix_to_virt(nr_ioapics), mp_ioapic.mpc_apicaddr);
+
+	*(int *)&reg_01 = io_apic_read(nr_ioapics, 1);
+	mp_ioapic.mpc_apicver = reg_01.version;
+	MP_ioapic_info(&mp_ioapic);
+	 */
+
+	return 0;
+}
+
+
+int __init
+acpi_parse_int_src_ovr (
+	acpi_table_entry_header *header)
+{
+	struct acpi_table_int_src_ovr *int_src_ovr = NULL;
+	/*
+	struct mpc_config_intsrc my_intsrc;
+	int			i = 0;
+	*/
+
+	int_src_ovr = (struct acpi_table_int_src_ovr*) header;
+	if (!int_src_ovr)
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
 
-	/* TBD: Support ioapic entries */
+	/*
+	 * TBD: Complete I/O APIC support.
+	 *
+	my_intsrc.mpc_type = MP_INTSRC;
+	my_intsrc.mpc_irqtype = mp_INT;
+	my_intsrc.mpc_irqflag = *(unsigned short*)(&(int_src_ovr->flags));
+	my_intsrc.mpc_srcbus = int_src_ovr->bus;
+	my_intsrc.mpc_srcbusirq = int_src_ovr->bus_irq;
+	my_intsrc.mpc_dstapic = 0;
+	my_intsrc.mpc_dstirq = int_src_ovr->global_irq;
+
+	for (i = 0; i < mp_irq_entries; i++) {
+		if (mp_irqs[i].mpc_srcbusirq == my_intsrc.mpc_srcbusirq) {
+			mp_irqs[i] = my_intsrc;
+			break;
+		}
+	}
+	 */
 
 	return 0;
 }
+
+
+int __init
+acpi_parse_nmi_src (
+	acpi_table_entry_header *header)
+{
+	struct acpi_table_nmi_src *nmi_src = NULL;
+
+	nmi_src = (struct acpi_table_nmi_src*) header;
+	if (!nmi_src)
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	/* TBD: Support nimsrc entries */
+
+	return 0;
+}
+
 
 #endif /*CONFIG_X86_IO_APIC*/
 
@@ -288,14 +378,115 @@ acpi_find_rsdp (
 }
 
 
+int __init
+acpi_boot_init (
+	char			*cmdline)
+{
+	int			result = 0;
+
+	/* Initialize the ACPI boot-time table parser */
+	result = acpi_table_init(cmdline);
+	if (0 != result)
+		return result;
+
+#ifdef CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_IO_APIC
+
+	/* 
+	 * MADT
+	 * ----
+	 * Parse the Multiple APIC Description Table (MADT), if exists.
+	 * Note that this table provides platform SMP configuration 
+	 * information -- the successor to MPS tables.
+	 */
+
+	if (!acpi_boot.madt) {
+		printk(KERN_INFO PREFIX "MADT parsing disabled via command-line\n");
+		return 0;
+	}
+
+	result = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
+	if (0 == result) {
+		printk(KERN_WARNING PREFIX "MADT not present\n");
+		return 0;
+	}
+	else if (0 > result) {
+		printk(KERN_ERR PREFIX "Error parsing MADT\n");
+		return result;
+	}
+	else if (1 < result) 
+		printk(KERN_WARNING PREFIX "Multiple MADT tables exist\n");
+
+	/* Local APIC */
+
+	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr);
+	if (0 > result) {
+		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
+		return result;
+	}
+
+	result = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic);
+	if (1 > result) {
+		printk(KERN_ERR PREFIX "Error parsing MADT - no LAPIC entries!\n");
+		return -ENODEV;
+	}
+
+	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi);
+	if (0 > result) {
+		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
+		return result;
+	}
+
+	/* I/O APIC */
+
+	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic);
+	if (1 > result) {
+		printk(KERN_ERR PREFIX "Error parsing MADT - no IOAPIC entries!\n");
+		return -ENODEV;
+	}
+
+	acpi_mp_config = 1;
+
+	/*
+	 * TBD: Complete I/O APIC support.
+	 *
+	construct_default_ACPI_table();
+	 */
+
+	result = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr);
+	if (0 > result) {
+		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
+		return result;
+	}
+
+	result = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src);
+	if (0 > result) {
+		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
+		return result;
+	}
+
+	/* Make boot-up look pretty */
+	printk("%d CPUs total\n", total_cpus);
+
+#endif /*CONFIG_X86_IO_APIC*/
+#endif /*CONFIG_X86_LOCAL_APIC*/
+
+#ifdef CONFIG_SERIAL_ACPI
+	/*
+	 * TBD: Need phased approach to table parsing (only do those absolutely
+	 *      required during boot-up).  Recommend expanding concept of fix-
+	 *      feature devices (ACPI Bus driver) to include table-based devices 
+	 *      such as serial ports, EC, SMBus, etc.
+	 */
+	/* acpi_table_parse(ACPI_SPCR, acpi_parse_spcr);*/
+#endif /*CONFIG_SERIAL_ACPI*/
+
+	return 0;
+}
+
 #endif /*CONFIG_ACPI_BOOT*/
 
 
-/* --------------------------------------------------------------------------
-                            PCI Interrupt Routing Support
-   -------------------------------------------------------------------------- */
-
-#ifdef CONFIG_ACPI_PCI
 int __init
 acpi_get_interrupt_model (
 	int		*type)
@@ -304,15 +495,13 @@ acpi_get_interrupt_model (
 		return -EINVAL;
 
 #ifdef CONFIG_X86_IO_APIC
-	if (io_apic_assign_pci_irqs)
-		*type = ACPI_PCI_ROUTING_IOAPIC;
-	else
+	*type = ACPI_INT_MODEL_IOAPIC;
+#else
+	*type = ACPI_INT_MODEL_PIC;
 #endif
-		*type = ACPI_PCI_ROUTING_PIC;
 
 	return 0;
 }
-#endif
 
 
 /* --------------------------------------------------------------------------
