@@ -1024,7 +1024,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	 */
 
 	if (in6_dev->nd_parms) {
-		__u32 rtime = ntohl(ra_msg->retrans_timer);
+		unsigned long rtime = ntohl(ra_msg->retrans_timer);
 
 		if (rtime && rtime/1000 < MAX_SCHEDULE_TIMEOUT/HZ) {
 			rtime = (rtime*HZ)/1000;
