@@ -23,6 +23,8 @@
 #      driver for Linux.
 #
 
+export-objs := ftape_syms.o
+
 obj-$(CONFIG_FTAPE) += ftape.o
 
 ftape-objs := ftape-init.o fdc-io.o fdc-isr.o \
