@@ -192,7 +192,7 @@ enum ata_ioctls {
 struct ata_prd {
 	u32			addr;
 	u32			flags_len;
-} __attribute__((packed));
+};
 
 struct ata_taskfile {
 	unsigned long		flags;		/* ATA_TFLAG_xxx */
