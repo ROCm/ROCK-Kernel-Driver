@@ -1869,6 +1869,25 @@ static void fbcon_bmove_rec(struct display *p, int sy, int sx, int dy,
 }
 
 
+static int fbcon_resize(struct vc_data *vc, unsigned int width, 
+			unsigned int height)
+{
+	struct display *p = &fb_display[vc->vc_num];
+	struct fb_info *info = p->fb_info;
+	struct fb_var_screeninfo var = info->var;
+	int err;
+
+	var.xres = width * vc->vc_font.width;
+	var.yres = height * vc->vc_font.height;
+	var.activate = FB_ACTIVATE_NOW;
+
+	err = fb_set_var(&var, info);
+	return  (err || var.xres != info->var.xres ||
+		 var.yres != info->var.yres) ?
+		-EINVAL : 0;
+	  
+}
+
 static int fbcon_switch(struct vc_data *vc)
 {
 	int unit = vc->vc_num;
@@ -1918,8 +1937,10 @@ static int fbcon_switch(struct vc_data *vc)
 
 	info->currcon = unit;
 	
+        fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
 	update_var(unit, info);
-	
+	fbcon_set_palette(vc, color_table); 	
+
 	if (vt_cons[unit]->vc_mode == KD_TEXT)
 		accel_clear_margins(vc, p, 0);
 	if (logo_shown == -2) {
@@ -2535,6 +2556,7 @@ const struct consw fb_con = {
 	.con_invert_region 	= fbcon_invert_region,
 	.con_screen_pos 	= fbcon_screen_pos,
 	.con_getxy 		= fbcon_getxy,
+	.con_resize             = fbcon_resize,
 };
 
 int __init fb_console_init(void)
