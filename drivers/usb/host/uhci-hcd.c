@@ -862,7 +862,7 @@ static int usb_control_retrigger_status(struct uhci_hcd *uhci, struct urb *urb)
 	urbp->short_control_packet = 1;
 
 	td = list_entry(urbp->td_list.prev, struct uhci_td, list);
-	urbp->qh->element = td->dma_handle;
+	urbp->qh->element = cpu_to_le32(td->dma_handle);
 
 	return -EINPROGRESS;
 }
