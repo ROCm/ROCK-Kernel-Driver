@@ -407,7 +407,11 @@ static void agp_v2_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 		*cmd &= ~(AGPSTAT2_2X | AGPSTAT2_4X);	/* 1Xf */
 }
 
-
+/*
+ * mode = requested mode.
+ * cmd = PCI_AGP_STATUS from agp bridge.
+ * tmp = PCI_AGP_STATUS from graphic card.
+ */
 static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 {
 	/* ARQSZ - Set the value to the maximum one.
@@ -454,9 +458,19 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 
 	if (!((*cmd & AGPSTAT3_8X) && (*tmp & AGPSTAT3_8X) && (*mode & AGPSTAT3_8X)))
 		*cmd &= ~AGPSTAT3_8X;
-
-	if (!((*cmd & AGPSTAT3_4X) && (*tmp & AGPSTAT3_4X) && (*mode & AGPSTAT3_4X)))
-		*cmd &= ~AGPSTAT3_4X;
+	else {
+		/*
+		 * If we didn't specify AGPx8, we can only do x4.
+		 * If the hardware can't do x4, we're up shit creek, and never
+		 *  should have got this far.
+		 */
+		if ((*cmd & AGPSTAT3_4X) && (*tmp & AGPSTAT3_4X))
+			*cmd |= ~AGPSTAT3_4X;
+		else {
+			printk (KERN_INFO PFX "Badness. Don't know which AGP mode to set. [cmd:%x tmp:%x]\n", cmd, tmp);
+			return;
+		}
+	}
 
 	/* Clear out unwanted bits. */
 	if (*cmd & AGPSTAT3_8X)
@@ -479,6 +493,8 @@ u32 agp_collect_device_status(u32 mode, u32 cmd)
 		if (!cap_ptr)
 			continue;
 
+		//FIXME: We should probably skip anything here that
+		// isn't an AGP graphic card.
 		/*
 		 * Ok, here we have a AGP device. Disable impossible
 		 * settings, and adjust the readqueue to the minimum.
