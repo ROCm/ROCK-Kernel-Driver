@@ -132,6 +132,11 @@ The following information is available in this file:
 
 2. Version History
 
+        6.2.34 - Fix locking regression instroduced in 6.2.29 that
+                 could cuase a lock order reversal between the io_request_lock
+                 and our per-softc lock.  This was only possible on RH9,
+                 SuSE, and kernel.org 2.4.X kernels.
+
         6.2.33 - Dynamically disable PCI parity error reporting after
 		 10 errors are reported to the user.  These errors are
 		 the result of some other device issuing PCI transactions

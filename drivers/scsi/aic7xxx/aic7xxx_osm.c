@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#221 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#228 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -140,11 +140,6 @@
 
 #include <linux/mm.h>		/* For fetching system memory size */
 #include <linux/blk.h>		/* For block_size() */
-
-#define __KERNEL_SYSCALLS__
- 
-#include <linux/unistd.h>
-static int errno;
 
 /*
  * Lock protecting manipulation of the ahc softc list.
@@ -746,31 +741,11 @@ ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
 	consumed = 1;
 	sg->addr = ahc_htole32(addr & 0xFFFFFFFF);
 	scb->platform_data->xfer_len += len;
+
 	if (sizeof(bus_addr_t) > 4
-	 && (ahc->flags & AHC_39BIT_ADDRESSING) != 0) {
-		/*
-		 * Due to DAC restrictions, we can't
-		 * cross a 4GB boundary.
-		 */
-		if ((addr ^ (addr + len - 1)) & ~0xFFFFFFFF) {
-			struct	 ahc_dma_seg *next_sg;
-			uint32_t next_len;
+	 && (ahc->flags & AHC_39BIT_ADDRESSING) != 0)
+		len |= (addr >> 8) & AHC_SG_HIGH_ADDR_MASK;
 
-			printf("Crossed Seg\n");
-			if ((scb->sg_count + 2) > AHC_NSEG)
-				panic("Too few segs for dma mapping.  "
-				      "Increase AHC_NSEG\n");
-
-			consumed++;
-			next_sg = sg + 1;
-			next_sg->addr = 0;
-			next_len = 0x100000000 - (addr & 0xFFFFFFFF);
-			len -= next_len;
-			next_len |= ((addr >> 8) + 0x1000000) & 0x7F000000;
-			next_sg->len = ahc_htole32(next_len);
-		}
-		len |= (addr >> 8) & 0x7F000000;
-	}
 	sg->len = ahc_htole32(len);
 	return (consumed);
 }
@@ -1195,6 +1170,7 @@ ahc_linux_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs)
 }
 #endif
 
+#if defined(__i386__)
 /*
  * Return the disk geometry for the given SCSI device.
  */
@@ -1747,7 +1723,7 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	struct	 Scsi_Host *host;
 	char	*new_name;
 	u_long	 s;
-	u_int	 target;
+	u_int	 targ_offset;
 
 	template->name = ahc->description;
 	host = scsi_register(template, sizeof(struct ahc_softc *));
@@ -1802,14 +1778,19 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	 * negotiation will occur for the first command, and DV
 	 * will comence should that first command be successful.
 	 */
-	for (target = 0;
-	     target < host->max_id * (host->max_channel + 1); target++) {
+	for (targ_offset = 0;
+	     targ_offset < host->max_id * (host->max_channel + 1);
+	     targ_offset++) {
 		u_int channel;
+		u_int target;
 
 		channel = 0;
+		target = targ_offset;
 		if (target > 7
-		 && (ahc->features & AHC_TWIN) != 0)
+		 && (ahc->features & AHC_TWIN) != 0) {
 			channel = 1;
+			target &= 0x7;
+		}
 		/*
 		 * Skip our own ID.  Some Compaq/HP storage devices
 		 * have enclosure management devices that respond to
@@ -2443,8 +2424,10 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 		ahc_unlock(ahc, &s);
 		return;
 	}
-	ahc_compile_devinfo(&devinfo, ahc->our_id, targ->target, /*lun*/0,
-			    targ->channel + 'A', ROLE_INITIATOR);
+	ahc_compile_devinfo(&devinfo,
+			    targ->channel == 0 ? ahc->our_id : ahc->our_id_b,
+			    targ->target, /*lun*/0, targ->channel + 'A',
+			    ROLE_INITIATOR);
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_DV) {
 		ahc_print_devinfo(ahc, &devinfo);
@@ -3881,7 +3864,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 /*
  * SCSI controller interrupt handler.
  */
-AIC_LINUX_IRQRETURN_T
+irqreturn_t
 ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct	ahc_softc *ahc;
@@ -3895,7 +3878,7 @@ ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 		ahc_schedule_runq(ahc);
 	ahc_linux_run_complete_queue(ahc);
 	ahc_unlock(ahc, &flags);
-	AIC_LINUX_IRQRETURN(ours);
+	return IRQ_RETVAL(ours);
 }
 
 void
