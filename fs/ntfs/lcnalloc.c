@@ -46,7 +46,7 @@
  * Locking: - The volume lcn bitmap must be locked for writing on entry and is
  *	      left locked on return.
  */
-static int ntfs_cluster_free_from_rl_nolock(ntfs_volume *vol,
+int ntfs_cluster_free_from_rl_nolock(ntfs_volume *vol,
 		const runlist_element *rl)
 {
 	struct inode *lcnbmp_vi = vol->lcnbmp_ino;

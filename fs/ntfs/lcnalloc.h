@@ -78,6 +78,34 @@ static inline s64 ntfs_cluster_free(struct inode *vi, const VCN start_vcn,
 	return __ntfs_cluster_free(vi, start_vcn, count, FALSE);
 }
 
+extern int ntfs_cluster_free_from_rl_nolock(ntfs_volume *vol,
+		const runlist_element *rl);
+
+/**
+ * ntfs_cluster_free_from_rl - free clusters from runlist
+ * @vol:	mounted ntfs volume on which to free the clusters
+ * @rl:		runlist describing the clusters to free
+ *
+ * Free all the clusters described by the runlist @rl on the volume @vol.  In
+ * the case of an error being returned, at least some of the clusters were not
+ * freed.
+ *
+ * Return 0 on success and -errno on error.
+ *
+ * Locking: This function takes the volume lcn bitmap lock for writing and
+ *	    modifies the bitmap contents.
+ */
+static inline int ntfs_cluster_free_from_rl(ntfs_volume *vol,
+		const runlist_element *rl)
+{
+	int ret;
+
+	down_write(&vol->lcnbmp_lock);
+	ret = ntfs_cluster_free_from_rl_nolock(vol, rl);
+	up_write(&vol->lcnbmp_lock);
+	return ret;
+}
+
 #endif /* NTFS_RW */
 
 #endif /* defined _LINUX_NTFS_LCNALLOC_H */
