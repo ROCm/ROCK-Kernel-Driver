@@ -270,6 +270,7 @@ static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
 	struct us_data *us;
 	char *pos = buffer;
 	struct Scsi_Host *hostptr;
+	unsigned long f;
 
 	/* if someone is sending us data, just throw it away */
 	if (inout)
@@ -284,6 +285,7 @@ static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
 
 	/* if we couldn't find it, we return an error */
 	if (!us) {
+		scsi_host_put(hostptr);
 		return -ESRCH;
 	}
 
@@ -298,6 +300,24 @@ static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
 	/* show the protocol and transport */
 	SPRINTF("     Protocol: %s\n", us->protocol_name);
 	SPRINTF("    Transport: %s\n", us->transport_name);
+
+	/* show the device flags */
+	if (pos < buffer + length) {
+		pos += sprintf(pos, "       Quirks:");
+		f = us->flags;
+
+#define DO_FLAG(a)  	if (f & US_FL_##a)  pos += sprintf(pos, " " #a)
+		DO_FLAG(SINGLE_LUN);
+		DO_FLAG(MODE_XLATE);
+		DO_FLAG(START_STOP);
+		DO_FLAG(IGNORE_SER);
+		DO_FLAG(SCM_MULT_TARG);
+		DO_FLAG(FIX_INQUIRY);
+		DO_FLAG(FIX_CAPACITY);
+#undef DO_FLAG
+
+		*(pos++) = '\n';
+		}
 
 	/* release the reference count on this host */
 	scsi_host_put(hostptr);
