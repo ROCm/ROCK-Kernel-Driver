@@ -58,14 +58,6 @@
 static int pc_debug;
 #endif
 
-/* This structure maintains housekeeping state for each socket, such
- * as the last known values of the card detect pins, or the Card Services
- * callback value associated with the socket:
- */
-static struct sa1100_pcmcia_socket sa1100_pcmcia_socket[SA1100_PCMCIA_MAX_SOCK];
-
-#define PCMCIA_SOCKET(x)	(sa1100_pcmcia_socket + (x))
-
 #define to_sa1100_socket(x)	container_of(x, struct sa1100_pcmcia_socket, socket)
 
 /*
@@ -682,6 +674,9 @@ void sa11xx_enable_irqs(struct sa1100_pcmcia_socket *skt, struct pcmcia_irqs *ir
 }
 EXPORT_SYMBOL(sa11xx_enable_irqs);
 
+static LIST_HEAD(sa1100_sockets);
+static DECLARE_MUTEX(sa1100_sockets_lock);
+
 static const char *skt_names[] = {
 	"PCMCIA socket 0",
 	"PCMCIA socket 1",
@@ -689,7 +684,11 @@ static const char *skt_names[] = {
 
 struct skt_dev_info {
 	int nskt;
+	struct sa1100_pcmcia_socket skt[0];
 };
+
+#define SKT_DEV_INFO_SIZE(n) \
+	(sizeof(struct skt_dev_info) + (n)*sizeof(struct sa1100_pcmcia_socket))
 
 int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, int first, int nr)
 {
@@ -704,13 +703,15 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	if (!ops->socket_get_timing)
 		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
-	sinfo = kmalloc(sizeof(struct skt_dev_info), GFP_KERNEL);
+	down(&sa1100_sockets_lock);
+
+	sinfo = kmalloc(SKT_DEV_INFO_SIZE(nr), GFP_KERNEL);
 	if (!sinfo) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
-	memset(sinfo, 0, sizeof(struct skt_dev_info));
+	memset(sinfo, 0, SKT_DEV_INFO_SIZE(nr));
 	sinfo->nskt = nr;
 
 	cpu_clock = cpufreq_get(0);
@@ -719,8 +720,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	 * Initialise the per-socket structure.
 	 */
 	for (i = 0; i < nr; i++) {
-		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
-		memset(skt, 0, sizeof(*skt));
+		struct sa1100_pcmcia_socket *skt = &sinfo->skt[i];
 
 		skt->socket.ops = &sa11xx_pcmcia_operations;
 		skt->socket.owner = ops->owner;
@@ -778,6 +778,8 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 			goto out_err_5;
 		}
 
+		list_add(&skt->node, &sa1100_sockets);
+
 		/*
 		 * We initialize the MECR to default values here, because
 		 * we are not guaranteed to see a SetIOMap operation at
@@ -809,10 +811,11 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	}
 
 	dev_set_drvdata(dev, sinfo);
-	return 0;
+	ret = 0;
+	goto out;
 
 	do {
-		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
+		struct sa1100_pcmcia_socket *skt = &sinfo->skt[i];
 
 		del_timer_sync(&skt->poll_timer);
 		pcmcia_unregister_socket(&skt->socket);
@@ -822,6 +825,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 
 		ops->hw_shutdown(skt);
  out_err_6:
+ 		list_del(&skt->node);
 		iounmap(skt->virt_io);
  out_err_5:
 		release_resource(&skt->res_attr);
@@ -838,6 +842,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	kfree(sinfo);
 
  out:
+	up(&sa1100_sockets_lock);
 	return ret;
 }
 EXPORT_SYMBOL(sa11xx_drv_pcmcia_probe);
@@ -849,8 +854,9 @@ int sa11xx_drv_pcmcia_remove(struct device *dev)
 
 	dev_set_drvdata(dev, NULL);
 
+	down(&sa1100_sockets_lock);
 	for (i = 0; i < sinfo->nskt; i++) {
-		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
+		struct sa1100_pcmcia_socket *skt = &sinfo->skt[i];
 
 		del_timer_sync(&skt->poll_timer);
 
@@ -862,6 +868,7 @@ int sa11xx_drv_pcmcia_remove(struct device *dev)
 
 		sa1100_pcmcia_config_skt(skt, &dead_socket);
 
+		list_del(&skt->node);
 		iounmap(skt->virt_io);
 		skt->virt_io = NULL;
 		release_resource(&skt->res_attr);
@@ -869,6 +876,7 @@ int sa11xx_drv_pcmcia_remove(struct device *dev)
 		release_resource(&skt->res_io);
 		release_resource(&skt->res_skt);
 	}
+	up(&sa1100_sockets_lock);
 
 	kfree(sinfo);
 
@@ -886,13 +894,12 @@ EXPORT_SYMBOL(sa11xx_drv_pcmcia_remove);
  */
 static void sa1100_pcmcia_update_mecr(unsigned int clock)
 {
-	unsigned int sock;
+	struct sa1100_pcmcia_socket *skt;
 
-	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
-		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-		if (skt->ops)
-			sa1100_pcmcia_set_mecr(skt, clock);
-	}
+	down(&sa1100_sockets_lock);
+	list_for_each_entry(skt, &sa1100_sockets, node)
+		sa1100_pcmcia_set_mecr(skt, clock);
+	up(&sa1100_sockets_lock);
 }
 
 /* sa1100_pcmcia_notifier()

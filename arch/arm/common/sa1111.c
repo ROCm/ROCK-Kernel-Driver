@@ -1100,6 +1100,62 @@ int sa1111_get_audio_rate(struct sa1111_dev *sadev)
 	return __sa1111_pll_clock(sachip) / (256 * div);
 }
 
+void sa1111_set_io_dir(struct sa1111_dev *sadev,
+		       unsigned int bits, unsigned int dir,
+		       unsigned int sleep_dir)
+{
+	struct sa1111 *sachip = sa1111_chip_driver(sadev);
+	unsigned long flags;
+	unsigned int val;
+	void *gpio = sachip->base + SA1111_GPIO;
+
+#define MODIFY_BITS(port, mask, dir)		\
+	if (mask) {				\
+		val = sa1111_readl(port);	\
+		val &= ~(mask);			\
+		val |= (dir) & (mask);		\
+		sa1111_writel(val, port);	\
+	}
+
+	spin_lock_irqsave(&sachip->lock, flags);
+	MODIFY_BITS(gpio + SA1111_GPIO_PADDR, bits & 15, dir);
+	MODIFY_BITS(gpio + SA1111_GPIO_PBDDR, (bits >> 8) & 255, dir >> 8);
+	MODIFY_BITS(gpio + SA1111_GPIO_PCDDR, (bits >> 16) & 255, dir >> 16);
+
+	MODIFY_BITS(gpio + SA1111_GPIO_PASDR, bits & 15, sleep_dir);
+	MODIFY_BITS(gpio + SA1111_GPIO_PBSDR, (bits >> 8) & 255, sleep_dir >> 8);
+	MODIFY_BITS(gpio + SA1111_GPIO_PCSDR, (bits >> 16) & 255, sleep_dir >> 16);
+	spin_unlock_irqrestore(&sachip->lock, flags);
+}
+
+void sa1111_set_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+{
+	struct sa1111 *sachip = sa1111_chip_driver(sadev);
+	unsigned long flags;
+	unsigned int val;
+	void *gpio = sachip->base + SA1111_GPIO;
+
+	spin_lock_irqsave(&sachip->lock, flags);
+	MODIFY_BITS(gpio + SA1111_GPIO_PADWR, bits & 15, v);
+	MODIFY_BITS(gpio + SA1111_GPIO_PBDWR, (bits >> 8) & 255, v >> 8);
+	MODIFY_BITS(gpio + SA1111_GPIO_PCDWR, (bits >> 16) & 255, v >> 16);
+	spin_unlock_irqrestore(&sachip->lock, flags);
+}
+
+void sa1111_set_sleep_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+{
+	struct sa1111 *sachip = sa1111_chip_driver(sadev);
+	unsigned long flags;
+	unsigned int val;
+	void *gpio = sachip->base + SA1111_GPIO;
+
+	spin_lock_irqsave(&sachip->lock, flags);
+	MODIFY_BITS(gpio + SA1111_GPIO_PASSR, bits & 15, v);
+	MODIFY_BITS(gpio + SA1111_GPIO_PBSSR, (bits >> 8) & 255, v >> 8);
+	MODIFY_BITS(gpio + SA1111_GPIO_PCSSR, (bits >> 16) & 255, v >> 16);
+	spin_unlock_irqrestore(&sachip->lock, flags);
+}
+
 /*
  * Individual device operations.
  */
@@ -1238,6 +1294,9 @@ EXPORT_SYMBOL(sa1111_check_dma_bug);
 EXPORT_SYMBOL(sa1111_select_audio_mode);
 EXPORT_SYMBOL(sa1111_set_audio_rate);
 EXPORT_SYMBOL(sa1111_get_audio_rate);
+EXPORT_SYMBOL(sa1111_set_io_dir);
+EXPORT_SYMBOL(sa1111_set_io);
+EXPORT_SYMBOL(sa1111_set_sleep_io);
 EXPORT_SYMBOL(sa1111_enable_device);
 EXPORT_SYMBOL(sa1111_disable_device);
 EXPORT_SYMBOL(sa1111_pll_clock);
