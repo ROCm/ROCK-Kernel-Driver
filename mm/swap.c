@@ -113,34 +113,35 @@ static DEFINE_PER_CPU(struct pagevec, lru_add_active_pvecs) = { 0, };
 
 void lru_cache_add(struct page *page)
 {
-	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs);
+	struct pagevec *pvec = &per_cpu(lru_add_pvecs, get_cpu());
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
 		__pagevec_lru_add(pvec);
-	put_cpu_var(lru_add_pvecs);
+	put_cpu();
 }
 
 void lru_cache_add_active(struct page *page)
 {
-	struct pagevec *pvec = &get_cpu_var(lru_add_active_pvecs);
+	struct pagevec *pvec = &per_cpu(lru_add_active_pvecs, get_cpu());
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
 		__pagevec_lru_add_active(pvec);
-	put_cpu_var(lru_add_active_pvecs);
+	put_cpu();
 }
 
 void lru_add_drain(void)
 {
-	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs);
+	int cpu = get_cpu();
+	struct pagevec *pvec = &per_cpu(lru_add_pvecs, cpu);
 
 	if (pagevec_count(pvec))
 		__pagevec_lru_add(pvec);
-	pvec = &__get_cpu_var(lru_add_active_pvecs);
+	pvec = &per_cpu(lru_add_active_pvecs, cpu);
 	if (pagevec_count(pvec))
 		__pagevec_lru_add_active(pvec);
-	put_cpu_var(lru_add_pvecs);
+	put_cpu();
 }
 
 /*

@@ -2457,7 +2457,7 @@ next:
 static void reap_timer_fnc(unsigned long data)
 {
 	int cpu = smp_processor_id();
-	struct timer_list *rt = &__get_cpu_var(reap_timers);
+	struct timer_list *rt = &per_cpu(reap_timers, cpu);
 
 	cache_reap();
 	mod_timer(rt, jiffies + REAPTIMEOUT_CPUC + cpu);

@@ -24,6 +24,8 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+#include <linux/config.h>
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -35,6 +37,9 @@
 #include <linux/acpi.h>
 #ifdef CONFIG_X86_IO_APIC
 #include <asm/mpspec.h>
+#endif
+#ifdef CONFIG_IOSAPIC
+# include <asm/iosapic.h>
 #endif
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -248,6 +253,8 @@ acpi_pci_irq_lookup (struct pci_bus *bus, int device, int pin)
 		return_VALUE(0);
 	}
 
+	entry->irq = entry->link.index;
+
 	if (!entry->irq && entry->link.handle) {
 		entry->irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index);
 		if (!entry->irq) {
@@ -356,7 +363,11 @@ acpi_pci_irq_enable (
 		}
  	}
 
+#ifdef CONFIG_IA64
+	dev->irq = gsi_to_irq(irq);
+#else
 	dev->irq = irq;
+#endif
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s using IRQ %d\n", dev->slot_name, dev->irq));
 
@@ -369,6 +380,10 @@ acpi_pci_irq_enable (
 		irq_mask |= (1 << dev->irq);
 		eisa_set_level_irq(dev->irq);
 	}
+#endif
+#ifdef CONFIG_IOSAPIC
+	if (acpi_irq_model == ACPI_IRQ_MODEL_IOSAPIC)
+		iosapic_enable_intr(dev->irq);
 #endif
 
 	return_VALUE(dev->irq);
