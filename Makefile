@@ -457,9 +457,6 @@ endif
 # warn about C99 declaration after statement
 CFLAGS += $(call check_gcc,-Wdeclaration-after-statement,)
 
-# Disable unit-at-a-time.
-CFLAGS += $(call check_gcc,-fno-unit-at-a-time,)
-
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
 # images.  Uncomment if you want to place them anywhere other than root.

@@ -7,7 +7,11 @@
 
 /* Simple VGA output */
 
+#ifdef __i386__
+#define VGABASE		(__PAGE_OFFSET + 0xb8000UL)
+#else
 #define VGABASE		0xffffffff800b8000UL
+#endif
 
 #define MAX_YPOS	25
 #define MAX_XPOS	80
