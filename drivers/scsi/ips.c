@@ -4829,6 +4829,29 @@ ips_init_morpheus(ips_ha_t *ha) {
 
    Post = readl(ha->mem_ptr + IPS_REG_I960_MSG0);
 
+   if (Post == 0x4F00) {                          /* If Flashing the Battery PIC         */
+       printk(KERN_WARNING "Flashing Battery PIC, Please wait ...\n" );
+
+       /* Clear the interrupt bit */
+       Isr = (uint32_t) IPS_BIT_I960_MSG0I;
+       writel(Isr, ha->mem_ptr + IPS_REG_I2O_HIR);
+
+       for (i = 0; i < 120; i++) {                /*    Wait Up to 2 Min. for Completion */
+          Post = readl(ha->mem_ptr + IPS_REG_I960_MSG0);
+          if (Post != 0x4F00)
+              break;
+          /* Delay for 1 Second */
+          MDELAY(IPS_ONE_SEC);
+       }
+
+       if (i >= 120) {
+          printk(KERN_WARNING "(%s%d) timeout waiting for Battery PIC Flash\n",
+                 ips_name, ha->host_num);
+          return (0);
+       }
+
+   }
+
    /* Clear the interrupt bit */
    Isr = (uint32_t) IPS_BIT_I960_MSG0I;
    writel(Isr, ha->mem_ptr + IPS_REG_I2O_HIR);
@@ -5484,8 +5507,7 @@ ips_write_driver_status(ips_ha_t *ha, int intr) {
    if (le32_to_cpu(ha->nvram->signature) != IPS_NVRAM_P5_SIG) {
       DEBUG_VAR(1, "(%s%d) NVRAM page 5 has an invalid signature: %X.",
                 ips_name, ha->host_num, ha->nvram->signature);
-
-      return (1);
+      ha->nvram->signature = IPS_NVRAM_P5_SIG;
    }
 
    DEBUG_VAR(2, "(%s%d) Ad Type: %d, Ad Slot: %d, BIOS: %c%c%c%c %c%c%c%c.",
@@ -6622,6 +6644,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
    dma_addr_t        dma_address;
    char             *ioremap_ptr;
    char             *mem_ptr;             
+   uint32_t          IsDead;
 
    METHOD_TRACE("ips_init_phase1", 1);
    index = IPS_MAX_ADAPTERS;
@@ -6719,7 +6742,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
        return ips_abort_init(ha, sh, index);
     }
 
-    ha->adapt = pci_alloc_consistent(ha->pcidev, sizeof(IPS_ADAPTER) +
+    ha->adapt = pci_alloc_consistent(pci_dev, sizeof(IPS_ADAPTER) +
                                      sizeof(IPS_IO_CMD), &dma_address);
     if (!ha->adapt) {
        printk(KERN_WARNING "Unable to allocate host adapt & dummy structures\n");
@@ -6845,6 +6868,13 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
           ha->func.issue = ips_issue_copperhead;
     }
 
+    if ( IPS_IS_MORPHEUS( ha ) ) {
+        /* If Morpheus appears dead, reset it */
+        IsDead = readl( ha->mem_ptr + IPS_REG_I960_MSG1 );
+        if ( IsDead == 0xDEADBEEF ) {
+            ips_reset_morpheus( ha );
+        }
+    }
     /*
      * Initialize the card if it isn't already
      */
