@@ -322,9 +322,11 @@ xfs_initialize_perag(xfs_mount_t *mp, int agcount)
 	ino = XFS_AGINO_TO_INO(mp, agcount - 1, agino);
 
 	/* Clear the mount flag if no inode can overflow 32 bits
-	 * on this filesystem.
+	 * on this filesystem, or if specifically requested..
 	 */
-	if (ino <= max_inum) {
+	if ((mp->m_flags & XFS_MOUNT_32BITINOOPT) && ino > max_inum) {
+		mp->m_flags |= XFS_MOUNT_32BITINODES;
+	} else {
 		mp->m_flags &= ~XFS_MOUNT_32BITINODES;
 	}
 

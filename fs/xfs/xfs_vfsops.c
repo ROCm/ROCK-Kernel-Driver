@@ -283,7 +283,7 @@ xfs_start_flags(
 		mp->m_flags |= XFS_MOUNT_OSYNCISOSYNC;
 
 	if (ap->flags & XFSMNT_32BITINODES)
-		mp->m_flags |= XFS_MOUNT_32BITINODES;
+		mp->m_flags |= (XFS_MOUNT_32BITINODES | XFS_MOUNT_32BITINOOPT);
 
 	if (ap->flags & XFSMNT_IOSIZE) {
 		if (ap->iosizelog > XFS_MAX_IO_LOG ||
@@ -1587,6 +1587,7 @@ xfs_vget(
 #define MNTOPT_NORECOVERY   "norecovery"   /* don't run XFS recovery */
 #define MNTOPT_NOLOGFLUSH   "nologflush"   /* don't hard flush on log writes */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
+#define MNTOPT_64BITINODE   "inode64"  /* inodes can be allocated anywhere */
 
 
 int
@@ -1694,6 +1695,13 @@ xfs_parseargs(
 				return EINVAL;
 			}
 			dswidth = simple_strtoul(value, &eov, 10);
+		} else if (!strcmp(this_char, MNTOPT_64BITINODE)) {
+			args->flags &= ~XFSMNT_32BITINODES;
+#ifndef XFS_BIG_FILESYSTEMS
+			printk("XFS: %s option not allowed on this system\n",
+				MNTOPT_64BITINODE);
+			return EINVAL;
+#endif
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
 			args->flags |= XFSMNT_NOUUID;
 		} else if (!strcmp(this_char, MNTOPT_NOLOGFLUSH)) {

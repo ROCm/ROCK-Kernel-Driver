@@ -413,10 +413,11 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_DFLT_IOSIZE	0x00001000	/* set default i/o size */
 #define XFS_MOUNT_OSYNCISOSYNC	0x00002000	/* o_sync is REALLY o_sync */
 						/* osyncisdsync is now default*/
-#define XFS_MOUNT_NOUUID	0x00004000	/* ignore uuid during mount */
-#define XFS_MOUNT_32BITINODES	0x00008000	/* do not create inodes above
+#define XFS_MOUNT_32BITINODES	0x00004000	/* do not create inodes above
 						 * 32 bits in size */
-#define XFS_MOUNT_NOLOGFLUSH	0x00010000
+#define XFS_MOUNT_32BITINOOPT	0x00008000	/* saved mount option state */
+#define XFS_MOUNT_NOUUID	0x00010000	/* ignore uuid during mount */
+#define XFS_MOUNT_NOLOGFLUSH	0x00020000
 
 /*
  * Default minimum read and write sizes.
