@@ -14,6 +14,7 @@
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
 #include <linux/shm.h>
+#include <linux/blkdev.h>
 #include <linux/compiler.h>
 
 #include <asm/pgtable.h>
@@ -787,8 +788,12 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	swap_device_unlock(p);
 	swap_list_unlock();
 	vfree(swap_map);
-	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode))
-		bd_release(swap_file->f_dentry->d_inode->i_bdev);
+	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode)) {
+		struct block_device *bdev;
+		bdev = swap_file->f_dentry->d_inode->i_bdev;
+		set_blocksize(to_kdev_t(bdev->bd_dev), p->old_block_size);
+		bd_release(bdev);
+	}
 	filp_close(swap_file, NULL);
 	err = 0;
 
@@ -879,6 +884,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 		nr_swapfiles = type+1;
 	p->flags = SWP_USED;
 	p->swap_file = NULL;
+	p->old_block_size = 0;
 	p->swap_map = NULL;
 	p->lowest_bit = 0;
 	p->highest_bit = 0;
@@ -914,6 +920,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 			bdev = NULL;
 			goto bad_swap;
 		}
+		p->old_block_size = block_size(to_kdev_t(bdev->bd_dev));
 		error = set_blocksize(swap_file->f_dentry->d_inode->i_rdev,
 				      PAGE_SIZE);
 		if (error < 0)
@@ -1066,8 +1073,10 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	error = 0;
 	goto out;
 bad_swap:
-	if (bdev)
+	if (bdev) {
+		set_blocksize(to_kdev_t(bdev->bd_dev), p->old_block_size);
 		bd_release(bdev);
+	}
 bad_swap_2:
 	swap_list_lock();
 	swap_map = p->swap_map;
