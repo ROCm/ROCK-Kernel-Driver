@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/macide.c -- Macintosh IDE Driver
+ *  linux/drivers/ide/legacy/macide.c -- Macintosh IDE Driver
  *
  *     Copyright (C) 1998 by Michael Schmitz
  *
@@ -98,21 +98,21 @@ void macide_init(void)
 
 	switch (macintosh_config->ide_type) {
 	case MAC_IDE_QUADRA:
-		ide_setup_ports(&hw, (ide_ioreg_t)IDE_BASE, macide_offsets,
+		ide_setup_ports(&hw, IDE_BASE, macide_offsets,
 				0, 0, macide_ack_intr,
 //				quadra_ide_iops,
 				IRQ_NUBUS_F);
 		index = ide_register_hw(&hw, NULL);
 		break;
 	case MAC_IDE_PB:
-		ide_setup_ports(&hw, (ide_ioreg_t)IDE_BASE, macide_offsets,
+		ide_setup_ports(&hw, IDE_BASE, macide_offsets,
 				0, 0, macide_ack_intr,
 //				macide_pb_iops,
 				IRQ_NUBUS_C);
 		index = ide_register_hw(&hw, NULL);
 		break;
 	case MAC_IDE_BABOON:
-		ide_setup_ports(&hw, (ide_ioreg_t)BABOON_BASE, macide_offsets,
+		ide_setup_ports(&hw, BABOON_BASE, macide_offsets,
 				0, 0, NULL,
 //				macide_baboon_iops,
 				IRQ_BABOON_1);
