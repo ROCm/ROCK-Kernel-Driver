@@ -170,6 +170,7 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	client=kmalloc(sizeof(*client), GFP_KERNEL);
 	if(client == NULL)
 		return -ENOMEM;
+	memset(client, 0, sizeof(*client));
 
 	client_template.adapter = adap;
 	client_template.addr = addr;
@@ -190,9 +191,10 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		// We should never get here!!!
 		dname = unknown_name;
 	}
-	strcpy(client->name, dname);
+	strncpy(client->dev.name, dname, DEVICE_NAME_SIZE);
 	init_MUTEX(&encoder->lock);
 	encoder->client = client;
+	i2c_set_clientdata(client, encoder);
 	encoder->addr = addr;
 	encoder->norm = VIDEO_MODE_PAL;
 	encoder->input = 0;
@@ -201,7 +203,7 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	for (i=1; i<x_common; i++) {
 		rv = i2c_smbus_write_byte(client,init_common[i]);
 		if (rv < 0) {
-			printk(KERN_ERR "%s_attach: init error %d\n", client->name, rv);
+			printk(KERN_ERR "%s_attach: init error %d\n", client->dev.name, rv);
 			break;
 		}
 	}
@@ -211,7 +213,7 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		i2c_smbus_write_byte_data(client,0x07, TR0MODE);
 		i2c_smbus_read_byte_data(client,0x12);
 		printk(KERN_INFO "%s_attach: %s rev. %d at 0x%02x\n",
-		       client->name, dname, rv & 1, client->addr);
+		       client->dev.name, dname, rv & 1, client->addr);
 	}
 
 	i2c_attach_client(client);
@@ -229,7 +231,7 @@ int adv717x_probe(struct i2c_adapter *adap)
 static int adv717x_detach(struct i2c_client *client)
 {
 	i2c_detach_client(client);
-	kfree(client->data);
+	i2c_get_clientdata(client);
 	kfree(client);
 	return 0;
 }
@@ -237,7 +239,7 @@ static int adv717x_detach(struct i2c_client *client)
 static int adv717x_command(struct i2c_client *client, unsigned int cmd,
 			   void *arg)
 {
-	struct adv7175 *encoder = client->data;
+	struct adv7175 *encoder = i2c_get_clientdata(client);
 	int i, x_ntsc=13, x_pal=13; 
 		/* x_ntsc is number of entries in init_ntsc -1 */
 		/* x_pal is number of entries in init_pal -1 */
@@ -297,7 +299,7 @@ static int adv717x_command(struct i2c_client *client, unsigned int cmd,
 				default:
 					printk(KERN_ERR
 					       "%s: illegal norm: %d\n",
-					       client->name, iarg);
+					       client->dev.name, iarg);
 					return -EINVAL;
 
 				}
@@ -353,7 +355,7 @@ static int adv717x_command(struct i2c_client *client, unsigned int cmd,
 				default:
 					printk(KERN_ERR
 					       "%s: illegal input: %d\n",
-					       client->name, iarg);
+					       client->dev.name, iarg);
 					return -EINVAL;
 
 				}
@@ -419,8 +421,10 @@ static struct i2c_driver i2c_driver_adv7176 = {
 };
 
 static struct i2c_client client_template = {
-	.name		= "adv7175_client",
-	.driver		= &i2c_driver_adv7175
+	.driver		= &i2c_driver_adv7175,
+	.dev		= {
+		.name	= "adv7175_client",
+	},
 };
 
 static int adv717x_init(void)

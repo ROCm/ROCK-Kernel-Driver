@@ -138,10 +138,12 @@ static struct i2c_algo_bit_data bit_data = {
 }; 
 
 static struct i2c_adapter bit_ops = {
-	.name			= "PCILynx I2C adapter",
 	.id 			= 0xAA, //FIXME: probably we should get an id in i2c-id.h
 	.client_register	= bit_reg,
 	.client_unregister	= bit_unreg,
+	.dev			= {
+		.name		= "PCILynx I2C",
+	},
 };
 
 
