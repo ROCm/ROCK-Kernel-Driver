@@ -63,7 +63,7 @@ struct page *
 ia32_install_shared_page (struct vm_area_struct *vma, unsigned long address, int no_share)
 {
 #	define NUM_SHARED_PAGES	(PAGE_SIZE > IA32_PAGE_SIZE ? 1 : 2)
-	struct page *pg = ia32_shared_page[NUM_SHARED__PAGES * smp_processor_id()
+	struct page *pg = ia32_shared_page[NUM_SHARED_PAGES * smp_processor_id()
 					   + (address - vma->vm_start)/PAGE_SIZE];
 
 	get_page(pg);

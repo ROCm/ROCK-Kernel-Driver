@@ -457,11 +457,11 @@ void ia64_elf32_init(struct pt_regs *regs);
 static inline void
 load_TLS (struct thread_struct *t, unsigned int cpu)
 {
-	extern struct desc_struct *cpu_gdt_table[NR_CPUS];
+	extern unsigned long *cpu_gdt_table[NR_CPUS];
 
-	cpu_gdt_table[cpu][GDT_ENTRY_TLS_MIN + 0] = t->tls_array[0];
-	cpu_gdt_table[cpu][GDT_ENTRY_TLS_MIN + 1] = t->tls_array[1];
-	cpu_gdt_table[cpu][GDT_ENTRY_TLS_MIN + 2] = t->tls_array[2];
+	memcpy(cpu_gdt_table[cpu] + GDT_ENTRY_TLS_MIN + 0, &t->tls_array[0], sizeof(long));
+	memcpy(cpu_gdt_table[cpu] + GDT_ENTRY_TLS_MIN + 1, &t->tls_array[1], sizeof(long));
+	memcpy(cpu_gdt_table[cpu] + GDT_ENTRY_TLS_MIN + 2, &t->tls_array[2], sizeof(long));
 }
 
 struct ia32_user_desc {
