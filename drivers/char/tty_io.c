@@ -1691,6 +1691,55 @@ static int send_break(struct tty_struct *tty, int duration)
 	return 0;
 }
 
+static int
+tty_tiocmget(struct tty_struct *tty, struct file *file, unsigned long arg)
+{
+	int retval = -EINVAL;
+
+	if (tty->driver.tiocmget) {
+		retval = tty->driver.tiocmget(tty, file);
+
+		if (retval >= 0)
+			retval = put_user(retval, (int *)arg);
+	}
+	return retval;
+}
+
+static int
+tty_tiocmset(struct tty_struct *tty, struct file *file, unsigned int cmd,
+	     unsigned long arg)
+{
+	int retval = -EINVAL;
+
+	if (tty->driver.tiocmset) {
+		unsigned int set, clear, val;
+
+		retval = get_user(val, (unsigned int *)arg);
+		if (retval)
+			return retval;
+
+		set = clear = 0;
+		switch (cmd) {
+		case TIOCMBIS:
+			set = val;
+			break;
+		case TIOCMBIC:
+			clear = val;
+			break;
+		case TIOCMSET:
+			set = val;
+			clear = ~val;
+			break;
+		}
+
+		set &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
+		clear &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
+
+		retval = tty->driver.tiocmset(tty, file, set, clear);
+	}
+	return retval;
+}
+
 /*
  * Split this up, as gcc can choke on it otherwise..
  */
@@ -1816,6 +1865,14 @@ int tty_ioctl(struct inode * inode, struct file * file,
 			return 0;
 		case TCSBRKP:	/* support for POSIX tcsendbreak() */	
 			return send_break(tty, arg ? arg*(HZ/10) : HZ/4);
+
+		case TIOCMGET:
+			return tty_tiocmget(tty, file, arg);
+
+		case TIOCMSET:
+		case TIOCMBIC:
+		case TIOCMBIS:
+			return tty_tiocmset(tty, file, cmd, arg);
 	}
 	if (tty->driver.ioctl) {
 		int retval = (tty->driver.ioctl)(tty, file, cmd, arg);
