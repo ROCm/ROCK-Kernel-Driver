@@ -153,10 +153,8 @@ static int ohci_urb_enqueue (
 #endif
 	
 	/* every endpoint has a ed, locate and fill it */
-	if (! (ed = ep_add_ed (urb->dev, pipe, urb->interval, 1, mem_flags))) {
-		usb_dec_dev_use (urb->dev);	
+	if (! (ed = ep_add_ed (urb->dev, pipe, urb->interval, 1, mem_flags)))
 		return -ENOMEM;
-	}
 
 	/* for the private part of the URB we need the number of TDs (size) */
 	switch (usb_pipetype (pipe)) {
@@ -181,10 +179,8 @@ static int ohci_urb_enqueue (
 			break;
 		case PIPE_ISOCHRONOUS: /* number of packets from URB */
 			size = urb->number_of_packets;
-			if (size <= 0) {
-				usb_dec_dev_use (urb->dev);	
+			if (size <= 0)
 				return -EINVAL;
-			}
 			for (i = 0; i < urb->number_of_packets; i++) {
   				urb->iso_frame_desc [i].actual_length = 0;
   				urb->iso_frame_desc [i].status = -EXDEV;
@@ -198,10 +194,8 @@ static int ohci_urb_enqueue (
 	/* allocate the private part of the URB */
 	urb_priv = kmalloc (sizeof (urb_priv_t) + size * sizeof (struct td *),
 			mem_flags);
-	if (!urb_priv) {
-		usb_dec_dev_use (urb->dev);	
+	if (!urb_priv)
 		return -ENOMEM;
-	}
 	memset (urb_priv, 0, sizeof (urb_priv_t) + size * sizeof (struct td *));
 	
 	/* fill the private part of the URB */
@@ -216,7 +210,6 @@ static int ohci_urb_enqueue (
 			urb_priv->length = i;
 			urb_free_priv (ohci, urb_priv);
 			spin_unlock_irqrestore (&ohci->lock, flags);
-			usb_dec_dev_use (urb->dev);	
 			return -ENOMEM;
 		}
 	}	
@@ -242,7 +235,6 @@ static int ohci_urb_enqueue (
 			if (bustime < 0) {
 				urb_free_priv (ohci, urb_priv);
 				spin_unlock_irqrestore (&ohci->lock, flags);
-				usb_dec_dev_use (urb->dev);	
 				return bustime;
 			}
 			usb_claim_bandwidth (urb->dev, urb,
@@ -356,9 +348,6 @@ static int ohci_get_frame (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
-#ifdef	OHCI_VERBOSE_DEBUG
-	dbg ("%s: ohci_get_frame", hcd->bus_name);
-#endif
 	return le16_to_cpu (ohci->hcca->frame_no);
 }
 
@@ -445,7 +434,7 @@ static int hc_start (struct ohci_hcd *ohci)
  	writel (ohci->hc_control, &ohci->regs->control);
  
 	/* Choose the interrupts we care about now, others later on demand */
-	mask = OHCI_INTR_MIE | OHCI_INTR_UE | OHCI_INTR_WDH | OHCI_INTR_SO;
+	mask = OHCI_INTR_MIE | OHCI_INTR_UE | OHCI_INTR_WDH;
 	writel (mask, &ohci->regs->intrstatus);
 	writel (mask, &ohci->regs->intrenable);
 
@@ -517,10 +506,7 @@ static void ohci_irq (struct usb_hcd *hcd)
 		writel (OHCI_INTR_WDH, &regs->intrenable); 
 	}
   
-	if (ints & OHCI_INTR_SO) {
-		dbg ("USB Schedule overrun");
-		writel (OHCI_INTR_SO, &regs->intrenable); 	 
-	}
+	/* could track INTR_SO to reduce available PCI/... bandwidth */
 
 	// FIXME:  this assumes SOF (1/ms) interrupts don't get lost...
 	if (ints & OHCI_INTR_SF) { 
