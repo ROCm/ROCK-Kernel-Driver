@@ -10,6 +10,7 @@
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -96,8 +97,7 @@ static void h3600_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 	set_h3600_egpio(IPAQ_EGPIO_OPT_ON);
 	clr_h3600_egpio(IPAQ_EGPIO_OPT_RESET);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(10*HZ / 1000);
+	msleep(10);
 
 	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }

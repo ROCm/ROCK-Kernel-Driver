@@ -496,8 +496,12 @@ struct pneigh_entry * pneigh_lookup(struct neigh_table *tbl, const void *pkey,
 
 	memcpy(n->key, pkey, key_len);
 	n->dev = dev;
+	if (dev)
+		dev_hold(dev);
 
 	if (tbl->pconstructor && tbl->pconstructor(n)) {
+		if (dev)
+			dev_put(dev);
 		kfree(n);
 		n = NULL;
 		goto out;
@@ -532,6 +536,8 @@ int pneigh_delete(struct neigh_table *tbl, const void *pkey,
 			write_unlock_bh(&tbl->lock);
 			if (tbl->pdestructor)
 				tbl->pdestructor(n);
+			if (n->dev)
+				dev_put(n->dev);
 			kfree(n);
 			return 0;
 		}
@@ -552,6 +558,8 @@ static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev)
 				*np = n->next;
 				if (tbl->pdestructor)
 					tbl->pdestructor(n);
+				if (n->dev)
+					dev_put(n->dev);
 				kfree(n);
 				continue;
 			}

@@ -952,7 +952,7 @@ static void moxa_poll(unsigned long ignored)
 				if (MoxaPortTxQueue(ch->port) <= WAKEUP_CHARS) {
 					if (!tp->stopped) {
 						ch->statusflags &= ~LOWWAIT;
-						tty_wakeup(tty);
+						tty_wakeup(tp);
 						wake_up_interruptible(&tp->write_wait);
 					}
 				}
@@ -1119,7 +1119,7 @@ static void check_xmit_empty(unsigned long data)
 	if (ch->tty && (ch->statusflags & EMPTYWAIT)) {
 		if (MoxaPortTxQueue(ch->port) == 0) {
 			ch->statusflags &= ~EMPTYWAIT;
-			tty_wakeup(tty);
+			tty_wakeup(ch->tty);
 			wake_up_interruptible(&ch->tty->write_wait);
 			return;
 		}
