@@ -1274,11 +1274,11 @@ static snd_minor_t snd_ctl_reg =
 };
 
 /*
- * registration of the control device:
- * called from init.c
+ * registration of the control device
  */
-int snd_ctl_register(snd_card_t *card)
+static int snd_ctl_dev_register(snd_device_t *device)
 {
+	snd_card_t *card = device->device_data;
 	int err, cardnum;
 	char name[16];
 
@@ -1293,11 +1293,11 @@ int snd_ctl_register(snd_card_t *card)
 }
 
 /*
- * disconnection of the control device:
- * called from init.c
+ * disconnection of the control device
  */
-int snd_ctl_disconnect(snd_card_t *card)
+static int snd_ctl_dev_disconnect(snd_device_t *device)
 {
+	snd_card_t *card = device->device_data;
 	struct list_head *flist;
 	snd_ctl_file_t *ctl;
 
@@ -1312,11 +1312,11 @@ int snd_ctl_disconnect(snd_card_t *card)
 }
 
 /*
- * de-registration of the control device:
- * called from init.c
+ * de-registration of the control device
  */
-int snd_ctl_unregister(snd_card_t *card)
+static int snd_ctl_dev_unregister(snd_device_t *device)
 {
+	snd_card_t *card = device->device_data;
 	int err, cardnum;
 	snd_kcontrol_t *control;
 
@@ -1332,4 +1332,20 @@ int snd_ctl_unregister(snd_card_t *card)
 	}
 	up_write(&card->controls_rwsem);
 	return 0;
+}
+
+/*
+ * create control core:
+ * called from init.c
+ */
+int snd_ctl_create(snd_card_t *card)
+{
+	static snd_device_ops_t ops = {
+		.dev_register =	snd_ctl_dev_register,
+		.dev_disconnect = snd_ctl_dev_disconnect,
+		.dev_unregister = snd_ctl_dev_unregister
+	};
+
+	snd_assert(card != NULL, return -ENXIO);
+	return snd_device_new(card, SNDRV_DEV_CONTROL, card, &ops);
 }

@@ -228,12 +228,11 @@ int snd_register_device(int type, snd_card_t * card, int dev, snd_minor_t * reg,
 		return -EBUSY;
 	}
 	list_add_tail(&preg->list, &snd_minors_hash[SNDRV_MINOR_CARD(minor)]);
-	if (strncmp(name, "controlC", 8) || card->number >= cards_limit) {
+	if (strncmp(name, "controlC", 8) || card->number >= cards_limit)
 		devfs_mk_cdev(MKDEV(major, minor), S_IFCHR | device_mode, "snd/%s", name);
-		if (card)
-			device = card->dev;
-		class_simple_device_add(sound_class, MKDEV(major, minor), device, name);
-	}
+	if (card)
+		device = card->dev;
+	class_simple_device_add(sound_class, MKDEV(major, minor), device, name);
 
 	up(&sound_mutex);
 	return 0;
@@ -263,10 +262,9 @@ int snd_unregister_device(int type, snd_card_t * card, int dev)
 		return -EINVAL;
 	}
 
-	if (strncmp(mptr->name, "controlC", 8) || card->number >= cards_limit) { /* created in sound.c */
+	if (strncmp(mptr->name, "controlC", 8) || card->number >= cards_limit) /* created in sound.c */
 		devfs_remove("snd/%s", mptr->name);
-		class_simple_device_remove(MKDEV(major, minor));
-	}
+	class_simple_device_remove(MKDEV(major, minor));
 
 	list_del(&mptr->list);
 	up(&sound_mutex);
@@ -357,10 +355,8 @@ static int __init alsa_sound_init(void)
 		return -ENOMEM;
 	}
 	snd_info_minor_register();
-	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
+	for (controlnum = 0; controlnum < cards_limit; controlnum++)
 		devfs_mk_cdev(MKDEV(major, controlnum<<5), S_IFCHR | device_mode, "snd/controlC%d", controlnum);
-		class_simple_device_add(sound_class, MKDEV(major, controlnum<<5), NULL, "controlC%d", controlnum);
-	}
 #ifndef MODULE
 	printk(KERN_INFO "Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n");
 #endif
@@ -371,10 +367,8 @@ static void __exit alsa_sound_exit(void)
 {
 	short controlnum;
 
-	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
+	for (controlnum = 0; controlnum < cards_limit; controlnum++)
 		devfs_remove("snd/controlC%d", controlnum);
-		class_simple_device_remove(MKDEV(major, controlnum<<5));
-	}
 
 	snd_info_minor_unregister();
 	snd_info_done();

@@ -124,7 +124,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 #endif
 	/* the control interface cannot be accessed from the user space until */
 	/* snd_cards_bitmask and snd_cards are set with snd_card_register */
-	if ((err = snd_ctl_register(card)) < 0) {
+	if ((err = snd_ctl_create(card)) < 0) {
 		snd_printd("unable to register control minors\n");
 		goto __error;
 	}
@@ -137,7 +137,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	return card;
 
       __error_ctl:
-	snd_ctl_unregister(card);
+	snd_device_free_all(card, SNDRV_DEV_CMD_PRE);
       __error:
 	kfree(card);
       	return NULL;
@@ -216,8 +216,6 @@ int snd_card_disconnect(snd_card_t * card)
 	/* phase 3: notify all connected devices about disconnection */
 	/* at this point, they cannot respond to any calls except release() */
 
-	snd_ctl_disconnect(card);
-
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
 		snd_mixer_oss_notify_callback(card, SND_MIXER_OSS_NOTIFY_DISCONNECT);
@@ -276,10 +274,6 @@ int snd_card_free(snd_card_t * card)
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_NORMAL) < 0) {
 		snd_printk(KERN_ERR "unable to free all devices (normal)\n");
 		/* Fatal, but this situation should never occur */
-	}
-	if (snd_ctl_unregister(card) < 0) {
-		snd_printk(KERN_ERR "unable to unregister control minors\n");
-		/* Not fatal error */
 	}
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_POST) < 0) {
 		snd_printk(KERN_ERR "unable to free all devices (post)\n");
