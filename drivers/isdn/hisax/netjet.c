@@ -659,7 +659,9 @@ void netjet_fill_dma(struct BCState *bcs)
 	if (test_and_clear_bit(BC_FLG_NOFRAME, &bcs->Flag)) {
 		write_raw(bcs, bcs->hw.tiger.sendp, bcs->hw.tiger.free);
 	} else if (test_and_clear_bit(BC_FLG_HALF, &bcs->Flag)) {
-		p = bus_to_virt(inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR));
+		p = inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR)
+			- bcs->hw.tiger.send_dma
+			+ bcs->hw.tiger.send;
 		sp = bcs->hw.tiger.sendp;
 		if (p == bcs->hw.tiger.s_end)
 			p = bcs->hw.tiger.send -1;
@@ -680,7 +682,9 @@ void netjet_fill_dma(struct BCState *bcs)
 			write_raw(bcs, p, bcs->hw.tiger.free - cnt);
 		}
 	} else if (test_and_clear_bit(BC_FLG_EMPTY, &bcs->Flag)) {
-		p = bus_to_virt(inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR));
+		p = inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR) 
+			- bcs->hw.tiger.send_dma
+			+ bcs->hw.tiger.send;
 		cnt = bcs->hw.tiger.s_end - p;
 		if (cnt < 2) {
 			p = bcs->hw.tiger.send + 1;
@@ -935,29 +939,36 @@ setstack_tiger(struct PStack *st, struct BCState *bcs)
 void __init
 inittiger(struct IsdnCardState *cs)
 {
-	if (!(cs->bcs[0].hw.tiger.send = kmalloc(NETJET_DMA_TXSIZE * sizeof(unsigned int),
-		GFP_KERNEL | GFP_DMA))) {
+	cs->bcs[0].hw.tiger.send = 
+		pci_alloc_consistent(cs->hw.njet.pdev,
+				     NETJET_DMA_TXSIZE * sizeof(unsigned int),
+				     &cs->bcs[0].hw.tiger.send_dma);
+	if (!cs->bcs[0].hw.tiger.send) {
 		printk(KERN_WARNING
 		       "HiSax: No memory for tiger.send\n");
 		return;
 	}
-	cs->bcs[0].hw.tiger.s_irq = cs->bcs[0].hw.tiger.send + NETJET_DMA_TXSIZE/2 - 1;
-	cs->bcs[0].hw.tiger.s_end = cs->bcs[0].hw.tiger.send + NETJET_DMA_TXSIZE - 1;
-	cs->bcs[1].hw.tiger.send = cs->bcs[0].hw.tiger.send;
-	cs->bcs[1].hw.tiger.s_irq = cs->bcs[0].hw.tiger.s_irq;
-	cs->bcs[1].hw.tiger.s_end = cs->bcs[0].hw.tiger.s_end;
+	cs->bcs[0].hw.tiger.s_end     = cs->bcs[0].hw.tiger.send     + NETJET_DMA_TXSIZE - 1;
+
+	cs->bcs[1].hw.tiger.send      = cs->bcs[0].hw.tiger.send;
+	cs->bcs[1].hw.tiger.send_dma  = cs->bcs[0].hw.tiger.send_dma;
+	cs->bcs[1].hw.tiger.s_end     = cs->bcs[0].hw.tiger.s_end;
 	
 	memset(cs->bcs[0].hw.tiger.send, 0xff, NETJET_DMA_TXSIZE * sizeof(unsigned int));
 	debugl1(cs, "tiger: send buf %x - %x", (u_int)cs->bcs[0].hw.tiger.send,
 		(u_int)(cs->bcs[0].hw.tiger.send + NETJET_DMA_TXSIZE - 1));
-	outl(virt_to_bus(cs->bcs[0].hw.tiger.send),
+	outl(cs->bcs[0].hw.tiger.send_dma,
 		cs->hw.njet.base + NETJET_DMA_READ_START);
-	outl(virt_to_bus(cs->bcs[0].hw.tiger.s_irq),
+	outl(cs->bcs[0].hw.tiger.send_dma + NETJET_DMA_TXSIZE/2 - 1,
 		cs->hw.njet.base + NETJET_DMA_READ_IRQ);
-	outl(virt_to_bus(cs->bcs[0].hw.tiger.s_end),
+	outl(cs->bcs[0].hw.tiger.send_dma + NETJET_DMA_TXSIZE - 1,
 		cs->hw.njet.base + NETJET_DMA_READ_END);
-	if (!(cs->bcs[0].hw.tiger.rec = kmalloc(NETJET_DMA_RXSIZE * sizeof(unsigned int),
-		GFP_KERNEL | GFP_DMA))) {
+
+	cs->bcs[0].hw.tiger.rec = 
+		pci_alloc_consistent(cs->hw.njet.pdev,
+				     NETJET_DMA_RXSIZE * sizeof(unsigned int),
+				     &cs->bcs[0].hw.tiger.rec_dma);
+	if (!cs->bcs[0].hw.tiger.rec) {
 		printk(KERN_WARNING
 		       "HiSax: No memory for tiger.rec\n");
 		return;
@@ -965,12 +976,13 @@ inittiger(struct IsdnCardState *cs)
 	debugl1(cs, "tiger: rec buf %x - %x", (u_int)cs->bcs[0].hw.tiger.rec,
 		(u_int)(cs->bcs[0].hw.tiger.rec + NETJET_DMA_RXSIZE - 1));
 	cs->bcs[1].hw.tiger.rec = cs->bcs[0].hw.tiger.rec;
+	cs->bcs[1].hw.tiger.rec_dma = cs->bcs[0].hw.tiger.rec_dma;
 	memset(cs->bcs[0].hw.tiger.rec, 0xff, NETJET_DMA_RXSIZE * sizeof(unsigned int));
-	outl(virt_to_bus(cs->bcs[0].hw.tiger.rec),
+	outl(cs->bcs[0].hw.tiger.rec_dma,
 		cs->hw.njet.base + NETJET_DMA_WRITE_START);
-	outl(virt_to_bus(cs->bcs[0].hw.tiger.rec + NETJET_DMA_RXSIZE/2 - 1),
+	outl(cs->bcs[0].hw.tiger.rec_dma + NETJET_DMA_RXSIZE/2 - 1,
 		cs->hw.njet.base + NETJET_DMA_WRITE_IRQ);
-	outl(virt_to_bus(cs->bcs[0].hw.tiger.rec + NETJET_DMA_RXSIZE - 1),
+	outl(cs->bcs[0].hw.tiger.rec_dma + NETJET_DMA_RXSIZE - 1,
 		cs->hw.njet.base + NETJET_DMA_WRITE_END);
 	debugl1(cs, "tiger: dmacfg  %x/%x  pulse=%d",
 		inl(cs->hw.njet.base + NETJET_DMA_WRITE_ADR),
@@ -987,14 +999,20 @@ void
 releasetiger(struct IsdnCardState *cs)
 {
 	if (cs->bcs[0].hw.tiger.send) {
-		kfree(cs->bcs[0].hw.tiger.send);
+		pci_free_consistent(cs->hw.njet.pdev,
+				    NETJET_DMA_TXSIZE * sizeof(unsigned int),
+				    cs->bcs[0].hw.tiger.send,
+				    cs->bcs[0].hw.tiger.send_dma);
 		cs->bcs[0].hw.tiger.send = NULL;
 	}
 	if (cs->bcs[1].hw.tiger.send) {
 		cs->bcs[1].hw.tiger.send = NULL;
 	}
 	if (cs->bcs[0].hw.tiger.rec) {
-		kfree(cs->bcs[0].hw.tiger.rec);
+		pci_free_consistent(cs->hw.njet.pdev,
+				    NETJET_DMA_RXSIZE * sizeof(unsigned int),
+				    cs->bcs[0].hw.tiger.rec,
+				    cs->bcs[0].hw.tiger.rec_dma);
 		cs->bcs[0].hw.tiger.rec = NULL;
 	}
 	if (cs->bcs[1].hw.tiger.rec) {
