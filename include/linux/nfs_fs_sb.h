@@ -27,6 +27,8 @@ struct nfs_server {
 				lru_dirty,
 				lru_commit,
 				lru_busy;
+	struct nfs_fh		fh;
+	struct sockaddr_in	addr;
 };
 
 #endif
