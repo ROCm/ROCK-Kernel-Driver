@@ -4199,9 +4199,9 @@ ahc_probe_scbs(struct ahc_softc *ahc) {
 static void
 ahc_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error) 
 {
-	bus_addr_t *baddr;
+	dma_addr_t *baddr;
 
-	baddr = (bus_addr_t *)arg;
+	baddr = (dma_addr_t *)arg;
 	*baddr = segs->ds_addr;
 }
 
@@ -4456,7 +4456,7 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 	struct scb_data *scb_data;
 	struct scb *next_scb;
 	struct sg_map_node *sg_map;
-	bus_addr_t physaddr;
+	dma_addr_t physaddr;
 	struct ahc_dma_seg *segs;
 	int newcount;
 	int i;
@@ -4820,7 +4820,7 @@ ahc_init(struct ahc_softc *ahc)
 	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
 			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
 			       /*lowaddr*/ahc->flags & AHC_39BIT_ADDRESSING
-					? (bus_addr_t)0x7FFFFFFFFFULL
+					? (dma_addr_t)0x7FFFFFFFFFULL
 					: BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,

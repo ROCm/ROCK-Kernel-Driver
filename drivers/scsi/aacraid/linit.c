@@ -65,8 +65,7 @@ MODULE_DESCRIPTION("Dell PERC2, 2/Si, 3/Si, 3/Di, "
 MODULE_LICENSE("GPL");
 MODULE_VERSION(AAC_DRIVER_VERSION);
 
-struct aac_dev *aac_devices[MAXIMUM_NUM_ADAPTERS];
-static unsigned aac_count;
+static LIST_HEAD(aac_devices);
 static int aac_cfg_major = -1;
 
 /*
@@ -452,11 +451,18 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 
 static int aac_cfg_open(struct inode *inode, struct file *file)
 {
+	struct aac_dev *aac;
 	unsigned minor = iminor(inode);
+	int err = -ENODEV;
 
-	if (minor >= aac_count)
-		return -ENODEV;
-	file->private_data = aac_devices[minor];
+	list_for_each_entry(aac, &aac_devices, entry) {
+		if (aac->id == minor) {
+			file->private_data = aac;
+			err = 0;
+			break;
+		}
+	}
+
 	return 0;
 }
 
@@ -515,10 +521,18 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 {
 	unsigned index = id->driver_data;
 	struct Scsi_Host *shost;
-	struct fsa_scsi_hba *fsa_dev_ptr;
 	struct aac_dev *aac;
-	int container;
+	struct list_head *insert = &aac_devices;
 	int error = -ENODEV;
+	int unique_id = 0;
+
+	list_for_each_entry(aac, &aac_devices, entry) {
+		if (aac->id > unique_id) {
+			insert = &aac->entry;
+			break;
+		}
+		unique_id++;
+	}
 
 	if (pci_enable_device(pdev))
 		goto out;
@@ -537,16 +551,13 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	
 	pci_set_master(pdev);
 
-	/* Increment the host adapter count */
-	aac_count++;
-
 	shost = scsi_host_alloc(&aac_driver_template, sizeof(struct aac_dev));
 	if (!shost)
 		goto out_disable_pdev;
 
 	shost->irq = pdev->irq;
 	shost->base = pci_resource_start(pdev, 0);
-	shost->unique_id = aac_count - 1;
+	shost->unique_id = unique_id;
 
 	aac = (struct aac_dev *)shost->hostdata;
 	aac->scsi_host_ptr = shost;	
@@ -554,16 +565,12 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	aac->name = aac_driver_template.name;
 	aac->id = shost->unique_id;
 	aac->cardtype =  index;
+	INIT_LIST_HEAD(&aac->entry);
 
 	aac->fibs = kmalloc(sizeof(struct fib) * AAC_NUM_FIB, GFP_KERNEL);
 	if (!aac->fibs)
 		goto out_free_host;
 	spin_lock_init(&aac->fib_lock);
-
-	/* Initialize the ordinal number of the device to -1 */
-	fsa_dev_ptr = &aac->fsa_dev;
-	for (container = 0; container < MAXIMUM_NUM_CONTAINERS; container++)
-		fsa_dev_ptr->devname[container][0] = '\0';
 
 	if ((*aac_drivers[index].init)(aac))
 		goto out_free_fibs;
@@ -589,26 +596,32 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	else
 		shost->max_channel = 1;
 
+	aac_get_config_status(aac);
 	aac_get_containers(aac);
-	aac_devices[aac_count-1] = aac;
+	list_add(&aac->entry, insert);
+
+	shost->max_id = aac->maximum_num_containers;
+	if (shost->max_id < MAXIMUM_NUM_CONTAINERS)
+		shost->max_id = MAXIMUM_NUM_CONTAINERS;
+	else
+		shost->this_id = shost->max_id;
 
 	/*
 	 * dmb - we may need to move the setting of these parms somewhere else once
 	 * we get a fib that can report the actual numbers
 	 */
-	shost->max_id = MAXIMUM_NUM_CONTAINERS;
 	shost->max_lun = AAC_MAX_LUN;
+
+	pci_set_drvdata(pdev, shost);
 
 	error = scsi_add_host(shost, &pdev->dev);
 	if (error)
 		goto out_deinit;
-
-	pci_set_drvdata(pdev, shost);
 	scsi_scan_host(shost);
 
 	return 0;
 
- out_deinit:
+out_deinit:
 	kill_proc(aac->thread_pid, SIGKILL, 0);
 	wait_for_completion(&aac->aif_completion);
 
@@ -620,11 +633,11 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	iounmap((void * )aac->regs.sa);
  out_free_fibs:
 	kfree(aac->fibs);
+	kfree(aac->fsa_dev);
  out_free_host:
 	scsi_host_put(shost);
  out_disable_pdev:
 	pci_disable_device(pdev);
-	aac_count--;
  out:
 	return error;
 }
@@ -653,15 +666,7 @@ static void __devexit aac_remove_one(struct pci_dev *pdev)
 	scsi_host_put(shost);
 	pci_disable_device(pdev);
 
-	/*
-	 * We don't decrement aac_count here because adapters can be unplugged
-	 * in a different order than they were detected.  If we're ever going
-	 * to overflow MAXIMUM_NUM_ADAPTERS we'll have to consider using a
-	 * bintmap of free aac_devices slots.
-	 */
-#if 0
-	aac_count--;
-#endif
+	list_del(&aac->entry);
 }
 
 static struct pci_driver aac_pci_driver = {

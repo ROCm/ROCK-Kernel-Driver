@@ -86,6 +86,7 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 				rval = QLA_FUNCTION_TIMEOUT;
 		}
 	} else {
+		RD_REG_WORD(&reg->hccr);		/* PCI Posting. */
 		udelay(10);
 	}
 
@@ -221,6 +222,7 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					WRT_REG_WORD(&reg->semaphore, 0);
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
+					RD_REG_WORD(&reg->hccr);
 					break;
 				} else if (stat == 0x10 || stat == 0x11) {
 					set_bit(MBX_INTERRUPT,
@@ -231,11 +233,13 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
+					RD_REG_WORD(&reg->hccr);
 					break;
 				}
 
 				/* clear this intr; it wasn't a mailbox intr */
 				WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
+				RD_REG_WORD(&reg->hccr);
 			}
 			udelay(5);
 		}
@@ -277,6 +281,7 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					WRT_REG_WORD(&reg->semaphore, 0);
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
+					RD_REG_WORD(&reg->hccr);
 					break;
 				} else if (stat == 0x10 || stat == 0x11) {
 					set_bit(MBX_INTERRUPT,
@@ -287,11 +292,13 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
+					RD_REG_WORD(&reg->hccr);
 					break;
 				}
 
 				/* clear this intr; it wasn't a mailbox intr */
 				WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
+				RD_REG_WORD(&reg->hccr);
 			}
 			udelay(5);
 		}
@@ -334,6 +341,7 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					WRT_REG_WORD(&reg->semaphore, 0);
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
+					RD_REG_WORD(&reg->hccr);
 					break;
 				} else if (stat == 0x10 || stat == 0x11) {
 					set_bit(MBX_INTERRUPT,
@@ -344,11 +352,13 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
+					RD_REG_WORD(&reg->hccr);
 					break;
 				}
 
 				/* clear this intr; it wasn't a mailbox intr */
 				WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
+				RD_REG_WORD(&reg->hccr);
 			}
 			udelay(5);
 		}
@@ -731,6 +741,7 @@ qla2100_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 				WRT_REG_WORD(&reg->mctr, 0xf1);
 			else
 				WRT_REG_WORD(&reg->mctr, 0xf2);
+			RD_REG_WORD(&reg->mctr);	/* PCI Posting. */
 
 			/* Release RISC. */
 			WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
@@ -761,9 +772,11 @@ qla2100_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					WRT_REG_WORD(&reg->semaphore, 0);
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
+					RD_REG_WORD(&reg->hccr);
 					break;
 				}
 				WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
+				RD_REG_WORD(&reg->hccr);
 			}
 			udelay(5);
 		}

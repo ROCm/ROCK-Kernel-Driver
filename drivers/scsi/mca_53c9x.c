@@ -445,7 +445,7 @@ static void dma_led_off(struct NCR_ESP *esp)
 }
 
 static Scsi_Host_Template driver_template = {
-	.proc_name		= "esp",
+	.proc_name		= "mca_53c9x",
 	.name			= "NCR 53c9x SCSI",
 	.detect			= mca_esp_detect,
 	.slave_alloc		= esp_slave_alloc,

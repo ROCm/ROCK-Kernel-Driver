@@ -418,12 +418,9 @@ qla2x00_start_scsi(srb_t *sp)
 	cmd_pkt->lun = cpu_to_le16(fclun->lun);
 
 	/* Update tagged queuing modifier */
+	cmd_pkt->control_flags = __constant_cpu_to_le16(CF_SIMPLE_TAG);
 	if (scsi_populate_tag_msg(cmd, tag)) {
 		switch (tag[0]) {
-		case MSG_SIMPLE_TAG:
-			cmd_pkt->control_flags =
-			    __constant_cpu_to_le16(CF_SIMPLE_TAG);
-			break;
 		case MSG_HEAD_TAG:
 			cmd_pkt->control_flags =
 			    __constant_cpu_to_le16(CF_HEAD_TAG);
