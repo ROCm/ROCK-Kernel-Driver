@@ -337,7 +337,7 @@ static void invalidate_dquots(struct super_block *sb, short type)
 	struct list_head *head;
 
 restart:
-	for (head = inuse_list.next; head != &inuse_list; head = head->next) {
+	list_for_each(head, &inuse_list) {
 		dquot = list_entry(head, struct dquot, dq_inuse);
 		if (dquot->dq_sb != sb)
 			continue;
@@ -367,7 +367,7 @@ int sync_dquots(struct super_block *sb, short type)
 
 	lock_kernel();
 restart:
-	for (head = inuse_list.next; head != &inuse_list; head = head->next) {
+	list_for_each(head, &inuse_list) {
 		dquot = list_entry(head, struct dquot, dq_inuse);
 		if (sb && dquot->dq_sb != sb)
 			continue;
@@ -579,7 +579,7 @@ static void add_dquot_ref(struct super_block *sb, short type)
 
 restart:
 	file_list_lock();
-	for (p = sb->s_files.next; p != &sb->s_files; p = p->next) {
+	list_for_each(p, &sb->s_files) {
 		struct file *filp = list_entry(p, struct file, f_list);
 		struct inode *inode = filp->f_dentry->d_inode;
 		if (filp->f_mode & FMODE_WRITE && dqinit_needed(inode, type)) {
