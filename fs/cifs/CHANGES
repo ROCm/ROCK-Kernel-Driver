@@ -6,7 +6,8 @@ is the usual maximum active multiplex SMB/CIFS requests per server).
 Do not kill cifsd (and thus hurt the other SMB session) when more than one
 session to the same server (but with different userids) exists and one
 of the two user's smb sessions is being removed while leaving the other.
-
+Do not loop reconnecting in cifsd demultiplex thread when admin
+kills the thread without going through unmount.
 
 Version 1.18
 ------------

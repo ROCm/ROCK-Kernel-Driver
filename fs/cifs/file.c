@@ -627,7 +627,6 @@ cifs_write(struct file * file, const char *write_data,
 			while we blocked so return what we managed to write */
 				return total_written;
 			} 
-                        open_file = (struct cifsFileInfo *) file->private_data;
 			if(open_file->closePend) {
 				FreeXid(xid);
 				if(total_written)
