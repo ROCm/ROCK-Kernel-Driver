@@ -524,7 +524,7 @@ build_cpu_to_node_map (void)
 #else
 #		error Fixme: Dunno how to build CPU-to-node map.
 #endif
-		cpu_to_node_map[cpu] = node;
+		cpu_to_node_map[cpu] = (node >= 0) ? node : 0;
 		if (node >= 0)
 			cpu_set(cpu, node_to_cpu_mask[node]);
 	}
