@@ -1159,11 +1159,6 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	 * after this line .. requeueing in the device queue is no longer allowed!!!
 	 */
 
-	/* Pull off the fake header we stuck on earlier to keep
-	 * the fragmentation code happy.
-	 */
-	skb_pull(skb,IPPP_MAX_HEADER);
-
 	if (ipt->debug & 0x4)
 		printk(KERN_DEBUG "xmit skb, len %d\n", (int) skb->len);
         if (ipts->debug & 0x40)
@@ -2144,16 +2139,6 @@ isdn_ppp_close(isdn_net_local *lp)
 	ippp_ccp_free(lp->ccp);
 }
 
-static int
-isdn_ppp_header(struct sk_buff *skb, struct net_device *dev,
-		unsigned short type, void *daddr, void *saddr, 
-		unsigned plen)
-{
-	skb_push(skb, IPPP_MAX_HEADER);
-
-	return IPPP_MAX_HEADER;
-}
-
 static void
 isdn_ppp_disconnected(isdn_net_dev *idev)
 {
@@ -2163,7 +2148,6 @@ isdn_ppp_disconnected(isdn_net_dev *idev)
 
 struct isdn_netif_ops isdn_ppp_ops = {
 	.hard_start_xmit     = isdn_ppp_start_xmit,
-	.hard_header         = isdn_ppp_header,
 	.do_ioctl            = isdn_ppp_dev_ioctl,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
 	.type                = ARPHRD_PPP,
