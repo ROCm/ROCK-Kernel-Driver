@@ -1572,8 +1572,6 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 
 		qla2x00_config_os(ha);
 
-		qla2x00_config_os(ha);
-
 		/* If we found all devices then go ready */
 		if (!(test_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags))) {
 			atomic_set(&ha->loop_state, LOOP_READY);
@@ -1632,7 +1630,6 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 		uint8_t	domain;		
 		uint8_t	loop_id_2100;	/* ISP2100/ISP2200 -- 4 bytes. */
 		uint16_t loop_id;	/* ISP23XX         -- 6 bytes. */
-		uint16_t rsvd;		/* ISP2XXX         -- 8 bytes. */
 	} *id_list;
 #define MAX_ID_LIST_SIZE (sizeof(struct dev_id) * MAX_FIBRE_DEVICES)
 	dma_addr_t	id_list_dma;
@@ -2805,6 +2802,7 @@ qla2x00_device_resync(scsi_qla_host_t *ha)
 		switch (format) {
 		case 0:
 			if (!IS_QLA2100(ha) && !IS_QLA2200(ha) &&
+			    !IS_QLA6312(ha) && !IS_QLA6322(ha) &&
 			    ha->flags.init_done) {
 				/* Handle port RSCN via asyncronous IOCBs */
 				rval2 = qla2x00_handle_port_rscn(ha, rscn_entry,

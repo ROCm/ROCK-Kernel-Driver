@@ -643,8 +643,7 @@ qla2x00_get_fw_version_str(struct scsi_qla_host *ha, char *str)
 	    ha->fw_minor_version,
 	    ha->fw_subminor_version);
 
-	/* Workaround till firmware fix. */
-	if (IS_QLA6312(ha) || IS_QLA6322(ha)) {
+	if (ha->fw_attributes & BIT_9) {
 		strcat(str, "FLX");
 		return (str);
 	}

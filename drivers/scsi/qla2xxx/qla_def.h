@@ -53,22 +53,34 @@
 #define IS_QLA2200(ha)	0
 #endif
 
-#if defined(CONFIG_SCSI_QLA23XX) || defined(CONFIG_SCSI_QLA23XX_MODULE)
+#if defined(CONFIG_SCSI_QLA2300) || defined(CONFIG_SCSI_QLA2300_MODULE)
 #define IS_QLA2300(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2300)
 #define IS_QLA2312(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2312)
-#define IS_QLA2322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2322)
-#define IS_QLA6312(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6312)
-#define IS_QLA6322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6322)
-#define IS_QLA23XX(ha)	(IS_QLA2300(ha) || IS_QLA2312(ha) || IS_QLA2322(ha) || \
-    			 IS_QLA6312(ha) || IS_QLA6322(ha))
 #else
 #define IS_QLA2300(ha)	0
 #define IS_QLA2312(ha)	0
-#define IS_QLA2322(ha)	0
-#define IS_QLA6312(ha)	0
-#define IS_QLA6322(ha)	0
-#define IS_QLA23XX(ha)	0
 #endif
+
+#if defined(CONFIG_SCSI_QLA2322) || defined(CONFIG_SCSI_QLA2322_MODULE)
+#define IS_QLA2322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2322)
+#else
+#define IS_QLA2322(ha)	0
+#endif
+
+#if defined(CONFIG_SCSI_QLA6312) || defined(CONFIG_SCSI_QLA6312_MODULE)
+#define IS_QLA6312(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6312)
+#else
+#define IS_QLA6312(ha)	0
+#endif
+
+#if defined(CONFIG_SCSI_QLA6322) || defined(CONFIG_SCSI_QLA6322_MODULE)
+#define IS_QLA6322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6322)
+#else
+#define IS_QLA6322(ha)	0
+#endif
+
+#define IS_QLA23XX(ha)	(IS_QLA2300(ha) || IS_QLA2312(ha) || IS_QLA2322(ha) || \
+    			 IS_QLA6312(ha) || IS_QLA6322(ha))
 
 /*
  * Only non-ISP2[12]00 have extended addressing support in the firmware.

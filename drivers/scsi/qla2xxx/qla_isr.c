@@ -545,8 +545,8 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		 * us, create a new entry in our rscn fcports list and handle
 		 * the event like an RSCN.
 		 */
-		if (!IS_QLA2100(ha) && !IS_QLA2200(ha) &&
-		    ha->flags.init_done && mb[1] != 0xffff &&
+		if (!IS_QLA2100(ha) && !IS_QLA2200(ha) && !IS_QLA6312(ha) &&
+		    !IS_QLA6322(ha) && ha->flags.init_done && mb[1] != 0xffff &&
 		    ((ha->operating_mode == P2P && mb[1] != 0) ||
 		    (ha->operating_mode != P2P && mb[1] !=
 			SNS_FIRST_LOOP_ID)) && (mb[2] == 6 || mb[2] == 7)) {
@@ -774,7 +774,8 @@ qla2x00_process_response_queue(struct scsi_qla_host *ha)
 			qla2x00_ms_entry(ha, (ms_iocb_entry_t *)pkt);
 			break;
 		case MBX_IOCB_TYPE:
-			if (!IS_QLA2100(ha) && !IS_QLA2200(ha)) {
+			if (!IS_QLA2100(ha) && !IS_QLA2200(ha) &&
+			    !IS_QLA6312(ha) && !IS_QLA6322(ha)) {
 				if (pkt->sys_define == SOURCE_ASYNC_IOCB) {
 					qla2x00_process_iodesc(ha,
 					    (struct mbx_entry *)pkt);

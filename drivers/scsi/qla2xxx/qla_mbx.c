@@ -175,7 +175,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 		/* Wait for either the timer to expire
 		 * or the mbox completion interrupt
 		 */
-		down_interruptible(&ha->mbx_intr_sem);
+		down(&ha->mbx_intr_sem);
 
 		DEBUG11(printk("qla2x00_mailbox_command:"
 		    "waking up."
