@@ -2071,7 +2071,7 @@ static void dump_slb(void)
 
 	printf("SLB contents of cpu %d\n", smp_processor_id());
 
-	for (i = 0; i < naca->slb_size; i++) {
+	for (i = 0; i < SLB_NUM_ENTRIES; i++) {
 		asm volatile("slbmfee  %0,%1" : "=r" (tmp) : "r" (i));
 		printf("%02d %016lx ", i, tmp);
 

@@ -73,7 +73,6 @@ int main(void)
         DEFINE(ICACHEL1LINESIZE, offsetof(struct systemcfg, iCacheL1LineSize));
         DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct naca_struct, iCacheL1LogLineSize));
         DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct naca_struct, iCacheL1LinesPerPage));
-	DEFINE(SLBSIZE, offsetof(struct naca_struct, slb_size));
 	DEFINE(PLATFORM, offsetof(struct systemcfg, platform));
 
 	/* paca */

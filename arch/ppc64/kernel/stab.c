@@ -51,6 +51,14 @@ void stab_initialize(unsigned long stab)
 		make_slbe(esid, vsid, seg0_largepages, 1);
 		asm volatile("isync":::"memory");
 #endif
+
+		/* 
+		 * Bolt in the first vmalloc segment. Since modules end
+		 * up there it gets hit very heavily.
+		 */
+		esid = GET_ESID(VMALLOCBASE);
+		vsid = get_kernel_vsid(VMALLOCBASE); 
+		make_slbe(esid, vsid, 0, 1);
 	} else {
 		asm volatile("isync; slbia; isync":::"memory");
 		make_ste(stab, esid, vsid);
@@ -335,8 +343,12 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	do {
 		entry = castout_entry;
 		castout_entry++; 
-		if (castout_entry >= naca->slb_size)
-			castout_entry = 1; 
+		/* 
+		 * We bolt in the first kernel segment and the first
+		 * vmalloc segment.
+		 */
+		if (castout_entry >= SLB_NUM_ENTRIES)
+			castout_entry = 2;
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
 	} while (esid_data.data.v &&
 		 esid_data.data.esid == GET_ESID(__get_SP()));
@@ -422,6 +434,8 @@ int slb_allocate(unsigned long ea)
 	}
 
 	esid = GET_ESID(ea);
+
+	BUG_ON((esid << SID_SHIFT) == VMALLOCBASE);
 	__slb_allocate(esid, vsid, context);
 
 	return 0;
@@ -478,7 +492,9 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		unsigned long word0;
 		slb_dword0 data;
 	} esid_data;
+	unsigned long esid, vsid;
 
+	WARN_ON(!irqs_disabled());
 
 	if (offset <= NR_STAB_CACHE_ENTRIES) {
 		int i;
@@ -486,11 +502,23 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		for (i = 0; i < offset; i++) {
 			esid_data.word0 = 0;
 			esid_data.data.esid = __get_cpu_var(stab_cache[i]);
+			BUG_ON(esid_data.data.esid == GET_ESID(VMALLOCBASE));
 			asm volatile("slbie %0" : : "r" (esid_data));
 		}
 		asm volatile("isync" : : : "memory");
 	} else {
 		asm volatile("isync; slbia; isync" : : : "memory");
+
+		/* 
+		 * Bolt in the first vmalloc segment. Since modules end
+		 * up there it gets hit very heavily. We must not touch
+		 * the vmalloc region between the slbia and here, thats
+		 * why we require interrupts off.
+		 */
+		esid = GET_ESID(VMALLOCBASE);
+		vsid = get_kernel_vsid(VMALLOCBASE); 
+		get_paca()->xStab_data.next_round_robin = 1;
+		make_slbe(esid, vsid, 0, 1);
 	}
 
 	/* Workaround POWER5 < DD2.1 issue */
