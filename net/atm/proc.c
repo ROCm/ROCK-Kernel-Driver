@@ -24,6 +24,7 @@
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/errno.h>
 #include <linux/atm.h>
 #include <linux/atmdev.h>
@@ -64,31 +65,29 @@ static struct file_operations proc_spec_atm_operations = {
 	.read =		proc_spec_atm_read,
 };
 
-static void add_stats(char *buf,const char *aal,
+static void add_stats(struct seq_file *seq, const char *aal,
   const struct k_atm_aal_stats *stats)
 {
-	sprintf(strchr(buf,0),"%s ( %d %d %d %d %d )",aal,
+	seq_printf(seq, "%s ( %d %d %d %d %d )", aal,
 	    atomic_read(&stats->tx),atomic_read(&stats->tx_err),
 	    atomic_read(&stats->rx),atomic_read(&stats->rx_err),
 	    atomic_read(&stats->rx_drop));
 }
 
-
-static void atm_dev_info(const struct atm_dev *dev,char *buf)
+static void atm_dev_info(struct seq_file *seq, const struct atm_dev *dev)
 {
-	int off,i;
+	int i;
 
-	off = sprintf(buf,"%3d %-8s",dev->number,dev->type);
+	seq_printf(seq, "%3d %-8s", dev->number, dev->type);
 	for (i = 0; i < ESI_LEN; i++)
-		off += sprintf(buf+off,"%02x",dev->esi[i]);
-	strcat(buf,"  ");
-	add_stats(buf,"0",&dev->stats.aal0);
-	strcat(buf,"  ");
-	add_stats(buf,"5",&dev->stats.aal5);
-	sprintf(strchr(buf,0), "\t[%d]", atomic_read(&dev->refcnt));
-	strcat(buf,"\n");
+		seq_printf(seq, "%02x", dev->esi[i]);
+	seq_puts(seq, "  ");
+	add_stats(seq, "0", &dev->stats.aal0);
+	seq_puts(seq, "  ");
+	add_stats(seq, "5", &dev->stats.aal5);
+	seq_printf(seq, "\t[%d]", atomic_read(&dev->refcnt));
+	seq_putc(seq, '\n');
 }
-
 
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 
@@ -303,29 +302,40 @@ lec_info(struct lec_arp_table *entry, char *buf)
 
 #endif
 
-static int atm_devices_info(loff_t pos,char *buf)
+static int atm_dev_seq_show(struct seq_file *seq, void *v)
 {
-	struct atm_dev *dev;
-	struct list_head *p;
-	int left;
+	static char atm_dev_banner[] =
+		"Itf Type    ESI/\"MAC\"addr "
+		"AAL(TX,err,RX,err,drop) ...               [refcnt]\n";
+ 
+	if (v == (void *)1)
+		seq_puts(seq, atm_dev_banner);
+	else {
+		struct atm_dev *dev = list_entry(v, struct atm_dev, dev_list);
 
-	if (!pos) {
-		return sprintf(buf,"Itf Type    ESI/\"MAC\"addr "
-		    "AAL(TX,err,RX,err,drop) ...               [refcnt]\n");
+		atm_dev_info(seq, dev);
 	}
-	left = pos-1;
-	spin_lock(&atm_dev_lock);
-	list_for_each(p, &atm_devs) {
-		dev = list_entry(p, struct atm_dev, dev_list);
-		if (left-- == 0) {
-			atm_dev_info(dev,buf);
-			spin_unlock(&atm_dev_lock);
-			return strlen(buf);
-		}
-	}
-	spin_unlock(&atm_dev_lock);
-	return 0;
+ 	return 0;
 }
+ 
+static struct seq_operations atm_dev_seq_ops = {
+	.start	= atm_dev_seq_start,
+	.next	= atm_dev_seq_next,
+	.stop	= atm_dev_seq_stop,
+	.show	= atm_dev_seq_show,
+};
+ 
+static int atm_dev_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &atm_dev_seq_ops);
+}
+ 
+static struct file_operations devices_seq_fops = {
+	.open		= atm_dev_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
 
 /*
  * FIXME: it isn't safe to walk the VCC list without turning off interrupts.
@@ -630,6 +640,14 @@ void atm_proc_dev_deregister(struct atm_dev *dev)
 	kfree(dev->proc_name);
 }
 
+#define CREATE_SEQ_ENTRY(name) \
+	do { \
+		name = create_proc_entry(#name, S_IRUGO, atm_proc_root); \
+		if (!name) \
+			goto cleanup; \
+		name->proc_fops = & name##_seq_fops; \
+		name->owner = THIS_MODULE; \
+	} while (0)
 
 #define CREATE_ENTRY(name) \
     name = create_proc_entry(#name,0,atm_proc_root); \
@@ -663,7 +681,7 @@ int __init atm_proc_init(void)
 	atm_proc_root = proc_mkdir("net/atm",NULL);
 	if (!atm_proc_root)
 		return -ENOMEM;
-	CREATE_ENTRY(devices);
+	CREATE_SEQ_ENTRY(devices);
 	CREATE_ENTRY(pvc);
 	CREATE_ENTRY(svc);
 	CREATE_ENTRY(vc);

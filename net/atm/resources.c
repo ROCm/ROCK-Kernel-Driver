@@ -395,6 +395,35 @@ done:
 	return error;
 }
 
+static __inline__ void *dev_get_idx(loff_t left)
+{
+	struct list_head *p;
+
+	list_for_each(p, &atm_devs) {
+		if (!--left)
+			break;
+	}
+	return (p != &atm_devs) ? p : NULL;
+}
+
+void *atm_dev_seq_start(struct seq_file *seq, loff_t *pos)
+{
+ 	spin_lock(&atm_dev_lock);
+	return *pos ? dev_get_idx(*pos) : (void *) 1;
+}
+
+void atm_dev_seq_stop(struct seq_file *seq, void *v)
+{
+ 	spin_unlock(&atm_dev_lock);
+}
+ 
+void *atm_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	v = (v == (void *)1) ? atm_devs.next : ((struct list_head *)v)->next;
+	return (v == &atm_devs) ? NULL : v;
+}
+
 
 EXPORT_SYMBOL(atm_dev_register);
 EXPORT_SYMBOL(atm_dev_deregister);
