@@ -243,6 +243,7 @@ void __init time_init(void)
 
 		if ((CMOS_READ(RTC_REG_A) & 0x7f) == RTC_REF_CLCK_32KHZ &&
 		    CMOS_READ(RTC_REG_B) == reg_b) {
+			struct timespec tv;
 
 			/*
 			 * We have a RTC.  Check the battery
@@ -250,7 +251,9 @@ void __init time_init(void)
 			if ((reg_d & 0x80) == 0)
 				printk(KERN_WARNING "RTC: *** warning: CMOS battery bad\n");
 
-			xtime.tv_sec = get_isa_cmos_time();
+			tv.tv_nsec = 0;
+			tv.tv_sec = get_isa_cmos_time();
+			do_settimeofday(&tv);
 			set_rtc = set_isa_cmos_time;
 		} else
 			rtc_base = 0;
