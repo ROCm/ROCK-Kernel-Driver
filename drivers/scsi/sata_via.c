@@ -124,6 +124,15 @@ static struct ata_port_operations svia_sata_ops = {
 	.port_stop		= ata_port_stop,
 };
 
+static struct ata_port_info svia_port_info = {
+	.sht		= &svia_sht,
+	.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SRST | ATA_FLAG_NO_LEGACY,
+	.pio_mask	= 0x1f,
+	.mwdma_mask	= 0x07,
+	.udma_mask	= 0x7f,
+	.port_ops	= &svia_sata_ops,
+};
+
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("SCSI low-level driver for VIA SATA controllers");
 MODULE_LICENSE("GPL");
@@ -157,6 +166,7 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	static int printed_version;
 	unsigned int i;
 	int rc;
+	struct ata_port_info *ppi;
 	struct ata_probe_ent *probe_ent;
 	u8 tmp8;
 
@@ -197,42 +207,17 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_regions;
 
-	probe_ent = kmalloc(sizeof(*probe_ent), GFP_KERNEL);
+	ppi = &svia_port_info;
+	probe_ent = ata_pci_init_native_mode(pdev, &ppi);
 	if (!probe_ent) {
 		printk(KERN_ERR DRV_NAME "(%s): out of memory\n",
 		       pci_name(pdev));
 		rc = -ENOMEM;
 		goto err_out_regions;
 	}
-	memset(probe_ent, 0, sizeof(*probe_ent));
-	INIT_LIST_HEAD(&probe_ent->node);
-	probe_ent->pdev = pdev;
-	probe_ent->sht = &svia_sht;
-	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SRST |
-				ATA_FLAG_NO_LEGACY;
-	probe_ent->port_ops = &svia_sata_ops;
-	probe_ent->n_ports = 2;
-	probe_ent->irq = pdev->irq;
-	probe_ent->irq_flags = SA_SHIRQ;
-	probe_ent->pio_mask = 0x1f;
-	probe_ent->mwdma_mask = 0x07;
-	probe_ent->udma_mask = 0x7f;
 
-	probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
-	ata_std_ports(&probe_ent->port[0]);
-	probe_ent->port[0].altstatus_addr =
-	probe_ent->port[0].ctl_addr =
-		pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS;
-	probe_ent->port[0].bmdma_addr = pci_resource_start(pdev, 4);
 	probe_ent->port[0].scr_addr =
 		svia_scr_addr(pci_resource_start(pdev, 5), 0);
-
-	probe_ent->port[1].cmd_addr = pci_resource_start(pdev, 2);
-	ata_std_ports(&probe_ent->port[1]);
-	probe_ent->port[1].altstatus_addr =
-	probe_ent->port[1].ctl_addr =
-		pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS;
-	probe_ent->port[1].bmdma_addr = pci_resource_start(pdev, 4) + 8;
 	probe_ent->port[1].scr_addr =
 		svia_scr_addr(pci_resource_start(pdev, 5), 1);
 
