@@ -550,6 +550,74 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 
 /*-------------------------------------------------------------------------*/
 
+static void unlink1_callback (struct urb *urb)
+{
+	int	status = urb->status;
+
+	// we "know" -EPIPE (stall) never happens
+	if (!status)
+		status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status) {
+		if (status == -ECONNRESET || status == -ENOENT)
+			status = 0;
+		urb->status = status;
+		complete ((struct completion *) urb->context);
+	}
+}
+
+static int unlink1 (struct usbtest_dev *dev, int pipe, int size, int async)
+{
+	struct urb		*urb;
+	struct completion	completion;
+	int			retval = 0;
+
+	init_completion (&completion);
+	urb = simple_alloc_urb (testdev_to_usbdev (dev), pipe, size);
+	if (async)
+		urb->transfer_flags |= URB_ASYNC_UNLINK;
+	urb->context = &completion;
+	urb->complete = unlink1_callback;
+
+	/* keep the endpoint busy.  there are lots of hc/hcd-internal
+	 * states, and testing should get to all of them over time.
+	 *
+	 * FIXME want additional tests for when endpoint is STALLing
+	 * due to errors, or is just NAKing requests.
+	 */
+	if ((retval = usb_submit_urb (urb, SLAB_KERNEL)) != 0) {
+		dbg ("submit/unlink fail %d", retval);
+		return retval;
+	}
+
+	/* unlinking that should always work.  variable delay tests more
+	 * hcd states and code paths, even with little other system load.
+	 */
+	wait_ms (jiffies % (2 * INTERRUPT_RATE));
+	retval = usb_unlink_urb (urb);
+	if (!(retval == 0 || retval == -EINPROGRESS)) {
+		dbg ("submit/unlink fail %d", retval);
+		return retval;
+	}
+
+	wait_for_completion (&completion);
+	retval = urb->status;
+	simple_free_urb (urb);
+	return retval;
+}
+
+static int unlink_simple (struct usbtest_dev *dev, int pipe, int len)
+{
+	int			retval = 0;
+
+	/* test sync and async paths */
+	retval = unlink1 (dev, pipe, len, 1);
+	if (!retval)
+		retval = unlink1 (dev, pipe, len, 0);
+	return retval;
+}
+
+/*-------------------------------------------------------------------------*/
+
 /* We only have this one interface to user space, through usbfs.
  * User mode code can scan usbfs to find N different devices (maybe on
  * different busses) to use when testing, and allocate one thread per
@@ -560,7 +628,8 @@ static int ch9_postconfig (struct usbtest_dev *dev)
  * video capture, and so on.  Run different tests at different times, in
  * different sequences.  Nothing here should interact with other devices,
  * except indirectly by consuming USB bandwidth and CPU resources for test
- * threads and request completion.
+ * threads and request completion.  But the only way to know that for sure
+ * is to test when HC queues are in use by many devices.
  */
 
 static int
@@ -761,13 +830,35 @@ usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *buf)
 			dbg ("ch9 subset failed, iterations left %d", i);
 		break;
 
-	/* test cases for the unlink/cancel codepaths need a thread to
-	 * usb_unlink_urb() or usg_sg_cancel(), and a way to check if
-	 * the urb/sg_request was properly canceled.
-	 *
-	 * for the unlink-queued cases, the usb_sg_*() code uses/tests
-	 * the "streamed" cleanup mode, not the "packet" one
-	 */
+	// case 10: queued control
+
+	/* simple non-queued unlinks (ring with one urb) */
+	case 11:
+		if (dev->in_pipe == 0 || !param->length)
+			break;
+		retval = 0;
+		dbg ("%s TEST 11:  unlink %d reads of %d",
+				dev->id, param->iterations, param->length);
+		for (i = param->iterations; retval == 0 && i--; /* NOP */)
+			retval = unlink_simple (dev, dev->in_pipe, param->length);
+		if (retval)
+			dbg ("unlink reads failed, iterations left %d", i);
+		break;
+	case 12:
+		if (dev->out_pipe == 0 || !param->length)
+			break;
+		retval = 0;
+		dbg ("%s TEST 12:  unlink %d writes of %d",
+				dev->id, param->iterations, param->length);
+		for (i = param->iterations; retval == 0 && i--; /* NOP */)
+			retval = unlink_simple (dev, dev->out_pipe, param->length);
+		if (retval)
+			dbg ("unlink writes failed, iterations left %d", i);
+		break;
+
+	// FIXME unlink from queue (ring with N urbs)
+
+	// FIXME scatterlist cancel (needs helper thread)
 
 	}
 	do_gettimeofday (&param->duration);

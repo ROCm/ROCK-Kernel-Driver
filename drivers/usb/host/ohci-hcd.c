@@ -271,7 +271,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 	unsigned long		flags;
 	
-#ifdef DEBUG
+#ifdef OHCI_VERBOSE_DEBUG
 	urb_print (urb, "UNLINK", 1);
 #endif		  
 
@@ -514,7 +514,7 @@ static int hc_start (struct ohci_hcd *ohci)
 
 	usb_connect (udev);
 	udev->speed = USB_SPEED_FULL;
-	if (usb_register_root_hub (udev, ohci->parent_dev) != 0) {
+	if (usb_register_root_hub (udev, ohci->hcd.controller) != 0) {
 		usb_free_dev (udev);
 		ohci->hcd.self.root_hub = NULL;
 		disable (ohci);

@@ -159,6 +159,7 @@ struct hiddev_usage_ref {
 #define HIDIOCSFLAG		_IOW('H', 0x0F, int)
 #define HIDIOCGCOLLECTIONINDEX	_IOW('H', 0x10, struct hiddev_usage_ref)
 #define HIDIOCGCOLLECTIONINFO	_IOWR('H', 0x11, struct hiddev_collection_info)
+#define HIDIOCGPHYS(len)	_IOC(_IOC_READ, 'H', 0x12, len)
 
 /* 
  * Flags to be used in HIDIOCSFLAG

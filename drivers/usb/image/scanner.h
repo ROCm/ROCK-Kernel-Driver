@@ -211,10 +211,10 @@ static struct usb_device_id scanner_device_ids [] = {
 
 MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 
-#define IS_EP_BULK(ep)  ((ep).desc.bmAttributes == USB_ENDPOINT_XFER_BULK ? 1 : 0)
-#define IS_EP_BULK_IN(ep) (IS_EP_BULK(ep) && ((ep).desc.bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN)
-#define IS_EP_BULK_OUT(ep) (IS_EP_BULK(ep) && ((ep).desc.bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT)
-#define IS_EP_INTR(ep) ((ep).desc.bmAttributes == USB_ENDPOINT_XFER_INT ? 1 : 0)
+#define IS_EP_BULK(ep)  ((ep)->bmAttributes == USB_ENDPOINT_XFER_BULK ? 1 : 0)
+#define IS_EP_BULK_IN(ep) (IS_EP_BULK(ep) && ((ep)->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN)
+#define IS_EP_BULK_OUT(ep) (IS_EP_BULK(ep) && ((ep)->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT)
+#define IS_EP_INTR(ep) ((ep)->bmAttributes == USB_ENDPOINT_XFER_INT ? 1 : 0)
 
 #define USB_SCN_MINOR(X) minor((X)->i_rdev) - SCN_BASE_MNR
 

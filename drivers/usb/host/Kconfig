@@ -49,7 +49,7 @@ config USB_OHCI_HCD
 	  The module will be called ohci-hcd.o. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
-config USB_UHCI_HCD_ALT
+config USB_UHCI_HCD
 	tristate "UHCI HCD (most Intel and VIA) support"
 	depends on USB
 	---help---

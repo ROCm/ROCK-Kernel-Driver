@@ -615,12 +615,6 @@ acpi_battery_add_fs (
 
 	ACPI_FUNCTION_TRACE("acpi_battery_add_fs");
 
-	if (!acpi_battery_dir) {
-		acpi_battery_dir = proc_mkdir(ACPI_BATTERY_CLASS, acpi_root_dir);
-		if (!acpi_battery_dir)
-			return_VALUE(-ENODEV);
-	}
-
 	if (!acpi_device_dir(device)) {
 		acpi_device_dir(device) = proc_mkdir(acpi_device_bid(device),
 			acpi_battery_dir);
@@ -674,9 +668,6 @@ acpi_battery_remove_fs (
 	struct acpi_device	*device)
 {
 	ACPI_FUNCTION_TRACE("acpi_battery_remove_fs");
-
-	if (!acpi_battery_dir)
-		return_VALUE(-ENODEV);
 
 	if (acpi_device_dir(device))
 		remove_proc_entry(acpi_device_bid(device), acpi_battery_dir);
@@ -812,6 +803,10 @@ acpi_battery_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_battery_init");
 
+	acpi_battery_dir = proc_mkdir(ACPI_BATTERY_CLASS, acpi_root_dir);
+	if (!acpi_battery_dir)
+		return_VALUE(-ENODEV);
+
 	result = acpi_bus_register_driver(&acpi_battery_driver);
 	if (result < 0) {
 		remove_proc_entry(ACPI_BATTERY_CLASS, acpi_root_dir);
@@ -825,13 +820,11 @@ acpi_battery_init (void)
 static void __exit
 acpi_battery_exit (void)
 {
-	int			result = 0;
-
 	ACPI_FUNCTION_TRACE("acpi_battery_exit");
 
-	result = acpi_bus_unregister_driver(&acpi_battery_driver);
-	if (!result)
-		remove_proc_entry(ACPI_BATTERY_CLASS, acpi_root_dir);
+	acpi_bus_unregister_driver(&acpi_battery_driver);
+
+	remove_proc_entry(ACPI_BATTERY_CLASS, acpi_root_dir);
 
 	return_VOID;
 }

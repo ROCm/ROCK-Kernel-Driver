@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 120 $
+ *              $Revision: 121 $
  *
  *****************************************************************************/
 
@@ -107,28 +107,24 @@ acpi_ex_decode_field_access (
 		break;
 
 	case AML_FIELD_ACCESS_BYTE:
+	case AML_FIELD_ACCESS_BUFFER:   /* ACPI 2.0 (SMBus Buffer) */
 		byte_alignment = 1;
-		bit_length = 8;
+		bit_length    = 8;
 		break;
 
 	case AML_FIELD_ACCESS_WORD:
 		byte_alignment = 2;
-		bit_length = 16;
+		bit_length    = 16;
 		break;
 
 	case AML_FIELD_ACCESS_DWORD:
 		byte_alignment = 4;
-		bit_length = 32;
+		bit_length    = 32;
 		break;
 
-	case AML_FIELD_ACCESS_QWORD:  /* ACPI 2.0 */
+	case AML_FIELD_ACCESS_QWORD:    /* ACPI 2.0 */
 		byte_alignment = 8;
-		bit_length = 64;
-		break;
-
-	case AML_FIELD_ACCESS_BUFFER:  /* ACPI 2.0 */
-		byte_alignment = 8;
-		bit_length = 8;
+		bit_length    = 64;
 		break;
 
 	default:
