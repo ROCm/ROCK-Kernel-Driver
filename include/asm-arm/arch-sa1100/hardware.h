@@ -96,6 +96,8 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
  * ifdefs, and lots of other preprocessor gunk elsewhere.
  */
 
+#include "badge4.h"
+
 #ifdef CONFIG_SA1100_PANGOLIN
 #include "pangolin.h"
 #endif
