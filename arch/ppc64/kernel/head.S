@@ -1248,9 +1248,6 @@ _GLOBAL(__start_initialization_pSeries)
 	mr	r29,r5
 	mr	r28,r6
 	mr	r27,r7
-	mr	r26,r8                  /* YABOOT: debug_print() routine */
-	mr	r25,r9                  /* YABOOT: debug_delay() routine */
-	mr	r24,r10                 /* YABOOT: debug_prom() routine */
 
 	bl	.enable_64b_mode
 
@@ -1295,9 +1292,6 @@ _GLOBAL(__start_initialization_pSeries)
 	mr	r5,r29
 	mr	r6,r28
 	mr	r7,r27
-	mr	r8,r26
-	mr	r9,r25
-	mr	r10,r24
 
 	bl	.prom_init
 
