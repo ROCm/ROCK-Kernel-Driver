@@ -7,26 +7,18 @@
  * @author John Levon <levon@movementarian.org>
  */
 
-#include <linux/oprofile.h>
 #include <linux/fs.h>
-#include <linux/slab.h>
-#include <asm/uaccess.h>
- 
-#include "oprof.h"
+#include <linux/oprofile.h>
+
 #include "event_buffer.h"
 #include "oprofile_stats.h"
+#include "oprof.h"
  
 unsigned long fs_buffer_size = 131072;
 unsigned long fs_cpu_buffer_size = 8192;
 unsigned long fs_buffer_watershed = 32768; /* FIXME: tune */
 
  
-static int simple_open(struct inode * inode, struct file * filp)
-{
-	return 0;
-}
-
-
 static ssize_t cpu_type_read(struct file * file, char * buf, size_t count, loff_t * offset)
 {
 	unsigned long cpu_type = oprofile_cpu_type;
@@ -36,7 +28,6 @@ static ssize_t cpu_type_read(struct file * file, char * buf, size_t count, loff_
  
  
 static struct file_operations cpu_type_fops = {
-	.open		= simple_open,
 	.read		= cpu_type_read,
 };
  
@@ -71,15 +62,26 @@ static ssize_t enable_write(struct file *file, char const * buf, size_t count, l
 
  
 static struct file_operations enable_fops = {
-	.open		= simple_open,
 	.read		= enable_read,
 	.write		= enable_write,
 };
 
+
+static ssize_t dump_write(struct file *file, char const * buf, size_t count, loff_t * offset)
+{
+	wake_up_buffer_waiter();
+	return count;
+}
+
+
+static struct file_operations dump_fops = {
+	.write		= dump_write,
+};
  
 void oprofile_create_files(struct super_block * sb, struct dentry * root)
 {
 	oprofilefs_create_file(sb, root, "enable", &enable_fops);
+	oprofilefs_create_file(sb, root, "dump", &dump_fops);
 	oprofilefs_create_file(sb, root, "buffer", &event_buffer_fops);
 	oprofilefs_create_ulong(sb, root, "buffer_size", &fs_buffer_size);
 	oprofilefs_create_ulong(sb, root, "buffer_watershed", &fs_buffer_watershed);

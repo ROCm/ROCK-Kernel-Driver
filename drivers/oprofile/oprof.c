@@ -10,12 +10,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/module.h>
-#include <linux/sched.h>
-#include <linux/notifier.h>
-#include <linux/profile.h>
 #include <linux/oprofile.h>
+#include <asm/semaphore.h>
 
 #include "oprof.h"
 #include "event_buffer.h"
@@ -82,11 +78,12 @@ int oprofile_start(void)
 	if (oprofile_started)
 		goto out;
  
+	oprofile_reset_stats();
+
 	if ((err = oprofile_ops->start()))
 		goto out;
 
 	oprofile_started = 1;
-	oprofile_reset_stats();
 out:
 	up(&start_sem); 
 	return err;
@@ -148,6 +145,10 @@ static void __exit oprofile_exit(void)
 	oprofilefs_unregister();
 }
 
-MODULE_LICENSE("GPL");
+ 
 module_init(oprofile_init);
 module_exit(oprofile_exit);
+ 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("John Levon <levon@movementarian.org>");
+MODULE_DESCRIPTION("OProfile system profiler");
