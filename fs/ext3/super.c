@@ -735,6 +735,10 @@ static int parse_options (char * options, struct ext3_sb_info *sbi,
 		case Opt_commit:
 			if (match_int(&args[0], &option))
 				return 0;
+			if (option < 0)
+				return 0;
+			if (option == 0)
+				option = JBD_DEFAULT_MAX_COMMIT_AGE;
 			sbi->s_commit_interval = HZ * option;
 			break;
 		case Opt_data_journal:
