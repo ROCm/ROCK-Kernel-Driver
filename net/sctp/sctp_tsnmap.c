@@ -74,7 +74,7 @@ sctp_tsnmap_t *sctp_tsnmap_new(__u16 len, __u32 initial_tsn, int priority)
 	return retval;
 
 fail_map:
-	kfree retval;
+	kfree(retval);
 
 fail:
 	return NULL;
