@@ -67,7 +67,7 @@ uint32_t ixgb_mac_reset(struct ixgb_hw *hw)
 	/* Delay a few ms just to allow the reset to complete */
 	msec_delay(IXGB_DELAY_AFTER_RESET);
 	ctrl_reg = IXGB_READ_REG(hw, CTRL0);
-#if DBG
+#ifdef DBG
 	/* Make sure the self-clearing global reset bit did self clear */
 	ASSERT(!(ctrl_reg & IXGB_CTRL0_RST));
 #endif
