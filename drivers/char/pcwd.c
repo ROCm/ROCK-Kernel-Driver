@@ -238,7 +238,7 @@ static void pcwd_send_heartbeat(void)
 static int pcwd_ioctl(struct inode *inode, struct file *file,
 		      unsigned int cmd, unsigned long arg)
 {
-	int i, cdat, rv;
+	int cdat, rv;
 	static struct watchdog_info ident=
 	{
 		WDIOF_OVERHEAT|WDIOF_CARDRESET,
@@ -251,8 +251,9 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 		return -ENOTTY;
 
 	case WDIOC_GETSUPPORT:
-		i = copy_to_user((void*)arg, &ident, sizeof(ident));
-		return i ? -EFAULT : 0;
+		if(copy_to_user((void*)arg, &ident, sizeof(ident)))
+			return -EFAULT;
+		return 0;
 
 	case WDIOC_GETSTATUS:
 		spin_lock(&io_lock);
@@ -575,7 +576,6 @@ static int __init pcwatchdog_init(void)
 	printk("pcwd: v%s Ken Hollis (kenji@bitgate.com)\n", WD_VER);
 
 	/* Initial variables */
-	set_bit( 0, &open_allowed );
 	supports_temp = 0;
 	mode_debug = 0;
 	temp_panic = 0;
