@@ -627,7 +627,7 @@ static void ar_interrupt(int irq, void *dev, struct pt_regs *regs)
  */
 static int ar_initialize(struct video_device *dev)
 {
-	struct ar_device *ar = (struct ar_device *)dev->priv;
+	struct ar_device *ar = dev->priv;
 	unsigned long cr = 0;
 	int i,found=0;
 
