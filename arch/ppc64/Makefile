@@ -15,6 +15,7 @@
 
 KERNELLOAD	=0xc000000000000000
 
+LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	= -T arch/ppc64/vmlinux.lds -Bstatic \
 		-e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		:= $(CFLAGS) -fsigned-char -msoft-float -pipe \
