@@ -60,12 +60,8 @@ config IP_MULTIPLE_TABLES
 	  Normally, a router decides what to do with a received packet based
 	  solely on the packet's final destination address. If you say Y here,
 	  the Linux router will also be able to take the packet's source
-	  address into account. Furthermore, if you also say Y to "Use TOS
-	  value as routing key" below, the TOS (Type-Of-Service) field of the
-	  packet can be used for routing decisions as well. In addition, if
-	  you say Y here and to "Fast network address translation" below,
-	  the router will also be able to modify source and destination
-	  addresses of forwarded packets.
+	  address into account. Furthermore, the TOS (Type-Of-Service) field
+	  of the packet can be used for routing decisions as well.
 
 	  If you are interested in this, please see the preliminary
 	  documentation at <http://www.compendium.com.ar/policy-routing.txt>
