@@ -127,8 +127,9 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	if (dev == NULL)
 		dev = skb->dev;
 
-        if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
-                return 1;
+        if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL) {
+                goto put;
+	}
 
 	if (bp[16] == AX25_P_IP) {
 		if (route->ip_mode == 'V' || (route->ip_mode == ' ' && ax25_dev->values[AX25_VALUES_IPDEFMODE])) {
@@ -153,7 +154,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 
 			if ((ourskb = skb_copy(skb, GFP_ATOMIC)) == NULL) {
 				kfree_skb(skb);
-				return 1;
+				goto put;
 			}
 
 			if (skb->sk != NULL)
@@ -170,7 +171,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 			ax25_send_frame(ourskb, ax25_dev->values[AX25_VALUES_PACLEN], &src_c, 
 &dst_c, route->digipeat, dev);
 
-			return 1;
+			goto put;
 		}
 	}
 
@@ -187,7 +188,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	if (route->digipeat != NULL) {
 		if ((ourskb = ax25_rt_build_path(skb, src, dst, route->digipeat)) == NULL) {
 			kfree_skb(skb);
-			return 1;
+			goto put;
 		}
 
 		skb = ourskb;
@@ -196,6 +197,9 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	skb->dev      = dev;
 
 	ax25_queue_xmit(skb);
+
+put:
+	ax25_put_route(route);
 
   	return 1;
 }
