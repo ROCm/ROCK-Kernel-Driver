@@ -11,9 +11,17 @@
 #include "of1275.h"
 
 prom_entry of_prom_entry;
+ihandle of_prom_mmu;
 
 void
 ofinit(prom_entry prom_ptr)
 {
+    phandle chosen;
+
     of_prom_entry = prom_ptr;
+   
+    if ((chosen = finddevice("/chosen")) == OF_INVALID_HANDLE)
+	return;
+    if (getprop(chosen, "mmu", &of_prom_mmu, sizeof(ihandle)) != 4)
+	return;
 }

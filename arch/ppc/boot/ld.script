@@ -66,7 +66,7 @@ SECTIONS
   _edata  =  .;
   PROVIDE (edata = .);
 
-  . = ALIGN(8);
+  . = ALIGN(4096);
   __bss_start = .;
   .bss       :
   {

@@ -9,7 +9,7 @@
 	.text
 
 /*
- * Use the BAT3 registers to map the 1st 8MB of RAM to
+ * Use the BAT2 & 3 registers to map the 1st 16MB of RAM to
  * the address given as the 1st argument.
  */
 	.globl	setup_bats
@@ -22,6 +22,10 @@ setup_bats:
 	mtibatl	3,0			/* invalidate BAT first */
 	ori	3,3,4			/* set up BAT registers for 601 */
 	li	4,0x7f
+	mtibatu	2,3
+	mtibatl	2,4
+	oris	3,3,0x80
+	oris	4,4,0x80
 	mtibatu	3,3
 	mtibatl	3,4
 	b	5f
@@ -29,6 +33,12 @@ setup_bats:
 	mtibatu	3,0
 	ori	3,3,0xff		/* set up BAT registers for 604 */
 	li	4,2
+	mtdbatl	2,4
+	mtdbatu	2,3
+	mtibatl	2,4
+	mtibatu	2,3
+	oris	3,3,0x80
+	oris	4,4,0x80
 	mtdbatl	3,4
 	mtdbatu	3,3
 	mtibatl	3,4
