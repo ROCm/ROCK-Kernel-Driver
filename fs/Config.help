@@ -576,6 +576,12 @@ CONFIG_NFSD_V3
   If you would like to include the NFSv3 server as well as the NFSv2
   server, say Y here.  If unsure, say Y.
 
+CONFIG_NFSD_V4
+  If you would like to include the NFSv4 server as well as the NFSv2
+  and NFSv3 servers, say Y here.  This feature is experimental, and
+  should only be used if you are interested in helping to test NFSv4.
+  If unsure, say N.
+
 CONFIG_NFSD_TCP
   Enable NFS service over TCP connections.  This the officially
   still experimental, but seems to work well.
