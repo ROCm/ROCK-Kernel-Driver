@@ -755,8 +755,10 @@ Module parameters
 
     port	- port number or -1 (disable)
     irq		- IRQ number or -1 (disable)
+    acpipnp	- ACPI PnP detection - 0 = disable, 1 = enable (default)
 
-    Module supports multiple devices (max 8).
+    Module supports multiple devices (max 8) and ACPI PnP.  If PnP is not
+    used (or ACPI not enabled), port and irq must be specified.
     
   Module snd-mtpav
   ----------------
