@@ -602,8 +602,9 @@ static struct file_operations tun_fops = {
 
 static struct miscdevice tun_miscdev = {
 	.minor = TUN_MINOR,
-	.name = "net/tun",
-	.fops = &tun_fops
+	.name = "tun",
+	.fops = &tun_fops,
+	.devfs_name = "net/tun",
 };
 
 int __init tun_init(void)
