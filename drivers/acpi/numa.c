@@ -172,7 +172,7 @@ acpi_numa_init()
 					       NR_CPUS);
 		result = acpi_table_parse_srat(ACPI_SRAT_MEMORY_AFFINITY,
 					       acpi_parse_memory_affinity,
-					       NR_NODE_MEMBLKS);
+					       NR_NODE_MEMBLKS);	// IA64 specific
 	} else {
 		/* FIXME */
 		printk("Warning: acpi_table_parse(ACPI_SRAT) returned %d!\n",result);
