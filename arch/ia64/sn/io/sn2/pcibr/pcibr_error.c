@@ -19,8 +19,6 @@
 
 extern int	hubii_check_widget_disabled(nasid_t, int);
 
-#define kdebug 0
-
 
 /* =====================================================================
  *    ERROR HANDLING
@@ -130,29 +128,6 @@ static struct reg_values       space_v[] =
 struct reg_desc         space_desc[] =
 {
     {0xFF, 0, "space", 0, space_v},
-    {0}
-};
-#define	device_desc	device_bits
-static struct reg_desc   device_bits[] =
-{
-    {BRIDGE_DEV_ERR_LOCK_EN, 0, "ERR_LOCK_EN"},
-    {BRIDGE_DEV_PAGE_CHK_DIS, 0, "PAGE_CHK_DIS"},
-    {BRIDGE_DEV_FORCE_PCI_PAR, 0, "FORCE_PCI_PAR"},
-    {BRIDGE_DEV_VIRTUAL_EN, 0, "VIRTUAL_EN"},
-    {BRIDGE_DEV_PMU_WRGA_EN, 0, "PMU_WRGA_EN"},
-    {BRIDGE_DEV_DIR_WRGA_EN, 0, "DIR_WRGA_EN"},
-    {BRIDGE_DEV_DEV_SIZE, 0, "DEV_SIZE"},
-    {BRIDGE_DEV_RT, 0, "RT"},
-    {BRIDGE_DEV_SWAP_PMU, 0, "SWAP_PMU"},
-    {BRIDGE_DEV_SWAP_DIR, 0, "SWAP_DIR"},
-    {BRIDGE_DEV_PREF, 0, "PREF"},
-    {BRIDGE_DEV_PRECISE, 0, "PRECISE"},
-    {BRIDGE_DEV_COH, 0, "COH"},
-    {BRIDGE_DEV_BARRIER, 0, "BARRIER"},
-    {BRIDGE_DEV_GBR, 0, "GBR"},
-    {BRIDGE_DEV_DEV_SWAP, 0, "DEV_SWAP"},
-    {BRIDGE_DEV_DEV_IO_MEM, 0, "DEV_IO_MEM"},
-    {BRIDGE_DEV_OFF_MASK, BRIDGE_DEV_OFF_ADDR_SHFT, "DEV_OFF", "%x"},
     {0}
 };
 
@@ -388,7 +363,7 @@ pcibr_error_dump(pcibr_soft_t pcibr_soft)
 
 	    case PIC_ISR_PCIX_ARB_ERR:	    /* bit40	PCI_X_ARB_ERR */
 		/* XXX: should breakdown meaning of bits in reg */
-		printk( "\t	Arbitration Reg: 0x%x\n",
+		printk( "\t	Arbitration Reg: 0x%lx\n",
 		    bridge->b_arb);
 		break;
 
@@ -622,7 +597,7 @@ pcibr_pioerr_check(pcibr_soft_t soft)
  *                due to read or write error!.
  */
 
-void
+irqreturn_t
 pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
 {
     pcibr_soft_t            pcibr_soft;
@@ -647,7 +622,9 @@ pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
 	entry = pcibr_list;
 	while (1) {
 	    if (entry == NULL) {
-		panic("pcibr_error_intr_handler:\tmy parameter (0x%p) is not a pcibr_soft!", arg);
+		printk("pcibr_error_intr_handler: (0x%lx) is not a pcibr_soft!",
+	 	      (uint64_t)arg);
+    		return IRQ_NONE;
 	    }
 	    if ((intr_arg_t) entry->bl_soft == arg)
 		break;
@@ -696,7 +673,7 @@ pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
     number_bits = PCIBR_ISR_MAX_ERRS_PIC;
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ERROR, pcibr_soft->bs_conn,
-		"pcibr_error_intr_handler: int_status=0x%x\n", int_status));
+		"pcibr_error_intr_handler: int_status=0x%lx\n", int_status));
 
     /* int_status is which bits we have to clear;
      * err_status is the bits we haven't handled yet.
@@ -707,7 +684,7 @@ pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
 	/*
 	 * No error bit set!!.
 	 */
-	return;
+	return IRQ_HANDLED;
     }
     /*
      * If we have a PCIBUS_PIOERR, hand it to the logger.
@@ -850,7 +827,7 @@ pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
     }
 
     if (disable_errintr_mask) {
-	unsigned s;
+	unsigned long s;
 	/*
 	 * Disable some high frequency errors as they
 	 * could eat up too much cpu time.
@@ -935,6 +912,7 @@ pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
 
     /* Zero out bserr_intstat field */
     pcibr_soft->bs_errinfo.bserr_intstat = 0;
+    return IRQ_HANDLED;
 }
 
 void
@@ -1039,8 +1017,6 @@ pcibr_pioerror(
     int                     retval = IOERROR_HANDLED;
 
     vertex_hdl_t            pcibr_vhdl = pcibr_soft->bs_vhdl;
-    bridge_t               *bridge = pcibr_soft->bs_base;
-
     iopaddr_t               bad_xaddr;
 
     pciio_space_t           raw_space;	/* raw PCI space */
@@ -1066,7 +1042,7 @@ pcibr_pioerror(
     IOERROR_GETVALUE(bad_xaddr, ioe, xtalkaddr);
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ERROR_HDLR, pcibr_soft->bs_conn,
-                "pcibr_pioerror: pcibr_soft=0x%x, bad_xaddr=0x%x\n",
+                "pcibr_pioerror: pcibr_soft=0x%lx, bad_xaddr=0x%lx\n",
 		pcibr_soft, bad_xaddr));
 
     slot = PCIIO_SLOT_NONE;
@@ -1365,42 +1341,8 @@ pcibr_pioerror(
 	    printk(KERN_ALERT
 		    "PIO Error on PCI Bus %s",
 		    pcibr_soft->bs_name);
-	    /* this decodes part of the ioe; our caller
-	     * will dump the raw details in DEBUG and
-	     * kdebug kernels.
-	     */
 	    BEM_ADD_IOE(ioe);
 	}
-#if defined(FORCE_ERRORS)
-	if (0) {
-#elif !DEBUG
-	if (kdebug) {
-#endif
-	    /*
-	     * Dump raw data from Bridge/PCI layer.
-	     */
-
-	    BEM_ADD_STR("Raw info from Bridge/PCI layer:\n");
-	    if (bridge->p_int_status_64 & (picreg_t)BRIDGE_ISR_PCIBUS_PIOERR)
-		pcibr_error_dump(pcibr_soft);
-	    BEM_ADD_SPC(raw_space);
-	    BEM_ADD_VAR(raw_paddr);
-	    if (IOERROR_FIELDVALID(ioe, widgetdev)) {
-		short widdev;
-		IOERROR_GETVALUE(widdev, ioe, widgetdev);
-		slot = pciio_widgetdev_slot_get(widdev);
-		func = pciio_widgetdev_func_get(widdev);
-		if (slot < PCIBR_NUM_SLOTS(pcibr_soft)) {
-		    bridgereg_t             device = bridge->b_device[slot].reg;
-
-		    BEM_ADD_VAR(slot);
-		    BEM_ADD_VAR(func);
-		    BEM_ADD_REG(device);
-		}
-	    }
-#if !DEBUG || defined(FORCE_ERRORS)
-	}
-#endif
 
 	/*
 	 * Since error could not be handled at lower level,
@@ -1461,7 +1403,6 @@ pcibr_dmard_error(
 	IOERROR_GETVALUE(tmp, ioe, widgetnum);
 	ASSERT(tmp == pcibr_soft->bs_xid);
     }
-    ASSERT(bridge);
 
     /*
      * read error log registers
@@ -1592,7 +1533,7 @@ pcibr_error_handler(
     pcibr_soft = (pcibr_soft_t) einfo;
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ERROR_HDLR, pcibr_soft->bs_conn,
-		"pcibr_error_handler: pcibr_soft=0x%x, error_code=0x%x\n",
+		"pcibr_error_handler: pcibr_soft=0x%lx, error_code=0x%x\n",
 		pcibr_soft, error_code));
 
 #if DEBUG && ERROR_DEBUG
@@ -1656,7 +1597,7 @@ pcibr_error_handler_wrapper(
     int		       dma_retval = -1;
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ERROR_HDLR, pcibr_soft->bs_conn,
-                "pcibr_error_handler_wrapper: pcibr_soft=0x%x, "
+                "pcibr_error_handler_wrapper: pcibr_soft=0x%lx, "
 		"error_code=0x%x\n", pcibr_soft, error_code));
 
     /*
@@ -1690,7 +1631,7 @@ pcibr_error_handler_wrapper(
 	    if (!pcibr_soft) {
 #if DEBUG
 		printk(KERN_WARNING "pcibr_error_handler: "
-			"bs_peers_soft==NULL. bad_xaddr= 0x%x mode= 0x%x\n",
+			"bs_peers_soft==NULL. bad_xaddr= 0x%lx mode= 0x%lx\n",
 						bad_xaddr, mode);
 #endif
   		pio_retval = IOERROR_HANDLED;
