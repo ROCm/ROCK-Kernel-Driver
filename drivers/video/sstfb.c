@@ -403,7 +403,6 @@ static void __dac_i_write(u_long vbase, u8 reg,u8 val)
 	__sst_dac_write(vbase, DACREG_DATA_I, val);
 }
 
-
 /* compute the m,n,p  , returns the real freq
  * (ics datasheet :  N <-> N1 , P <-> N2)
  *
@@ -457,10 +456,370 @@ static int sst_calc_pll(const int freq, int *freq_out, struct pll_timing *t)
 }
 
 /*
- *
- *  Internal routines
- *
+ * Frame buffer API
  */
+static int sstfb_check_var(struct fb_var_screeninfo *var,
+		struct fb_info *info)
+{
+	struct sstfb_par *par = (struct sstfb_par *) info->par;
+	int hSyncOff   = var->xres + var->right_margin + var->left_margin;
+	int vSyncOff   = var->yres + var->lower_margin + var->upper_margin;
+	int vBackPorch = var->left_margin, yDim = var->yres, vSyncOn = var->vsync_len;
+	int tiles_in_X, real_length;
+	unsigned int freq;
+
+	f_dprintk("sstfb_check_var()\n");
+	
+	if (sst_calc_pll(PICOS2KHZ(var->pixclock), &freq, &par->pll)) {
+		eprintk("Pixclock at %ld KHZ out of range\n", PICOS2KHZ(var->pixclock));
+		return -EINVAL;
+	}
+	var->pixclock = KHZ2PICOS(freq);
+	
+	if (var->vmode & FB_VMODE_INTERLACED)
+		vBackPorch += (vBackPorch % 2);
+	if (var->vmode & FB_VMODE_DOUBLE) {
+		vBackPorch <<= 1;
+		yDim <<=1;
+		vSyncOn <<=1;
+		vSyncOff <<=1;
+	}
+
+	switch (var->bits_per_pixel) {
+	case 0 ... 16 :
+		var->bits_per_pixel = 16;
+		break;
+#ifdef EN_24_32_BPP
+	case 17 ... 24 :
+		var->bits_per_pixel = 24;
+		break;
+	case 25 ... 32 :
+		var->bits_per_pixel = 32;
+		break;
+#endif
+	default :
+		eprintk("Unsupported bpp %d\n", var->bits_per_pixel);
+		return -EINVAL;
+		break;
+	}
+	
+	/* validity tests */
+	if ((var->xres <= 1) || (yDim <= 0 )
+	   || (var->hsync_len <= 1)
+	   || (hSyncOff <= 1)
+	   || (var->left_margin <= 2)
+	   || (vSyncOn <= 0)
+	   || (vSyncOff <= 0)
+	   || (vBackPorch <= 0)) {
+		return -EINVAL;
+	}
+
+	if (IS_VOODOO2(par)) {
+		/* Voodoo 2 limits */
+		tiles_in_X = (var->xres + 63 ) / 64 * 2;		
+
+		if (((var->xres - 1) >= POW2(11)) || (yDim >= POW2(11))) {
+			eprintk("Unsupported resolution %dx%d\n",
+			         var->xres, var->yres);
+			return -EINVAL;
+		}
+
+		if (((var->hsync_len-1) >= POW2(9))
+		   || ((hSyncOff-1) >= POW2(11))
+		   || ((var->left_margin - 2) >= POW2(9))
+		   || (vSyncOn >= POW2(13))
+		   || (vSyncOff >= POW2(13))
+		   || (vBackPorch >= POW2(9))
+		   || (tiles_in_X >= POW2(6))
+		   || (tiles_in_X <= 0)) {
+			eprintk("Unsupported Timings\n");
+			return -EINVAL;
+		}
+	} else {
+		/* Voodoo limits */
+		tiles_in_X = (var->xres + 63 ) / 64;
+
+		if (var->vmode) {
+			eprintk("Interlace/Doublescan not supported %#x\n",
+				var->vmode);
+			return -EINVAL;
+		}
+		if (((var->xres - 1) >= POW2(10)) || (var->yres >= POW2(10))) {
+			eprintk("Unsupported resolution %dx%d\n",
+			         var->xres, var->yres);
+			return -EINVAL;
+		}
+		if (((var->hsync_len - 1) >= POW2(8))
+		   || ((hSyncOff-1) >= POW2(10))
+		   || ((var->left_margin - 2) >= POW2(8))
+		   || (vSyncOn >= POW2(12))
+		   || (vSyncOff >= POW2(12))
+		   || (vBackPorch >= POW2(8))
+		   || (tiles_in_X >= POW2(4))
+		   || (tiles_in_X <= 0)) {
+			eprintk("Unsupported Timings\n");
+			return -EINVAL;
+		}
+	}
+
+	/* it seems that the fbi uses tiles of 64x16 pixels to "map" the mem */
+	/* FIXME: i don't like this... looks wrong */
+	real_length = tiles_in_X  * (IS_VOODOO2(par) ? 32 : 64 )
+	              * ((var->bits_per_pixel == 16) ? 2 : 4);
+
+	if ((real_length * yDim) > info->fix.smem_len) {
+		eprintk("Not enough video memory\n");
+		return -ENOMEM;
+	}
+
+	var->sync &= (FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT);
+	var->vmode &= (FB_VMODE_INTERLACED | FB_VMODE_DOUBLE);
+	var->xoffset		= 0;
+	var->yoffset		= 0;
+	var->height		= -1;
+	var->width		= -1;
+
+	/*
+	 * correct the color bit fields
+	 */
+	/* var->{red|green|blue}.msb_right = 0; */
+
+	switch (var->bits_per_pixel) {
+	case 16:	/* RGB 565  LfbMode 0 */
+		var->red.length    = 5;
+		var->green.length  = 6;
+		var->blue.length   = 5;
+		var->transp.length = 0;
+
+		var->red.offset    = 11;
+		var->green.offset  = 5;
+		var->blue.offset   = 0;
+		var->transp.offset = 0;
+		break;
+#ifdef EN_24_32_BPP
+	case 24:	/* RGB 888 LfbMode 4 */
+	case 32:	/* ARGB 8888 LfbMode 5 */
+		var->red.length    = 8;
+		var->green.length  = 8;
+		var->blue.length   = 8;
+		var->transp.length = 0;
+
+		var->red.offset    = 16;
+		var->green.offset  = 8;
+		var->blue.offset   = 0;
+		var->transp.offset = 0; /* in 24bpp we fake a 32 bpp mode */
+		break;
+#endif
+	default:
+		BUG();
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int sstfb_set_par(struct fb_info *info)
+{
+	struct sstfb_par *par = (struct sstfb_par *) info->par;
+	u32 lfbmode, fbiinit1, fbiinit2, fbiinit3, fbiinit5, fbiinit6=0;
+	struct pci_dev *sst_dev = par->dev;
+	unsigned int freq;
+	int ntiles;
+
+	par->hSyncOff	= info->var.xres + info->var.right_margin + info->var.left_margin;
+
+	par->yDim 	= info->var.yres;
+	par->vSyncOn 	= info->var.vsync_len;
+	par->vSyncOff	= info->var.yres + info->var.lower_margin + info->var.upper_margin;
+	par->vBackPorch = info->var.upper_margin;
+
+	/* We need par->pll */
+	sst_calc_pll(PICOS2KHZ(info->var.pixclock), &freq, &par->pll);
+
+	if (info->var.vmode & FB_VMODE_INTERLACED)
+		par->vBackPorch += (par->vBackPorch % 2);
+	if (info->var.vmode & FB_VMODE_DOUBLE) {
+		par->vBackPorch <<= 1;
+		par->yDim <<=1;
+		par->vSyncOn <<=1;
+		par->vSyncOff <<=1;
+	}
+
+	if (IS_VOODOO2(par)) {
+		/* voodoo2 has 32 pixel wide tiles , BUT stange things
+		   happen with odd number of tiles */
+		par->tiles_in_X= (info->var.xres + 63 ) / 64 * 2;
+	} else {
+		/* voodoo1 has 64 pixels wide tiles. */
+		par->tiles_in_X= (info->var.xres + 63 ) / 64;
+	}
+
+	f_dprintk("sst_set_par(%dx%d)\n", info->var.xres, info->var.yres);
+	f_ddprintk("var->hsync_len hSyncOff var->vsync_len vSyncOff\n");
+	f_ddprintk("%-7d %-8d %-7d %-8d\n",
+	           info->var.hsync_len, par->hSyncOff,
+	           par->vSyncOn, par->vSyncOff);
+	f_ddprintk("var->left_margin var->upper_margin var->xres var->yres Freq\n");
+	f_ddprintk("%-10d %-10d %-4d %-4d %-8d\n",
+	           info->var.left_margin, var->upper_margin,
+	           info->var.xres, info->var.yres, par->freq);
+
+	sst_write(NOPCMD, 0);
+	sst_wait_idle();
+	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE, PCI_EN_INIT_WR);
+	sst_set_bits(FBIINIT1, VIDEO_RESET);
+	sst_set_bits(FBIINIT0, FBI_RESET | FIFO_RESET);
+	sst_unset_bits(FBIINIT2, EN_DRAM_REFRESH);
+	sst_wait_idle();
+
+	/*sst_unset_bits (FBIINIT0, FBI_RESET); / reenable FBI ? */
+
+	sst_write(BACKPORCH, par->vBackPorch << 16 | (info->var.left_margin - 2));
+	sst_write(VIDEODIMENSIONS, par->yDim << 16 | (info->var.xres - 1));
+	sst_write(HSYNC, (par->hSyncOff - 1) << 16 | (info->var.hsync_len - 1));
+	sst_write(VSYNC,       par->vSyncOff << 16 | par->vSyncOn);
+
+	fbiinit2=sst_read(FBIINIT2);
+	fbiinit3=sst_read(FBIINIT3);
+
+	/* everything is reset. we enable fbiinit2/3 remap : dac acces ok */
+	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE,
+	                       PCI_EN_INIT_WR | PCI_REMAP_DAC );
+
+	par->dac_sw.set_vidmod(info, info->var.bits_per_pixel);
+
+	/* set video clock */
+	par->dac_sw.set_pll(info, &par->pll, VID_CLOCK);
+
+	/* disable fbiinit2/3 remap */
+	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE,
+	                       PCI_EN_INIT_WR);
+
+	/* restore fbiinit2/3 */
+	sst_write(FBIINIT2,fbiinit2);
+	sst_write(FBIINIT3,fbiinit3);
+
+	fbiinit1 = (sst_read(FBIINIT1) & VIDEO_MASK)
+	            | EN_DATA_OE
+	            | EN_BLANK_OE
+	            | EN_HVSYNC_OE
+	            | EN_DCLK_OE
+/*	            | (15 << TILES_IN_X_SHIFT)*/
+	            | SEL_INPUT_VCLK_2X
+/*	            | (2 << VCLK_2X_SEL_DEL_SHIFT)
+	            | (2 << VCLK_DEL_SHIFT)*/;
+/* try with vclk_in_delay =0 (bits 29:30) , vclk_out_delay =0 (bits(27:28)
+ in (near) future set them accordingly to revision + resolution (cf glide)
+ first understand what it stands for :)
+ FIXME: there are some artefacts... check for the vclk_in_delay
+ lets try with 6ns delay in both vclk_out & in...
+ doh... they're still there :\
+*/
+
+	ntiles = par->tiles_in_X;
+	if (IS_VOODOO2(par)) {
+		fbiinit1 |= ((ntiles & 0x20) >> 5) << TILES_IN_X_MSB_SHIFT
+		            | ((ntiles & 0x1e) >> 1) << TILES_IN_X_SHIFT ;
+/* as the only value of importance for us in fbiinit6 is tiles in X (lsb),
+   and as reading fbinit 6 will return crap (see FBIINIT6_DEFAULT) we just
+   write our value. BTW due to the dac unable to read odd number of tiles, this
+   field is always null ... */
+		fbiinit6 = (ntiles & 0x1) << TILES_IN_X_LSB_SHIFT;
+	}
+	else
+		fbiinit1 |= ntiles << TILES_IN_X_SHIFT;
+
+	switch (info->var.bits_per_pixel) {
+	case 16:
+		fbiinit1 |=  SEL_SOURCE_VCLK_2X_SEL;
+		break;
+#ifdef EN_24_32_BPP
+	case 24:
+	case 32:
+/*	orig	sst_set_bits(FBIINIT1, SEL_SOURCE_VCLK_2X_DIV2 | EN_24BPP); */
+		fbiinit1 |= SEL_SOURCE_VCLK_2X_SEL | EN_24BPP;
+		break;
+#endif
+	default:
+		dprintk("bug line %d: bad depth '%u'\n", __LINE__,
+			info->var.bits_per_pixel );
+		return 0;
+		break;
+	}
+	sst_write(FBIINIT1, fbiinit1);
+	if (IS_VOODOO2(par)) {
+		sst_write(FBIINIT6, fbiinit6);
+		fbiinit5=sst_read(FBIINIT5) & FBIINIT5_MASK ;
+		if (info->var.vmode & FB_VMODE_INTERLACED)
+			fbiinit5 |= INTERLACE;
+		if (info->var.vmode & FB_VMODE_DOUBLE )
+			fbiinit5 |= VDOUBLESCAN;
+		if (info->var.sync & FB_SYNC_HOR_HIGH_ACT)
+			fbiinit5 |= HSYNC_HIGH;
+		if (info->var.sync & FB_SYNC_VERT_HIGH_ACT)
+			fbiinit5 |= VSYNC_HIGH;
+		sst_write(FBIINIT5, fbiinit5);
+	}
+	sst_wait_idle();
+	sst_unset_bits(FBIINIT1, VIDEO_RESET);
+	sst_unset_bits(FBIINIT0, FBI_RESET | FIFO_RESET);
+	sst_set_bits(FBIINIT2, EN_DRAM_REFRESH);
+/* disables fbiinit writes */
+	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE, PCI_EN_FIFO_WR);
+
+	/* set lfbmode : set mode + front buffer for reads/writes
+	   + disable pipeline */
+	switch (info->var.bits_per_pixel) {
+	case 16:
+		lfbmode = LFB_565;
+		break;
+#ifdef EN_24_32_BPP
+	case 24:
+		lfbmode = LFB_888;
+		break;
+	case 32:
+		lfbmode = LFB_8888;
+		break;
+#endif
+	default:
+		dprintk("bug line %d: bad depth '%u'\n", __LINE__,
+			info->var.bits_per_pixel );
+		return 0;
+		break;
+	}
+
+#if defined(__BIG_ENDIAN)
+	/* Enable byte-swizzle functionality in hardware.
+	 * With this enabled, all our read- and write-accesses to
+	 * the voodoo framebuffer can be done in native format, and
+	 * the hardware will automatically convert it to little-endian.
+	 * (tested on HP-PARISC, deller@gmx.de) */
+	lfbmode |= ( LFB_WORD_SWIZZLE_WR | LFB_BYTE_SWIZZLE_WR |
+		     LFB_WORD_SWIZZLE_RD | LFB_BYTE_SWIZZLE_RD );
+#endif
+	
+	if (clipping) {
+		sst_write(LFBMODE, lfbmode | EN_PXL_PIPELINE);
+	/*
+	 * Set "clipping" dimensions. If clipping is disabled and
+	 * writes to offscreen areas of the framebuffer are performed,
+	 * the "behaviour is undefined" (_very_ undefined) - Urs
+	 */
+	/* btw, it requires enabling pixel pipeline in LFBMODE .
+	   off screen read/writes will just wrap and read/print pixels
+	   on screen. Ugly but not that dangerous */
+
+		f_ddprintk("setting clipping dimensions 0..%d, 0..%d\n",
+		            info->var.xres - 1, par->yDim - 1);
+
+		sst_write(CLIP_LEFT_RIGHT, info->var.xres );
+		sst_write(CLIP_LOWY_HIGHY, par->yDim );
+		sst_set_bits(FBZMODE, EN_CLIPPING | EN_RGB_WRITE);
+	} else {
+		/* no clipping : direct access, no pipeline */
+		sst_write(LFBMODE, lfbmode );
+	}
+	return 1;
+}
 
 static int sstfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
                            u_int transp, struct fb_info *info)
@@ -480,231 +839,8 @@ static int sstfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	    | (green << info->var.green.offset)
 	    | (blue  << info->var.blue.offset)
 	    | (transp << info->var.transp.offset);
-
 	return 0;
 }
-
-/* set par according to var ( checks var ) */
-static int sstfb_decode_var( const struct fb_var_screeninfo *var,
-                             struct sstfb_par *par,
-                             struct fb_info *info)
-{
-	int real_length;
-
-	f_dprintk("sstfb_decode_var\n");
-	/* Check var validity */
-	par->valid=0;
-
-	memset(par, 0, sizeof(par));
-	par->xDim       = var->xres;
-	par->hSyncOn    = var->hsync_len;
-	par->hSyncOff   = var->xres + var->right_margin + var->left_margin;
-	par->hBackPorch = var->left_margin;
-	par->yDim       = var->yres;
-	par->vSyncOn    = var->vsync_len;
-	par->vSyncOff   = var->yres + var->lower_margin + var->upper_margin;
-	par->vBackPorch = var->upper_margin;
-
-	if(sst_calc_pll(PICOS2KHZ(var->pixclock), &par->freq, &par->pll)) {
-		eprintk("Pixclock at %ld KHZ out of range\n", PICOS2KHZ(var->pixclock));
-		return -EINVAL;
-	}
-
-	par->sync=var->sync & (FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT);
-	par->vmode=var->vmode & (FB_VMODE_INTERLACED | FB_VMODE_DOUBLE);
-
-	/* in laced mode, vBackPorch should be even. odd -> funky display */
-	if (par->vmode & FB_VMODE_INTERLACED)
-		par->vBackPorch += (par->vBackPorch % 2);
-	if (par->vmode & FB_VMODE_DOUBLE) {
-		par->vBackPorch <<= 1;
-		par->yDim <<=1;
-		par->vSyncOn <<=1;
-		par->vSyncOff <<=1;
-	}
-
-	switch (var->bits_per_pixel) {
-	case 0 ... 16 :
-		par->bpp = 16;
-		break;
-#ifdef EN_24_32_BPP
-	case 17 ... 24 :
-		par->bpp = 24;
-		break;
-	case 25 ... 32 :
-		par->bpp = 32;
-		break;
-#endif
-	default :
-		eprintk("Unsupported bpp %d\n", par->bpp);
-		return -EINVAL;
-		break;
-	}
-
-	if (IS_VOODOO2(par)) {
-		/* voodoo2 has 32 pixel wide tiles , BUT stange things
-		 happen with odd number of tiles */
-		par->tiles_in_X = (par->xDim + 63 ) / 64 * 2;
-	} else {
-		/* voodoo1 has 64 pixels wide tiles. */
-		par->tiles_in_X = (par->xDim + 63 ) / 64;
-	}
-
-	/* validity tests */
-	if((par->xDim <= 1) || (par->yDim <= 0 )
-	   || (par->hSyncOn <= 1)
-	   || (par->hSyncOff <= 1)
-	   || (par->hBackPorch <= 2)
-	   || (par->vSyncOn <= 0)
-	   || (par->vSyncOff <= 0)
-	   || (par->vBackPorch <= 0)
-	   || (par->tiles_in_X <= 0)) {
-		return -EINVAL;
-	}
-	if (IS_VOODOO2(par)) {
-		/* Voodoo 2 limits */
-		if(((par->xDim-1) >= POW2(11)) || (par->yDim >= POW2(11))) {
-			eprintk("Unsupported resolution %dx%d\n",
-			         var->xres, var->yres);
-			return -EINVAL;
-		}
-		if (((par->hSyncOn-1) >= POW2(9))
-		   || ((par->hSyncOff-1) >= POW2(11))
-		   || ((par->hBackPorch-2) >= POW2(9))
-		   || (par->vSyncOn >= POW2(13))
-		   || (par->vSyncOff >= POW2(13))
-		   || (par->vBackPorch >= POW2(9))
-		   || (par->tiles_in_X >= POW2(6))) {
-			eprintk("Unsupported Timing\n");
-			return -EINVAL;
-		}
-	} else {
-		/* Voodoo limits */
-		if (par->vmode) {
-			eprintk("Interlace/Doublescan not supported %#x\n",
-				par->vmode);
-			return -EINVAL;
-		}
-		if(((par->xDim-1) >= POW2(10)) || (par->yDim >= POW2(10))) {
-			eprintk("Unsupported resolution %dx%d\n",
-			         var->xres, var->yres);
-			return -EINVAL;
-		}
-		if (((par->hSyncOn-1) >= POW2(8))
-		   || ((par->hSyncOff-1) >= POW2(10))
-		   || ((par->hBackPorch-2) >= POW2(8))
-		   || (par->vSyncOn >= POW2(12))
-		   || (par->vSyncOff >= POW2(12))
-		   || (par->vBackPorch >= POW2(8))
-		   || (par->tiles_in_X >= POW2(4))) {
-			eprintk("Unsupported Timings\n");
-			return -EINVAL;
-		}
-	}
-
-	/* it seems that the fbi uses tiles of 64x16 pixels to "map" the mem */
-	/* FIXME: i don't like this... looks wrong */
-	real_length = par->tiles_in_X  * (IS_VOODOO2(par) ? 32 : 64 )
-	              * ((par->bpp == 16) ? 2 : 4);
-
-	if ((real_length * var->yres) > info->fix.smem_len) {
-		eprintk("Not enough video memory\n");
-		return -ENOMEM;
-	}
-	par->valid = 1;
-	return 0;
-}
-
-/* sets var according to par (basically, sets sane values) */
-static int sstfb_encode_var( struct fb_var_screeninfo *var,
-                             const struct sstfb_par *par,
-                             struct fb_info *info)
-{
-	memset(var, 0, sizeof(*var));
-
-	var->xres           = par->xDim;
-	var->yres           = par->yDim;
-	var->xres_virtual   = par->xDim;
-	var->yres_virtual   = par->yDim;
-	var->bits_per_pixel = par->bpp;
-	/* {x|y}offset = 0 ; sync=0 */
-	var->height         = -1;
-	var->width          = -1;
-	var->pixclock       = KHZ2PICOS(par->freq);
-	var->left_margin    = par->hBackPorch;
-	var->right_margin   = par->hSyncOff - par->xDim - par->hBackPorch;
-	var->upper_margin   = par->vBackPorch;
-	var->lower_margin   = par->vSyncOff - par->yDim - par->vBackPorch;
-	var->hsync_len      = par->hSyncOn;
-	var->vsync_len      = par->vSyncOn;
-	var->sync           = par->sync;
-	var->vmode          = par->vmode;
-	if (var->vmode & FB_VMODE_DOUBLE) {
-		var->yres           >>=1;
-		var->yres_virtual   >>=1;
-		var->vsync_len      >>=1;
-		var->upper_margin   >>=1;
-		var->lower_margin   >>=1;
-	}
-
-	/*
-	 * correct the color bit fields
-	 */
-	/* var->{red|green|blue}.msb_right = 0; */
-
-	switch (par->bpp) {
-	case 16:	/* RGB 565  LfbMode 0 */
-		var->red.length    = 5;
-		var->green.length  = 6;
-		var->blue.length   = 5;
-		var->transp.length = 0;
-
-		var->red.offset    = 11;
-		var->green.offset  = 5;
-		var->blue.offset   = 0;
-		var->transp.offset = 0;
-		info->fix.line_length = 2048;
-		break;
-#ifdef EN_24_32_BPP
-	case 24:	/* RGB 888 LfbMode 4 */
-	case 32:	/* ARGB 8888 LfbMode 5 */
-		var->red.length    = 8;
-		var->green.length  = 8;
-		var->blue.length   = 8;
-		var->transp.length = 0;
-
-		var->red.offset    = 16;
-		var->green.offset  = 8;
-		var->blue.offset   = 0;
-		var->transp.offset = 0; /* in 24bpp we fake a 32 bpp mode */
-		info->fix.line_length = 4096;
-		break;
-#endif
-	default:
-		BUG();
-		return -EINVAL;
-	}
-	
-	return 0;
-}
-
-/*
- * Frame buffer API
- */
-
-static int sstfb_check_var(struct fb_var_screeninfo *var,
-		struct fb_info *info)
-{
-	struct sstfb_par par;
-	int res;
-
-	f_dprintk("sstfb_check_var()\n");
-	print_var(var, "var");
-	if ((res = sstfb_decode_var(var, &par, info)))
-		return res;
-	return 0;
-}
-
 
 static int sstfb_ioctl(struct inode *inode, struct file *file,
                        u_int cmd, u_long arg, struct fb_info *info )
@@ -818,7 +954,6 @@ static int __devinit sst_get_memsize(struct fb_info *info, u_long *memsize)
 /* 
  * DAC detection routines 
  */
-
 
 /* fbi should be idle, and fifo emty and mem disabled */
 /* supposed to detect AT&T ATT20C409 and Ti TVP3409 ramdacs */
@@ -1117,191 +1252,9 @@ static int __devinit sst_detect_dactype(struct fb_info *info, struct sstfb_par *
 	return 1;
 }
 
-
-
-static int sstfb_set_par(struct fb_info *info)
-{
-	struct sstfb_par *par = (struct sstfb_par *) info->par;
-	u32 lfbmode, fbiinit1, fbiinit2, fbiinit3, fbiinit5, fbiinit6=0;
-	struct pci_dev *sst_dev = par->dev;
-	int ntiles;
-
-	sstfb_encode_var(&info->var, par, info);
-
-	f_dprintk("sst_set_par(%dx%d)\n", par->xDim, par->yDim);
-	f_ddprintk("hSyncOn hSyncOff vSyncOn vSyncOff\n");
-	f_ddprintk("%-7d %-8d %-7d %-8d\n",
-	           par->hSyncOn, par->hSyncOff,
-	           par->vSyncOn, par->vSyncOff);
-	f_ddprintk("hBackPorch vBackPorch xDim yDim Freq\n");
-	f_ddprintk("%-10d %-10d %-4d %-4d %-8d\n",
-	           par->hBackPorch, par->vBackPorch,
-	           par->xDim, par->yDim, par->freq);
-
-	if (!par->valid) {
-		BUG();
-		return -EINVAL;
-	}
-	sst_write(NOPCMD, 0);
-	sst_wait_idle();
-	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE, PCI_EN_INIT_WR);
-	sst_set_bits(FBIINIT1, VIDEO_RESET);
-	sst_set_bits(FBIINIT0, FBI_RESET | FIFO_RESET);
-	sst_unset_bits(FBIINIT2, EN_DRAM_REFRESH);
-	sst_wait_idle();
-
-	/*sst_unset_bits (FBIINIT0, FBI_RESET); / reenable FBI ? */
-
-	sst_write(BACKPORCH, par->vBackPorch << 16 | (par->hBackPorch - 2));
-	sst_write(VIDEODIMENSIONS, par->yDim << 16 | (par->xDim - 1));
-	sst_write(HSYNC, (par->hSyncOff - 1) << 16 | (par->hSyncOn - 1));
-	sst_write(VSYNC,       par->vSyncOff << 16 | par->vSyncOn);
-
-	fbiinit2=sst_read(FBIINIT2);
-	fbiinit3=sst_read(FBIINIT3);
-
-	/* everything is reset. we enable fbiinit2/3 remap : dac acces ok */
-	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE,
-	                       PCI_EN_INIT_WR | PCI_REMAP_DAC );
-
-	par->dac_sw.set_vidmod(info, par->bpp);
-
-	/* set video clock */
-	par->dac_sw.set_pll(info, &par->pll, VID_CLOCK);
-
-	/* disable fbiinit2/3 remap */
-	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE,
-	                       PCI_EN_INIT_WR);
-
-	/* restore fbiinit2/3 */
-	sst_write(FBIINIT2,fbiinit2);
-	sst_write(FBIINIT3,fbiinit3);
-
-	fbiinit1 = (sst_read(FBIINIT1) & VIDEO_MASK)
-	            | EN_DATA_OE
-	            | EN_BLANK_OE
-	            | EN_HVSYNC_OE
-	            | EN_DCLK_OE
-/*	            | (15 << TILES_IN_X_SHIFT)*/
-	            | SEL_INPUT_VCLK_2X
-/*	            | (2 << VCLK_2X_SEL_DEL_SHIFT)
-	            | (2 << VCLK_DEL_SHIFT)*/;
-/* try with vclk_in_delay =0 (bits 29:30) , vclk_out_delay =0 (bits(27:28)
- in (near) future set them accordingly to revision + resolution (cf glide)
- first understand what it stands for :)
- FIXME: there are some artefacts... check for the vclk_in_delay
- lets try with 6ns delay in both vclk_out & in...
- doh... they're still there :\
-*/
-
-	ntiles = par->tiles_in_X;
-	if (IS_VOODOO2(par)) {
-		fbiinit1 |= ((ntiles & 0x20) >> 5) << TILES_IN_X_MSB_SHIFT
-		            | ((ntiles & 0x1e) >> 1) << TILES_IN_X_SHIFT ;
-/* as the only value of importance for us in fbiinit6 is tiles in X (lsb),
-   and as reading fbinit 6 will return crap (see FBIINIT6_DEFAULT) we just
-   write our value. BTW due to the dac unable to read odd number of tiles, this
-   field is always null ... */
-		fbiinit6 = (ntiles & 0x1) << TILES_IN_X_LSB_SHIFT;
-	}
-	else
-		fbiinit1 |= ntiles << TILES_IN_X_SHIFT;
-
-	switch(par->bpp) {
-	case 16:
-		fbiinit1 |=  SEL_SOURCE_VCLK_2X_SEL;
-		break;
-#ifdef EN_24_32_BPP
-	case 24:
-	case 32:
-/*	orig	sst_set_bits(FBIINIT1, SEL_SOURCE_VCLK_2X_DIV2 | EN_24BPP); */
-		fbiinit1 |= SEL_SOURCE_VCLK_2X_SEL | EN_24BPP;
-		break;
-#endif
-	default:
-		dprintk("bug line %d: bad depth '%u'\n", __LINE__,
-			par->bpp );
-		return 0;
-		break;
-	}
-	sst_write(FBIINIT1, fbiinit1);
-	if (IS_VOODOO2(par)) {
-		sst_write(FBIINIT6, fbiinit6);
-		fbiinit5=sst_read(FBIINIT5) & FBIINIT5_MASK ;
-		if (par->vmode & FB_VMODE_INTERLACED)
-			fbiinit5 |= INTERLACE;
-		if (par->vmode & FB_VMODE_DOUBLE )
-			fbiinit5 |= VDOUBLESCAN;
-		if (par->sync & FB_SYNC_HOR_HIGH_ACT)
-			fbiinit5 |= HSYNC_HIGH;
-		if (par->sync & FB_SYNC_VERT_HIGH_ACT)
-			fbiinit5 |= VSYNC_HIGH;
-		sst_write(FBIINIT5, fbiinit5);
-	}
-	sst_wait_idle();
-	sst_unset_bits(FBIINIT1, VIDEO_RESET);
-	sst_unset_bits(FBIINIT0, FBI_RESET | FIFO_RESET);
-	sst_set_bits(FBIINIT2, EN_DRAM_REFRESH);
-/* disables fbiinit writes */
-	pci_write_config_dword(sst_dev, PCI_INIT_ENABLE, PCI_EN_FIFO_WR);
-
-	/* set lfbmode : set mode + front buffer for reads/writes
-	   + disable pipeline */
-	switch(par->bpp) {
-	case 16:
-		lfbmode = LFB_565;
-		break;
-#ifdef EN_24_32_BPP
-	case 24:
-		lfbmode = LFB_888;
-		break;
-	case 32:
-		lfbmode = LFB_8888;
-		break;
-#endif
-	default:
-		dprintk("bug line %d: bad depth '%u'\n", __LINE__,
-			par->bpp );
-		return 0;
-		break;
-	}
-
-#if defined(__BIG_ENDIAN)
-	/* Enable byte-swizzle functionality in hardware.
-	 * With this enabled, all our read- and write-accesses to
-	 * the voodoo framebuffer can be done in native format, and
-	 * the hardware will automatically convert it to little-endian.
-	 * (tested on HP-PARISC, deller@gmx.de) */
-	lfbmode |= ( LFB_WORD_SWIZZLE_WR | LFB_BYTE_SWIZZLE_WR |
-		     LFB_WORD_SWIZZLE_RD | LFB_BYTE_SWIZZLE_RD );
-#endif
-	
-	if (clipping) {
-		sst_write(LFBMODE, lfbmode | EN_PXL_PIPELINE);
-	/*
-	 * Set "clipping" dimensions. If clipping is disabled and
-	 * writes to offscreen areas of the framebuffer are performed,
-	 * the "behaviour is undefined" (_very_ undefined) - Urs
-	 */
-	/* btw, it requires enabling pixel pipeline in LFBMODE .
-	   off screen read/writes will just wrap and read/print pixels
-	   on screen. Ugly but not that dangerous */
-
-		f_ddprintk("setting clipping dimensions 0..%d, 0..%d\n",
-		            par->xDim-1, par->yDim-1);
-
-		sst_write(CLIP_LEFT_RIGHT, par->xDim );
-		sst_write(CLIP_LOWY_HIGHY, par->yDim );
-		sst_set_bits(FBZMODE, EN_CLIPPING | EN_RGB_WRITE);
-	} else {
-		/* no clipping : direct access, no pipeline */
-		sst_write(LFBMODE, lfbmode );
-	}
-
-	return 1;
-}
-
-
+/*
+ * Internal Routines
+ */
 static int __devinit sst_init(struct fb_info *info, struct sstfb_par *par)
 {
 	u32 fbiinit0, fbiinit1, fbiinit4;
@@ -1491,7 +1444,6 @@ static int __devinit sstfb_probe(struct pci_dev *pdev, const struct pci_device_i
 {
 	struct sstfb_par *default_par;
 	struct fb_fix_screeninfo *fix;
-	struct fb_var_screeninfo var;
 	struct sst_spec *spec;
 	struct fb_info *info;
 	int err;
@@ -1514,6 +1466,7 @@ static int __devinit sstfb_probe(struct pci_dev *pdev, const struct pci_device_i
 		return -ENOMEM;
 	default_par = (struct sstfb_par *) (info + 1);
 	fix  = &info->fix;
+	info->par	= default_par;
 	
 	pci_set_drvdata(pdev, info);
 	default_par->type = id->driver_data;
@@ -1570,7 +1523,6 @@ static int __devinit sstfb_probe(struct pci_dev *pdev, const struct pci_device_i
 	info->node	= NODEV;
 	info->flags	= FBINFO_FLAG_DEFAULT;
 	info->fbops	= &sstfb_ops;
-	info->par	= default_par;
 
 	fix->mmio_len	= 0x400000;
 	fix->type	= FB_TYPE_PACKED_PIXELS;
@@ -1583,25 +1535,19 @@ static int __devinit sstfb_probe(struct pci_dev *pdev, const struct pci_device_i
 	fix->line_length= 2048;	/* default value, for 24 or 32bit: 4096*/
 	
 	if ( mode_option &&
-	     fb_find_mode(&var, info, mode_option, NULL, 0, NULL, 16)) {
-		if (sstfb_check_var(&var, info)) {
-			eprintk("can't set supplied video mode. Using default\n");
-			var = sstfb_default;
-		}
-	}
+	     fb_find_mode(&info->var, info, mode_option, NULL, 0, NULL, 16)) {
+		eprintk("can't set supplied video mode. Using default\n");
+		info->var = sstfb_default;
+	} else
+		info->var = sstfb_default;
 
-	if (sstfb_check_var(&var, info)) {
+	if (sstfb_check_var(&info->var, info)) {
 		eprintk("can't set default video mode.\n");
 		goto fail;
 	}
 	
 	fb_alloc_cmap(&info->cmap, 16, 0);
 
-	/* set the video mode */
-	sstfb_set_par(info);
-
-	/* sstfb_test16(info); */
-	
 	/* register fb */
 	if (register_framebuffer(info) < 0) {
 		eprintk("can't register framebuffer.\n");

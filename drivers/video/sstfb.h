@@ -316,21 +316,15 @@ struct sst_spec {
 };
 
 struct sstfb_par {
-	unsigned int bpp;
-	unsigned int xDim;	/* xres */
+	unsigned int yDim;
 	unsigned int hSyncOn;	/* hsync_len */
 	unsigned int hSyncOff;	/* left_margin + xres + right_margin */
 	unsigned int hBackPorch;/* left_margin */
-	unsigned int yDim;
 	unsigned int vSyncOn;
 	unsigned int vSyncOff;
 	unsigned int vBackPorch;
-	unsigned int freq;	/* freq in kHz */
 	struct pll_timing pll;
 	unsigned int tiles_in_X;/* num of tiles in X res */
-	unsigned int vmode;     /* doublescan/interlaced */
-	unsigned int sync;      /* H/V sync polarity */
-	unsigned int valid;	/* par is correct (fool proof) */
 	unsigned long mmio_vbase;
 	struct dac_switch 	dac_sw;	/* dac specific functions */
 	struct pci_dev		*dev;
