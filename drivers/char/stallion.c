@@ -2804,9 +2804,6 @@ static inline int stl_findpcibrds()
 	printk("stl_findpcibrds()\n");
 #endif
 
-	if (! pci_present())
-		return(0);
-
 	for (i = 0; (i < stl_nrpcibrds); i++)
 		while ((dev = pci_find_device(stl_pcibrds[i].vendid,
 		    stl_pcibrds[i].devid, dev))) {
