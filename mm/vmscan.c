@@ -235,19 +235,11 @@ shrink_cache(int nr_pages, zone_t *classzone,
 
 			if (try_to_release_page(page, gfp_mask)) {
 				if (!mapping) {
-					/*
-					 * We must not allow an anon page
-					 * with no buffers to be visible on
-					 * the LRU, so we unlock the page after
-					 * taking the lru lock
-					 */
-					spin_lock(&pagemap_lru_lock);
-					unlock_page(page);
-					__lru_cache_del(page);
-
 					/* effectively free the page here */
+					unlock_page(page);
 					page_cache_release(page);
 
+					spin_lock(&pagemap_lru_lock);
 					if (--nr_pages)
 						continue;
 					break;
