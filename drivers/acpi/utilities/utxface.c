@@ -145,22 +145,8 @@ acpi_enable_subsystem (
 
 
 	/*
-	 * Install the default op_region handlers. These are installed unless
-	 * other handlers have already been installed via the
-	 * install_address_space_handler interface
-	 */
-	if (!(flags & ACPI_NO_ADDRESS_SPACE_INIT)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing default address space handlers\n"));
-
-		status = acpi_ev_init_address_spaces ();
-		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
-		}
-	}
-
-	/*
 	 * We must initialize the hardware before we can enable ACPI.
-	 * FADT values are validated here.
+	 * The values from the FADT are validated here.
 	 */
 	if (!(flags & ACPI_NO_HARDWARE_INIT)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI hardware\n"));
@@ -172,7 +158,7 @@ acpi_enable_subsystem (
 	}
 
 	/*
-	 * Enable ACPI on this platform
+	 * Enable ACPI mode
 	 */
 	if (!(flags & ACPI_NO_ACPI_ENABLE)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Going into ACPI mode\n"));
@@ -187,8 +173,9 @@ acpi_enable_subsystem (
 	}
 
 	/*
-	 * Note:
-	 * We must have the hardware AND events initialized before we can execute
+	 * Initialize ACPI Event handling
+	 *
+	 * NOTE: We must have the hardware AND events initialized before we can execute
 	 * ANY control methods SAFELY.  Any control method can require ACPI hardware
 	 * support, so the hardware MUST be initialized before execution!
 	 */
@@ -201,7 +188,7 @@ acpi_enable_subsystem (
 		}
 	}
 
-	/* Install SCI handler, Global Lock handler, GPE handlers */
+	/* Install the SCI handler, Global Lock handler, and GPE handlers */
 
 	if (!(flags & ACPI_NO_HANDLER_INIT)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing SCI/GL/GPE handlers\n"));
@@ -237,6 +224,39 @@ acpi_initialize_objects (
 
 	ACPI_FUNCTION_TRACE ("acpi_initialize_objects");
 
+
+	/*
+	 * Install the default op_region handlers. These are installed unless
+	 * other handlers have already been installed via the
+	 * install_address_space_handler interface.
+	 *
+	 * NOTE: This will cause _REG methods to be run.  Any objects accessed
+	 * by the _REG methods will be automatically initialized, even if they
+	 * contain executable AML (see call to acpi_ns_initialize_objects below).
+	 */
+	if (!(flags & ACPI_NO_ADDRESS_SPACE_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing default address space handlers\n"));
+
+		status = acpi_ev_init_address_spaces ();
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+	}
+
+	/*
+	 * Initialize the objects that remain uninitialized.  This
+	 * runs the executable AML that may be part of the declaration of these
+	 * objects: operation_regions, buffer_fields, Buffers, and Packages.
+	 */
+	if (!(flags & ACPI_NO_OBJECT_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI Objects\n"));
+
+		status = acpi_ns_initialize_objects ();
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+	}
+
 	/*
 	 * Initialize all device objects in the namespace
 	 * This runs the _STA and _INI methods.
@@ -245,20 +265,6 @@ acpi_initialize_objects (
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI Devices\n"));
 
 		status = acpi_ns_initialize_devices ();
-		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
-		}
-	}
-
-	/*
-	 * Initialize the objects that remain uninitialized.  This
-	 * runs the executable AML that is part of the declaration of op_regions
-	 * and Fields.
-	 */
-	if (!(flags & ACPI_NO_OBJECT_INIT)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI Objects\n"));
-
-		status = acpi_ns_initialize_objects ();
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -431,9 +437,9 @@ acpi_get_system_info (
 
 	/* Current status of the ACPI tables, per table type */
 
-	info_ptr->num_table_types = NUM_ACPI_TABLES;
-	for (i = 0; i < NUM_ACPI_TABLES; i++) {
-		info_ptr->table_info[i].count = acpi_gbl_acpi_tables[i].count;
+	info_ptr->num_table_types = NUM_ACPI_TABLE_TYPES;
+	for (i = 0; i < NUM_ACPI_TABLE_TYPES; i++) {
+		info_ptr->table_info[i].count = acpi_gbl_table_lists[i].count;
 	}
 
 	return_ACPI_STATUS (AE_OK);

@@ -290,12 +290,12 @@ acpi_os_derive_pci_id(
 u8
 acpi_os_readable (
 	void                            *pointer,
-	u32                             length);
+	acpi_size                       length);
 
 u8
 acpi_os_writable (
 	void                            *pointer,
-	u32                             length);
+	acpi_size                       length);
 
 u32
 acpi_os_get_timer (
