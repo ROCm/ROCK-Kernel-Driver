@@ -3308,11 +3308,18 @@ static const struct usb_device_id	products [] = {
  *
  * PXA25x or PXA210 ...  these use a "usb-eth" driver much like
  * the sa1100 one, but hardware uses different endpoint numbers.
+ *
+ * Or the Linux "Ethernet" gadget on hardware that can't talk
+ * CDC Ethernet (e.g., no altsettings), in either of two modes:
+ *  - acting just like the old "usb-eth" firmware, though
+ *    the implementation is different 
+ *  - supporting RNDIS as the first/default configuration for
+ *    MS-Windows interop; Linux needs to use the other config
  */
 {
 	// 1183 = 0x049F, both used as hex values?
 	// Compaq "Itsy" vendor/product id
-	USB_DEVICE (0x049F, 0x505A),
+	USB_DEVICE (0x049F, 0x505A),	// usb-eth, or compatible
 	.driver_info =	(unsigned long) &linuxdev_info,
 }, {
 	USB_DEVICE (0x0E7E, 0x1001),	// G.Mate "Yopy"
@@ -3320,6 +3327,10 @@ static const struct usb_device_id	products [] = {
 }, {
 	USB_DEVICE (0x8086, 0x07d3),	// "blob" bootloader
 	.driver_info =	(unsigned long) &blob_info,
+}, {
+	// Linux Ethernet/RNDIS gadget on pxa210/25x/26x
+	USB_DEVICE_VER (0x0525, 0xa4a2, 0x0203, 0x0203),
+	.driver_info =	(unsigned long) &linuxdev_info,
 }, 
 #endif
 

@@ -1045,11 +1045,19 @@ static int choose_configuration(struct usb_device *udev)
 					->altsetting->desc;
 			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
 				continue;
-			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS */
+			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS.
+			 * MSFT needs this to be the first config; never use
+			 * it as the default unless Linux has host-side RNDIS.
+			 * A second config would ideally be CDC-Ethernet, but
+			 * may instead be the "vendor specific" CDC subset
+			 * long used by ARM Linux for sa1100 or pxa255.
+			 */
 			if (desc->bInterfaceClass == USB_CLASS_COMM
 					&& desc->bInterfaceSubClass == 2
-					&& desc->bInterfaceProtocol == 0xff)
+					&& desc->bInterfaceProtocol == 0xff) {
+				c = udev->config[1].desc.bConfigurationValue;
 				continue;
+			}
 			c = udev->config[i].desc.bConfigurationValue;
 			break;
 		}
