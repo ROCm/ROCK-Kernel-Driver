@@ -1,6 +1,7 @@
 /*
  *  hosts.c Copyright (C) 1992 Drew Eckhardt
  *          Copyright (C) 1993, 1994, 1995 Eric Youngdale
+ *          Copyright (C) 2002-2003 Christoph Hellwig
  *
  *  mid to lowlevel SCSI driver interface
  *      Initial versions: Drew Eckhardt
@@ -30,8 +31,8 @@
 #include <linux/completion.h>
 #include <linux/unistd.h>
 
+#include <scsi/scsi_host.h>
 #include "scsi.h"
-#include "hosts.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -50,6 +51,11 @@ static struct class shost_class = {
 	.release	= scsi_host_cls_release,
 };
 
+static int scsi_device_cancel_cb(struct device *dev, void *data)
+{
+	return scsi_device_cancel(to_scsi_device(dev), *(int *)data);
+}
+
 /**
  * scsi_host_cancel - cancel outstanding IO to this host
  * @shost:	pointer to struct Scsi_Host
@@ -57,11 +63,7 @@ static struct class shost_class = {
  **/
 void scsi_host_cancel(struct Scsi_Host *shost, int recovery)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(shost->host_lock, flags);
 	set_bit(SHOST_CANCEL, &shost->shost_state);
-	spin_unlock_irqrestore(shost->host_lock, flags);
 	device_for_each_child(&shost->shost_gendev, &recovery,
 			      scsi_device_cancel_cb);
 	wait_event(shost->host_wait, (!test_bit(SHOST_RECOVERY,
@@ -74,15 +76,11 @@ void scsi_host_cancel(struct Scsi_Host *shost, int recovery)
  **/
 void scsi_remove_host(struct Scsi_Host *shost)
 {
-	unsigned long flags;
-
 	scsi_host_cancel(shost, 0);
 	scsi_proc_host_rm(shost);
 	scsi_forget_host(shost);
 
-	spin_lock_irqsave(shost->host_lock, flags);
 	set_bit(SHOST_DEL, &shost->shost_state);
-	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	class_device_unregister(&shost->shost_classdev);
 	device_del(&shost->shost_gendev);
@@ -209,7 +207,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
-	INIT_LIST_HEAD(&shost->my_devices);
+	INIT_LIST_HEAD(&shost->__devices);
 	INIT_LIST_HEAD(&shost->eh_cmd_q);
 	INIT_LIST_HEAD(&shost->starved_list);
 	init_waitqueue_head(&shost->host_wait);
@@ -323,23 +321,20 @@ void scsi_unregister(struct Scsi_Host *shost)
  **/
 struct Scsi_Host *scsi_host_lookup(unsigned short hostnum)
 {
-	struct class *class = class_get(&shost_class);
+	struct class *class = &shost_class;
 	struct class_device *cdev;
 	struct Scsi_Host *shost = ERR_PTR(-ENXIO), *p;
 
-	if (class) {
-		down_read(&class->subsys.rwsem);
-		list_for_each_entry(cdev, &class->children, node) {
-			p = class_to_shost(cdev);
-			if (p->host_no == hostnum) {
-				shost = scsi_host_get(p);
-				break;
-			}
+	down_read(&class->subsys.rwsem);
+	list_for_each_entry(cdev, &class->children, node) {
+		p = class_to_shost(cdev);
+		if (p->host_no == hostnum) {
+			shost = scsi_host_get(p);
+			break;
 		}
-		up_read(&class->subsys.rwsem);
 	}
+	up_read(&class->subsys.rwsem);
 
-	class_put(&shost_class);
 	return shost;
 }
 

@@ -27,8 +27,8 @@
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 
+#include <scsi/scsi_host.h>
 #include "scsi.h"
-#include "hosts.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -212,15 +212,13 @@ static int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
 	shost = scsi_host_lookup(host);
 	if (IS_ERR(shost))
 		return PTR_ERR(shost);
-	sdev = scsi_find_device(shost, channel, id, lun);
-	if (!sdev)
-		goto out;
-	if (atomic_read(&sdev->access_count))
-		goto out;
+	sdev = scsi_device_lookup(shost, channel, id, lun);
+	if (sdev) {
+		scsi_remove_device(sdev);
+		scsi_device_put(sdev);
+		error = 0;
+	}
 
-	scsi_remove_device(sdev);
-	error = 0;
-out:
 	scsi_host_put(shost);
 	return error;
 }

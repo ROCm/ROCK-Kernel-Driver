@@ -115,6 +115,9 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 	unsigned long ip, flags, nat, um, cfm;
 	long err;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	/* restore scratch that always needs gets updated during signal delivery: */
 	err  = __get_user(flags, &sc->sc_flags);
 	err |= __get_user(nat, &sc->sc_nat);
@@ -558,9 +561,6 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			break;
 
 		ka = &current->sighand->action[signr - 1];
-
-		/* Always make any pending restarted system calls return -EINTR */
-		current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 		if (restart) {
 			switch (errno) {

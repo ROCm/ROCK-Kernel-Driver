@@ -914,7 +914,8 @@ sg_ioctl(struct inode *inode, struct file *filp,
 	case SG_GET_VERSION_NUM:
 		return put_user(sg_version_num, (int *) arg);
 	case SG_GET_ACCESS_COUNT:
-		val = (sdp->device ? atomic_read(&sdp->device->access_count) : 0);
+		/* faked - we don't have a real access count anymore */
+		val = (sdp->device ? 1 : 0);
 		return put_user(val, (int *) arg);
 	case SG_GET_REQUEST_TABLE:
 		result = verify_area(VERIFY_WRITE, (void *) arg,
@@ -1630,7 +1631,7 @@ st_map_user_pages(struct scatterlist *sgl, const unsigned int max_pages,
 	unsigned int nr_pages;
 	struct page **pages;
 
-	nr_pages = ((uaddr & ~PAGE_MASK) + count - 1 + ~PAGE_MASK) >> PAGE_SHIFT;
+	nr_pages = ((uaddr & ~PAGE_MASK) + count + ~PAGE_MASK) >> PAGE_SHIFT;
 
 	/* User attempted Overflow! */
 	if ((uaddr + count) < uaddr)
@@ -2906,7 +2907,7 @@ sg_proc_dev_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
 			PRINT_PROC("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 				   scsidp->host->host_no, scsidp->channel,
 				   scsidp->id, scsidp->lun, (int) scsidp->type,
-				   (int) atomic_read(&scsidp->access_count),
+				   1,
 				   (int) scsidp->queue_depth,
 				   (int) scsidp->device_busy,
 				   (int) scsidp->online);

@@ -90,6 +90,7 @@
 #include <linux/igmp.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
+#include <linux/times.h>
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <net/route.h>
@@ -2215,7 +2216,7 @@ static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq,
 			   "\t\t\t\t%08lX %5d %d:%08lX\t\t%d\n",
 			   im->multiaddr, im->users,
-			   im->tm_running, im->timer.expires-jiffies, im->reporter);
+			   im->tm_running, jiffies_to_clock_t(im->timer.expires-jiffies), im->reporter);
 	}
 	return 0;
 }

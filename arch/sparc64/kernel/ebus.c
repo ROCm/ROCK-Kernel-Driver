@@ -58,12 +58,16 @@
 
 #define EBUS_DMA_RESET_TIMEOUT	10000
 
-static void __ebus_dma_reset(struct ebus_dma_info *p)
+static void __ebus_dma_reset(struct ebus_dma_info *p, int no_drain)
 {
 	int i;
 	u32 val = 0;
 
 	writel(EBDMA_CSR_RESET, p->regs + EBDMA_CSR);
+	udelay(1);
+
+	if (no_drain)
+		return;
 
 	for (i = EBUS_DMA_RESET_TIMEOUT; i > 0; i--) {
 		val = readl(p->regs + EBDMA_CSR);
@@ -78,7 +82,7 @@ static irqreturn_t ebus_dma_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct ebus_dma_info *p = dev_id;
 	unsigned long flags;
-	u32 csr;
+	u32 csr = 0;
 
 	spin_lock_irqsave(&p->lock, flags);
 	csr = readl(p->regs + EBDMA_CSR);
@@ -98,20 +102,31 @@ static irqreturn_t ebus_dma_irq(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	return IRQ_NONE;
+
 }
 
 int ebus_dma_register(struct ebus_dma_info *p)
 {
+	u32 csr;
+
 	if (!p->regs)
 		return -EINVAL;
-	if (p->flags & ~(EBUS_DMA_FLAG_USE_EBDMA_HANDLER))
+	if (p->flags & ~(EBUS_DMA_FLAG_USE_EBDMA_HANDLER |
+			 EBUS_DMA_FLAG_TCI_DISABLE))
 		return -EINVAL;
 	if ((p->flags & EBUS_DMA_FLAG_USE_EBDMA_HANDLER) && !p->callback)
 		return -EINVAL;
 	if (!strlen(p->name))
 		return -EINVAL;
 
-	__ebus_dma_reset(p);
+	__ebus_dma_reset(p, 1);
+
+	csr = EBDMA_CSR_BURST_SZ_16 | EBDMA_CSR_EN_CNT;
+
+	if (p->flags & EBUS_DMA_FLAG_TCI_DISABLE)
+		csr |= EBDMA_CSR_TCI_DIS;
+
+	writel(csr, p->regs + EBDMA_CSR);
 
 	return 0;
 }
@@ -201,14 +216,23 @@ EXPORT_SYMBOL(ebus_dma_request);
 void ebus_dma_prepare(struct ebus_dma_info *p, int write)
 {
 	unsigned long flags;
+	u32 csr;
 
 	spin_lock_irqsave(&p->lock, flags);
-	__ebus_dma_reset(p);
-	writel(EBDMA_CSR_INT_EN |
-	       ((write) ? EBDMA_CSR_WRITE : 0) |
+	__ebus_dma_reset(p, 0);
+
+	csr = (EBDMA_CSR_INT_EN |
 	       EBDMA_CSR_EN_CNT |
 	       EBDMA_CSR_BURST_SZ_16 |
-	       EBDMA_CSR_EN_NEXT, p->regs + EBDMA_CSR);
+	       EBDMA_CSR_EN_NEXT);
+
+	if (write)
+		csr |= EBDMA_CSR_WRITE;
+	if (p->flags & EBUS_DMA_FLAG_TCI_DISABLE)
+		csr |= EBDMA_CSR_TCI_DIS;
+
+	writel(csr, p->regs + EBDMA_CSR);
+
 	spin_unlock_irqrestore(&p->lock, flags);
 }
 EXPORT_SYMBOL(ebus_dma_prepare);
@@ -228,15 +252,17 @@ EXPORT_SYMBOL(ebus_dma_addr);
 void ebus_dma_enable(struct ebus_dma_info *p, int on)
 {
 	unsigned long flags;
-	u32 csr;
+	u32 orig_csr, csr;
 
 	spin_lock_irqsave(&p->lock, flags);
-	csr = readl(p->regs + EBDMA_CSR);
+	orig_csr = csr = readl(p->regs + EBDMA_CSR);
 	if (on)
 		csr |= EBDMA_CSR_EN_DMA;
 	else
 		csr &= ~EBDMA_CSR_EN_DMA;
-	writel(csr, p->regs + EBDMA_CSR);
+	if ((orig_csr & EBDMA_CSR_EN_DMA) !=
+	    (csr & EBDMA_CSR_EN_DMA))
+		writel(csr, p->regs + EBDMA_CSR);
 	spin_unlock_irqrestore(&p->lock, flags);
 }
 EXPORT_SYMBOL(ebus_dma_enable);

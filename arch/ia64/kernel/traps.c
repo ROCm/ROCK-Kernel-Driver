@@ -219,18 +219,14 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
  * Unimplemented system calls.  This is called only for stuff that
  * we're supposed to implement but haven't done so yet.  Everything
  * else goes to sys_ni_syscall.
+ *
+ * XXX Remove this for v2.6.1.
  */
 asmlinkage long
 ia64_ni_syscall (unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3,
 		 unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7,
 		 unsigned long stack)
 {
-#if 0
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-
-	printk(KERN_DEBUG "%s(%d): <sc%ld(%lx,%lx,%lx,%lx)>\n", current->comm, current->pid,
-	       regs->r15, arg0, arg1, arg2, arg3);
-#endif
 	return -ENOSYS;
 }
 

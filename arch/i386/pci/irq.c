@@ -327,152 +327,30 @@ static int pirq_cyrix_set(struct pci_dev *router, struct pci_dev *dev, int pirq,
 #define PIRQ_SIS_IRQ_DISABLE	0x80
 #define PIRQ_SIS_USB_ENABLE	0x40
 
-/* return value:
- * -1 on error
- * 0 for PCI INTA-INTD
- * 0 or enable bit mask to check or set for onchip functions
- */
-static inline int pirq_sis5595_onchip(int pirq, int *reg)
-{
-	int ret = -1;
-
-	*reg = pirq;
-	switch(pirq) {
-	case 0x01:
-	case 0x02:
-	case 0x03:
-	case 0x04:
-		*reg += 0x40;
-	case 0x41:
-	case 0x42:
-	case 0x43:
-	case 0x44:
-		ret = 0;
-		break;
-
-	case 0x62:
-		ret = PIRQ_SIS_USB_ENABLE;	/* documented for 5595 */
-		break;
-
-	case 0x61:
-	case 0x6a:
-	case 0x7e:
-		printk(KERN_INFO "SiS pirq: IDE/ACPI/DAQ mapping not implemented: (%u)\n",
-		       (unsigned) pirq);
-		/* fall thru */
-	default:
-		printk(KERN_INFO "SiS router unknown request: (%u)\n",
-		       (unsigned) pirq);
-		break;
-	}
-	return ret;
-}		
-
-/* return value:
- * -1 on error
- * 0 for PCI INTA-INTD
- * 0 or enable bit mask to check or set for onchip functions
- */
-static inline int pirq_sis96x_onchip(int pirq, int *reg)
-{
-	int ret = -1;
-
-	*reg = pirq;
-	switch(pirq) {
-	case 0x01:
-	case 0x02:
-	case 0x03:
-	case 0x04:
-		*reg += 0x40;
-	case 0x41:
-	case 0x42:
-	case 0x43:
-	case 0x44:
-	case 0x60:
-	case 0x61:
-	case 0x62:
-	case 0x63:
-		ret = 0;
-		break;
-
-	default:
-		printk(KERN_INFO "SiS router unknown request: (%u)\n",
-		       (unsigned) pirq);
-		break;
-	}
-	return ret;
-}		
-
-
-static int pirq_sis5595_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
+static int pirq_sis_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
 	u8 x;
-	int reg, check;
+	int reg;
 
-	check = pirq_sis5595_onchip(pirq, &reg);
-	if (check < 0)
-		return 0;
-
+	reg = pirq;
+	if (reg >= 0x01 && reg <= 0x04)
+		reg += 0x40;
 	pci_read_config_byte(router, reg, &x);
-	if (check != 0  &&  !(x & check))
-		return 0;
-
 	return (x & PIRQ_SIS_IRQ_DISABLE) ? 0 : (x & PIRQ_SIS_IRQ_MASK);
 }
 
-static int pirq_sis96x_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
+static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
 	u8 x;
-	int reg, check;
+	int reg;
 
-	check = pirq_sis96x_onchip(pirq, &reg);
-	if (check < 0)
-		return 0;
-
+	reg = pirq;
+	if (reg >= 0x01 && reg <= 0x04)
+		reg += 0x40;
 	pci_read_config_byte(router, reg, &x);
-	if (check != 0  &&  !(x & check))
-		return 0;
-
-	return (x & PIRQ_SIS_IRQ_DISABLE) ? 0 : (x & PIRQ_SIS_IRQ_MASK);
-}
-
-static int pirq_sis5595_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	u8 x;
-	int reg, set;
-
-	set = pirq_sis5595_onchip(pirq, &reg);
-	if (set < 0)
-		return 0;
-
-	x = (irq & PIRQ_SIS_IRQ_MASK);
-	if (x == 0)
-		x = PIRQ_SIS_IRQ_DISABLE;
-	else
-		x |= set;
-
+	x &= ~(PIRQ_SIS_IRQ_MASK | PIRQ_SIS_IRQ_DISABLE);
+	x |= irq ? irq: PIRQ_SIS_IRQ_DISABLE;
 	pci_write_config_byte(router, reg, x);
-
-	return 1;
-}
-
-static int pirq_sis96x_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	u8 x;
-	int reg, set;
-
-	set = pirq_sis96x_onchip(pirq, &reg);
-	if (set < 0)
-		return 0;
-
-	x = (irq & PIRQ_SIS_IRQ_MASK);
-	if (x == 0)
-		x = PIRQ_SIS_IRQ_DISABLE;
-	else
-		x |= set;
-
-	pci_write_config_byte(router, reg, x);
-
 	return 1;
 }
 
@@ -657,26 +535,11 @@ static __init int sis_router_probe(struct irq_router *r, struct pci_dev *router,
 	if (device != PCI_DEVICE_ID_SI_503)
 		return 0;
 		
-	/*
-	 * In case of SiS south bridge, we need to detect the two
-	 * kinds of routing tables we have seen so far (5595 and 96x). 
-	 *
-	 * The 96x tends to still come with routing tables that claim
-	 * to be 503's.. Silly thing. Check the actual router chip.
-	 */
-	if ((router->device & 0xfff0) == 0x0960) {
-		r->name = "SIS96x";
-		r->get = pirq_sis96x_get;
-		r->set = pirq_sis96x_set;
-		DBG("PCI: Detecting SiS router at %02x:%02x : SiS096x detected\n",
-		    rt->rtr_bus, rt->rtr_devfn);
-	} else {
-		r->name = "SIS5595";
-		r->get = pirq_sis5595_get;
-		r->set = pirq_sis5595_set;
-		DBG("PCI: Detecting SiS router at %02x:%02x : SiS5595 detected\n",
-		    rt->rtr_bus, rt->rtr_devfn);
-	}
+	r->name = "SIS";
+	r->get = pirq_sis_get;
+	r->set = pirq_sis_set;
+	DBG("PCI: Detecting SiS router at %02x:%02x\n",
+	    rt->rtr_bus, rt->rtr_devfn);
 	return 1;
 }
 

@@ -54,7 +54,7 @@ static void __init reserve_resources_of_dev( struct pnp_dev *dev )
 	int i;
 
 	for (i=0;i<PNP_MAX_PORT;i++) {
-		if (pnp_port_valid(dev, i))
+		if (!pnp_port_valid(dev, i))
 			/* end of resources */
 			continue;
 		if (pnp_port_start(dev, i) == 0)

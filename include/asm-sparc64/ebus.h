@@ -57,6 +57,7 @@ struct ebus_dma_info {
 
 	unsigned int	flags;
 #define EBUS_DMA_FLAG_USE_EBDMA_HANDLER		0x00000001
+#define EBUS_DMA_FLAG_TCI_DISABLE		0x00000002
 
 	/* These are only valid is EBUS_DMA_FLAG_USE_EBDMA_HANDLER is
 	 * set.

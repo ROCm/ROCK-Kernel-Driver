@@ -11,8 +11,9 @@
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/device.h>
+
+#include <scsi/scsi_host.h>
 #include "scsi.h"
-#include "hosts.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -257,20 +258,12 @@ store_rescan_field (struct device *dev, const char *buf, size_t count)
 	scsi_rescan_device(dev);
 	return count;
 }
-
 static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field)
 
 static ssize_t sdev_store_delete(struct device *dev, const char *buf,
 				 size_t count)
 {
-	struct scsi_device *sdev = to_scsi_device(dev);
-
-	/*
-	 * FIXME and scsi_proc.c: racey use of access_count,
-	 */
-	if (atomic_read(&sdev->access_count))
-		return -EBUSY;
-	scsi_remove_device(sdev);
+	scsi_remove_device(to_scsi_device(dev));
 	return count;
 };
 static DEVICE_ATTR(delete, S_IWUSR, NULL, sdev_store_delete);
@@ -403,22 +396,12 @@ clean_device:
  **/
 void scsi_remove_device(struct scsi_device *sdev)
 {
-	struct class *class = class_get(&sdev_class);
-
 	class_device_unregister(&sdev->sdev_classdev);
-
-	if (class) {
-		down_write(&class->subsys.rwsem);
-		set_bit(SDEV_DEL, &sdev->sdev_state);
-		if (sdev->host->hostt->slave_destroy)
-			sdev->host->hostt->slave_destroy(sdev);
-		device_del(&sdev->sdev_gendev);
-		up_write(&class->subsys.rwsem);
-	}
-
+	set_bit(SDEV_DEL, &sdev->sdev_state);
+	if (sdev->host->hostt->slave_destroy)
+		sdev->host->hostt->slave_destroy(sdev);
+	device_del(&sdev->sdev_gendev);
 	put_device(&sdev->sdev_gendev);
-
-	class_put(&sdev_class);
 }
 
 int scsi_register_driver(struct device_driver *drv)

@@ -77,7 +77,7 @@ void
 ia64_patch_imm60 (u64 insn_addr, u64 val)
 {
 	ia64_patch(insn_addr,
-		   0x011ffffe000, (  ((val & 0x1000000000000000) >> 24) /* bit 60 -> 36 */
+		   0x011ffffe000, (  ((val & 0x0800000000000000) >> 23) /* bit 59 -> 36 */
 				   | ((val & 0x00000000000fffff) << 13) /* bit  0 -> 13 */));
 	ia64_patch(insn_addr - 1, 0x1fffffffffc, val >> 18);
 }
