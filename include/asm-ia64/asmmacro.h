@@ -43,21 +43,25 @@ name:
 	.section "__ex_table", "a"		// declare section & section attributes
 	.previous
 
-#if __GNUC__ >= 3
 # define EX(y,x...)				\
 	.xdata4 "__ex_table", 99f-., y-.;	\
   [99:]	x
 # define EXCLR(y,x...)				\
 	.xdata4 "__ex_table", 99f-., y-.+4;	\
   [99:]	x
-#else
-# define EX(y,x...)				\
-	.xdata4 "__ex_table", 99f-., y-.;	\
-  99:	x
-# define EXCLR(y,x...)				\
-	.xdata4 "__ex_table", 99f-., y-.+4;	\
-  99:	x
-#endif
+
+/*
+ * Mark instructions that need a load of a virtual address patched to be
+ * a load of a physical address.  We use this either in critical performance
+ * path (ivt.S - TLB miss processing) or in places where it might not be
+ * safe to use a "tpa" instruction (mca_asm.S - error recovery).
+ */
+	.section ".data.patch.vtop", "a"	// declare section & section attributes
+	.previous
+
+#define	LOAD_PHYSICAL(pr, reg, obj)		\
+[1:](pr)movl reg = obj;				\
+	.xdata4 ".data.patch.vtop", 1b-.
 
 /*
  * For now, we always put in the McKinley E9 workaround.  On CPUs that don't need it,
@@ -65,11 +69,11 @@ name:
  */
 #define DO_MCKINLEY_E9_WORKAROUND
 #ifdef DO_MCKINLEY_E9_WORKAROUND
-	.section "__mckinley_e9_bundles", "a"
+	.section ".data.patch.mckinley_e9", "a"
 	.previous
 /* workaround for Itanium 2 Errata 9: */
 # define MCKINLEY_E9_WORKAROUND			\
-	.xdata4 "__mckinley_e9_bundles", 1f-.;	\
+	.xdata4 ".data.patch.mckinley_e9", 1f-.;\
 1:{ .mib;					\
 	nop.m 0;				\
 	nop.i 0;				\

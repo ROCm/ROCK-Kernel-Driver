@@ -65,7 +65,7 @@
 /*
  * Controller mappings for all interrupt sources:
  */
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
+irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 	[0 ... NR_IRQS-1] = {
 		.status = IRQ_DISABLED,
 		.handler = &no_irq_type,
@@ -235,7 +235,6 @@ int handle_IRQ_event(unsigned int irq,
 {
 	int status = 1;	/* Force the "do bottom halves" bit */
 	int retval = 0;
-	struct irqaction *first_action = action;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
@@ -248,30 +247,88 @@ int handle_IRQ_event(unsigned int irq,
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
-	if (retval != 1) {
-		static int count = 100;
-		if (count) {
-			count--;
-			if (retval) {
-				printk("irq event %d: bogus retval mask %x\n",
-					irq, retval);
-			} else {
-				printk("irq %d: nobody cared!\n", irq);
-			}
-			dump_stack();
-			printk("handlers:\n");
-			action = first_action;
-			do {
-				printk("[<%p>]", action->handler);
-				print_symbol(" (%s)",
-					(unsigned long)action->handler);
-				printk("\n");
-				action = action->next;
-			} while (action);
-		}
+	return retval;
+}
+
+static void __report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	struct irqaction *action;
+
+	if (action_ret != IRQ_HANDLED && action_ret != IRQ_NONE) {
+		printk(KERN_ERR "irq event %d: bogus return value %x\n",
+				irq, action_ret);
+	} else {
+		printk(KERN_ERR "irq %d: nobody cared!\n", irq);
+	}
+	dump_stack();
+	printk(KERN_ERR "handlers:\n");
+	action = desc->action;
+	do {
+		printk(KERN_ERR "[<%p>]", action->handler);
+		print_symbol(" (%s)",
+			(unsigned long)action->handler);
+		printk("\n");
+		action = action->next;
+	} while (action);
+}
+
+static void report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	static int count = 100;
+
+	if (count) {
+		count--;
+		__report_bad_irq(irq, desc, action_ret);
+	}
+}
+
+static int noirqdebug;
+
+static int __init noirqdebug_setup(char *str)
+{
+	noirqdebug = 1;
+	printk("IRQ lockup detection disabled\n");
+	return 1;
+}
+
+__setup("noirqdebug", noirqdebug_setup);
+
+/*
+ * If 99,900 of the previous 100,000 interrupts have not been handled then
+ * assume that the IRQ is stuck in some manner.  Drop a diagnostic and try to
+ * turn the IRQ off.
+ *
+ * (The other 100-of-100,000 interrupts may have been a correctly-functioning
+ *  device sharing an IRQ with the failing one)
+ *
+ * Called under desc->lock
+ */
+static void note_interrupt(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	if (action_ret != IRQ_HANDLED) {
+		desc->irqs_unhandled++;
+		if (action_ret != IRQ_NONE)
+			report_bad_irq(irq, desc, action_ret);
 	}
 
-	return status;
+	desc->irq_count++;
+	if (desc->irq_count < 100000)
+		return;
+
+	desc->irq_count = 0;
+	if (desc->irqs_unhandled > 99900) {
+		/*
+		 * The interrupt is stuck
+		 */
+		__report_bad_irq(irq, desc, action_ret);
+		/*
+		 * Now kill the IRQ
+		 */
+		printk(KERN_EMERG "Disabling IRQ #%d\n", irq);
+		desc->status |= IRQ_DISABLED;
+		desc->handler->disable(irq);
+	}
+	desc->irqs_unhandled = 0;
 }
 
 /*
@@ -380,21 +437,24 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 	 * 0 return value means that this irq is already being
 	 * handled by some other CPU. (or is disabled)
 	 */
-	int cpu;
 	irq_desc_t *desc = irq_desc(irq);
 	struct irqaction * action;
+	irqreturn_t action_ret;
 	unsigned int status;
+	int cpu;
 
 	irq_enter();
-	cpu = smp_processor_id();
+	cpu = smp_processor_id(); /* for CONFIG_PREEMPT, this must come after irq_enter()! */
 
 	kstat_cpu(cpu).irqs[irq]++;
 
 	if (desc->status & IRQ_PER_CPU) {
 		/* no locking required for CPU-local interrupts: */
 		desc->handler->ack(irq);
-		handle_IRQ_event(irq, regs, desc->action);
+		action_ret = handle_IRQ_event(irq, regs, desc->action);
 		desc->handler->end(irq);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
 	} else {
 		spin_lock(&desc->lock);
 		desc->handler->ack(irq);
@@ -438,9 +498,10 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		 */
 		for (;;) {
 			spin_unlock(&desc->lock);
-			handle_IRQ_event(irq, regs, action);
+			action_ret = handle_IRQ_event(irq, regs, action);
 			spin_lock(&desc->lock);
-
+			if (!noirqdebug)
+				note_interrupt(irq, desc, action_ret);
 			if (!(desc->status & IRQ_PENDING))
 				break;
 			desc->status &= ~IRQ_PENDING;

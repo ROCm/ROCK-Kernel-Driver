@@ -889,11 +889,15 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	if (clone_flags & CLONE_CHILD_SETTID)
 		p->set_child_tid = child_tidptr;
+	else
+		p->set_child_tid = NULL;
 	/*
 	 * Clear TID on mm_release()?
 	 */
 	if (clone_flags & CLONE_CHILD_CLEARTID)
 		p->clear_child_tid = child_tidptr;
+	else
+		p->clear_child_tid = NULL;
 
 	/*
 	 * Syscall tracing should be turned off in the child regardless

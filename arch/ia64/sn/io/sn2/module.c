@@ -18,7 +18,6 @@
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/pci/bridge.h>
 #include <asm/sn/klconfig.h>
-#include <asm/sn/sn1/hubdev.h>
 #include <asm/sn/module.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/xtalk/xswitch.h>

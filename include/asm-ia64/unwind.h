@@ -26,7 +26,9 @@ enum unw_application_register {
 	UNW_AR_EC,
 	UNW_AR_FPSR,
 	UNW_AR_RSC,
-	UNW_AR_CCV
+	UNW_AR_CCV,
+	UNW_AR_CSD,
+	UNW_AR_SSD
 };
 
 /*
@@ -95,7 +97,6 @@ struct unw_frame_info {
  * Initialize unwind support.
  */
 extern void unw_init (void);
-extern void unw_create_gate_table (void);
 
 extern void *unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned long gp,
 				   const void *table_start, const void *table_end);

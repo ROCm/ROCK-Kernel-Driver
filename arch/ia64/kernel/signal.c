@@ -108,25 +108,22 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 	long err;
 
 	/* restore scratch that always needs gets updated during signal delivery: */
-	err = __get_user(flags, &sc->sc_flags);
-
+	err  = __get_user(flags, &sc->sc_flags);
 	err |= __get_user(nat, &sc->sc_nat);
 	err |= __get_user(ip, &sc->sc_ip);			/* instruction pointer */
 	err |= __get_user(cfm, &sc->sc_cfm);
 	err |= __get_user(um, &sc->sc_um);			/* user mask */
 	err |= __get_user(scr->pt.ar_rsc, &sc->sc_ar_rsc);
-	err |= __get_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
 	err |= __get_user(scr->pt.ar_unat, &sc->sc_ar_unat);
 	err |= __get_user(scr->pt.ar_fpsr, &sc->sc_ar_fpsr);
 	err |= __get_user(scr->pt.ar_pfs, &sc->sc_ar_pfs);
 	err |= __get_user(scr->pt.pr, &sc->sc_pr);		/* predicates */
 	err |= __get_user(scr->pt.b0, &sc->sc_br[0]);		/* b0 (rp) */
 	err |= __get_user(scr->pt.b6, &sc->sc_br[6]);		/* b6 */
-	err |= __get_user(scr->pt.b7, &sc->sc_br[7]);		/* b7 */
-	err |= __copy_from_user(&scr->pt.r1, &sc->sc_gr[1], 3*8);	/* r1-r3 */
+	err |= __copy_from_user(&scr->pt.r1, &sc->sc_gr[1], 8);	/* r1 */
 	err |= __copy_from_user(&scr->pt.r8, &sc->sc_gr[8], 4*8);	/* r8-r11 */
-	err |= __copy_from_user(&scr->pt.r12, &sc->sc_gr[12], 4*8);	/* r12-r15 */
-	err |= __copy_from_user(&scr->pt.r16, &sc->sc_gr[16], 16*8);	/* r16-r31 */
+	err |= __copy_from_user(&scr->pt.r12, &sc->sc_gr[12], 2*8);	/* r12-r13 */
+	err |= __copy_from_user(&scr->pt.r15, &sc->sc_gr[15], 8);	/* r15 */
 
 	scr->pt.cr_ifs = cfm | (1UL << 63);
 
@@ -137,17 +134,27 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 
 	scr->scratch_unat = ia64_put_scratch_nat_bits(&scr->pt, nat);
 
+	if (!(flags & IA64_SC_FLAG_IN_SYSCALL)) {
+		/* Restore most scratch-state only when not in syscall. */
+		err |= __get_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);		/* ar.ccv */
+		err |= __get_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
+		err |= __get_user(scr->pt.r14, &sc->sc_gr[14]);			/* r14 */
+		err |= __copy_from_user(&scr->pt.ar_csd, &sc->sc_ar25, 2*8); /* ar.csd & ar.ssd */
+		err |= __copy_from_user(&scr->pt.r2, &sc->sc_gr[2], 2*8);	/* r2-r3 */
+		err |= __copy_from_user(&scr->pt.r16, &sc->sc_gr[16], 16*8);	/* r16-r31 */
+	}
+
 	if ((flags & IA64_SC_FLAG_FPH_VALID) != 0) {
 		struct ia64_psr *psr = ia64_psr(&scr->pt);
 
 		__copy_from_user(current->thread.fph, &sc->sc_fr[32], 96*16);
 		psr->mfh = 0;	/* drop signal handler's fph contents... */
 		if (psr->dfh)
-			current->thread.last_fph_cpu = -1;
+			ia64_drop_fpu(current);
 		else {
+			/* We already own the local fph, otherwise psr->dfh wouldn't be 0.  */
 			__ia64_load_fpu(current->thread.fph);
-			ia64_set_fpu_owner(current);
-			current->thread.last_fph_cpu = smp_processor_id();
+			ia64_set_local_fpu_owner(current);
 		}
 	}
 	return err;
@@ -166,11 +173,10 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 		int err;
 
 		/*
-		 * If you change siginfo_t structure, please be sure
-		 * this code is fixed accordingly.  It should never
-		 * copy any pad contained in the structure to avoid
-		 * security leaks, but must copy the generic 3 ints
-		 * plus the relevant union member.
+		 * If you change siginfo_t structure, please be sure this code is fixed
+		 * accordingly.  It should never copy any pad contained in the structure
+		 * to avoid security leaks, but must copy the generic 3 ints plus the
+		 * relevant union member.
 		 */
 		err = __put_user(from->si_signo, &to->si_signo);
 		err |= __put_user(from->si_errno, &to->si_errno);
@@ -183,24 +189,15 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 			err |= __put_user(from->si_addr, &to->si_addr);
 			err |= __put_user(from->si_imm, &to->si_imm);
 			break;
-		      case __SI_CHLD >> 16:
-			err |= __put_user(from->si_utime, &to->si_utime);
-			err |= __put_user(from->si_stime, &to->si_stime);
-			err |= __put_user(from->si_status, &to->si_status);
-		      case __SI_PROF >> 16:
-			err |= __put_user(from->si_uid, &to->si_uid);
-			err |= __put_user(from->si_pid, &to->si_pid);
-			if (from->si_code == PROF_OVFL) {
-				err |= __put_user(from->si_pfm_ovfl[0], &to->si_pfm_ovfl[0]);
-				err |= __put_user(from->si_pfm_ovfl[1], &to->si_pfm_ovfl[1]);
-				err |= __put_user(from->si_pfm_ovfl[2], &to->si_pfm_ovfl[2]);
-				err |= __put_user(from->si_pfm_ovfl[3], &to->si_pfm_ovfl[3]);
-			}
 		      case __SI_TIMER >> 16:
 			err |= __put_user(from->si_tid, &to->si_tid);
 			err |= __put_user(from->si_overrun, &to->si_overrun);
 			err |= __put_user(from->si_value, &to->si_value);
 			break;
+		      case __SI_CHLD >> 16:
+			err |= __put_user(from->si_utime, &to->si_utime);
+			err |= __put_user(from->si_stime, &to->si_stime);
+			err |= __put_user(from->si_status, &to->si_status);
 		      default:
 			err |= __put_user(from->si_uid, &to->si_uid);
 			err |= __put_user(from->si_pid, &to->si_pid);
@@ -235,10 +232,6 @@ copy_siginfo_from_user (siginfo_t *to, siginfo_t *from)
 
 		      case SIGPOLL:
 			to->si_code |= __SI_POLL;
-			break;
-
-		      case SIGPROF:
-			to->si_code |= __SI_PROF;
 			break;
 
 		      default:
@@ -352,27 +345,40 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 	nat = ia64_get_scratch_nat_bits(&scr->pt, scr->scratch_unat);
 
 	err  = __put_user(flags, &sc->sc_flags);
-
 	err |= __put_user(nat, &sc->sc_nat);
 	err |= PUT_SIGSET(mask, &sc->sc_mask);
 	err |= __put_user(cfm, &sc->sc_cfm);
 	err |= __put_user(scr->pt.cr_ipsr & IA64_PSR_UM, &sc->sc_um);
 	err |= __put_user(scr->pt.ar_rsc, &sc->sc_ar_rsc);
-	err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
 	err |= __put_user(scr->pt.ar_unat, &sc->sc_ar_unat);		/* ar.unat */
 	err |= __put_user(scr->pt.ar_fpsr, &sc->sc_ar_fpsr);		/* ar.fpsr */
 	err |= __put_user(scr->pt.ar_pfs, &sc->sc_ar_pfs);
 	err |= __put_user(scr->pt.pr, &sc->sc_pr);			/* predicates */
 	err |= __put_user(scr->pt.b0, &sc->sc_br[0]);			/* b0 (rp) */
 	err |= __put_user(scr->pt.b6, &sc->sc_br[6]);			/* b6 */
-	err |= __put_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
-
-	err |= __copy_to_user(&sc->sc_gr[1], &scr->pt.r1, 3*8);		/* r1-r3 */
+	err |= __copy_to_user(&sc->sc_gr[1], &scr->pt.r1, 8);		/* r1 */
 	err |= __copy_to_user(&sc->sc_gr[8], &scr->pt.r8, 4*8);		/* r8-r11 */
-	err |= __copy_to_user(&sc->sc_gr[12], &scr->pt.r12, 4*8);	/* r12-r15 */
-	err |= __copy_to_user(&sc->sc_gr[16], &scr->pt.r16, 16*8);	/* r16-r31 */
-
+	err |= __copy_to_user(&sc->sc_gr[12], &scr->pt.r12, 2*8);	/* r12-r13 */
+	err |= __copy_to_user(&sc->sc_gr[15], &scr->pt.r15, 8);		/* r15 */
 	err |= __put_user(scr->pt.cr_iip + ia64_psr(&scr->pt)->ri, &sc->sc_ip);
+
+	if (flags & IA64_SC_FLAG_IN_SYSCALL) {
+		/* Clear scratch registers if the signal interrupted a system call. */
+		err |= __put_user(0, &sc->sc_ar_ccv);				/* ar.ccv */
+		err |= __put_user(0, &sc->sc_br[7]);				/* b7 */
+		err |= __put_user(0, &sc->sc_gr[14]);				/* r14 */
+		err |= __clear_user(&sc->sc_ar25, 2*8);			/* ar.csd & ar.ssd */
+		err |= __clear_user(&sc->sc_gr[2], 2*8);			/* r2-r3 */
+		err |= __clear_user(&sc->sc_gr[16], 16*8);			/* r16-r31 */
+	} else {
+		/* Copy scratch regs to sigcontext if the signal didn't interrupt a syscall. */
+		err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);		/* ar.ccv */
+		err |= __put_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
+		err |= __put_user(scr->pt.r14, &sc->sc_gr[14]);			/* r14 */
+		err |= __copy_to_user(&scr->pt.ar_csd, &sc->sc_ar25, 2*8); /* ar.csd & ar.ssd */
+		err |= __copy_to_user(&sc->sc_gr[2], &scr->pt.r2, 2*8);		/* r2-r3 */
+		err |= __copy_to_user(&sc->sc_gr[16], &scr->pt.r16, 16*8);	/* r16-r31 */
+	}
 	return err;
 }
 
@@ -389,14 +395,14 @@ static long
 setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	     struct sigscratch *scr)
 {
-	extern char ia64_sigtramp[], __start_gate_section[];
+	extern char __kernel_sigtramp[];
 	unsigned long tramp_addr, new_rbs = 0;
 	struct sigframe *frame;
 	struct siginfo si;
 	long err;
 
 	frame = (void *) scr->pt.r12;
-	tramp_addr = GATE_ADDR + (ia64_sigtramp - __start_gate_section);
+	tramp_addr = (unsigned long) __kernel_sigtramp;
 	if ((ka->sa.sa_flags & SA_ONSTACK) && sas_ss_flags((unsigned long) frame) == 0) {
 		frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
 				  & ~(STACK_ALIGN - 1));
@@ -406,7 +412,7 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 		 * in the kernel, register stack is switched in the signal trampoline).
 		 */
 		if (!rbs_on_sig_stack(scr->pt.ar_bspstore))
-			new_rbs  = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
+			new_rbs = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
 	}
 	frame = (void *) frame - ((sizeof(*frame) + STACK_ALIGN - 1) & ~(STACK_ALIGN - 1));
 
@@ -451,8 +457,8 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	scr->scratch_unat = 0; /* ensure NaT bits of r12 is clear */
 
 #if DEBUG_SIG
-	printk("SIG deliver (%s:%d): sig=%d sp=%lx ip=%lx handler=%lx\n",
-	       current->comm, current->pid, sig, scr->pt.r12, scr->pt.cr_iip, scr->pt.r3);
+	printk("SIG deliver (%s:%d): sig=%d sp=%lx ip=%lx handler=%p\n",
+	       current->comm, current->pid, sig, scr->pt.r12, frame->sc.sc_ip, frame->handler);
 #endif
 	return 1;
 

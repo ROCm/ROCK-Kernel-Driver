@@ -1682,6 +1682,10 @@ ioc_init(u64 hpa, void *handle)
 	ioc_resource_init(ioc);
 	ioc_sac_init(ioc);
 
+	if ((long) ~IOVP_MASK > (long) ia64_max_iommu_merge_mask)
+		ia64_max_iommu_merge_mask = ~IOVP_MASK;
+	MAX_DMA_ADDRESS = ~0UL;
+
 	printk(KERN_INFO PFX
 		"%s %d.%d HPA 0x%lx IOVA space %dMb at 0x%lx\n",
 		ioc->name, (ioc->rev >> 4) & 0xF, ioc->rev & 0xF,
@@ -1898,13 +1902,14 @@ acpi_sba_ioc_add(struct acpi_device *device)
 	struct ioc *ioc;
 	acpi_status status;
 	u64 hpa, length;
+	struct acpi_buffer buffer;
 	struct acpi_device_info *dev_info;
-	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 
 	status = hp_acpi_csr_space(device->handle, &hpa, &length);
 	if (ACPI_FAILURE(status))
 		return 1;
 
+	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
 	status = acpi_get_object_info(device->handle, &buffer);
 	if (ACPI_FAILURE(status))
 		return 1;
@@ -1916,6 +1921,7 @@ acpi_sba_ioc_add(struct acpi_device *device)
 	 */
 	if (strncmp("HWP0001", dev_info->hardware_id.value, 7) == 0)
 		hpa += ZX1_IOC_OFFSET;
+	ACPI_MEM_FREE(dev_info);
 
 	ioc = ioc_init(hpa, device->handle);
 	if (!ioc)
@@ -1935,8 +1941,6 @@ static struct acpi_driver acpi_sba_ioc_driver = {
 static int __init
 sba_init(void)
 {
-	MAX_DMA_ADDRESS = ~0UL;
-
 	acpi_bus_register_driver(&acpi_sba_ioc_driver);
 
 #ifdef CONFIG_PCI

@@ -173,6 +173,8 @@ static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}
 #endif
 
+extern irq_desc_t irq_desc [NR_IRQS];
+
 #endif
 
 #endif /* _ASM_HW_IRQ_H */

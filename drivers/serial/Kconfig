@@ -77,7 +77,15 @@ config SERIAL_8250_CS
 	  a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
-config SERIAL_HCDP
+config SERIAL_8250_ACPI
+	bool "8250/16550 device discovery via ACPI namespace"
+	default y if IA64
+	depends on ACPI_BUS
+	---help---
+	  If you wish to enable serial port discovery via the ACPI
+	  namespace, say Y here.  If unsure, say N.
+
+config SERIAL_8250_HCDP
 	bool "8250/16550 device discovery support via EFI HCDP table"
 	depends on IA64
 	---help---

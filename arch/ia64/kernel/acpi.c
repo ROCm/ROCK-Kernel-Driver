@@ -96,6 +96,9 @@ acpi_get_sysname (void)
 	if (!strcmp(hdr->oem_id, "HP")) {
 		return "hpzx1";
 	}
+	else if (!strcmp(hdr->oem_id, "SGI")) {
+		return "sn2";
+	}
 
 	return "dig";
 #else
@@ -103,8 +106,6 @@ acpi_get_sysname (void)
 	return "hpsim";
 # elif defined (CONFIG_IA64_HP_ZX1)
 	return "hpzx1";
-# elif defined (CONFIG_IA64_SGI_SN1)
-	return "sn1";
 # elif defined (CONFIG_IA64_SGI_SN2)
 	return "sn2";
 # elif defined (CONFIG_IA64_DIG)
@@ -191,21 +192,19 @@ acpi_parse_lsapic (acpi_table_entry_header *header)
 
 	printk(KERN_INFO "CPU %d (0x%04x)", total_cpus, (lsapic->id << 8) | lsapic->eid);
 
-	if (lsapic->flags.enabled) {
-		available_cpus++;
+	if (!lsapic->flags.enabled)
+		printk(" disabled");
+	else if (available_cpus >= NR_CPUS)
+		printk(" ignored (increase NR_CPUS)");
+	else {
 		printk(" enabled");
 #ifdef CONFIG_SMP
-		smp_boot_data.cpu_phys_id[total_cpus] = (lsapic->id << 8) | lsapic->eid;
+		smp_boot_data.cpu_phys_id[available_cpus] = (lsapic->id << 8) | lsapic->eid;
 		if (hard_smp_processor_id()
-		    == (unsigned int) smp_boot_data.cpu_phys_id[total_cpus])
+		    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
 			printk(" (BSP)");
 #endif
-	}
-	else {
-		printk(" disabled");
-#ifdef CONFIG_SMP
-		smp_boot_data.cpu_phys_id[total_cpus] = -1;
-#endif
+		++available_cpus;
 	}
 
 	printk("\n");
@@ -576,59 +575,6 @@ acpi_find_rsdp (void)
 }
 
 
-#ifdef CONFIG_SERIAL_8250_ACPI
-
-#include <linux/acpi_serial.h>
-
-static int __init
-acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
-{
-	acpi_ser_t *spcr;
-	unsigned int gsi;
-
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	if (!iosapic_register_intr)
-		return -ENODEV;
-
-	/*
-	 * ACPI is able to describe serial ports that live at non-standard
-	 * memory addresses and use non-standard interrupts, either via
-	 * direct SAPIC mappings or via PCI interrupts.  We handle interrupt
-	 * routing for SAPIC-based (non-PCI) devices here.  Interrupt routing
-	 * for PCI devices will be handled when processing the PCI Interrupt
-	 * Routing Table (PRT).
-	 */
-
-	spcr = (acpi_ser_t *) __va(phys_addr);
-
-	setup_serial_acpi(spcr);
-
-	if (spcr->length < sizeof(acpi_ser_t))
-		/* Table not long enough for full info, thus no interrupt */
-		return -ENODEV;
-
-	if ((spcr->base_addr.space_id != ACPI_SERIAL_PCICONF_SPACE) &&
-	    (spcr->int_type == ACPI_SERIAL_INT_SAPIC))
-	{
-		int vector;
-
-		/* We have a UART in memory space with an SAPIC interrupt */
-
-		gsi = (  (spcr->global_int[3] << 24) |
-			 (spcr->global_int[2] << 16) |
-			 (spcr->global_int[1] << 8)  |
-			 (spcr->global_int[0])  );
-
-		vector = iosapic_register_intr(gsi, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
-	}
-	return 0;
-}
-
-#endif /* CONFIG_SERIAL_8250_ACPI */
-
-
 int __init
 acpi_boot_init (void)
 {
@@ -683,22 +629,12 @@ acpi_boot_init (void)
 	if (acpi_table_parse(ACPI_FADT, acpi_parse_fadt) < 1)
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
 
-#ifdef CONFIG_SERIAL_8250_ACPI
-	/*
-	 * TBD: Need phased approach to table parsing (only do those absolutely
-	 *      required during boot-up).  Recommend expanding concept of fix-
-	 *      feature devices (LDM) to include table-based devices such as
-	 *      serial ports, EC, SMBus, etc.
-	 */
-	acpi_table_parse(ACPI_SPCR, acpi_parse_spcr);
-#endif
-
 #ifdef CONFIG_SMP
+	smp_boot_data.cpu_count = available_cpus;
 	if (available_cpus == 0) {
 		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
-	smp_boot_data.cpu_count = total_cpus;
 
 	smp_build_cpu_map();
 # ifdef CONFIG_NUMA

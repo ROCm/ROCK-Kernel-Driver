@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Check whether linker can handle cross-segment @segrel():
+#
+CC=$1
+OBJDUMP=$2
+dir=$(dirname $0)
+tmp=${TMPDIR:-/tmp}
+out=$tmp/out$$
+$CC -nostdlib -static -Wl,-T$dir/check-segrel.lds $dir/check-segrel.S -o $out
+res=$($OBJDUMP --full --section .rodata $out | fgrep 000 | cut -f3 -d' ')
+rm -f $out
+if [ $res != 00000a00 ]; then
+    echo " -DHAVE_BUGGY_SEGREL"
+    cat >&2 <<EOF
+warning: your linker cannot handle cross-segment segment-relative relocations.
+         please upgrade to a newer version (it is safe to use this linker, but
+         the kernel will be bigger than strictly necessary).
+EOF
+fi
