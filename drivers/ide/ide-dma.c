@@ -681,17 +681,14 @@ int __ide_dma_good_drive (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_good_drive);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
-int __ide_dma_verbose (ide_drive_t *drive)
+void ide_dma_verbose(ide_drive_t *drive)
 {
 	struct hd_driveid *id	= drive->id;
 	ide_hwif_t *hwif	= HWIF(drive);
 
 	if (id->field_valid & 4) {
-		if ((id->dma_ultra >> 8) && (id->dma_mword >> 8)) {
-			printk(", BUG DMA OFF");
-			return hwif->ide_dma_off_quietly(drive);
-		}
+		if ((id->dma_ultra >> 8) && (id->dma_mword >> 8))
+			goto bug_dma_off;
 		if (id->dma_ultra & ((id->dma_ultra >> 8) & hwif->ultra_mask)) {
 			if (((id->dma_ultra >> 11) & 0x1F) &&
 			    eighty_ninty_three(drive)) {
@@ -721,19 +718,22 @@ int __ide_dma_verbose (ide_drive_t *drive)
 			printk(", (U)DMA");	/* Can be BIOS-enabled! */
 		}
 	} else if (id->field_valid & 2) {
-		if ((id->dma_mword >> 8) && (id->dma_1word >> 8)) {
-			printk(", BUG DMA OFF");
-			return hwif->ide_dma_off_quietly(drive);
-		}
+		if ((id->dma_mword >> 8) && (id->dma_1word >> 8))
+			goto bug_dma_off;
 		printk(", DMA");
 	} else if (id->field_valid & 1) {
 		printk(", BUG");
 	}
-	return 1;
+	return;
+bug_dma_off:
+	printk(", BUG DMA OFF");
+	hwif->ide_dma_off_quietly(drive);
+	return;
 }
 
-EXPORT_SYMBOL(__ide_dma_verbose);
+EXPORT_SYMBOL(ide_dma_verbose);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 int __ide_dma_lostirq (ide_drive_t *drive)
 {
 	printk("%s: DMA interrupt recovery\n", drive->name);
@@ -908,8 +908,6 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_end = &__ide_dma_end;
 	if (!hwif->ide_dma_test_irq)
 		hwif->ide_dma_test_irq = &__ide_dma_test_irq;
-	if (!hwif->ide_dma_verbose)
-		hwif->ide_dma_verbose = &__ide_dma_verbose;
 	if (!hwif->ide_dma_timeout)
 		hwif->ide_dma_timeout = &__ide_dma_timeout;
 	if (!hwif->ide_dma_lostirq)

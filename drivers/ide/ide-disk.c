@@ -1244,7 +1244,7 @@ static void idedisk_setup (ide_drive_t *drive)
 	printk(", CHS=%d/%d/%d", 
 	       drive->bios_cyl, drive->bios_head, drive->bios_sect);
 	if (drive->using_dma)
-		(void) HWIF(drive)->ide_dma_verbose(drive);
+		ide_dma_verbose(drive);
 	printk("\n");
 
 	drive->mult_count = 0;

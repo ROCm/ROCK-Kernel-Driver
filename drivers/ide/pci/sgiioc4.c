@@ -332,17 +332,6 @@ sgiioc4_ide_dma_host_off(ide_drive_t * drive)
 }
 
 static int
-sgiioc4_ide_dma_verbose(ide_drive_t * drive)
-{
-	if (drive->using_dma == 1)
-		printk(", UDMA(16)");
-	else
-		printk(", PIO");
-
-	return 1;
-}
-
-static int
 sgiioc4_ide_dma_lostirq(ide_drive_t * drive)
 {
 	HWIF(drive)->resetproc(drive);
@@ -620,7 +609,6 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->ide_dma_test_irq = &sgiioc4_ide_dma_test_irq;
 	hwif->ide_dma_host_on = &sgiioc4_ide_dma_host_on;
 	hwif->ide_dma_host_off = &sgiioc4_ide_dma_host_off;
-	hwif->ide_dma_verbose = &sgiioc4_ide_dma_verbose;
 	hwif->ide_dma_lostirq = &sgiioc4_ide_dma_lostirq;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->INB = &sgiioc4_INB;
