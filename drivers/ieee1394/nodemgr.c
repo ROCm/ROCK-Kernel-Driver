@@ -1490,7 +1490,10 @@ static int nodemgr_host_thread(void *__hi)
 		}
 
 		if (hi->kill_me)
+		{
+			up(&nodemgr_serialize);
 			break;
+		}
 
 		/* Pause for 1/4 second in 1/16 second intervals,
 		 * to make sure things settle down. */
@@ -1515,7 +1518,10 @@ static int nodemgr_host_thread(void *__hi)
 
 			/* Check the kill_me again */
 			if (hi->kill_me)
+			{
+				up(&nodemgr_serialize);
 				goto caught_signal;
+			}
 		}
 
 		if (!nodemgr_check_irm_capability(host, reset_cycles)) {
