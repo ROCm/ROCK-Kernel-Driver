@@ -70,6 +70,12 @@
 #include <pagebuf/page_buf.h>
 
 /*
+ * Feature macros (disable/enable)
+ */
+#undef  HAVE_REFCACHE	/* reference cache not needed for NFS in 2.6 */
+#define HAVE_SENDFILE	/* sendfile(2) exists in 2.6, but not in 2.4 */
+
+/*
  * State flag for unwritten extent buffers.
  *
  * We need to be able to distinguish between these and delayed

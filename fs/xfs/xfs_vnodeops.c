@@ -4767,7 +4767,9 @@ vnodeops_t xfs_vnodeops = {
 	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_XFS),
 	.vop_open		= xfs_open,
 	.vop_read		= xfs_read,
+#ifdef HAVE_SENDFILE
 	.vop_sendfile		= xfs_sendfile,
+#endif
 	.vop_write		= xfs_write,
 	.vop_ioctl		= xfs_ioctl,
 	.vop_getattr		= xfs_getattr,
