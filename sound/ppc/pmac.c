@@ -318,7 +318,8 @@ static snd_pcm_uframes_t snd_pmac_pcm_pointer(pmac_t *chip, pmac_stream_t *rec,
 	stat = ld_le16(&cp->xfer_status);
 	if (stat & (ACTIVE|DEAD)) {
 		count = in_le16(&cp->res_count);
-		count = rec->period_size - count;
+		if (count)
+			count = rec->period_size - count;
 	}
 #endif
 	count += rec->cur_period * rec->period_size;
