@@ -159,7 +159,7 @@ reach_long64:
 	 * addresses where we're currently running on. We have to do that here
 	 * because in 32bit we couldn't load a 64bit linear address.
 	 */
-	lgdt	pGDT64
+	lgdt	cpu_gdt_descr
 
 	/* 
 	 * Setup up a dummy PDA. this is just for some early bootup code
@@ -276,7 +276,7 @@ temp_boot_pmds:
 .org 0x5000
 ENTRY(level2_kernel_pgt)
 	/* 40MB kernel mapping. The kernel code cannot be bigger than that.
-	   When you change this change KERNEL_TEXT_SIZE in pgtable.h too. */
+	   When you change this change KERNEL_TEXT_SIZE in page.h too. */
 	/* (2^48-(2*1024*1024*1024)-((2^39)*511)-((2^30)*510)) = 0 */
 	.quad	0x0000000000000183
 	.quad	0x0000000000200183
@@ -320,16 +320,18 @@ ENTRY(level3_physmem_pgt)
 .org 0xb000
 .data
 
-.globl gdt
-
-	.word 0
 	.align 16
-	.word 0
-pGDT64:
-	.word	gdt_end-gdt_table
+	.globl cpu_gdt_descr
+cpu_gdt_descr:
+	.word	gdt_end-cpu_gdt_table
 gdt:
-	.quad	gdt_table
-	
+	.quad	cpu_gdt_table
+#ifdef CONFIG_SMP
+	.rept	NR_CPUS-1
+	.word	0
+	.quad	0
+	.endr
+#endif
 
 .align 64 /* cacheline aligned */
 ENTRY(gdt_table32)
@@ -344,8 +346,12 @@ gdt32_end:
  */
 		 		
 .align 64 /* cacheline aligned, keep this synchronized with asm/desc.h */
-ENTRY(gdt_table)
-	.quad	0x0000000000000000	/* This one is magic */
+
+/* The TLS descriptors are currently at a different place compared to i386.
+   Hopefully nobody expects them at a fixed place (Wine?) */
+	
+ENTRY(cpu_gdt_table)
+	.quad	0x0000000000000000	/* NULL descriptor */
 	.quad	0x0000000000000000	/* unused */
 	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
 	.quad	0x00cf92000000ffff	/* __KERNEL_DS */
@@ -358,14 +364,19 @@ ENTRY(gdt_table)
 	.word	0x00CF				# granularity = 4096, 386
 						#  (+5th nibble of limit)
 					/* __KERNEL32_CS */
-
-	.globl  tss_start
-tss_start:
-	.rept NR_CPUS	 	
-	.quad   0,0,0,0,0,0,0,0		/* TSS/LDT/per cpu entries. filled in later */
-	.endr	
+	.quad	0,0			/* TSS */
+	.quad	0			/* LDT */
+	.quad   0,0,0			/* three TLS descriptors */ 
+	.quad	0,0			/* pad to cache line boundary */
 gdt_end:	
 	.globl gdt_end
+
+	/* GDTs of other CPUs */	
+#ifdef CONFIG_SMP
+	.rept NR_CPUS-1
+	.quad 0,0,0,0,0,0,0,0,0,0,0
+	.endr	
+#endif
 
 	.align  64
 ENTRY(idt_table)	

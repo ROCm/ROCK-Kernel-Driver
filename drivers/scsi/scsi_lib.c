@@ -160,6 +160,30 @@ int scsi_init_cmd_errh(Scsi_Cmnd * SCpnt)
 }
 
 /*
+ * Function:   scsi_setup_cmd_retry()
+ *
+ * Purpose:    Restore the command state for a retry
+ *
+ * Arguments:  SCpnt   - command to be restored
+ *
+ * Returns:    Nothing
+ *
+ * Notes:      Immediately prior to retrying a command, we need
+ *             to restore certain fields that we saved above.
+ */
+void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt)
+{
+	memcpy((void *) SCpnt->cmnd, (void *) SCpnt->data_cmnd,
+		sizeof(SCpnt->data_cmnd));
+	SCpnt->request_buffer = SCpnt->buffer;
+	SCpnt->request_bufflen = SCpnt->bufflen;
+	SCpnt->use_sg = SCpnt->old_use_sg;
+	SCpnt->cmd_len = SCpnt->old_cmd_len;
+	SCpnt->sc_data_direction = SCpnt->sc_old_data_direction;
+	SCpnt->underflow = SCpnt->old_underflow;
+}
+
+/*
  * Function:    scsi_queue_next_request()
  *
  * Purpose:     Handle post-processing of completed commands.
@@ -614,7 +638,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			printk("scsi%d: ERROR on channel %d, id %d, lun %d, CDB: ",
 			       SCpnt->host->host_no, (int) SCpnt->channel,
 			       (int) SCpnt->target, (int) SCpnt->lun);
-			print_command(SCpnt->cmnd);
+			print_command(SCpnt->data_cmnd);
 			print_sense("sd", SCpnt);
 			SCpnt = scsi_end_request(SCpnt, 0, block_sectors);
 			return;
@@ -796,33 +820,6 @@ void scsi_request_fn(request_queue_t * q)
 			break;
 		} else {
 			SDpnt->starved = 0;
-		}
-
- 		/*
-		 * FIXME(eric)
-		 * I am not sure where the best place to do this is.  We need
-		 * to hook in a place where we are likely to come if in user
-		 * space.   Technically the error handling thread should be
-		 * doing this crap, but the error handler isn't used by
-		 * most hosts.
-		 */
-		if (SDpnt->was_reset) {
-			/*
-			 * We need to relock the door, but we might
-			 * be in an interrupt handler.  Only do this
-			 * from user space, since we do not want to
-			 * sleep from an interrupt.
-			 *
-			 * FIXME(eric) - have the error handler thread do
-			 * this work.
-			 */
-			SDpnt->was_reset = 0;
-			if (SDpnt->removable && !in_interrupt()) {
-				spin_unlock_irq(q->queue_lock);
-				scsi_ioctl(SDpnt, SCSI_IOCTL_DOORLOCK, 0);
-				spin_lock_irq(q->queue_lock);
-				continue;
-			}
 		}
 
 		/*

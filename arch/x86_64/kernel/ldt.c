@@ -22,32 +22,13 @@
 #include <asm/ldt.h>
 #include <asm/desc.h>
 
-void load_gs_index(unsigned gs)
-{
-	int access;
-	struct task_struct *me = current;
-	if (me->mm) 
-		read_lock(&me->mm->context.ldtlock); 
-	asm volatile("pushf\n\t" 
-		     "cli\n\t"
-		     "swapgs\n\t"
-		     "lar %1,%0\n\t"
-		     "jnz 1f\n\t"
-		     "movl %1,%%eax\n\t"
-		     "movl %%eax,%%gs\n\t"
-		     "jmp 2f\n\t"
-		     "1: movl %2,%%gs\n\t"
-		     "2: swapgs\n\t"
-		     "popf" : "=g" (access) : "g" (gs), "r" (0) : "rax"); 
-	if (me->mm) 
-		read_unlock(&me->mm->context.ldtlock); 
-}
+extern void load_gs_index(unsigned gs);
 
 #ifdef CONFIG_SMP /* avoids "defined but not used" warnig */
-static void flush_ldt(void *mm)
+static void flush_ldt(void *null)
 {
-	if (current->mm)
-		load_LDT(&current->mm->context);
+	if (current->active_mm)
+               load_LDT(&current->active_mm->context);
 }
 #endif
 
@@ -75,15 +56,18 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 	memset(newldt+oldsize*LDT_ENTRY_SIZE, 0, (mincount-oldsize)*LDT_ENTRY_SIZE);
 	wmb();
 	pc->ldt = newldt;
+	wmb();
 	pc->size = mincount;
+	wmb();
 	if (reload) {
 		load_LDT(pc);
 #ifdef CONFIG_SMP
+		preempt_disable();
 		if (current->mm->cpu_vm_mask != (1<<smp_processor_id()))
 			smp_call_function(flush_ldt, 0, 1, 1);
+		preempt_enable();
 #endif
 	}
-	wmb();
 	if (oldsize) {
 		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(oldldt);
@@ -96,11 +80,8 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 {
 	int err = alloc_ldt(new, old->size, 0);
-	if (err < 0) {
-		printk(KERN_WARNING "ldt allocation failed\n");
-		new->size = 0;
+	if (err < 0)
 		return err;
-	}
 	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
 	return 0;
 }
@@ -187,7 +168,7 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 	struct mm_struct * mm = me->mm;
 	__u32 entry_1, entry_2, *lp;
 	int error;
-	struct modify_ldt_ldt_s ldt_info;
+	struct user_desc ldt_info;
 
 	error = -EINVAL;
 
@@ -223,34 +204,17 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 
    	/* Allow LDTs to be cleared by the user. */
    	if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {
-		if (oldmode ||
-		    (ldt_info.contents == 0		&&
-		     ldt_info.read_exec_only == 1	&&
-		     ldt_info.seg_32bit == 0		&&
-		     ldt_info.limit_in_pages == 0	&&
-		     ldt_info.seg_not_present == 1	&&
-		     ldt_info.useable == 0 && 
-		     ldt_info.lm == 0)) {
+		if (oldmode || LDT_empty(&ldt_info)) {
 			entry_1 = 0;
 			entry_2 = 0;
 			goto install;
 		}
 	}
 
-	entry_1 = ((ldt_info.base_addr & 0x0000ffff) << 16) |
-		  (ldt_info.limit & 0x0ffff);
-	entry_2 = (ldt_info.base_addr & 0xff000000) |
-		  ((ldt_info.base_addr & 0x00ff0000) >> 16) |
-		  (ldt_info.limit & 0xf0000) |
-		  ((ldt_info.read_exec_only ^ 1) << 9) |
-		  (ldt_info.contents << 10) |
-		  ((ldt_info.seg_not_present ^ 1) << 15) |
-		  (ldt_info.seg_32bit << 22) |
-		  (ldt_info.limit_in_pages << 23) |
-		  (ldt_info.lm << 21) |
-		  0x7000;
-	if (!oldmode)
-		entry_2 |= (ldt_info.useable << 20);
+	entry_1 = LDT_entry_a(&ldt_info);
+	entry_2 = LDT_entry_b(&ldt_info);
+	if (oldmode)
+		entry_2 &= ~(1 << 20);
 
 	/* Install the new entry ...  */
 install:

@@ -131,19 +131,17 @@ static int qnx4_statfs(struct super_block *, struct statfs *);
 
 static struct super_operations qnx4_sops =
 {
-	alloc_inode:	qnx4_alloc_inode,
-	destroy_inode:	qnx4_destroy_inode,
-	read_inode:	qnx4_read_inode,
+	.alloc_inode	= qnx4_alloc_inode,
+	.destroy_inode	= qnx4_destroy_inode,
+	.read_inode	= qnx4_read_inode,
+	.put_super	= qnx4_put_super,
+	.statfs		= qnx4_statfs,
+	.remount_fs	= qnx4_remount,
 #ifdef CONFIG_QNX4FS_RW
-	write_inode:	qnx4_write_inode,
-	delete_inode:	qnx4_delete_inode,
+	.write_inode	= qnx4_write_inode,
+	.delete_inode	= qnx4_delete_inode,
+	.write_super	= qnx4_write_super,
 #endif
-	put_super:	qnx4_put_super,
-#ifdef CONFIG_QNX4FS_RW
-	write_super:	qnx4_write_super,
-#endif
-	statfs:		qnx4_statfs,
-	remount_fs:	qnx4_remount,
 };
 
 static int qnx4_remount(struct super_block *sb, int *flags, char *data)
@@ -358,25 +356,18 @@ static int qnx4_fill_super(struct super_block *s, void *data, int silent)
 
 	sb_set_blocksize(s, QNX4_BLOCK_SIZE);
 
-	/* Check the boot signature. Since the qnx4 code is
+	/* Check the superblock signature. Since the qnx4 code is
 	   dangerous, we should leave as quickly as possible
 	   if we don't belong here... */
-	bh = sb_bread(s, 0);
-	if (!bh) {
-		printk("qnx4: unable to read the boot sector\n");
-		goto outnobh;
-	}
-	if ( memcmp( (char*)bh->b_data + 4, "QNX4FS", 6 ) ) {
-		if (!silent)
-			printk("qnx4: wrong fsid in boot sector.\n");
-		goto out;
-	}
-	brelse(bh);
-
 	bh = sb_bread(s, 1);
 	if (!bh) {
 		printk("qnx4: unable to read the superblock\n");
 		goto outnobh;
+	}
+	if ( le32_to_cpu( *(__u32*)bh->b_data ) != QNX4_SUPER_MAGIC ) {
+		if (!silent)
+			printk("qnx4: wrong fsid in superblock.\n");
+		goto out;
 	}
 	s->s_op = &qnx4_sops;
 	s->s_magic = QNX4_SUPER_MAGIC;
@@ -449,12 +440,12 @@ static sector_t qnx4_bmap(struct address_space *mapping, sector_t block)
 	return generic_block_bmap(mapping,block,qnx4_get_block);
 }
 struct address_space_operations qnx4_aops = {
-	readpage: qnx4_readpage,
-	writepage: qnx4_writepage,
-	sync_page: block_sync_page,
-	prepare_write: qnx4_prepare_write,
-	commit_write: generic_commit_write,
-	bmap: qnx4_bmap
+	.readpage	= qnx4_readpage,
+	.writepage	= qnx4_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= qnx4_prepare_write,
+	.commit_write	= generic_commit_write,
+	.bmap		= qnx4_bmap
 };
 
 static void qnx4_read_inode(struct inode *inode)
@@ -564,11 +555,11 @@ static struct super_block *qnx4_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type qnx4_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"qnx4",
-	get_sb:		qnx4_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "qnx4",
+	.get_sb		= qnx4_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_qnx4_fs(void)
@@ -585,7 +576,7 @@ static int __init init_qnx4_fs(void)
 		return err;
 	}
 
-	printk("QNX4 filesystem 0.2.2 registered.\n");
+	printk("QNX4 filesystem 0.2.3 registered.\n");
 	return 0;
 }
 

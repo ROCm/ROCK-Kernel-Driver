@@ -18,4 +18,17 @@
 #define __USER_CS     0x33   /* 6*8+3 */ 
 #define __USER32_DS	__USER_DS 
 
+#define GDT_ENTRY_TLS 1
+#define GDT_ENTRY_TSS 8	/* needs two entries */
+#define GDT_ENTRY_LDT 10
+#define GDT_ENTRY_TLS_MIN 11
+#define GDT_ENTRY_TLS_MAX 13
+
+#define GDT_ENTRY_TLS_ENTRIES 3
+
+#define IDT_ENTRIES 256
+#define GDT_ENTRIES 16
+#define GDT_SIZE (GDT_ENTRIES * 8)
+#define TLS_SIZE (GDT_ENTRY_TLS_ENTRIES * 8) 
+
 #endif

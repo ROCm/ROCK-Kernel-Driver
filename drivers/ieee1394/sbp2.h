@@ -324,7 +324,7 @@ struct sbp2_request_packet {
 
 	struct list_head list;
 	struct hpsb_packet *packet;
-	struct tq_struct tq;
+	struct hpsb_queue_struct tq;
 	void *hi_context;
 
 };
@@ -510,9 +510,9 @@ static void sbp2_remove_device(struct sbp2scsi_host_info *hi,
 
 #ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
 static int sbp2_handle_physdma_write(struct hpsb_host *host, int nodeid, int destid, quadlet_t *data,
-                                     u64 addr, unsigned int length);
+                                     u64 addr, unsigned int length, u16 flags);
 static int sbp2_handle_physdma_read(struct hpsb_host *host, int nodeid, quadlet_t *data,
-                                    u64 addr, unsigned int length);
+                                    u64 addr, unsigned int length, u16 flags);
 #endif
 
 /*
@@ -522,7 +522,7 @@ static int sbp2_login_device(struct sbp2scsi_host_info *hi, struct scsi_id_insta
 static int sbp2_reconnect_device(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id); 
 static int sbp2_logout_device(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id); 
 static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int destid,
-				    quadlet_t *data, u64 addr, unsigned int length);
+				    quadlet_t *data, u64 addr, unsigned int length, u16 flags);
 static int sbp2_agent_reset(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, u32 flags);
 static int sbp2_create_command_orb(struct sbp2scsi_host_info *hi, 
 				   struct scsi_id_instance_data *scsi_id,

@@ -127,6 +127,8 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #define MODULES_END      0xffffffffafffffff
 #define MODULES_LEN   (MODULES_END - MODULES_VADDR)
 
+#define IOMAP_START      0xfffffe8000000000
+
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1
 #define _PAGE_BIT_USER		2
@@ -169,6 +171,8 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 	(_PAGE_PRESENT | _PAGE_DIRTY | _PAGE_ACCESSED)
 #define __PAGE_KERNEL_VSYSCALL \
 	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
+#define __PAGE_KERNEL_LARGE \
+	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_PSE)
 
 #define MAKE_GLOBAL(x) __pgprot((x) | _PAGE_GLOBAL)
 
@@ -176,6 +180,7 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #define PAGE_KERNEL_RO MAKE_GLOBAL(__PAGE_KERNEL_RO)
 #define PAGE_KERNEL_NOCACHE MAKE_GLOBAL(__PAGE_KERNEL_NOCACHE)
 #define PAGE_KERNEL_VSYSCALL MAKE_GLOBAL(__PAGE_KERNEL_VSYSCALL)
+#define PAGE_KERNEL_LARGE MAKE_GLOBAL(__PAGE_KERNEL_LARGE)
 
 #define __P000	PAGE_NONE
 #define __P001	PAGE_READONLY
@@ -244,6 +249,12 @@ static inline  int ptep_test_and_clear_dirty(pte_t *ptep)	{ return test_and_clea
 static inline  int ptep_test_and_clear_young(pte_t *ptep)	{ return test_and_clear_bit(_PAGE_BIT_ACCESSED, ptep); }
 static inline void ptep_set_wrprotect(pte_t *ptep)		{ clear_bit(_PAGE_BIT_RW, ptep); }
 static inline void ptep_mkdirty(pte_t *ptep)			{ set_bit(_PAGE_BIT_DIRTY, ptep); }
+
+#define __LARGE_PTE (_PAGE_PSE|_PAGE_PRESENT) 
+static inline int pmd_large(pmd_t pte) { 
+	return (pmd_val(pte) & __LARGE_PTE) == __LARGE_PTE; 
+} 	
+
 
 /*
  * Conversion functions: convert a page and protection to a page entry,

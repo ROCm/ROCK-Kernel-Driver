@@ -9,10 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  *
- * For the purpose of avoiding doubt the preferred form of the work
- * for making modifications shall be a standards compliant form such
- * gzipped tar and not one requiring a proprietary or patent encumbered
- * tool to unpack.
+ * For the avoidance of doubt the "preferred form" of this code is one which
+ * is in an open non patent encumbered format. Where cryptographic key signing
+ * forms part of the process of creating an executable the information
+ * including keys needed to generate an equivalently functional executable
+ * are deemed to be part of the source code.
  *
  *  Complications for I2O scsi
  *
@@ -61,7 +62,7 @@
 #include "../../scsi/sd.h"
 #include "i2o_scsi.h"
 
-#define VERSION_STRING        "Version 0.1.0"
+#define VERSION_STRING        "Version 0.1.1"
 
 #define dprintk(x)
 
@@ -114,7 +115,10 @@ static chain_buf *sg_chain_pool = NULL;
 static int sg_chain_tag = 0;
 static int sg_max_frags = SG_MAX_FRAGS;
 
-/*
+/**
+ *	i2o_retry_run		-	retry on timeout
+ *	@f: unused
+ *
  *	Retry congested frames. This actually needs pushing down into
  *	i2o core. We should only bother the OSM with this when we can't
  *	queue and retry the frame. Or perhaps we should call the OSM
@@ -134,6 +138,13 @@ static void i2o_retry_run(unsigned long f)
 	spin_unlock_irqrestore(&retry_lock, flags);
 }
 
+/**
+ *	flush_pending		-	empty the retry queue
+ *
+ *	Turn each of the pending commands into a NOP and post it back
+ *	to the controller to clear it.
+ */
+ 
 static void flush_pending(void)
 {
 	int i;
@@ -149,6 +160,20 @@ static void flush_pending(void)
 	retry_ct=0;
 	spin_unlock_irqrestore(&retry_lock, flags);
 }
+
+/**
+ *	i2o_scsi_reply		-	scsi message reply processor
+ *	@h: our i2o handler
+ *	@c: controller issuing the reply
+ *	@msg: the message from the controller (mapped)
+ *
+ *	Process reply messages (interrupts in normal scsi controller think).
+ *	We can get a variety of messages to process. The normal path is
+ *	scsi command completions. We must also deal with IOP failures,
+ *	the reply to a bus reset and the reply to a LUN query.
+ *
+ *	Locks: the queue lock is taken to call the completion handler
+ */
 
 static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, struct i2o_message *msg)
 {
@@ -227,7 +252,7 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	dprintk(("i2o got a scsi reply %08X: ", m[0]));
 	dprintk(("m[2]=%08X: ", m[2]));
 	dprintk(("m[4]=%08X\n", m[4]));
-
+ 
 	if(m[2]&0x80000000)
 	{
 		if(m[2]&0x40000000)
@@ -236,7 +261,7 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 			lun_done=1;
 			return;
 		}
-		printk(KERN_ERR "i2o_scsi: bus reset reply.\n");
+		printk(KERN_INFO "i2o_scsi: bus reset completed.\n");
 		return;
 	}
 	/*
@@ -313,6 +338,18 @@ struct i2o_handler i2o_scsi_handler=
 	I2O_CLASS_SCSI_PERIPHERAL
 };
 
+/**
+ *	i2o_find_lun		-	report the lun of an i2o device
+ *	@c: i2o controller owning the device
+ *	@d: i2o disk device
+ *	@target: filled in with target id
+ *	@lun: filled in with target lun
+ *
+ *	Query an I2O device to find out its SCSI lun and target numbering. We
+ *	don't currently handle some of the fancy SCSI-3 stuff although our
+ *	querying is sufficient to do so.
+ */
+ 
 static int i2o_find_lun(struct i2o_controller *c, struct i2o_device *d, int *target, int *lun)
 {
 	u8 reply[8];
@@ -331,6 +368,19 @@ static int i2o_find_lun(struct i2o_controller *c, struct i2o_device *d, int *tar
 	return 0;
 }
 
+/**
+ *	i2o_scsi_init		-	initialize an i2o device for scsi
+ *	@c: i2o controller owning the device
+ *	@d: scsi controller
+ *	@shpnt: scsi device we wish it to become
+ *
+ *	Enumerate the scsi peripheral/fibre channel peripheral class
+ *	devices that are children of the controller. From that we build
+ *	a translation map for the command queue code. Since I2O works on
+ *	its own tid's we effectively have to think backwards to get what
+ *	the midlayer wants
+ */
+ 
 static void i2o_scsi_init(struct i2o_controller *c, struct i2o_device *d, struct Scsi_Host *shpnt)
 {
 	struct i2o_device *unit;
@@ -391,6 +441,16 @@ static void i2o_scsi_init(struct i2o_controller *c, struct i2o_device *d, struct
 	}		
 }
 
+/**
+ *	i2o_scsi_detect		-	probe for I2O scsi devices
+ *	@tpnt: scsi layer template
+ *
+ *	I2O is a little odd here. The I2O core already knows what the
+ *	devices are. It also knows them by disk and tape as well as
+ *	by controller. We register each I2O scsi class object as a
+ *	scsi controller and then let the enumeration fake up the rest
+ */
+ 
 static int i2o_scsi_detect(Scsi_Host_Template * tpnt)
 {
 	unsigned long flags;
@@ -398,7 +458,7 @@ static int i2o_scsi_detect(Scsi_Host_Template * tpnt)
 	int i;
 	int count;
 
-	printk("i2o_scsi.c: %s\n", VERSION_STRING);
+	printk(KERN_INFO "i2o_scsi.c: %s\n", VERSION_STRING);
 
 	if(i2o_install_handler(&i2o_scsi_handler)<0)
 	{
@@ -409,14 +469,14 @@ static int i2o_scsi_detect(Scsi_Host_Template * tpnt)
 	
 	if((sg_chain_pool = kmalloc(SG_CHAIN_POOL_SZ, GFP_KERNEL)) == NULL)
 	{
-		printk("i2o_scsi: Unable to alloc %d byte SG chain buffer pool.\n", SG_CHAIN_POOL_SZ);
-		printk("i2o_scsi: SG chaining DISABLED!\n");
+		printk(KERN_INFO "i2o_scsi: Unable to alloc %d byte SG chain buffer pool.\n", SG_CHAIN_POOL_SZ);
+		printk(KERN_INFO "i2o_scsi: SG chaining DISABLED!\n");
 		sg_max_frags = 11;
 	}
 	else
 	{
-		printk("  chain_pool: %d bytes @ %p\n", SG_CHAIN_POOL_SZ, sg_chain_pool);
-		printk("  (%d byte buffers X %d can_queue X %d i2o controllers)\n",
+		printk(KERN_INFO "  chain_pool: %d bytes @ %p\n", SG_CHAIN_POOL_SZ, sg_chain_pool);
+		printk(KERN_INFO "  (%d byte buffers X %d can_queue X %d i2o controllers)\n",
 				SG_CHAIN_BUF_SZ, I2O_SCSI_CAN_QUEUE, i2o_num_controllers);
 		sg_max_frags = SG_MAX_FRAGS;    // 64
 	}
@@ -456,14 +516,11 @@ static int i2o_scsi_detect(Scsi_Host_Template * tpnt)
 			shpnt = scsi_register(tpnt, sizeof(struct i2o_scsi_host));
 			if(shpnt==NULL)
 				continue;
-			save_flags(flags);
-			cli();
 			shpnt->unique_id = (u32)d;
 			shpnt->io_port = 0;
 			shpnt->n_io_port = 0;
 			shpnt->irq = 0;
 			shpnt->this_id = /* Good question */15;
-			restore_flags(flags);
 			i2o_scsi_init(c, d, shpnt);
 			count++;
 		}
@@ -509,6 +566,20 @@ static const char *i2o_scsi_info(struct Scsi_Host *SChost)
 	return(&hostdata->controller->name[0]);
 }
 
+/**
+ *	i2o_scsi_queuecommand	-	queue a SCSI command
+ *	@SCpnt: scsi command pointer
+ *	@done: callback for completion
+ *
+ *	Issue a scsi comamnd asynchronously. Return 0 on success or 1 if
+ *	we hit an error (normally message queue congestion). The only 
+ *	minor complication here is that I2O deals with the device addressing
+ *	so we have to map the bus/dev/lun back to an I2O handle as well
+ *	as faking absent devices ourself. 
+ *
+ *	Locks: takes the controller lock on error path only
+ */
+ 
 static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {
 	int i;
@@ -525,6 +596,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	u32 len;
 	u32 reqlen;
 	u32 tag;
+	unsigned long flags;
 	
 	static int max_qd = 1;
 	
@@ -560,24 +632,22 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	if(tid == -1)
 	{
 		SCpnt->result = DID_NO_CONNECT << 16;
+		spin_lock_irqsave(host->host_lock, flags);
 		done(SCpnt);
+		spin_unlock_irqrestore(host->host_lock, flags);
 		return 0;
 	}
 	
 	dprintk(("Real scsi messages.\n"));
 
-	
 	/*
-	 *	Obtain an I2O message. Right now we _have_ to obtain one
-	 *	until the scsi layer stuff is cleaned up.
+	 *	Obtain an I2O message. If there are none free then 
+	 *	throw it back to the scsi layer
 	 */	
 	 
-	do
-	{
-		mb();
-		m = le32_to_cpu(I2O_POST_READ32(c));
-	}
-	while(m==0xFFFFFFFF);
+	m = le32_to_cpu(I2O_POST_READ32(c));
+	if(m==0xFFFFFFFF)
+		return 1;
 
 	msg = (u32 *)(c->mem_offset + m);
 	
@@ -603,7 +673,11 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	{
 		/* Unknown - kill the command */
 		SCpnt->result = DID_NO_CONNECT << 16;
+		
+		/* We must lock the request queue while completing */
+		spin_lock_irqsave(host->host_lock, flags);
 		done(SCpnt);
+		spin_unlock_irqrestore(host->host_lock, flags);
 		return 0;
 	}
 	
@@ -772,11 +846,25 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	return 0;
 }
 
+/**
+ *	internal_done	-	legacy scsi glue
+ *	@SCPnt: command
+ *
+ *	Completion function for a synchronous command
+ */
+
 static void internal_done(Scsi_Cmnd * SCpnt)
 {
 	SCpnt->SCp.Status++;
 }
 
+/**
+ *	i2o_scsi_command	-	issue a scsi command and wait
+ *	@SCPnt: command
+ *
+ *	Issue a SCSI command and wait for it to complete.
+ */
+ 
 static int i2o_scsi_command(Scsi_Cmnd * SCpnt)
 {
 	i2o_scsi_queuecommand(SCpnt, internal_done);
@@ -786,6 +874,17 @@ static int i2o_scsi_command(Scsi_Cmnd * SCpnt)
 	return SCpnt->result;
 }
 
+/**
+ *	i2o_scsi_abort	-	abort a running command
+ *	@SCpnt: command to abort
+ *
+ *	Ask the I2O controller to abort a command. This is an asynchrnous
+ *	process and oru callback handler will see the command complete
+ *	with an aborted message if it succeeds. 
+ *
+ *	Locks: no locks are held or needed
+ */
+ 
 int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 {
 	struct i2o_controller *c;
@@ -795,21 +894,24 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 	u32 m;
 	int tid;
 	
-	printk("i2o_scsi: Aborting command block.\n");
+	printk(KERN_WARNING "i2o_scsi: Aborting command block.\n");
 	
 	host = SCpnt->host;
 	hostdata = (struct i2o_scsi_host *)host->hostdata;
 	tid = hostdata->task[SCpnt->target][SCpnt->lun];
 	if(tid==-1)
 	{
-		printk(KERN_ERR "impossible command to abort.\n");
-		return SCSI_ABORT_NOT_RUNNING;
+		printk(KERN_ERR "i2o_scsi: Impossible command to abort!\n");
+		return FAILED;
 	}
 	c = hostdata->controller;
 	
 	/*
 	 *	Obtain an I2O message. Right now we _have_ to obtain one
 	 *	until the scsi layer stuff is cleaned up.
+	 *
+	 *	FIXME: we are in error context so we could sleep retry
+	 * 	a bit and then bail in the improved scsi layer.
 	 */	
 	 
 	do
@@ -828,10 +930,21 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 	wmb();
 	i2o_post_message(c,m);
 	wmb();
-	return SCSI_ABORT_PENDING;
+	return SUCCESS;
 }
 
-static int i2o_scsi_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
+/**
+ *	i2o_scsi_bus_reset		-	Issue a SCSI reset
+ *	@SCpnt: the command that caused the reset
+ *
+ *	Perform a SCSI bus reset operation. In I2O this is just a message
+ *	we pass. I2O can do clever multi-initiator and shared reset stuff
+ *	but we don't support this.
+ *
+ *	Locks: called with no lock held, requires no locks.
+ */
+ 
+static int i2o_scsi_bus_reset(Scsi_Cmnd * SCpnt)
 {
 	int tid;
 	struct i2o_controller *c;
@@ -844,7 +957,7 @@ static int i2o_scsi_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 	 *	Find the TID for the bus
 	 */
 
-	printk("i2o_scsi: Attempting to reset the bus.\n");
+	printk(KERN_WARNING "i2o_scsi: Attempting to reset the bus.\n");
 	
 	host = SCpnt->host;
 	hostdata = (struct i2o_scsi_host *)host->hostdata;
@@ -875,11 +988,43 @@ static int i2o_scsi_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 	__raw_writel(c->unit << 16 | tid, msg+12);
 	wmb();
 	i2o_post_message(c,m);
-	return SCSI_RESET_PENDING;
+	return SUCCESS;
 }
 
-/*
- *	This is anyones guess quite frankly.
+/**
+ *	i2o_scsi_host_reset	-	host reset callback
+ *	@SCpnt: command causing the reset
+ *
+ *	An I2O controller can be many things at once. While we can
+ *	reset a controller the potential mess from doing so is vast, and
+ *	it's better to simply hold on and pray
+ */
+ 
+static int i2o_scsi_host_reset(Scsi_Cmnd * SCpnt)
+{
+	return FAILED;
+}
+
+/**
+ *	i2o_scsi_device_reset	-	device reset callback
+ *	@SCpnt: command causing the reset
+ *
+ *	I2O does not (AFAIK) support doing a device reset
+ */
+ 
+static int i2o_scsi_device_reset(Scsi_Cmnd * SCpnt)
+{
+	return FAILED;
+}
+
+/**
+ *	i2o_scsi_bios_param	-	Invent disk geometry
+ *	@disk: device 
+ *	@dev: block layer device
+ *	@ip: geometry array
+ *
+ *	This is anyones guess quite frankly. We use the same rules everyone 
+ *	else appears to and hope. It seems to work.
  */
  
 static int i2o_scsi_bios_param(Disk * disk, struct block_device *dev, int *ip)

@@ -5,9 +5,19 @@
  *               highlevel or lowlevel code
  *
  * Copyright (C) 1999, 2000 Andreas E. Bombe
+ *                     2002 Manfred Weihs <weihs@ict.tuwien.ac.at>
  *
  * This code is licensed under the GPL.  See the file COPYING in the root
  * directory of the kernel sources for details.
+ *
+ *
+ * Contributions:
+ *
+ * Manfred Weihs <weihs@ict.tuwien.ac.at>
+ *        loopback functionality in hpsb_send_packet
+ *        allow highlevel drivers to disable automatic response generation
+ *              and to generate responses themselves (deferred)
+ *
  */
 
 #include <linux/config.h>
@@ -19,7 +29,6 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
-#include <linux/tqueue.h>
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
@@ -72,9 +81,10 @@ static void process_complete_tasks(struct hpsb_packet *packet)
 	struct list_head *lh, *next;
 
 	list_for_each_safe(lh, next, &packet->complete_tq) {
-		struct tq_struct *tq = list_entry(lh, struct tq_struct, list);
-		list_del(&tq->list);
-		schedule_task(tq);
+		struct hpsb_queue_struct *tq =
+			list_entry(lh, struct hpsb_queue_struct, hpsb_queue_list);
+		list_del(&tq->hpsb_queue_list);
+		hpsb_schedule_work(tq);
 	}
 
 	return;
@@ -83,11 +93,11 @@ static void process_complete_tasks(struct hpsb_packet *packet)
 /**
  * hpsb_add_packet_complete_task - add a new task for when a packet completes
  * @packet: the packet whose completion we want the task added to
- * @tq: the tq_struct describing the task to add
+ * @tq: the hpsb_queue_struct describing the task to add
  */
-void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct tq_struct *tq)
+void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct hpsb_queue_struct *tq)
 {
-	list_add_tail(&tq->list, &packet->complete_tq);
+	list_add_tail(&tq->hpsb_queue_list, &packet->complete_tq);
 	return;
 }
 
@@ -372,12 +382,19 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
                 build_speed_map(host, host->node_count);
         }
 
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+        HPSB_INFO("selfid_complete called with successful SelfID stage "
+		"... irm_id: 0x%X node_id: 0x%X",host->irm_id,host->node_id);
+#endif
         /* irm_id is kept up to date by check_selfids() */
         if (host->irm_id == host->node_id) {
                 host->is_irm = 1;
                 host->is_busmgr = 1;
                 host->busmgr_id = host->node_id;
                 host->csr.bus_manager_id = host->node_id;
+        } else {
+                host->is_busmgr = 0;
+                host->is_irm = 0;
         }
 
         host->reset_retries = 0;
@@ -420,7 +437,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
         up(&packet->state_change);
-        schedule_task(&host->timeout_tq);
+        hpsb_schedule_work(&host->timeout_tq);
 }
 
 /**
@@ -447,6 +464,45 @@ int hpsb_send_packet(struct hpsb_packet *packet)
         }
 
         packet->state = hpsb_queued;
+
+        if (packet->node_id == host->node_id)
+        { /* it is a local request, so handle it locally */
+                quadlet_t *data;
+                size_t size=packet->data_size+packet->header_size;
+
+                int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
+                data = kmalloc(packet->header_size + packet->data_size, kmflags);
+                if (!data) {
+                        HPSB_ERR("unable to allocate memory for concatenating header and data");
+                        return 0;
+                }
+
+                memcpy(data, packet->header, packet->header_size);
+
+                if (packet->data_size)
+                {
+                        if (packet->data_be) {
+                                memcpy(((u8*)data)+packet->header_size, packet->data, packet->data_size);
+                        } else {
+                                int i;
+                                quadlet_t *my_data=(quadlet_t*) ((u8*) data + packet->data_size);
+                                for (i=0; i < packet->data_size/4; i++) {
+                                        my_data[i] = cpu_to_be32(packet->data[i]);
+                                }
+                        }
+                }
+
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+                dump_packet("send packet local:", packet->header,
+                            packet->header_size);
+#endif
+                hpsb_packet_sent(host, packet,  packet->expect_response?ACK_PENDING:ACK_COMPLETE);
+                hpsb_packet_received(host, data, size, 0);
+
+                kfree(data);
+
+                return 1;
+        }
 
         if (packet->type == hpsb_async && packet->node_id != ALL_NODES) {
                 packet->speed_code =
@@ -600,8 +656,10 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
 {
         struct hpsb_packet *packet;
         int length, rcode, extcode;
+        quadlet_t buffer;
         nodeid_t source = data[1] >> 16;
-	nodeid_t dest = data[0] >> 16;
+        nodeid_t dest = data[0] >> 16;
+        u16 flags = (u16) data[0];
         u64 addr;
 
         /* big FIXME - no error checking is done for an out of bounds length */
@@ -610,10 +668,11 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
         case TCODE_WRITEQ:
                 addr = (((u64)(data[1] & 0xffff)) << 32) | data[2];
                 rcode = highlevel_write(host, source, dest, data+3,
-					addr, 4);
+					addr, 4, flags);
 
                 if (!write_acked
-                    && ((data[0] >> 16) & NODE_MASK) != NODE_MASK) {
+                    && (((data[0] >> 16) & NODE_MASK) != NODE_MASK)
+                    && (rcode >= 0)) {
                         /* not a broadcast write, reply */
                         PREP_REPLY_PACKET(0);
                         fill_async_write_resp(packet, rcode);
@@ -624,10 +683,11 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
         case TCODE_WRITEB:
                 addr = (((u64)(data[1] & 0xffff)) << 32) | data[2];
                 rcode = highlevel_write(host, source, dest, data+4,
-					addr, data[3]>>16);
+					addr, data[3]>>16, flags);
 
                 if (!write_acked
-                    && ((data[0] >> 16) & NODE_MASK) != NODE_MASK) {
+                    && (((data[0] >> 16) & NODE_MASK) != NODE_MASK)
+                    && (rcode >= 0)) {
                         /* not a broadcast write, reply */
                         PREP_REPLY_PACKET(0);
                         fill_async_write_resp(packet, rcode);
@@ -636,12 +696,14 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
                 break;
 
         case TCODE_READQ:
-                PREP_REPLY_PACKET(0);
-
                 addr = (((u64)(data[1] & 0xffff)) << 32) | data[2];
-                rcode = highlevel_read(host, source, data, addr, 4);
-                fill_async_readquad_resp(packet, rcode, *data);
-                send_packet_nocare(packet);
+                rcode = highlevel_read(host, source, &buffer, addr, 4, flags);
+
+                if (rcode >= 0) {
+                        PREP_REPLY_PACKET(0);
+                        fill_async_readquad_resp(packet, rcode, buffer);
+                        send_packet_nocare(packet);
+                }
                 break;
 
         case TCODE_READB:
@@ -650,9 +712,12 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
 
                 addr = (((u64)(data[1] & 0xffff)) << 32) | data[2];
                 rcode = highlevel_read(host, source, packet->data, addr,
-                                       length);
-                fill_async_readblock_resp(packet, rcode, length);
-                send_packet_nocare(packet);
+                                       length, flags);
+
+                if (rcode >= 0) {
+                        fill_async_readblock_resp(packet, rcode, length);
+                        send_packet_nocare(packet);
+                }
                 break;
 
         case TCODE_LOCK_REQUEST:
@@ -670,7 +735,7 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
                 switch (length) {
                 case 4:
                         rcode = highlevel_lock(host, source, packet->data, addr,
-                                               data[4], 0, extcode);
+                                               data[4], 0, extcode,flags);
                         fill_async_lock_resp(packet, rcode, extcode, 4);
                         break;
                 case 8:
@@ -679,13 +744,13 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
                                 rcode = highlevel_lock(host, source,
                                                        packet->data, addr,
                                                        data[5], data[4], 
-                                                       extcode);
+                                                       extcode, flags);
                                 fill_async_lock_resp(packet, rcode, extcode, 4);
                         } else {
                                 rcode = highlevel_lock64(host, source,
                                              (octlet_t *)packet->data, addr,
                                              *(octlet_t *)(data + 4), 0ULL,
-                                             extcode);
+                                             extcode, flags);
                                 fill_async_lock_resp(packet, rcode, extcode, 8);
                         }
                         break;
@@ -694,15 +759,20 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
                                                  (octlet_t *)packet->data, addr,
                                                  *(octlet_t *)(data + 6),
                                                  *(octlet_t *)(data + 4), 
-                                                 extcode);
+                                                 extcode, flags);
                         fill_async_lock_resp(packet, rcode, extcode, 8);
                         break;
                 default:
-                        fill_async_lock_resp(packet, RCODE_TYPE_ERROR,
+                        rcode = RCODE_TYPE_ERROR;
+                        fill_async_lock_resp(packet, rcode,
                                              extcode, 0);
                 }
 
-                send_packet_nocare(packet);
+                if (rcode >= 0) {
+                        send_packet_nocare(packet);
+                } else {
+                        free_hpsb_packet(packet);
+                }
                 break;
         }
 
@@ -811,7 +881,7 @@ void abort_timedouts(struct hpsb_host *host)
         }
 
         if (!list_empty(&host->pending_packets))
-		schedule_task(&host->timeout_tq);
+		hpsb_schedule_work(&host->timeout_tq);
 
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
@@ -1109,6 +1179,7 @@ EXPORT_SYMBOL(hpsb_make_readbpacket);
 EXPORT_SYMBOL(hpsb_make_writeqpacket);
 EXPORT_SYMBOL(hpsb_make_writebpacket);
 EXPORT_SYMBOL(hpsb_make_lockpacket);
+EXPORT_SYMBOL(hpsb_make_lock64packet);
 EXPORT_SYMBOL(hpsb_make_phypacket);
 EXPORT_SYMBOL(hpsb_packet_success);
 EXPORT_SYMBOL(hpsb_make_packet);
@@ -1119,6 +1190,7 @@ EXPORT_SYMBOL(hpsb_lock);
 EXPORT_SYMBOL(hpsb_register_highlevel);
 EXPORT_SYMBOL(hpsb_unregister_highlevel);
 EXPORT_SYMBOL(hpsb_register_addrspace);
+EXPORT_SYMBOL(hpsb_unregister_addrspace);
 EXPORT_SYMBOL(hpsb_listen_channel);
 EXPORT_SYMBOL(hpsb_unlisten_channel);
 EXPORT_SYMBOL(highlevel_read);
@@ -1135,6 +1207,8 @@ EXPORT_SYMBOL(hpsb_node_fill_packet);
 EXPORT_SYMBOL(hpsb_node_read);
 EXPORT_SYMBOL(hpsb_node_write);
 EXPORT_SYMBOL(hpsb_node_lock);
+EXPORT_SYMBOL(hpsb_update_config_rom);
+EXPORT_SYMBOL(hpsb_get_config_rom);
 EXPORT_SYMBOL(hpsb_register_protocol);
 EXPORT_SYMBOL(hpsb_unregister_protocol);
 EXPORT_SYMBOL(hpsb_release_unit_directory);

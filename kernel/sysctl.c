@@ -50,6 +50,7 @@ extern atomic_t nr_queued_signals;
 extern int max_queued_signals;
 extern int sysrq_enabled;
 extern int core_uses_pid;
+extern char core_pattern[];
 extern int cad_pid;
 extern int pid_max;
 
@@ -176,6 +177,8 @@ static ctl_table kern_table[] = {
 	 0644, NULL, &proc_dointvec},
 	{KERN_CORE_USES_PID, "core_uses_pid", &core_uses_pid, sizeof(int),
 	 0644, NULL, &proc_dointvec},
+	{KERN_CORE_PATTERN, "core_pattern", core_pattern, 64,
+	 0644, NULL, &proc_dostring, &sysctl_string},
 	{KERN_TAINTED, "tainted", &tainted, sizeof(int),
 	 0644, NULL, &proc_dointvec},
 	{KERN_CAP_BSET, "cap-bound", &cap_bset, sizeof(kernel_cap_t),
@@ -283,8 +286,8 @@ static ctl_table vm_table[] = {
 	 &dirty_background_ratio, sizeof(dirty_background_ratio),
 	 0644, NULL, &proc_dointvec_minmax,  &sysctl_intvec, NULL,
 	 &zero, &one_hundred },
-	{VM_DIRTY_ASYNC, "dirty_async_ratio", &dirty_async_ratio,
-	 sizeof(dirty_async_ratio), 0644, NULL, &proc_dointvec_minmax,
+	{VM_DIRTY_RATIO, "dirty_ratio", &vm_dirty_ratio,
+	 sizeof(vm_dirty_ratio), 0644, NULL, &proc_dointvec_minmax,
 	 &sysctl_intvec, NULL, &zero, &one_hundred },
 	{VM_DIRTY_WB_CS, "dirty_writeback_centisecs",
 	 &dirty_writeback_centisecs, sizeof(dirty_writeback_centisecs), 0644,
@@ -308,6 +311,9 @@ static ctl_table vm_table[] = {
 	{ VM_NR_PDFLUSH_THREADS, "nr_pdflush_threads",
 	  &nr_pdflush_threads, sizeof nr_pdflush_threads,
 	  0444 /* read-only*/, NULL, &proc_dointvec},
+	{VM_SWAPPINESS, "swappiness", &vm_swappiness, sizeof(vm_swappiness),
+	 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL, &zero,
+	 &one_hundred },
 #ifdef CONFIG_HUGETLB_PAGE
 	 {VM_HUGETLB_PAGES, "nr_hugepages", &htlbpage_max, sizeof(int), 0644, NULL, 
 	  &proc_dointvec},

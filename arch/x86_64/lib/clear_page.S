@@ -1,7 +1,6 @@
 /*
  * Copyright 2002 Andi Kleen, SuSE Labs.
  */		 
-	
 	#include <linux/linkage.h>
 
 /*
@@ -13,7 +12,7 @@ ENTRY(clear_page)
 	movl   $4096/128,%ecx
 	movl   $128,%edx
 loop:
-#define PUT(x) movnti %rax,x*8(%rdi) 
+#define PUT(x) movq %rax,x*8(%rdi) 
 	PUT(0)
 	PUT(1)
 	PUT(2)

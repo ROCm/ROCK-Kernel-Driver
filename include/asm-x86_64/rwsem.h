@@ -47,6 +47,7 @@ struct rwsem_waiter;
 extern struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_wake(struct rw_semaphore *);
+extern struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *sem);
 
 /*
  * the semaphore definition
@@ -113,6 +114,31 @@ LOCK_PREFIX	"  incl      (%%rdi)\n\t" /* adds 0x00000001, returns the old value 
 		: "memory", "cc");
 }
 
+
+/*
+ * trylock for reading -- returns 1 if successful, 0 if contention
+ */
+static inline int __down_read_trylock(struct rw_semaphore *sem)
+{
+	__s32 result, tmp;
+	__asm__ __volatile__(
+		"# beginning __down_read_trylock\n\t"
+		"  movl      %0,%1\n\t"
+		"1:\n\t"
+		"  movl	     %1,%2\n\t"
+		"  addl      %3,%2\n\t"
+		"  jle	     2f\n\t"
+LOCK_PREFIX	"  cmpxchgl  %2,%0\n\t"
+		"  jnz	     1b\n\t"
+		"2:\n\t"
+		"# ending __down_read_trylock\n\t"
+		: "+m"(sem->count), "=&a"(result), "=&r"(tmp)
+		: "i"(RWSEM_ACTIVE_READ_BIAS)
+		: "memory", "cc");
+	return result>=0 ? 1 : 0;
+}
+
+
 /*
  * lock for writing
  */
@@ -139,6 +165,19 @@ LOCK_PREFIX	"  xaddl      %0,(%%rdi)\n\t" /* subtract 0x0000ffff, returns the ol
 }
 
 /*
+ * trylock for writing -- returns 1 if successful, 0 if contention
+ */
+static inline int __down_write_trylock(struct rw_semaphore *sem)
+{
+	signed long ret = cmpxchg(&sem->count,
+				  RWSEM_UNLOCKED_VALUE, 
+				  RWSEM_ACTIVE_WRITE_BIAS);
+	if (ret == RWSEM_UNLOCKED_VALUE)
+		return 1;
+	return 0;
+}
+
+/*
  * unlock after reading
  */
 static inline void __up_read(struct rw_semaphore *sem)
@@ -157,7 +196,7 @@ LOCK_PREFIX	"  xaddl      %[tmp],(%%rdi)\n\t" /* subtracts 1, returns the old va
 		"  jmp       1b\n"
 		LOCK_SECTION_END
 		"# ending __up_read\n"
-		: "+m"(sem->count), "+r" (tmp)
+		: "+m"(sem->count), [tmp] "+r" (tmp)
 		: "D"(sem)
 		: "memory", "cc");
 }
@@ -170,7 +209,7 @@ static inline void __up_write(struct rw_semaphore *sem)
 	unsigned tmp; 
 	__asm__ __volatile__(
 		"# beginning __up_write\n\t"
-		"  movl      %2,%[tmp]\n\t"
+		"  movl     %[bias],%[tmp]\n\t"
 LOCK_PREFIX	"  xaddl     %[tmp],(%%rdi)\n\t" /* tries to transition 0xffff0001 -> 0x00000000 */
 		"  jnz       2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
@@ -182,8 +221,29 @@ LOCK_PREFIX	"  xaddl     %[tmp],(%%rdi)\n\t" /* tries to transition 0xffff0001 -
 		"  jmp       1b\n"
 		LOCK_SECTION_END
 		"# ending __up_write\n"
-		: "+m"(sem->count), [tmp] "r" (tmp)
-		: "D"(sem), "i"(-RWSEM_ACTIVE_WRITE_BIAS)
+		: "+m"(sem->count), [tmp] "=r" (tmp)
+		: "D"(sem), [bias] "i"(-RWSEM_ACTIVE_WRITE_BIAS)
+		: "memory", "cc");
+}
+
+/*
+ * downgrade write lock to read lock
+ */
+static inline void __downgrade_write(struct rw_semaphore *sem)
+{
+	__asm__ __volatile__(
+		"# beginning __downgrade_write\n\t"
+LOCK_PREFIX	"  addl      %[bias],(%%rdi)\n\t" /* transitions 0xZZZZ0001 -> 0xYYYY0001 */
+		"  js        2f\n\t" /* jump if the lock is being waited upon */
+		"1:\n\t"
+		LOCK_SECTION_START("")
+		"2:\n\t"
+		"  call	     rwsem_downgrade_thunk\n"
+		"  jmp       1b\n"
+		LOCK_SECTION_END
+		"# ending __downgrade_write\n"
+		: "=m"(sem->count)
+		: "D"(sem), [bias] "i"(-RWSEM_WAITING_BIAS), "m"(sem->count)
 		: "memory", "cc");
 }
 

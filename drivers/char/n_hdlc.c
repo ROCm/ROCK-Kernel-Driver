@@ -9,7 +9,7 @@
  *	Al Longyear <longyear@netcom.com>, Paul Mackerras <Paul.Mackerras@cs.anu.edu.au>
  *
  * Original release 01/11/99
- * $Id: n_hdlc.c,v 4.1 2002/04/10 19:30:58 paulkf Exp $
+ * $Id: n_hdlc.c,v 4.2 2002/10/10 14:52:41 paulkf Exp $
  *
  * This code is released under the GNU General Public License (GPL)
  *
@@ -78,7 +78,7 @@
  */
 
 #define HDLC_MAGIC 0x239e
-#define HDLC_VERSION "$Revision: 4.1 $"
+#define HDLC_VERSION "$Revision: 4.2 $"
 
 #include <linux/version.h>
 #include <linux/config.h>
@@ -264,7 +264,8 @@ static void n_hdlc_release (struct n_hdlc *n_hdlc)
 		} else
 			break;
 	}
-	
+	if (n_hdlc->tbuf)
+		kfree(n_hdlc->tbuf);
 	kfree(n_hdlc);
 	
 }	/* end of n_hdlc_release() */
@@ -381,16 +382,15 @@ static void n_hdlc_send_frames (struct n_hdlc *n_hdlc, struct tty_struct *tty)
 		printk("%s(%d)n_hdlc_send_frames() called\n",__FILE__,__LINE__);
  check_again:
 		
-	save_flags(flags);
-	cli ();
+ 	spin_lock_irqsave(&n_hdlc->tx_buf_list.spinlock, flags);
 	if (n_hdlc->tbusy) {
 		n_hdlc->woke_up = 1;
-		restore_flags(flags);
+ 		spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock, flags);
 		return;
 	}
 	n_hdlc->tbusy = 1;
 	n_hdlc->woke_up = 0;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock, flags);
 
 	/* get current transmit buffer or get new transmit */
 	/* buffer from list of pending transmit buffers */
@@ -445,10 +445,9 @@ static void n_hdlc_send_frames (struct n_hdlc *n_hdlc, struct tty_struct *tty)
 		tty->flags  &= ~(1 << TTY_DO_WRITE_WAKEUP);
 	
 	/* Clear the re-entry flag */
-	save_flags(flags);
-	cli ();
+	spin_lock_irqsave(&n_hdlc->tx_buf_list.spinlock, flags);
 	n_hdlc->tbusy = 0;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock, flags); 
 	
         if (n_hdlc->woke_up)
 	  goto check_again;

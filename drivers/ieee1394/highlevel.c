@@ -5,6 +5,16 @@
  *
  * This code is licensed under the GPL.  See the file COPYING in the root
  * directory of the kernel sources for details.
+ *
+ *
+ * Contributions:
+ *
+ * Christian Toegel <christian.toegel@gmx.at>
+ *        unregister address space
+ *
+ * Manfred Weihs <weihs@ict.tuwien.ac.at>
+ *        unregister address space
+ *
  */
 
 #include <linux/config.h>
@@ -129,6 +139,32 @@ int hpsb_register_addrspace(struct hpsb_highlevel *hl,
         return retval;
 }
 
+int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, u64 start)
+{
+        int retval = 0;
+        struct hpsb_address_serve *as;
+        struct list_head *entry;
+
+        write_lock_irq(&addr_space_lock);
+
+        entry = hl->addr_list.next;
+
+        while (entry != &hl->addr_list) {
+                as = list_entry(entry, struct hpsb_address_serve, addr_list);
+                entry = entry->next;
+                if (as->start == start) {
+                        list_del(&as->as_list);
+                        list_del(&as->addr_list);
+                        kfree(as);
+                        retval = 1;
+                        break;
+                }
+        }
+
+        write_unlock_irq(&addr_space_lock);
+
+        return retval;
+}
 
 void hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                          unsigned int channel)
@@ -243,7 +279,7 @@ void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
 }
 
 int highlevel_read(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-                   u64 addr, unsigned int length)
+                   u64 addr, unsigned int length, u16 flags)
 {
         struct hpsb_address_serve *as;
         struct list_head *entry;
@@ -261,7 +297,7 @@ int highlevel_read(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 
                         if (as->op->read != NULL) {
                                 rcode = as->op->read(host, nodeid, buffer,
-						     addr, partlength);
+						     addr, partlength, flags);
                         } else {
                                 rcode = RCODE_TYPE_ERROR;
                         }
@@ -288,7 +324,7 @@ int highlevel_read(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 }
 
 int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
-		    quadlet_t *data, u64 addr, unsigned int length)
+		    quadlet_t *data, u64 addr, unsigned int length, u16 flags)
 {
         struct hpsb_address_serve *as;
         struct list_head *entry;
@@ -306,7 +342,7 @@ int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
 
                         if (as->op->write != NULL) {
                                 rcode = as->op->write(host, nodeid, destid,
-						      data, addr, partlength);
+						      data, addr, partlength, flags);
                         } else {
                                 rcode = RCODE_TYPE_ERROR;
                         }
@@ -334,7 +370,7 @@ int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
 
 
 int highlevel_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
-                   u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode)
+                   u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags)
 {
         struct hpsb_address_serve *as;
         struct list_head *entry;
@@ -349,7 +385,7 @@ int highlevel_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
                 if (as->end > addr) {
                         if (as->op->lock != NULL) {
                                 rcode = as->op->lock(host, nodeid, store, addr,
-                                                     data, arg, ext_tcode);
+                                                     data, arg, ext_tcode, flags);
                         } else {
                                 rcode = RCODE_TYPE_ERROR;
                         }
@@ -367,7 +403,7 @@ int highlevel_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
 }
 
 int highlevel_lock64(struct hpsb_host *host, int nodeid, octlet_t *store,
-                     u64 addr, octlet_t data, octlet_t arg, int ext_tcode)
+                     u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags)
 {
         struct hpsb_address_serve *as;
         struct list_head *entry;
@@ -383,7 +419,7 @@ int highlevel_lock64(struct hpsb_host *host, int nodeid, octlet_t *store,
                         if (as->op->lock64 != NULL) {
                                 rcode = as->op->lock64(host, nodeid, store,
                                                        addr, data, arg,
-                                                       ext_tcode);
+                                                       ext_tcode, flags);
                         } else {
                                 rcode = RCODE_TYPE_ERROR;
                         }

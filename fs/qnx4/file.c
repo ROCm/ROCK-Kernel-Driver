@@ -24,21 +24,19 @@
  */
 struct file_operations qnx4_file_operations =
 {
-	llseek:			generic_file_llseek,
-	read:			generic_file_read,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.mmap		= generic_file_mmap,
+	.sendfile	= generic_file_sendfile,
 #ifdef CONFIG_QNX4FS_RW
-	write:			generic_file_write,
+	.write		= generic_file_write,
+	.fsync		= qnx4_sync_file,
 #endif
-	mmap:			generic_file_mmap,
-#ifdef CONFIG_QNX4FS_RW
-	fsync:			qnx4_sync_file,
-#endif
-	sendfile:		generic_file_sendfile,
 };
 
 struct inode_operations qnx4_file_inode_operations =
 {
 #ifdef CONFIG_QNX4FS_RW
-	truncate:		qnx4_truncate,
+	.truncate	= qnx4_truncate,
 #endif
 };

@@ -1,4 +1,3 @@
-O_TARGET        := pci.o
 
 obj-y		:= x86-64.o
 

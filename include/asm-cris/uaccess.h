@@ -147,25 +147,6 @@ extern unsigned long search_exception_table(unsigned long);
 #define __put_user(x,ptr) \
   __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
-/*
- * The "xxx_ret" versions return constant specified in third argument, if
- * something bad happens. These macros can be optimized for the
- * case of just returning from the function xxx_ret is used.
- */
-
-#define put_user_ret(x,ptr,ret) \
-	do { if (put_user(x,ptr)) return ret; } while (0)
-
-#define get_user_ret(x,ptr,ret) \
-	do { if (get_user(x,ptr)) return ret; } while (0)
-
-#define __put_user_ret(x,ptr,ret) \
-	do { if (__put_user(x,ptr)) return ret; } while (0)
-
-#define __get_user_ret(x,ptr,ret) \
-	do { if (__get_user(x,ptr)) return ret; } while (0)
-
-
 extern long __put_user_bad(void);
 
 #define __put_user_nocheck(x,ptr,size)			\
@@ -1016,11 +997,6 @@ __constant_clear_user(void *to, unsigned long n)
 (__builtin_constant_p(n) ?			\
  __constant_copy_to_user(to, from, n) :		\
  __generic_copy_to_user(to, from, n))
-
-#define copy_to_user_ret(to,from,n,retval) \
-	do { if (copy_to_user(to,from,n)) return retval; } while (0)
-#define copy_from_user_ret(to,from,n,retval) \
-	do { if (copy_from_user(to,from,n)) return retval; } while (0)
 
 /* We let the __ versions of copy_from/to_user inline, because they're often
  * used in fast paths and have only a small space overhead.

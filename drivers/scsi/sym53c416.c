@@ -9,6 +9,8 @@
  *  Alan Cox <alan@redhat.com> : Cleaned up code formatting
  *				 Fixed an irq locking bug
  *				 Added ISAPnP support
+ *  Bjoern A. Zeeb <bzeeb@zabbadoz.net> : Initial irq locking updates
+ *					  Added another card with ISAPnP support
  * 
  *  LILO command line usage: sym53c416=<PORTBASE>[,<IRQ>]
  *
@@ -27,6 +29,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
+#include <linux/init.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
@@ -194,17 +197,9 @@ static unsigned int sym53c416_base_3[2] = {0,0};
 
 #endif
 
-/* #define DEBUG */
-
-/* Macro for debugging purposes */
-
-#ifdef DEBUG
-#define DEB(x) x
-#else
-#define DEB(x)
-#endif
-
 #define MAXHOSTS 4
+
+#define SG_ADDRESS(buffer)     ((char *) (page_address((buffer)->page)+(buffer)->offset))
 
 enum phases
 {
@@ -246,6 +241,8 @@ static void sym53c416_set_transfer_counter(int base, unsigned int len)
 	outb((len & 0xFF0000) >> 16, base + TC_HIGH);
 }
 
+static spinlock_t sym53c416_lock = SPIN_LOCK_UNLOCKED;
+
 /* Returns the number of bytes read */
 static __inline__ unsigned int sym53c416_read(int base, unsigned char *buffer, unsigned int len)
 {
@@ -256,8 +253,7 @@ static __inline__ unsigned int sym53c416_read(int base, unsigned char *buffer, u
 	int timeout = READ_TIMEOUT;
 
 	/* Do transfer */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&sym53c416_lock, flags);
 	while(len && timeout)
 	{
 		bytes_left = inb(base + PIO_FIFO_CNT); /* Number of bytes in the PIO FIFO */
@@ -276,17 +272,16 @@ static __inline__ unsigned int sym53c416_read(int base, unsigned char *buffer, u
 		else
 		{
 			i = jiffies + timeout;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&sym53c416_lock, flags);
 			while(jiffies < i && (inb(base + PIO_INT_REG) & EMPTY) && timeout)
 				if(inb(base + PIO_INT_REG) & SCI)
 					timeout = 0;
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&sym53c416_lock, flags);
 			if(inb(base + PIO_INT_REG) & EMPTY)
 				timeout = 0;
 		}
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&sym53c416_lock, flags);
 	return orig_len - len;
 }
 
@@ -300,8 +295,7 @@ static __inline__ unsigned int sym53c416_write(int base, unsigned char *buffer, 
 	unsigned int timeout = WRITE_TIMEOUT;
 
 	/* Do transfer */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&sym53c416_lock, flags);
 	while(len && timeout)
 	{
 		bufferfree = PIO_SIZE - inb(base + PIO_FIFO_CNT);
@@ -322,16 +316,15 @@ static __inline__ unsigned int sym53c416_write(int base, unsigned char *buffer, 
 		else
 		{
 			i = jiffies + timeout;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&sym53c416_lock, flags);
 			while(jiffies < i && (inb(base + PIO_INT_REG) & FULL) && timeout)
 				;
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&sym53c416_lock, flags);
 			if(inb(base + PIO_INT_REG) & FULL)
 				timeout = 0;
 		}
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&sym53c416_lock, flags);
 	return orig_len - len;
 }
 
@@ -449,7 +442,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 					sglist = current_command->request_buffer;
 					while(sgcount--)
 					{
-						tot_trans += sym53c416_write(base, sglist->address, sglist->length);
+						tot_trans += sym53c416_write(base, SG_ADDRESS(sglist), sglist->length);
 						sglist++;
 					}
 				}
@@ -475,7 +468,7 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 					sglist = current_command->request_buffer;
 					while(sgcount--)
 					{
-						tot_trans += sym53c416_read(base, sglist->address, sglist->length);
+						tot_trans += sym53c416_read(base, SG_ADDRESS(sglist), sglist->length);
 						sglist++;
 					}
 				}
@@ -562,7 +555,7 @@ static int sym53c416_probeirq(int base, int scsi_id)
 	i = jiffies + 20;
 	while(i > jiffies && !(inb(base + STATUS_REG) & SCI))
 		barrier();
-	if(i <= jiffies) /* timed out */
+	if(time_before_eq(i, jiffies))	/* timed out */
 		return 0;
 	/* Get occurred irq */
 	irq = probe_irq_off(irqs);
@@ -611,10 +604,12 @@ static int sym53c416_test(int base)
 }
 
 
-static struct isapnp_device_id id_table[] = {
+static struct isapnp_device_id id_table[] __devinitdata = {
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('S','L','I'), ISAPNP_FUNCTION(0x4161), 0 },
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('S','L','I'), ISAPNP_FUNCTION(0x4163), 0 },
-	{0}
+	{	ISAPNP_DEVICE_SINGLE_END }
 };
 
 MODULE_DEVICE_TABLE(isapnp, id_table);
@@ -635,7 +630,7 @@ void sym53c416_probe(void)
 	}
 }
 
-int sym53c416_detect(Scsi_Host_Template *tpnt)
+int __init sym53c416_detect(Scsi_Host_Template *tpnt)
 {
 	unsigned long flags;
 	struct Scsi_Host * shpnt = NULL;
@@ -674,29 +669,32 @@ int sym53c416_detect(Scsi_Host_Template *tpnt)
 #endif
 	printk(KERN_INFO "sym53c416.c: %s\n", VERSION_STRING);
 
-	while((idev=isapnp_find_dev(NULL, ISAPNP_VENDOR('S','L','I'), 
-				ISAPNP_FUNCTION(0x4163), idev))!=NULL)
-	{
-		int i[3];
-		
-		if(idev->prepare(idev)<0)
+	for (i=0; id_table[i].vendor != 0; i++) {
+		while((idev=isapnp_find_dev(NULL, id_table[i].vendor,
+					id_table[i].function, idev))!=NULL)
 		{
-			printk(KERN_WARNING "sym53c416: unable to prepare PnP card.\n");
-			continue;
-		}
-		if(idev->activate(idev)<0)
-		{
-			printk(KERN_WARNING "sym53c416: unable to activate PnP card.\n");
-			continue;
-		}
-		
-		i[0] = 2;
-		i[1] = idev->resource[0].start;
-		i[2] = idev->irq_resource[0].start;
-		
-		printk(KERN_INFO "sym53c416: ISAPnP card found and configured at 0x%X, IRQ %d.\n",
-			i[1], i[2]);
-		sym53c416_setup(NULL, i);
+			int i[3];
+
+			if(idev->prepare(idev)<0)
+			{
+				printk(KERN_WARNING "sym53c416: unable to prepare PnP card.\n");
+				continue;
+			}
+			if(idev->activate(idev)<0)
+			{
+				printk(KERN_WARNING "sym53c416: unable to activate PnP card.\n");
+				continue;
+			
+			}
+
+			i[0] = 2;
+			i[1] = idev->resource[0].start;
+ 			i[2] = idev->irq_resource[0].start;
+
+			printk(KERN_INFO "sym53c416: ISAPnP card found and configured at 0x%X, IRQ %d.\n",
+				i[1], i[2]);
+ 			sym53c416_setup(NULL, i);
+ 		}
 	}
 	sym53c416_probe();
 
@@ -716,13 +714,12 @@ int sym53c416_detect(Scsi_Host_Template *tpnt)
 				shpnt = scsi_register(tpnt, 0);
 				if(shpnt==NULL)
 					continue;
-				save_flags(flags);
-				cli();
+				spin_lock_irqsave(&sym53c416_lock, flags);
 				/* FIXME: Request_irq with CLI is not safe */
 				/* Request for specified IRQ */
 				if(request_irq(hosts[i].irq, sym53c416_intr_handle, 0, ID, shpnt))
 				{
-					restore_flags(flags);
+					spin_unlock_irqrestore(&sym53c416_lock, flags);
 					printk(KERN_ERR "sym53c416: Unable to assign IRQ %d\n", hosts[i].irq);
 					scsi_unregister(shpnt);
 				}
@@ -737,7 +734,7 @@ int sym53c416_detect(Scsi_Host_Template *tpnt)
 					shpnt->this_id = hosts[i].scsi_id;
 					sym53c416_init(hosts[i].base, hosts[i].scsi_id);
 					count++;
-					restore_flags(flags);
+					spin_unlock_irqrestore(&sym53c416_lock, flags);
 				}
 			}
 		}
@@ -774,8 +771,7 @@ int sym53c416_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	current_command->SCp.Status = 0;
 	current_command->SCp.Message = 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&sym53c416_lock, flags);
 	outb(SCpnt->target, base + DEST_BUS_ID); /* Set scsi id target        */
 	outb(FLUSH_FIFO, base + COMMAND_REG);    /* Flush SCSI and PIO FIFO's */
 	/* Write SCSI command into the SCSI fifo */
@@ -784,7 +780,7 @@ int sym53c416_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/* Start selection sequence */
 	outb(SEL_WITHOUT_ATN_SEQ, base + COMMAND_REG);
 	/* Now an interrupt will be generated which we will catch in out interrupt routine */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&sym53c416_lock, flags);
 	return 0;
 }
 
@@ -804,7 +800,7 @@ static int sym53c416_command(Scsi_Cmnd *SCpnt)
 
 static int sym53c416_abort(Scsi_Cmnd *SCpnt)
 {
-	//printk("sym53c416_abort\n");
+	/* printk("sym53c416_abort\n"); */
 	/* We don't know how to abort for the moment */
 	return SCSI_ABORT_SNOOZE;
 }
@@ -815,7 +811,7 @@ static int sym53c416_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 	int scsi_id = -1;	
 	int i;
 
-	//printk("sym53c416_reset\n");
+	/* printk("sym53c416_reset\n"); */
 	base = SCpnt->host->io_port;
 	/* search scsi_id */
 	for(i = 0; i < host_index && scsi_id != -1; i++)

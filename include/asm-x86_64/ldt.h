@@ -15,7 +15,7 @@
 /* Note on 64bit base and limit is ignored and you cannot set
    DS/ES/CS not to the default values if you still want to do syscalls. This
    call is more for 32bit mode therefore. */
-struct modify_ldt_ldt_s {
+struct user_desc {
 	unsigned int  entry_number;
 	unsigned int  base_addr;
 	unsigned int  limit;

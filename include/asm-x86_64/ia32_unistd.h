@@ -249,7 +249,17 @@
 #define __NR_ia32_futex		240
 #define __NR_ia32_sched_setaffinity	241
 #define __NR_ia32_sched_getaffinity	242
+#define __NR_ia32_set_thread_area   243
+#define __NR_ia32_get_thread_area	244
+#define __NR_ia32_io_setup		245
+#define __NR_ia32_io_destroy		246
+#define __NR_ia32_io_getevents	247
+#define __NR_ia32_io_submit		248
+#define __NR_ia32_io_cancel		249
+#define __NR_ia32_alloc_hugepages		250
+#define __NR_ia32_free_hugepages		251
+#define __NR_ia32_exit_group		252
 
-#define IA32_NR_syscalls 243	/* must be > than biggest syscall! */	
+#define IA32_NR_syscalls 260	/* must be > than biggest syscall! */	
 
 #endif /* _ASM_X86_64_IA32_UNISTD_H_ */

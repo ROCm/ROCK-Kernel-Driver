@@ -4,7 +4,7 @@
  * Supports CPiA based parallel port Video Camera's.
  *
  * (C) Copyright 1999 Bas Huisman <bhuism@cs.utwente.nl>
- * (C) Copyright 1999-2000 Scott J. Bertin <sbertin@mindspring.com>,
+ * (C) Copyright 1999-2000 Scott J. Bertin <sbertin@securenym.net>,
  * (C) Copyright 1999-2000 Peter Pregler <Peter_Pregler@email.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -341,17 +341,6 @@ static int cpia_pp_streamStop(void *privdata)
 	return 0;
 }
 
-static int cpia_pp_read(struct parport *port, u8 *buffer, int len)
-{
-	int bytes_read, new_bytes;
-	for(bytes_read=0; bytes_read<len; bytes_read += new_bytes) {
-		new_bytes = parport_read(port, buffer+bytes_read,
-			                 len-bytes_read);
-		if(new_bytes < 0) break;
-	}
-	return bytes_read;
-}
-
 /****************************************************************************
  *
  *  cpia_pp_streamRead
@@ -361,7 +350,7 @@ static int cpia_pp_streamRead(void *privdata, u8 *buffer, int noblock)
 {
 	struct pp_cam_entry *cam = privdata;
 	int read_bytes = 0;
-	int i, endseen, block_size, new_bytes;
+	int i, endseen;
 
 	if(cam == NULL) {
 		DBG("Internal driver error: cam is NULL\n");
@@ -390,34 +379,24 @@ static int cpia_pp_streamRead(void *privdata, u8 *buffer, int noblock)
 			return -EIO;
 		}
 	}
-	endseen = 0;
-	block_size = PARPORT_CHUNK_SIZE;
-	while( !cam->image_complete ) {
-		cond_resched();
-		
-		new_bytes = cpia_pp_read(cam->port, buffer, block_size );
-		if( new_bytes <= 0 ) {
-			break;
-		}
-		i=-1;
-		while(++i<new_bytes && endseen<4) {
-	        	if(*buffer==EOI) {
-	                	endseen++;
-	                } else {
-	                	endseen=0;
-	                }
-			buffer++;
-		}
-		read_bytes += i;
-		if( endseen==4 ) {
-			cam->image_complete=1;
-			break;
-		}
-		if( CPIA_MAX_IMAGE_SIZE-read_bytes <= PARPORT_CHUNK_SIZE ) {
-			block_size=CPIA_MAX_IMAGE_SIZE-read_bytes;
-		}
-	}
+	read_bytes = parport_read(cam->port, buffer, CPIA_MAX_IMAGE_SIZE );
+
 	EndTransferMode(cam);
+	DBG("read %d bytes\n", read_bytes);
+	if( read_bytes<0) return -EIO;
+	endseen = 0;
+	for( i=0; i<read_bytes && endseen<4; i++ ) {
+	  if( *buffer==EOI ) {
+	    endseen++;
+	  } else {
+	    endseen=0;
+	  }
+	  buffer++;
+	}
+	if( endseen>3 ) {
+	  cam->image_complete=1;
+	  DBG("endseen at %d bytes\n", i);
+ 	}
 	return cam->image_complete ? read_bytes : -EIO;
 }
 
@@ -716,15 +695,6 @@ void cleanup_module(void)
 
 static int __init cpia_pp_setup(char *str)
 {
-#if 0
-	/* Is this only a 2.2ism? -jerdfelt */
-	if (!str) {
-		if (ints[0] == 0 || ints[1] == 0) {
-			/* disable driver on "cpia_pp=" or "cpia_pp=0" */
-			parport_nr[0] = PPCPIA_PARPORT_OFF;
-		}
-	} else
-#endif
 	if (!strncmp(str, "parport", 7)) {
 		int n = simple_strtoul(str + 7, NULL, 10);
 		if (parport_ptr < PARPORT_MAX) {

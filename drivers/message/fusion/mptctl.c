@@ -34,7 +34,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptctl.c,v 1.59 2002/09/05 22:30:10 pdelaney Exp $
+ *  $Id: mptctl.c,v 1.60 2002/10/03 13:10:13 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -627,7 +627,7 @@ mptctl_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned 
 	/* Test for Compaq-specific IOCTL's.
 	 */
 	if ((cmd == CPQFCTS_GETPCIINFO) || (cmd == CPQFCTS_CTLR_STATUS) ||
-		(cmd == CPQFCTS_GETDRIVER) || (cmd == CPQFCTS_SCSI_PASSTHRU) ||
+		(cmd == CPQFCTS_GETDRIVVER) || (cmd == CPQFCTS_SCSI_PASSTHRU) ||
 		(cmd == CPQFCTS_SCSI_IOCTL_FC_TARGET_ADDRESS))
 		return mptctl_compaq_ioctl(file, cmd, arg);
 
@@ -2406,7 +2406,7 @@ mptctl_compaq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case CPQFCTS_GETPCIINFO:
 		ret = mptctl_cpq_getpciinfo(arg);
 		break;
-	case CPQFCTS_GETDRIVER:
+	case CPQFCTS_GETDRIVVER:
 		ret = mptctl_cpq_getdriver(arg);
 		break;
 	case CPQFCTS_CTLR_STATUS:
@@ -3180,7 +3180,7 @@ int __init mptctl_init(void)
 	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(CPQFCTS_CTLR_STATUS, NULL);
 	if (++where && err) goto out_fail;
-	err = register_ioctl32_conversion(CPQFCTS_GETDRIVER, NULL);
+	err = register_ioctl32_conversion(CPQFCTS_GETDRIVVER, NULL);
 	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(CPQFCTS_SCSI_IOCTL_FC_TARGET_ADDRESS, NULL);
 	if (++where && err) goto out_fail;
@@ -3234,7 +3234,7 @@ out_fail:
 	unregister_ioctl32_conversion(MPTCOMMAND32);
 	unregister_ioctl32_conversion(MPTFWDOWNLOAD32);
 	unregister_ioctl32_conversion(CPQFCTS_GETPCIINFO);
-	unregister_ioctl32_conversion(CPQFCTS_GETDRIVER);
+	unregister_ioctl32_conversion(CPQFCTS_GETDRIVVER);
 	unregister_ioctl32_conversion(CPQFCTS_CTLR_STATUS);
 	unregister_ioctl32_conversion(CPQFCTS_SCSI_IOCTL_FC_TARGET_ADDRESS);
 	unregister_ioctl32_conversion(CPQFCTS_SCSI_PASSTHRU32);

@@ -327,6 +327,7 @@ writeback_inodes(struct writeback_control *wbc)
 	}
 	spin_unlock(&sb_lock);
 	spin_unlock(&inode_lock);
+	blk_run_queues();
 }
 
 /*

@@ -243,7 +243,7 @@ Simple example, of poor code:
 	if (!dev)
 		return -ENODEV;
 	#ifdef CONFIG_NET_FUNKINESS
-		init_funky_net(dev);
+	init_funky_net(dev);
 	#endif
 
 Cleaned-up example:

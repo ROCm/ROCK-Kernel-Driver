@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/synclink.c
  *
- * $Id: synclink.c,v 4.2 2002/04/10 20:45:13 paulkf Exp $
+ * $Id: synclink.c,v 4.4 2002/10/10 14:53:36 paulkf Exp $
  *
  * Device driver for Microgate SyncLink ISA and PCI
  * high speed multiprotocol serial adapters.
@@ -917,7 +917,7 @@ MODULE_PARM(txdmabufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 MODULE_PARM(txholdbufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 
 static char *driver_name = "SyncLink serial driver";
-static char *driver_version = "$Revision: 4.2 $";
+static char *driver_version = "$Revision: 4.4 $";
 
 static int synclink_init_one (struct pci_dev *dev,
 				     const struct pci_device_id *ent);
@@ -3387,7 +3387,7 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout)
 			schedule_timeout(char_time);
 			if (signal_pending(current))
 				break;
-			if (timeout && ((orig_jiffies + timeout) < jiffies))
+			if (timeout && time_after(jiffies, orig_jiffies + timeout))
 				break;
 		}
 	} else {
@@ -3397,7 +3397,7 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout)
 			schedule_timeout(char_time);
 			if (signal_pending(current))
 				break;
-			if (timeout && ((orig_jiffies + timeout) < jiffies))
+			if (timeout && time_after(jiffies, orig_jiffies + timeout))
 				break;
 		}
 	}
@@ -3512,12 +3512,12 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		printk("%s(%d):block_til_ready before block on %s count=%d\n",
 			 __FILE__,__LINE__, tty->driver.name, info->count );
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&info->irq_spinlock, flags);
 	if (!tty_hung_up_p(filp)) {
 		extra_count = 1;
 		info->count--;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&info->irq_spinlock, flags);
 	info->blocked_open++;
 	
 	while (1) {
@@ -4728,21 +4728,18 @@ static int __init synclink_init(void)
 
 static void __exit synclink_exit(void) 
 {
-	unsigned long flags;
 	int rc;
 	struct mgsl_struct *info;
 	struct mgsl_struct *tmp;
 
 	printk("Unloading %s: %s\n", driver_name, driver_version);
-	save_flags(flags);
-	cli();
+
 	if ((rc = tty_unregister_driver(&serial_driver)))
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
 	if ((rc = tty_unregister_driver(&callout_driver)))
 		printk("%s(%d) failed to unregister callout driver err=%d\n",
 		       __FILE__,__LINE__,rc);
-	restore_flags(flags);
 
 	info = mgsl_device_list;
 	while(info) {
@@ -7486,7 +7483,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 	EndTime = jiffies + jiffies_from_ms(100);
 
 	for(;;) {
-		if ( jiffies > EndTime ) {
+		if (time_after(jiffies, EndTime)) {
 			rc = FALSE;
 			break;
 		}
@@ -7542,7 +7539,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 	EndTime = jiffies + jiffies_from_ms(100);
 
 	for(;;) {
-		if ( jiffies > EndTime ) {
+		if (time_after(jiffies, EndTime)) {
 			rc = FALSE;
 			break;
 		}
@@ -7590,7 +7587,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 		spin_unlock_irqrestore(&info->irq_spinlock,flags);
 
 		while ( !(status & (BIT6+BIT5+BIT4+BIT2+BIT1)) ) {
-			if ( jiffies > EndTime ) {
+			if (time_after(jiffies, EndTime)) {
 				rc = FALSE;
 				break;
 			}
@@ -7617,8 +7614,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 		/* Wait for 16C32 to write receive status to buffer entry. */
 		status=info->rx_buffer_list[0].status;
 		while ( status == 0 ) {
-			if ( jiffies > EndTime ) {
-			printk(KERN_ERR"mark 4\n");
+			if (time_after(jiffies, EndTime)) {
 				rc = FALSE;
 				break;
 			}

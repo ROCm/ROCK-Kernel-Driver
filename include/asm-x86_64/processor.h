@@ -28,6 +28,12 @@
 #define VIP_MASK	0x00100000	/* virtual interrupt pending */
 #define ID_MASK		0x00200000
 
+#define desc_empty(desc) \
+               (!((desc)->a + (desc)->b))
+
+#define desc_equal(desc1, desc2) \
+               (((desc1)->a == (desc2)->a) && ((desc1)->b == (desc2)->b))
+
 /*
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
@@ -49,8 +55,8 @@ struct cpuinfo_x86 {
 	__u32	x86_capability[NCAPINTS];
 	char	x86_vendor_id[16];
 	char	x86_model_id[64];
-	int 	x86_cache_size;  /* in KB - valid for CPUS which support this
-				    call  */
+	int 	x86_cache_size;  /* in KB */
+	int	x86_clflush_size;
 	unsigned long loops_per_jiffy;
 } ____cacheline_aligned;
 
@@ -315,10 +321,11 @@ struct thread_struct {
    switch faster for a limited number of ioperm using tasks. -AK */
 	int		ioperm;
 	u32	*io_bitmap_ptr;
+/* cached TLS descriptors. */
+	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
 };
 
-#define INIT_THREAD  {				\
-}
+#define INIT_THREAD  {}
 
 #define INIT_MMAP \
 { &init_mm, 0, 0, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }

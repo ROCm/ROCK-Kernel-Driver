@@ -952,12 +952,13 @@ static struct ext2_inode *ext2_get_inode(struct super_block *sb, ino_t ino,
 	return (struct ext2_inode *) (bh->b_data + offset);
 
 Einval:
-	ext2_error(sb, "ext2_get_inode", "bad inode number: %lu", ino);
+	ext2_error(sb, "ext2_get_inode", "bad inode number: %lu",
+		   (unsigned long) ino);
 	return ERR_PTR(-EINVAL);
 Eio:
 	ext2_error(sb, "ext2_get_inode",
 		   "unable to read inode block - inode=%lu, block=%lu",
-		   ino, block);
+		   (unsigned long) ino, block);
 Egdp:
 	return ERR_PTR(-EIO);
 }
@@ -1076,7 +1077,8 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
  		return -EIO;
 
 	if (ino == EXT2_ACL_IDX_INO || ino == EXT2_ACL_DATA_INO) {
-		ext2_error (sb, "ext2_write_inode", "bad inode number: %lu", ino);
+		ext2_error (sb, "ext2_write_inode", "bad inode number: %lu",
+			    (unsigned long) ino);
 		brelse(bh);
 		return -EIO;
 	}
@@ -1146,7 +1148,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 		wait_on_buffer (bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh)) {
 			printk ("IO error syncing ext2 inode [%s:%08lx]\n",
-				sb->s_id, ino);
+				sb->s_id, (unsigned long) ino);
 			err = -EIO;
 		}
 	}

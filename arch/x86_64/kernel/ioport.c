@@ -56,17 +56,21 @@ static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_
 asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	struct thread_struct * t = &current->thread;
-	struct tss_struct * tss = init_tss + smp_processor_id();
+	struct tss_struct * tss;
+	int ret = 0;
 
 	if ((from + num <= from) || (from + num > IO_BITMAP_SIZE*32))
 		return -EINVAL;
 	if (turn_on && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
+	tss  = init_tss + get_cpu();
 	if (!t->io_bitmap_ptr) { 
 		t->io_bitmap_ptr = kmalloc((IO_BITMAP_SIZE+1)*4, GFP_KERNEL);
-		if (!t->io_bitmap_ptr) 
-			return -ENOMEM; 
+		if (!t->io_bitmap_ptr) { 
+			ret = -ENOMEM;
+			goto out;
+		}
 		memset(t->io_bitmap_ptr,0xff,(IO_BITMAP_SIZE+1)*4);
 		tss->io_map_base = IO_BITMAP_OFFSET;
 	}
@@ -77,7 +81,9 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	set_bitmap((unsigned long *) t->io_bitmap_ptr, from, num, !turn_on);
 	set_bitmap((unsigned long *) tss->io_bitmap, from, num, !turn_on);
 
-	return 0;
+ out:
+	put_cpu();
+	return ret;
 }
 
 /*

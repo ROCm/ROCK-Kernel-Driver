@@ -342,7 +342,8 @@ repeat:
 	if (ino < EXT2_FIRST_INO(sb) || ino > le32_to_cpu(es->s_inodes_count)) {
 		ext2_error (sb, "ext2_new_inode",
 			    "reserved inode or inode > inodes count - "
-			    "block_group = %d,inode=%ld", group, ino);
+			    "block_group = %d,inode=%lu", group,
+			    (unsigned long) ino);
 		err = -EIO;
 		goto fail2;
 	}

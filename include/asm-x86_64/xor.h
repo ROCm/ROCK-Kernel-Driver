@@ -46,7 +46,7 @@ typedef struct { unsigned long a,b; } __attribute__((aligned(16))) xmm_store_t;
 		"movups %%xmm1,0x10(%1)	;\n\t"	\
 		"movups %%xmm2,0x20(%1)	;\n\t"	\
 		"movups %%xmm3,0x30(%1)	;\n\t"	\
-		: "=r" (cr0)			\
+		: "=&r" (cr0)			\
 		: "r" (xmm_save) 		\
 		: "memory");			\
 } while(0)
@@ -335,11 +335,11 @@ xor_sse_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 }
 
 static struct xor_block_template xor_block_sse = {
-        name: "generic_sse",
-        do_2: xor_sse_2,
-        do_3: xor_sse_3,
-        do_4: xor_sse_4,
-        do_5: xor_sse_5,
+        .name = "generic_sse",
+        .do_2 = xor_sse_2,
+        .do_3 = xor_sse_3,
+        .do_4 = xor_sse_4,
+        .do_5 = xor_sse_5,
 };
 
 #undef XOR_TRY_TEMPLATES

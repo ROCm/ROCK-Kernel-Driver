@@ -1284,12 +1284,12 @@ static void sppp_cp_timeout (unsigned long arg)
 {
 	struct sppp *sp = (struct sppp*) arg;
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+
+	spin_lock_irqsave(&spppq_lock, flags);
 
 	sp->pp_flags &= ~PP_TIMO;
 	if (! (sp->pp_if->flags & IFF_UP) || (sp->pp_flags & PP_CISCO)) {
-		restore_flags(flags);
+		spin_unlock_irqrestore(&spppq_lock, flags);
 		return;
 	}
 	switch (sp->lcp.state) {
@@ -1328,7 +1328,7 @@ static void sppp_cp_timeout (unsigned long arg)
 		}
 		break;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&spppq_lock, flags);
 }
 
 static char *sppp_lcp_type_name (u8 type)
