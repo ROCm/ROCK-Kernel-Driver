@@ -58,7 +58,7 @@ static void BAD_DMA(void *address, unsigned int length)
 {
 	printk(KERN_CRIT "buf vaddress %p paddress 0x%lx length %d\n",
 	       address,
-	       SCSI_BUS_PA(address),
+	       SCSI_BUF_PA(address),
 	       length);
 	panic("Buffer at physical address > 16Mb used for aha1542");
 }
@@ -68,7 +68,7 @@ static void BAD_SG_DMA(Scsi_Cmnd * SCpnt,
 		       int nseg,
 		       int badseg)
 {
-	printk(KERN_CRIT "sgpnt[%d:%d] page %p/0x%lx length %d\n",
+	printk(KERN_CRIT "sgpnt[%d:%d] page %p/0x%x length %d\n",
 	       badseg, nseg,
 	       page_address(sgpnt[badseg].page) + sgpnt[badseg].offset,
 	       SCSI_SG_PA(&sgpnt[badseg]),
@@ -727,7 +727,7 @@ static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 				panic("Foooooooood fight!");
 			};
 			any2scsi(cptr[i].dataptr, SCSI_SG_PA(&sgpnt[i]));
-			if (SCSI_SG_PA(&sgpnt[i].page) + sgpnt[i].length - 1 > ISA_DMA_THRESHOLD)
+			if (SCSI_SG_PA(&sgpnt[i]) + sgpnt[i].length - 1 > ISA_DMA_THRESHOLD)
 				BAD_SG_DMA(SCpnt, sgpnt, SCpnt->use_sg, i);
 			any2scsi(cptr[i].datalen, sgpnt[i].length);
 		};
