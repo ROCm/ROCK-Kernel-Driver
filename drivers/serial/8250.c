@@ -122,13 +122,13 @@ struct uart_8250_port {
 	struct uart_port	port;
 	struct timer_list	timer;		/* "no irq" timer */
 	struct list_head	list;		/* ports on this IRQ */
+	unsigned short		rev;
 	unsigned char		acr;
 	unsigned char		ier;
-	unsigned char		rev;
 	unsigned char		lcr;
 	unsigned char		mcr_mask;	/* mask of user bits */
 	unsigned char		mcr_force;	/* mask of forced bits */
-	unsigned int		lsr_break_flag;
+	unsigned char		lsr_break_flag;
 
 	/*
 	 * We provide a per-port pm hook.
