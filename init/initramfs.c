@@ -453,10 +453,10 @@ static void __init unpack_to_rootfs(char *buf, unsigned len)
 	free(header_buf);
 }
 
-extern unsigned long __initramfs_start, __initramfs_end;
+extern char __initramfs_start, __initramfs_end;
 
 void __init populate_rootfs(void)
 {
-	unpack_to_rootfs((void *) &__initramfs_start,
+	unpack_to_rootfs(&__initramfs_start,
 			 &__initramfs_end - &__initramfs_start);
 }
