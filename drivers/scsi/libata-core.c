@@ -2383,6 +2383,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_l
  *	writing the taskfile to hardware, starting the command.
  *
  *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
  *
  *	RETURNS:
  *	Zero on success, negative on error.
@@ -2754,54 +2755,15 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 void atapi_start(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	struct ata_device *dev = qc->dev;
-	struct scsi_cmnd *cmd = qc->scsicmd;
-	u8 status;
-	int doing_dma;
 
-	doing_dma = (qc->tf.protocol == ATA_PROT_ATAPI_DMA);
+	qc->flags |= ATA_QCFLAG_ACTIVE;
+	ap->active_tag = qc->tag;
 
-	if (cmd->sc_data_direction == SCSI_DATA_NONE) {
-		ap->active_tag = qc->tag;
-		qc->flags |= ATA_QCFLAG_ACTIVE | ATA_QCFLAG_POLL;
-
-		ata_dev_select(ap, dev->devno, 1, 0);
-
-		DPRINTK("direction: none\n");
-		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
-		ata_tf_to_host_nolock(ap, &qc->tf);
-	} else {
-		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
-		qc->tf.feature = ATAPI_PKT_DMA;
-
-		/* select device, send command to hardware */
-		if (ata_qc_issue(qc))
-			goto err_out;
-	}
-
-	status = ata_busy_wait(ap, ATA_BUSY, 1000);
-	if (status & ATA_BUSY) {
-		queue_work(ata_wq, &ap->packet_task);
-		return;
-	}
-	if ((status & ATA_DRQ) == 0)
-		goto err_out;
-
-	/* FIXME: mmio-ize */
-	DPRINTK("writing cdb\n");
-	outsl(ap->ioaddr.data_addr, cmd->cmnd, ap->host->max_cmd_len / 4);
-
-	if (!doing_dma)
-		queue_work(ata_wq, &ap->packet_task);
+	ata_dev_select(ap, qc->dev->devno, 1, 0);
+	ata_tf_to_host_nolock(ap, &qc->tf);
+	queue_work(ata_wq, &ap->packet_task);
 
 	VPRINTK("EXIT\n");
-	return;
-
-err_out:
-	if (!doing_dma)
-		ata_irq_on(ap);	/* re-enable interrupts */
-	ata_bad_cdb(cmd, qc->scsidone);
-	DPRINTK("EXIT - badcmd\n");
 }
 
 /**
@@ -2844,33 +2806,17 @@ static void atapi_packet_task(void *_data)
 	outsl(ap->ioaddr.data_addr,
 	      qc->scsicmd->cmnd, ap->host->max_cmd_len / 4);
 
-	/* FIXME: start DMA here */
-
 	/* if we are DMA'ing, irq handler takes over from here */
-	if (qc->tf.feature == ATAPI_PKT_DMA)
-		goto out;
+	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA) {
+		/* FIXME: start DMA here */
+	} else {
+		queue_work(ata_wq, &ap->pio_task);
+	}
 
-	/* sleep-wait for BSY to clear */
-	DPRINTK("busy wait 2\n");
-	if (ata_busy_sleep(ap, ATA_TMOUT_CDB_QUICK, ATA_TMOUT_CDB))
-		goto err_out;
-
-	/* wait for BSY,DRQ to clear */
-	status = ata_wait_idle(ap);
-	if (status & (ATA_BUSY | ATA_DRQ))
-		goto err_out;
-
-	/* transaction completed, indicate such to scsi stack */
-	ata_qc_complete(qc, status, 0);
-	ata_irq_on(ap);
-
-out:
-	ap->thr_state = THR_IDLE;
 	return;
 
 err_out:
 	ata_qc_complete(qc, ATA_ERR, 0);
-	goto out;
 }
 
 int ata_port_start (struct ata_port *ap)

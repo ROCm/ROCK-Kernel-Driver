@@ -923,10 +923,16 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 	}
 
 	qc->tf.command = ATA_CMD_PACKET;
-	if (cmd->sc_data_direction == SCSI_DATA_NONE)
+
+	if (cmd->sc_data_direction == SCSI_DATA_NONE) {
 		qc->tf.protocol = ATA_PROT_ATAPI;
-	else
+		qc->flags |= ATA_QCFLAG_POLL;
+		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
+	} else {
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
+		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
+		qc->tf.feature |= ATAPI_PKT_DMA;
+	}
 
 	atapi_start(qc);
 }
