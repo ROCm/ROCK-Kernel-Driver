@@ -339,8 +339,9 @@ struct kmem_cache_s {
 #define	RED_MAGIC2	0x170FC2A5UL	/* when obj is inactive */
 
 /* ...and for poisoning */
-#define	POISON_BYTE	0x5a		/* byte value for poisoning */
-#define	POISON_END	0xa5		/* end-byte of poisoning */
+#define	POISON_BEFORE	0x5a	/* for use-uninitialised poisoning */
+#define POISON_AFTER	0x6b	/* for use-after-free poisoning */
+#define	POISON_END	0xa5	/* end-byte of poisoning */
 
 #endif
 
@@ -744,14 +745,14 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 }
 
 #if DEBUG
-static void poison_obj (kmem_cache_t *cachep, void *addr)
+static void poison_obj(kmem_cache_t *cachep, void *addr, unsigned char val)
 {
 	int size = cachep->objsize;
 	if (cachep->flags & SLAB_RED_ZONE) {
 		addr += BYTES_PER_WORD;
 		size -= 2*BYTES_PER_WORD;
 	}
-	memset(addr, POISON_BYTE, size);
+	memset(addr, val, size);
 	*(unsigned char *)(addr+size-1) = POISON_END;
 }
 
@@ -1266,7 +1267,7 @@ static void cache_init_objs (kmem_cache_t * cachep,
 #if DEBUG
 		/* need to poison the objs? */
 		if (cachep->flags & SLAB_POISON)
-			poison_obj(cachep, objp);
+			poison_obj(cachep, objp, POISON_BEFORE);
 
 		if (cachep->flags & SLAB_RED_ZONE) {
 			*((unsigned long*)(objp)) = RED_MAGIC1;
@@ -1481,9 +1482,8 @@ static inline void *cache_free_debugcheck (kmem_cache_t * cachep, void * objp)
 		else
 			cachep->dtor(objp, cachep, 0);
 	}
-	if (cachep->flags & SLAB_POISON) {
-		poison_obj(cachep, objp);
-	}
+	if (cachep->flags & SLAB_POISON)
+		poison_obj(cachep, objp, POISON_AFTER);
 #endif
 	return objp;
 }
