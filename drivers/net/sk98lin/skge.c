@@ -260,6 +260,7 @@ extern void SkDimEnableModerationIfNeeded(SK_AC *pAC);
 extern void SkDimDisplayModerationSettings(SK_AC *pAC);
 extern void SkDimStartModerationTimer(SK_AC *pAC);
 extern void SkDimModerate(SK_AC *pAC);
+extern void SkGeBlinkTimer(unsigned long data);
 
 #ifdef DEBUG
 static void	DumpMsg(struct sk_buff*, char*);
@@ -516,6 +517,11 @@ SK_BOOL	DualNet;
 		spin_lock_init(&pAC->RxPort[i].RxDesRingLock);
 	}
 	spin_lock_init(&pAC->SlowPathLock);
+
+	/* setup phy_id blink timer */
+	pAC->BlinkTimer.function = SkGeBlinkTimer;
+	pAC->BlinkTimer.data = (unsigned long) dev;
+	init_timer(&pAC->BlinkTimer);
 
 	/* level 0 init common modules here */
 	

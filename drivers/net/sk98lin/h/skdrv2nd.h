@@ -382,6 +382,8 @@ struct s_AC  {
 	SK_CSUM		Csum;		/* for checksum module */
 	SK_RLMT		Rlmt;		/* for rlmt module */
 	spinlock_t	SlowPathLock;	/* Normal IRQ lock */
+	struct timer_list BlinkTimer;	/* for LED blinking */
+	int		LedsOn;
 	SK_PNMI_STRUCT_DATA PnmiStruct;	/* structure to get all Pnmi-Data */
 	int			RlmtMode;	/* link check mode to set */
 	int			RlmtNets;	/* Number of nets */
