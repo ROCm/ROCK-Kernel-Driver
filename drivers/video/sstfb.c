@@ -790,7 +790,7 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
 		
 	/* fills lfb with #arg pixels */
 	case _IOW('F', 0xdc, u32):	/* 0x46dc */
-		if (copy_from_user(&val, (void *)arg, sizeof(val)))
+		if (copy_from_user(&val, (void __user *)arg, sizeof(val)))
 			return -EFAULT;
 		if (val > info->fix.smem_len)
 			val = info->fix.smem_len;
@@ -801,7 +801,7 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
 		
 	/* change VGA pass_through mode */
 	case _IOW('F', 0xdd, u32):	/* 0x46dd */
-		if (copy_from_user(&val, (void *)arg, sizeof(val)))
+		if (copy_from_user(&val, (void __user *)arg, sizeof(val)))
 			return -EFAULT;
 		pci_read_config_dword(sst_dev, PCI_INIT_ENABLE, &tmp);
 		pci_write_config_dword(sst_dev, PCI_INIT_ENABLE,
