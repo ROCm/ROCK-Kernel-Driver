@@ -181,7 +181,7 @@ void hdlc_close(struct net_device *dev)
 #endif
 
 #ifndef CONFIG_HDLC_CISCO
-#define hdlc_cisco_ioctl(hdlc, ifr)	-ENOSYS
+#define hdlc_cisco_ioctl(dev, ifr)	-ENOSYS
 #endif
 
 #ifndef CONFIG_HDLC_FR
@@ -219,7 +219,7 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case IF_PROTO_HDLC:	return hdlc_raw_ioctl(hdlc, ifr);
 	case IF_PROTO_HDLC_ETH:	return hdlc_raw_eth_ioctl(hdlc, ifr);
 	case IF_PROTO_PPP:	return hdlc_ppp_ioctl(hdlc, ifr);
-	case IF_PROTO_CISCO:	return hdlc_cisco_ioctl(hdlc, ifr);
+	case IF_PROTO_CISCO:	return hdlc_cisco_ioctl(dev, ifr);
 	case IF_PROTO_FR:	return hdlc_fr_ioctl(hdlc, ifr);
 	case IF_PROTO_X25:	return hdlc_x25_ioctl(hdlc, ifr);
 	default:		return -EINVAL;
