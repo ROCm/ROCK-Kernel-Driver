@@ -410,11 +410,14 @@ static void __init ethif_probe2(int unit)
 #ifdef CONFIG_TR
 /* Token-ring device probe */
 extern int ibmtr_probe(struct net_device *);
-extern int sk_isa_probe(struct net_device *);
+extern struct net_device *sk_isa_probe(int unit);
 extern struct net_device *proteon_probe(int unit);
 extern struct net_device *smctr_probe(int unit);
 
 static struct devprobe2 tr_probes2[] __initdata = {
+#ifdef CONFIG_SKISA
+	{sk_isa_probe, 0},
+#endif
 #ifdef CONFIG_PROTEON
 	{proteon_probe, 0},
 #endif
@@ -438,9 +441,6 @@ static __init int trif_probe(int unit)
 	if (
 #ifdef CONFIG_IBMTR
 	    ibmtr_probe(dev) == 0  ||
-#endif
-#ifdef CONFIG_SKISA
-	    sk_isa_probe(dev) == 0 || 
 #endif
 	    0 ) 
 		err = register_netdev(dev);
