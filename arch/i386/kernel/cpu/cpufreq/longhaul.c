@@ -63,7 +63,11 @@ static struct cpufreq_frequency_table *longhaul_table;
 
 static unsigned int calc_speed (int mult, int fsb)
 {
-	return ((mult/10)*fsb) + ((mult%10)*(fsb/2));
+	int mhz;
+	mhz = (mult/10)*fsb;
+	if (mult%10)
+		mhz += fsb/2;
+	return mhz;
 }
 
 
