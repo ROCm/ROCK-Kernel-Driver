@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.99 2003/04/28 10:17:17 dwmw2 Exp $
+ * $Id: scan.c,v 1.100 2003/06/05 14:42:24 dwmw2 Exp $
  *
  */
 #include <linux/kernel.h>
@@ -354,7 +354,7 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 
 		if (ofs & 3) {
 			printk(KERN_WARNING "Eep. ofs 0x%08x not word-aligned!\n", ofs);
-			ofs = (ofs+3)&~3;
+			ofs = PAD(ofs);
 			continue;
 		}
 		if (ofs == prevofs) {

@@ -28,6 +28,9 @@
  *   the transmit lock. <steve@chygwyn.com>
  * 02-10-11 Allow hung xmit to be aborted via SIGKILL & various fixes.
  *   <Paul.Clements@SteelEye.com> <James.Bottomley@SteelEye.com>
+ * 03-06-22 Make nbd work with new linux 2.5 block layer design. This fixes
+ *   memory corruption from module removal and possible memory corruption
+ *   from sending/receiving disk data. <ldl@aros.net>
  *
  * possible FIXME: make set_sock / set_blksize / set_size / do_it one syscall
  * why not: would need verify_area and friends, would share yet another 
@@ -63,6 +66,16 @@
 
 static struct nbd_device nbd_dev[MAX_NBD];
 
+/*
+ * Use just one lock (or at most 1 per NIC). Two arguments for this:
+ * 1. Each NIC is essentially a synchronization point for all servers
+ *    accessed through that NIC so there's no need to have more locks
+ *    than NICs anyway.
+ * 2. More locks lead to more "Dirty cache line bouncing" which will slow
+ *    down each lock to the point where they're actually slower than just
+ *    a single lock.
+ * Thanks go to Jens Axboe and Al Viro for their LKML emails explaining this!
+ */
 static spinlock_t nbd_lock = SPIN_LOCK_UNLOCKED;
 
 #define DEBUG( s )
@@ -168,6 +181,17 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 	return result;
 }
 
+static inline int sock_send_bvec(struct socket *sock, struct bio_vec *bvec,
+		int flags)
+{
+	int result;
+	void *kaddr = kmap(bvec->bv_page);
+	result = nbd_xmit(1, sock, kaddr + bvec->bv_offset, bvec->bv_len,
+			flags);
+	kunmap(bvec->bv_page);
+	return result;
+}
+
 #define FAIL( s ) { printk( KERN_ERR "NBD: " s "(result %d)\n", result ); goto error_out; }
 
 void nbd_send_req(struct nbd_device *lo, struct request *req)
@@ -209,7 +233,7 @@ void nbd_send_req(struct nbd_device *lo, struct request *req)
 				if ((i < (bio->bi_vcnt - 1)) || bio->bi_next)
 					flags = MSG_MORE;
 				DEBUG("data, ");
-				result = nbd_xmit(1, sock, page_address(bvec->bv_page) + bvec->bv_offset, bvec->bv_len, flags);
+				result = sock_send_bvec(sock, bvec, flags);
 				if (result <= 0)
 					FAIL("Send data failed.");
 			}
@@ -244,6 +268,16 @@ static struct request *nbd_find_request(struct nbd_device *lo, char *handle)
 	return NULL;
 }
 
+static inline int sock_recv_bvec(struct socket *sock, struct bio_vec *bvec)
+{
+	int result;
+	void *kaddr = kmap(bvec->bv_page);
+	result = nbd_xmit(0, sock, kaddr + bvec->bv_offset, bvec->bv_len,
+			MSG_WAITALL);
+	kunmap(bvec->bv_page);
+	return result;
+}
+
 #define HARDFAIL( s ) { printk( KERN_ERR "NBD: " s "(result %d)\n", result ); lo->harderror = result; return NULL; }
 struct request *nbd_read_stat(struct nbd_device *lo)
 		/* NULL returned = something went wrong, inform userspace       */ 
@@ -251,10 +285,11 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 	int result;
 	struct nbd_reply reply;
 	struct request *req;
+	struct socket *sock = lo->sock;
 
 	DEBUG("reading control, ");
 	reply.magic = 0;
-	result = nbd_xmit(0, lo->sock, (char *) &reply, sizeof(reply), MSG_WAITALL);
+	result = nbd_xmit(0, sock, (char *) &reply, sizeof(reply), MSG_WAITALL);
 	if (result <= 0)
 		HARDFAIL("Recv control failed.");
 	req = nbd_find_request(lo, reply.handle);
@@ -268,14 +303,17 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 		FAIL("Other side returned error.");
 
 	if (nbd_cmd(req) == NBD_CMD_READ) {
-		struct bio *bio = req->bio;
+		int i;
+		struct bio *bio;
 		DEBUG("data, ");
-		do {
-			result = nbd_xmit(0, lo->sock, bio_data(bio), bio->bi_size, MSG_WAITALL);
-			if (result <= 0)
-				HARDFAIL("Recv data failed.");
-			bio = bio->bi_next;
-		} while(bio);
+		rq_for_each_bio(bio, req) {
+			struct bio_vec *bvec;
+			bio_for_each_segment(bvec, bio, i) {
+				result = sock_recv_bvec(sock, bvec);
+				if (result <= 0)
+					HARDFAIL("Recv data failed.");
+			}
+		}
 	}
 	DEBUG("done.\n");
 	return req;
@@ -538,8 +576,6 @@ static struct block_device_operations nbd_fops =
  *  (Just smiley confuses emacs :-)
  */
 
-static struct request_queue nbd_queue;
-
 static int __init nbd_init(void)
 {
 	int err = -ENOMEM;
@@ -555,6 +591,17 @@ static int __init nbd_init(void)
 		if (!disk)
 			goto out;
 		nbd_dev[i].disk = disk;
+		/*
+		 * The new linux 2.5 block layer implementation requires
+		 * every gendisk to have its very own request_queue struct.
+		 * These structs are big so we dynamically allocate them.
+		 */
+		disk->queue = kmalloc(sizeof(struct request_queue), GFP_KERNEL);
+		if (!disk->queue) {
+			put_disk(disk);
+			goto out;
+		}
+		blk_init_queue(disk->queue, do_nbd_request, &nbd_lock);
 	}
 
 	if (register_blkdev(NBD_MAJOR, "nbd")) {
@@ -564,7 +611,6 @@ static int __init nbd_init(void)
 #ifdef MODULE
 	printk("nbd: registered device at major %d\n", NBD_MAJOR);
 #endif
-	blk_init_queue(&nbd_queue, do_nbd_request, &nbd_lock);
 	devfs_mk_dir("nbd");
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
@@ -582,7 +628,6 @@ static int __init nbd_init(void)
 		disk->first_minor = i;
 		disk->fops = &nbd_fops;
 		disk->private_data = &nbd_dev[i];
-		disk->queue = &nbd_queue;
 		sprintf(disk->disk_name, "nbd%d", i);
 		sprintf(disk->devfs_name, "nbd/%d", i);
 		set_capacity(disk, 0x3ffffe);
@@ -591,8 +636,10 @@ static int __init nbd_init(void)
 
 	return 0;
 out:
-	while (i--)
+	while (i--) {
+		kfree(nbd_dev[i].disk->queue);
 		put_disk(nbd_dev[i].disk);
+	}
 	return err;
 }
 
@@ -600,12 +647,22 @@ static void __exit nbd_cleanup(void)
 {
 	int i;
 	for (i = 0; i < MAX_NBD; i++) {
-		del_gendisk(nbd_dev[i].disk);
-		put_disk(nbd_dev[i].disk);
+		struct gendisk *disk = nbd_dev[i].disk;
+		if (disk) {
+			if (disk->queue) {
+				blk_cleanup_queue(disk->queue);
+				kfree(disk->queue);
+				disk->queue = NULL;
+			}
+			del_gendisk(disk);
+			put_disk(disk);
+		}
 	}
 	devfs_remove("nbd");
-	blk_cleanup_queue(&nbd_queue);
 	unregister_blkdev(NBD_MAJOR, "nbd");
+#ifdef MODULE
+	printk("nbd: unregistered device at major %d\n", NBD_MAJOR);
+#endif
 }
 
 module_init(nbd_init);

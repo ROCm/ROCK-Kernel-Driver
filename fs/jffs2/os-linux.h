@@ -123,7 +123,7 @@ static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 #define jffs2_flash_write_oob(c, ofs, len, retlen, buf) ((c)->mtd->write_oob((c)->mtd, ofs, len, retlen, buf))
 #define jffs2_flash_read_oob(c, ofs, len, retlen, buf) ((c)->mtd->read_oob((c)->mtd, ofs, len, retlen, buf))
 
-struct statfs;
+struct kstatfs;
 
 /* wbuf.c */
 int jffs2_flash_writev(struct jffs2_sb_info *c, const struct iovec *vecs, unsigned long count, loff_t to, size_t *retlen);
@@ -169,7 +169,7 @@ void jffs2_read_inode (struct inode *);
 void jffs2_clear_inode (struct inode *);
 struct inode *jffs2_new_inode (struct inode *dir_i, int mode,
 			       struct jffs2_raw_inode *ri);
-int jffs2_statfs (struct super_block *, struct statfs *);
+int jffs2_statfs (struct super_block *, struct kstatfs *);
 void jffs2_write_super (struct super_block *);
 int jffs2_remount_fs (struct super_block *, int *, char *);
 int jffs2_do_fill_super(struct super_block *sb, void *data, int silent);
