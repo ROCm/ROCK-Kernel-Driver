@@ -2074,6 +2074,48 @@ void * kmem_cache_alloc (kmem_cache_t *cachep, int flags)
 EXPORT_SYMBOL(kmem_cache_alloc);
 
 /**
+ * kmem_ptr_validate - check if an untrusted pointer might
+ *	be a slab entry.
+ * @cachep: the cache we're checking against
+ * @ptr: pointer to validate
+ *
+ * This verifies that the untrusted pointer looks sane:
+ * it is _not_ a guarantee that the pointer is actually
+ * part of the slab cache in question, but it at least
+ * validates that the pointer can be dereferenced and
+ * looks half-way sane.
+ *
+ * Currently only used for dentry validation.
+ */
+int kmem_ptr_validate(kmem_cache_t *cachep, void *ptr)
+{
+	unsigned long addr = (unsigned long) ptr;
+	unsigned long min_addr = PAGE_OFFSET;
+	unsigned long align_mask = BYTES_PER_WORD-1;
+	unsigned long size = cachep->objsize;
+	struct page *page;
+
+	if (unlikely(addr < min_addr))
+		goto out;
+	if (unlikely(addr > (unsigned long)high_memory - size))
+		goto out;
+	if (unlikely(addr & align_mask))
+		goto out;
+	if (unlikely(!kern_addr_valid(addr)))
+		goto out;
+	if (unlikely(!kern_addr_valid(addr + size - 1)))
+		goto out;
+	page = virt_to_page(ptr);
+	if (unlikely(!PageSlab(page)))
+		goto out;
+	if (unlikely(GET_PAGE_CACHE(page) != cachep))
+		goto out;
+	return 1;
+out:
+	return 0;
+}
+
+/**
  * kmalloc - allocate memory
  * @size: how many bytes of memory are required.
  * @flags: the type of memory to allocate.
