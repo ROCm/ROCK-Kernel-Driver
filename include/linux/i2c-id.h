@@ -233,6 +233,7 @@
 #define I2C_HW_SMBUS_ALI1535	0x07
 #define I2C_HW_SMBUS_SIS630	0x08
 #define I2C_HW_SMBUS_SIS645	0x09
+#define I2C_HW_SMBUS_AMD8111	0x0a
 
 /* --- ISA pseudo-adapter						*/
 #define I2C_HW_ISA 0x00
