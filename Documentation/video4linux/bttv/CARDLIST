@@ -22,7 +22,7 @@ bttv.o
   card=20 - CEI Raffles Card
   card=21 - Lifeview FlyVideo 98/ Lucky Star Image World ConferenceTV LR50
   card=22 - Askey CPH050/ Phoebe Tv Master + FM
-  card=23 - Modular Technology MM205 PCTV, bt878
+  card=23 - Modular Technology MM201/MM202/MM205/MM210/MM215 PCTV, bt878
   card=24 - Askey CPH05X/06X (bt878) [many vendors]
   card=25 - Terratec TerraTV+ Version 1.0 (Bt848)/ Terra TValue Version 1.0/ Vobis TV-Boostar
   card=26 - Hauppauge WinCam newer (bt878)
@@ -39,7 +39,7 @@ bttv.o
   card=37 - Prolink PixelView PlayTV pro
   card=38 - Askey CPH06X TView99
   card=39 - Pinnacle PCTV Studio/Rave
-  card=40 - STB TV PCI FM, Gateway P/N 6000704 (bt878)
+  card=40 - STB TV PCI FM, Gateway P/N 6000704 (bt878), 3Dfx VoodooTV 100
   card=41 - AVerMedia TVPhone 98
   card=42 - ProVideo PV951
   card=43 - Little OnAir TV
@@ -81,11 +81,27 @@ bttv.o
   card=79 - DSP Design TCVIDEO
   card=80 - Hauppauge WinTV PVR
   card=81 - GV-BCTV5/PCI
+  card=82 - Osprey 100/150 (878)
+  card=83 - Osprey 100/150 (848)
+  card=84 - Osprey 101 (848)
+  card=85 - Osprey 101/151
+  card=86 - Osprey 101/151 w/ svid
+  card=87 - Osprey 200/201/250/251
+  card=88 - Osprey 200/250
+  card=89 - Osprey 210/220
+  card=90 - Osprey 500
+  card=91 - Osprey 540
+  card=92 - Osprey 2000
+  card=93 - IDS Eagle
+  card=94 - Pinnacle PCTV Sat
+  card=95 - Formac ProTV II
+  card=96 - MachTV
+  card=97 - Euresys Picolo
 
 tuner.o
   type=0 - Temic PAL (4002 FH5)
   type=1 - Philips PAL_I (FI1246 and compatibles)
-  type=2 - Philips NTSC (FI1236 and compatibles)
+  type=2 - Philips NTSC (FI1236,FM1236 and compatibles)
   type=3 - Philips (SECAM+PAL_BG) (FI1216MF, FM1216MF, FR1216MF)
   type=4 - NoTuner
   type=5 - Philips PAL_BG (FI1216 and compatibles)

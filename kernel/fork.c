@@ -752,12 +752,12 @@ asmlinkage long sys_set_tid_address(int __user *tidptr)
  * parts of the process environment (as per the clone
  * flags). The actual kick-off is left to the caller.
  */
-static struct task_struct *copy_process(unsigned long clone_flags,
-			    unsigned long stack_start,
-			    struct pt_regs *regs,
-			    unsigned long stack_size,
-			    int __user *parent_tidptr,
-			    int __user *child_tidptr)
+struct task_struct *copy_process(unsigned long clone_flags,
+				 unsigned long stack_start,
+				 struct pt_regs *regs,
+				 unsigned long stack_size,
+				 int __user *parent_tidptr,
+				 int __user *child_tidptr)
 {
 	int retval;
 	struct task_struct *p = NULL;
@@ -1067,15 +1067,16 @@ static inline int fork_traceflag (unsigned clone_flags)
  * It copies the process, and if successful kick-starts
  * it and waits for it to finish using the VM if required.
  */
-struct task_struct *do_fork(unsigned long clone_flags,
-			    unsigned long stack_start,
-			    struct pt_regs *regs,
-			    unsigned long stack_size,
-			    int __user *parent_tidptr,
-			    int __user *child_tidptr)
+long do_fork(unsigned long clone_flags,
+	      unsigned long stack_start,
+	      struct pt_regs *regs,
+	      unsigned long stack_size,
+	      int __user *parent_tidptr,
+	      int __user *child_tidptr)
 {
 	struct task_struct *p;
 	int trace = 0;
+	long pid;
 
 	if (unlikely(current->ptrace)) {
 		trace = fork_traceflag (clone_flags);
@@ -1084,6 +1085,12 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	}
 
 	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr);
+	/*
+	 * Do this prior waking up the new thread - the thread pointer
+	 * might get invalid after that point, if the thread exits quickly.
+	 */
+	pid = IS_ERR(p) ? PTR_ERR(p) : p->pid;
+
 	if (!IS_ERR(p)) {
 		struct completion vfork;
 
@@ -1104,7 +1111,7 @@ struct task_struct *do_fork(unsigned long clone_flags,
 		++total_forks;
 
 		if (unlikely (trace)) {
-			current->ptrace_message = (unsigned long) p->pid;
+			current->ptrace_message = pid;
 			ptrace_notify ((trace << 8) | SIGTRAP);
 		}
 
@@ -1119,7 +1126,7 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			 */
 			set_need_resched();
 	}
-	return p;
+	return pid;
 }
 
 /* SLAB cache for signal_struct structures (tsk->signal) */

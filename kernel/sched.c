@@ -340,10 +340,9 @@ static inline void __activate_task(task_t *p, runqueue_t *rq)
  * Update all the scheduling statistics stuff. (sleep average
  * calculation, priority modifiers, etc.)
  */
-static inline int activate_task(task_t *p, runqueue_t *rq)
+static inline void activate_task(task_t *p, runqueue_t *rq)
 {
 	long sleep_time = jiffies - p->last_run - 1;
-	int requeue_waker = 0;
 
 	if (sleep_time > 0) {
 		int sleep_avg;
@@ -372,8 +371,6 @@ static inline int activate_task(task_t *p, runqueue_t *rq)
 		}
 	}
 	__activate_task(p, rq);
-
-	return requeue_waker;
 }
 
 /*
@@ -454,27 +451,12 @@ repeat:
 }
 #endif
 
-/*
- * kick_if_running - kick the remote CPU if the task is running currently.
- *
- * This code is used by the signal code to signal tasks
- * which are in user-mode, as quickly as possible.
- *
- * (Note that we do this lockless - if the task does anything
- * while the message is in flight then it will notice the
- * sigpending condition anyway.)
- */
-void kick_if_running(task_t * p)
-{
-	if ((task_running(task_rq(p), p)) && (task_cpu(p) != smp_processor_id()))
-		resched_task(p);
-}
-
 /***
  * try_to_wake_up - wake up a thread
  * @p: the to-be-woken-up thread
  * @state: the mask of task states that can be woken
  * @sync: do a synchronous wakeup?
+ * @kick: kick the CPU if the task is already running?
  *
  * Put it on the run-queue if it's not already there. The "current"
  * thread is always on the run-queue (except when the actual
@@ -484,10 +466,10 @@ void kick_if_running(task_t * p)
  *
  * returns failure only if the task is already active.
  */
-static int try_to_wake_up(task_t * p, unsigned int state, int sync)
+static int try_to_wake_up(task_t * p, unsigned int state, int sync, int kick)
 {
-	int success = 0, requeue_waker = 0;
 	unsigned long flags;
+	int success = 0;
 	long old_state;
 	runqueue_t *rq;
 
@@ -513,42 +495,34 @@ repeat_lock_task:
 			if (sync)
 				__activate_task(p, rq);
 			else {
-				requeue_waker = activate_task(p, rq);
+				activate_task(p, rq);
 				if (p->prio < rq->curr->prio)
 					resched_task(rq->curr);
 			}
 			success = 1;
-		}
+		} else
+			if (unlikely(kick) && task_running(rq, p))
+				resched_task(rq->curr);
 		p->state = TASK_RUNNING;
 	}
 	task_rq_unlock(rq, &flags);
-
-	/*
-	 * We have to do this outside the other spinlock, the two
-	 * runqueues might be different:
-	 */
-	if (requeue_waker) {
-		prio_array_t *array;
-
-		rq = task_rq_lock(current, &flags);
-		array = current->array;
-		dequeue_task(current, array);
-		current->prio = effective_prio(current);
-		enqueue_task(current, array);
-		task_rq_unlock(rq, &flags);
-	}
 
 	return success;
 }
 
 int wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
+	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 0);
+}
+
+int wake_up_process_kick(task_t * p)
+{
+	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 1);
 }
 
 int wake_up_state(task_t *p, unsigned int state)
 {
-	return try_to_wake_up(p, state, 0);
+	return try_to_wake_up(p, state, 0, 0);
 }
 
 /*
@@ -1206,7 +1180,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
 		set_tsk_need_resched(p);
-		return;
+		goto out;
 	}
 	spin_lock(&rq->lock);
 	/*
@@ -1233,7 +1207,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			dequeue_task(p, rq->active);
 			enqueue_task(p, rq->active);
 		}
-		goto out;
+		goto out_unlock;
 	}
 	if (!--p->time_slice) {
 		dequeue_task(p, rq->active);
@@ -1249,8 +1223,9 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 		} else
 			enqueue_task(p, rq->active);
 	}
-out:
+out_unlock:
 	spin_unlock(&rq->lock);
+out:
 	rebalance_tick(rq, 0);
 }
 
@@ -1389,7 +1364,7 @@ need_resched:
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
 {
 	task_t *p = curr->task;
-	return try_to_wake_up(p, mode, sync);
+	return try_to_wake_up(p, mode, sync, 0);
 }
 
 /*
@@ -1440,8 +1415,6 @@ void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
 	__wake_up_common(q, mode, 1, 0);
 }
 
-#ifdef CONFIG_SMP
-
 /**
  * __wake_up - sync- wake up threads blocked on a waitqueue.
  * @q: the waitqueue
@@ -1452,6 +1425,8 @@ void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
  * away soon, so while the target thread will be woken up, it will not
  * be migrated to another CPU - ie. the two threads are 'synchronized'
  * with each other. This can prevent needless bouncing between CPUs.
+ *
+ * On UP it can prevent extra preemption.
  */
 void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
@@ -1467,8 +1442,6 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 		__wake_up_common(q, mode, nr_exclusive, 0);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
-
-#endif
 
 void complete(struct completion *x)
 {

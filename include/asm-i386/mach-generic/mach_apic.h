@@ -26,5 +26,6 @@
 #define check_apicid_used (genapic->check_apicid_used)
 #define GET_APIC_ID (genapic->get_apic_id)
 #define APIC_ID_MASK (genapic->apic_id_mask)
+#define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
 
 #endif /* __ASM_MACH_APIC_H */

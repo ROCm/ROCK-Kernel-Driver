@@ -52,8 +52,9 @@ static int buffer_activate(struct saa7134_dev *dev,
 {
 	u32 control;
 	
-	dprintk("buffer_activate [%p]\n",buf);
+	dprintk("buffer_activate [%p]",buf);
 	buf->vb.state = STATE_ACTIVE;
+	buf->top_seen = 0;
 	
         /* dma: setup channel 5 (= TS) */
         control = SAA7134_RS_CONTROL_BURST_16 |
@@ -63,11 +64,11 @@ static int buffer_activate(struct saa7134_dev *dev,
 	if (NULL == next)
 		next = buf;
 	if (V4L2_FIELD_TOP == buf->vb.field) {
-		dprintk("[top]     buf=%p next=%p",buf,next);
+		dprintk("- [top]     buf=%p next=%p\n",buf,next);
 		saa_writel(SAA7134_RS_BA1(5),saa7134_buffer_base(buf));
 		saa_writel(SAA7134_RS_BA2(5),saa7134_buffer_base(next));
 	} else {
-		dprintk("[bottom]  buf=%p next=%p",buf,next);
+		dprintk("- [bottom]  buf=%p next=%p\n",buf,next);
 		saa_writel(SAA7134_RS_BA1(5),saa7134_buffer_base(next));
 		saa_writel(SAA7134_RS_BA2(5),saa7134_buffer_base(buf));
 	}
@@ -86,8 +87,11 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 {
 	struct saa7134_dev *dev = file->private_data;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
-	int lines, llength, size, err;
+	unsigned int lines, llength, size;
+	int err;
 	
+	dprintk("buffer_prepare [%p,%s]\n",buf,v4l2_field_names[field]);
+
 	llength = TS_PACKET_SIZE;
 	lines = TS_NR_PACKETS;
 	
@@ -116,7 +120,6 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 			goto oops;
 	}
 	buf->vb.state = STATE_PREPARED;
-	buf->top_seen = 0;
 	buf->activate = buffer_activate;
 	buf->vb.field = field;
 	return 0;
@@ -163,7 +166,7 @@ static struct videobuf_queue_ops ts_qops = {
 
 static int ts_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct saa7134_dev *h,*dev = NULL;
 	struct list_head *list;
 	int err;
@@ -414,6 +417,7 @@ int saa7134_ts_init(struct saa7134_dev *dev)
 	dev->ts_q.timeout.function = saa7134_buffer_timeout;
 	dev->ts_q.timeout.data     = (unsigned long)(&dev->ts_q);
 	dev->ts_q.dev              = dev;
+	dev->ts_q.need_two         = 1;
 	videobuf_queue_init(&dev->ts.ts, &ts_qops, dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VIDEO_CAPTURE,
 			    V4L2_FIELD_ALTERNATE,
@@ -445,7 +449,7 @@ void saa7134_irq_ts_done(struct saa7134_dev *dev, unsigned long status)
 
 	spin_lock(&dev->slock);
 	if (dev->ts_q.curr) {
-		field = dev->video_q.curr->vb.field;
+		field = dev->ts_q.curr->vb.field;
 		if (field == V4L2_FIELD_TOP) {
 			if ((status & 0x100000) != 0x100000)
 				goto done;

@@ -32,7 +32,6 @@ void hpsb_iso_shutdown(struct hpsb_iso *iso)
 	}
 
 	dma_region_free(&iso->data_buf);
-	kfree(iso->infos);
 	kfree(iso);
 }
 
@@ -70,14 +69,11 @@ static struct hpsb_iso* hpsb_iso_common_init(struct hpsb_host *host, enum hpsb_i
 
 	/* allocate and write the struct hpsb_iso */
 
-	iso = kmalloc(sizeof(*iso), SLAB_KERNEL);
+	iso = kmalloc(sizeof(*iso) + buf_packets * sizeof(struct hpsb_iso_packet_info), GFP_KERNEL);
 	if(!iso)
 		return NULL;
 
-	/* allocate ringbuffer of packet descriptors */
-	iso->infos = kmalloc(buf_packets * sizeof(struct hpsb_iso_packet_info), SLAB_KERNEL);
-	if(!iso->infos)
-		return NULL;
+	iso->infos = (struct hpsb_iso_packet_info *)(iso + 1);
 
 	iso->type = type;
 	iso->host = host;

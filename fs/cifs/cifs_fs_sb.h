@@ -22,7 +22,7 @@ struct cifs_sb_info {
 	struct cifsTconInfo *tcon;	/* primary mount */
 	struct list_head nested_tcon_q;
 	struct nls_table *local_nls;
-    unsigned int rsize;
-    unsigned int wsize;
+	unsigned int rsize;
+	unsigned int wsize;
 };
 #endif				/* _CIFS_FS_SB_H */

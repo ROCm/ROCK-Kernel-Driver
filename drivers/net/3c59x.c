@@ -466,6 +466,9 @@ enum vortex_chips {
 	CH_3C920,
 	CH_3C982A,
 	CH_3C982B,
+
+	CH_905BT4,
+	CH_920B_EMB_WNM,
 };
 
 
@@ -565,6 +568,11 @@ static struct vortex_chip_info {
 	{"3c982 Hydra Dual Port B",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_TORNADO|HAS_HWCKSM|HAS_NWAY, 128, },
 
+	{"3c905B-T4",
+	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_NWAY|HAS_HWCKSM|EXTRA_PREAMBLE, 128, },
+	{"3c920B-EMB-WNM Tornado",
+	 PCI_USES_IO|PCI_USES_MASTER, IS_TORNADO|HAS_NWAY|HAS_HWCKSM, 128, },
+
 	{0,}, /* 0 terminated list. */
 };
 
@@ -611,6 +619,10 @@ static struct pci_device_id vortex_pci_tbl[] __devinitdata = {
 	{ 0x10B7, 0x9201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3C920 },
 	{ 0x10B7, 0x1201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3C982A },
 	{ 0x10B7, 0x1202, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3C982B },
+
+	{ 0x10B7, 0x9056, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_905BT4 },
+	{ 0x10B7, 0x9210, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_920B_EMB_WNM },
+
 	{0,}						/* 0 terminated list. */
 };
 MODULE_DEVICE_TABLE(pci, vortex_pci_tbl);
@@ -2321,7 +2333,6 @@ boomerang_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	long ioaddr;
 	int status;
 	int work_done = max_interrupt_work;
-	int handled;
 
 	ioaddr = dev->base_addr;
 
@@ -2336,18 +2347,14 @@ boomerang_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (vortex_debug > 6)
 		printk(KERN_DEBUG "boomerang_interrupt. status=0x%4x\n", status);
 
-	if ((status & IntLatch) == 0) {
-		handled = 0;
+	if ((status & IntLatch) == 0)
 		goto handler_exit;		/* No interrupt: shared IRQs can cause this */
-	}
 
 	if (status == 0xffff) {		/* h/w no longer present (hotplug)? */
 		if (vortex_debug > 1)
 			printk(KERN_DEBUG "boomerang_interrupt(1): status = 0xffff\n");
-		handled = 0;
 		goto handler_exit;
 	}
-	handled = 1;
 
 	if (status & IntReq) {
 		status |= vp->deferred;
@@ -2442,7 +2449,7 @@ boomerang_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			   dev->name, status);
 handler_exit:
 	spin_unlock(&vp->lock);
-	return IRQ_RETVAL(handled);
+	return IRQ_HANDLED;
 }
 
 static int vortex_rx(struct net_device *dev)

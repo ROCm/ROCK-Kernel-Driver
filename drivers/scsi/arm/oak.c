@@ -16,8 +16,8 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-#include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include "../scsi.h"
+#include "../hosts.h"
 
 #define AUTOSENSE
 /*#define PSEUDO_DMA*/
@@ -40,7 +40,7 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 #define BOARD_NORMAL	0
 #define BOARD_NCR53C400	1
 
-#include "../../scsi/NCR5380.h"
+#include "../NCR5380.h"
 
 #undef START_DMA_INITIATOR_RECEIVE_REG
 #define START_DMA_INITIATOR_RECEIVE_REG (7 + 128)
@@ -112,7 +112,7 @@ printk("reading %p len %d\n", addr, len);
 
 #undef STAT
 
-#include "../../scsi/NCR5380.c"
+#include "../NCR5380.c"
 
 static Scsi_Host_Template oakscsi_template = {
 	.module			= THIS_MODULE,

@@ -101,7 +101,8 @@ extern void xfs_blkdev_put(struct block_device *);
 extern struct pb_target *xfs_alloc_buftarg(struct block_device *);
 extern void xfs_relse_buftarg(struct pb_target *);
 extern void xfs_free_buftarg(struct pb_target *);
-
+extern void xfs_flush_buftarg(struct pb_target *);
+extern int xfs_readonly_buftarg(struct pb_target *);
 extern void xfs_setsize_buftarg(struct pb_target *, unsigned int, unsigned int);
 extern unsigned int xfs_getsize_buftarg(struct pb_target *);
 

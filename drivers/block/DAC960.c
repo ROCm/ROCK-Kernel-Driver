@@ -102,7 +102,7 @@ static int DAC960_ioctl(struct inode *inode, struct file *file,
 	int drive_nr = (int)disk->private_data;
 	struct hd_geometry g, *loc = (struct hd_geometry *)arg;
 
-	if (file->f_flags & O_NONBLOCK)
+	if (file && (file->f_flags & O_NONBLOCK))
 		return DAC960_UserIOCTL(inode, file, cmd, arg);
 
 	if (cmd != HDIO_GETGEO || !loc)

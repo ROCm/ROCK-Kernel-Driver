@@ -9,8 +9,14 @@
 #ifndef PCI_DEVICE_ID_PHILIPS_SAA7130
 # define PCI_DEVICE_ID_PHILIPS_SAA7130 0x7130
 #endif
+#ifndef PCI_DEVICE_ID_PHILIPS_SAA7133
+# define PCI_DEVICE_ID_PHILIPS_SAA7133 0x7133
+#endif
 #ifndef PCI_DEVICE_ID_PHILIPS_SAA7134
 # define PCI_DEVICE_ID_PHILIPS_SAA7134 0x7134
+#endif
+#ifndef PCI_DEVICE_ID_PHILIPS_SAA7135
+# define PCI_DEVICE_ID_PHILIPS_SAA7135 0x7135
 #endif
 
 /* ------------------------------------------------------------------ */
@@ -328,6 +334,13 @@
 
 /* test modes */
 #define SAA7134_SPECIAL_MODE                    0x1d0
+
+/* audio -- saa7133 + saa7135 only */
+#define SAA7135_DSP_RWSTATE                     0x580
+#define SAA7135_DSP_RWSTATE_ERR                 (1 << 3)
+#define SAA7135_DSP_RWSTATE_IDA                 (1 << 2)
+#define SAA7135_DSP_RWSTATE_RDB                 (1 << 1)
+#define SAA7135_DSP_RWSTATE_WRR                 (1 << 0)
 
 /* ------------------------------------------------------------------ */
 /*

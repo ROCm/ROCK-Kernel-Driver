@@ -114,7 +114,7 @@ obj-$(CONFIG_SCSI_CPQFCTS)	+= cpqfc.o
 obj-$(CONFIG_SCSI_LASI700)	+= lasi700.o 53c700.o
 obj-$(CONFIG_SCSI_NSP32)	+= nsp32.o
 
-obj-$(CONFIG_ARCH_ACORN)	+= ../acorn/scsi/
+obj-$(CONFIG_ARM)		+= arm/
 
 obj-$(CONFIG_CHR_DEV_ST)	+= st.o
 obj-$(CONFIG_CHR_DEV_OSST)	+= osst.o

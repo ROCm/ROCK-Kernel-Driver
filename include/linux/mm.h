@@ -218,7 +218,7 @@ struct page {
  */
 #define put_page_testzero(p)				\
 	({						\
-		BUG_ON(page_count(page) == 0);		\
+		BUG_ON(page_count(p) == 0);		\
 		atomic_dec_and_test(&(p)->count);	\
 	})
 

@@ -16,8 +16,8 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 
-#include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include "../scsi.h"
+#include "../hosts.h"
 
 #include <scsi/scsicam.h>
 
@@ -41,7 +41,7 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 #define BOARD_NORMAL	0
 #define BOARD_NCR53C400	1
 
-#include "../../scsi/NCR5380.h"
+#include "../NCR5380.h"
 
 void cumanascsi_setup(char *str, int *ints)
 {
@@ -239,7 +239,7 @@ static void cumanascsi_write(struct Scsi_Host *instance, int reg, int value)
 
 #undef CTRL
 
-#include "../../scsi/NCR5380.c"
+#include "../NCR5380.c"
 
 static Scsi_Host_Template cumanascsi_template = {
 	.module			= THIS_MODULE,

@@ -362,21 +362,33 @@ videobuf_queue_is_busy(struct videobuf_queue *q)
 {
 	int i;
 	
-	if (q->reading)
+	if (q->streaming) {
+		dprintk(1,"busy: streaming active\n");
 		return 1;
-	if (q->streaming)
+	}
+	if (q->reading) {
+		dprintk(1,"busy: pending read #1\n");
 		return 1;
-	if (q->read_buf)
+	}
+	if (q->read_buf) {
+		dprintk(1,"busy: pending read #2\n");
 		return 1;
+	}
 	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
 		if (NULL == q->bufs[i])
 			continue;
-		if (q->bufs[i]->map)
+		if (q->bufs[i]->map) {
+			dprintk(1,"busy: buffer #%d mapped\n",i);
 			return 1;
-		if (q->bufs[i]->state == STATE_QUEUED)
+		}
+		if (q->bufs[i]->state == STATE_QUEUED) {
+			dprintk(1,"busy: buffer #%d queued\n",i);
 			return 1;
-		if (q->bufs[i]->state == STATE_ACTIVE)
+		}
+		if (q->bufs[i]->state == STATE_ACTIVE) {
+			dprintk(1,"busy: buffer #%d avtive\n",i);
 			return 1;
+		}
 	}
 	return 0;
 }
@@ -569,7 +581,7 @@ videobuf_dqbuf(struct file *file, struct videobuf_queue *q,
 	if (list_empty(&q->stream))
 		goto done;
 	buf = list_entry(q->stream.next, struct videobuf_buffer, stream);
-	retval = videobuf_waiton(buf,1,1);
+	retval = videobuf_waiton(buf, file->f_flags & O_NONBLOCK, 1);
 	if (retval < 0)
 		goto done;
 	switch (buf->state) {
@@ -925,6 +937,9 @@ static void
 videobuf_vm_open(struct vm_area_struct *vma)
 {
 	struct videobuf_mapping *map = vma->vm_private_data;
+
+	dprintk(2,"vm_open %p [count=%d,vma=%08lx-%08lx]\n",map,
+		map->count,vma->vm_start,vma->vm_end);
 	map->count++;
 }
 
@@ -933,6 +948,9 @@ videobuf_vm_close(struct vm_area_struct *vma)
 {
 	struct videobuf_mapping *map = vma->vm_private_data;
 	int i;
+
+	dprintk(2,"vm_close %p [count=%d,vma=%08lx-%08lx]\n",map,
+		map->count,vma->vm_start,vma->vm_end);
 
 	/* down(&fh->lock); FIXME */
 	map->count--;
@@ -1081,11 +1099,11 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 		q->bufs[i]->map   = map;
 		q->bufs[i]->baddr = vma->vm_start + size;
 	}
-	map->count   = 1;
-	map->start   = vma->vm_start;
-	map->end     = vma->vm_end;
-	map->q       = q;
-	vma->vm_ops  = &videobuf_vm_ops;
+	map->count    = 1;
+	map->start    = vma->vm_start;
+	map->end      = vma->vm_end;
+	map->q        = q;
+	vma->vm_ops   = &videobuf_vm_ops;
 	vma->vm_flags |= VM_DONTEXPAND;
 	vma->vm_flags &= ~VM_IO; /* using shared anonymous pages */
 	vma->vm_private_data = map;
@@ -1119,6 +1137,7 @@ EXPORT_SYMBOL_GPL(videobuf_queue_init);
 EXPORT_SYMBOL_GPL(videobuf_queue_cancel);
 EXPORT_SYMBOL_GPL(videobuf_queue_is_busy);
 
+EXPORT_SYMBOL_GPL(videobuf_next_field);
 EXPORT_SYMBOL_GPL(videobuf_status);
 EXPORT_SYMBOL_GPL(videobuf_reqbufs);
 EXPORT_SYMBOL_GPL(videobuf_querybuf);

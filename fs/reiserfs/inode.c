@@ -14,6 +14,8 @@
 #include <linux/mpage.h>
 #include <linux/writeback.h>
 
+extern int reiserfs_default_io_size; /* default io size devuned in super.c */
+
 /* args for the create parameter of reiserfs_get_block */
 #define GET_BLOCK_NO_CREATE 0 /* don't create new blocks or convert tails */
 #define GET_BLOCK_CREATE 1    /* add anything you need to find block */
@@ -766,7 +768,11 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	       pointer to 'block'-th block use block, which is already
 	       allocated */
 	    struct cpu_key tmp_key;
-	    struct unfm_nodeinfo un = {0, 0};
+	    unp_t unf_single=0; // We use this in case we need to allocate only
+				// one block which is a fastpath
+	    unp_t *un;
+	    __u64 max_to_insert=MAX_ITEM_LEN(inode->i_sb->s_blocksize)/UNFM_P_SIZE;
+	    __u64 blocks_needed;
 
 	    RFALSE( pos_in_item != ih_item_len(ih) / UNFM_P_SIZE,
 		    "vs-804: invalid position for append");
@@ -775,30 +781,58 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 			  le_key_k_offset (version, &(ih->ih_key)) + op_bytes_number (ih, inode->i_sb->s_blocksize),
 			  //pos_in_item * inode->i_sb->s_blocksize,
 			  TYPE_INDIRECT, 3);// key type is unimportant
-		  
-	    if (cpu_key_k_offset (&tmp_key) == cpu_key_k_offset (&key)) {
+
+	    blocks_needed = 1 + ((cpu_key_k_offset (&key) - cpu_key_k_offset (&tmp_key)) >> inode->i_sb->s_blocksize_bits);
+	    RFALSE( blocks_needed < 0, "green-805: invalid offset");
+
+	    if ( blocks_needed == 1 ) {
+		un = &unf_single;
+	    } else {
+		un=kmalloc( min(blocks_needed,max_to_insert)*UNFM_P_SIZE,
+			    GFP_ATOMIC); // We need to avoid scheduling.
+		if ( !un) {
+		    un = &unf_single;
+		    blocks_needed = 1;
+		    max_to_insert = 0;
+		} else
+		    memset(un, 0, UNFM_P_SIZE * min(blocks_needed,max_to_insert));
+	    }
+	    if ( blocks_needed <= max_to_insert) {
 		/* we are going to add target block to the file. Use allocated
 		   block for that */
-		un.unfm_nodenum = cpu_to_le32 (allocated_block_nr);
+		un[blocks_needed-1] = cpu_to_le32 (allocated_block_nr);
 		set_block_dev_mapped (bh_result, allocated_block_nr, inode);
 		set_buffer_new(bh_result);
 		done = 1;
 	    } else {
 		/* paste hole to the indirect item */
+		/* If kmalloc failed, max_to_insert becomes zero and it means we
+		   only have space for one block */
+		blocks_needed=max_to_insert?max_to_insert:1;
 	    }
-	    retval = reiserfs_paste_into_item (&th, &path, &tmp_key, (char *)&un, UNFM_P_SIZE);
+	    retval = reiserfs_paste_into_item (&th, &path, &tmp_key, (char *)un, UNFM_P_SIZE * blocks_needed);
+
+	    if (blocks_needed != 1)
+		kfree(un);
+
 	    if (retval) {
 		reiserfs_free_block (&th, allocated_block_nr);
 		goto failure;
 	    }
-	    if (un.unfm_nodenum)
+	    if (done) {
 		inode->i_blocks += inode->i_sb->s_blocksize / 512;
+	    } else {
+		/* We need to mark new file size in case this function will be
+		   interrupted/aborted later on. And we may do this only for
+		   holes. */
+		inode->i_size += inode->i_sb->s_blocksize * blocks_needed;
+	    }
 	    //mark_tail_converted (inode);
 	}
-		
+
 	if (done == 1)
 	    break;
-	 
+
 	/* this loop could log more blocks than we had originally asked
 	** for.  So, we have to allow the transaction to end if it is
 	** too big or too full.  Update the inode so things are 
@@ -876,7 +910,7 @@ static void init_inode (struct inode * inode, struct path * path)
 
 
     copy_key (INODE_PKEY (inode), &(ih->ih_key));
-    inode->i_blksize = PAGE_SIZE;
+    inode->i_blksize = reiserfs_default_io_size;
 
     INIT_LIST_HEAD(&(REISERFS_I(inode)->i_prealloc_list ));
     REISERFS_I(inode)->i_flags = 0;
@@ -1566,7 +1600,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     }
     // these do not go to on-disk stat data
     inode->i_ino = le32_to_cpu (ih.ih_key.k_objectid);
-    inode->i_blksize = PAGE_SIZE;
+    inode->i_blksize = reiserfs_default_io_size;
   
     // store in in-core inode the key of stat data and version all
     // object items will have (directory items will have old offset

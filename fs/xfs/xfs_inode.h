@@ -243,6 +243,7 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
 	struct xfs_inode	**i_prevp;	/* ptr to prev i_next */
 	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
+	struct list_head	i_reclaim;	/* reclaim list */
 	struct bhv_desc		i_bhv_desc;	/* inode behavior descriptor*/
 	struct xfs_dquot	*i_udquot;	/* user dquot */
 	struct xfs_dquot	*i_gdquot;	/* group dquot */
@@ -477,7 +478,7 @@ void		xfs_iunlock_map_shared(xfs_inode_t *, uint);
 void		xfs_ifunlock(xfs_inode_t *);
 void		xfs_ireclaim(xfs_inode_t *);
 int		xfs_finish_reclaim(xfs_inode_t *, int, int);
-int		xfs_finish_reclaim_all(struct xfs_mount *);
+int		xfs_finish_reclaim_all(struct xfs_mount *, int);
 
 /*
  * xfs_inode.c prototypes.

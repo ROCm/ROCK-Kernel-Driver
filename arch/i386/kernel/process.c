@@ -212,7 +212,6 @@ __asm__(".align 4\n"
  */
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
-	struct task_struct *p;
 	struct pt_regs regs;
 
 	memset(&regs, 0, sizeof(regs));
@@ -228,8 +227,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.eflags = 0x286;
 
 	/* Ok, create the new process.. */
-	p = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
 
 /*
@@ -518,15 +516,11 @@ struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct 
 
 asmlinkage int sys_fork(struct pt_regs regs)
 {
-	struct task_struct *p;
-
-	p = do_fork(SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
 }
 
 asmlinkage int sys_clone(struct pt_regs regs)
 {
-	struct task_struct *p;
 	unsigned long clone_flags;
 	unsigned long newsp;
 	int __user *parent_tidptr, *child_tidptr;
@@ -537,8 +531,7 @@ asmlinkage int sys_clone(struct pt_regs regs)
 	child_tidptr = (int __user *)regs.edi;
 	if (!newsp)
 		newsp = regs.esp;
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, parent_tidptr, child_tidptr);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, parent_tidptr, child_tidptr);
 }
 
 /*
@@ -553,10 +546,7 @@ asmlinkage int sys_clone(struct pt_regs regs)
  */
 asmlinkage int sys_vfork(struct pt_regs regs)
 {
-	struct task_struct *p;
-
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
 }
 
 /*

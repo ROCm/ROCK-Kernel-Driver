@@ -1071,7 +1071,7 @@ static void disable_comm (sdla_t *card)
 		card->tty=NULL;
 		tty_card_map[card->tty_minor]=NULL;
 		state = &rs_table[card->tty_minor];
-		memset(state,0,sizeof(state));
+		memset(state, 0, sizeof(*state));
 	}
 	return;
 }

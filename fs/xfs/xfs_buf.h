@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -283,7 +283,6 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 	return error;
 }
 
-
 #define XFS_bdwrite(pb)		     \
 	    pagebuf_iostart(pb, PBF_DELWRI | PBF_ASYNC)
 
@@ -307,15 +306,15 @@ static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
  * of its metadata.
  */
 
-extern void XFS_bflush(xfs_buftarg_t *);
-#define xfs_binval(buftarg) XFS_bflush(buftarg)
+#define xfs_binval(buftarg)	xfs_flush_buftarg(buftarg)
+
+#define XFS_bflush(buftarg)	xfs_flush_buftarg(buftarg)
 
 #define xfs_incore_relse(buftarg,delwri_only,wait)	\
 	xfs_relse_buftarg(buftarg)
 
 #define xfs_baread(target, rablkno, ralen)  \
-	pagebuf_readahead((target), (rablkno), \
-			  (ralen), PBF_DONT_BLOCK)
+	pagebuf_readahead((target), (rablkno), (ralen), PBF_DONT_BLOCK)
 
 #define XFS_getrbuf(sleep,mp)	\
 	pagebuf_get_empty((mp)->m_ddev_targp)
