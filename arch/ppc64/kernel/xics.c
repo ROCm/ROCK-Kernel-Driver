@@ -84,7 +84,7 @@ struct xics_info	xics_info;
 unsigned long long intr_base = 0;
 int xics_irq_8259_cascade = 0;
 int xics_irq_8259_cascade_real = 0;
-unsigned int default_server = 0;
+unsigned int default_server = 0xFF;
 unsigned int default_distrib_server = 0;
 
 /* RTAS service tokens */
@@ -197,9 +197,7 @@ xics_end_irq(
 }
 
 void
-xics_mask_and_ack_irq(
-	u_int	irq
-	)
+xics_mask_and_ack_irq(u_int	irq)
 {
 	int cpu = smp_processor_id();
 
