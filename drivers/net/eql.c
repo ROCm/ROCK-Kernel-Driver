@@ -607,7 +607,7 @@ static int __init eql_init_module(void)
 static void __exit eql_cleanup_module(void)
 {
 	unregister_netdev(dev_eql);
-	kfree(dev_eql);
+	free_netdev(dev_eql);
 }
 
 module_init(eql_init_module);

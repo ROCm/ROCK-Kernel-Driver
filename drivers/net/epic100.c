@@ -1482,7 +1482,7 @@ static void __devexit epic_remove_one (struct pci_dev *pdev)
 	iounmap((void*) dev->base_addr);
 #endif
 	pci_release_regions(pdev);
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 	/* pci_power_off(pdev, -1); */
 }

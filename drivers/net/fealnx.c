@@ -712,7 +712,7 @@ static void __devexit fealnx_remove_one(struct pci_dev *pdev)
 #ifndef USE_IO_OPS
 		iounmap((void *)dev->base_addr);
 #endif
-		kfree(dev);
+		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_set_drvdata(pdev, NULL);
 	} else

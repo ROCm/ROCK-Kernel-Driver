@@ -864,7 +864,7 @@ static void __exit lane_module_cleanup(void)
                 if (dev_lec[i] != NULL) {
                         priv = (struct lec_priv *)dev_lec[i]->priv;
 			unregister_netdev(dev_lec[i]);
-                        kfree(dev_lec[i]);
+                        free_netdev(dev_lec[i]);
                         dev_lec[i] = NULL;
                 }
         }

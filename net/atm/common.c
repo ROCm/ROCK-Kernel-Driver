@@ -545,9 +545,6 @@ int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
         if (error)
                 return error;
         sock_recv_timestamp(msg, sk, skb);
-        if (vcc->dev->ops->feedback)
-                vcc->dev->ops->feedback(vcc, skb, (unsigned long) skb->data,
-                    (unsigned long) msg->msg_iov->iov_base, copied);
         DPRINTK("RcvM %d -= %d\n", atomic_read(&vcc->sk->rmem_alloc), skb->truesize);
         atm_return(vcc, skb->truesize);
         skb_free_datagram(sk, skb);

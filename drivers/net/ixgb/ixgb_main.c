@@ -478,7 +478,7 @@ ixgb_remove(struct pci_dev *pdev)
 	iounmap((void *) adapter->hw.hw_addr);
 	pci_release_regions(pdev);
 
-	kfree(netdev);
+	free_netdev(netdev);
 }
 
 /**

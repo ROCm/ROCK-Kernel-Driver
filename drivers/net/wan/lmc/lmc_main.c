@@ -1913,7 +1913,7 @@ static void __exit exit_lmc(void)
         kfree (dev->priv);
         dev->priv = NULL;
 
-        kfree ((struct ppp_device *) dev);
+        free_netdev (dev);
         dev = NULL;
     }
 

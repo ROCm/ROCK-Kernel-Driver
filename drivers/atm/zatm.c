@@ -307,37 +307,6 @@ static void unuse_pool(struct atm_dev *dev,int pool)
 		drain_free(dev,pool);
 }
 
-
-static void zatm_feedback(struct atm_vcc *vcc,struct sk_buff *skb,
-    unsigned long start,unsigned long dest,int len)
-{
-	struct zatm_pool_info *pool;
-	unsigned long offset,flags;
-	struct zatm_dev *zatm_dev = ZATM_DEV(vcc->dev);
-
-	DPRINTK("start 0x%08lx dest 0x%08lx len %d\n",start,dest,len);
-	if (len < PAGE_SIZE) return;
-	pool = &zatm_dev->pool_info[ZATM_VCC(vcc)->pool];
-	offset = (dest-start) & (PAGE_SIZE-1);
-	spin_lock_irqsave(&zatm_dev->lock, flags);
-	if (!offset || pool->offset == offset) {
-		pool->next_cnt = 0;
-		spin_unlock_irqrestore(&zatm_dev->lock, flags);
-		return;
-	}
-	if (offset != pool->next_off) {
-		pool->next_off = offset;
-		pool->next_cnt = 0;
-		spin_unlock_irqrestore(&zatm_dev->lock, flags);
-		return;
-	}
-	if (++pool->next_cnt >= pool->next_thres) {
-		pool->offset = pool->next_off;
-		pool->next_cnt = 0;
-	}
-	spin_unlock_irqrestore(&zatm_dev->lock, flags);
-}
-
 /*----------------------------------- RX ------------------------------------*/
 
 
@@ -1548,17 +1517,6 @@ static int zatm_setsockopt(struct atm_vcc *vcc,int level,int optname,
 	return -EINVAL;
 }
 
-
-#if 0
-static int zatm_sg_send(struct atm_vcc *vcc,unsigned long start,
-    unsigned long size)
-{
-	return vcc->aal == ATM_AAL5;
-	   /* @@@ should check size and maybe alignment*/
-}
-#endif
-
-
 static int zatm_send(struct atm_vcc *vcc,struct sk_buff *skb)
 {
 	int error;
@@ -1615,10 +1573,8 @@ static const struct atmdev_ops ops = {
 	.getsockopt	= zatm_getsockopt,
 	.setsockopt	= zatm_setsockopt,
 	.send		= zatm_send,
-	/*zatm_sg_send*/
 	.phy_put	= zatm_phy_put,
 	.phy_get	= zatm_phy_get,
-	.feedback	= zatm_feedback,
 	.change_qos	= zatm_change_qos,
 };
 

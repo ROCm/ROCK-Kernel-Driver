@@ -531,7 +531,7 @@ e1000_remove(struct pci_dev *pdev)
 	iounmap(adapter->hw.hw_addr);
 	pci_release_regions(pdev);
 
-	kfree(netdev);
+	free_netdev(netdev);
 }
 
 /**

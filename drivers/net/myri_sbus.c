@@ -1151,7 +1151,7 @@ static void __exit myri_sbus_cleanup(void)
 
 		unregister_netdev(root_myri_dev->dev);
 		/* this will also free the co-allocated 'root_myri_dev' */
-		kfree(root_myri_dev->dev);
+		free_netdev(root_myri_dev->dev);
 		root_myri_dev = next;
 	}
 #endif /* MODULE */

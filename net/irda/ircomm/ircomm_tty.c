@@ -117,6 +117,7 @@ int __init ircomm_tty_init(void)
 		return -ENOMEM;
 	}
 
+	driver->owner		= THIS_MODULE;
 	driver->driver_name     = "ircomm";
 	driver->name            = "ircomm";
 	driver->devfs_name      = "ircomm";
@@ -363,10 +364,8 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
-	MOD_INC_USE_COUNT;
 	line = tty->index;
 	if ((line < 0) || (line >= IRCOMM_TTY_PORTS)) {
-		MOD_DEC_USE_COUNT;
 		return -ENODEV;
 	}
 
@@ -377,7 +376,6 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 		self = kmalloc(sizeof(struct ircomm_tty_cb), GFP_KERNEL);
 		if (self == NULL) {
 			ERROR("%s(), kmalloc failed!\n", __FUNCTION__);
-			MOD_DEC_USE_COUNT;
 			return -ENOMEM;
 		}
 		memset(self, 0, sizeof(struct ircomm_tty_cb));
@@ -503,7 +501,6 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 	spin_lock_irqsave(&self->spinlock, flags);
 
 	if (tty_hung_up_p(filp)) {
-		MOD_DEC_USE_COUNT;
 		spin_unlock_irqrestore(&self->spinlock, flags);
 
 		IRDA_DEBUG(0, "%s(), returning 1\n", __FUNCTION__ );
@@ -530,7 +527,6 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 		self->open_count = 0;
 	}
 	if (self->open_count) {
-		MOD_DEC_USE_COUNT;
 		spin_unlock_irqrestore(&self->spinlock, flags);
 
 		IRDA_DEBUG(0, "%s(), open count > 0\n", __FUNCTION__ );
@@ -572,8 +568,6 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 
 	self->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&self->close_wait);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /*

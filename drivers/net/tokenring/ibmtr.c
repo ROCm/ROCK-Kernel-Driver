@@ -1975,7 +1975,7 @@ static void __exit ibmtr_cleanup(void)
 			iounmap((u32 *)ti->sram_virt);
 		}
 #endif		
-		kfree(dev_ibmtr[i]);
+		free_netdev(dev_ibmtr[i]);
 		dev_ibmtr[i] = NULL;
 	}
 }

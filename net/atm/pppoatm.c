@@ -132,7 +132,7 @@ static void pppoatm_unassign_vcc(struct atm_vcc *atmvcc)
 	atmvcc->user_back = NULL;
 	kfree(pvcc);
 	/* Gee, I hope we have the big kernel lock here... */
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 }
 
 /* Called when an AAL5 PDU comes in */
@@ -286,12 +286,9 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, unsigned long arg)
 	if (be.encaps != PPPOATM_ENCAPS_AUTODETECT &&
 	    be.encaps != PPPOATM_ENCAPS_VC && be.encaps != PPPOATM_ENCAPS_LLC)
 		return -EINVAL;
-	MOD_INC_USE_COUNT;
 	pvcc = kmalloc(sizeof(*pvcc), GFP_KERNEL);
-	if (pvcc == NULL) {
-		MOD_DEC_USE_COUNT;
+	if (pvcc == NULL)
 		return -ENOMEM;
-	}
 	memset(pvcc, 0, sizeof(*pvcc));
 	pvcc->atmvcc = atmvcc;
 	pvcc->old_push = atmvcc->push;
@@ -310,6 +307,7 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, unsigned long arg)
 	atmvcc->user_back = pvcc;
 	atmvcc->push = pppoatm_push;
 	atmvcc->pop = pppoatm_pop;
+	(void) try_module_get(THIS_MODULE);
 	return 0;
 }
 

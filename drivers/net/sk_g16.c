@@ -652,7 +652,7 @@ static void __exit SK_cleanup_module (void)
 			SK_dev->priv = NULL;
 		}
 		unregister_netdev(SK_dev);
-		kfree(SK_dev);
+		free_netdev(SK_dev);
 		SK_dev = NULL;
 	}
 	if (SK_ioaddr) {

@@ -4410,7 +4410,7 @@ void cleanup_module(void)
 
 		/* Free pieces. */
 		kfree(dev->priv);
-		kfree(dev);
+		free_netdev(dev);
 	}
 
 #ifdef DEBUG_MODULE_TRACE
