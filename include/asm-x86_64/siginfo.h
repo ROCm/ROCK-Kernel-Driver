@@ -3,6 +3,8 @@
 
 #define __ARCH_SI_PREAMBLE_SIZE	(4 * sizeof(int))
 
+#define __ARCH_SI_BAND_T long
+
 #include <asm-generic/siginfo.h>
 
 #endif
