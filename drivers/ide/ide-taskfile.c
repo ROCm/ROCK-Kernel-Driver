@@ -273,7 +273,7 @@ static u8 wait_drive_not_busy(ide_drive_t *drive)
 	return stat;
 }
 
-static void ide_pio_sector(ide_drive_t *drive, unsigned int write)
+void ide_pio_sector(ide_drive_t *drive, unsigned int write)
 {
 	ide_hwif_t *hwif = drive->hwif;
 	struct scatterlist *sg = hwif->sg_table;
@@ -310,7 +310,9 @@ static void ide_pio_sector(ide_drive_t *drive, unsigned int write)
 #endif
 }
 
-static void ide_pio_multi(ide_drive_t *drive, unsigned int write)
+EXPORT_SYMBOL_GPL(ide_pio_sector);
+
+void ide_pio_multi(ide_drive_t *drive, unsigned int write)
 {
 	unsigned int nsect;
 
@@ -318,6 +320,8 @@ static void ide_pio_multi(ide_drive_t *drive, unsigned int write)
 	while (nsect--)
 		ide_pio_sector(drive, write);
 }
+
+EXPORT_SYMBOL_GPL(ide_pio_multi);
 
 static inline void ide_pio_datablock(ide_drive_t *drive, struct request *rq,
 				     unsigned int write)
@@ -336,9 +340,8 @@ static inline void ide_pio_datablock(ide_drive_t *drive, struct request *rq,
 	}
 }
 
-#ifdef CONFIG_IDE_TASKFILE_IO
-static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
-				  const char *s, u8 stat)
+ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
+			   const char *s, u8 stat)
 {
 	if (rq->bio) {
 		ide_hwif_t *hwif = drive->hwif;
@@ -367,9 +370,8 @@ static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
 	}
 	return drive->driver->error(drive, s, stat);
 }
-#else
-# define task_error(d, rq, s, stat) drive->driver->error(d, s, stat)
-#endif
+
+EXPORT_SYMBOL_GPL(task_error);
 
 static void task_end_request(ide_drive_t *drive, struct request *rq, u8 stat)
 {

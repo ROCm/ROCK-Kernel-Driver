@@ -675,7 +675,7 @@ ide_startstop_t do_special (ide_drive_t *drive)
 
 EXPORT_SYMBOL(do_special);
 
-static void ide_map_sg(ide_drive_t *drive, struct request *rq)
+void ide_map_sg(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = drive->hwif;
 	struct scatterlist *sg = hwif->sg_table;
@@ -688,14 +688,14 @@ static void ide_map_sg(ide_drive_t *drive, struct request *rq)
 	}
 }
 
+EXPORT_SYMBOL_GPL(ide_map_sg);
+
 void ide_init_sg_cmd(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = drive->hwif;
 
 	hwif->nsect = hwif->nleft = rq->nr_sectors;
 	hwif->cursg = hwif->cursg_ofs = 0;
-
-	ide_map_sg(drive, rq);
 }
 
 EXPORT_SYMBOL_GPL(ide_init_sg_cmd);
@@ -729,6 +729,7 @@ ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
 		case TASKFILE_MULTI_IN:
 		case TASKFILE_IN:
 			ide_init_sg_cmd(drive, rq);
+			ide_map_sg(drive, rq);
 		default:
 			break;
 		}

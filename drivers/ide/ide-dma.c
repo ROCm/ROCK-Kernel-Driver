@@ -610,8 +610,10 @@ int ide_dma_setup(ide_drive_t *drive)
 		reading = 1 << 3;
 
 	/* fall back to pio! */
-	if (!ide_build_dmatable(drive, rq))
+	if (!ide_build_dmatable(drive, rq)) {
+		ide_map_sg(drive, rq);
 		return 1;
+	}
 
 	/* PRD table */
 	hwif->OUTL(hwif->dmatable_dma, hwif->dma_prdtable);

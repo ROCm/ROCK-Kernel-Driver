@@ -789,27 +789,6 @@ typedef struct ide_drive_s {
 	struct gendisk *disk;
 } ide_drive_t;
 
-/*
- * mapping stuff, prepare for highmem...
- * 
- * temporarily mapping a (possible) highmem bio for PIO transfer
- */
-#ifndef CONFIG_IDE_TASKFILE_IO
-
-#define ide_rq_offset(rq) \
-	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
-
-static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
-{
-	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-}
-
-static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
-{
-	bio_kunmap_irq(buffer, flags);
-}
-#endif /* !CONFIG_IDE_TASKFILE_IO */
-
 #define IDE_CHIPSET_PCI_MASK	\
     ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
 #define IDE_CHIPSET_IS_PCI(c)	((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
@@ -1375,6 +1354,11 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
+void ide_pio_sector(ide_drive_t *, unsigned int);
+void ide_pio_multi(ide_drive_t *, unsigned int);
+
+ide_startstop_t task_error(ide_drive_t *, struct request *, const char *, u8);
+
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);
 
@@ -1505,6 +1489,7 @@ typedef struct ide_pci_device_s {
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_device_t *);
 
+void ide_map_sg(ide_drive_t *, struct request *);
 void ide_init_sg_cmd(ide_drive_t *, struct request *);
 
 #define BAD_DMA_DRIVE		0

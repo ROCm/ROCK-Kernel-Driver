@@ -297,8 +297,10 @@ static int e100_dma_setup(ide_drive_t *drive)
 	}
 
 	/* set up the Etrax DMA descriptors */
-	if (e100_ide_build_dmatable(drive))
+	if (e100_ide_build_dmatable(drive)) {
+		ide_map_sg(drive, rq);
 		return 1;
+	}
 
 	return 0;
 }

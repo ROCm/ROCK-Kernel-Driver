@@ -577,6 +577,7 @@ static int sgiioc4_ide_dma_setup(ide_drive_t *drive)
 
 	if (!(count = sgiioc4_build_dma_table(drive, rq, ddir))) {
 		/* try PIO instead of DMA */
+		ide_map_sg(drive, rq);
 		return 1;
 	}
 

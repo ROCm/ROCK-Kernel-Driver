@@ -1885,8 +1885,10 @@ pmac_ide_dma_setup(ide_drive_t *drive)
 		return 1;
 	ata4 = (pmif->kind == controller_kl_ata4);	
 
-	if (!pmac_ide_build_dmatable(drive, rq))
+	if (!pmac_ide_build_dmatable(drive, rq)) {
+		ide_map_sg(drive, rq);
 		return 1;
+	}
 
 	/* Apple adds 60ns to wrDataSetup on reads */
 	if (ata4 && (pmif->timings[unit] & TR_66_UDMA_EN)) {
