@@ -312,13 +312,16 @@ nfs_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr *
 	return 0;
 }
 
-static void
-nfs_proc_unlink_done(struct dentry *dir, struct rpc_message *msg)
+static int
+nfs_proc_unlink_done(struct dentry *dir, struct rpc_task *task)
 {
+	struct rpc_message *msg = &task->tk_msg;
+	
 	if (msg->rpc_argp) {
 		NFS_CACHEINV(dir->d_inode);
 		kfree(msg->rpc_argp);
 	}
+	return 0;
 }
 
 static int
