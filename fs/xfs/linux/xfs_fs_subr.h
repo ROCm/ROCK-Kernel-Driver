@@ -42,7 +42,6 @@ extern int	fs_noerr(void);
 extern int	fs_nosys(void);
 extern int	fs_nodev(void);
 extern void	fs_noval(void);
-extern int	fs_dounmount(bhv_desc_t *, int, vnode_t *, struct cred *);
 extern void	fs_tosspages(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 extern void	fs_flushinval_pages(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 extern int	fs_flush_pages(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);

@@ -75,9 +75,6 @@ typedef struct vfsops {
 	int	(*vfs_mount)(struct vfs *, struct xfs_mount_args *,
 					struct cred *);
 					/* mount file system */
-	int	(*vfs_dounmount)(bhv_desc_t *, int, struct vnode *,
-				 struct cred *);
-					/* preparation and unmount */
 	int	(*vfs_unmount)(bhv_desc_t *, int, struct cred *);
 					/* unmount file system */
 	int	(*vfs_root)(bhv_desc_t *, struct vnode **);
@@ -98,12 +95,6 @@ typedef struct vfsops {
 					int, char *, int);
 } vfsops_t;
 
-#define VFS_DOUNMOUNT(vfsp,f,vp,cr, rv) \
-{	\
-	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
-	rv = (*(VFS_FOPS(vfsp)->vfs_dounmount))((vfsp)->vfs_fbhv, f, vp, cr);	\
-	BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
-}
 #define VFS_UNMOUNT(vfsp,f,cr, rv)	\
 {	\
 	BHV_READ_LOCK(&(vfsp)->vfs_bh); \
