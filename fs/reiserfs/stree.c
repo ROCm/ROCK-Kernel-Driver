@@ -126,19 +126,19 @@ inline int  comp_keys (const struct key * le_key, const struct cpu_key * cpu_key
   retval = comp_short_keys (le_key, cpu_key);
   if (retval)
       return retval;
-  if (le_key_k_offset (cpu_key->version, le_key) < cpu_key_k_offset (cpu_key))
+  if (le_key_k_offset (le_key_version(le_key), le_key) < cpu_key_k_offset (cpu_key))
       return -1;
-  if (le_key_k_offset (cpu_key->version, le_key) > cpu_key_k_offset (cpu_key))
+  if (le_key_k_offset (le_key_version(le_key), le_key) > cpu_key_k_offset (cpu_key))
       return 1;
 
   if (cpu_key->key_length == 3)
       return 0;
 
   /* this part is needed only when tail conversion is in progress */
-  if (le_key_k_type (cpu_key->version, le_key) < cpu_key_k_type (cpu_key))
+  if (le_key_k_type (le_key_version(le_key), le_key) < cpu_key_k_type (cpu_key))
     return -1;
 
-  if (le_key_k_type (cpu_key->version, le_key) > cpu_key_k_type (cpu_key))
+  if (le_key_k_type (le_key_version(le_key), le_key) > cpu_key_k_type (cpu_key))
     return 1;
 
   return 0;
