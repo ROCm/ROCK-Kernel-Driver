@@ -32,11 +32,11 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#include "rz1000.h"
 
-void __init ide_init_rz1000 (ide_hwif_t *hwif)	/* called from ide-pci.c */
+static void __init init_hwif_rz1000 (ide_hwif_t *hwif)
 {
-	unsigned short reg;
+	u16 reg;
 	struct pci_dev *dev = hwif->pci_dev;
 
 	hwif->chipset = ide_rz1000;
@@ -53,48 +53,28 @@ void __init ide_init_rz1000 (ide_hwif_t *hwif)	/* called from ide-pci.c */
 	}
 }
 
-#else
+extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_rz1000 (struct pci_dev *dev, const char *name)
+static void __init init_setup_rz1000 (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	unsigned short reg, h;
+	ide_setup_pci_device(dev, d);
+}
 
-	if (!pci_read_config_word (dev, PCI_COMMAND, &reg) &&
-	    !(reg & PCI_COMMAND_IO)) {
-		printk("%s: buggy IDE controller disabled (BIOS)\n", name);
-		return;
-	}
-	if (!pci_read_config_word (dev, 0x40, &reg) &&
-	    !pci_write_config_word(dev, 0x40, reg & 0xdfff)) {
-		printk("IDE: disabled chipset read-ahead (buggy %s)\n", name);
-	} else {
-		for (h = 0; h < MAX_HWIFS; ++h) {
-			ide_hwif_t *hwif = &ide_hwifs[h];
-			if ((hwif->io_ports[IDE_DATA_OFFSET] == 0x1f0 ||
-			     hwif->io_ports[IDE_DATA_OFFSET] == 0x170)  &&
-			    (hwif->chipset == ide_unknown ||
-			     hwif->chipset == ide_generic)) {
-				hwif->chipset = ide_rz1000;
-				hwif->serialized = 1;
-				hwif->drives[0].no_unmask = 1;
-				hwif->drives[1].no_unmask = 1;
-				if (hwif->io_ports[IDE_DATA_OFFSET] == 0x170)
-					hwif->channel = 1;
-				printk("%s: serialized, disabled unmasking "
-					"(buggy %s)\n", hwif->name, name);
-			}
+int __init rz1000_scan_pcidev (struct pci_dev *dev)
+{
+	ide_pci_device_t *d;
+
+	if (dev->vendor != PCI_VENDOR_ID_PCTECH)
+		return 0;
+
+	for (d = rz1000_chipsets; d && d->vendor && d->device; ++d) {
+		if (((d->vendor == dev->vendor) &&
+		     (d->device == dev->device)) &&
+		    (d->init_setup)) {
+			d->init_setup(dev, d);
+			return 1;
 		}
 	}
+	return 0;
 }
 
-void __init ide_probe_for_rz100x (void)	/* called from ide.c */
-{
-	struct pci_dev *dev = NULL;
-
-	while ((dev = pci_find_device(PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, dev))!=NULL)
-		init_rz1000 (dev, "RZ1000");
-	while ((dev = pci_find_device(PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1001, dev))!=NULL)
-		init_rz1000 (dev, "RZ1001");
-}
-
-#endif /* CONFIG_BLK_DEV_IDEPCI */
