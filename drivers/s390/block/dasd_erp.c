@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.11 $
+ * $Revision: 1.12 $
  */
 
 #include <linux/config.h>
@@ -77,8 +77,6 @@ dasd_free_erp_request(struct dasd_ccw_req * cqr, struct dasd_device * device)
 {
 	unsigned long flags;
 
-	if (cqr->dstat != NULL)
-		kfree(cqr->dstat);
 	debug_text_event(dasd_debug_area, 1, "FREE");
 	debug_int_event(dasd_debug_area, 1, (long) cqr);
 	spin_lock_irqsave(&device->mem_lock, flags);

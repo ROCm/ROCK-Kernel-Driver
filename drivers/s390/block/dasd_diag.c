@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.36 $
+ * $Revision: 1.37 $
  */
 
 #include <linux/config.h>
@@ -158,7 +158,7 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 	unsigned long long expires;
 	unsigned long flags;
 	char status;
-	int ip, cpu;
+	int ip;
 
 	/*
 	 * Get the external interruption subcode. VM stores
@@ -170,8 +170,6 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 		return;
 	status = *((char *) &S390_lowcore.ext_params + 5);
 	ip = S390_lowcore.ext_params;
-
-	cpu = smp_processor_id();
 
 	if (!ip) {		/* no intparm: unsolicited interrupt */
 		MESSAGE(KERN_DEBUG, "%s", "caught unsolicited interrupt");
