@@ -133,7 +133,7 @@ acpi_ut_evaluate_object (
 	u32                             expected_return_btypes,
 	union acpi_operand_object       **return_desc)
 {
-	union acpi_operand_object       *obj_desc;
+	struct acpi_parameter_info      info;
 	acpi_status                     status;
 	u32                             return_btype;
 
@@ -141,9 +141,13 @@ acpi_ut_evaluate_object (
 	ACPI_FUNCTION_TRACE ("ut_evaluate_object");
 
 
+	info.node = prefix_node;
+	info.parameters = NULL;
+	info.parameter_type = ACPI_PARAM_ARGS;
+
 	/* Evaluate the object/method */
 
-	status = acpi_ns_evaluate_relative (prefix_node, path, NULL, &obj_desc);
+	status = acpi_ns_evaluate_relative (path, &info);
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s.%s] was not found\n",
@@ -159,7 +163,7 @@ acpi_ut_evaluate_object (
 
 	/* Did we get a return object? */
 
-	if (!obj_desc) {
+	if (!info.return_object) {
 		if (expected_return_btypes) {
 			ACPI_REPORT_METHOD_ERROR ("No object was returned from",
 				prefix_node, path, AE_NOT_EXIST);
@@ -172,7 +176,7 @@ acpi_ut_evaluate_object (
 
 	/* Map the return object type to the bitmapped type */
 
-	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+	switch (ACPI_GET_OBJECT_TYPE (info.return_object)) {
 	case ACPI_TYPE_INTEGER:
 		return_btype = ACPI_BTYPE_INTEGER;
 		break;
@@ -202,17 +206,17 @@ acpi_ut_evaluate_object (
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Type returned from %s was incorrect: %X\n",
-			path, ACPI_GET_OBJECT_TYPE (obj_desc)));
+			path, ACPI_GET_OBJECT_TYPE (info.return_object)));
 
 		/* On error exit, we must delete the return object */
 
-		acpi_ut_remove_reference (obj_desc);
+		acpi_ut_remove_reference (info.return_object);
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
 	/* Object type is OK, return it */
 
-	*return_desc = obj_desc;
+	*return_desc = info.return_object;
 	return_ACPI_STATUS (AE_OK);
 }
 

@@ -79,7 +79,6 @@ acpi_ds_execute_arguments (
 	acpi_status                     status;
 	union acpi_parse_object         *op;
 	struct acpi_walk_state          *walk_state;
-	union acpi_parse_object         *arg;
 
 
 	ACPI_FUNCTION_TRACE ("ds_execute_arguments");
@@ -105,7 +104,7 @@ acpi_ds_execute_arguments (
 	}
 
 	status = acpi_ds_init_aml_walk (walk_state, op, NULL, aml_start,
-			  aml_length, NULL, NULL, 1);
+			  aml_length, NULL, 1);
 	if (ACPI_FAILURE (status)) {
 		acpi_ds_delete_walk_state (walk_state);
 		return_ACPI_STATUS (status);
@@ -126,9 +125,7 @@ acpi_ds_execute_arguments (
 
 	/* Get and init the Op created above */
 
-	arg = op->common.value.arg;
 	op->common.node = node;
-	arg->common.node = node;
 	acpi_ps_delete_parse_tree (op);
 
 	/* Evaluate the deferred arguments */
@@ -150,7 +147,7 @@ acpi_ds_execute_arguments (
 	/* Execute the opcode and arguments */
 
 	status = acpi_ds_init_aml_walk (walk_state, op, NULL, aml_start,
-			  aml_length, NULL, NULL, 3);
+			  aml_length, NULL, 3);
 	if (ACPI_FAILURE (status)) {
 		acpi_ds_delete_walk_state (walk_state);
 		return_ACPI_STATUS (status);

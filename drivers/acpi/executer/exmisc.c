@@ -389,6 +389,8 @@ acpi_ex_do_math_op (
 	acpi_integer                    operand1)
 {
 
+	ACPI_FUNCTION_ENTRY ();
+
 
 	switch (opcode) {
 	case AML_ADD_OP:                /* Add (Operand0, Operand1, Result) */
@@ -452,15 +454,17 @@ acpi_ex_do_math_op (
  * FUNCTION:    acpi_ex_do_logical_op
  *
  * PARAMETERS:  Opcode              - AML opcode
- *              Operand0            - Integer operand #0
- *              Operand1            - Integer operand #1
+ *              obj_desc0           - operand #0
+ *              obj_desc1           - operand #1
  *
  * RETURN:      TRUE/FALSE result of the operation
  *
  * DESCRIPTION: Execute a logical AML opcode. The purpose of having all of the
  *              functions here is to prevent a lot of pointer dereferencing
  *              to obtain the operands and to simplify the generation of the
- *              logical value.
+ *              logical value.  Both operands must already be validated as
+ *              1) Both the same type, and
+ *              2) Either Integer, Buffer, or String type.
  *
  *              Note: cleanest machine code seems to be produced by the code
  *              below, rather than using statements of the form:
@@ -471,54 +475,137 @@ acpi_ex_do_math_op (
 u8
 acpi_ex_do_logical_op (
 	u16                             opcode,
-	acpi_integer                    operand0,
-	acpi_integer                    operand1)
+	union acpi_operand_object       *obj_desc0,
+	union acpi_operand_object       *obj_desc1)
 {
+	acpi_integer                    operand0;
+	acpi_integer                    operand1;
+	u8                              *ptr0;
+	u8                              *ptr1;
+	u32                             length0;
+	u32                             length1;
+	u32                             i;
 
 
-	switch (opcode) {
+	ACPI_FUNCTION_ENTRY ();
 
-	case AML_LAND_OP:               /* LAnd (Operand0, Operand1) */
 
-		if (operand0 && operand1) {
-			return (TRUE);
+	if (ACPI_GET_OBJECT_TYPE (obj_desc0) == ACPI_TYPE_INTEGER) {
+		/* Both operands are of type integer */
+
+		operand0 = obj_desc0->integer.value;
+		operand1 = obj_desc1->integer.value;
+
+		switch (opcode) {
+		case AML_LAND_OP:               /* LAnd (Operand0, Operand1) */
+
+			if (operand0 && operand1) {
+				return (TRUE);
+			}
+			break;
+
+		case AML_LEQUAL_OP:             /* LEqual (Operand0, Operand1) */
+
+			if (operand0 == operand1) {
+				return (TRUE);
+			}
+			break;
+
+		case AML_LGREATER_OP:           /* LGreater (Operand0, Operand1) */
+
+			if (operand0 > operand1) {
+				return (TRUE);
+			}
+			break;
+
+		case AML_LLESS_OP:              /* LLess (Operand0, Operand1) */
+
+			if (operand0 < operand1) {
+				return (TRUE);
+			}
+			break;
+
+		case AML_LOR_OP:                 /* LOr (Operand0, Operand1) */
+
+			if (operand0 || operand1) {
+				return (TRUE);
+			}
+			break;
+
+		default:
+			break;
 		}
-		break;
+	}
+	else {
+		/*
+		 * Case for Buffer/String objects.
+		 * NOTE: takes advantage of common Buffer/String object fields
+		 */
+		length0 = obj_desc0->buffer.length;
+		ptr0    = obj_desc0->buffer.pointer;
 
+		length1 = obj_desc1->buffer.length;
+		ptr1    = obj_desc1->buffer.pointer;
 
-	case AML_LEQUAL_OP:             /* LEqual (Operand0, Operand1) */
+		switch (opcode) {
+		case AML_LEQUAL_OP:             /* LEqual (Operand0, Operand1) */
 
-		if (operand0 == operand1) {
+			/* Length and all bytes must be equal */
+
+			if (length0 != length1) {
+				return (FALSE);
+			}
+
+			for (i = 0; i < length0; i++) {
+				if (ptr0[i] != ptr1[i]) {
+					return (FALSE);
+				}
+			}
 			return (TRUE);
+
+		case AML_LGREATER_OP:           /* LGreater (Operand0, Operand1) */
+
+			/* Lexicographic compare:  Scan the 1-to-1 data */
+
+			for (i = 0; (i < length0) && (i < length1); i++) {
+				if (ptr0[i] > ptr1[i]) {
+					return (TRUE);
+				}
+			}
+
+			/* Bytes match, now check lengths */
+
+			if (length0 > length1) {
+				return (TRUE);
+			}
+
+			/* Length0 <= Length1 */
+
+			return (FALSE);
+
+		case AML_LLESS_OP:              /* LLess (Operand0, Operand1) */
+
+			/* Lexicographic compare:  Scan the 1-to-1 data */
+
+			for (i = 0; (i < length0) && (i < length1); i++) {
+				if (ptr0[i] < ptr1[i]) {
+					return (TRUE);
+				}
+			}
+
+			/* Bytes match, now check lengths */
+
+			if (length0 < length1) {
+				return (TRUE);
+			}
+
+			/* Length0 >= Length1 */
+
+			return (FALSE);
+
+		default:
+			break;
 		}
-		break;
-
-
-	case AML_LGREATER_OP:           /* LGreater (Operand0, Operand1) */
-
-		if (operand0 > operand1) {
-			return (TRUE);
-		}
-		break;
-
-
-	case AML_LLESS_OP:              /* LLess (Operand0, Operand1) */
-
-		if (operand0 < operand1) {
-			return (TRUE);
-		}
-		break;
-
-
-	case AML_LOR_OP:                 /* LOr (Operand0, Operand1) */
-
-		if (operand0 || operand1) {
-			return (TRUE);
-		}
-		break;
-
-	default:
-		break;
 	}
 
 	return (FALSE);

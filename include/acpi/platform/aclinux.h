@@ -44,8 +44,6 @@
 #ifndef __ACLINUX_H__
 #define __ACLINUX_H__
 
-#define ACPI_OS_NAME                "Linux"
-
 #define ACPI_USE_SYSTEM_CLIBRARY
 #define ACPI_USE_DO_WHILE_0
 

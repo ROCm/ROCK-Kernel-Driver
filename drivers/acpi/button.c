@@ -456,6 +456,15 @@ acpi_button_add (
 		goto end;
 	}
 
+	if (device->wakeup.flags.valid) {
+		/* Button's GPE is run-wake GPE */
+		acpi_set_gpe_type(device->wakeup.gpe_device, 
+			device->wakeup.gpe_number, ACPI_GPE_TYPE_WAKE_RUN);
+		acpi_enable_gpe(device->wakeup.gpe_device, 
+			device->wakeup.gpe_number, ACPI_NOT_ISR);
+		device->wakeup.state.enabled = 1;
+	}
+
 	printk(KERN_INFO PREFIX "%s [%s]\n", 
 		acpi_device_name(device), acpi_device_bid(device));
 

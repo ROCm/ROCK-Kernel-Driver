@@ -49,6 +49,7 @@
 #include <asm/ist.h>
 #include <asm/io.h>
 #include "setup_arch_pre.h"
+#include <bios_ebda.h>
 
 #ifdef CONFIG_X86_LOCAL_APIC
 extern int enable_local_apic;
@@ -1007,6 +1008,17 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 	}
 }
 
+/*
+ * workaround for Dell systems that neglect to reserve EBDA
+ */
+static void __init reserve_ebda_region(void)
+{
+	unsigned int addr;
+	addr = get_bios_ebda();
+	if (addr)
+		reserve_bootmem(addr, PAGE_SIZE);	
+}
+
 static unsigned long __init setup_memory(void)
 {
 	unsigned long bootmap_size, start_pfn, max_low_pfn;
@@ -1052,6 +1064,9 @@ static unsigned long __init setup_memory(void)
 	 * enabling clean reboots, SMP operation, laptop functions.
 	 */
 	reserve_bootmem(0, PAGE_SIZE);
+
+	/* reserve EBDA region, it's a 4K region */
+	reserve_ebda_region();
 
     /* could be an AMD 768MPX chipset. Reserve a page  before VGA to prevent
        PCI prefetch into it (errata #56). Usually the page is reserved anyways,

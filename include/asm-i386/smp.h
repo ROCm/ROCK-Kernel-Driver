@@ -43,6 +43,7 @@ extern void (*mtrr_hook) (void);
 extern void zap_low_mappings (void);
 
 #define MAX_APICID 256
+extern u8 x86_cpu_to_apicid[];
 
 /*
  * This function is needed by all SMP systems. It must _always_ be valid

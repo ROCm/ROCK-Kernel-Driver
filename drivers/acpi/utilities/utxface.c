@@ -157,9 +157,8 @@ acpi_enable_subsystem (
 		}
 	}
 
-	/*
-	 * Enable ACPI mode
-	 */
+	/* Enable ACPI mode */
+
 	if (!(flags & ACPI_NO_ACPI_ENABLE)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Going into ACPI mode\n"));
 
@@ -173,7 +172,21 @@ acpi_enable_subsystem (
 	}
 
 	/*
-	 * Initialize ACPI Event handling
+	 * Install the default op_region handlers. These are installed unless
+	 * other handlers have already been installed via the
+	 * install_address_space_handler interface.
+	 */
+	if (!(flags & ACPI_NO_ADDRESS_SPACE_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing default address space handlers\n"));
+
+		status = acpi_ev_install_region_handlers ();
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+	}
+
+	/*
+	 * Initialize ACPI Event handling (Fixed and General Purpose)
 	 *
 	 * NOTE: We must have the hardware AND events initialized before we can execute
 	 * ANY control methods SAFELY.  Any control method can require ACPI hardware
@@ -182,18 +195,18 @@ acpi_enable_subsystem (
 	if (!(flags & ACPI_NO_EVENT_INIT)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI events\n"));
 
-		status = acpi_ev_initialize ();
+		status = acpi_ev_initialize_events ();
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
 	}
 
-	/* Install the SCI handler, Global Lock handler, and GPE handlers */
+	/* Install the SCI handler and Global Lock handler */
 
 	if (!(flags & ACPI_NO_HANDLER_INIT)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing SCI/GL/GPE handlers\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing SCI/GL handlers\n"));
 
-		status = acpi_ev_handler_initialize ();
+		status = acpi_ev_install_xrupt_handlers ();
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -226,18 +239,16 @@ acpi_initialize_objects (
 
 
 	/*
-	 * Install the default op_region handlers. These are installed unless
-	 * other handlers have already been installed via the
-	 * install_address_space_handler interface.
+	 * Run all _REG methods
 	 *
-	 * NOTE: This will cause _REG methods to be run.  Any objects accessed
+	 * NOTE: Any objects accessed
 	 * by the _REG methods will be automatically initialized, even if they
 	 * contain executable AML (see call to acpi_ns_initialize_objects below).
 	 */
 	if (!(flags & ACPI_NO_ADDRESS_SPACE_INIT)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing default address space handlers\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Executing _REG op_region methods\n"));
 
-		status = acpi_ev_init_address_spaces ();
+		status = acpi_ev_initialize_op_regions ();
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -249,7 +260,7 @@ acpi_initialize_objects (
 	 * objects: operation_regions, buffer_fields, Buffers, and Packages.
 	 */
 	if (!(flags & ACPI_NO_OBJECT_INIT)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI Objects\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Completing Initialization of ACPI Objects\n"));
 
 		status = acpi_ns_initialize_objects ();
 		if (ACPI_FAILURE (status)) {

@@ -289,6 +289,7 @@ acpi_rs_set_srs_method_data (
 	acpi_handle                     handle,
 	struct acpi_buffer              *in_buffer)
 {
+	struct acpi_parameter_info      info;
 	union acpi_operand_object       *params[2];
 	acpi_status                     status;
 	struct acpi_buffer              buffer;
@@ -329,10 +330,14 @@ acpi_rs_set_srs_method_data (
 	params[0]->common.flags   = AOPOBJ_DATA_VALID;
 	params[1] = NULL;
 
+	info.node = handle;
+	info.parameters = params;
+	info.parameter_type = ACPI_PARAM_ARGS;
+
 	/*
 	 * Execute the method, no return value
 	 */
-	status = acpi_ns_evaluate_relative (handle, "_SRS", params, NULL);
+	status = acpi_ns_evaluate_relative ("_SRS", &info);
 
 	/*
 	 * Clean up and return the status from acpi_ns_evaluate_relative
