@@ -1225,19 +1225,32 @@ int fb_get_options(char *name, char **option)
  *
  */
 
+extern const char *global_mode_option;
+
 int __init video_setup(char *options)
 {
-	int i;
+	int i, global = 0;
 
 	if (!options || !*options)
-		return 0;
+ 		global = 1;
 
-	for (i = 0; i < FB_MAX; i++) {
-		if (!strncmp(options, "ofonly", 6))
-			ofonly = 1;
-		if (video_options[i] == NULL) {
-			video_options[i] = options;
-			break;
+ 	if (!global && !strncmp(options, "ofonly", 6)) {
+ 		ofonly = 1;
+ 		global = 1;
+ 	}
+
+ 	if (!global && !strstr(options, "fb:")) {
+ 		global_mode_option = options;
+ 		global = 1;
+ 	}
+
+ 	if (!global) {
+ 		for (i = 0; i < FB_MAX; i++) {
+ 			if (video_options[i] == NULL) {
+ 				video_options[i] = options;
+ 				break;
+ 			}
+
 		}
 	}
 
