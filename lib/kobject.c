@@ -122,7 +122,7 @@ char * kobject_get_path(struct kset *kset, struct kobject *kobj, int gfp_mask)
 
 #define BUFFER_SIZE	1024	/* should be enough memory for the env */
 #define NUM_ENVP	32	/* number of env pointers */
-static unsigned long sequence_num;
+unsigned long hotplug_seqnum;
 static spinlock_t sequence_lock = SPIN_LOCK_UNLOCKED;
 
 static void kset_hotplug(const char *action, struct kset *kset,
@@ -178,7 +178,7 @@ static void kset_hotplug(const char *action, struct kset *kset,
 	scratch += sprintf(scratch, "ACTION=%s", action) + 1;
 
 	spin_lock(&sequence_lock);
-	seq = sequence_num++;
+	seq = hotplug_seqnum++;
 	spin_unlock(&sequence_lock);
 
 	envp [i++] = scratch;
