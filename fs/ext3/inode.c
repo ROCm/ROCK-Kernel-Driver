@@ -734,9 +734,9 @@ err_out:
  * The BKL may not be held on entry here.  Be sure to take it early.
  */
 
-static int ext3_get_block_handle(handle_t *handle, struct inode *inode, 
-				 sector_t iblock,
-				 struct buffer_head *bh_result, int create)
+static int
+ext3_get_block_handle(handle_t *handle, struct inode *inode, sector_t iblock,
+		struct buffer_head *bh_result, int create, int extend_disksize)
 {
 	int err = -EIO;
 	int offsets[4];
@@ -818,16 +818,17 @@ out:
 	if (err)
 		goto cleanup;
 
-	new_size = inode->i_size;
-	/*
-	 * This is not racy against ext3_truncate's modification of i_disksize
-	 * because VM/VFS ensures that the file cannot be extended while
-	 * truncate is in progress.  It is racy between multiple parallel
-	 * instances of get_block, but we have the BKL.
-	 */
-	if (new_size > ei->i_disksize)
-		ei->i_disksize = new_size;
-
+	if (extend_disksize) {
+		/*
+		 * This is not racy against ext3_truncate's modification of
+		 * i_disksize because VM/VFS ensures that the file cannot be
+		 * extended while truncate is in progress.  It is racy between
+		 * multiple parallel instances of get_block, but we have BKL.
+		 */
+		new_size = inode->i_size;
+		if (new_size > ei->i_disksize)
+			ei->i_disksize = new_size;
+	}
 	set_buffer_new(bh_result);
 	goto got_it;
 
@@ -851,9 +852,42 @@ static int ext3_get_block(struct inode *inode, sector_t iblock,
 		handle = ext3_journal_current_handle();
 		J_ASSERT(handle != 0);
 	}
-	ret = ext3_get_block_handle(handle, inode, iblock, bh_result, create);
+	ret = ext3_get_block_handle(handle, inode, iblock,
+				bh_result, create, 1);
 	return ret;
 }
+
+#define DIO_CREDITS (EXT3_RESERVE_TRANS_BLOCKS + 32)
+
+static int
+ext3_direct_io_get_blocks(struct inode *inode, sector_t iblock,
+		unsigned long max_blocks, struct buffer_head *bh_result,
+		int create)
+{
+	handle_t *handle = journal_current_handle();
+	int ret = 0;
+
+	lock_kernel();
+	if (handle && handle->h_buffer_credits <= EXT3_RESERVE_TRANS_BLOCKS) {
+		/*
+		 * Getting low on buffer credits...
+		 */
+		if (!ext3_journal_extend(handle, DIO_CREDITS)) {
+			/*
+			 * Couldn't extend the transaction.  Start a new one
+			 */
+			ret = ext3_journal_restart(handle, DIO_CREDITS);
+		}
+	}
+	if (ret == 0)
+		ret = ext3_get_block_handle(handle, inode, iblock,
+					bh_result, create, 0);
+	if (ret == 0)
+		bh_result->b_size = (1 << inode->i_blkbits);
+	unlock_kernel();
+	return ret;
+}
+
 
 /*
  * `handle' can be NULL if create is zero
@@ -869,7 +903,7 @@ struct buffer_head *ext3_getblk(handle_t *handle, struct inode * inode,
 	dummy.b_state = 0;
 	dummy.b_blocknr = -1000;
 	buffer_trace_init(&dummy.b_history);
-	*errp = ext3_get_block_handle(handle, inode, block, &dummy, create);
+	*errp = ext3_get_block_handle(handle, inode, block, &dummy, create, 1);
 	if (!*errp && buffer_mapped(&dummy)) {
 		struct buffer_head *bh;
 		bh = sb_getblk(inode->i_sb, dummy.b_blocknr);
@@ -1344,10 +1378,11 @@ out_fail:
 
 	/*
 	 * We have to fail this writepage to avoid cross-fs transactions.
-	 * Put the page back on mapping->dirty_pages, but leave its buffer's
-	 * dirty state as-is.
+	 * Return EAGAIN so the caller will the page back on
+	 * mapping->dirty_pages.  The page's buffers' dirty state will be left
+	 * as-is.
 	 */
-	__set_page_dirty_nobuffers(page);
+	ret = -EAGAIN;
 	unlock_page(page);
 	return ret;
 }
@@ -1376,17 +1411,83 @@ static int ext3_releasepage(struct page *page, int wait)
 	return journal_try_to_free_buffers(journal, page, wait);
 }
 
+/*
+ * If the O_DIRECT write will extend the file then add this inode to the
+ * orphan list.  So recovery will truncate it back to the original size
+ * if the machine crashes during the write.
+ *
+ * If the O_DIRECT write is intantiating holes inside i_size and the machine
+ * crashes then stale disk data _may_ be exposed inside the file.
+ */
+static int ext3_direct_IO(int rw, struct inode *inode, char *buf,
+			loff_t offset, size_t count)
+{
+	struct ext3_inode_info *ei = EXT3_I(inode);
+	handle_t *handle = NULL;
+	int ret;
+	int orphan = 0;
+
+	if (rw == WRITE) {
+		loff_t final_size = offset + count;
+
+		lock_kernel();
+		handle = ext3_journal_start(inode, DIO_CREDITS);
+		unlock_kernel();
+		if (IS_ERR(handle)) {
+			ret = PTR_ERR(handle);
+			goto out;
+		}
+		if (final_size > inode->i_size) {
+			lock_kernel();
+			ret = ext3_orphan_add(handle, inode);
+			unlock_kernel();
+			if (ret)
+				goto out_stop;
+			orphan = 1;
+			ei->i_disksize = inode->i_size;
+		}
+	}
+
+	ret = generic_direct_IO(rw, inode, buf, offset,
+				count, ext3_direct_io_get_blocks);
+
+out_stop:
+	if (handle) {
+		int err;
+
+		lock_kernel();
+		if (orphan) 
+			ext3_orphan_del(handle, inode);
+		if (orphan && ret > 0) {
+			loff_t end = offset + ret;
+			if (end > inode->i_size) {
+				ei->i_disksize = end;
+				inode->i_size = end;
+				err = ext3_mark_inode_dirty(handle, inode);
+				if (!ret) 
+					ret = err;
+			}
+		}
+		err = ext3_journal_stop(handle, inode);
+		if (ret == 0)
+			ret = err;
+		unlock_kernel();
+	}
+out:
+	return ret;
+}
 
 struct address_space_operations ext3_aops = {
-	.readpage	= ext3_readpage,		/* BKL not held.  Don't need */
-	.readpages	= ext3_readpages,		/* BKL not held.  Don't need */
-	.writepage	= ext3_writepage,		/* BKL not held.  We take it */
+	.readpage	= ext3_readpage,	/* BKL not held.  Don't need */
+	.readpages	= ext3_readpages,	/* BKL not held.  Don't need */
+	.writepage	= ext3_writepage,	/* BKL not held.  We take it */
 	.sync_page	= block_sync_page,
 	.prepare_write	= ext3_prepare_write,	/* BKL not held.  We take it */
 	.commit_write	= ext3_commit_write,	/* BKL not held.  We take it */
 	.bmap		= ext3_bmap,		/* BKL held */
 	.invalidatepage	= ext3_invalidatepage,	/* BKL not held.  Don't need */
 	.releasepage	= ext3_releasepage,	/* BKL not held.  Don't need */
+	.direct_IO	= ext3_direct_IO,	/* BKL not held.  Don't need */
 };
 
 /* For writeback mode, we can use mpage_writepages() */
@@ -1405,9 +1506,9 @@ ext3_writepages(struct address_space *mapping, int *nr_to_write)
 }
 
 struct address_space_operations ext3_writeback_aops = {
-	.readpage	= ext3_readpage,		/* BKL not held.  Don't need */
-	.readpages	= ext3_readpages,		/* BKL not held.  Don't need */
-	.writepage	= ext3_writepage,		/* BKL not held.  We take it */
+	.readpage	= ext3_readpage,	/* BKL not held.  Don't need */
+	.readpages	= ext3_readpages,	/* BKL not held.  Don't need */
+	.writepage	= ext3_writepage,	/* BKL not held.  We take it */
 	.writepages	= ext3_writepages,	/* BKL not held.  Don't need */
 	.sync_page	= block_sync_page,
 	.prepare_write	= ext3_prepare_write,	/* BKL not held.  We take it */
@@ -1415,6 +1516,7 @@ struct address_space_operations ext3_writeback_aops = {
 	.bmap		= ext3_bmap,		/* BKL held */
 	.invalidatepage	= ext3_invalidatepage,	/* BKL not held.  Don't need */
 	.releasepage	= ext3_releasepage,	/* BKL not held.  Don't need */
+	.direct_IO	= ext3_direct_IO,	/* BKL not held.  Don't need */
 };
 
 /*

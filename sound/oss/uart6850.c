@@ -23,7 +23,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-
+#include <linux/spinlock.h>
 /* Mon Nov 22 22:38:35 MET 1993 marco@driq.home.usn.nl:
  *      added 6850 support, used with COVOX SoundMaster II and custom cards.
  */
@@ -71,6 +71,7 @@ static int uart6850_opened;
 static int uart6850_irq;
 static int uart6850_detected;
 static int my_dev;
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 
 static void (*midi_input_intr) (int dev, unsigned char data);
 static void poll_uart6850(unsigned long dummy);
@@ -122,9 +123,7 @@ static void poll_uart6850(unsigned long dummy)
 	if (!(uart6850_opened & OPEN_READ))
 		return;		/* Device has been closed */
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&lock,flags);
 	if (input_avail())
 		uart6850_input_loop();
 
@@ -135,7 +134,7 @@ static void poll_uart6850(unsigned long dummy)
 	 *	Come back later
 	 */
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static int uart6850_open(int dev, int mode,
@@ -176,13 +175,12 @@ static int uart6850_out(int dev, unsigned char midi_byte)
 	 * Test for input since pending input seems to block the output.
 	 */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	if (input_avail())
 		uart6850_input_loop();
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 
 	/*
 	 * Sometimes it takes about 13000 loops before the output becomes ready
@@ -265,15 +263,14 @@ static void __init attach_uart6850(struct address_info *hw_config)
 	uart6850_osp = hw_config->osp;
 	uart6850_irq = hw_config->irq;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	for (timeout = 30000; timeout > 0 && !output_ready(); timeout--);	/*
 										 * Wait
 										 */
 	uart6850_cmd(UART_MODE_ON);
 	ok = 1;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 
 	conf_printf("6850 Midi Interface", hw_config);
 

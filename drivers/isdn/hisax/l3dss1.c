@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include "hisax.h"
 #include "isdnl3.h"
 #include "l3dss1.h"

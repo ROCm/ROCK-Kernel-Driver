@@ -42,6 +42,8 @@
  */
 
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
+
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_dinode.h"
@@ -281,7 +283,6 @@ int diSync(struct inode *ipimap)
 	/*
 	 * write out dirty pages of imap
 	 */
-	filemap_fdatawait(ipimap->i_mapping);
 	filemap_fdatawrite(ipimap->i_mapping);
 	filemap_fdatawait(ipimap->i_mapping);
 
@@ -595,7 +596,6 @@ void diFreeSpecial(struct inode *ip)
 		jERROR(1, ("diFreeSpecial called with NULL ip!\n"));
 		return;
 	}
-	filemap_fdatawait(ip->i_mapping);
 	filemap_fdatawrite(ip->i_mapping);
 	filemap_fdatawait(ip->i_mapping);
 	truncate_inode_pages(ip->i_mapping, 0);
@@ -815,21 +815,19 @@ int diWrite(tid_t tid, struct inode *ip)
 		memcpy(&dp->di_fastsymlink, jfs_ip->i_inline, IDATASIZE);
 		dilinelock->index++;
 	}
-#ifdef _STILL_TO_PORT
 	/*
 	 * copy inline data from in-memory inode to on-disk inode:
 	 * 128 byte slot granularity
 	 */
-	if (test_cflag(COMMIT_Inlineea, ip))
+	if (test_cflag(COMMIT_Inlineea, ip)) {
 		lv = (lv_t *) & dilinelock->lv[dilinelock->index];
 		lv->offset = (dioffset + 3 * 128) >> L2INODESLOTSIZE;
 		lv->length = 1;
-		memcpy(&dp->di_inlineea, &ip->i_inlineea, INODESLOTSIZE);
+		memcpy(&dp->di_inlineea, jfs_ip->i_inline_ea, INODESLOTSIZE);
 		dilinelock->index++;
 
 		clear_cflag(COMMIT_Inlineea, ip);
 	}
-#endif				/* _STILL_TO_PORT */
 
 	/*
 	 *      lock/copy inode base: 128 byte slot granularity
@@ -914,8 +912,6 @@ int diFree(struct inode *ip)
 	u32 bitmap, mask;
 	struct inode *ipimap = JFS_SBI(ip->i_sb)->ipimap;
 	imap_t *imap = JFS_IP(ipimap)->i_imap;
-	s64 xaddr;
-	s64 xlen;
 	pxd_t freepxd;
 	tid_t tid;
 	struct inode *iplist[3];
@@ -1181,9 +1177,7 @@ int diFree(struct inode *ip)
 	 * invalidate any page of the inode extent freed from buffer cache;
 	 */
 	freepxd = iagp->inoext[extno];
-	xaddr = addressPXD(&iagp->inoext[extno]);
-	xlen = lengthPXD(&iagp->inoext[extno]);
-	invalidate_metapages(JFS_SBI(ip->i_sb)->direct_inode, xaddr, xlen);
+	invalidate_pxd_metapages(ip->i_sb->s_bdev->bd_inode, freepxd);
 
 	/*
 	 *      update iag list(s) (careful update step 2)
@@ -2971,26 +2965,30 @@ printf("diExtendFS: iag:%d agstart:%Ld agno:%d\n", i, agstart, n);
  *
  * note: shadow page with regular inode (rel.2);
  */
-static void
-duplicateIXtree(struct super_block *sb, s64 blkno, int xlen, s64 * xaddr)
+static void duplicateIXtree(struct super_block *sb, s64 blkno,
+			    int xlen, s64 *xaddr)
 {
-	int rc;
-	tid_t tid;
-	struct inode *ip;
-	metapage_t *mpsuper;
 	struct jfs_superblock *j_sb;
+	struct buffer_head *bh;
+	struct inode *ip;
+	tid_t tid;
+	int rc;
 
 	/* if AIT2 ipmap2 is bad, do not try to update it */
 	if (JFS_SBI(sb)->mntflag & JFS_BAD_SAIT)	/* s_flag */
 		return;
 	ip = diReadSpecial(sb, FILESYSTEM_I, 1);
-	if (ip == 0) {
+	if (ip == NULL) {
 		JFS_SBI(sb)->mntflag |= JFS_BAD_SAIT;
-		if ((rc = readSuper(sb, &mpsuper)))
+		if ((rc = readSuper(sb, &bh)))
 			return;
-		j_sb = (struct jfs_superblock *) (mpsuper->data);
+		j_sb = (struct jfs_superblock *)bh->b_data;
 		j_sb->s_flag |= JFS_BAD_SAIT;
-		write_metapage(mpsuper);
+
+		mark_buffer_dirty(bh);
+		ll_rw_block(WRITE, 1, &bh);
+		wait_on_buffer(bh);
+		brelse(bh);
 		return;
 	}
 
@@ -3046,16 +3044,17 @@ static int copy_from_dinode(dinode_t * dip, struct inode *ip)
 	jfs_ip->next_index = le32_to_cpu(dip->di_next_index);
 	jfs_ip->otime = le32_to_cpu(dip->di_otime.tv_sec);
 	jfs_ip->acltype = le32_to_cpu(dip->di_acltype);
-	/*
-	 * We may only need to do this for "special" inodes (dmap, imap)
-	 */
+
 	if (S_ISCHR(ip->i_mode) || S_ISBLK(ip->i_mode))
 		ip->i_rdev = to_kdev_t(le32_to_cpu(dip->di_rdev));
-	else if (S_ISDIR(ip->i_mode)) {
+
+	if (S_ISDIR(ip->i_mode)) {
 		memcpy(&jfs_ip->i_dirtable, &dip->di_dirtable, 384);
-	} else if (!S_ISFIFO(ip->i_mode)) {
+	} else if (S_ISREG(ip->i_mode) || S_ISLNK(ip->i_mode)) {
 		memcpy(&jfs_ip->i_xtroot, &dip->di_xtroot, 288);
-	}
+	} else
+		memcpy(&jfs_ip->i_inline_ea, &dip->di_inlineea, 128);
+
 	/* Zero the in-memory-only stuff */
 	jfs_ip->cflag = 0;
 	jfs_ip->btindex = 0;

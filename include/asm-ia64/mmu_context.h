@@ -36,7 +36,7 @@ struct ia64_ctx {
 };
 
 extern struct ia64_ctx ia64_ctx;
-extern u8 ia64_need_tlb_flush __per_cpu_data;
+DECLARE_PER_CPU(u8, ia64_need_tlb_flush);
 
 extern void wrap_mmu_context (struct mm_struct *mm);
 
@@ -56,9 +56,9 @@ delayed_tlb_flush (void)
 {
 	extern void __flush_tlb_all (void);
 
-	if (unlikely(ia64_need_tlb_flush)) {
+	if (unlikely(__get_cpu_var(ia64_need_tlb_flush))) {
 		__flush_tlb_all();
-		ia64_need_tlb_flush = 0;
+		__get_cpu_var(ia64_need_tlb_flush) = 0;
 	}
 }
 

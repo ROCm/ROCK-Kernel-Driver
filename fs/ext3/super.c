@@ -443,12 +443,16 @@ void ext3_put_super (struct super_block * sb)
 	return;
 }
 
-static kmem_cache_t * ext3_inode_cachep;
+static kmem_cache_t *ext3_inode_cachep;
 
+/*
+ * Called inside transaction, so use GFP_NOFS
+ */
 static struct inode *ext3_alloc_inode(struct super_block *sb)
 {
 	struct ext3_inode_info *ei;
-	ei = (struct ext3_inode_info *)kmem_cache_alloc(ext3_inode_cachep, SLAB_KERNEL);
+
+	ei = kmem_cache_alloc(ext3_inode_cachep, SLAB_NOFS);
 	if (!ei)
 		return NULL;
 	return &ei->vfs_inode;

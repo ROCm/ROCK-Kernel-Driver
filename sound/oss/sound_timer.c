@@ -12,7 +12,7 @@
  * Thomas Sailer   : ioctl code reworked (vmalloc/vfree removed)
  */
 #include <linux/string.h>
-
+#include <linux/spinlock.h>
 
 #include "sound_config.h"
 
@@ -26,6 +26,7 @@ static unsigned long prev_event_time;
 static volatile unsigned long usecs_per_tmr;	/* Length of the current interval */
 
 static struct sound_lowlev_timer *tmr;
+static spinlock_t lock;
 
 static unsigned long tmr2ticks(int tmr_value)
 {
@@ -80,15 +81,14 @@ static void tmr_reset(void)
 {
 	unsigned long   flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 	tmr_offs = 0;
 	ticks_offs = 0;
 	tmr_ctr = 0;
 	next_event_time = (unsigned long) -1;
 	prev_event_time = 0;
 	curr_ticks = 0;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static int timer_open(int dev, int mode)
@@ -278,6 +278,8 @@ static struct sound_timer_operations sound_timer =
 
 void sound_timer_interrupt(void)
 {
+	unsigned long flags;
+	
 	if (!opened)
 		return;
 
@@ -286,6 +288,7 @@ void sound_timer_interrupt(void)
 	if (!tmr_running)
 		return;
 
+	spin_lock_irqsave(&lock,flags);
 	tmr_ctr++;
 	curr_ticks = ticks_offs + tmr2ticks(tmr_ctr);
 
@@ -294,6 +297,7 @@ void sound_timer_interrupt(void)
 		next_event_time = (unsigned long) -1;
 		sequencer_timer(0);
 	}
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 void  sound_timer_init(struct sound_lowlev_timer *t, char *name)

@@ -1099,20 +1099,17 @@ M:	James.Bottomley@HansenPartnership.com
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
-NETFILTER
+NETFILTER/IPTABLES
 P:	Rusty Russell
-M:	rusty@rustcorp.com.au
 P:	Marc Boucher
-M:	marc@mbsi.ca
 P:	James Morris
-M:	jamesm@intercode.com.au
 P:	Harald Welte
-M:	laforge@gnumonks.org
 P:	Jozsef Kadlecsik
-M:	kadlec@blackhole.kfki.hu
+M:	coreteam@netfilter.org
 W:	http://www.netfilter.org/
 W:	http://www.iptables.org/
-L:	netfilter@lists.samba.org
+L:	netfilter@lists.netfilter.org
+L:	netfilter-devel@lists.netfilter.org
 S:	Supported
 
 NETROM NETWORK LAYER
@@ -1406,7 +1403,7 @@ S:	Maintained
 SCHEDULER
 P:	Ingo Molnar
 M:	mingo@elte.hu
-P:	Robert Love
+P:	Robert Love    [the preemptible kernel bits]
 M:	rml@tech9.net
 L:	linux-kernel@vger.kernel.org
 S:	Maintained

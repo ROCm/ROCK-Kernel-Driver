@@ -17,18 +17,70 @@ struct pci_pool {	/* the pool */
 	size_t			allocation;
 	char			name [32];
 	wait_queue_head_t	waitq;
+	struct list_head	pools;
 };
 
 struct pci_page {	/* cacheable header for 'allocation' bytes */
 	struct list_head	page_list;
 	void			*vaddr;
 	dma_addr_t		dma;
+	unsigned		in_use;
 	unsigned long		bitmap [0];
 };
 
 #define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
 #define	POOL_POISON_BYTE	0xa7
 
+static spinlock_t pools_lock = SPIN_LOCK_UNLOCKED;
+
+static ssize_t
+show_pools (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct pci_dev		*pdev;
+	unsigned long		flags;
+	unsigned		temp, size;
+	char			*next;
+	struct list_head	*i, *j;
+
+	if (off != 0)
+		return 0;
+
+	pdev = container_of (dev, struct pci_dev, dev);
+	next = buf;
+	size = count;
+
+	temp = snprintf (next, size, "poolinfo - 0.1\n");
+	size -= temp;
+	next += temp;
+
+	spin_lock_irqsave (&pools_lock, flags);
+	list_for_each (i, &pdev->pools) {
+		struct pci_pool	*pool;
+		unsigned	pages = 0, blocks = 0;
+
+		pool = list_entry (i, struct pci_pool, pools);
+
+		list_for_each (j, &pool->page_list) {
+			struct pci_page	*page;
+
+			page = list_entry (j, struct pci_page, page_list);
+			pages++;
+			blocks += page->in_use;
+		}
+
+		/* per-pool info, no real statistics yet */
+		temp = snprintf (next, size, "%-16s %4u %4u %4u %2u\n",
+				pool->name,
+				blocks, pages * pool->blocks_per_page,
+				pool->size, pages);
+		size -= temp;
+		next += temp;
+	}
+	spin_unlock_irqrestore (&pools_lock, flags);
+
+	return count - size;
+}
+static DEVICE_ATTR (pools, S_IRUGO, show_pools, NULL);
 
 /**
  * pci_pool_create - Creates a pool of pci consistent memory blocks, for dma.
@@ -56,6 +108,7 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	size_t size, size_t align, size_t allocation, int mem_flags)
 {
 	struct pci_pool		*retval;
+	unsigned long		flags;
 
 	if (align == 0)
 		align = 1;
@@ -84,6 +137,17 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	retval->name [sizeof retval->name - 1] = 0;
 
 	retval->dev = pdev;
+
+	if (pdev) {
+		spin_lock_irqsave (&pools_lock, flags);
+		/* note:  not currently insisting "name" be unique */
+		if (list_empty (&pdev->pools))
+			device_create_file (&pdev->dev, &dev_attr_pools);
+		list_add (&retval->pools, &pdev->pools);
+		spin_unlock_irqrestore (&pools_lock, flags);
+	} else
+		INIT_LIST_HEAD (&retval->pools);
+
 	INIT_LIST_HEAD (&retval->page_list);
 	spin_lock_init (&retval->lock);
 	retval->size = size;
@@ -117,6 +181,7 @@ pool_alloc_page (struct pci_pool *pool, int mem_flags)
 		memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
 #endif
 		list_add (&page->page_list, &pool->page_list);
+		page->in_use = 0;
 	} else {
 		kfree (page);
 		page = 0;
@@ -177,6 +242,13 @@ pci_pool_destroy (struct pci_pool *pool)
 		} else
 			pool_free_page (pool, page);
 	}
+
+	spin_lock (&pools_lock);
+	list_del (&pool->pools);
+	if (pool->dev && list_empty (&pool->dev->pools))
+		device_remove_file (&pool->dev->dev, &dev_attr_pools);
+	spin_unlock (&pools_lock);
+
 	spin_unlock_irqrestore (&pool->lock, flags);
 	kfree (pool);
 }
@@ -243,6 +315,7 @@ restart:
 	clear_bit (0, &page->bitmap [0]);
 	offset = 0;
 ready:
+	page->in_use++;
 	retval = offset + page->vaddr;
 	*handle = offset + page->dma;
 done:
@@ -318,6 +391,7 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 #endif
 
 	spin_lock_irqsave (&pool->lock, flags);
+	page->in_use--;
 	set_bit (block, &page->bitmap [map]);
 	if (waitqueue_active (&pool->waitq))
 		wake_up (&pool->waitq);

@@ -32,12 +32,12 @@
 #include <linux/cache.h>
 #include <linux/delay.h>
 #include <linux/cache.h>
+#include <linux/efi.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
 #include <asm/current.h>
 #include <asm/delay.h>
-#include <asm/efi.h>
 #include <asm/machvec.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -72,7 +72,7 @@ static volatile struct call_data_struct *call_data;
 #define IPI_CPU_STOP		1
 
 /* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
-static DECLARE_PER_CPU(__u64, ipi_operation) ____cacheline_aligned;
+static DEFINE_PER_CPU(__u64, ipi_operation) ____cacheline_aligned;
 
 static void
 stop_this_cpu (void)

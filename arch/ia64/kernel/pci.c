@@ -46,9 +46,6 @@ struct pci_fixup pcibios_fixups[1];
 
 struct pci_ops *pci_root_ops;
 
-int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 *value);
-int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 value);
-
 
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
@@ -60,7 +57,7 @@ int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32
 	((u64)(bus << 16) | (u64)(dev << 11) | (u64)(fn << 8) | (u64)(reg))
 
 static int
-pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+__pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 {
 	int result = 0;
 	u64 data = 0;
@@ -76,7 +73,7 @@ pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 }
 
 static int
-pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+__pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
 	if ((bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
 		return -EINVAL;
@@ -86,77 +83,22 @@ pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 
 
 static int
-pci_sal_read_config_byte (struct pci_dev *dev, int where, u8 *value)
+pci_sal_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	int result = 0;
-	u32 data = 0;
-
-	if (!value)
-		return -EINVAL;
-
-	result = pci_sal_read(0, dev->bus->number, PCI_SLOT(dev->devfn),
-			      PCI_FUNC(dev->devfn), where, 1, &data);
-
-	*value = (u8) data;
-
-	return result;
+	return __pci_sal_read(0, bus->number, PCI_SLOT(devfn),
+			    PCI_FUNC(devfn), where, size, value);
 }
 
 static int
-pci_sal_read_config_word (struct pci_dev *dev, int where, u16 *value)
+pci_sal_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	int result = 0;
-	u32 data = 0;
-
-	if (!value)
-		return -EINVAL;
-
-	result = pci_sal_read(0, dev->bus->number, PCI_SLOT(dev->devfn),
-			      PCI_FUNC(dev->devfn), where, 2, &data);
-
-	*value = (u16) data;
-
-	return result;
-}
-
-static int
-pci_sal_read_config_dword (struct pci_dev *dev, int where, u32 *value)
-{
-	if (!value)
-		return -EINVAL;
-
-	return pci_sal_read(0, dev->bus->number, PCI_SLOT(dev->devfn),
-			    PCI_FUNC(dev->devfn), where, 4, value);
-}
-
-static int
-pci_sal_write_config_byte (struct pci_dev *dev, int where, u8 value)
-{
-	return pci_sal_write(0, dev->bus->number, PCI_SLOT(dev->devfn),
-			     PCI_FUNC(dev->devfn), where, 1, value);
-}
-
-static int
-pci_sal_write_config_word (struct pci_dev *dev, int where, u16 value)
-{
-	return pci_sal_write(0, dev->bus->number, PCI_SLOT(dev->devfn),
-			     PCI_FUNC(dev->devfn), where, 2, value);
-}
-
-static int
-pci_sal_write_config_dword (struct pci_dev *dev, int where, u32 value)
-{
-	return pci_sal_write(0, dev->bus->number, PCI_SLOT(dev->devfn),
-			     PCI_FUNC(dev->devfn), where, 4, value);
+	return __pci_sal_write(0, bus->number, PCI_SLOT(devfn),
+			     PCI_FUNC(devfn), where, size, value);
 }
 
 struct pci_ops pci_sal_ops = {
-	pci_sal_read_config_byte,
-	pci_sal_read_config_word,
-	pci_sal_read_config_dword,
-	pci_sal_write_config_byte,
-	pci_sal_write_config_word,
-	pci_sal_write_config_dword
+	.read = 	pci_sal_read,
+	.write =	pci_sal_write,
 };
 
 
@@ -193,8 +135,6 @@ pcibios_config_init (void)
 	printk("PCI: Using SAL to access configuration space\n");
 
 	pci_root_ops = &pci_sal_ops;
-	pci_config_read = pci_sal_read;
-	pci_config_write = pci_sal_write;
 
 	return;
 }

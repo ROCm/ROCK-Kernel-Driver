@@ -103,7 +103,6 @@
 #include <linux/string.h>
 #include <linux/sockios.h>
 #include <linux/net.h>
-#include <linux/fcntl.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -1048,34 +1047,6 @@ int sock_no_getsockopt(struct socket *sock, int level, int optname,
 	return -EOPNOTSUPP;
 }
 
-/* 
- * Note: if you add something that sleeps here then change sock_fcntl()
- *       to do proper fd locking.
- */
-int sock_no_fcntl(struct socket *sock, unsigned int cmd, unsigned long arg)
-{
-	struct sock *sk = sock->sk;
-
-	switch(cmd)
-	{
-		case F_SETOWN:
-			/*
-			 * This is a little restrictive, but it's the only
-			 * way to make sure that you can't send a sigurg to
-			 * another process.
-			 */
-			if (current->pgrp != -arg &&
-				current->pid != arg &&
-				!capable(CAP_KILL)) return(-EPERM);
-			sk->proc = arg;
-			return(0);
-		case F_GETOWN:
-			return(sk->proc);
-		default:
-			return(-EINVAL);
-	}
-}
-
 int sock_no_sendmsg(struct socket *sock, struct msghdr *m, int flags,
 		    struct scm_cookie *scm)
 {
@@ -1177,6 +1148,13 @@ void sock_def_destruct(struct sock *sk)
 {
 	if (sk->protinfo)
 		kfree(sk->protinfo);
+}
+
+void sk_send_sigurg(struct sock *sk)
+{
+	if (sk->socket && sk->socket->file)
+		if (send_sigurg(&sk->socket->file->f_owner))
+			sk_wake_async(sk, 3, POLL_PRI);
 }
 
 void sock_init_data(struct socket *sock, struct sock *sk)

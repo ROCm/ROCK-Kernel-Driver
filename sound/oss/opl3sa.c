@@ -22,6 +22,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/spinlock.h>
 
 #undef  SB_OK
 
@@ -37,7 +38,7 @@ static int sb_initialized = 0;
 
 static int kilroy_was_here = 0;	/* Don't detect twice */
 static int mpu_initialized = 0;
-
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 static int *opl3sa_osp = NULL;
 
 static unsigned char opl3sa_read(int addr)
@@ -45,12 +46,11 @@ static unsigned char opl3sa_read(int addr)
 	unsigned long flags;
 	unsigned char tmp;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 	outb((0x1d), 0xf86);	/* password */
 	outb(((unsigned char) addr), 0xf86);	/* address */
 	tmp = inb(0xf87);	/* data */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 
 	return tmp;
 }
@@ -59,12 +59,11 @@ static void opl3sa_write(int addr, int data)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 	outb((0x1d), 0xf86);	/* password */
 	outb(((unsigned char) addr), 0xf86);	/* address */
 	outb(((unsigned char) data), 0xf87);	/* data */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static int __init opl3sa_detect(void)

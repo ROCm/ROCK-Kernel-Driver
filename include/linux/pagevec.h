@@ -18,7 +18,6 @@ void __pagevec_release(struct pagevec *pvec);
 void __pagevec_release_nonlru(struct pagevec *pvec);
 void __pagevec_free(struct pagevec *pvec);
 void __pagevec_lru_add(struct pagevec *pvec);
-void __pagevec_lru_del(struct pagevec *pvec);
 void lru_add_drain(void);
 void pagevec_deactivate_inactive(struct pagevec *pvec);
 
@@ -68,10 +67,4 @@ static inline void pagevec_lru_add(struct pagevec *pvec)
 {
 	if (pagevec_count(pvec))
 		__pagevec_lru_add(pvec);
-}
-
-static inline void pagevec_lru_del(struct pagevec *pvec)
-{
-	if (pagevec_count(pvec))
-		__pagevec_lru_del(pvec);
 }

@@ -960,20 +960,19 @@ int lmLogSync(log_t * log, int nosyncwait)
 	 * reset syncpt = sync
 	 */
 	if (log->sync != log->syncpt) {
-		struct jfs_sb_info	*sbi = JFS_SBI(log->sb);
+		struct super_block *sb = log->sb;
+		struct jfs_sb_info *sbi = JFS_SBI(sb);
+
 		/*
 		 * We need to make sure all of the "written" metapages
 		 * actually make it to disk
 		 */
-		filemap_fdatawait(sbi->ipbmap->i_mapping);
-		filemap_fdatawait(sbi->ipimap->i_mapping);
-		filemap_fdatawait(sbi->direct_inode->i_mapping);
 		filemap_fdatawrite(sbi->ipbmap->i_mapping);
 		filemap_fdatawrite(sbi->ipimap->i_mapping);
-		filemap_fdatawrite(sbi->direct_inode->i_mapping);
+		filemap_fdatawrite(sb->s_bdev->bd_inode->i_mapping);
 		filemap_fdatawait(sbi->ipbmap->i_mapping);
 		filemap_fdatawait(sbi->ipimap->i_mapping);
-		filemap_fdatawait(sbi->direct_inode->i_mapping);
+		filemap_fdatawait(sb->s_bdev->bd_inode->i_mapping);
 
 		lrd.logtid = 0;
 		lrd.backchain = 0;
@@ -1988,6 +1987,7 @@ static void lbmIODone(struct bio *bio)
 
 		jERROR(1, ("lbmIODone: I/O error in JFS log\n"));
 	}
+
 	bio_put(bio);
 
 	/*
@@ -2105,7 +2105,6 @@ static void lbmIODone(struct bio *bio)
 
 		LCACHE_UNLOCK(flags);	/* unlock+enable */
 	}
-	return;
 }
 
 int jfsIOWait(void *arg)
@@ -2117,7 +2116,6 @@ int jfsIOWait(void *arg)
 	lock_kernel();
 
 	daemonize();
-	current->tty = NULL;
 	strcpy(current->comm, "jfsIO");
 
 	unlock_kernel();

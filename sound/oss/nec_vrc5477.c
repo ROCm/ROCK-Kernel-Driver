@@ -807,7 +807,7 @@ static void vrc5477_ac97_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static int vrc5477_ac97_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct list_head *list;
 	struct vrc5477_ac97_state *s;
 
@@ -1331,13 +1331,13 @@ static int vrc5477_ac97_ioctl(struct inode *inode, struct file *file,
 	case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_dac.count = 0;
 			s->dma_dac.nextIn = s->dma_dac.nextOut = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_adc.count = 0;
 			s->dma_adc.nextIn = s->dma_adc.nextOut = 0;
 		}
@@ -1523,7 +1523,7 @@ static int vrc5477_ac97_ioctl(struct inode *inode, struct file *file,
 
 static int vrc5477_ac97_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;
@@ -1993,7 +1993,7 @@ static void __devinit vrc5477_ac97_remove(struct pci_dev *dev)
 	if (s->ps)
 		remove_proc_entry(VRC5477_AC97_MODULE_NAME, NULL);
 #endif /* CONFIG_LL_DEBUG */
-	synchronize_irq();
+	synchronize_irq(s->irq);
 	free_irq(s->irq, s);
 	release_region(s->io, pci_resource_len(dev,0));
 	unregister_sound_dsp(s->dev_audio);

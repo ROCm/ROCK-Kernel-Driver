@@ -13,8 +13,6 @@
  *	Stephane Eranian <eranian@hpl.hp.com>
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
-#include <linux/config.h>
-
 #include <asm/asmmacro.h>
 
 GLOBAL_ENTRY(bcopy)

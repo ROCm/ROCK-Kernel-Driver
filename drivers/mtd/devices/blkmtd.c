@@ -304,7 +304,6 @@ static int write_queue_task(void *data)
   DEBUG(1, "blkmtd: writetask: starting (pid = %d)\n", tsk->pid);
   daemonize();
   strcpy(tsk->comm, "blkmtdd");
-  tsk->tty = NULL;
   spin_lock_irq(&tsk->sigmask_lock);
   sigfillset(&tsk->blocked);
   recalc_sigpending();

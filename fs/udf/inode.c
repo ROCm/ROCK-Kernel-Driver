@@ -208,7 +208,8 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 	mark_buffer_dirty_inode(bh, inode);
 	udf_release_data(bh);
 
-	inode->i_data.a_ops->writepage(page);
+	if (inode->i_data.a_ops->writepage(page) == -EAGAIN)
+		__set_page_dirty_nobuffers(page);
 	page_cache_release(page);
 
 	mark_inode_dirty(inode);

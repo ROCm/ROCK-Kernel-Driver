@@ -13,7 +13,6 @@
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
  */
 #include <linux/config.h>
-#include <linux/percpu.h>
 
 #include <asm/kregs.h>
 #include <asm/page.h>
@@ -26,6 +25,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/percpu.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 
@@ -368,8 +368,8 @@ extern void ia64_save_extra (struct task_struct *task);
 extern void ia64_load_extra (struct task_struct *task);
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PERFMON)
-  extern int __per_cpu_data pfm_syst_wide;
-# define PERFMON_IS_SYSWIDE() (this_cpu(pfm_syst_wide) != 0)
+  DECLARE_PER_CPU(int, pfm_syst_wide);
+# define PERFMON_IS_SYSWIDE() (get_cpu_var(pfm_syst_wide) != 0)
 #else
 # define PERFMON_IS_SYSWIDE() (0)
 #endif

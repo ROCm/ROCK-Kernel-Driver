@@ -22,8 +22,6 @@ extern unsigned long pci_mem_start;
 
 void pcibios_config_init(void);
 struct pci_bus * pcibios_scan_root(int bus);
-extern int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 *value);
-extern int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 value);
 
 void pcibios_set_master(struct pci_dev *dev);
 void pcibios_penalize_isa_irq(int irq);
@@ -109,7 +107,7 @@ static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 
-	return (dma_addr_t)(page - mem_map) * PAGE_SIZE + offset;
+	return (dma_addr_t)(page_to_pfn(page)) * PAGE_SIZE + offset;
 }
 
 static inline void pci_unmap_page(struct pci_dev *hwdev, dma_addr_t dma_address,
@@ -238,9 +236,7 @@ pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page, unsigned long offse
 static __inline__ struct page *
 pci_dac_dma_to_page(struct pci_dev *pdev, dma64_addr_t dma_addr)
 {
-	unsigned long poff = (dma_addr >> PAGE_SHIFT);
-
-	return mem_map + poff;
+	return pfn_to_page(dma_addr >> PAGE_SHIFT);
 }
 
 static __inline__ unsigned long

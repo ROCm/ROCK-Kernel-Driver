@@ -46,6 +46,14 @@ int nr_threads;
 
 int max_threads;
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
+
+/*
+ * Protects next_safe, last_pid and pid_max:
+ */
+spinlock_t lastpid_lock = SPIN_LOCK_UNLOCKED;
+
+static int next_safe = DEFAULT_PID_MAX;
+int pid_max = DEFAULT_PID_MAX;
 int last_pid;
 
 struct task_struct *pidhash[PIDHASH_SZ];
@@ -151,11 +159,8 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	return tsk;
 }
 
-spinlock_t lastpid_lock = SPIN_LOCK_UNLOCKED;
-
 static int get_pid(unsigned long flags)
 {
-	static int next_safe = PID_MAX;
 	struct task_struct *p;
 	int pid;
 
@@ -163,34 +168,35 @@ static int get_pid(unsigned long flags)
 		return 0;
 
 	spin_lock(&lastpid_lock);
-	if((++last_pid) & ~PID_MASK) {
+	if (++last_pid > pid_max) {
 		last_pid = 300;		/* Skip daemons etc. */
 		goto inside;
 	}
-	if(last_pid >= next_safe) {
+
+	if (last_pid >= next_safe) {
 inside:
-		next_safe = PID_MAX;
+		next_safe = pid_max;
 		read_lock(&tasklist_lock);
 	repeat:
 		for_each_task(p) {
-			if(p->pid == last_pid	||
+			if (p->pid == last_pid	||
 			   p->pgrp == last_pid	||
 			   p->tgid == last_pid	||
 			   p->session == last_pid) {
-				if(++last_pid >= next_safe) {
-					if(last_pid & ~PID_MASK)
+				if (++last_pid >= next_safe) {
+					if (last_pid >= pid_max)
 						last_pid = 300;
-					next_safe = PID_MAX;
+					next_safe = pid_max;
 				}
 				goto repeat;
 			}
-			if(p->pid > last_pid && next_safe > p->pid)
+			if (p->pid > last_pid && next_safe > p->pid)
 				next_safe = p->pid;
-			if(p->pgrp > last_pid && next_safe > p->pgrp)
+			if (p->pgrp > last_pid && next_safe > p->pgrp)
 				next_safe = p->pgrp;
-			if(p->tgid > last_pid && next_safe > p->tgid)
+			if (p->tgid > last_pid && next_safe > p->tgid)
 				next_safe = p->tgid;
-			if(p->session > last_pid && next_safe > p->session)
+			if (p->session > last_pid && next_safe > p->session)
 				next_safe = p->session;
 		}
 		read_unlock(&tasklist_lock);
@@ -649,7 +655,8 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 static struct task_struct *copy_process(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
-			    unsigned long stack_size)
+			    unsigned long stack_size,
+			    int *user_tid)
 {
 	int retval;
 	struct task_struct *p = NULL;
@@ -760,7 +767,20 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_namespace;
-	
+	/*
+	 * Notify the child of the TID?
+	 */
+	retval = -EFAULT;
+	if (clone_flags & CLONE_SETTID)
+		if (put_user(p->pid, user_tid))
+			goto bad_fork_cleanup_namespace;
+
+	/*
+	 * Does the userspace VM want the TID cleared on mm_release()?
+	 */
+	if (clone_flags & CLONE_CLEARTID)
+		p->user_tid = user_tid;
+
 	/* Our parent execution domain becomes current domain
 	   These must match for thread signalling to apply */
 	   
@@ -876,11 +896,12 @@ bad_fork_free:
 struct task_struct *do_fork(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
-			    unsigned long stack_size)
+			    unsigned long stack_size,
+			    int *user_tid)
 {
 	struct task_struct *p;
 
-	p = copy_process(clone_flags, stack_start, regs, stack_size);
+	p = copy_process(clone_flags, stack_start, regs, stack_size, user_tid);
 	if (!IS_ERR(p)) {
 		struct completion vfork;
 

@@ -264,7 +264,7 @@ struct task_struct {
 	int lock_depth;		/* Lock depth */
 
 	int prio, static_prio;
-	list_t run_list;
+	struct list_head run_list;
 	prio_array_t *array;
 
 	unsigned long sleep_avg;
@@ -405,6 +405,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_FREEZE	0x00010000	/* this task should be frozen for suspend */
 #define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
 #define PF_FROZEN	0x00040000	/* frozen for system suspend */
+#define PF_SYNC		0x00080000	/* performing fsync(), etc */
 
 /*
  * Ptrace flags
@@ -454,7 +455,7 @@ extern struct task_struct init_task;
 extern struct   mm_struct init_mm;
 
 /* PID hashing. (shouldnt this be dynamic?) */
-#define PIDHASH_SZ (4096 >> 2)
+#define PIDHASH_SZ 8192
 extern struct task_struct *pidhash[PIDHASH_SZ];
 
 #define pid_hashfn(x)	((((x) >> 8) ^ (x)) & (PIDHASH_SZ - 1))
@@ -659,7 +660,7 @@ extern void daemonize(void);
 extern task_t *child_reaper;
 
 extern int do_execve(char *, char **, char **, struct pt_regs *);
-extern struct task_struct *do_fork(unsigned long, unsigned long, struct pt_regs *, unsigned long);
+extern struct task_struct *do_fork(unsigned long, unsigned long, struct pt_regs *, unsigned long, int *);
 
 extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));

@@ -20,11 +20,9 @@
 #include <linux/fs.h>
 #include "jfs_incore.h"
 #include "jfs_txnmgr.h"
+#include "jfs_xattr.h"
 #include "jfs_debug.h"
 
-
-extern int generic_file_open(struct inode *, struct file *);
-extern loff_t generic_file_llseek(struct file *, loff_t, int origin);
 
 extern int jfs_commit_inode(struct inode *, int);
 
@@ -98,6 +96,10 @@ static void jfs_truncate(struct inode *ip)
 
 struct inode_operations jfs_file_inode_operations = {
 	.truncate	= jfs_truncate,
+	.setxattr	= jfs_setxattr,
+	.getxattr	= jfs_getxattr,
+	.listxattr	= jfs_listxattr,
+	.removexattr	= jfs_removexattr,
 };
 
 struct file_operations jfs_file_operations = {

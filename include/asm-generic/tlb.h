@@ -79,10 +79,8 @@ static inline void tlb_flush_mmu(mmu_gather_t *tlb, unsigned long start, unsigne
 	tlb_flush(tlb);
 	nr = tlb->nr;
 	if (!tlb_fast_mode(tlb)) {
-		unsigned long i;
+		free_pages_and_swap_cache(tlb->pages, tlb->nr);
 		tlb->nr = 0;
-		for (i=0; i < nr; i++)
-			free_page_and_swap_cache(tlb->pages[i]);
 	}
 }
 

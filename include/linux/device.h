@@ -57,9 +57,9 @@ struct bus_type {
 	rwlock_t		lock;
 	atomic_t		refcount;
 
-	list_t			node;
-	list_t			devices;
-	list_t			drivers;
+	struct list_head	node;
+	struct list_head	devices;
+	struct list_head	drivers;
 
 	struct driver_dir_entry	dir;
 	struct driver_dir_entry	device_dir;

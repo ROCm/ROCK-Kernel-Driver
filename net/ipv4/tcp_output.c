@@ -478,6 +478,56 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	return 0;
 }
 
+/* This is similar to __pskb_pull_head() (it will go to core/skbuff.c
+ * eventually). The difference is that pulled data not copied, but
+ * immediately discarded.
+ */
+unsigned char * __pskb_trim_head(struct sk_buff *skb, int len)
+{
+	int i, k, eat;
+
+	eat = len;
+	k = 0;
+	for (i=0; i<skb_shinfo(skb)->nr_frags; i++) {
+		if (skb_shinfo(skb)->frags[i].size <= eat) {
+			put_page(skb_shinfo(skb)->frags[i].page);
+			eat -= skb_shinfo(skb)->frags[i].size;
+		} else {
+			skb_shinfo(skb)->frags[k] = skb_shinfo(skb)->frags[i];
+			if (eat) {
+				skb_shinfo(skb)->frags[k].page_offset += eat;
+				skb_shinfo(skb)->frags[k].size -= eat;
+				eat = 0;
+			}
+			k++;
+		}
+	}
+	skb_shinfo(skb)->nr_frags = k;
+
+	skb->tail = skb->data;
+	skb->data_len -= len;
+	skb->len = skb->data_len;
+	return skb->tail;
+}
+
+static int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
+{
+	if (skb_cloned(skb) &&
+	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
+		return -ENOMEM;
+
+	if (len <= skb_headlen(skb)) {
+		__skb_pull(skb, len);
+	} else {
+		if (__pskb_trim_head(skb, len-skb_headlen(skb)) == NULL)
+			return -ENOMEM;
+	}
+
+	TCP_SKB_CB(skb)->seq += len;
+	skb->ip_summed = CHECKSUM_HW;
+	return 0;
+}
+
 /* This function synchronize snd mss to current pmtu/exthdr set.
 
    tp->user_mss is mss set by user by TCP_MAXSEG. It does NOT counts
@@ -836,8 +886,6 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		return -EAGAIN;
 
 	if (before(TCP_SKB_CB(skb)->seq, tp->snd_una)) {
-		struct sk_buff *skb2;
-
 		if (before(TCP_SKB_CB(skb)->end_seq, tp->snd_una))
 			BUG();
 
@@ -847,13 +895,8 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 			tp->mss_cache = tp->mss_cache_std;
 		}
 
-		if(tcp_fragment(sk, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
+		if (tcp_trim_head(sk, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
 			return -ENOMEM;
-
-		skb2 = skb->next;
-		__skb_unlink(skb, skb->list);
-		tcp_free_skb(sk, skb);
-		skb = skb2;
 	}
 
 	/* If receiver has shrunk his window, and skb is out of

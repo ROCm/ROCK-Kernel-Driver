@@ -8,8 +8,6 @@
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/include/linux/sctp.h,v 1.7 2002/07/17 16:13:50 jgrimm Exp $
- * 
  * Various protocol defined structures.  
  * 
  * The SCTP reference implementation is free software; 

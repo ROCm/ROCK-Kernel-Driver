@@ -1589,12 +1589,12 @@ static int sv_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_dac.swptr = s->dma_dac.hwptr = s->dma_dac.count = s->dma_dac.total_bytes = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_adc.swptr = s->dma_adc.hwptr = s->dma_adc.count = s->dma_adc.total_bytes = 0;
 		}
 		return 0;
@@ -2683,7 +2683,7 @@ static void __devinit sv_remove(struct pci_dev *dev)
 		return;
 	list_del(&s->devs);
 	outb(~0, s->ioenh + SV_CODEC_INTMASK);  /* disable ints */
-	synchronize_irq();
+	synchronize_irq(s->irq);
 	inb(s->ioenh + SV_CODEC_STATUS); /* ack interrupts */
 	wrindir(s, SV_CIENABLE, 0);     /* disable DMAA and DMAC */
 	/*outb(0, s->iodmaa + SV_DMA_RESET);*/

@@ -144,7 +144,6 @@ struct {
  */
 extern int lmGroupCommit(log_t * log, tblock_t * tblk);
 extern void lmSync(log_t *);
-extern int readSuper(struct super_block *sb, metapage_t ** bpp);
 extern int jfs_commit_inode(struct inode *, int);
 extern int jfs_stop_threads;
 
@@ -1165,7 +1164,6 @@ int txCommit(tid_t tid,		/* transaction identifier */
 		 *
 		 * if ((!S_ISDIR(ip->i_mode))
 		 *    && (tblk->flag & COMMIT_DELETE) == 0) {
-		 *	filemap_fdatawait(ip->i_mapping);
 		 *	filemap_fdatawrite(ip->i_mapping);
 		 *	filemap_fdatawait(ip->i_mapping);
 		 * }
@@ -2764,7 +2762,6 @@ int jfs_lazycommit(void *arg)
 	lock_kernel();
 
 	daemonize();
-	current->tty = NULL;
 	strcpy(current->comm, "jfsCommit");
 
 	unlock_kernel();
@@ -2962,7 +2959,6 @@ int jfs_sync(void *arg)
 	lock_kernel();
 
 	daemonize();
-	current->tty = NULL;
 	strcpy(current->comm, "jfsSync");
 
 	unlock_kernel();

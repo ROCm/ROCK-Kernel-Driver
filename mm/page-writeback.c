@@ -350,10 +350,15 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 #if 0
 		if (!PageWriteback(page) && PageDirty(page)) {
 			lock_page(page);
-			if (!PageWriteback(page) && TestClearPageDirty(page))
-				page->mapping->a_ops->writepage(page);
-			else
+			if (!PageWriteback(page) && TestClearPageDirty(page)) {
+				int ret;
+
+				ret = page->mapping->a_ops->writepage(page);
+				if (ret == -EAGAIN)
+					__set_page_dirty_nobuffers(page);
+			} else {
 				unlock_page(page);
+			}
 		}
 #endif
 	}
@@ -395,6 +400,10 @@ int write_one_page(struct page *page, int wait)
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 		ret = mapping->a_ops->writepage(page);
+		if (ret == -EAGAIN) {
+			__set_page_dirty_nobuffers(page);
+			ret = 0;
+		}
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
 			if (PageError(page))

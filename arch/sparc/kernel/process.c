@@ -459,15 +459,16 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
                              struct pt_regs *regs,
                              unsigned long stack_size)
 {
+	unsigned long tid_ptr = 0;
 	struct task_struct *p;
 
-	/* XXX This was spelled in DaveM's will and testament. Why? */
-	if (clone_flags & CLONE_IDLETASK) {
-		printk(KERN_DEBUG "Userland clone with CLONE_IDLETASK\n");
-		clone_flags &= ~CLONE_IDLETASK;
-	}
+	clone_flags &= ~CLONE_IDLETASK;
 
-	p = do_fork(clone_flags, stack_start, regs, stack_size);
+	if (clone_flags & (CLONE_SETTID | CLONE_CLEARTID))
+		tid_ptr = regs->u_regs[UREG_G2];
+
+	p = do_fork(clone_flags, stack_start,
+		    regs, stack_size, (int *) tid_ptr);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 

@@ -17,7 +17,6 @@
  *     +1 (416) 297-6433 Facsimile
  */
 
-#define __NO_VERSION__
 #include "includes.h"		/* This must be first */
 #include "hardware.h"
 #include "card.h"

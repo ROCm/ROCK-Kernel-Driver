@@ -89,11 +89,10 @@
  */
 
 static int
-mk_conf_addr(struct pci_dev *dev, int where, unsigned long *pci_addr,
-	     unsigned char *type1)
+mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+	     unsigned long *pci_addr, unsigned char *type1)
 {
-	u8 bus = dev->bus->number;
-	u8 device_fn = dev->devfn;
+	u8 bus = bus_dev->number;
 
 	*type1 = (bus != 0);
 	*pci_addr = (bus << 16) | (device_fn << 8) | where;
@@ -208,88 +207,70 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 	DBGC(("done\n"));
 }
 
-static int
-cia_read_config_byte(struct pci_dev *dev, int where, u8 *value)
-{
-	unsigned long addr, pci_addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	addr = (pci_addr << 5) + 0x00 + CIA_CONF;
-	*value = conf_read(addr, type1) >> ((where & 3) * 8);
-	return PCIBIOS_SUCCESSFUL;
-}
-
 static int 
-cia_read_config_word(struct pci_dev *dev, int where, u16 *value)
+cia_read_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
+		u32 *value)
 {
 	unsigned long addr, pci_addr;
+	long mask;
 	unsigned char type1;
+	int shift;
 
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	addr = (pci_addr << 5) + 0x08 + CIA_CONF;
-	*value = conf_read(addr, type1) >> ((where & 3) * 8);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int 
-cia_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	unsigned long addr, pci_addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
+	switch (size) {
+	case 1:
+		mask = 0x00;
+		shift = (where & 3) * 8;
+		break;
+	case 2:
+		mask = 0x08;
+		shift = (where & 3) * 8;
+		break;
+	case 4:
+		mase = 0x18;
+		shift = 0;
+		break;
+	}
 
 	addr = (pci_addr << 5) + 0x18 + CIA_CONF;
-	*value = conf_read(addr, type1);
+	*value = conf_read(addr, type1) >> (shift);
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int 
-cia_write_config(struct pci_dev *dev, int where, u32 value, long mask)
+cia_write_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
+		 u32 value)
 {
 	unsigned long addr, pci_addr;
+	long mask;
 	unsigned char type1;
 
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	switch (size) {
+	case 1:
+		mask = 0x00;
+		break;
+	case 2:
+		mask = 0x08;
+		break;
+	case 4:
+		mase = 0x18;
+		break;
+	}
 
 	addr = (pci_addr << 5) + mask + CIA_CONF;
 	conf_write(addr, value << ((where & 3) * 8), type1);
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int
-cia_write_config_byte(struct pci_dev *dev, int where, u8 value)
-{
-	return cia_write_config(dev, where, value, 0x00);
-}
-
-static int 
-cia_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	return cia_write_config(dev, where, value, 0x08);
-}
-
-static int 
-cia_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	return cia_write_config(dev, where, value, 0x18);
-}
-
 struct pci_ops cia_pci_ops = 
 {
-	read_byte:	cia_read_config_byte,
-	read_word:	cia_read_config_word,
-	read_dword:	cia_read_config_dword,
-	write_byte:	cia_write_config_byte,
-	write_word:	cia_write_config_word,
-	write_dword:	cia_write_config_dword
+	.read = 	cia_read_config,
+	.write =	cia_write_config,
 };
 
 /*

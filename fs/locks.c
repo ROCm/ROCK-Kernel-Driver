@@ -997,9 +997,7 @@ static int lease_modify(struct file_lock **before, int arg)
 	if (arg == F_UNLCK) {
 		struct file *filp = fl->fl_file;
 
-		filp->f_owner.pid = 0;
-		filp->f_owner.uid = 0;
-		filp->f_owner.euid = 0;
+		f_delown(filp);
 		filp->f_owner.signum = 0;
 		locks_delete_lock(before);
 	}
@@ -1277,13 +1275,7 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 	*before = fl;
 	list_add(&fl->fl_link, &file_lock_list);
 
-	error = security_ops->file_set_fowner(filp);
-	if (error)
-		goto out_unlock;
-
-	filp->f_owner.pid = current->pid;
-	filp->f_owner.uid = current->uid;
-	filp->f_owner.euid = current->euid;
+	error = f_setown(filp, current->pid, 1);
 out_unlock:
 	unlock_kernel();
 	return error;

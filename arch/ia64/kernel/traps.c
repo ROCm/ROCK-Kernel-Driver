@@ -135,8 +135,6 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 	siginfo_t siginfo;
 	int sig, code;
 
-	die_if_kernel("bad break", regs, break_num);
-
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
 	siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 	siginfo.si_imm = break_num;
@@ -144,7 +142,8 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 	siginfo.si_isr = 0;
 
 	switch (break_num) {
-	      case 0: /* unknown error */
+	      case 0: /* unknown error (used by GCC for __builtin_abort()) */
+		die_if_kernel("bad break", regs, break_num);
 		sig = SIGILL; code = ILL_ILLOPC;
 		break;
 

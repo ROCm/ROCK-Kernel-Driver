@@ -224,11 +224,13 @@ acpi_table_compute_checksum (
 
 
 int __init
-acpi_table_parse_madt (
+acpi_table_parse_madt_family (
 	enum acpi_table_id	id,
+	unsigned long		madt_size,
+	int			entry_id,
 	acpi_madt_entry_handler	handler)
 {
-	struct acpi_table_madt	*madt = NULL;
+	void			*madt = NULL;
 	acpi_table_entry_header	*entry = NULL;
 	unsigned long		count = 0;
 	unsigned long		madt_end = 0;
@@ -240,19 +242,21 @@ acpi_table_parse_madt (
 	/* Locate the MADT (if exists). There should only be one. */
 
 	for (i = 0; i < sdt.count; i++) {
-		if (sdt.entry[i].id != ACPI_APIC)
+		if (sdt.entry[i].id != id)
 			continue;
-		madt = (struct acpi_table_madt *)
+		madt = (void *)
 			__acpi_map_table(sdt.entry[i].pa, sdt.entry[i].size);
 		if (!madt) {
-			printk(KERN_WARNING PREFIX "Unable to map MADT\n");
+			printk(KERN_WARNING PREFIX "Unable to map %s\n",
+			       acpi_table_signatures[id]);
 			return -ENODEV;
 		}
 		break;
 	}
 
 	if (!madt) {
-		printk(KERN_WARNING PREFIX "MADT not present\n");
+		printk(KERN_WARNING PREFIX "%s not present\n",
+		       acpi_table_signatures[id]);
 		return -ENODEV;
 	}
 
@@ -261,10 +265,10 @@ acpi_table_parse_madt (
 	/* Parse all entries looking for a match. */
 
 	entry = (acpi_table_entry_header *)
-		((unsigned long) madt + sizeof(struct acpi_table_madt));
+		((unsigned long) madt + madt_size);
 
 	while (((unsigned long) entry) < madt_end) {
-		if (entry->type == id) {
+		if (entry->type == entry_id) {
 			count++;
 			handler(entry);
 		}
@@ -273,6 +277,16 @@ acpi_table_parse_madt (
 	}
 
 	return count;
+}
+
+
+int __init
+acpi_table_parse_madt (
+	enum acpi_madt_entry_id	id,
+	acpi_madt_entry_handler	handler)
+{
+	return acpi_table_parse_madt_family(ACPI_APIC, sizeof(struct acpi_table_madt),
+					    id, handler);
 }
 
 

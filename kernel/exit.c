@@ -233,6 +233,8 @@ void daemonize(void)
  	exit_files(current);
 	current->files = init_task.files;
 	atomic_inc(&current->files->count);
+
+	reparent_to_init();
 }
 
 static void reparent_thread(task_t *p, task_t *reaper, task_t *child_reaper)
@@ -407,7 +409,7 @@ void exit_mm(struct task_struct *tsk)
 static inline void forget_original_parent(struct task_struct * father)
 {
 	struct task_struct *p, *reaper;
-	list_t *_p;
+	struct list_head *_p;
 
 	read_lock(&tasklist_lock);
 
@@ -477,7 +479,7 @@ static inline void zap_thread(task_t *p, task_t *father)
 static void exit_notify(void)
 {
 	struct task_struct *t;
-	list_t *_p, *_n;
+	struct list_head *_p, *_n;
 
 	forget_original_parent(current);
 	/*
@@ -712,15 +714,19 @@ repeat:
 				if (retval)
 					goto end_wait4; 
 				retval = p->pid;
-				if (p->real_parent != p->parent || p->ptrace) {
+				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
-					remove_parent(p);
-					p->parent = p->real_parent;
-					add_parent(p, p->parent);
+					ptrace_unlink(p);
 					do_notify_parent(p, SIGCHLD);
 					write_unlock_irq(&tasklist_lock);
-				} else
+				} else {
+					if (p->ptrace) {
+						write_lock_irq(&tasklist_lock);
+						ptrace_unlink(p);
+						write_unlock_irq(&tasklist_lock);
+					}
 					release_task(p);
+				}
 				goto end_wait4;
 			default:
 				continue;

@@ -18,7 +18,7 @@
  */
 
 #include <linux/config.h>
-#include <asm/efi.h>
+#include <linux/efi.h>
 #include "fpmem.h"
 
 /*

@@ -26,8 +26,9 @@
  * forward references
  */
 static int extBalloc(struct inode *, s64, s64 *, s64 *);
+#ifdef _NOTYET
 static int extBrealloc(struct inode *, s64, s64, s64 *, s64 *);
-int extRecord(struct inode *, xad_t *);
+#endif
 static s64 extRoundDown(s64 nb);
 
 /*
@@ -191,6 +192,7 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
 }
 
 
+#ifdef _NOTYET
 /*
  * NAME:        extRealloc()
  *
@@ -335,6 +337,7 @@ exit:
 	up(&JFS_IP(ip)->commit_sem);
 	return (rc);
 }
+#endif			/* _NOTYET */
 
 
 /*
@@ -440,6 +443,7 @@ int extRecord(struct inode *ip, xad_t * xp)
 }
 
 
+#ifdef _NOTYET
 /*
  * NAME:        extFill()
  *
@@ -473,6 +477,7 @@ int extFill(struct inode *ip, xad_t * xp)
 
 	return (0);
 }
+#endif			/* _NOTYET */
 
 
 /*
@@ -548,6 +553,7 @@ extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
 }
 
 
+#ifdef _NOTYET
 /*
  * NAME:	extBrealloc()
  *
@@ -601,6 +607,7 @@ extBrealloc(struct inode *ip,
 	 */
 	return (extBalloc(ip, blkno, newnblks, newblkno));
 }
+#endif			/* _NOTYET */
 
 
 /*

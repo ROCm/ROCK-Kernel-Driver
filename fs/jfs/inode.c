@@ -65,6 +65,7 @@ struct inode *jfs_iget(struct super_block *sb, ino_t ino)
 		} else
 			inode->i_op = &jfs_symlink_inode_operations;
 	} else {
+		inode->i_op = &jfs_file_inode_operations;
 		init_special_inode(inode, inode->i_mode,
 				   kdev_t_to_nr(inode->i_rdev));
 	}
@@ -163,8 +164,9 @@ void jfs_dirty_inode(struct inode *inode)
 	set_cflag(COMMIT_Dirty, inode);
 }
 
-static int jfs_get_block(struct inode *ip, sector_t lblock,
-			 struct buffer_head *bh_result, int create)
+static int
+jfs_get_blocks(struct inode *ip, sector_t lblock, unsigned long max_blocks,
+			struct buffer_head *bh_result, int create)
 {
 	s64 lblock64 = lblock;
 	int no_size_check = 0;
@@ -200,7 +202,7 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 
 	if ((no_size_check ||
 	     ((lblock64 << ip->i_sb->s_blocksize_bits) < ip->i_size)) &&
-	    (xtLookup(ip, lblock64, 1, &xflag, &xaddr, &xlen, no_size_check)
+	    (xtLookup(ip, lblock64, max_blocks, &xflag, &xaddr, &xlen, no_size_check)
 	     == 0) && xlen) {
 		if (xflag & XAD_NOTRECORDED) {
 			if (!create)
@@ -228,6 +230,7 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 		}
 
 		map_bh(bh_result, ip->i_sb, xaddr);
+		bh_result->b_size = xlen << ip->i_blkbits;
 		goto unlock;
 	}
 	if (!create)
@@ -239,12 +242,13 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 #ifdef _JFS_4K
 	if ((rc = extHint(ip, lblock64 << ip->i_sb->s_blocksize_bits, &xad)))
 		goto unlock;
-	rc = extAlloc(ip, 1, lblock64, &xad, FALSE);
+	rc = extAlloc(ip, max_blocks, lblock64, &xad, FALSE);
 	if (rc)
 		goto unlock;
 
 	set_buffer_new(bh_result);
 	map_bh(bh_result, ip->i_sb, addressXAD(&xad));
+	bh_result->b_size = lengthXAD(&xad) << ip->i_blkbits;
 
 #else				/* _JFS_4K */
 	/*
@@ -265,6 +269,12 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 			IREAD_UNLOCK(ip);
 	}
 	return -rc;
+}
+
+static int jfs_get_block(struct inode *ip, sector_t lblock,
+			 struct buffer_head *bh_result, int create)
+{
+	return jfs_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
 static int jfs_writepage(struct page *page)
@@ -297,18 +307,6 @@ static int jfs_prepare_write(struct file *file,
 static int jfs_bmap(struct address_space *mapping, long block)
 {
 	return generic_block_bmap(mapping, block, jfs_get_block);
-}
-
-static int
-jfs_get_blocks(struct inode *inode, sector_t iblock, unsigned long max_blocks,
-			struct buffer_head *bh_result, int create)
-{
-	int ret;
-
-	ret = jfs_get_block(inode, iblock, bh_result, create);
-	if (ret == 0)
-		bh_result->b_size = (1 << inode->i_blkbits);
-	return ret;
 }
 
 static int jfs_direct_IO(int rw, struct inode *inode, char *buf,

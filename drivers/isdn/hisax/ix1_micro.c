@@ -17,7 +17,6 @@
  * Germany
  */
 
-#define __NO_VERSION__
 #include <linux/init.h>
 #include <linux/isapnp.h>
 #include "hisax.h"

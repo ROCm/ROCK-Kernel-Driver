@@ -937,7 +937,7 @@ static void handle_stripe(struct stripe_head *sh)
 	    for (i=disks; i--; )
 		if (sh->dev[i].written) {
 		    dev = &sh->dev[i];
-		    if (!test_bit(R5_Insync, &dev->flags) &&
+		    if (!test_bit(R5_Insync, &sh->dev[sh->pd_idx].flags) &&
 			(!test_bit(R5_LOCKED, &dev->flags) && test_bit(R5_UPTODATE, &dev->flags)) ) {
 			/* maybe we can return some write requests */
 			    struct bio *wbi, *wbi2;

@@ -667,14 +667,14 @@ extern void amiga_enable_irq(unsigned int irq);
 extern void amiga_disable_irq(unsigned int irq);
 
 struct hw_interrupt_type amiga_sys_irqctrl = {
-	typename: "Amiga IPL",
-	end: apus_end_irq,
+	.typename = "Amiga IPL",
+	.end = apus_end_irq,
 };
 
 struct hw_interrupt_type amiga_irqctrl = {
-	typename: "Amiga    ",
-	enable: amiga_enable_irq,
-	disable: amiga_disable_irq,
+	.typename = "Amiga    ",
+	.enable = amiga_enable_irq,
+	.disable = amiga_disable_irq,
 };
 
 #define HARDWARE_MAPPED_SIZE (512*1024)

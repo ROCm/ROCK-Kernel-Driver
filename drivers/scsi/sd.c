@@ -523,13 +523,6 @@ static int sd_open(struct inode *inode, struct file *filp)
 	if (!sdp->online) {
 		goto error_out;
 	}
-	/*
-	 * See if we are requesting a non-existent partition.  Do this
-	 * after checking for disk change.
-	 */
-	if (sd[SD_PARTITION(inode->i_rdev)].nr_sects == 0) {
-		goto error_out;
-	}
 
 	if (sdp->removable)
 		if (sdp->access_count==1)
@@ -1014,6 +1007,28 @@ sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
 	sdkp->device->sector_size = sector_size;
 }
 
+static int
+sd_do_mode_sense6(Scsi_Device *sdp, Scsi_Request *SRpnt,
+		  int modepage, unsigned char *buffer, int len) {
+	unsigned char cmd[8];
+
+	memset((void *) &cmd[0], 0, 8);
+	cmd[0] = MODE_SENSE;
+	cmd[1] = (sdp->scsi_level <= SCSI_2) ? ((sdp->lun << 5) & 0xe0) : 0;
+	cmd[2] = modepage;
+	cmd[4] = len;
+
+	SRpnt->sr_cmd_len = 0;
+	SRpnt->sr_sense_buffer[0] = 0;
+	SRpnt->sr_sense_buffer[2] = 0;
+	SRpnt->sr_data_direction = SCSI_DATA_READ;
+
+	scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
+		      len, SD_TIMEOUT, MAX_RETRIES);
+
+	return SRpnt->sr_result;
+}
+
 /*
  * read write protect setting, if possible - called only in sd_init_onedisk()
  */
@@ -1021,50 +1036,38 @@ static void
 sd_read_write_protect_flag(Scsi_Disk *sdkp, char *diskname,
 			   Scsi_Request *SRpnt, unsigned char *buffer) {
 	Scsi_Device *sdp = sdkp->device;
-	unsigned char cmd[8];
-	int the_result;
+	int res;
 
 	/*
-	 * For removable scsi disks we have to recognise the
-	 * Write Protect Flag. This flag is kept in the Scsi_Disk
-	 * struct and tested at open !
-	 * Daniel Roche ( dan@lectra.fr )
-	 *
-	 * Changed to get all pages (0x3f) rather than page 1 to
-	 * get around devices which do not have a page 1.  Since
-	 * we're only interested in the header anyway, this should
-	 * be fine.
-	 *   -- Matthew Dharm (mdharm-scsi@one-eyed-alien.net)
-	 *
-	 * As it turns out, some devices return an error for
-	 * every MODE_SENSE request except one for page 0.
-	 * So, we should also try that. --aeb
+	 * First attempt: ask for all pages (0x3F), but only 4 bytes.
+	 * We have to start carefully: some devices hang if we ask
+	 * for more than is available.
 	 */
+	res = sd_do_mode_sense6(sdp, SRpnt, 0x3F, buffer, 4);
 
-	memset((void *) &cmd[0], 0, 8);
-	cmd[0] = MODE_SENSE;
-	cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-		((sdp->lun << 5) & 0xe0) : 0;
-	cmd[2] = 0x3f;	/* Get all pages */
-	cmd[4] = 255;   /* Ask for 255 bytes, even tho we want just the first 8 */
-	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_sense_buffer[0] = 0;
-	SRpnt->sr_sense_buffer[2] = 0;
-	SRpnt->sr_data_direction = SCSI_DATA_READ;
+	/*
+	 * Second attempt: ask for page 0
+	 * When only page 0 is implemented, a request for page 3F may return
+	 * Sense Key 5: Illegal Request, Sense Code 24: Invalid field in CDB.
+	 */
+	if (res)
+		res = sd_do_mode_sense6(sdp, SRpnt, 0, buffer, 4);
 
-	scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-		      255, SD_TIMEOUT, MAX_RETRIES);
+	/*
+	 * Third attempt: ask 255 bytes, as we did earlier.
+	 */
+	if (res)
+		res = sd_do_mode_sense6(sdp, SRpnt, 0x3F, buffer, 255);
 
-	the_result = SRpnt->sr_result;
-
-	if (the_result) {
-		printk("%s: test WP failed, assume Write Enabled\n",
-		       diskname);
-		/* alternatively, try page 0 */
+	if (res) {
+		printk(KERN_WARNING
+		       "%s: test WP failed, assume Write Enabled\n", diskname);
 	} else {
 		sdkp->write_prot = ((buffer[2] & 0x80) != 0);
 		printk(KERN_NOTICE "%s: Write Protect is %s\n", diskname,
 		       sdkp->write_prot ? "on" : "off");
+		printk(KERN_DEBUG "%s: Mode Sense: %02x %02x %02x %02x\n",
+		       diskname, buffer[0], buffer[1], buffer[2], buffer[3]);
 	}
 }
 

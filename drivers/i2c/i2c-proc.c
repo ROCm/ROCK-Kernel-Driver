@@ -60,7 +60,6 @@ int __init sensors_init(void);
 static struct ctl_table_header *i2c_entries[SENSORS_ENTRY_MAX];
 
 static struct i2c_client *i2c_clients[SENSORS_ENTRY_MAX];
-static unsigned short i2c_inodes[SENSORS_ENTRY_MAX];
 
 static ctl_table sysctl_table[] = {
 	{CTL_DEV, "dev", NULL, 0, 0555},
@@ -189,8 +188,6 @@ int i2c_register_entry(struct i2c_client *client, const char *prefix,
 		return id;
 	}
 #endif				/* DEBUG */
-	i2c_inodes[id - 256] =
-	    new_header->ctl_table->child->child->de->low_ino;
 	new_header->ctl_table->child->child->de->owner = controlling_mod;
 
 	return id;
@@ -211,49 +208,6 @@ void i2c_deregister_entry(int id)
 		i2c_entries[id] = NULL;
 		i2c_clients[id] = NULL;
 	}
-}
-
-/* Monitor access for /proc/sys/dev/sensors; make unloading i2c-proc.o 
-   impossible if some process still uses it or some file in it */
-void i2c_fill_inode(struct inode *inode, int fill)
-{
-	if (fill)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-
-/* Monitor access for /proc/sys/dev/sensors/ directories; make unloading
-   the corresponding module impossible if some process still uses it or
-   some file in it */
-void i2c_dir_fill_inode(struct inode *inode, int fill)
-{
-	int i;
-	struct i2c_client *client;
-
-#ifdef DEBUG
-	if (!inode) {
-		printk(KERN_ERR "i2c-proc.o: Warning: inode NULL in fill_inode()\n");
-		return;
-	}
-#endif				/* def DEBUG */
-
-	for (i = 0; i < SENSORS_ENTRY_MAX; i++)
-		if (i2c_clients[i]
-		    && (i2c_inodes[i] == inode->i_ino)) break;
-#ifdef DEBUG
-	if (i == SENSORS_ENTRY_MAX) {
-		printk
-		    (KERN_ERR "i2c-proc.o: Warning: inode (%ld) not found in fill_inode()\n",
-		     inode->i_ino);
-		return;
-	}
-#endif				/* def DEBUG */
-	client = i2c_clients[i];
-	if (fill)
-		client->driver->inc_use(client);
-	else
-		client->driver->dec_use(client);
 }
 
 int i2c_proc_chips(ctl_table * ctl, int write, struct file *filp,

@@ -41,7 +41,7 @@ struct ia64_ctx ia64_ctx = {
 	.max_ctx =	~0U
 };
 
-u8 ia64_need_tlb_flush __per_cpu_data;
+DEFINE_PER_CPU(u8, ia64_need_tlb_flush);
 
 /*
  * Acquire the ia64_ctx.lock before calling this function!

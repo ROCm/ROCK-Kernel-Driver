@@ -212,6 +212,8 @@ csum_partial:
 	mov		1, %g5			/*  IEU0	Group		*/
 	cmp		%o1, 6			/*  IEU1			*/
 	bl,pn		%icc, 21f		/*  CTI				*/
+	 andcc		%o0, 1, %g0		/*  IEU1	Group		*/
+	bne,pn		%icc, csump_really_slow /*  CTI				*/
 	 andcc		%o0, 2, %g0		/*  IEU1	Group		*/
 	be,pt		%icc, 1f		/*  CTI				*/
 	 and		%o0, 4, %g7		/*  IEU0			*/
@@ -449,3 +451,96 @@ csum_partial:
 	 add		%o2, 1, %o2		/*  IEU0			*/
 1:	ba,pt		%xcc, 25b		/*  CTI		Group		*/
 	 sllx		%o2, 32, %g1		/*  IEU0			*/
+
+	/* When buff is byte aligned and len is large, we backoff to
+	 * this really slow handling.  The issue is that we cannot do
+	 * the VIS stuff when buff is byte aligned as unaligned.c will
+	 * not fix it up.
+	 */
+csump_really_slow:
+	mov	%o0, %o3
+	mov	%o1, %o4
+	cmp	%o1, 0
+	ble,pn	%icc, 9f
+	 mov	0, %o0
+	andcc	%o3, 1, %o5
+	be,pt	%icc, 1f
+	 sra	%o4, 1, %g3
+	add	%o1, -1, %o4
+	ldub	[%o3], %o0
+	add	%o3, 1, %o3
+	sra	%o4, 1, %g3
+1:
+	cmp	%g3, 0
+	be,pt	%icc, 3f
+	 and	%o4, 1, %g2
+	and	%o3, 2, %g2
+	brz,a,pt %g2, 1f
+	 sra	%g3, 1, %g3
+	add	%g3, -1, %g3
+	add	%o4, -2, %o4
+	lduh	[%o3], %g2
+	add	%o3, 2, %o3
+	add	%o0, %g2, %o0
+	sra	%g3, 1, %g3
+1:
+	cmp	%g3, 0
+	be,pt	%icc, 2f
+	 and	%o4, 2, %g2
+1:
+	ld	[%o3], %g2
+	addcc	%o0, %g2, %o0
+	addx	%o0, %g0, %o0
+	addcc	%g3, -1, %g3
+	bne,pt	%icc, 1b
+	 add	%o3, 4, %o3
+	srl	%o0, 16, %o1
+	sethi	%hi(64512), %g2
+	or	%g2, 1023, %g2
+	and	%o0, %g2, %g3
+	add	%g3, %o1, %g3
+	srl	%g3, 16, %o0
+	and	%g3, %g2, %g2
+	add	%g2, %o0, %g3
+	sll	%g3, 16, %g3
+	srl	%g3, 16, %o0
+	and	%o4, 2, %g2
+2:
+	cmp	%g2, 0
+	be,pt	%icc, 3f
+	 and	%o4, 1, %g2
+	lduh	[%o3], %g2
+	add	%o3, 2, %o3
+	add	%o0, %g2, %o0
+	and	%o4, 1, %g2
+3:
+	cmp	%g2, 0
+	be,pt	%icc, 1f
+	 srl	%o0, 16, %o1
+	ldub	[%o3], %g2
+	sll	%g2, 8, %g2
+	add	%o0, %g2, %o0
+	srl	%o0, 16, %o1
+1:
+	sethi	%hi(64512), %g2
+	or	%g2, 1023, %g2
+	cmp	%o5, 0
+	and	%o0, %g2, %g3
+	add	%g3, %o1, %g3
+	srl	%g3, 16, %o0
+	and	%g3, %g2, %g2
+	add	%g2, %o0, %g3
+	sll	%g3, 16, %g3
+	srl	%g3, 16, %o0
+	srl	%g3, 24, %g3
+	and	%o0, 255, %g2
+	sll	%g2, 8, %g2
+	bne,pt	%icc, 1f
+	 or	%g3, %g2, %g2
+9:
+	mov	%o0, %g2
+1:
+	addcc	%g2, %o2, %g2
+	addx	%g2, %g0, %g2
+	retl
+	 srl	%g2, 0, %o0

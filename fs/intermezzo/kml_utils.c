@@ -25,7 +25,7 @@ char * bdup_printf (char *format, ...)
         va_list args;
         int  i;
         char *path;
-        long flags;
+        unsigned long flags;
 
         spin_lock_irqsave(&kml_lock, flags);
         va_start(args, format);

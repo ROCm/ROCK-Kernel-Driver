@@ -41,7 +41,7 @@ CONFIG_X86
   486, 586, Pentiums, and various instruction-set-compatible chips by
   AMD, Cyrix, and others.
 
-CONFIG_MULTIQUAD
+CONFIG_X86_NUMAQ
   This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
   multiquad box. This changes the way that processors are bootstrapped,
   and uses Clustered Logical APIC addressing mode instead of Flat Logical.

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
- *              $Revision: 90 $
+ *              $Revision: 91 $
  *
  *****************************************************************************/
 
@@ -137,6 +137,7 @@ acpi_ev_handler_initialize (
 		return_ACPI_STATUS (status);
 	}
 
+	acpi_gbl_events_initialized = TRUE;
 	return_ACPI_STATUS (status);
 }
 

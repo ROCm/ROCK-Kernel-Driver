@@ -1876,14 +1876,10 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 			err = get_user(pid, (int *) arg);
 			if (err)
 				return err; 
-			if (current->pid != pid && current->pgrp != -pid && 
-			    !capable(CAP_NET_ADMIN))
-				return -EPERM;
-			sk->proc = pid;
-			return(0);
+			return f_setown(sock->file, pid, 1);
 		case FIOGETOWN:
 		case SIOCGPGRP:
-			return put_user(sk->proc, (int *)arg);
+			return put_user(sock->file->f_owner.pid, (int *)arg);
 		case SIOCGSTAMP:
 			if(sk->stamp.tv_sec==0)
 				return -ENOENT;

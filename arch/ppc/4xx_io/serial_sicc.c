@@ -343,13 +343,13 @@ static void sicc_set_mctrl_null(struct SICC_port *port, u_int mctrl)
 
 static struct SICC_port sicc_ports[SERIAL_SICC_NR] = {
     {
-        uart_base:  0,
-        uart_base_phys:  SICC0_IO_BASE,
-        irqrx:      SICC0_INTRX,
-        irqtx:      SICC0_INTTX,
-//      uartclk:    0,
-        fifosize:   1,
-        set_mctrl:  sicc_set_mctrl_null,
+        .uart_base = 0,
+        .uart_base_phys = SICC0_IO_BASE,
+        .irqrx =    SICC0_INTRX,
+        .irqtx =    SICC0_INTTX,
+//      .uartclk =    0,
+        .fifosize = 1,
+        .set_mctrl = sicc_set_mctrl_null,
     }
 };
 
@@ -2113,16 +2113,16 @@ static int __init siccuart_console_setup(struct console *co, char *options)
 
 static struct console siccuart_cons =
 {
-    name:       SERIAL_SICC_NAME,
-    write:      siccuart_console_write,
+    .name =     SERIAL_SICC_NAME,
+    .write =    siccuart_console_write,
 #ifdef used_and_not_const_char_pointer
-    read:       siccuart_console_read,
+    .read =     siccuart_console_read,
 #endif
-    device:     siccuart_console_device,
-    wait_key:   siccuart_console_wait_key,
-    setup:      siccuart_console_setup,
-    flags:      CON_PRINTBUFFER,
-    index:      -1,
+    .device =   siccuart_console_device,
+    .wait_key = siccuart_console_wait_key,
+    .setup =    siccuart_console_setup,
+    .flags =    CON_PRINTBUFFER,
+    .index =    -1,
 };
 
 void __init sicc_console_init(void)

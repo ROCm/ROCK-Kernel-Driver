@@ -85,10 +85,24 @@ ide_init_default_hwifs (void)
 	for(index = 0; index < MAX_HWIFS; index++) {
 		ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, NULL);
 		hw.irq = ide_default_irq(ide_default_io_base(index));
-		ide_register_hw(&hw);
+		ide_register_hw(&hw, NULL);
 	}
 #endif
 }
+
+#define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
+#define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))
+#define ide_check_region(from,extent)		check_region((from), (extent))
+#define ide_request_region(from,extent,name)	request_region((from), (extent), (name))
+#define ide_release_region(from,extent)		release_region((from), (extent))
+
+/*
+ * The following are not needed for the non-m68k ports
+ */
+#define ide_ack_intr(hwif)		(1)
+#define ide_fix_driveid(id)		do {} while (0)
+#define ide_release_lock(lock)		do {} while (0)
+#define ide_get_lock(lock, hdlr, data)	do {} while (0)
 
 #endif /* __KERNEL__ */
 

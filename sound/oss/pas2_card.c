@@ -7,6 +7,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include "pas2.h"
@@ -38,6 +39,7 @@ int             translate_code = 0;
 static int      pas_intr_mask = 0;
 static int      pas_irq = 0;
 static int      pas_sb_base = 0;
+spinlock_t		lock=SPIN_LOCK_UNLOCKED;
 #ifndef CONFIG_PAS_JOYSTICK
 static int	joystick = 0;
 #else

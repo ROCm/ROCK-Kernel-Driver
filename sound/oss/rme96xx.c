@@ -10,6 +10,7 @@
    *  11 May 2001: 0.4 fixed for SMP, included into kernel source tree
    *  17 May 2001: 0.5 draining code didn't work on new cards
    *  18 May 2001: 0.6 remove synchronize_irq() call 
+   *  10 Aug 2002: added synchronize_irq() again
 
 TODO:
    - test more than one card --- done
@@ -41,6 +42,7 @@ TODO:
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <asm/dma.h>
+#include <asm/hardirq.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include "rme96xx.h"
@@ -786,8 +788,8 @@ static void __devinit rme96xx_remove(struct pci_dev *dev)
 	}
 	
 	unregister_sound_mixer(s->mixer);
-/*	synchronize_irq(); This call got lost somehow ? */
-        free_irq(s->irq,s);
+	synchronize_irq(s->irq);
+	free_irq(s->irq,s);
 	busmaster_free(s->recbuf,RME96xx_DMA_MAX_SIZE_ALL);
 	busmaster_free(s->playbuf,RME96xx_DMA_MAX_SIZE_ALL);
 	kfree(s);

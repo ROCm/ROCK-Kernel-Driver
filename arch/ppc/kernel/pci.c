@@ -816,19 +816,19 @@ scan_OF_childs_for_device(struct device_node* node, u8 bus, u8 dev_fn)
 /* 
  * Scans the OF tree for a device node matching a PCI device
  */
-struct device_node*
-pci_device_to_OF_node(struct pci_dev *dev)
+struct device_node *
+pci_busdev_to_OF_node(struct pci_bus *bus, int devfn)
 {
 	struct pci_controller *hose;
 	struct device_node *node;
-	int bus;
+	int busnr;
 	
 	if (!have_of)
 		return NULL;
 		
 	/* Lookup the hose */
-	bus = dev->bus->number;
-	hose = pci_bus_to_hose(bus);
+	busnr = bus->number;
+	hose = pci_bus_to_hose(busnr);
 	if (!hose)
 		return NULL;
 
@@ -839,12 +839,18 @@ pci_device_to_OF_node(struct pci_dev *dev)
 
 	/* Fixup bus number according to what OF think it is. */
 	if (pci_to_OF_bus_map)
-		bus = pci_to_OF_bus_map[bus];
-	if (bus == 0xff)
+		busnr = pci_to_OF_bus_map[busnr];
+	if (busnr == 0xff)
 		return NULL;
 		
 	/* Now, lookup childs of the hose */
-	return scan_OF_childs_for_device(node->child, bus, dev->devfn);
+	return scan_OF_childs_for_device(node->child, busnr, devfn);
+}
+
+struct device_node*
+pci_device_to_OF_node(struct pci_dev *dev)
+{
+	return pci_busdev_to_OF_node(dev->bus, dev->devfn);
 }
 
 /* This routine is meant to be used early during boot, when the
@@ -1512,31 +1518,33 @@ null_##rw##_config_##size(struct pci_dev *dev, int offset, type val)	\
 	return PCIBIOS_DEVICE_NOT_FOUND;    				\
 }
 
-NULL_PCI_OP(read, byte, u8 *)
-NULL_PCI_OP(read, word, u16 *)
-NULL_PCI_OP(read, dword, u32 *)
-NULL_PCI_OP(write, byte, u8)
-NULL_PCI_OP(write, word, u16)
-NULL_PCI_OP(write, dword, u32)
+static int
+null_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		 int len, u32 *val)
+{
+	return PCIBIOS_DEVICE_NOT_FOUND;
+}
+
+static int
+null_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		  int len, u32 val)
+{
+	return PCIBIOS_DEVICE_NOT_FOUND;
+}
 
 static struct pci_ops null_pci_ops =
 {
-	null_read_config_byte,
-	null_read_config_word,
-	null_read_config_dword,
-	null_write_config_byte,
-	null_write_config_word,
-	null_write_config_dword
+	null_read_config,
+	null_write_config
 };
 
 /*
  * These functions are used early on before PCI scanning is done
  * and all of the pci_dev and pci_bus structures have been created.
  */
-static struct pci_dev *
-fake_pci_dev(struct pci_controller *hose, int busnr, int devfn)
+static struct pci_bus *
+fake_pci_bus(struct pci_controller *hose, int busnr)
 {
-	static struct pci_dev dev;
 	static struct pci_bus bus;
 
 	if (hose == 0) {
@@ -1544,20 +1552,17 @@ fake_pci_dev(struct pci_controller *hose, int busnr, int devfn)
 		if (hose == 0)
 			printk(KERN_ERR "Can't find hose for PCI bus %d!\n", busnr);
 	}
-	dev.bus = &bus;
-	dev.sysdata = hose;
-	dev.devfn = devfn;
 	bus.number = busnr;
 	bus.ops = hose? hose->ops: &null_pci_ops;
-	return &dev;
+	return &bus;
 }
 
 #define EARLY_PCI_OP(rw, size, type)					\
 int early_##rw##_config_##size(struct pci_controller *hose, int bus,	\
 			       int devfn, int offset, type value)	\
 {									\
-	return pci_##rw##_config_##size(fake_pci_dev(hose, bus, devfn),	\
-					offset, value);			\
+	return pci_bus_##rw##_config_##size(fake_pci_bus(hose, bus),	\
+					    devfn, offset, value);	\
 }
 
 EARLY_PCI_OP(read, byte, u8 *)

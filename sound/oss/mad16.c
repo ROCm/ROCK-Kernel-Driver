@@ -43,7 +43,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/gameport.h>
-
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include "ad1848.h"
@@ -53,7 +53,7 @@
 static int      mad16_conf;
 static int      mad16_cdsel;
 static struct gameport gameport;
-
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 static int      already_initialized = 0;
 
 #define C928	1
@@ -106,8 +106,7 @@ static unsigned char mad_read(int port)
 	unsigned long flags;
 	unsigned char tmp;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	switch (board_type)	/* Output password */
 	{
@@ -142,7 +141,7 @@ static unsigned char mad_read(int port)
 		if (!c924pnp)
 			tmp = inb(port); else
 			tmp = inb(port-0x80);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 
 	return tmp;
 }
@@ -151,8 +150,7 @@ static void mad_write(int port, int value)
 {
 	unsigned long   flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	switch (board_type)	/* Output password */
 	{
@@ -185,7 +183,7 @@ static void mad_write(int port, int value)
 		if (!c924pnp)
 			outb(((unsigned char) (value & 0xff)), port); else
 			outb(((unsigned char) (value & 0xff)), port-0x80);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static int __init detect_c930(void)

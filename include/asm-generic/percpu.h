@@ -10,7 +10,7 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
 /* Separate out the type, so (int[3], foo) works. */
 #ifndef MODULE
 #define DEFINE_PER_CPU(type, name) \
-    __attribute__((__section__(".percpu"))) __typeof__(type) name##__per_cpu
+    __attribute__((__section__(".data.percpu"))) __typeof__(type) name##__per_cpu
 #endif
 
 /* var is in discarded region: offset to particular copy we want */

@@ -94,12 +94,15 @@
 #define MSR_K6_STAR			0xC0000081
 #define MSR_K6_WHCR			0xC0000082
 #define MSR_K6_UWCCR			0xC0000085
+#define MSR_K6_EPMR			0xC0000086
 #define MSR_K6_PSOR			0xC0000087
 #define MSR_K6_PFIR			0xC0000088
 
 #define MSR_K7_EVNTSEL0			0xC0010000
 #define MSR_K7_PERFCTR0			0xC0010004
 #define MSR_K7_HWCR			0xC0010015
+#define MSR_K7_FID_VID_CTL		0xC0010041
+#define MSR_K7_VID_STATUS		0xC0010042
 
 /* Centaur-Hauls/IDT defined MSRs. */
 #define MSR_IDT_FCR1			0x107
@@ -119,5 +122,7 @@
 
 /* VIA Cyrix defined MSRs*/
 #define MSR_VIA_FCR			0x1107
+#define MSR_VIA_LONGHAUL		0x110a
+#define MSR_VIA_BCR2			0x1147
 
 #endif /* __ASM_MSR_H */

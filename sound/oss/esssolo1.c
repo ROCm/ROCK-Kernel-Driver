@@ -1284,12 +1284,12 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_dac.swptr = s->dma_dac.hwptr = s->dma_dac.count = s->dma_dac.total_bytes = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_adc.swptr = s->dma_adc.hwptr = s->dma_adc.count = s->dma_adc.total_bytes = 0;
 		}
 		prog_codec(s);
@@ -2419,7 +2419,7 @@ static void __devinit solo1_remove(struct pci_dev *dev)
 	outb(0, s->iobase+6);
 	outb(0, s->ddmabase+0xd); /* DMA master clear */
 	outb(3, s->sbbase+6); /* reset sequencer and FIFO */
-	synchronize_irq();
+	synchronize_irq(s->irq);
 	pci_write_config_word(s->dev, 0x60, 0); /* turn off DDMA controller address space */
 	free_irq(s->irq, s);
 	if (s->gameport.io) {

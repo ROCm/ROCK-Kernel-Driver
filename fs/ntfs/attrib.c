@@ -1182,8 +1182,9 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 		else {
 			register int rc;
 			
-			rc = memcmp(val, (u8*)a +le16_to_cpu(a->_ARA(value_offset)),
-				min(val_len, le32_to_cpu(a->_ARA(value_length))));
+			rc = memcmp(val, (u8*)a + le16_to_cpu(
+					a->_ARA(value_offset)), min(val_len,
+					le32_to_cpu(a->_ARA(value_length))));
 			/*
 			 * If @val collates before the current attribute's
 			 * value, there is no matching attribute.
@@ -1676,7 +1677,7 @@ void reinit_attr_search_ctx(attr_search_context *ctx)
 		return;
 	} /* Attribute list. */
 	if (ctx->ntfs_ino != ctx->base_ntfs_ino)
-		unmap_mft_record(ctx->ntfs_ino);
+		unmap_extent_mft_record(ctx->ntfs_ino);
 	init_attr_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
 	return;
 }
@@ -1709,7 +1710,7 @@ attr_search_context *get_attr_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 void put_attr_search_ctx(attr_search_context *ctx)
 {
 	if (ctx->base_ntfs_ino && ctx->ntfs_ino != ctx->base_ntfs_ino)
-		unmap_mft_record(ctx->ntfs_ino);
+		unmap_extent_mft_record(ctx->ntfs_ino);
 	kmem_cache_free(ntfs_attr_ctx_cache, ctx);
 	return;
 }

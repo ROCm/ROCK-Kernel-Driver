@@ -43,5 +43,19 @@ static inline void unmap_extent_mft_record(ntfs_inode *ni)
 	return;
 }
 
+/*
+ * flush_dcache_mft_record_page - flush_dcache_page() for mft records
+ * @ni:		ntfs inode structure of mft record
+ *
+ * Call flush_dcache_page() for the page in which an mft record resides.
+ *
+ * This must be called every time an mft record is modified, just after the
+ * modification.
+ */
+static inline void flush_dcache_mft_record_page(ntfs_inode *ni)
+{
+	flush_dcache_page(ni->page);
+}
+
 #endif /* _LINUX_NTFS_MFT_H */
 

@@ -496,8 +496,6 @@ EXPORT_SYMBOL(loops_per_jiffy);
 #endif
 
 EXPORT_SYMBOL(kstat);
-EXPORT_SYMBOL(nr_running);
-EXPORT_SYMBOL(nr_context_switches);
 
 /* misc */
 EXPORT_SYMBOL(panic);
@@ -526,7 +524,6 @@ EXPORT_SYMBOL(secure_tcp_sequence_number);
 EXPORT_SYMBOL(get_random_bytes);
 EXPORT_SYMBOL(securebits);
 EXPORT_SYMBOL(cap_bset);
-EXPORT_SYMBOL(reparent_to_init);
 EXPORT_SYMBOL(daemonize);
 EXPORT_SYMBOL(csum_partial); /* for networking and md */
 EXPORT_SYMBOL(seq_escape);

@@ -123,8 +123,6 @@ void gusintr(int irq, void *dev_id, struct pt_regs *dummy)
 	unsigned char src;
 	extern int gus_timer_enabled;
 
-	sti();
-
 #ifdef CONFIG_SOUND_GUSMAX
 	if (have_gus_max) {
 		struct address_info *hw_config = dev_id;

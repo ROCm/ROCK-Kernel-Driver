@@ -33,11 +33,7 @@
 #include <linux/major.h>
 #include <linux/string.h>
 #include <linux/blk.h>
-/*
- * Yes, specifying asm-ia64 is ugly, but this lets it build on
- * other platforms too, until efi.h moves to include/linux.
- */
-#include <asm-ia64/efi.h>
+#include <linux/efi.h>
 
 #define MSDOS_MBR_SIGNATURE 0xaa55
 #define EFI_PMBR_OSTYPE_EFI 0xEF

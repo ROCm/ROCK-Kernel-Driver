@@ -88,7 +88,6 @@ struct pdflush_work {
 static int __pdflush(struct pdflush_work *my_work)
 {
 	daemonize();
-	reparent_to_init();
 	strcpy(current->comm, "pdflush");
 
 	/* interruptible sleep, so block all signals */

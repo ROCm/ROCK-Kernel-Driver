@@ -134,173 +134,138 @@ static inline void ddb_close_config_base(struct pci_config_swap *swap)
 	ddb_out32(swap->pmr, swap->pmr_backup);
 }
 
-static int read_config_dword(struct pci_config_swap *swap,
-			     struct pci_dev *dev,
+static int read_config(struct pci_config_swap *swap,
+			     struct pci_bus *bus,
+			     unsigned int devfn,
 			     u32 where,
+			     int size,
 			     u32 *val)
 {
-	u32 bus, slot_num, func_num;
-	u32 base;
+	u32 busnum, slot_num, func_num, base, result;
+	int status	
 
-	MIPS_ASSERT((where & 3) == 0);
-	MIPS_ASSERT(where < (1 << 8));
+	switch (size) {
+		case 4:
+			MIPS_ASSERT((where & 3) == 0);
+			MIPS_ASSERT(where < (1 << 8));
 
-	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		MIPS_ASSERT(bus != 0);
-	} else {
-		bus = 0;
+			/* check if the bus is top-level */
+			if (bus->parent != NULL) {
+				busnum = bus->number;
+				MIPS_ASSERT(busnum != 0);
+			} else {
+				busnum = 0;
+			}
+
+			slot_num = PCI_SLOT(devfn);
+			func_num = PCI_FUNC(devfn);
+			base = ddb_access_config_base(swap, busnum, slot_num);
+			*val = *(volatile u32*) (base + (func_num << 8) + where);
+			ddb_close_config_base(swap);
+			return PCIBIOS_SUCCESSFUL;
+
+		case 2:
+			MIPS_ASSERT((where & 1) == 0);
+
+        		status = read_config(swap, bus, devfn, where & ~3, 4,
+					     &result);
+        		if (where & 2) result >>= 16;
+        		*val = (u16)(result & 0xffff);
+        		return status;
+
+		case 1:
+        		status = read_config(swap, bus, devfn, where & ~3, 4,
+					     &result);
+        		if (where & 1) result >>= 8;
+        		if (where & 2) result >>= 16;
+        		*val = (u8)(result & 0xff);
+        		return status;
 	}
-
-	slot_num = PCI_SLOT(dev->devfn);
-	func_num = PCI_FUNC(dev->devfn);
-	base = ddb_access_config_base(swap, bus, slot_num);
-	*val = *(volatile u32*) (base + (func_num << 8) + where);
-	ddb_close_config_base(swap);
-	return PCIBIOS_SUCCESSFUL;
 }
 
-static int read_config_word(struct pci_config_swap *swap,
-			    struct pci_dev *dev,
-			    u32 where,
-			    u16 *val)
-{
-        int status;
-        u32 result;
-
-	MIPS_ASSERT((where & 1) == 0);
-
-        status = read_config_dword(swap, dev, where & ~3, &result);
-        if (where & 2) result >>= 16;
-        *val = result & 0xffff;
-        return status;
-}
-
-static int read_config_byte(struct pci_config_swap *swap,
-			    struct pci_dev *dev,
-			    u32 where,
-			    u8 *val)
-{
-        int status;
-        u32 result;
-
-        status = read_config_dword(swap, dev, where & ~3, &result);
-        if (where & 1) result >>= 8;
-        if (where & 2) result >>= 16;
-        *val = result & 0xff;
-        return status;
-}
-
-static int write_config_dword(struct pci_config_swap *swap,
-			      struct pci_dev *dev,
+static int write_config(struct pci_config_swap *swap,
+			      struct pci_bus *bus,
+			      unsigned int devfn,
 			      u32 where,
+			      int size,
 			      u32 val)
 {
-	u32 bus, slot_num, func_num;
-	u32 base;
+	u32 busnum, slot_num, func_num, base, results;
+	int status, shift = 0;	
 
-	MIPS_ASSERT((where & 3) == 0);
-	MIPS_ASSERT(where < (1 << 8));
+	switch (size) {
+		case 4:
+			MIPS_ASSERT((where & 3) == 0);
+			MIPS_ASSERT(where < (1 << 8));
 
-	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		MIPS_ASSERT(bus != 0);
-	} else {
-		bus = 0;
+			/* check if the bus is top-level */
+			if (bus->parent != NULL) {
+				busnum = bus->number;
+				MIPS_ASSERT(busnum != 0);
+			} else {
+				busnum = 0;
+			}
+
+			slot_num = PCI_SLOT(devfn);
+			func_num = PCI_FUNC(devfn);
+			base = ddb_access_config_base(swap, busnum, slot_num);
+			*(volatile u32*) (base + (func_num << 8) + where) = val; 
+			ddb_close_config_base(swap);
+			return PCIBIOS_SUCCESSFUL;
+
+		case 2:
+			MIPS_ASSERT((where & 1) == 0);
+
+			status = read_config(swap, bus, devfn, where & ~3, 4, 
+					     &result);
+			if (status != PCIBIOS_SUCCESSFUL) return status;
+
+        		if (where & 2)
+                		shift += 16;
+        		result &= ~(0xffff << shift);
+        		result |= (u16)(val << shift);
+        		return write_config(swap, bus, devfn, where & ~3, size, 
+					    result);
+
+		case 1:
+			status = read_config(swap, bus, devfn, where & ~3, 4,
+					    &result);
+			if (status != PCIBIOS_SUCCESSFUL) return status;
+
+        		if (where & 2)
+                		shift += 16;
+        		if (where & 1)
+                		shift += 8;
+        		result &= ~(0xff << shift);
+        		result |= (u8)(val << shift);
+        		return write_config(swap, bus, devfn, where & ~3, size, 
+					    result);
 	}
-
-	slot_num = PCI_SLOT(dev->devfn);
-	func_num = PCI_FUNC(dev->devfn);
-	base = ddb_access_config_base(swap, bus, slot_num);
-	*(volatile u32*) (base + (func_num << 8) + where) = val; 
-	ddb_close_config_base(swap);
-	return PCIBIOS_SUCCESSFUL;
 }
 
-static int write_config_word(struct pci_config_swap *swap,
-			     struct pci_dev *dev,
-			     u32 where,
-			     u16 val)
-{
-	int status, shift=0;
-	u32 result;
-
-	MIPS_ASSERT((where & 1) == 0);
-
-	status = read_config_dword(swap, dev, where & ~3, &result);
-	if (status != PCIBIOS_SUCCESSFUL) return status;
-
-        if (where & 2)
-                shift += 16;
-        result &= ~(0xffff << shift);
-        result |= val << shift;
-        return write_config_dword(swap, dev, where & ~3, result);
-}
-
-static int write_config_byte(struct pci_config_swap *swap,
-			     struct pci_dev *dev,
-			     u32 where,
-			     u8 val)
-{
-	int status, shift=0;
-	u32 result;
-
-	status = read_config_dword(swap, dev, where & ~3, &result);
-	if (status != PCIBIOS_SUCCESSFUL) return status;
-
-        if (where & 2)
-                shift += 16;
-        if (where & 1)
-                shift += 8;
-        result &= ~(0xff << shift);
-        result |= val << shift;
-        return write_config_dword(swap, dev, where & ~3, result);
-}
-
-#define	MAKE_PCI_OPS(prefix, rw, unitname, unittype, pciswap) \
-static int prefix##_##rw##_config_##unitname(struct pci_dev *dev, int where, unittype val) \
+#define	MAKE_PCI_OPS(prefix, rw, pciswap) \
+static int prefix##_##rw##_config(struct pci_bus *bus, unsigned int devfn, \
+				  int where, int size, u32 val) \
 { \
-     return rw##_config_##unitname(pciswap, \
-                                   dev, \
-                                   where, \
-                                   val); \
+     return rw##_config(pciswap, bus, devfn, \
+                                   where, size, val); \
 }
 
-MAKE_PCI_OPS(extpci, read, byte, u8 *, &ext_pci_swap)
-MAKE_PCI_OPS(extpci, read, word, u16 *, &ext_pci_swap)
-MAKE_PCI_OPS(extpci, read, dword, u32 *, &ext_pci_swap)
+MAKE_PCI_OPS(extpci, read, &ext_pci_swap)
+MAKE_PCI_OPS(extpci, write, &ext_pci_swap)
 
-MAKE_PCI_OPS(iopci, read, byte, u8 *, &io_pci_swap)
-MAKE_PCI_OPS(iopci, read, word, u16 *, &io_pci_swap)
-MAKE_PCI_OPS(iopci, read, dword, u32 *, &io_pci_swap)
-
-MAKE_PCI_OPS(extpci, write, byte, u8, &ext_pci_swap)
-MAKE_PCI_OPS(extpci, write, word, u16, &ext_pci_swap)
-MAKE_PCI_OPS(extpci, write, dword, u32, &ext_pci_swap)
-
-MAKE_PCI_OPS(iopci, write, byte, u8, &io_pci_swap)
-MAKE_PCI_OPS(iopci, write, word, u16, &io_pci_swap)
-MAKE_PCI_OPS(iopci, write, dword, u32, &io_pci_swap)
+MAKE_PCI_OPS(iopci, read, &io_pci_swap)
+MAKE_PCI_OPS(iopci, write, &io_pci_swap)
 
 struct pci_ops ddb5477_ext_pci_ops ={
-	extpci_read_config_byte,
-	extpci_read_config_word,
-	extpci_read_config_dword,
-	extpci_write_config_byte,
-	extpci_write_config_word,
-	extpci_write_config_dword
+	.read = 	extpci_read_config,
+	.write = 	extpci_write_config,
 };
 
 
 struct pci_ops ddb5477_io_pci_ops ={
-	iopci_read_config_byte,
-	iopci_read_config_word,
-	iopci_read_config_dword,
-	iopci_write_config_byte,
-	iopci_write_config_word,
-	iopci_write_config_dword
+	.read = 	iopci_read_config,
+	.write = 	iopci_write_config,
 };
 
 #if defined(CONFIG_LL_DEBUG)

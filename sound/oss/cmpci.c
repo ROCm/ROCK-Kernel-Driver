@@ -1791,14 +1791,14 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_dac.swptr = s->dma_dac.hwptr = s->dma_dac.count = s->dma_dac.total_bytes = 0;
 			if (s->status & DO_DUAL_DAC)
 				s->dma_adc.swptr = s->dma_adc.hwptr = s->dma_adc.count = s->dma_adc.total_bytes = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_adc.swptr = s->dma_adc.hwptr = s->dma_adc.count = s->dma_adc.total_bytes = 0;
 		}
 		return 0;
@@ -3166,7 +3166,7 @@ static void __exit cleanup_cmpci(void)
 	while ((s = devs)) {
 		devs = devs->next;
 		outb(0, s->iobase + CODEC_CMI_INT_HLDCLR + 2);  /* disable ints */
-		synchronize_irq();
+		synchronize_irq(s->irq);
 		outb(0, s->iobase + CODEC_CMI_FUNCTRL0 + 2); /* disable channels */
 		free_irq(s->irq, s);
 

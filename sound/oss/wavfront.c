@@ -76,7 +76,7 @@
 #include <linux/ptrace.h>
 #include <linux/fcntl.h>
 #include <linux/ioport.h>    
-
+#include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/config.h>
 
@@ -274,6 +274,7 @@ struct wf_config {
 	wait_queue_head_t interrupt_sleeper; 
 } dev;
 
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 static int  detect_wffx(void);
 static int  wffx_ioctl (wavefront_fx_info *);
 static int  wffx_init (void);
@@ -2202,12 +2203,12 @@ wavefront_should_cause_interrupt (int val, int port, int timeout)
 {
 	unsigned long flags;
 
-	save_flags (flags);
-	cli();
+	/* this will not help on SMP - but at least it compiles */
+	spin_lock_irqsave(&lock, flags);
 	dev.irq_ok = 0;
 	outb (val,port);
 	interruptible_sleep_on_timeout (&dev.interrupt_sleeper, timeout);
-	restore_flags (flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static int __init wavefront_hw_reset (void)
@@ -2222,8 +2223,6 @@ static int __init wavefront_hw_reset (void)
 	bits = wavefront_interrupt_bits (dev.irq);
 
 	printk (KERN_DEBUG LOGNAME "autodetecting WaveFront IRQ\n");
-
-	sti ();
 
 	irq_mask = probe_irq_on ();
 

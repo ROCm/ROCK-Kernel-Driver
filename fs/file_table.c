@@ -54,6 +54,7 @@ struct file * get_empty_filp(void)
 		f->f_version = ++event;
 		f->f_uid = current->fsuid;
 		f->f_gid = current->fsgid;
+		f->f_owner.lock = RW_LOCK_UNLOCKED;
 		list_add(&f->f_list, &anon_list);
 		file_list_unlock();
 		return f;

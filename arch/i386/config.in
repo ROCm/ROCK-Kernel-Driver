@@ -166,7 +166,22 @@ if [ "$CONFIG_SMP" != "y" ]; then
       define_bool CONFIG_X86_IO_APIC y
    fi
 else
-   bool 'Multiquad NUMA system' CONFIG_MULTIQUAD
+  bool 'Multi-node NUMA system support' CONFIG_X86_NUMA
+  if [ "$CONFIG_X86_NUMA" = "y" ]; then
+     #Platform Choices
+     bool 'Multiquad (IBM/Sequent) NUMAQ support' CONFIG_X86_NUMAQ
+     if [ "$CONFIG_X86_NUMAQ" = "y" ]; then
+        define_bool CONFIG_MULTIQUAD y
+     fi
+     # Common NUMA Features
+     if [ "$CONFIG_X86_NUMAQ" = "y" ]; then
+        bool 'Numa Memory Allocation Support' CONFIG_NUMA
+        if [ "$CONFIG_NUMA" = "y" ]; then
+           define_bool CONFIG_DISCONTIGMEM y
+           define_bool CONFIG_HAVE_ARCH_BOOTMEM_NODE y
+        fi
+     fi
+  fi
 fi
 
 bool 'Machine Check Exception' CONFIG_X86_MCE

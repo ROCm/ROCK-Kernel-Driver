@@ -2552,12 +2552,12 @@ static int ess_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac(s);
-			synchronize_irq();
+			synchronize_irq(s->card->pcidev->irq);
 			s->dma_dac.swptr = s->dma_dac.hwptr = s->dma_dac.count = s->dma_dac.total_bytes = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->card->pcidev->irq);
 			s->dma_adc.swptr = s->dma_adc.hwptr = s->dma_adc.count = s->dma_adc.total_bytes = 0;
 		}
 		return 0;
@@ -3682,8 +3682,7 @@ maestro_suspend(struct ess_card *card)
 	unsigned long flags;
 	int i,j;
 
-	save_flags(flags); 
-	cli(); /* over-kill */
+	spin_lock_irqsave(&card->lock,flags); /* over-kill */
 
 	M_printk("maestro: apm in dev %p\n",card);
 
@@ -3711,7 +3710,7 @@ maestro_suspend(struct ess_card *card)
 
 	card->in_suspend++;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock,flags);
 
 	/* we trust in the bios to power down the chip on suspend.
 	 * XXX I'm also not sure that in_suspend will protect
@@ -3725,8 +3724,7 @@ maestro_resume(struct ess_card *card)
 	unsigned long flags;
 	int i;
 
-	save_flags(flags);
-	cli(); /* over-kill */
+	spin_lock_irqsave(&card->lock,flags); /* over-kill */
 
 	card->in_suspend = 0;
 
@@ -3779,7 +3777,7 @@ maestro_resume(struct ess_card *card)
 		}
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock,flags);
 
 	/* all right, we think things are ready, 
 		wake up people who were using the device

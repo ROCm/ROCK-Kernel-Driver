@@ -606,6 +606,15 @@ CONFIG_NTFS_DEBUG
   When reporting bugs, please try to have available a full dump of
   debugging messages while the misbehaviour was occurring.
 
+CONFIG_NTFS_RW
+  This enables the experimental write support in the NTFS driver.
+
+  WARNING: Do not use this option unless you are actively developing
+           NTFS as it is currently guaranteed to be broken and you
+           may lose all your data!
+
+  It is strongly recommended and perfectly safe to say N here.
+
 CONFIG_SYSV_FS
   SCO, Xenix and Coherent are commercial Unix systems for Intel
   machines, and Version 7 was used on the DEC PDP-11. Saying Y

@@ -1458,15 +1458,9 @@ static int tty_fasync(int fd, struct file * filp, int on)
 	if (on) {
 		if (!waitqueue_active(&tty->read_wait))
 			tty->minimum_to_wake = 1;
-		if (filp->f_owner.pid == 0) {
-			retval = security_ops->file_set_fowner(filp);
-			if (retval)
-				return retval;
-
-			filp->f_owner.pid = (-tty->pgrp) ? : current->pid;
-			filp->f_owner.uid = current->uid;
-			filp->f_owner.euid = current->euid;
-		}
+		retval = f_setown(filp, (-tty->pgrp) ? : current->pid, 0);
+		if (retval)
+			return retval;
 	} else {
 		if (!tty->fasync && !waitqueue_active(&tty->read_wait))
 			tty->minimum_to_wake = N_TTY_BUF_SIZE;

@@ -61,7 +61,7 @@ struct vm_area_struct {
 	 * one of the address_space->i_mmap{,shared} lists,
 	 * for shm areas, the list of attaches, otherwise unused.
 	 */
-	list_t shared;
+	struct list_head shared;
 
 	/* Function pointers to deal with this struct. */
 	struct vm_operations_struct * vm_ops;
@@ -182,6 +182,12 @@ struct page {
 };
 
 /*
+ * FIXME: take this include out, include page-flags.h in
+ * files which need it (119 of them)
+ */
+#include <linux/page-flags.h>
+
+/*
  * Methods to modify the page usage count.
  *
  * What counts for a page usage:
@@ -195,16 +201,22 @@ struct page {
  */
 #define get_page(p)		atomic_inc(&(p)->count)
 #define __put_page(p)		atomic_dec(&(p)->count)
-#define put_page_testzero(p) 	atomic_dec_and_test(&(p)->count)
+#define put_page_testzero(p)				\
+	({						\
+		BUG_ON(page_count(page) == 0);		\
+		atomic_dec_and_test(&(p)->count);	\
+	})
 #define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
+
 extern void FASTCALL(__page_cache_release(struct page *));
-#define put_page(p)							\
-	do {								\
-		if (!PageReserved(p) && put_page_testzero(p))		\
-			__page_cache_release(p);			\
-	} while (0)
 void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
+
+static inline void put_page(struct page *page)
+{
+	if (!PageReserved(page) && put_page_testzero(page))
+		__page_cache_release(page);
+}
 
 /*
  * Multiple processes may "see" the same page. E.g. for untouched
@@ -256,12 +268,6 @@ void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
  */
 
 /*
- * FIXME: take this include out, include page-flags.h in
- * files which need it (119 of them)
- */
-#include <linux/page-flags.h>
-
-/*
  * The zone field is never updated after free_area_init_core()
  * sets it, so none of the operations on it need to be atomic.
  */
@@ -310,8 +316,8 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 #else /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
 
 #define page_address(page)						\
-	__va( (((page) - page_zone(page)->zone_mem_map) << PAGE_SHIFT)	\
-			+ page_zone(page)->zone_start_paddr)
+	__va( ( ((page) - page_zone(page)->zone_mem_map)		\
+			+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
 
 #endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
 
@@ -392,7 +398,7 @@ static inline pmd_t *pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long a
 
 extern void free_area_init(unsigned long * zones_size);
 extern void free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
-	unsigned long * zones_size, unsigned long zone_start_paddr, 
+	unsigned long * zones_size, unsigned long zone_start_pfn, 
 	unsigned long *zholes_size);
 extern void mem_init(void);
 extern void show_mem(void);

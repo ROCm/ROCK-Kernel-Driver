@@ -28,135 +28,107 @@
 /* LongTrail */
 unsigned long gg2_pci_config_base;
 
-#define pci_config_addr(dev, offset) \
-(gg2_pci_config_base | ((dev->bus->number)<<16) | ((dev->devfn)<<8) | (offset))
-
-volatile struct Hydra *Hydra = NULL;
-
 /*
  * The VLSI Golden Gate II has only 512K of PCI configuration space, so we
  * limit the bus number to 3 bits
  */
 
-#define cfg_read(val, addr, type, op)	*val = op((type)(addr))
-#define cfg_write(val, addr, type, op)	op((type *)(addr), (val))
+int __chrp gg2_read_config(struct pci_bus *bus, unsigned int devfn, int off,
+			   int len, u32 *val)
+{
+	volatile unsigned char *cfg_data;
+	struct pci_controller *hose = bus->sysdata;
 
-#define cfg_read_bad(val, size)		*val = bad_##size;
-#define cfg_write_bad(val, size)
-
-#define bad_byte	0xff
-#define bad_word	0xffff
-#define bad_dword	0xffffffffU
-
-#define GG2_PCI_OP(rw, size, type, op)					    \
-int __chrp gg2_##rw##_config_##size(struct pci_dev *dev, int off, type val) \
-{									    \
-	if (dev->bus->number > 7) {					    \
-		cfg_##rw##_bad(val, size)				    \
-		return PCIBIOS_DEVICE_NOT_FOUND;			    \
-	}								    \
-	cfg_##rw(val, pci_config_addr(dev, off), type, op);		    \
-	return PCIBIOS_SUCCESSFUL;					    \
+	if (bus->number > 7)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	/*
+	 * Note: the caller has already checked that off is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	cfg_data = hose->cfg_data + ((bus->number<<16) | (devfn<<8) | off);
+	switch (len) {
+	case 1:
+		*val =  in_8((u8 *)cfg_data);
+		break;
+	case 2:
+		*val = in_le16((u16 *)cfg_data);
+		break;
+	default:
+		*val = in_le32((u32 *)cfg_data);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
-GG2_PCI_OP(read, byte, u8 *, in_8)
-GG2_PCI_OP(read, word, u16 *, in_le16)
-GG2_PCI_OP(read, dword, u32 *, in_le32)
-GG2_PCI_OP(write, byte, u8, out_8)
-GG2_PCI_OP(write, word, u16, out_le16)
-GG2_PCI_OP(write, dword, u32, out_le32)
+int __chrp gg2_write_config(struct pci_bus *bus, unsigned int devfn, int off,
+			    int len, u32 val)
+{
+	volatile unsigned char *cfg_data;
+	struct pci_controller *hose = bus->sysdata;
+
+	if (bus->number > 7)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	/*
+	 * Note: the caller has already checked that off is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	cfg_data = hose->cfg_data + ((bus->number<<16) | (devfn<<8) | off);
+	switch (len) {
+	case 1:
+		out_8((u8 *)cfg_data, val);
+		break;
+	case 2:
+		out_le16((u16 *)cfg_data, val);
+		break;
+	default:
+		out_le32((u32 *)cfg_data, val);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
+}
 
 static struct pci_ops gg2_pci_ops =
 {
-	gg2_read_config_byte,
-	gg2_read_config_word,
-	gg2_read_config_dword,
-	gg2_write_config_byte,
-	gg2_write_config_word,
-	gg2_write_config_dword
-};
-
-/*
- * Access functions for PCI config space on IBM "python" host bridges.
- */
-#define PYTHON_CFA(b, d, o)	(0x80 | ((b) << 8) | ((d) << 16) \
-				 | (((o) & ~3) << 24))
-
-#define PYTHON_PCI_OP(rw, size, type, op, mask)			    	     \
-int __chrp								     \
-python_##rw##_config_##size(struct pci_dev *dev, int offset, type val) 	     \
-{									     \
-	struct pci_controller *hose = dev->sysdata;			     \
-									     \
-	out_be32(hose->cfg_addr,					     \
-		 PYTHON_CFA(dev->bus->number, dev->devfn, offset));	     \
-	cfg_##rw(val, hose->cfg_data + (offset & mask), type, op);   	     \
-	return PCIBIOS_SUCCESSFUL;					     \
-}
-
-PYTHON_PCI_OP(read, byte, u8 *, in_8, 3)
-PYTHON_PCI_OP(read, word, u16 *, in_le16, 2)
-PYTHON_PCI_OP(read, dword, u32 *, in_le32, 0)
-PYTHON_PCI_OP(write, byte, u8, out_8, 3)
-PYTHON_PCI_OP(write, word, u16, out_le16, 2)
-PYTHON_PCI_OP(write, dword, u32, out_le32, 0)
-
-static struct pci_ops python_pci_ops =
-{
-	python_read_config_byte,
-	python_read_config_word,
-	python_read_config_dword,
-	python_write_config_byte,
-	python_write_config_word,
-	python_write_config_dword
+	gg2_read_config,
+	gg2_write_config
 };
 
 /*
  * Access functions for PCI config space using RTAS calls.
  */
-#define RTAS_PCI_READ_OP(size, type, nbytes)			    	  \
-int __chrp								  \
-rtas_read_config_##size(struct pci_dev *dev, int offset, type val) 	  \
-{									  \
-	unsigned long addr = (offset & 0xff) | ((dev->devfn & 0xff) << 8) \
-		| ((dev->bus->number & 0xff) << 16);			  \
-	unsigned long ret = ~0UL;					  \
-	int rval;							  \
-									  \
-	rval = call_rtas("read-pci-config", 2, 2, &ret, addr, nbytes);	  \
-	*val = ret;							  \
-	return rval? PCIBIOS_DEVICE_NOT_FOUND: PCIBIOS_SUCCESSFUL;    	  \
+int __chrp
+rtas_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		 int len, u32 *val)
+{
+	unsigned long addr = (offset & 0xff) | ((devfn & 0xff) << 8)
+		| ((bus->number & 0xff) << 16);
+        unsigned long ret = ~0UL;
+	int rval;
+
+	rval = call_rtas("read-pci-config", 2, 2, &ret, addr, len);
+	*val = ret;
+	return rval? PCIBIOS_DEVICE_NOT_FOUND: PCIBIOS_SUCCESSFUL;
 }
 
-#define RTAS_PCI_WRITE_OP(size, type, nbytes)				  \
-int __chrp								  \
-rtas_write_config_##size(struct pci_dev *dev, int offset, type val)	  \
-{									  \
-	unsigned long addr = (offset & 0xff) | ((dev->devfn & 0xff) << 8) \
-		| ((dev->bus->number & 0xff) << 16);			  \
-	int rval;							  \
-									  \
-	rval = call_rtas("write-pci-config", 3, 1, NULL,		  \
-			 addr, nbytes, (ulong)val);			  \
-	return rval? PCIBIOS_DEVICE_NOT_FOUND: PCIBIOS_SUCCESSFUL;	  \
-}
+int __chrp
+rtas_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		  int len, u32 val)
+{
+	unsigned long addr = (offset & 0xff) | ((devfn & 0xff) << 8)
+		| ((bus->number & 0xff) << 16);
+	int rval;
 
-RTAS_PCI_READ_OP(byte, u8 *, 1)
-RTAS_PCI_READ_OP(word, u16 *, 2)
-RTAS_PCI_READ_OP(dword, u32 *, 4)
-RTAS_PCI_WRITE_OP(byte, u8, 1)
-RTAS_PCI_WRITE_OP(word, u16, 2)
-RTAS_PCI_WRITE_OP(dword, u32, 4)
+	rval = call_rtas("write-pci-config", 3, 1, NULL, addr, len, val);
+	return rval? PCIBIOS_DEVICE_NOT_FOUND: PCIBIOS_SUCCESSFUL;
+}
 
 static struct pci_ops rtas_pci_ops =
 {
-	rtas_read_config_byte,
-	rtas_read_config_word,
-	rtas_read_config_dword,
-	rtas_write_config_byte,
-	rtas_write_config_word,
-	rtas_write_config_dword
+	rtas_read_config,
+	rtas_write_config
 };
+
+volatile struct Hydra *Hydra = NULL;
 
 int __init
 hydra_init(void)
@@ -203,12 +175,9 @@ static void __init
 setup_python(struct pci_controller *hose, struct device_node *dev)
 {
 	u32 *reg, val;
-	volatile unsigned char *cfg;
+	unsigned long addr = dev->addrs[0].address;
 
-	hose->ops = &python_pci_ops;
-	cfg = ioremap(dev->addrs[0].address + 0xf8000, 0x20);
-	hose->cfg_addr = (volatile unsigned int *) cfg;
-	hose->cfg_data = cfg + 0x10;
+	setup_indirect_pci(hose, addr + 0xf8000, addr + 0xf8010);
 
 	/* Clear the magic go-slow bit */
 	reg = (u32 *) ioremap(dev->addrs[0].address + 0xf6000, 0x40);
@@ -288,8 +257,9 @@ chrp_find_bridges(void)
 			setup_grackle(hose);
 		} else if (is_longtrail) {
 			hose->ops = &gg2_pci_ops;
-			gg2_pci_config_base = (unsigned long)
+			hose->cfg_data = (unsigned char *)
 				ioremap(GG2_PCI_CONFIG_BASE, 0x80000);
+			gg2_pci_config_base = (unsigned long) hose->cfg_data;
 		} else {
 			printk("No methods for %s (model %s), using RTAS\n",
 			       dev->full_name, model);

@@ -27,13 +27,13 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
+#include <linux/efi.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
 #include <asm/cache.h>
 #include <asm/current.h>
 #include <asm/delay.h>
-#include <asm/efi.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/machvec.h>

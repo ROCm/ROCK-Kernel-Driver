@@ -18,4 +18,7 @@
 #define flush_agp_mappings()		/* nothing */
 #define flush_agp_cache()		mb()
 
+/* Page-protection value to be used for AGP memory mapped into kernel space.  */
+#define PAGE_AGP			PAGE_KERNEL
+
 #endif /* _ASM_IA64_AGP_H */

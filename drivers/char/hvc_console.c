@@ -232,7 +232,6 @@ int khvcd(void *unused)
 	int i;
 
 	daemonize();
-	reparent_to_init();
 	strcpy(current->comm, "khvcd");
 	sigfillset(&current->blocked);
 

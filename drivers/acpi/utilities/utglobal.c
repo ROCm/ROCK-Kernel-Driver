@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 168 $
+ *              $Revision: 170 $
  *
  *****************************************************************************/
 
@@ -166,10 +166,10 @@ const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES] = {
 
 
 /*
- * Names built-in to the interpreter
+ * Predefined ACPI Names (Built-in to the Interpreter)
  *
  * Initial values are currently supported only for types String and Number.
- * To avoid type punning, both are specified as strings in this table.
+ * Both are specified as strings in this table.
  *
  * NOTES:
  * 1) _SB_ is defined to be a device to allow _SB_/_INI to be run
@@ -177,11 +177,11 @@ const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES] = {
  */
 
 const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
-{ {"_GPE",    INTERNAL_TYPE_DEF_ANY,      NULL},
-	{"_PR_",    INTERNAL_TYPE_DEF_ANY,      NULL},
+{ {"_GPE",    INTERNAL_TYPE_SCOPE,        NULL},
+	{"_PR_",    INTERNAL_TYPE_SCOPE,        NULL},
 	{"_SB_",    ACPI_TYPE_DEVICE,           NULL},
-	{"_SI_",    INTERNAL_TYPE_DEF_ANY,      NULL},
-	{"_TZ_",    INTERNAL_TYPE_DEF_ANY,      NULL},
+	{"_SI_",    INTERNAL_TYPE_SCOPE,        NULL},
+	{"_TZ_",    INTERNAL_TYPE_SCOPE,        NULL},
 	{"_REV",    ACPI_TYPE_INTEGER,          "2"},
 	{"_OS_",    ACPI_TYPE_STRING,           ACPI_OS_NAME},
 	{"_GL_",    ACPI_TYPE_MUTEX,            "0"},
@@ -195,9 +195,7 @@ const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
 
 /*
  * Properties of the ACPI Object Types, both internal and external.
- *
- * Elements of Acpi_ns_properties are bit significant
- * and the table is indexed by values of acpi_object_type
+ * The table is indexed by values of acpi_object_type
  */
 
 const u8                        acpi_gbl_ns_properties[] =
@@ -530,7 +528,6 @@ acpi_ut_get_object_type_name (
 
 /*
  * Strings and procedures used for debug only
- *
  */
 
 
@@ -763,6 +760,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_gpe_register_info          = NULL;
 	acpi_gbl_gpe_number_info            = NULL;
+	acpi_gbl_events_initialized         = FALSE;
 
 	/* Namespace */
 

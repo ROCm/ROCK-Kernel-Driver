@@ -464,7 +464,6 @@ typedef struct ide_drive_s {
 	byte     nice1;			/* flag: give potential excess bandwidth */
 	unsigned present	: 1;	/* drive is physically present */
 	unsigned noprobe 	: 1;	/* from:  hdx=noprobe */
-	unsigned busy		: 1;	/* currently doing revalidate_disk() */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
 	unsigned forced_geom	: 1;	/* 1 if hdx=c,h,s was given at boot */
 	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
@@ -506,7 +505,6 @@ typedef struct ide_drive_s {
 	unsigned long long capacity48;	/* total number of sectors */
 	unsigned int	drive_data;	/* for use by tuneproc/selectproc as needed */
 	struct hwif_s	  *hwif;	/* actually (ide_hwif_t *) */
-	wait_queue_head_t wqueue;	/* used to wait for drive in open() */
 	struct hd_driveid *id;		/* drive model identification info */
 	struct hd_struct  *part;	/* drive partition table */
 	char		name[4];	/* drive name, such as "hda" */

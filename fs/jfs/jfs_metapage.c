@@ -27,16 +27,13 @@
 #include "jfs_txnmgr.h"
 #include "jfs_debug.h"
 
-extern struct task_struct *jfsCommitTask;
 static spinlock_t meta_lock = SPIN_LOCK_UNLOCKED;
-static wait_queue_head_t meta_wait;
 
 #ifdef CONFIG_JFS_STATISTICS
 struct {
 	uint	pagealloc;	/* # of page allocations */
 	uint	pagefree;	/* # of page frees */
 	uint	lockwait;	/* # of sleeping lock_metapage() calls */
-	uint	allocwait;	/* # of sleeping alloc_metapage() calls */
 } mpStat;
 #endif
 
@@ -135,11 +132,6 @@ static void mp_mempool_free(void *element, void *pool_data)
 int __init metapage_init(void)
 {
 	/*
-	 * Initialize wait queue
-	 */
-	init_waitqueue_head(&meta_wait);
-
-	/*
 	 * Allocate the metapage structures
 	 */
 	metapage_cache = kmem_cache_create("jfs_mp", sizeof(metapage_t), 0, 0,
@@ -225,51 +217,6 @@ static void remove_from_hash(metapage_t * mp, metapage_t ** hash_ptr)
 		mp->hash_next->hash_prev = mp->hash_prev;
 }
 
-/*
- * Direct address space operations
- */
-
-static int direct_get_block(struct inode *ip, sector_t lblock,
-			    struct buffer_head *bh_result, int create)
-{
-	if (create)
-		set_buffer_new(bh_result);
-
-	map_bh(bh_result, ip->i_sb, lblock);
-
-	return 0;
-}
-
-static int direct_writepage(struct page *page)
-{
-	return block_write_full_page(page, direct_get_block);
-}
-
-static int direct_readpage(struct file *fp, struct page *page)
-{
-	return block_read_full_page(page, direct_get_block);
-}
-
-static int direct_prepare_write(struct file *file, struct page *page,
-				unsigned from, unsigned to)
-{
-	return block_prepare_write(page, from, to, direct_get_block);
-}
-
-static int direct_bmap(struct address_space *mapping, long block)
-{
-	return generic_block_bmap(mapping, block, direct_get_block);
-}
-
-struct address_space_operations direct_aops = {
-	.readpage	= direct_readpage,
-	.writepage	= direct_writepage,
-	.sync_page	= block_sync_page,
-	.prepare_write	= direct_prepare_write,
-	.commit_write	= generic_commit_write,
-	.bmap		= direct_bmap,
-};
-
 metapage_t *__get_metapage(struct inode *inode,
 			   unsigned long lblock, unsigned int size,
 			   int absolute, unsigned long new)
@@ -286,14 +233,12 @@ metapage_t *__get_metapage(struct inode *inode,
 		 inode, lblock));
 
 	if (absolute)
-		mapping = JFS_SBI(inode->i_sb)->direct_mapping;
+		mapping = inode->i_sb->s_bdev->bd_inode->i_mapping;
 	else
 		mapping = inode->i_mapping;
 
 	spin_lock(&meta_lock);
-
 	hash_ptr = meta_hash(mapping, lblock);
-
 	mp = search_hash(hash_ptr, mapping, lblock);
 	if (mp) {
 	      page_found:
@@ -309,7 +254,7 @@ metapage_t *__get_metapage(struct inode *inode,
 		lock_metapage(mp);
 		spin_unlock(&meta_lock);
 	} else {
-		l2bsize = inode->i_sb->s_blocksize_bits;
+		l2bsize = inode->i_blkbits;
 		l2BlocksPerPage = PAGE_CACHE_SHIFT - l2bsize;
 		page_index = lblock >> l2BlocksPerPage;
 		page_offset = (lblock - (page_index << l2BlocksPerPage)) <<
@@ -431,12 +376,11 @@ void hold_metapage(metapage_t * mp, int force)
 
 static void __write_metapage(metapage_t * mp)
 {
-	struct inode *ip = (struct inode *) mp->mapping->host;
+	int l2bsize = mp->mapping->host->i_blkbits;
+	int l2BlocksPerPage = PAGE_CACHE_SHIFT - l2bsize;
 	unsigned long page_index;
 	unsigned long page_offset;
 	int rc;
-	int l2bsize = ip->i_sb->s_blocksize_bits;
-	int l2BlocksPerPage = PAGE_CACHE_SHIFT - l2bsize;
 
 	jFYI(1, ("__write_metapage: mp = 0x%p\n", mp));
 
@@ -557,12 +501,11 @@ void release_metapage(metapage_t * mp)
 	jFYI(1, ("release_metapage: done\n"));
 }
 
-void invalidate_metapages(struct inode *ip, unsigned long addr,
-			 unsigned long len)
+void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 {
 	metapage_t **hash_ptr;
 	unsigned long lblock;
-	int l2BlocksPerPage = PAGE_CACHE_SHIFT - ip->i_sb->s_blocksize_bits;
+	int l2BlocksPerPage = PAGE_CACHE_SHIFT - ip->i_blkbits;
 	struct address_space *mapping = ip->i_mapping;
 	metapage_t *mp;
 	struct page *page;
@@ -625,12 +568,10 @@ int jfs_mpstat_read(char *buffer, char **start, off_t offset, int length,
 		       "=======================\n"
 		       "page allocations = %d\n"
 		       "page frees = %d\n"
-		       "lock waits = %d\n"
-		       "allocation waits = %d\n",
+		       "lock waits = %d\n",
 		       mpStat.pagealloc,
 		       mpStat.pagefree,
-		       mpStat.lockwait,
-		       mpStat.allocwait);
+		       mpStat.lockwait);
 
 	begin = offset;
 	*start = buffer + begin;

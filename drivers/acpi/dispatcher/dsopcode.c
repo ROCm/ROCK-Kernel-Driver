@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 81 $
+ *              $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -93,7 +93,7 @@ acpi_ds_execute_arguments (
 		return_ACPI_STATUS (status);
 	}
 
-	walk_state->parse_flags = 0;
+	walk_state->parse_flags = ACPI_PARSE_DEFERRED_OP;
 
 	/* Pass1: Parse the entire declaration */
 

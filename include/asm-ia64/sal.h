@@ -24,9 +24,9 @@
  */
 
 #include <linux/spinlock.h>
+#include <linux/efi.h>
 
 #include <asm/pal.h>
-#include <asm/efi.h>
 #include <asm/system.h>
 #include <asm/fpu.h>
 

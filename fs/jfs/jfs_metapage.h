@@ -57,11 +57,6 @@ typedef struct metapage {
 	struct jfs_log *log;
 } metapage_t;
 
-/*
- * Direct-access address space operations
- */
-extern struct address_space_operations direct_aops;
-
 /* metapage flag */
 #define META_locked	0
 #define META_absolute	1
@@ -107,9 +102,13 @@ static inline void discard_metapage(metapage_t *mp)
 }
 
 /*
- * This routine uses hash to explicitly find small number of pages
+ * This routines invalidate all pages for an extent.
  */
-extern void invalidate_metapages(struct inode *, unsigned long, unsigned long);
+extern void __invalidate_metapages(struct inode *, s64, int);
+#define invalidate_pxd_metapages(ip, pxd) \
+	__invalidate_metapages((ip), addressPXD(&(pxd)), lengthPXD(&(pxd)))
+#define invalidate_dxd_metapages(ip, dxd) \
+	__invalidate_metapages((ip), addressDXD(&(dxd)), lengthDXD(&(dxd)))
 
 /*
  * This one uses mp_list to invalidate all pages for an inode

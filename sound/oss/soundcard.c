@@ -658,22 +658,16 @@ int sound_alloc_dma(int chn, char *deviceID)
 
 int sound_open_dma(int chn, char *deviceID)
 {
-	unsigned long   flags;
-
 	if (!valid_dma(chn)) {
 		printk(KERN_ERR "sound_open_dma: Invalid DMA channel %d\n", chn);
 		return 1;
 	}
-	save_flags(flags);
-	cli();
 
 	if (dma_alloc_map[chn] != DMA_MAP_FREE) {
 		printk("sound_open_dma: DMA channel %d busy or not allocated (%d)\n", chn, dma_alloc_map[chn]);
-		restore_flags(flags);
 		return 1;
 	}
 	dma_alloc_map[chn] = DMA_MAP_BUSY;
-	restore_flags(flags);
 	return 0;
 }
 
@@ -689,18 +683,11 @@ void sound_free_dma(int chn)
 
 void sound_close_dma(int chn)
 {
-	unsigned long   flags;
-
-	save_flags(flags);
-	cli();
-
 	if (dma_alloc_map[chn] != DMA_MAP_BUSY) {
 		printk(KERN_ERR "sound_close_dma: Bad access to DMA channel %d\n", chn);
-		restore_flags(flags);
 		return;
 	}
 	dma_alloc_map[chn] = DMA_MAP_FREE;
-	restore_flags(flags);
 }
 
 static void do_sequencer_timer(unsigned long dummy)

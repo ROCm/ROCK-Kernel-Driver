@@ -133,7 +133,7 @@ typedef struct runqueue runqueue_t;
 struct prio_array {
 	int nr_active;
 	unsigned long bitmap[BITMAP_SIZE];
-	list_t queue[MAX_PRIO];
+	struct list_head queue[MAX_PRIO];
 };
 
 /*
@@ -152,7 +152,7 @@ struct runqueue {
 	int prev_nr_running[NR_CPUS];
 
 	task_t *migration_thread;
-	list_t migration_queue;
+	struct list_head migration_queue;
 
 } ____cacheline_aligned;
 
@@ -739,7 +739,7 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	int imbalance, idx, this_cpu = smp_processor_id();
 	runqueue_t *busiest;
 	prio_array_t *array;
-	list_t *head, *curr;
+	struct list_head *head, *curr;
 	task_t *tmp;
 
 	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance);
@@ -937,7 +937,7 @@ asmlinkage void schedule(void)
 	task_t *prev, *next;
 	runqueue_t *rq;
 	prio_array_t *array;
-	list_t *queue;
+	struct list_head *queue;
 	int idx;
 
 	if (unlikely(in_interrupt()))
@@ -1032,15 +1032,12 @@ asmlinkage void preempt_schedule(void)
 {
 	struct thread_info *ti = current_thread_info();
 
-	if (unlikely(ti->preempt_count))
+	/*
+	 * If there is a non-zero preempt_count or interrupts are disabled,
+	 * we do not want to preempt the current task.  Just return..
+	 */
+	if (unlikely(ti->preempt_count || irqs_disabled()))
 		return;
-	if (unlikely(irqs_disabled())) {
-		preempt_disable();
-		printk("bad: schedule() with irqs disabled!\n");
-		show_stack(NULL);
-		preempt_enable_no_resched();
-		return;
-	}
 
 need_resched:
 	ti->preempt_count = PREEMPT_ACTIVE;
@@ -1899,9 +1896,9 @@ void __init init_idle(task_t *idle, int cpu)
  */
 
 typedef struct {
-	list_t list;
+	struct list_head list;
 	task_t *task;
-	struct semaphore sem;
+	struct completion done;
 } migration_req_t;
 
 /*
@@ -1945,13 +1942,13 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}
-	init_MUTEX_LOCKED(&req.sem);
+	init_completion(&req.done);
 	req.task = p;
 	list_add(&req.list, &rq->migration_queue);
 	task_rq_unlock(rq, &flags);
 	wake_up_process(rq->migration_thread);
 
-	down(&req.sem);
+	wait_for_completion(&req.done);
 out:
 	preempt_enable();
 }
@@ -2032,7 +2029,7 @@ repeat:
 		double_rq_unlock(rq_src, rq_dest);
 		local_irq_restore(flags);
 
-		up(&req->sem);
+		complete(&req->done);
 	}
 }
 

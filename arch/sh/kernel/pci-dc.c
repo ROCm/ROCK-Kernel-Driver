@@ -31,76 +31,57 @@ struct pci_fixup pcibios_fixups[] = {
 	{0, 0, 0, NULL}
 };
 
-#define BBA_SELECTED(dev) (dev->bus->number==0 && dev->devfn==0)
+#define BBA_SELECTED(bus,devfn) (bus->number==0 && devfn==0)
 
-static int gapspci_read_config_byte(struct pci_dev *dev, int where,
-                                    u8 * val)
+static int gapspci_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 * val)
 {
-	if (BBA_SELECTED(dev))
-		*val = inb(GAPSPCI_BBA_CONFIG+where);
-	else
-                *val = 0xff;
-
+	switch (size) {
+	case 1:
+		if (BBA_SELECTED(bus, devfn))
+			*val = (u8)inb(GAPSPCI_BBA_CONFIG+where);
+		else
+			*val = (u8)0xff;
+		break;
+	case 2:
+		if (BBA_SELECTED(bus, devfn))
+			*val = (u16)inw(GAPSPCI_BBA_CONFIG+where);
+		else
+			*val = (u16)0xffff;
+		break;
+	case 4:
+		if (BBA_SELECTED(bus, devfn))
+			*val = inl(GAPSPCI_BBA_CONFIG+where);
+		else
+			*val = 0xffffffff;
+		break;
+	}	
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int gapspci_read_config_word(struct pci_dev *dev, int where,
-                                    u16 * val)
+static int gapspci_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val)
 {
-        if (BBA_SELECTED(dev))
-		*val = inw(GAPSPCI_BBA_CONFIG+where);
-	else
-                *val = 0xffff;
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-static int gapspci_read_config_dword(struct pci_dev *dev, int where,
-                                     u32 * val)
-{
-        if (BBA_SELECTED(dev))
-		*val = inl(GAPSPCI_BBA_CONFIG+where);
-	else
-                *val = 0xffffffff;
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-static int gapspci_write_config_byte(struct pci_dev *dev, int where,
-                                     u8 val)
-{
-        if (BBA_SELECTED(dev))
-		outb(val, GAPSPCI_BBA_CONFIG+where);
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-
-static int gapspci_write_config_word(struct pci_dev *dev, int where,
-                                     u16 val)
-{
-        if (BBA_SELECTED(dev))
-		outw(val, GAPSPCI_BBA_CONFIG+where);
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-static int gapspci_write_config_dword(struct pci_dev *dev, int where,
-                                      u32 val)
-{
-        if (BBA_SELECTED(dev))
-		outl(val, GAPSPCI_BBA_CONFIG+where);
-
-        return PCIBIOS_SUCCESSFUL;
+	if (BBA_SELECTED(bus, devfn)) {
+		switch (size) {
+		case 1:
+			if (BBA_SELECTED(bus, devfn))
+				outb((u8)val, GAPSPCI_BBA_CONFIG+where);
+			break;
+		case 2:
+			if (BBA_SELECTED(bus, devfn))
+				outw((u16)val, GAPSPCI_BBA_CONFIG+where);
+			break;
+		case 4:
+			if (BBA_SELECTED(bus, devfn))
+				outl(val, GAPSPCI_BBA_CONFIG+where);
+			break;
+		}
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops pci_config_ops = {
-        gapspci_read_config_byte,
-        gapspci_read_config_word,
-        gapspci_read_config_dword,
-        gapspci_write_config_byte,
-        gapspci_write_config_word,
-        gapspci_write_config_dword
+	.read = 	gapspci_read,
+	.write = 	gapspci_write,
 };
 
 
@@ -143,7 +124,7 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 
 	for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
 		dev = pci_dev_b(ln);
-		if (!BBA_SELECTED(dev)) continue;
+		if (!BBA_SELECTED(bus, dev->devfn)) continue;
 
 		printk("PCI: MMIO fixup to %s\n", dev->name);
 		dev->resource[1].start=0x01001700;

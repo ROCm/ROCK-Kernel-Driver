@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 56 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -547,7 +547,7 @@ acpi_ev_release_global_lock (void)
  *
  * RETURN:      none
  *
- * DESCRIPTION: free memory allocated for table storage.
+ * DESCRIPTION: Disable events and free memory allocated for table storage.
  *
  ******************************************************************************/
 
@@ -560,39 +560,42 @@ acpi_ev_terminate (void)
 
 	ACPI_FUNCTION_TRACE ("Ev_terminate");
 
-	/*
-	 * Disable all event-related functionality.
-	 * In all cases, on error, print a message but obviously we don't abort.
-	 */
 
-	/*
-	 * Disable all fixed events
-	 */
-	for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
-		status = acpi_disable_event(i, ACPI_EVENT_FIXED, 0);
-		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Failed to disable fixed event %d.\n", i));
-		}
-	}
+	if (acpi_gbl_events_initialized) {
+		/*
+		 * Disable all event-related functionality.
+		 * In all cases, on error, print a message but obviously we don't abort.
+		 */
 
-	/*
-	 * Disable all GPEs
-	 */
-	for (i = 0; i < acpi_gbl_gpe_number_max; i++) {
-		if (acpi_ev_get_gpe_number_index(i) != ACPI_GPE_INVALID) {
-			status = acpi_hw_disable_gpe(i);
+		/*
+		 * Disable all fixed events
+		 */
+		for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
+			status = acpi_disable_event(i, ACPI_EVENT_FIXED, 0);
 			if (ACPI_FAILURE (status)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Failed to disable GPE %d.\n", i));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable fixed event %d\n", i));
 			}
 		}
-	}
 
-	/*
-	 * Remove SCI handler
-	 */
-	status = acpi_ev_remove_sci_handler();
-	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to remove SCI handler.\n"));
+		/*
+		 * Disable all GPEs
+		 */
+		for (i = 0; i < acpi_gbl_gpe_number_max; i++) {
+			if (acpi_ev_get_gpe_number_index(i) != ACPI_GPE_INVALID) {
+				status = acpi_hw_disable_gpe(i);
+				if (ACPI_FAILURE (status)) {
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable GPE %d\n", i));
+				}
+			}
+		}
+
+		/*
+		 * Remove SCI handler
+		 */
+		status = acpi_ev_remove_sci_handler();
+		if (ACPI_FAILURE(status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not remove SCI handler\n"));
+		}
 	}
 
 	/*
@@ -601,7 +604,7 @@ acpi_ev_terminate (void)
 	if (acpi_gbl_original_mode == ACPI_SYS_MODE_LEGACY) {
 		status = acpi_disable ();
 		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Acpi_disable failed.\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Acpi_disable failed\n"));
 		}
 	}
 

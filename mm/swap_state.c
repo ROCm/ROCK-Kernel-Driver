@@ -292,6 +292,23 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	return err;
 }
 
+
+/* 
+ * If we are the only user, then try to free up the swap cache. 
+ * 
+ * Its ok to check for PageSwapCache without the page lock
+ * here because we are going to recheck again inside 
+ * exclusive_swap_page() _with_ the lock. 
+ * 					- Marcelo
+ */
+static inline void free_swap_cache(struct page *page)
+{
+	if (PageSwapCache(page) && !TestSetPageLocked(page)) {
+		remove_exclusive_swap_page(page);
+		unlock_page(page);
+	}
+}
+
 /* 
  * Perform a free_page(), also freeing any swap cache associated with
  * this page if it is the last user of the page. Can not do a lock_page,
@@ -299,19 +316,29 @@ int move_from_swap_cache(struct page *page, unsigned long index,
  */
 void free_page_and_swap_cache(struct page *page)
 {
-	/* 
-	 * If we are the only user, then try to free up the swap cache. 
-	 * 
-	 * Its ok to check for PageSwapCache without the page lock
-	 * here because we are going to recheck again inside 
-	 * exclusive_swap_page() _with_ the lock. 
-	 * 					- Marcelo
-	 */
-	if (PageSwapCache(page) && !TestSetPageLocked(page)) {
-		remove_exclusive_swap_page(page);
-		unlock_page(page);
-	}
+	free_swap_cache(page);
 	page_cache_release(page);
+}
+
+/*
+ * Passed an array of pages, drop them all from swapcache and then release
+ * them.  They are removed from the LRU and freed if this is their last use.
+ */
+void free_pages_and_swap_cache(struct page **pages, int nr)
+{
+	const int chunk = 16;
+	struct page **pagep = pages;
+
+	while (nr) {
+		int todo = min(chunk, nr);
+		int i;
+
+		for (i = 0; i < todo; i++)
+			free_swap_cache(pagep[i]);
+		release_pages(pagep, todo);
+		pagep += todo;
+		nr -= todo;
+	}
 }
 
 /*

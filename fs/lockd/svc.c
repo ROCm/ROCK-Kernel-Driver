@@ -98,7 +98,6 @@ lockd(struct svc_rqst *rqstp)
 	up(&lockd_start);
 
 	daemonize();
-	reparent_to_init();
 	sprintf(current->comm, "lockd");
 
 	/* Process request with signals blocked.  */

@@ -213,7 +213,7 @@ simeth_probe1(void)
 
 	memcpy(dev->dev_addr, mac_addr, sizeof(mac_addr));
 
-	dev->irq = ia64_alloc_irq();
+	dev->irq = ia64_alloc_vector();
 
 	/*
 	 * attach the interrupt in the simulator, this does enable interrupts

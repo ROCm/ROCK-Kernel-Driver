@@ -2150,14 +2150,14 @@ static int trident_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		/* FIXME: spin_lock ? */
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac(state);
-			synchronize_irq();
+			synchronize_irq(card->irq);
 			dmabuf->ready = 0;
 			dmabuf->swptr = dmabuf->hwptr = 0;
 			dmabuf->count = dmabuf->total_bytes = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(state);
-			synchronize_irq();
+			synchronize_irq(card->irq);
 			dmabuf->ready = 0;
 			dmabuf->swptr = dmabuf->hwptr = 0;
 			dmabuf->count = dmabuf->total_bytes = 0;

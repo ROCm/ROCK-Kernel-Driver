@@ -239,6 +239,7 @@ static int allowed_drive_mask = 0x33;
 
 static int irqdma_allocated;
 
+#define CURRENT current_req
 #define LOCAL_END_REQUEST
 #define MAJOR_NR FLOPPY_MAJOR
 #define DEVICE_NAME "floppy"
@@ -248,6 +249,8 @@ static int irqdma_allocated;
 #include <linux/blkpg.h>
 #include <linux/cdrom.h> /* for the compatibility eject ioctl */
 #include <linux/completion.h>
+
+static struct request *current_req;
 
 #ifndef fd_get_dma_residue
 #define fd_get_dma_residue() get_dma_residue(FLOPPY_DMA)
@@ -2292,12 +2295,15 @@ static inline void end_request(struct request *req, int uptodate)
 {
 	kdev_t dev = req->rq_dev;
 
-	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
+	if (end_that_request_first(req, uptodate, current_count_sectors))
 		return;
 	add_blkdev_randomness(major(dev));
 	floppy_off(DEVICE_NR(dev));
 	blkdev_dequeue_request(req);
 	end_that_request_last(req);
+
+	/* We're done with the request */
+	CURRENT = NULL;
 }
 
 
@@ -2306,15 +2312,15 @@ static inline void end_request(struct request *req, int uptodate)
 static void request_done(int uptodate)
 {
 	struct request_queue *q = QUEUE;
-	struct request *req = elv_next_request(q);
+	struct request *req = CURRENT;
 	unsigned long flags;
 	int block;
 
 	probing = 0;
 	reschedule_timeout(MAXTIMEOUT, "request done %d", uptodate);
 
-	if (blk_queue_empty(q)) {
-		DPRINT("request list destroyed in floppy request done\n");
+	if (!req) {
+		printk("floppy.c: no request in request_done\n");
 		return;
 	}
 
@@ -2328,27 +2334,8 @@ static void request_done(int uptodate)
 
 		/* unlock chained buffers */
 		spin_lock_irqsave(q->queue_lock, flags);
-		while (current_count_sectors && !blk_queue_empty(q) &&
-		       current_count_sectors >= req->current_nr_sectors){
-			current_count_sectors -= req->current_nr_sectors;
-			req->nr_sectors -= req->current_nr_sectors;
-			req->sector += req->current_nr_sectors;
-			end_request(req, 1);
-		}
+		end_request(req, 1);
 		spin_unlock_irqrestore(q->queue_lock, flags);
-
-		if (current_count_sectors && !blk_queue_empty(q)) {
-			/* "unlock" last subsector */
-			req->buffer += current_count_sectors <<9;
-			req->current_nr_sectors -= current_count_sectors;
-			req->nr_sectors -= current_count_sectors;
-			req->sector += current_count_sectors;
-			return;
-		}
-
-		if (current_count_sectors && blk_queue_empty(q))
-			DPRINT("request list destroyed in floppy request done\n");
-
 	} else {
 		if (rq_data_dir(req) == WRITE) {
 			/* record write error information */
@@ -2924,10 +2911,14 @@ static void redo_fd_request(void)
 		floppy_off(current_drive);
 
 	for (;;) {
-		if (blk_queue_empty(QUEUE)) {
-			do_floppy = NULL;
-			unlock_fdc();
-			return;
+		if (!CURRENT) {
+			struct request *req = elv_next_request(QUEUE);
+			if (!req) {
+				do_floppy = NULL;
+				unlock_fdc();
+				return;
+			}
+			CURRENT = req;
 		}
 		if (major(CURRENT->rq_dev) != MAJOR_NR)
 			panic(DEVICE_NAME ": request list destroyed");

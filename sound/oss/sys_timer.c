@@ -15,6 +15,7 @@
  * Thomas Sailer   : ioctl code reworked (vmalloc/vfree removed)
  * Andrew Veliath  : adapted tmr2ticks from level 1 sequencer (avoid overflow)
  */
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 static volatile int opened = 0, tmr_running = 0;
@@ -26,7 +27,7 @@ static volatile unsigned long next_event_time;
 static unsigned long prev_event_time;
 
 static void     poll_def_tmr(unsigned long dummy);
-
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 
 static struct timer_list def_tmr =
 {function: poll_def_tmr};
@@ -62,6 +63,7 @@ poll_def_tmr(unsigned long dummy)
 
 		  if (tmr_running)
 		    {
+				spin_lock(&lock);
 			    tmr_ctr++;
 			    curr_ticks = ticks_offs + tmr2ticks(tmr_ctr);
 
@@ -70,6 +72,7 @@ poll_def_tmr(unsigned long dummy)
 				      next_event_time = (unsigned long) -1;
 				      sequencer_timer(0);
 			      }
+				spin_unlock(&lock);
 		    }
 	  }
 }
@@ -79,15 +82,14 @@ tmr_reset(void)
 {
 	unsigned long   flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 	tmr_offs = 0;
 	ticks_offs = 0;
 	tmr_ctr = 0;
 	next_event_time = (unsigned long) -1;
 	prev_event_time = 0;
 	curr_ticks = 0;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static int
