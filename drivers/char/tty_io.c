@@ -1944,27 +1944,25 @@ static void flush_to_ldisc(void *private_)
 		schedule_delayed_work(&tty->flip.work, 1);
 		return;
 	}
+
+	spin_lock_irqsave(&tty->read_lock, flags);
 	if (tty->flip.buf_num) {
 		cp = tty->flip.char_buf + TTY_FLIPBUF_SIZE;
 		fp = tty->flip.flag_buf + TTY_FLIPBUF_SIZE;
 		tty->flip.buf_num = 0;
-
-		local_irq_save(flags); // FIXME: is this safe?
 		tty->flip.char_buf_ptr = tty->flip.char_buf;
 		tty->flip.flag_buf_ptr = tty->flip.flag_buf;
 	} else {
 		cp = tty->flip.char_buf;
 		fp = tty->flip.flag_buf;
 		tty->flip.buf_num = 1;
-
-		local_irq_save(flags); // FIXME: is this safe?
 		tty->flip.char_buf_ptr = tty->flip.char_buf + TTY_FLIPBUF_SIZE;
 		tty->flip.flag_buf_ptr = tty->flip.flag_buf + TTY_FLIPBUF_SIZE;
 	}
 	count = tty->flip.count;
 	tty->flip.count = 0;
-	local_irq_restore(flags); // FIXME: is this safe?
-	
+	spin_unlock_irqrestore(&tty->read_lock, flags);
+
 	tty->ldisc.receive_buf(tty, cp, fp, count);
 }
 
