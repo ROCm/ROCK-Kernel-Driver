@@ -383,7 +383,7 @@ kvirt_to_pa(unsigned long adr)
 	unsigned long va, kva, ret;
 
 	va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(pgd_offset_k(va), va));
+	kva = page_address(vmalloc_to_page(va));
 	ret = __pa(kva);
 	return ret;
 }

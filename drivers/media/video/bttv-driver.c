@@ -145,7 +145,7 @@ static inline unsigned long uvirt_to_bus(unsigned long adr)
 {
         unsigned long kva, ret;
 
-	kva = page_address(vmalloc_to_page(pgd_offset(current->mm, adr), adr));
+	kva = page_address(vmalloc_to_page(adr));
 	ret = virt_to_bus((void *)kva);
         MDEBUG(printk("uv2b(%lx-->%lx)", adr, ret));
         return ret;
@@ -156,7 +156,7 @@ static inline unsigned long kvirt_to_bus(unsigned long adr)
         unsigned long va, kva, ret;
 
         va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(pgd_offset_k(va), va));
+	kva = page_address(vmalloc_to_page(va));
 	ret = virt_to_bus((void *)kva);
         MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
         return ret;
@@ -171,7 +171,7 @@ static inline unsigned long kvirt_to_pa(unsigned long adr)
         unsigned long va, kva, ret;
 
         va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(pgd_offset_k(va), va));
+	kva = page_address(vmalloc_to_page(va));
 	ret = __pa(kva);
         MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
         return ret;

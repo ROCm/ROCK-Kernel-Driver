@@ -68,7 +68,7 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 	unsigned long pages, i, j;
 	pgd_t *pgd;
 	pmd_t *pmd;
-	pte_t *pte;
+	pte_t *pte, pte_entry;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -144,18 +144,17 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 			goto failed;
 
 		preempt_disable();
-		pte = pte_offset_map( pmd, i );
-		if ( !pte_present( *pte ) ) {
-			pte_unmap(pte);
-			preempt_enable();
-			goto failed;
-		}
+		pte = pte_offset_map(pmd, i);
+		pte_entry = *pte;
 		pte_unmap(pte);
 		preempt_enable();
 
-		entry->pagelist[j] = pte_page( *pte );
+		if (!pte_present(pte_entry))
+			goto failed;
 
-		SetPageReserved( entry->pagelist[j] );
+		entry->pagelist[j] = pte_page(pte_entry);
+
+		SetPageReserved(entry->pagelist[j]);
 	}
 
 	request.handle = entry->handle;
