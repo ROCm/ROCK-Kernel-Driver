@@ -590,6 +590,11 @@ static int try_to_unuse(unsigned int type)
 	 * to swapoff for a while, then reappear - but that is rare.
 	 */
 	while ((i = find_next_to_unuse(si, i))) {
+		if (signal_pending(current)) {
+			retval = -EINTR;
+			break;
+		}
+
 		/* 
 		 * Get a page for the entry, using the existing swap
 		 * cache page if there is one.  Otherwise, get a clean
@@ -759,8 +764,7 @@ static int try_to_unuse(unsigned int type)
 
 		/*
 		 * Make sure that we aren't completely killing
-		 * interactive performance.  Interruptible check on
-		 * signal_pending() would be nice, but changes the spec?
+		 * interactive performance.
 		 */
 		cond_resched();
 	}
