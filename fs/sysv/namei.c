@@ -12,10 +12,9 @@
  *  Copyright (C) 1997, 1998  Krzysztof G. Baranowski
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include "sysv.h"
 
 static inline void inc_count(struct inode *inode)
 {

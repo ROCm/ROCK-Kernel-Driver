@@ -5,10 +5,9 @@
  *  AV, Sep--Dec 2000
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
+#include "sysv.h"
 
 enum {DIRECT = 10, DEPTH = 4};	/* Have triple indirect */
 

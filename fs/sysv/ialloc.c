@@ -20,12 +20,11 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/stddef.h>
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/locks.h>
+#include "sysv.h"
 
 /* We don't trust the value of
    sb->sv_sbd2->s_tinode = *sb->sv_sb_total_free_inodes

@@ -19,9 +19,8 @@
  *  This file contains code for allocating/freeing blocks.
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/locks.h>
+#include "sysv.h"
 
 /* We don't trust the value of
    sb->sv_sbd2->s_tfree = *sb->sv_free_blocks

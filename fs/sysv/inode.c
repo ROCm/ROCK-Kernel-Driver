@@ -21,14 +21,13 @@
  *  the superblock.
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <asm/byteorder.h>
+#include "sysv.h"
 
 /* This is only called on sync() and umount(), when s_dirt=1. */
 static void sysv_write_super(struct super_block *sb)

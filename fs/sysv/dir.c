@@ -13,9 +13,8 @@
  *  SystemV/Coherent directory handling functions
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/pagemap.h>
+#include "sysv.h"
 
 static int sysv_readdir(struct file *, void *, filldir_t);
 

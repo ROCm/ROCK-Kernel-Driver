@@ -21,11 +21,9 @@
  */
 
 #include <linux/module.h>
-
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include "sysv.h"
 
 /*
  * The following functions try to recognize specific filesystems.
