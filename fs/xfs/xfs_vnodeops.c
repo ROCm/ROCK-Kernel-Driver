@@ -3954,15 +3954,13 @@ int
 xfs_finish_reclaim_all(xfs_mount_t *mp, int noblock)
 {
 	int		purged;
-	struct list_head	*curr, *next;
-	xfs_inode_t	*ip;
+	xfs_inode_t	*ip, *n;
 	int		done = 0;
 
 	while (!done) {
 		purged = 0;
 		XFS_MOUNT_ILOCK(mp);
-		list_for_each_safe(curr, next, &mp->m_del_inodes) {
-			ip = list_entry(curr, xfs_inode_t, i_reclaim);
+		list_for_each_entry_safe(ip, n, &mp->m_del_inodes, i_reclaim) {
 			if (noblock) {
 				if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0)
 					continue;
