@@ -954,6 +954,7 @@ asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 		ret = put_user(ioctx->user_id, ctxp);
 		if (!ret)
 			return 0;
+	 	get_ioctx(ioctx);
 		io_destroy(ioctx);
 	}
 
