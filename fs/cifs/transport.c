@@ -37,7 +37,6 @@ struct mid_q_entry *
 AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 {
 	struct mid_q_entry *temp;
-	int timeout = 10 * HZ;
 
 	if (ses == NULL) {
 		cERROR(1, ("Null session passed in to AllocMidQEntry "));
@@ -63,25 +62,11 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		temp->tsk = current;
 	}
 
-	while ((ses->server->tcpStatus != CifsGood) && (timeout > 0)){ 
-		/* Give the tcp thread up to 10 seconds to reconnect */
-		/* Should we wake up tcp thread first? BB  */
-		timeout = wait_event_interruptible_timeout(ses->server->response_q,
-			(ses->server->tcpStatus == CifsGood), timeout);
-	}
-
-	if (ses->server->tcpStatus == CifsGood) {
-		spin_lock(&GlobalMid_Lock);
-		list_add_tail(&temp->qhead, &ses->server->pending_mid_q);
-		atomic_inc(&midCount);
-		temp->midState = MID_REQUEST_ALLOCATED;
-		spin_unlock(&GlobalMid_Lock);
-	} else { 
-		cERROR(1,("Need to reconnect after session died to server"));
-		if (temp)
-			kmem_cache_free(cifs_mid_cachep, temp);
-		return NULL;
-	}
+	spin_lock(&GlobalMid_Lock);
+	list_add_tail(&temp->qhead, &ses->server->pending_mid_q);
+	atomic_inc(&midCount);
+	temp->midState = MID_REQUEST_ALLOCATED;
+	spin_unlock(&GlobalMid_Lock);
 	return temp;
 }
 
@@ -190,10 +175,32 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	long timeout;
 	struct mid_q_entry *midQ;
 
-cifs_dead_ses_retry:
-	midQ = AllocMidQEntry(in_buf, ses);
-	if (midQ == NULL)
+	if ((ses == NULL) || (ses->server == NULL)) {
+		cERROR(1,("Null tcp session or smb session: %p",ses));
 		return -EIO;
+	}
+
+	if (ses->server->tcpStatus == CifsExiting) {
+		return -ENOENT;
+	} else if (ses->server->tcpStatus == CifsNeedReconnect) {
+		cFYI(1,("tcp session dead - return to caller to retry"));
+		/* Give Demultiplex thread up to 10 seconds to reconnect */
+		wait_event_interruptible_timeout(ses->server->response_q,
+				(ses->server->tcpStatus == CifsGood), 10 * HZ);
+		return -EAGAIN;
+	} else if (ses->status != CifsGood) {
+		/* check if SMB session is bad because we are setting it up */
+		if((in_buf->Command != SMB_COM_SESSION_SETUP_ANDX) && 
+			(in_buf->Command != SMB_COM_NEGOTIATE)) {
+			return - EAGAIN;
+		} /* else ok - we are setting up session */
+	}
+
+	midQ = AllocMidQEntry(in_buf, ses);
+	if (midQ == NULL) {
+		return -EIO;
+	}
+
 	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4) {
 		cERROR(1,
 		       ("Illegal length, greater than maximum frame, %d ",
@@ -242,28 +249,21 @@ cifs_dead_ses_retry:
 			if(midQ->midState == MID_REQUEST_SUBMITTED) {
 				ses->server->tcpStatus = CifsNeedReconnect;
 				midQ->midState = MID_RETRY_NEEDED;
-                                spin_unlock(&GlobalMid_Lock);
-				DeleteMidQEntry(midQ);
-				cFYI(1,("retrying after setting session need reconnectd"));
-				goto cifs_dead_ses_retry;
-			} else if(midQ->midState == MID_RETRY_NEEDED) {
-				spin_unlock(&GlobalMid_Lock);
-				DeleteMidQEntry(midQ);
-				cFYI(1,("retrying MID_RETRY"));
-				goto cifs_dead_ses_retry;
-			} else {
-				spin_unlock(&GlobalMid_Lock);
-				DeleteMidQEntry(midQ);
-				return -EIO;
 			}
+
+			if(midQ->midState == MID_RETRY_NEEDED) {
+				rc = -EAGAIN;
+				cFYI(1,("marking request for retry"));
+			} else {
+				rc = -EIO;
+			}
+			spin_unlock(&GlobalMid_Lock);
+			DeleteMidQEntry(midQ);
+			return rc;
 		}
 	}
 
-	if (timeout == 0) {
-		cFYI(1,
-		     ("Timeout on receive. Assume response SMB is invalid."));
-		rc = -ETIMEDOUT;
-	} else if (receive_len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
+	if (receive_len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,
 		       ("Frame too large received.  Length: %d  Xid: %d",
 			receive_len, xid));
