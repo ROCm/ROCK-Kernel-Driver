@@ -686,9 +686,11 @@ static int pdc202xx_dmaproc(struct ata_device *drive)
 
 void pdc202xx_new_reset(struct ata_device *drive)
 {
-	set_reg_and_wait(0x04,IDE_CONTROL_REG, 1000);
-	set_reg_and_wait(0x00,IDE_CONTROL_REG, 1000);
-	printk("PDC202XX: %s channel reset.\n",
+	ata_reset(drive->channel);
+	mdelay(1000);
+	ata_irq_enable(drive, 1);
+	mdelay(1000);
+	printk(KERN_INFO "PDC202XX: %s channel reset.\n",
 		drive->channel->unit ? "Secondary" : "Primary");
 }
 

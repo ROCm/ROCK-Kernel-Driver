@@ -267,6 +267,34 @@ void ata_fix_driveid(struct hd_driveid *id)
 #endif
 }
 
+void ide_fixstring(char *s, const int bytecount, const int byteswap)
+{
+	char *p = s;
+	char *end = &s[bytecount & ~1]; /* bytecount must be even */
+
+	if (byteswap) {
+		/* convert from big-endian to host byte order */
+		for (p = end ; p != s;) {
+			unsigned short *pp = (unsigned short *) (p -= 2);
+			*pp = ntohs(*pp);
+		}
+	}
+
+	/* strip leading blanks */
+	while (s != end && *s == ' ')
+		++s;
+
+	/* compress internal blanks and strip trailing blanks */
+	while (s != end && *s) {
+		if (*s++ != ' ' || (s != end && *s && *s != ' '))
+			*p++ = *(s-1);
+	}
+
+	/* wipe out trailing garbage */
+	while (p != end)
+		*p++ = '\0';
+}
+
 /*
  *  All hosts that use the 80c ribbon must use this!
  */
@@ -280,7 +308,7 @@ byte eighty_ninty_three(struct ata_device *drive)
 }
 
 /*
- * Similar to ide_wait_stat(), except it never calls ide_error internally.
+ * Similar to ide_wait_stat(), except it never calls ata_error internally.
  * This is a kludge to handle the new ide_config_drive_speed() function,
  * and should not otherwise be used anywhere.  Eventually, the tuneproc's
  * should be updated to return ide_startstop_t, in which case we can get
@@ -292,13 +320,13 @@ byte eighty_ninty_three(struct ata_device *drive)
  */
 int ide_config_drive_speed(struct ata_device *drive, byte speed)
 {
-	struct ata_channel *hwif = drive->channel;
+	struct ata_channel *ch = drive->channel;
 	int i;
 	int error = 1;
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
 	u8 unit = (drive->select.b.unit & 0x01);
-	outb(inb(hwif->dma_base + 2) & ~(1 << (5 + unit)), hwif->dma_base + 2);
+	outb(inb(ch->dma_base + 2) & ~(1 << (5 + unit)), ch->dma_base + 2);
 #endif
 
 	/*
@@ -309,18 +337,17 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
         /*
          * Select the drive, and issue the SETFEATURES command
          */
-	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
+	disable_irq(ch->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
 	ata_select(drive, 0);
 	ata_mask(drive);
 	udelay(1);
-	if (IDE_CONTROL_REG)
-		OUT_BYTE(drive->ctl | 2, IDE_CONTROL_REG);
+	ata_irq_enable(drive, 0);
 	OUT_BYTE(speed, IDE_NSECTOR_REG);
 	OUT_BYTE(SETFEATURES_XFER, IDE_FEATURE_REG);
 	OUT_BYTE(WIN_SETFEATURES, IDE_COMMAND_REG);
-	if ((IDE_CONTROL_REG) && (drive->quirk_list == 2))
-		OUT_BYTE(drive->ctl, IDE_CONTROL_REG);
+	if (drive->quirk_list == 2)
+		ata_irq_enable(drive, 1);
 	udelay(1);
 
 	/*
@@ -355,7 +382,7 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 
 	ata_mask(drive);
 
-	enable_irq(hwif->irq);
+	enable_irq(ch->irq);
 
 	if (error) {
 		ide_dump_status(drive, NULL, "set_drive_speed_status", drive->status);
@@ -368,9 +395,9 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
 	if (speed > XFER_PIO_4) {
-		outb(inb(hwif->dma_base+2)|(1<<(5+unit)), hwif->dma_base+2);
+		outb(inb(ch->dma_base + 2)|(1 << (5 + unit)), ch->dma_base + 2);
 	} else {
-		outb(inb(hwif->dma_base+2) & ~(1<<(5+unit)), hwif->dma_base+2);
+		outb(inb(ch->dma_base + 2) & ~(1 << (5 + unit)), ch->dma_base + 2);
 	}
 #endif
 
@@ -391,6 +418,7 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 		case XFER_SW_DMA_0: drive->id->dma_1word |= 0x0101; break;
 		default: break;
 	}
+
 	return error;
 }
 
@@ -446,9 +474,9 @@ static inline void do_identify(struct ata_device *drive, u8 cmd)
 		 || (id->model[0] == 'P' && id->model[1] == 'i'))/* Pioneer */
 			bswap ^= 1;	/* Vertos drives may still be weird */
 	}
-	ide_fixstring (id->model,     sizeof(id->model),     bswap);
-	ide_fixstring (id->fw_rev,    sizeof(id->fw_rev),    bswap);
-	ide_fixstring (id->serial_no, sizeof(id->serial_no), bswap);
+	ide_fixstring(id->model,     sizeof(id->model),     bswap);
+	ide_fixstring(id->fw_rev,    sizeof(id->fw_rev),    bswap);
+	ide_fixstring(id->serial_no, sizeof(id->serial_no), bswap);
 
 	if (strstr(id->model, "E X A B Y T E N E S T"))
 		goto err_misc;
@@ -566,36 +594,40 @@ err_kmalloc:
  */
 static int identify(struct ata_device *drive, u8 cmd)
 {
-	int rc;
+	struct ata_channel *ch = drive->channel;
+	int rc = 1;
 	int autoprobe = 0;
 	unsigned long cookie = 0;
 	ide_ioreg_t hd_status;
 	unsigned long timeout;
-	u8 s;
-	u8 a;
 
 
-	if (IDE_CONTROL_REG && !drive->channel->irq) {
-		autoprobe = 1;
-		cookie = probe_irq_on();
-		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* enable device irq */
-	}
+	/* FIXME: perhaps we should be just using allways the status register,
+	 * since it should simplify the code significantly.
+	 */
+	if (ch->io_ports[IDE_CONTROL_OFFSET]) {
+		u8 s;
+		u8 a;
 
-	rc = 1;
-	if (IDE_CONTROL_REG) {
+		if (!drive->channel->irq) {
+			autoprobe = 1;
+			cookie = probe_irq_on();
+			ata_irq_enable(drive, 1);	/* enable device irq */
+		}
+
 		/* take a deep breath */
 		mdelay(50);
-		a = IN_BYTE(IDE_ALTSTATUS_REG);
-		s = IN_BYTE(IDE_STATUS_REG);
+		a = IN_BYTE(ch->io_ports[IDE_ALTSTATUS_OFFSET]);
+		s = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
 		if ((a ^ s) & ~INDEX_STAT) {
 			printk("%s: probing with STATUS(0x%02x) instead of ALTSTATUS(0x%02x)\n", drive->name, s, a);
-			hd_status = IDE_STATUS_REG;	/* ancient Seagate drives, broken interfaces */
+			hd_status = ch->io_ports[IDE_STATUS_OFFSET];	/* ancient Seagate drives, broken interfaces */
 		} else {
-			hd_status = IDE_ALTSTATUS_REG;	/* use non-intrusive polling */
+			hd_status = ch->io_ports[IDE_ALTSTATUS_OFFSET];	/* use non-intrusive polling */
 		}
 	} else {
 		mdelay(50);
-		hd_status = IDE_STATUS_REG;
+		hd_status = ch->io_ports[IDE_STATUS_OFFSET];
 	}
 
 	/* set features register for atapi identify command to be sure of reply */
@@ -637,8 +669,8 @@ out:
 	if (autoprobe) {
 		int irq;
 
-		OUT_BYTE(drive->ctl | 0x02, IDE_CONTROL_REG);	/* mask device irq */
-		ata_status(drive, 0, 0);			/* clear drive IRQ */
+		ata_irq_enable(drive, 0);	/* mask device irq */
+		ata_status(drive, 0, 0);	/* clear drive IRQ */
 		udelay(5);
 		irq = probe_irq_off(cookie);
 		if (!drive->channel->irq) {
@@ -855,19 +887,8 @@ static void channel_probe(struct ata_channel *ch)
 
 	device_register(&ch->dev);
 
-	if (ch->reset && ch->io_ports[IDE_CONTROL_OFFSET]) {
-		unsigned long timeout = jiffies + WAIT_WORSTCASE;
-		u8 stat;
-
-		printk("%s: reset\n", ch->name);
-		OUT_BYTE(12, ch->io_ports[IDE_CONTROL_OFFSET]);
-		udelay(10);
-		OUT_BYTE(8, ch->io_ports[IDE_CONTROL_OFFSET]);
-		do {
-			mdelay(50);
-			stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
-		} while ((stat & BUSY_STAT) && time_before(jiffies, timeout));
-	}
+	if (ch->reset)
+		ata_reset(ch);
 
 	__restore_flags(flags);	/* local CPU only */
 
@@ -969,14 +990,19 @@ static int init_irq(struct ata_channel *ch)
 	 * Allocate the irq, if not already obtained for another channel
 	 */
 	if (!match || match->irq != ch->irq) {
+		struct ata_device tmp;
 #ifdef CONFIG_IDEPCI_SHARE_IRQ
 		int sa = IDE_CHIPSET_IS_PCI(ch->chipset) ? SA_SHIRQ : SA_INTERRUPT;
 #else
 		int sa = IDE_CHIPSET_IS_PCI(ch->chipset) ? SA_INTERRUPT|SA_SHIRQ : SA_INTERRUPT;
 #endif
 
-		if (ch->io_ports[IDE_CONTROL_OFFSET])
-			OUT_BYTE(0x08, ch->io_ports[IDE_CONTROL_OFFSET]); /* clear nIEN */
+		/* Enable interrupts triggered by the drive.  We use a shallow
+		 * device structure, just to use the generic function very
+		 * early.
+		 */
+		tmp.channel = ch;
+		ata_irq_enable(&tmp, 1);
 
 		if (request_irq(ch->irq, &ata_irq_request, sa, ch->name, ch)) {
 			if (!match) {
@@ -1240,5 +1266,6 @@ int ideprobe_init(void)
 }
 
 EXPORT_SYMBOL(ata_fix_driveid);
+EXPORT_SYMBOL(ide_fixstring);
 EXPORT_SYMBOL(eighty_ninty_three);
 EXPORT_SYMBOL(ide_config_drive_speed);

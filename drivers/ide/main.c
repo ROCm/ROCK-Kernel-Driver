@@ -205,9 +205,8 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 		struct ata_device *drive = &ch->drives[unit];
 
 		drive->type		= ATA_DISK;
-		drive->select.all	= (unit<<4)|0xa0;
+		drive->select.all	= (unit << 4) | 0xa0;
 		drive->channel		= ch;
-		drive->ctl		= 0x08;
 		drive->ready_stat	= READY_STAT;
 		drive->bad_wstat	= BAD_W_STAT;
 		sprintf(drive->name, "hd%c", 'a' + (index * MAX_DRIVES) + unit);

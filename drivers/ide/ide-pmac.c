@@ -434,7 +434,7 @@ pmac_ide_do_setfeature(struct ata_device *drive, u8 command)
 		goto out;
 	}
 	udelay(10);
-	OUT_BYTE(drive->ctl | 2, IDE_CONTROL_REG);
+	ata_irq_enale(drive, 0);
 	OUT_BYTE(command, IDE_NSECTOR_REG);
 	OUT_BYTE(SETFEATURES_XFER, IDE_FEATURE_REG);
 	OUT_BYTE(WIN_SETFEATURES, IDE_COMMAND_REG);
@@ -443,7 +443,7 @@ pmac_ide_do_setfeature(struct ata_device *drive, u8 command)
 	ide__sti();		/* local CPU only -- for jiffies */
 	result = wait_for_ready(drive);
 	__restore_flags(flags); /* local CPU only */
-	OUT_BYTE(drive->ctl, IDE_CONTROL_REG);
+	ata_irq_enable(drive, 1);
 	if (result)
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready after SET_FEATURE !\n");
 out:
@@ -1330,7 +1330,7 @@ pmac_ide_check_dma(struct ata_device *drive)
 			/* Normal MultiWord DMA modes. */
 			drive->using_dma = pmac_ide_mdma_enable(drive, idx);
 		}
-		OUT_BYTE(0, IDE_CONTROL_REG);
+		ata_irq_enable(drive, 1);
 		/* Apply settings to controller */
 		pmac_ide_selectproc(drive);
 	}

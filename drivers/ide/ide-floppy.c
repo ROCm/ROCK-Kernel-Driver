@@ -1064,8 +1064,7 @@ static ide_startstop_t idefloppy_issue_pc(struct ata_device *drive, struct reque
 	}
 #endif
 
-	if (IDE_CONTROL_REG)
-		OUT_BYTE (drive->ctl,IDE_CONTROL_REG);
+	ata_irq_enable(drive, 1);
 	OUT_BYTE (dma_ok ? 1:0,IDE_FEATURE_REG);			/* Use PIO/DMA */
 	OUT_BYTE (bcount.b.high,IDE_BCOUNTH_REG);
 	OUT_BYTE (bcount.b.low,IDE_BCOUNTL_REG);

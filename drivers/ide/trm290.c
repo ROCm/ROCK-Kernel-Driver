@@ -222,7 +222,7 @@ static int do_udma(unsigned int reading, struct ata_device *drive, struct reques
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
 	OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 
 	return 0;

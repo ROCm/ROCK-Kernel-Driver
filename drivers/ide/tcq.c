@@ -55,17 +55,6 @@
 static ide_startstop_t ide_dmaq_intr(struct ata_device *drive, struct request *rq);
 static ide_startstop_t service(struct ata_device *drive, struct request *rq);
 
-static inline void drive_ctl_nien(struct ata_device *drive, int set)
-{
-#ifdef IDE_TCQ_NIEN
-	if (IDE_CONTROL_REG) {
-		int mask = set ? 0x02 : 0x00;
-
-		OUT_BYTE(drive->ctl | mask, IDE_CONTROL_REG);
-	}
-#endif
-}
-
 static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request *rq)
 {
 	struct ata_taskfile *args = rq->special;
@@ -136,11 +125,10 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	rq->rq_dev = mk_kdev(drive->channel->major, (drive->select.b.unit)<<PARTN_BITS);
 	_elv_add_request(q, rq, 0, 0);
 
-	/*
-	 * make sure that nIEN is cleared
-	 */
 out:
-	drive_ctl_nien(drive, 0);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 1);
+#endif
 
 	/*
 	 * start doing stuff again
@@ -250,8 +238,9 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	if (drive != drive->channel->drive)
 		ata_select(drive, 10);
 
-	drive_ctl_nien(drive, 1);
-
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 0);
+#endif
 	/*
 	 * send SERVICE, wait 400ns, wait for BUSY_STAT to clear
 	 */
@@ -265,7 +254,9 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 		return ide_stopped;
 	}
 
-	drive_ctl_nien(drive, 0);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 1);
+#endif
 
 	/*
 	 * FIXME, invalidate queue
@@ -559,7 +550,9 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	 * set nIEN, tag start operation will enable again when
 	 * it is safe
 	 */
-	drive_ctl_nien(drive, 1);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 0);
+#endif
 
 	OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 
@@ -569,7 +562,9 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 		return ide_stopped;
 	}
 
-	drive_ctl_nien(drive, 0);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 1);
+#endif
 
 	if (stat & ERR_STAT) {
 		ide_dump_status(drive, rq, "tcq_start", stat);

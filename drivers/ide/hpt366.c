@@ -813,31 +813,26 @@ static void hpt3xx_intrproc(struct ata_device *drive)
 	if (drive->quirk_list) {
 		/* drives in the quirk_list may not like intr setups/cleanups */
 	} else {
-		OUT_BYTE((drive)->ctl|2, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
+		OUT_BYTE(0x02, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
 	}
 }
 
 static void hpt3xx_maskproc(struct ata_device *drive)
 {
 	struct pci_dev *dev = drive->channel->pci_dev;
-	const int mask = 0;
+	struct ata_channel *ch = drive->channel;
 
 	if (drive->quirk_list) {
 		if (hpt_min_rev(dev, 3)) {
 			u8 reg5a;
 			pci_read_config_byte(dev, 0x5a, &reg5a);
-			if (((reg5a & 0x10) >> 4) != mask)
-				pci_write_config_byte(dev, 0x5a, mask ? (reg5a | 0x10) : (reg5a & ~0x10));
-		} else {
-			if (mask) {
-				disable_irq(drive->channel->irq);
-			} else {
-				enable_irq(drive->channel->irq);
-			}
-		}
+			if ((reg5a & 0x10) >> 4)
+				pci_write_config_byte(dev, 0x5a, reg5a & ~0x10);
+		} else
+			enable_irq(drive->channel->irq);
 	} else {
-		if (IDE_CONTROL_REG)
-			OUT_BYTE(mask ? (drive->ctl | 2) : (drive->ctl & ~2), IDE_CONTROL_REG);
+		if (ch->io_ports[IDE_CONTROL_OFFSET])
+			OUT_BYTE(0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
 	}
 }
 

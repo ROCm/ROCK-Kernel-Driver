@@ -38,11 +38,6 @@
 # define SUPPORT_SLOW_DATA_PORTS	1	/* 0 to reduce kernel size */
 #endif
 
-/* Right now this is only needed by a promise controlled.
- */
-#ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
-# define OK_TO_RESET_CONTROLLER	0	/* 0 for use with AH2372A/B interface */
-#endif
 #ifndef FANCY_STATUS_DUMPS		/* 1 for human-readable drive errors */
 # define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
 #endif
@@ -73,21 +68,22 @@ typedef unsigned char	byte;	/* used everywhere */
  */
 
 enum {
-	IDE_DATA_OFFSET	    = 0,
-	IDE_ERROR_OFFSET    = 1,
-	IDE_NSECTOR_OFFSET  = 2,
-	IDE_SECTOR_OFFSET   = 3,
-	IDE_LCYL_OFFSET	    = 4,
-	IDE_HCYL_OFFSET	    = 5,
-	IDE_SELECT_OFFSET   = 6,
-	IDE_STATUS_OFFSET   = 7,
-	IDE_CONTROL_OFFSET  = 8,
-	IDE_IRQ_OFFSET	    = 9,
-	IDE_NR_PORTS	    = 10
+	IDE_DATA_OFFSET		= 0,
+	IDE_ERROR_OFFSET	= 1,
+	IDE_FEATURE_OFFSET	= 1,
+	IDE_NSECTOR_OFFSET	= 2,
+	IDE_SECTOR_OFFSET	= 3,
+	IDE_LCYL_OFFSET		= 4,
+	IDE_HCYL_OFFSET		= 5,
+	IDE_SELECT_OFFSET	= 6,
+	IDE_STATUS_OFFSET	= 7,
+	IDE_COMMAND_OFFSET	= 7,
+	IDE_CONTROL_OFFSET	= 8,
+	IDE_ALTSTATUS_OFFSET	= 8,
+	IDE_IRQ_OFFSET		= 9,
+	IDE_NR_PORTS		= 10
 };
 
-#define IDE_FEATURE_OFFSET	IDE_ERROR_OFFSET
-#define IDE_COMMAND_OFFSET	IDE_STATUS_OFFSET
 
 #define IDE_DATA_REG		(drive->channel->io_ports[IDE_DATA_OFFSET])
 #define IDE_ERROR_REG		(drive->channel->io_ports[IDE_ERROR_OFFSET])
@@ -96,20 +92,16 @@ enum {
 #define IDE_LCYL_REG		(drive->channel->io_ports[IDE_LCYL_OFFSET])
 #define IDE_HCYL_REG		(drive->channel->io_ports[IDE_HCYL_OFFSET])
 #define IDE_SELECT_REG		(drive->channel->io_ports[IDE_SELECT_OFFSET])
-#define IDE_STATUS_REG		(drive->channel->io_ports[IDE_STATUS_OFFSET])
-#define IDE_CONTROL_REG		(drive->channel->io_ports[IDE_CONTROL_OFFSET])
+#define IDE_COMMAND_REG		(drive->channel->io_ports[IDE_STATUS_OFFSET])
 #define IDE_IRQ_REG		(drive->channel->io_ports[IDE_IRQ_OFFSET])
 
 #define IDE_FEATURE_REG		IDE_ERROR_REG
-#define IDE_COMMAND_REG		IDE_STATUS_REG
-#define IDE_ALTSTATUS_REG	IDE_CONTROL_REG
 #define IDE_IREASON_REG		IDE_NSECTOR_REG
 #define IDE_BCOUNTL_REG		IDE_LCYL_REG
 #define IDE_BCOUNTH_REG		IDE_HCYL_REG
 
 #define GET_ERR()		IN_BYTE(IDE_ERROR_REG)
-#define GET_STAT()		IN_BYTE(IDE_STATUS_REG)
-#define GET_ALTSTAT()		IN_BYTE(IDE_CONTROL_REG)
+#define GET_ALTSTAT()		IN_BYTE(drive->channel->io_ports[IDE_CONTROL_OFFSET])
 #define GET_FEAT()		IN_BYTE(IDE_NSECTOR_REG)
 
 #define BAD_R_STAT		(BUSY_STAT   | ERR_STAT)
@@ -346,8 +338,6 @@ struct ata_device {
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
 
 	select_t	select;		/* basic drive/head select reg value */
-
-	u8		ctl;		/* "normal" value for IDE_CONTROL_REG */
 	u8		status;		/* last retrived status value for device */
 
 	byte		ready_stat;	/* min status value for drive ready */
@@ -653,25 +643,10 @@ extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
  */
 extern u8 ide_dump_status(struct ata_device *, struct request *rq, const char *, u8);
 
-extern ide_startstop_t ide_error(struct ata_device *, struct request *rq,
-		const char *, byte);
+extern ide_startstop_t ata_error(struct ata_device *, struct request *rq, const char *);
 
-/*
- * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
- * removing leading/trailing blanks and compressing internal blanks.
- * It is primarily used to tidy up the model name/number fields as
- * returned by the WIN_[P]IDENTIFY commands.
- */
-void ide_fixstring(byte *s, const int bytecount, const int byteswap);
+extern void ide_fixstring(char *s, const int bytecount, const int byteswap);
 
-/*
- * This routine busy-waits for the drive status to be not "busy".
- * It then checks the status for all of the "good" bits and none
- * of the "bad" bits, and if all is okay it returns 0.  All other
- * cases return 1 after doing "*startstop = ide_error()", and the
- * caller should return the updated value of "startstop" in this case.
- * "startstop" is unchanged when the function returns 0;
- */
 extern int ide_wait_stat(ide_startstop_t *,
 		struct ata_device *, struct request *rq,
 		byte, byte, unsigned long);
@@ -896,5 +871,7 @@ extern int drive_is_ready(struct ata_device *drive);
 extern void ata_select(struct ata_device *, unsigned long);
 extern void ata_mask(struct ata_device *);
 extern int ata_status(struct ata_device *, u8, u8);
+extern int ata_irq_enable(struct ata_device *, int);
+extern void ata_reset(struct ata_channel *);
 
 #endif

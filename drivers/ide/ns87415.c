@@ -141,10 +141,6 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned int ctrl, using_inta;
 	byte progif;
-#ifdef __sparc_v9__
-	int timeout;
-	byte stat;
-#endif
 
 	/* Set a good latency timer and cache line size value. */
 	(void) pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);
@@ -197,16 +193,7 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 		 * XXX: Reset the device, if we don't it will not respond
 		 *      to select properly during first probe.
 		 */
-		timeout = 10000;
-		outb(12, hwif->io_ports[IDE_CONTROL_OFFSET]);
-		udelay(10);
-		outb(8, hwif->io_ports[IDE_CONTROL_OFFSET]);
-		do {
-			udelay(50);
-			stat = inb(hwif->io_ports[IDE_STATUS_OFFSET]);
-			if (stat == 0xff)
-				break;
-		} while ((stat & BUSY_STAT) && --timeout);
+		ata_reset(struct ata_channel *hwif);
 #endif
 	}
 

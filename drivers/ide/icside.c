@@ -476,7 +476,7 @@ static ide_startstop_t icside_dmaintr(struct ata_device *drive, struct request *
 		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
 	}
-	return ide_error(drive, rq, "dma_intr", drive->status);
+	return ata_error(drive, rq, __FUNCTION__);
 }
 
 static int

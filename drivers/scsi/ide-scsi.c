@@ -411,8 +411,7 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 	}
 
 	ata_select(drive, 10);
-	if (IDE_CONTROL_REG)
-		OUT_BYTE (drive->ctl,IDE_CONTROL_REG);
+	ata_irq_enable(drive, 1);
 	OUT_BYTE (dma_ok,IDE_FEATURE_REG);
 	OUT_BYTE (bcount >> 8,IDE_BCOUNTH_REG);
 	OUT_BYTE (bcount & 0xff,IDE_BCOUNTL_REG);

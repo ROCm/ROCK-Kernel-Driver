@@ -594,7 +594,7 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 		pc = (struct packet_command *) rq->special;
 		pc->stat = 1;
 		cdrom_end_request(drive, rq, 1);
-		*startstop = ide_error(drive, rq, "request sense failure", drive->status);
+		*startstop = ata_error(drive, rq, "request sense failure");
 
 		return 1;
 	} else if (rq->flags & (REQ_PC | REQ_BLOCK_PC)) {
@@ -673,7 +673,7 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
 			   for other errors. */
-			*startstop = ide_error(drive, rq, __FUNCTION__, drive->status);
+			*startstop = ata_error(drive, rq, __FUNCTION__);
 			return 1;
 		} else if ((++rq->errors > ERROR_MAX)) {
 			/* We've racked up too many retries.  Abort. */
@@ -751,9 +751,7 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 
 	OUT_BYTE(xferlen & 0xff, IDE_LCYL_REG);
 	OUT_BYTE(xferlen >> 8  , IDE_HCYL_REG);
-	if (IDE_CONTROL_REG)
-		OUT_BYTE (drive->ctl, IDE_CONTROL_REG);
-
+	ata_irq_enable(drive, 1);
 	if (info->dma)
 		udma_start(drive, rq);
 
@@ -918,7 +916,7 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 			__ide_end_request(drive, rq, 1, rq->nr_sectors);
 			return ide_stopped;
 		} else
-			return ide_error (drive, rq, "dma error", stat);
+			return ata_error(drive, rq, "dma error");
 	}
 
 	/* Read the interrupt reason and the transfer length. */
@@ -1498,7 +1496,7 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 	 */
 	if (dma) {
 		if (dma_error)
-			return ide_error(drive, rq, "dma error", stat);
+			return ata_error(drive, rq, "dma error");
 
 		__ide_end_request(drive, rq, 1, rq->nr_sectors);
 		return ide_stopped;
