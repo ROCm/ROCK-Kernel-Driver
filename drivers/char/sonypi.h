@@ -47,7 +47,8 @@
 #include <linux/input.h>
 #include <linux/pm.h>
 #include <linux/acpi.h>
-#include "linux/sonypi.h"
+#include <linux/kfifo.h>
+#include <linux/sonypi.h>
 
 /* type1 models use those */
 #define SONYPI_IRQ_PORT			0x8034
@@ -339,15 +340,6 @@ struct sonypi_eventtypes {
 };
 
 #define SONYPI_BUF_SIZE	128
-struct sonypi_queue {
-	unsigned long head;
-	unsigned long tail;
-	unsigned long len;
-	spinlock_t s_lock;
-	wait_queue_head_t proc_list;
-	struct fasync_struct *fasync;
-	unsigned char buf[SONYPI_BUF_SIZE];
-};
 
 /* We enable input subsystem event forwarding if the input 
  * subsystem is compiled in, but only if sonypi is not into the
@@ -372,7 +364,10 @@ struct sonypi_device {
 	int camera_power;
 	int bluetooth_power;
 	struct semaphore lock;
-	struct sonypi_queue queue;
+	struct kfifo *fifo;
+	spinlock_t fifo_lock;
+	wait_queue_head_t fifo_proc_list;
+	struct fasync_struct *fifo_async;
 	int open_count;
 	int model;
 #ifdef SONYPI_USE_INPUT

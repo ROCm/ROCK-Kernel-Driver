@@ -125,64 +125,6 @@ static int sonypi_ec_read(u8 addr, u8 *value)
 	return 0;
 }
 
-/* Inits the queue */
-static inline void sonypi_initq(void) {
-        sonypi_device.queue.head = sonypi_device.queue.tail = 0;
-	sonypi_device.queue.len = 0;
-	sonypi_device.queue.s_lock = SPIN_LOCK_UNLOCKED;
-	init_waitqueue_head(&sonypi_device.queue.proc_list);
-}
-
-/* Pulls an event from the queue */
-static inline unsigned char sonypi_pullq(void) {
-        unsigned char result;
-	unsigned long flags;
-
-	spin_lock_irqsave(&sonypi_device.queue.s_lock, flags);
-	if (!sonypi_device.queue.len) {
-		spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-		return 0;
-	}
-	result = sonypi_device.queue.buf[sonypi_device.queue.head];
-        sonypi_device.queue.head++;
-	sonypi_device.queue.head &= (SONYPI_BUF_SIZE - 1);
-	sonypi_device.queue.len--;
-	spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-        return result;
-}
-
-/* Pushes an event into the queue */
-static inline void sonypi_pushq(unsigned char event) {
-	unsigned long flags;
-
-	spin_lock_irqsave(&sonypi_device.queue.s_lock, flags);
-	if (sonypi_device.queue.len == SONYPI_BUF_SIZE) {
-		/* remove the first element */
-        	sonypi_device.queue.head++;
-		sonypi_device.queue.head &= (SONYPI_BUF_SIZE - 1);
-		sonypi_device.queue.len--;
-	}
-	sonypi_device.queue.buf[sonypi_device.queue.tail] = event;
-	sonypi_device.queue.tail++;
-	sonypi_device.queue.tail &= (SONYPI_BUF_SIZE - 1);
-	sonypi_device.queue.len++;
-
-	kill_fasync(&sonypi_device.queue.fasync, SIGIO, POLL_IN);
-	wake_up_interruptible(&sonypi_device.queue.proc_list);
-	spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-}
-
-/* Tests if the queue is empty */
-static inline int sonypi_emptyq(void) {
-        int result;
-	unsigned long flags;
-
-	spin_lock_irqsave(&sonypi_device.queue.s_lock, flags);
-        result = (sonypi_device.queue.len == 0);
-	spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-        return result;
-}
-
 static int ec_read16(u8 addr, u16 *value) {
 	u8 val_lb, val_hb;
 	if (sonypi_ec_read(addr, &val_lb))
@@ -419,7 +361,11 @@ found:
 		input_sync(jog_dev);
 	}
 #endif /* SONYPI_USE_INPUT */
-	sonypi_pushq(event);
+
+	kfifo_put(sonypi_device.fifo, (unsigned char *)&event, sizeof(event));
+	kill_fasync(&sonypi_device.fifo_async, SIGIO, POLL_IN);
+	wake_up_interruptible(&sonypi_device.fifo_proc_list);
+
 	return IRQ_HANDLED;
 }
 
@@ -504,7 +450,7 @@ EXPORT_SYMBOL(sonypi_camera_command);
 static int sonypi_misc_fasync(int fd, struct file *filp, int on) {
 	int retval;
 
-	retval = fasync_helper(fd, filp, on, &sonypi_device.queue.fasync);
+	retval = fasync_helper(fd, filp, on, &sonypi_device.fifo_async);
 	if (retval < 0)
 		return retval;
 	return 0;
@@ -522,7 +468,7 @@ static int sonypi_misc_open(struct inode * inode, struct file * file) {
 	down(&sonypi_device.lock);
 	/* Flush input queue on first open */
 	if (!sonypi_device.open_count)
-		sonypi_initq();
+		kfifo_reset(sonypi_device.fifo);
 	sonypi_device.open_count++;
 	up(&sonypi_device.lock);
 	return 0;
@@ -531,40 +477,34 @@ static int sonypi_misc_open(struct inode * inode, struct file * file) {
 static ssize_t sonypi_misc_read(struct file * file, char __user * buf,
 			size_t count, loff_t *pos)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	ssize_t i = count;
+	ssize_t ret;
 	unsigned char c;
 
-	if (sonypi_emptyq()) {
-		if (file->f_flags & O_NONBLOCK)
-			return -EAGAIN;
-		add_wait_queue(&sonypi_device.queue.proc_list, &wait);
-repeat:
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (sonypi_emptyq() && !signal_pending(current)) {
-			schedule();
-			goto repeat;
-		}
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&sonypi_device.queue.proc_list, &wait);
+	if ((kfifo_len(sonypi_device.fifo) == 0) &&
+	    (file->f_flags & O_NONBLOCK))
+		return -EAGAIN;
+
+	ret = wait_event_interruptible(sonypi_device.fifo_proc_list,
+				       kfifo_len(sonypi_device.fifo) != 0);
+	if (ret)
+		return ret;
+
+	while (ret < count &&
+	       (kfifo_get(sonypi_device.fifo, &c, sizeof(c)) == sizeof(c))) {
+		if (put_user(c, buf++))
+			return -EFAULT;
+		ret++;
 	}
-	while (i > 0 && !sonypi_emptyq()) {
-		c = sonypi_pullq();
-		put_user(c, buf++);
-		i--;
-        }
-	if (count - i) {
+
+	if (ret > 0)
 		file->f_dentry->d_inode->i_atime = CURRENT_TIME;
-		return count-i;
-	}
-	if (signal_pending(current))
-		return -ERESTARTSYS;
-	return 0;
+
+	return ret;
 }
 
 static unsigned int sonypi_misc_poll(struct file *file, poll_table * wait) {
-	poll_wait(file, &sonypi_device.queue.proc_list, wait);
-	if (!sonypi_emptyq())
+	poll_wait(file, &sonypi_device.fifo_proc_list, wait);
+	if (kfifo_len(sonypi_device.fifo))
 		return POLLIN | POLLRDNORM;
 	return 0;
 }
@@ -743,7 +683,16 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE1;
 	else
 		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE2;
-	sonypi_initq();
+	sonypi_device.fifo_lock = SPIN_LOCK_UNLOCKED;
+	sonypi_device.fifo = kfifo_alloc(SONYPI_BUF_SIZE, GFP_KERNEL,
+					 &sonypi_device.fifo_lock);
+	if (IS_ERR(sonypi_device.fifo)) {
+		printk(KERN_ERR "sonypi: kfifo_alloc failed\n");
+		ret = PTR_ERR(sonypi_device.fifo);
+		goto out_fifo;
+	}
+
+	init_waitqueue_head(&sonypi_device.fifo_proc_list);
 	init_MUTEX(&sonypi_device.lock);
 	sonypi_device.bluetooth_power = 0;
 	
@@ -896,6 +845,8 @@ out3:
 out2:
 	misc_deregister(&sonypi_misc_device);
 out1:
+	kfifo_free(sonypi_device.fifo);
+out_fifo:
 	return ret;
 }
 
@@ -929,6 +880,7 @@ static void __devexit sonypi_remove(void) {
 	free_irq(sonypi_device.irq, sonypi_irq);
 	release_region(sonypi_device.ioport1, sonypi_device.region_size);
 	misc_deregister(&sonypi_misc_device);
+	kfifo_free(sonypi_device.fifo);
 	printk(KERN_INFO "sonypi: removed.\n");
 }
 
