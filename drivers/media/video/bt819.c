@@ -48,18 +48,8 @@
 
 static unsigned short normal_i2c[] = {34>>1, I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
-static unsigned short probe[2] = { I2C_CLIENT_END , I2C_CLIENT_END };
-static unsigned short probe_range[2] = { I2C_CLIENT_END , I2C_CLIENT_END };
-static unsigned short ignore[2] = { I2C_CLIENT_END , I2C_CLIENT_END };
-static unsigned short ignore_range[2] = { I2C_CLIENT_END , I2C_CLIENT_END };
-static unsigned force[2] = { I2C_CLIENT_END , I2C_CLIENT_END };	
 
-static struct i2c_client_address_data addr_data = {
-	normal_i2c , normal_i2c_range,
-	probe , probe_range,
-	ignore , ignore_range,
-	force
-};
+I2C_CLIENT_INSMOD;
 
 static struct i2c_client client_template;
 
@@ -100,10 +90,6 @@ struct timing timing_data[] = {
 
 /* ----------------------------------------------------------------------- */
 
-static int bt819_probe(struct i2c_adapter *adap)
-{
-	return i2c_probe(adap, &addr_data, bt819_attach);
-}
 
 static int bt819_setbit(struct bt819 *dev, int subaddr, int bit, int data)
 {
@@ -210,6 +196,10 @@ static int bt819_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	i2c_attach_client(client);
 	MOD_INC_USE_COUNT;
 	return 0;
+}
+static int bt819_probe(struct i2c_adapter *adap)
+{
+	return i2c_probe(adap, &addr_data, bt819_attach);
 }
 
 static int bt819_detach(struct i2c_client *client)
@@ -448,21 +438,19 @@ static int bt819_command(struct i2c_client *client, unsigned int cmd, void *arg)
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver i2c_driver_bt819 = {
-	"bt819",		/* name */
-	I2C_DRIVERID_BT819,	/* ID */
-	I2C_DF_NOTIFY,
-	bt819_probe,
-	bt819_detach,
-	bt819_command
+        .name = "bt819",		/* name */
+	.id = I2C_DRIVERID_BT819,	/* ID */
+	.flags = I2C_DF_NOTIFY,
+	.attach_adapter = bt819_probe,
+	.detach_client = bt819_detach,
+	.command = bt819_command
+
 };
 
 static struct i2c_client client_template = {
-	"bt819_client",
-	-1,
-	0,
-	0,
-	NULL,
-	&i2c_driver_bt819
+	.name = "bt819_client",
+	.id = -1,
+	.driver = &i2c_driver_bt819
 };
 
 static int bt819_setup(void)

@@ -73,4 +73,4 @@ this driver but he better knows the Mac OS-X driver.
 CREDITS:
 
 The code is based on dabusb.c, printer.c and scanner.c !
-The driver has been developed independantly of Texas Instruments.
+The driver has been developed independently of Texas Instruments.

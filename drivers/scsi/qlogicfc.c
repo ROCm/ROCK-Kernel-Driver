@@ -397,7 +397,7 @@ struct Status_Entry {
 #define MBOX_PORT_LOGOUT                0x0071
 
 /*
- *	Firmware if needed (note this is a hack, it belongs in a seperate
+ *	Firmware if needed (note this is a hack, it belongs in a separate
  *	module.
  */
  

@@ -4,7 +4,7 @@
  * Copyright (C) 1999 Intel Corp.
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
  * Copyright (C) 2000-2002 J.I. Lee <jung-ik.lee@intel.com>
- * Copyright (C) 1999-2000, 2002 Hewlett-Packard Co.
+ * Copyright (C) 1999-2000, 2002-2003 Hewlett-Packard Co.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
@@ -433,7 +433,7 @@ iosapic_reassign_vector (int vector)
 	    || iosapic_intr_info[vector].polarity || iosapic_intr_info[vector].trigger)
 	{
 		new_vector = ia64_alloc_vector();
-		printk("Reassigning vector %d to %d\n", vector, new_vector);
+		printk(KERN_INFO "Reassigning vector %d to %d\n", vector, new_vector);
 		memcpy(&iosapic_intr_info[new_vector], &iosapic_intr_info[vector],
 		       sizeof(struct iosapic_intr_info));
 		memset(&iosapic_intr_info[vector], 0, sizeof(struct iosapic_intr_info));
@@ -468,17 +468,17 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 #else
 	if (iosapic_address) {
 		if (iosapic_intr_info[vector].addr && (iosapic_intr_info[vector].addr != iosapic_address))
-			printk("WARN: register_intr: diff IOSAPIC ADDRESS for GSI 0x%x, vector %d\n",
-			       gsi, vector);
+			printk(KERN_WARNING "warning: register_intr: diff IOSAPIC ADDRESS for "
+			       "GSI 0x%x, vector %d\n", gsi, vector);
 		iosapic_intr_info[vector].addr = iosapic_address;
 		if (iosapic_intr_info[vector].gsi_base && (iosapic_intr_info[vector].gsi_base != gsi_base)) {
-			printk("WARN: register_intr: diff GSI base 0x%x for GSI 0x%x, vector %d\n",
-			       gsi_base, gsi, vector);
+			printk(KERN_WARNING "warning: register_intr: diff GSI base 0x%x for "
+			       "GSI 0x%x, vector %d\n", gsi_base, gsi, vector);
 		}
 		iosapic_intr_info[vector].gsi_base = gsi_base;
 	} else if (!iosapic_intr_info[vector].addr)
-		printk("WARN: register_intr: invalid override for GSI 0x%x, vector %d\n",
-		       gsi, vector);
+		printk(KERN_WARNING "warning: register_intr: invalid override for GSI 0x%x, "
+		       "vector %d\n", gsi, vector);
 #endif
 	if (edge_triggered) {
 		iosapic_intr_info[vector].trigger = IOSAPIC_EDGE;
@@ -491,9 +491,8 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	idesc = irq_desc(vector);
 	if (idesc->handler != irq_type) {
 		if (idesc->handler != &no_irq_type)
-			printk("%s: changing vector %d from %s to %s\n",
-			       __FUNCTION__, vector, idesc->handler->typename,
-			       irq_type->typename);
+			printk(KERN_WARNING "%s: changing vector %d from %s to %s\n",
+			       __FUNCTION__, vector, idesc->handler->typename, irq_type->typename);
 		idesc->handler = irq_type;
 	}
 }
@@ -518,7 +517,7 @@ iosapic_register_intr (unsigned int gsi,
 	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
 		      polarity, edge_triggered, gsi_base, iosapic_address);
 
-	printk("GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
+	printk(KERN_INFO "GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
 	       gsi, (polarity ? "high" : "low"),
 	       (edge_triggered ? "edge" : "level"), dest, vector);
 
@@ -560,14 +559,14 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 		delivery = IOSAPIC_LOWEST_PRIORITY;
 		break;
 	      default:
-		printk("iosapic_register_platform_irq(): invalid int type\n");
+		printk(KERN_ERR "iosapic_register_platform_irq(): invalid int type\n");
 		return -1;
 	}
 
 	register_intr(gsi, vector, delivery, polarity,
 		      edge_triggered, gsi_base, iosapic_address);
 
-	printk("PLATFORM int 0x%x: GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
+	printk(KERN_INFO "PLATFORM int 0x%x: GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
 	       int_type, gsi, (polarity ? "high" : "low"),
 	       (edge_triggered ? "edge" : "level"), dest, vector);
 
@@ -594,7 +593,7 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 	index = find_iosapic(gsi);
 
 	if (index < 0) {
-		printk("ISA: No corresponding IOSAPIC found : ISA IRQ %u -> GSI 0x%x\n",
+		printk(KERN_ERR "ISA: No corresponding IOSAPIC found : ISA IRQ %u -> GSI 0x%x\n",
 		       isa_irq, gsi);
 		return;
 	}
@@ -634,7 +633,7 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 		 * Disable the compatibility mode interrupts (8259 style), needs IN/OUT support
 		 * enabled.
 		 */
-		printk("%s: Disabling PC-AT compatible 8259 interrupts\n", __FUNCTION__);
+		printk(KERN_INFO "%s: Disabling PC-AT compatible 8259 interrupts\n", __FUNCTION__);
 		outb(0xff, 0xA1);
 		outb(0xff, 0x21);
 	}
@@ -655,7 +654,7 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 	iosapic_lists[num_iosapic].num_rte = num_rte;
 	num_iosapic++;
 
-	printk(KERN_INFO"  IOSAPIC v%x.%x, address 0x%lx, GSIs 0x%x-0x%x\n",
+	printk(KERN_INFO "  IOSAPIC v%x.%x, address 0x%lx, GSIs 0x%x-0x%x\n",
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, gsi_base, gsi_base + num_rte - 1);
 
 	if ((gsi_base == 0) && pcat_compat) {
@@ -692,7 +691,7 @@ fixup_vector (int vector, unsigned int gsi, const char *pci_id)
 	idesc = irq_desc(vector);
 	if (idesc->handler != irq_type) {
 		if (idesc->handler != &no_irq_type)
-			printk("IOSAPIC: changing vector %d from %s to %s\n",
+			printk(KERN_INFO "IOSAPIC: changing vector %d from %s to %s\n",
 			       vector, idesc->handler->typename, irq_type->typename);
 		idesc->handler = irq_type;
 	}
@@ -723,7 +722,8 @@ fixup_vector (int vector, unsigned int gsi, const char *pci_id)
 #endif
 	set_rte(vector, dest);
 
-	printk("IOSAPIC: %s -> GSI 0x%x -> CPU 0x%04x vector %d\n", pci_id, gsi, dest, vector);
+	printk(KERN_INFO "IOSAPIC: %s -> GSI 0x%x -> CPU 0x%04x vector %d\n",
+	       pci_id, gsi, dest, vector);
 }
 
 void __init
@@ -751,8 +751,8 @@ iosapic_parse_prt (void)
 			index = find_iosapic(gsi);
 
 			if (index < 0) {
-				printk(KERN_WARNING"IOSAPIC: GSI 0x%x has no IOSAPIC!\n", gsi);
-				return;
+				printk(KERN_WARNING "IOSAPIC: GSI 0x%x has no IOSAPIC!\n", gsi);
+				continue;
 			}
 			addr = iosapic_lists[index].addr;
 			gsi_base = iosapic_lists[index].gsi_base;

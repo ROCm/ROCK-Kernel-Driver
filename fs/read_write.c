@@ -535,10 +535,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	if (retval)
 		goto fput_in;
 
-	retval = security_file_permission (in_file, MAY_READ);
-	if (retval)
-		goto fput_in;
-
 	/*
 	 * Get output file, and verify that it is ok..
 	 */
@@ -553,10 +549,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		goto fput_out;
 	out_inode = out_file->f_dentry->d_inode;
 	retval = locks_verify_area(FLOCK_VERIFY_WRITE, out_inode, out_file, out_file->f_pos, count);
-	if (retval)
-		goto fput_out;
-
-	retval = security_file_permission (out_file, MAY_WRITE);
 	if (retval)
 		goto fput_out;
 

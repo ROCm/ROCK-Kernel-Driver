@@ -1468,7 +1468,7 @@ static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 	spin_unlock(&hmp->lock);
 }
 
-/* This routine is logically part of the interrupt handler, but seperated
+/* This routine is logically part of the interrupt handler, but separated
    for clarity and better register allocation. */
 static int hamachi_rx(struct net_device *dev)
 {

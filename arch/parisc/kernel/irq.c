@@ -373,7 +373,7 @@ txn_alloc_data(int virt_irq, unsigned int bits_wide)
 	/* XXX FIXME : bits_wide indicates how wide the transaction
 	** data is allowed to be...we may need a different virt_irq
 	** if this one won't work. Another reason to index virtual
-	** irq's into a table which can manage CPU/IRQ bit seperately.
+	** irq's into a table which can manage CPU/IRQ bit separately.
 	*/
 	if (IRQ_OFFSET(virt_irq) > (1 << (bits_wide -1)))
 	{

@@ -341,7 +341,7 @@ static int cpci_configure_dev(struct pci_bus *bus, struct pci_dev *dev)
 
 	/*
 	 * Need to explicitly set irq field to 0 so that it'll get assigned
-	 * by the pcibios platform dependant code called by pci_enable_device.
+	 * by the pcibios platform dependent code called by pci_enable_device.
 	 */
 	dev->irq = 0;
 

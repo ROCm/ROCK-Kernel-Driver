@@ -4,7 +4,7 @@
  *
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2001, 2003 Hewlett-Packard Co
  *	David Mosberger <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
@@ -114,7 +114,7 @@ GLOBAL_ENTRY(ia64_pal_call_stacked)
 	;;
 	rsm psr.i
 	mov b7 = loc2
-	;; 
+	;;
 	br.call.sptk.many rp=b7		// now make the call
 .ret0:	mov psr.l  = loc3
 	mov ar.pfs = loc1
@@ -131,15 +131,15 @@ END(ia64_pal_call_stacked)
  * 	in0         Index of PAL service
  * 	in2 - in3   Remaning PAL arguments
  *
- * PSR_DB, PSR_LP, PSR_TB, PSR_ID, PSR_DA are never set by the kernel.
+ * PSR_LP, PSR_TB, PSR_ID, PSR_DA are never set by the kernel.
  * So we don't need to clear them.
  */
-#define PAL_PSR_BITS_TO_CLEAR						\
-	(IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT | IA64_PSR_RT |		\
-	 IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED |	\
+#define PAL_PSR_BITS_TO_CLEAR							\
+	(IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT  | IA64_PSR_DB | IA64_PSR_RT |	\
+	 IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED |		\
 	 IA64_PSR_DFL | IA64_PSR_DFH)
 
-#define PAL_PSR_BITS_TO_SET						\
+#define PAL_PSR_BITS_TO_SET							\
 	(IA64_PSR_BN)
 
 
@@ -161,7 +161,7 @@ GLOBAL_ENTRY(ia64_pal_call_phys_static)
 	;;
 	mov loc3 = psr			// save psr
 	adds r8  = 1f-1b,r8		// calculate return address for call
-	;; 
+	;;
 	mov loc4=ar.rsc			// save RSE configuration
 	dep.z loc2=loc2,0,61		// convert pal entry point to physical
 	dep.z r8=r8,0,61		// convert rp to physical
@@ -275,7 +275,6 @@ END(ia64_save_scratch_fpregs)
  * Inputs:
  *      in0	Address of stack storage for fp regs
  */
-
 GLOBAL_ENTRY(ia64_load_scratch_fpregs)
 	alloc r3=ar.pfs,1,0,0,0
 	add r2=16,in0

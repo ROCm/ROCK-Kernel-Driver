@@ -80,7 +80,7 @@ typedef unsigned long old_sigset_t;		/* at least 32 bits */
 #define SA_RESTART	0x10000000
 #define SA_SIGINFO	0x00000008
 #define SA_NODEFER	0x40000000
-#define SA_NOCLDWAIT	0x00010000	/* Not supported yet */
+#define SA_NOCLDWAIT	0x00010000
 #define SA_NOCLDSTOP	0x00000001
 
 #define SA_NOMASK	SA_NODEFER

@@ -2557,7 +2557,7 @@ aic7xxx_allocate_scb(struct aic7xxx_host *p)
      * than the right hand side.  If the number of SG array elements
      * is changed, this function may not be near so efficient any more.
      *
-     * Since the DMA'able buffers are now allocated in a seperate
+     * Since the DMA'able buffers are now allocated in a separate
      * chunk this algorithm has been modified to match.  The '12'
      * and '6' factors in scb_size are for the DMA'able command byte
      * and sensebuffers respectively.  -DaveM

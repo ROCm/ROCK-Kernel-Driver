@@ -78,7 +78,7 @@ design to add journaling capabilities on a block device.  The ext3
 filesystem code will inform the JBD of modifications it is performing
 (Call a transaction).  the journal support the transactions start and
 stop, and in case of crash, the journal can replayed the transactions
-to put the partition on a consistant state fastly.
+to put the partition on a consistent state fastly.
 
 handles represent a single atomic update to a filesystem.  JBD can
 handle external journal on a block device.

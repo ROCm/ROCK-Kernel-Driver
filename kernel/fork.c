@@ -665,23 +665,39 @@ out_release:
 
 static inline int copy_sighand(unsigned long clone_flags, struct task_struct * tsk)
 {
-	struct signal_struct *sig;
+	struct sighand_struct *sig;
 
-	if (clone_flags & CLONE_SIGHAND) {
-		atomic_inc(&current->sig->count);
+	if (clone_flags & (CLONE_SIGHAND | CLONE_THREAD)) {
+		atomic_inc(&current->sighand->count);
 		return 0;
 	}
-	sig = kmem_cache_alloc(sigact_cachep, GFP_KERNEL);
-	tsk->sig = sig;
+	sig = kmem_cache_alloc(sighand_cachep, GFP_KERNEL);
+	tsk->sighand = sig;
 	if (!sig)
 		return -1;
 	spin_lock_init(&sig->siglock);
+	atomic_set(&sig->count, 1);
+	memcpy(sig->action, current->sighand->action, sizeof(sig->action));
+	return 0;
+}
+
+static inline int copy_signal(unsigned long clone_flags, struct task_struct * tsk)
+{
+	struct signal_struct *sig;
+
+	if (clone_flags & CLONE_THREAD) {
+		atomic_inc(&current->signal->count);
+		return 0;
+	}
+	sig = kmem_cache_alloc(signal_cachep, GFP_KERNEL);
+	tsk->signal = sig;
+	if (!sig)
+		return -1;
 	atomic_set(&sig->count, 1);
 	sig->group_exit = 0;
 	sig->group_exit_code = 0;
 	sig->group_exit_task = NULL;
 	sig->group_stop_count = 0;
-	memcpy(sig->action, current->sig->action, sizeof(sig->action));
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
 
@@ -831,8 +847,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		goto bad_fork_cleanup_files;
 	if (copy_sighand(clone_flags, p))
 		goto bad_fork_cleanup_fs;
-	if (copy_mm(clone_flags, p))
+	if (copy_signal(clone_flags, p))
 		goto bad_fork_cleanup_sighand;
+	if (copy_mm(clone_flags, p))
+		goto bad_fork_cleanup_signal;
 	if (copy_namespace(clone_flags, p))
 		goto bad_fork_cleanup_mm;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
@@ -923,31 +941,31 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->parent = p->real_parent;
 
 	if (clone_flags & CLONE_THREAD) {
-		spin_lock(&current->sig->siglock);
+		spin_lock(&current->sighand->siglock);
 		/*
 		 * Important: if an exit-all has been started then
 		 * do not create this new thread - the whole thread
 		 * group is supposed to exit anyway.
 		 */
-		if (current->sig->group_exit) {
-			spin_unlock(&current->sig->siglock);
+		if (current->signal->group_exit) {
+			spin_unlock(&current->sighand->siglock);
 			write_unlock_irq(&tasklist_lock);
 			goto bad_fork_cleanup_namespace;
 		}
 		p->tgid = current->tgid;
 		p->group_leader = current->group_leader;
 
-		if (current->sig->group_stop_count > 0) {
+		if (current->signal->group_stop_count > 0) {
 			/*
 			 * There is an all-stop in progress for the group.
 			 * We ourselves will stop as soon as we check signals.
 			 * Make the new thread part of that group stop too.
 			 */
-			current->sig->group_stop_count++;
+			current->signal->group_stop_count++;
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		spin_unlock(&current->sig->siglock);
+		spin_unlock(&current->sighand->siglock);
 	}
 
 	SET_LINKS(p);
@@ -977,6 +995,8 @@ bad_fork_cleanup_namespace:
 	exit_namespace(p);
 bad_fork_cleanup_mm:
 	exit_mm(p);
+bad_fork_cleanup_signal:
+	exit_signal(p);
 bad_fork_cleanup_sighand:
 	exit_sighand(p);
 bad_fork_cleanup_fs:
@@ -1065,9 +1085,11 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			ptrace_notify ((trace << 8) | SIGTRAP);
 		}
 
-		if (clone_flags & CLONE_VFORK)
+		if (clone_flags & CLONE_VFORK) {
 			wait_for_completion(&vfork);
-		else
+			if (unlikely (current->ptrace & PT_TRACE_VFORK_DONE))
+				ptrace_notify ((PTRACE_EVENT_VFORK_DONE << 8) | SIGTRAP);
+		} else
 			/*
 			 * Let the child process run first, to avoid most of the
 			 * COW overhead when the child exec()s afterwards.
@@ -1077,8 +1099,11 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	return p;
 }
 
-/* SLAB cache for signal_struct structures (tsk->sig) */
-kmem_cache_t *sigact_cachep;
+/* SLAB cache for signal_struct structures (tsk->signal) */
+kmem_cache_t *signal_cachep;
+
+/* SLAB cache for sighand_struct structures (tsk->sighand) */
+kmem_cache_t *sighand_cachep;
 
 /* SLAB cache for files_struct structures (tsk->files) */
 kmem_cache_t *files_cachep;
@@ -1094,11 +1119,17 @@ kmem_cache_t *mm_cachep;
 
 void __init proc_caches_init(void)
 {
-	sigact_cachep = kmem_cache_create("signal_act",
+	sighand_cachep = kmem_cache_create("sighand_cache",
+			sizeof(struct sighand_struct), 0,
+			SLAB_HWCACHE_ALIGN, NULL, NULL);
+	if (!sighand_cachep)
+		panic("Cannot create sighand SLAB cache");
+
+	signal_cachep = kmem_cache_create("signal_cache",
 			sizeof(struct signal_struct), 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!sigact_cachep)
-		panic("Cannot create signal action SLAB cache");
+	if (!signal_cachep)
+		panic("Cannot create signal SLAB cache");
 
 	files_cachep = kmem_cache_create("files_cache", 
 			 sizeof(struct files_struct), 0, 

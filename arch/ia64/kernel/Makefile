@@ -10,6 +10,7 @@ obj-y := acpi.o entry.o gate.o efi.o efi_stub.o ia64_ksyms.o \
 	 semaphore.o setup.o	\
 	 signal.o sys_ia64.o traps.o time.o unaligned.o unwind.o
 
+obj-$(CONFIG_FSYS) += fsys.o
 obj-$(CONFIG_IOSAPIC) += iosapic.o
 obj-$(CONFIG_IA64_PALINFO) += palinfo.o
 obj-$(CONFIG_EFI_VARS) += efivars.o

@@ -158,7 +158,7 @@
 				 *                  0x3 = CD Audio
 				 *                  0x4 = External Audio
 				 *
-				 * The volume is definately not the general
+				 * The volume is definitely not the general
 				 * output volume as it doesn't affect the
 				 * alert sound volume.
 				 */

@@ -2,7 +2,7 @@
 #define _ASM_IA64_PROCESSOR_H
 
 /*
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
@@ -223,7 +223,10 @@ typedef struct {
 struct siginfo;
 
 struct thread_struct {
-	__u64 flags;			/* various thread flags (see IA64_THREAD_*) */
+	__u32 flags;			/* various thread flags (see IA64_THREAD_*) */
+	/* writing on_ustack is performance-critical, so it's worth spending 8 bits on it... */
+	__u8 on_ustack;			/* executing on user-stacks? */
+	__u8 pad[3];
 	__u64 ksp;			/* kernel stack pointer */
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
@@ -277,6 +280,7 @@ struct thread_struct {
 
 #define INIT_THREAD {				\
 	.flags =	0,			\
+	.on_ustack =	0,			\
 	.ksp =		0,			\
 	.map_base =	DEFAULT_MAP_BASE,	\
 	.task_size =	DEFAULT_TASK_SIZE,	\

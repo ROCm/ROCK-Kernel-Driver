@@ -220,10 +220,21 @@ struct mm_struct {
 
 extern int mmlist_nr;
 
-struct signal_struct {
+struct sighand_struct {
 	atomic_t		count;
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
+};
+
+/*
+ * NOTE! "signal_struct" does not have it's own
+ * locking, because a shared signal_struct always
+ * implies a shared sighand_struct, so locking
+ * sighand_struct is always a proper superset of
+ * the locking of signal_struct.
+ */
+struct signal_struct {
+	atomic_t		count;
 
 	/* current thread group signal load-balancing target: */
 	task_t			*curr_target;
@@ -378,7 +389,8 @@ struct task_struct {
 /* namespace */
 	struct namespace *namespace;
 /* signal handlers */
-	struct signal_struct *sig;
+	struct signal_struct *signal;
+	struct sighand_struct *sighand;
 
 	sigset_t blocked, real_blocked;
 	struct sigpending pending;
@@ -405,6 +417,7 @@ struct task_struct {
 	struct backing_dev_info *backing_dev_info;
 
 	unsigned long ptrace_message;
+	siginfo_t *last_siginfo; /* For ptrace use.  */
 };
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -445,6 +458,8 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PT_TRACE_VFORK	0x00000020
 #define PT_TRACE_CLONE	0x00000040
 #define PT_TRACE_EXEC	0x00000080
+#define PT_TRACE_VFORK_DONE	0x00000100
+#define PT_TRACE_EXIT	0x00000200
 
 #if CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
@@ -589,6 +604,8 @@ extern void exit_thread(void);
 
 extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
+extern void exit_signal(struct task_struct *);
+extern void __exit_signal(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
 

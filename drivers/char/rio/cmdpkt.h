@@ -41,7 +41,7 @@ static char *_cmdpkt_h_sccs_ = "@(#)cmdpkt.h	1.2";
 /*
 ** overlays for the data area of a packet. Used in both directions
 ** (to build a packet to send, and to interpret a packet that arrives)
-** and is very inconvenient for MIPS, so they appear as two seperate
+** and is very inconvenient for MIPS, so they appear as two separate
 ** structures - those used for modifying/reading packets on the card
 ** and those for modifying/reading packets in real memory, which have an _M
 ** suffix.

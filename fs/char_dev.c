@@ -1,5 +1,5 @@
 /*
- *  linux/fs/block_dev.c
+ *  linux/fs/char_dev.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
@@ -38,16 +38,13 @@ static kmem_cache_t * cdev_cachep;
 	 ((struct char_device *) kmem_cache_alloc(cdev_cachep, SLAB_KERNEL))
 #define destroy_cdev(cdev) kmem_cache_free(cdev_cachep, (cdev))
 
-static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 {
-	struct char_device * cdev = (struct char_device *) foo;
+	struct char_device *cdev = (struct char_device *) foo;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR)
-	{
 		memset(cdev, 0, sizeof(*cdev));
-		sema_init(&cdev->sem, 1);
-	}
 }
 
 void __init cdev_cache_init(void)

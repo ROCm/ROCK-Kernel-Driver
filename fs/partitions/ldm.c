@@ -510,7 +510,7 @@ static BOOL ldm_validate_vmdb (struct block_device *bdev, unsigned long base,
 
 	/* Are there uncommitted transactions? */
 	if (BE16(data + 0x10) != 0x01) {
-		ldm_crit ("Database is not in a consistant state.  Aborting.");
+		ldm_crit ("Database is not in a consistent state.  Aborting.");
 		goto out;
 	}
 

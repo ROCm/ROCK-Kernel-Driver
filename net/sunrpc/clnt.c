@@ -233,27 +233,27 @@ void rpc_clnt_sigmask(struct rpc_clnt *clnt, sigset_t *oldset)
 	
 	/* Turn off various signals */
 	if (clnt->cl_intr) {
-		struct k_sigaction *action = current->sig->action;
+		struct k_sigaction *action = current->sighand->action;
 		if (action[SIGINT-1].sa.sa_handler == SIG_DFL)
 			sigallow |= sigmask(SIGINT);
 		if (action[SIGQUIT-1].sa.sa_handler == SIG_DFL)
 			sigallow |= sigmask(SIGQUIT);
 	}
-	spin_lock_irqsave(&current->sig->siglock, irqflags);
+	spin_lock_irqsave(&current->sighand->siglock, irqflags);
 	*oldset = current->blocked;
 	siginitsetinv(&current->blocked, sigallow & ~oldset->sig[0]);
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sig->siglock, irqflags);
+	spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
 }
 
 void rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset)
 {
 	unsigned long	irqflags;
 	
-	spin_lock_irqsave(&current->sig->siglock, irqflags);
+	spin_lock_irqsave(&current->sighand->siglock, irqflags);
 	current->blocked = *oldset;
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sig->siglock, irqflags);
+	spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
 }
 
 /*

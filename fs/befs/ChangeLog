@@ -60,7 +60,7 @@ Version 0.63 (2002-01-31)
 
 * Documentation improvements in source. [WD]
 
-* Makefile fix for independant module when CONFIG_MODVERSION is set in 
+* Makefile fix for independent module when CONFIG_MODVERSION is set in 
 	kernel config [Pavel Roskin <proski@gnu.org>]
 
 * Compile warning fix for namei.c. [Sergey S. Kostyliov <rathamahata@php4.ru>]

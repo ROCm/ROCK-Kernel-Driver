@@ -4,16 +4,14 @@
  * Needs:
  *	void check_bugs(void);
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2003 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
+#ifndef _ASM_IA64_BUGS_H
+#define _ASM_IA64_BUGS_H
 
 #include <asm/processor.h>
 
-/*
- * I don't know of any ia-64 bugs yet..
- */
-static void
-check_bugs (void)
-{
-}
+extern void check_bugs (void);
+
+#endif /* _ASM_IA64_BUGS_H */

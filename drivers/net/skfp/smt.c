@@ -417,7 +417,7 @@ int event ;
 		/*
 		 * Make sure the fddiMACUNDA_Flag = FALSE is
 		 * included in the SRF so we don't generate
-		 * a seperate SRF for the deassertion of this
+		 * a separate SRF for the deassertion of this
 		 * condition
 		 */
 		update_dac(smc,0) ;

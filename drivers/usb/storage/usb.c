@@ -301,12 +301,12 @@ static int usb_stor_control_thread(void * __us)
 	daemonize();
 
 	/* avoid getting signals */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	flush_signals(current);
 	current->flags |= PF_IOTHREAD;
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/* set our name for identification purposes */
 	sprintf(current->comm, "usb-storage");
@@ -706,7 +706,7 @@ static int storage_probe(struct usb_interface *intf,
 
 	/* 
 	 * Set the handler pointers based on the protocol
-	 * Again, this data is persistant across reattachments
+	 * Again, this data is persistent across reattachments
 	 */
 	switch (ss->protocol) {
 	case US_PR_CB:

@@ -632,7 +632,7 @@ static inline void reset_board(const struct lanai_dev *lanai)
  * anytime it wants to consult its table of vccs - for instance
  * when handling an incoming PDU.  This also explains why we would
  * probably want the write_lock while in _change_qos - to prevent
- * handling of PDUs while possibly in an inconsistant state.
+ * handling of PDUs while possibly in an inconsistent state.
  * Also, _send would grab the lock for reading.
  *
  * One problem with this is that _open and _close could no longer

@@ -27,7 +27,7 @@ The flash is accessed as follows:
    
    16 bit I/O port (0x22) for some sort of paging.
 
-The single flash device is divided into 3 partition which appear as seperate
+The single flash device is divided into 3 partition which appear as separate
 MTD devices.
 
 Linux thinks that the I/O port is used by the PIC and hence check_region() will

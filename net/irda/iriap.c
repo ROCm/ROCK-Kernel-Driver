@@ -990,7 +990,7 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 		len += sprintf(buf+len, "\n");
 
 		/* Careful for priority inversions here !
-		 * All other uses of attrib spinlock are independant of
+		 * All other uses of attrib spinlock are independent of
 		 * the object spinlock, so we are safe. Jean II */
 		spin_lock(&obj->attribs->hb_spinlock);
 

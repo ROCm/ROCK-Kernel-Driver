@@ -42,7 +42,7 @@ struct sclp_ioctls {
 #define TIOCSCLPSINIT	_IO(SCLP_IOCTL_LETTER, 6)
 /* enable/disable conversion from upper to lower case of input */
 #define TIOCSCLPSCASE	_IOW(SCLP_IOCTL_LETTER, 7, unsigned char)
-/* set special character used for seperating upper and lower case, */
+/* set special character used for separating upper and lower case, */
 /* 0x00 disables this feature */
 #define TIOCSCLPSDELIM	_IOW(SCLP_IOCTL_LETTER, 9, unsigned char)
 
@@ -58,7 +58,7 @@ struct sclp_ioctls {
 #define TIOCSCLPGOBUF	_IOR(SCLP_IOCTL_LETTER, 15, unsigned short)
 /* Is conversion from upper to lower case of input enabled ? */
 #define TIOCSCLPGCASE	_IOR(SCLP_IOCTL_LETTER, 17, unsigned char)
-/* get special character used for seperating upper and lower case, */
+/* get special character used for separating upper and lower case, */
 /* 0x00 disables this feature */
 #define TIOCSCLPGDELIM	_IOR(SCLP_IOCTL_LETTER, 19, unsigned char)
 /* get the number of buffers/pages got from kernel at startup */
