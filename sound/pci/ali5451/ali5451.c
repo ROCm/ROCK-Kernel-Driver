@@ -1440,8 +1440,10 @@ static int snd_ali_capture_prepare(snd_pcm_substream_t * substream)
 
 		unsigned int rate;
 		
-		if (codec->revision != ALI_5451_V02)
+		if (codec->revision != ALI_5451_V02) {
+			spin_unlock_irqrestore(&codec->reg_lock, flags);			
 			return -1;
+		}
 		rate = snd_ali_get_spdif_in_rate(codec);
 		if (rate == 0) {
 			snd_printk("ali_capture_preapre: spdif rate detect err!\n");

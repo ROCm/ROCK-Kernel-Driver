@@ -1,5 +1,5 @@
 /* stored in little-endian */
-static u32 multiface_firmware[97652] __devinitdata = {
+static u32 multiface_firmware[24413] __devinitdata = {
 0xffffffff, 0x66aa9955, 0x8001000c, 0xe0000000, 0x8006800c, 0xb0000000,
 0x8004800c, 0xb4fc0100, 0x8003000c, 0x00000000, 0x8001000c, 0x90000000,
 0x8004000c, 0x00000000, 0x8001000c, 0x80000000, 0x0002000c, 0x581a000a,

@@ -79,17 +79,19 @@ static const ac97_codec_id_t snd_ac97_codec_id_vendors[] = {
 { 0x414c4300, 0xffffff00, "Realtek",		NULL },
 { 0x414c4700, 0xffffff00, "Avance Logic",	NULL },
 { 0x43525900, 0xffffff00, "Cirrus Logic",	NULL },
+{ 0x43585400, 0xffffff00, "Conexant",           NULL },
+{ 0x45838300, 0xffffff00, "ESS Technology",	NULL },
 { 0x48525300, 0xffffff00, "Intersil",		NULL },
 { 0x49434500, 0xffffff00, "ICEnsemble",		NULL },
 { 0x4e534300, 0xffffff00, "National Semiconductor", NULL },
 { 0x53494c00, 0xffffff00, "Silicon Laboratory",	NULL },
 { 0x54524100, 0xffffff00, "TriTech",		NULL },
 { 0x54584e00, 0xffffff00, "Texas Instruments",	NULL },
+{ 0x56494100, 0xffffff00, "VIA Technologies",   NULL },
 { 0x57454300, 0xffffff00, "Winbond",		NULL },
 { 0x574d4c00, 0xffffff00, "Wolfson",		NULL },
 { 0x594d4800, 0xffffff00, "Yamaha",		NULL },
 { 0x83847600, 0xffffff00, "SigmaTel",		NULL },
-{ 0x45838300, 0xffffff00, "ESS Technology",	NULL },
 { 0,	      0, 	  NULL,			NULL }
 };
 
@@ -115,12 +117,14 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4750, 0xfffffff0, "ALC250",		NULL },
 { 0x43525900, 0xfffffff8, "CS4297",		NULL },
 { 0x43525910, 0xfffffff8, "CS4297A",		patch_cirrus_spdif },
-{ 0x42525920, 0xfffffff8, "CS4294/4298",	NULL },
-{ 0x42525928, 0xfffffff8, "CS4294",		NULL },
+{ 0x43525920, 0xfffffff8, "CS4294/4298",	NULL },
+{ 0x43525928, 0xfffffff8, "CS4294",		NULL },
 { 0x43525930, 0xfffffff8, "CS4299",		patch_cirrus_cs4299 },
 { 0x43525948, 0xfffffff8, "CS4201",		NULL },
 { 0x43525958, 0xfffffff8, "CS4205",		patch_cirrus_spdif },
 { 0x43525960, 0xfffffff8, "CS4291",		NULL },
+{ 0x43585429, 0xffffffff, "Cx20468",		patch_conexant },
+{ 0x45838308, 0xffffffff, "ESS1988",		NULL },
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
 { 0x49434501, 0xffffffff, "ICE1230",		NULL },
 { 0x49434511, 0xffffffff, "ICE1232",		NULL }, // alias VIA VT1611A?
@@ -131,6 +135,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x54524108, 0xffffffff, "TR28028",		patch_tritech_tr28028 }, // added by xin jin [07/09/99]
 { 0x54524123, 0xffffffff, "TR28602",		NULL }, // only guess --jk [TR28023 = eMicro EM28023 (new CT1297)]
 { 0x54584e20, 0xffffffff, "TLC320AD9xC",	NULL },
+{ 0x56494161, 0xffffffff, "VIA1612A",		NULL }, // modified ICE1232 with S/PDIF
 { 0x57454301, 0xffffffff, "W83971D",		NULL },
 { 0x574d4c00, 0xffffffff, "WM9701A",		patch_wolfson00 },
 { 0x574d4c03, 0xffffffff, "WM9703/9707",	patch_wolfson03 },
@@ -143,8 +148,6 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x83847609, 0xffffffff, "STAC9721/23",	patch_sigmatel_stac9721 },
 { 0x83847644, 0xffffffff, "STAC9744",		patch_sigmatel_stac9744 },
 { 0x83847656, 0xffffffff, "STAC9756/57",	patch_sigmatel_stac9756 },
-{ 0x45838308, 0xffffffff, "ESS1988",		NULL },
-{ 0x43585429, 0xffffffff, "Cx20468",		patch_conexant },
 { 0, 	      0,	  NULL,			NULL }
 };
 

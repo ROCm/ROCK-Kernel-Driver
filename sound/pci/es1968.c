@@ -1446,8 +1446,10 @@ static esm_memory_t *snd_es1968_new_memory(es1968_t *chip, int size)
 __found:
 	if (buf->size > size) {
 		esm_memory_t *chunk = kmalloc(sizeof(*chunk), GFP_KERNEL);
-		if (chunk == NULL)
+		if (chunk == NULL) {
+			up(&chip->memory_mutex);
 			return NULL;
+		}
 		chunk->size = buf->size - size;
 		chunk->buf = buf->buf + size;
 		chunk->addr = buf->addr + size;

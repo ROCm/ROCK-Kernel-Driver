@@ -45,7 +45,7 @@ typedef struct _snd_virmidi {
 	snd_rawmidi_substream_t *substream;
 } snd_virmidi_t;
 
-#define SNDRV_VIRMIDI_SUBSCRIBE	(1<<0)
+#define SNDRV_VIRMIDI_SUBSCRIBE		(1<<0)
 #define SNDRV_VIRMIDI_USE		(1<<1)
 
 /*
@@ -69,14 +69,16 @@ struct _snd_virmidi_dev {
  * ATTACH = input/output events from midi device are routed to the
  *          attached sequencer port.  sequencer port is not created
  *          by virmidi itself.
+ *          the input to rawmidi must be processed by passing the
+ *          incoming events via snd_virmidi_receive()
  * DISPATCH = input/output events are routed to subscribers.
  *            sequencer port is created in virmidi.
  */
 #define SNDRV_VIRMIDI_SEQ_NONE		0
-#define SNDRV_VIRMIDI_SEQ_ATTACH		1
+#define SNDRV_VIRMIDI_SEQ_ATTACH	1
 #define SNDRV_VIRMIDI_SEQ_DISPATCH	2
 
 int snd_virmidi_new(snd_card_t *card, int device, snd_rawmidi_t **rrmidi);
+int snd_virmidi_receive(snd_rawmidi_t *rmidi, snd_seq_event_t *ev);
 
 #endif /* __SOUND_SEQ_VIRMIDI */
-

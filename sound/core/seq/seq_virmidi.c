@@ -89,11 +89,6 @@ static int snd_virmidi_dev_receive_event(snd_virmidi_dev_t *rdev, snd_seq_event_
 	unsigned char msg[4];
 	int len;
 
-	snd_assert(rdev != NULL, return -EINVAL);
-
-	if (!(rdev->flags & SNDRV_VIRMIDI_USE))
-		return 0; /* ignored */
-
 	read_lock(&rdev->filelist_lock);
 	list_for_each(list, &rdev->filelist) {
 		vmidi = list_entry(list, snd_virmidi_t, list);
@@ -115,14 +110,32 @@ static int snd_virmidi_dev_receive_event(snd_virmidi_dev_t *rdev, snd_seq_event_
 }
 
 /*
- * event_input callback from sequencer
+ * receive an event from the remote virmidi port
+ *
+ * for rawmidi inputs, you can call this function from the event
+ * handler of a remote port which is attached to the virmidi via
+ * SNDRV_VIRMIDI_SEQ_ATTACH.
  */
-int snd_virmidi_receive(snd_seq_event_t *ev, int direct,
-			void *private_data, int atomic, int hop)
+/* exported */
+int snd_virmidi_receive(snd_rawmidi_t *rmidi, snd_seq_event_t *ev)
+{
+	snd_virmidi_dev_t *rdev;
+
+	rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, return -EINVAL);
+	return snd_virmidi_dev_receive_event(rdev, ev);
+}
+
+/*
+ * event handler of virmidi port
+ */
+static int snd_virmidi_event_input(snd_seq_event_t *ev, int direct,
+				   void *private_data, int atomic, int hop)
 {
 	snd_virmidi_dev_t *rdev;
 
 	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
+	if (!(rdev->flags & SNDRV_VIRMIDI_USE))
+		return 0; /* ignored */
 	return snd_virmidi_dev_receive_event(rdev, ev);
 }
 
@@ -387,7 +400,7 @@ static int snd_virmidi_dev_attach_seq(snd_virmidi_dev_t *rdev)
 	pcallbacks.unsubscribe = snd_virmidi_unsubscribe;
 	pcallbacks.use = snd_virmidi_use;
 	pcallbacks.unuse = snd_virmidi_unuse;
-	pcallbacks.event_input = snd_virmidi_receive;
+	pcallbacks.event_input = snd_virmidi_event_input;
 	pinfo.kernel = &pcallbacks;
 	err = snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_CREATE_PORT, &pinfo);
 	if (err < 0) {
@@ -470,7 +483,9 @@ static void snd_virmidi_free(snd_rawmidi_t *rmidi)
 
 /*
  * create a new device
+ *
  */
+/* exported */
 int snd_virmidi_new(snd_card_t *card, int device, snd_rawmidi_t **rrmidi)
 {
 	snd_rawmidi_t *rmidi;
@@ -525,3 +540,4 @@ module_init(alsa_virmidi_init)
 module_exit(alsa_virmidi_exit)
 
 EXPORT_SYMBOL(snd_virmidi_new);
+EXPORT_SYMBOL(snd_virmidi_receive);

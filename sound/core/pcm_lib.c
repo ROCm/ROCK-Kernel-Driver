@@ -1899,7 +1899,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 			frames = cont;
 		if (frames == 0 && runtime->status->state == SNDRV_PCM_STATE_PAUSED) {
 			err = -EPIPE;
-			goto _end;
+			goto _end_unlock;
 		}
 		snd_assert(frames != 0,
 			   spin_unlock_irq(&runtime->lock);
