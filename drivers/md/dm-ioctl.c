@@ -88,30 +88,24 @@ static unsigned int hash_str(const char *str)
  *---------------------------------------------------------------*/
 static struct hash_cell *__get_name_cell(const char *str)
 {
-	struct list_head *tmp;
 	struct hash_cell *hc;
 	unsigned int h = hash_str(str);
 
-	list_for_each (tmp, _name_buckets + h) {
-		hc = list_entry(tmp, struct hash_cell, name_list);
+	list_for_each_entry (hc, _name_buckets + h, name_list)
 		if (!strcmp(hc->name, str))
 			return hc;
-	}
 
 	return NULL;
 }
 
 static struct hash_cell *__get_uuid_cell(const char *str)
 {
-	struct list_head *tmp;
 	struct hash_cell *hc;
 	unsigned int h = hash_str(str);
 
-	list_for_each (tmp, _uuid_buckets + h) {
-		hc = list_entry(tmp, struct hash_cell, uuid_list);
+	list_for_each_entry (hc, _uuid_buckets + h, uuid_list)
 		if (!strcmp(hc->uuid, str))
 			return hc;
-	}
 
 	return NULL;
 }
@@ -935,6 +929,7 @@ static void retrieve_deps(struct dm_table *table,
 	unsigned int count = 0;
 	struct list_head *tmp;
 	size_t len, needed;
+	struct dm_dev *dd;
 	struct dm_target_deps *deps;
 
 	deps = get_result_buffer(param, param_size, &len);
@@ -942,7 +937,7 @@ static void retrieve_deps(struct dm_table *table,
 	/*
 	 * Count the devices.
 	 */
-	list_for_each(tmp, dm_table_get_devices(table))
+	list_for_each (tmp, dm_table_get_devices(table))
 		count++;
 
 	/*
@@ -959,10 +954,8 @@ static void retrieve_deps(struct dm_table *table,
 	 */
 	deps->count = count;
 	count = 0;
-	list_for_each(tmp, dm_table_get_devices(table)) {
-		struct dm_dev *dd = list_entry(tmp, struct dm_dev, list);
+	list_for_each_entry (dd, dm_table_get_devices(table), list)
 		deps->dev[count++] = huge_encode_dev(dd->bdev->bd_dev);
-	}
 
 	param->data_size = param->data_start + needed;
 }

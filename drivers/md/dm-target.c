@@ -25,15 +25,11 @@ static DECLARE_RWSEM(_lock);
 
 static inline struct tt_internal *__find_target_type(const char *name)
 {
-	struct list_head *tih;
 	struct tt_internal *ti;
 
-	list_for_each(tih, &_targets) {
-		ti = list_entry(tih, struct tt_internal, list);
-
+	list_for_each_entry (ti, &_targets, list)
 		if (!strcmp(name, ti->tt.name))
 			return ti;
-	}
 
 	return NULL;
 }

@@ -329,13 +329,11 @@ static int lookup_device(const char *path, dev_t *dev)
  */
 static struct dm_dev *find_device(struct list_head *l, dev_t dev)
 {
-	struct list_head *tmp;
+	struct dm_dev *dd;
 
-	list_for_each(tmp, l) {
-		struct dm_dev *dd = list_entry(tmp, struct dm_dev, list);
+	list_for_each_entry (dd, l, list)
 		if (dd->bdev->bd_dev == dev)
 			return dd;
-	}
 
 	return NULL;
 }
