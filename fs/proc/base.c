@@ -1713,11 +1713,14 @@ static int proc_task_readdir(struct file * filp, void * dirent, filldir_t filldi
 	nr_tids = get_tid_list(pos, tid_array, inode);
 
 	for (i = 0; i < nr_tids; i++) {
-		int tid = tid_array[i];
-		ino = fake_ino(tid,PROC_TID_INO);
 		unsigned long j = PROC_NUMBUF;
+		int tid = tid_array[i];
 
-		do buf[--j] = '0' + (tid % 10); while (tid/=10);
+		ino = fake_ino(tid,PROC_TID_INO);
+
+		do
+			buf[--j] = '0' + (tid % 10);
+		while (tid /= 10);
 
 		if (filldir(dirent, buf+j, PROC_NUMBUF-j, pos, ino, DT_DIR) < 0)
 			break;
