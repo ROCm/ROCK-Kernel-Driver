@@ -61,8 +61,6 @@ struct display {
     unsigned long cursor_pos;
     char fontname[40];              /* Font associated to this display */	
     u_char *fontdata;
-    unsigned short _fontheight;
-    unsigned short _fontwidth;
     int userfont;                   /* != 0 if fontdata kmalloc()ed */
     u_short scrollmode;             /* Scroll Method */
     short yscroll;                  /* Hardware scrolling */

@@ -204,7 +204,7 @@ static int fbcon_changevar(int con);
 static void fbcon_set_display(int con, int init, int logo);
 static __inline__ int real_y(struct display *p, int ypos);
 static void fbcon_vbl_handler(int irq, void *dummy, struct pt_regs *fp);
-static __inline__ void updatescrollmode(struct display *p);
+static __inline__ void updatescrollmode(struct display *p, struct vc_data *vc);
 static __inline__ void ywrap_up(struct display *p, struct vc_data *vc,
 				int count);
 static __inline__ void ywrap_down(struct display *p, struct vc_data *vc,
@@ -294,7 +294,6 @@ void set_con2fb_map(int unit, int newidx)
 	struct fb_info *oldfb, *newfb;
 	struct vc_data *vc;
 	char *fontdata;
-	unsigned short fontwidth, fontheight;
 	int userfont;
 
 	if (newidx != con2fb_map[unit]) {
@@ -314,15 +313,11 @@ void set_con2fb_map(int unit, int newidx)
 			__MOD_DEC_USE_COUNT(oldfb->fbops->owner);
 		vc = fb_display[unit].conp;
 		fontdata = fb_display[unit].fontdata;
-		fontwidth = fb_display[unit]._fontwidth;
-		fontheight = fb_display[unit]._fontheight;
 		userfont = fb_display[unit].userfont;
 		con2fb_map[unit] = newidx;
 
 		fb_display[unit].conp = vc;
 		fb_display[unit].fontdata = fontdata;
-		fb_display[unit]._fontwidth = fontwidth;
-		fb_display[unit]._fontheight = fontheight;
 		fb_display[unit].userfont = userfont;
 		fb_display[unit].fb_info = newfb;
 		gen_set_disp(unit, newfb);
@@ -536,12 +531,13 @@ static int fbcon_changevar(int con)
 		fbcon_free_font(p);
 		if (i < MAX_NR_CONSOLES) {
 			struct display *q = &fb_display[i];
-		
-			if (fontwidthvalid(p, fontwidth(q))) {
+			struct vc_data *tmp = vc_cons[i].d;
+			
+			if (fontwidthvalid(p, vc->vc_font.width)) {
 				/* If we are not the first console on this
 				   fb, copy the font from that console */
-				p->_fontwidth = q->_fontwidth;
-				p->_fontheight = q->_fontheight;
+				tmp->vc_font.width = vc->vc_font.width;
+				tmp->vc_font.height = vc->vc_font.height;
 				p->fontdata = q->fontdata;
 				p->userfont = q->userfont;
 				if (p->userfont) {
@@ -558,37 +554,37 @@ static int fbcon_changevar(int con)
 				font =
 			    		fbcon_get_default_font(info->var.xres,
 						   	info->var.yres);
-			p->_fontwidth = font->width;
-			p->_fontheight = font->height;
+			vc->vc_font.width = font->width;
+			vc->vc_font.height = font->height;
 			p->fontdata = font->data;
 		}
 
-		if (!fontwidthvalid(p, fontwidth(p))) {
+		if (!fontwidthvalid(p, vc->vc_font.width)) {
 			/* ++Geert: changed from panic() to `correct and continue' */
 			printk(KERN_ERR
 		       		"fbcon_set_display: No support for fontwidth %d\n",
-		       		fontwidth(p));
+		       		vc->vc_font.width);
 			p->dispsw = &fbcon_dummy;
 		}
 		if (p->dispsw->set_font)
-			p->dispsw->set_font(p, fontwidth(p), fontheight(p));
-		updatescrollmode(p);
+			p->dispsw->set_font(p, vc->vc_font.width, vc->vc_font.height);
+		updatescrollmode(p, vc);
 
 		old_cols = vc->vc_cols;
 		old_rows = vc->vc_rows;
 
-		nr_cols = info->var.xres / fontwidth(p);
-		nr_rows = info->var.yres / fontheight(p);
+		nr_cols = info->var.xres / vc->vc_font.width;
+		nr_rows = info->var.yres / vc->vc_font.height;
 
 		/*
 	 	 *  ++guenther: console.c:vc_allocate() relies on initializing
 	 	 *  vc_{cols,rows}, but we must not set those if we are only
 	 	 *  resizing the console.
 	 	 */
-		p->vrows = info->var.yres_virtual / fontheight(p);
-		if ((info->var.yres % fontheight(p)) &&
-	    	    (info->var.yres_virtual % fontheight(p) <
-	     	     info->var.yres % fontheight(p)))
+		p->vrows = info->var.yres_virtual / vc->vc_font.height;
+		if ((info->var.yres % vc->vc_font.height) &&
+	    	    (info->var.yres_virtual % vc->vc_font.height <
+	     	     info->var.yres % vc->vc_font.height))
 			p->vrows--;
 		vc->vc_can_do_color = info->var.bits_per_pixel != 1;
 		vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
@@ -644,19 +640,18 @@ static int fbcon_changevar(int con)
 	return 0;
 }
 
-
-static __inline__ void updatescrollmode(struct display *p)
+static __inline__ void updatescrollmode(struct display *p, struct vc_data *vc)
 {
 	struct fb_info *info = p->fb_info;
 
 	int m;
 	if (p->scrollmode & __SCROLL_YFIXED)
 		return;
-	if (divides(info->fix.ywrapstep, fontheight(p)) &&
-	    divides(fontheight(p), info->var.yres_virtual))
+	if (divides(info->fix.ywrapstep, vc->vc_font.height) &&
+	    divides(vc->vc_font.height, info->var.yres_virtual))
 		m = __SCROLL_YWRAP;
-	else if (divides(info->fix.ypanstep, fontheight(p)) &&
-		 info->var.yres_virtual >= info->var.yres + fontheight(p))
+	else if (divides(info->fix.ypanstep, vc->vc_font.height) &&
+		 info->var.yres_virtual >= info->var.yres + vc->vc_font.height)
 		m = __SCROLL_YPAN;
 	else if (p->scrollmode & __SCROLL_YNOMOVE)
 		m = __SCROLL_YREDRAW;
@@ -691,12 +686,13 @@ static void fbcon_set_display(int con, int init, int logo)
 	fbcon_free_font(p);
 	if (i < MAX_NR_CONSOLES) {
 		struct display *q = &fb_display[i];
+		struct vc_data *tmp = vc_cons[i].d;
 		
-		if (fontwidthvalid(p, fontwidth(q))) {
+		if (fontwidthvalid(p, vc->vc_font.width)) {
 			/* If we are not the first console on this
 			   fb, copy the font from that console */
-			p->_fontwidth = q->_fontwidth;
-			p->_fontheight = q->_fontheight;
+			tmp->vc_font.width = vc->vc_font.width;
+			tmp->vc_font.height = vc->vc_font.height;
 			p->fontdata = q->fontdata;
 			p->userfont = q->userfont;
 			if (p->userfont) {
@@ -713,34 +709,34 @@ static void fbcon_set_display(int con, int init, int logo)
 			font =
 			    fbcon_get_default_font(info->var.xres,
 						   info->var.yres);
-		p->_fontwidth = font->width;
-		p->_fontheight = font->height;
+		vc->vc_font.width = font->width;
+		vc->vc_font.height = font->height;
 		p->fontdata = font->data;
 	}
 
-	if (!fontwidthvalid(p, fontwidth(p))) {
+	if (!fontwidthvalid(p, vc->vc_font.width)) {
 		/* ++Geert: changed from panic() to `correct and continue' */
 		printk(KERN_ERR
 		       "fbcon_set_display: No support for fontwidth %d\n",
-		       fontwidth(p));
+		       vc->vc_font.width);
 		p->dispsw = &fbcon_dummy;
 	}
 	if (p->dispsw->set_font)
-		p->dispsw->set_font(p, fontwidth(p), fontheight(p));
-	updatescrollmode(p);
+		p->dispsw->set_font(p, vc->vc_font.width, vc->vc_font.height);
+	updatescrollmode(p, vc);
 
 	old_cols = vc->vc_cols;
 	old_rows = vc->vc_rows;
 
-	nr_cols = info->var.xres / fontwidth(p);
-	nr_rows = info->var.yres / fontheight(p);
+	nr_cols = info->var.xres / vc->vc_font.width;
+	nr_rows = info->var.yres / vc->vc_font.height;
 
 	if (logo) {
 		/* Need to make room for the logo */
 		int cnt;
 		int step;
 
-		logo_lines = (LOGO_H + fontheight(p) - 1) / fontheight(p);
+		logo_lines = (LOGO_H + vc->vc_font.height - 1) / vc->vc_font.height;
 		q = (unsigned short *) (vc->vc_origin +
 					vc->vc_size_row * old_rows);
 		step = logo_lines * old_cols;
@@ -790,10 +786,10 @@ static void fbcon_set_display(int con, int init, int logo)
 		vc->vc_cols = nr_cols;
 		vc->vc_rows = nr_rows;
 	}
-	p->vrows = info->var.yres_virtual / fontheight(p);
-	if ((info->var.yres % fontheight(p)) &&
-	    (info->var.yres_virtual % fontheight(p) <
-	     info->var.yres % fontheight(p)))
+	p->vrows = info->var.yres_virtual / vc->vc_font.height;
+	if ((info->var.yres % vc->vc_font.height) &&
+	    (info->var.yres_virtual % vc->vc_font.height <
+	     info->var.yres % vc->vc_font.height))
 		p->vrows--;
 	vc->vc_can_do_color = info->var.bits_per_pixel != 1;
 	vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
@@ -936,7 +932,7 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 	struct display *p = &fb_display[vc->vc_num];
 	struct fb_info *info = p->fb_info;
 	unsigned short charmask = p->charmask;
-	unsigned int width = ((fontwidth(p) + 7) >> 3);
+	unsigned int width = ((vc->vc_font.width + 7) >> 3);
 	struct fb_image image;
 	int redraw_cursor = 0;
 
@@ -953,12 +949,12 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 
 	image.fg_color = attr_fgcol(p, c);
 	image.bg_color = attr_bgcol(p, c);
-	image.dx = xpos * fontwidth(p);
-	image.dy = real_y(p, ypos) * fontheight(p);
-	image.width = fontwidth(p);
-	image.height = fontheight(p);
+	image.dx = xpos * vc->vc_font.width;
+	image.dy = real_y(p, ypos) * vc->vc_font.height;
+	image.width = vc->vc_font.width;
+	image.height = vc->vc_font.height;
 	image.depth = 1;
-	image.data = p->fontdata + (c & charmask) * fontheight(p) * width;
+	image.data = p->fontdata + (c & charmask) * vc->vc_font.height * width;
 
 	info->fbops->fb_imageblit(info, &image);
 
@@ -1086,7 +1082,7 @@ static __inline__ void ywrap_up(struct display *p, struct vc_data *vc,
 	if (p->yscroll >= p->vrows)	/* Deal with wrap */
 		p->yscroll -= p->vrows;
 	info->var.xoffset = 0;
-	info->var.yoffset = p->yscroll * fontheight(p);
+	info->var.yoffset = p->yscroll * vc->vc_font.height;
 	info->var.vmode |= FB_VMODE_YWRAP;
 	update_var(vc->vc_num, info);
 	scrollback_max += count;
@@ -1104,7 +1100,7 @@ static __inline__ void ywrap_down(struct display *p, struct vc_data *vc,
 	if (p->yscroll < 0)	/* Deal with wrap */
 		p->yscroll += p->vrows;
 	info->var.xoffset = 0;
-	info->var.yoffset = p->yscroll * fontheight(p);
+	info->var.yoffset = p->yscroll * vc->vc_font.height;
 	info->var.vmode |= FB_VMODE_YWRAP;
 	update_var(vc->vc_num, info);
 	scrollback_max -= count;
@@ -1125,7 +1121,7 @@ static __inline__ void ypan_up(struct display *p, struct vc_data *vc,
 		p->yscroll -= p->vrows - vc->vc_rows;
 	}
 	info->var.xoffset = 0;
-	info->var.yoffset = p->yscroll * fontheight(p);
+	info->var.yoffset = p->yscroll * vc->vc_font.height;
 	info->var.vmode &= ~FB_VMODE_YWRAP;
 	update_var(vc->vc_num, info);
 	if (p->dispsw->clear_margins)
@@ -1149,7 +1145,7 @@ static __inline__ void ypan_down(struct display *p, struct vc_data *vc,
 		p->yscroll += p->vrows - vc->vc_rows;
 	}
 	info->var.xoffset = 0;
-	info->var.yoffset = p->yscroll * fontheight(p);
+	info->var.yoffset = p->yscroll * vc->vc_font.height;
 	info->var.vmode &= ~FB_VMODE_YWRAP;
 	update_var(vc->vc_num, info);
 	if (p->dispsw->clear_margins)
@@ -1797,14 +1793,14 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 	if (fontwidth(p) != 8)
 		return -EINVAL;
 #endif
-	op->width = fontwidth(p);
-	op->height = fontheight(p);
+	op->width = vc->vc_font.width;
+	op->height = vc->vc_font.height;
 	op->charcount = (p->charmask == 0x1ff) ? 512 : 256;
 	if (!op->data)
 		return 0;
 
 	if (op->width <= 8) {
-		j = fontheight(p);
+		j = vc->vc_font.height;
 		for (i = 0; i < op->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 32 - j);
@@ -1814,7 +1810,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 	}
 #ifndef CONFIG_FBCON_FONTWIDTH8_ONLY
 	else if (op->width <= 16) {
-		j = fontheight(p) * 2;
+		j = vc->vc_font.height * 2;
 		for (i = 0; i < op->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 64 - j);
@@ -1823,7 +1819,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 		}
 	} else if (op->width <= 24) {
 		for (i = 0; i < op->charcount; i++) {
-			for (j = 0; j < fontheight(p); j++) {
+			for (j = 0; j < vc->vc_font.height; j++) {
 				*data++ = fontdata[0];
 				*data++ = fontdata[1];
 				*data++ = fontdata[2];
@@ -1833,7 +1829,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 			data += 3 * (32 - j);
 		}
 	} else {
-		j = fontheight(p) * 4;
+		j = vc->vc_font.height * 4;
 		for (i = 0; i < op->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 128 - j);
@@ -1862,10 +1858,10 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		return -ENXIO;
 	}
 
-	if (CON_IS_VISIBLE(p->conp) && softback_lines)
-		fbcon_set_origin(p->conp);
+	if (CON_IS_VISIBLE(vc) && softback_lines)
+		fbcon_set_origin(vc);
 
-	resize = (w != fontwidth(p)) || (h != fontheight(p));
+	resize = (w != vc->vc_font.width) || (h != vc->vc_font.height);
 	if (p->userfont)
 		old_data = p->fontdata;
 	if (userfont)
@@ -1875,19 +1871,18 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	p->fontdata = data;
 	if ((p->userfont = userfont))
 		REFCOUNT(data)++;
-	p->_fontwidth = w;
-	p->_fontheight = h;
-	if (p->conp->vc_hi_font_mask && cnt == 256) {
-		p->conp->vc_hi_font_mask = 0;
-		if (p->conp->vc_can_do_color)
-			p->conp->vc_complement_mask >>= 1;
+	vc->vc_font.width = w;
+	vc->vc_font.height = h;
+	if (vc->vc_hi_font_mask && cnt == 256) {
+		vc->vc_hi_font_mask = 0;
+		if (vc->vc_can_do_color)
+			vc->vc_complement_mask >>= 1;
 		p->fgshift--;
 		p->bgshift--;
 		p->charmask = 0xff;
 
 		/* ++Edmund: reorder the attribute bits */
-		if (p->conp->vc_can_do_color) {
-			struct vc_data *vc = p->conp;
+		if (vc->vc_can_do_color) {
 			unsigned short *cp =
 			    (unsigned short *) vc->vc_origin;
 			int count = vc->vc_screenbuf_size / 2;
@@ -1903,17 +1898,16 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 			vc->vc_attr >>= 1;
 		}
 
-	} else if (!p->conp->vc_hi_font_mask && cnt == 512) {
-		p->conp->vc_hi_font_mask = 0x100;
-		if (p->conp->vc_can_do_color)
-			p->conp->vc_complement_mask <<= 1;
+	} else if (!vc->vc_hi_font_mask && cnt == 512) {
+		vc->vc_hi_font_mask = 0x100;
+		if (vc->vc_can_do_color)
+			vc->vc_complement_mask <<= 1;
 		p->fgshift++;
 		p->bgshift++;
 		p->charmask = 0x1ff;
 
 		/* ++Edmund: reorder the attribute bits */
 		{
-			struct vc_data *vc = p->conp;
 			unsigned short *cp =
 			    (unsigned short *) vc->vc_origin;
 			int count = vc->vc_screenbuf_size / 2;
@@ -1941,14 +1935,13 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	}
 
 	if (resize) {
-		struct vc_data *vc = p->conp;
 		/* reset wrap/pan */
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;
 		p->vrows = info->var.yres_virtual / h;
 		if ((info->var.yres % h)
 		    && (info->var.yres_virtual % h < info->var.yres % h))
 			p->vrows--;
-		updatescrollmode(p);
+		updatescrollmode(p, vc);
 		vc_resize(vc->vc_num, info->var.xres / w, info->var.yres / h);
 		if (CON_IS_VISIBLE(vc) && softback_buf) {
 			int l = fbcon_softback_size / vc->vc_size_row;
@@ -1961,10 +1954,10 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 				softback_top = 0;
 			}
 		}
-	} else if (CON_IS_VISIBLE(p->conp)
+	} else if (CON_IS_VISIBLE(vc)
 		   && vt_cons[vc->vc_num]->vc_mode == KD_TEXT) {
 		if (p->dispsw->clear_margins)
-			p->dispsw->clear_margins(p->conp, p, 0);
+			p->dispsw->clear_margins(vc, p, 0);
 		update_screen(vc->vc_num);
 	}
 
@@ -1985,8 +1978,8 @@ static inline int fbcon_copy_font(struct vc_data *vc, struct console_font_op *op
 	od = &fb_display[h];
 	if (od->fontdata == p->fontdata)
 		return 0;	/* already the same font... */
-	op->width = fontwidth(od);
-	op->height = fontheight(od);
+	op->width = vc->vc_font.width;
+	op->height = vc->vc_font.height;
 	return fbcon_do_set_font(vc, op, od->fontdata, od->userfont);
 }
 
@@ -2067,11 +2060,13 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 	FNTSUM(new_data) = k;
 	/* Check if the same font is on some other console already */
 	for (i = 0; i < MAX_NR_CONSOLES; i++) {
+		struct vc_data *tmp = vc_cons[i].d;
+		
 		if (fb_display[i].userfont &&
 		    fb_display[i].fontdata &&
 		    FNTSUM(fb_display[i].fontdata) == k &&
 		    FNTSIZE(fb_display[i].fontdata) == size &&
-		    fontwidth(&fb_display[i]) == w &&
+		    tmp->vc_font.width == w &&
 		    !memcmp(fb_display[i].fontdata, new_data, size)) {
 			kfree(new_data - FONT_EXTRA_WORDS * sizeof(int));
 			new_data = fb_display[i].fontdata;
@@ -2315,7 +2310,7 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines)
 	else if (offset >= limit)
 		offset -= limit;
 	info->var.xoffset = 0;
-	info->var.yoffset = offset * fontheight(p);
+	info->var.yoffset = offset * vc->vc_font.height;
 	update_var(unit, info);
 	if (!scrollback_current)
 		fbcon_cursor(vc, CM_DRAW);
@@ -2338,6 +2333,7 @@ static int __init fbcon_show_logo(void)
 {
 	struct display *p = &fb_display[fg_console];	/* draw to vt in foreground */
 	struct fb_info *info = p->fb_info;
+	struct vc_data *vc = info->display_fg;
 #ifdef CONFIG_FBCON_ACCEL
 	struct fb_image image;
 	u32 *palette = NULL, *saved_palette = NULL;
@@ -2424,8 +2420,7 @@ static int __init fbcon_show_logo(void)
 		 */
 		palette = kmalloc(256 * 4, GFP_KERNEL);
 		if (palette == NULL)
-			return (LOGO_H + fontheight(p) -
-				1) / fontheight(p);
+			return (LOGO_H + vc->vc_font.height - 1)/vc->vc_font.height;
 
 		for (i = 0; i < LINUX_LOGO_COLORS; i++) {
 			palette[i + 32] =
@@ -2596,7 +2591,7 @@ static int __init fbcon_show_logo(void)
 	/* Modes not yet supported: packed pixels with depth != 8 (does such a
 	 * thing exist in reality?) */
 
-	return done ? (LOGO_H + fontheight(p) - 1) / fontheight(p) : 0;
+	return done ? (LOGO_H + vc->vc_font.height - 1) / vc->vc_font.height : 0;
 }
 
 /*

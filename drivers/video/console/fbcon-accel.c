@@ -22,14 +22,15 @@ void fbcon_accel_bmove(struct display *p, int sy, int sx, int dy, int dx,
 		       int height, int width)
 {
 	struct fb_info *info = p->fb_info;
+	struct vc_data *vc = p->conp;
 	struct fb_copyarea area;
 
-	area.sx = sx * fontwidth(p);
-	area.sy = sy * fontheight(p);
-	area.dx = dx * fontwidth(p);
-	area.dy = dy * fontheight(p);
-	area.height = height * fontheight(p);
-	area.width = width * fontwidth(p);
+	area.sx = sx * vc->vc_font.width;
+	area.sy = sy * vc->vc_font.height;
+	area.dx = dx * vc->vc_font.width;
+	area.dy = dy * vc->vc_font.height;
+	area.height = height * vc->vc_font.height;
+	area.width = width * vc->vc_font.width;
 
 	info->fbops->fb_copyarea(info, &area);
 }
@@ -41,10 +42,10 @@ void fbcon_accel_clear(struct vc_data *vc, struct display *p, int sy,
 	struct fb_fillrect region;
 
 	region.color = attr_bgcol_ec(p, vc);
-	region.dx = sx * fontwidth(p);
-	region.dy = sy * fontheight(p);
-	region.width = width * fontwidth(p);
-	region.height = height * fontheight(p);
+	region.dx = sx * vc->vc_font.width;
+	region.dy = sy * vc->vc_font.height;
+	region.width = width * vc->vc_font.width;
+	region.height = height * vc->vc_font.height;
 	region.rop = ROP_COPY;
 
 	info->fbops->fb_fillrect(info, &region);
@@ -55,23 +56,23 @@ void fbcon_accel_putcs(struct vc_data *vc, struct display *p,
 {
 	struct fb_info *info = p->fb_info;
 	unsigned short charmask = p->charmask;
-	unsigned int width = ((fontwidth(p) + 7) >> 3);
+	unsigned int width = ((vc->vc_font.width + 7) >> 3);
 	struct fb_image image;
 	u16 c = scr_readw(s);
 
 	image.fg_color = attr_fgcol(p, c);
 	image.bg_color = attr_bgcol(p, c);
-	image.dx = xx * fontwidth(p);
-	image.dy = yy * fontheight(p);
-	image.width = fontwidth(p);
-	image.height = fontheight(p);
+	image.dx = xx * vc->vc_font.width;
+	image.dy = yy * vc->vc_font.height;
+	image.width = vc->vc_font.width;
+	image.height = vc->vc_font.height;
 	image.depth = 1;
 
 	while (count--) {
 		image.data = p->fontdata +
-		    (scr_readw(s++) & charmask) * fontheight(p) * width;
+		    (scr_readw(s++) & charmask) * vc->vc_font.height * width;
 		info->fbops->fb_imageblit(info, &image);
-		image.dx += fontwidth(p);
+		image.dx += vc->vc_font.width;
 	}
 }
 
@@ -79,8 +80,8 @@ void fbcon_accel_clear_margins(struct vc_data *vc, struct display *p,
 			       int bottom_only)
 {
 	struct fb_info *info = p->fb_info;
-	unsigned int cw = fontwidth(p);
-	unsigned int ch = fontheight(p);
+	unsigned int cw = vc->vc_font.width;
+	unsigned int ch = vc->vc_font.height;
 	unsigned int rw = info->var.xres % cw;
 	unsigned int bh = info->var.yres % ch;
 	unsigned int rs = info->var.xres - rw;
@@ -118,9 +119,9 @@ void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 	char *font;
 
 	cursor.set = FB_CUR_SETPOS;
-	if (width != fontwidth(p) || height != fontheight(p)) {
-		width = fontwidth(p);
-		height = fontheight(p);
+	if (width != vc->vc_font.width || height != vc->vc_font.height) {
+		width = vc->vc_font.width;
+		height = vc->vc_font.height;
 		cursor.set |= FB_CUR_SETSIZE;
 	}
 
