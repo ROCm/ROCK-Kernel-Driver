@@ -421,12 +421,28 @@ static int usb_stor_control_thread(void * __us)
  * Device probing and disconnecting
  ***********************************************************************/
 
+/* Associate our private data with the USB device */
+static void associate_dev(struct us_data *us, struct usb_interface *intf)
+{
+	US_DEBUGP("-- %s\n", __FUNCTION__);
+
+	/* Fill in the device-related fields */
+	us->pusb_dev = interface_to_usbdev(intf);
+	us->pusb_intf = intf;
+	us->ifnum = intf->altsetting->desc.bInterfaceNumber;
+
+	/* Store our private data in the interface and increment the
+	 * device's reference count */
+	usb_set_intfdata(intf, us);
+	usb_get_dev(us->pusb_dev);
+}
+
 /* Get the unusual_devs entries and the string descriptors */
 static void get_device_info(struct us_data *us, int id_index)
 {
 	struct usb_device *dev = us->pusb_dev;
-	struct usb_host_interface *altsetting =
-		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting];
+	struct usb_interface_descriptor *idesc =
+		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting].desc;
 	struct us_unusual_dev *unusual_dev = &us_unusual_dev_list[id_index];
 	struct usb_device_id *id = &storage_usb_ids[id_index];
 
@@ -438,10 +454,10 @@ static void get_device_info(struct us_data *us, int id_index)
 	/* Store the entries */
 	us->unusual_dev = unusual_dev;
 	us->subclass = (unusual_dev->useProtocol == US_SC_DEVICE) ?
-			altsetting->desc.bInterfaceSubClass :
+			idesc->bInterfaceSubClass :
 			unusual_dev->useProtocol;
 	us->protocol = (unusual_dev->useTransport == US_PR_DEVICE) ?
-			altsetting->desc.bInterfaceProtocol :
+			idesc->bInterfaceProtocol :
 			unusual_dev->useTransport;
 	us->flags = unusual_dev->flags;
 
@@ -455,20 +471,26 @@ static void get_device_info(struct us_data *us, int id_index)
 			"an unneeded SubClass entry",
 			"an unneeded Protocol entry",
 			"unneeded SubClass and Protocol entries"};
+		struct usb_device_descriptor *ddesc = &dev->descriptor;
 		int msg = -1;
 
 		if (unusual_dev->useProtocol != US_SC_DEVICE &&
-			us->subclass == altsetting->desc.bInterfaceSubClass)
+			us->subclass == idesc->bInterfaceSubClass)
 			msg += 1;
 		if (unusual_dev->useTransport != US_PR_DEVICE &&
-			us->protocol == altsetting->desc.bInterfaceProtocol)
+			us->protocol == idesc->bInterfaceProtocol)
 			msg += 2;
 		if (msg >= 0)
 			printk(KERN_NOTICE USB_STORAGE "This device "
-				"(%04x,%04x) has %s in unusual_devs.h\n"
+				"(%04x,%04x,%04x S %02x P %02x)"
+				" has %s in unusual_devs.h\n"
 				"   Please send a copy of this message to "
 				"<linux-usb-devel@lists.sourceforge.net>\n",
-				id->idVendor, id->idProduct, msgs[msg]);
+				ddesc->idVendor, ddesc->idProduct,
+				ddesc->bcdDevice,
+				idesc->bInterfaceSubClass,
+				idesc->bInterfaceProtocol,
+				msgs[msg]);
 	}
 
 	/* Read the device's string descriptors */
@@ -857,15 +879,8 @@ static int storage_probe(struct usb_interface *intf,
 	init_MUTEX_LOCKED(&(us->sema));
 	init_completion(&(us->notify));
 
-	/* Fill in the device-related fields */
-	us->pusb_dev = interface_to_usbdev(intf);
-	us->pusb_intf = intf;
-	us->ifnum = intf->altsetting->desc.bInterfaceNumber;
-
-	/* Store our private data in the interface and increment the
-	 * device's reference count */
-	usb_set_intfdata(intf, us);
-	usb_get_dev(us->pusb_dev);
+	/* Associate the us_data structure with the USB device */
+	associate_dev(us, intf);
 
 	/*
 	 * Get the unusual_devs entries and the descriptors
