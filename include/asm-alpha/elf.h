@@ -98,6 +98,9 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 /* The registers are layed out in pt_regs for PAL and syscall
    convenience.  Re-order them for the linear elf_gregset_t.  */
 
+struct pt_regs;
+struct thread_info;
+struct task_struct;
 extern void dump_elf_thread(elf_greg_t *dest, struct pt_regs *pt,
 			    struct thread_info *ti);
 #define ELF_CORE_COPY_REGS(DEST, REGS) \
