@@ -40,12 +40,9 @@ struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
 {
 	struct net_bridge_port *p;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->port_no == port_no)
 			return p;
-
-		p = p->next;
 	}
 
 	return NULL;
@@ -109,12 +106,10 @@ static void br_root_selection(struct net_bridge *br)
 
 	root_port = 0;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (br_should_become_root_port(p, root_port))
 			root_port = p->port_no;
 
-		p = p->next;
 	}
 
 	br->root_port = root_port;
@@ -241,13 +236,11 @@ static void br_designated_port_selection(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED &&
 		    br_should_become_designated_port(p))
 			br_become_designated_port(p);
 
-		p = p->next;
 	}
 }
 
@@ -313,13 +306,10 @@ void br_config_bpdu_generation(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED &&
 		    br_is_designated_port(p))
 			br_transmit_config(p);
-
-		p = p->next;
 	}
 }
 
@@ -391,8 +381,7 @@ void br_port_state_selection(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED) {
 			if (p->port_no == br->root_port) {
 				p->config_pending = 0;
@@ -407,8 +396,6 @@ void br_port_state_selection(struct net_bridge *br)
 				br_make_blocking(p);
 			}
 		}
-
-		p = p->next;
 	}
 }
 

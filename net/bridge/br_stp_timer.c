@@ -32,13 +32,10 @@ static int br_is_designated_for_some_port(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED &&
 		    !memcmp(&p->designated_bridge, &br->bridge_id, 8))
 			return 1;
-
-		p = p->next;
 	}
 
 	return 0;
@@ -162,12 +159,9 @@ static void br_check_timers(struct net_bridge *br)
 		br_topology_change_timer_expired(br);
 	}
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED)
 			br_check_port_timers(p);
-
-		p = p->next;
 	}
 }
 

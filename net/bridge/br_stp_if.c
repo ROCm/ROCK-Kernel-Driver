@@ -53,12 +53,9 @@ void br_stp_enable_bridge(struct net_bridge *br)
 	br_timer_set(&br->hello_timer, jiffies);
 	br_config_bpdu_generation(br);
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->dev->flags & IFF_UP)
 			br_stp_enable_port(p);
-
-		p = p->next;
 	}
 
 	br_timer_set(&br->gc_timer, jiffies);
@@ -78,12 +75,9 @@ void br_stp_disable_bridge(struct net_bridge *br)
 	br_timer_clear(&br->gc_timer);
 	br_fdb_cleanup(br);
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED)
 			br_stp_disable_port(p);
-
-		p = p->next;
 	}
 	write_unlock(&br->lock);
 
@@ -135,15 +129,13 @@ static void br_stp_change_bridge_id(struct net_bridge *br, unsigned char *addr)
 	memcpy(br->bridge_id.addr, addr, ETH_ALEN);
 	memcpy(br->dev.dev_addr, addr, ETH_ALEN);
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (!memcmp(p->designated_bridge.addr, oldaddr, ETH_ALEN))
 			memcpy(p->designated_bridge.addr, addr, ETH_ALEN);
 
 		if (!memcmp(p->designated_root.addr, oldaddr, ETH_ALEN))
 			memcpy(p->designated_root.addr, addr, ETH_ALEN);
 
-		p = p->next;
 	}
 
 	br_configuration_update(br);
@@ -162,13 +154,11 @@ void br_stp_recalculate_bridge_id(struct net_bridge *br)
 
 	addr = br_mac_zero;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (addr == br_mac_zero ||
 		    memcmp(p->dev->dev_addr, addr, ETH_ALEN) < 0)
 			addr = p->dev->dev_addr;
 
-		p = p->next;
 	}
 
 	if (memcmp(br->bridge_id.addr, addr, ETH_ALEN))
@@ -183,15 +173,13 @@ void br_stp_set_bridge_priority(struct net_bridge *br, int newprio)
 
 	wasroot = br_is_root_bridge(br);
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED &&
 		    br_is_designated_port(p)) {
 			p->designated_bridge.prio[0] = (newprio >> 8) & 0xFF;
 			p->designated_bridge.prio[1] = newprio & 0xFF;
 		}
 
-		p = p->next;
 	}
 
 	br->bridge_id.prio[0] = (newprio >> 8) & 0xFF;

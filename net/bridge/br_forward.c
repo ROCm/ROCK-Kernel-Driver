@@ -115,8 +115,7 @@ static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
 
 	prev = NULL;
 
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		if (should_deliver(p, skb)) {
 			if (prev != NULL) {
 				struct sk_buff *skb2;
@@ -132,8 +131,6 @@ static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
 
 			prev = p;
 		}
-
-		p = p->next;
 	}
 
 	if (prev != NULL) {

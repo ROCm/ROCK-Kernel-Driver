@@ -55,9 +55,9 @@ struct net_bridge_fdb_entry
 
 struct net_bridge_port
 {
-	struct net_bridge_port		*next;
 	struct net_bridge		*br;
 	struct net_device		*dev;
+	struct list_head		list;
 	int				port_no;
 
 	/* STP */
@@ -80,7 +80,7 @@ struct net_bridge_port
 struct net_bridge
 {
 	rwlock_t			lock;
-	struct net_bridge_port		*port_list;
+	struct list_head		port_list;
 	struct net_device		dev;
 	struct net_device_stats		statistics;
 	rwlock_t			hash_lock;

@@ -39,42 +39,31 @@ static int br_initial_port_cost(struct net_device *dev)
 }
 
 /* called under BR_NETPROTO_LOCK and bridge lock */
-static int __br_del_if(struct net_bridge *br, struct net_device *dev)
+static void del_nbp(struct net_bridge_port *p)
 {
-	struct net_bridge_port *p;
-	struct net_bridge_port **pptr;
-
-	if ((p = dev->br_port) == NULL)
-		return -EINVAL;
+	struct net_device *dev = p->dev;
 
 	br_stp_disable_port(p);
 
 	dev_set_promiscuity(dev, -1);
 	dev->br_port = NULL;
 
-	pptr = &br->port_list;
-	while (*pptr != NULL) {
-		if (*pptr == p) {
-			*pptr = p->next;
-			break;
-		}
+	list_del(&p->list);
 
-		pptr = &((*pptr)->next);
-	}
-
-	br_fdb_delete_by_port(br, p);
+	br_fdb_delete_by_port(p->br, p);
 	kfree(p);
 	dev_put(dev);
-
-	return 0;
 }
 
 static void del_ifs(struct net_bridge *br)
 {
+	struct list_head *p, *n;
+
 	br_write_lock_bh(BR_NETPROTO_LOCK);
 	write_lock(&br->lock);
-	while (br->port_list != NULL)
-		__br_del_if(br, br->port_list->dev);
+	list_for_each_safe(p, n, &br->port_list) {
+		del_nbp(list_entry(p, struct net_bridge_port, list));
+	}
 	write_unlock(&br->lock);
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
 }
@@ -99,6 +88,7 @@ static struct net_bridge *new_nb(const char *name)
 	br_dev_setup(dev);
 
 	br->lock = RW_LOCK_UNLOCKED;
+	INIT_LIST_HEAD(&br->port_list);
 	br->hash_lock = RW_LOCK_UNLOCKED;
 
 	br->bridge_id.prio[0] = 0x80;
@@ -155,8 +145,7 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device 
 	br_init_port(p);
 	p->state = BR_STATE_DISABLED;
 
-	p->next = br->port_list;
-	br->port_list = p;
+	list_add(&p->list, &br->port_list);
 
 	return p;
 }
@@ -238,12 +227,17 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 
 int br_del_if(struct net_bridge *br, struct net_device *dev)
 {
-	int retval;
+	struct net_bridge_port *p;
+	int retval = 0;
 
 	br_write_lock_bh(BR_NETPROTO_LOCK);
 	write_lock(&br->lock);
-	retval = __br_del_if(br, dev);
-	br_stp_recalculate_bridge_id(br);
+	if ((p = dev->br_port) == NULL || p->br != br)
+		retval = -EINVAL;
+	else {
+		del_nbp(p);
+		br_stp_recalculate_bridge_id(br);
+	}
 	write_unlock(&br->lock);
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
 
@@ -270,10 +264,8 @@ void br_get_port_ifindices(struct net_bridge *br, int *ifindices)
 	struct net_bridge_port *p;
 
 	read_lock(&br->lock);
-	p = br->port_list;
-	while (p != NULL) {
+	list_for_each_entry(p, &br->port_list, list) {
 		ifindices[p->port_no] = p->dev->ifindex;
-		p = p->next;
 	}
 	read_unlock(&br->lock);
 }
