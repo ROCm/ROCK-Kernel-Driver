@@ -2072,6 +2072,10 @@ find_tb_table(unsigned long codeaddr, struct tbtable *tab)
 	int instr;
 	int num_parms;
 
+	/* dont look for traceback table in userspace */
+	if (codeaddr < PAGE_OFFSET)
+		return 0;
+
 	if (tab == NULL)
 		return 0;
 	memset(tab, 0, sizeof(tab));
