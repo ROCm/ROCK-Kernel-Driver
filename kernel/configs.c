@@ -29,8 +29,6 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
-#include <linux/compile.h>
-#include <linux/version.h>
 #include <asm/uaccess.h>
 
 /**************************************************/

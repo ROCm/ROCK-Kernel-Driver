@@ -23,7 +23,7 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 
-static struct file_system_type reiserfs_fs_type;
+struct file_system_type reiserfs_fs_type;
 
 const char reiserfs_3_5_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
 const char reiserfs_3_6_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
@@ -54,11 +54,6 @@ static int is_any_reiserfs_magic_string (struct reiserfs_super_block * rs)
 {
   return (is_reiserfs_3_5 (rs) || is_reiserfs_3_6 (rs) ||
 	  is_reiserfs_jr (rs));
-}
-
-int is_reiserfs_super (struct super_block *s)
-{
-	return s -> s_type == & reiserfs_fs_type ;
 }
 
 static int reiserfs_remount (struct super_block * s, int * flags, char * data);
@@ -391,13 +386,6 @@ static void reiserfs_put_super (struct super_block * s)
 		      REISERFS_SB(s)->reserved_blocks);
   }
 
-  reiserfs_proc_unregister( s, "journal" );
-  reiserfs_proc_unregister( s, "oidmap" );
-  reiserfs_proc_unregister( s, "on-disk-super" );
-  reiserfs_proc_unregister( s, "bitmap" );
-  reiserfs_proc_unregister( s, "per-level" );
-  reiserfs_proc_unregister( s, "super" );
-  reiserfs_proc_unregister( s, "version" );
   reiserfs_proc_info_done( s );
 
   kfree(s->s_fs_info);
@@ -1389,13 +1377,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     handle_attrs( s );
 
     reiserfs_proc_info_init( s );
-    reiserfs_proc_register( s, "version", reiserfs_version_in_proc );
-    reiserfs_proc_register( s, "super", reiserfs_super_in_proc );
-    reiserfs_proc_register( s, "per-level", reiserfs_per_level_in_proc );
-    reiserfs_proc_register( s, "bitmap", reiserfs_bitmap_in_proc );
-    reiserfs_proc_register( s, "on-disk-super", reiserfs_on_disk_super_in_proc );
-    reiserfs_proc_register( s, "oidmap", reiserfs_oidmap_in_proc );
-    reiserfs_proc_register( s, "journal", reiserfs_journal_in_proc );
+
     init_waitqueue_head (&(sbi->s_wait));
     sbi->bitmap_lock = SPIN_LOCK_UNLOCKED;
 
@@ -1480,7 +1462,7 @@ exit_reiserfs_fs ( void )
 	destroy_inodecache ();
 }
 
-static struct file_system_type reiserfs_fs_type = {
+struct file_system_type reiserfs_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "reiserfs",
 	.get_sb		= get_super_block,

@@ -23,7 +23,7 @@
 #endif
 
 /*
- * Our do_softirq out of line code.  See include/asm-arm/softirq.h for
+ * Our do_softirq out of line code.  See include/asm-arm/hardirq.h for
  * the calling assembly.
  */
 ENTRY(__do_softirq)

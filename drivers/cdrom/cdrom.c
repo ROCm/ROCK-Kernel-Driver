@@ -1869,20 +1869,26 @@ static int cdrom_do_cmd(struct cdrom_device_info *cdi,
 	if (cgc->buflen < 0 || cgc->buflen >= 131072)
 		return -EINVAL;
 
-	if ((ubuf = cgc->buffer)) {
+	usense = cgc->sense;
+	cgc->sense = &sense;
+	if (usense && !access_ok(VERIFY_WRITE, usense, sizeof(*usense))) {
+		return -EFAULT;
+	}
+
+	ubuf = cgc->buffer;
+	if (cgc->data_direction == CGC_DATA_READ ||
+	    cgc->data_direction == CGC_DATA_WRITE) {
 		cgc->buffer = kmalloc(cgc->buflen, GFP_KERNEL);
 		if (cgc->buffer == NULL)
 			return -ENOMEM;
 	}
 
-	usense = cgc->sense;
-	cgc->sense = &sense;
-	if (usense && !access_ok(VERIFY_WRITE, usense, sizeof(*usense)))
-		return -EFAULT;
 
 	if (cgc->data_direction == CGC_DATA_READ) {
-		if (!access_ok(VERIFY_READ, ubuf, cgc->buflen))
+		if (!access_ok(VERIFY_READ, ubuf, cgc->buflen)) {
+			kfree(cgc->buffer);
 			return -EFAULT;
+		}
 	} else if (cgc->data_direction == CGC_DATA_WRITE) {
 		if (copy_from_user(cgc->buffer, ubuf, cgc->buflen)) {
 			kfree(cgc->buffer);
@@ -1894,7 +1900,10 @@ static int cdrom_do_cmd(struct cdrom_device_info *cdi,
 	__copy_to_user(usense, cgc->sense, sizeof(*usense));
 	if (!ret && cgc->data_direction == CGC_DATA_READ)
 		__copy_to_user(ubuf, cgc->buffer, cgc->buflen);
-	kfree(cgc->buffer);
+	if (cgc->data_direction == CGC_DATA_READ ||
+	    cgc->data_direction == CGC_DATA_WRITE) {
+		kfree(cgc->buffer);
+	}
 	return ret;
 }
 

@@ -12,18 +12,15 @@
  *		Donald J. Becker, <becker@scyld.com>
  *
  * Changelog:
+ *		Stephen Hemminger (09/2003)
+ *		- get rid of pre-linked dev list, dynamic device allocation
  *		Paul Gortmaker (03/2002)
-		- struct init cleanup, enable multiple ISA autoprobes.
+ *		- struct init cleanup, enable multiple ISA autoprobes.
  *		Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 09/1999
  *		- fix sbni: s/device/net_device/
  *		Paul Gortmaker (06/98): 
  *		 - sort probes in a sane way, make sure all (safe) probes
  *		   get run once & failed autoprobes don't autoprobe again.
- *
- *	FIXME:
- *		Phase out placeholder dev entries put in the linked list
- *		here in favour of drivers using init_etherdev(NULL, ...)
- *		combined with a single find_all_devs() function (for 2.3)
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -106,7 +103,7 @@ extern int de620_probe(struct net_device *);
 extern int iph5526_probe(struct net_device *dev);
 
 /* SBNI adapters */
-extern int sbni_probe(void);
+extern int sbni_probe(int unit);
 
 struct devprobe
 {
@@ -125,22 +122,14 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
 {
 	struct devprobe *p = plist;
 	unsigned long base_addr = dev->base_addr;
-	int ret;
 
 	while (p->probe != NULL) {
-		if (base_addr && p->probe(dev) == 0) {	/* probe given addr */
-			ret = alloc_divert_blk(dev);
-			if (ret)
-				return ret;
+		if (base_addr && p->probe(dev) == 0) 	/* probe given addr */
 			return 0;
-		} else if (p->status == 0) {		/* has autoprobe failed yet? */
+		else if (p->status == 0) {		/* has autoprobe failed yet? */
 			p->status = p->probe(dev);	/* no, try autoprobe */
-			if (p->status == 0) {
-				ret = alloc_divert_blk(dev);
-				if (ret)
-					return ret;
+			if (p->status == 0)
 				return 0;
-			}
 		}
 		p++;
 	}
@@ -349,7 +338,7 @@ static struct devprobe mips_probes[] __initdata = {
  * per bus interface. This drives the legacy devices only for now.
  */
  
-static int __init ethif_probe(void)
+static int __init ethif_probe(int unit)
 {
 	struct net_device *dev;
 	int err = -ENODEV;
@@ -358,6 +347,7 @@ static int __init ethif_probe(void)
 	if (!dev)
 		return -ENOMEM;
 
+	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
 
 	/* 
@@ -394,7 +384,7 @@ extern int sk_isa_probe(struct net_device *);
 extern int proteon_probe(struct net_device *);
 extern int smctr_probe(struct net_device *);
 
-static __init int trif_probe(void)
+static __init int trif_probe(int unit)
 {
 	struct net_device *dev;
 	int err = -ENODEV;
@@ -403,6 +393,7 @@ static __init int trif_probe(void)
 	if (!dev)
 		return -ENOMEM;
 
+	sprintf(dev->name, "tr%d", unit);
 	netdev_boot_setup_check(dev);
 	if (
 #ifdef CONFIG_IBMTR
@@ -446,16 +437,16 @@ void __init probe_old_netdevs(void)
 	
 #ifdef CONFIG_SBNI
 	for (num = 0; num < 8; ++num)
-		if (sbni_probe())
+		if (sbni_probe(num))
 			break;
 #endif
 #ifdef CONFIG_TR
 	for (num = 0; num < 8; ++num)
-		if (trif_probe())
+		if (trif_probe(num))
 			break;
 #endif
 	for (num = 0; num < 8; ++num)
-		if (ethif_probe())
+		if (ethif_probe(num))
 			break;
 #ifdef CONFIG_COPS
 	cops_probe(0);

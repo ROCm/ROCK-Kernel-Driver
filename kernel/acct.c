@@ -340,9 +340,10 @@ static void do_acct_process(long exitcode, struct file *file)
 	ac.ac_btime = xtime.tv_sec - elapsed;
 	ac.ac_utime = encode_comp_t(current->utime);
 	ac.ac_stime = encode_comp_t(current->stime);
+	/* we really need to bite the bullet and change layout */
 	ac.ac_uid = current->uid;
 	ac.ac_gid = current->gid;
-	ac.ac_tty = current->tty ? current->tty->device : 0;
+	ac.ac_tty = current->tty ? old_encode_dev(tty_devnum(current->tty)) : 0;
 
 	ac.ac_flag = 0;
 	if (current->flags & PF_FORKNOEXEC)

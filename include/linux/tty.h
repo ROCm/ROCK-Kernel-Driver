@@ -264,7 +264,6 @@ struct tty_struct {
 	char name[64];
 	int pgrp;
 	int session;
-	dev_t	device;
 	unsigned long flags;
 	int count;
 	struct winsize winsize;
@@ -348,23 +347,7 @@ extern int fg_console, last_console, want_console;
 extern int kmsg_redirect;
 
 extern void console_init(void);
-
-extern int lp_init(void);
-extern int pty_init(void);
-extern int mxser_init(void);
-extern int moxa_init(void);
-extern int ip2_init(void);
-extern int pcxe_init(void);
-extern int pc_init(void);
 extern int vcs_init(void);
-extern int rp_init(void);
-extern int cy_init(void);
-extern int stl_init(void);
-extern int stli_init(void);
-extern int specialix_init(void);
-extern int espserial_init(void);
-extern int macserial_init(void);
-extern int a2232board_init(void);
 
 extern int tty_paranoia_check(struct tty_struct *tty, struct inode *inode,
 			      const char *routine);
@@ -418,6 +401,11 @@ extern void console_print(const char *);
 
 extern int vt_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg);
+
+static inline dev_t tty_devnum(struct tty_struct *tty)
+{
+	return MKDEV(tty->driver->major, tty->driver->minor_start) + tty->index;
+}
 
 #endif /* __KERNEL__ */
 #endif

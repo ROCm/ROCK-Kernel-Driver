@@ -180,19 +180,21 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *ubuf)
 {
 	int err;
 
-	if ((u64) stat->size > MAX_NON_LFS)
+	if ((u64) stat->size > MAX_NON_LFS ||
+	    !old_valid_dev(stat->dev) ||
+	    !old_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
 	if (clear_user(ubuf, sizeof(*ubuf)))
 		return -EFAULT;
 
-	err  = __put_user(stat->dev, &ubuf->st_dev);
+	err  = __put_user(old_encode_dev(stat->dev), &ubuf->st_dev);
 	err |= __put_user(stat->ino, &ubuf->st_ino);
 	err |= __put_user(stat->mode, &ubuf->st_mode);
 	err |= __put_user(stat->nlink, &ubuf->st_nlink);
 	err |= __put_user(high2lowuid(stat->uid), &ubuf->st_uid);
 	err |= __put_user(high2lowgid(stat->gid), &ubuf->st_gid);
-	err |= __put_user(stat->rdev, &ubuf->st_rdev);
+	err |= __put_user(old_encode_dev(stat->rdev), &ubuf->st_rdev);
 	err |= __put_user(stat->size, &ubuf->st_size);
 	err |= __put_user(stat->atime.tv_sec, &ubuf->st_atime);
 	err |= __put_user(stat->atime.tv_nsec, &ubuf->st_atime_nsec);
@@ -2488,7 +2490,7 @@ putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 	if (clear_user(ubuf, sizeof(*ubuf)))
 		return -EFAULT;
 
-	err  = __put_user(kbuf->dev, &ubuf->st_dev);
+	err  = __put_user(huge_encode_dev(kbuf->dev), &ubuf->st_dev);
 	err |= __put_user(kbuf->ino, &ubuf->__st_ino);
 	err |= __put_user(kbuf->ino, &ubuf->st_ino_lo);
 	err |= __put_user(kbuf->ino >> 32, &ubuf->st_ino_hi);
@@ -2496,7 +2498,7 @@ putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 	err |= __put_user(kbuf->nlink, &ubuf->st_nlink);
 	err |= __put_user(kbuf->uid, &ubuf->st_uid);
 	err |= __put_user(kbuf->gid, &ubuf->st_gid);
-	err |= __put_user(kbuf->rdev, &ubuf->st_rdev);
+	err |= __put_user(huge_encode_dev(kbuf->rdev), &ubuf->st_rdev);
 	err |= __put_user(kbuf->size, &ubuf->st_size_lo);
 	err |= __put_user((kbuf->size >> 32), &ubuf->st_size_hi);
 	err |= __put_user(kbuf->atime.tv_sec, &ubuf->st_atime);

@@ -313,7 +313,7 @@ static struct tty_operations pty_ops = {
 	.set_termios = pty_set_termios,
 };
 
-int __init pty_init(void)
+static int __init pty_init(void)
 {
 	/* Traditional BSD devices */
 
@@ -414,3 +414,4 @@ int __init pty_init(void)
 #endif
 	return 0;
 }
+module_init(pty_init);

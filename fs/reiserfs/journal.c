@@ -1916,7 +1916,7 @@ static int journal_init_dev( struct super_block *super,
 	journal -> j_dev_bd = NULL;
 	journal -> j_dev_file = NULL;
 	jdev = SB_ONDISK_JOURNAL_DEVICE( super ) ?
-		old_decode_dev(SB_ONDISK_JOURNAL_DEVICE(super)) : super->s_dev;	
+		new_decode_dev(SB_ONDISK_JOURNAL_DEVICE(super)) : super->s_dev;	
 
 	if (bdev_read_only(super->s_bdev))
 	    blkdev_mode = FMODE_READ;

@@ -55,11 +55,16 @@ static int		exp_verify_string(char *cp, int max);
 #define	EXPKEY_HASHMASK		(EXPKEY_HASHMAX -1)
 static struct cache_head *expkey_table[EXPKEY_HASHMAX];
 
+static inline int key_len(int type)
+{
+	return type == 0 ? 8 : type == 1 ? 4 : 12;
+}
+
 static inline int svc_expkey_hash(struct svc_expkey *item)
 {
 	int hash = item->ek_fsidtype;
 	char * cp = (char*)item->ek_fsid;
-	int len = (item->ek_fsidtype==0)?8:4;
+	int len = key_len(item->ek_fsidtype);
 
 	hash ^= hash_mem(cp, len, EXPKEY_HASHBITS);
 	hash ^= hash_ptr(item->ek_client, EXPKEY_HASHBITS);
@@ -89,7 +94,7 @@ void expkey_request(struct cache_detail *cd,
 	qword_add(bpp, blen, ek->ek_client->name);
 	snprintf(type, 5, "%d", ek->ek_fsidtype);
 	qword_add(bpp, blen, type);
-	qword_addhex(bpp, blen, (char*)ek->ek_fsid, ek->ek_fsidtype==0?8:4);
+	qword_addhex(bpp, blen, (char*)ek->ek_fsid, key_len(ek->ek_fsidtype));
 	(*bpp)[-1] = '\n';
 }
 
@@ -130,12 +135,12 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (*ep)
 		goto out;
 	dprintk("found fsidtype %d\n", fsidtype);
-	if (fsidtype > 1)
+	if (fsidtype > 2)
 		goto out;
 	if ((len=qword_get(&mesg, buf, PAGE_SIZE)) <= 0)
 		goto out;
 	dprintk("found fsid length %d\n", len);
-	if (len != ((fsidtype==0)?8:4))
+	if (len != key_len(fsidtype))
 		goto out;
 
 	/* OK, we seem to have a valid key */
@@ -206,8 +211,10 @@ static int expkey_show(struct seq_file *m,
 	ek = container_of(h, struct svc_expkey, h);
 	seq_printf(m, "%s %d 0x%08x", ek->ek_client->name,
 		   ek->ek_fsidtype, ek->ek_fsid[0]);
-	if (ek->ek_fsid == 0)
-		seq_printf(m, "%08x", ek->ek_fsid[0]);
+	if (ek->ek_fsidtype != 1)
+		seq_printf(m, "%08x", ek->ek_fsid[1]);
+	if (ek->ek_fsidtype == 2)
+		seq_printf(m, "%08x", ek->ek_fsid[2]);
 	if (test_bit(CACHE_VALID, &h->flags) && 
 	    !test_bit(CACHE_NEGATIVE, &h->flags)) {
 		seq_printf(m, " ");
@@ -230,13 +237,8 @@ struct cache_detail svc_expkey_cache = {
 static inline int svc_expkey_match (struct svc_expkey *a, struct svc_expkey *b)
 {
 	if (a->ek_fsidtype != b->ek_fsidtype ||
-	    a->ek_client != b->ek_client)
-		return 0;
-	if (a->ek_fsid[0] != b->ek_fsid[0])
-		return 0;
-	if (a->ek_fsidtype == 1)
-		return 1;
-	if (a->ek_fsid[1] != b->ek_fsid[1])
+	    a->ek_client != b->ek_client ||
+	    memcmp(a->ek_fsid, b->ek_fsid, key_len(a->ek_fsidtype)) != 0)
 		return 0;
 	return 1;
 }
@@ -248,6 +250,7 @@ static inline void svc_expkey_init(struct svc_expkey *new, struct svc_expkey *it
 	new->ek_fsidtype = item->ek_fsidtype;
 	new->ek_fsid[0] = item->ek_fsid[0];
 	new->ek_fsid[1] = item->ek_fsid[1];
+	new->ek_fsid[2] = item->ek_fsid[2];
 }
 
 static inline void svc_expkey_update(struct svc_expkey *new, struct svc_expkey *item)
@@ -502,8 +505,7 @@ exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv, struct cache_req *reqp)
 
 	key.ek_client = clp;
 	key.ek_fsidtype = fsid_type;
-	key.ek_fsid[0] = fsidv[0];
-	key.ek_fsid[1] = fsidv[1];
+	memcpy(key.ek_fsid, fsidv, key_len(fsid_type));
 
 	ek = svc_expkey_lookup(&key, 0);
 	if (ek != NULL)
@@ -519,8 +521,7 @@ int exp_set_key(svc_client *clp, int fsid_type, u32 *fsidv,
 
 	key.ek_client = clp;
 	key.ek_fsidtype = fsid_type;
-	key.ek_fsid[0] = fsidv[0];
-	key.ek_fsid[1] = fsidv[1];
+	memcpy(key.ek_fsid, fsidv, key_len(fsid_type));
 	key.ek_export = exp;
 	key.h.expiry_time = NEVER;
 	key.h.flags = 0;
@@ -539,10 +540,14 @@ int exp_set_key(svc_client *clp, int fsid_type, u32 *fsidv,
 static inline struct svc_expkey *
 exp_get_key(svc_client *clp, dev_t dev, ino_t ino)
 {
-	u32 fsidv[2];
+	u32 fsidv[3];
 	
-	mk_fsid_v0(fsidv, dev, ino);
-	return exp_find_key(clp, 0, fsidv, NULL);
+	if (old_valid_dev(dev)) {
+		mk_fsid_v0(fsidv, dev, ino);
+		return exp_find_key(clp, 0, fsidv, NULL);
+	}
+	mk_fsid_v2(fsidv, dev, ino);
+	return exp_find_key(clp, 2, fsidv, NULL);
 }
 
 /*
@@ -671,11 +676,15 @@ static int exp_fsid_hash(svc_client *clp, struct svc_export *exp)
 static int exp_hash(struct auth_domain *clp, struct svc_export *exp)
 {
 	u32 fsid[2];
-	struct inode *inode;
+	struct inode *inode = exp->ex_dentry->d_inode;
+	dev_t dev = inode->i_sb->s_dev;
 
-	inode = exp->ex_dentry->d_inode;
-	mk_fsid_v0(fsid,  inode->i_sb->s_dev, inode->i_ino);
-	return exp_set_key(clp, 0, fsid, exp);
+	if (old_valid_dev(dev)) {
+		mk_fsid_v0(fsid, dev, inode->i_ino);
+		return exp_set_key(clp, 0, fsid, exp);
+	}
+	mk_fsid_v2(fsid, dev, inode->i_ino);
+	return exp_set_key(clp, 2, fsid, exp);
 }
 
 static void exp_unhash(struct svc_export *exp)
@@ -819,32 +828,42 @@ int
 exp_unexport(struct nfsctl_export *nxp)
 {
 	struct auth_domain *dom;
+	svc_export *exp;
+	struct nameidata nd;
 	int		err;
 
 	/* Consistency check */
-	if (!exp_verify_string(nxp->ex_client, NFSCLNT_IDMAX))
+	if (!exp_verify_string(nxp->ex_path, NFS_MAXPATHLEN) ||
+	    !exp_verify_string(nxp->ex_client, NFSCLNT_IDMAX))
 		return -EINVAL;
 
 	exp_writelock();
 
 	err = -EINVAL;
 	dom = auth_domain_find(nxp->ex_client);
-
-	if (dom) {
-		struct svc_expkey *key = exp_get_key(dom, nxp->ex_dev, nxp->ex_ino);
-		if (key && !IS_ERR(key) && key->ek_export) {
-			exp_do_unexport(key->ek_export);
-			err = 0;
-			expkey_put(&key->h, &svc_expkey_cache);
-		} else
-			dprintk("nfsd: no export %x/%lx for %s\n",
-				(unsigned)nxp->ex_dev,
-				(unsigned long) nxp->ex_ino, nxp->ex_client);
-		auth_domain_put(dom);
-		cache_flush();
-	} else
+	if (!dom) {
 		dprintk("nfsd: unexport couldn't find %s\n", nxp->ex_client);
+		goto out_unlock;
+	}
 
+	err = path_lookup(nxp->ex_path, 0, &nd);
+	if (err)
+		goto out_domain;
+
+	err = -EINVAL;
+	exp = exp_get_by_name(dom, nd.mnt, nd.dentry, NULL);
+	path_release(&nd);
+	if (!exp)
+		goto out_domain;
+
+	exp_do_unexport(exp);
+	exp_put(exp);
+	err = 0;
+
+out_domain:
+	auth_domain_put(dom);
+	cache_flush();
+out_unlock:
 	exp_writeunlock();
 	return err;
 }
