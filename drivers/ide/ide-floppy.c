@@ -1077,14 +1077,11 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 	}
 	
 	if (test_bit (IDEFLOPPY_DRQ_INTERRUPT, &floppy->flags)) {
-		if (HWGROUP(drive)->handler != NULL)
-			BUG();
-		ide_set_handler(drive,
+		/* Issue the packet command */
+		ide_execute_command(drive, WIN_PACKETCMD,
 				pkt_xfer_routine,
 				IDEFLOPPY_WAIT_CMD,
 				NULL);
-		/* Issue the packet command */
-		HWIF(drive)->OUTB(WIN_PACKETCMD, IDE_COMMAND_REG);
 		return ide_started;
 	} else {
 		/* Issue the packet command */
