@@ -2038,41 +2038,6 @@ long sys32_module_warning(void)
 	return -ENOSYS ;
 } 
 
-long sys_sched_getaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
-long sys_sched_setaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
-
-/* only works on LE */
-long sys32_sched_setaffinity(pid_t pid, unsigned int len,
-			    unsigned int *new_mask_ptr)
-{
-	mm_segment_t oldfs = get_fs(); 
-	unsigned long mask; 
-	int err;
-	if (get_user(mask, new_mask_ptr)) 
-		return -EFAULT;	
-	set_fs(KERNEL_DS); 
-	err = sys_sched_setaffinity(pid,sizeof(mask),&mask); 	
-	set_fs(oldfs); 
-	return err;
-}
-
-/* only works on LE */ 
-long sys32_sched_getaffinity(pid_t pid, unsigned int len,
-			    unsigned int *new_mask_ptr)
-{
-	mm_segment_t oldfs = get_fs(); 
-	unsigned long mask; 
-	int err;
-	mask = 0; 
-	set_fs(KERNEL_DS); 
-	err = sys_sched_getaffinity(pid,sizeof(mask),&mask); 	
-	set_fs(oldfs); 
-	if (err > 0) 
-		err = put_user((u32)mask, new_mask_ptr); 
-	return err;
-}
-
-
 extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
 
 long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
