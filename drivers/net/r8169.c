@@ -6,6 +6,7 @@
  History:
  Feb  4 2002	- created initially by ShuChen <shuchen@realtek.com.tw>.
  May 20 2002	- Add link status force-mode and TBI mode support.
+        2004	- Massive updates. See kernel SCM system for details.
 =========================================================================
   1. [DEPRECATED: use ethtool instead] The media can be forced in 5 modes.
 	 Command: 'insmod r8169 media = SET_MEDIA'
@@ -32,6 +33,14 @@ VERSION 1.2	<2002/11/30>
 	- Use ether_crc in stock kernel (linux/crc32.h)
 	- Copy mc_filter setup code from 8139cp
 	  (includes an optimization, and avoids set_bit use)
+
+VERSION 1.6LK	<2004/04/14>
+
+	- Merge of Realtek's version 1.6
+	- Conversion to DMA API
+	- Suspend/resume
+	- Endianness
+	- Misc Rx/Tx bugs
 */
 
 #include <linux/module.h>
@@ -47,7 +56,7 @@ VERSION 1.2	<2002/11/30>
 
 #include <asm/io.h>
 
-#define RTL8169_VERSION "1.2"
+#define RTL8169_VERSION "1.6LK"
 #define MODULENAME "r8169"
 #define RTL8169_DRIVER_NAME   MODULENAME " Gigabit Ethernet driver " RTL8169_VERSION
 #define PFX MODULENAME ": "
