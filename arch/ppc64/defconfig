@@ -41,6 +41,7 @@ CONFIG_NR_CPUS=32
 # CONFIG_HMT is not set
 # CONFIG_DISCONTIGMEM is not set
 # CONFIG_RTAS_FLASH is not set
+CONFIG_PPC_RTAS=y
 
 #
 # General setup
