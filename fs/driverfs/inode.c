@@ -50,7 +50,6 @@
 static struct super_operations driverfs_ops;
 static struct file_operations driverfs_file_operations;
 static struct inode_operations driverfs_dir_inode_operations;
-static struct dentry_operations driverfs_dentry_dir_ops;
 static struct dentry_operations driverfs_dentry_file_ops;
 static struct address_space_operations driverfs_aops;
 
@@ -148,8 +147,8 @@ static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, in
 static int driverfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int res;
-	dentry->d_op = &driverfs_dentry_dir_ops;
- 	res = driverfs_mknod(dir, dentry, mode | S_IFDIR, 0);
+	mode = (mode & (S_IRWXUGO|S_ISVTX)) | S_IFDIR;
+ 	res = driverfs_mknod(dir, dentry, mode, 0);
  	if (!res)
  		dir->i_nlink++;
 	return res;
@@ -428,7 +427,6 @@ static struct inode_operations driverfs_dir_inode_operations = {
 	.lookup		= simple_lookup,
 	.unlink		= driverfs_unlink,
 	.symlink	= driverfs_symlink,
-	.mkdir		= driverfs_mkdir,
 	.rmdir		= driverfs_rmdir,
 };
 
@@ -581,7 +579,7 @@ driverfs_create_dir(struct driver_dir_entry * entry,
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *) entry;
 		entry->dentry = dentry;
-		error = vfs_mkdir(parent_dentry->d_inode,dentry,entry->mode);
+		error = driverfs_mkdir(parent_dentry->d_inode,dentry,entry->mode);
 	} else
 		error = PTR_ERR(dentry);
 	up(&parent_dentry->d_inode->i_sem);
