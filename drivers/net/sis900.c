@@ -262,13 +262,12 @@ static int __devinit sis630e_get_mac_addr(struct pci_dev * pci_dev, struct net_d
 	u8 reg;
 	int i;
 
-	isa_bridge = pci_find_device(PCI_VENDOR_ID_SI, 0x0008, isa_bridge);
+	isa_bridge = pci_get_device(PCI_VENDOR_ID_SI, 0x0008, isa_bridge);
+	if (!isa_bridge)
+		isa_bridge = pci_get_device(PCI_VENDOR_ID_SI, 0x0018, isa_bridge);
 	if (!isa_bridge) {
-		isa_bridge = pci_find_device(PCI_VENDOR_ID_SI, 0x0018, isa_bridge);
-		if (!isa_bridge) {
-			printk("%s: Can not find ISA bridge\n", net_dev->name);
-			return 0;
-		}
+		printk("%s: Can not find ISA bridge\n", net_dev->name);
+		return 0;
 	}
 	pci_read_config_byte(isa_bridge, 0x48, &reg);
 	pci_write_config_byte(isa_bridge, 0x48, reg | 0x40);
@@ -278,6 +277,7 @@ static int __devinit sis630e_get_mac_addr(struct pci_dev * pci_dev, struct net_d
 		((u8 *)(net_dev->dev_addr))[i] = inb(0x71); 
 	}
 	pci_write_config_byte(isa_bridge, 0x48, reg & ~0x40);
+	pci_dev_put(isa_bridge);
 
 	return 1;
 }
@@ -485,9 +485,11 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	}
 
 	/* save our host bridge revision */
-	dev = pci_find_device(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_630, NULL);
-	if (dev)
+	dev = pci_get_device(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_630, NULL);
+	if (dev) {
 		pci_read_config_byte(dev, PCI_CLASS_REVISION, &sis_priv->host_bridge_rev);
+		pci_dev_put(dev);
+	}
 
 	/* print some information about our NIC */
 	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ", net_dev->name,
