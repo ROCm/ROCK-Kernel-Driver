@@ -856,6 +856,8 @@ static struct termios *rfcomm_tty_termios[RFCOMM_TTY_PORTS];
 static struct termios *rfcomm_tty_termios_locked[RFCOMM_TTY_PORTS];
 
 static struct tty_driver rfcomm_tty_driver = {
+	.owner			= THIS_MODULE,
+
 	.magic			= TTY_DRIVER_MAGIC,
 	.driver_name		= "rfcomm",
 #ifdef CONFIG_DEVFS_FS
