@@ -30,7 +30,7 @@
 #ifndef _VXFS_SUPER_H_
 #define _VXFS_SUPER_H_
 
-#ident "$Id: vxfs.h 1.9 2001/04/24 19:28:36 hch Exp hch $"
+#ident "$Id: vxfs.h 1.11 2001/05/21 15:40:28 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - superblock structure.
@@ -62,90 +62,94 @@ typedef int32_t		vx_ino_t;
  */
 #define VXFS_NEFREE		32
 
+
 /*
  * VxFS superblock (disk).
  */
 struct vxfs_sb {
 	/*
-	 * Version 1
+	 * Readonly fields for the version 1 superblock.
+	 *
+	 * Lots of this fields are no more used by version 2
+	 * and never filesystems.
 	 */
-	u_int32_t	vs_magic;		/* Magic, VXFS_MAGIC */
-	int32_t		vs_version;		/* VxFS version, 1,2,3,4 */
+	u_int32_t	vs_magic;		/* Magic number */
+	int32_t		vs_version;		/* VxFS version */
 	u_int32_t	vs_ctime;		/* create time - secs */
 	u_int32_t	vs_cutime;		/* create time - usecs */
-	int32_t		__unused1;		/* ??? */
-	int32_t		__unused2;		/* ??? */
-	vx_daddr_t	vs_old_logstart;	/* OLD: addr of first log blk */
-	vx_daddr_t	vs_old_logend;		/* OLD: addr of last log blk */
-	int32_t		vs_bsize;		/* Block size */
-	int32_t		vs_size;		/* Number of blocks in FS */
-	int32_t		vs_dsize;		/* Number of data blocks */
-	u_int32_t	vs_old_ninode;		/* OLD: number of inodes */
-	int32_t		vs_old_nau;		/* Number of allocation units */
-	int32_t		__unused3;		/* ??? */
-	int32_t		vs_old_defiextsize;	/* OLD: dfault indirect ext size */
-	int32_t		vs_old_ilbsize;		/* OLD: Ilist block size in bytes */
-	int32_t		vs_immedlen;		/* Size of immediate data area */
-	int32_t		vs_ndaddr;		/* Number of direct extentes per inode */
-	vx_daddr_t	vs_firstau;		/* Address of first Allocation Unit */
-	vx_daddr_t	vs_emap;		/* Offset of extent map in AU */
-	vx_daddr_t	vs_imap;		/* Offset of inode map in AU (V1) */
-	vx_daddr_t	vs_iextop;		/* Offset of Ext. Op. map in AU */
-	vx_daddr_t	vs_istart;		/* Offset of inode list in AU */
-	vx_daddr_t	vs_bstart;		/* Offset of first data block in AU */
+	int32_t		__unused1;		/* unused */
+	int32_t		__unused2;		/* unused */
+	vx_daddr_t	vs_old_logstart;	/* obsolete */
+	vx_daddr_t	vs_old_logend;		/* obsolete */
+	int32_t		vs_bsize;		/* block size */
+	int32_t		vs_size;		/* number of blocks */
+	int32_t		vs_dsize;		/* number of data blocks */
+	u_int32_t	vs_old_ninode;		/* obsolete */
+	int32_t		vs_old_nau;		/* obsolete */
+	int32_t		__unused3;		/* unused */
+	int32_t		vs_old_defiextsize;	/* obsolete */
+	int32_t		vs_old_ilbsize;		/* obsolete */
+	int32_t		vs_immedlen;		/* size of immediate data area */
+	int32_t		vs_ndaddr;		/* number of direct extentes */
+	vx_daddr_t	vs_firstau;		/* address of first AU */
+	vx_daddr_t	vs_emap;		/* offset of extent map in AU */
+	vx_daddr_t	vs_imap;		/* offset of inode map in AU */
+	vx_daddr_t	vs_iextop;		/* offset of ExtOp. map in AU */
+	vx_daddr_t	vs_istart;		/* offset of inode list in AU */
+	vx_daddr_t	vs_bstart;		/* offset of fdblock in AU */
 	vx_daddr_t	vs_femap;		/* aufirst + emap */
 	vx_daddr_t	vs_fimap;		/* aufirst + imap */
 	vx_daddr_t	vs_fiextop;		/* aufirst + iextop */
 	vx_daddr_t	vs_fistart;		/* aufirst + istart */
 	vx_daddr_t	vs_fbstart;		/* aufirst + bstart */
-	int32_t		vs_nindir;		/* Number of entries in indirect */
-	int32_t		vs_aulen;		/* Length of AU in blocks */
-	int32_t		vs_auimlen;		/* Length of AU imap in blocks */
-	int32_t		vs_auemlen;		/* Length of AU emap in blocks */
-	int32_t		vs_auilen;		/* Length of AU ilist in blocks */
-	int32_t		vs_aupad;		/* Length of AU pad in blocks */
-	int32_t		vs_aublocks;		/* Number of data blocks in AU */
-	int32_t		vs_maxtier;		/* Log base 2 of aublocks */
-	int32_t		vs_inopb;		/* Number of inodes per blk */
-	int32_t		vs_old_inopau;		/* OLD: Number of inodes per AU */
-	int32_t		vs_old_inopilb;		/* OLD: Inodes per ilist blocks */
-	int32_t		vs_old_ndiripau;	/* OLD: Num of directory inodes per au */
-	int32_t		vs_iaddrlen;		/* Size of indirect addr ext. */
-	int32_t		vs_bshift;		/* Log base 2 of bsize */
-	int32_t		vs_inoshift;		/* Log base 2 of inobp */
+	int32_t		vs_nindir;		/* number of entries in indir */
+	int32_t		vs_aulen;		/* length of AU in blocks */
+	int32_t		vs_auimlen;		/* length of imap in blocks */
+	int32_t		vs_auemlen;		/* length of emap in blocks */
+	int32_t		vs_auilen;		/* length of ilist in blocks */
+	int32_t		vs_aupad;		/* length of pad in blocks */
+	int32_t		vs_aublocks;		/* data blocks in AU */
+	int32_t		vs_maxtier;		/* log base 2 of aublocks */
+	int32_t		vs_inopb;		/* number of inodes per blk */
+	int32_t		vs_old_inopau;		/* obsolete */
+	int32_t		vs_old_inopilb;		/* obsolete */
+	int32_t		vs_old_ndiripau;	/* obsolete */
+	int32_t		vs_iaddrlen;		/* size of indirect addr ext. */
+	int32_t		vs_bshift;		/* log base 2 of bsize */
+	int32_t		vs_inoshift;		/* log base 2 of inobp */
 	int32_t		vs_bmask;		/* ~( bsize - 1 ) */
 	int32_t		vs_boffmask;		/* bsize - 1 */
 	int32_t		vs_old_inomask;		/* old_inopilb - 1 */
-	int32_t		vs_checksum;		/* Checksum of V1 data */
+	int32_t		vs_checksum;		/* checksum of V1 data */
 	
 	/*
 	 * Version 1, writable
 	 */
-	int32_t		vs_free;		/* Number of free blocks */
-	int32_t		vs_ifree;		/* Number of free inodes */
-	int32_t		vs_efree[VXFS_NEFREE];	/* Number of free extents by size */
-	int32_t		vs_flags;		/* Flags ?!? */
-	u_int8_t	vs_mod;			/* Filesystem has been changed */
-	u_int8_t	vs_clean;		/* Clean FS */
-	u_int16_t	__unused4;		/* ??? */
-	u_int32_t	vs_firstlogid;		/* Mount time log ID */
-	u_int32_t	vs_wtime;		/* Last time written - sec */
-	u_int32_t	vs_wutime;		/* Last time written - usec */
+	int32_t		vs_free;		/* number of free blocks */
+	int32_t		vs_ifree;		/* number of free inodes */
+	int32_t		vs_efree[VXFS_NEFREE];	/* number of free extents by size */
+	int32_t		vs_flags;		/* flags ?!? */
+	u_int8_t	vs_mod;			/* filesystem has been changed */
+	u_int8_t	vs_clean;		/* clean FS */
+	u_int16_t	__unused4;		/* unused */
+	u_int32_t	vs_firstlogid;		/* mount time log ID */
+	u_int32_t	vs_wtime;		/* last time written - sec */
+	u_int32_t	vs_wutime;		/* last time written - usec */
 	u_int8_t	vs_fname[6];		/* FS name */
 	u_int8_t	vs_fpack[6];		/* FS pack name */
-	int32_t		vs_logversion;		/* Log format version */
-	int32_t		__unused5;		/* ??? */
+	int32_t		vs_logversion;		/* log format version */
+	int32_t		__unused5;		/* unused */
 	
 	/*
 	 * Version 2, Read-only
 	 */
 	vx_daddr_t	vs_oltext[2];		/* OLT extent and replica */
 	int32_t		vs_oltsize;		/* OLT extent size */
-	int32_t		vs_iauimlen;		/* Size of inode map */
-	int32_t		vs_iausize;		/* Size of IAU in blocks */
-	int32_t		vs_dinosize;		/* Size of inode in bytes */
-	int32_t		vs_old_dniaddr;		/* OLD: Sum of indir levels per inode */
-	int32_t		vs_checksum2;		/* Checksum of V2 RO */
+	int32_t		vs_iauimlen;		/* size of inode map */
+	int32_t		vs_iausize;		/* size of IAU in blocks */
+	int32_t		vs_dinosize;		/* size of inode in bytes */
+	int32_t		vs_old_dniaddr;		/* indir levels per inode */
+	int32_t		vs_checksum2;		/* checksum of V2 RO */
 
 	/*
 	 * Actually much more...
@@ -157,13 +161,13 @@ struct vxfs_sb {
  * In core superblock filesystem private data for VxFS.
  */
 struct vxfs_sb_info {
-	struct vxfs_sb		*vsi_raw;	/* Raw (on disk) supeblock */
-	struct buffer_head	*vsi_bp;	/* Buffer for raw superblock*/
-	struct inode		*vsi_fship;	/* Fileset header inode */
-	struct inode		*vsi_ilist;	/* Inode list inode */
-	struct inode		*vsi_stilist;	/* Structual inode list inode */
-	u_long			vsi_iext;	/* Initial inode list */
-	ino_t			vsi_fshino;	/* Fileset header inode */
+	struct vxfs_sb		*vsi_raw;	/* raw (on disk) supeblock */
+	struct buffer_head	*vsi_bp;	/* buffer for raw superblock*/
+	struct inode		*vsi_fship;	/* fileset header inode */
+	struct inode		*vsi_ilist;	/* inode list inode */
+	struct inode		*vsi_stilist;	/* structual inode list inode */
+	u_long			vsi_iext;	/* initial inode list */
+	ino_t			vsi_fshino;	/* fileset header inode */
 	daddr_t			vsi_oltext;	/* OLT extent */
 	daddr_t			vsi_oltsize;	/* OLT size */
 };
@@ -240,10 +244,10 @@ enum {
 };
 
 #define VXFS_IS_ORG(ip,org)	((ip)->vii_orgtype == (org))
-#define VXFS_ISNONE(ip)		VXFS_IS_ORG((ip),VXFS_ORG_NONE)
-#define VXFS_ISEXT4(ip)		VXFS_IS_ORG((ip),VXFS_ORG_EXT4)
-#define VXFS_ISIMMED(ip)	VXFS_IS_ORG((ip),VXFS_ORG_IMMED)
-#define VXFS_ISTYPED(ip)	VXFS_IS_ORG((ip),VXFS_ORG_TYPED)
+#define VXFS_ISNONE(ip)		VXFS_IS_ORG((ip), VXFS_ORG_NONE)
+#define VXFS_ISEXT4(ip)		VXFS_IS_ORG((ip), VXFS_ORG_EXT4)
+#define VXFS_ISIMMED(ip)	VXFS_IS_ORG((ip), VXFS_ORG_IMMED)
+#define VXFS_ISTYPED(ip)	VXFS_IS_ORG((ip), VXFS_ORG_TYPED)
 
 
 /*

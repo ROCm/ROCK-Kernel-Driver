@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.serial.h 1.12 05/17/01 18:14:25 cort
+ */
+/*
  * include/asm-ppc/serial.h
  */
 

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.est8260.h 1.5 05/17/01 18:14:24 cort
+ */
 
 /* Board information for the EST8260, which should be generic for
  * all 8260 boards.  The IMMR is now given to us so the hard define

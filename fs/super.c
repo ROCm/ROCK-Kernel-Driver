@@ -866,7 +866,7 @@ static struct super_block *get_sb_single(struct file_system_type *fs_type,
 	return sb;
 }
 
-static void kill_super(struct super_block *sb, int umount_root)
+static void kill_super(struct super_block *sb)
 {
 	struct block_device *bdev;
 	kdev_t dev;
@@ -904,12 +904,6 @@ static void kill_super(struct super_block *sb, int umount_root)
 	sb->s_type = NULL;
 	unlock_super(sb);
 	up_write(&sb->s_umount);
-	if (umount_root) {
-		/* special: the old device driver is going to be
-		   a ramdisk and the point of this call is to free its
-		   protected memory (even if dirty). */
-		destroy_buffers(dev);
-	}
 	if (bdev) {
 		blkdev_put(bdev, BDEV_FS);
 		bdput(bdev);
@@ -965,7 +959,7 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 	}
 	mnt = add_vfsmnt(NULL, sb->s_root, NULL);
 	if (!mnt) {
-		kill_super(sb, 0);
+		kill_super(sb);
 		return ERR_PTR(-ENOMEM);
 	}
 	type->kern_mnt = mnt;
@@ -979,7 +973,7 @@ void kern_umount(struct vfsmount *mnt)
 	struct super_block *sb = mnt->mnt_sb;
 	spin_lock(&dcache_lock);
 	remove_vfsmnt(mnt);
-	kill_super(sb, 0);
+	kill_super(sb);
 }
 
 /*
@@ -994,7 +988,7 @@ int may_umount(struct vfsmount *mnt)
 	return 0;
 }
 
-static int do_umount(struct vfsmount *mnt, int umount_root, int flags)
+static int do_umount(struct vfsmount *mnt, int flags)
 {
 	struct super_block * sb = mnt->mnt_sb;
 
@@ -1008,7 +1002,7 @@ static int do_umount(struct vfsmount *mnt, int umount_root, int flags)
 	 * /reboot - static binary that would close all descriptors and
 	 * call reboot(9). Then init(8) could umount root and exec /reboot.
 	 */
-	if (mnt == current->fs->rootmnt && !umount_root) {
+	if (mnt == current->fs->rootmnt) {
 		/*
 		 * Special case for "unmounting" root ...
 		 * we just try to remount it readonly.
@@ -1069,7 +1063,7 @@ static int do_umount(struct vfsmount *mnt, int umount_root, int flags)
 	mntput(mnt);
 	remove_vfsmnt(mnt);
 
-	kill_super(sb, umount_root);
+	kill_super(sb);
 	return 0;
 }
 
@@ -1109,7 +1103,7 @@ asmlinkage long sys_umount(char * name, int flags)
 	dput(nd.dentry);
 	/* puts nd.mnt */
 	down(&mount_sem);
-	retval = do_umount(nd.mnt, 0, flags);
+	retval = do_umount(nd.mnt, flags);
 	up(&mount_sem);
 	goto out;
 dput_and_out:
@@ -1379,7 +1373,7 @@ fail:
 	if (fstype->fs_flags & FS_SINGLE)
 		put_filesystem(fstype);
 	if (list_empty(&sb->s_mounts))
-		kill_super(sb, 0);
+		kill_super(sb);
 	goto unlock_out;
 }
 
@@ -1732,7 +1726,7 @@ int __init change_root(kdev_t new_root_dev,const char *put_old)
 			dput(devfs_nd.dentry);
 			down(&mount_sem);
 			/* puts devfs_nd.mnt */
-			do_umount(devfs_nd.mnt, 0, 0);
+			do_umount(devfs_nd.mnt, 0);
 			up(&mount_sem);
 		} else 
 			path_release(&devfs_nd);
@@ -1753,14 +1747,21 @@ int __init change_root(kdev_t new_root_dev,const char *put_old)
 		error = path_walk(put_old, &nd);
 	if (error) {
 		int blivet;
+		struct block_device *ramdisk = old_rootmnt->mnt_sb->s_bdev;
 
+		blivet = blkdev_get(ramdisk, FMODE_READ, 0, BDEV_FS);
 		printk(KERN_NOTICE "Trying to unmount old root ... ");
-		blivet = do_umount(old_rootmnt, 1, 0);
 		if (!blivet) {
-			printk("okay\n");
-			return 0;
+			blivet = do_umount(old_rootmnt, 0);
+			if (!blivet) {
+				ioctl_by_bdev(ramdisk, BLKFLSBUF, 0);
+				printk("okay\n");
+				error = 0;
+			}
+			blkdev_put(ramdisk, BDEV_FS);
 		}
-		printk(KERN_ERR "error %d\n", blivet);
+		if (blivet)
+			printk(KERN_ERR "error %d\n", blivet);
 		return error;
 	}
 	/* FIXME: we should hold i_zombie on nd.dentry */

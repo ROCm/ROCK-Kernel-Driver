@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.ppc_asm.h 1.10 05/17/01 18:14:21 cort
+ */
+/*
  * arch/ppc/kernel/ppc_asm.h
  *
  * Definitions used by various bits of low-level assembly code on PowerPC.

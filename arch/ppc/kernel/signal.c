@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.signal.c 1.7 05/17/01 18:14:22 cort
+ */
+/*
  *  linux/arch/ppc/kernel/signal.c
  *
  *  PowerPC version 

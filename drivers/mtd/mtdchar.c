@@ -310,8 +310,10 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		if (!databuf)
 			return -ENOMEM;
 		
-		if (copy_from_user(databuf, buf.ptr, buf.length))
+		if (copy_from_user(databuf, buf.ptr, buf.length)) {
+			kfree(databuf);
 			return -EFAULT;
+		}
 
 		ret = (mtd->write_oob)(mtd, buf.start, buf.length, &retlen, databuf);
 

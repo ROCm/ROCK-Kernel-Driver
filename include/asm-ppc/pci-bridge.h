@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.pci-bridge.h 1.11 05/21/01 01:31:30 cort
+ */
 #ifdef __KERNEL__
 #ifndef _ASM_PCI_BRIDGE_H
 #define _ASM_PCI_BRIDGE_H

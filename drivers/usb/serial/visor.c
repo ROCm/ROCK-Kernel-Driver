@@ -10,6 +10,9 @@
  *	(at your option) any later version.
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ * 
+ * (04/08/2001) gb
+ *	Identify version on module load.
  *
  * (01/21/2000) gkh
  *	Added write_room and chars_in_buffer, as they were previously using the
@@ -102,6 +105,13 @@
 
 #include "usb-serial.h"
 #include "visor.h"
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
+#define DRIVER_DESC "USB HandSpring Visor driver"
 
 #define MIN(a,b)                (((a)<(b))?(a):(b))
 
@@ -653,7 +663,10 @@ static int __init visor_init (void)
 			continue;
 		}
 	}
-	
+
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -686,8 +699,8 @@ static void __exit visor_exit (void)
 module_init(visor_init);
 module_exit(visor_exit);
 
-MODULE_AUTHOR("Greg Kroah-Hartman <greg@kroah.com>");
-MODULE_DESCRIPTION("USB HandSpring Visor driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

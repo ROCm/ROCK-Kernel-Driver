@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.heathrow.h 1.7 05/17/01 18:14:24 cort
+ */
+/*
  * heathrow.h: definitions for using the "Heathrow" I/O controller chip.
  *
  * Grabbed from Open Firmware definitions on a PowerBook G3 Series

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.amiints.c 1.8 05/21/01 00:48:24 cort
+ */
+/*
  * linux/arch/m68k/amiga/amiints.c -- Amiga Linux interrupt handling code
  *
  * This file is subject to the terms and conditions of the GNU General Public

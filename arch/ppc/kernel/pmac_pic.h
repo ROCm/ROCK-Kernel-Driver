@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.pmac_pic.h 1.5 05/17/01 18:14:21 cort
+ */
 #ifndef _PPC_KERNEL_PMAC_PIC_H
 #define _PPC_KERNEL_PMAC_PIC_H
 

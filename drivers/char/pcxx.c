@@ -685,7 +685,6 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 	int total, remain, size, stlen;
 	unsigned int head, tail;
 	unsigned long flags;
-
 	/* printk("Entering pcxe_write()\n"); */
 
 	if ((ch=chan(tty))==NULL)
@@ -696,6 +695,7 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 
 	if (from_user) {
 
+		down(&ch->tmp_buf_sem);
 		save_flags(flags);
 		cli();
 		globalwinon(ch);
@@ -703,19 +703,21 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 		/* It seems to be necessary to make sure that the value is stable here somehow
 		   This is a rather odd pice of code here. */
 		do
-		{ tail = bc->tout;
+		{
+			tail = bc->tout;
 		} while (tail != bc->tout);
 		
 		tail &= (size - 1);
 		stlen = (head >= tail) ? (size - (head - tail) - 1) : (tail - head - 1);
 		count = MIN(stlen, count);
+		memoff(ch);
+		restore_flags(flags);
+
 		if (count)
 			if (copy_from_user(ch->tmp_buf, buf, count))
 				count = 0;
 
 		buf = ch->tmp_buf;
-		memoff(ch);
-		restore_flags(flags);
 	}
 
 	/*
@@ -763,6 +765,9 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 	}
 	memoff(ch);
 	restore_flags(flags);
+	
+	if(from_user)
+		up(&ch->tmp_buf_sem);
 
 	return(total);
 }
@@ -1587,6 +1592,7 @@ load_fep:
 			ch->txbufsize = bc->tmax + 1;
 			ch->rxbufsize = bc->rmax + 1;
 			ch->tmp_buf = kmalloc(ch->txbufsize,GFP_KERNEL);
+			init_MUTEX(&ch->tmp_buf_sem);
 
 			if (!ch->tmp_buf) {
 				printk(KERN_ERR "Unable to allocate memory for temp buffers\n");

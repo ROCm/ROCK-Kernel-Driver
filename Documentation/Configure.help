@@ -10917,6 +10917,35 @@ CONFIG_USB_OV511
   The module will be called ov511.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
 
+Philips webcam support
+CONFIG_USB_PWC
+  Say Y or M here if you want to use one of these Philips USB webcams:
+  PCA645, PCA646, PCVC675, PCVC680, PCVC690, PCVC730, PCVC740, or 
+  the Askey VC010. The PCA635, PCVC665 and PCVC720 are not 
+  supported by this driver and never will be.
+
+  This driver has an optional plugin, which is distributed as a 
+  binary module only. It contains code that allow you to use 
+  higher resolutions and framerates but may not be distributed
+  as source. But even without this plugin you can these cams 
+  for most applications.
+
+  See Documentation/usb/philips.txt for more information and 
+  installation instructions.
+
+  The built-in microphone is enabled by selecting USB Audio support.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Character Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at http://roadrunner.swansea.uk.linux.org/v4l.shtml .
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pwc.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
+
+
 USB ADMtek Pegasus-based ethernet device support
 CONFIG_USB_PEGASUS
   Say Y if you want to use your USB ethernet device. Supported
@@ -11639,6 +11668,23 @@ CONFIG_HPFS_FS
   This file system is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module is called hpfs.o. If you want to compile it as a module,
+  say M here and read Documentation/modules.txt. If unsure, say N.
+
+FreeVxFS file system support (VERITAS VxFS(TM) compatible)
+CONFIG_VXFS_FS
+  FreeVxFS is a filesystem driver that support the VERITAS VxFS(TM)
+  filesystem format.  VERITAS VxFS(TM) is the standard filesystem
+  of SCO UnixWare (and possibly others) and optionally available
+  for Sunsoft Solaris, HP-UX and many other operating systems.
+  Currently only readonly access is supported.
+
+  NOTE:	the filesystem type as used by mount(1), mount(2) and fstab(5)
+	is 'vxfs' as it describes the filesystem format, not the
+	actual driver.
+
+  This file system is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called freevxfs.o. If you want to compile it as a module,
   say M here and read Documentation/modules.txt. If unsure, say N.
 
 NTFS support (read only)

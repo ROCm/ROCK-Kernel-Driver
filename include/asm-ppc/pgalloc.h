@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.pgalloc.h 1.9 05/17/01 18:14:25 cort
+ */
 #ifdef __KERNEL__
 #ifndef _PPC_PGALLOC_H
 #define _PPC_PGALLOC_H

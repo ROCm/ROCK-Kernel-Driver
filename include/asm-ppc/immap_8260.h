@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.immap_8260.h 1.5 05/17/01 18:14:24 cort
+ */
 
 /*
  * MPC8260 Internal Memory Map

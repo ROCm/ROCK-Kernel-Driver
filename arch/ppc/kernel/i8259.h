@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.i8259.h 1.5 05/17/01 18:14:21 cort
+ */
 
 #ifndef _PPC_KERNEL_i8259_H
 #define _PPC_KERNEL_i8259_H

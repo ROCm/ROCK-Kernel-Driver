@@ -1,6 +1,7 @@
 /*
- * $Id: idle.c,v 1.68 1999/10/15 18:16:03 cort Exp $
- *
+ * BK Id: SCCS/s.idle.c 1.11 05/17/01 18:14:21 cort
+ */
+/*
  * Idle daemon for PowerPC.  Idle daemon will handle any action
  * that needs to be taken when the system becomes idle.
  *

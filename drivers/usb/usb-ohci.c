@@ -12,6 +12,7 @@
  * 
  * History:
  * 
+ * 2001/04/08 Identify version on module load gb
  * 2001/03/24 td/ed hashing to remove bus_to_virt (Steve Longerbeam);
  	pci_map_single (db)
  * 2001/03/21 td and dev/ed allocation uses new pci_pool API (db)
@@ -84,6 +85,13 @@
 #endif
 #endif
 
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v5.2"
+#define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
+#define DRIVER_DESC "USB OHCI Host Controller Driver"
 
 /* For initializing controller (mask in an HCFS mode too) */
 #define	OHCI_CONTROL_INIT \
@@ -2756,6 +2764,8 @@ static int __init ohci_hcd_init (void)
 #ifdef CONFIG_PMAC_PBOOK
 	pmu_register_sleep_notifier (&ohci_sleep_notifier);
 #endif  
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return ret;
 }
 
@@ -2773,5 +2783,5 @@ module_init (ohci_hcd_init);
 module_exit (ohci_hcd_cleanup);
 
 
-MODULE_AUTHOR ("Roman Weissgaerber <weissg@vienna.at>, David Brownell");
-MODULE_DESCRIPTION ("USB OHCI Host Controller Driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );

@@ -1,3 +1,5 @@
+# BK Id: SCCS/s.Makefile 1.3 05/17/01 18:14:23 cort
+#
 # Makefile for xmon
 
 O_TARGET	:= x.o

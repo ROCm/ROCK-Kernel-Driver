@@ -23,6 +23,9 @@
  *    framework in, but haven't analyzed the "tty_flip" interface yet.
  * -- Add support for flush commands
  * -- Add everything that is missing :)
+ * 
+ * 08-Apr-2001 gb
+ *	- Identify version on module load.
  *
  * 12-Mar-2001 gkh
  *	- Added support for the GoHubs GO-COM232 device which is the same as the
@@ -78,6 +81,13 @@
 
 #include "usb-serial.h"
 #include "belkin_sa.h"
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "William Greathouse <wgreathouse@smva.com>"
+#define DRIVER_DESC "USB Belkin Serial converter driver"
 
 /* function prototypes for a Belkin USB Serial Adapter F5U103 */
 static int  belkin_sa_startup		(struct usb_serial *serial);
@@ -590,6 +600,8 @@ static int __init belkin_sa_init (void)
 	usb_serial_register (&belkin_old_device);
 	usb_serial_register (&peracom_device);
 	usb_serial_register (&gocom232_device);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -606,7 +618,8 @@ static void __exit belkin_sa_exit (void)
 module_init (belkin_sa_init);
 module_exit (belkin_sa_exit);
 
-MODULE_DESCRIPTION("USB Belkin Serial converter driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.enet.c 1.10 05/17/01 18:14:20 cort
+ */
+/*
  * Ethernet driver for Motorola MPC8xx.
  * Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
  *

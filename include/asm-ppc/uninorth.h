@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.uninorth.h 1.7 05/17/01 18:14:26 cort
+ */
+/*
  * uninorth.h: definitions for using the "UniNorth" host bridge chip
  *             from Apple. This chip is used on "Core99" machines
  *

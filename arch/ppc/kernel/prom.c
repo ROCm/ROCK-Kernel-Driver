@@ -1,6 +1,7 @@
 /*
- * $Id: prom.c,v 1.79 1999/10/08 01:56:32 paulus Exp $
- *
+ * BK Id: SCCS/s.prom.c 1.17 05/17/01 18:14:22 cort
+ */
+/*
  * Procedures for interfacing to the Open Firmware PROM on
  * Power Macintosh computers.
  *

@@ -563,6 +563,7 @@ host->proc_name =  "qlogicfas";
 			if ( ( (inb(qbase + 0xe) ^ inb(qbase + 0xe)) == 7 )
 			  && ( (inb(qbase + 0xe) ^ inb(qbase + 0xe)) == 7 ) )
 				break;
+			release_region(qbase, 0x10 );
 		}
 		if (qbase == 0x430)
 			return 0;

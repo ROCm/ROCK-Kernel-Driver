@@ -28,6 +28,9 @@
   open source projects.
 
   Change History
+   (04/08/2001) gb
+	Identify version on module load.
+   
    (11/01/2000) Adam J. Richter
 	usb_device_id table support.
    
@@ -73,6 +76,13 @@
 
 #include "usb-serial.h"
 #include "keyspan.h"
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Hugh Blemings <hugh@linuxcare.com>"
+#define DRIVER_DESC "Keyspan USB to Serial Converter Driver"
 
 #define INSTAT_BUFLEN	32
 #define GLOCONT_BUFLEN	64
@@ -166,6 +176,10 @@ int keyspan_init (void)
 	usb_serial_register (&keyspan_usa28_device);
 	usb_serial_register (&keyspan_usa28x_device);
 	usb_serial_register (&keyspan_usa49w_device);
+
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -1701,6 +1715,9 @@ static void keyspan_shutdown (struct usb_serial *serial)
 		kfree(port->private);
 	}
 }
+
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

@@ -44,8 +44,8 @@
 
 #define SMART2_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 
-#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.3)"
-#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,3)
+#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.4)"
+#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,4)
 
 /* Embedded module documentation macros - see modules.h */
 /* Original author Chris Frantz - Compaq Computer Corporation */
@@ -67,6 +67,8 @@ MODULE_DESCRIPTION("Driver for Compaq Smart2 Array Controllers");
 
 #define MAX_CTLR	8
 #define CTLR_SHIFT	8
+
+#define CPQARRAY_DMA_MASK	0xFFFFFFFF	/* 32 bit DMA */
 
 static int nr_ctlr;
 static ctlr_info_t *hba[MAX_CTLR];
@@ -123,8 +125,8 @@ static int pollcomplete(int ctlr);
 static void getgeometry(int ctlr);
 static void start_fwbk(int ctlr);
 
-static cmdlist_t * cmd_alloc(ctlr_info_t *h);
-static void cmd_free(ctlr_info_t *h, cmdlist_t *c);
+static cmdlist_t * cmd_alloc(ctlr_info_t *h, int get_from_pool);
+static void cmd_free(ctlr_info_t *h, cmdlist_t *c, int got_from_pool);
 
 static int sendcmd(
 	__u8	cmd,
@@ -324,7 +326,9 @@ void cleanup_module(void)
 		del_timer(&hba[i]->timer);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR + i));
 		remove_proc_entry(hba[i]->devname, proc_array);
-		kfree(hba[i]->cmd_pool);
+		pci_free_consistent(hba[i]->pci_dev, 
+			NR_CMDS * sizeof(cmdlist_t), (hba[i]->cmd_pool), 
+			hba[i]->cmd_pool_dhandle);
 		kfree(hba[i]->cmd_pool_bits);
 
 		if (gendisk_head == &ida_gendisk[i]) {
@@ -474,8 +478,9 @@ int __init cpqarray_init(void)
 			continue;
 		}
 		num_cntlrs_reg++;
-		hba[i]->cmd_pool = (cmdlist_t *)kmalloc(
-				NR_CMDS * sizeof(cmdlist_t), GFP_KERNEL);
+		hba[i]->cmd_pool = (cmdlist_t *)pci_alloc_consistent(
+				hba[i]->pci_dev, NR_CMDS * sizeof(cmdlist_t), 
+				&(hba[i]->cmd_pool_dhandle));
 		hba[i]->cmd_pool_bits = (__u32*)kmalloc(
 				((NR_CMDS+31)/32)*sizeof(__u32), GFP_KERNEL);
 		
@@ -485,7 +490,10 @@ int __init cpqarray_init(void)
 			if(hba[i]->cmd_pool_bits)
 				kfree(hba[i]->cmd_pool_bits);
 			if(hba[i]->cmd_pool)
-				kfree(hba[i]->cmd_pool);
+				pci_free_consistent(hba[i]->pci_dev, 
+					NR_CMDS * sizeof(cmdlist_t), 
+					hba[i]->cmd_pool, 
+					hba[i]->cmd_pool_dhandle);
 			free_irq(hba[i]->intr, hba[i]);
 			unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
 			num_cntlrs_reg--;
@@ -649,7 +657,15 @@ static int cpqarray_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 		addr[i] = pci_resource_start(pdev, i);
 
 	if (pci_enable_device(pdev))
+	{
+		printk(KERN_ERR "cpqarray: Unable to Enable PCI device\n");
 		return -1;
+	}
+	if (pci_set_dma_mask(pdev, CPQARRAY_DMA_MASK) != 0)
+	{
+		printk(KERN_ERR "cpqarray: Unable to set DMA mask\n");
+		return -1;
+	}
 
 	pci_read_config_word(pdev, PCI_COMMAND, &command);
 	pci_read_config_byte(pdev, PCI_CLASS_REVISION, &revision);
@@ -907,6 +923,8 @@ static void do_ida_request(request_queue_t *q)
 	struct list_head * queue_head = &q->queue_head;
 	struct buffer_head *bh;
 	struct request *creq;
+	struct my_sg tmp_sg[SG_MAX];
+	int i;
 
 // Loop till the queue is empty if or it is plugged 
    while (1)
@@ -930,7 +948,7 @@ static void do_ida_request(request_queue_t *q)
                 return;
 	}
 
-	if ((c = cmd_alloc(h)) == NULL)
+	if ((c = cmd_alloc(h,1)) == NULL)
 	{
                 start_io(h);
                 return;
@@ -956,17 +974,27 @@ DBGPX(
 	while(bh) {
 		sect += bh->b_size/512;
 		if (bh->b_data == lastdataend) {
-			c->req.sg[seg-1].size += bh->b_size;
+			tmp_sg[seg-1].size += bh->b_size;
 			lastdataend += bh->b_size;
 		} else {
 			if (seg == SG_MAX)
 				BUG();
-			c->req.sg[seg].size = bh->b_size;
-			c->req.sg[seg].addr = (__u32)virt_to_bus(bh->b_data);
+			tmp_sg[seg].size = bh->b_size;
+			tmp_sg[seg].start_addr = bh->b_data;
 			lastdataend = bh->b_data + bh->b_size;
 			seg++;
 		}
 		bh = bh->b_reqnext;
+	}
+	/* Now do all the DMA Mappings */
+	for( i=0; i < seg; i++)
+	{
+		c->req.sg[i].size = tmp_sg[i].size;
+		c->req.sg[i].addr = (__u32) pci_map_single(
+                		h->pci_dev, tmp_sg[i].start_addr, 
+				tmp_sg[i].size,
+                                (creq->cmd == READ) ? 
+					PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
 	}
 DBGPX(	printk("Submitting %d sectors in %d segments\n", sect, seg); );
 	c->req.hdr.sg_cnt = seg;
@@ -1047,6 +1075,7 @@ static inline void complete_buffers(struct buffer_head *bh, int ok)
 static inline void complete_command(cmdlist_t *cmd, int timeout)
 {
 	int ok=1;
+	int i;
 
 	if (cmd->req.hdr.rcode & RCODE_NONFATAL &&
 	   (hba[cmd->ctlr]->misc_tflags & MISC_NONFATAL_WARN) == 0) {
@@ -1067,6 +1096,13 @@ static inline void complete_command(cmdlist_t *cmd, int timeout)
 		ok = 0;	
 	}
 	if (timeout) ok = 0;
+	/* unmap the DMA mapping for all the scatter gather elements */
+        for(i=0; i<cmd->req.hdr.sg_cnt; i++)
+        {
+                pci_unmap_single(hba[cmd->ctlr]->pci_dev,
+                        cmd->req.sg[i].addr, cmd->req.sg[i].size,
+                        (cmd->req.hdr.cmd == IDA_READ) ? PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
+        }
 	complete_buffers(cmd->bh, ok);
 }
 
@@ -1114,7 +1150,7 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 				removeQ(&h->cmpQ, c);
 				if (c->type == CMD_RWREQ) {
 					complete_command(c, 0);
-					cmd_free(h, c);
+					cmd_free(h, c, 1);
 				} else if (c->type == CMD_IOCTL_PEND) {
 					c->type = CMD_IOCTL_DONE;
 				}
@@ -1247,7 +1283,7 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 	unsigned long flags;
 	int error;
 
-	if ((c = cmd_alloc(NULL)) == NULL)
+	if ((c = cmd_alloc(h, 0)) == NULL)
 		return -ENOMEM;
 	c->ctlr = ctlr;
 	c->hdr.unit = (io->unit & UNITVALID) ? (io->unit & ~UNITVALID) : dsk;
@@ -1266,13 +1302,16 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 		if (!p) 
 		{ 
 			error = -ENOMEM; 
-			cmd_free(NULL, c); 
+			cmd_free(h, c, 0); 
 			return(error);
 		}
 		copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size);
-		c->req.hdr.blk = virt_to_bus(&(io->c));
+		c->req.hdr.blk = pci_map_single(h->pci_dev, &(io->c), 
+				sizeof(ida_ioctl_t), 
+				PCI_DMA_BIDIRECTIONAL);
 		c->req.sg[0].size = io->sg[0].size;
-		c->req.sg[0].addr = virt_to_bus(p);
+		c->req.sg[0].addr = pci_map_single(h->pci_dev, p, 
+			c->req.sg[0].size, PCI_DMA_BIDIRECTIONAL);
 		c->req.hdr.sg_cnt = 1;
 		break;
 	case IDA_READ:
@@ -1280,12 +1319,13 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 		if (!p) 
 		{ 
                         error = -ENOMEM; 
-                        cmd_free(NULL, c);
+                        cmd_free(h, c, 0);
                         return(error);
                 }
 
 		c->req.sg[0].size = io->sg[0].size;
-		c->req.sg[0].addr = virt_to_bus(p);
+		c->req.sg[0].addr = pci_map_single(h->pci_dev, p, 
+			c->req.sg[0].size, PCI_DMA_BIDIRECTIONAL); 
 		c->req.hdr.sg_cnt = 1;
 		break;
 	case IDA_WRITE:
@@ -1295,20 +1335,22 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 		if (!p) 
  		{ 
                         error = -ENOMEM; 
-                        cmd_free(NULL, c);
+                        cmd_free(h, c, 0);
                         return(error);
                 }
 		copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size);
 		c->req.sg[0].size = io->sg[0].size;
-		c->req.sg[0].addr = virt_to_bus(p);
+		c->req.sg[0].addr = pci_map_single(h->pci_dev, p, 
+			c->req.sg[0].size, PCI_DMA_BIDIRECTIONAL); 
 		c->req.hdr.sg_cnt = 1;
 		break;
 	default:
 		c->req.sg[0].size = sizeof(io->c);
-		c->req.sg[0].addr = virt_to_bus(&io->c);
+		c->req.sg[0].addr = pci_map_single(h->pci_dev,&io->c, 
+			c->req.sg[0].size, PCI_DMA_BIDIRECTIONAL);
 		c->req.hdr.sg_cnt = 1;
 	}
-
+	
 	/* Put the request on the tail of the request queue */
 	spin_lock_irqsave(&io_request_lock, flags);
 	addQ(&h->reqQ, c);
@@ -1320,9 +1362,15 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 	while(c->type != CMD_IOCTL_DONE)
 		schedule();
 
+	/* Unmap the DMA  */
+	pci_unmap_single(h->pci_dev, c->req.sg[0].addr, c->req.sg[0].size, 
+		PCI_DMA_BIDIRECTIONAL);
 	/* Post submit processing */
 	switch(io->cmd) {
 	case PASSTHRU_A:
+		pci_unmap_single(h->pci_dev, c->req.hdr.blk,
+                                sizeof(ida_ioctl_t),
+                                PCI_DMA_BIDIRECTIONAL);
 	case IDA_READ:
 	case DIAG_PASS_THRU:
 		copy_to_user((void*)io->sg[0].addr, p, io->sg[0].size);
@@ -1336,7 +1384,7 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 	}
 
 	io->rcode = c->req.hdr.rcode;
-	cmd_free(NULL, c);
+	cmd_free(h, c, 0);
 	return(0);
 }
 
@@ -1346,13 +1394,15 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
  * critical (and can wait for kmalloc and possibly sleep) can pass in NULL
  * as the first argument to get a new command.
  */
-static cmdlist_t * cmd_alloc(ctlr_info_t *h)
+static cmdlist_t * cmd_alloc(ctlr_info_t *h, int get_from_pool)
 {
 	cmdlist_t * c;
 	int i;
+	dma_addr_t cmd_dhandle;
 
-	if (h == NULL) {
-		c = (cmdlist_t*)kmalloc(sizeof(cmdlist_t), GFP_KERNEL);
+	if (!get_from_pool) {
+		c = (cmdlist_t*)pci_alloc_consistent(h->pci_dev, 
+			sizeof(cmdlist_t), &cmd_dhandle);
 		if(c==NULL)
 			return NULL;
 	} else {
@@ -1362,20 +1412,22 @@ static cmdlist_t * cmd_alloc(ctlr_info_t *h)
 				return NULL;
 		} while(test_and_set_bit(i%32, h->cmd_pool_bits+(i/32)) != 0);
 		c = h->cmd_pool + i;
+		cmd_dhandle = h->cmd_pool_dhandle + i*sizeof(cmdlist_t);
 		h->nr_allocs++;
 	}
 
 	memset(c, 0, sizeof(cmdlist_t));
-	c->busaddr = virt_to_bus(c);
+	c->busaddr = cmd_dhandle; 
 	return c;
 }
 
-static void cmd_free(ctlr_info_t *h, cmdlist_t *c)
+static void cmd_free(ctlr_info_t *h, cmdlist_t *c, int got_from_pool)
 {
 	int i;
 
-	if (h == NULL) {
-		kfree(c);
+	if (!got_from_pool) {
+		pci_free_consistent(h->pci_dev, sizeof(cmdlist_t), c,
+			c->busaddr);
 	} else {
 		i = c - h->cmd_pool;
 		clear_bit(i%32, h->cmd_pool_bits+(i/32));
@@ -1404,7 +1456,7 @@ static int sendcmd(
 	unsigned long i;
 	ctlr_info_t *info_p = hba[ctlr];
 
-	c = cmd_alloc(info_p);
+	c = cmd_alloc(info_p, 1);
 	if(!c)
 		return IO_ERROR;
 	c->ctlr = ctlr;
@@ -1428,7 +1480,8 @@ static int sendcmd(
 	c->req.hdr.blk = blk;
 	c->req.hdr.blk_cnt = blkcnt;
 	c->req.hdr.cmd = (unsigned char) cmd;
-	c->req.sg[0].addr = (__u32) virt_to_bus(buff);
+	c->req.sg[0].addr = (__u32) pci_map_single(info_p->pci_dev, 
+		buff, c->req.sg[0].size, PCI_DMA_BIDIRECTIONAL);
 	/*
 	 * Disable interrupt
 	 */
@@ -1451,13 +1504,16 @@ DBG(
 	 */
 	info_p->access.submit_command(info_p, c);
 	complete = pollcomplete(ctlr);
+	
+	pci_unmap_single(info_p->pci_dev, (dma_addr_t) c->req.sg[0].addr, 
+		c->req.sg[0].size, PCI_DMA_BIDIRECTIONAL);
 	if (complete != 1) {
 		if (complete != c->busaddr) {
 			printk( KERN_WARNING
 			"cpqarray ida%d: idaSendPciCmd "
 		      "Invalid command list address returned! (%08lx)\n",
 				ctlr, (unsigned long)complete);
-			cmd_free(info_p, c);
+			cmd_free(info_p, c, 1);
 			return (IO_ERROR);
 		}
 	} else {
@@ -1465,7 +1521,7 @@ DBG(
 			"cpqarray ida%d: idaSendPciCmd Timeout out, "
 			"No command list address returned!\n",
 			ctlr);
-		cmd_free(info_p, c);
+		cmd_free(info_p, c, 1);
 		return (IO_ERROR);
 	}
 
@@ -1477,11 +1533,11 @@ DBG(
 				"cmd: 0x%x, return code = 0x%x\n",
 				ctlr, c->req.hdr.cmd, c->req.hdr.rcode);
 
-			cmd_free(info_p, c);
+			cmd_free(info_p, c, 1);
 			return (IO_ERROR);
 		}
 	}
-	cmd_free(info_p, c);
+	cmd_free(info_p, c, 1);
 	return (IO_OK);
 }
 

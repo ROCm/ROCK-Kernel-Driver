@@ -402,8 +402,20 @@ sg_fill(struct scatterlist *leader, struct scatterlist *end,
 	paddr &= ~PAGE_MASK;
 	npages = calc_npages(paddr + size);
 	dma_ofs = iommu_arena_alloc(arena, npages);
-	if (dma_ofs < 0)
-		return -1;
+	if (dma_ofs < 0) {
+		/* If we attempted a direct map above but failed, die.  */
+		if (leader->dma_address == 0)
+			return -1;
+
+		/* Otherwise, break up the remaining virtually contiguous
+		   hunks into individual direct maps.  */
+		for (sg = leader; sg < end; ++sg)
+			if (sg->dma_address == 2 || sg->dma_address == -2)
+				sg->dma_address = 0;
+
+		/* Retry.  */
+		return sg_fill(leader, end, out, arena, max_dma);
+	}
 
 	out->dma_address = arena->dma_base + dma_ofs*PAGE_SIZE + paddr;
 	out->dma_length = size;

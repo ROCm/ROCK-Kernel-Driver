@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.apus_setup.c 1.11 05/17/01 18:14:21 cort
+ */
+/*
  *  linux/arch/ppc/kernel/apus_setup.c
  *
  *  Copyright (C) 1998, 1999  Jesper Skov

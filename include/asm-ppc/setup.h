@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.setup.h 1.5 05/17/01 18:14:25 cort
+ */
 #ifdef __KERNEL__
 #ifndef _PPC_SETUP_H
 #define _PPC_SETUP_H

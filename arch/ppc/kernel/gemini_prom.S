@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.gemini_prom.S 1.5 05/17/01 18:14:21 cort
+ */
+/*
  *  arch/ppc/kernel/gemini_prom.S
  *
  *  Not really prom support code (yet), but sort of anti-prom code.  The current

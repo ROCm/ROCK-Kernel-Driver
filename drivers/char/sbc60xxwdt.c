@@ -16,6 +16,7 @@
  *
  *           12/4 - 2000      [Initial revision]
  *           25/4 - 2000      Added /dev/watchdog support
+ *           09/5 - 2001      [smj@oro.net] fixed fop_write to "return 1" on success
  *
  *
  *  Theory of operation:
@@ -178,6 +179,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 
 		/* Well, anyhow someone wrote to us, we should return that favour */
 		next_heartbeat = jiffies + WDT_HEARTBEAT;
+		return 1;
 	}
 	return 0;
 }

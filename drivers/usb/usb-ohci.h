@@ -29,6 +29,7 @@ static int cc_to_error[16] = {
 	/* Not Access */               USB_ST_NORESPONSE 
 };
 
+#include <linux/config.h>
 
 /* ED States */
 

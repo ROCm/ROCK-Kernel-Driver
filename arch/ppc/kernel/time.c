@@ -1,5 +1,7 @@
 /*
- * $Id: time.c,v 1.57 1999/10/21 03:08:16 cort Exp $
+ * BK Id: SCCS/s.time.c 1.15 05/17/01 18:14:22 cort
+ */
+/*
  * Common time routines among all ppc machines.
  *
  * Written by Cort Dougan (cort@cs.nmt.edu) to merge

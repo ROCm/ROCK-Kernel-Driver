@@ -24,6 +24,9 @@
  *	Edgeport/8i
  *
  * Version history:
+ * 
+ *     (04/08/2001) gb
+ *	- Identify version on module load.
  *
  * 2.0 2001_03_05 greg kroah-hartman
  *	- reworked entire driver to fit properly in with the other usb-serial
@@ -254,6 +257,13 @@
 #include "io_ionsp.h"		/* info for the iosp messages */
 #include "io_16654.h"		/* 16654 UART defines */
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v2.0.0"
+#define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com> and David Iacovelli"
+#define DRIVER_DESC "Edgeport USB Serial Driver"
+
 /* First, the latest boot code - for first generation edgeports */
 #define IMAGE_ARRAY_NAME	BootCodeImage_GEN1
 #define IMAGE_VERSION_NAME	BootCodeImageVersion_GEN1
@@ -274,13 +284,6 @@
 #define IMAGE_VERSION_NAME	OperationalCodeImageVersion_GEN2
 #include "io_fw_down2.h"	/* Define array OperationalCodeImage[] */
 
-
-/* Module information */
-MODULE_AUTHOR("Greg Kroah-Hartman <greg@kroah.com> and David Iacovelli");
-MODULE_DESCRIPTION("Edgeport USB Serial Driver");
-
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 #define MAX_NAME_LEN		64
 
@@ -3034,7 +3037,8 @@ int __init edgeport_init(void)
 	usb_serial_register (&edgeport_16dual_device);
 	usb_serial_register (&edgeport_compat_id_device);
 	usb_serial_register (&edgeport_8i_device);
-	
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -3066,4 +3070,11 @@ void __exit edgeport_exit (void)
 
 module_init(edgeport_init);
 module_exit(edgeport_exit);
+
+/* Module information */
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
 

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.bitops.c 1.7 05/17/01 18:14:21 cort
+ */
+/*
  * Copyright (C) 1996 Paul Mackerras.
  */
 

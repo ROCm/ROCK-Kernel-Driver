@@ -1,9 +1,8 @@
+/*
+ * BK Id: SCCS/s.byteorder.h 1.5 05/17/01 18:14:24 cort
+ */
 #ifndef _PPC_BYTEORDER_H
 #define _PPC_BYTEORDER_H
-
-/*
- *  $Id: byteorder.h,v 1.14 1998/08/12 05:07:12 paulus Exp $
- */
 
 #include <asm/types.h>
 

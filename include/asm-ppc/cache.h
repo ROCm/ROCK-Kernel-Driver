@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.cache.h 1.5 05/17/01 18:14:24 cort
+ */
+/*
  * include/asm-ppc/cache.h
  */
 #ifdef __KERNEL__

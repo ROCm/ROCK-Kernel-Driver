@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.timex.h 1.5 05/17/01 18:14:26 cort
+ */
+/*
  * linux/include/asm-ppc/timex.h
  *
  * ppc architecture timex specifications

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.op-4.h 1.5 05/17/01 18:14:23 cort
+ */
+/*
  * Basic four-word fraction declaration and manipulation.
  *
  * When adding quadword support for 32 bit machines, we need

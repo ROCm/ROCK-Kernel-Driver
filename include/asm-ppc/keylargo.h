@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.keylargo.h 1.9 05/17/01 18:14:24 cort
+ */
+/*
  * keylargo.h: definitions for using the "KeyLargo" I/O controller chip.
  *
  */

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.apus_pci.c 1.3 05/17/01 18:14:21 cort
+ */
+/*
  * Copyright (C) Michel Dänzer <michdaen@iiic.ethz.ch>
  *
  * APUS PCI routines.

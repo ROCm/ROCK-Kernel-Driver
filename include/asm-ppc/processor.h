@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.processor.h 1.19 05/18/01 08:18:10 patch
+ */
 #ifdef __KERNEL__
 #ifndef __ASM_PPC_PROCESSOR_H
 #define __ASM_PPC_PROCESSOR_H

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.8xx_immap.h 1.5 05/17/01 18:14:24 cort
+ */
 
 /*
  * MPC8xx Internal Memory Map

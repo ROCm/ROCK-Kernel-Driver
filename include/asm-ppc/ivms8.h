@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.ivms8.h 1.5 05/17/01 18:14:24 cort
+ */
+/*
  * A collection of structures, addresses, and values associated with
  * Speech Design Integrated Voicemail Systems (IVMS8) boards.
  *

@@ -50,6 +50,13 @@
 #undef DEBUG
 #include <linux/usb.h>
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.8"
+#define DRIVER_AUTHOR "Michael Gee, Pavel Machek, Vojtech Pavlik, Randy Dunlap"
+#define DRIVER_DESC "USB Printer Device Class driver"
+
 #define USBLP_BUF_SIZE		8192
 #define DEVICE_ID_SIZE		1024
 
@@ -655,6 +662,8 @@ static int __init usblp_init(void)
 {
 	if (usb_register(&usblp_driver))
 		return -1;
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -666,5 +675,6 @@ static void __exit usblp_exit(void)
 module_init(usblp_init);
 module_exit(usblp_exit);
 
-MODULE_AUTHOR("Michael Gee, Pavel Machek, Vojtech Pavlik, Randy Dunlap");
-MODULE_DESCRIPTION("USB Printer Device Class driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+

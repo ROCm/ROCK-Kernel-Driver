@@ -1,5 +1,7 @@
 /*
- * $Id: pci.c,v 1.64 1999/09/17 18:01:53 cort Exp $
+ * BK Id: SCCS/s.pci.c 1.21 05/21/01 01:31:30 cort
+ */
+/*
  * Common pmac/prep/chrp pci routines. -- Cort
  */
 
@@ -1037,7 +1039,6 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 
 	return ret;
 }
-
 
 /* Obsolete functions. Should be removed once the symbios driver
  * is fixed

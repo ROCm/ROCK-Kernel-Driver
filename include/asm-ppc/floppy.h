@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.floppy.h 1.5 05/17/01 18:14:24 cort
+ */
+/*
  * Architecture specific parts of the Floppy driver
  *
  * This file is subject to the terms and conditions of the GNU General Public

@@ -1250,6 +1250,9 @@ kmem_cache_t *dquot_cachep;
 kmem_cache_t *bh_cachep;
 EXPORT_SYMBOL(bh_cachep);
 
+extern void bdev_cache_init(void);
+extern void cdev_cache_init(void);
+
 void __init vfs_caches_init(unsigned long mempages)
 {
 	bh_cachep = kmem_cache_create("buffer_head",
@@ -1279,4 +1282,7 @@ void __init vfs_caches_init(unsigned long mempages)
 #endif
 
 	dcache_init(mempages);
+	inode_init(mempages);
+	bdev_cache_init();
+	cdev_cache_init();
 }

@@ -131,7 +131,7 @@ int raw_open(struct inode *inode, struct file *filp)
 	 */
 	
 	sector_size = 512;
-	if (get_super(rdev) != NULL) {
+	if (is_mounted(rdev)) {
 		if (blksize_size[MAJOR(rdev)])
 			sector_size = blksize_size[MAJOR(rdev)][MINOR(rdev)];
 	} else {

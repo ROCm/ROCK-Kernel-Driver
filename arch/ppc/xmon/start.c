@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.start.c 1.12 05/21/01 21:39:13 paulus
+ */
+/*
  * Copyright (C) 1996 Paul Mackerras.
  */
 #include <linux/config.h>
@@ -28,7 +31,7 @@ static int xmon_expect(const char *str, unsigned int timeout);
 
 static int console;
 static int use_screen;
-static int via_modem = 1;
+static int via_modem;
 static int xmon_use_sccb;
 static struct device_node *macio_node;
 

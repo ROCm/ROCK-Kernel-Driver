@@ -9,6 +9,9 @@
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
  * Please report both successes and troubles to the author at omninet@kroah.com
+ * 
+ * (04/08/2001) gb
+ *	Identify version on module load.
  *
  * (11/01/2000) Adam J. Richter
  *	usb_device_id table support
@@ -53,6 +56,13 @@
 
 #include "usb-serial.h"
 
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Anonymous"
+#define DRIVER_DESC "USB ZyXEL omni.net LCD PLUS Driver"
 
 #define ZYXEL_VENDOR_ID		0x0586
 #define ZYXEL_OMNINET_ID	0x1000
@@ -396,6 +406,8 @@ static void omninet_shutdown (struct usb_serial *serial)
 static int __init omninet_init (void)
 {
 	usb_serial_register (&zyxel_omninet_device);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -408,6 +420,9 @@ static void __exit omninet_exit (void)
 
 module_init(omninet_init);
 module_exit(omninet_exit);
+
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

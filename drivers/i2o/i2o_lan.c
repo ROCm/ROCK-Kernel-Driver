@@ -938,7 +938,7 @@ static int i2o_lan_sdu_send(struct sk_buff *skb, struct net_device *dev)
 	spin_unlock_irq(&priv->tx_lock);
 	return 0;
 }
-#endif CONFIG_NET_FC
+#endif /* CONFIG_NET_FC */
 
 /*
  * i2o_lan_packet_send(): Send a packet as is, including the MAC header.

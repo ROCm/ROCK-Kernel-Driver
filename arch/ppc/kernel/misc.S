@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.misc.S 1.16 05/17/01 18:14:21 cort
+ */
+/*
  * This file contains miscellaneous low-level functions.
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *

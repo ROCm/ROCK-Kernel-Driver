@@ -660,7 +660,9 @@ static _INLINE_ void receive_chars(struct async_struct *info,
 			tty->flip.flag_buf_ptr++;
 			tty->flip.char_buf_ptr++;
 		}
+#if defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 	ignore_char:
+#endif
 		*status = serial_inp(info, UART_LSR);
 	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
 #if (LINUX_VERSION_CODE > 131394) /* 2.1.66 */

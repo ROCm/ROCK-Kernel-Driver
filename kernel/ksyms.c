@@ -186,6 +186,8 @@ EXPORT_SYMBOL(write_inode_now);
 EXPORT_SYMBOL(notify_change);
 EXPORT_SYMBOL(set_blocksize);
 EXPORT_SYMBOL(getblk);
+EXPORT_SYMBOL(cdget);
+EXPORT_SYMBOL(cdput);
 EXPORT_SYMBOL(bdget);
 EXPORT_SYMBOL(bdput);
 EXPORT_SYMBOL(bread);

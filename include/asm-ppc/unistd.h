@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.unistd.h 1.7 05/17/01 18:14:26 cort
+ */
 #ifndef _ASM_PPC_UNISTD_H_
 #define _ASM_PPC_UNISTD_H_
 

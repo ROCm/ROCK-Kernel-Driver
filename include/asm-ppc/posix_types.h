@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.posix_types.h 1.5 05/17/01 18:14:25 cort
+ */
 #ifndef _PPC_POSIX_TYPES_H
 #define _PPC_POSIX_TYPES_H
 

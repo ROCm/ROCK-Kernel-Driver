@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.feature.c 1.10 05/17/01 18:14:21 cort
+ */
+/*
  *  arch/ppc/kernel/feature.c
  *
  *  Copyright (C) 1996 Paul Mackerras (paulus@cs.anu.edu.au)

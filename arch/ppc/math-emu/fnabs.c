@@ -1,6 +1,6 @@
-/* $Id: fnabs.c,v 1.1 1999/08/23 18:59:47 cort Exp $
+/*
+ * BK Id: SCCS/s.fnabs.c 1.6 05/17/01 18:14:22 cort
  */
-
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <asm/uaccess.h>

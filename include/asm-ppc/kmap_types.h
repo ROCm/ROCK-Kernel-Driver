@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.kmap_types.h 1.6 05/17/01 18:14:24 cort
+ */
 #ifdef __KERNEL__
 #ifndef _ASM_KMAP_TYPES_H
 #define _ASM_KMAP_TYPES_H

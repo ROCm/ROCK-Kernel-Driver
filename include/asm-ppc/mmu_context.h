@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.mmu_context.h 1.9 05/17/01 18:14:25 cort
+ */
 #include <linux/config.h>
 
 #ifdef __KERNEL__

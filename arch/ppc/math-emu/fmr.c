@@ -1,6 +1,6 @@
-/* $Id: fmr.c,v 1.1 1999/08/23 18:59:40 cort Exp $
+/*
+ * BK Id: SCCS/s.fmr.c 1.6 05/17/01 18:14:22 cort
  */
-
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <asm/uaccess.h>

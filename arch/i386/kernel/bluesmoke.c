@@ -173,10 +173,7 @@ void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 	{
 		wrmsr(0x401+4*i, 0x0, 0x0); 
 	}
-	__asm__ __volatile__ (
-		"movl %%cr4, %%eax\n\t"
-		"orl $0x40, %%eax\n\t"
-		"movl %%eax, %%cr4\n\t" : : : "eax");
+	set_in_cr4(X86_CR4_MCE);
 	printk(KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n", smp_processor_id());
 	done=1;
 }

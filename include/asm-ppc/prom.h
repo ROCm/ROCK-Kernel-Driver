@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.prom.h 1.11 05/18/01 08:18:10 patch
+ */
+/*
  * Definitions for talking to the Open Firmware PROM on
  * Power Macintosh computers.
  *
@@ -15,7 +18,7 @@ typedef void *ihandle;
 
 extern char *prom_display_paths[];
 extern unsigned int prom_num_displays;
-#ifndef CONFIG_MACH_SPECIFIC
+#ifdef CONFIG_ALL_PPC
 extern int have_of;
 #endif
 

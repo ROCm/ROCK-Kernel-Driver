@@ -43,6 +43,13 @@
 #include "dabusb.h"
 #include "dabfirmware.h"
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.54"
+#define DRIVER_AUTHOR "Deti Fliegl, deti@fliegl.de"
+#define DRIVER_DESC "DAB-USB Interface Driver for Linux (c)1999"
+
 /* --------------------------------------------------------------------- */
 
 #define NRDABUSB 4
@@ -829,6 +836,10 @@ static int __init dabusb_init (void)
 		return -1;
 
 	dbg("dabusb_init: driver registered");
+
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -841,8 +852,9 @@ static void __exit dabusb_cleanup (void)
 
 /* --------------------------------------------------------------------- */
 
-MODULE_AUTHOR ("Deti Fliegl, deti@fliegl.de");
-MODULE_DESCRIPTION ("DAB-USB Interface Driver for Linux (c)1999");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+
 MODULE_PARM (buffers, "i");
 MODULE_PARM_DESC (buffers, "Number of buffers (default=256)");
 

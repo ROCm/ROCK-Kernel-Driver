@@ -55,7 +55,6 @@ nautilus_init_irq(void)
 {
 	if (alpha_using_srm) {
 		alpha_mv.device_interrupt = srm_device_interrupt;
-		alpha_mv.kill_arch = NULL;
 	}
 
 	init_i8259a_irqs();
@@ -77,7 +76,7 @@ nautilus_kill_arch(int mode)
 {
 	switch (mode) {
 	case LINUX_REBOOT_CMD_RESTART:
-		{
+		if (! alpha_using_srm) {
 			u8 t8;
 			pcibios_read_config_byte(0, 0x38, 0x43, &t8);
 			pcibios_write_config_byte(0, 0x38, 0x43, t8 | 0x80);

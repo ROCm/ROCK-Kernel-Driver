@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.ppc8260_pic.c 1.5 05/17/01 18:14:21 cort
+ */
 
 #include <linux/stddef.h>
 #include <linux/init.h>

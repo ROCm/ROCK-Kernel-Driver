@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.nonstdio.h 1.5 05/17/01 18:14:23 cort
+ */
 typedef int	FILE;
 extern FILE *xmon_stdin, *xmon_stdout;
 #define EOF	(-1)

@@ -19,6 +19,7 @@
  */
 
 #include <asm/io.h>
+#include <linux/config.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/fb.h>

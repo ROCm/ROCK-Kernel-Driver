@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.syscalls.c 1.8 05/17/01 18:14:22 cort
+ */
+/*
  * linux/arch/ppc/kernel/sys_ppc.c
  *
  *  PowerPC version 

@@ -1,6 +1,7 @@
 /*
- * $Id: m8xx_setup.c,v 1.4 1999/09/18 18:40:36 dmalek Exp $
- *
+ * BK Id: SCCS/s.m8260_setup.c 1.15 05/17/01 18:14:21 cort
+ */
+/*
  *  linux/arch/ppc/kernel/setup.c
  *
  *  Copyright (C) 1995  Linus Torvalds

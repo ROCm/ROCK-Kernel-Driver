@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.softirq.h 1.5 05/17/01 18:14:25 cort
+ */
 #ifdef __KERNEL__
 #ifndef __ASM_SOFTIRQ_H
 #define __ASM_SOFTIRQ_H

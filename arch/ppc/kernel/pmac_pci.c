@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.pmac_pci.c 1.14 05/17/01 18:14:21 cort
+ */
+/*
  * Support for PCI bridges found on Power Macintoshes.
  * At present the "bandit" and "chaos" bridges are supported.
  * Fortunately you access configuration space in the same

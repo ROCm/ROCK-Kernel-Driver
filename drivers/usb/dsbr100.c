@@ -65,6 +65,13 @@
 #include <linux/videodev.h>
 #include <linux/usb.h>
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.24"
+#define DRIVER_AUTHOR "Markus Demleitner <msdemlei@tucana.harvard.edu>"
+#define DRIVER_DESC "D-Link DSB-R100 USB radio driver"
+
 #define DSB100_VENDOR 0x04b4
 #define DSB100_PRODUCT 0x1002
 
@@ -100,6 +107,7 @@ static struct video_device usb_dsbr100_radio=
 };
 
 static int users = 0;
+static int radio_nr = -1;
 
 static struct usb_device_id usb_dsbr100_table [] = {
 	{ USB_DEVICE(DSB100_VENDOR, DSB100_PRODUCT) },
@@ -330,10 +338,12 @@ static int __init dsbr100_init(void)
 {
 	usb_dsbr100_radio.priv = NULL;
 	usb_register(&usb_dsbr100_driver);
-	if (video_register_device(&usb_dsbr100_radio,VFL_TYPE_RADIO)==-1) {	
+	if (video_register_device(&usb_dsbr100_radio,VFL_TYPE_RADIO,radio_nr)==-1) {	
 		warn("couldn't register video device");
 		return -EINVAL;
 	}
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -350,8 +360,8 @@ static void __exit dsbr100_exit(void)
 module_init (dsbr100_init);
 module_exit (dsbr100_exit);
 
-MODULE_AUTHOR("Markus Demleitner <msdemlei@tucana.harvard.edu>");
-MODULE_DESCRIPTION("D-Link DSB-R100 USB radio driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 /*
 vi: ts=8

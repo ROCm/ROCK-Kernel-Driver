@@ -1,6 +1,7 @@
 /*
- * $Id: m8xx_setup.c,v 1.4 1999/09/18 18:40:36 dmalek Exp $
- *
+ * BK Id: SCCS/s.m8xx_setup.c 1.17 05/18/01 07:54:04 patch
+ */
+/*
  *  linux/arch/ppc/kernel/setup.c
  *
  *  Copyright (C) 1995  Linus Torvalds
@@ -107,10 +108,16 @@ ide_ioport_desc_t ioport_dsc[MAX_HWIFS] = {
 ide_pio_timings_t ide_pio_clocks[6];
 
 /* Make clock cycles and always round up */
-#define PCMCIA_MK_CLKS( t, T ) (( (t) * (T) + 999U ) / 1000U )
+#define PCMCIA_MK_CLKS( t, T ) (( (t) * ((T)/1000000) + 999U ) / 1000U )
 
 #endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
 #endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
+
+#ifdef CONFIG_BLK_DEV_RAM
+extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
+extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
+extern int rd_image_start;	/* starting block # of image */
+#endif
 
 extern char saved_command_line[256];
 
@@ -200,7 +207,7 @@ void __init m8xx_calibrate_decr(void)
 	/* Processor frequency is MHz.
 	 * The value 'fp' is the number of decrementer ticks per second.
 	 */
-	fp = (binfo->bi_intfreq * 1000000) / 16;
+	fp = binfo->bi_intfreq / 16;
 	freq = fp*60;	/* try to make freq/1e6 an integer */
         divisor = 60;
         printk("Decrementer Frequency = %d/%d\n", freq, divisor);
@@ -308,10 +315,10 @@ int m8xx_setup_residual(char *buffer)
 
 	bp = (bd_t *)__res;
 			
-	len += sprintf(len+buffer,"clock\t\t: %ldMHz\n"
-		       "bus clock\t: %ldMHz\n",
-		       bp->bi_intfreq /*/ 1000000*/,
-		       bp->bi_busfreq /*/ 1000000*/);
+	len += sprintf(len+buffer,"clock\t\t: %dMHz\n"
+		       "bus clock\t: %dMHz\n",
+		       bp->bi_intfreq / 1000000,
+		       bp->bi_busfreq / 1000000);
 
 	return len;
 }
@@ -358,7 +365,7 @@ m8xx_ide_insw(ide_ioreg_t port, void *buf, int ns)
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
 	ide_insw(port, buf, ns);
 #else
-	ide_insw(port+_IO_BASE, buf, ns);
+	_insw_ns((unsigned short *)(port+_IO_BASE), buf, ns);
 #endif
 }
 
@@ -368,7 +375,7 @@ m8xx_ide_outsw(ide_ioreg_t port, void *buf, int ns)
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
 	ide_outsw(port, buf, ns);
 #else
-	ide_outsw(port+_IO_BASE, buf, ns);
+	_outsw_ns((unsigned short *)(port+_IO_BASE), buf, ns);
 #endif
 }
 
@@ -381,7 +388,7 @@ m8xx_ide_default_irq(ide_ioreg_t base)
 	
 	return (ioport_dsc[base].irq);
 #else
-        return 14;
+        return 9;
 #endif
 }
 
@@ -398,11 +405,7 @@ m8xx_ide_request_irq(unsigned int irq,
 		       const char *device,
 		       void *dev_id)
 {
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
 	return request_8xxirq(irq, handler, flags, device, dev_id);
-#else
-	return request_irq(irq, handler, flags, device, dev_id);
-#endif
 }
 
 /* We can use an external IDE controller
@@ -413,16 +416,14 @@ m8xx_ide_request_irq(unsigned int irq,
 void m8xx_ide_init_hwif_ports(hw_regs_t *hw,
 	ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
 {
-	ide_ioreg_t *p = hw->io_ports;
 	int i;
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
+	ide_ioreg_t *p = hw->io_ports;
 	volatile pcmconf8xx_t	*pcmp;
 
 	static unsigned long pcmcia_base = 0;
-#else
-	ide_ioreg_t port = data_port;	/* ??? XXX ??? XXX */
-#endif
 	unsigned long base;
+#endif
 
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
 	*p = 0;
@@ -500,12 +501,15 @@ void m8xx_ide_init_hwif_ports(hw_regs_t *hw,
 	
 	/* Just a regular IDE drive on some I/O port.
 	*/
-	i = 8;
-	while (i--)
-		*p++ = port++;
-	*p++ = base + 0x206;
-	if (irq != NULL)
-		*irq = 0;
+	if (data_port == 0)
+		return;
+
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; ++i)
+		hw->io_ports[i] = data_port + i - IDE_DATA_OFFSET;
+
+	hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
+        return;
+
 #endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
 }
 #endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
@@ -522,7 +526,6 @@ void m8xx_ide_init_hwif_ports(hw_regs_t *hw,
 #define PCMCIA_SST(t)	((t & 0x0F)<<12)	/* Strobe Setup Time	*/
 #define PCMCIA_SL(t) ((t==32) ? 0 : ((t & 0x1F)<<7)) /* Strobe Length	*/
 #endif
-
 
 /* Calculate PIO timings */
 static void
@@ -581,7 +584,6 @@ void ide_interrupt_handler (void *dev)
 
 #endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
 #endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
-
 /* -------------------------------------------------------------------- */
 
 /*
@@ -657,7 +659,7 @@ m8xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.kbd_leds          = NULL;
 	ppc_md.kbd_init_hw       = NULL;
 #ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.kbd_sysrq_xlate	 = NULL;
+	ppc_md.ppc_kbd_sysrq_xlate	 = NULL;
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)

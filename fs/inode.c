@@ -497,6 +497,10 @@ void clear_inode(struct inode *inode)
 		bdput(inode->i_bdev);
 		inode->i_bdev = NULL;
 	}
+	if (inode->i_cdev) {
+		cdput(inode->i_cdev);
+		inode->i_cdev = NULL;
+	}
 	inode->i_state = I_CLEAR;
 }
 
@@ -750,6 +754,7 @@ static void clean_inode(struct inode *inode)
 	memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
 	inode->i_pipe = NULL;
 	inode->i_bdev = NULL;
+	inode->i_cdev = NULL;
 	inode->i_data.a_ops = &empty_aops;
 	inode->i_data.host = inode;
 	inode->i_data.gfp_mask = GFP_HIGHUSER;

@@ -5,6 +5,9 @@
  * Copyright (c) 2000 Mark Douglas Corner	<mcorner@umich.edu>
  *
  * USB Bluetooth driver, based on the Bluetooth Spec version 1.0B
+ * 
+ * (08/04/2001) gb
+ *	Identify version on module load.
  *
  * (2001/03/10) Version 0.8 gkh
  *	Fixed problem with not unlinking interrupt urb on device close
@@ -91,9 +94,12 @@
 #define DEBUG
 #include <linux/usb.h>
 
-/* Module information */
-MODULE_AUTHOR("Greg Kroah-Hartman, Mark Douglas Corner");
-MODULE_DESCRIPTION("USB Bluetooth driver");
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.8"
+#define DRIVER_AUTHOR "Greg Kroah-Hartman, Mark Douglas Corner"
+#define DRIVER_DESC "USB Bluetooth driver"
 
 /* define this if you have hardware that is not good */
 /*#define	BTBUGGYHARDWARE */
@@ -1280,6 +1286,9 @@ int usb_bluetooth_init(void)
 		return -1;
 	}
 
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -1294,4 +1303,7 @@ void usb_bluetooth_exit(void)
 module_init(usb_bluetooth_init);
 module_exit(usb_bluetooth_exit);
 
+/* Module information */
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 

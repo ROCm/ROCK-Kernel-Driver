@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.open_pic_defs.h 1.7 05/17/01 18:14:21 cort
+ */
+/*
  *  linux/openpic.h -- OpenPIC definitions
  *
  *  Copyright (C) 1997 Geert Uytterhoeven

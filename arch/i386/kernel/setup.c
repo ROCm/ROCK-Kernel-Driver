@@ -1663,7 +1663,7 @@ static void __init init_rise(struct cpuinfo_x86 *c)
 
 	/* Unhide possibly hidden capability flags
 	   The mp6 iDragon family don't have MSRs.
-	   We switch on extra features with this cpuid wierdness: */
+	   We switch on extra features with this cpuid weirdness: */
 	__asm__ (
 		"movl $0x6363452a, %%eax\n\t"
 		"movl $0x3231206c, %%ecx\n\t"
@@ -2274,7 +2274,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* Now the feature flags better reflect actual CPU features! */
 
-	printk(KERN_DEBUG "CPU: After generic, caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU:     After generic, caps: %08x %08x %08x %08x\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -2292,7 +2292,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
 
-	printk(KERN_DEBUG "CPU: Common caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU:             Common caps: %08x %08x %08x %08x\n",
 	       boot_cpu_data.x86_capability[0],
 	       boot_cpu_data.x86_capability[1],
 	       boot_cpu_data.x86_capability[2],

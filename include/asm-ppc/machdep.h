@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.machdep.h 1.11 05/17/01 18:14:25 cort
+ */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
 #define _PPC_MACHDEP_H

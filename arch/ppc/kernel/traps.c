@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.traps.c 1.11 05/17/01 18:14:22 cort
+ */
+/*
  *  linux/arch/ppc/kernel/traps.c
  *
  *  Copyright (C) 1995-1996  Gary Thomas (gdt@linuxppc.org)

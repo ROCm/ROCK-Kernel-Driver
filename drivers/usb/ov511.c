@@ -30,8 +30,6 @@
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-static const char version[] = "1.28";
-
 #define __NO_VERSION__
 
 #include <linux/config.h>
@@ -51,6 +49,13 @@ static const char version[] = "1.28";
 
 #include "ov511.h"
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.28"
+#define DRIVER_AUTHOR "Mark McClelland <mwm@i.am> & Bret Wallach & Orion Sky Lawlor <olawlor@acm.org> & Kevin Moore & Charl P. Botha <cpbotha@ieee.org> & Claudio Matsuoka <claudio@conectiva.com>"
+#define DRIVER_DESC "OV511 USB Camera Driver"
+
 #define OV511_I2C_RETRIES 3
 
 /* Video Size 640 x 480 x 3 bytes for RGB */
@@ -61,6 +66,8 @@ static const char version[] = "1.28";
 
 /* PARAMETER VARIABLES: */
 static int autoadjust = 1;    /* CCD dynamically changes exposure, etc... */
+
+static int video_nr = -1;
 
 /* 0=no debug messages
  * 1=init/detection/unload and other significant messages,
@@ -146,8 +153,8 @@ MODULE_PARM_DESC(sensor_gbr, "Make sensor output GBR422 rather than YUV420");
 MODULE_PARM(dumppix, "i");
 MODULE_PARM_DESC(dumppix, "Dump raw pixel data, in one of 3 formats. See ov511_dumppix() for details");
 
-MODULE_AUTHOR("Mark McClelland <mwm@i.am> & Bret Wallach & Orion Sky Lawlor <olawlor@acm.org> & Kevin Moore & Charl P. Botha <cpbotha@ieee.org> & Claudio Matsuoka <claudio@conectiva.com>");
-MODULE_DESCRIPTION("OV511 USB Camera Driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 static struct usb_driver ov511_driver;
 
@@ -3139,7 +3146,7 @@ static int ov511_configure(struct usb_ov511 *ov511)
 
 	init_waitqueue_head(&ov511->wq);
 
-	if (video_register_device(&ov511->vdev, VFL_TYPE_GRABBER) < 0) {
+	if (video_register_device(&ov511->vdev, VFL_TYPE_GRABBER, video_nr) < 0) {
 		err("video_register_device failed");
 		return -EBUSY;
 	}
@@ -3419,7 +3426,8 @@ static int __init usb_ov511_init(void)
 	if (usb_register(&ov511_driver) < 0)
 		return -1;
 
-	info("ov511 driver version %s registered", version);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 
 	return 0;
 }

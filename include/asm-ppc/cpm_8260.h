@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.cpm_8260.h 1.7 05/17/01 18:14:24 cort
+ */
 
 /*
  * MPC8260 Communication Processor Module.

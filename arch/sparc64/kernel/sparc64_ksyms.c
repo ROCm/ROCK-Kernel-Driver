@@ -1,4 +1,4 @@
-/* $Id: sparc64_ksyms.c,v 1.106 2001/05/11 07:46:28 davem Exp $
+/* $Id: sparc64_ksyms.c,v 1.107 2001/05/18 08:01:35 davem Exp $
  * arch/sparc64/kernel/sparc64_ksyms.c: Sparc64 specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -157,7 +157,6 @@ EXPORT_SYMBOL(smp_call_function);
 /* semaphores */
 EXPORT_SYMBOL(__down);
 EXPORT_SYMBOL(__down_interruptible);
-EXPORT_SYMBOL(__down_trylock);
 EXPORT_SYMBOL(__up);
 
 /* Atomic counter implementation. */

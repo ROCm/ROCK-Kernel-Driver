@@ -54,6 +54,13 @@
 #define hid_dump_device(c)	do { } while (0)
 #endif
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.16"
+#define DRIVER_AUTHOR "Andreas Gal, Vojtech Pavlik <vojtech@suse.cz>"
+#define DRIVER_DESC "USB HID support drivers"
+
 #define unk	KEY_UNKNOWN
 
 static unsigned char hid_keyboard[256] = {
@@ -1552,6 +1559,8 @@ static struct usb_driver hid_driver = {
 static int __init hid_init(void)
 {
 	usb_register(&hid_driver);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -1563,5 +1572,6 @@ static void __exit hid_exit(void)
 module_init(hid_init);
 module_exit(hid_exit);
 
-MODULE_AUTHOR("Andreas Gal, Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("USB HID support drivers");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+

@@ -160,7 +160,6 @@ jffs_put_super(struct super_block *sb)
 
 	D1(printk (KERN_NOTICE "jffs_put_super(): Successfully waited on thread.\n"));
 
-	sb->s_dev = 0;
 	jffs_cleanup_control((struct jffs_control *)sb->u.generic_sbp);
 	D1(printk(KERN_NOTICE "JFFS: Successfully unmounted device %s.\n",
 	       kdevname(dev)));

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_super.c,v 1.22 2001/04/24 19:28:36 hch Exp hch $"
+#ident "$Id: vxfs_super.c,v 1.24 2001/05/20 15:21:14 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - superblock related routines.
@@ -126,7 +126,7 @@ vxfs_statfs(struct super_block *sbp, struct statfs *bufp)
 	bufp->f_bavail = 0;
 	bufp->f_files = 0;
 	bufp->f_ffree = infp->vsi_raw->vs_ifree;
-	bufp->f_namelen = VXFS_NAME_LEN;
+	bufp->f_namelen = VXFS_NAMELEN;
 
 	return 0;
 }

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.ppc4xx_pic.c 1.5 05/17/01 18:14:21 cort
+ */
+/*
  *
  *    Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
  *

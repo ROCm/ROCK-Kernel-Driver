@@ -24,6 +24,7 @@
  * Based upon mouse.c (Brad Keryan) and printer.c (Michael Gee).
  *
  * */
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
@@ -39,6 +40,13 @@
 #include <linux/smp_lock.h>
 
 #include "rio500_usb.h"
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Cesar Miquel <miquel@df.uba.ar>"
+#define DRIVER_DESC "USB Rio 500 driver"
 
 #define RIO_MINOR   64
 
@@ -484,7 +492,9 @@ int usb_rio_init(void)
 	if (usb_register(&rio_driver) < 0)
 		return -1;
 
-	info("USB Rio support registered.");
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -502,5 +512,6 @@ void usb_rio_cleanup(void)
 module_init(usb_rio_init);
 module_exit(usb_rio_cleanup);
 
-MODULE_AUTHOR("Cesar Miquel <miquel@df.uba.ar>");
-MODULE_DESCRIPTION("USB Rio 500 driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+

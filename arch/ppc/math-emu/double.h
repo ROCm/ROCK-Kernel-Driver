@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.double.h 1.5 05/17/01 18:14:22 cort
+ */
+/*
  * Definitions for IEEE Double Precision
  */
 

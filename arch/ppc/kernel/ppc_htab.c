@@ -1,6 +1,7 @@
 /*
- * $Id: ppc_htab.c,v 1.29 1999/09/10 05:05:50 paulus Exp $
- *
+ * BK Id: SCCS/s.ppc_htab.c 1.8 05/17/01 18:14:21 cort
+ */
+/*
  * PowerPC hash table management proc entry.  Will show information
  * about the current hash table and will allow changes to it.
  *

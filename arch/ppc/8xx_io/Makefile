@@ -1,3 +1,5 @@
+# BK Id: SCCS/s.Makefile 1.3 05/17/01 18:14:20 cort
+#
 #
 # Makefile for the linux MPC8xx ppc-specific parts of comm processor
 #

@@ -1,3 +1,5 @@
+# BK Id: SCCS/s.Makefile 1.5 05/21/01 00:48:24 cort
+#
 #
 # Makefile for Linux arch/m68k/amiga source directory
 #

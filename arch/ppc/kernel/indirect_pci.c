@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.indirect_pci.c 1.7 05/17/01 18:14:21 cort
+ */
+/*
  * Support for indirect PCI bridges.
  *
  * Copyright (C) 1998 Gabriel Paubert.

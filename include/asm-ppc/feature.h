@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.feature.h 1.9 05/17/01 18:14:24 cort
+ */
+/*
  * Definitions for accessing the Feature Control Register (FCR)
  * on Power Macintoshes and similar machines.  The FCR lets us
  * enable/disable, reset, and power up/down various peripherals.

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.amigaints.h 1.5 05/17/01 18:14:24 cort
+ */
+/*
 ** amigaints.h -- Amiga Linux interrupt handling structs and prototypes
 **
 ** Copyright 1992 by Greg Harp

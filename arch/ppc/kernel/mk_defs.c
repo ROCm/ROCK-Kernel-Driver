@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.mk_defs.c 1.5 05/17/01 18:14:21 cort
+ */
+/*
  * This program is used to generate definitions needed by
  * assembly language modules.
  *

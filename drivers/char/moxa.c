@@ -698,7 +698,6 @@ static int moxa_write(struct tty_struct *tty, int from_user,
 	struct moxa_str *ch;
 	int len, port;
 	unsigned long flags;
-	unsigned char *temp;
 
 	ch = (struct moxa_str *) tty->driver_data;
 	if (ch == NULL)
@@ -706,6 +705,8 @@ static int moxa_write(struct tty_struct *tty, int from_user,
 	port = ch->port;
 	save_flags(flags);
 	if (from_user) {
+		if (count > PAGE_SIZE)
+			count = PAGE_SIZE;
 		down(&moxaBuffSem);
 		if (copy_from_user(moxaXmitBuff, buf, count)) {
 			len = -EFAULT;

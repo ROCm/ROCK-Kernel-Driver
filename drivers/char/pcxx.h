@@ -120,6 +120,7 @@ struct channel {
 	unchar						*txptr;
 	unchar						*rxptr;
 	unchar						*tmp_buf;		/* Temp buffer */
+	struct semaphore				tmp_buf_sem;
 							/* ---- Termios data ---- */
 	ulong						c_iflag;
 	ulong						c_cflag;

@@ -736,7 +736,7 @@
       
    Feb 20, 1999 (v3.1e)
    1) I took the warning from the Linux Kernel Hackers Guide serious and 
-      checked the cmd->result return value to the done-function very carefuly.
+      checked the cmd->result return value to the done-function very carefully.
       It is obvious, that the IBM SCSI only delivers the tsb.dev_status, if
       some error appeared, else it is undefined. Now, this is fixed. Before
       any SCB command gets queued, the tsb.dev_status is set to 0, so the 
@@ -1382,7 +1382,7 @@
    
    9 Disclaimer
    ------------
-   Beside the GNU public license and the dependant disclaimers and disclaimers
+   Beside the GNU General Public License and the dependant disclaimers and disclaimers
    concerning the Linux-kernel in special, this SCSI-driver comes without any
    warranty. Its functionality is tested as good as possible on certain 
    machines and combinations of computer hardware, which does not exclude,

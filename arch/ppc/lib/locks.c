@@ -1,6 +1,7 @@
 /*
- * $Id: locks.c,v 1.25 1999/09/10 10:40:13 davem Exp $
- *
+ * BK Id: SCCS/s.locks.c 1.8 05/17/01 18:14:22 cort
+ */
+/*
  * Locks for smp ppc 
  * 
  * Written by Cort Dougan (cort@cs.nmt.edu)

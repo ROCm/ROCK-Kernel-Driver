@@ -1,5 +1,7 @@
 /*
- * $Id: bitops.h,v 1.12 2000/02/09 03:28:31 davem Exp $
+ * BK Id: SCCS/s.bitops.h 1.7 05/17/01 18:14:24 cort
+ */
+/*
  * bitops.h: Bit string operations on the ppc
  */
 

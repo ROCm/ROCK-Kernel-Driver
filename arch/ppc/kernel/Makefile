@@ -1,3 +1,5 @@
+# BK Id: SCCS/s.Makefile 1.17 05/21/01 00:48:24 cort
+#
 #
 # Makefile for the linux kernel.
 #
@@ -51,10 +53,12 @@ endif
 obj-$(CONFIG_8xx)		+= m8xx_setup.o ppc8xx_pic.o
 ifeq ($(CONFIG_8xx),y)
 obj-$(CONFIG_PCI)		+= qspan_pci.c
+ifndef CONFIG_MATH_EMULATION
+obj-y				+= softemu8xx.o
+endif
 else
 obj-y				+= hashtable.o
 endif
-obj-$(CONFIG_MATH_EMULATION)	+= softemu8xx.o
 obj-$(CONFIG_MBX)		+= i8259.o
 obj-$(CONFIG_APUS)		+= apus_setup.o
 ifeq ($(CONFIG_APUS),y)

@@ -3,7 +3,6 @@
  *	I/O routines for SEGA Dreamcast
  */
 
-#include <linux/config.h>
 #include <asm/io.h>
 #include <asm/machvec.h>
 

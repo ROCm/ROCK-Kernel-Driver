@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.rpxlite.h 1.8 05/17/01 18:14:25 cort
+ */
 
 /*
  * A collection of structures, addresses, and values associated with
@@ -8,6 +11,8 @@
 #ifdef __KERNEL__
 #ifndef __MACH_RPX_DEFS
 #define __MACH_RPX_DEFS
+
+#include <linux/config.h>
 
 #ifndef __ASSEMBLY__
 /* A Board Information structure that is given to a program when

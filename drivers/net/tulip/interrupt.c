@@ -15,6 +15,7 @@
 */
 
 #include "tulip.h"
+#include <linux/config.h>
 #include <linux/etherdevice.h>
 #include <linux/pci.h>
 

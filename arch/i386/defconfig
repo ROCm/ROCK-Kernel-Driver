@@ -573,6 +573,7 @@ CONFIG_TMPFS=y
 CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
 # CONFIG_MINIX_FS is not set
+# CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
 # CONFIG_NTFS_RW is not set
 # CONFIG_HPFS_FS is not set
@@ -701,6 +702,7 @@ CONFIG_USB_STORAGE=y
 #
 # CONFIG_USB_IBMCAM is not set
 # CONFIG_USB_OV511 is not set
+# CONFIG_USB_PWC is not set
 # CONFIG_USB_DSBR is not set
 # CONFIG_USB_DABUSB is not set
 

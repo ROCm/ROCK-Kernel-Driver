@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.start_8xx.c 1.7 05/17/01 18:14:23 cort
+ */
+/*
  * Copyright (C) 1996 Paul Mackerras.
  * Copyright (C) 2000 Dan Malek.
  * Quick hack of Paul's code to make XMON work on 8xx processors.  Lots

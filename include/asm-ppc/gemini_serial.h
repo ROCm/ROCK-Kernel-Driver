@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.gemini_serial.h 1.5 05/17/01 18:14:24 cort
+ */
 #ifdef __KERNEL__
 #ifndef __ASMPPC_GEMINI_SERIAL_H
 #define __ASMPPC_GEMINI_SERIAL_H

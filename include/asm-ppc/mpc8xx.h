@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.mpc8xx.h 1.10 05/17/01 18:14:25 cort
+ */
 
 /* This is the single file included by all MPC8xx build options.
  * Since there are many different boards and no standard configuration,

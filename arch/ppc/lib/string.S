@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.string.S 1.5 05/17/01 18:14:22 cort
+ */
+/*
  * String handling functions for PowerPC.
  *
  * Copyright (C) 1996 Paul Mackerras.

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.ppc_ksyms.c 1.31 05/18/01 08:18:10 patch
+ */
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/threads.h>
@@ -90,19 +93,12 @@ EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(kernel_flag);
 #endif /* CONFIG_SMP */
 
-#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
-EXPORT_SYMBOL_NOVERS(isa_io_base);
-EXPORT_SYMBOL_NOVERS(isa_mem_base);
-EXPORT_SYMBOL_NOVERS(pci_dram_offset);
-#endif
 EXPORT_SYMBOL(ISA_DMA_THRESHOLD);
 EXPORT_SYMBOL_NOVERS(DMA_MODE_READ);
 EXPORT_SYMBOL(DMA_MODE_WRITE);
-#ifndef CONFIG_8xx
 #if defined(CONFIG_ALL_PPC)
 EXPORT_SYMBOL(_prep_type);
 EXPORT_SYMBOL(ucSystemType);
-#endif
 #endif
 
 #if !__INLINE_BITOPS
@@ -173,6 +169,9 @@ EXPORT_SYMBOL(chrp_ide_probe);
 #endif
 
 #ifdef CONFIG_PCI
+EXPORT_SYMBOL_NOVERS(isa_io_base);
+EXPORT_SYMBOL_NOVERS(isa_mem_base);
+EXPORT_SYMBOL_NOVERS(pci_dram_offset);
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
 #endif /* CONFIG_PCI */
@@ -214,9 +213,6 @@ EXPORT_SYMBOL(smp_num_cpus);
 EXPORT_SYMBOL(synchronize_irq);
 #endif
 
-#ifndef CONFIG_MACH_SPECIFIC
-EXPORT_SYMBOL(_machine);
-#endif
 EXPORT_SYMBOL(ppc_md);
 
 #ifdef CONFIG_ADB
@@ -247,10 +243,9 @@ EXPORT_SYMBOL(set_backlight_level);
 EXPORT_SYMBOL(set_backlight_enable);
 EXPORT_SYMBOL(register_backlight_controller);
 #endif /* CONFIG_PMAC_BACKLIGHT */
-#ifndef CONFIG_MACH_SPECIFIC
-EXPORT_SYMBOL_NOVERS(have_of);
-#endif /* CONFIG_MACH_SPECIFIC */
 #if defined(CONFIG_ALL_PPC)
+EXPORT_SYMBOL(_machine);
+EXPORT_SYMBOL_NOVERS(have_of);
 EXPORT_SYMBOL_NOVERS(sys_ctrler);
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);

@@ -378,19 +378,22 @@ static ssize_t slm_read( struct file *file, char *buf, size_t count,
 	
 	length = slm_getstats( (char *)page, MINOR(node->i_rdev) );
 	if (length < 0) {
-		free_page( page );
-		return( length );
+		count = length;
+		goto out;
 	}
 	if (file->f_pos >= length) {
-		free_page( page );
-		return( 0 );
+		count = 0;
+		goto out;
 	}
 	if (count + file->f_pos > length)
 		count = length - file->f_pos;
 	end = count + file->f_pos;
-	copy_to_user( buf, (char *)page + file->f_pos, count );
-	free_page( page );
+	if (copy_to_user(buf, (char *)page + file->f_pos, count)) {
+		count = -EFAULT;
+		goto out;
+	}
 	file->f_pos = end;
+out:	free_page( page );
 	return( count );
 }
 
@@ -648,7 +651,8 @@ static ssize_t slm_write( struct file *file, const char *buf, size_t count,
 	if (filled + n > BufferSize)
 		n = BufferSize - filled;
 
-	copy_from_user( BufferP, buf, n );
+	if (copy_from_user(BufferP, buf, n))
+		return -EFAULT;
 	BufferP += n;
 	filled += n;
 
@@ -725,8 +729,9 @@ static int slm_ioctl( struct inode *inode, struct file *file,
 			if (put_user(stat,
     	    	    	    	     (long *)&((struct SLM_status *)arg)->stat))
     	    	    	    	return -EFAULT;
-			copy_to_user( ((struct SLM_status *)arg)->str, str,
-						 strlen(str) + 1 );
+			if (copy_to_user( ((struct SLM_status *)arg)->str, str,
+						 strlen(str) + 1))
+				return -EFAULT;
 		}
 		return( stat );
 	  }
@@ -734,10 +739,6 @@ static int slm_ioctl( struct inode *inode, struct file *file,
 	  case SLMIOGPSIZE: {	/* get paper size */
 		int w, h;
 		
-		err = verify_area( VERIFY_WRITE, (long *)arg,
-						   sizeof(struct SLM_paper_size) );
-		if (err) return( err );
-
 		if ((err = slm_get_pagesize( device, &w, &h ))) return( err );
 		
     	    	if (put_user(w, (long *)&((struct SLM_paper_size *)arg)->width))

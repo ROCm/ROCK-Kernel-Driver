@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_subr.c,v 1.3 2001/04/24 19:28:36 hch Exp hch $"
+#ident "$Id: vxfs_subr.c,v 1.5 2001/04/26 22:49:51 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - shared subroutines.
@@ -35,6 +35,7 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/pagemap.h>
 
 #include "vxfs_extern.h"
 
@@ -49,14 +50,58 @@ struct address_space_operations vxfs_aops = {
 
 
 /**
+ * vxfs_get_page - read a page into memory.
+ * @ip:		inode to read from
+ * @n:		page number
+ *
+ * Description:
+ *   vxfs_get_page reads the @n th page of @ip into the pagecache.
+ *
+ * Returns:
+ *   The wanted page on success, else a NULL pointer.
+ */
+struct page *
+vxfs_get_page(struct inode *ip, u_long n)
+{
+	struct address_space *		mapping = ip->i_mapping;
+	struct page *			pp;
+
+	pp = read_cache_page(mapping, n,
+			(filler_t*)mapping->a_ops->readpage, NULL);
+
+	if (!IS_ERR(pp)) {
+		wait_on_page(pp);
+		kmap(pp);
+		if (!Page_Uptodate(pp))
+			goto fail;
+		/** if (!PageChecked(pp)) **/
+			/** vxfs_check_page(pp); **/
+		if (PageError(pp))
+			goto fail;
+	}
+	
+	return (pp);
+		 
+fail:
+	vxfs_put_page(pp);
+	return ERR_PTR(-EIO);
+}
+
+__inline__ void
+vxfs_put_page(struct page *pp)
+{
+	kunmap(pp);
+	page_cache_release(pp);
+}
+
+/**
  * vxfs_bread - read buffer for a give inode,block tuple
  * @ip:		inode
  * @block:	logical block
  *
  * Description:
- *   The vxfs_bread function performs a bmap operation for
- *   the given inode and block and reads the result block
- *   into main memory.
+ *   The vxfs_bread function reads block no @block  of
+ *   @ip into the buffercache.
  *
  * Returns:
  *   The resulting &struct buffer_head.

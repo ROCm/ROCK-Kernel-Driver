@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.dbdma.h 1.5 05/17/01 18:14:24 cort
+ */
+/*
  * Definitions for using the Apple Descriptor-Based DMA controller
  * in Power Macintosh computers.
  *

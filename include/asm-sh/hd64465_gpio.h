@@ -11,7 +11,6 @@
  * by Greg Banks <gbanks@pocketpenguins.com>
  * (c) 2000 PocketPenguins Inc.
  */
-#include <linux/config.h>
 #include <asm/hd64465.h>
 
 /* Macro to construct a portpin number (used in all

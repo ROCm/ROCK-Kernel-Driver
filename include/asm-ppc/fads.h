@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.fads.h 1.8 05/17/01 18:14:24 cort
+ */
 
 /*
  * A collection of structures, addresses, and values associated with

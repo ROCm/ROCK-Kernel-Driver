@@ -1,5 +1,7 @@
 /*
- * $Id: prep_pci.c,v 1.40 1999/09/17 17:23:05 cort Exp $
+ * BK Id: SCCS/s.prep_pci.c 1.18 05/17/01 18:14:22 cort
+ */
+/*
  * PReP pci functions.
  * Originally by Gary Thomas
  * rewritten and updated by Cort Dougan (cort@cs.nmt.edu)

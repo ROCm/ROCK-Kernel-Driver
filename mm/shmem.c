@@ -516,7 +516,7 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_gid = current->fsgid;
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_blocks = 0;
-		inode->i_rdev = to_kdev_t(dev);
+		inode->i_rdev = NODEV;
 		inode->i_mapping->a_ops = &shmem_aops;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		spin_lock_init (&inode->u.shmem_i.lock);

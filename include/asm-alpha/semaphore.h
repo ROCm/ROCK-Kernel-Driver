@@ -11,7 +11,7 @@
 #include <asm/current.h>
 #include <asm/system.h>
 #include <asm/atomic.h>
-#include <linux/compiler.h>
+#include <asm/compiler.h>
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 

@@ -217,7 +217,7 @@ hwc_tty_input (unsigned char *buf, unsigned int count)
 void 
 hwc_tty_init (void)
 {
-#ifdef CONFIG_3215
+#if defined(CONFIG_3215_CONSOLE) || defined(CONFIG_3270_CONSOLE)
 	if (MACHINE_IS_VM)
 		return;
 #endif

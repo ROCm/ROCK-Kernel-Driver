@@ -14,6 +14,7 @@
 
 #include <asm/io.h>
 #include <asm/machvec.h>
+#include <linux/config.h>
 #include <linux/module.h>
 
 #define SH3_PCMCIA_BUG_WORKAROUND 1

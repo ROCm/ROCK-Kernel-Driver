@@ -33,6 +33,7 @@
  *   0.4  13.08.99  Added Vendor/Product ID of Brad Hard's cable
  *   0.5  20.09.99  usb_control_msg wrapper used
  *        Nov01.00  usb_device_table support by Adam J. Richter
+ *        08.04.01  Identify version on module load.  gb
  *
  */
 
@@ -43,6 +44,13 @@
 #include <linux/parport.h>
 #include <linux/init.h>
 #include <linux/usb.h>
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.5"
+#define DRIVER_AUTHOR "Thomas M. Sailer, sailer@ife.ee.ethz.ch"
+#define DRIVER_DESC "USB Parport Cable driver for Cables using the Lucent Technologies USS720 Chip"
 
 /* --------------------------------------------------------------------- */
 
@@ -643,16 +651,16 @@ static struct usb_driver uss720_driver = {
 
 /* --------------------------------------------------------------------- */
 
-MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch");
-MODULE_DESCRIPTION("USB Parport Cable driver for Cables using the Lucent Technologies USS720 Chip");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 static int __init uss720_init(void)
 {
 	if (usb_register(&uss720_driver) < 0)
 		return -1;
 
-	printk(KERN_INFO "uss720: USB<->IEEE1284 cable driver v0.4 registered.\n"
-	       KERN_INFO "uss720: (C) 1999 by Thomas Sailer, <sailer@ife.ee.ethz.ch>\n");
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 

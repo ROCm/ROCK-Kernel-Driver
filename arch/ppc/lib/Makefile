@@ -1,3 +1,5 @@
+# BK Id: SCCS/s.Makefile 1.7 05/17/01 18:14:22 cort
+#
 #
 # Makefile for ppc-specific library files..
 #

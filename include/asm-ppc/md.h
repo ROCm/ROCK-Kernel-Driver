@@ -1,4 +1,7 @@
-/* $Id: md.h,v 1.1 1997/12/15 15:12:15 jj Exp $
+/*
+ * BK Id: SCCS/s.md.h 1.5 05/17/01 18:14:25 cort
+ */
+/*
  * md.h: High speed xor_block operation for RAID4/5 
  *
  */

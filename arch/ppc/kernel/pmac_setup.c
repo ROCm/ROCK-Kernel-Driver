@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.pmac_setup.c 1.21 05/17/01 18:14:21 cort
+ */
+/*
  *  linux/arch/ppc/kernel/setup.c
  *
  *  PowerPC version 

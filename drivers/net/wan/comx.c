@@ -621,7 +621,11 @@ static int comx_write_proc(struct file *file, const char *buffer, u_long count,
 
 	if (!(page = (char *)__get_free_page(GFP_KERNEL))) return -ENOMEM;
 
-	copy_from_user(page, buffer, count);
+	if(copy_from_user(page, buffer, count))
+	{
+		count = -EFAULT;
+		goto out;
+	}
 
 	if (page[count-1] == '\n')
 		page[count-1] = '\0';

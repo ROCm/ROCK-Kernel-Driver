@@ -93,7 +93,6 @@ extern void sbus_init(void);
 extern void ppc_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
-extern void bdev_init(void);
 extern int init_pcmcia_ds(void);
 extern void net_notifier_init(void);
 
@@ -569,8 +568,6 @@ asmlinkage void __init start_kernel(void)
 	ccwcache_init();
 #endif
 	signals_init();
-	bdev_init();
-	inode_init(mempages);
 #ifdef CONFIG_PROC_FS
 	proc_root_init();
 #endif

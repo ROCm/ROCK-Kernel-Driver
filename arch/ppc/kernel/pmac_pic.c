@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.pmac_pic.c 1.14 05/17/01 18:14:21 cort
+ */
 #include <linux/config.h>
 #include <linux/stddef.h>
 #include <linux/init.h>

@@ -7,4 +7,7 @@ struct usbdev_sb_info {
 	uid_t busuid;
 	gid_t busgid;
 	umode_t busmode;
+	uid_t listuid;
+	gid_t listgid;
+	umode_t listmode;
 };

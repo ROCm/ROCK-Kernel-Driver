@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.checksum.S 1.5 05/17/01 18:14:22 cort
+ */
+/*
  * This file contains assembly-language implementations
  * of IP-style 1's complement checksum routines.
  *	

@@ -24,6 +24,9 @@
  *   Basic tests have been performed with minicom/zmodem transfers and
  *   modem dialing under Linux 2.4.0-test10 (for me it works fine).
  *
+ * 08-Apr-2001 gb
+ *   - Identify version on module load.
+ *
  * 06-Jan-2001 Cornel Ciocirlan 
  *   - Added support for Sitecom U232-P25 model (Product Id 0x0230)
  *   - Added support for D-Link DU-H3SP USB BAY (Product Id 0x0200)
@@ -64,6 +67,13 @@
 #include "usb-serial.h"
 #include "mct_u232.h"
 
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Wolfgang Grandegger <wolfgang@ces.ch>"
+#define DRIVER_DESC "Magic Control Technology USB-RS232 converter driver"
 
 /*
  * Some not properly written applications do not handle the return code of
@@ -852,7 +862,8 @@ static int __init mct_u232_init (void)
 	usb_serial_register (&mct_u232_device);
 	usb_serial_register (&mct_u232_sitecom_device);
 	usb_serial_register (&mct_u232_du_h3sp_device);
-	
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -868,8 +879,8 @@ static void __exit mct_u232_exit (void)
 module_init (mct_u232_init);
 module_exit(mct_u232_exit);
 
-MODULE_AUTHOR("Wolfgang Grandegger <wolfgang@ces.ch>");
-MODULE_DESCRIPTION("Magic Control Technology USB-RS232 converter driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 #ifdef FIX_WRITE_RETURN_CODE_PROBLEM
 MODULE_PARM(write_blocking, "i");

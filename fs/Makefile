@@ -11,8 +11,8 @@ export-objs :=	filesystems.o dcache.o
 mod-subdirs :=	nls
 
 obj-y :=	open.o read_write.o devices.o file_table.o buffer.o \
-		super.o  block_dev.o stat.o exec.o pipe.o namei.o fcntl.o \
-		ioctl.o readdir.o select.o fifo.o locks.o \
+		super.o block_dev.o char_dev.o stat.o exec.o pipe.o namei.o \
+		fcntl.o ioctl.o readdir.o select.o fifo.o locks.o \
 		dcache.o inode.o attr.o bad_inode.o file.o iobuf.o dnotify.o \
 		filesystems.o
 
@@ -38,6 +38,7 @@ subdir-$(CONFIG_BFS_FS)		+= bfs
 subdir-$(CONFIG_ISO9660_FS)	+= isofs
 subdir-$(CONFIG_DEVFS_FS)	+= devfs
 subdir-$(CONFIG_HFS_FS)		+= hfs
+subdir-$(CONFIG_VXFS_FS)	+= freevxfs
 subdir-$(CONFIG_NFS_FS)		+= nfs
 subdir-$(CONFIG_NFSD)		+= nfsd
 subdir-$(CONFIG_LOCKD)		+= lockd

@@ -55,6 +55,13 @@
 #include <linux/usb.h>
 
 /*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.18"
+#define DRIVER_AUTHOR "Armin Fuerst, Pavel Machek, Johannes Erdfelt, Vojtech Pavlik"
+#define DRIVER_DESC "USB Abstract Control Model driver for USB modems and ISDN adapters"
+
+/*
  * CMSPAR, some architectures can't have space and mark parity.
  */
 
@@ -702,6 +709,9 @@ static int __init acm_init(void)
 		return -1;
 	}
 
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -714,5 +724,6 @@ static void __exit acm_exit(void)
 module_init(acm_init);
 module_exit(acm_exit);
 
-MODULE_AUTHOR("Armin Fuerst, Pavel Machek, Johannes Erdfelt, Vojtech Pavlik");
-MODULE_DESCRIPTION("USB Abstract Control Model driver for USB modems and ISDN adapters");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+

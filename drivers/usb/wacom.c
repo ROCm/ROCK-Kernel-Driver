@@ -28,6 +28,7 @@
  *	v1.12 (de) - Add support for two more inking pen IDs
  *	v1.14 (vp) - Use new USB device id probing scheme.
  *		     Fix Wacom Graphire mouse wheel
+ *	      (gb) - Identify version on module load.
  */
 
 /*
@@ -57,8 +58,15 @@
 #include <linux/init.h>
 #include <linux/usb.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("USB Wacom Graphire and Wacom Intuos tablet driver");
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.14"
+#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@suse.cz>"
+#define DRIVER_DESC "USB Wacom Graphire and Wacom Intuos tablet driver"
+
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 /*
  * Wacom Graphire packet:
@@ -407,6 +415,8 @@ static struct usb_driver wacom_driver = {
 static int __init wacom_init(void)
 {
 	usb_register(&wacom_driver);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 

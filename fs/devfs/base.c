@@ -2256,12 +2256,13 @@ static void devfs_read_inode (struct inode *inode)
     {
 	inode->i_rdev = MKDEV (de->u.fcb.u.device.major,
 			       de->u.fcb.u.device.minor);
+	inode->i_cdev = cdget (kdev_t_to_nr(inode->i_rdev));
     }
     else if ( S_ISBLK (de->inode.mode) )
     {
 	inode->i_rdev = MKDEV (de->u.fcb.u.device.major,
 			       de->u.fcb.u.device.minor);
-	inode->i_bdev = bdget (inode->i_rdev);
+	inode->i_bdev = bdget (kdev_t_to_nr(inode->i_rdev));
 	if (inode->i_bdev)
 	{
 	    if (!inode->i_bdev->bd_op && de->u.fcb.ops)

@@ -224,6 +224,7 @@ typedef struct _CommandList_struct {
 	/* information associated with the command */ 
   __u32			   busaddr; /* physical address of this record */
   ErrorInfo_struct * 	   err_info; /* pointer to the allocated mem */ 
+  int			   ctlr;
   int			   cmd_type; 
   struct _CommandList_struct *prev;
   struct _CommandList_struct *next;

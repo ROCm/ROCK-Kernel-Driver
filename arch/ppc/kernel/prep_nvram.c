@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.prep_nvram.c 1.9 05/17/01 18:14:22 cort
+ */
+/*
  *  linux/arch/ppc/kernel/prep_nvram.c
  *
  *  Copyright (C) 1998  Corey Minyard

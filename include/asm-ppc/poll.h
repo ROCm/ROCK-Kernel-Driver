@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.poll.h 1.5 05/17/01 18:14:25 cort
+ */
 #ifndef __PPC_POLL_H
 #define __PPC_POLL_H
 

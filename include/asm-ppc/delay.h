@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.delay.h 1.7 05/17/01 18:14:24 cort
+ */
 #ifdef __KERNEL__
 #ifndef _PPC_DELAY_H
 #define _PPC_DELAY_H

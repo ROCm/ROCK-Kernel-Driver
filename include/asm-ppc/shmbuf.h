@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.shmbuf.h 1.5 05/17/01 18:14:25 cort
+ */
 #ifndef _PPC_SHMBUF_H
 #define _PPC_SHMBUF_H
 

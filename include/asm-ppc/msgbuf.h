@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.msgbuf.h 1.5 05/17/01 18:14:25 cort
+ */
 #ifndef _PPC_MSGBUF_H
 #define _PPC_MSGBUF_H
 

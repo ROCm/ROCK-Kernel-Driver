@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.xics.c 1.5 05/17/01 18:14:22 cort
+ */
+/*
  * arch/ppc/kernel/xics.c
  *
  * Copyright 2000 IBM Corporation.

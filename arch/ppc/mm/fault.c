@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.fault.c 1.10 05/17/01 18:14:23 cort
+ */
+/*
  *  arch/ppc/mm/fault.c
  *
  *  PowerPC version 

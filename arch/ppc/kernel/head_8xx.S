@@ -1,7 +1,8 @@
 /*
+ * BK Id: SCCS/s.head_8xx.S 1.11 05/21/01 11:50:00 paulus
+ */
+/*
  *  arch/ppc/kernel/except_8xx.S
- *
- *  $Id: head_8xx.S,v 1.4 1999/09/18 18:43:19 dmalek Exp $
  *
  *  PowerPC version 
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
@@ -678,8 +679,6 @@ transfer_to_handler:
 	mflr	r23
 	andi.	r24,r23,0x3f00		/* get vector offset */
 	stw	r24,TRAP(r21)
-	li	r22,RESULT
-	stwcx.	r22,r22,r21		/* to clear the reservation */
 	li	r22,0
 	stw	r22,RESULT(r21)
 	mtspr	SPRG2,r22		/* r1 is now kernel sp */

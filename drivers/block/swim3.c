@@ -851,7 +851,7 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 				   sizeof(struct floppy_struct));
 		return err;
 	}
-	return -ENOIOCTLCMD;
+	return -ENOTTY;
 }
 
 static int floppy_open(struct inode *inode, struct file *filp)

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.atomic.h 1.8 05/17/01 18:14:24 cort
+ */
+/*
  * PowerPC atomic operations
  */
 

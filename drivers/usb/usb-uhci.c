@@ -58,6 +58,13 @@
 #include "usb-uhci.h"
 #include "usb-uhci-debug.h"
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.251"
+#define DRIVER_AUTHOR "Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
+#define DRIVER_DESC "USB Universal Host Controller Interface driver"
+
 #undef DEBUG
 #undef dbg
 #define dbg(format, arg...) do {} while (0)
@@ -2889,6 +2896,7 @@ _static int __init uhci_start_usb (uhci_t *s)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 _static void
 uhci_pci_suspend (struct pci_dev *dev)
 {
@@ -2900,7 +2908,7 @@ uhci_pci_resume (struct pci_dev *dev)
 {
 	start_hc((uhci_t *) dev->driver_data);
 }
-
+#endif
 
 _static int __devinit alloc_uhci (struct pci_dev *dev, int irq, unsigned int io_addr, unsigned int io_size)
 {
@@ -3100,6 +3108,9 @@ static int __init uhci_hcd_init (void)
 	}
 #endif
 	
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return retval;
 }
 
@@ -3117,6 +3128,6 @@ module_init (uhci_hcd_init);
 module_exit (uhci_hcd_cleanup);
 
 
-MODULE_AUTHOR("Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber");
-MODULE_DESCRIPTION("USB Universal Host Controller Interface driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 

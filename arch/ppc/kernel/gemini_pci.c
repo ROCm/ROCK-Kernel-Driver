@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.gemini_pci.c 1.5 05/17/01 18:14:21 cort
+ */
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/pci.h>

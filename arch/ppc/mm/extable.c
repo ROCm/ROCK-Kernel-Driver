@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.extable.c 1.5 05/17/01 18:14:23 cort
+ */
+/*
  * linux/arch/ppc/mm/extable.c
  *
  * from linux/arch/i386/mm/extable.c

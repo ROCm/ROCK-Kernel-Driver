@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.softemu8xx.c 1.8 05/17/01 18:14:22 cort
+ */
+/*
  * Software emulation of some PPC instructions for the 8xx core.
  *
  * Copyright (C) 1998 Dan Malek (dmalek@jlc.net)

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.galaxy_pci.c 1.7 05/17/01 18:14:21 cort
+ */
+/*
  *
  *    Copyright (c) 2000 Grant Erickson <grant@borg.umn.edu>
  *    All rights reserved.

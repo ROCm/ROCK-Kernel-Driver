@@ -16,6 +16,7 @@
 #ifndef __NET_TULIP_H__
 #define __NET_TULIP_H__
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/spinlock.h>

@@ -338,6 +338,11 @@ static struct {
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031),
 		0,0,0,0,
 		0,1,1,-1},
+        {"Sound Blaster AWE 32",
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0045),
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031),
+		0,0,0,0,
+		0,1,1,-1},
 	{"Sound Blaster AWE 32",
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0047),
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031),
@@ -536,6 +541,9 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031), 0 },
 
 	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0044),
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031), 0 },
+
+	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0045),
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031), 0 },
 
 	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0048), 

@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.109 2001/04/18 21:06:05 davem Exp $
+# $Id: config.in,v 1.110 2001/05/20 05:14:46 davem Exp $
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
@@ -162,9 +162,7 @@ if [ "$CONFIG_SCSI" != "n" ]; then
 
    dep_tristate '  SCSI tape support' CONFIG_CHR_DEV_ST $CONFIG_SCSI
 
-   if [ "$CONFIG_BLK_DEV_ST" != "n" ]; then
-      int  'Maximum number of SCSI tapes that can be loaded as modules' CONFIG_ST_EXTRA_DEVS 2
-   fi
+   dep_tristate '  SCSI OnStream SC-x0 tape support' CONFIG_CHR_DEV_OSST $CONFIG_SCSI
 
    dep_tristate '  SCSI CDROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI
 

@@ -1,8 +1,7 @@
 /*
- *  arch/ppc/kernel/entry.S
- *
- *  $Id: entry.S,v 1.4 1999/09/14 05:18:14 dmalek Exp $
- *
+ * BK Id: SCCS/s.entry.S 1.12 05/21/01 11:49:59 paulus
+ */
+/*
  *  PowerPC version 
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *  Rewritten by Cort Dougan (cort@fsmlabs.com) for PReP
@@ -362,7 +361,9 @@ restore:
 	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
 	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
-	
+
+	stwcx.	r0,0,r1		/* to clear the reservation */
+
 	/* if returning to user mode, set new sprg2 and save kernel SP */
 	lwz	r0,_MSR(r1)
 	andi.	r0,r0,MSR_PR

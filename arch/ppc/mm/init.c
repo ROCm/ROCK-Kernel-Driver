@@ -1,6 +1,7 @@
 /*
- *  $Id: init.c,v 1.195 1999/10/15 16:39:39 cort Exp $
- *
+ * BK Id: SCCS/s.init.c 1.22 05/17/01 18:14:23 cort
+ */
+/*
  *  PowerPC version 
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *

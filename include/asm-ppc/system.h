@@ -1,6 +1,7 @@
 /*
- * $Id: system.h,v 1.49 1999/09/11 18:37:54 cort Exp $
- *
+ * BK Id: SCCS/s.system.h 1.10 05/17/01 18:14:26 cort
+ */
+/*
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>
  */
 #ifndef __PPC_SYSTEM_H

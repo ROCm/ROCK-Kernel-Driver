@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.bootinfo.h 1.5 05/17/01 18:14:24 cort
+ */
+/*
  * Non-machine dependent bootinfo structure.  Basic idea
  * borrowed from the m68k.
  *

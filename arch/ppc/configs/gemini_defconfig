@@ -33,7 +33,6 @@ CONFIG_GEMINI=y
 # CONFIG_PPC601_SYNC_FIX is not set
 # CONFIG_SMP is not set
 CONFIG_ALTIVEC=y
-CONFIG_MACH_SPECIFIC=y
 
 #
 # General setup

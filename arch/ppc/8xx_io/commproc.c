@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.commproc.c 1.8 05/18/01 07:54:04 patch
+ */
 
 /*
  * General Purpose functions for the global management of the
@@ -218,7 +221,7 @@ m8xx_cpm_hostalloc(uint size)
  * The internal baud rate clock is the system clock divided by 16.
  * This assumes the baudrate is 16x oversampled by the uart.
  */
-#define BRG_INT_CLK		(((bd_t *)__res)->bi_intfreq * 1000000)
+#define BRG_INT_CLK		(((bd_t *)__res)->bi_intfreq)
 #define BRG_UART_CLK		(BRG_INT_CLK/16)
 #define BRG_UART_CLK_DIV16	(BRG_UART_CLK/16)
 

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.elf.h 1.10 05/17/01 18:14:24 cort
+ */
 #ifndef __PPC_ELF_H
 #define __PPC_ELF_H
 

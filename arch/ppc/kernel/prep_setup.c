@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.prep_setup.c 1.20 05/21/01 09:19:50 trini
+ */
+/*
  *  linux/arch/ppc/kernel/setup.c
  *
  *  Copyright (C) 1995  Linus Torvalds
@@ -102,6 +105,17 @@ extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 extern int probingmem;
 extern unsigned long loops_per_jiffy;
+
+#ifdef CONFIG_BLK_DEV_RAM
+extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
+extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
+extern int rd_image_start;	/* starting block # of image */
+#endif
+
+#ifdef CONFIG_SOUND_MODULE
+EXPORT_SYMBOL(ppc_cs4232_dma);
+EXPORT_SYMBOL(ppc_cs4232_dma2);
+#endif
 
 int __prep
 prep_get_cpuinfo(char *buffer)
@@ -246,7 +260,16 @@ prep_setup_arch(void)
 	case _PREP_Motorola:
 		/* Enable L2.  Assume we don't need to flush -- Cort*/
 		*(unsigned char *)(0x8000081c) |= 3;
-		ROOT_DEV = to_kdev_t(0x0802); /* sda2 */
+#ifdef CONFIG_BLK_DEV_INITRD
+		if (initrd_start)
+			ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0); /* /dev/ram */
+		else
+#endif
+#ifdef CONFIG_ROOT_NFS
+			ROOT_DEV = to_kdev_t(0x00ff); /* /dev/nfs */
+#else
+			ROOT_DEV = to_kdev_t(0x0802); /* /dev/sda2 */
+#endif
 		break;
 	}
 
@@ -312,8 +335,8 @@ prep_setup_arch(void)
 	/* remap the VGA memory */
 	vgacon_remap_base = 0xf0000000;
 	/*vgacon_remap_base = ioremap(0xc0000000, 0xba000);*/
-	conswitchp = &vga_con;
-#else
+        conswitchp = &vga_con;
+#elif defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
 #endif
 }
@@ -761,6 +784,14 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 #endif
 
+#ifdef CONFIG_BLK_DEV_INITRD
+	if ( r4 )
+	{
+		initrd_start = r4 + KERNELBASE;
+		initrd_end = r5 + KERNELBASE;
+	}
+#endif /* CONFIG_BLK_DEV_INITRD */
+
 	/* Copy cmd_line parameters */
 	if ( r6)
 	{
@@ -844,8 +875,3 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 #endif
 }
-
-#ifdef CONFIG_SOUND_MODULE
-EXPORT_SYMBOL(ppc_cs4232_dma);
-EXPORT_SYMBOL(ppc_cs4232_dma2);
-#endif

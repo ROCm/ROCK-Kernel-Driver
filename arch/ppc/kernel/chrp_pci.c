@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.chrp_pci.c 1.16 05/17/01 18:14:21 cort
+ */
+/*
  * CHRP pci routines.
  */
 

@@ -1,6 +1,7 @@
 /*
- * $Id: irq_control.h,v 1.8 1999/09/15 23:58:48 cort Exp $
- *
+ * BK Id: SCCS/s.hw_irq.h 1.10 05/17/01 18:14:24 cort
+ */
+/*
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>
  */
 #ifdef __KERNEL__

@@ -20,7 +20,6 @@
  * Luckily, the work-around for this is not too horrible.  See
  * __isamem_convert_addr for the details.
  */
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>

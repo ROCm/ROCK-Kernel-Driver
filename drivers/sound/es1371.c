@@ -2771,22 +2771,22 @@ static struct initvol {
 	{ SOUND_MIXER_WRITE_IGAIN, 0x4040 }
 };
 
-#define RSRCISIOREGION(dev,num) (pci_resource_start((dev), (num)) != 0 && \
-				 (pci_resource_flags((dev), (num)) & IORESOURCE_IO))
-
 static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_device_id *pciid)
 {
 	struct es1371_state *s;
 	mm_segment_t fs;
-	int i, val;
+	int i, val, res = -1;
 	unsigned long tmo;
 	signed long tmo2;
 	unsigned int cssr;
 
-	if (!RSRCISIOREGION(pcidev, 0))
-		return -1;
+	if ((res=pci_enable_device(pcidev)))
+		return res;
+
+	if (!(pci_resource_flags(pcidev, 0) & IORESOURCE_IO))
+		return -ENODEV;
 	if (pcidev->irq == 0) 
-		return -1;
+		return -ENODEV;
 	i = pci_set_dma_mask(pcidev, 0xffffffff);
 	if (i) {
 		printk(KERN_WARNING "es1371: architecture does not support 32bit PCI busmaster DMA\n");
@@ -2794,7 +2794,7 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	}
 	if (!(s = kmalloc(sizeof(struct es1371_state), GFP_KERNEL))) {
 		printk(KERN_WARNING PFX "out of memory\n");
-		return -1;
+		return -ENOMEM;
 	}
 	memset(s, 0, sizeof(struct es1371_state));
 	init_waitqueue_head(&s->dma_adc.wait);
@@ -2820,24 +2820,23 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	       s->vendor, s->device, s->rev);
 	if (!request_region(s->io, ES1371_EXTENT, "es1371")) {
 		printk(KERN_ERR PFX "io ports %#lx-%#lx in use\n", s->io, s->io+ES1371_EXTENT-1);
+		res = -EBUSY;
 		goto err_region;
 	}
-	if (pci_enable_device(pcidev))
-		goto err_irq;
-	if (request_irq(s->irq, es1371_interrupt, SA_SHIRQ, "es1371", s)) {
+	if ((res=request_irq(s->irq, es1371_interrupt, SA_SHIRQ, "es1371",s))) {
 		printk(KERN_ERR PFX "irq %u in use\n", s->irq);
 		goto err_irq;
 	}
 	printk(KERN_INFO PFX "found es1371 rev %d at io %#lx irq %u\n"
 	       KERN_INFO PFX "features: joystick 0x%x\n", s->rev, s->io, s->irq, joystick[devindex]);
 	/* register devices */
-	if ((s->dev_audio = register_sound_dsp(&es1371_audio_fops, -1)) < 0)
+	if ((res=(s->dev_audio = register_sound_dsp(&es1371_audio_fops,-1))<0))
 		goto err_dev1;
-	if ((s->codec.dev_mixer = register_sound_mixer(&es1371_mixer_fops, -1)) < 0)
+	if ((res=(s->codec.dev_mixer = register_sound_mixer(&es1371_mixer_fops, -1)) < 0))
 		goto err_dev2;
-	if ((s->dev_dac = register_sound_dsp(&es1371_dac_fops, -1)) < 0)
+	if ((res=(s->dev_dac = register_sound_dsp(&es1371_dac_fops, -1)) < 0))
 		goto err_dev3;
-	if ((s->dev_midi = register_sound_midi(&es1371_midi_fops, -1)) < 0)
+	if ((res=(s->dev_midi = register_sound_midi(&es1371_midi_fops, -1))<0 ))
 		goto err_dev4;
 #ifdef ES1371_DEBUG
 	/* intialize the debug proc device */
@@ -2916,8 +2915,10 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	/* init the sample rate converter */
 	src_init(s);
 	/* codec init */
-	if (!ac97_probe_codec(&s->codec))
+	if (!ac97_probe_codec(&s->codec)) {
+		res = -ENODEV;
 		goto err_gp;
+	}
 	/* set default values */
 
 	fs = get_fs();
@@ -2964,7 +2965,7 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	release_region(s->io, ES1371_EXTENT);
  err_region:
 	kfree(s);
-	return -1;
+	return res;
 }
 
 static void __devinit es1371_remove(struct pci_dev *dev)

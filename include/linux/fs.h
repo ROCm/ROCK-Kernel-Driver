@@ -384,6 +384,14 @@ struct address_space {
 	int			gfp_mask;	/* how to allocate the pages */
 };
 
+struct char_device {
+	struct list_head	hash;
+	atomic_t		count;
+	dev_t			dev;
+	atomic_t		openers;
+	struct semaphore	sem;
+};
+
 struct block_device {
 	struct list_head	bd_hash;
 	atomic_t		bd_count;
@@ -426,8 +434,10 @@ struct inode {
 	struct address_space	*i_mapping;
 	struct address_space	i_data;	
 	struct dquot		*i_dquot[MAXQUOTAS];
+	/* These three should probably be a union */
 	struct pipe_inode_info	*i_pipe;
 	struct block_device	*i_bdev;
+	struct char_device	*i_cdev;
 
 	unsigned long		i_dnotify_mask; /* Directory notify events */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
@@ -982,6 +992,8 @@ extern int register_blkdev(unsigned int, const char *, struct block_device_opera
 extern int unregister_blkdev(unsigned int, const char *);
 extern struct block_device *bdget(dev_t);
 extern void bdput(struct block_device *);
+extern struct char_device *cdget(dev_t);
+extern void cdput(struct char_device *);
 extern int blkdev_open(struct inode *, struct file *);
 extern struct file_operations def_blk_fops;
 extern struct file_operations def_fifo_fops;
@@ -1301,6 +1313,15 @@ extern int dcache_readdir(struct file *, void *, filldir_t);
 extern struct file_system_type *get_fs_type(const char *name);
 extern struct super_block *get_super(kdev_t);
 extern void put_super(kdev_t);
+static inline int is_mounted(kdev_t dev)
+{
+	struct super_block *sb = get_super(dev);
+	if (sb) {
+		/* drop_super(sb); will go here */
+		return 1;
+	}
+	return 0;
+}
 unsigned long generate_cluster(kdev_t, int b[], int);
 unsigned long generate_cluster_swab32(kdev_t, int b[], int);
 extern kdev_t ROOT_DEV;

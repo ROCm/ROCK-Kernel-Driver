@@ -299,10 +299,13 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	if (status < 0)
 		return status;
 
-	if ((status = nlmclnt_proc(inode, cmd, fl)) < 0)
+	lock_kernel();
+	status = nlmclnt_proc(inode, cmd, fl);
+	unlock_kernel();
+	if (status < 0)
 		return status;
-	else
-		status = 0;
+	
+	status = 0;
 
 	/*
 	 * Make sure we clear the cache whenever we try to get the lock.

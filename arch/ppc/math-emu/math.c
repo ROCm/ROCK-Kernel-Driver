@@ -1,4 +1,7 @@
-/* $Id: math.c,v 1.1 1999/08/23 19:00:11 cort Exp $
+/*
+ * BK Id: SCCS/s.math.c 1.6 05/17/01 18:14:23 cort
+ */
+/*
  * arch/ppc/math-emu/math.c
  *
  * Copyright (C) 1999  Eddie C. Dost  (ecd@atecom.com)

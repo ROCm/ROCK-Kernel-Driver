@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.pmac_time.c 1.8 05/17/01 18:14:21 cort
+ */
+/*
  * Support for periodic interrupts (100 per second) and for getting
  * the current time from the RTC on Power Macintoshes.
  *

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.keyboard.h 1.5 05/17/01 18:14:24 cort
+ */
+/*
  *  linux/include/asm-ppc/keyboard.h
  *
  *  Created 3 Nov 1996 by Geert Uytterhoeven

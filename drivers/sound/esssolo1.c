@@ -77,6 +77,8 @@
  *                       Fix SETTRIGGER non OSS API conformity
  *    10.03.2001         provide abs function, prevent picking up a bogus kernel macro
  *                       for abs. Bug report by Andrew Morton <andrewm@uow.edu.au>
+ *    15.05.2001         pci_enable_device moved, return values in probe cleaned
+ *                       up. Marcus Meissner <mm@caldera.de>
  */
 
 /*****************************************************************************/
@@ -125,17 +127,6 @@ extern inline void gameport_unregister_port(struct gameport *gameport)
 /* --------------------------------------------------------------------- */
 
 #undef OSS_DOCUMENTED_MIXER_SEMANTICS
-
-/* --------------------------------------------------------------------- */
-
-/* prevent picking up a bogus abs macro */
-#undef abs
-extern inline int abs(int x)
-{
-	if (x < 0)
-		return -x;
-	return x;
-}
 
 /* --------------------------------------------------------------------- */
 
@@ -2288,22 +2279,21 @@ static int solo1_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
-
-#define RSRCISIOREGION(dev,num) (pci_resource_start((dev), (num)) != 0 && \
-				 (pci_resource_flags((dev), (num)) & IORESOURCE_IO))
-
 static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device_id *pciid)
 {
 	struct solo1_state *s;
 	struct pm_dev *pmdev;
+	int ret;
 
-	if (!RSRCISIOREGION(pcidev, 0) ||
-	    !RSRCISIOREGION(pcidev, 1) ||
-	    !RSRCISIOREGION(pcidev, 2) ||
-	    !RSRCISIOREGION(pcidev, 3))
-		return -1;
+ 	if ((ret=pci_enable_device(pcidev)))
+		return ret;
+	if (!(pci_resource_flags(pcidev, 0) & IORESOURCE_IO) ||
+	    !(pci_resource_flags(pcidev, 1) & IORESOURCE_IO) ||
+	    !(pci_resource_flags(pcidev, 2) & IORESOURCE_IO) ||
+	    !(pci_resource_flags(pcidev, 3) & IORESOURCE_IO))
+		return -ENODEV;
 	if (pcidev->irq == 0)
-		return -1;
+		return -ENODEV;
 
 	/* Recording requires 24-bit DMA, so attempt to set dma mask
 	 * to 24 bits first, then 32 bits (playback only) if that fails.
@@ -2311,12 +2301,12 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	if (pci_set_dma_mask(pcidev, 0x00ffffff) &&
 	    pci_set_dma_mask(pcidev, 0xffffffff)) {
 		printk(KERN_WARNING "solo1: architecture does not support 24bit or 32bit PCI busmaster DMA\n");
-		return -1;
+		return -ENODEV;
 	}
 
 	if (!(s = kmalloc(sizeof(struct solo1_state), GFP_KERNEL))) {
 		printk(KERN_WARNING "solo1: out of memory\n");
-		return -1;
+		return -ENOMEM;
 	}
 	memset(s, 0, sizeof(struct solo1_state));
 	init_waitqueue_head(&s->dma_adc.wait);
@@ -2336,6 +2326,7 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	s->gameport.io = pci_resource_start(pcidev, 4);
 	s->gameport.size = pci_resource_len(pcidev,4);
 	s->irq = pcidev->irq;
+	ret = -EBUSY;
 	if (!request_region(s->iobase, IOBASE_EXTENT, "ESS Solo1")) {
 		printk(KERN_ERR "solo1: io ports in use\n");
 		goto err_region1;
@@ -2358,24 +2349,32 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 		printk(KERN_ERR "solo1: gameport io ports in use\n");
 		s->gameport.io = s->gameport.size = 0;
 	}
-	if (request_irq(s->irq, solo1_interrupt, SA_SHIRQ, "ESS Solo1", s)) {
+	if ((ret=request_irq(s->irq,solo1_interrupt,SA_SHIRQ,"ESS Solo1",s))) {
 		printk(KERN_ERR "solo1: irq %u in use\n", s->irq);
 		goto err_irq;
 	}
- 	if (pci_enable_device(pcidev))
-		goto err_irq;
 	printk(KERN_INFO "solo1: joystick port at %#x\n", s->gameport.io+1);
 	/* register devices */
-	if ((s->dev_audio = register_sound_dsp(&solo1_audio_fops, -1)) < 0)
+	if ((s->dev_audio = register_sound_dsp(&solo1_audio_fops, -1)) < 0) {
+		ret = s->dev_audio;
 		goto err_dev1;
-	if ((s->dev_mixer = register_sound_mixer(&solo1_mixer_fops, -1)) < 0)
+	}
+	if ((s->dev_mixer = register_sound_mixer(&solo1_mixer_fops, -1)) < 0) {
+		ret = s->dev_mixer;
 		goto err_dev2;
-	if ((s->dev_midi = register_sound_midi(&solo1_midi_fops, -1)) < 0)
+	}
+	if ((s->dev_midi = register_sound_midi(&solo1_midi_fops, -1)) < 0) {
+		ret = s->dev_midi;
 		goto err_dev3;
-	if ((s->dev_dmfm = register_sound_special(&solo1_dmfm_fops, 15 /* ?? */)) < 0)
+	}
+	if ((s->dev_dmfm = register_sound_special(&solo1_dmfm_fops, 15 /* ?? */)) < 0) {
+		ret = s->dev_dmfm;
 		goto err_dev4;
-	if (setup_solo1(s))
+	}
+	if (setup_solo1(s)) {
+		ret = -EIO;
 		goto err;
+	}
 	/* register gameport */
 	gameport_register_port(&s->gameport);
 	/* store it in the driver field */
@@ -2412,7 +2411,7 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	release_region(s->mpubase, MPUBASE_EXTENT);
  err_region1:
 	kfree(s);
-	return -1;
+	return ret;
 }
 
 static void __devinit solo1_remove(struct pci_dev *dev)

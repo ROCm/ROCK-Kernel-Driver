@@ -290,19 +290,9 @@ static void capifs_put_super(struct super_block *sb)
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-static int capifs_statfs(struct super_block *sb, struct statfs *buf, int bufsiz);
-static void capifs_write_inode(struct inode *inode) { };
-#else
 static int capifs_statfs(struct super_block *sb, struct statfs *buf);
-#endif
-static void capifs_read_inode(struct inode *inode);
 
 static struct super_operations capifs_sops = {
-	read_inode:	capifs_read_inode,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-	write_inode:	capifs_write_inode,
-#endif
 	put_super:	capifs_put_super,
 	statfs:		capifs_statfs,
 };
@@ -411,7 +401,14 @@ struct super_block *capifs_read_super(struct super_block *s, void *data,
 	/*
 	 * Get the root inode and dentry, but defer checking for errors.
 	 */
-	root_inode = iget(s, 1); /* inode 1 == root directory */
+	root_inode = capifs_new_inode(s);
+	if (root_inode) {
+		root_inode->i_ino = 1;
+		root_inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR;
+		root_inode->i_op = &capifs_root_inode_operations;
+		root_inode->i_fop = &capifs_root_operations;
+		root_inode->i_nlink = 2;
+	} 
 	root = d_alloc_root(root_inode);
 
 	/*
@@ -494,33 +491,16 @@ static int capifs_statfs(struct super_block *sb, struct statfs *buf)
 }
 #endif
 
-static void capifs_read_inode(struct inode *inode)
+static struct inode *capifs_new_inode(struct super_block *sb);
 {
-	ino_t ino = inode->i_ino;
-	struct capifs_sb_info *sbi = SBI(inode->i_sb);
-
-	inode->i_mode = 0;
-	inode->i_nlink = 0;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-	inode->i_blocks = 0;
-	inode->i_blksize = 1024;
-	inode->i_uid = inode->i_gid = 0;
-
-	if ( ino == 1 ) {
-		inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR;
-		inode->i_op = &capifs_root_inode_operations;
-		inode->i_fop = &capifs_root_operations;
-		inode->i_nlink = 2;
-		return;
-	} 
-
-	ino -= 2;
-	if ( ino >= sbi->max_ncci )
-		return;		/* Bogus */
-	
-	init_special_inode(inode, S_IFCHR, 0);
-
-	return;
+	inode = new_inode(sb);
+	if (inode) {
+		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+		inode->i_blocks = 0;
+		inode->i_blksize = 1024;
+		inode->i_uid = inode->i_gid = 0;
+	}
+	return inode;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
@@ -553,14 +533,16 @@ void capifs_new_ncci(char type, unsigned int num, kdev_t device)
 				break;
 			}
 		}
+		if ( ino >= sbi->max_ncci )
+			continue;
 
-		if ((np->inode = iget(sb, ino+2)) != 0) {
+		if ((np->inode = capifs_new_inode(sb)) != NULL) {
 			struct inode *inode = np->inode;
 			inode->i_uid = sbi->setuid ? sbi->uid : current->fsuid;
 			inode->i_gid = sbi->setgid ? sbi->gid : current->fsgid;
-			inode->i_mode = sbi->mode | S_IFCHR;
-			inode->i_rdev = np->kdev;
-			inode->i_nlink++;
+			inode->i_nlink = 1;
+			inode->i_ino = ino + 2;
+			init_special_inode(inode, sbi->mode|S_IFCHR, np->kdev);
 		}
 	}
 }

@@ -1,6 +1,7 @@
 /*
- * $Id: process.c,v 1.97 1999/09/14 19:07:42 cort Exp $
- *
+ * BK Id: SCCS/s.process.c 1.15 05/17/01 18:14:22 cort
+ */
+/*
  *  linux/arch/ppc/kernel/process.c
  *
  *  Derived from "arch/i386/kernel/process.c"

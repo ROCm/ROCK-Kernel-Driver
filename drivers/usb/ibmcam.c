@@ -43,8 +43,17 @@
 
 #include "ibmcam.h"
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Johannes Erdfelt, Randy Dunlap"
+#define DRIVER_DESC "IBM/Xirlink C-it USB Camera Driver for Linux (c) 2000"
+
 #define	ENABLE_HEXDUMP	0	/* Enable if you need it */
 static int debug = 0;
+
+static int video_nr = -1;
 
 /* Completion states of the data parser */
 typedef enum {
@@ -158,9 +167,6 @@ MODULE_PARM(init_model2_sat, "i");
 MODULE_PARM_DESC(init_model2_sat, "Model2 preconfiguration: 0-255 (default=52)");
 MODULE_PARM(init_model2_yb, "i");
 MODULE_PARM_DESC(init_model2_yb, "Model2 preconfiguration: 0-255 (default=160)");
-
-MODULE_AUTHOR ("module author");
-MODULE_DESCRIPTION ("IBM/Xirlink C-it USB Camera Driver for Linux (c) 2000");
 
 /* Still mysterious i2c commands */
 static const unsigned short unknown_88 = 0x0088;
@@ -3032,7 +3038,7 @@ static void *usb_ibmcam_probe(struct usb_device *dev, unsigned int ifnum,
 	usb_ibmcam_configure_video(ibmcam);
 	up (&ibmcam->lock);
 
-	if (video_register_device(&ibmcam->vdev, VFL_TYPE_GRABBER) == -1) {
+	if (video_register_device(&ibmcam->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		printk(KERN_ERR "video_register_device failed\n");
 		ibmcam = NULL; /* Do not free, it's preallocated */
 	}
@@ -3141,6 +3147,8 @@ static int __init usb_ibmcam_init(void)
 		struct usb_ibmcam *ibmcam = &cams[u];
 		memset (ibmcam, 0, sizeof(struct usb_ibmcam));
 	}
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return usb_register(&ibmcam_driver);
 }
 
@@ -3151,5 +3159,8 @@ static void __exit usb_ibmcam_cleanup(void)
 
 module_init(usb_ibmcam_init);
 module_exit(usb_ibmcam_cleanup);
+
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 

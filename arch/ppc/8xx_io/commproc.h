@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.commproc.h 1.8 05/17/01 18:14:20 cort
+ */
 
 /*
  * MPC8xx Communication Processor Module.

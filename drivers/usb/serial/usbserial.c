@@ -14,6 +14,9 @@
  * based on a driver by Brad Keryan)
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ * 
+ * (04/08/2001) gb
+ *	Identify version on module load.
  *
  * 2001_02_05 gkh
  *	Fixed buffer overflows bug with the generic serial driver.  Thanks to
@@ -282,14 +285,12 @@
 
 #include "usb-serial.h"
 
-
-/* Module information */
-MODULE_AUTHOR("Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/");
-MODULE_DESCRIPTION("USB Serial Driver");
-
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Debug enabled or not");
-
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
+#define DRIVER_DESC "USB Serial Driver"
 
 #define MAX(a,b)	(((a)>(b))?(a):(b))
 
@@ -309,11 +310,6 @@ static void generic_shutdown		(struct usb_serial *serial);
 #ifdef CONFIG_USB_SERIAL_GENERIC
 static __u16	vendor	= 0x05f9;
 static __u16	product	= 0xffff;
-MODULE_PARM(vendor, "i");
-MODULE_PARM_DESC(vendor, "User specified USB idVendor");
-
-MODULE_PARM(product, "i");
-MODULE_PARM_DESC(product, "User specified USB idProduct");
 
 static struct usb_device_id generic_device_ids[2]; /* Initially all zeroes. */
 
@@ -1398,8 +1394,10 @@ int usb_serial_init(void)
 		err("usb_register failed for the usb-serial driver. Error number %d", result);
 		return -1;
 	}
-	
-	
+
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -1463,4 +1461,18 @@ EXPORT_SYMBOL(usb_serial_deregister);
 	EXPORT_SYMBOL(ezusb_writememory);
 	EXPORT_SYMBOL(ezusb_set_reset);
 #endif
+
+
+/* Module information */
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+
+MODULE_PARM(vendor, "i");
+MODULE_PARM_DESC(vendor, "User specified USB idVendor");
+
+MODULE_PARM(product, "i");
+MODULE_PARM_DESC(product, "User specified USB idProduct");
 

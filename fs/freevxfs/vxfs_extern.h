@@ -30,7 +30,7 @@
 #ifndef _VXFS_EXTERN_H_
 #define _VXFS_EXTERN_H_
 
-#ident "$Id: vxfs_extern.h,v 1.18 2001/04/24 19:28:36 hch Exp hch $"
+#ident "$Id: vxfs_extern.h,v 1.20 2001/04/26 22:48:44 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - external prototypes.
@@ -70,6 +70,8 @@ extern struct file_operations	vxfs_dir_operations;
 extern int			vxfs_read_olt(struct super_block *, u_long);
 
 /* vxfs_subr.c */
+extern struct page *		vxfs_get_page(struct inode *, u_long);
+extern __inline__ void		vxfs_put_page(struct page *);
 extern struct buffer_head *	vxfs_bread(struct inode *, int);
 
 #endif /* _VXFS_EXTERN_H_ */

@@ -1,6 +1,6 @@
-/* $Id: lfs.c,v 1.1 1999/08/23 19:00:10 cort Exp $
+/*
+ * BK Id: SCCS/s.lfs.c 1.6 05/17/01 18:14:23 cort
  */
-
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <asm/uaccess.h>

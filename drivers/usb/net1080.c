@@ -34,6 +34,9 @@
  * 01-nov-2000
  * usb_device_id table support added by Adam J. Richter <adam@yggdrasil.com>.
  * 
+ * 08-apr-2001 gb
+ * Identify version on module load.
+ * 
  *-------------------------------------------------------------------------*/
 
 #include <linux/config.h>
@@ -54,6 +57,13 @@
 #   define DEBUG
 #endif
 #include <linux/usb.h>
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "David Brownell <dbrownell@users.sourceforge.net>"
+#define DRIVER_DESC "NetChip 1080 Driver (USB Host-to-Host Link)"
 
 
 static const struct usb_device_id	products [] = {
@@ -1101,6 +1111,9 @@ static int __init net1080_init (void)
 	get_random_bytes (node_id, sizeof node_id);
 	node_id [0] &= 0x7f;
 
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 module_init (net1080_init);
@@ -1111,5 +1124,6 @@ static void __exit net1080_exit (void)
 }
 module_exit (net1080_exit);
 
-MODULE_AUTHOR ("David Brownell <dbrownell@users.sourceforge.net>");
-MODULE_DESCRIPTION ("NetChip 1080 Driver (USB Host-to-Host Link)");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+

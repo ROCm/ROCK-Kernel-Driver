@@ -13,6 +13,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <asm/system.h>

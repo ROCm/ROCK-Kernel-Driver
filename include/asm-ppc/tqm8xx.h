@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.tqm8xx.h 1.6 05/17/01 18:14:26 cort
+ */
+/*
  * A collection of structures, addresses, and values associated with
  * the TQ Systems TQM8xx(L) modules.  This was originally created for the
  * MBX860, and probably needs revisions for other boards (like the 821).

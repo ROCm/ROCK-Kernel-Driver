@@ -113,6 +113,8 @@
  *
  */
 
+#include <linux/config.h>
+
 /*
  * The next three defines are user configurable.  These should be the only
  * defines a user might need to get in here and change.  There are other

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.commproc.c 1.5 05/17/01 18:14:19 cort
+ */
 
 /*
  * General Purpose functions for the global management of the

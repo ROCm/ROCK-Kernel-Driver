@@ -30,7 +30,7 @@
 #ifndef _VXFS_DIR_H_
 #define _VXFS_DIR_H_
 
-#ident "$Id: vxfs_dir.h,v 1.4 2001/04/24 19:28:36 hch Exp hch $"
+#ident "$Id: vxfs_dir.h,v 1.7 2001/05/21 15:48:26 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - directory structure.
@@ -41,31 +41,54 @@
 
 /*
  * VxFS directory block header.
+ *
+ * This entry is the head of every filesystem block in a directory.
+ * It is used for free space managment and additionally includes
+ * a hash for speeding up directory search (lookup).
+ *
+ * The hash may be empty and in fact we do not use it all in the
+ * Linux driver for now.
  */
 struct vxfs_dirblk {
-	u_int16_t	d_free;
-	u_int16_t	d_nhash;
-	u_int16_t	d_hash[1];
+	u_int16_t	d_free;		/* free space in dirblock */
+	u_int16_t	d_nhash;	/* no of hash chains */
+	u_int16_t	d_hash[1];	/* hash chain */
 };
 
 /*
- * Special dirblk for immed inodes:  no hash.
+ * VXFS_NAMELEN is the maximum length of the d_name field
+ *	of an VxFS directory entry.
  */
-struct vxfs_immed_dirblk {
-	u_int16_t	d_free;
-	u_int16_t	d_nhash;
-};
+#define VXFS_NAMELEN	256
 
 /*
  * VxFS directory entry.
  */
-#define VXFS_NAME_LEN	256
 struct vxfs_direct {
-	vx_ino_t	d_ino;
-	u_int16_t	d_reclen;
-	u_int16_t	d_namelen;
-	u_int16_t	d_hashnext;
-	char		d_name[VXFS_NAME_LEN];
+	vx_ino_t	d_ino;			/* inode number */
+	u_int16_t	d_reclen;		/* record length */
+	u_int16_t	d_namelen;		/* d_name length */
+	u_int16_t	d_hashnext;		/* next hash entry */
+	char		d_name[VXFS_NAMELEN];	/* name */
 };
+
+/*
+ * VXFS_DIRPAD defines the directory entry boundaries, is _must_ be
+ *	a multiple of four.
+ * VXFS_NAMEMIN is the length of a directory entry with a NULL d_name.
+ * VXFS_DIRROUND is an internal macros that rounds a length to a value
+ *	usable for directory sizes.
+ * VXFS_DIRLEN calculates the directory entry size for an entry with
+ *	a d_name with size len.
+ */
+#define VXFS_DIRPAD		4
+#define VXFS_NAMEMIN		((int)((struct vxfs_direct *)0)->d_name)
+#define VXFS_DIRROUND(len)	((VXFS_DIRPAD + (len) - 1) & ~(VXFS_DIRPAD -1))
+#define VXFS_DIRLEN(len)	(VXFS_DIRROUND(VXFS_NAMEMIN + (len)))
+
+/*
+ * VXFS_DIRBLKOV is the overhead of a specific dirblock.
+ */
+#define VXFS_DIRBLKOV(dbp)	((sizeof(short) * dbp->d_nhash) + 4)
 
 #endif /* _VXFS_DIR_H_ */

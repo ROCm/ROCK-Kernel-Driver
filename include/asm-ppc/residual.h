@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.residual.h 1.5 05/17/01 18:14:25 cort
+ */
 /* 7/18/95                                                                    */
 /*----------------------------------------------------------------------------*/
 /*      Residual Data header definitions and prototypes                       */

@@ -157,8 +157,7 @@ int del_partition(kdev_t dev, struct blkpg_partition *p) {
 
 	/* partition in use? Incomplete check for now. */
 	devp = MKDEV(MAJOR(dev), minor);
-	if (get_super(devp) ||		/* mounted? */
-	    is_swap_partition(devp))
+	if (is_mounted(devp) || is_swap_partition(devp))
 		return -EBUSY;
 
 	/* all seems OK */

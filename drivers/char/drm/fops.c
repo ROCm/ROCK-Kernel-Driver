@@ -47,7 +47,10 @@ int drm_open_helper(struct inode *inode, struct file *filp, drm_device_t *dev)
 	DRM_DEBUG("pid = %d, minor = %d\n", current->pid, minor);
 
 	priv		    = drm_alloc(sizeof(*priv), DRM_MEM_FILES);
+	if(priv == NULL)
+		return -ENOMEM;
 	memset(priv, 0, sizeof(*priv));
+
 	filp->private_data  = priv;
 	priv->uid	    = current->euid;
 	priv->pid	    = current->pid;

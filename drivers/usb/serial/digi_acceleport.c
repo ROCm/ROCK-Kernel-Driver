@@ -13,6 +13,9 @@
 *
 *  Peter Berger (pberger@brimson.com)
 *  Al Borchers (borchers@steinerpoint.com)
+* 
+* (04/08/2001) gb
+*	Identify version on module load.
 *
 * (11/01/2000) Adam J. Richter
 *	usb_device_id table support
@@ -253,6 +256,13 @@
 
 
 /* Defines */
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.80.1.2"
+#define DRIVER_AUTHOR "Peter Berger <pberger@brimson.com>, Al Borchers <borchers@steinerpoint.com>"
+#define DRIVER_DESC "Digi AccelePort USB-2/USB-4 Serial Converter driver"
 
 /* port output buffer length -- must be <= transfer buffer length - 2 */
 /* so we can be sure to send the full buffer in one urb */
@@ -2068,6 +2078,8 @@ static int __init digi_init (void)
 {
 	usb_serial_register (&digi_acceleport_2_device);
 	usb_serial_register (&digi_acceleport_4_device);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -2083,8 +2095,8 @@ module_init(digi_init);
 module_exit(digi_exit);
 
 
-MODULE_AUTHOR("Peter Berger <pberger@brimson.com>, Al Borchers <borchers@steinerpoint.com>");
-MODULE_DESCRIPTION("Digi AccelePort USB-2/USB-4 Serial Converter driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

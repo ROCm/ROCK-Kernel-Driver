@@ -57,6 +57,15 @@
 
 #include <linux/pm.h>
 
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION ""
+#define DRIVER_AUTHOR "Linus Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
+#define DRIVER_DESC "USB Universal Host Controller Interface driver"
+
+
 /*
  * debug = 0, no debugging messages
  * debug = 1, dump failed URB's except for stalls
@@ -2912,6 +2921,7 @@ static void __devexit uhci_pci_remove(struct pci_dev *dev)
 	release_uhci(uhci);
 }
 
+#ifdef CONFIG_PM
 static void uhci_pci_suspend(struct pci_dev *dev)
 {
 	reset_hc((struct uhci *) dev->driver_data);
@@ -2922,6 +2932,7 @@ static void uhci_pci_resume(struct pci_dev *dev)
 	reset_hc((struct uhci *) dev->driver_data);
 	start_hc((struct uhci *) dev->driver_data);
 }
+#endif
 
 static const struct pci_device_id __devinitdata uhci_pci_ids[] = { {
 
@@ -2979,6 +2990,9 @@ static int __init uhci_hcd_init(void)
 	if (retval)
 		goto init_failed;
 
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 
 init_failed:
@@ -3018,6 +3032,6 @@ static void __exit uhci_hcd_cleanup (void)
 module_init(uhci_hcd_init);
 module_exit(uhci_hcd_cleanup);
 
-MODULE_AUTHOR("Linus Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber");
-MODULE_DESCRIPTION("USB Universal Host Controller Interface driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 

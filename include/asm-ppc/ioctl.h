@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.ioctl.h 1.5 05/17/01 18:14:24 cort
+ */
 #ifndef _PPC_IOCTL_H
 #define _PPC_IOCTL_H
 

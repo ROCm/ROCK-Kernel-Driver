@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.single.h 1.5 05/17/01 18:14:23 cort
+ */
+/*
  * Definitions for IEEE Single Precision
  */
 

@@ -1,6 +1,7 @@
 /*
- * $Id: residual.c,v 1.17 1999/09/27 18:40:23 cort Exp $
- *
+ * BK Id: SCCS/s.residual.c 1.7 05/17/01 18:14:22 cort
+ */
+/*
  * Code to deal with the PReP residual data.
  *
  * Written by: Cort Dougan (cort@cs.nmt.edu)

@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.chrp_time.c 1.7 05/17/01 18:14:21 cort
+ */
+/*
  *  linux/arch/i386/kernel/time.c
  *
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds

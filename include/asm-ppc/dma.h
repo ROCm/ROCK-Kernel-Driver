@@ -1,4 +1,7 @@
-/* $Id: dma.h,v 1.3 1997/03/16 06:20:39 cort Exp $
+/*
+ * BK Id: SCCS/s.dma.h 1.8 05/17/01 18:14:24 cort
+ */
+/*
  * linux/include/asm/dma.h: Defines for using and allocating dma channels.
  * Written by Hennus Bergman, 1992.
  * High DMA channel support & info by Hannu Savolainen

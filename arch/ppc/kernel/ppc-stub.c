@@ -1,4 +1,7 @@
-/* $Id: ppc-stub.c,v 1.6 1999/08/12 22:18:11 cort Exp $
+/*
+ * BK Id: SCCS/s.ppc-stub.c 1.6 05/17/01 18:14:21 cort
+ */
+/*
  * ppc-stub.c:  KGDB support for the Linux kernel.
  *
  * adapted from arch/sparc/kernel/sparc-stub.c for the PowerPC

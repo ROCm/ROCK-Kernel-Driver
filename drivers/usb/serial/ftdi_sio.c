@@ -14,6 +14,9 @@
  *
  * See http://reality.sgi.com/bryder_wellington/ftdi_sio for upto date testing info
  *     and extra documentation
+ * 
+ * (04/08/2001) gb
+ *	Identify version on module load.
  *       
  * (12/3/2000) Bill Ryder
  *     Added support for 8U232AM device.
@@ -89,6 +92,13 @@
 #include "usb-serial.h"
 #include "ftdi_sio.h"
 
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>, Bill Ryder <bryder@sgi.com>"
+#define DRIVER_DESC "USB FTDI RS232 Converters Driver"
 
 static __devinitdata struct usb_device_id id_table_sio [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
@@ -863,6 +873,8 @@ static int __init ftdi_sio_init (void)
 	dbg(__FUNCTION__);
 	usb_serial_register (&ftdi_sio_device);
 	usb_serial_register (&ftdi_8U232AM_device);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -878,8 +890,8 @@ static void __exit ftdi_sio_exit (void)
 module_init(ftdi_sio_init);
 module_exit(ftdi_sio_exit);
 
-MODULE_AUTHOR("Greg Kroah-Hartman <greg@kroah.com>, Bill Ryder <bryder@sgi.com>");
-MODULE_DESCRIPTION("USB FTDI RS232 converters driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

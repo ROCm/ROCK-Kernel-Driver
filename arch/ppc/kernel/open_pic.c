@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.open_pic.c 1.20 05/17/01 18:14:21 cort
+ */
+/*
  *  arch/ppc/kernel/open_pic.c -- OpenPIC Interrupt Handling
  *
  *  Copyright (C) 1997 Geert Uytterhoeven

@@ -1346,6 +1346,7 @@ put_all:
 static int __init dquot_init(void)
 {
 	printk(KERN_NOTICE "VFS: Diskquotas version %s initialized\n", __DQUOT_VERSION__);
+	return 0;
 }
 __initcall(dquot_init);
 

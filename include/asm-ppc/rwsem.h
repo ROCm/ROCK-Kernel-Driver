@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.rwsem.h 1.6 05/17/01 18:14:25 cort
+ */
+/*
  * include/asm-ppc/rwsem.h: R/W semaphores for PPC using the stuff
  * in lib/rwsem.c.  Adapted largely from include/asm-i386/rwsem.h
  * by Paul Mackerras <paulus@samba.org>.

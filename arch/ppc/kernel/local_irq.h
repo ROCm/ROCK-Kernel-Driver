@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.local_irq.h 1.7 05/17/01 18:14:21 cort
+ */
 
 #ifndef _PPC_KERNEL_LOCAL_IRQ_H
 #define _PPC_KERNEL_LOCAL_IRQ_H

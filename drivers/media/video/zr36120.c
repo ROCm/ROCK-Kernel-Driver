@@ -1198,8 +1198,10 @@ int zoran_ioctl(struct video_device* dev, unsigned int cmd, void *arg)
 		vcp = vmalloc(sizeof(struct video_clip)*(vw.clipcount+4));
 		if (vcp==NULL)
 			return -ENOMEM;
-		if (vw.clipcount && copy_from_user(vcp,vw.clips,sizeof(struct video_clip)*vw.clipcount))
+		if (vw.clipcount && copy_from_user(vcp,vw.clips,sizeof(struct video_clip)*vw.clipcount)) {
+			vfree(vcp);
 			return -EFAULT;
+		}
 
 		on = ztv->running;
 		if (on)

@@ -9,6 +9,7 @@
  * (C) Copyright 1999-2001 Johannes Erdfelt
  */
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <asm/io.h>

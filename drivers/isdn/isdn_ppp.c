@@ -819,7 +819,7 @@ isdn_ppp_init(void)
 		      kmalloc(sizeof(struct ippp_struct), GFP_KERNEL))) {
 			printk(KERN_WARNING "isdn_ppp_init: Could not alloc ippp_table\n");
 			for (j = 0; j < i; j++)
-				kfree(ippp_table[i]);
+				kfree(ippp_table[j]);
 			return -1;
 		}
 		memset((char *) ippp_table[i], 0, sizeof(struct ippp_struct));

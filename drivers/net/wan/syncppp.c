@@ -51,6 +51,7 @@
 #include <linux/random.h>
 #include <linux/pkt_sched.h>
 #include <asm/byteorder.h>
+#include <asm/uaccess.h>
 #include <linux/spinlock.h>
 #include <net/syncppp.h>
 
@@ -128,7 +129,7 @@ struct cisco_packet {
 
 static struct sppp *spppq;
 static struct timer_list sppp_keepalive_timer;
-static spinlock_t spppq_lock;
+static spinlock_t spppq_lock = SPIN_LOCK_UNLOCKED;
 
 static void sppp_keepalive (unsigned long dummy);
 static void sppp_cp_send (struct sppp *sp, u16 proto, u8 type,
@@ -975,6 +976,14 @@ int sppp_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			if(ifr->ifr_flags)
 				sp->pp_flags|=PP_DEBUG;
 			break;
+		case SPPPIOCGFLAGS:
+			if(copy_to_user(ifr->ifr_data, &sp->pp_flags, sizeof(sp->pp_flags)))
+				return -EFAULT;
+			break;
+		case SPPPIOCSFLAGS:
+			if(copy_from_user(&sp->pp_flags, ifr->ifr_data, sizeof(sp->pp_flags)))
+				return -EFAULT;
+			break;
 		default:
 			return -EINVAL;
 	}
@@ -1397,7 +1406,6 @@ static int __init sync_ppp_init(void)
 		debug=PP_DEBUG;
 	printk(KERN_INFO "Cronyx Ltd, Synchronous PPP and CISCO HDLC (c) 1994\n");
 	printk(KERN_INFO "Linux port (c) 1998 Building Number Three Ltd & Jan \"Yenya\" Kasprzak.\n");
-	spin_lock_init(&spppq_lock);
 	sppp_packet_type.type=htons(ETH_P_WAN_PPP);	
 	dev_add_pack(&sppp_packet_type);
 	return 0;

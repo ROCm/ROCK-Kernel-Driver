@@ -1,5 +1,7 @@
 /*
- * $Id: time.h,v 1.12 1999/08/27 04:21:23 cort Exp $
+ * BK Id: SCCS/s.time.h 1.10 05/17/01 18:14:26 cort
+ */
+/*
  * Common time prototypes and such for all ppc machines.
  *
  * Written by Cort Dougan (cort@fsmlabs.com) to merge

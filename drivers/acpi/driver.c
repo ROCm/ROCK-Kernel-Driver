@@ -311,8 +311,10 @@ acpi_do_table(ctl_table * ctl,
 		size = buf.length - file->f_pos;
 		if (size > *len)
 			size = *len;
-		if (copy_to_user(buffer, data, size))
+		if (copy_to_user(buffer, data, size)) {
+			kfree(buf.pointer);
 			return -EFAULT;
+		}
 	}
 
 	kfree(buf.pointer);

@@ -17,6 +17,21 @@ export-objs		:= usb.o
 list-multi		:= usbcore.o
 usbcore-objs		:= usb.o usb-debug.o hub.o
 
+ifneq ($(CONFIG_USB_PWC),n)
+	# By default we use the C colour conversion functions unless we
+	# detect an Intel CPU, for which there is assembly available
+	ccvt-objs		:= ccvt_c.o vcvt_c.o
+	ifeq ($(CONFIG_X86),y)
+		ccvt-objs		:= ccvt_i386.o vcvt_i386.o
+	endif
+
+	export-objs		+= pwc-uncompress.o
+	list-multi		+= pwc.o
+endif
+
+pwc-objs		:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o $(ccvt-objs)
+
+
 # Optional parts of multipart objects.
 
 ifeq ($(CONFIG_USB_DEVICEFS),y)
@@ -47,6 +62,7 @@ obj-$(CONFIG_USB_ACM)		+= acm.o
 obj-$(CONFIG_USB_PRINTER)	+= printer.o
 obj-$(CONFIG_USB_AUDIO)		+= audio.o
 obj-$(CONFIG_USB_IBMCAM)	+= ibmcam.o
+obj-$(CONFIG_USB_PWC)		+= pwc.o
 obj-$(CONFIG_USB_DC2XX)		+= dc2xx.o
 obj-$(CONFIG_USB_MDC800)	+= mdc800.o
 obj-$(CONFIG_USB_USS720)	+= uss720.o
@@ -79,4 +95,7 @@ include $(TOPDIR)/Rules.make
 
 usbcore.o: $(usbcore-objs)
 	$(LD) -r -o $@ $(usbcore-objs)
+
+pwc.o:		$(pwc-objs)
+	$(LD) -r -o $@ $(pwc-objs)
 

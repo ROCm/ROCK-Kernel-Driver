@@ -163,7 +163,7 @@ static void fast_copy_page(void *to, void *from)
 		".previous"
 		: : "r" (from) );
 
-	for(i=0; i<4096/64; i++)
+	for(i=0; i<(4096-320)/64; i++)
 	{
 		__asm__ __volatile__ (
 		"1: prefetch 320(%0)\n"
@@ -195,6 +195,29 @@ static void fast_copy_page(void *to, void *from)
 		from+=64;
 		to+=64;
 	}
+	for(i=(4096-320)/64; i<4096/64; i++)
+	{
+		__asm__ __volatile__ (
+		"2: movq (%0), %%mm0\n"
+		"   movntq %%mm0, (%1)\n"
+		"   movq 8(%0), %%mm1\n"
+		"   movntq %%mm1, 8(%1)\n"
+		"   movq 16(%0), %%mm2\n"
+		"   movntq %%mm2, 16(%1)\n"
+		"   movq 24(%0), %%mm3\n"
+		"   movntq %%mm3, 24(%1)\n"
+		"   movq 32(%0), %%mm4\n"
+		"   movntq %%mm4, 32(%1)\n"
+		"   movq 40(%0), %%mm5\n"
+		"   movntq %%mm5, 40(%1)\n"
+		"   movq 48(%0), %%mm6\n"
+		"   movntq %%mm6, 48(%1)\n"
+		"   movq 56(%0), %%mm7\n"
+		"   movntq %%mm7, 56(%1)\n"
+		: : "r" (from), "r" (to) : "memory");
+		from+=64;
+		to+=64;
+	}
 	/* since movntq is weakly-ordered, a "sfence" is needed to become
 	 * ordered again.
 	 */
@@ -213,13 +236,8 @@ static void fast_copy_page(void *to, void *from)
 static void fast_clear_page(void *page)
 {
 	int i;
-	if (!(current->flags & PF_USEDFPU))
-		clts();
-	else
-	{
-		__asm__ __volatile__ ( " fnsave %0; fwait\n"::"m"(current->thread.i387));
-		current->flags &= ~PF_USEDFPU;
-	}
+	
+	kernel_fpu_begin();
 	
 	__asm__ __volatile__ (
 		"  pxor %%mm0, %%mm0\n" : :
@@ -247,19 +265,16 @@ static void fast_clear_page(void *page)
 		: : "r" (page) : "memory");
 		page+=128;
 	}
-	stts();
+
+	kernel_fpu_end();
 }
 
 static void fast_copy_page(void *to, void *from)
 {
 	int i;
-	if (!(current->flags & PF_USEDFPU))
-		clts();
-	else
-	{
-		__asm__ __volatile__ ( " fnsave %0; fwait\n"::"m"(current->thread.i387));
-		current->flags &= ~PF_USEDFPU;
-	}
+	
+	
+	kernel_fpu_begin();
 
 	__asm__ __volatile__ (
 		"1: prefetch (%0)\n"
@@ -310,7 +325,7 @@ static void fast_copy_page(void *to, void *from)
 		from+=64;
 		to+=64;
 	}
-	stts();
+	kernel_fpu_end();
 }
 
 

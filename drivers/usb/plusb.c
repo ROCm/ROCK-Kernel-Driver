@@ -140,6 +140,13 @@
 #define dev_kfree_skb_any dev_kfree_skb
 #endif
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.5.7"
+#define DRIVER_AUTHOR "Deti Fliegl, deti@fliegl.de"
+#define DRIVER_DESC "PL-2302 USB Interface Driver for Linux (c)2000"
+
 /* Definitions formerly in plusb.h relocated. No need to export them -EZA */
 
 #define _PLUSB_INTPIPE		0x1
@@ -1007,6 +1014,9 @@ static int __init plusb_init (void)
 
 	dbg("plusb_init: driver registered");
 
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -1041,8 +1051,8 @@ static void __exit plusb_cleanup (void)
 
 /* --------------------------------------------------------------------- */
 
-MODULE_AUTHOR ("Deti Fliegl, deti@fliegl.de");
-MODULE_DESCRIPTION ("PL-2302 USB Interface Driver for Linux (c)2000");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
 
 module_init (plusb_init);

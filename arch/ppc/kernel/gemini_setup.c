@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.gemini_setup.c 1.7 05/17/01 18:14:21 cort
+ */
+/*
  *  linux/arch/ppc/kernel/setup.c
  *
  *  Copyright (C) 1995 Linus Torvalds

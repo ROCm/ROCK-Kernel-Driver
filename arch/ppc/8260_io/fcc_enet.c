@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.fcc_enet.c 1.7 05/17/01 18:14:20 cort
+ */
+/*
  * Fast Ethernet Controller (FCC) driver for Motorola MPC8260.
  * Copyright (c) 2000 MontaVista Software, Inc.   Dan Malek (dmalek@jlc.net)
  *

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.hardirq.h 1.7 05/17/01 18:14:24 cort
+ */
 #ifdef __KERNEL__
 #ifndef __ASM_HARDIRQ_H
 #define __ASM_HARDIRQ_H

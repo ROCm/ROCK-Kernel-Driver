@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.mem_pieces.c 1.5 05/17/01 18:14:23 cort
+ */
+/*
  *    Copyright (c) 1996 Paul Mackerras <paulus@cs.anu.edu.au>
  *      Changes to accomodate Power Macintoshes.
  *    Cort Dougan <cort@cs.nmt.edu>

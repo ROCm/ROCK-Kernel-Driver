@@ -1,6 +1,7 @@
 /*
- * $Id: semaphore.c,v 1.1 1999/08/31 15:11:44 cort Exp $
- *
+ * BK Id: SCCS/s.semaphore.c 1.12 05/17/01 18:14:22 cort
+ */
+/*
  * PowerPC-specific semaphore code.
  *
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>

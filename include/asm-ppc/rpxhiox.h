@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.rpxhiox.h 1.3 05/17/01 18:14:25 cort
+ */
 
 /*
  * The Embedded Planet HIOX expansion card definitions.

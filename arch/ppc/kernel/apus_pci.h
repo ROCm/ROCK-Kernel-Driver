@@ -1,10 +1,11 @@
 /*
+ * BK Id: SCCS/s.apus_pci.h 1.4 05/17/01 18:14:21 cort
+ */
+/*
  * Phase5 CybervisionPPC (TVP4020) definitions for the Permedia2 framebuffer
  * driver.
  *
  * Copyright (c) 1998-1999 Ilario Nardinocchi (nardinoc@CS.UniBO.IT)
- * --------------------------------------------------------------------------
- * $Id: cvisionppc.h,v 1.9 1999/03/12 09:45:06 illo Exp $
  * --------------------------------------------------------------------------
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file README.legal in the main directory of this archive

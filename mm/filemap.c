@@ -2571,11 +2571,14 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	 *	Linus frestrict idea will clean these up nicely..
 	 */
 	 
-	if (pos > inode->i_sb->s_maxbytes)
+	if (pos >= inode->i_sb->s_maxbytes)
 	{
-		send_sig(SIGXFSZ, current, 0);
-		err = -EFBIG;
-		goto out;	
+		if (count || pos > inode->i_sb->s_maxbytes) {
+			send_sig(SIGXFSZ, current, 0);
+			err = -EFBIG;
+			goto out;
+		}
+		/* zero-length writes at ->s_maxbytes are OK */
 	}
 
 	if (pos + count > inode->i_sb->s_maxbytes)

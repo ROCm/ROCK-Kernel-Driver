@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.ppc8260_pic.h 1.7 05/17/01 18:14:21 cort
+ */
 
 #ifndef _PPC_KERNEL_PPC8260_H
 #define _PPC_KERNEL_PPC8260_H

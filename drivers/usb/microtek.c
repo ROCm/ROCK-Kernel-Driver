@@ -115,6 +115,7 @@
  *      20010311 Remove all timeouts and tidy up generally (john)
  *	20010320 check return value of scsi_register()
  *	20010320 Version 0.4.3
+ *	20010408 Identify version on module load.
  */
 
 #include <linux/module.h>
@@ -138,6 +139,13 @@
 #include "../scsi/sd.h"
 
 #include "microtek.h"
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.4.3"
+#define DRIVER_AUTHOR "John Fremlin <vii@penguinpowered.com>, Oliver Neukum <Oliver.Neukum@lrz.uni-muenchen.de>"
+#define DRIVER_DESC "Microtek Scanmaker X6 USB scanner driver"
 
 /* Should we do debugging? */
 
@@ -1021,6 +1029,9 @@ int __init microtek_drv_init(void)
 		MTS_DEBUG("driver registered.\n");
 	}
 
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
+
 	return 0;
 }
 
@@ -1050,5 +1061,6 @@ void __exit microtek_drv_exit(void)
 module_init(microtek_drv_init);
 module_exit(microtek_drv_exit);
 
-MODULE_AUTHOR("John Fremlin <vii@penguinpowered.com>, Oliver Neukum <Oliver.Neukum@lrz.uni-muenchen.de>");
-MODULE_DESCRIPTION("Microtek Scanmaker X6 USB scanner driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+

@@ -1097,7 +1097,7 @@ static int md_import_device (kdev_t newdev, int on_disk)
 	}
 	memset(rdev, 0, sizeof(*rdev));
 
-	if (get_super(newdev)) {
+	if (is_mounted(newdev)) {
 		printk("md: can not import %s, has active inodes!\n",
 			partition_name(newdev));
 		err = -EBUSY;
@@ -1735,7 +1735,7 @@ static int do_md_stop (mddev_t * mddev, int ro)
  	}
  
  	/* this shouldn't be needed as above would have fired */
-	if (!ro && get_super(dev)) {
+	if (!ro && is_mounted(dev)) {
 		printk (STILL_MOUNTED, mdidx(mddev));
 		OUT(-EBUSY);
 	}

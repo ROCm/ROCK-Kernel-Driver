@@ -1119,8 +1119,10 @@ S: 65183 Wiesbaden
 S: Germany
 
 N: Christoph Hellwig
-E: chhellwig@gmx.net
-D: Sound/OSS hacking
+E: hch@caldera.de
+E: hch@infradead.org
+D: misc driver & makefile hacking
+D: freevxfs driver
 S: Triftstraﬂe 26
 S: 38644 Goslar
 S: Germany

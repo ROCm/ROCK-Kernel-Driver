@@ -1,6 +1,6 @@
-/* $Id: mtfsb1.c,v 1.1 1999/08/23 19:00:17 cort Exp $
+/*
+ * BK Id: SCCS/s.mtfsb1.c 1.6 05/17/01 18:14:23 cort
  */
-
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <asm/uaccess.h>

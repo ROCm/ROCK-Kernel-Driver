@@ -505,6 +505,12 @@ M:	mike.mclagan@linux.org
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+FREEVXFS FILESYSTEM
+P:	Christoph Hellwig
+M:	hch@caldera.de
+W:	ftp://ftp.openlinux.org/pub/people/hch/vxfs
+S:	Maintained
+
 FTAPE/QIC-117
 P:	Claus-Justus Heine
 M:	claus@momo.math.rwth-aachen.de

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.types.c 1.5 05/17/01 18:14:23 cort
+ */
 
 #include "soft-fp.h"
 #include "double.h"

@@ -863,9 +863,12 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		req = _nfs_find_request(inode, page);
 		if (req) {
 			if (!nfs_lock_request(req)) {
+				int error;
 				spin_unlock(&nfs_wreq_lock);
-				nfs_wait_on_request(req);
+				error = nfs_wait_on_request(req);
 				nfs_release_request(req);
+				if (error < 0)
+					return ERR_PTR(error);
 				continue;
 			}
 			spin_unlock(&nfs_wreq_lock);

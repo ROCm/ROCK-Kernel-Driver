@@ -50,12 +50,15 @@
 #include <linux/module.h>
 #include "pegasus.h"
 
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.4.18 2001/03/18 (C) 1999-2000"
+#define DRIVER_AUTHOR "Petko Manolov <petkan@dce.bg>"
+#define DRIVER_DESC "ADMtek AN986 Pegasus USB Ethernet driver"
 
 #define	PEGASUS_USE_INTR
 #define	PEGASUS_WRITE_EEPROM
-
-static const char *version = __FILE__ ": v0.4.18 2001/03/18 (C) 1999-2000 Petko Manolov (petkan@dce.bg)";
-
 
 static int loopback = 0;
 static int mii_mode = 0;
@@ -78,8 +81,8 @@ static struct usb_device_id pegasus_ids[] = {
 };
 
 
-MODULE_AUTHOR("Petko Manolov <petkan@dce.bg>");
-MODULE_DESCRIPTION("ADMtek AN986 Pegasus USB Ethernet driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_PARM(loopback, "i");
 MODULE_PARM(mii_mode, "i");
 MODULE_PARM_DESC(loopback, "Enable MAC loopback mode (bit 0)");
@@ -902,7 +905,8 @@ static struct usb_driver pegasus_driver = {
 
 int __init pegasus_init(void)
 {
-	info( "%s", version );
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return usb_register( &pegasus_driver );
 }
 

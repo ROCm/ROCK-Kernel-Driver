@@ -508,6 +508,7 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
                     VDEB(printk("port_base=%x\n", port_base));
                     break;
                 }
+                release_region(ports[i], 0x10);
             }
         }
     }

@@ -14,6 +14,8 @@
  * Richard L. Sites and Richard T. Witek.
  */
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <sys/fcntl.h>

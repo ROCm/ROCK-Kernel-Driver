@@ -12,7 +12,6 @@
  * Hitachi 7751 and the STM ST40 STB1.
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/irq.h>

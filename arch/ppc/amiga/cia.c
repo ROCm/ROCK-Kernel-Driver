@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.cia.c 1.7 05/21/01 00:48:24 cort
+ */
+/*
  *  linux/arch/m68k/amiga/cia.c - CIA support
  *
  *  Copyright (C) 1996 Roman Zippel

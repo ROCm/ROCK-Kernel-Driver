@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.align.c 1.5 05/17/01 18:14:21 cort
+ */
+/*
  * align.c - handle alignment exceptions for the Power PC.
  *
  * Copyright (c) 1996 Paul Mackerras <paulus@cs.anu.edu.au>

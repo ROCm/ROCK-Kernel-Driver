@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.walnut_setup.h 1.5 05/17/01 18:14:22 cort
+ */
+/*
  *
  *    Copyright (c) 1999-2000 Grant Erickson <grant@lcse.umn.edu>
  *

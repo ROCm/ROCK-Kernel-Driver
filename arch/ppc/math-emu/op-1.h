@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.op-1.h 1.5 05/17/01 18:14:23 cort
+ */
+/*
  * Basic one-word fraction declaration and manipulation.
  */
 

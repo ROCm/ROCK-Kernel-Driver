@@ -392,7 +392,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	}
 }
 
-void __init bdev_init(void)
+void __init bdev_cache_init(void)
 {
 	int i;
 	struct list_head *head = bdev_hashtable;

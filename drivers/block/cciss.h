@@ -15,6 +15,11 @@
 
 #define MAJOR_NR COMPAQ_CISS_MAJOR 
 
+struct my_sg {
+	int len;
+	char *start_addr;
+};
+
 struct ctlr_info;
 typedef struct ctlr_info ctlr_info_t;
 
@@ -42,8 +47,7 @@ struct ctlr_info
 	char	devname[8];
 	char    *product_name;
 	char	firm_ver[4]; // Firmware version 
-	unchar  pci_bus;
-        unchar  pci_dev_fn;
+	struct pci_dev *pdev;
 	__u32	board_id;
 	ulong   vaddr;
 	__u32	paddr;	
@@ -70,7 +74,9 @@ struct ctlr_info
 
 	//* pointers to command and error info pool */ 
 	CommandList_struct 	*cmd_pool;
+	dma_addr_t		cmd_pool_dhandle; 
 	ErrorInfo_struct 	*errinfo_pool;
+	dma_addr_t		errinfo_pool_dhandle; 
         __u32   		*cmd_pool_bits;
 	int			nr_allocs;
 	int			nr_frees; 

@@ -1,4 +1,5 @@
-# $Id: config.in,v 1.106 1999/09/14 19:21:18 cort Exp $
+# BK Id: SCCS/s.config.in 1.24 05/21/01 00:48:24 cort
+#
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
@@ -105,10 +106,6 @@ if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ];then
   bool 'AltiVec Support' CONFIG_ALTIVEC
 fi
 
-if [ "$CONFIG_ALL_PPC" != "y" ];then
-  define_bool CONFIG_MACH_SPECIFIC y
-fi
-
 if [ "$CONFIG_4xx" = "y" -o "$CONFIG_8xx" = "y" ]; then
   bool 'Math emulation' CONFIG_MATH_EMULATION
 fi
@@ -135,7 +132,8 @@ else
      define_bool CONFIG_PCI $CONFIG_PCI_QSPAN
   else
      if [ "$CONFIG_APUS" = "y" ]; then
-       bool 'PCI for Permedia2' CONFIG_PCI
+       bool 'PCI for Permedia2' CONFIG_PCI_PERMEDIA
+       define_bool CONFIG_PCI $CONFIG_PCI_PERMEDIA
      else
        define_bool CONFIG_PCI y
      fi

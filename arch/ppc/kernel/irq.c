@@ -1,6 +1,7 @@
 /*
- * $Id: irq.c,v 1.113 1999/09/17 17:22:56 cort Exp $
- *
+ * BK Id: SCCS/s.irq.c 1.23 05/17/01 18:14:21 cort
+ */
+/*
  *  arch/ppc/kernel/irq.c
  *
  *  Derived from arch/i386/kernel/irq.c

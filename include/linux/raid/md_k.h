@@ -36,6 +36,7 @@ static inline int pers_to_level (int pers)
 		case RAID5:		return 5;
 	}
 	panic("pers_to_level()");
+	return MD_RESERVED;
 }
 
 extern inline int level_to_pers (int level)

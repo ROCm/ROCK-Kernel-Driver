@@ -56,6 +56,11 @@ typedef struct {
 
 #ifdef __KERNEL__
 
+struct my_sg {
+	int size;
+	char *start_addr;
+};
+
 struct ctlr_info;
 typedef struct ctlr_info ctlr_info_t;
 
@@ -104,6 +109,7 @@ struct ctlr_info {
 	cmdlist_t *reqQ;
 	cmdlist_t *cmpQ;
 	cmdlist_t *cmd_pool;
+	dma_addr_t cmd_pool_dhandle;
 	__u32	*cmd_pool_bits;
 
 	unsigned int Qdepth;

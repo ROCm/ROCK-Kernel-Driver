@@ -29,6 +29,7 @@
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/bootmem.h>
+#include <linux/pci.h>
 
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/blk.h>
@@ -49,7 +50,6 @@ static struct notifier_block alpha_panic_block = {
 #include <asm/hwrpb.h>
 #include <asm/dma.h>
 #include <asm/io.h>
-#include <asm/pci.h>
 #include <asm/mmu_context.h>
 #include <asm/console.h>
 

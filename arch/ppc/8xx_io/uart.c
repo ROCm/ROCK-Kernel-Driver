@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.uart.c 1.10 05/17/01 18:14:20 cort
+ */
+/*
  *  UART driver for MPC860 CPM SCC or SMC
  *  Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
  *

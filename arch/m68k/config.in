@@ -192,7 +192,7 @@ if [ "$CONFIG_SCSI" != "n" ]; then
       int  'Maximum number of SCSI disks that can be loaded as modules' CONFIG_SD_EXTRA_DEVS 40
    fi
    dep_tristate '  SCSI tape support' CONFIG_CHR_DEV_ST $CONFIG_SCSI
-   if [ "$CONFIG_BLK_DEV_ST" != "n" ]; then
+   if [ "$CONFIG_CHR_DEV_ST" != "n" ]; then
       int  'Maximum number of SCSI tapes that can be loaded as modules' CONFIG_ST_EXTRA_DEVS 2
    fi
    dep_tristate '  SCSI CD-ROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI

@@ -1,3 +1,6 @@
+/*
+ * BK Id: SCCS/s.irq.h 1.9 05/17/01 18:14:24 cort
+ */
 #ifdef __KERNEL__
 #ifndef _ASM_IRQ_H
 #define _ASM_IRQ_H

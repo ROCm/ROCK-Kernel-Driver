@@ -29,6 +29,9 @@
  * mknod /dev/mustek c 180 32
  *
  * The driver supports only one camera.
+ * 
+ * (08/04/2001) gb
+ * Identify version on module load.
  *
  * version 0.7.5
  * Fixed potential SMP races with Spinlocks.
@@ -90,8 +93,12 @@
 
 #include <linux/usb.h>
 
-#define VERSION 	"0.7.5"
-#define RELEASE_DATE 	"(30/10/2000)"
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v0.7.5 (30/10/2000)"
+#define DRIVER_AUTHOR "Henning Zabel <henning@uni-paderborn.de>"
+#define DRIVER_DESC "USB Driver for Mustek MDC800 Digital Camera"
 
 /* Vendor and Product Information */
 #define MDC800_VENDOR_ID 	0x055f
@@ -925,8 +932,8 @@ int __init usb_mdc800_init (void)
 	if (usb_register (&mdc800_usb_driver) < 0)
 		goto cleanup_on_fail;
 
-	info ("Mustek Digital Camera Driver " VERSION " (MDC800)");
-	info (RELEASE_DATE " Henning Zabel <henning@uni-paderborn.de>");
+	info (DRIVER_VERSION " " DRIVER_AUTHOR);
+	info (DRIVER_DESC);
 
 	return 0;
 
@@ -969,9 +976,9 @@ void __exit usb_mdc800_cleanup (void)
 	mdc800=0;
 }
 
-
-MODULE_AUTHOR ("Henning Zabel <henning@uni-paderborn.de>");
-MODULE_DESCRIPTION ("USB Driver for Mustek MDC800 Digital Camera");
-
 module_init (usb_mdc800_init);
 module_exit (usb_mdc800_cleanup);
+
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+

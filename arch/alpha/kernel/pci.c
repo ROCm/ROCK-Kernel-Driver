@@ -441,15 +441,15 @@ sys_pciconfig_iobase(long which, unsigned long bus, unsigned long dfn)
 			if (hose->index == bus) break;
 		if (!hose) return -ENODEV;
 	} else {
-	/* Special hook for ISA access.  */
-	if (bus == 0 && dfn == 0) {
-		hose = pci_isa_hose;
-	} else {
-		dev = pci_find_slot(bus, dfn);
-		if (!dev)
-			return -ENODEV;
-		hose = dev->sysdata;
-	}
+		/* Special hook for ISA access.  */
+		if (bus == 0 && dfn == 0) {
+			hose = pci_isa_hose;
+		} else {
+			dev = pci_find_slot(bus, dfn);
+			if (!dev)
+				return -ENODEV;
+			hose = dev->sysdata;
+		}
 	}
 
 	switch (which & ~IOBASE_FROM_HOSE) {
@@ -468,4 +468,12 @@ sys_pciconfig_iobase(long which, unsigned long bus, unsigned long dfn)
 	}
 
 	return -EOPNOTSUPP;
+}
+
+/* Return the index of the PCI controller for device PDEV. */
+int
+pci_controller_num(struct pci_dev *pdev)
+{
+        struct pci_controller *hose = pdev->sysdata;
+	return (hose ? hose->index : -ENXIO);
 }

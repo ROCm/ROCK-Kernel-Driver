@@ -1,4 +1,7 @@
 /*
+ * BK Id: SCCS/s.fec.c 1.12 05/18/01 07:54:04 patch
+ */
+/*
  * Fast Ethernet Controller (FEC) driver for Motorola MPC8xx.
  * Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
  *
@@ -1686,10 +1689,7 @@ int __init fec_enet_init(void)
 	/* Set MII speed to 2.5 MHz
 	*/
 	fecp->fec_mii_speed = fep->phy_speed =
-		(
-		  ( ((bd->bi_intfreq * 1000000) + 500000) / 2500000 / 2 )
-		  & 0x3F
-		) << 1;
+		(( (bd->bi_intfreq + 500000) / 2500000 / 2 ) & 0x3F ) << 1;
 #else
 	fecp->fec_mii_speed = 0;	/* turn off MDIO */
 #endif	/* CONFIG_USE_MDIO */

@@ -1,7 +1,8 @@
 /*
+ * BK Id: SCCS/s.hashtable.S 1.11 05/17/01 18:14:21 cort
+ */
+/*
  *  arch/ppc/kernel/hashtable.S
- *
- *  $Id: hashtable.S,v 1.6 1999/10/08 01:56:15 paulus Exp $
  *
  *  PowerPC version 
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)

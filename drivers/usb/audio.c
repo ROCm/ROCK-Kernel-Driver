@@ -92,6 +92,8 @@
  * 2000-11-26:  Thomas Sailer
  *              Workaround for Dallas DS4201. The DS4201 uses PCM8 as format tag for
  *              its 8 bit modes, but expects signed data (and should therefore have used PCM).
+ * 2001-04-08:  gb
+ *              Identify version on module load.
  *
  */
 
@@ -189,6 +191,13 @@
 #include <linux/usb.h>
 
 #include "audio.h"
+
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_AUTHOR "Alan Cox <alan@lxorguk.ukuu.org.uk>, Thomas Sailer (sailer@ife.ee.ethz.ch)"
+#define DRIVER_DESC "USB Audio Class driver"
 
 #define AUDIO_DEBUG 1
 
@@ -3746,6 +3755,8 @@ static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
 static int __init usb_audio_init(void)
 {
 	usb_register(&usb_audio_driver);
+	info(DRIVER_VERSION " " DRIVER_AUTHOR);
+	info(DRIVER_DESC);
 	return 0;
 }
 
@@ -3758,6 +3769,6 @@ static void __exit usb_audio_cleanup(void)
 module_init(usb_audio_init);
 module_exit(usb_audio_cleanup);
 
-MODULE_AUTHOR("Alan Cox <alan@lxorguk.ukuu.org.uk>, Thomas Sailer (sailer@ife.ee.ethz.ch)");
-MODULE_DESCRIPTION("USB Audio Class driver");
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 
