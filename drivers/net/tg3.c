@@ -1060,6 +1060,8 @@ static int tg3_phy_copper_begin(struct tg3 *tp)
 	u32 new_adv;
 	int i;
 
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+
 	if (tp->link_config.phy_is_low_power) {
 		/* Entering low power mode.  Disable gigabit and
 		 * 100baseT advertisements.
