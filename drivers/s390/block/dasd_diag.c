@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.38 $
+ * $Revision: 1.39 $
  */
 
 #include <linux/config.h>
@@ -414,6 +414,16 @@ dasd_diag_build_cp(struct dasd_device * device, struct request *req)
 }
 
 static int
+dasd_diag_free_cp(struct dasd_ccw_req *cqr, struct request *req)
+{
+	int status;
+
+	status = cqr->status == DASD_CQR_DONE;
+	dasd_sfree_request(cqr, cqr->device);
+	return status;
+}
+
+static int
 dasd_diag_fill_info(struct dasd_device * device,
 		    struct dasd_information2_t * info)
 {
@@ -475,6 +485,7 @@ struct dasd_discipline dasd_diag_discipline = {
 	.erp_action = dasd_diag_erp_action,
 	.erp_postaction = dasd_diag_erp_postaction,
 	.build_cp = dasd_diag_build_cp,
+	.free_cp = dasd_diag_free_cp,
 	.dump_sense = dasd_diag_dump_sense,
 	.fill_info = dasd_diag_fill_info,
 };
