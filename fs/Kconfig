@@ -496,6 +496,7 @@ config JOLIET
 config ZISOFS
 	bool "Transparent decompression extension"
 	depends on ISO9660_FS
+	select ZLIB_INFLATE
 	help
 	  This is a Linux-specific extension to RockRidge which lets you store
 	  data in compressed form on a CD-ROM and have it transparently
@@ -1047,6 +1048,8 @@ config JFFS2_FS
 	tristate "Journalling Flash File System v2 (JFFS2) support"
 	depends on MTD
 	select CRC32
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
 	help
 	  JFFS2 is the second generation of the Journalling Flash File System
 	  for use on diskless embedded devices. It provides improved wear
@@ -1092,6 +1095,7 @@ config JFFS2_FS_NAND
 
 config CRAMFS
 	tristate "Compressed ROM file system support"
+	select ZLIB_INFLATE
 	help
 	  Saying Y here includes support for CramFs (Compressed ROM File
 	  System).  CramFs is designed to be a simple, small, and compressed

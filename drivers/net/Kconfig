@@ -2268,6 +2268,8 @@ config PPP_SYNC_TTY
 config PPP_DEFLATE
 	tristate "PPP Deflate compression"
 	depends on PPP
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
 	---help---
 	  Support for the Deflate compression method for PPP, which uses the
 	  Deflate algorithm (the same algorithm that gzip uses) to compress
