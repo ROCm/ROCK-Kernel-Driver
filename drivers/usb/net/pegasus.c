@@ -798,7 +798,6 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
 {
 	pegasus_t	*pegasus;
 	int		cmd;
-	char		tmp[128];
 
 	pegasus = net->priv;
 	if (get_user(cmd, (int *)uaddr))
@@ -808,9 +807,7 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
 		strncpy(info.driver, DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
 		strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
-		sprintf(tmp, "usb%d:%d", pegasus->usb->bus->busnum,
-		        pegasus->usb->devnum);
-		strncpy(info.bus_info, tmp, ETHTOOL_BUSINFO_LEN);
+		usb_make_path (pegasus->usb, info.bus_info, sizeof info.bus_info);
 		if (copy_to_user(uaddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

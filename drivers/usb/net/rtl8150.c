@@ -552,7 +552,6 @@ static int rtl8150_ethtool_ioctl(struct net_device *netdev, void *uaddr)
 {
 	rtl8150_t	*dev;
 	int		cmd;
-	char		tmp[128];
 
 	dev = netdev->priv;
 	if (get_user(cmd, (int *)uaddr))
@@ -564,9 +563,7 @@ static int rtl8150_ethtool_ioctl(struct net_device *netdev, void *uaddr)
 		
 		strncpy(info.driver, DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
 		strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
-		sprintf(tmp, "usb%d:%d", dev->udev->bus->busnum,
-		        dev->udev->devnum);
-		strncpy(info.bus_info, tmp, ETHTOOL_BUSINFO_LEN);
+		usb_make_path (dev->udev, info.bus_info, sizeof info.bus_info);
 		if (copy_to_user(uaddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

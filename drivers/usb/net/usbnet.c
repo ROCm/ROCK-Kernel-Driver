@@ -834,10 +834,10 @@ static void nc_dump_registers (struct usbnet *dev)
 static inline void nc_dump_usbctl (struct usbnet *dev, u16 usbctl)
 {
 #ifdef DEBUG
-	devdbg (dev, "net1080 %03d/%03d usbctl 0x%x:%s%s%s%s%s;"
+	devdbg (dev, "net1080 %s-%s usbctl 0x%x:%s%s%s%s%s;"
 			" this%s%s;"
 			" other%s%s; r/o 0x%x",
-		dev->udev->bus->busnum, dev->udev->devnum,
+		dev->udev->bus->bus_name, dev->udev->devpath,
 		usbctl,
 		(usbctl & USBCTL_ENABLE_LANG) ? " lang" : "",
 		(usbctl & USBCTL_ENABLE_MFGR) ? " mfgr" : "",
@@ -879,10 +879,10 @@ static inline void nc_dump_usbctl (struct usbnet *dev, u16 usbctl)
 static inline void nc_dump_status (struct usbnet *dev, u16 status)
 {
 #ifdef DEBUG
-	devdbg (dev, "net1080 %03d/%03d status 0x%x:"
+	devdbg (dev, "net1080 %s-%s status 0x%x:"
 			" this (%c) PKT=%d%s%s%s;"
 			" other PKT=%d%s%s%s; unspec 0x%x",
-		dev->udev->bus->busnum, dev->udev->devnum,
+		dev->udev->bus->bus_name, dev->udev->devpath,
 		status,
 
 		// XXX the packet counts don't seem right
@@ -917,8 +917,8 @@ static inline void nc_dump_status (struct usbnet *dev, u16 status)
 static inline void nc_dump_ttl (struct usbnet *dev, u16 ttl)
 {
 #ifdef DEBUG
-	devdbg (dev, "net1080 %03d/%03d ttl 0x%x this = %d, other = %d",
-		dev->udev->bus->busnum, dev->udev->devnum,
+	devdbg (dev, "net1080 %s-%s ttl 0x%x this = %d, other = %d",
+		dev->udev->bus->bus_name, dev->udev->devpath,
 		ttl,
 
 		TTL_THIS (ttl),
@@ -941,7 +941,8 @@ static int net1080_reset (struct usbnet *dev)
 	// nc_dump_registers (dev);
 
 	if ((retval = nc_register_read (dev, REG_STATUS, vp)) < 0) {
-		dbg ("can't read dev %d status: %d", dev->udev->devnum, retval);
+		dbg ("can't read %s-%s status: %d",
+			dev->udev->bus->bus_name, dev->udev->devpath, retval);
 		goto done;
 	}
 	status = *vp;
@@ -1504,10 +1505,9 @@ static int usbnet_open (struct net_device *net)
 
 	// put into "known safe" state
 	if (info->reset && (retval = info->reset (dev)) < 0) {
-		devinfo (dev, "open reset fail (%d) usbnet bus%d%s, %s",
+		devinfo (dev, "open reset fail (%d) usbnet usb-%s-%s, %s",
 			retval,
-			// FIXME busnum is unstable
-			dev->udev->bus->busnum, dev->udev->devpath,
+			dev->udev->bus->bus_name, dev->udev->devpath,
 			info->description);
 		goto done;
 	}
@@ -1557,9 +1557,7 @@ static int usbnet_ethtool_ioctl (struct net_device *net, void *useraddr)
 		strncpy (info.version, DRIVER_VERSION, sizeof info.version);
 		strncpy (info.fw_version, dev->driver_info->description,
 			sizeof info.fw_version);
-		snprintf (info.bus_info, sizeof info.bus_info, "USB bus%d%s",
-			/* FIXME busnums are bogus/unstable IDs */
-			dev->udev->bus->busnum, dev->udev->devpath);
+		usb_make_path (dev->udev, info.bus_info, sizeof info.bus_info);
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
 		return 0;
@@ -1847,9 +1845,8 @@ static void usbnet_disconnect (struct usb_device *udev, void *ptr)
 {
 	struct usbnet	*dev = (struct usbnet *) ptr;
 
-	devinfo (dev, "unregister usbnet bus%d%s, %s",
-		// FIXME busnum is unstable
-		udev->bus->busnum, udev->devpath,
+	devinfo (dev, "unregister usbnet usb-%s-%s, %s",
+		udev->bus->bus_name, udev->devpath,
 		dev->driver_info->description);
 	
 	unregister_netdev (&dev->net);
@@ -1938,9 +1935,8 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 	net->do_ioctl = usbnet_ioctl;
 
 	register_netdev (&dev->net);
-	devinfo (dev, "register usbnet bus%d%s, %s",
-		// FIXME busnum is unstable
-		udev->bus->busnum, udev->devpath,
+	devinfo (dev, "register usbnet usb-%s-%s, %s",
+		udev->bus->bus_name, udev->devpath,
 		dev->driver_info->description);
 
 	// ok, it's ready to go.
