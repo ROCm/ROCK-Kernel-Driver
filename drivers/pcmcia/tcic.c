@@ -344,10 +344,14 @@ static int __init is_active(int s)
 
     if ((sstat & TCIC_SSTAT_CD) && (pwr & TCIC_PWR_VCC(s)) &&
 	(scf1 & TCIC_SCF1_IOSTS) && (ioctl & TCIC_ICTL_ENA) &&
-	(check_region(base, num) != 0) && ((base & 0xfeef) != 0x02e8))
-	return 1;
-    else
-	return 0;
+	((base & 0xfeef) != 0x02e8)) {
+	struct resource *res = request_region(base, num, "tcic-2");
+	if (!res) /* region is busy */
+	    return 1;
+	release_region(base, num);
+    }
+
+    return 0;
 }
 
 /*======================================================================
