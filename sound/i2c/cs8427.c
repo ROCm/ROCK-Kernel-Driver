@@ -553,6 +553,7 @@ int snd_cs8427_iec958_pcm(snd_i2c_device_t *cs8427, unsigned int rate)
 			       SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->playback.pcm_ctl->id);
 	reset = chip->rate != rate;
+	chip->rate = rate;
 	snd_i2c_unlock(cs8427->bus);
 	if (reset)
 		snd_cs8427_reset(cs8427);

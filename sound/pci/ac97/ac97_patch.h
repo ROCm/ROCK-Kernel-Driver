@@ -34,6 +34,7 @@ int patch_sigmatel_stac9708(ac97_t * ac97);
 int patch_sigmatel_stac9721(ac97_t * ac97);
 int patch_sigmatel_stac9744(ac97_t * ac97);
 int patch_sigmatel_stac9756(ac97_t * ac97);
+int patch_sigmatel_stac9758(ac97_t * ac97);
 int patch_cirrus_cs4299(ac97_t * ac97);
 int patch_cirrus_spdif(ac97_t * ac97);
 int patch_conexant(ac97_t * ac97);
