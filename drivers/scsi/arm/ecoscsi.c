@@ -52,8 +52,8 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-#include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include "../scsi.h"
+#include "../hosts.h"
 
 #define NCR5380_implementation_fields	int port, ctrl
 #define NCR5380_local_declare()		struct Scsi_Host *_instance
@@ -66,7 +66,7 @@
 #define NCR5380_queue_command		ecoscsi_queue_command
 #define NCR5380_proc_info		ecoscsi_proc_info
 
-#include "../../scsi/NCR5380.h"
+#include "../NCR5380.h"
 
 #define ECOSCSI_PUBLIC_RELEASE 1
 
@@ -239,7 +239,7 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 #define BOARD_NORMAL	0
 #define BOARD_NCR53C400	1
 
-#include "../../scsi/NCR5380.c"
+#include "../NCR5380.c"
 
 static Scsi_Host_Template ecoscsi_template =  {
 	.module		= THIS_MODULE,

@@ -146,7 +146,7 @@ cyber2000_seqw(unsigned int reg, unsigned int val, struct cfb_info *cfb)
  * Hardware Cyber2000 Acceleration
  */
 static void
-cyber2000fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+cyber2000fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	struct cfb_info *cfb = (struct cfb_info *)info;
 	unsigned long dst, col;
@@ -178,7 +178,7 @@ cyber2000fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 }
 
 static void
-cyber2000fb_copyarea(struct fb_info *info, struct fb_copyarea *region)
+cyber2000fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 {
 	struct cfb_info *cfb = (struct cfb_info *)info;
 	unsigned int cmd = CO_CMD_L_PATTERN_FGCOL;
@@ -189,24 +189,25 @@ cyber2000fb_copyarea(struct fb_info *info, struct fb_copyarea *region)
 		return;
 	}
 
-	if (region->sx < region->dx) {
-		region->sx += region->width - 1;
-		region->dx += region->width - 1;
-		cmd |= CO_CMD_L_INC_LEFT;
-	}
-
-	if (region->sy < region->dy) {
-		region->sy += region->height - 1;
-		region->dy += region->height - 1;
-		cmd |= CO_CMD_L_INC_UP;
-	}
-
 	cyber2000fb_writeb(0, CO_REG_CONTROL, cfb);
 	cyber2000fb_writew(region->width - 1, CO_REG_PIXWIDTH, cfb);
 	cyber2000fb_writew(region->height - 1, CO_REG_PIXHEIGHT, cfb);
 
 	src = region->sx + region->sy * cfb->fb.var.xres_virtual;
 	dst = region->dx + region->dy * cfb->fb.var.xres_virtual;
+
+	if (region->sx < region->dx) {
+		src += region->width - 1;
+		dst += region->width - 1;
+		cmd |= CO_CMD_L_INC_LEFT;
+	}
+
+	if (region->sy < region->dy) {
+		src += (region->height - 1) * cfb->fb.var.xres_virtual;
+		dst += (region->height - 1) * cfb->fb.var.xres_virtual;
+		cmd |= CO_CMD_L_INC_UP;
+	}
+
 	if (cfb->fb.var.bits_per_pixel == 24) {
 		cyber2000fb_writeb(dst, CO_REG_X_PHASE, cfb);
 		src *= 3;
@@ -221,9 +222,9 @@ cyber2000fb_copyarea(struct fb_info *info, struct fb_copyarea *region)
 }
 
 static void
-cyber2000fb_imageblit(struct fb_info *info, struct fb_image *image)
+cyber2000fb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
-	struct cfb_info *cfb = (struct cfb_info *)info;
+//	struct cfb_info *cfb = (struct cfb_info *)info;
 
 //	if (!(cfb->fb.var.accel_flags & FB_ACCELF_TEXT)) {
 		cfb_imageblit(info, image);
@@ -754,7 +755,6 @@ cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	var->blue.msb_right	= 0;
 
 	switch (var->bits_per_pixel) {
-#ifdef FBCON_HAS_CFB8
 	case 8:	/* PSEUDOCOLOUR, 256 */
 		var->transp.offset	= 0;
 		var->transp.length	= 0;
@@ -765,8 +765,7 @@ cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		var->blue.offset	= 0;
 		var->blue.length	= 8;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB16
+
 	case 16:/* DIRECTCOLOUR, 64k or 32k */
 		switch (var->green.length) {
 		case 6: /* RGB565, 64k */
@@ -804,8 +803,7 @@ cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 			break;
 		}
 		break;
-#endif
-#ifdef FBCON_HAS_CFB24
+
 	case 24:/* TRUECOLOUR, 16m */
 		var->transp.offset	= 0;
 		var->transp.length	= 0;
@@ -816,8 +814,7 @@ cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		var->blue.offset	= 0;
 		var->blue.length	= 8;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB32
+
 	case 32:/* TRUECOLOUR, 16m */
 		var->transp.offset	= 24;
 		var->transp.length	= 8;
@@ -828,7 +825,7 @@ cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		var->blue.offset	= 0;
 		var->blue.length	= 8;
 		break;
-#endif
+
 	default:
 		return -EINVAL;
 	}
@@ -1601,15 +1598,17 @@ cyberpro_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	/*
 	 * Use MCLK from BIOS. FIXME: what about hotplug?
 	 */
-#ifndef __arm__
 	cfb->mclk_mult = cyber2000_grphr(EXT_MCLK_MULT, cfb);
 	cfb->mclk_div  = cyber2000_grphr(EXT_MCLK_DIV, cfb);
-#else
+
+#ifdef __arm__
 	/*
 	 * MCLK on the NetWinder and the Shark is fixed at 75MHz
 	 */
-	cfb->mclk_mult = 0xdb;
-	cfb->mclk_div  = 0x54;
+	if (machine_is_netwinder()) {
+		cfb->mclk_mult = 0xdb;
+		cfb->mclk_div  = 0x54;
+	}
 #endif
 
 	err = cyberpro_common_probe(cfb);

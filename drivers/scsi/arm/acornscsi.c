@@ -149,8 +149,8 @@
 #include <asm/irq.h>
 #include <asm/ecard.h>
 
-#include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include "../scsi.h"
+#include "../hosts.h"
 #include "acornscsi.h"
 #include "msgqueue.h"
 #include "scsi.h"
@@ -2929,6 +2929,35 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
 		prev = host->status[devidx][statptr].when;
 	    }
 	}
+    }
+
+    p += sprintf(p, "\nAttached devices:\n");
+
+    list_for_each_entry(scd, &instance->my_devices, siblings) {
+	p += sprintf(p, "Device/Lun TaggedQ      Sync\n");
+	p += sprintf(p, "     %d/%d   ", scd->id, scd->lun);
+	if (scd->tagged_supported)
+		p += sprintf(p, "%3sabled(%3d) ",
+			     scd->tagged_queue ? "en" : "dis",
+			     scd->current_tag);
+	else
+		p += sprintf(p, "unsupported  ");
+
+	if (host->device[scd->id].sync_xfer & 15)
+		p += sprintf(p, "offset %d, %d ns\n",
+			     host->device[scd->id].sync_xfer & 15,
+			     acornscsi_getperiod(host->device[scd->id].sync_xfer));
+	else
+		p += sprintf(p, "async\n");
+
+	pos = p - buffer;
+	if (pos + begin < offset) {
+	    begin += pos;
+	    p = buffer;
+	}
+	pos = p - buffer;
+	if (pos + begin > offset + length)
+	    break;
     }
 
     pos = p - buffer;
