@@ -1,7 +1,7 @@
 /*
  * USB Serial Converter driver
  *
- * Copyright (C) 1999 - 2002 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 1999 - 2003 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (c) 2000 Peter Berger (pberger@brimson.com)
  * Copyright (c) 2000 Al Borchers (borchers@steinerpoint.com)
  *

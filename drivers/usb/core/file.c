@@ -11,7 +11,7 @@
  	more docs, etc)
  * (C) Copyright Yggdrasil Computing, Inc. 2000
  *     (usb_device_id matching changes by Adam J. Richter)
- * (C) Copyright Greg Kroah-Hartman 2002
+ * (C) Copyright Greg Kroah-Hartman 2002-2003
  *
  */
 
