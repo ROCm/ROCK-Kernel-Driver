@@ -623,3 +623,13 @@ int in_gate_area(struct task_struct *task, unsigned long addr)
 	struct vm_area_struct *vma = get_gate_vma(task);
 	return (addr >= vma->vm_start) && (addr < vma->vm_end);
 }
+
+/* Use this when you have no reliable task/vma, typically from interrupt
+ * context.  It is less reliable than using the task's vma and may give
+ * false positives.
+ */
+int in_gate_area_no_task(unsigned long addr)
+{
+	return ((addr >= VSYSCALL_START) && (addr < VSYSCALL_END) ||
+		(addr >= VSYSCALL32_BASE) && (addr < VSYSCALL32_END));
+}
