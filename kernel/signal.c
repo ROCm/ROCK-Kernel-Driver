@@ -837,7 +837,7 @@ force_sig_specific(int sig, struct task_struct *t)
 	 && (task_curr(p) || !signal_pending(p)))
 
 
-static inline void
+static void
 __group_complete_signal(int sig, struct task_struct *p, unsigned int mask)
 {
 	struct task_struct *t;
