@@ -51,7 +51,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "cs5520.h"
+#define DISPLAY_CS5520_TIMINGS
 
 #if defined(DISPLAY_CS5520_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
@@ -251,7 +251,24 @@ static void __devinit init_hwif_cs5520(ide_hwif_t *hwif)
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
 }
-		
+
+#define DECLARE_CS_DEV(name_str)				\
+	{							\
+		.name		= name_str,			\
+		.init_chipset	= init_chipset_cs5520,		\
+		.init_setup_dma = cs5520_init_setup_dma,	\
+		.init_hwif	= init_hwif_cs5520,		\
+		.channels	= 2,				\
+		.autodma	= AUTODMA,			\
+		.bootable	= ON_BOARD,			\
+		.flags		= IDEPCI_FLAG_ISA_PORTS,	\
+	}
+
+static ide_pci_device_t cyrix_chipsets[] __devinitdata = {
+	/* 0 */ DECLARE_CS_DEV("Cyrix 5510"),
+	/* 1 */ DECLARE_CS_DEV("Cyrix 5520")
+};
+
 /*
  *	The 5510/5520 are a bit weird. They don't quite set up the way
  *	the PCI helper layer expects so we must do much of the set up 

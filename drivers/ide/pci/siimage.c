@@ -31,7 +31,8 @@
 
 #include <asm/io.h>
 
-#include "siimage.h"
+#undef SIIMAGE_VIRTUAL_DMAPIO
+#undef SIIMAGE_LARGE_DMA
 
 /**
  *	pdev_is_sata		-	check if device is SATA
@@ -1091,6 +1092,23 @@ static void __devinit init_hwif_siimage(ide_hwif_t *hwif)
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
 }
+
+#define DECLARE_SII_DEV(name_str)			\
+	{						\
+		.name		= name_str,		\
+		.init_chipset	= init_chipset_siimage,	\
+		.init_iops	= init_iops_siimage,	\
+		.init_hwif	= init_hwif_siimage,	\
+		.channels	= 2,			\
+		.autodma	= AUTODMA,		\
+		.bootable	= ON_BOARD,		\
+	}
+
+static ide_pci_device_t siimage_chipsets[] __devinitdata = {
+	/* 0 */ DECLARE_SII_DEV("SiI680"),
+	/* 1 */ DECLARE_SII_DEV("SiI3112 Serial ATA"),
+	/* 2 */ DECLARE_SII_DEV("Adaptec AAR-1210SA")
+};
 
 /**
  *	siimage_init_one	-	pci layer discovery entry
