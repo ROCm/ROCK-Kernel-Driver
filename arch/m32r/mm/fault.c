@@ -222,7 +222,8 @@ survive:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-	addr = (address & PAGE_MASK) | (error_code & ACE_INSTRUCTION);
+	addr = (address & PAGE_MASK);
+	set_thread_fault_code(error_code);
 	switch (handle_mm_fault(mm, vma, addr, write)) {
 		case VM_FAULT_MINOR:
 			tsk->min_flt++;
@@ -237,7 +238,7 @@ survive:
 		default:
 			BUG();
 	}
-
+	set_thread_fault_code(0);
 	up_read(&mm->mmap_sem);
 	return;
 
@@ -381,7 +382,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long vaddr,
 	unsigned long *entry1, *entry2;
 	unsigned long pte_data, flags;
 	unsigned int *entry_dat;
-	int inst = vaddr & 8;
+	int inst = get_thread_fault_code() & ACE_INSTRUCTION;
 	int i;
 
 	/* Ptrace may call this routine. */

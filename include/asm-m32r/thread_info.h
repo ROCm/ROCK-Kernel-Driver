@@ -99,6 +99,21 @@ static inline struct thread_info *current_thread_info(void)
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
+#define TI_FLAG_FAULT_CODE_SHIFT	28
+
+static inline void set_thread_fault_code(unsigned int val)
+{
+	struct thread_info *ti = current_thread_info();
+	ti->flags = (ti->flags & (~0 >> (32 - TI_FLAG_FAULT_CODE_SHIFT)))
+		| (val << TI_FLAG_FAULT_CODE_SHIFT);
+}
+
+static inline unsigned int get_thread_fault_code(void)
+{
+	struct thread_info *ti = current_thread_info();
+	return ti->flags >> TI_FLAG_FAULT_CODE_SHIFT;
+}
+
 #else /* !__ASSEMBLY__ */
 
 /* how to get the thread information struct from ASM */
@@ -123,6 +138,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_SINGLESTEP		4	/* restore singlestep on return to user mode */
 #define TIF_IRET		5	/* return with iret */
 #define TIF_POLLING_NRFLAG	16	/* true if poll_idle() is polling TIF_NEED_RESCHED */
+					/* 31..28 fault code */
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)
