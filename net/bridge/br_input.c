@@ -143,6 +143,9 @@ int br_handle_frame(struct sk_buff *skb)
 			return -1;
 		}
 
+		if (!memcmp(p->br->dev.dev_addr, dest, ETH_ALEN))
+			skb->pkt_type = PACKET_HOST;
+
 		NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
 			br_handle_frame_finish);
 		rcu_read_unlock();

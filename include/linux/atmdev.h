@@ -96,6 +96,8 @@ struct atm_dev_stats {
 					/* enable or disable single-copy */
 #define ATM_SETBACKEND	_IOW('a',ATMIOC_SPECIAL+2,atm_backend_t)
 					/* set backend handler */
+#define ATM_NEWBACKENDIF _IOW('a',ATMIOC_SPECIAL+3,atm_backend_t)
+					/* use backend to make new if */
 
 /*
  * These are backend handkers that can be set via the ATM_SETBACKEND call
@@ -104,7 +106,7 @@ struct atm_dev_stats {
  */
 #define ATM_BACKEND_RAW		0	
 #define ATM_BACKEND_PPP		1	/* PPPoATM - RFC2364 */
-#define ATM_BACKEND_BR_2684	2	/* Bridged RFC1483/2684 */
+#define ATM_BACKEND_BR2684	2	/* Bridged RFC1483/2684 */
 
 /* for ATM_GETTYPE */
 #define ATM_ITFTYP_LEN	8	/* maximum length of interface type name */
@@ -304,9 +306,6 @@ struct atm_vcc {
 	struct sockaddr_atmsvc local;
 	struct sockaddr_atmsvc remote;
 	void (*callback)(struct atm_vcc *vcc);
-	struct sk_buff_head listenq;
-	int		backlog_quota;	/* number of connection requests we */
-					/* can still accept */
 	int		reply;		/* also used by ATMTCP */
 	/* Multipoint part ------------------------------------------------- */
 	struct atm_vcc	*session;	/* session VCC descriptor */
