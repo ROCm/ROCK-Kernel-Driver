@@ -88,7 +88,6 @@
 #define SPEEDTOUCH_VENDORID		0x06b9
 #define SPEEDTOUCH_PRODUCTID		0x4061
 
-#define MAX_UDSL			1
 #define UDSL_OBUF_SIZE			32768
 #define UDSL_MINOR			48
 #define UDSL_NUMBER_RCV_URBS		1
@@ -138,7 +137,6 @@ struct udsl_usb_send_data_context {
  */
 
 struct udsl_instance_data {
-	int minor;
 	struct tasklet_struct recvqueue_tasklet;
 
 	/* usb device part */
@@ -156,8 +154,6 @@ struct udsl_instance_data {
 
 	struct atmsar_vcc_data *atmsar_vcc_list;
 };
-
-struct udsl_instance_data *minor_data[MAX_UDSL];
 
 static const char udsl_driver_name[] = "Alcatel SpeedTouch USB";
 
@@ -298,8 +294,9 @@ int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page)
 	int left = *pos;
 
 	if (!left--)
-		return sprintf (page, "Speed Touch USB:%d (%02x:%02x:%02x:%02x:%02x:%02x)\n",
-				instance->minor, atm_dev->esi[0], atm_dev->esi[1], atm_dev->esi[2],
+		return sprintf (page, "Speed Touch USB %s-%s (%02x:%02x:%02x:%02x:%02x:%02x)\n",
+				instance->usb_dev->bus->bus_name, instance->usb_dev->devpath,
+				atm_dev->esi[0], atm_dev->esi[1], atm_dev->esi[2],
 				atm_dev->esi[3], atm_dev->esi[4], atm_dev->esi[5]);
 
 	if (!left--)
@@ -841,18 +838,8 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data)
 {
-	struct usb_device *dev = interface_to_usbdev (intf);
-	struct udsl_instance_data *instance;
-	int i,retval;
-
-	for (i = 0; i < MAX_UDSL; i++)
-		if (minor_data[i] && (minor_data[i]->usb_dev == dev))
-			break;
-
-	if (i == MAX_UDSL)
-		return -EINVAL;
-
-	instance = minor_data[i];
+	struct udsl_instance_data *instance = usb_get_intfdata (intf);
+	int retval;
 
 	down(&udsl_usb_ioctl_lock);
 	switch (code) {
@@ -889,16 +876,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	MOD_INC_USE_COUNT;
 
-	for (i = 0; i < MAX_UDSL; i++)
-		if (minor_data[i] == NULL)
-			break;
-
-	if (i >= MAX_UDSL) {
-		printk (KERN_INFO "No minor table space available for SpeedTouch USB\n");
-		return -ENOMEM;
-	};
-
-	PDEBUG ("Device Accepted, assigning minor %d\n", i);
+	PDEBUG ("Device Accepted\n");
 
 	/* device init */
 	instance = kmalloc (sizeof (struct udsl_instance_data), GFP_KERNEL);
@@ -909,7 +887,6 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	/* initialize structure */
 	memset (instance, 0, sizeof (struct udsl_instance_data));
-	instance->minor = i;
 	instance->usb_dev = dev;
 	instance->rcvbufs = NULL;
 	spin_lock_init (&instance->sndqlock);
@@ -927,8 +904,6 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 		mac[5]);
 	udsl_atm_set_mac (instance, mac);
 
-	minor_data[instance->minor] = instance;
-
 	usb_set_intfdata (intf, instance);
 	return 0;
 }
@@ -936,11 +911,11 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 static void udsl_usb_disconnect (struct usb_interface *intf)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
-	int i;
+
+	PDEBUG ("disconnecting\n");
 
 	usb_set_intfdata (intf, NULL);
 	if (instance) {
-		i = instance->minor;
 		/* unlinking receive buffers */
 		udsl_usb_data_exit (instance);
 
@@ -948,10 +923,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		if (instance->atm_dev)
 			udsl_atm_stopdevice (instance);
 
-		PDEBUG ("disconnecting minor %d\n", i);
-
 		kfree (instance);
-		minor_data[i] = NULL;
 
 		MOD_DEC_USE_COUNT;
 	}
@@ -965,12 +937,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 static int __init udsl_usb_init (void)
 {
-	int i;
-
 	PDEBUG ("Initializing SpeedTouch Driver Version " DRIVER_VERSION "\n");
-
-	for (i = 0; i < MAX_UDSL; i++)
-		minor_data[i] = NULL;
 
 	return usb_register (&udsl_usb_driver);
 }
