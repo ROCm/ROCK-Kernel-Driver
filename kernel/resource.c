@@ -361,6 +361,49 @@ int insert_resource(struct resource *parent, struct resource *new)
 EXPORT_SYMBOL(insert_resource);
 
 /*
+ * Given an existing resource, change its start and size to match the
+ * arguments.  Returns -EBUSY if it can't fit.  Existing children of
+ * the resource are assumed to be immutable.
+ */
+int adjust_resource(struct resource *res, unsigned long start, unsigned long size)
+{
+	struct resource *tmp, *parent = res->parent;
+	unsigned long end = start + size - 1;
+	int result = -EBUSY;
+
+	write_lock(&resource_lock);
+
+	if ((start < parent->start) || (end > parent->end))
+		goto out;
+
+	for (tmp = res->child; tmp; tmp = tmp->sibling) {
+		if ((tmp->start < start) || (tmp->end > end))
+			goto out;
+	}
+
+	if (res->sibling && (res->sibling->start <= end))
+		goto out;
+
+	tmp = parent->child;
+	if (tmp != res) {
+		while (tmp->sibling != res)
+			tmp = tmp->sibling;
+		if (start <= tmp->end)
+			goto out;
+	}
+
+	res->start = start;
+	res->end = end;
+	result = 0;
+
+ out:
+	write_unlock(&resource_lock);
+	return result;
+}
+
+EXPORT_SYMBOL(adjust_resource);
+
+/*
  * This is compatibility stuff for IO resources.
  *
  * Note how this, unlike the above, knows about

@@ -1,3 +1,26 @@
+/* 
+ *    Private structs/constants for PARISC IOSAPIC support
+ *
+ *    Copyright (C) 2000 Hewlett Packard (Grant Grundler)
+ *    Copyright (C) 2000,2003 Grant Grundler (grundler at parisc-linux.org)
+ *    Copyright (C) 2002 Matthew Wilcox (willy at parisc-linux.org)
+ *
+ *
+ *    This program is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 2 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program; if not, write to the Free Software
+ *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 /*
 ** This file is private to iosapic driver.
 ** If stuff needs to be used by another driver, move it to a common file.
@@ -107,16 +130,16 @@ struct iosapic_irt {
 #endif
 
 struct vector_info {
-	struct iosapic_info *vi_ios;    /* I/O SAPIC this vector is on */
-	struct irt_entry *vi_irte;      /* IRT entry */
-	u32	*vi_eoi_addr;	/* precalculate EOI reg address */
-	u32	vi_eoi_data;	/* IA64: ?       PA: swapped txn_data */
-	int	vi_txn_irq;	/* virtual IRQ number for processor */
-	ulong	vi_txn_addr;    /* IA64: id_eid  PA: partial HPA */
-	ulong	vi_txn_data;    /* IA64: vector  PA: EIR bit */
-	u8	vi_status;	/* status/flags */
-	u8	vi_irqline;	/* INTINn(IRQ) */
-	char	vi_name[32];    /* user visible identity */
+	struct iosapic_info *iosapic;	/* I/O SAPIC this vector is on */
+	struct irt_entry *irte;		/* IRT entry */
+	u32	*eoi_addr;		/* precalculate EOI reg address */
+	u32	eoi_data;		/* IA64: ?       PA: swapped txn_data */
+	int	txn_irq;		/* virtual IRQ number for processor */
+	ulong	txn_addr;		/* IA64: id_eid  PA: partial HPA */
+	ulong	txn_data;		/* IA64: vector  PA: EIR bit */
+	u8	status;			/* status/flags */
+	u8	irqline;		/* INTINn(IRQ) */
+	char	name[32];		/* user visible identity */
 };
 
 

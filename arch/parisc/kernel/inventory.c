@@ -526,20 +526,6 @@ static void __init system_map_inventory(void)
 	int i;
 	long status = PDC_OK;
     
-#if defined(CONFIG_IOMMU_SBA) && defined(CONFIG_SUPERIO)
-	/*
-	 * Stop the suckyio usb controller on Astro based systems.
-	 * Otherwise the machine might crash during iommu setup.
-	 */
-	pdc_io_reset();
-
-	/*
-	 * Unfortunately if we reset devices here, serial console
-	 * stops working :-(
-	 */
-	/* pdc_io_reset_devices(); */
-#endif
-
 	for (i = 0; status != PDC_BAD_PROC && status != PDC_NE_MOD; i++) {
 		struct parisc_device *dev;
 		struct pdc_system_map_mod_info module_result;

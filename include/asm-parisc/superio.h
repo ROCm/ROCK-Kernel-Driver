@@ -1,25 +1,33 @@
 #ifndef _PARISC_SUPERIO_H
 #define _PARISC_SUPERIO_H
 
-/* Offsets to configuration and base address registers */
 #define IC_PIC1    0x20		/* PCI I/O address of master 8259 */
 #define IC_PIC2    0xA0		/* PCI I/O address of slave */
+
+/* Config Space Offsets to configuration and base address registers */
 #define SIO_CR     0x5A		/* Configuration Register */
-#define SIO_ACPIBAR 0x88		/* ACPI BAR */
+#define SIO_ACPIBAR 0x88	/* ACPI BAR */
 #define SIO_FDCBAR 0x90		/* Floppy Disk Controller BAR */
 #define SIO_SP1BAR 0x94		/* Serial 1 BAR */
 #define SIO_SP2BAR 0x98		/* Serial 2 BAR */
 #define SIO_PPBAR  0x9C		/* Parallel BAR */
 
-/* Interrupt triggers and routing */
 #define TRIGGER_1  0x67		/* Edge/level trigger register 1 */
 #define TRIGGER_2  0x68		/* Edge/level trigger register 2 */
-#define IR_SER     0x69		/* Serial 1 [0:3] and Serial 2 [4:7] */
-#define IR_PFD     0x6a		/* Parallel [0:3] and Floppy [4:7] */
-#define IR_IDE     0x6b		/* IDE1 [0:3] and IDE2 [4:7] */
-#define IR_USB     0x6d         /* USB [4:7] */
-#define IR_LOW     0x69		/* Lowest interrupt routing reg */
-#define IR_HIGH    0x71		/* Highest interrupt routing reg */
+
+/* Interrupt Routing Control registers */
+#define CFG_IR_SER    0x69	/* Serial 1 [0:3] and Serial 2 [4:7] */
+#define CFG_IR_PFD    0x6a	/* Parallel [0:3] and Floppy [4:7] */
+#define CFG_IR_IDE    0x6b	/* IDE1     [0:3] and IDE2 [4:7] */
+#define CFG_IR_INTAB  0x6c	/* PCI INTA [0:3] and INT B [4:7] */
+#define CFG_IR_INTCD  0x6d	/* PCI INTC [0:3] and INT D [4:7] */
+#define CFG_IR_PS2    0x6e	/* PS/2 KBINT [0:3] and Mouse [4:7] */
+#define CFG_IR_FXBUS  0x6f	/* FXIRQ[0] [0:3] and FXIRQ[1] [4:7] */
+#define CFG_IR_USB    0x70	/* FXIRQ[2] [0:3] and USB [4:7] */
+#define CFG_IR_ACPI   0x71	/* ACPI SCI [0:3] and reserved [4:7] */
+
+#define CFG_IR_LOW     CFG_IR_SER	/* Lowest interrupt routing reg */
+#define CFG_IR_HIGH    CFG_IR_ACPI	/* Highest interrupt routing reg */
 
 /* 8259 operational control words */
 #define OCW2_EOI   0x20		/* Non-specific EOI */
@@ -42,15 +50,15 @@
 #define SUPERIO_NIRQS   8
 
 struct superio_device {
-	u16 fdc_base;
-	u16 sp1_base;
-	u16 sp2_base;
-	u16 pp_base;
-	u16 acpi_base;
-	int iosapic_irq;
-	int iosapic_irq_enabled;
+	u32 fdc_base;
+	u32 sp1_base;
+	u32 sp2_base;
+	u32 pp_base;
+	u32 acpi_base;
+	int suckyio_irq_enabled;
 	struct irq_region *irq_region;
-	struct pci_dev *lio_pdev;       /* pci device for legacy IO fn */
+	struct pci_dev *lio_pdev;       /* pci device for legacy IO (fn 1) */
+	struct pci_dev *usb_pdev;       /* pci device for USB (fn 2) */
 };
 
 /*

@@ -29,7 +29,8 @@
 #ifdef PCI_DEBUG
 #define ASSERT(expr) \
 	if(!(expr)) { \
-		printk( "\n" __FILE__ ":%d: Assertion " #expr " failed!\n",__LINE__); \
+		printk("\n%s:%d: Assertion " #expr " failed!\n", \
+		       __FILE__, __LINE__); \
 		panic(#expr); \
 	}
 #else
@@ -55,6 +56,12 @@ struct pci_hba_data {
 	struct resource io_space;	/* PIOP */
 	struct resource lmmio_space;	/* bus addresses < 4Gb */
 	struct resource elmmio_space;	/* additional bus addresses < 4Gb */
+	struct resource gmmio_space;	/* bus addresses > 4Gb */
+	/* NOTE: Dino code assumes it can use *all* of the lmmio_space,
+	 * elmmio_space and gmmio_space as a contiguous array of
+	 * resources.  This #define represents the array size */
+	#define DINO_MAX_LMMIO_RESOURCES	3
+
 	unsigned long   lmmio_space_offset;  /* CPU view - PCI view */
 	void *          iommu;          /* IOMMU this device is under */
 	/* REVISIT - spinlock to protect resources? */

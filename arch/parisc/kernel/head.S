@@ -22,17 +22,6 @@
 
 	.level 1.1
 
-	.section	.initcall.init
-	.align		4
-	.export __initcall_start
-__initcall_start:
-	.export __initcall_end
-__initcall_end:
-	.export __setup_start
-__setup_start:
-	.export __setup_end
-__setup_end:
-
 	.data
 
 	.export boot_args
@@ -64,13 +53,13 @@ stext:
 
 	/* Clear BSS (shouldn't the boot loader do this?) */
 
-	.import _edata,data
-	.import _end,data
+	.import __bss_start,data
+	.import __bss_stop,data
 
-	ldil            L%PA(_edata),%r3
-	ldo             R%PA(_edata)(%r3),%r3
-	ldil            L%PA(_end),%r4
-	ldo             R%PA(_end)(%r4),%r4
+	ldil            L%PA(__bss_start),%r3
+	ldo             R%PA(__bss_start)(%r3),%r3
+	ldil            L%PA(__bss_stop),%r4
+	ldo             R%PA(__bss_stop)(%r4),%r4
 $bss_loop:
 	cmpb,<<,n       %r3,%r4,$bss_loop
 	stw,ma          %r0,4(%r3)

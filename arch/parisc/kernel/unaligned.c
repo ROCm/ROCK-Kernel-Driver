@@ -270,7 +270,7 @@ static int emulate_ldd(struct pt_regs *regs, int toreg, int flop)
     }
 #endif
 
-	DPRINTF("val = 0xllx\n", val);
+	DPRINTF("val = 0x%llx\n", val);
 
 	if (flop)
 		regs->fr[toreg] = val;

@@ -62,7 +62,7 @@ extern int __put_user_bad(void);
  */
 
 struct exception_table_entry {
-	unsigned long addr;  /* address of insn that is allowed to fault.   */
+	unsigned long insn;  /* address of insn that is allowed to fault.   */
 	long skip;           /* pcoq skip | r9 clear flag | r8 -EFAULT flag */
 };
 
@@ -98,7 +98,7 @@ struct exception_table_entry {
 #define __get_kernel_asm(ldx,ptr)                       \
 	__asm__("\n1:\t" ldx "\t0(%2),%0\n"             \
 		"2:\n"					\
-		"\t.section __ex_table,\"a\"\n"         \
+		"\t.section __ex_table,\"aw\"\n"         \
 		 "\t.dword\t1b\n"                       \
 		 "\t.dword\t(2b-1b)+3\n"                \
 		 "\t.previous"                          \
@@ -108,7 +108,7 @@ struct exception_table_entry {
 #define __get_user_asm(ldx,ptr)                         \
 	__asm__("\n1:\t" ldx "\t0(%%sr3,%2),%0\n"       \
 		"2:\n"					\
-		"\t.section __ex_table,\"a\"\n"         \
+		"\t.section __ex_table,\"aw\"\n"         \
 		 "\t.dword\t1b\n"                       \
 		 "\t.dword\t(2b-1b)+3\n"                \
 		 "\t.previous"                          \
@@ -118,7 +118,7 @@ struct exception_table_entry {
 #define __get_kernel_asm(ldx,ptr)                       \
 	__asm__("\n1:\t" ldx "\t0(%2),%0\n"             \
 		"2:\n"					\
-		"\t.section __ex_table,\"a\"\n"         \
+		"\t.section __ex_table,\"aw\"\n"         \
 		 "\t.word\t1b\n"                        \
 		 "\t.word\t(2b-1b)+3\n"                 \
 		 "\t.previous"                          \
@@ -128,13 +128,13 @@ struct exception_table_entry {
 #define __get_user_asm(ldx,ptr)                         \
 	__asm__("\n1:\t" ldx "\t0(%%sr3,%2),%0\n"       \
 		"2:\n"					\
-		"\t.section __ex_table,\"a\"\n"         \
+		"\t.section __ex_table,\"aw\"\n"         \
 		 "\t.word\t1b\n"                        \
 		 "\t.word\t(2b-1b)+3\n"                 \
 		 "\t.previous"                          \
 		: "=r"(__gu_val), "=r"(__gu_err)        \
 		: "r"(ptr), "1"(__gu_err));
-#endif
+#endif /* !__LP64__ */
 
 #define __put_user(x,ptr)                                       \
 ({								\
@@ -173,7 +173,7 @@ struct exception_table_entry {
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%1)\n"                 \
 		"2:\n"					    \
-		"\t.section __ex_table,\"a\"\n"             \
+		"\t.section __ex_table,\"aw\"\n"             \
 		 "\t.dword\t1b\n"                           \
 		 "\t.dword\t(2b-1b)+1\n"                    \
 		 "\t.previous"                              \
@@ -184,7 +184,7 @@ struct exception_table_entry {
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%%sr3,%1)\n"           \
 		"2:\n"					    \
-		"\t.section __ex_table,\"a\"\n"             \
+		"\t.section __ex_table,\"aw\"\n"             \
 		 "\t.dword\t1b\n"                           \
 		 "\t.dword\t(2b-1b)+1\n"                    \
 		 "\t.previous"                              \
@@ -195,7 +195,7 @@ struct exception_table_entry {
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%1)\n"                 \
 		"2:\n"					    \
-		"\t.section __ex_table,\"a\"\n"             \
+		"\t.section __ex_table,\"aw\"\n"             \
 		 "\t.word\t1b\n"                            \
 		 "\t.word\t(2b-1b)+1\n"                     \
 		 "\t.previous"                              \
@@ -206,7 +206,7 @@ struct exception_table_entry {
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%%sr3,%1)\n"           \
 		"2:\n"					    \
-		"\t.section __ex_table,\"a\"\n"             \
+		"\t.section __ex_table,\"aw\"\n"             \
 		 "\t.word\t1b\n"                            \
 		 "\t.word\t(2b-1b)+1\n"                     \
 		 "\t.previous"                              \
@@ -221,7 +221,7 @@ static inline void __put_kernel_asm64(u64 x, void *ptr)
 		"\n1:\tstw %1,0(%0)\n"
 		"\n2:\tstw %2,4(%0)\n"
 		"3:\n"
-		"\t.section __ex_table,\"a\"\n"
+		"\t.section __ex_table,\"aw\"\n"
 		 "\t.word\t1b\n"
 		 "\t.word\t(3b-1b)+1\n"
 		 "\t.word\t2b\n"
@@ -239,7 +239,7 @@ static inline void __put_user_asm64(u64 x, void *ptr)
 		"\n1:\tstw %1,0(%%sr3,%0)\n"
 		"\n2:\tstw %2,4(%%sr3,%0)\n"
 		"3:\n"
-		"\t.section __ex_table,\"a\"\n"
+		"\t.section __ex_table,\"aw\"\n"
 		 "\t.word\t1b\n"
 		 "\t.word\t(3b-1b)+1\n"
 		 "\t.word\t2b\n"
@@ -249,7 +249,7 @@ static inline void __put_user_asm64(u64 x, void *ptr)
 
 }
 
-#endif
+#endif /* !__LP64__ */
 
 
 /*
