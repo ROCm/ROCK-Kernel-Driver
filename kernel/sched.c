@@ -26,7 +26,7 @@
 #include <linux/highmem.h>
 #include <linux/smp_lock.h>
 #include <asm/mmu_context.h>
-#include <linux//pagemap.h>
+#include <linux/pagemap.h>
 #include <asm/tlb.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
