@@ -1,5 +1,5 @@
 /*
- *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 35 $)
+ *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 38 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -62,15 +62,15 @@ static int acpi_ec_start (struct acpi_device *device);
 static int acpi_ec_stop (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_ec_driver = {
-	name:			ACPI_EC_DRIVER_NAME,
-	class:			ACPI_EC_CLASS,
-	ids:			ACPI_EC_HID,
-	ops:			{
-					add:	acpi_ec_add,
-					remove:	acpi_ec_remove,
-					start:	acpi_ec_start,
-					stop:	acpi_ec_stop,
-				},
+	.name =		ACPI_EC_DRIVER_NAME,
+	.class =	ACPI_EC_CLASS,
+	.ids =		ACPI_EC_HID,
+	.ops =		{
+				.add =		acpi_ec_add,
+				.remove =	acpi_ec_remove,
+				.start =	acpi_ec_start,
+				.stop =		acpi_ec_stop,
+			},
 };
 
 struct acpi_ec {
@@ -134,7 +134,7 @@ static int
 acpi_ec_read (
 	struct acpi_ec		*ec,
 	u8			address,
-	u8			*data)
+	u32			*data)
 {
 	acpi_status		status = AE_OK;
 	int			result = 0;
@@ -167,7 +167,7 @@ acpi_ec_read (
 		goto end;
 
 
-	acpi_hw_low_level_read(8, (u32*) data, &ec->data_addr, 0);
+	acpi_hw_low_level_read(8, data, &ec->data_addr, 0);
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Read [%02x] from address [%02x]\n",
 		*data, address));
@@ -237,7 +237,7 @@ end:
 static int
 acpi_ec_query (
 	struct acpi_ec		*ec,
-	u8			*data)
+	u32			*data)
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
@@ -269,7 +269,7 @@ acpi_ec_query (
 	if (result)
 		goto end;
 	
-	acpi_hw_low_level_read(8, (u32*) data, &ec->data_addr, 0);
+	acpi_hw_low_level_read(8, data, &ec->data_addr, 0);
 	if (!*data)
 		result = -ENODATA;
 
@@ -328,7 +328,7 @@ acpi_ec_gpe_handler (
 {
 	acpi_status		status = AE_OK;
 	struct acpi_ec		*ec = (struct acpi_ec *) data;
-	u8			value = 0;
+	u32			value = 0;
 	unsigned long		flags = 0;
 	struct acpi_ec_query_data *query_data = NULL;
 
@@ -336,7 +336,7 @@ acpi_ec_gpe_handler (
 		return;
 
 	spin_lock_irqsave(&ec->lock, flags);
-	acpi_hw_low_level_read(8, (u32*) &value, &ec->command_addr, 0);
+	acpi_hw_low_level_read(8, &value, &ec->command_addr, 0);
 	spin_unlock_irqrestore(&ec->lock, flags);
 
 	/* TBD: Implement asynch events!
@@ -398,6 +398,7 @@ acpi_ec_space_handler (
 {
 	int			result = 0;
 	struct acpi_ec		*ec = NULL;
+	u32			temp = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_space_handler");
 
@@ -408,7 +409,8 @@ acpi_ec_space_handler (
 
 	switch (function) {
 	case ACPI_READ:
-		result = acpi_ec_read(ec, (u8) address, (u8*) value);
+		result = acpi_ec_read(ec, (u8) address, &temp);
+		*value = (acpi_integer) temp;
 		break;
 	case ACPI_WRITE:
 		result = acpi_ec_write(ec, (u8) address, (u8) *value);
