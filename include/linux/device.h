@@ -182,8 +182,8 @@ struct class_attribute class_attr_##_name = { 			\
 	.store	= _store,					\
 };
 
-extern int class_create_file(struct class *, struct class_attribute *);
-extern void class_remove_file(struct class *, struct class_attribute *);
+extern int class_create_file(struct class *, const struct class_attribute *);
+extern void class_remove_file(struct class *, const struct class_attribute *);
 
 
 struct class_device {
@@ -234,8 +234,10 @@ struct class_device_attribute class_device_attr_##_name = { 	\
 	.store	= _store,					\
 };
 
-extern int class_device_create_file(struct class_device *, struct class_device_attribute *);
-extern void class_device_remove_file(struct class_device *, struct class_device_attribute *);
+extern int class_device_create_file(struct class_device *, 
+				    const struct class_device_attribute *);
+extern void class_device_remove_file(struct class_device *, 
+				     const struct class_device_attribute *);
 
 
 struct class_interface {
