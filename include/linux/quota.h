@@ -40,9 +40,12 @@
 #define _LINUX_QUOTA_
 
 #include <linux/errno.h>
+#include <linux/types.h>
 
 #define __DQUOT_VERSION__	"dquot_6.5.1"
 #define __DQUOT_NUM_VERSION__	6*10000+5*100+1
+
+typedef __kernel_uid32_t qid_t; /* Type in which we store ids in memory */
 
 /*
  * Convert diskblocks to blocks and the other way around.
@@ -94,31 +97,48 @@
 #define SUBCMDSHIFT 8
 #define QCMD(cmd, type)  (((cmd) << SUBCMDSHIFT) | ((type) & SUBCMDMASK))
 
-#define Q_QUOTAON  0x0100	/* enable quotas */
-#define Q_QUOTAOFF 0x0200	/* disable quotas */
-#define Q_GETQUOTA 0x0300	/* get limits and usage */
-#define Q_SETQUOTA 0x0400	/* set limits and usage */
-#define Q_SETUSE   0x0500	/* set usage */
 #define Q_SYNC     0x0600	/* sync disk copy of a filesystems quotas */
-#define Q_SETQLIM  0x0700	/* set limits */
-#define Q_GETSTATS 0x0800	/* get collected stats */
-#define Q_RSQUASH  0x1000	/* set root_squash option */
 
 /*
- * The following structure defines the format of the disk quota file
- * (as it appears on disk) - the file is an array of these structures
- * indexed by user or group number.
+ * Data for one user/group kept in memory
  */
-struct dqblk {
+struct mem_dqblk {
 	__u32 dqb_bhardlimit;	/* absolute limit on disk blks alloc */
 	__u32 dqb_bsoftlimit;	/* preferred limit on disk blks */
 	__u32 dqb_curblocks;	/* current block count */
 	__u32 dqb_ihardlimit;	/* absolute limit on allocated inodes */
 	__u32 dqb_isoftlimit;	/* preferred inode limit */
 	__u32 dqb_curinodes;	/* current # allocated inodes */
-	time_t dqb_btime;		/* time limit for excessive disk use */
-	time_t dqb_itime;		/* time limit for excessive inode use */
+	time_t dqb_btime;	/* time limit for excessive disk use */
+	time_t dqb_itime;	/* time limit for excessive inode use */
 };
+
+/*
+ * Data for one quotafile kept in memory
+ */
+struct mem_dqinfo {
+	int dqi_flags;
+	unsigned int dqi_bgrace;
+	unsigned int dqi_igrace;
+	union {
+	} u;
+};
+
+#ifdef __KERNEL__
+
+#define DQF_MASK 0xffff		/* Mask for format specific flags */
+#define DQF_INFO_DIRTY 0x10000  /* Is info dirty? */
+
+extern inline void mark_info_dirty(struct mem_dqinfo *info)
+{
+	info->dqi_flags |= DQF_INFO_DIRTY;
+}
+
+#define info_dirty(info) ((info)->dqi_flags & DQF_INFO_DIRTY)
+
+#define sb_dqopt(sb) (&(sb)->s_dquot)
+
+#endif  /* __KERNEL__ */
 
 /*
  * Shorthand notation.
@@ -134,6 +154,11 @@ struct dqblk {
 
 #define dqoff(UID)      ((loff_t)((UID) * sizeof (struct dqblk)))
 
+#ifdef __KERNEL__
+
+extern int nr_dquots, nr_free_dquots;
+extern int dquot_root_squash;
+
 struct dqstats {
 	__u32 lookups;
 	__u32 drops;
@@ -144,10 +169,6 @@ struct dqstats {
 	__u32 free_dquots;
 	__u32 syncs;
 };
-
-#ifdef __KERNEL__
-
-extern int dquot_root_squash;
 
 #define NR_DQHASH 43            /* Just an arbitrary number */
 
@@ -174,20 +195,30 @@ struct dquot {
 	short dq_flags;			/* See DQ_* */
 	unsigned long dq_referenced;	/* Number of times this dquot was 
 					   referenced during its lifetime */
-	struct dqblk dq_dqb;		/* Diskquota usage */
+	struct mem_dqblk dq_dqb;	/* Diskquota usage */
 };
+
+extern inline void mark_dquot_dirty(struct dquot *dquot)
+{
+	dquot->dq_flags |= DQ_MOD;
+}
+
+#define dquot_dirty(dquot) ((dquot)->dq_flags & DQ_MOD)
 
 #define NODQUOT (struct dquot *)NULL
 
-/*
- * Flags used for set_dqblk.
- */
-#define SET_QUOTA         0x02
-#define SET_USE           0x04
-#define SET_QLIMIT        0x08
-
 #define QUOTA_OK          0
 #define NO_QUOTA          1
+
+/* Operations which must be implemented by each quota format */
+struct quota_format_ops {
+	int (*check_quota_file)(struct super_block *sb, int type);	/* Detect whether file is in our format */
+	int (*read_file_info)(struct super_block *sb, int type);	/* Read main info about file */
+	int (*write_file_info)(struct super_block *sb, int type);	/* Write main info about file */
+	int (*free_file_info)(struct super_block *sb, int type);	/* Called on quotaoff() */
+	int (*read_dqblk)(struct dquot *dquot);		/* Read structure for one user */
+	int (*commit_dqblk)(struct dquot *dquot);	/* Write (or delete) structure for one user */
+};
 
 #else
 
