@@ -15,7 +15,7 @@
  *  Copyright (C) 2002 David S. Miller (davem@redhat.com)
  */
 
-#include "sun.h"
+#include "suncore.h"
 #include "sunzilog.h"
 
 /* On 32-bit sparcs we need to delay after register accesses

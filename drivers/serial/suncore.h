@@ -1,4 +1,4 @@
-/* sun.h
+/* suncore.h
  *
  * Generic SUN serial/kbd/ms layer.  Based entirely
  * upon drivers/sbus/char/sunserial.h which is:

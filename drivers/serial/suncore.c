@@ -1,4 +1,4 @@
-/* sun.c
+/* suncore.c
  *
  * Generic SUN serial/kbd/ms layer.  Based entirely
  * upon drivers/sbus/char/sunserial.c which is:
@@ -21,7 +21,7 @@
 
 #include <asm/oplib.h>
 
-#include "sun.h"
+#include "suncore.h"
 
 int serial_console;
 int stop_a_enabled = 1;
