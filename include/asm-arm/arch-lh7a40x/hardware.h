@@ -13,8 +13,6 @@
 #ifndef __ASM_ARCH_HARDWARE_H
 #define __ASM_ARCH_HARDWARE_H
 
-#include <asm/mach-types.h>
-
 #define io_p2v(x) (0xf0000000 | (((x) & 0xfff00000) >> 4) | ((x) & 0x0000ffff))
 #define io_v2p(x) (             (((x) & 0x0fff0000) << 4) | ((x) & 0x0000ffff))
 
