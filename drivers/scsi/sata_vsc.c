@@ -213,6 +213,7 @@ static struct ata_port_operations vsc_sata_ops = {
 	.tf_read		= vsc_sata_tf_read,
 	.exec_command		= ata_exec_command,
 	.check_status		= ata_check_status,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= sata_phy_reset,
 	.bmdma_setup            = ata_bmdma_setup,
 	.bmdma_start            = ata_bmdma_start,

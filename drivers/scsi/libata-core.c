@@ -50,7 +50,6 @@
 static unsigned int ata_busy_sleep (struct ata_port *ap,
 				    unsigned long tmout_pat,
 			    	    unsigned long tmout);
-static void __ata_dev_select (struct ata_port *ap, unsigned int device);
 static void ata_set_mode(struct ata_port *ap);
 static void ata_dev_set_xfermode(struct ata_port *ap, struct ata_device *dev);
 static unsigned int ata_get_mode_mask(struct ata_port *ap, int shift);
@@ -637,7 +636,7 @@ static unsigned int ata_pio_devchk(struct ata_port *ap,
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	u8 nsect, lbal;
 
-	__ata_dev_select(ap, device);
+	ap->ops->dev_select(ap, device);
 
 	outb(0x55, ioaddr->nsect_addr);
 	outb(0xaa, ioaddr->lbal_addr);
@@ -681,7 +680,7 @@ static unsigned int ata_mmio_devchk(struct ata_port *ap,
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	u8 nsect, lbal;
 
-	__ata_dev_select(ap, device);
+	ap->ops->dev_select(ap, device);
 
 	writeb(0x55, (void __iomem *) ioaddr->nsect_addr);
 	writeb(0xaa, (void __iomem *) ioaddr->lbal_addr);
@@ -738,7 +737,7 @@ static unsigned int ata_devchk(struct ata_port *ap,
  *	the event of failure.
  */
 
-static unsigned int ata_dev_classify(struct ata_taskfile *tf)
+unsigned int ata_dev_classify(struct ata_taskfile *tf)
 {
 	/* Apple's open source Darwin code hints that some devices only
 	 * put a proper signature into the LBA mid/high registers,
@@ -786,7 +785,7 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
 	unsigned int class;
 	u8 err;
 
-	__ata_dev_select(ap, device);
+	ap->ops->dev_select(ap, device);
 
 	memset(&tf, 0, sizeof(tf));
 
@@ -849,8 +848,12 @@ void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
 	}
 }
 
+void ata_noop_dev_select (struct ata_port *ap, unsigned int device)
+{
+}
+
 /**
- *	__ata_dev_select - Select device 0/1 on ATA bus
+ *	ata_std_dev_select - Select device 0/1 on ATA bus
  *	@ap: ATA channel to manipulate
  *	@device: ATA device (numbered from zero) to select
  *
@@ -862,7 +865,7 @@ void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
  *	caller.
  */
 
-static void __ata_dev_select (struct ata_port *ap, unsigned int device)
+void ata_std_dev_select (struct ata_port *ap, unsigned int device)
 {
 	u8 tmp;
 
@@ -890,7 +893,7 @@ static void __ata_dev_select (struct ata_port *ap, unsigned int device)
  *	make either device 0, or device 1, active on the
  *	ATA channel.
  *
- *	This is a high-level version of __ata_dev_select(),
+ *	This is a high-level version of ata_std_dev_select(),
  *	which additionally provides the services of inserting
  *	the proper pauses and status polling, where needed.
  *
@@ -907,7 +910,7 @@ void ata_dev_select(struct ata_port *ap, unsigned int device,
 	if (wait)
 		ata_wait_idle(ap);
 
-	__ata_dev_select(ap, device);
+	ap->ops->dev_select(ap, device);
 
 	if (wait) {
 		if (can_sleep && ap->device[device].class == ATA_DEV_ATAPI)
@@ -1214,13 +1217,13 @@ void ata_port_probe(struct ata_port *ap)
 }
 
 /**
- *	sata_phy_reset -
+ *	__sata_phy_reset -
  *	@ap:
  *
  *	LOCKING:
  *
  */
-void sata_phy_reset(struct ata_port *ap)
+void __sata_phy_reset(struct ata_port *ap)
 {
 	u32 sstatus;
 	unsigned long timeout = jiffies + (HZ * 5);
@@ -1258,6 +1261,21 @@ void sata_phy_reset(struct ata_port *ap)
 		return;
 	}
 
+	ap->cbl = ATA_CBL_SATA;
+}
+
+/**
+ *	__sata_phy_reset -
+ *	@ap:
+ *
+ *	LOCKING:
+ *
+ */
+void sata_phy_reset(struct ata_port *ap)
+{
+	__sata_phy_reset(ap);
+	if (ap->flags & ATA_FLAG_PORT_DISABLED)
+		return;
 	ata_bus_reset(ap);
 }
 
@@ -1483,7 +1501,7 @@ static void ata_bus_post_reset(struct ata_port *ap, unsigned int devmask)
 	while (dev1) {
 		u8 nsect, lbal;
 
-		__ata_dev_select(ap, 1);
+		ap->ops->dev_select(ap, 1);
 		if (ap->flags & ATA_FLAG_MMIO) {
 			nsect = readb((void __iomem *) ioaddr->nsect_addr);
 			lbal = readb((void __iomem *) ioaddr->lbal_addr);
@@ -1503,11 +1521,11 @@ static void ata_bus_post_reset(struct ata_port *ap, unsigned int devmask)
 		ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT);
 
 	/* is all this really necessary? */
-	__ata_dev_select(ap, 0);
+	ap->ops->dev_select(ap, 0);
 	if (dev1)
-		__ata_dev_select(ap, 1);
+		ap->ops->dev_select(ap, 1);
 	if (dev0)
-		__ata_dev_select(ap, 0);
+		ap->ops->dev_select(ap, 0);
 }
 
 /**
@@ -1622,7 +1640,7 @@ void ata_bus_reset(struct ata_port *ap)
 		devmask |= (1 << 1);
 
 	/* select device 0 again */
-	__ata_dev_select(ap, 0);
+	ap->ops->dev_select(ap, 0);
 
 	/* issue bus reset */
 	if (ap->flags & ATA_FLAG_SRST)
@@ -1651,9 +1669,9 @@ void ata_bus_reset(struct ata_port *ap)
 
 	/* is double-select really necessary? */
 	if (ap->device[1].class != ATA_DEV_NONE)
-		__ata_dev_select(ap, 1);
+		ap->ops->dev_select(ap, 1);
 	if (ap->device[0].class != ATA_DEV_NONE)
-		__ata_dev_select(ap, 0);
+		ap->ops->dev_select(ap, 0);
 
 	/* if no devices were detected, disable this port */
 	if ((ap->device[0].class == ATA_DEV_NONE) &&
@@ -2166,9 +2184,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
 		qc->cursg_ofs = 0;
 	}
 
-	DPRINTK("data %s, drv_stat 0x%X\n",
-		qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read",
-		status);
+	DPRINTK("data %s\n", qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read");
 
 	/* do the actual data transfer */
 	do_write = (qc->tf.flags & ATA_TFLAG_WRITE);
@@ -3609,6 +3625,8 @@ EXPORT_SYMBOL_GPL(ata_qc_issue_prot);
 EXPORT_SYMBOL_GPL(ata_eng_timeout);
 EXPORT_SYMBOL_GPL(ata_tf_load);
 EXPORT_SYMBOL_GPL(ata_tf_read);
+EXPORT_SYMBOL_GPL(ata_noop_dev_select);
+EXPORT_SYMBOL_GPL(ata_std_dev_select);
 EXPORT_SYMBOL_GPL(ata_tf_to_fis);
 EXPORT_SYMBOL_GPL(ata_tf_from_fis);
 EXPORT_SYMBOL_GPL(ata_pci_init_legacy_mode);
@@ -3624,6 +3642,7 @@ EXPORT_SYMBOL_GPL(ata_bmdma_start);
 EXPORT_SYMBOL_GPL(ata_bmdma_irq_clear);
 EXPORT_SYMBOL_GPL(ata_port_probe);
 EXPORT_SYMBOL_GPL(sata_phy_reset);
+EXPORT_SYMBOL_GPL(__sata_phy_reset);
 EXPORT_SYMBOL_GPL(ata_bus_reset);
 EXPORT_SYMBOL_GPL(ata_port_disable);
 EXPORT_SYMBOL_GPL(ata_pci_init_one);
@@ -3634,4 +3653,5 @@ EXPORT_SYMBOL_GPL(ata_scsi_error);
 EXPORT_SYMBOL_GPL(ata_scsi_slave_config);
 EXPORT_SYMBOL_GPL(ata_scsi_release);
 EXPORT_SYMBOL_GPL(ata_host_intr);
+EXPORT_SYMBOL_GPL(ata_dev_classify);
 EXPORT_SYMBOL_GPL(ata_dev_id_string);
