@@ -1579,6 +1579,12 @@ static ssize_t ext3_direct_IO(int rw, struct kiocb *iocb,
 				 offset, nr_segs,
 				 ext3_direct_io_get_blocks, NULL);
 
+	/*
+	 * Reacquire the handle: ext3_direct_io_get_block() can restart the
+	 * transaction
+	 */
+	handle = journal_current_handle();
+
 out_stop:
 	if (handle) {
 		int err;
