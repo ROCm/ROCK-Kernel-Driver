@@ -126,6 +126,7 @@ extern void __get_user_4(void);
 extern void __put_user_1(void);
 extern void __put_user_2(void);
 extern void __put_user_4(void);
+extern void __put_user_8(void);
 
 extern void __put_user_bad(void);
 
@@ -154,6 +155,23 @@ extern void __put_user_bad(void);
 	__pu_err;					\
 })							
 
+#define __put_user_u64(x, addr, err)				\
+	__asm__ __volatile__(					\
+		"1:	movl %%eax,0(%2)\n"			\
+		"2:	movl %%edx,4(%2)\n"			\
+		"3:\n"						\
+		".section .fixup,\"ax\"\n"			\
+		"4:	movl %3,%0\n"				\
+		"	jmp 3b\n"				\
+		".previous\n"					\
+		".section __ex_table,\"a\"\n"			\
+		"	.align 4\n"				\
+		"	.long 1b,4b\n"				\
+		"	.long 2b,4b\n"				\
+		".previous"					\
+		: "=r"(err)					\
+		: "A" (x), "r" (addr), "i"(-EFAULT), "0"(err))
+
 #define __put_user_size(x,ptr,size,retval)				\
 do {									\
 	retval = 0;							\
@@ -161,6 +179,7 @@ do {									\
 	  case 1: __put_user_asm(x,ptr,retval,"b","b","iq"); break;	\
 	  case 2: __put_user_asm(x,ptr,retval,"w","w","ir"); break;	\
 	  case 4: __put_user_asm(x,ptr,retval,"l","","ir"); break;	\
+	  case 8: __put_user_u64(x,ptr,retval); break;			\
 	  default: __put_user_bad();					\
 	}								\
 } while (0)

@@ -269,6 +269,9 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			if (!arg)  return -EINVAL;
 			return put_user(rd_kbsize[minor] << 1, (long *) arg);
 
+         	case BLKGETSIZE64:
+			return put_user((u64)rd_kbsize[minor] << 10, (u64*)arg);
+
 		case BLKROSET:
 		case BLKROGET:
 		case BLKSSZGET:

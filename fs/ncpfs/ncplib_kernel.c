@@ -127,7 +127,7 @@ ncp_negotiate_buffersize(struct ncp_server *server, int size, int *target)
 		ncp_unlock_server(server);
 		return result;
 	}
-	*target = min(unsigned int, ntohs(ncp_reply_word(server, 0)), size);
+	*target = min_t(unsigned int, ntohs(ncp_reply_word(server, 0)), size);
 
 	ncp_unlock_server(server);
 	return 0;
@@ -159,7 +159,7 @@ ncp_negotiate_size_and_options(struct ncp_server *server,
 	/* NCP over UDP returns 0 (!!!) */
 	result = ntohs(ncp_reply_word(server, 0));
 	if (result >= NCP_BLOCK_SIZE)
-		size = min(int, result, size);
+		size = min(result, size);
 	*ret_size = size;
 	*ret_options = ncp_reply_byte(server, 4);
 

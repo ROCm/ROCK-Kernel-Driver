@@ -1008,7 +1008,7 @@ static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
  * between the file and the memory map for a potential last
  * incomplete page.  Ugly, but necessary.
  */
-void vmtruncate(struct inode * inode, loff_t offset)
+int vmtruncate(struct inode * inode, loff_t offset)
 {
 	unsigned long pgoff;
 	struct address_space *mapping = inode->i_mapping;
@@ -1053,7 +1053,7 @@ out_truncate:
 		unlock_kernel();
 	}
 out:
-	return;
+	return 0;
 }
 
 /* 

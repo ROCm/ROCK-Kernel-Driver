@@ -1114,6 +1114,9 @@ static int ps2esdi_ioctl(struct inode *inode,
 			}
 			break;
 
+		case BLKGETSIZE64:
+			return put_user((u64)ps2esdi[MINOR(inode->i_rdev)].nr_sects << 9, (u64 *) arg);
+
 		case BLKRRPART:
                         if (!capable(CAP_SYS_ADMIN)) 
 				return -EACCES;

@@ -814,7 +814,7 @@ de600_rspace(struct sock *sk)
  */
 
 	if (atomic_read(&sk->rmem_alloc) >= sk->rcvbuf-2*DE600_MIN_WINDOW) return(0);
-	amt = min(int, (sk->rcvbuf-atomic_read(&sk->rmem_alloc))/2/*-DE600_MIN_WINDOW*/, DE600_MAX_WINDOW);
+	amt = min_t(int, (sk->rcvbuf-atomic_read(&sk->rmem_alloc))/2/*-DE600_MIN_WINDOW*/, DE600_MAX_WINDOW);
 	if (amt < 0) return(0);
 	return(amt);
   }

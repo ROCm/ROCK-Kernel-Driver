@@ -256,7 +256,7 @@ extern spinlock_t pagemap_lru_lock;
  * 64 (1 << INACTIVE_SHIFT) seconds.
  */
 #define INACTIVE_SHIFT 6
-#define inactive_target min(unsigned long, \
+#define inactive_target min_t(unsigned long, \
 			    (memory_pressure >> INACTIVE_SHIFT), \
 			    (num_physpages / 4))
 

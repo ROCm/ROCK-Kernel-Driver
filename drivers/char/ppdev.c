@@ -118,7 +118,7 @@ static ssize_t pp_read (struct file * file, char * buf, size_t count,
 		return -EINVAL;
 	}
 
-	kbuffer = kmalloc(min(unsigned int, count, PP_BUFFER_SIZE), GFP_KERNEL);
+	kbuffer = kmalloc(min_t(size_t, count, PP_BUFFER_SIZE), GFP_KERNEL);
 	if (!kbuffer) {
 		return -ENOMEM;
 	}
@@ -126,7 +126,7 @@ static ssize_t pp_read (struct file * file, char * buf, size_t count,
 	mode = pport->ieee1284.mode & ~(IEEE1284_DEVICEID | IEEE1284_ADDR);
 
 	while (bytes_read < count) {
-		ssize_t need = min(unsigned long, count - bytes_read, PP_BUFFER_SIZE);
+		ssize_t need = min_t(unsigned long, count - bytes_read, PP_BUFFER_SIZE);
 
 		if (mode == IEEE1284_MODE_EPP) {
 			/* various specials for EPP mode */
@@ -198,7 +198,7 @@ static ssize_t pp_write (struct file * file, const char * buf, size_t count,
 		return -EINVAL;
 	}
 
-	kbuffer = kmalloc(min(unsigned int, count, PP_BUFFER_SIZE), GFP_KERNEL);
+	kbuffer = kmalloc(min_t(size_t, count, PP_BUFFER_SIZE), GFP_KERNEL);
 	if (!kbuffer) {
 		return -ENOMEM;
 	}
@@ -206,7 +206,7 @@ static ssize_t pp_write (struct file * file, const char * buf, size_t count,
 	mode = pport->ieee1284.mode & ~(IEEE1284_DEVICEID | IEEE1284_ADDR);
 
 	while (bytes_written < count) {
-		ssize_t n = min(unsigned long, count - bytes_written, PP_BUFFER_SIZE);
+		ssize_t n = min_t(unsigned long, count - bytes_written, PP_BUFFER_SIZE);
 
 		if (copy_from_user (kbuffer, buf + bytes_written, n)) {
 			bytes_written = -EFAULT;

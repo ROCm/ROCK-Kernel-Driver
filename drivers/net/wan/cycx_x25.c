@@ -260,13 +260,13 @@ int cyx_init (cycx_t *card, wandev_conf_t *conf)
 	        cfg.flags = 0;      /* FIXME just reset the 2nd bit */
 
 	if (conf->u.x25.hi_pvc) {
-		card->u.x.hi_pvc = min(unsigned int, conf->u.x25.hi_pvc, 4095);
-		card->u.x.lo_pvc = min(unsigned int, conf->u.x25.lo_pvc, card->u.x.hi_pvc);
+		card->u.x.hi_pvc = min_t(unsigned int, conf->u.x25.hi_pvc, 4095);
+		card->u.x.lo_pvc = min_t(unsigned int, conf->u.x25.lo_pvc, card->u.x.hi_pvc);
 	}
 
 	if (conf->u.x25.hi_svc) {
-		card->u.x.hi_svc = min(unsigned int, conf->u.x25.hi_svc, 4095);
-		card->u.x.lo_svc = min(unsigned int, conf->u.x25.lo_svc, card->u.x.hi_svc);
+		card->u.x.hi_svc = min_t(unsigned int, conf->u.x25.hi_svc, 4095);
+		card->u.x.lo_svc = min_t(unsigned int, conf->u.x25.lo_svc, card->u.x.hi_svc);
 	}
 
 	if (card->u.x.lo_pvc == 255)
@@ -277,25 +277,25 @@ int cyx_init (cycx_t *card, wandev_conf_t *conf)
 	cfg.nvc = card->u.x.hi_svc - card->u.x.lo_svc + 1 + cfg.npvc;
 
 	if (conf->u.x25.hdlc_window)
-		cfg.n2win = min(unsigned int, conf->u.x25.hdlc_window, 7);
+		cfg.n2win = min_t(unsigned int, conf->u.x25.hdlc_window, 7);
 
 	if (conf->u.x25.pkt_window)
-		cfg.n3win = min(unsigned int, conf->u.x25.pkt_window, 7);
+		cfg.n3win = min_t(unsigned int, conf->u.x25.pkt_window, 7);
 
 	if (conf->u.x25.t1)
-		cfg.t1 = min(unsigned int, conf->u.x25.t1, 30);
+		cfg.t1 = min_t(unsigned int, conf->u.x25.t1, 30);
 
 	if (conf->u.x25.t2)
-		cfg.t2 = min(unsigned int, conf->u.x25.t2, 30);
+		cfg.t2 = min_t(unsigned int, conf->u.x25.t2, 30);
 
 	if (conf->u.x25.t11_t21)
-		cfg.t21 = min(unsigned int, conf->u.x25.t11_t21, 30);
+		cfg.t21 = min_t(unsigned int, conf->u.x25.t11_t21, 30);
 
 	if (conf->u.x25.t13_t23)
-		cfg.t23 = min(unsigned int, conf->u.x25.t13_t23, 30);
+		cfg.t23 = min_t(unsigned int, conf->u.x25.t13_t23, 30);
 
 	if (conf->u.x25.n2)
-		cfg.n2 = min(unsigned int, conf->u.x25.n2, 30);
+		cfg.n2 = min_t(unsigned int, conf->u.x25.n2, 30);
 
 	/* initialize adapter */
 	if (x25_configure(card, &cfg))

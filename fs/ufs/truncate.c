@@ -88,7 +88,7 @@ static int ufs_trunc_direct (struct inode * inode)
 	retry = 0;
 	
 	frag1 = DIRECT_FRAGMENT;
-	frag4 = min(u32, UFS_NDIR_FRAGMENT, inode->u.ufs_i.i_lastfrag);
+	frag4 = min_t(u32, UFS_NDIR_FRAGMENT, inode->u.ufs_i.i_lastfrag);
 	frag2 = ((frag1 & uspi->s_fpbmask) ? ((frag1 | uspi->s_fpbmask) + 1) : frag1);
 	frag3 = frag4 & ~uspi->s_fpbmask;
 	block1 = block2 = 0;

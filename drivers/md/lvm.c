@@ -877,6 +877,11 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		break;
 
+	case BLKGETSIZE64:
+		if (put_user((u64)lv_ptr->lv_size << 9, (u64 *)arg))
+			return -EFAULT;
+		break;
+
 
 	case BLKFLSBUF:
 		/* flush buffer cache */

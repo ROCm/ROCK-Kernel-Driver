@@ -654,13 +654,13 @@ int wpx_init (sdla_t* card, wandev_conf_t* conf)
 	u.cfg.defPktSize = u.cfg.pktMTU = card->wandev.mtu;
 
 	if (conf->u.x25.hi_pvc){
-		card->u.x.hi_pvc = min(unsigned int, conf->u.x25.hi_pvc, MAX_LCN_NUM);
-		card->u.x.lo_pvc = min(unsigned int, conf->u.x25.lo_pvc, card->u.x.hi_pvc);
+		card->u.x.hi_pvc = min_t(unsigned int, conf->u.x25.hi_pvc, MAX_LCN_NUM);
+		card->u.x.lo_pvc = min_t(unsigned int, conf->u.x25.lo_pvc, card->u.x.hi_pvc);
 	}
 
 	if (conf->u.x25.hi_svc){
-		card->u.x.hi_svc = min(unsigned int, conf->u.x25.hi_svc, MAX_LCN_NUM);
-		card->u.x.lo_svc = min(unsigned int, conf->u.x25.lo_svc, card->u.x.hi_svc);
+		card->u.x.hi_svc = min_t(unsigned int, conf->u.x25.hi_svc, MAX_LCN_NUM);
+		card->u.x.lo_svc = min_t(unsigned int, conf->u.x25.lo_svc, card->u.x.hi_svc);
 	}
 
 	/* Figure out the total number of channels to configure */
@@ -685,38 +685,38 @@ int wpx_init (sdla_t* card, wandev_conf_t* conf)
 	u.cfg.hiTwoWaySVC = card->u.x.hi_svc;
 
 	if (conf->u.x25.hdlc_window)
-		u.cfg.hdlcWindow = min(unsigned int, conf->u.x25.hdlc_window, 7);
+		u.cfg.hdlcWindow = min_t(unsigned int, conf->u.x25.hdlc_window, 7);
 	if (conf->u.x25.pkt_window)
-		u.cfg.pktWindow = min(unsigned int, conf->u.x25.pkt_window, 7);
+		u.cfg.pktWindow = min_t(unsigned int, conf->u.x25.pkt_window, 7);
 
 	if (conf->u.x25.t1)
-		u.cfg.t1 = min(unsigned int, conf->u.x25.t1, 30);
+		u.cfg.t1 = min_t(unsigned int, conf->u.x25.t1, 30);
 	if (conf->u.x25.t2)
-		u.cfg.t2 = min(unsigned int, conf->u.x25.t2, 29);
+		u.cfg.t2 = min_t(unsigned int, conf->u.x25.t2, 29);
 	if (conf->u.x25.t4)
-		u.cfg.t4 = min(unsigned int, conf->u.x25.t4, 240);
+		u.cfg.t4 = min_t(unsigned int, conf->u.x25.t4, 240);
 	if (conf->u.x25.n2)
-		u.cfg.n2 = min(unsigned int, conf->u.x25.n2, 30);
+		u.cfg.n2 = min_t(unsigned int, conf->u.x25.n2, 30);
 
 	if (conf->u.x25.t10_t20)
-		u.cfg.t10t20 = min(unsigned int, conf->u.x25.t10_t20,255);
+		u.cfg.t10t20 = min_t(unsigned int, conf->u.x25.t10_t20,255);
 	if (conf->u.x25.t11_t21)
-		u.cfg.t11t21 = min(unsigned int, conf->u.x25.t11_t21,255);
+		u.cfg.t11t21 = min_t(unsigned int, conf->u.x25.t11_t21,255);
 	if (conf->u.x25.t12_t22)
-		u.cfg.t12t22 = min(unsigned int, conf->u.x25.t12_t22,255);
+		u.cfg.t12t22 = min_t(unsigned int, conf->u.x25.t12_t22,255);
 	if (conf->u.x25.t13_t23)	
-		u.cfg.t13t23 = min(unsigned int, conf->u.x25.t13_t23,255);
+		u.cfg.t13t23 = min_t(unsigned int, conf->u.x25.t13_t23,255);
 	if (conf->u.x25.t16_t26)
-		u.cfg.t16t26 = min(unsigned int, conf->u.x25.t16_t26, 255);
+		u.cfg.t16t26 = min_t(unsigned int, conf->u.x25.t16_t26, 255);
 	if (conf->u.x25.t28)
-		u.cfg.t28 = min(unsigned int, conf->u.x25.t28, 255);
+		u.cfg.t28 = min_t(unsigned int, conf->u.x25.t28, 255);
 
 	if (conf->u.x25.r10_r20)
-		u.cfg.r10r20 = min(unsigned int, conf->u.x25.r10_r20,250);
+		u.cfg.r10r20 = min_t(unsigned int, conf->u.x25.r10_r20,250);
 	if (conf->u.x25.r12_r22)
-		u.cfg.r12r22 = min(unsigned int, conf->u.x25.r12_r22,250);
+		u.cfg.r12r22 = min_t(unsigned int, conf->u.x25.r12_r22,250);
 	if (conf->u.x25.r13_r23)
-		u.cfg.r13r23 = min(unsigned int, conf->u.x25.r13_r23,250);
+		u.cfg.r13r23 = min_t(unsigned int, conf->u.x25.r13_r23,250);
 
 
 	if (conf->u.x25.ccitt_compat)

@@ -1138,6 +1138,10 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 		return put_user(acsi_part[MINOR(inode->i_rdev)].nr_sects,
 				(long *) arg);
 
+	  case BLKGETSIZE64:   /* Return device size */
+		return put_user((u64)acsi_part[MINOR(inode->i_rdev)].nr_sects << 9,
+				(u64 *) arg);
+
 	  case BLKROSET:
 	  case BLKROGET:
 	  case BLKFLSBUF:

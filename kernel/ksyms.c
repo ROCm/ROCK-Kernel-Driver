@@ -334,11 +334,6 @@ EXPORT_SYMBOL(compute_creds);
 EXPORT_SYMBOL(remove_arg_zero);
 EXPORT_SYMBOL(set_binfmt);
 
-/* execution environment registration */
-EXPORT_SYMBOL(register_exec_domain);
-EXPORT_SYMBOL(unregister_exec_domain);
-EXPORT_SYMBOL(__set_personality);
-
 /* sysctl table registration */
 EXPORT_SYMBOL(register_sysctl_table);
 EXPORT_SYMBOL(unregister_sysctl_table);

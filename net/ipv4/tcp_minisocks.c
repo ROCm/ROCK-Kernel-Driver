@@ -766,7 +766,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			newtp->rcv_wscale = req->rcv_wscale;
 		} else {
 			newtp->snd_wscale = newtp->rcv_wscale = 0;
-			newtp->window_clamp = min(u32, newtp->window_clamp, 65535);
+			newtp->window_clamp = min_t(u32, newtp->window_clamp, 65535);
 		}
 		newtp->snd_wnd = ntohs(skb->h.th->window) << newtp->snd_wscale;
 		newtp->max_window = newtp->snd_wnd;

@@ -1336,7 +1336,7 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		 *	fallback size buffer which is under a page and will
 		 *	succeed. [Alan]
 		 */
-		size = min(int, size, skb_tailroom(skb));
+		size = min_t(int, size, skb_tailroom(skb));
 
 		memcpy(UNIXCREDS(skb), &scm->creds, sizeof(struct ucred));
 		if (scm->fp)
@@ -1568,7 +1568,7 @@ static int unix_stream_recvmsg(struct socket *sock, struct msghdr *msg, int size
 			sunaddr = NULL;
 		}
 
-		chunk = min(unsigned int, skb->len, size);
+		chunk = min_t(unsigned int, skb->len, size);
 		if (memcpy_toiovec(msg->msg_iov, skb->data, chunk)) {
 			skb_queue_head(&sk->receive_queue, skb);
 			if (copied == 0)

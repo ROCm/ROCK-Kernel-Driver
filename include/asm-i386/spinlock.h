@@ -4,6 +4,7 @@
 #include <asm/atomic.h>
 #include <asm/rwlock.h>
 #include <asm/page.h>
+#include <linux/config.h>
 
 extern int printk(const char * fmt, ...)
 	__attribute__ ((format (printf, 1, 2)));
@@ -12,7 +13,11 @@ extern int printk(const char * fmt, ...)
  * initialize their spinlocks properly, tsk tsk.
  * Remember to turn this off in 2.4. -ben
  */
+#if defined(CONFIG_DEBUG_SPINLOCK)
+#define SPINLOCK_DEBUG	1
+#else
 #define SPINLOCK_DEBUG	0
+#endif
 
 /*
  * Your basic SMP spinlocks, allowing only a single CPU anywhere

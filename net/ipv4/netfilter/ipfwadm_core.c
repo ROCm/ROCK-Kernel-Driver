@@ -648,7 +648,7 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 			struct sk_buff *skb=alloc_skb(128, GFP_ATOMIC);
 			if(skb)
 			{
-				int len = min(unsigned int,
+				int len = min_t(unsigned int,
 					      128, ntohs(ip->tot_len));
 
 				skb_put(skb,len);

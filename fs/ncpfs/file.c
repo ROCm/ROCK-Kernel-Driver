@@ -152,7 +152,7 @@ ncp_file_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	/* First read in as much as possible for each bufsize. */
 	while (already_read < count) {
 		int read_this_time;
-		size_t to_read = min(unsigned int,
+		size_t to_read = min_t(unsigned int,
 				     bufsize - (pos % bufsize),
 				     count - already_read);
 
@@ -234,7 +234,7 @@ ncp_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	}
 	while (already_written < count) {
 		int written_this_time;
-		size_t to_write = min(unsigned int,
+		size_t to_write = min_t(unsigned int,
 				      bufsize - (pos % bufsize),
 				      count - already_written);
 

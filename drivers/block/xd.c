@@ -337,6 +337,8 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 		case BLKGETSIZE:
 			if (!arg) return -EINVAL;
 			return put_user(xd_struct[MINOR(inode->i_rdev)].nr_sects,(long *) arg);
+		case BLKGETSIZE64:
+			return put_user((u64)xd_struct[MINOR(inode->i_rdev)].nr_sects << 9, (u64 *)arg);
 		case HDIO_SET_DMA:
 			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 			if (xdc_busy) return -EBUSY;

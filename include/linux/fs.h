@@ -167,7 +167,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define BLKROSET   _IO(0x12,93)	/* set device read-only (0 = read-write) */
 #define BLKROGET   _IO(0x12,94)	/* get read-only status (0 = read_write) */
 #define BLKRRPART  _IO(0x12,95)	/* re-read partition table */
-#define BLKGETSIZE _IO(0x12,96)	/* return device size */
+#define BLKGETSIZE _IO(0x12,96)	/* return device size /512 (long *arg) */
 #define BLKFLSBUF  _IO(0x12,97)	/* flush buffer cache */
 #define BLKRASET   _IO(0x12,98)	/* Set read ahead for block device */
 #define BLKRAGET   _IO(0x12,99)	/* get current read ahead setting */
@@ -186,6 +186,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 /* A jump here: 108-111 have been used for various private purposes. */
 #define BLKBSZGET  _IOR(0x12,112,sizeof(int))
 #define BLKBSZSET  _IOW(0x12,113,sizeof(int))
+#define BLKGETSIZE64 _IOR(0x12,114,sizeof(u64))	/* return device size in bytes (u64 *arg) */
 
 #define BMAP_IOCTL 1		/* obsolete - kept for compatibility */
 #define FIBMAP	   _IO(0x00,1)	/* bmap access */
@@ -1397,7 +1398,7 @@ extern int generic_buffer_fdatasync(struct inode *inode, unsigned long start_idx
 extern int generic_osync_inode(struct inode *, int);
 
 extern int inode_change_ok(struct inode *, struct iattr *);
-extern void inode_setattr(struct inode *, struct iattr *);
+extern int inode_setattr(struct inode *, struct iattr *);
 
 /*
  * Common dentry functions for inclusion in the VFS

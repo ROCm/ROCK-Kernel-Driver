@@ -69,7 +69,7 @@
 { \
 	long i, t, m; \
 	while (count > 0) { \
-		m = min(unsigned long, count, maxio); \
+		m = min_t(unsigned long, count, maxio); \
 		for (i = 0; i < m; i++) { \
 			for (t = 0; t < timeout && !ENABLE; t++) \
 				wait_some(HZ/50); \

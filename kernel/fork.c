@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/vmalloc.h>
 #include <linux/completion.h>
+#include <linux/personality.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>

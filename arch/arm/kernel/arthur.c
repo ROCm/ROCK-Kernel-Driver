@@ -65,7 +65,7 @@ static void arthur_lcall7(int nr, struct pt_regs *regs)
 
 static struct exec_domain arthur_exec_domain = {
 	"Arthur",	/* name */
-	(lcall7_func)arthur_lcall7,
+	arthur_lcall7,
 	PER_RISCOS, PER_RISCOS,
 	arthur_to_linux_signals,
 	linux_to_arthur_signals,

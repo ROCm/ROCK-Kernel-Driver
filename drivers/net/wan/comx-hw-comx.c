@@ -1044,7 +1044,7 @@ static int comxhw_write_proc(struct file *file, const char *buffer,
 		if (!(page = (char *)__get_free_page(GFP_KERNEL))) {
 			return -ENOMEM;
 		}
-		if(copy_from_user(page, buffer, count = (min(int, count, PAGE_SIZE))))
+		if(copy_from_user(page, buffer, count = (min_t(int, count, PAGE_SIZE))))
 		{
 			count = -EFAULT;
 			goto out;
@@ -1182,8 +1182,8 @@ static int comxhw_read_proc(char *page, char **start, off_t off, int count,
 			len = sprintf(page, "external\n");
 		}
 	} else if (strcmp(file->name, FILENAME_FIRMWARE) == 0) {
-		len = min(int, FILE_PAGESIZE,
-			  min(int, count, 
+		len = min_t(int, FILE_PAGESIZE,
+			  min_t(int, count, 
 			      hw->firmware ?
 			      (hw->firmware->len - off) : 0));
 		if (len < 0) {
@@ -1205,7 +1205,7 @@ static int comxhw_read_proc(char *page, char **start, off_t off, int count,
 	if (count >= len - off) {
 		*eof = 1;
 	}
-	return min(int, count, len - off);
+	return min_t(int, count, len - off);
 }
 
 /* Called on echo comx >boardtype */

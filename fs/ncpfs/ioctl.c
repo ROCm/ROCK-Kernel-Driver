@@ -378,7 +378,7 @@ outrel:
 		}
 		{
 			struct ncp_objectname_ioctl user;
-			int outl;
+			size_t outl;
 
 			if (copy_from_user(&user, 
 					   (struct ncp_objectname_ioctl*)arg,
@@ -448,7 +448,7 @@ outrel:
 		}
 		{
 			struct ncp_privatedata_ioctl user;
-			int outl;
+			size_t outl;
 
 			if (copy_from_user(&user, 
 					   (struct ncp_privatedata_ioctl*)arg,

@@ -2175,11 +2175,13 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 	case BLKGETSIZE:{	/* Return device size */
 			long blocks = major_info->gendisk.sizes 
                                       [MINOR (inp->i_rdev)] << 1;
-			rc =
-			    copy_to_user ((long *) data, &blocks,
-					  sizeof (long));
-			if (rc)
-				rc = -EFAULT;
+			rc = put_user(blocks, (long *)arg);
+			break;
+		}
+	case BLKGETSIZE64:{
+			u64 blocks = major_info->gendisk.sizes 
+                                      [MINOR (inp->i_rdev)];
+			rc = put_user(blocks << 10, (u64 *)arg);
 			break;
 		}
 	case BLKRRPART:{

@@ -331,7 +331,7 @@ static inline unsigned _ubh_find_next_zero_bit_(
 	base = offset >> uspi->s_bpfshift;
 	offset &= uspi->s_bpfmask;
 	for (;;) {
-		count = min(unsigned int, size + offset, uspi->s_bpf);
+		count = min_t(unsigned int, size + offset, uspi->s_bpf);
 		size -= count - offset;
 		pos = ext2_find_next_zero_bit (ubh->bh[base]->b_data, count, offset);
 		if (pos < count || !size)
@@ -378,7 +378,7 @@ static inline unsigned _ubh_find_last_zero_bit_(
 	base = start >> uspi->s_bpfshift;
 	start &= uspi->s_bpfmask;
 	for (;;) {
-		count = min(unsigned int,
+		count = min_t(unsigned int,
 			    size + (uspi->s_bpf - start), uspi->s_bpf)
 			- (uspi->s_bpf - start);
 		size -= count;

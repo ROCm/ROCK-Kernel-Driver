@@ -400,8 +400,10 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		put_user(hba[ctlr]->hd[MINOR(inode->i_rdev)].start_sect, &geo->start);
 		return 0;
 	case BLKGETSIZE:
-		if (!arg) return -EINVAL;
 		put_user(hba[ctlr]->hd[MINOR(inode->i_rdev)].nr_sects, (long*)arg);
+		return 0;
+	case BLKGETSIZE64:
+		put_user((u64)hba[ctlr]->hd[MINOR(inode->i_rdev)].nr_sects << 9, (u64*)arg);
 		return 0;
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);

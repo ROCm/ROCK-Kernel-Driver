@@ -1390,7 +1390,7 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	/* Trim buffer in case of stray trailing data */
 	origlen = skb->len;
-	skb_trim(skb, min(unsigned int, skb->len, ddphv.deh_len));
+	skb_trim(skb, min_t(unsigned int, skb->len, ddphv.deh_len));
 
 	/*
 	 * Size check to see if ddp->deh_len was crap
@@ -1455,7 +1455,7 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 		}
 
                 /* Fix up skb->len field */
-                skb_trim(skb, min(unsigned int, origlen, rt->dev->hard_header_len +
+                skb_trim(skb, min_t(unsigned int, origlen, rt->dev->hard_header_len +
 			ddp_dl->header_length + ddphv.deh_len));
 
 		/* Mend the byte order */

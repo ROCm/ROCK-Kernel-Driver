@@ -1311,7 +1311,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	fifo = &edge_port->txfifo;
 
 	// calculate number of bytes to put in fifo
-	copySize = min (int, count, (edge_port->txCredits - fifo->count));
+	copySize = min_t (int, count, (edge_port->txCredits - fifo->count));
 
 	dbg(__FUNCTION__"(%d) of %d byte(s) Fifo room  %d -- will copy %d bytes", 
 	    port->number, count, edge_port->txCredits - fifo->count, copySize);
@@ -1329,7 +1329,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	// then copy the reset from the start of the buffer 
 
 	bytesleft = fifo->size - fifo->head;
-	firsthalf = min (int, bytesleft, copySize);
+	firsthalf = min_t (int, bytesleft, copySize);
 	dbg (__FUNCTION__" - copy %d bytes of %d into fifo ", firsthalf, bytesleft);
 
 	/* now copy our data */
@@ -1454,7 +1454,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 
 	/* now copy our data */
 	bytesleft =  fifo->size - fifo->tail;
-	firsthalf = min (int, bytesleft, count);
+	firsthalf = min_t (int, bytesleft, count);
 	memcpy(&buffer[2], &fifo->fifo[fifo->tail], firsthalf);
 	fifo->tail  += firsthalf;
 	fifo->count -= firsthalf;

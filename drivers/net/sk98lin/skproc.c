@@ -293,7 +293,7 @@ void *data)
 	if (buffer_length >= len - offset) {
 		*eof = 1;
 	}
-	return (min(int, buffer_length, len - offset));
+	return (min_t(int, buffer_length, len - offset));
 }
 
 

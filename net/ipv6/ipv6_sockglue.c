@@ -535,7 +535,7 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 		return -EINVAL;
 #endif
 	}
-	len = min(unsigned int, sizeof(int), len);
+	len = min_t(unsigned int, sizeof(int), len);
 	if(put_user(len, optlen))
 		return -EFAULT;
 	if(copy_to_user(optval,&val,len))

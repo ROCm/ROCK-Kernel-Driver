@@ -647,14 +647,14 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 
 	case BLKGETSIZE:  /* 0x1260 */
 		/* Return the device size, expressed in sectors */
-		if (!arg) return -EINVAL; /* NULL pointer: not valid */
-		err= 0; /* verify_area_20(VERIFY_WRITE, (long *) arg, sizeof(long)); 
-			 *  if (err) return err;
-			 */
-		put_user ( 1024* xpram_sizes[MINOR(inode->i_rdev)]
+		return put_user( 1024* xpram_sizes[MINOR(inode->i_rdev)]
                            / XPRAM_SOFTSECT,
 			   (long *) arg);
-		return 0;
+
+	case BLKGETSIZE64:
+		return put_user( (u64)(1024* xpram_sizes[MINOR(inode->i_rdev)]
+                           / XPRAM_SOFTSECT) << 9,
+			   (u64 *) arg);
 
 	case BLKFLSBUF: /* flush, 0x1261 */
 		fsync_dev(inode->i_rdev);

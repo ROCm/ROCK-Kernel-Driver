@@ -482,11 +482,9 @@ static int pf_ioctl(struct inode *inode,struct file *file,
                 put_user(0,(long *)&geo->start);
                 return 0;
             case BLKGETSIZE:
-                if (!arg) return -EINVAL;
-                err = verify_area(VERIFY_WRITE,(long *) arg,sizeof(long));
-                if (err) return (err);
-                put_user(PF.capacity,(long *) arg);
-                return (0);
+                return put_user(PF.capacity,(long *) arg);
+            case BLKGETSIZE64:
+                return put_user((u64)PF.capacity << 9,(u64 *)arg);
 	    case BLKROSET:
 	    case BLKROGET:
 	    case BLKRASET:

@@ -791,9 +791,11 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		return copy_to_user((void *)arg, &g, sizeof g) ? -EFAULT : 0;
 	}
 	case BLKGETSIZE:   /* Return device size */
-		if (!arg) return -EINVAL;
 		return put_user(part_table[MINOR(inode->i_rdev)].nr_sects,
                                 (long *) arg);
+	case BLKGETSIZE64:
+		return put_user((u64)part_table[MINOR(inode->i_rdev)].nr_sects << 9,
+                                (u64 *)arg);
 		
 	case BLKFLSBUF:
 		if (!capable(CAP_SYS_ADMIN)) return -EACCES;

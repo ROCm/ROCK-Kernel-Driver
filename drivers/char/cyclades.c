@@ -1629,8 +1629,8 @@ cyz_handle_rx(struct cyclades_port *info, volatile struct CH_CTRL *ch_ctrl,
 	       for performance, but because of buffer boundaries, there
 	       may be several steps to the operation */
 	    while(0 < (small_count = 
-		       min(unsigned int, (rx_bufsize - new_rx_get),
-		       min(unsigned int, (TTY_FLIPBUF_SIZE - tty->flip.count), char_count))
+		       min_t(unsigned int, (rx_bufsize - new_rx_get),
+		       min_t(unsigned int, (TTY_FLIPBUF_SIZE - tty->flip.count), char_count))
 		 )) {
 		memcpy_fromio(tty->flip.char_buf_ptr,
 			      (char *)(cinfo->base_addr
@@ -1724,9 +1724,9 @@ cyz_handle_tx(struct cyclades_port *info, volatile struct CH_CTRL *ch_ctrl,
 	}
 #ifdef BLOCKMOVE
 	while(0 < (small_count = 
-		   min(unsigned int, (tx_bufsize - tx_put),
-		       min(unsigned int, (SERIAL_XMIT_SIZE - info->xmit_tail),
-			   min(unsigned int, info->xmit_cnt, char_count))))) {
+		   min_t(unsigned int, (tx_bufsize - tx_put),
+		       min_t(unsigned int, (SERIAL_XMIT_SIZE - info->xmit_tail),
+			   min_t(unsigned int, info->xmit_cnt, char_count))))) {
 
 	    memcpy_toio((char *)(cinfo->base_addr + tx_bufaddr + tx_put),
 			&info->xmit_buf[info->xmit_tail],

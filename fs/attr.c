@@ -57,16 +57,21 @@ error:
 	return retval;
 }
 
-void inode_setattr(struct inode * inode, struct iattr * attr)
+int inode_setattr(struct inode * inode, struct iattr * attr)
 {
 	unsigned int ia_valid = attr->ia_valid;
+	int error = 0;
+
+	if (ia_valid & ATTR_SIZE) {
+		error = vmtruncate(inode, attr->ia_size);
+		if (error)
+			goto out;
+	}
 
 	if (ia_valid & ATTR_UID)
 		inode->i_uid = attr->ia_uid;
 	if (ia_valid & ATTR_GID)
 		inode->i_gid = attr->ia_gid;
-	if (ia_valid & ATTR_SIZE)
-		vmtruncate(inode, attr->ia_size);
 	if (ia_valid & ATTR_ATIME)
 		inode->i_atime = attr->ia_atime;
 	if (ia_valid & ATTR_MTIME)
@@ -79,6 +84,8 @@ void inode_setattr(struct inode * inode, struct iattr * attr)
 			inode->i_mode &= ~S_ISGID;
 	}
 	mark_inode_dirty(inode);
+out:
+	return error;
 }
 
 static int setattr_mask(unsigned int ia_valid)

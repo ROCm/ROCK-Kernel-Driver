@@ -1,6 +1,8 @@
 #ifndef _ASM_IO_H
 #define _ASM_IO_H
 
+#include <linux/config.h>
+
 /*
  * This file contains the definitions for the x86 IO instructions
  * inb/inw/inl/outb/outw/outl and the "string versions" of the same
@@ -111,7 +113,7 @@ __OUTS(l)
  * Temporary debugging check to catch old code using
  * unmapped ISA addresses. Will be removed in 2.4.
  */
-#if 0
+#if CONFIG_DEBUG_IOVIRT
   extern void *__io_virt_debug(unsigned long x, const char *file, int line);
   extern unsigned long __io_phys_debug(unsigned long x, const char *file, int line);
   #define __io_virt(x) __io_virt_debug((unsigned long)(x), __FILE__, __LINE__)

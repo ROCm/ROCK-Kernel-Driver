@@ -517,7 +517,7 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 				}
 				
 
-				buffer_size = min (int, count, bluetooth->bulk_out_buffer_size);
+				buffer_size = min_t (int, count, bluetooth->bulk_out_buffer_size);
 				memcpy (urb->transfer_buffer, current_position, buffer_size);
 
 				/* build up our urb */

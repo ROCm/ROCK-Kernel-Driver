@@ -115,7 +115,7 @@
 
 // TxCredits value below which driver won't bother sending (to prevent too many small writes).
 // Send only if above 25%
-#define EDGE_FW_GET_TX_CREDITS_SEND_THRESHOLD(InitialCredit)	(max(int, ((InitialCredit) / 4), EDGE_FW_BULK_MAX_PACKET_SIZE))
+#define EDGE_FW_GET_TX_CREDITS_SEND_THRESHOLD(InitialCredit)	(max_t(int, ((InitialCredit) / 4), EDGE_FW_BULK_MAX_PACKET_SIZE))
 
 #define	EDGE_FW_BULK_MAX_PACKET_SIZE		64	// Max Packet Size for Bulk In Endpoint (EP1)
 #define EDGE_FW_BULK_READ_BUFFER_SIZE		1024	// Size to use for Bulk reads

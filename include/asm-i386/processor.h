@@ -477,4 +477,32 @@ static inline void rep_nop(void)
 	__asm__ __volatile__("rep;nop");
 }
 
+/* Prefetch instructions for Pentium III and AMD Athlon */
+#ifdef 	CONFIG_MPENTIUMIII
+
+#define ARCH_HAS_PREFETCH
+extern inline void prefetch(const void *x)
+{
+	__asm__ __volatile__ ("prefetchnta (%0)" : : "r"(x));
+}
+
+#elif CONFIG_X86_USE_3DNOW
+
+#define ARCH_HAS_PREFETCH
+#define ARCH_HAS_PREFETCHW
+#define ARCH_HAS_SPINLOCK_PREFETCH
+
+extern inline void prefetch(const void *x)
+{
+	 __asm__ __volatile__ ("prefetch (%0)" : : "r"(x));
+}
+
+extern inline void prefetchw(const void *x)
+{
+	 __asm__ __volatile__ ("prefetchw (%0)" : : "r"(x));
+}
+#define spin_lock_prefetch(x)	prefetchw(x)
+
+#endif
+
 #endif /* __ASM_I386_PROCESSOR_H */

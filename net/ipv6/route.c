@@ -785,7 +785,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg)
 
 install_route:
 	rt->u.dst.pmtu = ipv6_get_mtu(dev);
-	rt->u.dst.advmss = max(unsigned int, rt->u.dst.pmtu - 60, ip6_rt_min_advmss);
+	rt->u.dst.advmss = max_t(unsigned int, rt->u.dst.pmtu - 60, ip6_rt_min_advmss);
 	/* Maximal non-jumbo IPv6 payload is 65535 and corresponding
 	   MSS is 65535 - tcp_header_size. 65535 is also valid and
 	   means: "any MSS, rely only on pmtu discovery"
@@ -944,7 +944,7 @@ source_ok:
 	nrt->rt6i_nexthop = neigh_clone(neigh);
 	/* Reset pmtu, it may be better */
 	nrt->u.dst.pmtu = ipv6_get_mtu(neigh->dev);
-	nrt->u.dst.advmss = max(unsigned int, nrt->u.dst.pmtu - 60, ip6_rt_min_advmss);
+	nrt->u.dst.advmss = max_t(unsigned int, nrt->u.dst.pmtu - 60, ip6_rt_min_advmss);
 	if (rt->u.dst.advmss > 65535-20)
 		rt->u.dst.advmss = 65535;
 	nrt->rt6i_hoplimit = ipv6_get_hoplimit(neigh->dev);
@@ -1199,7 +1199,7 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 	rt->u.dst.output = ip6_output;
 	rt->rt6i_dev = dev_get_by_name("lo");
 	rt->u.dst.pmtu = ipv6_get_mtu(rt->rt6i_dev);
-	rt->u.dst.advmss = max(unsigned int, rt->u.dst.pmtu - 60, ip6_rt_min_advmss);
+	rt->u.dst.advmss = max_t(unsigned int, rt->u.dst.pmtu - 60, ip6_rt_min_advmss);
 	if (rt->u.dst.advmss > 65535-20)
 		rt->u.dst.advmss = 65535;
 	rt->rt6i_hoplimit = ipv6_get_hoplimit(rt->rt6i_dev);
@@ -1390,7 +1390,7 @@ static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
 	    rt->u.dst.pmtu > arg->mtu &&
 	    !(rt->u.dst.mxlock&(1<<RTAX_MTU)))
 		rt->u.dst.pmtu = arg->mtu;
-	rt->u.dst.advmss = max(unsigned int, arg->mtu - 60, ip6_rt_min_advmss);
+	rt->u.dst.advmss = max_t(unsigned int, arg->mtu - 60, ip6_rt_min_advmss);
 	if (rt->u.dst.advmss > 65535-20)
 		rt->u.dst.advmss = 65535;
 	return 0;

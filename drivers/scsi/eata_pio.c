@@ -161,7 +161,7 @@ void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs * regs)
 			    IncStat(&cmd->SCp,1);
 			    odd=FALSE;
 			}
-			x=min(unsigned int,z,cmd->SCp.this_residual/2);
+			x=min_t(unsigned int,z,cmd->SCp.this_residual/2);
 			insw(base+HA_RDATA,cmd->SCp.ptr,x);
 			z-=x; 
 			IncStat(&cmd->SCp,2*x);
@@ -191,7 +191,7 @@ void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs * regs)
 			    z--; 
 			    odd=FALSE; 
 			}
-			x=min(unsigned int,z,cmd->SCp.this_residual/2);
+			x=min_t(unsigned int,z,cmd->SCp.this_residual/2);
 			outsw(base+HA_RDATA,cmd->SCp.ptr,x);
 			z-=x; 
 			IncStat(&cmd->SCp,2*x);

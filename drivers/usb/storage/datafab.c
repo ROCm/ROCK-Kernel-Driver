@@ -204,7 +204,7 @@ static int datafab_read_data(struct us_data *us,
 
 	do {
 		// loop, never allocate or transfer more than 64k at once (min(128k, 255*info->ssize) is the real limit)
-		len = min(int, totallen, 65536);
+		len = min_t(int, totallen, 65536);
 
 		if (use_sg) {
 			sg = (struct scatterlist *) dest;
@@ -329,7 +329,7 @@ static int datafab_write_data(struct us_data *us,
 
 	do {
 		// loop, never allocate or transfer more than 64k at once (min(128k, 255*info->ssize) is the real limit)
-		len = min(int, totallen, 65536);
+		len = min_t(int, totallen, 65536);
 
 		if (use_sg) {
 			sg = (struct scatterlist *) src;

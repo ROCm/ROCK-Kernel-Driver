@@ -61,7 +61,8 @@ enum
 	CTL_FS=5,		/* Filesystems */
 	CTL_DEBUG=6,		/* Debugging */
 	CTL_DEV=7,		/* Devices */
-	CTL_BUS=8		/* Buses */
+	CTL_BUS=8,		/* Buses */
+	CTL_ABI=9		/* Binary emulation */
 };
 
 /* CTL_BUS names: */
@@ -604,6 +605,17 @@ enum {
 	DEV_MAC_HID_MOUSE_BUTTON2_KEYCODE=4,
 	DEV_MAC_HID_MOUSE_BUTTON3_KEYCODE=5,
 	DEV_MAC_HID_ADB_MOUSE_SENDS_KEYCODES=6
+};
+
+/* /proc/sys/abi */
+enum
+{
+	ABI_DEFHANDLER_COFF=1,	/* default handler for coff binaries */
+	ABI_DEFHANDLER_ELF=2, 	/* default handler for ELF binaries */
+	ABI_DEFHANDLER_LCALL7=3,/* default handler for procs using lcall7 */
+	ABI_DEFHANDLER_LIBCSO=4,/* default handler for an libc.so ELF interp */
+	ABI_TRACE=5,		/* tracing flags */
+	ABI_FAKE_UTSNAME=6,	/* fake target utsname information */
 };
 
 #ifdef __KERNEL__

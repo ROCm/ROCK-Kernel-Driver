@@ -5074,10 +5074,12 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 			   sizeof(DiskGeometry_T)) ? -EFAULT : 0);
     case BLKGETSIZE:
       /* Get Device Size. */
-      if ((long *) Argument == NULL) return -EINVAL;
       return put_user(Controller->GenericDiskInfo.part[MINOR(Inode->i_rdev)]
 						 .nr_sects,
 		      (long *) Argument);
+    case BLKGETSIZE64:
+      return put_user((u64)Controller->GenericDiskInfo.part[MINOR(Inode->i_rdev)].nr_sects << 9,
+		      (u64 *) Argument);
     case BLKRAGET:
     case BLKRASET:
     case BLKFLSBUF:

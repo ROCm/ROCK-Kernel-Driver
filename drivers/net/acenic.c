@@ -2995,8 +2995,8 @@ static void __init ace_copy(struct ace_regs *regs, void *src,
 		return;
 
 	while (size > 0) {
-		tsize = min(u32, ((~dest & (ACE_WINDOW_SIZE - 1)) + 1),
-			    min(u32, size, ACE_WINDOW_SIZE));
+		tsize = min_t(u32, ((~dest & (ACE_WINDOW_SIZE - 1)) + 1),
+			    min_t(u32, size, ACE_WINDOW_SIZE));
 		tdest = (unsigned long)&regs->Window +
 			(dest & (ACE_WINDOW_SIZE - 1));
 		writel(dest & ~(ACE_WINDOW_SIZE - 1), &regs->WinBase);
@@ -3026,8 +3026,8 @@ static void __init ace_clear(struct ace_regs *regs, u32 dest, int size)
 		return;
 
 	while (size > 0) {
-		tsize = min(u32, ((~dest & (ACE_WINDOW_SIZE - 1)) + 1),
-			    min(u32, size, ACE_WINDOW_SIZE));
+		tsize = min_t(u32, ((~dest & (ACE_WINDOW_SIZE - 1)) + 1),
+			    min_t(u32, size, ACE_WINDOW_SIZE));
 		tdest = (unsigned long)&regs->Window +
 			(dest & (ACE_WINDOW_SIZE - 1));
 		writel(dest & ~(ACE_WINDOW_SIZE - 1), &regs->WinBase);

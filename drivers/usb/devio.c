@@ -1082,7 +1082,7 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 		if (retval == 0)
 			/* ifno might usefully be passed ... */
 			retval = ifp->driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
-			/* size = min(int, size, retval)? */
+			/* size = min_t(int, size, retval)? */
 	}
 
 	/* cleanup and return */

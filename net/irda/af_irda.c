@@ -1400,7 +1400,7 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 			continue;
 		}
 
-		chunk = min(unsigned int, skb->len, size);
+		chunk = min_t(unsigned int, skb->len, size);
 		if (memcpy_toiovec(msg->msg_iov, skb->data, chunk)) {
 			skb_queue_head(&sk->receive_queue, skb);
 			if (copied == 0)

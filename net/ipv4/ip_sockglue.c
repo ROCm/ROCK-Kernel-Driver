@@ -683,7 +683,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 
 				ip_options_undo(opt);
 
-				len = min(unsigned int, len, opt->optlen);
+				len = min_t(unsigned int, len, opt->optlen);
 				if(put_user(len, optlen))
 					return -EFAULT;
 				if(copy_to_user(optval, opt->__data, len))
@@ -744,7 +744,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 		case IP_MULTICAST_IF:
 		{
 			struct in_addr addr;
-			len = min(unsigned int, len, sizeof(struct in_addr));
+			len = min_t(unsigned int, len, sizeof(struct in_addr));
 			addr.s_addr = sk->protinfo.af_inet.mc_addr;
 			release_sock(sk);
 
@@ -808,7 +808,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 		if(copy_to_user(optval,&ucval,1))
 			return -EFAULT;
 	} else {
-		len = min(unsigned int, sizeof(int), len);
+		len = min_t(unsigned int, sizeof(int), len);
 		if(put_user(len, optlen))
 			return -EFAULT;
 		if(copy_to_user(optval,&val,len))

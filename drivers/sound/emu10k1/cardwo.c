@@ -581,7 +581,7 @@ void emu10k1_waveout_xferdata(struct woinst *woinst, u8 *data, u32 *size)
 	u32 sizetocopy, sizetocopy_now, start;
 	unsigned long flags;
 
-	sizetocopy = min(u32, buffer->size, *size);
+	sizetocopy = min_t(u32, buffer->size, *size);
 	*size = sizetocopy;
 
 	if (!sizetocopy)

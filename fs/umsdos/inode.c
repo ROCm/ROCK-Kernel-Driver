@@ -211,7 +211,7 @@ dentry->d_parent->d_name.name, dentry->d_name.name, info.fake.fname));
 	ret = umsdos_notify_change_locked(dentry, attr);
 	up(&dir->i_sem);
 	if (ret == 0)
-		inode_setattr (inode, attr);
+		ret = inode_setattr (inode, attr);
 out:
 	if (old_dentry)
 		dput (dentry);	/* if we had to use fake dentry for hardlinks, dput() it now */

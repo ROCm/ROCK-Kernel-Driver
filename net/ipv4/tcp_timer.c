@@ -248,7 +248,7 @@ static void tcp_delack_timer(unsigned long data)
 	if (tcp_ack_scheduled(tp)) {
 		if (!tp->ack.pingpong) {
 			/* Delayed ACK missed: inflate ATO. */
-			tp->ack.ato = min(u32, tp->ack.ato << 1, tp->rto);
+			tp->ack.ato = min_t(u32, tp->ack.ato << 1, tp->rto);
 		} else {
 			/* Delayed ACK missed: leave pingpong mode and
 			 * deflate ATO.
@@ -381,7 +381,7 @@ static void tcp_retransmit_timer(struct sock *sk)
 		if (!tp->retransmits)
 			tp->retransmits=1;
 		tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS,
-				     min(u32, tp->rto, TCP_RESOURCE_PROBE_INTERVAL));
+				     min_t(u32, tp->rto, TCP_RESOURCE_PROBE_INTERVAL));
 		goto out;
 	}
 
@@ -404,7 +404,7 @@ static void tcp_retransmit_timer(struct sock *sk)
 	tp->retransmits++;
 
 out_reset_timer:
-	tp->rto = min(u32, tp->rto << 1, TCP_RTO_MAX);
+	tp->rto = min_t(u32, tp->rto << 1, TCP_RTO_MAX);
 	tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 	if (tp->retransmits > sysctl_tcp_retries1)
 		__sk_dst_reset(sk);
@@ -517,7 +517,7 @@ static void tcp_synack_timer(struct sock *sk)
 
 					if (req->retrans++ == 0)
 						lopt->qlen_young--;
-					timeo = min(unsigned long,
+					timeo = min_t(unsigned long,
 						    (TCP_TIMEOUT_INIT << req->retrans),
 						    TCP_RTO_MAX);
 					req->expires = now + timeo;

@@ -1309,7 +1309,7 @@ iucv_receive (u16 pathid, u32 msgid, u32 trgcls,
 			if (residual_buffer)
 				*residual_buffer = parm.ipbfadr1;
 		} else {
-			moved = min(unsigned int, buflen, 8);
+			moved = min_t(unsigned int, buflen, 8);
 
 			memcpy ((char *) buffer,
 				(char *) &parm.ipbfadr1, moved);
@@ -1402,7 +1402,7 @@ iucv_receive_array (u16 pathid,
 
 			while ((moved < 8) && (moved < buflen)) {
 				dyn_len =
-				    min(unsigned int,
+				    min_t(unsigned int,
 					(buffer + i)->length, need_to_move);
 
 				memcpy ((char *)((ulong)((buffer + i)->address)),

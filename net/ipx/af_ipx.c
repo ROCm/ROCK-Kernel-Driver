@@ -1890,7 +1890,7 @@ static int ipx_getsockopt(struct socket *sock, int level, int optname,
 	if (get_user(len, optlen))
 		goto out;
 
-	len = min(unsigned int, len, sizeof(int));
+	len = min_t(unsigned int, len, sizeof(int));
 	ret = -EINVAL;
 	if(len < 0)
 		goto out;

@@ -610,7 +610,7 @@ static int transmit(struct baycom_state *bc, int cnt, unsigned char stat)
 	while (cnt > 0) {
 		switch (bc->hdlctx.state) {
 		case tx_keyup:
-			i = min(int, cnt, bc->hdlctx.flags);
+			i = min_t(int, cnt, bc->hdlctx.flags);
 			cnt -= i;
 			bc->hdlctx.flags -= i;
 			if (bc->hdlctx.flags <= 0)
@@ -633,7 +633,7 @@ static int transmit(struct baycom_state *bc, int cnt, unsigned char stat)
 					break;
 				}
 			}
-			i = min(int, cnt, bc->hdlctx.bufcnt);
+			i = min_t(int, cnt, bc->hdlctx.bufcnt);
 			bc->hdlctx.bufcnt -= i;
 			cnt -= i;
 			if (i != pp->ops->epp_write_data(pp, bc->hdlctx.bufptr, i, 0))
@@ -647,7 +647,7 @@ static int transmit(struct baycom_state *bc, int cnt, unsigned char stat)
 				bc->hdlctx.state = tx_data;
 				break;
 			}
-			i = min(int, cnt, bc->hdlctx.flags);
+			i = min_t(int, cnt, bc->hdlctx.flags);
 			if (i) {
 				cnt -= i;
 				bc->hdlctx.flags -= i;
@@ -664,7 +664,7 @@ static int transmit(struct baycom_state *bc, int cnt, unsigned char stat)
 		default:  /* fall through */
 			if (bc->hdlctx.calibrate <= 0)
 				return 0;
-			i = min(int, cnt, bc->hdlctx.calibrate);
+			i = min_t(int, cnt, bc->hdlctx.calibrate);
 			cnt -= i;
 			bc->hdlctx.calibrate -= i;
 			memset(tmp, 0, sizeof(tmp));

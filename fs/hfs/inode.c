@@ -169,7 +169,9 @@ static int __hfs_notify_change(struct dentry *dentry, struct iattr * attr, int k
 			attr->ia_valid &= ~ATTR_SIZE;
 		}
 	}
-	inode_setattr(inode, attr);
+	error = inode_setattr(inode, attr);
+	if (error)
+		return error;
 
 	/* We wouldn't want to mess with the sizes of the other fork */
 	attr->ia_valid &= ~ATTR_SIZE;

@@ -828,7 +828,7 @@ register_iucv_dev (int devnumber, char *userid)
 
 	memset (iucv_userid[devnumber], ' ', 8);
 	memcpy (iucv_userid[devnumber], userid,
-		min(unsigned int, strlen(userid), 8));
+		min_t(unsigned int, strlen(userid), 8));
 	dev = &iucv_netdev[devnumber];
 	sprintf (dev->name, "iucv%i", devnumber);
 

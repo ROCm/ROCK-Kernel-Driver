@@ -170,7 +170,7 @@ void _ubh_ubhcpymem_(struct ufs_sb_private_info * uspi,
 		size = ubh->count << uspi->s_fshift;
 	bhno = 0;
 	while (size) {
-		len = min(unsigned int, size, uspi->s_fsize);
+		len = min_t(unsigned int, size, uspi->s_fsize);
 		memcpy (mem, ubh->bh[bhno]->b_data, len);
 		mem += uspi->s_fsize;
 		size -= len;
@@ -186,7 +186,7 @@ void _ubh_memcpyubh_(struct ufs_sb_private_info * uspi,
 		size = ubh->count << uspi->s_fshift;
 	bhno = 0;
 	while (size) {
-		len = min(unsigned int, size, uspi->s_fsize);
+		len = min_t(unsigned int, size, uspi->s_fsize);
 		memcpy (ubh->bh[bhno]->b_data, mem, len);
 		mem += uspi->s_fsize;
 		size -= len;

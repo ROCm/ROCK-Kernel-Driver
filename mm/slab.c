@@ -85,9 +85,15 @@
  * FORCED_DEBUG	- 1 enables SLAB_RED_ZONE and SLAB_POISON (if possible)
  */
 
+#ifdef CONFIG_DEBUG_SLAB
+#define	DEBUG		1
+#define	STATS		1
+#define	FORCED_DEBUG	1
+#else
 #define	DEBUG		0
 #define	STATS		0
 #define	FORCED_DEBUG	0
+#endif
 
 /*
  * Parameters for kmem_cache_reap
@@ -816,6 +822,33 @@ opps:
 	return cachep;
 }
 
+
+#if DEBUG
+/*
+ * This check if the kmem_cache_t pointer is chained in the cache_cache
+ * list. -arca
+ */
+static int is_chained_kmem_cache(kmem_cache_t * cachep)
+{
+	struct list_head *p;
+	int ret = 0;
+
+	/* Find the cache in the chain of caches. */
+	down(&cache_chain_sem);
+	list_for_each(p, &cache_chain) {
+		if (p == &cachep->next) {
+			ret = 1;
+			break;
+		}
+	}
+	up(&cache_chain_sem);
+
+	return ret;
+}
+#else
+#define is_chained_kmem_cache(x) 1
+#endif
+
 #ifdef CONFIG_SMP
 /*
  * Waits for all CPUs to execute func().
@@ -915,7 +948,7 @@ static int __kmem_cache_shrink(kmem_cache_t *cachep)
  */
 int kmem_cache_shrink(kmem_cache_t *cachep)
 {
-	if (!cachep || in_interrupt())
+	if (!cachep || in_interrupt() || !is_chained_kmem_cache(cachep))
 		BUG();
 
 	return __kmem_cache_shrink(cachep);

@@ -115,7 +115,7 @@ static ssize_t emu10k1_audio_read(struct file *file, char *buffer, size_t count,
 
 		if ((bytestocopy >= wiinst->buffer.fragment_size)
 		    || (bytestocopy >= count)) {
-			bytestocopy = min(u32, bytestocopy, count);
+			bytestocopy = min_t(u32, bytestocopy, count);
 
 			emu10k1_wavein_xferdata(wiinst, (u8 *) buffer, &bytestocopy);
 
@@ -215,7 +215,7 @@ static ssize_t emu10k1_audio_write(struct file *file, const char *buffer, size_t
 		if ((bytestocopy >= woinst->buffer.fragment_size)
 		    || (bytestocopy >= count)) {
 
-			bytestocopy = min(u32, bytestocopy, count);
+			bytestocopy = min_t(u32, bytestocopy, count);
 
 			emu10k1_waveout_xferdata(woinst, (u8 *) buffer, &bytestocopy);
 

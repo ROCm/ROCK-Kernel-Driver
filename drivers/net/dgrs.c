@@ -733,7 +733,7 @@ static int dgrs_start_xmit(struct sk_buff *skb, struct net_device *devN)
 			goto no_resources;
 		}
 
-		amt = min(unsigned int, len, rbdp->size - count);
+		amt = min_t(unsigned int, len, rbdp->size - count);
 		memcpy( (char *) S2H(rbdp->buf) + count, skb->data + i, amt);
 		i += amt;
 		count += amt;

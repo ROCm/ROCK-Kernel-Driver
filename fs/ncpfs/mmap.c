@@ -61,7 +61,7 @@ static struct page* ncp_file_mmap_nopage(struct vm_area_struct *area,
 
 			to_read = bufsize - (pos % bufsize);
 
-			to_read = min(unsigned int, to_read, count - already_read);
+			to_read = min_t(unsigned int, to_read, count - already_read);
 
 			if (ncp_read_kernel(NCP_SERVER(inode),
 				     NCP_FINFO(inode)->file_handle,

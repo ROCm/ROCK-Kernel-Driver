@@ -454,7 +454,6 @@ int parse_rock_ridge_inode(struct iso_directory_record * de,
    if ((inode->i_sb->u.isofs_sb.s_rock_offset==-1)
        &&(inode->i_sb->u.isofs_sb.s_rock==2))
      {
-	printk(KERN_DEBUG"scanning for RockRidge behind XA attributes\n");
 	result=parse_rock_ridge_inode_internal(de,inode,14);
      };
    return result;

@@ -692,7 +692,7 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 		ncp_inode_close(inode);
 		result = ncp_make_closed(inode);
 		if (!result)
-			vmtruncate(inode, attr->ia_size);
+			result = vmtruncate(inode, attr->ia_size);
 	}
 out:
 	return result;

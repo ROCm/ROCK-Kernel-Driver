@@ -2478,6 +2478,11 @@ static int md_ioctl (struct inode *inode, struct file *file,
 						(long *) arg);
 			goto done;
 
+		case BLKGETSIZE64:   /* Return device size */
+			err = md_put_user((u64)md_hd_struct[minor].nr_sects << 9,
+						(u64 *) arg);
+			goto done;
+
 		case BLKRAGET:
 		case BLKRASET:
 		case BLKFLSBUF:

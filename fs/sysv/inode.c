@@ -198,8 +198,7 @@ int sysv_notify_change(struct dentry *dentry, struct iattr *attr)
 			if (attr->ia_mode == COH_KLUDGE_SYMLINK_MODE)
 				attr->ia_mode = COH_KLUDGE_NOT_SYMLINK;
 
-	inode_setattr(inode, attr);
-	return 0;
+	return inode_setattr(inode, attr);
 }
 
 static struct buffer_head * sysv_update_inode(struct inode * inode)

@@ -87,7 +87,7 @@ int memcpy_toiovec(struct iovec *iov, unsigned char *kdata, int len)
 	{
 		if(iov->iov_len)
 		{
-			int copy = min(unsigned int, iov->iov_len, len);
+			int copy = min_t(unsigned int, iov->iov_len, len);
 			if (copy_to_user(iov->iov_base, kdata, copy))
 				goto out;
 			kdata+=copy;
@@ -114,7 +114,7 @@ void memcpy_tokerneliovec(struct iovec *iov, unsigned char *kdata, int len)
 	{
 		if(iov->iov_len)
 		{
-			int copy = min(unsigned int, iov->iov_len, len);
+			int copy = min_t(unsigned int, iov->iov_len, len);
 			memcpy(iov->iov_base, kdata, copy);
 			kdata+=copy;
 			len-=copy;
@@ -140,7 +140,7 @@ int memcpy_fromiovec(unsigned char *kdata, struct iovec *iov, int len)
 	{
 		if(iov->iov_len)
 		{
-			int copy = min(unsigned int, len, iov->iov_len);
+			int copy = min_t(unsigned int, len, iov->iov_len);
 			if (copy_from_user(kdata, iov->iov_base, copy))
 				goto out;
 			len-=copy;
@@ -175,7 +175,7 @@ int memcpy_fromiovecend(unsigned char *kdata, struct iovec *iov, int offset,
 	while (len > 0)
 	{
 		u8 *base = iov->iov_base + offset;
-		int copy = min(unsigned int, len, iov->iov_len - offset);
+		int copy = min_t(unsigned int, len, iov->iov_len - offset);
 
 		offset = 0;
 		if (copy_from_user(kdata, base, copy))
@@ -214,7 +214,7 @@ int csum_partial_copy_fromiovecend(unsigned char *kdata, struct iovec *iov,
 	while (len > 0)
 	{
 		u8 *base = iov->iov_base + offset;
-		int copy = min(unsigned int, len, iov->iov_len - offset);
+		int copy = min_t(unsigned int, len, iov->iov_len - offset);
 
 		offset = 0;
 		/* There is a remnant from previous iov. */

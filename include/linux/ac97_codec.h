@@ -36,7 +36,10 @@
 #define AC97_PCM_MIC_ADC_RATE     0x0034       /* PCM MIC ADC Rate */
 #define AC97_CENTER_LFE_MASTER    0x0036       /* Center + LFE Master Volume */
 #define AC97_SURROUND_MASTER      0x0038       /* Surround (Rear) Master Volume */
-#define AC97_RESERVED_3A          0x003A       /* Reserved */
+#define AC97_RESERVED_3A          0x003A       /* Reserved in AC '97 < 2.2 */
+
+/* AC'97 2.2 */
+#define AC97_SPDIF_CONTROL        0x003A       /* S/PDIF Control */
 
 /* range 0x3c-0x58 - MODEM */
 #define AC97_EXTENDED_MODEM_ID    0x003C
@@ -86,6 +89,40 @@
 #define AC97_GP_3D                0x2000       /* 3D Enhancement 1=on */
 #define AC97_GP_ST                0x4000       /* Stereo Enhancement 1=on */
 #define AC97_GP_POP               0x8000       /* Pcm Out Path, 0=pre 3D, 1=post 3D */
+
+/* extended audio status and control bit defines */
+#define AC97_EA_VRA               0x0001       /* Variable bit rate enable bit */
+#define AC97_EA_DRA               0x0002       /* Double-rate audio enable bit */
+#define AC97_EA_SPDIF             0x0004       /* S/PDIF Enable bit */
+#define AC97_EA_VRM               0x0008       /* Variable bit rate for MIC enable bit */
+#define AC97_EA_CDAC              0x0040       /* PCM Center DAC is ready (Read only) */
+#define AC97_EA_SDAC              0x0040       /* PCM Surround DACs are ready (Read only) */
+#define AC97_EA_LDAC              0x0080       /* PCM LFE DAC is ready (Read only) */
+#define AC97_EA_MDAC              0x0100       /* MIC ADC is ready (Read only) */
+#define AC97_EA_SPCV              0x0400       /* S/PDIF configuration valid (Read only) */
+#define AC97_EA_PRI               0x0800       /* Turns the PCM Center DAC off */
+#define AC97_EA_PRJ               0x1000       /* Turns the PCM Surround DACs off */
+#define AC97_EA_PRK               0x2000       /* Turns the PCM LFE DAC off */
+#define AC97_EA_PRL               0x4000       /* Turns the MIC ADC off */
+#define AC97_EA_SLOT_MASK         0xffcf       /* Mask for slot assignment bits */
+#define AC97_EA_SPSA_3_4          0x0000       /* Slot assigned to 3 & 4 */
+#define AC97_EA_SPSA_7_8          0x0010       /* Slot assigned to 7 & 8 */
+#define AC97_EA_SPSA_6_9          0x0020       /* Slot assigned to 6 & 9 */
+#define AC97_EA_SPSA_10_11        0x0030       /* Slot assigned to 10 & 11 */
+
+/* S/PDIF control bit defines */
+#define AC97_SC_PRO               0x0001       /* Professional status */
+#define AC97_SC_NAUDIO            0x0002       /* Non audio stream */
+#define AC97_SC_COPY              0x0004       /* Copyright status */
+#define AC97_SC_PRE               0x0008       /* Preemphasis status */
+#define AC97_SC_CC_MASK           0x07f0       /* Category Code mask */
+#define AC97_SC_L                 0x0800       /* Generation Level status */
+#define AC97_SC_SPSR_MASK         0xcfff       /* S/PDIF Sample Rate bits */
+#define AC97_SC_SPSR_44K          0x0000       /* Use 44.1kHz Sample rate */
+#define AC97_SC_SPSR_48K          0x2000       /* Use 48kHz Sample rate */
+#define AC97_SC_SPSR_32K          0x3000       /* Use 32kHz Sample rate */
+#define AC97_SC_DRS               0x4000       /* Double Rate S/PDIF */
+#define AC97_SC_V                 0x8000       /* Validity status */
 
 /* powerdown control and status bit defines */
 

@@ -979,7 +979,7 @@ int ip_mroute_getsockopt(struct sock *sk,int optname,char *optval,int *optlen)
 	if (get_user(olr, optlen))
 		return -EFAULT;
 
-	olr = min(unsigned int, olr, sizeof(int));
+	olr = min_t(unsigned int, olr, sizeof(int));
 	if (olr < 0)
 		return -EINVAL;
 		

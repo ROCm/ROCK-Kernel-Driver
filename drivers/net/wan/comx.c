@@ -151,8 +151,8 @@ int comx_debug(struct net_device *dev, char *fmt, ...)
 		int free = (ch->debug_start - ch->debug_end + ch->debug_size) 
 			% ch->debug_size;
 
-		to_copy = min(int, free ? free : ch->debug_size, 
-			      min(int, ch->debug_size - ch->debug_end, len));
+		to_copy = min_t(int, free ? free : ch->debug_size, 
+			      min_t(int, ch->debug_size - ch->debug_end, len));
 		memcpy(ch->debug_area + ch->debug_end, str, to_copy);
 		str += to_copy;
 		len -= to_copy;
@@ -567,7 +567,7 @@ static int comx_read_proc(char *page, char **start, off_t off, int count,
 	if (count >= len - off) {
 		*eof = 1;
 	}
-	return min(int, count, len - off);
+	return min_t(int, count, len - off);
 }
 
 
@@ -597,7 +597,7 @@ static int comx_root_read_proc(char *page, char **start, off_t off, int count,
 	if (count >= len - off) {
 		*eof = 1;
 	}
-	return min(int, count, len - off);
+	return min_t(int, count, len - off);
 }
 
 

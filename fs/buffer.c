@@ -103,7 +103,8 @@ static void __refile_buffer(struct buffer_head *);
 atomic_t buffermem_pages = ATOMIC_INIT(0);
 
 /* Here is the parameter block for the bdflush process. If you add or
- * remove any of the parameters, make sure to update kernel/sysctl.c.
+ * remove any of the parameters, make sure to update kernel/sysctl.c
+ * and the documentation at linux/Documentation/sysctl/vm.txt.
  */
 
 #define N_PARAM 9

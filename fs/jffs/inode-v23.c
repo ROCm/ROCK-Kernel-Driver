@@ -718,7 +718,7 @@ jffs_readpage(struct file *file, struct page *page)
 
 	offset = page->index << PAGE_CACHE_SHIFT;
 	if (offset < inode->i_size) {
-		read_len = min(long, inode->i_size - offset, PAGE_SIZE);
+		read_len = min_t(long, inode->i_size - offset, PAGE_SIZE);
 		r = jffs_read_data(f, buf, offset, read_len);
 		if (r == read_len) {
 			if (read_len < PAGE_SIZE) {
@@ -1373,7 +1373,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		goto out_isem;
 	}
 	
-	thiscount = min(unsigned int,
+	thiscount = min_t(unsigned int,
 			c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode),
 			count);
 
@@ -1440,7 +1440,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		
 		if (pos < f->size) {
 			node->removed_size = raw_inode.rsize =
-				min(unsigned int, thiscount, f->size - pos);
+				min_t(unsigned int, thiscount, f->size - pos);
 			
 			/* If this node is going entirely over the top of old data, 
 			   we can allow it to go into the reserved space, because 
@@ -1482,7 +1482,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 
 		D3(printk("jffs_file_write(): new f_pos %ld.\n", (long)pos));
 
-		thiscount = min(unsigned int,
+		thiscount = min_t(unsigned int,
 			c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode),
 			count);
 	}

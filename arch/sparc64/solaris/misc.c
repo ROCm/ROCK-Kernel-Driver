@@ -709,7 +709,7 @@ extern long solaris_to_linux_signals[], linux_to_solaris_signals[];
 
 struct exec_domain solaris_exec_domain = {
 	"Solaris",
-	(lcall7_func)NULL,
+	NULL,
 	1, 1,	/* PER_SVR4 personality */
 	solaris_to_linux_signals,
 	linux_to_solaris_signals,

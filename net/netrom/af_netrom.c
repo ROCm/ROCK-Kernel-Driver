@@ -435,7 +435,7 @@ static int nr_getsockopt(struct socket *sock, int level, int optname,
 			return -ENOPROTOOPT;
 	}
 
-	len = min(unsigned int, len, sizeof(int));
+	len = min_t(unsigned int, len, sizeof(int));
 
 	if (put_user(len, optlen))
 		return -EFAULT;

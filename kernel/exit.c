@@ -10,6 +10,7 @@
 #include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/completion.h>
+#include <linux/personality.h>
 #include <linux/tty.h>
 #ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/acct.h>

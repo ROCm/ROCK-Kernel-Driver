@@ -529,10 +529,9 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 
 	switch (cmd) {
 	case BLKGETSIZE:   /* Return device size */
-		if (!arg)
-			return -EFAULT;
-		return put_user((mtdblk->mtd->size >> 9),
-                                (long *) arg)?-EFAULT:0;
+		return put_user((mtdblk->mtd->size >> 9), (long *) arg);
+	case BLKGETSIZE64:
+		return put_user((u64)mtdblk->mtd->size, (u64 *)arg);
 		
 	case BLKFLSBUF:
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)

@@ -239,6 +239,7 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 		case BLKGETSIZE:
 			/* Today get_gendisk() requires a linear scan;
 			   add this when dev has pointer type. */
+			/* add BLKGETSIZE64 too */
 			g = get_gendisk(dev);
 			if (!g)
 				longval = 0;

@@ -3497,6 +3497,10 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		case BLKGETSIZE:
 			ECALL(get_floppy_geometry(drive, type, &g));
 			return put_user(g->size, (long *) param);
+
+		case BLKGETSIZE64:
+			ECALL(get_floppy_geometry(drive, type, &g));
+			return put_user((u64)g->size << 9, (u64 *) param);
 		/* BLKRRPART is not defined as floppies don't have
 		 * partition tables */
 	}

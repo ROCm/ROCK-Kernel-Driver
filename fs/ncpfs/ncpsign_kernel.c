@@ -100,7 +100,7 @@ void sign_packet(struct ncp_server *server, int *size) {
  memcpy(data,server->sign_root,8);
  PUT_LE32(data+8,(*size));
  memcpy(data+12,server->packet+sizeof(struct ncp_request_header)-1,
-  min(unsigned int,(*size)-sizeof(struct ncp_request_header)+1,52));
+  min_t(unsigned int,(*size)-sizeof(struct ncp_request_header)+1,52));
 
  nwsign(server->sign_last,data,server->sign_last);
 

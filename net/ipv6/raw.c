@@ -699,7 +699,7 @@ static int rawv6_getsockopt(struct sock *sk, int level, int optname,
 		return -ENOPROTOOPT;
 	}
 
-	len = min(unsigned int, sizeof(int), len);
+	len = min_t(unsigned int, sizeof(int), len);
 
 	if (put_user(len, optlen))
 		return -EFAULT;

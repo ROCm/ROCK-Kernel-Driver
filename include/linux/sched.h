@@ -7,7 +7,6 @@ extern unsigned long event;
 
 #include <linux/config.h>
 #include <linux/binfmts.h>
-#include <linux/personality.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -26,6 +25,8 @@ extern unsigned long event;
 #include <linux/signal.h>
 #include <linux/securebits.h>
 #include <linux/fs_struct.h>
+
+struct exec_domain;
 
 /*
  * cloning flags:
@@ -436,6 +437,12 @@ struct task_struct {
 #define DEF_COUNTER	(10*HZ/100)	/* 100 ms time slice */
 #define MAX_COUNTER	(20*HZ/100)
 #define DEF_NICE	(0)
+
+
+/*
+ * The default (Linux) execution domain.
+ */
+extern struct exec_domain	default_exec_domain;
 
 /*
  *  INIT_TASK is used to set up the first task table, touch at

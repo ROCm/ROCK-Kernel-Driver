@@ -446,6 +446,8 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 #endif
 	case BLKGETSIZE:
 		return put_user(nbd_bytesizes[dev] >> 9, (long *) arg);
+	case BLKGETSIZE64:
+		return put_user((u64)nbd_bytesizes[dev], (u64 *) arg);
 	}
 	return -EINVAL;
 }

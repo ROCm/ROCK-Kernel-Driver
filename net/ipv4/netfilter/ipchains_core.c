@@ -534,7 +534,7 @@ ip_fw_domatch(struct ip_fwkernel *f,
 	}
 	if (f->ipfw.fw_flg & IP_FW_F_NETLINK) {
 #if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
-		size_t len = min(unsigned int, f->ipfw.fw_outputsize, ntohs(ip->tot_len))
+		size_t len = min_t(unsigned int, f->ipfw.fw_outputsize, ntohs(ip->tot_len))
 			+ sizeof(__u32) + sizeof(skb->nfmark) + IFNAMSIZ;
 		struct sk_buff *outskb=alloc_skb(len, GFP_ATOMIC);
 

@@ -544,7 +544,9 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 					 attr->ia_size);
 		if (error)
 			goto out;
-		vmtruncate(inode, attr->ia_size);
+		error = vmtruncate(inode, attr->ia_size);
+		if (error)
+			goto out;
 		refresh = 1;
 	}
 

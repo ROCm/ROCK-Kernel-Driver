@@ -1753,7 +1753,7 @@ static int PC4500_readrid(struct airo_info *ai, u16 rid, void *pBuf, int len)
 	// read the rid length field
 	bap_read(ai, pBuf, 2, BAP1);
 	// length for remaining part of rid
-	len = min(unsigned int, len, le16_to_cpu(*(u16*)pBuf)) - 2;
+	len = min_t(unsigned int, len, le16_to_cpu(*(u16*)pBuf)) - 2;
 	
 	if ( len <= 2 ) {
 		printk( KERN_ERR 
@@ -3997,7 +3997,7 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	 */
 
 	if (copy_to_user(comp->data, iobuf,
-			 min(unsigned int, comp->len, sizeof(iobuf))))
+			 min_t(unsigned int, comp->len, sizeof(iobuf))))
 		return -EFAULT;
 	return 0;
 }
@@ -4057,7 +4057,7 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 		PC4500_readrid(dev->priv,ridcode,iobuf,sizeof(iobuf));
 
 		if (copy_to_user(comp->data, iobuf,
-				 min(unsigned int, comp->len, sizeof(iobuf))))
+				 min_t(unsigned int, comp->len, sizeof(iobuf))))
 			return -EFAULT;
 		return 0;
 

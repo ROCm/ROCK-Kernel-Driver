@@ -1210,6 +1210,8 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 
 	case BLKGETSIZE:
 		return put_user (mfm[minor].nr_sects, (long *)arg);
+	case BLKGETSIZE64:
+		return put_user ((u64)mfm[minor].nr_sects << 9, (u64 *)arg);
 
 	case BLKFRASET:
 		if (!capable(CAP_SYS_ADMIN))

@@ -1609,7 +1609,7 @@ jffs_get_node_data(struct jffs_file *f, struct jffs_node *node,
 		  "version: %u, node_offset: %u\n",
 		  f->name, node->ino, node->version, node_offset));
 
-	r = min(u32, avail, max_size);
+	r = min_t(u32, avail, max_size);
 	D3(printk(KERN_NOTICE "jffs_get_node_data\n"));
 	flash_safe_read(fmc->mtd, pos, buf, r);
 
@@ -1662,7 +1662,7 @@ jffs_read_data(struct jffs_file *f, unsigned char *buf, __u32 read_offset,
 		int r;
 		if (!node->fm) {
 			/* This node does not refer to real data.  */
-			r = min(u32, size - read_data,
+			r = min_t(u32, size - read_data,
 				node->data_size - node_offset);
 			memset(&buf[read_data], 0, r);
 		}
@@ -1904,7 +1904,7 @@ jffs_delete_data(struct jffs_file *f, struct jffs_node *node)
 		else {
 			/* No.  No need to split the node.  Just remove
 			   the end of the node.  */
-			int r = min(u32, n->data_offset + n->data_size
+			int r = min_t(u32, n->data_offset + n->data_size
 				    - offset, remove_size);
 			n->data_size -= r;
 			remove_size -= r;
@@ -2460,7 +2460,7 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 		}
 
 		while (size) {
-			__u32 s = min(int, size, PAGE_SIZE);
+			__u32 s = min_t(int, size, PAGE_SIZE);
 			if ((r = jffs_read_data(f, (char *)page,
 						offset, s)) < s) {
 				free_page((unsigned long)page);
@@ -2821,7 +2821,7 @@ jffs_try_to_erase(struct jffs_control *c)
 				printk("JFFS: Erase failed! pos = 0x%lx\n",
 				       (long)pos);
 				jffs_hexdump(fmc->mtd, pos,
-					     min(u32, 256, end - pos));
+					     min_t(u32, 256, end - pos));
 				err = -1;
 				break;
 			}

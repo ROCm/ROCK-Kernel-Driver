@@ -2131,14 +2131,14 @@ static int rh_submit_urb(struct urb *urb)
 	case RH_GET_DESCRIPTOR:
 		switch ((wValue & 0xff00) >> 8) {
 		case 0x01:	/* device descriptor */
-			len = min(unsigned int, leni,
-				  min(unsigned int,
+			len = min_t(unsigned int, leni,
+				  min_t(unsigned int,
 				      sizeof(root_hub_dev_des), wLength));
 			memcpy(data, root_hub_dev_des, len);
 			OK(len);
 		case 0x02:	/* configuration descriptor */
-			len = min(unsigned int, leni,
-				  min(unsigned int,
+			len = min_t(unsigned int, leni,
+				  min_t(unsigned int,
 				      sizeof(root_hub_config_des), wLength));
 			memcpy (data, root_hub_config_des, len);
 			OK(len);
@@ -2147,15 +2147,15 @@ static int rh_submit_urb(struct urb *urb)
 				uhci->io_addr, "UHCI-alt",
 				data, wLength);
 			if (len > 0) {
-				OK(min(int, leni, len));
+				OK(min_t(int, leni, len));
 			} else 
 				stat = -EPIPE;
 		}
 		break;
 	case RH_GET_DESCRIPTOR | RH_CLASS:
 		root_hub_hub_des[2] = uhci->rh.numports;
-		len = min(unsigned int, leni,
-			  min(unsigned int, sizeof(root_hub_hub_des), wLength));
+		len = min_t(unsigned int, leni,
+			  min_t(unsigned int, sizeof(root_hub_hub_des), wLength));
 		memcpy(data, root_hub_hub_des, len);
 		OK(len);
 	case RH_GET_CONFIGURATION:

@@ -259,7 +259,7 @@ typedef struct wan_stat_entry
 		pos = dent->get_info(page, dent->data, 0, 0);
 		offs = file->f_pos;
 		if (offs < pos) {
-			len = min(unsigned int, pos - offs, count);
+			len = min_t(unsigned int, pos - offs, count);
 			if (copy_to_user(buf, (page + offs), len)) {
 				kfree(page);
 				return -EFAULT;
@@ -805,7 +805,7 @@ typedef struct wan_stat_entry
 		pos = dent->get_info(page, dent->data, 0, 0, 0);
 		offs = file->f_pos;
 		if (offs < pos) {
-			len = min(unsigned int, pos - offs, count);
+			len = min_t(unsigned int, pos - offs, count);
 			if (copy_to_user(buf, (page + offs), len)) {
 				kfree(page);
 				return -EFAULT;
@@ -841,7 +841,7 @@ typedef struct wan_stat_entry
 		pos = dent->get_info(page, dent->data, 0, 0, 0);
 		offs = file->f_pos;
 		if (offs < pos) {
-			len = min(unsigned int, pos - offs, count);
+			len = min_t(unsigned int, pos - offs, count);
 			memcpy_tofs((void*)buf, (void*)(page + offs), len);
 			file->f_pos += len;
 		}

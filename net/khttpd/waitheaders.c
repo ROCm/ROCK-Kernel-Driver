@@ -244,7 +244,7 @@ static int DecodeHeader(const int CPUNR, struct http_request *Request)
 		Request->Time       = Request->filp->f_dentry->d_inode->i_mtime;
 		Request->IMS_Time   = mimeTime_to_UnixTime(Request->IMS);
 		sprintf(Request->LengthS,"%i",Request->FileLength);
-		time_Unix2RFC(min(unsigned int, Request->Time,CurrentTime_i),Request->TimeS);
+		time_Unix2RFC(min_t(unsigned int, Request->Time,CurrentTime_i),Request->TimeS);
    	        /* The min() is required by rfc1945, section 10.10:
    	           It is not allowed to send a filetime in the future */
 

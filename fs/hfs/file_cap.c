@@ -27,7 +27,7 @@
 
 /*================ Forward declarations ================*/
 static loff_t      cap_info_llseek(struct file *, loff_t,
-				   int);
+                                   int);
 static hfs_rwret_t cap_info_read(struct file *, char *,
 				 hfs_rwarg_t, loff_t *);
 static hfs_rwret_t cap_info_write(struct file *, const char *,

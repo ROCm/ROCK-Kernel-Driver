@@ -1059,7 +1059,7 @@ void acornscsi_dma_setup(AS_Host *host, dmadir_t direction)
     /*
      * Allocate some buffer space, limited to half the buffer size
      */
-    length = min(unsigned int, host->scsi.SCp.this_residual, DMAC_BUFFER_SIZE / 2);
+    length = min_t(unsigned int, host->scsi.SCp.this_residual, DMAC_BUFFER_SIZE / 2);
     if (length) {
 	host->dma.start_addr = address = host->dma.free_addr;
 	host->dma.free_addr = (host->dma.free_addr + length) &
@@ -1187,7 +1187,7 @@ void acornscsi_dma_intr(AS_Host *host)
     /*
      * Allocate some buffer space, limited to half the on-board RAM size
      */
-    length = min(unsigned int, host->scsi.SCp.this_residual, DMAC_BUFFER_SIZE / 2);
+    length = min_t(unsigned int, host->scsi.SCp.this_residual, DMAC_BUFFER_SIZE / 2);
     if (length) {
 	host->dma.start_addr = address = host->dma.free_addr;
 	host->dma.free_addr = (host->dma.free_addr + length) &
@@ -1656,8 +1656,8 @@ void acornscsi_message(AS_Host *host)
 		 * to be in operation AFTER the target leaves message out phase.
 		 */
 		acornscsi_sbic_issuecmd(host, CMND_ASSERTATN);
-		period = max(unsigned int, message[3], sdtr_period / 4);
-		length = min(unsigned int, message[4], sdtr_size);
+		period = max_t(unsigned int, message[3], sdtr_period / 4);
+		length = min_t(unsigned int, message[4], sdtr_size);
 		msgqueue_addmsg(&host->scsi.msgs, 5, EXTENDED_MESSAGE, 3,
 				 EXTENDED_SDTR, period, length);
 		host->device[host->SCpnt->target].sync_xfer =

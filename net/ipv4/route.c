@@ -515,14 +515,14 @@ static int rt_garbage_collect(void)
 			equilibrium = ipv4_dst_ops.gc_thresh;
 		goal = atomic_read(&ipv4_dst_ops.entries) - equilibrium;
 		if (goal > 0) {
-			equilibrium += min(unsigned int, goal / 2, rt_hash_mask + 1);
+			equilibrium += min_t(unsigned int, goal / 2, rt_hash_mask + 1);
 			goal = atomic_read(&ipv4_dst_ops.entries) - equilibrium;
 		}
 	} else {
 		/* We are in dangerous area. Try to reduce cache really
 		 * aggressively.
 		 */
-		goal = max(unsigned int, goal / 2, rt_hash_mask + 1);
+		goal = max_t(unsigned int, goal / 2, rt_hash_mask + 1);
 		equilibrium = atomic_read(&ipv4_dst_ops.entries) - goal;
 	}
 
@@ -1207,7 +1207,7 @@ static void rt_set_nexthop(struct rtable *rt, struct fib_result *res, u32 itag)
 	if (rt->u.dst.pmtu > IP_MAX_MTU)
 		rt->u.dst.pmtu = IP_MAX_MTU;
 	if (rt->u.dst.advmss == 0)
-		rt->u.dst.advmss = max(unsigned int, rt->u.dst.dev->mtu - 40,
+		rt->u.dst.advmss = max_t(unsigned int, rt->u.dst.dev->mtu - 40,
 				       ip_rt_min_advmss);
 	if (rt->u.dst.advmss > 65535 - 40)
 		rt->u.dst.advmss = 65535 - 40;

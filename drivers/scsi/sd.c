@@ -90,6 +90,7 @@ static Scsi_Disk *rscsi_disks;
 static int *sd_sizes;
 static int *sd_blocksizes;
 static int *sd_hardsizes;	/* Hardware sector size */
+static int *sd_max_sectors;
 
 static int check_scsidisk_media_change(kdev_t);
 static int fop_revalidate_scsidisk(kdev_t);
@@ -227,9 +228,9 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 			return 0;
 		}
 		case BLKGETSIZE:   /* Return device size */
-			if (!arg)
-				return -EINVAL;
 			return put_user(sd[SD_PARTITION(inode->i_rdev)].nr_sects, (long *) arg);
+		case BLKGETSIZE64:
+			return put_user((u64)sd[SD_PARTITION(inode->i_rdev)].nr_sects << 9, (u64 *)arg);
 
 		case BLKROSET:
 		case BLKROGET:
@@ -1100,15 +1101,30 @@ static int sd_init()
 	if (!sd_hardsizes)
 		goto cleanup_blocksizes;
 
+	sd_max_sectors = kmalloc((sd_template.dev_max << 4) * sizeof(int), GFP_ATOMIC);
+	if (!sd_max_sectors)
+		goto cleanup_max_sectors;
+
 	for (i = 0; i < sd_template.dev_max << 4; i++) {
 		sd_blocksizes[i] = 1024;
 		sd_hardsizes[i] = 512;
+		/*
+		 * Allow lowlevel device drivers to generate 512k large scsi
+		 * commands if they know what they're doing and they ask for it
+		 * explicitly via the SHpnt->max_sectors API.
+		 */
+		sd_max_sectors[i] = MAX_SEGMENTS*8;
 	}
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
 		blksize_size[SD_MAJOR(i)] = sd_blocksizes + i * (SCSI_DISKS_PER_MAJOR << 4);
 		hardsect_size[SD_MAJOR(i)] = sd_hardsizes + i * (SCSI_DISKS_PER_MAJOR << 4);
+		max_sectors[SD_MAJOR(i)] = sd_max_sectors + i * (SCSI_DISKS_PER_MAJOR << 4);
 	}
+	/*
+	 * FIXME: should unregister blksize_size, hardsect_size and max_sectors when
+	 * the module is unloaded.
+	 */
 	sd = kmalloc((sd_template.dev_max << 4) *
 					  sizeof(struct hd_struct),
 					  GFP_ATOMIC);
@@ -1158,6 +1174,8 @@ cleanup_gendisks_de_arr:
 cleanup_sd_gendisks:
 	kfree(sd);
 cleanup_sd:
+	kfree(sd_max_sectors);
+cleanup_max_sectors:
 	kfree(sd_hardsizes);
 cleanup_blocksizes:
 	kfree(sd_blocksizes);

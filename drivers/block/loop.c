@@ -849,11 +849,14 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 			err = -ENXIO;
 			break;
 		}
-		if (!arg) {
-			err = -EINVAL;
+		err = put_user(loop_sizes[lo->lo_number] << 1, (long *) arg);
+		break;
+	case BLKGETSIZE64:
+		if (lo->lo_state != Lo_bound) {
+			err = -ENXIO;
 			break;
 		}
-		err = put_user(loop_sizes[lo->lo_number] << 1, (long *) arg);
+		err = put_user((u64)loop_sizes[lo->lo_number] << 10, (u64*)arg);
 		break;
 	case BLKBSZGET:
 	case BLKBSZSET:
