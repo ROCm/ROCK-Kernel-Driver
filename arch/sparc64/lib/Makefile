@@ -3,6 +3,7 @@
 #
 
 EXTRA_AFLAGS := -ansi
+CFLAGS += -Werror
 
 L_TARGET = lib.a
 obj-y := PeeCeeI.o blockops.o debuglocks.o strlen.o strncmp.o \
