@@ -549,7 +549,7 @@ ip_fw_domatch(struct ip_fwkernel *f,
 			strcpy(outskb->data+sizeof(__u32)*2, rif);
 			memcpy(outskb->data+sizeof(__u32)*2+IFNAMSIZ, ip,
 			       len-(sizeof(__u32)*2+IFNAMSIZ));
-			netlink_broadcast(ipfwsk, outskb, 0, ~0, GFP_KERNEL);
+			netlink_broadcast(ipfwsk, outskb, 0, ~0, GFP_ATOMIC);
 		}
 		else {
 #endif
