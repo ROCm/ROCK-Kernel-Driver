@@ -22,7 +22,7 @@
 
 #include "msi.h"
 
-static spinlock_t msi_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(msi_lock);
 static struct msi_desc* msi_desc[NR_IRQS] = { [0 ... NR_IRQS-1] = NULL };
 static kmem_cache_t* msi_cachep;
 

@@ -13,7 +13,7 @@
 #include <linux/interrupt.h>
 #include "pci.h"
 
-spinlock_t pci_bus_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pci_bus_lock);
 
 static struct pci_bus * __devinit
 pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
