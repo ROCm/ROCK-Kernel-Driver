@@ -1199,15 +1199,7 @@ config UNIX98_PTY_COUNT
 
 endmenu
 
-
-menu "Sound support"
-
-config SOUND
-	tristate "Sound card support"
-
-source "sound/oss/dmasound/Kconfig"
-
-endmenu
+source "sound/Kconfig"
 
 source "fs/Kconfig"
 
