@@ -31,16 +31,10 @@ acpi_device_register (
 
 	ACPI_FUNCTION_TRACE("acpi_device_register");
 
-	if (!device)
-		return_VALUE(-EINVAL);
-
-	sprintf(device->dev.name, "ACPI device %s:%s", 
-		device->pnp.hardware_id, device->pnp.unique_id);
-	strncpy(device->dev.bus_id, device->pnp.bus_id, sizeof(acpi_bus_id));
-	if (parent)
-		device->dev.parent = &parent->dev;
-
-	result = device_register(&device->dev);
+	if (device)
+		result = acpi_create_dir(device);
+	else 
+		result = -EINVAL;
 
 	return_VALUE(result);
 }
@@ -52,9 +46,7 @@ acpi_device_unregister (
 {
 	ACPI_FUNCTION_TRACE("acpi_device_unregister");
 
-	if (device)
-		put_device(&device->dev);
-
+	acpi_remove_dir(device);
 	return_VALUE(0);
 }
 
@@ -383,15 +375,6 @@ acpi_bus_driver_init (
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Driver successfully bound to device\n"));
-
-#ifdef CONFIG_LDM
-	/* 
-	 * Update the device information (in the global device hierarchy) now
-	 * that there's a driver bound to it.
-	 */
-	strncpy(device->dev.name, device->pnp.device_name, 
-		sizeof(device->dev.name));
-#endif
 
 	if (driver->ops.scan) {
 		driver->ops.scan(device);
