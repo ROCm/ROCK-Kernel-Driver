@@ -16,7 +16,7 @@
 
 #include <asm/assembler.h>
 	
-		.section	".start", #alloc, #execinstr
+		.section	".start", "ax"
 
 		b	__beginning
 	

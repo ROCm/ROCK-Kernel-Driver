@@ -57,6 +57,7 @@ static inline Indirect *get_branch(struct inode *inode,
 
 changed:
 	read_unlock(&pointers_lock);
+	brelse(bh);
 	*err = -EAGAIN;
 	goto no_block;
 failure:

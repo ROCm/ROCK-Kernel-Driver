@@ -1,0 +1,5 @@
+#
+# Config.in for PCBIT ISDN driver
+#
+
+dep_tristate       'PCBIT-D support' CONFIG_ISDN_DRV_PCBIT $CONFIG_ISDN

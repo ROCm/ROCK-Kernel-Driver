@@ -433,6 +433,12 @@ else
    define_bool CONFIG_FIQ n
 fi
 
+# Compressed boot loader in ROM.  Yes, we really want to ask about
+# TEXT and BSS so we preserve their values in the config files.
+bool 'Compressed boot loader in ROM/flash' CONFIG_ZBOOT_ROM
+hex 'Compressed ROM boot loader base address' CONFIG_ZBOOT_ROM_TEXT 0
+hex 'Compressed ROM boot loader BSS address' CONFIG_ZBOOT_ROM_BSS 0
+
 if [ "$CONFIG_ARCH_SA1100" = "y" -o \
      "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
    dep_bool 'Support CPU clock change (EXPERIMENTAL)' CONFIG_CPU_FREQ $CONFIG_EXPERIMENTAL
@@ -573,14 +579,7 @@ source drivers/ieee1394/Config.in
 
 source drivers/message/i2o/Config.in
 
-mainmenu_option next_comment
-comment 'ISDN subsystem'
-
-tristate 'ISDN support' CONFIG_ISDN
-if [ "$CONFIG_ISDN" != "n" ]; then
-   source drivers/isdn/Config.in
-fi
-endmenu
+source drivers/isdn/Config.in
 
 #
 # input before char - char/joystick depends on it. As does USB.

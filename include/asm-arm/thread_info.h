@@ -102,6 +102,8 @@ static inline unsigned long __thread_saved_fp(struct thread_info *thread)
 
 #endif
 
+#define PREEMPT_ACTIVE	0x04000000
+
 /*
  * thread information flags:
  *  TIF_SYSCALL_TRACE	- syscall trace active

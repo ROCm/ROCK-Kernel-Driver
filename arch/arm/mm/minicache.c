@@ -44,7 +44,7 @@ static pte_t *minicache_pte;
 unsigned long map_page_minicache(unsigned long virt)
 {
 	set_pte(minicache_pte, mk_pte_phys(__pa(virt), minicache_pgprot));
-	flush_kern_tlb_page(minicache_address);
+	flush_tlb_kernel_page(minicache_address);
 
 	return minicache_address;
 }

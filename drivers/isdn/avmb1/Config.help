@@ -1,0 +1,64 @@
+CONFIG_ISDN_CAPI
+  This provides the CAPI (Common ISDN Application Programming
+  Interface, a standard making it easy for programs to access ISDN
+  hardware, see <http://www.capi.org/>.  This is needed for AVM's set
+  of active ISDN controllers like B1, T1, M1.
+
+CONFIG_ISDN_CAPI_CAPI20
+  This option will provide the CAPI 2.0 interface to userspace
+  applications via /dev/capi20. Applications should use the
+  standardized libcapi20 to access this functionality.  You should say
+  Y/M here.
+
+CONFIG_ISDN_CAPI_MIDDLEWARE
+  This option will enhance the capabilities of the /dev/capi20
+  interface.  It will provide a means of moving a data connection,
+  established via the usual /dev/capi20 interface to a special tty
+  device.  If you want to use pppd with pppdcapiplugin to dial up to
+  your ISP, say Y here.
+
+CONFIG_ISDN_CAPI_CAPIFS
+  This option provides a special file system, similar to /dev/pts with
+  device nodes for the special ttys established by using the
+  middleware extension above. If you want to use pppd with
+  pppdcapiplugin to dial up to your ISP, say Y here.
+
+CONFIG_ISDN_CAPI_CAPIDRV
+  This option provides the glue code to hook up CAPI driven cards to
+  the legacy isdn4linux link layer.  If you have a card which is
+  supported by a CAPI driver, but still want to use old features like
+  ippp interfaces or ttyI emulation, say Y/M here.
+
+CONFIG_ISDN_DRV_AVMB1_B1ISA
+  Enable support for the ISA version of the AVM B1 card.
+
+CONFIG_ISDN_DRV_AVMB1_B1PCI
+  Enable support for the PCI version of the AVM B1 card.
+
+CONFIG_ISDN_DRV_AVMB1_B1PCIV4
+  Enable support for the V4 version of AVM B1 PCI card.
+
+CONFIG_ISDN_DRV_AVMB1_T1ISA
+  Enable support for the AVM T1 T1B card.
+  Note: This is a PRI card and handle 30 B-channels.
+
+CONFIG_ISDN_DRV_AVMB1_B1PCMCIA
+  Enable support for the PCMCIA version of the AVM B1 card.
+
+CONFIG_ISDN_DRV_AVMB1_AVM_CS
+  Enable the PCMCIA client driver for the AVM B1/M1/M2
+  PCMCIA cards.
+
+CONFIG_ISDN_DRV_AVMB1_T1PCI
+  Enable support for the AVM T1 T1B card.
+  Note: This is a PRI card and handle 30 B-channels.
+
+CONFIG_ISDN_DRV_AVMB1_C4
+  Enable support for the AVM C4/C2 PCI cards.
+  These cards handle 4/2 BRI ISDN lines (8/4 channels).
+
+CONFIG_ISDN_DRV_AVMB1_VERBOSE_REASON
+  If you say Y here, the AVM B1 driver will give verbose reasons for
+  disconnecting. This will increase the size of the kernel by 7 KB. If
+  unsure, say Y.
+

@@ -769,7 +769,7 @@ static int stv680_start_stream (struct usb_stv *stv680)
 	for (i = 0; i < STV680_NUMSBUF; i++) {
 		urb = usb_alloc_urb (0, GFP_KERNEL);
 		if (!urb)
-			return ENOMEM;
+			return -ENOMEM;
 
 		/* sbuf is urb->transfer_buffer, later gets memcpyed to scratch */
 		usb_fill_bulk_urb (urb, stv680->udev,

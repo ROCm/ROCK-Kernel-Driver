@@ -99,13 +99,13 @@ static ssize_t TA_read(struct file *file, char *buf, size_t size, loff_t *pos)
 	return size;
 }
 
-static ssize_t TA_open(struct inode *inode, struct file *file)
+static int TA_open(struct inode *inode, struct file *file)
 {
 	file->private_data = NULL;
 	return 0;
 }
 
-static ssize_t TA_release(struct inode *inode, struct file *file)
+static int TA_release(struct inode *inode, struct file *file)
 {
 	void *p = file->private_data;
 	file->private_data = NULL;

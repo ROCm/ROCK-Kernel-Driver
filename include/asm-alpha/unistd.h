@@ -528,6 +528,7 @@ static inline long dup(int fd)
 
 static inline long close(int fd)
 {
+	extern long sys_close(unsigned int);
 	return sys_close(fd);
 }
 
@@ -603,6 +604,6 @@ static inline long delete_module(const char *name)
  * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
  * but it doesn't work on all toolchains, so we just do it by hand
  */
-#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+#define cond_syscall(x) asmlinkage long x(void) __attribute__((weak,alias("sys_ni_syscall")));
 
 #endif /* _ALPHA_UNISTD_H */

@@ -149,11 +149,15 @@ static int __init ms_bus_mouse_init(void)
 	}
 	if (present == 0)
 		return -EIO;
+	if (!request_region(MS_MSE_CONTROL_PORT, 0x04, "MS Busmouse"))
+		return -EIO;
+	
 	MS_MSE_INT_OFF();
-	request_region(MS_MSE_CONTROL_PORT, 0x04, "MS Busmouse");
 	msedev = register_busmouse(&msbusmouse);
-	if (msedev < 0)
+	if (msedev < 0) {
 		printk(KERN_WARNING "Unable to register msbusmouse driver.\n");
+		release_region(MS_MSE_CONTROL_PORT, 0x04);
+	}
 	else
 		printk(KERN_INFO "Microsoft BusMouse detected and installed.\n");
 	return msedev < 0 ? msedev : 0;

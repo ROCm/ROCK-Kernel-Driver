@@ -180,7 +180,7 @@ anakinfb_init(void)
 {
 	memset(&fb_info, 0, sizeof(struct fb_info));
 	strcpy(fb_info.modename, "AnakinFB");
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.fbops = &anakinfb_ops;
 	fb_info.disp = &display;
@@ -192,7 +192,12 @@ anakinfb_init(void)
 
 	memset(&display, 0, sizeof(struct display));
 	anakinfb_get_var(&display.var, 0, &fb_info);
-	display.screen_base = ioremap(VGA_START, VGA_SIZE);
+	if (!(request_mem_region(VGA_START, VGA_SIZE, "vga")))
+		return -ENOMEM;
+	if (!(display.screen_base = ioremap(VGA_START, VGA_SIZE))) {
+		release_mem_region(VGA_START, VGA_SIZE);
+		return -EIO;
+	}
 	display.visual = FB_VISUAL_TRUECOLOR;
 	display.type = FB_TYPE_PACKED_PIXELS;
 	display.type_aux = 0;
@@ -209,8 +214,11 @@ anakinfb_init(void)
 	display.dispsw = &fbcon_dummy;
 #endif
 
-	if (register_framebuffer(&fb_info) < 0)
+	if (register_framebuffer(&fb_info) < 0) {
+		iounmap(display.screen_base);
+		release_mem_region(VGA_START, VGA_SIZE);
 		return -EINVAL;
+	}
 
 	MOD_INC_USE_COUNT;
 	return 0;

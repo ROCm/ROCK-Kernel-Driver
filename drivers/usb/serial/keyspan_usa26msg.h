@@ -44,7 +44,7 @@
 	Buffer formats for RX/TX data messages are not defined by
 	a structure, but are described here:
 
-	USB OUT (host -> USA26, transmit) messages contain a 
+	USB OUT (host -> USAxx, transmit) messages contain a 
 	REQUEST_ACK indicator (set to 0xff to request an ACK at the 
 	completion of transmit; 0x00 otherwise), followed by data:
 
@@ -52,25 +52,48 @@
 
 	with a total data length of 63.
 
-	USB IN (USA26 -> host, receive) messages contain either a zero
-	flag (indicating no error in any data bytes):
+	USB IN (USAxx -> host, receive) messages begin with a status
+	byte in which the 0x80 bit is either:
 
-		00 DAT DAT DAT ...
+		(a)	0x80 bit clear
+			indicates that the bytes following it are all data
+			bytes:
 
-	for a total of 63 data bytes, or a non-zero status flag (indicating 
-	that all data bytes will be preceded by status flag):
+				STAT DATA DATA DATA DATA DATA ...
 
-		STAT DAT STAT DAT STAT DAT ...
+			for a total of up to 63 DATA bytes,
 
-	for a total of 32 data bytes.  The valid bits in the STAT bytes are:
+	or:
+
+		(b)	0x80 bit set
+			indiates that the bytes following alternate data and
+			status bytes:
+
+				STAT DATA STAT DATA STAT DATA STAT DATA ...
+
+			for a total of up to 32 DATA bytes.
+
+	The valid bits in the STAT bytes are:
 
 		OVERRUN	0x02
 		PARITY	0x04
 		FRAMING	0x08
 		BREAK	0x10
 
-	Note: a "no status" RX data message (first byte zero) can serve as
-	a "break off" indicator.
+	Notes:
+
+	(1) The OVERRUN bit can appear in either (a) or (b) format
+		messages, but the but the PARITY/FRAMING/BREAK bits
+		only appear in (b) format messages.
+	(2) For the host to determine the exact point at which the
+		overrun occurred (to identify the point in the data
+		stream at which the data was lost), it needs to count
+		128 characters, starting at the first character of the
+		message in which OVERRUN was reported; the lost character(s)
+		would have been received between the 128th and 129th
+		characters.
+	(3)	An RX data message in which the first byte has 0x80 clear
+		serves as a "break off" indicator.
 
 	revision history:
 
@@ -80,6 +103,7 @@
 	1999apr14	add resetDataToggle to control message
 	2000jan04	merge with usa17msg.h
 	2000jun01	add extended BSD-style copyright text
+	2001jul05	change message format to improve OVERRUN case
 
 	Note on shared names:
 

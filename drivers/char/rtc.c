@@ -544,7 +544,7 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		return 0;
 	}
 	default:
-		return -EINVAL;
+		return -ENOTTY;
 	}
 	return copy_to_user((void *)arg, &wtime, sizeof wtime) ? -EFAULT : 0;
 }

@@ -1,0 +1,267 @@
+CONFIG_ISDN_DRV_HISAX
+  This is a driver supporting the Siemens chipset on various
+  ISDN-cards (like AVM A1, Elsa ISDN cards, Teles S0-16.0, Teles
+  S0-16.3, Teles S0-8, Teles/Creatix PnP, ITK micro ix1 and many
+  compatibles).
+
+  HiSax is just the name of this driver, not the name of any hardware.
+
+  If you have a card with such a chipset, you should say Y here and
+  also to the configuration option of the driver for your particular
+  card, below.
+
+CONFIG_HISAX_EURO
+  Say Y or N according to the D-channel protocol which your local
+  telephone service company provides.
+
+  The call control protocol E-DSS1 is used in most European countries.
+  If unsure, say Y.
+
+CONFIG_DE_AOC
+  If you want that the HiSax hardware driver sends messages to the
+  upper level of the isdn code on each AOCD (Advice Of Charge, During
+  the call -- transmission of the fee information during a call) and
+  on each AOCE (Advice Of Charge, at the End of the call --
+  transmission of fee information at the end of the call), say Y here.
+  This works only in Germany.
+
+CONFIG_HISAX_NO_SENDCOMPLETE
+  If you have trouble with some ugly exchanges or you live in
+  Australia select this option.
+
+CONFIG_HISAX_NO_LLC
+  If you have trouble with some ugly exchanges try to select this
+  option.
+
+CONFIG_HISAX_NO_KEYPAD
+  If you like to send special dial strings including * or # without
+  using the keypad protocol, select this option.
+
+CONFIG_HISAX_1TR6
+  Say Y or N according to the D-channel protocol which your local
+  telephone service company provides.
+
+  1TR6 is an old call control protocol which was used in Germany
+  before E-DSS1 was established. Nowadays, all new lines in Germany
+  use E-DSS1.
+
+CONFIG_HISAX_NI1
+  Enable this if you like to use ISDN in US on a NI1 basic rate
+  interface.
+
+CONFIG_HISAX_MAX_CARDS
+  This option allows you to specify the maximum number of cards which
+  the HiSax driver will be able to handle.  
+
+CONFIG_HISAX_16_0
+  This enables HiSax support for the Teles ISDN-cards S0-16.0, S0-8
+  and many compatibles.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port/shmem settings.
+
+CONFIG_HISAX_16_3
+  This enables HiSax support for the Teles ISDN-cards S0-16.3 the
+  Teles/Creatix PnP and the Teles PCMCIA.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_TELESPCI
+  This enables HiSax support for the Teles PCI.
+  See <file:Documentation/isdn/README.HiSax> on how to configure it.
+
+CONFIG_HISAX_S0BOX
+  This enables HiSax support for the Teles/Creatix parallel port
+  S0BOX.  See <file:Documentation/isdn/README.HiSax> on how to
+  configure it.
+
+CONFIG_HISAX_AVM_A1
+  This enables HiSax support for the AVM A1 (aka "Fritz").
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_FRITZPCI
+  This enables HiSax support for the AVM "Fritz!PnP" and "Fritz!PCI".
+  See <file:Documentation/isdn/README.HiSax> on how to configure it.
+
+CONFIG_HISAX_AVM_A1_PCMCIA
+  This enables HiSax support for the AVM A1 "Fritz!PCMCIA").
+  See <file:Documentation/isdn/README.HiSax> on how to configure it.
+
+CONFIG_HISAX_ELSA
+  This enables HiSax support for the Elsa Mircolink ISA cards, for the
+  Elsa Quickstep series cards and Elsa PCMCIA.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_IX1MICROR2
+  This enables HiSax support for the ITK ix1-micro Revision 2 card.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_DIEHLDIVA
+  This enables HiSax support for the Eicon.Diehl Diva none PRO
+  versions passive ISDN cards.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_ASUSCOM
+  This enables HiSax support for the AsusCom and their OEM versions
+  passive ISDN ISA cards.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_TELEINT
+  This enables HiSax support for the TELEINT SA1 semiactiv ISDN card.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_HFCS
+  This enables HiSax support for the HFC-S 2BDS0 based cards, like
+  teles 16.3c.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_SEDLBAUER
+  This enables HiSax support for the Sedlbauer passive ISDN cards.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using the different cards, a different D-channel protocol, or
+  non-standard IRQ/port settings.
+
+CONFIG_HISAX_SPORTSTER
+  This enables HiSax support for the USR Sportster internal TA card.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_MIC
+  This enables HiSax support for the ITH MIC card.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_NETJET
+  This enables HiSax support for the NetJet from Traverse
+  Technologies.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_NETJET_U
+  This enables HiSax support for the Netspider U interface ISDN card
+  from Traverse Technologies.
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_NICCY
+  This enables HiSax support for the Dr. Neuhaus Niccy PnP or PCI.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_ISURF
+  This enables HiSax support for the Siemens I-Talk/I-Surf card with
+  ISAR chip.
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_HSTSAPHIR
+  This enables HiSax support for the HST Saphir card.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_BKM_A4T
+  This enables HiSax support for the Telekom A4T card.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_SCT_QUADRO
+  This enables HiSax support for the Scitel Quadro card.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_GAZEL
+  This enables HiSax support for the Gazel cards.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_HFC_PCI
+  This enables HiSax support for the HFC-S PCI 2BDS0 based cards.
+
+  For more informations see under
+  <file:Documentation/isdn/README.hfc-pci>.
+
+CONFIG_HISAX_W6692
+  This enables HiSax support for Winbond W6692 based PCI ISDN cards.
+
+  See <file:Documentation/isdn/README.HiSax> on how to configure it
+  using a different D-channel protocol, or non-standard IRQ/port
+  settings.
+
+CONFIG_HISAX_HFC_SX
+  This enables HiSax support for the HFC-S+, HFC-SP and HFC-PCMCIA
+  cards. This code is not finished yet.
+
+CONFIG_HISAX_AMD7930
+  This enables HiSax support for the AMD7930 chips on some SPARCs.
+  This code is not finished yet.
+
+CONFIG_HISAX_DEBUG
+  This enables debugging code in the new-style HiSax drivers, i.e.
+  the ST5481 USB driver currently. 
+  If in doubt, say yes.
+
+CONFIG_HISAX_ELSA_CS
+  This enables the PCMCIA client driver for the Elsa PCMCIA MicroLink
+  card.
+
+CONFIG_HISAX_SEDLBAUER_CS
+  This enables the PCMCIA client driver for the Sedlbauer Speed Star
+  and Speed Star II cards.
+
+CONFIG_HISAX_ST5481
+  This enables the driver for ST5481 based USB ISDN adapters,
+  e.g. the BeWan Gazel 128 USB
+
+CONFIG_HISAX_FRITZ_PCIPNP
+  This enables the driver for the AVM Fritz!Card PCI, Fritz!Card PCI v2 
+  and Fritz!Card PnP.
+  (the latter also needs you to select "ISA Plug and Play support"
+  from the menu "Plug and Play configuration")
+
+CONFIG_HISAX_FRITZ_CLASSIC
+  This enables the driver for the AVM Fritz!Card classic, formerly
+  known as AVM A1.
+

@@ -27,7 +27,7 @@ fundamental disruption in the standard workflow of changes, commits,
 and merges.  You will need to take a few minutes to think about
 how to best work under BitKeeper, and re-optimize things a bit.
 In some sense it is a bit radical, because it might described as
-tossing changes out into a maelstrom and having them them magically
+tossing changes out into a maelstrom and having them magically
 land at the right destination... but I'm getting ahead of myself.
 
 Let's start with this progression:
