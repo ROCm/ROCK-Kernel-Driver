@@ -1322,19 +1322,19 @@ static int snd_cs4231_probe(cs4231_t *chip)
 	id = 0;
 	for (i = 0; i < 50; i++) {
 		mb();
-		if (inb(CS4231P(chip, REGSEL)) & CS4231_INIT)
+		if (__cs4231_readb(chip, CS4231P(chip, REGSEL)) & CS4231_INIT)
 			udelay(2000);
 		else {
 			spin_lock_irqsave(&chip->lock, flags);
 			snd_cs4231_out(chip, CS4231_MISC_INFO, CS4231_MODE2);
 			id = snd_cs4231_in(chip, CS4231_MISC_INFO) & 0x0f;
 			spin_unlock_irqrestore(&chip->lock, flags);
-			if (id == 0x0a)
+			if (id == 0x0a || id == 0x0c)
 				break;	/* this is valid value */
 		}
 	}
 	snd_printdd("cs4231: port = 0x%lx, id = 0x%x\n", chip->port, id);
-	if (id != 0x0a)
+	if (id != 0x0a && id != 0x0c)
 		return -ENODEV;	/* no valid device found */
 
 	spin_lock_irqsave(&chip->lock, flags);
@@ -2077,14 +2077,15 @@ static int __init snd_cs4231_ebus_create(snd_card_t *card,
 	spin_lock_init(&chip->lock);
 	init_MUTEX(&chip->mce_mutex);
 	init_MUTEX(&chip->open_mutex);
+	chip->flags |= CS4231_FLAG_EBUS;
 	chip->card = card;
 	chip->dev_u.pdev = edev->bus->self;
 	memcpy(&chip->image, &snd_cs4231_original_image,
 	       sizeof(snd_cs4231_original_image));
 
-	chip->port = (unsigned long) ioremap(&edev->resource[0].start, 0x10);
-	chip->eb2p = (unsigned long) ioremap(&edev->resource[1].start, 0x10);
-	chip->eb2c = (unsigned long) ioremap(&edev->resource[2].start, 0x10);
+	chip->port = (unsigned long) ioremap(edev->resource[0].start, 0x10);
+	chip->eb2p = (unsigned long) ioremap(edev->resource[1].start, 0x10);
+	chip->eb2c = (unsigned long) ioremap(edev->resource[2].start, 0x10);
 	if (!chip->port || !chip->eb2p || !chip->eb2c) {
 		snd_cs4231_ebus_free(chip);
 		snd_printk("cs4231-%d: Unable to map chip registers.\n", dev);
@@ -2180,7 +2181,7 @@ static int __init cs4231_init(void)
 
 			if (!strcmp(edev->prom_name, "SUNW,CS4231")) {
 				match = 1;
-			} else {
+			} else if (!strcmp(edev->prom_name, "audio")) {
 				char compat[16];
 
 				prom_getstring(edev->prom_node, "compatible",
