@@ -403,10 +403,11 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 	if (!input)
 		return;
 
+	input_regs(input, regs);
+	input_event(input, EV_MSC, MSC_SCAN, usage->hid);
+
 	if (!usage->type)
 		return;
-
-	input_regs(input, regs);
 
 	if (((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_5) && (usage->hid == 0x00090005))
 		|| ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_7) && (usage->hid == 0x00090007))) {
@@ -574,13 +575,16 @@ int hidinput_connect(struct hid_device *hid)
 				hidinput->input.id.product = le16_to_cpu(dev->descriptor.idProduct);
 				hidinput->input.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 				hidinput->input.dev = &hid->intf->dev;
+
+				set_bit(EV_MSC, hidinput->input.evbit);
+				set_bit(MSC_SCAN, hidinput->input.mscbit);
 			}
 
 			for (i = 0; i < report->maxfield; i++)
 				for (j = 0; j < report->field[i]->maxusage; j++)
 					hidinput_configure_usage(hidinput, report->field[i],
 								 report->field[i]->usage + j);
-
+			
 			if (hid->quirks & HID_QUIRK_MULTI_INPUT) {
 				/* This will leave hidinput NULL, so that it
 				 * allocates another one if we have more inputs on
