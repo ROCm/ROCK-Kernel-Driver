@@ -166,6 +166,7 @@ static struct inode *hpfs_alloc_inode(struct super_block *sb)
 	ei = (struct hpfs_inode_info *)kmem_cache_alloc(hpfs_inode_cachep, SLAB_KERNEL);
 	if (!ei)
 		return NULL;
+	ei->vfs_inode.i_version = 0;
 	return &ei->vfs_inode;
 }
 

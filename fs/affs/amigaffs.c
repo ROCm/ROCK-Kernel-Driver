@@ -69,7 +69,7 @@ affs_insert_hash(struct inode *dir, struct buffer_head *bh)
 	affs_brelse(dir_bh);
 
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
-	dir->i_version = ++event;
+	dir->i_version++;
 	mark_inode_dirty(dir);
 
 	return 0;
@@ -121,7 +121,7 @@ affs_remove_hash(struct inode *dir, struct buffer_head *rem_bh)
 	affs_brelse(bh);
 
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
-	dir->i_version = ++event;
+	dir->i_version++;
 	mark_inode_dirty(dir);
 
 	return retval;

@@ -353,7 +353,7 @@ ino_t ufs_inode_by_name(struct inode * dir, struct dentry *dentry)
 void ufs_set_link(struct inode *dir, struct ufs_dir_entry *de,
 		struct buffer_head *bh, struct inode *inode)
 {
-	dir->i_version = ++event;
+	dir->i_version++;
 	de->d_ino = cpu_to_fs32(dir->i_sb, inode->i_ino);
 	mark_buffer_dirty(bh);
 	if (IS_DIRSYNC(dir)) {
@@ -463,7 +463,7 @@ int ufs_add_link(struct dentry *dentry, struct inode *inode)
 	}
 	brelse (bh);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
-	dir->i_version = ++event;
+	dir->i_version++;
 	mark_inode_dirty(dir);
 
 	UFSD(("EXIT\n"))
@@ -504,7 +504,7 @@ int ufs_delete_entry (struct inode * inode, struct ufs_dir_entry * dir,
 				fs16_add(sb, &pde->d_reclen,
 					fs16_to_cpu(sb, dir->d_reclen));
 			dir->d_ino = 0;
-			inode->i_version = ++event;
+			inode->i_version++;
 			inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 			mark_inode_dirty(inode);
 			mark_buffer_dirty(bh);
