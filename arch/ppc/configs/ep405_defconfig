@@ -13,16 +13,14 @@ CONFIG_EXPERIMENTAL=y
 #
 # General setup
 #
+CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
-# CONFIG_LOG_BUF_SHIFT_17 is not set
-# CONFIG_LOG_BUF_SHIFT_16 is not set
-# CONFIG_LOG_BUF_SHIFT_15 is not set
-CONFIG_LOG_BUF_SHIFT_14=y
-# CONFIG_LOG_BUF_SHIFT_13 is not set
-# CONFIG_LOG_BUF_SHIFT_12 is not set
 CONFIG_LOG_BUF_SHIFT=14
+# CONFIG_EMBEDDED is not set
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
 
 #
 # Loadable module support
@@ -31,6 +29,7 @@ CONFIG_MODULES=y
 CONFIG_MODULE_UNLOAD=y
 # CONFIG_MODULE_FORCE_UNLOAD is not set
 CONFIG_OBSOLETE_MODPARM=y
+# CONFIG_MODVERSIONS is not set
 CONFIG_KMOD=y
 
 #
@@ -40,7 +39,6 @@ CONFIG_PPC=y
 CONFIG_PPC32=y
 # CONFIG_6xx is not set
 CONFIG_40x=y
-# CONFIG_440 is not set
 # CONFIG_POWER3 is not set
 # CONFIG_8xx is not set
 CONFIG_4xx=y
@@ -54,14 +52,12 @@ CONFIG_4xx=y
 # CONFIG_CPCI405 is not set
 CONFIG_EP405=y
 # CONFIG_OAK is not set
-# CONFIG_RAINIER is not set
 # CONFIG_REDWOOD_4 is not set
 # CONFIG_REDWOOD_5 is not set
 # CONFIG_REDWOOD_6 is not set
 # CONFIG_SYCAMORE is not set
 # CONFIG_TIVO is not set
 # CONFIG_WALNUT is not set
-# CONFIG_XILINX_ML300 is not set
 # CONFIG_EP405PC is not set
 CONFIG_IBM405_ERR77=y
 CONFIG_IBM405_ERR51=y
@@ -69,8 +65,6 @@ CONFIG_IBM_OCP=y
 CONFIG_BIOS_FIXUP=y
 CONFIG_405GP=y
 CONFIG_EMBEDDEDBOOT=y
-# CONFIG_PPC4xx_DMA is not set
-CONFIG_OCP=y
 # CONFIG_405_DMA is not set
 # CONFIG_PM is not set
 CONFIG_UART0_TTYS0=y
@@ -79,17 +73,20 @@ CONFIG_NOT_COHERENT_CACHE=y
 # CONFIG_SMP is not set
 # CONFIG_PREEMPT is not set
 # CONFIG_MATH_EMULATION is not set
+# CONFIG_CPU_FREQ is not set
 
 #
 # General setup
 #
 # CONFIG_HIGHMEM is not set
 CONFIG_PCI=y
+CONFIG_PCI_DOMAINS=y
 # CONFIG_PC_KEYBOARD is not set
 CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
 CONFIG_KERNEL_ELF=y
 # CONFIG_BINFMT_MISC is not set
+# CONFIG_PCI_LEGACY_PROC is not set
 # CONFIG_PCI_NAMES is not set
 # CONFIG_HOTPLUG is not set
 
@@ -108,11 +105,10 @@ CONFIG_KERNEL_ELF=y
 # Default settings for advanced configuration options are used
 #
 CONFIG_HIGHMEM_START=0xfe000000
-CONFIG_LOWMEM_SIZE=0x20000000
+CONFIG_LOWMEM_SIZE=0x30000000
 CONFIG_KERNEL_START=0xc0000000
 CONFIG_TASK_SIZE=0x80000000
 CONFIG_BOOT_LOAD=0x00400000
-CONFIG_SWAP=y
 
 #
 # Memory Technology Devices (MTD)
@@ -178,7 +174,6 @@ CONFIG_NET=y
 # CONFIG_PACKET is not set
 # CONFIG_NETLINK_DEV is not set
 # CONFIG_NETFILTER is not set
-# CONFIG_FILTER is not set
 CONFIG_UNIX=y
 # CONFIG_NET_KEY is not set
 CONFIG_INET=y
@@ -196,8 +191,9 @@ CONFIG_IP_PNP_RARP=y
 CONFIG_SYN_COOKIES=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
-# CONFIG_XFRM_USER is not set
+# CONFIG_INET_IPCOMP is not set
 # CONFIG_IPV6 is not set
+# CONFIG_XFRM_USER is not set
 
 #
 # SCTP Configuration (EXPERIMENTAL)
@@ -242,14 +238,7 @@ CONFIG_NETDEVICES=y
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
-CONFIG_IBM_OCP_ENET=y
-# CONFIG_IBM_OCP_ENET_ERROR_MSG is not set
-CONFIG_IBM_OCP_ENET_RX_BUFF=64
-CONFIG_IBM_OCP_ENET_TX_BUFF=8
-CONFIG_IBM_OCP_ENET_GAP=8
-CONFIG_IBM_OCP_ENET_SKB_RES=0
-CONFIG_OCP_NET=y
-CONFIG_CRC32=y
+# CONFIG_MII is not set
 # CONFIG_OAKNET is not set
 # CONFIG_HAPPYMEAL is not set
 # CONFIG_SUNGEM is not set
@@ -274,6 +263,11 @@ CONFIG_CRC32=y
 # CONFIG_R8169 is not set
 # CONFIG_SK98LIN is not set
 # CONFIG_TIGON3 is not set
+
+#
+# Ethernet (10000 Mbit)
+#
+# CONFIG_IXGB is not set
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
 # CONFIG_PPP is not set
@@ -316,13 +310,6 @@ CONFIG_CRC32=y
 # CONFIG_FB is not set
 
 #
-# Console display driver support
-#
-# CONFIG_VGA_CONSOLE is not set
-# CONFIG_MDA_CONSOLE is not set
-CONFIG_DUMMY_CONSOLE=y
-
-#
 # Old CD-ROM drivers (not SCSI, not IDE)
 #
 # CONFIG_CD_NO_IDESCSI is not set
@@ -357,7 +344,6 @@ CONFIG_SERIO_SERPORT=y
 #
 # Character devices
 #
-# CONFIG_VT is not set
 # CONFIG_SERIAL_NONSTANDARD is not set
 
 #
@@ -382,15 +368,28 @@ CONFIG_I2C=y
 # CONFIG_I2C_ALGOPCF is not set
 # CONFIG_I2C_IBM_OCP_ALGO is not set
 # CONFIG_I2C_CHARDEV is not set
-# CONFIG_I2C_PROC is not set
 
 #
 # I2C Hardware Sensors Mainboard support
 #
+# CONFIG_I2C_ALI15X3 is not set
+# CONFIG_I2C_AMD756 is not set
+# CONFIG_I2C_AMD8111 is not set
+# CONFIG_I2C_I801 is not set
+# CONFIG_I2C_PIIX4 is not set
+# CONFIG_I2C_SIS96X is not set
+# CONFIG_I2C_VIAPRO is not set
 
 #
 # I2C Hardware Sensors Chip support
 #
+# CONFIG_SENSORS_ADM1021 is not set
+# CONFIG_SENSORS_IT87 is not set
+# CONFIG_SENSORS_LM75 is not set
+# CONFIG_SENSORS_LM85 is not set
+# CONFIG_SENSORS_VIA686A is not set
+# CONFIG_SENSORS_W83781D is not set
+# CONFIG_I2C_SENSOR is not set
 
 #
 # Mice
@@ -399,11 +398,15 @@ CONFIG_I2C=y
 # CONFIG_QIC02_TAPE is not set
 
 #
+# IPMI
+#
+# CONFIG_IPMI_HANDLER is not set
+
+#
 # Watchdog Cards
 #
 # CONFIG_WATCHDOG is not set
 # CONFIG_NVRAM is not set
-# CONFIG_RTC is not set
 CONFIG_GEN_RTC=y
 # CONFIG_GEN_RTC_X is not set
 # CONFIG_DTLK is not set
@@ -417,6 +420,7 @@ CONFIG_GEN_RTC=y
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
+# CONFIG_HANGCHECK_TIMER is not set
 
 #
 # Multimedia devices
@@ -424,57 +428,79 @@ CONFIG_GEN_RTC=y
 # CONFIG_VIDEO_DEV is not set
 
 #
+# Digital Video Broadcasting Devices
+#
+# CONFIG_DVB is not set
+
+#
 # File systems
 #
+CONFIG_EXT2_FS=y
+# CONFIG_EXT2_FS_XATTR is not set
+# CONFIG_EXT3_FS is not set
+# CONFIG_JBD is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_JFS_FS is not set
+# CONFIG_XFS_FS is not set
+# CONFIG_MINIX_FS is not set
+# CONFIG_ROMFS_FS is not set
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
-# CONFIG_REISERFS_FS is not set
+
+#
+# CD-ROM/DVD Filesystems
+#
+# CONFIG_ISO9660_FS is not set
+# CONFIG_UDF_FS is not set
+
+#
+# DOS/FAT/NT Filesystems
+#
+# CONFIG_FAT_FS is not set
+# CONFIG_NTFS_FS is not set
+
+#
+# Pseudo filesystems
+#
+CONFIG_PROC_FS=y
+# CONFIG_DEVFS_FS is not set
+CONFIG_TMPFS=y
+CONFIG_RAMFS=y
+
+#
+# Miscellaneous filesystems
+#
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
-# CONFIG_EXT3_FS is not set
-# CONFIG_JBD is not set
-# CONFIG_FAT_FS is not set
 # CONFIG_EFS_FS is not set
 # CONFIG_CRAMFS is not set
-CONFIG_TMPFS=y
-CONFIG_RAMFS=y
-# CONFIG_ISO9660_FS is not set
-# CONFIG_JFS_FS is not set
-# CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
-# CONFIG_NTFS_FS is not set
 # CONFIG_HPFS_FS is not set
-CONFIG_PROC_FS=y
-# CONFIG_DEVFS_FS is not set
 # CONFIG_QNX4FS_FS is not set
-# CONFIG_ROMFS_FS is not set
-CONFIG_EXT2_FS=y
-# CONFIG_EXT2_FS_XATTR is not set
 # CONFIG_SYSV_FS is not set
-# CONFIG_UDF_FS is not set
 # CONFIG_UFS_FS is not set
-# CONFIG_XFS_FS is not set
 
 #
 # Network File Systems
 #
-# CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=y
 # CONFIG_NFS_V3 is not set
 # CONFIG_NFS_V4 is not set
-CONFIG_ROOT_NFS=y
 # CONFIG_NFSD is not set
-CONFIG_SUNRPC=y
+CONFIG_ROOT_NFS=y
 CONFIG_LOCKD=y
 # CONFIG_EXPORTFS is not set
-# CONFIG_CIFS is not set
+CONFIG_SUNRPC=y
+# CONFIG_SUNRPC_GSS is not set
 # CONFIG_SMB_FS is not set
+# CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
+# CONFIG_CODA_FS is not set
+# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
 
 #
@@ -496,6 +522,7 @@ CONFIG_MSDOS_PARTITION=y
 # USB support
 #
 # CONFIG_USB is not set
+# CONFIG_USB_GADGET is not set
 
 #
 # Bluetooth support
@@ -505,6 +532,7 @@ CONFIG_MSDOS_PARTITION=y
 #
 # Library routines
 #
+CONFIG_CRC32=y
 
 #
 # Kernel hacking
@@ -512,6 +540,7 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_DEBUG_KERNEL is not set
 # CONFIG_KALLSYMS is not set
 # CONFIG_SERIAL_TEXT_DEBUG is not set
+CONFIG_OCP=y
 
 #
 # Security options
