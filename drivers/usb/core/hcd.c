@@ -495,25 +495,17 @@ static void rh_report_status (unsigned long ptr)
 			if (length > 0) {
 				urb->actual_length = length;
 				urb->status = 0;
+				urb->hcpriv = 0;
 				urb->complete (urb);
+				return;
 			}
-			spin_lock_irqsave (&hcd_data_lock, flags);
-			urb->status = -EINPROGRESS;
-			if (HCD_IS_RUNNING (hcd->state)
-					&& rh_status_urb (hcd, urb) != 0) {
-				/* another driver snuck in? */
-				dbg ("%s, can't resubmit roothub status urb?",
-					hcd->self.bus_name);
-				spin_unlock_irqrestore (&hcd_data_lock, flags);
-				BUG ();
-			}
-			spin_unlock_irqrestore (&hcd_data_lock, flags);
-		} else {
+		} else
 			spin_unlock_irqrestore (&urb->lock, flags);
-			spin_lock_irqsave (&hcd_data_lock, flags);
-			rh_status_urb (hcd, urb);
-			spin_unlock_irqrestore (&hcd_data_lock, flags);
-		}
+
+		/* retrigger timer until completion:  success or unlink */
+		spin_lock_irqsave (&hcd_data_lock, flags);
+		rh_status_urb (hcd, urb);
+		spin_unlock_irqrestore (&hcd_data_lock, flags);
 	} else {
 		/* this urb's been unlinked */
 		urb->hcpriv = 0;
@@ -967,7 +959,6 @@ static void urb_unlink (struct urb *urb)
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	list_del_init (&urb->urb_list);
 	dev = urb->dev;
-	urb->dev = NULL;
 	usb_put_dev (dev);
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
 }
@@ -1155,7 +1146,10 @@ static int hcd_unlink_urb (struct urb *urb)
 		goto done;
 	}
 
-	/* maybe set up to block on completion notification */
+	/* maybe set up to block until the urb's completion fires.  the
+	 * lower level hcd code is always async, locking on urb->status
+	 * updates; an intercepted completion unblocks us.
+	 */
 	if ((urb->transfer_flags & USB_TIMEOUT_KILLED))
 		urb->status = -ETIMEDOUT;
 	else if (!(urb->transfer_flags & USB_ASYNC_UNLINK)) {
@@ -1290,11 +1284,6 @@ EXPORT_SYMBOL (usb_hcd_operations);
  * (and is done using urb->hcpriv).  It also released all HCD locks;
  * the device driver won't cause problems if it frees, modifies,
  * or resubmits this URB.
- * Bandwidth and other resources will be deallocated.
- *
- * HCDs must not use this for periodic URBs that are still scheduled
- * and will be reissued.  They should just call their completion handlers
- * until the urb is returned to the device driver by unlinking.
  */
 void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 {

@@ -190,6 +190,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -211,6 +212,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID) },
 	{ }					/* Terminating entry */
 };
 

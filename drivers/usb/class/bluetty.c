@@ -767,6 +767,7 @@ static void bluetooth_int_callback (struct urb *urb)
 	unsigned int i;
 	unsigned int count = urb->actual_length;
 	unsigned int packet_size;
+	int status;
 
 	dbg("%s", __FUNCTION__);
 
@@ -775,14 +776,24 @@ static void bluetooth_int_callback (struct urb *urb)
 		return;
 	}
 
-	if (urb->status) {
-		dbg("%s - nonzero int status received: %d", __FUNCTION__, urb->status);
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
 	}
 
 	if (!count) {
 		dbg("%s - zero length int", __FUNCTION__);
-		return;
+		goto exit;
 	}
 
 
@@ -803,7 +814,7 @@ static void bluetooth_int_callback (struct urb *urb)
 	}
 	if (count == 0) {
 		urb->actual_length = 0;
-		return;
+		goto exit;
 	}
 #endif
 	/* We add  a packet type identifier to the beginning of each
@@ -820,7 +831,7 @@ static void bluetooth_int_callback (struct urb *urb)
 	if (bluetooth->int_packet_pos + count > EVENT_BUFFER_SIZE) {
 		err("%s - exceeded EVENT_BUFFER_SIZE", __FUNCTION__);
 		bluetooth->int_packet_pos = 0;
-		return;
+		goto exit;
 	}
 
 	memcpy (&bluetooth->int_buffer[bluetooth->int_packet_pos],
@@ -831,12 +842,12 @@ static void bluetooth_int_callback (struct urb *urb)
 	if (bluetooth->int_packet_pos >= EVENT_HDR_SIZE)
 		packet_size = bluetooth->int_buffer[2];
 	else
-		return;
+		goto exit;
 
 	if (packet_size + EVENT_HDR_SIZE < bluetooth->int_packet_pos) {
 		err("%s - packet was too long", __FUNCTION__);
 		bluetooth->int_packet_pos = 0;
-		return;
+		goto exit;
 	}
 
 	if (packet_size + EVENT_HDR_SIZE == bluetooth->int_packet_pos) {
@@ -851,6 +862,12 @@ static void bluetooth_int_callback (struct urb *urb)
 
 		bluetooth->int_packet_pos = 0;
 	}
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 
