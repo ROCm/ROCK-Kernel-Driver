@@ -711,7 +711,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 
 SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
-			     struct msghdr *msg, int size)
+			     struct msghdr *msg, int msg_len)
 {
 	sctp_opt_t *sp;
 	sctp_endpoint_t *ep;
@@ -726,13 +726,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	sctp_assoc_t associd = NULL;
 	sctp_cmsgs_t cmsgs = { 0 };
 	int err;
-	size_t msg_len;
 	sctp_scope_t scope;
 	long timeo;
 	__u16 sinfo_flags = 0;
 
-	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, "
-			  "size: %d)\n", sk, msg, size);
+	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %d)\n",
+			  sk, msg, msg_len);
 
 	err = 0;
 	sp = sctp_sk(sk);
@@ -754,12 +753,16 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	 * For a peeled-off socket, msg_name is ignored.
 	 */
 	if ((SCTP_SOCKET_UDP_HIGH_BANDWIDTH != sp->type) && msg->msg_name) {
+		int msg_namelen = msg->msg_namelen;
+	
 		err = sctp_verify_addr(sk, (union sctp_addr *)msg->msg_name, 
-				       msg->msg_namelen);
+				       msg_namelen);
 		if (err)
 			return err;
 
-		memcpy(&to, msg->msg_name, msg->msg_namelen);
+		if (msg_namelen > sizeof(to))
+			msg_namelen = sizeof(to);
+		memcpy(&to, msg->msg_name, msg_namelen);
 		SCTP_DEBUG_PRINTK("Just memcpy'd. msg_name is "
 				  "0x%x:%u.\n",
 				  to.v4.sin_addr.s_addr, to.v4.sin_port);
@@ -767,8 +770,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		to.v4.sin_port = ntohs(to.v4.sin_port);
 		msg_name = msg->msg_name;
 	}
-
-	msg_len = get_user_iov_size(msg->msg_iov, msg->msg_iovlen);
 
 	sinfo = cmsgs.info;
 	sinit = cmsgs.init;
