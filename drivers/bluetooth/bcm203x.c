@@ -2,6 +2,7 @@
  *
  *  Broadcom Blutonium firmware driver
  *
+ *  Copyright (C) 2003  Maxim Krasnyansky <maxk@qualcomm.com>
  *  Copyright (C) 2003  Marcel Holtmann <marcel@holtmann.org>
  *
  *
