@@ -2234,7 +2234,6 @@ int tty_register_driver(struct tty_driver *driver)
 	int error;
         int i;
 	dev_t dev;
-	char *s;
 	void **p = NULL;
 
 	if (driver->flags & TTY_DRIVER_INSTALLED)
