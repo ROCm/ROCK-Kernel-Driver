@@ -434,14 +434,13 @@ void flush_thread(void)
 		if (test_thread_flag(TIF_32BIT)) {
 			struct mm_struct *mm = t->task->mm;
 			pgd_t *pgd0 = &mm->pgd[0];
+			pud_t *pud0 = pud_offset(pgd0, 0);
 
-			if (pgd_none(*pgd0)) {
-				pmd_t *page = pmd_alloc_one_fast(NULL, 0);
-				if (!page)
-					page = pmd_alloc_one(NULL, 0);
-				pgd_set(pgd0, page);
+			if (pud_none(*pud0)) {
+				pmd_t *page = pmd_alloc_one(mm, 0);
+				pud_set(pud0, page);
 			}
-			pgd_cache = ((unsigned long) pgd_val(*pgd0)) << 11UL;
+			pgd_cache = ((unsigned long) pud_val(*pud0)) << 11UL;
 		}
 		__asm__ __volatile__("stxa %0, [%1] %2\n\t"
 				     "membar #Sync"

@@ -151,6 +151,7 @@ int prom_callback(long *args)
 			struct task_struct *p;
 			struct mm_struct *mm = NULL;
 			pgd_t *pgdp;
+			pud_t *pudp;
 			pmd_t *pmdp;
 			pte_t *ptep;
 
@@ -166,7 +167,10 @@ int prom_callback(long *args)
 			pgdp = pgd_offset(mm, va);
 			if (pgd_none(*pgdp))
 				goto done;
-			pmdp = pmd_offset(pgdp, va);
+			pudp = pud_offset(pgdp, va);
+			if (pud_none(*pudp))
+				goto done;
+			pmdp = pmd_offset(pudp, va);
 			if (pmd_none(*pmdp))
 				goto done;
 
@@ -208,6 +212,7 @@ int prom_callback(long *args)
 			 * vmalloc or prom_inherited mapping.
 			 */
 			pgd_t *pgdp;
+			pud_t *pudp;
 			pmd_t *pmdp;
 			pte_t *ptep;
 			int error;
@@ -221,7 +226,10 @@ int prom_callback(long *args)
 			pgdp = pgd_offset_k(va);
 			if (pgd_none(*pgdp))
 				goto done;
-			pmdp = pmd_offset(pgdp, va);
+			pudp = pud_offset(pgdp, va);
+			if (pud_none(*pudp))
+				goto done;
+			pmdp = pmd_offset(pudp, va);
 			if (pmd_none(*pmdp))
 				goto done;
 

@@ -96,6 +96,27 @@ static inline int io_remap_pmd_range(pmd_t * pmd, unsigned long address, unsigne
 	return 0;
 }
 
+static inline int io_remap_pud_range(pud_t * pud, unsigned long address, unsigned long size,
+	unsigned long offset, pgprot_t prot, int space)
+{
+	unsigned long end;
+
+	address &= ~PUD_MASK;
+	end = address + size;
+	if (end > PUD_SIZE)
+		end = PUD_SIZE;
+	offset -= address;
+	do {
+		pmd_t *pmd = pmd_alloc(current->mm, pud, address);
+		if (!pud)
+			return -ENOMEM;
+		io_remap_pmd_range(pmd, address, end - address, address + offset, prot, space);
+		address = (address + PUD_SIZE) & PUD_MASK;
+		pud++;
+	} while (address < end);
+	return 0;
+}
+
 int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space)
 {
 	int error = 0;
@@ -111,11 +132,11 @@ int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned
 
 	spin_lock(&mm->page_table_lock);
 	while (from < end) {
-		pmd_t *pmd = pmd_alloc(current->mm, dir, from);
+		pud_t *pud = pud_alloc(current->mm, dir, from);
 		error = -ENOMEM;
-		if (!pmd)
+		if (!pud)
 			break;
-		error = io_remap_pmd_range(pmd, from, end - from, offset + from, prot, space);
+		error = io_remap_pud_range(pud, from, end - from, offset + from, prot, space);
 		if (error)
 			break;
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;

@@ -2096,7 +2096,6 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 }
 
 #ifndef __ARCH_HAS_4LEVEL_HACK
-#if (PTRS_PER_PUD > 1)
 /*
  * Allocate page upper directory.
  *
@@ -2125,12 +2124,10 @@ pud_t fastcall *__pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long addr
 		goto out;
 	}
 	pgd_populate(mm, pgd, new);
-out:
+ out:
 	return pud_offset(pgd, address);
 }
-#endif
 
-#if (PTRS_PER_PMD > 1)
 /*
  * Allocate page middle directory.
  *
@@ -2159,10 +2156,9 @@ pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long addr
 		goto out;
 	}
 	pud_populate(mm, pud, new);
-out:
+ out:
 	return pmd_offset(pud, address);
 }
-#endif
 #else
 pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
 {

@@ -857,7 +857,8 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 		/* Flush instruction space. */
 		unsigned long address = ((unsigned long)&(sf->insns[0]));
 		pgd_t *pgdp = pgd_offset(current->mm, address);
-		pmd_t *pmdp = pmd_offset(pgdp, address);
+		pud_t *pudp = pud_offset(pgdp, address);
+		pmd_t *pmdp = pmd_offset(pudp, address);
 		pte_t *ptep;
 
 		regs->u_regs[UREG_I7] = (unsigned long) (&(sf->insns[0]) - 2);
@@ -1268,7 +1269,8 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 		/* Flush instruction space. */
 		unsigned long address = ((unsigned long)&(sf->insns[0]));
 		pgd_t *pgdp = pgd_offset(current->mm, address);
-		pmd_t *pmdp = pmd_offset(pgdp, address);
+		pud_t *pudp = pud_offset(pgdp, address);
+		pmd_t *pmdp = pmd_offset(pudp, address);
 		pte_t *ptep;
 
 		regs->u_regs[UREG_I7] = (unsigned long) (&(sf->insns[0]) - 2);
