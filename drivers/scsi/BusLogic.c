@@ -2344,6 +2344,8 @@ static int __exit BusLogic_ReleaseHostAdapter(struct BusLogic_HostAdapter *HostA
 	   Remove Host Adapter from the list of registered BusLogic Host Adapters.
 	 */
 	list_del(&HostAdapter->host_list);
+
+	scsi_host_put(Host);
 	return 0;
 }
 
