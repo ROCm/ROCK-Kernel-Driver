@@ -580,12 +580,13 @@ int __set_page_dirty_nobuffers(struct page *page)
 
 	if (!TestSetPageDirty(page)) {
 		struct address_space *mapping = page_mapping(page);
+		struct address_space *mapping2;
 
 		if (mapping) {
 			spin_lock_irq(&mapping->tree_lock);
-			mapping = page_mapping(page);
-			if (page_mapping(page)) { /* Race with truncate? */
-				BUG_ON(page_mapping(page) != mapping);
+			mapping2 = page_mapping(page);
+			if (mapping2) { /* Race with truncate? */
+				BUG_ON(mapping2 != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
 					inc_page_state(nr_dirty);
 				radix_tree_tag_set(&mapping->page_tree,

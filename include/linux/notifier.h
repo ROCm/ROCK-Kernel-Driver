@@ -64,10 +64,12 @@ extern int notifier_call_chain(struct notifier_block **n, unsigned long val, voi
 
 #define NETLINK_URELEASE	0x0001	/* Unicast netlink socket released */
 
-#define CPU_ONLINE	0x0002 /* CPU (unsigned)v is up */
-#define CPU_UP_PREPARE	0x0003 /* CPU (unsigned)v coming up */
-#define CPU_UP_CANCELED	0x0004 /* CPU (unsigned)v NOT coming up */
-#define CPU_DEAD	0x0006 /* CPU (unsigned)v dead */
+#define CPU_ONLINE		0x0002 /* CPU (unsigned)v is up */
+#define CPU_UP_PREPARE		0x0003 /* CPU (unsigned)v coming up */
+#define CPU_UP_CANCELED		0x0004 /* CPU (unsigned)v NOT coming up */
+#define CPU_DOWN_PREPARE	0x0005 /* CPU (unsigned)v going down */
+#define CPU_DOWN_FAILED		0x0006 /* CPU (unsigned)v NOT going down */
+#define CPU_DEAD		0x0007 /* CPU (unsigned)v dead */
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_NOTIFIER_H */

@@ -22,6 +22,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/wait.h>
+#include <linux/suspend.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
@@ -236,8 +237,10 @@ static int monitor_task(void *arg)
 #ifdef DEBUG
 	int mfan_speed;
 #endif
-	while(!kthread_should_stop())
-	{
+	while(!kthread_should_stop()) {
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_FREEZE);
+
 		msleep_interruptible(2000);
 
 		/* Check status */

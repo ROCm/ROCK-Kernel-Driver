@@ -39,9 +39,6 @@ static inline cpumask_t node_to_cpumask(int node)
 	return node_cpu_mask;
 }
 
-/* Cross-node load balancing interval. */
-# define NODE_BALANCE_RATE 10
-
 #define pcibus_to_cpumask(bus)	(cpu_online_map)
 
 #else /* CONFIG_NUMA */

@@ -1,15 +1,15 @@
-/* 
+/*
  * arch/sh/boards/dreamcast/setup.c
  *
  * Hardware support for the Sega Dreamcast.
  *
  * Copyright (c) 2001, 2002 M. R. Brown <mrbrown@linuxdc.org>
- * Copyright (c) 2002, 2003 Paul Mundt <lethal@linux-sh.org>
+ * Copyright (c) 2002, 2003, 2004 Paul Mundt <lethal@linux-sh.org>
  *
  * This file is part of the LinuxDC project (www.linuxdc.org)
  *
  * Released under the terms of the GNU GPL v2.0.
- * 
+ *
  * This file originally bore the message (with enclosed-$):
  *	Id: setup_dc.c,v 1.5 2001/05/24 05:09:16 mrbrown Exp
  *	SEGA Dreamcast support
@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/irq.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -34,6 +35,10 @@ extern void (*board_time_init)(void);
 extern void aica_time_init(void);
 extern int gapspci_init(void);
 extern int systemasic_irq_demux(int);
+
+void *dreamcast_consistent_alloc(struct device *, size_t, dma_addr_t *, int);
+int dreamcast_consistent_free(struct device *, size_t, void *, dma_addr_t);
+
 const char *get_system_type(void)
 {
 	return "Sega Dreamcast";
@@ -43,6 +48,11 @@ struct sh_machine_vector mv_dreamcast __initmv = {
 	.mv_nr_irqs		= NR_IRQS,
 
 	.mv_irq_demux		= systemasic_irq_demux,
+
+#ifdef CONFIG_PCI
+	.mv_consistent_alloc	= dreamcast_consistent_alloc,
+	.mv_consistent_free	= dreamcast_consistent_free,
+#endif
 };
 ALIAS_MV(dreamcast)
 

@@ -1,5 +1,4 @@
-/* $Id: ioremap.c,v 1.9 2004/02/25 04:59:10 lethal Exp $
- *
+/*
  * arch/sh/mm/ioremap.c
  *
  * Re-map IO memory to kernel address space so that we can access it.

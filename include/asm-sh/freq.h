@@ -10,6 +10,7 @@
  */
 #ifndef __ASM_SH_FREQ_H
 #define __ASM_SH_FREQ_H
+#ifdef __KERNEL__
 
 #include <asm/cpu/freq.h>
 
@@ -24,5 +25,5 @@ extern unsigned int get_ifc_value(unsigned int divisor);
 extern unsigned int get_pfc_value(unsigned int divisor);
 extern unsigned int get_bfc_value(unsigned int divisor);
 
+#endif /* __KERNEL__ */
 #endif /* __ASM_SH_FREQ_H */
-

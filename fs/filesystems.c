@@ -6,6 +6,7 @@
  *  table of configured filesystems
  */
 
+#include <linux/syscalls.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>

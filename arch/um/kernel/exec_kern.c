@@ -43,7 +43,9 @@ static int execve1(char *file, char **argv, char **env)
 #endif
         error = do_execve(file, argv, env, &current->thread.regs);
         if (error == 0){
+		task_lock(current);
                 current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
                 set_cmdline(current_cmd());
         }
         return(error);

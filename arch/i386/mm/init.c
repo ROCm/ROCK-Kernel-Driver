@@ -438,8 +438,8 @@ static int __init noexec_setup(char *str)
 
 __setup("noexec=", noexec_setup);
 
-#ifdef CONFIG_X86_PAE
 int nx_enabled = 0;
+#ifdef CONFIG_X86_PAE
 
 static void __init set_nx(void)
 {

@@ -3,7 +3,7 @@
  *
  * NEC PowerVR 2 (Dreamcast) DMA support
  *
- * Copyright (C) 2003  Paul Mundt
+ * Copyright (C) 2003, 2004  Paul Mundt
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -38,7 +38,7 @@ static irqreturn_t pvr2_dma_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	return IRQ_HANDLED;
 }
 
-static int pvr2_request_dma(struct dma_info *info)
+static int pvr2_request_dma(struct dma_channel *chan)
 {
 	if (ctrl_inl(PVR2_DMA_MODE) != 0)
 		return -EBUSY;
@@ -48,21 +48,21 @@ static int pvr2_request_dma(struct dma_info *info)
 	return 0;
 }
 
-static int pvr2_get_dma_residue(struct dma_info *info)
+static int pvr2_get_dma_residue(struct dma_channel *chan)
 {
 	return xfer_complete == 0;
 }
 
-static int pvr2_xfer_dma(struct dma_info *info)
+static int pvr2_xfer_dma(struct dma_channel *chan)
 {
-	if (info->sar || !info->dar)
+	if (chan->sar || !chan->dar)
 		return -EINVAL;
 
 	xfer_complete = 0;
 
-	ctrl_outl(info->dar, PVR2_DMA_ADDR);
-	ctrl_outl(info->count, PVR2_DMA_COUNT);
-	ctrl_outl(info->mode & DMA_MODE_MASK, PVR2_DMA_MODE);
+	ctrl_outl(chan->dar, PVR2_DMA_ADDR);
+	ctrl_outl(chan->count, PVR2_DMA_COUNT);
+	ctrl_outl(chan->mode & DMA_MODE_MASK, PVR2_DMA_MODE);
 
 	return 0;
 }
@@ -74,26 +74,24 @@ static struct irqaction pvr2_dma_irq = {
 };
 
 static struct dma_ops pvr2_dma_ops = {
-	.name		= "PowerVR 2 DMA",
 	.request	= pvr2_request_dma,
 	.get_residue	= pvr2_get_dma_residue,
 	.xfer		= pvr2_xfer_dma,
 };
 
+static struct dma_info pvr2_dma_info = {
+	.name		= "PowerVR 2 DMA",
+	.nr_channels	= 1,
+	.ops		= &pvr2_dma_ops,
+	.flags		= DMAC_CHANNELS_TEI_CAPABLE,
+};
+
 static int __init pvr2_dma_init(void)
 {
-	int i, base;
-
 	setup_irq(HW_EVENT_PVR2_DMA, &pvr2_dma_irq);
 	request_dma(PVR2_CASCADE_CHAN, "pvr2 cascade");
 
-	/* PVR2 cascade comes after on-chip DMAC */
-	base = ONCHIP_NR_DMA_CHANNELS;
-
-	for (i = 0; i < PVR2_NR_DMA_CHANNELS; i++)
-		dma_info[base + i].ops = &pvr2_dma_ops;
-
-	return register_dmac(&pvr2_dma_ops);
+	return register_dmac(&pvr2_dma_info);
 }
 
 static void __exit pvr2_dma_exit(void)

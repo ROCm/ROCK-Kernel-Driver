@@ -88,6 +88,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/wait.h>
+#include <linux/suspend.h>
 #include <linux/reboot.h>
 #include <linux/kmod.h>
 #include <linux/i2c.h>
@@ -1043,6 +1044,11 @@ static int main_control_loop(void *x)
 
 	while (state == state_attached) {
 		unsigned long elapsed, start;
+
+		if (current->flags & PF_FREEZE) {
+			printk(KERN_INFO "therm_pm72: freezing thermostat\n");
+			refrigerator(PF_FREEZE);
+		}
 
 		start = jiffies;
 

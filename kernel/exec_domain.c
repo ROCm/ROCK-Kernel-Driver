@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/personality.h>
 #include <linux/sched.h>
+#include <linux/syscalls.h>
 #include <linux/sysctl.h>
 #include <linux/types.h>
 

@@ -1195,7 +1195,7 @@ static int x25_place_call(struct cycx_device *card,
 	     remotelen = strlen(chan->addr);
 	u8 key;
 
-	if (card->u.x.connection_keys == ~0UL) {
+	if (card->u.x.connection_keys == ~0U) {
 		printk(KERN_INFO "%s: too many simultaneous connection "
 				 "requests!\n", card->devname);
 		return -EAGAIN;

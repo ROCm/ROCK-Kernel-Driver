@@ -32,8 +32,8 @@ expand_backing_store (struct vm_area_struct *vma, unsigned long address)
 	unsigned long grow;
 
 	grow = PAGE_SIZE >> PAGE_SHIFT;
-	if (address - vma->vm_start > current->rlim[RLIMIT_STACK].rlim_cur
-	    || (((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) > current->rlim[RLIMIT_AS].rlim_cur))
+	if (address - vma->vm_start > current->signal->rlim[RLIMIT_STACK].rlim_cur
+	    || (((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) > current->signal->rlim[RLIMIT_AS].rlim_cur))
 		return -ENOMEM;
 	vma->vm_end += PAGE_SIZE;
 	vma->vm_mm->total_vm += grow;

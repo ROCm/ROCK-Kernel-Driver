@@ -3,6 +3,7 @@
  *
  *  Copyright (C) 1999, 2000  Niibe Yutaka
  *  Copyright (C) 2002  M. R. Brown
+ *  Copyright (C) 2004  Paul Mundt
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -109,7 +110,8 @@ void scif_sercon_init(int baud)
 	ctrl_outw(0, SCIF_REG);
 
 	/* Set baud rate */
-	ctrl_outb((50000000 / (32 * baud)) - 1, SCIF_REG + 4);
+	ctrl_outb((CONFIG_SH_PCLK_FREQ + 16 * baud) /
+		  (32 * baud) - 1, SCIF_REG + 4);
 
 	ctrl_outw(12, SCIF_REG + 24);
 	ctrl_outw(8, SCIF_REG + 24);

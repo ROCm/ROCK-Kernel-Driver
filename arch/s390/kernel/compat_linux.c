@@ -751,7 +751,9 @@ sys32_execve(struct pt_regs regs)
 				 compat_ptr(regs.gprs[4]), &regs);
 	if (error == 0)
 	{
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
 		current->thread.fp_regs.fpc=0;
 		__asm__ __volatile__
 		        ("sr  0,0\n\t"

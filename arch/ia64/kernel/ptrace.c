@@ -1422,7 +1422,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		 * sigkill.  Perhaps it should be put in the status
 		 * that it wants to exit.
 		 */
-		if (child->state == TASK_ZOMBIE)		/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)		/* already dead */
 			goto out_tsk;
 		child->exit_code = SIGKILL;
 

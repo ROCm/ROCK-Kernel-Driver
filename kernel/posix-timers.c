@@ -43,6 +43,7 @@
 #include <linux/compiler.h>
 #include <linux/idr.h>
 #include <linux/posix-timers.h>
+#include <linux/syscalls.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 

@@ -26,6 +26,7 @@
 #include <linux/proc_fs.h>
 #include <linux/shmem_fs.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <asm/uaccess.h>
 
 #include "util.h"

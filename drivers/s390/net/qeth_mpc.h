@@ -14,7 +14,7 @@
 
 #include <asm/qeth.h>
 
-#define VERSION_QETH_MPC_H "$Revision: 1.36 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.38 $"
 
 extern const char *VERSION_QETH_MPC_C;
 
@@ -105,6 +105,12 @@ enum qeth_routing_types {
 enum qeth_ipa_cmds {
 	IPA_CMD_STARTLAN              = 0x01,
 	IPA_CMD_STOPLAN               = 0x02,
+	IPA_CMD_SETVMAC 	      = 0x21,
+	IPA_CMD_DELVMAC 	      =	0x22,
+	IPA_CMD_SETGMAC  	      = 0x23,
+	IPA_CMD_DELGMAC 	      = 0x24,
+	IPA_CMD_SETVLAN 	      = 0x25,
+	IPA_CMD_DELVLAN 	      = 0x26,
 	IPA_CMD_SETIP                 = 0xb1,
 	IPA_CMD_DELIP                 = 0xb7,
 	IPA_CMD_QIPASSIST             = 0xb2,
@@ -238,6 +244,16 @@ struct qeth_ipacmd_setdelipm {
 	__u8 ip6[12];
 	__u8 ip4[4];
 } __attribute__ ((packed));
+
+struct qeth_ipacmd_layer2setdelmac {
+	__u32 mac_length;
+	__u8 mac[6];
+} __attribute__ ((packed));
+
+struct qeth_ipacmd_layer2setdelvlan {
+	__u16 vlan_id;
+} __attribute__ ((packed));
+
 
 struct qeth_ipacmd_setassparms_hdr {
 	__u32 assist_no;
@@ -381,13 +397,15 @@ struct qeth_ipacmd_hdr {
 struct qeth_ipa_cmd {
 	struct qeth_ipacmd_hdr hdr;
 	union {
-		struct qeth_ipacmd_setdelip4   	setdelip4;
-		struct qeth_ipacmd_setdelip6   	setdelip6;
-		struct qeth_ipacmd_setdelipm	setdelipm;
-		struct qeth_ipacmd_setassparms 	setassparms;
-		struct qeth_create_destroy_address create_destroy_addr;
-		struct qeth_ipacmd_setadpparms 	setadapterparms;
-		struct qeth_set_routing setrtg;
+		struct qeth_ipacmd_setdelip4   		setdelip4;
+		struct qeth_ipacmd_setdelip6   		setdelip6;
+		struct qeth_ipacmd_setdelipm		setdelipm;
+		struct qeth_ipacmd_setassparms 		setassparms;
+		struct qeth_ipacmd_layer2setdelmac  	setdelmac;
+		struct qeth_ipacmd_layer2setdelvlan 	setdelvlan;
+		struct qeth_create_destroy_address 	create_destroy_addr;
+		struct qeth_ipacmd_setadpparms 		setadapterparms;
+		struct qeth_set_routing 		setrtg;
 	} data;
 } __attribute__ ((packed));
 
@@ -459,6 +477,11 @@ extern unsigned char ULP_ENABLE[];
 		(PDU_ENCAPSULATION(buffer) + 0x17)
 #define QETH_ULP_ENABLE_RESP_LINK_TYPE(buffer) \
 		(PDU_ENCAPSULATION(buffer)+ 0x2b)
+/* Layer 2 defintions */
+#define QETH_PROT_LAYER2 0x08
+#define QETH_PROT_TCPIP  0x03
+#define QETH_ULP_ENABLE_PROT_TYPE(buffer) (buffer+0x50)
+#define QETH_IPA_CMD_PROT_TYPE(buffer) (buffer+0x19)
 
 extern unsigned char ULP_SETUP[];
 #define ULP_SETUP_SIZE 0x6c

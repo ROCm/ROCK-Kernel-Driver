@@ -329,6 +329,11 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 		return 1;
 #endif /* CONFIG_SPE */
 
+#ifndef CONFIG_SMP
+	last_task_used_math = NULL;
+	last_task_used_altivec = NULL;
+	last_task_used_spe = NULL;
+#endif
 	return 0;
 }
 

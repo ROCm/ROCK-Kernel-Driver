@@ -59,6 +59,14 @@ wakeup_code:
 	movl	$swapper_pg_dir-__PAGE_OFFSET, %eax
 	movl	%eax, %cr3
 
+	testl	$1, real_efer_save_restore - wakeup_code
+	jz	4f
+	# restore efer setting
+	movl	real_save_efer_edx - wakeup_code, %edx
+	movl	real_save_efer_eax - wakeup_code, %eax
+	mov     $0xc0000080, %ecx
+	wrmsr
+4:
 	# make sure %cr4 is set correctly (features, etc)
 	movl	real_save_cr4 - wakeup_code, %eax
 	movl	%eax, %cr4
@@ -89,6 +97,9 @@ real_save_cr4:	.long 0
 real_magic:	.long 0
 video_mode:	.long 0
 video_flags:	.long 0
+real_efer_save_restore:	.long 0
+real_save_efer_edx: 	.long 0
+real_save_efer_eax: 	.long 0
 
 bogus_real_magic:
 	movw	$0x0e00 + 'B', %fs:(0x12)
@@ -222,6 +233,20 @@ ENTRY(acpi_copy_wakeup_routine)
 	sidt	saved_idt
 	sldt	saved_ldt
 	str	saved_tss
+
+	movl	nx_enabled, %edx
+	movl	%edx, real_efer_save_restore - wakeup_start (%eax)
+	testl	$1, real_efer_save_restore - wakeup_start (%eax)
+	jz	2f
+	# save efer setting
+	pushl	%eax
+	movl	%eax, %ebx
+	mov     $0xc0000080, %ecx
+	rdmsr
+	movl	%edx, real_save_efer_edx - wakeup_start (%ebx)
+	movl	%eax, real_save_efer_eax - wakeup_start (%ebx)
+	popl	%eax
+2:
 
 	movl    %cr3, %edx
 	movl    %edx, real_save_cr3 - wakeup_start (%eax)

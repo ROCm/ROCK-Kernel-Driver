@@ -17,14 +17,17 @@ There are three types of systems where video works after S3 resume:
 
 * systems where video state is preserved over S3. (Athlon HP Omnibook xe3s)
 
-* systems that initialize video card into vga text mode and where BIOS
-  works well enough to be able to set video mode. Use
-  acpi_sleep=s3_mode on these. (Toshiba 4030cdt)
-
 * systems where it is possible to call video bios during S3
   resume. Unfortunately, it is not correct to call video BIOS at that
   point, but it happens to work on some machines. Use
   acpi_sleep=s3_bios (Athlon64 desktop system)
+
+* systems that initialize video card into vga text mode and where BIOS
+  works well enough to be able to set video mode. Use
+  acpi_sleep=s3_mode on these. (Toshiba 4030cdt)
+
+* on some systems s3_bios kicks video into text mode, and
+  acpi_sleep=s3_bios,s3_mode is needed (Toshiba Satellite P10-554)
 
 * radeon systems, where X can soft-boot your video card. You'll need
   patched X, and plain text console (no vesafb or radeonfb), see

@@ -191,9 +191,7 @@ mpc85xx_cds_show_cpuinfo(struct seq_file *m)
 static void cpm2_cascade(int irq, void *dev_id, struct pt_regs *regs)
 {
 	while((irq = cpm2_get_irq(regs)) >= 0)
-	{
-		ppc_irq_dispatch_handler(regs,irq);
-	}
+		__do_IRQ(irq, regs);
 }
 #endif /* CONFIG_CPM2 */
 

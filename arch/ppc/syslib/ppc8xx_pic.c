@@ -105,7 +105,7 @@ m8xx_do_IRQ(struct pt_regs *regs,
 		ppc_spurious_interrupts++;
 	}
 	else {
-                ppc_irq_dispatch_handler( regs, irq );
+                __do_IRQ(irq, regs);
 	}
 
 }
@@ -161,7 +161,7 @@ void mbx_i8259_action(int cpl, void *dev_id, struct pt_regs *regs)
 	}
 	bits = 1UL << irq;
 	irq += i8259_pic.irq_offset;
-	ppc_irq_dispatch_handler( regs, irq );
+	__do_IRQ(irq, regs);
 }
 #endif
 

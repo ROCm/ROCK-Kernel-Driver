@@ -11,6 +11,10 @@ config MMU
 config UID16
 	bool
 
+config GENERIC_HARDIRQS
+	bool
+	default y
+
 config RWSEM_GENERIC_SPINLOCK
 	bool
 

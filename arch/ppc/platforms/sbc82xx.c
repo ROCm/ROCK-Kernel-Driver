@@ -142,7 +142,7 @@ static irqreturn_t sbc82xx_i8259_demux(int irq, void *dev_id, struct pt_regs *re
 			return IRQ_HANDLED;
 		}
 	}
-	ppc_irq_dispatch_handler(regs, NR_SIU_INTS + irq);
+	__do_IRQ(NR_SIU_INTS + irq, regs);
 	return IRQ_HANDLED;
 }
 
