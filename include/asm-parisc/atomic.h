@@ -187,6 +187,16 @@ static __inline__ int atomic_read(const atomic_t *v)
 
 #define atomic_add_negative(a, v)	(atomic_add_return((a), (v)) < 0)
 
+/*
+ * atomic_inc_and_test - increment and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1
+ * and returns true if the result is zero, or false for all
+ * other cases.
+ */
+#define atomic_inc_and_test(v) (atomic_inc_return(v) == 0)
+
 #define atomic_dec_and_test(v)	(atomic_dec_return(v) == 0)
 
 #define ATOMIC_INIT(i)	{ (i) }
