@@ -57,7 +57,7 @@
 #define NAME53C		"sym53c"
 #define NAME53C8XX	"sym53c8xx"
 
-static int __init
+static int __devinit
 pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
 {
 	u32 tmp;
@@ -176,7 +176,7 @@ m_addr_t __vtobus(m_pool_ident_t dev_dmat, void *m)
  *  Map/unmap a PCI memory window.
  */
 #ifndef SYM_OPT_NO_BUS_MEMORY_MAPPING
-static u_long __init pci_map_mem(u_long base, u_long size)
+static u_long __devinit pci_map_mem(u_long base, u_long size)
 {
 	u_long page_base	= ((u_long) base) & PAGE_MASK;
 	u_long page_offs	= ((u_long) base) - page_base;
@@ -185,7 +185,7 @@ static u_long __init pci_map_mem(u_long base, u_long size)
 	return page_remapped? (page_remapped + page_offs) : 0UL;
 }
 
-static void __init pci_unmap_mem(u_long vaddr, u_long size)
+static void __devinit pci_unmap_mem(u_long vaddr, u_long size)
 {
 	if (vaddr)
 		iounmap((void *) (vaddr & PAGE_MASK));
@@ -1791,7 +1791,7 @@ out_err32:
  *  If all is OK, install interrupt handling and
  *  start the timer daemon.
  */
-static int __init 
+static int __devinit 
 sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 {
         struct host_data *host_data;
@@ -2039,7 +2039,7 @@ attach_failed:
  *    Detect and try to read SYMBIOS and TEKRAM NVRAM.
  */
 #if SYM_CONF_NVRAM_SUPPORT
-static void __init sym_get_nvram(sym_device *devp, sym_nvram *nvp)
+static void __devinit sym_get_nvram(sym_device *devp, sym_nvram *nvp)
 {
 	if (!nvp)
 		return;
@@ -2269,7 +2269,7 @@ __setup("sym53c8xx=", sym53c8xx_setup);
  *  boards and save data for attaching after all boards have 
  *  been detected.
  */
-static int __init
+static int __devinit
 sym53c8xx_pci_init(struct pci_dev *pdev, sym_device *device)
 {
 	u_short vendor_id, device_id, command, status_reg;
