@@ -120,10 +120,10 @@ static int cciss_release(struct inode *inode, struct file *filep);
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg);
 
-static int revalidate_allvol(kdev_t dev);
+static int revalidate_allvol(ctlr_info_t *host);
 static int cciss_revalidate(struct gendisk *disk);
-static int deregister_disk(int ctlr, int logvol);
-static int register_new_disk(int cltr);
+static int deregister_disk(struct gendisk *disk);
+static int register_new_disk(ctlr_info_t *h);
 
 static void cciss_getgeometry(int cntl_num);
 
@@ -351,34 +351,42 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
         }
 }
 
+static inline ctlr_info_t *get_host(struct gendisk *disk)
+{
+	return disk->queue->queuedata; 
+}
+
+static inline drive_info_struct *get_drv(struct gendisk *disk)
+{
+	return disk->private_data;
+}
+
 /*
  * Open.  Make sure the device is really there.
  */
 static int cciss_open(struct inode *inode, struct file *filep)
 {
-	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
-	int dsk  = iminor(inode) >> NWD_SHIFT;
+	ctlr_info_t *host = get_host(inode->i_bdev->bd_disk);
+	drive_info_struct *drv = get_drv(inode->i_bdev->bd_disk);
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss_open %s (%x:%x)\n", inode->i_bdev->bd_disk->disk_name, ctlr, dsk);
+	printk(KERN_DEBUG "cciss_open %s\n", inode->i_bdev->bd_disk->disk_name);
 #endif /* CCISS_DEBUG */ 
 
-	if (ctlr >= MAX_CTLR || hba[ctlr] == NULL)
-		return -ENXIO;
 	/*
 	 * Root is allowed to open raw volume zero even if it's not configured
 	 * so array config can still work.  I don't think I really like this,
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".
 	 */
-	if (hba[ctlr]->drv[dsk].nr_blocks == 0) {
+	if (drv->nr_blocks == 0) {
 		if (iminor(inode) != 0)
 			return -ENXIO;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 	}
-	hba[ctlr]->drv[dsk].usage_count++;
-	hba[ctlr]->usage_count++;
+	drv->usage_count++;
+	host->usage_count++;
 	return 0;
 }
 /*
@@ -386,17 +394,15 @@ static int cciss_open(struct inode *inode, struct file *filep)
  */
 static int cciss_release(struct inode *inode, struct file *filep)
 {
-	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
-	int dsk  = iminor(inode) >> NWD_SHIFT;
+	ctlr_info_t *host = get_host(inode->i_bdev->bd_disk);
+	drive_info_struct *drv = get_drv(inode->i_bdev->bd_disk);
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss_release %s (%x:%x)\n", inode->i_bdev->bd_disk->disk_name, ctlr, dsk);
+	printk(KERN_DEBUG "cciss_release %s\n", inode->i_bdev->bd_disk->disk_name);
 #endif /* CCISS_DEBUG */
 
-	/* fsync_dev(inode->i_rdev); */
-
-	hba[ctlr]->drv[dsk].usage_count--;
-	hba[ctlr]->usage_count--;
+	drv->usage_count--;
+	host->usage_count--;
 	return 0;
 }
 
@@ -406,8 +412,11 @@ static int cciss_release(struct inode *inode, struct file *filep)
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg)
 {
-	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
-	int dsk  = iminor(inode) >> NWD_SHIFT;
+	struct block_device *bdev = inode->i_bdev;
+	struct gendisk *disk = bdev->bd_disk;
+	ctlr_info_t *host = get_host(disk);
+	drive_info_struct *drv = get_drv(disk);
+	int ctlr = host->ctlr;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_ioctl: Called with cmd=%x %lx\n", cmd, arg);
@@ -417,14 +426,14 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case HDIO_GETGEO:
 	{
                 struct hd_geometry driver_geo;
-                if (hba[ctlr]->drv[dsk].cylinders) {
-                        driver_geo.heads = hba[ctlr]->drv[dsk].heads;
-                        driver_geo.sectors = hba[ctlr]->drv[dsk].sectors;
-                        driver_geo.cylinders = hba[ctlr]->drv[dsk].cylinders;
+                if (drv->cylinders) {
+                        driver_geo.heads = drv->heads;
+                        driver_geo.sectors = drv->sectors;
+                        driver_geo.cylinders = drv->cylinders;
                 } else {
                         driver_geo.heads = 0xff;
                         driver_geo.sectors = 0x3f;
-                        driver_geo.cylinders = (int)hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);
+                        driver_geo.cylinders = (int)drv->nr_blocks / (0xff*0x3f);
                 }
                 driver_geo.start= get_start_sect(inode->i_bdev);
                 if (copy_to_user((void *) arg, &driver_geo,
@@ -438,9 +447,9 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		cciss_pci_info_struct pciinfo;
 
 		if (!arg) return -EINVAL;
-		pciinfo.bus = hba[ctlr]->pdev->bus->number;
-		pciinfo.dev_fn = hba[ctlr]->pdev->devfn;
-		pciinfo.board_id = hba[ctlr]->board_id;
+		pciinfo.bus = host->pdev->bus->number;
+		pciinfo.dev_fn = host->pdev->devfn;
+		pciinfo.board_id = host->board_id;
 		if (copy_to_user((void *) arg, &pciinfo,  sizeof( cciss_pci_info_struct )))
 			return  -EFAULT;
 		return(0);
@@ -448,11 +457,9 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_GETINTINFO:
 	{
 		cciss_coalint_struct intinfo;
-		ctlr_info_t *c = hba[ctlr];
-
 		if (!arg) return -EINVAL;
-		intinfo.delay = readl(&c->cfgtable->HostWrite.CoalIntDelay);
-		intinfo.count = readl(&c->cfgtable->HostWrite.CoalIntCount);
+		intinfo.delay = readl(&host->cfgtable->HostWrite.CoalIntDelay);
+		intinfo.count = readl(&host->cfgtable->HostWrite.CoalIntCount);
 		if (copy_to_user((void *) arg, &intinfo, sizeof( cciss_coalint_struct )))
 			return -EFAULT;
                 return(0);
@@ -460,7 +467,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_SETINTINFO:
         {
                 cciss_coalint_struct intinfo;
-                ctlr_info_t *c = hba[ctlr];
 		unsigned long flags;
 		int i;
 
@@ -477,13 +483,13 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 		/* Update the field, and then ring the doorbell */ 
 		writel( intinfo.delay, 
-			&(c->cfgtable->HostWrite.CoalIntDelay));
+			&(host->cfgtable->HostWrite.CoalIntDelay));
 		writel( intinfo.count, 
-                        &(c->cfgtable->HostWrite.CoalIntCount));
-		writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
+                        &(host->cfgtable->HostWrite.CoalIntCount));
+		writel( CFGTBL_ChangeReq, host->vaddr + SA5_DOORBELL);
 
 		for(i=0;i<MAX_IOCTL_CONFIG_WAIT;i++) {
-			if (!(readl(c->vaddr + SA5_DOORBELL) 
+			if (!(readl(host->vaddr + SA5_DOORBELL) 
 					& CFGTBL_ChangeReq))
 				break;
 			/* delay and try again */
@@ -497,12 +503,11 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_GETNODENAME:
         {
                 NodeName_type NodeName;
-                ctlr_info_t *c = hba[ctlr];
 		int i; 
 
 		if (!arg) return -EINVAL;
 		for(i=0;i<16;i++)
-			NodeName[i] = readb(&c->cfgtable->ServerName[i]);
+			NodeName[i] = readb(&host->cfgtable->ServerName[i]);
                 if (copy_to_user((void *) arg, NodeName, sizeof( NodeName_type)))
                 	return  -EFAULT;
                 return(0);
@@ -510,7 +515,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_SETNODENAME:
 	{
 		NodeName_type NodeName;
-		ctlr_info_t *c = hba[ctlr];
 		unsigned long flags;
 		int i;
 
@@ -524,12 +528,12 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 			/* Update the field, and then ring the doorbell */ 
 		for(i=0;i<16;i++)
-			writeb( NodeName[i], &c->cfgtable->ServerName[i]);
+			writeb( NodeName[i], &host->cfgtable->ServerName[i]);
 			
-		writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
+		writel( CFGTBL_ChangeReq, host->vaddr + SA5_DOORBELL);
 
 		for(i=0;i<MAX_IOCTL_CONFIG_WAIT;i++) {
-			if (!(readl(c->vaddr + SA5_DOORBELL) 
+			if (!(readl(host->vaddr + SA5_DOORBELL) 
 					& CFGTBL_ChangeReq))
 				break;
 			/* delay and try again */
@@ -544,10 +548,9 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_GETHEARTBEAT:
         {
                 Heartbeat_type heartbeat;
-                ctlr_info_t *c = hba[ctlr];
 
 		if (!arg) return -EINVAL;
-                heartbeat = readl(&c->cfgtable->HeartBeat);
+                heartbeat = readl(&host->cfgtable->HeartBeat);
                 if (copy_to_user((void *) arg, &heartbeat, sizeof( Heartbeat_type)))
                 	return -EFAULT;
                 return(0);
@@ -555,10 +558,9 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_GETBUSTYPES:
         {
                 BusTypes_type BusTypes;
-                ctlr_info_t *c = hba[ctlr];
 
 		if (!arg) return -EINVAL;
-                BusTypes = readl(&c->cfgtable->BusTypes);
+                BusTypes = readl(&host->cfgtable->BusTypes);
                 if (copy_to_user((void *) arg, &BusTypes, sizeof( BusTypes_type) ))
                 	return  -EFAULT;
                 return(0);
@@ -568,7 +570,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		FirmwareVer_type firmware;
 
 		if (!arg) return -EINVAL;
-		memcpy(firmware, hba[ctlr]->firm_ver, 4);
+		memcpy(firmware, host->firm_ver, 4);
 
                 if (copy_to_user((void *) arg, firmware, sizeof( FirmwareVer_type)))
                 	return -EFAULT;
@@ -586,12 +588,12 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
         }
 
 	case CCISS_REVALIDVOLS:
-                return( revalidate_allvol(inode->i_rdev));
+		if (bdev != bdev->bd_contains || drv != host->drv)
+			return -ENXIO;
+                return revalidate_allvol(host);
 
  	case CCISS_GETLUNINFO: {
  		LogvolInfo_struct luninfo;
- 		struct gendisk *disk = hba[ctlr]->gendisk[dsk];
- 		drive_info_struct *drv = &hba[ctlr]->drv[dsk];
  		int i;
  		
  		luninfo.LunID = drv->LunID;
@@ -610,16 +612,14 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
  		return(0);
  	}
 	case CCISS_DEREGDISK:
-		return( deregister_disk(ctlr,dsk));
+		return deregister_disk(disk);
 
 	case CCISS_REGNEWD:
-	{
-		return(register_new_disk(ctlr));
-	}	
+		return register_new_disk(host);
+
 	case CCISS_PASSTHRU:
 	{
 		IOCTL_Command_struct iocommand;
-		ctlr_info_t *h = hba[ctlr];
 		CommandList_struct *c;
 		char 	*buff = NULL;
 		u64bit	temp64;
@@ -655,7 +655,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 				return -EFAULT;
 			}
 		}
-		if ((c = cmd_alloc(h , 0)) == NULL)
+		if ((c = cmd_alloc(host , 0)) == NULL)
 		{
 			kfree(buff);
 			return -ENOMEM;
@@ -682,7 +682,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		// Fill in the scatter gather information
 		if (iocommand.buf_size > 0 ) 
 		{
-			temp64.val = pci_map_single( h->pdev, buff,
+			temp64.val = pci_map_single( host->pdev, buff,
                                         iocommand.buf_size, 
                                 PCI_DMA_BIDIRECTIONAL);	
 			c->SG[0].Addr.lower = temp64.val32.lower;
@@ -694,9 +694,9 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 		/* Put the request on the tail of the request queue */
 		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
-		addQ(&h->reqQ, c);
-		h->Qdepth++;
-		start_io(h);
+		addQ(&host->reqQ, c);
+		host->Qdepth++;
+		start_io(host);
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 		wait_for_completion(&wait);
@@ -704,7 +704,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		/* unlock the buffers from DMA */
 		temp64.val32.lower = c->SG[0].Addr.lower;
                 temp64.val32.upper = c->SG[0].Addr.upper;
-                pci_unmap_single( h->pdev, (dma_addr_t) temp64.val,
+                pci_unmap_single( host->pdev, (dma_addr_t) temp64.val,
                 	iocommand.buf_size, PCI_DMA_BIDIRECTIONAL);
 
 		/* Copy the error information out */ 
@@ -712,7 +712,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if ( copy_to_user((void *) arg, &iocommand, sizeof( IOCTL_Command_struct) ) )
 		{
 			kfree(buff);
-			cmd_free(h, c, 0);
+			cmd_free(host, c, 0);
 			return( -EFAULT);	
 		} 	
 
@@ -722,17 +722,16 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                         if (copy_to_user(iocommand.buf, buff, iocommand.buf_size))
 			{
                         	kfree(buff);
-				cmd_free(h, c, 0);
+				cmd_free(host, c, 0);
 				return -EFAULT;
 			}
                 }
                 kfree(buff);
-		cmd_free(h, c, 0);
+		cmd_free(host, c, 0);
                 return(0);
 	} 
 	case CCISS_BIG_PASSTHRU: {
 		BIG_IOCTL_Command_struct *ioc;
-		ctlr_info_t *h = hba[ctlr];
 		CommandList_struct *c;
 		unsigned char **buff = NULL;
 		int	*buff_size = NULL;
@@ -798,7 +797,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			data_ptr += sz;
 			sg_used++;
 		}
-		if ((c = cmd_alloc(h , 0)) == NULL) {
+		if ((c = cmd_alloc(host , 0)) == NULL) {
 			status = -ENOMEM;
 			goto cleanup1;	
 		}
@@ -819,7 +818,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if (ioc->buf_size > 0 ) {
 			int i;
 			for(i=0; i<sg_used; i++) {
-				temp64.val = pci_map_single( h->pdev, buff[i],
+				temp64.val = pci_map_single( host->pdev, buff[i],
 					buff_size[i],
 					PCI_DMA_BIDIRECTIONAL);
 				c->SG[i].Addr.lower = temp64.val32.lower;
@@ -831,22 +830,22 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		c->waiting = &wait;
 		/* Put the request on the tail of the request queue */
 		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
-		addQ(&h->reqQ, c);
-		h->Qdepth++;
-		start_io(h);
+		addQ(&host->reqQ, c);
+		host->Qdepth++;
+		start_io(host);
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 		wait_for_completion(&wait);
 		/* unlock the buffers from DMA */
 		for(i=0; i<sg_used; i++) {
 			temp64.val32.lower = c->SG[i].Addr.lower;
 			temp64.val32.upper = c->SG[i].Addr.upper;
-			pci_unmap_single( h->pdev, (dma_addr_t) temp64.val,
+			pci_unmap_single( host->pdev, (dma_addr_t) temp64.val,
 				buff_size[i], PCI_DMA_BIDIRECTIONAL);
 		}
 		/* Copy the error information out */
 		ioc->error_info = *(c->err_info);
 		if (copy_to_user((void *) arg, ioc, sizeof(*ioc))) {
-			cmd_free(h, c, 0);
+			cmd_free(host, c, 0);
 			status = -EFAULT;
 			goto cleanup1;
 		}
@@ -855,14 +854,14 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			BYTE *ptr = (BYTE  *) ioc->buf;
 	        	for(i=0; i< sg_used; i++) {
 				if (copy_to_user(ptr, buff[i], buff_size[i])) {
-					cmd_free(h, c, 0);
+					cmd_free(host, c, 0);
 					status = -EFAULT;
 					goto cleanup1;
 				}
 				ptr += buff_size[i];
 			}
 		}
-		cmd_free(h, c, 0);
+		cmd_free(host, c, 0);
 		status = 0;
 cleanup1:
 		if (buff) {
@@ -901,27 +900,23 @@ static int cciss_revalidate(struct gendisk *disk)
  * particualar logical volume (instead of all of them on a particular
  * controller).
  */
-static int revalidate_allvol(kdev_t dev)
+static int revalidate_allvol(ctlr_info_t *host)
 {
-	int ctlr, i;
+	int ctlr = host->ctlr, i;
 	unsigned long flags;
 
-	ctlr = major(dev) - COMPAQ_CISS_MAJOR;
-        if (minor(dev) != 0)
-                return -ENXIO;
-
         spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
-        if (hba[ctlr]->usage_count > 1) {
+        if (host->usage_count > 1) {
                 spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
                 printk(KERN_WARNING "cciss: Device busy for volume"
-                        " revalidation (usage=%d)\n", hba[ctlr]->usage_count);
+                        " revalidation (usage=%d)\n", host->usage_count);
                 return -EBUSY;
         }
-        hba[ctlr]->usage_count++;
+        host->usage_count++;
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 	for(i=0; i< NWD; i++) {
-		struct gendisk *disk = hba[ctlr]->gendisk[i];
+		struct gendisk *disk = host->gendisk[i];
 		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
 	}
@@ -930,54 +925,55 @@ static int revalidate_allvol(kdev_t dev)
          * Set the partition and block size structures for all volumes
          * on this controller to zero.  We will reread all of this data
          */
-        memset(hba[ctlr]->drv,        0, sizeof(drive_info_struct)
+        memset(host->drv,        0, sizeof(drive_info_struct)
 						* CISS_MAX_LUN);
         /*
          * Tell the array controller not to give us any interrupts while
          * we check the new geometry.  Then turn interrupts back on when
          * we're done.
          */
-        hba[ctlr]->access.set_intr_mask(hba[ctlr], CCISS_INTR_OFF);
+        host->access.set_intr_mask(host, CCISS_INTR_OFF);
         cciss_getgeometry(ctlr);
-        hba[ctlr]->access.set_intr_mask(hba[ctlr], CCISS_INTR_ON);
+        host->access.set_intr_mask(host, CCISS_INTR_ON);
 
 	/* Loop through each real device */ 
 	for (i = 0; i < NWD; i++) {
-		struct gendisk *disk = hba[ctlr]->gendisk[i];
-		drive_info_struct *drv = &(hba[ctlr]->drv[i]);
+		struct gendisk *disk = host->gendisk[i];
+		drive_info_struct *drv = &(host->drv[i]);
 		if (!drv->nr_blocks)
 			continue;
-		blk_queue_hardsect_size(hba[ctlr]->queue, drv->block_size);
+		blk_queue_hardsect_size(host->queue, drv->block_size);
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
-        hba[ctlr]->usage_count--;
+        host->usage_count--;
         return 0;
 }
 
-static int deregister_disk(int ctlr, int logvol)
+static int deregister_disk(struct gendisk *disk)
 {
 	unsigned long flags;
-	struct gendisk *disk = hba[ctlr]->gendisk[logvol];
-	ctlr_info_t  *h = hba[ctlr];
+	ctlr_info_t *h = get_host(disk);
+	drive_info_struct *drv = get_drv(disk);
+	int ctlr = h->ctlr;
 
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
 	spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 	/* make sure logical volume is NOT is use */
-	if( h->drv[logvol].usage_count > 1) {
+	if( drv->usage_count > 1) {
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
                 return -EBUSY;
 	}
-	h->drv[logvol].usage_count++;
+	drv->usage_count++;
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 	/* invalidate the devices and deregister the disk */ 
 	if (disk->flags & GENHD_FL_UP)
 		del_gendisk(disk);
 	/* check to see if it was the last disk */
-	if (logvol == h->highest_lun) {
+	if (drv == h->drv + h->highest_lun) {
 		/* if so, find the new hightest lun */
 		int i, newhighest =-1;
 		for(i=0; i<h->highest_lun; i++) {
@@ -990,10 +986,10 @@ static int deregister_disk(int ctlr, int logvol)
 	}
 	--h->num_luns;
 	/* zero out the disk size info */ 
-	h->drv[logvol].nr_blocks = 0;
-	h->drv[logvol].block_size = 0;
-	h->drv[logvol].cylinders = 0;
-	h->drv[logvol].LunID = 0;
+	drv->nr_blocks = 0;
+	drv->block_size = 0;
+	drv->cylinders = 0;
+	drv->LunID = 0;
 	return(0);
 }
 static int fill_cmd(CommandList_struct *c, __u8 cmd, int ctlr, void *buff,
@@ -1304,10 +1300,10 @@ cciss_read_capacity(int ctlr, int logvol, ReadCapdata_struct *buf,
 		*total_size, *block_size);
 	return;
 }
-static int register_new_disk(int ctlr)
+static int register_new_disk(ctlr_info_t *h)
 {
         struct gendisk *disk;
-        ctlr_info_t  *h = hba[ctlr];
+	int ctlr = h->ctlr;
         int i;
 	int num_luns;
 	int logvol;
@@ -1417,7 +1413,7 @@ static int register_new_disk(int ctlr)
 #ifdef CCISS_DEBUG
 		printk("Checking Index %d\n", i);
 #endif /* CCISS_DEBUG */
-		if(hba[ctlr]->drv[i].LunID == 0)
+		if(h->drv[i].LunID == 0)
 		{
 #ifdef CCISS_DEBUG
 			printk("free index found at %d\n", i);
@@ -1434,19 +1430,19 @@ static int register_new_disk(int ctlr)
          }
 
 	logvol = free_index;
-	hba[ctlr]->drv[logvol].LunID = lunid;
+	h->drv[logvol].LunID = lunid;
 		/* there could be gaps in lun numbers, track hightest */
-	if(hba[ctlr]->highest_lun < lunid)
-		hba[ctlr]->highest_lun = logvol;
+	if(h->highest_lun < lunid)
+		h->highest_lun = logvol;
 	cciss_read_capacity(ctlr, logvol, size_buff, 1,
 		&total_size, &block_size);
 	cciss_geometry_inquiry(ctlr, logvol, 1, total_size, block_size,
-			inq_buff, &hba[ctlr]->drv[logvol]);
-	hba[ctlr]->drv[logvol].usage_count = 0;
-	++hba[ctlr]->num_luns;
+			inq_buff, &h->drv[logvol]);
+	h->drv[logvol].usage_count = 0;
+	++h->num_luns;
 	/* setup partitions per disk */
-        disk = hba[ctlr]->gendisk[logvol];
-	set_capacity(disk, hba[ctlr]->drv[logvol].nr_blocks);
+        disk = h->gendisk[logvol];
+	set_capacity(disk, h->drv[logvol].nr_blocks);
 	add_disk(disk);
 freeret:
 	kfree(ld_buff);
