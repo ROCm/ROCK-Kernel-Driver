@@ -411,12 +411,25 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 }
 
 /*
- * This is the 'heart' of the zoned buddy allocator:
+ * This is the 'heart' of the zoned buddy allocator.
+ *
+ * Herein lies the mysterious "incremental min".  That's the
+ *
+ *	min += z->pages_low;
+ *
+ * thing.  The intent here is to provide additional protection to low zones for
+ * allocation requests which _could_ use higher zones.  So a GFP_HIGHMEM
+ * request is not allowed to dip as deeply into the normal zone as a GFP_KERNEL
+ * request.  This preserves additional space in those lower zones for requests
+ * which really do need memory from those zones.  It means that on a decent
+ * sized machine, GFP_HIGHMEM and GFP_KERNEL requests basically leave the DMA
+ * zone untouched.
  */
 struct page *
 __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		struct zonelist *zonelist)
 {
+	const int wait = gfp_mask & __GFP_WAIT;
 	unsigned long min;
 	struct zone **zones, *classzone;
 	struct page *page;
@@ -424,7 +437,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int i;
 	int cold;
 
-	if (gfp_mask & __GFP_WAIT)
+	if (wait)
 		might_sleep();
 
 	cold = 0;
@@ -441,9 +454,9 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *z = zones[i];
 
-		/* the incremental min is allegedly to discourage fallback */
 		min += z->pages_low;
-		if (z->free_pages > min || z->free_pages >= z->pages_high) {
+		if (z->free_pages > min ||
+				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
@@ -468,7 +481,8 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
 		min += local_min;
-		if (z->free_pages > min || z->free_pages >= z->pages_high) {
+		if (z->free_pages > min ||
+				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
@@ -490,7 +504,7 @@ rebalance:
 	}
 
 	/* Atomic allocations - we can't balance anything */
-	if (!(gfp_mask & __GFP_WAIT))
+	if (!wait)
 		goto nopage;
 
 	inc_page_state(allocstall);
@@ -505,7 +519,8 @@ rebalance:
 		struct zone *z = zones[i];
 
 		min += z->pages_min;
-		if (z->free_pages > min || z->free_pages >= z->pages_high) {
+		if (z->free_pages > min ||
+				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;

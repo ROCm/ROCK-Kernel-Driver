@@ -712,28 +712,28 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
  * This is the direct reclaim path, for page-allocating processes.  We only
  * try to reclaim pages from zones which will satisfy the caller's allocation
  * request.
+ *
+ * We reclaim from a zone even if that zone is over pages_high.  Because:
+ * a) The caller may be trying to free *extra* pages to satisfy a higher-order
+ *    allocation or
+ * b) The zones may be over pages_high but they must go *over* pages_high to
+ *    satisfy the `incremental min' zone defense algorithm.
+ *
+ * Returns the number of reclaimed pages.
  */
 static int
 shrink_caches(struct zone *classzone, int priority, int *total_scanned,
-		int gfp_mask, const int nr_pages, int order,
-		struct page_state *ps)
+		int gfp_mask, const int nr_pages, struct page_state *ps)
 {
 	struct zone *first_classzone;
 	struct zone *zone;
-	int nr_mapped = 0;
 	int ret = 0;
 
 	first_classzone = classzone->zone_pgdat->node_zones;
 	for (zone = classzone; zone >= first_classzone; zone--) {
+		int to_reclaim = max(nr_pages, SWAP_CLUSTER_MAX);
+		int nr_mapped = 0;
 		int max_scan;
-		int to_reclaim;
-
-		to_reclaim = zone->pages_high - zone->free_pages;
-		if (order == 0 && to_reclaim < 0)
-			continue;	/* zone has enough memory */
-
-		to_reclaim = min(to_reclaim, SWAP_CLUSTER_MAX);
-		to_reclaim = max(to_reclaim, nr_pages);
 
 		/*
 		 * If we cannot reclaim `nr_pages' pages by scanning twice
@@ -744,8 +744,7 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
 			max_scan = to_reclaim * 2;
 		ret += shrink_zone(zone, max_scan, gfp_mask,
 				to_reclaim, &nr_mapped, ps, priority);
-		*total_scanned += max_scan;
-		*total_scanned += nr_mapped;
+		*total_scanned += max_scan + nr_mapped;
 		if (ret >= nr_pages)
 			break;
 	}
@@ -786,11 +785,11 @@ try_to_free_pages(struct zone *classzone,
 		get_page_state(&ps);
 		nr_reclaimed += shrink_caches(classzone, priority,
 					&total_scanned, gfp_mask,
-					nr_pages, order, &ps);
+					nr_pages, &ps);
 		if (nr_reclaimed >= nr_pages)
 			return 1;
 		if (total_scanned == 0)
-			return 1;	/* All zones had enough free memory */
+			printk("%s: I am buggy\n", __FUNCTION__);
 		if (!(gfp_mask & __GFP_FS))
 			break;		/* Let the caller handle it */
 		/*
