@@ -47,4 +47,9 @@ struct device_node *fetch_dev_dn(struct pci_dev *dev);
 void pci_addr_cache_insert_device(struct pci_dev *dev);
 void pci_addr_cache_remove_device(struct pci_dev *dev);
 
+/* From pSeries_pci.h */
+void init_pci_config_tokens (void);
+unsigned long get_phb_buid (struct device_node *);
+
+
 #endif /* __PPC_KERNEL_PCI_H__ */

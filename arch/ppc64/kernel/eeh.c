@@ -543,7 +543,7 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 			       dn->full_name);
 #endif
 		} else {
-			printk(KERN_WARNING "EEH: %s: rtas_call failed.\n",
+			printk(KERN_WARNING "EEH: %s: could not enable EEH, rtas_call failed.\n",
 			       dn->full_name);
 		}
 	} else {
@@ -588,24 +588,17 @@ void __init eeh_init(void)
 	}
 
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
+	init_pci_config_tokens();
 	for (phb = of_find_node_by_name(NULL, "pci"); phb;
 	     phb = of_find_node_by_name(phb, "pci")) {
-		int len;
-		int *buid_vals;
+		unsigned long buid;
 
-		buid_vals = (int *)get_property(phb, "ibm,fw-phb-id", &len);
-		if (!buid_vals)
+		buid = get_phb_buid(phb);
+		if (buid == 0)
 			continue;
-		if (len == sizeof(int)) {
-			info.buid_lo = buid_vals[0];
-			info.buid_hi = 0;
-		} else if (len == sizeof(int)*2) {
-			info.buid_hi = buid_vals[0];
-			info.buid_lo = buid_vals[1];
-		} else {
-			printk(KERN_INFO "EEH: odd ibm,fw-phb-id len returned: %d\n", len);
-			continue;
-		}
+
+		info.buid_lo = BUID_LO(buid);
+		info.buid_hi = BUID_HI(buid);
 		traverse_pci_devices(phb, early_enable_eeh, NULL, &info);
 	}
 
