@@ -1941,7 +1941,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 }
 
 #ifndef __ARCH_HAS_4LEVEL_HACK
-#if (PTRS_PER_PGD > 1)
+#if (PTRS_PER_PUD > 1)
 /*
  * Allocate page upper directory.
  *
@@ -1975,7 +1975,7 @@ out:
 }
 #endif
 
-#if (PTRS_PER_PUD > 1)
+#if (PTRS_PER_PMD > 1)
 /*
  * Allocate page middle directory.
  *
