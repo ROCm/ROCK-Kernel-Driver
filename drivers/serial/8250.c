@@ -188,6 +188,9 @@ static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
 	case UPIO_MEM:
 		return readb(up->port.membase + offset);
 
+	case UPIO_MEM32:
+		return readl(up->port.membase + offset);
+
 	default:
 		return inb(up->port.iobase + offset);
 	}
@@ -206,6 +209,10 @@ serial_out(struct uart_8250_port *up, int offset, int value)
 
 	case UPIO_MEM:
 		writeb(value, up->port.membase + offset);
+		break;
+
+	case UPIO_MEM32:
+		writel(value, up->port.membase + offset);
 		break;
 
 	default:

@@ -4,7 +4,7 @@
  */
 
 #include "linux/mm.h"
-#include "linux/ghash.h"
+#include "linux/rbtree.h"
 #include "linux/slab.h"
 #include "linux/vmalloc.h"
 #include "linux/bootmem.h"
@@ -19,36 +19,8 @@
 #include "kern.h"
 #include "init.h"
 
-#if 0
-static pgd_t physmem_pgd[PTRS_PER_PGD];
-
-static struct phys_desc *lookup_mapping(void *addr)
-{
-	pgd = &physmem_pgd[pgd_index(addr)];
-	if(pgd_none(pgd))
-		return(NULL);
-
-	pmd = pmd_offset(pgd, addr);
-	if(pmd_none(pmd))
-		return(NULL);
-
-	pte = pte_offset_kernel(pmd, addr);
-	return((struct phys_desc *) pte_val(pte));
-}
-
-static struct add_mapping(void *addr, struct phys_desc *new)
-{
-}
-#endif
-
-#define PHYS_HASHSIZE (8192)
-
-struct phys_desc;
-
-DEF_HASH_STRUCTS(virtmem, PHYS_HASHSIZE, struct phys_desc);
-
 struct phys_desc {
-	struct virtmem_ptrs virt_ptrs;
+	struct rb_node rb;
 	int fd;
 	__u64 offset;
 	void *virt;
@@ -56,21 +28,48 @@ struct phys_desc {
 	struct list_head list;
 };
 
-struct virtmem_table virtmem_hash;
+static struct rb_root phys_mappings = RB_ROOT;
 
-static int virt_cmp(void *virt1, void *virt2)
+static struct rb_node **find_rb(void *virt)
 {
-	return(virt1 != virt2);
+	struct rb_node **n = &phys_mappings.rb_node;
+	struct phys_desc *d;
+
+	while(*n != NULL){
+		d = rb_entry(n, struct phys_desc, rb);
+		if(d->virt == virt)
+			return(n);
+
+		if(d->virt > virt)
+			n = &(*n)->rb_left;
+		else
+			n = &(*n)->rb_right;
+	}
+
+	return(n);
 }
 
-static int virt_hash(void *virt)
+static struct phys_desc *find_phys_mapping(void *virt)
 {
-	unsigned long addr = ((unsigned long) virt) >> PAGE_SHIFT;
-	return(addr % PHYS_HASHSIZE);
+	struct rb_node **n = find_rb(virt);
+
+	if(*n == NULL)
+		return(NULL);
+
+	return(rb_entry(n, struct phys_desc, rb));
 }
 
-DEF_HASH(static, virtmem, struct phys_desc, virt_ptrs, void *, virt, virt_cmp,
-	 virt_hash);
+static void insert_phys_mapping(struct phys_desc *desc)
+{
+	struct rb_node **n = find_rb(desc->virt);
+
+	if(*n != NULL)
+		panic("Physical remapping for %p already present",
+		      desc->virt);
+
+	rb_link_node(&desc->rb, (*n)->rb_parent, n);
+	rb_insert_color(&desc->rb, &phys_mappings);
+}
 
 LIST_HEAD(descriptor_mappings);
 
@@ -127,7 +126,8 @@ int physmem_subst_mapping(void *virt, int fd, __u64 offset, int w)
 		return(-ENOMEM);
 
 	phys = __pa(virt);
-	if(find_virtmem_hash(&virtmem_hash, virt) != NULL)
+	desc = find_phys_mapping(virt);
+  	if(desc != NULL)
 		panic("Address 0x%p is already substituted\n", virt);
 
 	err = -ENOMEM;
@@ -136,13 +136,12 @@ int physmem_subst_mapping(void *virt, int fd, __u64 offset, int w)
 		goto out;
 
 	*desc = ((struct phys_desc)
-		{ .virt_ptrs =	{ NULL, NULL },
-		  .fd =		fd,
+		{ .fd =			fd,
 		  .offset =		offset,
 		  .virt =		virt,
 		  .phys =		__pa(virt),
 		  .list = 		LIST_HEAD_INIT(desc->list) });
-	insert_virtmem_hash(&virtmem_hash, desc);
+	insert_phys_mapping(desc);
 
 	list_add(&desc->list, &fd_maps->pages);
 
@@ -151,7 +150,7 @@ int physmem_subst_mapping(void *virt, int fd, __u64 offset, int w)
 	if(!err)
 		goto out;
 
-	remove_virtmem_hash(&virtmem_hash, desc);
+	rb_erase(&desc->rb, &phys_mappings);
 	kfree(desc);
  out:
 	return(err);
@@ -164,7 +163,7 @@ static void remove_mapping(struct phys_desc *desc)
 	void *virt = desc->virt;
 	int err;
 
-	remove_virtmem_hash(&virtmem_hash, desc);
+	rb_erase(&desc->rb, &phys_mappings);
 	list_del(&desc->list);
 	kfree(desc);
 
@@ -179,7 +178,7 @@ int physmem_remove_mapping(void *virt)
 	struct phys_desc *desc;
 
 	virt = (void *) ((unsigned long) virt & PAGE_MASK);
-	desc = find_virtmem_hash(&virtmem_hash, virt);
+	desc = find_phys_mapping(virt);
 	if(desc == NULL)
 		return(0);
 
@@ -234,7 +233,9 @@ void arch_free_page(struct page *page, int order)
 
 int is_remapped(void *virt)
 {
-	return(find_virtmem_hash(&virtmem_hash, virt) != NULL);
+  	struct phys_desc *desc = find_phys_mapping(virt);
+
+	return(desc != NULL);
 }
 
 /* Changed during early boot */
@@ -367,8 +368,7 @@ void setup_physmem(unsigned long start, unsigned long reserve_end,
 
 int phys_mapping(unsigned long phys, __u64 *offset_out)
 {
-	struct phys_desc *desc = find_virtmem_hash(&virtmem_hash,
-						   __va(phys & PAGE_MASK));
+	struct phys_desc *desc = find_phys_mapping(__va(phys & PAGE_MASK));
 	int fd = -1;
 
 	if(desc != NULL){

@@ -120,7 +120,7 @@
  * i_sem on quota files is special (it's below dqio_sem)
  */
 
-spinlock_t dq_list_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t dq_list_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t dq_data_lock = SPIN_LOCK_UNLOCKED;
 
 static char *quotatypes[] = INITQFNAMES;
@@ -1792,7 +1792,6 @@ module_init(dquot_init);
 EXPORT_SYMBOL(register_quota_format);
 EXPORT_SYMBOL(unregister_quota_format);
 EXPORT_SYMBOL(dqstats);
-EXPORT_SYMBOL(dq_list_lock);
 EXPORT_SYMBOL(dq_data_lock);
 EXPORT_SYMBOL(vfs_quota_on);
 EXPORT_SYMBOL(vfs_quota_on_mount);

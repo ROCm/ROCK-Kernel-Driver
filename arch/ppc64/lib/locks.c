@@ -20,8 +20,6 @@
 #include <asm/hvcall.h>
 #include <asm/iSeries/HvCall.h>
 
-#ifndef CONFIG_SPINLINE
-
 /* waiting for a spinlock... */
 #if defined(CONFIG_PPC_SPLPAR) || defined(CONFIG_PPC_ISERIES)
 
@@ -95,5 +93,3 @@ void spin_unlock_wait(spinlock_t *lock)
 }
 
 EXPORT_SYMBOL(spin_unlock_wait);
-
-#endif /* CONFIG_SPINLINE */

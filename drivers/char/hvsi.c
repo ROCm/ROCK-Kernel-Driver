@@ -1004,7 +1004,7 @@ static int hvsi_write(struct tty_struct *tty, int from_user,
 {
 	struct hvsi_struct *hp = tty->driver_data;
 	const char *source = buf;
-	char *kbuf;
+	char *kbuf = NULL;
 	unsigned long flags;
 	int total = 0;
 	int origcount = count;

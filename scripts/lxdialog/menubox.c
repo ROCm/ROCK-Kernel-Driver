@@ -276,6 +276,15 @@ dialog_menu (const char *title, const char *prompt, int height, int width,
 
     while (key != ESC) {
 	key = wgetch(menu);
+	if ( key == '/' ) {
+		int ret = dialog_inputbox("Search Configuration Parameter",
+					"Enter Keyword", height, width,
+					(char *) NULL);
+		if (ret == 0) {
+			fprintf(stderr, "%s", dialog_input_result);
+			return 26;
+		}
+	}
 
 	if (key < 256 && isalpha(key)) key = tolower(key);
 

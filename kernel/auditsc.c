@@ -857,6 +857,7 @@ void audit_putname(const char *name)
 	}
 #endif
 }
+EXPORT_SYMBOL(audit_putname);
 
 /* Store the inode and device from a lookup.  Called from
  * fs/namei.c:path_lookup(). */
@@ -913,11 +914,3 @@ int audit_set_loginuid(struct audit_context *ctx, uid_t loginuid)
 	}
 	return 0;
 }
-
-EXPORT_SYMBOL_GPL(audit_alloc);
-EXPORT_SYMBOL_GPL(audit_free);
-EXPORT_SYMBOL_GPL(audit_syscall_entry);
-EXPORT_SYMBOL_GPL(audit_syscall_exit);
-EXPORT_SYMBOL_GPL(audit_getname);
-EXPORT_SYMBOL_GPL(audit_putname);
-EXPORT_SYMBOL_GPL(audit_inode);

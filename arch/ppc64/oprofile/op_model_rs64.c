@@ -21,8 +21,8 @@
 
 static void ctrl_write(unsigned int i, unsigned int val)
 {
-	unsigned int tmp;
-	unsigned long shift, mask;
+	unsigned int tmp = 0;
+	unsigned long shift = 0, mask = 0;
 
 	dbg("ctrl_write %d %x\n", i, val);
 

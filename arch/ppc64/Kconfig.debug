@@ -44,16 +44,6 @@ config IRQSTACKS
 	  for handling hard and soft interrupts.  This can help avoid
 	  overflowing the process kernel stacks.
 
-config SPINLINE
-	bool "Inline spinlock code at each call site"
-	depends on SMP && !PPC_SPLPAR && !PPC_ISERIES
-	help
-	  Say Y if you want to have the code for acquiring spinlocks
-	  and rwlocks inlined at each call site.  This makes the kernel
-	  somewhat bigger, but can be useful when profiling the kernel.
-
-	  If in doubt, say N.
-
 config SCHEDSTATS
 	bool "Collect scheduler statistics"
 	depends on DEBUG_KERNEL && PROC_FS

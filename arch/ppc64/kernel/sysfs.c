@@ -97,6 +97,13 @@ __setup("smt-snooze-delay=", setup_smt_snooze_delay);
 
 /* PMC stuff */
 
+#ifdef CONFIG_PPC_ISERIES
+void ppc64_enable_pmcs(void)
+{
+	/* XXX Implement for iseries */
+}
+#else
+
 /*
  * Enabling PMCs will slow partition context switch times so we only do
  * it the first time we write to the PMCs.
@@ -104,12 +111,6 @@ __setup("smt-snooze-delay=", setup_smt_snooze_delay);
 
 static DEFINE_PER_CPU(char, pmcs_enabled);
 
-#ifdef CONFIG_PPC_ISERIES
-void ppc64_enable_pmcs(void)
-{
-	/* XXX Implement for iseries */
-}
-#else
 void ppc64_enable_pmcs(void)
 {
 	unsigned long hid0;

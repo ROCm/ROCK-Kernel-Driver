@@ -51,27 +51,74 @@ struct mip_reg		*host_reg;
 int 			mip_port;
 unsigned long		mip_addr, host_addr;
 
+#if defined(CONFIG_X86_IO_APIC) && (defined(CONFIG_ACPI_INTERPRETER) || defined(CONFIG_ACPI_BOOT))
+static unsigned long cycle_irqs = 0;
+static unsigned long free_irqs = 0;
+static int gsi_map[MAX_GSI_MAPSIZE] = { [0 ... MAX_GSI_MAPSIZE-1] = -1 };
+
+/*
+ * GSI override for ES7000 platforms.
+ */
+
+static int __init
+es7000_gsi_override(int ioapic, int gsi)
+{
+	static int newgsi = 0;
+
+	if (gsi_map[gsi] != -1)
+		gsi = gsi_map[gsi];
+	else if (cycle_irqs ^ free_irqs) {
+		newgsi = find_next_bit(&cycle_irqs, IOAPIC_GSI_BOUND(0), newgsi);
+		__set_bit(newgsi, &free_irqs);
+		gsi_map[gsi] = newgsi;
+		gsi = newgsi;
+		newgsi++;
+		Dprintk("es7000_gsi_override: free_irqs = 0x%lx\n", free_irqs);
+	}
+
+	return gsi;
+}
+
 static int __init
 es7000_rename_gsi(int ioapic, int gsi)
 {
+	static int initialized = 0;
+	int i;
+
+	/*
+	 * These should NEVER be true at this point but we'd rather be
+	 * safe than sorry.
+	 */
+	if (acpi_disabled || acpi_pci_disabled || acpi_noirq)
+ 		return gsi;
+
 	if (ioapic)
-		return gsi;
-	else {
-		if (gsi == 0)
-			return 13;
-		if (gsi == 1)
-			return 16;
-		if (gsi == 4)
-			return 17;
-		if (gsi == 6)
-			return 18;
-		if (gsi == 7)
-			return 19;
-		if (gsi == 8)
-			return 20;
-		return gsi;
-        }
+ 		return gsi;
+
+	if (!initialized) {
+		unsigned long tmp_irqs = 0;
+
+		for (i = 0; i < nr_ioapic_registers[0]; i++)
+			__set_bit(mp_irqs[i].mpc_srcbusirq, &tmp_irqs);
+
+		cycle_irqs = (~tmp_irqs & io_apic_irqs & ((1 << IOAPIC_GSI_BOUND(0)) - 1));
+
+		initialized = 1;
+		Dprintk("es7000_rename_gsi: cycle_irqs = 0x%lx\n", cycle_irqs);
+	}
+
+	for (i = 0; i < nr_ioapic_registers[0]; i++) {
+		if (mp_irqs[i].mpc_srcbusirq == gsi) {
+			if (mp_irqs[i].mpc_dstirq == gsi)
+				return gsi;
+			else
+				return es7000_gsi_override(0, gsi);
+		}
+	}
+
+	return gsi;
 }
+#endif // (CONFIG_X86_IO_APIC) && (CONFIG_ACPI_INTERPRETER || CONFIG_ACPI_BOOT)
 
 /*
  * Parse the OEM Table
@@ -193,7 +240,7 @@ find_unisys_acpi_oem_table(unsigned long *oem_addr, int *length)
 			}
 		}
 	}
-	printk("ES7000: did not find Unisys ACPI OEM table!\n");
+	Dprintk("ES7000: did not find Unisys ACPI OEM table!\n");
 	return -1;
 }
 

@@ -11,6 +11,7 @@ extern void switch_timers(int to_real);
 extern void set_interval(int timer_type);
 extern void idle_sleep(int secs);
 extern void enable_timer(void);
+extern void disable_timer(void);
 extern unsigned long time_lock(void);
 extern void time_unlock(unsigned long);
 

@@ -918,11 +918,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 		= (void *)virt_to_abs(&__secondary_hold_acknowledge);
 	unsigned long secondary_hold
 		= virt_to_abs(*PTRRELOC((unsigned long *)__secondary_hold));
-	struct systemcfg *_systemcfg = RELOC(systemcfg);
 	struct prom_t *_prom = PTRRELOC(&prom);
-#ifdef CONFIG_SMP
-	struct naca_struct *_naca = RELOC(naca);
-#endif
 
 	prom_debug("prom_hold_cpus: start...\n");
 	prom_debug("    1) spinloop       = 0x%x\n", (unsigned long)spinloop);
@@ -1003,18 +999,18 @@ static void __init prom_hold_cpus(unsigned long mem)
 			      (*acknowledge == ((unsigned long)-1)); i++ ) ;
 
 			if (*acknowledge == cpuid) {
-				prom_printf("... done\n");
+				prom_printf(" done\n");
 				/* We have to get every CPU out of OF,
 				 * even if we never start it. */
 				if (cpuid >= NR_CPUS)
 					goto next;
 			} else {
-				prom_printf("... failed: %x\n", *acknowledge);
+				prom_printf(" failed: %x\n", *acknowledge);
 			}
 		}
 #ifdef CONFIG_SMP
 		else
-			prom_printf("%x : booting  cpu %s\n", cpuid, path);
+			prom_printf("%x : boot cpu     %s\n", cpuid, path);
 #endif
 next:
 #ifdef CONFIG_SMP
@@ -1023,13 +1019,6 @@ next:
 			cpuid++;
 			if (cpuid >= NR_CPUS)
 				continue;
-			prom_printf("%x : preparing thread ... ",
-				    interrupt_server[i]);
-			if (_naca->smt_state) {
-				prom_printf("available\n");
-			} else {
-				prom_printf("not available\n");
-			}
 		}
 #endif
 		cpuid++;
@@ -1067,57 +1056,6 @@ next:
 
 	prom_debug("prom_hold_cpus: end...\n");
 }
-
-static void __init smt_setup(void)
-{
-	char *p, *q;
-	char my_smt_enabled = SMT_DYNAMIC;
-	ihandle prom_options = 0;
-	char option[9];
-	unsigned long offset = reloc_offset();
-	struct naca_struct *_naca = RELOC(naca);
-	char found = 0;
-
-	if (strstr(RELOC(cmd_line), RELOC("smt-enabled="))) {
-		for (q = RELOC(cmd_line); (p = strstr(q, RELOC("smt-enabled="))) != 0; ) {
-			q = p + 12;
-			if (p > RELOC(cmd_line) && p[-1] != ' ')
-				continue;
-			found = 1;
-			if (q[0] == 'o' && q[1] == 'f' && 
-			    q[2] == 'f' && (q[3] == ' ' || q[3] == '\0')) {
-				my_smt_enabled = SMT_OFF;
-			} else if (q[0]=='o' && q[1] == 'n' && 
-				   (q[2] == ' ' || q[2] == '\0')) {
-				my_smt_enabled = SMT_ON;
-			} else {
-				my_smt_enabled = SMT_DYNAMIC;
-			} 
-		}
-	}
-	if (!found) {
-		prom_options = call_prom("finddevice", 1, 1, ADDR("/options"));
-		if (prom_options != (ihandle) -1) {
-			prom_getprop(prom_options, "ibm,smt-enabled",
-				     option, sizeof(option));
-			if (option[0] != 0) {
-				found = 1;
-				if (!strcmp(option, RELOC("off")))
-					my_smt_enabled = SMT_OFF;
-				else if (!strcmp(option, RELOC("on")))
-					my_smt_enabled = SMT_ON;
-				else
-					my_smt_enabled = SMT_DYNAMIC;
-			}
-		}
-	}
-
-	if (!found )
-		my_smt_enabled = SMT_DYNAMIC; /* default to on */
-
-	_naca->smt_state = my_smt_enabled;
-}
-
 
 #ifdef CONFIG_BOOTX_TEXT
 
@@ -1707,6 +1645,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	}
 
 	RELOC(cmd_line[0]) = 0;
+#ifdef CONFIG_CMDLINE
+	strlcpy(RELOC(cmd_line), CONFIG_CMDLINE, sizeof(cmd_line));
+#endif /* CONFIG_CMDLINE */
 	if ((long)_prom->chosen > 0) {
 		prom_getprop(_prom->chosen, "bootargs", p, sizeof(cmd_line));
 		if (p != NULL && p[0] != 0)
@@ -1726,8 +1667,6 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	/* Initialize some system info into the Naca early... */
 	prom_initialize_naca();
-
-	smt_setup();
 
 	/* If we are on an SMP machine, then we *MUST* do the
 	 * following, regardless of whether we have an SMP

@@ -62,12 +62,20 @@ size:      The limit of allocated bytes for this tmpfs instance. The
            since the OOM handler will not be able to free that memory.
 nr_blocks: The same as size, but in blocks of PAGE_CACHE_SIZE.
 nr_inodes: The maximum number of inodes for this instance. The default
-           is half of the number of your physical RAM pages.
+           is half of the number of your physical RAM pages, or (on a
+           a machine with highmem) the number of lowmem RAM pages,
+           whichever is the lower.
 
 These parameters accept a suffix k, m or g for kilo, mega and giga and
 can be changed on remount.  The size parameter also accepts a suffix %
 to limit this tmpfs instance to that percentage of your physical RAM:
 the default, when neither size nor nr_blocks is specified, is size=50%
+
+If both nr_blocks (or size) and nr_inodes are set to 0, neither blocks
+nor inodes will be limited in that instance.  It is generally unwise to
+mount with such options, since it allows any user with write access to
+use up all the memory on the machine; but enhances the scalability of
+that instance in a system with many cpus making intensive use of it.
 
 
 To specify the initial root directory you can use the following mount
@@ -89,4 +97,4 @@ RAM/SWAP in 10240 inodes and it is only accessible by root.
 Author:
    Christoph Rohland <cr@sap.com>, 1.12.01
 Updated:
-   Hugh Dickins <hugh@veritas.com>, 01 April 2003
+   Hugh Dickins <hugh@veritas.com>, 01 September 2004

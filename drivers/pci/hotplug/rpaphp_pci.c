@@ -186,7 +186,7 @@ static struct pci_dev *
 rpaphp_pci_config_slot(struct device_node *dn, struct pci_bus *bus)
 {
 	struct device_node *eads_first_child = dn->child;
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int num;
 	
 	dbg("Enter %s: dn=%s bus=%s\n", __FUNCTION__, dn->full_name, bus->name);

@@ -352,7 +352,7 @@ void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
 		printk("%s: set to minimum %d\n", __FUNCTION__, max_sectors);
 	}
 
-	q->max_sectors = max_sectors;
+	q->max_sectors = q->max_hw_sectors = max_sectors;
 }
 
 EXPORT_SYMBOL(blk_queue_max_sectors);
@@ -454,7 +454,8 @@ EXPORT_SYMBOL(blk_queue_hardsect_size);
 void blk_queue_stack_limits(request_queue_t *t, request_queue_t *b)
 {
 	/* zero is "infinity" */
-	t->max_sectors = min_not_zero(t->max_sectors,b->max_sectors);
+	t->max_sectors = t->max_hw_sectors =
+		min_not_zero(t->max_sectors,b->max_sectors);
 
 	t->max_phys_segments = min(t->max_phys_segments,b->max_phys_segments);
 	t->max_hw_segments = min(t->max_hw_segments,b->max_hw_segments);
@@ -2583,11 +2584,11 @@ end_io:
 			break;
 		}
 
-		if (unlikely(bio_sectors(bio) > q->max_sectors)) {
+		if (unlikely(bio_sectors(bio) > q->max_hw_sectors)) {
 			printk("bio too big device %s (%u > %u)\n", 
 				bdevname(bio->bi_bdev, b),
 				bio_sectors(bio),
-				q->max_sectors);
+				q->max_hw_sectors);
 			goto end_io;
 		}
 
@@ -3206,12 +3207,60 @@ queue_ra_store(struct request_queue *q, const char *page, size_t count)
 	unsigned long ra_kb;
 	ssize_t ret = queue_var_store(&ra_kb, page, count);
 
+	spin_lock_irq(q->queue_lock);
 	if (ra_kb > (q->max_sectors >> 1))
 		ra_kb = (q->max_sectors >> 1);
 
 	q->backing_dev_info.ra_pages = ra_kb >> (PAGE_CACHE_SHIFT - 10);
+	spin_unlock_irq(q->queue_lock);
+
 	return ret;
 }
+
+static ssize_t queue_max_sectors_show(struct request_queue *q, char *page)
+{
+	int max_sectors_kb = q->max_sectors >> 1;
+
+	return queue_var_show(max_sectors_kb, (page));
+}
+
+static ssize_t
+queue_max_sectors_store(struct request_queue *q, const char *page, size_t count)
+{
+	unsigned long max_sectors_kb,
+			max_hw_sectors_kb = q->max_hw_sectors >> 1,
+			page_kb = 1 << (PAGE_CACHE_SHIFT - 10);
+	ssize_t ret = queue_var_store(&max_sectors_kb, page, count);
+	int ra_kb;
+
+	if (max_sectors_kb > max_hw_sectors_kb || max_sectors_kb < page_kb)
+		return -EINVAL;
+	/*
+	 * Take the queue lock to update the readahead and max_sectors
+	 * values synchronously:
+	 */
+	spin_lock_irq(q->queue_lock);
+	/*
+	 * Trim readahead window as well, if necessary:
+	 */
+	ra_kb = q->backing_dev_info.ra_pages << (PAGE_CACHE_SHIFT - 10);
+	if (ra_kb > max_sectors_kb)
+		q->backing_dev_info.ra_pages =
+				max_sectors_kb >> (PAGE_CACHE_SHIFT - 10);
+
+	q->max_sectors = max_sectors_kb << 1;
+	spin_unlock_irq(q->queue_lock);
+
+	return ret;
+}
+
+static ssize_t queue_max_hw_sectors_show(struct request_queue *q, char *page)
+{
+	int max_hw_sectors_kb = q->max_hw_sectors >> 1;
+
+	return queue_var_show(max_hw_sectors_kb, (page));
+}
+
 
 static struct queue_sysfs_entry queue_requests_entry = {
 	.attr = {.name = "nr_requests", .mode = S_IRUGO | S_IWUSR },
@@ -3225,9 +3274,22 @@ static struct queue_sysfs_entry queue_ra_entry = {
 	.store = queue_ra_store,
 };
 
+static struct queue_sysfs_entry queue_max_sectors_entry = {
+	.attr = {.name = "max_sectors_kb", .mode = S_IRUGO | S_IWUSR },
+	.show = queue_max_sectors_show,
+	.store = queue_max_sectors_store,
+};
+
+static struct queue_sysfs_entry queue_max_hw_sectors_entry = {
+	.attr = {.name = "max_hw_sectors_kb", .mode = S_IRUGO },
+	.show = queue_max_hw_sectors_show,
+};
+
 static struct attribute *default_attrs[] = {
 	&queue_requests_entry.attr,
 	&queue_ra_entry.attr,
+	&queue_max_hw_sectors_entry.attr,
+	&queue_max_sectors_entry.attr,
 	NULL,
 };
 

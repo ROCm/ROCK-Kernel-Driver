@@ -495,6 +495,16 @@ int os_set_fd_async(int fd, int owner)
 	return(0);
 }
 
+int os_clear_fd_async(int fd)
+{
+	int flags = fcntl(fd, F_GETFL);
+
+	flags &= ~(O_ASYNC | O_NONBLOCK);
+	if(fcntl(fd, F_SETFL, flags) < 0)
+		return(-errno);
+	return(0);
+}
+
 int os_set_fd_block(int fd, int blocking)
 {
 	int flags;

@@ -45,10 +45,16 @@
                     PGD_INDEX_SIZE + PAGE_SHIFT) 
 
 /*
+ * Size of EA range mapped by our pagetables.
+ */
+#define PGTABLE_EA_BITS	41
+#define PGTABLE_EA_MASK	((1UL<<PGTABLE_EA_BITS)-1)
+
+/*
  * Define the address range of the vmalloc VM area.
  */
 #define VMALLOC_START (0xD000000000000000ul)
-#define VMALLOC_END   (VMALLOC_START + VALID_EA_BITS)
+#define VMALLOC_END   (VMALLOC_START + PGTABLE_EA_MASK)
 
 /*
  * Define the address range of the imalloc VM area.
@@ -58,19 +64,19 @@
 #define IMALLOC_VMADDR(x) ((unsigned long)(x))
 #define PHBS_IO_BASE  	  (0xE000000000000000ul)	/* Reserve 2 gigs for PHBs */
 #define IMALLOC_BASE      (0xE000000080000000ul)  
-#define IMALLOC_END       (IMALLOC_BASE + VALID_EA_BITS)
+#define IMALLOC_END       (IMALLOC_BASE + PGTABLE_EA_MASK)
 
 /*
  * Define the address range mapped virt <-> physical
  */
 #define KRANGE_START KERNELBASE
-#define KRANGE_END   (KRANGE_START + VALID_EA_BITS)
+#define KRANGE_END   (KRANGE_START + PGTABLE_EA_MASK)
 
 /*
  * Define the user address range
  */
 #define USER_START (0UL)
-#define USER_END   (USER_START + VALID_EA_BITS)
+#define USER_END   (USER_START + PGTABLE_EA_MASK)
 
 
 /*

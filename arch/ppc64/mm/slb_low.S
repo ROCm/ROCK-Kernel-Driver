@@ -68,19 +68,19 @@ _GLOBAL(slb_allocate)
 	srdi	r3,r3,28		/* get esid */
 	cmpldi	cr7,r9,0xc		/* cmp KERNELBASE for later use */
 
-	/* r9 = region, r3 = esid, cr7 = <>KERNELBASE */
+	rldimi	r10,r3,28,0		/* r10= ESID<<28 | entry */
+	oris	r10,r10,SLB_ESID_V@h	/* r10 |= SLB_ESID_V */
 
-	rldicr.	r11,r3,32,16
-	bne-	8f			/* invalid ea bits set */
-	addi	r11,r9,-1
-	cmpldi	r11,0xb
-	blt-	8f			/* invalid region */
-
-	/* r9 = region, r3 = esid, r10 = entry, cr7 = <>KERNELBASE */
+	/* r3 = esid, r10 = esid_data, cr7 = <>KERNELBASE */
 
 	blt	cr7,0f			/* user or kernel? */
 
-	/* kernel address */
+	/* kernel address: proto-VSID = ESID */
+	/* WARNING - MAGIC: we don't use the VSID 0xfffffffff, but
+	 * this code will generate the protoVSID 0xfffffffff for the
+	 * top segment.  That's ok, the scramble below will translate
+	 * it to VSID 0, which is reserved as a bad VSID - one which
+	 * will never have any pages in it.  */
 	li	r11,SLB_VSID_KERNEL
 BEGIN_FTR_SECTION
 	bne	cr7,9f
@@ -88,8 +88,12 @@ BEGIN_FTR_SECTION
 END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 	b	9f
 
-0:	/* user address */
+0:	/* user address: proto-VSID = context<<15 | ESID */
 	li	r11,SLB_VSID_USER
+
+	srdi.	r9,r3,13
+	bne-	8f			/* invalid ea bits set */
+
 #ifdef CONFIG_HUGETLB_PAGE
 BEGIN_FTR_SECTION
 	/* check against the hugepage ranges */
@@ -111,33 +115,18 @@ END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 #endif /* CONFIG_HUGETLB_PAGE */
 
 6:	ld	r9,PACACONTEXTID(r13)
+	rldimi	r3,r9,USER_ESID_BITS,0
 
-9:	/* r9 = "context", r3 = esid, r11 = flags, r10 = entry */
+9:	/* r3 = protovsid, r11 = flags, r10 = esid_data, cr7 = <>KERNELBASE */
+	ASM_VSID_SCRAMBLE(r3,r9)
 
-	rldimi	r9,r3,15,0		/* r9= VSID ordinal */
-
-7:	rldimi	r10,r3,28,0		/* r10= ESID<<28 | entry */
-	oris	r10,r10,SLB_ESID_V@h	/* r10 |= SLB_ESID_V */
-
-	/* r9 = ordinal, r3 = esid, r11 = flags, r10 = esid_data */
-
-	li	r3,VSID_RANDOMIZER@higher
-	sldi	r3,r3,32
-	oris	r3,r3,VSID_RANDOMIZER@h
-	ori	r3,r3,VSID_RANDOMIZER@l
-
-	mulld	r9,r3,r9		/* r9 = ordinal * VSID_RANDOMIZER */
-	clrldi	r9,r9,28		/* r9 &= VSID_MASK */
-	sldi	r9,r9,SLB_VSID_SHIFT	/* r9 <<= SLB_VSID_SHIFT */
-	or	r9,r9,r11		/* r9 |= flags */
-
-	/* r9 = vsid_data, r10 = esid_data, cr7 = <>KERNELBASE */
+	rldimi	r11,r3,SLB_VSID_SHIFT,16	/* combine VSID and flags */
 
 	/*
 	 * No need for an isync before or after this slbmte. The exception
 	 * we enter with and the rfid we exit with are context synchronizing.
 	 */
-	slbmte	r9,r10
+	slbmte	r11,r10
 
 	bgelr	cr7			/* we're done for kernel addresses */
 
@@ -160,6 +149,6 @@ END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 	blr
 
 8:	/* invalid EA */
-	li	r9,0			/* 0 VSID ordinal -> BAD_VSID */
+	li	r3,0			/* BAD_VSID */
 	li	r11,SLB_VSID_USER	/* flags don't much matter */
-	b	7b
+	b	9b

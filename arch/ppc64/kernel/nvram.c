@@ -340,7 +340,7 @@ static int nvram_create_os_partition(void)
 	struct list_head * p;
 	struct nvram_partition * part;
 	struct nvram_partition * new_part = NULL;
-	struct nvram_partition * free_part;
+	struct nvram_partition * free_part = NULL;
 	int seq_init[2] = { 0, 0 };
 	loff_t tmp_index;
 	long size = 0;

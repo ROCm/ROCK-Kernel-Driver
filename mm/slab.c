@@ -562,6 +562,22 @@ static inline struct array_cache *ac_data(kmem_cache_t *cachep)
 	return cachep->array[smp_processor_id()];
 }
 
+static kmem_cache_t * kmem_find_general_cachep (size_t size, int gfpflags)
+{
+	struct cache_sizes *csizep = malloc_sizes;
+
+	/* This function could be moved to the header file, and
+	 * made inline so consumers can quickly determine what
+	 * cache pointer they require.
+	 */
+	for ( ; csizep->cs_size; csizep++) {
+		if (size > csizep->cs_size)
+			continue;
+		break;
+	}
+	return (gfpflags & GFP_DMA) ? csizep->cs_dmacachep : csizep->cs_cachep;
+}
+
 /* Cal the num objs, wastage, and bytes left over for a given slab size. */
 static void cache_estimate (unsigned long gfporder, size_t size, size_t align,
 		 int flags, size_t *left_over, unsigned int *num)
@@ -2554,24 +2570,6 @@ unsigned int kmem_cache_size(kmem_cache_t *cachep)
 }
 
 EXPORT_SYMBOL(kmem_cache_size);
-
-kmem_cache_t * kmem_find_general_cachep (size_t size, int gfpflags)
-{
-	struct cache_sizes *csizep = malloc_sizes;
-
-	/* This function could be moved to the header file, and
-	 * made inline so consumers can quickly determine what
-	 * cache pointer they require.
-	 */
-	for ( ; csizep->cs_size; csizep++) {
-		if (size > csizep->cs_size)
-			continue;
-		break;
-	}
-	return (gfpflags & GFP_DMA) ? csizep->cs_dmacachep : csizep->cs_cachep;
-}
-
-EXPORT_SYMBOL(kmem_find_general_cachep);
 
 struct ccupdate_struct {
 	kmem_cache_t *cachep;

@@ -15,6 +15,7 @@
 
 #include <linux/config.h>
 #include <asm/page.h>
+#include <linux/stringify.h>
 
 #ifndef __ASSEMBLY__
 
@@ -215,12 +216,44 @@ extern void htab_finish_init(void);
 #define SLB_VSID_KERNEL		(SLB_VSID_KP|SLB_VSID_C)
 #define SLB_VSID_USER		(SLB_VSID_KP|SLB_VSID_KS)
 
-#define VSID_RANDOMIZER ASM_CONST(42470972311)
-#define VSID_MASK	0xfffffffffUL
-/* Because we never access addresses below KERNELBASE as kernel
- * addresses, this VSID is never used for anything real, and will
- * never have pages hashed into it */
-#define BAD_VSID	ASM_CONST(0)
+#define VSID_MULTIPLIER	ASM_CONST(268435399)	/* largest 28-bit prime */
+#define VSID_BITS	36
+#define VSID_MODULUS	((1UL<<VSID_BITS)-1)
+
+#define CONTEXT_BITS	20
+#define USER_ESID_BITS	15
+
+/*
+ * This macro generates asm code to compute the VSID scramble
+ * function.  Used in slb_allocate() and do_stab_bolted.  The function
+ * computed is: (protovsid*VSID_MULTIPLIER) % VSID_MODULUS
+ *
+ *	rt = register continaing the proto-VSID and into which the
+ *		VSID will be stored
+ *	rx = scratch register (clobbered)
+ *
+ * 	- rt and rx must be different registers
+ * 	- The answer will end up in the low 36 bits of rt.  The higher
+ * 	  bits may contain other garbage, so you may need to mask the
+ * 	  result.
+ */
+#define ASM_VSID_SCRAMBLE(rt, rx)	\
+	lis	rx,VSID_MULTIPLIER@h;					\
+	ori	rx,rx,VSID_MULTIPLIER@l;				\
+	mulld	rt,rt,rx;		/* rt = rt * MULTIPLIER */	\
+									\
+	srdi	rx,rt,VSID_BITS;					\
+	clrldi	rt,rt,(64-VSID_BITS);					\
+	add	rt,rt,rx;		/* add high and low bits */	\
+	/* Now, r3 == VSID (mod 2^36-1), and lies between 0 and		\
+	 * 2^36-1+2^28-1.  That in particular means that if r3 >=	\
+	 * 2^36-1, then r3+1 has the 2^36 bit set.  So, if r3+1 has	\
+	 * the bit clear, r3 already has the answer we want, if it	\
+	 * doesn't, the answer is the low 36 bits of r3+1.  So in all	\
+	 * cases the answer is the low 36 bits of (r3 + ((r3+1) >> 36))*/\
+	addi	rx,rt,1;						\
+	srdi	rx,rx,VSID_BITS;	/* extract 2^36 bit */		\
+	add	rt,rt,rx
 
 /* Block size masks */
 #define BL_128K	0x000

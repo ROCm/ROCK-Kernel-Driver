@@ -48,9 +48,6 @@ static int ibm_read_slot_reset_state;
 static int ibm_slot_error_detail;
 
 static int eeh_subsystem_enabled;
-#define EEH_MAX_OPTS 4096
-static char *eeh_opts;
-static int eeh_opts_last;
 
 /* Buffer for reporting slot-error-detail rtas calls */
 static unsigned char slot_errbuf[RTAS_ERROR_LOG_MAX];
@@ -61,10 +58,6 @@ static int eeh_error_buf_size;
 static DEFINE_PER_CPU(unsigned long, total_mmio_ffs);
 static DEFINE_PER_CPU(unsigned long, false_positives);
 static DEFINE_PER_CPU(unsigned long, ignored_failures);
-
-static int eeh_check_opts_config(struct device_node *dn, int class_code,
-				 int vendor_id, int device_id,
-				 int default_state);
 
 /**
  * The pci address cache subsystem.  This subsystem places
@@ -497,7 +490,6 @@ EXPORT_SYMBOL(eeh_check_failure);
 struct eeh_early_enable_info {
 	unsigned int buid_hi;
 	unsigned int buid_lo;
-	int force_off;
 };
 
 /* Enable eeh for the given device node. */
@@ -539,18 +531,8 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 	if ((*class_code >> 16) == PCI_BASE_CLASS_DISPLAY)
 		enable = 0;
 
-	if (!eeh_check_opts_config(dn, *class_code, *vendor_id, *device_id,
-				   enable)) {
-		if (enable) {
-			printk(KERN_WARNING "EEH: %s user requested to run "
-			       "without EEH checking.\n", dn->full_name);
-			enable = 0;
-		}
-	}
-
-	if (!enable || info->force_off) {
+	if (!enable)
 		dn->eeh_mode |= EEH_MODE_NOCHECK;
-	}
 
 	/* Ok... see if this device supports EEH.  Some do, some don't,
 	 * and the only way to find out is to check each and every one. */
@@ -604,15 +586,12 @@ void __init eeh_init(void)
 {
 	struct device_node *phb, *np;
 	struct eeh_early_enable_info info;
-	char *eeh_force_off = strstr(saved_command_line, "eeh-force-off");
 
 	init_pci_config_tokens();
 
 	np = of_find_node_by_path("/rtas");
-	if (np == NULL) {
-		printk(KERN_WARNING "EEH: RTAS not found !\n");
+	if (np == NULL)
 		return;
-	}
 
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
@@ -632,13 +611,6 @@ void __init eeh_init(void)
 		eeh_error_buf_size = RTAS_ERROR_LOG_MAX;
 	}
 
-	info.force_off = 0;
-	if (eeh_force_off) {
-		printk(KERN_WARNING "EEH: WARNING: PCI Enhanced I/O Error "
-		       "Handling is user disabled\n");
-		info.force_off = 1;
-	}
-
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
 	for (phb = of_find_node_by_name(NULL, "pci"); phb;
 	     phb = of_find_node_by_name(phb, "pci")) {
@@ -653,11 +625,10 @@ void __init eeh_init(void)
 		traverse_pci_devices(phb, early_enable_eeh, &info);
 	}
 
-	if (eeh_subsystem_enabled) {
+	if (eeh_subsystem_enabled)
 		printk(KERN_INFO "EEH: PCI Enhanced I/O Error Handling Enabled\n");
-	} else {
-		printk(KERN_WARNING "EEH: disabled PCI Enhanced I/O Error Handling\n");
-	}
+	else
+		printk(KERN_WARNING "EEH: No capable adapters found\n");
 }
 
 /**
@@ -816,129 +787,3 @@ static int __init eeh_init_proc(void)
 	return 0;
 }
 __initcall(eeh_init_proc);
-
-/*
- * Test if "dev" should be configured on or off.
- * This processes the options literally from left to right.
- * This lets the user specify stupid combinations of options,
- * but at least the result should be very predictable.
- */
-static int eeh_check_opts_config(struct device_node *dn,
-				 int class_code, int vendor_id, int device_id,
-				 int default_state)
-{
-	char devname[32], classname[32];
-	char *strs[8], *s;
-	int nstrs, i;
-	int ret = default_state;
-
-	/* Build list of strings to match */
-	nstrs = 0;
-	s = (char *)get_property(dn, "ibm,loc-code", NULL);
-	if (s)
-		strs[nstrs++] = s;
-	sprintf(devname, "dev%04x:%04x", vendor_id, device_id);
-	strs[nstrs++] = devname;
-	sprintf(classname, "class%04x", class_code);
-	strs[nstrs++] = classname;
-	strs[nstrs++] = "";	/* yes, this matches the empty string */
-
-	/*
-	 * Now see if any string matches the eeh_opts list.
-	 * The eeh_opts list entries start with + or -.
-	 */
-	for (s = eeh_opts; s && (s < (eeh_opts + eeh_opts_last));
-	     s += strlen(s)+1) {
-		for (i = 0; i < nstrs; i++) {
-			if (strcasecmp(strs[i], s+1) == 0) {
-				ret = (strs[i][0] == '+') ? 1 : 0;
-			}
-		}
-	}
-	return ret;
-}
-
-/*
- * Handle kernel eeh-on & eeh-off cmd line options for eeh.
- *
- * We support:
- *	eeh-off=loc1,loc2,loc3...
- *
- * and this option can be repeated so
- *      eeh-off=loc1,loc2 eeh-off=loc3
- * is the same as eeh-off=loc1,loc2,loc3
- *
- * loc is an IBM location code that can be found in a manual or
- * via openfirmware (or the Hardware Management Console).
- *
- * We also support these additional "loc" values:
- *
- *	dev#:#    vendor:device id in hex (e.g. dev1022:2000)
- *	class#    class id in hex (e.g. class0200)
- *
- * If no location code is specified all devices are assumed
- * so eeh-off means eeh by default is off.
- */
-
-/*
- * This is implemented as a null separated list of strings.
- * Each string looks like this:  "+X" or "-X"
- * where X is a loc code, vendor:device, class (as shown above)
- * or empty which is used to indicate all.
- *
- * We interpret this option string list so that it will literally
- * behave left-to-right even if some combinations don't make sense.
- */
-static int __init eeh_parm(char *str, int state)
-{
-	char *s, *cur, *curend;
-
-	if (!eeh_opts) {
-		eeh_opts = alloc_bootmem(EEH_MAX_OPTS);
-		eeh_opts[eeh_opts_last++] = '+'; /* default */
-		eeh_opts[eeh_opts_last++] = '\0';
-	}
-	if (*str == '\0') {
-		eeh_opts[eeh_opts_last++] = state ? '+' : '-';
-		eeh_opts[eeh_opts_last++] = '\0';
-		return 1;
-	}
-	if (*str == '=')
-		str++;
-	for (s = str; s && *s != '\0'; s = curend) {
-		cur = s;
-		/* ignore empties.  Don't treat as "all-on" or "all-off" */
-		while (*cur == ',')
-			cur++;
-		curend = strchr(cur, ',');
-		if (!curend)
-			curend = cur + strlen(cur);
-		if (*cur) {
-			int curlen = curend-cur;
-			if (eeh_opts_last + curlen > EEH_MAX_OPTS-2) {
-				printk(KERN_WARNING "EEH: sorry...too many "
-				       "eeh cmd line options\n");
-				return 1;
-			}
-			eeh_opts[eeh_opts_last++] = state ? '+' : '-';
-			strncpy(eeh_opts+eeh_opts_last, cur, curlen);
-			eeh_opts_last += curlen;
-			eeh_opts[eeh_opts_last++] = '\0';
-		}
-	}
-
-	return 1;
-}
-
-static int __init eehoff_parm(char *str)
-{
-	return eeh_parm(str, 0);
-}
-
-static int __init eehon_parm(char *str)
-{
-	return eeh_parm(str, 1);
-}
-
-__setup("eeh-off", eehoff_parm);
-__setup("eeh-on", eehon_parm);

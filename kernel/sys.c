@@ -274,7 +274,9 @@ cond_syscall(compat_sys_mq_getsetattr)
 cond_syscall(sys_mbind)
 cond_syscall(sys_get_mempolicy)
 cond_syscall(sys_set_mempolicy)
+cond_syscall(compat_mbind)
 cond_syscall(compat_get_mempolicy)
+cond_syscall(compat_set_mempolicy)
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read)
@@ -1727,6 +1729,17 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			}
 			current->keep_capabilities = arg2;
 			break;
+		case PR_SET_NAME: {
+			struct task_struct *me = current;
+			unsigned char ncomm[sizeof(me->comm)];
+
+			ncomm[sizeof(me->comm)-1] = 0;
+			if (strncpy_from_user(ncomm, (char *)arg2,
+						sizeof(me->comm)-1) < 0)
+				return -EFAULT;
+			set_task_comm(me, ncomm);
+			return 0;
+		}
 		default:
 			error = -EINVAL;
 			break;

@@ -74,6 +74,8 @@ void smp_call_function_interrupt(void);
 extern long register_vpa(unsigned long flags, unsigned long proc,
 			 unsigned long vpa);
 
+int smt_enabled_at_boot = 1;
+
 /* Low level assembly function used to backup CPU 0 state */
 extern void __save_cpu_setup(void);
 
@@ -942,4 +944,12 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	smp_threads_ready = 1;
 
 	set_cpus_allowed(current, old_mask);
+
+	/*
+	 * We know at boot the maximum number of cpus we can add to
+	 * a partition and set cpu_possible_map accordingly. cpu_present_map
+	 * needs to match for the hotplug code to allow us to hot add
+	 * any offline cpus.
+	 */
+	cpu_present_map = cpu_possible_map;
 }

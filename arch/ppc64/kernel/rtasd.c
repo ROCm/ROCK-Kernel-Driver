@@ -106,7 +106,7 @@ static char *rtas_event_type(int type)
 static void printk_log_rtas(char *buf, int len)
 {
 
-	int i,j,n;
+	int i,j,n = 0;
 	int perline = 16;
 	char buffer[64];
 	char * str = "RTAS event";
@@ -216,12 +216,13 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	if (!no_more_logging && !(err_type & ERR_FLAG_BOOT))
 		nvram_write_error_log(buf, len, err_type);
 
-	/* rtas errors can occur during boot, and we do want to capture
+	/*
+	 * rtas errors can occur during boot, and we do want to capture
 	 * those somewhere, even if nvram isn't ready (why not?), and even
-	 * if rtasd isn't ready. Put them into the boot log, at least.  */
-	if ((err_type & ERR_TYPE_MASK) == ERR_TYPE_RTAS_LOG) {
+	 * if rtasd isn't ready. Put them into the boot log, at least.
+	 */
+	if ((err_type & ERR_TYPE_MASK) == ERR_TYPE_RTAS_LOG)
 		printk_log_rtas(buf, len);
-	}
 
 	/* Check to see if we need to or have stopped logging */
 	if (fatal || no_more_logging) {
@@ -233,9 +234,6 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	/* call type specific method for error */
 	switch (err_type & ERR_TYPE_MASK) {
 	case ERR_TYPE_RTAS_LOG:
-		/* put into syslog and error_log file */
-		printk_log_rtas(buf, len);
-
 		offset = rtas_error_log_buffer_max *
 			((rtas_log_start+rtas_log_size) & LOG_NUMBER_MASK);
 

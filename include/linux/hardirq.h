@@ -2,9 +2,7 @@
 #define LINUX_HARDIRQ_H
 
 #include <linux/config.h>
-#ifdef CONFIG_PREEPT
 #include <linux/smp_lock.h>
-#endif
 #include <asm/hardirq.h>
 
 #define __IRQ_MASK(x)	((1UL << (x))-1)
@@ -28,9 +26,6 @@
 #define in_irq()		(hardirq_count())
 #define in_softirq()		(softirq_count())
 #define in_interrupt()		(irq_count())
-
-#define hardirq_trylock()	(!in_interrupt())
-#define hardirq_endlock()	do { } while (0)
 
 #ifdef CONFIG_PREEMPT
 # define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())

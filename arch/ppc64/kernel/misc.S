@@ -860,9 +860,9 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
 	.llong .sys_ni_syscall		/* 257 reserved for vserver */
 	.llong .sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
-	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
-	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
-	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
+	.llong .compat_mbind
+	.llong .compat_get_mempolicy	/* 260 */
+	.llong .compat_set_mempolicy
 	.llong .compat_sys_mq_open
 	.llong .sys_mq_unlink
 	.llong .compat_sys_mq_timedsend
@@ -1132,9 +1132,9 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
 	.llong .sys_ni_syscall		/* 257 reserved for vserver */
 	.llong .sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
-	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
-	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
-	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
+	.llong .sys_mbind
+	.llong .sys_get_mempolicy	/* 260 */
+	.llong .sys_set_mempolicy
 	.llong .sys_mq_open
 	.llong .sys_mq_unlink
 	.llong .sys_mq_timedsend

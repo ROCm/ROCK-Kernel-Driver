@@ -333,15 +333,18 @@ void __init iSeries_init_early(void)
 #endif
 	if (itLpNaca.xPirEnvironMode == 0) 
 		piranha_simulator = 1;
-}
-
-void __init iSeries_init(unsigned long r3, unsigned long r4, unsigned long r5, 
-	   unsigned long r6, unsigned long r7)
-{
-	char *p, *q;
 
 	/* Associate Lp Event Queue 0 with processor 0 */
 	HvCallEvent_setLpEventQueueInterruptProc(0, 0);
+
+	mf_init();
+	mf_initialized = 1;
+	mb();
+}
+
+void __init iSeries_parse_cmdline(void)
+{
+	char *p, *q;
 
 	/* copy the command line parameter from the primary VSP  */
 	HvCallEvent_dmaToSp(cmd_line, 2 * 64* 1024, 256,
@@ -349,16 +352,12 @@ void __init iSeries_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	p = cmd_line;
 	q = cmd_line + 255;
-	while( p < q ) {
+	while(p < q) {
 		if (!*p || *p == '\n')
 			break;
 		++p;
 	}
 	*p = 0;
-
-	mf_init();
-	mf_initialized = 1;
-	mb();
 }
 
 /*

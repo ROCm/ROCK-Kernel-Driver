@@ -1978,6 +1978,7 @@ uart_report_port(struct uart_driver *drv, struct uart_port *port)
 		printk("I/O 0x%x offset 0x%x", port->iobase, port->hub6);
 		break;
 	case UPIO_MEM:
+	case UPIO_MEM32:
 		printk("MMIO 0x%lx", port->mapbase);
 		break;
 	}

@@ -132,8 +132,9 @@ config MCONSOLE
 config HOST_2G_2G
 	bool "2G/2G host address space split"
 
-config UML_SMP
+config SMP
 	bool "Symmetric multi-processing support"
+	default n
 	help
         This option enables UML SMP support.  UML implements virtual SMP by
         allowing as many processes to run simultaneously on the host as
@@ -144,10 +145,6 @@ config UML_SMP
         on the host scheduler.
         CONFIG_SMP will be set to whatever this option is set to.
         It is safe to leave this unchanged.
-
-config SMP
-	bool
-	default UML_SMP
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"

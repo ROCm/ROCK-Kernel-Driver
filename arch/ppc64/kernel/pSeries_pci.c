@@ -497,7 +497,7 @@ unsigned long __init find_and_init_phbs(void)
 	struct pci_controller *phb;
 	unsigned int root_size_cells = 0;
 	unsigned int index;
-	unsigned int *opprop;
+	unsigned int *opprop = NULL;
 	struct device_node *root = of_find_node_by_path("/");
 
 	if (naca->interrupt_controller == IC_OPEN_PIC) {

@@ -1727,8 +1727,8 @@ void sched_exec(void)
 		if (tmp->flags & SD_BALANCE_EXEC)
 			sd = tmp;
 
-	schedstat_inc(sd, sbe_attempts);
 	if (sd) {
+		schedstat_inc(sd, sbe_attempts);
 		new_cpu = find_idlest_cpu(current, this_cpu, sd);
 		if (new_cpu != this_cpu) {
 			schedstat_inc(sd, sbe_pushed);

@@ -178,7 +178,7 @@ static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
 	elf_vrreg_t __user *v_regs;
 #endif
 	unsigned long err = 0;
-	unsigned long save_r13;
+	unsigned long save_r13 = 0;
 	elf_greg_t *gregs = (elf_greg_t *)regs;
 	int i;
 

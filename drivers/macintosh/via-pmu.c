@@ -1446,7 +1446,7 @@ static struct adb_request* __pmac
 pmu_sr_intr(struct pt_regs *regs)
 {
 	struct adb_request *req;
-	int bite;
+	int bite = 0;
 
 	if (via[B] & TREQ) {
 		printk(KERN_ERR "PMU: spurious SR intr (%x)\n", via[B]);

@@ -51,7 +51,6 @@
 extern unsigned long klimit;
 /* extern void *stab; */
 extern HTAB htab_data;
-extern unsigned long loops_per_jiffy;
 
 int have_of = 1;
 
@@ -68,15 +67,15 @@ extern void  pmac_init(unsigned long r3,
 		       unsigned long r7);
 
 extern void fw_feature_init(void);
-extern void iSeries_init( void );
-extern void iSeries_init_early( void );
-extern void pSeries_init_early( void );
+extern void iSeries_init_early(void);
+extern void pSeries_init_early(void);
 extern void pSeriesLP_init_early(void);
 extern void pmac_init_early(void);
-extern void mm_init_ppc64( void ); 
+extern void mm_init_ppc64(void);
 extern void pseries_secondary_smp_init(unsigned long); 
 extern int  idle_setup(void);
 extern void vpa_init(int cpu);
+extern void iSeries_parse_cmdline(void);
 
 unsigned long decr_overclock = 1;
 unsigned long decr_overclock_proc0 = 1;
@@ -86,10 +85,6 @@ unsigned long decr_overclock_proc0_set = 0;
 int powersave_nap;
 
 unsigned char aux_device_present;
-
-void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
-		    unsigned long r6, unsigned long r7);
-int parse_bootinfo(void);
 
 #ifdef CONFIG_MAGIC_SYSRQ
 unsigned long SYSRQ_KEY;
@@ -157,6 +152,50 @@ void __init disable_early_printk(void)
 }
 
 #if !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP)
+
+static int smt_enabled_cmdline;
+
+/* Look for ibm,smt-enabled OF option */
+static void check_smt_enabled(void)
+{
+	struct device_node *dn;
+	char *smt_option;
+
+	/* Allow the command line to overrule the OF option */
+	if (smt_enabled_cmdline)
+		return;
+
+	dn = of_find_node_by_path("/options");
+
+	if (dn) {
+		smt_option = (char *)get_property(dn, "ibm,smt-enabled", NULL);
+
+                if (smt_option) {
+			if (!strcmp(smt_option, "on"))
+				smt_enabled_at_boot = 1;
+			else if (!strcmp(smt_option, "off"))
+				smt_enabled_at_boot = 0;
+                }
+        }
+}
+
+/* Look for smt-enabled= cmdline option */
+static int __init early_smt_enabled(char *p)
+{
+	smt_enabled_cmdline = 1;
+
+	if (!p)
+		return 0;
+
+	if (!strcmp(p, "on") || !strcmp(p, "1"))
+		smt_enabled_at_boot = 1;
+	else if (!strcmp(p, "off") || !strcmp(p, "0"))
+		smt_enabled_at_boot = 0;
+
+	return 0;
+}
+early_param("smt-enabled", early_smt_enabled);
+
 /**
  * setup_cpu_maps - initialize the following cpu maps:
  *                  cpu_possible_map
@@ -179,6 +218,8 @@ static void __init setup_cpu_maps(void)
 	struct device_node *dn = NULL;
 	int cpu = 0;
 
+	check_smt_enabled();
+
 	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu < NR_CPUS) {
 		u32 *intserv;
 		int j, len = sizeof(u32), nthreads;
@@ -191,9 +232,16 @@ static void __init setup_cpu_maps(void)
 		nthreads = len / sizeof(u32);
 
 		for (j = 0; j < nthreads && cpu < NR_CPUS; j++) {
+			/*
+			 * Only spin up secondary threads if SMT is enabled.
+			 * We must leave space in the logical map for the
+			 * threads.
+			 */
+			if (j == 0 || smt_enabled_at_boot) {
+				cpu_set(cpu, cpu_present_map);
+				set_hard_smp_processor_id(cpu, intserv[j]);
+			}
 			cpu_set(cpu, cpu_possible_map);
-			cpu_set(cpu, cpu_present_map);
-			set_hard_smp_processor_id(cpu, intserv[j]);
 			cpu++;
 		}
 	}
@@ -249,7 +297,21 @@ static void __init setup_cpu_maps(void)
 
 	systemcfg->processorCount = num_present_cpus();
 }
+
 #endif /* !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP) */
+
+#ifdef CONFIG_XMON
+static int __init early_xmon(char *p)
+{
+	/* ensure xmon is enabled */
+	xmon_init();
+	debugger(0);
+
+	return 0;
+}
+early_param("xmon", early_xmon);
+#endif
+
 /*
  * Do some initial setup of the system.  The parameters are those which 
  * were passed in from the bootloader.
@@ -261,16 +323,12 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	int ret, i;
 #endif
 
-#ifdef CONFIG_XMON_DEFAULT
-	xmon_init();
-#endif
-
 #ifdef CONFIG_PPC_ISERIES
 	/* pSeries systems are identified in prom.c via OF. */
-	if ( itLpNaca.xLparInstalled == 1 )
+	if (itLpNaca.xLparInstalled == 1)
 		systemcfg->platform = PLATFORM_ISERIES_LPAR;
 #endif
-	
+
 	switch (systemcfg->platform) {
 #ifdef CONFIG_PPC_ISERIES
 	case PLATFORM_ISERIES_LPAR:
@@ -282,22 +340,22 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	case PLATFORM_PSERIES:
 		fw_feature_init();
 		pSeries_init_early();
-		parse_bootinfo();
 		break;
 
 	case PLATFORM_PSERIES_LPAR:
 		fw_feature_init();
 		pSeriesLP_init_early();
-		parse_bootinfo();
 		break;
 #endif /* CONFIG_PPC_PSERIES */
 #ifdef CONFIG_PPC_PMAC
 	case PLATFORM_POWERMAC:
 		pmac_init_early();
-		parse_bootinfo();
 #endif /* CONFIG_PPC_PMAC */
 	}
 
+#ifdef CONFIG_XMON_DEFAULT
+	xmon_init();
+#endif
 	/* If we were passed an initrd, set the ROOT_DEV properly if the values
 	 * look sensible. If not, clear initrd reference.
 	 */
@@ -334,6 +392,15 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 #endif /* CONFIG_PPC_PSERIES */
 
+#ifdef CONFIG_PPC_ISERIES
+	iSeries_parse_cmdline();
+#endif
+
+	/* Save unparsed command line copy for /proc/cmdline */
+	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
+
+	parse_early_param();
+
 #ifdef CONFIG_SMP
 #ifndef CONFIG_PPC_ISERIES
 	/*
@@ -355,6 +422,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 				  i);
 		}
 	}
+
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
+		vpa_init(boot_cpuid);
+
 #endif /* CONFIG_PPC_PSERIES */
 #endif /* CONFIG_SMP */
 
@@ -384,27 +455,6 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("-----------------------------------------------------\n");
 
 	mm_init_ppc64();
-
-#if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		vpa_init(boot_cpuid);
-	}
-#endif
-
-	/* Select the correct idle loop for the platform. */
-	idle_setup();
-
-	switch (systemcfg->platform) {
-#ifdef CONFIG_PPC_ISERIES
-	case PLATFORM_ISERIES_LPAR:
-		iSeries_init();
-		break;
-#endif
-	default:
-		/* The following relies on the device tree being */
-		/* fully configured.                             */
-		parse_cmd_line(r3, r4, r5, r6, r7);
-	}
 }
 
 void machine_restart(char *cmd)
@@ -528,62 +578,27 @@ struct seq_operations cpuinfo_op = {
 	.show =	show_cpuinfo,
 };
 
-/*
- * Fetch the cmd_line from open firmware. 
- */
-void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
-		  unsigned long r6, unsigned long r7)
+#if 0 /* XXX not currently used */
+unsigned long memory_limit;
+
+static int __init early_parsemem(char *p)
 {
-	cmd_line[0] = 0;
+	if (!p)
+		return 0;
 
-#ifdef CONFIG_CMDLINE
-	strlcpy(cmd_line, CONFIG_CMDLINE, sizeof(cmd_line));
-#endif /* CONFIG_CMDLINE */
+	memory_limit = memparse(p, &p);
 
-#ifdef CONFIG_PPC_PSERIES
-	{
-	struct device_node *chosen;
-
-	chosen = of_find_node_by_name(NULL, "chosen");
-	if (chosen != NULL) {
-		char *p;
-		p = get_property(chosen, "bootargs", NULL);
-		if (p != NULL && p[0] != 0)
-			strlcpy(cmd_line, p, sizeof(cmd_line));
-		of_node_put(chosen);
-	}
-	}
-#endif
-
-	/* Look for mem= option on command line */
-	if (strstr(cmd_line, "mem=")) {
-		char *p, *q;
-		unsigned long maxmem = 0;
-		extern unsigned long __max_memory;
-
-		for (q = cmd_line; (p = strstr(q, "mem=")) != 0; ) {
-			q = p + 4;
-			if (p > cmd_line && p[-1] != ' ')
-				continue;
-			maxmem = simple_strtoul(q, &q, 0);
-			if (*q == 'k' || *q == 'K') {
-				maxmem <<= 10;
-				++q;
-			} else if (*q == 'm' || *q == 'M') {
-				maxmem <<= 20;
-				++q;
-			}
-		}
-		__max_memory = maxmem;
-	}
+	return 0;
 }
+early_param("mem", early_parsemem);
+#endif
 
 #ifdef CONFIG_PPC_PSERIES
 static int __init set_preferred_console(void)
 {
 	struct device_node *prom_stdout;
 	char *name;
-	int offset;
+	int offset = 0;
 
 	/* The user has requested a console so this is already set up. */
 	if (strstr(saved_command_line, "console="))
@@ -652,26 +667,6 @@ static int __init set_preferred_console(void)
 
 }
 console_initcall(set_preferred_console);
-
-int parse_bootinfo(void)
-{
-	struct bi_record *rec;
-
-	rec = prom.bi_recs;
-
-	if ( rec == NULL || rec->tag != BI_FIRST )
-		return -1;
-
-	for ( ; rec->tag != BI_LAST ; rec = bi_rec_next(rec) ) {
-		switch (rec->tag) {
-		case BI_CMD_LINE:
-			strlcpy(cmd_line, (void *)rec->data, sizeof(cmd_line));
-			break;
-		}
-	}
-
-	return 0;
-}
 #endif
 
 int __init ppc_init(void)
@@ -686,17 +681,6 @@ int __init ppc_init(void)
 }
 
 arch_initcall(ppc_init);
-
-void __init ppc64_calibrate_delay(void)
-{
-	loops_per_jiffy = tb_ticks_per_jiffy;
-
-	printk("Calibrating delay loop... %lu.%02lu BogoMips\n",
-			       loops_per_jiffy/(500000/HZ),
-			       loops_per_jiffy/(5000/HZ) % 100);
-}	
-
-extern void (*calibrate_delay)(void);
 
 #ifdef CONFIG_IRQSTACKS
 static void __init irqstack_early_init(void)
@@ -753,17 +737,10 @@ void __init setup_arch(char **cmdline_p)
 	extern int panic_timeout;
 	extern void do_init_bootmem(void);
 
-	calibrate_delay = ppc64_calibrate_delay;
-
 	ppc64_boot_msg(0x12, "Setup Arch");
 
-#ifdef CONFIG_XMON
-	if (strstr(cmd_line, "xmon")) {
-		/* ensure xmon is enabled */
-		xmon_init();
-		debugger(0);
-	}
-#endif /* CONFIG_XMON */
+	*cmdline_p = cmd_line;
+
 
 	/*
 	 * Set cache line size based on type of cpu as a default.
@@ -784,15 +761,14 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data = (unsigned long) _edata;
 	init_mm.brk = klimit;
 	
-	/* Save unparsed command line copy for /proc/cmdline */
-	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
-	*cmdline_p = cmd_line;
-
 	irqstack_early_init();
 	emergency_stack_init();
 
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
+
+	/* Select the correct idle loop for the platform. */
+	idle_setup();
 
 	ppc_md.setup_arch();
 
