@@ -21,6 +21,7 @@
 #include <asm/smp.h>
 #include <asm/i387.h>
 #include <asm/percpu.h>
+#include <asm/mtrr.h>
 
 char x86_boot_params[2048] __initdata = {0,};
 

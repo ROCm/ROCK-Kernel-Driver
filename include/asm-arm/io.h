@@ -22,7 +22,6 @@
 
 #ifdef __KERNEL__
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <asm/byteorder.h>
 #include <asm/memory.h>
@@ -94,6 +93,8 @@ extern void __readwrite_bug(const char *fn);
  * Note that we prevent GCC re-ordering or caching values in expressions
  * by introducing sequence points into the in*() definitions.  Note that
  * __raw_* do not guarantee this behaviour.
+ *
+ * The {in,out}[bwl] macros are for emulating x86-style PCI/ISA IO space.
  */
 #ifdef __io
 #define outb(v,p)		__raw_writeb(v,__io(p))

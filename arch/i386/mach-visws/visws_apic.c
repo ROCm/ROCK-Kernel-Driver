@@ -324,7 +324,7 @@ static void do_piix4_master_IRQ(unsigned int irq, struct pt_regs * regs)
 	/*
 	 * handle this 'virtual interrupt' as a Cobalt one now.
 	 */
-	kstat.irqs[smp_processor_id()][irq]++;
+	kstat_cpu(smp_processor_id()).irqs[irq]++;
 	do_cobalt_IRQ(realirq, regs);
 
 	spin_lock(&irq_controller_lock);

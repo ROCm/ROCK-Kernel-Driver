@@ -1146,19 +1146,21 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 #endif
 
 	if (vif->flags&VIFF_TUNNEL) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = vif->link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = vif->remote,
 						.saddr = vif->local,
 						.tos = RT_TOS(iph->tos) } },
-				    .oif = vif->link };
+				    .proto = IPPROTO_IPIP };
 		if (ip_route_output_key(&rt, &fl))
 			return;
 		encap = sizeof(struct iphdr);
 	} else {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = vif->link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = iph->daddr,
 						.tos = RT_TOS(iph->tos) } },
-				    .oif = vif->link };
+				    .proto = IPPROTO_IPIP };
 		if (ip_route_output_key(&rt, &fl))
 			return;
 	}

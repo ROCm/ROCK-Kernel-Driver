@@ -130,6 +130,7 @@ struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);
 	void (*close)(struct vm_area_struct * area);
 	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int unused);
+	int (*populate)(struct vm_area_struct * area, unsigned long address, unsigned long len, unsigned long prot, unsigned long pgoff, int nonblock);
 };
 
 /* forward declaration; pte_chain is meant to be internal to rmap.c */
@@ -211,7 +212,6 @@ struct page {
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
 
 extern void FASTCALL(__page_cache_release(struct page *));
-void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
 
 static inline void put_page(struct page *page)
 {
@@ -366,9 +366,12 @@ extern int vmtruncate(struct inode * inode, loff_t offset);
 extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));
 extern pte_t *FASTCALL(pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
 extern pte_t *FASTCALL(pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
+extern int install_page(struct mm_struct *mm, struct vm_area_struct *vma, unsigned long addr, struct page *page, unsigned long prot);
 extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsigned long address, int write_access);
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
+extern int sys_remap_file_pages(unsigned long start, unsigned long size, unsigned long prot, unsigned long pgoff, unsigned long nonblock);
+
 
 extern struct page * follow_page(struct mm_struct *mm, unsigned long address, int write);
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
@@ -376,20 +379,6 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
-
-#ifdef CONFIG_HUGETLB_PAGE
-#define is_vm_hugetlb_page(vma) (vma->vm_flags & VM_HUGETLB)
-extern int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
-extern int follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *, struct page **, struct vm_area_struct **, unsigned long *, int *, int);
-extern	int free_hugepages(struct vm_area_struct *);
-
-#else
-#define is_vm_hugetlb_page(vma) (0)
-#define follow_hugetlb_page(mm, vma, pages, vmas, start, len, i) (0)
-#define copy_hugetlb_page_range(dst, src, vma) (0)
-#define free_hugepages(mpnt)  do { } while(0)
-#endif
-
 
 /*
  * Prototype to add a shrinker callback for ageable caches.
@@ -450,10 +439,10 @@ extern void free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 extern void mem_init(void);
 extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
+#ifdef CONFIG_NUMA
+extern void si_meminfo_node(struct sysinfo *val, int nid);
+#endif
 extern void swapin_readahead(swp_entry_t);
-
-extern int can_share_swap_page(struct page *);
-extern int remove_exclusive_swap_page(struct page *);
 
 /* mmap.c */
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
@@ -534,6 +523,7 @@ extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned lon
 					     struct vm_area_struct **pprev);
 extern int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		     unsigned long addr, int new_below);
+extern void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area);
 
 /* Look up the first VMA which intersects the interval start_addr..end_addr-1,
    NULL if none.  Assume start_addr < end_addr. */

@@ -238,7 +238,7 @@ get_stack(struct k_sigaction *ka, struct pt_regs *regs, unsigned long size)
 
 	/* This is the X/Open sanctioned signal stack switching.  */
 	if (ka->sa.sa_flags & SA_ONSTACK) {
-		if (! sas_ss_flags(rsp) == 0)
+		if (sas_ss_flags(rsp) == 0)
 			rsp = current->sas_ss_sp + current->sas_ss_size;
 	}
 

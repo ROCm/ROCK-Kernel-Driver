@@ -1,0 +1,77 @@
+#
+# PCI Hotplug support
+#
+
+menu "PCI Hotplug Support"
+	depends on HOTPLUG
+
+config HOTPLUG_PCI
+	tristate "Support for PCI Hotplug (EXPERIMENTAL)"
+	depends on PCI && EXPERIMENTAL
+	---help---
+	  Say Y here if you have a motherboard with a PCI Hotplug controller.
+	  This allows you to add and remove PCI cards while the machine is
+	  powered up and running.  The file system pcihpfs must be mounted
+	  in order to interact with any PCI Hotplug controllers.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called pci_hotplug.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_COMPAQ
+	tristate "Compaq PCI Hotplug driver"
+	depends on HOTPLUG_PCI && X86
+	help
+	  Say Y here if you have a motherboard with a Compaq PCI Hotplug
+	  controller.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called cpqphp.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_COMPAQ_NVRAM
+	bool "Save configuration into NVRAM on Compaq servers"
+	depends on HOTPLUG_PCI_COMPAQ
+	help
+	  Say Y here if you have a Compaq server that has a PCI Hotplug
+	  controller.  This will allow the PCI Hotplug driver to store the PCI
+	  system configuration options in NVRAM.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_IBM
+	tristate "IBM PCI Hotplug driver"
+	depends on HOTPLUG_PCI && X86_IO_APIC && X86
+	help
+	  Say Y here if you have a motherboard with a IBM PCI Hotplug
+	  controller.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called cpqphp.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_ACPI
+	tristate "ACPI PCI Hotplug driver"
+	depends on ACPI && HOTPLUG_PCI
+	help
+	  Say Y here if you have a system that supports PCI Hotplug using
+	  ACPI.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called acpiphp.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  When in doubt, say N.
+
+endmenu
+

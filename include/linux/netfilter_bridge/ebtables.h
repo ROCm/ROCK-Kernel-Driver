@@ -20,19 +20,6 @@
 #define EBT_CHAIN_MAXNAMELEN EBT_TABLE_MAXNAMELEN
 #define EBT_FUNCTION_MAXNAMELEN EBT_TABLE_MAXNAMELEN
 
-// [gs]etsockopt numbers
-#define EBT_BASE_CTL            128
-
-#define EBT_SO_SET_ENTRIES      (EBT_BASE_CTL)
-#define EBT_SO_SET_COUNTERS     (EBT_SO_SET_ENTRIES+1)
-#define EBT_SO_SET_MAX          (EBT_SO_SET_COUNTERS+1)
-
-#define EBT_SO_GET_INFO         (EBT_BASE_CTL)
-#define EBT_SO_GET_ENTRIES      (EBT_SO_GET_INFO+1)
-#define EBT_SO_GET_INIT_INFO    (EBT_SO_GET_ENTRIES+1)
-#define EBT_SO_GET_INIT_ENTRIES (EBT_SO_GET_INIT_INFO+1)
-#define EBT_SO_GET_MAX          (EBT_SO_GET_INIT_ENTRIES+1)
-
 // verdicts >0 are "branches"
 #define EBT_ACCEPT   -1
 #define EBT_DROP     -2
@@ -40,13 +27,10 @@
 #define EBT_RETURN   -4
 #define NUM_STANDARD_TARGETS   4
 
-// return values for match() functions
-#define EBT_MATCH 0
-#define EBT_NOMATCH 1
-
 struct ebt_counter
 {
 	uint64_t pcnt;
+	uint64_t bcnt;
 };
 
 struct ebt_entries {
@@ -178,7 +162,24 @@ struct ebt_replace
 	char *entries;
 };
 
+// [gs]etsockopt numbers
+#define EBT_BASE_CTL            128
+
+#define EBT_SO_SET_ENTRIES      (EBT_BASE_CTL)
+#define EBT_SO_SET_COUNTERS     (EBT_SO_SET_ENTRIES+1)
+#define EBT_SO_SET_MAX          (EBT_SO_SET_COUNTERS+1)
+
+#define EBT_SO_GET_INFO         (EBT_BASE_CTL)
+#define EBT_SO_GET_ENTRIES      (EBT_SO_GET_INFO+1)
+#define EBT_SO_GET_INIT_INFO    (EBT_SO_GET_ENTRIES+1)
+#define EBT_SO_GET_INIT_ENTRIES (EBT_SO_GET_INIT_INFO+1)
+#define EBT_SO_GET_MAX          (EBT_SO_GET_INIT_ENTRIES+1)
+
 #ifdef __KERNEL__
+
+// return values for match() functions
+#define EBT_MATCH 0
+#define EBT_NOMATCH 1
 
 struct ebt_match
 {

@@ -343,27 +343,28 @@ static void dma_mmu_get_scsi_one (struct NCR_ESP *esp, Scsi_Cmnd *sp)
 static void dma_mmu_get_scsi_sgl (struct NCR_ESP *esp, Scsi_Cmnd *sp)
 {
     int sz = sp->SCp.buffers_residual;
-    struct mmu_sglist *sg = (struct mmu_sglist *) sp->SCp.buffer;
+    struct scatterlist *sg = sp->SCp.buffer;
 
     while (sz >= 0) {
-        sg[sz].dvma_addr = dvma_map((unsigned long)sg[sz].addr, sg[sz].len);
-        sz--;
+	    sg[sz].dvma_address = dvma_map((unsigned long)page_address(sg[sz].page) +
+					   sg[sz].offset, sg[sz].length);
+	    sz--;
     }
     sp->SCp.ptr=(char *)((unsigned long)sp->SCp.buffer->dvma_address);
 }
 
 static void dma_mmu_release_scsi_one (struct NCR_ESP *esp, Scsi_Cmnd *sp)
 {
-    dvma_unmap(sp->SCp.have_data_in);
+    dvma_unmap((char *)sp->SCp.have_data_in);
 }
 
 static void dma_mmu_release_scsi_sgl (struct NCR_ESP *esp, Scsi_Cmnd *sp)
 {
     int sz = sp->use_sg - 1;
-    struct mmu_sglist *sg = (struct mmu_sglist *)sp->buffer;
+    struct scatterlist *sg = (struct scatterlist *)sp->buffer;
                         
     while(sz >= 0) {
-        dvma_unmap(sg[sz].dvma_addr);
+        dvma_unmap((char *)sg[sz].dvma_address);
         sz--;
     }
 }

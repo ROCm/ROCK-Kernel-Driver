@@ -351,15 +351,26 @@ igmp_max_memberships - INTEGER
 	Change the maximum number of multicast groups we can subscribe to.
 	Default: 20
 
-conf/interface/*: 
-conf/all/* is special and changes the settings for all interfaces.
-	Change special settings per interface.
+conf/interface/*  changes special settings per interface (where "interface" is 
+		  the name of your network interface)
+conf/all/*	  is special, changes the settings for all interfaces
+
 
 log_martians - BOOLEAN
 	Log packets with impossible addresses to kernel log.
+	log_martians for the interface will be enabled if at least one of
+	conf/{all,interface}/log_martians is set to TRUE,
+	it will be disabled otherwise
 
 accept_redirects - BOOLEAN
 	Accept ICMP redirect messages.
+	accept_redirects for the interface will be enabled if:
+	- both conf/{all,interface}/accept_redirects are TRUE in the case forwarding
+	  for the interface is enabled
+	or
+	- at least one of conf/{all,interface}/accept_redirects is TRUE in the case
+	  forwarding for the interface is disabled
+	accept_redirects for the interface will be disabled otherwise
 	default TRUE (host)
 		FALSE (router)
 
@@ -369,6 +380,8 @@ forwarding - BOOLEAN
 mc_forwarding - BOOLEAN
 	Do multicast routing. The kernel needs to be compiled with CONFIG_MROUTE
 	and a multicast routing daemon is required.
+	conf/all/mc_forwarding must also be set to TRUE to enable multicast routing
+	for the interface
 
 medium_id - INTEGER
 	Integer value used to differentiate the devices by the medium they
@@ -383,30 +396,46 @@ medium_id - INTEGER
 
 proxy_arp - BOOLEAN
 	Do proxy arp.
+	proxy_arp for the interface will be enabled if at least one of
+	conf/{all,interface}/proxy_arp is set to TRUE,
+	it will be disabled otherwise
 
 shared_media - BOOLEAN
 	Send(router) or accept(host) RFC1620 shared media redirects.
 	Overrides ip_secure_redirects.
+	shared_media for the interface will be enabled if at least one of
+	conf/{all,interface}/shared_media is set to TRUE,
+	it will be disabled otherwise
 	default TRUE
 
 secure_redirects - BOOLEAN
 	Accept ICMP redirect messages only for gateways,
 	listed in default gateway list.
+	secure_redirects for the interface will be enabled if at least one of
+	conf/{all,interface}/secure_redirects is set to TRUE,
+	it will be disabled otherwise
 	default TRUE
 
 send_redirects - BOOLEAN
-	Send redirects, if router. Default: TRUE
+	Send redirects, if router.
+	send_redirects for the interface will be enabled if at least one of
+	conf/{all,interface}/send_redirects is set to TRUE,
+	it will be disabled otherwise
+	Default: TRUE
 
 bootp_relay - BOOLEAN
 	Accept packets with source address 0.b.c.d destined
 	not to this host as local ones. It is supposed, that
 	BOOTP relay daemon will catch and forward such packets.
-
+	conf/all/bootp_relay must also be set to TRUE to enable BOOTP relay
+	for the interface
 	default FALSE
 	Not Implemented Yet.
 
 accept_source_route - BOOLEAN
 	Accept packets with SRR option.
+	conf/all/accept_source_route must also be set to TRUE to accept packets
+	with SRR option on the interface
 	default TRUE (router)
 		FALSE (host)
 
@@ -417,7 +446,10 @@ rp_filter - BOOLEAN
 	    networks running a slow unreliable protocol (sort of RIP),
 	    or using static routes.
 
-	0 - No source validation. 
+	0 - No source validation.
+
+	conf/all/rp_filter must also be set to TRUE to do source validation
+	on the interface
 
 	Default value is 0. Note that some distributions enable it
 	in startup scripts.
@@ -437,6 +469,10 @@ arp_filter - BOOLEAN
 	particular interfaces. Only for more complex setups like load-
 	balancing, does this behaviour cause problems.
 
+	arp_filter for the interface will be enabled if at least one of
+	conf/{all,interface}/arp_filter is set to TRUE,
+	it will be disabled otherwise
+
 tag - INTEGER
 	Allows you to write a number, which can be used as required.
 	Default value is 0.
@@ -451,8 +487,8 @@ kuznet@ms2.inr.ac.ru
 Updated by:
 Andi Kleen
 ak@muc.de
-
-
+Nicolas Delon
+delon.nicolas@wanadoo.fr
 
 
 
@@ -461,6 +497,15 @@ ak@muc.de
 
 IPv6 has no global variables such as tcp_*.  tcp_* settings under ipv4/ also
 apply to IPv6 [XXX?].
+
+bindv6only - BOOLEAN
+	Default value for IPV6_V6ONLY socket option,
+	which restricts use of the IPv6 socket to IPv6 communication 
+	only.
+		TRUE: disable IPv4-mapped address feature
+		FALSE: enable IPv4-mapped address feature
+
+	Default: FALSE (as specified in RFC2553bis)
 
 conf/default/*:
 	Change the interface-specific default settings.
@@ -560,8 +605,14 @@ router_solicitations - INTEGER
 	routers are present.
 	Default: 3
 
+icmp/*:
+ratelimit - INTEGER
+	Limit the maximal rates for sending ICMPv6 packets.
+	0 to disable any limiting, otherwise the maximal rate in jiffies(1)
+	Default: 100
+
 IPv6 Update by:
-Pekka Savola
-pekkas@netcore.fi
+Pekka Savola <pekkas@netcore.fi>
+YOSHIFUJI Hideaki / USAGI Project <yoshfuji@linux-ipv6.org>
 
 $Id: ip-sysctl.txt,v 1.20 2001/12/13 09:00:18 davem Exp $

@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/personality.h>
 #include <linux/security.h>
+#include <linux/hugetlb.h>
 #include <linux/profile.h>
 
 #include <asm/uaccess.h>
@@ -95,7 +96,7 @@ int vm_enough_memory(long pages)
 		 * this compensates for the swap-space over-allocation
 		 * (ie "nr_swap_pages" being too small).
 		 */
-		free += swapper_space.nrpages;
+		free += total_swapcache_pages;
 
 		/*
 		 * The code below doesn't account for free space in the
@@ -132,7 +133,7 @@ int vm_enough_memory(long pages)
 }
 
 /* Remove one vm structure from the inode's i_mapping address space. */
-static inline void remove_shared_vm_struct(struct vm_area_struct *vma)
+static void remove_shared_vm_struct(struct vm_area_struct *vma)
 {
 	struct file *file = vma->vm_file;
 
@@ -301,7 +302,7 @@ static inline void __vma_link_list(struct mm_struct * mm, struct vm_area_struct 
 	}
 }
 
-static inline void __vma_link_rb(struct mm_struct * mm, struct vm_area_struct * vma,
+static void __vma_link_rb(struct mm_struct * mm, struct vm_area_struct * vma,
 				 struct rb_node ** rb_link, struct rb_node * rb_parent)
 {
 	rb_link_node(&vma->vm_rb, rb_parent, rb_link);
@@ -335,8 +336,9 @@ static void __vma_link(struct mm_struct * mm, struct vm_area_struct * vma,  stru
 	__vma_link_file(vma);
 }
 
-static inline void vma_link(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev,
-			    struct rb_node ** rb_link, struct rb_node * rb_parent)
+static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
+			struct vm_area_struct *prev, struct rb_node **rb_link,
+			struct rb_node *rb_parent)
 {
 	struct address_space *mapping = NULL;
 
@@ -398,6 +400,10 @@ static int vma_merge(struct mm_struct * mm, struct vm_area_struct * prev,
 
 	return 0;
 }
+
+/*
+ * The caller must hold down_write(current->mm->mmap_sem).
+ */
 
 unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 			unsigned long len, unsigned long prot,
@@ -602,6 +608,12 @@ out:
 		mm->locked_vm += len >> PAGE_SHIFT;
 		make_pages_present(addr, addr + len);
 	}
+	if (flags & MAP_POPULATE) {
+		up_write(&mm->mmap_sem);
+		sys_remap_file_pages(addr, len, prot,
+					pgoff, flags & MAP_NONBLOCK);
+		down_write(&mm->mmap_sem);
+	}
 	return addr;
 
 unmap_and_free_vma:
@@ -634,24 +646,33 @@ unacct_error:
 #ifndef HAVE_ARCH_UNMAPPED_AREA
 static inline unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
+	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
+	int found_hole = 0;
 
 	if (len > TASK_SIZE)
 		return -ENOMEM;
 
 	if (addr) {
 		addr = PAGE_ALIGN(addr);
-		vma = find_vma(current->mm, addr);
+		vma = find_vma(mm, addr);
 		if (TASK_SIZE - len >= addr &&
 		    (!vma || addr + len <= vma->vm_start))
 			return addr;
 	}
-	addr = PAGE_ALIGN(TASK_UNMAPPED_BASE);
+	addr = mm->free_area_cache;
 
-	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
+	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr)
 			return -ENOMEM;
+		/*
+		 * Record the first available hole.
+		 */
+		if (!found_hole && (!vma || addr < vma->vm_start)) {
+			mm->free_area_cache = addr;
+			found_hole = 1;
+		}
 		if (!vma || addr + len <= vma->vm_start)
 			return addr;
 		addr = vma->vm_end;
@@ -935,13 +956,19 @@ no_mmaps:
  * By the time this function is called, the area struct has been
  * removed from the process mapping list.
  */
-static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
+void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 {
 	size_t len = area->vm_end - area->vm_start;
 
 	area->vm_mm->total_vm -= len >> PAGE_SHIFT;
 	if (area->vm_flags & VM_LOCKED)
 		area->vm_mm->locked_vm -= len >> PAGE_SHIFT;
+	/*
+	 * Is this a new hole at the lowest possible address?
+	 */
+	if (area->vm_start >= TASK_UNMAPPED_BASE &&
+				area->vm_start < area->vm_mm->free_area_cache)
+	      area->vm_mm->free_area_cache = area->vm_start;
 
 	remove_shared_vm_struct(area);
 
@@ -1020,14 +1047,10 @@ static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
 	touched = NULL;
 	do {
 		struct vm_area_struct *next = mpnt->vm_next;
-		if (!(is_vm_hugetlb_page(mpnt))) {
-			mpnt->vm_next = touched;
-			touched = mpnt;
-			rb_erase(&mpnt->vm_rb, &mm->mm_rb);
-			mm->map_count--;
-		}
-		else
-			free_hugepages(mpnt);
+		mpnt->vm_next = touched;
+		touched = mpnt;
+		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+		mm->map_count--;
 		mpnt = next;
 	} while (mpnt && mpnt->vm_start < end);
 	*npp = mpnt;
@@ -1260,8 +1283,6 @@ void exit_mmap(struct mm_struct * mm)
 
 	profile_exit_mmap(mm);
  
-	release_segments(mm);
- 
 	spin_lock(&mm->page_table_lock);
 
 	tlb = tlb_gather_mmu(mm, 1);
@@ -1280,10 +1301,7 @@ void exit_mmap(struct mm_struct * mm)
 			vm_unacct_memory((end - start) >> PAGE_SHIFT);
 
 		mm->map_count--;
-		if (!(is_vm_hugetlb_page(mpnt)))
-			unmap_page_range(tlb, mpnt, start, end);
-		else
-			mpnt->vm_ops->close(mpnt);
+		unmap_page_range(tlb, mpnt, start, end);
 		mpnt = mpnt->vm_next;
 	}
 

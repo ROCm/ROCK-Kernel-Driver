@@ -54,7 +54,6 @@ static const char *version =
 #include <linux/fcdevice.h> /* had the declarations for init_fcdev among others + includes if_fcdevice.h */
 
 #include <linux/blk.h>
-#include "../../scsi/sd.h"
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "../../fc4/fcp.h"
@@ -3891,9 +3890,10 @@ struct pci_dev *pdev = NULL;
 }
 
 
-int iph5526_biosparam(Disk * disk, struct block_device *n, int ip[])
+int iph5526_biosparam(struct scsi_device *sdev, struct block_device *n,
+		sector_t capacity, int ip[])
 {
-int size = disk->capacity;
+int size = capacity;
 	ip[0] = 64;
 	ip[1] = 32;
 	ip[2] = size >> 11;

@@ -100,7 +100,6 @@ static unsigned long dn_rt_deadline = 0;
 
 static int dn_dst_gc(void);
 static struct dst_entry *dn_dst_check(struct dst_entry *, __u32);
-static struct dst_entry *dn_dst_reroute(struct dst_entry *, struct sk_buff *skb);
 static struct dst_entry *dn_dst_negative_advice(struct dst_entry *);
 static void dn_dst_link_failure(struct sk_buff *);
 static int dn_route_input(struct sk_buff *);
@@ -119,7 +118,6 @@ static struct dst_ops dn_dst_ops = {
 	.gc_thresh =		128,
 	.gc =			dn_dst_gc,
 	.check =		dn_dst_check,
-	.reroute =		dn_dst_reroute,
 	.negative_advice =	dn_dst_negative_advice,
 	.link_failure =		dn_dst_link_failure,
 	.entry_size =		sizeof(struct dn_route),
@@ -199,12 +197,6 @@ static int dn_dst_gc(void)
 static struct dst_entry *dn_dst_check(struct dst_entry *dst, __u32 cookie)
 {
 	dst_release(dst);
-	return NULL;
-}
-
-static struct dst_entry *dn_dst_reroute(struct dst_entry *dst,
-					struct sk_buff *skb)
-{
 	return NULL;
 }
 
@@ -1066,10 +1058,12 @@ static int dn_rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event, int
 	RTA_PUT(skb, RTA_SRC, 2, &rt->rt_saddr);
 	if (rt->u.dst.dev)
 		RTA_PUT(skb, RTA_OIF, sizeof(int), &rt->u.dst.dev->ifindex);
-	if (rt->u.dst.window)
-		RTA_PUT(skb, RTAX_WINDOW, sizeof(unsigned), &rt->u.dst.window);
-	if (rt->u.dst.rtt)
-		RTA_PUT(skb, RTAX_RTT, sizeof(unsigned), &rt->u.dst.rtt);
+	if (dst_metric(&rt->u.dst, RTAX_WINDOW))
+		RTA_PUT(skb, RTAX_WINDOW, sizeof(unsigned),
+			&rt->u.dst.metrics[RTAX_WINDOW - 1]);
+	if (dst_metric(&rt->u.dst, RTAX_RTT))
+		RTA_PUT(skb, RTAX_RTT, sizeof(unsigned),
+			&rt->u.dst.metrics[RTAX_RTT]);
 
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
@@ -1225,7 +1219,7 @@ static int decnet_cache_get_info(char *buffer, char **start, off_t offset, int l
 					dn_addr2asc(dn_ntohs(rt->rt_saddr), buf2),
 					atomic_read(&rt->u.dst.__refcnt),
 					rt->u.dst.__use,
-					(int)rt->u.dst.rtt
+					(int) dst_metric(&rt->u.dst, RTAX_RTT)
 					);
 
 

@@ -492,6 +492,7 @@ out:
 	memset(&fl, 0, sizeof(fl));
 	fl.fl4_dst = eiph->saddr;
 	fl.fl4_tos = RT_TOS(eiph->tos);
+	fl.proto = IPPROTO_GRE;
 	if (ip_route_output_key(&rt, &fl)) {
 		kfree_skb(skb2);
 		return;
@@ -674,12 +675,6 @@ drop_nolock:
 	return(0);
 }
 
-/* Need this wrapper because NF_HOOK takes the function address */
-static inline int do_ip_send(struct sk_buff *skb)
-{
-	return ip_send(skb);
-}
-
 static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = (struct ip_tunnel*)dev->priv;
@@ -757,11 +752,12 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	{
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = tunnel->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = dst,
 						.saddr = tiph->saddr,
 						.tos = RT_TOS(tos) } },
-				    .oif = tunnel->parms.link };
+				    .proto = IPPROTO_GRE };
 		if (ip_route_output_key(&rt, &fl)) {
 			tunnel->stat.tx_carrier_errors++;
 			goto tx_error;
@@ -777,13 +773,16 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	df = tiph->frag_off;
 	if (df)
-		mtu = rt->u.dst.pmtu - tunnel->hlen;
+		mtu = dst_pmtu(&rt->u.dst) - tunnel->hlen;
 	else
-		mtu = skb->dst ? skb->dst->pmtu : dev->mtu;
+		mtu = skb->dst ? dst_pmtu(skb->dst) : dev->mtu;
+
+	if (skb->dst)
+		skb->dst->ops->update_pmtu(skb->dst, mtu);
 
 	if (skb->protocol == htons(ETH_P_IP)) {
-		if (skb->dst && mtu < skb->dst->pmtu && mtu >= 68)
-			skb->dst->pmtu = mtu;
+		if (skb->dst)
+			skb->dst->ops->update_pmtu(skb->dst, mtu);
 
 		df |= (old_iph->frag_off&htons(IP_DF));
 
@@ -798,11 +797,11 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	else if (skb->protocol == htons(ETH_P_IPV6)) {
 		struct rt6_info *rt6 = (struct rt6_info*)skb->dst;
 
-		if (rt6 && mtu < rt6->u.dst.pmtu && mtu >= IPV6_MIN_MTU) {
+		if (rt6 && mtu < dst_pmtu(skb->dst) && mtu >= IPV6_MIN_MTU) {
 			if ((tunnel->parms.iph.daddr && !MULTICAST(tunnel->parms.iph.daddr)) ||
 			    rt6->rt6i_dst.plen == 128) {
 				rt6->rt6i_flags |= RTF_MODIFIED;
-				skb->dst->pmtu = mtu;
+				skb->dst->metrics[RTAX_MTU-1] = mtu;
 			}
 		}
 
@@ -1118,11 +1117,12 @@ static int ipgre_open(struct net_device *dev)
 
 	MOD_INC_USE_COUNT;
 	if (MULTICAST(t->parms.iph.daddr)) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = t->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = t->parms.iph.daddr,
 						.saddr = t->parms.iph.saddr,
 						.tos = RT_TOS(t->parms.iph.tos) } },
-				    .oif = t->parms.link };
+				    .proto = IPPROTO_GRE };
 		struct rtable *rt;
 		if (ip_route_output_key(&rt, &fl)) {
 			MOD_DEC_USE_COUNT;
@@ -1194,11 +1194,12 @@ static int ipgre_tunnel_init(struct net_device *dev)
 	/* Guess output device to choose reasonable mtu and hard_header_len */
 
 	if (iph->daddr) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = tunnel->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = iph->daddr,
 						.saddr = iph->saddr,
 						.tos = RT_TOS(iph->tos) } },
-				    .oif = tunnel->parms.link };
+				    .proto = IPPROTO_GRE };
 		struct rtable *rt;
 		if (!ip_route_output_key(&rt, &fl)) {
 			tdev = rt->u.dst.dev;

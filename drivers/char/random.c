@@ -253,6 +253,7 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/workqueue.h>
+#include <linux/genhd.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -718,7 +719,6 @@ static struct timer_rand_state keyboard_timer_state;
 static struct timer_rand_state mouse_timer_state;
 static struct timer_rand_state extract_timer_state;
 static struct timer_rand_state *irq_timer_state[NR_IRQS];
-static struct timer_rand_state *blkdev_timer_state[MAX_BLKDEV];
 
 /*
  * This function adds entropy to the entropy "pool" by using timing
@@ -812,18 +812,12 @@ void add_interrupt_randomness(int irq)
 	add_timer_randomness(irq_timer_state[irq], 0x100+irq);
 }
 
-void add_blkdev_randomness(int major)
+void add_disk_randomness(struct gendisk *disk)
 {
-	if (major >= MAX_BLKDEV)
+	if (!disk || !disk->random)
 		return;
-
-	if (blkdev_timer_state[major] == 0) {
-		rand_initialize_blkdev(major, GFP_ATOMIC);
-		if (blkdev_timer_state[major] == 0)
-			return;
-	}
-		
-	add_timer_randomness(blkdev_timer_state[major], 0x200+major);
+	/* first major is 1, so we get >= 0x200 here */
+	add_timer_randomness(disk->random, 0x100+MKDEV(disk->major, disk->first_minor));
 }
 
 /******************************************************************
@@ -1447,8 +1441,6 @@ void __init rand_initialize(void)
 #endif
 	for (i = 0; i < NR_IRQS; i++)
 		irq_timer_state[i] = NULL;
-	for (i = 0; i < MAX_BLKDEV; i++)
-		blkdev_timer_state[i] = NULL;
 	memset(&keyboard_timer_state, 0, sizeof(struct timer_rand_state));
 	memset(&mouse_timer_state, 0, sizeof(struct timer_rand_state));
 	memset(&extract_timer_state, 0, sizeof(struct timer_rand_state));
@@ -1472,25 +1464,21 @@ void rand_initialize_irq(int irq)
 		irq_timer_state[irq] = state;
 	}
 }
-
-void rand_initialize_blkdev(int major, int mode)
+ 
+void rand_initialize_disk(struct gendisk *disk)
 {
 	struct timer_rand_state *state;
 	
-	if (major >= MAX_BLKDEV || blkdev_timer_state[major])
-		return;
-
 	/*
 	 * If kmalloc returns null, we just won't use that entropy
 	 * source.
 	 */
-	state = kmalloc(sizeof(struct timer_rand_state), mode);
+	state = kmalloc(sizeof(struct timer_rand_state), GFP_KERNEL);
 	if (state) {
 		memset(state, 0, sizeof(struct timer_rand_state));
-		blkdev_timer_state[major] = state;
+		disk->random = state;
 	}
 }
-
 
 static ssize_t
 random_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
@@ -2309,7 +2297,7 @@ __u32 check_tcp_syn_cookie(__u32 cookie, __u32 saddr, __u32 daddr, __u16 sport,
 EXPORT_SYMBOL(add_keyboard_randomness);
 EXPORT_SYMBOL(add_mouse_randomness);
 EXPORT_SYMBOL(add_interrupt_randomness);
-EXPORT_SYMBOL(add_blkdev_randomness);
+EXPORT_SYMBOL(add_disk_randomness);
 EXPORT_SYMBOL(batch_entropy_store);
 EXPORT_SYMBOL(generate_random_uuid);
 

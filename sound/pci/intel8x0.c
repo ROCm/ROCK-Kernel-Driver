@@ -60,12 +60,12 @@ MODULE_DEVICES("{{Intel,82801AA-ICH},"
 #define SUPPORT_JOYSTICK 1
 #define SUPPORT_MIDI 1
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 #ifdef SUPPORT_JOYSTICK
-static int snd_joystick_port[SNDRV_CARDS] =
+static int joystick_port[SNDRV_CARDS] =
 #ifdef CONFIG_ISA
 	{0x200};	/* enable as default */
 #else
@@ -73,30 +73,30 @@ static int snd_joystick_port[SNDRV_CARDS] =
 #endif
 #endif
 #ifdef SUPPORT_MIDI
-static int snd_mpu_port[SNDRV_CARDS]; /* disabled */
+static int mpu_port[SNDRV_CARDS]; /* disabled */
 #endif
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for Intel i8x0 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for Intel i8x0 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable Intel i8x0 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_ac97_clock, "AC'97 codec clock (0 = auto-detect).");
-MODULE_PARM_SYNTAX(snd_ac97_clock, SNDRV_ENABLED ",default:0");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for Intel i8x0 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for Intel i8x0 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable Intel i8x0 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
+MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:0");
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(snd_joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_joystick_port, "Joystick port address for Intel i8x0 soundcard. (0 = disabled)");
-MODULE_PARM_SYNTAX(snd_joystick_port, SNDRV_ENABLED ",allows:{{0},{0x200}},dialog:list");
+MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick_port, "Joystick port address for Intel i8x0 soundcard. (0 = disabled)");
+MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{0x200}},dialog:list");
 #endif
 #ifdef SUPPORT_MIDI
-MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_mpu_port, "MPU401 port # for Intel i8x0 driver.");
-MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog:list");
+MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(mpu_port, "MPU401 port # for Intel i8x0 driver.");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog:list");
 #endif
 
 /*
@@ -149,7 +149,7 @@ DEFINE_REGSET(PI, 0x00);	/* PCM in */
 DEFINE_REGSET(PO, 0x10);	/* PCM out */
 DEFINE_REGSET(MC, 0x20);	/* Mic in */
 
-/* ICH4 busmater blocks */
+/* ICH4 busmaster blocks */
 DEFINE_REGSET(MC2, 0x40);	/* Mic in 2 */
 DEFINE_REGSET(PI2, 0x50);	/* PCM in 2 */
 DEFINE_REGSET(SP, 0x60);	/* SPDIF out */
@@ -2305,7 +2305,7 @@ static struct shortname_table {
 };
 
 static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
-					const struct pci_device_id *id)
+					const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -2315,12 +2315,12 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
@@ -2333,12 +2333,12 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 		}
 	}
 
-	if ((err = snd_intel8x0_create(card, pci, id->driver_data, &chip)) < 0) {
+	if ((err = snd_intel8x0_create(card, pci, pci_id->driver_data, &chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
 
-	if ((err = snd_intel8x0_mixer(chip, snd_ac97_clock[dev])) < 0) {
+	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev])) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -2390,20 +2390,20 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	}
 	
 	
-	if (snd_mpu_port[dev] == 0x300 || snd_mpu_port[dev] == 0x330) {
+	if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_INTEL8X0,
-					       snd_mpu_port[dev], 0,
+					       mpu_port[dev], 0,
 					       -1, 0, &chip->rmidi)) < 0) {
-			printk(KERN_ERR "intel8x0: no UART401 device at 0x%x, skipping.\n", snd_mpu_port[dev]);
-			snd_mpu_port[dev] = 0;
+			printk(KERN_ERR "intel8x0: no UART401 device at 0x%x, skipping.\n", mpu_port[dev]);
+			mpu_port[dev] = 0;
 		}
 	} else
-		snd_mpu_port[dev] = 0;
+		mpu_port[dev] = 0;
 
 	sprintf(card->longname, "%s at 0x%lx, irq %i",
 		card->shortname, chip->addr, chip->irq);
 
-	if (! snd_ac97_clock[dev])
+	if (! ac97_clock[dev])
 		intel8x0_measure_ac97_clock(chip);
 
 	if ((err = snd_card_register(card)) < 0) {
@@ -2446,24 +2446,24 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 	static int dev;
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	if (snd_joystick_port[dev] > 0 || snd_mpu_port[dev] > 0) {
+	if (joystick_port[dev] > 0 || mpu_port[dev] > 0) {
 		u16 val;
 		pci_read_config_word(pci, 0xe6, &val);
-		if (snd_joystick_port[dev] > 0)
+		if (joystick_port[dev] > 0)
 			val |= 0x100;
-		if (snd_mpu_port[dev] == 0x300 || snd_mpu_port[dev] == 0x330)
+		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330)
 			val |= 0x20;
 		pci_write_config_word(pci, 0xe6, val | 0x100);
 
-		if (snd_mpu_port[dev] == 0x300 || snd_mpu_port[dev] == 0x330) {
+		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
 			u8 b;
 			pci_read_config_byte(pci, 0xe2, &b);
-			if (snd_mpu_port[dev] == 0x300)
+			if (mpu_port[dev] == 0x300)
 				b |= 0x08;
 			else
 				b &= ~0x08;
@@ -2522,7 +2522,7 @@ module_exit(alsa_card_intel8x0_exit)
 
 #ifndef MODULE
 
-/* format is: snd-intel8x0=snd_enable,snd_index,snd_id,snd_ac97_clock */
+/* format is: snd-intel8x0=enable,index,id,ac97_clock */
 
 static int __init alsa_card_intel8x0_setup(char *str)
 {
@@ -2530,10 +2530,10 @@ static int __init alsa_card_intel8x0_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_ac97_clock[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&ac97_clock[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

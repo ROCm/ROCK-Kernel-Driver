@@ -33,13 +33,12 @@
 /* Drop the inode semaphore and wait for a pipe event, atomically */
 void pipe_wait(struct inode * inode)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	current->state = TASK_INTERRUPTIBLE;
-	add_wait_queue(PIPE_WAIT(*inode), &wait);
+	DEFINE_WAIT(wait);
+
+	prepare_to_wait(PIPE_WAIT(*inode), &wait, TASK_INTERRUPTIBLE);
 	up(PIPE_SEM(*inode));
 	schedule();
-	remove_wait_queue(PIPE_WAIT(*inode), &wait);
-	current->state = TASK_RUNNING;
+	finish_wait(PIPE_WAIT(*inode), &wait);
 	down(PIPE_SEM(*inode));
 }
 
@@ -109,7 +108,7 @@ pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 			break;
 		}
 		if (do_wakeup) {
-			wake_up_interruptible(PIPE_WAIT(*inode));
+			wake_up_interruptible_sync(PIPE_WAIT(*inode));
  			kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 		}
 		pipe_wait(inode);
@@ -117,7 +116,7 @@ pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	up(PIPE_SEM(*inode));
 	/* Signal writers asynchronously that there is more room.  */
 	if (do_wakeup) {
-		wake_up_interruptible_sync(PIPE_WAIT(*inode));
+		wake_up_interruptible(PIPE_WAIT(*inode));
 		kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 	}
 	if (ret > 0)

@@ -29,7 +29,7 @@
  *
  * 2001/10/18 merge pmac cleanup (Benjamin Herrenschmidt) and bugfixes
  *	from post-2.4.5 patches.
- * 2001/09/20 USB_ZERO_PACKET support; hcca_dma portability, OPTi warning
+ * 2001/09/20 URB_ZERO_PACKET support; hcca_dma portability, OPTi warning
  * 2001/09/07 match PCI PM changes, errnos from Linus' tree
  * 2001/05/05 fork 2.4.5 version into "hcd" framework, cleanup, simplify;
  *	pbook pci quirks gone (please fix pbook pci sw!) (db)
@@ -185,7 +185,7 @@ static int ohci_urb_enqueue (
 			/* ... and maybe a zero length packet to wrap it up */
 			if (size == 0)
 				size++;
-			else if ((urb->transfer_flags & USB_ZERO_PACKET) != 0
+			else if ((urb->transfer_flags & URB_ZERO_PACKET) != 0
 				&& (urb->transfer_buffer_length
 					% usb_maxpacket (urb->dev, pipe,
 						usb_pipeout (pipe))) == 0)
@@ -239,7 +239,7 @@ static int ohci_urb_enqueue (
 			frame |= ed->branch;
 			urb->start_frame = frame;
 
-			/* yes, only USB_ISO_ASAP is supported, and
+			/* yes, only URB_ISO_ASAP is supported, and
 			 * urb->start_frame is never used as input.
 			 */
 		}
@@ -383,10 +383,16 @@ static int hc_reset (struct ohci_hcd *ohci)
 
 	/* SMM owns the HC?  not for long! */
 	if (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
-		temp = 50;	/* arbitrary: half second */
+		dbg ("USB HC TakeOver from BIOS/SMM");
+
+		/* this timeout is arbitrary.  we make it long, so systems
+		 * depending on usb keyboards may be usable even if the
+		 * BIOS/SMM code seems pretty broken.
+		 */
+		temp = 500;	/* arbitrary: five seconds */
+
 		writel (OHCI_INTR_OC, &ohci->regs->intrenable);
 		writel (OHCI_OCR, &ohci->regs->cmdstatus);
-		dbg ("USB HC TakeOver from SMM");
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 			wait_ms (10);
 			if (--temp == 0) {

@@ -772,9 +772,19 @@ static void edge_interrupt_callback (struct urb *urb)
 		return;
 	}
 
-	if (urb->status) {
-		dbg("%s - nonzero control read status received: %d", __FUNCTION__, urb->status);
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
 	}
 
 	// process this interrupt-read even if there are no ports open
@@ -825,6 +835,12 @@ static void edge_interrupt_callback (struct urb *urb)
 			position += 2;
 			++portNumber;
 		}
+	}
+
+exit:
+	result = usb_submit_urb (urb, GFP_ATOMIC);
+	if (result) {
+		err("%s - Error %d submitting control urb", __FUNCTION__, result);
 	}
 }
 
@@ -1020,21 +1036,22 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		edge_serial->bulk_out_endpoint = port0->bulk_out_endpointAddress;
 	
 		/* set up our interrupt urb */
-		FILL_INT_URB(edge_serial->interrupt_read_urb,
-			     serial->dev,
-			     usb_rcvintpipe(serial->dev,
-					    port0->interrupt_in_endpointAddress),
-			     port0->interrupt_in_buffer,
-			     edge_serial->interrupt_read_urb->transfer_buffer_length,
-			     edge_interrupt_callback, edge_serial,
-			     edge_serial->interrupt_read_urb->interval);
+		usb_fill_int_urb(edge_serial->interrupt_read_urb,
+				 serial->dev,
+				 usb_rcvintpipe(serial->dev,
+					        port0->interrupt_in_endpointAddress),
+				 port0->interrupt_in_buffer,
+				 edge_serial->interrupt_read_urb->transfer_buffer_length,
+				 edge_interrupt_callback, edge_serial,
+				 edge_serial->interrupt_read_urb->interval);
 		
 		/* set up our bulk in urb */
-		FILL_BULK_URB(edge_serial->read_urb, serial->dev,
-			      usb_rcvbulkpipe(serial->dev, port0->bulk_in_endpointAddress),
-			      port0->bulk_in_buffer,
-			      edge_serial->read_urb->transfer_buffer_length,
-			      edge_bulk_in_callback, edge_serial);
+		usb_fill_bulk_urb(edge_serial->read_urb, serial->dev,
+				  usb_rcvbulkpipe(serial->dev,
+					  	  port0->bulk_in_endpointAddress),
+				  port0->bulk_in_buffer,
+				  edge_serial->read_urb->transfer_buffer_length,
+				  edge_bulk_in_callback, edge_serial);
 
 		/* start interrupt read for this edgeport
 		 * this interrupt will continue as long as the edgeport is connected */
@@ -1462,7 +1479,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	}
 
 	/* fill up the urb with all of our data and submit it */
-	FILL_BULK_URB (urb, edge_serial->serial->dev, 
+	usb_fill_bulk_urb (urb, edge_serial->serial->dev, 
 		       usb_sndbulkpipe(edge_serial->serial->dev, edge_serial->bulk_out_endpoint),
 		       buffer, count+2, edge_bulk_out_data_callback, edge_port);
 
@@ -2487,7 +2504,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	CmdUrbs++;
 	dbg("%s - ALLOCATE URB %p (outstanding %d)", __FUNCTION__, urb, CmdUrbs);
 
-	FILL_BULK_URB (urb, edge_serial->serial->dev, 
+	usb_fill_bulk_urb (urb, edge_serial->serial->dev, 
 		       usb_sndbulkpipe(edge_serial->serial->dev, edge_serial->bulk_out_endpoint),
 		       buffer, length, edge_bulk_out_cmd_callback, edge_port);
 

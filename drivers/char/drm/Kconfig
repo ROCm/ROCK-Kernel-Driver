@@ -1,0 +1,63 @@
+#
+# Drm device configuration
+#
+# This driver provides support for the
+# Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+#
+config DRM
+	bool "Direct Rendering Manager (XFree86 4.1.0 and higher DRI support)"
+	help
+	  Kernel-level support for the Direct Rendering Infrastructure (DRI)
+	  introduced in XFree86 4.0. If you say Y here, you need to select
+	  the module that's right for your graphics card from the list below.
+	  These modules provide support for synchronization, security, and
+	  DMA transfers. Please see <http://dri.sourceforge.net/> for more
+	  details.  You should also select and configure AGP
+	  (/dev/agpgart) support.
+
+config DRM_TDFX
+	tristate "3dfx Banshee/Voodoo3+"
+	depends on DRM
+	help
+	  Choose this option if you have a 3dfx Banshee or Voodoo3 (or later),
+	  graphics card.  If M is selected, the module will be called tdfx.o.
+
+#    tristate '  3dlabs GMX 2000' CONFIG_DRM_GAMMA
+config DRM_R128
+	tristate "ATI Rage 128"
+	depends on DRM
+	help
+	  Choose this option if you have an ATI Rage 128 graphics card.  If M
+	  is selected, the module will be called r128.o.  AGP support for
+	  this card is strongly suggested (unless you have a PCI version).
+
+config DRM_RADEON
+	tristate "ATI Radeon"
+	depends on DRM && AGP
+	help
+	  Choose this option if you have an ATI Radeon graphics card.  There
+	  are both PCI and AGP versions.  You don't need to choose this to
+	  run the Radeon in plain VGA mode.  There is a product page at
+	  <http://www.ati.com/na/pages/products/pc/radeon32/index.html>.
+	  If M is selected, the module will be called radeon.o.
+
+config DRM_I810
+	tristate "Intel I810"
+	depends on DRM && AGP
+	help
+	  Choose this option if you have an Intel I810 graphics card.  If M is
+	  selected, the module will be called i810.o.  AGP support is required
+	  for this driver to work.
+
+config DRM_I830
+	tristate "Intel 830M"
+	depends on DRM && AGP
+
+config DRM_MGA
+	tristate "Matrox g200/g400"
+	depends on DRM && AGP
+	help
+	  Choose this option if you have a Matrox G200, G400 or G450 graphics
+	  card.  If M is selected, the module will be called mga.o.  AGP
+	  support is required for this driver to work.
+

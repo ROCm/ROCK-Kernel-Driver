@@ -43,6 +43,8 @@ struct ext2_sb_info {
 	int s_inode_size;
 	int s_first_ino;
 	u32 s_next_generation;
+	unsigned long s_dir_count;
+	u8 *s_debts;
 };
 
 #endif	/* _LINUX_EXT2_FS_SB */

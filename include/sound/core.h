@@ -200,9 +200,9 @@ typedef struct _snd_minor snd_minor_t;
 /* sound.c */
 
 extern int snd_ecards_limit;
-extern int snd_device_mode;
-extern int snd_device_gid;
-extern int snd_device_uid;
+extern int device_mode;
+extern int device_gid;
+extern int device_uid;
 
 void snd_request_card(int card);
 

@@ -27,6 +27,7 @@ extern int get_filesystem_list(char * buf);
 extern asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
 	 unsigned long flags, void *data);
 extern asmlinkage long sys_mkdir(const char *name, int mode);
+extern asmlinkage long sys_rmdir(const char *name);
 extern asmlinkage long sys_chdir(const char *name);
 extern asmlinkage long sys_fchdir(int fd);
 extern asmlinkage long sys_chroot(const char *name);
@@ -55,6 +56,7 @@ int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 
 int root_mountflags = MS_RDONLY | MS_VERBOSE;
 static char root_device_name[64];
+static char saved_root_name[64];
 
 /* this is initialized in init/main.c */
 dev_t ROOT_DEV;
@@ -87,169 +89,135 @@ static int __init readwrite(char *str)
 __setup("ro", readonly);
 __setup("rw", readwrite);
 
-static struct dev_name_struct {
-	const char *name;
-	const int num;
-} root_dev_names[] __initdata = {
-	{ "nfs",     0x00ff },
-	{ "hda",     0x0300 },
-	{ "hdb",     0x0340 },
-	{ "loop",    0x0700 },
-	{ "hdc",     0x1600 },
-	{ "hdd",     0x1640 },
-	{ "hde",     0x2100 },
-	{ "hdf",     0x2140 },
-	{ "hdg",     0x2200 },
-	{ "hdh",     0x2240 },
-	{ "hdi",     0x3800 },
-	{ "hdj",     0x3840 },
-	{ "hdk",     0x3900 },
-	{ "hdl",     0x3940 },
-	{ "hdm",     0x5800 },
-	{ "hdn",     0x5840 },
-	{ "hdo",     0x5900 },
-	{ "hdp",     0x5940 },
-	{ "hdq",     0x5A00 },
-	{ "hdr",     0x5A40 },
-	{ "hds",     0x5B00 },
-	{ "hdt",     0x5B40 },
-	{ "sda",     0x0800 },
-	{ "sdb",     0x0810 },
-	{ "sdc",     0x0820 },
-	{ "sdd",     0x0830 },
-	{ "sde",     0x0840 },
-	{ "sdf",     0x0850 },
-	{ "sdg",     0x0860 },
-	{ "sdh",     0x0870 },
-	{ "sdi",     0x0880 },
-	{ "sdj",     0x0890 },
-	{ "sdk",     0x08a0 },
-	{ "sdl",     0x08b0 },
-	{ "sdm",     0x08c0 },
-	{ "sdn",     0x08d0 },
-	{ "sdo",     0x08e0 },
-	{ "sdp",     0x08f0 },
-	{ "ada",     0x1c00 },
-	{ "adb",     0x1c10 },
-	{ "adc",     0x1c20 },
-	{ "add",     0x1c30 },
-	{ "ade",     0x1c40 },
-	{ "fd",      0x0200 },
-	{ "md",      0x0900 },	     
-	{ "xda",     0x0d00 },
-	{ "xdb",     0x0d40 },
-	{ "ram",     0x0100 },
-	{ "scd",     0x0b00 },
-	{ "mcd",     0x1700 },
-	{ "cdu535",  0x1800 },
-	{ "sonycd",  0x1800 },
-	{ "aztcd",   0x1d00 },
-	{ "cm206cd", 0x2000 },
-	{ "gscd",    0x1000 },
-	{ "sbpcd",   0x1900 },
-	{ "eda",     0x2400 },
-	{ "edb",     0x2440 },
-	{ "pda",	0x2d00 },
-	{ "pdb",	0x2d10 },
-	{ "pdc",	0x2d20 },
-	{ "pdd",	0x2d30 },
-	{ "pcd",	0x2e00 },
-	{ "pf",		0x2f00 },
-	{ "apblock", APBLOCK_MAJOR << 8},
-	{ "ddv", DDV_MAJOR << 8},
-	{ "jsfd",    JSFD_MAJOR << 8},
-#if defined(CONFIG_ARCH_S390)
-	{ "dasda", (DASD_MAJOR << MINORBITS) },
-	{ "dasdb", (DASD_MAJOR << MINORBITS) + (1 << 2) },
-	{ "dasdc", (DASD_MAJOR << MINORBITS) + (2 << 2) },
-	{ "dasdd", (DASD_MAJOR << MINORBITS) + (3 << 2) },
-	{ "dasde", (DASD_MAJOR << MINORBITS) + (4 << 2) },
-	{ "dasdf", (DASD_MAJOR << MINORBITS) + (5 << 2) },
-	{ "dasdg", (DASD_MAJOR << MINORBITS) + (6 << 2) },
-	{ "dasdh", (DASD_MAJOR << MINORBITS) + (7 << 2) },
-#endif
-#if defined(CONFIG_BLK_CPQ_DA) || defined(CONFIG_BLK_CPQ_DA_MODULE)
-	{ "ida/c0d0p",0x4800 },
-	{ "ida/c0d1p",0x4810 },
-	{ "ida/c0d2p",0x4820 },
-	{ "ida/c0d3p",0x4830 },
-	{ "ida/c0d4p",0x4840 },
-	{ "ida/c0d5p",0x4850 },
-	{ "ida/c0d6p",0x4860 },
-	{ "ida/c0d7p",0x4870 },
-	{ "ida/c0d8p",0x4880 },
-	{ "ida/c0d9p",0x4890 },
-	{ "ida/c0d10p",0x48A0 },
-	{ "ida/c0d11p",0x48B0 },
-	{ "ida/c0d12p",0x48C0 },
-	{ "ida/c0d13p",0x48D0 },
-	{ "ida/c0d14p",0x48E0 },
-	{ "ida/c0d15p",0x48F0 },
-#endif
-#if defined(CONFIG_BLK_CPQ_CISS_DA) || defined(CONFIG_BLK_CPQ_CISS_DA_MODULE)
-	{ "cciss/c0d0p",0x6800 },
-	{ "cciss/c0d1p",0x6810 },
-	{ "cciss/c0d2p",0x6820 },
-	{ "cciss/c0d3p",0x6830 },
-	{ "cciss/c0d4p",0x6840 },
-	{ "cciss/c0d5p",0x6850 },
-	{ "cciss/c0d6p",0x6860 },
-	{ "cciss/c0d7p",0x6870 },
-	{ "cciss/c0d8p",0x6880 },
-	{ "cciss/c0d9p",0x6890 },
-	{ "cciss/c0d10p",0x68A0 },
-	{ "cciss/c0d11p",0x68B0 },
-	{ "cciss/c0d12p",0x68C0 },
-	{ "cciss/c0d13p",0x68D0 },
-	{ "cciss/c0d14p",0x68E0 },
-	{ "cciss/c0d15p",0x68F0 },
-#endif
-	{ "nftla", 0x5d00 },
-	{ "nftlb", 0x5d10 },
-	{ "nftlc", 0x5d20 },
-	{ "nftld", 0x5d30 },
-	{ "ftla", 0x2c00 },
-	{ "ftlb", 0x2c08 },
-	{ "ftlc", 0x2c10 },
-	{ "ftld", 0x2c18 },
-	{ "mtdblock", 0x1f00 },
-	{ NULL, 0 }
-};
-
-kdev_t __init name_to_kdev_t(char *line)
+static __init dev_t try_name(char *name, int part)
 {
-	int base = 0;
+	char path[64];
+	char buf[32];
+	int range;
+	dev_t res;
+	char *s;
+	int len;
+	int fd;
 
-	if (strncmp(line,"/dev/",5) == 0) {
-		struct dev_name_struct *dev = root_dev_names;
-		line += 5;
-		do {
-			int len = strlen(dev->name);
-			if (strncmp(line,dev->name,len) == 0) {
-				line += len;
-				base = dev->num;
-				break;
-			}
-			dev++;
-		} while (dev->name);
+	/* read device number from .../dev */
+
+	sprintf(path, "/sys/block/%s/dev", name);
+	fd = open(path, 0, 0);
+	if (fd < 0)
+		goto fail;
+	len = read(fd, buf, 32);
+	close(fd);
+	if (len <= 0 || len == 32 || buf[len - 1] != '\n')
+		goto fail;
+	buf[len - 1] = '\0';
+	res = (dev_t) simple_strtoul(buf, &s, 16);
+	if (*s)
+		goto fail;
+
+	/* if it's there and we are not looking for a partition - that's it */
+	if (!part)
+		return res;
+
+	/* otherwise read range from .../range */
+	sprintf(path, "/sys/block/%s/range", name);
+	fd = open(path, 0, 0);
+	if (fd < 0)
+		goto fail;
+	len = read(fd, buf, 32);
+	close(fd);
+	if (len <= 0 || len == 32 || buf[len - 1] != '\n')
+		goto fail;
+	buf[len - 1] = '\0';
+	range = simple_strtoul(buf, &s, 10);
+	if (*s)
+		goto fail;
+
+	/* if partition is within range - we got it */
+	if (part < range)
+		return res + part;
+fail:
+	return (dev_t) 0;
+}
+
+/*
+ *	Convert a name into device number.  We accept the following variants:
+ *
+ *	1) device number in hexadecimal	represents itself
+ *	2) /dev/nfs represents Root_NFS (0xff)
+ *	3) /dev/<disk_name> represents the device number of disk
+ *	4) /dev/<disk_name><decimal> represents the device number
+ *         of partition - device number of disk plus the partition number
+ *	5) /dev/<disk_name>p<decimal> - same as the above, that form is
+ *	   used when disk name of partitioned disk ends on a digit.
+ *
+ *	If name doesn't have fall into the categories above, we return 0.
+ *	Driverfs is used to check if something is a disk name - it has
+ *	all known disks under bus/block/devices.  If the disk name
+ *	contains slashes, name of driverfs node has them replaced with
+ *	dots.  try_name() does the actual checks, assuming that driverfs
+ *	is mounted on rootfs /sys.
+ */
+
+__init dev_t name_to_dev_t(char *name)
+{
+	char s[32];
+	char *p;
+	dev_t res = 0;
+	int part;
+
+	sys_mkdir("/sys", 0700);
+	if (sys_mount("sysfs", "/sys", "sysfs", 0, NULL) < 0)
+		goto out;
+
+	if (strncmp(name, "/dev/", 5) != 0) {
+		res = (dev_t) simple_strtoul(name, &p, 16);
+		if (*p)
+			goto fail;
+		goto done;
 	}
-	return to_kdev_t(base + simple_strtoul(line,NULL,base?10:16));
+	name += 5;
+	res = Root_NFS;
+	if (strcmp(name, "nfs") == 0)
+		goto done;
+
+	if (strlen(name) > 31)
+		goto fail;
+	strcpy(s, name);
+	for (p = s; *p; p++)
+		if (*p == '/')
+			*p = '.';
+	res = try_name(s, 0);
+	if (res)
+		goto done;
+
+	while (p > s && isdigit(p[-1]))
+		p--;
+	if (p == s || !*p || *p == '0')
+		goto fail;
+	part = simple_strtoul(p, NULL, 10);
+	*p = '\0';
+	res = try_name(s, part);
+	if (res)
+		goto done;
+
+	if (p < s + 2 || !isdigit(p[-2]) || p[-1] != 'p')
+		goto fail;
+	p[-1] = '\0';
+	res = try_name(s, part);
+done:
+	sys_umount("/sys", 0);
+out:
+	sys_rmdir("/sys");
+	return res;
+fail:
+	res = (dev_t) 0;
+	goto done;
 }
 
 static int __init root_dev_setup(char *line)
 {
-	int i;
-	char ch;
-
-	ROOT_DEV = kdev_t_to_nr(name_to_kdev_t(line));
-	memset (root_device_name, 0, sizeof root_device_name);
-	if (strncmp (line, "/dev/", 5) == 0) line += 5;
-	for (i = 0; i < sizeof root_device_name - 1; ++i)
-	{
-	    ch = line[i];
-	    if ( isspace (ch) || (ch == ',') || (ch == '\0') ) break;
-	    root_device_name[i] = ch;
-	}
+	strncpy(saved_root_name, line, 64);
+	saved_root_name[63] = '\0';
 	return 1;
 }
 
@@ -768,14 +736,19 @@ static int __init initrd_load(void)
 void prepare_namespace(void)
 {
 	int is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
+	if (saved_root_name[0]) {
+		char *p = saved_root_name;
+		ROOT_DEV = name_to_dev_t(p);
+		if (strncmp(p, "/dev/", 5) == 0)
+			p += 5;
+		strcpy(root_device_name, p);
+	}
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (!initrd_start)
 		mount_initrd = 0;
 	real_root_dev = ROOT_DEV;
 #endif
-	sys_mkdir("/dev", 0700);
-	sys_mkdir("/root", 0700);
-	sys_mknod("/dev/console", S_IFCHR|0600, MKDEV(TTYAUX_MAJOR, 1));
+
 #ifdef CONFIG_DEVFS_FS
 	sys_mount("devfs", "/dev", "devfs", 0, NULL);
 	do_devfs = 1;

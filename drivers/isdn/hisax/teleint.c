@@ -19,6 +19,7 @@
 extern const char *CardType[];
 
 const char *TeleInt_revision = "$Revision: 1.14.6.2 $";
+static spinlock_t teleint_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -28,21 +29,20 @@ readreg(unsigned int ale, unsigned int adr, u_char off)
 {
 	register u_char ret;
 	int max_delay = 2000;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&teleint_lock, flags);
 	byteout(ale, off);
 	ret = HFC_BUSY & bytein(ale);
 	while (ret && --max_delay)
 		ret = HFC_BUSY & bytein(ale);
 	if (!max_delay) {
 		printk(KERN_WARNING "TeleInt Busy not inactive\n");
-		restore_flags(flags);
+		spin_unlock_irqrestore(&teleint_lock, flags);
 		return (0);
 	}
 	ret = bytein(adr);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&teleint_lock, flags);
 	return (ret);
 }
 
@@ -72,21 +72,20 @@ writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
 	register u_char ret;
 	int max_delay = 2000;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&teleint_lock, flags);
 	byteout(ale, off);
 	ret = HFC_BUSY & bytein(ale);
 	while (ret && --max_delay)
 		ret = HFC_BUSY & bytein(ale);
 	if (!max_delay) {
 		printk(KERN_WARNING "TeleInt Busy not inactive\n");
-		restore_flags(flags);
+		spin_unlock_irqrestore(&teleint_lock, flags);
 		return;
 	}
 	byteout(adr, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&teleint_lock, flags);
 }
 
 static inline void
@@ -220,20 +219,15 @@ release_io_TeleInt(struct IsdnCardState *cs)
 static void
 reset_TeleInt(struct IsdnCardState *cs)
 {
-	long flags;
-
 	printk(KERN_INFO "TeleInt: resetting card\n");
 	cs->hw.hfc.cirm |= HFC_RESET;
 	byteout(cs->hw.hfc.addr | 1, cs->hw.hfc.cirm);	/* Reset On */
-	save_flags(flags);
-	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);
 	cs->hw.hfc.cirm &= ~HFC_RESET;
 	byteout(cs->hw.hfc.addr | 1, cs->hw.hfc.cirm);	/* Reset Off */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
-	restore_flags(flags);
 }
 
 static int

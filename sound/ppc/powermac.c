@@ -34,23 +34,23 @@ MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Apple,PowerMac}}");
 MODULE_LICENSE("GPL");
 
-static int snd_index = SNDRV_DEFAULT_IDX1;		/* Index 0-MAX */
-static char *snd_id = SNDRV_DEFAULT_STR1;		/* ID for this card */
-static int snd_enable = 1;
-static int snd_enable_beep = 1;
+static int index = SNDRV_DEFAULT_IDX1;		/* Index 0-MAX */
+static char *id = SNDRV_DEFAULT_STR1;		/* ID for this card */
+static int enable = 1;
+static int enable_beep = 1;
 
-MODULE_PARM(snd_index, "i");
-MODULE_PARM_DESC(snd_index, "Index value for " CHIP_NAME " soundchip.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "s");
-MODULE_PARM_DESC(snd_id, "ID string for " CHIP_NAME " soundchip.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "i");
-MODULE_PARM_DESC(snd_enable, "Enable this soundchip.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_enable_beep, "i");
-MODULE_PARM_DESC(snd_enable_beep, "Enable beep using PCM.");
-MODULE_PARM_SYNTAX(snd_enable_beep, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
+MODULE_PARM(index, "i");
+MODULE_PARM_DESC(index, "Index value for " CHIP_NAME " soundchip.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "s");
+MODULE_PARM_DESC(id, "ID string for " CHIP_NAME " soundchip.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "i");
+MODULE_PARM_DESC(enable, "Enable this soundchip.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(enable_beep, "i");
+MODULE_PARM_DESC(enable_beep, "Enable beep using PCM.");
+MODULE_PARM_SYNTAX(enable_beep, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 
 
 /*
@@ -69,7 +69,7 @@ static int __init snd_pmac_probe(void)
 	char *name_ext;
 	int err;
 
-	card = snd_card_new(snd_index, snd_id, THIS_MODULE, 0);
+	card = snd_card_new(index, id, THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
@@ -129,7 +129,7 @@ static int __init snd_pmac_probe(void)
 		goto __error;
 
 	chip->initialized = 1;
-	if (snd_enable_beep)
+	if (enable_beep)
 		snd_pmac_attach_beep(chip);
 
 	if ((err = snd_card_register(card)) < 0)
@@ -172,15 +172,15 @@ module_exit(alsa_card_pmac_exit)
 
 #ifndef MODULE
 
-/* format is: snd-pmac=snd_enable,snd_index,snd_id,snd_enable_beep
+/* format is: snd-pmac=enable,index,id,enable_beep
  */
 
 static int __init alsa_card_pmac_setup(char *str)
 {
-	(void)(get_option(&str,&snd_enable) == 2 &&
-	       get_option(&str,&snd_index) == 2 &&
-	       get_id(&str,&snd_id) == 2 &&
-	       get_option(&str,&snd_enable_beep) == 2
+	(void)(get_option(&str,&enable) == 2 &&
+	       get_option(&str,&index) == 2 &&
+	       get_id(&str,&id) == 2 &&
+	       get_option(&str,&enable_beep) == 2
 	       );
 	return 1;
 }

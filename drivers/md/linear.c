@@ -52,19 +52,21 @@ static inline dev_info_t *which_dev(mddev_t *mddev, sector_t sector)
  *	@bio: the buffer head that's been built up so far
  *	@biovec: the request that could be merged to it.
  *
- *	Return 1 if the merge is not permitted (because the
- *	result would cross a device boundary), 0 otherwise.
+ *	Return amount of bytes we can take at this offset
  */
 static int linear_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio_vec *biovec)
 {
 	mddev_t *mddev = q->queuedata;
-	dev_info_t *dev0, *dev1;
+	dev_info_t *dev0;
+	int maxsectors, bio_sectors = (bio->bi_size + biovec->bv_len) >> 9;
 
 	dev0 = which_dev(mddev, bio->bi_sector);
-	dev1 = which_dev(mddev, bio->bi_sector +
-			        ((bio->bi_size + biovec->bv_len - 1) >> 9));
+	maxsectors = (dev0->size << 1) - (bio->bi_sector - (dev0->offset<<1));
 
-	return dev0 != dev1;
+	if (bio_sectors <= maxsectors)
+		return biovec->bv_len;
+
+	return (maxsectors << 9) - bio->bi_size;
 }
 
 static int linear_run (mddev_t *mddev)

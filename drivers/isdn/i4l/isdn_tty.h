@@ -1,13 +1,10 @@
-/* $Id: isdn_tty.h,v 1.22.6.2 2001/09/23 22:24:32 kai Exp $
- *
- * header for Linux ISDN subsystem, tty related functions (linklevel).
+/* Linux ISDN subsystem, tty related functions
  *
  * Copyright 1994-1999  by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    by Thinking Objects Software GmbH Wuerzburg
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #include <linux/config.h>
@@ -101,16 +98,9 @@
 	((info->emu.mdmreg[REG_L2PROT] == ISDN_PROTO_L2_FAX) && \
 	 (info->emu.mdmreg[REG_L3PROT] == ISDN_PROTO_L3_FCLASS2))
 
-extern void isdn_tty_modem_escape(void);
-extern void isdn_tty_modem_ring(void);
-extern void isdn_tty_carrier_timeout(void);
-extern void isdn_tty_modem_xmit(void);
 extern int isdn_tty_init(void);
-extern void isdn_tty_readmodem(void);
-extern int isdn_tty_find_icall(int, int, setup_parm *);
+extern int isdn_tty_find_icall(struct isdn_slot *slot, setup_parm *setup);
 extern void isdn_tty_cleanup_xmit(modem_info *);
-extern int isdn_tty_stat_callback(int, isdn_ctrl *);
-extern int isdn_tty_rcv_skb(int, int, int, struct sk_buff *);
 extern int isdn_tty_capi_facility(capi_msg *cm); 
 extern void isdn_tty_at_cout(char *, modem_info *);
 extern void isdn_tty_modem_hup(modem_info *, int);
@@ -122,3 +112,22 @@ extern void isdn_tty_fax_bitorder(modem_info *, struct sk_buff *);
 
 extern int isdn_tty_init(void);
 extern void isdn_tty_exit(void);
+
+struct isdn_modem {
+  int                refcount;			   /* Number of opens        */
+  struct tty_driver  tty_modem;			   /* tty-device             */
+  struct tty_driver  cua_modem;			   /* cua-device             */
+  struct tty_struct  *modem_table[ISDN_MAX_CHANNELS]; /* ?? copied from Orig */
+  struct termios     *modem_termios[ISDN_MAX_CHANNELS];
+  struct termios     *modem_termios_locked[ISDN_MAX_CHANNELS];
+  modem_info         info[ISDN_MAX_CHANNELS];	   /* Private data           */
+};
+
+extern struct isdn_modem isdn_mdm;
+
+static inline void
+isdn_tty_queue_tail(modem_info *info, struct sk_buff *skb, int len)
+{
+	__skb_queue_tail(&info->rpqueue, skb);
+	info->rcvcount += len;
+}

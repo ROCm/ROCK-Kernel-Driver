@@ -192,4 +192,19 @@ struct iphdr {
 	/*The options start here. */
 };
 
+struct ip_auth_hdr {
+	__u8  nexthdr;
+	__u8  hdrlen;		/* This one is measured in 32 bit units! */
+	__u16 reserved;
+	__u32 spi;
+	__u32 seq_no;		/* Sequence number */
+	__u8  auth_data[4];	/* Variable len but >=4. Mind the 64 bit alignment! */
+};
+
+struct ip_esp_hdr {
+	__u32 spi;
+	__u32 seq_no;		/* Sequence number */
+	__u8  enc_data[8];	/* Variable len but >=8. Mind the 64 bit alignment! */
+};
+
 #endif	/* _LINUX_IP_H */

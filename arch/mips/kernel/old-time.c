@@ -424,7 +424,7 @@ r4k_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	 */
 	write_32bit_cp0_register (CP0_COMPARE, 
 				  (unsigned long) (count + r4k_interval));
-        kstat.irqs[0][irq]++;
+        kstat_cpu(0).irqs[irq]++;
 #endif
 
 	timer_interrupt(irq, dev_id, regs);

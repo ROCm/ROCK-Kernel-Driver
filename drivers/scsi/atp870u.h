@@ -21,7 +21,8 @@ static int atp870u_detect(Scsi_Host_Template *);
 static int atp870u_command(Scsi_Cmnd *);
 static int atp870u_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int atp870u_abort(Scsi_Cmnd *);
-static int atp870u_biosparam(Disk *, struct block_device *, int *);
+static int atp870u_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 static int atp870u_release(struct Scsi_Host *);
 
 #define qcnt		32
@@ -37,18 +38,13 @@ extern const char *atp870u_info(struct Scsi_Host *);
 extern int atp870u_proc_info(char *, char **, off_t, int, int, int);
 
 #define ATP870U {						\
-	next: NULL,						\
-	module: NULL,						\
 	proc_info: atp870u_proc_info,				\
-	name: NULL,						\
 	detect: atp870u_detect, 				\
 	release: atp870u_release,				\
 	info: atp870u_info,					\
 	command: atp870u_command,				\
 	queuecommand: atp870u_queuecommand,			\
-	eh_strategy_handler: NULL,				\
 	eh_abort_handler: atp870u_abort, 			\
-	slave_attach: NULL,					\
 	bios_param: atp870u_biosparam,				\
 	can_queue: qcnt,	 /* max simultaneous cmds      */\
 	this_id: 7,	       /* scsi id of host adapter    */\

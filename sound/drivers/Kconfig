@@ -1,0 +1,42 @@
+# ALSA generic drivers
+
+menu "Generic devices"
+	depends on SND!=n
+
+config SND_DUMMY
+	tristate "Dummy (/dev/null) soundcard"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include dummy driver. This driver does nothing, but
+	  emulates various mixer controls and PCM devices.
+	  
+
+config SND_VIRMIDI
+	tristate "Virtual MIDI soundcard"
+	depends on SND_SEQUENCER
+	help
+	  Say 'Y' or 'M' to include virtual MIDI driver. This driver allows to
+	  connect applications using raw MIDI devices to sequencer.
+
+config SND_MTPAV
+	tristate "MOTU MidiTimePiece AV multiport MIDI"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for MOTU MidiTimePiece AV multiport
+	  MIDI adapter.
+
+config SND_SERIAL_U16550
+	tristate "UART16550 - MIDI only driver"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for MIDI serial port driver. It works
+	  with serial UARTs 16550 and better.
+
+config SND_MPU401
+	tristate "Generic MPU-401 UART driver"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for MPU401 hardware using UART access.
+
+endmenu
+

@@ -74,6 +74,8 @@
 #include <linux/cache.h>
 #include <linux/module.h>
 #include <linux/highmem.h>
+#include <linux/wireless.h>
+#include <linux/divert.h>
 
 #if defined(CONFIG_KMOD) && defined(CONFIG_NET)
 #include <linux/kmod.h>
@@ -708,6 +710,15 @@ static ssize_t sock_writev(struct file *file, const struct iovec *vector,
 				 file, vector, count, tot_len);
 }
 
+int (*br_ioctl_hook)(unsigned long arg);
+int (*vlan_ioctl_hook)(unsigned long arg);
+
+#ifdef CONFIG_DLCI
+extern int dlci_ioctl(unsigned int, void *);
+#else
+int (*dlci_ioctl_hook)(unsigned int, void *);
+#endif
+
 /*
  *	With an ioctl, arg may well be a user mode pointer, but we don't know
  *	what to do with it - that's up to the protocol still.
@@ -742,6 +753,56 @@ int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case FIOGETOWN:
 		case SIOCGPGRP:
 			err = put_user(sock->file->f_owner.pid, (int *)arg);
+			break;
+		case SIOCGIFBR:
+		case SIOCSIFBR:
+			err = -ENOPKG;
+#ifdef CONFIG_KMOD
+			if (!br_ioctl_hook)
+				request_module("bridge");
+#endif
+			if (br_ioctl_hook)
+				err = br_ioctl_hook(arg);
+			break;
+		case SIOCGIFVLAN:
+		case SIOCSIFVLAN:
+			err = -ENOPKG;
+#ifdef CONFIG_KMOD
+			if (!vlan_ioctl_hook)
+				request_module("8021q");
+#endif
+			if (vlan_ioctl_hook)
+				err = vlan_ioctl_hook(arg);
+			break;
+		case SIOCGIFDIVERT:
+		case SIOCSIFDIVERT:
+		/* Convert this to call through a hook */
+#ifdef CONFIG_NET_DIVERT
+			err = divert_ioctl(cmd, (struct divert_cf *)arg);
+#else
+			err = -ENOPKG;
+#endif	/* CONFIG_NET_DIVERT */
+			break;
+		case SIOCADDDLCI:
+		case SIOCDELDLCI:
+		/* Convert this to always call through a hook */
+#ifdef CONFIG_DLCI
+			lock_kernel();
+			err = dlci_ioctl(cmd, (void *)arg);
+			unlock_kernel();
+			break;
+#else
+			err = -ENOPKG;
+#ifdef CONFIG_KMOD
+			if (!dlci_ioctl_hook)
+				request_module("dlci");
+#endif
+			if (dlci_ioctl_hook) {
+				lock_kernel();
+				err = dlci_ioctl_hook(cmd, (void *)arg);
+				unlock_kernel();
+			}
+#endif
 			break;
 		default:
 			err = sock->ops->ioctl(sock, cmd, arg);

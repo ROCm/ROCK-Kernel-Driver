@@ -23,6 +23,7 @@
 #include <linux/backing-dev.h>
 #include <linux/blkdev.h>
 #include <linux/mpage.h>
+#include <linux/percpu.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
 
@@ -182,9 +183,7 @@ EXPORT_SYMBOL_GPL(balance_dirty_pages);
  */
 void balance_dirty_pages_ratelimited(struct address_space *mapping)
 {
-	static struct rate_limit_struct {
-		int count;
-	} ____cacheline_aligned_in_smp ratelimits[NR_CPUS];
+	static DEFINE_PER_CPU(int, ratelimits) = 0;
 	int cpu;
 	long ratelimit;
 
@@ -193,8 +192,8 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 		ratelimit = 8;
 
 	cpu = get_cpu();
-	if (ratelimits[cpu].count++ >= ratelimit) {
-		ratelimits[cpu].count = 0;
+	if (per_cpu(ratelimits, cpu)++ >= ratelimit) {
+		per_cpu(ratelimits, cpu) = 0;
 		put_cpu();
 		balance_dirty_pages(mapping);
 		return;

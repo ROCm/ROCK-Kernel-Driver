@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 67 $
+ *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -67,7 +67,7 @@ acpi_ex_add_table (
 
 	/* Create an object to be the table handle */
 
-	obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_REFERENCE);
+	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_LOCAL_REFERENCE);
 	if (!obj_desc) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -77,7 +77,6 @@ acpi_ex_add_table (
 	table_info.pointer     = table;
 	table_info.length      = (ACPI_SIZE) table->length;
 	table_info.allocation  = ACPI_MEM_ALLOCATED;
-	table_info.base_pointer = table;
 
 	status = acpi_tb_install_table (&table_info);
 	if (ACPI_FAILURE (status)) {
@@ -316,9 +315,9 @@ acpi_ex_load_op (
 
 
 	case ACPI_TYPE_BUFFER_FIELD:
-	case INTERNAL_TYPE_REGION_FIELD:
-	case INTERNAL_TYPE_BANK_FIELD:
-	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_LOCAL_REGION_FIELD:
+	case ACPI_TYPE_LOCAL_BANK_FIELD:
+	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Load from Field %p %s\n",
 			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
@@ -417,7 +416,7 @@ acpi_ex_unload_table (
 	 */
 	if ((!ddb_handle) ||
 		(ACPI_GET_DESCRIPTOR_TYPE (ddb_handle) != ACPI_DESC_TYPE_OPERAND) ||
-		(ACPI_GET_OBJECT_TYPE (ddb_handle) != INTERNAL_TYPE_REFERENCE)) {
+		(ACPI_GET_OBJECT_TYPE (ddb_handle) != ACPI_TYPE_LOCAL_REFERENCE)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 

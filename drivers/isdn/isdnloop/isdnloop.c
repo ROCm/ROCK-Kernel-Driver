@@ -71,9 +71,6 @@ isdnloop_bchan_send(isdnloop_card * card, int ch)
 				printk(KERN_WARNING "isdnloop: no rcard, skb dropped\n");
 				dev_kfree_skb(skb);
 
-				cmd.command = ISDN_STAT_L1ERR;
-				cmd.parm.errcode = ISDN_STAT_L1ERR_SEND;
-				card->interface.statcallb(&cmd); 
 			};
 			cmd.command = ISDN_STAT_BSENT;
 			cmd.parm.length = len;
@@ -166,7 +163,6 @@ static isdnloop_stat isdnloop_stat_table[] =
 	{"AOC",            ISDN_STAT_CINF,  6}, /* Charge-info, DSS1-type     */
 	{"CAU",            ISDN_STAT_CAUSE, 7}, /* Cause code                 */
 	{"TEI OK",         ISDN_STAT_RUN,   0}, /* Card connected to wallplug */
-	{"NO D-CHAN",      ISDN_STAT_NODCH, 0}, /* No D-channel available     */
 	{"E_L1: ACT FAIL", ISDN_STAT_BHUP,  8}, /* Layer-1 activation failed  */
 	{"E_L2: DATA LIN", ISDN_STAT_BHUP,  8}, /* Layer-2 data link lost     */
 	{"E_L1: ACTIVATION FAILED",
@@ -1337,6 +1333,9 @@ isdnloop_command(isdn_ctrl * c, isdnloop_card * card)
 							break;
 #endif
 						case ISDN_PROTO_L2_HDLC:
+							sprintf(cbuf, "%02d;BTRA\n", (int) (a & 255) + 1);
+							break;
+						case ISDN_PROTO_L2_TRANS:
 							sprintf(cbuf, "%02d;BTRA\n", (int) (a & 255) + 1);
 							break;
 						default:

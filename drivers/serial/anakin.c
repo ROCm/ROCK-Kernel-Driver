@@ -161,7 +161,7 @@ anakin_tx_chars(struct uart_port *port)
 	anakin_transmit_buffer(port);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(port);
 }
 
 static void

@@ -41,13 +41,14 @@
 #include <linux/module.h>
 #include <linux/completion.h>
 #include <linux/percpu.h>
+#include <linux/notifier.h>
 #include <linux/rcupdate.h>
 
 /* Definition for rcupdate control block. */
 struct rcu_ctrlblk rcu_ctrlblk = 
 	{ .mutex = SPIN_LOCK_UNLOCKED, .curbatch = 1, 
 	  .maxbatch = 1, .rcu_cpu_mask = 0 };
-struct rcu_data rcu_data[NR_CPUS] __cacheline_aligned;
+DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
 
 /* Fake initialization required by compiler */
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
@@ -192,10 +193,38 @@ static void rcu_process_callbacks(unsigned long unused)
 void rcu_check_callbacks(int cpu, int user)
 {
 	if (user || 
-	    (idle_cpu(cpu) && !in_softirq() && hardirq_count() <= 1))
+	    (idle_cpu(cpu) && !in_softirq() && 
+				hardirq_count() <= (1 << HARDIRQ_SHIFT)))
 		RCU_qsctr(cpu)++;
 	tasklet_schedule(&RCU_tasklet(cpu));
 }
+
+static void __devinit rcu_online_cpu(int cpu)
+{
+	memset(&per_cpu(rcu_data, cpu), 0, sizeof(struct rcu_data));
+	tasklet_init(&RCU_tasklet(cpu), rcu_process_callbacks, 0UL);
+	INIT_LIST_HEAD(&RCU_nxtlist(cpu));
+	INIT_LIST_HEAD(&RCU_curlist(cpu));
+}
+
+static int __devinit rcu_cpu_notify(struct notifier_block *self, 
+				unsigned long action, void *hcpu)
+{
+	long cpu = (long)hcpu;
+	switch (action) {
+	case CPU_UP_PREPARE:
+		rcu_online_cpu(cpu);
+		break;
+	/* Space reserved for CPU_OFFLINE :) */
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __devinitdata rcu_nb = {
+	.notifier_call	= rcu_cpu_notify,
+};
 
 /*
  * Initializes rcu mechanism.  Assumed to be called early.
@@ -205,15 +234,12 @@ void rcu_check_callbacks(int cpu, int user)
  */
 void __init rcu_init(void)
 {
-	int i;
-
-	memset(&rcu_data[0], 0, sizeof(rcu_data));
-	for (i = 0; i < NR_CPUS; i++) {
-		tasklet_init(&RCU_tasklet(i), rcu_process_callbacks, 0UL);
-		INIT_LIST_HEAD(&RCU_nxtlist(i));
-		INIT_LIST_HEAD(&RCU_curlist(i));
-	}
+	rcu_cpu_notify(&rcu_nb, CPU_UP_PREPARE,
+			(void *)(long)smp_processor_id());
+	/* Register notifier for non-boot CPUs */
+	register_cpu_notifier(&rcu_nb);
 }
+
 
 /* Because of FASTCALL declaration of complete, we use this wrapper */
 static void wakeme_after_rcu(void *completion)

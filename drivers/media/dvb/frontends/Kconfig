@@ -1,0 +1,57 @@
+comment "Supported Frontend Modules"
+	depends on DVB
+
+config DVB_ALPS_BSRU6
+	tristate "Alps BSRU6 (QPSK)"
+	depends on DVB_CORE
+	help
+	  A DVB-S tuner module. 
+
+	  Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_ALPS_BSRV2
+	tristate "Alps BSRV2 (QPSK)"
+	depends on DVB_CORE
+	help
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_GRUNDIG_29504_491
+	tristate "Grundig 29504-491 (QPSK)"
+	depends on DVB_CORE
+	help
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_GRUNDIG_29504_401
+	tristate "Grundig 29504-401 (OFDM)"
+	depends on DVB_CORE
+	help
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_VES1820
+	tristate "Frontends with external VES1820 demodulator (QAM)"
+	depends on DVB_CORE
+	help
+	  The VES1820 Demodulator is used on many DVB-C PCI cards and in some
+	  DVB-C SetTopBoxes. Say Y when you see this demodulator chip near your
+	  tuner module.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+

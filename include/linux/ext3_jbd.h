@@ -30,13 +30,19 @@
 
 #define EXT3_SINGLEDATA_TRANS_BLOCKS	8
 
+/* Extended attributes may touch two data buffers, two bitmap buffers,
+ * and two group and summaries. */
+
+#define EXT3_XATTR_TRANS_BLOCKS		8
+
 /* Define the minimum size for a transaction which modifies data.  This
  * needs to take into account the fact that we may end up modifying two
  * quota files too (one for the group, one for the user quota).  The
  * superblock only gets updated once, of course, so don't bother
  * counting that again for the quota updates. */
 
-#define EXT3_DATA_TRANS_BLOCKS		(3 * EXT3_SINGLEDATA_TRANS_BLOCKS - 2)
+#define EXT3_DATA_TRANS_BLOCKS		(3 * EXT3_SINGLEDATA_TRANS_BLOCKS + \
+					 EXT3_XATTR_TRANS_BLOCKS - 2)
 
 extern int ext3_writepage_trans_blocks(struct inode *inode);
 

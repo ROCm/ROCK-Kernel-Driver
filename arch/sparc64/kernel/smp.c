@@ -967,7 +967,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 			if (cpu == boot_cpu_id) {
 				irq_enter();
 
-				kstat.irqs[cpu][0]++;
+				kstat_cpu(cpu).irqs[0]++;
 				timer_tick_interrupt(regs);
 
 				irq_exit();

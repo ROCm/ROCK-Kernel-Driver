@@ -44,10 +44,7 @@
 #define REG_XDREG14	47
 #define REG_FPSCR	48
 
-#define PTRACE_SETOPTIONS         21
-
-/* options set using PTRACE_SETOPTIONS */
-#define PTRACE_O_TRACESYSGOOD     0x00000001
+#define PTRACE_OLDSETOPTIONS         21
 
 /*
  * This struct defines the way the registers are stored on the

@@ -51,6 +51,7 @@ struct exec_domain;
 #define CLONE_SETTID	0x00100000	/* write the TID back to userspace */
 #define CLONE_CLEARTID	0x00200000	/* clear the userspace TID */
 #define CLONE_DETACHED	0x00400000	/* parent wants no child-exit signal */
+#define CLONE_UNTRACED  0x00800000	/* set if the tracing process can't force CLONE_PTRACE on this clone */
 
 /*
  * List of flags we want to share for kernel threads,
@@ -173,6 +174,7 @@ struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
 	struct rb_root mm_rb;
 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
+	unsigned long free_area_cache;		/* first hole */
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
@@ -293,9 +295,6 @@ struct task_struct {
 	struct list_head ptrace_list;
 
 	struct mm_struct *mm, *active_mm;
-	struct list_head local_pages;
-
-	unsigned int allocation_order, nr_local_pages;
 
 /* task state */
 	struct linux_binfmt *binfmt;
@@ -391,6 +390,8 @@ struct task_struct {
 	void *journal_info;
 	struct dentry *proc_dentry;
 	struct backing_dev_info *backing_dev_info;
+
+	unsigned long ptrace_message;
 };
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -411,16 +412,15 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
 #define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
-#define PF_FREE_PAGES	0x00002000	/* per process page freeing */
-#define PF_FLUSHER	0x00004000	/* responsible for disk writeback */
-#define PF_NOWARN	0x00008000	/* debug: don't warn if alloc fails */
+#define PF_FLUSHER	0x00002000	/* responsible for disk writeback */
+#define PF_NOWARN	0x00004000	/* debug: don't warn if alloc fails */
 
-#define PF_FREEZE	0x00010000	/* this task should be frozen for suspend */
-#define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
-#define PF_FROZEN	0x00040000	/* frozen for system suspend */
-#define PF_SYNC		0x00080000	/* performing fsync(), etc */
-#define PF_FSTRANS	0x00100000	/* inside a filesystem transaction */
-#define PF_KSWAPD	0x00200000	/* I am kswapd */
+#define PF_FREEZE	0x00008000	/* this task should be frozen for suspend */
+#define PF_IOTHREAD	0x00010000	/* this thread is needed for doing I/O to swap */
+#define PF_FROZEN	0x00020000	/* frozen for system suspend */
+#define PF_SYNC		0x00040000	/* performing fsync(), etc */
+#define PF_FSTRANS	0x00080000	/* inside a filesystem transaction */
+#define PF_KSWAPD	0x00100000	/* I am kswapd */
 
 /*
  * Ptrace flags
@@ -430,6 +430,10 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PT_DTRACE	0x00000002	/* delayed trace (used on m68k, i386) */
 #define PT_TRACESYSGOOD	0x00000004
 #define PT_PTRACE_CAP	0x00000008	/* ptracer can follow suid-exec */
+#define PT_TRACE_FORK	0x00000010
+#define PT_TRACE_VFORK	0x00000020
+#define PT_TRACE_CLONE	0x00000040
+#define PT_TRACE_EXEC	0x00000080
 
 /*
  * Limit the stack by to some sane default: root can always

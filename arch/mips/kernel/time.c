@@ -369,7 +369,7 @@ asmlinkage void ll_timer_interrupt(int irq, struct pt_regs *regs)
 	int cpu = smp_processor_id();
 
 	irq_enter(cpu, irq);
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	/* we keep interrupt disabled all the time */
 	timer_interrupt(irq, NULL, regs);

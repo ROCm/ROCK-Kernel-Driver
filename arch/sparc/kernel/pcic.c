@@ -1031,6 +1031,6 @@ void insl(unsigned long addr, void *dst, unsigned long count) {
 	}
 }
 
-#endif
-
 subsys_initcall(pcic_init);
+
+#endif

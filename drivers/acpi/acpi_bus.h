@@ -27,7 +27,7 @@
 #define __ACPI_BUS_H__
 
 #include <linux/version.h>
-#include <linux/driverfs_fs.h>
+#include <linux/kobject.h>
 
 #include "include/acpi.h"
 
@@ -255,7 +255,7 @@ struct acpi_device {
 	struct acpi_device_ops	ops;
 	struct acpi_driver	*driver;
 	void			*driver_data;
-	struct driver_dir_entry	driverfs_dir;
+	struct kobject		kobj;
 };
 
 #define acpi_driver_data(d)	((d)->driver_data)
@@ -274,6 +274,7 @@ struct acpi_bus_event {
 	u32			data;
 };
 
+extern struct subsystem acpi_subsys;
 
 /*
  * External Functions

@@ -2842,20 +2842,6 @@ putreg (struct task_struct *child, int regno, unsigned int value)
 	}
 }
 
-static inline void
-ia32f2ia64f (void *dst, void *src)
-{
-	asm volatile ("ldfe f6=[%1];; stf.spill [%0]=f6" :: "r"(dst), "r"(src) : "memory");
-	return;
-}
-
-static inline void
-ia64f2ia32f (void *dst, void *src)
-{
-	asm volatile ("ldf.fill f6=[%1];; stfe [%0]=f6" :: "r"(dst),  "r"(src) : "memory");
-	return;
-}
-
 static void
 put_fpreg (int regno, struct _fpreg_ia32 *reg, struct pt_regs *ptp, struct switch_stack *swp,
 	   int tos)
@@ -3090,7 +3076,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		break;
 
 	      default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 
 	}

@@ -58,6 +58,7 @@
 #include <net/dst.h>
 #include <net/sock.h>
 #include <net/checksum.h>
+#include <net/xfrm.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -235,6 +236,7 @@ static inline void skb_headerinit(void *p, kmem_cache_t *cache,
 	skb->stamp.tv_sec = 0;	/* No idea about time */
 	skb->dev	  = NULL;
 	skb->dst	  = NULL;
+	skb->sp		  = NULL;
 	memset(skb->cb, 0, sizeof(skb->cb));
 	skb->pkt_type	  = PACKET_HOST;	/* Default type */
 	skb->ip_summed	  = 0;
@@ -247,6 +249,9 @@ static inline void skb_headerinit(void *p, kmem_cache_t *cache,
 	skb->nfct	  = NULL;
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug	  = 0;
+#endif
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	skb->nf_bridge	  = NULL;
 #endif
 #endif
 #ifdef CONFIG_NET_SCHED
@@ -319,6 +324,7 @@ void __kfree_skb(struct sk_buff *skb)
 	}
 
 	dst_release(skb->dst);
+	secpath_put(skb->sp);
 	if(skb->destructor) {
 		if (in_irq())
 			printk(KERN_WARNING "Warning: kfree_skb on "
@@ -327,6 +333,9 @@ void __kfree_skb(struct sk_buff *skb)
 	}
 #ifdef CONFIG_NETFILTER
 	nf_conntrack_put(skb->nfct);
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	nf_bridge_put(skb->nf_bridge);
+#endif
 #endif
 	skb_headerinit(skb, NULL, 0);  /* clean state */
 	kfree_skbmem(skb);
@@ -368,6 +377,8 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(mac);
 	C(dst);
 	dst_clone(n->dst);
+	C(sp);
+	secpath_get(n->sp);
 	memcpy(n->cb, skb->cb, sizeof(skb->cb));
 	C(len);
 	C(data_len);
@@ -392,6 +403,9 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 #ifdef CONFIG_NETFILTER_DEBUG
 	C(nf_debug);
 #endif
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	C(nf_bridge);
+#endif
 #endif /*CONFIG_NETFILTER*/
 #if defined(CONFIG_HIPPI)
 	C(private);
@@ -404,6 +418,9 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	skb->cloned = 1;
 #ifdef CONFIG_NETFILTER
 	nf_conntrack_get(skb->nfct);
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	nf_bridge_get(skb->nf_bridge);
+#endif
 #endif
 	return n;
 }
@@ -421,6 +438,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->priority	= old->priority;
 	new->protocol	= old->protocol;
 	new->dst	= dst_clone(old->dst);
+	new->sp		= secpath_get(old->sp);
 	new->h.raw	= old->h.raw + offset;
 	new->nh.raw	= old->nh.raw + offset;
 	new->mac.raw	= old->mac.raw + offset;
@@ -437,6 +455,10 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	nf_conntrack_get(new->nfct);
 #ifdef CONFIG_NETFILTER_DEBUG
 	new->nf_debug	= old->nf_debug;
+#endif
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	new->nf_bridge	= old->nf_bridge;
+	nf_bridge_get(new->nf_bridge);
 #endif
 #endif
 #ifdef CONFIG_NET_SCHED

@@ -4,7 +4,7 @@
 
 EXTRA_TARGETS 	:= head.o head64.o init_task.o
 
-export-objs     := mtrr.o x8664_ksyms.o pci-gart.o
+export-objs     := mtrr.o x8664_ksyms.o pci-gart.o pci-dma.o
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_x86_64.o \

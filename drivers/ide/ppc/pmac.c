@@ -1579,11 +1579,8 @@ idepmac_wake_device(ide_drive_t *drive, int used_dma)
 	 * Problem: This can schedule. I moved the block device
 	 * wakeup almost late by priority because of that.
 	 */
-	if (DRIVER(drive) && DRIVER(drive)->media_change)
-		DRIVER(drive)->media_change(drive);
-
-	/* We kick the VFS too (see fix in ide.c revalidate) */
-	check_disk_change(MKDEV(HWIF(drive)->major, (drive->select.b.unit) << PARTN_BITS));
+	if (DRIVER(drive))
+		check_disk_change(MKDEV(drive->disk->major, drive->disk->first_minor));
 	
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* We re-enable DMA on the drive if it was active. */

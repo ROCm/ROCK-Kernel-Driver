@@ -4,11 +4,12 @@
  *
  *   Copyright (C) 2000 Philipp Rumpf */
 
-#include <asm/gsc.h>
-#include <asm/ptrace.h>
-#include <asm/machdep.h>
+#include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/kernel.h>
+#include <asm/io.h>
+#include <asm/ptrace.h>
+#include <asm/machdep.h>
 
 /* CPU register indices */
 
@@ -18,12 +19,6 @@
 #define DMAERR		0xf0e8
 #define DIOERR		0xf0ec
 #define HIDMAMEM	0xf0f4
-
-/* read CPU Diagnose register index */
-static u32 diag_read(int index)
-{
-	return 0;
-}
 
 /* this returns the HPA of the CPU it was called on */
 static u32 cpu_hpa(void)

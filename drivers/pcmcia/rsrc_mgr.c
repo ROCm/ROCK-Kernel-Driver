@@ -124,16 +124,36 @@ static struct resource *resource_parent(unsigned long b, unsigned long n,
 	return &ioport_resource;
 }
 
+/* FIXME: Fundamentally racy. */
 static inline int check_io_resource(unsigned long b, unsigned long n,
 				    struct pci_dev *dev)
 {
-	return check_resource(resource_parent(b, n, IORESOURCE_IO, dev), b, n);
+	struct resource *region;
+
+	region = __request_region(resource_parent(b, n, IORESOURCE_IO, dev),
+				  b, n, "check_io_resource");
+	if (!region)
+		return -EBUSY;
+
+	release_resource(region);
+	kfree(region);
+	return 0;
 }
 
+/* FIXME: Fundamentally racy. */
 static inline int check_mem_resource(unsigned long b, unsigned long n,
 				     struct pci_dev *dev)
 {
-	return check_resource(resource_parent(b, n, IORESOURCE_MEM, dev), b, n);
+	struct resource *region;
+
+	region = __request_region(resource_parent(b, n, IORESOURCE_MEM, dev),
+				  b, n, "check_mem_resource");
+	if (!region)
+		return -EBUSY;
+
+	release_resource(region);
+	kfree(region);
+	return 0;
 }
 
 static struct resource *make_resource(unsigned long b, unsigned long n,

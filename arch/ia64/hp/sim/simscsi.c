@@ -20,7 +20,6 @@
 #include <asm/irq.h>
 
 #include "../drivers/scsi/scsi.h"
-#include "../drivers/scsi/sd.h"
 #include "../drivers/scsi/hosts.h"
 #include "simscsi.h"
 
@@ -132,27 +131,12 @@ simscsi_info (struct Scsi_Host *host)
 }
 
 int
-simscsi_abort (Scsi_Cmnd *cmd)
+simscsi_biosparam (struct scsi_device *sdev, struct block_device *n,
+		sector_t capacity, int ip[])
 {
-	printk ("simscsi_abort: unimplemented\n");
-	return SCSI_ABORT_SUCCESS;
-}
-
-int
-simscsi_reset (Scsi_Cmnd *cmd, unsigned int reset_flags)
-{
-	printk ("simscsi_reset: unimplemented\n");
-	return SCSI_RESET_SUCCESS;
-}
-
-int
-simscsi_biosparam (Disk *disk, struct block_device *n, int ip[])
-{
-	int size = disk->capacity;
-
 	ip[0] = 64;		/* heads */
 	ip[1] = 32;		/* sectors */
-	ip[2] = size >> 11;	/* cylinders */
+	ip[2] = capacity >> 11;	/* cylinders */
 	return 0;
 }
 
@@ -361,7 +345,9 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 			break;
 
 		      case MODE_SENSE:
-			printk("MODE_SENSE\n");
+			/* sd.c uses this to determine whether disk does write-caching. */
+			memset(sc->request_buffer, 0, 128);
+			sc->result = GOOD;
 			break;
 
 		      case START_STOP:
@@ -390,7 +376,5 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 
 
 static Scsi_Host_Template driver_template = SIMSCSI;
-
-#define __initcall(fn)	late_initcall(fn)
 
 #include "../drivers/scsi/scsi_module.c"

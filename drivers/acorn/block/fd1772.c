@@ -152,11 +152,6 @@
 #include <asm/uaccess.h>
 
 
-#define MAJOR_NR FLOPPY_MAJOR
-#define FLOPPY_DMA 0
-#define DEVICE_NAME "floppy"
-#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
-#define QUEUE (&floppy_queue)
 #include <linux/blk.h>
 
 /* Note: FD_MAX_UNITS could be redefined to 2 for the Atari (with
@@ -181,6 +176,12 @@
 #endif
 
 static struct request_queue floppy_queue;
+
+#define MAJOR_NR FLOPPY_MAJOR
+#define FLOPPY_DMA 0
+#define DEVICE_NAME "floppy"
+#define QUEUE (&floppy_queue)
+#define CURRENT elv_next_request(&floppy_queue)
 
 /* Disk types: DD */
 static struct archy_disk_type {
@@ -1205,11 +1206,11 @@ static void setup_req_params(int drive)
 
 static void redo_fd_request(void)
 {
-	int device, drive, type;
+	int drive, type;
 	struct archy_floppy_struct *floppy;
 
-	DPRINT(("redo_fd_request: CURRENT=%08lx CURRENT->rq_dev=%04x CURRENT->sector=%ld\n",
-		(unsigned long) CURRENT, CURRENT ? CURRENT->rq_dev : 0,
+	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
+		CURRENT, CURRENT ? CURRENT->rq_disk->disk_name : "",
 		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0));
 
 repeat:
@@ -1217,17 +1218,9 @@ repeat:
 	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
-	if (major(CURRENT->rq_dev) != MAJOR_NR)
-		panic(DEVICE_NAME ": request list destroyed");
-
-	if (CURRENT->bh) {
-		if (!buffer_locked(CURRENT->bh))
-			panic(DEVICE_NAME ": block not locked");
-	}
-	device = minor(CURRENT->rq_dev);
-	drive = device & 3;
-	type = device >> 2;
-	floppy = &unit[drive];
+	floppy = CURRENT->rq_disk->private_data;
+	drive = floppy - unit;
+	type = fd_device[drive];
 
 	if (!floppy->connected) {
 		/* drive not connected */
@@ -1469,13 +1462,11 @@ static void config_types(void)
 static int floppy_open(struct inode *inode, struct file *filp)
 {
 	int drive = minor(inode->i_rdev) & 3;
-	int old_dev;
+	int type =  minor(inode->i_rdev) >> 2;
+	int old_dev = fd_device[drive];
 
-	old_dev = fd_device[drive];
-
-	if (fd_ref[drive])
-		if (old_dev != inode->i_rdev)
-			return -EBUSY;
+	if (fd_ref[drive] && old_dev != type)
+		return -EBUSY;
 
 	if (fd_ref[drive] == -1 || (fd_ref[drive] && filp->f_flags & O_EXCL))
 		return -EBUSY;
@@ -1485,10 +1476,10 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	else
 		fd_ref[drive]++;
 
-	fd_device[drive] = inode->i_rdev;
+	fd_device[drive] = type;
 
-	if (old_dev && old_dev != inode->i_rdev)
-		invalidate_buffers(old_dev);
+	if (old_dev && old_dev != type)
+		invalidate_buffers(mk_kdev(MAJOR_NR, drive + (old_dev<<2)));
 
 	if (filp->f_flags & O_NDELAY)
 		return 0;
@@ -1534,6 +1525,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	int drive = *part & 3;
 	if ((*part >> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
 		return NULL;
+	*part = 0;
 	return get_disk(disks[drive]);
 }
 

@@ -1570,13 +1570,8 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     }
     if (ops == NULL)
     {
-	if ( S_ISBLK (mode) ) ops = (void *) get_blkfops (major);
-	if (ops == NULL)
-	{
-	    PRINTK ("(%s): NULL ops pointer\n", name);
-	    return NULL;
-	}
-	PRINTK ("(%s): NULL ops, got %p from major table\n", name, ops);
+	PRINTK ("(%s): NULL ops pointer\n", name);
+	return NULL;
     }
     if ( S_ISDIR (mode) )
     {
@@ -2378,28 +2373,20 @@ static int try_modload (struct devfs_entry *parent, struct fs_info *fs_info,
 
 static int check_disc_changed (struct devfs_entry *de)
 {
-    int tmp;
-    int retval = 0;
-    kdev_t dev = mk_kdev (de->u.fcb.u.device.major, de->u.fcb.u.device.minor);
-    struct block_device *bdev;
-    struct block_device_operations *bdops;
-    extern int warn_no_part;
+	int tmp;
+	int retval = 0;
+	dev_t dev = MKDEV(de->u.fcb.u.device.major, de->u.fcb.u.device.minor);
+	extern int warn_no_part;
 
-    if ( !S_ISBLK (de->mode) ) return 0;
-    bdev = bdget (kdev_t_to_nr (dev) );
-    if (!bdev) return 0;
-    bdops = devfs_get_ops (de);
-    if (!bdops) return 0;
-    bdev->bd_op = bdops;
-    /*  Ugly hack to disable messages about unable to read partition table  */
-    tmp = warn_no_part;
-    warn_no_part = 0;
-    retval = full_check_disk_change (bdev);
-    warn_no_part = tmp;
-    devfs_put_ops (de);
-    return retval;
+	if (!S_ISBLK(de->mode))
+		return 0;
+	/* Ugly hack to disable messages about unable to read partition table */
+	tmp = warn_no_part;
+	warn_no_part = 0;
+	retval = __check_disk_change(dev);
+	warn_no_part = tmp;
+	return retval;
 }   /*  End Function check_disc_changed  */
-
 
 /**
  *	scan_dir_for_removable - Scan a directory for removable media devices and check media.
@@ -2582,12 +2569,8 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     {
 	inode->i_rdev = mk_kdev (de->u.fcb.u.device.major,
 				 de->u.fcb.u.device.minor);
-	if (bd_acquire (inode) == 0)
-	{
-	    if (!inode->i_bdev->bd_op && de->u.fcb.ops)
-		inode->i_bdev->bd_op = de->u.fcb.ops;
-	}
-	else PRINTK ("(%d): no block device from bdget()\n",(int)inode->i_ino);
+	if (bd_acquire (inode) != 0)
+		PRINTK ("(%d): no block device from bdget()\n",(int)inode->i_ino);
 	is_fcb = TRUE;
     }
     else if ( S_ISFIFO (de->mode) ) inode->i_fop = &def_fifo_fops;
@@ -2706,7 +2689,6 @@ static int devfs_open (struct inode *inode, struct file *file)
     if ( S_ISBLK (inode->i_mode) )
     {
 	file->f_op = &def_blk_fops;
-	if (ops) inode->i_bdev->bd_op = ops;
 	err = def_blk_fops.open (inode, file); /* Module refcount unchanged */
     }
     else

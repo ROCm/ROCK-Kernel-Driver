@@ -900,12 +900,26 @@ static int hid_input_report(int type, struct urb *urb)
 
 static void hid_irq_in(struct urb *urb)
 {
-	if (urb->status) {
-		dbg("nonzero status in input irq %d", urb->status);
-		return;
-	}
+	struct hid_device	*hid = urb->context;
+	int			status;
 
-	hid_input_report(HID_INPUT_REPORT, urb);
+	switch (urb->status) {
+	case 0:			/* success */
+		hid_input_report(HID_INPUT_REPORT, urb);
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	default:		/* error */
+		dbg("nonzero status in input irq %d", urb->status);
+	}
+	
+	status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status)
+		err ("can't resubmit intr, %s-%s/input%d, status %d",
+				hid->dev->bus->bus_name, hid->dev->devpath,
+				hid->ifnum, status);
 }
 
 /*
@@ -1372,7 +1386,7 @@ static void hid_free_buffers(struct usb_device *dev, struct hid_device *hid)
 
 static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 {
-	struct usb_interface_descriptor *interface = intf->altsetting + intf->act_altsetting;
+	struct usb_host_interface *interface = intf->altsetting + intf->act_altsetting;
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct hid_descriptor *hdesc;
 	struct hid_device *hid;
@@ -1388,7 +1402,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	if (quirks & HID_QUIRK_IGNORE)
 		return NULL;
 
-	if (usb_get_extra_descriptor(interface, HID_DT_HID, &hdesc) && ((!interface->bNumEndpoints) ||
+	if (usb_get_extra_descriptor(interface, HID_DT_HID, &hdesc) && ((!interface->desc.bNumEndpoints) ||
 		usb_get_extra_descriptor(&interface->endpoint[0], HID_DT_HID, &hdesc))) {
 			dbg("class descriptor not present\n");
 			return NULL;
@@ -1408,7 +1422,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 		return NULL;
 	}
 
-	if ((n = hid_get_class_descriptor(dev, interface->bInterfaceNumber, HID_DT_REPORT, rdesc, rsize)) < 0) {
+	if ((n = hid_get_class_descriptor(dev, interface->desc.bInterfaceNumber, HID_DT_REPORT, rdesc, rsize)) < 0) {
 		dbg("reading report descriptor failed");
 		kfree(rdesc);
 		return NULL;
@@ -1435,11 +1449,12 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 		goto fail;
 	}
 
-	for (n = 0; n < interface->bNumEndpoints; n++) {
+	for (n = 0; n < interface->desc.bNumEndpoints; n++) {
 
-		struct usb_endpoint_descriptor *endpoint = &interface->endpoint[n];
+		struct usb_endpoint_descriptor *endpoint;
 		int pipe;
 
+		endpoint = &interface->endpoint[n].desc;
 		if ((endpoint->bmAttributes & 3) != 3)		/* Not an interrupt endpoint */
 			continue;
 
@@ -1479,7 +1494,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	hid->version = le16_to_cpu(hdesc->bcdHID);
 	hid->country = hdesc->bCountryCode;
 	hid->dev = dev;
-	hid->ifnum = interface->bInterfaceNumber;
+	hid->ifnum = interface->desc.bInterfaceNumber;
 
 	hid->name[0] = 0;
 
@@ -1496,7 +1511,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
 
 	usb_make_path(dev, buf, 64);
-	snprintf(hid->phys, 64, "%s/input%d", buf, intf->altsetting[0].bInterfaceNumber);
+	snprintf(hid->phys, 64, "%s/input%d", buf,
+			intf->altsetting[0].desc.bInterfaceNumber);
 
 	if (usb_string(dev, dev->descriptor.iSerialNumber, hid->uniq, 64) <= 0)
 		hid->uniq[0] = 0;

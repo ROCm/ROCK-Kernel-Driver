@@ -38,6 +38,7 @@
 
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
 #include <linux/highmem.h>
@@ -397,6 +398,11 @@ void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned lo
 {
 	pgd_t * dir;
 
+	if (is_vm_hugetlb_page(vma)) {
+		unmap_hugepage_range(vma, address, end);
+		return;
+	}
+
 	BUG_ON(address >= end);
 
 	dir = pgd_offset(vma->vm_mm, address);
@@ -435,6 +441,11 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 	struct mm_struct *mm = vma->vm_mm;
 	mmu_gather_t *tlb;
 	unsigned long end, block;
+
+	if (is_vm_hugetlb_page(vma)) {
+		zap_hugepage_range(vma, address, size);
+		return;
+	}
 
 	spin_lock(&mm->page_table_lock);
 
@@ -573,6 +584,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 					i = -EFAULT;
 					goto out;
 				}
+				flush_dcache_page(pages[i]);
 				if (!PageReserved(pages[i]))
 					page_cache_get(pages[i]);
 			}
@@ -588,7 +600,7 @@ out:
 	return i;
 }
 
-static inline void zeromap_pte_range(pte_t * pte, unsigned long address,
+static void zeromap_pte_range(pte_t * pte, unsigned long address,
                                      unsigned long size, pgprot_t prot)
 {
 	unsigned long end;
@@ -830,7 +842,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		page_remove_rmap(old_page, page_table);
 		break_cow(vma, new_page, address, page_table);
 		page_add_rmap(new_page, page_table);
-		lru_cache_add(new_page);
+		lru_cache_add_active(new_page);
 
 		/* Free the old page.. */
 		new_page = old_page;
@@ -955,12 +967,13 @@ void swapin_readahead(swp_entry_t entry)
 	num = valid_swaphandles(entry, &offset);
 	for (i = 0; i < num; offset++, i++) {
 		/* Ok, do the async read-ahead now */
-		new_page = read_swap_cache_async(swp_entry(swp_type(entry), offset));
+		new_page = read_swap_cache_async(swp_entry(swp_type(entry),
+						offset));
 		if (!new_page)
 			break;
 		page_cache_release(new_page);
 	}
-	return;
+	lru_add_drain();	/* Push any new pages onto the LRU now */
 }
 
 /*
@@ -995,7 +1008,7 @@ static int do_swap_page(struct mm_struct * mm,
 				ret = VM_FAULT_MINOR;
 			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
-			return ret;
+			goto out;
 		}
 
 		/* Had to read the page from swap area: Major fault */
@@ -1017,7 +1030,8 @@ static int do_swap_page(struct mm_struct * mm,
 		spin_unlock(&mm->page_table_lock);
 		unlock_page(page);
 		page_cache_release(page);
-		return VM_FAULT_MINOR;
+		ret = VM_FAULT_MINOR;
+		goto out;
 	}
 
 	/* The page isn't present yet, go ahead with the fault. */
@@ -1041,6 +1055,7 @@ static int do_swap_page(struct mm_struct * mm,
 	update_mmu_cache(vma, address, pte);
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
+out:
 	return ret;
 }
 
@@ -1080,7 +1095,7 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		mm->rss++;
 		flush_page_to_ram(page);
 		entry = pte_mkwrite(pte_mkdirty(mk_pte(page, vma->vm_page_prot)));
-		lru_cache_add(page);
+		lru_cache_add_active(page);
 		mark_page_accessed(page);
 	}
 
@@ -1139,7 +1154,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
-		lru_cache_add(page);
+		lru_cache_add_active(page);
 		new_page = page;
 	}
 

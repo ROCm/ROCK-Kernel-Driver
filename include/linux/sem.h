@@ -2,6 +2,7 @@
 #define _LINUX_SEM_H
 
 #include <linux/ipc.h>
+#include <asm/atomic.h>
 
 /* semop flags */
 #define SEM_UNDO        0x1000  /* undo the operation on exit */

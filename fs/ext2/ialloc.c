@@ -13,11 +13,14 @@
  */
 
 #include <linux/config.h>
-#include "ext2.h"
 #include <linux/quotaops.h>
 #include <linux/sched.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
+#include <linux/random.h>
+#include "ext2.h"
+#include "xattr.h"
+#include "acl.h"
 
 /*
  * ialloc.c contains the inodes allocation and deallocation routines
@@ -97,6 +100,7 @@ void ext2_free_inode (struct inode * inode)
 	 */
 	if (!is_bad_inode(inode)) {
 		/* Quota is already initialized in iput() */
+		ext2_xattr_delete_inode(inode);
 	    	DQUOT_FREE_INODE(inode);
 		DQUOT_DROP(inode);
 	}
@@ -205,8 +209,7 @@ static void ext2_preread_inode(struct inode *inode)
  * For other inodes, search forward from the parent directory\'s block
  * group to find a free inode.
  */
-
-static int find_group_dir(struct super_block *sb, int parent_group)
+static int find_group_dir(struct super_block *sb, struct inode *parent)
 {
 	struct ext2_super_block * es = EXT2_SB(sb)->s_es;
 	int ngroups = EXT2_SB(sb)->s_groups_count;
@@ -239,8 +242,140 @@ static int find_group_dir(struct super_block *sb, int parent_group)
 	return best_group;
 }
 
-static int find_group_other(struct super_block *sb, int parent_group)
+/* 
+ * Orlov's allocator for directories. 
+ * 
+ * We always try to spread first-level directories.
+ *
+ * If there are blockgroups with both free inodes and free blocks counts 
+ * not worse than average we return one with smallest directory count. 
+ * Otherwise we simply return a random group. 
+ * 
+ * For the rest rules look so: 
+ * 
+ * It's OK to put directory into a group unless 
+ * it has too many directories already (max_dirs) or 
+ * it has too few free inodes left (min_inodes) or 
+ * it has too few free blocks left (min_blocks) or 
+ * it's already running too large debt (max_debt). 
+ * Parent's group is prefered, if it doesn't satisfy these 
+ * conditions we search cyclically through the rest. If none 
+ * of the groups look good we just look for a group with more 
+ * free inodes than average (starting at parent's group). 
+ * 
+ * Debt is incremented each time we allocate a directory and decremented 
+ * when we allocate an inode, within 0--255. 
+ */ 
+
+#define INODE_COST 64
+#define BLOCK_COST 256
+
+static int find_group_orlov(struct super_block *sb, struct inode *parent)
 {
+	int parent_group = EXT2_I(parent)->i_block_group;
+	struct ext2_sb_info *sbi = EXT2_SB(sb);
+	struct ext2_super_block *es = sbi->s_es;
+	int ngroups = sbi->s_groups_count;
+	int inodes_per_group = EXT2_INODES_PER_GROUP(sb);
+	int avefreei = le32_to_cpu(es->s_free_inodes_count) / ngroups;
+	int avefreeb = le32_to_cpu(es->s_free_blocks_count) / ngroups;
+	int blocks_per_dir;
+	int ndirs = sbi->s_dir_count;
+	int max_debt, max_dirs, min_blocks, min_inodes;
+	int group = -1, i;
+	struct ext2_group_desc *desc;
+	struct buffer_head *bh;
+
+	if ((parent == sb->s_root->d_inode) ||
+	    (parent->i_flags & EXT2_TOPDIR_FL)) {
+		struct ext2_group_desc *best_desc = NULL;
+		struct buffer_head *best_bh = NULL;
+		int best_ndir = inodes_per_group;
+		int best_group = -1;
+
+		get_random_bytes(&group, sizeof(group));
+		parent_group = (unsigned)group % ngroups;
+		for (i = 0; i < ngroups; i++) {
+			group = (parent_group + i) % ngroups;
+			desc = ext2_get_group_desc (sb, group, &bh);
+			if (!desc || !desc->bg_free_inodes_count)
+				continue;
+			if (le16_to_cpu(desc->bg_used_dirs_count) >= best_ndir)
+				continue;
+			if (le16_to_cpu(desc->bg_free_inodes_count) < avefreei)
+				continue;
+			if (le16_to_cpu(desc->bg_free_blocks_count) < avefreeb)
+				continue;
+			best_group = group;
+			best_ndir = le16_to_cpu(desc->bg_used_dirs_count);
+			best_desc = desc;
+			best_bh = bh;
+		}
+		if (best_group >= 0) {
+			desc = best_desc;
+			bh = best_bh;
+			group = best_group;
+			goto found;
+		}
+		goto fallback;
+	}
+
+	blocks_per_dir = (le32_to_cpu(es->s_blocks_count) -
+			  le32_to_cpu(es->s_free_blocks_count)) / ndirs;
+
+	max_dirs = ndirs / ngroups + inodes_per_group / 16;
+	min_inodes = avefreei - inodes_per_group / 4;
+	min_blocks = avefreeb - EXT2_BLOCKS_PER_GROUP(sb) / 4;
+
+	max_debt = EXT2_BLOCKS_PER_GROUP(sb) / max(blocks_per_dir, BLOCK_COST);
+	if (max_debt * INODE_COST > inodes_per_group)
+		max_debt = inodes_per_group / INODE_COST;
+	if (max_debt > 255)
+		max_debt = 255;
+	if (max_debt == 0)
+		max_debt = 1;
+
+	for (i = 0; i < ngroups; i++) {
+		group = (parent_group + i) % ngroups;
+		desc = ext2_get_group_desc (sb, group, &bh);
+		if (!desc || !desc->bg_free_inodes_count)
+			continue;
+		if (sbi->s_debts[group] >= max_debt)
+			continue;
+		if (le16_to_cpu(desc->bg_used_dirs_count) >= max_dirs)
+			continue;
+		if (le16_to_cpu(desc->bg_free_inodes_count) < min_inodes)
+			continue;
+		if (le16_to_cpu(desc->bg_free_blocks_count) < min_blocks)
+			continue;
+		goto found;
+	}
+
+fallback:
+	for (i = 0; i < ngroups; i++) {
+		group = (parent_group + i) % ngroups;
+		desc = ext2_get_group_desc (sb, group, &bh);
+		if (!desc || !desc->bg_free_inodes_count)
+			continue;
+		if (le16_to_cpu(desc->bg_free_inodes_count) >= avefreei)
+			goto found;
+	}
+
+	return -1;
+
+found:
+	desc->bg_free_inodes_count =
+		cpu_to_le16(le16_to_cpu(desc->bg_free_inodes_count) - 1);
+	desc->bg_used_dirs_count =
+		cpu_to_le16(le16_to_cpu(desc->bg_used_dirs_count) + 1);
+	sbi->s_dir_count++;
+	mark_buffer_dirty(bh);
+	return group;
+}
+
+static int find_group_other(struct super_block *sb, struct inode *parent)
+{
+	int parent_group = EXT2_I(parent)->i_block_group;
 	int ngroups = EXT2_SB(sb)->s_groups_count;
 	struct ext2_group_desc *desc;
 	struct buffer_head *bh;
@@ -300,7 +435,6 @@ struct inode * ext2_new_inode(struct inode * dir, int mode)
 	struct ext2_super_block * es;
 	struct ext2_inode_info *ei;
 	int err;
-	struct inode *ret;
 
 	sb = dir->i_sb;
 	inode = new_inode(sb);
@@ -311,17 +445,19 @@ struct inode * ext2_new_inode(struct inode * dir, int mode)
 	lock_super (sb);
 	es = EXT2_SB(sb)->s_es;
 repeat:
-	if (S_ISDIR(mode))
-		group = find_group_dir(sb, EXT2_I(dir)->i_block_group);
-	else 
-		group = find_group_other(sb, EXT2_I(dir)->i_block_group);
+	if (S_ISDIR(mode)) {
+		if (test_opt (sb, OLDALLOC))
+			group = find_group_dir(sb, dir);
+		else
+			group = find_group_orlov(sb, dir);
+	} else 
+		group = find_group_other(sb, dir);
 
 	err = -ENOSPC;
 	if (group == -1)
 		goto fail;
 
 	err = -EIO;
-	brelse(bitmap_bh);
 	bitmap_bh = read_inode_bitmap(sb, group);
 	if (!bitmap_bh)
 		goto fail2;
@@ -337,6 +473,7 @@ repeat:
 		ll_rw_block(WRITE, 1, &bitmap_bh);
 		wait_on_buffer(bitmap_bh);
 	}
+	brelse(bitmap_bh);
 
 	ino = group * EXT2_INODES_PER_GROUP(sb) + i + 1;
 	if (ino < EXT2_FIRST_INO(sb) || ino > le32_to_cpu(es->s_inodes_count)) {
@@ -350,6 +487,15 @@ repeat:
 
 	es->s_free_inodes_count =
 		cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) - 1);
+
+	if (S_ISDIR(mode)) {
+		if (EXT2_SB(sb)->s_debts[group] < 255)
+			EXT2_SB(sb)->s_debts[group]++;
+	} else {
+		if (EXT2_SB(sb)->s_debts[group])
+			EXT2_SB(sb)->s_debts[group]--;
+	}
+
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	sb->s_dirt = 1;
 	inode->i_uid = current->fsuid;
@@ -386,27 +532,34 @@ repeat:
 	ei->i_prealloc_block = 0;
 	ei->i_prealloc_count = 0;
 	ei->i_dir_start_lookup = 0;
+	ei->i_state = EXT2_STATE_NEW;
 	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
 	if (ei->i_flags & EXT2_DIRSYNC_FL)
 		inode->i_flags |= S_DIRSYNC;
 	inode->i_generation = EXT2_SB(sb)->s_next_generation++;
 	insert_inode_hash(inode);
-	mark_inode_dirty(inode);
 
 	unlock_super(sb);
-	ret = inode;
 	if(DQUOT_ALLOC_INODE(inode)) {
 		DQUOT_DROP(inode);
-		inode->i_flags |= S_NOQUOTA;
-		inode->i_nlink = 0;
-		iput(inode);
-		ret = ERR_PTR(-EDQUOT);
-	} else {
-		ext2_debug("allocating inode %lu\n", inode->i_ino);
-		ext2_preread_inode(inode);
+		goto fail3;
 	}
-	goto out;
+	err = ext2_init_acl(inode, dir);
+	if (err) {
+		DQUOT_FREE_INODE(inode);
+		goto fail3;
+	}
+	mark_inode_dirty(inode);
+	ext2_debug("allocating inode %lu\n", inode->i_ino);
+	ext2_preread_inode(inode);
+	return inode;
+
+fail3:
+	inode->i_flags |= S_NOQUOTA;
+	inode->i_nlink = 0;
+	iput(inode);
+	return ERR_PTR(err);
 
 fail2:
 	desc = ext2_get_group_desc (sb, group, &bh2);
@@ -420,10 +573,10 @@ fail:
 	unlock_super(sb);
 	make_bad_inode(inode);
 	iput(inode);
-	ret = ERR_PTR(err);
-	goto out;
+	return ERR_PTR(err);
 
 bad_count:
+	brelse(bitmap_bh);
 	ext2_error (sb, "ext2_new_inode",
 		    "Free inodes count corrupted in group %d",
 		    group);
@@ -436,9 +589,6 @@ bad_count:
 	desc->bg_free_inodes_count = 0;
 	mark_buffer_dirty(bh2);
 	goto repeat;
-out:
-	brelse(bitmap_bh);
-	return ret;
 }
 
 unsigned long ext2_count_free_inodes (struct super_block * sb)
@@ -477,6 +627,21 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 #else
 	return le32_to_cpu(EXT2_SB(sb)->s_es->s_free_inodes_count);
 #endif
+}
+
+/* Called at mount-time, super-block is locked */
+unsigned long ext2_count_dirs (struct super_block * sb)
+{
+	unsigned long count = 0;
+	int i;
+
+	for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
+		struct ext2_group_desc *gdp = ext2_get_group_desc (sb, i, NULL);
+		if (!gdp)
+			continue;
+		count += le16_to_cpu(gdp->bg_used_dirs_count);
+	}
+	return count;
 }
 
 #ifdef CONFIG_EXT2_CHECK

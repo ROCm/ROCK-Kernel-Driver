@@ -628,18 +628,21 @@ struct notifier_block hci_sock_nblock = {
 int hci_sock_init(void)
 {
 	if (bt_sock_register(BTPROTO_HCI, &hci_sock_family_ops)) {
-		BT_ERR("Can't register HCI socket");
+		BT_ERR("HCI socket registration failed");
 		return -EPROTO;
 	}
 
 	hci_register_notifier(&hci_sock_nblock);
+
+	BT_INFO("HCI socket layer initialized");
+
 	return 0;
 }
 
 int hci_sock_cleanup(void)
 {
 	if (bt_sock_unregister(BTPROTO_HCI))
-		BT_ERR("Can't unregister HCI socket");
+		BT_ERR("HCI socket unregistration failed");
 
 	hci_unregister_notifier(&hci_sock_nblock);
 	return 0;

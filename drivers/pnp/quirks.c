@@ -164,6 +164,5 @@ void pnp_fixup_device(struct pnp_dev *dev)
 		}
 		i++;
 	}
-	return;
 }
 

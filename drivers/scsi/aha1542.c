@@ -1635,14 +1635,18 @@ static int aha1542_old_abort(Scsi_Cmnd * SCpnt)
 		if (HOSTDATA(SCpnt->host)->SCint[i]) {
 			if (HOSTDATA(SCpnt->host)->SCint[i] == SCpnt) {
 				printk(KERN_ERR "Timed out command pending for %s\n",
-				       kdevname(SCpnt->request->rq_dev));
+				       SCpnt->request->rq_disk ?
+				       SCpnt->request->rq_disk->disk_name : "?"
+				       );
 				if (HOSTDATA(SCpnt->host)->mb[i].status) {
 					printk(KERN_ERR "OGMB still full - restarting\n");
 					aha1542_out(SCpnt->host->io_port, &ahacmd, 1);
 				};
 			} else
 				printk(KERN_ERR "Other pending command %s\n",
-				       kdevname(SCpnt->request->rq_dev));
+				       SCpnt->request->rq_disk ?
+				       SCpnt->request->rq_disk->disk_name : "?"
+				       );
 		}
 #endif
 
@@ -1781,14 +1785,13 @@ fail:
 }
 #endif    /* end of big comment block around old_abort + old_reset */
 
-#include "sd.h"
-
-static int aha1542_biosparam(Scsi_Disk * disk, struct block_device *dev, int *ip)
+static int aha1542_biosparam(struct scsi_device *sdev,
+		struct block_device *bdev, sector_t capacity, int *ip)
 {
 	int translation_algorithm;
-	int size = disk->capacity;
+	int size = capacity;
 
-	translation_algorithm = HOSTDATA(disk->device->host)->bios_translation;
+	translation_algorithm = HOSTDATA(sdev->host)->bios_translation;
 
 	if ((size >> 11) > 1024 && translation_algorithm == BIOS_TRANSLATION_25563) {
 		/* Please verify that this is the same as what DOS returns */

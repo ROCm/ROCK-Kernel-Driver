@@ -205,19 +205,26 @@ nt_lm_owf_gen(char *pwd, unsigned char nt_p16[16], unsigned char p16[16])
 /* Does the NTLMv2 owfs of a user's password */
 void
 ntv2_owf_gen(const unsigned char owf[16], const char *user_n,
-	     const char *domain_n, unsigned char kr_buf[16],
-	     const struct nls_table *nls_codepage)
+		const char *domain_n, unsigned char kr_buf[16],
+		const struct nls_table *nls_codepage)
 {
-	wchar_t user_u[1024];
-	wchar_t dom_u[1024];
+	wchar_t * user_u;
+	wchar_t * dom_u;
+	int user_l, domain_l;
 	struct HMACMD5Context ctx;
 
+	/* might as well do one alloc to hold both (user_u and dom_u) */
+	user_u = kmalloc(2048 * sizeof(wchar_t),GFP_KERNEL); 
+	if(user_u == NULL)
+		return;
+	dom_u = user_u + 1024;
+    
 	/* push_ucs2(NULL, user_u, user_n, (user_l+1)*2, STR_UNICODE|STR_NOALIGN|STR_TERMINATE|STR_UPPER);
 	   push_ucs2(NULL, dom_u, domain_n, (domain_l+1)*2, STR_UNICODE|STR_NOALIGN|STR_TERMINATE|STR_UPPER); */
 
-    /* do not think it is supposed to be uppercased */
-	int user_l = cifs_strtoUCS(user_u, user_n, 511, nls_codepage);
-	int domain_l = cifs_strtoUCS(dom_u, domain_n, 511, nls_codepage);
+	/* do not think it is supposed to be uppercased */
+	user_l = cifs_strtoUCS(user_u, user_n, 511, nls_codepage);
+	domain_l = cifs_strtoUCS(dom_u, domain_n, 511, nls_codepage);
 
 	user_l++;		/* trailing null */
 	domain_l++;
@@ -234,6 +241,7 @@ ntv2_owf_gen(const unsigned char owf[16], const char *user_n,
 	dump_data(100, owf, 16);
 	dump_data(100, kr_buf, 16);
 #endif
+	kfree(user_u);
 }
 
 /* Does the des encryption from the NT or LM MD4 hash. */

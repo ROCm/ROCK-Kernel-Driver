@@ -17,7 +17,7 @@
  * (fokkensr@vertis.nl)	 Which means: You can adjust the recording levels.
  *
  * 2000/01/18 - separated sb_card and sb_common -
- * Jeff Garzik <jgarzik@mandrakesoft.com>
+ * Jeff Garzik <jgarzik@pobox.com>
  *
  * 2000/09/18 - got rid of attach_uart401
  * Arnaldo Carvalho de Melo <acme@conectiva.com.br>

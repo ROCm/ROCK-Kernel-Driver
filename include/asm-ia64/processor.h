@@ -89,6 +89,9 @@
 #include <asm/rse.h>
 #include <asm/unwind.h>
 #include <asm/atomic.h>
+#ifdef CONFIG_NUMA
+#include <asm/nodedata.h>
+#endif
 
 /* like above but expressed as bitfields for more efficient access: */
 struct ia64_psr {
@@ -173,6 +176,9 @@ struct cpuinfo_ia64 {
 	__u64 ipi_count;
 	__u64 prof_counter;
 	__u64 prof_multiplier;
+#endif
+#ifdef CONFIG_NUMA
+	struct ia64_node_data *node_data;
 #endif
 };
 

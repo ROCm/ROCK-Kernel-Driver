@@ -2667,7 +2667,7 @@ under /dev.  These special filesystems provide kernel interfaces that
 cannot be provided with standard device nodes.
 
 /dev/pts	devpts		PTY slave filesystem
-/dev/shm	shmfs		POSIX shared memory maintenance access
+/dev/shm	tmpfs		POSIX shared memory maintenance access
 
  ****	TERMINAL DEVICES
 

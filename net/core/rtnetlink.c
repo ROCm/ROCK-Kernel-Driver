@@ -128,7 +128,7 @@ int rtnetlink_send(struct sk_buff *skb, u32 pid, unsigned group, int echo)
 	return err;
 }
 
-int rtnetlink_put_metrics(struct sk_buff *skb, unsigned *metrics)
+int rtnetlink_put_metrics(struct sk_buff *skb, u32 *metrics)
 {
 	struct rtattr *mx = (struct rtattr*)skb->tail;
 	int i;
@@ -136,7 +136,7 @@ int rtnetlink_put_metrics(struct sk_buff *skb, unsigned *metrics)
 	RTA_PUT(skb, RTA_METRICS, 0, NULL);
 	for (i=0; i<RTAX_MAX; i++) {
 		if (metrics[i])
-			RTA_PUT(skb, i+1, sizeof(unsigned), metrics+i);
+			RTA_PUT(skb, i+1, sizeof(u32), metrics+i);
 	}
 	mx->rta_len = skb->tail - (u8*)mx;
 	if (mx->rta_len == RTA_LENGTH(0))
@@ -523,6 +523,7 @@ void __init rtnetlink_init(void)
 	rtnl = netlink_kernel_create(NETLINK_ROUTE, rtnetlink_rcv);
 	if (rtnl == NULL)
 		panic("rtnetlink_init: cannot initialize rtnetlink\n");
+	netlink_set_nonroot(NETLINK_ROUTE, NL_NONROOT_RECV);
 	register_netdevice_notifier(&rtnetlink_dev_notifier);
 	rtnetlink_links[PF_UNSPEC] = link_rtnetlink_table;
 	rtnetlink_links[PF_PACKET] = link_rtnetlink_table;

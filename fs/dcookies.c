@@ -8,7 +8,7 @@
  * non-transitory that can be processed at a later date.
  * This is done by locking the dentry/vfsmnt pair in the
  * kernel until released by the tasks needing the persistent
- * objects. The tag is simply an u32 that refers
+ * objects. The tag is simply an unsigned long that refers
  * to the pair and can be looked up from userspace.
  */
 
@@ -46,19 +46,19 @@ static inline int is_live(void)
 
 
 /* The dentry is locked, its address will do for the cookie */
-static inline u32 dcookie_value(struct dcookie_struct * dcs)
+static inline unsigned long dcookie_value(struct dcookie_struct * dcs)
 {
-	return (u32)dcs->dentry;
+	return (unsigned long)dcs->dentry;
 }
 
 
-static size_t dcookie_hash(u32 dcookie)
+static size_t dcookie_hash(unsigned long dcookie)
 {
-	return (dcookie >> 2) & (hash_size - 1);
+	return (dcookie >> L1_CACHE_SHIFT) & (hash_size - 1);
 }
 
 
-static struct dcookie_struct * find_dcookie(u32 dcookie)
+static struct dcookie_struct * find_dcookie(unsigned long dcookie)
 {
 	struct dcookie_struct * found = 0;
 	struct dcookie_struct * dcs;
@@ -109,7 +109,7 @@ static struct dcookie_struct * alloc_dcookie(struct dentry * dentry,
  * value for a dentry/vfsmnt pair.
  */
 int get_dcookie(struct dentry * dentry, struct vfsmount * vfsmnt,
-	u32 * cookie)
+	unsigned long * cookie)
 {
 	int err = 0;
 	struct dcookie_struct * dcs;
@@ -142,11 +142,12 @@ out:
 /* And here is where the userspace process can look up the cookie value
  * to retrieve the path.
  */
-asmlinkage int sys_lookup_dcookie(u32 cookie, char * buf, size_t len)
+asmlinkage int sys_lookup_dcookie(u64 cookie64, char * buf, size_t len)
 {
+	unsigned long cookie = (unsigned long)cookie64;
+	int err = -EINVAL;
 	char * kbuf;
 	char * path;
-	int err = -EINVAL;
 	size_t pathlen;
 	struct dcookie_struct * dcs;
 
@@ -170,19 +171,18 @@ asmlinkage int sys_lookup_dcookie(u32 cookie, char * buf, size_t len)
 	kbuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!kbuf)
 		goto out;
-	memset(kbuf, 0, PAGE_SIZE);
 
 	/* FIXME: (deleted) ? */
 	path = d_path(dcs->dentry, dcs->vfsmnt, kbuf, PAGE_SIZE);
 
-	err = 0;
-
+	err = -ERANGE;
+ 
 	pathlen = kbuf + PAGE_SIZE - path;
-	if (len > pathlen)
-		len = pathlen;
-
-	if (copy_to_user(buf, path, len))
-		err = -EFAULT;
+	if (pathlen <= len) {
+		err = pathlen;
+		if (copy_to_user(buf, path, pathlen))
+			err = -EFAULT;
+	}
 
 	kfree(kbuf);
 out:

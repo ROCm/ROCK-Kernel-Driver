@@ -1,0 +1,53 @@
+#
+# Config.in for Eicon active ISDN support
+#
+config ISDN_DRV_EICON
+	bool "Eicon active card support"
+	help
+	  Say Y here if you have an Eicon active ISDN card. In order to use
+	  this card, additional firmware is necessary, which has to be loaded
+	  into the card using the eiconctrl utility which is part of the
+	  latest isdn4k-utils package. Please read the file
+	  <file:Documentation/isdn/README.eicon> for more information.
+
+choice
+	prompt "Eicon active card support"
+	optional
+	depends on ISDN_DRV_EICON && ISDN
+
+config ISDN_DRV_EICON_DIVAS
+	tristate "Eicon driver"
+	depends on PCI
+	help
+	  Enable this option if you want the eicon driver as standalone
+	  version with no interface to the ISDN4Linux isdn module. If you
+	  say Y here, the eicon module only supports the Diva Server PCI
+	  cards and will provide its own IDI interface. You should say N
+	  here.
+
+config ISDN_DRV_EICON_OLD
+	tristate "Legacy driver"
+	help
+	  Say Y here to use your Eicon active ISDN card with ISDN4Linux
+	  isdn module.
+
+config ISDN_DRV_EICON_PCI
+	bool "Eicon PCI DIVA Server BRI/PRI/4BRI support"
+	depends on ISDN_DRV_EICON_OLD && PCI
+	help
+	  Say Y here if you have an Eicon Diva Server (BRI/PRI/4BRI) ISDN
+	  card.  Please read <file:Documentation/isdn/README.eicon> for more
+	  information.
+
+config ISDN_DRV_EICON_ISA
+	bool "Eicon S,SX,SCOM,Quadro,S2M support"
+	depends on ISDN_DRV_EICON_OLD
+	help
+	  Say Y here if you have an old-type Eicon active ISDN card. In order
+	  to use this card, additional firmware is necessary, which has to be
+	  loaded into the card using the eiconctrl utility which is part of
+	  the latest isdn4k-utils package. Please read the file
+	  <file:Documentation/isdn/README.eicon> for more information.
+
+endchoice
+

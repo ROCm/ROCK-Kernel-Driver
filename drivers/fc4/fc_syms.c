@@ -26,7 +26,6 @@ EXPORT_SYMBOL(fc_do_prli);
 
 /* SCSI stuff */
 EXPORT_SYMBOL(fcp_scsi_queuecommand);
-EXPORT_SYMBOL(fcp_old_abort);
 EXPORT_SYMBOL(fcp_scsi_abort);
 EXPORT_SYMBOL(fcp_scsi_dev_reset);
 EXPORT_SYMBOL(fcp_scsi_bus_reset);

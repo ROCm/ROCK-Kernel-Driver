@@ -1,7 +1,7 @@
 /*
  *      MOTU Midi Timepiece ALSA Main routines
  *      Copyright by Michael T. Mayers (c) Jan 09, 2000
- *      mail: tweakoz@pacbell.net
+ *      mail: michael@tweakoz.com
  *      Thanks to John Galbraith
  *
  *      This program is free software; you can redistribute it and/or modify
@@ -44,7 +44,7 @@
  * Jun 11 2001	Takashi Iwai <tiwai@suse.de>
  *      - Recoded & debugged
  *      - Added timer interrupt for midi outputs
- *      - snd_hwports is between 1 and 8, which specifies the number of hardware ports.
+ *      - hwports is between 1 and 8, which specifies the number of hardware ports.
  *        The three global ports, computer, adat and broadcast ports, are created
  *        always after h/w and remote ports.
  *
@@ -75,27 +75,27 @@ MODULE_DEVICES("{{MOTU,MidiTimePiece AV multiport MIDI}}");
 #define MTPAV_IRQ		7
 #define MTPAV_MAX_PORTS		8
 
-static int snd_index = SNDRV_DEFAULT_IDX1;
-static char *snd_id = SNDRV_DEFAULT_STR1;
-static long snd_port = MTPAV_IOBASE;	/* 0x378, 0x278 */
-static int snd_irq = MTPAV_IRQ;		/* 7, 5 */
-static int snd_hwports = MTPAV_MAX_PORTS;	/* use hardware ports 1-8 */
+static int index = SNDRV_DEFAULT_IDX1;
+static char *id = SNDRV_DEFAULT_STR1;
+static long port = MTPAV_IOBASE;	/* 0x378, 0x278 */
+static int irq = MTPAV_IRQ;		/* 7, 5 */
+static int hwports = MTPAV_MAX_PORTS;	/* use hardware ports 1-8 */
 
-MODULE_PARM(snd_index, "i");
-MODULE_PARM_DESC(snd_index, "Index value for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "s");
-MODULE_PARM_DESC(snd_id, "ID string for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_port, "l");
-MODULE_PARM_DESC(snd_port, "Parallel port # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_ENABLED ",allows:{{0x378},{0x278}},dialog:list");
-MODULE_PARM(snd_irq, "i");
-MODULE_PARM_DESC(snd_irq, "Parallel IRQ # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_irq,  SNDRV_ENABLED ",allows:{{7},{5}},dialog:list");
-MODULE_PARM(snd_hwports, "i");
-MODULE_PARM_DESC(snd_hwports, "Hardware ports # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_hwports, SNDRV_ENABLED ",allows:{{1,8}},dialog:list");
+MODULE_PARM(index, "i");
+MODULE_PARM_DESC(index, "Index value for MotuMTPAV MIDI.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "s");
+MODULE_PARM_DESC(id, "ID string for MotuMTPAV MIDI.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(port, "l");
+MODULE_PARM_DESC(port, "Parallel port # for MotuMTPAV MIDI.");
+MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x378},{0x278}},dialog:list");
+MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(irq, "Parallel IRQ # for MotuMTPAV MIDI.");
+MODULE_PARM_SYNTAX(irq,  SNDRV_ENABLED ",allows:{{7},{5}},dialog:list");
+MODULE_PARM(hwports, "i");
+MODULE_PARM_DESC(hwports, "Hardware ports # for MotuMTPAV MIDI.");
+MODULE_PARM_SYNTAX(hwports, SNDRV_ENABLED ",allows:{{1,8}},dialog:list");
 
 /*
  *      defines
@@ -421,25 +421,19 @@ static void snd_mtpav_output_timer(unsigned long data)
 	spin_unlock(&chip->spinlock);
 }
 
+/* spinlock held! */
 static void snd_mtpav_add_output_timer(mtpav_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->spinlock, flags);
 	chip->timer.function = snd_mtpav_output_timer;
 	chip->timer.data = (unsigned long) mtp_card;
 	chip->timer.expires = 1 + jiffies;
 	add_timer(&chip->timer);
-	spin_unlock_irqrestore(&chip->spinlock, flags);
 }
 
+/* spinlock held! */
 static void snd_mtpav_remove_output_timer(mtpav_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->spinlock, flags);
 	del_timer(&chip->timer);
-	spin_unlock_irqrestore(&chip->spinlock, flags);
 }
 
 /*
@@ -510,8 +504,11 @@ static void snd_mtpav_inmidi_process(mtpav_t *mcrd, u8 inbyte)
 		return;
 
 	port = &mcrd->ports[mcrd->inmidiport];
-	if (port->mode & MTPAV_MODE_INPUT_TRIGGERED)
+	if (port->mode & MTPAV_MODE_INPUT_TRIGGERED) {
+		spin_unlock(&mcrd->spinlock);
 		snd_rawmidi_receive(port->input, &inbyte, 1);
+		spin_lock(&mcrd->spinlock);
+	}
 }
 
 static void snd_mtpav_inmidi_h(mtpav_t * mcrd, u8 inbyte)
@@ -588,16 +585,16 @@ static void snd_mtpav_irqh(int irq, void *dev_id, struct pt_regs *regs)
  */
 static int snd_mtpav_get_ISA(mtpav_t * mcard)
 {
-	if ((mcard->res_port = request_region(snd_port, 3, "MotuMTPAV MIDI")) == NULL) {
-		snd_printk("MTVAP port 0x%lx is busy\n", snd_port);
+	if ((mcard->res_port = request_region(port, 3, "MotuMTPAV MIDI")) == NULL) {
+		snd_printk("MTVAP port 0x%lx is busy\n", port);
 		return -EBUSY;
 	}
-	mcard->port = snd_port;
-	if (request_irq(snd_irq, snd_mtpav_irqh, SA_INTERRUPT, "MOTU MTPAV", (void *)mcard)) {
-		snd_printk("MTVAP IRQ %d busy\n", snd_irq);
+	mcard->port = port;
+	if (request_irq(irq, snd_mtpav_irqh, SA_INTERRUPT, "MOTU MTPAV", (void *)mcard)) {
+		snd_printk("MTVAP IRQ %d busy\n", irq);
 		return -EBUSY;
 	}
-	mcard->irq = snd_irq;
+	mcard->irq = irq;
 	return 0;
 }
 
@@ -645,12 +642,12 @@ static int snd_mtpav_get_RAWMIDI(mtpav_t * mcard)
 
 	//printk("entering snd_mtpav_get_RAWMIDI\n");
 
-	if (snd_hwports < 1)
+	if (hwports < 1)
 		mcard->num_ports = 1;
-	else if (snd_hwports > 8)
+	else if (hwports > 8)
 		mcard->num_ports = 8;
 	else
-		mcard->num_ports = snd_hwports;
+		mcard->num_ports = hwports;
 
 	if ((rval = snd_rawmidi_new(mcard->card, "MotuMIDI", 0,
 				    mcard->num_ports * 2 + MTPAV_PIDX_BROADCAST + 1,
@@ -730,7 +727,7 @@ static int __init alsa_card_mtpav_init(void)
 	if (mtp_card == NULL)
 		return -ENOMEM;
 
-	mtp_card->card = snd_card_new(snd_index, snd_id, THIS_MODULE, 0);
+	mtp_card->card = snd_card_new(index, id, THIS_MODULE, 0);
 	if (mtp_card->card == NULL) {
 		free_mtpav(mtp_card);
 		return -ENOMEM;
@@ -760,7 +757,7 @@ static int __init alsa_card_mtpav_init(void)
 
 	snd_mtpav_portscan(mtp_card);
 
-	printk(KERN_INFO "Motu MidiTimePiece on parallel port irq: %d ioport: 0x%lx\n", snd_irq, snd_port);
+	printk(KERN_INFO "Motu MidiTimePiece on parallel port irq: %d ioport: 0x%lx\n", irq, port);
 
 	return 0;
 
@@ -790,19 +787,19 @@ module_exit(alsa_card_mtpav_exit)
 
 #ifndef MODULE
 
-/* format is: snd-mtpav=snd_enable,snd_index,snd_id,
-			snd_port,snd_irq,snd_hwports */
+/* format is: snd-mtpav=snd_enable,index,id,
+			port,irq,hwports */
 
 static int __init alsa_card_mtpav_setup(char *str)
 {
         int __attribute__ ((__unused__)) enable = 1;
 
 	(void)(get_option(&str,&enable) == 2 &&
-	       get_option(&str,&snd_index) == 2 &&
-	       get_id(&str,&snd_id) == 2 &&
-	       get_option(&str,(int *)&snd_port) == 2 &&
-	       get_option(&str,&snd_irq) == 2 &&
-	       get_option(&str,&snd_hwports) == 2);
+	       get_option(&str,&index) == 2 &&
+	       get_id(&str,&id) == 2 &&
+	       get_option(&str,(int *)&port) == 2 &&
+	       get_option(&str,&irq) == 2 &&
+	       get_option(&str,&hwports) == 2);
 	return 1;
 }
 

@@ -78,14 +78,33 @@ static void powermate_config_complete(struct urb *urb); /* forward declararation
 static void powermate_irq(struct urb *urb)
 {
 	struct powermate_device *pm = urb->context;
+	int retval;
 
-	if (urb->status)
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	/* handle updates to device state */
 	input_report_key(&pm->input, BTN_0, pm->data[0] & 0x01);
 	input_report_rel(&pm->input, REL_DIAL, pm->data[1]);
 	input_sync(&pm->input);
+
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 /* Decide if we need to issue a control message and do so. Must be called with pm->lock down */
@@ -271,14 +290,14 @@ static void powermate_free_buffers(struct usb_device *udev, struct powermate_dev
 static int powermate_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev (intf);
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct powermate_device *pm;
 	int pipe, maxp;
 	char path[64];
 
 	interface = intf->altsetting + 0;
-	endpoint = interface->endpoint + 0;
+	endpoint = &interface->endpoint[0].desc;
 	if (!(endpoint->bEndpointAddress & 0x80))
 		return -EIO;
 	if ((endpoint->bmAttributes & 3) != 3)
@@ -286,7 +305,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 
 	usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 		0x0a, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		0, interface->bInterfaceNumber, NULL, 0,
+		0, interface->desc.bInterfaceNumber, NULL, 0,
 		HZ * USB_CTRL_SET_TIMEOUT);
 
 	if (!(pm = kmalloc(sizeof(struct powermate_device), GFP_KERNEL)))

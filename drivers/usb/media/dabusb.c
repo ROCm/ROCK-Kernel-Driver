@@ -251,7 +251,7 @@ static int dabusb_alloc_buffers (pdabusb_t s)
 		b->purb->context = b;
 		b->purb->dev = s->usbdev;
 		b->purb->pipe = pipe;
-		b->purb->transfer_flags = USB_ISO_ASAP;
+		b->purb->transfer_flags = URB_ISO_ASAP;
 
 		for (i = 0; i < packets; i++) {
 			b->purb->iso_frame_desc[i].offset = i * pipesize;
@@ -728,7 +728,7 @@ static int dabusb_probe (struct usb_interface *intf,
 	if (usbdev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	if (intf->altsetting->bInterfaceNumber != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
+	if (intf->altsetting->desc.bInterfaceNumber != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
 		return -ENODEV;
 
 	retval = usb_register_dev (&dabusb_fops, DABUSB_MINOR, 1, &devnum);
@@ -742,7 +742,7 @@ static int dabusb_probe (struct usb_interface *intf,
 	s->usbdev = usbdev;
 	s->devnum = devnum;
 
-	if (usb_set_configuration (usbdev, usbdev->config[0].bConfigurationValue) < 0) {
+	if (usb_set_configuration (usbdev, usbdev->config[0].desc.bConfigurationValue) < 0) {
 		err("set_configuration failed");
 		goto reject;
 	}

@@ -176,6 +176,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	unsigned first_hole = blocks_per_page;
 	struct block_device *bdev = NULL;
 	struct buffer_head bh;
+	int length;
 
 	if (page_has_buffers(page))
 		goto confused;
@@ -233,7 +234,8 @@ alloc_new:
 			goto confused;
 	}
 
-	if (bio_add_page(bio, page, first_hole << blkbits, 0)) {
+	length = first_hole << blkbits;
+	if (bio_add_page(bio, page, length, 0) < length) {
 		bio = mpage_bio_submit(READ, bio);
 		goto alloc_new;
 	}
@@ -261,7 +263,7 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
 	sector_t last_block_in_bio = 0;
 	struct pagevec lru_pvec;
 
-	pagevec_init(&lru_pvec);
+	pagevec_init(&lru_pvec, 0);
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 
@@ -334,6 +336,7 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 	int boundary = 0;
 	sector_t boundary_block = 0;
 	struct block_device *boundary_bdev = NULL;
+	int length;
 
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
@@ -467,7 +470,8 @@ alloc_new:
 			try_to_free_buffers(page);
 	}
 
-	if (bio_add_page(bio, page, first_unmapped << blkbits, 0)) {
+	length = first_unmapped << blkbits;
+	if (bio_add_page(bio, page, length, 0) < length) {
 		bio = mpage_bio_submit(WRITE, bio);
 		goto alloc_new;
 	}
@@ -556,7 +560,7 @@ mpage_writepages(struct address_space *mapping,
 	if (get_block == NULL)
 		writepage = mapping->a_ops->writepage;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	write_lock(&mapping->page_lock);
 
 	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
@@ -591,6 +595,10 @@ mpage_writepages(struct address_space *mapping,
 					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page);
+				if (ret == -EAGAIN) {
+					__set_page_dirty_nobuffers(page);
+					ret = 0;
+				}
 			} else {
 				bio = mpage_writepage(bio, page, get_block,
 						&last_block_in_bio, &ret);
@@ -600,10 +608,6 @@ mpage_writepages(struct address_space *mapping,
 				if (!pagevec_add(&pvec, page))
 					pagevec_deactivate_inactive(&pvec);
 				page = NULL;
-			}
-			if (ret == -EAGAIN && page) {
-				__set_page_dirty_nobuffers(page);
-				ret = 0;
 			}
 			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;

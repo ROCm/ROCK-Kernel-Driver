@@ -4,7 +4,6 @@
  *
  * ipc helper functions (c) 1999 Manfred Spraul <manfreds@colorfullife.com>
  */
-
 #define USHRT_MAX 0xffff
 #define SEQ_MULTIPLIER	(IPCMNI)
 
@@ -19,14 +18,12 @@ struct ipc_ids {
 	unsigned short seq;
 	unsigned short seq_max;
 	struct semaphore sem;	
-	spinlock_t ary;
 	struct ipc_id* entries;
 };
 
 struct ipc_id {
 	struct kern_ipc_perm* p;
 };
-
 
 void __init ipc_init_ids(struct ipc_ids* ids, int size);
 
@@ -44,57 +41,17 @@ int ipcperms (struct kern_ipc_perm *ipcp, short flg);
  */
 void* ipc_alloc(int size);
 void ipc_free(void* ptr, int size);
+/* for allocation that need to be freed by RCU
+ * both function can sleep
+ */
+void* ipc_rcu_alloc(int size);
+void ipc_rcu_free(void* arg, int size);
 
-extern inline void ipc_lockall(struct ipc_ids* ids)
-{
-	spin_lock(&ids->ary);
-}
-
-extern inline struct kern_ipc_perm* ipc_get(struct ipc_ids* ids, int id)
-{
-	struct kern_ipc_perm* out;
-	int lid = id % SEQ_MULTIPLIER;
-	if(lid >= ids->size)
-		return NULL;
-
-	out = ids->entries[lid].p;
-	return out;
-}
-
-extern inline void ipc_unlockall(struct ipc_ids* ids)
-{
-	spin_unlock(&ids->ary);
-}
-extern inline struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
-{
-	struct kern_ipc_perm* out;
-	int lid = id % SEQ_MULTIPLIER;
-	if(lid >= ids->size)
-		return NULL;
-
-	spin_lock(&ids->ary);
-	out = ids->entries[lid].p;
-	if(out==NULL)
-		spin_unlock(&ids->ary);
-	return out;
-}
-
-extern inline void ipc_unlock(struct ipc_ids* ids, int id)
-{
-	spin_unlock(&ids->ary);
-}
-
-extern inline int ipc_buildid(struct ipc_ids* ids, int id, int seq)
-{
-	return SEQ_MULTIPLIER*seq + id;
-}
-
-extern inline int ipc_checkid(struct ipc_ids* ids, struct kern_ipc_perm* ipcp, int uid)
-{
-	if(uid/SEQ_MULTIPLIER != ipcp->seq)
-		return 1;
-	return 0;
-}
+struct kern_ipc_perm* ipc_get(struct ipc_ids* ids, int id);
+struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id);
+void ipc_unlock(struct kern_ipc_perm* perm);
+int ipc_buildid(struct ipc_ids* ids, int id, int seq);
+int ipc_checkid(struct ipc_ids* ids, struct kern_ipc_perm* ipcp, int uid);
 
 void kernel_to_ipc64_perm(struct kern_ipc_perm *in, struct ipc64_perm *out);
 void ipc64_perm_to_ipc_perm(struct ipc64_perm *in, struct ipc_perm *out);

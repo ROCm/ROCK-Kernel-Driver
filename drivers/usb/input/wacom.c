@@ -108,8 +108,22 @@ static void wacom_pl_irq(struct urb *urb)
 	unsigned char *data = wacom->data;
 	struct input_dev *dev = &wacom->dev;
 	int prox, pressure;
+	int retval;
 
-	if (urb->status) return;
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	if (data[0] != 2)
 		dbg("received unknown report #%d", data[0]);
@@ -135,6 +149,12 @@ static void wacom_pl_irq(struct urb *urb)
 	}
 	
 	input_sync(dev);
+
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 static void wacom_penpartner_irq(struct urb *urb)
@@ -142,8 +162,22 @@ static void wacom_penpartner_irq(struct urb *urb)
 	struct wacom *wacom = urb->context;
 	unsigned char *data = wacom->data;
 	struct input_dev *dev = &wacom->dev;
+	int retval;
 
-	if (urb->status) return;
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	input_report_key(dev, BTN_TOOL_PEN, 1);
 	input_report_abs(dev, ABS_X, data[2] << 8 | data[1]);
@@ -152,6 +186,12 @@ static void wacom_penpartner_irq(struct urb *urb)
 	input_report_key(dev, BTN_TOUCH, ((signed char)data[6] > -80) && !(data[5] & 0x20));
 	input_report_key(dev, BTN_STYLUS, (data[5] & 0x40));
 	input_sync(dev);
+
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 static void wacom_graphire_irq(struct urb *urb)
@@ -160,8 +200,22 @@ static void wacom_graphire_irq(struct urb *urb)
 	unsigned char *data = wacom->data;
 	struct input_dev *dev = &wacom->dev;
 	int x, y;
+	int retval;
 
-	if (urb->status) return;
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	if (data[0] != 2)
 		dbg("received unknown report #%d", data[0]);
@@ -191,7 +245,7 @@ static void wacom_graphire_irq(struct urb *urb)
 			input_report_abs(dev, ABS_Y, y);
 
 			input_sync(dev);
-			return;
+			goto exit;
 	}
 
 	if (data[1] & 0x80) {
@@ -205,6 +259,12 @@ static void wacom_graphire_irq(struct urb *urb)
 	input_report_key(dev, BTN_STYLUS2, data[1] & 0x04);
 
 	input_sync(dev);
+
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 static void wacom_intuos_irq(struct urb *urb)
@@ -214,8 +274,22 @@ static void wacom_intuos_irq(struct urb *urb)
 	struct input_dev *dev = &wacom->dev;
 	unsigned int t;
 	int idx;
+	int retval;
 
-	if (urb->status) return;
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	if (data[0] != 2)
 		dbg("received unknown report #%d", data[0]);
@@ -253,13 +327,13 @@ static void wacom_intuos_irq(struct urb *urb)
 		input_report_key(dev, wacom->tool[idx], 1);
 		input_event(dev, EV_MSC, MSC_SERIAL, wacom->serial[idx]);
 		input_sync(dev);
-		return;
+		goto exit;
 	}
 
 	if ((data[1] & 0xfe) == 0x80) {						/* Exit report */
 		input_report_key(dev, wacom->tool[idx], 0);
 		input_sync(dev);
-		return;
+		goto exit;
 	}
 
 	input_report_abs(dev, ABS_X, ((__u32)data[2] << 8) | data[3]);
@@ -323,6 +397,12 @@ static void wacom_intuos_irq(struct urb *urb)
 	}
 	
 	input_sync(dev);
+
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 struct wacom_features wacom_features[] = {
@@ -481,7 +561,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 	wacom->dev.id.version = dev->descriptor.bcdDevice;
 	wacom->usbdev = dev;
 
-	endpoint = intf->altsetting[0].endpoint + 0;
+	endpoint = &intf->altsetting[0].endpoint[0].desc;
 
 	if (wacom->features->pktlen > 10)
 		BUG();

@@ -32,12 +32,12 @@ struct svc_cacherep {
 	u32			c_vers;
 	unsigned long		c_timestamp;
 	union {
-		struct svc_buf	u_buffer;
+		struct iovec	u_vec;
 		u32		u_status;
 	}			c_u;
 };
 
-#define c_replbuf		c_u.u_buffer
+#define c_replvec		c_u.u_vec
 #define c_replstat		c_u.u_status
 
 /* cache entry states */

@@ -244,7 +244,7 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 		priv->wrsent=length;
 
 		/* set up our urb */
-		FILL_BULK_URB(port->write_urb, serial->dev, 
+		usb_fill_bulk_urb(port->write_urb, serial->dev, 
 			      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
 			      port->write_urb->transfer_buffer, length,
 			      ((serial->type->write_bulk_callback) ? 
@@ -422,7 +422,7 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 		priv->wrsent+=length;
 
 		/* set up our urb */
-		FILL_BULK_URB(port->write_urb, serial->dev, 
+		usb_fill_bulk_urb(port->write_urb, serial->dev, 
 			      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
 			      port->write_urb->transfer_buffer, length,
 			      ((serial->type->write_bulk_callback) ? 

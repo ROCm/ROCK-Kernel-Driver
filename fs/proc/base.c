@@ -28,6 +28,7 @@
 #include <linux/namespace.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
+#include <linux/kallsyms.h>
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.
@@ -54,6 +55,7 @@ enum pid_directory_inos {
 	PROC_PID_MAPS,
 	PROC_PID_CPU,
 	PROC_PID_MOUNTS,
+	PROC_PID_WCHAN,
 	PROC_PID_FD_DIR = 0x8000,	/* 0x8000-0xffff */
 };
 
@@ -81,6 +83,9 @@ static struct pid_entry base_stuff[] = {
   E(PROC_PID_ROOT,	"root",		S_IFLNK|S_IRWXUGO),
   E(PROC_PID_EXE,	"exe",		S_IFLNK|S_IRWXUGO),
   E(PROC_PID_MOUNTS,	"mounts",	S_IFREG|S_IRUGO),
+#ifdef CONFIG_KALLSYMS
+  E(PROC_PID_WCHAN,	"wchan",	S_IFREG|S_IRUGO),
+#endif
   {0,0,NULL,0}
 };
 #undef E
@@ -244,6 +249,28 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 out:
 	return res;
 }
+
+#ifdef CONFIG_KALLSYMS
+/*
+ * Provides a wchan file via kallsyms in a proper one-value-per-file format.
+ * Returns the resolved symbol.  If that fails, simply return the address.
+ */
+static int proc_pid_wchan(struct task_struct *task, char *buffer)
+{
+	const char *sym_name, *ignore;
+	unsigned long wchan, dummy;
+
+	wchan = get_wchan(task);
+
+	if (!kallsyms_address_to_symbol(wchan, &ignore, &dummy, &dummy,
+			&ignore, &dummy, &dummy, &sym_name,
+			&dummy, &dummy)) {
+		return sprintf(buffer, "%lu", wchan);
+	}
+
+	return sprintf(buffer, "%s", sym_name);
+}
+#endif
 
 /************************************************************************/
 /*                       Here the fs part begins                        */
@@ -1016,6 +1043,12 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 		case PROC_PID_MOUNTS:
 			inode->i_fop = &proc_mounts_operations;
 			break;
+#ifdef CONFIG_KALLSYMS
+		case PROC_PID_WCHAN:
+			inode->i_fop = &proc_info_file_operations;
+			ei->op.proc_read = proc_pid_wchan;
+			break;
+#endif
 		default:
 			printk("procfs: impossible type (%d)",p->type);
 			iput(inode);

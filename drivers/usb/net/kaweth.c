@@ -449,7 +449,7 @@ static int kaweth_reset(struct kaweth_device *kaweth)
 				usb_sndctrlpipe(kaweth->dev, 0),
 				USB_REQ_SET_CONFIGURATION,
 				0,
-				kaweth->dev->config[0].bConfigurationValue,
+				kaweth->dev->config[0].desc.bConfigurationValue,
 				0,
 				NULL,
 				0,
@@ -471,11 +471,23 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *, int);
 static void int_callback(struct urb *u)
 {
 	struct kaweth_device *kaweth = u->context;
-	int act_state;
+	int act_state, status;
 
 	/* we abuse the interrupt urb for rebsubmitting under low memory saving a timer */
 	if (kaweth->suspend_lowmem)
 		kaweth_resubmit_rx_urb(kaweth, GFP_ATOMIC);
+
+	switch (u->status) {
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		goto resubmit;
+	}
 
 	/* we check the link state to report changes */
 	if (kaweth->linkstate != (act_state = ( kaweth->intbuffer[STATE_OFFSET] | STATE_MASK) >> STATE_SHIFT)) {
@@ -486,7 +498,12 @@ static void int_callback(struct urb *u)
 
 		kaweth->linkstate = act_state;
 	}
-
+resubmit:
+	status = usb_submit_urb (u, SLAB_ATOMIC);
+	if (status)
+		err ("can't resubmit intr, %s-%s, status %d",
+				kaweth->dev->bus->bus_name,
+				kaweth->dev->devpath, status);
 }
 
 /****************************************************************
@@ -497,7 +514,7 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 {
 	int result;
 
-	FILL_BULK_URB(kaweth->rx_urb,
+	usb_fill_bulk_urb(kaweth->rx_urb,
 		      kaweth->dev,
 		      usb_rcvbulkpipe(kaweth->dev, 1),
 		      kaweth->rx_buf,
@@ -603,7 +620,7 @@ static int kaweth_open(struct net_device *net)
 	if (res)
 		return -EIO;
 
-	FILL_INT_URB(
+	usb_fill_int_urb(
 		kaweth->irq_urb,
 		kaweth->dev,
 		usb_rcvintpipe(kaweth->dev, 3),
@@ -735,7 +752,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 	*private_header = cpu_to_le16(skb->len);
 	kaweth->tx_skb = skb;
 
-	FILL_BULK_URB(kaweth->tx_urb,
+	usb_fill_bulk_urb(kaweth->tx_urb,
 		      kaweth->dev,
 		      usb_sndbulkpipe(kaweth->dev, 2),
 		      private_header,
@@ -743,7 +760,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		      kaweth_usb_transmit_complete,
 		      kaweth);
 	kaweth->end = 0;
-	kaweth->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	kaweth->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 
 	if((res = usb_submit_urb(kaweth->tx_urb, GFP_ATOMIC)))
 	{
@@ -1190,7 +1207,7 @@ int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
         if (!urb)
                 return -ENOMEM;
 
-        FILL_CONTROL_URB(urb, usb_dev, pipe, (unsigned char*)cmd, data,
+        usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char*)cmd, data,
 			 len, (usb_complete_t)usb_api_blocking_completion,0);
 
         retv = usb_start_wait_urb(urb, timeout, &length);

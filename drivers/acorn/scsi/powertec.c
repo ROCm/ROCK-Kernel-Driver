@@ -38,7 +38,6 @@
 #include <asm/irq.h>
 #include <asm/pgtable.h>
 
-#include "../../scsi/sd.h"
 #include "../../scsi/hosts.h"
 #include "fas216.h"
 #include "scsi.h"
@@ -456,7 +455,6 @@ static Scsi_Host_Template powertecscsi_template = {
 	.detect				= powertecscsi_detect,
 	.release			= powertecscsi_release,
 	.info				= powertecscsi_info,
-	.bios_param			= scsicam_bios_param,
 	.can_queue			= 1,
 	.this_id			= 7,
 	.sg_tablesize			= SG_ALL,

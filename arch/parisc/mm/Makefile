@@ -1,7 +1,5 @@
 #
-# Makefile for the linux parisc-specific parts of the memory manager.
+# Makefile for arch/parisc/mm
 #
 
-objs-y	 := init.o fault.o kmap.o extable.o
-
-include $(TOPDIR)/Rules.make
+obj-y	 := init.o fault.o extable.o ioremap.o

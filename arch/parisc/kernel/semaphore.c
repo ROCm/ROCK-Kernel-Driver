@@ -1,131 +1,101 @@
 /*
- * Just taken from alpha implementation.
- * This can't work well, perhaps.
- */
-/*
- *  Generic semaphore code. Buyer beware. Do your own
- * specific changes in <asm/semaphore-helper.h>
+ * Semaphore implementation Copyright (c) 2001 Matthew Wilcox, Hewlett-Packard
  */
 
 #include <linux/sched.h>
-#include <asm/semaphore-helper.h>
+#include <linux/spinlock.h>
+#include <linux/errno.h>
 
 /*
- * Semaphores are implemented using a two-way counter:
- * The "count" variable is decremented for each process
- * that tries to sleep, while the "waking" variable is
- * incremented when the "up()" code goes to wake up waiting
- * processes.
+ * Semaphores are complex as we wish to avoid using two variables.
+ * `count' has multiple roles, depending on its value.  If it is positive
+ * or zero, there are no waiters.  The functions here will never be
+ * called; see <asm/semaphore.h>
  *
- * Notably, the inline "up()" and "down()" functions can
- * efficiently test if they need to do any extra work (up
- * needs to do something only if count was negative before
- * the increment operation.
+ * When count is -1 it indicates there is at least one task waiting
+ * for the semaphore.
  *
- * waking_non_zero() (from asm/semaphore.h) must execute
- * atomically.
+ * When count is less than that, there are '- count - 1' wakeups
+ * pending.  ie if it has value -3, there are 2 wakeups pending.
  *
- * When __up() is called, the count was negative before
- * incrementing it, and we need to wake up somebody.
- *
- * This routine adds one to the count of processes that need to
- * wake up and exit.  ALL waiting processes actually wake up but
- * only the one that gets to the "waking" field first will gate
- * through and acquire the semaphore.  The others will go back
- * to sleep.
- *
- * Note that these functions are only called when there is
- * contention on the lock, and as such all this is the
- * "non-critical" part of the whole semaphore business. The
- * critical part is the inline stuff in <asm/semaphore.h>
- * where we want to avoid any extra jumps and calls.
+ * Note that these functions are only called when there is contention
+ * on the lock, and as such all this is the "non-critical" part of the
+ * whole semaphore business. The critical part is the inline stuff in
+ * <asm/semaphore.h> where we want to avoid any extra jumps and calls.
  */
 void __up(struct semaphore *sem)
 {
-	wake_one_more(sem);
+	sem->count--;
 	wake_up(&sem->wait);
 }
 
-/*
- * Perform the "down" function.  Return zero for semaphore acquired,
- * return negative for signalled out of the function.
- *
- * If called from __down, the return is ignored and the wait loop is
- * not interruptible.  This means that a task waiting on a semaphore
- * using "down()" cannot be killed until someone does an "up()" on
- * the semaphore.
- *
- * If called from __down_interruptible, the return value gets checked
- * upon return.  If the return value is negative then the task continues
- * with the negative value in the return register (it can be tested by
- * the caller).
- *
- * Either form may be used in conjunction with "up()".
- *
- */
+#define wakers(count) (-1 - count)
 
+#define DOWN_HEAD							\
+	int ret = 0;							\
+	DECLARE_WAITQUEUE(wait, current);				\
+									\
+	/* Note that someone is waiting */				\
+	if (sem->count == 0)						\
+		sem->count = -1;					\
+									\
+	/* protected by the sentry still -- use unlocked version */	\
+	wait.flags = WQ_FLAG_EXCLUSIVE;					\
+	__add_wait_queue_tail(&sem->wait, &wait);			\
+ lost_race:								\
+	spin_unlock_irq(&sem->sentry);					\
 
-#define DOWN_HEAD(task_state)						\
-									\
-									\
-	current->state = (task_state);					\
-	add_wait_queue(&sem->wait, &wait);				\
-									\
-	/*								\
-	 * Ok, we're set up.  sem->count is known to be less than zero	\
-	 * so we must wait.						\
-	 *								\
-	 * We can let go the lock for purposes of waiting.		\
-	 * We re-acquire it after awaking so as to protect		\
-	 * all semaphore operations.					\
-	 *								\
-	 * If "up()" is called before we call waking_non_zero() then	\
-	 * we will catch it right away.  If it is called later then	\
-	 * we will have to go through a wakeup cycle to catch it.	\
-	 *								\
-	 * Multiple waiters contend for the semaphore lock to see	\
-	 * who gets to gate through and who has to wait some more.	\
-	 */								\
-	for (;;) {
+#define DOWN_TAIL							\
+	spin_lock_irq(&sem->sentry);					\
+	if (wakers(sem->count) == 0 && ret == 0)			\
+		goto lost_race;	/* Someone stole our wakeup */		\
+	__remove_wait_queue(&sem->wait, &wait);				\
+	current->state = TASK_RUNNING;					\
+	if (!waitqueue_active(&sem->wait) && (sem->count < 0))		\
+		sem->count = wakers(sem->count);
 
-#define DOWN_TAIL(task_state)			\
-		current->state = (task_state);	\
-	}					\
-	current->state = TASK_RUNNING;		\
-	remove_wait_queue(&sem->wait, &wait);
+#define UPDATE_COUNT							\
+	sem->count += (sem->count < 0) ? 1 : - 1;
+	
 
 void __down(struct semaphore * sem)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DOWN_HEAD
 
-	DOWN_HEAD(TASK_UNINTERRUPTIBLE)
-	if (waking_non_zero(sem))
-		break;
-	schedule();
-	DOWN_TAIL(TASK_UNINTERRUPTIBLE)
+	for(;;) {
+		set_task_state(current, TASK_UNINTERRUPTIBLE);
+		/* we can _read_ this without the sentry */
+		if (sem->count != -1)
+			break;
+ 		schedule();
+ 	}
+
+	DOWN_TAIL
+	UPDATE_COUNT
 }
 
 int __down_interruptible(struct semaphore * sem)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	int ret = 0;
+	DOWN_HEAD
 
-	DOWN_HEAD(TASK_INTERRUPTIBLE)
+	for(;;) {
+		set_task_state(current, TASK_INTERRUPTIBLE);
+		/* we can _read_ this without the sentry */
+		if (sem->count != -1)
+			break;
 
-	ret = waking_non_zero_interruptible(sem, current);
-	if (ret)
-	{
-		if (ret == 1)
-			/* ret != 0 only if we get interrupted -arca */
-			ret = 0;
-		break;
+		if (signal_pending(current)) {
+			ret = -EINTR;
+			break;
+		}
+		schedule();
 	}
-	schedule();
-	DOWN_TAIL(TASK_INTERRUPTIBLE)
-	return ret;
-}
 
-int __down_trylock(struct semaphore * sem)
-{
-	return waking_non_zero_trylock(sem);
+	DOWN_TAIL
+
+	if (!ret) {
+		UPDATE_COUNT
+	}
+
+	return ret;
 }

@@ -40,7 +40,7 @@ struct blk_probe {
 	unsigned long range;
 	struct module *owner;
 	struct gendisk *(*get)(dev_t dev, int *part, void *data);
-	void (*lock)(dev_t, void *);
+	int (*lock)(dev_t, void *);
 	void *data;
 } *probes[MAX_BLKDEV];
 
@@ -52,7 +52,7 @@ static inline int dev_to_index(dev_t dev)
 
 void blk_register_region(dev_t dev, unsigned long range, struct module *module,
 		    struct gendisk *(*probe)(dev_t, int *, void *),
-		    void (*lock)(dev_t, void *), void *data)
+		    int (*lock)(dev_t, void *), void *data)
 {
 	int index = dev_to_index(dev);
 	struct blk_probe *p = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
@@ -92,15 +92,15 @@ EXPORT_SYMBOL(blk_unregister_region);
 
 static struct gendisk *exact_match(dev_t dev, int *part, void *data)
 {
-	struct gendisk *p = data;
-	*part = MINOR(dev) - p->first_minor;
-	return p;
+	return data;
 }
 
-static void exact_lock(dev_t dev, void *data)
+static int exact_lock(dev_t dev, void *data)
 {
 	struct gendisk *p = data;
-	get_disk(p);
+	if (!get_disk(p))
+		return -1;
+	return 0;
 }
 
 /**
@@ -167,8 +167,11 @@ retry:
 		probe = p->get;
 		best = p->range;
 		*part = dev - p->dev;
-		if (p->lock)
-			p->lock(dev, data);
+		if (p->lock && p->lock(dev, data) < 0) {
+			if (owner)
+				__MOD_DEC_USE_COUNT(owner);
+			continue;
+		}
 		read_unlock(&gendisk_lock);
 		disk = probe(dev, part, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
@@ -249,14 +252,6 @@ struct seq_operations partitions_op = {
 
 extern int blk_dev_init(void);
 
-struct device_class disk_devclass = {
-	.name		= "disk",
-};
-
-static struct bus_type disk_bus = {
-	name:		"block",
-};
- 
 static struct gendisk *base_probe(dev_t dev, int *part, void *data)
 {
 	char name[20];
@@ -264,6 +259,8 @@ static struct gendisk *base_probe(dev_t dev, int *part, void *data)
 	request_module(name);
 	return NULL;
 }
+
+struct subsystem block_subsys;
 
 int __init device_init(void)
 {
@@ -277,21 +274,115 @@ int __init device_init(void)
 	for (i = 1; i < MAX_BLKDEV; i++)
 		probes[i] = base;
 	blk_dev_init();
-	devclass_register(&disk_devclass);
-	bus_register(&disk_bus);
+	subsystem_register(&block_subsys);
 	return 0;
 }
 
-__initcall(device_init);
+subsys_initcall(device_init);
 
-EXPORT_SYMBOL(disk_devclass);
 
-static void disk_release(struct device *dev)
+
+/*
+ * kobject & sysfs bindings for block devices
+ */
+
+#define to_disk(obj) container_of(obj,struct gendisk,kobj)
+
+struct disk_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct gendisk *, char *, size_t, loff_t);
+};
+
+static ssize_t disk_attr_show(struct kobject * kobj, struct attribute * attr,
+			      char * page, size_t count, loff_t off)
 {
-	struct gendisk *disk = dev->driver_data;
+	struct gendisk * disk = to_disk(kobj);
+	struct disk_attribute * disk_attr = container_of(attr,struct disk_attribute,attr);
+	ssize_t ret = 0;
+	if (disk_attr->show)
+		ret = disk_attr->show(disk,page,count,off);
+	return ret;
+}
+
+static struct sysfs_ops disk_sysfs_ops = {
+	.show	= &disk_attr_show,
+};
+
+static ssize_t disk_dev_read(struct gendisk * disk,
+			     char *page, size_t count, loff_t off)
+{
+	dev_t base = MKDEV(disk->major, disk->first_minor); 
+	return off ? 0 : sprintf(page, "%04x\n",base);
+}
+static ssize_t disk_range_read(struct gendisk * disk,
+			       char *page, size_t count, loff_t off)
+{
+	return off ? 0 : sprintf(page, "%d\n",disk->minors);
+}
+static ssize_t disk_size_read(struct gendisk * disk,
+			      char *page, size_t count, loff_t off)
+{
+	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)get_capacity(disk));
+}
+static inline unsigned MSEC(unsigned x)
+{
+	return x * 1000 / HZ;
+}
+static ssize_t disk_stat_read(struct gendisk * disk,
+			      char *page, size_t count, loff_t off)
+{
+	disk_round_stats(disk);
+	return off ? 0 : sprintf(page,
+		"%8u %8u %8llu %8u "
+		"%8u %8u %8llu %8u "
+		"%8u %8u %8u"
+		"\n",
+		disk->reads, disk->read_merges, (u64)disk->read_sectors,
+		MSEC(disk->read_ticks),
+		disk->writes, disk->write_merges, (u64)disk->write_sectors,
+		MSEC(disk->write_ticks),
+		disk->in_flight, MSEC(disk->io_ticks),
+		MSEC(disk->time_in_queue));
+}
+static struct disk_attribute disk_attr_dev = {
+	.attr = {.name = "dev", .mode = S_IRUGO },
+	.show	= disk_dev_read
+};
+static struct disk_attribute disk_attr_range = {
+	.attr = {.name = "range", .mode = S_IRUGO },
+	.show	= disk_range_read
+};
+static struct disk_attribute disk_attr_size = {
+	.attr = {.name = "size", .mode = S_IRUGO },
+	.show	= disk_size_read
+};
+static struct disk_attribute disk_attr_stat = {
+	.attr = {.name = "stat", .mode = S_IRUGO },
+	.show	= disk_stat_read
+};
+
+static struct attribute * default_attrs[] = {
+	&disk_attr_dev.attr,
+	&disk_attr_range.attr,
+	&disk_attr_size.attr,
+	&disk_attr_stat.attr,
+	NULL,
+};
+
+static void disk_release(struct kobject * kobj)
+{
+	struct gendisk *disk = to_disk(kobj);
+	kfree(disk->random);
 	kfree(disk->part);
 	kfree(disk);
 }
+
+struct subsystem block_subsys = {
+	.kobj	= { .name = "block" },
+	.release	= disk_release,
+	.sysfs_ops	= &disk_sysfs_ops,
+	.default_attrs	= default_attrs,
+};
 
 struct gendisk *alloc_disk(int minors)
 {
@@ -310,27 +401,68 @@ struct gendisk *alloc_disk(int minors)
 		disk->minors = minors;
 		while (minors >>= 1)
 			disk->minor_shift++;
+		kobject_init(&disk->kobj);
+		disk->kobj.subsys = &block_subsys;
 		INIT_LIST_HEAD(&disk->full_list);
-		disk->disk_dev.bus = &disk_bus;
-		disk->disk_dev.release = disk_release;
-		disk->disk_dev.driver_data = disk;
-		device_initialize(&disk->disk_dev);
 	}
+	rand_initialize_disk(disk);
 	return disk;
 }
 
 struct gendisk *get_disk(struct gendisk *disk)
 {
-	atomic_inc(&disk->disk_dev.refcount);
-	return disk;
+	struct module *owner;
+	if (!disk->fops)
+		return NULL;
+	owner = disk->fops->owner;
+	if (owner && !try_inc_mod_count(owner))
+		return NULL;
+	return to_disk(kobject_get(&disk->kobj));
 }
 
 void put_disk(struct gendisk *disk)
 {
 	if (disk)
-		put_device(&disk->disk_dev);
+		kobject_put(&disk->kobj);
 }
 
 EXPORT_SYMBOL(alloc_disk);
 EXPORT_SYMBOL(get_disk);
 EXPORT_SYMBOL(put_disk);
+
+void set_device_ro(struct block_device *bdev, int flag)
+{
+	struct gendisk *disk = bdev->bd_disk;
+	if (bdev->bd_contains != bdev) {
+		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
+		struct hd_struct *p = &disk->part[part-1];
+		p->policy = flag;
+	} else
+		disk->policy = flag;
+}
+
+void set_disk_ro(struct gendisk *disk, int flag)
+{
+	int i;
+	disk->policy = flag;
+	for (i = 0; i < disk->minors - 1; i++)
+		disk->part[i].policy = flag;
+}
+
+int bdev_read_only(struct block_device *bdev)
+{
+	struct gendisk *disk;
+	if (!bdev)
+		return 0;
+	disk = bdev->bd_disk;
+	if (bdev->bd_contains != bdev) {
+		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
+		struct hd_struct *p = &disk->part[part-1];
+		return p->policy;
+	} else
+		return disk->policy;
+}
+
+EXPORT_SYMBOL(bdev_read_only);
+EXPORT_SYMBOL(set_device_ro);
+EXPORT_SYMBOL(set_disk_ro);

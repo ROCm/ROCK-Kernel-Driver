@@ -81,11 +81,11 @@ SECTIONS
 
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
+  .init.text : { *(.init.text) }
+  .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {
@@ -109,8 +109,10 @@ SECTIONS
 
   /* Sections to be discarded */
   /DISCARD/ : {
-	*(.data.exit)
+	*(.exit.data)
+	*(.exit.text)
 	*(.exitcall.exit)
+	*(.eh_frame)
 	}
 
   /* DWARF 2 */

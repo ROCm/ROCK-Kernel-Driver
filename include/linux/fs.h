@@ -110,6 +110,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_MOVE		8192
 #define MS_REC		16384
 #define MS_VERBOSE	32768
+#define MS_POSIXACL	(1<<16)	/* VFS does not apply the umask */
 #define MS_ACTIVE	(1<<30)
 #define MS_NOUSER	(1<<31)
 
@@ -164,6 +165,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define IS_IMMUTABLE(inode)	((inode)->i_flags & S_IMMUTABLE)
 #define IS_NOATIME(inode)	(__IS_FLG(inode, MS_NOATIME) || ((inode)->i_flags & S_NOATIME))
 #define IS_NODIRATIME(inode)	__IS_FLG(inode, MS_NODIRATIME)
+#define IS_POSIXACL(inode)	__IS_FLG(inode, MS_POSIXACL)
 
 #define IS_DEADDIR(inode)	((inode)->i_flags & S_DEAD)
 
@@ -348,8 +350,6 @@ struct block_device {
 	struct inode *		bd_inode;
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
 	int			bd_openers;
-	struct block_device_operations *bd_op;
-	struct request_queue	*bd_queue;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
 	void *			bd_holder;
@@ -793,6 +793,8 @@ struct seq_file;
 
 extern ssize_t vfs_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t vfs_write(struct file *, const char *, size_t, loff_t *);
+extern ssize_t vfs_readv(struct file *, struct iovec *, int, size_t, loff_t *);
+extern ssize_t vfs_writev(struct file *, const struct iovec *, int, size_t, loff_t *);
 
 /*
  * NOTE: write_inode, delete_inode, clear_inode, put_inode can be called
@@ -1096,7 +1098,6 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/devices.c */
-extern struct block_device_operations *get_blkfops(unsigned int);
 extern int register_chrdev(unsigned int, const char *, struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
@@ -1144,6 +1145,7 @@ extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
 extern sector_t bmap(struct inode *, sector_t);
+extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);
 extern int permission(struct inode *, int);
 extern int vfs_permission(struct inode *, int);
@@ -1222,6 +1224,7 @@ static inline struct inode *iget(struct super_block *sb, unsigned long ino)
 
 extern void __iget(struct inode * inode);
 extern void clear_inode(struct inode *);
+extern void destroy_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
 extern void remove_suid(struct dentry *);
 
@@ -1242,6 +1245,7 @@ extern int sb_min_blocksize(struct super_block *, int);
 
 extern int generic_file_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
+extern int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern ssize_t generic_file_aio_read(struct kiocb *, char *, size_t, loff_t);
@@ -1253,10 +1257,12 @@ ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 extern ssize_t generic_file_sendfile(struct file *, struct file *, loff_t *, size_t);
 extern void do_generic_mapping_read(struct address_space *, struct file_ra_state *, struct file *,
 				    loff_t *, read_descriptor_t *, read_actor_t);
+extern void
+file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping);
 extern ssize_t generic_file_direct_IO(int rw, struct file *file,
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs);
-extern int generic_direct_IO(int rw, struct inode *inode, const struct iovec 
-	*iov, loff_t offset, unsigned long nr_segs, get_blocks_t *get_blocks);
+extern int generic_direct_IO(int rw, struct inode *inode, struct block_device *bdev,
+	const struct iovec *iov, loff_t offset, unsigned long nr_segs, get_blocks_t *get_blocks);
 extern ssize_t generic_file_readv(struct file *filp, const struct iovec *iov, 
 	unsigned long nr_segs, loff_t *ppos);
 ssize_t generic_file_writev(struct file *filp, const struct iovec *iov, 
@@ -1314,6 +1320,12 @@ extern int simple_rmdir(struct inode *, struct dentry *);
 extern int simple_rename(struct inode *, struct dentry *, struct inode *, struct dentry *);
 extern int simple_sync_file(struct file *, struct dentry *, int);
 extern int simple_empty(struct dentry *);
+extern int simple_readpage(struct file *file, struct page *page);
+extern int simple_prepare_write(struct file *file, struct page *page,
+			unsigned offset, unsigned to);
+extern int simple_commit_write(struct file *file, struct page *page,
+				unsigned offset, unsigned to);
+
 extern struct dentry *simple_lookup(struct inode *, struct dentry *);
 extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;

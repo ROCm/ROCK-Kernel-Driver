@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 44
+SUBLEVEL = 45
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -38,13 +38,17 @@ ARCH := $(SUBARCH)
 
 KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//g")
 
+UTS_MACHINE := $(ARCH)
+
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
 TOPDIR	:= $(CURDIR)
 
 HOSTCC  	= gcc
+HOSTCXX  	= g++
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCXXFLAGS	= -O2
 
 CROSS_COMPILE 	=
 
@@ -106,11 +110,20 @@ endif
 
 MAKEFLAGS += --no-print-directory
 
+# For maximum performance (+ possibly random breakage, uncomment
+# the following)
+
+#MAKEFLAGS += -rR
+
 #	If the user wants quiet mode, echo short versions of the commands 
 #	only
 
-ifneq ($(KBUILD_VERBOSE),1)
+ifeq ($(KBUILD_VERBOSE),1)
+  quiet =
+  Q =
+else
   quiet=quiet_
+  Q = @
 endif
 
 #	If the user is running make -s (silent mode), suppress echoing of
@@ -120,7 +133,7 @@ ifneq ($(findstring s,$(MAKEFLAGS)),)
   quiet=silent_
 endif
 
-export quiet KBUILD_VERBOSE
+export quiet Q KBUILD_VERBOSE
 
 #	Paths to obj / src tree
 
@@ -142,7 +155,7 @@ NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
-MAKEFILES	= .config
+AWK		= awk
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= /sbin/kallsyms
@@ -161,7 +174,8 @@ AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
+	HOSTCXX HOSTCXXFLAGS
 
 export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
@@ -187,7 +201,7 @@ scripts/docproc scripts/fixdep scripts/split-include : scripts ;
 
 .PHONY: scripts
 scripts:
-	+@$(call descend,scripts,)
+	+@$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts
 
 # Objects we will link into vmlinux / subdirs we need to visit
 # ---------------------------------------------------------------------------
@@ -196,12 +210,12 @@ init-y		:= init/
 drivers-y	:= drivers/ sound/
 net-y		:= net/
 libs-y		:= lib/
-core-y		:=
+core-y		:= usr/
 SUBDIRS		:=
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
-include-config := 1
+export include_config := 1
 
 -include .config
 
@@ -209,15 +223,16 @@ endif
 
 include arch/$(ARCH)/Makefile
 
-core-y		+= kernel/ mm/ fs/ ipc/ security/
+core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
 
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
 		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
 
-ALL_SUBDIRS     := $(SUBDIRS) $(patsubst %/,%,$(filter %/, $(init-n) $(init-) \
+ALL_SUBDIRS     := $(sort $(SUBDIRS) $(patsubst %/,%,$(filter %/, \
+		     $(init-n) $(init-) \
 		     $(core-n) $(core-) $(drivers-n) $(drivers-) \
-		     $(net-n) $(net-) $(libs-n) $(libs-)))
+		     $(net-n)  $(net-)  $(libs-n)    $(libs-))))
 
 init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
 core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
@@ -225,7 +240,7 @@ drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
 libs-y		:= $(patsubst %/, %/lib.a, $(libs-y))
 
-ifdef include-config
+ifdef include_config
 
 # Here goes the main Makefile
 # ===========================================================================
@@ -237,21 +252,7 @@ ifdef include-config
 
 #	In this section, we need .config
 
-#	If .config doesn't exist - tough luck
-
-.config: arch/$(ARCH)/config.in # FIXME $(shell find . -name Config.in)
-	@echo '***'
-	@if [ -f $@ ]; then \
-	  echo '*** The tree was updated, so your .config may be'; \
-	  echo '*** out of date!'; \
-	else \
-	  echo '*** You have not yet configured your kernel!'; \
-	fi
-	@echo '***'
-	@echo '*** Please run some configurator (e.g. "make oldconfig" or'
-	@echo '*** "make menuconfig" or "make xconfig").'
-	@echo '***'
-	@exit 1
+-include ..config.cmd
 
 ifdef CONFIG_MODULES
 export EXPORT_FLAGS := -DEXPORT_SYMTAB
@@ -306,7 +307,7 @@ define rule_vmlinux__
 	  echo '  Generating build number'
 	  . scripts/mkversion > .tmp_version
 	  mv -f .tmp_version .version
-	  +$(call descend,init,)
+	  $(Q)$(MAKE) -f scripts/Makefile.build obj=init
 	)
 	$(call cmd,vmlinux__)
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
@@ -365,7 +366,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): .hdepend prepare
-	+@$(call descend,$@,)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$@
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
@@ -388,17 +389,17 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 # ---------------------------------------------------------------------------
 
 %.s: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.i: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.o: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.lst: %.c scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.s: %.S scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 %.o: %.S scripts FORCE
-	+@$(call descend,$(@D),$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
 
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
@@ -419,11 +420,8 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 # 	with it and forgot to run make oldconfig
 
 include/linux/autoconf.h: .config
-	@echo '***'
-	@echo '*** You changed .config w/o running make *config?'
-	@echo '*** Please run "make oldconfig"'
-	@echo '***'
-	@exit 1
+	+@$(call descend,scripts/kconfig,scripts/kconfig/conf)
+	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
 # Generate some files
 # ---------------------------------------------------------------------------
@@ -472,9 +470,11 @@ ifdef CONFIG_MODVERSIONS
 
 # 	Update modversions.h, but only if it would change.
 
-include/linux/modversions.h: FORCE
+.PHONY: __rm_tmp_export-objs
+__rm_tmp_export-objs: 
 	@rm -rf .tmp_export-objs
-	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+
+include/linux/modversions.h: $(patsubst %,_modver_%,$(SUBDIRS))
 	@echo -n '  Generating $@'
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
@@ -487,8 +487,9 @@ include/linux/modversions.h: FORCE
 	) > $@.tmp; \
 	$(update-if-changed)
 
-$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
-	+@$(call descend,$(patsubst _sfdep_%,%,$@),fastdep)
+.PHONY: $(patsubst %, _modver_%, $(SUBDIRS))
+$(patsubst %, _modver_%, $(SUBDIRS)): __rm_tmp_export-objs
+	$(Q)$(MAKE) -f scripts/Makefile.modver obj=$(patsubst _modver_%,%,$@)
 
 else # !CONFIG_MODVERSIONS
 
@@ -540,8 +541,7 @@ _modinst_post:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	+@$(call descend,$(patsubst _modinst_%,%,$@),modules_install)
-
+	$(Q)$(MAKE) -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
 else # CONFIG_MODULES
 
 # Modules not configured
@@ -604,7 +604,7 @@ rpm:	clean spec
 	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
-else # ifdef include-config
+else # ifdef include_config
 
 ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -637,34 +637,36 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 .PHONY: oldconfig xconfig menuconfig config \
 	make_with_config
 
-xconfig:
-	+@$(call descend,scripts,scripts/kconfig.tk)
-	wish -f scripts/kconfig.tk
+scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf: scripts/fixdep FORCE
+	+@$(call descend,scripts/kconfig,$@)
 
-menuconfig:
-	+@$(call descend,scripts,lxdialog)
-	$(CONFIG_SHELL) $(src)/scripts/Menuconfig arch/$(ARCH)/config.in
+xconfig: scripts/kconfig/qconf
+	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
 
-config:
-	$(CONFIG_SHELL) $(src)/scripts/Configure arch/$(ARCH)/config.in
+menuconfig: scripts/kconfig/mconf
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts lxdialog
+	./scripts/kconfig/mconf arch/$(ARCH)/Kconfig
 
-oldconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
+config: scripts/kconfig/conf
+	./scripts/kconfig/conf arch/$(ARCH)/Kconfig
 
-randconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -r arch/$(ARCH)/config.in
+oldconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -o arch/$(ARCH)/Kconfig
 
-allyesconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -y arch/$(ARCH)/config.in
+randconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -r arch/$(ARCH)/Kconfig
 
-allnoconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -n arch/$(ARCH)/config.in
+allyesconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -y arch/$(ARCH)/Kconfig
 
-allmodconfig:
-	$(CONFIG_SHELL) $(src)/scripts/Configure -m arch/$(ARCH)/config.in
+allnoconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -n arch/$(ARCH)/Kconfig
 
-defconfig:
-	yes '' | $(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
+allmodconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -m arch/$(ARCH)/Kconfig
+
+defconfig: scripts/kconfig/conf
+	./scripts/kconfig/conf -d arch/$(ARCH)/Kconfig
 
 ###
 # Cleaning is done on three levels.
@@ -698,7 +700,7 @@ MRPROPER_DIRS += \
 clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
 $(addprefix _clean_,$(clean-dirs)):
-	$(MAKE) MAKEFILES= -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
@@ -764,8 +766,7 @@ tags: FORCE
 help:
 	@echo  'Cleaning targets:'
 	@echo  '  clean		- remove most generated files but keep the config'
-	@echo  '  mrproper	- remove all generated files including the config'
-	@echo  '  distclean	- mrproper + remove files generated by editors and patch'
+	@echo  '  mrproper	- remove all generated files + config + various backup files'
 	@echo  ''
 	@echo  'Configuration targets:'
 	@echo  '  oldconfig	- Update current config utilising a line-oriented program'
@@ -798,7 +799,7 @@ help:
 # Documentation targets
 # ---------------------------------------------------------------------------
 sgmldocs psdocs pdfdocs htmldocs: scripts
-	+@$(call descend,Documentation/DocBook,$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------
@@ -828,17 +829,15 @@ else # ifneq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	$(MAKE) $@
 
 endif # ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
-endif # ifdef include-config
+endif # ifdef include_config
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
 
-echo_target = $@
-
 a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
-quiet_cmd_as_s_S = CPP     $(echo_target)
+quiet_cmd_as_s_S = CPP     $@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 # read all saved command lines
@@ -885,13 +884,9 @@ define update-if-changed
 		mv -f $@.tmp $@; \
 	fi
 endef
-
 #	$(call descend,<dir>,<target>)
-#	Recursively call a sub-make in <dir> with target <target> 
+#	Recursively call a sub-make in <dir> with target <target>
 
-ifeq ($(KBUILD_VERBOSE),1)
-descend = echo '$(MAKE) -f $(1)/Makefile $(2)';
-endif
-descend += $(MAKE) -f $(1)/Makefile obj=$(1) $(2)
+descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:

@@ -83,6 +83,7 @@ struct svc_expkey {
  */
 void			nfsd_export_init(void);
 void			nfsd_export_shutdown(void);
+void			nfsd_export_flush(void);
 void			exp_readlock(void);
 void			exp_readunlock(void);
 struct svc_expkey *	exp_find_key(struct auth_domain *clp, 

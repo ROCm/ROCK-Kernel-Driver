@@ -208,8 +208,9 @@ static int igmp_send_report(struct net_device *dev, u32 group, int type)
 		dst = IGMP_ALL_ROUTER;
 
 	{
-		struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dst } },
-				    .oif = dev->ifindex };
+		struct flowi fl = { .oif = dev->ifindex,
+				    .nl_u = { .ip4_u = { .daddr = dst } },
+				    .proto = IPPROTO_IGMP };
 		if (ip_route_output_key(&rt, &fl))
 			return -1;
 	}

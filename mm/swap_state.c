@@ -301,7 +301,7 @@ void free_pages_and_swap_cache(struct page **pages, int nr)
 
 		for (i = 0; i < todo; i++)
 			free_swap_cache(pagep[i]);
-		release_pages(pagep, todo);
+		release_pages(pagep, todo, 0);
 		pagep += todo;
 		nr -= todo;
 	}
@@ -376,7 +376,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 			/*
 			 * Initiate read into locked page and return.
 			 */
-			lru_cache_add(new_page);
+			lru_cache_add_active(new_page);
 			swap_readpage(NULL, new_page);
 			return new_page;
 		}

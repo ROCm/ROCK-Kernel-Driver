@@ -1,0 +1,1862 @@
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
+config UID16
+	bool
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default y
+
+config HAVE_DEC_LOCK
+	bool
+	default y
+
+
+mainmenu "Linux/PowerPC Kernel Configuration"
+
+source "init/Kconfig"
+
+
+menu "Platform support"
+
+config PPC
+	bool
+	default y
+	---help---
+	  The PowerPC is a modern RISC architecture descended from the POWER
+	  architecture designed by IBM.  The PowerPC architecture is designed
+	  to allow high-speed implementations which can execute several
+	  instructions in each clock cycle.  IBM and Motorola design and
+	  manufacture PowerPC processors aimed at embedded, desktop and server
+	  applications.  PowerPC chips are used in Apple Power Macintoshes
+	  (including iMacs, iBooks and PowerBooks), in IBM pSeries (RS/6000)
+	  and iSeries (AS/400) machines, and in a broad range of embedded
+	  applications.  The Linux PowerPC port has a home page at
+	  <http://penguinppc.org/intro.shtml>.
+
+config PPC32
+	bool
+	default y
+
+choice
+	prompt "Processor Type"
+	default 6xx
+
+config 6xx
+	bool "6xx/7xx/74xx/8260"
+	help
+	  There are four types of PowerPC chips supported.  The more common
+	  types (601, 603, 604, 740, 750, 7400), the Motorola embedded
+	  versions (821, 823, 850, 855, 860, 8260), the IBM embedded versions
+	  (403 and 405) and the high end 64 bit Power processors (POWER 3)
+	  Unless you are building a kernel for one of the embedded processor
+	  systems, or a 64 bit IBM RS/6000, choose 6xx.  Note that the kernel
+	  runs in 32-bit mode even on 64-bit chips.  Also note that because
+	  the 82xx family has a 603e core, specific support for that chipset
+	  is asked later on.
+
+config 40x
+	bool "40x"
+
+config POWER3
+	bool "POWER3"
+
+config 8xx
+	bool "8xx"
+
+config PPC_ISERIES
+	bool "iSeries"
+
+endchoice
+
+config 4xx
+	bool
+	depends on 40x
+	default y
+
+config 8260
+	bool "MPC8260 CPM Support"
+	depends on 6xx
+	help
+	  The MPC8260 CPM (Communications Processor Module) is a typical
+	  embedded CPU made by Motorola.  Selecting this option means that
+	  you wish to build a kernel for a machine with specifically an 8260
+	  for a CPU.
+
+	  If in doubt, say N.
+
+config GENERIC_ISA_DMA
+	bool
+	depends on POWER3 || 6xx && !8260
+	default y
+
+config PPC64BRIDGE
+	bool
+	depends on PPC_ISERIES || POWER3
+	default y
+
+config ALL_PPC
+	bool
+	depends on ALL_PPC_CH || POWER3
+	default y
+	---help---
+	  Linux currently supports several different kinds of PowerPC-based
+	  machines: Apple Power Macintoshes and clones (such as the Motorola
+	  Starmax series), PReP (PowerPC Reference Platform) machines (such
+	  as the Motorola PowerStacks, Motorola cPCI/VME embedded systems,
+	  and some IBM RS/6000 systems), CHRP (Common Hardware Reference
+	  Platform) machines (including all of the recent IBM RS/6000 and
+	  pSeries machines), and several embedded PowerPC systems containing
+	  4xx, 6xx, 7xx, 8xx, 74xx, and 82xx processors.  Currently, the
+	  default option is to build a kernel which works on the first three.
+
+	  Select CHRP/PowerMac/PReP if configuring for an IBM RS/6000 or
+	  pSeries machine, a Power Macintosh (including iMacs, iBooks and
+	  Powerbooks), or a PReP machine.
+
+	  Select Gemini if configuring for a Synergy Microsystems' Gemini
+	  series Single Board Computer.  More information is available at:
+	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
+
+	  Select APUS if configuring for a PowerUP Amiga.  More information is
+	  available at: <http://linux-apus.sourceforge.net/>.
+
+config PPC_STD_MMU
+	bool
+	depends on 6xx || POWER3
+	default y
+
+config SERIAL_CONSOLE
+	bool
+	depends on 8xx || 8260
+	default y
+	---help---
+	  If you say Y here, it will be possible to use a serial port as the
+	  system console (the system console is the device which receives all
+	  kernel messages and warnings and which allows logins in single user
+	  mode). This could be useful if some terminal or printer is connected
+	  to that serial port.
+
+	  Even if you say Y here, the currently visible virtual console
+	  (/dev/tty0) will still be used as the system console by default, but
+	  you can alter that using a kernel command line option such as
+	  "console=ttyS1". (Try "man bootparam" or see the documentation of
+	  your boot loader (lilo or loadlin) about how to pass options to the
+	  kernel at boot time.)
+
+	  If you don't have a graphics card installed and you say Y here, the
+	  kernel will automatically use the first serial line, /dev/ttyS0, as
+	  system console.
+
+	  If unsure, say N.
+
+choice
+	prompt "Machine Type"
+	depends on 8260
+	default WILLOW_1
+
+config EST8260
+	bool "EST8260"
+	---help---
+	  EST8260:
+	  The EST8260 is a single-board computer manufactured by Wind River
+	  Systems, Inc. (formerly Embedded Support Tools Corp.) and based on
+	  the MPC8260.  Wind River Systems has a website at
+	  <http://www.windriver.com/>, but the EST8260 cannot be found on it
+	  and has probably been discontinued or rebadged.
+
+	  TQM8260:
+	  MPC8260 based module, little larger than credit card,
+	  up to 128 MB global + 64 MB local RAM, 32 MB Flash,
+	  32 kB EEPROM, 256 kB L@ Cache, 10baseT + 100baseT Ethernet,
+	  2 x serial ports, ...
+	  Manufacturer: TQ Components, www.tq-group.de
+	  Date of Release: June 2001
+	  End of Life: not yet :-)
+	  URL: <http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf>
+
+	  PM826:
+	  Modular system with MPC8260 CPU
+	  Manufacturer: MicroSys GmbH, <http://www.microsys.de/>
+	  Date of Release: mid 2001
+	  End of life: -
+	  URL: <http://www.microsys.de/html/pm826.html>
+
+	  CU824:
+	  VMEBus Board with PCI extension with MPC8240 CPU
+	  Manufacturer: MicroSys GmbH, http://www.microsys.de/
+	  Date of Release: early 2001 (?)
+	  End of life: -
+	  URL: <http://www.microsys.de/html/cu824.html>
+
+config SBS8260
+	bool "SBS8260"
+
+config RPX6
+	bool "RPXSUPER"
+
+config TQM8260
+	bool "TQM8260"
+
+config WILLOW_1
+	bool "Willow"
+
+endchoice
+
+choice
+	prompt "Machine Type"
+	depends on 40x
+	default WALNUT
+
+config ASH
+	bool "Ash"
+
+config CEDER
+	bool "Ceder"
+
+config CPCI405
+	bool "CPCI405"
+
+config EP405
+	bool "EP405/EP405PC"
+
+config OAK
+	bool "Oak"
+	help
+	  Select Oak if you have an IBM 403GCX "Oak" Evaluation Board.
+
+	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
+
+	  More information on these boards is available at:
+	  <http://www.chips.ibm.com/products/powerpc/tools/evk_pn.html#GCX>.
+
+config REDWOOD_4
+	bool "Redwood-4"
+
+config REDWOOD_5
+	bool "Redwood-5"
+
+config TIVO
+	bool "Tivo"
+
+config WALNUT
+	bool "Walnut"
+	help
+	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
+
+endchoice
+
+config EP405PC
+	bool "EP405PC Support"
+	depends on EP405
+
+config NOT_COHERENT_CACHE
+	bool
+	depends on 40x || 8xx
+	default y
+
+choice
+	prompt "Machine Type"
+	depends on 8xx
+	default RPXLITE
+
+config RPXLITE
+	bool "RPX-Lite"
+	---help---
+	  Single-board computers based around the PowerPC MPC8xx chips and
+	  intended for embedded applications.  The following types are
+	  supported:
+
+	  RPX-Lite:
+	  Embedded Planet RPX Lite. PC104 form-factor SBC based on the MPC823.
+
+	  RPX-Classic:
+	  Embedded Planet RPX Classic Low-fat. Credit-card-size SBC based on 
+	  the MPC 860
+
+	  BSE-IP: 
+	  Bright Star Engineering ip-Engine.
+
+	  TQM823L:
+	  TQM850L:
+	  TQM855L:
+	  TQM860L:
+	  MPC8xx based family of mini modules, half credit card size,
+	  up to 64 MB of RAM, 8 MB Flash, (Fast) Ethernet, 2 x serial ports,
+	  2 x CAN bus interface, ...
+	  Manufacturer: TQ Components, www.tq-group.de
+	  Date of Release: October (?) 1999
+	  End of Life: not yet :-)
+	  URL:
+	  - module: <http://www.denx.de/PDF/TQM8xxLHWM201.pdf>
+	  - starter kit: <http://www.denx.de/PDF/STK8xxLHWM201.pdf>
+	  - images: <http://www.denx.de/embedded-ppc-en.html>
+
+	  FPS850L:
+	  FingerPrint Sensor System (based on TQM850L)
+	  Manufacturer: IKENDI AG, <http://www.ikendi.com/>
+	  Date of Release: November 1999
+	  End of life: end 2000 ?
+	  URL: see TQM850L
+
+	  SPD823TS:
+	  MPC823 based board used in the "Tele Server" product
+	  Manufacturer: Speech Design, <http://www.speech-design.de/>
+	  Date of Release: Mid 2000 (?)
+	  End of life: -
+	  URL: <http://www.speech-design.de/>
+	  select "English", then "Teleteam Solutions", then "TeleServer"
+
+	  IVMS8:
+	  MPC860 based board used in the "Integrated Voice Mail System",
+	  Small Version (8 voice channels)
+	  Manufacturer: Speech Design, <http://www.speech-design.de/>
+	  Date of Release: December 2000 (?)
+	  End of life: -
+	  URL: <http://www.speech-design.de/>
+
+	  IVML24:
+	  MPC860 based board used in the "Integrated Voice Mail System", 
+	  Large Version (24 voice channels)
+	  Manufacturer: Speech Design, <http://www.speech-design.de/>
+	  Date of Release: March 2001  (?)
+	  End of life: -
+	  URL: <http://www.speech-design.de/>
+
+	  SM850:
+	  Service Module (based on TQM850L)
+	  Manufacturer: Dependable Computer Systems, <http://www.decomsys.com/>
+	  Date of Release: end 2000 (?)
+	  End of life: mid 2001 (?)
+	  URL: <http://www.tz-mikroelektronik.de/ServiceModule/index.html>
+
+	  HERMES:
+	  Hermes-Pro ISDN/LAN router with integrated 8 x hub
+	  Manufacturer: Multidata Gesellschaft für Datentechnik und Informatik
+	  <http://www.multidata.de/>
+	  Date of Release: 2000 (?)
+	  End of life: -
+	  URL: <http://www.multidata.de/english/products/hpro.htm>
+
+	  IP860:	
+	  VMEBus IP (Industry Pack) carrier board with MPC860
+	  Manufacturer: MicroSys GmbH, <http://www.microsys.de/>
+	  Date of Release: ?
+	  End of life: -
+	  URL: <http://www.microsys.de/html/ip860.html>
+
+	  PCU_E:
+	  PCU = Peripheral Controller Unit, Extended
+	  Manufacturer: Siemens AG, ICN (Information and Communication Networks)
+	  	<http://www.siemens.de/page/1,3771,224315-1-999_2_226207-0,00.html>
+	  Date of Release: April 2001
+	  End of life: August 2001
+	  URL: n. a.
+
+config RPXCLASSIC
+	bool "RPX-Classic"
+	help
+	  The RPX-Classic is a single-board computer based on the Motorola
+	  MPC860.  It features 16MB of DRAM and a variable amount of flash,
+	  I2C EEPROM, thermal monitoring, a PCMCIA slot, a DIP switch and two
+	  LEDs.  Variants with Ethernet ports exist.  Say Y here to support it
+	  directly.
+
+config BSEIP
+	bool "BSE-IP"
+	help
+	  Say Y here to support the Bright Star Engineering ipEngine SBC.
+	  This is a credit-card-sized device featuring a MPC823 processor,
+	  26MB DRAM, 4MB flash, Ethernet, a 16K-gate FPGA, USB, an LCD/video
+	  controller, and two RS232 ports.
+
+config FADS
+	bool "FADS"
+
+config TQM823L
+	bool "TQM823L"
+	help
+	  Say Y here to support the TQM823L, one of an MPC8xx-based family of
+	  mini SBCs (half credit-card size) from TQ Components first released
+	  in late 1999.  Technical references are at
+	  <http://www.denx.de/PDF/TQM8xxLHWM201.pdf>, and
+	  <http://www.denx.de/PDF/STK8xxLHWM201.pdf>, and an image at
+	  <http://www.denx.de/embedded-ppc-en.html>.
+
+config TQM850L
+	bool "TQM850L"
+	help
+	  Say Y here to support the TQM850L, one of an MPC8xx-based family of
+	  mini SBCs (half credit-card size) from TQ Components first released
+	  in late 1999.  Technical references are at
+	  <http://www.denx.de/PDF/TQM8xxLHWM201.pdf>, and
+	  <http://www.denx.de/PDF/STK8xxLHWM201.pdf>, and an image at
+	  <http://www.denx.de/embedded-ppc-en.html>.
+
+config TQM855L
+	bool "TQM855L"
+	help
+	  Say Y here to support the TQM855L, one of an MPC8xx-based family of
+	  mini SBCs (half credit-card size) from TQ Components first released
+	  in late 1999.  Technical references are at
+	  <http://www.denx.de/PDF/TQM8xxLHWM201.pdf>, and
+	  <http://www.denx.de/PDF/STK8xxLHWM201.pdf>, and an image at
+	  <http://www.denx.de/embedded-ppc-en.html>.
+
+config TQM860L
+	bool "TQM860L"
+	help
+	  Say Y here to support the TQM860L, one of an MPC8xx-based family of
+	  mini SBCs (half credit-card size) from TQ Components first released
+	  in late 1999.  Technical references are at
+	  <http://www.denx.de/PDF/TQM8xxLHWM201.pdf>, and
+	  <http://www.denx.de/PDF/STK8xxLHWM201.pdf>, and an image at
+	  <http://www.denx.de/embedded-ppc-en.html>.
+
+config FPS850L
+	bool "FPS850L"
+
+config SPD823TS
+	bool "SPD823TS"
+	help
+	  Say Y here to support the Speech Design 823 Tele-Server from Speech
+	  Design, released in 2000.  The manufacturer's website is at
+	  <http://www.speech-design.de/>.
+
+config IVMS8
+	bool "IVMS8"
+	help
+	  Say Y here to support the Integrated Voice-Mail Small 8-channel SBC
+	  from Speech Design, released March 2001.  The manufacturer's website
+	  is at <http://www.speech-design.de/>.
+
+config IVML24
+	bool "IVML24"
+	help
+	  Say Y here to support the Integrated Voice-Mail Large 24-channel SBC
+	  from Speech Design, released March 2001.  The manufacturer's website
+	  is at <http://www.speech-design.de/>.
+
+config SM850
+	bool "SM850"
+	help
+	  Say Y here to support the Service Module 850 from Dependable
+	  Computer Systems, an SBC based on the TQM850L module by TQ
+	  Components.  This board is no longer in production.  The
+	  manufacturer's website is at <http://www.decomsys.com/>.
+
+config HERMES_PRO
+	bool "HERMES"
+
+config IP860
+	bool "IP860"
+
+config LWMON
+	bool "LWMON"
+
+config PCU_E
+	bool "PCU_E"
+
+config CCM
+	bool "CCM"
+
+config LANTEC
+	bool "LANTEC"
+
+config MBX
+	bool "MBX"
+	help
+	  MBX is a line of Motorola single-board computer based around the
+	  MPC821 and MPC860 processors, and intended for embedded-controller
+	  applications.  Say Y here to support these boards directly.
+
+config WINCEPT
+	bool "WinCept"
+	help
+	  The Wincept 100/110 is a Motorola single-board computer based on the
+	  MPC821 PowerPC, introduced in 1998 and designed to be used in
+	  thin-client machines.  Say Y to support it directly.
+
+endchoice
+
+config TQM8xxL
+	bool
+	depends on 8xx && (TQM823L || TQM850L || FPS850L || TQM855L || TQM860L || SM850)
+	default y
+
+choice
+	prompt "Machine Type"
+	depends on 6xx && !8260
+	default ALL_PPC_CH
+
+config ALL_PPC_CH
+	bool "CHRP/PowerMac/PReP"
+
+config APUS
+	bool "Amiga-APUS"
+	help
+	  Select APUS if configuring for a PowerUP Amiga.
+	  More information is available at:
+	  <http://linux-apus.sourceforge.net/>.
+
+config WILLOW_2
+	bool "Cogent-Willow"
+
+config PCORE
+	bool "Force-PowerCore"
+
+config POWERPMC250
+	bool "Force-PowerPMC250"
+
+config EV64260
+	bool "Galileo-EV-64260-BP"
+
+config SPRUCE
+	bool "IBM-Spruce"
+
+config MENF1
+	bool "MEN-F1"
+
+config LOPEC
+	bool "Motorola-LoPEC"
+
+config MCPN765
+	bool "Motorola-MCPN765"
+
+config MVME5100
+	bool "Motorola-MVME5100"
+
+config PPLUS
+	bool "Motorola-PowerPlus"
+
+config PRPMC750
+	bool "Motorola-PrPMC750"
+
+config PRPMC800
+	bool "Motorola-PrPMC800"
+
+config SANDPOINT
+	bool "Motorola-Sandpoint"
+
+config ADIR
+	bool "SBS-Adirondack"
+
+config K2
+	bool "SBS-K2"
+
+config PAL4
+	bool "SBS-Palomar4"
+
+config GEMINI
+	bool "Synergy-Gemini"
+	help
+	  Select Gemini if configuring for a Synergy Microsystems' Gemini
+	  series Single Board Computer.  More information is available at:
+	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
+
+config ZX4500
+	bool "Zynx-ZX4500"
+
+endchoice
+
+config SANDPOINT_X3
+	bool "Sandpoint X3"
+	depends on SANDPOINT
+
+config FORCE
+	bool
+	depends on 6xx && !8260 && (PCORE || POWERPMC250)
+	default y
+
+config EPIC_SERIAL_MODE
+	bool
+	depends on 6xx && !8260 && (LOPEC || SANDPOINT_X3)
+	default y
+
+config WILLOW
+	bool
+	depends on WILLOW_1 || WILLOW_2
+	default y
+
+config MPC10X_STORE_GATHERING
+	bool "Enable MPC10x store gathering"
+	depends on FORCE || MENF1 || SANDPOINT || ZX4500
+
+config GT64260
+	bool
+	depends on EV64260
+	default y
+
+config SERIAL_CONSOLE_BAUD
+	int
+	depends on EV64260
+	default "115200"
+
+config CPC710_DATA_GATHERING
+	bool "Enable CPC710 data gathering"
+	depends on K2
+
+config MVME5100_IPMC761_PRESENT
+	bool "MVME5100 configured with an IPMC761"
+	depends on MVME5100
+
+config SPRUCE_BAUD_33M
+	bool "Spruce baud clock support"
+	depends on SPRUCE
+
+config SMP
+	bool "Symmetric multi-processing support"
+	---help---
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, say N. If you have a system with more
+	  than one CPU, say Y.  Note that the kernel does not currently
+	  support SMP machines with 603/603e/603ev or PPC750 ("G3") processors
+	  since they have inadequate hardware support for multiprocessor
+	  operation.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  machines, but will use only one CPU of a multiprocessor machine. If
+	  you say Y here, the kernel will run on single-processor machines.
+	  On a single-processor machine, the kernel will run faster if you say
+	  N here.
+
+	  If you don't know what to do here, say N.
+
+config IRQ_ALL_CPUS
+	bool "Distribute interrupts on all CPUs by default"
+	depends on SMP
+	help
+	  This option gives the kernel permission to distribute IRQs across
+	  multiple CPUs.  Saying N here will route all IRQs to the first
+	  CPU.  Generally saying Y is safe, although some problems have been
+	  reported with SMP Power Macintoshes with this option enabled.
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	depends on SMP
+	default "32"
+
+config PREEMPT
+	bool "Preemptible Kernel"
+	depends on !SMP
+	help
+	  This option reduces the latency of the kernel when reacting to
+	  real-time or interactive events by allowing a low priority process to
+	  be preempted even if it is in kernel mode executing a system call.
+	  Unfortunately the kernel code has some race conditions if both
+	  CONFIG_SMP and CONFIG_PREEMPT are enabled, so this option is
+	  currently disabled if you are building an SMP kernel.
+
+	  Say Y here if you are building a kernel for a desktop, embedded
+	  or real-time system.  Say N if you are unsure.
+
+config ALTIVEC
+	bool "AltiVec Support"
+	depends on 6xx && !8260
+	---help---
+	  This option enables kernel support for the Altivec extensions to the
+	  PowerPC processor. The kernel currently supports saving and restoring
+	  altivec registers, and turning on the 'altivec enable' bit so user
+	  processes can execute altivec instructions.
+
+	  This option is only usefully if you have a processor that supports
+	  altivec (G4, otherwise known as 74xx series), but does not have
+	  any affect on a non-altivec cpu (it does, however add code to the
+	  kernel).
+
+	  If in doubt, say Y here.
+
+config TAU
+	bool "Thermal Management Support"
+	depends on 6xx && !8260
+	help
+	  G3 and G4 processors have an on-chip temperature sensor called the
+	  'Thermal Assist Unit (TAU)', which, in theory, can measure the on-die
+	  temperature within 2-4 degrees Celsius. This option shows the current
+	  on-die temperature in /proc/cpuinfo if the cpu supports it.
+
+	  Unfortunately, on some chip revisions, this sensor is very inaccurate
+	  and in some cases, does not work at all, so don't assume the cpu
+	  temp is actually what /proc/cpuinfo says it is.
+
+config TAU_INT
+	bool "Interrupt driven TAU driver (DANGEROUS)"
+	depends on TAU
+	---help---
+	  The TAU supports an interrupt driven mode which causes an interrupt
+	  whenever the temperature goes out of range. This is the fastest way
+	  to get notified the temp has exceeded a range. With this option off,
+	  a timer is used to re-check the temperature periodically.
+
+	  However, on some cpus it appears that the TAU interrupt hardware
+	  is buggy and can cause a situation which would lead unexplained hard
+	  lockups.
+
+	  Unless you are extending the TAU driver, or enjoy kernel/hardware
+	  debugging, leave this option off.
+
+config TAU_AVERAGE
+	bool "Average high and low temp"
+	depends on TAU
+	---help---
+	  The TAU hardware can compare the temperature to an upper and lower
+	  bound.  The default behavior is to show both the upper and lower
+	  bound in /proc/cpuinfo. If the range is large, the temperature is
+	  either changing a lot, or the TAU hardware is broken (likely on some
+	  G4's). If the range is small (around 4 degrees), the temperature is
+	  relatively stable.  If you say Y here, a single temperature value,
+	  halfway between the upper and lower bounds, will be reported in
+	  /proc/cpuinfo.
+
+	  If in doubt, say N here.
+
+config MATH_EMULATION
+	bool "Math emulation"
+	depends on 4xx || 8xx
+	---help---
+	  Some PowerPC chips designed for embedded applications do not have 
+	  a floating-point unit and therefore do not implement the
+	  floating-point instructions in the PowerPC instruction set.  If you
+	  say Y here, the kernel will include code to emulate a floating-point
+	  unit, which will allow programs that use floating-point
+	  instructions to run.
+
+	  If you have an Apple machine or an IBM RS/6000 or pSeries machine,
+	  or any machine with a 6xx, 7xx or 7xxx series processor, say N
+	  here.  Saying Y here will not hurt performance (on any machine) but
+	  will increase the size of the kernel.
+
+# It's often necessary to know the specific 4xx processor type.
+# Fortunately, it is impled (so far) from the board type, so we
+# don't need to ask more redundant questions.
+config NP405H
+	bool
+	depends on ASH
+	default y
+
+config TREEBOOT
+	bool
+	depends on 40x && (WALNUT || REDWOOD_5 || REDWOOD_4 || OAK || TIVO || CEDER || ASH)
+	default y
+
+config IBM405_ERR77
+	bool
+	depends on 40x && (WALNUT || REDWOOD_5 || REDWOOD_4 || EP405 || CPCI405 || CEDER || ASH)
+	default y
+
+config IBM_OCP
+	bool
+	depends on 40x && (WALNUT || REDWOOD_5 || REDWOOD_4 || EP405 || CPCI405 || CEDER || ASH)
+	default y
+
+config NP405L
+	bool
+	depends on CEDER
+	default y
+
+config BIOS_FIXUP
+	bool
+	depends on 40x && (WALNUT || EP405 || CEDER)
+	default y
+
+config 405GP
+	bool
+	depends on 40x && (WALNUT || EP405 || CPCI405)
+	default y
+
+config EMBEDDEDBOOT
+	bool
+	depends on 8xx || 8260 || 40x && EP405
+	default y
+
+config 403GCX
+	bool
+	depends on 40x && (OAK || TIVO)
+	default y
+
+config STB03xxx
+	bool
+	depends on 40x && (REDWOOD_5 || REDWOOD_4)
+	default y
+
+config 405_DMA
+	bool "Blue Logic DMA"
+	depends on 40x
+
+config PM
+	bool "Power Management support (EXPERIMENTAL)"
+	depends on 40x && EXPERIMENTAL
+
+choice
+	prompt "TTYS0 device and default console"
+	depends on 40x
+	default UART0_TTYS0
+
+config UART0_TTYS0
+	bool "UART0"
+
+config UART0_TTYS1
+	bool "UART1"
+
+endchoice
+
+config IBM405_ERR51
+	bool
+	depends on 40x
+	default y
+
+endmenu
+
+
+menu "General setup"
+
+config HIGHMEM
+	bool "High memory support"
+
+config ISA
+	bool "Support for ISA-bus hardware"
+	depends on ALL_PPC
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  If you have an Apple machine, say N here; if you
+	  have an IBM RS/6000 or pSeries machine or a PReP machine, say Y.  If
+	  you have an embedded board, consult your board documentation.
+
+config EISA
+	bool
+	help
+	  The Extended Industry Standard Architecture (EISA) bus is a bus
+	  architecture used on some older intel-based PCs.
+
+config SBUS
+	bool
+
+# Yes MCA RS/6000s exist but Linux-PPC does not currently support any
+config MCA
+	bool
+	help
+	  MicroChannel Architecture is found in some older IBM RS/6000
+	  machines.  It is a bus system similar to PCI or ISA.  MCA-based
+	  RS/6000 machines are currently not supported by Linux.
+
+config PCI
+	bool "PCI support" if 4xx || 8260
+	default y if !4xx && !8260 && !8xx && !APUS && !PPC_ISERIES
+	default PCI_ISERIES if !4xx && !8260 && !8xx && !APUS && PPC_ISERIES
+	default PCI_PERMEDIA if !4xx && !8260 && !8xx && APUS
+	default PCI_QSPAN if !4xx && !8260 && 8xx
+	help
+	  Find out whether your system includes a PCI bus. PCI is the name of
+	  a bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box.  If you say Y here, the kernel will include drivers and
+	  infrastructure code to support PCI bus devices.
+
+config PC_KEYBOARD
+	bool "PC PS/2 style Keyboard"
+	depends on 4xx || 8260
+
+config PCI_QSPAN
+	bool "QSpan PCI"
+	depends on !4xx && !8260 && 8xx
+	help
+	  Say Y here if you have a system based on a Motorola 8xx-series
+	  embedded processor with a QSPAN PCI interface, otherwise say N.
+
+config PCI_PERMEDIA
+	bool "PCI for Permedia2"
+	depends on !4xx && !8xx && APUS
+
+config PCI_ISERIES
+	bool "IBM iSeries Native I/O Support"
+	depends on !4xx && !8260 && !8xx && !APUS && PPC_ISERIES
+
+# only elf supported, a.out is not -- Cort
+config KCORE_ELF
+	bool
+	depends on PROC_FS
+	default y
+	help
+	  If you enabled support for /proc file system then the file
+	  /proc/kcore will contain the kernel core image in ELF format. This
+	  can be used in gdb:
+
+	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+	  This is especially useful if you have compiled the kernel with the
+	  "-g" option to preserve debugging information. It is mainly used
+	  for examining kernel data structures on the live kernel.
+
+config BINFMT_ELF
+	bool
+	default y
+	help
+	  ELF (Executable and Linkable Format) is a format for libraries and
+	  executables used across different architectures and operating
+	  systems.
+
+config KERNEL_ELF
+	bool
+	default y
+
+config BINFMT_MISC
+	tristate "Kernel support for MISC binaries"
+	---help---
+	  If you say Y here, it will be possible to plug wrapper-driven binary
+	  formats into the kernel. You will like this especially when you use
+	  programs that need an interpreter to run like Java, Python or
+	  Emacs-Lisp.  It's also useful if you often run DOS executables under
+	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>).  Once you have
+	  registered such a binary class with the kernel, you can start one of
+	  those programs simply by typing in its name at a shell prompt; Linux
+	  will automatically feed it to the correct interpreter.
+
+	  You can do other nice things, too. Read the file
+	  <file:Documentation/binfmt_misc.txt> to learn how to use this
+	  feature, and <file:Documentation/java.txt> for information about how
+	  to include Java support.
+
+	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+	  use this part of the kernel.
+
+	  You may say M here for module support and later load the module when
+	  you have use for it; the module is called binfmt_misc.o. If you
+	  don't know what to answer at this point, say Y.
+
+source "drivers/pci/Kconfig"
+
+config HOTPLUG
+	bool "Support for hot-pluggable devices"
+	---help---
+	  Say Y here if you want to plug devices into your computer while
+	  the system is running, and be able to use them quickly.  In many
+	  cases, the devices can likewise be unplugged at any time too.
+
+	  One well known example of this is PCMCIA- or PC-cards, credit-card
+	  size devices such as network cards, modems or hard drives which are
+	  plugged into slots found on all modern laptop computers.  Another
+	  example, used on modern desktops as well as laptops, is USB.
+
+	  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+	  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+	  Then your kernel will automatically call out to a user mode "policy
+	  agent" (/sbin/hotplug) to load modules and set up software needed
+	  to use devices as you hotplug them.
+
+source "drivers/pcmcia/Kconfig"
+
+source "drivers/parport/Kconfig"
+
+config PPC601_SYNC_FIX
+	bool "Workarounds for PPC601 bugs"
+	depends on ALL_PPC && !POWER3
+	help
+	  Some versions of the PPC601 (the first PowerPC chip) have bugs which
+	  mean that extra synchronization instructions are required near
+	  certain instructions, typically those that make major changes to the
+	  CPU state.  These extra instructions reduce performance slightly.
+	  If you say N here, these extra instructions will not be included,
+	  resulting in a kernel which will run faster but may not run at all
+	  on some systems with the PPC601 chip.
+
+	  If in doubt, say Y here.
+
+config PROC_DEVICETREE
+	bool "Support for Open Firmware device tree in /proc"
+	depends on ALL_PPC
+	help
+	  This option adds a device-tree directory under /proc which contains
+	  an image of the device tree that the kernel copies from Open
+	  Firmware. If unsure, say Y here.
+
+config PPC_RTAS
+	bool "Support for RTAS (RunTime Abstraction Services) in /proc"
+	depends on ALL_PPC
+	---help---
+	  When you use this option, you will be able to use RTAS from
+	  userspace.
+
+	  RTAS stands for RunTime Abstraction Services and should
+	  provide a portable way to access and set system information. This is
+	  commonly used on RS/6000 (pSeries) computers.
+
+	  You can access RTAS via the special proc file system entry rtas.
+	  Don't confuse this rtas entry with the one in /proc/device-tree/rtas
+	  which is readonly.
+
+	  If you don't know if you can use RTAS look into
+	  /proc/device-tree/rtas. If there are some entries, it is very likely
+	  that you will be able to use RTAS.
+
+	  You can do cool things with rtas. To print out information about
+	  various sensors in the system, just do a
+
+	  $ cat /proc/rtas/sensors
+
+	  or if you power off your machine at night but want it running when
+	  you enter your office at 7:45 am, do a
+
+	  # date -d 'tomorrow 7:30' +%s > /proc/rtas/poweron
+
+	  and shutdown.
+
+	  If unsure, say Y.
+
+config PREP_RESIDUAL
+	bool "Support for PReP Residual Data"
+	depends on ALL_PPC
+	help
+	  Some PReP systems have residual data passed to the kernel by the
+	  firmware.  This allows detection of memory size, devices present and
+	  other useful pieces of information.  Sometimes this information is
+	  not present or incorrect.
+
+	  Unless you expect to boot on a PReP system, there is no need to
+	  select Y.
+
+config PROC_PREPRESIDUAL
+	bool "Support for reading of PReP Residual Data in /proc"
+	depends on PREP_RESIDUAL
+	help
+	  Enabling this option will create a /proc/residual file which allows
+	  you to get at the residual data on PReP systems.  You will need a tool
+	  (lsresidual) to parse it.  If you aren't on a PReP system, you don't
+	  want this.
+
+config PPCBUG_NVRAM
+	bool "Enable reading PPCBUG NVRAM during boot" if PPLUS || LOPEC
+	default y if ALL_PPC
+
+config CMDLINE_BOOL
+	bool "Default bootloader kernel arguments"
+
+config CMDLINE
+	string "Initial kernel command string"
+	depends on CMDLINE_BOOL
+	default "console=ttyS0,9600 console=tty0 root=/dev/sda2"
+	help
+	  On some platforms, there is currently no way for the boot loader to
+	  pass arguments to the kernel. For these platforms, you can supply
+	  some command-line options at build time by entering them here.  In
+	  most cases you will need to specify the root device here.
+
+config FB_CONSOLE
+	bool
+	depends on APUS
+	default y
+
+config AMIGA
+	bool
+	depends on APUS
+	default y
+	help
+	  This option enables support for the Amiga series of computers.
+
+config ZORRO
+	bool
+	depends on APUS
+	default y
+	help
+	  This enables support for the Zorro bus in the Amiga. If you have
+	  expansion cards in your Amiga that conform to the Amiga
+	  AutoConfig(tm) specification, say Y, otherwise N. Note that even
+	  expansion cards that do not fit in the Zorro slots but fit in e.g.
+	  the CPU slot may fall in this category, so you have to say Y to let
+	  Linux use these.
+
+config ABSTRACT_CONSOLE
+	bool
+	depends on APUS
+	default y
+
+config APUS_FAST_EXCEPT
+	bool
+	depends on APUS
+	default y
+
+config AMIGA_PCMCIA
+	bool "Amiga 1200/600 PCMCIA support"
+	depends on APUS && EXPERIMENTAL
+	help
+	  Include support in the kernel for pcmcia on Amiga 1200 and Amiga
+	  600. If you intend to use pcmcia cards say Y; otherwise say N.
+
+config AMIGA_BUILTIN_SERIAL
+	tristate "Amiga builtin serial support"
+	depends on APUS
+	help
+	  If you want to use your Amiga's built-in serial port in Linux,
+	  answer Y.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config GVPIOEXT
+	tristate "GVP IO-Extender support"
+	depends on APUS
+	help
+	  If you want to use a GVP IO-Extender serial card in Linux, say Y.
+	  Otherwise, say N.
+
+config GVPIOEXT_LP
+	tristate "GVP IO-Extender parallel printer support"
+	depends on GVPIOEXT
+	help
+	  Say Y to enable driving a printer from the parallel port on your
+	  GVP IO-Extender card, N otherwise.
+
+config GVPIOEXT_PLIP
+	tristate "GVP IO-Extender PLIP support"
+	depends on GVPIOEXT
+	help
+	  Say Y to enable doing IP over the parallel port on your GVP
+	  IO-Extender card, N otherwise.
+
+config MULTIFACE_III_TTY
+	tristate "Multiface Card III serial support"
+	depends on APUS
+	help
+	  If you want to use a Multiface III card's serial port in Linux,
+	  answer Y.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config A2232
+	tristate "Commodore A2232 serial support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && APUS
+	---help---
+	  This option supports the 2232 7-port serial card shipped with the
+	  Amiga 2000 and other Zorro-bus machines, dating from 1989.  At
+	  a max of 19,200 bps, the ports are served by a 6551 ACIA UART chip
+	  each, plus a 8520 CIA, and a master 6502 CPU and buffer as well. The
+	  ports were connected with 8 pin DIN connectors on the card bracket,
+	  for which 8 pin to DB25 adapters were supplied. The card also had
+	  jumpers internally to toggle various pinning configurations.
+
+	  This driver can be built as a module; but then "generic_serial.o"
+	  will also be built as a module. This has to be loaded before
+	  "ser_a2232.o". If you want to do this, answer M here and read
+	  "<file:Documentation/modules.txt>".
+
+config WHIPPET_SERIAL
+	tristate "Hisoft Whippet PCMCIA serial support"
+	depends on AMIGA_PCMCIA
+	help
+	  HiSoft has a web page at <http://www.hisoft.co.uk/>, but there
+	  is no listing for the Whippet in their Amiga section.
+
+config APNE
+	tristate "PCMCIA NE2000 support"
+	depends on AMIGA_PCMCIA
+	help
+	  If you have a PCMCIA NE2000 compatible adapter, say Y.  Otherwise,
+	  say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). The module is called apne.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config SERIAL_CONSOLE
+	bool "Support for serial port console"
+	depends on APUS && (AMIGA_BUILTIN_SERIAL=y || GVPIOEXT=y || MULTIFACE_III_TTY=y)
+
+config HEARTBEAT
+	bool "Use power LED as a heartbeat"
+	depends on APUS
+	help
+	  Use the power-on LED on your machine as a load meter.  The exact
+	  behavior is platform-dependent, but normally the flash frequency is
+	  a hyperbolic function of the 5-minute load average.
+
+config PROC_HARDWARE
+	bool "/proc/hardware support"
+	depends on APUS
+
+source "drivers/zorro/Kconfig"
+
+endmenu
+
+
+menu "Advanced setup"
+
+config ADVANCED_OPTIONS
+	bool "Prompt for advanced kernel configuration options"
+	help
+	  This option will enable prompting for a variety of advanced kernel
+	  configuration options.  These options can cause the kernel to not
+	  work if they are set incorrectly, but can be used to optimize certain
+	  aspects of kernel memory management.
+
+	  Unless you know what you are doing, say N here.
+
+config HIGHMEM_START_BOOL
+	bool "Set high memory pool address"
+	depends on ADVANCED_OPTIONS && HIGHMEM
+	help
+	  This option allows you to set the base address of the kernel virtual
+	  area used to map high memory pages.  This can be useful in
+	  optimizing the layout of kernel virtual memory.
+
+	  Say N here unless you know what you are doing.
+
+config HIGHMEM_START
+	hex "Virtual start address of high memory pool"
+	depends on HIGHMEM_START_BOOL
+	default "0xfe000000"
+
+config LOWMEM_SIZE_BOOL
+	bool "Set maximum low memory"
+	depends on ADVANCED_OPTIONS && HIGHMEM
+	help
+	  This option allows you to set the maximum amount of memory which
+	  will be used as "low memory", that is, memory which the kernel can
+	  access directly, without having to set up a kernel virtual mapping.
+	  This can be useful in optimizing the layout of kernel virtual
+	  memory.
+
+	  Say N here unless you know what you are doing.
+
+config LOWMEM_SIZE
+	hex "Maximum low memory size (in bytes)"
+	depends on LOWMEM_SIZE_BOOL
+	default "0x20000000"
+
+config KERNEL_START_BOOL
+	bool "Set custom kernel base address"
+	depends on ADVANCED_OPTIONS
+	help
+	  This option allows you to set the kernel virtual address at which
+	  the kernel will map low memory (the kernel image will be linked at
+	  this address).  This can be useful in optimizing the virtual memory
+	  layout of the system.
+
+	  Say N here unless you know what you are doing.
+
+config KERNEL_START
+	hex "Virtual address of kernel base"
+	depends on KERNEL_START_BOOL
+	default "0xc0000000"
+
+config TASK_SIZE_BOOL
+	bool "Set custom user task size"
+	depends on ADVANCED_OPTIONS
+	help
+	  This option allows you to set the amount of virtual address space
+	  allocated to user tasks.  This can be useful in optimizing the
+	  virtual memory layout of the system.
+
+	  Say N here unless you know what you are doing.
+
+config TASK_SIZE
+	hex "Size of user task space"
+	depends on TASK_SIZE_BOOL
+	default "0x80000000"
+
+config PIN_TLB
+	bool "Pinned Kernel TLBs (860 ONLY)"
+	depends on ADVANCED_OPTIONS && 8xx
+
+config BOOT_LOAD_BOOL
+	bool "Set the boot link/load address"
+	depends on ADVANCED_OPTIONS && !ALL_PPC
+	help
+	  This option allows you to set the initial load address of the zImage
+	  or zImage.initrd file.  This can be useful if you are on a board
+	  which has a small amount of memory.
+
+	  Say N here unless you know what you are doing.
+
+config BOOT_LOAD
+	hex "Link/load address for booting"
+	depends on BOOT_LOAD_BOOL
+	default "0x00400000"
+
+endmenu
+
+source "drivers/mtd/Kconfig"
+
+source "drivers/pnp/Kconfig"
+
+source "drivers/block/Kconfig"
+
+source "drivers/md/Kconfig"
+
+
+menu "ATA/IDE/MFM/RLL support"
+
+config IDE
+	tristate "ATA/IDE/MFM/RLL support"
+	---help---
+	  If you say Y here, your kernel will be able to manage low cost mass
+	  storage units such as ATA/(E)IDE and ATAPI units. The most common
+	  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	  If your system is pure SCSI and doesn't use these interfaces, you
+	  can say N here.
+
+	  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+	  for mass storage units such as hard disks. It was designed by
+	  Western Digital and Compaq Computer in 1984.  Quite a number of
+	  disks use the IDE interface.
+
+	  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+	  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+	  the LBA standard), more disks (4 instead of 2) and for other mass
+	  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+	  ATA-4 and provides faster (and more CPU friendly) transfer modes
+	  than previous PIO (Programmed processor Input/Output) from previous
+	  ATA/IDE standards by means of fast DMA controllers.
+
+	  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+	  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+	  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+	  designed in order to prevent data corruption and disk crash by
+	  detecting pre hardware failure conditions (heat, access time, and
+	  the like...). Disks built since June 1995 may follow this standard.
+	  The kernel itself don't manage this; however there are quite a
+	  number of user programs such as smart that can query the status of
+	  SMART parameters disk.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>. The module
+	  will be called ide.o.
+
+	  For further information, please read <file:Documentation/ide.txt>.
+
+	  If unsure, say Y.
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+
+menu "SCSI support"
+
+config SCSI
+	tristate "SCSI support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you want support for the parallel
+	  port version of the 100 MB IOMEGA ZIP drive.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
+source "drivers/scsi/Kconfig"
+
+endmenu
+
+source "drivers/message/fusion/Kconfig"
+
+source "drivers/ieee1394/Kconfig"
+
+source "drivers/message/i2o/Kconfig"
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+endmenu
+
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+
+menu "Console drivers"
+
+config VGA_CONSOLE
+	bool "VGA text console"
+	depends on !4xx && !8xx
+	help
+	  Saying Y here will allow you to use Linux in text mode through a
+	  display that complies with the generic VGA standard.  This can be
+	  useful on PReP systems and IBM RS/6000 or pSeries machines but is of
+	  limited usefulness on Apple machines.
+
+	  Say N here if you have an Apple machine.
+
+source "drivers/video/Kconfig"
+
+endmenu
+
+
+menu "iSeries device drivers"
+	depends on PPC_ISERIES
+
+config VIOCONS
+	tristate "iSeries Virtual Console Support"
+
+config VIODASD
+	tristate "iSeries Virtual I/O disk support"
+
+config VIODASD_IDE
+	bool "iSeries Virtual disk IDE emulation"
+	depends on VIODASD
+
+config VIOCD
+	tristate "iSeries Virtual I/O CD support"
+
+config VIOCD_AZTECH
+	bool "iSeries Virtual CD Aztech emulation"
+	depends on VIOCD
+
+config VIOTAPE
+	tristate "iSeries Virtual Tape Support"
+
+config VETH
+	tristate "iSeries Virtual Ethernet driver support"
+
+config VIOPATH
+	bool
+	depends on VIOCONS || VIODASD || VIOTAPE || VIOCD
+	default y
+
+config CD_NO_IDESCSI
+	bool
+	depends on VIOCD=y
+	default y
+	---help---
+	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+	  here, otherwise N. Read the CD-ROM-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about these CD-ROM drives. If you are unsure what you
+	  have, say Y and find out whether you have one of the following
+	  drives.
+
+	  For each of these drivers, a file Documentation/cdrom/{driver_name}
+	  exists. Especially in cases where you do not know exactly which kind
+	  of drive you have you should read there. Most of these drivers use a
+	  file drivers/cdrom/{driver_name}.h where you can define your
+	  interface parameters and switch some internal goodies.
+
+	  All these CD-ROM drivers are also usable as a module ( = code which
+	  can be inserted in and removed from the running kernel whenever you
+	  want). If you want to compile them as module, say M instead of Y and
+	  read <file:Documentation/modules.txt>.
+
+	  If you want to use any of these CD-ROM drivers, you also have to
+	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+	  answer will get "defaulted" for you if you enable any of the Linux
+	  CD-ROM drivers).
+
+config BLK_DEV_IDECD
+	tristate
+	depends on VIOCD=y
+	default y
+
+endmenu
+
+
+menu "Old CD-ROM drivers (not SCSI, not IDE)"
+	depends on !PPC_ISERIES
+
+config CD_NO_IDESCSI
+	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
+
+source "drivers/cdrom/Kconfig"
+
+endmenu
+
+source "drivers/input/Kconfig"
+
+
+menu "Macintosh device drivers"
+
+# we want to change this to something like CONFIG_SYSCTRL_CUDA/PMU
+config ADB_CUDA
+	bool "Support for CUDA based PowerMacs"
+	depends on ALL_PPC
+	help
+	  This provides support for CUDA based Power Macintosh systems.  This
+	  includes most OldWorld PowerMacs, the first generation iMacs, the
+	  Blue&White G3 and the "Yikes" G4 (PCI Graphics).  All later models
+	  should use CONFIG_ADB_PMU instead.  It is safe to say Y here even if
+	  your machine doesn't have a CUDA.
+
+	  If unsure say Y.
+
+config ADB_PMU
+	bool "Support for PMU  based PowerMacs"
+	depends on ALL_PPC
+	help
+	  On PowerBooks, iBooks, and recent iMacs and Power Macintoshes, the
+	  PMU is an embedded microprocessor whose primary function is to
+	  control system power, and battery charging on the portable models.
+	  The PMU also controls the ADB (Apple Desktop Bus) which connects to
+	  the keyboard and mouse on some machines, as well as the non-volatile
+	  RAM and the RTC (real time clock) chip.  Say Y to enable support for
+	  this device; you should do so if your machine is one of those
+	  mentioned above.
+
+config PMAC_PBOOK
+	bool "Power management support for PowerBooks"
+	depends on ADB_PMU
+	---help---
+	  This provides support for putting a PowerBook to sleep; it also
+	  enables media bay support.  Power management works on the
+	  PB2400/3400/3500, Wallstreet, Lombard, and Bronze PowerBook G3 and
+	  the Titanium Powerbook G4, as well as the iBooks.  You should get
+	  the power management daemon, pmud, to make it work and you must have
+	  the /dev/pmu device (see the pmud README).
+
+	  Get pmud from <ftp://ftp.samba.org/pub/ppclinux/pmud/>.
+
+	  If you have a PowerBook, you should say Y here.
+
+	  You may also want to compile the dma sound driver as a module and
+	  have it autoloaded. The act of removing the module shuts down the
+	  sound hardware for more power savings.
+
+config PM
+	bool
+	depends on ALL_PPC && ADB_PMU && PMAC_PBOOK
+	default y
+
+config PMAC_APM_EMU
+	tristate "APM emulation"
+	depends on PMAC_PBOOK
+
+# made a separate option since backlight may end up beeing used
+# on non-powerbook machines (but only on PMU based ones AFAIK)
+config PMAC_BACKLIGHT
+	bool "Backlight control for LCD screens"
+	depends on ADB_PMU
+	help
+	  Say Y here to build in code to manage the LCD backlight on a
+	  Macintosh PowerBook.  With this code, the backlight will be turned
+	  on and off appropriately on power-management and lid-open/lid-closed
+	  events; also, the PowerBook button device will be enabled so you can
+	  change the screen brightness.
+
+config MAC_FLOPPY
+	bool "Support for PowerMac floppy"
+	depends on ALL_PPC
+	help
+	  If you have a SWIM-3 (Super Woz Integrated Machine 3; from Apple)
+	  floppy controller, say Y here. Most commonly found in PowerMacs.
+
+config MAC_SERIAL
+	tristate "Support for PowerMac serial ports"
+	depends on ALL_PPC
+	help
+	  If you have Macintosh style serial ports (8 pin mini-DIN), say Y
+	  here. If you also have regular serial ports and enable the driver
+	  for them, you can't currently use the serial console feature.
+
+config SERIAL_CONSOLE
+	bool "Support for console on serial port"
+	depends on ALL_PPC && MAC_SERIAL=y
+
+config ADB
+	bool "Apple Desktop Bus (ADB) support"
+	depends on ALL_PPC
+	help
+	  Apple Desktop Bus (ADB) support is for support of devices which
+	  are connected to an ADB port.  ADB devices tend to have 4 pins.
+	  If you have an Apple Macintosh prior to the iMac, an iBook or
+	  PowerBook, or a "Blue and White G3", you probably want to say Y
+	  here.  Otherwise say N.
+
+config ADB_MACIO
+	bool "Include MacIO (CHRP) ADB driver"
+	depends on ADB
+	help
+	  Say Y here to include direct support for the ADB controller in the
+	  Hydra chip used on PowerPC Macintoshes of the CHRP type.  (The Hydra
+	  also includes a MESH II SCSI controller, DBDMA controller, VIA chip,
+	  OpenPIC controller and two RS422/Geoports.)
+
+config INPUT_ADBHID
+	bool "Support for ADB input devices (keyboard, mice, ...)"
+	depends on ADB && INPUT=y
+	help
+	  Say Y here if you want to have ADB (Apple Desktop Bus) HID devices
+	  such as keyboards, mice, joysticks, trackpads  or graphic tablets
+	  handled by the input layer.  If you say Y here, make sure to say Y to
+	  the corresponding drivers "Keyboard support" (CONFIG_INPUT_KEYBDEV),
+	  "Mouse Support" (CONFIG_INPUT_MOUSEDEV) and "Event interface
+	  support" (CONFIG_INPUT_EVDEV) as well.
+
+	  If unsure, say Y.
+
+config MAC_EMUMOUSEBTN
+	bool "Support for mouse button 2+3 emulation"
+	depends on INPUT_ADBHID
+	help
+	  This provides generic support for emulating the 2nd and 3rd mouse
+	  button with keypresses.  If you say Y here, the emulation is still
+	  disabled by default.  The emulation is controlled by these sysctl
+	  entries:
+	  /proc/sys/dev/mac_hid/mouse_button_emulation
+	  /proc/sys/dev/mac_hid/mouse_button2_keycode
+	  /proc/sys/dev/mac_hid/mouse_button3_keycode
+
+	  If you have an Apple machine with a 1-button mouse, say Y here.
+
+config ANSLCD
+	bool "Support for ANS LCD display"
+	depends on ADB_CUDA
+
+endmenu
+
+source "drivers/char/Kconfig"
+
+source "drivers/media/Kconfig"
+
+source "fs/Kconfig"
+
+
+menu "Sound"
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/oss/dmasound/Kconfig"
+
+source "sound/Kconfig"
+
+endmenu
+
+source "arch/ppc/8xx_io/Kconfig"
+
+source "arch/ppc/8260_io/Kconfig"
+
+
+menu "IBM 40x options"
+	depends on 40x
+
+config SERIAL_SICC
+	bool "SICC Serial port"
+	depends on STB03xxx
+
+config UART1_DFLT_CONSOLE
+	bool
+	depends on SERIAL_SICC && UART0_TTYS1
+	default y
+
+config SERIAL_SICC_CONSOLE
+	bool
+	depends on SERIAL_SICC && UART0_TTYS1
+	default y
+
+endmenu
+
+source "drivers/usb/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
+source "lib/Kconfig"
+
+
+menu "Kernel hacking"
+
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config DEBUG_SPINLOCK
+	bool "Spinlock debugging"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here and to CONFIG_SMP to include code to check for missing
+	  spinlock initialization and some other common spinlock errors.
+
+config DEBUG_HIGHMEM
+	bool "Highmem debugging"
+	depends on DEBUG_KERNEL && HIGHMEM
+
+config KALLSYMS
+	bool "Load all symbols for debugging/kksymoops"
+	depends on DEBUG_KERNEL
+
+config KGDB
+	bool "Include kgdb kernel debugger"
+	depends on DEBUG_KERNEL
+	help
+	  Include in-kernel hooks for kgdb, the Linux kernel source level
+	  debugger.  See <http://kgdb.sourceforge.net/> for more information.
+	  Unless you are intending to debug the kernel, say N here.
+
+choice
+	prompt "Serial Port"
+	depends on KGDB
+	default KGDB_TTYS1
+
+config KGDB_TTYS0
+	bool "ttyS0"
+
+config KGDB_TTYS1
+	bool "ttyS1"
+
+config KGDB_TTYS2
+	bool "ttyS2"
+
+config KGDB_TTYS3
+	bool "ttyS3"
+
+endchoice
+
+config XMON
+	bool "Include xmon kernel debugger"
+	depends on DEBUG_KERNEL
+	help
+	  Include in-kernel hooks for the xmon kernel monitor/debugger.
+	  Unless you are intending to debug the kernel, say N here.
+
+config BDI_SWITCH
+	bool "Include BDI-2000 user context switcher"
+	depends on DEBUG_KERNEL
+	help
+	  Include in-kernel support for the Abatron BDI2000 debugger.
+	  Unless you are intending to debug the kernel with one of these
+	  machines, say N here.
+
+config MORE_COMPILE_OPTIONS
+	bool "Add any additional compile options"
+	depends on DEBUG_KERNEL && (KGDB || XMON || BDI_SWITCH)
+	help
+	  If you want to add additional CFLAGS to the kernel build, such as -g
+	  for KGDB or the BDI2000, enable this option and then enter what you
+	  would like to add in the next question.
+
+config COMPILE_OPTIONS
+	string "Additional compile arguments"
+	depends on MORE_COMPILE_OPTIONS
+	default "-g -ggdb"
+
+config BOOTX_TEXT
+	bool "Support for early boot text console (BootX or OpenFirmware only)"
+	depends on ALL_PPC
+	help
+	  Say Y here to see progress messages from the boot firmware in text
+	  mode. Requires either BootX or Open Firmware.
+
+config SERIAL_TEXT_DEBUG
+	bool "Support for early boot texts over serial port"
+	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT || ZX4500
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+

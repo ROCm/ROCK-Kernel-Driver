@@ -1,0 +1,154 @@
+kobjects - Simple, Generic Kernel Objects
+
+Patrick Mochel <mochel@osdl.org>
+
+30 October 2002
+
+
+kobjects
+
+struct kobject introduces a simple, intregral datatype and a simple
+set of semantics for operating on the device. kobjects are intended to
+be embedded in larger data structures and replace fields it
+duplicates. A set of library functions has been developed to assist in
+the manipulation of kobjects.
+
+struct kobject looks like this:
+
+
+struct kobject {
+	char			name[16];
+	atomic_t		refcount;
+	struct list_head	entry;
+	struct kobject		* parent;
+	struct subsystem	* subsys;
+	struct dentry		* dentry;
+};
+
+void kobject_init(struct kobject *);
+int kobject_register(struct kobject *);
+void kobject_unregister(struct kobject *);
+struct kobject * kobject_get(struct kobject *);
+void kobject_put(struct kobject *);
+
+
+
+subsystems
+
+struct subsystem is introduced to describe a collection of objects of
+a certain type. subsystems are kobjects themselves, though they
+contain lists of kobjects that belong to that subsystem. Objects of a
+subsystem (the embedder objects in which kobjects live) are all of the
+same type. The interface looks like:
+
+
+struct subsystem {
+	struct kobject		kobj;
+	struct list_head	list;
+	struct rw_semaphore	rwsem;
+	struct subsystem	* parent;
+	void (*release)(struct kobject *);
+	struct sysfs_ops	* sysfs_ops;
+	struct attribute	** default_attrs;
+};
+
+void subsystem_init(struct subsystem *);
+int subsystem_register(struct subsystem *);
+void subsystem_unregister(struct subsystem *);
+
+struct subsystem * subsys_get(struct subsystem * s);
+void subsys_put(struct subsystem * s);
+
+
+
+Familial Relations
+
+kobjects and subsystems intersect and intertwine in several ways. Each
+is well-defined (though maybe they could be made simpler). Each kobject
+belongs to a subsystem. Since subsystems are kobjects themselves, they
+also belong to a controlling subsystem. This implies that subsystems
+are hierarchial. 
+
+Many kobjects are hierarchial in nature, which is represented by
+including a pointer to its parent kobject in struct kobject. Many
+different types of kobject-embedding objects may all point to the same
+parent. 
+
+The ancestral hierarchy of kobjects should not be confused with
+membership in a subsystem, or the ancestral relationship of
+subsystems. A set of kobjects may all belong to a subsystem, but all
+have different parents. 
+
+kobjects may be orphans and have no explicit parent. In that case, the
+subsystem to which the object belongs becomes its parent. 
+
+
+Sysfs
+
+These rules force a complete kobject hierarchy, which Suprise! maps
+very well onto a filesystem.
+
+driverfs was recently cloned, and there now exists sysfs. All driverfs
+operations operate on a separate data type: struct driver_dir_entry,
+which all objects that are represented in driverfs must have. driverfs
+also allowed rogue directory creation that had no explicit objects
+associated with them.
+
+struct kobject is intended to be the common data type which sysfs
+operates on. This gives the filesystem the ability to directly access
+more fields of the object, including the reference count. This also
+forces each directory in the filesystem to be tied directly to a
+kobject. 
+
+
+Directory Placement
+
+Parental relationships are determined in the kobject/subsystem layer,
+and the kobject is then passed off to the sysfs layer. kobjects with
+no parent have directories created for them in the sysfs root
+directory. Per the rules above, the only kobjects that remain orphans
+are subsystems without parent subsystems (since leaf objects either
+have an explicit parent, or are assigned their controlling subsystem
+as their foster parent). 
+
+
+File Callbacks
+
+Previously, each driverfs directory contained a pointer to a list of file
+operations for reading and writing driverfs files. These callbacks
+received a struct driver_dir_entry, when they performed a
+container_of() transform on to receive the specific object type for
+which the call was meant. 
+
+These callbacks have been converted to accept a struct kobject instead
+of struct driver_dir_entry. Since all kobjects belong to a subsystem
+that contains kobjects all of the same type, the sysfs operations
+have been moved to reside in the subsystem, since they are common for
+all kobjects.
+
+
+Default Attributes
+
+Most subsystems have a set of default attributes associated with an
+object that registers with them. A subsystem definition may contain a
+NULL-terminated array of attributes that will be exported when an
+object is registered with the subsystem. 
+
+
+Reference Counting
+
+All objects contain reference counts. All functions accessing objects
+should increment the reference count until they are finished, and
+decrement the reference count. When an object is initialized, it
+receives a reference count of 1. When a device is unregistered, the
+reference is decremented. When the reference counts reaches 0, the
+subsystem's ->release() callback for that object type (remember
+subsystems control only one type of device each) is called; and the
+reference counts of the kobject's subsystem and parent are
+decremented. 
+
+The ->release() callback is the opportunity for the subsystem to free
+memory allocated for the object. It is the notification that
+absolutely no one is using the structure any more (and can't acquire a
+reference to it), so it is safe to free it.
+

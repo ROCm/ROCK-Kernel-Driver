@@ -287,6 +287,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 	struct ip_options *opt = inet->opt;
 	struct rtable *rt;
 	struct iphdr *iph;
+	u32 mtu;
 
 	/* Skip all of this if the packet is already routed,
 	 * f.e. by something like SCTP.
@@ -306,15 +307,19 @@ int ip_queue_xmit(struct sk_buff *skb)
 			daddr = opt->faddr;
 
 		{
-			struct flowi fl = { .nl_u = { .ip4_u =
+			struct flowi fl = { .oif = sk->bound_dev_if,
+					    .nl_u = { .ip4_u =
 						      { .daddr = daddr,
 							.saddr = inet->saddr,
 							.tos = RT_CONN_FLAGS(sk) } },
-					    .oif = sk->bound_dev_if };
+					    .proto = sk->protocol,
+					    .uli_u = { .ports =
+						       { .sport = inet->sport,
+							 .dport = inet->dport } } };
 
 			/* If this fails, retransmit mechanism of transport layer will
-			 * keep trying until route appears or the connection times itself
-			 * out.
+			 * keep trying until route appears or the connection times
+			 * itself out.
 			 */
 			if (ip_route_output_key(&rt, &fl))
 				goto no_route;
@@ -348,12 +353,13 @@ packet_routed:
 		ip_options_build(skb, opt, inet->daddr, rt, 0);
 	}
 
-	if (skb->len > rt->u.dst.pmtu && (sk->route_caps&NETIF_F_TSO)) {
+	mtu = dst_pmtu(&rt->u.dst);
+	if (skb->len > mtu && (sk->route_caps&NETIF_F_TSO)) {
 		unsigned int hlen;
 
 		/* Hack zone: all this must be done by TCP. */
 		hlen = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
-		skb_shinfo(skb)->tso_size = rt->u.dst.pmtu - hlen;
+		skb_shinfo(skb)->tso_size = mtu - hlen;
 		skb_shinfo(skb)->tso_segs =
 			(skb->len - hlen + skb_shinfo(skb)->tso_size - 1)/
 				skb_shinfo(skb)->tso_size - 1;
@@ -396,6 +402,10 @@ static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 	/* Connection association is same as pre-frag packet */
 	to->nfct = from->nfct;
 	nf_conntrack_get(to->nfct);
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	to->nf_bridge = from->nf_bridge;
+	nf_bridge_get(to->nf_bridge);
+#endif
 #ifdef CONFIG_NETFILTER_DEBUG
 	to->nf_debug = from->nf_debug;
 #endif
@@ -432,7 +442,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 
 	if (unlikely(iph->frag_off & htons(IP_DF))) {
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
-			  htonl(rt->u.dst.pmtu));
+			  htonl(dst_pmtu(&rt->u.dst)));
 		kfree_skb(skb);
 		return -EMSGSIZE;
 	}
@@ -442,7 +452,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	 */
 
 	hlen = iph->ihl * 4;
-	mtu = rt->u.dst.pmtu - hlen;	/* Size of data space */
+	mtu = dst_pmtu(&rt->u.dst) - hlen;	/* Size of data space */
 
 	/* When frag_list is given, use it. First, check its validity:
 	 * some transformers could create wrong frag_list or break existing
@@ -743,7 +753,7 @@ int ip_append_data(struct sock *sk,
 			inet->cork.addr = ipc->addr;
 		}
 		dst_hold(&rt->u.dst);
-		inet->cork.fragsize = mtu = rt->u.dst.pmtu;
+		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
 		inet->cork.rt = rt;
 		inet->cork.length = 0;
 		inet->sndmsg_page = NULL;
@@ -830,7 +840,7 @@ alloc_new_skb:
 			 *	Find where to start putting bytes.
 			 */
 			data = skb_put(skb, fraglen);
-			skb->nh.raw = __skb_pull(skb, exthdrlen);
+			skb->nh.raw = data + exthdrlen;
 			data += fragheaderlen;
 			skb->h.raw = data + exthdrlen;
 
@@ -1059,6 +1069,9 @@ int ip_push_pending_frames(struct sock *sk)
 		goto out;
 	tail_skb = &(skb_shinfo(skb)->frag_list);
 
+	/* move skb->data to ip header from ext header */
+	if (skb->data < skb->nh.raw)
+		__skb_pull(skb, skb->nh.raw - skb->data);
 	while ((tmp_skb = __skb_dequeue(&sk->write_queue)) != NULL) {
 		__skb_pull(tmp_skb, skb->h.raw - skb->nh.raw);
 		*tail_skb = tmp_skb;
@@ -1206,7 +1219,8 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 		struct flowi fl = { .nl_u = { .ip4_u =
 					      { .daddr = daddr,
 						.saddr = rt->rt_spec_dst,
-						.tos = RT_TOS(skb->nh.iph->tos) } } };
+						.tos = RT_TOS(skb->nh.iph->tos) } },
+				    .proto = sk->protocol };
 		if (ip_route_output_key(&rt, &fl))
 			return;
 	}

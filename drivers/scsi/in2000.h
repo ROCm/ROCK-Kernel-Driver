@@ -402,7 +402,8 @@ static int in2000_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int in2000_abort(Scsi_Cmnd *);
 static void in2000_setup(char *, int *) in2000__INIT;
 static int in2000_proc_info(char *, char **, off_t, int, int, int);
-static int in2000_biosparam(struct scsi_disk *, struct block_device *, int *);
+static int in2000_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 static int in2000_host_reset(Scsi_Cmnd *);
 static int in2000_bus_reset(Scsi_Cmnd *);
 static int in2000_device_reset(Scsi_Cmnd *);
@@ -417,6 +418,7 @@ static int in2000_device_reset(Scsi_Cmnd *);
                   proc_info:       		in2000_proc_info,    /* pointer to proc info function */ \
                   name:            		"Always IN2000",     /* device name */ \
                   detect:          		in2000_detect,       /* returns number of in2000's found */ \
+                  release:			in2000_release,	     /* release the in2000 controller */ \
                   queuecommand:    		in2000_queuecommand, /* queue scsi command, don't wait */ \
                   eh_abort_handler:		in2000_abort,        /* abort current command */ \
                   eh_bus_reset_handler:		in2000_bus_reset,    /* reset scsi bus */ \

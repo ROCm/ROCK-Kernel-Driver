@@ -67,8 +67,8 @@
 #endif
 
 #ifndef CONFIG_BT_USB_ZERO_PACKET
-#undef  USB_ZERO_PACKET
-#define USB_ZERO_PACKET 0
+#undef  URB_ZERO_PACKET
+#define URB_ZERO_PACKET 0
 #endif
 
 static struct usb_driver hci_usb_driver; 
@@ -131,7 +131,7 @@ static int hci_usb_enable_intr(struct hci_usb *husb)
 	
         pipe = usb_rcvintpipe(husb->udev, husb->intr_ep);
         size = usb_maxpacket(husb->udev, pipe, usb_pipeout(pipe));
-	FILL_INT_URB(urb, husb->udev, pipe, buf, size, 
+	usb_fill_int_urb(urb, husb->udev, pipe, buf, size, 
 			hci_usb_interrupt, husb, husb->intr_interval);
 	
 	return usb_submit_urb(urb, GFP_KERNEL);
@@ -182,7 +182,7 @@ static int hci_usb_rx_submit(struct hci_usb *husb, struct urb *urb)
 
         pipe = usb_rcvbulkpipe(husb->udev, husb->bulk_in_ep);
 
-        FILL_BULK_URB(urb, husb->udev, pipe, skb->data, size, hci_usb_rx_complete, skb);
+        usb_fill_bulk_urb(urb, husb->udev, pipe, skb->data, size, hci_usb_rx_complete, skb);
 
 	skb_queue_tail(&husb->pending_q, skb);
 	err = usb_submit_urb(urb, GFP_ATOMIC);
@@ -299,7 +299,7 @@ static inline int hci_usb_send_ctrl(struct hci_usb *husb, struct sk_buff *skb)
 	cr->wValue   = 0;
 	cr->wLength  = __cpu_to_le16(skb->len);
 
-	FILL_CONTROL_URB(urb, husb->udev, pipe, (void *) cr,
+	usb_fill_control_urb(urb, husb->udev, pipe, (void *) cr,
 			skb->data, skb->len, hci_usb_tx_complete, skb);
 
 	BT_DBG("%s urb %p len %d", husb->hdev.name, urb, skb->len);
@@ -328,9 +328,9 @@ static inline int hci_usb_send_bulk(struct hci_usb *husb, struct sk_buff *skb)
 
 	pipe = usb_sndbulkpipe(husb->udev, husb->bulk_out_ep);
         
-	FILL_BULK_URB(urb, husb->udev, pipe, skb->data, skb->len,
+	usb_fill_bulk_urb(urb, husb->udev, pipe, skb->data, skb->len,
 	              hci_usb_tx_complete, skb);
-	urb->transfer_flags = USB_ZERO_PACKET;
+	urb->transfer_flags = URB_ZERO_PACKET;
 
 	BT_DBG("%s urb %p len %d", husb->hdev.name, urb, skb->len);
 
@@ -438,16 +438,34 @@ static void hci_usb_interrupt(struct urb *urb)
 	__u8 *data = urb->transfer_buffer;
 	int count = urb->actual_length;
 	int len = HCI_EVENT_HDR_SIZE;
+	int status;
 
 	BT_DBG("%s urb %p count %d", husb->hdev.name, urb, count);
 
 	if (!test_bit(HCI_RUNNING, &husb->hdev.flags))
 		return;
 
-	if (urb->status || !count) {
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		BT_DBG("%s urb shutting down with status: %d",
+				husb->hdev.name, urb->status);
+		return;
+	default:
+		BT_ERR("%s nonzero urb status received: %d",
+				husb->hdev.name, urb->status);
+		goto exit;
+	}
+
+	if (!count) {
 		BT_DBG("%s intr status %d, count %d", 
 				husb->hdev.name, urb->status, count);
-		return;
+		goto exit;
 	}
 
 	read_lock(&husb->completion_lock);
@@ -499,12 +517,18 @@ static void hci_usb_interrupt(struct urb *urb)
 
 done:
 	read_unlock(&husb->completion_lock);
-	return;
+	goto exit;
 
 bad_len:
 	BT_ERR("%s bad frame len %d expected %d", husb->hdev.name, count, len);
 	husb->hdev.stat.err_rx++;
 	read_unlock(&husb->completion_lock);
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		BT_ERR ("%s usb_submit_urb failed with result %d",
+				husb->hdev.name, status);
 }
 
 static void hci_usb_tx_complete(struct urb *urb)
@@ -605,13 +629,13 @@ static void hci_usb_destruct(struct hci_dev *hdev)
 int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);	
-	struct usb_endpoint_descriptor *bulk_out_ep[HCI_MAX_IFACE_NUM];
-	struct usb_endpoint_descriptor *isoc_out_ep[HCI_MAX_IFACE_NUM];
-	struct usb_endpoint_descriptor *bulk_in_ep[HCI_MAX_IFACE_NUM];
-	struct usb_endpoint_descriptor *isoc_in_ep[HCI_MAX_IFACE_NUM];
-	struct usb_endpoint_descriptor *intr_in_ep[HCI_MAX_IFACE_NUM];
-	struct usb_interface_descriptor *uif;
-	struct usb_endpoint_descriptor *ep;
+	struct usb_host_endpoint *bulk_out_ep[HCI_MAX_IFACE_NUM];
+	struct usb_host_endpoint *isoc_out_ep[HCI_MAX_IFACE_NUM];
+	struct usb_host_endpoint *bulk_in_ep[HCI_MAX_IFACE_NUM];
+	struct usb_host_endpoint *isoc_in_ep[HCI_MAX_IFACE_NUM];
+	struct usb_host_endpoint *intr_in_ep[HCI_MAX_IFACE_NUM];
+	struct usb_host_interface *uif;
+	struct usb_host_endpoint *ep;
 	struct usb_interface *iface, *isoc_iface;
 	struct hci_usb *husb;
 	struct hci_dev *hdev;
@@ -624,7 +648,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		return -EIO;
 
 	/* Check number of endpoints */
-	if (intf->altsetting[0].bNumEndpoints < 3)
+	if (intf->altsetting[0].desc.bNumEndpoints < 3)
 		return -EIO;
 
 	memset(bulk_out_ep, 0, sizeof(bulk_out_ep));
@@ -639,37 +663,37 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	
 	/* Find endpoints that we need */
 
-	ifn = min_t(unsigned int, udev->actconfig->bNumInterfaces, HCI_MAX_IFACE_NUM);
+	ifn = min_t(unsigned int, udev->actconfig->desc.bNumInterfaces, HCI_MAX_IFACE_NUM);
 	for (i = 0; i < ifn; i++) {
 		iface = &udev->actconfig->interface[i];
 		for (a = 0; a < iface->num_altsetting; a++) {
 			uif = &iface->altsetting[a];
-			for (e = 0; e < uif->bNumEndpoints; e++) {
+			for (e = 0; e < uif->desc.bNumEndpoints; e++) {
 				ep = &uif->endpoint[e];
 
-				switch (ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
+				switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
 				case USB_ENDPOINT_XFER_INT:
-					if (ep->bEndpointAddress & USB_DIR_IN)
+					if (ep->desc.bEndpointAddress & USB_DIR_IN)
 						intr_in_ep[i] = ep;
 					break;
 
 				case USB_ENDPOINT_XFER_BULK:
-					if (ep->bEndpointAddress & USB_DIR_IN)
+					if (ep->desc.bEndpointAddress & USB_DIR_IN)
 						bulk_in_ep[i]  = ep;
 					else
 						bulk_out_ep[i] = ep;
 					break;
 
 				case USB_ENDPOINT_XFER_ISOC:
-					if (ep->wMaxPacketSize < size)
+					if (ep->desc.wMaxPacketSize < size)
 						break;
-					size = ep->wMaxPacketSize;
+					size = ep->desc.wMaxPacketSize;
 
 					isoc_iface = iface;
 					isoc_alts  = a;
 					isoc_ifnum = i;
 
-					if (ep->bEndpointAddress & USB_DIR_IN)
+					if (ep->desc.bEndpointAddress & USB_DIR_IN)
 						isoc_in_ep[i]  = ep;
 					else
 						isoc_out_ep[i] = ep;
@@ -697,11 +721,11 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	memset(husb, 0, sizeof(struct hci_usb));
 
 	husb->udev = udev;
-	husb->bulk_out_ep = bulk_out_ep[0]->bEndpointAddress;
-	husb->bulk_in_ep  = bulk_in_ep[0]->bEndpointAddress;
+	husb->bulk_out_ep = bulk_out_ep[0]->desc.bEndpointAddress;
+	husb->bulk_in_ep  = bulk_in_ep[0]->desc.bEndpointAddress;
 
-	husb->intr_ep = intr_in_ep[0]->bEndpointAddress;
-	husb->intr_interval = intr_in_ep[0]->bInterval;
+	husb->intr_ep = intr_in_ep[0]->desc.bEndpointAddress;
+	husb->intr_interval = intr_in_ep[0]->desc.bInterval;
 
 	if (isoc_iface) {
 		if (usb_set_interface(udev, isoc_ifnum, isoc_alts)) {
@@ -711,8 +735,8 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		usb_driver_claim_interface(&hci_usb_driver, isoc_iface, husb);
 		husb->isoc_iface  = isoc_iface;
 
-		husb->isoc_in_ep  = isoc_in_ep[1]->bEndpointAddress;
-		husb->isoc_out_ep = isoc_in_ep[1]->bEndpointAddress;
+		husb->isoc_in_ep  = isoc_in_ep[1]->desc.bEndpointAddress;
+		husb->isoc_out_ep = isoc_in_ep[1]->desc.bEndpointAddress;
 	}
 
 	husb->completion_lock = RW_LOCK_UNLOCKED;
@@ -781,9 +805,7 @@ int hci_usb_init(void)
 {
 	int err;
 
-	BT_INFO("Bluetooth HCI USB driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
-		VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("HCI USB driver ver %s", VERSION);
 
 	if ((err = usb_register(&hci_usb_driver)) < 0)
 		BT_ERR("Failed to register HCI USB driver");

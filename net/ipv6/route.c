@@ -78,26 +78,23 @@ static int ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort);
 static struct dst_entry	*ip6_dst_check(struct dst_entry *dst, u32 cookie);
-static struct dst_entry	*ip6_dst_reroute(struct dst_entry *dst,
-					 struct sk_buff *skb);
 static struct dst_entry *ip6_negative_advice(struct dst_entry *);
 static int		 ip6_dst_gc(void);
 
 static int		ip6_pkt_discard(struct sk_buff *skb);
 static void		ip6_link_failure(struct sk_buff *skb);
+static void		ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
 
 static struct dst_ops ip6_dst_ops = {
-	AF_INET6,
-	__constant_htons(ETH_P_IPV6),
-	1024,
-
-        ip6_dst_gc,
-	ip6_dst_check,
-	ip6_dst_reroute,
-	NULL,
-	ip6_negative_advice,
-	ip6_link_failure,
-	sizeof(struct rt6_info),
+	.family			=	AF_INET6,
+	.protocol		=	__constant_htons(ETH_P_IPV6),
+	.gc			=	ip6_dst_gc,
+	.gc_thresh		=	1024,
+	.check			=	ip6_dst_check,
+	.negative_advice	=	ip6_negative_advice,
+	.link_failure		=	ip6_link_failure,
+	.update_pmtu		=	ip6_rt_update_pmtu,
+	.entry_size		=	sizeof(struct rt6_info),
 };
 
 struct rt6_info ip6_null_entry = {
@@ -510,16 +507,6 @@ static struct dst_entry *ip6_dst_check(struct dst_entry *dst, u32 cookie)
 	return NULL;
 }
 
-static struct dst_entry *ip6_dst_reroute(struct dst_entry *dst, struct sk_buff *skb)
-{
-	/*
-	 *	FIXME
-	 */
-	RDBG(("ip6_dst_reroute(%p,%p)[%p] (AIEEE)\n", dst, skb,
-	      __builtin_return_address(0)));
-	return NULL;
-}
-
 static struct dst_entry *ip6_negative_advice(struct dst_entry *dst)
 {
 	struct rt6_info *rt = (struct rt6_info *) dst;
@@ -546,6 +533,16 @@ static void ip6_link_failure(struct sk_buff *skb)
 			rt->rt6i_flags |= RTF_EXPIRES;
 		} else if (rt->rt6i_node && (rt->rt6i_flags & RTF_DEFAULT))
 			rt->rt6i_node->fn_sernum = -1;
+	}
+}
+
+static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
+{
+	struct rt6_info *rt6 = (struct rt6_info*)dst;
+
+	if (mtu < dst_pmtu(dst) && rt6->rt6i_dst.plen == 128) {
+		rt6->rt6i_flags |= RTF_MODIFIED;
+		dst->metrics[RTAX_MTU-1] = mtu;
 	}
 }
 
@@ -755,14 +752,14 @@ int ip6_route_add(struct in6_rtmsg *rtmsg)
 	rt->rt6i_flags = rtmsg->rtmsg_flags;
 
 install_route:
-	rt->u.dst.pmtu = ipv6_get_mtu(dev);
-	rt->u.dst.advmss = max_t(unsigned int, rt->u.dst.pmtu - 60, ip6_rt_min_advmss);
+	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(dev);
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&rt->u.dst) - 60, ip6_rt_min_advmss);
 	/* Maximal non-jumbo IPv6 payload is 65535 and corresponding
 	   MSS is 65535 - tcp_header_size. 65535 is also valid and
 	   means: "any MSS, rely only on pmtu discovery"
 	 */
-	if (rt->u.dst.advmss > 65535-20)
-		rt->u.dst.advmss = 65535;
+	if (dst_metric(&rt->u.dst, RTAX_ADVMSS) > 65535-20)
+		rt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
 	rt->u.dst.dev = dev;
 	return rt6_ins(rt);
 
@@ -914,10 +911,10 @@ source_ok:
 	ipv6_addr_copy(&nrt->rt6i_gateway, (struct in6_addr*)neigh->primary_key);
 	nrt->rt6i_nexthop = neigh_clone(neigh);
 	/* Reset pmtu, it may be better */
-	nrt->u.dst.pmtu = ipv6_get_mtu(neigh->dev);
-	nrt->u.dst.advmss = max_t(unsigned int, nrt->u.dst.pmtu - 60, ip6_rt_min_advmss);
-	if (rt->u.dst.advmss > 65535-20)
-		rt->u.dst.advmss = 65535;
+	nrt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(neigh->dev);
+	nrt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&nrt->u.dst) - 60, ip6_rt_min_advmss);
+	if (nrt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
+		nrt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
 	nrt->rt6i_hoplimit = ipv6_get_hoplimit(neigh->dev);
 
 	if (rt6_ins(nrt))
@@ -947,7 +944,11 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		if (net_ratelimit())
 			printk(KERN_DEBUG "rt6_pmtu_discovery: invalid MTU value %d\n",
 			       pmtu);
-		return;
+		/* According to RFC1981, the PMTU is set to the IPv6 minimum
+		   link MTU if the node receives a Packet Too Big message
+		   reporting next-hop MTU that is less than the IPv6 minimum MTU.
+		   */
+		pmtu = IPV6_MIN_MTU;
 	}
 
 	rt = rt6_lookup(daddr, saddr, dev->ifindex, 0);
@@ -955,7 +956,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 	if (rt == NULL)
 		return;
 
-	if (pmtu >= rt->u.dst.pmtu)
+	if (pmtu >= dst_pmtu(&rt->u.dst))
 		goto out;
 
 	/* New mtu received -> path was valid.
@@ -970,7 +971,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 	   would return automatically.
 	 */
 	if (rt->rt6i_flags & RTF_CACHE) {
-		rt->u.dst.pmtu = pmtu;
+		rt->u.dst.metrics[RTAX_MTU-1] = pmtu;
 		dst_set_expires(&rt->u.dst, ip6_rt_mtu_expires);
 		rt->rt6i_flags |= RTF_MODIFIED|RTF_EXPIRES;
 		goto out;
@@ -984,8 +985,14 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 	if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
 		nrt = rt6_cow(rt, daddr, saddr);
 		if (!nrt->u.dst.error) {
-			nrt->u.dst.pmtu = pmtu;
-			dst_set_expires(&rt->u.dst, ip6_rt_mtu_expires);
+			nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
+			/* According to RFC 1981, detecting PMTU increase shouldn't be
+			   happened within 5 mins, the recommended timer is 10 mins.
+			   Here this route expiration time is set to ip6_rt_mtu_expires
+			   which is 10 mins. After 10 mins the decreased pmtu is expired
+			   and detecting PMTU increase will be automatically happened.
+			 */
+			dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 			nrt->rt6i_flags |= RTF_DYNAMIC|RTF_EXPIRES;
 			dst_release(&nrt->u.dst);
 		}
@@ -997,9 +1004,9 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		nrt->rt6i_dst.plen = 128;
 		nrt->u.dst.flags |= DST_HOST;
 		nrt->rt6i_nexthop = neigh_clone(rt->rt6i_nexthop);
-		dst_set_expires(&rt->u.dst, ip6_rt_mtu_expires);
+		dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 		nrt->rt6i_flags |= RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
-		nrt->u.dst.pmtu = pmtu;
+		nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
 		rt6_ins(nrt);
 	}
 
@@ -1021,7 +1028,7 @@ static struct rt6_info * ip6_rt_copy(struct rt6_info *ort)
 		rt->u.dst.input = ort->u.dst.input;
 		rt->u.dst.output = ort->u.dst.output;
 
-		memcpy(&rt->u.dst.mxlock, &ort->u.dst.mxlock, RTAX_MAX*sizeof(unsigned));
+		memcpy(rt->u.dst.metrics, ort->u.dst.metrics, RTAX_MAX*sizeof(u32));
 		rt->u.dst.dev = ort->u.dst.dev;
 		if (rt->u.dst.dev)
 			dev_hold(rt->u.dst.dev);
@@ -1169,10 +1176,10 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 	rt->u.dst.input = ip6_input;
 	rt->u.dst.output = ip6_output;
 	rt->rt6i_dev = dev_get_by_name("lo");
-	rt->u.dst.pmtu = ipv6_get_mtu(rt->rt6i_dev);
-	rt->u.dst.advmss = max_t(unsigned int, rt->u.dst.pmtu - 60, ip6_rt_min_advmss);
-	if (rt->u.dst.advmss > 65535-20)
-		rt->u.dst.advmss = 65535;
+	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&rt->u.dst) - 60, ip6_rt_min_advmss);
+	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
+		rt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
 	rt->rt6i_hoplimit = ipv6_get_hoplimit(rt->rt6i_dev);
 	rt->u.dst.obsolete = -1;
 
@@ -1236,19 +1243,38 @@ struct rt6_mtu_change_arg
 static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
 {
 	struct rt6_mtu_change_arg *arg = (struct rt6_mtu_change_arg *) p_arg;
+	struct inet6_dev *idev;
 
 	/* In IPv6 pmtu discovery is not optional,
 	   so that RTAX_MTU lock cannot disable it.
 	   We still use this lock to block changes
 	   caused by addrconf/ndisc.
 	*/
+
+	idev = __in6_dev_get(arg->dev);
+	/* For administrative MTU increase, there is no way to discover
+	   IPv6 PMTU increase, so PMTU increase should be updated here.
+	   Since RFC 1981 doesn't include administrative MTU increase
+	   update PMTU increase is a MUST. (i.e. jumbo frame)
+	 */
+	/*
+	   If new MTU is less than route PMTU, this new MTU will be the
+	   lowest MTU in the path, update the route PMTU to refect PMTU
+	   decreases; if new MTU is greater than route PMTU, and the
+	   old MTU is the lowest MTU in the path, update the route PMTU
+	   to refect the increase. In this case if the other nodes' MTU
+	   also have the lowest MTU, TOO BIG MESSAGE will be lead to
+	   PMTU discouvery.
+	 */
 	if (rt->rt6i_dev == arg->dev &&
-	    rt->u.dst.pmtu > arg->mtu &&
-	    !(rt->u.dst.mxlock&(1<<RTAX_MTU)))
-		rt->u.dst.pmtu = arg->mtu;
-	rt->u.dst.advmss = max_t(unsigned int, arg->mtu - 60, ip6_rt_min_advmss);
-	if (rt->u.dst.advmss > 65535-20)
-		rt->u.dst.advmss = 65535;
+	    !dst_metric_locked(&rt->u.dst, RTAX_MTU) &&
+            (dst_pmtu(&rt->u.dst) > arg->mtu ||
+             (dst_pmtu(&rt->u.dst) < arg->mtu &&
+	      dst_pmtu(&rt->u.dst) == idev->cnf.mtu6)))
+		rt->u.dst.metrics[RTAX_MTU-1] = arg->mtu;
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, arg->mtu - 60, ip6_rt_min_advmss);
+	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
+		rt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
 	return 0;
 }
 
@@ -1385,7 +1411,7 @@ static int rt6_fill_node(struct sk_buff *skb, struct rt6_info *rt,
 		if (ipv6_get_saddr(&rt->u.dst, dst, &saddr_buf) == 0)
 			RTA_PUT(skb, RTA_PREFSRC, 16, &saddr_buf);
 	}
-	if (rtnetlink_put_metrics(skb, &rt->u.dst.mxlock) < 0)
+	if (rtnetlink_put_metrics(skb, rt->u.dst.metrics) < 0)
 		goto rtattr_failure;
 	if (rt->u.dst.neighbour)
 		RTA_PUT(skb, RTA_GATEWAY, 16, &rt->u.dst.neighbour->primary_key);

@@ -13,6 +13,7 @@
 #include <linux/smp_lock.h>
 #include <linux/fs.h>
 #include <linux/security.h>
+#include <linux/eventpoll.h>
 
 /* sysctl tunables... */
 struct files_stat_struct files_stat = {0, 0, NR_FILE};
@@ -123,6 +124,7 @@ void __fput(struct file * file)
 	struct vfsmount * mnt = file->f_vfsmnt;
 	struct inode * inode = dentry->d_inode;
 
+	ep_notify_file_close(file);
 	locks_remove_flock(file);
 
 	if (file->f_op && file->f_op->release)

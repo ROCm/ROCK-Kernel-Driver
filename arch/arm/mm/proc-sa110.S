@@ -18,6 +18,7 @@
  *    Flush the read buffer at context switches
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -484,7 +485,7 @@ cpu_sa1110_name:
 	.asciz	"StrongARM-1110"
 	.align
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 __sa1100_setup:	@ Allow read-buffer operations from userland
 	mcr	p15, 0, r0, c9, c0, 5
@@ -560,7 +561,7 @@ cpu_sa110_info:
  */
 	.type	sa1100_processor_functions, #object
 ENTRY(sa1100_processor_functions)
-	.word	armv4_early_abort
+	.word	v4_early_abort
 	.word	cpu_sa1100_check_bugs
 	.word	cpu_sa1100_proc_init
 	.word	cpu_sa1100_proc_fin

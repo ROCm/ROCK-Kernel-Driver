@@ -1238,6 +1238,21 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 	set_bit(PC_DMA_RECOMMENDED, &pc->flags);
 }
 
+static int
+idefloppy_blockpc_cmd(idefloppy_floppy_t *floppy, idefloppy_pc_t *pc, struct request *rq)
+{
+	/*
+	 * just support eject for now, it would not be hard to make the
+	 * REQ_BLOCK_PC support fully-featured
+	 */
+	if (rq->cmd[0] != IDEFLOPPY_START_STOP_CMD)
+		return 1;
+
+	idefloppy_init_pc(pc);
+	memcpy(pc->c, rq->cmd, sizeof(pc->c));
+	return 0;
+}
+
 /*
  *	idefloppy_do_request is our request handling function.	
  */
@@ -1248,8 +1263,8 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 	unsigned long block = (unsigned long)block_s;
 
 #if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "rq_status: %d, rq_dev: %u, flags: %lx, errors: %d\n",
-			rq->rq_status, (unsigned int) rq->rq_dev,
+	printk(KERN_INFO "rq_status: %d, dev: %s, flags: %lx, errors: %d\n",
+			rq->rq_status, rq->rq_disk->disk_name,
 			rq->flags, rq->errors);
 	printk(KERN_INFO "sector: %ld, nr_sectors: %ld, "
 			"current_nr_sectors: %ld\n", (long)rq->sector,
@@ -1280,6 +1295,12 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 		idefloppy_create_rw_cmd(floppy, pc, rq, block);
 	} else if (rq->flags & REQ_SPECIAL) {
 		pc = (idefloppy_pc_t *) rq->buffer;
+	} else if (rq->flags & REQ_BLOCK_PC) {
+		pc = idefloppy_next_pc_storage(drive);
+		if (idefloppy_blockpc_cmd(floppy, pc, rq)) {
+			idefloppy_do_end_request(drive, 0, 0);
+			return ide_stopped;
+		}
 	} else {
 		blk_dump_rq_flags(rq,
 			"ide-floppy: unsupported command in queue");
@@ -1490,10 +1511,7 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 **
 */
 
-static int idefloppy_get_format_capacities (ide_drive_t *drive,
-					    struct inode *inode,
-					    struct file *file,
-					    int *arg)	/* Cheater */
+static int idefloppy_get_format_capacities(ide_drive_t *drive, int *arg)
 {
         idefloppy_pc_t pc;
 	idefloppy_capacity_header_t *header;
@@ -1569,10 +1587,7 @@ static int idefloppy_get_format_capacities (ide_drive_t *drive,
 **        0x01 - verify media after format.
 */
 
-static int idefloppy_begin_format(ide_drive_t *drive,
-				  struct inode *inode,
-				  struct file *file,
-				  int *arg)
+static int idefloppy_begin_format(ide_drive_t *drive, int *arg)
 {
 	int blocks;
 	int length;
@@ -1605,10 +1620,7 @@ static int idefloppy_begin_format(ide_drive_t *drive,
 ** the dsc bit, and return either 0 or 65536.
 */
 
-static int idefloppy_get_format_progress(ide_drive_t *drive,
-					 struct inode *inode,
-					 struct file *file,
-					 int *arg)
+static int idefloppy_get_format_progress(ide_drive_t *drive, int *arg)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	idefloppy_pc_t pc;
@@ -1641,181 +1653,6 @@ static int idefloppy_get_format_progress(ide_drive_t *drive,
 		return (-EFAULT);
 
 	return (0);
-}
-
-/*
- *	Our special ide-floppy ioctl's.
- *
- *	Currently there aren't any ioctl's.
- */
-static int idefloppy_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file,
-				 unsigned int cmd, unsigned long arg)
-{
-	idefloppy_pc_t pc;
-	idefloppy_floppy_t *floppy = drive->driver_data;
-	int prevent = (arg) ? 1 : 0;
-
-	switch (cmd) {
-	case CDROMEJECT:
-		prevent = 0;
-		/* fall through */
-	case CDROM_LOCKDOOR:
-		if (drive->usage > 1)
-			return -EBUSY;
-
-		/* The IOMEGA Clik! Drive doesn't support this command - no room for an eject mechanism */
-                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
-			idefloppy_create_prevent_cmd(&pc, prevent);
-			(void) idefloppy_queue_pc_tail(drive, &pc);
-		}
-		if (cmd == CDROMEJECT) {
-			idefloppy_create_start_stop_cmd(&pc, 2);
-			(void) idefloppy_queue_pc_tail(drive, &pc);
-		}
-		return 0;
-	case IDEFLOPPY_IOCTL_FORMAT_SUPPORTED:
-		return (0);
-	case IDEFLOPPY_IOCTL_FORMAT_GET_CAPACITY:
-		return (idefloppy_get_format_capacities(drive, inode, file,
-							(int *)arg));
-	case IDEFLOPPY_IOCTL_FORMAT_START:
-
-		if (!(file->f_mode & 2))
-			return (-EPERM);
-
-		{
-			idefloppy_floppy_t *floppy = drive->driver_data;
-
-			if (drive->usage > 1) {
-				/* Don't format if someone is using the disk */
-
-				clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS,
-					  &floppy->flags);
-				return -EBUSY;
-			} else {
-				int rc;
-
-				set_bit(IDEFLOPPY_FORMAT_IN_PROGRESS,
-					&floppy->flags);
-
-				rc=idefloppy_begin_format(drive, inode,
-							      file,
-							      (int *)arg);
-
-				if (rc)
-					clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS,
-						  &floppy->flags);
-				return (rc);
-
-			/*
-			** Note, the bit will be cleared when the device is
-			** closed.  This is the cleanest way to handle the
-			** situation where the drive does not support
-			** format progress reporting.
-			*/
-			}
-		}
-	case IDEFLOPPY_IOCTL_FORMAT_GET_PROGRESS:
-		return (idefloppy_get_format_progress(drive, inode, file,
-						      (int *)arg));
-	}
- 	return -EINVAL;
-}
-
-/*
- *	Our open/release functions
- */
-static int idefloppy_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	idefloppy_floppy_t *floppy = drive->driver_data;
-	idefloppy_pc_t pc;
-	
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "Reached idefloppy_open\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
-
-	MOD_INC_USE_COUNT;
-	if (drive->usage == 1) {
-		clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
-		/* Just in case */
-
-		idefloppy_create_test_unit_ready_cmd(&pc);
-		if (idefloppy_queue_pc_tail(drive, &pc)) {
-			idefloppy_create_start_stop_cmd(&pc, 1);
-			(void) idefloppy_queue_pc_tail(drive, &pc);
-		}
-
-		if (idefloppy_get_capacity (drive)
-		   && (filp->f_flags & O_NDELAY) == 0
-		    /*
-		    ** Allow O_NDELAY to open a drive without a disk, or with
-		    ** an unreadable disk, so that we can get the format
-		    ** capacity of the drive or begin the format - Sam
-		    */
-		    ) {
-			drive->usage--;
-			MOD_DEC_USE_COUNT;
-			return -EIO;
-		}
-
-		if (floppy->wp && (filp->f_mode & 2)) {
-			drive->usage--;
-			MOD_DEC_USE_COUNT;
-			return -EROFS;
-		}		
-		set_bit(IDEFLOPPY_MEDIA_CHANGED, &floppy->flags);
-		/* IOMEGA Clik! drives do not support lock/unlock commands */
-                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
-			idefloppy_create_prevent_cmd(&pc, 1);
-			(void) idefloppy_queue_pc_tail(drive, &pc);
-		}
-		check_disk_change(inode->i_bdev);
-	} else if (test_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags)) {
-		drive->usage--;
-		MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
-	return 0;
-}
-
-static void idefloppy_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	idefloppy_pc_t pc;
-	
-#if IDEFLOPPY_DEBUG_LOG
-	printk (KERN_INFO "Reached idefloppy_release\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
-
-	if (!drive->usage) {
-		idefloppy_floppy_t *floppy = drive->driver_data;
-
-		/* IOMEGA Clik! drives do not support lock/unlock commands */
-                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
-			idefloppy_create_prevent_cmd(&pc, 0);
-			(void) idefloppy_queue_pc_tail(drive, &pc);
-		}
-
-		clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
-	}
-	MOD_DEC_USE_COUNT;
-}
-
-/*
- *	Check media change. Use a simple algorithm for now.
- */
-static int idefloppy_media_change (ide_drive_t *drive)
-{
-	idefloppy_floppy_t *floppy = drive->driver_data;
-	
-	return test_and_clear_bit(IDEFLOPPY_MEDIA_CHANGED, &floppy->flags);
-}
-
-/*
- *	Revalidate the new media. Should set blk_size[]
- */
-static void idefloppy_revalidate (ide_drive_t *drive)
-{
-	ide_revalidate_drive(drive);
 }
 
 /*
@@ -2021,6 +1858,7 @@ static int idefloppy_cleanup (ide_drive_t *drive)
 	drive->driver_data = NULL;
 	kfree(floppy);
 	del_gendisk(g);
+	g->fops = ide_fops;
 	return 0;
 }
 
@@ -2055,27 +1893,177 @@ static ide_driver_t idefloppy_driver = {
 #endif
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idefloppy_cleanup,
-	.standby		= NULL,
-	.suspend		= NULL,
-	.resume			= NULL,
-	.flushcache		= NULL,
 	.do_request		= idefloppy_do_request,
 	.end_request		= idefloppy_do_end_request,
-	.sense			= NULL,
-	.error			= NULL,
-	.ioctl			= idefloppy_ioctl,
-	.open			= idefloppy_open,
-	.release		= idefloppy_release,
-	.media_change		= idefloppy_media_change,
-	.revalidate		= idefloppy_revalidate,
-	.pre_reset		= NULL,
 	.capacity		= idefloppy_capacity,
-	.special		= NULL,
 	.proc			= idefloppy_proc,
 	.attach			= idefloppy_attach,
-	.ata_prebuilder		= NULL,
-	.atapi_prebuilder	= NULL,
 	.drives			= LIST_HEAD_INIT(idefloppy_driver.drives),
+};
+
+static int idefloppy_open(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	idefloppy_floppy_t *floppy = drive->driver_data;
+	idefloppy_pc_t pc;
+
+	drive->usage++;
+	
+#if IDEFLOPPY_DEBUG_LOG
+	printk(KERN_INFO "Reached idefloppy_open\n");
+#endif /* IDEFLOPPY_DEBUG_LOG */
+
+	if (drive->usage == 1) {
+		clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
+		/* Just in case */
+
+		idefloppy_create_test_unit_ready_cmd(&pc);
+		if (idefloppy_queue_pc_tail(drive, &pc)) {
+			idefloppy_create_start_stop_cmd(&pc, 1);
+			(void) idefloppy_queue_pc_tail(drive, &pc);
+		}
+
+		if (idefloppy_get_capacity (drive)
+		   && (filp->f_flags & O_NDELAY) == 0
+		    /*
+		    ** Allow O_NDELAY to open a drive without a disk, or with
+		    ** an unreadable disk, so that we can get the format
+		    ** capacity of the drive or begin the format - Sam
+		    */
+		    ) {
+			drive->usage--;
+			return -EIO;
+		}
+
+		if (floppy->wp && (filp->f_mode & 2)) {
+			drive->usage--;
+			return -EROFS;
+		}		
+		set_bit(IDEFLOPPY_MEDIA_CHANGED, &floppy->flags);
+		/* IOMEGA Clik! drives do not support lock/unlock commands */
+                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
+			idefloppy_create_prevent_cmd(&pc, 1);
+			(void) idefloppy_queue_pc_tail(drive, &pc);
+		}
+		check_disk_change(inode->i_bdev);
+	} else if (test_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags)) {
+		drive->usage--;
+		return -EBUSY;
+	}
+	return 0;
+}
+
+static int idefloppy_release(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	idefloppy_pc_t pc;
+	
+#if IDEFLOPPY_DEBUG_LOG
+	printk (KERN_INFO "Reached idefloppy_release\n");
+#endif /* IDEFLOPPY_DEBUG_LOG */
+
+	if (drive->usage == 1) {
+		idefloppy_floppy_t *floppy = drive->driver_data;
+
+		/* IOMEGA Clik! drives do not support lock/unlock commands */
+                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
+			idefloppy_create_prevent_cmd(&pc, 0);
+			(void) idefloppy_queue_pc_tail(drive, &pc);
+		}
+
+		clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
+	}
+	drive->usage--;
+	return 0;
+}
+
+static int idefloppy_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	struct block_device *bdev = inode->i_bdev;
+	ide_drive_t *drive = bdev->bd_disk->private_data;
+	idefloppy_floppy_t *floppy = drive->driver_data;
+	int err = generic_ide_ioctl(bdev, cmd, arg);
+	int prevent = (arg) ? 1 : 0;
+	idefloppy_pc_t pc;
+	if (err != -EINVAL)
+		return err;
+
+	switch (cmd) {
+	case CDROMEJECT:
+		prevent = 0;
+		/* fall through */
+	case CDROM_LOCKDOOR:
+		if (drive->usage > 1)
+			return -EBUSY;
+
+		/* The IOMEGA Clik! Drive doesn't support this command - no room for an eject mechanism */
+                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
+			idefloppy_create_prevent_cmd(&pc, prevent);
+			(void) idefloppy_queue_pc_tail(drive, &pc);
+		}
+		if (cmd == CDROMEJECT) {
+			idefloppy_create_start_stop_cmd(&pc, 2);
+			(void) idefloppy_queue_pc_tail(drive, &pc);
+		}
+		return 0;
+	case IDEFLOPPY_IOCTL_FORMAT_SUPPORTED:
+		return 0;
+	case IDEFLOPPY_IOCTL_FORMAT_GET_CAPACITY:
+		return idefloppy_get_format_capacities(drive, (int *)arg);
+	case IDEFLOPPY_IOCTL_FORMAT_START:
+
+		if (!(file->f_mode & 2))
+			return -EPERM;
+
+		if (drive->usage > 1) {
+			/* Don't format if someone is using the disk */
+
+			clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS,
+				  &floppy->flags);
+			return -EBUSY;
+		}
+
+		set_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
+
+		err = idefloppy_begin_format(drive, (int *)arg);
+		if (err)
+			clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
+		return err;
+		/*
+		** Note, the bit will be cleared when the device is
+		** closed.  This is the cleanest way to handle the
+		** situation where the drive does not support
+		** format progress reporting.
+		*/
+	case IDEFLOPPY_IOCTL_FORMAT_GET_PROGRESS:
+		return idefloppy_get_format_progress(drive, (int *)arg);
+	}
+ 	return -EINVAL;
+}
+
+static int idefloppy_media_changed(struct gendisk *disk)
+{
+	ide_drive_t *drive = disk->private_data;
+	idefloppy_floppy_t *floppy = drive->driver_data;
+	
+	return test_and_clear_bit(IDEFLOPPY_MEDIA_CHANGED, &floppy->flags);
+}
+
+static int idefloppy_revalidate_disk(struct gendisk *disk)
+{
+	ide_drive_t *drive = disk->private_data;
+	set_capacity(disk, current_capacity(drive));
+	return 0;
+}
+
+static struct block_device_operations idefloppy_ops = {
+	.owner		= THIS_MODULE,
+	.open		= idefloppy_open,
+	.release	= idefloppy_release,
+	.ioctl		= idefloppy_ioctl,
+	.media_changed	= idefloppy_media_changed,
+	.revalidate_disk= idefloppy_revalidate_disk
 };
 
 static int idefloppy_attach (ide_drive_t *drive)
@@ -2114,6 +2102,7 @@ static int idefloppy_attach (ide_drive_t *drive)
 	g->de = drive->de;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	g->flags |= GENHD_FL_DEVFS;
+	g->fops = &idefloppy_ops;
 	add_disk(g);
 	return 0;
 failed:

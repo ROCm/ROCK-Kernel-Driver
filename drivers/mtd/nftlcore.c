@@ -49,6 +49,8 @@
 
 struct NFTLrecord *NFTLs[MAX_NFTLS];
 
+static struct request_queue nftl_queue;
+
 static void NFTL_setup(struct mtd_info *mtd)
 {
 	int i;
@@ -134,6 +136,8 @@ static void NFTL_setup(struct mtd_info *mtd)
 	gd->first_minor = firstfree << NFTL_PARTN_BITS;
 	set_capacity(gd, nftl->nr_sects);
 	nftl->disk = gd;
+	gd->private_data = nftl;
+	gd->queue = &nftl_queue;
 	add_disk(gd);
 }
 
@@ -752,13 +756,7 @@ static int NFTL_readblock(struct NFTLrecord *nftl, unsigned block, char *buffer)
 
 static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd, unsigned long arg)
 {
-	struct NFTLrecord *nftl;
-	int res;
-
-	nftl = NFTLs[minor(inode->i_rdev) >> NFTL_PARTN_BITS];
-
-	if (!nftl) return -EINVAL;
-
+	struct NFTLrecord *nftl = inode->i_bdev->bd_disk->private_data;
 	switch (cmd) {
 	case HDIO_GETGEO: {
 		struct hd_geometry g;
@@ -780,23 +778,19 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 	}
 }
 
-void nftl_request(RQFUNC_ARG)
+void nftl_request(struct request_queue *q)
 {
-	unsigned int dev, unit, block, nsect;
-	struct NFTLrecord *nftl;
-	char *buffer;
-	struct request *req;
-	int res;
-
-	while (1) {
-		if (blk_queue_empty(QUEUE))
-			return;
-
-		req = CURRENT;
+	while (!blk_queue_empty(q)) {
+		struct request *req = elv_next_request(q);
+		unsigned block = req->sector;
+		unsigned nsect = req->current_nr_sectors;
+		char *buffer = req->buffer;
+		struct NFTLrecord *nftl = req->rq_disk->private_data;
+		int res = 1; /* succeed */
 		
 		/* We can do this because the generic code knows not to
 		   touch the request at the head of the queue */
-		spin_unlock_irq(QUEUE->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 
 		DEBUG(MTD_DEBUG_LEVEL2, "NFTL_request\n");
 		DEBUG(MTD_DEBUG_LEVEL3,
@@ -804,29 +798,14 @@ void nftl_request(RQFUNC_ARG)
 		      (req->cmd == READ) ? "Read " : "Write",
 		      (unsigned long long)req->sector, req->current_nr_sectors);
 
-		dev = minor(req->rq_dev);
-		block = req->sector;
-		nsect = req->current_nr_sectors;
-		buffer = req->buffer;
-		res = 1; /* succeed */
-
-		unit = dev >> NFTL_PARTN_BITS;
-		if (unit >= MAX_NFTLS || dev != (unit << NFTL_PARTN_BITS)) {
-			printk("nftl: bad minor number: device = %s\n",
-			       kdevname(req->rq_dev));
-			res = 0; /* fail */
-			goto repeat;
-		}
-		
-		nftl = NFTLs[dev / (1<<NFTL_PARTN_BITS)];
 		DEBUG(MTD_DEBUG_LEVEL3, "Waiting for mutex\n");
 		down(&nftl->mutex);
 		DEBUG(MTD_DEBUG_LEVEL3, "Got mutex\n");
 
 		if (block + nsect > get_capacity(nftl->disk)) {
 			/* access past the end of device */
-			printk("nftl%c%d: bad access: block = %d, count = %d\n",
-			       unit+'a', dev & 0xf, block, nsect);
+			printk("%s: bad access: block = %d, count = %d\n",
+			       nftl->disk->disk_name, block, nsect);
 			up(&nftl->mutex);
 			res = 0; /* fail */
 			goto repeat;
@@ -877,30 +856,24 @@ void nftl_request(RQFUNC_ARG)
 		}
 	repeat: 
 		DEBUG(MTD_DEBUG_LEVEL3, "end_request(%d)\n", res);
-		spin_lock_irq(QUEUE->queue_lock);
-		end_request(CURRENT, res);
+		spin_lock_irq(q->queue_lock);
+		end_request(req, res);
 	}
+}
+
+static struct gendisk *nftl_probe(dev_t dev, int *part, void *data)
+{
+	request_module("docprobe");
+	return NULL;
 }
 
 static int nftl_open(struct inode *ip, struct file *fp)
 {
-	int nftlnum = minor(ip->i_rdev) >> NFTL_PARTN_BITS;
-	struct NFTLrecord *thisNFTL;
-	thisNFTL = NFTLs[nftlnum];
+	struct NFTLrecord *thisNFTL = ip->i_bdev->bd_disk->private_data;
 
 	DEBUG(MTD_DEBUG_LEVEL2,"NFTL_open\n");
-
-#ifdef CONFIG_KMOD
-	if (!thisNFTL && nftlnum == 0) {
-		request_module("docprobe");
-		thisNFTL = NFTLs[nftlnum];
-	}
-#endif
-	if (!thisNFTL) {
-		DEBUG(MTD_DEBUG_LEVEL2,"ENODEV: thisNFTL = %d, minor = %d, ip = %p, fp = %p\n", 
-		      nftlnum, minor(ip->i_rdev), ip, fp);
+	if (!thisNFTL)
 		return -ENODEV;
-	}
 
 #ifndef CONFIG_NFTL_RW
 	if (fp->f_mode & FMODE_WRITE)
@@ -915,9 +888,7 @@ static int nftl_open(struct inode *ip, struct file *fp)
 
 static int nftl_release(struct inode *inode, struct file *fp)
 {
-	struct NFTLrecord *thisNFTL;
-
-	thisNFTL = NFTLs[minor(inode->i_rdev) / 16];
+	struct NFTLrecord *thisNFTL = inode->i_bdev->bd_disk->private_data;
 
 	DEBUG(MTD_DEBUG_LEVEL2, "NFTL_release\n");
 
@@ -930,10 +901,10 @@ static int nftl_release(struct inode *inode, struct file *fp)
 }
 static struct block_device_operations nftl_fops = 
 {
-	owner:		THIS_MODULE,
-	open:		nftl_open,
-	release:	nftl_release,
-	ioctl: 		nftl_ioctl
+	.owner		= THIS_MODULE,
+	.open		= nftl_open,
+	.release	= nftl_release,
+	.ioctl 		= nftl_ioctl
 };
 
 /****************************************************************************
@@ -957,11 +928,15 @@ int __init init_nftl(void)
 	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.82 $, nftlmount.c %s\n", nftlmountrev);
 #endif
 
-	if (register_blkdev(MAJOR_NR, "nftl", &nftl_fops)){
+	if (register_blkdev(MAJOR_NR, "nftl", &nftl_fops)) {
 		printk("unable to register NFTL block device on major %d\n", MAJOR_NR);
 		return -EBUSY;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request, &nftl_lock);
+
+	blk_register_region(MKDEV(MAJOR_NR, 0), 256,
+			THIS_MODULE, nftl_probe, NULL, NULL);
+
+	blk_init_queue(&nftl_queue, &nftl_request, &nftl_lock);
 	
 	register_mtd_user(&nftl_notifier);
 
@@ -971,8 +946,9 @@ int __init init_nftl(void)
 static void __exit cleanup_nftl(void)
 {
   	unregister_mtd_user(&nftl_notifier);
+	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
   	unregister_blkdev(MAJOR_NR, "nftl");
-  	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+  	blk_cleanup_queue(&nftl_queue);
 }
 
 module_init(init_nftl);

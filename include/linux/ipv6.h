@@ -1,6 +1,7 @@
 #ifndef _IPV6_H
 #define _IPV6_H
 
+#include <linux/config.h>
 #include <linux/in6.h>
 #include <asm/byteorder.h>
 
@@ -152,7 +153,8 @@ struct ipv6_pinfo {
 	__u8			mc_loop:1,
 	                        recverr:1,
 	                        sndflow:1,
-	                        pmtudisc:2;
+				pmtudisc:2,
+				ipv6only:1;
 
 	struct ipv6_mc_socklist	*ipv6_mc_list;
 	struct ipv6_fl_socklist *ipv6_fl_list;
@@ -195,6 +197,15 @@ struct tcp6_sock {
 
 #define inet6_sk(__sk) ((struct raw6_sock *)__sk)->pinet6
 #define raw6_sk(__sk) (&((struct raw6_sock *)__sk)->raw6)
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+#define __ipv6_only_sock(sk)	(inet6_sk(sk)->ipv6only)
+#define ipv6_only_sock(sk)	((sk)->family == PF_INET6 && __ipv6_only_sock(sk))
+#else
+#define __ipv6_only_sock(sk)	0
+#define ipv6_only_sock(sk)	0
+#endif
+
 #endif
 
 #endif

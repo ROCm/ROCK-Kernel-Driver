@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #endif
 
+#include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/errno.h>
 // #include <linux/etherdevice.h>
@@ -20,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
+#include <linux/version.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)
 #include <linux/tqueue.h>
 #else

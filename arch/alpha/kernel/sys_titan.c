@@ -306,10 +306,7 @@ privateer_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	u8 irq;
 	
-	pcibios_read_config_byte(dev->bus->number,
-				 dev->devfn,
-				 PCI_INTERRUPT_LINE,
-				 &irq);
+	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
 
 	/* is it routed through ISA? */
 	if ((irq & 0xF0) == 0xE0)

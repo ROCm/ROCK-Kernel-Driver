@@ -9,6 +9,7 @@
  * most "normal" filesystems (but you don't /have/ to use this:
  * the NFS filesystem used to do this differently, for example)
  */
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/compiler.h>
@@ -61,6 +62,10 @@
  *          ->mapping->page_lock
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
+ *  ->page_table_lock
+ *    ->swap_device_lock	(try_to_unmap_one)
+ *    ->private_lock		(try_to_unmap_one)
+ *    ->page_lock		(try_to_unmap_one)
  */
 
 /*
@@ -244,37 +249,6 @@ int add_to_page_cache_lru(struct page *page,
 }
 
 /*
- * This adds the requested page to the page cache if it isn't already there,
- * and schedules an I/O to read in its contents from disk.
- */
-static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
-static int page_cache_read(struct file * file, unsigned long offset)
-{
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
-	struct page *page; 
-	int error;
-
-	page = page_cache_alloc(mapping);
-	if (!page)
-		return -ENOMEM;
-
-	error = add_to_page_cache_lru(page, mapping, offset);
-	if (!error) {
-		error = mapping->a_ops->readpage(file, page);
-		page_cache_release(page);
-		return error;
-	}
-
-	/*
-	 * We arrive here in the unlikely event that someone 
-	 * raced with us and added our page to the cache first
-	 * or we are out of memory for radix-tree nodes.
-	 */
-	page_cache_release(page);
-	return error == -EEXIST ? 0 : error;
-}
-
-/*
  * In order to wait for pages to become available there must be
  * waitqueues associated with pages. By using a hash table of
  * waitqueues where the bucket discipline is to maintain all
@@ -284,7 +258,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
  * at a cost of "thundering herd" phenomena during rare hash
  * collisions.
  */
-static inline wait_queue_head_t *page_waitqueue(struct page *page)
+static wait_queue_head_t *page_waitqueue(struct page *page)
 {
 	const struct zone *zone = page_zone(page);
 
@@ -546,24 +520,6 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 }
 
 /*
- * Mark a page as having seen activity.
- *
- * inactive,unreferenced	->	inactive,referenced
- * inactive,referenced		->	active,unreferenced
- * active,unreferenced		->	active,referenced
- */
-void mark_page_accessed(struct page *page)
-{
-	if (!PageActive(page) && PageReferenced(page)) {
-		activate_page(page);
-		ClearPageReferenced(page);
-		return;
-	} else if (!PageReferenced(page)) {
-		SetPageReferenced(page);
-	}
-}
-
-/*
  * This is a generic file read routine, and uses the
  * inode->i_op->readpage() function for the actual low-level
  * stuff.
@@ -701,7 +657,7 @@ no_cached_page:
 		 * page..
 		 */
 		if (!cached_page) {
-			cached_page = page_cache_alloc(mapping);
+			cached_page = page_cache_alloc_cold(mapping);
 			if (!cached_page) {
 				desc->error = -ENOMEM;
 				break;
@@ -754,7 +710,7 @@ static inline int fault_in_pages_writeable(char *uaddr, int size)
 	return ret;
 }
 
-static inline void fault_in_pages_readable(const char *uaddr, int size)
+static void fault_in_pages_readable(const char *uaddr, int size)
 {
 	volatile char c;
 	int ret;
@@ -912,7 +868,7 @@ generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	return ret;
 }
 
-static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
+int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
 	ssize_t written;
 	unsigned long count = desc->count;
@@ -992,6 +948,38 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 	return ret;
 }
 
+#ifdef CONFIG_MMU
+/*
+ * This adds the requested page to the page cache if it isn't already there,
+ * and schedules an I/O to read in its contents from disk.
+ */
+static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
+static int page_cache_read(struct file * file, unsigned long offset)
+{
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct page *page; 
+	int error;
+
+	page = page_cache_alloc_cold(mapping);
+	if (!page)
+		return -ENOMEM;
+
+	error = add_to_page_cache_lru(page, mapping, offset);
+	if (!error) {
+		error = mapping->a_ops->readpage(file, page);
+		page_cache_release(page);
+		return error;
+	}
+
+	/*
+	 * We arrive here in the unlikely event that someone 
+	 * raced with us and added our page to the cache first
+	 * or we are out of memory for radix-tree nodes.
+	 */
+	page_cache_release(page);
+	return error == -EEXIST ? 0 : error;
+}
+
 /*
  * filemap_nopage() is invoked via the vma operations vector for a
  * mapped memory region to read in file data during a page fault.
@@ -1000,7 +988,6 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
  * it in the page cache, and handles the special cases reasonably without
  * having a lot of duplicated code.
  */
-
 struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address, int unused)
 {
 	int error;
@@ -1162,8 +1149,159 @@ page_not_uptodate:
 	return NULL;
 }
 
+static struct page * filemap_getpage(struct file *file, unsigned long pgoff,
+					int nonblock)
+{
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct page *page;
+	int error;
+
+	/*
+	 * Do we have something in the page cache already?
+	 */
+retry_find:
+	page = find_get_page(mapping, pgoff);
+	if (!page) {
+		if (nonblock)
+			return NULL;
+		goto no_cached_page;
+	}
+
+	/*
+	 * Ok, found a page in the page cache, now we need to check
+	 * that it's up-to-date.
+	 */
+	if (!PageUptodate(page))
+		goto page_not_uptodate;
+
+success:
+	/*
+	 * Found the page and have a reference on it, need to check sharing
+	 * and possibly copy it over to another page..
+	 */
+	mark_page_accessed(page);
+	flush_page_to_ram(page);
+
+	return page;
+
+no_cached_page:
+	error = page_cache_read(file, pgoff);
+
+	/*
+	 * The page we want has now been added to the page cache.
+	 * In the unlikely event that someone removed it in the
+	 * meantime, we'll just come back here and read it again.
+	 */
+	if (error >= 0)
+		goto retry_find;
+
+	/*
+	 * An error return from page_cache_read can result if the
+	 * system is low on memory, or a problem occurs while trying
+	 * to schedule I/O.
+	 */
+	return NULL;
+
+page_not_uptodate:
+	lock_page(page);
+
+	/* Did it get unhashed while we waited for it? */
+	if (!page->mapping) {
+		unlock_page(page);
+		goto err;
+	}
+
+	/* Did somebody else get it up-to-date? */
+	if (PageUptodate(page)) {
+		unlock_page(page);
+		goto success;
+	}
+
+	if (!mapping->a_ops->readpage(file, page)) {
+		wait_on_page_locked(page);
+		if (PageUptodate(page))
+			goto success;
+	}
+
+	/*
+	 * Umm, take care of errors if the page isn't up-to-date.
+	 * Try to re-read it _once_. We do this synchronously,
+	 * because there really aren't any performance issues here
+	 * and we need to check for errors.
+	 */
+	lock_page(page);
+
+	/* Somebody truncated the page on us? */
+	if (!page->mapping) {
+		unlock_page(page);
+		goto err;
+	}
+	/* Somebody else successfully read it in? */
+	if (PageUptodate(page)) {
+		unlock_page(page);
+		goto success;
+	}
+
+	ClearPageError(page);
+	if (!mapping->a_ops->readpage(file, page)) {
+		wait_on_page_locked(page);
+		if (PageUptodate(page))
+			goto success;
+	}
+
+	/*
+	 * Things didn't work out. Return zero to tell the
+	 * mm layer so, possibly freeing the page cache page first.
+	 */
+err:
+	page_cache_release(page);
+
+	return NULL;
+}
+
+static int filemap_populate(struct vm_area_struct *vma,
+			unsigned long addr,
+			unsigned long len,
+			unsigned long prot,
+			unsigned long pgoff,
+			int nonblock)
+{
+	struct file *file = vma->vm_file;
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct inode *inode = mapping->host;
+	unsigned long size;
+	struct mm_struct *mm = vma->vm_mm;
+	struct page *page;
+	int err;
+
+repeat:
+	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	if (pgoff + (len >> PAGE_CACHE_SHIFT) > size)
+		return -EINVAL;
+
+	page = filemap_getpage(file, pgoff, nonblock);
+	if (!page && !nonblock)
+		return -ENOMEM;
+	if (page) {
+		err = install_page(mm, vma, addr, page, prot);
+		if (err) {
+			page_cache_release(page);
+			return err;
+		}
+	}
+
+	len -= PAGE_SIZE;
+	addr += PAGE_SIZE;
+	pgoff++;
+	if (len)
+		goto repeat;
+
+	return 0;
+}
+
 static struct vm_operations_struct generic_file_vm_ops = {
 	.nopage		= filemap_nopage,
+	.populate	= filemap_populate,
 };
 
 /* This is used for a general mmap of a disk file */
@@ -1183,6 +1321,12 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 	vma->vm_ops = &generic_file_vm_ops;
 	return 0;
 }
+#else
+int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
+{
+	return -ENOSYS;
+}
+#endif /* CONFIG_MMU */
 
 static inline struct page *__read_cache_page(struct address_space *mapping,
 				unsigned long index,
@@ -1195,7 +1339,7 @@ repeat:
 	page = find_get_page(mapping, index);
 	if (!page) {
 		if (!cached_page) {
-			cached_page = page_cache_alloc(mapping);
+			cached_page = page_cache_alloc_cold(mapping);
 			if (!cached_page)
 				return ERR_PTR(-ENOMEM);
 		}
@@ -1292,7 +1436,7 @@ repeat:
 	return page;
 }
 
-inline void remove_suid(struct dentry *dentry)
+void remove_suid(struct dentry *dentry)
 {
 	struct iattr newattrs;
 	struct inode *inode = dentry->d_inode;
@@ -1328,7 +1472,7 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 	return left;
 }
 
-static inline int
+static int
 __filemap_copy_from_user_iovec(char *vaddr, 
 			const struct iovec *iov, size_t base, size_t bytes)
 {
@@ -1445,7 +1589,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	/* We can write back this queue in page reclaim */
 	current->backing_dev_info = mapping->backing_dev_info;
 
-	pagevec_init(&lru_pvec);
+	pagevec_init(&lru_pvec, 0);
 
 	if (unlikely(file->f_error)) {
 		err = file->f_error;

@@ -344,7 +344,8 @@ static void hci_uart_tty_wakeup(struct tty_struct *tty)
 	if (tty != hu->tty)
 		return;
 
-	hci_uart_tx_wakeup(hu);
+	if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
+		hci_uart_tx_wakeup(hu);
 }
 
 /* hci_uart_tty_room()
@@ -521,9 +522,7 @@ int __init hci_uart_init(void)
 	static struct tty_ldisc hci_uart_ldisc;
 	int err;
 
-	BT_INFO("Bluetooth HCI UART driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",
-		VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("HCI UART driver ver %s", VERSION);
 
 	/* Register the tty discipline */
 
@@ -541,7 +540,7 @@ int __init hci_uart_init(void)
 	hci_uart_ldisc.write_wakeup= hci_uart_tty_wakeup;
 
 	if ((err = tty_register_ldisc(N_HCI, &hci_uart_ldisc))) {
-		BT_ERR("Can't register HCI line discipline (%d)", err);
+		BT_ERR("HCI line discipline registration failed. (%d)", err);
 		return err;
 	}
 

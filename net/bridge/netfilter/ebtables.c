@@ -194,6 +194,7 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff **pskb,
 
 		// increase counter
 		(*(counter_base + i)).pcnt++;
+		(*(counter_base + i)).bcnt+=(**pskb).len;
 
 		// these should only watch: not modify, nor tell us
 		// what to do with the packet
@@ -885,8 +886,10 @@ static void get_counters(struct ebt_counter *oldcounters,
 	// add other counters to those of cpu 0
 	for (cpu = 1; cpu < NR_CPUS; cpu++) {
 		counter_base = COUNTER_BASE(oldcounters, nentries, cpu);
-		for (i = 0; i < nentries; i++)
+		for (i = 0; i < nentries; i++) {
 			counters[i].pcnt += counter_base[i].pcnt;
+			counters[i].bcnt += counter_base[i].bcnt;
+		}
 	}
 }
 
@@ -1245,8 +1248,10 @@ static int update_counters(void *user, unsigned int len)
 	write_lock_bh(&t->lock);
 
 	// we add to the counters of the first cpu
-	for (i = 0; i < hlp.num_counters; i++)
+	for (i = 0; i < hlp.num_counters; i++) {
 		t->private->counters[i].pcnt += tmp[i].pcnt;
+		t->private->counters[i].bcnt += tmp[i].bcnt;
+	}
 
 	write_unlock_bh(&t->lock);
 	ret = 0;

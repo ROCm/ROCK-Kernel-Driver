@@ -62,7 +62,7 @@ static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
 #define GPTE_VALID    1
 #define GPTE_COHERENT 2
 #define GPTE_ENCODE(x,flag) (((x) & 0xfffffff0) | ((x) >> 28) | GPTE_VALID | (flag))
-#define GPTE_DECODE(x) (((x) & 0xfffff000) | (((x) & 0xff0) << 28))
+#define GPTE_DECODE(x) (((x) & 0xfffff000) | (((u64)(x) & 0xff0) << 28))
 
 #define for_all_nb(dev) \
 	pci_for_each_dev(dev) \
@@ -524,7 +524,7 @@ void __init pci_iommu_init(void)
    leak  turn on simple iommu leak tracing (only when CONFIG_IOMMU_LEAK is on)
    memaper[=order] allocate an own aperture over RAM with size 32MB^order.  
 */
-__init int iommu_setup(char *opt) 
+__init int iommu_setup(char *opt, char **end) 
 { 
     int arg;
     char *p = opt;
@@ -551,10 +551,11 @@ __init int iommu_setup(char *opt)
 	    if (isdigit(*p) && get_option(&p, &arg)) 
 		    iommu_size = arg;
 	    do {
-		    if (*p == ' ' || *p == 0) 
+		    if (*p == ' ' || *p == 0) { 
+			    *end = p; 
 			    return 0; 
+		    }
 	    } while (*p++ != ','); 
     }
-    return 1;
 } 
 

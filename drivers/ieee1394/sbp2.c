@@ -333,11 +333,9 @@
 #ifdef CONFIG_KBUILD_2_5
 #include <scsi.h>
 #include <hosts.h>
-#include <sd.h>
 #else
 #include "../scsi/scsi.h"
 #include "../scsi/hosts.h"
-#include "../scsi/sd.h"
 #endif
 
 #include "ieee1394.h"
@@ -1512,7 +1510,7 @@ static void sbp2_remove_device(struct sbp2scsi_host_info *hi,
  * physical dma in hardware). Mostly just here for debugging...
  */
 static int sbp2_handle_physdma_write(struct hpsb_host *host, int nodeid, int destid, quadlet_t *data,
-                                     u64 addr, unsigned int length)
+                                     u64 addr, unsigned int length, u16 flags)
 {
 
         /*
@@ -1528,7 +1526,7 @@ static int sbp2_handle_physdma_write(struct hpsb_host *host, int nodeid, int des
  * physical dma in hardware). Mostly just here for debugging...
  */
 static int sbp2_handle_physdma_read(struct hpsb_host *host, int nodeid, quadlet_t *data,
-                                    u64 addr, unsigned int length)
+                                    u64 addr, unsigned int length, u16 flags)
 {
 
         /*
@@ -3139,24 +3137,27 @@ static int sbp2scsi_reset (Scsi_Cmnd *SCpnt)
 /*
  * Called by scsi stack to get bios parameters (used by fdisk, and at boot).
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,28)
-static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]) 
-#else
-static int sbp2scsi_biosparam (Scsi_Disk *disk, struct block_device *dev, int geom[]) 
-#endif
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,44)
+static int sbp2scsi_biosparam (struct scsi_device *sdev,
+		struct block_device *dev, sector_t capacy, int geom[]) 
 {
+#else
+static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]) 
+{
+	sector_t capacy = disk->capacity;
+#endif
 	int heads, sectors, cylinders;
 
 	SBP2_DEBUG("Request for bios parameters");
 
 	heads = 64;
 	sectors = 32;
-	cylinders = (int)disk->capacity / (heads * sectors);
+	cylinders = (int)capacity / (heads * sectors);
 
 	if (cylinders > 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = (int)disk->capacity / (heads * sectors);
+		cylinders = (int)capacity / (heads * sectors);
 	}
 
 	geom[0] = heads;

@@ -37,7 +37,6 @@ pnp_name_device(struct pnp_dev *dev)
 			return;
 		}
 	}
-	return;
 }
 
 #else

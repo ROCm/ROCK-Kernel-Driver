@@ -226,7 +226,7 @@ __writeback_single_inode(struct inode *inode, int sync,
  * The inodes to be written are parked on sb->s_io.  They are moved back onto
  * sb->s_dirty as they are selected for writing.  This way, none can be missed
  * on the writer throttling path, and we get decent balancing between many
- * throlttled threads: we don't want them all piling up on __wait_on_inode.
+ * throttled threads: we don't want them all piling up on __wait_on_inode.
  */
 static void
 sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)

@@ -1,0 +1,95 @@
+#
+# USB device configuration
+#
+
+menu "USB support"
+
+# ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
+config USB
+	tristate "Support for USB"
+	depends on PCI || SA1111
+	---help---
+	  Universal Serial Bus (USB) is a specification for a serial bus
+	  subsystem which offers higher speeds and more features than the
+	  traditional PC serial port.  The bus supplies power to peripherals
+	  and allows for hot swapping.  Up to 127 USB peripherals can be
+	  connected to a single USB port in a tree structure.  The USB port is
+	  the root of the tree, the peripherals are the leaves and the inner
+	  nodes are special USB devices called hubs.  Many newer PC's have USB
+	  ports and newer peripherals such as scanners, keyboards, mice,
+	  modems, and printers support the USB protocol and can be connected
+	  to the PC via those ports.
+
+	  Say Y here if your computer has a USB port and you want to use USB
+	  devices.  You then need to say Y to at least one of "UHCI HCD support"
+	  or "OHCI HCD support" below (the type of interface that the USB hardware
+	  in your computer provides to the operating system) and then choose
+	  from amongst the drivers for USB peripherals.  You may want to check
+	  out the information provided in <file:Documentation/usb/> and
+	  especially the links given in <file:Documentation/usb/usb-help.txt>.
+
+	  If you have a new USB 2.0 High Speed system, you should also choose
+	  "EHCI HCD (USB 2.0) support" as well as at least one of UHCI or OHCI.
+
+	  It doesn't normally hurt to select them all if you are not certain.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called usbcore.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+source "drivers/usb/core/Kconfig"
+
+source "drivers/usb/host/Kconfig"
+
+source "drivers/usb/class/Kconfig"
+
+source "drivers/usb/storage/Kconfig"
+
+source "drivers/usb/input/Kconfig"
+
+source "drivers/usb/image/Kconfig"
+
+source "drivers/usb/media/Kconfig"
+
+source "drivers/usb/net/Kconfig"
+
+comment "USB port drivers"
+	depends on USB
+
+config USB_USS720
+	tristate "USS720 parport driver"
+	depends on USB && PARPORT
+	---help---
+	  This driver is for USB parallel port adapters that use the Lucent
+	  Technologies USS-720 chip. These cables are plugged into your USB
+	  port and provide USB compatibility to peripherals designed with
+	  parallel port interfaces.
+
+	  The chip has two modes: automatic mode and manual mode. In automatic
+	  mode, it looks to the computer like a standard USB printer. Only
+	  printers may be connected to the USS-720 in this mode. The generic
+	  USB printer driver ("USB Printer support", above) may be used in
+	  that mode, and you can say N here if you want to use the chip only
+	  in this mode.
+
+	  Manual mode is not limited to printers, any parallel port
+	  device should work. This driver utilizes manual mode.
+	  Note however that some operations are three orders of magnitude
+	  slower than on a PCI/ISA Parallel Port, so timing critical
+	  applications might not work.
+
+	  Say Y here if you own an USS-720 USB->Parport cable and intend to
+	  connect anything other than a printer to it.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called uss720.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+source "drivers/usb/serial/Kconfig"
+
+source "drivers/usb/misc/Kconfig"
+
+endmenu
+

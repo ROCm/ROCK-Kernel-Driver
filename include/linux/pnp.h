@@ -94,7 +94,6 @@ struct pnp_driver {
 	int  (*probe)  (struct pnp_dev *dev, const struct pnp_id *card_id,
 		 	const struct pnp_id *dev_id);
 	void (*remove) (struct pnp_dev *dev);
-	struct device * (*legacy) (void);
 	struct device_driver	driver;
 };
 
@@ -227,28 +226,19 @@ int pnp_disable_dev(struct pnp_dev *dev);
 int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, int mode);
 
 /* driver */
+int compare_pnp_id(struct list_head * id_list, const char * id);
 int pnp_add_id(struct pnp_id *id, struct pnp_dev *dev);
 int pnp_register_driver(struct pnp_driver *drv);
 void pnp_unregister_driver(struct pnp_driver *drv);
-
-/* compat */
-struct pnp_card *pnp_find_card(unsigned short vendor,
-				 unsigned short device,
-				 struct pnp_card *from);
-struct pnp_dev *pnp_find_dev(struct pnp_card *card,
-				unsigned short vendor,
-				unsigned short function,
-				struct pnp_dev *from);
-
 
 #else
 
 /* just in case anyone decides to call these without PnP Support Enabled */
 static inline int pnp_protocol_register(struct pnp_protocol *protocol) { return -ENODEV; }
-static inline void pnp_protocol_unregister(struct pnp_protocol *protocol) { ; )
+static inline void pnp_protocol_unregister(struct pnp_protocol *protocol) { }
 static inline int pnp_init_device(struct pnp_dev *dev) { return -ENODEV; }
 static inline int pnp_add_device(struct pnp_dev *dev) { return -ENODEV; }
-static inline void pnp_remove_device(struct pnp_dev *dev) { ; }
+static inline void pnp_remove_device(struct pnp_dev *dev) { }
 static inline struct pnp_resources * pnp_build_resource(struct pnp_dev *dev, int dependent) { return NULL; }
 static inline struct pnp_resources * pnp_find_resources(struct pnp_dev *dev, int depnum) { return NULL; }
 static inline int pnp_get_max_depnum(struct pnp_dev *dev) { return -ENODEV; }
@@ -260,9 +250,25 @@ static inline int pnp_add_mem32_resource(struct pnp_dev *dev, int depnum, struct
 static inline int pnp_activate_dev(struct pnp_dev *dev) { return -ENODEV; }
 static inline int pnp_disable_dev(struct pnp_dev *dev) { return -ENODEV; }
 static inline int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, int mode) { return -ENODEV; }
+static inline int compare_pnp_id(struct list_head * id_list, char * id) { return -ENODEV; }
 static inline int pnp_add_id(struct pnp_id *id, struct pnp_dev *dev) { return -ENODEV; }
 static inline int pnp_register_driver(struct pnp_driver *drv) { return -ENODEV; }
 static inline void pnp_unregister_driver(struct pnp_driver *drv) { ; }
+
+#endif /* CONFIG_PNP */
+
+#if defined(CONFIG_ISAPNP)
+/* compat */
+struct pnp_card *pnp_find_card(unsigned short vendor,
+				 unsigned short device,
+				 struct pnp_card *from);
+struct pnp_dev *pnp_find_dev(struct pnp_card *card,
+				unsigned short vendor,
+				unsigned short function,
+				struct pnp_dev *from);
+
+#else
+
 static inline struct pnp_card *pnp_find_card(unsigned short vendor,
 				 unsigned short device,
 				 struct pnp_card *from) { return NULL; }
@@ -271,7 +277,7 @@ static inline struct pnp_dev *pnp_find_dev(struct pnp_card *card,
 				unsigned short function,
 				struct pnp_dev *from) { return NULL; }
 
-#endif /* CONFIG_PNP */
+#endif /* CONFIG_ISAPNP */
 
 
 #ifdef DEBUG

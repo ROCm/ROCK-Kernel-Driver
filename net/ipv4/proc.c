@@ -47,6 +47,8 @@
 #include <net/tcp.h>
 #include <net/udp.h>
 #include <linux/skbuff.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <net/sock.h>
 #include <net/raw.h>
 
@@ -211,4 +213,34 @@ int netstat_get_info(char *buffer, char **start, off_t offset, int length)
 	if (len < 0)
 		len = 0; 
 	return len;
+}
+
+int __init ip_misc_proc_init(void)
+{
+	int rc = 0;
+
+	if (!proc_net_create("netstat", 0, netstat_get_info))
+		goto out_netstat;
+	if (!proc_net_create("snmp", 0, snmp_get_info))
+		goto out_snmp;
+	if (!proc_net_create("sockstat", 0, afinet_get_info))
+		goto out_sockstat;
+out:
+	return rc;
+out_sockstat:
+	proc_net_remove("snmp");
+out_snmp:
+	proc_net_remove("netstat");
+out_netstat:
+	rc = -ENOMEM;
+	goto out;
+}
+
+int ip_seq_release(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq = (struct seq_file *)file->private_data;
+
+	kfree(seq->private);
+	seq->private = NULL;
+	return seq_release(inode, file);
 }

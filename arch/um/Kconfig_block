@@ -1,0 +1,34 @@
+
+menu "Block Devices"
+
+config BLK_DEV_UBD
+	bool "Virtual block device"
+
+config BLK_DEV_UBD_SYNC
+	bool "Always do synchronous disk IO for UBD"
+	depends on BLK_DEV_UBD
+
+config BLK_DEV_LOOP
+	tristate "Loopback device support"
+
+config BLK_DEV_NBD
+	tristate "Network block device support"
+	depends on NET
+
+config BLK_DEV_RAM
+	tristate "RAM disk support"
+
+config BLK_DEV_RAM_SIZE
+	int "Default RAM disk size"
+	depends on BLK_DEV_RAM
+	default "4096"
+
+config BLK_DEV_INITRD
+	bool "Initial RAM disk (initrd) support"
+	depends on BLK_DEV_RAM=y
+
+config MMAPPER
+	tristate "Example IO memory driver"
+
+endmenu
+

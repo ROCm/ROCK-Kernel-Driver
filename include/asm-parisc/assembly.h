@@ -27,7 +27,7 @@
 	.level 2.0w
 #endif
 
-#include <asm/offset.h>
+#include <asm/offsets.h>
 #include <asm/page.h>
 
 #include <asm/asmregs.h>
@@ -36,17 +36,34 @@
 	gp	=	27
 	ipsw	=	22
 
-#if __PAGE_OFFSET == 0xc0000000
-	.macro	tophys	gr
-	zdep	\gr, 31, 30, \gr
+	/*
+	 * We provide two versions of each macro to convert from physical
+	 * to virtual and vice versa. The "_r1" versions take one argument
+	 * register, but trashes r1 to do the conversion. The other
+	 * version takes two arguments: a src and destination register.
+	 * However, the source and destination registers can not be
+	 * the same register.
+	 */
+
+	.macro  tophys  grvirt, grphys
+	ldil    L%(__PAGE_OFFSET), \grphys
+	sub     \grvirt, \grphys, \grphys
 	.endm
 	
-	.macro	tovirt	gr
-	depi	3,1,2,\gr
+	.macro  tovirt  grphys, grvirt
+	ldil    L%(__PAGE_OFFSET), \grvirt
+	add     \grphys, \grvirt, \grvirt
 	.endm
-#else
-#error	unknown __PAGE_OFFSET
-#endif
+
+	.macro  tophys_r1  gr
+	ldil    L%(__PAGE_OFFSET), %r1
+	sub     \gr, %r1, \gr
+	.endm
+	
+	.macro  tovirt_r1  gr
+	ldil    L%(__PAGE_OFFSET), %r1
+	add     \gr, %r1, \gr
+	.endm
 
 	.macro delay value
 	ldil	L%\value, 1
@@ -59,11 +76,21 @@
 	.macro	debug value
 	.endm
 
-#ifdef __LP64__
-# define LDIL_FIXUP(reg) depdi 0,31,32,reg
-#else
-# define LDIL_FIXUP(reg)
-#endif
+
+	/* Shift Left - note the r and t can NOT be the same! */
+	.macro shl r, sa, t
+	dep,z	\r, 31-\sa, 32-\sa, \t
+	.endm
+
+	/* The PA 2.0 shift left */
+	.macro shlw r, sa, t
+	depw,z	\r, 31-\sa, 32-\sa, \t
+	.endm
+
+	/* And the PA 2.0W shift left */
+	.macro shld r, sa, t
+	depd,z	\r, 63-\sa, 64-\sa, \t
+	.endm
 
 	/* load 32-bit 'value' into 'reg' compensating for the ldil
 	 * sign-extension when running in wide mode.
@@ -72,7 +99,6 @@
 	.macro	load32 value, reg
 	ldil	L%\value, \reg
 	ldo	R%\value(\reg), \reg
-	LDIL_FIXUP(\reg)
 	.endm
 
 #ifdef __LP64__
@@ -89,7 +115,6 @@
 #ifdef __LP64__
 	ldil		L%__gp, %r27
 	ldo		R%__gp(%r27), %r27
-	LDIL_FIXUP(%r27)
 #else
 	ldil		L%$global$, %r27
 	ldo		R%$global$(%r27), %r27
@@ -102,6 +127,7 @@
 #define REST_CR(r, where) LDREG where, %r1 ! mtctl %r1, r
 
 	.macro	save_general	regs
+	STREG %r1, PT_GR1 (\regs)
 	STREG %r2, PT_GR2 (\regs)
 	STREG %r3, PT_GR3 (\regs)
 	STREG %r4, PT_GR4 (\regs)
@@ -126,15 +152,16 @@
 	STREG %r23, PT_GR23(\regs)
 	STREG %r24, PT_GR24(\regs)
 	STREG %r25, PT_GR25(\regs)
-	/* r26 is clobbered by cr19 and assumed to be saved before hand */
+	/* r26 is saved in get_stack and used to preserve a value across virt_map */
 	STREG %r27, PT_GR27(\regs)
 	STREG %r28, PT_GR28(\regs)
-	/* r29 is already saved and points to PT_xxx struct */
+	/* r29 is saved in get_stack and used to point to saved registers */
 	/* r30 stack pointer saved in get_stack */
 	STREG %r31, PT_GR31(\regs)
 	.endm
 
 	.macro	rest_general	regs
+	/* r1 used as a temp in rest_stack and is restored there */
 	LDREG PT_GR2 (\regs), %r2
 	LDREG PT_GR3 (\regs), %r3
 	LDREG PT_GR4 (\regs), %r4
@@ -162,6 +189,7 @@
 	LDREG PT_GR26(\regs), %r26
 	LDREG PT_GR27(\regs), %r27
 	LDREG PT_GR28(\regs), %r28
+	/* r29 points to register save area, and is restored in rest_stack */
 	/* r30 stack pointer restored in rest_stack */
 	LDREG PT_GR31(\regs), %r31
 	.endm
@@ -238,8 +266,8 @@
 
 #ifdef __LP64__
 	.macro	callee_save
-	ldo	144(%r30), %r30
-	std	  %r3,	-144(%r30)
+	std,ma	  %r3,	144(%r30)
+	mfctl	  %cr27, %r3
 	std	  %r4,	-136(%r30)
 	std	  %r5,	-128(%r30)
 	std	  %r6,	-120(%r30)
@@ -255,9 +283,11 @@
 	std	 %r16,	 -40(%r30)
 	std	 %r17,	 -32(%r30)
 	std	 %r18,	 -24(%r30)
+	std	  %r3,	 -16(%r30)
 	.endm
 
 	.macro	callee_rest
+	ldd	 -16(%r30),    %r3
 	ldd	 -24(%r30),   %r18
 	ldd	 -32(%r30),   %r17
 	ldd	 -40(%r30),   %r16
@@ -273,52 +303,54 @@
 	ldd	-120(%r30),    %r6
 	ldd	-128(%r30),    %r5
 	ldd	-136(%r30),    %r4
-	ldd	-144(%r30),    %r3
-	ldo	-144(%r30),   %r30
+	mtctl	%r3, %cr27
+	ldd,mb	-144(%r30),    %r3
 	.endm
 
-#else /* __LP64__ */
+#else /* ! __LP64__ */
 
 	.macro	callee_save
-	ldo	128(30), 30
-	stw	 3,	-128(30)
-	stw	 4,	-124(30)
-	stw	 5,	-120(30)
-	stw	 6,	-116(30)
-	stw	 7,	-112(30)
-	stw	 8,	-108(30)
-	stw	 9,	-104(30)
-	stw	 10,	-100(30)
-	stw	 11,	 -96(30)
-	stw	 12,	 -92(30)
-	stw	 13,	 -88(30)
-	stw	 14,	 -84(30)
-	stw	 15,	 -80(30)
-	stw	 16,	 -76(30)
-	stw	 17,	 -72(30)
-	stw	 18,	 -68(30)
+	stw,ma	 %r3,	128(%r30)
+	mfctl	 %cr27, %r3
+	stw	 %r4,	-124(%r30)
+	stw	 %r5,	-120(%r30)
+	stw	 %r6,	-116(%r30)
+	stw	 %r7,	-112(%r30)
+	stw	 %r8,	-108(%r30)
+	stw	 %r9,	-104(%r30)
+	stw	 %r10,	-100(%r30)
+	stw	 %r11,	 -96(%r30)
+	stw	 %r12,	 -92(%r30)
+	stw	 %r13,	 -88(%r30)
+	stw	 %r14,	 -84(%r30)
+	stw	 %r15,	 -80(%r30)
+	stw	 %r16,	 -76(%r30)
+	stw	 %r17,	 -72(%r30)
+	stw	 %r18,	 -68(%r30)
+	stw	  %r3,	 -64(%r30)
 	.endm
 
 	.macro	callee_rest
-	ldw	 -68(30),   18
-	ldw	 -72(30),   17
-	ldw	 -76(30),   16
-	ldw	 -80(30),   15
-	ldw	 -84(30),   14
-	ldw	 -88(30),   13
-	ldw	 -92(30),   12
-	ldw	 -96(30),   11
-	ldw	-100(30),   10
-	ldw	-104(30),    9
-	ldw	-108(30),    8
-	ldw	-112(30),    7
-	ldw	-116(30),    6
-	ldw	-120(30),    5
-	ldw	-124(30),    4
-	ldw	-128(30),    3
-	ldo	-128(30),   30
+	ldw	 -64(%r30),    %r3
+	ldw	 -68(%r30),   %r18
+	ldw	 -72(%r30),   %r17
+	ldw	 -76(%r30),   %r16
+	ldw	 -80(%r30),   %r15
+	ldw	 -84(%r30),   %r14
+	ldw	 -88(%r30),   %r13
+	ldw	 -92(%r30),   %r12
+	ldw	 -96(%r30),   %r11
+	ldw	-100(%r30),   %r10
+	ldw	-104(%r30),   %r9
+	ldw	-108(%r30),   %r8
+	ldw	-112(%r30),   %r7
+	ldw	-116(%r30),   %r6
+	ldw	-120(%r30),   %r5
+	ldw	-124(%r30),   %r4
+	mtctl	%r3, %cr27
+	ldw,mb	-128(%r30),   %r3
 	.endm
-#endif /* __LP64__ */
+#endif /* ! __LP64__ */
 
 	.macro	save_specials	regs
 
@@ -339,14 +371,25 @@
 	mtctl	 %r0,	%cr18
 	SAVE_CR  (%cr18, PT_IAOQ1(\regs))
 
+#ifdef __LP64__
+	/* cr11 (sar) is a funny one.  5 bits on PA1.1 and 6 bit on PA2.0
+	 * For PA2.0 mtsar or mtctl always write 6 bits, but mfctl only
+	 * reads 5 bits.  Use mfctl,w to read all six bits.  Otherwise
+	 * we loose the 6th bit on a save/restore over interrupt.
+	 */
+	mfctl,w  %cr11, %r1
+	STREG    %r1, PT_SAR (\regs)
+#else
 	SAVE_CR  (%cr11, PT_SAR  (\regs))
-	SAVE_CR  (%cr22, PT_PSW  (\regs))
+#endif
 	SAVE_CR  (%cr19, PT_IIR  (\regs))
-	SAVE_CR  (%cr28, PT_GR1  (\regs))
-	SAVE_CR  (%cr31, PT_GR29 (\regs))
 
-	STREG	%r26,	PT_GR26 (\regs)
-	mfctl	%cr29,	%r26
+	/*
+	 * Code immediately following this macro (in intr_save) relies
+	 * on r8 containing ipsw.
+	 */
+	mfctl    %cr22, %r8
+	STREG    %r8,   PT_PSW(\regs)
 	.endm
 
 	.macro	rest_specials	regs

@@ -56,6 +56,8 @@ struct ipc_perm
 /* used by in-kernel data structures */
 struct kern_ipc_perm
 {
+	spinlock_t	lock;
+	int		deleted;
 	key_t		key;
 	uid_t		uid;
 	gid_t		gid;

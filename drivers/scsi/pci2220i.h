@@ -33,7 +33,9 @@ int Pci2220i_QueueCommand	(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
 int Pci2220i_Abort			(Scsi_Cmnd *SCpnt);
 int Pci2220i_Reset			(Scsi_Cmnd *SCpnt, unsigned int flags);
 int Pci2220i_Release		(struct Scsi_Host *pshost);
-int Pci2220i_BiosParam		(Disk *disk, struct block_device *dev, int geom[]);
+int Pci2220i_BiosParam		(struct scsi_device *sdev,
+					struct block_device *dev,
+					sector_t capacity, int geom[]);
 
 #ifndef NULL
 	#define NULL 0

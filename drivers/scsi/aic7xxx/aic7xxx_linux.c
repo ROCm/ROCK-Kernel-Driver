@@ -126,8 +126,6 @@
 #include <linux/init.h>		/* __setup */
 #endif
 
-#include "../sd.h"		/* For geometry detection */
-
 #include <linux/mm.h>		/* For fetching system memory size */
 #include <linux/blk.h>
 #include <scsi/scsicam.h>
@@ -398,26 +396,26 @@ MODULE_DESCRIPTION("Adaptec Aic77XX/78XX SCSI Host Bus Adapter driver");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 MODULE_PARM(aic7xxx, "s");
-MODULE_PARM_DESC(aic7xxx, "period delimited, options string.
-	verbose			Enable verbose/diagnostic logging
-	no_probe		Disable EISA/VLB controller probing
-	no_reset		Supress initial bus resets
-	extended		Enable extended geometry on all controllers
-	periodic_otag		Send an ordered tagged transaction periodically
-				to prevent tag starvation.  This may be
-				required by some older disk drives/RAID arrays. 
-	reverse_scan		Sort PCI devices highest Bus/Slot to lowest
-	tag_info:<tag_str>	Set per-target tag depth
-	seltime:<int>		Selection Timeout(0/256ms,1/128ms,2/64ms,3/32ms)
-
-	Sample /etc/modules.conf line:
-		Enable verbose logging
-		Disable EISA/VLB probing
-		Set tag depth on Controller 2/Target 2 to 10 tags
-		Shorten the selection timeout to 128ms from its default of 256
-
-	options aic7xxx='\"verbose.no_probe.tag_info:{{}.{}.{..10}}.seltime:1\"'
-");
+MODULE_PARM_DESC(aic7xxx, "period delimited, options string.\n" \
+"	verbose			Enable verbose/diagnostic logging\n" \
+"	no_probe		Disable EISA/VLB controller probing\n" \
+"	no_reset		Supress initial bus resets\n" \
+"	extended		Enable extended geometry on all controllers\n" \
+"	periodic_otag		Send an ordered tagged transaction periodically\n" \
+"				to prevent tag starvation.  This may be\n" \
+"				required by some older disk drives/RAID arrays. \n" \
+"	reverse_scan		Sort PCI devices highest Bus/Slot to lowest\n" \
+"	tag_info:<tag_str>	Set per-target tag depth\n" \
+"	seltime:<int>		Selection Timeout(0/256ms,1/128ms,2/64ms,3/32ms)\n" \
+"\n" \
+"	Sample /etc/modules.conf line:\n" \
+"		Enable verbose logging\n" \
+"		Disable EISA/VLB probing\n" \
+"		Set tag depth on Controller 2/Target 2 to 10 tags\n" \
+"		Shorten the selection timeout to 128ms from its default of 256\n" \
+" \n" \
+"	options aic7xxx='\"verbose.no_probe.tag_info:{{}.{}.{..10}}.seltime:1\"'\n"
+);
 #endif
 
 static void ahc_linux_handle_scsi_status(struct ahc_softc *,
@@ -2718,7 +2716,8 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
  * Return the disk geometry for the given SCSI device.
  */
 int
-ahc_linux_biosparam(Disk *disk, struct block_device *bdev, int geom[])
+ahc_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[])
 {
 	int	heads;
 	int	sectors;
@@ -2728,11 +2727,11 @@ ahc_linux_biosparam(Disk *disk, struct block_device *bdev, int geom[])
 	struct	ahc_softc *ahc;
 	unsigned char *buf;
 
-	ahc = *((struct ahc_softc **)disk->device->host->hostdata);
+	ahc = *((struct ahc_softc **)sdev->host->hostdata);
 	buf = scsi_bios_ptable(bdev);
 
 	if (buf) {
-		ret = scsi_partsize(buf, disk->capacity,
+		ret = scsi_partsize(buf, capacity,
 				    &geom[2], &geom[0], &geom[1]);
 		kfree(buf);
 		if (ret != -1)
@@ -2740,18 +2739,18 @@ ahc_linux_biosparam(Disk *disk, struct block_device *bdev, int geom[])
 	}
 	heads = 64;
 	sectors = 32;
-	cylinders = (unsigned long)disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)capacity / (heads * sectors);
 
 	if (aic7xxx_extended != 0)
 		extended = 1;
-	else if (disk->device->channel == 0)
+	else if (sdev->channel == 0)
 		extended = (ahc->flags & AHC_EXTENDED_TRANS_A) != 0;
 	else
 		extended = (ahc->flags & AHC_EXTENDED_TRANS_B) != 0;
 	if (extended && cylinders >= 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = (unsigned long)disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)capacity / (heads * sectors);
 	}
 	geom[0] = heads;
 	geom[1] = sectors;

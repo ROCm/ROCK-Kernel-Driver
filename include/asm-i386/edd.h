@@ -36,6 +36,10 @@
 #define EDDMAXNR 6		/* number of edd_info structs starting at EDDBUF  */
 #define EDDEXTSIZE 4		/* change these if you muck with the structures */
 #define EDDPARMSIZE 74
+#define CHECKEXTENSIONSPRESENT 0x41
+#define GETDEVICEPARAMETERS 0x48
+#define EDDMAGIC1 0x55AA
+#define EDDMAGIC2 0xAA55
 
 #ifndef __ASSEMBLY__
 

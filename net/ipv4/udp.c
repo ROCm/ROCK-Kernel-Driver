@@ -62,10 +62,13 @@
  *					return ENOTCONN for unconnected sockets (POSIX)
  *		Janos Farkas	:	don't deliver multi/broadcasts to a different
  *					bound-to-device socket
- *		Arnaldo C. Melo :	move proc routines to ip_proc.c.
  *	Hirokazu Takahashi	:	HW checksumming for outgoing UDP
  *					datagrams.
  *	Hirokazu Takahashi	:	sendfile() on UDP works now.
+ *		Arnaldo C. Melo :	convert /proc/net/udp to seq_file
+ *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
+ *	Alexey Kuznetsov:		allow both IPv4 and IPv6 sockets to bind
+ *					a single port at the same time.
  *
  *
  *		This program is free software; you can redistribute it and/or
@@ -87,11 +90,14 @@
 #include <linux/mm.h>
 #include <linux/config.h>
 #include <linux/inet.h>
+#include <linux/ipv6.h>
 #include <linux/netdevice.h>
 #include <net/snmp.h>
 #include <net/tcp.h>
 #include <net/protocol.h>
 #include <linux/skbuff.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <net/sock.h>
 #include <net/udp.h>
 #include <net/icmp.h>
@@ -168,6 +174,7 @@ gotit:
 
 			if (inet2->num == snum &&
 			    sk2 != sk &&
+			    !ipv6_only_sock(sk2) &&
 			    sk2->bound_dev_if == sk->bound_dev_if &&
 			    (!inet2->rcv_saddr ||
 			     !inet->rcv_saddr ||
@@ -226,29 +233,29 @@ struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport, u32 daddr, u16 dport, i
 	for(sk = udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]; sk != NULL; sk = sk->next) {
 		struct inet_opt *inet = inet_sk(sk);
 
-		if (inet->num == hnum) {
-			int score = 0;
+		if (inet->num == hnum && !ipv6_only_sock(sk)) {
+			int score = (sk->family == PF_INET ? 1 : 0);
 			if (inet->rcv_saddr) {
 				if (inet->rcv_saddr != daddr)
 					continue;
-				score++;
+				score+=2;
 			}
 			if (inet->daddr) {
 				if (inet->daddr != saddr)
 					continue;
-				score++;
+				score+=2;
 			}
 			if (inet->dport) {
 				if (inet->dport != sport)
 					continue;
-				score++;
+				score+=2;
 			}
 			if(sk->bound_dev_if) {
 				if(sk->bound_dev_if != dif)
 					continue;
-				score++;
+				score+=2;
 			}
-			if(score == 4) {
+			if(score == 9) {
 				result = sk;
 				break;
 			} else if(score > badness) {
@@ -286,6 +293,7 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 		    (inet->daddr && inet->daddr != rmt_addr)		||
 		    (inet->dport != rmt_port && inet->dport)		||
 		    (inet->rcv_saddr && inet->rcv_saddr != loc_addr)	||
+		    ipv6_only_sock(s)					||
 		    (s->bound_dev_if && s->bound_dev_if != dif))
 			continue;
 		break;
@@ -512,9 +520,6 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		if (likely(up->pending))
  			goto do_append_data;
 		release_sock(sk);
-
-		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp cork app bug 1\n"));
-		return -EINVAL;
 	}
 	ulen += sizeof(struct udphdr);
 
@@ -586,11 +591,15 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		rt = (struct rtable*)sk_dst_check(sk, 0);
 
 	if (rt == NULL) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = ipc.oif,
+				    .nl_u = { .ip4_u =
 					      { .daddr = faddr,
 						.saddr = saddr,
 						.tos = tos } },
-				    .oif = ipc.oif };
+				    .proto = IPPROTO_UDP,
+				    .uli_u = { .ports =
+					       { .sport = inet->sport,
+						 .dport = dport } } };
 		err = ip_route_output_key(&rt, &fl);
 		if (err)
 			goto out;
@@ -872,7 +881,9 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 			saddr = inet->mc_addr;
 	}
 	err = ip_route_connect(&rt, usin->sin_addr.s_addr, saddr,
-			       RT_CONN_FLAGS(sk), oif);
+			       RT_CONN_FLAGS(sk), oif,
+			       IPPROTO_UDP,
+			       inet->sport, usin->sin_port);
 	if (err)
 		return err;
 	if ((rt->rt_flags&RTCF_BROADCAST) && !sk->broadcast) {
@@ -937,8 +948,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if (__udp_checksum_complete(skb)) {
 			UDP_INC_STATS_BH(UdpInErrors);
-			IP_INC_STATS_BH(IpInDiscards);
-			ip_statistics[smp_processor_id()*2].IpInDelivers--;
 			kfree_skb(skb);
 			return -1;
 		}
@@ -948,8 +957,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 
 	if (sock_queue_rcv_skb(sk,skb)<0) {
 		UDP_INC_STATS_BH(UdpInErrors);
-		IP_INC_STATS_BH(IpInDiscards);
-		ip_statistics[smp_processor_id()*2].IpInDelivers--;
 		kfree_skb(skb);
 		return -1;
 	}
@@ -1032,8 +1039,6 @@ int udp_rcv(struct sk_buff *skb)
 	u32 saddr = skb->nh.iph->saddr;
 	u32 daddr = skb->nh.iph->daddr;
 	int len = skb->len;
-
-  	IP_INC_STATS_BH(IpInDelivers);
 
 	/*
 	 *	Validate the packet and the UDP length.
@@ -1208,3 +1213,171 @@ struct proto udp_prot = {
 	.unhash =	udp_v4_unhash,
 	.get_port =	udp_v4_get_port,
 };
+
+/* ------------------------------------------------------------------------ */
+#ifdef CONFIG_PROC_FS
+
+struct udp_iter_state {
+	int bucket;
+};
+
+static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
+{
+	int i;
+	struct sock *sk = NULL;
+	loff_t l = *pos;
+	struct udp_iter_state *state = seq->private;
+
+	for (; state->bucket < UDP_HTABLE_SIZE; ++state->bucket)
+		for (i = 0, sk = udp_hash[state->bucket]; sk; ++i, sk = sk->next) {
+			if (sk->family != PF_INET)
+				continue;
+			if (l--)
+				continue;
+			*pos = i;
+			goto out;
+		}
+out:
+	return sk;
+}
+
+static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock(&udp_hash_lock);
+	return *pos ? udp_get_bucket(seq, pos) : (void *)1;
+}
+
+static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct sock *sk;
+	struct udp_iter_state *state;
+
+	if (v == (void *)1) {
+		sk = udp_get_bucket(seq, pos);
+		goto out;
+	}
+
+	sk = v;
+	sk = sk->next;
+	if (sk) 
+		goto out;
+
+	state = seq->private;
+	if (++state->bucket >= UDP_HTABLE_SIZE) 
+		goto out;
+
+	*pos = 0;
+	sk = udp_get_bucket(seq, pos);
+out:
+	++*pos;
+	return sk;
+}
+
+static void udp_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&udp_hash_lock);
+}
+
+static void udp_format_sock(struct sock *sp, char *tmpbuf, int bucket)
+{
+	struct inet_opt *inet = inet_sk(sp);
+	unsigned int dest = inet->daddr;
+	unsigned int src  = inet->rcv_saddr;
+	__u16 destp	  = ntohs(inet->dport);
+	__u16 srcp	  = ntohs(inet->sport);
+
+	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
+		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
+		bucket, src, srcp, dest, destp, sp->state, 
+		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		0, 0L, 0, sock_i_uid(sp), 0, sock_i_ino(sp),
+		atomic_read(&sp->refcnt), sp);
+}
+
+static int udp_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == (void *)1)
+		seq_printf(seq, "%-127s\n",
+			   "  sl  local_address rem_address   st tx_queue "
+			   "rx_queue tr tm->when retrnsmt   uid  timeout "
+			   "inode");
+	else {
+		char tmpbuf[129];
+		struct udp_iter_state *state = seq->private;
+
+		udp_format_sock(v, tmpbuf, state->bucket);
+		seq_printf(seq, "%-127s\n", tmpbuf);
+	}
+	return 0;
+}
+/* ------------------------------------------------------------------------ */
+
+static struct seq_operations udp_seq_ops = {
+	.start  = udp_seq_start,
+	.next   = udp_seq_next,
+	.stop   = udp_seq_stop,
+	.show   = udp_seq_show,
+};
+
+static int udp_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct udp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+       
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &udp_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations udp_seq_fops = {
+	.open           = udp_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= ip_seq_release,
+};
+
+/* ------------------------------------------------------------------------ */
+
+int __init udp_proc_init(void)
+{
+	struct proc_dir_entry *p;
+	int rc = 0;
+
+	p = create_proc_entry("udp", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &udp_seq_fops;
+	else
+		rc = -ENOMEM;
+	return rc;
+}
+
+void __init udp_proc_exit(void)
+{
+	remove_proc_entry("udp", proc_net);
+}
+
+#else /* CONFIG_PROC_FS */
+
+int __init udp_proc_init(void)
+{
+	return 0;
+}
+
+void __init udp_proc_exit(void)
+{
+	return 0;
+}
+#endif /* CONFIG_PROC_FS */

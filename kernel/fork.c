@@ -215,6 +215,7 @@ static inline int dup_mmap(struct mm_struct * mm)
 	mm->locked_vm = 0;
 	mm->mmap = NULL;
 	mm->mmap_cache = NULL;
+	mm->free_area_cache = TASK_UNMAPPED_BASE;
 	mm->map_count = 0;
 	mm->rss = 0;
 	mm->cpu_vm_mask = 0;
@@ -308,6 +309,8 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
 	mm->ioctx_list_lock = RW_LOCK_UNLOCKED;
 	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
+	mm->free_area_cache = TASK_UNMAPPED_BASE;
+
 	mm->pgd = pgd_alloc(mm);
 	if (mm->pgd)
 		return mm;
@@ -769,8 +772,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->start_time = jiffies;
 	p->security = NULL;
 
-	INIT_LIST_HEAD(&p->local_pages);
-
 	retval = -ENOMEM;
 	if (security_ops->task_alloc_security(p))
 		goto bad_fork_cleanup;
@@ -863,6 +864,14 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
+	/*
+	 * Check for pending SIGKILL! The new thread should not be allowed
+	 * to slip out of an OOM kill. (or normal SIGKILL.)
+	 */
+	if (sigismember(&current->pending.signal, SIGKILL)) {
+		write_unlock_irq(&tasklist_lock);
+		goto bad_fork_cleanup_namespace;
+	}
 
 	/* CLONE_PARENT re-uses the old parent */
 	if (clone_flags & CLONE_PARENT)
@@ -937,6 +946,22 @@ bad_fork_free:
 	goto fork_out;
 }
 
+static inline int fork_traceflag (unsigned clone_flags)
+{
+	if (clone_flags & (CLONE_UNTRACED | CLONE_IDLETASK))
+		return 0;
+	else if (clone_flags & CLONE_VFORK) {
+		if (current->ptrace & PT_TRACE_VFORK)
+			return PTRACE_EVENT_VFORK;
+	} else if ((clone_flags & CSIGNAL) != SIGCHLD) {
+		if (current->ptrace & PT_TRACE_CLONE)
+			return PTRACE_EVENT_CLONE;
+	} else if (current->ptrace & PT_TRACE_FORK)
+		return PTRACE_EVENT_FORK;
+
+	return 0;
+}
+
 /*
  *  Ok, this is the main fork-routine.
  *
@@ -950,6 +975,13 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			    int *user_tid)
 {
 	struct task_struct *p;
+	int trace = 0;
+
+	if (unlikely(current->ptrace)) {
+		trace = fork_traceflag (clone_flags);
+		if (trace)
+			clone_flags |= CLONE_PTRACE;
+	}
 
 	p = copy_process(clone_flags, stack_start, regs, stack_size, user_tid);
 	if (!IS_ERR(p)) {
@@ -965,6 +997,12 @@ struct task_struct *do_fork(unsigned long clone_flags,
 
 		wake_up_forked_process(p);		/* do this last */
 		++total_forks;
+
+		if (unlikely (trace)) {
+			current->ptrace_message = (unsigned long) p->pid;
+			ptrace_notify ((trace << 8) | SIGTRAP);
+		}
+
 		if (clone_flags & CLONE_VFORK)
 			wait_for_completion(&vfork);
 		else

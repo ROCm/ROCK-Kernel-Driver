@@ -45,39 +45,39 @@ MODULE_DEVICES("{{ESS,ES688 PnP AudioDrive,pnp:ESS0100},"
 	        "{ESS,ES688 AudioDrive,pnp:ESS6881},"
 	        "{ESS,ES1688 AudioDrive,pnp:ESS1681}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
-static long snd_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260 */
-static long snd_mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
-static int snd_mpu_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
-static int snd_dma8[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
+static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260 */
+static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
+static int mpu_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
+static int dma8[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for ESx688 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for ESx688 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable ESx688 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port, "Port # for ESx688 driver.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_mpu_port, "MPU-401 port # for ESx688 driver.");
-MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for ESx688 driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_mpu_irq, "MPU-401 IRQ # for ESx688 driver.");
-MODULE_PARM_SYNTAX(snd_mpu_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_dma8, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma8, "8-bit DMA # for ESx688 driver.");
-MODULE_PARM_SYNTAX(snd_dma8, SNDRV_DMA8_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for ESx688 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for ESx688 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable ESx688 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port, "Port # for ESx688 driver.");
+MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
+MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(mpu_port, "MPU-401 port # for ESx688 driver.");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT12_DESC);
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for ESx688 driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
+MODULE_PARM(mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for ESx688 driver.");
+MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
+MODULE_PARM(dma8, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma8, "8-bit DMA # for ESx688 driver.");
+MODULE_PARM_SYNTAX(dma8, SNDRV_DMA8_DESC);
 
 static snd_card_t *snd_audiodrive_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
@@ -86,37 +86,37 @@ static int __init snd_audiodrive_probe(int dev)
 {
 	static int possible_irqs[] = {5, 9, 10, 7, -1};
 	static int possible_dmas[] = {1, 3, 0, -1};
-	int irq, dma, mpu_irq;
+	int xirq, xdma, xmpu_irq;
 	snd_card_t *card;
 	es1688_t *chip;
 	opl3_t *opl3;
 	snd_pcm_t *pcm;
 	int err;
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
-	irq = snd_irq[dev];
-	if (irq == SNDRV_AUTO_IRQ) {
-		if ((irq = snd_legacy_find_free_irq(possible_irqs)) < 0) {
+	xirq = irq[dev];
+	if (xirq == SNDRV_AUTO_IRQ) {
+		if ((xirq = snd_legacy_find_free_irq(possible_irqs)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free IRQ\n");
 			return -EBUSY;
 		}
 	}
-	mpu_irq = snd_mpu_irq[dev];
-	dma = snd_dma8[dev];
-	if (dma == SNDRV_AUTO_DMA) {
-		if ((dma = snd_legacy_find_free_dma(possible_dmas)) < 0) {
+	xmpu_irq = mpu_irq[dev];
+	xdma = dma8[dev];
+	if (xdma == SNDRV_AUTO_DMA) {
+		if ((xdma = snd_legacy_find_free_dma(possible_dmas)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free DMA\n");
 			return -EBUSY;
 		}
 	}
 
-	if ((err = snd_es1688_create(card, snd_port[dev], snd_mpu_port[dev],
-				     irq, mpu_irq, dma,
+	if ((err = snd_es1688_create(card, port[dev], mpu_port[dev],
+				     xirq, xmpu_irq, xdma,
 				     ES1688_HW_AUTO, &chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -139,10 +139,10 @@ static int __init snd_audiodrive_probe(int dev)
 		}
 	}
 
-	if (mpu_irq >= 0) {
+	if (xmpu_irq >= 0) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_ES1688,
 					       chip->mpu_port, 0,
-					       mpu_irq,
+					       xmpu_irq,
 					       SA_INTERRUPT,
 					       NULL)) < 0) {
 			snd_card_free(card);
@@ -151,7 +151,7 @@ static int __init snd_audiodrive_probe(int dev)
 	}
 	strcpy(card->driver, "ES1688");
 	strcpy(card->shortname, pcm->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i", pcm->name, chip->port, irq, dma);
+	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i", pcm->name, chip->port, xirq, xdma);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -161,18 +161,18 @@ static int __init snd_audiodrive_probe(int dev)
 
 }
 
-static int __init snd_audiodrive_legacy_auto_probe(unsigned long port)
+static int __init snd_audiodrive_legacy_auto_probe(unsigned long xport)
 {
 	static int dev;
 	int res;
 	
 	for ( ; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev] || snd_port[dev] != SNDRV_AUTO_PORT)
+		if (!enable[dev] || port[dev] != SNDRV_AUTO_PORT)
 			continue;
-		snd_port[dev] = port;
+		port[dev] = xport;
 		res = snd_audiodrive_probe(dev);
 		if (res < 0)
-			snd_port[dev] = SNDRV_AUTO_PORT;
+			port[dev] = SNDRV_AUTO_PORT;
 		return res;
 	}
 	return -ENODEV;
@@ -183,8 +183,8 @@ static int __init alsa_card_es1688_init(void)
 	static unsigned long possible_ports[] = {0x220, 0x240, 0x260, -1};
 	int dev, cards = 0;
 
-	for (dev = cards = 0; dev < SNDRV_CARDS && snd_enable[dev]; dev++) {
-		if (snd_port[dev] == SNDRV_AUTO_PORT)
+	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev]; dev++) {
+		if (port[dev] == SNDRV_AUTO_PORT)
 			continue;
 		if (snd_audiodrive_probe(dev) >= 0)
 			cards++;
@@ -212,10 +212,10 @@ module_exit(alsa_card_es1688_exit)
 
 #ifndef MODULE
 
-/* format is: snd-es1688=snd_enable,snd_index,snd_id,
-			 snd_port,snd_mpu_port,
-			 snd_irq,snd_mpu_irq,
-			 snd_dma8 */
+/* format is: snd-es1688=enable,index,id,
+			 port,mpu_port,
+			 irq,mpu_irq,
+			 dma8 */
 
 static int __init alsa_card_es1688_setup(char *str)
 {
@@ -223,14 +223,14 @@ static int __init alsa_card_es1688_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_mpu_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma8[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
+	       get_option(&str,&dma8[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

@@ -165,7 +165,7 @@ struct cifsSesInfo {
  */
 struct cifsTconInfo {
 	struct list_head cifsConnectionList;
-    struct list_head openFileList;
+	struct list_head openFileList;
 	struct semaphore tconSem;
 	struct cifsSesInfo *ses;	/* pointer to session associated with */
 	char treeName[MAX_TREE_SIZE + 1];	/* The ascii or unicode name of this resource depending on the ses->capabilities *//* BB fill in this field */
@@ -201,6 +201,7 @@ struct cifsFileInfo {
 	__u16 netfid;		/* file id from remote */
 	/* BB add lock scope info here if needed */ ;
 	/* lock scope id (0 if none) */
+    struct file * pfile; /* needed for writepage */
 	int endOfSearch:1;	/* we have reached end of search */
 	int closePend:1;	/* file is marked to close */
 };
@@ -212,12 +213,12 @@ struct cifsFileInfo {
 struct cifsInodeInfo {
 	struct list_head lockList;
 	/* BB add in lists for dirty pages - i.e. write caching info for oplock */
-    struct list_head openFileList;
+	struct list_head openFileList;
 	__u32 cifsAttrs;	/* e.g. DOS archive bit, sparse, compressed, system etc. */
 	atomic_t inUse;		/* num concurrent users (local openers cifs) of file */
 	unsigned long time;	/* jiffies of last update/check of inode */
 	int clientCanCache:1;	/* oplocked.  We need to extend cases beyond this i.e. what
-				   if file read-only or if file locked? or if file on r/o vol? */
+			   if file read-only or if file locked? or if file on r/o vol? */
 	struct inode vfs_inode;
 };
 
@@ -244,7 +245,7 @@ struct mid_q_entry {
 	struct cifsSesInfo *ses;	/* smb was sent to this server */
 	struct task_struct *tsk;	/* task waiting for response */
 	struct smb_hdr *resp_buf;	/* response buffer */
-	int midState;		/* wish this could be an enum but can not pass that to wait_event */
+	int midState;	/* wish this were enum but can not pass to wait_event */
 };
 
 #define   MID_FREE 0
@@ -292,13 +293,10 @@ GLOBAL_EXTERN struct servers_not_supported *NotSuppList;	/*@z4a */
  */
 GLOBAL_EXTERN struct smbUidInfo *GlobalUidList[UID_HASH];
 
-GLOBAL_EXTERN struct list_head GlobalServerList;	/* BB this one is not implemented yet */
+GLOBAL_EXTERN struct list_head GlobalServerList; /* BB not implemented yet */
 GLOBAL_EXTERN struct list_head GlobalSMBSessionList;
 GLOBAL_EXTERN struct list_head GlobalTreeConnectionList;
-/*
- * Global list of free SMB structures
- */
-GLOBAL_EXTERN void *GlobalFreeSMB;
+GLOBAL_EXTERN rwlock_t GlobalSMBSeslock;  /* protects list inserts on 3 above */
 
 /*
  * Global transaction id (XID) information
@@ -306,7 +304,8 @@ GLOBAL_EXTERN void *GlobalFreeSMB;
 GLOBAL_EXTERN unsigned int GlobalCurrentXid;	/* protected by GlobalMid_Sem */
 GLOBAL_EXTERN unsigned int GlobalTotalActiveXid;	/* prot by GlobalMid_Sem */
 GLOBAL_EXTERN unsigned int GlobalMaxActiveXid;	/* prot by GlobalMid_Sem */
-
+GLOBAL_EXTERN rwlock_t GlobalMid_Lock;  /* protects above and list operations */
+					/* on midQ entries */
 GLOBAL_EXTERN char Local_System_Name[15];
 
 /*
@@ -321,13 +320,12 @@ GLOBAL_EXTERN atomic_t midCount;
 
 /* Misc globals */
 GLOBAL_EXTERN unsigned int multiuser_mount;	/* if enabled allows new sessions
-                                     to be established on existing mount if we
-					                 have the uid/password or Kerberos credential 
-                                     or equivalent for current user */
+				to be established on existing mount if we
+				have the uid/password or Kerberos credential 
+				or equivalent for current user */
 GLOBAL_EXTERN unsigned int oplockEnabled;
 GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent 
-                                     with more secure ntlmssp2 challenge/resp */
+				with more secure ntlmssp2 challenge/resp */
 GLOBAL_EXTERN unsigned int ntlmv2_support;  /* better optional password hash */
 GLOBAL_EXTERN unsigned int sign_CIFS_PDUs;  /* enable smb packet signing */
-
 

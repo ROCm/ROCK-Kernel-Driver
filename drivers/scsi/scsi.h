@@ -164,8 +164,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SCSI_OWNER_BH_HANDLER     0x104
 #define SCSI_OWNER_NOBODY         0x105
 
-#define COMMAND_SIZE(opcode) scsi_command_size[((opcode) >> 5) & 7]
-
 #define IDENTIFY_BASE       0x80
 #define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
 		     ((can_disconnect) ?  0x40 : 0) |\
@@ -415,7 +413,6 @@ extern unsigned int scsi_dma_free_sectors;	/* How much room do we have left */
 extern unsigned int scsi_need_isa_buffer;	/* True if some devices need indirection
 						   * buffers */
 extern volatile int in_scan_scsis;
-extern const unsigned char scsi_command_size[8];
 
 extern struct bus_type scsi_driverfs_bus_type;
 
@@ -444,20 +441,6 @@ extern int  scsi_partsize(unsigned char *buf, unsigned long capacity,
  */
 struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask);
 void scsi_free_sgtable(struct scatterlist *sgl, int index);
-
-/*
- * Prototypes for functions in scsi_dma.c
- */
-void scsi_resize_dma_pool(void);
-int scsi_init_minimal_dma_pool(void);
-void *scsi_malloc(unsigned int);
-int scsi_free(void *, unsigned int);
-
-/*
- * Prototypes for functions in scsi_merge.c
- */
-extern void scsi_initialize_merge_fn(Scsi_Device *SDpnt);
-extern int scsi_init_io(Scsi_Cmnd *SCpnt);
 
 /*
  * Prototypes for functions in scsi_lib.c
@@ -494,6 +477,7 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			void (*done) (struct scsi_cmnd *),
 			int timeout, int retries);
 extern int scsi_dev_init(void);
+extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
 
 /*
  * Newer request-based interfaces.

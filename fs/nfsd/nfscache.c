@@ -41,7 +41,7 @@ static struct svc_cacherep *	lru_tail;
 static struct svc_cacherep *	nfscache;
 static int			cache_disabled = 1;
 
-static int	nfsd_cache_append(struct svc_rqst *rqstp, struct svc_buf *data);
+static int	nfsd_cache_append(struct svc_rqst *rqstp, struct iovec *vec);
 
 /* 
  * locking for the reply cache:
@@ -107,7 +107,7 @@ nfsd_cache_shutdown(void)
 
 	for (rp = lru_head; rp; rp = rp->c_lru_next) {
 		if (rp->c_state == RC_DONE && rp->c_type == RC_REPLBUFF)
-			kfree(rp->c_replbuf.buf);
+			kfree(rp->c_replvec.iov_base);
 	}
 
 	cache_disabled = 1;
@@ -242,8 +242,8 @@ nfsd_cache_lookup(struct svc_rqst *rqstp, int type)
 
 	/* release any buffer */
 	if (rp->c_type == RC_REPLBUFF) {
-		kfree(rp->c_replbuf.buf);
-		rp->c_replbuf.buf = NULL;
+		kfree(rp->c_replvec.iov_base);
+		rp->c_replvec.iov_base = NULL;
 	}
 	rp->c_type = RC_NOCACHE;
  out:
@@ -272,11 +272,11 @@ found_entry:
 	case RC_NOCACHE:
 		break;
 	case RC_REPLSTAT:
-		svc_putu32(&rqstp->rq_resbuf, rp->c_replstat);
+		svc_putu32(&rqstp->rq_res.head[0], rp->c_replstat);
 		rtn = RC_REPLY;
 		break;
 	case RC_REPLBUFF:
-		if (!nfsd_cache_append(rqstp, &rp->c_replbuf))
+		if (!nfsd_cache_append(rqstp, &rp->c_replvec))
 			goto out;	/* should not happen */
 		rtn = RC_REPLY;
 		break;
@@ -308,13 +308,14 @@ void
 nfsd_cache_update(struct svc_rqst *rqstp, int cachetype, u32 *statp)
 {
 	struct svc_cacherep *rp;
-	struct svc_buf	*resp = &rqstp->rq_resbuf, *cachp;
+	struct iovec	*resv = &rqstp->rq_res.head[0], *cachv;
 	int		len;
 
 	if (!(rp = rqstp->rq_cacherep) || cache_disabled)
 		return;
 
-	len = resp->len - (statp - resp->base);
+	len = resv->iov_len - ((char*)statp - (char*)resv->iov_base);
+	len >>= 2;
 	
 	/* Don't cache excessive amounts of data and XDR failures */
 	if (!statp || len > (256 >> 2)) {
@@ -329,16 +330,16 @@ nfsd_cache_update(struct svc_rqst *rqstp, int cachetype, u32 *statp)
 		rp->c_replstat = *statp;
 		break;
 	case RC_REPLBUFF:
-		cachp = &rp->c_replbuf;
-		cachp->buf = (u32 *) kmalloc(len << 2, GFP_KERNEL);
-		if (!cachp->buf) {
+		cachv = &rp->c_replvec;
+		cachv->iov_base = kmalloc(len << 2, GFP_KERNEL);
+		if (!cachv->iov_base) {
 			spin_lock(&cache_lock);
 			rp->c_state = RC_UNUSED;
 			spin_unlock(&cache_lock);
 			return;
 		}
-		cachp->len = len;
-		memcpy(cachp->buf, statp, len << 2);
+		cachv->iov_len = len << 2;
+		memcpy(cachv->iov_base, statp, len << 2);
 		break;
 	}
 	spin_lock(&cache_lock);
@@ -353,19 +354,20 @@ nfsd_cache_update(struct svc_rqst *rqstp, int cachetype, u32 *statp)
 
 /*
  * Copy cached reply to current reply buffer. Should always fit.
+ * FIXME as reply is in a page, we should just attach the page, and
+ * keep a refcount....
  */
 static int
-nfsd_cache_append(struct svc_rqst *rqstp, struct svc_buf *data)
+nfsd_cache_append(struct svc_rqst *rqstp, struct iovec *data)
 {
-	struct svc_buf	*resp = &rqstp->rq_resbuf;
+	struct iovec	*vec = &rqstp->rq_res.head[0];
 
-	if (resp->len + data->len > resp->buflen) {
+	if (vec->iov_len + data->iov_len > PAGE_SIZE) {
 		printk(KERN_WARNING "nfsd: cached reply too large (%d).\n",
-				data->len);
+				data->iov_len);
 		return 0;
 	}
-	memcpy(resp->buf, data->buf, data->len << 2);
-	resp->buf += data->len;
-	resp->len += data->len;
+	memcpy((char*)vec->iov_base + vec->iov_len, data->iov_base, data->iov_len);
+	vec->iov_len += data->iov_len;
 	return 1;
 }

@@ -1,0 +1,76 @@
+#
+# SCTP configuration
+#
+
+menu "SCTP Configuration (EXPERIMENTAL)"
+	depends on INET && EXPERIMENTAL
+
+config IPV6_SCTP__
+	bool
+	default y if IPV6=n
+	default IPV6 if IPV6
+
+config IP_SCTP
+	tristate "The SCTP Protocol (EXPERIMENTAL)"
+	depends on IPV6_SCTP__
+	---help---
+	  Stream Control Transmission Protocol
+
+	  From RFC 2960 (http://www.ietf.org/rfc/rfc2960.txt)
+
+	  "SCTP is a reliable transport protocol operating on top of a
+	  connectionless packet network such as IP.  It offers the following
+	  services to its users:
+
+	  -- acknowledged error-free non-duplicated transfer of user data,
+	  -- data fragmentation to conform to discovered path MTU size,
+	  -- sequenced delivery of user messages within multiple streams,
+	  with an option for order-of-arrival delivery of individual user
+	  messages,
+	  -- optional bundling of multiple user messages into a single SCTP
+	  packet, and
+	  -- network-level fault tolerance through supporting of multi-
+	  homing at either or both ends of an association."
+
+	  This protocol support is also available as a module ( = code which
+	  can be inserted in and removed from the running kernel whenever you
+	  want). The module will be called sctp.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  If in doubt, say N.
+
+config SCTP_ADLER32
+	bool "SCTP: Use old checksum (Adler-32)"
+	depends on IP_SCTP
+	help
+	  RCF2960 currently specifies the Adler-32 checksum algorithm for SCTP.  
+	  This has been deprecated and replaced by an algorithm now referred
+	  to as crc32c.
+
+	  If you say Y, this will use the Adler-32 algorithm, this might be useful
+	  for interoperation with downlevel peers. 
+
+	  If unsure, say N.  
+
+config SCTP_DBG_MSG
+	bool "SCTP: Debug messages"
+	depends on IP_SCTP
+	help
+	  If you say Y, this will enable verbose debugging messages. 
+
+	  If unsure, say N.  However, if you are running into problems, use this
+	  option to gather detailed trace information
+
+config SCTP_DBG_OBJCNT
+	bool "SCTP: Debug object counts"
+	depends on IP_SCTP
+	help
+	  If you say Y, this will enable debugging support for counting the types
+	  of objects that are currently allocated.  This is useful for identifying
+	  memory leaks.   If the /proc filesystem is enabled this debug information
+	  can be viewed by 'cat /proc/net/sctp/sctp_dbg_objcnt'
+
+	  If unsure, say N
+
+endmenu
+

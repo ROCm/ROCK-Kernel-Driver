@@ -1041,6 +1041,8 @@ static void __init esp_init_swstate(struct esp *esp)
 	esp->resetting_bus = 0;
 	esp->snip = 0;
 
+	init_waitqueue_head(&esp->reset_queue);
+
 	/* Debugging... */
 	for(i = 0; i < 32; i++)
 		esp->espcmdlog[i] = 0;
@@ -1953,7 +1955,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 		esp->msgout_ctr = 0;
 		esp_cmd(esp, ESP_CMD_SATN);
 		spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-		return SCSI_ABORT_PENDING;
+		return SUCCESS;
 	}
 
 	/* If it is still in the issue queue then we can safely
@@ -1982,7 +1984,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 					ESP_INTSON(esp->dregs);
 
 				spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-				return SCSI_ABORT_SUCCESS;
+				return SUCCESS;
 			}
 		}
 	}
@@ -1996,20 +1998,20 @@ int esp_abort(Scsi_Cmnd *SCptr)
 		if (don)
 			ESP_INTSON(esp->dregs);
 		spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-		return SCSI_ABORT_BUSY;
+		return FAILED;
 	}
 
 	/* It's disconnected, we have to reconnect to re-establish
 	 * the nexus and tell the device to abort.  However, we really
-	 * cannot 'reconnect' per se, therefore we tell the upper layer
-	 * the safest thing we can.  This is, wait a bit, if nothing
-	 * happens, we are really hung so reset the bus.
+	 * cannot 'reconnect' per se.  Don't try to be fancy, just
+	 * indicate failure, which causes our caller to reset the whole
+	 * bus.
 	 */
 
 	if (don)
 		ESP_INTSON(esp->dregs);
 	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-	return SCSI_ABORT_SNOOZE;
+	return FAILED;
 }
 
 /* We've sent ESP_CMD_RS to the ESP, the interrupt had just
@@ -2045,6 +2047,7 @@ static int esp_finish_reset(struct esp *esp)
 
 	/* SCSI bus reset is complete. */
 	esp->resetting_bus = 0;
+	wake_up(&esp->reset_queue);
 
 	/* Ok, now it is safe to get commands going once more. */
 	if (esp->issue_SC)
@@ -2065,7 +2068,7 @@ static int esp_do_resetbus(struct esp *esp)
 /* Reset ESP chip, reset hanging bus, then kill active and
  * disconnected commands for targets without soft reset.
  */
-int esp_reset(Scsi_Cmnd *SCptr, unsigned int how)
+int esp_reset(Scsi_Cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->host->hostdata;
 	unsigned long flags;
@@ -2074,7 +2077,9 @@ int esp_reset(Scsi_Cmnd *SCptr, unsigned int how)
 	(void) esp_do_resetbus(esp);
 	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
 
-	return SCSI_RESET_PENDING;
+	wait_event(esp->reset_queue, (esp->resetting_bus == 0));
+
+	return SUCCESS;
 }
 
 /* Internal ESP done function. */

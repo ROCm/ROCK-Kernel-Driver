@@ -1,0 +1,1061 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+config ALPHA
+	bool
+	default y
+	help
+	  The Alpha is a 64-bit general-purpose processor designed and
+	  marketed by the Digital Equipment Corporation of blessed memory, now
+	  Compaq.  Alpha Linux dates from 1995-1996 and was the first non-x86
+	  port. The Alpha Linux project has a home page at
+	  <http://www.alphalinux.org/>.
+
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
+config UID16
+	bool
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default y
+
+config GENERIC_ISA_DMA
+	bool
+	default y
+
+source "init/Kconfig"
+
+
+menu "System setup"
+
+choice
+	prompt "Alpha system type"
+	default ALPHA_GENERIC
+
+config ALPHA_GENERIC
+	bool "Generic"
+	---help---
+	  This is the system type of your hardware.  A "generic" kernel will
+	  run on any supported Alpha system. However, if you configure a
+	  kernel for your specific system, it will be faster and smaller.
+
+	  To find out what type of Alpha system you have, you may want to
+	  check out the Linux/Alpha FAQ, accessible on the WWW from
+	  <http://www.alphalinux.org/>. In summary:
+
+	  Alcor/Alpha-XLT     AS 600
+	  Alpha-XL            XL-233, XL-266
+	  AlphaBook1          Alpha laptop
+	  Avanti              AS 200, AS 205, AS 250, AS 255, AS 300, AS 400
+	  Cabriolet           AlphaPC64, AlphaPCI64
+	  DP264               DP264
+	  EB164               EB164 21164 evaluation board
+	  EB64+               EB64+ 21064 evaluation board
+	  EB66                EB66 21066 evaluation board
+	  EB66+               EB66+ 21066 evaluation board
+	  Jensen              DECpc 150, DEC 2000 model 300,
+	  DEC 2000 model 500
+	  LX164               AlphaPC164-LX
+	  Miata               Personal Workstation 433a, 433au, 500a,
+	  500au, 600a, or 600au
+	  Mikasa              AS 1000
+	  Noname              AXPpci33, UDB (Multia)
+	  Noritake            AS 1000A, AS 600A, AS 800
+	  PC164               AlphaPC164
+	  Rawhide             AS 1200, AS 4000, AS 4100
+	  Ruffian             RPX164-2, AlphaPC164-UX, AlphaPC164-BX
+	  SX164               AlphaPC164-SX
+	  Sable               AS 2000, AS 2100
+	  Shark		      DS 20L
+	  Takara              Takara
+	  Titan               Privateer
+	  Wildfire            AlphaServer GS 40/80/160/320
+
+	  If you don't know what to do, choose "generic".
+
+config ALPHA_ALCOR
+	bool "Alcor/Alpha-XLT"
+	help
+	  For systems using the Digital ALCOR chipset: 5 chips (4, 64-bit data
+	  slices (Data Switch, DSW) - 208-pin PQFP and 1 control (Control, I/O
+	  Address, CIA) - a 383 pin plastic PGA).  It provides a DRAM
+	  controller (256-bit memory bus) and a PCI interface.  It also does
+	  all the work required to support an external Bcache and to maintain
+	  memory coherence when a PCI device DMAs into (or out of) memory.
+
+config ALPHA_XL
+	bool "Alpha-XL"
+	help
+	  XL-233 and XL-266-based Alpha systems.
+
+config ALPHA_BOOK1
+	bool "AlphaBook1"
+	help
+	  Dec AlphaBook1/Burns Alpha-based laptops.
+
+config ALPHA_AVANTI_CH
+	bool "Avanti"
+
+config ALPHA_CABRIOLET
+	bool "Cabriolet"
+	help
+	  Cabriolet AlphaPC64, AlphaPCI64 systems.  Derived from EB64+ but now
+	  baby-AT with Flash boot ROM, no on-board SCSI or Ethernet. 3 ISA
+	  slots, 4 PCI slots (one pair are on a shared slot), uses plug-in
+	  Bcache SIMMs.  Requires power supply with 3.3V output.
+
+config ALPHA_DP264
+	bool "DP264"
+	help
+	  Various 21264 systems with the tsunami core logic chipset.
+	  API Networks: 264DP, UP2000(+), CS20;
+	  Compaq: DS10(E,L), XP900, XP1000, DS20(E), ES40.
+
+config ALPHA_EB164
+	bool "EB164"
+	help
+	  EB164 21164 evaluation board from DEC.  Uses 21164 and ALCOR.  Has
+	  ISA and PCI expansion (3 ISA slots, 2 64-bit PCI slots (one is
+	  shared with an ISA slot) and 2 32-bit PCI slots.  Uses plus-in
+	  Bcache SIMMs. I/O sub-system provides SuperI/O (2S, 1P, FD), KBD,
+	  MOUSE (PS2 style), RTC/NVRAM.  Boot ROM is Flash.  PC-AT-sized
+	  motherboard.  Requires power supply with 3.3V output.
+
+config ALPHA_EB64P_CH
+	bool "EB64+"
+
+config ALPHA_EB66
+	bool "EB66"
+	help
+	  A Digital DS group board.  Uses 21066 or 21066A.  I/O sub-system is
+	  identical to EB64+.  Baby PC-AT size.  Runs from standard PC power
+	  supply.  The EB66 schematic was published as a marketing poster
+	  advertising the 21066 as "the first microprocessor in the world with
+	  embedded PCI".
+
+config ALPHA_EB66P
+	bool "EB66+"
+	help
+	  Later variant of the EB66 board.
+
+config ALPHA_EIGER
+	bool "Eiger"
+	help
+	  Apparently an obscure OEM single-board computer based on the
+	  Typhoon/Tsunami chipset family. Information on it is scanty.
+
+config ALPHA_JENSEN
+	bool "Jensen"
+	help
+	  DEC PC 150 AXP (aka Jensen): This is a very old Digital system - one
+	  of the first-generation Alpha systems. A number of these systems
+	  seem to be available on the second- hand market. The Jensen is a
+	  floor-standing tower system which originally used a 150MHz 21064 It
+	  used programmable logic to interface a 486 EISA I/O bridge to the
+	  CPU.
+
+config ALPHA_LX164
+	bool "LX164"
+	help
+	  A technical overview of this board is available at
+	  <http://www.unix-ag.org/Linux-Alpha/Architectures/LX164.html>.
+
+config ALPHA_MIATA
+	bool "Miata"
+	help
+	  The Digital PersonalWorkStation (PWS 433a, 433au, 500a, 500au, 600a,
+	  or 600au).  There is an Installation HOWTO for this hardware at
+	  <http://members.brabant.chello.nl/~s.vandereijk/miata.html>.
+
+config ALPHA_MIKASA
+	bool "Mikasa"
+	help
+	  AlphaServer 1000-based Alpha systems.
+
+config ALPHA_NAUTILUS
+	bool "Nautilus"
+	help
+	  Alpha systems based on the AMD 751 & ALI 1543C chipsets.
+
+config ALPHA_NONAME_CH
+	bool "Noname"
+
+config ALPHA_NORITAKE
+	bool "Noritake"
+	help
+	  AlphaServer 1000A, AlphaServer 600A, and AlphaServer 800-based
+	  systems.
+
+config ALPHA_PC164
+	bool "PC164"
+
+config ALPHA_P2K
+	bool "Platform2000"
+
+config ALPHA_RAWHIDE
+	bool "Rawhide"
+	help
+	  AlphaServer 1200, AlphaServer 4000 and AlphaServer 4100 machines.
+	  See HOWTO at
+	  <http://www.alphalinux.org/docs/rawhide/4100_install.shtml>.
+
+config ALPHA_RUFFIAN
+	bool "Ruffian"
+	help
+	  Samsung APC164UX.  There is a page on known problems and workarounds
+	  at <http://www.alphalinux.org/faq/FAQ-11.html>.
+
+config ALPHA_RX164
+	bool "RX164"
+
+config ALPHA_SX164
+	bool "SX164"
+
+config ALPHA_SABLE
+	bool "Sable"
+	help
+	  Digital AlphaServer 2000 and 2100-based systems.
+
+config ALPHA_SHARK
+	bool "Shark"
+
+config ALPHA_TAKARA
+	bool "Takara"
+	help
+	  Alpha 11164-based OEM single-board computer.
+
+config ALPHA_TITAN
+	bool "Titan"
+
+config ALPHA_WILDFIRE
+	bool "Wildfire"
+	help
+	  AlphaServer GS 40/80/160/320 SMP based on the EV67 core.
+
+endchoice
+
+# clear all implied options (don't want default values for those):
+# Most of these machines have ISA slots; not exactly sure which don't,
+# and this doesn't activate hordes of code, so do it always.
+config ISA
+	bool
+	default y
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config EISA
+	bool
+	default y
+	---help---
+	  The Extended Industry Standard Architecture (EISA) bus was
+	  developed as an open alternative to the IBM MicroChannel bus.
+
+	  The EISA bus provided some of the features of the IBM MicroChannel
+	  bus while maintaining backward compatibility with cards made for
+	  the older ISA bus.  The EISA bus saw limited use between 1988 and
+	  1995 when it was made obsolete by the PCI bus.
+
+	  Say Y here if you are building a kernel for an EISA-based machine.
+
+	  Otherwise, say N.
+
+config SBUS
+	bool
+
+config MCA
+	bool
+	help
+	  MicroChannel Architecture is found in some IBM PS/2 machines and
+	  laptops.  It is a bus system similar to PCI or ISA. See
+	  <file:Documentation/mca.txt> (and especially the web page given
+	  there) before attempting to build an MCA bus kernel.
+
+config PCI
+	bool
+	depends on !ALPHA_JENSEN
+	default y
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+config ALPHA_NONAME
+	bool
+	depends on ALPHA_BOOK1 || ALPHA_NONAME_CH
+	default y
+	help
+	  The AXPpci33 (aka NoName), is based on the EB66 (includes the Multia
+	  UDB).  This design was produced by Digital's Technical OEM (TOEM)
+	  group. It uses the 21066 processor running at 166MHz or 233MHz. It
+	  is a baby-AT size, and runs from a standard PC power supply. It has
+	  5 ISA slots and 3 PCI slots (one pair are a shared slot). There are
+	  2 versions, with either PS/2 or large DIN connectors for the
+	  keyboard.
+
+config ALPHA_EV4
+	bool
+	depends on ALPHA_JENSEN || ALPHA_SABLE && !ALPHA_GAMMA || ALPHA_NORITAKE && !ALPHA_PRIMO || ALPHA_MIKASA && !ALPHA_PRIMO || ALPHA_CABRIOLET || ALPHA_AVANTI_CH || ALPHA_EB64P_CH || ALPHA_XL || ALPHA_NONAME || ALPHA_EB66 || ALPHA_EB66P || ALPHA_P2K
+	default y
+
+config ALPHA_LCA
+	bool
+	depends on ALPHA_NONAME || ALPHA_EB66 || ALPHA_EB66P || ALPHA_P2K
+	default y
+
+config ALPHA_APECS
+	bool
+	depends on !ALPHA_PRIMO && (ALPHA_NORITAKE || ALPHA_MIKASA) || ALPHA_CABRIOLET || ALPHA_AVANTI_CH || ALPHA_EB64P_CH || ALPHA_XL
+	default y
+
+config ALPHA_EB64P
+	bool
+	depends on ALPHA_CABRIOLET || ALPHA_EB64P_CH
+	default y
+	help
+	  Uses 21064 or 21064A and APECs.  Has ISA and PCI expansion (3 ISA,
+	  2 PCI, one pair are on a shared slot). Supports 36-bit DRAM SIMs.
+	  ISA bus generated by Intel SaturnI/O PCI-ISA bridge. On-board SCSI
+	  (NCR 810 on PCI) Ethernet (Digital 21040), KBD, MOUSE (PS2 style),
+	  SuperI/O (2S, 1P, FD), RTC/NVRAM. Boot ROM is EPROM.  PC-AT size.
+	  Runs from standard PC power supply.
+
+config ALPHA_EV5
+	bool
+	depends on ALPHA_RX164 || ALPHA_RAWHIDE || ALPHA_MIATA || ALPHA_LX164 || ALPHA_SX164 || ALPHA_RUFFIAN || ALPHA_SABLE && ALPHA_GAMMA || ALPHA_NORITAKE && ALPHA_PRIMO || ALPHA_MIKASA && ALPHA_PRIMO || ALPHA_PC164 || ALPHA_TAKARA || ALPHA_EB164 || ALPHA_ALCOR
+	default y
+
+config ALPHA_CIA
+	bool
+	depends on ALPHA_MIATA || ALPHA_LX164 || ALPHA_SX164 || ALPHA_RUFFIAN || ALPHA_NORITAKE && ALPHA_PRIMO || ALPHA_MIKASA && ALPHA_PRIMO || ALPHA_PC164 || ALPHA_TAKARA || ALPHA_EB164 || ALPHA_ALCOR
+	default y
+
+config ALPHA_EV56
+	bool "EV56 CPU (speed >= 366MHz)?" if ALPHA_ALCOR
+	default y if ALPHA_RX164 || ALPHA_MIATA || ALPHA_LX164 || ALPHA_SX164 || ALPHA_RUFFIAN || ALPHA_PC164 || ALPHA_TAKARA
+
+config ALPHA_EV56
+	prompt "EV56 CPU (speed >= 333MHz)?"
+	depends on ALPHA_NORITAKE && ALPHA_PRIMO
+
+config ALPHA_EV56
+	prompt "EV56 CPU (speed >= 400MHz)?"
+	depends on ALPHA_RAWHIDE
+
+config ALPHA_PRIMO
+	bool "EV5 CPU daughtercard (model 5/xxx)?"
+	depends on ALPHA_NORITAKE || ALPHA_MIKASA
+	help
+	  Say Y if you have an AS 1000 5/xxx or an AS 1000A 5/xxx.
+
+config ALPHA_GAMMA
+	bool "EV5 CPU(s) (model 5/xxx)?"
+	depends on ALPHA_SABLE
+	help
+	  Say Y if you have an AS 2000 5/xxx or an AS 2100 5/xxx.
+
+config ALPHA_T2
+	bool
+	depends on ALPHA_SABLE
+	default y
+
+config ALPHA_PYXIS
+	bool
+	depends on ALPHA_MIATA || ALPHA_LX164 || ALPHA_SX164 || ALPHA_RUFFIAN
+	default y
+
+config ALPHA_EV6
+	bool
+	depends on ALPHA_NAUTILUS || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK || ALPHA_DP264 || ALPHA_EIGER
+	default y
+
+config ALPHA_TSUNAMI
+	bool
+	depends on ALPHA_SHARK || ALPHA_DP264 || ALPHA_EIGER
+	default y
+
+config ALPHA_EV67
+	bool "EV67 (or later) CPU (speed > 600MHz)?" if ALPHA_DP264 || ALPHA_EIGER
+	default y if ALPHA_NAUTILUS || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK
+	help
+	  Is this a machine based on the EV67 core?  If in doubt, select N here
+	  and the machine will be treated as an EV6.
+
+config ALPHA_MCPCIA
+	bool
+	depends on ALPHA_RAWHIDE
+	default y
+
+config ALPHA_POLARIS
+	bool
+	depends on ALPHA_RX164
+	default y
+
+config ALPHA_IRONGATE
+	bool
+	depends on ALPHA_NAUTILUS
+	default y
+
+config ALPHA_SRM
+	bool "Use SRM as bootloader" if ALPHA_CABRIOLET || ALPHA_AVANTI_CH || ALPHA_EB64P || ALPHA_PC164 || ALPHA_TAKARA || ALPHA_EB164 || ALPHA_ALCOR || ALPHA_MIATA || ALPHA_LX164 || ALPHA_SX164 || ALPHA_NAUTILUS || ALPHA_NONAME
+	default y if ALPHA_JENSEN || ALPHA_MIKASA || ALPHA_SABLE || ALPHA_NORITAKE || ALPHA_DP264 || ALPHA_RAWHIDE || ALPHA_EIGER || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK
+	---help---
+	  There are two different types of booting firmware on Alphas: SRM,
+	  which is command line driven, and ARC, which uses menus and arrow
+	  keys. Details about the Linux/Alpha booting process are contained in
+	  the Linux/Alpha FAQ, accessible on the WWW from
+	  <http://www.alphalinux.org/>.
+
+	  The usual way to load Linux on an Alpha machine is to use MILO
+	  (a bootloader that lets you pass command line parameters to the
+	  kernel just like lilo does for the x86 architecture) which can be
+	  loaded either from ARC or can be installed directly as a permanent
+	  firmware replacement from floppy (which requires changing a certain
+	  jumper on the motherboard). If you want to do either of these, say N
+	  here. If MILO doesn't work on your system (true for Jensen
+	  motherboards), you can bypass it altogether and boot Linux directly
+	  from an SRM console; say Y here in order to do that. Note that you
+	  won't be able to boot from an IDE disk using SRM.
+
+	  If unsure, say N.
+
+config ALPHA_EISA
+	bool
+	depends on ALPHA_ALCOR || ALPHA_MIKASA || ALPHA_SABLE || ALPHA_NORITAKE || ALPHA_RAWHIDE
+	default y
+
+config ALPHA_AVANTI
+	bool
+	depends on ALPHA_XL || ALPHA_AVANTI_CH
+	default y
+	help
+	  Avanti AS 200, AS 205, AS 250, AS 255, AS 300, and AS 400-based
+	  Alphas. Info at
+	  <http://www.unix-ag.org/Linux-Alpha/Architectures/Avanti.html>.
+
+config ALPHA_BROKEN_IRQ_MASK
+	bool
+	depends on ALPHA_GENERIC || ALPHA_PC164
+	default y
+
+config SMP
+	bool "Symmetric multi-processing support"
+	depends on ALPHA_SABLE || ALPHA_RAWHIDE || ALPHA_DP264 || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_GENERIC || ALPHA_SHARK
+	---help---
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, like most personal computers, say N. If
+	  you have a system with more than one CPU, say Y.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  machines, but will use only one CPU of a multiprocessor machine. If
+	  you say Y here, the kernel will run on many, but not all,
+	  singleprocessor machines. On a singleprocessor machine, the kernel
+	  will run faster if you say N here.
+
+	  Note that if you say Y here and choose architecture "586" or
+	  "Pentium" under "Processor family", the kernel will not work on 486
+	  architectures. Similarly, multiprocessor kernels for the "PPro"
+	  architecture may not work on all Pentium based boards.
+
+	  People using multiprocessor machines who say Y here should also say
+	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
+	  Management" code will be disabled if you say Y here.
+
+	  See also the <file:Documentation/smp.tex>,
+	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you don't know what to do here, say N.
+
+config HAVE_DEC_LOCK
+	bool
+	depends on SMP
+	default y
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-64)"
+	depends on SMP
+	default "64"
+
+config DISCONTIGMEM
+	bool "Discontiguous Memory Support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  Say Y to upport efficient handling of discontiguous physical memory,
+	  for architectures which are either NUMA (Non-Uniform Memory Access)
+	  or have huge holes in the physical address space for other reasons.
+	  See <file:Documentation/vm/numa> for more.
+
+config NUMA
+	bool "NUMA Support (EXPERIMENTAL)"
+	depends on DISCONTIGMEM
+	help
+	  Say Y to compile the kernel to support NUMA (Non-Uniform Memory
+	  Access).  This option is for configuring high-end multiprocessor
+	  server machines.  If in doubt, say N.
+
+# LARGE_VMALLOC is racy, if you *really* need it then fix it first
+config ALPHA_LARGE_VMALLOC
+	bool
+	---help---
+	  Process creation and other aspects of virtual memory management can
+	  be streamlined if we restrict the kernel to one PGD for all vmalloc
+	  allocations.  This equates to about 8GB.
+
+	  Under normal circumstances, this is so far and above what is needed
+	  as to be laughable.  However, there are certain applications (such
+	  as benchmark-grade in-kernel web serving) that can make use of as
+	  much vmalloc space as is available.
+
+	  Say N unless you know you need gobs and gobs of vmalloc space.
+
+config VERBOSE_MCHECK
+	bool "Verbose Machine Checks"
+
+source "drivers/pci/Kconfig"
+
+config HOTPLUG
+	bool "Support for hot-pluggable devices"
+	---help---
+	  Say Y here if you want to plug devices into your computer while
+	  the system is running, and be able to use them quickly.  In many
+	  cases, the devices can likewise be unplugged at any time too.
+
+	  One well known example of this is PCMCIA- or PC-cards, credit-card
+	  size devices such as network cards, modems or hard drives which are
+	  plugged into slots found on all modern laptop computers.  Another
+	  example, used on modern desktops as well as laptops, is USB.
+
+	  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+	  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+	  Then your kernel will automatically call out to a user mode "policy
+	  agent" (/sbin/hotplug) to load modules and set up software needed
+	  to use devices as you hotplug them.
+
+source "drivers/pcmcia/Kconfig"
+
+choice
+	prompt "Kernel core (/proc/kcore) format"
+	depends on PROC_FS
+	default KCORE_ELF
+
+config KCORE_ELF
+	bool "ELF"
+	---help---
+	  If you enabled support for /proc file system then the file
+	  /proc/kcore will contain the kernel core image. This can be used
+	  in gdb:
+
+	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+	  You have two choices here: ELF and A.OUT. Selecting ELF will make
+	  /proc/kcore appear in ELF core format as defined by the Executable
+	  and Linking Format specification. Selecting A.OUT will choose the
+	  old "a.out" format which may be necessary for some old versions
+	  of binutils or on some architectures.
+
+	  This is especially useful if you have compiled the kernel with the
+	  "-g" option to preserve debugging information. It is mainly used
+	  for examining kernel data structures on the live kernel so if you
+	  don't understand what this means or are not a kernel hacker, just
+	  leave it at its default value ELF.
+
+config KCORE_AOUT
+	bool "A.OUT"
+	help
+	  Not necessary unless you're using a very out-of-date binutils
+	  version.  You probably want KCORE_ELF.
+
+endchoice
+
+config SRM_ENV
+	tristate "SRM environment through procfs"
+	depends on PROC_FS
+	---help---
+	  If you enable this option, a subdirectory inside /proc called
+	  /proc/srm_environment will give you access to the all important
+	  SRM environment variables (those which have a name) and also
+	  to all others (by their internal number).
+
+	  SRM is something like a BIOS for Alpha machines. There are some
+	  other such BIOSes, like AlphaBIOS, which this driver cannot
+	  support (hey, that's not SRM!).
+
+	  Despite the fact that this driver doesn't work on all Alphas (but
+	  only on those which have SRM as their firmware), it's save to
+	  build it even if your particular machine doesn't know about SRM
+	  (or if you intend to compile a generic kernel). It will simply
+	  not create those subdirectory in /proc (and give you some warning,
+	  of course).
+
+	  This driver is also available as a module and will be called
+	  srm_env.o then.
+
+config BINFMT_AOUT
+	tristate "Kernel support for a.out (ECOFF) binaries"
+	---help---
+	  A.out (Assembler.OUTput) is a set of formats for libraries and
+	  executables used in the earliest versions of UNIX. Linux used the
+	  a.out formats QMAGIC and ZMAGIC until they were replaced with the
+	  ELF format.
+
+	  As more and more programs are converted to ELF, the use for a.out
+	  will gradually diminish. If you disable this option it will reduce
+	  your kernel by one page. This is not much and by itself does not
+	  warrant removing support. However its removal is a good idea if you
+	  wish to ensure that absolutely none of your programs will use this
+	  older executable format. If you don't know what to answer at this
+	  point then answer Y. If someone told you "You need a kernel with
+	  QMAGIC support" then you'll have to say Y here. You may answer M to
+	  compile a.out support as a module and later load the module when you
+	  want to use a program or library in a.out format. The module will be
+	  called binfmt_aout.o. Saying M or N here is dangerous though,
+	  because some crucial programs on your system might still be in A.OUT
+	  format.
+
+config OSF4_COMPAT
+	bool "OSF/1 v4 readv/writev compatibility"
+	depends on BINFMT_AOUT
+	help
+	  Say Y if you are using OSF/1 binaries (like Netscape and Acrobat)
+	  with v4 shared libraries freely available from Compaq. If you're
+	  going to use shared libraries from Tru64 version 5.0 or later, say N.
+
+config BINFMT_ELF
+	tristate "Kernel support for ELF binaries"
+	---help---
+	  ELF (Executable and Linkable Format) is a format for libraries and
+	  executables used across different architectures and operating
+	  systems. Saying Y here will enable your kernel to run ELF binaries
+	  and enlarge it by about 13 KB. ELF support under Linux has now all
+	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+	  because it is portable (this does *not* mean that you will be able
+	  to run executables from different architectures or operating systems
+	  however) and makes building run-time libraries very easy. Many new
+	  executables are distributed solely in ELF format. You definitely
+	  want to say Y here.
+
+	  Information about ELF is contained in the ELF HOWTO available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you find that after upgrading from Linux kernel 1.2 and saying Y
+	  here, you still can't run any ELF binaries (they just crash), then
+	  you'll have to install the newest ELF runtime libraries, including
+	  ld.so (check the file <file:Documentation/Changes> for location and
+	  latest version).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  some crucial programs on your system might be in ELF format.
+
+config BINFMT_MISC
+	tristate "Kernel support for MISC binaries"
+	---help---
+	  If you say Y here, it will be possible to plug wrapper-driven binary
+	  formats into the kernel. You will like this especially when you use
+	  programs that need an interpreter to run like Java, Python or
+	  Emacs-Lisp. It's also useful if you often run DOS executables under
+	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  registered such a binary class with the kernel, you can start one of
+	  those programs simply by typing in its name at a shell prompt; Linux
+	  will automatically feed it to the correct interpreter.
+
+	  You can do other nice things, too. Read the file
+	  <file:Documentation/binfmt_misc.txt> to learn how to use this
+	  feature, and <file:Documentation/java.txt> for information about how
+	  to include Java support.
+
+	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+	  use this part of the kernel.
+
+	  You may say M here for module support and later load the module when
+	  you have use for it; the module is called binfmt_misc.o. If you
+	  don't know what to answer at this point, say Y.
+
+config BINFMT_EM86
+	tristate "Kernel support for Linux/Intel ELF binaries"
+	---help---
+	  Say Y here if you want to be able to execute Linux/Intel ELF
+	  binaries just like native Alpha binaries on your Alpha machine. For
+	  this to work, you need to have the emulator /usr/bin/em86 in place.
+
+	  You can get the same functionality by saying N here and saying Y to
+	  "Kernel support for MISC binaries".
+
+	  You may answer M to compile the emulation support as a module and
+	  later load the module when you want to use a Linux/Intel binary. The
+	  module will be called binfmt_em86.o. If unsure, say Y.
+
+source "drivers/parport/Kconfig"
+
+endmenu
+
+source "drivers/mtd/Kconfig"
+
+source "drivers/pnp/Kconfig"
+
+source "drivers/block/Kconfig"
+
+source "drivers/md/Kconfig"
+
+
+menu "ATA/ATAPI/MFM/RLL support"
+
+config IDE
+	tristate "ATA/ATAPI/MFM/RLL support"
+	---help---
+	  If you say Y here, your kernel will be able to manage low cost mass
+	  storage units such as ATA/(E)IDE and ATAPI units. The most common
+	  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	  If your system is pure SCSI and doesn't use these interfaces, you
+	  can say N here.
+
+	  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+	  for mass storage units such as hard disks. It was designed by
+	  Western Digital and Compaq Computer in 1984. It was then named
+	  ST506. Quite a number of disks use the IDE interface.
+
+	  AT Attachment (ATA) is the superset of the IDE specifications.
+	  ST506 was also called ATA-1.
+
+	  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+	  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+	  the LBA standard), more disks (4 instead of 2) and for other mass
+	  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+	  ATA-4 and provides faster (and more CPU friendly) transfer modes
+	  than previous PIO (Programmed processor Input/Output) from previous
+	  ATA/IDE standards by means of fast DMA controllers.
+
+	  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+	  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+	  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+	  designed in order to prevent data corruption and disk crash by
+	  detecting pre hardware failure conditions (heat, access time, and
+	  the like...). Disks built since June 1995 may follow this standard.
+	  The kernel itself don't manage this; however there are quite a
+	  number of user programs such as smart that can query the status of
+	  SMART parameters disk.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>. The module
+	  will be called ide.o.
+
+	  For further information, please read <file:Documentation/ide.txt>.
+
+	  If unsure, say Y.
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+
+menu "SCSI support"
+
+config SCSI
+	tristate "SCSI support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you want support for the parallel
+	  port version of the 100 MB IOMEGA ZIP drive.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
+source "drivers/scsi/Kconfig"
+
+endmenu
+
+if PCI
+source "drivers/message/fusion/Kconfig"
+endif
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+endmenu
+
+source "net/ax25/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+
+menu "Old CD-ROM drivers (not SCSI, not IDE)"
+
+config CD_NO_IDESCSI
+	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
+	---help---
+	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+	  here, otherwise N. Read the CD-ROM-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about these CD-ROM drives. If you are unsure what you
+	  have, say Y and find out whether you have one of the following
+	  drives.
+
+	  For each of these drivers, a file Documentation/cdrom/{driver_name}
+	  exists. Especially in cases where you do not know exactly which kind
+	  of drive you have you should read there. Most of these drivers use a
+	  file drivers/cdrom/{driver_name}.h where you can define your
+	  interface parameters and switch some internal goodies.
+
+	  All these CD-ROM drivers are also usable as a module ( = code which
+	  can be inserted in and removed from the running kernel whenever you
+	  want). If you want to compile them as module, say M instead of Y and
+	  read <file:Documentation/modules.txt>.
+
+	  If you want to use any of these CD-ROM drivers, you also have to
+	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+	  answer will get "defaulted" for you if you enable any of the Linux
+	  CD-ROM drivers).
+
+source "drivers/cdrom/Kconfig"
+
+endmenu
+
+source "drivers/input/Kconfig"
+
+source "drivers/char/Kconfig"
+
+#source drivers/misc/Config.in
+source "drivers/media/Kconfig"
+
+source "fs/Kconfig"
+
+
+menu "Console drivers"
+	depends on VT
+
+config VGA_CONSOLE
+	bool "VGA text console"
+	help
+	  Saying Y here will allow you to use Linux in text mode through a
+	  display that complies with the generic VGA standard. Virtually
+	  everyone wants that.
+
+	  The program SVGATextMode can be used to utilize SVGA video cards to
+	  their full potential in text mode. Download it from
+	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+	  Say Y.
+
+#  if [ "$CONFIG_PCI" = "y" -a "$CONFIG_VGA_CONSOLE" = "y" ]; then
+#    bool '   Allow VGA on any bus?' CONFIG_VGA_HOSE
+#    if [ "$CONFIG_VGA_HOSE" = "y" ]; then
+#      define_bool CONFIG_DUMMY_CONSOLE y
+#    fi
+#  fi
+source "drivers/video/Kconfig"
+
+config PCI_CONSOLE
+	bool
+	depends on FB
+	default y
+
+endmenu
+
+
+menu "Sound"
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/Kconfig"
+
+endmenu
+
+source "drivers/usb/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
+
+menu "Kernel hacking"
+
+config ALPHA_LEGACY_START_ADDRESS
+	bool "Legacy kernel start address"
+	---help---
+	  The 2.4 kernel changed the kernel start address from 0x310000
+	  to 0x810000 to make room for the Wildfire's larger SRM console.
+
+	  If you're using aboot 0.7 or later, the bootloader will examine the
+	  ELF headers to determine where to transfer control. Unfortunately,
+	  most older bootloaders -- APB or MILO -- hardcoded the kernel start
+	  address rather than examining the ELF headers, and the result is a
+	  hard lockup.
+
+	  Say Y if you have a broken bootloader.  Say N if you do not, or if
+	  you wish to run on Wildfire.
+
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+	help
+	  Say Y here if you are developing drivers or trying to debug and
+	  identify kernel problems.
+
+config MATHEMU
+	tristate "Kernel FP software completion" if DEBUG_KERNEL
+	default y if !DEBUG_KERNEL
+	help
+	  This option is required for IEEE compliant floating point arithmetic
+	  on the Alpha. The only time you would ever not say Y is to say M in
+	  order to debug the code. Say Y unless you know what you are doing.
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to have the kernel do limited verification on memory
+	  allocation as well as poisoning memory on free to catch use of freed
+	  memory.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config DEBUG_SPINLOCK
+	bool "Spinlock debugging"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here and build SMP to catch missing spinlock initialization
+	  and certain other kinds of spinlock errors commonly made.  This is
+	  best used in conjunction with the NMI watchdog so that spinlock
+	  deadlocks are also debuggable.
+
+config DEBUG_RWLOCK
+	bool "Read-write spinlock debugging"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here then read-write lock processing will count how many
+	  times it has tried to get the lock and issue an error message after
+	  too many attempts.  If you suspect a rwlock problem or a kernel
+	  hacker asks for this option then say Y.  Otherwise say N.
+
+config DEBUG_SEMAPHORE
+	bool "Semaphore debugging"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here then semaphore processing will issue lots of
+	  verbose debugging messages.  If you suspect a semaphore problem or a
+	  kernel hacker asks for this option then say Y.  Otherwise say N.
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+

@@ -164,7 +164,7 @@ static unsigned char tw_sense_table[][4] =
 #define TW_RESPONSE_ID_MASK		       0x00000FF0
 
 /* PCI related defines */
-#define TW_IO_ADDRESS_RANGE		       0xD
+#define TW_IO_ADDRESS_RANGE		       0x10
 #define TW_DEVICE_NAME			       "3ware Storage Controller"
 #define TW_VENDOR_ID (0x13C1)	/* 3ware */
 #define TW_DEVICE_ID (0x1000)	/* Storage Controller */
@@ -183,6 +183,7 @@ static unsigned char tw_sense_table[][4] =
 #define TW_OP_SET_PARAM	      0x13
 #define TW_OP_SECTOR_INFO     0x1a
 #define TW_OP_AEN_LISTEN      0x1c
+#define TW_OP_FLUSH_CACHE     0x0e
 #define TW_CMD_PACKET         0x1d
 #define TW_ATA_PASSTHRU       0x1e
 #define TW_CMD_PACKET_WITH_DATA 0x1f
@@ -221,7 +222,6 @@ static unsigned char tw_sense_table[][4] =
 #define TW_MAX_CMDS_PER_LUN		      255
 #define TW_BLOCK_SIZE			      0x200 /* 512-byte blocks */
 #define TW_IOCTL                              0x80
-#define TW_MAX_AEN_TRIES                      100
 #define TW_UNIT_ONLINE                        1
 #define TW_IN_INTR                            1
 #define TW_IN_IOCTL                           2
@@ -248,8 +248,8 @@ static unsigned char tw_sense_table[][4] =
 
 /* Scatter Gather List Entry */
 typedef struct TAG_TW_SG_Entry {
-	unsigned long address;
-	unsigned long length;
+	u32 address;
+	u32 length;
 } TW_SG_Entry;
 
 typedef unsigned char TW_Sector[512];
@@ -277,17 +277,17 @@ typedef struct TW_Command {
 	} byte6;
 	union {
 		struct {
-			unsigned long lba;
+			u32 lba;
 			TW_SG_Entry sgl[TW_MAX_SGL_LENGTH];
-			unsigned long padding;	/* pad to 512 bytes */
+			u32 padding;	/* pad to 512 bytes */
 		} io;
 		struct {
 			TW_SG_Entry sgl[TW_MAX_SGL_LENGTH];
-			unsigned long padding[2];
+			u32 padding[2];
 		} param;
 		struct {
-			unsigned long response_queue_pointer;
-			unsigned long padding[125];
+			u32 response_queue_pointer;
+			u32 padding[125];
 		} init_connection;
 		struct {
 			char version[504];
@@ -376,12 +376,12 @@ typedef struct TAG_TW_Passthru
 
 typedef struct TAG_TW_Device_Extension {
 	TW_Registers		registers;
-	u32			*alignment_virtual_address[TW_Q_LENGTH];
-	u32			alignment_physical_address[TW_Q_LENGTH];
+	unsigned long		*alignment_virtual_address[TW_Q_LENGTH];
+	unsigned long		alignment_physical_address[TW_Q_LENGTH];
 	int			is_unit_present[TW_MAX_UNITS];
 	int			num_units;
-	u32			*command_packet_virtual_address[TW_Q_LENGTH];
-	u32			command_packet_physical_address[TW_Q_LENGTH];
+	unsigned long		*command_packet_virtual_address[TW_Q_LENGTH];
+	unsigned long		command_packet_physical_address[TW_Q_LENGTH];
 	struct pci_dev		*tw_pci_dev;
 	Scsi_Cmnd		*srb[TW_Q_LENGTH];
 	unsigned char		free_queue[TW_Q_LENGTH];
@@ -411,8 +411,9 @@ typedef struct TAG_TW_Device_Extension {
 	unsigned char		aen_head;
 	unsigned char		aen_tail;
 	volatile long		flags; /* long req'd for set_bit --RR */
-	char			*ioctl_data[TW_Q_LENGTH];
+	unsigned long		*ioctl_data[TW_Q_LENGTH];
 	int			reset_print;
+	char                    online;
 } TW_Device_Extension;
 
 /* Function prototypes */
@@ -440,10 +441,12 @@ int tw_ioctl(TW_Device_Extension *tw_dev, int request_id);
 int tw_ioctl_complete(TW_Device_Extension *tw_dev, int request_id);
 void tw_mask_command_interrupt(TW_Device_Extension *tw_dev);
 int tw_poll_status(TW_Device_Extension *tw_dev, u32 flag, int seconds);
+int tw_poll_status_gone(TW_Device_Extension *tw_dev, u32 flag, int seconds);
 int tw_post_command_packet(TW_Device_Extension *tw_dev, int request_id);
 int tw_reset_device_extension(TW_Device_Extension *tw_dev);
 int tw_reset_sequence(TW_Device_Extension *tw_dev);
-int tw_scsi_biosparam(Disk *disk, struct block_device *dev, int geom[]);
+int tw_scsi_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[]);
 int tw_scsi_detect(Scsi_Host_Template *tw_host);
 int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt);
 int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt);
@@ -452,10 +455,13 @@ int tw_scsi_queue(Scsi_Cmnd *cmd, void (*done) (Scsi_Cmnd *));
 int tw_scsi_release(struct Scsi_Host *tw_host);
 int tw_scsiop_inquiry(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_inquiry_complete(TW_Device_Extension *tw_dev, int request_id);
+int tw_scsiop_mode_sense(TW_Device_Extension *tw_dev, int request_id);
+int tw_scsiop_mode_sense_complete(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_read_capacity(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_read_capacity_complete(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_read_write(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_request_sense(TW_Device_Extension *tw_dev, int request_id);
+int tw_scsiop_synchronize_cache(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_test_unit_ready(TW_Device_Extension *tw_dev, int request_id);
 int tw_setfeature(TW_Device_Extension *tw_dev, int parm, int param_size, 
 		  unsigned char *val);
@@ -468,25 +474,14 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 
 /* Scsi_Host_Template Initializer */
 #define TWXXXX {					\
-	next : NULL,					\
-	module : NULL,					\
 	proc_name : "3w-xxxx",				\
 	proc_info : tw_scsi_proc_info,			\
 	name : "3ware Storage Controller",		\
 	detect : tw_scsi_detect,			\
 	release : tw_scsi_release,			\
-	info : NULL,					\
-	ioctl : NULL,                  			\
-	command : NULL,					\
 	queuecommand : tw_scsi_queue,			\
-	eh_strategy_handler : NULL,			\
 	eh_abort_handler : tw_scsi_eh_abort,		\
-	eh_device_reset_handler : NULL,			\
-	eh_bus_reset_handler : NULL,			\
 	eh_host_reset_handler : tw_scsi_eh_reset,	\
-	abort : NULL,					\
-	reset : NULL,					\
-	slave_attach : NULL,				\
 	bios_param : tw_scsi_biosparam,			\
 	can_queue : TW_Q_LENGTH-1,			\
 	this_id: -1,					\
@@ -495,6 +490,7 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 	present : 0,					\
 	unchecked_isa_dma : 0,				\
 	use_clustering : ENABLE_CLUSTERING,		\
-	emulated : 1					\
+	emulated : 1,					\
+	highmem_io : 1					\
 }
 #endif /* _3W_XXXX_H */

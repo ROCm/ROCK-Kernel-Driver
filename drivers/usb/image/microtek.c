@@ -137,7 +137,6 @@
 #include <linux/blk.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/sd.h"
 
 #include "microtek.h"
 
@@ -488,7 +487,7 @@ void mts_int_submit_urb (struct urb* transfer,
 
 	MTS_INT_INIT();
 
-	FILL_BULK_URB(transfer,
+	usb_fill_bulk_urb(transfer,
 		      context->instance->usb_dev,
 		      pipe,
 		      data,
@@ -716,7 +715,7 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 	}
 
 	
-	FILL_BULK_URB(desc->urb,
+	usb_fill_bulk_urb(desc->urb,
 		      desc->usb_dev,
 		      usb_sndbulkpipe(desc->usb_dev,desc->ep_out),
 		      srb->cmnd,
@@ -852,7 +851,7 @@ static int mts_usb_probe (struct usb_interface *intf,
 	struct usb_device *dev = interface_to_usbdev (intf);
 
 	/* the altsettting 0 on the interface we're probing */
-	struct usb_interface_descriptor *altsetting;
+	struct usb_host_interface *altsetting;
 
 	MTS_DEBUG_GOT_HERE();
 	MTS_DEBUG( "usb-device descriptor at %x\n", (int)dev );
@@ -878,23 +877,23 @@ static int mts_usb_probe (struct usb_interface *intf,
 
 	/* Check if the config is sane */
 
-	if ( altsetting->bNumEndpoints != MTS_EP_TOTAL ) {
+	if ( altsetting->desc.bNumEndpoints != MTS_EP_TOTAL ) {
 		MTS_WARNING( "expecting %d got %d endpoints! Bailing out.\n",
-			     (int)MTS_EP_TOTAL, (int)altsetting->bNumEndpoints );
+			     (int)MTS_EP_TOTAL, (int)altsetting->desc.bNumEndpoints );
 		return -ENODEV;
 	}
 
-	for( i = 0; i < altsetting->bNumEndpoints; i++ ) {
-		if ((altsetting->endpoint[i].bmAttributes &
+	for( i = 0; i < altsetting->desc.bNumEndpoints; i++ ) {
+		if ((altsetting->endpoint[i].desc.bmAttributes &
 		     USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK) {
 
 			MTS_WARNING( "can only deal with bulk endpoints; endpoint %d is not bulk.\n",
-			     (int)altsetting->endpoint[i].bEndpointAddress );
+			     (int)altsetting->endpoint[i].desc.bEndpointAddress );
 		} else {
-			if (altsetting->endpoint[i].bEndpointAddress &
+			if (altsetting->endpoint[i].desc.bEndpointAddress &
 			    USB_DIR_IN)
 				*ep_in_current++
-					= altsetting->endpoint[i].bEndpointAddress &
+					= altsetting->endpoint[i].desc.bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			else {
 				if ( ep_out != -1 ) {
@@ -902,7 +901,7 @@ static int mts_usb_probe (struct usb_interface *intf,
 					return -ENODEV;
 				}
 
-				ep_out = altsetting->endpoint[i].bEndpointAddress &
+				ep_out = altsetting->endpoint[i].desc.bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			}
 		}
@@ -915,23 +914,14 @@ static int mts_usb_probe (struct usb_interface *intf,
 		return -ENODEV;
 	}
 
-
-	/* I don't understand the following fully (it's from usb-storage) -- John */
-
-	/* set the interface -- STALL is an acceptable response here */
-	result = usb_set_interface(dev, altsetting->bInterfaceNumber, 0);
+	result = usb_set_interface(dev, altsetting->desc.bInterfaceNumber, 0);
 
 	MTS_DEBUG("usb_set_interface returned %d.\n",result);
 	switch( result )
 	{
 	case 0: /* no error */
 		break;
-		
-	case -EPIPE:
-		usb_clear_halt(dev, usb_sndctrlpipe(dev, 0));
-		MTS_DEBUG( "clearing clearing stall on control interface\n" );
-		break;
-		
+
 	default:
 		MTS_DEBUG( "unknown error %d from usb_set_interface\n",
 			(int)result );

@@ -84,63 +84,63 @@ MODULE_DEVICES("{{Crystal Semiconductors,CS4235},"
 #define IDENT "CS4236+"
 #endif
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this card */
 #ifdef __ISAPNP__
-static int snd_isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
+static int isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 #endif
-static long snd_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
-static long snd_cport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
-static long snd_mpu_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;/* PnP setup */
-static long snd_fm_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
-static long snd_sb_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,11,12,15 */
-static int snd_mpu_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 9,11,12,15 */
-static int snd_dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
-static int snd_dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
+static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
+static long cport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
+static long mpu_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;/* PnP setup */
+static long fm_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
+static long sb_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,11,12,15 */
+static int mpu_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 9,11,12,15 */
+static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
+static int dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for " IDENT " soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for " IDENT " soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable " IDENT " soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for " IDENT " soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for " IDENT " soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable " IDENT " soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef __ISAPNP__
-MODULE_PARM(snd_isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_isapnp, "ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(snd_isapnp, SNDRV_ISAPNP_DESC);
+MODULE_PARM(isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(isapnp, "ISA PnP detection for specified soundcard.");
+MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
-MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port, "Port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_cport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_cport, "Control port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_cport, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_mpu_port, "MPU-401 port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_fm_port, "FM port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_sb_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_sb_port, "SB port # for " IDENT " driver (optional).");
-MODULE_PARM_SYNTAX(snd_sb_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_mpu_irq, "MPU-401 IRQ # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_mpu_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma1, "DMA1 # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_dma1, SNDRV_DMA_DESC);
-MODULE_PARM(snd_dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma2, "DMA2 # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(snd_dma2, SNDRV_DMA_DESC);
+MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port, "Port # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
+MODULE_PARM(cport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(cport, "Control port # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(cport, SNDRV_PORT12_DESC);
+MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(mpu_port, "MPU-401 port # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT12_DESC);
+MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(fm_port, "FM port # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT12_DESC);
+MODULE_PARM(sb_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(sb_port, "SB port # for " IDENT " driver (optional).");
+MODULE_PARM_SYNTAX(sb_port, SNDRV_PORT12_DESC);
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
+MODULE_PARM(mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
+MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma1, "DMA1 # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
+MODULE_PARM(dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma2, "DMA2 # for " IDENT " driver.");
+MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 
 struct snd_card_cs4236 {
 	struct resource *res_sb_port;
@@ -304,76 +304,76 @@ static int __init snd_card_cs4236_isapnp(int dev, struct snd_card_cs4236 *acard)
 	pdev = acard->wss;
 	if (pdev->prepare(pdev) < 0)
 		return -EAGAIN;
-	if (snd_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], snd_port[dev], 4);
-	if (snd_fm_port[dev] != SNDRV_AUTO_PORT && snd_fm_port[dev] >= 0)
-		isapnp_resource_change(&pdev->resource[1], snd_fm_port[dev], 4);
-	if (snd_sb_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[2], snd_sb_port[dev], 16);
-	if (snd_irq[dev] != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], snd_irq[dev], 1);
-	if (snd_dma1[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], snd_dma1[dev], 1);
-	if (snd_dma2[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[1], snd_dma2[dev] < 0 ? 4 : snd_dma2[dev], 1);
+	if (port[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[0], port[dev], 4);
+	if (fm_port[dev] != SNDRV_AUTO_PORT && fm_port[dev] >= 0)
+		isapnp_resource_change(&pdev->resource[1], fm_port[dev], 4);
+	if (sb_port[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[2], sb_port[dev], 16);
+	if (irq[dev] != SNDRV_AUTO_IRQ)
+		isapnp_resource_change(&pdev->irq_resource[0], irq[dev], 1);
+	if (dma1[dev] != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[0], dma1[dev], 1);
+	if (dma2[dev] != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[1], dma2[dev] < 0 ? 4 : dma2[dev], 1);
 	if (pdev->activate(pdev)<0) {
 		printk(KERN_ERR IDENT " isapnp configure failed for WSS (out of resources?)\n");
 		return -EBUSY;
 	}
-	snd_port[dev] = pdev->resource[0].start;
-	if (snd_fm_port[dev] >= 0)
-		snd_fm_port[dev] = pdev->resource[1].start;
-	snd_sb_port[dev] = pdev->resource[2].start;
-	snd_irq[dev] = pdev->irq_resource[0].start;
-	snd_dma1[dev] = pdev->dma_resource[0].start;
-	snd_dma2[dev] = pdev->dma_resource[1].start == 4 ? -1 : pdev->dma_resource[1].start;
+	port[dev] = pdev->resource[0].start;
+	if (fm_port[dev] >= 0)
+		fm_port[dev] = pdev->resource[1].start;
+	sb_port[dev] = pdev->resource[2].start;
+	irq[dev] = pdev->irq_resource[0].start;
+	dma1[dev] = pdev->dma_resource[0].start;
+	dma2[dev] = pdev->dma_resource[1].start == 4 ? -1 : pdev->dma_resource[1].start;
 	snd_printdd("isapnp WSS: wss port=0x%lx, fm port=0x%lx, sb port=0x%lx\n",
-			snd_port[dev], snd_fm_port[dev], snd_sb_port[dev]);
+			port[dev], fm_port[dev], sb_port[dev]);
 	snd_printdd("isapnp WSS: irq=%i, dma1=%i, dma2=%i\n",
-			snd_irq[dev], snd_dma1[dev], snd_dma2[dev]);
+			irq[dev], dma1[dev], dma2[dev]);
 	/* CTRL initialization */
-	if (acard->ctrl && snd_cport[dev] >= 0) {
+	if (acard->ctrl && cport[dev] >= 0) {
 		pdev = acard->ctrl;
 		if (pdev->prepare(pdev) < 0) {
 			acard->wss->deactivate(acard->wss);
 			return -EAGAIN;
 		}
-		if (snd_cport[dev] != SNDRV_AUTO_PORT)
-			isapnp_resource_change(&pdev->resource[0], snd_cport[dev], 8);
+		if (cport[dev] != SNDRV_AUTO_PORT)
+			isapnp_resource_change(&pdev->resource[0], cport[dev], 8);
 		if (pdev->activate(pdev)<0) {
 			printk(KERN_ERR IDENT " isapnp configure failed for control (out of resources?)\n");
 			acard->wss->deactivate(acard->wss);
 			return -EBUSY;
 		}
-		snd_cport[dev] = pdev->resource[0].start;
-		snd_printdd("isapnp CTRL: control port=0x%lx\n", snd_cport[dev]);
+		cport[dev] = pdev->resource[0].start;
+		snd_printdd("isapnp CTRL: control port=0x%lx\n", cport[dev]);
 	}
 	/* MPU initialization */
-	if (acard->mpu && snd_mpu_port[dev] >= 0) {
+	if (acard->mpu && mpu_port[dev] >= 0) {
 		pdev = acard->mpu;
 		if (pdev->prepare(pdev) < 0) {
 			acard->wss->deactivate(acard->wss);
 			acard->ctrl->deactivate(acard->ctrl);
 			return -EAGAIN;
 		}
-		if (snd_mpu_port[dev] != SNDRV_AUTO_PORT)
-			isapnp_resource_change(&pdev->resource[0], snd_mpu_port[dev], 2);
-		if (snd_mpu_irq[dev] != SNDRV_AUTO_IRQ && snd_mpu_irq[dev] >= 0)
-			isapnp_resource_change(&pdev->irq_resource[0], snd_mpu_irq[dev], 1);
+		if (mpu_port[dev] != SNDRV_AUTO_PORT)
+			isapnp_resource_change(&pdev->resource[0], mpu_port[dev], 2);
+		if (mpu_irq[dev] != SNDRV_AUTO_IRQ && mpu_irq[dev] >= 0)
+			isapnp_resource_change(&pdev->irq_resource[0], mpu_irq[dev], 1);
 		if (pdev->activate(pdev)<0) {
-			snd_mpu_port[dev] = SNDRV_AUTO_PORT;
-			snd_mpu_irq[dev] = SNDRV_AUTO_IRQ;
+			mpu_port[dev] = SNDRV_AUTO_PORT;
+			mpu_irq[dev] = SNDRV_AUTO_IRQ;
 			printk(KERN_ERR IDENT " isapnp configure failed for MPU (out of resources?)\n");
 		} else {
-			snd_mpu_port[dev] = pdev->resource[0].start;
+			mpu_port[dev] = pdev->resource[0].start;
 			if ((pdev->irq_resource[0].flags & IORESOURCE_IRQ) &&
-			    snd_mpu_irq[dev] >= 0) {
-				snd_mpu_irq[dev] = pdev->irq_resource[0].start;
+			    mpu_irq[dev] >= 0) {
+				mpu_irq[dev] = pdev->irq_resource[0].start;
 			} else {
-				snd_mpu_irq[dev] = -1;	/* disable interrupt */
+				mpu_irq[dev] = -1;	/* disable interrupt */
 			}
 		}
-		snd_printdd("isapnp MPU: port=0x%lx, irq=%i\n", snd_mpu_port[dev], snd_mpu_irq[dev]);
+		snd_printdd("isapnp MPU: port=0x%lx, irq=%i\n", mpu_port[dev], mpu_irq[dev]);
 	}
 	return 0;
 }
@@ -420,52 +420,52 @@ static int __init snd_card_cs4236_probe(int dev)
 	int err;
 
 #ifdef __ISAPNP__
-	if (!snd_isapnp[dev]) {
+	if (!isapnp[dev]) {
 #endif
-		if (snd_port[dev] == SNDRV_AUTO_PORT) {
-			snd_printk("specify snd_port\n");
+		if (port[dev] == SNDRV_AUTO_PORT) {
+			snd_printk("specify port\n");
 			return -EINVAL;
 		}
-		if (snd_cport[dev] == SNDRV_AUTO_PORT) {
-			snd_printk("specify snd_cport\n");
+		if (cport[dev] == SNDRV_AUTO_PORT) {
+			snd_printk("specify cport\n");
 			return -EINVAL;
 		}
 #ifdef __ISAPNP__
 	}
 #endif
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE,
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE,
 			    sizeof(struct snd_card_cs4236));
 	if (card == NULL)
 		return -ENOMEM;
 	acard = (struct snd_card_cs4236 *)card->private_data;
 	card->private_free = snd_card_cs4236_free;
 #ifdef __ISAPNP__
-	if (snd_isapnp[dev] && (err = snd_card_cs4236_isapnp(dev, acard))<0) {
+	if (isapnp[dev] && (err = snd_card_cs4236_isapnp(dev, acard))<0) {
 		printk(KERN_ERR "isapnp detection failed and probing for " IDENT " is not supported\n");
 		snd_card_free(card);
 		return -ENXIO;
 	}
 #endif
-	if (snd_mpu_port[dev] < 0)
-		snd_mpu_port[dev] = SNDRV_AUTO_PORT;
-	if (snd_fm_port[dev] < 0)
-		snd_fm_port[dev] = SNDRV_AUTO_PORT;
-	if (snd_sb_port[dev] < 0)
-		snd_sb_port[dev] = SNDRV_AUTO_PORT;
-	if (snd_sb_port[dev] != SNDRV_AUTO_PORT)
-		if ((acard->res_sb_port = request_region(snd_sb_port[dev], 16, IDENT " SB")) == NULL) {
-			printk(KERN_ERR IDENT ": unable to register SB port at 0x%lx\n", snd_sb_port[dev]);
+	if (mpu_port[dev] < 0)
+		mpu_port[dev] = SNDRV_AUTO_PORT;
+	if (fm_port[dev] < 0)
+		fm_port[dev] = SNDRV_AUTO_PORT;
+	if (sb_port[dev] < 0)
+		sb_port[dev] = SNDRV_AUTO_PORT;
+	if (sb_port[dev] != SNDRV_AUTO_PORT)
+		if ((acard->res_sb_port = request_region(sb_port[dev], 16, IDENT " SB")) == NULL) {
+			printk(KERN_ERR IDENT ": unable to register SB port at 0x%lx\n", sb_port[dev]);
 			snd_card_free(card);
 			return -ENOMEM;
 		}
 
 #ifdef CS4232
 	if ((err = snd_cs4231_create(card,
-				     snd_port[dev],
-				     snd_cport[dev],
-				     snd_irq[dev],
-				     snd_dma1[dev],
-				     snd_dma2[dev],
+				     port[dev],
+				     cport[dev],
+				     irq[dev],
+				     dma1[dev],
+				     dma2[dev],
 				     CS4231_HW_DETECT,
 				     0,
 				     &chip)) < 0) {
@@ -483,11 +483,11 @@ static int __init snd_card_cs4236_probe(int dev)
 
 #else /* CS4236 */
 	if ((err = snd_cs4236_create(card,
-				     snd_port[dev],
-				     snd_cport[dev],
-				     snd_irq[dev],
-				     snd_dma1[dev],
-				     snd_dma2[dev],
+				     port[dev],
+				     cport[dev],
+				     irq[dev],
+				     dma1[dev],
+				     dma2[dev],
 				     CS4231_HW_DETECT,
 				     0,
 				     &chip)) < 0) {
@@ -509,9 +509,9 @@ static int __init snd_card_cs4236_probe(int dev)
 		return err;
 	}
 
-	if (snd_fm_port[dev] != SNDRV_AUTO_PORT) {
+	if (fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card,
-				    snd_fm_port[dev], snd_fm_port[dev] + 2,
+				    fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_OPL3_CS, 0, &opl3) < 0) {
 			printk(KERN_ERR IDENT ": OPL3 not detected\n");
 		} else {
@@ -522,11 +522,11 @@ static int __init snd_card_cs4236_probe(int dev)
 		}
 	}
 
-	if (snd_mpu_port[dev] != SNDRV_AUTO_PORT) {
+	if (mpu_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_mpu401_uart_new(card, 0, MPU401_HW_CS4232,
-					snd_mpu_port[dev], 0,
-					snd_mpu_irq[dev],
-					snd_mpu_irq[dev] >= 0 ? SA_INTERRUPT : 0, NULL) < 0)
+					mpu_port[dev], 0,
+					mpu_irq[dev],
+					mpu_irq[dev] >= 0 ? SA_INTERRUPT : 0, NULL) < 0)
 			printk(KERN_ERR IDENT ": MPU401 not detected\n");
 	}
 	strcpy(card->driver, pcm->name);
@@ -534,10 +534,10 @@ static int __init snd_card_cs4236_probe(int dev)
 	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i",
 		pcm->name,
 		chip->port,
-		snd_irq[dev],
-		snd_dma1[dev]);
-	if (snd_dma1[dev] >= 0)
-		sprintf(card->longname + strlen(card->longname), "&%d", snd_dma2[dev]);
+		irq[dev],
+		dma1[dev]);
+	if (dma1[dev] >= 0)
+		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -554,7 +554,7 @@ static int __init snd_cs4236_isapnp_detect(struct isapnp_card *card,
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev])
+		if (!enable[dev])
 			continue;
 		snd_cs4236_isapnp_cards[dev] = card;
 		snd_cs4236_isapnp_id[dev] = id;
@@ -573,10 +573,10 @@ static int __init alsa_card_cs423x_init(void)
 	int dev, cards = 0;
 
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev])
+		if (!enable[dev])
 			continue;
 #ifdef __ISAPNP__
-		if (snd_isapnp[dev])
+		if (isapnp[dev])
 			continue;
 #endif
 		if (snd_card_cs4236_probe(dev) >= 0)
@@ -607,14 +607,14 @@ module_exit(alsa_card_cs423x_exit)
 
 #ifndef MODULE
 
-/* format is: snd-cs4232=snd_enable,snd_index,snd_id,snd_isapnp,snd_port,
-			 snd_cport,snd_mpu_port,snd_fm_port,snd_sb_port,
-			 snd_irq,snd_mpu_irq,snd_dma1,snd_dma1_size,
-			 snd_dma2,snd_dma2_size */
-/* format is: snd-cs4236=snd_enable,snd_index,snd_id,snd_isapnp,snd_port,
-			 snd_cport,snd_mpu_port,snd_fm_port,snd_sb_port,
-			 snd_irq,snd_mpu_irq,snd_dma1,snd_dma1_size,
-			 snd_dma2,snd_dma2_size */
+/* format is: snd-cs4232=enable,index,id,isapnp,port,
+			 cport,mpu_port,fm_port,sb_port,
+			 irq,mpu_irq,dma1,dma1_size,
+			 dma2,dma2_size */
+/* format is: snd-cs4236=enable,index,id,isapnp,port,
+			 cport,mpu_port,fm_port,sb_port,
+			 irq,mpu_irq,dma1,dma1_size,
+			 dma2,dma2_size */
 
 static int __init alsa_card_cs423x_setup(char *str)
 {
@@ -623,22 +623,22 @@ static int __init alsa_card_cs423x_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&snd_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_cport[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_fm_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_sb_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_mpu_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma1[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma2[nr_dev]) == 2);
+	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&cport[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&sb_port[nr_dev]) == 2 &&
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
+	       get_option(&str,&dma1[nr_dev]) == 2 &&
+	       get_option(&str,&dma2[nr_dev]) == 2);
 #ifdef __ISAPNP__
 	if (pnp != INT_MAX)
-		snd_isapnp[nr_dev] = pnp;
+		isapnp[nr_dev] = pnp;
 #endif
 	nr_dev++;
 	return 1;

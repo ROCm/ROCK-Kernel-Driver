@@ -816,7 +816,6 @@ int Pci2000_Release (struct Scsi_Host *pshost)
     return 0;
 	}
 
-#include "sd.h"
 /****************************************************************
  *	Name:	Pci2000_BiosParam
  *
@@ -830,15 +829,16 @@ int Pci2000_Release (struct Scsi_Host *pshost)
  *	Returns:		zero.
  *
  ****************************************************************/
-int Pci2000_BiosParam (Scsi_Disk *disk, struct block_device *dev, int geom[])
+int Pci2000_BiosParam (struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int geom[])
 	{
 	PADAPTER2000	    padapter;
 
-	padapter = HOSTDATA(disk->device->host);
+	padapter = HOSTDATA(sdev->host);
 
 	if ( WaitReady (padapter) )
 		return 0;
-	outb_p (disk->device->id, padapter->mb0);
+	outb_p (sdev->id, padapter->mb0);
 	outb_p (CMD_GET_PARMS, padapter->cmd);
 	if ( WaitReady (padapter) )
 		return 0;

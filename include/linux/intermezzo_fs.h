@@ -223,8 +223,6 @@ struct presto_cache {
 
         int   cache_flags;
 
-        kdev_t cache_dev;            /* underlying block device */
-
         char *cache_type;            /* filesystem type of cache */
         struct filter_fs *cache_filter;
 
@@ -425,10 +423,10 @@ int presto_prep(struct dentry *, struct presto_cache **,
                        struct presto_file_set **);
 /* cache.c */
 extern struct presto_cache *presto_cache_init(void);
-extern inline void presto_cache_add(struct presto_cache *cache, kdev_t dev);
+extern inline void presto_cache_add(struct presto_cache *cache);
 extern inline void presto_cache_init_hash(void);
 
-struct presto_cache *presto_cache_find(kdev_t dev);
+struct presto_cache *presto_cache_find(struct super_block *sb);
 
 #define PRESTO_REQLOW  (3 * 4096)
 #define PRESTO_REQHIGH (6 * 4096)

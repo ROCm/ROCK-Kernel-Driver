@@ -914,7 +914,7 @@ static void usbin_completed(struct urb *urb)
 	if (!usbin_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbin_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_ATOMIC)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -980,7 +980,7 @@ static void usbin_sync_completed(struct urb *urb)
 	if (!usbin_sync_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbin_sync_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_ATOMIC)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -1049,7 +1049,7 @@ static int usbin_start(struct usb_audiodev *as)
 		urb = u->durb[0].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbin_completed;
@@ -1062,7 +1062,7 @@ static int usbin_start(struct usb_audiodev *as)
 		urb = u->durb[1].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbin_completed;
@@ -1076,7 +1076,7 @@ static int usbin_start(struct usb_audiodev *as)
 			urb = u->surb[0].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbin_sync_completed;
@@ -1090,7 +1090,7 @@ static int usbin_start(struct usb_audiodev *as)
 			urb = u->surb[1].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbin_sync_completed;
@@ -1274,7 +1274,7 @@ static void usbout_completed(struct urb *urb)
 	if (!usbout_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbout_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_ATOMIC)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -1347,7 +1347,7 @@ static void usbout_sync_completed(struct urb *urb)
 	if (!usbout_sync_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbout_sync_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_ATOMIC)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -1416,7 +1416,7 @@ static int usbout_start(struct usb_audiodev *as)
 		urb = u->durb[0].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbout_completed;
@@ -1429,7 +1429,7 @@ static int usbout_start(struct usb_audiodev *as)
 		urb = u->durb[1].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbout_completed;
@@ -1443,7 +1443,7 @@ static int usbout_start(struct usb_audiodev *as)
 			urb = u->surb[0].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbout_sync_completed;
@@ -1457,7 +1457,7 @@ static int usbout_start(struct usb_audiodev *as)
 			urb = u->surb[1].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbout_sync_completed;
@@ -1512,8 +1512,8 @@ static int find_format(struct audioformat *afp, unsigned int nr, unsigned int fm
 static int set_format_in(struct usb_audiodev *as)
 {
 	struct usb_device *dev = as->state->usbdev;
-	struct usb_config_descriptor *config = dev->actconfig;
-	struct usb_interface_descriptor *alts;
+	struct usb_host_config *config = dev->actconfig;
+	struct usb_host_interface *alts;
 	struct usb_interface *iface;
 	struct usbin *u = &as->usbin;
 	struct dmabuf *d = &u->dma;
@@ -1522,7 +1522,7 @@ static int set_format_in(struct usb_audiodev *as)
 	unsigned char data[3];
 	int fmtnr, ret;
 
-	if (u->interface < 0 || u->interface >= config->bNumInterfaces)
+	if (u->interface < 0 || u->interface >= config->desc.bNumInterfaces)
 		return 0;
 	iface = &config->interface[u->interface];
 
@@ -1535,26 +1535,26 @@ static int set_format_in(struct usb_audiodev *as)
 	fmt = as->fmtin + fmtnr;
 	alts = &iface->altsetting[fmt->altsetting];
 	u->format = fmt->format;
-	u->datapipe = usb_rcvisocpipe(dev, alts->endpoint[0].bEndpointAddress & 0xf);
+	u->datapipe = usb_rcvisocpipe(dev, alts->endpoint[0].desc.bEndpointAddress & 0xf);
 	u->syncpipe = u->syncinterval = 0;
-	if ((alts->endpoint[0].bmAttributes & 0x0c) == 0x08) {
-		if (alts->bNumEndpoints < 2 ||
-		    alts->endpoint[1].bmAttributes != 0x01 ||
-		    alts->endpoint[1].bSynchAddress != 0 ||
-		    alts->endpoint[1].bEndpointAddress != (alts->endpoint[0].bSynchAddress & 0x7f)) {
+	if ((alts->endpoint[0].desc.bmAttributes & 0x0c) == 0x08) {
+		if (alts->desc.bNumEndpoints < 2 ||
+		    alts->endpoint[1].desc.bmAttributes != 0x01 ||
+		    alts->endpoint[1].desc.bSynchAddress != 0 ||
+		    alts->endpoint[1].desc.bEndpointAddress != (alts->endpoint[0].desc.bSynchAddress & 0x7f)) {
 			printk(KERN_ERR "usbaudio: device %d interface %d altsetting %d invalid synch pipe\n",
 			       dev->devnum, u->interface, fmt->altsetting);
 			return -1;
 		}
-		u->syncpipe = usb_sndisocpipe(dev, alts->endpoint[1].bEndpointAddress & 0xf);
-		u->syncinterval = alts->endpoint[1].bRefresh;
+		u->syncpipe = usb_sndisocpipe(dev, alts->endpoint[1].desc.bEndpointAddress & 0xf);
+		u->syncinterval = alts->endpoint[1].desc.bRefresh;
 	}
 	if (d->srate < fmt->sratelo)
 		d->srate = fmt->sratelo;
 	if (d->srate > fmt->sratehi)
 		d->srate = fmt->sratehi;
-	dprintk((KERN_DEBUG "usbaudio: set_format_in: usb_set_interface %u %u\n", alts->bInterfaceNumber, fmt->altsetting));
-	if (usb_set_interface(dev, alts->bInterfaceNumber, fmt->altsetting) < 0) {
+	dprintk((KERN_DEBUG "usbaudio: set_format_in: usb_set_interface %u %u\n", alts->desc.bInterfaceNumber, fmt->altsetting));
+	if (usb_set_interface(dev, alts->desc.bInterfaceNumber, fmt->altsetting) < 0) {
 		printk(KERN_WARNING "usbaudio: usb_set_interface failed, device %d interface %d altsetting %d\n",
 		       dev->devnum, u->interface, fmt->altsetting);
 		return -1;
@@ -1600,8 +1600,8 @@ static int set_format_in(struct usb_audiodev *as)
 static int set_format_out(struct usb_audiodev *as)
 {
 	struct usb_device *dev = as->state->usbdev;
-	struct usb_config_descriptor *config = dev->actconfig;
-	struct usb_interface_descriptor *alts;
+	struct usb_host_config *config = dev->actconfig;
+	struct usb_host_interface *alts;
 	struct usb_interface *iface;	
 	struct usbout *u = &as->usbout;
 	struct dmabuf *d = &u->dma;
@@ -1610,7 +1610,7 @@ static int set_format_out(struct usb_audiodev *as)
 	unsigned char data[3];
 	int fmtnr, ret;
 
-	if (u->interface < 0 || u->interface >= config->bNumInterfaces)
+	if (u->interface < 0 || u->interface >= config->desc.bNumInterfaces)
 		return 0;
 	iface = &config->interface[u->interface];
 
@@ -1623,9 +1623,9 @@ static int set_format_out(struct usb_audiodev *as)
 	fmt = as->fmtout + fmtnr;
 	u->format = fmt->format;
 	alts = &iface->altsetting[fmt->altsetting];
-	u->datapipe = usb_sndisocpipe(dev, alts->endpoint[0].bEndpointAddress & 0xf);
+	u->datapipe = usb_sndisocpipe(dev, alts->endpoint[0].desc.bEndpointAddress & 0xf);
 	u->syncpipe = u->syncinterval = 0;
-	if ((alts->endpoint[0].bmAttributes & 0x0c) == 0x04) {
+	if ((alts->endpoint[0].desc.bmAttributes & 0x0c) == 0x04) {
 #if 0
 		printk(KERN_DEBUG "bNumEndpoints 0x%02x endpoint[1].bmAttributes 0x%02x\n"
 		       KERN_DEBUG "endpoint[1].bSynchAddress 0x%02x endpoint[1].bEndpointAddress 0x%02x\n"
@@ -1633,22 +1633,22 @@ static int set_format_out(struct usb_audiodev *as)
 		       alts->endpoint[1].bmAttributes, alts->endpoint[1].bSynchAddress,
 		       alts->endpoint[1].bEndpointAddress, alts->endpoint[0].bSynchAddress);
 #endif
-		if (alts->bNumEndpoints < 2 ||
-		    alts->endpoint[1].bmAttributes != 0x01 ||
-		    alts->endpoint[1].bSynchAddress != 0 ||
-		    alts->endpoint[1].bEndpointAddress != (alts->endpoint[0].bSynchAddress | 0x80)) {
+		if (alts->desc.bNumEndpoints < 2 ||
+		    alts->endpoint[1].desc.bmAttributes != 0x01 ||
+		    alts->endpoint[1].desc.bSynchAddress != 0 ||
+		    alts->endpoint[1].desc.bEndpointAddress != (alts->endpoint[0].desc.bSynchAddress | 0x80)) {
 			printk(KERN_ERR "usbaudio: device %d interface %d altsetting %d invalid synch pipe\n",
 			       dev->devnum, u->interface, fmt->altsetting);
 			return -1;
 		}
-		u->syncpipe = usb_rcvisocpipe(dev, alts->endpoint[1].bEndpointAddress & 0xf);
-		u->syncinterval = alts->endpoint[1].bRefresh;
+		u->syncpipe = usb_rcvisocpipe(dev, alts->endpoint[1].desc.bEndpointAddress & 0xf);
+		u->syncinterval = alts->endpoint[1].desc.bRefresh;
 	}
 	if (d->srate < fmt->sratelo)
 		d->srate = fmt->sratelo;
 	if (d->srate > fmt->sratehi)
 		d->srate = fmt->sratehi;
-	dprintk((KERN_DEBUG "usbaudio: set_format_out: usb_set_interface %u %u\n", alts->bInterfaceNumber, fmt->altsetting));
+	dprintk((KERN_DEBUG "usbaudio: set_format_out: usb_set_interface %u %u\n", alts->desc.bInterfaceNumber, fmt->altsetting));
 	if (usb_set_interface(dev, u->interface, fmt->altsetting) < 0) {
 		printk(KERN_WARNING "usbaudio: usb_set_interface failed, device %d interface %d altsetting %d\n",
 		       dev->devnum, u->interface, fmt->altsetting);
@@ -2705,7 +2705,7 @@ static int usb_audio_release(struct inode *inode, struct file *file)
 		usbout_stop(as);
 		if (dev && as->usbout.interface >= 0) {
 			iface = &dev->actconfig->interface[as->usbout.interface];
-			usb_set_interface(dev, iface->altsetting->bInterfaceNumber, 0);
+			usb_set_interface(dev, iface->altsetting->desc.bInterfaceNumber, 0);
 		}
 		dmabuf_release(&as->usbout.dma);
 		usbout_release(as);
@@ -2714,7 +2714,7 @@ static int usb_audio_release(struct inode *inode, struct file *file)
 		usbin_stop(as);
 		if (dev && as->usbin.interface >= 0) {
 			iface = &dev->actconfig->interface[as->usbin.interface];
-			usb_set_interface(dev, iface->altsetting->bInterfaceNumber, 0);
+			usb_set_interface(dev, iface->altsetting->desc.bInterfaceNumber, 0);
 		}
 		dmabuf_release(&as->usbin.dma);
 		usbin_release(as);
@@ -2819,8 +2819,8 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 {
 	struct usb_device *dev = s->usbdev;
 	struct usb_audiodev *as;
-	struct usb_config_descriptor *config = dev->actconfig;
-	struct usb_interface_descriptor *alts;
+	struct usb_host_config *config = dev->actconfig;
+	struct usb_host_interface *alts;
 	struct usb_interface *iface;
 	struct audioformat *fp;
 	unsigned char *fmt, *csep;
@@ -2868,17 +2868,17 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 		iface = &config->interface[asifin];
 		for (i = 0; i < iface->num_altsetting; i++) {
 			alts = &iface->altsetting[i];
-			if (alts->bInterfaceClass != USB_CLASS_AUDIO || alts->bInterfaceSubClass != 2)
+			if (alts->desc.bInterfaceClass != USB_CLASS_AUDIO || alts->desc.bInterfaceSubClass != 2)
 				continue;
-			if (alts->bNumEndpoints < 1) {
+			if (alts->desc.bNumEndpoints < 1) {
 				if (i != 0) {  /* altsetting 0 has no endpoints (Section B.3.4.1) */
 					printk(KERN_ERR "usbaudio: device %u interface %u altsetting %u does not have an endpoint\n", 
 					       dev->devnum, asifin, i);
 				}
 				continue;
 			}
-			if ((alts->endpoint[0].bmAttributes & 0x03) != 0x01 ||
-			    !(alts->endpoint[0].bEndpointAddress & 0x80)) {
+			if ((alts->endpoint[0].desc.bmAttributes & 0x03) != 0x01 ||
+			    !(alts->endpoint[0].desc.bEndpointAddress & 0x80)) {
 				printk(KERN_ERR "usbaudio: device %u interface %u altsetting %u first endpoint not isochronous in\n", 
 				       dev->devnum, asifin, i);
 				continue;
@@ -2949,15 +2949,15 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 		iface = &config->interface[asifout];
 		for (i = 0; i < iface->num_altsetting; i++) {
 			alts = &iface->altsetting[i];
-			if (alts->bInterfaceClass != USB_CLASS_AUDIO || alts->bInterfaceSubClass != 2)
+			if (alts->desc.bInterfaceClass != USB_CLASS_AUDIO || alts->desc.bInterfaceSubClass != 2)
 				continue;
-			if (alts->bNumEndpoints < 1) {
+			if (alts->desc.bNumEndpoints < 1) {
 				printk(KERN_ERR "usbaudio: device %u interface %u altsetting %u does not have an endpoint\n", 
 				       dev->devnum, asifout, i);
 				continue;
 			}
-			if ((alts->endpoint[0].bmAttributes & 0x03) != 0x01 ||
-			    (alts->endpoint[0].bEndpointAddress & 0x80)) {
+			if ((alts->endpoint[0].desc.bmAttributes & 0x03) != 0x01 ||
+			    (alts->endpoint[0].desc.bEndpointAddress & 0x80)) {
 				printk(KERN_ERR "usbaudio: device %u interface %u altsetting %u first endpoint not isochronous out\n", 
 				       dev->devnum, asifout, i);
 				continue;
@@ -3642,10 +3642,13 @@ static void usb_audio_constructmixer(struct usb_audio_state *s, unsigned char *b
 	list_add_tail(&ms->list, &s->mixerlist);
 }
 
+/* arbitrary limit, we won't check more interfaces than this */
+#define USB_MAXINTERFACES	32
+
 static struct usb_audio_state *usb_audio_parsecontrol(struct usb_device *dev, unsigned char *buffer, unsigned int buflen, unsigned int ctrlif)
 {
 	struct usb_audio_state *s;
-	struct usb_config_descriptor *config = dev->actconfig;
+	struct usb_host_config *config = dev->actconfig;
 	struct usb_interface *iface;
 	unsigned char ifin[USB_MAXINTERFACES], ifout[USB_MAXINTERFACES];
 	unsigned char *p1;
@@ -3675,23 +3678,23 @@ static struct usb_audio_state *usb_audio_parsecontrol(struct usb_device *dev, un
 		       dev->devnum, ctrlif);
 	for (i = 0; i < p1[7]; i++) {
 		j = p1[8+i];
-		if (j >= config->bNumInterfaces) {
+		if (j >= config->desc.bNumInterfaces) {
 			printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u interface %u does not exist\n",
 			       dev->devnum, ctrlif, j);
 			continue;
 		}
 		iface = &config->interface[j];
-		if (iface->altsetting[0].bInterfaceClass != USB_CLASS_AUDIO) {
+		if (iface->altsetting[0].desc.bInterfaceClass != USB_CLASS_AUDIO) {
 			printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u interface %u is not an AudioClass interface\n",
 			       dev->devnum, ctrlif, j);
 			continue;
 		}
-		if (iface->altsetting[0].bInterfaceSubClass == 3) {
+		if (iface->altsetting[0].desc.bInterfaceSubClass == 3) {
 			printk(KERN_INFO "usbaudio: device %d audiocontrol interface %u interface %u MIDIStreaming not supported\n",
 			       dev->devnum, ctrlif, j);
 			continue;
 		}
-		if (iface->altsetting[0].bInterfaceSubClass != 2) {
+		if (iface->altsetting[0].desc.bInterfaceSubClass != 2) {
 			printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u interface %u invalid AudioClass subtype\n",
 			       dev->devnum, ctrlif, j);
 			continue;
@@ -3704,25 +3707,25 @@ static struct usb_audio_state *usb_audio_parsecontrol(struct usb_device *dev, un
 			printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u has only 1 altsetting.\n", dev->devnum, ctrlif);
 			continue;
 		}
-		if (iface->altsetting[0].bNumEndpoints > 0) {
+		if (iface->altsetting[0].desc.bNumEndpoints > 0) {
 			/* Check all endpoints; should they all have a bandwidth of 0 ? */
-			for (k = 0; k < iface->altsetting[0].bNumEndpoints; k++) {
-				if (iface->altsetting[0].endpoint[k].wMaxPacketSize > 0) {
+			for (k = 0; k < iface->altsetting[0].desc.bNumEndpoints; k++) {
+				if (iface->altsetting[0].endpoint[k].desc.wMaxPacketSize > 0) {
 					printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u endpoint %d does not have 0 bandwidth at alt[0]\n", dev->devnum, ctrlif, k);
 					break;
 				}
 			}
-			if (k < iface->altsetting[0].bNumEndpoints)
+			if (k < iface->altsetting[0].desc.bNumEndpoints)
 				continue;
 		}
-		if (iface->altsetting[1].bNumEndpoints < 1) {
+		if (iface->altsetting[1].desc.bNumEndpoints < 1) {
 			printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u interface %u has no endpoint\n",
 			       dev->devnum, ctrlif, j);
 			continue;
 		}
 		/* note: this requires the data endpoint to be ep0 and the optional sync
 		   ep to be ep1, which seems to be the case */
-		if (iface->altsetting[1].endpoint[0].bEndpointAddress & USB_DIR_IN) {
+		if (iface->altsetting[1].endpoint[0].desc.bEndpointAddress & USB_DIR_IN) {
 			if (numifin < USB_MAXINTERFACES) {
 				ifin[numifin++] = j;
 				usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
@@ -3769,7 +3772,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
-	struct usb_config_descriptor *config = dev->actconfig;	
+	struct usb_host_config *config = dev->actconfig;	
 	struct usb_audio_state *s;
 	unsigned char *buffer;
 	unsigned char buf[8];
@@ -3778,8 +3781,8 @@ static int usb_audio_probe(struct usb_interface *intf,
 
 #if 0
 	printk(KERN_DEBUG "usbaudio: Probing if %i: IC %x, ISC %x\n", ifnum,
-	       config->interface[ifnum].altsetting[0].bInterfaceClass,
-	       config->interface[ifnum].altsetting[0].bInterfaceSubClass);
+	       config->interface[ifnum].altsetting[0].desc.bInterfaceClass,
+	       config->interface[ifnum].altsetting[0].desc.bInterfaceSubClass);
 #endif
 
 	/*
@@ -3788,8 +3791,8 @@ static int usb_audio_probe(struct usb_interface *intf,
 	 */
 	i = dev->actconfig - config;
 
-	if (usb_set_configuration(dev, config->bConfigurationValue) < 0) {
-		printk(KERN_ERR "usbaudio: set_configuration failed (ConfigValue 0x%x)\n", config->bConfigurationValue);
+	if (usb_set_configuration(dev, config->desc.bConfigurationValue) < 0) {
+		printk(KERN_ERR "usbaudio: set_configuration failed (ConfigValue 0x%x)\n", config->desc.bConfigurationValue);
 		return -EIO;
 	}
 	ret = usb_get_descriptor(dev, USB_DT_CONFIG, i, buf, 8);
@@ -3810,7 +3813,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 		printk(KERN_ERR "usbaudio: cannot get config descriptor %d of device %d (error %d)\n", i, dev->devnum, ret);
 		return -EIO;
 	}
-	s = usb_audio_parsecontrol(dev, buffer, buflen, intf->altsetting->bInterfaceNumber);
+	s = usb_audio_parsecontrol(dev, buffer, buflen, intf->altsetting->desc.bInterfaceNumber);
 	if (s) {
 		dev_set_drvdata (&intf->dev, s);
 		return 0;

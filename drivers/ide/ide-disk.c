@@ -788,56 +788,7 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 
 #endif /* CONFIG_IDE_TASKFILE_IO */
 
-static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	MOD_INC_USE_COUNT;
-	if (drive->removable && drive->usage == 1) {
-		ide_task_t args;
-		memset(&args, 0, sizeof(ide_task_t));
-		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORLOCK;
-		args.command_type = ide_cmd_type_parser(&args);
-		check_disk_change(inode->i_bdev);
-		/*
-		 * Ignore the return code from door_lock,
-		 * since the open() has already succeeded,
-		 * and the door_lock is irrelevant at this point.
-		 */
-		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
-			drive->doorlocking = 0;
-	}
-	return 0;
-}
-
 static int do_idedisk_flushcache(ide_drive_t *drive);
-
-static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	if (drive->removable && !drive->usage) {
-		ide_task_t args;
-		memset(&args, 0, sizeof(ide_task_t));
-		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORUNLOCK;
-		args.command_type = ide_cmd_type_parser(&args);
-		invalidate_bdev(inode->i_bdev, 0);
-		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
-			drive->doorlocking = 0;
-	}
-	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (do_idedisk_flushcache(drive))
-			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
-				drive->name);
-	MOD_DEC_USE_COUNT;
-}
-
-static int idedisk_media_change (ide_drive_t *drive)
-{
-	/* if removable, always assume it was changed */
-	return drive->removable;
-}
-
-static void idedisk_revalidate (ide_drive_t *drive)
-{
-	ide_revalidate_drive(drive);
-}
 
 static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 {
@@ -1610,78 +1561,6 @@ static void idedisk_add_settings(ide_drive_t *drive)
 #endif
 }
 
-static int idedisk_suspend(struct device *dev, u32 state, u32 level)
-{
-	ide_drive_t *drive = dev->driver_data;
-
-	printk("Suspending device %p\n", dev->driver_data);
-
-	/* I hope that every freeze operation from the upper levels have
-	 * already been done...
-	 */
-
-	if (level != SUSPEND_SAVE_STATE)
-		return 0;
-	BUG_ON(in_interrupt());
-
-	printk("Waiting for commands to finish\n");
-
-	/* wait until all commands are finished */
-	/* FIXME: waiting for spinlocks should be done instead. */
-	if (!(HWGROUP(drive)))
-		printk("No hwgroup?\n");
-	while (HWGROUP(drive)->handler)
-		yield();
-
-	/* set the drive to standby */
-	printk(KERN_INFO "suspending: %s ", drive->name);
-	if (drive->driver) {
-		if (drive->driver->standby)
-			drive->driver->standby(drive);
-	}
-	drive->blocked = 1;
-
-	while (HWGROUP(drive)->handler)
-		yield();
-
-	return 0;
-}
-
-static int idedisk_resume(struct device *dev, u32 level)
-{
-	ide_drive_t *drive = dev->driver_data;
-
-	if (level != RESUME_RESTORE_STATE)
-		return 0;
-	if (!drive->blocked)
-		panic("ide: Resume but not suspended?\n");
-
-	drive->blocked = 0;
-	return 0;
-}
-
-
-/* This is just a hook for the overall driver tree.
- */
-
-static int idedisk_ioctl (ide_drive_t *drive, struct inode *inode,
-	struct file *file, unsigned int cmd, unsigned long arg)
-{
-#if 0
-HDIO_GET_ADDRESS
-HDIO_SET_ADDRESS
-HDIO_GET_WCACHE
-HDIO_SET_WCACHE
-HDIO_GET_ACOUSTIC
-HDIO_SET_ACOUSTIC
-HDIO_GET_MULTCOUNT
-HDIO_SET_MULTCOUNT
-HDIO_GET_NOWERR
-HDIO_SET_NOWERR
-#endif
-	return -EINVAL;
-}
-
 static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
@@ -1799,6 +1678,7 @@ static int idedisk_cleanup (ide_drive_t *drive)
 	if (ide_unregister_subdriver(drive))
 		return 1;
 	del_gendisk(g);
+	g->fops = ide_fops;
 	return 0;
 }
 
@@ -1821,22 +1701,85 @@ static ide_driver_t idedisk_driver = {
 	.resume			= do_idedisk_resume,
 	.flushcache		= do_idedisk_flushcache,
 	.do_request		= do_rw_disk,
-	.end_request		= NULL,
 	.sense			= idedisk_dump_status,
 	.error			= idedisk_error,
-	.ioctl			= idedisk_ioctl,
-	.open			= idedisk_open,
-	.release		= idedisk_release,
-	.media_change		= idedisk_media_change,
-	.revalidate		= idedisk_revalidate,
 	.pre_reset		= idedisk_pre_reset,
 	.capacity		= idedisk_capacity,
 	.special		= idedisk_special,
 	.proc			= idedisk_proc,
 	.attach			= idedisk_attach,
-	.ata_prebuilder		= NULL,
-	.atapi_prebuilder	= NULL,
 	.drives			= LIST_HEAD_INIT(idedisk_driver.drives),
+};
+
+static int idedisk_open(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	drive->usage++;
+	if (drive->removable && drive->usage == 1) {
+		ide_task_t args;
+		memset(&args, 0, sizeof(ide_task_t));
+		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORLOCK;
+		args.command_type = ide_cmd_type_parser(&args);
+		check_disk_change(inode->i_bdev);
+		/*
+		 * Ignore the return code from door_lock,
+		 * since the open() has already succeeded,
+		 * and the door_lock is irrelevant at this point.
+		 */
+		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
+			drive->doorlocking = 0;
+	}
+	return 0;
+}
+
+static int idedisk_release(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	if (drive->removable && drive->usage == 1) {
+		ide_task_t args;
+		memset(&args, 0, sizeof(ide_task_t));
+		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORUNLOCK;
+		args.command_type = ide_cmd_type_parser(&args);
+		invalidate_bdev(inode->i_bdev, 0);
+		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
+			drive->doorlocking = 0;
+	}
+	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
+		if (do_idedisk_flushcache(drive))
+			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
+				drive->name);
+	drive->usage--;
+	return 0;
+}
+
+static int idedisk_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	struct block_device *bdev = inode->i_bdev;
+	return generic_ide_ioctl(bdev, cmd, arg);
+}
+
+static int idedisk_media_changed(struct gendisk *disk)
+{
+	ide_drive_t *drive = disk->private_data;
+	/* if removable, always assume it was changed */
+	return drive->removable;
+}
+
+static int idedisk_revalidate_disk(struct gendisk *disk)
+{
+	ide_drive_t *drive = disk->private_data;
+	set_capacity(disk, current_capacity(drive));
+	return 0;
+}
+
+static struct block_device_operations idedisk_ops = {
+	.owner		= THIS_MODULE,
+	.open		= idedisk_open,
+	.release	= idedisk_release,
+	.ioctl		= idedisk_ioctl,
+	.media_changed	= idedisk_media_changed,
+	.revalidate_disk= idedisk_revalidate_disk
 };
 
 MODULE_DESCRIPTION("ATA DISK Driver");
@@ -1878,6 +1821,7 @@ static int idedisk_attach(ide_drive_t *drive)
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	g->flags |= GENHD_FL_DEVFS;
 	set_capacity(g, current_capacity(drive));
+	g->fops = &idedisk_ops;
 	add_disk(g);
 	return 0;
 failed:

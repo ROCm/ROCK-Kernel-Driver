@@ -14,6 +14,9 @@
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
+ *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
+ *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
+ *					a single port at the same time.
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -90,14 +93,35 @@ static inline int ipv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	int addr_type = ipv6_addr_type(&np->rcv_saddr);
 
-	return !inet_sk(sk2)->rcv_saddr || addr_type == IPV6_ADDR_ANY ||
-	       (sk2->family == AF_INET6 &&
-	        !ipv6_addr_cmp(&np->rcv_saddr,
-			       sk2->state != TCP_TIME_WAIT ?
-			       &inet6_sk(sk2)->rcv_saddr :
-			       &((struct tcp_tw_bucket *)sk)->v6_rcv_saddr)) ||
-	       (addr_type == IPV6_ADDR_MAPPED && sk2->family == AF_INET &&
-		inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr);
+	if (!inet_sk(sk2)->rcv_saddr && !ipv6_only_sock(sk))
+		return 1;
+
+	if (sk2->family == AF_INET6 &&
+	    ipv6_addr_any(&inet6_sk(sk2)->rcv_saddr) &&
+	    !(ipv6_only_sock(sk2) && addr_type == IPV6_ADDR_MAPPED))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_ANY &&
+	    (!ipv6_only_sock(sk) ||
+	     !(sk2->family == AF_INET6 ?
+	       ipv6_addr_type(&inet6_sk(sk2)->rcv_saddr) == IPV6_ADDR_MAPPED : 1)))
+		return 1;
+
+	if (sk2->family == AF_INET6 &&
+	    !ipv6_addr_cmp(&np->rcv_saddr,
+			   (sk2->state != TCP_TIME_WAIT ?
+			    &inet6_sk(sk2)->rcv_saddr :
+			    &((struct tcp_tw_bucket *)sk)->v6_rcv_saddr)))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_MAPPED &&
+	    !ipv6_only_sock(sk2) &&
+	    (!inet_sk(sk2)->rcv_saddr ||
+	     !inet_sk(sk)->rcv_saddr ||
+	     inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr))
+		return 1;
+
+	return 0;
 }
 
 static inline int tcp_v6_bind_conflict(struct sock *sk,
@@ -612,6 +636,9 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 
 		SOCK_DEBUG(sk, "connect: ipv4 mapped\n");
 
+		if (__ipv6_only_sock(sk))
+			return -ENETUNREACH;
+
 		sin.sin_family = AF_INET;
 		sin.sin_port = usin->sin6_port;
 		sin.sin_addr.s_addr = usin->sin6_addr.s6_addr32[3];
@@ -778,8 +805,8 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 		if (dst->error) {
 			sk->err_soft = -dst->error;
-		} else if (tp->pmtu_cookie > dst->pmtu) {
-			tcp_sync_mss(sk, dst->pmtu);
+		} else if (tp->pmtu_cookie > dst_pmtu(dst)) {
+			tcp_sync_mss(sk, dst_pmtu(dst));
 			tcp_simple_retransmit(sk);
 		} /* else let the usual retransmit timer handle it */
 		dst_release(dst);
@@ -1389,8 +1416,8 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		newtp->ext_header_len = newnp->opt->opt_nflen +
 					newnp->opt->opt_flen;
 
-	tcp_sync_mss(newsk, dst->pmtu);
-	newtp->advmss = dst->advmss;
+	tcp_sync_mss(newsk, dst_pmtu(dst));
+	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);
 	tcp_initialize_rcv_mss(newsk);
 
 	newinet->daddr = newinet->saddr = newinet->rcv_saddr = LOOPBACK4_IPV6;
@@ -1469,8 +1496,6 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	 *	socket locking is here for SMP purposes as backlog rcv
 	 *	is currently called with bh processing disabled.
 	 */
-
-  	IP6_INC_STATS_BH(Ip6InDelivers);
 
 	/* Do Stevens' IPV6_PKTOPTIONS.
 

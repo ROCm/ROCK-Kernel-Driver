@@ -1,100 +1,50 @@
+/*
+ *  linux/arch/parisc/kernel/pdc_console.c
+ *
+ *  The PDC console is a simple console, which can be used for debugging 
+ *  boot related problems on HP PA-RISC machines.
+ *
+ *  This code uses the ROM (=PDC) based functions to read and write characters
+ *  from and to PDC's boot path.
+ *  Since all character read from that path must be polled, this code never
+ *  can or will be a fully functional linux console.
+ */
+
+/* Define EARLY_BOOTUP_DEBUG to debug kernel related boot problems. 
+ * On production kernels EARLY_BOOTUP_DEBUG should be undefined. */
+#undef EARLY_BOOTUP_DEBUG
+
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/console.h>
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/major.h>
 #include <asm/page.h>
 #include <asm/types.h>
 #include <asm/system.h>
-#include <asm/pdc.h>	/* for iodc_call() proto and friends */
-#include <asm/real.h>
+#include <asm/pdc.h>		/* for iodc_call() proto and friends */
 
-static int __attribute__((aligned(8)))   iodc_retbuf[32];
-static char __attribute__((aligned(64))) iodc_dbuf[4096];
-
-/*
- * pdc_putc:
- * Console character print using IODC.
- *
- * Note that only these special chars are architected for console IODC io:
- * BEL, BS, CR, and LF. Others are passed through.
- * Since the HP console requires CR+LF to perform a 'newline', we translate
- * "\n" to "\r\n".
- */
-
-static int posx;	/* for simple TAB-Simulation... */
-
-/* XXX Should we spinlock posx usage */
-
-void pdc_putc(unsigned char c)
-{
-	unsigned int n;
-	unsigned long flags;
-
-	switch (c) {
-	case '\n':
-		iodc_dbuf[0] = '\r'; 
-		iodc_dbuf[1] = '\n';
-               	n = 2;
-               	posx = 0;
-		break;
-	case '\t':
-		pdc_putc(' ');
-		while (posx & 7) 	/* expand TAB */
-			pdc_putc(' ');
-		return;		/* return since IODC can't handle this */
-	case '\b':
-		posx-=2;		/* BS */
-	default:
-		iodc_dbuf[0] = c;
-		n = 1;
-		posx++;
-		break;
-	}
-	{
-		real32_call(PAGE0->mem_cons.iodc_io,
-			(unsigned long)PAGE0->mem_cons.hpa, ENTRY_IO_COUT,
-			PAGE0->mem_cons.spa, __pa(PAGE0->mem_cons.dp.layers),
-			__pa(iodc_retbuf), 0, __pa(iodc_dbuf), n, 0);
-	}
-}
 
 static void pdc_console_write(struct console *co, const char *s, unsigned count)
 {
 	while(count--)
-		pdc_putc(*s++);
+		pdc_iodc_putc(*s++);
 }
 
-int pdc_console_wait_key(struct console *co)
+void pdc_outc(unsigned char c)
 {
-	int ch = 'X';
-	int status;
-
-	/* Bail if no console input device. */
-	if (!PAGE0->mem_kbd.iodc_io)
-		return 0;
-	
-	/* wait for a keyboard (rs232)-input */
-	do {
-		unsigned long flags;
-
-		save_flags(flags);
-		cli();
-		status = real32_call(PAGE0->mem_kbd.iodc_io,
-			(unsigned long)PAGE0->mem_kbd.hpa, ENTRY_IO_CIN,
-			PAGE0->mem_kbd.spa, __pa(PAGE0->mem_kbd.dp.layers),
-			__pa(iodc_retbuf), 0, __pa(iodc_dbuf), 1, 0);
-		restore_flags(flags);
-		ch = *iodc_dbuf;	/* save the character directly to ch */
-	} while (*iodc_retbuf == 0);	/* wait for a key */
-	return ch;
+	pdc_iodc_outc(c);
 }
 
-int pdc_getc(void)
+
+int pdc_console_poll_key(struct console *co)
 {
-	return pdc_console_wait_key(NULL);
+	return pdc_iodc_getc();
 }
 
 static int pdc_console_setup(struct console *co, char *options)
@@ -102,17 +52,34 @@ static int pdc_console_setup(struct console *co, char *options)
 	return 0;
 }
 
+#ifdef CONFIG_PDC_CONSOLE
+static kdev_t pdc_console_device (struct console *c)
+{
+        return mk_kdev(PDCCONS_MAJOR, 0);
+}
+#endif
+
+#ifdef CONFIG_PDC_CONSOLE
+#define PDC_CONSOLE_DEVICE pdc_console_device
+#else
+#define PDC_CONSOLE_DEVICE NULL
+#endif
+
 static struct console pdc_cons = {
 	name:		"ttyB",
 	write:		pdc_console_write,
+	device:		PDC_CONSOLE_DEVICE,
 	setup:		pdc_console_setup,
-	flags:		CON_PRINTBUFFER|CON_ENABLED,  // |CON_CONSDEV,
+	flags:		CON_PRINTBUFFER|CON_ENABLED,
 	index:		-1,
 };
 
 static int pdc_console_initialized;
+extern unsigned long con_start;	/* kernel/printk.c */
+extern unsigned long log_end;	/* kernel/printk.c */
 
-void pdc_console_init(void)
+
+static void pdc_console_init_force(void)
 {
 	if (pdc_console_initialized)
 		return;
@@ -122,23 +89,32 @@ void pdc_console_init(void)
 	if (PAGE0->mem_cons.cl_class == CL_DUPLEX)
 		memcpy(&PAGE0->mem_kbd, &PAGE0->mem_cons, sizeof(PAGE0->mem_cons));
 
-	pdc_console_write(0, "PDC Console Initialized\n", 24);
 	/* register the pdc console */
 	register_console(&pdc_cons);
+}
+
+void pdc_console_init(void)
+{
+#if defined(EARLY_BOOTUP_DEBUG) || defined(CONFIG_PDC_CONSOLE)
+	pdc_console_init_force();
+#endif
+#ifdef EARLY_BOOTUP_DEBUG
+	printk(KERN_INFO "Initialized PDC Console for debugging.\n");
+#endif
 }
 
 
 /* Unregister the pdc console with the printk console layer */
 void pdc_console_die(void)
 {
-	printk("Switching from PDC console\n");
 	if (!pdc_console_initialized)
 		return;
 	--pdc_console_initialized;
-	
-#ifdef CONFIG_VT_CONSOLE
-	schedule_console_callback();
-#endif
+
+	printk(KERN_INFO "Switching from PDC console\n");
+
+	/* Don't repeat what we've already printed */
+	con_start = log_end;
 
 	unregister_console(&pdc_cons);
 }
@@ -155,17 +131,17 @@ void pdc_console_die(void)
 void pdc_console_restart(void)
 {
 	struct console *console;
-	extern int log_size;
 
 	if (pdc_console_initialized)
 		return;
 
-	while ((console = console_drivers) != (struct console *)0)
+	while ((console = console_drivers) != NULL)
 		unregister_console(console_drivers);
 
-	log_size = 0;
-	pdc_console_init();
-	printk("Switched to PDC console\n");
-	return;
+	/* Don't repeat what we've already printed */
+	con_start = log_end;
+	
+	/* force registering the pdc console */
+	pdc_console_init_force();
 }
 

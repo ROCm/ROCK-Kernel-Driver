@@ -2,7 +2,7 @@
  * tg3.h: Definitions for Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
- * Copyright (C) 2001 Jeff Garzik (jgarzik@mandrakesoft.com)
+ * Copyright (C) 2001 Jeff Garzik (jgarzik@pobox.com)
  */
 
 #ifndef _T3_H

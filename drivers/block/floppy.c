@@ -2158,12 +2158,13 @@ static void bad_flp_intr(void)
 		DRS->track = NEED_2_RECAL;
 }
 
-static void set_floppy(kdev_t device)
+static void set_floppy(int drive)
 {
-	if (TYPE(device))
-		_floppy = TYPE(device) + floppy_type;
+	int type = ITYPE(UDRS->fd_device);
+	if (type)
+		_floppy = floppy_type + type;
 	else
-		_floppy = current_type[ DRIVE(device) ];
+		_floppy = current_type[ drive ];
 }
 
 /*
@@ -2269,7 +2270,7 @@ static int do_format(kdev_t device, struct format_descr *tmp_format_req)
 	int drive=DRIVE(device);
 
 	LOCK_FDC(drive,1);
-	set_floppy(device);
+	set_floppy(drive);
 	if (!_floppy ||
 	    _floppy->track > DP->tracks ||
 	    tmp_format_req->track >= _floppy->track ||
@@ -2297,7 +2298,7 @@ static inline void end_request(struct request *req, int uptodate)
 {
 	if (end_that_request_first(req, uptodate, current_count_sectors))
 		return;
-	add_blkdev_randomness(MAJOR_NR);
+	add_disk_randomness(req->rq_disk);
 	floppy_off((int)req->rq_disk->private_data);
 	blkdev_dequeue_request(req);
 	end_that_request_last(req);
@@ -2631,7 +2632,7 @@ static int make_raw_rw_request(void)
 		return 0;
 	}
 
-	set_fdc(DRIVE(current_req->rq_dev));
+	set_fdc((int)current_req->rq_disk->private_data);
 
 	raw_cmd = &default_raw_cmd;
 	raw_cmd->flags = FD_RAW_SPIN | FD_RAW_NEED_DISK | FD_RAW_NEED_DISK |
@@ -2902,7 +2903,7 @@ static int make_raw_rw_request(void)
 static void redo_fd_request(void)
 {
 #define REPEAT {request_done(0); continue; }
-	kdev_t device;
+	int drive;
 	int tmp;
 
 	lastredo = jiffies;
@@ -2919,11 +2920,11 @@ static void redo_fd_request(void)
 			}
 			current_req = req;
 		}
-		device = current_req->rq_dev;
-		set_fdc(DRIVE(device));
+		drive = (int)current_req->rq_disk->private_data;
+		set_fdc(drive);
 		reschedule_timeout(current_reqD, "redo fd request", 0);
 
-		set_floppy(device);
+		set_floppy(drive);
 		raw_cmd = & default_raw_cmd;
 		raw_cmd->flags = 0;
 		if (start_motor(redo_fd_request)) return;
@@ -3594,7 +3595,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			if (type)
 				return -EINVAL;
 			LOCK_FDC(drive,1);
-			set_floppy(device);
+			set_floppy(drive);
 			CALL(i = raw_cmd_ioctl(cmd,(void *) param));
 			process_fd_request();
 			return i;
@@ -4210,6 +4211,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	    !(allowed_drive_mask & (1 << drive)) ||
 	    fdc_state[FDC(drive)].version == FDC_NONE)
 		return NULL;
+	*part = 0;
 	return get_disk(disks[drive]);
 }
 

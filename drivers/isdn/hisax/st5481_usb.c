@@ -182,21 +182,28 @@ static void usb_int_complete(struct urb *urb)
 	u_char irqbyte;
 	struct st5481_adapter *adapter = urb->context;
 	int j;
+	int status;
 
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
-			WARN("urb status %d",urb->status);
-			urb->actual_length = 0;
-		} else {
-			DBG(1,"urb killed");
-			return; // Give up
-		}
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		DBG(1, "urb shutting down with status: %d", urb->status);
+		return;
+	default:
+		WARN("nonzero urb status received: %d", urb->status);
+		goto exit;
 	}
+
 	
 	DBG_PACKET(1, data, INT_PKT_SIZE);
 		
 	if (urb->actual_length == 0) {
-		return;
+		goto exit;
 	}
 
 	irqbyte = data[MPINT];
@@ -221,6 +228,11 @@ static void usb_int_complete(struct urb *urb)
 		adapter->bcs[j].b_out.flow_event |= data[FFINT_B1 + j];
 
 	urb->actual_length = 0;
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		WARN("usb_submit_urb failed with result %d", status);
 }
 
 /* ======================================================================
@@ -232,15 +244,15 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	struct usb_device *dev = adapter->usb_dev;
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
 	struct st5481_intr *intr = &adapter->intr;
-	struct usb_interface_descriptor *altsetting;
-	struct usb_endpoint_descriptor *endpoint;
+	struct usb_host_interface *altsetting;
+	struct usb_host_endpoint *endpoint;
 	int status;
 	struct urb *urb;
 	u_char *buf;
 	
 	DBG(1,"");
 	
-	if ((status = usb_set_configuration (dev,dev->config[0].bConfigurationValue)) < 0) {
+	if ((status = usb_set_configuration (dev,dev->config[0].desc.bConfigurationValue)) < 0) {
 		WARN("set_configuration failed,status=%d",status);
 		return status;
 	}
@@ -249,14 +261,14 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	altsetting = &(dev->config->interface[0].altsetting[3]);	
 
 	// Check if the config is sane
-	if ( altsetting->bNumEndpoints != 7 ) {
-		WARN("expecting 7 got %d endpoints!", altsetting->bNumEndpoints);
+	if ( altsetting->desc.bNumEndpoints != 7 ) {
+		WARN("expecting 7 got %d endpoints!", altsetting->desc.bNumEndpoints);
 		return -EINVAL;
 	}
 
 	// The descriptor is wrong for some early samples of the ST5481 chip
-	altsetting->endpoint[3].wMaxPacketSize = 32;
-	altsetting->endpoint[4].wMaxPacketSize = 32;
+	altsetting->endpoint[3].desc.wMaxPacketSize = 32;
+	altsetting->endpoint[4].desc.wMaxPacketSize = 32;
 
 	// Use alternative setting 3 on interface 0 to have 2B+D
 	if ((status = usb_set_interface (dev, 0, 3)) < 0) {
@@ -272,7 +284,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	ctrl->urb = urb;
 	
 	// Fill the control URB
-	FILL_CONTROL_URB (urb, dev, 
+	usb_fill_control_urb (urb, dev, 
 			  usb_sndctrlpipe(dev, 0),
 			  NULL, NULL, 0, usb_ctrl_complete, adapter);
 
@@ -294,11 +306,11 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	endpoint = &altsetting->endpoint[EP_INT-1];
 				
 	// Fill the interrupt URB
-	FILL_INT_URB(urb, dev,
-		     usb_rcvintpipe(dev, endpoint->bEndpointAddress),
+	usb_fill_int_urb(urb, dev,
+		     usb_rcvintpipe(dev, endpoint->desc.bEndpointAddress),
 		     buf, INT_PKT_SIZE,
 		     usb_int_complete, adapter,
-		     endpoint->bInterval);
+		     endpoint->desc.bInterval);
 		
 	return 0;
 }
@@ -397,7 +409,7 @@ fill_isoc_urb(struct urb *urb, struct usb_device *dev,
 	urb->actual_length = 0;
 	urb->complete=complete;
 	urb->context=context;
-	urb->transfer_flags=USB_ISO_ASAP;
+	urb->transfer_flags=URB_ISO_ASAP;
 	for (k = 0; k < num_packets; k++) {
 		urb->iso_frame_desc[k].offset = packet_size * k;
 		urb->iso_frame_desc[k].length = packet_size;

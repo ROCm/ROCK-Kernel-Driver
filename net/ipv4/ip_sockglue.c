@@ -726,7 +726,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 			val = 0;
 			dst = sk_dst_get(sk);
 			if (dst) {
-				val = dst->pmtu;
+				val = dst_pmtu(dst) - dst->header_len;
 				dst_release(dst);
 			}
 			if (!val) {

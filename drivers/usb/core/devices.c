@@ -234,7 +234,7 @@ static char *usb_dump_endpoint_descriptor (
 
 static char *usb_dump_interface_descriptor(char *start, char *end, const struct usb_interface *iface, int setno)
 {
-	struct usb_interface_descriptor *desc = &iface->altsetting[setno];
+	struct usb_interface_descriptor *desc = &iface->altsetting[setno].desc;
 
 	if (start > end)
 		return start;
@@ -259,15 +259,15 @@ static char *usb_dump_interface(
 	const struct usb_interface *iface,
 	int setno
 ) {
-	struct usb_interface_descriptor *desc = &iface->altsetting[setno];
+	struct usb_host_interface *desc = &iface->altsetting[setno];
 	int i;
 
 	start = usb_dump_interface_descriptor(start, end, iface, setno);
-	for (i = 0; i < desc->bNumEndpoints; i++) {
+	for (i = 0; i < desc->desc.bNumEndpoints; i++) {
 		if (start > end)
 			return start;
 		start = usb_dump_endpoint_descriptor(speed,
-				start, end, desc->endpoint + i);
+				start, end, &desc->endpoint[i].desc);
 	}
 	return start;
 }
@@ -288,7 +288,7 @@ static char *usb_dump_config_descriptor(char *start, char *end, const struct usb
 			 desc->bNumInterfaces,
 			 desc->bConfigurationValue,
 			 desc->bmAttributes,
-			 desc->MaxPower * 2);
+			 desc->bMaxPower * 2);
 	return start;
 }
 
@@ -296,7 +296,7 @@ static char *usb_dump_config (
 	int speed,
 	char *start,
 	char *end,
-	const struct usb_config_descriptor *config,
+	const struct usb_host_config *config,
 	int active
 )
 {
@@ -307,8 +307,8 @@ static char *usb_dump_config (
 		return start;
 	if (!config)		/* getting these some in 2.3.7; none in 2.3.6 */
 		return start + sprintf(start, "(null Cfg. desc.)\n");
-	start = usb_dump_config_descriptor(start, end, config, active);
-	for (i = 0; i < config->bNumInterfaces; i++) {
+	start = usb_dump_config_descriptor(start, end, &config->desc, active);
+	for (i = 0; i < config->desc.bNumInterfaces; i++) {
 		interface = config->interface + i;
 		if (!interface)
 			break;

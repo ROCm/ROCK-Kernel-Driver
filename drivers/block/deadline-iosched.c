@@ -118,6 +118,7 @@ deadline_find_hash(struct deadline_data *dd, sector_t offset)
 
 	while ((entry = next) != hash_list) {
 		next = entry->next;
+		
 		drq = list_entry_hash(entry);
 
 		BUG_ON(!drq->hash_valid_count);

@@ -10,25 +10,6 @@
 #include <linux/msdos_fs.h>
 #include <linux/buffer_head.h>
 
-#if 0
-#  define PRINTK(x)	printk x
-#else
-#  define PRINTK(x)
-#endif
-#define Printk(x)	printk x
-
-/* Well-known binary file extensions - of course there are many more */
-
-static char ascii_extensions[] =
-  "TXT" "ME " "HTM" "1ST" "LOG" "   " 	/* text files */
-  "C  " "H  " "CPP" "LIS" "PAS" "FOR"  /* programming languages */
-  "F  " "MAK" "INC" "BAS" 		/* programming languages */
-  "BAT" "SH "				/* program code :) */
-  "INI"					/* config files */
-  "PBM" "PGM" "DXF"			/* graphics */
-  "TEX";				/* TeX */
-
-
 /*
  * fat_fs_panic reports a severe file system problem and sets the file system
  * read-only. The file system can be made writable again by remounting it.
@@ -49,36 +30,10 @@ void fat_fs_panic(struct super_block *s, const char *fmt, ...)
 	if (not_ro)
 		s->s_flags |= MS_RDONLY;
 
-	printk("FAT: Filesystem panic (dev %s)\n"
+	printk(KERN_ERR "FAT: Filesystem panic (dev %s)\n"
 	       "    %s\n", s->s_id, panic_msg);
 	if (not_ro)
-		printk("    File system has been set read-only\n");
-}
-
-
-/*
- * fat_is_binary selects optional text conversion based on the conversion mode
- * and the extension part of the file name.
- */
-
-int fat_is_binary(char conversion,char *extension)
-{
-	char *walk;
-
-	switch (conversion) {
-		case 'b':
-			return 1;
-		case 't':
-			return 0;
-		case 'a':
-			for (walk = ascii_extensions; *walk; walk += 3)
-				if (!strncmp(extension,walk,3)) return 0;
-			return 1;	/* default binary conversion */
-		default:
-			printk("Invalid conversion mode - defaulting to "
-			    "binary.\n");
-			return 1;
-	}
+		printk(KERN_ERR "    File system has been set read-only\n");
 }
 
 void lock_fat(struct super_block *sb)
@@ -103,25 +58,25 @@ void fat_clusters_flush(struct super_block *sb)
 	if (MSDOS_SB(sb)->free_clusters == -1)
 		return;
 
-	bh = fat_bread(sb, MSDOS_SB(sb)->fsinfo_sector);
+	bh = sb_bread(sb, MSDOS_SB(sb)->fsinfo_sector);
 	if (bh == NULL) {
-		printk("FAT bread failed in fat_clusters_flush\n");
+		printk(KERN_ERR "FAT bread failed in fat_clusters_flush\n");
 		return;
 	}
 
 	fsinfo = (struct fat_boot_fsinfo *)bh->b_data;
 	/* Sanity check */
 	if (!IS_FSINFO(fsinfo)) {
-		printk("FAT: Did not find valid FSINFO signature.\n"
+		printk(KERN_ERR "FAT: Did not find valid FSINFO signature.\n"
 		       "     Found signature1 0x%08x signature2 0x%08x"
 		       " (sector = %lu)\n",
 		       CF_LE_L(fsinfo->signature1), CF_LE_L(fsinfo->signature2),
 		       MSDOS_SB(sb)->fsinfo_sector);
 	} else {
 		fsinfo->free_clusters = CF_LE_L(MSDOS_SB(sb)->free_clusters);
-		fat_mark_buffer_dirty(sb, bh);
+		mark_buffer_dirty(bh);
 	}
-	fat_brelse(sb, bh);
+	brelse(bh);
 }
 
 /*
@@ -205,7 +160,7 @@ int fat_add_cluster(struct inode *inode)
 		mark_inode_dirty(inode);
 	}
 	if (file_cluster != (inode->i_blocks >> (cluster_bits - 9))) {
-		printk ("file_cluster badly computed!!! %d <> %ld\n",
+		printk (KERN_ERR "file_cluster badly computed!!! %d <> %ld\n",
 			file_cluster, inode->i_blocks >> (cluster_bits - 9));
 		fat_cache_inval_inode(inode);
 	}
@@ -233,27 +188,19 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 	
 	sector = MSDOS_SB(sb)->data_start + (nr - 2) * cluster_size;
 	last_sector = sector + cluster_size;
-	if (MSDOS_SB(sb)->cvf_format
-	    && MSDOS_SB(sb)->cvf_format->zero_out_cluster) {
-		res = ERR_PTR(-EIO);
-		MSDOS_SB(sb)->cvf_format->zero_out_cluster(inode, nr);
-	} else {
-		for ( ; sector < last_sector; sector++) {
-			if (!(bh = fat_getblk(sb, sector)))
-				printk("FAT: fat_getblk() failed\n");
-			else {
-				memset(bh->b_data, 0, sb->s_blocksize);
-				fat_set_uptodate(sb, bh, 1);
-				fat_mark_buffer_dirty(sb, bh);
-				if (!res)
-					res = bh;
-				else
-					fat_brelse(sb, bh);
-			}
+	for ( ; sector < last_sector; sector++) {
+		if ((bh = sb_getblk(sb, sector))) {
+			memset(bh->b_data, 0, sb->s_blocksize);
+			set_buffer_uptodate(bh);
+			mark_buffer_dirty(bh);
+			if (!res)
+				res = bh;
+			else
+				brelse(bh);
 		}
-		if (res == NULL)
-			res = ERR_PTR(-EIO);
 	}
+	if (res == NULL)
+		res = ERR_PTR(-EIO);
 	if (inode->i_size & (sb->s_blocksize - 1)) {
 		fat_fs_panic(sb, "Odd directory size");
 		inode->i_size = (inode->i_size + sb->s_blocksize)
@@ -261,7 +208,6 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 	}
 	inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
 	MSDOS_I(inode)->mmu_private += 1 << MSDOS_SB(sb)->cluster_bits;
-	mark_inode_dirty(inode);
 
 	return res;
 }
@@ -347,7 +293,7 @@ int fat__get_entry(struct inode *dir, loff_t *pos,struct buffer_head **bh,
 next:
 	offset = *pos;
 	if (*bh)
-		fat_brelse(sb, *bh);
+		brelse(*bh);
 
 	*bh = NULL;
 	iblock = *pos >> sb->s_blocksize_bits;
@@ -355,9 +301,10 @@ next:
 	if (sector <= 0)
 		return -1;	/* beyond EOF or error */
 
-	*bh = fat_bread(sb, sector);
+	*bh = sb_bread(sb, sector);
 	if (*bh == NULL) {
-		printk("FAT: Directory bread(block %d) failed\n", sector);
+		printk(KERN_ERR "FAT: Directory bread(block %d) failed\n",
+		       sector);
 		/* skip this block */
 		*pos = (iblock + 1) << sb->s_blocksize_bits;
 		goto next;
@@ -430,7 +377,7 @@ static int raw_scan_sector(struct super_block *sb,int sector,const char *name,
 	struct msdos_dir_entry *data;
 	int entry,start,done;
 
-	if (!(bh = fat_bread(sb,sector)))
+	if (!(bh = sb_bread(sb,sector)))
 		return -EIO;
 	data = (struct msdos_dir_entry *) bh->b_data;
 	for (entry = 0; entry < MSDOS_SB(sb)->dir_per_block; entry++) {
@@ -452,7 +399,7 @@ static int raw_scan_sector(struct super_block *sb,int sector,const char *name,
 				start |= (CF_LE_W(data[entry].starthi) << 16);
 			}
 			if (!res_bh)
-				fat_brelse(sb, bh);
+				brelse(bh);
 			else {
 				*res_bh = bh;
 				*res_de = &data[entry];
@@ -460,7 +407,7 @@ static int raw_scan_sector(struct super_block *sb,int sector,const char *name,
 			return start;
 		}
 	}
-	fat_brelse(sb, bh);
+	brelse(bh);
 	return -ENOENT;
 }
 

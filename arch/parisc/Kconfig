@@ -1,0 +1,424 @@
+#
+# For a description of the syntax of this configuration file,
+# see the Configure script.
+#
+
+mainmenu "Linux/PA-RISC Kernel Configuration"
+
+config PARISC
+	bool
+	default y
+	help
+	  The PA-RISC microprocessor is designed by Hewlett-Packard and used
+	  in many of their workstations & servers (HP9000 700 and 800 series,
+	  and later HP3000 series).  The PA-RISC Linux project home page is
+	  at <http://www.parisc-linux.org/>.
+
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
+config UID16
+	bool
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+
+config GENERIC_ISA_DMA
+	bool
+
+# unless you want to implement ACPI on PA-RISC ... ;-)
+config PM
+	bool
+
+source "init/Kconfig"
+
+
+menu "Processor type and features"
+
+choice
+	prompt "Processor type"
+	default PA7000
+
+config PA7000
+	bool "PA7000/PA7100"
+	---help---
+	  This is the processor type of your CPU. This information is used for
+	  optimizing purposes.  In order to compile a kernel that can run on
+	  all PA CPUs (albeit not optimally fast), you can specify "PA7000"
+	  here.
+
+	  Specifying "PA8000" here will allow you to select a 64-bit kernel
+	  which is required on some machines.
+
+config PA7100LC
+	bool "PA7100LC/PA7300LC"
+	help
+	  Select this option for a 7100LC or 7300LC processor, as used
+	  in the 712, 715/Mirage, A180, B132, C160L and some other machines.
+
+config PA7200
+	bool "PA7200"
+	help
+	  Select this option for the PCX-T' processor, as used in C110, D100
+	  and similar machines.
+
+config PA8X00
+	bool "PA8000 and up"
+	help
+	  Select this option for PCX-U to PCX-W2 processors.
+
+endchoice
+
+# Define implied options from the CPU selection here
+
+config PA20
+	bool
+	depends on PA8X00
+	default y
+
+config PA11
+	bool
+	depends on PA7000 || PA7100LC || PA7200
+	default y
+
+config PARISC64
+	bool "64-bit kernel"
+	depends on PA8X00
+
+config PDC_NARROW
+	bool "32-bit firmware"
+	depends on PARISC64
+
+config SMP
+	bool "Symmetric multi-processing support"
+	---help---
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, like most personal computers, say N. If
+	  you have a system with more than one CPU, say Y.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  machines, but will use only one CPU of a multiprocessor machine. If
+	  you say Y here, the kernel will run on many, but not all,
+	  singleprocessor machines. On a singleprocessor machine, the kernel
+	  will run faster if you say N here.
+
+	  See also the <file:Documentation/smp.tex>,
+	  <file:Documentation/smp.txt>, <file:Documentation/nmi_watchdog.txt>
+	  and the SMP-HOWTO available at
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you don't know what to do here, say N.
+
+config PREEMPT
+	bool
+#	bool "Preemptible Kernel"
+	default n
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	depends on SMP
+	default "32"
+
+endmenu
+
+
+source "drivers/parisc/Kconfig"
+
+
+menu "Executable file formats"
+
+config KCORE_ELF
+	bool
+	depends on PROC_FS
+	default y
+
+config BINFMT_SOM
+	tristate "Kernel support for SOM binaries"
+	help
+	  SOM is a binary executable format inherited from HP/UX.  Say Y here
+	  to be able to load and execute SOM binaries directly.
+
+config BINFMT_ELF
+	tristate "Kernel support for ELF binaries"
+	---help---
+	  ELF (Executable and Linkable Format) is a format for libraries and
+	  executables used across different architectures and operating
+	  systems. Saying Y here will enable your kernel to run ELF binaries
+	  and enlarge it by about 13 KB. ELF support under Linux has now all
+	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+	  because it is portable (this does *not* mean that you will be able
+	  to run executables from different architectures or operating systems
+	  however) and makes building run-time libraries very easy. Many new
+	  executables are distributed solely in ELF format. You definitely
+	  want to say Y here.
+
+	  Information about ELF is contained in the ELF HOWTO available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you find that after upgrading from Linux kernel 1.2 and saying Y
+	  here, you still can't run any ELF binaries (they just crash), then
+	  you'll have to install the newest ELF runtime libraries, including
+	  ld.so (check the file <file:Documentation/Changes> for location and
+	  latest version).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  some crucial programs on your system might be in ELF format.
+
+config BINFMT_MISC
+	tristate "Kernel support for MISC binaries"
+	---help---
+	  If you say Y here, it will be possible to plug wrapper-driven binary
+	  formats into the kernel. You will like this especially when you use
+	  programs that need an interpreter to run like Java, Python or
+	  Emacs-Lisp. It's also useful if you often run DOS executables under
+	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  registered such a binary class with the kernel, you can start one of
+	  those programs simply by typing in its name at a shell prompt; Linux
+	  will automatically feed it to the correct interpreter.
+
+	  You can do other nice things, too. Read the file
+	  <file:Documentation/binfmt_misc.txt> to learn how to use this
+	  feature, and <file:Documentation/java.txt> for information about how
+	  to include Java support.
+
+	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+	  use this part of the kernel.
+
+	  You may say M here for module support and later load the module when
+	  you have use for it; the module is called binfmt_misc.o. If you
+	  don't know what to answer at this point, say Y.
+
+endmenu
+
+# source "drivers/mtd/Kconfig"
+
+source "drivers/parport/Kconfig"
+
+# source "drivers/pnp/Kconfig"
+
+source "drivers/block/Kconfig"
+
+menu "ATA/IDE/MFM/RLL support"
+	depends on SUPERIO
+
+config IDE
+	tristate "ATA/IDE/MFM/RLL support"
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+menu "SCSI support"
+
+config SCSI
+	tristate "SCSI support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you want support for the parallel
+	  port version of the 100 MB IOMEGA ZIP drive.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
+source drivers/scsi/Kconfig
+
+endmenu
+
+source "drivers/md/Kconfig"
+
+#source drivers/message/fusion/Kconfig
+
+#source drivers/ieee1394/Kconfig
+
+#source drivers/message/i2o/Kconfig
+
+source "net/Kconfig"
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+endmenu
+
+#source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+#source "drivers/isdn/Kconfig"
+
+#source "drivers/telephony/Kconfig"
+
+# input before char - char/joystick depends on it. As does USB.
+source "drivers/input/Kconfig"
+
+source "drivers/char/Kconfig"
+
+#source "drivers/misc/Kconfig"
+
+source "drivers/media/Kconfig"
+
+source "fs/Kconfig"
+
+
+menu "Console drivers"
+	depends on VT
+
+config STI_CONSOLE
+	bool "STI console"
+	help
+	  The STI console is the builtin display/keyboard on HP-PARISC
+	  machines.  Say Y here to build support for it into your kernel.
+	  The alternative is to use your primary serial port as a console.
+
+config DUMMY_CONSOLE
+	bool
+	depends on STI_CONSOLE || SERIAL_8250_CONSOLE
+	default y
+
+source "drivers/video/Kconfig"
+
+endmenu
+
+menu "Sound"
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/Kconfig"
+
+endmenu
+
+source "drivers/usb/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
+menu "Kernel hacking"
+
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+	help
+	  Say Y here if you are developing drivers or trying to debug and
+	  identify kernel problems.
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to have the kernel do limited verification on memory
+	  allocation as well as poisoning memory on free to catch use of freed
+	  memory.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config KALLSYMS
+	bool "Load all symbols for debugging/kksymoops"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to let the kernel print out symbolic crash information and
+	  symbolic stack backtraces. This increases the size of the kernel
+	  somewhat, as all symbols have to be loaded into the kernel image.
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+

@@ -251,7 +251,7 @@ void mac_init_IRQ(void)
 #endif /* SHUTUP_SONIC */
 
 	/* 
-	 * Now register the handlers for the the master IRQ handlers
+	 * Now register the handlers for the master IRQ handlers
 	 * at levels 1-7. Most of the work is done elsewhere.
 	 */
 
@@ -345,7 +345,7 @@ void mac_do_irq_list(int irq, struct pt_regs *fp)
 	irq_node_t *node, *slow_nodes;
 	unsigned long cpu_flags;
 
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 
 #ifdef DEBUG_SPURIOUS
 	if (!mac_irq_list[irq] && (console_loglevel > 7)) {
@@ -620,7 +620,7 @@ int show_mac_interrupts(struct seq_file *p, void *v)
 			case 8: base = "bbn";
 				break;
 		}
-		seq_printf(p, "%4s %2d: %10u ", base, i, kstat.irqs[0][i]);
+		seq_printf(p, "%4s %2d: %10u ", base, i, kstat_cpu(0).irqs[i]);
 
 		do {
 			if (node->flags & IRQ_FLG_FAST) {

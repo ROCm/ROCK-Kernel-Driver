@@ -151,9 +151,6 @@ void __init config_sun3(void)
         mach_default_handler = &sun3_default_handler;
         mach_request_irq     =  sun3_request_irq;
         mach_free_irq        =  sun3_free_irq;
-#ifdef CONFIG_VT
-//	mach_keyb_init       =  sun3_keyb_init;
-#endif
 	enable_irq     	     =  sun3_enable_irq;
         disable_irq  	     =  sun3_disable_irq;
 	mach_process_int     =  sun3_process_int;

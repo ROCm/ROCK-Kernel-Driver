@@ -18,7 +18,6 @@ extern void     arp_send(int type, int ptype, u32 dest_ip,
 extern int	arp_bind_neighbour(struct dst_entry *dst);
 extern int	arp_mc_map(u32 addr, u8 *haddr, struct net_device *dev, int dir);
 extern void	arp_ifdown(struct net_device *dev);
-extern unsigned arp_state_to_flags(struct neighbour *neigh);
 
 extern struct neigh_ops arp_broken_ops;
 

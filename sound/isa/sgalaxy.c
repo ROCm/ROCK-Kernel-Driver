@@ -41,32 +41,32 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Aztech Systems,Sound Galaxy}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
-static long snd_sbport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240 */
-static long snd_wssport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x530,0xe80,0xf40,0x604 */
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 7,9,10,11 */
-static int snd_dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
+static long sbport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240 */
+static long wssport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x530,0xe80,0xf40,0x604 */
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 7,9,10,11 */
+static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for Sound Galaxy soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for Sound Galaxy soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_sbport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_sbport, "Port # for Sound Galaxy SB driver.");
-MODULE_PARM_SYNTAX(snd_sbport, SNDRV_ENABLED ",allows:{{0x220},{0x240}},dialog:list");
-MODULE_PARM(snd_wssport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_wssport, "Port # for Sound Galaxy WSS driver.");
-MODULE_PARM_SYNTAX(snd_wssport, SNDRV_ENABLED ",allows:{{0x530},{0xe80},{0xf40},{0x604}},dialog:list");
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for Sound Galaxy driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_ENABLED ",allows:{{7},{9},{10},{11}},dialog:list");
-MODULE_PARM(snd_dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma1, "DMA1 # for Sound Galaxy driver.");
-MODULE_PARM_SYNTAX(snd_dma1, SNDRV_DMA8_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for Sound Galaxy soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for Sound Galaxy soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(sbport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(sbport, "Port # for Sound Galaxy SB driver.");
+MODULE_PARM_SYNTAX(sbport, SNDRV_ENABLED ",allows:{{0x220},{0x240}},dialog:list");
+MODULE_PARM(wssport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(wssport, "Port # for Sound Galaxy WSS driver.");
+MODULE_PARM_SYNTAX(wssport, SNDRV_ENABLED ",allows:{{0x530},{0xe80},{0xf40},{0x604}},dialog:list");
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for Sound Galaxy driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_ENABLED ",allows:{{7},{9},{10},{11}},dialog:list");
+MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma1, "DMA1 # for Sound Galaxy driver.");
+MODULE_PARM_SYNTAX(dma1, SNDRV_DMA8_DESC);
 
 #define SGALAXY_AUXC_LEFT 18
 #define SGALAXY_AUXC_RIGHT 19
@@ -167,13 +167,13 @@ static int __init snd_sgalaxy_detect(int dev, int irq, int dma)
 #endif
 
 	/* switch to WSS mode */
-	snd_sgalaxy_sbdsp_reset(snd_sbport[dev]);
+	snd_sgalaxy_sbdsp_reset(sbport[dev]);
 
-	snd_sgalaxy_sbdsp_command(snd_sbport[dev], 9);
-	snd_sgalaxy_sbdsp_command(snd_sbport[dev], 0);
+	snd_sgalaxy_sbdsp_command(sbport[dev], 9);
+	snd_sgalaxy_sbdsp_command(sbport[dev], 0);
 
 	udelay(400);
-	return snd_sgalaxy_setup_wss(snd_wssport[dev], irq, dma);
+	return snd_sgalaxy_setup_wss(wssport[dev], irq, dma);
 }
 
 #define SGALAXY_CONTROLS 2
@@ -222,46 +222,46 @@ static int __init snd_sgalaxy_probe(int dev)
 {
 	static int possible_irqs[] = {7, 9, 10, 11, -1};
 	static int possible_dmas[] = {1, 3, 0, -1};
-	int err, irq, dma1;
+	int err, xirq, xdma1;
 	snd_card_t *card;
 	ad1848_t *chip;
 
-	if (snd_sbport[dev] == SNDRV_AUTO_PORT) {
+	if (sbport[dev] == SNDRV_AUTO_PORT) {
 		snd_printk("specify SB port\n");
 		return -EINVAL;
 	}
-	if (snd_wssport[dev] == SNDRV_AUTO_PORT) {
+	if (wssport[dev] == SNDRV_AUTO_PORT) {
 		snd_printk("specify WSS port\n");
 		return -EINVAL;
 	}
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
-	irq = snd_irq[dev];
-	if (irq == SNDRV_AUTO_IRQ) {
-		if ((irq = snd_legacy_find_free_irq(possible_irqs)) < 0) {
+	xirq = irq[dev];
+	if (xirq == SNDRV_AUTO_IRQ) {
+		if ((xirq = snd_legacy_find_free_irq(possible_irqs)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free IRQ\n");
 			return -EBUSY;
 		}
 	}
-	dma1 = snd_dma1[dev];
-        if (dma1 == SNDRV_AUTO_DMA) {
-		if ((dma1 = snd_legacy_find_free_dma(possible_dmas)) < 0) {
+	xdma1 = dma1[dev];
+        if (xdma1 == SNDRV_AUTO_DMA) {
+		if ((xdma1 = snd_legacy_find_free_dma(possible_dmas)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free DMA\n");
 			return -EBUSY;
 		}
 	}
 
-	if ((err = snd_sgalaxy_detect(dev, irq, dma1)) < 0) {
+	if ((err = snd_sgalaxy_detect(dev, xirq, xdma1)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
 
-	if ((err = snd_ad1848_create(card, snd_wssport[dev] + 4,
-				     irq, dma1,
+	if ((err = snd_ad1848_create(card, wssport[dev] + 4,
+				     xirq, xdma1,
 				     AD1848_HW_DETECT, &chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -286,7 +286,7 @@ static int __init snd_sgalaxy_probe(int dev)
 	strcpy(card->driver, "Sound Galaxy");
 	strcpy(card->shortname, "Sound Galaxy");
 	sprintf(card->longname, "Sound Galaxy at 0x%lx, irq %d, dma %d",
-		snd_wssport[dev], irq, dma1);
+		wssport[dev], xirq, xdma1);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
@@ -327,9 +327,9 @@ module_exit(alsa_card_sgalaxy_exit)
 
 #ifndef MODULE
 
-/* format is: snd-sgalaxy=snd_enable,snd_index,snd_id,
-			  snd_sbport,snd_wssport,
-			  snd_irq,snd_dma1 */
+/* format is: snd-sgalaxy=snd_enable,index,id,
+			  sbport,wssport,
+			  irq,dma1 */
 
 static int __init alsa_card_sgalaxy_setup(char *str)
 {
@@ -338,12 +338,12 @@ static int __init alsa_card_sgalaxy_setup(char *str)
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
 	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_sbport[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_wssport[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_dma1[nr_dev]) == 2);
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&sbport[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&wssport[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&irq[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&dma1[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

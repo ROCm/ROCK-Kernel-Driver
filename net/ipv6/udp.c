@@ -11,6 +11,9 @@
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
+ *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
+ *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
+ *					a single port at the same time.
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -50,16 +53,41 @@
 
 struct udp_mib udp_stats_in6[NR_CPUS*2];
 
+/* XXX This is identical to tcp_ipv6.c:ipv6_rcv_saddr_equal, put
+ * XXX it somewhere common. -DaveM
+ */
 static __inline__ int udv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	int addr_type = ipv6_addr_type(&np->rcv_saddr);
 
-	return !inet_sk(sk2)->rcv_saddr || addr_type == IPV6_ADDR_ANY ||
-	       (sk2->family == AF_INET6 &&
-	        !ipv6_addr_cmp(&np->rcv_saddr, &inet6_sk(sk2)->rcv_saddr)) ||
-	       (addr_type == IPV6_ADDR_MAPPED && sk2->family == AF_INET &&
-		inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr);
+	if (!inet_sk(sk2)->rcv_saddr && !ipv6_only_sock(sk))
+		return 1;
+
+	if (sk2->family == AF_INET6 && 
+	    ipv6_addr_any(&inet6_sk(sk2)->rcv_saddr) &&
+	    !(ipv6_only_sock(sk2) && addr_type == IPV6_ADDR_MAPPED))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_ANY && 
+	    (!ipv6_only_sock(sk) || 
+	     !(sk2->family == AF_INET6 ?
+	       (ipv6_addr_type(&inet6_sk(sk2)->rcv_saddr) == IPV6_ADDR_MAPPED) : 1)))
+		return 1;
+
+	if (sk2->family == AF_INET6 && 
+	    !ipv6_addr_cmp(&inet6_sk(sk)->rcv_saddr,
+			   &inet6_sk(sk2)->rcv_saddr))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_MAPPED &&
+	    !ipv6_only_sock(sk2) &&
+	    (!inet_sk(sk2)->rcv_saddr || 
+	     !inet_sk(sk)->rcv_saddr ||
+	     inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr))
+		return 1;
+
+	return 0;
 }
 
 /* Grrr, addr_type already calculated by caller, but I don't want
@@ -228,6 +256,8 @@ int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	int			err;
 
 	if (usin->sin6_family == AF_INET) {
+		if (__ipv6_only_sock(sk))
+			return -EAFNOSUPPORT;
 		err = udp_connect(sk, uaddr, addr_len);
 		goto ipv4_connected;
 	}
@@ -262,6 +292,9 @@ int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 	if (addr_type == IPV6_ADDR_MAPPED) {
 		struct sockaddr_in sin;
+
+		if (__ipv6_only_sock(sk))
+			return -ENETUNREACH;
 
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = daddr->s6_addr32[3];
@@ -512,7 +545,6 @@ static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 			UDP6_INC_STATS_BH(UdpInErrors);
-			IP6_INC_STATS_BH(Ip6InDiscards);
 			kfree_skb(skb);
 			return 0;
 		}
@@ -521,11 +553,9 @@ static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 #endif
 	if (sock_queue_rcv_skb(sk,skb)<0) {
 		UDP6_INC_STATS_BH(UdpInErrors);
-		IP6_INC_STATS_BH(Ip6InDiscards);
 		kfree_skb(skb);
 		return 0;
 	}
-  	IP6_INC_STATS_BH(Ip6InDelivers);
 	UDP6_INC_STATS_BH(UdpInDatagrams);
 	return 0;
 }
@@ -793,8 +823,11 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	fl.oif = 0;
 
 	if (sin6) {
-		if (sin6->sin6_family == AF_INET)
+		if (sin6->sin6_family == AF_INET) {
+			if (__ipv6_only_sock(sk))
+				return -ENETUNREACH;
 			return udp_sendmsg(iocb, sk, msg, ulen);
+		}
 
 		if (addr_len < SIN6_LEN_RFC2133)
 			return -EINVAL;
@@ -840,6 +873,9 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 	if (addr_type == IPV6_ADDR_MAPPED) {
 		struct sockaddr_in sin;
+
+		if (__ipv6_only_sock(sk))
+			return -ENETUNREACH;
 
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = daddr->s6_addr32[3];

@@ -43,6 +43,7 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
+#include <asm/proto.h>
 
 extern int acpi_disabled;
 
@@ -57,15 +58,6 @@ extern int acpi_disabled;
 
 enum acpi_irq_model_id		acpi_irq_model;
 
-
-/*
- * Use reserved fixmap pages for physical-to-virtual mappings of ACPI tables.
- * Note that the same range is used for each table, so tables that need to
- * persist should be memcpy'd.
- */
-
-extern unsigned long end_pfn; 
-
 /* rely on all ACPI tables being in the direct mapping */
 char *
 __acpi_map_table (
@@ -75,7 +67,7 @@ __acpi_map_table (
 	if (!phys_addr || !size)
 		return NULL;
 
-	if (phys_addr < (end_pfn << PAGE_SHIFT)) 
+	if (phys_addr < (end_pfn_map << PAGE_SHIFT)) 
 		return __va(phys_addr); 
 
 	printk("acpi mapping beyond end_pfn: %lx > %lx\n", phys_addr, end_pfn<<PAGE_SHIFT);

@@ -75,38 +75,25 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 
-#include "sd.h"
-
 extern int inia100_detect(Scsi_Host_Template *);
 extern int inia100_release(struct Scsi_Host *);
 extern int inia100_queue(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 extern int inia100_abort(Scsi_Cmnd *);
 extern int inia100_reset(Scsi_Cmnd *, unsigned int);
 
-extern int inia100_biosparam(Scsi_Disk *, struct block_device *, int *);
+extern int inia100_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
-#define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02c"
+#define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02d"
 
 #define INIA100	{ \
-	next:		NULL,						\
-	module:		NULL,						\
 	proc_name:	"inia100", \
-	proc_info:	NULL,				\
 	name:		inia100_REVID, \
 	detect:		inia100_detect, \
 	release:	inia100_release, \
-	info:		NULL,					\
-	command:	NULL, \
 	queuecommand:	inia100_queue, \
- 	eh_strategy_handler: NULL, \
- 	eh_abort_handler: NULL, \
- 	eh_device_reset_handler: NULL, \
- 	eh_bus_reset_handler: NULL, \
- 	eh_host_reset_handler: NULL, \
 	abort:		inia100_abort, \
 	reset:		inia100_reset, \
-	slave_attach:	NULL, \
-	bios_param:	inia100_biosparam, \
 	can_queue:	1, \
 	this_id:	1, \
 	sg_tablesize:	SG_ALL, \

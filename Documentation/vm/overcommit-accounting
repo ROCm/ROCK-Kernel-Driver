@@ -1,4 +1,4 @@
-The Linux kernel supports four overcommit handling modes
+The Linux kernel supports three overcommit handling modes
 
 0	-	Heuristic overcommit handling. Obvious overcommits of
 		address space are refused. Used for a typical system. It

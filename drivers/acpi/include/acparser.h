@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: acparser.h - AML Parser subcomponent prototypes and defines
- *       $Revision: 62 $
+ *       $Revision: 63 $
  *
  *****************************************************************************/
 
@@ -89,9 +89,9 @@ acpi_ps_get_next_simple_arg (
 
 acpi_status
 acpi_ps_get_next_namepath (
+	acpi_walk_state         *walk_state,
 	acpi_parse_state        *parser_state,
 	acpi_parse_object       *arg,
-	u32                     *arg_count,
 	u8                      method_call);
 
 acpi_parse_object *
@@ -100,9 +100,9 @@ acpi_ps_get_next_field (
 
 acpi_status
 acpi_ps_get_next_arg (
+	acpi_walk_state         *walk_state,
 	acpi_parse_state        *parser_state,
 	u32                     arg_type,
-	u32                     *arg_count,
 	acpi_parse_object       **return_arg);
 
 

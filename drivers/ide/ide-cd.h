@@ -104,9 +104,6 @@ struct ide_cd_state_flags {
 
 #define CDROM_STATE_FLAGS(drive) (&(((struct cdrom_info *)(drive->driver_data))->state_flags))
 
-struct packet_command {
-};
-
 /* Structure of a MSF cdrom address. */
 struct atapi_msf {
 	byte reserved;
@@ -472,7 +469,6 @@ struct cdrom_info {
 	struct request_sense sense_data;
 
 	struct request request_sense_request;
-	struct packet_command request_sense_pc;
 	int dma;
 	int cmd;
 	unsigned long last_block;

@@ -166,11 +166,30 @@ static void xpad_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned char *d
 static void xpad_irq_in(struct urb *urb)
 {
 	struct usb_xpad *xpad = urb->context;
+	int retval;
 	
-	if (urb->status)
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 	
 	xpad_process_packet(xpad, 0, xpad->idata);
+
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 static int xpad_open (struct input_dev *dev)
@@ -230,7 +249,7 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 		return -ENOMEM;
         }
 	
-	ep_irq_in = intf->altsetting[0].endpoint + 0;
+	ep_irq_in = &intf->altsetting[0].endpoint[0].desc;
 	
 	usb_fill_int_urb(xpad->irq_in, udev,
 			 usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),

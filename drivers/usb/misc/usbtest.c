@@ -290,7 +290,7 @@ static int get_altsetting (struct usbtest_dev *dev)
 
 	retval = usb_control_msg (udev, usb_rcvctrlpipe (udev, 0),
 			USB_REQ_GET_INTERFACE, USB_DIR_IN|USB_RECIP_INTERFACE,
-			0, iface->altsetting [0].bInterfaceNumber,
+			0, iface->altsetting [0].desc.bInterfaceNumber,
 			dev->buf, 1, HZ * USB_CTRL_GET_TIMEOUT);
 	switch (retval) {
 	case 1:
@@ -308,7 +308,7 @@ static int set_altsetting (struct usbtest_dev *dev, int alternate)
 {
 	struct usb_interface		*iface = dev->intf;
 	struct usb_device		*udev;
-	struct usb_interface_descriptor	*iface_as;
+	struct usb_host_interface	*iface_as;
 	int				i, ret;
 
 	if (alternate < 0 || alternate >= iface->num_altsetting)
@@ -317,8 +317,8 @@ static int set_altsetting (struct usbtest_dev *dev, int alternate)
 	udev = interface_to_usbdev (iface);
 	if ((ret = usb_control_msg (udev, usb_sndctrlpipe (udev, 0),
 			USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE,
-			iface->altsetting [alternate].bAlternateSetting,
-			iface->altsetting [alternate].bInterfaceNumber,
+			alternate,
+			iface->altsetting->desc.bInterfaceNumber,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT)) < 0)
 		return ret;
 
@@ -328,8 +328,8 @@ static int set_altsetting (struct usbtest_dev *dev, int alternate)
 
 	/* prevent requests using previous endpoint settings */
 	iface_as = iface->altsetting + iface->act_altsetting;
-	for (i = 0; i < iface_as->bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint [i].bEndpointAddress;
+	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint [i].desc.bEndpointAddress;
 		int	out = !(ep & USB_DIR_IN);
 
 		ep &= USB_ENDPOINT_NUMBER_MASK;
@@ -340,14 +340,14 @@ static int set_altsetting (struct usbtest_dev *dev, int alternate)
 
 	/* reset toggles and maxpacket for all endpoints affected */
 	iface_as = iface->altsetting + iface->act_altsetting;
-	for (i = 0; i < iface_as->bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint [i].bEndpointAddress;
+	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint [i].desc.bEndpointAddress;
 		int	out = !(ep & USB_DIR_IN);
 
 		ep &= USB_ENDPOINT_NUMBER_MASK;
 		usb_settoggle (udev, ep, out, 0);
 		(out ? udev->epmaxpacketout : udev->epmaxpacketin ) [ep]
-			= iface_as->endpoint [i].wMaxPacketSize;
+			= iface_as->endpoint [i].desc.wMaxPacketSize;
 	}
 
 	return 0;
@@ -415,10 +415,10 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 		/* 9.2.3 constrains the range here, and Linux ensures
 		 * they're ordered meaningfully in this array
 		 */
-		if (iface->altsetting [i].bAlternateSetting != i) {
+		if (iface->altsetting [i].desc.bAlternateSetting != i) {
 			dbg ("%s, illegal alt [%d].bAltSetting = %d",
 					dev->id, i, 
-					iface->altsetting [i]
+					iface->altsetting [i].desc
 						.bAlternateSetting);
 			return -EDOM;
 		}
@@ -447,9 +447,12 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 
 	/* [real world] get_config unimplemented if there's only one */
 	if (udev->descriptor.bNumConfigurations != 1) {
-		int	expected = udev->actconfig->bConfigurationValue;
+		int	expected = udev->actconfig->desc.bConfigurationValue;
 
-		/* [9.4.2] get_configuration always works */
+		/* [9.4.2] get_configuration always works
+		 * ... although some cheap devices (like one TI Hub I've got)
+		 * won't return config descriptors except before set_config.
+		 */
 		retval = usb_control_msg (udev, usb_rcvctrlpipe (udev, 0),
 				USB_REQ_GET_CONFIGURATION, USB_RECIP_DEVICE,
 				0, 0, dev->buf, 1, HZ * USB_CTRL_GET_TIMEOUT);
@@ -531,7 +534,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 	// the device's remote wakeup feature ... if we can, test that here
 
 	retval = usb_get_status (udev, USB_RECIP_INTERFACE,
-			iface->altsetting [0].bInterfaceNumber, dev->buf);
+			iface->altsetting [0].desc.bInterfaceNumber, dev->buf);
 	if (retval != 2) {
 		dbg ("%s get interface status --> %d", dev->id, retval);
 		return (retval < 0) ? retval : -EDOM;
@@ -540,6 +543,10 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 	
 	return 0;
 }
+
+/*-------------------------------------------------------------------------*/
+
+// control queueing !!
 
 /*-------------------------------------------------------------------------*/
 
@@ -584,7 +591,7 @@ static int usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *b
 	if (dev->info->alt >= 0) {
 	    	int	res;
 
-		if (intf->altsetting->bInterfaceNumber)
+		if (intf->altsetting->desc.bInterfaceNumber)
 			return -ENODEV;
 		res = set_altsetting (dev, dev->info->alt);
 		if (res) {
@@ -816,7 +823,7 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 	/* use the same kind of id the hid driver shows */
 	snprintf (dev->id, sizeof dev->id, "%s-%s:%d",
 			udev->bus->bus_name, udev->devpath,
-			intf->altsetting [0].bInterfaceNumber);
+			intf->altsetting [0].desc.bInterfaceNumber);
 	dev->intf = intf;
 
 	/* cacheline-aligned scratch for i/o */
@@ -839,14 +846,6 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 			dev->out_pipe = usb_sndintpipe (udev, info->ep_out);
 			wtest = " intr-out";
 		}
-
-#if 1
-		// FIXME disabling this until we finally get rid of
-		// interrupt "automagic" resubmission
-		dbg ("%s:  no interrupt transfers for now", dev->id);
-		kfree (dev);
-		return -ENODEV;
-#endif
 	} else {
 		if (info->ep_in) {
 			dev->in_pipe = usb_rcvbulkpipe (udev, info->ep_in);

@@ -67,7 +67,7 @@ struct fib_info
 	int			fib_protocol;
 	u32			fib_prefsrc;
 	u32			fib_priority;
-	unsigned		fib_metrics[RTAX_MAX];
+	u32			fib_metrics[RTAX_MAX];
 #define fib_mtu fib_metrics[RTAX_MTU-1]
 #define fib_window fib_metrics[RTAX_WINDOW-1]
 #define fib_rtt fib_metrics[RTAX_RTT-1]
@@ -129,7 +129,6 @@ struct fib_table
 	int		(*tb_dump)(struct fib_table *table, struct sk_buff *skb,
 				     struct netlink_callback *cb);
 	int		(*tb_flush)(struct fib_table *table);
-	int		(*tb_seq_show)(struct fib_table *table, struct seq_file *seq);
 	void		(*tb_select_default)(struct fib_table *table,
 					     const struct flowi *flp, struct fib_result *res);
 
@@ -277,5 +276,7 @@ static inline void fib_res_put(struct fib_result *res)
 #endif
 }
 
+extern int fib_proc_init(void);
+extern void fib_proc_exit(void);
 
 #endif  /* _NET_FIB_H */

@@ -15,202 +15,87 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/seq_file.h>
 
 #include <asm/pdc.h>
 #include <asm/cache.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 #include <asm/system.h>
 #include <asm/page.h>
 #include <asm/pgalloc.h>
+#include <asm/processor.h>
+
+int split_tlb;
+int dcache_stride;
+int icache_stride;
 
 struct pdc_cache_info cache_info;
-#ifndef __LP64__
+#ifndef CONFIG_PA20
 static struct pdc_btlb_info btlb_info;
 #endif
 
-
-void __flush_page_to_ram(unsigned long address)
+#ifdef CONFIG_SMP
+void
+flush_data_cache(void)
 {
-	__flush_dcache_range(address, PAGE_SIZE);
-	__flush_icache_range(address, PAGE_SIZE);
+	smp_call_function((void (*)(void *))flush_data_cache_local, NULL, 1, 1);
+	flush_data_cache_local();
+}
+#endif
+
+void
+flush_cache_all_local(void)
+{
+	flush_instruction_cache_local();
+	flush_data_cache_local();
 }
 
+/* flushes EVERYTHING (tlb & cache) */
 
-
-void flush_data_cache(void)
+void
+flush_all_caches(void)
 {
-	register unsigned long base   = cache_info.dc_base;
-	register unsigned long count  = cache_info.dc_count;
-	register unsigned long loop   = cache_info.dc_loop;
-	register unsigned long stride = cache_info.dc_stride;
-	register unsigned long addr;
-	register long i, j;
-
-	for(i=0,addr=base; i<count; i++,addr+=stride)
-		for(j=0; j<loop; j++)
-			fdce(addr);
-}
-		
-static inline void flush_data_tlb_space(void)
-{
-	unsigned long base   = cache_info.dt_off_base;
-	unsigned long count  = cache_info.dt_off_count;
-	unsigned long stride = cache_info.dt_off_stride;
-	unsigned long loop   = cache_info.dt_loop;
-
-	unsigned long addr;
-	long i,j;
-	
-	for(i=0,addr=base; i<count; i++,addr+=stride)
-		for(j=0; j<loop; j++)
-			pdtlbe(addr);
+	flush_cache_all();
+	flush_tlb_all();
 }
 
-
-
-void flush_data_tlb(void)
+void
+update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 {
-	unsigned long base   = cache_info.dt_sp_base;
-	unsigned long count  = cache_info.dt_sp_count;
-	unsigned long stride = cache_info.dt_sp_stride;
-	unsigned long space;
-	unsigned long old_sr1;
-	long i;
-	
-	old_sr1 = mfsp(1);
-	
-	for(i=0,space=base; i<count; i++, space+=stride) {
-		mtsp(space,1);
-		flush_data_tlb_space();
+	struct page *page = pte_page(pte);
+
+	if (VALID_PAGE(page) && page->mapping &&
+	    test_bit(PG_dcache_dirty, &page->flags)) {
+
+		flush_kernel_dcache_page(page_address(page));
+		clear_bit(PG_dcache_dirty, &page->flags);
 	}
-
-	mtsp(old_sr1, 1);
 }
 
-static inline void flush_instruction_tlb_space(void)
+void
+show_cache_info(struct seq_file *m)
 {
-	unsigned long base   = cache_info.it_off_base;
-	unsigned long count  = cache_info.it_off_count;
-	unsigned long stride = cache_info.it_off_stride;
-	unsigned long loop   = cache_info.it_loop;
-
-	unsigned long addr;
-	long i,j;
-	
-	for(i=0,addr=base; i<count; i++,addr+=stride)
-		for(j=0; j<loop; j++)
-			pitlbe(addr);
-}
-
-void flush_instruction_tlb(void)
-{
-	unsigned long base   = cache_info.it_sp_base;
-	unsigned long count  = cache_info.it_sp_count;
-	unsigned long stride = cache_info.it_sp_stride;
-	unsigned long space;
-	unsigned long old_sr1;
-	unsigned int i;
-	
-	old_sr1 = mfsp(1);
-	
-	for(i=0,space=base; i<count; i++, space+=stride) {
-		mtsp(space,1);
-		flush_instruction_tlb_space();
-	}
-
-	mtsp(old_sr1, 1);
-}
-
-
-void __flush_tlb_space(unsigned long space)
-{
-	unsigned long old_sr1;
-
-	old_sr1 = mfsp(1);
-	mtsp(space, 1);
-	
-	flush_data_tlb_space();
-	flush_instruction_tlb_space();
-
-	mtsp(old_sr1, 1);
-}
-
-
-void flush_instruction_cache(void)
-{
-	register unsigned long base   = cache_info.ic_base;
-	register unsigned long count  = cache_info.ic_count;
-	register unsigned long loop   = cache_info.ic_loop;
-	register unsigned long stride = cache_info.ic_stride;
-	register unsigned long addr;
-	register long i, j;
-	unsigned long old_sr1;
-	
-	old_sr1 = mfsp(1);
-	mtsp(0,1);
-
-	/*
-	 * Note: fice instruction has 3 bit space field, so one must
-	 *       be specified (otherwise you are justing using whatever
-	 *       happens to be in sr0).
-	 */
-
-	for(i=0,addr=base; i<count; i++,addr+=stride)
-		for(j=0; j<loop; j++)
-			fice(addr);
-
-	mtsp(old_sr1, 1);
-}
-
-/* not yet ... fdc() needs to be implemented in cache.h !
-void flush_datacache_range( unsigned int base, unsigned int end )
-{
-    register long offset,offset_add;
-    offset_add = ( (1<<(cache_info.dc_conf.cc_block-1)) * 
-		    cache_info.dc_conf.cc_line ) << 4;
-    for (offset=base; offset<=end; offset+=offset_add)
-	fdc(space,offset);
-    fdc(space,end);
-}
-*/
-
-/* flushes code and data-cache */
-void flush_all_caches(void)
-{
-	flush_instruction_cache();
-	flush_data_cache();
-
-	flush_instruction_tlb();
-	flush_data_tlb();
-
-	asm volatile("sync");
-	asm volatile("syncdma");
-	asm volatile("sync");
-}
-
-int get_cache_info(char *buffer)
-{
-	char *p = buffer;
-
-	p += sprintf(p, "I-cache\t\t: %ld KB\n", 
+	seq_printf(m, "I-cache\t\t: %ld KB\n", 
 		cache_info.ic_size/1024 );
-	p += sprintf(p, "D-cache\t\t: %ld KB (%s)%s\n", 
+	seq_printf(m, "D-cache\t\t: %ld KB (%s)%s\n", 
 		cache_info.dc_size/1024,
 		(cache_info.dc_conf.cc_wt ? "WT":"WB"),
 		(cache_info.dc_conf.cc_sh ? " - shared I/D":"")
 	);
 
-	p += sprintf(p, "ITLB entries\t: %ld\n" "DTLB entries\t: %ld%s\n",
+	seq_printf(m, "ITLB entries\t: %ld\n" "DTLB entries\t: %ld%s\n",
 		cache_info.it_size,
 		cache_info.dt_size,
 		cache_info.dt_conf.tc_sh ? " - shared with ITLB":""
 	);
 		
-#ifndef __LP64__
+#ifndef CONFIG_PA20
 	/* BTLB - Block TLB */
 	if (btlb_info.max_size==0) {
-		p += sprintf(p, "BTLB\t\t: not supported\n" );
+		seq_printf(m, "BTLB\t\t: not supported\n" );
 	} else {
-		p += sprintf(p, 
+		seq_printf(m, 
 		"BTLB fixed\t: max. %d pages, pagesize=%d (%dMB)\n"
 		"BTLB fix-entr.\t: %d instruction, %d data (%d combined)\n"
 		"BTLB var-entr.\t: %d instruction, %d data (%d combined)\n",
@@ -225,29 +110,117 @@ int get_cache_info(char *buffer)
 		);
 	}
 #endif
-
-	return p - buffer;
 }
 
-
 void __init 
-cache_init(void)
+parisc_cache_init(void)
 {
 	if(pdc_cache_info(&cache_info)<0)
-		panic("cache_init: pdc_cache_info failed");
+		panic("parisc_cache_init: pdc_cache_info failed");
 
 #if 0
-	printk("ic_size %lx dc_size %lx it_size %lx pdc_cache_info %d*long pdc_cache_cf %d\n",
+	printk(KERN_DEBUG "ic_size %lx dc_size %lx it_size %lx pdc_cache_info %d*long pdc_cache_cf %d\n",
 	    cache_info.ic_size,
 	    cache_info.dc_size,
 	    cache_info.it_size,
 	    sizeof (struct pdc_cache_info) / sizeof (long),
 	    sizeof (struct pdc_cache_cf)
 	);
+
+	printk(KERN_DEBUG "dc base %x dc stride %x dc count %x dc loop %d\n",
+	    cache_info.dc_base,
+	    cache_info.dc_stride,
+	    cache_info.dc_count,
+	    cache_info.dc_loop);
+
+	printk(KERN_DEBUG "dc conf: alias %d block %d line %d wt %d sh %d cst %d assoc %d\n",
+	    cache_info.dc_conf.cc_alias,
+	    cache_info.dc_conf.cc_block,
+	    cache_info.dc_conf.cc_line,
+	    cache_info.dc_conf.cc_wt,
+	    cache_info.dc_conf.cc_sh,
+	    cache_info.dc_conf.cc_cst,
+	    cache_info.dc_conf.cc_assoc);
+
+	printk(KERN_DEBUG "ic conf: alias %d block %d line %d wt %d sh %d cst %d assoc %d\n",
+	    cache_info.ic_conf.cc_alias,
+	    cache_info.ic_conf.cc_block,
+	    cache_info.ic_conf.cc_line,
+	    cache_info.ic_conf.cc_wt,
+	    cache_info.ic_conf.cc_sh,
+	    cache_info.ic_conf.cc_cst,
+	    cache_info.ic_conf.cc_assoc);
+
+	printk(KERN_DEBUG "dt conf: sh %d page %d cst %d aid %d pad1 %d \n",
+	    cache_info.dt_conf.tc_sh,
+	    cache_info.dt_conf.tc_page,
+	    cache_info.dt_conf.tc_cst,
+	    cache_info.dt_conf.tc_aid,
+	    cache_info.dt_conf.tc_pad1);
+
+	printk(KERN_DEBUG "it conf: sh %d page %d cst %d aid %d pad1 %d \n",
+	    cache_info.it_conf.tc_sh,
+	    cache_info.it_conf.tc_page,
+	    cache_info.it_conf.tc_cst,
+	    cache_info.it_conf.tc_aid,
+	    cache_info.it_conf.tc_pad1);
 #endif
-#ifndef __LP64__
+
+	split_tlb = 0;
+	if (cache_info.dt_conf.tc_sh == 0 || cache_info.dt_conf.tc_sh == 2) {
+
+	    if (cache_info.dt_conf.tc_sh == 2)
+		printk(KERN_WARNING "Unexpected TLB configuration. "
+			"Will flush I/D separately (could be optimized).\n");
+
+	    split_tlb = 1;
+	}
+
+	dcache_stride = ( (1<<(cache_info.dc_conf.cc_block+3)) *
+			 cache_info.dc_conf.cc_line );
+	icache_stride = ( (1<<(cache_info.ic_conf.cc_block+3)) *
+			 cache_info.ic_conf.cc_line );
+#ifndef CONFIG_PA20
 	if(pdc_btlb_info(&btlb_info)<0) {
 		memset(&btlb_info, 0, sizeof btlb_info);
 	}
 #endif
+
+	if ((boot_cpu_data.pdc.capabilities & PDC_MODEL_NVA_MASK) == PDC_MODEL_NVA_UNSUPPORTED) {
+		printk(KERN_WARNING "Only equivalent aliasing supported\n");
+#ifndef CONFIG_SMP
+		panic("SMP kernel required to avoid non-equivalent aliasing");
+#endif
+	}
+}
+
+void disable_sr_hashing(void)
+{
+    int srhash_type;
+
+    if (boot_cpu_data.cpu_type == pcxl2)
+	return; /* pcxl2 doesn't support space register hashing */
+
+    switch (boot_cpu_data.cpu_type) {
+
+    case pcx:
+	BUG(); /* We shouldn't get here. code in setup.c should prevent it */
+	return;
+
+    case pcxs:
+    case pcxt:
+    case pcxt_:
+	srhash_type = SRHASH_PCXST;
+	break;
+
+    case pcxl:
+	srhash_type = SRHASH_PCXL;
+	break;
+
+    default: /* Currently all PA2.0 machines use the same ins. sequence */
+	srhash_type = SRHASH_PA20;
+	break;
+    }
+
+    disable_sr_hashing_asm(srhash_type);
 }

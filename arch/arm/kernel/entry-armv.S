@@ -14,6 +14,7 @@
  *  it to save wrong values...  Be aware!
  */
 #include <linux/config.h>
+#include <linux/init.h>
 #include "entry-header.S"
 #include <asm/thread_info.h>
 #include <asm/glue.h>
@@ -593,23 +594,12 @@ ENTRY(anakin_active_irqs)
 		add	\base, \base, #0x00d00000
 		ldr	\irqstat, [\base, #0]		@ ICIP
 		ldr	\irqnr, [\base, #4]		@ ICMR
-		ands	\irqstat, \irqstat, \irqnr
-		mov	\irqnr, #0
+		ands	\irqnr, \irqstat, \irqnr
 		beq	1001f
-		tst	\irqstat, #0xff00
-		moveq	\irqstat, \irqstat, lsr #8
-		addeq	\irqnr, \irqnr, #8
-		tsteq	\irqstat, #0xff00
-		moveq	\irqstat, \irqstat, lsr #8
-		addeq	\irqnr, \irqnr, #8
-		tst	\irqstat, #0x0f00
-		moveq	\irqstat, \irqstat, lsr #4
-		addeq	\irqnr, \irqnr, #4
-		tst	\irqstat, #0x0300
-		moveq	\irqstat, \irqstat, lsr #2
-		addeq	\irqnr, \irqnr, #2
-		tst	\irqstat, #0x0100
-		addeqs	\irqnr, \irqnr, #1
+		rsb	\irqstat, \irqnr, #0
+		and	\irqstat, \irqstat, \irqnr
+		clz	\irqnr, \irqstat
+		rsb	\irqnr, \irqnr, #23
 1001:
 		.endm
 
@@ -1013,7 +1003,7 @@ ENTRY(__switch_to)
 		mcr	p15, 0, r2, c3, c0		@ Set domain register
 		ldmib	r1, {r4 - sl, fp, sp, pc}	@ Load all regs saved previously
 
-		.section ".text.init",#alloc,#execinstr
+		__INIT
 /*
  * Vector stubs.  NOTE that we only align 'vector_IRQ' to a cache line boundary,
  * and we rely on each stub being exactly 48 (1.5 cache lines) in size.  This

@@ -71,8 +71,6 @@ int main(void)
 
 	/* offsets into the irq_cpustat_t struct */
 	DEFINE(CPUSTAT_SOFTIRQ_PENDING, offsetof(irq_cpustat_t, __softirq_pending));
-	DEFINE(CPUSTAT_LOCAL_IRQ_COUNT, offsetof(irq_cpustat_t, __local_irq_count));
-	DEFINE(CPUSTAT_LOCAL_BH_COUNT, offsetof(irq_cpustat_t, __local_bh_count));
 	DEFINE(CPUSTAT_SYSCALL_COUNT, offsetof(irq_cpustat_t, __syscall_count));
 
 	/* offsets into the bi_record struct */

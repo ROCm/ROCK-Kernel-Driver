@@ -134,9 +134,22 @@ aiptek_irq(struct urb *urb)
 	int y;
 	int pressure;
 	int proximity;
+	int retval;
 
-	if (urb->status)
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	if ((data[0] & 2) == 0) {
 		dbg("received unknown report #%d", data[0]);
@@ -165,6 +178,11 @@ aiptek_irq(struct urb *urb)
 
 	input_sync(dev);
 
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 struct aiptek_features aiptek_features[] = {
@@ -295,7 +313,7 @@ aiptek_probe(struct usb_interface *intf,
 	aiptek->dev.id.version = dev->descriptor.bcdDevice;
 	aiptek->usbdev = dev;
 
-	endpoint = intf->altsetting[0].endpoint + 0;
+	endpoint = &intf->altsetting[0].endpoint[0].desc;
 
 	if (aiptek->features->pktlen > 10)
 		BUG();

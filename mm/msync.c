@@ -39,7 +39,7 @@ static int filemap_sync_pte(pte_t *ptep, struct vm_area_struct *vma,
 	return 0;
 }
 
-static inline int filemap_sync_pte_range(pmd_t * pmd,
+static int filemap_sync_pte_range(pmd_t * pmd,
 	unsigned long address, unsigned long end, 
 	struct vm_area_struct *vma, unsigned int flags)
 {

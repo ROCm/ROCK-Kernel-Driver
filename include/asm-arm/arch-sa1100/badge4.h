@@ -68,6 +68,7 @@
 #define BADGE4_5V_PCMCIA_SOCK1		(1<<1)
 #define BADGE4_5V_PCMCIA_SOCK(n)	(1<<(n))
 #define BADGE4_5V_USB			(1<<2)
+#define BADGE4_5V_INITIALLY		(1<<3)
 
 #ifndef __ASSEMBLY__
 extern void badge4_set_5V(unsigned subsystem, int on);

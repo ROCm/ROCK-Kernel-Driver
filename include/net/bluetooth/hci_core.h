@@ -29,6 +29,7 @@
 #ifndef __HCI_CORE_H
 #define __HCI_CORE_H
 
+#include <linux/proc_fs.h>
 #include <net/bluetooth/hci.h>
 
 /* HCI upper protocols */
@@ -36,6 +37,8 @@
 #define HCI_PROTO_SCO	1
 
 #define HCI_INIT_TIMEOUT (HZ * 10)
+
+extern struct proc_dir_entry *proc_bt_hci;
 
 /* HCI Core structures */
 
@@ -111,6 +114,10 @@ struct hci_dev {
 
 	atomic_t 		promisc;
 
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry   *proc;
+#endif
+
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);
 	int (*flush)(struct hci_dev *hdev);
@@ -148,8 +155,8 @@ struct hci_conn {
 };
 
 extern struct hci_proto *hci_proto[];
-extern struct list_head hdev_list;
-extern rwlock_t hdev_list_lock;
+extern struct list_head hci_dev_list;
+extern rwlock_t hci_dev_list_lock;
 
 /* ----- Inquiry cache ----- */
 #define INQUIRY_CACHE_AGE_MAX   (HZ*30)   // 30 seconds
@@ -344,6 +351,9 @@ static inline int hci_recv_frame(struct sk_buff *skb)
 	hci_sched_rx(hdev);
 	return 0;
 }
+
+int  hci_dev_proc_init(struct hci_dev *hdev);
+void hci_dev_proc_cleanup(struct hci_dev *hdev);
 
 /* ----- LMP capabilities ----- */
 #define lmp_rswitch_capable(dev) (dev->features[0] & LMP_RSWITCH)

@@ -125,7 +125,6 @@ static struct Scsi_Device_Template sg_template = {
 	.name = "generic",
 	.tag = "sg",
 	.scsi_type = 0xff,
-	.major = SCSI_GENERIC_MAJOR,
 	.detect = sg_detect,
 	.init = sg_init,
 	.attach = sg_attach,
@@ -180,16 +179,17 @@ typedef struct sg_fd {		/* holds the state of a file descriptor */
 } Sg_fd;
 
 typedef struct sg_device { /* holds the state of each scsi generic device */
+	struct Scsi_Device_Template *driver;
 	Scsi_Device *device;
 	wait_queue_head_t o_excl_wait;	/* queue open() when O_EXCL in use */
 	int sg_tablesize;	/* adapter's max scatter-gather table size */
 	Sg_fd *headfp;		/* first open fd belonging to this device */
 	devfs_handle_t de;
-	kdev_t i_rdev;		/* holds device major+minor number */
 	volatile char detached;	/* 0->attached, 1->detached pending removal */
 	volatile char exclude;	/* opened for exclusive access */
 	char sgdebug;		/* 0->off, 1->sense, 9->dump dev, 10-> all devs */
 	struct device sg_driverfs_dev;
+	struct gendisk *disk;
 } Sg_device;
 
 static int sg_fasync(int fd, struct file *filp, int mode);
@@ -330,7 +330,7 @@ sg_release(struct inode *inode, struct file *filp)
 
 	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
 		return -ENXIO;
-	SCSI_LOG_TIMEOUT(3, printk("sg_release: dev=%d\n", minor(sdp->i_rdev)));
+	SCSI_LOG_TIMEOUT(3, printk("sg_release: %s\n", sdp->disk->disk_name));
 	sg_fasync(-1, filp, 0);	/* remove filp from async notification list */
 	if (0 == sg_remove_sfp(sdp, sfp)) {	/* Returns 1 when sdp gone */
 		if (!sdp->detached) {
@@ -359,8 +359,8 @@ sg_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
 
 	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
 		return -ENXIO;
-	SCSI_LOG_TIMEOUT(3, printk("sg_read: dev=%d, count=%d\n",
-				   minor(sdp->i_rdev), (int) count));
+	SCSI_LOG_TIMEOUT(3, printk("sg_read: %s, count=%d\n",
+				   sdp->disk->disk_name, (int) count));
 	if (ppos != &filp->f_pos) ;	/* FIXME: Hmm.  Seek to the right place, or fail?  */
 	if ((k = verify_area(VERIFY_WRITE, buf, count)))
 		return k;
@@ -514,8 +514,8 @@ sg_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 
 	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
 		return -ENXIO;
-	SCSI_LOG_TIMEOUT(3, printk("sg_write: dev=%d, count=%d\n",
-				   minor(sdp->i_rdev), (int) count));
+	SCSI_LOG_TIMEOUT(3, printk("sg_write: %s, count=%d\n",
+				   sdp->disk->disk_name, (int) count));
 	if (sdp->detached)
 		return -ENODEV;
 	if (!((filp->f_flags & O_NONBLOCK) ||
@@ -702,7 +702,7 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 
 	srp->my_cmdp = SRpnt;
 	q = &SRpnt->sr_device->request_queue;
-	SRpnt->sr_request->rq_dev = sdp->i_rdev;
+	SRpnt->sr_request->rq_disk = sdp->disk;
 	SRpnt->sr_sense_buffer[0] = 0;
 	SRpnt->sr_cmd_len = hp->cmd_len;
 	SRpnt->sr_use_sg = srp->data.k_use_sg;
@@ -753,8 +753,8 @@ sg_ioctl(struct inode *inode, struct file *filp,
 
 	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
 		return -ENXIO;
-	SCSI_LOG_TIMEOUT(3, printk("sg_ioctl: dev=%d, cmd=0x%x\n",
-				   minor(sdp->i_rdev), (int) cmd_in));
+	SCSI_LOG_TIMEOUT(3, printk("sg_ioctl: %s, cmd=0x%x\n",
+				   sdp->disk->disk_name, (int) cmd_in));
 	read_only = (O_RDWR != (filp->f_flags & O_ACCMODE));
 
 	switch (cmd_in) {
@@ -1056,8 +1056,8 @@ sg_poll(struct file *filp, poll_table * wait)
 			res |= POLLOUT | POLLWRNORM;
 	} else if (count < SG_MAX_QUEUE)
 		res |= POLLOUT | POLLWRNORM;
-	SCSI_LOG_TIMEOUT(3, printk("sg_poll: dev=%d, res=0x%x\n",
-				   minor(sdp->i_rdev), (int) res));
+	SCSI_LOG_TIMEOUT(3, printk("sg_poll: %s, res=0x%x\n",
+				   sdp->disk->disk_name, (int) res));
 	return res;
 }
 
@@ -1070,8 +1070,8 @@ sg_fasync(int fd, struct file *filp, int mode)
 
 	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
 		return -ENXIO;
-	SCSI_LOG_TIMEOUT(3, printk("sg_fasync: dev=%d, mode=%d\n",
-				   minor(sdp->i_rdev), mode));
+	SCSI_LOG_TIMEOUT(3, printk("sg_fasync: %s, mode=%d\n",
+				   sdp->disk->disk_name, mode));
 
 	retval = fasync_helper(fd, filp, mode, &sfp->async_qp);
 	return (retval < 0) ? retval : 0;
@@ -1257,13 +1257,13 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 	SRpnt->sr_bufflen = 0;
 	SRpnt->sr_buffer = NULL;
 	SRpnt->sr_underflow = 0;
-	SRpnt->sr_request->rq_dev = mk_kdev(0, 0);	/* "sg" _disowns_ request blk */
+	SRpnt->sr_request->rq_disk = NULL; /* "sg" _disowns_ request blk */
 
 	srp->my_cmdp = NULL;
 	srp->done = 1;
 
-	SCSI_LOG_TIMEOUT(4, printk("sg_cmd_done: dev=%d, pack_id=%d, res=0x%x\n",
-		minor(sdp->i_rdev), srp->header.pack_id, (int) SRpnt->sr_result));
+	SCSI_LOG_TIMEOUT(4, printk("sg_cmd_done: %s, pack_id=%d, res=0x%x\n",
+		sdp->disk->disk_name, srp->header.pack_id, (int) SRpnt->sr_result));
 	srp->header.resid = SCpnt->resid;
 	/* N.B. unit of duration changes here from jiffies to millisecs */
 	srp->header.duration =
@@ -1420,7 +1420,8 @@ sg_device_kdev_read(struct device *driverfs_dev, char *page,
 		    size_t count, loff_t off)
 {
 	Sg_device *sdp = list_entry(driverfs_dev, Sg_device, sg_driverfs_dev);
-	return off ? 0 : sprintf(page, "%x\n", sdp->i_rdev.value);
+	return off ? 0 : sprintf(page, "%x\n", MKDEV(sdp->disk->major,
+						     sdp->disk->first_minor));
 }
 static DEVICE_ATTR(kdev,S_IRUGO,sg_device_kdev_read,NULL);
 
@@ -1436,10 +1437,13 @@ static DEVICE_ATTR(type,S_IRUGO,sg_device_type_read,NULL);
 static int
 sg_attach(Scsi_Device * scsidp)
 {
+	struct gendisk *disk = alloc_disk(1);
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
 	int k;
 
+	if (!disk)
+		return 1;
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
 	if (sg_template.nr_dev >= sg_template.dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
@@ -1452,6 +1456,7 @@ sg_attach(Scsi_Device * scsidp)
 			scsidp->attached--;
 			printk(KERN_ERR
 			       "sg_attach: device array cannot be resized\n");
+			put_disk(disk);
 			return 1;
 		}
 		write_lock_irqsave(&sg_dev_arr_lock, iflags);
@@ -1477,6 +1482,7 @@ find_empty_slot:
 		       scsidp->lun, scsidp->type, SG_MAX_DEVS_MASK);
 		if (NULL != sdp)
 			vfree((char *) sdp);
+		put_disk(disk);
 		return 1;
 	}
 	if (k < sg_template.dev_max) {
@@ -1493,11 +1499,18 @@ find_empty_slot:
 		scsidp->attached--;
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_ERR "sg_attach: Sg_device cannot be allocated\n");
+		put_disk(disk);
 		return 1;
 	}
 
 	SCSI_LOG_TIMEOUT(3, printk("sg_attach: dev=%d \n", k));
 	memset(sdp, 0, sizeof(*sdp));
+	sdp->driver = &sg_template;
+	disk->private_data = &sdp->driver;
+	sprintf(disk->disk_name, "sg%d", k);
+	disk->major = SCSI_GENERIC_MAJOR;
+	disk->first_minor = k;
+	sdp->disk = disk;
 	sdp->device = scsidp;
 	init_waitqueue_head(&sdp->o_excl_wait);
 	sdp->headfp = NULL;
@@ -1505,7 +1518,6 @@ find_empty_slot:
 	sdp->sgdebug = 0;
 	sdp->detached = 0;
 	sdp->sg_tablesize = scsidp->host ? scsidp->host->sg_tablesize : 0;
-	sdp->i_rdev = mk_kdev(SCSI_GENERIC_MAJOR, k);
 
 	memset(&sdp->sg_driverfs_dev, 0, sizeof (struct device));
 	sprintf(sdp->sg_driverfs_dev.bus_id, "%s:gen",
@@ -1607,7 +1619,9 @@ sg_detach(Scsi_Device * scsidp)
 		sdp->de = NULL;
 		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_type);
 		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
-		put_device(&sdp->sg_driverfs_dev);
+		device_unregister(&sdp->sg_driverfs_dev);
+		put_disk(sdp->disk);
+		sdp->disk = NULL;
 		if (NULL == sdp->headfp)
 			vfree((char *) sdp);
 	}
@@ -1629,17 +1643,9 @@ MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 static int __init
 init_sg(void)
 {
-	int rc;
 	if (def_reserved_size >= 0)
 		sg_big_buff = def_reserved_size;
-	rc = scsi_register_device(&sg_template);
-	if (!rc) {
-		sg_template.scsi_driverfs_driver.name =
-		    (char *) sg_template.tag;
-		sg_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-		driver_register(&sg_template.scsi_driverfs_driver);
-	}
-	return rc;
+	return scsi_register_device(&sg_template);
 }
 
 static void __exit
@@ -1655,7 +1661,6 @@ exit_sg(void)
 		sg_dev_arr = NULL;
 	}
 	sg_template.dev_max = 0;
-	driver_unregister(&sg_template.scsi_driverfs_driver);
 }
 
 static int
@@ -2981,18 +2986,16 @@ sg_proc_debug_info(char *buffer, int *len, off_t * begin,
 	PRINT_PROC(" def_reserved_size=%d\n", sg_big_buff);
 	for (j = 0; j < max_dev; ++j) {
 		if ((sdp = sg_get_dev(j))) {
-			struct scsi_device *scsidp;
-			int dev;
+			struct scsi_device *scsidp = sdp->device;
 
-			scsidp = sdp->device;
 			if (NULL == scsidp) {
 				PRINT_PROC("device %d detached ??\n", j);
 				continue;
 			}
-			dev = minor(sdp->i_rdev);
 
 			if (sg_get_nth_sfp(sdp, 0)) {
-				PRINT_PROC(" >>> device=sg%d ", dev);
+				PRINT_PROC(" >>> device=%s ",
+					sdp->disk->disk_name);
 				if (sdp->detached)
 					PRINT_PROC("detached pending close ");
 				else

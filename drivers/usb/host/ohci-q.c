@@ -62,54 +62,6 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 	usb_hcd_giveback_urb (&ohci->hcd, urb);
 }
 
-static void td_submit_urb (struct ohci_hcd *ohci, struct urb *urb);
-
-/* Report interrupt transfer completion, maybe reissue */
-static inline void intr_resub (struct ohci_hcd *hc, struct urb *urb)
-{
-	struct urb_priv	*urb_priv = urb->hcpriv;
-	unsigned long	flags;
-
-// FIXME going away along with the rest of interrrupt automagic...
-
-	/* FIXME: MP race.  If another CPU partially unlinks
-	 * this URB (urb->status was updated, hasn't yet told
-	 * us to dequeue) before we call complete() here, an
-	 * extra "unlinked" completion will be reported...
-	 */
-
-	spin_lock_irqsave (&urb->lock, flags);
-	if (likely (urb->status == -EINPROGRESS))
-		urb->status = 0;
-	spin_unlock_irqrestore (&urb->lock, flags);
-
-	if (!(urb->transfer_flags & URB_NO_DMA_MAP)
-			&& usb_pipein (urb->pipe))
-		pci_dma_sync_single (hc->hcd.pdev, urb->transfer_dma,
-				urb->transfer_buffer_length,
-				PCI_DMA_FROMDEVICE);
-
-#ifdef OHCI_VERBOSE_DEBUG
-	urb_print (urb, "INTR", usb_pipeout (urb->pipe));
-#endif
-	urb->complete (urb);
-
-	/* always requeued, but ED_SKIP if complete() unlinks.
-	 * EDs are removed from periodic table only at SOF intr.
-	 */
-	urb->actual_length = 0;
-	spin_lock_irqsave (&urb->lock, flags);
-	if (urb_priv->state != URB_DEL)
-		urb->status = -EINPROGRESS;
-	spin_unlock (&urb->lock);
-
-	/* syncing with PCI_DMA_TODEVICE is evidently trouble... */
-
-	spin_lock (&hc->lock);
-	td_submit_urb (hc, urb);
-	spin_unlock_irqrestore (&hc->lock, flags);
-}
-
 
 /*-------------------------------------------------------------------------*
  * ED handling functions
@@ -623,7 +575,7 @@ static void td_submit_urb (
 			info |= TD_R;
 		td_fill (info, data, data_len, urb, cnt);
 		cnt++;
-		if ((urb->transfer_flags & USB_ZERO_PACKET)
+		if ((urb->transfer_flags & URB_ZERO_PACKET)
 				&& cnt < urb_priv->length) {
 			td_fill (info, 0, 0, urb, cnt);
 			cnt++;
@@ -784,42 +736,39 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 	 */
 	ed->hwINFO |= ED_SKIP;
 	wmb ();
-	td->ed->hwHeadP &= ~ED_H; 
+	ed->hwHeadP &= ~ED_H; 
 
+	/* put any later tds from this urb onto the donelist, after 'td',
+	 * order won't matter here: no errors, and nothing was transferred.
+	 * also patch the ed so it looks as if those tds completed normally.
+	 */
 	while (tmp != &ed->td_list) {
 		struct td	*next;
+		u32		info;
 
 		next = list_entry (tmp, struct td, td_list);
 		tmp = next->td_list.next;
 
-		/* move other tds from this urb to the donelist, after 'td'.
-		 * order won't matter here: no errors, nothing transferred.
-		 *
-		 * NOTE: this "knows" short control reads won't need fixup:
-		 * hc went from the (one) data TD to the status td. that'll
-		 * change if multi-td control DATA segments are supported,
-		 * and we want to send the status packet.
+		if (next->urb != urb)
+			break;
+
+		/* NOTE: if multi-td control DATA segments get supported,
+		 * this urb had one of them, this td wasn't the last td
+		 * in that segment (TD_R clear), this ed halted because
+		 * of a short read, _and_ URB_SHORT_NOT_OK is clear ...
+		 * then we need to leave the control STATUS packet queued
+		 * and clear ED_SKIP.
 		 */
-		if (next->urb == urb) {
-			u32	info = next->hwINFO;
+		info = next->hwINFO;
+		info |= cpu_to_le32 (TD_DONE);
+		info &= ~cpu_to_le32 (TD_CC);
+		next->hwINFO = info;
 
-			info |= cpu_to_le32 (TD_DONE);
-			info &= ~cpu_to_le32 (TD_CC);
-			next->hwINFO = info;
-			next->next_dl_td = rev;	
-			rev = next;
-			continue;
-		}
+		next->next_dl_td = rev;	
+		rev = next;
 
-		/* restart ed with first td of this next urb */
-		ed->hwHeadP = cpu_to_le32 (next->td_dma) | toggle;
-		tmp = 0;
-		break;
+		ed->hwHeadP = next->hwNextTD | toggle;
 	}
-
-	/* no urbs queued? then ED is empty. */
-	if (tmp)
-		ed->hwHeadP = cpu_to_le32 (ed->dummy->td_dma) | toggle;
 
 	/* help for troubleshooting: */
 	dbg ("urb %p usb-%s-%s ep-%d-%s cc %d --> status %d",
@@ -1022,22 +971,10 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
    		td_done (urb, td);
   		urb_priv->td_cnt++;
 
-		/* If all this urb's TDs are done, call complete().
-		 * Interrupt transfers are the only special case:
-		 * they're reissued, until "deleted" by usb_unlink_urb
-		 * (real work done in a SOF intr, by finish_unlinks).
-		 */
+		/* If all this urb's TDs are done, call complete() */
   		if (urb_priv->td_cnt == urb_priv->length) {
-			int	resubmit;
-
-			resubmit = usb_pipeint (urb->pipe)
-					&& (urb_priv->state != URB_DEL);
-
      			spin_unlock_irqrestore (&ohci->lock, flags);
-			if (resubmit)
-  				intr_resub (ohci, urb);
-  			else
-  				finish_urb (ohci, urb);
+  			finish_urb (ohci, urb);
   			spin_lock_irqsave (&ohci->lock, flags);
   		}
 

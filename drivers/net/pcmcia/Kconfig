@@ -1,0 +1,199 @@
+#
+# PCMCIA Network device configuration
+#
+
+menu "PCMCIA network device support"
+	depends on NETDEVICES && HOTPLUG && PCMCIA!=n
+
+config NET_PCMCIA
+	bool "PCMCIA network device support"
+	---help---
+	  Say Y if you would like to include support for any PCMCIA or CardBus
+	  network adapters, then say Y to the driver for your particular card
+	  below.  PCMCIA- or PC-cards are credit-card size devices often used
+	  with laptops computers; CardBus is the newer and faster version of
+	  PCMCIA.
+
+	  To use your PC-cards, you will need supporting software from David
+	  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+	  for location).  You also want to check out the PCMCIA-HOWTO,
+	  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If unsure, say N.
+
+config PCMCIA_3C589
+	tristate "3Com 3c589 PCMCIA support"
+	depends on NET_PCMCIA && PCMCIA
+	help
+	  Say Y here if you intend to attach a 3Com 3c589 or compatible PCMCIA
+	  (PC-card) Ethernet card to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called 3c589_cs.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>. If
+	  unsure, say N.
+
+config PCMCIA_3C574
+	tristate "3Com 3c574 PCMCIA support"
+	depends on NET_PCMCIA && PCMCIA
+	help
+	  Say Y here if you intend to attach a 3Com 3c574 or compatible PCMCIA
+	  (PC-card) Fast Ethernet card to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called 3c574_cs.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.  If
+	  unsure, say N.
+
+config PCMCIA_FMVJ18X
+	tristate "Fujitsu FMV-J18x PCMCIA support"
+	depends on NET_PCMCIA && PCMCIA
+	help
+	  Say Y here if you intend to attach a Fujitsu FMV-J18x or compatible
+	  PCMCIA (PC-card) Ethernet card to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called fmvj18x_cs.o.  If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  If unsure, say N.
+
+config PCMCIA_PCNET
+	tristate "NE2000 compatible PCMCIA support"
+	depends on NET_PCMCIA && PCMCIA
+	help
+	  Say Y here if you intend to attach an NE2000 compatible PCMCIA
+	  (PC-card) Ethernet or Fast Ethernet card to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called pcnet_cs.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>. If
+	  unsure, say N.
+
+config PCMCIA_NMCLAN
+	tristate "New Media PCMCIA support"
+	depends on NET_PCMCIA && PCMCIA
+	help
+	  Say Y here if you intend to attach a New Media Ethernet or LiveWire
+	  PCMCIA (PC-card) Ethernet card to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called nmclan_cs.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.  If
+	  unsure, say N.
+
+config PCMCIA_SMC91C92
+	tristate "SMC 91Cxx PCMCIA support"
+	depends on NET_PCMCIA && PCMCIA
+	help
+	  Say Y here if you intend to attach an SMC 91Cxx compatible PCMCIA
+	  (PC-card) Ethernet or Fast Ethernet card to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called smc91c92_cs.o.  If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  If unsure, say N.
+
+config PCMCIA_XIRC2PS
+	tristate "Xircom 16-bit PCMCIA support"
+	depends on NET_PCMCIA && PCMCIA
+	help
+	  Say Y here if you intend to attach a Xircom 16-bit PCMCIA (PC-card)
+	  Ethernet or Fast Ethernet card to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called xirc2ps_cs.o.  If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  If unsure, say N.
+
+config PCMCIA_AXNET
+	tristate "broken NS8390-cards support"
+	depends on NET_PCMCIA && PCMCIA
+	---help---
+	  Say Y here if you intend to attach an Asix AX88190-based PCMCIA
+	  (PC-card) Fast Ethernet card to your computer.  These cards are
+	  nearly NE2000 compatible but need a separate driver due to a few
+	  misfeatures.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called axnet_cs.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.  If
+	  unsure, say N.
+
+config ARCNET_COM20020_CS
+	tristate "COM20020 ARCnet PCMCIA support"
+	depends on NET_PCMCIA && ARCNET_COM20020 && PCMCIA
+	help
+	  Say Y here if you intend to attach this type of ARCnet PCMCIA card
+	  to your computer.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called com20020_cs.o.  If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  If unsure, say N.
+
+config PCMCIA_IBMTR
+	tristate "IBM PCMCIA tokenring adapter support"
+	depends on NET_PCMCIA && IBMTR!=y && TR && PCMCIA
+	help
+	  Say Y here if you intend to attach this type of Token Ring PCMCIA
+	  card to your computer. You then also need to say Y to "Token Ring
+	  driver support".
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called ibmtr_cs.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config NET_PCMCIA_RADIO
+	bool "Pcmcia Wireless LAN"
+	depends on NET_PCMCIA
+	help
+	  Say Y here if you would like to use a PCMCIA (PC-card) device to
+	  connect to a wireless local area network. Then say Y to the driver
+	  for your particular card below.
+
+	  To use your PC-cards, you will need supporting software from David
+	  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+	  for location). You also want to check out the PCMCIA-HOWTO,
+	  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+config PCMCIA_RAYCS
+	tristate "Aviator/Raytheon 2.4MHz wireless support"
+	depends on NET_PCMCIA_RADIO && PCMCIA
+	---help---
+	  Say Y here if you intend to attach an Aviator/Raytheon PCMCIA
+	  (PC-card) wireless Ethernet networking card to your computer.
+	  Please read the file <file:Documentation/networking/ray_cs.txt> for
+	  details.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called ray_cs.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.  If
+	  unsure, say N.
+
+config AIRONET4500_CS
+	tristate "Aironet 4500/4800 PCMCIA support"
+	depends on NET_PCMCIA_RADIO && AIRONET4500 && PCMCIA
+	help
+	  Say Y here if you have a PCMCIA Aironet 4500/4800 card which you
+	  want to use with the standard PCMCIA cardservices provided by the
+	  pcmcia-cs package.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called aironet4500_cs.o. If you want to
+	  compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+endmenu
+

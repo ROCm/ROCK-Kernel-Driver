@@ -47,9 +47,13 @@
  *					coma.
  *	Andi Kleen		:	Fix new listen.
  *	Andi Kleen		:	Fix accept error reporting.
+ *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
+ *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
+ *					a single port at the same time.
  */
 
 #include <linux/config.h>
+
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/random.h>
@@ -62,6 +66,7 @@
 #include <net/inet_common.h>
 
 #include <linux/inet.h>
+#include <linux/ipv6.h>
 #include <linux/stddef.h>
 #include <linux/ipsec.h>
 
@@ -176,7 +181,9 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 	int sk_reuse = sk->reuse;
 
 	for ( ; sk2; sk2 = sk2->bind_next) {
-		if (sk != sk2 && sk->bound_dev_if == sk2->bound_dev_if) {
+		if (sk != sk2 &&
+		    !ipv6_only_sock(sk2) &&
+		    sk->bound_dev_if == sk2->bound_dev_if) {
 			if (!sk_reuse || !sk2->reuse ||
 			    sk2->state == TCP_LISTEN) {
 				struct inet_opt *inet2 = inet_sk(sk2);
@@ -412,25 +419,25 @@ static struct sock *__tcp_v4_lookup_listener(struct sock *sk, u32 daddr,
 	struct sock *result = NULL;
 	int score, hiscore;
 
-	hiscore=0;
+	hiscore=-1;
 	for (; sk; sk = sk->next) {
 		struct inet_opt *inet = inet_sk(sk);
 
-		if (inet->num == hnum) {
+		if (inet->num == hnum && !ipv6_only_sock(sk)) {
 			__u32 rcv_saddr = inet->rcv_saddr;
 
-			score = 1;
+			score = (sk->family == PF_INET ? 1 : 0);
 			if (rcv_saddr) {
 				if (rcv_saddr != daddr)
 					continue;
-				score++;
+				score+=2;
 			}
 			if (sk->bound_dev_if) {
 				if (sk->bound_dev_if != dif)
 					continue;
-				score++;
+				score+=2;
 			}
-			if (score == 3)
+			if (score == 5)
 				return sk;
 			if (score > hiscore) {
 				hiscore = score;
@@ -454,6 +461,7 @@ __inline__ struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
 
 		if (inet->num == hnum && !sk->next &&
 		    (!inet->rcv_saddr || inet->rcv_saddr == daddr) &&
+		    (sk->family == PF_INET || !ipv6_only_sock(sk)) &&
 		    !sk->bound_dev_if)
 			goto sherry_cache;
 		sk = __tcp_v4_lookup_listener(sk, daddr, hnum, dif);
@@ -770,7 +778,9 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	}
 
 	tmp = ip_route_connect(&rt, nexthop, inet->saddr,
-			       RT_CONN_FLAGS(sk), sk->bound_dev_if);
+			       RT_CONN_FLAGS(sk), sk->bound_dev_if,
+			       IPPROTO_TCP,
+			       inet->sport, usin->sin_port);
 	if (tmp < 0)
 		return tmp;
 
@@ -778,10 +788,6 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		ip_rt_put(rt);
 		return -ENETUNREACH;
 	}
-
-	__sk_dst_set(sk, &rt->u.dst);
-	tcp_v4_setup_caps(sk, &rt->u.dst);
-	tp->ext_header_len += rt->u.dst.header_len;
 
 	if (!inet->opt || !inet->opt->srr)
 		daddr = rt->rt_dst;
@@ -831,6 +837,19 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (err)
 		goto failure;
 
+	err = ip_route_newports(&rt, inet->sport, inet->dport);
+	if (err)
+		goto failure;
+
+	/* OK, now commit destination to socket.  */
+	__sk_dst_set(sk, &rt->u.dst);
+	tcp_v4_setup_caps(sk, &rt->u.dst);
+
+	/* DAVEM REDPEN: This used to sit above forced ext_header_len = 0
+	 *               above, it was real bug.  Is this one correct?
+	 */
+	tp->ext_header_len += rt->u.dst.header_len;
+
 	if (!tp->write_seq)
 		tp->write_seq = secure_tcp_sequence_number(inet->saddr,
 							   inet->daddr,
@@ -846,8 +865,9 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	return 0;
 
 failure:
+	/* This unhashes the socket and releases the local port, if necessary. */
 	tcp_set_state(sk, TCP_CLOSE);
-	__sk_dst_reset(sk);
+	ip_rt_put(rt);
 	sk->route_caps = 0;
 	inet->dport = 0;
 	return err;
@@ -913,7 +933,7 @@ static void tcp_v4_synq_add(struct sock *sk, struct open_request *req)
  * This routine does path mtu discovery as defined in RFC1191.
  */
 static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *iph,
-				     unsigned mtu)
+				     u32 mtu)
 {
 	struct dst_entry *dst;
 	struct inet_opt *inet = inet_sk(sk);
@@ -935,17 +955,19 @@ static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *iph,
 	if ((dst = __sk_dst_check(sk, 0)) == NULL)
 		return;
 
-	ip_rt_update_pmtu(dst, mtu);
+	dst->ops->update_pmtu(dst, mtu);
 
 	/* Something is about to be wrong... Remember soft error
 	 * for the case, if this connection will not able to recover.
 	 */
-	if (mtu < dst->pmtu && ip_dont_fragment(sk, dst))
+	if (mtu < dst_pmtu(dst) && ip_dont_fragment(sk, dst))
 		sk->err_soft = EMSGSIZE;
 
+	mtu = dst_pmtu(dst);
+
 	if (inet->pmtudisc != IP_PMTUDISC_DONT &&
-	    tp->pmtu_cookie > dst->pmtu) {
-		tcp_sync_mss(sk, dst->pmtu);
+	    tp->pmtu_cookie > mtu) {
+		tcp_sync_mss(sk, mtu);
 
 		/* Resend the TCP packet because it's
 		 * clear that the old packet has been
@@ -1265,13 +1287,17 @@ static struct dst_entry* tcp_v4_route_req(struct sock *sk,
 {
 	struct rtable *rt;
 	struct ip_options *opt = req->af.v4_req.opt;
-	struct flowi fl = { .nl_u = { .ip4_u =
+	struct flowi fl = { .oif = sk->bound_dev_if,
+			    .nl_u = { .ip4_u =
 				      { .daddr = ((opt && opt->srr) ?
 						  opt->faddr :
 						  req->af.v4_req.rmt_addr),
 					.saddr = req->af.v4_req.loc_addr,
 					.tos = RT_CONN_FLAGS(sk) } },
-			    .oif = sk->bound_dev_if };
+			    .proto = IPPROTO_TCP,
+			    .uli_u = { .ports =
+				       { .sport = inet_sk(sk)->sport,
+					 .dport = req->rmt_port } } };
 
 	if (ip_route_output_key(&rt, &fl)) {
 		IP_INC_STATS_BH(IpOutNoRoutes);
@@ -1499,7 +1525,7 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 			 (sysctl_max_syn_backlog - tcp_synq_len(sk) <
 			  (sysctl_max_syn_backlog >> 2)) &&
 			 (!peer || !peer->tcp_ts_stamp) &&
-			 (!dst || !dst->rtt)) {
+			 (!dst || !dst_metric(dst, RTAX_RTT))) {
 			/* Without syncookies last quarter of
 			 * backlog is filled with destinations,
 			 * proven to be alive.
@@ -1579,8 +1605,8 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newtp->ext_header_len += dst->header_len;
 	newinet->id = newtp->write_seq ^ jiffies;
 
-	tcp_sync_mss(newsk, dst->pmtu);
-	newtp->advmss = dst->advmss;
+	tcp_sync_mss(newsk, dst_pmtu(dst));
+	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);;
 	tcp_initialize_rcv_mss(newsk);
 
 	__tcp_v4_hash(newsk, 0);
@@ -1673,8 +1699,6 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 	if (filter && sk_filter(skb, filter))
 		goto discard;
 #endif /* CONFIG_FILTER */
-
-  	IP_INC_STATS_BH(IpInDelivers);
 
 	if (sk->state == TCP_ESTABLISHED) { /* Fast path */
 		TCP_CHECK_TIMER(sk);
@@ -1864,7 +1888,9 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 	/* Query new route. */
 	err = ip_route_connect(&rt, daddr, 0,
 			       RT_TOS(inet->tos) | sk->localroute,
-			       sk->bound_dev_if);
+			       sk->bound_dev_if,
+			       IPPROTO_TCP,
+			       inet->sport, inet->dport);
 	if (err)
 		return err;
 
@@ -1914,11 +1940,15 @@ int tcp_v4_rebuild_header(struct sock *sk)
 		daddr = inet->opt->faddr;
 
 	{
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = sk->bound_dev_if,
+				    .nl_u = { .ip4_u =
 					      { .daddr = daddr,
 						.saddr = inet->saddr,
 						.tos = RT_CONN_FLAGS(sk) } },
-				    .oif = sk->bound_dev_if };
+				    .proto = IPPROTO_TCP,
+				    .uli_u = { .ports =
+					       { .sport = inet->sport,
+						 .dport = inet->dport } } };
 						
 		err = ip_route_output_key(&rt, &fl);
 	}

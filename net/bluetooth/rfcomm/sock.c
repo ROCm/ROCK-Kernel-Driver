@@ -44,6 +44,8 @@
 #include <linux/socket.h>
 #include <linux/skbuff.h>
 #include <linux/list.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <net/sock.h>
 
 #include <asm/system.h>
@@ -772,26 +774,86 @@ done:
 }
 
 /* ---- Proc fs support ---- */
-int rfcomm_sock_dump(char *buf)
+#ifdef CONFIG_PROC_FS
+static void *rfcomm_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct bt_sock_list *list = &rfcomm_sk_list;
-	struct rfcomm_pinfo *pi;
 	struct sock *sk;
-	char *ptr = buf;
+	loff_t l = *pos;
 
-	write_lock_bh(&list->lock);
+	read_lock_bh(&rfcomm_sk_list.lock);
 
-	for (sk = list->head; sk; sk = sk->next) {
-		pi = rfcomm_pi(sk);
-		ptr += sprintf(ptr, "sk  %s %s %d %d\n",
-				batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst),
-				sk->state, rfcomm_pi(sk)->channel);
-	}
-
-	write_unlock_bh(&list->lock);
-
-	return ptr - buf;
+	for (sk = rfcomm_sk_list.head; sk; sk = sk->next)
+		if (!l--)
+			return sk;
+	return NULL;
 }
+
+static void *rfcomm_seq_next(struct seq_file *seq, void *e, loff_t *pos)
+{
+	struct sock *sk = e;
+	(*pos)++;
+	return sk->next;
+}
+
+static void rfcomm_seq_stop(struct seq_file *seq, void *e)
+{
+	read_unlock_bh(&rfcomm_sk_list.lock);
+}
+
+static int  rfcomm_seq_show(struct seq_file *seq, void *e)
+{
+	struct sock *sk = e;
+	seq_printf(seq, "%s %s %d %d\n",
+			batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst),
+			sk->state, rfcomm_pi(sk)->channel);
+	return 0;
+}
+
+static struct seq_operations rfcomm_seq_ops = {
+	.start  = rfcomm_seq_start,
+	.next   = rfcomm_seq_next,
+	.stop   = rfcomm_seq_stop,
+	.show   = rfcomm_seq_show 
+};
+
+static int rfcomm_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &rfcomm_seq_ops);
+}
+
+static struct file_operations rfcomm_seq_fops = {
+	.open    = rfcomm_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
+static int __init rfcomm_sock_proc_init(void)
+{
+        struct proc_dir_entry *p = create_proc_entry("sock", S_IRUGO, proc_bt_rfcomm);
+        if (!p)
+                return -ENOMEM;
+        p->proc_fops = &rfcomm_seq_fops;
+        return 0;
+}
+
+static void __init rfcomm_sock_proc_cleanup(void)
+{
+        remove_proc_entry("sock", proc_bt_rfcomm);
+}
+
+#else /* CONFIG_PROC_FS */
+
+static int __init rfcomm_sock_proc_init(void)
+{
+        return 0;
+}
+
+static void __init rfcomm_sock_proc_cleanup(void)
+{
+        return 0;
+}
+#endif /* CONFIG_PROC_FS */
 
 static struct proto_ops rfcomm_sock_ops = {
 	.family		= PF_BLUETOOTH,
@@ -822,10 +884,13 @@ int rfcomm_init_sockets(void)
 	int err;
 
 	if ((err = bt_sock_register(BTPROTO_RFCOMM, &rfcomm_sock_family_ops))) {
-		BT_ERR("Can't register RFCOMM socket layer");
+		BT_ERR("RFCOMM socket layer registration failed. %d", err);
 		return err;
 	}
 
+	rfcomm_sock_proc_init();
+
+	BT_INFO("RFCOMM socket layer initialized");
 	return 0;
 }
 
@@ -833,7 +898,9 @@ void rfcomm_cleanup_sockets(void)
 {
 	int err;
 
+	rfcomm_sock_proc_cleanup();
+
 	/* Unregister socket, protocol and notifier */
 	if ((err = bt_sock_unregister(BTPROTO_RFCOMM)))
-		BT_ERR("Can't unregister RFCOMM socket layer %d", err);
+		BT_ERR("RFCOMM socket layer unregistration failed. %d", err);
 }

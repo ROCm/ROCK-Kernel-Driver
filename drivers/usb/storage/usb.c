@@ -547,6 +547,13 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 		return 2;
 	}
 
+	US_DEBUGP("Allocating scatter-gather request block\n");
+	ss->current_sg = kmalloc(sizeof(*ss->current_sg), GFP_KERNEL);
+	if (!ss->current_sg) {
+		US_DEBUGP("allocation failed\n");
+		return 5;
+	}
+
 	/* allocate the IRQ URB, if it is needed */
 	if (ss->protocol == US_PR_CBI) {
 		US_DEBUGP("Allocating IRQ for CBI transport\n");
@@ -570,7 +577,7 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 			maxp = sizeof(ss->irqbuf);
 
 		/* fill in the URB with our data */
-		FILL_INT_URB(ss->irq_urb, ss->pusb_dev, pipe, ss->irqbuf,
+		usb_fill_int_urb(ss->irq_urb, ss->pusb_dev, pipe, ss->irqbuf,
 			maxp, usb_stor_CBI_irq, ss, ss->ep_int->bInterval); 
 
 		/* submit the URB for processing */
@@ -607,6 +614,12 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 	}
 	up(&(ss->irq_urb_sem));
 
+	/* free the scatter-gather request block */
+	if (ss->current_sg) {
+		kfree(ss->current_sg);
+		ss->current_sg = NULL;
+	}
+
 	/* free up the main URB for this device */
 	if (ss->current_urb) {
 		US_DEBUGP("-- releasing main URB\n");
@@ -633,7 +646,7 @@ static int storage_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
-	int ifnum = intf->altsetting->bInterfaceNumber;
+	int ifnum = intf->altsetting->desc.bInterfaceNumber;
 	int i;
 	const int id_index = id - storage_usb_ids; 
 	char mf[USB_STOR_STRING_LEN];		     /* manufacturer */
@@ -658,7 +671,7 @@ static int storage_probe(struct usb_interface *intf,
 	/* the altsetting on the interface we're probing that matched our
 	 * usb_match_id table
 	 */
-	struct usb_interface_descriptor *altsetting =
+	struct usb_host_interface *altsetting =
 		intf[ifnum].altsetting + intf[ifnum].act_altsetting;
 	US_DEBUGP("act_altsetting is %d\n", intf[ifnum].act_altsetting);
 
@@ -703,22 +716,25 @@ static int storage_probe(struct usb_interface *intf,
 	 * An optional interrupt is OK (necessary for CBI protocol).
 	 * We will ignore any others.
 	 */
-	for (i = 0; i < altsetting->bNumEndpoints; i++) {
+	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
+		struct usb_endpoint_descriptor *ep;
+
+		ep = &altsetting->endpoint[i].desc;
+
 		/* is it an BULK endpoint? */
-		if ((altsetting->endpoint[i].bmAttributes & 
-		     USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK) {
+		if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+				== USB_ENDPOINT_XFER_BULK) {
 			/* BULK in or out? */
-			if (altsetting->endpoint[i].bEndpointAddress & 
-			    USB_DIR_IN)
-				ep_in = &altsetting->endpoint[i];
+			if (ep->bEndpointAddress & USB_DIR_IN)
+				ep_in = ep;
 			else
-				ep_out = &altsetting->endpoint[i];
+				ep_out = ep;
 		}
 
 		/* is it an interrupt endpoint? */
-		if ((altsetting->endpoint[i].bmAttributes & 
-		     USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_INT) {
-			ep_int = &altsetting->endpoint[i];
+		else if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+				== USB_ENDPOINT_XFER_INT) {
+			ep_int = ep;
 		}
 	}
 	US_DEBUGP("Endpoints: In: 0x%p Out: 0x%p Int: 0x%p (Period %d)\n",

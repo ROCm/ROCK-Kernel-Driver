@@ -37,7 +37,6 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/ptrace.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
@@ -191,7 +190,7 @@ __asm__ (__ALIGN_STR "\n"						   \
 "	andw	#0xfeff,%%sr\n"		/* set IPL = 6 again */		   \
 "	orb 	#(1<<(%c3&7)),%a4:w\n"	/* now unmask the int again */	   \
 "	jbra	ret_from_interrupt\n"					   \
-	 : : "i" (&kstat.irqs[0][n+8]), "i" (&irq_handler[n+8]),	   \
+	 : : "i" (&kstat_cpu(0).irqs[n+8]), "i" (&irq_handler[n+8]),	   \
 	     "n" (PT_OFF_SR), "n" (n),					   \
 	     "i" (n & 8 ? (n & 16 ? &tt_mfp.int_mk_a : &mfp.int_mk_a)	   \
 		        : (n & 16 ? &tt_mfp.int_mk_b : &mfp.int_mk_b)),	   \
@@ -297,7 +296,7 @@ atari_prio_irq_handler:\t
 	addql	#8,%%sp
 	addql	#4,%%sp
 	jbra	ret_from_interrupt"
-	 : : "i" (&kstat.irqs[0]), "n" (PT_OFF_FORMATVEC),
+	 : : "i" (&kstat_cpu(0).irqs), "n" (PT_OFF_FORMATVEC),
 	     "m" (local_irq_count(0))
 );
 	for (;;);
@@ -623,11 +622,11 @@ int show_atari_interrupts(struct seq_file *p, void *v)
 			continue;
 		if (i < STMFP_SOURCE_BASE)
 			seq_printf(p, "auto %2d: %10u ",
-				       i, kstat.irqs[0][i]);
+				       i, kstat_cpu(0).irqs[i]);
 		else
 			seq_printf(p, "vec $%02x: %10u ",
 				       IRQ_SOURCE_TO_VECTOR(i),
-				       kstat.irqs[0][i]);
+				       kstat_cpu(0).irqs[i]);
 
 		if (irq_handler[i].handler != atari_call_irq_list) {
 			seq_printf(p, "%s\n", irq_param[i].devname);

@@ -90,7 +90,6 @@
 #include <linux/proc_fs.h>
 #include <asm/io.h>
 #include "scsi.h"
-#include "sd.h"
 #include "hosts.h"
 #include <linux/slab.h>
 #include "inia100.h"
@@ -653,27 +652,28 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int inia100_biosparam(Scsi_Disk * disk, struct block_device *dev, int *info_array)
+int inia100_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *info_array)
 {
 	ORC_HCS *pHcb;		/* Point to Host adapter control block */
 	ORC_TCS *pTcb;
 
-	pHcb = (ORC_HCS *) disk->device->host->hostdata;
-	pTcb = &pHcb->HCS_Tcs[disk->device->id];
+	pHcb = (ORC_HCS *) sdev->host->hostdata;
+	pTcb = &pHcb->HCS_Tcs[sdev->id];
 
 	if (pTcb->TCS_DrvHead) {
 		info_array[0] = pTcb->TCS_DrvHead;
 		info_array[1] = pTcb->TCS_DrvSector;
-		info_array[2] = (unsigned long)disk->capacity / pTcb->TCS_DrvHead / pTcb->TCS_DrvSector;
+		info_array[2] = (unsigned long)capacity / pTcb->TCS_DrvHead / pTcb->TCS_DrvSector;
 	} else {
 		if (pTcb->TCS_DrvFlags & TCF_DRV_255_63) {
 			info_array[0] = 255;
 			info_array[1] = 63;
-			info_array[2] = (unsigned long)disk->capacity / 255 / 63;
+			info_array[2] = (unsigned long)capacity / 255 / 63;
 		} else {
 			info_array[0] = 64;
 			info_array[1] = 32;
-			info_array[2] = disk->capacity >> 11;
+			info_array[2] = capacity >> 11;
 		}
 	}
 	return 0;

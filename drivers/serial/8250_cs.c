@@ -41,6 +41,7 @@
 #include <linux/timer.h>
 #include <linux/tty.h>
 #include <linux/serial.h>
+#include <linux/serial_core.h>
 #include <linux/major.h>
 #include <linux/workqueue.h>
 #include <asm/io.h>
@@ -306,7 +307,7 @@ static int setup_serial(serial_info_t * info, ioaddr_t port, int irq)
 	memset(&serial, 0, sizeof (serial));
 	serial.port = port;
 	serial.irq = irq;
-	serial.flags = ASYNC_SKIP_TEST | ASYNC_SHARE_IRQ;
+	serial.flags = UPF_SKIP_TEST | UPF_SHARE_IRQ;
 	line = register_serial(&serial);
 	if (line < 0) {
 		printk(KERN_NOTICE "serial_cs: register_serial() at 0x%04lx,"

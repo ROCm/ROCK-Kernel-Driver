@@ -1,6 +1,6 @@
 /* de2104x.c: A Linux PCI Ethernet driver for Intel/Digital 21040/1 chips. */
 /*
-	Copyright 2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2001 Jeff Garzik <jgarzik@pobox.com>
 
 	Copyright 1994, 1995 Digital Equipment Corporation.	    [de4x5.c]
 	Written/copyright 1994-2001 by Donald Becker.		    [tulip.c]
@@ -53,7 +53,7 @@
 static char version[] __initdata =
 KERN_INFO DRV_NAME " PCI Ethernet driver v" DRV_VERSION " (" DRV_RELDATE ")\n";
 
-MODULE_AUTHOR("Jeff Garzik <jgarzik@mandrakesoft.com>");
+MODULE_AUTHOR("Jeff Garzik <jgarzik@pobox.com>");
 MODULE_DESCRIPTION("Intel/Digital 21040/1 series PCI Ethernet driver");
 MODULE_LICENSE("GPL");
 
@@ -2216,7 +2216,7 @@ static struct pci_driver de_driver = {
 	.name		= DRV_NAME,
 	.id_table	= de_pci_tbl,
 	.probe		= de_init_one,
-	.remove		= de_remove_one,
+	.remove		= __devexit_p(de_remove_one),
 #ifdef CONFIG_PM
 	.suspend	= de_suspend,
 	.resume		= de_resume,

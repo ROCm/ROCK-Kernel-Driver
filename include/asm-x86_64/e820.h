@@ -54,8 +54,7 @@ extern int e820_mapped(unsigned long start, unsigned long end, int type);
 
 extern void e820_bootmem_free(pg_data_t *pgdat, unsigned long start,unsigned long end);
 
-extern void __init parse_memopt(char *p);
-extern void __init print_user_map(void);
+extern void __init parse_memopt(char *p, char **end);
 
 extern struct e820map e820;
 #endif/*!__ASSEMBLY__*/

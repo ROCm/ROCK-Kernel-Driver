@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/slab.h>
 #include <linux/blk.h>
 #include <linux/swap.h>

@@ -1,0 +1,29 @@
+#
+# Library configuration
+#
+
+menu "Library routines"
+
+config CRC32
+	tristate "CRC32 functions"
+	help
+	  This option is provided for the case where no in-kernel-tree
+	  modules require CRC32 functions, but a module built outside the
+	  kernel tree does. Such modules that use library CRC32 functions
+	  require M here.
+
+#
+# Do we need the compression support?
+#
+config ZLIB_INFLATE
+	tristate
+	default m if CRAMFS!=y && PPP_DEFLATE!=y && JFFS2_FS!=y && ZISOFS_FS!=y && (CRAMFS=m || PPP_DEFLATE=m || JFFS2_FS=m || ZISOFS_FS=m)
+	default y if CRAMFS=y || PPP_DEFLATE=y || JFFS2_FS=y || ZISOFS_FS=y
+
+config ZLIB_DEFLATE
+	tristate
+	default m if PPP_DEFLATE!=y && JFFS2_FS!=y && (PPP_DEFLATE=m || JFFS2_FS=m)
+	default y if PPP_DEFLATE=y || JFFS2_FS=y
+
+endmenu
+

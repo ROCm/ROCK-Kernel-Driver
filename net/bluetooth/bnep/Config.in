@@ -1,8 +1,0 @@
-
-dep_tristate 'BNEP protocol support' CONFIG_BT_BNEP $CONFIG_BT_L2CAP
-
-if [ "$CONFIG_BT_BNEP" != "n" ]; then
-   bool '  Multicast filter support' CONFIG_BT_BNEP_MC_FILTER
-   bool '  Protocol filter support'  CONFIG_BT_BNEP_PROTO_FILTER
-fi
-

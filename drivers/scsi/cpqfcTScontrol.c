@@ -44,7 +44,7 @@
 #include <asm/irq.h>
 #include <linux/spinlock.h>
 
-#include "sd.h"
+#include "scsi.h"
 #include "hosts.h"   // Scsi_Host definition for INT handler
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"

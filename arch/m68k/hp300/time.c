@@ -40,7 +40,7 @@ static void hp300_tick(int irq, void *dev_id, struct pt_regs *regs)
 {
   unsigned long tmp;
   void (*vector)(int, void *, struct pt_regs *) = dev_id;
-  readb(CLOCKBASE + CLKSR);
+  in_8(CLOCKBASE + CLKSR);
   asm volatile ("movpw %1@(5),%0" : "=d" (tmp) : "a" (CLOCKBASE));
   vector(irq, NULL, regs);
 }
@@ -51,25 +51,25 @@ unsigned long hp300_gettimeoffset(void)
   unsigned char lsb, msb1, msb2;
   unsigned short ticks;
 
-  msb1 = readb(CLOCKBASE + 5);
-  lsb = readb(CLOCKBASE + 7);
-  msb2 = readb(CLOCKBASE + 5);
+  msb1 = in_8(CLOCKBASE + 5);
+  lsb = in_8(CLOCKBASE + 7);
+  msb2 = in_8(CLOCKBASE + 5);
   if (msb1 != msb2)
     /* A carry happened while we were reading.  Read it again */
-    lsb = readb(CLOCKBASE + 7);
+    lsb = in_8(CLOCKBASE + 7);
   ticks = INTVAL - ((msb2 << 8) | lsb);
   return (USECS_PER_JIFFY * ticks) / INTVAL;
 }
 
 void __init hp300_sched_init(void (*vector)(int, void *, struct pt_regs *))
 {
-  writeb(0x1, CLOCKBASE + CLKCR2);		/* select CR1 */
-  writeb(0x1, CLOCKBASE + CLKCR1);		/* reset */
+  out_8(CLOCKBASE + CLKCR2, 0x1);		/* select CR1 */
+  out_8(CLOCKBASE + CLKCR1, 0x1);		/* reset */
 
   asm volatile(" movpw %0,%1@(5)" : : "d" (INTVAL), "a" (CLOCKBASE));
 
   sys_request_irq(6, hp300_tick, IRQ_FLG_STD, "timer tick", vector);
 
-  writeb(0x1, CLOCKBASE + CLKCR2);		/* select CR1 */
-  writeb(0x40, CLOCKBASE + CLKCR1);		/* enable irq */
+  out_8(CLOCKBASE + CLKCR2, 0x1);		/* select CR1 */
+  out_8(CLOCKBASE + CLKCR1, 0x40);		/* enable irq */
 }

@@ -253,8 +253,8 @@ static void st5481B_mode(struct st5481_bcs *bcs, int mode)
 static int __devinit st5481_setup_b_out(struct st5481_bcs *bcs)
 {
 	struct usb_device *dev = bcs->adapter->usb_dev;
-	struct usb_interface_descriptor *altsetting;
-	struct usb_endpoint_descriptor *endpoint;
+	struct usb_host_interface *altsetting;
+	struct usb_host_endpoint *endpoint;
   	struct st5481_b_out *b_out = &bcs->b_out;
 
 	DBG(4,"");
@@ -265,11 +265,11 @@ static int __devinit st5481_setup_b_out(struct st5481_bcs *bcs)
 	endpoint = &altsetting->endpoint[EP_B1_OUT - 1 + bcs->channel * 2];
 
 	DBG(4,"endpoint address=%02x,packet size=%d",
-	    endpoint->bEndpointAddress,endpoint->wMaxPacketSize);
+	    endpoint->desc.bEndpointAddress,endpoint->desc.wMaxPacketSize);
 
 	// Allocate memory for 8000bytes/sec + extra bytes if underrun
 	return st5481_setup_isocpipes(b_out->urb, dev, 
-				      usb_sndisocpipe(dev, endpoint->bEndpointAddress),
+				      usb_sndisocpipe(dev, endpoint->desc.bEndpointAddress),
 				      NUM_ISO_PACKETS_B, SIZE_ISO_PACKETS_B_OUT,
 				      NUM_ISO_PACKETS_B * SIZE_ISO_PACKETS_B_OUT + B_FLOW_ADJUST,
 				      usb_b_out_complete, bcs);

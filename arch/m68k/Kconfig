@@ -1,0 +1,2355 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+config M68K
+	bool
+	default y
+
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
+config UID16
+	bool
+	default y
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+
+
+mainmenu "Linux/68k Kernel Configuration"
+
+source "init/Kconfig"
+
+
+menu "Platform dependent setup"
+
+config EISA
+	bool
+	---help---
+	  The Extended Industry Standard Architecture (EISA) bus was
+	  developed as an open alternative to the IBM MicroChannel bus.
+
+	  The EISA bus provided some of the features of the IBM MicroChannel
+	  bus while maintaining backward compatibility with cards made for
+	  the older ISA bus.  The EISA bus saw limited use between 1988 and
+	  1995 when it was made obsolete by the PCI bus.
+
+	  Say Y here if you are building a kernel for an EISA-based machine.
+
+	  Otherwise, say N.
+
+config MCA
+	bool
+	help
+	  MicroChannel Architecture is found in some IBM PS/2 machines and
+	  laptops.  It is a bus system similar to PCI or ISA. See
+	  <file:Documentation/mca.txt> (and especially the web page given
+	  there) before attempting to build an MCA bus kernel.
+
+config PCMCIA
+	tristate
+	---help---
+	  Say Y here if you want to attach PCMCIA- or PC-cards to your Linux
+	  computer.  These are credit-card size devices such as network cards,
+	  modems or hard drives often used with laptops computers.  There are
+	  actually two varieties of these cards: the older 16 bit PCMCIA cards
+	  and the newer 32 bit CardBus cards.  If you want to use CardBus
+	  cards, you need to say Y here and also to "CardBus support" below.
+
+	  To use your PC-cards, you will need supporting software from David
+	  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+	  for location).  Please also read the PCMCIA-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  When compiled this way, there will be modules called pcmcia_core.o
+	  and ds.o.  If you want to compile it as a module, say M here and
+	  read <file:Documentation/modules.txt>.
+
+config AMIGA
+	bool "Amiga support"
+	help
+	  This option enables support for the Amiga series of computers. If
+	  you plan to use this kernel on an Amiga, say Y here and browse the
+	  material available in <file:Documentation/m68k>; otherwise say N.
+
+config ATARI
+	bool "Atari support"
+	help
+	  This option enables support for the 68000-based Atari series of
+	  computers (including the TT, Falcon and Medusa). If you plan to use
+	  this kernel on an Atari, say Y here and browse the material
+	  available in <file:Documentation/m68k>; otherwise say N.
+
+config HADES
+	bool "Hades support"
+	depends on ATARI
+	help
+	  This option enables support for the Hades Atari clone. If you plan
+	  to use this kernel on a Hades, say Y here; otherwise say N.
+
+config PCI
+	bool
+	depends on HADES
+	default y
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+config MAC
+	bool "Macintosh support"
+	help
+	  This option enables support for the Apple Macintosh series of
+	  computers (yes, there is experimental support now, at least for part
+	  of the series).
+
+	  Say N unless you're willing to code the remaining necessary support.
+	  ;)
+
+config NUBUS
+	bool
+	depends on MAC
+	default y
+
+config M68K_L2_CACHE
+	bool
+	depends on MAC
+	default y
+
+config APOLLO
+	bool "Apollo support"
+	help
+	  Say Y here if you want to run Linux on an MC680x0-based Apollo
+	  Domain workstation such as the DN3500.
+
+config VME
+	bool "VME (Motorola and BVM) support"
+	help
+	  Say Y here if you want to build a kernel for a 680x0 based VME
+	  board.  Boards currently supported include Motorola boards MVME147,
+	  MVME162, MVME166, MVME167, MVME172, and MVME177.  BVME4000 and
+	  BVME6000 boards from BVM Ltd are also supported.
+
+config MVME147
+	bool "MVME147 support"
+	depends on VME
+	help
+	  Say Y to include support for early Motorola VME boards.  This will
+	  build a kernel which can run on MVME147 single-board computers.  If
+	  you select this option you will have to select the appropriate
+	  drivers for SCSI, Ethernet and serial ports later on.
+
+config MVME16x
+	bool "MVME162, 166 and 167 support"
+	depends on VME
+	help
+	  Say Y to include support for Motorola VME boards.  This will build a
+	  kernel which can run on MVME162, MVME166, MVME167, MVME172, and
+	  MVME177 boards.  If you select this option you will have to select
+	  the appropriate drivers for SCSI, Ethernet and serial ports later
+	  on.
+
+config BVME6000
+	bool "BVME4000 and BVME6000 support"
+	depends on VME
+	help
+	  Say Y to include support for VME boards from BVM Ltd.  This will
+	  build a kernel which can run on BVME4000 and BVME6000 boards.  If
+	  you select this option you will have to select the appropriate
+	  drivers for SCSI, Ethernet and serial ports later on.
+
+config HP300
+	bool "HP9000/300 support"
+	help
+	  This option enables support for the HP9000/300 series of
+	  workstations. Support for these machines is still very experimental.
+	  If you plan to try to use the kernel on such a machine say Y here.
+	  Everybody else says N.
+
+config DIO
+	bool "DIO bus support"
+	depends on HP300
+	help
+	  Say Y here to enable support for the "DIO" expansion bus used in
+	  HP300 machines. If you are using such a system you almost certainly
+	  want this.
+
+config SUN3X
+	bool "Sun3x support"
+	help
+	  This option enables support for the Sun 3x series of workstations.
+	  Be warned that this support is very experimental. You will also want
+	  to say Y to 68030 support and N to the other processors below.
+	  Note that Sun 3x kernels are not compatible with Sun 3 hardware.
+	  General Linux information on the Sun 3x series (now discontinued)
+	  is at <http://www.angelfire.com/ca2/tech68k/sun3.html>.
+
+	  If you don't want to compile a kernel for a Sun 3x, say N.
+
+config SUN3
+	bool "Sun3 support"
+	help
+	  This option enables support for the Sun 3 series of workstations
+	  (3/50, 3/60, 3/1xx, 3/2xx systems). Enabling this option requires 
+	  that all other hardware types must be disabled, as Sun 3 kernels 
+	  are incompatible with all other m68k targets (including Sun 3x!).  
+	  Also, you will want to say Y to 68020 support and N to the other 
+	  processors below.
+
+	  If you don't want to compile a kernel exclusively for a Sun 3, say N.
+
+config Q40
+	bool "Q40/Q60 support"
+	help
+	  The Q40 is a Motorola 68040-based successor to the Sinclair QL
+	  manufactured in Germany.  There is an official Q40 home page at
+	  <http://www.q40.de/>.  This option enables support for the Q40 and
+	  Q60. Select your CPU below.  For 68LC060 don't forget to enable FPU
+	  emulation.
+
+comment "Processor type"
+
+config M68020
+	bool "68020 support"
+	help
+	  If you anticipate running this kernel on a computer with a MC68020
+	  processor, say Y. Otherwise, say N. Note that the 68020 requires a
+	  68851 MMU (Memory Management Unit) to run Linux/m68k, except on the
+	  Sun 3, which provides its own version.
+
+config M68030
+	bool "68030 support"
+	help
+	  If you anticipate running this kernel on a computer with a MC68030
+	  processor, say Y. Otherwise, say N. Note that a MC68EC030 will not
+	  work, as it does not include an MMU (Memory Management Unit).
+
+config M68040
+	bool "68040 support"
+	help
+	  If you anticipate running this kernel on a computer with a MC68LC040
+	  or MC68040 processor, say Y. Otherwise, say N. Note that an
+	  MC68EC040 will not work, as it does not include an MMU (Memory
+	  Management Unit).
+
+config M68060
+	bool "68060 support"
+	help
+	  If you anticipate running this kernel on a computer with a MC68060
+	  processor, say Y. Otherwise, say N.
+
+config M68KFPU_EMU
+	bool "Math emulation support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  At some point in the future, this will cause floating-point math
+	  instructions to be emulated by the kernel on machines that lack a
+	  floating-point math coprocessor.  Thrill-seekers and chronically
+	  sleep-deprived psychotic hacker types can say Y now, everyone else
+	  should probably wait a while.
+
+config M68KFPU_EMU_EXTRAPREC
+	bool "Math emulation extra precision"
+	depends on M68KFPU_EMU
+	help
+	  The fpu uses normally a few bit more during calculations for
+	  correct rounding, the emulator can (often) do the same but this
+	  extra calculation can cost quite some time, so you can disable
+	  it here. The emulator will then "only" calculate with a 64 bit
+	  mantissa and round slightly incorrect, what is more then enough
+	  for normal usage.
+
+config M68KFPU_EMU_ONLY
+	bool "Math emulation only kernel"
+	depends on M68KFPU_EMU
+	help
+	  This option prevents any floating-point instructions from being
+	  compiled into the kernel, thereby the kernel doesn't save any
+	  floating point context anymore during task switches, so this
+	  kernel will only be usable on machines without a floating-point
+	  math coprocessor. This makes the kernel a bit faster as no tests
+	  needs to be executed whether a floating-point instruction in the
+	  kernel should be executed or not.
+
+config ADVANCED
+	bool "Advanced configuration options"
+	---help---
+	  This gives you access to some advanced options for the CPU. The
+	  defaults should be fine for most users, but these options may make
+	  it possible for you to improve performance somewhat if you know what
+	  you are doing.
+
+	  Note that the answer to this question won't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about these options.
+
+	  Most users should say N to this question.
+
+config RMW_INSNS
+	bool "Use read-modify-write instructions"
+	depends on ADVANCED
+	---help---
+	  This allows to use certain instructions that work with indivisible
+	  read-modify-write bus cycles. While this is faster than the
+	  workaround of disabling interrupts, it can conflict with DMA
+	  ( = direct memory access) on many Amiga systems, and it is also said
+	  to destabilize other machines. It is very likely that this will
+	  cause serious problems on any Amiga or Atari Medusa if set. The only
+	  configuration where it should work are 68030-based Ataris, where it
+	  apparently improves performance. But you've been warned! Unless you
+	  really know what you are doing, say N. Try Y only if you're quite
+	  adventurous.
+
+config SINGLE_MEMORY_CHUNK
+	bool "Use one physical chunk of memory only"
+	depends on ADVANCED && !SUN3
+	help
+	  Ignore all but the first contiguous chunk of physical memory for VM
+	  purposes.  This will save a few bytes kernel size and may speed up
+	  some operations.  Say N if not sure.
+
+config 060_WRITETHROUGH
+	bool "Use write-through caching for 68060 supervisor accesses"
+	depends on ADVANCED && M68060
+	---help---
+	  The 68060 generally uses copyback caching of recently accessed data.
+	  Copyback caching means that memory writes will be held in an on-chip
+	  cache and only written back to memory some time later.  Saying Y
+	  here will force supervisor (kernel) accesses to use writethrough
+	  caching.  Writethrough caching means that data is written to memory
+	  straight away, so that cache and memory data always agree.
+	  Writethrough caching is less efficient, but is needed for some
+	  drivers on 68060 based systems where the 68060 bus snooping signal
+	  is hardwired on.  The 53c710 SCSI driver is known to suffer from
+	  this problem.
+
+endmenu
+
+
+menu "General setup"
+
+choice
+	prompt "Kernel core (/proc/kcore) format"
+	depends on PROC_FS
+	default KCORE_ELF
+
+config KCORE_ELF
+	bool "ELF"
+	---help---
+	  If you enabled support for /proc file system then the file
+	  /proc/kcore will contain the kernel core image. This can be used
+	  in gdb:
+
+	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+	  You have two choices here: ELF and A.OUT. Selecting ELF will make
+	  /proc/kcore appear in ELF core format as defined by the Executable
+	  and Linking Format specification. Selecting A.OUT will choose the
+	  old "a.out" format which may be necessary for some old versions
+	  of binutils or on some architectures.
+
+	  This is especially useful if you have compiled the kernel with the
+	  "-g" option to preserve debugging information. It is mainly used
+	  for examining kernel data structures on the live kernel so if you
+	  don't understand what this means or are not a kernel hacker, just
+	  leave it at its default value ELF.
+
+config KCORE_AOUT
+	bool "A.OUT"
+	help
+	  Not necessary unless you're using a very out-of-date binutils
+	  version.  You probably want KCORE_ELF.
+
+endchoice
+
+config BINFMT_AOUT
+	tristate "Kernel support for a.out binaries"
+	---help---
+	  A.out (Assembler.OUTput) is a set of formats for libraries and
+	  executables used in the earliest versions of UNIX. Linux used the
+	  a.out formats QMAGIC and ZMAGIC until they were replaced with the
+	  ELF format.
+
+	  As more and more programs are converted to ELF, the use for a.out
+	  will gradually diminish. If you disable this option it will reduce
+	  your kernel by one page. This is not much and by itself does not
+	  warrant removing support. However its removal is a good idea if you
+	  wish to ensure that absolutely none of your programs will use this
+	  older executable format. If you don't know what to answer at this
+	  point then answer Y. If someone told you "You need a kernel with
+	  QMAGIC support" then you'll have to say Y here. You may answer M to
+	  compile a.out support as a module and later load the module when you
+	  want to use a program or library in a.out format. The module will be
+	  called binfmt_aout.o. Saying M or N here is dangerous though,
+	  because some crucial programs on your system might still be in A.OUT
+	  format.
+
+config BINFMT_ELF
+	tristate "Kernel support for ELF binaries"
+	---help---
+	  ELF (Executable and Linkable Format) is a format for libraries and
+	  executables used across different architectures and operating
+	  systems. Saying Y here will enable your kernel to run ELF binaries
+	  and enlarge it by about 13 KB. ELF support under Linux has now all
+	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+	  because it is portable (this does *not* mean that you will be able
+	  to run executables from different architectures or operating systems
+	  however) and makes building run-time libraries very easy. Many new
+	  executables are distributed solely in ELF format. You definitely
+	  want to say Y here.
+
+	  Information about ELF is contained in the ELF HOWTO available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you find that after upgrading from Linux kernel 1.2 and saying Y
+	  here, you still can't run any ELF binaries (they just crash), then
+	  you'll have to install the newest ELF runtime libraries, including
+	  ld.so (check the file <file:Documentation/Changes> for location and
+	  latest version).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  some crucial programs on your system might be in ELF format.
+
+config BINFMT_MISC
+	tristate "Kernel support for MISC binaries"
+	---help---
+	  If you say Y here, it will be possible to plug wrapper-driven binary
+	  formats into the kernel. You will like this especially when you use
+	  programs that need an interpreter to run like Java, Python or
+	  Emacs-Lisp. It's also useful if you often run DOS executables under
+	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  registered such a binary class with the kernel, you can start one of
+	  those programs simply by typing in its name at a shell prompt; Linux
+	  will automatically feed it to the correct interpreter.
+
+	  You can do other nice things, too. Read the file
+	  <file:Documentation/binfmt_misc.txt> to learn how to use this
+	  feature, and <file:Documentation/java.txt> for information about how
+	  to include Java support.
+
+	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+	  use this part of the kernel.
+
+	  You may say M here for module support and later load the module when
+	  you have use for it; the module is called binfmt_misc.o. If you
+	  don't know what to answer at this point, say Y.
+
+config ZORRO
+	bool "Amiga Zorro (AutoConfig) bus support"
+	depends on AMIGA
+	help
+	  This enables support for the Zorro bus in the Amiga. If you have
+	  expansion cards in your Amiga that conform to the Amiga
+	  AutoConfig(tm) specification, say Y, otherwise N. Note that even
+	  expansion cards that do not fit in the Zorro slots but fit in e.g.
+	  the CPU slot may fall in this category, so you have to say Y to let
+	  Linux use these.
+
+config AMIGA_PCMCIA
+	bool "Amiga 1200/600 PCMCIA support (EXPERIMENTAL)"
+	depends on AMIGA && EXPERIMENTAL
+	help
+	  Include support in the kernel for pcmcia on Amiga 1200 and Amiga
+	  600. If you intend to use pcmcia cards say Y; otherwise say N.
+
+config STRAM_SWAP
+	bool "Support for ST-RAM as swap space"
+	depends on ATARI
+	---help---
+	  Some Atari 68k macines (including the 520STF and 1020STE) divide
+	  their addressible memory into ST and TT sections.  The TT section
+	  (up to 512MB) is the main memory; the ST section (up to 4MB) is
+	  accessible to the built-in graphics board, runs slower, and is
+	  present mainly for backward compatibility with older machines.
+
+	  This enables support for using (parts of) ST-RAM as swap space,
+	  instead of as normal system memory. This can first enhance system
+	  performance if you have lots of alternate RAM (compared to the size
+	  of ST-RAM), because executable code always will reside in faster
+	  memory. ST-RAM will remain as ultra-fast swap space. On the other
+	  hand, it allows much improved dynamic allocations of ST-RAM buffers
+	  for device driver modules (e.g. floppy, ACSI, SLM printer, DMA
+	  sound). The probability that such allocations at module load time
+	  fail is drastically reduced.
+
+config STRAM_PROC
+	bool "ST-RAM statistics in /proc"
+	depends on ATARI
+	help
+	  Say Y here to report ST-RAM usage statistics in /proc/stram.  See
+	  the help for CONFIG_STRAM_SWAP for discussion of ST-RAM and its
+	  uses.
+
+config HEARTBEAT
+	bool "Use power LED as a heartbeat" if AMIGA || ATARI || Q40
+	default y if !AMIGA && !ATARI && !Q40 && HP300
+	help
+	  Use the power-on LED on your machine as a load meter.  The exact
+	  behavior is platform-dependent, but normally the flash frequency is
+	  a hyperbolic function of the 5-minute load average.
+
+# We have a dedicated heartbeat LED. :-)
+config PROC_HARDWARE
+	bool "/proc/hardware support"
+	help
+	  Say Y here to support the /proc/hardware file, which gives you
+	  access to information about the machine you're running on,
+	  including the model, CPU, MMU, clock speed, BogoMIPS rating,
+	  and memory size.
+
+config PARPORT
+	tristate "Parallel port support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	---help---
+	  If you want to use devices connected to your machine's parallel port
+	  (the connector at the computer with 25 holes), e.g. printer, ZIP
+	  drive, PLIP link (Parallel Line Internet Protocol is mainly used to
+	  create a mini network by connecting the parallel ports of two local
+	  machines) etc., then you need to say Y here; please read
+	  <file:Documentation/parport.txt> and
+	  <file:drivers/parport/BUGS-parport>.
+
+	  For extensive information about drivers for many devices attaching
+	  to the parallel port see <http://www.torque.net/linux-pp.html> on
+	  the WWW.
+
+	  It is possible to share a single parallel port among several devices
+	  and it is safe to compile all the corresponding drivers into the
+	  kernel.  If you want to compile parallel port support as a module
+	  ( = code which can be inserted in and removed from the running
+	  kernel whenever you want), say M here and read
+	  <file:Documentation/modules.txt>.  The module will be called
+	  parport.o.  If you have more than one parallel port and want to
+	  specify which port and IRQ to be used by this driver at module load
+	  time, take a look at <file:Documentation/parport.txt>.
+
+	  If unsure, say Y.
+
+config PARPORT_AMIGA
+	tristate "Amiga builtin port"
+	depends on AMIGA && PARPORT
+	help
+	  Say Y here if you need support for the parallel port hardware on
+	  Amiga machines. This code is also available as a module (say M),
+	  called parport_amiga.o. If in doubt, saying N is the safe plan.
+
+config PARPORT_MFC3
+	tristate "Multiface III parallel port"
+	depends on ZORRO && PARPORT
+	help
+	  Say Y here if you need parallel port support for the MFC3 card.
+	  This code is also available as a module (say M), called
+	  parport_mfc3.o. If in doubt, saying N is the safe plan.
+
+config PARPORT_PC
+	bool
+	depends on Q40 && PARPORT
+	default y
+	---help---
+	  You should say Y here if you have a PC-style parallel port. All IBM
+	  PC compatible computers and some Alphas have PC-style parallel
+	  ports.
+
+	  This code is also available as a module.  If you want to compile it
+	  as a module ( = code which can be inserted in and removed from the
+	  running kernel whenever you want), say M here and read
+	  <file:Documentation/modules.txt>.  The module will be called
+	  parport_pc.o.
+
+	  If unsure, say Y.
+
+config PARPORT_ATARI
+	tristate "Atari builtin port"
+	depends on ATARI && PARPORT
+	help
+	  Say Y here if you need support for the parallel port hardware on
+	  Atari machines. This code is also available as a module (say M),
+	  called parport_atari.o. If in doubt, saying N is the safe plan.
+
+config PRINTER
+	tristate "Parallel printer support"
+	depends on PARPORT
+	---help---
+	  If you intend to attach a printer to the parallel port of your Linux
+	  box (as opposed to using a serial printer; if the connector at the
+	  printer has 9 or 25 holes ["female"], then it's serial), say Y.
+	  Also read the Printing-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  It is possible to share one parallel port among several devices
+	  (e.g. printer and ZIP drive) and it is safe to compile the
+	  corresponding drivers into the kernel.  If you want to compile this
+	  driver as a module however ( = code which can be inserted in and
+	  removed from the running kernel whenever you want), say M here and
+	  read <file:Documentation/modules.txt> and
+	  <file:Documentation/parport.txt>.  The module will be called lp.o.
+
+	  If you have several parallel ports, you can specify which ports to
+	  use with the "lp" kernel command line option.  (Try "man bootparam"
+	  or see the documentation of your boot loader (lilo or loadlin) about
+	  how to pass options to the kernel at boot time.)  The syntax of the
+	  "lp" command line option can be found in <file:drivers/char/lp.c>.
+
+	  If you have more than 8 printers, you need to increase the LP_NO
+	  macro in lp.c and the PARPORT_MAX macro in parport.h.
+
+config PARPORT_1284
+	bool "IEEE 1284 transfer modes"
+	depends on PRINTER
+	help
+	  If you have a printer that supports status readback or device ID, or
+	  want to use a device that uses enhanced parallel port transfer modes
+	  such as EPP and ECP, say Y here to enable advanced IEEE 1284
+	  transfer modes. Also say Y if you want device ID information to
+	  appear in /proc/sys/dev/parport/*/autoprobe*. It is safe to say N.
+
+config ISA
+	bool
+	depends on Q40 || AMIGA_PCMCIA || GG2
+	default y
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config GENERIC_ISA_DMA
+	bool
+	depends on Q40 || AMIGA_PCMCIA || GG2
+	default y
+
+source "drivers/pci/Kconfig"
+
+source "drivers/zorro/Kconfig"
+
+if Q40
+source "drivers/pnp/Kconfig"
+endif
+
+endmenu
+
+source "drivers/mtd/Kconfig"
+
+source "drivers/block/Kconfig"
+
+source "drivers/md/Kconfig"
+
+source "drivers/input/Kconfig"
+
+
+menu "ATA/ATAPI/MFM/RLL device support"
+
+config IDE
+	tristate "ATA/ATAPI/MFM/RLL device support"
+	---help---
+	  If you say Y here, your kernel will be able to manage low cost mass
+	  storage units such as ATA/(E)IDE and ATAPI units. The most common
+	  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	  If your system is pure SCSI and doesn't use these interfaces, you
+	  can say N here.
+
+	  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+	  for mass storage units such as hard disks. It was designed by
+	  Western Digital and Compaq Computer in 1984. It was then named
+	  ST506. Quite a number of disks use the IDE interface.
+
+	  AT Attachment (ATA) is the superset of the IDE specifications.
+	  ST506 was also called ATA-1.
+
+	  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+	  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+	  the LBA standard), more disks (4 instead of 2) and for other mass
+	  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+	  ATA-4 and provides faster (and more CPU friendly) transfer modes
+	  than previous PIO (Programmed processor Input/Output) from previous
+	  ATA/IDE standards by means of fast DMA controllers.
+
+	  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+	  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+	  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+	  designed in order to prevent data corruption and disk crash by
+	  detecting pre hardware failure conditions (heat, access time, and
+	  the like...). Disks built since June 1995 may follow this standard.
+	  The kernel itself don't manage this; however there are quite a
+	  number of user programs such as smart that can query the status of
+	  SMART parameters disk.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>. The module
+	  will be called ide.o.
+
+	  For further information, please read <file:Documentation/ide.txt>.
+
+	  If unsure, say Y.
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+
+menu "SCSI device support"
+
+config SCSI
+	tristate "SCSI device support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you want support for the parallel
+	  port version of the 100 MB IOMEGA ZIP drive.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
+comment "SCSI support type (disk, tape, CD-ROM)"
+	depends on SCSI
+
+config BLK_DEV_SD
+	tristate "SCSI disk support"
+	depends on SCSI
+	---help---
+	  If you want to use a SCSI hard disk or the SCSI or parallel port
+	  version of the IOMEGA ZIP drive under Linux, say Y and read the
+	  SCSI-HOWTO, the Disk-HOWTO and the Multi-Disk-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. This is NOT for SCSI
+	  CD-ROMs.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called sd_mod.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  Do not compile this driver as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI disk. In this case, do not compile the driver
+	  for your SCSI host adapter (below) as a module either.
+
+config SD_EXTRA_DEVS
+	int "Maximum number of SCSI disks that can be loaded as modules"
+	depends on BLK_DEV_SD
+	default "40"
+	---help---
+	  This controls the amount of additional space allocated in tables for
+	  drivers that are loaded as modules after the kernel is booted.  In
+	  the event that the SCSI core itself was loaded as a module, this
+	  value is the number of additional disks that can be loaded after the
+	  first host driver is loaded.
+
+	  Admittedly this isn't pretty, but there are tons of race conditions
+	  involved with resizing the internal arrays on the fly.  Someday this
+	  flag will go away, and everything will work automatically.
+
+	  If you don't understand what's going on, go with the default.
+
+config CHR_DEV_ST
+	tristate "SCSI tape support"
+	depends on SCSI
+	---help---
+	  If you want to use a SCSI tape drive under Linux, say Y and read the
+	  SCSI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, and
+	  <file:drivers/scsi/README.st> in the kernel source.  This is NOT for
+	  SCSI CD-ROMs.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called st.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.
+
+config ST_EXTRA_DEVS
+	int "Maximum number of SCSI tapes that can be loaded as modules"
+	depends on CHR_DEV_ST
+	default "2"
+	---help---
+	  This controls the amount of additional space allocated in tables for
+	  drivers that are loaded as modules after the kernel is booted.  In
+	  the event that the SCSI core itself was loaded as a module, this
+	  value is the number of additional tapes that can be loaded after the
+	  first host driver is loaded.
+
+	  Admittedly this isn't pretty, but there are tons of race conditions
+	  involved with resizing the internal arrays on the fly.  Someday this
+	  flag will go away, and everything will work automatically.
+
+	  If you don't understand what's going on, go with the default.
+
+config BLK_DEV_SR
+	tristate "SCSI CDROM support"
+	depends on SCSI
+	---help---
+	  If you want to use a SCSI CD-ROM under Linux, say Y and read the
+	  SCSI-HOWTO and the CD-ROM-HOWTO at
+	  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
+	  or M to "ISO 9660 CD-ROM file system support" later.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called sr_mod.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.
+
+config BLK_DEV_SR_VENDOR
+	bool "Enable vendor-specific extensions (for SCSI CDROM)"
+	depends on BLK_DEV_SR
+	help
+	  This enables the usage of vendor specific SCSI commands. This is
+	  required to support multisession CDs with old NEC/TOSHIBA cdrom
+	  drives (and HP Writers). If you have such a drive and get the first
+	  session only, try saying Y here; everybody else says N.
+
+config SR_EXTRA_DEVS
+	int "Maximum number of CDROM devices that can be loaded as modules"
+	depends on BLK_DEV_SR
+	default "2"
+	---help---
+	  This controls the amount of additional space allocated in tables for
+	  drivers that are loaded as modules after the kernel is booted. In
+	  the event that the SCSI core itself was loaded as a module, this
+	  value is the number of additional CD-ROMs that can be loaded after
+	  the first host driver is loaded.
+
+	  Admittedly this isn't pretty, but there are tons of race conditions
+	  involved with resizing the internal arrays on the fly.  Someday this
+	  flag will go away, and everything will work automatically.
+
+	  If you don't understand what's going on, go with the default.
+
+config CHR_DEV_SG
+	tristate "SCSI generic support"
+	depends on SCSI
+	---help---
+	  If you want to use SCSI scanners, synthesizers or CD-writers or just
+	  about anything having "SCSI" in its name other than hard disks,
+	  CD-ROMs or tapes, say Y here. These won't be supported by the kernel
+	  directly, so you need some additional software which knows how to
+	  talk to these devices using the SCSI protocol:
+
+	  For scanners, look at SANE (<http://www.mostang.com/sane/>). For CD
+	  writer software look at Cdrtools
+	  (<http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/cdrecord.html>)
+	  and for burning a "disk at once": CDRDAO
+	  (<http://cdrdao.sourceforge.net/>). Cdparanoia is a high
+	  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
+	  For other devices, it's possible that you'll have to write the
+	  driver software yourself. Please read the file
+	  <file:Documentation/scsi-generic.txt> for more information.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
+	  say N.
+
+comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
+	depends on SCSI
+
+config SCSI_MULTI_LUN
+	bool "Probe all LUNs on each SCSI device"
+	depends on SCSI
+	help
+	  If you have a SCSI device that supports more than one LUN (Logical
+	  Unit Number), e.g. a CD jukebox, and only one LUN is detected, you
+	  can say Y here to force the SCSI driver to probe for multiple LUNs.
+	  A SCSI device with multiple LUNs acts logically like multiple SCSI
+	  devices. The vast majority of SCSI devices have only one LUN, and
+	  so most people can say N here and should in fact do so, because it
+	  is safer.
+
+config SCSI_CONSTANTS
+	bool "Verbose SCSI error reporting (kernel size +=12K)"
+	depends on SCSI
+	help
+	  The error messages regarding your SCSI hardware will be easier to
+	  understand if you say Y here; it will enlarge your kernel by about
+	  12 KB. If in doubt, say Y.
+
+config SCSI_LOGGING
+	bool "SCSI logging facility"
+	depends on SCSI
+	---help---
+	  This turns on a logging facility that can be used to debug a number
+	  of SCSI related problems.
+
+	  If you say Y here, no logging output will appear by default, but you
+	  can enable logging by saying Y to "/proc file system support" and
+	  "Sysctl support" below and executing the command
+
+	  echo "scsi log token [level]" > /proc/scsi/scsi
+
+	  at boot time after the /proc file system has been mounted.
+
+	  There are a number of things that can be used for 'token' (you can
+	  find them in the source: <file:drivers/scsi/scsi.c>), and this
+	  allows you to select the types of information you want, and the
+	  level allows you to select the level of verbosity.
+
+	  If you say N here, it may be harder to track down some types of SCSI
+	  problems. If you say Y here your kernel will be somewhat larger, but
+	  there should be no noticeable performance impact as long as you have
+	  logging turned off.
+
+
+menu "SCSI low-level drivers"
+	depends on SCSI!=n
+
+config A3000_SCSI
+	tristate "A3000 WD33C93A support"
+	depends on AMIGA && SCSI
+	help
+	  If you have an Amiga 3000 and have SCSI devices connected to the
+	  built-in SCSI controller, say Y. Otherwise, say N. This driver is
+	  also available as a module ( = code which can be inserted in and
+	  removed from the running kernel whenever you want). The module is
+	  called wd33c93.o. If you want to compile it as a module, say M here
+	  and read <file:Documentation/modules.txt>.
+
+config A4000T_SCSI
+	bool "A4000T SCSI support (EXPERIMENTAL)"
+	depends on AMIGA && EXPERIMENTAL
+	help
+	  Support for the NCR53C710 SCSI controller on the Amiga 4000T.
+
+config A2091_SCSI
+	tristate "A2091 WD33C93A support"
+	depends on ZORRO && SCSI
+	help
+	  If you have a Commodore A2091 SCSI controller, say Y. Otherwise,
+	  say N. This driver is also available as a module ( = code which can
+	  be inserted in and removed from the running kernel whenever you
+	  want). The module is called wd33c93.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config GVP11_SCSI
+	tristate "GVP Series II WD33C93A support"
+	depends on ZORRO && SCSI
+	---help---
+	  If you have a Great Valley Products Series II SCSI controller,
+	  answer Y. Also say Y if you have a later model of GVP SCSI
+	  controller (such as the GVP A4008 or a Combo board). Otherwise,
+	  answer N. This driver does NOT work for the T-Rex series of
+	  accelerators from TekMagic and GVP-M.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). The module will be called gvp11.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+config CYBERSTORM_SCSI
+	tristate "CyberStorm SCSI support"
+	depends on ZORRO && SCSI
+	help
+	  If you have an Amiga with an original (MkI) Phase5 Cyberstorm
+	  accelerator board and the optional Cyberstorm SCSI controller,
+	  answer Y. Otherwise, say N.
+
+config CYBERSTORMII_SCSI
+	tristate "CyberStorm Mk II SCSI support"
+	depends on ZORRO && SCSI
+	help
+	  If you have an Amiga with a Phase5 Cyberstorm MkII accelerator board
+	  and the optional Cyberstorm SCSI controller, say Y. Otherwise,
+	  answer N.
+
+config BLZ2060_SCSI
+	tristate "Blizzard 2060 SCSI support"
+	depends on ZORRO && SCSI
+	help
+	  If you have an Amiga with a Phase5 Blizzard 2060 accelerator board
+	  and want to use the onboard SCSI controller, say Y. Otherwise,
+	  answer N.
+
+config BLZ1230_SCSI
+	tristate "Blizzard 1230IV/1260 SCSI support"
+	depends on ZORRO && SCSI
+	help
+	  If you have an Amiga 1200 with a Phase5 Blizzard 1230IV or Blizzard
+	  1260 accelerator, and the optional SCSI module, say Y. Otherwise,
+	  say N.
+
+config FASTLANE_SCSI
+	tristate "Fastlane SCSI support"
+	depends on ZORRO && SCSI
+	help
+	  If you have the Phase5 Fastlane Z3 SCSI controller, or plan to use
+	  one in the near future, say Y to this question. Otherwise, say N.
+
+config A4091_SCSI
+	bool "A4091 SCSI support (EXPERIMENTAL)"
+	depends on ZORRO && EXPERIMENTAL
+	help
+	  Support for the NCR53C710 chip on the Amiga 4091 Z3 SCSI2 controller
+	  (1993).  Very obscure -- the 4091 was part of an Amiga 4000 upgrade
+	  plan at the time the Amiga business was sold to DKB.
+
+config WARPENGINE_SCSI
+	bool "WarpEngine SCSI support (EXPERIMENTAL)"
+	depends on ZORRO && EXPERIMENTAL
+	help
+	  Support for MacroSystem Development's WarpEngine Amiga SCSI-2
+	  controller. Info at
+	  <http://www.lysator.liu.se/amiga/ar/guide/ar310.guide?FEATURE5>.
+
+config BLZ603EPLUS_SCSI
+	bool "Blizzard PowerUP 603e+ SCSI (EXPERIMENTAL)"
+	depends on ZORRO && EXPERIMENTAL
+	help
+	  If you have an Amiga 1200 with a Phase5 Blizzard PowerUP 603e+
+	  accelerator, say Y. Otherwise, say N.
+
+config OKTAGON_SCSI
+	tristate "BSC Oktagon SCSI support (EXPERIMENTAL)"
+	depends on ZORRO && EXPERIMENTAL && SCSI
+	help
+	  If you have the BSC Oktagon SCSI disk controller for the Amiga, say
+	  Y to this question.  If you're in doubt about whether you have one,
+	  see the picture at
+	  <http://amiga.multigraph.com/photos/oktagon.html>.
+
+#	 bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
+#	 bool 'GVP Turbo 040/060 SCSI support (EXPERIMENTAL)' CONFIG_GVP_TURBO_SCSI
+config ATARI_SCSI
+	tristate "Atari native SCSI support"
+	depends on ATARI && SCSI
+	---help---
+	  If you have an Atari with built-in NCR5380 SCSI controller (TT,
+	  Falcon, ...) say Y to get it supported. Of course also, if you have
+	  a compatible SCSI controller (e.g. for Medusa).  This driver is also
+	  available as a module ( = code which can be inserted in and removed
+	  from the running kernel whenever you want).  The module is called
+	  atari_scsi.o.  If you want to compile it as a module, say M here and
+	  read <file:Documentation/modules.txt>.  This driver supports both
+	  styles of NCR integration into the system: the TT style (separate
+	  DMA), and the Falcon style (via ST-DMA, replacing ACSI).  It does
+	  NOT support other schemes, like in the Hades (without DMA).
+
+config ATARI_SCSI_TOSHIBA_DELAY
+	bool "Long delays for Toshiba CD-ROMs"
+	depends on ATARI_SCSI
+	help
+	  This option increases the delay after a SCSI arbitration to
+	  accommodate some flaky Toshiba CD-ROM drives. Say Y if you intend to
+	  use a Toshiba CD-ROM drive; otherwise, the option is not needed and
+	  would impact performance a bit, so say N.
+
+config ATARI_SCSI_RESET_BOOT
+	bool "Reset SCSI-devices at boottime"
+	depends on ATARI_SCSI
+	help
+	  Reset the devices on your Atari whenever it boots.  This makes the
+	  boot process fractionally longer but may assist recovery from errors
+	  that leave the devices with SCSI operations partway completed.
+
+config TT_DMA_EMUL
+	bool "Hades SCSI DMA emulator"
+	depends on ATARI_SCSI && HADES
+	help
+	  This option enables code which emulates the TT SCSI DMA chip on the
+	  Hades. This increases the SCSI transfer rates at least ten times
+	  compared to PIO transfers.
+
+config MAC_SCSI
+	bool "Macintosh NCR5380 SCSI"
+	depends on MAC
+	help
+	  This is the NCR 5380 SCSI controller included on most of the 68030
+	  based Macintoshes.  If you have one of these say Y and read the
+	  SCSI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+config SCSI_MAC_ESP
+	tristate "Macintosh NCR53c9[46] SCSI"
+	depends on MAC && SCSI
+	help
+	  This is the NCR 53c9x SCSI controller found on most of the 68040
+	  based Macintoshes.  If you have one of these say Y and read the
+	  SCSI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mac_esp.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+#   dep_tristate 'SCSI debugging host adapter' CONFIG_SCSI_DEBUG $CONFIG_SCSI
+config MVME147_SCSI
+	bool "WD33C93 SCSI driver for MVME147"
+	depends on MVME147
+	help
+	  Support for the on-board SCSI controller on the Motorola MVME147
+	  single-board computer.
+
+config MVME16x_SCSI
+	bool "NCR53C710 SCSI driver for MVME16x"
+	depends on MVME16x
+	help
+	  The Motorola MVME162, 166, 167, 172 and 177 boards use the NCR53C710
+	  SCSI controller chip.  Almost everyone using one of these boards
+	  will want to say Y to this question.
+
+config BVME6000_SCSI
+	bool "NCR53C710 SCSI driver for BVME6000"
+	depends on BVME6000
+	help
+	  The BVME4000 and BVME6000 boards from BVM Ltd use the NCR53C710
+	  SCSI controller chip.  Almost everyone using one of these boards
+	  will want to say Y to this question.
+
+config SUN3_SCSI
+	tristate "Sun3 NCR5380 SCSI"
+	depends on SUN3 && SCSI
+	help
+	  This option will enable support for the OBIO (onboard io) NCR5380
+	  SCSI controller found in the Sun 3/50 and 3/60, as well as for
+	  "Sun3" type VME scsi controllers also based on the NCR5380.
+	  General Linux information on the Sun 3 series (now discontinued)
+	  is at <http://www.angelfire.com/ca2/tech68k/sun3.html>.
+
+config SUN3X_ESP
+	bool "Sun3x ESP SCSI"
+	depends on SUN3X
+	help
+	  The ESP was an on-board SCSI controller used on Sun 3/80
+	  machines.  Say Y here to compile in support for it.
+
+endmenu
+
+endmenu
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+#
+# Network device configuration
+#
+config DUMMY
+	tristate "Dummy net driver support"
+	depends on NETDEVICES
+	---help---
+	  This is essentially a bit-bucket device (i.e. traffic you send to
+	  this device is consigned into oblivion) with a configurable IP
+	  address. It is most commonly used in order to make your currently
+	  inactive SLIP address seem like a real address for local programs.
+	  If you use SLIP or PPP, you might want to say Y here. Since this
+	  thing often comes in handy, the default is Y. It won't enlarge your
+	  kernel either. What a deal. Read about it in the Network
+	  Administrator's Guide, available from
+	  <http://www.linuxdoc.org/docs.html#guide>.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called dummy.o.  If you want to use more than one dummy
+	  device at a time, you need to compile this driver as a module.
+	  Instead of 'dummy', the devices will then be called 'dummy0',
+	  'dummy1' etc.
+
+config SLIP
+	tristate "SLIP (serial line) support"
+	depends on NETDEVICES
+	---help---
+	  Say Y if you intend to use SLIP or CSLIP (compressed SLIP) to
+	  connect to your Internet service provider or to connect to some
+	  other local Unix box or if you want to configure your Linux box as a
+	  Slip/CSlip server for other people to dial in. SLIP (Serial Line
+	  Internet Protocol) is a protocol used to send Internet traffic over
+	  serial connections such as telephone lines or null modem cables;
+	  nowadays, the protocol PPP is more commonly used for this same
+	  purpose.
+
+	  Normally, your access provider has to support SLIP in order for you
+	  to be able to use it, but there is now a SLIP emulator called SLiRP
+	  around (available from
+	  <ftp://ibiblio.org/pub/Linux/system/network/serial/>) which
+	  allows you to use SLIP over a regular dial up shell connection. If
+	  you plan to use SLiRP, make sure to say Y to CSLIP, below. The
+	  NET-3-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, explains how to
+	  configure SLIP. Note that you don't need this option if you just
+	  want to run term (term is a program which gives you almost full
+	  Internet connectivity if you have a regular dial up shell account on
+	  some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>). SLIP
+	  support will enlarge your kernel by about 4 KB. If unsure, say N.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>. The module will be
+	  called slip.o.
+
+config SLIP_COMPRESSED
+	bool "CSLIP compressed headers"
+	depends on SLIP
+	---help---
+	  This protocol is faster than SLIP because it uses compression on the
+	  TCP/IP headers (not on the data itself), but it has to be supported
+	  on both ends. Ask your access provider if you are not sure and
+	  answer Y, just in case. You will still be able to use plain SLIP. If
+	  you plan to use SLiRP, the SLIP emulator (available from
+	  <ftp://ibiblio.org/pub/Linux/system/network/serial/>) which
+	  allows you to use SLIP over a regular dial up shell connection, you
+	  definitely want to say Y here. The NET-3-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, explains how to configure
+	  CSLIP. This won't enlarge your kernel.
+
+config SLIP_SMART
+	bool "Keepalive and linefill"
+	depends on SLIP
+	help
+	  Adds additional capabilities to the SLIP driver to support the
+	  RELCOM line fill and keepalive monitoring. Ideal on poor quality
+	  analogue lines.
+
+config SLIP_MODE_SLIP6
+	bool "Six bit SLIP encapsulation"
+	depends on SLIP
+	help
+	  Just occasionally you may need to run IP over hostile serial
+	  networks that don't pass all control characters or are only seven
+	  bit. Saying Y here adds an extra mode you can use with SLIP:
+	  "slip6". In this mode, SLIP will only send normal ASCII symbols over
+	  the serial device. Naturally, this has to be supported at the other
+	  end of the link as well. It's good enough, for example, to run IP
+	  over the async ports of a Camtec JNT Pad. If unsure, say N.
+
+config PPP
+	tristate "PPP (point-to-point protocol) support"
+	depends on NETDEVICES
+	---help---
+	  PPP (Point to Point Protocol) is a newer and better SLIP.  It serves
+	  the same purpose: sending Internet traffic over telephone (and other
+	  serial) lines.  Ask your access provider if they support it, because
+	  otherwise you can't use it; most Internet access providers these
+	  days support PPP rather than SLIP.
+
+	  To use PPP, you need an additional program called pppd as described
+	  in the PPP-HOWTO, available at
+	  <http://www.linuxdoc.org/docs.html#howto>.  Make sure that you have
+	  the version of pppd recommended in <file:Documentation/Changes>.
+	  The PPP option enlarges your kernel by about 16 KB.
+
+	  There are actually two versions of PPP: the traditional PPP for
+	  asynchronous lines, such as regular analog phone lines, and
+	  synchronous PPP which can be used over digital ISDN lines for
+	  example.  If you want to use PPP over phone lines or other
+	  asynchronous serial lines, you need to say Y (or M) here and also to
+	  the next option, "PPP support for async serial ports".  For PPP over
+	  synchronous lines, you should say Y (or M) here and to "Support
+	  synchronous PPP", below.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you said Y to "Version information on all symbols" above, then
+	  you cannot compile the PPP driver into the kernel; you can then only
+	  compile it as a module.  The module will be called ppp_generic.o.
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>.
+
+config PPP_MULTILINK
+	bool "PPP multilink support (EXPERIMENTAL)"
+	depends on PPP && EXPERIMENTAL
+
+config PPP_FILTER
+	bool "PPP filtering"
+	depends on PPP && FILTER
+
+config PPP_ASYNC
+	tristate "PPP support for async serial ports"
+	depends on PPP
+
+config PPP_SYNC_TTY
+	tristate "PPP support for sync tty ports"
+	depends on PPP
+
+config PPP_DEFLATE
+	tristate "PPP Deflate compression"
+	depends on PPP
+
+config PPP_BSDCOMP
+	tristate "PPP BSD-Compress compression"
+	depends on PPP
+
+config PPPOE
+	tristate "PPP over Ethernet (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && PPP
+
+config EQUALIZER
+	tristate "EQL (serial line load balancing) support"
+	depends on NETDEVICES
+	---help---
+	  If you have two serial connections to some other computer (this
+	  usually requires two modems and two telephone lines) and you use
+	  SLIP (the protocol for sending Internet traffic over telephone
+	  lines) or PPP (a better SLIP) on them, you can make them behave like
+	  one double speed connection using this driver.  Naturally, this has
+	  to be supported at the other end as well, either with a similar EQL
+	  Linux driver or with a Livingston Portmaster 2e.
+
+	  Say Y if you want this and read
+	  <file:Documentation/networking/eql.txt>.  You may also want to read
+	  section 6.2 of the NET-3-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called eql.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.  If
+	  unsure, say N.
+
+config ARIADNE
+	tristate "Ariadne support"
+	depends on NETDEVICES && ZORRO
+	help
+	  If you have a Village Tronic Ariadne Ethernet adapter, say Y.
+	  Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). The module is called ariadne.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config ARIADNE2
+	tristate "Ariadne II support"
+	depends on NETDEVICES && ZORRO
+	help
+	  This driver is for the Village Tronic Ariadne II and the Individual
+	  Computers X-Surf Ethernet cards. If you have such a card, say Y.
+	  Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called ariadne2.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config A2065
+	tristate "A2065 support"
+	depends on NETDEVICES && ZORRO
+	help
+	  If you have a Commodore A2065 Ethernet adapter, say Y. Otherwise,
+	  say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). The module is called a2065.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config HYDRA
+	tristate "Hydra support"
+	depends on NETDEVICES && ZORRO
+	help
+	  If you have a Hydra Ethernet adapter, say Y. Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). The module is called hydra.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config APNE
+	tristate "PCMCIA NE2000 support"
+	depends on NETDEVICES && AMIGA_PCMCIA
+	help
+	  If you have a PCMCIA NE2000 compatible adapter, say Y.  Otherwise,
+	  say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). The module is called apne.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config APOLLO_ELPLUS
+	tristate "Apollo 3c505 support"
+	depends on NETDEVICES && APOLLO
+	help
+	  Say Y or M here if your Apollo has a 3Com 3c505 ISA Ethernet card.
+	  If you don't have one made for Apollos, you can use one from a PC,
+	  except that your Apollo won't be able to boot from it (because the
+	  code in the ROM will be for a PC).
+
+config MAC8390
+	bool "Macintosh NS 8390 based ethernet cards"
+	depends on NETDEVICES && MAC
+	help
+	  If you want to include a driver to support Nubus or LC-PDS
+	  Ethernet cards using an NS8390 chipset or its equivalent, say Y
+	  and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+config MACSONIC
+	tristate "Macintosh SONIC based ethernet (onboard, NuBus, LC, CS)"
+	depends on NETDEVICES && MAC
+	---help---
+	  Support for NatSemi SONIC based Ethernet devices.  This includes
+	  the onboard Ethernet in many Quadras as well as some LC-PDS,
+	  a few Nubus and all known Comm Slot Ethernet cards.  If you have
+	  one of these say Y and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>.  This module will
+	  be called macsonic.o.
+
+config SMC9194
+	tristate "Macintosh SMC 9194 based ethernet cards"
+	depends on NETDEVICES && MAC
+	---help---
+	  This is support for the SMC9xxx based Ethernet cards. Choose this
+	  option if you have a DELL laptop with the docking station, or
+	  another SMC9192/9194 based chipset.  Say Y if you want it compiled
+	  into the kernel, and read the file
+	  <file:Documentation/networking/smc9.txt> and the Ethernet-HOWTO,
+	  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called smc9194.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
+config MAC89x0
+	tristate "Macintosh CS89x0 based ethernet cards"
+	depends on NETDEVICES && MAC
+	---help---
+	  Support for CS89x0 chipset based Ethernet cards.  If you have a
+	  Nubus or LC-PDS network (Ethernet) card of this type, say Y and
+	  read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>.  This module will
+	  be called mac89x0.o.
+
+config MACMACE
+	bool "Macintosh (AV) onboard MACE ethernet (EXPERIMENTAL)"
+	depends on NETDEVICES && MAC && EXPERIMENTAL
+	help
+	  Support for the onboard AMD 79C940 MACE Ethernet controller used in
+	  the 660AV and 840AV Macintosh.  If you have one of these Macintoshes
+	  say Y and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+config MVME147_NET
+	tristate "MVME147 (Lance) Ethernet support"
+	depends on NETDEVICES && MVME147
+	help
+	  Support for the on-board Ethernet interface on the Motorola MVME147
+	  single-board computer.  Say Y here to include the
+	  driver for this chip in your kernel.   If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config MVME16x_NET
+	tristate "MVME16x Ethernet support"
+	depends on NETDEVICES && MVME16x
+	help
+	  This is the driver for the Ethernet interface on the Motorola
+	  MVME162, 166, 167, 172 and 177 boards.  Say Y here to include the
+	  driver for this chip in your kernel.   If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config BVME6000_NET
+	tristate "BVME6000 Ethernet support"
+	depends on NETDEVICES && BVME6000
+	help
+	  This is the driver for the Ethernet interface on BVME4000 and
+	  BVME6000 VME boards.  Say Y here to include the driver for this chip
+	  in your kernel.   If you want to compile it as a module, say M here
+	  and read <file:Documentation/modules.txt>.
+
+config ATARILANCE
+	tristate "Atari Lance support"
+	depends on NETDEVICES && ATARI
+	help
+	  Say Y to include support for several Atari Ethernet adapters based
+	  on the AMD Lance chipset: RieblCard (with or without battery), or
+	  PAMCard VME (also the version by Rhotron, with different addresses).
+
+config ATARI_BIONET
+	tristate "BioNet-100 support"
+	depends on NETDEVICES && ATARI && ATARI_ACSI!=n
+	help
+	  Say Y to include support for BioData's BioNet-100 Ethernet adapter
+	  for the ACSI port. The driver works (has to work...) with a polled
+	  I/O scheme, so it's rather slow :-(
+
+config ATARI_PAMSNET
+	tristate "PAMsNet support"
+	depends on NETDEVICES && ATARI && ATARI_ACSI!=n
+	help
+	  Say Y to include support for the PAMsNet Ethernet adapter for the
+	  ACSI port ("ACSI node"). The driver works (has to work...) with a
+	  polled I/O scheme, so it's rather slow :-(
+
+config SUN3LANCE
+	tristate "Sun3/Sun3x on-board LANCE support"
+	depends on NETDEVICES && (SUN3 || SUN3X)
+	help
+	  Most Sun3 and Sun3x motherboards (including the 3/50, 3/60 and 3/80)
+	  featured an AMD Lance 10Mbit Ethernet controller on board; say Y
+	  here to compile in the Linux driver for this and enable Ethernet.
+	  General Linux information on the Sun 3 and 3x series (now
+	  discontinued) is at
+	  <http://www.angelfire.com/ca2/tech68k/sun3.html>.
+
+	  If you're not building a kernel for a Sun 3, say N.
+
+config SUN3_82586
+	tristate "Sun3 on-board Intel 82586 support"
+	depends on NETDEVICES && SUN3
+	help
+	  This driver enables support for the on-board Intel 82586 based
+	  Ethernet adapter found on Sun 3/1xx and 3/2xx motherboards.  Note
+	  that this driver does not support 82586-based adapters on additional
+	  VME boards.
+
+config HPLANCE
+	bool "HP on-board LANCE support"
+	depends on NETDEVICES && HP300
+	help
+	  If you want to use the builtin "LANCE" Ethernet controller on an
+	  HP300 machine, say Y here.
+
+config PLIP
+	tristate "PLIP (parallel port) support"
+	depends on NETDEVICES && Q40 && PARPORT
+	---help---
+	  PLIP (Parallel Line Internet Protocol) is used to create a
+	  reasonably fast mini network consisting of two (or, rarely, more)
+	  local machines.  A PLIP link from a Linux box is a popular means to
+	  install a Linux distribution on a machine which doesn't have a
+	  CD-ROM drive (a minimal system has to be transferred with floppies
+	  first). The kernels on both machines need to have this PLIP option
+	  enabled for this to work.
+
+	  The PLIP driver has two modes, mode 0 and mode 1.  The parallel
+	  ports (the connectors at the computers with 25 holes) are connected
+	  with "null printer" or "Turbo Laplink" cables which can transmit 4
+	  bits at a time (mode 0) or with special PLIP cables, to be used on
+	  bidirectional parallel ports only, which can transmit 8 bits at a
+	  time (mode 1); you can find the wiring of these cables in
+	  <file:Documentation/networking/PLIP.txt>.  The cables can be up to
+	  15m long.  Mode 0 works also if one of the machines runs DOS/Windows
+	  and has some PLIP software installed, e.g. the Crynwr PLIP packet
+	  driver (<http://oak.oakland.edu/simtel.net/msdos/pktdrvr-pre.html>)
+	  and winsock or NCSA's telnet.
+
+	  If you want to use PLIP, say Y and read the PLIP mini-HOWTO as well
+	  as the NET-3-HOWTO, both available from
+	  <http://www.linuxdoc.org/docs.html#howto>.  Note that the PLIP
+	  protocol has been changed and this PLIP driver won't work together
+	  with the PLIP support in Linux versions 1.0.x.  This option enlarges
+	  your kernel by about 8 KB.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>.  The module will be
+	  called plip.o.  If unsure, say Y or M, in case you buy a laptop
+	  later.
+
+config NE2000
+	tristate "NE2000/NE1000 support"
+	depends on NETDEVICES && Q40 && m
+	---help---
+	  If you have a network (Ethernet) card of this type, say Y and read
+	  the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.  Many Ethernet cards
+	  without a specific driver are compatible with NE2000.
+
+	  If you have a PCI NE2000 card however, say N here and Y to "PCI
+	  NE2000 support", above. If you have a NE2000 card and are running on
+	  an MCA system (a bus system used on some IBM PS/2 computers and
+	  laptops), say N here and Y to "NE/2 (ne2000 MCA version) support",
+	  below.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called ne.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
+endmenu
+
+
+menu "Character devices"
+
+config SERIAL
+	tristate "Q40 Standard/generic serial support" if Q40
+	default DN_SERIAL if APOLLO
+	---help---
+	  This selects whether you want to include the driver for the standard
+	  serial ports.  The standard answer is Y.  People who might say N
+	  here are those that are setting up dedicated Ethernet WWW/FTP
+	  servers, or users that have one of the various bus mice instead of a
+	  serial mouse and don't intend to use their machine's standard serial
+	  port for anything.  (Note that the Cyclades and Stallion multi
+	  serial port drivers do not need this driver built in for them to
+	  work.)
+
+	  If you want to compile this driver as a module, say M here and read
+	  <file:Documentation/modules.txt>.  The module will be called
+	  serial.o.
+	  [WARNING: Do not compile this driver as a module if you are using
+	  non-standard serial ports, since the configuration information will
+	  be lost when the driver is unloaded.  This limitation may be lifted
+	  in the future.]
+
+	  BTW1: If you have a mouseman serial mouse which is not recognized by
+	  the X window system, try running gpm first.
+
+	  BTW2: If you intend to use a software modem (also called Winmodem)
+	  under Linux, forget it.  These modems are crippled and require
+	  proprietary drivers which are only available under Windows.
+
+	  Most people will say Y or M here, so that they can use serial mice,
+	  modems and similar devices connecting to the standard serial ports.
+
+config SERIAL_EXTENDED
+	bool "Extended dumb serial driver options"
+	depends on SERIAL=y
+	help
+	  If you wish to use any non-standard features of the standard "dumb"
+	  driver, say Y here. This includes HUB6 support, shared serial
+	  interrupts, special multiport support, support for more than the
+	  four COM 1/2/3/4 boards, etc.
+
+	  Note that the answer to this question won't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about serial driver options. If unsure, say N.
+
+config SERIAL_MANY_PORTS
+	bool "Support more than 4 serial ports"
+	depends on SERIAL_EXTENDED
+	help
+	  Say Y here if you have dumb serial boards other than the four
+	  standard COM 1/2/3/4 ports. This may happen if you have an AST
+	  FourPort, Accent Async, Boca (read the Boca mini-HOWTO, available
+	  from <http://www.linuxdoc.org/docs.html#howto>), or other custom
+	  serial port hardware which acts similar to standard serial port
+	  hardware. If you only use the standard COM 1/2/3/4 ports, you can
+	  say N here to save some memory. You can also say Y if you have an
+	  "intelligent" multiport card such as Cyclades, Digiboards, etc.
+
+config SERIAL_SHARE_IRQ
+	bool "Support for sharing serial interrupts"
+	depends on SERIAL_EXTENDED
+	help
+	  Some serial boards have hardware support which allows multiple dumb
+	  serial ports on the same board to share a single IRQ. To enable
+	  support for this in the serial driver, say Y here.
+
+config SERIAL_MULTIPORT
+	bool "Support special multiport boards"
+	depends on SERIAL_EXTENDED
+	help
+	  Some multiport serial ports have special ports which are used to
+	  signal when there are any serial ports on the board which need
+	  servicing. Say Y here to enable the serial driver to take advantage
+	  of those special I/O ports.
+
+config HUB6
+	bool "Support the Bell Technologies HUB6 card"
+	depends on SERIAL_EXTENDED
+	help
+	  Say Y here to enable support in the dumb serial driver to support
+	  the HUB6 card.
+
+config VT
+	bool "Virtual terminal"
+	---help---
+	  If you say Y here, you will get support for terminal devices with
+	  display and keyboard devices. These are called "virtual" because you
+	  can run several virtual terminals (also called virtual consoles) on
+	  one physical terminal. This is rather useful, for example one
+	  virtual terminal can collect system messages and warnings, another
+	  one can be used for a text-mode user session, and a third could run
+	  an X session, all in parallel. Switching between virtual terminals
+	  is done with certain key combinations, usually Alt-<function key>.
+
+	  The setterm command ("man setterm") can be used to change the
+	  properties (such as colors or beeping) of a virtual terminal. The
+	  man page console_codes(4) ("man console_codes") contains the special
+	  character sequences that can be used to change those properties
+	  directly. The fonts used on virtual terminals can be changed with
+	  the setfont ("man setfont") command and the key bindings are defined
+	  with the loadkeys ("man loadkeys") command.
+
+	  You need at least one virtual terminal device in order to make use
+	  of your keyboard and monitor. Therefore, only people configuring an
+	  embedded system would want to say N here in order to save some
+	  memory; the only way to log into such a system is then via a serial
+	  or network connection.
+
+	  If unsure, say Y, or else you won't be able to do much with your new
+	  shiny Linux system :-)
+
+config VT_CONSOLE
+	bool "Support for console on virtual terminal"
+	depends on VT
+	---help---
+	  The system console is the device which receives all kernel messages
+	  and warnings and which allows logins in single user mode. If you
+	  answer Y here, a virtual terminal (the device used to interact with
+	  a physical terminal) can be used as system console. This is the most
+	  common mode of operations, so you should say Y here unless you want
+	  the kernel messages be output only to a serial port (in which case
+	  you should say Y to "Console on serial port", below).
+
+	  If you do say Y here, by default the currently visible virtual
+	  terminal (/dev/tty0) will be used as system console. You can change
+	  that with a kernel command line option such as "console=tty3" which
+	  would use the third virtual terminal as system console. (Try "man
+	  bootparam" or see the documentation of your boot loader (lilo or
+	  loadlin) about how to pass options to the kernel at boot time.)
+
+	  If unsure, say Y.
+
+config HW_CONSOLE
+	bool
+	depends on VT
+	default y
+
+config NVRAM
+	bool
+	depends on ATARI
+	default y
+	---help---
+	  If you say Y here and create a character special file /dev/nvram
+	  with major number 10 and minor number 144 using mknod ("man mknod"),
+	  you get read and write access to the 50 bytes of non-volatile memory
+	  in the real time clock (RTC), which is contained in every PC and
+	  most Ataris.
+
+	  This memory is conventionally called "CMOS RAM" on PCs and "NVRAM"
+	  on Ataris. /dev/nvram may be used to view settings there, or to
+	  change them (with some utility). It could also be used to frequently
+	  save a few bits of very important data that may not be lost over
+	  power-off and for which writing to disk is too insecure. Note
+	  however that most NVRAM space in a PC belongs to the BIOS and you
+	  should NEVER idly tamper with it. See Ralf Brown's interrupt list
+	  for a guide to the use of CMOS bytes by your BIOS.
+
+	  On Atari machines, /dev/nvram is always configured and does not need
+	  to be selected.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called nvram.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config ATARI_MFPSER
+	tristate "Atari MFP serial support"
+	depends on ATARI
+	---help---
+	  If you like to use the MFP serial ports ("Modem1", "Serial1") under
+	  Linux, say Y. The driver equally supports all kinds of MFP serial
+	  ports and automatically detects whether Serial1 is available.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+	  Note for Falcon users: You also have an MFP port, it's just not
+	  wired to the outside... But you could use the port under Linux.
+
+config ATARI_SCC
+	tristate "Atari SCC serial support"
+	depends on ATARI
+	---help---
+	  If you have serial ports based on a Zilog SCC chip (Modem2, Serial2,
+	  LAN) and like to use them under Linux, say Y. All built-in SCC's are
+	  supported (TT, MegaSTE, Falcon), and also the ST-ESCC. If you have
+	  two connectors for channel A (Serial2 and LAN), they are visible as
+	  two separate devices.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config ATARI_SCC_DMA
+	bool "Atari SCC serial DMA support"
+	depends on ATARI_SCC
+	help
+	  This enables DMA support for receiving data on channel A of the SCC.
+	  If you have a TT you may say Y here and read
+	  drivers/char/atari_SCC.README. All other users should say N here,
+	  because only the TT has SCC-DMA, even if your machine keeps claiming
+	  so at boot time.
+
+config ATARI_MIDI
+	tristate "Atari MIDI serial support"
+	depends on ATARI
+	help
+	  If you want to use your Atari's MIDI port in Linux, say Y.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config ATARI_DSP56K
+	tristate "Atari DSP56k support (EXPERIMENTAL)"
+	depends on ATARI && EXPERIMENTAL
+	help
+	  If you want to be able to use the DSP56001 in Falcons, say Y. This
+	  driver is still experimental, and if you don't know what it is, or
+	  if you don't have this processor, just say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config AMIGA_BUILTIN_SERIAL
+	tristate "Amiga builtin serial support"
+	depends on AMIGA
+	help
+	  If you want to use your Amiga's built-in serial port in Linux,
+	  answer Y.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config WHIPPET_SERIAL
+	tristate "Hisoft Whippet PCMCIA serial support"
+	depends on AMIGA_PCMCIA
+	help
+	  HiSoft has a web page at <http://www.hisoft.co.uk/>, but there
+	  is no listing for the Whippet in their Amiga section.
+
+config MULTIFACE_III_TTY
+	tristate "Multiface Card III serial support"
+	depends on AMIGA
+	help
+	  If you want to use a Multiface III card's serial port in Linux,
+	  answer Y.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config A2232
+	tristate "Commodore A2232 serial support (EXPERIMENTAL)"
+	depends on AMIGA && EXPERIMENTAL
+	---help---
+	  This option supports the 2232 7-port serial card shipped with the
+	  Amiga 2000 and other Zorro-bus machines, dating from 1989.  At
+	  a max of 19,200 bps, the ports are served by a 6551 ACIA UART chip
+	  each, plus a 8520 CIA, and a master 6502 CPU and buffer as well. The
+	  ports were connected with 8 pin DIN connectors on the card bracket,
+	  for which 8 pin to DB25 adapters were supplied. The card also had
+	  jumpers internally to toggle various pinning configurations.
+
+	  This driver can be built as a module; but then "generic_serial.o"
+	  will also be built as a module. This has to be loaded before
+	  "ser_a2232.o". If you want to do this, answer M here and read
+	  "<file:Documentation/modules.txt>".
+
+config GVPIOEXT
+	tristate "GVP IO-Extender support"
+	depends on PARPORT=n && ZORRO
+	help
+	  If you want to use a GVP IO-Extender serial card in Linux, say Y.
+	  Otherwise, say N.
+
+config GVPIOEXT_LP
+	tristate "GVP IO-Extender parallel printer support"
+	depends on GVPIOEXT
+	help
+	  Say Y to enable driving a printer from the parallel port on your
+	  GVP IO-Extender card, N otherwise.
+
+config GVPIOEXT_PLIP
+	tristate "GVP IO-Extender PLIP support"
+	depends on GVPIOEXT
+	help
+	  Say Y to enable doing IP over the parallel port on your GVP
+	  IO-Extender card, N otherwise.
+
+config MAC_SCC
+	tristate "Macintosh serial support"
+	depends on MAC
+
+config ADB
+	bool "Apple Desktop Bus (ADB) support"
+	depends on MAC
+	help
+	  Apple Desktop Bus (ADB) support is for support of devices which
+	  are connected to an ADB port.  ADB devices tend to have 4 pins.
+	  If you have an Apple Macintosh prior to the iMac, or a
+	  "Blue and White G3", you probably want to say Y here.  Otherwise
+	  say N.
+
+config ADB_MACII
+	bool "Include Mac II ADB driver"
+	depends on ADB
+	help
+	  Say Y here if want your kernel to support Macintosh systems that use
+	  the Mac II style ADB.  This includes the II, IIx, IIcx, SE/30, IIci,
+	  Quadra 610, Quadra 650, Quadra 700, Quadra 800, Centris 610 and
+	  Centris 650.
+
+config ADB_MACIISI
+	bool "Include Mac IIsi ADB driver"
+	depends on ADB
+	help
+	  Say Y here if want your kernel to support Macintosh systems that use
+	  the Mac IIsi style ADB.  This includes the IIsi, IIvi, IIvx, Classic
+	  II, LC, LC II, LC III, Performa 460, and the Performa 600.
+
+config ADB_CUDA
+	bool "Include CUDA ADB driver"
+	depends on ADB
+	help
+	  This provides support for CUDA based Power Macintosh systems.  This
+	  includes most OldWorld PowerMacs, the first generation iMacs, the
+	  Blue&White G3 and the Yikes G4 (PCI Graphics).  All later models
+	  should use CONFIG_ADB_PMU instead.
+
+	  If unsure say Y.
+
+config ADB_IOP
+	bool "Include IOP (IIfx/Quadra 9x0) ADB driver"
+	depends on ADB
+	help
+	  The I/O Processor (IOP) is an Apple custom IC designed to provide
+	  intelligent support for I/O controllers.  It is described at
+	  <http://www.angelfire.com/ca2/dev68k/iopdesc.html> to enable direct
+	  support for it, say 'Y' here.
+
+config ADB_PMU68K
+	bool "Include PMU (Powerbook) ADB driver"
+	depends on ADB
+	help
+	  Say Y here if want your kernel to support the m68k based Powerbooks.
+	  This includes the PowerBook 140, PowerBook 145, PowerBook 150,
+	  PowerBook 160, PowerBook 165, PowerBook 165c, PowerBook 170,
+	  PowerBook 180, PowerBook, 180c, PowerBook 190cs, PowerBook 520,
+	  PowerBook Duo 210, PowerBook Duo 230, PowerBook Duo 250,
+	  PowerBook Duo 270c, PowerBook Duo 280 and PowerBook Duo 280c.
+
+config INPUT_ADBHID
+	bool "Use input layer for ADB devices"
+	depends on MAC && INPUT=y
+	---help---
+	  Say Y here if you want to have ADB (Apple Desktop Bus) HID devices
+	  such as keyboards, mice, joysticks, or graphic tablets handled by
+	  the input layer.  If you say Y here, make sure to say Y to the
+	  corresponding drivers "Keyboard support" (CONFIG_INPUT_KEYBDEV),
+	  "Mouse Support" (CONFIG_INPUT_MOUSEDEV) and "Event interface
+	  support" (CONFIG_INPUT_EVDEV) as well.
+
+	  If you say N here, you still have the option of using the old ADB
+	  keyboard and mouse drivers.
+
+	  If unsure, say Y.
+
+config MAC_HID
+	bool
+	depends on INPUT_ADBHID
+	default y
+
+config MAC_ADBKEYCODES
+	bool "Support for ADB raw keycodes"
+	depends on INPUT_ADBHID
+	help
+	  This provides support for sending raw ADB keycodes to console
+	  devices.  This is the default up to 2.4.0, but in future this may be
+	  phased out in favor of generic Linux keycodes.  If you say Y here,
+	  you can dynamically switch via the
+	  /proc/sys/dev/mac_hid/keyboard_sends_linux_keycodes
+	  sysctl and with the "keyboard_sends_linux_keycodes=" kernel
+	  argument.
+
+	  If unsure, say Y here.
+
+config MAC_EMUMOUSEBTN
+	bool "Support for mouse button 2+3 emulation"
+	depends on INPUT_ADBHID
+	help
+	  This provides generic support for emulating the 2nd and 3rd mouse
+	  button with keypresses.  If you say Y here, the emulation is still
+	  disabled by default.  The emulation is controlled by these sysctl
+	  entries:
+	  /proc/sys/dev/mac_hid/mouse_button_emulation
+	  /proc/sys/dev/mac_hid/mouse_button2_keycode
+	  /proc/sys/dev/mac_hid/mouse_button3_keycode
+
+config ADB_KEYBOARD
+	bool "Support for ADB keyboard (old driver)"
+	depends on MAC && !INPUT_ADBHID
+	help
+	  This option allows you to use an ADB keyboard attached to your
+	  machine. Note that this disables any other (ie. PS/2) keyboard
+	  support, even if your machine is physically capable of using both at
+	  the same time.
+
+	  If you use an ADB keyboard (4 pin connector), say Y here.
+	  If you use a PS/2 keyboard (6 pin connector), say N here.
+
+config HPDCA
+	tristate "HP DCA serial support"
+	depends on DIO
+	help
+	  If you want to use the internal "DCA" serial ports on an HP300
+	  machine, say Y here.
+
+config SUN3X_ZS
+	bool "Sun3/3x builtin serial support"
+	depends on SUN3 || SUN3X
+	help
+	  ZS refers to a type of asynchronous serial port built in to the Sun3
+	  and Sun3x workstations; if you have a Sun 3, you probably have
+	  these.  Say 'Y' to support ZS ports directly.  This option must be
+	  enabled in order to support the
+	  keyboard and mouse ports.
+
+config SUN_KEYBOARD
+	bool
+	depends on SUN3X_ZS
+	default y
+	help
+	  Say Y here to support the keyboard found on Sun 3 and 3x
+	  workstations.  It can also be used support Sun Type-5 keyboards
+	  through an adaptor.  See
+	  <http://www.suse.cz/development/input/adapters.html> and
+	  <http://sourceforge.net/projects/linuxconsole/> for details on the
+	  latter.
+
+config SUN_MOUSE
+	bool
+	depends on SUN3X_ZS
+	default y
+
+config SBUS
+	bool
+	depends on SUN3X_ZS
+	default y
+
+config SBUSCHAR
+	bool
+	depends on SUN3X_ZS
+	default y
+
+config SUN_SERIAL
+	bool
+	depends on SUN3X_ZS
+	default y
+
+config MVME147_SCC
+	bool "SCC support for MVME147 serial ports"
+	depends on MVME147
+	help
+	  This is the driver for the serial ports on the Motorola MVME147
+	  boards.  Everyone using one of these boards should say Y here.
+
+config SERIAL167
+	bool "CD2401 support for MVME166/7 serial ports"
+	depends on MVME16x
+	help
+	  This is the driver for the serial ports on the Motorola MVME166,
+	  167, and 172 boards.  Everyone using one of these boards should say
+	  Y here.
+
+config MVME162_SCC
+	bool "SCC support for MVME162 serial ports"
+	depends on MVME16x
+	help
+	  This is the driver for the serial ports on the Motorola MVME162 and
+	  172 boards.  Everyone using one of these boards should say Y here.
+
+config BVME6000_SCC
+	bool "SCC support for BVME6000 serial ports"
+	depends on BVME6000
+	help
+	  This is the driver for the serial ports on the BVME4000 and BVME6000
+	  boards from BVM Ltd.  Everyone using one of these boards should say
+	  Y here.
+
+config DN_SERIAL
+	bool "Support for DN serial port (dummy)"
+	depends on APOLLO
+
+config SERIAL_CONSOLE
+	bool "Support for serial port console"
+	depends on (AMIGA || ATARI || MAC || HP300 || SUN3 || SUN3X || VME || APOLLO) && (ATARI_MFPSER=y || ATARI_SCC=y || ATARI_MIDI=y || MAC_SCC=y || AMIGA_BUILTIN_SERIAL=y || GVPIOEXT=y || MULTIFACE_III_TTY=y || HPDCA=y || SUN3X_ZS || SERIAL=y || MVME147_SCC || SERIAL167 || MVME162_SCC || BVME6000_SCC || DN_SERIAL)
+	---help---
+	  If you say Y here, it will be possible to use a serial port as the
+	  system console (the system console is the device which receives all
+	  kernel messages and warnings and which allows logins in single user
+	  mode). This could be useful if some terminal or printer is connected
+	  to that serial port.
+
+	  Even if you say Y here, the currently visible virtual console
+	  (/dev/tty0) will still be used as the system console by default, but
+	  you can alter that using a kernel command line option such as
+	  "console=ttyS1". (Try "man bootparam" or see the documentation of
+	  your boot loader (lilo or loadlin) about how to pass options to the
+	  kernel at boot time.)
+
+	  If you don't have a VGA card installed and you say Y here, the
+	  kernel will automatically use the first serial line, /dev/ttyS0, as
+	  system console.
+
+	  If unsure, say N.
+
+config USERIAL
+	bool "Support for user serial device modules"
+
+config WATCHDOG
+	bool "Watchdog Timer Support"
+	---help---
+	  If you say Y here (and to one of the following options) and create a
+	  character special file /dev/watchdog with major number 10 and minor
+	  number 130 using mknod ("man mknod"), you will get a watchdog, i.e.:
+	  subsequently opening the file and then failing to write to it for
+	  longer than 1 minute will result in rebooting the machine. This
+	  could be useful for a networked machine that needs to come back
+	  online as fast as possible after a lock-up. There's both a watchdog
+	  implementation entirely in software (which can sometimes fail to
+	  reboot the machine) and a driver for hardware watchdog boards, which
+	  are more robust and can also keep track of the temperature inside
+	  your computer. For details, read <file:Documentation/watchdog.txt>
+	  in the kernel source.
+
+	  The watchdog is usually used together with the watchdog daemon
+	  which is available from
+	  <ftp://ibiblio.org/pub/Linux/system/daemons/watchdog/>. This daemon can
+	  also monitor NFS connections and can reboot the machine when the process
+	  table is full.
+
+	  If unsure, say N.
+
+config WATCHDOG_NOWAYOUT
+	bool "Disable watchdog shutdown on close"
+	depends on WATCHDOG
+	help
+	  The default watchdog behaviour (which you get if you say N here) is
+	  to stop the timer if the process managing it closes the file
+	  /dev/watchdog. It's always remotely possible that this process might
+	  get killed. If you say Y here, the watchdog cannot be stopped once
+	  it has been started.
+
+config SOFT_WATCHDOG
+	bool "Software watchdog"
+	depends on WATCHDOG
+	help
+	  A software monitoring watchdog. This will fail to reboot your system
+	  from some situations that the hardware watchdog will recover
+	  from. Equally it's a lot cheaper to install.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>. The module will be called
+	  softdog.o.
+
+config RTC
+	bool "Enhanced Real Time Clock Support"
+	depends on ATARI
+	---help---
+	  If you say Y here and create a character special file /dev/rtc with
+	  major number 10 and minor number 135 using mknod ("man mknod"), you
+	  will get access to the real time clock (or hardware clock) built
+	  into your computer.
+
+	  Every PC has such a clock built in. It can be used to generate
+	  signals from as low as 1Hz up to 8192Hz, and can also be used
+	  as a 24 hour alarm. It reports status information via the file
+	  /proc/driver/rtc and its behaviour is set by various ioctls on
+	  /dev/rtc.
+
+	  If you run Linux on a multiprocessor machine and said Y to
+	  "Symmetric Multi Processing" above, you should say Y here to read
+	  and set the RTC in an SMP compatible fashion.
+
+	  If you think you have a use for such a device (such as periodic data
+	  sampling), then say Y here, and read <file:Documentation/rtc.txt>
+	  for details.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module is called rtc.o. If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+config GEN_RTC
+	tristate "Generic /dev/rtc emulation" if !SUN3
+	depends on !ATARI
+	default y if SUN3
+
+config UNIX98_PTYS
+	bool "Unix98 PTY support"
+	---help---
+	  A pseudo terminal (PTY) is a software device consisting of two
+	  halves: a master and a slave. The slave device behaves identical to
+	  a physical terminal; the master device is used by a process to
+	  read data from and write data to the slave, thereby emulating a
+	  terminal. Typical programs for the master side are telnet servers
+	  and xterms.
+
+	  Linux has traditionally used the BSD-like names /dev/ptyxx for
+	  masters and /dev/ttyxx for slaves of pseudo terminals. This scheme
+	  has a number of problems. The GNU C library glibc 2.1 and later,
+	  however, supports the Unix98 naming standard: in order to acquire a
+	  pseudo terminal, a process opens /dev/ptmx; the number of the pseudo
+	  terminal is then made available to the process and the pseudo
+	  terminal slave can be accessed as /dev/pts/<number>. What was
+	  traditionally /dev/ttyp2 will then be /dev/pts/2, for example.
+
+	  The entries in /dev/pts/ are created on the fly by a virtual
+	  file system; therefore, if you say Y here you should say Y to
+	  "/dev/pts file system for Unix98 PTYs" as well.
+
+	  If you want to say Y here, you need to have the C library glibc 2.1
+	  or later (equal to libc-6.1, check with "ls -l /lib/libc.so.*").
+	  Read the instructions in <file:Documentation/Changes> pertaining to
+	  pseudo terminals. It's safe to say N.
+
+config UNIX98_PTY_COUNT
+	int "Maximum number of Unix98 PTYs in use (0-2048)"
+	depends on UNIX98_PTYS
+	default "256"
+	help
+	  The maximum number of Unix98 PTYs that can be used at any one time.
+	  The default is 256, and should be enough for desktop systems. Server
+	  machines which support incoming telnet/rlogin/ssh connections and/or
+	  serve several X terminals may want to increase this: every incoming
+	  connection and every xterm uses up one PTY.
+
+	  When not in use, each additional set of 256 PTYs occupy
+	  approximately 8 KB of kernel memory on 32-bit architectures.
+
+endmenu
+
+
+menu "Sound support"
+
+config SOUND
+	tristate "Sound card support"
+
+source "sound/oss/dmasound/Kconfig"
+
+endmenu
+
+source "fs/Kconfig"
+
+
+menu "Console drivers"
+	depends on VT
+
+source "drivers/video/Kconfig"
+
+endmenu
+
+
+menu "Kernel hacking"
+
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+
+config DEBUG_BUGVERBOSE
+	bool "Verbose BUG() reporting"
+	depends on DEBUG_KERNEL
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+

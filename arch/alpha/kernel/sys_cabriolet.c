@@ -338,7 +338,6 @@ struct alpha_machine_vector cabriolet_mv __initmv = {
 	.init_irq		= cabriolet_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= cabriolet_init_pci,
-	.kill_arch		= NULL,
 	.pci_map_irq		= cabriolet_map_irq,
 	.pci_swizzle		= common_swizzle,
 };
@@ -366,6 +365,7 @@ struct alpha_machine_vector eb164_mv __initmv = {
 	.init_irq		= cabriolet_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= cia_cab_init_pci,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= cabriolet_map_irq,
 	.pci_swizzle		= common_swizzle,
 };
@@ -417,6 +417,7 @@ struct alpha_machine_vector lx164_mv __initmv = {
 	.init_irq		= cabriolet_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= alphapc164_init_pci,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= alphapc164_map_irq,
 	.pci_swizzle		= common_swizzle,
 };
@@ -442,6 +443,7 @@ struct alpha_machine_vector pc164_mv __initmv = {
 	.init_irq		= pc164_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= alphapc164_init_pci,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= alphapc164_map_irq,
 	.pci_swizzle		= common_swizzle,
 };

@@ -428,7 +428,8 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 		struct flowi fl = { .nl_u = { .ip4_u =
 					      { .daddr = daddr,
 						.saddr = rt->rt_spec_dst,
-						.tos = RT_TOS(skb->nh.iph->tos) } } };
+						.tos = RT_TOS(skb->nh.iph->tos) } },
+				    .proto = IPPROTO_ICMP };
 		if (ip_route_output_key(&rt, &fl))
 			goto out_unlock;
 	}
@@ -550,7 +551,8 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	{
 		struct flowi fl = { .nl_u = { .ip4_u = { .daddr = iph->saddr,
 							 .saddr = saddr,
-							 .tos = RT_TOS(tos) } } };
+							 .tos = RT_TOS(tos) } },
+				    .proto = IPPROTO_ICMP };
 		if (ip_route_output_key(&rt, &fl))
 		    goto out_unlock;
 	}
@@ -577,7 +579,8 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 		struct flowi fl = { .nl_u = { .ip4_u =
 					      { .daddr = icmp_param.replyopts.faddr,
 						.saddr = saddr,
-						.tos = RT_TOS(tos) } } };
+						.tos = RT_TOS(tos) } },
+				    .proto = IPPROTO_ICMP };
 		ip_rt_put(rt);
 		if (ip_route_output_key(&rt, &fl))
 			goto out_unlock;
@@ -588,7 +591,7 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 
 	/* RFC says return as much as we can without exceeding 576 bytes. */
 
-	room = rt->u.dst.pmtu;
+	room = dst_pmtu(&rt->u.dst);
 	if (room > 576)
 		room = 576;
 	room -= sizeof(struct iphdr) + icmp_param.replyopts.optlen;

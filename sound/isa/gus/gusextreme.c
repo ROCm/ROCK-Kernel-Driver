@@ -41,64 +41,64 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Gravis,UltraSound Extreme}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
-static long snd_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260 */
-static long snd_gf1_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS) - 1] = -1}; /* 0x210,0x220,0x230,0x240,0x250,0x260,0x270 */
-static long snd_mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS) - 1] = -1}; /* 0x300,0x310,0x320 */
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
-static int snd_mpu_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
-static int snd_gf1_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 2,3,5,9,11,12,15 */
-static int snd_dma8[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
-static int snd_dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;
-static int snd_joystick_dac[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 29};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
+static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260 */
+static long gf1_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS) - 1] = -1}; /* 0x210,0x220,0x230,0x240,0x250,0x260,0x270 */
+static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS) - 1] = -1}; /* 0x300,0x310,0x320 */
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
+static int mpu_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
+static int gf1_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 2,3,5,9,11,12,15 */
+static int dma8[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
+static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;
+static int joystick_dac[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 29};
 				/* 0 to 31, (0.59V-4.52V or 0.389V-2.98V) */
-static int snd_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 24};
-static int snd_pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
+static int channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 24};
+static int pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for GUS Extreme soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for GUS Extreme soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable GUS Extreme soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port, "Port # for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_ENABLED ",allows:{{0x220,0x260,0x20}},dialog:list");
-MODULE_PARM(snd_gf1_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_gf1_port, "GF1 port # for GUS Extreme driver (optional).");
-MODULE_PARM_SYNTAX(snd_gf1_port, SNDRV_ENABLED ",allows:{{0x210,0x270,0x10}},dialog:list");
-MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_mpu_port, "MPU-401 port # for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED ",allows:{{0x300,0x320,0x10}},dialog:list");
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_ENABLED ",allows:{{5},{7},{9},{10}},dialog:list");
-MODULE_PARM(snd_mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_mpu_irq, "MPU-401 IRQ # for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_mpu_irq, SNDRV_ENABLED ",allows:{{5},{7},{9},{10}},dialog:list");
-MODULE_PARM(snd_gf1_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_gf1_irq, "GF1 IRQ # for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_gf1_irq, SNDRV_ENABLED ",allows:{{2},{3},{5},{9},{11},{12},{15}},dialog:list");
-MODULE_PARM(snd_dma8, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma8, "8-bit DMA # for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_dma8, SNDRV_DMA8_DESC);
-MODULE_PARM(snd_dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma1, "GF1 DMA # for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_dma1, SNDRV_DMA_DESC);
-MODULE_PARM(snd_joystick_dac, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_joystick_dac, "Joystick DAC level 0.59V-4.52V or 0.389V-2.98V for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_joystick_dac, SNDRV_ENABLED ",allows:{{0,31}}");
-MODULE_PARM(snd_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_channels, "GF1 channels for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_channels, SNDRV_ENABLED ",allows:{{14,32}}");
-MODULE_PARM(snd_pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_pcm_channels, "Reserved PCM channels for GUS Extreme driver.");
-MODULE_PARM_SYNTAX(snd_pcm_channels, SNDRV_ENABLED ",allows:{{2,16}}");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for GUS Extreme soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for GUS Extreme soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable GUS Extreme soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port, "Port # for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x220,0x260,0x20}},dialog:list");
+MODULE_PARM(gf1_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(gf1_port, "GF1 port # for GUS Extreme driver (optional).");
+MODULE_PARM_SYNTAX(gf1_port, SNDRV_ENABLED ",allows:{{0x210,0x270,0x10}},dialog:list");
+MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(mpu_port, "MPU-401 port # for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0x300,0x320,0x10}},dialog:list");
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_ENABLED ",allows:{{5},{7},{9},{10}},dialog:list");
+MODULE_PARM(mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(mpu_irq, SNDRV_ENABLED ",allows:{{5},{7},{9},{10}},dialog:list");
+MODULE_PARM(gf1_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(gf1_irq, "GF1 IRQ # for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(gf1_irq, SNDRV_ENABLED ",allows:{{2},{3},{5},{9},{11},{12},{15}},dialog:list");
+MODULE_PARM(dma8, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma8, "8-bit DMA # for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(dma8, SNDRV_DMA8_DESC);
+MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma1, "GF1 DMA # for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
+MODULE_PARM(joystick_dac, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick_dac, "Joystick DAC level 0.59V-4.52V or 0.389V-2.98V for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(joystick_dac, SNDRV_ENABLED ",allows:{{0,31}}");
+MODULE_PARM(channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(channels, "GF1 channels for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(channels, SNDRV_ENABLED ",allows:{{14,32}}");
+MODULE_PARM(pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(pcm_channels, "Reserved PCM channels for GUS Extreme driver.");
+MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",allows:{{2,16}}");
 
 static snd_card_t *snd_gusextreme_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
@@ -128,11 +128,11 @@ static int __init snd_gusextreme_detect(int dev,
 	snd_es1688_mixer_write(es1688, 0x40, 0x0b);	/* don't change!!! */
 	spin_unlock_irqrestore(&es1688->mixer_lock, flags);
 	spin_lock_irqsave(&es1688->reg_lock, flags);
-	outb(snd_gf1_port[dev] & 0x040 ? 2 : 0, ES1688P(es1688, INIT1));
+	outb(gf1_port[dev] & 0x040 ? 2 : 0, ES1688P(es1688, INIT1));
 	outb(0, 0x201);
-	outb(snd_gf1_port[dev] & 0x020 ? 2 : 0, ES1688P(es1688, INIT1));
+	outb(gf1_port[dev] & 0x020 ? 2 : 0, ES1688P(es1688, INIT1));
 	outb(0, 0x201);
-	outb(snd_gf1_port[dev] & 0x010 ? 3 : 1, ES1688P(es1688, INIT1));
+	outb(gf1_port[dev] & 0x010 ? 3 : 1, ES1688P(es1688, INIT1));
 	spin_unlock_irqrestore(&es1688->reg_lock, flags);
 
 	udelay(100);
@@ -173,7 +173,7 @@ static int __init snd_gusextreme_detect(int dev,
 
 static void __init snd_gusextreme_init(int dev, snd_gus_card_t * gus)
 {
-	gus->joystick_dac = snd_joystick_dac[dev];
+	gus->joystick_dac = joystick_dac[dev];
 }
 
 static int __init snd_gusextreme_mixer(es1688_t *chip)
@@ -204,7 +204,7 @@ static int __init snd_gusextreme_probe(int dev)
 	static int possible_ess_dmas[] = {1, 3, 0, -1};
 	static int possible_gf1_irqs[] = {5, 11, 12, 9, 7, 15, 3, -1};
 	static int possible_gf1_dmas[] = {5, 6, 7, 1, 3, -1};
-	int gf1_irq, gf1_dma, ess_irq, mpu_irq, ess_dma;
+	int xgf1_irq, xgf1_dma, xess_irq, xmpu_irq, xess_dma;
 	snd_card_t *card;
 	struct snd_gusextreme *acard;
 	snd_gus_card_t *gus;
@@ -212,64 +212,64 @@ static int __init snd_gusextreme_probe(int dev)
 	opl3_t *opl3;
 	int err;
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 	acard = (struct snd_gusextreme *)card->private_data;
 
-	gf1_irq = snd_gf1_irq[dev];
-	if (gf1_irq == SNDRV_AUTO_IRQ) {
-		if ((gf1_irq = snd_legacy_find_free_irq(possible_gf1_irqs)) < 0) {
+	xgf1_irq = gf1_irq[dev];
+	if (xgf1_irq == SNDRV_AUTO_IRQ) {
+		if ((xgf1_irq = snd_legacy_find_free_irq(possible_gf1_irqs)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free IRQ for GF1\n");
 			return -EBUSY;
 		}
 	}
-	ess_irq = snd_irq[dev];
-	if (ess_irq == SNDRV_AUTO_IRQ) {
-		if ((ess_irq = snd_legacy_find_free_irq(possible_ess_irqs)) < 0) {
+	xess_irq = irq[dev];
+	if (xess_irq == SNDRV_AUTO_IRQ) {
+		if ((xess_irq = snd_legacy_find_free_irq(possible_ess_irqs)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free IRQ for ES1688\n");
 			return -EBUSY;
 		}
 	}
-	if (snd_mpu_port[dev] == SNDRV_AUTO_PORT)
-		snd_mpu_port[dev] = 0;
-	mpu_irq = snd_mpu_irq[dev];
-	if (mpu_irq > 15)
-		mpu_irq = -1;
-	gf1_dma = snd_dma1[dev];
-	if (gf1_dma == SNDRV_AUTO_DMA) {
-		if ((gf1_dma = snd_legacy_find_free_dma(possible_gf1_dmas)) < 0) {
+	if (mpu_port[dev] == SNDRV_AUTO_PORT)
+		mpu_port[dev] = 0;
+	xmpu_irq = mpu_irq[dev];
+	if (xmpu_irq > 15)
+		xmpu_irq = -1;
+	xgf1_dma = dma1[dev];
+	if (xgf1_dma == SNDRV_AUTO_DMA) {
+		if ((xgf1_dma = snd_legacy_find_free_dma(possible_gf1_dmas)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free DMA for GF1\n");
 			return -EBUSY;
 		}
 	}
-	ess_dma = snd_dma8[dev];
-	if (ess_dma == SNDRV_AUTO_DMA) {
-		if ((ess_dma = snd_legacy_find_free_dma(possible_ess_dmas)) < 0) {
+	xess_dma = dma8[dev];
+	if (xess_dma == SNDRV_AUTO_DMA) {
+		if ((xess_dma = snd_legacy_find_free_dma(possible_ess_dmas)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free DMA for ES1688\n");
 			return -EBUSY;
 		}
 	}
 
-	if ((err = snd_es1688_create(card, snd_port[dev], snd_mpu_port[dev],
-				     ess_irq, mpu_irq, ess_dma,
+	if ((err = snd_es1688_create(card, port[dev], mpu_port[dev],
+				     xess_irq, xmpu_irq, xess_dma,
 				     ES1688_HW_1688, &es1688)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
-	if (snd_gf1_port[dev] < 0)
-		snd_gf1_port[dev] = snd_port[dev] + 0x20;
+	if (gf1_port[dev] < 0)
+		gf1_port[dev] = port[dev] + 0x20;
 	if ((err = snd_gus_create(card,
-				  snd_gf1_port[dev],
-				  gf1_irq,
-				  gf1_dma,
+				  gf1_port[dev],
+				  xgf1_irq,
+				  xgf1_dma,
 				  -1,
-				  0, snd_channels[dev],
-				  snd_pcm_channels[dev], 0,
+				  0, channels[dev],
+				  pcm_channels[dev], 0,
 				  &gus)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -297,7 +297,7 @@ static int __init snd_gusextreme_probe(int dev)
 		return err;
 	}
 	snd_component_add(card, "ES1688");
-	if (snd_pcm_channels[dev] > 0) {
+	if (pcm_channels[dev] > 0) {
 		if ((err = snd_gf1_pcm_new(gus, 1, 1, NULL)) < 0) {
 			snd_card_free(card);
 			return err;
@@ -325,7 +325,7 @@ static int __init snd_gusextreme_probe(int dev)
 	if (es1688->mpu_port >= 0x300) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_ES1688,
 					       es1688->mpu_port, 0,
-					       mpu_irq,
+					       xmpu_irq,
 					       SA_INTERRUPT,
 					       NULL)) < 0) {
 			snd_card_free(card);
@@ -334,7 +334,7 @@ static int __init snd_gusextreme_probe(int dev)
 	}
 
 	sprintf(card->longname, "Gravis UltraSound Extreme at 0x%lx, irq %i&%i, dma %i&%i",
-		es1688->port, gf1_irq, ess_irq, gf1_dma, ess_dma);
+		es1688->port, xgf1_irq, xess_irq, xgf1_dma, xess_dma);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -343,18 +343,18 @@ static int __init snd_gusextreme_probe(int dev)
 	return 0;
 }
 
-static int __init snd_gusextreme_legacy_auto_probe(unsigned long port)
+static int __init snd_gusextreme_legacy_auto_probe(unsigned long xport)
 {
         static int dev;
         int res;
 
         for ( ; dev < SNDRV_CARDS; dev++) {
-                if (!snd_enable[dev] || snd_port[dev] != SNDRV_AUTO_PORT)
+                if (!enable[dev] || port[dev] != SNDRV_AUTO_PORT)
                         continue;
-                snd_port[dev] = port;
+                port[dev] = xport;
                 res = snd_gusextreme_probe(dev);
                 if (res < 0)
-                        snd_port[dev] = SNDRV_AUTO_PORT;
+                        port[dev] = SNDRV_AUTO_PORT;
                 return res;
         }
         return -ENODEV;
@@ -365,8 +365,8 @@ static int __init alsa_card_gusextreme_init(void)
 	static unsigned long possible_ports[] = {0x220, 0x240, 0x260, -1};
 	int dev, cards;
 
-	for (dev = cards = 0; dev < SNDRV_CARDS && snd_enable[dev] > 0; dev++) {
-		if (snd_port[dev] == SNDRV_AUTO_PORT)
+	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev] > 0; dev++) {
+		if (port[dev] == SNDRV_AUTO_PORT)
 			continue;
 		if (snd_gusextreme_probe(dev) >= 0)
 			cards++;
@@ -401,12 +401,12 @@ module_exit(alsa_card_gusextreme_exit)
 
 #ifndef MODULE
 
-/* format is: snd-gusextreme=snd_enable,snd_index,snd_id,
-			     snd_port,snd_gf1_port,snd_mpu_port,
-			     snd_irq,snd_gf1_irq,snd_mpu_irq,
-			     snd_dma8,snd_dma1,
-			     snd_joystick_dac,
-			     snd_channels,snd_pcm_channels */
+/* format is: snd-gusextreme=enable,index,id,
+			     port,gf1_port,mpu_port,
+			     irq,gf1_irq,mpu_irq,
+			     dma8,dma1,
+			     joystick_dac,
+			     channels,pcm_channels */
 
 static int __init alsa_card_gusextreme_setup(char *str)
 {
@@ -414,17 +414,17 @@ static int __init alsa_card_gusextreme_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_gf1_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_gf1_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_mpu_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma8[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma1[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&gf1_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&gf1_irq[nr_dev]) == 2 &&
+	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
+	       get_option(&str,&dma8[nr_dev]) == 2 &&
+	       get_option(&str,&dma1[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

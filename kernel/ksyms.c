@@ -62,8 +62,6 @@
 #include <linux/kmod.h>
 #endif
 
-extern void set_device_ro(kdev_t dev,int flag);
-
 extern struct timezone sys_tz;
 
 #ifdef CONFIG_MODVERSIONS
@@ -230,6 +228,7 @@ EXPORT_SYMBOL(generic_block_bmap);
 EXPORT_SYMBOL(generic_file_read);
 EXPORT_SYMBOL(generic_file_sendfile);
 EXPORT_SYMBOL(do_generic_mapping_read);
+EXPORT_SYMBOL(file_ra_state_init);
 EXPORT_SYMBOL(generic_file_write);
 EXPORT_SYMBOL(generic_file_write_nolock);
 EXPORT_SYMBOL(generic_file_mmap);
@@ -254,7 +253,9 @@ EXPORT_SYMBOL(find_inode_number);
 EXPORT_SYMBOL(is_subdir);
 EXPORT_SYMBOL(get_unused_fd);
 EXPORT_SYMBOL(vfs_read);
+EXPORT_SYMBOL(vfs_readv);
 EXPORT_SYMBOL(vfs_write);
+EXPORT_SYMBOL(vfs_writev);
 EXPORT_SYMBOL(vfs_create);
 EXPORT_SYMBOL(vfs_mkdir);
 EXPORT_SYMBOL(vfs_mknod);
@@ -308,6 +309,9 @@ EXPORT_SYMBOL(simple_unlink);
 EXPORT_SYMBOL(simple_rmdir);
 EXPORT_SYMBOL(simple_rename);
 EXPORT_SYMBOL(simple_sync_file);
+EXPORT_SYMBOL(simple_readpage);
+EXPORT_SYMBOL(simple_prepare_write);
+EXPORT_SYMBOL(simple_commit_write);
 EXPORT_SYMBOL(simple_empty);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
@@ -341,9 +345,6 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(blk_dev);
-EXPORT_SYMBOL(bdev_read_only);
-EXPORT_SYMBOL(set_device_ro);
 EXPORT_SYMBOL(bmap);
 EXPORT_SYMBOL(blkdev_open);
 EXPORT_SYMBOL(blkdev_get);
@@ -446,7 +447,6 @@ EXPORT_SYMBOL(enable_hlt);
 EXPORT_SYMBOL(request_resource);
 EXPORT_SYMBOL(release_resource);
 EXPORT_SYMBOL(allocate_resource);
-EXPORT_SYMBOL(check_resource);
 EXPORT_SYMBOL(__request_region);
 EXPORT_SYMBOL(__check_region);
 EXPORT_SYMBOL(__release_region);
@@ -493,7 +493,6 @@ EXPORT_SYMBOL(__might_sleep);
 EXPORT_SYMBOL(loops_per_jiffy);
 #endif
 
-EXPORT_SYMBOL(kstat);
 
 /* misc */
 EXPORT_SYMBOL(panic);

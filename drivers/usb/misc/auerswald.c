@@ -445,7 +445,7 @@ static int auerchain_submit_urb (pauerchain_t acp, struct urb * urb)
 
 /* cancel an urb which is submitted to the chain
    the result is 0 if the urb is cancelled, or -EINPROGRESS if
-   USB_ASYNC_UNLINK is set and the function is successfully started.
+   URB_ASYNC_UNLINK is set and the function is successfully started.
 */
 static int auerchain_unlink_urb (pauerchain_t acp, struct urb * urb)
 {
@@ -534,7 +534,7 @@ static void auerchain_unlink_all (pauerchain_t acp)
         acep = acp->active;
         if (acep) {
                 urbp = acep->urbp;
-                urbp->transfer_flags &= ~USB_ASYNC_UNLINK;
+                urbp->transfer_flags &= ~URB_ASYNC_UNLINK;
                 dbg ("unlink active urb");
                 usb_unlink_urb (urbp);
         }
@@ -717,7 +717,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 	dr->wIndex  = cpu_to_le16 (index);
 	dr->wLength = cpu_to_le16 (size);
 
-	FILL_CONTROL_URB (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
+	usb_fill_control_urb (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
 		          (usb_complete_t)auerchain_blocking_completion,0);
 	ret = auerchain_start_wait_urb (acp, urb, timeout, &length);
 
@@ -919,7 +919,7 @@ static void auerswald_ctrlread_wretcomplete (struct urb * urb)
 	bp->dr->wLength      = bp->dr->wValue;	/* temporary stored */
 	bp->dr->wValue       = cpu_to_le16 (1);	/* Retry Flag */
 	/* bp->dr->index    = channel id;          remains */
-	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
+	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
                           (unsigned char*)bp->dr, bp->bufp, le16_to_cpu (bp->dr->wLength),
 		          (usb_complete_t)auerswald_ctrlread_complete,bp);
 
@@ -967,7 +967,7 @@ static void auerswald_ctrlread_complete (struct urb * urb)
 		bp->dr->wValue       = bp->dr->wLength; /* temporary storage */
 		// bp->dr->wIndex    channel ID remains
 		bp->dr->wLength      = cpu_to_le16 (32); /* >= 8 bytes */
-		FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
+		usb_fill_control_urb (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
   			(unsigned char*)bp->dr, bp->bufp, 32,
 	   		(usb_complete_t)auerswald_ctrlread_wretcomplete,bp);
 
@@ -1014,30 +1014,39 @@ static void auerswald_int_complete (struct urb * urb)
         pauerbuf_t   bp = NULL;
         pauerswald_t cp = (pauerswald_t) urb->context;
 
-        dbg ("auerswald_int_complete called");
+        dbg ("%s called", __FUNCTION__);
 
-        /* do not respond to an error condition */
-        if (urb->status != 0) {
-                dbg ("nonzero URB status = %d", urb->status);
-                return;
-        }
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
         /* check if all needed data was received */
 	if (urb->actual_length < AU_IRQMINSIZE) {
                 dbg ("invalid data length received: %d bytes", urb->actual_length);
-                return;
+		goto exit;
         }
 
         /* check the command code */
         if (cp->intbufp[0] != AU_IRQCMDID) {
                 dbg ("invalid command received: %d", cp->intbufp[0]);
-                return;
+		goto exit;
         }
 
         /* check the command type */
         if (cp->intbufp[1] != AU_BLOCKRDY) {
                 dbg ("invalid command type received: %d", cp->intbufp[1]);
-                return;
+		goto exit;
         }
 
         /* now extract the information */
@@ -1047,13 +1056,13 @@ static void auerswald_int_complete (struct urb * urb)
         /* check the channel id */
         if (channelid >= AUH_TYPESIZE) {
                 dbg ("invalid channel id received: %d", channelid);
-                return;
+		goto exit;
         }
 
         /* check the byte count */
         if (bytecount > (cp->maxControlLength+AUH_SIZE)) {
                 dbg ("invalid byte count received: %d", bytecount);
-                return;
+		goto exit;
         }
         dbg ("Service Channel = %d", channelid);
         dbg ("Byte Count = %d", bytecount);
@@ -1077,7 +1086,7 @@ static void auerswald_int_complete (struct urb * urb)
 		   The only real solution is: having enought buffers!
 		   Or perhaps temporary disabling the int endpoint?
 		*/
-		return;
+		goto exit;
         }
 
 	/* fill the control message */
@@ -1086,7 +1095,7 @@ static void auerswald_int_complete (struct urb * urb)
 	bp->dr->wValue       = cpu_to_le16 (0);
 	bp->dr->wIndex       = cpu_to_le16 (channelid | AUH_DIRECT | AUH_UNSPLIT);
 	bp->dr->wLength      = cpu_to_le16 (bytecount);
-	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
+	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
                           (unsigned char*)bp->dr, bp->bufp, bytecount,
 		          (usb_complete_t)auerswald_ctrlread_complete,bp);
 
@@ -1098,6 +1107,11 @@ static void auerswald_int_complete (struct urb * urb)
                 auerswald_ctrlread_complete( bp->urbp);
 		/* here applies the same problem as above: device locking! */
         }
+exit:
+	ret = usb_submit_urb (urb, GFP_ATOMIC);
+	if (ret)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, ret);
 }
 
 /* int memory deallocation
@@ -1150,7 +1164,7 @@ static int auerswald_int_open (pauerswald_t cp)
                 }
         }
         /* setup urb */
-        FILL_INT_URB (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
+        usb_fill_int_urb (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
         /* start the urb */
 	cp->inturbp->status = 0;	/* needed! */
 	ret = usb_submit_urb (cp->inturbp, GFP_KERNEL);
@@ -1816,7 +1830,7 @@ write_again:
 	bp->dr->wValue       = cpu_to_le16 (0);
 	bp->dr->wIndex       = cpu_to_le16 (ccp->scontext.id | AUH_DIRECT | AUH_UNSPLIT);
 	bp->dr->wLength      = cpu_to_le16 (len+AUH_SIZE);
-	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
+	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
                    (unsigned char*)bp->dr, bp->bufp, len+AUH_SIZE,
 		    auerchar_ctrlwrite_complete, bp);
 	/* up we go */
@@ -1929,7 +1943,7 @@ static int auerswald_probe (struct usb_interface *intf,
 		return -ENODEV;
 
         /* we use only the first -and only- interface */
-        if (intf->altsetting->bInterfaceNumber != 0)
+        if (intf->altsetting->desc.bInterfaceNumber != 0)
 		return -ENODEV;
 
 	/* prevent module unloading while sleeping */

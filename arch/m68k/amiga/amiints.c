@@ -128,8 +128,7 @@ static inline int amiga_insert_irq(irq_node_t **list, irq_node_t *node)
 		printk("%s: Warning: dev_id of %s is zero\n",
 		       __FUNCTION__, node->devname);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	cur = *list;
 
@@ -153,7 +152,7 @@ static inline int amiga_insert_irq(irq_node_t **list, irq_node_t *node)
 	node->next = cur;
 	*list = node;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -162,19 +161,18 @@ static inline void amiga_delete_irq(irq_node_t **list, void *dev_id)
 	unsigned long flags;
 	irq_node_t *node;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	for (node = *list; node; list = &node->next, node = *list) {
 		if (node->dev_id == dev_id) {
 			*list = node->next;
 			/* Mark it as free. */
 			node->handler = NULL;
-			restore_flags(flags);
+			local_irq_restore(flags);
 			return;
 		}
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 	printk ("%s: tried to remove invalid irq\n", __FUNCTION__);
 }
 
@@ -350,7 +348,7 @@ void amiga_disable_irq(unsigned int irq)
 
 inline void amiga_do_irq(int irq, struct pt_regs *fp)
 {
-	kstat.irqs[0][SYS_IRQS + irq]++;
+	kstat_cpu(0).irqs[SYS_IRQS + irq]++;
 	ami_irq_list[irq]->handler(irq, ami_irq_list[irq]->dev_id, fp);
 }
 
@@ -358,7 +356,7 @@ void amiga_do_irq_list(int irq, struct pt_regs *fp)
 {
 	irq_node_t *node;
 
-	kstat.irqs[0][SYS_IRQS + irq]++;
+	kstat_cpu(0).irqs[SYS_IRQS + irq]++;
 
 	custom.intreq = amiga_intena_vals[irq];
 
@@ -479,7 +477,7 @@ int show_amiga_interrupts(struct seq_file *p, void *v)
 		if (!(node = ami_irq_list[i]))
 			continue;
 		seq_printf(p, "ami  %2d: %10u ", i,
-		               kstat.irqs[0][SYS_IRQS + i]);
+		               kstat_cpu(0).irqs[SYS_IRQS + i]);
 		do {
 			if (node->flags & SA_INTERRUPT)
 				seq_puts(p, "F ");

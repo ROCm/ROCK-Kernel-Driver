@@ -65,7 +65,6 @@ MODULE_DESCRIPTION("Adaptec I2O RAID Driver");
 
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 
 #include "dpt/dptsig.h"
 #include "dpti.h"
@@ -445,7 +444,8 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	return adpt_scsi_to_i2o(pHba, cmd, pDev);
 }
 
-static int adpt_bios_param(Disk* disk, struct block_device *dev, int geom[])
+static int adpt_bios_param(struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int geom[])
 {
 	int heads=-1;
 	int sectors=-1;
@@ -454,22 +454,22 @@ static int adpt_bios_param(Disk* disk, struct block_device *dev, int geom[])
 	// *** First lets set the default geometry ****
 	
 	// If the capacity is less than ox2000
-	if (disk->capacity < 0x2000 ) {	// floppy
+	if (capacity < 0x2000 ) {	// floppy
 		heads = 18;
 		sectors = 2;
 	} 
 	// else if between 0x2000 and 0x20000
-	else if (disk->capacity < 0x20000) {
+	else if (capacity < 0x20000) {
 		heads = 64;
 		sectors = 32;
 	}
 	// else if between 0x20000 and 0x40000
-	else if (disk->capacity < 0x40000) {
+	else if (capacity < 0x40000) {
 		heads = 65;
 		sectors = 63;
 	}
 	// else if between 0x4000 and 0x80000
-	else if (disk->capacity < 0x80000) {
+	else if (capacity < 0x80000) {
 		heads = 128;
 		sectors = 63;
 	}
@@ -478,10 +478,10 @@ static int adpt_bios_param(Disk* disk, struct block_device *dev, int geom[])
 		heads = 255;
 		sectors = 63;
 	}
-	cylinders = disk->capacity / (heads * sectors);
+	cylinders = capacity / (heads * sectors);
 
 	// Special case if CDROM
-	if(disk->device->type == 5) {  // CDROM
+	if(sdev->type == 5) {  // CDROM
 		heads = 252;
 		sectors = 63;
 		cylinders = 1111;

@@ -238,7 +238,6 @@
 #include <linux/spinlock.h>
 #include <linux/smp.h>
 #include <linux/blk.h>
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 #include "aic7xxx_old/aic7xxx.h"
@@ -11179,18 +11178,19 @@ aic7xxx_reset(Scsi_Cmnd *cmd, unsigned int flags)
  *   Return the disk geometry for the given SCSI device.
  *-F*************************************************************************/
 int
-aic7xxx_biosparam(Disk *disk, struct block_device *bdev, int geom[])
+aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[])
 {
   int heads, sectors, cylinders, ret;
   struct aic7xxx_host *p;
   unsigned char *buf;
 
-  p = (struct aic7xxx_host *) disk->device->host->hostdata;
+  p = (struct aic7xxx_host *) sdev->host->hostdata;
   buf = scsi_bios_ptable(bdev);
 
   if ( buf )
   {
-    ret = scsi_partsize(buf, disk->capacity, &geom[2], &geom[0], &geom[1]);
+    ret = scsi_partsize(buf, capacity, &geom[2], &geom[0], &geom[1]);
     kfree(buf);
     if ( ret != -1 )
       return(ret);
@@ -11198,13 +11198,13 @@ aic7xxx_biosparam(Disk *disk, struct block_device *bdev, int geom[])
   
   heads = 64;
   sectors = 32;
-  cylinders = (unsigned long)disk->capacity / (heads * sectors);
+  cylinders = (unsigned long)capacity / (heads * sectors);
 
   if ((p->flags & AHC_EXTEND_TRANS_A) && (cylinders > 1024))
   {
     heads = 255;
     sectors = 63;
-    cylinders = (unsigned long)disk->capacity / (heads * sectors);
+    cylinders = (unsigned long)capacity / (heads * sectors);
   }
 
   geom[0] = heads;

@@ -78,10 +78,6 @@
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
 #include <asm/irq.h>
-
-#define MAJOR_NR FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
-#define QUEUE (&floppy_queue)
 #include <linux/blk.h>
 
 #undef DEBUG /* print _LOTS_ of infos */
@@ -124,6 +120,11 @@ MODULE_PARM(fd_def_df0,"l");
 MODULE_LICENSE("GPL");
 
 static struct request_queue floppy_queue;
+
+#define MAJOR_NR FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define QUEUE (&floppy_queue)
+#define CURRENT elv_next_request(&floppy_queue)
 
 /*
  *  Macros
@@ -207,7 +208,7 @@ static DECLARE_WAIT_QUEUE_HEAD(ms_wait);
 
 /* Prevent "aliased" accesses. */
 static int fd_ref[4] = { 0,0,0,0 };
-static kdev_t fd_device[4] = { NODEV, NODEV, NODEV, NODEV };
+static int fd_device[4] = { 0, 0, 0, 0 };
 
 /*
  * Here come the actual hardware access and helper functions.
@@ -1368,7 +1369,7 @@ static int get_track(int drive, int track)
 static void redo_fd_request(void)
 {
 	unsigned int cnt, block, track, sector;
-	int device, drive;
+	int drive;
 	struct amiga_floppy_struct *floppy;
 	char *data;
 	unsigned long flags;
@@ -1379,19 +1380,8 @@ static void redo_fd_request(void)
 		return;
 	}
 
-	device = minor(CURRENT->rq_dev);
-	if (device < 8) {
-		/* manual selection */
-		drive = device & 3;
-	} else {
-		/* Auto-detection */
-#ifdef DEBUG
-		printk("redo_fd_request: can't handle auto detect\n");
-		printk("redo_fd_request: default to normal\n");
-#endif
-		drive = device & 3;
-	}
 	floppy = CURRENT->rq_disk->private_data;
+	drive = floppy - unit;
 
 	/* Here someone could investigate to be more efficient */
 	for (cnt = 0; cnt < CURRENT->current_nr_sectors; cnt++) { 
@@ -1593,17 +1583,16 @@ static void fd_probe(int dev)
  */
 static int floppy_open(struct inode *inode, struct file *filp)
 {
-	int drive;
-	kdev_t old_dev;
+	int drive = minor(inode->i_rdev) & 3;
+	int system =  (minor(inode->i_rdev) & 4) >> 2;
+	int old_dev;
 	int system;
 	unsigned long flags;
 
-	drive = minor(inode->i_rdev) & 3;
 	old_dev = fd_device[drive];
 
-	if (fd_ref[drive])
-		if (!kdev_same(old_dev, inode->i_rdev))
-			return -EBUSY;
+	if (fd_ref[drive] && old_dev != system)
+		return -EBUSY;
 
 	if (filp && filp->f_mode & 3) {
 		check_disk_change(inode->i_bdev);
@@ -1624,17 +1613,16 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	save_flags(flags);
 	cli();
 	fd_ref[drive]++;
-	fd_device[drive] = inode->i_rdev;
+	fd_device[drive] = system;
 #ifdef MODULE
 	if (unit[drive].motor == 0)
 		MOD_INC_USE_COUNT;
 #endif
 	restore_flags(flags);
 
-	if (!kdev_same(old_dev, NODEV) && !kdev_same(old_dev, inode->i_rdev))
-		invalidate_buffers(old_dev);
+	if (old_dev != system)
+		invalidate_buffers(mk_kdev(MAJOR_NR, drive + (system << 2));
 
-	system=(minor(inode->i_rdev) & 4)>>2;
 	unit[drive].dtype=&data_types[system];
 	unit[drive].blocks=unit[drive].type->heads*unit[drive].type->tracks*
 		data_types[system].sects*unit[drive].type->sect_mult;
@@ -1764,6 +1752,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	int drive = *part & 3;
 	if (unit[drive].type->code == FD_NODRIVE)
 		return NULL;
+	*part = 0;
 	return get_disk(unit[drive].gendisk);
 }
 

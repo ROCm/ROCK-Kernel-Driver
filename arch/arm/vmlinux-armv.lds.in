@@ -11,7 +11,7 @@ SECTIONS
 	.init : {			/* Init code and data		*/
 		_stext = .;
 		__init_begin = .;
-			*(.text.init)
+			*(.init.text)
 		__proc_info_begin = .;
 			*(.proc.info)
 		__proc_info_end = .;
@@ -21,10 +21,10 @@ SECTIONS
 		__tagtable_begin = .;
 			*(.taglist)
 		__tagtable_end = .;
-			*(.data.init)
+			*(.init.data)
 		. = ALIGN(16);
 		__setup_start = .;
-			*(.setup.init)
+			*(.init.setup)
 		__setup_end = .;
 		__initcall_start = .;
 			*(.initcall1.init)
@@ -35,13 +35,17 @@ SECTIONS
 			*(.initcall6.init)
 			*(.initcall7.init)
 		__initcall_end = .;
+		. = ALIGN(32);
+		__initramfs_start = .;
+			*(.init.initramfs)
+		__initramfs_end = .;
 		. = ALIGN(4096);
 		__init_end = .;
 	}
 
 	/DISCARD/ : {			/* Exit code and data		*/
-		*(.text.exit)
-		*(.data.exit)
+		*(.exit.text)
+		*(.exit.data)
 		*(.exitcall.exit)
 	}
 
@@ -72,6 +76,12 @@ SECTIONS
 		__start___ksymtab = .;
 			*(__ksymtab)
 		__stop___ksymtab = .;
+	}
+
+	__kallsyms : {			/* All kernel symbols		*/
+		__start___kallsyms = .;
+			*(__kallsyms)
+		__stop___kallsyms = .;
 	}
 
 	. = ALIGN(8192);

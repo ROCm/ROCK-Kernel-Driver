@@ -2591,8 +2591,8 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 #if 0
 	if (tape->debug_level >= 5)
 		printk(KERN_INFO "ide-tape: rq_status: %d, "
-			"rq_dev: %u, cmd: %ld, errors: %d\n", rq->rq_status,
-			(unsigned int) rq->rq_dev, rq->flags, rq->errors);
+			"dev: %s, cmd: %ld, errors: %d\n", rq->rq_status,
+			 rq->rq_disk->disk_name, rq->flags, rq->errors);
 #endif
 	if (tape->debug_level >= 2)
 		printk(KERN_INFO "ide-tape: sector: %ld, "
@@ -4221,7 +4221,7 @@ static int idetape_rewind_tape (ide_drive_t *drive)
  *	mtio.h compatible commands should be issued to the character device
  *	interface.
  */
-static int idetape_blkdev_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+static int idetape_blkdev_ioctl(ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
 	idetape_tape_t *tape = drive->driver_data;
 	idetape_config_t config;
@@ -4247,28 +4247,6 @@ static int idetape_blkdev_ioctl (ide_drive_t *drive, struct inode *inode, struct
 			return -EIO;
 	}
 	return 0;
-}
-
-/*
- *	The block device interface should not be used for data transfers.
- *	However, we still allow opening it so that we can issue general
- *	ide driver configuration ioctl's, such as the interrupt unmask feature.
- */
-static int idetape_blkdev_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	MOD_INC_USE_COUNT;
-#if ONSTREAM_DEBUG
-        printk(KERN_INFO "ide-tape: MOD_INC_USE_COUNT in idetape_blkdev_open\n");
-#endif
-	return 0;
-}
-
-static void idetape_blkdev_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-        printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_blkdev_release\n");
-#endif
 }
 
 /*
@@ -5337,7 +5315,7 @@ static int idetape_chrdev_ioctl (struct inode *inode, struct file *file, unsigne
 		default:
 			if (tape->chrdev_direction == idetape_direction_read)
 				idetape_discard_read_pipeline(drive, 1);
-			return (idetape_blkdev_ioctl(drive,inode,file,cmd,arg));
+			return idetape_blkdev_ioctl(drive, cmd, arg);
 	}
 }
 
@@ -5461,7 +5439,6 @@ static int idetape_chrdev_open (struct inode *inode, struct file *filp)
 
 	if (test_and_set_bit(IDETAPE_BUSY, &tape->flags))
 		return -EBUSY;
-	MOD_INC_USE_COUNT;
 	if (!tape->onstream) {	
 		idetape_read_position(drive);
 		if (!test_bit(IDETAPE_ADDRESS_VALID, &tape->flags))
@@ -5479,15 +5456,12 @@ static int idetape_chrdev_open (struct inode *inode, struct file *filp)
 	if (idetape_wait_ready(drive, 60 * HZ)) {
 		clear_bit(IDETAPE_BUSY, &tape->flags);
 		printk(KERN_ERR "ide-tape: %s: drive not ready\n", tape->name);
-		MOD_DEC_USE_COUNT;
 		return -EBUSY;
 	}
 	idetape_read_position(drive);
-	MOD_DEC_USE_COUNT;
 	clear_bit(IDETAPE_PIPELINE_ERROR, &tape->flags);
 
 	if (tape->chrdev_direction == idetape_direction_none) {
-		MOD_INC_USE_COUNT;
 		if (idetape_create_prevent_cmd(drive, &pc, 1)) {
 			if (!idetape_queue_pc_tail(drive, &pc)) {
 				if (tape->door_locked != DOOR_EXPLICITLY_LOCKED)
@@ -5562,7 +5536,6 @@ static int idetape_chrdev_release (struct inode *inode, struct file *filp)
 				if (!idetape_queue_pc_tail(drive, &pc))
 					tape->door_locked = DOOR_UNLOCKED;
 		}
-		MOD_DEC_USE_COUNT;
 	}
 	clear_bit(IDETAPE_BUSY, &tape->flags);
 	unlock_kernel();
@@ -6150,6 +6123,7 @@ static int idetape_cleanup (ide_drive_t *drive)
 	devfs_unregister(tape->de_r);
 	devfs_unregister(tape->de_n);
 	kfree (tape);
+	drive->disk->fops = ide_fops;
 	return 0;
 }
 
@@ -6196,26 +6170,11 @@ static ide_driver_t idetape_driver = {
 #endif
 	.supports_dsc_overlap 	= 1,
 	.cleanup		= idetape_cleanup,
-	.standby		= NULL,
-	.suspend		= NULL,
-	.resume			= NULL,
-	.flushcache		= NULL,
 	.do_request		= idetape_do_request,
 	.end_request		= idetape_end_request,
-	.sense			= NULL,
-	.error			= NULL,
-	.ioctl			= idetape_blkdev_ioctl,
-	.open			= idetape_blkdev_open,
-	.release		= idetape_blkdev_release,
-	.media_change		= NULL,
-	.revalidate		= NULL,
 	.pre_reset		= idetape_pre_reset,
-	.capacity		= NULL,
-	.special		= NULL,
 	.proc			= idetape_proc,
 	.attach			= idetape_attach,
-	.ata_prebuilder		= NULL,
-	.atapi_prebuilder	= NULL,
 	.drives			= LIST_HEAD_INIT(idetape_driver.drives),
 };
 
@@ -6229,6 +6188,38 @@ static struct file_operations idetape_fops = {
 	.ioctl		= idetape_chrdev_ioctl,
 	.open		= idetape_chrdev_open,
 	.release	= idetape_chrdev_release,
+};
+
+static int idetape_open(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	drive->usage++;
+	return 0;
+}
+
+static int idetape_release(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	drive->usage--;
+	return 0;
+}
+
+static int idetape_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	struct block_device *bdev = inode->i_bdev;
+	ide_drive_t *drive = bdev->bd_disk->private_data;
+	int err = generic_ide_ioctl(bdev, cmd, arg);
+	if (err == -EINVAL)
+		err = idetape_blkdev_ioctl(drive, cmd, arg);
+	return err;
+}
+
+static struct block_device_operations idetape_block_ops = {
+	.owner		= THIS_MODULE,
+	.open		= idetape_open,
+	.release	= idetape_release,
+	.ioctl		= idetape_ioctl,
 };
 
 static int idetape_attach (ide_drive_t *drive)
@@ -6279,6 +6270,7 @@ static int idetape_attach (ide_drive_t *drive)
 			    S_IFCHR | S_IRUGO | S_IWUGO,
 			    &idetape_fops, NULL);
 	devfs_register_tape(tape->de_r);
+	drive->disk->fops = &idetape_block_ops;
 	return 0;
 failed:
 	return 1;

@@ -58,7 +58,6 @@
 #include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/major.h>
-#define QUEUE (&acsi_queue)
 #include <linux/blk.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -81,6 +80,8 @@ typedef void Scsi_Device; /* hack to avoid including scsi.h */
 
 static void (*do_acsi)(void) = NULL;
 static struct request_queue acsi_queue;
+#define QUEUE (&acsi_queue)
+#define CURRENT elv_next_request(&acsi_queue)
 
 #define DEBUG
 #undef DEBUG_DETECT

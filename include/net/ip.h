@@ -162,14 +162,6 @@ extern int sysctl_local_port_range[2];
 extern int sysctl_ip_default_ttl;
 
 #ifdef CONFIG_INET
-static inline int ip_send(struct sk_buff *skb)
-{
-	if (skb->len > skb->dst->pmtu)
-		return ip_fragment(skb, ip_finish_output);
-	else
-		return ip_finish_output(skb);
-}
-
 /* The function in 2.2 was invalid, producing wrong result for
  * check=0xFEFF. It was noticed by Arthur Skawina _year_ ago. --ANK(000625) */
 static inline
@@ -186,7 +178,7 @@ int ip_dont_fragment(struct sock *sk, struct dst_entry *dst)
 {
 	return (inet_sk(sk)->pmtudisc == IP_PMTUDISC_DO ||
 		(inet_sk(sk)->pmtudisc == IP_PMTUDISC_WANT &&
-		 !(dst->mxlock&(1<<RTAX_MTU))));
+		 !(dst_metric(dst, RTAX_LOCK)&(1<<RTAX_MTU))));
 }
 
 extern void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst, int more);
@@ -282,6 +274,7 @@ extern void	ip_icmp_error(struct sock *sk, struct sk_buff *skb, int err,
 extern void	ip_local_error(struct sock *sk, int err, u32 daddr, u16 dport,
 			       u32 info);
 
+extern int ip_seq_release(struct inode *inode, struct file *file);
 extern int ipv4_proc_init(void);
 
 #endif	/* _IP_H */

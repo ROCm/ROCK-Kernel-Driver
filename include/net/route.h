@@ -112,10 +112,10 @@ extern void		ip_rt_redirect(u32 old_gw, u32 dst, u32 new_gw,
 				       u32 src, u8 tos, struct net_device *dev);
 extern void		ip_rt_advice(struct rtable **rp, int advice);
 extern void		rt_cache_flush(int how);
-extern int		ip_route_output_key(struct rtable **, const struct flowi *flp);
+extern int		__ip_route_output_key(struct rtable **, const struct flowi *flp);
+extern int		ip_route_output_key(struct rtable **, struct flowi *flp);
 extern int		ip_route_input(struct sk_buff*, u32 dst, u32 src, u8 tos, struct net_device *devin);
 extern unsigned short	ip_rt_frag_needed(struct iphdr *iph, unsigned short new_mtu);
-extern void		ip_rt_update_pmtu(struct dst_entry *dst, unsigned mtu);
 extern void		ip_rt_send_redirect(struct sk_buff *skb);
 
 extern unsigned		inet_addr_type(u32 addr);
@@ -139,22 +139,44 @@ static inline char rt_tos2priority(u8 tos)
 	return ip_tos2prio[IPTOS_TOS(tos)>>1];
 }
 
-static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos, int oif)
+static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos, int oif, u8 protocol, u16 sport, u16 dport)
 {
-	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dst,
+	struct flowi fl = { .oif = oif,
+			    .nl_u = { .ip4_u = { .daddr = dst,
 						 .saddr = src,
 						 .tos   = tos } },
-			    .oif = oif };
+			    .proto = protocol,
+			    .uli_u = { .ports =
+				       { .sport = sport,
+					 .dport = dport } } };
 
 	int err;
-	err = ip_route_output_key(rp, &fl);
-	if (err || (dst && src))
-		return err;
-	fl.fl4_dst = (*rp)->rt_dst;
-	fl.fl4_src = (*rp)->rt_src;
-	ip_rt_put(*rp);
-	*rp = NULL;
+	if (!dst || !src) {
+		err = __ip_route_output_key(rp, &fl);
+		if (err)
+			return err;
+		fl.fl4_dst = (*rp)->rt_dst;
+		fl.fl4_src = (*rp)->rt_src;
+		ip_rt_put(*rp);
+		*rp = NULL;
+	}
 	return ip_route_output_key(rp, &fl);
+}
+
+static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport)
+{
+	if (sport != (*rp)->fl.uli_u.ports.sport ||
+	    dport != (*rp)->fl.uli_u.ports.dport) {
+		struct flowi fl;
+
+		memcpy(&fl, &(*rp)->fl, sizeof(fl));
+		fl.uli_u.ports.sport = sport;
+		fl.uli_u.ports.dport = dport;
+		ip_rt_put(*rp);
+		*rp = NULL;
+		return ip_route_output_key(rp, &fl);
+	}
+	return 0;
 }
 
 extern void rt_bind_peer(struct rtable *rt, int create);

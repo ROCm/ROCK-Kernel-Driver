@@ -3026,8 +3026,6 @@ static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pnp_
 {
 	char *busname = bus->name[0] ? bus->name : ad1848_isapnp_list[slot].name;
 
-	printk(KERN_INFO "ad1848: %s detected\n", busname);
-
 	/* Initialize this baby. */
 
 	if(ad1848_init_generic(bus, hw_config, slot)) {
@@ -3039,9 +3037,6 @@ static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pnp_
 		       hw_config->dma2);
 		return 1;
 	}
-	else
-		printk(KERN_INFO "ad1848: Failed to initialize %s\n", busname);
-
 	return 0;
 }
 

@@ -37,7 +37,6 @@
  *		Fix the resource management problems.
  */
 
-#error Please convert me to Documentation/DMA-mapping.txt
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -55,18 +54,22 @@
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <linux/blk.h>
-#include <linux/version.h>
 #include <linux/i2o.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "../../scsi/sd.h"
-#include "i2o_scsi.h"
 
-#define VERSION_STRING        "Version 0.1.1"
+#if BITS_PER_LONG == 64
+#error FIXME: driver does not support 64-bit platforms
+#endif
+
+
+#define VERSION_STRING        "Version 0.1.2"
 
 #define dprintk(x)
 
-#define MAXHOSTS 32
+#define I2O_SCSI_CAN_QUEUE	4
+#define MAXHOSTS		32
 
 struct i2o_scsi_host
 {
@@ -320,6 +323,12 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 		 *	It worked maybe ?
 		 */		
 		current_command->result = DID_OK << 16 | ds;
+
+	if (current_command->use_sg)
+		pci_unmap_sg(c->pdev, (struct scatterlist *)current_command->buffer, current_command->use_sg, scsi_to_pci_dma_dir(current_command->sc_data_direction));
+	else if (current_command->request_bufflen)
+		pci_unmap_single(c->pdev, (dma_addr_t)((long)current_command->SCp.ptr), current_command->request_bufflen, scsi_to_pci_dma_dir(current_command->sc_data_direction));
+
 	lock = current_command->host->host_lock;
 	spin_lock_irqsave(lock, flags);
 	current_command->scsi_done(current_command);
@@ -453,7 +462,6 @@ static void i2o_scsi_init(struct i2o_controller *c, struct i2o_device *d, struct
  
 static int i2o_scsi_detect(Scsi_Host_Template * tpnt)
 {
-	unsigned long flags;
 	struct Scsi_Host *shpnt = NULL;
 	int i;
 	int count;
@@ -680,6 +688,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		spin_unlock_irqrestore(host->host_lock, flags);
 		return 0;
 	}
+
 	
 	i2o_raw_writel(I2O_CMD_SCSI_EXEC<<24|HOST_TID<<12|tid, &msg[1]);
 	i2o_raw_writel(scsi_context, &msg[2]);	/* So the I2O layer passes to us */
@@ -752,10 +761,18 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	if(SCpnt->use_sg)
 	{
 		struct scatterlist *sg = (struct scatterlist *)SCpnt->request_buffer;
+		int sg_count;
 		int chain = 0;
 		
 		len = 0;
 
+		sg_count = pci_map_sg(c->pdev, sg, SCpnt->use_sg,
+				      scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+
+		/* FIXME: handle fail */
+		if(!sg_count)
+			BUG();
+		
 		if((sg_max_frags > 11) && (SCpnt->use_sg > 11))
 		{
 			chain = 1;
@@ -775,27 +792,27 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 				sg_chain_tag = 0;
 			for(i = 0 ; i < SCpnt->use_sg; i++)
 			{
-				*mptr++=direction|0x10000000|sg->length;
-				len+=sg->length;
-				*mptr++=virt_to_bus(page_address(sg->page)+sg->offset);
+				*mptr++=cpu_to_le32(direction|0x10000000|sg_dma_len(sg));
+				len+=sg_dma_len(sg);
+				*mptr++=cpu_to_le32(sg_dma_address(sg));
 				sg++;
 			}
-			mptr[-2]=direction|0xD0000000|(sg-1)->length;
+			mptr[-2]=cpu_to_le32(direction|0xD0000000|sg_dma_len(sg-1));
 		}
 		else
 		{		
 			for(i = 0 ; i < SCpnt->use_sg; i++)
 			{
-				i2o_raw_writel(direction|0x10000000|sg->length, mptr++);
+				i2o_raw_writel(direction|0x10000000|sg_dma_len(sg), mptr++);
 				len+=sg->length;
-				i2o_raw_writel(virt_to_bus(page_address(sg->page) + sg->offset), mptr++);
+				i2o_raw_writel(sg_dma_address(sg), mptr++);
 				sg++;
 			}
 
 			/* Make this an end of list. Again evade the 920 bug and
 			   unwanted PCI read traffic */
 		
-			i2o_raw_writel(direction|0xD0000000|(sg-1)->length, &mptr[-2]);
+			i2o_raw_writel(direction|0xD0000000|sg_dma_len(sg-1), &mptr[-2]);
 		}
 		
 		if(!chain)
@@ -818,8 +835,16 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		}
 		else
 		{
+			dma_addr_t dma_addr;
+			dma_addr = pci_map_single(c->pdev,
+					       SCpnt->request_buffer,
+					       SCpnt->request_bufflen,
+					       scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+			if(dma_addr == 0)
+				BUG();	/* How to handle ?? */
+			SCpnt->SCp.ptr = (char *)(unsigned long) dma_addr;
 			i2o_raw_writel(0xD0000000|direction|SCpnt->request_bufflen, mptr++);
-			i2o_raw_writel(virt_to_bus(SCpnt->request_buffer), mptr++);
+			i2o_raw_writel(dma_addr, mptr++);
 		}
 	}
 	
@@ -1027,11 +1052,12 @@ static int i2o_scsi_device_reset(Scsi_Cmnd * SCpnt)
  *	else appears to and hope. It seems to work.
  */
  
-static int i2o_scsi_bios_param(Disk * disk, struct block_device *dev, int *ip)
+static int i2o_scsi_bios_param(struct scsi_device * sdev,
+		struct block_device *dev, sector_t capacity, int *ip)
 {
 	int size;
 
-	size = disk->capacity;
+	size = capacity;
 	ip[0] = 64;		/* heads                        */
 	ip[1] = 32;		/* sectors                      */
 	if ((ip[2] = size >> 11) > 1024) {	/* cylinders, test for big disk */
@@ -1046,6 +1072,24 @@ MODULE_AUTHOR("Red Hat Software");
 MODULE_LICENSE("GPL");
 
 
-static Scsi_Host_Template driver_template = I2OSCSI;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "i2o_scsi",
+	.name			= "I2O SCSI Layer",
+	.detect			= i2o_scsi_detect,
+	.release		= i2o_scsi_release,
+	.info			= i2o_scsi_info,
+	.command		= i2o_scsi_command,
+	.queuecommand		= i2o_scsi_queuecommand,
+	.eh_abort_handler	= i2o_scsi_abort,
+	.eh_bus_reset_handler	= i2o_scsi_bus_reset,
+	.eh_device_reset_handler= i2o_scsi_device_reset,
+	.eh_host_reset_handler	= i2o_scsi_host_reset,
+	.bios_param		= i2o_scsi_bios_param,
+	.can_queue		= I2O_SCSI_CAN_QUEUE,
+	.this_id		= 15,
+	.sg_tablesize		= 8,
+	.cmd_per_lun		= 6,
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 
 #include "../../scsi/scsi_module.c"

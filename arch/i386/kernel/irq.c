@@ -153,7 +153,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		for (j = 0; j < NR_CPUS; j++)
 			if (cpu_online(j))
 				p += seq_printf(p, "%10u ",
-					     kstat.irqs[j][i]);
+					     kstat_cpu(j).irqs[i]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %s", action->name);
@@ -328,23 +328,24 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
 	unsigned int status;
-	long esp;
 
 	irq_enter();
 
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
 	/* Debugging check for stack overflow: is there less than 1KB free? */
-	__asm__ __volatile__("andl %%esp,%0" : "=r" (esp) : "0" (8191));
-	if (unlikely(esp < (sizeof(struct task_struct) + 1024))) {
-		extern void show_stack(unsigned long *);
+	{
+		long esp;
 
-		printk("do_IRQ: stack overflow: %ld\n",
-		esp - sizeof(struct task_struct));
-		__asm__ __volatile__("movl %%esp,%0" : "=r" (esp));
-		show_stack((void *)esp);
+		__asm__ __volatile__("andl %%esp,%0" :
+					"=r" (esp) : "0" (8191));
+		if (unlikely(esp < (sizeof(struct task_struct) + 1024))) {
+			printk("do_IRQ: stack overflow: %ld\n",
+				esp - sizeof(struct task_struct));
+			dump_stack();
+		}
 	}
 #endif
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
 	/*

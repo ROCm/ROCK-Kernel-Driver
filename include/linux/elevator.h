@@ -40,8 +40,8 @@ struct elevator_s
 /*
  * block elevator interface
  */
-extern void __elv_add_request(request_queue_t *, struct request *,
-			      struct list_head *);
+extern void elv_add_request(request_queue_t *, struct request *, int, int);
+extern void __elv_add_request(request_queue_t *, struct request *, int, int);
 extern int elv_merge(request_queue_t *, struct list_head **, struct bio *);
 extern void elv_merge_requests(request_queue_t *, struct request *,
 			       struct request *);
@@ -49,6 +49,9 @@ extern void elv_merged_request(request_queue_t *, struct request *);
 extern void elv_remove_request(request_queue_t *, struct request *);
 extern int elv_queue_empty(request_queue_t *);
 extern inline struct list_head *elv_get_sort_head(request_queue_t *, struct request *);
+
+#define __elv_add_request_pos(q, rq, pos)	\
+	(q)->elevator.elevator_add_req_fn((q), (rq), (pos))
 
 /*
  * noop I/O scheduler. always merges, always inserts new request at tail

@@ -176,13 +176,6 @@ td_alloc (struct ohci_hcd *hc, int mem_flags)
 			pci_pool_free (hc->td_cache, td, dma);
 			return NULL;
 		}
-		// DEBUG ONLY want to see if these tds are really getting
-		// allocated.  the last one in a page shouldn't be getting
-		// allocated during these tests!
-		if ((dma & 0x0fff) == 0x0fc0) {
-			dbg ("td = %p", td);
-			dump_stack ();
-		}
 	}
 	return td;
 }

@@ -16,27 +16,9 @@
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
 #include <linux/msdos_fs.h>
-#include <linux/fat_cvf.h>
 #include <linux/pagemap.h>
 #include <linux/buffer_head.h>
-
-//#include <asm/uaccess.h>
 #include <asm/unaligned.h>
-
-extern struct cvf_format default_cvf;
-
-/* #define FAT_PARANOIA 1 */
-#define DEBUG_LEVEL 0
-#ifdef FAT_DEBUG
-#  define PRINTK(x) printk x
-#else
-#  define PRINTK(x)
-#endif
-#if (DEBUG_LEVEL >= 1)
-#  define PRINTK1(x) printk x
-#else
-#  define PRINTK1(x)
-#endif
 
 /*
  * New FAT inode stuff. We do the following:
@@ -175,10 +157,6 @@ void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
-	if (sbi->cvf_format->cvf_version) {
-		dec_cvf_format_use_count_by_version(sbi->cvf_format->cvf_version);
-		sbi->cvf_format->unmount_cvf(sb);
-	}
 	fat_clusters_flush(sb);
 	fat_cache_inval_dev(sb);
 	if (sbi->nls_disk) {
@@ -255,8 +233,6 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 	}
 	if (opts->name_check != 'n')
 		seq_printf(m, ",check=%c", opts->name_check);
-	if (opts->conversion != 'b')
-		seq_printf(m, ",conv=%c", opts->conversion);
 	if (opts->quiet)
 		seq_puts(m, ",quiet");
 	if (opts->showexec)
@@ -281,8 +257,7 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 }
 
 static int parse_options(char *options, int is_vfat, int *debug,
-			 struct fat_mount_options *opts,
-			 char *cvf_format, char *cvf_options)
+			 struct fat_mount_options *opts)
 {
 	char *this_char, *value, *p;
 	int ret = 1, val, len;
@@ -299,7 +274,6 @@ static int parse_options(char *options, int is_vfat, int *debug,
 	else
 		opts->shortname = 0;
 	opts->name_check = 'n';
-	opts->conversion = 'b';
 	opts->quiet = opts->showexec = opts->sys_immutable = opts->dotsOK =  0;
 	opts->utf8 = opts->unicode_xlate = 0;
 	opts->numtail = 1;
@@ -326,15 +300,8 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			else ret = 0;
 		}
 		else if (!strcmp(this_char,"conv") && value) {
-			if (value[0] && !value[1] && strchr("bta",*value))
-				opts->conversion = *value;
-			else if (!strcmp(value,"binary"))
-				opts->conversion = 'b';
-			else if (!strcmp(value,"text"))
-				opts->conversion = 't';
-			else if (!strcmp(value,"auto"))
-				opts->conversion = 'a';
-			else ret = 0;
+			printk(KERN_INFO "FAT: conv option is obsolete, "
+			       "not supported now\n");
 		}
 		else if (!strcmp(this_char,"nocase")) {
 			if (!is_vfat)
@@ -381,7 +348,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			else *debug = 1;
 		}
 		else if (!strcmp(this_char,"fat")) {
-			printk("FAT: fat option is obsolete, "
+			printk(KERN_INFO "FAT: fat option is obsolete, "
 			       "not supported now\n");
 		}
 		else if (!strcmp(this_char,"quiet")) {
@@ -389,7 +356,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			else opts->quiet = 1;
 		}
 		else if (!strcmp(this_char,"blocksize")) {
-			printk("FAT: blocksize option is obsolete, "
+			printk(KERN_INFO "FAT: blocksize option is obsolete, "
 			       "not supported now\n");
 		}
 		else if (!strcmp(this_char,"sys_immutable")) {
@@ -399,16 +366,6 @@ static int parse_options(char *options, int is_vfat, int *debug,
 		else if (!strcmp(this_char,"codepage") && value) {
 			opts->codepage = simple_strtoul(value,&value,0);
 			if (*value) ret = 0;
-		}
-		else if (!strcmp(this_char,"cvf_format")) {
-			if (!value)
-				return 0;
-			strncpy(cvf_format,value,20);
-		}
-		else if (!strcmp(this_char,"cvf_options")) {
-			if (!value)
-				return 0;
-			strncpy(cvf_options,value,100);
 		}
 
 		/* msdos specific */
@@ -455,7 +412,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			if (ret) opts->unicode_xlate = val;
 		}
 		else if (is_vfat && !strcmp(this_char,"posix")) {
-			printk("FAT: posix option is obsolete, "
+			printk(KERN_INFO "FAT: posix option is obsolete, "
 			       "not supported now\n");
 		}
 		else if (is_vfat && !strcmp(this_char,"nonumtail")) {
@@ -480,7 +437,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			else
 				ret = 0;
 		} else {
-			printk("FAT: Unrecognized mount option %s\n",
+			printk(KERN_ERR "FAT: Unrecognized mount option %s\n",
 			       this_char);
 			ret = 0;
 		}
@@ -642,7 +599,6 @@ struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
 	result->d_op = sb->s_root->d_op;
 	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
-		
 }
 
 int fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
@@ -692,7 +648,7 @@ struct dentry *fat_get_parent(struct dentry *child)
 
  out:
 	if(bh)
-		fat_brelse(child->d_sb, bh);
+		brelse(bh);
 	unlock_kernel();
 	if (res)
 		return ERR_PTR(res);
@@ -780,9 +736,6 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	unsigned char media;
 	long error;
 	char buf[50];
-	int i;
-	char cvf_format[21];
-	char cvf_options[101];
 
 	sbi = kmalloc(sizeof(struct msdos_sb_info), GFP_KERNEL);
 	if (!sbi)
@@ -790,19 +743,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct msdos_sb_info));
 
-	cvf_format[0] = '\0';
-	cvf_options[0] = '\0';
-	sbi->private_data = NULL;
-
 	sb->s_magic = MSDOS_SUPER_MAGIC;
 	sb->s_op = &fat_sops;
 	sb->s_export_op = &fat_export_ops;
 	sbi->dir_ops = fs_dir_inode_ops;
-	sbi->cvf_format = &default_cvf;
 
 	error = -EINVAL;
-	if (!parse_options((char *)data, isvfat, &debug, &sbi->options,
-			   cvf_format, cvf_options))
+	if (!parse_options(data, isvfat, &debug, &sbi->options))
 		goto out_fail;
 
 	fat_cache_init();
@@ -813,39 +760,40 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sb_min_blocksize(sb, 512);
 	bh = sb_bread(sb, 0);
 	if (bh == NULL) {
-		printk("FAT: unable to read boot sector\n");
+		printk(KERN_ERR "FAT: unable to read boot sector\n");
 		goto out_fail;
 	}
 
 	b = (struct fat_boot_sector *) bh->b_data;
 	if (!b->reserved) {
 		if (!silent)
-			printk("FAT: bogus number of reserved sectors\n");
+			printk(KERN_ERR "FAT: bogus number of reserved sectors\n");
 		brelse(bh);
 		goto out_invalid;
 	}
 	if (!b->fats) {
 		if (!silent)
-			printk("FAT: bogus number of FAT structure\n");
+			printk(KERN_ERR "FAT: bogus number of FAT structure\n");
 		brelse(bh);
 		goto out_invalid;
 	}
 	if (!b->secs_track) {
 		if (!silent)
-			printk("FAT: bogus sectors-per-track value\n");
+			printk(KERN_ERR "FAT: bogus sectors-per-track value\n");
 		brelse(bh);
 		goto out_invalid;
 	}
 	if (!b->heads) {
 		if (!silent)
-			printk("FAT: bogus number-of-heads value\n");
+			printk(KERN_ERR "FAT: bogus number-of-heads value\n");
 		brelse(bh);
 		goto out_invalid;
 	}
 	media = b->media;
 	if (!FAT_VALID_MEDIA(media)) {
 		if (!silent)
-			printk("FAT: invalid media value (0x%02x)\n", media);
+			printk(KERN_ERR "FAT: invalid media value (0x%02x)\n",
+			       media);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -856,7 +804,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	    || (logical_sector_size < 512)
 	    || (PAGE_CACHE_SIZE < logical_sector_size)) {
 		if (!silent)
-			printk("FAT: bogus logical sector size %d\n",
+			printk(KERN_ERR "FAT: bogus logical sector size %d\n",
 			       logical_sector_size);
 		brelse(bh);
 		goto out_invalid;
@@ -865,14 +813,14 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!sbi->cluster_size
 	    || (sbi->cluster_size & (sbi->cluster_size - 1))) {
 		if (!silent)
-			printk("FAT: bogus cluster size %d\n",
+			printk(KERN_ERR "FAT: bogus cluster size %d\n",
 			       sbi->cluster_size);
 		brelse(bh);
 		goto out_invalid;
 	}
 
 	if (logical_sector_size < sb->s_blocksize) {
-		printk("FAT: logical sector size too small for device"
+		printk(KERN_ERR "FAT: logical sector size too small for device"
 		       " (logical sector size = %d)\n", logical_sector_size);
 		brelse(bh);
 		goto out_fail;
@@ -881,13 +829,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 
 		if (!sb_set_blocksize(sb, logical_sector_size)) {
-			printk("FAT: unable to set blocksize %d\n",
+			printk(KERN_ERR "FAT: unable to set blocksize %d\n",
 			       logical_sector_size);
 			goto out_fail;
 		}
 		bh = sb_bread(sb, 0);
 		if (bh == NULL) {
-			printk("FAT: unable to read boot sector"
+			printk(KERN_ERR "FAT: unable to read boot sector"
 			       " (logical sector size = %lu)\n",
 			       sb->s_blocksize);
 			goto out_fail;
@@ -922,7 +870,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 		fsinfo_bh = sb_bread(sb, sbi->fsinfo_sector);
 		if (fsinfo_bh == NULL) {
-			printk("FAT: bread failed, FSINFO block"
+			printk(KERN_ERR "FAT: bread failed, FSINFO block"
 			       " (sector = %lu)\n", sbi->fsinfo_sector);
 			brelse(bh);
 			goto out_fail;
@@ -930,7 +878,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 		fsinfo = (struct fat_boot_fsinfo *)fsinfo_bh->b_data;
 		if (!IS_FSINFO(fsinfo)) {
-			printk("FAT: Did not find valid FSINFO signature.\n"
+			printk(KERN_WARNING
+			       "FAT: Did not find valid FSINFO signature.\n"
 			       "     Found signature1 0x%08x signature2 0x%08x"
 			       " (sector = %lu)\n",
 			       CF_LE_L(fsinfo->signature1),
@@ -950,7 +899,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->dir_entries =
 		CF_LE_W(get_unaligned((unsigned short *)&b->dir_entries));
 	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
-		printk("FAT: bogus directroy-entries per block\n");
+		printk(KERN_ERR "FAT: bogus directroy-entries per block\n");
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -981,7 +930,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	}
 	if (FAT_FIRST_ENT(sb, media) != first) {
 		if (!silent) {
-			printk("FAT: invalid first entry of FAT "
+			printk(KERN_ERR "FAT: invalid first entry of FAT "
 			       "(0x%x != 0x%x)\n",
 			       FAT_FIRST_ENT(sb, media), first);
 		}
@@ -989,22 +938,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	}
 
 	error = -EINVAL;
-	if (!strcmp(cvf_format, "none"))
-		i = -1;
-	else
-		i = detect_cvf(sb, cvf_format);
-	if (i >= 0) {
-		if (cvf_formats[i]->mount_cvf(sb, cvf_options))
-			goto out_fail;
-	}
-
 	cp = sbi->options.codepage ? sbi->options.codepage : 437;
 	sprintf(buf, "cp%d", cp);
 	sbi->nls_disk = load_nls(buf);
-	if (! sbi->nls_disk) {
+	if (!sbi->nls_disk) {
 		/* Fail only if explicit charset specified */
 		if (sbi->options.codepage != 0) {
-			printk("FAT: codepage %s not found\n", buf);
+			printk(KERN_ERR "FAT: codepage %s not found\n", buf);
 			goto out_fail;
 		}
 		sbi->options.codepage = 0; /* already 0?? */
@@ -1016,7 +956,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		if (sbi->options.iocharset != NULL) {
 			sbi->nls_io = load_nls(sbi->options.iocharset);
 			if (!sbi->nls_io) {
-				printk("FAT: IO charset %s not found\n",
+				printk(KERN_ERR
+				       "FAT: IO charset %s not found\n",
 				       sbi->options.iocharset);
 				goto out_fail;
 			}
@@ -1037,13 +978,10 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	insert_inode_hash(root_inode);
 	sb->s_root = d_alloc_root(root_inode);
 	if (!sb->s_root) {
-		printk("FAT: get root inode failed\n");
+		printk(KERN_ERR "FAT: get root inode failed\n");
 		goto out_fail;
 	}
-	if(i >= 0) {
-		sbi->cvf_format = cvf_formats[i];
-		++cvf_format_use_count[i];
-	}
+
 	return 0;
 
 out_invalid:
@@ -1061,12 +999,8 @@ out_fail:
 		unload_nls(sbi->nls_disk);
 	if (sbi->options.iocharset)
 		kfree(sbi->options.iocharset);
-	if (sbi->private_data)
-		kfree(sbi->private_data);
-	sbi->private_data = NULL;
 	sb->s_fs_info = NULL;
 	kfree(sbi);
-
 	return error;
 }
 
@@ -1074,11 +1008,6 @@ int fat_statfs(struct super_block *sb,struct statfs *buf)
 {
 	int free,nr;
        
-	if (MSDOS_SB(sb)->cvf_format &&
-	    MSDOS_SB(sb)->cvf_format->cvf_statfs)
-		return MSDOS_SB(sb)->cvf_format->cvf_statfs(sb,buf,
-						sizeof(struct statfs));
-	  
 	lock_fat(sb);
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		free = MSDOS_SB(sb)->free_clusters;
@@ -1182,13 +1111,6 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 
 		inode->i_nlink = fat_subdirs(inode);
-		    /* includes .., compensating for "self" */
-#ifdef DEBUG
-		if (!inode->i_nlink) {
-			printk("directory %lu: i_nlink == 0\n",inode->i_ino);
-			inode->i_nlink = 1;
-		}
-#endif
 	} else { /* not a directory */
 		inode->i_generation |= 1;
 		inode->i_mode = MSDOS_MKMODE(de->attr,
@@ -1240,16 +1162,16 @@ retry:
 		return;
 	}
 	lock_kernel();
-	if (!(bh = fat_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
-		printk("dev = %s, ino = %d\n", sb->s_id, i_pos);
-		fat_fs_panic(sb, "msdos_write_inode: unable to read i-node block");
+	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
+		fat_fs_panic(sb, "unable to read i-node block (ino %lu)",
+			     i_pos);
 		unlock_kernel();
 		return;
 	}
 	spin_lock(&fat_inode_lock);
 	if (i_pos != MSDOS_I(inode)->i_location) {
 		spin_unlock(&fat_inode_lock);
-		fat_brelse(sb, bh);
+		brelse(bh);
 		unlock_kernel();
 		goto retry;
 	}
@@ -1278,8 +1200,8 @@ retry:
 		raw_entry->cdate = CT_LE_W(raw_entry->cdate);
 	}
 	spin_unlock(&fat_inode_lock);
-	fat_mark_buffer_dirty(sb, bh);
-	fat_brelse(sb, bh);
+	mark_buffer_dirty(bh);
+	brelse(bh);
 	unlock_kernel();
 }
 

@@ -46,6 +46,7 @@
 #include <linux/socket.h>
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/list.h>
 #include <net/sock.h>
 
@@ -884,52 +885,86 @@ drop:
 	return 0;
 }
 
-/* ----- Proc fs support ------ */
-static int sco_sock_dump(char *buf, struct bt_sock_list *list)
+/* ---- Proc fs support ---- */
+#ifdef CONFIG_PROC_FS
+static void *sco_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct sco_pinfo *pi;
 	struct sock *sk;
-	char *ptr = buf;
+	loff_t l = *pos;
 
-	read_lock_bh(&list->lock);
+	read_lock_bh(&sco_sk_list.lock);
 
-	for (sk = list->head; sk; sk = sk->next) {
-		pi = sco_pi(sk);
-		ptr += sprintf(ptr, "%s %s %d\n",
-				batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst),
-				sk->state); 
-	}
-
-	read_unlock_bh(&list->lock);
-
-	ptr += sprintf(ptr, "\n");
-
-	return ptr - buf;
+	for (sk = sco_sk_list.head; sk; sk = sk->next)
+		if (!l--)
+			return sk;
+	return NULL;
 }
 
-static int sco_read_proc(char *buf, char **start, off_t offset, int count, int *eof, void *priv)
+static void *sco_seq_next(struct seq_file *seq, void *e, loff_t *pos)
 {
-	char *ptr = buf;
-	int len;
-
-	BT_DBG("count %d, offset %ld", count, offset);
-
-	ptr += sco_sock_dump(ptr, &sco_sk_list);
-	len  = ptr - buf;
-
-	if (len <= count + offset)
-		*eof = 1;
-
-	*start = buf + offset;
-	len -= offset;
-
-	if (len > count)
-		len = count;
-	if (len < 0)
-		len = 0;
-
-	return len;
+	struct sock *sk = e;
+	(*pos)++;
+	return sk->next;
 }
+
+static void sco_seq_stop(struct seq_file *seq, void *e)
+{
+	read_unlock_bh(&sco_sk_list.lock);
+}
+
+static int  sco_seq_show(struct seq_file *seq, void *e)
+{
+	struct sock *sk = e;
+	seq_printf(seq, "%s %s %d\n",
+			batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst), sk->state);
+	return 0;
+}
+
+static struct seq_operations sco_seq_ops = {
+	.start  = sco_seq_start,
+	.next   = sco_seq_next,
+	.stop   = sco_seq_stop,
+	.show   = sco_seq_show 
+};
+
+static int sco_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &sco_seq_ops);
+}
+
+static struct file_operations sco_seq_fops = {
+	.open    = sco_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
+static int __init sco_proc_init(void)
+{
+        struct proc_dir_entry *p = create_proc_entry("sco", S_IRUGO, proc_bt);
+        if (!p)
+                return -ENOMEM;
+        p->proc_fops = &sco_seq_fops;
+        return 0;
+}
+
+static void __init sco_proc_cleanup(void)
+{
+        remove_proc_entry("sco", proc_bt);
+}
+
+#else /* CONFIG_PROC_FS */
+
+static int __init sco_proc_init(void)
+{
+        return 0;
+}
+
+static void __init sco_proc_cleanup(void)
+{
+        return 0;
+}
+#endif /* CONFIG_PROC_FS */
 
 static struct proto_ops sco_sock_ops = {
 	.family  =      PF_BLUETOOTH,
@@ -969,19 +1004,20 @@ int __init sco_init(void)
 	int err;
 
 	if ((err = bt_sock_register(BTPROTO_SCO, &sco_sock_family_ops))) {
-		BT_ERR("Can't register SCO socket layer");
+		BT_ERR("SCO socket registration failed");
 		return err;
 	}
 
 	if ((err = hci_register_proto(&sco_hci_proto))) {
-		BT_ERR("Can't register SCO protocol");
+		BT_ERR("SCO protocol registration failed");
 		return err;
 	}
 
-	create_proc_read_entry("bluetooth/sco", 0, 0, sco_read_proc, NULL);
+	sco_proc_init();
+	
+	BT_INFO("SCO (Voice Link) ver %s", VERSION);
+	BT_INFO("SCO socket layer initialized");
 
-	BT_INFO("Bluetooth SCO ver %s Copyright (C) 2000,2001 Qualcomm Inc", VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 	return 0;
 }
 
@@ -989,14 +1025,14 @@ void sco_cleanup(void)
 {
 	int err;
 
-	remove_proc_entry("bluetooth/sco", NULL);
+	sco_proc_cleanup();
 
 	/* Unregister socket, protocol and notifier */
 	if ((err = bt_sock_unregister(BTPROTO_SCO)))
-		BT_ERR("Can't unregister SCO socket layer %d", err);
+		BT_ERR("SCO socket unregistration failed. %d", err);
 
 	if ((err = hci_unregister_proto(&sco_hci_proto)))
-		BT_ERR("Can't unregister SCO protocol %d", err);
+		BT_ERR("SCO protocol unregistration failed. %d", err);
 }
 
 module_init(sco_init);

@@ -96,15 +96,19 @@ struct ifmap
 struct if_settings
 {
 	unsigned int type;	/* Type of physical device or protocol */
+	unsigned int size;	/* Size of the data allocated by the caller */
 	union {
 		/* {atm/eth/dsl}_settings anyone ? */
-		union hdlc_settings ifsu_hdlc;
-		union line_settings ifsu_line;
+		raw_hdlc_proto		*raw_hdlc;
+		cisco_proto		*cisco;
+		fr_proto		*fr;
+		fr_proto_pvc		*fr_pvc;
+
+		/* interface settings */
+		sync_serial_settings	*sync;
+		te1_settings		*te1;
 	} ifs_ifsu;
 };
-
-#define ifs_hdlc	ifs_ifsu.ifsu_hdlc
-#define ifs_line	ifs_ifsu.ifsu_line
 
 /*
  * Interface request structure used for socket
@@ -135,7 +139,7 @@ struct ifreq
 		char	ifru_slave[IFNAMSIZ];	/* Just fits the size */
 		char	ifru_newname[IFNAMSIZ];
 		char *	ifru_data;
-		struct	if_settings *ifru_settings;
+		struct	if_settings ifru_settings;
 	} ifr_ifru;
 };
 

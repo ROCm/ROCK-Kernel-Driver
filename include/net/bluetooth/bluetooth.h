@@ -53,7 +53,7 @@
 #define SOL_SCO     17
 #define SOL_RFCOMM  18
 
-#define BT_INFO(fmt, arg...) printk(KERN_INFO fmt "\n" , ## arg)
+#define BT_INFO(fmt, arg...) printk(KERN_INFO "Bluetooth: " fmt "\n" , ## arg)
 #define BT_DBG(fmt, arg...)  printk(KERN_INFO "%s: " fmt "\n" , __FUNCTION__ , ## arg)
 #define BT_ERR(fmt, arg...)  printk(KERN_ERR  "%s: " fmt "\n" , __FUNCTION__ , ## arg)
 
@@ -62,6 +62,8 @@
 #else
 #define BT_DMP(D...)
 #endif
+
+extern struct proc_dir_entry *proc_bt;
 
 /* Connection and socket states */
 enum {

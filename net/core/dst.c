@@ -110,6 +110,7 @@ void * dst_alloc(struct dst_ops * ops)
 	memset(dst, 0, ops->entry_size);
 	dst->ops = ops;
 	dst->lastuse = jiffies;
+	dst->path = dst;
 	dst->input = dst_discard;
 	dst->output = dst_blackhole;
 #if RT_CACHE_DEBUG >= 2 

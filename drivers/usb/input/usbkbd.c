@@ -87,7 +87,17 @@ static void usb_kbd_irq(struct urb *urb)
 	struct usb_kbd *kbd = urb->context;
 	int i;
 
-	if (urb->status) return;
+	switch (urb->status) {
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		goto resubmit;
+	}
 
 	for (i = 0; i < 8; i++)
 		input_report_key(&kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);
@@ -112,6 +122,13 @@ static void usb_kbd_irq(struct urb *urb)
 	input_sync(&kbd->dev);
 
 	memcpy(kbd->old, kbd->new, 8);
+
+resubmit:
+	i = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (i)
+		err ("can't resubmit intr, %s-%s/input0, status %d",
+				kbd->usbdev->bus->bus_name,
+				kbd->usbdev->devpath, i);
 }
 
 int usb_kbd_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
@@ -211,7 +228,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			 const struct usb_device_id *id)
 {
 	struct usb_device * dev = interface_to_usbdev(iface);
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_kbd *kbd;
 	int i, pipe, maxp;
@@ -220,10 +237,10 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 	interface = &iface->altsetting[iface->act_altsetting];
 
-	if (interface->bNumEndpoints != 1)
+	if (interface->desc.bNumEndpoints != 1)
 		return -ENODEV;
 
-	endpoint = interface->endpoint + 0;
+	endpoint = &interface->endpoint[0].desc;
 	if (!(endpoint->bEndpointAddress & 0x80))
 		return -ENODEV;
 	if ((endpoint->bmAttributes & 3) != 3)
@@ -265,7 +282,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	kbd->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
 	kbd->cr->bRequest = 0x09;
 	kbd->cr->wValue = cpu_to_le16(0x200);
-	kbd->cr->wIndex = cpu_to_le16(interface->bInterfaceNumber);
+	kbd->cr->wIndex = cpu_to_le16(interface->desc.bInterfaceNumber);
 	kbd->cr->wLength = cpu_to_le16(1);
 
 	usb_make_path(dev, path, 64);

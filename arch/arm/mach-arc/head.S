@@ -11,6 +11,7 @@
  */
 #include <linux/config.h>
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/mach-types.h>
 
 		.globl	swapper_pg_dir
@@ -19,7 +20,7 @@
 /*
  * Entry point.
  */
-		.section ".text.init",#alloc,#execinstr
+		__INIT
 ENTRY(stext)
 __entry:	cmp	pc, #0x02000000
 		ldrlt	pc, LC0			@ if 0x01800000, call at 0x02080000

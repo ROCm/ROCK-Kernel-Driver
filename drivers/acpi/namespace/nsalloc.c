@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 74 $
+ *              $Revision: 77 $
  *
  ******************************************************************************/
 
@@ -125,6 +125,57 @@ acpi_ns_delete_node (
 }
 
 
+#ifdef ACPI_ALPHABETIC_NAMESPACE
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ns_compare_names
+ *
+ * PARAMETERS:  Name1           - First name to compare
+ *              Name2           - Second name to compare
+ *
+ * RETURN:      value from strncmp
+ *
+ * DESCRIPTION: Compare two ACPI names.  Names that are prefixed with an
+ *              underscore are forced to be alphabetically first.
+ *
+ ******************************************************************************/
+
+int
+acpi_ns_compare_names (
+	char                    *name1,
+	char                    *name2)
+{
+	char                    reversed_name1[ACPI_NAME_SIZE];
+	char                    reversed_name2[ACPI_NAME_SIZE];
+	u32                     i;
+	u32                     j;
+
+
+	/*
+	 * Replace all instances of "underscore" with a value that is smaller so
+	 * that all names that are prefixed with underscore(s) are alphabetically
+	 * first.
+	 *
+	 * Reverse the name bytewise so we can just do a 32-bit compare instead
+	 * of a strncmp.
+	 */
+	for (i = 0, j= (ACPI_NAME_SIZE - 1); i < ACPI_NAME_SIZE; i++, j--) {
+		reversed_name1[j] = name1[i];
+		if (name1[i] == '_') {
+			reversed_name1[j] = '*';
+		}
+
+		reversed_name2[j] = name2[i];
+		if (name2[i] == '_') {
+			reversed_name2[j] = '*';
+		}
+	}
+
+	return (*(int *) reversed_name1 - *(int *) reversed_name2);
+}
+#endif
+
+
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_install_node
@@ -139,8 +190,10 @@ acpi_ns_delete_node (
  * DESCRIPTION: Initialize a new namespace node and install it amongst
  *              its peers.
  *
- *              Note: Current namespace lookup is linear search, so the nodes
- *              are not linked in any particular order.
+ *              Note: Current namespace lookup is linear search.  However, the
+ *              nodes are linked in alphabetical order to 1) put all reserved
+ *              names (start with underscore) first, and to 2) make a readable
+ *              namespace dump.
  *
  ******************************************************************************/
 
@@ -153,6 +206,10 @@ acpi_ns_install_node (
 {
 	u16                     owner_id = TABLE_ID_DSDT;
 	acpi_namespace_node     *child_node;
+#ifdef ACPI_ALPHABETIC_NAMESPACE
+
+	acpi_namespace_node     *previous_child_node;
+#endif
 
 
 	ACPI_FUNCTION_TRACE ("Ns_install_node");
@@ -172,8 +229,60 @@ acpi_ns_install_node (
 	child_node = parent_node->child;
 	if (!child_node) {
 		parent_node->child = node;
+		node->flags |= ANOBJ_END_OF_PEER_LIST;
+		node->peer = parent_node;
 	}
 	else {
+#ifdef ACPI_ALPHABETIC_NAMESPACE
+		/*
+		 * Walk the list whilst searching for the the correct
+		 * alphabetic placement.
+		 */
+		previous_child_node = NULL;
+		while (acpi_ns_compare_names (child_node->name.ascii, node->name.ascii) < 0) {
+			if (child_node->flags & ANOBJ_END_OF_PEER_LIST) {
+				/* Last peer;  Clear end-of-list flag */
+
+				child_node->flags &= ~ANOBJ_END_OF_PEER_LIST;
+
+				/* This node is the new peer to the child node */
+
+				child_node->peer = node;
+
+				/* This node is the new end-of-list */
+
+				node->flags |= ANOBJ_END_OF_PEER_LIST;
+				node->peer = parent_node;
+				break;
+			}
+
+			/* Get next peer */
+
+			previous_child_node = child_node;
+			child_node = child_node->peer;
+		}
+
+		/* Did the node get inserted at the end-of-list? */
+
+		if (!(node->flags & ANOBJ_END_OF_PEER_LIST)) {
+			/*
+			 * Loop above terminated without reaching the end-of-list.
+			 * Insert the new node at the current location
+			 */
+			if (previous_child_node) {
+				/* Insert node alphabetically */
+
+				node->peer = child_node;
+				previous_child_node->peer = node;
+			}
+			else {
+				/* Insert node alphabetically at start of list */
+
+				node->peer = child_node;
+				parent_node->child = node;
+			}
+		}
+#else
 		while (!(child_node->flags & ANOBJ_END_OF_PEER_LIST)) {
 			child_node = child_node->peer;
 		}
@@ -183,55 +292,19 @@ acpi_ns_install_node (
 		/* Clear end-of-list flag */
 
 		child_node->flags &= ~ANOBJ_END_OF_PEER_LIST;
+		node->flags     |= ANOBJ_END_OF_PEER_LIST;
+		node->peer = parent_node;
+#endif
 	}
 
 	/* Init the new entry */
 
-	node->owner_id  = owner_id;
-	node->flags     |= ANOBJ_END_OF_PEER_LIST;
-	node->peer      = parent_node;
+	node->owner_id = owner_id;
+	node->type = (u8) type;
 
-
-	/*
-	 * If adding a name with unknown type, or having to
-	 * add the region in order to define fields in it, we
-	 * have a forward reference.
-	 */
-	if ((ACPI_TYPE_ANY == type) ||
-		(INTERNAL_TYPE_FIELD_DEFN == type) ||
-		(INTERNAL_TYPE_BANK_FIELD_DEFN == type)) {
-		/*
-		 * We don't want to abort here, however!
-		 * We will fill in the actual type when the
-		 * real definition is found later.
-		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] is a forward reference\n",
-			node->name.ascii));
-	}
-
-	/*
-	 * The Def_field_defn and Bank_field_defn cases are actually
-	 * looking up the Region in which the field will be defined
-	 */
-	if ((INTERNAL_TYPE_FIELD_DEFN == type) ||
-		(INTERNAL_TYPE_BANK_FIELD_DEFN == type)) {
-		type = ACPI_TYPE_REGION;
-	}
-
-	/*
-	 * Scope, Def_any, and Index_field_defn are bogus "types" which do
-	 * not actually have anything to do with the type of the name
-	 * being looked up.  Save any other value of Type as the type of
-	 * the entry.
-	 */
-	if ((type != INTERNAL_TYPE_SCOPE) &&
-		(type != INTERNAL_TYPE_DEF_ANY) &&
-		(type != INTERNAL_TYPE_INDEX_FIELD_DEFN)) {
-		node->type = (u8) type;
-	}
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s added to %p at %p\n",
-		node->name.ascii, parent_node, node));
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s (%s) added to %4.4s (%s) %p at %p\n",
+		node->name.ascii, acpi_ut_get_type_name (node->type),
+		parent_node->name.ascii, acpi_ut_get_type_name (parent_node->type), parent_node, node));
 
 	/*
 	 * Increment the reference count(s) of all parents up to

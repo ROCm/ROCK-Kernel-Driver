@@ -92,7 +92,7 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (!urb)
 		return -ENOMEM;
   
-	FILL_CONTROL_URB(urb, usb_dev, pipe, (unsigned char*)cmd, data, len,
+	usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char*)cmd, data, len,
 		   usb_api_blocking_completion, 0);
 
 	retv = usb_start_wait_urb(urb, timeout, &length);
@@ -190,7 +190,7 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (!urb)
 		return -ENOMEM;
 
-	FILL_BULK_URB(urb, usb_dev, pipe, data, len,
+	usb_fill_bulk_urb(urb, usb_dev, pipe, data, len,
 		    usb_api_blocking_completion, 0);
 
 	return usb_start_wait_urb(urb,timeout,actual_length);
@@ -287,12 +287,6 @@ static void sg_complete (struct urb *urb)
  *
  * The request may be canceled with usb_sg_cancel(), either before or after
  * usb_sg_wait() is called.
- *
- * NOTE:
- *
- * At this writing, don't use the interrupt transfer mode, since the old old
- * "automagic resubmit" mode hasn't yet been removed.  It should be removed
- * by the time 2.5 finalizes.
  */
 int usb_sg_init (
 	struct usb_sg_request	*io,
@@ -330,7 +324,7 @@ int usb_sg_init (
 	if (!io->urbs)
 		goto nomem;
 
-	urb_flags = USB_ASYNC_UNLINK | URB_NO_DMA_MAP | URB_NO_INTERRUPT;
+	urb_flags = URB_ASYNC_UNLINK | URB_NO_DMA_MAP | URB_NO_INTERRUPT;
 	if (usb_pipein (pipe))
 		urb_flags |= URB_SHORT_NOT_OK;
 
@@ -646,31 +640,33 @@ int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 
 
 // hub-only!! ... and only exported for reset/reinit path.
-// otherwise used internally, for config/altsetting reconfig.
+// otherwise used internally, when setting up a config
 void usb_set_maxpacket(struct usb_device *dev)
 {
 	int i, b;
 
-	for (i=0; i<dev->actconfig->bNumInterfaces; i++) {
+	for (i=0; i<dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *ifp = dev->actconfig->interface + i;
-		struct usb_interface_descriptor *as = ifp->altsetting + ifp->act_altsetting;
-		struct usb_endpoint_descriptor *ep = as->endpoint;
+		struct usb_host_interface *as = ifp->altsetting + ifp->act_altsetting;
+		struct usb_host_endpoint *ep = as->endpoint;
 		int e;
 
-		for (e=0; e<as->bNumEndpoints; e++) {
-			b = ep[e].bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-			if ((ep[e].bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
+		for (e=0; e<as->desc.bNumEndpoints; e++) {
+			struct usb_endpoint_descriptor	*d;
+			d = &ep [e].desc;
+			b = d->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+			if ((d->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 				USB_ENDPOINT_XFER_CONTROL) {	/* Control => bidirectional */
-				dev->epmaxpacketout[b] = ep[e].wMaxPacketSize;
-				dev->epmaxpacketin [b] = ep[e].wMaxPacketSize;
+				dev->epmaxpacketout[b] = d->wMaxPacketSize;
+				dev->epmaxpacketin [b] = d->wMaxPacketSize;
 				}
-			else if (usb_endpoint_out(ep[e].bEndpointAddress)) {
-				if (ep[e].wMaxPacketSize > dev->epmaxpacketout[b])
-					dev->epmaxpacketout[b] = ep[e].wMaxPacketSize;
+			else if (usb_endpoint_out(d->bEndpointAddress)) {
+				if (d->wMaxPacketSize > dev->epmaxpacketout[b])
+					dev->epmaxpacketout[b] = d->wMaxPacketSize;
 			}
 			else {
-				if (ep[e].wMaxPacketSize > dev->epmaxpacketin [b])
-					dev->epmaxpacketin [b] = ep[e].wMaxPacketSize;
+				if (d->wMaxPacketSize > dev->epmaxpacketin [b])
+					dev->epmaxpacketin [b] = d->wMaxPacketSize;
 			}
 		}
 	}
@@ -686,8 +682,9 @@ void usb_set_maxpacket(struct usb_device *dev)
  * as reported by URB completion status.  Endpoints that are halted are
  * sometimes referred to as being "stalled".  Such endpoints are unable
  * to transmit or receive data until the halt status is cleared.  Any URBs
- * queued queued for such an endpoint should normally be unlinked before
- * clearing the halt condition.
+ * queued for such an endpoint should normally be unlinked by the driver
+ * before clearing the halt condition, as described in sections 5.7.5
+ * and 5.8.5 of the USB 2.0 spec.
  *
  * Note that control and isochronous endpoints don't halt, although control
  * endpoints report "protocol stall" (for unsupported requests) using the
@@ -701,48 +698,34 @@ void usb_set_maxpacket(struct usb_device *dev)
 int usb_clear_halt(struct usb_device *dev, int pipe)
 {
 	int result;
-	__u16 status;
-	unsigned char *buffer;
-	int endp=usb_pipeendpoint(pipe)|(usb_pipein(pipe)<<7);
+	int endp = usb_pipeendpoint(pipe);
+	
+	if (usb_pipein (pipe))
+		endp |= USB_DIR_IN;
 
-/*
-	if (!usb_endpoint_halted(dev, endp & 0x0f, usb_endpoint_out(endp)))
-		return 0;
-*/
-
+	/* we don't care if it wasn't halted first. in fact some devices
+	 * (like some ibmcam model 1 units) seem to expect hosts to make
+	 * this request for iso endpoints, which can't halt!
+	 */
 	result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0, endp, NULL, 0,
 		HZ * USB_CTRL_SET_TIMEOUT);
 
-	/* don't clear if failed */
+	/* don't un-halt or force to DATA0 except on success */
 	if (result < 0)
 		return result;
 
-	buffer = kmalloc(sizeof(status), GFP_KERNEL);
-	if (!buffer) {
-		err("unable to allocate memory for configuration descriptors");
-		return -ENOMEM;
-	}
+	/* NOTE:  seems like Microsoft and Apple don't bother verifying
+	 * the clear "took", so some devices could lock up if you check...
+	 * such as the Hagiwara FlashGate DUAL.  So we won't bother.
+	 *
+	 * NOTE:  make sure the logic here doesn't diverge much from
+	 * the copy in usb-storage, for as long as we need two copies.
+	 */
 
-	result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RECIP_ENDPOINT, 0, endp,
-		// FIXME USB_CTRL_GET_TIMEOUT, yes?  why not usb_get_status() ?
-		buffer, sizeof(status), HZ * USB_CTRL_SET_TIMEOUT);
-
-	memcpy(&status, buffer, sizeof(status));
-	kfree(buffer);
-
-	if (result < 0)
-		return result;
-
-	if (le16_to_cpu(status) & 1)
-		return -EPIPE;		/* still halted */
-
-	usb_endpoint_running(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe));
-
-	/* toggle is reset on clear */
-
+	/* toggle was reset by the clear, then ep was reactivated */
 	usb_settoggle(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe), 0);
+	usb_endpoint_running(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe));
 
 	return 0;
 }
@@ -783,7 +766,7 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 {
 	struct usb_interface *iface;
-	struct usb_interface_descriptor *iface_as;
+	struct usb_host_interface *iface_as;
 	int i, ret;
 
 	iface = usb_ifnum_to_if(dev, interface);
@@ -805,7 +788,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				   USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE,
-				   iface->altsetting[alternate].bAlternateSetting,
+				   iface->altsetting[alternate]
+				   	.desc.bAlternateSetting,
 				   interface, NULL, 0, HZ * 5)) < 0)
 		return ret;
 
@@ -817,8 +801,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 
 	/* prevent submissions using previous endpoint settings */
 	iface_as = iface->altsetting + iface->act_altsetting;
-	for (i = 0; i < iface_as->bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint [i].bEndpointAddress;
+	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint [i].desc.bEndpointAddress;
 		int	out = !(ep & USB_DIR_IN);
 
 		ep &= USB_ENDPOINT_NUMBER_MASK;
@@ -840,14 +824,14 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 */
 
 	iface_as = &iface->altsetting[alternate];
-	for (i = 0; i < iface_as->bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint[i].bEndpointAddress;
+	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint[i].desc.bEndpointAddress;
 		int	out = !(ep & USB_DIR_IN);
 
 		ep &= USB_ENDPOINT_NUMBER_MASK;
 		usb_settoggle (dev, ep, out, 0);
 		(out ? dev->epmaxpacketout : dev->epmaxpacketin) [ep]
-			= iface_as->endpoint [i].wMaxPacketSize;
+			= iface_as->endpoint [i].desc.wMaxPacketSize;
 	}
 
 	return 0;
@@ -886,10 +870,10 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
-	struct usb_config_descriptor *cp = NULL;
+	struct usb_host_config *cp = NULL;
 	
 	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
-		if (dev->config[i].bConfigurationValue == configuration) {
+		if (dev->config[i].desc.bConfigurationValue == configuration) {
 			cp = &dev->config[i];
 			break;
 		}

@@ -72,7 +72,9 @@ EXPORT_SYMBOL(pfn_to_nid);
 #ifdef CONFIG_X86_NUMAQ
 EXPORT_SYMBOL(xquad_portio);
 #endif
+#ifndef CONFIG_X86_WP_WORKS_OK
 EXPORT_SYMBOL(__verify_write);
+#endif
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(dump_extended_fpu);
@@ -116,8 +118,10 @@ EXPORT_SYMBOL(strncpy_from_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(clear_user);
 EXPORT_SYMBOL(__clear_user);
-EXPORT_SYMBOL(__generic_copy_from_user);
-EXPORT_SYMBOL(__generic_copy_to_user);
+EXPORT_SYMBOL(copy_from_user);
+EXPORT_SYMBOL(__copy_from_user);
+EXPORT_SYMBOL(copy_to_user);
+EXPORT_SYMBOL(__copy_to_user);
 EXPORT_SYMBOL(strnlen_user);
 
 EXPORT_SYMBOL(pci_alloc_consistent);
@@ -137,6 +141,11 @@ EXPORT_SYMBOL(pcibios_get_irq_routing_table);
 EXPORT_SYMBOL(_mmx_memcpy);
 EXPORT_SYMBOL(mmx_clear_page);
 EXPORT_SYMBOL(mmx_copy_page);
+#endif
+
+#ifdef CONFIG_X86_HT
+EXPORT_SYMBOL(smp_num_siblings);
+EXPORT_SYMBOL(cpu_sibling_map);
 #endif
 
 #ifdef CONFIG_SMP

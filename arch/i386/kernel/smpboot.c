@@ -58,7 +58,7 @@ static int __initdata smp_b_stepping;
 
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
-int __initdata phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
+int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
 
 /* Bitmask of currently online CPUs */
 unsigned long cpu_online_map;
@@ -118,7 +118,8 @@ static void __init smp_store_cpu_info(int id)
 	struct cpuinfo_x86 *c = cpu_data + id;
 
 	*c = boot_cpu_data;
-	identify_cpu(c);
+	if (id!=0)
+		identify_cpu(c);
 	/*
 	 * Mask B, Pentium, but not Pentium MMX
 	 */

@@ -270,7 +270,7 @@ extern unsigned int mca_pentium_flag;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(TASK_SIZE / 3)
+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
 /*
  * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
@@ -433,9 +433,6 @@ extern void release_thread(struct task_struct *);
  * create a kernel thread without removing it from tasklists
  */
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
-
-/* Release all segment info associated with a VM */
-extern void release_segments(struct mm_struct * mm);
 
 extern unsigned long thread_saved_pc(struct task_struct *tsk);
 

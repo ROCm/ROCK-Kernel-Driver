@@ -7,7 +7,9 @@ GENSRCS= aicasm_gram.c aicasm_scan.c
 GENHDRS= y.tab.h aicdb.h
 
 SRCS=	${GENSRCS} ${CSRCS}
-CLEANFILES= ${GENSRCS} ${GENHDRS} y.output
+
+# Cleaned up by make clean
+clean-files := $(GENSRCS) $(GENHDRS) y.output $(PROG)
 # Override default kernel CFLAGS.  This is a userland app.
 AICASM_CFLAGS:= -I/usr/include -I. -ldb
 YFLAGS= -d
@@ -41,9 +43,6 @@ aicdb.h:
 	 else							\
 		echo "*** Install db development libraries";	\
 	 fi
-
-clean:
-	@rm -f $(CLEANFILES) $(PROG)
 
 y.tab.h aicasm_gram.c: aicasm_gram.y
 	$(YACC) $(YFLAGS) aicasm_gram.y

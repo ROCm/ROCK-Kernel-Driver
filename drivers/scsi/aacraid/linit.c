@@ -56,7 +56,6 @@
 #include <scsi/scsicam.h>
 
 #include "aacraid.h"
-#include "sd.h"
 
 #define AAC_DRIVERNAME	"aacraid"
 
@@ -120,7 +119,8 @@ static struct file_operations aac_cfg_fops = {
 static int aac_detect(Scsi_Host_Template *);
 static int aac_release(struct Scsi_Host *);
 static int aac_queuecommand(Scsi_Cmnd *, void (*CompletionRoutine)(Scsi_Cmnd *));
-static int aac_biosparm(Scsi_Disk *, struct block_device *, int *);
+static int aac_biosparm(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 static int aac_procinfo(char *, char **, off_t, int, int, int);
 static int aac_ioctl(Scsi_Device *, int, void *);
 static int aac_eh_abort(Scsi_Cmnd * cmd);
@@ -237,7 +237,7 @@ static int aac_detect(Scsi_Host_Template *template)
 			/* Initialize the ordinal number of the device to -1 */
 			fsa_dev_ptr = &(aac->fsa_dev);
 			for( container = 0; container < MAXIMUM_NUM_CONTAINERS; container++ )
-				fsa_dev_ptr->devno[container] = -1;
+				fsa_dev_ptr->devname[container][0] = '\0';
 
 			dprintk((KERN_DEBUG "Initializing Hardware...\n"));
 			if((*aac_drivers[index].init)(aac , host_ptr->unique_id) != 0)
@@ -410,7 +410,8 @@ struct aac_driver_ident* aac_get_driver_ident(int devtype)
  *	be displayed.
  */
  
-static int aac_biosparm(Scsi_Disk *disk, struct block_device *bdev, int *geom)
+static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *geom)
 {
 	struct diskparm *param = (struct diskparm *)geom;
 	u8 *buf;
@@ -420,9 +421,9 @@ static int aac_biosparm(Scsi_Disk *disk, struct block_device *bdev, int *geom)
 	/*
 	 *	Assuming extended translation is enabled - #REVISIT#
 	 */
-	if( disk->capacity >= 2 * 1024 * 1024 ) /* 1 GB in 512 byte sectors */
+	if( capacity >= 2 * 1024 * 1024 ) /* 1 GB in 512 byte sectors */
 	{
-		if( disk->capacity >= 4 * 1024 * 1024 ) /* 2 GB in 512 byte sectors */
+		if( capacity >= 4 * 1024 * 1024 ) /* 2 GB in 512 byte sectors */
 		{
 			param->heads = 255;
 			param->sectors = 63;
@@ -439,7 +440,7 @@ static int aac_biosparm(Scsi_Disk *disk, struct block_device *bdev, int *geom)
 		param->sectors = 32;
 	}
 
-	param->cylinders = disk->capacity/(param->heads * param->sectors);
+	param->cylinders = capacity/(param->heads * param->sectors);
 
 	/*
 	 *	Read the partition table block
@@ -493,7 +494,7 @@ static int aac_biosparm(Scsi_Disk *disk, struct block_device *bdev, int *geom)
 			end_sec = first->end_sector & 0x3f;
 		}
 
-		param->cylinders = disk->capacity / (param->heads * param->sectors);
+		param->cylinders = capacity / (param->heads * param->sectors);
 
 		if(num < 4 && end_sec == param->sectors)
 		{

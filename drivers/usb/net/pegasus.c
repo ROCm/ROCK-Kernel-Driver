@@ -143,7 +143,7 @@ static int get_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 	pegasus->dr.wLength = cpu_to_le16p(&size);
 	pegasus->ctrl_urb->transfer_buffer_length = size;
 
-	FILL_CONTROL_URB(pegasus->ctrl_urb, pegasus->usb,
+	usb_fill_control_urb(pegasus->ctrl_urb, pegasus->usb,
 			 usb_rcvctrlpipe(pegasus->usb, 0),
 			 (char *) &pegasus->dr,
 			 buffer, size, ctrl_callback, pegasus);
@@ -194,7 +194,7 @@ static int set_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 	pegasus->dr.wLength = cpu_to_le16p(&size);
 	pegasus->ctrl_urb->transfer_buffer_length = size;
 
-	FILL_CONTROL_URB(pegasus->ctrl_urb, pegasus->usb,
+	usb_fill_control_urb(pegasus->ctrl_urb, pegasus->usb,
 			 usb_sndctrlpipe(pegasus->usb, 0),
 			 (char *) &pegasus->dr,
 			 buffer, size, ctrl_callback, pegasus);
@@ -243,7 +243,7 @@ static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 	pegasus->dr.wLength = cpu_to_le16(1);
 	pegasus->ctrl_urb->transfer_buffer_length = 1;
 
-	FILL_CONTROL_URB(pegasus->ctrl_urb, pegasus->usb,
+	usb_fill_control_urb(pegasus->ctrl_urb, pegasus->usb,
 			 usb_sndctrlpipe(pegasus->usb, 0),
 			 (char *) &pegasus->dr,
 			 buffer, 1, ctrl_callback, pegasus);
@@ -275,7 +275,7 @@ static int update_eth_regs_async(pegasus_t * pegasus)
 	pegasus->dr.wLength = cpu_to_le16(3);
 	pegasus->ctrl_urb->transfer_buffer_length = 3;
 
-	FILL_CONTROL_URB(pegasus->ctrl_urb, pegasus->usb,
+	usb_fill_control_urb(pegasus->ctrl_urb, pegasus->usb,
 			 usb_sndctrlpipe(pegasus->usb, 0),
 			 (char *) &pegasus->dr,
 			 pegasus->eth_regs, 3, ctrl_callback, pegasus);
@@ -596,7 +596,7 @@ static void read_bulk_callback(struct urb *urb)
 	if (pegasus->rx_skb == NULL)
 		goto tl_sched;
 goon:
-	FILL_BULK_URB(pegasus->rx_urb, pegasus->usb,
+	usb_fill_bulk_urb(pegasus->rx_urb, pegasus->usb,
 		      usb_rcvbulkpipe(pegasus->usb, 1),
 		      pegasus->rx_skb->data, PEGASUS_MTU + 8,
 		      read_bulk_callback, pegasus);
@@ -635,7 +635,7 @@ static void rx_fixup(unsigned long data)
 		tasklet_schedule(&pegasus->rx_tl);
 		return;
 	}
-	FILL_BULK_URB(pegasus->rx_urb, pegasus->usb,
+	usb_fill_bulk_urb(pegasus->rx_urb, pegasus->usb,
  	              usb_rcvbulkpipe(pegasus->usb, 1),
 	              pegasus->rx_skb->data, PEGASUS_MTU + 8,
 	              read_bulk_callback, pegasus);	
@@ -670,6 +670,7 @@ static void intr_callback(struct urb *urb)
 	pegasus_t *pegasus = urb->context;
 	struct net_device *net;
 	__u8 *d;
+	int status;
 
 	if (!pegasus)
 		return;
@@ -677,7 +678,9 @@ static void intr_callback(struct urb *urb)
 	switch (urb->status) {
 	case 0:
 		break;
+	case -ECONNRESET:	/* unlink */
 	case -ENOENT:
+	case -ESHUTDOWN:
 		return;
 	default:
 		info("intr status %d", urb->status);
@@ -700,6 +703,11 @@ static void intr_callback(struct urb *urb)
 			netif_carrier_on(net);
 		}
 	}
+
+	status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status)
+		err ("%s: can't resubmit interrupt urb, %d",
+				net->name, status);
 }
 
 static void pegasus_tx_timeout(struct net_device *net)
@@ -710,7 +718,7 @@ static void pegasus_tx_timeout(struct net_device *net)
 		return;
 
 	warn("%s: Tx timed out.", net->name);
-	pegasus->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	pegasus->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 	usb_unlink_urb(pegasus->tx_urb);
 	pegasus->stats.tx_errors++;
 }
@@ -726,7 +734,7 @@ static int pegasus_start_xmit(struct sk_buff *skb, struct net_device *net)
 
 	((__u16 *) pegasus->tx_buff)[0] = cpu_to_le16(l16);
 	memcpy(pegasus->tx_buff + 2, skb->data, skb->len);
-	FILL_BULK_URB(pegasus->tx_urb, pegasus->usb,
+	usb_fill_bulk_urb(pegasus->tx_urb, pegasus->usb,
 		      usb_sndbulkpipe(pegasus->usb, 2),
 		      pegasus->tx_buff, count,
 		      write_bulk_callback, pegasus);
@@ -844,13 +852,13 @@ static int pegasus_open(struct net_device *net)
 		return -ENOMEM;
 
 	down(&pegasus->sem);
-	FILL_BULK_URB(pegasus->rx_urb, pegasus->usb,
+	usb_fill_bulk_urb(pegasus->rx_urb, pegasus->usb,
 		      usb_rcvbulkpipe(pegasus->usb, 1),
 		      pegasus->rx_skb->data, PEGASUS_MTU + 8,
 		      read_bulk_callback, pegasus);
 	if ((res = usb_submit_urb(pegasus->rx_urb, GFP_KERNEL)))
 		warn("%s: failed rx_urb %d", __FUNCTION__, res);
-	FILL_INT_URB(pegasus->intr_urb, pegasus->usb,
+	usb_fill_int_urb(pegasus->intr_urb, pegasus->usb,
 		     usb_rcvintpipe(pegasus->usb, 3),
 		     pegasus->intr_buff, sizeof(pegasus->intr_buff),
 		     intr_callback, pegasus, pegasus->intr_interval);
@@ -1053,7 +1061,7 @@ static int pegasus_probe(struct usb_interface *intf,
 	pegasus_t *pegasus;
 	int dev_index = id - pegasus_ids;
 
-	if (usb_set_configuration(dev, dev->config[0].bConfigurationValue)) {
+	if (usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue)) {
 		err("usb_set_configuration() failed");
 		return -ENODEV;
 	}

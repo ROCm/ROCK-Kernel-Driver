@@ -14,12 +14,12 @@
 	* 21142.c (t21142_lnk_change): Revert earlier patch
 	to always reset phy; only conditionally do so now.
 
-2002-05-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2002-05-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core (tulip_pci_tbl): Add new "comet"
 	pci id.  Contributed by Ohta Kyuma.
 
-2002-03-07  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2002-03-07  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core (tulip_mwi_config): Use new PCI API functions
 	for enabling and disabled Memory-Write-Invalidate
@@ -27,7 +27,7 @@
 	Fix bugs in tulip MWI config also.
 
 2002-01-28  Stefan Rompf  <srompf@isg.de>,
-            Jeff Garzik  <jgarzik@mandrakesoft.com>
+            Jeff Garzik  <jgarzik@pobox.com>
 
         * 21142.c (t21142_timer):  Use return value of
         tulip_check_duplex() to indicate to system whether or not
@@ -53,7 +53,7 @@
         * tulip_core (tulip_pci_tbl[]):
         Add PCI id for comet tulip clone.
 
-2001-12-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-12-11  Jeff Garzik  <jgarzik@pobox.com>
 
 	* eeprom.c, timer.c, media.c, tulip_core.c:
 	Remove 21040 and 21041 chip support.
@@ -115,30 +115,30 @@
 	Clear status for in-progress Tx's, and count
 	Tx errors for all packets being released.
 
-2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-06-16  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip.h, tulip_core.c:
 	Integrate MMIO support from devel branch, but default
 	it to off for stable kernel and driver series.
 
-2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-06-16  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_init_one):
 	Free descriptor rings on error.
 
-2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-06-16  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_mwi_config, tulip_init_one):
 	Large update to csr0 bus configuration code.  This is not stable
 	yet, so it is only conditionally enabled, via CONFIG_TULIP_MWI.
 
-2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-06-16  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c:
 	Initialize timer in tulip_init_one and tulip_down,
 	not in tulip_up.
 
-2001-06-14  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-06-14  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c:
 	- Update tulip_suspend, tulip_resume for new PCI PM API.
@@ -155,14 +155,14 @@
 	* tulip_core (set_rx_mode):  Do not use set_bit
 	on an integer variable.  Also fix endianness issue.
 
-2001-06-04  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-06-04  Jeff Garzik  <jgarzik@pobox.com>
 
 	* interrupt.c:
 	Simplify rx processing when CONFIG_NET_HW_FLOWCONTROL is
 	active, and in the process fix a bug where flow control
 	and low load caused rx not to be acknowledged properly.
 
-2001-06-01  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-06-01  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip.h:
 	- Remove tulip_outl_csr helper, redundant.
@@ -182,7 +182,7 @@
 	  convert tabs to spaces.
 	- Move tp->stats.rx_missed_errors update outside the ifdef.
 
-2001-05-18  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-18  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: Added ethtool support.
 	  ETHTOOL_GDRVINFO ioctl only, for now.
@@ -201,22 +201,22 @@
 
 	* tulip_refill_rx prototype added to tulip.h
 
-2001-05-13  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-13  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: Remove HAS_PCI_MWI flag from Comet, untested.
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c, tulip.h: Remove Conexant PCI id, no chip
 	docs are available to fix problems with support.
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_init_one): Do not call
 	unregister_netdev in error cleanup.  Remnant of old
 	usage of init_etherdev.
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* media.c (tulip_find_mii): Simple write the updated BMCR
 	twice, as it seems the best thing to do for both broken and
@@ -227,36 +227,36 @@
 	Fill in tp->advertising for all cases.
 	Just to be safe, clear all unwanted bits.
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (private_ioctl):  Fill in tp->advertising
 	when advertising value is changed by the user.
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: Mark Comet chips as needed the updated MWI
 	csr0 configuration.
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* media.c, tulip_core.c:  Move MII scan into
 	from inlined inside tulip_init_one to new function
 	tulip_find_mii in media.c.
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* media.c (tulip_check_duplex):
 	Only restart Rx/Tx engines if they are active
 	(and csr6 changes)
 
-2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-12  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_mwi_config):
 	Clamp values read from PCI cache line size register to
 	values acceptable to tulip chip.  Done for safety and
 	-almost- certainly unneeded.
 
-2001-05-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-11  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_init_one):
 	Instead of unconditionally enabling autonegotiation, disable
@@ -270,7 +270,7 @@
 	to BMCR twice, to avoid setting unnecessarily changing
 	phy settings.
 
-2001-05-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-11  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip.h, tulip_core.c:  If HAS_PCI_MWI is set for a
 	given chip, adjust the csr0 values not according to
@@ -281,7 +281,7 @@
 	alignment and system cache size.  Currently MWI bit is set
 	only if the MWI bit is present in the PCI command register.
 
-2001-05-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-11  Jeff Garzik  <jgarzik@pobox.com>
 
 	* media.c (tulip_select_media):
 	For media types 1 and 3, only use the provided eeprom
@@ -291,7 +291,7 @@
 	ensures that the csr6 value is written if an update
 	is needed.
 
-2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	Merge PNIC-II-specific stuff from Becker's tulip.c:
 
@@ -301,13 +301,13 @@
 	* tulip_core.c (tulip_tx_timeout): Add specific
 	debugging for PNIC2.
 
-2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_init_one): Print out
 	tulip%d instead of PCI device number, for
 	consistency.
 
-2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	* Merge changes from Becker's tulip.c:
 	Fix bugs in ioctl.
@@ -316,7 +316,7 @@
 	Set CSR14 autonegotiation bit for media types 2 and 4,
 	where the SIA CSR setup values are not provided.
 
-2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	* media.c (tulip_select_media): Only update MII
 	advertising value if startup arg < 2.
@@ -330,7 +330,7 @@
 	value 2 as 'startup' arg to select_media, to avoid updating
 	MII advertising value.
 
-2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	* pnic.c (pnic_check_duplex): remove
 	pnic.c (pnic_lnk_change, pnic_timer): use
@@ -343,13 +343,13 @@
 
 	(found by Manfred Spraul)
 
-2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	* 21142.c, eeprom.c, tulip.h, tulip_core.c:
 	Remove DPRINTK as another, better method of
 	debug message printing is available.
 
-2001-05-09  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-05-09  Jeff Garzik  <jgarzik@pobox.com>
 
 	* 21142.c (t21142_lnk_change): Pass arg startup==1
 	to tulip_select_media, in order to force csr13 to be
@@ -361,32 +361,32 @@
 
 	* interrupt.c: Better PCI bus error reporting.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: Now that dev->name is only available late
 	  in the probe, insert a hack to replace a not-evaluated
 	  "eth%d" string with an evaluated "tulip%d" string.
 	  Also, remove obvious comment and an indentation cleanup.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: If we are a module, always print out the
 	  version string.  If we are built into the kernel, only print
 	  the version string if at least one tulip is detected.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	Merged from Becker's tulip.c 0.92t:
 
 	* tulip_core.c: Add support for Conexant LANfinity.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: Only suspend/resume if the interface
 	  is up and running.  Use alloc_etherdev and pci_request_regions.
 	  Spelling fix.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: Remove code that existed when one or more of
 	  the following defines existed.  These defines were never used
@@ -399,7 +399,7 @@
 	* media.c: Add barrier() to mdio_read/write's PNIC status check
 	  loops.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	Merged from Becker's tulip.c 0.92t:
 
@@ -416,20 +416,20 @@
 	  they are in mdio_read/write now.  Use mask to limit
 	  phy number in tulip_init_one's MII scan.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	Merged from Becker's tulip.c 0.92t:
 
 	* 21142.c, tulip_core.c: PNIC2 MAC address and NWay fixes.
 	* tulip.h: Add FullDuplex constant, used in above change.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* timer.c: Do not call netif_carrier_{on,off}, it is not used in
 	  the main tree.  Leave code in, disabled, as markers for future
 	  carrier notification.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	Merged from Becker's tulip.c 0.92t, except for the tulip.h
 	whitespace cleanup:
@@ -448,14 +448,14 @@
 	  Prefer COMET_MAC_ADDR flag test to chip_id test in set_rx_mode.
 	  Store built mc_filter for later use in intr handler by Comets.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: Use tp->cur_tx when building the
 	  setup frame, instead of assuming that the setup
 	  frame is always built in slot zero.  This case is
 	  hit during PM resume.
 
-2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-03  Jeff Garzik  <jgarzik@pobox.com>
 
 	* *.c: Update file headers (copyright, urls, etc.)
 	* Makefile: re-order to that chip-specific modules on own line
@@ -463,7 +463,7 @@
 	* tulip_core.c: merge medianame[] update from tulip.c.
 	  Additional arch-specific rx_copybreak, csr0 values. (various)
 
-2001-02-20  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-02-20  Jeff Garzik  <jgarzik@pobox.com>
 
 	* media.c (tulip_select_media): No need to initialize
 	new_csr6, all cases initialize it properly.
@@ -482,7 +482,7 @@
 	interrupt handler, as PNIC doesn't support a h/w timer.
 	* tulip_core.c (tulip_tbl[]): Modify default csr6
 
-2001-02-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-02-11  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_init_one): Call pci_enable_device
 	to ensure wakeup/resource assignment before checking those
@@ -491,30 +491,30 @@
 	(tulip_suspend, tulip_resume, tulip_remove_one): Call
 	pci_power_on/off (commented out for now).
 
-2001-02-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-02-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip.h: Add CFDD_xxx bits for Tulip power management
 	* tulip_core.c (tulip_set_power_state): New function,
 	manipulating Tulip chip power state where supported.
 	(tulip_up, tulip_down, tulip_init_one): Use it.
 
-2001-02-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-02-10  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_tx_timeout): Call netif_wake_queue
 	to ensure the next Tx is always sent to us.
 
-2001-01-27  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-01-27  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (tulip_remove_one): Fix mem leak by freeing
 	tp->media_tbl.  Add check for !dev, reformat code appropriately.
 
-2001-01-27  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-01-27  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_tbl[]: Comment all entries to make order and chip_id
 	relationship more clear.
 	* tulip_pci_tbl[]: Add new Accton PCI id (COMET chipset).
 
-2001-01-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-01-16  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: static vars no longer explicitly
 	initialized to zero.
@@ -549,7 +549,7 @@
 	medianame[] and block_name[] arrays to avoid oops due
 	to bad values returned from hardware.
 
-2000-11-02  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2000-11-02  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c (set_rx_mode): This is synchronized via
 	dev->xmit_lock, so only the queueing of the setup frame needs to
@@ -564,13 +564,13 @@
 	* tulip_core.c (tulip_init_ring, tulip_start_xmit, set_rx_mode):
 	Likewise.
 
-2000-10-18  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2000-10-18  Jeff Garzik  <jgarzik@pobox.com>
 
 	* tulip_core.c: (tulip_init_one) Print out ethernet interface
 	on error.  Print out a message when pci_enable_device fails.
 	Handle DMA alloc failure.
 
-2000-10-18  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2000-10-18  Jeff Garzik  <jgarzik@pobox.com>
 
 	* Makefile: New file.
 	* tulip_core.c (tulip_init_one): Correct error messages

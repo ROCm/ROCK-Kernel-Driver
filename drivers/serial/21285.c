@@ -171,7 +171,7 @@ static void serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
 	} while (--count > 0 && !(*CSR_UARTFLG & 0x20));
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
 		serial21285_stop_tx(port, 0);
@@ -485,11 +485,7 @@ void __init rs285_console_init(void)
 static struct uart_driver serial21285_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyFB",
-#ifdef CONFIG_DEVFS_FS
 	.dev_name		= "ttyFB%d",
-#else
-	.dev_name		= "ttyFB",
-#endif
 	.major			= SERIAL_21285_MAJOR,
 	.minor			= SERIAL_21285_MINOR,
 	.nr			= 1,

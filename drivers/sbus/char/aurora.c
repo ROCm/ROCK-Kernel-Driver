@@ -59,7 +59,6 @@
 #include <linux/mm.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/tqueue.h>
 #include <linux/delay.h>
 
 #include <asm/io.h>

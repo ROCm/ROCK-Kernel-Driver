@@ -345,4 +345,6 @@ int  rfcomm_dev_ioctl(struct sock *sk, unsigned int cmd, unsigned long arg);
 int  rfcomm_init_ttys(void);
 void rfcomm_cleanup_ttys(void);
 
+extern struct proc_dir_entry *proc_bt_rfcomm;
+
 #endif /* __RFCOMM_H */

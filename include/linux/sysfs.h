@@ -9,43 +9,34 @@
 #ifndef _SYSFS_H_
 #define _SYSFS_H_
 
-struct driver_dir_entry;
-struct attribute;
-
-struct sysfs_ops {
-	int	(*open)(struct driver_dir_entry *);
-	int	(*close)(struct driver_dir_entry *);
-	ssize_t	(*show)(struct driver_dir_entry *, struct attribute *,char *, size_t, loff_t);
-	ssize_t	(*store)(struct driver_dir_entry *,struct attribute *,const char *, size_t, loff_t);
-};
-
-struct driver_dir_entry {
-	char			* name;
-	struct dentry		* dentry;
-	mode_t			mode;
-	struct sysfs_ops	* ops;
-};
+struct kobject;
 
 struct attribute {
 	char			* name;
 	mode_t			mode;
 };
 
+struct sysfs_ops {
+	ssize_t	(*show)(struct kobject *, struct attribute *,char *, size_t, loff_t);
+	ssize_t	(*store)(struct kobject *,struct attribute *,const char *, size_t, loff_t);
+};
+
 extern int
-sysfs_create_dir(struct driver_dir_entry *, struct driver_dir_entry *);
+sysfs_create_dir(struct kobject *);
 
 extern void
-sysfs_remove_dir(struct driver_dir_entry * entry);
+sysfs_remove_dir(struct kobject *);
 
 extern int
-sysfs_create_file(struct attribute * attr,
-		     struct driver_dir_entry * parent);
+sysfs_create_file(struct kobject *, struct attribute *);
+
+extern void
+sysfs_remove_file(struct kobject *, struct attribute *);
 
 extern int 
-sysfs_create_symlink(struct driver_dir_entry * parent, 
-			char * name, char * target);
+sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name);
 
 extern void
-sysfs_remove_file(struct driver_dir_entry *, const char * name);
+sysfs_remove_link(struct kobject *, char * name);
 
 #endif /* _SYSFS_H_ */

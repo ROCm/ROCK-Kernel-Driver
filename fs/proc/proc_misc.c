@@ -39,6 +39,7 @@
 #include <linux/seq_file.h>
 #include <linux/times.h>
 #include <linux/profile.h>
+#include <linux/blkdev.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -61,7 +62,6 @@ extern int get_filesystem_list(char *);
 extern int get_exec_domain_list(char *);
 extern int get_dma_list(char *);
 extern int get_locks_status (char *, char **, off_t, int);
-extern int get_swaparea_info (char *);
 #ifdef CONFIG_SGI_DS1286
 extern int get_ds1286_status(char *);
 #endif
@@ -347,14 +347,14 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		int j;
 
 		if(!cpu_online(i)) continue;
-		user += kstat.per_cpu_user[i];
-		nice += kstat.per_cpu_nice[i];
-		system += kstat.per_cpu_system[i];
-		idle += kstat.per_cpu_idle[i];
-		iowait += kstat.per_cpu_iowait[i];
+		user += kstat_cpu(i).cpustat.user;
+		nice += kstat_cpu(i).cpustat.nice;
+		system += kstat_cpu(i).cpustat.system;
+		idle += kstat_cpu(i).cpustat.idle;
+		iowait += kstat_cpu(i).cpustat.iowait;
 #if !defined(CONFIG_ARCH_S390)
 		for (j = 0 ; j < NR_IRQS ; j++)
-			sum += kstat.irqs[i][j];
+			sum += kstat_cpu(i).irqs[j];
 #endif
 	}
 
@@ -368,11 +368,11 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		if (!cpu_online(i)) continue;
 		len += sprintf(page + len, "cpu%d %u %u %u %u %u\n",
 			i,
-			jiffies_to_clock_t(kstat.per_cpu_user[i]),
-			jiffies_to_clock_t(kstat.per_cpu_nice[i]),
-			jiffies_to_clock_t(kstat.per_cpu_system[i]),
-			jiffies_to_clock_t(kstat.per_cpu_idle[i]),
-			jiffies_to_clock_t(kstat.per_cpu_iowait[i]));
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.user),
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.nice),
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.system),
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle),
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle));
 	}
 	len += sprintf(page + len, "intr %u", sum);
 
@@ -385,18 +385,18 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 
 	for (major = 0; major < DK_MAX_MAJOR; major++) {
 		for (disk = 0; disk < DK_MAX_DISK; disk++) {
-			int active = kstat.dk_drive[major][disk] +
-				kstat.dk_drive_rblk[major][disk] +
-				kstat.dk_drive_wblk[major][disk];
+			int active = dkstat.drive[major][disk] +
+				dkstat.drive_rblk[major][disk] +
+				dkstat.drive_wblk[major][disk];
 			if (active)
 				len += sprintf(page + len,
 					"(%u,%u):(%u,%u,%u,%u,%u) ",
 					major, disk,
-					kstat.dk_drive[major][disk],
-					kstat.dk_drive_rio[major][disk],
-					kstat.dk_drive_rblk[major][disk],
-					kstat.dk_drive_wio[major][disk],
-					kstat.dk_drive_wblk[major][disk]
+					dkstat.drive[major][disk],
+					dkstat.drive_rio[major][disk],
+					dkstat.drive_rblk[major][disk],
+					dkstat.drive_wio[major][disk],
+					dkstat.drive_wblk[major][disk]
 			);
 		}
 	}
@@ -404,10 +404,14 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	len += sprintf(page + len,
 		"\nctxt %lu\n"
 		"btime %lu\n"
-		"processes %lu\n",
+		"processes %lu\n"
+		"procs_running %lu\n"
+		"procs_blocked %u\n",
 		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
-		total_forks);
+		total_forks,
+		nr_running(),
+		atomic_read(&nr_iowait_tasks));
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
@@ -500,13 +504,6 @@ static int execdomains_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
 	int len = get_exec_domain_list(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
-}
-
-static int swaps_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = get_swaparea_info(page);
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
@@ -616,7 +613,6 @@ void __init proc_misc_init(void)
 		{"rtc",		ds1286_read_proc},
 #endif
 		{"locks",	locks_read_proc},
-		{"swaps",	swaps_read_proc},
 		{"iomem",	memory_read_proc},
 		{"execdomains",	execdomains_read_proc},
 		{NULL,}

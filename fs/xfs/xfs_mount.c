@@ -1792,9 +1792,6 @@ xfs_alloc_buftarg(
 	case EVMS_MAJOR:
 		btp->pbr_flags = PBR_ALIGNED_ONLY;
 		break;
-	case LVM_BLK_MAJOR:
-		btp->pbr_flags = PBR_SECTOR_ONLY;
-		break;
 	}
 
 	return btp;

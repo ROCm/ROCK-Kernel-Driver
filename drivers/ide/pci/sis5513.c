@@ -10,7 +10,7 @@
  *
  * SiS Taiwan		: for direct support and hardware.
  * Daniela Engert	: for initial ATA100 advices and numerous others.
- * John Fremlin, Manfred Spraul :
+ * John Fremlin, Manfred Spraul, Dave Morgan :
  *			  for checking code correctness, providing patches.
  *
  *
@@ -244,6 +244,14 @@ static struct pci_dev *host_dev = NULL;
 /*
  * Printing configuration
  */
+/* Used for chipset type printing at boot time */
+static char* chipset_capability[] = {
+	"ATA", "ATA 16",
+	"ATA 33", "ATA 66",
+	"ATA 100", "ATA 100",
+	"ATA 133", "ATA 133"
+};
+
 #if defined(DISPLAY_SIS_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
@@ -284,13 +292,6 @@ static char* cycle_time[] = {
 	"11 CLK", "12 CLK",
 	"13 CLK", "14 CLK",
 	"15 CLK", "16 CLK"
-};
-
-static char* chipset_capability[] = {
-	"ATA", "ATA 16",
-	"ATA 33", "ATA 66",
-	"ATA 100", "ATA 100",
-	"ATA 133", "ATA 133"
 };
 
 /* Generic add master or slave info function */

@@ -26,6 +26,7 @@
 
 #include <linux/config.h>
 #include <linux/proc_fs.h>
+#include <linux/types.h>
 #include <linux/pci.h>
 
 /* It is senseless to set SG_ALL any higher than this - the performance
@@ -141,9 +142,31 @@ typedef struct	SHT
      * Host number is the POSITION IN THE hosts array of THIS
      * host adapter.
      *
-     * The done() function must only be called after QueueCommand() 
-     * has returned.
-     */
+     * if queuecommand returns 0, then the HBA has accepted the
+     * command.  The done() function must be called on the command
+     * when the driver has finished with it. (you may call done on the
+     * command before queuecommand returns, but in this case you
+     * *must* return 0 from queuecommand).
+     *
+     * queuecommand may also reject the command, in which case it may
+     * not touch the command and must not call done() for it.
+     *
+     * There are two possible rejection returns:
+     *
+     *   SCSI_MLQUEUE_DEVICE_BUSY: Block this device temporarily, but
+     *   allow commands to other devices serviced by this host.
+     *
+     *   SCSI_MLQUEUE_HOST_BUSY: Block all devices served by this
+     *   host temporarily.
+     *
+     *   for compatibility, any other non-zero return is treated the
+     *   same as SCSI_MLQUEUE_HOST_BUSY.
+     *
+     *   NOTE: "temporarily" means either until the next command for
+     *   this device/host completes, or a period of time determined by
+     *   I/O pressure in the system if there are no other outstanding
+     *   commands.
+     * */
     int (* queuecommand)(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 
     /*
@@ -168,38 +191,11 @@ typedef struct	SHT
      int (*eh_host_reset_handler)(Scsi_Cmnd *);
 
     /*
-     * Since the mid level driver handles time outs, etc, we want to
-     * be able to abort the current command.  Abort returns 0 if the
-     * abortion was successful.	 The field SCpnt->abort reason
-     * can be filled in with the appropriate reason why we wanted
-     * the abort in the first place, and this will be used
-     * in the mid-level code instead of the host_byte().
-     * If non-zero, the code passed to it
-     * will be used as the return code, otherwise
-     * DID_ABORT  should be returned.
-     *
-     * Note that the scsi driver should "clean up" after itself,
-     * resetting the bus, etc.	if necessary.
-     *
-     * NOTE - this interface is depreciated, and will go away.  Use
-     * the eh_ routines instead.
+     * Old EH handlers, no longer used. Make them warn the user of old
+     * drivers by using a wrogn type
      */
-    int (* abort)(Scsi_Cmnd *);
-
-    /*
-     * The reset function will reset the SCSI bus.  Any executing
-     * commands should fail with a DID_RESET in the host byte.
-     * The Scsi_Cmnd  is passed so that the reset routine can figure
-     * out which host adapter should be reset, and also which command
-     * within the command block was responsible for the reset in
-     * the first place.	 Some hosts do not implement a reset function,
-     * and these hosts must call scsi_request_sense(SCpnt) to keep
-     * the command alive.
-     *
-     * NOTE - this interface is depreciated, and will go away.  Use
-     * the eh_ routines instead.
-     */
-    int (* reset)(Scsi_Cmnd *, unsigned int);
+    int (*abort)(int);
+    int (*reset)(int,int);
 
     /*
      * Once the device has responded to an INQUIRY and we know the device
@@ -262,7 +258,8 @@ typedef struct	SHT
      * the host adapter.  Parameters:
      * size, device, list (heads, sectors, cylinders)
      */
-    int (* bios_param)(Disk *, struct block_device *, int []);
+    int (* bios_param)(struct scsi_device *, struct block_device *,
+		    sector_t, int []);
 
     /*
      * This determines if we will use a non-interrupt driven
@@ -551,9 +548,6 @@ static inline void scsi_set_pci_device(struct Scsi_Host *shost,
 {
 	shost->pci_dev = pdev;
 	shost->host_driverfs_dev.parent=&pdev->dev;
-
-	/* register parent with driverfs */
-	device_register(&shost->host_driverfs_dev);
 }
 
 
@@ -573,9 +567,6 @@ struct Scsi_Device_Template
     const char * tag;
     struct module * module;	  /* Used for loadable modules */
     unsigned char scsi_type;
-    unsigned int major;
-    unsigned int min_major;      /* Minimum major in range. */ 
-    unsigned int max_major;      /* Maximum major in range. */
     unsigned int nr_dev;	  /* Number currently attached */
     unsigned int dev_noticed;	  /* Number of devices detected. */
     unsigned int dev_max;	  /* Current size of arrays */
@@ -583,7 +574,6 @@ struct Scsi_Device_Template
     int (*detect)(Scsi_Device *); /* Returns 1 if we can attach this device */
     int (*init)(void);		  /* Sizes arrays based upon number of devices
 		   *  detected */
-    void (*finish)(void);	  /* Perform initialization after attachment */
     int (*attach)(Scsi_Device *); /* Attach devices to arrays */
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 
@@ -631,13 +621,9 @@ extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
  * The generics driver has been updated to resize as required.  So as the tape
  * driver. Two down, two more to go.
  */
-#ifndef CONFIG_SD_EXTRA_DEVS
-#define CONFIG_SD_EXTRA_DEVS 2
-#endif
 #ifndef CONFIG_SR_EXTRA_DEVS
 #define CONFIG_SR_EXTRA_DEVS 2
 #endif
-#define SD_EXTRA_DEVS CONFIG_SD_EXTRA_DEVS
 #define SR_EXTRA_DEVS CONFIG_SR_EXTRA_DEVS
 
 

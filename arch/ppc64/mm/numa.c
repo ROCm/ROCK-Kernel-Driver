@@ -1,5 +1,5 @@
 /*
- * NUMA support
+ * pSeries NUMA support
  *
  * Copyright (C) 2002 Anton Blanchard <anton@au.ibm.com>, IBM
  *
@@ -15,10 +15,10 @@
 #include <linux/mmzone.h>
 #include <asm/lmb.h>
 
-#if 0
-#define dbg(format, arg...) udbg_printf(format, arg)
+#if 1
+#define dbg(args...) udbg_printf(args)
 #else
-#define dbg(format, arg...)
+#define dbg(args...)
 #endif
 
 int numa_cpu_lookup_table[NR_CPUS] = { [ 0 ... (NR_CPUS - 1)] = -1};
@@ -31,8 +31,137 @@ bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 
 static int __init parse_numa_properties(void)
 {
-	/* XXX implement */
-	return -1;
+	struct device_node *cpu;
+	struct device_node *memory;
+	int *cpu_associativity;
+	int *memory_associativity;
+	int depth;
+	int max_domain = 0;
+
+	cpu = find_type_devices("cpu");
+	if (!cpu)
+		return -1;
+
+	memory = find_type_devices("memory");
+	if (!memory)
+		return -1;
+
+	cpu_associativity = (int *)get_property(cpu, "ibm,associativity", NULL);
+	if (!cpu_associativity)
+		return -1;
+
+	memory_associativity = (int *)get_property(memory, "ibm,associativity",
+						   NULL);
+	if (!memory_associativity)
+		return -1;
+
+	/* find common depth */
+	if (cpu_associativity[0] < memory_associativity[0])
+		depth = cpu_associativity[0];
+	else
+		depth = memory_associativity[0];
+
+	for (cpu = find_type_devices("cpu"); cpu; cpu = cpu->next) {
+		int *tmp;
+		int cpu_nr, numa_domain;
+
+		tmp = (int *)get_property(cpu, "reg", NULL);
+		if (!tmp)
+			continue;
+		cpu_nr = *tmp;
+
+		tmp = (int *)get_property(cpu, "ibm,associativity",
+					  NULL);
+		if (!tmp)
+			continue;
+		numa_domain = tmp[depth];
+
+		/* FIXME */
+		if (numa_domain == 0xffff) {
+			dbg("cpu %d has no numa doman\n", cpu_nr);
+			numa_domain = 0;
+		}
+
+		if (numa_domain >= MAX_NUMNODES)
+			BUG();
+
+		if (max_domain < numa_domain)
+			max_domain = numa_domain;
+
+		numa_cpu_lookup_table[cpu_nr] = numa_domain;
+
+		dbg("cpu %d maps to domain %d\n", cpu_nr, numa_domain);
+	}
+
+	for (memory = find_type_devices("memory"); memory;
+	     memory = memory->next) {
+		int *tmp1, *tmp2;
+		unsigned long i;
+		unsigned long start = 0;
+		unsigned long size = 0;
+		int numa_domain;
+		int ranges;
+
+		tmp1 = (int *)get_property(memory, "reg", NULL);
+		if (!tmp1)
+			continue;
+
+		ranges = memory->n_addrs;
+new_range:
+
+		i = prom_n_size_cells(memory);
+		while (i--) {
+			start = (start << 32) | *tmp1;
+			tmp1++;
+		}
+
+		i = prom_n_size_cells(memory);
+		while (i--) {
+			size = (size << 32) | *tmp1;
+			tmp1++;
+		}
+
+		start = _ALIGN_DOWN(start, MEMORY_INCREMENT);
+		size = _ALIGN_UP(size, MEMORY_INCREMENT);
+
+		if ((start + size) > MAX_MEMORY)
+			BUG();
+
+		tmp2 = (int *)get_property(memory, "ibm,associativity",
+					   NULL);
+		if (!tmp2)
+			continue;
+		numa_domain = tmp2[depth];
+
+		/* FIXME */
+		if (numa_domain == 0xffff) {
+			dbg("cpu has no numa doman\n");
+			numa_domain = 0;
+		}
+
+		if (numa_domain >= MAX_NUMNODES)
+			BUG();
+
+		if (max_domain < numa_domain)
+			max_domain = numa_domain;
+
+		numa_node_exists[numa_domain] = 1;
+
+		for (i = start ; i < (start+size); i += MEMORY_INCREMENT)
+			numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] =
+				numa_domain;
+
+		dbg("memory region %lx to %lx maps to domain %d\n",
+		    start, start+size, numa_domain);
+
+		ranges--;
+		if (ranges)
+			goto new_range;
+	}
+
+	numnodes = max_domain + 1;
+
+	return 0;
 }
 
 void __init do_init_bootmem(void)
@@ -42,15 +171,16 @@ void __init do_init_bootmem(void)
 	min_low_pfn = 0;
 	max_low_pfn = lmb_end_of_DRAM() >> PAGE_SHIFT;
 
+	/* XXX FIXME: support machines without associativity information */
 	if (parse_numa_properties())
 		BUG();
 
-	for (nid = 0; nid < MAX_NUMNODES; nid++) {
+	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long start, end;
 		unsigned long start_paddr, end_paddr;
 		int i;
 		unsigned long bootmem_paddr;
-		unsigned long bootmap_size;
+		unsigned long bootmap_pages;
 
 		if (!numa_node_exists[nid])
 			continue;
@@ -74,20 +204,16 @@ void __init do_init_bootmem(void)
 
 		NODE_DATA(nid)->bdata = &plat_node_bdata[nid];
 
-		/* XXX FIXME: first bitmap hardwired to 1G */
-		if (start_paddr == 0)
-			bootmem_paddr = (1 << 30);
-		else
-			bootmem_paddr = start_paddr;
+		bootmap_pages = bootmem_bootmap_pages(end_paddr - start_paddr);
+		dbg("bootmap_pages = %lx\n", bootmap_pages);
 
+		bootmem_paddr = lmb_alloc_base(bootmap_pages << PAGE_SHIFT,
+				PAGE_SIZE, end_paddr);
 		dbg("bootmap_paddr = %lx\n", bootmem_paddr);
 
-		bootmap_size = init_bootmem_node(NODE_DATA(nid),
-						 bootmem_paddr >> PAGE_SHIFT,
-						 start_paddr >> PAGE_SHIFT,
-						 end_paddr >> PAGE_SHIFT);
-
-		dbg("bootmap_size = %lx\n", bootmap_size);
+		init_bootmem_node(NODE_DATA(nid), bootmem_paddr >> PAGE_SHIFT,
+				  start_paddr >> PAGE_SHIFT,
+				  end_paddr >> PAGE_SHIFT);
 
 		for (i = 0; i < lmb.memory.cnt; i++) {
 			unsigned long physbase, size;
@@ -137,10 +263,6 @@ void __init do_init_bootmem(void)
 						     size);
 			}
 		}
-
-		dbg("reserve_bootmem %lx %lx\n", bootmem_paddr, bootmap_size);
-		reserve_bootmem_node(NODE_DATA(nid), bootmem_paddr,
-				     bootmap_size);
 	}
 }
 
@@ -152,7 +274,7 @@ void __init paging_init(void)
 	for (i = 1; i < MAX_NR_ZONES; i++)
 		zones_size[i] = 0;
 
-	for (nid = 0; nid < MAX_NUMNODES; nid++) {
+	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long start_pfn;
 		unsigned long end_pfn;
 
@@ -163,8 +285,8 @@ void __init paging_init(void)
 		end_pfn = plat_node_bdata[nid].node_low_pfn;
 
 		zones_size[ZONE_DMA] = end_pfn - start_pfn;
-		dbg("free_area_init node %d %lx %lx\n", nid, zones_size,
-		    start_pfn);
+		dbg("free_area_init node %d %lx %lx\n", nid,
+				zones_size[ZONE_DMA], start_pfn);
 		free_area_init_node(nid, NODE_DATA(nid), NULL, zones_size,
 				    start_pfn, NULL);
 	}

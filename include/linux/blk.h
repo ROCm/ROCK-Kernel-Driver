@@ -7,8 +7,10 @@
 #include <linux/spinlock.h>
 #include <linux/compiler.h>
 
-extern void set_device_ro(kdev_t dev,int flag);
-extern void add_blkdev_randomness(int major);
+extern void set_device_ro(struct block_device *bdev, int flag);
+extern void set_disk_ro(struct gendisk *disk, int flag);
+extern void add_disk_randomness(struct gendisk *disk);
+extern void rand_initialize_disk(struct gendisk *disk);
 
 #ifdef CONFIG_BLK_DEV_RAM
 
@@ -39,45 +41,19 @@ void initrd_init(void);
  */
 
 extern int end_that_request_first(struct request *, int, int);
+extern int end_that_request_chunk(struct request *, int, int);
 extern void end_that_request_last(struct request *);
 struct request *elv_next_request(request_queue_t *q);
 
 static inline void blkdev_dequeue_request(struct request *req)
 {
-	list_del(&req->queuelist);
+	BUG_ON(list_empty(&req->queuelist));
+
+	list_del_init(&req->queuelist);
 
 	if (req->q)
 		elv_remove_request(req->q, req);
 }
-
-#define _elv_add_request_core(q, rq, where, plug)			\
-	do {								\
-		if ((plug))						\
-			blk_plug_device((q));				\
-		(q)->elevator.elevator_add_req_fn((q), (rq), (where));	\
-	} while (0)
-
-#define _elv_add_request(q, rq, back, p) do {				      \
-	if ((back))							      \
-		_elv_add_request_core((q), (rq), (q)->queue_head.prev, (p));  \
-	else								      \
-		_elv_add_request_core((q), (rq), &(q)->queue_head, (p));      \
-} while (0)
-
-#define elv_add_request(q, rq, back) _elv_add_request((q), (rq), (back), 1)
-
-#if defined(MAJOR_NR) || defined(IDE_DRIVER)
-#if (MAJOR_NR != SCSI_TAPE_MAJOR) && (MAJOR_NR != OSST_MAJOR)
-#if !defined(IDE_DRIVER)
-
-#ifndef QUEUE
-# define QUEUE (&blk_dev[MAJOR_NR].request_queue)
-#endif
-#ifndef CURRENT
-# define CURRENT elv_next_request(QUEUE)
-#endif
-
-#endif /* !defined(IDE_DRIVER) */
 
 /*
  * If we have our own end_request, we do not want to include this mess
@@ -88,12 +64,10 @@ static inline void end_request(struct request *req, int uptodate)
 	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
 		return;
 
-	add_blkdev_randomness(major(req->rq_dev));
+	add_disk_randomness(req->rq_disk);
 	blkdev_dequeue_request(req);
 	end_that_request_last(req);
 }
 #endif /* !LOCAL_END_REQUEST */
-#endif /* (MAJOR_NR != SCSI_TAPE_MAJOR) */
-#endif /* defined(MAJOR_NR) || defined(IDE_DRIVER) */
 
 #endif /* _BLK_H */

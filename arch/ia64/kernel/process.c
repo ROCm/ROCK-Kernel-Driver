@@ -12,6 +12,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/personality.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -45,8 +46,9 @@ static void
 do_show_stack (struct unw_frame_info *info, void *arg)
 {
 	unsigned long ip, sp, bsp;
+	char buf[80];			/* don't make it so big that it overflows the stack! */
 
-	printk("\nCall Trace: ");
+	printk("\nCall Trace:\n");
 	do {
 		unw_get_ip(info, &ip);
 		if (ip == 0)
@@ -54,7 +56,9 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 
 		unw_get_sp(info, &sp);
 		unw_get_bsp(info, &bsp);
-		printk("[<%016lx>] sp=0x%016lx bsp=0x%016lx\n", ip, sp, bsp);
+		snprintf(buf, sizeof(buf), " [<%016lx>] %%s sp=0x%016lx bsp=0x%016lx\n",
+			 ip, sp, bsp);
+		print_symbol(buf, ip);
 	} while (unw_unwind(info) >= 0);
 }
 
@@ -94,6 +98,7 @@ show_regs (struct pt_regs *regs)
 	printk("\nPid: %d, comm: %20s\n", current->pid, current->comm);
 	printk("psr : %016lx ifs : %016lx ip  : [<%016lx>]    %s\n",
 	       regs->cr_ipsr, regs->cr_ifs, ip, print_tainted());
+	print_symbol("ip is at %s\n", ip);
 	printk("unat: %016lx pfs : %016lx rsc : %016lx\n",
 	       regs->ar_unat, regs->ar_pfs, regs->ar_rsc);
 	printk("rnat: %016lx bsps: %016lx pr  : %016lx\n",
@@ -199,10 +204,8 @@ ia64_save_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_save_regs(task);
 
-# ifdef CONFIG_SMP
 	if (__get_cpu_var(pfm_syst_wide))
 		pfm_syst_wide_update_task(task, 0);
-# endif
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -221,9 +224,8 @@ ia64_load_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_load_regs(task);
 
-# ifdef CONFIG_SMP
-	if (__get_cpu_var(pfm_syst_wide)) pfm_syst_wide_update_task(task, 1);
-# endif
+	if (__get_cpu_var(pfm_syst_wide)) 
+		pfm_syst_wide_update_task(task, 1);
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -514,7 +516,7 @@ kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 	struct task_struct *parent = current;
 	int result, tid;
 
-	tid = clone(flags | CLONE_VM, 0);
+	tid = clone(flags | CLONE_VM | CLONE_UNTRACED, 0);
 	if (parent != current) {
 		result = (*fn)(arg);
 		_exit(result);

@@ -1,0 +1,65 @@
+# drivers/sound/dmasound/Config.in
+config DMASOUND_ATARI
+	tristate "Atari DMA sound support"
+	depends on ATARI && SOUND
+	help
+	  If you want to use the internal audio of your Atari in Linux, answer
+	  Y to this question. This will provide a Sun-like /dev/audio,
+	  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config DMASOUND_AWACS
+	tristate "PowerMac DMA sound support"
+	depends on ALL_PPC && SOUND
+	help
+	  If you want to use the internal audio of your PowerMac in Linux,
+	  answer Y to this question. This will provide a Sun-like /dev/audio,
+	  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config DMASOUND_PAULA
+	tristate "Amiga DMA sound support"
+	depends on (AMIGA || APUS) && SOUND
+	help
+	  If you want to use the internal audio of your Amiga in Linux, answer
+	  Y to this question. This will provide a Sun-like /dev/audio,
+	  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config DMASOUND_Q40
+	tristate "Q40 sound support"
+	depends on Q40 && SOUND
+	help
+	  If you want to use the internal audio of your Q40 in Linux, answer
+	  Y to this question. This will provide a Sun-like /dev/audio,
+	  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.
+
+config DMASOUND
+	tristate
+	depends on SOUND!=n
+	default m if DMASOUND_ATARI!=y && DMASOUND_AWACS!=y && DMASOUND_PAULA!=y && DMASOUND_Q40!=y && (DMASOUND_ATARI=m || DMASOUND_AWACS=m || DMASOUND_PAULA=m || DMASOUND_Q40=m)
+	default y if DMASOUND_ATARI=y || DMASOUND_AWACS=y || DMASOUND_PAULA=y || DMASOUND_Q40=y
+	help
+	  Support built-in audio chips accessible by DMA on various machines
+	  that have them.  Note that this symbol does not affect the kernel
+	  directly; rather, it controls whether configuration questions
+	  enabling DMA sound drivers for various specific machine
+	  architectures will be used.
+

@@ -1044,7 +1044,7 @@ static int __init calc_erase_regions(struct mtd_erase_region_info *info, size_t 
 }
 
 
-extern kdev_t name_to_kdev_t(char *line) __init;
+extern dev_t name_to_dev_t(char *line) __init;
 
 /* Startup */
 static int __init init_blkmtd(void)
@@ -1059,7 +1059,7 @@ static int __init init_blkmtd(void)
   loff_t size;
   int readonly = 0;
   int erase_size = CONFIG_MTD_BLKDEV_ERASESIZE;
-  kdev_t rdev;
+  dev_t rdev;
   struct block_device *bdev;
   int err;
   int mode;
@@ -1107,17 +1107,17 @@ static int __init init_blkmtd(void)
     filp_close(file, NULL);
     return 1;
   }
-  rdev = inode->i_rdev;
+  rdev = inode->i_bdev->bd_dev;
   filp_close(file, NULL);
 #else
-  rdev = name_to_kdev_t(device);
+  rdev = name_to_dev_t(device);
 #endif
 
-  maj = major(rdev);
-  min = minor(rdev);
+  maj = MAJOR(rdev);
+  min = MINOR(rdev);
   DEBUG(1, "blkmtd: found a block device major = %d, minor = %d\n", maj, min);
 
-  if(kdev_none(rdev)) {
+  if(!rdev) {
     printk("blkmtd: bad block device: `%s'\n", device);
     return 1;
   }

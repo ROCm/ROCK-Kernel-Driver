@@ -34,7 +34,7 @@ struct ip_tunnel
 	ip_select_ident(iph, &rt->u.dst, NULL);				\
 	ip_send_check(iph);						\
 									\
-	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, do_ip_send); \
+	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, dst_output);\
 	if (err == NET_XMIT_SUCCESS || err == NET_XMIT_CN) {		\
 		stats->tx_bytes += pkt_len;				\
 		stats->tx_packets++;					\

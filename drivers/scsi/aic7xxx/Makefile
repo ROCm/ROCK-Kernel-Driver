@@ -1,6 +1,8 @@
 #
 # Makefile for the Linux aic7xxx SCSI driver.
 #
+# Let kbuild descend into aicasm when cleaning
+subdir-				+= aicasm
 
 obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx.o
 
@@ -23,12 +25,6 @@ endif
 # Files generated that shall be removed upon make clean
 clean-files := aic7xxx_seq.h aic7xxx_reg.h
 
-# Command to be executed upon make clean
-# Note: Assignment without ':' to force late evaluation of $(src)
-clean-rule = @$(MAKE) -C $(src)/aicasm clean
-
-include $(TOPDIR)/Rules.make
-
 # Dependencies for generated files need to be listed explicitly
 
 $(obj)/aic7xxx_core.o: $(obj)/aic7xxx_seq.h
@@ -39,10 +35,10 @@ ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
 
 $(obj)/aic7xxx_seq.h: $(src)/aic7xxx.seq $(src)/aic7xxx.reg \
 		      $(obj)/aicasm/aicasm
-	$(obj)/aicasm/aicasm -I. -r $(obj)/aic7xxx_reg.h \
+	$(obj)/aicasm/aicasm -I$(obj) -r $(obj)/aic7xxx_reg.h \
 				 -o $(obj)/aic7xxx_seq.h $(src)/aic7xxx.seq
 
-$(obj)/aic7xxx_reg.h: $(obj)/aix7xxx_seq.h
+$(obj)/aic7xxx_reg.h: $(obj)/aic7xxx_seq.h
 
 $(obj)/aicasm/aicasm: $(src)/aicasm/*.[chyl]
 	$(MAKE) -C $(src)/aicasm

@@ -98,7 +98,7 @@ void indy_timer_interrupt(struct pt_regs *regs)
         else
             r4k_cur += r4k_offset;
 	ack_r4ktimer(r4k_cur);
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 	do_timer(regs);
 
 	/* We update the Dallas time of day approx. every 11 minutes,
@@ -236,7 +236,7 @@ void indy_8254timer_irq(void)
 	int irq = 4;
 
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 	panic("indy_8254timer_irq: Whoops, should not have gotten this IRQ\n");
 	irq_exit(cpu, irq);
 }

@@ -91,10 +91,6 @@
 #include <asm/atariints.h>
 #include <asm/atari_stdma.h>
 #include <asm/atari_stram.h>
-
-#define MAJOR_NR FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
-#define QUEUE (&floppy_queue)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -103,6 +99,11 @@
 #undef DEBUG
 
 static struct request_queue floppy_queue;
+
+#define MAJOR_NR FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define QUEUE (&floppy_queue)
+#define CURRENT elv_next_request(&floppy_queue)
 
 /* Disk types: DD, HD, ED */
 static struct atari_disk_type {
@@ -1437,10 +1438,11 @@ static void setup_req_params( int drive )
 
 static void redo_fd_request(void)
 {
-	int device, drive, type;
-  
-	DPRINT(("redo_fd_request: CURRENT=%08lx CURRENT->dev=%04x CURRENT->sector=%ld\n",
-		(unsigned long)CURRENT, !blk_queue_empty(QUEUE) ? CURRENT->rq_dev : 0,
+	int drive, type;
+	struct atari_floppy_struct *floppy;
+
+	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
+		CURRENT, !blk_queue_empty(QUEUE) ? CURRENT->rq_disk->disk_name : "",
 		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0 ));
 
 	IsFormatting = 0;
@@ -1450,12 +1452,9 @@ repeat:
 	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
-	if (major(CURRENT->rq_dev) != MAJOR_NR)
-		panic(DEVICE_NAME ": request list destroyed");
-
-	device = minor(CURRENT->rq_dev);
-	drive = device & 3;
-	type = device >> 2;
+	floppy = CURRENT->rq_disk->private_data;
+	drive = floppy - unit;
+	type = fd_device[drive];
 	
 	if (!UD.connected) {
 		/* drive not connected */
@@ -1859,7 +1858,7 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	int old_dev = fd_device[drive];
 
 	DPRINT(("fd_open: type=%d\n",type));
-	if (fd_ref[drive] && old_dev != minor(inode->i_rdev))
+	if (fd_ref[drive] && old_dev != type)
 		return -EBUSY;
 
 	if (fd_ref[drive] == -1 || (fd_ref[drive] && filp->f_flags & O_EXCL))
@@ -1870,10 +1869,10 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	else
 		fd_ref[drive]++;
 
-	fd_device[drive] = minor(inode->i_rdev);
+	fd_device[drive] = type;
 
-	if (old_dev && old_dev != minor(inode->i_rdev))
-		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, old_dev));
+	if (old_dev && old_dev != type)
+		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, drive + (type<<2)));
 
 	if (filp->f_flags & O_NDELAY)
 		return 0;
@@ -1921,6 +1920,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	int type  = *part >> 2;
 	if (drive >= FD_MAX_UNITS || type > NUM_DISK_MINORS)
 		return NULL;
+	*part = 0;
 	return get_disk(unit[drive].disk);
 }
 

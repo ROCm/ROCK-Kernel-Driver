@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 19 $
+ *       $Revision: 20 $
  *
  *****************************************************************************/
 
@@ -59,6 +59,8 @@ typedef struct acpi_walk_state
 	u8                      return_used;
 	u8                      walk_type;
 	u16                     opcode;                             /* Current AML opcode */
+	u8                      scope_depth;
+	u8                      reserved1;
 	u32                     arg_count;                          /* push for fixed or var args */
 	u32                     aml_offset;
 	u32                     arg_types;

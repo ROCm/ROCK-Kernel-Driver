@@ -49,7 +49,7 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 			br_pass_frame_up_finish);
 }
 
-static int br_handle_frame_finish(struct sk_buff *skb)
+int br_handle_frame_finish(struct sk_buff *skb)
 {
 	struct net_bridge *br;
 	unsigned char *dest;

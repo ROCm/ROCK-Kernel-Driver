@@ -22,6 +22,7 @@
 #include <linux/mm_inline.h>
 #include <linux/buffer_head.h>
 #include <linux/prefetch.h>
+#include <linux/percpu.h>
 
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
@@ -43,15 +44,33 @@ void activate_page(struct page *page)
 	spin_unlock_irq(&zone->lru_lock);
 }
 
+/*
+ * Mark a page as having seen activity.
+ *
+ * inactive,unreferenced	->	inactive,referenced
+ * inactive,referenced		->	active,unreferenced
+ * active,unreferenced		->	active,referenced
+ */
+void mark_page_accessed(struct page *page)
+{
+	if (!PageActive(page) && PageReferenced(page) && PageLRU(page)) {
+		activate_page(page);
+		ClearPageReferenced(page);
+	} else if (!PageReferenced(page)) {
+		SetPageReferenced(page);
+	}
+}
+
 /**
  * lru_cache_add: add a page to the page lists
  * @page: the page to add
  */
-static struct pagevec lru_add_pvecs[NR_CPUS];
+static DEFINE_PER_CPU(struct pagevec, lru_add_pvecs) = { 0, };
+static DEFINE_PER_CPU(struct pagevec, lru_add_active_pvecs) = { 0, };
 
 void lru_cache_add(struct page *page)
 {
-	struct pagevec *pvec = &lru_add_pvecs[get_cpu()];
+	struct pagevec *pvec = &per_cpu(lru_add_pvecs, get_cpu());
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
@@ -59,17 +78,32 @@ void lru_cache_add(struct page *page)
 	put_cpu();
 }
 
+void lru_cache_add_active(struct page *page)
+{
+	struct pagevec *pvec = &per_cpu(lru_add_active_pvecs, get_cpu());
+
+	page_cache_get(page);
+	if (!pagevec_add(pvec, page))
+		__pagevec_lru_add_active(pvec);
+	put_cpu();
+}
+
 void lru_add_drain(void)
 {
-	struct pagevec *pvec = &lru_add_pvecs[get_cpu()];
+	int cpu = get_cpu();
+	struct pagevec *pvec = &per_cpu(lru_add_pvecs, cpu);
 
 	if (pagevec_count(pvec))
 		__pagevec_lru_add(pvec);
+	pvec = &per_cpu(lru_add_active_pvecs, cpu);
+	if (pagevec_count(pvec))
+		__pagevec_lru_add_active(pvec);
 	put_cpu();
 }
 
 /*
- * This path almost never happens - pages are normally freed via pagevecs.
+ * This path almost never happens for VM activity - pages are normally
+ * freed via pagevecs.  But it gets used by networking.
  */
 void __page_cache_release(struct page *page)
 {
@@ -83,7 +117,7 @@ void __page_cache_release(struct page *page)
 		page = NULL;
 	spin_unlock_irqrestore(&zone->lru_lock, flags);
 	if (page)
-		__free_pages_ok(page, 0);
+		free_hot_page(page);
 }
 
 /*
@@ -98,13 +132,13 @@ void __page_cache_release(struct page *page)
  * page count inside the lock to see whether shrink_cache grabbed the page
  * via the LRU.  If it did, give up: shrink_cache will free it.
  */
-void release_pages(struct page **pages, int nr)
+void release_pages(struct page **pages, int nr, int cold)
 {
 	int i;
 	struct pagevec pages_to_free;
 	struct zone *zone = NULL;
 
-	pagevec_init(&pages_to_free);
+	pagevec_init(&pages_to_free, cold);
 	for (i = 0; i < nr; i++) {
 		struct page *page = pages[i];
 		struct zone *pagezone;
@@ -125,7 +159,7 @@ void release_pages(struct page **pages, int nr)
 			if (!pagevec_add(&pages_to_free, page)) {
 				spin_unlock_irq(&zone->lru_lock);
 				__pagevec_free(&pages_to_free);
-				pagevec_init(&pages_to_free);
+				pagevec_reinit(&pages_to_free);
 				zone = NULL;	/* No lock is held */
 			}
 		}
@@ -138,8 +172,8 @@ void release_pages(struct page **pages, int nr)
 
 void __pagevec_release(struct pagevec *pvec)
 {
-	release_pages(pvec->pages, pagevec_count(pvec));
-	pagevec_init(pvec);
+	release_pages(pvec->pages, pagevec_count(pvec), pvec->cold);
+	pagevec_reinit(pvec);
 }
 
 /*
@@ -152,7 +186,8 @@ void __pagevec_release_nonlru(struct pagevec *pvec)
 	int i;
 	struct pagevec pages_to_free;
 
-	pagevec_init(&pages_to_free);
+	pagevec_init(&pages_to_free, pvec->cold);
+	pages_to_free.cold = pvec->cold;
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
 
@@ -161,7 +196,7 @@ void __pagevec_release_nonlru(struct pagevec *pvec)
 			pagevec_add(&pages_to_free, page);
 	}
 	pagevec_free(&pages_to_free);
-	pagevec_init(pvec);
+	pagevec_reinit(pvec);
 }
 
 /*
@@ -196,8 +231,6 @@ void pagevec_deactivate_inactive(struct pagevec *pvec)
 /*
  * Add the passed pages to the LRU, then drop the caller's refcount
  * on them.  Reinitialises the caller's pagevec.
- *
- * Mapped pages go onto the active list.
  */
 void __pagevec_lru_add(struct pagevec *pvec)
 {
@@ -216,13 +249,33 @@ void __pagevec_lru_add(struct pagevec *pvec)
 		}
 		if (TestSetPageLRU(page))
 			BUG();
-		if (page_mapped(page)) {
-			if (TestSetPageActive(page))
-				BUG();
-			add_page_to_active_list(zone, page);
-		} else {
-			add_page_to_inactive_list(zone, page);
+		add_page_to_inactive_list(zone, page);
+	}
+	if (zone)
+		spin_unlock_irq(&zone->lru_lock);
+	pagevec_release(pvec);
+}
+
+void __pagevec_lru_add_active(struct pagevec *pvec)
+{
+	int i;
+	struct zone *zone = NULL;
+
+	for (i = 0; i < pagevec_count(pvec); i++) {
+		struct page *page = pvec->pages[i];
+		struct zone *pagezone = page_zone(page);
+
+		if (pagezone != zone) {
+			if (zone)
+				spin_unlock_irq(&zone->lru_lock);
+			zone = pagezone;
+			spin_lock_irq(&zone->lru_lock);
 		}
+		if (TestSetPageLRU(page))
+			BUG();
+		if (TestSetPageActive(page))
+			BUG();
+		add_page_to_active_list(zone, page);
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);

@@ -1,0 +1,44 @@
+#
+# Cryptographic API Configuration
+#
+
+menu "Cryptographic options"
+
+config CRYPTO
+	bool "Cryptographic API"
+	help
+	  This option provides the core Cryptographic API.
+
+config CRYPTO_MD4
+	tristate "MD4 digest algorithm"
+	depends on CRYPTO
+	help
+	  MD4 message digest algorithm (RFC1320), including HMAC (RFC2104).
+	  
+
+config CRYPTO_MD5
+	tristate "MD5 digest algorithm"
+	depends on CRYPTO
+	help
+	  MD5 message digest algorithm (RFC1321), including HMAC (RFC2104, RFC2403).
+
+config CRYPTO_SHA1
+	tristate "SHA-1 digest algorithm"
+	depends on CRYPTO
+	help
+	  SHA-1 secure hash standard (FIPS 180-1), including HMAC (RFC2104, RFC2404).
+
+config CRYPTO_DES
+	tristate "DES and Triple DES EDE cipher algorithms"
+	depends on CRYPTO
+	help
+	  DES cipher algorithm (FIPS 46-2), and Triple DES EDE (FIPS 46-3).
+
+config CRYPTO_TEST
+	tristate "Testing module"
+	depends on CRYPTO
+	help
+	  Quick & dirty crypto test module.
+
+endmenu
+

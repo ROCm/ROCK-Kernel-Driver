@@ -233,8 +233,9 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 {
 	int i;
 
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++)
-		if (dev->actconfig->interface[i].altsetting[0].bInterfaceNumber == ifnum)
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
+		if (dev->actconfig->interface[i].altsetting[0]
+				.desc.bInterfaceNumber == ifnum)
 			return &dev->actconfig->interface[i];
 
 	return NULL;
@@ -254,15 +255,21 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
  * the first endpoint in that descriptor corresponds to interface zero.
  * This routine helps device drivers avoid such mistakes.
  */
-struct usb_endpoint_descriptor *usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
+struct usb_endpoint_descriptor *
+usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 {
 	int i, j, k;
 
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++)
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
 		for (j = 0; j < dev->actconfig->interface[i].num_altsetting; j++)
-			for (k = 0; k < dev->actconfig->interface[i].altsetting[j].bNumEndpoints; k++)
-				if (epnum == dev->actconfig->interface[i].altsetting[j].endpoint[k].bEndpointAddress)
-					return &dev->actconfig->interface[i].altsetting[j].endpoint[k];
+			for (k = 0; k < dev->actconfig->interface[i]
+				.altsetting[j].desc.bNumEndpoints; k++)
+				if (epnum == dev->actconfig->interface[i]
+						.altsetting[j].endpoint[k]
+						.desc.bEndpointAddress)
+					return &dev->actconfig->interface[i]
+						.altsetting[j].endpoint[k]
+						.desc;
 
 	return NULL;
 }
@@ -408,7 +415,7 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
 const struct usb_device_id *
 usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 {
-	struct usb_interface_descriptor *intf;
+	struct usb_host_interface *intf;
 	struct usb_device *dev;
 
 	/* proc_connectinfo in devio.c may call us with id == NULL. */
@@ -457,15 +464,15 @@ usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_CLASS) &&
-		    (id->bInterfaceClass != intf->bInterfaceClass))
+		    (id->bInterfaceClass != intf->desc.bInterfaceClass))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_SUBCLASS) &&
-		    (id->bInterfaceSubClass != intf->bInterfaceSubClass))
+		    (id->bInterfaceSubClass != intf->desc.bInterfaceSubClass))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_PROTOCOL) &&
-		    (id->bInterfaceProtocol != intf->bInterfaceProtocol))
+		    (id->bInterfaceProtocol != intf->desc.bInterfaceProtocol))
 			continue;
 
 		return id;
@@ -604,10 +611,10 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 		 */
 		envp [i++] = scratch;
 		length += snprintf (scratch, buffer_size - length,
-				    "INTERFACE=%d/%d/%d",
-				    intf->altsetting[alt].bInterfaceClass,
-				    intf->altsetting[alt].bInterfaceSubClass,
-				    intf->altsetting[alt].bInterfaceProtocol);
+			    "INTERFACE=%d/%d/%d",
+			    intf->altsetting[alt].desc.bInterfaceClass,
+			    intf->altsetting[alt].desc.bInterfaceSubClass,
+			    intf->altsetting[alt].desc.bInterfaceProtocol);
 		if ((buffer_size - length <= 0) || (i >= num_envp))
 			return -ENOMEM;
 		++length;
@@ -792,7 +799,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	dbg ("unregistering interfaces on device %d", dev->devnum);
 	if (dev->actconfig) {
-		for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
+		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 			struct usb_interface *interface = &dev->actconfig->interface[i];
 
 			/* remove this interface */
@@ -942,12 +949,27 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	int i;
 	int j;
 
-	/* USB v1.1 5.5.3 */
-	/* We read the first 8 bytes from the device descriptor to get to */
-	/*  the bMaxPacketSize0 field. Then we set the maximum packet size */
-	/*  for the control pipe, and retrieve the rest */
-	dev->epmaxpacketin [0] = 8;
-	dev->epmaxpacketout[0] = 8;
+	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
+	 * it's fixed size except for full speed devices.
+	 */
+	switch (dev->speed) {
+	case USB_SPEED_HIGH:		/* fixed at 64 */
+		i = 64;
+		break;
+	case USB_SPEED_FULL:		/* 8, 16, 32, or 64 */
+		/* to determine the ep0 maxpacket size, read the first 8
+		 * bytes from the device descriptor to get bMaxPacketSize0;
+		 * then correct our initial (small) guess.
+		 */
+		// FALLTHROUGH
+	case USB_SPEED_LOW:		/* fixed at 8 */
+		i = 8;
+		break;
+	default:
+		return -EINVAL;
+	}
+	dev->epmaxpacketin [0] = i;
+	dev->epmaxpacketout[0] = i;
 
 	for (i = 0; i < NEW_DEVICE_RETRYS; ++i) {
 
@@ -967,6 +989,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 		wait_ms(10);	/* Let the SET_ADDRESS settle */
 
+		/* high and low speed devices don't need this... */
 		err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor, 8);
 		if (err >= 8)
 			break;
@@ -982,8 +1005,10 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		dev->devnum = -1;
 		return 1;
 	}
-	dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
-	dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
+	if (dev->speed == USB_SPEED_FULL) {
+		dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
+		dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
+	}
 
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {
@@ -1008,7 +1033,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	}
 
 	/* we set the default configuration here */
-	err = usb_set_configuration(dev, dev->config[0].bConfigurationValue);
+	err = usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
 	if (err) {
 		err("failed to set device %d default configuration (error=%d)",
 			dev->devnum, err);
@@ -1047,16 +1072,17 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* Register all of the interfaces for this device with the driver core.
 	 * Remember, interfaces get bound to drivers, not devices. */
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *interface = &dev->actconfig->interface[i];
-		struct usb_interface_descriptor *desc = interface->altsetting;
+		struct usb_interface_descriptor *desc;
 
+		desc = &interface->altsetting [interface->act_altsetting].desc;
 		interface->dev.parent = &dev->dev;
 		interface->dev.driver = NULL;
 		interface->dev.bus = &usb_bus_type;
 		sprintf (&interface->dev.bus_id[0], "%d-%s:%d",
 			 dev->bus->busnum, dev->devpath,
-			 interface->altsetting->bInterfaceNumber);
+			 desc->bInterfaceNumber);
 		if (!desc->iInterface
 				|| usb_string (dev, desc->iInterface,
 					interface->dev.name,
@@ -1069,7 +1095,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 			sprintf (&interface->dev.name[0],
 				"usb-%s-%s interface %d",
 				dev->bus->bus_name, dev->devpath,
-				interface->altsetting->bInterfaceNumber);
+				desc->bInterfaceNumber);
 		}
 		dbg ("%s - registering %s", __FUNCTION__, interface->dev.bus_id);
 		device_register (&interface->dev);

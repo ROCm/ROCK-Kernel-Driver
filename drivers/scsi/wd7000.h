@@ -22,7 +22,8 @@ static int wd7000_abort(Scsi_Cmnd *);
 static int wd7000_bus_reset(Scsi_Cmnd *);
 static int wd7000_host_reset(Scsi_Cmnd *);
 static int wd7000_device_reset(Scsi_Cmnd *);
-static int wd7000_biosparam(Disk *, struct block_device *, int *);
+static int wd7000_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
 #ifndef NULL
 #define NULL 0L
@@ -49,7 +50,6 @@ static int wd7000_biosparam(Disk *, struct block_device *, int *);
 	detect:			wd7000_detect,			\
 	command:		wd7000_command,			\
 	queuecommand:		wd7000_queuecommand,		\
-	abort:			wd7000_abort,			\
 	eh_bus_reset_handler:	wd7000_bus_reset,		\
 	eh_device_reset_handler:wd7000_device_reset,		\
 	eh_host_reset_handler:	wd7000_host_reset,		\

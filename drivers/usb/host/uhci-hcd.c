@@ -739,7 +739,7 @@ static void uhci_inc_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 
-	if ((!(urb->transfer_flags & USB_NO_FSBR)) && !urbp->fsbr) {
+	if ((!(urb->transfer_flags & URB_NO_FSBR)) && !urbp->fsbr) {
 		urbp->fsbr = 1;
 		if (!uhci->fsbr++ && !uhci->fsbrtimeout)
 			uhci->skel_term_qh->link = cpu_to_le32(uhci->skel_hs_control_qh->dma_handle) | UHCI_PTR_QH;
@@ -755,7 +755,7 @@ static void uhci_dec_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 
-	if ((!(urb->transfer_flags & USB_NO_FSBR)) && urbp->fsbr) {
+	if ((!(urb->transfer_flags & URB_NO_FSBR)) && urbp->fsbr) {
 		urbp->fsbr = 0;
 		if (!--uhci->fsbr)
 			uhci->fsbrtimeout = jiffies + FSBR_DELAY;
@@ -1124,13 +1124,13 @@ static int uhci_submit_common(struct uhci_hcd *uhci, struct urb *urb, struct urb
 	} while (len > 0);
 
 	/*
-	 * USB_ZERO_PACKET means adding a 0-length packet, if direction
+	 * URB_ZERO_PACKET means adding a 0-length packet, if direction
 	 * is OUT and the transfer_length was an exact multiple of maxsze,
 	 * hence (len = transfer_length - N * maxsze) == 0
 	 * however, if transfer_length == 0, the zero packet was already
 	 * prepared above.
 	 */
-	if (usb_pipeout(urb->pipe) && (urb->transfer_flags & USB_ZERO_PACKET) &&
+	if (usb_pipeout(urb->pipe) && (urb->transfer_flags & URB_ZERO_PACKET) &&
 	    !len && urb->transfer_buffer_length) {
 		td = uhci_alloc_td(uhci, urb->dev);
 		if (!td)
@@ -1247,10 +1247,11 @@ static inline int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struc
 
 static inline int uhci_submit_interrupt(struct uhci_hcd *uhci, struct urb *urb, struct urb *eurb)
 {
-	/* Interrupt-IN can't be more than 1 packet */
-	if (usb_pipein(urb->pipe) && urb->transfer_buffer_length > usb_maxpacket(urb->dev, urb->pipe, usb_pipeout(urb->pipe)))
-		return -EINVAL;
-
+	/* USB 1.1 interrupt transfers only involve one packet per interval;
+	 * that's the uhci_submit_common() "breadth first" policy.  Drivers
+	 * can submit urbs of any length, but longer ones might need many
+	 * intervals to complete.
+	 */
 	return uhci_submit_common(uhci, urb, eurb, uhci->skelqh[__interval_to_skel(urb->interval)]);
 }
 
@@ -1305,7 +1306,7 @@ static int isochronous_find_start(struct uhci_hcd *uhci, struct urb *urb)
 
 	limits = isochronous_find_limits(uhci, urb, &start, &end);
 
-	if (urb->transfer_flags & USB_ISO_ASAP) {
+	if (urb->transfer_flags & URB_ISO_ASAP) {
 		if (limits) {
 			int curframe;
 
@@ -1751,7 +1752,7 @@ static void stall_callback(unsigned long ptr)
 
 		tmp = tmp->next;
 
-		u->transfer_flags |= USB_TIMEOUT_KILLED;
+		u->transfer_flags |= URB_TIMEOUT_KILLED;
 		uhci_urb_dequeue(hcd, u);
 	}
 
@@ -1804,44 +1805,19 @@ static void uhci_free_pending_qhs(struct uhci_hcd *uhci)
 static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb)
 {
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
-	struct usb_device *dev = urb->dev;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	int killed, resubmit_interrupt, status, ret;
+	int status;
 	unsigned long flags;
 
 	spin_lock_irqsave(&urb->lock, flags);
-
- 	killed = (urb->status == -ENOENT || urb->status == -ECONNRESET);
-	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
-			urb->interval && !killed);
-
 	status = urbp->status;
 	uhci_destroy_urb_priv(uhci, urb);
 
-	if (!killed)
+ 	if (urb->status != -ENOENT && urb->status != -ECONNRESET)
 		urb->status = status;
 	spin_unlock_irqrestore(&urb->lock, flags);
 
-	if (resubmit_interrupt) {
-		urb->complete(urb);
-
-		/* Recheck the status. The completion handler may have */
-		/* unlinked the resubmitting interrupt URB */
-		/* Note that this doesn't do what usb_hcd_giveback_urb() */
-		/* normally does, so that doesn't ever get done. */
-		if (urb->status == -ECONNRESET) {
-			usb_put_urb(urb);
-			return;
-		}
-
-		urb->dev = dev;
-		urb->status = -EINPROGRESS;
-		urb->actual_length = 0;
-		urb->bandwidth = 0;
-		if ((ret = uhci_urb_enqueue(&uhci->hcd, urb, 0)))
-			printk(KERN_ERR __FILE__ ": could not resubmit interrupt URB : %d\n", ret);		  
-	} else
-		usb_hcd_giveback_urb(hcd, urb);
+	usb_hcd_giveback_urb(hcd, urb);
 }
 
 static void uhci_finish_completion(struct usb_hcd *hcd)

@@ -947,6 +947,7 @@ ok:
 				ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
 						0 : RTM_NEWADDR, ifp);
 			in6_ifa_put(ifp);
+			addrconf_verify(0);
 		}
 	}
 	in6_dev_put(in6_dev);
@@ -1273,9 +1274,8 @@ static void addrconf_sit_config(struct net_device *dev)
 int addrconf_notify(struct notifier_block *this, unsigned long event, 
 		    void * data)
 {
-	struct net_device *dev;
-
-	dev = (struct net_device *) data;
+	struct net_device *dev = (struct net_device *) data;
+	struct inet6_dev *idev = __in6_dev_get(dev);
 
 	switch(event) {
 	case NETDEV_UP:
@@ -1292,16 +1292,27 @@ int addrconf_notify(struct notifier_block *this, unsigned long event,
 			addrconf_dev_config(dev);
 			break;
 		};
+		if (idev) {
+			/* If the MTU changed during the interface down, when the
+			   interface up, the changed MTU must be reflected in the
+			   idev as well as routers.
+			 */
+			if (idev->cnf.mtu6 != dev->mtu && dev->mtu >= IPV6_MIN_MTU) {
+				rt6_mtu_change(dev, dev->mtu);
+				idev->cnf.mtu6 = dev->mtu;
+			}
+			/* If the changed mtu during down is lower than IPV6_MIN_MTU
+			   stop IPv6 on this interface.
+			 */
+			if (dev->mtu < IPV6_MIN_MTU)
+				addrconf_ifdown(dev, event != NETDEV_DOWN);
+		}
 		break;
 
 	case NETDEV_CHANGEMTU:
-		if (dev->mtu >= IPV6_MIN_MTU) {
-			struct inet6_dev *idev;
-
-			if ((idev = __in6_dev_get(dev)) == NULL)
-				break;
-			idev->cnf.mtu6 = dev->mtu;
+		if ( idev && dev->mtu >= IPV6_MIN_MTU) {
 			rt6_mtu_change(dev, dev->mtu);
+			idev->cnf.mtu6 = dev->mtu;
 			break;
 		}
 

@@ -247,14 +247,6 @@ static void init_turbomouse(int id);
 static void init_microspeed(int id);
 static void init_ms_a3(int id);
 
-#ifdef CONFIG_ADBMOUSE
-/* XXX: Hook for mouse driver */
-void (*adb_mouse_interrupt_hook)(unsigned char *, int);
-int adb_emulate_buttons = 0;
-int adb_button2_keycode = 0x7d;	/* right control key */
-int adb_button3_keycode = 0x7c; /* right option key */
-#endif
-
 extern struct kbd_struct kbd_table[];
 
 extern void handle_scancode(unsigned char, int);
@@ -342,38 +334,6 @@ input_keycode(int keycode, int repeat)
 	if (!repeat)
 		del_timer(&repeat_timer);
 
-#ifdef CONFIG_ADBMOUSE
-	/*
-	 * XXX: Add mouse button 2+3 fake codes here if mouse open.
-	 *	Keep track of 'button' states here as we only send
-	 *	single up/down events!
-	 *	Really messy; might need to check if keyboard is in
-	 *	VC_RAW mode.
-	 *	Might also want to know how many buttons need to be emulated.
-	 *	-> hide this as function in arch/m68k/mac ?
-	 */
-	if (adb_emulate_buttons
-	    && (keycode == adb_button2_keycode
-		|| keycode == adb_button3_keycode)
-	    && (adb_mouse_interrupt_hook || console_loglevel == 10)) {
-		int button;
-		/* faked ADB packet */
-		static unsigned char data[4] = { 0, 0x80, 0x80, 0x80 };
-
-		button = keycode == adb_button2_keycode? 2: 3;
-		if (data[button] != up_flag) {
-			/* send a fake mouse packet */
-			data[button] = up_flag;
-			if (console_loglevel >= 8)
-				printk("fake mouse event: %x %x %x\n",
-				       data[1], data[2], data[3]);
-			if (adb_mouse_interrupt_hook)
-				adb_mouse_interrupt_hook(data, 4);
-		}
-		return;
-	}
-#endif /* CONFIG_ADBMOUSE */
-
 	if (kbd->kbdmode != VC_RAW) {
 		if (!up_flag && !dont_repeat[keycode]) {
 			last_keycode = keycode;
@@ -427,163 +387,6 @@ static void mac_put_queue(int ch)
 		con_schedule_flip(tty);
 	}
 }
-
-#ifdef CONFIG_ADBMOUSE
-static void
-mouse_input(unsigned char *data, int nb, struct pt_regs *regs, int autopoll)
-{
-  /* [ACA:23-Mar-97] Three button mouse support.  This is designed to
-     function with MkLinux DR-2.1 style X servers.  It only works with
-     three-button mice that conform to Apple's multi-button mouse
-     protocol. */
-
-  /*
-    The X server for MkLinux DR2.1 uses the following unused keycodes to
-    read the mouse:
-
-    0x7e  This indicates that the next two keycodes should be interpreted
-          as mouse information.  The first following byte's high bit
-          represents the state of the left button.  The lower seven bits
-          represent the x-axis acceleration.  The lower seven bits of the
-          second byte represent y-axis acceleration.
-
-    0x3f  The x server interprets this keycode as a middle button
-          release.
-
-    0xbf  The x server interprets this keycode as a middle button
-          depress.
-
-    0x40  The x server interprets this keycode as a right button
-          release.
-
-    0xc0  The x server interprets this keycode as a right button
-          depress.
-
-    NOTES: There should be a better way of handling mice in the X server.
-    The MOUSE_ESCAPE code (0x7e) should be followed by three bytes instead
-    of two.  The three mouse buttons should then, in the X server, be read
-    as the high-bits of all three bytes.  The x and y motions can still be
-    in the first two bytes.  Maybe I'll do this...
-  */
-
-  /*
-    Handler 1 -- 100cpi original Apple mouse protocol.
-    Handler 2 -- 200cpi original Apple mouse protocol.
-
-    For Apple's standard one-button mouse protocol the data array will
-    contain the following values:
-
-                BITS    COMMENTS
-    data[0] = dddd 1100 ADB command: Talk, register 0, for device dddd.
-    data[1] = bxxx xxxx First button and x-axis motion.
-    data[2] = byyy yyyy Second button and y-axis motion.
-
-    Handler 4 -- Apple Extended mouse protocol.
-
-    For Apple's 3-button mouse protocol the data array will contain the
-    following values:
-
-		BITS    COMMENTS
-    data[0] = dddd 1100 ADB command: Talk, register 0, for device dddd.
-    data[1] = bxxx xxxx Left button and x-axis motion.
-    data[2] = byyy yyyy Second button and y-axis motion.
-    data[3] = byyy bxxx Third button and fourth button.  Y is additional
-	      high bits of y-axis motion.  XY is additional
-	      high bits of x-axis motion.
-
-    MacAlly 2-button mouse protocol.
-
-    For MacAlly 2-button mouse protocol the data array will contain the
-    following values:
-
-		BITS    COMMENTS
-    data[0] = dddd 1100 ADB command: Talk, register 0, for device dddd.
-    data[1] = bxxx xxxx Left button and x-axis motion.
-    data[2] = byyy yyyy Right button and y-axis motion.
-    data[3] = ???? ???? unknown
-    data[4] = ???? ???? unknown
-
-  */
-	struct kbd_struct *kbd;
-
-	/* If it's a trackpad, we alias the second button to the first.
-	   NOTE: Apple sends an ADB flush command to the trackpad when
-	         the first (the real) button is released. We could do
-		 this here using async flush requests.
-	*/
-	switch (adb_mouse_kinds[(data[0]>>4) & 0xf])
-	{
-	    case ADBMOUSE_TRACKPAD:
-		data[1] = (data[1] & 0x7f) | ((data[1] & data[2]) & 0x80);
-		data[2] = data[2] | 0x80;
-		break;
-	    case ADBMOUSE_MICROSPEED:
-		data[1] = (data[1] & 0x7f) | ((data[3] & 0x01) << 7);
-		data[2] = (data[2] & 0x7f) | ((data[3] & 0x02) << 6);
-		data[3] = (data[3] & 0x77) | ((data[3] & 0x04) << 5)
-			| (data[3] & 0x08);
-		break;
-	    case ADBMOUSE_TRACKBALLPRO:
-		data[1] = (data[1] & 0x7f) | (((data[3] & 0x04) << 5)
-			& ((data[3] & 0x08) << 4));
-		data[2] = (data[2] & 0x7f) | ((data[3] & 0x01) << 7);
-		data[3] = (data[3] & 0x77) | ((data[3] & 0x02) << 6);
-		break;
-	    case ADBMOUSE_MS_A3:
-		data[1] = (data[1] & 0x7f) | ((data[3] & 0x01) << 7);
-		data[2] = (data[2] & 0x7f) | ((data[3] & 0x02) << 6);
-		data[3] = ((data[3] & 0x04) << 5);
-		break;
-            case ADBMOUSE_MACALLY2:
-		data[3] = (data[2] & 0x80) ? 0x80 : 0x00;
-		data[2] |= 0x80;  /* Right button is mapped as button 3 */
-		nb=4;
-                break;
-	}
-
-	if (adb_mouse_interrupt_hook)
-		adb_mouse_interrupt_hook(data, nb);
-
-	kbd = kbd_table + fg_console;
-
-	/* Only send mouse codes when keyboard is in raw mode. */
-	if (kbd->kbdmode == VC_RAW) {
-		static unsigned char uch_ButtonStateSecond = 0x80;
-		unsigned char uchButtonSecond;
-
-		/* Send first button, second button and movement. */
-		mac_put_queue(0x7e);
-		mac_put_queue(data[1]);
-		mac_put_queue(data[2]);
-
-		/* [ACA: Are there any two-button ADB mice that use handler 1 or 2?] */
-
-		/* Store the button state. */
-		uchButtonSecond = (data[2] & 0x80);
-
-		/* Send second button. */
-		if (uchButtonSecond != uch_ButtonStateSecond) {
-			mac_put_queue(0x3f | uchButtonSecond);
-			uch_ButtonStateSecond = uchButtonSecond;
-		}
-
-		/* Macintosh 3-button mouse (handler 4). */
-		if (nb >= 4) {
-			static unsigned char uch_ButtonStateThird = 0x80;
-			unsigned char uchButtonThird;
-
-			/* Store the button state for speed. */
-			uchButtonThird = (data[3] & 0x80);
-
-			/* Send third button. */
-			if (uchButtonThird != uch_ButtonStateThird) {
-				mac_put_queue(0x40 | uchButtonThird);
-				uch_ButtonStateThird = uchButtonThird;
-			}
-		}
-	}
-}
-#endif /* CONFIG_ADBMOUSE */
 
 static void
 buttons_input(unsigned char *data, int nb, struct pt_regs *regs, int autopoll)
@@ -708,11 +511,6 @@ void __init mackbd_init_hw(void)
 	memcpy(key_maps[8], macalt_map, sizeof(plain_map));
 	memcpy(key_maps[12], macctrl_alt_map, sizeof(plain_map));
 
-#ifdef CONFIG_ADBMOUSE
-	/* initialize mouse interrupt hook */
-	adb_mouse_interrupt_hook = NULL;
-#endif
-
 	led_request.complete = 1;
 
 	mackeyb_probe();
@@ -751,10 +549,6 @@ mackeyb_probe(void)
 {
 	struct adb_request req;
 	int i;
-
-#ifdef CONFIG_ADBMOUSE
-	adb_register(ADB_MOUSE, 0, &mouse_ids, mouse_input);
-#endif /* CONFIG_ADBMOUSE */
 
 	adb_register(ADB_KEYBOARD, 0, &keyboard_ids, keyboard_input);
 	adb_register(0x07, 0x1F, &buttons_ids, buttons_input);

@@ -11,6 +11,22 @@
 
 #include <asm/scatterlist.h>
 
+/*
+ * Disk stats ...
+ */
+
+#define DK_MAX_MAJOR 16
+#define DK_MAX_DISK 16
+ 
+struct disk_stat {
+        unsigned int drive[DK_MAX_MAJOR][DK_MAX_DISK];
+        unsigned int drive_rio[DK_MAX_MAJOR][DK_MAX_DISK];
+        unsigned int drive_wio[DK_MAX_MAJOR][DK_MAX_DISK];
+        unsigned int drive_rblk[DK_MAX_MAJOR][DK_MAX_DISK];
+        unsigned int drive_wblk[DK_MAX_MAJOR][DK_MAX_DISK];
+};
+extern struct disk_stat dkstat;
+
 struct request_queue;
 typedef struct request_queue request_queue_t;
 struct elevator_s;
@@ -22,27 +38,34 @@ struct request_list {
 	wait_queue_head_t wait;
 };
 
+/*
+ * try to put the fields that are referenced together in the same cacheline
+ */
 struct request {
 	struct list_head queuelist; /* looking for ->queue? you must _not_
 				     * access it directly, use
 				     * blkdev_dequeue_request! */
-	void *elevator_private;
-
-	unsigned char cmd[16];
-
 	unsigned long flags;		/* see REQ_ bits below */
 
-	int rq_status;	/* should split this into a few status bits */
-	kdev_t rq_dev;
-	struct gendisk *rq_disk;
-	int errors;
 	sector_t sector;
 	unsigned long nr_sectors;
+	unsigned int current_nr_sectors;
+
+	void *elevator_private;
+
+	int rq_status;	/* should split this into a few status bits */
+	struct gendisk *rq_disk;
+	int errors;
+	unsigned long start_time;
 	sector_t hard_sector;		/* the hard_* are block layer
 					 * internals, no driver should
 					 * touch them
 					 */
 	unsigned long hard_nr_sectors;
+	unsigned int hard_cur_sectors;
+
+	struct bio *bio;
+	struct bio *biotail;
 
 	/* Number of scatter-gather DMA addr+len pairs after
 	 * physical address coalescing is performed.
@@ -56,21 +79,29 @@ struct request {
 	 */
 	unsigned short nr_hw_segments;
 
-	unsigned int current_nr_sectors;
-	unsigned int hard_cur_sectors;
 	int tag;
-	void *special;
 	char *buffer;
 
-	/* For packet commands */
-	unsigned int data_len;
-	void *data, *sense;
-
-	unsigned int timeout;
-	struct completion *waiting;
-	struct bio *bio, *biotail;
+	int ref_count;
 	request_queue_t *q;
 	struct request_list *rl;
+
+	struct completion *waiting;
+	void *special;
+
+	/*
+	 * when request is used as a packet command carrier
+	 */
+	unsigned int cmd_len;
+	unsigned char cmd[16];
+
+	unsigned int data_len;
+	void *data;
+
+	unsigned int sense_len;
+	void *sense;
+
+	unsigned int timeout;
 };
 
 /*
@@ -126,7 +157,6 @@ typedef int (merge_request_fn) (request_queue_t *, struct request *,
 typedef int (merge_requests_fn) (request_queue_t *, struct request *,
 				 struct request *);
 typedef void (request_fn_proc) (request_queue_t *q);
-typedef request_queue_t * (queue_proc) (kdev_t dev);
 typedef int (make_request_fn) (request_queue_t *q, struct bio *bio);
 typedef int (prep_rq_fn) (request_queue_t *, struct request *);
 typedef void (unplug_fn) (void *q);
@@ -149,12 +179,6 @@ struct blk_queue_tag {
 	int busy;			/* current depth */
 	int max_depth;
 };
-
-/*
- * Default nr free requests per queue, ll_rw_blk will scale it down
- * according to available RAM at init time
- */
-#define QUEUE_NR_REQUESTS	8192
 
 struct request_queue
 {
@@ -215,10 +239,17 @@ struct request_queue
 	unsigned int		max_segment_size;
 
 	unsigned long		seg_boundary_mask;
+	unsigned int		dma_alignment;
 
 	wait_queue_head_t	queue_wait;
 
 	struct blk_queue_tag	*queue_tags;
+
+	/*
+	 * sg stuff
+	 */
+	unsigned int		sg_timeout;
+	unsigned int		sg_reserved_size;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -254,6 +285,13 @@ struct request_queue
  */
 #define blk_queue_headactive(q, head_active)
 
+/*
+ * q->prep_rq_fn return values
+ */
+#define BLKPREP_OK		0	/* serve it */
+#define BLKPREP_KILL		1	/* fatal error, kill */
+#define BLKPREP_DEFER		2	/* leave on queue */
+
 extern unsigned long blk_max_low_pfn, blk_max_pfn;
 
 /*
@@ -268,39 +306,19 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
 #define BLK_BOUNCE_ISA		(ISA_DMA_THRESHOLD)
 
 extern int init_emergency_isa_pool(void);
-void blk_queue_bounce(request_queue_t *q, struct bio **bio);
+inline void blk_queue_bounce(request_queue_t *q, struct bio **bio);
 
 #define rq_for_each_bio(bio, rq)	\
 	if ((rq->bio))			\
 		for (bio = (rq)->bio; bio; bio = bio->bi_next)
-
-struct blk_dev_struct {
-	/*
-	 * queue_proc has to be atomic
-	 */
-	request_queue_t		request_queue;
-	queue_proc		*queue;
-	void			*data;
-};
 
 struct sec_size {
 	unsigned block_size;
 	unsigned block_size_bits;
 };
 
-/*
- * Used to indicate the default queue for drivers that don't bother
- * to implement multiple queues.  We have this access macro here
- * so as to eliminate the need for each and every block device
- * driver to know about the internal structure of blk_dev[].
- */
-#define BLK_DEFAULT_QUEUE(_MAJOR)  &blk_dev[_MAJOR].request_queue
-
-extern struct sec_size * blk_sec[MAX_BLKDEV];
-extern struct blk_dev_struct blk_dev[MAX_BLKDEV];
 extern void register_disk(struct gendisk *dev);
 extern void generic_make_request(struct bio *bio);
-extern inline request_queue_t *bdev_get_queue(struct block_device *bdev);
 extern void blk_put_request(struct request *);
 extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern void __blk_attempt_remerge(request_queue_t *, struct request *);
@@ -317,6 +335,11 @@ extern int scsi_cmd_ioctl(struct block_device *, unsigned int, unsigned long);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
+
+static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
+{
+	return bdev->bd_disk->queue;
+}
 
 /*
  * get ready for proper ref counting
@@ -339,6 +362,7 @@ extern void blk_queue_segment_boundary(request_queue_t *, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *, prep_rq_fn *pfn);
 extern void blk_queue_merge_bvec(request_queue_t *, merge_bvec_fn *);
+extern void blk_queue_dma_alignment(request_queue_t *, int);
 extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
@@ -383,6 +407,21 @@ static inline int queue_hardsect_size(request_queue_t *q)
 static inline int bdev_hardsect_size(struct block_device *bdev)
 {
 	return queue_hardsect_size(bdev_get_queue(bdev));
+}
+
+static inline int queue_dma_alignment(request_queue_t *q)
+{
+	int retval = 511;
+
+	if (q && q->dma_alignment)
+		retval = q->dma_alignment;
+
+	return retval;
+}
+
+static inline int bdev_dma_aligment(struct block_device *bdev)
+{
+	return queue_dma_alignment(bdev_get_queue(bdev));
 }
 
 #define blk_finished_io(nsects)	do { } while (0)

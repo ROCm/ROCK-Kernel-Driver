@@ -1,0 +1,108 @@
+#
+# USB Miscellaneous driver configuration
+#
+comment "USB Miscellaneous drivers"
+	depends on USB
+
+config USB_EMI26
+	tristate "EMI 2|6 USB Audio interface support"
+	depends on USB_AUDIO
+	---help---
+	  This driver loads firmware to Emagic EMI 2|6 low latency USB
+	  Audio interface.
+
+	  After firmware load the device is handled with standard linux
+	  USB Audio driver.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called audio.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config USB_TIGL
+	tristate "Texas Instruments Graph Link USB (aka SilverLink) cable support"
+	depends on USB
+	---help---
+	  If you own a Texas Instruments graphing calculator and use a 
+	  TI-GRAPH LINK USB cable (aka SilverLink), then you might be 
+	  interested in this driver.
+
+	  If you enable this driver, you will be able to communicate with
+	  your calculator through a set of device nodes under /dev.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called tiglusb.o. If you want to compile it as a
+	  module, say M here and read Documentation/modules.txt.
+
+	  If you don't know what the SilverLink cable is or what a Texas
+	  Instruments graphing calculator is, then you probably don't need this
+	  driver.
+
+	  If unsure, say N.
+
+config USB_AUERSWALD
+	tristate "USB Auerswald ISDN support (EXPERIMENTAL)"
+	depends on USB && EXPERIMENTAL
+	help
+	  Say Y here if you want to connect an Auerswald USB ISDN Device
+	  to your computer's USB port.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called auerswald.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config USB_RIO500
+	tristate "USB Diamond Rio500 support (EXPERIMENTAL)"
+	depends on USB && EXPERIMENTAL
+	help
+	  Say Y here if you want to connect a USB Rio500 mp3 player to your
+	  computer's USB port. Please read <file:Documentation/usb/rio.txt>
+	  for more information.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called rio500.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config USB_BRLVGER
+	tristate "Tieman Voyager USB Braille display support (EXPERIMENTAL)"
+	depends on USB && EXPERIMENTAL
+	help
+	  Say Y here if you want to use the Voyager USB Braille display from
+	  Tieman. See <file:Documentation/usb/brlvger.txt> for more
+	  information.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called brlvger.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config USB_LCD
+	tristate "USB LCD driver support"
+	depends on USB
+	help
+	  Say Y here if you want to connect an USBLCD to your computer's
+	  USB port. The USBLCD is a small USB interface board for
+	  alphanumeric LCD modules. See <http://www.usblcd.de> for more
+	  information.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called usblcd.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config USB_SPEEDTOUCH
+	tristate "Alcatel Speedtouch ADSL USB Modem"
+	depends on USB && ATM
+
+config USB_TEST
+	tristate "USB testing driver (DEVELOPMENT)"
+	depends on USB_DEVICEFS && EXPERIMENTAL
+	help
+
+	  This driver is for testing host controller software.  It is used
+	  with specialized device firmware for regression and stress testing,
+	  to help prevent problems from cropping up with 'real" drivers.
+

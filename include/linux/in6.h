@@ -156,6 +156,7 @@ struct in6_flowlabel_req
 #define IPV6_MTU_DISCOVER	23
 #define IPV6_MTU		24
 #define IPV6_RECVERR		25
+#define IPV6_V6ONLY		26
 
 /* IPV6_MTU_DISCOVER values */
 #define IPV6_PMTUDISC_DONT		0

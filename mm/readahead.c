@@ -20,6 +20,16 @@ struct backing_dev_info default_backing_dev_info = {
 };
 
 /*
+ * Initialise a struct file's readahead state
+ */
+void
+file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
+{
+	memset(ra, 0, sizeof(*ra));
+	ra->ra_pages = mapping->backing_dev_info->ra_pages;
+}
+
+/*
  * Return max readahead size for this inode in number-of-pages.
  */
 static inline unsigned long get_max_readahead(struct file_ra_state *ra)
@@ -39,7 +49,7 @@ read_pages(struct address_space *mapping, struct file *filp,
 	unsigned page_idx;
 	struct pagevec lru_pvec;
 
-	pagevec_init(&lru_pvec);
+	pagevec_init(&lru_pvec, 0);
 
 	if (mapping->a_ops->readpages)
 		return mapping->a_ops->readpages(mapping, pages, nr_pages);
@@ -166,7 +176,7 @@ int do_page_cache_readahead(struct address_space *mapping,
 			continue;
 
 		read_unlock(&mapping->page_lock);
-		page = page_cache_alloc(mapping);
+		page = page_cache_alloc_cold(mapping);
 		read_lock(&mapping->page_lock);
 		if (!page)
 			break;

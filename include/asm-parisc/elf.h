@@ -9,19 +9,13 @@
 
 #define EM_PARISC 15
 
-#define ELF_NGREG 32
-#define ELF_NFPREG 32
-
-typedef unsigned long elf_greg_t;
-typedef elf_greg_t elf_gregset_t[ELF_NGREG];
-
-typedef double elf_fpreg_t;
-typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
-
-#define ELF_CORE_COPY_REGS(gregs, regs) \
-	memcpy(gregs, regs, \
-	       sizeof(struct pt_regs) < sizeof(elf_gregset_t)? \
-	       sizeof(struct pt_regs): sizeof(elf_gregset_t));
+/*
+ * The following definitions are those for 32-bit ELF binaries on a 32-bit kernel
+ * and for 64-bit binaries on a 64-bit kernel.  To run 32-bit binaries on a 64-bit
+ * kernel, arch/parisc64/kernel/binfmt_elf32.c defines these macros appropriately
+ * and then #includes binfmt_elf.c, which then includes this file.
+ */
+#ifndef ELF_CLASS
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.
@@ -30,15 +24,83 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
  * the following macros are for the default case. However, for the 64
  * bit kernel we also support 32 bit parisc binaries. To do that
  * arch/parisc64/kernel/binfmt_elf32.c defines its own set of these
- * macros, and then if includes fs/binfmt_elf.c to provide an alternate
+ * macros, and then it includes fs/binfmt_elf.c to provide an alternate
  * elf binary handler for 32 bit binaries (on the 64 bit kernel).
  */
-
 #ifdef __LP64__
 #define ELF_CLASS       ELFCLASS64
 #else
 #define ELF_CLASS	ELFCLASS32
 #endif
+
+typedef unsigned long elf_greg_t;
+
+/* This yields a string that ld.so will use to load implementation
+   specific libraries for optimization.  This is more specific in
+   intent than poking at uname or /proc/cpuinfo.
+
+   For the moment, we have only optimizations for the Intel generations,
+   but that could change... */
+
+#define ELF_PLATFORM  ("PARISC\0" /*+((boot_cpu_data.x86-3)*5) */)
+
+#ifdef __KERNEL__
+#define SET_PERSONALITY(ex, ibcs2) \
+	current->personality = PER_LINUX
+#endif
+
+/*
+ * Fill in general registers in a core dump.  This saves pretty
+ * much the same registers as hp-ux, although in a different order.
+ * Registers marked # below are not currently saved in pt_regs, so
+ * we use their current values here.
+ *
+ * 	gr0..gr31
+ * 	sr0..sr7
+ * 	iaoq0..iaoq1
+ * 	iasq0..iasq1
+ * 	cr11 (sar)
+ * 	cr19 (iir)
+ * 	cr20 (isr)
+ * 	cr21 (ior)
+ *  #	cr22 (ipsw)
+ *  #	cr0 (recovery counter)
+ *  #	cr24..cr31 (temporary registers)
+ *  #	cr8,9,12,13 (protection IDs)
+ *  #	cr10 (scr/ccr)
+ *  #	cr15 (ext int enable mask)
+ *
+ */
+
+#define ELF_CORE_COPY_REGS(dst, pt)	\
+	memset(dst, 0, sizeof(dst));	/* don't leak any "random" bits */ \
+	memcpy(dst + 0, pt->gr, 32 * sizeof(elf_greg_t)); \
+	memcpy(dst + 32, pt->sr, 8 * sizeof(elf_greg_t)); \
+	memcpy(dst + 40, pt->iaoq, 2 * sizeof(elf_greg_t)); \
+	memcpy(dst + 42, pt->iasq, 2 * sizeof(elf_greg_t)); \
+	dst[44] = pt->sar;   dst[45] = pt->iir; \
+	dst[46] = pt->isr;   dst[47] = pt->ior; \
+	dst[48] = mfctl(22); dst[49] = mfctl(0); \
+	dst[50] = mfctl(24); dst[51] = mfctl(25); \
+	dst[52] = mfctl(26); dst[53] = mfctl(27); \
+	dst[54] = mfctl(28); dst[55] = mfctl(29); \
+	dst[56] = mfctl(30); dst[57] = mfctl(31); \
+	dst[58] = mfctl( 8); dst[59] = mfctl( 9); \
+	dst[60] = mfctl(12); dst[61] = mfctl(13); \
+	dst[62] = mfctl(10); dst[63] = mfctl(15);
+
+#endif /* ! ELF_CLASS */
+
+#define ELF_NGREG 80	/* We only need 64 at present, but leave space
+			   for expansion. */
+typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+
+#define ELF_NFPREG 32
+typedef double elf_fpreg_t;
+typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
+
+struct pt_regs;	/* forward declaration... */
+
 
 #define elf_check_arch(x) ((x)->e_machine == EM_PARISC && (x)->e_ident[EI_CLASS] == ELF_CLASS)
 
@@ -79,19 +141,5 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 
 #define ELF_HWCAP	0
 /* (boot_cpu_data.x86_capability) */
-
-/* This yields a string that ld.so will use to load implementation
-   specific libraries for optimization.  This is more specific in
-   intent than poking at uname or /proc/cpuinfo.
-
-   For the moment, we have only optimizations for the Intel generations,
-   but that could change... */
-
-#define ELF_PLATFORM  ("PARISC\0" /*+((boot_cpu_data.x86-3)*5) */)
-
-#ifdef __KERNEL__
-#define SET_PERSONALITY(ex, ibcs2) \
-	current->personality = PER_LINUX
-#endif
 
 #endif

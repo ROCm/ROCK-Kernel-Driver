@@ -89,8 +89,8 @@ static __u16 tcp_advertise_mss(struct sock *sk)
 	struct dst_entry *dst = __sk_dst_get(sk);
 	int mss = tp->advmss;
 
-	if (dst && dst->advmss < mss) {
-		mss = dst->advmss;
+	if (dst && dst_metric(dst, RTAX_ADVMSS) < mss) {
+		mss = dst_metric(dst, RTAX_ADVMSS);
 		tp->advmss = mss;
 	}
 
@@ -554,13 +554,17 @@ static int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 int tcp_sync_mss(struct sock *sk, u32 pmtu)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
+	struct dst_entry *dst = __sk_dst_get(sk);
 	int mss_now;
+
+	if (dst && dst->ops->get_mss)
+		pmtu = dst->ops->get_mss(dst, pmtu);
 
 	/* Calculate base mss without TCP options:
 	   It is MMS_S - sizeof(tcphdr) of rfc1122
 	 */
-
 	mss_now = pmtu - tp->af_specific->net_header_len - sizeof(struct tcphdr);
+
 	/* Clamp it (mss_clamp does not include tcp options) */
 	if (mss_now > tp->mss_clamp)
 		mss_now = tp->mss_clamp;
@@ -1211,10 +1215,10 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	if (req->rcv_wnd == 0) { /* ignored for retransmitted syns */
 		__u8 rcv_wscale; 
 		/* Set this up on the first call only */
-		req->window_clamp = tp->window_clamp ? : dst->window;
+		req->window_clamp = tp->window_clamp ? : dst_metric(dst, RTAX_WINDOW);
 		/* tcp_full_space because it is guaranteed to be the first packet */
 		tcp_select_initial_window(tcp_full_space(sk), 
-			dst->advmss - (req->tstamp_ok ? TCPOLEN_TSTAMP_ALIGNED : 0),
+			dst_metric(dst, RTAX_ADVMSS) - (req->tstamp_ok ? TCPOLEN_TSTAMP_ALIGNED : 0),
 			&req->rcv_wnd,
 			&req->window_clamp,
 			req->wscale_ok,
@@ -1226,7 +1230,7 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	th->window = htons(req->rcv_wnd);
 
 	TCP_SKB_CB(skb)->when = tcp_time_stamp;
-	tcp_syn_build_options((__u32 *)(th + 1), dst->advmss, req->tstamp_ok,
+	tcp_syn_build_options((__u32 *)(th + 1), dst_metric(dst, RTAX_ADVMSS), req->tstamp_ok,
 			      req->sack_ok, req->wscale_ok, req->rcv_wscale,
 			      TCP_SKB_CB(skb)->when,
 			      req->ts_recent);
@@ -1255,11 +1259,11 @@ static inline void tcp_connect_init(struct sock *sk)
 	if (tp->user_mss)
 		tp->mss_clamp = tp->user_mss;
 	tp->max_window = 0;
-	tcp_sync_mss(sk, dst->pmtu);
+	tcp_sync_mss(sk, dst_pmtu(dst));
 
 	if (!tp->window_clamp)
-		tp->window_clamp = dst->window;
-	tp->advmss = dst->advmss;
+		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);
+	tp->advmss = dst_metric(dst, RTAX_ADVMSS);
 	tcp_initialize_rcv_mss(sk);
 
 	tcp_select_initial_window(tcp_full_space(sk),

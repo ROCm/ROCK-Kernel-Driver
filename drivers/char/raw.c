@@ -56,9 +56,15 @@ static int raw_open(struct inode *inode, struct file *filp)
 	bdev = raw_devices[minor].binding;
 	err = -ENODEV;
 	if (bdev) {
+		err = bd_claim(bdev, raw_open);
+		if (err)
+			goto out;
 		atomic_inc(&bdev->bd_count);
 		err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
-		if (!err) {
+		if (err) {
+			bd_release(bdev);
+			goto out;
+		} else {
 			err = set_blocksize(bdev, bdev_hardsect_size(bdev));
 			if (err == 0) {
 				raw_devices[minor].inuse++;
@@ -68,6 +74,8 @@ static int raw_open(struct inode *inode, struct file *filp)
 			}
 		}
 	}
+	filp->private_data = bdev;
+out:
 	up(&raw_mutex);
 	return err;
 }
@@ -81,6 +89,7 @@ static int raw_release(struct inode *inode, struct file *filp)
 	bdev = raw_devices[minor].binding;
 	raw_devices[minor].inuse--;
 	up(&raw_mutex);
+	bd_release(bdev);
 	blkdev_put(bdev, BDEV_RAW);
 	return 0;
 }
@@ -92,22 +101,9 @@ static int
 raw_ioctl(struct inode *inode, struct file *filp,
 		  unsigned int command, unsigned long arg)
 {
-	const int minor = minor(inode->i_rdev);
-	int err;
-	struct block_device *bdev;
+	struct block_device *bdev = filp->private_data;
 
-	err = -ENODEV;
-	if (minor < 1 && minor > 255)
-		goto out;
-
-	bdev = raw_devices[minor].binding;
-	err = -EINVAL;
-	if (bdev == NULL)
-		goto out;
-	if (bdev->bd_inode && bdev->bd_op && bdev->bd_op->ioctl)
-		err = bdev->bd_op->ioctl(bdev->bd_inode, NULL, command, arg);
-out:
-	return err;
+	return blkdev_ioctl(bdev->bd_inode, NULL, command, arg);
 }
 
 /*

@@ -2,7 +2,7 @@
 
 	drivers/net/pci-skeleton.c
 
-	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
+	Maintained by Jeff Garzik <jgarzik@pobox.com>
 
 	Original code came from 8139too.c, which in turns was based
 	originally on Donald Becker's rtl8139.c driver, versions 1.11
@@ -483,7 +483,7 @@ struct netdrv_private {
 	chip_t chipset;
 };
 
-MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
+MODULE_AUTHOR ("Jeff Garzik <jgarzik@pobox.com>");
 MODULE_DESCRIPTION ("Skeleton for a PCI Fast Ethernet driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM (multicast_filter_limit, "i");

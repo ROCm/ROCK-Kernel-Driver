@@ -154,9 +154,9 @@ mcpn765_setup_via_82c586b(void)
 	 * PPCBug doesn't set the enable bits for the IDE device.
 	 * Turn them on now.
 	 */
-	pcibios_read_config_byte(dev->bus->number, dev->devfn, 0x40, &c);
+	pci_read_config_byte(dev, 0x40, &c);
 	c |= 0x03;
-	pcibios_write_config_byte(dev->bus->number, dev->devfn, 0x40, c);
+	pci_write_config_byte(dev, 0x40, c);
 
 	return;
 }

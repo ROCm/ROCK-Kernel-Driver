@@ -110,7 +110,7 @@ out:
 
 asmlinkage int sys_iopl(unsigned long unused)
 {
-	struct pt_regs * regs = (struct pt_regs *) &unused;
+	volatile struct pt_regs * regs = (struct pt_regs *) &unused;
 	unsigned int level = regs->ebx;
 	unsigned int old = (regs->eflags >> 12) & 3;
 

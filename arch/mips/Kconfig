@@ -1,0 +1,1348 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+config MIPS
+	bool
+	default y
+
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
+config SMP
+	bool
+	---help---
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, like most personal computers, say N. If
+	  you have a system with more than one CPU, say Y.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  machines, but will use only one CPU of a multiprocessor machine. If
+	  you say Y here, the kernel will run on many, but not all,
+	  singleprocessor machines. On a singleprocessor machine, the kernel
+	  will run faster if you say N here.
+
+	  Note that if you say Y here and choose architecture "586" or
+	  "Pentium" under "Processor family", the kernel will not work on 486
+	  architectures. Similarly, multiprocessor kernels for the "PPro"
+	  architecture may not work on all Pentium based boards.
+
+	  People using multiprocessor machines who say Y here should also say
+	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
+	  Management" code will be disabled if you say Y here.
+
+	  See also the <file:Documentation/smp.tex>,
+	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you don't know what to do here, say N.
+
+config GENERIC_ISA_DMA
+	bool
+	default y
+
+
+mainmenu "Linux Kernel Configuration"
+
+source "init/Kconfig"
+
+
+menu "Machine selection"
+
+config ACER_PICA_61
+	bool "Support for Acer PICA 1 chipset (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This is a machine with a R4400 133/150 MHz CPU. To compile a Linux
+	  kernel that runs on these, say Y here. For details about Linux on
+	  the MIPS architecture, check out the Linux/MIPS FAQ on the WWW at
+	  <http://oss.sgi.com/mips/>.
+
+config ALGOR_P4032
+	bool "Support for Algorithmics P4032 (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This is an evaluation board of the British company Algorithmics.
+	  The board uses the R4300 and a R5230 CPUs.  For more information
+	  about this board see <http://www.algor.co.uk/>.
+
+config BAGET_MIPS
+	bool "Support for BAGET MIPS series (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This enables support for the Baget, a Russian embedded system.  For
+	  more details about the Baget see the Linux/MIPS FAQ on
+	  <http://oss.sgi.com/mips/>.
+
+config DECSTATION
+	bool "Support for DECstations (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	---help---
+	  This enables support for DEC's MIPS based workstations.  For details
+	  see the Linux/MIPS FAQ on <http://oss.sgi.com/mips/> and the
+	  DECstation porting pages on <http://decstation.unix-ag.org/>.
+
+	  If you have one of the following DECstation Models you definitely
+	  want to choose R4xx0 for the CPU Type:
+
+	  	DECstation 5000/50
+	  	DECstation 5000/150
+	  	DECstation 5000/260
+	  	DECsystem 5900/260
+
+	  otherwise choose R3000.
+
+config DDB5074
+	bool "Support for NEC DDB Vrc-5074 (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This enables support for the VR5000-based NEC DDB Vrc-5074
+	  evaluation board.
+
+config MIPS_EV96100
+	bool "Support for Galileo EV96100 Evaluation board (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This is an evaluation board based on the Galielo GT-96100 LAN/WAN
+	  communications controllers containing a MIPS R5000 compatible core
+	  running at 83MHz. Their website is <http://www.galileot.com/>. Say Y
+	  here if you wish to build a kernel for this platform.
+
+config MIPS_EV64120
+	bool "Support for Galileo EV64120 Evaluation board (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This is an evaluation board based on the Galileo GT-64120
+	  single-chip system controller that contains a MIPS R5000 compatible
+	  core running at 75/100MHz.  Their website is located at
+	  <http://www.galileot.com/>.  Say Y here if you wish to build a
+	  kernel for this platform.
+
+config EVB_PCI1
+	bool "Enable Second PCI (PCI1)"
+	depends on MIPS_EV64120
+
+choice
+	prompt "Galileo Chip Clock"
+	depends on MIPS_EV64120
+
+config SYSCLK_75
+	bool "75"
+
+config SYSCLK_83
+	bool "83.3"
+
+config SYSCLK_100_1
+	bool "100"
+
+endchoice
+
+config MIPS_ATLAS
+	bool "Support for MIPS Atlas board (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This enables support for the QED R5231-based MIPS Atlas evaluation
+	  board.
+
+config MIPS_MALTA
+	bool "Support for MIPS Malta board (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This enables support for the VR5000-based MIPS Malta evaluation
+	  board.
+
+config NINO
+	bool "Support for Philips Nino (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  Say Y here to select a kernel for the Philips Nino Palm PC. The
+	  website at <http://www.realitydiluted.com/projects/nino/index.html>
+	  will have more information.
+
+choice
+	prompt "Nino Model Number"
+	depends on NINO
+
+config NINO_4MB
+	bool "Model-300/301/302/319"
+	help
+	  Say Y here to build a kernel specifically for Nino Palm PCs with
+	  4MB of memory. These include models 300/301/302/319.
+
+config NINO_8MB
+	bool "Model-200/210/312/320/325/350/390"
+	help
+	  Say Y here to build a kernel specifically for Nino Palm PCs with
+	  8MB of memory. These include models 200/210/312/320/325/350/390.
+
+config NINO_16MB
+	bool "Model-500/510"
+	help
+	  Say Y here to build a kernel specifically for Nino 500/501 color
+	  Palm PCs from Philips (INCOMPLETE).
+
+endchoice
+
+config MIPS_MAGNUM_4000
+	bool "Support for Mips Magnum 4000"
+	help
+	  This is a machine with a R4000 100 MHz CPU. To compile a Linux
+	  kernel that runs on these, say Y here. For details about Linux on
+	  the MIPS architecture, check out the Linux/MIPS FAQ on the WWW at
+	  <http://oss.sgi.com/mips/>.
+
+config MOMENCO_OCELOT
+	bool "Support for Momentum Ocelot board"
+	help
+	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
+	  Momentum Computer <http://www.momenco.com/>.
+
+config DDB5476
+	bool "Support for NEC DDB Vrc-5476"
+	help
+	  This enables support for the R5432-based NEC DDB Vrc-5476
+	  evaluation board.
+
+	  Features : kernel debugging, serial terminal, NFS root fs, on-board
+	  ether port (Need an additional patch at <http://linux.junsun.net/>),
+	  USB, AC97, PCI, PCI VGA card & framebuffer console, IDE controller,
+	  PS2 keyboard, PS2 mouse, etc.
+
+config DDB5477
+	bool "Support for NEC DDB Vrc-5477"
+	help
+	  This enables support for the R5432-based NEC DDB Vrc-5477
+	  evaluation board.
+
+	  Features : kernel debugging, serial terminal, NFS root fs, on-board
+	  ether port (Need an additional patch at <http://linux.junsun.net/>),
+	  USB, AC97, PCI, etc.
+
+config OLIVETTI_M700
+	bool "Support for Olivetti M700-10"
+	help
+	  This is a machine with a R4000 100 MHz CPU. To compile a Linux
+	  kernel that runs on these, say Y here. For details about Linux on
+	  the MIPS architecture, check out the Linux/MIPS FAQ on the WWW at
+	  <http://oss.sgi.com/mips/>.
+
+config SGI_IP22
+	bool "Support for SGI IP22"
+	help
+	  This are the SGI Indy, Challenge S and Indigo2, as well as certain
+	  OEM variants like the Tandem CMN B006S. To compile a Linux kernel
+	  that runs on these, say Y here.
+
+config SNI_RM200_PCI
+	bool "Support for SNI RM200 PCI"
+	help
+	  The SNI RM200 PCI was a MIPS-based platform manufactured by Siemens
+	  Nixdorf Informationssysteme (SNI), parent company of Pyramid
+	  Technology and now in turn merged with Fujitsu.  Say Y here to
+	  support this machine type.
+
+config MIPS_ITE8172
+	bool "Support for ITE 8172G board"
+	help
+	  Ths is an evaluation board made by ITE <http://www.ite.com.tw/>
+	  with ATX form factor that utilizes a MIPS R5000 to work with its
+	  ITE8172G companion internet appliance chip. The MIPS core can be
+	  either a NEC Vr5432 or QED RM5231. Say Y here if you wish to build
+	  a kernel for this platform.
+
+config IT8172_REVC
+	bool "Support for older IT8172 (Rev C)"
+	depends on MIPS_ITE8172
+	help
+	  Say Y here to support the older, Revision C version of the Integrated
+	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
+	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
+	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+
+config QTRONIX_KEYBOARD
+	bool "Enable Qtronix 990P Keyboard Support"
+	depends on MIPS_IVR || MIPS_ITE8172
+	help
+	  Images of Qtronix keyboards are at
+	  <http://www.qtronix.com/keyboard.html>.
+
+config IT8172_CIR
+	bool
+	depends on QTRONIX_KEYBOARD && (MIPS_IVR || MIPS_ITE8172)
+	default y
+
+config PC_KEYB
+	bool "Enable PS2 Keyboard Support" if MIPS_ITE8172 && !QTRONIX_KEYBOARD
+	default y if NINO || MIPS_ITE8172 || DDB5476 || DDB5074 || SNI_RM200_PCI || SGI_IP22 || ACER_PICA_61 || MIPS_MAGNUM_4000 || OLIVETTI_M700
+
+config IT8172_SCR0
+	bool "Enable Smart Card Reader 0 Support "
+	depends on MIPS_IVR || MIPS_ITE8172
+	help
+	  Say Y here to support smart-card reader 0 (SCR0) on the Integrated
+	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
+	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
+	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+
+config IT8172_SCR1
+	bool "Enable Smart Card Reader 1 Support "
+	depends on MIPS_ITE8172
+	help
+	  Say Y here to support smart-card reader 1 (SCR1) on the Integrated
+	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
+	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
+	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+
+config MIPS_IVR
+	bool "Support for Globespan IVR board"
+	help
+	  This is an evaluation board built by Globespan to showcase thir
+	  iVR (Internet Video Recorder) design. It utilizes a QED RM5231
+	  R5000 MIPS core. More information can be found out their website
+	  located at <http://www.globespan.net/products/product4.html>P. Say Y
+	  here if you wish to build a kernel for this platform.
+
+config MIPS_PB1000
+	bool "Support for Alchemy Semi PB1000 board"
+	help
+	  This is an evaluation board built by Alchemy Semiconducttor to
+	  showcase their Au1000 Internet Edge Processor. It is SOC design
+	  containing a MIPS32 core running at 266/400/500MHz with many
+	  integrated peripherals. Further information can be found at their
+	  website, <http://www.alchemysemi.com/>. Say Y here if you wish to
+	  build a kernel for this platform.
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+
+#
+# Select some configuration options automatically for certain systems.
+#
+config ISA
+	bool
+	depends on DDB5476 || DDB5074 || SNI_RM200_PCI || ACER_PICA_61 || MIPS_MAGNUM_4000 || OLIVETTI_M700
+	default y
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config EISA
+	bool
+	depends on ISA
+	default y
+	---help---
+	  The Extended Industry Standard Architecture (EISA) bus was
+	  developed as an open alternative to the IBM MicroChannel bus.
+
+	  The EISA bus provided some of the features of the IBM MicroChannel
+	  bus while maintaining backward compatibility with cards made for
+	  the older ISA bus.  The EISA bus saw limited use between 1988 and
+	  1995 when it was made obsolete by the PCI bus.
+
+	  Say Y here if you are building a kernel for an EISA-based machine.
+
+	  Otherwise, say N.
+
+config PCI
+	bool
+	depends on MIPS_IVR || MIPS_ITE8172 || DDB5477 || DDB5476 || DDB5074 || SNI_RM200_PCI || MOMENCO_OCELOT || MIPS_MALTA || MIPS_ATLAS || ALGOR_P4032 || MIPS_EV64120 || MIPS_EV96100
+	default y
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+config MCA
+	bool
+	help
+	  MicroChannel Architecture is found in some IBM PS/2 machines and
+	  laptops.  It is a bus system similar to PCI or ISA. See
+	  <file:Documentation/mca.txt> (and especially the web page given
+	  there) before attempting to build an MCA bus kernel.
+
+config SBUS
+	bool
+
+config I8259
+	bool
+	depends on DDB5074 || SNI_RM200_PCI || MIPS_MALTA || ACER_PICA_61 || MIPS_MAGNUM_4000 || OLIVETTI_M700
+	default y
+
+config MIPS_GT96100
+	bool
+	depends on MIPS_EV96100
+	default y
+	help
+	  Say Y here to support the Galileo Technology GT96100 communications
+	  controller card.  There is a web page at <http://www.galileot.com/>.
+
+config SWAP_IO_SPACE
+	bool
+	depends on MOMENCO_OCELOT || MIPS_MALTA || MIPS_ATLAS || MIPS_EV96100
+	default y
+
+config NEW_PCI
+	bool
+	depends on MIPS_ITE8172 || MIPS_EV96100
+	default y
+
+config PCI_AUTO
+	bool
+	depends on MIPS_ITE8172 || MIPS_EV96100
+	default y
+
+config MIPS_GT64120
+	bool
+	depends on MIPS_EV64120
+	default y
+
+config OLD_TIME_C
+	bool
+	depends on DDB5074 || SNI_RM200_PCI || SGI_IP22 || MOMENCO_OCELOT || ACER_PICA_61 || MIPS_MAGNUM_4000 || OLIVETTI_M700 || ALGOR_P4032 || MIPS_EV64120
+	default y
+
+config ARC32
+	bool
+	depends on SNI_RM200_PCI || SGI_IP22 || ACER_PICA_61 || MIPS_MAGNUM_4000 || OLIVETTI_M700
+	default y
+
+config FB
+	bool
+	depends on MIPS_MAGNUM_4000 || OLIVETTI_M700
+	default y
+	---help---
+	  The frame buffer device provides an abstraction for the graphics
+	  hardware. It represents the frame buffer of some video hardware and
+	  allows application software to access the graphics hardware through
+	  a well-defined interface, so the software doesn't need to know
+	  anything about the low-level (hardware register) stuff.
+
+	  Frame buffer devices work identically across the different
+	  architectures supported by Linux and make the implementation of
+	  application programs easier and more portable; at this point, an X
+	  server exists which uses the frame buffer device exclusively.
+	  On several non-X86 architectures, the frame buffer device is the
+	  only way to use the graphics hardware.
+
+	  The device is accessed through special device nodes, usually located
+	  in the /dev directory, i.e. /dev/fb*.
+
+	  You need an utility program called fbset to make full use of frame
+	  buffer devices. Please read <file:Documentation/fb/framebuffer.txt>
+	  and the Framebuffer-HOWTO at
+	  <http://www.tahallah.demon.co.uk/programming/prog.html> for more
+	  information.
+
+	  Say Y here and to the driver for your graphics board below if you
+	  are compiling a kernel for a non-x86 architecture.
+
+	  If you are compiling for the x86 architecture, you can say Y if you
+	  want to play with it, but it is not essential. Please note that
+	  running graphical applications that directly touch the hardware
+	  (e.g. an accelerated X server) and that are not frame buffer
+	  device-aware may cause unexpected results. If unsure, say N.
+
+config FB_G364
+	bool
+	depends on MIPS_MAGNUM_4000 || OLIVETTI_M700
+	default y
+
+config MIPS_JAZZ
+	bool
+	depends on ACER_PICA_61 || MIPS_MAGNUM_4000 || OLIVETTI_M700
+	default y
+
+config ROTTEN_IRQ
+	bool
+	depends on DDB5476 || DDB5074 || SNI_RM200_PCI || ACER_PICA_61
+	default y
+
+config HAVE_STD_PC_SERIAL_PORT
+	bool
+	depends on DDB5476 || DDB5074 || MIPS_MALTA
+	default y
+
+config NEW_IRQ
+	bool
+	depends on MIPS_PB1000 || DDB5477 || SGI_IP22 || MOMENCO_OCELOT || MIPS_MALTA
+	default y
+
+config SYSCLK_100_2
+	bool
+	depends on MOMENCO_OCELOT
+	default y
+
+config BOARD_SCACHE
+	bool
+	depends on SGI_IP22
+	default y
+
+config SGI
+	bool
+	depends on SGI_IP22
+	default y
+
+config NEW_TIME_C
+	bool
+	depends on DDB5477 || DDB5476
+	default y
+
+config CPU_LITTLE_ENDIAN
+	bool
+	depends on DDB5477
+	default y
+	help
+	  Some MIPS machines can be configured for either little or big endian
+	  byte order. These modes require different kernels. Say Y if your
+	  machine is little endian, N if it's a big endian machine.
+
+config IT8712
+	bool
+	depends on MIPS_ITE8172
+	default y
+
+config MIPS_AU1000
+	bool
+	depends on MIPS_PB1000
+	default y
+
+config SYSCLK_100
+	bool
+	depends on SYSCLK_100_1 || SYSCLK_100_2
+	default y
+
+endmenu
+
+
+menu "CPU selection"
+
+choice
+	prompt "CPU type"
+	default CPU_R4X00
+
+config CPU_R3000
+	bool "R3000"
+	---help---
+	  Please make sure to pick the right CPU type. Linux/MIPS is not
+	  designed to be generic, i.e. Kernels compiled for R3000 CPUs will
+	  *not* work on R4000 machines and vice versa.  However, since most
+	  of the supported machines have an R4000 (or similar) CPU, R4x00
+	  might be a safe bet.  If the resulting kernel does not work,
+	  try to recompile with R3000.
+
+	  R3000    MIPS Technologies R3000-series processors,
+	  including the 3041, 3051, and 3081.
+
+	  R6000    MIPS Technologies R6000-series processors,
+	  including the 64474, 64475, 64574 and 64575.
+
+	  R4300    MIPS Technologies R4300-series processors.
+
+	  R4x00    MIPS Technologies R4000-series processors other than 4300,
+	  including the 4640, 4650, and 4700.
+
+	  R5000    MIPS Technologies R5000-series processors other than the
+	  Nevada.
+
+	  R52xx    MIPS Technologies R52xx-series ("Nevada") processors.
+
+	  R10000   MIPS Technologies R10000-series processors.
+
+config CPU_R6000
+	bool "R6000"
+	help
+	  MIPS Technologies R6000-series processors, including the 64474,
+	  64475, 64574 and 64575.
+
+config CPU_VR41XX
+	bool "R41xx"
+	help
+	  The options selects support for the NEC VR41xx series of processors.
+	  Only choose this option if you have one of these processors as a
+	  kernel built with this option will not run on any other type of
+	  processor or vice versa.
+
+config CPU_R4300
+	bool "R4300"
+	help
+	  MIPS Technologies R4300-series processors.
+
+config CPU_R4X00
+	bool "R4x00"
+	help
+	  MIPS Technologies R4000-series processors other than 4300, including
+	  the 4640, 4650, and 4700.
+
+config CPU_R5000
+	bool "R5000"
+	help
+	  MIPS Technologies R5000-series processors other than the Nevada.
+
+config CPU_R5432
+	bool "R5432"
+
+config CPU_RM7000
+	bool "RM7000"
+
+config CPU_NEVADA
+	bool "R52xx"
+	help
+	  MIPS Technologies R52x0-series ("Nevada") processors.
+
+config CPU_R10000
+	bool "R10000"
+	help
+	  MIPS Technologies R10000-series processors.
+
+config CPU_SB1
+	bool "SB1"
+
+config CPU_MIPS32
+	bool "MIPS32"
+
+config CPU_MIPS64
+	bool "MIPS64"
+
+endchoice
+
+config CPU_ADVANCED
+	bool "Override CPU Options"
+	help
+	  Saying yes here allows you to select support for various features
+	  your CPU may or may not have.  Most people should say N here.
+
+config CPU_HAS_LLSC
+	bool "ll/sc Instructions available" if CPU_ADVANCED
+	default y if !CPU_ADVANCED && !CPU_R3000 && !CPU_VR41XX
+	help
+	  MIPS R4000 series and later provide the Load Linked (ll)
+	  and Store Conditional (sc) instructions. More information is
+	  available at <http://www.go-ecs.com/mips/miptek1.htm>.
+
+	  Say Y here if your CPU has the ll and sc instructions.  Say Y here
+	  for better performance, N if you don't know.  You must say Y here
+	  for multiprocessor machines.
+
+config CPU_HAS_LLDSCD
+	bool "lld/scd Instructions available" if CPU_ADVANCED
+	default y if !CPU_ADVANCED && !CPU_R3000 && !CPU_VR41XX && !CPU_MIPS32
+	help
+	  Say Y here if your CPU has the lld and scd instructions, the 64-bit
+	  equivalents of ll and sc.  Say Y here for better performance, N if
+	  you don't know.  You must say Y here for multiprocessor machines.
+
+config CPU_HAS_WB
+	bool "Writeback Buffer available" if CPU_ADVANCED
+	default y if !CPU_ADVANCED && (CPU_R3000 || CPU_VR41XX) && CONFIG_DECSTATION=y
+	help
+	  Say N here for slightly better performance.  You must say Y here for
+	  machines which require flushing of write buffers in software.  Saying
+	  Y is the safe option; N may result in kernel malfunction and crashes.
+
+endmenu
+
+
+menu "General setup"
+
+config CPU_LITTLE_ENDIAN
+	bool "Generate little endian code" if !DECSTATION && !DDB5074 && !DDB5476 && !NINO
+	default y if DECSTATION || DDB5074 || DDB5476 || NINO
+
+config KCORE_ELF
+	bool
+	depends on PROC_FS
+	default y
+	---help---
+	  If you enabled support for /proc file system then the file
+	  /proc/kcore will contain the kernel core image. This can be used
+	  in gdb:
+
+	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+	  You have two choices here: ELF and A.OUT. Selecting ELF will make
+	  /proc/kcore appear in ELF core format as defined by the Executable
+	  and Linking Format specification. Selecting A.OUT will choose the
+	  old "a.out" format which may be necessary for some old versions
+	  of binutils or on some architectures.
+
+	  This is especially useful if you have compiled the kernel with the
+	  "-g" option to preserve debugging information. It is mainly used
+	  for examining kernel data structures on the live kernel so if you
+	  don't understand what this means or are not a kernel hacker, just
+	  leave it at its default value ELF.
+
+config ELF_KERNEL
+	bool
+	default y
+
+config BINFMT_IRIX
+	bool "Include IRIX binary compatibility"
+	depends on !CPU_LITTLE_ENDIAN
+
+config FORWARD_KEYBOARD
+	bool "Include forward keyboard"
+	depends on !CPU_LITTLE_ENDIAN
+
+config ARC_CONSOLE
+	bool "ARC console support"
+	depends on ARC32
+
+config BINFMT_AOUT
+	bool
+	---help---
+	  A.out (Assembler.OUTput) is a set of formats for libraries and
+	  executables used in the earliest versions of UNIX. Linux used the
+	  a.out formats QMAGIC and ZMAGIC until they were replaced with the
+	  ELF format.
+
+	  As more and more programs are converted to ELF, the use for a.out
+	  will gradually diminish. If you disable this option it will reduce
+	  your kernel by one page. This is not much and by itself does not
+	  warrant removing support. However its removal is a good idea if you
+	  wish to ensure that absolutely none of your programs will use this
+	  older executable format. If you don't know what to answer at this
+	  point then answer Y. If someone told you "You need a kernel with
+	  QMAGIC support" then you'll have to say Y here. You may answer M to
+	  compile a.out support as a module and later load the module when you
+	  want to use a program or library in a.out format. The module will be
+	  called binfmt_aout.o. Saying M or N here is dangerous though,
+	  because some crucial programs on your system might still be in A.OUT
+	  format.
+
+config BINFMT_ELF
+	bool
+	default y
+	---help---
+	  ELF (Executable and Linkable Format) is a format for libraries and
+	  executables used across different architectures and operating
+	  systems. Saying Y here will enable your kernel to run ELF binaries
+	  and enlarge it by about 13 KB. ELF support under Linux has now all
+	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+	  because it is portable (this does *not* mean that you will be able
+	  to run executables from different architectures or operating systems
+	  however) and makes building run-time libraries very easy. Many new
+	  executables are distributed solely in ELF format. You definitely
+	  want to say Y here.
+
+	  Information about ELF is contained in the ELF HOWTO available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you find that after upgrading from Linux kernel 1.2 and saying Y
+	  here, you still can't run any ELF binaries (they just crash), then
+	  you'll have to install the newest ELF runtime libraries, including
+	  ld.so (check the file <file:Documentation/Changes> for location and
+	  latest version).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  some crucial programs on your system might be in ELF format.
+
+config BINFMT_MISC
+	tristate "Kernel support for MISC binaries"
+	---help---
+	  If you say Y here, it will be possible to plug wrapper-driven binary
+	  formats into the kernel. You will like this especially when you use
+	  programs that need an interpreter to run like Java, Python or
+	  Emacs-Lisp. It's also useful if you often run DOS executables under
+	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  registered such a binary class with the kernel, you can start one of
+	  those programs simply by typing in its name at a shell prompt; Linux
+	  will automatically feed it to the correct interpreter.
+
+	  You can do other nice things, too. Read the file
+	  <file:Documentation/binfmt_misc.txt> to learn how to use this
+	  feature, and <file:Documentation/java.txt> for information about how
+	  to include Java support.
+
+	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+	  use this part of the kernel.
+
+	  You may say M here for module support and later load the module when
+	  you have use for it; the module is called binfmt_misc.o. If you
+	  don't know what to answer at this point, say Y.
+
+source "drivers/pci/Kconfig"
+
+config HOTPLUG
+	bool "Support for hot-pluggable devices"
+	---help---
+	  Say Y here if you want to plug devices into your computer while
+	  the system is running, and be able to use them quickly.  In many
+	  cases, the devices can likewise be unplugged at any time too.
+
+	  One well known example of this is PCMCIA- or PC-cards, credit-card
+	  size devices such as network cards, modems or hard drives which are
+	  plugged into slots found on all modern laptop computers.  Another
+	  example, used on modern desktops as well as laptops, is USB.
+
+	  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+	  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+	  Then your kernel will automatically call out to a user mode "policy
+	  agent" (/sbin/hotplug) to load modules and set up software needed
+	  to use devices as you hotplug them.
+
+source "drivers/pcmcia/Kconfig"
+
+config TC
+	bool "TURBOchannel support"
+	depends on DECSTATION
+	help
+	  TurboChannel is a DEC (now Compaq) bus for Alpha and MIPS processors.
+	  Documentation on writing device drivers for TurboChannel is available at:
+	  <http://www.cs.arizona.edu/computer.help/policy/DIGITAL_unix/AA-PS3HD-TET1_html/TITLE.html>.
+
+#    if [ "$CONFIG_TC" = "y" ]; then
+#	bool ' Access.Bus support' CONFIG_ACCESSBUS
+#    fi
+endmenu
+
+
+if ISA
+source "drivers/pnp/Kconfig"
+endif
+
+source "drivers/mtd/Kconfig"
+
+source "drivers/parport/Kconfig"
+
+source "drivers/block/Kconfig"
+
+source "drivers/md/Kconfig"
+
+
+menu "ATA/ATAPI/MFM/RLL support"
+	depends on !SGI_IP22 && !DECSTATION
+
+config IDE
+	tristate "ATA/ATAPI/MFM/RLL support"
+	---help---
+	  If you say Y here, your kernel will be able to manage low cost mass
+	  storage units such as ATA/(E)IDE and ATAPI units. The most common
+	  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	  If your system is pure SCSI and doesn't use these interfaces, you
+	  can say N here.
+
+	  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+	  for mass storage units such as hard disks. It was designed by
+	  Western Digital and Compaq Computer in 1984. It was then named
+	  ST506. Quite a number of disks use the IDE interface.
+
+	  AT Attachment (ATA) is the superset of the IDE specifications.
+	  ST506 was also called ATA-1.
+
+	  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+	  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+	  the LBA standard), more disks (4 instead of 2) and for other mass
+	  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+	  ATA-4 and provides faster (and more CPU friendly) transfer modes
+	  than previous PIO (Programmed processor Input/Output) from previous
+	  ATA/IDE standards by means of fast DMA controllers.
+
+	  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+	  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+	  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+	  designed in order to prevent data corruption and disk crash by
+	  detecting pre hardware failure conditions (heat, access time, and
+	  the like...). Disks built since June 1995 may follow this standard.
+	  The kernel itself don't manage this; however there are quite a
+	  number of user programs such as smart that can query the status of
+	  SMART parameters disk.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>. The module
+	  will be called ide.o.
+
+	  For further information, please read <file:Documentation/ide.txt>.
+
+	  If unsure, say Y.
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+
+menu "SCSI support"
+
+config SCSI
+	tristate "SCSI support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you want support for the parallel
+	  port version of the 100 MB IOMEGA ZIP drive.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
+source "drivers/scsi/Kconfig"
+
+endmenu
+
+
+if !DECSTATION" && !SGI_IP22
+source "drivers/message/i2o/Kconfig"
+endif
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+endmenu
+
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+source "drivers/telephony/Kconfig"
+
+
+menu "Old CD-ROM drivers (not SCSI, not IDE)"
+
+config CD_NO_IDESCSI
+	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
+	---help---
+	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+	  here, otherwise N. Read the CD-ROM-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about these CD-ROM drives. If you are unsure what you
+	  have, say Y and find out whether you have one of the following
+	  drives.
+
+	  For each of these drivers, a file Documentation/cdrom/{driver_name}
+	  exists. Especially in cases where you do not know exactly which kind
+	  of drive you have you should read there. Most of these drivers use a
+	  file drivers/cdrom/{driver_name}.h where you can define your
+	  interface parameters and switch some internal goodies.
+
+	  All these CD-ROM drivers are also usable as a module ( = code which
+	  can be inserted in and removed from the running kernel whenever you
+	  want). If you want to compile them as module, say M instead of Y and
+	  read <file:Documentation/modules.txt>.
+
+	  If you want to use any of these CD-ROM drivers, you also have to
+	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+	  answer will get "defaulted" for you if you enable any of the Linux
+	  CD-ROM drivers).
+
+source "drivers/cdrom/Kconfig"
+
+endmenu
+
+source "drivers/input/Kconfig"
+
+source "drivers/char/Kconfig"
+
+source "drivers/media/Kconfig"
+
+
+menu "DECStation Character devices"
+	depends on DECSTATION
+
+config VT
+	bool "Virtual terminal"
+
+config VT_CONSOLE
+	bool "Support for console on virtual terminal"
+	depends on VT
+
+config SERIAL
+	tristate "Standard/generic (dumb) serial support"
+	---help---
+	  This selects whether you want to include the driver for the standard
+	  serial ports.  The standard answer is Y.  People who might say N
+	  here are those that are setting up dedicated Ethernet WWW/FTP
+	  servers, or users that have one of the various bus mice instead of a
+	  serial mouse and don't intend to use their machine's standard serial
+	  port for anything.  (Note that the Cyclades and Stallion multi
+	  serial port drivers do not need this driver built in for them to
+	  work.)
+
+	  If you want to compile this driver as a module, say M here and read
+	  <file:Documentation/modules.txt>.  The module will be called
+	  serial.o.
+	  [WARNING: Do not compile this driver as a module if you are using
+	  non-standard serial ports, since the configuration information will
+	  be lost when the driver is unloaded.  This limitation may be lifted
+	  in the future.]
+
+	  BTW1: If you have a mouseman serial mouse which is not recognized by
+	  the X window system, try running gpm first.
+
+	  BTW2: If you intend to use a software modem (also called Winmodem)
+	  under Linux, forget it.  These modems are crippled and require
+	  proprietary drivers which are only available under Windows.
+
+	  Most people will say Y or M here, so that they can use serial mice,
+	  modems and similar devices connecting to the standard serial ports.
+
+config DZ
+	bool "DZ11 Serial Support"
+	depends on SERIAL=y
+	help
+	  DZ11-family serial controllers for VAXstations, including the
+	  DC7085, M7814, and M7819.
+
+config ZS
+	bool "Z85C30 Serial Support"
+	depends on SERIAL=y && TC
+	help
+	  Documentation on the Zilog 85C350 serial communications controller
+	  is downloadable at <http://www.zilog.com/pdfs/serial/z85c30.pdf>.
+
+config SERIAL_CONSOLE
+	bool "Support for console on serial port"
+	depends on SERIAL=y
+	---help---
+	  If you say Y here, it will be possible to use a serial port as the
+	  system console (the system console is the device which receives all
+	  kernel messages and warnings and which allows logins in single user
+	  mode). This could be useful if some terminal or printer is connected
+	  to that serial port.
+
+	  Even if you say Y here, the currently visible virtual console
+	  (/dev/tty0) will still be used as the system console by default, but
+	  you can alter that using a kernel command line option such as
+	  "console=ttyS1". (Try "man bootparam" or see the documentation of
+	  your boot loader (lilo or loadlin) about how to pass options to the
+	  kernel at boot time.)
+
+	  If you don't have a VGA card installed and you say Y here, the
+	  kernel will automatically use the first serial line, /dev/ttyS0, as
+	  system console.
+
+	  If unsure, say N.
+
+config UNIX98_PTYS
+	bool "Unix98 PTY support"
+
+config UNIX98_PTY_COUNT
+	int "Maximum number of Unix98 PTYs in use (0-2048)"
+	depends on UNIX98_PTYS
+	default "256"
+
+#   if [ "$CONFIG_ACCESSBUS" = "y" ]; then
+#      bool 'MAXINE Access.Bus mouse (VSXXX-BB/GB) support' CONFIG_DTOP_MOUSE
+#   fi
+config RTC
+	tristate "Enhanced Real Time Clock Support"
+
+endmenu
+
+
+menu "SGI Character devices"
+	depends on SGI_IP22
+
+config VT
+	bool "Virtual terminal"
+
+config VT_CONSOLE
+	bool "Support for console on virtual terminal"
+	depends on VT
+
+config SGI_NEWPORT_CONSOLE
+	tristate "SGI Newport Console support"
+	depends on VT
+	help
+	  Say Y here if you want the console on the Newport aka XL graphics
+	  card of your Indy.  Most people say Y here.
+
+config DUMMY_CONSOLE
+	bool
+	depends on VT && SGI_NEWPORT_CONSOLE!=y
+	default y
+
+config FONT_8x16
+	bool
+	depends on VT && SGI_NEWPORT_CONSOLE=y
+	default y
+	help
+	  This is the "high resolution" font for the VGA frame buffer (the one
+	  provided by the VGA text console 80x25 mode.
+
+	  If unsure, say Y.
+
+config PSMOUSE
+	bool "PS/2 mouse support (aka \"auxiliary device\")"
+	---help---
+	  The PS/2 mouse connects to a special mouse port that looks much like
+	  the keyboard port (small circular connector with 6 pins). This way,
+	  the mouse does not use any serial ports. This port can also be used
+	  for other input devices like light pens, tablets, keypads. Compaq,
+	  AST and IBM all use this as their mouse port on currently shipping
+	  machines. The trackballs of some laptops are PS/2 mice also. In
+	  particular, the C&T 82C710 mouse on TI Travelmates is a PS/2 mouse.
+
+	  Although PS/2 mice are not technically bus mice, they are explained
+	  in detail in the Busmouse-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  When using a PS/2 mouse, you can get problems if you want to use the
+	  mouse both on the Linux console and under X. Using the "-R" option
+	  of the Linux mouse managing program gpm (available from
+	  <ftp://gnu.systemy.it/pub/gpm/>) solves this problem, or you can get
+	  the "mconv2" utility from <ftp://ibiblio.org/pub/Linux/system/mouse/>.
+
+config MOUSE
+	bool
+	depends on PSMOUSE
+	default y
+	---help---
+	  This is for machines with a mouse which is neither a serial nor a
+	  bus mouse. Examples are PS/2 mice (such as the track balls on some
+	  laptops) and some digitizer pads. Most people have a regular serial
+	  MouseSystem or Microsoft mouse (made by Logitech) that plugs into a
+	  COM port (rectangular with 9 or 25 pins). These people say N here.
+	  If you have something else, read the Busmouse-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. This HOWTO contains
+	  information about all non-serial mice, not just bus mice.
+
+	  If you have a laptop, you either have to check the documentation or
+	  experiment a bit to find out whether the trackball is a serial mouse
+	  or not; it's best to say Y here for you.
+
+	  Note that the answer to this question won't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about non-serial mice. If unsure, say Y.
+
+config UNIX98_PTYS
+	bool "Unix98 PTY support"
+
+config UNIX98_PTY_COUNT
+	int "Maximum number of Unix98 PTYs in use (0-2048)"
+	depends on UNIX98_PTYS
+	default "256"
+
+endmenu
+
+source "fs/Kconfig"
+
+
+menu "Console drivers"
+	depends on VT
+
+config VGA_CONSOLE
+	bool "VGA text console"
+	help
+	  Saying Y here will allow you to use Linux in text mode through a
+	  display that complies with the generic VGA standard. Virtually
+	  everyone wants that.
+
+	  The program SVGATextMode can be used to utilize SVGA video cards to
+	  their full potential in text mode. Download it from
+	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+	  Say Y.
+
+if EXPERIMENTAL
+
+config MDA_CONSOLE
+	tristate "MDA text console (dual-headed) (EXPERIMENTAL)"
+	---help---
+	  Say Y here if you have an old MDA or monochrome Hercules graphics
+	  adapter in your system acting as a second head ( = video card). You
+	  will then be able to use two monitors with your Linux system. Do not
+	  say Y here if your MDA card is the primary card in your system; the
+	  normal VGA driver will handle it.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted and removed from the running kernel whenever you want).
+	  The module will be called mdacon.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+	  If unsure, say N.
+
+source "drivers/video/Kconfig"
+
+endif
+
+endmenu
+
+
+menu "Sound"
+	depends on !DECSTATION
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/Kconfig"
+
+endmenu
+
+source "drivers/sgi/Kconfig"
+
+source "drivers/usb/Kconfig"
+
+
+menu "Kernel hacking"
+
+config CROSSCOMPILE
+	bool "Are you using a crosscompiler"
+	help
+	  Say Y here if you are compiling the kernel on a different
+	  architecture than the one it is intended to run on.
+
+config REMOTE_DEBUG
+	bool "Remote GDB kernel debugging"
+	depends on SERIAL=y || AU1000_UART
+	help
+	  If you say Y here, it will be possible to remotely debug the MIPS
+	  kernel using gdb. This enlarges your kernel image disk size by
+	  several megabytes and requires a machine with more than 16 MB,
+	  better 32 MB RAM to avoid excessive linking time. This is only
+	  useful for kernel hackers. If unsure, say N.
+
+config GDB_CONSOLE
+	bool "Console output to GDB"
+	depends on REMOTE_DEBUG
+	help
+	  If you are using GDB for remote debugging over a serial port and
+	  would like kernel messages to be formatted into GDB $O packets so
+	  that GDB prints them as program output, say 'Y'.
+
+config LL_DEBUG
+	bool "Low-level debugging"
+	depends on SERIAL=y
+	help
+	  Enable low-level debugging assertion macros in the kernel code.
+	  Currently used only by the time services code in the MIPS port.
+	  Don't turn this on unless you know what you are doing.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config MIPS_UNCACHED
+	bool "Run uncached"
+	depends on !SMP
+	help
+	  If you say Y here there kernel will disable all CPU caches.  This will
+	  reduce the system's performance dramatically but can help finding
+	  otherwise hard to track bugs.  It can also useful if you're doing
+	  hardware debugging with a logic analyzer and need to see all traffic
+	  on the bus.
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	depends on SMP
+	default "32"
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+

@@ -37,11 +37,12 @@
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 
 #include "aacraid.h"
 
-/* FIXME: We share this with sd.c - wants putting in one spot only */
+#warning this is broken
+#define N_SD_MAJORS	8
+#define SD_MAJOR_MASK	(N_SD_MAJORS - 1)
 #define DEVICE_NR(device) (((major(device) & SD_MAJOR_MASK) << (8 - 4)) + (minor(device) >> 4))
 
 /*	SCSI Commands */
@@ -219,7 +220,6 @@ struct sense_data {
  
 static struct fsa_scsi_hba *fsa_dev[MAXIMUM_NUM_ADAPTERS];	/*  SCSI Device Instance Pointers */
 static struct sense_data sense_data[MAXIMUM_NUM_CONTAINERS];
-static void get_sd_devname(int disknum, char *buffer);
 static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* sgmap);
 static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg);
 static int aac_send_srb_fib(Scsi_Cmnd* scsicmd);
@@ -1060,8 +1060,10 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 			 */
 			 
 			spin_unlock_irq(scsicmd->host->host_lock);
-			fsa_dev_ptr->devno[cid] = 
-				DEVICE_NR(scsicmd->request->rq_dev);
+			if  (scsicmd->request->rq_disk)
+				memcpy(fsa_dev_ptr->devname[cid],
+					scsicmd->request->rq_disk->disk_name,
+					8);
 			ret = aac_read(scsicmd, cid);
 			spin_lock_irq(scsicmd->host->host_lock);
 			return ret;
@@ -1111,38 +1113,16 @@ static int query_disk(struct aac_dev *dev, void *arg)
 	qd.locked = fsa_dev_ptr->locked[qd.cnum];
 	qd.deleted = fsa_dev_ptr->deleted[qd.cnum];
 
-	if (fsa_dev_ptr->devno[qd.cnum] == -1)
+	if (fsa_dev_ptr->devno[qd.cnum][0] == '\0')
 		qd.unmapped = 1;
 	else
 		qd.unmapped = 0;
 
-	get_sd_devname(fsa_dev_ptr->devno[qd.cnum], qd.name);
+	strncpy(dq.name, fsa_dev_ptr->devname[qd.cnum], 8);
 
 	if (copy_to_user(arg, &qd, sizeof (struct aac_query_disk)))
 		return -EFAULT;
 	return 0;
-}
-
-static void get_sd_devname(int disknum, char *buffer)
-{
-	if (disknum < 0) {
-		sprintf(buffer, "%s", "");
-		return;
-	}
-
-	if (disknum < 26)
-		sprintf(buffer, "sd%c", 'a' + disknum);
-	else {
-		unsigned int min1;
-		unsigned int min2;
-		/*
-		 * For larger numbers of disks, we need to go to a new
-		 * naming scheme.
-		 */
-		min1 = disknum / 26;
-		min2 = disknum % 26;
-		sprintf(buffer, "sd%c%c", 'a' + min1 - 1, 'a' + min2);
-	}
 }
 
 static int force_delete_disk(struct aac_dev *dev, void *arg)
@@ -1190,7 +1170,7 @@ static int delete_disk(struct aac_dev *dev, void *arg)
 		 *	Mark the container as no longer being valid.
 		 */
 		fsa_dev_ptr->valid[dd.cnum] = 0;
-		fsa_dev_ptr->devno[dd.cnum] = -1;
+		fsa_dev_ptr->devno[dd.cnum][0] = '\0';
 		return 0;
 	}
 }

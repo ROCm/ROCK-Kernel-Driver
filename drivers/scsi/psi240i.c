@@ -688,8 +688,6 @@ int Psi240i_Reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 	return SCSI_RESET_PUNT;
 	}
 
-#include "sd.h"
-
 /****************************************************************
  *	Name:	Psi240i_BiosParam
  *
@@ -703,11 +701,12 @@ int Psi240i_Reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags)
  *	Returns:		zero.
  *
  ****************************************************************/
-int Psi240i_BiosParam (Scsi_Disk *disk, struct block_device *dev, int geom[])
+int Psi240i_BiosParam (struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int geom[])
 	{
 	POUR_DEVICE	pdev;
 
-	pdev = &(HOSTDATA(disk->device->host)->device[disk->device->id]);
+	pdev = &(HOSTDATA(sdev->host)->device[sdev->id]);
 
 	geom[0] = pdev->heads;
 	geom[1] = pdev->sectors;

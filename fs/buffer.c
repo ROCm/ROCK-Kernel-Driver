@@ -36,6 +36,7 @@
 #include <linux/suspend.h>
 #include <linux/buffer_head.h>
 #include <linux/bio.h>
+#include <linux/notifier.h>
 #include <asm/bitops.h>
 
 static void invalidate_bh_lrus(void);
@@ -1230,9 +1231,11 @@ __bread_slow(struct block_device *bdev, sector_t block, int size)
 
 #define BH_LRU_SIZE	8
 
-static struct bh_lru {
+struct bh_lru {
 	struct buffer_head *bhs[BH_LRU_SIZE];
-} ____cacheline_aligned_in_smp bh_lrus[NR_CPUS];
+};
+
+static DEFINE_PER_CPU(struct bh_lru, bh_lrus) = {{0}};
 
 #ifdef CONFIG_SMP
 #define bh_lru_lock()	local_irq_disable()
@@ -1262,7 +1265,7 @@ static void bh_lru_install(struct buffer_head *bh)
 
 	check_irqs_on();
 	bh_lru_lock();
-	lru = &bh_lrus[smp_processor_id()];
+	lru = &per_cpu(bh_lrus, smp_processor_id());
 	if (lru->bhs[0] != bh) {
 		struct buffer_head *bhs[BH_LRU_SIZE];
 		int in;
@@ -1305,7 +1308,7 @@ lookup_bh(struct block_device *bdev, sector_t block, int size)
 
 	check_irqs_on();
 	bh_lru_lock();
-	lru = &bh_lrus[smp_processor_id()];
+	lru = &per_cpu(bh_lrus, smp_processor_id());
 	for (i = 0; i < BH_LRU_SIZE; i++) {
 		struct buffer_head *bh = lru->bhs[i];
 
@@ -1378,11 +1381,12 @@ EXPORT_SYMBOL(__bread);
 static void invalidate_bh_lru(void *arg)
 {
 	const int cpu = get_cpu();
+	struct bh_lru *b = &per_cpu(bh_lrus, cpu);
 	int i;
 
 	for (i = 0; i < BH_LRU_SIZE; i++) {
-		brelse(bh_lrus[cpu].bhs[i]);
-		bh_lrus[cpu].bhs[i] = NULL;
+		brelse(b->bhs[i]);
+		b->bhs[i] = NULL;
 	}
 	put_cpu();
 }
@@ -1394,8 +1398,6 @@ static void invalidate_bh_lrus(void)
 	smp_call_function(invalidate_bh_lru, NULL, 1, 1);
 	preempt_enable();
 }
-
-
 
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset)
@@ -2576,8 +2578,10 @@ static void recalc_bh_state(void)
 	if (__get_cpu_var(bh_accounting).ratelimit++ < 4096)
 		return;
 	__get_cpu_var(bh_accounting).ratelimit = 0;
-	for (i = 0; i < NR_CPUS; i++)
-		tot += per_cpu(bh_accounting, i).nr;
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i))
+			tot += per_cpu(bh_accounting, i).nr;
+	}
 	buffer_heads_over_limit = (tot > max_buffer_heads);
 }
 	
@@ -2629,6 +2633,34 @@ static void bh_mempool_free(void *element, void *pool_data)
 #define NR_RESERVED (10*MAX_BUF_PER_PAGE)
 #define MAX_UNUSED_BUFFERS NR_RESERVED+20
 
+static void buffer_init_cpu(int cpu)
+{
+	struct bh_accounting *bha = &per_cpu(bh_accounting, cpu);
+	struct bh_lru *bhl = &per_cpu(bh_lrus, cpu);
+
+	bha->nr = 0;
+	bha->ratelimit = 0;
+	memset(bhl, 0, sizeof(*bhl));
+}
+	
+static int __devinit buffer_cpu_notify(struct notifier_block *self, 
+				unsigned long action, void *hcpu)
+{
+	long cpu = (long)hcpu;
+	switch(action) {
+	case CPU_UP_PREPARE:
+		buffer_init_cpu(cpu);
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __devinitdata buffer_nb = {
+	.notifier_call	= buffer_cpu_notify,
+};
+
 void __init buffer_init(void)
 {
 	int i;
@@ -2647,4 +2679,7 @@ void __init buffer_init(void)
 	 */
 	nrpages = (nr_free_buffer_pages() * 10) / 100;
 	max_buffer_heads = nrpages * (PAGE_SIZE / sizeof(struct buffer_head));
+	buffer_cpu_notify(&buffer_nb, (unsigned long)CPU_UP_PREPARE,
+				(void *)(long)smp_processor_id());
+	register_cpu_notifier(&buffer_nb);
 }
