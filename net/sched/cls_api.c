@@ -142,7 +142,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	struct tcf_proto *tp;
 	struct tcf_proto_ops *tp_ops;
 	struct Qdisc_class_ops *cops;
-	unsigned long cl = 0;
+	unsigned long cl;
 	unsigned long fh;
 	int err;
 
@@ -153,6 +153,7 @@ replay:
 	prio = TC_H_MAJ(t->tcm_info);
 	nprio = prio;
 	parent = t->tcm_parent;
+	cl = 0;
 
 	if (prio == 0) {
 		/* If no priority is given, user wants we allocated it. */
@@ -219,20 +220,29 @@ replay:
 		err = -ENOBUFS;
 		if ((tp = kmalloc(sizeof(*tp), GFP_KERNEL)) == NULL)
 			goto errout;
+		err = -EINVAL;
 		tp_ops = tcf_proto_lookup_ops(tca[TCA_KIND-1]);
+		if (tp_ops == NULL) {
 #ifdef CONFIG_KMOD
-		if (tp_ops==NULL && tca[TCA_KIND-1] != NULL) {
 			struct rtattr *kind = tca[TCA_KIND-1];
 			char name[IFNAMSIZ];
 
-			if (rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+			if (kind != NULL &&
+			    rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+				rtnl_unlock();
 				request_module("cls_%s", name);
+				rtnl_lock();
 				tp_ops = tcf_proto_lookup_ops(kind);
+				/* We dropped the RTNL semaphore in order to
+				 * perform the module load.  So, even if we
+				 * succeeded in loading the module we have to
+				 * replay the request.  We indicate this using
+				 * -EAGAIN.
+				 */
+				if (tp_ops != NULL)
+					err = -EAGAIN;
 			}
-		}
 #endif
-		if (tp_ops == NULL) {
-			err = -EINVAL;
 			kfree(tp);
 			goto errout;
 		}
