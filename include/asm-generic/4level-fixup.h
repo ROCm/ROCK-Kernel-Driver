@@ -24,7 +24,7 @@
 #define pud_bad(pud)			0
 #define pud_present(pud)		1
 #define pud_ERROR(pud)			do { } while (0)
-#define pud_clear(pud)			do { } while (0)
+#define pud_clear(pud)			pgd_clear(pud)
 
 #undef pud_free_tlb
 #define pud_free_tlb(tlb, x)            do { } while (0)
