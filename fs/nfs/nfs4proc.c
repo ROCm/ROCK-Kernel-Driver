@@ -2061,6 +2061,7 @@ nfs4_lck_type(int cmd, struct file_lock *request)
 			return NFS4_WRITE_LT; 
 	}
 	BUG();
+	return 0;
 }
 
 static inline uint64_t
@@ -2208,7 +2209,9 @@ nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
 	if (lsp == NULL) {
 		struct nfs4_state_owner *owner = state->owner;
 		struct nfs_open_to_lock otl = {
-			.lock_owner.clientid = server->nfs4_state->cl_clientid,
+			.lock_owner = {
+				.clientid = server->nfs4_state->cl_clientid,
+			},
 		};
 		status = -ENOMEM;
 		lsp = nfs4_alloc_lock_state(state, request->fl_owner);
