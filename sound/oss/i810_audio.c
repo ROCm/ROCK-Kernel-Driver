@@ -2686,6 +2686,14 @@ static int __init i810_ac97_init(struct i810_card *card)
 			break;
 		}
 		
+		codec->codec_write(codec, AC97_EXTENDED_MODEM_ID, 0L);
+		if(codec->codec_read(codec, AC97_EXTENDED_MODEM_ID))
+		{
+			printk(KERN_WARNING "i810_audio: codec %d is a softmodem - skipping.\n", num_ac97);
+			kfree(codec);
+			continue;
+		}
+	
 		card->ac97_features = eid;
 				
 		/* Now check the codec for useful features to make up for
