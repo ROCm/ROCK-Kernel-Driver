@@ -786,12 +786,11 @@ early_param("mem", early_parsemem);
 #ifdef CONFIG_PPC_MULTIPLATFORM
 static int __init set_preferred_console(void)
 {
-	struct device_node *prom_stdout;
+	struct device_node *prom_stdout = NULL;
 	char *name;
+	u32 *spd;
 	int offset = 0;
-#if  0
-	phandle *stdout_ph;
-#endif
+
 	DBG(" -> set_preferred_console()\n");
 
 	/* The user has requested a console so this is already set up. */
@@ -805,20 +804,7 @@ static int __init set_preferred_console(void)
 		return -ENODEV;
 	}
 	/* We are getting a weird phandle from OF ... */
-#if 0
-	stdout_ph = (phandle *)get_property(of_chosen, "linux,stdout-package", NULL);
-	if (stdout_ph == NULL) {
-		DBG(" no linux,stdout-package !\n");
-		return -ENODEV;
-	}
-	prom_stdout = of_find_node_by_phandle(*stdout_ph);
-	if (!prom_stdout) {
-		DBG(" can't find stdout package for phandle 0x%x !\n", *stdout_ph);
-		return -ENODEV;
-	}
-#endif
 	/* ... So use the full path instead */
-#if 1
 	name = (char *)get_property(of_chosen, "linux,stdout-path", NULL);
 	if (name == NULL) {
 		DBG(" no linux,stdout-path !\n");
@@ -829,7 +815,6 @@ static int __init set_preferred_console(void)
 		DBG(" can't find stdout package %s !\n", name);
 		return -ENODEV;
 	}	
-#endif
 	DBG("stdout is %s\n", prom_stdout->full_name);
 
 	name = (char *)get_property(prom_stdout, "name", NULL);
@@ -837,8 +822,12 @@ static int __init set_preferred_console(void)
 		DBG(" stdout package has no name !\n");
 		goto not_found;
 	}
+	spd = (u32 *)get_property(prom_stdout, "current-speed", NULL);
 
-	if (strcmp(name, "serial") == 0) {
+	if (0)
+		;
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	else if (strcmp(name, "serial") == 0) {
 		int i;
 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
 		if (i > 8) {
@@ -861,6 +850,7 @@ static int __init set_preferred_console(void)
 			}
 		}
 	}
+#endif /* CONFIG_SERIAL_8250_CONSOLE */
 #ifdef CONFIG_PPC_PSERIES
 	else if (strcmp(name, "vty") == 0) {
  		u32 *reg = (u32 *)get_property(prom_stdout, "reg", NULL);
@@ -890,17 +880,24 @@ static int __init set_preferred_console(void)
  		}
 	}
 #endif /* CONFIG_PPC_PSERIES */
+#ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
 	else if (strcmp(name, "ch-a") == 0)
 		offset = 0;
 	else if (strcmp(name, "ch-b") == 0)
 		offset = 1;
+#endif /* CONFIG_SERIAL_PMACZILOG_CONSOLE */
 	else
 		goto not_found;
 	of_node_put(prom_stdout);
 
 	DBG("Found serial console at ttyS%d\n", offset);
 
-	return add_preferred_console("ttyS", offset, NULL);
+	if (spd) {
+		char opt[16];
+		sprintf(opt, "%d", *spd);
+		return add_preferred_console("ttyS", offset, opt);
+	} else
+		return add_preferred_console("ttyS", offset, NULL);
 
  not_found:
 	DBG("No preferred console found !\n");
