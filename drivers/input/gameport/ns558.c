@@ -161,7 +161,7 @@ static void ns558_isa_probe(int io)
 
 #ifdef CONFIG_PNP
 
-static struct pnp_id pnp_devids[] = {
+static struct pnp_device_id pnp_devids[] = {
 	{ .id = "@P@0001", .driver_data = 0 }, /* ALS 100 */
 	{ .id = "@P@0020", .driver_data = 0 }, /* ALS 200 */
 	{ .id = "@P@1001", .driver_data = 0 }, /* ALS 100+ */
@@ -189,7 +189,7 @@ static struct pnp_id pnp_devids[] = {
 
 MODULE_DEVICE_TABLE(pnp, pnp_devids);
 
-static int ns558_pnp_probe(struct pnp_dev *dev, const struct pnp_id *cid, const struct pnp_id *did)
+static int ns558_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *did)
 {
 	int ioport, iolen;
 	struct ns558 *port;
