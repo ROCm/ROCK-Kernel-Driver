@@ -29,7 +29,7 @@
 struct driver_dir_entry;
 struct attribute;
 
-struct driverfs_ops {
+struct sysfs_ops {
 	int	(*open)(struct driver_dir_entry *);
 	int	(*close)(struct driver_dir_entry *);
 	ssize_t	(*show)(struct driver_dir_entry *, struct attribute *,char *, size_t, loff_t);
@@ -40,7 +40,7 @@ struct driver_dir_entry {
 	char			* name;
 	struct dentry		* dentry;
 	mode_t			mode;
-	struct driverfs_ops	* ops;
+	struct sysfs_ops	* ops;
 };
 
 struct attribute {
@@ -49,22 +49,20 @@ struct attribute {
 };
 
 extern int
-driverfs_create_dir(struct driver_dir_entry *, struct driver_dir_entry *);
+sysfs_create_dir(struct driver_dir_entry *, struct driver_dir_entry *);
 
 extern void
-driverfs_remove_dir(struct driver_dir_entry * entry);
+sysfs_remove_dir(struct driver_dir_entry * entry);
 
 extern int
-driverfs_create_file(struct attribute * attr,
+sysfs_create_file(struct attribute * attr,
 		     struct driver_dir_entry * parent);
 
 extern int 
-driverfs_create_symlink(struct driver_dir_entry * parent, 
+sysfs_create_symlink(struct driver_dir_entry * parent, 
 			char * name, char * target);
 
 extern void
-driverfs_remove_file(struct driver_dir_entry *, const char * name);
-
-extern int init_driverfs_fs(void);
+sysfs_remove_file(struct driver_dir_entry *, const char * name);
 
 #endif /* _DDFS_H_ */
