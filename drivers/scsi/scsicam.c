@@ -126,7 +126,7 @@ int scsi_partsize(unsigned char *buf, unsigned long capacity,
 	unsigned int logical_end, physical_end, ext_physical_end;
 
 
-	if (*(unsigned short *) (buf + 66) == 0xAA55) {
+	if (*(unsigned short *) (buf + 64) == 0xAA55) {
 		for (largest_cyl = -1, i = 0; i < 4; ++i, ++p) {
 			if (!p->sys_ind)
 				continue;
