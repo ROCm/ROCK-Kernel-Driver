@@ -626,7 +626,7 @@ if [ "$CONFIG_ARCH_ACORN" = "y" -o \
    mainmenu_option next_comment
    comment 'Sound'
 
-   tristate 'Sound support' CONFIG_SOUND
+   tristate 'Sound card support' CONFIG_SOUND
    if [ "$CONFIG_SOUND" != "n" ]; then
       source sound/Config.in
    fi
