@@ -319,6 +319,8 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (!server)
 		return -ENOMEM;
 	sb->u.generic_sbp = server;
+	memset(server, 0, sizeof(struct ncp_server));
+
 	error = -EFAULT;
 	if (raw_data == NULL)
 		goto out;

@@ -469,6 +469,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sbi)
 		return -ENOMEM;
 	sb->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(struct ext2_super_block));
 
 	/*
 	 * See what the current blocksize for the device is, and
