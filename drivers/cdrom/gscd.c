@@ -965,7 +965,7 @@ static int __init gscd_init(void)
 
 	gscd_queue = blk_init_queue(do_gscd_request, &gscd_lock);
 	if (!gscd_queue) {
-		ret -ENOMEM;
+		ret = -ENOMEM;
 		goto err_out3;
 	}
 
