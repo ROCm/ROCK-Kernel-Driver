@@ -258,11 +258,23 @@ static void belkin_sa_read_int_callback (struct urb *urb)
 	struct belkin_sa_private *priv;
 	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
+	int retval;
 
-	/* the urb might have been killed. */
-	if (urb->status)
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
-	
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
+
 	if (port_paranoia_check (port, __FUNCTION__)) return;
 
 	serial = port->serial;
@@ -321,8 +333,11 @@ static void belkin_sa_read_int_callback (struct urb *urb)
 		}
 	}
 #endif
-
-	/* INT urbs are automatically re-submitted */
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios *old_termios)

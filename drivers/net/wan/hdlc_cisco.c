@@ -247,15 +247,19 @@ static void cisco_close(hdlc_device *hdlc)
 
 int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
-	cisco_proto *cisco_s = &ifr->ifr_settings->ifs_hdlc.cisco;
+	cisco_proto *cisco_s = ifr->ifr_settings.ifs_ifsu.cisco;
 	const size_t size = sizeof(cisco_proto);
 	cisco_proto new_settings;
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	int result;
 
-	switch (ifr->ifr_settings->type) {
+	switch (ifr->ifr_settings.type) {
 	case IF_GET_PROTO:
-		ifr->ifr_settings->type = IF_PROTO_CISCO;
+		ifr->ifr_settings.type = IF_PROTO_CISCO;
+		if (ifr->ifr_settings.size < size) {
+			ifr->ifr_settings.size = size; /* data size wanted */
+			return -ENOBUFS;
+		}
 		if (copy_to_user(cisco_s, &hdlc->state.cisco.settings, size))
 			return -EFAULT;
 		return 0;

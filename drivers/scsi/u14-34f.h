@@ -14,7 +14,7 @@ int u14_34f_reset(Scsi_Cmnd *);
 int u14_34f_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
 
-#define U14_34F_VERSION "7.22.00"
+#define U14_34F_VERSION "7.70.00"
 
 #define ULTRASTOR_14_34F {                                                   \
                 name:         "UltraStor 14F/34F rev. " U14_34F_VERSION " ", \

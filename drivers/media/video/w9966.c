@@ -130,7 +130,7 @@ static const char* pardev[] = {[0 ... W9966_MAXCAMS] = "aggressive"};
 MODULE_PARM(pardev, "1-" __MODULE_STRING(W9966_MAXCAMS) "s");
 MODULE_PARM_DESC(pardev, "pardev: where to search for\n\
 \teach camera. 'aggressive' means brute-force search.\n\
-\tEg: >pardev=parport3,aggressive,parport2,parport1< would assign
+\tEg: >pardev=parport3,aggressive,parport2,parport1< would assign\n\
 \tcam 1 to parport3 and search every parport for cam 2 etc...");
 
 static int parmode = 0;

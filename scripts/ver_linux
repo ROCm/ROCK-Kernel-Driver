@@ -4,7 +4,7 @@
 # /bin /sbin /usr/bin /usr/sbin /usr/local/bin, but it may
 # differ on your system.
 #
-PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:$PATH
 echo 'If some fields are empty or look unusual you may have an old version.'
 echo 'Compare to the current minimal requirements in Documentation/Changes.'
 echo ' '
@@ -12,7 +12,11 @@ echo ' '
 uname -a
 echo ' '
 
-echo "Gnu C                 " `gcc --version`
+gcc --version 2>&1| head -n 1 | grep -v gcc | awk \
+'NR==1{print "Gnu C                 ", $1}'
+
+gcc --version 2>&1| grep gcc | awk \
+'NR==1{print "Gnu C                 ", $3}'
 
 make --version 2>&1 | awk -F, '{print $1}' | awk \
       '/GNU Make/{print "Gnu make              ",$NF}'
@@ -29,8 +33,14 @@ insmod -V  2>&1 | awk 'NR==1 {print "modutils              ",$NF}'
 tune2fs 2>&1 | grep "^tune2fs" | sed 's/,//' |  awk \
 'NR==1 {print "e2fsprogs             ", $2}'
 
-reiserfsck 2>&1 | grep reiserfsprogs | awk \
+fsck.jfs -V 2>&1 | grep version | sed 's/,//' |  awk \
+'NR==1 {print "jfsutils              ", $3}'
+
+reiserfsck -V 2>&1 | grep reiserfsprogs | awk \
 'NR==1{print "reiserfsprogs         ", $NF}'
+
+xfs_db -V 2>&1 | grep version | awk \
+'NR==1{print "xfsprogs              ", $3}'
 
 cardmgr -V 2>&1| grep version | awk \
 'NR==1{print "pcmcia-cs             ", $3}'

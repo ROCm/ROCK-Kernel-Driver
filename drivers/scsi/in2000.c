@@ -2154,6 +2154,15 @@ char buf[32];
    return detect_count;
 }
 
+static int in2000_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, shost);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	return 0;
+}
+
 
 /* NOTE: I lifted this function straight out of the old driver,
  *       and have not tested it. Presumably it does what it's
@@ -2208,7 +2217,7 @@ Scsi_Cmnd *cmd;
 int x,i;
 static int stop = 0;
 
-   instance = scsi_host_hn_get(hn);
+   instance = scsi_host_hn_get(hn);  
    if (!instance) {
       printk("*** Hmm... Can't find host #%d!\n",hn);
       return (-ESRCH);

@@ -963,6 +963,28 @@ CONFIG_VXFS_FS
   module, say M here and read <file:Documentation/modules.txt>.  If
   unsure, say N.
 
+CONFIG_BEFS_FS
+  The BeOS File System (BeFS) is the native file system of Be, Inc's
+  BeOS. Notable features include support for arbitrary attributes
+  on files and directories, and database-like indices on selected
+  attributes. (Also note that this driver doesn't make those features
+  available at this time). It is a 64 bit filesystem, so it supports
+  extreemly large volumes and files.
+
+  If you use this filesystem, you should also say Y to at least one
+  of the NLS (native language support) options below.
+
+  If you don't know what this is about, say N.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. The module will be
+  called befs.o.
+
+CONFIG_BEFS_DEBUG
+  If you say Y here, you can use the 'debug' mount option to enable
+  debugging output from the driver. 
+
 CIFS (Common Internet File System) support
 CONFIG_CIFS
   This is the client VFS module for the Common Internet File System

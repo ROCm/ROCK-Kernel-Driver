@@ -3670,7 +3670,6 @@ int
 mptscsih_slave_attach(Scsi_Device *device)
 {
 	VirtDevice		*pTarget;
-
 	pTarget = device->hostdata;
 	if (!device->tagged_supported ||
 	    !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {

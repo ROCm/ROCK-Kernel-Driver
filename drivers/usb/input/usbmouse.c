@@ -62,8 +62,20 @@ static void usb_mouse_irq(struct urb *urb)
 	struct usb_mouse *mouse = urb->context;
 	signed char *data = mouse->data;
 	struct input_dev *dev = &mouse->dev;
+	int status;
 
-	if (urb->status) return;
+	switch (urb->status) {
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		goto resubmit;
+	}
+
 
 	input_report_key(dev, BTN_LEFT,   data[0] & 0x01);
 	input_report_key(dev, BTN_RIGHT,  data[0] & 0x02);
@@ -76,6 +88,12 @@ static void usb_mouse_irq(struct urb *urb)
 	input_report_rel(dev, REL_WHEEL, data[3]);
 
 	input_sync(dev);
+resubmit:
+	status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status)
+		err ("can't resubmit intr, %s-%s/input0, status %d",
+				mouse->usbdev->bus->bus_name,
+				mouse->usbdev->devpath, status);
 }
 
 static int usb_mouse_open(struct input_dev *dev)

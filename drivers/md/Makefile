@@ -2,8 +2,10 @@
 # Makefile for the kernel software RAID and LVM drivers.
 #
 
-export-objs	:= md.o xor.o
+export-objs	:= md.o xor.o dm-table.o dm-target.o
 lvm-mod-objs	:= lvm.o lvm-snap.o lvm-fs.o
+dm-mod-objs	:= dm.o dm-table.o dm-target.o dm-linear.o dm-stripe.o \
+		   dm-ioctl.o
 
 # Note: link order is important.  All raid personalities
 # and xor.o must come before md.o, as they each initialise 
@@ -17,6 +19,7 @@ obj-$(CONFIG_MD_RAID5)		+= raid5.o xor.o
 obj-$(CONFIG_MD_MULTIPATH)	+= multipath.o
 obj-$(CONFIG_BLK_DEV_MD)	+= md.o
 obj-$(CONFIG_BLK_DEV_LVM)	+= lvm-mod.o
+obj-$(CONFIG_BLK_DEV_DM)	+= dm-mod.o
 
 include $(TOPDIR)/Rules.make
 

@@ -446,19 +446,6 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 	if (retval)
 		goto exit;
 
-	/* Work around HCD bugs */
-	usb_clear_halt(port->serial->dev, port->read_urb->pipe);
-	usb_clear_halt(port->serial->dev, port->write_urb->pipe);
-
-	/* Start reading from the device */
-	port->read_urb->dev = port->serial->dev;
-	retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
-	if (retval) {
-		err("%s - failed submitting read urb, error %d", __FUNCTION__, retval);
-		stop_command_port(port->serial);
-		goto exit;
-	}
-
 	/* send an open port command */
 	retval = firm_open(port);
 	if (retval) {
@@ -477,15 +464,15 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 	old_term.c_iflag = ~port->tty->termios->c_iflag;
 	whiteheat_set_termios(port, &old_term);
 
-	retval = firm_set_rts(port, WHITEHEAT_RTS_ON);
+	/* Work around HCD bugs */
+	usb_clear_halt(port->serial->dev, port->read_urb->pipe);
+	usb_clear_halt(port->serial->dev, port->write_urb->pipe);
+
+	/* Start reading from the device */
+	port->read_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (retval) {
-		firm_close(port);
-		stop_command_port(port->serial);
-		goto exit;
-	}
-	retval = firm_set_dtr(port, WHITEHEAT_DTR_ON);
-	if (retval) {
-		firm_set_rts(port, WHITEHEAT_RTS_OFF);
+		err("%s - failed submitting read urb, error %d", __FUNCTION__, retval);
 		firm_close(port);
 		stop_command_port(port->serial);
 		goto exit;
@@ -524,9 +511,6 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 		port->tty->ldisc.flush_buffer(port->tty);
 
 	firm_report_tx_done(port);
-
-	firm_set_dtr(port, WHITEHEAT_DTR_OFF);
-	firm_set_rts(port, WHITEHEAT_RTS_OFF);
 
 	firm_close(port);
 
@@ -711,7 +695,7 @@ static void whiteheat_set_termios (struct usb_serial_port *port, struct termios 
 	/* check that they really want us to change something */
 	if (old_termios) {
 		if ((port->tty->termios->c_cflag == old_termios->c_cflag) &&
-		    (RELEVANT_IFLAG(port->tty->termios->c_iflag) == RELEVANT_IFLAG(old_termios->c_iflag))) {
+		    (port->tty->termios->c_iflag == old_termios->c_iflag)) {
 			dbg("%s - nothing to change...", __FUNCTION__);
 			goto exit;
 		}

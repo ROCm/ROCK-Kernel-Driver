@@ -15,7 +15,7 @@ int eata2x_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
 static int eata2x_slave_attach(Scsi_Device *);
 
-#define EATA_VERSION "7.22.00"
+#define EATA_VERSION "7.70.00"
 
 #define EATA {                                                               \
                 name:              "EATA/DMA 2.0x rev. " EATA_VERSION " ",   \

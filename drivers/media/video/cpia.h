@@ -26,13 +26,13 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define CPIA_MAJ_VER	0
-#define CPIA_MIN_VER    8
-#define CPIA_PATCH_VER	1
+#define CPIA_MAJ_VER	1
+#define CPIA_MIN_VER    2
+#define CPIA_PATCH_VER	2
 
-#define CPIA_PP_MAJ_VER       0
-#define CPIA_PP_MIN_VER       8
-#define CPIA_PP_PATCH_VER     1
+#define CPIA_PP_MAJ_VER       1
+#define CPIA_PP_MIN_VER       2
+#define CPIA_PP_PATCH_VER     2
 
 #define CPIA_MAX_FRAME_SIZE_UNALIGNED	(352 * 288 * 4)   /* CIF at RGB32 */
 #define CPIA_MAX_FRAME_SIZE	((CPIA_MAX_FRAME_SIZE_UNALIGNED + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)) /* align above to PAGE_SIZE */
@@ -93,6 +93,11 @@ struct cpia_camera_ops
 	 * is STREAM_READY before calling streamRead.
 	 */
 	int wait_for_stream_ready;
+
+	/* 
+	 * Used to maintain lowlevel module usage counts
+	 */
+	struct module *owner;
 };
 
 struct cpia_frame {
@@ -150,7 +155,7 @@ struct cam_params {
 		u8 blueComp;
 	} exposure;
 	struct {
-		u8 balanceModeIsAuto;
+		u8 balanceMode;
 		u8 redGain;
 		u8 greenGain;
 		u8 blueGain;
@@ -166,9 +171,10 @@ struct cam_params {
 		u8 gain8;
 	} apcor;
 	struct {
+		u8 disabled;
 		u8 flickerMode;
 		u8 coarseJump;
-		u8 allowableOverExposure;
+		int allowableOverExposure;
 	} flickerControl;
 	struct {
 		u8 gain1;
@@ -261,6 +267,7 @@ struct cam_data {
 	struct video_device vdev;	/* v4l videodev */
 	struct video_picture vp;	/* v4l camera settings */
 	struct video_window vw;		/* v4l capture area */
+	struct video_capture vc;       	/* v4l subcapture area */
 
 				/* mmap interface */
 	int curframe;			/* the current frame to grab into */
@@ -271,6 +278,8 @@ struct cam_data {
 	int first_frame;
 	int mmap_kludge;		/* 'wrong' byte order for mmap */
 	volatile u32 cmd_queue;		/* queued commands */
+	int exposure_status;		/* EXPOSURE_* */
+	int exposure_count;		/* number of frames at this status */
 };
 
 /* cpia_register_camera is called by low level driver for each camera.
@@ -382,15 +391,27 @@ void cpia_unregister_camera(struct cam_data *cam);
 #define VP_STATE_ACB_RMAX		0x40
 #define VP_STATE_ACB_GMAX		0x80
 
+/* default (minimum) compensation values */
+#define COMP_RED        220
+#define COMP_GREEN1     214
+#define COMP_GREEN2     COMP_GREEN1
+#define COMP_BLUE       230
+
+/* exposure status */
+#define EXPOSURE_VERY_LIGHT 0
+#define EXPOSURE_LIGHT      1
+#define EXPOSURE_NORMAL     2
+#define EXPOSURE_DARK       3
+#define EXPOSURE_VERY_DARK  4
+
 /* ErrorCode */
 #define ERROR_FLICKER_BELOW_MIN_EXP     0x01 /*flicker exposure got below minimum exposure */
-
 #define ALOG(fmt,args...) printk(fmt, ##args)
 #define LOG(fmt,args...) ALOG(KERN_INFO __FILE__ ":%s(%d):" fmt, __FUNCTION__ , __LINE__ , ##args)
 
 #ifdef _CPIA_DEBUG_
-#define ADBG(lineno,fmt,args...) printk(fmt, jiffies, lineno, ##args)
-#define DBG(fmt,args...) ADBG((__LINE__), KERN_DEBUG __FILE__" (%ld):" __FUNCTION__ "(%d):" fmt, ##args)
+#define ADBG(fmt,args...) printk(fmt, jiffies, ##args)
+#define DBG(fmt,args...) ADBG(KERN_DEBUG __FILE__" (%ld):%s(%d):" fmt, __FUNCTION__, __LINE__ , ##args)
 #else
 #define DBG(fmn,args...) do {} while(0)
 #endif
@@ -400,15 +421,19 @@ void cpia_unregister_camera(struct cam_data *cam);
       (p)&0x80?1:0, (p)&0x40?1:0, (p)&0x20?1:0, (p)&0x10?1:0,\
         (p)&0x08?1:0, (p)&0x04?1:0, (p)&0x02?1:0, (p)&0x01?1:0);
 
-static inline void cpia_add_to_list(struct cam_data* l, struct cam_data* drv)
+static inline void cpia_add_to_list(struct cam_data** l, struct cam_data** drv_p)
 {
-	drv->next = l;
-	drv->previous = &l;
-	l = drv;
+	struct cam_data* drv;
+	drv = *drv_p;
+	drv->next = *l;
+	drv->previous = l;
+	*l = drv;
 }
 
-static inline void cpia_remove_from_list(struct cam_data* drv)
+static inline void cpia_remove_from_list(struct cam_data** drv_p)
 {
+	struct cam_data* drv;
+	drv = *drv_p;
 	if (drv->previous != NULL) {
 		if (drv->next != NULL)
 			drv->next->previous = drv->previous;

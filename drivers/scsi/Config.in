@@ -88,12 +88,10 @@ if [ "$CONFIG_MCA" = "y" ]; then
    dep_tristate 'Future Domain MCS-600/700 SCSI support' CONFIG_SCSI_FD_MCS $CONFIG_SCSI
 fi
 dep_tristate 'Intel/ICP (former GDT SCSI Disk Array) RAID Controller support' CONFIG_SCSI_GDTH $CONFIG_SCSI
-dep_tristate 'Generic NCR5380/53c400 SCSI support' CONFIG_SCSI_GENERIC_NCR5380 $CONFIG_SCSI
+dep_tristate 'Generic NCR5380/53c400 SCSI PIO support' CONFIG_SCSI_GENERIC_NCR5380 $CONFIG_SCSI
+dep_tristate 'Generic NCR5380/53c400 SCSI MMIO support' CONFIG_SCSI_GENERIC_NCR5380_MMIO $CONFIG_SCSI
 if [ "$CONFIG_SCSI_GENERIC_NCR5380" != "n" ]; then
    bool '  Enable NCR53c400 extensions' CONFIG_SCSI_GENERIC_NCR53C400
-   choice 'NCR5380/53c400 mapping method (use Port for T130B)' \
-		"Port CONFIG_SCSI_G_NCR5380_PORT \
-		 Memory CONFIG_SCSI_G_NCR5380_MEM" Port
 fi
 if [ "$CONFIG_MCA" = "y" ]; then
    dep_tristate 'IBMMCA SCSI support' CONFIG_SCSI_IBMMCA $CONFIG_SCSI

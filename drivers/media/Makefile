@@ -2,6 +2,6 @@
 # Makefile for the kernel multimedia device drivers.
 #
 
-obj-y        := video/ radio/
+obj-y        := video/ radio/ dvb/
 
 include $(TOPDIR)/Rules.make

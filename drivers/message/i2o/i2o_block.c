@@ -55,8 +55,6 @@
  *		Serial number scanning to find duplicates for FC multipathing
  */
 
-#error Please convert me to Documentation/DMA-mapping.txt
-
 #include <linux/major.h>
 
 #include <linux/module.h>
@@ -132,15 +130,12 @@
 #define I2O_BSA_DSC_VOLUME_CHANGED      0x000D
 #define I2O_BSA_DSC_TIMEOUT             0x000E
 
-#define I2O_UNIT(dev)	(i2ob_dev[minor((dev)) & 0xf0])
 #define I2O_LOCK(unit)	(i2ob_dev[(unit)].req_queue->queue_lock)
 
 /*
  *	Some of these can be made smaller later
  */
 
-static int i2ob_blksizes[MAX_I2OB<<4];
-static int i2ob_sizes[MAX_I2OB<<4];
 static int i2ob_media_change_flag[MAX_I2OB];
 static u32 i2ob_max_sectors[MAX_I2OB<<4];
 
@@ -166,6 +161,7 @@ struct i2ob_device
 	int rcache;
 	int wcache;
 	int power;
+	int index;
 };
 
 /*
@@ -179,6 +175,9 @@ struct i2ob_request
 	struct i2ob_request *next;
 	struct request *req;
 	int num;
+	int sg_dma_direction;
+	int sg_nents;
+	struct scatterlist sg_table[16];
 };
 
 /*
@@ -259,6 +258,30 @@ static u32 i2ob_get(struct i2ob_device *dev)
 	struct i2o_controller *c=dev->controller;
    	return I2O_POST_READ32(c);
 }
+
+static int i2ob_build_sglist(struct i2ob_device *dev,  struct i2ob_request *ireq)
+{
+	struct scatterlist *sg = ireq->sg_table;
+	int nents;
+
+	nents = blk_rq_map_sg(dev->req_queue, ireq->req, ireq->sg_table);
+		
+	if (rq_data_dir(ireq->req) == READ)
+		ireq->sg_dma_direction = PCI_DMA_FROMDEVICE;
+	else
+		ireq->sg_dma_direction = PCI_DMA_TODEVICE;
+
+	ireq->sg_nents = pci_map_sg(dev->controller->pdev, sg, nents, ireq->sg_dma_direction);
+	return ireq->sg_nents;
+}
+
+void i2ob_free_sglist(struct i2ob_device *dev, struct i2ob_request *ireq)
+{
+	struct pci_dev *pdev = dev->controller->pdev;
+	struct scatterlist *sg = ireq->sg_table;
+	int nents = ireq->sg_nents;
+	pci_unmap_sg(pdev, sg, nents, ireq->sg_dma_direction);
+}
  
 /**
  *	i2ob_send		-	Turn a request into a message and send it
@@ -273,8 +296,6 @@ static u32 i2ob_get(struct i2ob_device *dev)
  *
  *	No cleanup is done by this interface. It is done on the interrupt side when the
  *	reply arrives
- *
- *	To Fix: Generate PCI maps of the buffers
  */
  
 static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, int unit)
@@ -285,14 +306,20 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 	unsigned long mptr;
 	u64 offset;
 	struct request *req = ireq->req;
-	struct bio *bio = req->bio;
 	int count = req->nr_sectors<<9;
-	unsigned long last = 0;
-	unsigned short size = 0;
+	struct scatterlist *sg;
+	int sgnum;
+	int i;
 
 	// printk(KERN_INFO "i2ob_send called\n");
 	/* Map the message to a virtual address */
 	msg = c->mem_offset + m;
+	
+	sgnum = i2ob_build_sglist(dev, ireq);
+	
+	/* FIXME: if we have no resources how should we get out of this */
+	if(sgnum == 0)
+		BUG();
 	
 	/*
 	 * Build the message based on the request.
@@ -313,34 +340,21 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 	i2o_raw_writel(offset>>32, msg+28);
 	mptr=msg+32;
 	
-	if(req->cmd == READ)
+	sg = ireq->sg_table;
+	if(rq_data_dir(req) == READ)
 	{
 		DEBUG("READ\n");
 		i2o_raw_writel(I2O_CMD_BLOCK_READ<<24|HOST_TID<<12|tid, msg+4);
-		while(bio!=NULL)
+		for(i = sgnum; i > 0; i--)
 		{
-			if(bio_to_phys(bio) == last) {
-				size += bio->bi_size;
-				last += bio->bi_size;
-				if(bio->bi_next)
-					i2o_raw_writel(0x10000000|(size), mptr-8);
-				else
-					__raw_writel(0xD0000000|(size), mptr-8);
-			}
+			if(i != 1)
+				i2o_raw_writel(0x10000000|sg_dma_len(sg), mptr);
 			else
-			{
-				if(bio->bi_next)
-					i2o_raw_writel(0x10000000|bio->bi_size, mptr);
-				else
-					i2o_raw_writel(0xD0000000|bio->bi_size, mptr);
-				i2o_raw_writel(bio_to_phys(bio), mptr+4);
-				mptr += 8;	
-				size = bio->bi_size;
-				last = bio_to_phys(bio) + size;
-			}
-
-			count -= bio->bi_size;
-			bio = bio->bi_next;
+				i2o_raw_writel(0xD0000000|sg_dma_len(sg), mptr);
+			i2o_raw_writel(sg_dma_address(sg), mptr+4);
+			mptr += 8;	
+			count -= sg_dma_len(sg);
+			sg++;
 		}
 		switch(dev->rcache)
 		{
@@ -359,34 +373,20 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 //		printk("Reading %d entries %d bytes.\n",
 //			mptr-msg-8, req->nr_sectors<<9);
 	}
-	else if(req->cmd == WRITE)
+	else if(rq_data_dir(req) == WRITE)
 	{
 		DEBUG("WRITE\n");
 		i2o_raw_writel(I2O_CMD_BLOCK_WRITE<<24|HOST_TID<<12|tid, msg+4);
-		while(bio!=NULL)
+		for(i = sgnum; i > 0; i--)
 		{
-			if(bio_to_phys(bio) == last) {
-				size += bio->bi_size;
-				last += bio->bi_size;
-				if(bio->bi_next)
-					i2o_raw_writel(0x14000000|(size), mptr-8);
-				else
-					i2o_raw_writel(0xD4000000|(size), mptr-8);
-			}
+			if(i != 1)
+				i2o_raw_writel(0x14000000|sg_dma_len(sg), mptr);
 			else
-			{
-				if(bio->bi_next)
-					i2o_raw_writel(0x14000000|(bio->bi_size), mptr);
-				else
-					i2o_raw_writel(0xD4000000|(bio->bi_size), mptr);
-				i2o_raw_writel(bio_to_phys(bio), mptr+4);
-				mptr += 8;	
-				size = bio->bi_size;
-				last = bio_to_phys(bio) + bio->bi_size;
-			}
-
-			count -= bio->bi_size;
-			bio = bio->bi_next;
+				i2o_raw_writel(0xD4000000|sg_dma_len(sg), mptr);
+			i2o_raw_writel(sg_dma_address(sg), mptr+4);
+			mptr += 8;	
+			count -= sg_dma_len(sg);
+			sg++;
 		}
 
 		switch(dev->wcache)
@@ -502,7 +502,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 		/* Now flush the message by making it a NOP */
 		m[0]&=0x00FFFFFF;
 		m[0]|=(I2O_CMD_UTIL_NOP)<<24;
-		i2o_post_message(c,virt_to_bus(m));
+		i2o_post_message(c, ((unsigned long)m) - c->mem_offset);
 
 		return;
 	}
@@ -594,6 +594,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 	 *	may be running polled controllers from a BH...
 	 */
 	
+	i2ob_free_sglist(dev, ireq);
 	spin_lock_irqsave(I2O_LOCK(c->unit), flags);
 	i2ob_unhook_request(ireq, c->unit);
 	i2ob_end_request(ireq->req);
@@ -715,7 +716,6 @@ static int i2ob_evt(void *dummy)
 					i2ob_query_device(&i2ob_dev[unit], 0x0000, 4, &size, 8);
 
 				spin_lock_irqsave(I2O_LOCK(unit), flags);	
-				i2ob_sizes[unit] = (int)(size>>10);
 				set_capacity(i2ob_disk[unit>>4], size>>9);
 				spin_unlock_irqrestore(I2O_LOCK(unit), flags);	
 				break;
@@ -782,7 +782,6 @@ static void i2ob_request(request_queue_t *q)
 {
 	struct request *req;
 	struct i2ob_request *ireq;
-	int unit;
 	struct i2ob_device *dev;
 	u32 m;
 	
@@ -796,9 +795,8 @@ static void i2ob_request(request_queue_t *q)
 
 		if(req->rq_status == RQ_INACTIVE)
 			return;
-			
-		unit = minor(req->rq_dev);
-		dev = &i2ob_dev[(unit&0xF0)];
+
+		dev = req->rq_disk->private_data;
 
 		/* 
 		 *	Queue depths probably belong with some kind of 
@@ -828,7 +826,7 @@ static void i2ob_request(request_queue_t *q)
 		i2ob_queues[dev->unit]->i2ob_qhead = ireq->next;
 		ireq->req = req;
 
-		i2ob_send(m, dev, ireq, (unit&0xF0));
+		i2ob_send(m, dev, ireq, (dev->unit&0xF0));
 	}
 }
 
@@ -896,27 +894,19 @@ static void i2o_block_biosparam(
 static int i2ob_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	struct i2ob_device *dev;
-	int minor;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct i2ob_device *dev = disk->private_data;
 
 	/* Anyone capable of this syscall can do *real bad* things */
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (!inode)
-		return -EINVAL;
-	minor = minor(inode->i_rdev);
-	if (minor >= (MAX_I2OB<<4))
-		return -ENODEV;
-
-	dev = &i2ob_dev[minor];
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{
 			struct hd_geometry g;
-			int u=minor >> 4;
-			i2o_block_biosparam(get_capacity(i2ob_disk[u]), 
-						&g.cylinders, &g.heads, &g.sectors);
+			i2o_block_biosparam(get_capacity(disk), 
+					&g.cylinders, &g.heads, &g.sectors);
 			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user((void *)arg,&g, sizeof(g))?-EFAULT:0;
 		}
@@ -945,13 +935,8 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
  
 static int i2ob_release(struct inode *inode, struct file *file)
 {
-	struct i2ob_device *dev;
-	int minor;
-
-	minor = minor(inode->i_rdev);
-	if (minor >= (MAX_I2OB<<4))
-		return -ENODEV;
-	dev = &i2ob_dev[(minor&0xF0)];
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct i2ob_device *dev = disk->private_data;
 
 	/*
 	 * This is to deail with the case of an application
@@ -1022,15 +1007,8 @@ static int i2ob_release(struct inode *inode, struct file *file)
  
 static int i2ob_open(struct inode *inode, struct file *file)
 {
-	int minor;
-	struct i2ob_device *dev;
-	
-	if (!inode)
-		return -EINVAL;
-	minor = minor(inode->i_rdev);
-	if (minor >= MAX_I2OB<<4)
-		return -ENODEV;
-	dev=&i2ob_dev[(minor&0xF0)];
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct i2ob_device *dev = disk->private_data;
 
 	if(!dev->i2odev)	
 		return -ENODEV;
@@ -1133,7 +1111,6 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 		power = 0;
 	i2ob_query_device(dev, 0x0000, 5, &flags, 4);
 	i2ob_query_device(dev, 0x0000, 6, &status, 4);
-	i2ob_sizes[unit] = (int)(size>>10);
 	set_capacity(i2ob_disk[unit>>4], size>>9);
 
 	/*
@@ -1146,14 +1123,18 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	for(i=unit;i<=unit+15;i++)
 	{
 		request_queue_t *q = i2ob_dev[unit].req_queue;
-		
+		int segments = (d->controller->status_block->inbound_frame_size - 7) / 2;
+
+		if(segments > 16)
+			segments = 16;
+					
 		i2ob_dev[i].power = power;	/* Save power state */
 		i2ob_dev[unit].flags = flags;	/* Keep the type info */
 		
 		blk_queue_max_sectors(q, 96);	/* 256 might be nicer but many controllers 
 						   explode on 65536 or higher */
-		blk_queue_max_phys_segments(q, (d->controller->status_block->inbound_frame_size - 7) / 2);
-		blk_queue_max_hw_segments(q, (d->controller->status_block->inbound_frame_size - 7) / 2);
+		blk_queue_max_phys_segments(q, segments);
+		blk_queue_max_hw_segments(q, segments);
 		
 		i2ob_dev[i].rcache = CACHE_SMARTFETCH;
 		i2ob_dev[i].wcache = CACHE_WRITETHROUGH;
@@ -1372,7 +1353,7 @@ static void i2ob_scan(int bios)
 					printk(KERN_WARNING "Could not install I2O block device\n");
 				else
 				{
-					add_disk(i2o_disk[scan_unit>>4]);
+					add_disk(i2ob_disk[scan_unit>>4]);
 					scan_unit+=16;
 					i2ob_dev_count++;
 
@@ -1459,7 +1440,7 @@ void i2ob_new_device(struct i2o_controller *c, struct i2o_device *d)
 		printk(KERN_ERR "i2o_block: Could not install new device\n");
 	else	
 	{
-		add_disk(i2o_disk[unit>>4]);
+		add_disk(i2ob_disk[unit>>4]);
 		i2ob_dev_count++;
 		i2o_device_notify_on(d, &i2o_block_handler);
 	}
@@ -1544,7 +1525,8 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
  */
 static int i2ob_media_change(struct gendisk *disk)
 {
-	int i = (int)disk->private_data;
+	struct i2ob_device *p = disk->private_data;
+	int i = p->index;
 	if(i2ob_media_change_flag[i])
 	{
 		i2ob_media_change_flag[i]=0;
@@ -1555,9 +1537,8 @@ static int i2ob_media_change(struct gendisk *disk)
 
 static int i2ob_revalidate(struct gendisk *disk)
 {
-	int i = (int)disk->private_data;
-	return i2ob_install_device(i2ob_dev[i<<4].controller,
-				   i2ob_dev[i<<4].i2odev, i<<4);
+	struct i2ob_device *p = disk->private_data;
+	return i2ob_install_device(p->controller, p->i2odev, p->index<<4);
 }
 
 /*
@@ -1640,10 +1621,9 @@ static int i2o_block_init(void)
 		struct gendisk *disk = alloc_disk(16);
 		if (!disk)
 			goto oom;
-		/* to be cleaned up */
-		disk->private_data = (void*)i;
+		i2ob_dev[i<<4].index = i;
 		disk->queue = i2ob_dev[i<<4].req_queue;
-		i2o_disk[i] = disk;
+		i2ob_disk[i] = disk;
 	}
 #ifdef MODULE
 	printk(KERN_INFO "i2o_block: registered device at major %d\n", MAJOR_NR);
@@ -1662,12 +1642,11 @@ static int i2o_block_init(void)
 		i2ob_dev[i].head = NULL;
 		i2ob_dev[i].tail = NULL;
 		i2ob_dev[i].depth = MAX_I2OB_DEPTH;
-		i2ob_blksizes[i] = 1024;
 		i2ob_max_sectors[i] = 2;
 	}
 	
 	for (i = 0; i < MAX_I2OB; i++) {
-		struct gendisk *disk = i2ob_disk + i;
+		struct gendisk *disk = i2ob_disk[i];
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<4;
 		disk->fops = &i2ob_fops;
@@ -1715,7 +1694,7 @@ static int i2o_block_init(void)
 
 oom:
 	while (i--)
-		put_disk(i2o_disk[i]);
+		put_disk(i2ob_disk[i]);
 	unregister_blkdev(MAJOR_NR, "i2o_block");
 	return -ENOMEM;
 }
@@ -1769,7 +1748,7 @@ static void i2o_block_exit(void)
 	i2o_remove_handler(&i2o_block_handler);
 		 
 	for (i = 0; i < MAX_I2OB; i++)
-		put_disk(i2o_disk[i]);
+		put_disk(i2ob_disk[i]);
 
 	/*
 	 *	Return the block device

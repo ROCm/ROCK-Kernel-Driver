@@ -100,12 +100,6 @@
 #define NCR5380_STATS
 #undef NCR5380_STAT_LIMIT
 #endif
-#if defined(CONFIG_SCSI_G_NCR5380_PORT) && defined(CONFIG_SCSI_G_NCR5380_MEM)
-#error You can not configure the Generic NCR 5380 SCSI Driver for memory mapped I/O and port mapped I/O at the same time (yet)
-#endif
-#if !defined(CONFIG_SCSI_G_NCR5380_PORT) && !defined(CONFIG_SCSI_G_NCR5380_MEM)
-#error You must configure the Generic NCR 5380 SCSI Driver for one of memory mapped I/O and port mapped I/O.
-#endif
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -120,6 +114,7 @@
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/isapnp.h>
+#include <linux/delay.h>
 
 #define NCR_NOT_SET 0
 static int ncr_irq = NCR_NOT_SET;
@@ -142,7 +137,10 @@ static struct override {
 [1] __initdata = { { 0,},};
 #endif
 
+
 #define NO_OVERRIDES (sizeof(overrides) / sizeof(struct override))
+
+#ifndef MODULE 
 
 /**
  *	internal_setup		-	handle lilo command string override
@@ -197,6 +195,7 @@ static void __init internal_setup(int board, char *str, int *ints)
 		++commandline_current;
 	}
 }
+
 
 /**
  * 	do_NCR53C80_setup		-	set up entry point
@@ -268,6 +267,8 @@ static int __init do_DTC3181E_setup(char *str)
 	internal_setup(BOARD_DTC3181E, str, ints);
 	return 1;
 }
+
+#endif
 
 /**
  * 	generic_NCR5380_detect	-	look for NCR5380 controllers
@@ -366,7 +367,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 			break;
 		}
 
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 		if (ports) {
 			/* wakeup sequence for the NCR53C400A and DTC3181E */
 
@@ -411,7 +412,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 #endif
 		instance = scsi_register(tpnt, sizeof(struct NCR5380_hostdata));
 		if (instance == NULL) {
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 			release_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size);
 #else
 			release_mem_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size);
@@ -429,7 +430,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 			instance->irq = NCR5380_probe_irq(instance, 0xffff);
 
 		if (instance->irq != IRQ_NONE)
-			if (request_irq(instance->irq, do_generic_NCR5380_intr, SA_INTERRUPT, "NCR5380", NULL)) {
+			if (request_irq(instance->irq, generic_NCR5380_intr, SA_INTERRUPT, "NCR5380", NULL)) {
 				printk(KERN_WARNING "scsi%d : IRQ%d not free, interrupts disabled\n", instance->host_no, instance->irq);
 				instance->irq = IRQ_NONE;
 			}
@@ -481,7 +482,7 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
 	NCR5380_local_declare();
 	NCR5380_setup(instance);
 
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 	release_region(instance->NCR5380_instance_name, NCR5380_region_size);
 #else
 	release_mem_region(instance->NCR5380_instance_name, NCR5380_region_size);
@@ -554,7 +555,7 @@ static inline int NCR5380_pread(struct Scsi_Host *instance, unsigned char *dst, 
 		}
 		while (NCR5380_read(C400_CONTROL_STATUS_REG) & CSR_HOST_BUF_NOT_RDY);
 
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 		{
 			int i;
 			for (i = 0; i < 128; i++)
@@ -574,7 +575,7 @@ static inline int NCR5380_pread(struct Scsi_Host *instance, unsigned char *dst, 
 			// FIXME - no timeout
 		}
 
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 		{
 			int i;	
 			for (i = 0; i < 128; i++)
@@ -640,7 +641,7 @@ static inline int NCR5380_pwrite(struct Scsi_Host *instance, unsigned char *src,
 		}
 		while (NCR5380_read(C400_CONTROL_STATUS_REG) & CSR_HOST_BUF_NOT_RDY)
 			; // FIXME - timeout
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 		{
 			for (i = 0; i < 128; i++)
 				NCR5380_write(C400_HOST_BUFFER, src[start + i]);
@@ -656,7 +657,7 @@ static inline int NCR5380_pwrite(struct Scsi_Host *instance, unsigned char *src,
 		while (NCR5380_read(C400_CONTROL_STATUS_REG) & CSR_HOST_BUF_NOT_RDY)
 			; // FIXME - no timeout
 
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 		{
 			for (i = 0; i < 128; i++)
 				NCR5380_write(C400_HOST_BUFFER, src[start + i]);
@@ -780,9 +781,8 @@ int generic_NCR5380_proc_info(char *buffer, char **start, off_t offset, int leng
 #endif
 
 	/* For now this is constant so we may walk it */
-	for (scsi_ptr = first_instance; scsi_ptr; scsi_ptr = scsi_ptr->next)
-		if (scsi_ptr->host_no == hostno)
-			break;
+	scsi_ptr = scsi_host_hn_get(hostno);
+	
 	NCR5380_setup(scsi_ptr);
 	hostdata = (struct NCR5380_hostdata *) scsi_ptr->hostdata;
 

@@ -846,14 +846,21 @@ intr_callback(struct urb *urb)
 {
 	struct brlvger_priv *priv = urb->context;
 	int intr_idx, read_idx;
+	int status;
 
-	if( urb->status ) {
-		if(urb->status == -ETIMEDOUT)
-			dbg2("Status -ETIMEDOUT, "
-			     "probably disconnected");
-		else if(urb->status != -ENOENT)
-			err("Status: %d", urb->status);
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
 	}
 
 	read_idx = atomic_read(&priv->read_idx);
@@ -862,7 +869,7 @@ intr_callback(struct urb *urb)
 	if(read_idx == intr_idx) {
 		dbg2("Queue full, dropping braille display input");
 		spin_unlock(&priv->intr_idx_lock);
-		return;	/* queue full */
+		goto exit;	/* queue full */
 	}
 
 	memcpy(priv->event_queue[intr_idx], urb->transfer_buffer,
@@ -873,6 +880,12 @@ intr_callback(struct urb *urb)
 	spin_unlock(&priv->intr_idx_lock);
 
 	wake_up_interruptible(&priv->read_wait);
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 /* ----------------------------------------------------------------------- */

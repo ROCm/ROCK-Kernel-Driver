@@ -1,76 +1,7 @@
 #ifndef __LINUX_USB_H
 #define __LINUX_USB_H
 
-/* USB constants */
-
-/*
- * Device and/or Interface Class codes
- */
-#define USB_CLASS_PER_INTERFACE		0	/* for DeviceClass */
-#define USB_CLASS_AUDIO			1
-#define USB_CLASS_COMM			2
-#define USB_CLASS_HID			3
-#define USB_CLASS_PHYSICAL		5
-#define USB_CLASS_STILL_IMAGE		6
-#define USB_CLASS_PRINTER		7
-#define USB_CLASS_MASS_STORAGE		8
-#define USB_CLASS_HUB			9
-#define USB_CLASS_CDC_DATA		0x0a
-#define USB_CLASS_CSCID			0x0b	/* chip+ smart card */
-#define USB_CLASS_CONTENT_SEC		0x0d	/* content security */
-#define USB_CLASS_APP_SPEC		0xfe
-#define USB_CLASS_VENDOR_SPEC		0xff
-
-/*
- * USB types
- */
-#define USB_TYPE_MASK			(0x03 << 5)
-#define USB_TYPE_STANDARD		(0x00 << 5)
-#define USB_TYPE_CLASS			(0x01 << 5)
-#define USB_TYPE_VENDOR			(0x02 << 5)
-#define USB_TYPE_RESERVED		(0x03 << 5)
-
-/*
- * USB recipients
- */
-#define USB_RECIP_MASK			0x1f
-#define USB_RECIP_DEVICE		0x00
-#define USB_RECIP_INTERFACE		0x01
-#define USB_RECIP_ENDPOINT		0x02
-#define USB_RECIP_OTHER			0x03
-
-/*
- * USB directions
- */
-#define USB_DIR_OUT			0		/* to device */
-#define USB_DIR_IN			0x80		/* to host */
-
-/*
- * Endpoints
- */
-#define USB_ENDPOINT_NUMBER_MASK	0x0f	/* in bEndpointAddress */
-#define USB_ENDPOINT_DIR_MASK		0x80
-
-#define USB_ENDPOINT_XFERTYPE_MASK	0x03	/* in bmAttributes */
-#define USB_ENDPOINT_XFER_CONTROL	0
-#define USB_ENDPOINT_XFER_ISOC		1
-#define USB_ENDPOINT_XFER_BULK		2
-#define USB_ENDPOINT_XFER_INT		3
-
-/*
- * Standard requests
- */
-#define USB_REQ_GET_STATUS		0x00
-#define USB_REQ_CLEAR_FEATURE		0x01
-#define USB_REQ_SET_FEATURE		0x03
-#define USB_REQ_SET_ADDRESS		0x05
-#define USB_REQ_GET_DESCRIPTOR		0x06
-#define USB_REQ_SET_DESCRIPTOR		0x07
-#define USB_REQ_GET_CONFIGURATION	0x08
-#define USB_REQ_SET_CONFIGURATION	0x09
-#define USB_REQ_GET_INTERFACE		0x0A
-#define USB_REQ_SET_INTERFACE		0x0B
-#define USB_REQ_SYNCH_FRAME		0x0C
+#include <linux/usb_ch9.h>
 
 #define USB_MAJOR			180
 
@@ -97,27 +28,6 @@ static __inline__ void wait_ms(unsigned int ms)
 		mdelay(ms);
 }
 
-/**
- * struct usb_ctrlrequest - structure used to make USB device control requests easier to create and decode
- * @bRequestType: matches the USB bmRequestType field
- * @bRequest: matches the USB bRequest field
- * @wValue: matches the USB wValue field
- * @wIndex: matches the USB wIndex field
- * @wLength: matches the USB wLength field
- *
- * This structure is used to send control requests to a USB device.  It matches
- * the different fields of the USB 2.0 Spec section 9.3, table 9-2.  See the
- * USB spec for a fuller description of the different fields, and what they are
- * used for.
- */
-struct usb_ctrlrequest {
-	__u8 bRequestType;
-	__u8 bRequest;
-	__u16 wValue;
-	__u16 wIndex;
-	__u16 wLength;
-} __attribute__ ((packed));
-
 /*
  * USB device number allocation bitmap. There's one bitmap
  * per USB tree.
@@ -136,18 +46,6 @@ struct usb_device;
  */
 
 /*
- * Descriptor types ... USB 2.0 spec table 9.5
- */
-#define USB_DT_DEVICE			0x01
-#define USB_DT_CONFIG			0x02
-#define USB_DT_STRING			0x03
-#define USB_DT_INTERFACE		0x04
-#define USB_DT_ENDPOINT			0x05
-#define USB_DT_DEVICE_QUALIFIER		0x06
-#define USB_DT_OTHER_SPEED_CONFIG	0x07
-#define USB_DT_INTERFACE_POWER		0x08
-
-/*
  * Descriptor sizes per descriptor type
  */
 #define USB_DT_DEVICE_SIZE		18
@@ -162,30 +60,6 @@ struct usb_device;
 #define USB_MAXALTSETTING		128	/* Hard limit */
 #define USB_MAXINTERFACES		32
 #define USB_MAXENDPOINTS		32	/* Hard limit */
-
-/* All standard descriptors have these 2 fields in common */
-struct usb_descriptor_header {
-	__u8  bLength;
-	__u8  bDescriptorType;
-} __attribute__ ((packed));
-
-/* USB_DT_DEVICE: Device descriptor */
-struct usb_device_descriptor {
-	__u8  bLength;
-	__u8  bDescriptorType;
-	__u16 bcdUSB;
-	__u8  bDeviceClass;
-	__u8  bDeviceSubClass;
-	__u8  bDeviceProtocol;
-	__u8  bMaxPacketSize0;
-	__u16 idVendor;
-	__u16 idProduct;
-	__u16 bcdDevice;
-	__u8  iManufacturer;
-	__u8  iProduct;
-	__u8  iSerialNumber;
-	__u8  bNumConfigurations;
-} __attribute__ ((packed));
 
 /* USB_DT_ENDPOINT: Endpoint descriptor */
 struct usb_endpoint_descriptor {
@@ -291,26 +165,6 @@ struct usb_config_descriptor {
 	int extralen;
 };
 
-/* USB_DT_STRING: String descriptor */
-struct usb_string_descriptor {
-	__u8  bLength;
-	__u8  bDescriptorType;
-	__u16 wData[1];		/* UTF-16LE encoded */
-} __attribute__ ((packed));
-
-/* USB_DT_DEVICE_QUALIFIER: Device Qualifier descriptor */
-struct usb_qualifier_descriptor {
-	__u8  bLength;
-	__u8  bDescriptorType;
-	__u16 bcdUSB;
-	__u8  bDeviceClass;
-	__u8  bDeviceSubClass;
-	__u8  bDeviceProtocol;
-	__u8  bMaxPacketSize0;
-	__u8  bNumConfigurations;
-	__u8  bRESERVED;
-} __attribute__ ((packed));
-
 // FIXME remove; exported only for drivers/usb/misc/auserwald.c
 // prefer usb_device->epnum[0..31]
 extern struct usb_endpoint_descriptor *
@@ -374,11 +228,7 @@ struct usb_device {
 	int		devnum;		/* Address on USB bus */
 	char		devpath [16];	/* Use in messages: /port/port/... */
 
-	enum {
-		USB_SPEED_UNKNOWN = 0,			/* enumerating */
-		USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
-		USB_SPEED_HIGH				/* usb 2.0 */
-	} speed;
+	enum usb_device_speed	speed;	/* high/full/low (or error) */
 
 	struct usb_tt	*tt; 		/* low/full speed dev, highspeed hub */
 	int		ttport;		/* device port on that tt hub */
@@ -791,8 +641,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * @context: For use in completion functions.  This normally points to
  *	request-specific driver context.
  * @complete: Completion handler. This URB is passed as the parameter to the
- *	completion function.  Except for interrupt or isochronous transfers
- *	that aren't being unlinked, the completion function may then do what
+ *	completion function.  The completion function may then do what
  *	it likes with the URB, including resubmitting or freeing it.
  * @iso_frame_desc: Used to provide arrays of ISO transfer buffers and to 
  *	collect the transfer status for each buffer.
@@ -884,11 +733,6 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * When completion callback is invoked for non-isochronous URBs, the
  * actual_length field tells how many bytes were transferred.
- *
- * For interrupt URBs, the URB provided to the callback
- * function is still "owned" by the USB core subsystem unless the status
- * indicates that the URB has been unlinked.  Completion handlers should
- * not modify such URBs until they have been unlinked.
  *
  * ISO transfer status is reported in the status and actual_length fields
  * of the iso_frame_desc array, and the number of errors is reported in

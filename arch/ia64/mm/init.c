@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/swap.h>
 #include <linux/efi.h>
+#include <linux/mmzone.h>
 
 #include <asm/a.out.h>
 #include <asm/bitops.h>
@@ -78,7 +79,7 @@ ia64_init_addr_space (void)
 		vma->vm_mm = current->mm;
 		vma->vm_start = IA64_RBS_BOT;
 		vma->vm_end = vma->vm_start + PAGE_SIZE;
-		vma->vm_page_prot = protection_map[VM_READ | VM_WRITE];
+		vma->vm_page_prot = protection_map[VM_DATA_DEFAULT_FLAGS & 0x7];
 		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE|VM_GROWSUP;
 		vma->vm_ops = NULL;
 		vma->vm_pgoff = 0;
@@ -347,6 +348,15 @@ extern long htlbzone_pages;
 extern struct list_head htlbpage_freelist;
 #endif
 
+#ifdef CONFIG_DISCONTIGMEM
+void
+paging_init (void)
+{
+	extern void discontig_paging_init(void);
+
+	discontig_paging_init();
+}
+#else /* !CONFIG_DISCONTIGMEM */
 void
 paging_init (void)
 {
@@ -365,6 +375,7 @@ paging_init (void)
 	}
 	free_area_init(zones_size);
 }
+#endif /* !CONFIG_DISCONTIGMEM */
 
 static int
 count_pages (u64 start, u64 end, void *arg)
@@ -380,10 +391,9 @@ count_reserved_pages (u64 start, u64 end, void *arg)
 {
 	unsigned long num_reserved = 0;
 	unsigned long *count = arg;
-	struct page *pg;
 
-	for (pg = virt_to_page(start); pg < virt_to_page(end); ++pg)
-		if (PageReserved(pg))
+	for (; start < end; start += PAGE_SIZE)
+		if (PageReserved(virt_to_page(start)))
 			++num_reserved;
 	*count += num_reserved;
 	return 0;
@@ -395,6 +405,7 @@ mem_init (void)
 	extern char __start_gate_section[];
 	long reserved_pages, codesize, datasize, initsize;
 	unsigned long num_pgt_pages;
+	pg_data_t *pgdat;
 
 #ifdef CONFIG_PCI
 	/*
@@ -405,16 +416,19 @@ mem_init (void)
 	platform_pci_dma_init();
 #endif
 
+#ifndef CONFIG_DISCONTIGMEM
 	if (!mem_map)
 		BUG();
+	max_mapnr = max_low_pfn;
+#endif
 
 	num_physpages = 0;
 	efi_memmap_walk(count_pages, &num_physpages);
 
-	max_mapnr = max_low_pfn;
 	high_memory = __va(max_low_pfn * PAGE_SIZE);
 
-	totalram_pages += free_all_bootmem();
+	for_each_pgdat(pgdat)
+		totalram_pages += free_all_bootmem_node(pgdat);
 
 	reserved_pages = 0;
 	efi_memmap_walk(count_reserved_pages, &reserved_pages);
@@ -425,7 +439,7 @@ mem_init (void)
 
 	printk("Memory: %luk/%luk available (%luk code, %luk reserved, %luk data, %luk init)\n",
 	       (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),
-	       max_mapnr << (PAGE_SHIFT - 10), codesize >> 10, reserved_pages << (PAGE_SHIFT - 10),
+	       num_physpages << (PAGE_SHIFT - 10), codesize >> 10, reserved_pages << (PAGE_SHIFT - 10),
 	       datasize >> 10, initsize >> 10);
 
 	/*
@@ -440,6 +454,8 @@ mem_init (void)
 		num_pgt_pages = nr_free_pages() / 10;
 	if (num_pgt_pages > pgt_cache_water[1])
 		pgt_cache_water[1] = num_pgt_pages;
+
+	show_mem();
 
 	/* install the gate page in the global page table: */
 	put_gate_page(virt_to_page(__start_gate_section), GATE_ADDR);

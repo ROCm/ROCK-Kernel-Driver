@@ -116,26 +116,28 @@
  * card+drive info if runtime configuration has been selected.
  */
 
-static struct mtconfiginfo qic02_tape_dynconf =	/* user settable */
-{ 0, 0, BOGUS_IRQ, 0, 0, TPQD_DEFAULT_FLAGS, };
+static struct mtconfiginfo qic02_tape_dynconf =	 {
+	/* user settable */
+	0, 0, BOGUS_IRQ, 0, 0, TPQD_DEFAULT_FLAGS, 
+};
 static struct qic02_ccb qic02_tape_ccb;	/* private stuff */
 
 #else
 
-unsigned long qic02_tape_debug = TPQD_DEFAULT_FLAGS;
+static unsigned long qic02_tape_debug = TPQD_DEFAULT_FLAGS;
 
 # if ((QIC02_TAPE_IFC!=WANGTEK) && (QIC02_TAPE_IFC!=ARCHIVE) && (QIC02_TAPE_IFC!=MOUNTAIN))
 #  error No valid interface card specified
 # endif
 #endif				/* CONFIG_QIC02_DYNCONF */
 
-static volatile int ctlbits;	/* control reg bits for tape interface */
+static int ctlbits;	/* control reg bits for tape interface */
 
 static wait_queue_head_t qic02_tape_transfer;	/* sync rw with interrupts */
 
-static volatile struct mtget ioctl_status;	/* current generic status */
+static struct mtget ioctl_status;	/* current generic status */
 
-static volatile struct tpstatus tperror;	/* last drive status */
+static struct tpstatus tperror;	/* last drive status */
 
 static char rcs_revision[] = "$Revision: 1.10 $";
 static char rcs_date[] = "$Date: 1997/01/26 07:13:20 $";
@@ -145,31 +147,33 @@ static char rcs_date[] = "$Date: 1997/01/26 07:13:20 $";
  * Some variables need `volatile' because they may be modified
  * by an interrupt.
  */
-static volatile flag status_dead = YES;	/* device is legally dead until proven alive */
+static flag status_dead = YES;	/* device is legally dead until proven alive */
 static flag status_zombie = YES;	/* it's `zombie' until irq/dma allocated */
 
-static volatile flag status_bytes_wr = NO;	/* write FM at close or not */
-static volatile flag status_bytes_rd = NO;	/* (rd|wr) used for rewinding */
+static flag status_bytes_wr = NO;	/* write FM at close or not */
+static flag status_bytes_rd = NO;	/* (rd|wr) used for rewinding */
 
 static volatile unsigned long status_cmd_pending;	/* cmd in progress */
-static volatile flag status_expect_int = NO;	/* ready for interrupts */
-static volatile flag status_timer_on = NO;	/* using time-out */
-static volatile int status_error;	/* int handler may detect error */
-static volatile flag status_eof_detected = NO;	/* end of file */
-static volatile flag status_eom_detected = NO;	/* end of recorded media */
-static volatile flag status_eot_detected = NO;	/* end of tape */
-static volatile flag doing_read = NO;
-static volatile flag doing_write = NO;
+static flag status_expect_int = NO;	/* ready for interrupts */
+static flag status_timer_on = NO;	/* using time-out */
+static int status_error;	/* int handler may detect error */
+static flag status_eof_detected = NO;	/* end of file */
+static flag status_eom_detected = NO;	/* end of recorded media */
+static flag status_eot_detected = NO;	/* end of tape */
+static flag doing_read = NO;
+static flag doing_write = NO;
 
-static volatile unsigned long dma_bytes_todo;
-static volatile unsigned long dma_bytes_done;
+static unsigned long dma_bytes_todo;
+static unsigned long dma_bytes_done;
 static volatile unsigned dma_mode;	/* !=0 also means DMA in use */
 static flag need_rewind = YES;
 
 static kdev_t current_tape_dev;
 static int extra_blocks_left = BLOCKS_BEYOND_EW;
-
 static struct timer_list tp_timer;
+
+static unsigned long tape_open;		/* Guard open one only */
+static DECLARE_MUTEX(tape_op);		/* Serialize tape operations */
 
 /* return_*_eof:
  *	NO:	not at EOF,
@@ -183,6 +187,7 @@ static struct timer_list tp_timer;
  *	move on to the next file.
  *
  */
+ 
 static flag return_read_eof = NO;	/* set to signal app EOF was reached */
 static flag return_write_eof = NO;
 static flag reported_read_eof = NO;	/* set when we've done that */
@@ -248,70 +253,34 @@ static struct exception_list_type {
 	const char *msg;
 	/* EXC_nr attribute should match with tpqic02.h */
 } exception_list[] = {
-	{
-	0, 0, "Unknown exception status code", /* extra: 0 */ },
-	{
-	~(0), TP_ST0 | TP_CNI | TP_USL | TP_WRP,
-		    "Drive not online" /* 1 */ },
-	    /* Drive presence goes before cartridge presence. */
-	{
-		~(TP_WRP | TP_USL), TP_ST0 | TP_CNI,
+	{ 0, 0, "Unknown exception status code", /* extra: 0 */ },
+	{ ~(0), TP_ST0 | TP_CNI | TP_USL | TP_WRP, "Drive not online" /* 1 */ }, /* Drive presence goes before cartridge presence. */
+	{ ~(TP_WRP | TP_USL), TP_ST0 | TP_CNI,
 		    /* My Wangtek 5150EQ sometimes reports a status code
 		     * of 0x00e0, which is not a valid exception code, but
 		     * I think it should be recognized as "NO CARTRIDGE".
 		     */
-	"Cartridge not in place" /* 2 */ },
-	{
-	(unsigned short) ~(TP_ST1 | TP_BOM), (TP_ST0 | TP_WRP),
-		    "Write protected cartridge" /* 3 */ },
-	{
-	(unsigned short) ~(TP_ST1 | TP_EOR), (TP_ST0 | TP_EOM),
-		    "End of media" /* 4 */ },
-	{
-	~TP_WRP, TP_ST0 | TP_UDA | TP_ST1 | TP_BOM,
-		    "Read or Write abort. Rewind tape." /* 5 */ },
-	{
-	~TP_WRP, TP_ST0 | TP_UDA,
-		    "Read error. Bad block transferred." /* 6 */ },
-	{
-	~TP_WRP, TP_ST0 | TP_UDA | TP_BNL,
-		    "Read error. Filler block transferred." /* 7 */ },
-	{
-	~TP_WRP, TP_ST0 | TP_UDA | TP_BNL | TP_ST1 | TP_NDT,
-		    "Read error. No data detected." /* 8 */ },
-	{
-	~TP_WRP,
-		    TP_ST0 | TP_EOM | TP_UDA | TP_BNL | TP_ST1 |
-		    TP_NDT, "Read error. No data detected. EOM." /* 9 */ },
-	{
-	~(TP_WRP | TP_MBD | TP_PAR | TP_EOR),
-		    TP_ST0 | TP_UDA | TP_BNL | TP_ST1 | TP_NDT |
-		    TP_BOM,
-		    "Read error. No data detected. BOM." /* 10 */ },
-	{
-		~(TP_WRP | TP_EOM), TP_ST0 | TP_FIL,
+			"Cartridge not in place" /* 2 */ },
+	{ (unsigned short) ~(TP_ST1 | TP_BOM), (TP_ST0 | TP_WRP), "Write protected cartridge" /* 3 */ },
+	{ (unsigned short) ~(TP_ST1 | TP_EOR), (TP_ST0 | TP_EOM), "End of media" /* 4 */ },
+	{ ~TP_WRP, TP_ST0 | TP_UDA | TP_ST1 | TP_BOM, "Read or Write abort. Rewind tape." /* 5 */ },
+	{ ~TP_WRP, TP_ST0 | TP_UDA, "Read error. Bad block transferred." /* 6 */ },
+	{ ~TP_WRP, TP_ST0 | TP_UDA | TP_BNL, "Read error. Filler block transferred." /* 7 */ },
+	{ ~TP_WRP, TP_ST0 | TP_UDA | TP_BNL | TP_ST1 | TP_NDT, "Read error. No data detected." /* 8 */ },
+	{ ~TP_WRP, TP_ST0 | TP_EOM | TP_UDA | TP_BNL | TP_ST1 | TP_NDT, "Read error. No data detected. EOM." /* 9 */ },
+	{ ~(TP_WRP | TP_MBD | TP_PAR | TP_EOR), TP_ST0 | TP_UDA | TP_BNL | TP_ST1 | TP_NDT | TP_BOM, "Read error. No data detected. BOM." /* 10 */ },
+	{ ~(TP_WRP | TP_EOM), TP_ST0 | TP_FIL,
 		    /* Status 0x0089 (EOM & FM) is viewed as an FM,
 		     * because it can only happen during a read.
 		     * EOM is checked separately for an FM condition.
 		     */
-	"File mark detected" /* 11 */ },
-	{
-	~(TP_ST0 | TP_CNI | TP_USL | TP_WRP | TP_BOM),
-		    TP_ST1 | TP_ILL, "Illegal command" /* 12 */ },
-	{
-	~(TP_ST0 | TP_CNI | TP_USL | TP_WRP | TP_BOM),
-		    TP_ST1 | TP_POR, "Reset occurred" /* 13 */ },
-	{
-		~TP_WRP, TP_ST0 | TP_FIL | TP_MBD,	/* NOTE: ST1 not set! */
-	"Marginal block detected" /* 14 */ },
-	{
-		~(TP_ST0 | TP_WRP | TP_EOM | TP_UDA | TP_BNL | TP_FIL |
-		  TP_NDT), TP_ST1 | TP_EOR,
-		/********** Is the extra TP_NDT really needed Eddy? **********/
-	"End of recorded media" /* extra: 15 */ },
+			"File mark detected" /* 11 */ },
+	{ ~(TP_ST0 | TP_CNI | TP_USL | TP_WRP | TP_BOM), TP_ST1 | TP_ILL, "Illegal command" /* 12 */ },
+	{ ~(TP_ST0 | TP_CNI | TP_USL | TP_WRP | TP_BOM), TP_ST1 | TP_POR, "Reset occurred" /* 13 */ },
+	{ ~TP_WRP, TP_ST0 | TP_FIL | TP_MBD,	/* NOTE: ST1 not set! */ "Marginal block detected" /* 14 */ },
+	{ ~(TP_ST0 | TP_WRP | TP_EOM | TP_UDA | TP_BNL | TP_FIL |  TP_NDT), TP_ST1 | TP_EOR,	/********** Is the extra TP_NDT really needed Eddy? **********/ "End of recorded media" /* extra: 15 */ },
 	    /* 15 is returned when SEEKEOD completes successfully */
-	{
-	~(TP_WRP | TP_ST0), TP_ST1 | TP_BOM, "Beginning of media" /* extra: 16 */ }
+	{ ~(TP_WRP | TP_ST0), TP_ST1 | TP_BOM, "Beginning of media" /* extra: 16 */ }
 };
 
 #define NR_OF_EXC	(sizeof(exception_list)/sizeof(struct exception_list_type))
@@ -333,24 +302,12 @@ static void tpqputs(unsigned long flags, const char *s)
 }				/* tpqputs */
 
 
-/* Perform byte order swapping for a 16-bit word.
- *
- * [FIXME] This should probably be in include/asm/
- * ([FIXME] i486 can do this faster)
- */
-static inline void byte_swap_w(volatile unsigned short *w)
-{
-	int t = *w;
-	*w = (t >> 8) | ((t & 0xff) << 8);
-}
-
-
-
 /* Init control register bits on interface card.
  * For Archive, interrupts must be enabled explicitly.
  * Wangtek interface card requires ONLINE to be set, Archive SC402/SC499R
  * cards keep it active all the time.
  */
+
 static void ifc_init(void)
 {
 	if (QIC02_TAPE_IFC == WANGTEK) {	/* || (QIC02_TAPE_IFC == EVEREX) */
@@ -374,10 +331,8 @@ static void report_qic_exception(unsigned n)
 		tpqputs(TPQD_ALWAYS, "Oops -- report_qic_exception");
 		n = 0;
 	}
-	if (TPQDBG(SENSE_TEXT) || n == 0) {
-		printk(TPQIC02_NAME ": sense: %s\n",
-		       exception_list[n].msg);
-	}
+	if (TPQDBG(SENSE_TEXT) || n == 0)
+		printk(TPQIC02_NAME ": sense: %s\n", exception_list[n].msg);
 }				/* report_qic_exception */
 
 
@@ -395,9 +350,7 @@ static int decode_qic_exception_nr(unsigned s)
 			return i;
 		}
 	}
-	printk(TPQIC02_NAME
-	       ": decode_qic_exception_nr: exception(%x) not recognized\n",
-	       s);
+	printk(TPQIC02_NAME ": decode_qic_exception_nr: exception(%x) not recognized\n", s);
 	return 0;
 }				/* decode_qic_exception_nr */
 
@@ -477,15 +430,13 @@ static int tape_reset(int verbose)
 	/* KLUDGE FOR G++ BUG */
 	{
 		int stat = inb_p(QIC02_STAT_PORT);
-		status_dead =
-		    ((stat & QIC02_STAT_RESETMASK) != QIC02_STAT_RESETVAL);
+		status_dead = ((stat & QIC02_STAT_RESETMASK) != QIC02_STAT_RESETVAL);
 	}
 	/* if successful, inb(STAT) returned RESETVAL */
-	if (status_dead == YES) {
+	if (status_dead == YES)
 		printk(TPQIC02_NAME ": reset failed!\n");
-	} else if (verbose) {
+	else if (verbose)
 		printk(TPQIC02_NAME ": reset successful\n");
-	}
 
 	return (status_dead == YES) ? TE_DEAD : TE_OK;
 }				/* tape_reset */
@@ -528,11 +479,10 @@ static int notify_cmd(char cmd, short ignore_ex)
 	 * it could be *much* longer!
 	 */
 	while ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY) && (--i > 0))
-		/*skip */ ;
+		udelay(1);
 	/* wait for ready */
 	if (i == 0) {
-		tpqputs(TPQD_ALWAYS,
-			"timed out waiting for ready in notify_cmd");
+		tpqputs(TPQD_ALWAYS, "timed out waiting for ready in notify_cmd");
 		status_dead = YES;
 		return TE_TIM;
 	}
@@ -541,7 +491,7 @@ static int notify_cmd(char cmd, short ignore_ex)
 	i = TAPE_NOTIFY_TIMEOUT;
 	/* according to the specs this one should never time-out */
 	while (((inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY) == 0) && (--i > 0))
-		/*skip */ ;
+		udelay(1);
 	/* wait for not ready */
 	if (i == 0) {
 		tpqputs(TPQD_ALWAYS, "timed out waiting for !ready in notify_cmd");
@@ -568,7 +518,7 @@ static int wait_for_ready(time_t timeout)
 	 */
 	spin_t = 50;
 	while (((stat = inb_p(QIC02_STAT_PORT) & QIC02_STAT_MASK) == QIC02_STAT_MASK) && (--spin_t > 0))
-		/*SKIP*/;
+		udelay(1);
 	if ((stat & QIC02_STAT_READY) == 0)
 		return TE_OK;	/* covers 99.99% of all calls */
 
@@ -580,9 +530,11 @@ static int wait_for_ready(time_t timeout)
 	spin_t += jiffies;
 
 	/* FIXME...*/
-	while (((stat = inb_p(QIC02_STAT_PORT) & QIC02_STAT_MASK) == QIC02_STAT_MASK) 
-		&& time_before(jiffies, spin_t))
-		schedule();	/* don't waste all the CPU time */
+	while (((stat = inb_p(QIC02_STAT_PORT) & QIC02_STAT_MASK) == QIC02_STAT_MASK)  && time_before(jiffies, spin_t))
+	{
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);	/* don't waste all the CPU time */
+	}
 	if ((stat & QIC02_STAT_READY) == 0)
 		return TE_OK;
 
@@ -611,8 +563,7 @@ static int wait_for_ready(time_t timeout)
 	}
 
 	if ((stat & QIC02_STAT_EXCEPTION) == 0) {
-		tpqputs(TPQD_ALWAYS,
-			"exception detected after waiting_for_ready");
+		tpqputs(TPQD_ALWAYS, "exception detected after waiting_for_ready");
 		return TE_EX;
 	} else {
 		return TE_OK;
@@ -627,7 +578,6 @@ static int send_qic02_data(char sb[], unsigned size, int ignore_ex)
 	int i, stat;
 
 	for (i = 0; i < size; i++) {
-
 		stat = wait_for_ready(TIM_S);
 		if (stat != TE_OK)
 			return stat;
@@ -700,9 +650,12 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 	 * de-schedule immediately, we waste a lot of time because a
 	 * task switch is much longer than we usually have to wait here.
 	 */
-	n = 1000;		/* 500 is not enough on a 486/33 */
+	n = 700;
 	while ((n > 0) && ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_MASK) == QIC02_STAT_MASK))
+	{
+		udelay(1);
 		n--;		/* wait for ready or exception or timeout */
+	}
 	if (n == 0) {
 		/* n (above) should be chosen such that on your machine
 		 * you rarely ever see the message below, and it should
@@ -711,7 +664,10 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 	 	/* FIXME */
 		tpqputs(TPQD_ALWAYS, "waiting looong in rdstatus() -- drive dead?");
 		while ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_MASK) == QIC02_STAT_MASK)
-			schedule();
+		{
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1);
+		}
 		tpqputs(TPQD_ALWAYS, "finished waiting in rdstatus()");
 	}
 
@@ -737,12 +693,12 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 		*q = inb_p(QIC02_DATA_PORT);	/* read status byte */
 
 		if (TP_DIAGS(current_tape_dev))
-			printk("[%1d]=0x%x  ", q - stp,
-			       (unsigned) (*q) & 0xff);
+			printk("[%1d]=0x%x  ", q - stp, (unsigned) (*q) & 0xff);
 
 		outb_p(ctlbits | QIC02_CTL_REQUEST, QIC02_CTL_PORT);	/* set request */
 
-		while ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY) == 0);	/* wait for not ready */
+		while ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY) == 0)
+			cpu_relax();	/* wait for not ready */
 
 		udelay(22);	/* delay >20 usec */
 
@@ -754,7 +710,7 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 	 * My drive doesn't seem to need it here yet, but others do?
 	 */
 	while (inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY)
-		/*skip */ ;
+		cpu_relax();
 	/* wait for ready */
 
 	if (TP_DIAGS(current_tape_dev))
@@ -772,13 +728,8 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 static int get_status(volatile struct tpstatus *stp)
 {
 	int stat = rdstatus((char *) stp, TPSTATSIZE, QCMD_RD_STAT);
-#if defined(__i386__) || defined (__x86_64__)
-	byte_swap_w(&(stp->dec));
-	byte_swap_w(&(stp->urc));
-#else
-#warning Undefined architecture
-	/* should probably swap status bytes #definition */
-#endif
+	stp->dec = be16_to_cpu(stp->dec);
+	stp->urc = be16_to_cpu(stp->urc);
 	return stat;
 }				/* get_status */
 
@@ -823,8 +774,7 @@ static int tp_sense(int ignore)
 	static void finish_rw(int cmd);
 
 	if (TPQDBG(SENSE_TEXT))
-		printk(TPQIC02_NAME ": tp_sense(ignore=0x%x) enter\n",
-		       ignore);
+		printk(TPQIC02_NAME ": tp_sense(ignore=0x%x) enter\n", ignore);
 
 	/* sense() is not allowed during a read or write cycle */
 	if (doing_write == YES)
@@ -842,11 +792,8 @@ static int tp_sense(int ignore)
 	if (err & (TP_ST0 | TP_ST1))
 		printk(TPQIC02_NAME ": tp_sense: status: %x, error count: %d, underruns: %d\n",
 		       tperror.exs, tperror.dec, tperror.urc);
-	else if ((tperror.dec != 0) || (tperror.urc != 0)
-		 || TPQDBG(SENSE_CNTS))
-		printk(TPQIC02_NAME
-		       ": tp_sense: no hard errors, soft error count: %d, underruns: %d\n",
-		       tperror.dec, tperror.urc);
+	else if ((tperror.dec != 0) || (tperror.urc != 0) || TPQDBG(SENSE_CNTS))
+		printk(TPQIC02_NAME ": tp_sense: no hard errors, soft error count: %d, underruns: %d\n", tperror.dec, tperror.urc);
 
 	/* Set generic status. HP-UX defines these, but some extra would 
 	 * be useful. Problem is to remain compatible. [Do we want to be
@@ -909,9 +856,7 @@ static int wait_for_rewind(time_t timeout)
 
 	stat = inb(QIC02_STAT_PORT) & QIC02_STAT_MASK;
 	if (TPQDBG(REWIND))
-		printk(TPQIC02_NAME
-		       ": Waiting for (re-)wind to finish: stat=0x%x\n",
-		       stat);
+		printk(TPQIC02_NAME ": Waiting for (re-)wind to finish: stat=0x%x\n", stat);
 
 	stat = wait_for_ready(timeout);
 
@@ -946,13 +891,13 @@ static int ll_do_qic_cmd(int cmd, time_t timeout)
 		stat = TE_OK;
 	}
 	if (stat != TE_OK) {
-		printk(TPQIC02_NAME ": ll_do_qic_cmd(%x, %ld) failed\n",
-		       cmd, (long) timeout);
+		printk(TPQIC02_NAME ": ll_do_qic_cmd(%x, %ld) failed\n", cmd, (long) timeout);
 		return -EIO;
 	}
 #if OBSOLETE
 	/* wait for ready since it may not be active immediately after reading status */
-	while ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY) != 0);
+	while ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY) != 0)
+		cpu_relax();
 #endif
 
 	stat = send_qic02_cmd(cmd, timeout, 0);	/* (checks for exceptions) */
@@ -982,20 +927,15 @@ static int ll_do_qic_cmd(int cmd, time_t timeout)
 	/* sense() will set eof/eom as required */
 	if (stat == TE_EX) {
 		if (tp_sense(TP_WRP | TP_BOM | TP_EOM | TP_FIL) != TE_OK) {
-			printk(TPQIC02_NAME
-			       ": Exception persist in ll_do_qic_cmd[1](%x, %ld)",
-			       cmd, (long) timeout);
+			printk(TPQIC02_NAME ": Exception persist in ll_do_qic_cmd[1](%x, %ld)", cmd, (long) timeout);
 			status_dead = YES;
 			return -ENXIO;
 			/* if rdstatus fails too, we're in trouble */
 		}
 	} else if (stat != TE_OK) {
-		printk(TPQIC02_NAME
-		       ": ll_do_qic_cmd: send_qic02_cmd failed, stat = 0x%x\n",
-		       stat);
+		printk(TPQIC02_NAME ": ll_do_qic_cmd: send_qic02_cmd failed, stat = 0x%x\n", stat);
 		return -EIO;	/*** -EIO is probably not always appropriate */
 	}
-
 
 	if (timeout == TIM_R)
 		stat = wait_for_rewind(timeout);
@@ -1007,18 +947,14 @@ static int ll_do_qic_cmd(int cmd, time_t timeout)
 			      TP_EOR | TP_NDT | TP_UDA | TP_BNL | TP_WRP |
 			      TP_BOM | TP_EOM | TP_FIL : TP_WRP | TP_BOM |
 			      TP_EOM | TP_FIL)) != TE_OK) {
-			printk(TPQIC02_NAME
-			       ": Exception persist in ll_do_qic_cmd[2](%x, %ld)\n",
-			       cmd, (long) timeout);
+			printk(TPQIC02_NAME ": Exception persist in ll_do_qic_cmd[2](%x, %ld)\n", cmd, (long) timeout);
 			if (cmd != QCMD_RD_FM)
 				status_dead = YES;
 			return -ENXIO;
 			/* if rdstatus fails too, we're in trouble */
 		}
 	} else if (stat != TE_OK) {
-		printk(TPQIC02_NAME
-		       ": ll_do_qic_cmd %x: wait failed, stat == 0x%x\n",
-		       cmd, stat);
+		printk(TPQIC02_NAME ": ll_do_qic_cmd %x: wait failed, stat == 0x%x\n", cmd, stat);
 		return -EIO;
 	}
 	return 0;
@@ -1052,30 +988,30 @@ static int ll_do_qic_cmd(int cmd, time_t timeout)
 
 static void terminate_read(int cmd)
 {
-	if (doing_read == YES) {
-		doing_read = NO;
-		if (cmd != QCMD_RD_FM) {
-			/* if the command is a RFM, there is no need to do this
-			 * because a RFM will legally terminate the read-cycle.
-			 */
-			tpqputs(TPQD_ALWAYS, "terminating pending read-cycle");
+	if (doing_read != YES)
+		return;
+		
+	doing_read = NO;
+	
+	if (cmd == QCMD_RD_FM)
+		return;
+		
+	/* if the command is a RFM, there is no need to do this
+	 * because a RFM will legally terminate the read-cycle.
+	 */
+	tpqputs(TPQD_ALWAYS, "terminating pending read-cycle");
 
-			/* I'm not too sure about this part  -- hhb */
-			if (QIC02_TAPE_IFC == MOUNTAIN) {
-				/* Mountain reference says can terminate by de-asserting online */
-				ctlbits &= ~MTN_QIC02_CTL_ONLINE;
-			}
+	/* I'm not too sure about this part  -- hhb */
+	if (QIC02_TAPE_IFC == MOUNTAIN) {
+		/* Mountain reference says can terminate by de-asserting online */
+		ctlbits &= ~MTN_QIC02_CTL_ONLINE;
+	}
 
-			if (tp_sense(TP_FIL | TP_EOM | TP_WRP) != TE_OK) {
-				tpqputs(TPQD_ALWAYS,
-					"finish_rw[read1]: ignore the 2 lines above");
-				if (is_exception()) {
-					if (tp_sense
-					    (TP_ILL | TP_FIL | TP_EOM |
-					     TP_WRP) != TE_OK)
-						tpqputs(TPQD_ALWAYS,"finish_rw[read2]: read cycle error");
-				}
-			}
+	if (tp_sense(TP_FIL | TP_EOM | TP_WRP) != TE_OK) {
+		tpqputs(TPQD_ALWAYS, "finish_rw[read1]: ignore the 2 lines above");
+		if (is_exception()) {
+			if (tp_sense(TP_ILL | TP_FIL | TP_EOM | TP_WRP) != TE_OK)
+				tpqputs(TPQD_ALWAYS,"finish_rw[read2]: read cycle error");
 		}
 	}
 }				/* terminate_read */
@@ -1085,23 +1021,23 @@ static void terminate_write(int cmd)
 {
 	int stat;
 
-	if (doing_write == YES) {
-		doing_write = NO;
-		/* Finish writing by appending a FileMark at the end. */
-		if (cmd != QCMD_WRT_FM) {
-			/* finish off write cycle */
-			stat = ll_do_qic_cmd(QCMD_WRT_FM, TIM_M);
-			if (stat != TE_OK)
-				tpqputs(TPQD_ALWAYS,
-					"Couldn't finish write cycle properly");
-			(void) tp_sense(0);
-		}
-		/* If there is an EOF token waiting to be returned to
-		 * the (writing) application, discard it now.
-		 * We could be at EOT, so don't reset return_write_eof.
-		 */
-		reported_write_eof = YES;
+	if (doing_write != YES)
+		return;
+
+	doing_write = NO;
+	/* Finish writing by appending a FileMark at the end. */
+	if (cmd != QCMD_WRT_FM) {
+		/* finish off write cycle */
+		stat = ll_do_qic_cmd(QCMD_WRT_FM, TIM_M);
+		if (stat != TE_OK)
+			tpqputs(TPQD_ALWAYS, "Couldn't finish write cycle properly");
+		(void) tp_sense(0);
 	}
+	/* If there is an EOF token waiting to be returned to
+	 * the (writing) application, discard it now.
+	 * We could be at EOT, so don't reset return_write_eof.
+	 */
+	reported_write_eof = YES;
 }				/* terminate_write */
 
 
@@ -1109,8 +1045,7 @@ static void terminate_write(int cmd)
 static void finish_rw(int cmd)
 {
 	if (wait_for_ready(TIM_S) != TE_OK) {
-		tpqputs(TPQD_ALWAYS,
-			"error: drive not ready in finish_rw() !");
+		tpqputs(TPQD_ALWAYS, "error: drive not ready in finish_rw() !");
 		return;
 	}
 	terminate_read(cmd);
@@ -1172,8 +1107,7 @@ static int do_ioctl_cmd(int cmd)
 
 	case MTBSF:
 		if (TP_HAVE_BSF) {
-			tpqputs(TPQD_IOCTLS,
-				"MTBSF backward searching filemark -- optional command");
+			tpqputs(TPQD_IOCTLS, "MTBSF backward searching filemark -- optional command");
 			if ((mode_access == WRITE) && status_bytes_wr)
 				return -EACCES;
 			stat = do_qic_cmd(QCMD_RD_FM_BCK, TIM_F);
@@ -1243,7 +1177,7 @@ static int do_ioctl_cmd(int cmd)
 
 	case MTNOP:
 		tpqputs(TPQD_IOCTLS, "MTNOP setting status only");
-			/********** should do `read position' for drives that support it **********/
+		/********** should do `read position' for drives that support it **********/
 		return (tp_sense(-1) == TE_OK) ? 0 : -EIO;	/**** check return codes ****/
 
 	case MTRETEN:
@@ -1377,12 +1311,7 @@ static int do_ioctl_cmd(int cmd)
 /* dma_transfer(): This routine is called for every 512 bytes to be read
  * from/written to the tape controller. Speed is important here!
  * (There must be enough time left for the hd controller!)
- * When other devices use DMA they must ensure they use un-interruptible
- * double byte accesses to the DMA controller. Floppy.c is ok.
- * Must have interrupts disabled when this function is invoked,
- * otherwise, the double-byte transfers to the DMA controller will not
- * be atomic. That could lead to nasty problems when they are interrupted
- * by other DMA interrupt-routines.
+ * The dma lock protects the DMA controller
  *
  * This routine merely does the least possible to keep
  * the transfers going:
@@ -1407,8 +1336,7 @@ static inline void dma_transfer(void)
 	flags = claim_dma_lock();
 	clear_dma_ff(QIC02_TAPE_DMA);
 	set_dma_mode(QIC02_TAPE_DMA, dma_mode);
-	set_dma_addr(QIC02_TAPE_DMA,
-		     isa_virt_to_bus(buffaddr) + dma_bytes_done);
+	set_dma_addr(QIC02_TAPE_DMA, isa_virt_to_bus(buffaddr) + dma_bytes_done);
 	set_dma_count(QIC02_TAPE_DMA, TAPE_BLKSIZE);
 
 	/* start tape DMA controller */
@@ -1452,13 +1380,12 @@ static int start_dma(short mode, unsigned long bytes_todo)
 /* assume 'bytes_todo'>0 */
 {
 	int stat;
-	unsigned long flags;
 
 	tpqputs(TPQD_DEBUG, "start_dma() enter");
 	TPQDEB( {printk(TPQIC02_NAME ": doing_read==%d, doing_write==%d\n",
 		      doing_read, doing_write);})
 
-	    dma_bytes_done = 0;
+	dma_bytes_done = 0;
 	dma_bytes_todo = bytes_todo;
 	status_error = NO;
 	/* dma_mode!=0 indicates that the dma controller is in use */
@@ -1484,17 +1411,14 @@ static int start_dma(short mode, unsigned long bytes_todo)
 		/* TP_CNI should now be handled in open(). -Hennus */
 #endif
 
-		stat =
-		    tp_sense(((mode ==
-			       WRITE) ? 0 : TP_WRP) | TP_BOM | TP_FIL);
+		stat = tp_sense(((mode == WRITE) ? 0 : TP_WRP) | TP_BOM | TP_FIL);
 		if (stat != TE_OK)
 			return stat;
 
 #if OBSOLETE
 		/************* not needed iff rd_status() would wait for ready!!!!!! **********/
 		if (wait_for_ready(TIM_S) != TE_OK) {	/*** not sure this is needed ***/
-			tpqputs(TPQD_ALWAYS,
-				"wait_for_ready failed in start_dma");
+			tpqputs(TPQD_ALWAYS, "wait_for_ready failed in start_dma");
 			return -EIO;
 		}
 #endif
@@ -1507,11 +1431,9 @@ static int start_dma(short mode, unsigned long bytes_todo)
 		/* Tell the controller the data direction */
 
 		/* r/w, timeout medium, check exceptions, sets status_cmd_pending. */
-		stat = send_qic02_cmd((mode == WRITE) 
-					? QCMD_WRT_DATA : QCMD_RD_DATA, TIM_M, 0);
+		stat = send_qic02_cmd((mode == WRITE) ? QCMD_WRT_DATA : QCMD_RD_DATA, TIM_M, 0);
 		if (stat != TE_OK) {
-			printk(TPQIC02_NAME ": start_dma: init %s failed\n",
-			       (mode == WRITE) ? "write" : "read");
+			printk(TPQIC02_NAME ": start_dma: init %s failed\n", (mode == WRITE) ? "write" : "read");
 			(void) tp_sense(0);
 			return stat;
 		}
@@ -1529,10 +1451,8 @@ static int start_dma(short mode, unsigned long bytes_todo)
 			doing_write = YES;
 			break;
 		default:
-			printk(TPQIC02_NAME
-			       ": requested unknown mode %d\n", mode);
-			panic(TPQIC02_NAME
-			      ": invalid mode in start_dma()");
+			printk(TPQIC02_NAME ": requested unknown mode %d\n", mode);
+			panic(TPQIC02_NAME ": invalid mode in start_dma()");
 		}
 
 	} else if (is_exception()) {
@@ -1541,8 +1461,7 @@ static int start_dma(short mode, unsigned long bytes_todo)
 		 *
 		 * ******** this also affects EOF/EOT handling! ************
 		 */
-		tpqputs(TPQD_ALWAYS,
-			"detected exception in start_dma() while transfer in progress");
+		tpqputs(TPQD_ALWAYS, "detected exception in start_dma() while transfer in progress");
 		status_error = YES;
 		return TE_END;
 	}
@@ -1557,10 +1476,7 @@ static int start_dma(short mode, unsigned long bytes_todo)
 
 	/* initiate first data block read from/write to the tape controller */
 
-	save_flags(flags);
-	cli();
 	dma_transfer();
-	restore_flags(flags);
 
 	TPQPUTS("start_dma() end");
 	return TE_OK;
@@ -1594,7 +1510,6 @@ static void end_dma(unsigned long *bytes_done)
 	else if (QIC02_TAPE_IFC == ARCHIVE)
 		outb_p(0, AR_RESET_DMA_PORT);
 	else {			/* QIC02_TAPE_IFC == MOUNTAIN */
-
 		/* Clear control bits, de-select ONLINE during tp_sense */
 		ctlbits &= ~MTN_QIC02_CTL_ONLINE;
 	}
@@ -1605,7 +1520,6 @@ static void end_dma(unsigned long *bytes_done)
 		stat = tp_sense((dma_mode == READ) ? TP_WRP : 0);
 		/* no return here -- got to clean up first! */
 	} else {		/* if (QIC02_TAPE_IFC == MOUNTAIN) */
-
 		outb_p(ctlbits, QIC02_CTL_PORT);
 	}
 
@@ -1718,8 +1632,7 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
 			 *      - something went wrong
 			 * So don't continue with the next block.
 			 */
-			tpqputs(TPQD_ALWAYS,
-				"isr: exception on tape controller");
+			tpqputs(TPQD_ALWAYS, "isr: exception on tape controller");
 			printk("      status %02x\n", stat);
 			status_error = TE_EX;
 
@@ -1740,16 +1653,14 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
 		 */
 		if (QIC02_TAPE_IFC == WANGTEK)	/* I think this is a drive-dependency, not IFC -- hhb */
 			if (stat & QIC02_STAT_READY) {	/* not ready */
-				tpqputs(TPQD_ALWAYS,
-					"isr: ? Tape controller not ready");
+				tpqputs(TPQD_ALWAYS, "isr: ? Tape controller not ready");
 				r = 1;
 			}
 
 		flags = claim_dma_lock();
 
 		if ((i = get_dma_residue(QIC02_TAPE_DMA)) != 0) {
-			printk(TPQIC02_NAME ": dma_residue == %x !!!\n",
-			       i);
+			printk(TPQIC02_NAME ": dma_residue == %x !!!\n", i);
 			r = 1;	/* big trouble, but can't do much about it... */
 		}
 
@@ -1774,8 +1685,7 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
 			dma_transfer();
 		}
 	} else {
-		printk(TPQIC02_NAME ": Unexpected interrupt, stat == %x\n",
-		       inb(QIC02_STAT_PORT));
+		printk(TPQIC02_NAME ": Unexpected interrupt, stat == %x\n", inb(QIC02_STAT_PORT));
 	}
 }				/* qic02_tape_interrupt */
 
@@ -1812,10 +1722,8 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
  * request would return the EOF flag for the previous file.
  */
 
-static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
-			       loff_t * ppos)
+static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
 {
-	int err;
 	kdev_t dev = filp->f_dentry->d_inode->i_rdev;
 	unsigned short flags = filp->f_flags;
 	unsigned long bytes_todo, bytes_done, total_bytes_done = 0;
@@ -1827,11 +1735,8 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 	}
 
 	if (TP_DIAGS(current_tape_dev))
-		/* can't print a ``long long'' (for filp->f_pos), so chop it */
-		printk(TPQIC02_NAME
-		       ": request READ, minor=%x, buf=%p, count=%lx"
-		       ", pos=%lx, flags=%x\n", minor(dev), buf,
-		       (long) count, (unsigned long) filp->f_pos, flags);
+		printk(TPQIC02_NAME ": request READ, minor=%x, buf=%p, count=%lx, pos=%Lx, flags=%x\n", minor(dev), buf,
+		       (long) count, filp->f_pos, flags);
 
 	if (count % TAPE_BLKSIZE) {	/* Only allow mod 512 bytes at a time. */
 		tpqputs(TPQD_BLKSZ, "Wrong block size");
@@ -1858,10 +1763,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 		/* Must ensure that user program sees exactly one EOF token (==0) */
 		if (return_read_eof == YES) {
 			if (TPQDBG(DEBUG)) {
-				printk
-				    ("read: return_read_eof==%d, reported_read_eof==%d, total_bytes_done==%lu\n",
-				     return_read_eof, reported_read_eof,
-				     total_bytes_done);
+				printk("read: return_read_eof==%d, reported_read_eof==%d, total_bytes_done==%lu\n", return_read_eof, reported_read_eof, total_bytes_done);
 			}
 
 			if (reported_read_eof == NO) {
@@ -1897,7 +1799,6 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 			}
 		}
 
-	/*****************************/
 		if (bytes_todo == 0) {
 			return total_bytes_done;
 		}
@@ -1905,9 +1806,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 		if (bytes_todo > 0) {
 			/* start reading data */
 			if (is_exception()) {
-/****************************************/
-				tpqputs(TPQD_DMAX,
-					"is_exception() before start_dma()!");
+				tpqputs(TPQD_DMAX, "is_exception() before start_dma()!");
 			}
 
 /******************************************************************
@@ -1919,12 +1818,11 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 			stat = start_dma(READ, bytes_todo);
 			if (stat == TE_OK) {
 				/* Wait for transfer to complete, interrupt should wake us */
-				while (dma_mode != 0) {
-					sleep_on(&qic02_tape_transfer);
-				}
-				if (status_error) {
+				
+				wait_event(qic02_tape_transfer, dma_mode != 0);
+
+				if (status_error)
 					return_read_eof = YES;
-				}
 
 			} else if (stat != TE_END) {
 				/* should do sense() on error here */
@@ -1938,8 +1836,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 			}
 			end_dma(&bytes_done);
 			if (bytes_done > bytes_todo) {
-				tpqputs(TPQD_ALWAYS,
-					"read: Oops, read more bytes than requested");
+				tpqputs(TPQD_ALWAYS, "read: Oops, read more bytes than requested");
 				return -EIO;
 			}
 			/* copy buffer to user-space in one go */
@@ -1949,15 +1846,12 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 			}
 #if 1
 			/* Checks Ton's patch below */
-			if ((return_read_eof == NO)
-			    && (status_eof_detected == YES)) {
-				printk(TPQIC02_NAME
-				       ": read(): return_read_eof=%d, status_eof_detected=YES. return_read_eof:=YES\n",
+			if ((return_read_eof == NO)  && (status_eof_detected == YES)) {
+				printk(TPQIC02_NAME ": read(): return_read_eof=%d, status_eof_detected=YES. return_read_eof:=YES\n",
 				       return_read_eof);
 			}
 #endif
-			if ((bytes_todo != bytes_done)
-			    || (status_eof_detected == YES)) {
+			if ((bytes_todo != bytes_done) || (status_eof_detected == YES)) {
 				/* EOF or EOM detected. return EOF next time. */
 				return_read_eof = YES;
 			}
@@ -2006,10 +1900,8 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
  * tape device again. The driver will detect an exception status in (No Cartridge)
  * and force a rewind. After that tar may continue writing.
  */
-static ssize_t qic02_tape_write(struct file *filp, const char *buf,
-				size_t count, loff_t * ppos)
+static ssize_t qic02_tape_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 {
-	int err;
 	kdev_t dev = filp->f_dentry->d_inode->i_rdev;
 	unsigned short flags = filp->f_flags;
 	unsigned long bytes_todo, bytes_done, total_bytes_done = 0;
@@ -2020,11 +1912,8 @@ static ssize_t qic02_tape_write(struct file *filp, const char *buf,
 	}
 
 	if (TP_DIAGS(current_tape_dev)) {
-		/* can't print a ``long long'' (for filp->f_pos), so chop it */
-		printk(TPQIC02_NAME ": request WRITE, minor=%x, buf=%p"
-		       ", count=%lx, pos=%lx, flags=%x\n",
-		       minor(dev), buf,
-		       (long) count, (unsigned long) filp->f_pos, flags);
+		printk(TPQIC02_NAME ": request WRITE, minor=%x, buf=%p, count=%lx, pos=%Lx, flags=%x\n",
+		       minor(dev), buf, (long) count, filp->f_pos, flags);
 	}
 
 	if (count % TAPE_BLKSIZE) {	/* only allow mod 512 bytes at a time */
@@ -2063,8 +1952,7 @@ static ssize_t qic02_tape_write(struct file *filp, const char *buf,
 
 			if (reported_write_eof == NO) {
 				if (bytes_todo > 0) {
-					tpqputs(TPQD_ALWAYS,
-						"partial write");
+					tpqputs(TPQD_ALWAYS, "partial write");
 					/* partial write signals EOF to user program */
 				}
 				reported_write_eof = YES;
@@ -2091,22 +1979,18 @@ static ssize_t qic02_tape_write(struct file *filp, const char *buf,
  ***** fail and write() will return ENXIO error
  *****/
 			if (start_dma(WRITE, bytes_todo) != TE_OK) {
-				tpqputs(TPQD_ALWAYS,
-					"write: start_dma() failed");
+				tpqputs(TPQD_ALWAYS, "write: start_dma() failed");
 				/* should do sense() on error here */
 				return -ENXIO;
 				/*********** FIXTHIS **************/
 			}
 
 			/* Wait for write to complete, interrupt should wake us. */
-			while ((status_error == 0) && (dma_mode != 0)) {
-				sleep_on(&qic02_tape_transfer);
-			}
+			wait_event(qic02_tape_transfer, (status_error == 0 && dma_mode != 0));
 
 			end_dma(&bytes_done);
 			if (bytes_done > bytes_todo) {
-				tpqputs(TPQD_ALWAYS,
-					"write: Oops, wrote more bytes than requested");
+				tpqputs(TPQD_ALWAYS, "write: Oops, wrote more bytes than requested");
 				return -EIO;
 			}
 			/* If the dma-transfer was aborted because of an exception,
@@ -2123,13 +2007,11 @@ static ssize_t qic02_tape_write(struct file *filp, const char *buf,
 			 */
 			if (status_error) {
 				if (status_eom_detected == YES) {
-					tpqputs(TPQD_ALWAYS,
-						"write: EW detected");
+					tpqputs(TPQD_ALWAYS, "write: EW detected");
 					return_write_eof = YES;
 				} else {
 					/* probably EXC_RWA */
-					tpqputs(TPQD_ALWAYS,
-						"write: dma: error in writing");
+					tpqputs(TPQD_ALWAYS, "write: dma: error in writing");
 					return -EIO;
 				}
 			}
@@ -2193,8 +2075,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 
 
 	if (TP_DIAGS(dev)) {
-		printk("qic02_tape_open: dev=%s, flags=%x     ",
-		       kdevname(dev), flags);
+		printk("qic02_tape_open: dev=%s, flags=%x     ", kdevname(dev), flags);
 	}
 
 	if (minor(dev) == 255) {	/* special case for resetting */
@@ -2210,11 +2091,9 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 		return 0;
 	}
 
-	/* Only one at a time from here on... */
-	if (file_count(filp) > 1) {	/* filp->f_count==1 for the first open() */
+	if(test_and_set_bit(0, &tape_open))
 		return -EBUSY;
-	}
-
+		
 	if (status_zombie == YES) {
 		/* no irq/dma/port stuff allocated yet, no reset done
 		 * yet, so return until MTSETCONFIG has been done.
@@ -2256,13 +2135,13 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	if (s == TE_OK) {
 		/* Try to clear cartridge-changed status for Archive-2150L */
 		if ((tperror.exs & TP_ST0) && (tperror.exs & TP_CNI)) {
-			s = tp_sense(TP_WRP | TP_EOM | TP_BOM | TP_CNI |
-				     TP_EOR);
+			s = tp_sense(TP_WRP | TP_EOM | TP_BOM | TP_CNI | TP_EOR);
 		}
 	}
 
 	if (s != TE_OK) {
 		tpqputs(TPQD_ALWAYS, "open: sense() failed");
+		clear_bit(0, &tape_open);
 		return -EIO;
 	}
 
@@ -2272,6 +2151,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	 */
 	if ((tperror.exs & TP_ST0) && (tperror.exs & TP_CNI)) {
 		tpqputs(TPQD_ALWAYS, "No tape present.");
+		clear_bit(0, &tape_open);
 		return -EIO;
 	}
 
@@ -2280,15 +2160,13 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	 */
 
 	/* not allowed to do QCMD_DENS_* unless tape is rewound */
-	if ((TP_DENS(dev) != 0)
-	    && (TP_DENS(current_tape_dev) != TP_DENS(dev))) {
+	if ((TP_DENS(dev) != 0) && (TP_DENS(current_tape_dev) != TP_DENS(dev))) {
 		/* force rewind if minor bits have changed,
 		 * i.e. user wants to use tape in different format.
 		 * [assuming single drive operation]
 		 */
 		if (TP_HAVE_DENS) {
-			tpqputs(TPQD_REWIND,
-				"Density minor bits have changed. Forcing rewind.");
+			tpqputs(TPQD_REWIND, "Density minor bits have changed. Forcing rewind.");
 			need_rewind = YES;
 		}
 	} else {
@@ -2318,8 +2196,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 		} else {
 			status_dead = NO;
 			if (tp_sense(~(TP_ST1 | TP_ILL)) != TE_OK) {
-				tpqputs(TPQD_ALWAYS,
-					"open: tp_sense() failed\n");
+				tpqputs(TPQD_ALWAYS, "open: tp_sense() failed\n");
 				status_dead = YES;	/* try reset next time */
 				return -EIO;
 			}
@@ -2343,12 +2220,10 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 		dens = TP_DENS(dev);
 	}
 
-	if (dens < sizeof(format_names) / sizeof(char *)) {
-		printk(TPQIC02_NAME ": format: %s%s\n",
-		       (dens != 0) ? "QIC-" : "", format_names[dens]);
-	} else {
+	if (dens < sizeof(format_names) / sizeof(char *))
+		printk(TPQIC02_NAME ": format: %s%s\n", (dens != 0) ? "QIC-" : "", format_names[dens]);
+	else
 		tpqputs(TPQD_REWIND, "Wait for retensioning...");
-	}
 
 	switch (TP_DENS(dev)) {
 	case 0:		/* Minor 0 is for drives without set-density support */
@@ -2406,12 +2281,12 @@ static int qic02_tape_release(struct inode *inode, struct file *filp)
 		/* Rewind only if minor number requires it AND 
 		 * read/writes have been done. ************* IS THIS CORRECT??????????
 		 */
-		if ((TP_REWCLOSE(dev))
-		    && (status_bytes_rd | status_bytes_wr)) {
+		if ((TP_REWCLOSE(dev)) && (status_bytes_rd | status_bytes_wr)) {
 			tpqputs(TPQD_REWIND, "release: Doing rewind...");
 			(void) do_qic_cmd(QCMD_REWIND, TIM_R);
 		}
 	}
+	clear_bit(0, &tape_open);
 	return 0;
 }				/* qic02_tape_release */
 
@@ -2512,33 +2387,22 @@ static int update_ifc_masks(int ifc)
 
 
 /* ioctl allows user programs to rewind the tape and stuff like that */
-static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
-			    unsigned int iocmd, unsigned long ioarg)
+static int qic02_tape_ioctl(struct inode *inode, struct file *filp, unsigned int iocmd, unsigned long ioarg)
 {
 	int error;
-	int dev_maj = major(inode->i_rdev);
 	int c;
 	struct mtop operation;
 	unsigned char blk_addr[6];
 	struct mtpos ioctl_tell;
 
 
-	if (TP_DIAGS(current_tape_dev)) {
-		printk(TPQIC02_NAME ": ioctl(%4x, %4x, %4lx)\n", dev_maj,
-		       iocmd, ioarg);
-	}
+	if (TP_DIAGS(current_tape_dev))
+		printk(TPQIC02_NAME ": ioctl(%4x, %4lx)\n", iocmd, ioarg);
 
-	if (!inode || !ioarg) {
+	if (!inode)
 		return -EINVAL;
-	}
 
 	/* check iocmd first */
-
-	if (dev_maj != QIC02_TAPE_MAJOR) {
-		printk(TPQIC02_NAME ": Oops! Wrong device?\n");
-		/* A panic() would be appropriate here */
-		return -ENODEV;
-	}
 
 	c = _IOC_NR(iocmd);
 
@@ -2546,13 +2410,9 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
 	if (c == _IOC_NR(MTIOCGETCONFIG)) {
 		CHECK_IOC_SIZE(mtconfiginfo);
 
-		if (copy_to_user
-		    ((char *) ioarg, (char *) &qic02_tape_dynconf,
-		     sizeof(qic02_tape_dynconf))) {
+		if (copy_to_user((char *) ioarg, (char *) &qic02_tape_dynconf, sizeof(qic02_tape_dynconf)))
 			return -EFAULT;
-		}
 		return 0;
-
 	} else if (c == _IOC_NR(MTIOCSETCONFIG)) {
 		/* One should always do a MTIOCGETCONFIG first, then update
 		 * user-settings, then write back with MTIOCSETCONFIG.
@@ -2562,24 +2422,19 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
 
 		CHECK_IOC_SIZE(mtconfiginfo);
 
-		if (!capable(CAP_SYS_ADMIN)) {
+		if (!capable(CAP_SYS_RAWIO))
 			return -EPERM;
-		}
 
-		if ((doing_read != NO) || (doing_write != NO)) {
+		if (doing_read != NO || doing_write != NO)
 			return -EBUSY;
-		}
 
-		if (status_zombie == NO) {
+		if (status_zombie == NO)
 			qic02_release_resources();	/* and go zombie */
-		}
 
 		/* copy struct from user space to kernel space */
-		if (copy_from_user
-		    ((char *) &qic02_tape_dynconf, (char *) ioarg,
-		     sizeof(qic02_tape_dynconf))) {
+		if (copy_from_user((char *) &qic02_tape_dynconf, (char *) ioarg, sizeof(qic02_tape_dynconf)))
 			return -EFAULT;
-		}
+		
 		return update_ifc_masks(qic02_tape_dynconf.ifc_type);
 	}
 	if (status_zombie == YES) {
@@ -2591,11 +2446,8 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
 		CHECK_IOC_SIZE(mtop);
 
 		/* copy mtop struct from user space to kernel space */
-		if (copy_from_user
-		    ((char *) &operation, (char *) ioarg,
-		     sizeof(operation))) {
+		if (copy_from_user((char *) &operation, (char *) ioarg, sizeof(operation)))
 			return -EFAULT;
-		}
 
 		/* ---note: mt_count is signed, negative seeks must be
 		 * ---      translated to seeks in opposite direction!
@@ -2605,42 +2457,32 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
 		 * ---      tape at the beginning of the current file.
 		 */
 
-		if (TP_DIAGS(current_tape_dev)) {
-			printk("OP op=%4x, count=%4x\n", operation.mt_op,
-			       operation.mt_count);
-		}
+		if (TP_DIAGS(current_tape_dev))
+			printk("OP op=%4x, count=%4x\n", operation.mt_op, operation.mt_count);
 
-		if (operation.mt_count < 0) {
-			tpqputs(TPQD_ALWAYS,
-				"Warning: negative mt_count ignored");
-		}
+		if (operation.mt_count < 0)
+			tpqputs(TPQD_ALWAYS, "Warning: negative mt_count ignored");
 
 		ioctl_status.mt_resid = operation.mt_count;
 		if (operation.mt_op == MTSEEK) {
-			if (!TP_HAVE_SEEK) {
+			if (!TP_HAVE_SEEK)
 				return -ENOTTY;
-			}
 
-			seek_addr_buf[0] =
-			    (operation.mt_count >> 16) & 0xff;
-			seek_addr_buf[1] =
-			    (operation.mt_count >> 8) & 0xff;
+			seek_addr_buf[0] = (operation.mt_count >> 16) & 0xff;
+			seek_addr_buf[1] = (operation.mt_count >> 8) & 0xff;
 			seek_addr_buf[2] = (operation.mt_count) & 0xff;
-			if (operation.mt_count >> 24) {
+			if (operation.mt_count >> 24)
 				return -EINVAL;
-			}
-			if ((error = do_ioctl_cmd(operation.mt_op)) != 0) {
+			
+			if ((error = do_ioctl_cmd(operation.mt_op)) != 0)
 				return error;
-			}
 
 			ioctl_status.mt_resid = 0;
 		} else {
 			while (operation.mt_count > 0) {
 				operation.mt_count--;
-				if ((error =
-				     do_ioctl_cmd(operation.mt_op)) != 0) {
+				if ((error = do_ioctl_cmd(operation.mt_op)) != 0)
 					return error;
-				}
 
 				ioctl_status.mt_resid = operation.mt_count;
 			}
@@ -2648,9 +2490,8 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
 		return 0;
 
 	} else if (c == _IOC_NR(MTIOCGET)) {
-		if (TP_DIAGS(current_tape_dev)) {
+		if (TP_DIAGS(current_tape_dev))
 			printk("GET ");
-		}
 
 		CHECK_IOC_SIZE(mtget);
 
@@ -2660,55 +2501,75 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
 		 */
 
 		/* copy results to user space */
-		if (copy_to_user
-		    ((char *) ioarg, (char *) &ioctl_status,
-		     sizeof(ioctl_status))) {
+		if (copy_to_user((char *) ioarg, (char *) &ioctl_status, sizeof(ioctl_status)))
 			return -EFAULT;
-		}
 		return 0;
 	} else if (TP_HAVE_TELL && (c == _IOC_NR(MTIOCPOS))) {
-		if (TP_DIAGS(current_tape_dev)) {
+		if (TP_DIAGS(current_tape_dev))
 			printk("POS ");
-		}
 
 		CHECK_IOC_SIZE(mtpos);
 
 		tpqputs(TPQD_IOCTLS, "MTTELL reading block address");
-		if ((doing_read == YES) || (doing_write == YES)) {
+		if (doing_read == YES || doing_write == YES)
 			finish_rw(AR_QCMDV_TELL_BLK);
-		}
 
-		c = rdstatus((char *) blk_addr, sizeof(blk_addr),
-			     AR_QCMDV_TELL_BLK);
-		if (c != TE_OK) {
+		c = rdstatus((char *) blk_addr, sizeof(blk_addr), AR_QCMDV_TELL_BLK);
+		if (c != TE_OK)
 			return -EIO;
-		}
 
-		ioctl_tell.mt_blkno =
-		    (blk_addr[3] << 16) | (blk_addr[4] << 8) | blk_addr[5];
+		ioctl_tell.mt_blkno = (blk_addr[3] << 16) | (blk_addr[4] << 8) | blk_addr[5];
 
 		/* copy results to user space */
-		if (copy_to_user
-		    ((char *) ioarg, (char *) &ioctl_tell,
-		     sizeof(ioctl_tell))) {
+		if (copy_to_user((char *) ioarg, (char *) &ioctl_tell, sizeof(ioctl_tell)))
 			return -EFAULT;
-		}
 		return 0;
 
-	} else {
+	} else
 		return -ENOTTY;	/* Other cmds not supported. */
-	}
 }				/* qic02_tape_ioctl */
 
 
+static ssize_t qic02_do_tape_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
+{
+	int err;
+	
+	down(&tape_op);	
+	err = qic02_tape_read(filp, buf, count, ppos);
+	up(&tape_op);
+	
+	return err;
+}
+
+static ssize_t qic02_do_tape_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
+{
+	int err;
+
+	down(&tape_op);	
+	err = qic02_tape_write(filp, buf, count, ppos);
+	up(&tape_op);
+	
+	return err;
+}
+
+static int qic02_do_tape_ioctl(struct inode *inode, struct file *filp, unsigned int iocmd, unsigned long ioarg)
+{
+	int err;
+	
+	down(&tape_op);	
+	err = qic02_tape_ioctl(inode, filp,  iocmd, ioarg);
+	up(&tape_op);
+	
+	return err;
+}
 
 /* These are (most) of the interface functions: */
 static struct file_operations qic02_tape_fops = {
 	owner:THIS_MODULE,
 	llseek:no_llseek,
-	read:qic02_tape_read,
-	write:qic02_tape_write,
-	ioctl:qic02_tape_ioctl,
+	read:qic02_do_tape_read,
+	write:qic02_do_tape_write,
+	ioctl:qic02_do_tape_ioctl,
 	open:qic02_tape_open,
 	release:qic02_tape_release,
 };
@@ -2719,10 +2580,8 @@ static void qic02_release_resources(void)
 	free_irq(QIC02_TAPE_IRQ, NULL);
 	free_dma(QIC02_TAPE_DMA);
 	release_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
-	if (buffaddr) {
-		free_pages((unsigned long) buffaddr,
-			   get_order(TPQBUF_SIZE));
-	}
+	if (buffaddr)
+		free_pages((unsigned long) buffaddr, get_order(TPQBUF_SIZE));
 	buffaddr = 0;		/* Better to cause a panic than overwite someone else */
 	status_zombie = YES;
 }				/* qic02_release_resources */
@@ -2733,49 +2592,35 @@ static int qic02_get_resources(void)
 	/* First perform some checks. If one of them fails,
 	 * the tape driver will not be registered to the system.
 	 */
-	if (QIC02_TAPE_IRQ > 16) {
-		tpqputs(TPQD_ALWAYS, "Bogus interrupt number.");
-		return -ENXIO;
-	}
 
 	/* for DYNCONF, allocating IO, DMA and IRQ should not be done until 
 	 * the config parameters have been set using MTSETCONFIG.
 	 */
 
 	/* Grab the IO region. */
-	if (!request_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE,
-			   TPQIC02_NAME)) {
-		printk(TPQIC02_NAME
-		       ": IO space at 0x%x [%d ports] already reserved\n",
+	if (!request_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE, TPQIC02_NAME)) {
+		printk(TPQIC02_NAME ": IO space at 0x%x [%d ports] already reserved\n",
 		       QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
 		return -ENXIO;
 	}
 
 	/* get IRQ */
-	if (request_irq
-	    (QIC02_TAPE_IRQ, qic02_tape_interrupt, SA_INTERRUPT, "QIC-02",
-	     NULL)) {
-		printk(TPQIC02_NAME
-		       ": can't allocate IRQ%d for QIC-02 tape\n",
-		       QIC02_TAPE_IRQ);
+	if (request_irq(QIC02_TAPE_IRQ, qic02_tape_interrupt, SA_INTERRUPT, "QIC-02", NULL)) {
+		printk(TPQIC02_NAME ": can't allocate IRQ%d for QIC-02 tape\n", QIC02_TAPE_IRQ);
 		release_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
 		return -EBUSY;
 	}
 
 	/* After IRQ, allocate DMA channel */
 	if (request_dma(QIC02_TAPE_DMA, "QIC-02")) {
-		printk(TPQIC02_NAME
-		       ": can't allocate DMA%d for QIC-02 tape\n",
-		       QIC02_TAPE_DMA);
+		printk(TPQIC02_NAME ": can't allocate DMA%d for QIC-02 tape\n", QIC02_TAPE_DMA);
 		free_irq(QIC02_TAPE_IRQ, NULL);
 		release_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
 		return -EBUSY;
 	}
 
 	/* Setup the page-address for the dma transfer. */
-	buffaddr =
-	    (void *) __get_dma_pages(GFP_KERNEL, get_order(TPQBUF_SIZE));
-
+	buffaddr = (void *) __get_dma_pages(GFP_KERNEL, get_order(TPQBUF_SIZE));
 	if (!buffaddr) {
 		qic02_release_resources();
 		return -EBUSY;	/* Not ideal, EAGAIN perhaps? */
@@ -2783,8 +2628,7 @@ static int qic02_get_resources(void)
 
 	memset(buffaddr, 0, TPQBUF_SIZE);
 
-	printk(TPQIC02_NAME
-	       ": Settings: IRQ %d, DMA %d, IO 0x%x, IFC %s\n",
+	printk(TPQIC02_NAME ": Settings: IRQ %d, DMA %d, IO 0x%x, IFC %s\n",
 	       QIC02_TAPE_IRQ, QIC02_TAPE_DMA, ((QIC02_TAPE_IFC == ARCHIVE)
 						|| (QIC02_TAPE_IFC ==
 						    MOUNTAIN)) ?
@@ -2794,11 +2638,9 @@ static int qic02_get_resources(void)
 					   ARCHIVE) ? "Archive" :
 					  "Wangtek"));
 
-	if (tape_reset(0) != TE_OK
-	    || tp_sense(TP_WRP | TP_POR | TP_CNI) != TE_OK) {
+	if (tape_reset(0) != TE_OK || tp_sense(TP_WRP | TP_POR | TP_CNI) != TE_OK) {
 		/* No drive detected, so vanish */
-		tpqputs(TPQD_ALWAYS,
-			"No drive detected -- releasing IO/IRQ/DMA.");
+		tpqputs(TPQD_ALWAYS, "No drive detected -- releasing IO/IRQ/DMA.");
 		status_dead = YES;
 		qic02_release_resources();
 		return -EIO;
@@ -2812,13 +2654,11 @@ static int qic02_get_resources(void)
 int __init qic02_tape_init(void)
 {
 	if (TPSTATSIZE != 6) {
-		printk(TPQIC02_NAME
-		       ": internal error: tpstatus struct incorrect!\n");
+		printk(TPQIC02_NAME ": internal error: tpstatus struct incorrect!\n");
 		return -ENODEV;
 	}
 	if ((TPQBUF_SIZE < 512) || (TPQBUF_SIZE >= 0x10000)) {
-		printk(TPQIC02_NAME
-		       ": internal error: DMA buffer size out of range\n");
+		printk(TPQIC02_NAME ": internal error: DMA buffer size out of range\n");
 		return -ENODEV;
 	}
 
@@ -2837,19 +2677,16 @@ int __init qic02_tape_init(void)
 #  error
 # endif
 	       rcs_revision, rcs_date);
-	if (qic02_get_resources()) {
+	if (qic02_get_resources())
 		return -ENODEV;
-	}
 #else
-	printk(TPQIC02_NAME ": Runtime config, %s, %s\n",
-	       rcs_revision, rcs_date);
+	printk(TPQIC02_NAME ": Runtime config, %s, %s\n", rcs_revision, rcs_date);
 #endif
 	printk(TPQIC02_NAME ": DMA buffers: %u blocks\n", NR_BLK_BUF);
 	/* If we got this far, install driver functions */
-	if (register_chrdev
-	    (QIC02_TAPE_MAJOR, TPQIC02_NAME, &qic02_tape_fops)) {
-		printk(TPQIC02_NAME ": Unable to get chrdev major %d\n",
-		       QIC02_TAPE_MAJOR);
+	if (register_chrdev(QIC02_TAPE_MAJOR, TPQIC02_NAME, &qic02_tape_fops)) 
+	{
+		printk(TPQIC02_NAME ": Unable to get chrdev major %d\n", QIC02_TAPE_MAJOR);
 #ifndef CONFIG_QIC02_DYNCONF
 		qic02_release_resources();
 #endif
@@ -2894,11 +2731,9 @@ int __init qic02_tape_init(void)
 	tp_timer.function = qic02_tape_times_out;
 
 #ifndef CONFIG_QIC02_DYNCONF
-	if (tape_reset(0) != TE_OK
-	    || tp_sense(TP_WRP | TP_POR | TP_CNI) != TE_OK) {
+	if (tape_reset(0) != TE_OK || tp_sense(TP_WRP | TP_POR | TP_CNI) != TE_OK) {
 		/* No drive detected, so vanish */
-		tpqputs(TPQD_ALWAYS,
-			"No drive detected -- driver going on vacation...");
+		tpqputs(TPQD_ALWAYS, "No drive detected -- driver going on vacation...");
 		qic02_release_resources();
 		status_dead = YES;
 		return -ENODEV;
@@ -2927,10 +2762,10 @@ int __init qic02_tape_init(void)
 
 void cleanup_module(void)
 {
-	if (status_zombie == NO) {
-		qic02_release_resources();
-	}
 	unregister_chrdev(QIC02_TAPE_MAJOR, TPQIC02_NAME);
+	if (status_zombie == NO)
+		qic02_release_resources();
+		
 	devfs_find_and_unregister(NULL, "ntpqic11", QIC02_TAPE_MAJOR, 2,
 				  DEVFS_SPECIAL_CHR, 0);
 	devfs_find_and_unregister(NULL, "tpqic11", QIC02_TAPE_MAJOR, 3,

@@ -63,6 +63,8 @@ struct aha1740_hostdata {
 
 #define HOSTDATA(host) ((struct aha1740_hostdata *) &host->hostdata)
 
+static spinlock_t aha1740_lock = SPIN_LOCK_UNLOCKED;
+
 /* One for each IRQ level (9-15) */
 static struct Scsi_Host * aha_host[8] = {NULL, };
 
@@ -257,7 +259,7 @@ void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
 		continue;
 	    }
 	    if (SCtmp->host_scribble)
-		scsi_free(SCtmp->host_scribble, 512);
+		kfree(SCtmp->host_scribble);
 	    /* Fetch the sense data, and tuck it away, in the required slot.
 	       The Adaptec automatically fetches it, and there is no
 	       guarantee that we will still have it in the cdb when we come
@@ -345,8 +347,8 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 #endif
 
     /* locate an available ecb */
-    save_flags(flags);
-    cli();
+
+    spin_lock_irqsave(&aha1740_lock, flags);
     ecbno = host->last_ecb_used + 1;		/* An optimization */
     if (ecbno >= AHA1740_ECBS)
 	ecbno = 0;
@@ -365,7 +367,7 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 						   doubles as reserved flag */
 
     host->last_ecb_used = ecbno;    
-    restore_flags(flags);
+    spin_unlock_irqrestore(&aha1740_lock, flags);
 
 #ifdef DEBUG
     printk("Sending command (%d %x)...", ecbno, done);
@@ -389,14 +391,18 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 	DEB(unsigned char * ptr);
 
 	host->ecb[ecbno].sg = 1;  /* SCSI Initiator Command  w/scatter-gather*/
-	SCpnt->host_scribble = (unsigned char *) scsi_malloc(512);
+	SCpnt->host_scribble = (unsigned char *)kmalloc(512, GFP_KERNEL);
+	if(SCpnt->host_scribble == NULL)
+	{
+		printk(KERN_WARNING "aha1740: out of memory in queuecommand!\n");
+		return 1;
+	}
 	sgpnt = (struct scatterlist *) SCpnt->request_buffer;
 	cptr = (struct aha1740_chain *) SCpnt->host_scribble; 
-	if (cptr == NULL) panic("aha1740.c: unable to allocate DMA memory\n");
 	for(i=0; i<SCpnt->use_sg; i++)
 	{
 	    cptr[i].datalen = sgpnt[i].length;
-	    cptr[i].dataptr = isa_virt_to_bus(sgpnt[i].address);
+	    cptr[i].dataptr = isa_virt_to_bus(page_address(sgpnt[i].page) + sgpnt[i].offset);
 	}
 	host->ecb[ecbno].datalen = SCpnt->use_sg * sizeof(struct aha1740_chain);
 	host->ecb[ecbno].dataptr = isa_virt_to_bus(cptr);
@@ -447,13 +453,12 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 	int loopcnt;
 	unsigned int base = SCpnt->host->io_port;
 	DEB(printk("aha1740[%d] critical section\n",ecbno));
-	save_flags(flags);
-	cli();
+
+	spin_lock_irqsave(&aha1740_lock, flags);
 	for (loopcnt = 0; ; loopcnt++) {
 	    if (inb(G2STAT(base)) & G2STAT_MBXOUT) break;
 	    if (loopcnt == LOOPCNT_WARN) {
 		printk("aha1740[%d]_mbxout wait!\n",ecbno);
-		cli(); /* printk may have done a sti()! */
 	    }
 	    if (loopcnt == LOOPCNT_MAX)
 		panic("aha1740.c: mbxout busy!\n");
@@ -463,13 +468,12 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 	    if (! (inb(G2STAT(base)) & G2STAT_BUSY)) break;
 	    if (loopcnt == LOOPCNT_WARN) {
 		printk("aha1740[%d]_attn wait!\n",ecbno);
-		cli();
 	    }
 	    if (loopcnt == LOOPCNT_MAX)
 		panic("aha1740.c: attn wait failed!\n");
 	}
 	outb(ATTN_START | (target & 7), ATTN(base)); /* Start it up */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1740_lock, flags);
 	DEB(printk("aha1740[%d] request queued.\n",ecbno));
     }
     else
@@ -487,7 +491,10 @@ int aha1740_command(Scsi_Cmnd * SCpnt)
     aha1740_queuecommand(SCpnt, internal_done);
     SCpnt->SCp.Status = 0;
     while (!SCpnt->SCp.Status)
+    {
+	cpu_relax();
 	barrier();
+    }
     return SCpnt->result;
 }
 

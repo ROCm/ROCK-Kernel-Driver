@@ -134,6 +134,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       tristate '    LP486E on board Ethernet' CONFIG_LP486E
       tristate '    ICL EtherTeam 16i/32 support' CONFIG_ETH16I
       tristate '    NE2000/NE1000 support' CONFIG_NE2000
+      dep_tristate '    Zenith Z-Note support (EXPERIMENTAL)' CONFIG_ZNET $CONFIG_EXPERIMENTAL
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
 	 dep_tristate '    SEEQ8005 support (EXPERIMENTAL)' CONFIG_SEEQ8005 $CONFIG_EXPERIMENTAL
       fi
@@ -186,9 +187,6 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       fi
       dep_tristate '    VIA Rhine support' CONFIG_VIA_RHINE $CONFIG_PCI
       dep_mbool '      Use MMIO instead of PIO (EXPERIMENTAL)' CONFIG_VIA_RHINE_MMIO $CONFIG_VIA_RHINE $CONFIG_EXPERIMENTAL
-      if [ "$CONFIG_OBSOLETE" = "y" ]; then
-	 dep_bool '    Zenith Z-Note support (OBSOLETE)' CONFIG_ZNET $CONFIG_ISA
-      fi
       if [ "$CONFIG_EXPERIMENTAL" = "y" -a "$CONFIG_MIPS" = "y" ]; then
 	 bool '    Philips SAA9730 Ethernet support (EXPERIMENTAL)' CONFIG_LAN_SAA9730
       fi
