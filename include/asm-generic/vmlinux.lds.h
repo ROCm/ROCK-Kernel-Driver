@@ -21,4 +21,4 @@
 	/* All kernel symbols */                                              \
 	__start___kallsyms = .;                                               \
 	__kallsyms : { *(__kallsyms) }                                        \
-	__stop___kallsyms = .;                                                \
+	__stop___kallsyms = .;
