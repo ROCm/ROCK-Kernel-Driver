@@ -187,13 +187,11 @@ static int rh_init(struct region_hash *rh, struct mirror_set *ms,
 static void rh_exit(struct region_hash *rh)
 {
 	unsigned int h;
-	struct region *reg;
-	struct list_head *tmp, *tmp2;
+	struct region *reg, *nreg;
 
 	BUG_ON(!list_empty(&rh->quiesced_regions));
 	for (h = 0; h < rh->nr_buckets; h++) {
-		list_for_each_safe (tmp, tmp2, rh->buckets + h) {
-			reg = list_entry(tmp, struct region, hash_list);
+		list_for_each_entry_safe(reg, nreg, rh->buckets + h, hash_list) {
 			BUG_ON(atomic_read(&reg->pending));
 			mempool_free(reg, rh->region_pool);
 		}
