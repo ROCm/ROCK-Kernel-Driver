@@ -349,10 +349,10 @@ static void mxser_set_termios(struct tty_struct *, struct termios *);
 static void mxser_stop(struct tty_struct *);
 static void mxser_start(struct tty_struct *);
 static void mxser_hangup(struct tty_struct *);
-static irqreturn_t mxser_interrupt(int, void *, struct pt_regs *);
 static inline void mxser_receive_chars(struct mxser_struct *, int *);
 static inline void mxser_transmit_chars(struct mxser_struct *);
 static inline void mxser_check_modem_status(struct mxser_struct *, int);
+static irqreturn_t mxser_interrupt(int, void *, struct pt_regs *);
 static int mxser_block_til_ready(struct tty_struct *, struct file *, struct mxser_struct *);
 static int mxser_startup(struct mxser_struct *);
 static void mxser_shutdown(struct mxser_struct *);
@@ -1307,69 +1307,6 @@ void mxser_hangup(struct tty_struct *tty)
 	wake_up_interruptible(&info->open_wait);
 }
 
-/*
- * This is the serial driver's generic interrupt routine
- */
-static irqreturn_t mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-{
-	int status, i;
-	struct mxser_struct *info;
-	struct mxser_struct *port;
-	int max, irqbits, bits, msr;
-	int pass_counter = 0;
-	int handled = 0;
-
-	port = NULL;
-	for (i = 0; i < MXSER_BOARDS; i++) {
-		if (dev_id == &(mxvar_table[i * MXSER_PORTS_PER_BOARD])) {
-			port = dev_id;
-			break;
-		}
-	}
-
-	if (i == MXSER_BOARDS)
-		return IRQ_NONE;
-	if (port == 0)
-		return IRQ_NONE;
-	max = mxser_numports[mxsercfg[i].board_type];
-
-	while (1) {
-		irqbits = inb(port->vector) & port->vectormask;
-		if (irqbits == port->vectormask)
-			break;
-		handled = 1;
-		for (i = 0, bits = 1; i < max; i++, irqbits |= bits, bits <<= 1) {
-			if (irqbits == port->vectormask)
-				break;
-			if (bits & irqbits)
-				continue;
-			info = port + i;
-			if (!info->tty ||
-			  (inb(info->base + UART_IIR) & UART_IIR_NO_INT))
-				continue;
-			status = inb(info->base + UART_LSR) & info->read_status_mask;
-			if (status & UART_LSR_DR)
-				mxser_receive_chars(info, &status);
-			msr = inb(info->base + UART_MSR);
-			if (msr & UART_MSR_ANY_DELTA)
-				mxser_check_modem_status(info, msr);
-			if (status & UART_LSR_THRE) {
-/* 8-2-99 by William
-   if ( info->x_char || (info->xmit_cnt > 0) )
- */
-				mxser_transmit_chars(info);
-			}
-		}
-		if (pass_counter++ > MXSER_ISR_PASS_LIMIT) {
-#if 0
-			printk("MOXA Smartio/Indusrtio family driver interrupt loop break\n");
-#endif
-			break;	/* Prevent infinite loops */
-		}
-	}
-	return IRQ_RETVAL(handled);
-}
-
 static inline void mxser_receive_chars(struct mxser_struct *info,
 					 int *status)
 {
@@ -1488,6 +1425,69 @@ static inline void mxser_check_modem_status(struct mxser_struct *info,
 			}
 		}
 	}
+}
+
+/*
+ * This is the serial driver's generic interrupt routine
+ */
+static irqreturn_t mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	int status, i;
+	struct mxser_struct *info;
+	struct mxser_struct *port;
+	int max, irqbits, bits, msr;
+	int pass_counter = 0;
+	int handled = 0;
+
+	port = NULL;
+	for (i = 0; i < MXSER_BOARDS; i++) {
+		if (dev_id == &(mxvar_table[i * MXSER_PORTS_PER_BOARD])) {
+			port = dev_id;
+			break;
+		}
+	}
+
+	if (i == MXSER_BOARDS)
+		return IRQ_NONE;
+	if (port == 0)
+		return IRQ_NONE;
+	max = mxser_numports[mxsercfg[i].board_type];
+
+	while (1) {
+		irqbits = inb(port->vector) & port->vectormask;
+		if (irqbits == port->vectormask)
+			break;
+		handled = 1;
+		for (i = 0, bits = 1; i < max; i++, irqbits |= bits, bits <<= 1) {
+			if (irqbits == port->vectormask)
+				break;
+			if (bits & irqbits)
+				continue;
+			info = port + i;
+			if (!info->tty ||
+			  (inb(info->base + UART_IIR) & UART_IIR_NO_INT))
+				continue;
+			status = inb(info->base + UART_LSR) & info->read_status_mask;
+			if (status & UART_LSR_DR)
+				mxser_receive_chars(info, &status);
+			msr = inb(info->base + UART_MSR);
+			if (msr & UART_MSR_ANY_DELTA)
+				mxser_check_modem_status(info, msr);
+			if (status & UART_LSR_THRE) {
+/* 8-2-99 by William
+   if ( info->x_char || (info->xmit_cnt > 0) )
+ */
+				mxser_transmit_chars(info);
+			}
+		}
+		if (pass_counter++ > MXSER_ISR_PASS_LIMIT) {
+#if 0
+			printk("MOXA Smartio/Indusrtio family driver interrupt loop break\n");
+#endif
+			break;	/* Prevent infinite loops */
+		}
+	}
+	return IRQ_RETVAL(handled);
 }
 
 static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,

@@ -379,7 +379,7 @@ extern unsigned long invalid_segment_patch1, invalid_segment_patch1_ff;
 extern unsigned long invalid_segment_patch2, invalid_segment_patch2_ff;
 extern unsigned long invalid_segment_patch1_1ff, invalid_segment_patch2_1ff;
 extern unsigned long num_context_patch1, num_context_patch1_16;
-extern unsigned long num_context_patch2, num_context_patch2_16;
+extern unsigned long num_context_patch2_16;
 extern unsigned long vac_linesize_patch, vac_linesize_patch_32;
 extern unsigned long vac_hwflush_patch1, vac_hwflush_patch1_on;
 extern unsigned long vac_hwflush_patch2, vac_hwflush_patch2_on;

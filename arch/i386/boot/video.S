@@ -232,6 +232,41 @@ mopar_gr:
 	xorl	%eax, %eax
 	movw	18(%di), %ax
 	movl	%eax, %fs:(PARAM_LFB_SIZE)
+
+# switching the DAC to 8-bit is for <= 8 bpp only
+	movw	%fs:(PARAM_LFB_DEPTH), %ax
+	cmpw	$8, %ax
+	jg	dac_done
+
+# get DAC switching capability
+	xorl	%eax, %eax
+	movb	10(%di), %al
+	testb	$1, %al
+	jz	dac_set
+
+# attempt to switch DAC to 8-bit
+	movw	$0x4f08, %ax
+	movw	$0x0800, %bx
+	int	$0x10
+	cmpw	$0x004f, %ax
+	jne     dac_set
+	movb    %bh, dac_size		# store actual DAC size
+
+dac_set:
+# set color size to DAC size
+	movb	dac_size, %al
+	movb	%al, %fs:(PARAM_LFB_COLORS+0)
+	movb	%al, %fs:(PARAM_LFB_COLORS+2)
+	movb	%al, %fs:(PARAM_LFB_COLORS+4)
+	movb	%al, %fs:(PARAM_LFB_COLORS+6)
+
+# set color offsets to 0
+	movb	$0, %fs:(PARAM_LFB_COLORS+1)
+	movb	$0, %fs:(PARAM_LFB_COLORS+3)
+	movb	$0, %fs:(PARAM_LFB_COLORS+5)
+	movb	$0, %fs:(PARAM_LFB_COLORS+7)
+
+dac_done:
 # get protected mode interface informations
 	movw	$0x4f0a, %ax
 	xorw	%bx, %bx
@@ -1929,6 +1964,7 @@ scanning:	.byte	0	# Performing mode scan
 do_restore:	.byte	0	# Screen contents altered during mode change
 svga_prefix:	.byte	VIDEO_FIRST_BIOS>>8	# Default prefix for BIOS modes
 graphic_mode:	.byte	0	# Graphic mode with a linear frame buffer
+dac_size:	.byte	6	# DAC bit depth
 
 # Status messages
 keymsg:		.ascii	"Press <RETURN> to see video modes available, "

@@ -221,7 +221,7 @@ static int usblp_set_protocol(struct usblp *usblp, int protocol);
 static int usblp_cache_device_id_string(struct usblp *usblp);
 
 /* forward reference to make our lives easier */
-extern struct usb_driver usblp_driver;
+static struct usb_driver usblp_driver;
 
 /*
  * Functions for usblp control messages.
@@ -1208,6 +1208,6 @@ module_exit(usblp_exit);
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
-MODULE_PARM(proto_bias, "i");
+module_param(proto_bias, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(proto_bias, "Favourite protocol number");
 MODULE_LICENSE("GPL");

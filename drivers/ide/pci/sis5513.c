@@ -968,7 +968,7 @@ static struct pci_device_id sis5513_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, sis5513_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "SIS IDE",
+	.name		= "SIS_IDE",
 	.id_table	= sis5513_pci_tbl,
 	.probe		= sis5513_init_one,
 };

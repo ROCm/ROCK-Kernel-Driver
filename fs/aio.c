@@ -759,7 +759,7 @@ out:
 	return ret;
 }
 
-struct timeout {
+struct aio_timeout {
 	struct timer_list	timer;
 	int			timed_out;
 	struct task_struct	*p;
@@ -767,13 +767,13 @@ struct timeout {
 
 static void timeout_func(unsigned long data)
 {
-	struct timeout *to = (struct timeout *)data;
+	struct aio_timeout *to = (struct aio_timeout *)data;
 
 	to->timed_out = 1;
 	wake_up_process(to->p);
 }
 
-static inline void init_timeout(struct timeout *to)
+static inline void init_timeout(struct aio_timeout *to)
 {
 	init_timer(&to->timer);
 	to->timer.data = (unsigned long)to;
@@ -782,7 +782,7 @@ static inline void init_timeout(struct timeout *to)
 	to->p = current;
 }
 
-static inline void set_timeout(long start_jiffies, struct timeout *to,
+static inline void set_timeout(long start_jiffies, struct aio_timeout *to,
 			       const struct timespec *ts)
 {
 	to->timer.expires = start_jiffies + timespec_to_jiffies(ts);
@@ -792,7 +792,7 @@ static inline void set_timeout(long start_jiffies, struct timeout *to,
 		to->timed_out = 1;
 }
 
-static inline void clear_timeout(struct timeout *to)
+static inline void clear_timeout(struct aio_timeout *to)
 {
 	del_singleshot_timer_sync(&to->timer);
 }
@@ -808,7 +808,7 @@ static int read_events(struct kioctx *ctx,
 	int			ret;
 	int			i = 0;
 	struct io_event		ent;
-	struct timeout		to;
+	struct aio_timeout	to;
 
 	/* needed to zero any padding within an entry (there shouldn't be 
 	 * any, but C is fun!

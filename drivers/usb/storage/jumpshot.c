@@ -47,15 +47,19 @@
   * in that routine.
   */
 
+#include <linux/sched.h>
+#include <linux/errno.h>
+#include <linux/slab.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+
 #include "transport.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
 #include "jumpshot.h"
 
-#include <linux/sched.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
 
 static inline int jumpshot_bulk_read(struct us_data *us,
 				     unsigned char *data, 
@@ -319,7 +323,7 @@ static int jumpshot_id_device(struct us_data *us,
 }
 
 static int jumpshot_handle_mode_sense(struct us_data *us,
-				      Scsi_Cmnd * srb, 
+				      struct scsi_cmnd * srb, 
 				      int sense_6)
 {
 	static unsigned char rw_err_page[12] = {
@@ -426,7 +430,7 @@ static void jumpshot_info_destructor(void *extra)
 
 // Transport for the Lexar 'Jumpshot'
 //
-int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
+int jumpshot_transport(struct scsi_cmnd * srb, struct us_data *us)
 {
 	struct jumpshot_info *info;
 	int rc;
@@ -551,12 +555,12 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 
 	if (srb->cmnd[0] == MODE_SENSE) {
 		US_DEBUGP("jumpshot_transport:  MODE_SENSE_6 detected\n");
-		return jumpshot_handle_mode_sense(us, srb, TRUE);
+		return jumpshot_handle_mode_sense(us, srb, 1);
 	}
 
 	if (srb->cmnd[0] == MODE_SENSE_10) {
 		US_DEBUGP("jumpshot_transport:  MODE_SENSE_10 detected\n");
-		return jumpshot_handle_mode_sense(us, srb, FALSE);
+		return jumpshot_handle_mode_sense(us, srb, 0);
 	}
 
 	if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL) {

@@ -29,7 +29,7 @@ endif
 head-y			:= head.o
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 
-extra-y := $(head-y) init_task.o vmlinux.lds.s
+extra-y := $(head-y) init_task.o vmlinux.lds
 
 # Spell out some dependencies that aren't automatically figured out
 $(obj)/entry-armv.o: 	$(obj)/entry-header.S include/asm-arm/constants.h

@@ -204,7 +204,6 @@ extern void free_pages_and_swap_cache(struct page **, int);
 extern struct page * lookup_swap_cache(swp_entry_t);
 extern struct page * read_swap_cache_async(swp_entry_t, struct vm_area_struct *vma,
 					   unsigned long addr);
-
 /* linux/mm/swapfile.c */
 extern long total_swap_pages;
 extern unsigned int nr_swapfiles;
@@ -228,6 +227,22 @@ extern spinlock_t swaplock;
 #define swap_list_unlock()	spin_unlock(&swaplock)
 #define swap_device_lock(p)	spin_lock(&p->sdev_lock)
 #define swap_device_unlock(p)	spin_unlock(&p->sdev_lock)
+
+/* linux/mm/thrash.c */
+extern struct mm_struct * swap_token_mm;
+extern void grab_swap_token(void);
+extern void __put_swap_token(struct mm_struct *);
+
+static inline int has_swap_token(struct mm_struct *mm)
+{
+	return (mm == swap_token_mm);
+}
+
+static inline void put_swap_token(struct mm_struct *mm)
+{
+	if (has_swap_token(mm))
+		__put_swap_token(mm);
+}
 
 #else /* CONFIG_SWAP */
 
@@ -265,6 +280,11 @@ static inline swp_entry_t get_swap_page(void)
 	entry.val = 0;
 	return entry;
 }
+
+/* linux/mm/thrash.c */
+#define put_swap_token(x) do { } while(0)
+#define grab_swap_token()  do { } while(0)
+#define has_swap_token(x) 0
 
 #endif /* CONFIG_SWAP */
 #endif /* __KERNEL__*/

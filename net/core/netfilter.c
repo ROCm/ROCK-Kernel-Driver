@@ -695,11 +695,12 @@ int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 	/* DaveM says protocol headers are also modifiable. */
 	switch ((*pskb)->nh.iph->protocol) {
 	case IPPROTO_TCP: {
-		struct tcphdr hdr;
-		if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4,
-				  &hdr, sizeof(hdr)) != 0)
+		struct tcphdr _hdr, *hp;
+		hp = skb_header_pointer(*pskb, (*pskb)->nh.iph->ihl*4,
+					sizeof(_hdr), &_hdr);
+		if (hp == NULL)
 			goto copy_skb;
-		if (writable_len <= (*pskb)->nh.iph->ihl*4 + hdr.doff*4)
+		if (writable_len <= (*pskb)->nh.iph->ihl*4 + hp->doff*4)
 			goto pull_skb;
 		goto copy_skb;
 	}
@@ -783,13 +784,12 @@ void nf_log_packet(int pf,
 	nf_logfn *logfn;
 	
 	rcu_read_lock();
-	logfn = nf_logging[pf];
+	logfn = rcu_dereference(nf_logging[pf]);
 	if (logfn) {
 		va_start(args, fmt);
 		vsnprintf(prefix, sizeof(prefix), fmt, args);
 		va_end(args);
 		/* We must read logging before nf_logfn[pf] */
-		smp_read_barrier_depends();
 		logfn(hooknum, skb, in, out, prefix);
 	} else if (!reported) {
 		printk(KERN_WARNING "nf_log_packet: can\'t log yet, "

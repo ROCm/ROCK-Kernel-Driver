@@ -58,7 +58,3 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 	return irq;
 }
-
-struct pci_fixup pcibios_fixups[] __initdata = {
-	{	.pass = 0,	},
-};

@@ -105,8 +105,9 @@ static int riva_setup_i2c_bus(struct riva_i2c_chan *chan, const char *name)
 	chan->algo.setscl		= riva_gpio_setscl;
 	chan->algo.getsda		= riva_gpio_getsda;
 	chan->algo.getscl		= riva_gpio_getscl;
-	chan->algo.udelay		= 40;
-	chan->algo.timeout		= 20;
+	chan->algo.udelay		= 5;
+	chan->algo.mdelay               = 5;
+	chan->algo.timeout		= 10;
 	chan->algo.data 		= chan;
 
 	i2c_set_adapdata(&chan->adapter, chan);

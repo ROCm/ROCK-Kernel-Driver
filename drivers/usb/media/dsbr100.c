@@ -107,7 +107,7 @@ static int usb_dsbr100_open(struct inode *inode, struct file *file);
 static int usb_dsbr100_close(struct inode *inode, struct file *file);
 
 static int radio_nr = -1;
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 /* Data for one (physical) device */
 typedef struct {

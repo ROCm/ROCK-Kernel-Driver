@@ -549,6 +549,13 @@ static const arg_desc_t logging_mode[] = {
     {NULL, 0}
 };
 
+/* possible values for -o barrier= */
+static const arg_desc_t barrier_mode[] = {
+    {"none", 1<<REISERFS_BARRIER_NONE, 1<<REISERFS_BARRIER_FLUSH},
+    {"flush", 1<<REISERFS_BARRIER_FLUSH, 1<<REISERFS_BARRIER_NONE},
+    {NULL, 0}
+};
+
 /* possible values for "-o block-allocator=" and bits which are to be set in
    s_mount_opt of reiserfs specific part of in-core super block */
 static const arg_desc_t balloc[] = {
@@ -711,6 +718,7 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"replayonly",	.setmask = 1<<REPLAYONLY},
 	{"block-allocator", .arg_required = 'a', .values = balloc},
 	{"data",	.arg_required = 'd', .values = logging_mode},
+	{"barrier",	.arg_required = 'b', .values = barrier_mode},
 	{"resize",	.arg_required = 'r', .values = NULL},
 	{"jdev",	.arg_required = 'j', .values = NULL},
 	{"nolargeio",	.arg_required = 'w', .values = NULL},
@@ -810,6 +818,23 @@ static void handle_data_mode(struct super_block *s, unsigned long mount_options)
     }
 }
 
+static void handle_barrier_mode(struct super_block *s, unsigned long bits) {
+    int flush = (1 << REISERFS_BARRIER_FLUSH);
+    int none = (1 << REISERFS_BARRIER_NONE);
+    int all_barrier = flush | none;
+
+    if (bits & all_barrier) {
+        REISERFS_SB(s)->s_mount_opt &= ~all_barrier;
+	if (bits & flush) {
+	    REISERFS_SB(s)->s_mount_opt |= flush;
+	    printk("reiserfs: enabling write barrier flush mode\n");
+	} else if (bits & none) {
+	    REISERFS_SB(s)->s_mount_opt |= none;
+	    printk("reiserfs: write barriers turned off\n");
+	}
+   }
+}
+
 static void handle_attrs( struct super_block *s )
 {
 	struct reiserfs_super_block * rs;
@@ -854,6 +879,8 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   safe_mask |= 1 << REISERFS_ATTRS;
   safe_mask |= 1 << REISERFS_XATTRS_USER;
   safe_mask |= 1 << REISERFS_POSIXACL;
+  safe_mask |= 1 << REISERFS_BARRIER_FLUSH;
+  safe_mask |= 1 << REISERFS_BARRIER_NONE;
 
   /* Update the bitmask, taking care to keep
    * the bits we're not allowed to change here */
@@ -900,6 +927,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
     }
 
     handle_data_mode(s, mount_options);
+    handle_barrier_mode(s, mount_options);
     REISERFS_SB(s)->s_mount_state = sb_umount_state(rs) ;
     s->s_flags &= ~MS_RDONLY ; /* now it is safe to call journal_begin */
     journal_begin(&th, s, 10) ;
@@ -1412,6 +1440,9 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
         reiserfs_info (s, "using ordered data mode\n");
     } else {
         reiserfs_info (s, "using writeback data mode\n");
+    }
+    if (reiserfs_barrier_flush(s)) {
+    	printk("reiserfs: using flush barriers\n");
     }
 
     // set_device_ro(s->s_dev, 1) ;

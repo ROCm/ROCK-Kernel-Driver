@@ -702,6 +702,37 @@ static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 	}
 #endif	/* FANCY_STATUS_DUMPS */
 	printk("\n");
+	{
+		struct request *rq;
+		unsigned char opcode = 0;
+		int found = 0;
+
+		spin_lock(&ide_lock);
+		rq = HWGROUP(drive)->rq;
+		spin_unlock(&ide_lock);
+		if (!rq)
+			goto out;
+		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
+			char *args = rq->buffer;
+			if (args) {
+				opcode = args[0];
+				found = 1;
+			}
+		} else if (rq->flags & REQ_DRIVE_TASKFILE) {
+			ide_task_t *args = rq->special;
+			if (args) {
+				task_struct_t *tf = (task_struct_t *) args->tfRegister;
+				opcode = tf->command;
+				found = 1;
+			}
+		}
+		printk("ide: failed opcode was: ");
+		if (!found)
+			printk("unknown\n");
+		else
+			printk("0x%02x\n", opcode);
+	}
+out:
 	local_irq_restore(flags);
 	return err;
 }
@@ -1203,6 +1234,42 @@ static ide_proc_entry_t idedisk_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
+static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
+			       sector_t *error_sector)
+{
+	ide_drive_t *drive = q->queuedata;
+	struct request *rq;
+	int ret;
+
+	if (!drive->wcache)
+		return 0;
+
+	rq = blk_get_request(q, WRITE, __GFP_WAIT);
+
+	memset(rq->cmd, 0, sizeof(rq->cmd));
+
+	if (ide_id_has_flush_cache_ext(drive->id) &&
+	    (drive->capacity64 >= (1UL << 28)))
+		rq->cmd[0] = WIN_FLUSH_CACHE_EXT;
+	else
+		rq->cmd[0] = WIN_FLUSH_CACHE;
+
+
+	rq->flags |= REQ_DRIVE_TASK | REQ_SOFTBARRIER;
+	rq->buffer = rq->cmd;
+
+	ret = blk_execute_rq(q, disk, rq);
+
+	/*
+	 * if we failed and caller wants error offset, get it
+	 */
+	if (ret && error_sector)
+		*error_sector = ide_get_error_location(drive, rq->cmd);
+
+	blk_put_request(rq);
+	return ret;
+}
+
 /*
  * This is tightly woven into the driver->do_special can not touch.
  * DON'T do it again until a total personality rewrite is committed.
@@ -1231,16 +1298,10 @@ static int set_nowerr(ide_drive_t *drive, int arg)
 	return 0;
 }
 
-/* check if CACHE FLUSH (EXT) command is supported (bits defined in ATA-6) */
-#define ide_id_has_flush_cache(id)	((id)->cfs_enable_2 & 0x3000)
-
-/* some Maxtor disks have bit 13 defined incorrectly so check bit 10 too */
-#define ide_id_has_flush_cache_ext(id)	\
-	(((id)->cfs_enable_2 & 0x2400) == 0x2400)
-
 static int write_cache (ide_drive_t *drive, int arg)
 {
 	ide_task_t args;
+	int err;
 
 	if (!ide_id_has_flush_cache(drive->id))
 		return 1;
@@ -1251,7 +1312,10 @@ static int write_cache (ide_drive_t *drive, int arg)
 	args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_SETFEATURES;
 	args.command_type			= IDE_DRIVE_TASK_NO_DATA;
 	args.handler				= &task_no_data_intr;
-	(void) ide_raw_taskfile(drive, &args, NULL);
+
+	err = ide_raw_taskfile(drive, &args, NULL);
+	if (err)
+		return err;
 
 	drive->wcache = arg;
 	return 0;
@@ -1412,6 +1476,7 @@ static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
 	unsigned long long capacity;
+	int barrier;
 
 	idedisk_add_settings(drive);
 
@@ -1543,6 +1608,27 @@ static void idedisk_setup (ide_drive_t *drive)
 		drive->wcache = 1;
 
 	write_cache(drive, 1);
+
+	/*
+	 * decide if we can sanely support flushes and barriers on
+	 * this drive. unfortunately not all drives advertise FLUSH_CACHE
+	 * support even if they support it. So assume FLUSH_CACHE is there
+	 * always. LBA48 drives are newer, so expect it to flag support
+	 * properly. We can safely support FLUSH_CACHE on lba48, if capacity
+	 * doesn't exceed lba28
+	 */
+	barrier = 1;
+	if (drive->addressing == 1) {
+		if (capacity > (1ULL << 28) && !ide_id_has_flush_cache_ext(id))
+			barrier = 0;
+	}
+
+	printk("%s: cache flushes %ssupported\n",
+		drive->name, barrier ? "" : "not ");
+	if (barrier) {
+		blk_queue_ordered(drive->queue, 1);
+		blk_queue_issue_flush_fn(drive->queue, idedisk_issue_flush);
+	}
 }
 
 static void ide_cacheflush_p(ide_drive_t *drive)

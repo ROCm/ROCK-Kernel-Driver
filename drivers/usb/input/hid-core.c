@@ -1619,10 +1619,16 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 
 		struct usb_endpoint_descriptor *endpoint;
 		int pipe;
+		int interval;
 
 		endpoint = &interface->endpoint[n].desc;
 		if ((endpoint->bmAttributes & 3) != 3)		/* Not an interrupt endpoint */
 			continue;
+
+		/* handle potential highspeed HID correctly */
+		interval = endpoint->bInterval;
+		if (dev->speed == USB_SPEED_HIGH)
+			interval = 1 << (interval - 1);
 
 		if (endpoint->bEndpointAddress & USB_DIR_IN) {
 			int len;
@@ -1636,7 +1642,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			if (len > HID_BUFFER_SIZE)
 				len = HID_BUFFER_SIZE;
 			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, len,
-					 hid_irq_in, hid, endpoint->bInterval);
+					 hid_irq_in, hid, interval);
 			hid->urbin->transfer_dma = hid->inbuf_dma;
 			hid->urbin->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		} else {
@@ -1646,7 +1652,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 				goto fail;
 			pipe = usb_sndintpipe(dev, endpoint->bEndpointAddress);
 			usb_fill_int_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
-					  hid_irq_out, hid, 1);
+					 hid_irq_out, hid, interval);
 			hid->urbout->transfer_dma = hid->outbuf_dma;
 			hid->urbout->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		}

@@ -15,7 +15,7 @@
 #include <asm/processor.h>
 #include <asm/cputable.h>
 
-#define dbg(args...) printk(args)
+#define dbg(args...)
 
 #include "op_impl.h"
 

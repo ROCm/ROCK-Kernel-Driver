@@ -37,31 +37,49 @@ static int get_free_im_addr(unsigned long size, unsigned long *im_addr)
 	return 0;
 }
 
+/* Return whether the region described by v_addr and size is a subset
+ * of the region described by parent
+ */
+static inline int im_region_is_subset(unsigned long v_addr, unsigned long size,
+			struct vm_struct *parent)
+{
+	return (int) (v_addr >= (unsigned long) parent->addr &&
+	              v_addr < (unsigned long) parent->addr + parent->size &&
+	    	      size < parent->size);
+}
+
+/* Return whether the region described by v_addr and size is a superset
+ * of the region described by child
+ */
+static int im_region_is_superset(unsigned long v_addr, unsigned long size,
+		struct vm_struct *child)
+{
+	struct vm_struct parent;
+
+	parent.addr = (void *) v_addr;
+	parent.size = size;
+
+	return im_region_is_subset((unsigned long) child->addr, child->size,
+			&parent);
+}
+
 /* Return whether the region described by v_addr and size overlaps
- * the region described by vm.  Overlapping regions meet the 
+ * the region described by vm.  Overlapping regions meet the
  * following conditions:
  * 1) The regions share some part of the address space
  * 2) The regions aren't identical
- * 3) The first region is not a subset of the second
+ * 3) Neither region is a subset of the other
  */
-static inline int im_region_overlaps(unsigned long v_addr, unsigned long size,
+static int im_region_overlaps(unsigned long v_addr, unsigned long size,
 		     struct vm_struct *vm)
 {
+	if (im_region_is_superset(v_addr, size, vm))
+		return 0;
+
 	return (v_addr + size > (unsigned long) vm->addr + vm->size &&
 		v_addr < (unsigned long) vm->addr + vm->size) ||
 	       (v_addr < (unsigned long) vm->addr &&
 		v_addr + size > (unsigned long) vm->addr);
-}
-
-/* Return whether the region described by v_addr and size is a subset
- * of the region described by vm
- */
-static inline int im_region_is_subset(unsigned long v_addr, unsigned long size,
-			struct vm_struct *vm)
-{
-	return (int) (v_addr >= (unsigned long) vm->addr && 
-	              v_addr < (unsigned long) vm->addr + vm->size &&
-	    	      size < vm->size);
 }
 
 /* Determine imalloc status of region described by v_addr and size.
@@ -73,28 +91,37 @@ static inline int im_region_is_subset(unsigned long v_addr, unsigned long size,
  * IM_REGION_EXISTS -    Exact region already allocated in imalloc space.
  *                       vm will be assigned to a ptr to the existing imlist
  *                       member.
- * IM_REGION_OVERLAPS -  A portion of the region is already allocated in 
- *                       imalloc space.
+ * IM_REGION_OVERLAPS -  Region overlaps an allocated region in imalloc space.
+ * IM_REGION_SUPERSET -  Region is a superset of a region that is already
+ *                       allocated in imalloc space.
  */
-static int im_region_status(unsigned long v_addr, unsigned long size, 
+static int im_region_status(unsigned long v_addr, unsigned long size,
 		    struct vm_struct **vm)
 {
 	struct vm_struct *tmp;
 
-	for (tmp = imlist; tmp; tmp = tmp->next) 
-		if (v_addr < (unsigned long) tmp->addr + tmp->size) 
+	for (tmp = imlist; tmp; tmp = tmp->next)
+		if (v_addr < (unsigned long) tmp->addr + tmp->size)
 			break;
-					
+
 	if (tmp) {
 		if (im_region_overlaps(v_addr, size, tmp))
 			return IM_REGION_OVERLAP;
 
 		*vm = tmp;
-		if (im_region_is_subset(v_addr, size, tmp))
+		if (im_region_is_subset(v_addr, size, tmp)) {
+			/* Return with tmp pointing to superset */
 			return IM_REGION_SUBSET;
-		else if (v_addr == (unsigned long) tmp->addr && 
-		 	 size == tmp->size) 
+		}
+		if (im_region_is_superset(v_addr, size, tmp)) {
+			/* Return with tmp pointing to first subset */
+			return IM_REGION_SUPERSET;
+		}
+		else if (v_addr == (unsigned long) tmp->addr &&
+		 	 size == tmp->size) {
+			/* Return with tmp pointing to exact region */
 			return IM_REGION_EXISTS;
+		}
 	}
 
 	*vm = NULL;
@@ -208,6 +235,10 @@ static struct vm_struct * __im_get_area(unsigned long req_addr,
 		tmp = split_im_region(req_addr, size, tmp);
 		break;
 	case IM_REGION_EXISTS:
+		/* Return requested region */
+		break;
+	case IM_REGION_SUPERSET:
+		/* Return first existing subset of requested region */
 		break;
 	default:
 		printk(KERN_ERR "%s() unexpected imalloc region status\n",

@@ -19,6 +19,7 @@
 #include <linux/netfilter_ipv4/lockhelp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
+#include <linux/moduleparam.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
@@ -33,10 +34,10 @@ struct module *ip_conntrack_ftp = THIS_MODULE;
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
 static int ports_c;
-MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
+module_param_array(ports, int, ports_c, 0400);
 
 static int loose;
-MODULE_PARM(loose, "i");
+module_param(loose, int, 0600);
 
 #if 0
 #define DEBUGP printk
@@ -247,7 +248,8 @@ static int help(struct sk_buff *skb,
 		enum ip_conntrack_info ctinfo)
 {
 	unsigned int dataoff, datalen;
-	struct tcphdr tcph;
+	struct tcphdr _tcph, *th;
+	char *fb_ptr;
 	u_int32_t old_seq_aft_nl;
 	int old_seq_aft_nl_set, ret;
 	u_int32_t array[6] = { 0 };
@@ -267,10 +269,12 @@ static int help(struct sk_buff *skb,
 		return NF_ACCEPT;
 	}
 
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) != 0)
+	th = skb_header_pointer(skb, skb->nh.iph->ihl*4,
+				sizeof(_tcph), &_tcph);
+	if (th == NULL)
 		return NF_ACCEPT;
 
-	dataoff = skb->nh.iph->ihl*4 + tcph.doff*4;
+	dataoff = skb->nh.iph->ihl*4 + th->doff*4;
 	/* No data? */
 	if (dataoff >= skb->len) {
 		DEBUGP("ftp: skblen = %u\n", skb->len);
@@ -279,26 +283,28 @@ static int help(struct sk_buff *skb,
 	datalen = skb->len - dataoff;
 
 	LOCK_BH(&ip_ftp_lock);
-	skb_copy_bits(skb, dataoff, ftp_buffer, skb->len - dataoff);
+	fb_ptr = skb_header_pointer(skb, dataoff,
+				    skb->len - dataoff, ftp_buffer);
+	BUG_ON(fb_ptr == NULL);
 
 	old_seq_aft_nl_set = ct_ftp_info->seq_aft_nl_set[dir];
 	old_seq_aft_nl = ct_ftp_info->seq_aft_nl[dir];
 
 	DEBUGP("conntrack_ftp: datalen %u\n", datalen);
-	if (ftp_buffer[datalen - 1] == '\n') {
+	if (fb_ptr[datalen - 1] == '\n') {
 		DEBUGP("conntrack_ftp: datalen %u ends in \\n\n", datalen);
 		if (!old_seq_aft_nl_set
-		    || after(ntohl(tcph.seq) + datalen, old_seq_aft_nl)) {
+		    || after(ntohl(th->seq) + datalen, old_seq_aft_nl)) {
 			DEBUGP("conntrack_ftp: updating nl to %u\n",
-			       ntohl(tcph.seq) + datalen);
+			       ntohl(th->seq) + datalen);
 			ct_ftp_info->seq_aft_nl[dir] = 
-						ntohl(tcph.seq) + datalen;
+						ntohl(th->seq) + datalen;
 			ct_ftp_info->seq_aft_nl_set[dir] = 1;
 		}
 	}
 
 	if(!old_seq_aft_nl_set ||
-			(ntohl(tcph.seq) != old_seq_aft_nl)) {
+			(ntohl(th->seq) != old_seq_aft_nl)) {
 		DEBUGP("ip_conntrack_ftp_help: wrong seq pos %s(%u)\n",
 		       old_seq_aft_nl_set ? "":"(UNSET) ", old_seq_aft_nl);
 		ret = NF_ACCEPT;
@@ -315,7 +321,7 @@ static int help(struct sk_buff *skb,
 	for (i = 0; i < ARRAY_SIZE(search); i++) {
 		if (search[i].dir != dir) continue;
 
-		found = find_pattern(ftp_buffer, skb->len - dataoff,
+		found = find_pattern(fb_ptr, skb->len - dataoff,
 				     search[i].pattern,
 				     search[i].plen,
 				     search[i].skip,
@@ -333,7 +339,7 @@ static int help(struct sk_buff *skb,
 		if (net_ratelimit())
 			printk("conntrack_ftp: partial %s %u+%u\n",
 			       search[i].pattern,
-			       ntohl(tcph.seq), datalen);
+			       ntohl(th->seq), datalen);
 		ret = NF_DROP;
 		goto out;
 	} else if (found == 0) { /* No match */
@@ -343,7 +349,7 @@ static int help(struct sk_buff *skb,
 
 	DEBUGP("conntrack_ftp: match `%.*s' (%u bytes at %u)\n",
 	       (int)matchlen, data + matchoff,
-	       matchlen, ntohl(tcph.seq) + matchoff);
+	       matchlen, ntohl(th->seq) + matchoff);
 
 	/* Allocate expectation which will be inserted */
 	exp = ip_conntrack_expect_alloc();
@@ -357,7 +363,7 @@ static int help(struct sk_buff *skb,
 	/* Update the ftp info */
 	if (htonl((array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3])
 	    == ct->tuplehash[dir].tuple.src.ip) {
-		exp->seq = ntohl(tcph.seq) + matchoff;
+		exp->seq = ntohl(th->seq) + matchoff;
 		exp_ftp_info->len = matchlen;
 		exp_ftp_info->ftptype = search[i].ftptype;
 		exp_ftp_info->port = array[4] << 8 | array[5];
@@ -420,10 +426,10 @@ static int __init init(void)
 	int i, ret;
 	char *tmpname;
 
-	if (ports[0] == 0)
-		ports[0] = FTP_PORT;
+	if (ports_c == 0)
+		ports[ports_c++] = FTP_PORT;
 
-	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
+	for (i = 0; i < ports_c; i++) {
 		ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
 		ftp[i].mask.src.u.tcp.port = 0xFFFF;
@@ -449,7 +455,6 @@ static int __init init(void)
 			fini();
 			return ret;
 		}
-		ports_c++;
 	}
 	return 0;
 }

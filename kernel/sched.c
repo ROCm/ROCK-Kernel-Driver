@@ -2287,7 +2287,7 @@ need_resched:
 switch_tasks:
 	prefetch(next);
 	clear_tsk_need_resched(prev);
-	RCU_qsctr(task_cpu(prev))++;
+	rcu_qsctr_inc(task_cpu(prev));
 
 	prev->sleep_avg -= run_time;
 	if ((long)prev->sleep_avg <= 0) {

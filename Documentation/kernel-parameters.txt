@@ -189,6 +189,11 @@ running once the system is up.
 			Disable APC CPU standby support. SPARCstation-Fox does
 			not play well with APC CPU idle - disable it if you have
 			APC and your system crashes randomly.
+
+	apic=		[APIC,i386] Change the output verbosity  whilst booting
+			Format: { quiet (default) | verbose | debug }
+			Change the amount of debugging information output
+			when initialising the APIC and IO-APIC components.
  
 	apm=		[APM] Advanced Power Management
 			See header of arch/i386/kernel/apm.c.
@@ -707,6 +712,9 @@ running once the system is up.
 	noasync		[HW,M68K] Disables async and sync negotiation for
 			all devices.
 
+	nobats		[PPC] Do not use BATs for mapping kernel lowmem
+			on "Classic" PPC cores.
+
 	nocache		[ARM]
  
 	nodisconnect	[HW,SCSI,M68K] Disables SCSI disconnects.
@@ -738,6 +746,9 @@ running once the system is up.
 	nointroute	[IA-64]
 
 	nolapic		[IA-32,APIC] Do not enable or use the local APIC.
+
+	noltlbs		[PPC] Do not use large page/tlb entries for kernel
+			lowmem mapping on PPC40x.
 
 	nomce		[IA-32] Machine Check Exception
 

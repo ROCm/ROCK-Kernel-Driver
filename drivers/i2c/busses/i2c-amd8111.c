@@ -392,7 +392,7 @@ static void __devexit amd8111_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver amd8111_driver = {
-	.name		= "amd8111 smbus 2",
+	.name		= "amd8111_smbus2",
 	.id_table	= amd8111_ids,
 	.probe		= amd8111_probe,
 	.remove		= __devexit_p(amd8111_remove),

@@ -1,6 +1,6 @@
 
-host-progs	:= genksyms
-always		:= $(host-progs)
+hostprogs-y	:= genksyms
+always		:= $(hostprogs-y)
 
 genksyms-objs	:= genksyms.o parse.o lex.o
 

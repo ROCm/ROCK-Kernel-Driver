@@ -38,6 +38,17 @@ config FB
 	  (e.g. an accelerated X server) and that are not frame buffer
 	  device-aware may cause unexpected results. If unsure, say N.
 
+config FB_MODE_HELPERS
+        bool "Enable Video Mode Handling Helpers"
+        depends on FB
+	default y
+	---help---
+	  This enables functions for handling video modes using the
+	  Generalized Timing Formula and the EDID parser. A few drivers rely
+          on this feature such as the radeonfb, rivafb, and the i810fb. If
+	  your driver does not take advantage of this feature, choosing Y will
+	  just increase the kernel size by about 5K.
+
 config FB_CIRRUS
 	tristate "Cirrus Logic support"
 	depends on FB && (ZORRO || PCI)
@@ -405,40 +416,21 @@ config FB_PVR2
 	  (<file:drivers/video/pvr2fb.c>). Please see the file
 	  <file:Documentation/fb/pvr2fb.txt>.
 
-config FB_E1355
+config FB_EPSON1355
 	bool "Epson 1355 framebuffer support"
-	depends on FB && SUPERH
+	depends on FB && (SUPERH || ARCH_CEIVA)
 	help
 	  Build in support for the SED1355 Epson Research Embedded RAMDAC
 	  LCD/CRT Controller (since redesignated as the S1D13505) as a
 	  framebuffer.  Product specs at
 	  <http://www.erd.epson.com/vdc/html/products.htm>.
 
-config E1355_REG_BASE
-	hex "Register Base Address"
-	depends on FB_E1355
-	default "a8000000"
-	help
-	  Epson SED1355/S1D13505 LCD/CRT controller register base address.
-	  See the manuals at
-	  <http://www.erd.epson.com/vdc/html/contents/S1D13505.htm> for
-	  discussion.
-
-config E1355_FB_BASE
-	hex "Framebuffer Base Address"
-	depends on FB_E1355
-	default "a8200000"
-	help
-	  Epson SED1355/S1D13505 LCD/CRT controller memory base address.  See
-	  the manuals at
-	  <http://www.erd.epson.com/vdc/html/contents/S1D13505.htm> for
-	  discussion.
-
 config FB_RIVA
 	tristate "nVidia Riva support"
 	depends on FB && PCI
 	select I2C_ALGOBIT if FB_RIVA_I2C
 	select I2C if FB_RIVA_I2C
+	select FB_MODE_HELPERS
 	help
 	  This driver supports graphics boards with the nVidia Riva/Geforce
 	  chips.
@@ -470,7 +462,10 @@ config FB_RIVA_DEBUG
 
 config FB_I810
 	tristate "Intel 810/815 support (EXPERIMENTAL)"
-	depends on FB && AGP && AGP_INTEL && EXPERIMENTAL && PCI	
+	depends on FB && EXPERIMENTAL && PCI && X86 && !X86_64
+	select AGP
+	select AGP_INTEL
+	select FB_MODE_HELPERS
 	help
 	  This driver supports the on-board graphics built in to the Intel 810 
           and 815 chipsets.  Say Y if you have and plan to use such a board.
@@ -674,6 +669,7 @@ config FB_RADEON
 	depends on FB && PCI
 	select I2C_ALGOBIT if FB_RADEON_I2C
 	select I2C if FB_RADEON_I2C
+	select FB_MODE_HELPERS
 	help
 	  Choose this option if you want to use an ATI Radeon graphics card as
 	  a framebuffer device.  There are both PCI and AGP versions.  You

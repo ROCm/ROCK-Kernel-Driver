@@ -124,4 +124,8 @@ extern void __chk_user_ptr(void __user *);
 #define noinline
 #endif
 
+#ifndef __always_inline
+#define __always_inline inline
+#endif
+
 #endif /* __LINUX_COMPILER_H */

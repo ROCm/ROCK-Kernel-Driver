@@ -200,7 +200,7 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	rtas_elog = (struct rtas_error_log *)ras_log_buf;
 
-	if ((status == 0) && (rtas_elog->severity >= SEVERITY_ERROR_SYNC))
+	if ((status == 0) && (rtas_elog->severity >= RTAS_SEVERITY_ERROR_SYNC))
 		fatal = 1;
 	else
 		fatal = 0;

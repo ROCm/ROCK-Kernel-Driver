@@ -220,6 +220,10 @@ struct mm_struct {
 	/* Architecture-specific MM context */
 	mm_context_t context;
 
+	/* Token based thrashing protection. */
+	unsigned long swap_token_time;
+	char recent_pagein;
+
 	/* coredumping support */
 	int core_waiters;
 	struct completion *core_startup_done, core_done;
@@ -312,6 +316,7 @@ struct user_struct {
 	atomic_t sigpending;	/* How many pending signals does this user have? */
 	/* protected by mq_lock	*/
 	unsigned long mq_bytes;	/* How many bytes can be allocated to mqueue? */
+	unsigned long locked_shm; /* How many pages of mlocked shm ? */
 
 	/* Hash table maintenance information */
 	struct list_head uidhash_list;
@@ -887,6 +892,9 @@ extern int do_execve(char *, char __user * __user *, char __user * __user *, str
 extern long do_fork(unsigned long, unsigned long, struct pt_regs *, unsigned long, int __user *, int __user *);
 extern struct task_struct * copy_process(unsigned long, unsigned long, struct pt_regs *, unsigned long, int __user *, int __user *);
 
+extern void set_task_comm(struct task_struct *tsk, char *from);
+extern void get_task_comm(char *to, struct task_struct *tsk);
+
 #ifdef CONFIG_SMP
 extern void wait_task_inactive(task_t * p);
 #else
@@ -941,8 +949,8 @@ static inline int thread_group_empty(task_t *p)
 extern void unhash_process(struct task_struct *p);
 
 /*
- * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info and synchronises with
- * wait4().
+ * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info, ->comm and
+ * synchronises with wait4().
  *
  * Nests both inside and outside of read_lock(&tasklist_lock).
  * It must not be nested with write_lock_irq(&tasklist_lock),

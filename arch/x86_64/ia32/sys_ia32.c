@@ -1262,7 +1262,7 @@ asmlinkage long sys32_open(const char __user * filename, int flags, int mode)
 		if (fd >= 0) {
 			struct file *f = filp_open(tmp, flags, mode);
 			error = PTR_ERR(f);
-			if (unlikely(IS_ERR(f))) {
+			if (IS_ERR(f)) {
 				put_unused_fd(fd); 
 				fd = error;
 			} else

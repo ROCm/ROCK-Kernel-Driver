@@ -643,7 +643,6 @@ svcauth_gss_register_pseudoflavor(u32 pseudoflavor, char * name)
 	if (!new)
 		goto out;
 	cache_init(&new->h.h);
-	atomic_inc(&new->h.h.refcnt);
 	new->h.name = kmalloc(strlen(name) + 1, GFP_KERNEL);
 	if (!new->h.name)
 		goto out_free_dom;
@@ -651,7 +650,6 @@ svcauth_gss_register_pseudoflavor(u32 pseudoflavor, char * name)
 	new->h.flavour = RPC_AUTH_GSS;
 	new->pseudoflavor = pseudoflavor;
 	new->h.h.expiry_time = NEVER;
-	new->h.h.flags = 0;
 
 	test = auth_domain_lookup(&new->h, 1);
 	if (test == &new->h) {

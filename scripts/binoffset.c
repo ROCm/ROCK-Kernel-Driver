@@ -41,7 +41,7 @@
 char		*progname;
 char		*inputname;
 int		inputfd;
-int		bix;			/* buf index */
+unsigned int	bix;			/* buf index */
 unsigned char	patterns [PAT_SIZE] = {0}; /* byte-sized pattern array */
 int		pat_len;		/* actual number of pattern bytes */
 unsigned char	*madr;			/* mmap address */
@@ -58,7 +58,7 @@ void usage (void)
 	exit (1);
 }
 
-int get_pattern (int pat_count, char *pats [])
+void get_pattern (int pat_count, char *pats [])
 {
 	int ix, err, tmp;
 
@@ -81,7 +81,7 @@ int get_pattern (int pat_count, char *pats [])
 	pat_len = pat_count;
 }
 
-int search_pattern (void)
+void search_pattern (void)
 {
 	for (bix = 0; bix < filesize; bix++) {
 		if (madr[bix] == patterns[0]) {
@@ -109,7 +109,7 @@ size_t get_filesize (int fd)
 	struct stat stat;
 
 	err = fstat (fd, &stat);
-	fprintf (stderr, "filesize: %d\n", err < 0 ? err : stat.st_size);
+	fprintf (stderr, "filesize: %ld\n", err < 0 ? (long)err : stat.st_size);
 	if (err < 0)
 		return err;
 	return (size_t) stat.st_size;
@@ -154,8 +154,8 @@ int main (int argc, char *argv [])
 	fprintf (stderr, "number of pattern matches = %d\n", num_matches);
 	if (num_matches == 0)
 		firstloc = ~0;
-	printf ("%d\n", firstloc);
-	fprintf (stderr, "%d\n", firstloc);
+	printf ("%ld\n", firstloc);
+	fprintf (stderr, "%ld\n", firstloc);
 
 	exit (num_matches ? 0 : 2);
 }

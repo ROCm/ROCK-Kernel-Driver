@@ -61,7 +61,7 @@
 
 static dabusb_t dabusb[NRDABUSB];
 static int buffers = 256;
-extern struct usb_driver dabusb_driver;
+static struct usb_driver dabusb_driver;
 
 /*-------------------------------------------------------------------*/
 
@@ -868,7 +868,7 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM (buffers, "i");
+module_param(buffers, int, 0);
 MODULE_PARM_DESC (buffers, "Number of buffers (default=256)");
 
 module_init (dabusb_init);

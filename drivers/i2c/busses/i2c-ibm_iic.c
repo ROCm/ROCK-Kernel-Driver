@@ -50,12 +50,12 @@
 MODULE_DESCRIPTION("IBM IIC driver v" DRIVER_VERSION);
 MODULE_LICENSE("GPL");
 
-static int iic_force_poll = 0;
-MODULE_PARM(iic_force_poll, "i");
+static int iic_force_poll;
+module_param(iic_force_poll, bool, 0);
 MODULE_PARM_DESC(iic_force_poll, "Force polling mode");
 
-static int iic_force_fast = 0;
-MODULE_PARM(iic_force_fast, "i");
+static int iic_force_fast;
+module_param(iic_force_fast, bool, 0);
 MODULE_PARM_DESC(iic_fast_poll, "Force fast mode (400 kHz)");
 
 #define DBG_LEVEL 0

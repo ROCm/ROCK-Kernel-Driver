@@ -28,7 +28,7 @@
 
 #define W1_FAMILY_DEFAULT	0
 #define W1_FAMILY_THERM		0x10
-#define W1_FAMILY_IBUT		0xff /* ? */
+#define W1_FAMILY_SMEM		0x01
 
 #define MAXNAMELEN		32
 

@@ -54,8 +54,6 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-void eeh_register_disable_func(int (*)(struct pci_dev *));
-
 module_param(debug, bool, 0644);
 
 static int enable_slot(struct hotplug_slot *slot);
@@ -407,18 +405,12 @@ static int __init rpaphp_init(void)
 {
 	info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
 
-	/* let EEH know they can use hotplug */
-	eeh_register_disable_func(&rpaphp_disable_slot);
-
 	/* read all the PRA info from the system */
 	return init_rpa();
 }
 
 static void __exit rpaphp_exit(void)
 {
-	/* let EEH know we are going away */
-	eeh_register_disable_func(NULL);
-
 	cleanup_slots();
 }
 

@@ -455,7 +455,7 @@ static void adm1025_init_client(struct i2c_client *client)
 	struct adm1025_data *data = i2c_get_clientdata(client);
 	int i;
 
-	data->vrm = 82;
+	data->vrm = i2c_which_vrm();
 
 	/*
 	 * Set high limits

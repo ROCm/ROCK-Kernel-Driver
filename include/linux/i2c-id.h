@@ -194,6 +194,7 @@
 #define I2C_ALGO_OCP    0x120000	/* IBM or otherwise On-chip I2C algorithm */
 #define I2C_ALGO_BITHS	0x130000	/* enhanced bit style adapters	*/
 #define I2C_ALGO_OCP_IOP3XX  0x140000	/* XSCALE IOP3XX On-chip I2C alg */
+#define I2C_ALGO_PCA	0x150000	/* PCA 9564 style adapters	*/
 
 #define I2C_ALGO_EXP	0x800000	/* experimental			*/
 
@@ -238,6 +239,9 @@
 #define I2C_HW_P_LP	0x00	/* Parallel port interface		*/
 #define I2C_HW_P_ISA	0x01	/* generic ISA Bus inteface card	*/
 #define I2C_HW_P_ELEK	0x02	/* Elektor ISA Bus inteface card	*/
+
+/* --- PCA 9564 based algorithms */
+#define I2C_HW_A_ISA	0x00	/* generic ISA Bus interface card	*/
 
 /* --- ACPI Embedded controller algorithms                              */
 #define I2C_HW_ACPI_EC          0x00

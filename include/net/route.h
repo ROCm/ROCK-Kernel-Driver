@@ -73,11 +73,6 @@ struct rtable
 	/* Miscellaneous cached information */
 	__u32			rt_spec_dst; /* RFC1122 specific destination */
 	struct inet_peer	*peer; /* long-living peer info */
-
-#ifdef CONFIG_IP_ROUTE_NAT
-	__u32			rt_src_map;
-	__u32			rt_dst_map;
-#endif
 };
 
 struct ip_rt_acct

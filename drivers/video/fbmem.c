@@ -432,6 +432,25 @@ static int ofonly __initdata = 0;
 #endif
 
 /*
+ * Helpers
+ */
+
+int fb_get_color_depth(struct fb_info *info)
+{
+	struct fb_var_screeninfo *var = &info->var;
+
+	if (var->green.length == var->blue.length &&
+	    var->green.length == var->red.length &&
+	    !var->green.offset && !var->blue.offset &&
+	    !var->red.offset)
+		return var->green.length;
+	else
+		return (var->green.length + var->red.length +
+			var->blue.length);
+}
+EXPORT_SYMBOL(fb_get_color_depth);
+
+/*
  * Drawing helpers.
  */
 void fb_iomove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
@@ -650,9 +669,12 @@ static void fb_set_logo(struct fb_info *info,
 			       const struct linux_logo *logo, u8 *dst,
 			       int depth)
 {
-	int i, j, shift;
+	int i, j, k, fg = 1;
 	const u8 *src = logo->data;
-	u8 d, xor = 0;
+	u8 d, xor = (info->fix.visual == FB_VISUAL_MONO01) ? 0xff : 0;
+
+	if (fb_get_color_depth(info) == 3)
+		fg = 7;
 
 	switch (depth) {
 	case 4:
@@ -666,17 +688,14 @@ static void fb_set_logo(struct fb_info *info,
 				}
 			}
 		break;
-	case ~1:
-		xor = 0xff;
 	case 1:
 		for (i = 0; i < logo->height; i++) {
-			shift = 7;
-			d = *src++ ^ xor;
-			for (j = 0; j < logo->width; j++) {
-				*dst++ = (d >> shift) & 1;
-				shift = (shift-1) & 7;
-				if (shift == 7)
-					d = *src++ ^ xor;
+			for (j = 0; j < logo->width; src++) {
+				d = *src ^ xor;
+				for (k = 7; k >= 0; k--) {
+					*dst++ = ((d >> k) & 1) ? fg : 0;
+					j++;
+				}
 			}
 		}
 		break;
@@ -719,26 +738,35 @@ static struct logo_data {
 
 int fb_prepare_logo(struct fb_info *info)
 {
+	int depth = fb_get_color_depth(info);
+
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
-	switch (info->fix.visual) {
-	case FB_VISUAL_TRUECOLOR:
-		if (info->var.bits_per_pixel >= 8)
+	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
+		depth = info->var.blue.length;
+		if (info->var.red.length < depth)
+			depth = info->var.red.length;
+		if (info->var.green.length < depth)
+			depth = info->var.green.length;
+	}
+
+	if (depth >= 8) {
+		switch (info->fix.visual) {
+		case FB_VISUAL_TRUECOLOR:
 			fb_logo.needs_truepalette = 1;
-		break;
-	case FB_VISUAL_DIRECTCOLOR:
-		if (info->var.bits_per_pixel >= 24) {
+			break;
+		case FB_VISUAL_DIRECTCOLOR:
 			fb_logo.needs_directpalette = 1;
 			fb_logo.needs_cmapreset = 1;
+			break;
+		case FB_VISUAL_PSEUDOCOLOR:
+			fb_logo.needs_cmapreset = 1;
+			break;
 		}
-		break;
-	case FB_VISUAL_PSEUDOCOLOR:
-		fb_logo.needs_cmapreset = 1;
-		break;
 	}
 
 	/* Return if no suitable logo was found */
-	fb_logo.logo = fb_find_logo(info->var.bits_per_pixel);
+	fb_logo.logo = fb_find_logo(depth);
 	
 	if (!fb_logo.logo || fb_logo.logo->height > info->var.yres) {
 		fb_logo.logo = NULL;
@@ -765,7 +793,7 @@ int fb_show_logo(struct fb_info *info)
 	if (fb_logo.logo == NULL || info->state != FBINFO_STATE_RUNNING)
 		return 0;
 
-	image.depth = fb_logo.depth;
+	image.depth = 8;
 	image.data = fb_logo.logo->data;
 
 	if (fb_logo.needs_cmapreset)
@@ -786,7 +814,7 @@ int fb_show_logo(struct fb_info *info)
 		info->pseudo_palette = palette;
 	}
 
-	if (fb_logo.depth == 4) {
+	if (fb_logo.depth <= 4) {
 		logo_new = kmalloc(fb_logo.logo->width * fb_logo.logo->height, 
 				   GFP_KERNEL);
 		if (logo_new == NULL) {
@@ -953,13 +981,14 @@ fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 	if (copy_from_user(&cursor_user, sprite, sizeof(struct fb_cursor_user)))
 		return -EFAULT;
 
-	memcpy(&cursor, &cursor_user, sizeof(cursor));
+	memcpy(&cursor, &cursor_user, sizeof(cursor_user));
 	cursor.mask = NULL;
 	cursor.image.data = NULL;
 	cursor.image.cmap.red = NULL;
 	cursor.image.cmap.green = NULL;
 	cursor.image.cmap.blue = NULL;
 	cursor.image.cmap.transp = NULL;
+	cursor.data = NULL;
 
 	if (cursor.set & FB_CUR_SETCUR)
 		info->cursor.enable = 1;
@@ -1059,6 +1088,30 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 {
 	int err;
 
+	if (var->activate & FB_ACTIVATE_INV_MODE) {
+		struct fb_videomode mode1, mode2;
+		int ret = 0;
+
+		fb_var_to_videomode(&mode1, var);
+		fb_var_to_videomode(&mode2, &info->var);
+		/* make sure we don't delete the videomode of current var */
+		ret = fb_mode_is_equal(&mode1, &mode2);
+
+		if (!ret) {
+		    struct fb_event event;
+
+		    event.info = info;
+		    event.data = &mode1;
+		    ret = notifier_call_chain(&fb_notifier_list,
+					      FB_EVENT_MODE_DELETE, &event);
+		}
+
+		if (!ret)
+		    fb_delete_videomode(&mode1, &info->monspecs.modelist);
+
+		return ret;
+	}
+
 	if ((var->activate & FB_ACTIVATE_FORCE) ||
 	    memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
 		if (!info->fbops->fb_check_var) {
@@ -1070,6 +1123,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			return err;
 
 		if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
+			struct fb_videomode mode;
 			info->var = *var;
 
 			if (info->fbops->fb_set_par)
@@ -1079,10 +1133,16 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 			fb_set_cmap(&info->cmap, info);
 
+			fb_var_to_videomode(&mode, &info->var);
+			fb_add_videomode(&mode, &info->monspecs.modelist);
+
 			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
+				struct fb_event event;
+
 				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+				event.info = info;
 				notifier_call_chain(&fb_notifier_list,
-						    FB_EVENT_MODE_CHANGE, info);
+						    FB_EVENT_MODE_CHANGE, &event);
 			}
 		}
 	}
@@ -1414,6 +1474,16 @@ register_framebuffer(struct fb_info *fb_info)
 	}
 	fb_info->sprite.offset = 0;
 
+	if (!fb_info->monspecs.modelist.prev ||
+	    !fb_info->monspecs.modelist.next ||
+	    list_empty(&fb_info->monspecs.modelist)) {
+	        struct fb_videomode mode;
+
+		INIT_LIST_HEAD(&fb_info->monspecs.modelist);
+		fb_var_to_videomode(&mode, &fb_info->var);
+		fb_add_videomode(&mode, &fb_info->monspecs.modelist);
+	}
+
 	registered_fb[i] = fb_info;
 
 	devfs_mk_cdev(MKDEV(FB_MAJOR, i),
@@ -1446,6 +1516,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 		kfree(fb_info->pixmap.addr);
 	if (fb_info->sprite.addr && (fb_info->sprite.flags & FB_PIXMAP_DEFAULT))
 		kfree(fb_info->sprite.addr);
+	fb_destroy_modelist(&fb_info->monspecs.modelist);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
 	class_simple_device_remove(MKDEV(FB_MAJOR, i));
@@ -1481,12 +1552,15 @@ int fb_unregister_client(struct notifier_block *nb)
  */
 void fb_set_suspend(struct fb_info *info, int state)
 {
+	struct fb_event event;
+
+	event.info = info;
 	if (state) {
-		notifier_call_chain(&fb_notifier_list, FB_EVENT_SUSPEND, info);
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_SUSPEND, &event);
 		info->state = FBINFO_STATE_SUSPENDED;
 	} else {
 		info->state = FBINFO_STATE_RUNNING;
-		notifier_call_chain(&fb_notifier_list, FB_EVENT_RESUME, info);
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_RESUME, &event);
 	}
 }
 

@@ -30,31 +30,34 @@ static inline int match_tcp(const struct sk_buff *skb,
 			    const struct ipt_ecn_info *einfo,
 			    int *hotdrop)
 {
-	struct tcphdr tcph;
+	struct tcphdr _tcph, *th;
 
 	/* In practice, TCP match does this, so can't fail.  But let's
-           be good citizens. */
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) < 0) {
+	 * be good citizens.
+	 */
+	th = skb_header_pointer(skb, skb->nh.iph->ihl * 4,
+				sizeof(_tcph), &_tcph);
+	if (th == NULL) {
 		*hotdrop = 0;
 		return 0;
 	}
 
 	if (einfo->operation & IPT_ECN_OP_MATCH_ECE) {
 		if (einfo->invert & IPT_ECN_OP_MATCH_ECE) {
-			if (tcph.ece == 1)
+			if (th->ece == 1)
 				return 0;
 		} else {
-			if (tcph.ece == 0)
+			if (th->ece == 0)
 				return 0;
 		}
 	}
 
 	if (einfo->operation & IPT_ECN_OP_MATCH_CWR) {
 		if (einfo->invert & IPT_ECN_OP_MATCH_CWR) {
-			if (tcph.cwr == 1)
+			if (th->cwr == 1)
 				return 0;
 		} else {
-			if (tcph.cwr == 0)
+			if (th->cwr == 0)
 				return 0;
 		}
 	}

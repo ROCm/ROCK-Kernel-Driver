@@ -31,7 +31,6 @@ config GENERIC_ISA_DMA
 
 source "init/Kconfig"
 
-
 menu "Processor type and features"
 
 choice
@@ -55,20 +54,20 @@ config X86_ELAN
 config X86_VOYAGER
 	bool "Voyager (NCR)"
 	help
-	  Voyager is a MCA based 32 way capable SMP architecture proprietary
-	  to NCR Corp.  Machine classes 345x/35xx/4100/51xx are voyager based.
-	  
+	  Voyager is an MCA-based 32-way capable SMP architecture proprietary
+	  to NCR Corp.  Machine classes 345x/35xx/4100/51xx are Voyager-based.
+
 	  *** WARNING ***
-	
+
 	  If you do not specifically know you have a Voyager based machine,
-	  say N here otherwise the kernel you build will not be bootable.
+	  say N here, otherwise the kernel you build will not be bootable.
 
 config X86_NUMAQ
 	bool "NUMAQ (IBM/Sequent)"
 	select DISCONTIGMEM
 	select NUMA
 	help
-	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
+	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA
 	  multiquad box. This changes the way that processors are bootstrapped,
 	  and uses Clustered Logical APIC addressing mode instead of Flat Logical.
 	  You will need a new lynxer.elf file to flash your firmware with - send
@@ -115,8 +114,8 @@ config X86_ES7000
 	depends on SMP
 	help
 	  Support for Unisys ES7000 systems.  Say 'Y' here if this kernel is
-	  supposed to run on an IA32-based Unisys ES7000 system. 
-	  Only choose this option if you have such a system, otherwise you 
+	  supposed to run on an IA32-based Unisys ES7000 system.
+	  Only choose this option if you have such a system, otherwise you
 	  should say N here.
 
 endchoice
@@ -322,7 +321,7 @@ config MVIAC3_2
 endchoice
 
 config X86_GENERIC
-       bool "Generic x86 support" 
+       bool "Generic x86 support"
        help
 	  Instead of just including optimizations for the selected
 	  x86 variant (e.g. PII, Crusoe or Athlon), include some more
@@ -1027,7 +1026,6 @@ source "arch/i386/kernel/cpu/cpufreq/Kconfig"
 
 endmenu
 
-
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 
 config X86_VISWS_APIC
@@ -1105,7 +1103,7 @@ config PCI_DIRECT
 
 config PCI_MMCONFIG
 	bool
-	depends on PCI && (PCI_GOMMCONFIG || PCI_GOANY)
+	depends on PCI && (PCI_GOMMCONFIG || (PCI_GOANY && ACPI))
 	select ACPI_BOOT
 	default y
 
@@ -1158,7 +1156,7 @@ config SCx200
 	tristate "NatSemi SCx200 support"
 	depends on !X86_VOYAGER
 	help
-	  This provides basic support for the National Semiconductor SCx200 
+	  This provides basic support for the National Semiconductor SCx200
 	  processor.  Right now this is just a driver for the GPIO pins.
 
 	  If you don't know what to do here, say N.
@@ -1172,7 +1170,6 @@ source "drivers/pci/hotplug/Kconfig"
 
 endmenu
 
-
 menu "Executable file formats"
 
 source "fs/Kconfig.binfmt"
@@ -1185,130 +1182,7 @@ source "fs/Kconfig"
 
 source "arch/i386/oprofile/Kconfig"
 
-
-menu "Kernel hacking"
-
-config DEBUG_KERNEL
-	bool "Kernel debugging"
-	help
-	  Say Y here if you are developing drivers or trying to debug and
-	  identify kernel problems.
-
-config EARLY_PRINTK
-	bool "Early printk" if EMBEDDED
-	default y
-	help
-	  Write kernel log output directly into the VGA buffer or to a serial
-	  port.
-
-	  This is useful for kernel debugging when your machine crashes very
-	  early before the console code is initialized. For normal operation
-	  it is not recommended because it looks ugly and doesn't cooperate
-	  with klogd/syslogd or the X server. You should normally N here,
-	  unless you want to debug such a crash.
-
-config DEBUG_STACKOVERFLOW
-	bool "Check for stack overflows"
-	depends on DEBUG_KERNEL
-
-config DEBUG_STACK_USAGE
-	bool "Stack utilization instrumentation"
-	depends on DEBUG_KERNEL
-	help
-	  Enables the display of the minimum amount of free stack which each
-	  task has ever had available in the sysrq-T and sysrq-P debug output.
-
-	  This option will slow down process creation somewhat.
-
-config DEBUG_SLAB
-	bool "Debug memory allocations"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here to have the kernel do limited verification on memory
-	  allocation as well as poisoning memory on free to catch use of freed
-	  memory.
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here, you will have some control over the system even
-	  if the system crashes for example during kernel debugging (e.g., you
-	  will be able to flush the buffer cache to disk, reboot the system
-	  immediately or dump some status information). This is accomplished
-	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
-	  also works on a serial console (on PC hardware at least), if you
-	  send a BREAK and then within 5 seconds a command keypress. The
-	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
-	  unless you really know what this hack does.
-
-config DEBUG_SPINLOCK
-	bool "Spinlock debugging"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here and build SMP to catch missing spinlock initialization
-	  and certain other kinds of spinlock errors commonly made.  This is
-	  best used in conjunction with the NMI watchdog so that spinlock
-	  deadlocks are also debuggable.
-
-config DEBUG_PAGEALLOC
-	bool "Page alloc debugging"
-	depends on DEBUG_KERNEL
-	help
-	  Unmap pages from the kernel linear mapping after free_pages().
-	  This results in a large slowdown, but helps to find certain types
-	  of memory corruptions.
-
-config DEBUG_HIGHMEM
-	bool "Highmem debugging"
-	depends on DEBUG_KERNEL && HIGHMEM
-	help
-	  This options enables addition error checking for high memory systems.
-	  Disable for production systems.
-
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-          If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use gdb to debug the kernel.
-	  If you don't debug the kernel, you can say N.
-	  
-config DEBUG_SPINLOCK_SLEEP
-	bool "Sleep-inside-spinlock checking"
-	help
-	  If you say Y here, various routines which may sleep will become very
-	  noisy if they are called with a spinlock held.	
-
-config FRAME_POINTER
-	bool "Compile the kernel with frame pointers"
-	help
-	  If you say Y here the resulting kernel image will be slightly larger
-	  and slower, but it will give very useful debugging information.
-	  If you don't debug the kernel, you can say N, but we may not be able
-	  to solve problems without frame pointers.
-
-config 4KSTACKS
-	bool "Use 4Kb for kernel stacks instead of 8Kb"
-	help
-	  If you say Y here the kernel will use a 4Kb stacksize for the
-	  kernel stack attached to each process/thread. This facilitates
-	  running more threads on a system and also reduces the pressure
-	  on the VM subsystem for higher order allocations. This option
-	  will also use IRQ stacks to compensate for the reduced stackspace.
-
-config X86_FIND_SMP_CONFIG
-	bool
-	depends on X86_LOCAL_APIC || X86_VOYAGER
-	default y
-
-config X86_MPPARSE
-	bool
-	depends on X86_LOCAL_APIC && !X86_VISWS
-	default y
-
-endmenu
+source "arch/i386/Kconfig.debug"
 
 source "security/Kconfig"
 

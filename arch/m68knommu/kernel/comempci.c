@@ -351,8 +351,6 @@ char *pcibios_setup(char *option)
 }
 /*****************************************************************************/
 
-struct pci_fixup pcibios_fixups[] = { { 0 } };
-
 void pcibios_fixup_bus(struct pci_bus *b)
 {
 }

@@ -88,6 +88,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define SPECIAL 4	/* For non-blockdevice requests in request queue */
 #define READ_SYNC	(READ | (1 << BIO_RW_SYNC))
 #define WRITE_SYNC	(WRITE | (1 << BIO_RW_SYNC))
+#define WRITE_BARRIER	((1 << BIO_RW) | (1 << BIO_RW_BARRIER))
 
 #define SEL_IN		1
 #define SEL_OUT		2
@@ -554,8 +555,8 @@ struct file_ra_state {
 	unsigned long prev_page;	/* Cache last read() position */
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
-	unsigned long serial_cnt;	/* measure of sequentiality */
-	unsigned long average;		/* another measure of sequentiality */
+	unsigned long currnt_wnd_hit;	/* locality in the current window */
+	unsigned long average;		/* size of next current window */
 	unsigned long ra_pages;		/* Maximum readahead window */
 	unsigned long mmap_hit;		/* Cache hit stat for mmap accesses */
 	unsigned long mmap_miss;	/* Cache miss stat for mmap accesses */
@@ -595,11 +596,6 @@ extern spinlock_t files_lock;
 #define get_file(x)	atomic_inc(&(x)->f_count)
 #define file_count(x)	atomic_read(&(x)->f_count)
 
-/* Initialize and open a private file and allocate its security structure. */
-extern int open_private_file(struct file *, struct dentry *, int);
-/* Release a private file and free its security structure. */
-extern void close_private_file(struct file *file);
-
 #define	MAX_NON_LFS	((1UL<<31) - 1)
 
 /* Page cache limit. The filesystems should put that into their s_maxbytes 
@@ -626,6 +622,18 @@ extern void close_private_file(struct file *file);
  */
 typedef struct files_struct *fl_owner_t;
 
+struct file_lock_operations {
+	void (*fl_insert)(struct file_lock *);	/* lock insertion callback */
+	void (*fl_remove)(struct file_lock *);	/* lock removal callback */
+	void (*fl_copy_lock)(struct file_lock *, struct file_lock *);
+	void (*fl_release_private)(struct file_lock *);
+};
+
+struct lock_manager_operations {
+	int (*fl_compare_owner)(struct file_lock *, struct file_lock *);
+	void (*fl_notify)(struct file_lock *);	/* unblock callback */
+};
+
 /* that will die - we need it for nfs_lock_info */
 #include <linux/nfs_fs_i.h>
 
@@ -642,13 +650,11 @@ struct file_lock {
 	loff_t fl_start;
 	loff_t fl_end;
 
-	void (*fl_notify)(struct file_lock *);	/* unblock callback */
-	void (*fl_insert)(struct file_lock *);	/* lock insertion callback */
-	void (*fl_remove)(struct file_lock *);	/* lock removal callback */
-
 	struct fasync_struct *	fl_fasync; /* for lease break notifications */
 	unsigned long fl_break_time;	/* for nonblocking lease breaks */
 
+	struct file_lock_operations *fl_ops;	/* Callbacks for filesystems */
+	struct lock_manager_operations *fl_lmops;	/* Callbacks for lockmanagers */
 	union {
 		struct nfs_lock_info	nfs_fl;
 	} fl_u;
@@ -684,6 +690,7 @@ extern void locks_remove_posix(struct file *, fl_owner_t);
 extern void locks_remove_flock(struct file *);
 extern struct file_lock *posix_test_lock(struct file *, struct file_lock *);
 extern int posix_lock_file(struct file *, struct file_lock *);
+extern int posix_lock_file_wait(struct file *, struct file_lock *);
 extern void posix_block_lock(struct file_lock *, struct file_lock *);
 extern void posix_unblock_lock(struct file *, struct file_lock *);
 extern int posix_locks_deadlock(struct file_lock *, struct file_lock *);
@@ -811,6 +818,11 @@ extern int vfs_unlink(struct inode *, struct dentry *);
 extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct dentry *);
 
 /*
+ * VFS dentry helper functions.
+ */
+extern void dentry_unhash(struct dentry *dentry);
+
+/*
  * File types
  *
  * NOTE! These match bits 12..15 of stat.st_mode
@@ -825,6 +837,11 @@ extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct de
 #define DT_LNK		10
 #define DT_SOCK		12
 #define DT_WHT		14
+
+#define OSYNC_METADATA	(1<<0)
+#define OSYNC_DATA	(1<<1)
+#define OSYNC_INODE	(1<<2)
+int generic_osync_inode(struct inode *, struct address_space *, int);
 
 /*
  * This is the "filldir" function type, used by readdir() to let
@@ -1411,7 +1428,11 @@ extern ssize_t generic_file_aio_read(struct kiocb *, char __user *, size_t, loff
 extern ssize_t __generic_file_aio_read(struct kiocb *, const struct iovec *, unsigned long, loff_t *);
 extern ssize_t generic_file_aio_write(struct kiocb *, const char __user *, size_t, loff_t);
 extern ssize_t generic_file_aio_write_nolock(struct kiocb *, const struct iovec *,
-				unsigned long, loff_t *);
+		unsigned long, loff_t *);
+extern ssize_t generic_file_direct_write(struct kiocb *, const struct iovec *,
+		unsigned long *, loff_t, loff_t *, size_t, size_t);
+extern ssize_t generic_file_buffered_write(struct kiocb *, const struct iovec *,
+		unsigned long, loff_t, loff_t *, size_t, ssize_t);
 extern ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos);
 extern ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos);
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,

@@ -133,7 +133,7 @@ static dev_info_t dev_info = "Driver Services";
 
 static int major_dev = -1;
 
-extern struct proc_dir_entry *proc_pccard;
+static struct proc_dir_entry *proc_pccard;
 
 /*====================================================================*/
 

@@ -752,6 +752,12 @@ int cirrusfb_check_var(struct fb_var_screeninfo *var,
 
 	switch (var->bits_per_pixel) {
 	case 1:
+		var->red.offset = 0;
+		var->red.length = 1;
+		var->green.offset = 0;
+		var->green.length = 1;
+		var->blue.offset = 0;
+		var->blue.length = 1;
 		break;
 
 	case 8:

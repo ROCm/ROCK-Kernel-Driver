@@ -357,7 +357,7 @@ void RunModeException(struct pt_regs *regs)
 
 /* Illegal instruction emulation support.  Originally written to
  * provide the PVR to user applications using the mfspr rd, PVR.
- * Return non-zero if we can't emulate, or EFAULT if the associated
+ * Return non-zero if we can't emulate, or -EFAULT if the associated
  * memory access caused an access fault.  Return zero on success.
  *
  * There are a couple of ways to do this, either "decode" the instruction
@@ -368,16 +368,19 @@ void RunModeException(struct pt_regs *regs)
 #define INST_MFSPR_PVR		0x7c1f42a6
 #define INST_MFSPR_PVR_MASK	0xfc1fffff
 
+#define INST_DCBA		0x7c0005ec
+#define INST_DCBA_MASK		0x7c0007fe
+
+#define INST_MCRXR		0x7c000400
+#define INST_MCRXR_MASK		0x7c0007fe
+
 static int emulate_instruction(struct pt_regs *regs)
 {
 	u32 instword;
 	u32 rd;
-	int retval;
-
-	retval = -EINVAL;
 
 	if (!user_mode(regs))
-		return retval;
+		return -EINVAL;
 	CHECK_FULL_REGS(regs);
 
 	if (get_user(instword, (u32 __user *)(regs->nip)))
@@ -388,10 +391,24 @@ static int emulate_instruction(struct pt_regs *regs)
 	if ((instword & INST_MFSPR_PVR_MASK) == INST_MFSPR_PVR) {
 		rd = (instword >> 21) & 0x1f;
 		regs->gpr[rd] = mfspr(PVR);
-		retval = 0;
-		regs->nip += 4;
+		return 0;
 	}
-	return retval;
+
+	/* Emulating the dcba insn is just a no-op.  */
+	if ((instword & INST_DCBA_MASK) == INST_DCBA)
+		return 0;
+
+	/* Emulate the mcrxr insn.  */
+	if ((instword & INST_MCRXR_MASK) == INST_MCRXR) {
+		int shift = (instword >> 21) & 0x1c;
+		unsigned long msk = 0xf0000000UL >> shift;
+
+		regs->ccr = (regs->ccr & ~msk) | ((regs->xer >> shift) & msk);
+		regs->xer &= ~0xf0000000UL;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 /*
@@ -528,17 +545,23 @@ void ProgramCheckException(struct pt_regs *regs)
 		return;
 	}
 
-	if (reason & REASON_PRIVILEGED) {
-		/* Try to emulate it if we should. */
-		if (emulate_instruction(regs) == 0) {
+	/* Try to emulate it if we should. */
+	if (reason & (REASON_ILLEGAL | REASON_PRIVILEGED)) {
+		switch (emulate_instruction(regs)) {
+		case 0:
+			regs->nip += 4;
 			emulate_single_step(regs);
 			return;
+		case -EFAULT:
+			_exception(SIGSEGV, regs, SEGV_MAPERR, regs->nip);
+			return;
 		}
-		_exception(SIGILL, regs, ILL_PRVOPC, regs->nip);
-		return;
 	}
 
-	_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
+	if (reason & REASON_PRIVILEGED)
+		_exception(SIGILL, regs, ILL_PRVOPC, regs->nip);
+	else
+		_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
 }
 
 void SingleStepException(struct pt_regs *regs)

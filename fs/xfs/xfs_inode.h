@@ -508,7 +508,6 @@ void		xfs_xlate_dinode_core(xfs_caddr_t, struct xfs_dinode_core *,
 uint		xfs_dic2xflags(struct xfs_dinode_core *, xfs_arch_t);
 int		xfs_ifree(struct xfs_trans *, xfs_inode_t *,
 			   struct xfs_bmap_free *);
-int		xfs_atruncate_start(xfs_inode_t *);
 void		xfs_itruncate_start(xfs_inode_t *, uint, xfs_fsize_t);
 int		xfs_itruncate_finish(struct xfs_trans **, xfs_inode_t *,
 				     xfs_fsize_t, int, int);

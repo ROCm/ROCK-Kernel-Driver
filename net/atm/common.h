@@ -24,11 +24,6 @@ int vcc_setsockopt(struct socket *sock, int level, int optname,
 int vcc_getsockopt(struct socket *sock, int level, int optname,
 		   char __user *optval, int __user *optlen);
 
-void atm_shutdown_dev(struct atm_dev *dev);
-
-void pppoatm_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long));
-void br2684_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long));
-
 int atmpvc_init(void);
 void atmpvc_exit(void);
 int atmsvc_init(void);
@@ -50,12 +45,6 @@ static inline void atm_proc_exit(void)
 #endif /* CONFIG_PROC_FS */
 
 /* SVC */
-
-void svc_callback(struct atm_vcc *vcc);
 int svc_change_qos(struct atm_vcc *vcc,struct atm_qos *qos);
-
-/* p2mp */
-
-int create_leaf(struct socket *leaf,struct socket *session);
 
 #endif

@@ -559,12 +559,12 @@ struct thread_struct {
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)
 
 #define INIT_THREAD  { \
-	INIT_SP, /* ksp */ \
-	(struct pt_regs *)INIT_SP - 1, /* regs */ \
-	KERNEL_DS, /*fs*/ \
-	{0}, /* fpr */ \
-	0, /* fpscr */ \
-	MSR_FE0|MSR_FE1, /* fpexc_mode */ \
+	.ksp = INIT_SP, \
+	.regs = (struct pt_regs *)INIT_SP - 1, \
+	.fs = KERNEL_DS, \
+	.fpr = {0}, \
+	.fpscr = 0, \
+	.fpexc_mode = MSR_FE0|MSR_FE1, \
 }
 
 /*

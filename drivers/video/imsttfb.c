@@ -1442,7 +1442,10 @@ init_imstt(struct fb_info *info)
 	info->var.pixclock = 1000000 / getclkMHz(par);
 
 	info->fbops = &imsttfb_ops;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT |
+                      FBINFO_HWACCEL_COPYAREA |
+	              FBINFO_HWACCEL_FILLRECT |
+	              FBINFO_HWACCEL_YPAN;
 
 	fb_alloc_cmap(&info->cmap, 0, 0);
 

@@ -4,7 +4,7 @@
 
 head-y			:= head.o
 head-$(CONFIG_PARISC64)	:= head64.o
-extra-y			:= init_task.o $(head-y) vmlinux.lds.s
+extra-y			:= init_task.o $(head-y) vmlinux.lds
 
 AFLAGS_entry.o	:= -traditional
 AFLAGS_pacache.o := -traditional

@@ -288,6 +288,90 @@ out_swapfile:
 	goto out;
 }
 
+static int do_getlk(struct file *filp, int cmd, struct file_lock *fl)
+{
+	struct inode *inode = filp->f_mapping->host;
+	int status;
+
+	lock_kernel();
+	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	unlock_kernel();
+	return status;
+}
+
+static int do_unlk(struct file *filp, int cmd, struct file_lock *fl)
+{
+	struct inode *inode = filp->f_mapping->host;
+	sigset_t oldset;
+	int status;
+
+	rpc_clnt_sigmask(NFS_CLIENT(inode), &oldset);
+	/*
+	 * Flush all pending writes before doing anything
+	 * with locks..
+	 */
+	filemap_fdatawrite(filp->f_mapping);
+	down(&inode->i_sem);
+	nfs_wb_all(inode);
+	up(&inode->i_sem);
+	filemap_fdatawait(filp->f_mapping);
+
+	/* NOTE: special case
+	 * 	If we're signalled while cleaning up locks on process exit, we
+	 * 	still need to complete the unlock.
+	 */
+	lock_kernel();
+	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	rpc_clnt_sigunmask(NFS_CLIENT(inode), &oldset);
+	return status;
+}
+
+static int do_setlk(struct file *filp, int cmd, struct file_lock *fl)
+{
+	struct inode *inode = filp->f_mapping->host;
+	int status;
+
+	/*
+	 * Flush all pending writes before doing anything
+	 * with locks..
+	 */
+	status = filemap_fdatawrite(filp->f_mapping);
+	if (status == 0) {
+		down(&inode->i_sem);
+		status = nfs_wb_all(inode);
+		up(&inode->i_sem);
+		if (status == 0)
+			status = filemap_fdatawait(filp->f_mapping);
+	}
+	if (status < 0)
+		return status;
+
+	lock_kernel();
+	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	/* If we were signalled we still need to ensure that
+	 * we clean up any state on the server. We therefore
+	 * record the lock call as having succeeded in order to
+	 * ensure that locks_remove_posix() cleans it out when
+	 * the process exits.
+	 */
+	if (status == -EINTR || status == -ERESTARTSYS)
+		posix_lock_file(filp, fl);
+	unlock_kernel();
+	if (status < 0)
+		return status;
+	/*
+	 * Make sure we clear the cache whenever we try to get the lock.
+	 * This makes locking act as a cache coherency point.
+	 */
+	filemap_fdatawrite(filp->f_mapping);
+	down(&inode->i_sem);
+	nfs_wb_all(inode);	/* we may have slept */
+	up(&inode->i_sem);
+	filemap_fdatawait(filp->f_mapping);
+	nfs_zap_caches(inode);
+	return 0;
+}
+
 /*
  * Lock a (portion of) a file
  */
@@ -295,8 +379,6 @@ int
 nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 {
 	struct inode * inode = filp->f_mapping->host;
-	int	status = 0;
-	int	status2;
 
 	dprintk("NFS: nfs_lock(f=%s/%ld, t=%x, fl=%x, r=%Ld:%Ld)\n",
 			inode->i_sb->s_id, inode->i_ino,
@@ -314,8 +396,8 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 		/* Fake OK code if mounted without NLM support */
 		if (NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM) {
 			if (IS_GETLK(cmd))
-				status = LOCK_USE_CLNT;
-			goto out_ok;
+				return LOCK_USE_CLNT;
+			return 0;
 		}
 	}
 
@@ -329,42 +411,9 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	if (!fl->fl_owner || !(fl->fl_flags & FL_POSIX))
 		return -ENOLCK;
 
-	/*
-	 * Flush all pending writes before doing anything
-	 * with locks..
-	 */
-	status = filemap_fdatawrite(filp->f_mapping);
-	down(&inode->i_sem);
-	status2 = nfs_wb_all(inode);
-	if (!status)
-		status = status2;
-	up(&inode->i_sem);
-	status2 = filemap_fdatawait(filp->f_mapping);
-	if (!status)
-		status = status2;
-	if (status < 0)
-		return status;
-
-	lock_kernel();
-	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
-	unlock_kernel();
-	if (status < 0)
-		return status;
-	
-	status = 0;
-
-	/*
-	 * Make sure we clear the cache whenever we try to get the lock.
-	 * This makes locking act as a cache coherency point.
-	 */
- out_ok:
-	if ((IS_SETLK(cmd) || IS_SETLKW(cmd)) && fl->fl_type != F_UNLCK) {
-		filemap_fdatawrite(filp->f_mapping);
-		down(&inode->i_sem);
-		nfs_wb_all(inode);      /* we may have slept */
-		up(&inode->i_sem);
-		filemap_fdatawait(filp->f_mapping);
-		nfs_zap_caches(inode);
-	}
-	return status;
+	if (IS_GETLK(cmd))
+		return do_getlk(filp, cmd, fl);
+	if (fl->fl_type == F_UNLCK)
+		return do_unlk(filp, cmd, fl);
+	return do_setlk(filp, cmd, fl);
 }

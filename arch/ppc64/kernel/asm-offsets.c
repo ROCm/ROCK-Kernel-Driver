@@ -113,15 +113,11 @@ int main(void)
         DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
 	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xIntDword.xAnyInt));
 	DEFINE(LPPACADECRINT, offsetof(struct ItLpPaca, xIntDword.xFields.xDecrInt));
-        DEFINE(LPQCUREVENTPTR, offsetof(struct ItLpQueue, xSlicCurEventPtr));
-        DEFINE(LPQOVERFLOW, offsetof(struct ItLpQueue, xPlicOverflowIntPending));
-        DEFINE(LPEVENTFLAGS, offsetof(struct HvLpEvent, xFlags));
 	DEFINE(PROMENTRY, offsetof(struct prom_t, entry));
 
 	/* RTAS */
 	DEFINE(RTASBASE, offsetof(struct rtas_t, base));
 	DEFINE(RTASENTRY, offsetof(struct rtas_t, entry));
-	DEFINE(RTASSIZE, offsetof(struct rtas_t, size));
 
 	/* Interrupt register frame */
 	DEFINE(STACK_FRAME_OVERHEAD, STACK_FRAME_OVERHEAD);
@@ -148,10 +144,6 @@ int main(void)
 	DEFINE(GPR11, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[11]));
 	DEFINE(GPR12, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[12]));
 	DEFINE(GPR13, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[13]));
-	DEFINE(GPR20, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[20]));
-	DEFINE(GPR21, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[21]));
-	DEFINE(GPR22, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[22]));
-	DEFINE(GPR23, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[23]));
 	/*
 	 * Note: these symbols include _ because they overlap with special
 	 * register names

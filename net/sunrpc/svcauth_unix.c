@@ -55,12 +55,10 @@ struct auth_domain *unix_domain_find(char *name)
 	if (new == NULL)
 		return NULL;
 	cache_init(&new->h.h);
-	atomic_inc(&new->h.h.refcnt);
 	new->h.name = strdup(name);
 	new->h.flavour = RPC_AUTH_UNIX;
 	new->addr_changes = 0;
 	new->h.h.expiry_time = NEVER;
-	new->h.h.flags = 0;
 
 	rv = auth_domain_lookup(&new->h, 2);
 	if (rv == &new->h) {
@@ -106,6 +104,7 @@ void ip_map_put(struct cache_head *item, struct cache_detail *cd)
 		if (test_bit(CACHE_VALID, &item->flags) &&
 		    !test_bit(CACHE_NEGATIVE, &item->flags))
 			auth_domain_put(&im->m_client->h);
+		kfree(im->m_class);
 		kfree(im);
 	}
 }
@@ -318,7 +317,8 @@ struct auth_domain *auth_unix_lookup(struct in_addr addr)
 		return NULL;
 
 	if ((ipm->m_client->addr_changes - ipm->m_add_change) >0) {
-		set_bit(CACHE_NEGATIVE, &ipm->h.flags);
+		if (test_and_set_bit(CACHE_NEGATIVE, &ipm->h.flags) == 0)
+			auth_domain_put(&ipm->m_client->h);
 		rv = NULL;
 	} else {
 		rv = &ipm->m_client->h;
@@ -405,6 +405,9 @@ svcauth_null_release(struct svc_rqst *rqstp)
 	if (rqstp->rq_client)
 		auth_domain_put(rqstp->rq_client);
 	rqstp->rq_client = NULL;
+	if (rqstp->rq_cred.cr_group_info)
+		put_group_info(rqstp->rq_cred.cr_group_info);
+	rqstp->rq_cred.cr_group_info = NULL;
 
 	return 0; /* don't drop */
 }

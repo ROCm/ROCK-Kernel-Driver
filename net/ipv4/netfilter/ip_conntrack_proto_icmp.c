@@ -12,6 +12,11 @@
 #include <linux/netfilter.h>
 #include <linux/in.h>
 #include <linux/icmp.h>
+#include <net/ip.h>
+#include <net/checksum.h>
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv4/ip_conntrack.h>
+#include <linux/netfilter_ipv4/ip_conntrack_core.h>
 #include <linux/netfilter_ipv4/ip_conntrack_protocol.h>
 
 unsigned long ip_ct_icmp_timeout = 30*HZ;
@@ -26,14 +31,15 @@ static int icmp_pkt_to_tuple(const struct sk_buff *skb,
 			     unsigned int dataoff,
 			     struct ip_conntrack_tuple *tuple)
 {
-	struct icmphdr hdr;
+	struct icmphdr _hdr, *hp;
 
-	if (skb_copy_bits(skb, dataoff, &hdr, sizeof(hdr)) != 0)
+	hp = skb_header_pointer(skb, dataoff, sizeof(_hdr), &_hdr);
+	if (hp == NULL)
 		return 0;
 
-	tuple->dst.u.icmp.type = hdr.type;
-	tuple->src.u.icmp.id = hdr.un.echo.id;
-	tuple->dst.u.icmp.code = hdr.code;
+	tuple->dst.u.icmp.type = hp->type;
+	tuple->src.u.icmp.id = hp->un.echo.id;
+	tuple->dst.u.icmp.code = hp->code;
 
 	return 1;
 }
@@ -94,7 +100,7 @@ static int icmp_packet(struct ip_conntrack *ct,
 			ct->timeout.function((unsigned long)ct);
 	} else {
 		atomic_inc(&ct->proto.icmp.count);
-		ip_ct_refresh(ct, ip_ct_icmp_timeout);
+		ip_ct_refresh_acct(ct, ctinfo, skb, ip_ct_icmp_timeout);
 	}
 
 	return NF_ACCEPT;
@@ -122,7 +128,147 @@ static int icmp_new(struct ip_conntrack *conntrack,
 	return 1;
 }
 
-struct ip_conntrack_protocol ip_conntrack_protocol_icmp
-= { { NULL, NULL }, IPPROTO_ICMP, "icmp",
-    icmp_pkt_to_tuple, icmp_invert_tuple, icmp_print_tuple,
-    icmp_print_conntrack, icmp_packet, icmp_new, NULL, NULL, NULL };
+static int
+icmp_error_message(struct sk_buff *skb,
+		   enum ip_conntrack_info *ctinfo,
+		   unsigned int hooknum)
+{
+	struct ip_conntrack_tuple innertuple, origtuple;
+	struct {
+		struct icmphdr icmp;
+		struct iphdr ip;
+	} inside;
+	struct ip_conntrack_protocol *innerproto;
+	struct ip_conntrack_tuple_hash *h;
+	int dataoff;
+
+	IP_NF_ASSERT(skb->nfct == NULL);
+
+	/* Not enough header? */
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &inside, sizeof(inside))!=0)
+		return NF_ACCEPT;
+
+	/* Ignore ICMP's containing fragments (shouldn't happen) */
+	if (inside.ip.frag_off & htons(IP_OFFSET)) {
+		DEBUGP("icmp_error_track: fragment of proto %u\n",
+		       inside.ip.protocol);
+		return NF_ACCEPT;
+	}
+
+	innerproto = ip_ct_find_proto(inside.ip.protocol);
+	dataoff = skb->nh.iph->ihl*4 + sizeof(inside.icmp) + inside.ip.ihl*4;
+	/* Are they talking about one of our connections? */
+	if (!ip_ct_get_tuple(&inside.ip, skb, dataoff, &origtuple, innerproto)) {
+		DEBUGP("icmp_error: ! get_tuple p=%u", inside.ip.protocol);
+		return NF_ACCEPT;
+	}
+
+	/* Ordinarily, we'd expect the inverted tupleproto, but it's
+	   been preserved inside the ICMP. */
+	if (!ip_ct_invert_tuple(&innertuple, &origtuple, innerproto)) {
+		DEBUGP("icmp_error_track: Can't invert tuple\n");
+		return NF_ACCEPT;
+	}
+
+	*ctinfo = IP_CT_RELATED;
+
+	h = ip_conntrack_find_get(&innertuple, NULL);
+	if (!h) {
+		/* Locally generated ICMPs will match inverted if they
+		   haven't been SNAT'ed yet */
+		/* FIXME: NAT code has to handle half-done double NAT --RR */
+		if (hooknum == NF_IP_LOCAL_OUT)
+			h = ip_conntrack_find_get(&origtuple, NULL);
+
+		if (!h) {
+			DEBUGP("icmp_error_track: no match\n");
+			return NF_ACCEPT;
+		}
+		/* Reverse direction from that found */
+		if (DIRECTION(h) != IP_CT_DIR_REPLY)
+			*ctinfo += IP_CT_IS_REPLY;
+	} else {
+		if (DIRECTION(h) == IP_CT_DIR_REPLY)
+			*ctinfo += IP_CT_IS_REPLY;
+	}
+
+	/* Update skb to refer to this connection */
+	skb->nfct = &h->ctrack->infos[*ctinfo];
+	return -NF_ACCEPT;
+}
+
+/* Small and modified version of icmp_rcv */
+static int
+icmp_error(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
+	   unsigned int hooknum)
+{
+	struct icmphdr icmph;
+
+	/* Not enough header? */
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &icmph, sizeof(icmph))!=0) {
+		if (LOG_INVALID(IPPROTO_ICMP))
+			nf_log_packet(PF_INET, 0, skb, NULL, NULL,
+				      "ip_ct_icmp: short packet ");
+		return -NF_ACCEPT;
+	}
+
+	/* See ip_conntrack_proto_tcp.c */
+	if (hooknum != NF_IP_PRE_ROUTING)
+		goto checksum_skipped;
+
+	switch (skb->ip_summed) {
+	case CHECKSUM_HW:
+		if (!(u16)csum_fold(skb->csum)) 
+			break;
+		if (LOG_INVALID(IPPROTO_ICMP))
+			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
+				      "ip_ct_icmp: bad HW ICMP checksum ");
+		return -NF_ACCEPT;
+	case CHECKSUM_NONE:
+		if ((u16)csum_fold(skb_checksum(skb, 0, skb->len, 0))) {
+			if (LOG_INVALID(IPPROTO_ICMP))
+				nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
+					      "ip_ct_icmp: bad ICMP checksum ");
+			return -NF_ACCEPT;
+		}
+	default:
+		break;
+	}
+
+checksum_skipped:
+	/*
+	 *	18 is the highest 'known' ICMP type. Anything else is a mystery
+	 *
+	 *	RFC 1122: 3.2.2  Unknown ICMP messages types MUST be silently
+	 *		  discarded.
+	 */
+	if (icmph.type > NR_ICMP_TYPES) {
+		if (LOG_INVALID(IPPROTO_ICMP))
+			nf_log_packet(PF_INET, 0, skb, NULL, NULL,
+				      "ip_ct_icmp: invalid ICMP type ");
+		return -NF_ACCEPT;
+	}
+
+	/* Need to track icmp error message? */
+	if (icmph.type != ICMP_DEST_UNREACH
+	    && icmph.type != ICMP_SOURCE_QUENCH
+	    && icmph.type != ICMP_TIME_EXCEEDED
+	    && icmph.type != ICMP_PARAMETERPROB
+	    && icmph.type != ICMP_REDIRECT)
+		return NF_ACCEPT;
+
+	return icmp_error_message(skb, ctinfo, hooknum);
+}
+
+struct ip_conntrack_protocol ip_conntrack_protocol_icmp =
+{
+	.proto 			= IPPROTO_ICMP,
+	.name 			= "icmp",
+	.pkt_to_tuple		= icmp_pkt_to_tuple,
+	.invert_tuple		= icmp_invert_tuple,
+	.print_tuple		= icmp_print_tuple,
+	.print_conntrack	= icmp_print_conntrack,
+	.packet			= icmp_packet,
+	.new			= icmp_new,
+	.error			= icmp_error,
+};

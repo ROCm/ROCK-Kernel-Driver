@@ -444,6 +444,8 @@ enum reiserfs_mount_options {
     REISERFS_XATTRS,
     REISERFS_XATTRS_USER,
     REISERFS_POSIXACL,
+    REISERFS_BARRIER_NONE,
+    REISERFS_BARRIER_FLUSH,
 
     REISERFS_TEST1,
     REISERFS_TEST2,
@@ -473,6 +475,8 @@ enum reiserfs_mount_options {
 #define reiserfs_xattrs_user(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_XATTRS_USER))
 #define reiserfs_posixacl(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_POSIXACL))
 #define reiserfs_xattrs_optional(s) (reiserfs_xattrs_user(s) || reiserfs_posixacl(s))
+#define reiserfs_barrier_none(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_BARRIER_NONE))
+#define reiserfs_barrier_flush(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_BARRIER_FLUSH))
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;

@@ -151,7 +151,6 @@ int lecd_attach(struct atm_vcc *vcc, int arg);
 int lec_vcc_attach(struct atm_vcc *vcc, void __user *arg);
 int lec_mcast_attach(struct atm_vcc *vcc, int arg);
 struct net_device *get_dev_lec(int itf);
-int make_lec(struct atm_vcc *vcc);
 int send_to_lecd(struct lec_priv *priv,
                  atmlec_msg_type type, unsigned char *mac_addr,
                  unsigned char *atm_addr, struct sk_buff *data);

@@ -11,6 +11,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <linux/spinlock.h>
@@ -26,7 +27,7 @@ MODULE_DESCRIPTION("IP6 tables LOG target module");
 MODULE_LICENSE("GPL");
 
 static unsigned int nflog = 1;
-MODULE_PARM(nflog, "i");
+module_param(nflog, int, 0400);
 MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
  
 struct in_device;

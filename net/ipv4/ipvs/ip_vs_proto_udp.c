@@ -26,19 +26,20 @@ udp_conn_in_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
 		const struct iphdr *iph, unsigned int proto_off, int inverse)
 {
 	struct ip_vs_conn *cp;
-	__u16 ports[2];
+	__u16 _ports[2], *pptr;
 
-	if (skb_copy_bits(skb, proto_off, ports, sizeof(ports)) < 0)
+	pptr = skb_header_pointer(skb, proto_off, sizeof(_ports), _ports);
+	if (pptr == NULL)
 		return NULL;
 
 	if (likely(!inverse)) {
 		cp = ip_vs_conn_in_get(iph->protocol,
-				       iph->saddr, ports[0],
-				       iph->daddr, ports[1]);
+				       iph->saddr, pptr[0],
+				       iph->daddr, pptr[1]);
 	} else {
 		cp = ip_vs_conn_in_get(iph->protocol,
-				       iph->daddr, ports[1],
-				       iph->saddr, ports[0]);
+				       iph->daddr, pptr[1],
+				       iph->saddr, pptr[0]);
 	}
 
 	return cp;
@@ -50,19 +51,21 @@ udp_conn_out_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
 		 const struct iphdr *iph, unsigned int proto_off, int inverse)
 {
 	struct ip_vs_conn *cp;
-	__u16 ports[2];
+	__u16 _ports[2], *pptr;
 
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, ports, sizeof(ports)) < 0)
+	pptr = skb_header_pointer(skb, skb->nh.iph->ihl*4,
+				  sizeof(_ports), _ports);
+	if (pptr == NULL)
 		return NULL;
 
 	if (likely(!inverse)) {
 		cp = ip_vs_conn_out_get(iph->protocol,
-					iph->saddr, ports[0],
-					iph->daddr, ports[1]);
+					iph->saddr, pptr[0],
+					iph->daddr, pptr[1]);
 	} else {
 		cp = ip_vs_conn_out_get(iph->protocol,
-					iph->daddr, ports[1],
-					iph->saddr, ports[0]);
+					iph->daddr, pptr[1],
+					iph->saddr, pptr[0]);
 	}
 
 	return cp;
@@ -74,15 +77,17 @@ udp_conn_schedule(struct sk_buff *skb, struct ip_vs_protocol *pp,
 		  int *verdict, struct ip_vs_conn **cpp)
 {
 	struct ip_vs_service *svc;
-	struct udphdr udph;
+	struct udphdr _udph, *uh;
 
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &udph, sizeof(udph)) < 0) {
+	uh = skb_header_pointer(skb, skb->nh.iph->ihl*4,
+				sizeof(_udph), &_udph);
+	if (uh == NULL) {
 		*verdict = NF_DROP;
 		return 0;
 	}
 
 	if ((svc = ip_vs_service_get(skb->nfmark, skb->nh.iph->protocol,
-				     skb->nh.iph->daddr, udph.dest))) {
+				     skb->nh.iph->daddr, uh->dest))) {
 		if (ip_vs_todrop()) {
 			/*
 			 * It seems that we are very loaded.
@@ -230,13 +235,14 @@ udp_dnat_handler(struct sk_buff **pskb,
 static int
 udp_csum_check(struct sk_buff *skb, struct ip_vs_protocol *pp)
 {
-	struct udphdr udph;
+	struct udphdr _udph, *uh;
 	unsigned int udphoff = skb->nh.iph->ihl*4;
 
-	if (skb_copy_bits(skb, udphoff, &udph, sizeof(udph)) < 0)
+	uh = skb_header_pointer(skb, udphoff, sizeof(_udph), &_udph);
+	if (uh == NULL)
 		return 0;
 
-	if (udph.check != 0) {
+	if (uh->check != 0) {
 		switch (skb->ip_summed) {
 		case CHECKSUM_NONE:
 			skb->csum = skb_checksum(skb, udphoff,

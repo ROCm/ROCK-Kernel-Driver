@@ -239,6 +239,9 @@ static int __devinit dnfb_probe(struct device *device)
 	info->fbops = &dn_fb_ops;
 	info->fix = dnfb_fix;
 	info->var = dnfb_var;
+	info->var.red.length = 1;
+	info->var.red.offset = 0;
+	info->var.green = info->var.blue = info->var.red;
 	info->screen_base = (u_char *) info->fix.smem_start;
 
 	err = fb_alloc_cmap(&info->cmap, 2, 0);

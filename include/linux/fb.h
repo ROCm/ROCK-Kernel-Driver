@@ -2,6 +2,7 @@
 #define _LINUX_FB_H
 
 #include <asm/types.h>
+#include <linux/list.h>
 
 /* Definitions of frame buffers						*/
 
@@ -158,6 +159,7 @@ struct fb_bitfield {
 #define FB_CHANGE_CMAP_VBL     32	/* change colormap on vbl	*/
 #define FB_ACTIVATE_ALL	       64	/* change all VCs on this fb	*/
 #define FB_ACTIVATE_FORCE     128	/* force apply even when no change*/
+#define FB_ACTIVATE_INV_MODE  256       /* invalidate videomode */
 
 #define FB_ACCELF_TEXT		1	/* (OBSOLETE) see fb_info.flags and vc_mode */
 
@@ -281,6 +283,7 @@ struct fb_chroma {
 struct fb_monspecs {
 	struct fb_chroma chroma;
 	struct fb_videomode *modedb;	/* mode database */
+	struct list_head modelist;      /* mode list */
 	__u8  manufacturer[4];		/* Manufacturer */
 	__u8  monitor[14];		/* Monitor String */
 	__u8  serial_no[14];		/* Serial Number */
@@ -383,6 +386,8 @@ struct fb_cursor {
 	const char *mask;	/* cursor mask bits */
 	struct fbcurpos hot;	/* cursor hot spot */
 	struct fb_image	image;	/* Cursor image */
+/* all fields below are for fbcon use only */
+	char  *data;             /* copy of bitmap */
 };
 
 #ifdef __KERNEL__
@@ -445,6 +450,14 @@ struct fb_cursor_user {
  *	if you own it
  */
 #define FB_EVENT_RESUME			0x03
+/*      An entry from the modelist was removed */
+#define FB_EVENT_MODE_DELETE            0x04
+
+struct fb_event {
+	struct fb_info *info;
+	void *data;
+};
+
 
 extern int fb_register_client(struct notifier_block *nb);
 extern int fb_unregister_client(struct notifier_block *nb);
@@ -687,6 +700,7 @@ extern void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 				u32 height);
 extern void fb_load_cursor_image(struct fb_info *);
 extern void fb_set_suspend(struct fb_info *info, int state);
+extern int fb_get_color_depth(struct fb_info *info);
 
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
@@ -708,6 +722,7 @@ extern void framebuffer_release(struct fb_info *info);
 #define FB_MODE_IS_VESA		4
 #define FB_MODE_IS_CALCULATED	8
 #define FB_MODE_IS_FIRST	16
+#define FB_MODE_IS_FROM_VAR     32
 
 extern int fbmon_valid_timings(u_int pixclock, u_int htotal, u_int vtotal,
 			       const struct fb_info *fb_info);
@@ -726,6 +741,22 @@ extern void fb_destroy_modedb(struct fb_videomode *modedb);
 /* drivers/video/modedb.c */
 #define VESA_MODEDB_SIZE 34
 extern const struct fb_videomode vesa_modes[];
+extern void fb_var_to_videomode(struct fb_videomode *mode,
+				struct fb_var_screeninfo *var);
+extern void fb_videomode_to_var(struct fb_var_screeninfo *var,
+				struct fb_videomode *mode);
+extern int fb_mode_is_equal(struct fb_videomode *mode1,
+			    struct fb_videomode *mode2);
+extern int fb_add_videomode(struct fb_videomode *mode, struct list_head *head);
+extern void fb_delete_videomode(struct fb_videomode *mode,
+				struct list_head *head);
+extern struct fb_videomode *fb_match_mode(struct fb_var_screeninfo *var,
+					  struct list_head *head);
+extern struct fb_videomode *fb_find_best_mode(struct fb_var_screeninfo *var,
+					      struct list_head *head);
+extern void fb_destroy_modelist(struct list_head *head);
+extern void fb_videomode_to_modelist(struct fb_videomode *modedb, int num,
+				     struct list_head *head);
 
 /* drivers/video/fbcmap.c */
 extern int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp);
@@ -752,6 +783,11 @@ struct fb_videomode {
 	u32 sync;
 	u32 vmode;
 	u32 flag;
+};
+
+struct fb_modelist {
+	struct list_head list;
+	struct fb_videomode mode;
 };
 
 extern int fb_find_mode(struct fb_var_screeninfo *var,

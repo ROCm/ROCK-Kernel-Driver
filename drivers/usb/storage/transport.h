@@ -44,7 +44,8 @@
 #include <linux/config.h>
 #include <linux/blkdev.h>
 #include "usb.h"
-#include "scsi.h"
+
+struct scsi_cmnd;
 
 /* Protocols */
 
@@ -150,16 +151,16 @@ struct bulk_cs_wrap {
 
 #define US_CBI_ADSC		0
 
-extern int usb_stor_CBI_transport(Scsi_Cmnd*, struct us_data*);
+extern int usb_stor_CBI_transport(struct scsi_cmnd *, struct us_data*);
 
-extern int usb_stor_CB_transport(Scsi_Cmnd*, struct us_data*);
+extern int usb_stor_CB_transport(struct scsi_cmnd *, struct us_data*);
 extern int usb_stor_CB_reset(struct us_data*);
 
-extern int usb_stor_Bulk_transport(Scsi_Cmnd*, struct us_data*);
+extern int usb_stor_Bulk_transport(struct scsi_cmnd *, struct us_data*);
 extern int usb_stor_Bulk_max_lun(struct us_data*);
 extern int usb_stor_Bulk_reset(struct us_data*);
 
-extern void usb_stor_invoke_transport(Scsi_Cmnd*, struct us_data*);
+extern void usb_stor_invoke_transport(struct scsi_cmnd *, struct us_data*);
 extern void usb_stor_stop_transport(struct us_data*);
 
 extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,

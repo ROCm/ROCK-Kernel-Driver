@@ -393,7 +393,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 
 	/* Map, pin, and lock the mft record. */
 	mrec = map_mft_record(base_ni);
-	if (unlikely(IS_ERR(mrec))) {
+	if (IS_ERR(mrec)) {
 		err = PTR_ERR(mrec);
 		goto err_out;
 	}
@@ -1111,7 +1111,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 
 	/* Map, pin, and lock the mft record. */
 	m = map_mft_record(base_ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		err = PTR_ERR(m);
 		m = NULL;
 		ctx = NULL;
@@ -1885,7 +1885,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 
 	/* Map, pin, and lock the mft record. */
 	m = map_mft_record(base_ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		err = PTR_ERR(m);
 		m = NULL;
 		ctx = NULL;

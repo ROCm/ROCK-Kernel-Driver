@@ -575,6 +575,7 @@ CONFIG_SERIAL_NONSTANDARD=y
 # CONFIG_SYNCLINKMP is not set
 # CONFIG_N_HDLC is not set
 # CONFIG_STALDRV is not set
+CONFIG_SGI_SNSC=y
 
 #
 # Serial drivers

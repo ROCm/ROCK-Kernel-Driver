@@ -540,7 +540,7 @@ static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valky
 {
 	info->fbops = &valkyriefb_ops;
 	info->screen_base = (char *) p->frame_buffer + 0x1000;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT;
 	info->pseudo_palette = p->pseudo_palette;
 	fb_alloc_cmap(&info->cmap, 256, 0);
 	info->par = &p->par;

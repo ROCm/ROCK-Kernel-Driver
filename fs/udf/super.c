@@ -194,7 +194,6 @@ struct udf_options
 static int __init init_udf_fs(void)
 {
 	int err;
-	printk(KERN_NOTICE "udf: registering filesystem\n");
 	err = init_inodecache();
 	if (err)
 		goto out1;
@@ -210,7 +209,6 @@ out1:
 
 static void __exit exit_udf_fs(void)
 {
-	printk(KERN_NOTICE "udf: unregistering filesystem\n");
 	unregister_filesystem(&udf_fstype);
 	destroy_inodecache();
 }

@@ -40,13 +40,12 @@ static int pas106b_init(struct sn9c102_device* cam)
 	err += sn9c102_i2c_write(cam, 0x02, 0x0c);
 	err += sn9c102_i2c_write(cam, 0x03, 0x12);
 	err += sn9c102_i2c_write(cam, 0x04, 0x05);
-	err += sn9c102_i2c_write(cam, 0x05, 0x22);
-	err += sn9c102_i2c_write(cam, 0x06, 0xac);
-	err += sn9c102_i2c_write(cam, 0x07, 0x00);
+	err += sn9c102_i2c_write(cam, 0x05, 0x5a);
+	err += sn9c102_i2c_write(cam, 0x06, 0x88);
+	err += sn9c102_i2c_write(cam, 0x07, 0x80);
 	err += sn9c102_i2c_write(cam, 0x08, 0x01);
-	err += sn9c102_i2c_write(cam, 0x0a, 0x00);
+	err += sn9c102_i2c_write(cam, 0x0a, 0x01);
 	err += sn9c102_i2c_write(cam, 0x0b, 0x00);
-	err += sn9c102_i2c_write(cam, 0x0d, 0x00);
 	err += sn9c102_i2c_write(cam, 0x10, 0x06);
 	err += sn9c102_i2c_write(cam, 0x11, 0x06);
 	err += sn9c102_i2c_write(cam, 0x12, 0x00);
@@ -64,11 +63,30 @@ static int pas106b_get_ctrl(struct sn9c102_device* cam,
 {
 	switch (ctrl->id) {
 	case V4L2_CID_RED_BALANCE:
-		return (ctrl->value = sn9c102_i2c_read(cam, 0x0c))<0 ? -EIO:0;
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0c)) < 0)
+			return -EIO;
+		ctrl->value &= 0x1f;
+		return 0;
 	case V4L2_CID_BLUE_BALANCE:
-		return (ctrl->value = sn9c102_i2c_read(cam, 0x09))<0 ? -EIO:0;
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x09)) < 0)
+			return -EIO;
+		ctrl->value &= 0x1f;
+		return 0;
+	case V4L2_CID_GAIN:
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0e)) < 0)
+			return -EIO;
+		ctrl->value &= 0x1f;
+		return 0;
 	case V4L2_CID_BRIGHTNESS:
-		return (ctrl->value = sn9c102_i2c_read(cam, 0x0e))<0 ? -EIO:0;
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0d)) < 0)
+			return -EIO;
+		ctrl->value &= 0x1f;
+		return 0;
+	case V4L2_CID_CONTRAST:
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0f)) < 0)
+			return -EIO;
+		ctrl->value &= 0x07;
+		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -87,8 +105,14 @@ static int pas106b_set_ctrl(struct sn9c102_device* cam,
 	case V4L2_CID_BLUE_BALANCE:
 		err += sn9c102_i2c_write(cam, 0x09, ctrl->value & 0x1f);
 		break;
-	case V4L2_CID_BRIGHTNESS:
+	case V4L2_CID_GAIN:
 		err += sn9c102_i2c_write(cam, 0x0e, ctrl->value & 0x1f);
+		break;
+	case V4L2_CID_BRIGHTNESS:
+		err += sn9c102_i2c_write(cam, 0x0d, ctrl->value & 0x1f);
+		break;
+	case V4L2_CID_CONTRAST:
+		err += sn9c102_i2c_write(cam, 0x0f, ctrl->value & 0x03);
 		break;
 	default:
 		return -EINVAL;
@@ -130,7 +154,7 @@ static struct sn9c102_sensor pas106b = {
 			.minimum = 0x00,
 			.maximum = 0x1f,
 			.step = 0x01,
-			.default_value = 0x03,
+			.default_value = 0x04,
 			.flags = 0,
 		},
 		{
@@ -140,17 +164,37 @@ static struct sn9c102_sensor pas106b = {
 			.minimum = 0x00,
 			.maximum = 0x1f,
 			.step = 0x01,
-			.default_value = 0x02,
+			.default_value = 0x06,
+			.flags = 0,
+		},
+		{
+			.id = V4L2_CID_GAIN,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "global gain",
+			.minimum = 0x00,
+			.maximum = 0x1f,
+			.step = 0x01,
+			.default_value = 0x0d,
 			.flags = 0,
 		},
 		{
 			.id = V4L2_CID_BRIGHTNESS,
 			.type = V4L2_CTRL_TYPE_INTEGER,
-			.name = "brightness",
+			.name = "darkness",
 			.minimum = 0x00,
 			.maximum = 0x1f,
 			.step = 0x01,
-			.default_value = 0x06,
+			.default_value = 0x00,
+			.flags = 0,
+		},
+		{
+			.id = V4L2_CID_CONTRAST,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "contrast",
+			.minimum = 0x00,
+			.maximum = 0x07,
+			.step = 0x01,
+			.default_value = 0x00, /* 0x00~0x03 have same effect */
 			.flags = 0,
 		},
 	},
@@ -185,11 +229,13 @@ int sn9c102_probe_pas106b(struct sn9c102_device* cam)
 	int r0 = 0, r1 = 0, err = 0;
 	unsigned int pid = 0;
 
-	/* Minimal initialization to enable the I2C communication
-	   NOTE: do NOT change the values! */
+	/*
+	   Minimal initialization to enable the I2C communication
+	   NOTE: do NOT change the values!
+	*/
 	err += sn9c102_write_reg(cam, 0x01, 0x01); /* sensor power down */
 	err += sn9c102_write_reg(cam, 0x00, 0x01); /* sensor power on */
-	err += sn9c102_write_reg(cam, 0x28, 0x17); /* sensor clock at 48 MHz */
+	err += sn9c102_write_reg(cam, 0x28, 0x17); /* sensor clock at 24 MHz */
 	if (err)
 		return -EIO;
 

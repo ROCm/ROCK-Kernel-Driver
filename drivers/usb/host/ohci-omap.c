@@ -658,7 +658,7 @@ static int __init ohci_hcd_omap_init (void)
 	return ret;
 }
 
-MODULE_PARM(hmc_mode, "hmc_mode");
+module_param(hmc_mode, int, 0);
 
 static void __exit ohci_hcd_omap_cleanup (void)
 {

@@ -102,7 +102,7 @@ ifneq ($(KBUILD_OUTPUT),)
 # check that the output directory actually exists
 saved-output := $(KBUILD_OUTPUT)
 KBUILD_OUTPUT := $(shell cd $(KBUILD_OUTPUT) && /bin/pwd)
-$(if $(wildcard $(KBUILD_OUTPUT)),, \
+$(if $(KBUILD_OUTPUT),, \
      $(error output directory "$(saved-output)" does not exist))
 
 .PHONY: $(MAKECMDGOALS)
@@ -256,9 +256,32 @@ ifneq ($(findstring s,$(MAKEFLAGS)),)
   quiet=silent_
 endif
 
-check_gcc = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi ;)
+export quiet Q KBUILD_VERBOSE
 
-export quiet Q KBUILD_VERBOSE check_gcc
+######
+# cc support functions to be used (only) in arch/$(ARCH)/Makefile
+# See documentation in Documentation/kbuild/makefiles.txt
+
+# cc-option
+# Usage: cflags-y += $(call gcc-option, -march=winchip-c6, -march=i586)
+
+cc-option = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null \
+             > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi ;)
+
+# For backward compatibility
+check_gcc = $(warning check_gcc is deprecated - use cc-option) \
+            $(call cc-option, $(1),$(2))
+
+# cc-option-yn
+# Usage: flag := $(call gcc-option-yn, -march=winchip-c6)
+cc-option-yn = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null \
+                > /dev/null 2>&1; then echo "y"; else echo "n"; fi;)
+
+# cc-version
+# Usage gcc-ver := $(call cc-version $(CC))
+cc-version = $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh \
+              $(if $(1), $(1), $(CC))
+
 
 # Look for make include files relative to root of kernel src
 MAKEFLAGS += --include-dir=$(srctree)
@@ -285,6 +308,7 @@ DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
 CHECK		= sparse
+CHECKFLAGS     :=
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
@@ -294,8 +318,12 @@ AFLAGS_KERNEL	=
 
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
-CPPFLAGS        := -D__KERNEL__ -Iinclude \
-		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
+# Use LINUXINCLUDE when you must reference the include/ directory.
+# Needed to be compatible with the O= option
+LINUXINCLUDE    := -Iinclude \
+                   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
+
+CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common
@@ -304,9 +332,9 @@ AFLAGS		:= -D__ASSEMBLY__
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
-	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB LDFLAGS_MODULE CHECK
+	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB LDFLAGS_MODULE CHECK CHECKFLAGS
 
-export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
+export CPPFLAGS NOSTDINC_FLAGS LINUXINCLUDE OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
@@ -458,7 +486,7 @@ CFLAGS		+= -g
 endif
 
 # warn about C99 declaration after statement
-CFLAGS += $(call check_gcc,-Wdeclaration-after-statement,)
+CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
 
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
@@ -506,7 +534,6 @@ libs-y		:= $(libs-y1) $(libs-y2)
 #       normal descending-into-subdirs phase, since at that time
 #       we cannot yet know if we will need to relink vmlinux.
 #	So we descend into init/ inside the rule for vmlinux again.
-head-y += $(HEAD)
 vmlinux-objs := $(head-y) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
 
 quiet_cmd_vmlinux__ = LD      $@
@@ -538,9 +565,10 @@ define rule_vmlinux__
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
-do_system_map = $(NM) $(1) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > $(2)
-
-LDFLAGS_vmlinux += -T arch/$(ARCH)/kernel/vmlinux.lds.s
+quiet_cmd_sysmap = SYSMAP 
+      cmd_sysmap = $(CONFIG_SHELL) $(srctree)/scripts/mksysmap
+		   
+LDFLAGS_vmlinux += -T arch/$(ARCH)/kernel/vmlinux.lds
 
 #	Generate section listing all symbols and add it into vmlinux
 #	It's a three stage process:
@@ -570,8 +598,10 @@ endif
 kallsyms.o := .tmp_kallsyms$(last_kallsyms).o
 
 define rule_verify_kallsyms
-	@$(call do_system_map, .tmp_vmlinux$(last_kallsyms), .tmp_System.map)
-	@cmp -s System.map .tmp_System.map || \
+	$(Q)$(if $($(quiet)cmd_sysmap),                       \
+	  echo '  $($(quiet)cmd_sysmap) .tmp_System.map' &&)  \
+	  $(cmd_sysmap) .tmp_vmlinux$(last_kallsyms) .tmp_System.map
+	$(Q)cmp -s System.map .tmp_System.map || \
 		(echo Inconsistent kallsyms data, try setting CONFIG_KALLSYMS_EXTRA_PASS ; rm .tmp_kallsyms* ; false)
 endef
 
@@ -581,35 +611,46 @@ cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) $(foreach x,$(CONFIG_KALLSYMS_ALL),--al
 .tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S scripts FORCE
 	$(call if_changed_dep,as_o_S)
 
-.tmp_kallsyms%.S: .tmp_vmlinux%
+.tmp_kallsyms%.S: .tmp_vmlinux% $(KALLSYMS)
 	$(call cmd,kallsyms)
 
-.tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
+.tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/kernel/vmlinux.lds FORCE
 	$(call if_changed_rule,vmlinux__)
 
-.tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
+.tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/kernel/vmlinux.lds FORCE
 	$(call if_changed_rule,vmlinux__)
 
-.tmp_vmlinux3: $(vmlinux-objs) .tmp_kallsyms2.o arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
+.tmp_vmlinux3: $(vmlinux-objs) .tmp_kallsyms2.o arch/$(ARCH)/kernel/vmlinux.lds FORCE
 	$(call if_changed_rule,vmlinux__)
+
+# Needs to visit scripts/ before $(KALLSYMS) can be used.
+$(KALLSYMS): scripts ;
 
 endif
 
-#	Finally the vmlinux rule
+# Finally the vmlinux rule
+# This rule is also used to generate System.map
+# and to verify that the content of kallsyms are consistent
 
 define rule_vmlinux
-	$(rule_vmlinux__); \
-	$(call do_system_map, $@, System.map)
+	$(rule_vmlinux__);
+	$(Q)$(if $($(quiet)cmd_sysmap),                  \
+	  echo '  $($(quiet)cmd_sysmap) System.map' &&)  \
+	$(cmd_sysmap) $@ System.map;                     \
+	if [ $$? -ne 0 ]; then                           \
+		rm -f $@;                                \
+		/bin/false;                              \
+	fi;
 	$(rule_verify_kallsyms)
 endef
 
-vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
+vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/kernel/vmlinux.lds FORCE
 	$(call if_changed_rule,vmlinux)
 
 #	The actual objects are generated when descending, 
 #	make sure no implicit rule kicks in
 
-$(sort $(vmlinux-objs)) arch/$(ARCH)/kernel/vmlinux.lds.s: $(vmlinux-dirs) ;
+$(sort $(vmlinux-objs)) arch/$(ARCH)/kernel/vmlinux.lds: $(vmlinux-dirs) ;
 
 # Handle descending into subdirectories listed in $(vmlinux-dirs)
 # Preset locale variables to speed up the build process. Limit locale
@@ -667,7 +708,7 @@ prepare-all: prepare0 prepare
 #	Leave this as default for preprocessing vmlinux.lds.S, which is now
 #	done in arch/$(ARCH)/kernel/Makefile
 
-export AFLAGS_vmlinux.lds.o += -P -C -U$(ARCH)
+export CPPFLAGS_vmlinux.lds += -P -C -U$(ARCH)
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -940,7 +981,8 @@ help:
 
 	@echo  '  make V=0|1 [targets] 0 => quiet build (default), 1 => verbose build'
 	@echo  '  make O=dir [targets] Locate all output files in "dir", including .config'
-	@echo  '  make C=1   [targets] Check all c source with checker tool'
+	@echo  '  make C=1   [targets] Check all c source with $$CHECK (sparse)'
+	@echo  '  make C=2   [targets] Force check of all c source with $$CHECK (sparse)'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info see the ./README file'

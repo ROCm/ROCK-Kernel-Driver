@@ -19,6 +19,7 @@
 #include <linux/cache.h>
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <asm/percpu.h>
 
 /* flag for disabling the tsc */
 extern int tsc_disable;
@@ -84,8 +85,8 @@ struct cpuinfo_x86 {
 
 extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 new_cpu_data;
-extern struct tss_struct init_tss[NR_CPUS];
 extern struct tss_struct doublefault_tss;
+DECLARE_PER_CPU(struct tss_struct, init_tss);
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -422,6 +423,8 @@ struct thread_struct {
 	unsigned int		saved_fs, saved_gs;
 /* IO permissions */
 	unsigned long	*io_bitmap_ptr;
+/* max allowed port in the bitmap, in bytes: */
+	unsigned int	io_bitmap_max;
 };
 
 #define INIT_THREAD  {							\
@@ -439,10 +442,9 @@ struct thread_struct {
 #define INIT_TSS  {							\
 	.esp0		= sizeof(init_stack) + (long)&init_stack,	\
 	.ss0		= __KERNEL_DS,					\
-	.esp1		= sizeof(init_tss[0]) + (long)&init_tss[0],	\
 	.ss1		= __KERNEL_CS,					\
 	.ldt		= GDT_ENTRY_LDT,				\
-	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,			\
+	.io_bitmap_base	= offsetof(struct tss_struct,io_bitmap),	\
 	.io_bitmap	= { [ 0 ... IO_BITMAP_LONGS] = ~0 },		\
 }
 

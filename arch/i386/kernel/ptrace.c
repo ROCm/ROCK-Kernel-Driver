@@ -147,6 +147,7 @@ void ptrace_disable(struct task_struct *child)
 { 
 	long tmp;
 
+	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 	tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
 	put_stack_long(child, EFL_OFFSET, tmp);
 }
@@ -370,6 +371,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		else {
 			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		}
+		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		child->exit_code = data;
 	/* make sure the single step bit is not set. */
 		tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
@@ -391,6 +393,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if (child->state == TASK_ZOMBIE)	/* already dead */
 			break;
 		child->exit_code = SIGKILL;
+		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		/* make sure the single step bit is not set. */
 		tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
 		put_stack_long(child, EFL_OFFSET, tmp);
@@ -411,6 +414,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		}
 		tmp = get_stack_long(child, EFL_OFFSET) | TRAP_FLAG;
 		put_stack_long(child, EFL_OFFSET, tmp);
+		set_tsk_thread_flag(child, TIF_SINGLESTEP);
 		child->exit_code = data;
 		/* give it a chance to run. */
 		wake_up_process(child);
@@ -535,14 +539,15 @@ void do_syscall_trace(struct pt_regs *regs, int entryexit)
 			audit_syscall_exit(current, regs->eax);
 	}
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
+	    !test_thread_flag(TIF_SINGLESTEP))
 		return;
 	if (!(current->ptrace & PT_PTRACED))
 		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-				 ? 0x80 : 0));
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) &&
+				 !test_thread_flag(TIF_SINGLESTEP) ? 0x80 : 0));
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do

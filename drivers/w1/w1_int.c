@@ -24,13 +24,13 @@
 
 #include "w1.h"
 #include "w1_log.h"
+#include "w1_netlink.h"
 
 static u32 w1_ids = 1;
 
 extern struct device_driver w1_driver;
 extern struct bus_type w1_bus_type;
 extern struct device w1_device;
-extern struct device_attribute w1_master_attribute;
 extern int w1_max_slave_count;
 extern struct list_head w1_masters;
 extern spinlock_t w1_mlock;
@@ -119,6 +119,7 @@ int w1_add_master_device(struct w1_bus_master *master)
 {
 	struct w1_master *dev;
 	int retval = 0;
+	struct w1_netlink_msg msg;
 
 	dev = w1_alloc_dev(w1_ids++, w1_max_slave_count, &w1_driver, &w1_device);
 	if (!dev)
@@ -133,7 +134,7 @@ int w1_add_master_device(struct w1_bus_master *master)
 		goto err_out_free_dev;
 	}
 
-	retval = device_create_file(&dev->dev, &w1_master_attribute);
+	retval =  w1_create_master_attributes(dev);
 	if (retval)
 		goto err_out_kill_thread;
 
@@ -144,6 +145,11 @@ int w1_add_master_device(struct w1_bus_master *master)
 	spin_lock(&w1_mlock);
 	list_add(&dev->w1_master_entry, &w1_masters);
 	spin_unlock(&w1_mlock);
+
+	msg.id.mst.id = dev->id;
+	msg.id.mst.pid = dev->kpid;
+	msg.type = W1_MASTER_ADD;
+	w1_netlink_send(dev, &msg);
 
 	return 0;
 
@@ -164,6 +170,7 @@ err_out_free_dev:
 void __w1_remove_master_device(struct w1_master *dev)
 {
 	int err;
+	struct w1_netlink_msg msg;
 
 	dev->need_exit = 1;
 	err = kill_proc(dev->kpid, SIGTERM, 1);
@@ -174,6 +181,11 @@ void __w1_remove_master_device(struct w1_master *dev)
 
 	while (atomic_read(&dev->refcnt))
 		schedule_timeout(10);
+
+	msg.id.mst.id = dev->id;
+	msg.id.mst.pid = dev->kpid;
+	msg.type = W1_MASTER_REMOVE;
+	w1_netlink_send(dev, &msg);
 
 	w1_free_dev(dev);
 }

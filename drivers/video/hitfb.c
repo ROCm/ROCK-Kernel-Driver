@@ -321,7 +321,7 @@ int __init hitfb_init(void)
 	fb_info.var = hitfb_var;
 	fb_info.fix = hitfb_fix;
 	fb_info.pseudo_palette = pseudo_palette;
-	fb_info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info.flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 
 	fb_info.screen_base = (void *)hitfb_fix.smem_start;
 

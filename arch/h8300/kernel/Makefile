@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-extra-y := vmlinux.lds.s
+extra-y := vmlinux.lds
 
 obj-y := process.o traps.o ptrace.o ints.o \
 	 sys_h8300.o time.o semaphore.o signal.o \

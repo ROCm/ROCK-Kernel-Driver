@@ -106,7 +106,7 @@ vmaddfp:
 1:	lfsx	fr0,r4,r7
 	lfsx	fr1,r5,r7
 	lfsx	fr2,r6,r7
-	fmadds	fr0,fr0,fr1,fr2
+	fmadds	fr0,fr0,fr2,fr1
 	stfsx	fr0,r3,r7
 	addi	r7,r7,4
 	bdnz	1b
@@ -133,7 +133,7 @@ vnmsubfp:
 1:	lfsx	fr0,r4,r7
 	lfsx	fr1,r5,r7
 	lfsx	fr2,r6,r7
-	fnmsubs	fr0,fr0,fr1,fr2
+	fnmsubs	fr0,fr0,fr2,fr1
 	stfsx	fr0,r3,r7
 	addi	r7,r7,4
 	bdnz	1b

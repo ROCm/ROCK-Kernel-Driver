@@ -1124,7 +1124,8 @@ static int __devinit pm2fb_probe(struct pci_dev *pdev,
 	info->fbops		= &pm2fb_ops;
 	info->fix		= pm2fb_fix; 	
 	info->pseudo_palette	= (void *)(default_par + 1); 
-	info->flags		= FBINFO_FLAG_DEFAULT;
+	info->flags		= FBINFO_DEFAULT |
+                                  FBINFO_HWACCEL_YPAN;
 
 #ifndef MODULE
 	if (!mode)

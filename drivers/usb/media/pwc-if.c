@@ -2009,33 +2009,35 @@ static int pwc_atoi(const char *s)
  * Initialization code & module stuff 
  */
 
-static char *size = NULL;
+static char size[PSZ_MAX];
 static int fps = 0;
 static int fbufs = 0;
 static int mbufs = 0;
 static int trace = -1;
 static int compression = -1;
-static int leds[2] = { -1, -1 };
 static char *dev_hint[MAX_DEV_HINTS] = { };
 
-MODULE_PARM(size, "s");
+module_param_string(size, size, PSZ_MAX, 0);
 MODULE_PARM_DESC(size, "Initial image size. One of sqcif, qsif, qcif, sif, cif, vga");
-MODULE_PARM(fps, "i");
+module_param(fps, int, 0);
 MODULE_PARM_DESC(fps, "Initial frames per second. Varies with model, useful range 5-30");
-MODULE_PARM(fbufs, "i");
+module_param(fbufs, int, 0);
 MODULE_PARM_DESC(fbufs, "Number of internal frame buffers to reserve");
-MODULE_PARM(mbufs, "i");
+module_param(mbufs, int, 0);
 MODULE_PARM_DESC(mbufs, "Number of external (mmap()ed) image buffers");
-MODULE_PARM(trace, "i");
+module_param(trace, int, 0);
 MODULE_PARM_DESC(trace, "For debugging purposes");
-MODULE_PARM(power_save, "i");
+module_param(power_save, int, 0);
 MODULE_PARM_DESC(power_save, "Turn power save feature in camera on or off");
-MODULE_PARM(compression, "i");
+module_param(compression, int, 0);
 MODULE_PARM_DESC(compression, "Preferred compression quality. Range 0 (uncompressed) to 3 (high compression)");
-MODULE_PARM(leds, "2i");
-MODULE_PARM_DESC(leds, "LED on,off time in milliseconds");
-MODULE_PARM(dev_hint, "0-20s");
-MODULE_PARM_DESC(dev_hint, "Device node hints");
+module_param(led_on, int, 0);
+MODULE_PARM_DESC(led_on, "LED on time in milliseconds");
+module_param(led_off, int, 0);
+MODULE_PARM_DESC(led_off, "LED off time in milliseconds");
+/* Commented out, as you should be using udev instead of crud like this... */
+/* MODULE_PARM(dev_hint, "0-20s"); */
+/* MODULE_PARM_DESC(dev_hint, "Device node hints"); */
 
 MODULE_DESCRIPTION("Philips & OEM USB webcam driver");
 MODULE_AUTHOR("Nemosoft Unv. <webcam@smcc.demon.nl>");
@@ -2060,7 +2062,7 @@ static int __init usb_pwc_init(void)
 		Info("Default framerate set to %d.\n", default_fps);
 	}
 
-	if (size) {
+	if (strlen(size)) {
 		/* string; try matching with array */
 		for (sz = 0; sz < PSZ_MAX; sz++) {
 			if (!strcmp(sizenames[sz], size)) { /* Found! */
@@ -2104,10 +2106,6 @@ static int __init usb_pwc_init(void)
 	}
 	if (power_save)
 		Info("Enabling power save on open/close.\n");
-	if (leds[0] >= 0)
-		led_on = leds[0];
-	if (leds[1] >= 0)
-		led_off = leds[1];
 
 	/* Big device node whoopla. Basicly, it allows you to assign a
 	   device node (/dev/videoX) to a camera, based on its type

@@ -32,6 +32,7 @@
 #include <linux/i2c.h>
 #include <linux/smp_lock.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 
 #include <linux/scx200.h>
@@ -44,7 +45,8 @@ MODULE_LICENSE("GPL");
 
 #define MAX_DEVICES 4
 static int base[MAX_DEVICES] = { 0x820, 0x840 };
-MODULE_PARM(base, "1-4i");
+static int num_base;
+module_param_array(base, int, num_base, 0);
 MODULE_PARM_DESC(base, "Base addresses for the ACCESS.bus controllers");
 
 #ifdef DEBUG
@@ -254,7 +256,7 @@ static void scx200_acb_poll(struct scx200_acb_iface *iface)
 			scx200_acb_machine(iface, status);
 			return;
 		}
-		schedule_timeout(HZ/100+1);
+		msleep(10);
 	}
 
 	scx200_acb_timeout(iface);

@@ -551,13 +551,6 @@ xfs_bmbt_insert(
 	struct xfs_btree_cur *,
 	int *);
 
-int
-xfs_bmbt_insert_many(
-	struct xfs_btree_cur *,
-	int,
-	xfs_bmbt_rec_t *,
-	int *);
-
 void
 xfs_bmbt_log_block(
 	struct xfs_btree_cur *,

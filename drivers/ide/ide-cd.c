@@ -2719,8 +2719,10 @@ int ide_cdrom_drive_status (struct cdrom_device_info *cdi, int slot_nr)
 	if (!cdrom_get_media_event(cdi, &med)) {
 		if (med.media_present)
 			return CDS_DISC_OK;
-		if (med.door_open)
+		else if (med.door_open)
 			return CDS_TRAY_OPEN;
+		else
+			return CDS_NO_DISC;
 	}
 
 	if (sense.sense_key == NOT_READY && sense.asc == 0x04 && sense.ascq == 0x04)
@@ -2732,10 +2734,12 @@ int ide_cdrom_drive_status (struct cdrom_device_info *cdi, int slot_nr)
 	 * any other way to detect this...
 	 */
 	if (sense.sense_key == NOT_READY) {
-		if (sense.asc == 0x3a && sense.ascq == 1)
-			return CDS_NO_DISC;
-		else
-			return CDS_TRAY_OPEN;
+		if (sense.asc == 0x3a) {
+			if (sense.ascq == 0 || sense.ascq == 1)
+				return CDS_NO_DISC;
+			else if (sense.ascq == 2)
+				return CDS_TRAY_OPEN;
+		}
 	}
 
 	return CDS_DRIVE_NOT_READY;

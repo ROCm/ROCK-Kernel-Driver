@@ -50,6 +50,11 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+
 #include "usb.h"
 #include "scsiglue.h"
 #include "transport.h"
@@ -133,7 +138,9 @@ static struct usb_device_id storage_usb_ids [] = {
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_QIC, US_PR_BULK) },
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_UFI, US_PR_BULK) },
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_8070, US_PR_BULK) },
+#if !defined(CONFIG_BLK_DEV_UB) && !defined(CONFIG_BLK_DEV_UB_MODULE)
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_SCSI, US_PR_BULK) },
+#endif
 
 	/* Terminating entry */
 	{ }
@@ -207,8 +214,10 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 	  .useTransport = US_PR_BULK},
 	{ .useProtocol = US_SC_8070,
 	  .useTransport = US_PR_BULK},
+#if !defined(CONFIG_BLK_DEV_UB) && !defined(CONFIG_BLK_DEV_UB_MODULE)
 	{ .useProtocol = US_SC_SCSI,
 	  .useTransport = US_PR_BULK},
+#endif
 
 	/* Terminating entry */
 	{ NULL }
@@ -322,7 +331,7 @@ static int usb_stor_control_thread(void * __us)
 		/* reject the command if the direction indicator 
 		 * is UNKNOWN
 		 */
-		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
+		if (us->srb->sc_data_direction == DMA_BIDIRECTIONAL) {
 			US_DEBUGP("UNKNOWN data direction\n");
 			us->srb->result = DID_ERROR << 16;
 		}
@@ -423,6 +432,13 @@ static int associate_dev(struct us_data *us, struct usb_interface *intf)
 	us->pusb_dev = interface_to_usbdev(intf);
 	us->pusb_intf = intf;
 	us->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
+	US_DEBUGP("Vendor: 0x%04x, Product: 0x%04x, Revision: 0x%04x\n",
+			us->pusb_dev->descriptor.idVendor,
+			us->pusb_dev->descriptor.idProduct,
+			us->pusb_dev->descriptor.bcdDevice);
+	US_DEBUGP("Interface Subclass: 0x%02x, Protocol: 0x%02x\n",
+			intf->cur_altsetting->desc.bInterfaceSubClass,
+			intf->cur_altsetting->desc.bInterfaceProtocol);
 
 	/* Store our private data in the interface */
 	usb_set_intfdata(intf, us);
@@ -452,11 +468,6 @@ static void get_device_info(struct us_data *us, int id_index)
 		&us->pusb_intf->cur_altsetting->desc;
 	struct us_unusual_dev *unusual_dev = &us_unusual_dev_list[id_index];
 	struct usb_device_id *id = &storage_usb_ids[id_index];
-
-	if (unusual_dev->vendorName)
-		US_DEBUGP("Vendor: %s\n", unusual_dev->vendorName);
-	if (unusual_dev->productName)
-		US_DEBUGP("Product: %s\n", unusual_dev->productName);
 
 	/* Store the entries */
 	us->unusual_dev = unusual_dev;
@@ -528,6 +539,8 @@ static void get_device_info(struct us_data *us, int id_index)
 	}
 	if (strlen(us->serial) == 0)
 		strcpy(us->serial, "None");
+
+	US_DEBUGP("Vendor: %s,  Product: %s\n", us->vendor, us->product);
 }
 
 /* Get the transport settings */
@@ -715,8 +728,6 @@ static int get_pipes(struct us_data *us)
 			ep_int = ep;
 		}
 	}
-	US_DEBUGP("Endpoints: In: 0x%p Out: 0x%p Int: 0x%p (Period %d)\n",
-		  ep_in, ep_out, ep_int, ep_int ? ep_int->bInterval : 0);
 
 	if (!ep_in || !ep_out || (us->protocol == US_PR_CBI && !ep_int)) {
 		US_DEBUGP("Endpoint sanity check failed! Rejecting dev.\n");
@@ -880,9 +891,6 @@ static int storage_probe(struct usb_interface *intf,
 	int result;
 
 	US_DEBUGP("USB Mass Storage device detected\n");
-	US_DEBUGP("altsetting is %d, id_index is %d\n",
-			intf->cur_altsetting->desc.bAlternateSetting,
-			id_index);
 
 	/* Allocate the us_data structure and initialize the mutexes */
 	us = (struct us_data *) kmalloc(sizeof(*us), GFP_KERNEL);

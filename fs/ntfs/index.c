@@ -157,7 +157,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	}
 	/* Get hold of the mft record for the index inode. */
 	m = map_mft_record(base_ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		ntfs_error(sb, "map_mft_record() failed with error code %ld.",
 				-PTR_ERR(m));
 		return PTR_ERR(m);

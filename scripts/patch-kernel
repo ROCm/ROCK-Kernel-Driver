@@ -40,17 +40,24 @@
 #
 # Added -ac option, use -ac or -ac9 (say) to stop at a particular version
 #       Dave Gilbert <linux@treblig.org>, 29th September 2001.
+#
+# Add support for (use of) EXTRAVERSION (to support 2.6.8.x, e.g.);
+# update usage message;
+# fix some whitespace damage;
+# be smarter about stopping when current version is larger than requested;
+#	Randy Dunlap <rddunlap@osdl.org>, 2004-AUG-18.
 
 # Set directories from arguments, or use defaults.
 sourcedir=${1-/usr/src/linux}
 patchdir=${2-.}
-stopvers=${3-imnotaversion}
+stopvers=${3-default}
 
-if [ "$1" = -h -o "$1" = --help -o ! -r "$sourcedir/Makefile" ]; then
+if [ "$1" == -h -o "$1" == --help -o ! -r "$sourcedir/Makefile" ]; then
 cat << USAGE
 usage: patch-kernel [-h] [ sourcedir [ patchdir [ stopversion ] [ -acxx ] ] ]
-  The source directory defaults to /usr/src/linux, and
-  the patch directory defaults to the current directory.
+  source directory defaults to /usr/src/linux,
+  patch directory defaults to the current directory,
+  stopversion defaults to <all in patchdir>.
 USAGE
 exit 1
 fi
@@ -77,7 +84,7 @@ findFile () {
 		uncomp="gunzip -dc"
   elif [ -r ${filebase}.bz  ]; then
 		ext=".bz"
-    name="bzip"
+		name="bzip"
 		uncomp="bunzip -dc"
   elif [ -r ${filebase}.bz2 ]; then
 		ext=".bz2"
@@ -96,8 +103,8 @@ findFile () {
 		name="plaintext"
 		uncomp="cat"
   else
-	  return 1;
-	fi
+	return 1;
+  fi
 
   return 0;
 }
@@ -126,48 +133,100 @@ applyPatch () {
   return 0;
 }
 
-# set current VERSION, PATCHLEVEL, SUBLEVEL, EXTERVERSION
-eval `sed -n -e 's/^\([A-Z]*\) = \([0-9]*\)$/\1=\2/p' -e 's/^\([A-Z]*\) = \(-[-a-z0-9]*\)$/\1=\2/p' $sourcedir/Makefile`
+# set current VERSION, PATCHLEVEL, SUBLEVEL, EXTRAVERSION
+TMPFILE=`mktemp .tmpver.XXXXXX` || { echo "cannot make temp file" ; exit 1; }
+grep -E "^(VERSION|PATCHLEVEL|SUBLEVEL|EXTRAVERSION)" $sourcedir/Makefile > $TMPFILE
+tr -d [:blank:] < $TMPFILE > $TMPFILE.1
+source $TMPFILE.1
+rm -f $TMPFILE*
 if [ -z "$VERSION" -o -z "$PATCHLEVEL" -o -z "$SUBLEVEL" ]
 then
     echo "unable to determine current kernel version" >&2
     exit 1
 fi
 
-echo "Current kernel version is $VERSION.$PATCHLEVEL.$SUBLEVEL${EXTRAVERSION}"
+NAME=`grep ^NAME $sourcedir/Makefile`
+NAME=${NAME##*=}
 
+echo "Current kernel version is $VERSION.$PATCHLEVEL.$SUBLEVEL${EXTRAVERSION} ($NAME)"
+
+# strip EXTRAVERSION to just a number (drop leading '.' and trailing additions)
+EXTRAVER=
 if [ x$EXTRAVERSION != "x" ]
 then
-  echo "I'm sorry but patch-kernel can't work with a kernel source tree that is not a base version"
-	exit 1;
+	if [ ${EXTRAVERSION:0:1} == "." ]; then
+		EXTRAVER=${EXTRAVERSION:1}
+	else
+		EXTRAVER=$EXTRAVERSION
+	fi
+	EXTRAVER=${EXTRAVER%%[[:punct:]]*}
+	#echo "patch-kernel: changing EXTRAVERSION from $EXTRAVERSION to $EXTRAVER"
 fi
 
-while :
+#echo "stopvers=$stopvers"
+if [ $stopvers != "default" ]; then
+	STOPSUBLEVEL=`echo $stopvers | cut -d. -f3`
+	STOPEXTRA=`echo $stopvers | cut -d. -f4`
+	#echo "STOPSUBLEVEL=$STOPSUBLEVEL, STOPEXTRA=$STOPEXTRA"
+else
+	STOPSUBLEVEL=9999
+	STOPEXTRA=9999
+fi
+
+while :				# incrementing SUBLEVEL (s in v.p.s)
 do
-    CURRENTFULLVERSION="$VERSION.$PATCHLEVEL.$SUBLEVEL"
-    if [ $stopvers = $CURRENTFULLVERSION ]
-    then
-        echo "Stoping at $CURRENTFULLVERSION base as requested."
+    if [ x$EXTRAVER != "x" ]; then
+	CURRENTFULLVERSION="$VERSION.$PATCHLEVEL.$SUBLEVEL.$EXTRAVER"
+    else
+	CURRENTFULLVERSION="$VERSION.$PATCHLEVEL.$SUBLEVEL"
+    fi
+
+    if [ $stopvers == $CURRENTFULLVERSION ]; then
+        echo "Stopping at $CURRENTFULLVERSION base as requested."
         break
     fi
 
-    SUBLEVEL=`expr $SUBLEVEL + 1`
+    while :			# incrementing EXTRAVER (x in v.p.s.x)
+    do
+	EXTRAVER=$((EXTRAVER + 1))
+	FULLVERSION="$VERSION.$PATCHLEVEL.$SUBLEVEL.$EXTRAVER"
+	#echo "... trying $FULLVERSION ..."
+
+	patch=patch-$FULLVERSION
+
+	# See if the file exists and find extension
+	findFile $patchdir/${patch} || break
+
+	# Apply the patch and check all is OK
+	applyPatch $patch || break
+
+	continue 2
+    done
+
+    EXTRAVER=
+    SUBLEVEL=$((SUBLEVEL + 1))
     FULLVERSION="$VERSION.$PATCHLEVEL.$SUBLEVEL"
+    #echo "___ trying $FULLVERSION ___"
+
+    if [ $((SUBLEVEL)) -gt $((STOPSUBLEVEL)) ]; then
+	echo "Stopping since sublevel ($SUBLEVEL) is beyond stop-sublevel ($STOPSUBLEVEL)"
+	exit 1
+    fi
 
     patch=patch-$FULLVERSION
 
-		# See if the file exists and find extension
-		findFile $patchdir/${patch} || break
+    # See if the file exists and find extension
+    findFile $patchdir/${patch} || break
 
     # Apply the patch and check all is OK
     applyPatch $patch || break
 done
+#echo "base all done"
 
 if [ x$gotac != x ]; then
   # Out great user wants the -ac patches
 	# They could have done -ac (get latest) or -acxx where xx=version they want
-	if [ $gotac == "-ac" ]
-	then
+	if [ $gotac == "-ac" ]; then
 	  # They want the latest version
 		HIGHESTPATCH=0
 		for PATCHNAMES in $patchdir/patch-${CURRENTFULLVERSION}-ac*\.*
@@ -176,18 +235,16 @@ if [ x$gotac != x ]; then
 			# Check it is actually a recognised patch type
 			findFile $patchdir/patch-${CURRENTFULLVERSION}-ac${ACVALUE} || break
 
-		  if [ $ACVALUE -gt $HIGHESTPATCH ]
-			then
+		  if [ $ACVALUE -gt $HIGHESTPATCH ]; then
 			  HIGHESTPATCH=$ACVALUE
 		  fi
 		done
 
-		if [ $HIGHESTPATCH -ne 0 ]
-		then
+		if [ $HIGHESTPATCH -ne 0 ]; then
 			findFile $patchdir/patch-${CURRENTFULLVERSION}-ac${HIGHESTPATCH} || break
 			applyPatch patch-${CURRENTFULLVERSION}-ac${HIGHESTPATCH}
 		else
-		  echo "No ac patches found"
+		  echo "No -ac patches found"
 		fi
 	else
 	  # They want an exact version
@@ -198,5 +255,3 @@ if [ x$gotac != x ]; then
 		applyPatch patch-${CURRENTFULLVERSION}${gotac}
 	fi
 fi
-
-

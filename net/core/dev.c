@@ -1332,8 +1332,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 	 * also serializes access to the device queue.
 	 */
 
-	q = dev->qdisc;
-	smp_read_barrier_depends();
+	q = rcu_dereference(dev->qdisc);
 #ifdef CONFIG_NET_CLS_ACT
 	skb->tc_verd = SET_TC_AT(skb->tc_verd,AT_EGRESS);
 #endif
@@ -3279,6 +3278,8 @@ static int __init net_dev_init(void)
 	int i, rc = -ENOMEM;
 
 	BUG_ON(!dev_boot_phase);
+
+	net_random_init();
 
 	if (dev_proc_init())
 		goto out;

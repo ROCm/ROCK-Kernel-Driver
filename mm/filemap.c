@@ -142,20 +142,26 @@ static inline int sync_page(struct page *page)
 }
 
 /**
- * filemap_fdatawrite - start writeback against all of a mapping's dirty pages
+ * filemap_fdatawrite_range - start writeback against all of a mapping's
+ * dirty pages that lie within the byte offsets <start, end>
  * @mapping: address space structure to write
+ * @start: offset in bytes where the range starts
+ * @end : offset in bytes where the range ends
  *
  * If sync_mode is WB_SYNC_ALL then this is a "data integrity" operation, as
  * opposed to a regular memory * cleansing writeback.  The difference between
  * these two operations is that if a dirty page/buffer is encountered, it must
  * be waited upon, and not just skipped over.
  */
-static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
+static int __filemap_fdatawrite_range(struct address_space *mapping,
+	loff_t start, loff_t end, int sync_mode)
 {
 	int ret;
 	struct writeback_control wbc = {
 		.sync_mode = sync_mode,
 		.nr_to_write = mapping->nrpages * 2,
+		.start = start,
+		.end = end,
 	};
 
 	if (mapping->backing_dev_info->memory_backed)
@@ -165,11 +171,24 @@ static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
 	return ret;
 }
 
+static inline int __filemap_fdatawrite(struct address_space *mapping,
+	int sync_mode)
+{
+	return __filemap_fdatawrite_range(mapping, 0, 0, sync_mode);
+}
+
 int filemap_fdatawrite(struct address_space *mapping)
 {
 	return __filemap_fdatawrite(mapping, WB_SYNC_ALL);
 }
 EXPORT_SYMBOL(filemap_fdatawrite);
+
+int filemap_fdatawrite_range(struct address_space *mapping,
+	loff_t start, loff_t end)
+{
+	return __filemap_fdatawrite_range(mapping, start, end, WB_SYNC_ALL);
+}
+EXPORT_SYMBOL(filemap_fdatawrite_range);
 
 /*
  * This is a mostly non-blocking flush.  Not suitable for data-integrity
@@ -198,13 +217,18 @@ static int wait_on_page_writeback_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	index = start;
-	while ((nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
+	while ((index <= end) &&
+			(nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
 			PAGECACHE_TAG_WRITEBACK,
 			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1)) != 0) {
 		unsigned i;
 
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
+
+			/* until radix tree lookup accepts end_index */
+			if (page->index > end)
+				continue;
 
 			wait_on_page_writeback(page);
 			if (PageError(page))
@@ -223,6 +247,34 @@ static int wait_on_page_writeback_range(struct address_space *mapping,
 	return ret;
 }
 
+/*
+ * Write and wait upon all the pages in the passed range.  This is a "data
+ * integrity" operation.  It waits upon in-flight writeout before starting and
+ * waiting upon new writeout.  If there was an IO error, return it.
+ *
+ * We need to re-take i_sem during the generic_osync_inode list walk because
+ * it is otherwise livelockable.
+ */
+int sync_page_range(struct inode *inode, struct address_space *mapping,
+			loff_t pos, size_t count)
+{
+	pgoff_t start = pos >> PAGE_CACHE_SHIFT;
+	pgoff_t end = (pos + count - 1) >> PAGE_CACHE_SHIFT;
+	int ret;
+
+	if (mapping->backing_dev_info->memory_backed || !count)
+		return 0;
+	ret = filemap_fdatawrite_range(mapping, pos, pos + count - 1);
+	if (ret == 0) {
+		down(&inode->i_sem);
+		ret = generic_osync_inode(inode, mapping, OSYNC_METADATA);
+		up(&inode->i_sem);
+	}
+	if (ret == 0)
+		ret = wait_on_page_writeback_range(mapping, start, end);
+	return ret;
+}
+
 /**
  * filemap_fdatawait - walk the list of under-writeback pages of the given
  *     address space and wait for all of them.
@@ -233,7 +285,6 @@ int filemap_fdatawait(struct address_space *mapping)
 {
 	return wait_on_page_writeback_range(mapping, 0, -1);
 }
-
 EXPORT_SYMBOL(filemap_fdatawait);
 
 int filemap_write_and_wait(struct address_space *mapping)
@@ -1195,6 +1246,7 @@ no_cached_page:
 	 * effect.
 	 */
 	error = page_cache_read(file, pgoff);
+	grab_swap_token();
 
 	/*
 	 * The page we want has now been added to the page cache.
@@ -1802,115 +1854,63 @@ inline int generic_write_checks(struct file *file, loff_t *pos, size_t *count, i
 
 EXPORT_SYMBOL(generic_write_checks);
 
-/*
- * Write to a file through the page cache. 
- * Called under i_sem for S_ISREG files.
- *
- * We put everything into the page cache prior to writing it. This is not a
- * problem when writing full pages. With partial pages, however, we first have
- * to read the data into the cache, then dirty the page, and finally schedule
- * it for writing by marking it dirty.
- *							okir@monad.swb.de
- */
 ssize_t
-generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
-				unsigned long nr_segs, loff_t *ppos)
+generic_file_direct_write(struct kiocb *iocb, const struct iovec *iov,
+		unsigned long *nr_segs, loff_t pos, loff_t *ppos,
+		size_t count, size_t ocount)
+{
+	struct file	*file = iocb->ki_filp;
+	struct address_space *mapping = file->f_mapping;
+	struct inode	*inode = mapping->host;
+	ssize_t		written;
+
+	if (count != ocount)
+		*nr_segs = iov_shorten((struct iovec *)iov, *nr_segs, count);
+
+	written = generic_file_direct_IO(WRITE, iocb, iov, pos, *nr_segs);
+	if (written > 0) {
+		loff_t end = pos + written;
+		if (end > i_size_read(inode) && !S_ISBLK(inode->i_mode)) {
+			i_size_write(inode,  end);
+			mark_inode_dirty(inode);
+		}
+		*ppos = end;
+	}
+
+	/*
+	 * Sync the fs metadata but not the minor inode changes and
+	 * of course not the data as we did direct DMA for the IO.
+	 * i_sem is held, which protects generic_osync_inode() from
+	 * livelocking.
+	 */
+	if (written >= 0 && file->f_flags & O_SYNC)
+		generic_osync_inode(inode, mapping, OSYNC_METADATA);
+	if (written == count && !is_sync_kiocb(iocb))
+		written = -EIOCBQUEUED;
+	return written;
+}
+
+EXPORT_SYMBOL(generic_file_direct_write);
+
+ssize_t
+generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
+		unsigned long nr_segs, loff_t pos, loff_t *ppos,
+		size_t count, ssize_t written)
 {
 	struct file *file = iocb->ki_filp;
 	struct address_space * mapping = file->f_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
-	size_t ocount;		/* original count */
-	size_t count;		/* after file limit checks */
 	struct inode 	*inode = mapping->host;
 	long		status = 0;
-	loff_t		pos;
 	struct page	*page;
 	struct page	*cached_page = NULL;
-	const int	isblk = S_ISBLK(inode->i_mode);
-	ssize_t		written;
-	ssize_t		err;
 	size_t		bytes;
 	struct pagevec	lru_pvec;
 	const struct iovec *cur_iov = iov; /* current iovec */
 	size_t		iov_base = 0;	   /* offset in the current iovec */
-	unsigned long	seg;
 	char __user	*buf;
 
-	ocount = 0;
-	for (seg = 0; seg < nr_segs; seg++) {
-		const struct iovec *iv = &iov[seg];
-
-		/*
-		 * If any segment has a negative length, or the cumulative
-		 * length ever wraps negative then return -EINVAL.
-		 */
-		ocount += iv->iov_len;
-		if (unlikely((ssize_t)(ocount|iv->iov_len) < 0))
-			return -EINVAL;
-		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
-			continue;
-		if (seg == 0)
-			return -EFAULT;
-		nr_segs = seg;
-		ocount -= iv->iov_len;	/* This segment is no good */
-		break;
-	}
-
-	count = ocount;
-	pos = *ppos;
 	pagevec_init(&lru_pvec, 0);
-
-	/* We can write back this queue in page reclaim */
-	current->backing_dev_info = mapping->backing_dev_info;
-	written = 0;
-
-	err = generic_write_checks(file, &pos, &count, isblk);
-	if (err)
-		goto out;
-
-	if (count == 0)
-		goto out;
-
-	err = remove_suid(file->f_dentry);
-	if (err)
-		goto out;
-
-	inode_update_time(inode, 1);
-
-	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
-	if (unlikely(file->f_flags & O_DIRECT)) {
-		if (count != ocount)
-			nr_segs = iov_shorten((struct iovec *)iov,
-						nr_segs, count);
-		written = generic_file_direct_IO(WRITE, iocb,
-					iov, pos, nr_segs);
-		if (written > 0) {
-			loff_t end = pos + written;
-			if (end > i_size_read(inode) && !isblk) {
-				i_size_write(inode,  end);
-				mark_inode_dirty(inode);
-			}
-			*ppos = end;
-		}
-		/*
-		 * Sync the fs metadata but not the minor inode changes and
-		 * of course not the data as we did direct DMA for the IO.
-		 * i_sem is held, which protects generic_osync_inode() from
-		 * livelocking.
-		 */
-		if (written >= 0 && file->f_flags & O_SYNC)
-			status = generic_osync_inode(inode, mapping, OSYNC_METADATA);
-		if (written == count && !is_sync_kiocb(iocb))
-			written = -EIOCBQUEUED;
-		if (written < 0 || written == count)
-			goto out_status;
-		/*
-		 * direct-io write to a hole: fall through to buffered I/O
-		 * for completing the rest of the request.
-		 */
-		pos += written;
-		count -= written;
-	}
 
 	buf = iov->iov_base + written;	/* handle partial DIO write */
 	do {
@@ -1992,11 +1992,13 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	/*
 	 * For now, when the user asks for O_SYNC, we'll actually give O_DSYNC
 	 */
-	if (status >= 0) {
-		if ((file->f_flags & O_SYNC) || IS_SYNC(inode))
-			status = generic_osync_inode(inode, mapping,
-					OSYNC_METADATA|OSYNC_DATA);
-	}
+	if (likely(status >= 0)) {
+		if (unlikely((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
+			if (!a_ops->writepage || !is_sync_kiocb(iocb))
+				status = generic_osync_inode(inode, mapping,
+						OSYNC_METADATA|OSYNC_DATA);
+		}
+  	}
 	
 	/*
 	 * If we get here for O_DIRECT writes then we must have fallen through
@@ -2006,12 +2008,85 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	if (unlikely(file->f_flags & O_DIRECT) && written)
 		status = filemap_write_and_wait(mapping);
 
-out_status:	
-	err = written ? written : status;
-out:
 	pagevec_lru_add(&lru_pvec);
+	return written ? written : status;
+}
+
+EXPORT_SYMBOL(generic_file_buffered_write);
+
+ssize_t
+generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
+				unsigned long nr_segs, loff_t *ppos)
+{
+	struct file *file = iocb->ki_filp;
+	struct address_space * mapping = file->f_mapping;
+	size_t ocount;		/* original count */
+	size_t count;		/* after file limit checks */
+	struct inode 	*inode = mapping->host;
+	unsigned long	seg;
+	loff_t		pos;
+	ssize_t		written;
+	ssize_t		err;
+
+	ocount = 0;
+	for (seg = 0; seg < nr_segs; seg++) {
+		const struct iovec *iv = &iov[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		ocount += iv->iov_len;
+		if (unlikely((ssize_t)(ocount|iv->iov_len) < 0))
+			return -EINVAL;
+		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
+			return -EFAULT;
+		nr_segs = seg;
+		ocount -= iv->iov_len;	/* This segment is no good */
+		break;
+	}
+
+	count = ocount;
+	pos = *ppos;
+
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = mapping->backing_dev_info;
+	written = 0;
+
+	err = generic_write_checks(file, &pos, &count, S_ISBLK(inode->i_mode));
+	if (err)
+		goto out;
+
+	if (count == 0)
+		goto out;
+
+	err = remove_suid(file->f_dentry);
+	if (err)
+		goto out;
+
+	inode_update_time(inode, 1);
+
+	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
+	if (unlikely(file->f_flags & O_DIRECT)) {
+		written = generic_file_direct_write(iocb, iov,
+				&nr_segs, pos, ppos, count, ocount);
+		if (written < 0 || written == count)
+			goto out;
+		/*
+		 * direct-io write to a hole: fall through to buffered I/O
+		 * for completing the rest of the request.
+		 */
+		pos += written;
+		count -= written;
+	}
+
+	written = generic_file_buffered_write(iocb, iov, nr_segs,
+			pos, ppos, count, written);
+out:
 	current->backing_dev_info = NULL;
-	return err;
+	return written ? written : err;
 }
 
 EXPORT_SYMBOL(generic_file_aio_write_nolock);
@@ -2036,36 +2111,52 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 			       size_t count, loff_t pos)
 {
 	struct file *file = iocb->ki_filp;
-	struct inode *inode = file->f_mapping->host;
-	ssize_t err;
-	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	ssize_t ret;
+	struct iovec local_iov = { .iov_base = (void __user *)buf,
+					.iov_len = count };
 
 	BUG_ON(iocb->ki_pos != pos);
 
 	down(&inode->i_sem);
-	err = generic_file_aio_write_nolock(iocb, &local_iov, 1, 
+	ret = generic_file_aio_write_nolock(iocb, &local_iov, 1,
 						&iocb->ki_pos);
 	up(&inode->i_sem);
 
-	return err;
-}
+	if (ret > 0 && ((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
+		ssize_t err;
 
+		err = sync_page_range(inode, mapping, pos, ret);
+		if (err < 0)
+			ret = err;
+	}
+	return ret;
+}
 EXPORT_SYMBOL(generic_file_aio_write);
 
 ssize_t generic_file_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
-	struct inode	*inode = file->f_mapping->host;
-	ssize_t		err;
-	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	ssize_t	ret;
+	struct iovec local_iov = { .iov_base = (void __user *)buf,
+					.iov_len = count };
 
 	down(&inode->i_sem);
-	err = generic_file_write_nolock(file, &local_iov, 1, ppos);
+	ret = generic_file_write_nolock(file, &local_iov, 1, ppos);
 	up(&inode->i_sem);
 
-	return err;
-}
+	if (ret > 0 && ((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
+		ssize_t err;
 
+		err = sync_page_range(inode, mapping, *ppos - ret, ret);
+		if (err < 0)
+			ret = err;
+	}
+	return ret;
+}
 EXPORT_SYMBOL(generic_file_write);
 
 ssize_t generic_file_readv(struct file *filp, const struct iovec *iov,
@@ -2084,14 +2175,23 @@ ssize_t generic_file_readv(struct file *filp, const struct iovec *iov,
 EXPORT_SYMBOL(generic_file_readv);
 
 ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
-			unsigned long nr_segs, loff_t * ppos) 
+			unsigned long nr_segs, loff_t *ppos)
 {
-	struct inode *inode = file->f_mapping->host;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
 	ssize_t ret;
 
 	down(&inode->i_sem);
 	ret = generic_file_write_nolock(file, iov, nr_segs, ppos);
 	up(&inode->i_sem);
+
+	if (ret > 0 && ((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
+		int err;
+
+		err = sync_page_range(inode, mapping, *ppos - ret, ret);
+		if (err < 0)
+			ret = err;
+	}
 	return ret;
 }
 

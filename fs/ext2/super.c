@@ -37,8 +37,6 @@ static void ext2_sync_super(struct super_block *sb,
 static int ext2_remount (struct super_block * sb, int * flags, char * data);
 static int ext2_statfs (struct super_block * sb, struct kstatfs * buf);
 
-static char error_buf[1024];
-
 void ext2_error (struct super_block * sb, const char * function,
 		 const char * fmt, ...)
 {
@@ -52,16 +50,17 @@ void ext2_error (struct super_block * sb, const char * function,
 			cpu_to_le16(le16_to_cpu(es->s_state) | EXT2_ERROR_FS);
 		ext2_sync_super(sb, es);
 	}
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
-	if (test_opt (sb, ERRORS_PANIC))
-		panic ("EXT2-fs panic (device %s): %s: %s\n",
-		       sb->s_id, function, error_buf);
-	printk (KERN_CRIT "EXT2-fs error (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
-	if (test_opt (sb, ERRORS_RO)) {
-		printk ("Remounting filesystem read-only\n");
+
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT2-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
+
+	if (test_opt(sb, ERRORS_PANIC))
+		panic("EXT2-fs panic from previous error\n");
+	if (test_opt(sb, ERRORS_RO)) {
+		printk("Remounting filesystem read-only\n");
 		sb->s_flags |= MS_RDONLY;
 	}
 }
@@ -79,12 +78,13 @@ NORET_TYPE void ext2_panic (struct super_block * sb, const char * function,
 		mark_buffer_dirty(sbi->s_sbh);
 		sb->s_dirt = 1;
 	}
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT2-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 	sb->s_flags |= MS_RDONLY;
-	panic ("EXT2-fs panic (device %s): %s: %s\n",
-	       sb->s_id, function, error_buf);
+	panic("EXT2-fs panic forced\n");
 }
 
 void ext2_warning (struct super_block * sb, const char * function,
@@ -92,11 +92,12 @@ void ext2_warning (struct super_block * sb, const char * function,
 {
 	va_list args;
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
-	printk (KERN_WARNING "EXT2-fs warning (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
+	va_start(args, fmt);
+	printk(KERN_WARNING "EXT2-fs warning (device %s): %s: ",
+	       sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 }
 
 void ext2_update_dynamic_rev(struct super_block *sb)

@@ -111,7 +111,6 @@ extern int8_t udf_next_aext(struct inode *, lb_addr *, int *, lb_addr *, uint32_
 extern int8_t udf_current_aext(struct inode *, lb_addr *, int *, lb_addr *, uint32_t *, struct buffer_head **, int);
 
 /* misc.c */
-extern int udf_read_tagged_data(char *, int size, int fd, int block, int partref);
 extern struct buffer_head *udf_tgetblk(struct super_block *, int);
 extern struct buffer_head *udf_tread(struct super_block *, int);
 extern struct genericFormat *udf_add_extendedattr(struct inode *, uint32_t, uint32_t, uint8_t);
@@ -163,7 +162,6 @@ extern struct fileIdentDesc * udf_get_fileident(void * buffer, int bufsize, int 
 extern extent_ad * udf_get_fileextent(void * buffer, int bufsize, int * offset);
 extern long_ad * udf_get_filelongad(uint8_t *, int, int *, int);
 extern short_ad * udf_get_fileshortad(uint8_t *, int, int *, int);
-extern uint8_t * udf_get_filead(struct fileEntry *, uint8_t *, int, int, int, int *);
 
 /* crc.c */
 extern uint16_t udf_crc(uint8_t *, uint32_t, uint16_t);

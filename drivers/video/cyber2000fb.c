@@ -1281,7 +1281,7 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 	cfb->fb.var.accel_flags	= FB_ACCELF_TEXT;
 
 	cfb->fb.fbops		= &cyber2000fb_ops;
-	cfb->fb.flags		= FBINFO_FLAG_DEFAULT;
+	cfb->fb.flags		= FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 	cfb->fb.pseudo_palette	= (void *)(cfb + 1);
 
 	fb_alloc_cmap(&cfb->fb.cmap, NR_PALETTE, 0);

@@ -44,16 +44,22 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
+#include <linux/slab.h>
+#include <linux/module.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_devinfo.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_eh.h>
+#include <scsi/scsi_host.h>
+
 #include "scsiglue.h"
 #include "usb.h"
 #include "debug.h"
 #include "transport.h"
 #include "protocol.h"
-
-#include <linux/slab.h>
-#include <linux/module.h>
-#include <scsi/scsi_devinfo.h>
-#include <scsi/scsi_host.h>
 
 /***********************************************************************
  * Host functions 
@@ -92,17 +98,15 @@ static int slave_configure(struct scsi_device *sdev)
 	 * the end, scatter-gather buffers follow page boundaries. */
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 
-	/* Devices using Genesys Logic chips cause a lot of trouble for
-	 * high-speed transfers; they die unpredictably when given more
-	 * than 64 KB of data at a time.  If we detect such a device,
-	 * reduce the maximum transfer size to 64 KB = 128 sectors. */
-
-#define USB_VENDOR_ID_GENESYS	0x05e3		// Needs a standard location
-
+	/* According to the technical support people at Genesys Logic,
+	 * devices using their chips have problems transferring more than
+	 * 32 KB at a time.  In practice people have found that 64 KB
+	 * works okay and that's what Windows does.  But we'll be
+	 * conservative; people can always use the sysfs interface to
+	 * increase max_sectors. */
 	if (us->pusb_dev->descriptor.idVendor == USB_VENDOR_ID_GENESYS &&
-			us->pusb_dev->speed == USB_SPEED_HIGH &&
-			sdev->request_queue->max_sectors > 128)
-		blk_queue_max_sectors(sdev->request_queue, 128);
+			sdev->request_queue->max_sectors > 64)
+		blk_queue_max_sectors(sdev->request_queue, 64);
 
 	/* We can't put these settings in slave_alloc() because that gets
 	 * called before the device type is known.  Consequently these
@@ -146,7 +150,8 @@ static int slave_configure(struct scsi_device *sdev)
 
 /* queue a command */
 /* This is always called with scsi_lock(srb->host) held */
-static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
+static int queuecommand(struct scsi_cmnd *srb,
+			void (*done)(struct scsi_cmnd *))
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 
@@ -176,7 +181,7 @@ static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 
 /* Command abort */
 /* This is always called with scsi_lock(srb->host) held */
-static int command_abort( Scsi_Cmnd *srb )
+static int command_abort(struct scsi_cmnd *srb )
 {
 	struct Scsi_Host *host = srb->device->host;
 	struct us_data *us = (struct us_data *) host->hostdata[0];
@@ -223,7 +228,7 @@ static int command_abort( Scsi_Cmnd *srb )
 /* This invokes the transport reset mechanism to reset the state of the
  * device */
 /* This is always called with scsi_lock(srb->host) held */
-static int device_reset( Scsi_Cmnd *srb )
+static int device_reset(struct scsi_cmnd *srb)
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 	int result;
@@ -258,7 +263,7 @@ static int device_reset( Scsi_Cmnd *srb )
 /* It refuses to work if there's more than one interface in
  * the device, so that other users are not affected. */
 /* This is always called with scsi_lock(srb->host) held */
-static int bus_reset( Scsi_Cmnd *srb )
+static int bus_reset(struct scsi_cmnd *srb)
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 	int result;
@@ -444,10 +449,10 @@ struct scsi_host_template usb_stor_host_template = {
 	 * periodically someone should test to see which setting is more
 	 * optimal.
 	 */
-	.use_clustering =		TRUE,
+	.use_clustering =		1,
 
 	/* emulated HBA */
-	.emulated =			TRUE,
+	.emulated =			1,
 
 	/* we do our own delay after a device or bus reset */
 	.skip_settle_delay =		1,

@@ -167,21 +167,28 @@ static int proc_mf_change_cmdline(struct file *file, const char *buffer,
 	return count;			
 }
 
-static int proc_mf_change_vmlinux(struct file *file, const char *buffer,
-		unsigned long count, void *data)
+static ssize_t proc_mf_change_vmlinux(struct file *file, 
+				      const char __user *buf,
+				      size_t count, loff_t *ppos)
 {
+	struct inode * inode = file->f_dentry->d_inode;
+	struct proc_dir_entry * dp = PDE(inode);
 	int rc;
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	rc = mf_setVmlinuxChunk(buffer, count, file->f_pos, (u64)data);
+	rc = mf_setVmlinuxChunk(buf, count, *ppos, (u64)dp->data);
 	if (rc < 0)
 		return rc;
 
-	file->f_pos += count;
+	*ppos += count;
 
 	return count;			
 }
+
+static struct file_operations proc_vmlinux_operations = {
+	.write		= proc_mf_change_vmlinux,
+};
 
 static int __init mf_proc_init(void)
 {
@@ -218,20 +225,7 @@ static int __init mf_proc_init(void)
 			return 1;
 		ent->nlink = 1;
 		ent->data = (void *)(long)i;
-#if 0
-		if (i == 3) {
-			/*
-			 * if we had a 'D' vmlinux entry, it would only
-			 * be readable.
-			 */
-			ent->read_proc = proc_mf_dump_vmlinux;
-			ent->write_proc = NULL;
-		} else
-#endif
-		{
-			ent->write_proc = proc_mf_change_vmlinux;
-			ent->read_proc = NULL;
-		}
+		ent->proc_fops = &proc_vmlinux_operations;
 	}
 
 	ent = create_proc_entry("side", S_IFREG|S_IRUSR|S_IWUSR, mf_proc_root);

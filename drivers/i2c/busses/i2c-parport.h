@@ -83,7 +83,7 @@ static struct adapter_parm adapter_parm[] = {
 };
 
 static int type;
-MODULE_PARM(type, "i");
+module_param(type, int, 0);
 MODULE_PARM_DESC(type,
 	"Type of adapter:\n"
 	" 0 = Philips adapter\n"

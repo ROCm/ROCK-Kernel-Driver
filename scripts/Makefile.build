@@ -14,6 +14,18 @@ include $(obj)/Makefile
 
 include scripts/Makefile.lib
 
+ifdef host-progs
+ifneq ($(hostprogs-y),$(host-progs))
+$(warning kbuild: $(obj)/Makefile - Usage of host-progs is deprecated. Please replace with hostprogs-y!)
+hostprogs-y += $(host-progs)
+endif
+endif
+
+# Do not include host rules unles needed
+ifneq ($(hostprogs-y)$(hostprogs-m),)
+include scripts/Makefile.host
+endif
+
 ifneq ($(KBUILD_SRC),)
 # Create output directory if not already present
 _dummy := $(shell [ -d $(obj) ] || mkdir -p $(obj))
@@ -71,8 +83,13 @@ __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
 
 # Linus' kernel sanity checking tool
 ifneq ($(KBUILD_CHECKSRC),0)
-quiet_cmd_checksrc = CHECK   $<
-      cmd_checksrc = $(CHECK) $(c_flags) $< ;
+  ifeq ($(KBUILD_CHECKSRC),2)
+    quiet_cmd_force_checksrc = CHECK   $<
+          cmd_force_checksrc = $(CHECK) $(CHECKFLAGS) $(c_flags) $< ;
+  else
+      quiet_cmd_checksrc     = CHECK   $<
+            cmd_checksrc     = $(CHECK) $(CHECKFLAGS) $(c_flags) $< ;
+  endif
 endif
 
 
@@ -170,11 +187,13 @@ endef
 # Built-in and composite module parts
 
 %.o: %.c FORCE
+	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 
 # Single-part modules are special since we need to mark them in $(MODVERDIR)
 
 $(single-used-m): %.o: %.c FORCE
+	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 	@{ echo $(@:.o=.ko); echo $@; } > $(MODVERDIR)/$(@F:.o=.mod)
 
@@ -208,6 +227,14 @@ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 targets += $(real-objs-y) $(real-objs-m) $(lib-y)
 targets += $(extra-y) $(MAKECMDGOALS) $(always)
+
+# Linker scripts preprocessor (.lds.S -> .lds)
+# ---------------------------------------------------------------------------
+quiet_cmd_cpp_lds_S = LDS     $@
+      cmd_cpp_lds_S = $(CPP) $(cpp_flags) -D__ASSEMBLY__ -o $@ $<
+
+%.lds: %.lds.S FORCE
+	$(call if_changed_dep,cpp_lds_S)
 
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
@@ -275,90 +302,6 @@ $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 
 targets += $(multi-used-y) $(multi-used-m)
 
-# Compile programs on the host
-# ===========================================================================
-# host-progs := bin2hex
-# Will compile bin2hex.c and create an executable named bin2hex
-#
-# host-progs    := lxdialog
-# lxdialog-objs := checklist.o lxdialog.o
-# Will compile lxdialog.c and checklist.c, and then link the executable
-# lxdialog, based on checklist.o and lxdialog.o
-#
-# host-progs      := qconf
-# qconf-cxxobjs   := qconf.o
-# qconf-objs      := menu.o
-# Will compile qconf as a C++ program, and menu as a C program.
-# They are linked as C++ code to the executable qconf
-
-# host-progs := conf
-# conf-objs  := conf.o libkconfig.so
-# libkconfig-objs := expr.o type.o
-# Will create a shared library named libkconfig.so that consist of
-# expr.o and type.o (they are both compiled as C code and the object file
-# are made as position independent code).
-# conf.c is compiled as a c program, and conf.o is linked together with
-# libkconfig.so as the executable conf.
-# Note: Shared libraries consisting of C++ files are not supported  
-#
-
-# Create executable from a single .c file
-# host-csingle -> Executable
-quiet_cmd_host-csingle 	= HOSTCC  $@
-      cmd_host-csingle	= $(HOSTCC) $(hostc_flags) $(HOST_LOADLIBES) -o $@ $<
-$(host-csingle): %: %.c FORCE
-	$(call if_changed_dep,host-csingle)
-
-# Link an executable based on list of .o files, all plain c
-# host-cmulti -> executable
-quiet_cmd_host-cmulti	= HOSTLD  $@
-      cmd_host-cmulti	= $(HOSTCC) $(HOSTLDFLAGS) -o $@ \
-			  $(addprefix $(obj)/,$($(@F)-objs)) \
-			  $(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
-$(host-cmulti): %: $(host-cobjs) $(host-cshlib) FORCE
-	$(call if_changed,host-cmulti)
-
-# Create .o file from a single .c file
-# host-cobjs -> .o
-quiet_cmd_host-cobjs	= HOSTCC  $@
-      cmd_host-cobjs	= $(HOSTCC) $(hostc_flags) -c -o $@ $<
-$(host-cobjs): %.o: %.c FORCE
-	$(call if_changed_dep,host-cobjs)
-
-# Link an executable based on list of .o files, a mixture of .c and .cc
-# host-cxxmulti -> executable
-quiet_cmd_host-cxxmulti	= HOSTLD  $@
-      cmd_host-cxxmulti	= $(HOSTCXX) $(HOSTLDFLAGS) -o $@ \
-			  $(foreach o,objs cxxobjs,\
-			  $(addprefix $(obj)/,$($(@F)-$(o)))) \
-			  $(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
-$(host-cxxmulti): %: $(host-cobjs) $(host-cxxobjs) $(host-cshlib) FORCE
-	$(call if_changed,host-cxxmulti)
-
-# Create .o file from a single .cc (C++) file
-quiet_cmd_host-cxxobjs	= HOSTCXX $@
-      cmd_host-cxxobjs	= $(HOSTCXX) $(hostcxx_flags) -c -o $@ $<
-$(host-cxxobjs): %.o: %.cc FORCE
-	$(call if_changed_dep,host-cxxobjs)
-
-# Compile .c file, create position independent .o file
-# host-cshobjs -> .o
-quiet_cmd_host-cshobjs	= HOSTCC  -fPIC $@
-      cmd_host-cshobjs	= $(HOSTCC) $(hostc_flags) -fPIC -c -o $@ $<
-$(host-cshobjs): %.o: %.c FORCE
-	$(call if_changed_dep,host-cshobjs)
-
-# Link a shared library, based on position independent .o files
-# *.o -> .so shared library (host-cshlib)
-quiet_cmd_host-cshlib	= HOSTLLD -shared $@
-      cmd_host-cshlib	= $(HOSTCC) $(HOSTLDFLAGS) -shared -o $@ \
-			  $(addprefix $(obj)/,$($(@F:.so=-objs))) \
-			  $(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
-$(host-cshlib): %: $(host-cshobjs) FORCE
-	$(call if_changed,host-cshlib)
-
-targets += $(host-csingle)  $(host-cmulti) $(host-cobjs)\
-	   $(host-cxxmulti) $(host-cxxobjs) $(host-cshlib) $(host-cshobjs) 
 
 # Descending
 # ---------------------------------------------------------------------------

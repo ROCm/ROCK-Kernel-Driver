@@ -68,9 +68,6 @@ struct mempolicy {
 	} v;
 };
 
-/* An NULL mempolicy pointer is a synonym of &default_policy. */
-extern struct mempolicy default_policy;
-
 /*
  * Support for managing mempolicy data objects (clone, copy, destroy)
  * The default fast path of a NULL MPOL_DEFAULT policy is always inlined.

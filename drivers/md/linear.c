@@ -47,7 +47,6 @@ static inline dev_info_t *which_dev(mddev_t *mddev, sector_t sector)
 		return hash->dev0;
 }
 
-
 /**
  *	linear_mergeable_bvec -- tell bio layer if a two requests can be merged
  *	@q: request queue
@@ -93,6 +92,27 @@ static void linear_unplug(request_queue_t *q)
 	}
 }
 
+static int linear_issue_flush(request_queue_t *q, struct gendisk *disk,
+			      sector_t *error_sector)
+{
+	mddev_t *mddev = q->queuedata;
+	linear_conf_t *conf = mddev_to_conf(mddev);
+	int i, ret = 0;
+
+	for (i=0; i < mddev->raid_disks; i++) {
+		struct block_device *bdev = conf->disks[i].rdev->bdev;
+		request_queue_t *r_queue = bdev_get_queue(bdev);
+
+		if (!r_queue->issue_flush_fn) {
+			ret = -EOPNOTSUPP;
+			break;
+		}
+		ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
+		if (ret)
+			break;
+	}
+	return ret;
+}
 
 static int linear_run (mddev_t *mddev)
 {
@@ -200,6 +220,7 @@ static int linear_run (mddev_t *mddev)
 
 	blk_queue_merge_bvec(mddev->queue, linear_mergeable_bvec);
 	mddev->queue->unplug_fn = linear_unplug;
+	mddev->queue->issue_flush_fn = linear_issue_flush;
 	return 0;
 
 out:

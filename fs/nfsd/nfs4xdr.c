@@ -55,6 +55,8 @@
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
 #include <linux/nfsd_idmap.h>
+#include <linux/nfs4.h>
+#include <linux/nfs4_acl.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
 
@@ -348,7 +350,8 @@ nfsd4_decode_bitmap(struct nfsd4_compoundargs *argp, u32 *bmval)
 }
 
 static int
-nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *iattr)
+nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *iattr,
+    struct nfs4_acl **acl)
 {
 	int expected_len, len = 0;
 	u32 dummy32;
@@ -377,6 +380,51 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READ64(iattr->ia_size);
 		iattr->ia_valid |= ATTR_SIZE;
 	}
+	if (bmval[0] & FATTR4_WORD0_ACL) {
+		int nace, i;
+		struct nfs4_ace ace;
+
+		READ_BUF(4); len += 4;
+		READ32(nace);
+
+		*acl = nfs4_acl_new();
+		if (*acl == NULL) {
+			status = -ENOMEM;
+			goto out_nfserr;
+		}
+		defer_free(argp, (void (*)(const void *))nfs4_acl_free, *acl);
+
+		for (i = 0; i < nace; i++) {
+			READ_BUF(16); len += 16;
+			READ32(ace.type);
+			READ32(ace.flag);
+			READ32(ace.access_mask);
+			READ32(dummy32);
+			READ_BUF(dummy32);
+			len += XDR_QUADLEN(dummy32) << 2;
+			READMEM(buf, dummy32);
+			if (check_utf8(buf, dummy32))
+				return nfserr_inval;
+			ace.whotype = nfs4_acl_get_whotype(buf, dummy32);
+			status = 0;
+			if (ace.whotype != NFS4_ACL_WHO_NAMED)
+				ace.who = 0;
+			else if (ace.flag & NFS4_ACE_IDENTIFIER_GROUP)
+				status = nfsd_map_name_to_gid(argp->rqstp,
+						buf, dummy32, &ace.who);
+			else
+				status = nfsd_map_name_to_uid(argp->rqstp,
+						buf, dummy32, &ace.who);
+			if (status)
+				goto out_nfserr;
+			if (nfs4_acl_add_ace(*acl, ace.type, ace.flag,
+				 ace.access_mask, ace.whotype, ace.who) != 0) {
+				status = -ENOMEM;
+				goto out_nfserr;
+			}
+		}
+	} else
+		*acl = NULL;
 	if (bmval[1] & FATTR4_WORD1_MODE) {
 		READ_BUF(4);
 		len += 4;
@@ -562,7 +610,7 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 	if ((status = check_filename(create->cr_name, create->cr_namelen, nfserr_inval)))
 		return status;
 
-	if ((status = nfsd4_decode_fattr(argp, create->cr_bmval, &create->cr_iattr)))
+	if ((status = nfsd4_decode_fattr(argp, create->cr_bmval, &create->cr_iattr, &create->cr_acl)))
 		goto out;
 
 	DECODE_TAIL;
@@ -711,7 +759,7 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 		switch (open->op_createmode) {
 		case NFS4_CREATE_UNCHECKED:
 		case NFS4_CREATE_GUARDED:
-			if ((status = nfsd4_decode_fattr(argp, open->op_bmval, &open->op_iattr)))
+			if ((status = nfsd4_decode_fattr(argp, open->op_bmval, &open->op_iattr, &open->op_acl)))
 				goto out;
 			break;
 		case NFS4_CREATE_EXCLUSIVE:
@@ -888,7 +936,7 @@ nfsd4_decode_setattr(struct nfsd4_compoundargs *argp, struct nfsd4_setattr *seta
 	READ_BUF(sizeof(stateid_t));
 	READ32(setattr->sa_stateid.si_generation);
 	COPYMEM(&setattr->sa_stateid.si_opaque, sizeof(stateid_opaque_t));
-	if ((status = nfsd4_decode_fattr(argp, setattr->sa_bmval, &setattr->sa_iattr)))
+	if ((status = nfsd4_decode_fattr(argp, setattr->sa_bmval, &setattr->sa_iattr, &setattr->sa_acl)))
 		goto out;
 
 	DECODE_TAIL;
@@ -1302,14 +1350,16 @@ static u32 nfs4_ftypes[16] = {
 };
 
 static int
-nfsd4_encode_name(struct svc_rqst *rqstp, int group, uid_t id,
+nfsd4_encode_name(struct svc_rqst *rqstp, int whotype, uid_t id, int group,
 			u32 **p, int *buflen)
 {
 	int status;
 
 	if (*buflen < (XDR_QUADLEN(IDMAP_NAMESZ) << 2) + 4)
 		return nfserr_resource;
-	if (group)
+	if (whotype != NFS4_ACL_WHO_NAMED)
+		status = nfs4_acl_write_who(whotype, (u8 *)(*p + 1));
+	else if (group)
 		status = nfsd_map_gid_to_name(rqstp, id, (u8 *)(*p + 1));
 	else
 		status = nfsd_map_uid_to_name(rqstp, id, (u8 *)(*p + 1));
@@ -1324,13 +1374,20 @@ nfsd4_encode_name(struct svc_rqst *rqstp, int group, uid_t id,
 static inline int
 nfsd4_encode_user(struct svc_rqst *rqstp, uid_t uid, u32 **p, int *buflen)
 {
-	return nfsd4_encode_name(rqstp, uid, 0, p, buflen);
+	return nfsd4_encode_name(rqstp, NFS4_ACL_WHO_NAMED, uid, 0, p, buflen);
 }
 
 static inline int
 nfsd4_encode_group(struct svc_rqst *rqstp, uid_t gid, u32 **p, int *buflen)
 {
-	return nfsd4_encode_name(rqstp, gid, 1, p, buflen);
+	return nfsd4_encode_name(rqstp, NFS4_ACL_WHO_NAMED, gid, 1, p, buflen);
+}
+
+static inline int
+nfsd4_encode_aclname(struct svc_rqst *rqstp, int whotype, uid_t id, int group,
+		u32 **p, int *buflen)
+{
+	return nfsd4_encode_name(rqstp, whotype, id, group, p, buflen);
 }
 
 
@@ -1357,6 +1414,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	u64 dummy64;
 	u32 *p = buffer;
 	int status;
+	struct nfs4_acl *acl = NULL;
 
 	BUG_ON(bmval1 & NFSD_WRITEONLY_ATTRS_WORD1);
 	BUG_ON(bmval0 & ~NFSD_SUPPORTED_ATTRS_WORD0);
@@ -1379,6 +1437,13 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 			goto out;
 		fhp = &tempfh;
 	}
+	if (bmval0 & FATTR4_WORD0_ACL) {
+		status = nfsd4_get_nfs4_acl(rqstp, dentry, &acl);
+		if (status == -EOPNOTSUPP)
+			bmval0 &= ~FATTR4_WORD0_ACL;
+		else if (status < 0)
+			goto out_nfserr;
+	}
 	if ((buflen -= 16) < 0)
 		goto out_resource;
 
@@ -1391,6 +1456,8 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		if ((buflen -= 12) < 0)
 			goto out_resource;
 		WRITE32(2);
+		/* XXX Should depend on exported filesystem (e.g.
+		 * for acl support) */
 		WRITE32(NFSD_SUPPORTED_ATTRS_WORD0);
 		WRITE32(NFSD_SUPPORTED_ATTRS_WORD1);
 	}
@@ -1462,10 +1529,44 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 			goto out_resource;
 		WRITE32(0);
 	}
+	if (bmval0 & FATTR4_WORD0_ACL) {
+		struct nfs4_ace *ace;
+		struct list_head *h;
+
+		if (acl == NULL) {
+			if ((buflen -= 4) < 0)
+				goto out_resource;
+
+			WRITE32(0);
+			goto out_acl;
+		}
+		if ((buflen -= 4) < 0)
+			goto out_resource;
+		WRITE32(acl->naces);
+
+		list_for_each(h, &acl->ace_head) {
+			ace = list_entry(h, struct nfs4_ace, l_ace);
+
+			if ((buflen -= 4*3) < 0)
+				goto out_resource;
+			WRITE32(ace->type);
+			WRITE32(ace->flag);
+			WRITE32(ace->access_mask & NFS4_ACE_MASK_ALL);
+			status = nfsd4_encode_aclname(rqstp, ace->whotype,
+				ace->who, ace->flag & NFS4_ACE_IDENTIFIER_GROUP,
+				&p, &buflen);
+			if (status == nfserr_resource)
+				goto out_resource;
+			if (status)
+				goto out;
+		}
+	}
+out_acl:
 	if (bmval0 & FATTR4_WORD0_ACLSUPPORT) {
 		if ((buflen -= 4) < 0)
 			goto out_resource;
-		WRITE32(0);
+		/* XXX: should depend on exported filesystem: */
+		WRITE32(ACL4_SUPPORT_ALLOW_ACL|ACL4_SUPPORT_DENY_ACL);
 	}
 	if (bmval0 & FATTR4_WORD0_CANSETTIME) {
 		if ((buflen -= 4) < 0)
@@ -1648,6 +1749,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	status = nfs_ok;
 
 out:
+	nfs4_acl_free(acl);
 	if (fhp == &tempfh)
 		fh_put(&tempfh);
 	return status;

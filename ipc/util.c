@@ -100,7 +100,7 @@ int ipc_findkey(struct ipc_ids* ids, key_t key)
 	int max_id = ids->max_id;
 
 	/*
-	 * read_barrier_depends is not needed here
+	 * rcu_dereference() is not needed here
 	 * since ipc_ids.sem is held
 	 */
 	for (id = 0; id <= max_id; id++) {
@@ -135,7 +135,6 @@ static int grow_ary(struct ipc_ids* ids, int newsize)
 		new[i].p = NULL;
 	}
 	old = ids->entries;
-	i = ids->size;
 
 	/*
 	 * before setting the ids->entries to the new array, there must be a
@@ -147,7 +146,7 @@ static int grow_ary(struct ipc_ids* ids, int newsize)
 	smp_wmb();	/* prevent indexing into old array based on new size. */
 	ids->size = newsize;
 
-	ipc_rcu_free(old, sizeof(struct ipc_id)*i);
+	ipc_rcu_putref(old);
 	return ids->size;
 }
 
@@ -172,7 +171,7 @@ int ipc_addid(struct ipc_ids* ids, struct kern_ipc_perm* new, int size)
 	size = grow_ary(ids,size);
 
 	/*
-	 * read_barrier_depends() is not needed here since
+	 * rcu_dereference()() is not needed here since
 	 * ipc_ids.sem is held
 	 */
 	for (id = 0; id < size; id++) {
@@ -221,7 +220,7 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 		BUG();
 
 	/* 
-	 * do not need a read_barrier_depends() here to force ordering
+	 * do not need a rcu_dereference()() here to force ordering
 	 * on Alpha, since the ipc_ids.sem is held.
 	 */	
 	p = ids->entries[lid].p;
@@ -277,25 +276,47 @@ void ipc_free(void* ptr, int size)
 		kfree(ptr);
 }
 
-struct ipc_rcu_kmalloc
+/*
+ * rcu allocations:
+ * There are three headers that are prepended to the actual allocation:
+ * - during use: ipc_rcu_hdr.
+ * - during the rcu grace period: ipc_rcu_grace.
+ * - [only if vmalloc]: ipc_rcu_sched.
+ * Their lifetime doesn't overlap, thus the headers share the same memory.
+ * Unlike a normal union, they are right-aligned, thus some container_of
+ * forward/backward casting is necessary:
+ */
+struct ipc_rcu_hdr
+{
+	int refcount;
+	int is_vmalloc;
+	void *data[0];
+};
+
+
+struct ipc_rcu_grace
 {
 	struct rcu_head rcu;
 	/* "void *" makes sure alignment of following data is sane. */
 	void *data[0];
 };
 
-struct ipc_rcu_vmalloc
+struct ipc_rcu_sched
 {
-	struct rcu_head rcu;
 	struct work_struct work;
 	/* "void *" makes sure alignment of following data is sane. */
 	void *data[0];
 };
 
+#define HDRLEN_KMALLOC		(sizeof(struct ipc_rcu_grace) > sizeof(struct ipc_rcu_hdr) ? \
+					sizeof(struct ipc_rcu_grace) : sizeof(struct ipc_rcu_hdr))
+#define HDRLEN_VMALLOC		(sizeof(struct ipc_rcu_sched) > HDRLEN_KMALLOC ? \
+					sizeof(struct ipc_rcu_sched) : HDRLEN_KMALLOC)
+
 static inline int rcu_use_vmalloc(int size)
 {
 	/* Too big for a single page? */
-	if (sizeof(struct ipc_rcu_kmalloc) + size > PAGE_SIZE)
+	if (HDRLEN_KMALLOC + size > PAGE_SIZE)
 		return 1;
 	return 0;
 }
@@ -317,14 +338,27 @@ void* ipc_rcu_alloc(int size)
 	 * workqueue if necessary (for vmalloc). 
 	 */
 	if (rcu_use_vmalloc(size)) {
-		out = vmalloc(sizeof(struct ipc_rcu_vmalloc) + size);
-		if (out) out += sizeof(struct ipc_rcu_vmalloc);
+		out = vmalloc(HDRLEN_VMALLOC + size);
+		if (out) {
+			out += HDRLEN_VMALLOC;
+			container_of(out, struct ipc_rcu_hdr, data)->is_vmalloc = 1;
+			container_of(out, struct ipc_rcu_hdr, data)->refcount = 1;
+		}
 	} else {
-		out = kmalloc(sizeof(struct ipc_rcu_kmalloc)+size, GFP_KERNEL);
-		if (out) out += sizeof(struct ipc_rcu_kmalloc);
+		out = kmalloc(HDRLEN_KMALLOC + size, GFP_KERNEL);
+		if (out) {
+			out += HDRLEN_KMALLOC;
+			container_of(out, struct ipc_rcu_hdr, data)->is_vmalloc = 0;
+			container_of(out, struct ipc_rcu_hdr, data)->refcount = 1;
+		}
 	}
 
 	return out;
+}
+
+void ipc_rcu_getref(void *ptr)
+{
+	container_of(ptr, struct ipc_rcu_hdr, data)->refcount++;
 }
 
 /**
@@ -335,11 +369,13 @@ void* ipc_rcu_alloc(int size)
  */
 static void ipc_schedule_free(struct rcu_head *head)
 {
-	struct ipc_rcu_vmalloc *free =
-		container_of(head, struct ipc_rcu_vmalloc, rcu);
+	struct ipc_rcu_grace *grace =
+		container_of(head, struct ipc_rcu_grace, rcu);
+	struct ipc_rcu_sched *sched =
+			container_of(&(grace->data[0]), struct ipc_rcu_sched, data[0]);
 
-	INIT_WORK(&free->work, vfree, free);
-	schedule_work(&free->work);
+	INIT_WORK(&sched->work, vfree, sched);
+	schedule_work(&sched->work);
 }
 
 /**
@@ -350,25 +386,23 @@ static void ipc_schedule_free(struct rcu_head *head)
  */
 static void ipc_immediate_free(struct rcu_head *head)
 {
-	struct ipc_rcu_kmalloc *free =
-		container_of(head, struct ipc_rcu_kmalloc, rcu);
+	struct ipc_rcu_grace *free =
+		container_of(head, struct ipc_rcu_grace, rcu);
 	kfree(free);
 }
 
-
-
-void ipc_rcu_free(void* ptr, int size)
+void ipc_rcu_putref(void *ptr)
 {
-	if (rcu_use_vmalloc(size)) {
-		struct ipc_rcu_vmalloc *free;
-		free = ptr - sizeof(*free);
-		call_rcu(&free->rcu, ipc_schedule_free);
-	} else {
-		struct ipc_rcu_kmalloc *free;
-		free = ptr - sizeof(*free);
-		call_rcu(&free->rcu, ipc_immediate_free);
-	}
+	if (--container_of(ptr, struct ipc_rcu_hdr, data)->refcount > 0)
+		return;
 
+	if (container_of(ptr, struct ipc_rcu_hdr, data)->is_vmalloc) {
+		call_rcu(&container_of(ptr, struct ipc_rcu_grace, data)->rcu,
+				ipc_schedule_free);
+	} else {
+		call_rcu(&container_of(ptr, struct ipc_rcu_grace, data)->rcu,
+				ipc_immediate_free);
+	}
 }
 
 /**
@@ -481,13 +515,12 @@ struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
 	 * Note: The following two read barriers are corresponding
 	 * to the two write barriers in grow_ary(). They guarantee 
 	 * the writes are seen in the same order on the read side. 
-	 * smp_rmb() has effect on all CPUs.  read_barrier_depends() 
+	 * smp_rmb() has effect on all CPUs.  rcu_dereference()
 	 * is used if there are data dependency between two reads, and 
 	 * has effect only on Alpha.
 	 */
 	smp_rmb(); /* prevent indexing old array with new size */
-	entries = ids->entries;
-	read_barrier_depends(); /*prevent seeing new array unitialized */
+	entries = rcu_dereference(ids->entries);
 	out = entries[lid].p;
 	if(out == NULL) {
 		rcu_read_unlock();
@@ -504,6 +537,12 @@ struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
 		return NULL;
 	}
 	return out;
+}
+
+void ipc_lock_by_ptr(struct kern_ipc_perm *perm)
+{
+	rcu_read_lock();
+	spin_lock(&perm->lock);
 }
 
 void ipc_unlock(struct kern_ipc_perm* perm)

@@ -601,8 +601,8 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	cpus = apm_save_cpus();
 	
 	cpu = get_cpu();
-	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
-	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
+	save_desc_40 = per_cpu(cpu_gdt_table, cpu)[0x40 / 8];
+	per_cpu(cpu_gdt_table, cpu)[0x40 / 8] = bad_bios_desc;
 
 	local_save_flags(flags);
 	APM_DO_CLI;
@@ -610,7 +610,7 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	apm_bios_call_asm(func, ebx_in, ecx_in, eax, ebx, ecx, edx, esi);
 	APM_DO_RESTORE_SEGS;
 	local_irq_restore(flags);
-	cpu_gdt_table[cpu][0x40 / 8] = save_desc_40;
+	per_cpu(cpu_gdt_table, cpu)[0x40 / 8] = save_desc_40;
 	put_cpu();
 	apm_restore_cpus(cpus);
 	
@@ -644,8 +644,8 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	cpus = apm_save_cpus();
 	
 	cpu = get_cpu();
-	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
-	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
+	save_desc_40 = per_cpu(cpu_gdt_table, cpu)[0x40 / 8];
+	per_cpu(cpu_gdt_table, cpu)[0x40 / 8] = bad_bios_desc;
 
 	local_save_flags(flags);
 	APM_DO_CLI;
@@ -653,7 +653,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	error = apm_bios_call_simple_asm(func, ebx_in, ecx_in, eax);
 	APM_DO_RESTORE_SEGS;
 	local_irq_restore(flags);
-	cpu_gdt_table[smp_processor_id()][0x40 / 8] = save_desc_40;
+	__get_cpu_var(cpu_gdt_table)[0x40 / 8] = save_desc_40;
 	put_cpu();
 	apm_restore_cpus(cpus);
 	return error;
@@ -2292,35 +2292,35 @@ static int __init apm_init(void)
 	apm_bios_entry.segment = APM_CS;
 
 	for (i = 0; i < NR_CPUS; i++) {
-		set_base(cpu_gdt_table[i][APM_CS >> 3],
+		set_base(per_cpu(cpu_gdt_table, i)[APM_CS >> 3],
 			 __va((unsigned long)apm_info.bios.cseg << 4));
-		set_base(cpu_gdt_table[i][APM_CS_16 >> 3],
+		set_base(per_cpu(cpu_gdt_table, i)[APM_CS_16 >> 3],
 			 __va((unsigned long)apm_info.bios.cseg_16 << 4));
-		set_base(cpu_gdt_table[i][APM_DS >> 3],
+		set_base(per_cpu(cpu_gdt_table, i)[APM_DS >> 3],
 			 __va((unsigned long)apm_info.bios.dseg << 4));
 #ifndef APM_RELAX_SEGMENTS
 		if (apm_info.bios.version == 0x100) {
 #endif
 			/* For ASUS motherboard, Award BIOS rev 110 (and others?) */
-			_set_limit((char *)&cpu_gdt_table[i][APM_CS >> 3], 64 * 1024 - 1);
+			_set_limit((char *)&per_cpu(cpu_gdt_table, i)[APM_CS >> 3], 64 * 1024 - 1);
 			/* For some unknown machine. */
-			_set_limit((char *)&cpu_gdt_table[i][APM_CS_16 >> 3], 64 * 1024 - 1);
+			_set_limit((char *)&per_cpu(cpu_gdt_table, i)[APM_CS_16 >> 3], 64 * 1024 - 1);
 			/* For the DEC Hinote Ultra CT475 (and others?) */
-			_set_limit((char *)&cpu_gdt_table[i][APM_DS >> 3], 64 * 1024 - 1);
+			_set_limit((char *)&per_cpu(cpu_gdt_table, i)[APM_DS >> 3], 64 * 1024 - 1);
 #ifndef APM_RELAX_SEGMENTS
 		} else {
-			_set_limit((char *)&cpu_gdt_table[i][APM_CS >> 3],
+			_set_limit((char *)&per_cpu(cpu_gdt_table, i)[APM_CS >> 3],
 				(apm_info.bios.cseg_len - 1) & 0xffff);
-			_set_limit((char *)&cpu_gdt_table[i][APM_CS_16 >> 3],
+			_set_limit((char *)&per_cpu(cpu_gdt_table, i)[APM_CS_16 >> 3],
 				(apm_info.bios.cseg_16_len - 1) & 0xffff);
-			_set_limit((char *)&cpu_gdt_table[i][APM_DS >> 3],
+			_set_limit((char *)&per_cpu(cpu_gdt_table, i)[APM_DS >> 3],
 				(apm_info.bios.dseg_len - 1) & 0xffff);
 		      /* workaround for broken BIOSes */
 	                if (apm_info.bios.cseg_len <= apm_info.bios.offset)
-        	                _set_limit((char *)&cpu_gdt_table[i][APM_CS >> 3], 64 * 1024 -1);
+        	                _set_limit((char *)&per_cpu(cpu_gdt_table, i)[APM_CS >> 3], 64 * 1024 -1);
                        if (apm_info.bios.dseg_len <= 0x40) { /* 0x40 * 4kB == 64kB */
                         	/* for the BIOS that assumes granularity = 1 */
-                        	cpu_gdt_table[i][APM_DS >> 3].b |= 0x800000;
+                        	per_cpu(cpu_gdt_table, i)[APM_DS >> 3].b |= 0x800000;
                         	printk(KERN_NOTICE "apm: we set the granularity of dseg.\n");
         	        }
 		}

@@ -118,8 +118,6 @@ void ext3_journal_abort_handle(const char *caller, const char *err_fn,
 		handle->h_err = err;
 }
 
-static char error_buf[1024];
-
 /* Deal with the reporting of failure conditions on a filesystem such as
  * inconsistencies detected or read IO failures.
  *
@@ -166,12 +164,11 @@ void ext3_error (struct super_block * sb, const char * function,
 {
 	va_list args;
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
-
-	printk (KERN_CRIT "EXT3-fs error (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT3-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 
 	ext3_handle_error(sb);
 }
@@ -240,21 +237,19 @@ void ext3_abort (struct super_block * sb, const char * function,
 
 	printk (KERN_CRIT "ext3_abort called.\n");
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT3-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 
-	if (test_opt (sb, ERRORS_PANIC))
-		panic ("EXT3-fs panic (device %s): %s: %s\n",
-		       sb->s_id, function, error_buf);
-
-	printk (KERN_CRIT "EXT3-fs abort (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
+	if (test_opt(sb, ERRORS_PANIC))
+		panic("EXT3-fs panic from previous error\n");
 
 	if (sb->s_flags & MS_RDONLY)
 		return;
 
-	printk (KERN_CRIT "Remounting filesystem read-only\n");
+	printk(KERN_CRIT "Remounting filesystem read-only\n");
 	EXT3_SB(sb)->s_mount_state |= EXT3_ERROR_FS;
 	sb->s_flags |= MS_RDONLY;
 	EXT3_SB(sb)->s_mount_opt |= EXT3_MOUNT_ABORT;
@@ -272,15 +267,16 @@ NORET_TYPE void ext3_panic (struct super_block * sb, const char * function,
 {
 	va_list args;
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT3-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 
 	/* this is to prevent panic from syncing this filesystem */
 	/* AKPM: is this sufficient? */
 	sb->s_flags |= MS_RDONLY;
-	panic ("EXT3-fs panic (device %s): %s: %s\n",
-	       sb->s_id, function, error_buf);
+	panic ("EXT3-fs panic forced\n");
 }
 
 void ext3_warning (struct super_block * sb, const char * function,
@@ -288,11 +284,12 @@ void ext3_warning (struct super_block * sb, const char * function,
 {
 	va_list args;
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
-	printk (KERN_WARNING "EXT3-fs warning (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
+	va_start(args, fmt);
+	printk(KERN_WARNING "EXT3-fs warning (device %s): %s: ",
+	       sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 }
 
 void ext3_update_dynamic_rev(struct super_block *sb)
@@ -587,7 +584,7 @@ enum {
 	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
 	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
 	Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0,
-	Opt_ignore, Opt_err,
+	Opt_ignore, Opt_barrier, Opt_err,
 };
 
 static match_table_t tokens = {
@@ -632,6 +629,7 @@ static match_table_t tokens = {
 	{Opt_ignore, "noquota"},
 	{Opt_ignore, "quota"},
 	{Opt_ignore, "usrquota"},
+	{Opt_barrier, "barrier=%u"},
 	{Opt_err, NULL}
 };
 
@@ -896,6 +894,14 @@ clear_qf_name:
 #endif
 		case Opt_abort:
 			set_opt(sbi->s_mount_opt, ABORT);
+			break;
+		case Opt_barrier:
+			if (match_int(&args[0], &option))
+				return 0;
+			if (option)
+				set_opt(sbi->s_mount_opt, BARRIER);
+			else
+				clear_opt(sbi->s_mount_opt, BARRIER);
 			break;
 		case Opt_ignore:
 			break;
@@ -1599,16 +1605,23 @@ out_fail:
  * initial mount, once the journal has been initialised but before we've
  * done any recovery; and again on any subsequent remount. 
  */
-static void ext3_init_journal_params(struct ext3_sb_info *sbi, 
-				     journal_t *journal)
+static void ext3_init_journal_params(struct super_block *sb, journal_t *journal)
 {
+	struct ext3_sb_info *sbi = EXT3_SB(sb);
+
 	if (sbi->s_commit_interval)
 		journal->j_commit_interval = sbi->s_commit_interval;
 	/* We could also set up an ext3-specific default for the commit
 	 * interval here, but for now we'll just fall back to the jbd
 	 * default. */
-}
 
+	spin_lock(&journal->j_state_lock);
+	if (test_opt(sb, BARRIER))
+		journal->j_flags |= JFS_BARRIER;
+	else
+		journal->j_flags &= ~JFS_BARRIER;
+	spin_unlock(&journal->j_state_lock);
+}
 
 static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 {
@@ -1646,7 +1659,7 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 		return NULL;
 	}
 	journal->j_private = sb;
-	ext3_init_journal_params(EXT3_SB(sb), journal);
+	ext3_init_journal_params(sb, journal);
 	return journal;
 }
 
@@ -1731,7 +1744,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 		goto out_journal;
 	}
 	EXT3_SB(sb)->journal_bdev = bdev;
-	ext3_init_journal_params(EXT3_SB(sb), journal);
+	ext3_init_journal_params(sb, journal);
 	return journal;
 out_journal:
 	journal_destroy(journal);
@@ -2028,7 +2041,7 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 
 	es = sbi->s_es;
 
-	ext3_init_journal_params(sbi, sbi->s_journal);
+	ext3_init_journal_params(sb, sbi->s_journal);
 
 	if ((*flags & MS_RDONLY) != (sb->s_flags & MS_RDONLY)) {
 		if (sbi->s_mount_opt & EXT3_MOUNT_ABORT)

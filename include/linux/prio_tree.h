@@ -17,7 +17,19 @@ struct prio_tree_iter {
 	unsigned long		mask;
 	unsigned long		value;
 	int			size_level;
+
+	struct prio_tree_root	*root;
+	pgoff_t			r_index;
+	pgoff_t			h_index;
 };
+
+static inline void prio_tree_iter_init(struct prio_tree_iter *iter,
+		struct prio_tree_root *root, pgoff_t r_index, pgoff_t h_index)
+{
+	iter->root = root;
+	iter->r_index = r_index;
+	iter->h_index = h_index;
+}
 
 #define INIT_PRIO_TREE_ROOT(ptr)	\
 do {					\

@@ -216,7 +216,7 @@ void show_registers(struct pt_regs *regs)
 		ss = regs->xss & 0xffff;
 	}
 	print_modules();
-	printk("CPU:    %d\nEIP:    %04x:[<%08lx>]    %s\nEFLAGS: %08lx"
+	printk("CPU:    %d\nEIP:    %04x:[<%08lx>]    %s VLI\nEFLAGS: %08lx"
 			"   (%s) \n",
 		smp_processor_id(), 0xffff & regs->xcs, regs->eip,
 		print_tainted(), regs->eflags, UTS_RELEASE);
@@ -234,23 +234,25 @@ void show_registers(struct pt_regs *regs)
 	 * time of the fault..
 	 */
 	if (in_kernel) {
+		u8 *eip;
 
 		printk("\nStack: ");
 		show_stack(NULL, (unsigned long*)esp);
 
 		printk("Code: ");
-		if(regs->eip < PAGE_OFFSET)
-			goto bad;
 
-		for(i=0;i<20;i++)
-		{
+		eip = (u8 *)regs->eip - 43;
+		for (i = 0; i < 64; i++, eip++) {
 			unsigned char c;
-			if(__get_user(c, &((unsigned char*)regs->eip)[i])) {
-bad:
+
+			if (eip < (u8 *)PAGE_OFFSET || __get_user(c, eip)) {
 				printk(" Bad EIP value.");
 				break;
 			}
-			printk("%02x ", c);
+			if (eip == (u8 *)regs->eip)
+				printk("<%02x> ", c);
+			else
+				printk("%02x ", c);
 		}
 	}
 	printk("\n");
@@ -292,35 +294,52 @@ bug:
 	printk("Kernel BUG\n");
 }
 
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
-
 void die(const char * str, struct pt_regs * regs, long err)
 {
+	static struct {
+		spinlock_t lock;
+		u32 lock_owner;
+		int lock_owner_depth;
+	} die = {
+		.lock =			SPIN_LOCK_UNLOCKED,
+		.lock_owner =		-1,
+		.lock_owner_depth =	0
+	};
 	static int die_counter;
-	int nl = 0;
 
-	console_verbose();
-	spin_lock_irq(&die_lock);
-	bust_spinlocks(1);
-	handle_BUG(regs);
-	printk(KERN_ALERT "%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
+	if (die.lock_owner != smp_processor_id()) {
+		console_verbose();
+		spin_lock_irq(&die.lock);
+		die.lock_owner = smp_processor_id();
+		die.lock_owner_depth = 0;
+		bust_spinlocks(1);
+	}
+
+	if (++die.lock_owner_depth < 3) {
+		int nl = 0;
+		handle_BUG(regs);
+		printk(KERN_ALERT "%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
 #ifdef CONFIG_PREEMPT
-	printk("PREEMPT ");
-	nl = 1;
+		printk("PREEMPT ");
+		nl = 1;
 #endif
 #ifdef CONFIG_SMP
-	printk("SMP ");
-	nl = 1;
+		printk("SMP ");
+		nl = 1;
 #endif
 #ifdef CONFIG_DEBUG_PAGEALLOC
-	printk("DEBUG_PAGEALLOC");
-	nl = 1;
+		printk("DEBUG_PAGEALLOC");
+		nl = 1;
 #endif
-	if (nl)
-		printk("\n");
-	show_registers(regs);
+		if (nl)
+			printk("\n");
+		show_registers(regs);
+  	} else
+		printk(KERN_ERR "Recursive die() failure, output suppressed\n");
+
 	bust_spinlocks(0);
-	spin_unlock_irq(&die_lock);
+	die.lock_owner = -1;
+	spin_unlock_irq(&die.lock);
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
@@ -431,9 +450,6 @@ DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
-	if (regs->eflags & X86_EFLAGS_IF)
-		local_irq_enable();
- 
 	if (regs->eflags & VM_MASK)
 		goto gp_in_vm86;
 
@@ -494,6 +510,27 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 		reason, smp_processor_id());
 	printk("Dazed and confused, but trying to continue\n");
 	printk("Do you have a strange power saving mode enabled?\n");
+}
+
+static spinlock_t nmi_print_lock = SPIN_LOCK_UNLOCKED;
+
+void die_nmi (struct pt_regs *regs, const char *msg)
+{
+	spin_lock(&nmi_print_lock);
+	/*
+	* We are in trouble anyway, lets at least try
+	* to get a message out.
+	*/
+	bust_spinlocks(1);
+	printk(msg);
+	printk(" on CPU%d, eip %08lx, registers:\n",
+		smp_processor_id(), regs->eip);
+	show_registers(regs);
+	printk("console shuts up ...\n");
+	console_silent();
+	spin_unlock(&nmi_print_lock);
+	bust_spinlocks(0);
+	do_exit(SIGSEGV);
 }
 
 static void default_do_nmi(struct pt_regs * regs)

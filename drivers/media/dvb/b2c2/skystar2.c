@@ -2345,7 +2345,7 @@ static struct pci_device_id skystar2_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, skystar2_pci_tbl);
 
 static struct pci_driver skystar2_pci_driver = {
-	.name = "Technisat SkyStar2 driver",
+	.name = "SkyStar2",
 	.id_table = skystar2_pci_tbl,
 	.probe = skystar2_probe,
 	.remove = skystar2_remove,

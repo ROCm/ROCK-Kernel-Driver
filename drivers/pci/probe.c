@@ -640,7 +640,7 @@ pci_scan_single_device(struct pci_bus *bus, int devfn)
 		return NULL;
 	
 	/* Fix up broken headers */
-	pci_fixup_device(PCI_FIXUP_HEADER, dev);
+	pci_fixup_device(pci_fixup_header, dev);
 
 	/*
 	 * Add the device to our list of discovered devices

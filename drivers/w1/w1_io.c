@@ -55,6 +55,14 @@ void w1_delay(unsigned long tm)
 	udelay(tm * w1_delay_parm);
 }
 
+u8 w1_touch_bit(struct w1_master *dev, int bit)
+{
+	if (dev->bus_master->touch_bit)
+		return dev->bus_master->touch_bit(dev->bus_master->data, bit);
+	else
+		return w1_read_bit(dev);
+}
+
 void w1_write_bit(struct w1_master *dev, int bit)
 {
 	if (bit) {
@@ -74,8 +82,11 @@ void w1_write_8(struct w1_master *dev, u8 byte)
 {
 	int i;
 
-	for (i = 0; i < 8; ++i)
-		w1_write_bit(dev, (byte >> i) & 0x1);
+	if (dev->bus_master->write_byte)
+		dev->bus_master->write_byte(dev->bus_master->data, byte);
+	else
+		for (i = 0; i < 8; ++i)
+			w1_write_bit(dev, (byte >> i) & 0x1);
 }
 
 u8 w1_read_bit(struct w1_master *dev)
@@ -98,23 +109,57 @@ u8 w1_read_8(struct w1_master * dev)
 	int i;
 	u8 res = 0;
 
-	for (i = 0; i < 8; ++i)
-		res |= (w1_read_bit(dev) << i);
+	if (dev->bus_master->read_byte)
+		res = dev->bus_master->read_byte(dev->bus_master->data);
+	else
+		for (i = 0; i < 8; ++i)
+			res |= (w1_read_bit(dev) << i);
 
 	return res;
 }
 
+void w1_write_block(struct w1_master *dev, u8 *buf, int len)
+{
+	int i;
+
+	if (dev->bus_master->write_block)
+		dev->bus_master->write_block(dev->bus_master->data, buf, len);
+	else
+		for (i = 0; i < len; ++i)
+			w1_write_8(dev, buf[i]);
+}
+
+u8 w1_read_block(struct w1_master *dev, u8 *buf, int len)
+{
+	int i;
+	u8 ret;
+
+	if (dev->bus_master->read_block)
+		ret = dev->bus_master->read_block(dev->bus_master->data, buf, len);
+	else {
+		for (i = 0; i < len; ++i)
+			buf[i] = w1_read_8(dev);
+		ret = len;
+	}
+
+	return ret;
+}
+
 int w1_reset_bus(struct w1_master *dev)
 {
-	int result;
+	int result = 0;
 
-	dev->bus_master->write_bit(dev->bus_master->data, 0);
-	w1_delay(480);
-	dev->bus_master->write_bit(dev->bus_master->data, 1);
-	w1_delay(70);
+	if (dev->bus_master->reset_bus)
+		result = dev->bus_master->reset_bus(dev->bus_master->data) & 0x1;
+	else {
+		dev->bus_master->write_bit(dev->bus_master->data, 0);
+		w1_delay(480);
+		dev->bus_master->write_bit(dev->bus_master->data, 1);
+		w1_delay(70);
 
-	result = dev->bus_master->read_bit(dev->bus_master->data) & 0x1;
-	w1_delay(410);
+		result = dev->bus_master->read_bit(dev->bus_master->data) & 0x1;
+		w1_delay(410);
+	}
 
 	return result;
 }
@@ -136,3 +181,5 @@ EXPORT_SYMBOL(w1_read_8);
 EXPORT_SYMBOL(w1_reset_bus);
 EXPORT_SYMBOL(w1_calc_crc8);
 EXPORT_SYMBOL(w1_delay);
+EXPORT_SYMBOL(w1_read_block);
+EXPORT_SYMBOL(w1_write_block);

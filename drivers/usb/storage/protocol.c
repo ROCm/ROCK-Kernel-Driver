@@ -45,6 +45,8 @@
  */
 
 #include <linux/highmem.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -59,7 +61,7 @@
  * Fix-up the return data from an INQUIRY command to show 
  * ANSI SCSI rev 2 so we don't confuse the SCSI layers above us
  */
-static void fix_inquiry_data(Scsi_Cmnd *srb)
+static void fix_inquiry_data(struct scsi_cmnd *srb)
 {
 	unsigned char databuf[3];
 	unsigned int index, offset;
@@ -91,7 +93,7 @@ static void fix_inquiry_data(Scsi_Cmnd *srb)
  * Fix-up the return data from a READ CAPACITY command. My Feiya reader
  * returns a value that is 1 too large.
  */
-static void fix_read_capacity(Scsi_Cmnd *srb)
+static void fix_read_capacity(struct scsi_cmnd *srb)
 {
 	unsigned int index, offset;
 	u32 c;
@@ -120,11 +122,11 @@ static void fix_read_capacity(Scsi_Cmnd *srb)
  * Protocol routines
  ***********************************************************************/
 
-void usb_stor_qic157_command(Scsi_Cmnd *srb, struct us_data *us)
+void usb_stor_qic157_command(struct scsi_cmnd *srb, struct us_data *us)
 {
 	/* Pad the ATAPI command with zeros 
 	 *
-	 * NOTE: This only works because a Scsi_Cmnd struct field contains
+	 * NOTE: This only works because a scsi_cmnd struct field contains
 	 * a unsigned char cmnd[16], so we know we have storage available
 	 */
 	for (; srb->cmd_len<12; srb->cmd_len++)
@@ -141,11 +143,11 @@ void usb_stor_qic157_command(Scsi_Cmnd *srb, struct us_data *us)
 	}
 }
 
-void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
+void usb_stor_ATAPI_command(struct scsi_cmnd *srb, struct us_data *us)
 {
 	/* Pad the ATAPI command with zeros 
 	 *
-	 * NOTE: This only works because a Scsi_Cmnd struct field contains
+	 * NOTE: This only works because a scsi_cmnd struct field contains
 	 * a unsigned char cmnd[16], so we know we have storage available
 	 */
 
@@ -166,12 +168,12 @@ void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
 }
 
 
-void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
+void usb_stor_ufi_command(struct scsi_cmnd *srb, struct us_data *us)
 {
 	/* fix some commands -- this is a form of mode translation
 	 * UFI devices only accept 12 byte long commands 
 	 *
-	 * NOTE: This only works because a Scsi_Cmnd struct field contains
+	 * NOTE: This only works because a scsi_cmnd struct field contains
 	 * a unsigned char cmnd[16], so we know we have storage available
 	 */
 
@@ -213,7 +215,8 @@ void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
 	}
 }
 
-void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
+void usb_stor_transparent_scsi_command(struct scsi_cmnd *srb,
+				       struct us_data *us)
 {
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
@@ -241,7 +244,7 @@ void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
  * pick up from where this one left off. */
 
 unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
-	unsigned int buflen, Scsi_Cmnd *srb, unsigned int *index,
+	unsigned int buflen, struct scsi_cmnd *srb, unsigned int *index,
 	unsigned int *offset, enum xfer_buf_dir dir)
 {
 	unsigned int cnt;
@@ -327,7 +330,7 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 /* Store the contents of buffer into srb's transfer buffer and set the
  * SCSI residue. */
 void usb_stor_set_xfer_buf(unsigned char *buffer,
-	unsigned int buflen, Scsi_Cmnd *srb)
+	unsigned int buflen, struct scsi_cmnd *srb)
 {
 	unsigned int index = 0, offset = 0;
 

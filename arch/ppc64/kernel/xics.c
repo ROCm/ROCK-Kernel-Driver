@@ -536,7 +536,7 @@ nextnode:
 #ifdef CONFIG_SMP
 		for_each_cpu(i) {
 			/* FIXME: Do this dynamically! --RR */
-			if (!cpu_present_at_boot(i))
+			if (!cpu_present(i))
 				continue;
 			xics_per_cpu[i] = __ioremap((ulong)inodes[get_hard_smp_processor_id(i)].addr, 
 						    (ulong)inodes[get_hard_smp_processor_id(i)].size,

@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/ip.h>
+#include <linux/moduleparam.h>
 #include <net/checksum.h>
 #include <net/udp.h>
 
@@ -34,7 +35,7 @@ static unsigned int master_timeout = 300;
 MODULE_AUTHOR("Brian J. Murrell <netfilter@interlinx.bc.ca>");
 MODULE_DESCRIPTION("Amanda connection tracking module");
 MODULE_LICENSE("GPL");
-MODULE_PARM(master_timeout, "i");
+module_param(master_timeout, int, 0600);
 MODULE_PARM_DESC(master_timeout, "timeout for the master connection");
 
 static char *conns[] = { "DATA ", "MESG ", "INDEX " };
@@ -48,7 +49,7 @@ static int help(struct sk_buff *skb,
 {
 	struct ip_conntrack_expect *exp;
 	struct ip_ct_amanda_expect *exp_amanda_info;
-	char *data, *data_limit, *tmp;
+	char *amp, *data, *data_limit, *tmp;
 	unsigned int dataoff, i;
 	u_int16_t port, len;
 
@@ -58,7 +59,7 @@ static int help(struct sk_buff *skb,
 
 	/* increase the UDP timeout of the master connection as replies from
 	 * Amanda clients to the server can be quite delayed */
-	ip_ct_refresh(ct, master_timeout * HZ);
+	ip_ct_refresh_acct(ct, ctinfo, NULL, master_timeout * HZ);
 
 	/* No data? */
 	dataoff = skb->nh.iph->ihl*4 + sizeof(struct udphdr);
@@ -69,9 +70,11 @@ static int help(struct sk_buff *skb,
 	}
 
 	LOCK_BH(&amanda_buffer_lock);
-	skb_copy_bits(skb, dataoff, amanda_buffer, skb->len - dataoff);
-	data = amanda_buffer;
-	data_limit = amanda_buffer + skb->len - dataoff;
+	amp = skb_header_pointer(skb, dataoff,
+				 skb->len - dataoff, amanda_buffer);
+	BUG_ON(amp == NULL);
+	data = amp;
+	data_limit = amp + skb->len - dataoff;
 	*data_limit = '\0';
 
 	/* Search for the CONNECT string */
@@ -107,7 +110,7 @@ static int help(struct sk_buff *skb,
 		exp->mask.dst.u.tcp.port = 0xFFFF;
 
 		exp_amanda_info = &exp->help.exp_amanda_info;
-		exp_amanda_info->offset = tmp - amanda_buffer;
+		exp_amanda_info->offset = tmp - amp;
 		exp_amanda_info->port   = port;
 		exp_amanda_info->len    = len;
 

@@ -7,13 +7,9 @@
  *
  * CODE STATUS HIGHLIGHTS
  *
- * Used with a gadget driver like "zero.c" this enumerates fine to Windows
- * or Linux hosts; handles disconnect, reconnect, and reset, for full or
- * high speed operation; and passes USB-IF "chapter 9" tests.
- *
- * Handles standard stress loads from the Linux "usbtest" driver, with
- * either DMA (default) or PIO (use_dma=n) used for ep-{a,b,c,d}.  Testing
- * with "ttcp" (and the "ether.c" driver) behaves nicely too.
+ * This driver should work well with most "gadget" drivers, including
+ * the File Storage, Serial, and Ethernet/RNDIS gadget drivers
+ * as well as Gadget Zero and Gadgetfs.
  *
  * DMA is enabled by default.  Drivers using transfer queues might use
  * DMA chaining to remove IRQ latencies between transfers.  (Except when
@@ -678,7 +674,7 @@ read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 	}
 	if (count) {
 		tmp = readl (&regs->ep_data);
-		cpu_to_le32s (&tmp);
+		/* LE conversion is implicit here: */
 		do {
 			*buf++ = (u8) tmp;
 			tmp >>= 8;
@@ -1419,10 +1415,34 @@ static int net2280_set_selfpowered (struct usb_gadget *_gadget, int value)
 	return 0;
 }
 
+static int net2280_pullup(struct usb_gadget *_gadget, int is_on)
+{
+	struct net2280  *dev;
+	u32             tmp;
+	unsigned long   flags;
+
+	if (!_gadget)
+		return -ENODEV;
+	dev = container_of (_gadget, struct net2280, gadget);
+
+	spin_lock_irqsave (&dev->lock, flags);
+	tmp = readl (&dev->usb->usbctl);
+	dev->softconnect = (is_on != 0);
+	if (is_on)
+		tmp |= (1 << USB_DETECT_ENABLE);
+	else
+		tmp &= ~(1 << USB_DETECT_ENABLE);
+	writel (tmp, &dev->usb->usbctl);
+	spin_unlock_irqrestore (&dev->lock, flags);
+
+	return 0;
+}
+
 static const struct usb_gadget_ops net2280_ops = {
 	.get_frame	= net2280_get_frame,
 	.wakeup		= net2280_wakeup,
 	.set_selfpowered = net2280_set_selfpowered,
+	.pullup		= net2280_pullup,
 };
 
 /*-------------------------------------------------------------------------*/
@@ -1807,8 +1827,6 @@ static void usb_reset (struct net2280 *dev)
 {
 	u32	tmp;
 
-	/* force immediate bus disconnect, and synch through pci */
-	writel (0, &dev->usb->usbctl);
 	dev->gadget.speed = USB_SPEED_UNKNOWN;
 	(void) readl (&dev->usb->usbctl);
 
@@ -1905,7 +1923,7 @@ static void ep0_start (struct net2280 *dev)
 		/* erratum 0102 workaround */
 		| ((dev->chiprev == 0100) ? 0 : 1) << SUSPEND_IMMEDIATELY
 		| (1 << REMOTE_WAKEUP_SUPPORT)
-		| (1 << USB_DETECT_ENABLE)
+		| (dev->softconnect << USB_DETECT_ENABLE)
 		| (1 << SELF_POWERED_STATUS)
 		, &dev->usb->usbctl);
 
@@ -1957,6 +1975,7 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 		dev->ep [i].irqs = 0;
 
 	/* hook up the driver ... */
+	dev->softconnect = 1;
 	driver->driver.bus = NULL;
 	dev->driver = driver;
 	dev->gadget.dev.driver = &driver->driver;
@@ -2788,6 +2807,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->epregs = (struct net2280_ep_regs *) (base + 0x0300);
 
 	/* put into initial config, link up all endpoints */
+	writel (0, &dev->usb->usbctl);
 	usb_reset (dev);
 	usb_reinit (dev);
 

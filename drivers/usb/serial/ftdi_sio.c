@@ -17,6 +17,11 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (21/Jul/2004) Ian Abbott
+ *      Incorporated Steven Turner's code to add support for the FT2232C chip.
+ *      The prelimilary port to the 2.6 kernel was by Rus V. Brushkoff.  I have
+ *      fixed a couple of things.
+ *
  * (27/May/2004) Ian Abbott
  *      Improved throttling code, mostly stolen from the WhiteHEAT driver.
  *
@@ -259,7 +264,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.4.0"
+#define DRIVER_VERSION "v1.4.1"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>, Bill Ryder <bryder@sgi.com>, Kuba Ober <kuba@mareimbrium.org>"
 #define DRIVER_DESC "USB FTDI Serial Converters Driver"
 
@@ -489,11 +494,18 @@ static struct usb_device_id id_table_HE_TIRA1 [] = {
 };
 
 
+static struct usb_device_id id_table_FT2232C[] = {
+	{ USB_DEVICE(FTDI_VID, FTDI_8U2232C_PID) },
+	{ }						/* Terminating entry */
+};
+
+
 static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_IRTRANS_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_ALT_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_8U2232C_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_RELAIS_PID) },
 	{ USB_DEVICE(INTERBIOMETRICS_VID, INTERBIOMETRICS_IOBOARD_PID) },
 	{ USB_DEVICE(INTERBIOMETRICS_VID, INTERBIOMETRICS_MINI_IOBOARD_PID) },
@@ -621,6 +633,8 @@ struct ftdi_private {
 	__u8 rx_flags;		/* receive state flags (throttling) */
 	spinlock_t rx_lock;	/* spinlock for receive state */
 
+	__u16 interface;	/* FT2232C port interface (0 for FT232/245) */
+
 	int force_baud;		/* if non-zero, force the baud rate to this value */
 	int force_rtscts;	/* if non-zero, force RTS-CTS to always be enabled */
 };
@@ -637,6 +651,7 @@ struct ftdi_private {
 static int  ftdi_SIO_startup		(struct usb_serial *serial);
 static int  ftdi_8U232AM_startup	(struct usb_serial *serial);
 static int  ftdi_FT232BM_startup	(struct usb_serial *serial);
+static int  ftdi_FT2232C_startup	(struct usb_serial *serial);
 static int  ftdi_USB_UIRT_startup	(struct usb_serial *serial);
 static int  ftdi_HE_TIRA1_startup	(struct usb_serial *serial);
 static void ftdi_shutdown		(struct usb_serial *serial);
@@ -736,6 +751,32 @@ static struct usb_serial_device_type ftdi_FT232BM_device = {
 	.set_termios =		ftdi_set_termios,
 	.break_ctl =		ftdi_break_ctl,
 	.attach =		ftdi_FT232BM_startup,
+	.shutdown =		ftdi_shutdown,
+};
+
+static struct usb_serial_device_type ftdi_FT2232C_device = {
+	.owner =		THIS_MODULE,
+	.name =			"FTDI FT2232C Compatible",
+	.id_table =		id_table_FT2232C,
+	.num_interrupt_in =	0,
+	.num_bulk_in =		1,
+	.num_bulk_out =		1,
+	.num_ports =		1,
+	.open =			ftdi_open,
+	.close =		ftdi_close,
+	.throttle =		ftdi_throttle,
+	.unthrottle =		ftdi_unthrottle,
+	.write =		ftdi_write,
+	.write_room =		ftdi_write_room,
+	.chars_in_buffer =	ftdi_chars_in_buffer,
+	.read_bulk_callback =	ftdi_read_bulk_callback,
+	.write_bulk_callback =	ftdi_write_bulk_callback,
+	.tiocmget =             ftdi_tiocmget,
+	.tiocmset =             ftdi_tiocmset,
+	.ioctl =		ftdi_ioctl,
+	.set_termios =		ftdi_set_termios,
+	.break_ctl =		ftdi_break_ctl,
+	.attach =		ftdi_FT2232C_startup,
 	.shutdown =		ftdi_shutdown,
 };
 
@@ -866,7 +907,7 @@ static int set_rts(struct usb_serial_port *port, int high_or_low)
 			       usb_sndctrlpipe(port->serial->dev, 0),
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST, 
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST_TYPE,
-			       ftdi_high_or_low, 0, 
+			       ftdi_high_or_low, priv->interface, 
 			       buf, 0, WDR_TIMEOUT);
 
 	kfree(buf);
@@ -896,7 +937,7 @@ static int set_dtr(struct usb_serial_port *port, int high_or_low)
 			       usb_sndctrlpipe(port->serial->dev, 0),
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST, 
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST_TYPE,
-			       ftdi_high_or_low, 0, 
+			       ftdi_high_or_low, priv->interface, 
 			       buf, 0, WDR_TIMEOUT);
 
 	kfree(buf);
@@ -909,6 +950,7 @@ static __u32 get_ftdi_divisor(struct usb_serial_port * port);
 
 static int change_speed(struct usb_serial_port *port)
 {
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	char *buf;
         __u16 urb_value;
 	__u16 urb_index;
@@ -922,6 +964,9 @@ static int change_speed(struct usb_serial_port *port)
 	urb_index_value = get_ftdi_divisor(port);
 	urb_value = (__u16)urb_index_value;
 	urb_index = (__u16)(urb_index_value >> 16);
+	if (priv->interface) {	/* FT2232C */
+		urb_index = (__u16)((urb_index << 8) | priv->interface);
+	}
 	
 	rv = usb_control_msg(port->serial->dev,
 			    usb_sndctrlpipe(port->serial->dev, 0),
@@ -1015,7 +1060,12 @@ static __u32 get_ftdi_divisor(struct usb_serial_port * port)
 		}
 		break;
 	case FT232BM: /* FT232BM chip */
-		chip_name = "FT232BM";
+	case FT2232C: /* FT2232C chip */
+		if (priv->chip_type == FT2232C) {
+			chip_name = "FT2232C";
+		} else {
+			chip_name = "FT232BM";
+		}
 		if (baud <= 3000000) {
 			div_value = ftdi_232bm_baud_to_divisor(baud);
 		} else {
@@ -1231,6 +1281,35 @@ static int ftdi_FT232BM_startup (struct usb_serial *serial)
 	return (0);
 } /* ftdi_FT232BM_startup */
 
+/* Startup for the FT2232C chip */
+/* Called from usbserial:serial_probe */
+static int ftdi_FT2232C_startup (struct usb_serial *serial)
+{ /* ftdi_FT2232C_startup */
+	struct ftdi_private *priv;
+	int err;
+	int inter;
+
+	dbg("%s",__FUNCTION__);
+	err = ftdi_common_startup(serial);
+	if (err){
+		return (err);
+	}
+
+	priv = usb_get_serial_port_data(serial->port[0]);
+	priv->chip_type = FT2232C;
+	inter = serial->interface->altsetting->desc.bInterfaceNumber;
+
+	if (inter) {
+		priv->interface = INTERFACE_B;
+	}
+	else  {
+		priv->interface = INTERFACE_A;
+	}
+	priv->baud_base = 48000000 / 2; /* Would be / 16, but FT2232C supports multiple of 0.125 divisor fractions! */
+	
+	return (0);
+} /* ftdi_FT2232C_startup */
+
 /* Startup for the USB-UIRT device, which requires hardwired baudrate (38400 gets mapped to 312500) */
 /* Called from usbserial:serial_probe */
 static int ftdi_USB_UIRT_startup (struct usb_serial *serial)
@@ -1323,7 +1402,7 @@ static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 	usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			FTDI_SIO_RESET_REQUEST, FTDI_SIO_RESET_REQUEST_TYPE, 
 			FTDI_SIO_RESET_SIO, 
-			0, buf, 0, WDR_TIMEOUT);
+			priv->interface, buf, 0, WDR_TIMEOUT);
 
 	/* Termios defaults are set by usb_serial_init. We don't change
 	   port->tty->termios - this would loose speed settings, etc.
@@ -1373,6 +1452,7 @@ static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 { /* ftdi_close */
 	unsigned int c_cflag = port->tty->termios->c_cflag;
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	char buf[1];
 
 	dbg("%s", __FUNCTION__);
@@ -1383,7 +1463,8 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 				    usb_sndctrlpipe(port->serial->dev, 0),
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-				    0, 0, buf, 0, WDR_TIMEOUT) < 0) {
+				    0, priv->interface, buf, 0,
+				    WDR_TIMEOUT) < 0) {
 			err("error from flowcontrol urb");
 		}	    
 
@@ -1796,7 +1877,7 @@ static void ftdi_break_ctl( struct usb_serial_port *port, int break_state )
 	if (usb_control_msg(port->serial->dev, usb_sndctrlpipe(port->serial->dev, 0),
 			    FTDI_SIO_SET_DATA_REQUEST, 
 			    FTDI_SIO_SET_DATA_REQUEST_TYPE,
-			    urb_value , 0,
+			    urb_value , priv->interface,
 			    buf, 0, WDR_TIMEOUT) < 0) {
 		err("%s FAILED to enable/disable break state (state was %d)", __FUNCTION__,break_state);
 	}	   
@@ -1875,7 +1956,7 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 	if (usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			    FTDI_SIO_SET_DATA_REQUEST, 
 			    FTDI_SIO_SET_DATA_REQUEST_TYPE,
-			    urb_value , 0,
+			    urb_value , priv->interface,
 			    buf, 0, 100) < 0) {
 		err("%s FAILED to set databits/stopbits/parity", __FUNCTION__);
 	}	   
@@ -1886,7 +1967,7 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 		if (usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST, 
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-				    0, 0, 
+				    0, priv->interface, 
 				    buf, 0, WDR_TIMEOUT) < 0) {
 			err("%s error from disable flowcontrol urb", __FUNCTION__);
 		}	    
@@ -1903,6 +1984,13 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 		if (change_speed(port)) {
 			err("%s urb failed to set baurdrate", __FUNCTION__);
 		}
+		/* Ensure  RTS and DTR are raised */
+		else if (set_dtr(port, HIGH) < 0){
+			err("%s Error from DTR HIGH urb", __FUNCTION__);
+		}
+		else if (set_rts(port, HIGH) < 0){
+			err("%s Error from RTS HIGH urb", __FUNCTION__);
+		}	
 	}
 
 	/* Set flow control */
@@ -1913,7 +2001,7 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 				    usb_sndctrlpipe(dev, 0),
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST, 
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-				    0 , FTDI_SIO_RTS_CTS_HS,
+				    0 , (FTDI_SIO_RTS_CTS_HS | priv->interface),
 				    buf, 0, WDR_TIMEOUT) < 0) {
 			err("urb failed to set to rts/cts flow control");
 		}		
@@ -1939,7 +2027,8 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 					    usb_sndctrlpipe(dev, 0),
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-					    urb_value , FTDI_SIO_XON_XOFF_HS,
+					    urb_value , (FTDI_SIO_XON_XOFF_HS
+							 | priv->interface),
 					    buf, 0, WDR_TIMEOUT) < 0) {
 				err("urb failed to set to xon/xoff flow control");
 			}
@@ -1951,7 +2040,7 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 					    usb_sndctrlpipe(dev, 0),
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST, 
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-					    0, 0, 
+					    0, priv->interface, 
 					    buf, 0, WDR_TIMEOUT) < 0) {
 				err("urb failed to clear flow control");
 			}				
@@ -1985,13 +2074,14 @@ static int ftdi_tiocmget (struct usb_serial_port *port, struct file *file)
 		break;
 	case FT8U232AM:
 	case FT232BM:
+	case FT2232C:
 		/* the 8U232AM returns a two byte value (the sio is a 1 byte value) - in the same
 		   format as the data returned from the in point */
 		if ((ret = usb_control_msg(port->serial->dev, 
 					   usb_rcvctrlpipe(port->serial->dev, 0),
 					   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
 					   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
-					   0, 0, 
+					   0, priv->interface, 
 					   buf, 2, WDR_TIMEOUT)) < 0 ) {
 			err("%s Could not get modem status of device - err: %d", __FUNCTION__,
 			    ret);
@@ -2206,6 +2296,9 @@ static int __init ftdi_init (void)
 	retval = usb_serial_register(&ftdi_FT232BM_device);
 	if (retval)
 		goto failed_FT232BM_register;
+	retval = usb_serial_register(&ftdi_FT2232C_device);
+	if (retval)
+		goto failed_FT2232C_register;
 	retval = usb_serial_register(&ftdi_USB_UIRT_device);
 	if (retval)
 		goto failed_USB_UIRT_register;
@@ -2223,6 +2316,8 @@ failed_usb_register:
 failed_HE_TIRA1_register:
 	usb_serial_deregister(&ftdi_USB_UIRT_device);
 failed_USB_UIRT_register:
+	usb_serial_deregister(&ftdi_FT2232C_device);
+failed_FT2232C_register:
 	usb_serial_deregister(&ftdi_FT232BM_device);
 failed_FT232BM_register:
 	usb_serial_deregister(&ftdi_8U232AM_device);
@@ -2241,6 +2336,7 @@ static void __exit ftdi_exit (void)
 	usb_deregister (&ftdi_driver);
 	usb_serial_deregister (&ftdi_HE_TIRA1_device);
 	usb_serial_deregister (&ftdi_USB_UIRT_device);
+	usb_serial_deregister (&ftdi_FT2232C_device);
 	usb_serial_deregister (&ftdi_FT232BM_device);
 	usb_serial_deregister (&ftdi_8U232AM_device);
 	usb_serial_deregister (&ftdi_SIO_device);

@@ -19,6 +19,9 @@ ipchains-objs		:= $(ip_nf_compat-objs) ipchains_core.o
 # connection tracking
 obj-$(CONFIG_IP_NF_CONNTRACK) += ip_conntrack.o
 
+# SCTP protocol connection tracking
+obj-$(CONFIG_IP_NF_CT_PROTO_SCTP) += ip_conntrack_proto_sctp.o
+
 # connection tracking helpers
 obj-$(CONFIG_IP_NF_AMANDA) += ip_conntrack_amanda.o
 obj-$(CONFIG_IP_NF_TFTP) += ip_conntrack_tftp.o
@@ -43,6 +46,7 @@ obj-$(CONFIG_IP_NF_RAW) += iptable_raw.o
 # matches
 obj-$(CONFIG_IP_NF_MATCH_HELPER) += ipt_helper.o
 obj-$(CONFIG_IP_NF_MATCH_LIMIT) += ipt_limit.o
+obj-$(CONFIG_IP_NF_MATCH_SCTP) += ipt_sctp.o
 obj-$(CONFIG_IP_NF_MATCH_MARK) += ipt_mark.o
 obj-$(CONFIG_IP_NF_MATCH_MAC) += ipt_mac.o
 obj-$(CONFIG_IP_NF_MATCH_IPRANGE) += ipt_iprange.o

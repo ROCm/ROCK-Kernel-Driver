@@ -49,6 +49,22 @@
 #define DPRINTK(fmt, args...)
 #endif
 
+#define FBMON_FIX_HEADER 1
+
+#ifdef CONFIG_FB_MODE_HELPERS
+struct broken_edid {
+	u8  manufacturer[4];
+	u32 model;
+	u32 fix;
+};
+
+static struct broken_edid brokendb[] = {
+	/* DEC FR-PCXAV-YZ */
+	{ .manufacturer = "DEC",
+	  .model        = 0x073a,
+	  .fix          = FBMON_FIX_HEADER,
+	},
+};
 
 const unsigned char edid_v1_header[] = { 0x00, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0x00
@@ -65,30 +81,77 @@ static void copy_string(unsigned char *c, unsigned char *s)
   while (i-- && (*--s == 0x20)) *s = 0;
 }
 
+static void fix_broken_edid(unsigned char *edid)
+{
+	unsigned char *block = edid + ID_MANUFACTURER_NAME, manufacturer[4];
+	u32 model, i;
+
+	manufacturer[0] = ((block[0] & 0x7c) >> 2) + '@';
+	manufacturer[1] = ((block[0] & 0x03) << 3) +
+		((block[1] & 0xe0) >> 5) + '@';
+	manufacturer[2] = (block[1] & 0x1f) + '@';
+	manufacturer[3] = 0;
+	model = block[2] + (block[3] << 8);
+
+	for (i = 0; i < ARRAY_SIZE(brokendb); i++) {
+		if (!strncmp(manufacturer, brokendb[i].manufacturer, 4) &&
+			brokendb[i].model == model) {
+			switch (brokendb[i].fix) {
+			case FBMON_FIX_HEADER:
+				printk("fbmon: The EDID header of "
+				       "Manufacturer: %s Model: 0x%x is "
+				       "known to be broken,\n"
+				       "fbmon: trying a header "
+				       "reconstruct\n", manufacturer, model);
+				memcpy(edid, edid_v1_header, 8);
+				break;
+			}
+		}
+	}
+}
+
 static int edid_checksum(unsigned char *edid)
 {
-	unsigned char i, csum = 0;
+	unsigned char i, csum = 0, all_null = 0;
 
-	for (i = 0; i < EDID_LENGTH; i++)
+	for (i = 0; i < EDID_LENGTH; i++) {
 		csum += edid[i];
+		all_null |= edid[i];
+	}
 
-	if (csum == 0x00) {
+	if (csum == 0x00 && all_null) {
 		/* checksum passed, everything's good */
 		return 1;
-	} else {
+	}
+
+	fix_broken_edid(edid);
+	csum = all_null = 0;
+	for (i = 0; i < EDID_LENGTH; i++) {
+		csum += edid[i];
+		all_null |= edid[i];
+	}
+	if (csum != 0x00 || !all_null) {
 		printk("EDID checksum failed, aborting\n");
 		return 0;
 	}
+	return 1;
 }
 
 static int edid_check_header(unsigned char *edid)
 {
-	if ((edid[0] != 0x00) || (edid[1] != 0xff) || (edid[2] != 0xff) ||
-	    (edid[3] != 0xff) || (edid[4] != 0xff) || (edid[5] != 0xff) ||
-	    (edid[6] != 0xff)) {
-		printk
-		    ("EDID header doesn't match EDID v1 header, aborting\n");
-		return 0;
+	int i, fix = 0;
+
+	for (i = 0; i < 8; i++) {
+		if (edid[i] != edid_v1_header[i])
+			fix = 1;
+	}
+	if (!fix)
+		return 1;
+
+	fix_broken_edid(edid);
+	for (i = 0; i < 8; i++) {
+		if (edid[i] != edid_v1_header[i])
+			return 0;
 	}
 	return 1;
 }
@@ -1094,6 +1157,36 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
 	
 	return 0;
 }
+#else
+int fb_parse_edid(unsigned char *edid, struct fb_var_screeninfo *var)
+{
+	return 1;
+}
+void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs)
+{
+	specs = NULL;
+}
+char *get_EDID_from_firmware(struct device *dev)
+{
+	return NULL;
+}
+struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
+{
+	return NULL;
+}
+void fb_destroy_modedb(struct fb_videomode *modedb)
+{
+}
+int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
+{
+	return 1;
+}
+int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
+		struct fb_info *info)
+{
+	return -EINVAL;
+}
+#endif /* CONFIG_FB_MODE_HELPERS */
 	
 /*
  * fb_validate_mode - validates var against monitor capabilities

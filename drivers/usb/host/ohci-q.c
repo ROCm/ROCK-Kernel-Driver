@@ -751,12 +751,6 @@ static void td_done (struct ohci_hcd *ohci, struct urb *urb, struct td *td)
 
   		cc = TD_CC_GET (tdINFO);
 
-		/* control endpoints only have soft stalls */
-  		if (type != PIPE_CONTROL && cc == TD_CC_STALL)
-			usb_endpoint_halt (urb->dev,
-				usb_pipeendpoint (urb->pipe),
-				usb_pipeout (urb->pipe));
-
 		/* update packet status if needed (short is normally ok) */
 		if (cc == TD_DATAUNDERRUN
 				&& !(urb->transfer_flags & URB_SHORT_NOT_OK))

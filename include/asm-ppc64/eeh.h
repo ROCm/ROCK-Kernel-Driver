@@ -244,7 +244,7 @@ static inline void eeh_memcpy_fromio(void *dest, void *src, unsigned long n) {
 	}
 }
 
-static inline void eeh_memcpy_toio(void *dest, void *src, unsigned long n) {
+static inline void eeh_memcpy_toio(void *dest, const void *src, unsigned long n) {
 	void *vdest = (void *)IO_TOKEN_TO_ADDR(dest);
 
 	while(n && (!EEH_CHECK_ALIGN(vdest, 4) || !EEH_CHECK_ALIGN(src, 4))) {

@@ -166,7 +166,7 @@ config BLK_CPQ_CISS_DA
 
 config CISS_SCSI_TAPE
 	bool "SCSI tape drive support for Smart Array 5xxx"
-	depends on BLK_CPQ_CISS_DA && SCSI
+	depends on BLK_CPQ_CISS_DA && SCSI && PROC_FS
 	help
 	  When enabled (Y), this option allows SCSI tape drives and SCSI medium
 	  changers (tape robots) to be accessed via a Compaq 5xxx array 
@@ -300,6 +300,15 @@ config BLK_DEV_SX8
 	  Promise SATA SX8 controllers.
 
 	  Use devices /dev/sx8/$N and /dev/sx8/$Np$M.
+
+config BLK_DEV_UB
+	tristate "Low Performance USB Block driver"
+	depends on USB
+	help
+	  This driver supports certain USB attached storage devices
+	  such as flash keys.
+
+	  If unsure, say N.
 
 config BLK_DEV_RAM
 	tristate "RAM disk support"

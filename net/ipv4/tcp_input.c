@@ -852,8 +852,10 @@ static void tcp_init_metrics(struct sock *sk)
 	 * to low value, and then abruptly stops to do it and starts to delay
 	 * ACKs, wait for troubles.
 	 */
-	if (dst_metric(dst, RTAX_RTT) > tp->srtt)
+	if (dst_metric(dst, RTAX_RTT) > tp->srtt) {
 		tp->srtt = dst_metric(dst, RTAX_RTT);
+		tp->rtt_seq = tp->snd_nxt;
+	}
 	if (dst_metric(dst, RTAX_RTTVAR) > tp->mdev) {
 		tp->mdev = dst_metric(dst, RTAX_RTTVAR);
 		tp->mdev_max = tp->rttvar = max(tp->mdev, TCP_RTO_MIN);

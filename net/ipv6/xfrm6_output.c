@@ -113,8 +113,7 @@ int xfrm6_output(struct sk_buff **pskb)
 
 	xfrm6_encap(skb);
 
-	err = x->type->output(pskb);
-	skb = *pskb;
+	err = x->type->output(skb);
 	if (err)
 		goto error;
 

@@ -95,7 +95,7 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 	BUG_ON(NInoAttr(dir_ni));
 	/* Get hold of the mft record for the directory. */
 	m = map_mft_record(dir_ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		ntfs_error(sb, "map_mft_record() failed with error code %ld.",
 				-PTR_ERR(m));
 		return ERR_MREF(PTR_ERR(m));
@@ -1170,7 +1170,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		goto skip_index_root;
 	/* Get hold of the mft record for the directory. */
 	m = map_mft_record(ndir);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		err = PTR_ERR(m);
 		m = NULL;
 		goto err_out;
@@ -1261,7 +1261,7 @@ skip_index_root:
 	if (unlikely(!bmp_vi)) {
 		ntfs_debug("Inode 0x%lx, regetting index bitmap.", vdir->i_ino);
 		bmp_vi = ntfs_attr_iget(vdir, AT_BITMAP, I30, 4);
-		if (unlikely(IS_ERR(bmp_vi))) {
+		if (IS_ERR(bmp_vi)) {
 			ntfs_error(sb, "Failed to get bitmap attribute.");
 			err = PTR_ERR(bmp_vi);
 			goto err_out;
@@ -1286,7 +1286,7 @@ get_next_bmp_page:
 			((PAGE_CACHE_SIZE * 8) - 1));
 	bmp_page = ntfs_map_page(bmp_mapping,
 			bmp_pos >> (3 + PAGE_CACHE_SHIFT));
-	if (unlikely(IS_ERR(bmp_page))) {
+	if (IS_ERR(bmp_page)) {
 		ntfs_error(sb, "Reading index bitmap failed.");
 		err = PTR_ERR(bmp_page);
 		bmp_page = NULL;
@@ -1327,7 +1327,7 @@ find_next_index_buffer:
 		 * reading it from disk if necessary.
 		 */
 		ia_page = ntfs_map_page(ia_mapping, ia_pos >> PAGE_CACHE_SHIFT);
-		if (unlikely(IS_ERR(ia_page))) {
+		if (IS_ERR(ia_page)) {
 			ntfs_error(sb, "Reading index allocation data failed.");
 			err = PTR_ERR(ia_page);
 			ia_page = NULL;

@@ -1353,11 +1353,15 @@ static int i810fb_set_par(struct fb_info *info)
 
 	encode_fix(&info->fix, info);
 
-	if (info->var.accel_flags && !(par->dev_flags & LOCKUP)) 
+	if (info->var.accel_flags && !(par->dev_flags & LOCKUP)) {
+		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN |
+		FBINFO_HWACCEL_COPYAREA | FBINFO_HWACCEL_FILLRECT |
+		FBINFO_HWACCEL_IMAGEBLIT;
 		info->pixmap.scan_align = 2;
-	else 
+	} else {
 		info->pixmap.scan_align = 1;
-	
+		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
+	}
 	return 0;
 }
 
@@ -1388,16 +1392,17 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	struct i810fb_par *par = (struct i810fb_par *)info->par;
 	u8 *mmio = par->mmio_start_virtual;	
-	u8 data[64 * 8];
-	
+
 	if (!info->var.accel_flags || par->dev_flags & LOCKUP) 
 		return soft_cursor(info, cursor);
 
 	if (cursor->image.width > 64 || cursor->image.height > 64)
 		return -ENXIO;
 
-	if ((i810_readl(CURBASE, mmio) & 0xf) != par->cursor_heap.physical)
+	if ((i810_readl(CURBASE, mmio) & 0xf) != par->cursor_heap.physical) {
 		i810_init_cursor(par);
+		cursor->set |= FB_CUR_SETALL;
+	}
 
 	i810_enable_cursor(mmio, OFF);
 
@@ -1409,50 +1414,56 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 
 		info->cursor.image.dx = cursor->image.dx;
 		info->cursor.image.dy = cursor->image.dy;
-		
-		tmp = cursor->image.dx - info->var.xoffset;
-		tmp |= (cursor->image.dy - info->var.yoffset) << 16;
-	    
+		tmp = (info->cursor.image.dx - info->var.xoffset) & 0xffff;
+		tmp |= (info->cursor.image.dy - info->var.yoffset) << 16;
 		i810_writel(CURPOS, mmio, tmp);
 	}
 
 	if (cursor->set & FB_CUR_SETSIZE) {
+		i810_reset_cursor_image(par);
 		info->cursor.image.height = cursor->image.height;
 		info->cursor.image.width = cursor->image.width;
-		i810_reset_cursor_image(par);
 	}
 
 	if (cursor->set & FB_CUR_SETCMAP) {
-		info->cursor.image.fg_color = cursor->image.fg_color;
-		info->cursor.image.bg_color = cursor->image.bg_color;
 		i810_load_cursor_colors(cursor->image.fg_color,
 					cursor->image.bg_color,
 					info);
+		info->cursor.image.fg_color = cursor->image.fg_color;
+		info->cursor.image.bg_color = cursor->image.bg_color;
+
 	}
 
-	if (cursor->set & FB_CUR_SETSHAPE) {
+	if (cursor->set & (FB_CUR_SETSHAPE)) {
 		int size = ((info->cursor.image.width + 7) >> 3) * 
-			     info->cursor.image.height;
+			info->cursor.image.height;
 		int i;
+		u8 *data = kmalloc(64 * 8, GFP_KERNEL);
+
+		if (data == NULL)
+			return -ENOMEM;
+		info->cursor.image.data = cursor->image.data;
 
 		switch (info->cursor.rop) {
 		case ROP_XOR:
 			for (i = 0; i < size; i++)
-				data[i] = cursor->image.data[i] ^ info->cursor.mask[i]; 
+				data[i] = info->cursor.image.data[i] ^ info->cursor.mask[i];
 			break;
 		case ROP_COPY:
 		default:
 			for (i = 0; i < size; i++)
-				data[i] = cursor->image.data[i] & info->cursor.mask[i]; 
+				data[i] = info->cursor.image.data[i] & info->cursor.mask[i];
 			break;
 		}
 		i810_load_cursor_image(info->cursor.image.width, 
 				       info->cursor.image.height, data,
 				       par);
+		kfree(data);
 	}
 
 	if (info->cursor.enable)
 		i810_enable_cursor(mmio, ON);
+
 	return 0;
 }
 
@@ -1641,9 +1652,11 @@ static void __devinit i810_init_monspecs(struct fb_info *info)
 		hsync1 = HFMIN;
 	if (!hsync2) 
 		hsync2 = HFMAX;
-	info->monspecs.hfmax = hsync2;
-	info->monspecs.hfmin = hsync1;
-	if (hsync2 < hsync1) 
+	if (!info->monspecs.hfmax)
+		info->monspecs.hfmax = hsync2;
+	if (!info->monspecs.hfmin)
+		info->monspecs.hfmin = hsync1;
+	if (hsync2 < hsync1)
 		info->monspecs.hfmin = hsync2;
 
 	if (!vsync1)
@@ -1652,8 +1665,10 @@ static void __devinit i810_init_monspecs(struct fb_info *info)
 		vsync2 = VFMAX;
 	if (IS_DVT && vsync1 < 60)
 		vsync1 = 60;
-	info->monspecs.vfmax = vsync2;
-	info->monspecs.vfmin = vsync1;		
+	if (!info->monspecs.vfmax)
+		info->monspecs.vfmax = vsync2;
+	if (!info->monspecs.vfmin)
+		info->monspecs.vfmin = vsync1;
 	if (vsync2 < vsync1) 
 		info->monspecs.vfmin = vsync2;
 }
@@ -1724,6 +1739,7 @@ static void __devinit i810_init_device(struct i810fb_par *par)
 	pci_read_config_byte(par->dev, 0x50, &reg);
 	reg &= FREQ_MASK;
 	par->mem_freq = (reg) ? 133 : 100;
+
 }
 
 static int __devinit 
@@ -1836,8 +1852,9 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 {
 	struct fb_info    *info;
 	struct i810fb_par *par = NULL;
-	int err, vfreq, hfreq, pixclock;
+	int i, err = -1, vfreq, hfreq, pixclock;
 
+	i = 0;
 	if (!(info = kmalloc(sizeof(struct fb_info), GFP_KERNEL))) {
 		i810fb_release_resource(info, par);
 		return -ENOMEM;
@@ -1879,8 +1896,6 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 	info->screen_base = par->fb.virtual;
 	info->fbops = &par->i810fb_ops;
 	info->pseudo_palette = par->pseudo_palette;
-	info->flags = FBINFO_FLAG_DEFAULT;
-	
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
 	if ((err = info->fbops->fb_check_var(&info->var, info))) {
@@ -1957,8 +1972,7 @@ static void i810fb_release_resource(struct fb_info *info,
 
 		kfree(par);
 	}
-	if (info) 
-		kfree(info);
+	kfree(info);
 }
 
 static void __exit i810fb_remove_pci(struct pci_dev *dev)

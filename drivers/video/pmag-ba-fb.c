@@ -142,7 +142,7 @@ int __init pmagbafb_init_one(int slot)
 	info->var = pmagbafb_defined;
 	info->fix = pmagbafb_fix; 
 	info->screen_base = pmagbafb_fix.smem_start;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 	

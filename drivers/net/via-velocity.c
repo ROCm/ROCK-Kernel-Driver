@@ -78,7 +78,7 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
-#include <linux/crc16.h>
+#include <linux/crc-ccitt.h>
 #include <linux/crc32.h>
 
 #include "via-velocity.h"
@@ -3086,7 +3086,7 @@ u16 wol_calc_crc(int size, u8 * pattern, u8 *mask_pattern)
 				continue;
 			}
 			mask >>= 1;
-			crc = crc16(crc, &(pattern[i * 8 + j]), 1);
+			crc = crc_ccitt(crc, &(pattern[i * 8 + j]), 1);
 		}
 	}
 	/*	Finally, invert the result once to get the correct data */

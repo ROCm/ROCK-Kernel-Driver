@@ -44,23 +44,26 @@ match(const struct sk_buff *skb,
       int offset,
       int *hotdrop)
 {
-	struct ip_esp_hdr esp;
+	struct ip_esp_hdr _esp, *eh;
 	const struct ipt_esp *espinfo = matchinfo;
 
 	/* Must not be a fragment. */
 	if (offset)
 		return 0;
 
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &esp, sizeof(esp)) < 0) {
+	eh = skb_header_pointer(skb, skb->nh.iph->ihl * 4,
+				sizeof(_esp), &_esp);
+	if (eh == NULL) {
 		/* We've been asked to examine this packet, and we
-		   can't.  Hence, no choice but to drop. */
+		 * can't.  Hence, no choice but to drop.
+		 */
 		duprintf("Dropping evil ESP tinygram.\n");
 		*hotdrop = 1;
 		return 0;
 	}
 
 	return spi_match(espinfo->spis[0], espinfo->spis[1],
-			 ntohl(esp.spi),
+			 ntohl(eh->spi),
 			 !!(espinfo->invflags & IPT_ESP_INV_SPI));
 }
 
