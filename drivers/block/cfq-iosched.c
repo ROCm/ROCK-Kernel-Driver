@@ -36,7 +36,7 @@ static int cfq_back_penalty = 2;	/* penalty of a backwards seek */
 static int cfq_slice_sync = HZ / 10;
 static int cfq_slice_async = HZ / 50;
 static int cfq_slice_async_rq = 2;
-static int cfq_slice_idle = HZ / 50;
+static int cfq_slice_idle = HZ / 100;
 
 #define CFQ_IDLE_GRACE		(HZ / 10)
 #define CFQ_SLICE_SCALE		(5)
@@ -97,6 +97,7 @@ static kmem_cache_t *cfq_ioc_pool;
 #define cfq_class_rt(cfqq)	((cfqq)->ioprio_class == IOPRIO_CLASS_RT)
 
 #define cfq_cfqq_sync(cfqq)	((cfqq)->key != CFQ_KEY_ASYNC)
+#define cfq_cfqq_async(cfqq)	((cfqq)->key == CFQ_KEY_ASYNC)
 
 /*
  * Per block device queue structure
@@ -1070,7 +1071,7 @@ __cfq_dispatch_requests(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 	 * expire an async queue immediately if it has used up its slice. idle
 	 * queue always expire after 1 dispatch round.
 	 */
-	if ((!cfq_cfqq_sync(cfqq) &&
+	if ((cfq_cfqq_async(cfqq) &&
 	    cfqd->dispatch_slice >= cfq_prio_to_maxrq(cfqd, cfqq)) ||
 	    cfq_class_idle(cfqq))
 		cfq_slice_expired(cfqd, 0);
@@ -1597,7 +1598,7 @@ cfq_should_preempt(struct cfq_data *cfqd, struct cfq_queue *new_cfqq,
 	 */
 	if (new_cfqq->slice_left < cfqd->cfq_slice_idle)
 		return 0;
-	if (crq->is_sync && !cfq_cfqq_sync(cfqq))
+	if (crq->is_sync && cfq_cfqq_async(cfqq))
 		return 1;
 
 	return 0;
@@ -1826,8 +1827,10 @@ static inline int
 __cfq_may_queue(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 		struct task_struct *task, int rw)
 {
-	if (cfqq->wait_request && cfqq->must_alloc)
+	if (cfqq->wait_request && cfqq->must_alloc && !cfqq->must_alloc_slice) {
+		cfqq->must_alloc_slice = 1;
 		return ELV_MQUEUE_MUST;
+	}
 
 	return ELV_MQUEUE_MAY;
 #if 0
