@@ -107,10 +107,6 @@ struct us_unusual_dev {
 #define US_FLIDX_IP_WANTED   17  /* 0x00020000	is an IRQ expected?	    */
 
 
-/* kernel thread actions */
-#define US_ACT_COMMAND		1
-#define US_ACT_EXIT		5
-
 /* processing state machine states */
 #define US_STATE_IDLE		1
 #define US_STATE_RUNNING	2
@@ -168,8 +164,6 @@ struct us_data {
 	Scsi_Cmnd		*srb;		 /* current srb		*/
 
 	/* thread information */
-	Scsi_Cmnd		*queue_srb;	 /* the single queue slot */
-	int			action;		 /* what to do		  */
 	int			pid;		 /* control thread	  */
 	atomic_t		sm_state;
 
@@ -192,7 +186,6 @@ struct us_data {
 
 	/* mutual exclusion structures */
 	struct completion	notify;		 /* thread begin/end	    */
-	spinlock_t		queue_exclusion; /* to protect data structs */
 	struct us_unusual_dev   *unusual_dev;	 /* If unusual device       */
 	void			*extra;		 /* Any extra data          */
 	extra_data_destructor	extra_destructor;/* extra data destructor   */
@@ -209,6 +202,8 @@ extern struct usb_driver usb_storage_driver;
 extern void fill_inquiry_response(struct us_data *us,
 	unsigned char *data, unsigned int data_len);
 
+/* The scsi_lock() and scsi_unlock() macros protect the sm_state and the
+ * single queue element srb for write access */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
 #define scsi_unlock(host)	spin_unlock_irq(host->host_lock)
 #define scsi_lock(host)		spin_lock_irq(host->host_lock)
