@@ -1,4 +1,4 @@
-/* $Id: platform.h,v 1.35 2003/12/05 18:45:05 armin Exp $
+/* $Id: platform.h,v 1.37 2004/03/20 17:44:29 armin Exp $
  *
  * platform.h
  * 
@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <linux/delay.h>
+#include <linux/list.h>
 #include <asm/types.h>
 #include <asm/io.h>
 
@@ -332,7 +333,6 @@ diva_os_atomic_decrement(diva_os_atomic_t* pv)
 */
 #define NO_CORNETN
 #define IMPLEMENT_DTMF 1
-#define IMPLEMENT_LINE_INTERCONNECT2 1
 #define IMPLEMENT_ECHO_CANCELLER 1
 #define IMPLEMENT_RTP 1
 #define IMPLEMENT_T38 1
@@ -346,7 +346,6 @@ diva_os_atomic_decrement(diva_os_atomic_t* pv)
 #define IMPLEMENT_FAX_NONSTANDARD 1
 #define VSWITCH_SUPPORT 1
 
-#define IMPLEMENT_LINE_INTERCONNECT  0
 #define IMPLEMENT_MARKED_OK_AFTER_FC 1
 
 #define DIVA_IDI_RX_DMA 1

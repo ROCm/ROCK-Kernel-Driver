@@ -374,7 +374,7 @@ config PCWATCHDOG
 	tristate "Berkshire Products ISA-PC Watchdog"
 	depends on WATCHDOG && ISA
 	---help---
-	  This is the driver for the Berkshire Products PC Watchdog card.
+	  This is the driver for the Berkshire Products ISA-PC Watchdog card.
 	  This card simply watches your kernel to make sure it doesn't freeze,
 	  and if it does, it reboots your computer after a certain amount of
 	  time. This driver is like the WDT501 driver but for different
@@ -406,10 +406,8 @@ config WDT
 	---help---
 	  If you have a WDT500P or WDT501P watchdog board, say Y here,
 	  otherwise N. It is not possible to probe for this board, which means
-	  that you have to inform the kernel about the IO port and IRQ using
-	  the "wdt=" kernel option (try "man bootparam" or see the
-	  documentation of your boot loader (lilo or loadlin) about how to
-	  pass options to the kernel at boot time).
+	  that you have to inform the kernel about the IO port and IRQ that
+	  is needed (you can do this via the io and irq parameters)
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called wdt.
@@ -425,11 +423,8 @@ config WDT_501
 	  Fahrenheit. This works only if you have a WDT501P watchdog board
 	  installed.
 
-config WDT_501_FAN
-	bool "Fan Tachometer"
-	depends on WDT_501
-	help
-	  Enable the Fan Tachometer on the WDT501. Only do this if you have a
+	  If you want to enable the Fan Tachometer on the WDT501P, then you
+	  can do this via the tachometer parameter. Only do this if you have a
 	  fan tachometer actually set up.
 
 #
@@ -455,29 +450,28 @@ config PCIPCWATCHDOG
 	  Most people will say N.
 
 config WDTPCI
-	tristate "WDT PCI Watchdog timer"
+	tristate "PCI-WDT500/501 Watchdog timer"
 	depends on WATCHDOG && PCI
 	---help---
-	  If you have a PCI WDT500/501 watchdog board, say Y here, otherwise
-	  N.  It is not possible to probe for this board, which means that you
-	  have to inform the kernel about the IO port and IRQ using the "wdt="
-	  kernel option (try "man bootparam" or see the documentation of your
-	  boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time).
+	  If you have a PCI-WDT500/501 watchdog board, say Y here, otherwise N.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called wdt_pci.
 
 config WDT_501_PCI
-	bool "WDT501-PCI features"
+	bool "PCI-WDT501 features"
 	depends on WDTPCI
 	help
 	  Saying Y here and creating a character special file /dev/temperature
 	  with major number 10 and minor number 131 ("man mknod") will give
 	  you a thermometer inside your computer: reading from
 	  /dev/temperature yields one byte, the temperature in degrees
-	  Fahrenheit. This works only if you have a WDT501P watchdog board
+	  Fahrenheit. This works only if you have a PCI-WDT501 watchdog board
 	  installed.
+
+	  If you want to enable the Fan Tachometer on the PCI-WDT501, then you
+	  can do this via the tachometer parameter. Only do this if you have a
+	  fan tachometer actually set up.
 
 #
 # USB-based Watchdog Cards

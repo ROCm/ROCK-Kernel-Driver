@@ -1,9 +1,8 @@
-/* $Id: um_idi.c,v 1.12 2004/01/12 18:00:09 armin Exp $ */
+/* $Id: um_idi.c,v 1.14 2004/03/21 17:54:37 armin Exp $ */
 
 #include "platform.h"
 #include "di_defs.h"
 #include "pc.h"
-#include "dlist.h"
 #include "dqueue.h"
 #include "adapter.h"
 #include "entity.h"
@@ -22,7 +21,7 @@ extern void diva_os_wakeup_close(void *os_context);
 /* --------------------------------------------------------------------------
 		LOCALS
    -------------------------------------------------------------------------- */
-static diva_entity_queue_t adapter_q;
+static LIST_HEAD(adapter_q);
 static diva_os_spin_lock_t adapter_lock;
 
 static diva_um_idi_adapter_t *diva_um_idi_find_adapter(dword nr);
@@ -37,17 +36,11 @@ static int process_idi_rc(divas_um_idi_entity_t * e, byte rc);
 static int process_idi_ind(divas_um_idi_entity_t * e, byte ind);
 static int write_return_code(divas_um_idi_entity_t * e, byte rc);
 
-/*
- * include queue functions
- */
-#include "dlist.c"
-
 /* --------------------------------------------------------------------------
 		MAIN
    -------------------------------------------------------------------------- */
 int diva_user_mode_idi_init(void)
 {
-	diva_q_init(&adapter_q);
 	diva_os_initialize_spin_lock(&adapter_lock, "adapter");
 	return (0);
 }
@@ -89,18 +82,18 @@ diva_user_mode_idi_adapter_features(diva_um_idi_adapter_t * a,
    -------------------------------------------------------------------------- */
 void diva_user_mode_idi_remove_adapter(int adapter_nr)
 {
-	diva_um_idi_adapter_t *a =
-	    (diva_um_idi_adapter_t *) diva_q_get_head(&adapter_q);
+	struct list_head *tmp;
+	diva_um_idi_adapter_t *a;
 
-	while (a) {
+	list_for_each(tmp, &adapter_q) {
+		a = list_entry(tmp, diva_um_idi_adapter_t, link);
 		if (a->adapter_nr == adapter_nr) {
-			diva_q_remove(&adapter_q, &a->link);
+			list_del(tmp);
 			cleanup_adapter(a);
 			DBG_LOG(("DIDD: del adapter(%d)", a->adapter_nr));
 			diva_os_free(0, a);
 			break;
 		}
-		a = (diva_um_idi_adapter_t *) diva_q_get_next(&a->link);
 	}
 }
 
@@ -109,15 +102,15 @@ void diva_user_mode_idi_remove_adapter(int adapter_nr)
    -------------------------------------------------------------------------- */
 void diva_user_mode_idi_finit(void)
 {
-	diva_um_idi_adapter_t *a =
-	    (diva_um_idi_adapter_t *) diva_q_get_head(&adapter_q);
+	struct list_head *tmp, *safe;
+	diva_um_idi_adapter_t *a;
 
-	while (a) {
-		diva_q_remove(&adapter_q, &a->link);
+	list_for_each_safe(tmp, safe, &adapter_q) {
+		a = list_entry(tmp, diva_um_idi_adapter_t, link);
+		list_del(tmp);
 		cleanup_adapter(a);
 		DBG_LOG(("DIDD: del adapter(%d)", a->adapter_nr));
 		diva_os_free(0, a);
-		a = (diva_um_idi_adapter_t *) diva_q_get_head(&adapter_q);
 	}
 	diva_os_destroy_spin_lock(&adapter_lock, "adapter");
 }
@@ -137,6 +130,7 @@ int diva_user_mode_idi_create_adapter(const DESCRIPTOR * d, int adapter_nr)
 		return (-1);
 	}
 	memset(a, 0x00, sizeof(*a));
+	INIT_LIST_HEAD(&a->entity_q);
 
 	a->d = *d;
 	a->adapter_nr = adapter_nr;
@@ -145,19 +139,9 @@ int diva_user_mode_idi_create_adapter(const DESCRIPTOR * d, int adapter_nr)
 		 adapter_nr, a->d.type, a->d.features, a->d.channels));
 
 	diva_os_enter_spin_lock(&adapter_lock, &old_irql, "create_adapter");
-	diva_q_add_tail(&adapter_q, &a->link);
+	list_add_tail(&a->link, &adapter_q);
 	diva_os_leave_spin_lock(&adapter_lock, &old_irql, "create_adapter");
 	return (0);
-}
-
-static int cmp_adapter_nr(const void *what, const diva_entity_link_t * p)
-{
-	diva_um_idi_adapter_t *a = (diva_um_idi_adapter_t *) p;
-	dword nr = (dword) (unsigned long) what;
-
-	DBG_TRC(("find_adapter: (%d)-(%d)", nr, a->adapter_nr));
-
-	return (nr != a->adapter_nr);
 }
 
 /* ------------------------------------------------------------------------
@@ -165,26 +149,17 @@ static int cmp_adapter_nr(const void *what, const diva_entity_link_t * p)
    ------------------------------------------------------------------------ */
 static diva_um_idi_adapter_t *diva_um_idi_find_adapter(dword nr)
 {
-	return (diva_um_idi_adapter_t *) diva_q_find(&adapter_q,
-						     (void *) (unsigned
-							       long) nr,
-						     cmp_adapter_nr);
-}
+	diva_um_idi_adapter_t *a = NULL;
+	struct list_head *tmp;
 
-/* ------------------------------------------------------------------------
-		Return number of adapters in system
-   ------------------------------------------------------------------------ */
-int diva_um_idi_nr_of_adapters(void)
-{
-	int i = 0;
-	const diva_entity_queue_t * q = &adapter_q;
-	const diva_entity_link_t *diva_current = q->head;
-
-	while (diva_current) {
-		i++;
-		diva_current = diva_current->next;
+	list_for_each(tmp, &adapter_q) {
+		a = list_entry(tmp, diva_um_idi_adapter_t, link);
+		DBG_TRC(("find_adapter: (%d)-(%d)", nr, a->adapter_nr));
+		if (a->adapter_nr == (int)nr)
+			break;
+		a = NULL;
 	}
-	return(i);
+	return(a);
 }
 
 /* ------------------------------------------------------------------------
@@ -193,17 +168,17 @@ int diva_um_idi_nr_of_adapters(void)
    ------------------------------------------------------------------------ */
 static void cleanup_adapter(diva_um_idi_adapter_t * a)
 {
-	divas_um_idi_entity_t *e =
-	    (divas_um_idi_entity_t *) diva_q_get_head(&a->entity_q);
+	struct list_head *tmp, *safe;
+	divas_um_idi_entity_t *e;
 
-	while (e) {
-		diva_q_remove(&a->entity_q, &e->link);
+	list_for_each_safe(tmp, safe, &a->entity_q) {
+		e = list_entry(tmp, divas_um_idi_entity_t, link);
+		list_del(tmp);
 		cleanup_entity(e);
 		if (e->os_context) {
 			diva_os_wakeup_read(e->os_context);
 			diva_os_wakeup_close(e->os_context);
 		}
-		e = (divas_um_idi_entity_t *) diva_q_get_head(&a->entity_q);
 	}
 	memset(&a->d, 0x00, sizeof(DESCRIPTOR));
 }
@@ -281,7 +256,7 @@ void *divas_um_idi_create_entity(dword adapter_nr, void *file)
 		e->os_ref = file;	/* link to os handle */
 		e->adapter = a;	/* link to adapter   */
 
-		diva_q_add_tail(&a->entity_q, &e->link);	/* link from adapter */
+		list_add_tail(&e->link, &a->entity_q);	/* link from adapter */
 
 		diva_os_leave_spin_lock(&adapter_lock, &old_irql, "create_entity");
 
@@ -305,7 +280,7 @@ int divas_um_idi_delete_entity(int adapter_nr, void *entity)
 
 	diva_os_enter_spin_lock(&adapter_lock, &old_irql, "delete_entity");
 	if ((a = e->adapter)) {
-		diva_q_remove(&a->entity_q, &e->link);
+		list_del(&e->link);
 	}
 	diva_os_leave_spin_lock(&adapter_lock, &old_irql, "delete_entity");
 

@@ -257,6 +257,7 @@ static struct pci_dev *rpaphp_config_pci_adapter(struct slot *slot)
 		}
 
 		dev = rpaphp_pci_config_dn(slot->dn, pci_bus);
+		eeh_add_device(dev);
 	} else {
 		/* slot is not enabled */
 		err("slot doesn't have pci_dev structure\n");
@@ -281,6 +282,7 @@ int rpaphp_unconfig_pci_adapter(struct slot *slot)
 		goto exit;
 	}
 	/* remove the device from the pci core */
+	eeh_remove_device(slot->dev.pci_dev);
 	pci_remove_bus_device(slot->dev.pci_dev);
 
 	slot->state = NOT_CONFIGURED;

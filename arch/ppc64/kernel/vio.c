@@ -419,7 +419,7 @@ dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
 			  size_t size, int direction )
 {
 	struct iommu_table *tbl;
-	dma_addr_t dma_handle = NO_TCE;
+	dma_addr_t dma_handle = PCI_DMA_ERROR_CODE;
 	unsigned long uaddr;
 	unsigned int npages;
 
@@ -504,7 +504,7 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 	/* It is easier to debug here for the drivers than in the tce tables.*/
  	if(order >= IOMAP_MAX_ORDER) {
  		printk("VIO_DMA: vio_alloc_consistent size to large: 0x%lx \n", size);
- 		return (void *)NO_TCE;
+ 		return (void *)PCI_DMA_ERROR_CODE;
  	}
 
 	tbl = dev->iommu_table;
@@ -517,7 +517,7 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			memset(ret, 0, npages << PAGE_SHIFT);
 			/* Set up tces to cover the allocated range */
 			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
-			if (tce == NO_TCE) {
+			if (tce == PCI_DMA_ERROR_CODE) {
 				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: iommu_alloc failed\n" );
 				free_pages((unsigned long)ret, order);
 				ret = NULL;

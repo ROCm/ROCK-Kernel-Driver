@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20040226";
+static char *verstr = "20040318";
 
 #include <linux/module.h>
 
@@ -4193,20 +4193,25 @@ CLASS_DEVICE_ATTR(default_compression, S_IRUGO, st_defcompression_show, NULL);
 
 static void do_create_class_files(Scsi_Tape *STp, int dev_num, int mode)
 {
-	int rew, error;
+	int i, rew, error;
+	char name[10];
 	struct class_device *st_class_member;
 
 	if (!st_sysfs_class)
 		return;
 
 	for (rew=0; rew < 2; rew++) {
+		/* Make sure that the minor numbers corresponding to the four
+		   first modes always get the same names */
+		i = mode << (4 - ST_NBR_MODE_BITS);
+		snprintf(name, 10, "%s%s%s", rew ? "n" : "",
+			 STp->disk->disk_name, st_formats[i]);
 		st_class_member =
 			class_simple_device_add(st_sysfs_class,
 						MKDEV(SCSI_TAPE_MAJOR,
 						      TAPE_MINOR(dev_num, mode, rew)),
-						&STp->device->sdev_gendev, "%s",
-						STp->modes[mode].cdevs[rew]->kobj.name);
-		if (!st_class_member) {
+						&STp->device->sdev_gendev, "%s", name);
+		if (IS_ERR(st_class_member)) {
 			printk(KERN_WARNING "st%d: class_simple_device_add failed\n",
 			       dev_num);
 			goto out;

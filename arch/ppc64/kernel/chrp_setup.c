@@ -88,13 +88,10 @@ extern unsigned long loops_per_jiffy;
 extern unsigned long ppc_proc_freq;
 extern unsigned long ppc_tb_freq;
 
-void 
-chrp_get_cpuinfo(struct seq_file *m)
+void chrp_get_cpuinfo(struct seq_file *m)
 {
 	struct device_node *root;
 	const char *model = "";
-
-	seq_printf(m, "timebase\t: %lu\n", ppc_tb_freq);
 
 	root = of_find_node_by_path("/");
 	if (root)
@@ -209,15 +206,17 @@ void __init fwnmi_init(void)
 		fwnmi_active = 1;
 }
 
-
 /* Early initialization.  Relocation is on but do not reference unbolted pages */
 void __init pSeries_init_early(void)
 {
-#ifdef CONFIG_PPC_PSERIES	/* This ifdef should go away */
 	void *comport;
 
 	hpte_init_pSeries();
-	tce_init_pSeries();
+
+	if (ppc64_iommu_off)
+		pci_dma_init_direct();
+	else
+		tce_init_pSeries();
 
 #ifdef CONFIG_SMP
 	smp_init_pSeries();
@@ -230,7 +229,6 @@ void __init pSeries_init_early(void)
 	ppc_md.udbg_putc = udbg_putc;
 	ppc_md.udbg_getc = udbg_getc;
 	ppc_md.udbg_getc_poll = udbg_getc_poll;
-#endif
 }
 
 void __init
@@ -253,7 +251,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 	ppc_md.setup_arch     = chrp_setup_arch;
-	ppc_md.setup_residual = NULL;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
 	if(naca->interrupt_controller == IC_OPEN_PIC) {
 		ppc_md.init_IRQ       = pSeries_init_openpic; 
@@ -418,46 +415,64 @@ chrp_progress(char *s, unsigned short hex)
 
 extern void setup_default_decr(void);
 
+/* Some sane defaults: 125 MHz timebase, 1GHz processor */
+#define DEFAULT_TB_FREQ		125000000UL
+#define DEFAULT_PROC_FREQ	(DEFAULT_TB_FREQ * 8)
+
 void __init pSeries_calibrate_decr(void)
 {
 	struct device_node *cpu;
 	struct div_result divres;
-	int *fp;
-	unsigned long freq, processor_freq;
+	unsigned int *fp;
+	int node_found;
 
 	/*
 	 * The cpu node should have a timebase-frequency property
 	 * to tell us the rate at which the decrementer counts.
 	 */
-	freq = 16666000;        /* hardcoded default */
 	cpu = of_find_node_by_type(NULL, "cpu");
+
+	ppc_tb_freq = DEFAULT_TB_FREQ;		/* hardcoded default */
+	node_found = 0;
 	if (cpu != 0) {
-		fp = (int *) get_property(cpu, "timebase-frequency", NULL);
-		if (fp != 0)
-			freq = *fp;
+		fp = (unsigned int *)get_property(cpu, "timebase-frequency",
+						  NULL);
+		if (fp != 0) {
+			node_found = 1;
+			ppc_tb_freq = *fp;
+		}
 	}
-	ppc_tb_freq = freq;
-	processor_freq = freq;
+	if (!node_found)
+		printk(KERN_ERR "WARNING: Estimating decrementer frequency "
+				"(not found)\n");
+
+	ppc_proc_freq = DEFAULT_PROC_FREQ;
+	node_found = 0;
 	if (cpu != 0) {
-		fp = (int *) get_property(cpu, "clock-frequency", NULL);
-		if (fp != 0)
-			processor_freq = *fp;
+		fp = (unsigned int *)get_property(cpu, "clock-frequency",
+						  NULL);
+		if (fp != 0) {
+			node_found = 1;
+			ppc_proc_freq = *fp;
+		}
 	}
-	ppc_proc_freq = processor_freq;
+	if (!node_found)
+		printk(KERN_ERR "WARNING: Estimating processor frequency "
+				"(not found)\n");
+
 	of_node_put(cpu);
 
-	printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
-	       freq/1000000, freq%1000000);
-	printk("time_init: processor frequency   = %lu.%.6lu MHz\n",
-	       processor_freq/1000000, processor_freq%1000000);
+	printk(KERN_INFO "time_init: decrementer frequency = %lu.%.6lu MHz\n",
+	       ppc_tb_freq/1000000, ppc_tb_freq%1000000);
+	printk(KERN_INFO "time_init: processor frequency   = %lu.%.6lu MHz\n",
+	       ppc_proc_freq/1000000, ppc_proc_freq%1000000);
 
-	tb_ticks_per_jiffy = freq / HZ;
+	tb_ticks_per_jiffy = ppc_tb_freq / HZ;
 	tb_ticks_per_sec = tb_ticks_per_jiffy * HZ;
-	tb_ticks_per_usec = freq / 1000000;
-	tb_to_us = mulhwu_scale_factor(freq, 1000000);
-	div128_by_32( 1024*1024, 0, tb_ticks_per_sec, &divres );
+	tb_ticks_per_usec = ppc_tb_freq / 1000000;
+	tb_to_us = mulhwu_scale_factor(ppc_tb_freq, 1000000);
+	div128_by_32(1024*1024, 0, tb_ticks_per_sec, &divres);
 	tb_to_xs = divres.result_low;
 
 	setup_default_decr();
 }
-

@@ -247,9 +247,9 @@ static int udf_release_file(struct inode * inode, struct file * filp)
 {
 	if (filp->f_mode & FMODE_WRITE)
 	{
-		down(&inode->i_sem);
+		lock_kernel();
 		udf_discard_prealloc(inode);
-		up(&inode->i_sem);
+		unlock_kernel();
 	}
 	return 0;
 }

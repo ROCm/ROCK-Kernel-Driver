@@ -3411,11 +3411,17 @@ static int __devinit via_init_one (struct pci_dev *pdev, const struct pci_device
 	rc = pci_enable_device (pdev);
 	if (rc)
 		goto err_out;
-		
 
 	rc = pci_request_regions (pdev, "via82cxxx_audio");
 	if (rc)
 		goto err_out_disable;
+
+	rc = pci_set_dma_mask(pdev, 0xffffffffULL);
+	if (rc)
+		goto err_out_res;
+	rc = pci_set_consistent_dma_mask(pdev, 0xffffffffULL);
+	if (rc)
+		goto err_out_res;
 
 	card = kmalloc (sizeof (*card), GFP_KERNEL);
 	if (!card) {
