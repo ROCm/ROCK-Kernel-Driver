@@ -35,8 +35,10 @@ $(error Sorry, you need a newer version of the assember, one that is built from	
 		ftp://ftp.hpl.hp.com/pub/linux-ia64/gas-030124.tar.gz)
 endif
 
-ifneq ($(GCC_VERSION),2)
+ifeq ($(GCC_VERSION),2)
 $(error Sorry, your compiler is too old.  GCC v2.96 is known to generate bad code.)
+else
+cflags-$(CONFIG_ITANIUM)	+= -frename-registers
 endif
 
 ifeq ($(GCC_VERSION),3)
