@@ -1060,7 +1060,7 @@ got_data:
 		 */
 		int hard_sector = sector_size;
 		sector_t sz = sdkp->capacity * (hard_sector/256);
-		request_queue_t *queue = &sdp->request_queue;
+		request_queue_t *queue = sdp->request_queue;
 		sector_t mb;
 
 		blk_queue_hardsect_size(queue, hard_sector);
@@ -1295,7 +1295,7 @@ static int sd_attach(struct scsi_device * sdp)
 	if (sdp->removable)
 		gd->flags |= GENHD_FL_REMOVABLE;
 	gd->private_data = &sdkp->driver;
-	gd->queue = &sdkp->device->request_queue;
+	gd->queue = sdkp->device->request_queue;
 
 	sd_devlist_insert(sdkp);
 	set_capacity(gd, sdkp->capacity);
