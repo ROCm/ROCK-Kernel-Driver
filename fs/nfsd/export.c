@@ -156,7 +156,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (len == 0) {
 		struct svc_expkey *ek;
 		set_bit(CACHE_NEGATIVE, &key.h.flags);
-		ek = svc_expkey_lookup(&key, 2);
+		ek = svc_expkey_lookup(&key, 1);
 		if (ek)
 			expkey_put(&ek->h, &svc_expkey_cache);
 	} else {
@@ -176,7 +176,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 		key.ek_export = exp;
 		dprintk("And found export\n");
 		
-		ek = svc_expkey_lookup(&key, 2);
+		ek = svc_expkey_lookup(&key, 1);
 		if (ek)
 			expkey_put(&ek->h, &svc_expkey_cache);
 		exp_put(exp);
@@ -231,7 +231,7 @@ static inline void svc_expkey_update(struct svc_expkey *new, struct svc_expkey *
 	new->ek_export = item->ek_export;
 }
 
-static DefineSimpleCacheLookup(svc_expkey)
+static DefineSimpleCacheLookup(svc_expkey,0) /* no inplace updates */
 
 #define	EXPORT_HASHBITS		8
 #define	EXPORT_HASHMAX		(1<< EXPORT_HASHBITS)
@@ -438,7 +438,7 @@ static inline void svc_export_update(struct svc_export *new, struct svc_export *
 	new->ex_fsid = item->ex_fsid;
 }
 
-static DefineSimpleCacheLookup(svc_export)
+static DefineSimpleCacheLookup(svc_export,1) /* allow inplace updates */
 
 
 struct svc_expkey *

@@ -155,8 +155,9 @@ struct cache_deferred_req {
  * TEST  tests if "tmp" matches "item"
  * INIT copies key information from "item" to "new"
  * UPDATE copies content information from "item" to "tmp"
+ * INPLACE is true if updates can happen inplace rather than allocating a new structure
  */
-#define DefineCacheLookup(RTN,MEMBER,FNAME,ARGS,SETUP,DETAIL,HASHFN,TEST,INIT,UPDATE)	\
+#define DefineCacheLookup(RTN,MEMBER,FNAME,ARGS,SETUP,DETAIL,HASHFN,TEST,INIT,UPDATE,INPLACE)	\
 RTN *FNAME ARGS										\
 {											\
 	RTN *tmp, *new=NULL;								\
@@ -170,12 +171,12 @@ RTN *FNAME ARGS										\
 		tmp = container_of(*hp, RTN, MEMBER);					\
 		if (TEST) { /* found a match */						\
 											\
-			if (set == 1 && test_bit(CACHE_VALID, &tmp->MEMBER.flags) && !new) \
+			if (set && !INPLACE && test_bit(CACHE_VALID, &tmp->MEMBER.flags) && !new) \
 				break;							\
 											\
 			atomic_inc(&tmp->MEMBER.refcnt);				\
 			if (set) {							\
-				if (set == 1 && test_bit(CACHE_VALID, &tmp->MEMBER.flags))\
+				if (!INPLACE && test_bit(CACHE_VALID, &tmp->MEMBER.flags))\
 				{ /* need to swap in new */				\
 					RTN *t2;					\
 											\
@@ -194,7 +195,7 @@ RTN *FNAME ARGS										\
 			else read_unlock(&(DETAIL)->hash_lock);				\
 			if (set)							\
 				cache_fresh(DETAIL, &tmp->MEMBER, item->MEMBER.expiry_time); \
-			if (set==1 && new) cache_fresh(DETAIL, &new->MEMBER, 0);	\
+			if (set && !INPLACE && new) cache_fresh(DETAIL, &new->MEMBER, 0);	\
 			if (new) (DETAIL)->cache_put(&new->MEMBER, DETAIL);		\
 			return tmp;							\
 		}									\
@@ -229,10 +230,10 @@ RTN *FNAME ARGS										\
 	return NULL;									\
 }
 
-#define DefineSimpleCacheLookup(STRUCT)	\
+#define DefineSimpleCacheLookup(STRUCT,INPLACE)	\
 	DefineCacheLookup(struct STRUCT, h, STRUCT##_lookup, (struct STRUCT *item, int set), /*no setup */,	\
 			  & STRUCT##_cache, STRUCT##_hash(item), STRUCT##_match(item, tmp),\
-			  STRUCT##_init(new, item), STRUCT##_update(tmp, item))
+			  STRUCT##_init(new, item), STRUCT##_update(tmp, item),INPLACE)
 
 #define cache_for_each(pos, detail, index, member) 						\
 	for (({read_lock(&(detail)->hash_lock); index = (detail)->hash_size;}) ;		\
