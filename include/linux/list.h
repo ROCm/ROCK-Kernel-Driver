@@ -4,6 +4,7 @@
 #ifdef __KERNEL__
 
 #include <linux/prefetch.h>
+#include <linux/stddef.h>
 #include <asm/system.h>
 
 /*
