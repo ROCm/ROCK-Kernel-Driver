@@ -172,7 +172,7 @@ tlb_finish_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
  * PTE, not just those pointing to (normal) physical memory.
  */
 static inline void
-tlb_remove_tlb_entry (mmu_gather_t *tlb, pte_t *ptep, unsigned long address)
+__tlb_remove_tlb_entry (mmu_gather_t *tlb, pte_t *ptep, unsigned long address)
 {
 	if (tlb->start_addr == ~0UL)
 		tlb->start_addr = address;
