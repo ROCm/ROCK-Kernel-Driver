@@ -28,7 +28,6 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpQueue.h>
@@ -68,8 +67,6 @@ int main(void)
 #endif /* CONFIG_ALTIVEC */
 	DEFINE(MM, offsetof(struct task_struct, mm));
 
-	/* naca */
-        DEFINE(PACA, offsetof(struct naca_struct, paca));
 	DEFINE(DCACHEL1LINESIZE, offsetof(struct ppc64_caches, dline_size));
 	DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct ppc64_caches, log_dline_size));
 	DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct ppc64_caches, dlines_per_page));

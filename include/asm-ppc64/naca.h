@@ -11,7 +11,6 @@
  */
 
 #include <asm/types.h>
-#include <asm/systemcfg.h>
 
 #ifndef __ASSEMBLY__
 
@@ -20,7 +19,6 @@ struct naca_struct {
 	void *xItVpdAreas;              /* VPD Data                  0x00 */
 	void *xRamDisk;                 /* iSeries ramdisk           0x08 */
 	u64   xRamDiskSize;		/* In pages                  0x10 */
-	struct paca_struct *paca;	/* Ptr to an array of pacas  0x18 */
 	u64 debug_switch;		/* Debug print control       0x20 */
 	u64 banner;                     /* Ptr to banner string      0x28 */
 	u64 log;                        /* Ptr to log buffer         0x30 */

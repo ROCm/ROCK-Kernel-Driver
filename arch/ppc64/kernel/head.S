@@ -517,12 +517,7 @@ __end_interrupts:
 __start_naca:
 #ifdef CONFIG_PPC_ISERIES
 	.llong itVpdAreas
-#else
-	.llong 0x0
 #endif
-	.llong 0x0
-	.llong 0x0
-	.llong paca
 
 	. = SYSTEMCFG_PHYS_ADDR
 	.globl __end_naca
@@ -1241,6 +1236,7 @@ _GLOBAL(pseries_secondary_smp_init)
 #endif
 #endif
 	b 	3b			/* Loop until told to go	 */
+
 #ifdef CONFIG_PPC_ISERIES
 _STATIC(__start_initialization_iSeries)
 	/* Clear out the BSS */
@@ -1277,10 +1273,6 @@ _STATIC(__start_initialization_iSeries)
 	LOADADDR(r9,naca)
 	SET_REG_TO_CONST(r4, NACA_VIRT_ADDR)
 	std	r4,0(r9)		/* set the naca pointer */
-
-	/* Get the pointer to the segment table */
-	ld	r6,PACA(r4)		/* Get the base paca pointer	*/
-	ld	r4,PACASTABVIRT(r6)
 
 	bl	.iSeries_early_setup
 
