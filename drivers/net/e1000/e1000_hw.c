@@ -41,7 +41,8 @@ static int32_t e1000_phy_force_speed_duplex(struct e1000_hw *hw);
 static int32_t e1000_config_mac_to_phy(struct e1000_hw *hw);
 static void e1000_raise_mdi_clk(struct e1000_hw *hw, uint32_t *ctrl);
 static void e1000_lower_mdi_clk(struct e1000_hw *hw, uint32_t *ctrl);
-static void e1000_shift_out_mdi_bits(struct e1000_hw *hw, uint32_t data, uint16_t count);
+static void e1000_shift_out_mdi_bits(struct e1000_hw *hw, uint32_t data,
+                                     uint16_t count);
 static uint16_t e1000_shift_in_mdi_bits(struct e1000_hw *hw);
 static int32_t e1000_phy_reset_dsp(struct e1000_hw *hw);
 static int32_t e1000_write_eeprom_spi(struct e1000_hw *hw, uint16_t offset,
@@ -52,7 +53,8 @@ static int32_t e1000_write_eeprom_microwire(struct e1000_hw *hw,
 static int32_t e1000_spi_eeprom_ready(struct e1000_hw *hw);
 static void e1000_raise_ee_clk(struct e1000_hw *hw, uint32_t *eecd);
 static void e1000_lower_ee_clk(struct e1000_hw *hw, uint32_t *eecd);
-static void e1000_shift_out_ee_bits(struct e1000_hw *hw, uint16_t data, uint16_t count);
+static void e1000_shift_out_ee_bits(struct e1000_hw *hw, uint16_t data,
+                                    uint16_t count);
 static int32_t e1000_write_phy_reg_ex(struct e1000_hw *hw, uint32_t reg_addr,
                                       uint16_t phy_data);
 static int32_t e1000_read_phy_reg_ex(struct e1000_hw *hw,uint32_t reg_addr,
@@ -257,7 +259,6 @@ e1000_set_mac_type(struct e1000_hw *hw)
         return -E1000_ERR_MAC_TYPE;
     }
 
-
     return E1000_SUCCESS;
 }
 
@@ -342,19 +343,20 @@ e1000_reset_hw(struct e1000_hw *hw)
      */
     msec_delay(10);
 
+    ctrl = E1000_READ_REG(hw, CTRL);
+
+    /* Must reset the PHY before resetting the MAC */
+    if((hw->mac_type == e1000_82541) || (hw->mac_type == e1000_82547)) {
+        E1000_WRITE_REG_IO(hw, CTRL, (ctrl | E1000_CTRL_PHY_RST));
+        msec_delay(5);
+    }
+
     /* Issue a global reset to the MAC.  This will reset the chip's
      * transmit, receive, DMA, and link units.  It will not effect
      * the current PCI configuration.  The global reset bit is self-
      * clearing, and should clear within a microsecond.
      */
     DEBUGOUT("Issuing a global reset to MAC\n");
-    ctrl = E1000_READ_REG(hw, CTRL);
-
-    /* Must reset the PHY before resetting the MAC */
-    if((hw->mac_type == e1000_82541) || (hw->mac_type == e1000_82547)) {
-        E1000_WRITE_REG_IO(hw, CTRL, (ctrl | E1000_CTRL_PHY_RST));
-	msec_delay(5);
-    }
 
     switch(hw->mac_type) {
         case e1000_82544:
@@ -3083,7 +3085,8 @@ e1000_shift_out_ee_bits(struct e1000_hw *hw,
  * hw - Struct containing variables accessed by shared code
  *****************************************************************************/
 static uint16_t
-e1000_shift_in_ee_bits(struct e1000_hw *hw, uint16_t count)
+e1000_shift_in_ee_bits(struct e1000_hw *hw,
+                       uint16_t count)
 {
     uint32_t eecd;
     uint32_t i;
@@ -4359,8 +4362,7 @@ e1000_update_adaptive(struct e1000_hw *hw)
     DEBUGFUNC("e1000_update_adaptive");
 
     if(hw->adaptive_ifs) {
-        if((hw->collision_delta * hw->ifs_ratio) >
-           hw->tx_packet_delta) {
+        if((hw->collision_delta * hw->ifs_ratio) > hw->tx_packet_delta) {
             if(hw->tx_packet_delta > MIN_NUM_XMITS) {
                 hw->in_ifs_mode = TRUE;
                 if(hw->current_ifs_val < hw->ifs_max_val) {
@@ -4372,8 +4374,7 @@ e1000_update_adaptive(struct e1000_hw *hw)
                 }
             }
         } else {
-            if((hw->in_ifs_mode == TRUE) &&
-               (hw->tx_packet_delta <= MIN_NUM_XMITS)) {
+            if(hw->in_ifs_mode && (hw->tx_packet_delta <= MIN_NUM_XMITS)) {
                 hw->current_ifs_val = 0;
                 hw->in_ifs_mode = FALSE;
                 E1000_WRITE_REG(hw, AIT, 0);

@@ -30,6 +30,22 @@
 
 /* Change Log
  *
+ * 5.2.16	8/8/03
+ *   o Added support for new controllers: 82545GM, 82546GB, 82541/7_B1
+ *   o Bug fix: reset h/w before first EEPROM read because we don't know
+ *     who may have been messing with the device before we got there.
+ *     [Dave Johnson (ddj -a-t- cascv.brown.edu)]
+ *   o Bug fix: read the correct work from EEPROM to detect programmed
+ *     WoL settings.
+ *   o Bug fix: TSO would hang if space left in FIFO was being miscalculated
+ *     when mss dropped without a correspoding drop in the DMA buffer size.
+ *   o ASF for Fiber nics isn't supported.
+ *   o Bug fix: Workaround added for potential hang with 82544 running in
+ *     PCI-X if send buffer terminates within an evenly-aligned dword.
+ *   o Feature: Add support for ethtool flow control setting.
+ *   o Feature: Add support for ethtool TSO setting.
+ *   o Feature: Increase default Tx Descriptor count to 1024 for >= 82544.
+ *   
  * 5.1.13	5/28/03
  *   o Bug fix: request_irq() failure resulted in freeing resources twice!
  *     [Don Fry (brazilnut@us.ibm.com)]
@@ -39,18 +55,11 @@
  *   o Cleanup: s/int/unsigned int/ for descriptor ring indexes.
  *   
  * 5.1.11	5/6/03
- *   o Feature: Added support for 82546EB (Quad-port) hardware.
- *   o Feature: Added support for Diagnostics through Ethtool.
- *   o Cleanup: Removed /proc support.
- *   o Cleanup: Removed proprietary IDIAG interface.
- *   o Bug fix: TSO bug fixes.
- *
- * 5.0.42	3/5/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.1.13-k2";
+char e1000_driver_version[] = "5.2.16-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -475,7 +484,7 @@ e1000_probe(struct pci_dev *pdev,
 	adapter->phy_info_timer.function = &e1000_update_phy_info;
 	adapter->phy_info_timer.data = (unsigned long) adapter;
 
-	INIT_WORK(&adapter->tx_timeout_task, 
+	INIT_WORK(&adapter->tx_timeout_task,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
 	register_netdev(netdev);
@@ -2078,6 +2087,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		   !e1000_clean_tx_irq(adapter))
 			break;
 #endif
+
 	return IRQ_HANDLED;
 }
 
@@ -2736,7 +2746,7 @@ e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 	case SYS_DOWN:
 	case SYS_HALT:
 	case SYS_POWER_OFF:
-		while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
+		while((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev))) {
 			if(pci_dev_driver(pdev) == &e1000_driver)
 				e1000_suspend(pdev, 3);
 		}
