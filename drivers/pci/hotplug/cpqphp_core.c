@@ -310,10 +310,7 @@ static void *get_SMBIOS_entry(void *smbios_start, void *smbios_table, u8 type,
 static void release_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = hotplug_slot->private;
-	
-	if (slot == NULL)
-		return;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	kfree(slot->hotplug_slot->info);
@@ -614,21 +611,14 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 {
 	struct pci_func *slot_func;
 	struct slot *slot = hotplug_slot->private;
-	struct controller *ctrl;
+	struct controller *ctrl = slot->ctrl;
 	u8 bus;
 	u8 devfn;
 	u8 device;
 	u8 function;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
 	if (cpqhp_get_bus_dev(ctrl, &bus, &devfn, slot->number) == -1)
 		return -ENODEV;
 
