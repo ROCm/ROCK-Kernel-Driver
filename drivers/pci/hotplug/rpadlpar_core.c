@@ -24,13 +24,6 @@
 
 static DECLARE_MUTEX(rpadlpar_sem);
 
-static inline int is_hotplug_capable(struct device_node *dn)
-{
-	unsigned char *ptr = get_property(dn, "ibm,fw-pci-hot-plug-ctrl", NULL);
-
-	return (int) (ptr != NULL);
-}
-
 static char *get_node_drc_name(struct device_node *dn)
 {
 	char *ptr = NULL;
@@ -52,7 +45,7 @@ static struct device_node *find_php_slot_vio_node(char *drc_name)
 	if (!parent)
 		return NULL;
 
-	for (child = of_get_next_child(parent, NULL);
+	for (child = of_get_next_child(parent, NULL);	
 	     child; child = of_get_next_child(parent, child)) {
 		loc_code = get_property(child, "ibm,loc-code", NULL);
 		if (loc_code && !strncmp(loc_code, drc_name, strlen(drc_name)))
@@ -262,6 +255,7 @@ int dlpar_add_slot(char *drc_name)
 	}
 
 	/* Add hotplug slot for new VIOA or PCI */
+	
 	if (!rc && rpaphp_add_slot(dn)) {
 		printk(KERN_ERR "%s: unable to add hotplug slot %s\n",
 			__FUNCTION__, drc_name);
@@ -324,6 +318,7 @@ int dlpar_remove_pci_slot(struct slot *slot, char *drc_name)
 	}
 
 	/* Remove pci bus */
+
 	if (dlpar_pci_remove_bus(bridge_dev)) {
 		printk(KERN_ERR "%s: unable to remove pci bus %s\n",
 			__FUNCTION__, drc_name);
@@ -352,7 +347,7 @@ int dlpar_remove_slot(char *drc_name)
 
 	if (down_interruptible(&rpadlpar_sem))
 		return -ERESTARTSYS;
-
+	
 	if (!find_php_slot_vio_node(drc_name) &&
 	    !find_php_slot_pci_node(drc_name)) {
 		rc = -ENODEV;
@@ -364,7 +359,7 @@ int dlpar_remove_slot(char *drc_name)
 		rc = -EINVAL;
 		goto exit;
 	}
-
+	
 	switch (slot->dev_type) {
 		case PCI_DEV:
 			rc = dlpar_remove_pci_slot(slot, drc_name);
