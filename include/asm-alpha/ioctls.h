@@ -9,6 +9,7 @@
 #define FIONBIO		_IOW('f', 126, int)
 #define FIONREAD	_IOR('f', 127, int)
 #define TIOCINQ		FIONREAD
+#define FIOQSIZE	_IOR('f', 128, loff_t)
 
 #define TIOCGETP	_IOR('t', 8, struct sgttyb)
 #define TIOCSETP	_IOW('t', 9, struct sgttyb)
