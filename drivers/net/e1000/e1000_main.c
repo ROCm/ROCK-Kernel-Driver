@@ -30,6 +30,16 @@
 
 /* Change Log
  *
+ * 5.2.18	9/13/03
+ *   o Bug fix: SERDES devices might be connected to a back-plane
+ *     switch that doesn't support auto-neg, so add the capability
+ *     to force 1000/Full.
+ *   o Bug fix: Flow control settings for hi/lo watermark didn't
+ *     consider changes in the Rx FIFO size, which could occur with
+ *     Jumbo Frames or with the reduced FIFO in 82547.
+ *   o Better propagation of error codes. [Janice Girouard 
+ *     (janiceg@us.ibm.com)].
+ *
  * 5.2.16	8/8/03
  *   o Added support for new controllers: 82545GM, 82546GB, 82541/7_B1
  *   o Bug fix: reset h/w before first EEPROM read because we don't know
@@ -47,19 +57,11 @@
  *   o Feature: Increase default Tx Descriptor count to 1024 for >= 82544.
  *   
  * 5.1.13	5/28/03
- *   o Bug fix: request_irq() failure resulted in freeing resources twice!
- *     [Don Fry (brazilnut@us.ibm.com)]
- *   o Bug fix: fix VLAN support on ppc64 [Mark Rakes (mrakes@vivato.net)]
- *   o Bug fix: missing Tx cleanup opportunities during interrupt handling.
- *   o Bug fix: alloc_etherdev failure didn't cleanup regions in probe.
- *   o Cleanup: s/int/unsigned int/ for descriptor ring indexes.
- *   
- * 5.1.11	5/6/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.16-k1";
+char e1000_driver_version[] = "5.2.19-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -552,7 +554,7 @@ err_sw_init:
 err_eeprom:
 	iounmap(adapter->hw.hw_addr);
 err_ioremap:
-	kfree(netdev);
+	free_netdev(netdev);
 err_alloc_etherdev:
 	pci_release_regions(pdev);
 	return err;
@@ -1560,7 +1562,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 	 * 4 = ceil(buffer len/mss).  To make sure we don't
 	 * overrun the FIFO, adjust the max buffer len if mss
 	 * drops. */
-	if (mss)
+	if(mss)
 		max_per_txd = min(mss << 2, max_per_txd);
 #endif
 	nr_frags = skb_shinfo(skb)->nr_frags;
@@ -2333,7 +2335,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 /**
  * e1000_alloc_rx_buffers - Replace used receive buffers
- * @data: address of board private structure
+ * @adapter: address of board private structure
  **/
 
 static void
