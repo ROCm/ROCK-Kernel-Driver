@@ -144,7 +144,6 @@ struct mdk_rdev_s
 {
 	struct list_head same_set;	/* RAID devices within the same set */
 
-	kdev_t dev;			/* Device number */
 	unsigned long size;		/* Device size (in blocks) */
 	mddev_t *mddev;			/* RAID array if running */
 	unsigned long last_events;	/* IO event timestamp */
@@ -249,7 +248,6 @@ static inline kdev_t mddev_to_kdev(mddev_t * mddev)
 	return mk_kdev(MD_MAJOR, mdidx(mddev));
 }
 
-extern mdk_rdev_t * find_rdev(mddev_t * mddev, kdev_t dev);
 extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
 extern mdk_rdev_t *get_spare(mddev_t *mddev);
 
