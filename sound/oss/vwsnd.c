@@ -535,7 +535,7 @@ static int li_ad1843_wait(lithium_t *lith)
 {
 	unsigned long later = jiffies + 2;
 	while (li_readl(lith, LI_CODEC_COMMAND) & LI_CC_BUSY)
-		if (jiffies >= later)
+		if (time_after_eq(jiffies, later))
 			return -EBUSY;
 	return 0;
 }
@@ -1358,7 +1358,7 @@ static int __init ad1843_init(lithium_t *lith)
 	later = jiffies + HZ / 2;	/* roughly half a second */
 	DBGDO(shut_up++);
 	while (ad1843_read_bits(lith, &ad1843_PDNO)) {
-		if (jiffies > later) {
+		if (time_after(jiffies, later)) {
 			printk(KERN_ERR
 			       "vwsnd audio: AD1843 won't power up\n");
 			return -EIO;
