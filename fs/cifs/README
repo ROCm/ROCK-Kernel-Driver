@@ -104,9 +104,21 @@ may require specifying a mkdev function to Samba.  For more information on these
 see the manual pages ("man smb.conf") on the Samba server system.  Note that the 
 cifs vfs, unlike the smbfs vfs, does not read the smb.conf on the client system 
 (the few optional settings are passed in on mount via -o parameters instead).  
-Note that Samba 2.2.7 or later includes a fix that allows the CIFS VFS to delete 
+Note that Samba 2.2.7 or later includes a fix that allows the CIFS VFS to delete
 open files (required for strict POSIX compliance).  Windows Servers already 
-supported this feature.  
+supported this feature. Samba server does not allow symlinks that refer to files
+outside of the share, so in Samba versions prior to 3.0.5, most symlinks to
+files with absolute paths (ie beginning with slash) such as:
+	 ln -s /mnt/foo bar
+would be forbidden. Samba 3.0.5 server or later includes the ability to create 
+such symlinks safely by converting unsafe symlinks (ie symlinks to server 
+files that are outside of the share) to a samba specific format on the server
+that is ignored by local server applications and non-cifs clients and that will
+not be traversed by the Samba server).  This is opaque to the Linux client
+application using the cifs vfs. Absolute symlinks will work to Samba 3.0.5 or
+later, but only for remote clients using the CIFS Unix extensions, and will
+be invisbile to Windows clients and typically will not affect local
+applications running on the same server as Samba.  
 
 Use instructions:
 ================
@@ -142,6 +154,8 @@ of the mount options. Credential files contain two lines
         password=your_password
 2) By specifying the password in the PASSWD environment variable (similarly
 the user name can be taken from the USER environment variable).
+3) By specifying the password in a file by name via PASSWD_FILE
+4) By specifying the password in a file by file descriptor via PASSWD_FD
 
 If no password is provided, mount.cifs will prompt for password entry
 
@@ -166,8 +180,28 @@ A partial list of the supported mount options follows:
 		mount.	
   domain	Set the SMB/CIFS workgroup name prepended to the
 		username during CIFS session establishment
-  uid           If CIFS Unix extensions are not supported by the server
-                this overrides the default uid for inodes.
+  uid		If CIFS Unix extensions are not supported by the server
+		this overrides the default uid for inodes. For mounts to
+		servers which do support the CIFS Unix extensions, such
+		as a properly configured Samba server, the server provides
+		the uid, gid and mode.  For servers which do not support
+		the Unix extensions, the default uid (and gid) returned on
+		lookup of existing files is the uid (gid) of the person
+		who executed the mount (root, except when mount.cifs
+		is configured setuid for user mounts) unless the "uid=" 
+		(gid) mount option is specified.  For the uid (gid) of newly
+		created files and directories, ie files created since 
+		the last mount of the server share, the expected uid 
+		(gid) is cached as as long as the inode remains in 
+		memory on the client.   Also note that permission
+		checks (authorization checks) on accesses to a file occur
+		at the server, but there are cases in which an administrator
+		may want to restrict at the client as well.  For those
+		servers which do not report a uid/gid owner
+		(such as Windows), permissions can also be checked at the
+		client, and a crude form of client side permission checking 
+		can be enabled by specifying file_mode and dir_mode on 
+		the client
   gid		If CIFS Unix extensions are not supported by the server
 		this overrides the default gid for inodes.
   file_mode     If CIFS Unix extensions are not supported by the server
@@ -218,6 +252,17 @@ A partial list of the supported mount options follows:
 		mount helper will not prompt the user for a password
 		if guest is specified on the mount options.  If no
 		password is specified a null password will be used.
+
+The mount.cifs mount helper also accepts a few mount options before -o
+including:
+
+	-S      take password from stdin (equivalent to setting the environment
+		variable "PASSWD_FD=0"
+	-V      print mount.cifs version
+	-?      display simple usage information
+
+With recent 2.6 kernel versions of modutils, the version of the cifs kernel
+module can be displayed via modinfo.
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================

@@ -1,9 +1,15 @@
+Version 1.14
+------------
+Fix incomplete listings of large directories on Samba servers when Unix
+extensions enabled.  Fix oops when smb_buffer can not be allocated. Fix
+rename deadlock when writing out dirty pages at same time.
+
 Version 1.13
 ------------
 Fix open of files in which O_CREATE can cause the mode to change in
 some cases. Fix case in which retry of write overlaps file close.
 Fix PPC64 build error.  Reduce excessive stack usage in smb password
-hashing.
+hashing. Fix overwrite of Linux user's view of file mode to Windows servers.
 
 Version 1.12
 ------------
