@@ -161,8 +161,8 @@ int attach_pid(task_t *task, enum pid_type type, int nr)
 		pid->nr = nr;
 		atomic_set(&pid->count, 1);
 		INIT_LIST_HEAD(&pid->task_list);
-		pid->task = current;
-		get_task_struct(current);
+		pid->task = task;
+		get_task_struct(task);
 		list_add(&pid->hash_chain, &pid_hash[type][pid_hashfn(nr)]);
 	}
 	list_add(&task->pids[type].pid_chain, &pid->task_list);
