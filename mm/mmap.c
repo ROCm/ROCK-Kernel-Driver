@@ -807,9 +807,10 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			return -EINVAL;
 		if (file && is_file_hugepages(file))  {
 			/*
-			 * Make sure that addr and length are properly aligned.
+			 * Check if the given range is hugepage aligned, and
+			 * can be made suitable for hugepages.
 			 */
-			ret = is_aligned_hugepage_range(addr, len);
+			ret = prepare_hugepage_range(addr, len);
 		} else {
 			/*
 			 * Ensure that a normal request is not falling in a

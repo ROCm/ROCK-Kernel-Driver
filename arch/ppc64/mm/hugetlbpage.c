@@ -295,6 +295,16 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 	return 0;
 }
 
+int prepare_hugepage_range(unsigned long addr, unsigned long len)
+{
+	if (is_hugepage_high_range(addr, len))
+		return 0;
+	else if (is_hugepage_low_range(addr, len))
+		return open_32bit_htlbpage_range(current->mm);
+
+	return -EINVAL;
+}
+
 int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma)
 {
