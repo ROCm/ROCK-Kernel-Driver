@@ -110,6 +110,11 @@ MODULE_PARM_DESC(ql2xdoinitscan,
 		"Signal mid-layer to perform scan after driver load: 0 -- no "
 		"signal sent to mid-layer.");
 
+int ql2xloginretrycount = 0;
+module_param(ql2xloginretrycount, int, 0);
+MODULE_PARM_DESC(ql2xloginretrycount,
+		"Specify an alternate value for the NVRAM login retry count.");
+
 /*
  * Proc structures and functions
  */

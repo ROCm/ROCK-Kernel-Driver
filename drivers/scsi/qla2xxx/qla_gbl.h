@@ -65,6 +65,7 @@ extern int ql2xmaxqdepth;
 extern int displayConfig;
 extern int ql2xplogiabsentdevice;
 extern int ql2xintrdelaytimer;
+extern int ql2xloginretrycount;
 
 extern int ConfigRequired;
 

@@ -1363,6 +1363,8 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		ha->login_retry_count = ha->port_down_retry_count;
 	else if (ha->port_down_retry_count > (int)ha->login_retry_count)
 		ha->login_retry_count = ha->port_down_retry_count;
+	if (ql2xloginretrycount)
+		ha->login_retry_count = ql2xloginretrycount;
 
 	ha->binding_type = Bind;
 	if (ha->binding_type != BIND_BY_PORT_NAME &&
