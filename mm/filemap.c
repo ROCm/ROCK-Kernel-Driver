@@ -579,7 +579,11 @@ int fastcall __lock_page_wq(struct page *page, wait_queue_t *wait)
 		wait = &local_wait.wait;
  
  	while (TestSetPageLocked(page)) {
-		prepare_to_wait_exclusive(wqh, wait, TASK_UNINTERRUPTIBLE);
+		if (wait == &local_wait.wait)
+			prepare_to_wait_exclusive(wqh, wait, 
+						  TASK_UNINTERRUPTIBLE);
+		else 
+			prepare_to_wait(wqh, wait, TASK_UNINTERRUPTIBLE);
  		if (PageLocked(page)) {
  			sync_page(page);
 			if (!is_sync_wait(wait)) {
