@@ -4,7 +4,7 @@
   Extended attributes handling.
 
   Copyright (C) 2001 by Andreas Gruenbacher <a.gruenbacher@computer.org>
-  Copyright (C) 2001 SGI - Silicon Graphics, Inc <linux-xfs@oss.sgi.com>
+  Copyright (c) 2001-2002 Silicon Graphics, Inc.  All Rights Reserved.
 */
 #ifndef _LINUX_XATTR_H
 #define _LINUX_XATTR_H

@@ -872,13 +872,12 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 	int error;
 
 	mp = XFS_BHVTOM(bdp);
-	xfs_binval(mp->m_ddev_targp);
+	pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT, &pincount);
+	xfs_finish_reclaim_all(mp);
 
 	do {
-		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 		VFS_SYNC(XFS_MTOVFS(mp), SYNC_ATTR|SYNC_WAIT, NULL, error);
-		pagebuf_delwri_flush(mp->m_ddev_targp,
-				PBDF_WAIT, &pincount);
+		pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT, &pincount);
 		if (pincount == 0) {delay(50); count++;}
 	}  while (count < 2);
 

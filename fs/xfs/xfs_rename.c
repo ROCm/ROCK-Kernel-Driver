@@ -72,14 +72,13 @@ int xfs_rename_skip, xfs_rename_nskip;
  * We are renaming dp1/name1 to dp2/name2.
  *
  * Return ENOENT if dp1 does not exist, other lookup errors, or 0 for success.
- * Return EAGAIN if the caller needs to try again.
  */
 STATIC int
 xfs_lock_for_rename(
 	xfs_inode_t	*dp1,	/* old (source) directory inode */
 	xfs_inode_t	*dp2,	/* new (target) directory inode */
-	vname_t		*dentry1, /* old entry name */
-	vname_t		*dentry2, /* new entry name */
+	vname_t		*vname1,/* old entry name */
+	vname_t		*vname2,/* new entry name */
 	xfs_inode_t	**ipp1, /* inode of old entry */
 	xfs_inode_t	**ipp2, /* inode of new entry, if it
 				   already exists, NULL otherwise. */
@@ -102,7 +101,7 @@ xfs_lock_for_rename(
 	 * to see if we still have the right inodes, directories, etc.
 	 */
 	lock_mode = xfs_ilock_map_shared(dp1);
-	error = xfs_get_dir_entry(dentry1, &ip1);
+	error = xfs_get_dir_entry(vname1, &ip1);
 	if (error) {
 		xfs_iunlock_map_shared(dp1, lock_mode);
 		return error;
@@ -123,7 +122,7 @@ xfs_lock_for_rename(
 	}
 
 	error = xfs_dir_lookup_int(XFS_ITOBHV(dp2), lock_mode,
-				   dentry2, &inum2, &ip2);
+				   vname2, &inum2, &ip2);
 	if (error == ENOENT) {		/* target does not need to exist. */
 		inum2 = 0;
 	} else if (error) {
@@ -213,20 +212,15 @@ xfs_lock_for_rename(
 
 int rename_which_error_return = 0;
 
-#ifdef DEBUG
-int xfs_rename_agains;
-int xfs_renames;
-#endif
-
 /*
  * xfs_rename
  */
 int
 xfs_rename(
 	bhv_desc_t	*src_dir_bdp,
-	vname_t		*src_dentry,
+	vname_t		*src_vname,
 	vnode_t		*target_dir_vp,
-	vname_t		*target_dentry,
+	vname_t		*target_vname,
 	cred_t		*credp)
 {
 	xfs_trans_t	*tp;
@@ -246,15 +240,11 @@ xfs_rename(
 	int		spaceres;
 	int		target_link_zero = 0;
 	int		num_inodes;
-	char		*src_name = VNAME(src_dentry);
-	char		*target_name = VNAME(target_dentry);
-	int		src_namelen;
-	int		target_namelen;
-#ifdef DEBUG
-	int		retries;
+	char		*src_name = VNAME(src_vname);
+	char		*target_name = VNAME(target_vname);
+	int		src_namelen = VNAMELEN(src_vname);
+	int		target_namelen = VNAMELEN(target_vname);
 
-	xfs_renames++;
-#endif
 	src_dir_vp = BHV_TO_VNODE(src_dir_bdp);
 	vn_trace_entry(src_dir_vp, "xfs_rename", (inst_t *)__return_address);
 	vn_trace_entry(target_dir_vp, "xfs_rename", (inst_t *)__return_address);
@@ -268,14 +258,10 @@ xfs_rename(
 	if (target_dir_bdp == NULL) {
 		return XFS_ERROR(EXDEV);
 	}
-	src_namelen = VNAMELEN(src_dentry);
-	if (src_namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
-	target_namelen = VNAMELEN(target_dentry);
-	if (target_namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
+
 	src_dp = XFS_BHVTOI(src_dir_bdp);
 	target_dp = XFS_BHVTOI(target_dir_bdp);
+
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_RENAME) ||
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
 				target_dp, DM_EVENT_RENAME)) {
@@ -290,9 +276,6 @@ xfs_rename(
 	}
 	/* Return through std_return after this point. */
 
-#ifdef DEBUG
-	retries = 0;
-#endif
 	/*
 	 * Lock all the participating inodes. Depending upon whether
 	 * the target_name exists in the target directory, and
@@ -302,15 +285,9 @@ xfs_rename(
 	 * does not exist in the source directory.
 	 */
 	tp = NULL;
-	do {
-		error = xfs_lock_for_rename(src_dp, target_dp, src_dentry,
-				target_dentry, &src_ip, &target_ip, inodes,
-				&num_inodes);
-#ifdef DEBUG
-		if (error == EAGAIN)
-			xfs_rename_agains++;
-#endif
-	} while (error == EAGAIN);
+	error = xfs_lock_for_rename(src_dp, target_dp, src_vname,
+			target_vname, &src_ip, &target_ip, inodes,
+			&num_inodes);
 
 	if (error) {
 		rename_which_error_return = __LINE__;

@@ -477,7 +477,8 @@ unsigned long max_sane_readahead(unsigned long nr)
 {
 	unsigned long active;
 	unsigned long inactive;
+	unsigned long free;
 
-	get_zone_counts(&active, &inactive);
-	return min(nr, inactive / 2);
+	get_zone_counts(&active, &inactive, &free);
+	return min(nr, (inactive + free) / 2);
 }

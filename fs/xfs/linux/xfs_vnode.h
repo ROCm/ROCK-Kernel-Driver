@@ -671,13 +671,14 @@ extern void	vn_rele(struct vnode *);
 #define VN_HOLD(vp)		((void)vn_hold(vp))
 #define VN_RELE(vp)		(iput(LINVFS_GET_IP(vp)))
 
-#endif	/* ! (defined(CONFIG_XFS_VNODE_TRACING) */
+#endif	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
 
 /*
  * Vname handling macros.
  */
 #define VNAME(dentry)		((char *) (dentry)->d_name.name)
 #define VNAMELEN(dentry)	((dentry)->d_name.len)
+#define VNAME_TO_VNODE(dentry)	(LINVFS_GET_VP((dentry)->d_inode))
 
 /*
  * Vnode spinlock manipulation.

@@ -53,6 +53,18 @@ config CRYPTO_SHA256
 	  This version of SHA implements a 256 bit hash with 128 bits of
 	  security against collision attacks.
 
+config CRYPTO_SHA512
+	tristate "SHA384 and SHA512 digest algorithms"
+	depends on CRYPTO
+	help
+	  SHA512 secure hash standard (DFIPS 180-2).
+	  
+	  This version of SHA implements a 512 bit hash with 256 bits of
+	  security against collision attacks.
+
+	  This code also includes SHA-384, a 384 bit hash with 192 bits
+	  of security against collision attacks.
+
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"
 	depends on CRYPTO

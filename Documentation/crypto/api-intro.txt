@@ -80,6 +80,10 @@ should also be added:
   alias digest_null crypto_null
   alias compress_null crypto_null
 
+The SHA384 algorithm shares code within the SHA512 module, so you'll
+also need:
+  alias sha384 sha512
+
 
 DEVELOPER NOTES
 
@@ -182,7 +186,7 @@ Original developers of the crypto algorithms:
   Andrew Tridgell and Steve French (MD4)
   Colin Plumb (MD5)
   Steve Reid (SHA1)
-  Jean-Luc Cooke (SHA256)
+  Jean-Luc Cooke (SHA256, SHA384, SHA512)
   Kazunori Miyazawa / USAGI (HMAC)
   Matthew Skala (Twofish)
   Dag Arne Osvik (Serpent)
@@ -201,9 +205,11 @@ Twofish algorithm contributors:
   Werner Koch
   Marc Mutz
 
-SHA256 algorithm contributors:
+SHA256/384/512 algorithm contributors:
   Andrew McDonald
-
+  Kyle McMartin
+  Herbert Valerio Riedel
+  
 AES algorithm contributors:
   Alexander Kjeldaas
   Herbert Valerio Riedel

@@ -19,18 +19,16 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/pci.h>
+#include <linux/scx200.h>
+
 #include <asm/uaccess.h>
 #include <asm/io.h>
-
-#include <linux/scx200.h>
 
 #define NAME "scx200_wdt"
 

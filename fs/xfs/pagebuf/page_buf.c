@@ -1108,7 +1108,7 @@ _pagebuf_wait_unpin(
  *	pagebuf_iodone
  *
  *	pagebuf_iodone marks a buffer for which I/O is in progress
- *	done with respect to that I/O.	The pb_done routine, if
+ *	done with respect to that I/O.	The pb_iodone routine, if
  *	present, will be called as a side-effect.
  */
 void
@@ -1173,7 +1173,7 @@ pagebuf_ioerror(			/* mark/clear buffer error flag */
  *	pagebuf_iostart initiates I/O on a buffer, based on the flags supplied.
  *	If necessary, it will arrange for any disk space allocation required,
  *	and it will break up the request if the block mappings require it.
- *	An pb_iodone routine in the buffer supplied will only be called
+ *	The pb_iodone routine in the buffer supplied will only be called
  *	when all of the subsidiary I/O requests, if any, have been completed.
  *	pagebuf_iostart calls the pagebuf_ioinitiate routine or
  *	pagebuf_iorequest, if the former routine is not defined, to start
@@ -1317,7 +1317,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 
 	/* Set the count to 1 initially, this will stop an I/O
 	 * completion callout which happens before we have started
-	 * all the I/O from calling iodone too early
+	 * all the I/O from calling pagebuf_iodone too early.
 	 */
 	atomic_set(&pb->pb_io_remaining, 1);
 

@@ -712,8 +712,9 @@ find_p2p_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 
 /* find hot-pluggable slots, and then find P2P bridge */
-static int add_bridges (acpi_handle *handle)
+static int add_bridges(struct acpi_device *device)
 {
+	acpi_handle *handle = device->handle;
 	acpi_status status;
 	unsigned long tmp;
 	int seg, bus;
@@ -764,36 +765,6 @@ static int add_bridges (acpi_handle *handle)
 		warn("find_p2p_bridge faied (error code = 0x%x)\n",status);
 
 	return 0;
-}
-
-
-/* callback routine to enumerate all the bridges in ACPI namespace */
-static acpi_status
-find_host_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
-{
-	acpi_status status;
-	struct acpi_device_info info;
-	char objname[5];
-	struct acpi_buffer buffer = { .length = sizeof(objname),
-				      .pointer = objname };
-
-	status = acpi_get_object_info(handle, &info);
-	if (ACPI_FAILURE(status)) {
-		dbg("%s: failed to get bridge information\n", __FUNCTION__);
-		return AE_OK;		/* continue */
-	}
-
-	info.hardware_id[sizeof(info.hardware_id)-1] = '\0';
-
-	/* TBD use acpi_get_devices() API */
-	if (info.current_status &&
-	    (info.valid & ACPI_VALID_HID) &&
-	    strcmp(info.hardware_id, ACPI_PCI_HOST_HID) == 0) {
-		acpi_get_name(handle, ACPI_SINGLE_NAME, &buffer);
-		dbg("checking PCI-hotplug capable bridges under [%s]\n", objname);
-		add_bridges(handle);
-	}
-	return AE_OK;
 }
 
 
@@ -1157,6 +1128,14 @@ static void handle_hotplug_event_func (acpi_handle handle, u32 type, void *conte
 	}
 }
 
+static struct acpi_driver acpi_pci_hp_driver = {
+	.name =		"pci_hp",
+	.class =	"",
+	.ids =		ACPI_PCI_HOST_HID,
+	.ops =	{
+		.add =	add_bridges,
+	}
+};
 
 /**
  * acpiphp_glue_init - initializes all PCI hotplug - ACPI glue data structures
@@ -1169,9 +1148,7 @@ int acpiphp_glue_init (void)
 	if (list_empty(&pci_root_buses))
 		return -1;
 
-	status = acpi_walk_namespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
-				     ACPI_UINT32_MAX, find_host_bridge,
-				     NULL, NULL);
+	status = acpi_bus_register_driver(&acpi_pci_hp_driver);
 
 	if (ACPI_FAILURE(status)) {
 		err("%s: acpi_walk_namespace() failed\n", __FUNCTION__);

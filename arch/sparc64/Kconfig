@@ -139,6 +139,39 @@ config NR_CPUS
 	depends on SMP
 	default "64"
 
+config CPU_FREQ
+	bool "CPU Frequency scaling"
+	help
+	  Clock scaling allows you to change the clock speed of CPUs on the
+	  fly.  Currently there is only a sparc64 driver for UltraSPARC-III
+	  processors.
+
+	  For details, take a look at linux/Documentation/cpufreq. 
+
+	  If in doubt, say N.
+
+config CPU_FREQ_PROC_INTF
+	bool "/proc/cpufreq interface (DEPRECATED)"
+	depends on CPU_FREQ && PROC_FS
+	help
+	  This enables the /proc/cpufreq interface for controlling
+	  CPUFreq. Please note that it is recommended to use the sysfs
+	  interface instead (which is built automatically). 
+	  
+	  For details, take a look at linux/Documentation/cpufreq. 
+	  
+	  If in doubt, say N.
+
+config US3_FREQ
+	tristate "UltraSPARC-III CPU Frequency driver"
+	depends on CPU_FREQ
+	help
+	  This adds the CPUFreq driver for UltraSPARC-III processors.
+
+	  For details, take a look at linux/Documentation/cpufreq. 
+
+	  If in doubt, say N.
+
 # Identify this as a Sparc64 build
 config SPARC64
 	bool
