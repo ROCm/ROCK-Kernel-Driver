@@ -708,12 +708,22 @@ static int hd_open(struct inode * inode, struct file * filp)
 
 extern struct block_device_operations hd_fops;
 
-static struct gendisk hd_gendisk = {
+static struct gendisk hd_gendisk[2] = {
+{
 	.major =	MAJOR_NR,
+	.first_minor =	0,
 	.major_name =	"hd",
 	.minor_shift =	6,
 	.part =		hd,
 	.fops =		&hd_fops,
+},{
+	.major =	MAJOR_NR,
+	.first_minor =	64,
+	.major_name =	"hd",
+	.minor_shift =	6,
+	.part =		hd + 64,
+	.fops =		&hd_fops,
+}
 };
 	
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -845,12 +855,14 @@ static void __init hd_geninit(void)
 		return;
 	}
 
-	hd_gendisk.nr_real = NR_HD;
-
-	for(drive=0; drive < NR_HD; drive++)
-		register_disk(&hd_gendisk, mk_kdev(MAJOR_NR,drive<<6), 1<<6,
+	for(drive=0; drive < NR_HD; drive++) {
+		hd_gendisk[i].nr_real = 1;
+		add_gendisk(hd_gendisk + drive);
+		register_disk(hd_gendisk + drive,
+			mk_kdev(MAJOR_NR,drive<<6), 1<<6,
 			&hd_fops, hd_info[drive].head * hd_info[drive].sect *
 			hd_info[drive].cyl);
+	}
 }
 
 int __init hd_init(void)
@@ -861,7 +873,6 @@ int __init hd_init(void)
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_hd_request, &hd_lock);
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
-	add_gendisk(&hd_gendisk);
 	init_timer(&device_timer);
 	device_timer.function = hd_times_out;
 	hd_geninit();

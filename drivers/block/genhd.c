@@ -55,8 +55,8 @@ add_gendisk(struct gendisk *gp)
 	{
 		if (sgp == gp)
 		{
-//			printk(KERN_ERR "add_gendisk: device major %d is buggy and added a live gendisk!\n",
-//				sgp->major)
+			printk(KERN_ERR "add_gendisk: device major %d is buggy and added a live gendisk!\n",
+				sgp->major)
 			goto out;
 		}
 	}

@@ -488,16 +488,19 @@ void ide_unregister(struct ata_channel *ch)
 	blk_dev[ch->major].data = NULL;
 	blk_dev[ch->major].queue = NULL;
 	blk_clear(ch->major);
-	gd = ch->gd;
+	gd = ch->gd[0];
 	if (gd) {
-		del_gendisk(gd);
+		int i;
+		for (i = 0; i < MAX_DRIVES; i++)
+			del_gendisk(gd + i);
 		kfree(gd->part);
 		if (gd->de_arr)
 			kfree (gd->de_arr);
 		if (gd->flags)
 			kfree (gd->flags);
 		kfree(gd);
-		ch->gd = NULL;
+		for (i = 0; i < MAX_DRIVES; i++)
+			ch->gd[i] = NULL;
 	}
 
 	/*

@@ -1043,6 +1043,9 @@ static request_queue_t *ata_get_queue(kdev_t dev)
 static void channel_init(struct ata_channel *ch)
 {
 	struct gendisk *gd;
+	struct hd_struct *part;
+	devfs_handle_t *de_arr;
+	char *flags;
 	unsigned int unit;
 	extern devfs_handle_t ide_devfs_handle;
 
@@ -1103,39 +1106,42 @@ static void channel_init(struct ata_channel *ch)
 	/* Initialize partition and global device data.
 	 */
 
-	gd = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
+	gd = kmalloc (MAX_DRIVES * sizeof(struct gendisk), GFP_KERNEL);
 	if (!gd)
 		goto err_kmalloc_gd;
 
-	memset(gd, 0, sizeof(struct gendisk));
+	memset(gd, 0, MAX_DRIVES * sizeof(struct gendisk));
 
-	gd->part = kmalloc(ATA_MINORS * sizeof(struct hd_struct), GFP_KERNEL);
-	if (!gd->part)
+	part = kmalloc(ATA_MINORS * sizeof(struct hd_struct), GFP_KERNEL);
+	if (!part)
 		goto err_kmalloc_gd_part;
-	memset(gd->part, 0, ATA_MINORS * sizeof(struct hd_struct));
+	memset(part, 0, ATA_MINORS * sizeof(struct hd_struct));
 
-	gd->de_arr = kmalloc (sizeof(*gd->de_arr) * MAX_DRIVES, GFP_KERNEL);
-	if (!gd->de_arr)
+	de_arr = kmalloc (sizeof(devfs_handle_t) * MAX_DRIVES, GFP_KERNEL);
+	if (!de_arr)
 		goto err_kmalloc_gd_de_arr;
-	memset(gd->de_arr, 0, sizeof(*gd->de_arr) * MAX_DRIVES);
+	memset(de_arr, 0, sizeof(devfs_handle_t) * MAX_DRIVES);
 
-	gd->flags = kmalloc (sizeof(*gd->flags) * MAX_DRIVES, GFP_KERNEL);
-	if (!gd->flags)
+	flags = kmalloc (sizeof(char) * MAX_DRIVES, GFP_KERNEL);
+	if (!flags)
 		goto err_kmalloc_gd_flags;
-	memset(gd->flags, 0, sizeof(*gd->flags) * MAX_DRIVES);
+	memset(flags, 0, sizeof(char) * MAX_DRIVES);
 
-	for (unit = 0; unit < MAX_DRIVES; ++unit)
-		ch->drives[unit].part = &gd->part[unit << PARTN_BITS];
-
-	gd->major	= ch->major;		/* our major device number */
-	gd->major_name	= IDE_MAJOR_NAME;	/* treated special in genhd.c */
-	gd->minor_shift	= PARTN_BITS;		/* num bits for partitions */
-	gd->nr_real	= MAX_DRIVES;		/* current num real drives */
-	gd->next	= NULL;			/* linked list of major devs */
-	gd->fops        = ide_fops;             /* file operations */
-
-	ch->gd = gd;
-	add_gendisk(gd);
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
+		gd[unit].part = part + (unit << PARTN_BITS);
+		gd[unit].de_arr = de_arr + unit;
+		gd[unit].flags = flags + unit;
+		ch->drives[unit].part = gd[unit].part;
+		gd[unit].major	= ch->major;
+		gd[unit].first_minor = unit << PARTN_BITS;
+		/* treated special in genhd.c */
+		gd[unit].major_name = IDE_MAJOR_NAME;
+		gd[unit].minor_shift = PARTN_BITS;
+		gd[unit].nr_real = 1;
+		gd[unit].fops = ide_fops;
+		ch->gd[unit] = gd + unit;
+		add_gendisk(gd + unit);
+	}
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		char name[80];
@@ -1156,9 +1162,9 @@ static void channel_init(struct ata_channel *ch)
 	return;
 
 err_kmalloc_gd_flags:
-	kfree(gd->de_arr);
+	kfree(de_arr);
 err_kmalloc_gd_de_arr:
-	kfree(gd->part);
+	kfree(part);
 err_kmalloc_gd_part:
 	kfree(gd);
 err_kmalloc_gd:

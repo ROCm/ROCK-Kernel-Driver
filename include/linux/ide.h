@@ -894,7 +894,7 @@ struct ata_channel {
 	struct pci_dev *pci_dev;		/* for pci chipsets */
 #endif
 	struct ata_device drives[MAX_DRIVES];	/* drive info */
-	struct gendisk *gd;			/* gendisk structure */
+	struct gendisk *gd[MAX_DRIVES];		/* gendisk structure */
 
 	/*
 	 * Routines to tune PIO and DMA mode for drives.

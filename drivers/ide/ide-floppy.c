@@ -1712,9 +1712,9 @@ static void idefloppy_setup(struct ata_device *drive, idefloppy_floppy_t *floppy
 		struct ata_channel *hwif = drive->channel;
 
 		if (drive != &hwif->drives[i]) continue;
-		hwif->gd->de_arr[i] = drive->de;
+		hwif->gd[i]->de_arr[0] = drive->de;
 		if (drive->removable)
-			hwif->gd->flags[i] |= GENHD_FL_REMOVABLE;
+			hwif->gd[i]->flags[0] |= GENHD_FL_REMOVABLE;
 		break;
 	}
 }

@@ -1064,9 +1064,9 @@ static void idedisk_setup(struct ata_device *drive)
 		if (drive != &ch->drives[i])
 		    continue;
 		drvid = i;
-		ch->gd->de_arr[i] = drive->de;
+		ch->gd[i]->de_arr[0] = drive->de;
 		if (drive->removable)
-			ch->gd->flags[i] |= GENHD_FL_REMOVABLE;
+			ch->gd[i]->flags[0] |= GENHD_FL_REMOVABLE;
 		break;
 	}
 

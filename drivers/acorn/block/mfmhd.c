@@ -1253,11 +1253,20 @@ void xd_set_geometry(struct block_device *bdev, unsigned char secsptrack,
 	}
 }
 
-static struct gendisk mfm_gendisk = {
+static struct gendisk mfm_gendisk[2] = {
+{
 	major:		MAJOR_NR,
+	first_minor:	0,
 	major_name:	"mfm",
 	minor_shift:	6,
 	part:		mfm,
+},
+{
+	major:		MAJOR_NR,
+	first_minor:	64,
+	major_name:	"mfm",
+	minor_shift:	6,
+	part:		mfm + 64,
 };
 
 static struct block_device_operations mfm_fops =
@@ -1275,8 +1284,6 @@ static void mfm_geninit (void)
 
 	printk("mfm: detected %d hard drive%s\n", mfm_drives,
 				mfm_drives == 1 ? "" : "s");
-	mfm_gendisk.nr_real = mfm_drives;
-
 	if (request_irq(mfm_irq, mfm_interrupt_handler, SA_INTERRUPT, "MFM harddisk", NULL))
 		printk("mfm: unable to get IRQ%d\n", mfm_irq);
 
@@ -1284,8 +1291,10 @@ static void mfm_geninit (void)
 		outw(0x80, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
 
 	for (i = 0; i < mfm_drives; i++) {
+		mfm_gendisk[i].nr_real = 1;
+		add_gendisk(mfm_gendisk + i);
 		mfm_geometry (i);
-		register_disk(&mfm_gendisk, mk_kdev(MAJOR_NR,i<<6), 1<<6,
+		register_disk(mfm_gendisk + i, mk_kdev(MAJOR_NR,i<<6), 1<<6,
 				&mfm_fops,
 				mfm_info[i].cylinders * mfm_info[i].heads *
 				mfm_info[i].sectors / 2);
@@ -1380,8 +1389,6 @@ int mfm_init (void)
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mfm_request);
 
-	add_gendisk(&mfm_gendisk);
-
 	Busy = 0;
 	lastspecifieddrive = -1;
 
@@ -1419,11 +1426,13 @@ int init_module(void)
 
 void cleanup_module(void)
 {
+	int i;
 	if (ecs && mfm_irqenable)
 		outw (0, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
 	free_irq(mfm_irq, NULL);
 	unregister_blkdev(MAJOR_NR, "mfm");
-	del_gendisk(&mfm_gendisk);
+	for (i = 0; i < mfm_drives; i++)
+		del_gendisk(mfm_gendisk + i);
 	if (ecs)
 		ecard_release(ecs);
 	if (mfm_addr)
