@@ -83,59 +83,40 @@ static void mousedev_abs_event(struct input_handle *handle, struct mousedev_list
 		return;
 
 	/* Handle touchpad data */
-	if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit) &&
-	    test_bit(ABS_PRESSURE, handle->dev->absbit) &&
-	    test_bit(ABS_TOOL_WIDTH, handle->dev->absbit)) {
+	if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
+
+		if (list->finger && list->finger < 3)
+			list->finger++;
+
 		switch (code) {
-		case ABS_PRESSURE:
-			if (!list->finger) {
-				if (value > 30)
-					list->finger = 1;
-			} else {
-				if (value < 25)
-					list->finger = 0;
-				else if (list->finger < 3)
-					list->finger++;
-			}
-			break;
-		case ABS_X:
-			if (list->finger >= 3) {
-				list->dx += (value - list->oldx) / 8;
-			}
-			list->oldx = value;
-			break;
-		case ABS_Y:
-			if (list->finger >= 3) {
-				list->dy -= (value - list->oldy) / 8;
-			}
-			list->oldy = value;
-			break;
+			case ABS_X:
+				if (list->finger == 3)
+					list->dx += (value - list->oldx) / 8;
+				list->oldx = value;
+				return;
+			case ABS_Y:
+				if (list->finger == 3)
+					list->dy -= (value - list->oldy) / 8;
+				list->oldy = value;
+				return;
 		}
 		return;
 	}
 
-	/* Handle tablet like devices */
+	/* Handle tablet data */
 	switch (code) {
-	case ABS_X:
-		size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
-		if (size != 0) {
+		case ABS_X:
+			size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
+			if (size == 0) size = xres;
 			list->dx += (value * xres - list->oldx) / size;
 			list->oldx += list->dx * size;
-		} else {
-			list->dx += value - list->oldx;
-			list->oldx += list->dx;
-		}
-		break;
-	case ABS_Y:
-		size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
-		if (size != 0) {
+			return;
+		case ABS_Y:
+			size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
+			if (size == 0) size = yres;
 			list->dy -= (value * yres - list->oldy) / size;
 			list->oldy -= list->dy * size;
-		} else {
-			list->dy -= value - list->oldy;
-			list->oldy -= list->dy;
-		}
-		break;
+			return;
 	}
 }
 
@@ -166,8 +147,13 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 
 				case EV_KEY:
 					switch (code) {
+						case BTN_TOUCH: /* Handle touchpad data */
+							if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
+								list->finger = value;
+								return;
+							}
 						case BTN_0:
-						case BTN_TOUCH:
+						case BTN_FORWARD:
 						case BTN_LEFT:   index = 0; break;
 						case BTN_4:
 						case BTN_EXTRA:  if (list->mode == 2) { index = 4; break; }
@@ -175,6 +161,7 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 						case BTN_1:
 						case BTN_RIGHT:  index = 1; break;
 						case BTN_3:
+						case BTN_BACK:
 						case BTN_SIDE:   if (list->mode == 2) { index = 3; break; }
 						case BTN_2:
 						case BTN_STYLUS2:
@@ -333,7 +320,7 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 {
 	struct mousedev_list *list = file->private_data;
 	unsigned char c;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < count; i++) {
 
