@@ -152,7 +152,7 @@ void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
     size = to->len-tooff;
     if (size > from->len-fromoff)
 	size = from->len-fromoff;
-    if (size < 0)
+    if (size <= 0)
 	return;
     size *= sizeof(u16);
     
