@@ -51,7 +51,7 @@ $(obj)/kconfig.tk: $(srctree)/arch/$(ARCH)/config.in $(obj)/tkparse FORCE
 # Targets hardcoded and wellknow in top-level makefile
 .PHONY: lxdialog
 lxdialog:
-	$(call descend,lxdialog,)
+	$(call descend,scripts/lxdialog,)
 
 # fixdep is needed to compile other host programs
 $(obj)/split-include $(obj)/docproc $(addprefix $(obj)/,$(tkparse-objs)) \

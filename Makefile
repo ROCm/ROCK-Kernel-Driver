@@ -104,12 +104,13 @@ ifndef KBUILD_VERBOSE
   KBUILD_VERBOSE = 1
 endif
 
+MAKEFLAGS += --no-print-directory
+
 #	If the user wants quiet mode, echo short versions of the commands 
-#	only and suppress the 'Entering/Leaving directory' messages
+#	only
 
 ifneq ($(KBUILD_VERBOSE),1)
   quiet=quiet_
-  MAKEFLAGS += --no-print-directory
 endif
 
 #	If the user is running make -s (silent mode), suppress echoing of
@@ -121,9 +122,16 @@ endif
 
 export quiet KBUILD_VERBOSE
 
-#
-# Include the make variables (CC, etc...)
-#
+#	Paths to obj / src tree
+
+src	:= .
+obj	:= .
+srctree := .
+objtree := .
+
+export srctree objtree
+
+# 	Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
@@ -144,23 +152,20 @@ CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
-EXPORT_FLAGS    =
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
+
+CPPFLAGS	:= -D__KERNEL__ -Iinclude
+CFLAGS 		:= $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
+	  	   -fomit-frame-pointer -fno-strict-aliasing -fno-common
+AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
 
-export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
+export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
-
-src	:= .
-obj	:= .
-srctree := $(TOPDIR)
-objtree := $(TOPDIR)
-
-export srctree objtree
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
@@ -184,7 +189,43 @@ scripts/docproc scripts/fixdep scripts/split-include : scripts ;
 scripts:
 	@$(call descend,scripts,)
 
+# Objects we will link into vmlinux / subdirs we need to visit
+# ---------------------------------------------------------------------------
+
+init-y		:= init/
+drivers-y	:= drivers/ sound/
+net-y		:= net/
+libs-y		:= lib/
+core-y		:=
+SUBDIRS		:=
+
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
+
+include-config := 1
+
+-include .config
+
+endif
+
+include arch/$(ARCH)/Makefile
+
+core-y		+= kernel/ mm/ fs/ ipc/ security/
+
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
+
+ALL_SUBDIRS     := $(SUBDIRS) $(patsubst %/,%,$(filter %/, $(init-n) $(init-) \
+		     $(core-n) $(core-) $(drivers-n) $(drivers-) \
+		     $(net-n) $(net-) $(libs-n) $(libs-)))
+
+init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
+core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
+drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
+net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
+libs-y		:= $(patsubst %/, %/lib.a, $(libs-y))
+
+ifdef include-config
 
 # Here goes the main Makefile
 # ===========================================================================
@@ -195,8 +236,6 @@ ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 # don't need .config, either
 
 #	In this section, we need .config
-
--include .config
 
 #	If .config doesn't exist - tough luck
 
@@ -214,6 +253,10 @@ ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 	@echo '***'
 	@exit 1
 
+ifdef CONFIG_MODULES
+export EXPORT_FLAGS := -DEXPORT_SYMTAB
+endif
+
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
 # images.  Uncomment if you want to place them anywhere other than root.
@@ -229,45 +272,6 @@ ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 MODLIB	:= $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
 export MODLIB
-
-#
-# standard CFLAGS
-#
-
-CPPFLAGS := -D__KERNEL__ -I$(objtree)/include
-
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
-	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
-AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
-
-ifdef CONFIG_MODULES
-EXPORT_FLAGS := -DEXPORT_SYMTAB
-endif
-
-# Link components for vmlinux
-# ---------------------------------------------------------------------------
-
-init-y		:= init/
-drivers-y	:= drivers/ sound/
-net-y		:= net/
-libs-y		:= lib/
-core-y		:=
-SUBDIRS		:=
-
-include arch/$(ARCH)/Makefile
-
-core-y		+= kernel/ mm/ fs/ ipc/ security/
-
-SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
-		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
-		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
-init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
-core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
-drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
-net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
-libs-y		:= $(patsubst %/, %/lib.a, $(libs-y))
-
-$(warning $(SUBDIRS))
 
 # Build vmlinux
 # ---------------------------------------------------------------------------
@@ -364,7 +368,7 @@ prepare: include/linux/version.h include/asm include/config/MARKER
 
 AFLAGS_vmlinux.lds.o += -P -C -U$(ARCH)
 
-arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S scripts FORCE
+arch/$(ARCH)/vmlinux.lds.s: %.s: %.S scripts FORCE
 	$(call if_changed_dep,as_s_S)
 
 targets += arch/$(ARCH)/vmlinux.lds.s
@@ -486,7 +490,7 @@ ifdef CONFIG_MODULES
 #	Build modules
 
 ifdef CONFIG_MODVERSIONS
-MODFLAGS += -include $(objtree)/include/linux/modversions.h
+MODFLAGS += -include include/linux/modversions.h
 endif
 
 .PHONY: modules
@@ -520,7 +524,7 @@ _modinst_post:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	$(descend,$(patsubst _modinst_%,%,$@),modules_install)
+	@$(call descend,$(patsubst _modinst_%,%,$@),modules_install)
 
 else # CONFIG_MODULES
 
@@ -584,7 +588,7 @@ rpm:	clean spec
 	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
-else # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
+else # ifdef include-config
 
 ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -691,7 +695,7 @@ MRPROPER_FILES += \
 	.version .config* config.in config.old \
 	.menuconfig.log \
 	include/asm \
-	.hdepend $(TOPDIR)/include/linux/modversions.h \
+	.hdepend include/linux/modversions.h \
 	tags TAGS kernel.spec \
 	.tmp*
 
@@ -699,11 +703,7 @@ MRPROPER_FILES += \
 MRPROPER_DIRS += \
 	.tmp_export-objs \
 	include/config \
-	$(TOPDIR)/include/linux/modules
-
-#	That's our way to know about arch specific cleanup.
-
-include arch/$(ARCH)/Makefile
+	include/linux/modules
 
 clean:	archclean
 	@echo 'Cleaning up'
@@ -839,10 +839,11 @@ else # ifneq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	$(MAKE) $@
 
 endif # ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
-endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
+endif # ifdef include-config
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
+
 echo_target = $@
 
 a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
@@ -899,6 +900,9 @@ endef
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
 
-descend = $(MAKE) -C $(1) $(2)
+ifeq ($(KBUILD_VERBOSE),1)
+descend = echo '$(MAKE) -f $(1)/Makefile $(2)';
+endif
+descend += $(MAKE) -f $(1)/Makefile obj=$(1) $(2)
 
 FORCE:
