@@ -318,8 +318,8 @@ static int usb_stor_control_thread(void * __us)
 		/* lock access to the state */
 		scsi_lock(host);
 
-		/* has the command been aborted *already* ? */
-		if (us->sm_state == US_STATE_ABORTING) {
+		/* has the command timed out *already* ? */
+		if (test_bit(US_FLIDX_TIMED_OUT, &us->flags)) {
 			us->srb->result = DID_ABORT << 16;
 			goto SkipForAbort;
 		}
@@ -330,8 +330,6 @@ static int usb_stor_control_thread(void * __us)
 			goto SkipForDisconnect;
 		}
 
-		/* set the state and release the lock */
-		us->sm_state = US_STATE_RUNNING;
 		scsi_unlock(host);
 
 		/* reject the command if the direction indicator 
@@ -392,16 +390,15 @@ SkipForAbort:
 
 		/* If an abort request was received we need to signal that
 		 * the abort has finished.  The proper test for this is
-		 * sm_state == US_STATE_ABORTING, not srb->result == DID_ABORT,
-		 * because an abort request might be received after all the
+		 * the TIMED_OUT flag, not srb->result == DID_ABORT, because
+		 * a timeout/abort request might be received after all the
 		 * USB processing was complete. */
-		if (us->sm_state == US_STATE_ABORTING)
+		if (test_bit(US_FLIDX_TIMED_OUT, &us->flags))
 			complete(&(us->notify));
 
-		/* empty the queue, reset the state, and release the lock */
+		/* finished working on this command */
 SkipForDisconnect:
 		us->srb = NULL;
-		us->sm_state = US_STATE_IDLE;
 		scsi_unlock(host);
 
 		/* unlock the device pointers */
@@ -801,7 +798,6 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	us->host->hostdata[0] = (unsigned long) us;
 
 	/* Start up our control thread */
-	us->sm_state = US_STATE_IDLE;
 	p = kernel_thread(usb_stor_control_thread, us, CLONE_VM);
 	if (p < 0) {
 		printk(KERN_WARNING USB_STORAGE 
@@ -829,7 +825,6 @@ void usb_stor_release_resources(struct us_data *us)
 		/* Wait for the thread to be idle */
 		down(&us->dev_semaphore);
 		US_DEBUGP("-- sending exit command to thread\n");
-		BUG_ON(us->sm_state != US_STATE_IDLE);
 
 		/* If the SCSI midlayer queued a final command just before
 		 * scsi_remove_host() was called, us->srb might not be
