@@ -34,7 +34,7 @@
 #include "sis_drv.h"
 #include "sis_ds.h"
 #if defined(__linux__) && defined(CONFIG_FB_SIS)
-#include <linux/sisfb.h>
+#include <video/sisfb.h>
 #endif
 
 #define MAX_CONTEXT 100
@@ -132,7 +132,7 @@ int sis_fb_free( DRM_IOCTL_ARGS )
 		retval = DRM_ERR(EINVAL);
 	sis_free(fb.free);
 
-	DRM_DEBUG("free fb, offset = %d\n", fb.free);
+	DRM_DEBUG("free fb, offset = %lu\n", fb.free);
 
 	return retval;
 }
