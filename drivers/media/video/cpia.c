@@ -2572,8 +2572,8 @@ static int cpia_read(struct file *file, char *buf,
 	return cam->decompressed_frame.count;
 }
 
-static int cpia_ioctl(struct inode *inode, struct file *file,
-		      unsigned int ioctlnr, void *arg)
+static int cpia_do_ioctl(struct inode *inode, struct file *file,
+			 unsigned int ioctlnr, void *arg)
 {
 	struct video_device *dev = file->private_data;
 	struct cam_data *cam = dev->priv;
@@ -2874,6 +2874,12 @@ static int cpia_ioctl(struct inode *inode, struct file *file,
 	return retval;
 } 
 
+static int cpia_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, cpia_do_ioctl);
+}
+
 /* FIXME */
 static int cpia_mmap(struct file *file, struct vm_area_struct *vma)
 {
@@ -2933,7 +2939,7 @@ static struct file_operations cpia_fops = {
 	release:       	cpia_close,
 	read:		cpia_read,
 	mmap:		cpia_mmap,
-	ioctl:          video_generic_ioctl,
+	ioctl:          cpia_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -2943,7 +2949,6 @@ static struct video_device cpia_template = {
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_CPIA,      /* FIXME */
 	fops:           &cpia_fops,
-	kernel_ioctl:	cpia_ioctl,
 };
 
 /* initialise cam_data structure  */

@@ -672,8 +672,8 @@ static int pms_capture(struct pms_device *dev, char *buf, int rgb555, int count)
  *	Video4linux interfacing
  */
 
-static int pms_ioctl(struct inode *inode, struct file *file,
-		     unsigned int cmd, void *arg)
+static int pms_do_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct pms_device *pd=(struct pms_device *)dev;
@@ -855,6 +855,12 @@ static int pms_ioctl(struct inode *inode, struct file *file,
 	return 0;
 }
 
+static int pms_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, pms_do_ioctl);
+}
+
 static int pms_read(struct file *file, char *buf,
 		    size_t count, loff_t *ppos)
 {
@@ -872,7 +878,7 @@ static struct file_operations pms_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:          video_generic_ioctl,
+	ioctl:          pms_ioctl,
 	read:           pms_read,
 	llseek:         no_llseek,
 };
@@ -884,7 +890,6 @@ static struct video_device pms_template=
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_PMS,
 	fops:           &pms_fops,
-	kernel_ioctl:	pms_ioctl,
 };
 
 struct pms_device pms_device;
