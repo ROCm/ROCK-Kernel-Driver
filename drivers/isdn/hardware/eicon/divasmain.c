@@ -263,7 +263,7 @@ static void diva_adapter_trapped(void *context)
 		pdpc->card_failed = 0;
 		argv[2] = &adapter[0];
 
-		ret = call_usermodehelper(argv[0], argv, envp);
+		ret = call_usermodehelper(argv[0], argv, envp, 0);
 
 		if (ret) {
 			printk(KERN_ERR

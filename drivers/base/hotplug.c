@@ -114,7 +114,7 @@ static int do_hotplug (struct device *dev, char *argv1, const char *action,
 
 	pr_debug ("%s: %s %s %s %s %s %s\n", __FUNCTION__, argv [0], argv[1],
 		  envp[0], envp[1], envp[2], envp[3]);
-	retval = call_usermodehelper (argv [0], argv, envp);
+	retval = call_usermodehelper (argv [0], argv, envp, 0);
 	if (retval)
 		pr_debug ("%s - call_usermodehelper returned %d\n",
 			  __FUNCTION__, retval);
