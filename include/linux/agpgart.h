@@ -112,10 +112,6 @@ typedef struct _agp_unbind {
 
 #define AGPGART_MINOR 175
 
-#define AGP_UNLOCK()      	up(&(agp_fe.agp_mutex));
-#define AGP_LOCK()    		down(&(agp_fe.agp_mutex));
-#define AGP_LOCK_INIT() 	sema_init(&(agp_fe.agp_mutex), 1)
-
 #ifndef _AGP_BACKEND_H
 struct _agp_version {
 	u16 major;
