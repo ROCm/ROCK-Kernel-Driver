@@ -169,18 +169,16 @@ static int (*mangle[])(struct sk_buff **, u_int32_t, u_int16_t,
 static int ftp_data_fixup(const struct ip_ct_ftp_expect *exp_ftp_info,
 			  struct ip_conntrack *ct,
 			  struct sk_buff **pskb,
+			  u32 tcp_seq,
 			  enum ip_conntrack_info ctinfo,
 			  struct ip_conntrack_expect *expect)
 {
 	u_int32_t newip;
-	struct iphdr *iph = (*pskb)->nh.iph;
-	struct tcphdr *tcph = (void *)iph + iph->ihl*4;
 	u_int16_t port;
 	struct ip_conntrack_tuple newtuple;
 
 	DEBUGP("FTP_NAT: seq %u + %u in %u\n",
-	       expect->seq, exp_ftp_info->len,
-	       ntohl(tcph->seq));
+	       expect->seq, exp_ftp_info->len, tcp_seq);
 
 	/* Change address inside packet to match way we're mapping
 	   this connection. */
@@ -217,7 +215,7 @@ static int ftp_data_fixup(const struct ip_ct_ftp_expect *exp_ftp_info,
 		return 0;
 
 	if (!mangle[exp_ftp_info->ftptype](pskb, newip, port,
-					  expect->seq - ntohl(tcph->seq),
+					  expect->seq - tcp_seq,
 					  exp_ftp_info->len, ct, ctinfo))
 		return 0;
 
@@ -232,7 +230,7 @@ static unsigned int help(struct ip_conntrack *ct,
 			 struct sk_buff **pskb)
 {
 	struct iphdr *iph = (*pskb)->nh.iph;
-	struct tcphdr *tcph = (void *)iph + iph->ihl*4;
+	struct tcphdr _tcph, *tcph;
 	unsigned int datalen;
 	int dir;
 	struct ip_ct_ftp_expect *exp_ftp_info;
@@ -255,12 +253,17 @@ static unsigned int help(struct ip_conntrack *ct,
 		return NF_ACCEPT;
 	}
 
+	/* We passed tcp tracking, plus ftp helper: this must succeed. */
+	tcph = skb_header_pointer(*pskb, iph->ihl * 4, sizeof(_tcph), &_tcph);
+	BUG_ON(!tcph);
+
 	datalen = (*pskb)->len - iph->ihl * 4 - tcph->doff * 4;
 	/* If it's in the right range... */
 	if (between(exp->seq + exp_ftp_info->len,
 		    ntohl(tcph->seq),
 		    ntohl(tcph->seq) + datalen)) {
-		if (!ftp_data_fixup(exp_ftp_info, ct, pskb, ctinfo, exp))
+		if (!ftp_data_fixup(exp_ftp_info, ct, pskb, ntohl(tcph->seq),
+				    ctinfo, exp))
 			return NF_DROP;
 	} else {
 		/* Half a match?  This means a partial retransmisison.
