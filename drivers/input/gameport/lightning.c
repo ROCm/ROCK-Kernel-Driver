@@ -209,7 +209,7 @@ static int l4_calibrate(struct gameport *gameport, int *axes, int *max)
 	return 0;
 }
 	
-int __init l4_init(void)
+static int __init l4_init(void)
 {
 	int cal[4] = {255,255,255,255};
 	int i, j, rev, cards = 0;
@@ -286,7 +286,7 @@ int __init l4_init(void)
 	return 0;
 }
 
-void __init l4_exit(void)
+static void __exit l4_exit(void)
 {
 	int i;
 	int cal[4] = {59, 59, 59, 59};
