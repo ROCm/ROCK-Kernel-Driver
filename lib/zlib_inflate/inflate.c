@@ -14,8 +14,9 @@ int ZEXPORT zlib_inflate_workspacesize(void)
 }
 
 
-int ZEXPORT zlib_inflateReset(z)
-z_streamp z;
+int ZEXPORT zlib_inflateReset(
+	z_streamp z
+)
 {
   if (z == Z_NULL || z->state == Z_NULL || z->workspace == Z_NULL)
     return Z_STREAM_ERROR;
@@ -27,8 +28,9 @@ z_streamp z;
 }
 
 
-int ZEXPORT zlib_inflateEnd(z)
-z_streamp z;
+int ZEXPORT zlib_inflateEnd(
+	z_streamp z
+)
 {
   if (z == Z_NULL || z->state == Z_NULL || z->workspace == Z_NULL)
     return Z_STREAM_ERROR;
@@ -39,11 +41,12 @@ z_streamp z;
 }
 
 
-int ZEXPORT zlib_inflateInit2_(z, w, version, stream_size)
-z_streamp z;
-int w;
-const char *version;
-int stream_size;
+int ZEXPORT zlib_inflateInit2_(
+	z_streamp z,
+	int w,
+	const char *version,
+	int stream_size
+)
 {
   if (version == Z_NULL || version[0] != ZLIB_VERSION[0] ||
       stream_size != sizeof(z_stream) || z->workspace == Z_NULL)
@@ -100,10 +103,11 @@ static int zlib_inflate_packet_flush(inflate_blocks_statef *s)
 }
 
 
-int ZEXPORT zlib_inflateInit_(z, version, stream_size)
-z_streamp z;
-const char *version;
-int stream_size;
+int ZEXPORT zlib_inflateInit_(
+	z_streamp z,
+	const char *version,
+	int stream_size
+)
 {
   return zlib_inflateInit2_(z, DEF_WBITS, version, stream_size);
 }
@@ -113,9 +117,10 @@ int stream_size;
 #define NEEDBYTE {if(z->avail_in==0)goto empty;r=trv;}
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
-int ZEXPORT zlib_inflate(z, f)
-z_streamp z;
-int f;
+int ZEXPORT zlib_inflate(
+	z_streamp z,
+	int f
+)
 {
   int r, trv;
   uInt b;
@@ -245,8 +250,9 @@ int f;
 }
 
 
-int ZEXPORT zlib_inflateSync(z)
-z_streamp z;
+int ZEXPORT zlib_inflateSync(
+	z_streamp z
+)
 {
   uInt n;       /* number of bytes to look at */
   Bytef *p;     /* pointer to bytes */
@@ -303,8 +309,9 @@ z_streamp z;
  * decompressing, PPP checks that at the end of input packet, inflate is
  * waiting for these length bytes.
  */
-int ZEXPORT zlib_inflateSyncPoint(z)
-z_streamp z;
+int ZEXPORT zlib_inflateSyncPoint(
+	z_streamp z
+)
 {
   if (z == Z_NULL || z->state == Z_NULL || z->state->blocks == Z_NULL)
     return Z_STREAM_ERROR;
@@ -373,8 +380,10 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
  * will have been updated if need be.
  */
 
-int ZEXPORT zlib_inflateIncomp(z)
-z_stream *z;
+int ZEXPORT zlib_inflateIncomp(
+	z_stream *z
+	
+)
 {
     if (z->state->mode != BLOCKS)
 	return Z_DATA_ERROR;

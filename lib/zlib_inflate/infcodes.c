@@ -14,11 +14,13 @@
 #define exop word.what.Exop
 #define bits word.what.Bits
 
-inflate_codes_statef *zlib_inflate_codes_new(bl, bd, tl, td, z)
-uInt bl, bd;
-inflate_huft *tl;
-inflate_huft *td; /* need separate declaration for Borland C++ */
-z_streamp z;
+inflate_codes_statef *zlib_inflate_codes_new(
+	uInt bl,
+	uInt bd,
+	inflate_huft *tl,
+	inflate_huft *td, /* need separate declaration for Borland C++ */
+	z_streamp z
+)
 {
   inflate_codes_statef *c;
 
@@ -34,10 +36,11 @@ z_streamp z;
 }
 
 
-int zlib_inflate_codes(s, z, r)
-inflate_blocks_statef *s;
-z_streamp z;
-int r;
+int zlib_inflate_codes(
+	inflate_blocks_statef *s,
+	z_streamp z,
+	int r
+)
 {
   uInt j;               /* temporary storage */
   inflate_huft *t;      /* temporary pointer */
@@ -197,8 +200,9 @@ int r;
 }
 
 
-void zlib_inflate_codes_free(c, z)
-inflate_codes_statef *c;
-z_streamp z;
+void zlib_inflate_codes_free(
+	inflate_codes_statef *c,
+	z_streamp z
+)
 {
 }
