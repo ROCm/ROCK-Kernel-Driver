@@ -1,3 +1,5 @@
+#ifndef	_CYCLOMX_H
+#define	_CYCLOMX_H
 /*
 * cyclomx.h	Cyclom 2X WAN Link Driver.
 *		User-level API definitions.
@@ -21,8 +23,6 @@
 * 1998/12/27	acme		cleanup: PACKED not needed
 * 1998/08/08	acme		Version 0.0.1
 */
-#ifndef	_CYCLOMX_H
-#define	_CYCLOMX_H
 
 #include <linux/config.h>
 #include <linux/wanrouter.h>
@@ -47,7 +47,6 @@ struct cycx_device {
 	char devname[WAN_DRVNAME_SZ+1];	/* card name */
 	cycxhw_t hw;			/* hardware configuration */
 	struct wan_device wandev;	/* WAN device data space */
-	u32 open_cnt;			/* number of open interfaces */
 	u32 state_tick;			/* link state timestamp */
 	spinlock_t lock;
 	char in_isr;			/* interrupt-in-service flag */
@@ -72,8 +71,6 @@ struct cycx_device {
 };
 
 /* Public Functions */
-void cyclomx_mod_inc_use_count(struct cycx_device *card);
-void cyclomx_mod_dec_use_count(struct cycx_device *card);
 void cyclomx_set_state(struct cycx_device *card, int state);
 
 #ifdef CONFIG_CYCLOMX_X25
