@@ -28,7 +28,7 @@
 #include <linux/spinlock.h>
 #include <linux/bootmem.h>
 #include <linux/ioport.h>
-#include <linux/proc_fs.h>
+#include <linux/module.h>
 #include <linux/efi.h>
 
 #include <asm/setup.h>
@@ -46,6 +46,7 @@
 extern efi_status_t asmlinkage efi_call_phys(void *, ...);
 
 struct efi efi;
+EXPORT_SYMBOL(efi);
 struct efi efi_phys __initdata;
 struct efi_memory_map memmap __initdata;
 
@@ -53,18 +54,6 @@ struct efi_memory_map memmap __initdata;
  * We require an early boot_ioremap mapping mechanism initially
  */
 extern void * boot_ioremap(unsigned long, unsigned long);
-
-/*
- * efi_dir is allocated here, but the directory isn't created
- * here, as proc_mkdir() doesn't work this early in the bootup
- * process.  Therefore, each module, like efivars, must test for
- *    if (!efi_dir) efi_dir = proc_mkdir("efi", NULL);
- * prior to creating their own entries under /proc/efi.
- */
-#ifdef CONFIG_PROC_FS
-struct proc_dir_entry *efi_dir;
-#endif
-
 
 /*
  * To make EFI call EFI runtime service in physical addressing mode we need
