@@ -444,7 +444,7 @@ static int DRM(dma_get_buffers_of_order)(struct file *filp, drm_dma_t *d,
 					d->flags & _DRM_DMA_WAIT);
 		if (!buf) break;
 		if (buf->pending || buf->waiting) {
-			DRM_ERROR("Free buffer %d in use by %x (w%d, p%d)\n",
+			DRM_ERROR("Free buffer %d in use: filp %p (w%d, p%d)\n",
 				  buf->idx,
 				  buf->filp,
 				  buf->waiting,
@@ -651,7 +651,7 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 		 * for the same vblank sequence number; nothing to be done in
 		 * that case
 		 */
-		list_for_each( ( (struct list_head *) vbl_sig ), &dev->vbl_sigs.head ) {
+		list_for_each_entry( vbl_sig, &dev->vbl_sigs.head, head ) {
 			if (vbl_sig->sequence == vblwait.request.sequence
 			    && vbl_sig->info.si_signo == vblwait.request.signal
 			    && vbl_sig->task == current)
@@ -702,19 +702,20 @@ done:
 
 void DRM(vbl_send_signals)( drm_device_t *dev )
 {
-	struct list_head *tmp;
+	struct list_head *list, *tmp;
 	drm_vbl_sig_t *vbl_sig;
 	unsigned int vbl_seq = atomic_read( &dev->vbl_received );
 	unsigned long flags;
 
 	spin_lock_irqsave( &dev->vbl_lock, flags );
 
-	list_for_each_safe( ( (struct list_head *) vbl_sig ), tmp, &dev->vbl_sigs.head ) {
+	list_for_each_safe( list, tmp, &dev->vbl_sigs.head ) {
+		vbl_sig = list_entry( list, drm_vbl_sig_t, head );
 		if ( ( vbl_seq - vbl_sig->sequence ) <= (1<<23) ) {
 			vbl_sig->info.si_code = vbl_seq;
 			send_sig_info( vbl_sig->info.si_signo, &vbl_sig->info, vbl_sig->task );
 
-			list_del( (struct list_head *) vbl_sig );
+			list_del( list );
 
 			DRM_FREE( vbl_sig, sizeof(*vbl_sig) );
 

@@ -46,9 +46,8 @@
 
 #define DRM_GETSAREA()							 \
 do { 									 \
-	struct list_head *list;						 \
-	list_for_each( list, &dev->maplist->head ) {			 \
-		drm_map_list_t *entry = (drm_map_list_t *)list;		 \
+	drm_map_list_t *entry;						 \
+	list_for_each_entry( entry, &dev->maplist->head, head ) {	 \
 		if ( entry->map &&					 \
 		     entry->map->type == _DRM_SHM &&			 \
 		     (entry->map->flags & _DRM_CONTAINS_LOCK) ) {	 \
@@ -60,28 +59,28 @@ do { 									 \
 
 #define DRM_HZ HZ
 
-#define DRM_WAIT_ON( ret, queue, timeout, condition )	\
-do {							\
-	DECLARE_WAITQUEUE(entry, current);		\
-	unsigned long end = jiffies + (timeout);	\
-	add_wait_queue(&(queue), &entry);		\
-							\
-	for (;;) {					\
-		current->state = TASK_INTERRUPTIBLE;	\
-		if (condition) 				\
-			break;				\
-		if((signed)(end - jiffies) <= 0) {	\
-			ret = -EBUSY;			\
-			break;				\
-		}					\
+#define DRM_WAIT_ON( ret, queue, timeout, condition )		\
+do {								\
+	DECLARE_WAITQUEUE(entry, current);			\
+	unsigned long end = jiffies + (timeout);		\
+	add_wait_queue(&(queue), &entry);			\
+								\
+	for (;;) {						\
+		current->state = TASK_INTERRUPTIBLE;		\
+		if (condition)					\
+			break;					\
+		if (time_after_eq(jiffies, end)) {		\
+			ret = -EBUSY;				\
+			break;					\
+		}						\
 		schedule_timeout((HZ/100 > 1) ? HZ/100 : 1);	\
-		if (signal_pending(current)) {		\
-			ret = -EINTR;			\
-			break;				\
-		}					\
-	}						\
-	current->state = TASK_RUNNING;			\
-	remove_wait_queue(&(queue), &entry);		\
+		if (signal_pending(current)) {			\
+			ret = -EINTR;				\
+			break;					\
+		}						\
+	}							\
+	current->state = TASK_RUNNING;				\
+	remove_wait_queue(&(queue), &entry);			\
 } while (0)
 
 

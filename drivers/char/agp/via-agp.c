@@ -101,7 +101,6 @@ static struct gatt_mask via_generic_masks[] =
 };
 
 
-#ifdef CONFIG_AGP3
 static int via_fetch_size_agp3(void)
 {
 	int i;
@@ -186,7 +185,7 @@ static int __init via_generic_agp3_setup (struct pci_dev *pdev)
 	agp_bridge->num_aperture_sizes = 10;
 	agp_bridge->dev_private_data = NULL;
 	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->agp_enable = agp_generic_agp_3_0_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->configure = via_configure_agp3;
 	agp_bridge->fetch_size = via_fetch_size_agp3;
 	agp_bridge->cleanup = via_cleanup_agp3;
@@ -206,18 +205,10 @@ static int __init via_generic_agp3_setup (struct pci_dev *pdev)
 	agp_bridge->cant_use_aperture = 0;
 	return 0;
 }
-#else
-static int __init via_generic_agp3_setup (struct pci_dev *pdev)
-{
-	printk (KERN_INFO PFX "Bridge in AGP3 mode, but CONFIG_AGP3=n\n");
-	return -ENODEV;
-}
-#endif	/* CONFIG_AGP3 */
 
 
 static int __init via_generic_setup (struct pci_dev *pdev)
 {
-#ifdef CONFIG_AGP3
 	/* Garg, there are KT400s with KT266 IDs. */
 	if (pdev->device == PCI_DEVICE_ID_VIA_8367_0) {
 
@@ -235,7 +226,6 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 			/* Its in 2.0 mode, drop through. */
 		}
 	}
-#endif
 
 	agp_bridge->masks = via_generic_masks;
 	agp_bridge->aperture_sizes = (void *) via_generic_sizes;
@@ -248,7 +238,7 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = via_cleanup;
 	agp_bridge->tlb_flush = via_tlbflush;
 	agp_bridge->mask_memory = via_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -319,10 +309,10 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* VT8361 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_8361,	// 0x3112
 		.chipset_name	= "Apollo KLE133",
-	}, */
+	},
 
 	/* VT8365 / VT8362 */
 	{
@@ -331,10 +321,10 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* VT8753A */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_8753_0,	// 0x3128
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8753_0,
 		.chipset_name	= "P4X266",
-	},	*/	
+	},
 
 	/* VT8366 */
 	{
@@ -349,16 +339,16 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* KM266 / PM266 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_KM266,	// 0x3116
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_KM266,
 		.chipset_name	= "KM266/PM266",
-	},	*/
+	},
 
 	/* CLE266 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_CLE266,	// 0x3123
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_CLE266,
 		.chipset_name	= "CLE266",
-	},	*/
+	},
 
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8377_0,
@@ -374,16 +364,16 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* VT8752*/
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_8752,	// 0x3148
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8752,
 		.chipset_name	= "ProSavage DDR P4M266",
-	},	*/
+	},
 
 	/* KN266/PN266 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_KN266,	// 0x3156
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_KN266,
 		.chipset_name	= "KN266/PN266",
-	},	*/
+	},
 
 	/* VT8754 */
 	{
@@ -392,28 +382,28 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* P4N333 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_P4N333,	// 0x3178
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_P4N333,
 		.chipset_name	= "P4N333",
-	}, */
+	},
 
 	/* P4X600 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_P4X600,	// 0x0198
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_P4X600,
 		.chipset_name	= "P4X600",
-	},	*/
+	},
 
 	/* KM400 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_KM400,	// 0x3205
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_KM400,
 		.chipset_name	= "KM400",
-	},	*/
+	},
 
 	/* P4M400 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_P4M400,	// 0x3209
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_P4M400,
 		.chipset_name	= "PM400",
-	},	*/
+	},
 
 	{ }, /* dummy final entry, always present */
 };

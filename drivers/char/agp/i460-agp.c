@@ -536,7 +536,7 @@ static int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused))
 	agp_bridge->cleanup = i460_cleanup;
 	agp_bridge->tlb_flush = i460_tlb_flush;
 	agp_bridge->mask_memory = i460_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = i460_create_gatt_table;
 	agp_bridge->free_gatt_table = i460_free_gatt_table;
@@ -560,7 +560,7 @@ static int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused))
 }
 
 static struct agp_driver i460_agp_driver = {
-	.owner = THIS_MODULE;
+	.owner = THIS_MODULE,
 };
 
 static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_device_id *ent)

@@ -242,17 +242,17 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 			DRM(ioremapfree)( (map)->handle, (map)->size );	\
 	} while (0)
 
-#define DRM_FIND_MAP(_map, _o)						\
-do {									\
-	struct list_head *_list;					\
-	list_for_each( _list, &dev->maplist->head ) {			\
-		drm_map_list_t *_entry = (drm_map_list_t *)_list;	\
-		if ( _entry->map &&					\
-		     _entry->map->offset == (_o) ) {			\
-			(_map) = _entry->map;				\
-			break;						\
- 		}							\
-	}								\
+#define DRM_FIND_MAP(_map, _o)								\
+do {											\
+	struct list_head *_list;							\
+	list_for_each( _list, &dev->maplist->head ) {					\
+		drm_map_list_t *_entry = list_entry( _list, drm_map_list_t, head );	\
+		if ( _entry->map &&							\
+		     _entry->map->offset == (_o) ) {					\
+			(_map) = _entry->map;						\
+			break;								\
+ 		}									\
+	}										\
 } while(0)
 #define DRM_DROP_MAP(_map)
 

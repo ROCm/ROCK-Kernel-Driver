@@ -1,12 +1,12 @@
 /* 
- * Copyright 2001,2002 SuSE Labs
+ * Copyright 2001-2003 SuSE Labs.
  * Distributed under the GNU public license, v2.
  * 
- * This is a GART driver for the AMD K8 northbridge and the AMD 8151 
- * AGP bridge. The main work is done in the northbridge. The configuration
- * is only mirrored in the 8151 for compatibility (could be likely
- * removed now).
- */ 
+ * This is a GART driver for the AMD64 on-CPU northbridge.
+ * It also includes support for the AMD 8151 AGP bridge,
+ * although it doesn't actually do much, as all the real
+ * work is done in the northbridge(s).
+ */
 
 /*
  * On x86-64 the AGP driver needs to be initialized early by the IOMMU 
@@ -224,7 +224,7 @@ static unsigned long amd_8151_mask_memory(unsigned long addr, int type)
 
 static struct gatt_mask amd_8151_masks[] =
 {
-	{0x00000001, 0}
+	{.mask = 0x00000001, .type = 0}
 };
 
 
@@ -265,7 +265,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 	/* If not enough, go to AGP v2 setup */
 	if (v3_devs<2) {
 		printk (KERN_INFO "AGP: Only %d devices found, not enough, trying AGPv2\n", v3_devs);
-		return agp_generic_agp_enable(mode);
+		return agp_generic_enable(mode);
 	} else {
 		printk (KERN_INFO "AGP: Enough AGPv3 devices found, setting up...\n");
 	}
@@ -339,6 +339,8 @@ static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_
 	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
 	if (cap_ptr == 0)
 		return -ENODEV;
+
+	printk (KERN_INFO PFX "Detected AMD64 on-CPU GART\n");
 
 	agp_bridge->dev = dev;
 	agp_bridge->capndx = cap_ptr;
