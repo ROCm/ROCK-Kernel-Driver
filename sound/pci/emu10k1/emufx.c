@@ -465,35 +465,25 @@ int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
  * EMU10K1 effect manager
  *************************************************************************/
 
-static int snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
-				u32 op, u32 r, u32 a, u32 x, u32 y)
+static void snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
+				 u32 op, u32 r, u32 a, u32 x, u32 y)
 {
-	snd_assert(*ptr < 512, return -EINVAL);
+	snd_assert(*ptr < 512, return);
 	set_bit(*ptr, icode->code_valid);
-	x = ((x & 0x3ff) << 10) | (y & 0x3ff);
-	y = ((op & 0x0f) << 20) | ((r & 0x3ff) << 10) | (a & 0x3ff);
-	a = (*ptr)++ * 2;
-	if (put_user(x, &icode->code[a + 0]) ||
-            put_user(y, &icode->code[a + 1]))
-		return -EFAULT;
-	return 0;
+	icode->code[(*ptr)   * 2 + 0] = ((x & 0x3ff) << 10) | (y & 0x3ff);
+	icode->code[(*ptr)++ * 2 + 1] = ((op & 0x0f) << 20) | ((r & 0x3ff) << 10) | (a & 0x3ff);
 }
 
 #define OP(icode, ptr, op, r, a, x, y) \
 	snd_emu10k1_write_op(icode, ptr, op, r, a, x, y)
 
-static int snd_emu10k1_audigy_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
-				       u32 op, u32 r, u32 a, u32 x, u32 y)
+static void snd_emu10k1_audigy_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
+					u32 op, u32 r, u32 a, u32 x, u32 y)
 {
-	snd_assert(*ptr < 1024, return -EINVAL);
+	snd_assert(*ptr < 1024, return);
 	set_bit(*ptr, icode->code_valid);
-	x = ((x & 0x7ff) << 12) | (y & 0x7ff);
-	y = ((op & 0x0f) << 24) | ((r & 0x7ff) << 12) | (a & 0x7ff);
-	a = (*ptr)++ * 2;
-	if (put_user(x, &icode->code[a + 0]) ||
-	    put_user(y, &icode->code[a + 1]))
-		return -EFAULT;
-	return 0;
+	icode->code[(*ptr)   * 2 + 0] = ((x & 0x7ff) << 12) | (y & 0x7ff);
+	icode->code[(*ptr)++ * 2 + 1] = ((op & 0x0f) << 24) | ((r & 0x7ff) << 12) | (a & 0x7ff);
 }
 
 #define A_OP(icode, ptr, op, r, a, x, y) \
@@ -589,7 +579,7 @@ static int snd_emu10k1_code_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	u32 pc, lo, hi;
 
 	for (pc = 0; pc < (emu->audigy ? 2*1024 : 2*512); pc += 2) {
-		if (!test_bit(pc, icode->code_valid))
+		if (!test_bit(pc / 2, icode->code_valid))
 			continue;
 		if (get_user(lo, &icode->code[pc + 0]) ||
 		    get_user(hi, &icode->code[pc + 1]))
@@ -606,7 +596,7 @@ static int snd_emu10k1_code_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 
 	memset(icode->code_valid, 0, sizeof(icode->code_valid));
 	for (pc = 0; pc < (emu->audigy ? 2*1024 : 2*512); pc += 2) {
-		set_bit(pc, icode->code_valid);
+		set_bit(pc / 2, icode->code_valid);
 		if (put_user(snd_emu10k1_efx_read(emu, pc + 0), &icode->code[pc + 0]))
 			return -EFAULT;
 		if (put_user(snd_emu10k1_efx_read(emu, pc + 1), &icode->code[pc + 1]))
