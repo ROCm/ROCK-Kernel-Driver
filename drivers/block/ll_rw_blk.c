@@ -1522,6 +1522,7 @@ void blk_requeue_request(request_queue_t *q, struct request *rq)
  * @rq:		request to be inserted
  * @at_head:	insert request at head or tail of queue
  * @data:	private data
+ * @reinsert:	true if request it a reinsertion of previously processed one
  *
  * Description:
  *    Many block devices need to execute commands asynchronously, so they don't
@@ -1536,7 +1537,7 @@ void blk_requeue_request(request_queue_t *q, struct request *rq)
  *    host that is unable to accept a particular command.
  */
 void blk_insert_request(request_queue_t *q, struct request *rq,
-			int at_head, void *data)
+			int at_head, void *data, int reinsert)
 {
 	unsigned long flags;
 
@@ -1554,11 +1555,15 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	/*
 	 * If command is tagged, release the tag
 	 */
-	if (blk_rq_tagged(rq))
-		blk_queue_end_tag(q, rq);
+	if(reinsert) {
+		blk_requeue_request(q, rq);
+	} else {
+		if (blk_rq_tagged(rq))
+			blk_queue_end_tag(q, rq);
 
-	drive_stat_acct(rq, rq->nr_sectors, 1);
-	__elv_add_request(q, rq, !at_head, 0);
+		drive_stat_acct(rq, rq->nr_sectors, 1);
+		__elv_add_request(q, rq, !at_head, 0);
+	}
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
