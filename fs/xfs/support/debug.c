@@ -89,10 +89,10 @@ cmn_err(register int level, char *fmt, ...)
 	switch (level) {
 	case CE_CONT:
 	case CE_WARN:
-		printk("%s", message);
+		printk("%s\n", message);
 		break;
 	case CE_DEBUG:
-		xdprintk("%s", message);
+		xdprintk("%s\n", message);
 		break;
 	default:
 		printk("%s\n", message);
