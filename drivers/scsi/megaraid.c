@@ -295,6 +295,7 @@ mega_find_card(Scsi_Host_Template *host_template, u16 pci_vendor,
 		if( subsysvid && (subsysvid != AMI_SUBSYS_VID) &&
 				(subsysvid != DELL_SUBSYS_VID) &&
 				(subsysvid != HP_SUBSYS_VID) &&
+				(subsysvid != INTEL_SUBSYS_VID) &&
 				(subsysvid != LSI_SUBSYS_VID) ) continue;
 
 

@@ -82,6 +82,7 @@
 #define DELL_SUBSYS_VID			0x1028
 #define	HP_SUBSYS_VID			0x103C
 #define LSI_SUBSYS_VID			0x1000
+#define INTEL_SUBSYS_VID		0x8086
 
 #define HBA_SIGNATURE	      		0x3344
 #define HBA_SIGNATURE_471	  	0xCCCC

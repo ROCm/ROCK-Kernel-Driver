@@ -361,7 +361,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	unsigned char *mpt=((unsigned char *)mpc)+count;
 
 	if (memcmp(mpc->mpc_signature,MPC_SIGNATURE,4)) {
-		panic("SMP mptable: bad signature [%c%c%c%c]!\n",
+		printk("SMP mptable: bad signature [%c%c%c%c]!\n",
 			mpc->mpc_signature[0],
 			mpc->mpc_signature[1],
 			mpc->mpc_signature[2],
@@ -369,7 +369,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 		return 0;
 	}
 	if (mpf_checksum((unsigned char *)mpc,mpc->mpc_length)) {
-		panic("SMP mptable: checksum error!\n");
+		printk("SMP mptable: checksum error!\n");
 		return 0;
 	}
 	if (mpc->mpc_spec!=0x01 && mpc->mpc_spec!=0x04) {
