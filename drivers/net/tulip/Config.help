@@ -1,0 +1,110 @@
+CONFIG_PCMCIA_XIRCOM
+  This driver is for the Digital "Tulip" Ethernet CardBus adapters.
+  It should work with most DEC 21*4*-based chips/ethercards, as well
+  as with work-alike chips from Lite-On (PNIC) and Macronix (MXIC) and
+  ASIX.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called xircom_cb.o.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>. If unsure, say N.
+
+CONFIG_PCMCIA_XIRTULIP
+  This driver is for the Digital "Tulip" Ethernet CardBus adapters.
+  It should work with most DEC 21*4*-based chips/ethercards, as well
+  as with work-alike chips from Lite-On (PNIC) and Macronix (MXIC) and
+  ASIX.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called xircom_tulip_cb.o.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>. If unsure, say N.
+
+CONFIG_DE2104X
+  This driver is developed for the SMC EtherPower series Ethernet
+  cards and also works with cards based on the DECchip
+  21040 (Tulip series) chips.  Some LinkSys PCI cards are
+  of this type.  (If your card is NOT SMC EtherPower 10/100 PCI
+  (smc9332dst), you can also try the driver for "Generic DECchip"
+  cards, above.  However, most people with a network card of this type
+  will say Y here.) Do read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  More specific
+  information is contained in
+  <file:Documentation/DocBook/tulip-user.tmpl>.
+  
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tulip.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_TULIP
+  This driver is developed for the SMC EtherPower series Ethernet
+  cards and also works with cards based on the DECchip 
+  21040/21041/21140 (Tulip series) chips.  Some LinkSys PCI cards are
+  of this type.  (If your card is NOT SMC EtherPower 10/100 PCI
+  (smc9332dst), you can also try the driver for "Generic DECchip"
+  cards, above.  However, most people with a network card of this type
+  will say Y here.) Do read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  More specific
+  information is contained in 
+  <file:Documentation/networking/tulip.txt>.
+  
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tulip.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_TULIP_MWI
+  This configures your Tulip card specifically for the card and
+  system cache line size type you are using.
+  
+  This is experimental code, not yet tested on many boards.
+
+  If unsure, say N.
+
+CONFIG_TULIP_MMIO
+  Use PCI shared memory for the NIC registers, rather than going through
+  the Tulip's PIO (programmed I/O ports).  Faster, but could produce
+  obscure bugs if your mainboard has memory controller timing issues.
+  If in doubt, say N.
+
+CONFIG_NET_TULIP
+  This selects the "Tulip" family of EISA/PCI network cards.
+
+CONFIG_DE4X5
+  This is support for the DIGITAL series of PCI/EISA Ethernet cards.
+  These include the DE425, DE434, DE435, DE450 and DE500 models.  If
+  you have a network card of this type, say Y and read the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. More specific
+  information is contained in
+  <file:Documentation/networking/de4x5.txt>.
+  
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called de4x5.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_WINBOND_840
+  This driver is for the Winbond W89c840 chip.  It also works with 
+  the TX9882 chip on the Compex RL100-ATX board.
+  More specific information and updates are available from
+  <http://www.scyld.com/network/drivers.html>.
+
+CONFIG_DM9102
+  This driver is for DM9102(A)/DM9132/DM9801 compatible PCI cards from
+  Davicom (<http://www.davicom.com.tw/>).  If you have such a network
+  (Ethernet) card, say Y.  Some information is contained in the file
+  <file:Documentation/networking/dmfe.txt>.
+  
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dmfe.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+

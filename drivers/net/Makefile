@@ -8,7 +8,7 @@ obj-m           :=
 obj-n           :=
 obj-            :=
 
-mod-subdirs     := appletalk arcnet fc irda tokenring pcmcia wireless wan
+mod-subdirs     := appletalk arcnet fc irda tokenring tulip pcmcia wireless wan
 
 O_TARGET := net.o
 
@@ -20,10 +20,6 @@ export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
 			net_init.o mii.o
 list-multi	:=	rcpci.o
 rcpci-objs	:=	rcpci45.o rclanmtl.o
-
-ifeq ($(CONFIG_TULIP),y)
-  obj-y += tulip/tulip.o
-endif
 
 ifeq ($(CONFIG_E100),y)
   obj-y += e1000/e100.o
@@ -38,7 +34,7 @@ endif
 
 subdir-$(CONFIG_NET_PCMCIA) += pcmcia
 subdir-$(CONFIG_NET_WIRELESS) += wireless
-subdir-$(CONFIG_TULIP) += tulip
+subdir-$(CONFIG_NET_TULIP) += tulip
 subdir-$(CONFIG_E100) += e100
 subdir-$(CONFIG_E1000) += e1000
 subdir-$(CONFIG_IRDA) += irda
@@ -78,7 +74,6 @@ obj-$(CONFIG_EEPRO100) += eepro100.o
 obj-$(CONFIG_TLAN) += tlan.o
 obj-$(CONFIG_EPIC100) += epic100.o mii.o
 obj-$(CONFIG_SIS900) += sis900.o
-obj-$(CONFIG_DM9102) += dmfe.o
 obj-$(CONFIG_YELLOWFIN) += yellowfin.o
 obj-$(CONFIG_ACENIC) += acenic.o
 obj-$(CONFIG_VETH) += veth.o
@@ -109,7 +104,7 @@ obj-$(CONFIG_AIRONET4500_NONCS)  += aironet4500_card.o
 obj-$(CONFIG_AIRONET4500_PROC)	+= aironet4500_proc.o
 obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_proc.o
 
-obj-$(CONFIG_WINBOND_840) += winbond-840.o mii.o
+obj-$(CONFIG_WINBOND_840) += mii.o
 obj-$(CONFIG_SUNDANCE) += sundance.o
 obj-$(CONFIG_HAMACHI) += hamachi.o
 obj-$(CONFIG_NET) += Space.o setup.o net_init.o loopback.o
@@ -181,8 +176,6 @@ obj-$(CONFIG_LAN_SAA9730) += saa9730.o
 obj-$(CONFIG_DEPCA) += depca.o
 obj-$(CONFIG_EWRK3) += ewrk3.o
 obj-$(CONFIG_ATP) += atp.o
-obj-$(CONFIG_DE4X5) += de4x5.o
-obj-$(CONFIG_DE2104X) += de2104x.o
 obj-$(CONFIG_NI5010) += ni5010.o
 obj-$(CONFIG_NI52) += ni52.o
 obj-$(CONFIG_NI65) += ni65.o
