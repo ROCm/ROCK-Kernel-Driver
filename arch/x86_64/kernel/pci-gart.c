@@ -30,7 +30,6 @@
 #include <asm/proto.h>
 #include <asm/cacheflush.h>
 #include <asm/kdebug.h>
-#include <asm/proto.h>
 
 #ifdef CONFIG_PREEMPT
 #define preempt_atomic() in_atomic()

@@ -44,8 +44,6 @@
 
 /*
  *  CPU type and hardware bug flags. Kept separately for each CPU.
- *  Members of this structure are referenced in head.S, so think twice
- *  before touching them. [mj]
  */
 
 struct cpuinfo_x86 {
@@ -229,6 +227,8 @@ struct tss_struct {
 	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
 } __attribute__((packed)) ____cacheline_aligned;
 
+#define ARCH_MIN_TASKALIGN	16
+
 struct thread_struct {
 	unsigned long	rsp0;
 	unsigned long	rsp;
@@ -246,14 +246,14 @@ struct thread_struct {
 /* fault info */
 	unsigned long	cr2, trap_no, error_code;
 /* floating point info */
-	union i387_union	i387;
+	union i387_union	i387  __attribute__((aligned(16)));
 /* IO permissions. the bitmap could be moved into the GDT, that would make
    switch faster for a limited number of ioperm using tasks. -AK */
 	int		ioperm;
 	unsigned long	*io_bitmap_ptr;
 /* cached TLS descriptors. */
 	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
-};
+} __attribute__((aligned(16)));
 
 #define INIT_THREAD  {}
 
@@ -345,7 +345,17 @@ struct extended_sigtable {
 /* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
 #define MICROCODE_IOCFREE	_IO('6',0)
 
+/* generic versions from gas */
+#define GENERIC_NOP1	".byte 0x90\n"
+#define GENERIC_NOP2    	".byte 0x89,0xf6\n"
+#define GENERIC_NOP3        ".byte 0x8d,0x76,0x00\n"
+#define GENERIC_NOP4        ".byte 0x8d,0x74,0x26,0x00\n"
+#define GENERIC_NOP5        GENERIC_NOP1 GENERIC_NOP4
+#define GENERIC_NOP6	".byte 0x8d,0xb6,0x00,0x00,0x00,0x00\n"
+#define GENERIC_NOP7	".byte 0x8d,0xb4,0x26,0x00,0x00,0x00,0x00\n"
+#define GENERIC_NOP8	GENERIC_NOP1 GENERIC_NOP7
 
+#ifdef CONFIG_MK8
 #define ASM_NOP1 K8_NOP1
 #define ASM_NOP2 K8_NOP2
 #define ASM_NOP3 K8_NOP3
@@ -354,6 +364,16 @@ struct extended_sigtable {
 #define ASM_NOP6 K8_NOP6
 #define ASM_NOP7 K8_NOP7
 #define ASM_NOP8 K8_NOP8
+#else
+#define ASM_NOP1 GENERIC_NOP1
+#define ASM_NOP2 GENERIC_NOP2
+#define ASM_NOP3 GENERIC_NOP3
+#define ASM_NOP4 GENERIC_NOP4
+#define ASM_NOP5 GENERIC_NOP5
+#define ASM_NOP6 GENERIC_NOP6
+#define ASM_NOP7 GENERIC_NOP7
+#define ASM_NOP8 GENERIC_NOP8
+#endif
 
 /* Opteron nops */
 #define K8_NOP1 ".byte 0x90\n"

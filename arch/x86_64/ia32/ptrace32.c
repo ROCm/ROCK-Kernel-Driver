@@ -17,6 +17,7 @@
 #include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/mm.h>
+#include <linux/ptrace.h>
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 #include <asm/user32.h>
@@ -25,8 +26,6 @@
 #include <asm/debugreg.h>
 #include <asm/i387.h>
 #include <asm/fpu32.h>
-#include <linux/ptrace.h>
-#include <linux/mm.h>
 
 /* determines which flags the user has access to. */
 /* 1 = access 0 = no access */

@@ -29,9 +29,9 @@ static enum {
 static int reboot_mode = 0;
 
 /* reboot=b[ios] | t[riple] | k[bd] [, [w]arm | [c]old]
-   bios	  Use the CPU reboto vector for warm reset
+   bios	  Use the CPU reboot vector for warm reset
    warm   Don't set the cold reboot flag
-   cold   Set the cold reboto flag
+   cold   Set the cold reboot flag
    triple Force a triple fault (init)
    kbd    Use the keyboard controller. cold reset (default)
  */ 

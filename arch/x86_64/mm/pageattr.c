@@ -32,7 +32,8 @@ static inline pte_t *lookup_address(unsigned long address)
 	return pte;
 } 
 
-static struct page *split_large_page(unsigned long address, pgprot_t prot)
+static struct page *split_large_page(unsigned long address, pgprot_t prot,
+				     pgprot_t ref_prot)
 { 
 	int i; 
 	unsigned long addr;
@@ -45,7 +46,7 @@ static struct page *split_large_page(unsigned long address, pgprot_t prot)
 	pbase = (pte_t *)page_address(base);
 	for (i = 0; i < PTRS_PER_PTE; i++, addr += PAGE_SIZE) {
 		pbase[i] = pfn_pte(addr >> PAGE_SHIFT, 
-				   addr == address ? prot : PAGE_KERNEL);
+				   addr == address ? prot : ref_prot);
 	}
 	return base;
 } 
@@ -95,7 +96,8 @@ static inline void save_page(unsigned long address, struct page *fpage)
  * No more special protections in this 2/4MB area - revert to a
  * large page again. 
  */
-static void revert_page(struct page *kpte_page, unsigned long address)
+static void revert_page(struct page *kpte_page, unsigned long address, 
+			pgprot_t ref_prot)
 {
        pgd_t *pgd;
        pmd_t *pmd; 
@@ -104,12 +106,14 @@ static void revert_page(struct page *kpte_page, unsigned long address)
        pgd = pgd_offset_k(address); 
        pmd = pmd_offset(pgd, address);
        BUG_ON(pmd_val(*pmd) & _PAGE_PSE); 
-       large_pte = mk_pte_phys(__pa(address) & LARGE_PAGE_MASK, PAGE_KERNEL_LARGE);
+       pgprot_val(ref_prot) |= _PAGE_PSE;
+       large_pte = mk_pte_phys(__pa(address) & LARGE_PAGE_MASK, ref_prot);
        set_pte((pte_t *)pmd, large_pte);
 }      
 
 static int
-__change_page_attr(unsigned long address, struct page *page, pgprot_t prot)
+__change_page_attr(unsigned long address, struct page *page, pgprot_t prot, 
+		   pgprot_t ref_prot)
 { 
 	pte_t *kpte; 
 	struct page *kpte_page;
@@ -119,29 +123,29 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot)
 	if (!kpte) return 0;
 	kpte_page = virt_to_page(((unsigned long)kpte) & PAGE_MASK);
 	kpte_flags = pte_val(*kpte); 
-	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL)) { 
+	if (pgprot_val(prot) != pgprot_val(ref_prot)) { 
 		if ((kpte_flags & _PAGE_PSE) == 0) { 
 			pte_t old = *kpte;
-			pte_t standard = mk_pte(page, PAGE_KERNEL); 
+			pte_t standard = mk_pte(page, ref_prot); 
 
 			set_pte(kpte, mk_pte(page, prot)); 
 			if (pte_same(old,standard))
 				get_page(kpte_page);
 		} else {
-			struct page *split = split_large_page(address, prot); 
+			struct page *split = split_large_page(address, prot, ref_prot); 
 			if (!split)
 				return -ENOMEM;
 			get_page(kpte_page);
-			set_pte(kpte,mk_pte(split, PAGE_KERNEL));
+			set_pte(kpte,mk_pte(split, ref_prot));
 		}	
 	} else if ((kpte_flags & _PAGE_PSE) == 0) { 
-		set_pte(kpte, mk_pte(page, PAGE_KERNEL));
+		set_pte(kpte, mk_pte(page, ref_prot));
 		__put_page(kpte_page);
 	}
 
 	if (page_count(kpte_page) == 1) {
 		save_page(address, kpte_page); 		     
-		revert_page(kpte_page, address);
+		revert_page(kpte_page, address, ref_prot);
 	} 
 	return 0;
 } 
@@ -167,13 +171,16 @@ int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 	down_write(&init_mm.mmap_sem);
 	for (i = 0; i < numpages; !err && i++, page++) { 
 		unsigned long address = (unsigned long)page_address(page); 
-		err = __change_page_attr(address, page, prot); 
+		err = __change_page_attr(address, page, prot, PAGE_KERNEL); 
 		if (err) 
 			break; 
-		/* Handle kernel mapping too which aliases part of the lowmem */
+		/* Handle kernel mapping too which aliases part of the
+		 * lowmem */
 		if (page_to_phys(page) < KERNEL_TEXT_SIZE) {		
-			unsigned long addr2 = __START_KERNEL_map + page_to_phys(page);
-			err = __change_page_attr(addr2, page, prot);
+			unsigned long addr2;
+			addr2 = __START_KERNEL_map + page_to_phys(page);
+			err = __change_page_attr(addr2, page, prot, 
+						 PAGE_KERNEL_EXECUTABLE);
 		} 
 	} 	
 	up_write(&init_mm.mmap_sem); 

@@ -731,7 +731,7 @@ asmlinkage long sys_pipe(int *fildes);
 
 #endif /* __KERNEL_SYSCALLS__ */
 
-#ifndef __ASSEMBLY__
+#if !defined(__ASSEMBLY__) && defined(__KERNEL__)
 
 #include <linux/linkage.h>
 #include <linux/compiler.h>

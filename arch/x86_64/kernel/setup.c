@@ -663,7 +663,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	return r;
 }
 
-static void __init detect_ht(void)
+static void __init detect_ht(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_SMP
 	u32 	eax, ebx, ecx, edx;
@@ -671,6 +671,9 @@ static void __init detect_ht(void)
 	int	initial_apic_id;
 	int 	cpu = smp_processor_id();
 	
+	if (!cpu_has(c, X86_FEATURE_HT))
+		return;
+
 	cpuid(1, &eax, &ebx, &ecx, &edx);
 	smp_num_siblings = (ebx & 0xff0000) >> 16;
 	
@@ -768,7 +771,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0; 
 	unsigned n;
 
-	select_idle_routine(c);
 	if (c->cpuid_level > 1) {
 		/* supports eax=2  call */
 		int i, j, n;
@@ -836,9 +838,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 
 		c->x86_cache_size = l2 ? l2 : (l1i+l1d);
 	}
-
-	if (cpu_has(c, X86_FEATURE_HT))
-		detect_ht(); 
 
 	n = cpuid_eax(0x80000000);
 	if (n >= 0x80000008) {
@@ -969,6 +968,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			break;
 	}
 	
+	select_idle_routine(c);
+	detect_ht(c); 
+		
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are
