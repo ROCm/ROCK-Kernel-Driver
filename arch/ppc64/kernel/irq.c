@@ -39,6 +39,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/random.h>
+#include <linux/kallsyms.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -350,14 +351,11 @@ skip:
 	return 0;
 }
 
-extern char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
-
-static inline void handle_irq_event(int irq, struct pt_regs *regs,
-				    struct irqaction *action)
+static inline int handle_irq_event(int irq, struct pt_regs *regs,
+				   struct irqaction *action)
 {
 	int status = 0;
 	int retval = 0;
-	struct irqaction *first_action = action;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
@@ -370,28 +368,88 @@ static inline void handle_irq_event(int irq, struct pt_regs *regs,
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
-	if (retval != 1) {
-		static int count = 100;
-		char name_buf[256];
-		if (count) {
-			count--;
-			if (retval) {
-				printk("irq event %d: bogus retval mask %x\n",
-					irq, retval);
-			} else {
-				printk("irq %d: nobody cared!\n", irq);
-			}
-			dump_stack();
-			printk("handlers:\n");
-			action = first_action;
-			do {
-				printk("[<%p>]", action->handler);
-				printk(" (%s)\n",
-				       ppc_find_proc_name((unsigned *)action->handler, name_buf, 256));
-				action = action->next;
-			} while (action);
-		}
+	return retval;
+}
+
+static void __report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	struct irqaction *action;
+
+	if (action_ret != IRQ_HANDLED && action_ret != IRQ_NONE) {
+		printk(KERN_ERR "irq event %d: bogus return value %x\n",
+				irq, action_ret);
+	} else {
+		printk(KERN_ERR "irq %d: nobody cared!\n", irq);
 	}
+	dump_stack();
+	printk(KERN_ERR "handlers:\n");
+	action = desc->action;
+	do {
+		printk(KERN_ERR "[<%p>]", action->handler);
+		print_symbol(" (%s)",
+			(unsigned long)action->handler);
+		printk("\n");
+		action = action->next;
+	} while (action);
+}
+
+static void report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	static int count = 100;
+
+	if (count) {
+		count--;
+		__report_bad_irq(irq, desc, action_ret);
+	}
+}
+
+static int noirqdebug;
+
+static int __init noirqdebug_setup(char *str)
+{
+	noirqdebug = 1;
+	printk("IRQ lockup detection disabled\n");
+	return 1;
+}
+
+__setup("noirqdebug", noirqdebug_setup);
+
+/*
+ * If 99,900 of the previous 100,000 interrupts have not been handled then
+ * assume that the IRQ is stuck in some manner.  Drop a diagnostic and try to
+ * turn the IRQ off.
+ *
+ * (The other 100-of-100,000 interrupts may have been a correctly-functioning
+ *  device sharing an IRQ with the failing one)
+ *
+ * Called under desc->lock
+ */
+static void note_interrupt(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	if (action_ret != IRQ_HANDLED) {
+		desc->irqs_unhandled++;
+		if (action_ret != IRQ_NONE)
+			report_bad_irq(irq, desc, action_ret);
+	}
+
+	desc->irq_count++;
+	if (desc->irq_count < 100000)
+		return;
+
+	desc->irq_count = 0;
+	if (desc->irqs_unhandled > 99900) {
+		/*
+		 * The interrupt is stuck
+		 */
+		__report_bad_irq(irq, desc, action_ret);
+		/*
+		 * Now kill the IRQ
+		 */
+		printk(KERN_EMERG "Disabling IRQ #%d\n", irq);
+		desc->status |= IRQ_DISABLED;
+		desc->handler->disable(irq);
+	}
+	desc->irqs_unhandled = 0;
 }
 
 /*
@@ -462,10 +520,13 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	 * SMP environment.
 	 */
 	for (;;) {
+		irqreturn_t action_ret;
+
 		spin_unlock(&desc->lock);
-		handle_irq_event(irq, regs, action);
+		action_ret = handle_irq_event(irq, regs, action);
 		spin_lock(&desc->lock);
-		
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
 		if (likely(!(desc->status & IRQ_PENDING)))
 			break;
 		desc->status &= ~IRQ_PENDING;
