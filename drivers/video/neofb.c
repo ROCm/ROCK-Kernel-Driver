@@ -100,18 +100,18 @@ static char *mode_option __initdata = NULL;
 MODULE_AUTHOR("(c) 2001-2002  Denis Oliver Kropp <dok@convergence.de>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("FBDev driver for NeoMagic PCI Chips");
-MODULE_PARM(internal, "i");
+module_param(internal, bool, 0);
 MODULE_PARM_DESC(internal, "Enable output on internal LCD Display.");
-MODULE_PARM(external, "i");
+module_param(external, bool, 0);
 MODULE_PARM_DESC(external, "Enable output on external CRT.");
-MODULE_PARM(libretto, "i");
+module_param(libretto, bool, 0);
 MODULE_PARM_DESC(libretto, "Force Libretto 100/110 800x480 LCD.");
-MODULE_PARM(nostretch, "i");
+module_param(nostretch, bool, 0);
 MODULE_PARM_DESC(nostretch,
 		 "Disable stretching of modes smaller than LCD.");
-MODULE_PARM(nopciburst, "i");
+module_param(nopciburst, bool, 0);
 MODULE_PARM_DESC(nopciburst, "Disable PCI burst mode.");
-MODULE_PARM(mode_option, "s");
+module_param(mode_option, charp, 0);
 MODULE_PARM_DESC(mode_option, "Preferred video mode ('640x480-8@60', etc)");
 
 #endif
