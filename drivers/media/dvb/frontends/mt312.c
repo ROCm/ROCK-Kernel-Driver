@@ -85,7 +85,7 @@ static int mt312_read(struct dvb_i2c_bus *i2c,
 		printk(KERN_ERR "%s: ret == %d\n", __FUNCTION__, ret);
 		return -EREMOTEIO;
 	}
-#ifdef MT312_DEBUG
+#if MT312_DEBUG
 	{
 		int i;
 		printk(KERN_INFO "R(%d):", reg & 0x7f);
@@ -106,7 +106,7 @@ static int mt312_write(struct dvb_i2c_bus *i2c,
 	u8 buf[count + 1];
 	struct i2c_msg msg;
 
-#ifdef MT312_DEBUG
+#if MT312_DEBUG
 	{
 		int i;
 		printk(KERN_INFO "W(%d):", reg & 0x7f);

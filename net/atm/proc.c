@@ -64,6 +64,7 @@ static void atm_dev_info(struct seq_file *seq, const struct atm_dev *dev)
 }
 
 struct vcc_state {
+	int bucket;
 	struct sock *sk;
 	int family;
 };
@@ -75,18 +76,29 @@ static inline int compare_family(struct sock *sk, int family)
 	return !family || (vcc->sk->sk_family == family);
 }
 
-static int __vcc_walk(struct sock **sock, int family, loff_t l)
+static int __vcc_walk(struct sock **sock, int family, int *bucket, loff_t l)
 {
 	struct sock *sk = *sock;
 
 	if (sk == (void *)1) {
-		sk = hlist_empty(&vcc_sklist) ? NULL : __sk_head(&vcc_sklist);
+		for (*bucket = 0; *bucket < VCC_HTABLE_SIZE; ++*bucket) {
+			struct hlist_head *head = &vcc_hash[*bucket];
+
+			sk = hlist_empty(head) ? NULL : __sk_head(head);
+			if (sk)
+				break;
+		}
 		l--;
 	} 
+try_again:
 	for (; sk; sk = sk_next(sk)) {
 		l -= compare_family(sk, family);
 		if (l < 0)
 			goto out;
+	}
+	if (!sk && ++*bucket < VCC_HTABLE_SIZE) {
+		sk = sk_head(&vcc_hash[*bucket]);
+		goto try_again;
 	}
 	sk = (void *)1;
 out:
@@ -96,7 +108,7 @@ out:
 
 static inline void *vcc_walk(struct vcc_state *state, loff_t l)
 {
-	return __vcc_walk(&state->sk, state->family, l) ?
+	return __vcc_walk(&state->sk, state->family, &state->bucket, l) ?
 	       state : NULL;
 }
 
@@ -207,9 +219,10 @@ static void vcc_info(struct seq_file *seq, struct atm_vcc *vcc)
 		default:
 			seq_printf(seq, "%3d", vcc->sk->sk_family);
 	}
-	seq_printf(seq, " %04lx  %5d %7d/%7d %7d/%7d\n", vcc->flags, vcc->sk->sk_err,
+	seq_printf(seq, " %04lx  %5d %7d/%7d %7d/%7d [%d] 0x%x\n", vcc->flags, vcc->sk->sk_err,
 		atomic_read(&vcc->sk->sk_wmem_alloc),vcc->sk->sk_sndbuf,
-		atomic_read(&vcc->sk->sk_rmem_alloc),vcc->sk->sk_rcvbuf);
+		atomic_read(&vcc->sk->sk_rmem_alloc),vcc->sk->sk_rcvbuf,
+		atomic_read(&vcc->sk->sk_refcnt), vcc->sk->sk_hashent);
 }
 
 static void svc_info(struct seq_file *seq, struct atm_vcc *vcc)

@@ -112,7 +112,11 @@ int dvb_generic_open(struct inode *inode, struct file *file)
 	if (!dvbdev->users)
                 return -EBUSY;
 
-	if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
+	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+                if (!dvbdev->readers)
+		        return -EBUSY;
+		dvbdev->readers--;
+	} else {
                 if (!dvbdev->writers)
 		        return -EBUSY;
 		dvbdev->writers--;
@@ -130,8 +134,11 @@ int dvb_generic_release(struct inode *inode, struct file *file)
 	if (!dvbdev)
                 return -ENODEV;
 
-	if ((file->f_flags & O_ACCMODE) != O_RDONLY)
+	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+		dvbdev->readers++;
+	} else {
 		dvbdev->writers++;
+	}
 
 	dvbdev->users++;
 	return 0;

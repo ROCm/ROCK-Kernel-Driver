@@ -4,5 +4,8 @@ config DVB_CORE
 	select CRC32
 	help
 	  DVB core utility functions for device handling, software fallbacks etc.
+	  Say Y when you have a DVB card and want to use it. Say Y if your want
+	  to build your drivers outside the kernel, but need the DVB core. All 
+	  in-kernel drivers will select this automatically if needed.
+	  If unsure say N.
 
-	  Say Y when you have a DVB card and want to use it. If unsure say N.

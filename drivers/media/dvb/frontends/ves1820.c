@@ -36,6 +36,9 @@
 #define dprintk(x...)
 #endif
 
+#define MAX_UNITS 4
+static int pwm[MAX_UNITS] = { -1, -1, -1, -1 };
+static int verbose;
 
 /**
  *  since we need only a few bits to store internal state we don't allocate
@@ -116,9 +119,9 @@ static int ves1820_writereg (struct dvb_frontend *fe, u8 reg, u8 data)
 	ret = i2c->xfer (i2c, &msg, 1);
 
 	if (ret != 1)
-		dprintk("%s: writereg error "
+		printk("DVB: VES1820(%d): %s, writereg error "
 			"(reg == 0x%02x, val == 0x%02x, ret == %i)\n",
-			__FUNCTION__, reg, data, ret);
+			fe->i2c->adapter->num, __FUNCTION__, reg, data, ret);
 
 	dvb_delay(10);
 	return (ret != 1) ? -EREMOTEIO : 0;
@@ -138,7 +141,8 @@ static u8 ves1820_readreg (struct dvb_frontend *fe, u8 reg)
 	ret = i2c->xfer (i2c, msg, 2);
 
 	if (ret != 2)
-		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
+		printk("DVB: VES1820(%d): %s: readreg error (ret == %i)\n",
+				fe->i2c->adapter->num, __FUNCTION__, ret);
 
 	return b1[0];
 }
@@ -152,7 +156,8 @@ static int tuner_write (struct dvb_i2c_bus *i2c, u8 addr, u8 data [4])
         ret = i2c->xfer (i2c, &msg, 1);
 
         if (ret != 1)
-                printk("%s: i/o error (ret == %i)\n", __FUNCTION__, ret);
+                printk("DVB: VES1820(%d): %s: i/o error (ret == %i)\n",
+				i2c->adapter->num, __FUNCTION__, ret);
 
         return (ret != 1) ? -EREMOTEIO : 0;
 }
@@ -173,7 +178,8 @@ static int tuner_set_tv_freq (struct dvb_frontend *fe, u32 freq)
 	if (tuner_type == 0xff)     /*  PLL not reachable over i2c ...  */
 		return 0;
 
-	if (strstr (fe->i2c->adapter->name, "Technotrend"))
+	if (strstr (fe->i2c->adapter->name, "Technotrend") ||
+	    strstr (fe->i2c->adapter->name, "TT-Budget"))
 		ifreq = 35937500;
 	else
 		ifreq = 36125000;
@@ -232,7 +238,7 @@ static int ves1820_init (struct dvb_frontend *fe)
 {
 	int i;
         
-        dprintk("VES1820: init chip\n");
+        dprintk("DVB: VES1820(%d): init chip\n", fe->i2c->adapter->num);
 
         ves1820_writereg (fe, 0, 0);
 
@@ -408,9 +414,10 @@ static int ves1820_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		if (sync & 2)
 			/* AFC only valid when carrier has been recovered */
 			afc = ves1820_readreg(fe, 0x19);
-		printk ("%s: AFC (%d) %dHz\n", __FILE__, afc,
+		if (verbose)
+			printk ("DVB: VES1820(%d): AFC (%d) %dHz\n",
+					fe->i2c->adapter->num, afc,
 				-((s32)(p->u.qam.symbol_rate >> 3) * afc >> 7));
-
 
 		p->inversion = reg0 & 0x20 ? INVERSION_OFF : INVERSION_ON;
 		p->u.qam.modulation = ((reg0 >> 2) & 7) + QAM_16;
@@ -449,15 +456,14 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
 
 	if (i2c->xfer(i2c, &msg1, 1) == 1) {
 		type = 0;
-		printk ("%s: setup for tuner spXXXX\n", __FILE__);
+		printk ("DVB: VES1820(%d): setup for tuner spXXXX\n", i2c->adapter->num);
 	} else if (i2c->xfer(i2c, &msg2, 1) == 1) {
 		type = 1;
-		printk ("%s: setup for tuner sp5659c\n", __FILE__);
+		printk ("DVB: VES1820(%d): setup for tuner sp5659c\n", i2c->adapter->num);
 	} else {
 		type = -1;
-		printk ("%s: unknown PLL, "
-			"please report to <linuxdvb@linuxtv.org>!!\n",
-			__FILE__);
+		printk ("DVB: VES1820(%d): unknown PLL, "
+			"please report to <linuxdvb@linuxtv.org>!!\n", i2c->adapter->num);
 	}
 
 	return type;
@@ -473,7 +479,7 @@ static u8 read_pwm (struct dvb_i2c_bus *i2c)
 
 	i2c->xfer (i2c, msg, 2);
 
-	dprintk("VES1820: pwm=%02x\n", pwm);
+	printk("DVB: VES1820(%d): pwm=0x%02x\n", i2c->adapter->num, pwm);
 
 	if (pwm == 0xff)
 		pwm = 0x48;
@@ -513,6 +519,12 @@ static int ves1820_attach (struct dvb_i2c_bus *i2c)
 	if ((tuner_type = probe_tuner(i2c)) < 0)
 		return -ENODEV;
 
+	if ((i2c->adapter->num < MAX_UNITS) && pwm[i2c->adapter->num] != -1) {
+		printk("DVB: VES1820(%d): pwm=0x%02x (user specified)\n",
+				i2c->adapter->num, pwm[i2c->adapter->num]);
+		SET_PWM(data, pwm[i2c->adapter->num]);
+	}
+	else
 	SET_PWM(data, read_pwm(i2c));
 	SET_REG0(data, ves1820_inittab[0]);
 	SET_TUNER(data, tuner_type);
@@ -532,6 +544,10 @@ static void ves1820_detach (struct dvb_i2c_bus *i2c)
 
 static int __init init_ves1820 (void)
 {
+	int i;
+	for (i = 0; i < MAX_UNITS; i++)
+		if (pwm[i] < -1 || pwm[i] > 255)
+			return -EINVAL;
 	return dvb_register_i2c_device (THIS_MODULE,
 					ves1820_attach, ves1820_detach);
 }
@@ -545,6 +561,11 @@ static void __exit exit_ves1820 (void)
 
 module_init(init_ves1820);
 module_exit(exit_ves1820);
+
+MODULE_PARM(pwm, "1-" __MODULE_STRING(MAX_UNITS) "i");
+MODULE_PARM_DESC(pwm, "override PWM value stored in EEPROM (tuner calibration)");
+MODULE_PARM(verbose, "i");
+MODULE_PARM_DESC(verbose, "print AFC offset after tuning for debugging the PWM setting");
 
 MODULE_DESCRIPTION("VES1820 DVB-C frontend driver");
 MODULE_AUTHOR("Ralph Metzler, Holger Waechtler");

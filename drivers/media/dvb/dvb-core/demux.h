@@ -1,4 +1,5 @@
-/* demux.h 
+/* 
+ * demux.h 
  *
  * Copyright (c) 2002 Convergence GmbH
  * 

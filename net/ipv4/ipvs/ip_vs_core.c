@@ -485,6 +485,7 @@ int ip_vs_leave(struct ip_vs_service *svc, struct sk_buff *skb,
 
 		/* transmit the first SYN packet */
 		ret = cp->packet_xmit(skb, cp, pp);
+		/* do not touch skb anymore */
 
 		atomic_inc(&cp->in_pkts);
 		ip_vs_conn_put(cp);
@@ -822,7 +823,8 @@ ip_vs_out(unsigned int hooknum, struct sk_buff **pskb,
 
   drop:
 	ip_vs_conn_put(cp);
-	return NF_DROP;
+	kfree_skb(*pskb);
+	return NF_STOLEN;
 }
 
 
@@ -939,6 +941,7 @@ static int ip_vs_in_icmp(struct sk_buff **pskb, int *related)
 	if (IPPROTO_TCP == ciph.protocol || IPPROTO_UDP == ciph.protocol)
 		offset += 2 * sizeof(__u16);
 	verdict = ip_vs_icmp_xmit(skb, cp, pp, offset);
+	/* do not touch skb anymore */
 
   out:
 	__ip_vs_conn_put(cp);
@@ -1032,6 +1035,7 @@ ip_vs_in(unsigned int hooknum, struct sk_buff **pskb,
 	restart = ip_vs_set_state(cp, IP_VS_DIR_INPUT, skb, pp);
 	if (cp->packet_xmit)
 		ret = cp->packet_xmit(skb, cp, pp);
+		/* do not touch skb anymore */
 	else {
 		IP_VS_DBG_RL("warning: packet_xmit is null");
 		ret = NF_ACCEPT;

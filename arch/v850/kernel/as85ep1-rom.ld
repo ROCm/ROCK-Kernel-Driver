@@ -6,14 +6,14 @@ MEMORY {
 	ROM   : ORIGIN = 0,          LENGTH = 0x00400000
 
 	/* 1MB of static RAM.  */
-	SRAM  : ORIGIN = 0x00400000, LENGTH = 0x00100000
+	SRAM  : ORIGIN = SRAM_ADDR,  LENGTH = SRAM_SIZE
 
 	/* About 58MB of DRAM.  This can actually be at one of two
 	   positions, determined by jumper JP3; we have to use the first
 	   position because the second is partially out of processor
 	   instruction addressing range (though in the second position
 	   there's actually 64MB available).  */
-	SDRAM : ORIGIN = 0x00600000, LENGTH = 0x039F8000
+	SDRAM : ORIGIN = SDRAM_ADDR, LENGTH = SDRAM_SIZE
 }
 
 SECTIONS {

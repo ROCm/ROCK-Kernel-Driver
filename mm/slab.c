@@ -2773,6 +2773,7 @@ void ptrinfo(unsigned long addr)
 		printk("virt addr invalid.\n");
 		return;
 	}
+#ifdef CONFIG_MMU
 	do {
 		pgd_t *pgd = pgd_offset_k(addr);
 		pmd_t *pmd;
@@ -2794,6 +2795,7 @@ void ptrinfo(unsigned long addr)
 		printk("normal page, pte_val 0x%llx\n",
 		  (unsigned long long)pte_val(*pte_offset_kernel(pmd, addr)));
 	} while(0);
+#endif
 
 	page = virt_to_page((void*)addr);
 	printk("struct page at %p, flags %lxh.\n", page, page->flags);

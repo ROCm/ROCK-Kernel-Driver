@@ -913,7 +913,10 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
 static int uni0299_attach (struct dvb_i2c_bus *i2c)
 {
         long tuner_type;
-	u8 id = stv0299_readreg (i2c, 0x00);
+	u8 id;
+ 
+	stv0299_writereg (i2c, 0x02, 0x00); /* standby off */
+	id = stv0299_readreg (i2c, 0x00);
 
 	dprintk ("%s: id == 0x%02x\n", __FUNCTION__, id);
 

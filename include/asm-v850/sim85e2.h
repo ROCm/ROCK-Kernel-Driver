@@ -38,11 +38,7 @@
 #define ERAM_SIZE		0x07f00000 /* 127MB (max) */
 /* Dynamic RAM; uses memory controller.  */
 #define SDRAM_ADDR		0x10000000
-#if 0
 #define SDRAM_SIZE		0x01000000 /* 16MB */
-#else
-#define SDRAM_SIZE		0x00200000 /* Only use 2MB for testing */
-#endif
 
 
 /* Simulator specific control registers.  */

@@ -1,8 +1,7 @@
 /* 
  * dvb_net.h
  *
- * Copyright (C) 2001 Convergence integrated media GmbH
- *                    Ralph Metzler <ralph@convergence.de>
+ * Copyright (C) 2001 Ralph Metzler for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -35,7 +34,7 @@
 
 struct dvb_net {
 	struct dvb_device *dvbdev;
-	struct net_device device[DVB_NET_DEVICES_MAX];
+	struct net_device *device[DVB_NET_DEVICES_MAX];
 	int state[DVB_NET_DEVICES_MAX];
 	struct dmx_demux *demux;
 };

@@ -1,6 +1,8 @@
 config DVB_AV7110
 	tristate "AV7110 cards"
-	depends on VIDEO_DEV && DVB_CORE
+	depends on DVB_CORE
+	select VIDEO_DEV
+	select VIDEO_SAA7146_VV
 	help
 	  Support for SAA7146 and AV7110 based DVB cards as produced 
 	  by Fujitsu-Siemens, Technotrend, Hauppauge and others.
@@ -26,6 +28,7 @@ config DVB_AV7110_OSD
 config DVB_BUDGET
 	tristate "Budget cards"
 	depends on DVB_CORE
+	select VIDEO_SAA7146
 	help
 	  Support for simple SAA7146 based DVB cards
 	  (so called Budget- or Nova-PCI cards) without onboard
@@ -38,7 +41,8 @@ config DVB_BUDGET
 
 config DVB_BUDGET_CI
 	tristate "Budget cards with onboard CI connector"
-	depends on VIDEO_DEV && DVB_CORE && DVB_BUDGET
+	depends on DVB_CORE
+	select VIDEO_SAA7146
 	help
 	  Support for simple SAA7146 based DVB cards
 	  (so called Budget- or Nova-PCI cards) without onboard
@@ -51,7 +55,9 @@ config DVB_BUDGET_CI
 
 config DVB_BUDGET_AV
 	tristate "Budget cards with analog video inputs"
-	depends on VIDEO_DEV && DVB_CORE && DVB_BUDGET
+	depends on DVB_CORE
+	select VIDEO_DEV
+	select VIDEO_SAA7146_VV
 	help
 	  Support for simple SAA7146 based DVB cards
 	  (so called Budget- or Nova-PCI cards) without onboard
@@ -64,7 +70,9 @@ config DVB_BUDGET_AV
 
 config DVB_BUDGET_PATCH
 	tristate "AV7110 cards with Budget Patch"
-	depends on DVB_CORE && DVB_BUDGET
+	depends on DVB_BUDGET
+	select VIDEO_DEV
+	select VIDEO_SAA7146_VV
 	help
 	  Support for Budget Patch (full TS) modification on 
 	  SAA7146+AV7110 based cards (DVB-S cards). This

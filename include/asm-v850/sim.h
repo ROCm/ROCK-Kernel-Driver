@@ -25,7 +25,7 @@
 /* We use a weird value for RAM, not just 0, for testing purposes.
    These must match the values used in the linker script.  */
 #define RAM_ADDR		0x8F000000
-#define RAM_SIZE		0x01000000
+#define RAM_SIZE		0x03000000
 
 
 /* For <asm/page.h> */
