@@ -97,8 +97,8 @@ sti_init_graph(struct sti_struct *sti)
 }
 
 static const struct sti_conf_flags default_conf_flags = {
-		wait:	STI_WAIT,
-	};
+	.wait	= STI_WAIT,
+};
 
 void
 sti_inq_conf(struct sti_struct *sti)
@@ -118,8 +118,8 @@ sti_inq_conf(struct sti_struct *sti)
 }
 
 static const struct sti_font_flags default_font_flags = {
-		wait:	STI_WAIT,
-		non_text: 0,
+	.wait		= STI_WAIT,
+	.non_text	= 0,
 };
 
 void

@@ -23,10 +23,6 @@ struct riva_regs {
 	RIVA_HW_STATE ext;
 };
 
-typedef struct {
-	unsigned char red, green, blue, transp;
-} riva_cfb8_cmap_t;
-
 struct riva_par {
 	RIVA_HW_INST riva;	/* interface to riva_hw.c */
 
@@ -37,11 +33,18 @@ struct riva_par {
 	struct riva_regs current_state;
 	struct vgastate state;
 	atomic_t ref_count;
-	riva_cfb8_cmap_t cmap[256];	/* VGA DAC palette cache */
-	u32 riva_palette[16];
 	u32 cursor_data[32 * 32/4];
 	int cursor_reset;
 	unsigned char *EDID;
+
+	int panel_xres, panel_yres;
+	int hOver_plus, hSync_width, hblank;
+	int vOver_plus, vSync_width, vblank;
+	int hAct_high, vAct_high, interlaced;
+	int synct, misc, clock;
+
+	int use_default_var;
+	int got_dfpinfo;
 	unsigned int Chipset;
 	int forceCRTC;
 	Bool SecondCRTC;

@@ -14,9 +14,8 @@
 #ifndef __I810_MAIN_H__
 #define __I810_MAIN_H__
 
-
 /* PCI */
-static const char *i810_pci_list[] __devinitdata = {
+static const char *i810_pci_list[] __initdata = {
 	"Intel(R) 810 Framebuffer Device"                                 ,
 	"Intel(R) 810-DC100 Framebuffer Device"                           ,
 	"Intel(R) 810E Framebuffer Device"                                ,
@@ -25,7 +24,7 @@ static const char *i810_pci_list[] __devinitdata = {
 	"Intel(R) 815 (Internal Graphics with AGP) Framebuffer Device"  
 };
 
-static struct pci_device_id i810fb_pci_tbl[] __devinitdata = {
+static struct pci_device_id i810fb_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810_IG1, 
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, 
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810_IG3,
@@ -41,64 +40,32 @@ static struct pci_device_id i810fb_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5 }
 };	  
 	             
-static int  __devinit i810fb_init_pci (struct pci_dev *dev, 
+static int  __init i810fb_init_pci (struct pci_dev *dev, 
 				       const struct pci_device_id *entry);
-static void __devexit i810fb_remove_pci(struct pci_dev *dev);
+static void __exit i810fb_remove_pci(struct pci_dev *dev);
 
 static struct pci_driver i810fb_driver = {
 	.name     =	"i810fb",
 	.id_table =	i810fb_pci_tbl,
 	.probe    =	i810fb_init_pci,
-	.remove   =	__devexit_p(i810fb_remove_pci),
+	.remove   =	__exit_p(i810fb_remove_pci),
 };	
 
-static int i810_init  __devinitdata = 0;
-static int vram       __devinitdata = 4;
-static int bpp        __devinitdata = 8;
-static int mtrr       __devinitdata = 0;
-static int accel      __devinitdata = 0;
-static int hsync1     __devinitdata = 0;
-static int hsync2     __devinitdata = 0;
-static int vsync1     __devinitdata = 0;
-static int vsync2     __devinitdata = 0;
-static int xres       __devinitdata = 640;
-static int yres       __devinitdata = 480;
-static int vyres      __devinitdata = 0;
-static int sync       __devinitdata = 0;
-static int ext_vga    __devinitdata = 0;
-static int dcolor     __devinitdata = 0;
-
-/* "use once" vars */
-static char i810fb_name[16]  = "i810fb";
-static struct fb_var_screeninfo i810fb_default __devinitdata = {
-	/* 640x480, 8 bpp */
-	.xres           = 640, 
-	.yres           = 480, 
-	.xres_virtual   = 640, 
-	.yres_virtual   = 480,
-	.xoffset        = 0, 
-	.yoffset        = 0, 
-	.bits_per_pixel = 8, 
-	.grayscale      = 0,
-	.red            = {0, 8, 0}, 
-	.green          = {0, 8, 0}, 
-	.blue           = {0, 8, 0}, 
-	.transp         = {0, 0, 0},
-	.nonstd         = 0, 
-	.activate       = 0, 
-	.height         = -1, 
-	.width          = -1, 
-	.accel_flags    = 0, 
-	.pixclock       = 20000, 
-	.left_margin    = 64, 
-	.right_margin   = 64, 
-	.upper_margin   = 32, 
-	.lower_margin   = 32, 
-	.hsync_len      = 64, 
-	.vsync_len      = 2,
-	.sync           = 0, 
-	.vmode          = FB_VMODE_NONINTERLACED
-};
+static int i810_init  __initdata = 0;
+static int vram       __initdata = 4;
+static int bpp        __initdata = 8;
+static int mtrr       __initdata = 0;
+static int accel      __initdata = 0;
+static int hsync1     __initdata = 0;
+static int hsync2     __initdata = 0;
+static int vsync1     __initdata = 0;
+static int vsync2     __initdata = 0;
+static int xres       __initdata = 640;
+static int yres       __initdata = 480;
+static int vyres      __initdata = 0;
+static int sync       __initdata = 0;
+static int ext_vga    __initdata = 0;
+static int dcolor     __initdata = 0;
 
 /*
  * voffset - framebuffer offset in MiB from aperture start address.  In order for
@@ -124,8 +91,8 @@ static struct fb_var_screeninfo i810fb_default __devinitdata = {
  * 
  * Experiment with v_offset to find out which works best for you.
  */
-static u32 v_offset_default __devinitdata; /* For 32 MiB Aper size, 8 should be the default */
-static u32 voffset          __devinitdata = 0;
+static u32 v_offset_default __initdata; /* For 32 MiB Aper size, 8 should be the default */
+static u32 voffset          __initdata = 0;
 
 static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor);
 
@@ -173,7 +140,7 @@ inline void flush_cache(void)
 
 #ifdef CONFIG_MTRR
 #define KERNEL_HAS_MTRR 1
-static inline void __devinit set_mtrr(struct i810fb_par *par)
+static inline void __init set_mtrr(struct i810fb_par *par)
 {
 	par->mtrr_reg = mtrr_add((u32) par->aperture.physical, 
 		 par->aperture.size, MTRR_TYPE_WRCOMB, 1);

@@ -378,6 +378,7 @@ void accel_clear(struct vc_data *vc, struct display *p, int sy,
 	info->fbops->fb_fillrect(info, &region);
 }	
 
+#define FB_PIXMAPSIZE 8192
 void accel_putcs(struct vc_data *vc, struct display *p,
 			const unsigned short *s, int count, int yy, int xx)
 {
@@ -387,7 +388,7 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 	unsigned int cellsize = vc->vc_font.height * width;
 	struct fb_image image;
 	u16 c = scr_readw(s);
-	static u8 pixmap[8192];
+	static u8 pixmap[FB_PIXMAPSIZE];
 	
 	image.fg_color = attr_fgcol(p, c);
 	image.bg_color = attr_bgcol(p, c);
@@ -396,43 +397,47 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 	image.height = vc->vc_font.height;
 	image.depth = 1;
 
-/*	pixmap = kmalloc((info->var.bits_per_pixel + 7) >> 3 *
-				vc->vc_font.height, GFP_KERNEL); 
-*/
-				
-	if (!(vc->vc_font.width & 7) && pixmap != NULL) {
-		unsigned int pitch = width * count, i, j;
+	if (!(vc->vc_font.width & 7)) {
+		unsigned int pitch, cnt, i, j, k;
+		unsigned int maxcnt = FB_PIXMAPSIZE/(vc->vc_font.height * width);
 		char *src, *dst, *dst0;
 
-		dst0 = pixmap;
-		image.width = vc->vc_font.width * count;
 		image.data = pixmap;
-		while (count--) {
-			src = p->fontdata + (scr_readw(s++) & charmask) * cellsize;
-			dst = dst0;
-			for (i = image.height; i--; ) {
-				for (j = 0; j < width; j++) 
-					dst[j] = *src++;
-				dst += pitch;
+		while (count) {
+			if (count > maxcnt) 
+				cnt = k = maxcnt;
+			else
+				cnt = k = count;
+			
+			dst0 = pixmap;
+			pitch = width * cnt;
+			image.width = vc->vc_font.width * cnt;
+			while (k--) {
+				src = p->fontdata + (scr_readw(s++)&charmask)*
+					cellsize;
+				dst = dst0;
+				for (i = image.height; i--; ) {
+					for (j = 0; j < width; j++) 
+						dst[j] = *src++;
+					dst += pitch;
+				}
+				dst0 += width;
 			}
-			dst0 += width;
+
+			info->fbops->fb_imageblit(info, &image);
+			image.dx += cnt * vc->vc_font.width;
+			count -= cnt;
 		}
-		info->fbops->fb_imageblit(info, &image);
-		if (info->fbops->fb_sync)
-			info->fbops->fb_sync(info);
 	} else {
 		image.width = vc->vc_font.width;
 		while (count--) {
 			image.data = p->fontdata + 
-				(scr_readw(s++) & charmask) * vc->vc_font.height * width;
+				(scr_readw(s++) & charmask) * 
+				vc->vc_font.height * width;
 			info->fbops->fb_imageblit(info, &image);
 			image.dx += vc->vc_font.width;
 		}	
 	}
-	/*
-	if (pixmap);
-		kfree(pixmap);
-	*/	
 }
 
 void accel_clear_margins(struct vc_data *vc, struct display *p,
@@ -1271,16 +1276,9 @@ static int scrollback_current = 0;
 
 int update_var(int con, struct fb_info *info)
 {
-	int err;
+	if (con == info->currcon) 
+		return fb_pan_display(&info->var, info);
 
-	if (con == info->currcon) {
-		if (info->fbops->fb_pan_display) {
-			if ((err =
-			     info->fbops->fb_pan_display(&info->var,
-							 info)))
-				return err;
-		}
-	}
 	return 0;
 }
 

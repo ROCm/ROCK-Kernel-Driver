@@ -218,7 +218,7 @@ void i810fb_encode_registers(const struct fb_var_screeninfo *var,
 	u32 diff = 0, diff_best = 0xFFFFFFFF, i = 0, i_best = 0; 
 	u8 hfl;
 
-	hfl =  (u8) ((xres >> 3) - 1);
+	hfl = (u8) ((xres >> 3) - 1);
 	for (i = 0; i < ARRAY_SIZE(std_modes); i++) { 
 		if (std_modes[i].cr01 == hfl) { 
 			if (std_modes[i].pixclock <= par->regs.pixclock)

@@ -1221,7 +1221,7 @@ static int encode_fix(struct fb_fix_screeninfo *fix, struct fb_info *info)
 
     	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
 
-    	strcpy(fix->id, i810fb_name);
+    	strcpy(fix->id, "I810");
     	fix->smem_start = par->fb.physical;
     	fix->smem_len = par->fb.size;
     	fix->type = FB_TYPE_PACKED_PIXELS;
@@ -1519,15 +1519,9 @@ static int i810fb_pan_display(struct fb_var_screeninfo *var,
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u32 total;
 	u8 *mmio = par->mmio_start_virtual;
-	int xoffset = var->xoffset, yoffset = var->yoffset;
 	
-	if (xoffset < 0 ||
-	    xoffset+var->xres > var->xres_virtual ||
-	    yoffset < 0 ||
-	    yoffset+var->yres > var->yres_virtual) 
-		return -EINVAL;
-
-	total = xoffset * par->depth + yoffset * info->fix.line_length;
+	total = var->xoffset * par->depth + 
+		var->yoffset * info->fix.line_length;
 	i810_writel(DPLYBASE, mmio, par->fb.physical + total);
 
 	return 0;
@@ -1575,6 +1569,7 @@ static int i810fb_set_par(struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 
+	decode_var(&info->var, par, info);
 	i810_load_regs(par);
 	i810_init_cursor(par);
 	par->cursor_reset = 1;
@@ -1586,7 +1581,6 @@ static int i810fb_set_par(struct fb_info *info)
 static int i810fb_check_var(struct fb_var_screeninfo *var, 
 			    struct fb_info *info)
 {
-	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	int err;
 
 	if (IS_DVT) {
@@ -1604,7 +1598,6 @@ static int i810fb_check_var(struct fb_var_screeninfo *var,
 
 	i810fb_fill_var_timings(var);
 	set_color_bitfields(var);
-	decode_var(&info->var, par, info);
 	return 0;
 }
 
@@ -1699,13 +1692,14 @@ static struct fb_ops i810fb_ops __initdata = {
     .fb_copyarea =       i810fb_copyarea,
     .fb_imageblit =      i810fb_imageblit,
     .fb_cursor =         i810fb_cursor,
+    .fb_sync =           i810fb_sync,
 };
 
 /***********************************************************************
  *                  AGP resource allocation                            *
  ***********************************************************************/
   
-static void __devinit i810_fix_pointers(struct i810fb_par *par)
+static void __init i810_fix_pointers(struct i810fb_par *par)
 {
       	par->fb.physical = par->aperture.physical+(par->fb.offset << 12);
 	par->fb.virtual = par->aperture.virtual+(par->fb.offset << 12);
@@ -1721,7 +1715,7 @@ static void __devinit i810_fix_pointers(struct i810fb_par *par)
 		(par->pixmap.offset << 12);
 }
 
-static void __devinit i810_fix_offsets(struct i810fb_par *par)
+static void __init i810_fix_offsets(struct i810fb_par *par)
 {
 	if (vram + 1 > par->aperture.size >> 20)
 		vram = (par->aperture.size >> 20) - 1;
@@ -1744,7 +1738,7 @@ static void __devinit i810_fix_offsets(struct i810fb_par *par)
 	par->cursor_heap.size = 4096;
 }
 
-static int __devinit i810_alloc_agp_mem(struct fb_info *info)
+static int __init i810_alloc_agp_mem(struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	int size;
@@ -1809,7 +1803,7 @@ static int __devinit i810_alloc_agp_mem(struct fb_info *info)
  * Sets the the user monitor's horizontal and vertical
  * frequency limits
  */
-static void __devinit i810_init_monspecs(struct fb_info *info)
+static void __init i810_init_monspecs(struct fb_info *info)
 {
 	if (!hsync1)
 		hsync1 = HFMIN;
@@ -1837,8 +1831,8 @@ static void __devinit i810_init_monspecs(struct fb_info *info)
  * @par: pointer to i810fb_par structure
  * @info: pointer to current fb_info structure
  */
-static void __devinit i810_init_defaults(struct i810fb_par *par, 
-					 struct fb_info *info)
+static void __init i810_init_defaults(struct i810fb_par *par, 
+				      struct fb_info *info)
 {
 	if (voffset) {
 		v_offset_default = voffset;
@@ -1866,16 +1860,16 @@ static void __devinit i810_init_defaults(struct i810fb_par *par,
 		vyres = (vram << 20)/(xres*bpp >> 3);
 
 	par->i810fb_ops = i810fb_ops;
-	i810fb_default.xres = xres;
-	i810fb_default.yres = yres;
-	i810fb_default.yres_virtual = vyres;
-	i810fb_default.bits_per_pixel = bpp;
+	info->var.xres = xres;
+	info->var.yres = yres;
+	info->var.yres_virtual = vyres;
+	info->var.bits_per_pixel = bpp;
 	
 	if (dcolor)
-		i810fb_default.nonstd = 1;
+		info->var.nonstd = 1;
 
 	if (par->dev_flags & HAS_ACCELERATION) 
-		i810fb_default.accel_flags = 1;
+		info->var.accel_flags = 1;
 
 	i810_init_monspecs(info);
 }
@@ -1884,7 +1878,7 @@ static void __devinit i810_init_defaults(struct i810fb_par *par,
  * i810_init_device - initialize device
  * @par: pointer to i810fb_par structure
  */
-static void __devinit i810_init_device(struct i810fb_par *par)
+static void __init i810_init_device(struct i810fb_par *par)
 {
 	u8 reg, *mmio = par->mmio_start_virtual;
 
@@ -1905,7 +1899,7 @@ static void __devinit i810_init_device(struct i810fb_par *par)
 	i810fb_init_ringbuffer(par);
 }
 
-static int __devinit 
+static int __init 
 i810_allocate_pci_resource(struct i810fb_par *par, 
 			   const struct pci_device_id *entry)
 {
@@ -2014,7 +2008,7 @@ int __init i810fb_setup(char *options)
 	return 0;
 }
 
-static int __devinit i810fb_init_pci (struct pci_dev *dev, 
+static int __init i810fb_init_pci (struct pci_dev *dev, 
 				      const struct pci_device_id *entry)
 {
 	struct fb_info    *info;
@@ -2061,7 +2055,6 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 	
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
-	info->var = i810fb_default;
 	if ((err = info->fbops->fb_check_var(&info->var, info))) {
 		i810fb_release_resource(info, par);
 		return err;
@@ -2082,6 +2075,7 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 			  info->var.hsync_len + info->var.right_margin);
 	vfreq = hfreq/(info->var.yres + info->var.upper_margin +
 		       info->var.vsync_len + info->var.lower_margin);
+
       	printk("fb: %s v%d.%d.%d%s, Tony Daplas\n"
       	       "     Video RAM      : %dK\n" 
 	       "     Mode           : %dx%d-%dbpp@%dHz\n"
@@ -2098,7 +2092,6 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 	       (ext_vga) ? "en" : "dis", (IS_DVT) ? 
 	       "Intel(R) DVT" : "VESA GTF (US)");
 
-	
 	return 0;
 }
 
@@ -2144,7 +2137,7 @@ static void i810fb_release_resource(struct fb_info *info,
 		kfree(info);
 }
 
-static void __devexit i810fb_remove_pci(struct pci_dev *dev)
+static void __exit i810fb_remove_pci(struct pci_dev *dev)
 {
 	struct fb_info *info = pci_get_drvdata(dev);
 	struct i810fb_par *par = (struct i810fb_par *) info->par;

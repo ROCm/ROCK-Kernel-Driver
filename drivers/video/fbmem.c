@@ -1189,5 +1189,6 @@ EXPORT_SYMBOL(registered_fb);
 EXPORT_SYMBOL(fb_show_logo);
 EXPORT_SYMBOL(fb_set_var);
 EXPORT_SYMBOL(fb_blank);
+EXPORT_SYMBOL(fb_pan_display);
 
 MODULE_LICENSE("GPL");
