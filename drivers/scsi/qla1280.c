@@ -16,9 +16,13 @@
 * General Public License for more details.
 *
 ******************************************************************************/
-#define QLA1280_VERSION      "3.23.37"
+#define QLA1280_VERSION      "3.23.37.1"
 /*****************************************************************************
     Revision History:
+    Rev  3.23.37.1 December 17, 2003, Jes Sorensen
+	- Delete completion queue from srb if mailbox command failed to
+	  to avoid qla1280_done completeting qla1280_error_action's
+	  obsolete context
     Rev  3.23.37 October 1, 2003, Jes Sorensen
 	- Make MMIO depend on CONFIG_X86_VISWS instead of yet another
 	  random CONFIG option
@@ -1464,8 +1468,15 @@ qla1280_error_action(Scsi_Cmnd * cmd, enum action action)
 	/* If we didn't manage to issue the action, or we have no
 	 * command to wait for, exit here */
 	if (result == FAILED || handle == NULL ||
-	    handle == (unsigned char *)INVALID_HANDLE)
+	    handle == (unsigned char *)INVALID_HANDLE) {
+		/*
+		 * Clear completion queue to avoid qla1280_done() trying
+		 * to complete the command at a later stage after we
+		 * have exited the current context
+		 */
+		sp->wait = NULL;
 		goto leave;
+	}
 
 	/* set up a timer just in case we're really jammed */
 	init_timer(&timer);
