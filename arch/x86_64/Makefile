@@ -23,7 +23,7 @@
 
 #
 # early bootup linking needs 32bit. You can either use real 32bit tools
-# here or 64bit tools switch to 32bit mode.
+# here or 64bit tools in 32bit mode.
 #
 IA32_CC := $(CROSS_COMPILE)gcc -m32 -O2 -fomit-frame-pointer -nostdinc -I $(HPATH)
 IA32_LD := $(CROSS_COMPILE)ld -m elf_i386
@@ -41,11 +41,12 @@ LINKFLAGS =-T $(TOPDIR)/arch/x86_64/vmlinux.lds $(LDFLAGS)
 CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
 CFLAGS += -pipe
+# this makes reading assembly source easier
 CFLAGS += -fno-reorder-blocks	
 # needed for later gcc 3.1
 CFLAGS += -finline-limit=2000
 # needed for earlier gcc 3.1
-CFLAGS += -fno-strength-reduce
+#CFLAGS += -fno-strength-reduce
 #CFLAGS += -g
 
 # prevent gcc from keeping the stack 16 byte aligned (FIXME)
@@ -63,9 +64,9 @@ SUBDIRS += arch/x86_64/ia32
 CORE_FILES += arch/x86_64/ia32/ia32.o
 endif
 
-ifdef CONFIG_HOSTFS
-SUBDIRS += arch/x86_64/hostfs
-core-$(CONFIG_HOSTFS) += arch/x86_64/hostfs/hostfs.o
+ifdef CONFIG_PCI
+SUBDIRS += arch/x86_64/pci
+DRIVERS += arch/x86_64/pci/pci.o
 endif
 
 CORE_FILES += $(core-y)
@@ -77,7 +78,7 @@ vmlinux: arch/x86_64/vmlinux.lds
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper archdep checkoffset
 
-checkoffset: FORCE
+checkoffset: FORCE include/asm
 	make -C arch/$(ARCH)/tools $(TOPDIR)/include/asm-x86_64/offset.h
 
 bzImage: checkoffset vmlinux

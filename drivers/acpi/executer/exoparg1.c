@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 137 $
+ *              $Revision: 139 $
  *
  *****************************************************************************/
 
@@ -560,23 +560,12 @@ acpi_ex_opcode_1A_0T_1R (
 
 	case AML_TYPE_OP:               /* Object_type (Source_object) */
 
-		if (INTERNAL_TYPE_REFERENCE == operand[0]->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (operand[0]) == INTERNAL_TYPE_REFERENCE) {
 			/*
 			 * Not a Name -- an indirect name pointer would have
 			 * been converted to a direct name pointer in Resolve_operands
 			 */
 			switch (operand[0]->reference.opcode) {
-			case AML_ZERO_OP:
-			case AML_ONE_OP:
-			case AML_ONES_OP:
-			case AML_REVISION_OP:
-
-				/* Constants are of type Integer */
-
-				type = ACPI_TYPE_INTEGER;
-				break;
-
-
 			case AML_DEBUG_OP:
 
 				/* The Debug Object is of type "Debug_object" */
@@ -596,7 +585,7 @@ acpi_ex_opcode_1A_0T_1R (
 					 * of the individual package element that is referenced by
 					 * the index.
 					 */
-					type = (*(operand[0]->reference.where))->common.type;
+					type = ACPI_GET_OBJECT_TYPE (*(operand[0]->reference.where));
 				}
 				break;
 
@@ -611,7 +600,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 			default:
 
-				ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R/Type_op: Internal error - Unknown Reference subtype %X\n",
+				ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R/Type_op: Unknown Reference subtype %X\n",
 					operand[0]->reference.opcode));
 				status = AE_AML_INTERNAL;
 				goto cleanup;
@@ -668,7 +657,7 @@ acpi_ex_opcode_1A_0T_1R (
 			 * point (even if the original operand was an object reference, it
 			 * will be resolved and typechecked during operand resolution.)
 			 */
-			switch (temp_desc->common.type) {
+			switch (ACPI_GET_OBJECT_TYPE (temp_desc)) {
 			case ACPI_TYPE_BUFFER:
 				value = temp_desc->buffer.length;
 				break;
@@ -683,7 +672,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 			default:
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Size_of, Not Buf/Str/Pkg - found type %s\n",
-					acpi_ut_get_type_name (temp_desc->common.type)));
+					acpi_ut_get_object_type_name (temp_desc)));
 				status = AE_AML_OPERAND_TYPE;
 				goto cleanup;
 			}

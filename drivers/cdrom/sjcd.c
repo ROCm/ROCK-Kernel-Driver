@@ -77,6 +77,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR SANYO_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include "sjcd.h"
 
@@ -1303,7 +1304,7 @@ static void sjcd_poll(void)
 					     sjcd_next_bn);
 #endif
 					if (current_valid())
-						end_request(0);
+						end_request(CURRENT, 0);
 #if defined( SJCD_TRACE )
 					printk
 					    ("SJCD_S_DATA: pre-cmd failed: go to SJCD_S_STOP mode\n");
@@ -1377,7 +1378,7 @@ static void sjcd_poll(void)
 							    nr_sectors ==
 							    0)
 								end_request
-								    (1);
+								    (CURRENT, 1);
 							else
 								break;
 						}
@@ -1472,7 +1473,7 @@ static void sjcd_poll(void)
 	if (--sjcd_transfer_timeout == 0) {
 		printk("SJCD: timeout in state %d\n", sjcd_transfer_state);
 		while (current_valid())
-			end_request(0);
+			end_request(CURRENT, 0);
 		sjcd_send_cmd(SCMD_STOP);
 		sjcd_transfer_state = SJCD_S_IDLE;
 		goto ReSwitch;
@@ -1495,7 +1496,7 @@ static void do_sjcd_request(request_queue_t * q)
 	while (current_valid()) {
 		sjcd_transfer();
 		if (CURRENT->nr_sectors == 0)
-			end_request(1);
+			end_request(CURRENT, 1);
 		else {
 			sjcd_buf_out = -1;	/* Want to read a block not in buffer */
 			if (sjcd_transfer_state == SJCD_S_IDLE) {
@@ -1504,7 +1505,7 @@ static void do_sjcd_request(request_queue_t * q)
 						printk
 						    ("SJCD: transfer: discard\n");
 						while (current_valid())
-							end_request(0);
+							end_request(CURRENT, 0);
 						break;
 					}
 				}

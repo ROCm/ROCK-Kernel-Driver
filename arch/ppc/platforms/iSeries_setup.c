@@ -24,6 +24,7 @@
 #include <linux/bootmem.h>
 #include <linux/blk.h>
 #include <linux/ide.h>
+#include <linux/root_dev.h>
 #include <linux/seq_file.h>
 
 #include <asm/processor.h>
@@ -154,7 +155,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		initrd_start = xNaca.xRamDisk + KERNELBASE;
 		initrd_end   = initrd_start + xNaca.xRamDiskSize * PAGE_SIZE;
 		initrd_below_start_ok = 1;	// ramdisk in kernel space
-		ROOT_DEV = MKDEV( RAMDISK_MAJOR, 0 );
+		ROOT_DEV = Root_RAM0;
 
 		if ( ((rd_size*1024)/PAGE_SIZE) < xNaca.xRamDiskSize )
 			rd_size = (xNaca.xRamDiskSize*PAGE_SIZE)/1024;
@@ -163,7 +164,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_BLK_DEV_INITRD */
 #if CONFIG_VIODASD_IDE
 	  {
-		ROOT_DEV = MKDEV( IDE0_MAJOR, 1 );
+		ROOT_DEV = Root_HDA1;
 	  }
 #elif defined(CONFIG_VIODASD)
 	  {

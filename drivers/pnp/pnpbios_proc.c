@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <linux/proc_fs.h>
 #include <linux/pnpbios.h>
+#include <linux/init.h>
 
 static struct proc_dir_entry *proc_pnp = NULL;
 static struct proc_dir_entry *proc_pnp_boot = NULL;

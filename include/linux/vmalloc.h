@@ -28,7 +28,6 @@ extern int vmalloc_area_pages(unsigned long address, unsigned long size,
  */
 
 extern void * vmalloc(unsigned long size);
-extern void * vmalloc_dma(unsigned long size);
 extern void * vmalloc_32(unsigned long size);
 
 /*

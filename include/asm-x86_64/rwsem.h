@@ -146,18 +146,18 @@ static inline void __up_read(struct rw_semaphore *sem)
 	__s32 tmp = -RWSEM_ACTIVE_READ_BIAS;
 	__asm__ __volatile__(
 		"# beginning __up_read\n\t"
-LOCK_PREFIX	"  xaddl      %%edx,(%%rdi)\n\t" /* subtracts 1, returns the old value */
+LOCK_PREFIX	"  xaddl      %[tmp],(%%rdi)\n\t" /* subtracts 1, returns the old value */
 		"  js        2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
 		LOCK_SECTION_START("")
 		"2:\n\t"
-		"  decw      %%dx\n\t" /* do nothing if still outstanding active readers */
+		"  decw      %w[tmp]\n\t" /* do nothing if still outstanding active readers */
 		"  jnz       1b\n\t"
 		"  call      rwsem_wake_thunk\n\t"
 		"  jmp       1b\n"
 		LOCK_SECTION_END
 		"# ending __up_read\n"
-		: "+m"(sem->count), "+d"(tmp)
+		: "+m"(sem->count), "+r" (tmp)
 		: "D"(sem)
 		: "memory", "cc");
 }
@@ -167,23 +167,24 @@ LOCK_PREFIX	"  xaddl      %%edx,(%%rdi)\n\t" /* subtracts 1, returns the old val
  */
 static inline void __up_write(struct rw_semaphore *sem)
 {
+	unsigned tmp; 
 	__asm__ __volatile__(
 		"# beginning __up_write\n\t"
-		"  movl      %2,%%edx\n\t"
-LOCK_PREFIX	"  xaddl     %%edx,(%%rdi)\n\t" /* tries to transition 0xffff0001 -> 0x00000000 */
+		"  movl      %2,%[tmp]\n\t"
+LOCK_PREFIX	"  xaddl     %[tmp],(%%rdi)\n\t" /* tries to transition 0xffff0001 -> 0x00000000 */
 		"  jnz       2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
 		LOCK_SECTION_START("")
 		"2:\n\t"
-		"  decw      %%dx\n\t" /* did the active count reduce to 0? */
+		"  decw      %w[tmp]\n\t" /* did the active count reduce to 0? */
 		"  jnz       1b\n\t" /* jump back if not */
 		"  call      rwsem_wake_thunk\n\t"
 		"  jmp       1b\n"
 		LOCK_SECTION_END
 		"# ending __up_write\n"
-		: "+m"(sem->count)
+		: "+m"(sem->count), [tmp] "r" (tmp)
 		: "D"(sem), "i"(-RWSEM_ACTIVE_WRITE_BIAS)
-		: "memory", "cc", "rdx");
+		: "memory", "cc");
 }
 
 /*

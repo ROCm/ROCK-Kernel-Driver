@@ -26,7 +26,8 @@
 		"2: call do_softirq_thunk;"					\
 		"jmp 1b;"							\
 		".previous" 							\
-		:: "i" (pda___softirq_pending), "i" (pda___local_bh_count) : \
+		:: "i" (pda_offset(__softirq_pending)), \
+		   "i" (pda_offset(__local_bh_count)) : \
 		"memory");	\
 } while (0)
 #define local_bh_enable() do { _local_bh_enable(); preempt_enable(); } while(0)

@@ -139,7 +139,7 @@ static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
 	__cli();
 
     /*  Save value of CR4 and clear Page Global Enable (bit 7)  */
-	if (test_bit(X86_FEATURE_PGE, &boot_cpu_data.x86_capability)) {
+	if (cpu_has_ge) {
 	 ctxt->cr4val = read_cr4();
 		write_cr4(ctxt->cr4val & ~(1UL << 7));
     }
@@ -170,7 +170,7 @@ static void set_mtrr_done (struct set_mtrr_context *ctxt)
 	write_cr0(read_cr0() & 0xbfffffff);
 
     /*  Restore value of CR4  */
-	if (test_bit(X86_FEATURE_PGE, &boot_cpu_data.x86_capability))
+	if (cpu_has_pge)
 		write_cr4 (ctxt->cr4val);
 
     /*  Re-enable interrupts locally (if enabled previously)  */
@@ -983,7 +983,7 @@ static ssize_t mtrr_write (struct file *file, const char *buf,
     char *ptr;
     char line[LINE_SIZE];
 
-	if (!capable (CAP_SYS_ADMIN))
+	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
     /*  Can't seek (pwrite) on this device  */
@@ -1071,7 +1071,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	return -ENOIOCTLCMD;
 
       case MTRRIOC_ADD_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1083,7 +1083,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_SET_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1093,7 +1093,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_DEL_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1103,7 +1103,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_KILL_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1134,7 +1134,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_ADD_PAGE_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1146,7 +1146,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_SET_PAGE_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1156,7 +1156,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_DEL_PAGE_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1166,7 +1166,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_KILL_PAGE_ENTRY:
-		if (!capable (CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1277,7 +1277,7 @@ static void __init mtrr_setup (void)
 {
 	printk ("mtrr: v%s)\n", MTRR_VERSION);
 
-	if (test_bit (X86_FEATURE_MTRR, &boot_cpu_data.x86_capability)) {
+	if (cpu_has_mtrr) { 
 		 /* Query the width (in bits) of the physical
 		   addressable memory on the Hammer family. */
 		if ((cpuid_eax (0x80000000) >= 0x80000008)) {

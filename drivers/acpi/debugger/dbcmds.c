@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 83 $
+ *              $Revision: 84 $
  *
  ******************************************************************************/
 
@@ -663,7 +663,7 @@ acpi_db_walk_for_specific_objects (
 	/* Display short information about the object */
 
 	if (obj_desc) {
-		switch (obj_desc->common.type) {
+		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 		case ACPI_TYPE_METHOD:
 			acpi_os_printf (" #Args %d Concurrency %X", obj_desc->method.param_count, obj_desc->method.concurrency);
 			break;
@@ -729,7 +729,8 @@ acpi_db_display_objects (
 	}
 
 	acpi_db_set_output_destination (ACPI_DB_DUPLICATE_OUTPUT);
-	acpi_os_printf ("Objects of type [%s] defined in the current ACPI Namespace: \n", acpi_ut_get_type_name (type));
+	acpi_os_printf ("Objects of type [%s] defined in the current ACPI Namespace: \n",
+		acpi_ut_get_type_name (type));
 
 	acpi_db_set_output_destination (ACPI_DB_REDIRECTABLE_OUTPUT);
 

@@ -401,8 +401,7 @@ static void ipaq_write_gather(struct usb_serial_port *port)
 		pkt->written += count;
 		priv->queue_len -= count;
 		if (pkt->written == pkt->len) {
-			list_del(&pkt->list);
-			list_add(&pkt->list, &priv->freelist);
+			list_move(&pkt->list, &priv->freelist);
 			priv->free_len += PACKET_SIZE;
 		}
 		if (room == 0) {

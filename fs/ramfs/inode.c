@@ -308,6 +308,12 @@ static struct super_block *ramfs_get_sb(struct file_system_type *fs_type,
 	return get_sb_nodev(fs_type, flags, data, ramfs_fill_super);
 }
 
+static struct super_block *rootfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags|MS_NOUSER, data, ramfs_fill_super);
+}
+
 static struct file_system_type ramfs_fs_type = {
 	name:		"ramfs",
 	get_sb:		ramfs_get_sb,
@@ -315,9 +321,8 @@ static struct file_system_type ramfs_fs_type = {
 };
 static struct file_system_type rootfs_fs_type = {
 	name:		"rootfs",
-	get_sb:		ramfs_get_sb,
+	get_sb:		rootfs_get_sb,
 	kill_sb:	kill_litter_super,
-	fs_flags:	FS_NOMOUNT,
 };
 
 static int __init init_ramfs_fs(void)
@@ -339,4 +344,3 @@ int __init init_rootfs(void)
 }
 
 MODULE_LICENSE("GPL");
-

@@ -3,8 +3,8 @@
  */
 OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)
-jiffies = jiffies_64;
 ENTRY(_start)
+jiffies_64 = jiffies;
 SECTIONS
 {
   . = 0xffffffff80100000;

@@ -101,7 +101,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		struct address_space * const mapping = &inode->i_data;
 
 		inode->i_sb = sb;
-		inode->i_dev = sb->s_dev;
+		inode->i_dev = to_kdev_t(sb->s_dev);
 		inode->i_blkbits = sb->s_blocksize_bits;
 		inode->i_flags = 0;
 		atomic_set(&inode->i_count, 1);
@@ -332,7 +332,7 @@ int invalidate_device(kdev_t dev, int do_sync)
 		fsync_bdev(bdev);
 
 	res = 0;
-	sb = get_super(dev);
+	sb = get_super(bdev);
 	if (sb) {
 		/*
 		 * no need to lock the super, get_super holds the

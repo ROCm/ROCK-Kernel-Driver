@@ -42,6 +42,7 @@
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -95,13 +96,13 @@ zx4500_setup_arch(void)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
-		ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+		ROOT_DEV = Root_RAM0;
 	else
 #endif
 #if	defined(CONFIG_ROOT_NFS)
-		ROOT_DEV = to_kdev_t(0x00FF);	/* /dev/nfs pseudo device */
+		ROOT_DEV = Root_NFS;
 #else
-		ROOT_DEV = to_kdev_t(0x0801);	/* /dev/sda1 SCSI disk */
+		ROOT_DEV = Root_SDA1;
 #endif
 
 	/* Get boot string from flash */

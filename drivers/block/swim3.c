@@ -33,6 +33,8 @@
 #include <asm/pmac_feature.h>
 
 #define MAJOR_NR	FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
@@ -327,15 +329,15 @@ static void start_request(struct floppy_state *fs)
 #endif
 
 		if (CURRENT->sector < 0 || CURRENT->sector >= fs->total_secs) {
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		if (CURRENT->current_nr_sectors == 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 			continue;
 		}
 		if (fs->ejected) {
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -343,7 +345,7 @@ static void start_request(struct floppy_state *fs)
 			if (fs->write_prot < 0)
 				fs->write_prot = swim3_readbit(fs, WRITE_PROT);
 			if (fs->write_prot) {
-				end_request(0);
+				end_request(CURRENT, 0);
 				continue;
 			}
 		}
@@ -514,7 +516,7 @@ static void act(struct floppy_state *fs)
 		case do_transfer:
 			if (fs->cur_cyl != fs->req_cyl) {
 				if (fs->retries > 5) {
-					end_request(0);
+					end_request(CURRENT, 0);
 					fs->state = idle;
 					return;
 				}
@@ -546,7 +548,7 @@ static void scan_timeout(unsigned long data)
 	out_8(&sw->intr_enable, 0);
 	fs->cur_cyl = -1;
 	if (fs->retries > 5) {
-		end_request(0);
+		end_request(CURRENT, 0);
 		fs->state = idle;
 		start_request(fs);
 	} else {
@@ -575,7 +577,7 @@ static void seek_timeout(unsigned long data)
 		return;
 	}
 	printk(KERN_ERR "swim3: seek timeout\n");
-	end_request(0);
+	end_request(CURRENT, 0);
 	fs->state = idle;
 	start_request(fs);
 }
@@ -603,7 +605,7 @@ static void xfer_timeout(unsigned long data)
 	CURRENT->current_nr_sectors -= s;
 	printk(KERN_ERR "swim3: timeout %sing sector %ld\n",
 	       (rq_data_dir(CURRENT)==WRITE? "writ": "read"), CURRENT->sector);
-	end_request(0);
+	end_request(CURRENT, 0);
 	fs->state = idle;
 	start_request(fs);
 }
@@ -637,7 +639,7 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				printk(KERN_ERR "swim3: seen sector but cyl=ff?\n");
 				fs->cur_cyl = -1;
 				if (fs->retries > 5) {
-					end_request(0);
+					end_request(CURRENT, 0);
 					fs->state = idle;
 					start_request(fs);
 				} else {
@@ -708,7 +710,7 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				printk("swim3: error %sing block %ld (err=%x)\n",
 				       rq_data_dir(CURRENT) == WRITE? "writ": "read",
 				       CURRENT->sector, err);
-				end_request(0);
+				end_request(CURRENT, 0);
 				fs->state = idle;
 			}
 		} else {
@@ -717,7 +719,7 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				printk(KERN_ERR "swim3: fd dma: stat=%x resid=%d\n", stat, resid);
 				printk(KERN_ERR "  state=%d, dir=%lx, intr=%x, err=%x\n",
 				       fs->state, rq_data_dir(CURRENT), intr, err);
-				end_request(0);
+				end_request(CURRENT, 0);
 				fs->state = idle;
 				start_request(fs);
 				break;
@@ -726,7 +728,7 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			CURRENT->current_nr_sectors -= fs->scount;
 			CURRENT->buffer += fs->scount * 512;
 			if (CURRENT->current_nr_sectors <= 0) {
-				end_request(1);
+				end_request(CURRENT, 1);
 				fs->state = idle;
 			} else {
 				fs->req_sector += fs->scount;

@@ -32,6 +32,7 @@
 #include <linux/irq.h>
 #include <linux/ide.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -92,13 +93,13 @@ mcpn765_setup_arch(void)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
-		ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+		ROOT_DEV = Root_RAM0;
 	else
 #endif
 #ifdef	CONFIG_ROOT_NFS
-		ROOT_DEV = to_kdev_t(0x00FF);	/* /dev/nfs pseudo device */
+		ROOT_DEV = Root_NFS;
 #else
-		ROOT_DEV = to_kdev_t(0x0802);	/* /dev/sda2 SCSI disk */
+		ROOT_DEV = Root_SDA2;
 #endif
 
 #ifdef CONFIG_DUMMY_CONSOLE

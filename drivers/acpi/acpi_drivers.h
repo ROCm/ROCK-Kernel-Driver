@@ -1,5 +1,5 @@
 /*
- *  acpi_drivers.h  ($Revision: 29 $)
+ *  acpi_drivers.h  ($Revision: 30 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -160,6 +160,7 @@ void acpi_ec_exit (void);
 
 int acpi_pci_root_init (void);
 void acpi_pci_root_exit (void);
+void acpi_pci_get_translations (acpi_pci_id* id, u64* mem_tra, u64* io_tra);
 
 /* ACPI PCI Interrupt Link (pci_link.c) */
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 98 $
+ *              $Revision: 101 $
  *
  *****************************************************************************/
 
@@ -57,7 +57,6 @@ acpi_ut_copy_isimple_to_esimple (
 	u8                      *data_space,
 	ACPI_SIZE               *buffer_space_used)
 {
-	acpi_buffer             buffer;
 	acpi_status             status = AE_OK;
 
 
@@ -68,7 +67,7 @@ acpi_ut_copy_isimple_to_esimple (
 
 	/*
 	 * Check for NULL object case (could be an uninitialized
-	 * package element
+	 * package element)
 	 */
 	if (!internal_object) {
 		return_ACPI_STATUS (AE_OK);
@@ -82,11 +81,11 @@ acpi_ut_copy_isimple_to_esimple (
 	 * In general, the external object will be the same type as
 	 * the internal object
 	 */
-	external_object->type = internal_object->common.type;
+	external_object->type = ACPI_GET_OBJECT_TYPE (internal_object);
 
 	/* However, only a limited number of external types are supported */
 
-	switch (internal_object->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (internal_object)) {
 	case ACPI_TYPE_STRING:
 
 		external_object->string.pointer = (NATIVE_CHAR *) data_space;
@@ -121,45 +120,9 @@ acpi_ut_copy_isimple_to_esimple (
 		 * This is an object reference.  Attempt to dereference it.
 		 */
 		switch (internal_object->reference.opcode) {
-		case AML_ZERO_OP:
-			external_object->type = ACPI_TYPE_INTEGER;
-			external_object->integer.value = 0;
-			break;
-
-		case AML_ONE_OP:
-			external_object->type = ACPI_TYPE_INTEGER;
-			external_object->integer.value = 1;
-			break;
-
-		case AML_ONES_OP:
-			external_object->type = ACPI_TYPE_INTEGER;
-			external_object->integer.value = ACPI_INTEGER_MAX;
-			break;
-
-		case AML_REVISION_OP:
-			external_object->type = ACPI_TYPE_INTEGER;
-			external_object->integer.value = ACPI_CA_SUPPORT_LEVEL;
-			break;
-
 		case AML_INT_NAMEPATH_OP:
-			/*
-			 * This is a named reference, get the string.  We already know that
-			 * we have room for it, use max length
-			 */
-			external_object->type = ACPI_TYPE_STRING;
-			external_object->string.pointer = (NATIVE_CHAR *) data_space;
 
-			buffer.length = MAX_STRING_LENGTH;
-			buffer.pointer = data_space;
-
-			status = acpi_ns_handle_to_pathname ((acpi_handle) internal_object->reference.node,
-					 &buffer);
-
-			/* Converted (external) string length is returned from above */
-
-			external_object->string.length = (u32) buffer.length;
-			*buffer_space_used = ACPI_ROUND_UP_TO_NATIVE_WORD (buffer.length);
-			break;
+			/* For namepath, return the object handle ("reference") */
 
 		default:
 			/*
@@ -175,7 +138,7 @@ acpi_ut_copy_isimple_to_esimple (
 
 	case ACPI_TYPE_PROCESSOR:
 
-		external_object->processor.proc_id = internal_object->processor.proc_id;
+		external_object->processor.proc_id    = internal_object->processor.proc_id;
 		external_object->processor.pblk_address = internal_object->processor.address;
 		external_object->processor.pblk_length = internal_object->processor.length;
 		break;
@@ -328,7 +291,7 @@ acpi_ut_copy_ipackage_to_epackage (
 	info.num_packages = 1;
 	info.free_space  = buffer + ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
 
-	external_object->type              = internal_object->common.type;
+	external_object->type              = ACPI_GET_OBJECT_TYPE (internal_object);
 	external_object->package.count     = internal_object->package.count;
 	external_object->package.elements  = ACPI_CAST_PTR (acpi_object, info.free_space);
 
@@ -372,7 +335,7 @@ acpi_ut_copy_iobject_to_eobject (
 	ACPI_FUNCTION_TRACE ("Ut_copy_iobject_to_eobject");
 
 
-	if (internal_object->common.type == ACPI_TYPE_PACKAGE) {
+	if (ACPI_GET_OBJECT_TYPE (internal_object) == ACPI_TYPE_PACKAGE) {
 		/*
 		 * Package object:  Copy all subobjects (including
 		 * nested packages)
@@ -550,7 +513,7 @@ acpi_ut_copy_epackage_to_ipackage (
 	free_space = buffer + sizeof(acpi_object);
 
 
-	external_object->type              = internal_object->common.type;
+	external_object->type              = ACPI_GET_OBJECT_TYPE (internal_object);
 	external_object->package.count     = internal_object->package.count;
 	external_object->package.elements  = (acpi_object *)free_space;
 
@@ -653,7 +616,7 @@ acpi_ut_copy_simple_object (
 
 	/* Handle the objects with extra data */
 
-	switch (dest_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (dest_desc)) {
 	case ACPI_TYPE_BUFFER:
 
 		dest_desc->buffer.node = NULL;
@@ -729,7 +692,7 @@ acpi_ut_copy_ielement_to_ielement (
 		/*
 		 * This is a simple object, just copy it
 		 */
-		target_object = acpi_ut_create_internal_object (source_object->common.type);
+		target_object = acpi_ut_create_internal_object (ACPI_GET_OBJECT_TYPE (source_object));
 		if (!target_object) {
 			return (AE_NO_MEMORY);
 		}
@@ -803,16 +766,16 @@ acpi_ut_copy_ipackage_to_ipackage (
 	ACPI_FUNCTION_TRACE ("Ut_copy_ipackage_to_ipackage");
 
 
-	dest_obj->common.type   = source_obj->common.type;
+	dest_obj->common.type   = ACPI_GET_OBJECT_TYPE (source_obj);
 	dest_obj->common.flags  = source_obj->common.flags;
 	dest_obj->package.count = source_obj->package.count;
-
 
 	/*
 	 * Create the object array and walk the source package tree
 	 */
-	dest_obj->package.elements = ACPI_MEM_CALLOCATE (((ACPI_SIZE) source_obj->package.count + 1) *
-			 sizeof (void *));
+	dest_obj->package.elements = ACPI_MEM_CALLOCATE (
+			   ((ACPI_SIZE) source_obj->package.count + 1) *
+			   sizeof (void *));
 	if (!dest_obj->package.elements) {
 		ACPI_REPORT_ERROR (
 			("Aml_build_copy_internal_package_object: Package allocation failure\n"));
@@ -863,14 +826,14 @@ acpi_ut_copy_iobject_to_iobject (
 
 	/* Create the top level object */
 
-	*dest_desc = acpi_ut_create_internal_object (source_desc->common.type);
+	*dest_desc = acpi_ut_create_internal_object (ACPI_GET_OBJECT_TYPE (source_desc));
 	if (!*dest_desc) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Copy the object and possible subobjects */
 
-	if (source_desc->common.type == ACPI_TYPE_PACKAGE) {
+	if (ACPI_GET_OBJECT_TYPE (source_desc) == ACPI_TYPE_PACKAGE) {
 		status = acpi_ut_copy_ipackage_to_ipackage (source_desc, *dest_desc,
 				  walk_state);
 	}

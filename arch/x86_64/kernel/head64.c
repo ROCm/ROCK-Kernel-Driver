@@ -70,16 +70,18 @@ static void __init setup_boot_cpu_data(void)
 	boot_cpu_data.x86_mask = eax & 0xf;
 }
 
-extern void start_kernel(void), pda_init(int); 
+extern void start_kernel(void), pda_init(int), setup_early_printk(char *); 
 
 void __init x86_64_start_kernel(char * real_mode_data)
 {
+	char *s;
+
 	clear_bss();
 	pda_init(0);
-
 	copy_bootdata(real_mode_data);
+	s = strstr(saved_command_line, "earlyprintk="); 
+	if (s != NULL)
+		setup_early_printk(s+12); 
 	setup_boot_cpu_data();
-
-
 	start_kernel();
 }

@@ -599,10 +599,12 @@ extern int noautodma;
  */
 #define IDE_DRIVER		/* Toggle some magic bits in blk.h */
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
+#define DEVICE_NR(device)	(minor(device) >> PARTN_BITS)
 #include <linux/blk.h>
 
-extern int __ide_end_request(struct ata_device *, struct request *, int, unsigned int);
-extern int ide_end_request(struct ata_device *drive, struct request *, int);
+/* Not locking and locking variant: */
+extern int __ata_end_request(struct ata_device *, struct request *, int, unsigned int);
+extern int ata_end_request(struct ata_device *drive, struct request *, int);
 
 extern void ata_set_handler(struct ata_device *drive, ata_handler_t handler,
 		unsigned long timeout, ata_expiry_t expiry);
@@ -611,11 +613,6 @@ extern u8 ata_dump(struct ata_device *, struct request *, const char *);
 extern ide_startstop_t ata_error(struct ata_device *, struct request *rq, const char *);
 
 extern void ide_fixstring(char *s, const int bytecount, const int byteswap);
-
-extern int ide_wait_stat(ide_startstop_t *,
-		struct ata_device *, struct request *rq,
-		byte, byte, unsigned long);
-
 extern int ide_wait_noerr(struct ata_device *, byte, byte, unsigned long);
 
 /*
@@ -831,7 +828,11 @@ extern int drive_is_ready(struct ata_device *drive);
 
 extern void ata_select(struct ata_device *, unsigned long);
 extern void ata_mask(struct ata_device *);
+extern int ata_busy_poll(struct ata_device *, unsigned long);
 extern int ata_status(struct ata_device *, u8, u8);
+extern int ata_status_poll( struct ata_device *, u8, u8,
+		unsigned long, struct request *rq, ide_startstop_t *);
+
 extern int ata_irq_enable(struct ata_device *, int);
 extern void ata_reset(struct ata_channel *);
 extern void ata_out_regfile(struct ata_device *, struct hd_drive_task_hdr *);

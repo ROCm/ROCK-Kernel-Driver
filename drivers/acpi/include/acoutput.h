@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acoutput.h -- debug output
- *       $Revision: 86 $
+ *       $Revision: 87 $
  *
  *****************************************************************************/
 
@@ -105,6 +105,16 @@
 #define ACPI_LV_INTERRUPTS          0x08000000
 #define ACPI_LV_VERBOSITY3          0x0F000000 | ACPI_LV_VERBOSITY2
 
+/* Exceptionally verbose output -- also used in the global "Debug_level" */
+
+#define ACPI_LV_AML_DISASSEMBLE     0x10000000
+#define ACPI_LV_VERBOSE_INFO        0x20000000
+#define ACPI_LV_FULL_TABLES         0x40000000
+#define ACPI_LV_EVENTS              0x80000000
+
+#define ACPI_LV_VERBOSE             0xF0000000
+
+
 /*
  * Debug level macros that are used in the DEBUG_PRINT macros
  */
@@ -145,17 +155,7 @@
 #define ACPI_DB_MUTEX               ACPI_DEBUG_LEVEL (ACPI_LV_MUTEX)
 #define ACPI_DB_INIT                ACPI_DEBUG_LEVEL (ACPI_LV_INIT)
 
-#define ACPI_DB_ALL                 ACPI_DEBUG_LEVEL (0x0FFFFF80)
-
-
-/* Exceptionally verbose output -- also used in the global "Debug_level" */
-
-#define ACPI_DB_AML_DISASSEMBLE     0x10000000
-#define ACPI_DB_VERBOSE_INFO        0x20000000
-#define ACPI_DB_FULL_TABLES         0x40000000
-#define ACPI_DB_EVENTS              0x80000000
-
-#define ACPI_DB_VERBOSE             0xF0000000
+#define ACPI_DB_ALL                 ACPI_DEBUG_LEVEL (ACPI_LV_ALL)
 
 
 /* Defaults for Debug_level, debug and normal */

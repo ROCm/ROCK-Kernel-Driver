@@ -230,138 +230,19 @@ do {									\
 
 /*
  * Copy To/From Userspace
+ * 
+ * This relies on an optimized common worker function.
+ * 
+ * Could do special inline versions for small constant copies, but avoid this
+ * for now. It's not clear it is worth it. 
  */
 
-/* Generic arbitrary sized copy.  */
+extern unsigned long copy_user_generic(void *to, const void *from, unsigned len); 
 
-/* Could do 8byte accesses, instead of 4bytes. */ 
-
-/* Generic arbitrary sized copy.  */
-#define __copy_user(to,from,size)					\
-do {									\
-	long __d0, __d1;						\
-	__asm__ __volatile__(						\
-		"0:	rep; movsl\n"					\
-		"	movq %3,%0\n"					\
-		"1:	rep; movsb\n"					\
-		"2:\n"							\
-		".section .fixup,\"ax\"\n"				\
-		"3:	lea 0(%3,%0,4),%0\n"				\
-		"	jmp 2b\n"					\
-		".previous\n"						\
-		".section __ex_table,\"a\"\n"				\
-		"	.align 8\n"					\
-		"	.quad 0b,3b\n"					\
-		"	.quad 1b,2b\n"					\
-		".previous"						\
-		: "=&c"(size), "=&D" (__d0), "=&S" (__d1)		\
-		: "r"(size & 3), "0"(size / 4), "1"(to), "2"(from)	\
-		: "memory");						\
-} while (0)
-
-#define __copy_user_zeroing(to,from,size)				\
-do {									\
-	long __d0, __d1;						\
-	__asm__ __volatile__(						\
-		"0:	rep; movsl\n"					\
-		"	movq %3,%0\n"					\
-		"1:	rep; movsb\n"					\
-		"2:\n"							\
-		".section .fixup,\"ax\"\n"				\
-		"3:	lea 0(%3,%0,4),%0\n"				\
-		"4:	pushq %0\n"					\
-		"	pushq %%rax\n"					\
-		"	xorq %%rax,%%rax\n"				\
-		"	rep; stosb\n"					\
-		"	popq %%rax\n"					\
-		"	popq %0\n"					\
-		"	jmp 2b\n"					\
-		".previous\n"						\
-		".section __ex_table,\"a\"\n"				\
-		"	.align 8\n"					\
-		"	.quad 0b,3b\n"					\
-		"	.quad 1b,4b\n"					\
-		".previous"						\
-		: "=&c"(size), "=&D" (__d0), "=&S" (__d1)		\
-		: "r"(size & 3), "0"(size / 4), "1"(to), "2"(from)	\
-		: "memory");						\
-} while (0)
-
-
-/* We let the __ versions of copy_from/to_user inline, because they're often
- * used in fast paths and have only a small space overhead.
- */
-static inline unsigned long
-__generic_copy_from_user_nocheck(void *to, const void *from, unsigned long n)
-{
-	__copy_user_zeroing(to,from,n);
-	return n;
-}
-
-static inline unsigned long
-__generic_copy_to_user_nocheck(void *to, const void *from, unsigned long n)
-{
-	prefetch(from);
-	__copy_user(to,from,n);
-	return n;
-}
-
-
-
-unsigned long __generic_copy_to_user(void *, const void *, unsigned long);
-unsigned long __generic_copy_from_user(void *, const void *, unsigned long);
-
-static inline unsigned long
-__constant_copy_to_user(void *to, const void *from, unsigned long n)
-{
-	if (access_ok(VERIFY_WRITE, to, n))
-		__copy_user(to,from,n);
-	return n;
-}
-
-static inline unsigned long
-__constant_copy_from_user(void *to, const void *from, unsigned long n)
-{
-	if (access_ok(VERIFY_READ, from, n))
-		__copy_user_zeroing(to,from,n);
-	else
-		memset(to, 0, n);
-	return n;
-}
-
-static inline unsigned long
-__constant_copy_to_user_nocheck(void *to, const void *from, unsigned long n)
-{
-	__copy_user(to,from,n);
-	return n;
-}
-
-static inline unsigned long
-__constant_copy_from_user_nocheck(void *to, const void *from, unsigned long n)
-{
-	__copy_user_zeroing(to,from,n);
-	return n;
-}
-
-#define copy_to_user(to,from,n)				\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_to_user((to),(from),(n)) :	\
-	 __generic_copy_to_user((to),(from),(n)))
-
-#define copy_from_user(to,from,n)			\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_from_user((to),(from),(n)) :	\
-	 __generic_copy_from_user((to),(from),(n)))
-
-#define __copy_to_user(to,from,n)			\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_to_user_nocheck((to),(from),(n)) :	\
-	 __generic_copy_to_user_nocheck((to),(from),(n)))
-
-#define __copy_from_user(to,from,n)			\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_from_user_nocheck((to),(from),(n)) :	\
-	 __generic_copy_from_user_nocheck((to),(from),(n)))
+extern unsigned long copy_to_user(void *to, const void *from, unsigned len); 
+extern unsigned long copy_from_user(void *to, const void *from, unsigned len); 
+#define __copy_to_user copy_user_generic
+#define __copy_from_user copy_user_generic
 
 long strncpy_from_user(char *dst, const char *src, long count);
 long __strncpy_from_user(char *dst, const char *src, long count);

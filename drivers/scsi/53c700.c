@@ -51,6 +51,14 @@
 
 /* CHANGELOG
  *
+ * Version 2.8
+ *
+ * Fixed bad bug affecting tag starvation processing (previously the
+ * driver would hang the system if too many tags starved.  Also fixed
+ * bad bug having to do with 10 byte command processing and REQUEST
+ * SENSE (the command would loop forever getting a transfer length
+ * mismatch in the CMD phase).
+ *
  * Version 2.7
  *
  * Fixed scripts problem which caused certain devices (notably CDRWs)
@@ -104,7 +112,7 @@
  * Initial modularisation from the D700.  See NCR_D700.c for the rest of
  * the changelog.
  * */
-#define NCR_700_VERSION "2.7"
+#define NCR_700_VERSION "2.8"
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -674,21 +682,34 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 			print_sense("53c700", SCp);
 
 #endif
-			SCp->use_sg = SCp->cmnd[8];
+			/* restore the old result if the request sense was
+			 * successful */
 			if(result == 0)
 				result = SCp->cmnd[7];
+			/* now restore the original command */
+			memcpy((void *) SCp->cmnd, (void *) SCp->data_cmnd,
+			       sizeof(SCp->data_cmnd));
+			SCp->request_buffer = SCp->buffer;
+			SCp->request_bufflen = SCp->bufflen;
+			SCp->use_sg = SCp->old_use_sg;
+			SCp->cmd_len = SCp->old_cmd_len;
+			SCp->sc_data_direction = SCp->sc_old_data_direction;
+			SCp->underflow = SCp->old_underflow;
+			
 		}
 
 		free_slot(slot, hostdata);
-
-		SCp->host_scribble = NULL;
-		SCp->result = result;
-		SCp->scsi_done(SCp);
+#ifdef NCR_700_DEBUG
 		if(NCR_700_get_depth(SCp->device) == 0 ||
 		   NCR_700_get_depth(SCp->device) > NCR_700_MAX_TAGS)
 			printk(KERN_ERR "Invalid depth in NCR_700_scsi_done(): %d\n",
 			       NCR_700_get_depth(SCp->device));
+#endif /* NCR_700_DEBUG */
 		NCR_700_set_depth(SCp->device, NCR_700_get_depth(SCp->device) - 1);
+
+		SCp->host_scribble = NULL;
+		SCp->result = result;
+		SCp->scsi_done(SCp);
 	} else {
 		printk(KERN_ERR "53c700: SCSI DONE HAS NULL SCp\n");
 	}
@@ -1048,7 +1069,6 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				 * of the command */
 				SCp->cmnd[6] = NCR_700_INTERNAL_SENSE_MAGIC;
 				SCp->cmnd[7] = hostdata->status[0];
-				SCp->cmnd[8] = SCp->use_sg;
 				SCp->use_sg = 0;
 				SCp->sc_data_direction = SCSI_DATA_READ;
 				pci_dma_sync_single(hostdata->pci_dev,
@@ -1885,6 +1905,10 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 				printk(KERN_WARNING "scsi%d (%d:%d) Target is suffering from tag starvation.\n", SCp->host->host_no, SCp->target, SCp->lun);
 				NCR_700_set_flag(SCp->device, NCR_700_DEV_TAG_STARVATION_WARNED);
 			}
+			/* Release the slot and ajust the depth before refusing
+			 * the command */
+			free_slot(slot, hostdata);
+			NCR_700_set_depth(SCp->device, NCR_700_get_depth(SCp->device) - 1);
 			return 1;
 		}
 		slot->tag = SCp->device->current_tag++;

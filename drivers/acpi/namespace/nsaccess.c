@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 155 $
+ *              $Revision: 156 $
  *
  ******************************************************************************/
 
@@ -179,7 +179,7 @@ acpi_ns_root_initialize (void)
 
 			/* Store pointer to value descriptor in the Node */
 
-			status = acpi_ns_attach_object (new_node, obj_desc, obj_desc->common.type);
+			status = acpi_ns_attach_object (new_node, obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc));
 
 			/* Remove local reference to the object */
 

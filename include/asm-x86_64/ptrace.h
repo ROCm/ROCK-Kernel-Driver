@@ -85,6 +85,7 @@ struct pt_regs {
 #define user_mode(regs) (!!((regs)->cs & 3))
 #define instruction_pointer(regs) ((regs)->rip)
 extern void show_regs(struct pt_regs *);
+void signal_fault(struct pt_regs *regs, void *frame, char *where);
 
 enum {
         EF_CF   = 0x00000001,

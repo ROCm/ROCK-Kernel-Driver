@@ -450,7 +450,7 @@ jffs_create_control(struct super_block *sb)
 	DJM(no_hash++);
 	for (i = 0; i < c->hash_len; i++)
 		INIT_LIST_HEAD(&c->hash[i]);
-	if (!(c->fmc = jffs_build_begin(c, sb->s_dev))) {
+	if (!(c->fmc = jffs_build_begin(c, MINOR(sb->s_dev)))) {
 		goto fail_fminit;
 	}
 	c->next_ino = JFFS_MIN_INO + 1;
@@ -3148,7 +3148,7 @@ jffs_try_to_erase(struct jffs_control *c)
 		__u32 pos;
 		__u32 end;
 
-		pos = (__u32)flash_get_direct_pointer(c->sb->s_dev, offset);
+		pos = (__u32)flash_get_direct_pointer(to_kdev_t(c->sb->s_dev), offset);
 		end = pos + erase_size;
 
 		D2(printk("JFFS: Checking erased sector(s)...\n"));

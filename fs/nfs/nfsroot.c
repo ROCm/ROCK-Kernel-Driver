@@ -81,6 +81,7 @@
 #include <linux/major.h>
 #include <linux/utsname.h>
 #include <linux/inet.h>
+#include <linux/root_dev.h>
 #include <net/ipconfig.h>
 
 /* Define this to allow debugging output */
@@ -335,7 +336,7 @@ int __init root_nfs_init(void)
  */
 int __init nfs_root_setup(char *line)
 {
-	ROOT_DEV = mk_kdev(UNNAMED_MAJOR, 255);
+	ROOT_DEV = Root_NFS;
 	if (line[0] == '/' || line[0] == ',' || (line[0] >= '0' && line[0] <= '9')) {
 		strncpy(nfs_root_name, line, sizeof(nfs_root_name));
 		nfs_root_name[sizeof(nfs_root_name)-1] = '\0';

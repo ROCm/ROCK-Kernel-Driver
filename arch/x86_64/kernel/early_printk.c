@@ -94,15 +94,20 @@ static void early_serial_write(struct console *con, const char *s, unsigned n)
 
 static __init void early_serial_init(char *opt)
 {
-	static int bases[] = { 0x3f8, 0x2f8 };
 	unsigned char c; 
 	unsigned divisor, baud = 38400;
 	char *s, *e;
 
+	if (*opt == ',') 
+		++opt;
+
 	s = strsep(&opt, ","); 
 	if (s != NULL) { 
 		unsigned port; 
-		++s; 
+		if (!strncmp(s,"0x",2))
+			early_serial_base = simple_strtoul(s, &e, 16);
+		else {	
+			static int bases[] = { 0x3f8, 0x2f8 };
 		if (!strncmp(s,"ttyS",4)) 
 			s+=4; 
 		port = simple_strtoul(s, &e, 10); 
@@ -110,12 +115,11 @@ static __init void early_serial_init(char *opt)
 			port = 0; 
 		early_serial_base = bases[port];
 	}
+	}
 
-	c = inb(early_serial_base + LCR); 
-	outb(c & ~DLAB, early_serial_base + LCR); 
+	outb(0x3, early_serial_base + LCR); /* 8n1 */
 	outb(0, early_serial_base + IER); /* no interrupt */ 
 	outb(0, early_serial_base + FCR); /* no fifo */ 
-	outb(0x3, early_serial_base + LCR); /* 8n1 */
 	outb(0x3, early_serial_base + MCR); /* DTR + RTS */ 
 
 	s = strsep(&opt, ","); 
@@ -155,33 +159,55 @@ void early_printk(const char *fmt, ...)
 	va_end(ap); 
 } 
 
+static int keep_early; 
+
 int __init setup_early_printk(char *opt) 
 {  
-	if (early_console_initialized)
-		return;
-	early_console_initialized = 1;
+	char *space;
+	char buf[256]; 
 
-	if (!strncmp(opt, "serial", 6)) { 
-		early_serial_init(opt+7);
+	if (early_console_initialized)
+		return -1;
+
+	strncpy(buf,opt,256); 
+	buf[255] = 0; 
+	space = strchr(buf, ' '); 
+	if (space)
+		*space = 0; 
+
+	if (strstr(buf,"keep"))
+		keep_early = 1; 
+
+	if (!strncmp(buf, "serial", 6)) { 
+		early_serial_init(buf + 6);
 		early_console = &early_serial_console;
-	} else if (!strncmp(opt, "vga", 3))
+	} else if (!strncmp(buf, "vga", 3)) {
 		early_console = &early_vga_console; 
-	else
+	} else {
+		early_console = NULL; 		
 		return -1; 
+	}
+	early_console_initialized = 1;
 	register_console(early_console);       
 	return 0;
 }
 
 void __init disable_early_printk(void)
 { 
-	if (early_console_initialized) {
+	if (!early_console_initialized || !early_console)
+		return;
+	if (!keep_early) {
+		printk("disabling early console...\n"); 
 		unregister_console(early_console);
 		early_console_initialized = 0;
+	} else { 
+		printk("keeping early console.\n"); 
 	}
 } 
 
 /* syntax: earlyprintk=vga
            earlyprintk=serial[,ttySn[,baudrate]] 
+   Append ,keep to not disable it when the real console takes over.
    Only vga or serial at a time, not both.
    Currently only ttyS0 and ttyS1 are supported. 
    Interaction with the standard serial driver is not very good. 

@@ -14,7 +14,6 @@
 
 #include <asm/spitfire.h>
 #include <asm/asi.h>
-#include <asm/mmu_context.h>
 #include <asm/system.h>
 #include <asm/page.h>
 #include <asm/processor.h>
@@ -62,6 +61,8 @@
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
 #ifndef __ASSEMBLY__
+
+#include <linux/sched.h>
 
 /* Certain architectures need to do special things when pte's
  * within a page table are directly modified.  Thus, the following
@@ -286,6 +287,7 @@ extern pgd_t swapper_pg_dir[1];
 #define mmu_lockarea(vaddr, len)		(vaddr)
 #define mmu_unlockarea(vaddr, len)		do { } while(0)
 
+struct vm_area_struct;
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 /* Make a non-present pseudo-TTE. */

@@ -22,10 +22,8 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
-#include <linux/tty.h>
 #include <linux/personality.h>
 #include <linux/compiler.h>
-#include <linux/binfmts.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
@@ -86,7 +84,7 @@ struct rt_sigframe
 	char *pretcode;
 	struct ucontext uc;
 	struct siginfo info;
-	struct _fpstate fpstate __attribute__((aligned(8)));
+	struct _fpstate fpstate;
 };
 
 static int
@@ -126,6 +124,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, unsigned long *p
 	{
 		struct _fpstate * buf;
 		err |= __get_user(buf, &sc->fpstate);
+
 		if (buf) {
 			if (verify_area(VERIFY_READ, buf, sizeof(*buf)))
 				goto badframe;
@@ -147,10 +146,12 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 	stack_t st;
 	long eax;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (verify_area(VERIFY_READ, frame, sizeof(*frame))) { 
 		goto badframe;
-	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
+	} 
+	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set))) { 
 		goto badframe;
+	} 
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
@@ -158,15 +159,17 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	
-	if (restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
+	if (restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax)) { 
 		goto badframe;
+	} 
 
 #if DEBUG_SIG
 	printk("%d sigreturn rip:%lx rsp:%lx frame:%p rax:%lx\n",current->pid,regs.rip,regs.rsp,frame,eax);
 #endif
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
+	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st))) {
 		goto badframe;
+	} 
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
 	do_sigaltstack(&st, NULL, regs.rsp);
@@ -174,10 +177,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 	return eax;
 
 badframe:
-#if DEBUG_SIG
-	printk("%d bad frame %p\n",current->pid,frame);
-#endif
-	force_sig(SIGSEGV, current);
+	signal_fault(&regs,frame,"sigreturn");
 	return 0;
 }	
 
@@ -233,8 +233,8 @@ setup_sigcontext(struct sigcontext *sc, struct _fpstate *fpstate,
 /*
  * Determine which stack to use..
  */
-static inline void *
-get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
+static inline struct rt_sigframe *
+get_sigframe(struct k_sigaction *ka, struct pt_regs * regs)
 {
 	unsigned long rsp;
 
@@ -247,15 +247,10 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 			rsp = current->sas_ss_sp + current->sas_ss_size;
 	}
 
-	{ 
-		extern void bad_sigframe(void); 
-		/* beginning of sigframe is 8 bytes misaligned, but fpstate
-		   must end up on a 16byte boundary */ 
-		if ((offsetof(struct rt_sigframe, fpstate) & 16) != 0) 
-			bad_sigframe(); 		
-	} 
+	rsp = (rsp - sizeof(struct _fpstate)) & ~(15UL); 
+	rsp -= offsetof(struct rt_sigframe, fpstate);
 
-	return (void *)((rsp - frame_size) & ~(15UL)) - 8;
+	return (struct rt_sigframe *) rsp; 
 }
 
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
@@ -264,15 +259,16 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	struct rt_sigframe *frame;
 	int err = 0;
 
-	frame = get_sigframe(ka, regs, sizeof(*frame));
+	frame = get_sigframe(ka, regs);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
 	if (ka->sa.sa_flags & SA_SIGINFO) { 
 		err |= copy_siginfo_to_user(&frame->info, info);
-		if (err)
+		if (err) { 
 			goto give_sigsegv;
+	}
 	}
 		
 	/* Create the ucontext.  */
@@ -285,9 +281,10 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	err |= setup_sigcontext(&frame->uc.uc_mcontext, &frame->fpstate,
 			        regs, set->sig[0]);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
-	if (err)
-		goto give_sigsegv;
 
+	if (err) { 
+		goto give_sigsegv;
+	} 
 
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
@@ -299,8 +296,10 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv; 
 	}
 
-	if (err)
+	if (err) { 
+		printk("fault 3\n"); 
 		goto give_sigsegv;
+	} 
 
 #if DEBUG_SIG
 	printk("%d old rip %lx old rsp %lx old rax %lx\n", current->pid,regs->rip,regs->rsp,regs->rax);
@@ -337,7 +336,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 give_sigsegv:
 	if (sig == SIGSEGV)
 		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	signal_fault(regs,frame,"signal setup");
 }
 
 /*
@@ -459,3 +458,15 @@ void do_notify_resume(struct pt_regs *regs, sigset_t *oldset, __u32 thread_info_
 	if (thread_info_flags & _TIF_SIGPENDING)
 		do_signal(regs,oldset);
 }
+
+extern int exception_trace;
+
+void signal_fault(struct pt_regs *regs, void *frame, char *where)
+{ 
+	struct task_struct *me = current; 
+	if (exception_trace)
+		printk("%s[%d] bad frame in %s frame:%p rip:%lx rsp:%lx orax:%lx\n",
+	       me->comm,me->pid,where,frame,regs->rip,regs->rsp,regs->orig_rax); 
+
+	force_sig(SIGSEGV, me); 
+} 

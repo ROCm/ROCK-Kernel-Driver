@@ -430,7 +430,7 @@ void ide_unregister(struct ata_channel *ch)
 		struct ata_device *drive = &ch->drives[i];
 
 		if (drive->de) {
-			devfs_unregister (drive->de);
+			devfs_unregister(drive->de);
 			drive->de = NULL;
 		}
 		if (!drive->present)
@@ -1246,7 +1246,7 @@ static int ata_sys_notify(struct notifier_block *this, unsigned long event, void
 			return NOTIFY_DONE;
 	}
 
-	printk("flushing ide devices: ");
+	printk(KERN_INFO "flushing ATA/ATAPI devices: ");
 
 	for (i = 0; i < MAX_HWIFS; i++) {
 		int unit;
@@ -1264,9 +1264,10 @@ static int ata_sys_notify(struct notifier_block *this, unsigned long event, void
 			/* set the drive to standby */
 			printk("%s ", drive->name);
 			if (ata_ops(drive)) {
-				if (event != SYS_RESTART)
+				if (event != SYS_RESTART) {
 					if (ata_ops(drive)->standby && ata_ops(drive)->standby(drive))
 						continue;
+				}
 
 				if (ata_ops(drive)->cleanup)
 					ata_ops(drive)->cleanup(drive);
@@ -1290,8 +1291,7 @@ static int __init ata_module_init(void)
 {
 	printk(KERN_INFO "ATA/ATAPI device driver v" VERSION "\n");
 
-	ide_devfs_handle = devfs_mk_dir(NULL, "ata", NULL);
-	devfs_mk_symlink(NULL, "ide", DEVFS_FL_DEFAULT, "ata", NULL, NULL);
+	ide_devfs_handle = devfs_mk_dir(NULL, "ide", NULL);
 
 	/*
 	 * Because most of the ATA adapters represent the timings in unit of

@@ -31,6 +31,7 @@
 #include <linux/bootmem.h>
 #include <linux/pci.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/blk.h>
@@ -608,7 +609,7 @@ setup_arch(char **cmdline_p)
 #endif
 
 	/* Default root filesystem to sda2.  */
-	ROOT_DEV = to_kdev_t(0x0802);
+	ROOT_DEV = Root_SDA2;
 
  	/*
 	 * Check ASN in HWRPB for validity, report if bad.

@@ -26,6 +26,7 @@
 #include <linux/console.h>
 #include <linux/irq.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -174,10 +175,10 @@ void __init gemini_setup_arch(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* bootable off CDROM */
 	if (initrd_start)
-		ROOT_DEV = MKDEV(SCSI_CDROM_MAJOR, 0);
+		ROOT_DEV = Root_SR0;
 	else
 #endif
-		ROOT_DEV = to_kdev_t(0x0801);
+		ROOT_DEV = Root_SDA1;
 
 	/* nothing but serial consoles... */
 	sprintf(cmd_line, "%s console=ttyS0", cmd_line);

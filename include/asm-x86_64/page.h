@@ -9,23 +9,18 @@
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
 #endif
 #define PAGE_MASK	(~(PAGE_SIZE-1))
+#define PHYSICAL_PAGE_MASK	(~(PAGE_SIZE-1) & (__PHYSICAL_MASK << PAGE_SHIFT))
 #define THREAD_SIZE (2*PAGE_SIZE)
 #define CURRENT_MASK (~(THREAD_SIZE-1))
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-#if 0 
-#include <asm/mmx.h>
-#define clear_page(page)	mmx_clear_page((void *)(page))
-#define copy_page(to,from)	mmx_copy_page(to,from)
-#else
-#define clear_page(page)	memset((void *)(page), 0, PAGE_SIZE)
-#define copy_page(to,from)	memcpy((void *)(to), (void *)(from), PAGE_SIZE)
-#endif
+void clear_page(void *);
+void copy_page(void *, void *);
 
-#define clear_user_page(page, vaddr)	clear_page(page)
-#define copy_user_page(to, from, vaddr)	copy_page(to, from)
+#define clear_user_page(page, vaddr, pg)	clear_page(page)
+#define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 
 /*
  * These are used to make use of C type-checking..
@@ -34,7 +29,7 @@ typedef struct { unsigned long pte; } pte_t;
 typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long pml4; } pml4_t;
-#define PTE_MASK	PAGE_MASK
+#define PTE_MASK	PHYSICAL_PAGE_MASK
 
 typedef struct { unsigned long pgprot; } pgprot_t;
 
@@ -59,8 +54,11 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define __START_KERNEL		0xffffffff80100000
 #define __START_KERNEL_map	0xffffffff80000000
 #define __PAGE_OFFSET           0x0000010000000000
+#define __PHYSICAL_MASK		0x000000ffffffffff
 
 #ifndef __ASSEMBLY__
+
+#include <linux/stringify.h>
 
 /*
  * Tell the user there is some problem.  The exception handler decodes this frame.
@@ -70,7 +68,9 @@ struct bug_frame {
 	char *filename;    /* should use 32bit offset instead, but the assembler doesn't like it */ 
 	unsigned short line; 
 } __attribute__((packed)); 
-#define BUG() asm volatile("ud2 ; .quad %c1 ; .short %c0" :: "i"(__LINE__), "i" (__FILE__))
+#define BUG() \
+	asm volatile("ud2 ; .quad %c1 ; .short %c0" :: \
+		     "i"(__LINE__), "i" (__stringify(KBUILD_BASENAME)))
 #define PAGE_BUG(page) BUG()
 void out_of_line_bug(void);
 
@@ -103,8 +103,11 @@ extern __inline__ int get_order(unsigned long size)
 	  __pa(v); })
 
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+#define pfn_to_page(pfn)	(mem_map + (pfn))
+#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#define pfn_valid(pfn)		((pfn) < max_mapnr)
+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 
 #define VM_DATA_DEFAULT_FLAGS  (VM_READ | VM_WRITE | VM_EXEC | \

@@ -556,7 +556,7 @@ static void cdrom_end_request(struct ata_device *drive, struct request *rq, int 
 	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
 		uptodate = 1;
 
-	ide_end_request(drive, rq, uptodate);
+	ata_end_request(drive, rq, uptodate);
 }
 
 
@@ -734,7 +734,7 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 	struct cdrom_info *info = drive->driver_data;
 
 	/* Wait for the controller to be idle. */
-	if (ide_wait_stat(&startstop, drive, rq, 0, BUSY_STAT, WAIT_READY))
+	if (ata_status_poll(drive, 0, BUSY_STAT, WAIT_READY, rq, &startstop))
 		return startstop;
 
 	spin_lock_irqsave(ch->lock, flags);
@@ -798,7 +798,8 @@ static ide_startstop_t cdrom_transfer_packet_command(struct ata_device *drive,
 			return startstop;
 	} else {
 		/* Otherwise, we must wait for DRQ to get set. */
-		if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY))
+		if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+					WAIT_READY, rq, &startstop))
 			return startstop;
 	}
 
@@ -926,7 +927,14 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 
 	if (dma) {
 		if (!dma_error) {
-			__ide_end_request(drive, rq, 1, rq->nr_sectors);
+			/* FIXME: this locking should encompass the above register
+			 * file access too.
+			 */
+
+			spin_lock_irqsave(ch->lock, flags);
+			__ata_end_request(drive, rq, 1, rq->nr_sectors);
+			spin_unlock_irqrestore(ch->lock, flags);
+
 			return ide_stopped;
 		} else
 			return ata_error(drive, rq, "dma error");
@@ -1518,7 +1526,14 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 		if (dma_error)
 			return ata_error(drive, rq, "dma error");
 
-		__ide_end_request(drive, rq, 1, rq->nr_sectors);
+		/* FIXME: this locking should encompass the above register
+		 * file access too.
+		 */
+
+		spin_lock_irqsave(ch->lock, flags);
+		__ata_end_request(drive, rq, 1, rq->nr_sectors);
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		return ide_stopped;
 	}
 

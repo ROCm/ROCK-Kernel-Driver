@@ -16,12 +16,12 @@
 #include <asm/smp.h>
 #include <asm/io_apic.h>
 
-#include "pci-x86_64.h"
+#include "pci.h"
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100
 
-int pci_use_acpi_routing = 0;
+int broken_hp_bios_irq9;
 
 static struct irq_routing_table *pirq_table;
 
@@ -43,6 +43,8 @@ struct irq_router {
 	int (*get)(struct pci_dev *router, struct pci_dev *dev, int pirq);
 	int (*set)(struct pci_dev *router, struct pci_dev *dev, int pirq, int new);
 };
+
+int (*pcibios_enable_irq)(struct pci_dev *dev) = NULL;
 
 /*
  *  Search 0xf0000 -- 0xfffff for the PCI IRQ Routing Table.
@@ -77,9 +79,6 @@ static struct irq_routing_table * __init pirq_find_routing_table(void)
  *  If we have a IRQ routing table, use it to search for peer host
  *  bridges.  It's a gross hack, but since there are no other known
  *  ways how to get a list of buses, we have to go this way.
- *
- *  [maybe x86-64 architecture should define way to query this info in
- more reasonable way?]
  */
 
 static void __init pirq_peer_trick(void)
@@ -117,7 +116,7 @@ static void __init pirq_peer_trick(void)
  *  Code for querying and setting of IRQ routes on various interrupt routers.
  */
 
-static void eisa_set_level_irq(unsigned int irq)
+void eisa_set_level_irq(unsigned int irq)
 {
 	unsigned char mask = 1 << (irq & 7);
 	unsigned int port = 0x4d0 + (irq >> 3);
@@ -177,24 +176,6 @@ static int pirq_ali_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
 }
 
 /*
- * The Intel PIIX4 pirq rules are fairly simple: "pirq" is
- * just a pointer to the config space.
- */
-static int pirq_piix_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
-{
-	u8 x;
-
-	pci_read_config_byte(router, pirq, &x);
-	return (x < 16) ? x : 0;
-}
-
-static int pirq_piix_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	pci_write_config_byte(router, pirq, irq);
-	return 1;
-}
-
-/*
  * The VIA pirq rules are nibble-based, like ALI,
  * but without the ugly irq number munging.
  */
@@ -206,35 +187,6 @@ static int pirq_via_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 static int pirq_via_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
 	write_config_nybble(router, 0x55, pirq, irq);
-	return 1;
-}
-
-/*
- * OPTI: high four bits are nibble pointer..
- * I wonder what the low bits do?
- */
-static int pirq_opti_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
-{
-	return read_config_nybble(router, 0xb8, pirq >> 4);
-}
-
-static int pirq_opti_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	write_config_nybble(router, 0xb8, pirq >> 4, irq);
-	return 1;
-}
-
-/*
- * Cyrix: nibble offset 0x5C
- */
-static int pirq_cyrix_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
-{
-	return read_config_nybble(router, 0x5C, pirq-1);
-}
-
-static int pirq_cyrix_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	write_config_nybble(router, 0x5C, pirq-1, irq);
 	return 1;
 }
 
@@ -290,7 +242,7 @@ static int pirq_sis_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 		case 0x43:
 		case 0x44:
 		case 0x62:
-	pci_read_config_byte(router, reg, &x);
+			pci_read_config_byte(router, reg, &x);
 			if (reg != 0x62)
 				break;
 			if (!(x & 0x40))
@@ -344,57 +296,7 @@ static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
 	return 1;
 }
 
-/*
- * VLSI: nibble offset 0x74 - educated guess due to routing table and
- *       config space of VLSI 82C534 PCI-bridge/router (1004:0102)
- *       Tested on HP OmniBook 800 covering PIRQ 1, 2, 4, 8 for onboard
- *       devices, PIRQ 3 for non-pci(!) soundchip and (untested) PIRQ 6
- *       for the busbridge to the docking station.
- */
-
-static int pirq_vlsi_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
-{
-	if (pirq > 8) {
-		printk(KERN_INFO "VLSI router pirq escape (%d)\n", pirq);
-		return 0;
-	}
-	return read_config_nybble(router, 0x74, pirq-1);
-}
-
-static int pirq_vlsi_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	if (pirq > 8) {
-		printk(KERN_INFO "VLSI router pirq escape (%d)\n", pirq);
-		return 0;
-	}
-	write_config_nybble(router, 0x74, pirq-1, irq);
-	return 1;
-}
-
-/*
- * ServerWorks: PCI interrupts mapped to system IRQ lines through Index
- * and Redirect I/O registers (0x0c00 and 0x0c01).  The Index register
- * format is (PCIIRQ## | 0x10), e.g.: PCIIRQ10=0x1a.  The Redirect
- * register is a straight binary coding of desired PIC IRQ (low nibble).
- *
- * The 'link' value in the PIRQ table is already in the correct format
- * for the Index register.  There are some special index values:
- * 0x00 for ACPI (SCI), 0x01 for USB, 0x02 for IDE0, 0x04 for IDE1,
- * and 0x03 for SMBus.
- */
-static int pirq_serverworks_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
-{
-	outb_p(pirq, 0xc00);
-	return inb(0xc01) & 0xf;
-}
-
-static int pirq_serverworks_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	outb_p(pirq, 0xc00);
-	outb_p(irq, 0xc01);
-	return 1;
-}
-
+#if 0 /* kept as reference */
 /* Support for AMD756 PCI IRQ Routing
  * Jhon H. Caicedo <jhcaiced@osso.org.co>
  * Jun/21/2001 0.2.0 Release, fixed to use "nybble" functions... (jhcaiced)
@@ -402,6 +304,8 @@ static int pirq_serverworks_set(struct pci_dev *router, struct pci_dev *dev, int
  * The AMD756 pirq rules are nibble-based
  * offset 0x56 0-3 PIRQA  4-7  PIRQB
  * offset 0x57 0-3 PIRQC  4-7  PIRQD
+ *
+ * AMD8111 is similar NIY.
  */
 static int pirq_amd756_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
@@ -426,47 +330,13 @@ static int pirq_amd756_set(struct pci_dev *router, struct pci_dev *dev, int pirq
 	}
 	return 1;
 }
-
-#ifdef CONFIG_PCI_BIOS
-
-static int pirq_bios_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	struct pci_dev *bridge;
-	int pin = pci_get_interrupt_pin(dev, &bridge);
-	return pcibios_set_irq_routing(bridge, pin, irq);
-}
-
-static struct irq_router pirq_bios_router =
-	{ "BIOS", 0, 0, NULL, pirq_bios_set };
-
 #endif
 
 static struct irq_router pirq_routers[] = {
-	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_0, pirq_piix_get, pirq_piix_set },
-	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_0, pirq_piix_get, pirq_piix_set },
-	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_0, pirq_piix_get, pirq_piix_set },
-	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371MX,   pirq_piix_get, pirq_piix_set },
-	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443MX_0, pirq_piix_get, pirq_piix_set },
-	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_0, pirq_piix_get, pirq_piix_set },
-
-	{ "ALI", PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533, pirq_ali_get, pirq_ali_set },
-
 	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_0, pirq_via_get, pirq_via_set },
 	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C596, pirq_via_get, pirq_via_set },
 	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686, pirq_via_get, pirq_via_set },
-
-	{ "OPTI", PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C700, pirq_opti_get, pirq_opti_set },
-
-	{ "NatSemi", PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5520, pirq_cyrix_get, pirq_cyrix_set },
 	{ "SIS", PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_503, pirq_sis_get, pirq_sis_set },
-	{ "VLSI 82C534", PCI_VENDOR_ID_VLSI, PCI_DEVICE_ID_VLSI_82C534, pirq_vlsi_get, pirq_vlsi_set },
-	{ "ServerWorks", PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4,
-	  pirq_serverworks_get, pirq_serverworks_set },
-	{ "ServerWorks", PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5,
-	  pirq_serverworks_get, pirq_serverworks_set },
-	{ "AMD756 VIPER", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_740B,
-		pirq_amd756_get, pirq_amd756_set },
-
 	{ "default", 0, 0, NULL, NULL }
 };
 
@@ -506,7 +376,7 @@ static void __init pirq_find_router(void)
 		}
 		/* Match against router device entry? Use it as a fallback */
 		if (r->vendor == pirq_router_dev->vendor && r->device == pirq_router_dev->device) {
-	pirq_router = r;
+			pirq_router = r;
 		}
 	}
 	printk(KERN_INFO "PCI: Using IRQ router %s [%04x/%04x] at %s\n",
@@ -532,54 +402,6 @@ static void pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs
 {
 }
 
-#ifdef CONFIG_ACPI_PCI
-
-static int acpi_lookup_irq (
-	struct pci_dev		*dev,
-	u8			pin,
-	int			assign)
-{
-	int			result = 0;
-	int			irq = 0;
-
-	/* TBD: Select IRQ from possible to improve routing performance. */
-
-	result = acpi_prt_get_irq(dev, pin, &irq);
-	if (!irq)
-		result = -ENODEV;
-	if (0 != result) {
-		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s\n",
-		       'A'+pin, dev->slot_name);
-		return result;
-	}
-
-	dev->irq = irq;
-
-	if (!assign) {
-		/* only check for the IRQ */
-		printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", irq, 
-		       dev->slot_name);
-		return 1;
-	}
-
-	/* also assign an IRQ */
-	if (irq && (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
-		result = acpi_prt_set_irq(dev, pin, irq);
-		if (0 != result) {
-			printk(KERN_WARNING "PCI: Could not assign IRQ %d to device %s\n", irq, dev->slot_name);
-			return result;
-		}
-
-		eisa_set_level_irq(irq);
-
-		printk(KERN_INFO "PCI: Assigned IRQ %d for device %s\n", irq, dev->slot_name);
-	}
-
-	return 1;
-}
-
-#endif /* CONFIG_ACPI_PCI */
-
 static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 {
 	u8 pin;
@@ -598,12 +420,6 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		return 0;
 	}
 	pin = pin - 1;
-	
-#ifdef CONFIG_ACPI_PCI
-	/* Use ACPI to lookup IRQ */
-	if (pci_use_acpi_routing)
-		return acpi_lookup_irq(dev, pin, assign);
-#endif
 
 	/* Find IRQ routing entry */
 
@@ -624,6 +440,15 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	}
 	DBG(" -> PIRQ %02x, mask %04x, excl %04x", pirq, mask, pirq_table->exclusive_irqs);
 	mask &= pcibios_irq_mask;
+
+	/* Work around broken HP Pavilion Notebooks which assign USB to
+	   IRQ 9 even though it is actually wired to IRQ 11 */
+
+	if (broken_hp_bios_irq9 && pirq == 0x59 && dev->irq == 9) {
+		dev->irq = 11;
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, 11);
+		r->set(pirq_router_dev, dev, pirq, 11);
+	}
 
 	/*
 	 * Find the best IRQ to assign: use the one
@@ -703,28 +528,15 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	return 1;
 }
 
-void __init pcibios_irq_init(void)
+static int __init pcibios_irq_init(void)
 {
 	DBG("PCI: IRQ init\n");
 
-#ifdef CONFIG_ACPI_PCI
-	if (!(pci_probe & PCI_NO_ACPI_ROUTING)) {
-		if (acpi_prts.count) {
-			printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
-			pci_use_acpi_routing = 1;
-			return;
-		}
-		else
-			printk(KERN_WARNING "PCI: Invalid ACPI-PCI IRQ routing table\n");
-	}
-#endif
+	if (pcibios_enable_irq)
+		return 0;
 
 	pirq_table = pirq_find_routing_table();
 
-#ifdef CONFIG_PCI_BIOS
-	if (!pirq_table && (pci_probe & PCI_BIOS_IRQ_SCAN))
-		pirq_table = pcibios_get_irq_routing_table();
-#endif
 	if (pirq_table) {
 		pirq_peer_trick();
 		pirq_find_router();
@@ -738,7 +550,14 @@ void __init pcibios_irq_init(void)
 		if (io_apic_assign_pci_irqs)
 			pirq_table = NULL;
 	}
+
+	pcibios_enable_irq = pirq_enable_irq;
+
+	pcibios_fixup_irqs();
+	return 0;
 }
+
+subsys_initcall(pcibios_irq_init);
 
 void __init pcibios_fixup_irqs(void)
 {
@@ -815,19 +634,19 @@ void pcibios_penalize_isa_irq(int irq)
 	pirq_penalty[irq] += 100;
 }
 
-void pcibios_enable_irq(struct pci_dev *dev)
+int pirq_enable_irq(struct pci_dev *dev)
 {
-		u8 pin;
-		pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
+	u8 pin;
+	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 	if (pin && !pcibios_lookup_irq(dev, 1) && !dev->irq) {
-			char *msg;
-			if (io_apic_assign_pci_irqs)
-				msg = " Probably buggy MP table.";
-			else if (pci_probe & PCI_BIOS_IRQ_SCAN)
-				msg = "";
-			else
-				msg = " Please try using pci=biosirq.";
-			printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.%s\n",
-			       'A' + pin - 1, dev->slot_name, msg);
+		char *msg;
+		if (io_apic_assign_pci_irqs)
+			msg = " Probably buggy MP table.";
+		else
+			msg = "";
+		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.%s\n",
+		       'A' + pin - 1, dev->slot_name, msg);
 	}
+
+	return 0;
 }

@@ -194,20 +194,24 @@ static void keyspan_pda_wakeup_write( struct usb_serial_port *port )
 
 static void keyspan_pda_request_unthrottle( struct usb_serial *serial )
 {
+	int result;
 
 	dbg(" request_unthrottle");
 	/* ask the device to tell us when the tx buffer becomes
 	   sufficiently empty */
-	usb_control_msg(serial->dev, 
-			     usb_sndctrlpipe(serial->dev, 0),
-			     7, /* request_unthrottle */
-			     USB_TYPE_VENDOR | USB_RECIP_INTERFACE
-			     | USB_DIR_OUT,
-			     16, /* value: threshold */
-			     0, /* index */
-			     NULL,
-			     0,
-			     2*HZ);
+	result = usb_control_msg(serial->dev, 
+				 usb_sndctrlpipe(serial->dev, 0),
+				 7, /* request_unthrottle */
+				 USB_TYPE_VENDOR | USB_RECIP_INTERFACE
+				 | USB_DIR_OUT,
+				 16, /* value: threshold */
+				 0, /* index */
+				 NULL,
+				 0,
+				 2*HZ);
+	if (result < 0)
+		dbg("%s - error %d from usb_control_msg", 
+		    __FUNCTION__, result);
 }
 
 
@@ -334,14 +338,19 @@ static void keyspan_pda_break_ctl (struct usb_serial_port *port, int break_state
 {
 	struct usb_serial *serial = port->serial;
 	int value;
+	int result;
+
 	if (break_state == -1)
 		value = 1; /* start break */
 	else
 		value = 0; /* clear break */
-	usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
-			4, /* set break */
-			USB_TYPE_VENDOR | USB_RECIP_INTERFACE | USB_DIR_OUT,
-			value, 0, NULL, 0, 2*HZ);
+	result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+				4, /* set break */
+				USB_TYPE_VENDOR | USB_RECIP_INTERFACE | USB_DIR_OUT,
+				value, 0, NULL, 0, 2*HZ);
+	if (result < 0)
+		dbg("%s - error %d from usb_control_msg", 
+		    __FUNCTION__, result);
 	/* there is something funky about this.. the TCSBRK that 'cu' performs
 	   ought to translate into a break_ctl(-1),break_ctl(0) pair HZ/4
 	   seconds apart, but it feels like the break sent isn't as long as it

@@ -14,6 +14,7 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
+#include <linux/personality.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -22,7 +23,7 @@
  * sys_pipe() is the normal C calling standard for creating
  * a pipe. It's not the way Unix traditionally does this, though.
  */
-asmlinkage long sys_pipe(unsigned long * fildes)
+asmlinkage long sys_pipe(int *fildes)
 {
 	int fd[2];
 	int error;
@@ -93,18 +94,15 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 	}
 }
 
-/*
- * Old cruft
- */
-asmlinkage long sys_uname(struct old_utsname * name)
+asmlinkage long sys_uname(struct new_utsname * name)
 {
 	int err;
-	if (!name)
-		return -EFAULT;
 	down_read(&uts_sem);
-	err=copy_to_user(name, &system_utsname, sizeof (*name));
+	err = copy_to_user(name, &system_utsname, sizeof (*name));
 	up_read(&uts_sem);
-	return err?-EFAULT:0;
+	if (current->personality == PER_LINUX32) 
+		err |= copy_to_user(&name->machine, "i386", 5); 		
+	return err ? -EFAULT : 0;
 }
 
 asmlinkage long sys_pause(void)

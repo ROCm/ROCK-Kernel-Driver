@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 114 $
+ *              $Revision: 116 $
  *
  ******************************************************************************/
 
@@ -40,12 +40,12 @@
  * FUNCTION:    Acpi_ns_evaluate_relative
  *
  * PARAMETERS:  Handle              - The relative containing object
- *              *Pathname           - Name of method to execute, If NULL, the
+ *              Pathname            - Name of method to execute, If NULL, the
  *                                    handle is the object to execute
- *              **Params            - List of parameters to pass to the method,
+ *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
- *              *Return_object      - Where to put method's return value (if
+ *              Return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *
  * RETURN:      Status
@@ -141,9 +141,9 @@ cleanup:
  * FUNCTION:    Acpi_ns_evaluate_by_name
  *
  * PARAMETERS:  Pathname            - Fully qualified pathname to the object
- *              *Return_object      - Where to put method's return value (if
+ *              Return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
- *              **Params            - List of parameters to pass to the method,
+ *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
  *
@@ -226,10 +226,10 @@ cleanup:
  * FUNCTION:    Acpi_ns_evaluate_by_handle
  *
  * PARAMETERS:  Handle              - Method Node to execute
- *              **Params            - List of parameters to pass to the method,
+ *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
- *              *Return_object      - Where to put method's return value (if
+ *              Return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *
  * RETURN:      Status
@@ -285,7 +285,6 @@ acpi_ns_evaluate_by_handle (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-
 	/*
 	 * Two major cases here:
 	 * 1) The object is an actual control method -- execute it.
@@ -302,7 +301,6 @@ acpi_ns_evaluate_by_handle (
 		status = acpi_ns_execute_control_method (node, params,
 				 &local_return_object);
 	}
-
 	else {
 		/*
 		 * Case 2) Object is NOT a method, just return its
@@ -310,7 +308,6 @@ acpi_ns_evaluate_by_handle (
 		 */
 		status = acpi_ns_get_object_value (node, &local_return_object);
 	}
-
 
 	/*
 	 * Check if there is a return value on the stack that must
@@ -348,11 +345,11 @@ acpi_ns_evaluate_by_handle (
  *
  * FUNCTION:    Acpi_ns_execute_control_method
  *
- * PARAMETERS:  Method_node     - The object/method
- *              **Params            - List of parameters to pass to the method,
+ * PARAMETERS:  Method_node         - The method to execute
+ *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
- *              **Return_obj_desc   - List of result objects to be returned
+ *              Return_obj_desc     - List of result objects to be returned
  *                                    from the method.
  *
  * RETURN:      Status
@@ -424,7 +421,8 @@ acpi_ns_execute_control_method (
  *
  * FUNCTION:    Acpi_ns_get_object_value
  *
- * PARAMETERS:  Node         - The object
+ * PARAMETERS:  Node                - The object
+ *              Return_obj_desc     - Where the objects value is returned
  *
  * RETURN:      Status
  *

@@ -6,6 +6,9 @@
  * Copyright (C) 1997,1998 Jakub Jelinek   (jj@ultra.linux.cz)
  */
 
+#include <asm/pgtable.h>
+#include <asm/mmu_context.h>
+
 /* %g1	TLB_SFSR	(%g1 + %g1 == TLB_TAG_ACCESS)
  * %g2	(KERN_HIGHBITS | KERN_LOWBITS)
  * %g3  VPTE base	(0xfffffffe00000000)	Spitfire/Blackbird (44-bit VA space)

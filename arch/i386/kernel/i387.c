@@ -357,14 +357,14 @@ static inline int restore_i387_fsave( struct _fpstate *buf )
 
 static inline int restore_i387_fxsave( struct _fpstate *buf )
 {
+	int err;
 	struct task_struct *tsk = current;
 	clear_fpu( tsk );
-	if ( __copy_from_user( &tsk->thread.i387.fxsave, &buf->_fxsr_env[0],
-			       sizeof(struct i387_fxsave_struct) ) )
-		return 1;
+	err = __copy_from_user( &tsk->thread.i387.fxsave, &buf->_fxsr_env[0],
+				sizeof(struct i387_fxsave_struct) );
 	/* mxcsr bit 6 and 31-16 must be zero for security reasons */
 	tsk->thread.i387.fxsave.mxcsr &= 0xffbf;
-	return convert_fxsr_from_user( &tsk->thread.i387.fxsave, buf );
+	return err ? 1 : convert_fxsr_from_user( &tsk->thread.i387.fxsave, buf );
 }
 
 int restore_i387( struct _fpstate *buf )

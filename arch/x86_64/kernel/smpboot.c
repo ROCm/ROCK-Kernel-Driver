@@ -50,9 +50,6 @@
 #include <asm/kdebug.h>
 #include <asm/tlbflush.h>
 
-/* Set if we find a B stepping CPU			*/
-static int smp_b_stepping;
-
 /* Setup configured maximum number of CPUs to activate */
 static int max_cpus = -1;
 
@@ -151,17 +148,6 @@ void __init smp_store_cpu_info(int id)
 
 	*c = boot_cpu_data;
 	identify_cpu(c);
-	/*
-	 * Mask B, Pentium, but not Pentium MMX
-	 */
-	if (c->x86_vendor == X86_VENDOR_INTEL &&
-	    c->x86 == 5 &&
-	    c->x86_mask >= 1 && c->x86_mask <= 4 &&
-	    c->x86_model <= 3)
-		/*
-		 * Remember we have B step Pentia with bugs
-		 */
-		smp_b_stepping = 1;
 }
 
 /*
@@ -772,7 +758,7 @@ unsigned long cache_decay_ticks;
 static void smp_tune_scheduling (void)
 {
 	unsigned long cachesize;       /* kB   */
-	unsigned long bandwidth = 350; /* MB/s */
+	unsigned long bandwidth = 1000; /* MB/s */
 	/*
 	 * Rough estimation for SMP scheduling, this is the number of
 	 * cycles it takes for a fully memory-limited process to flush
@@ -883,8 +869,7 @@ void __init smp_boot_cpus(void)
 	/*
 	 * If we couldn't find a local APIC, then get out of here now!
 	 */
-	if (APIC_INTEGRATED(apic_version[boot_cpu_id]) &&
-	    !test_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability)) {
+	if (APIC_INTEGRATED(apic_version[boot_cpu_id]) && !cpu_has_apic) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_id);
 		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
@@ -965,7 +950,7 @@ void __init smp_boot_cpus(void)
 
 	Dprintk("Before bogomips.\n");
 	if (!cpucount) {
-		printk(KERN_ERR "Error: only one processor found.\n");
+		printk(KERN_INFO "Only one processor found.\n");
 	} else {
 		unsigned long bogosum = 0;
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
@@ -979,8 +964,6 @@ void __init smp_boot_cpus(void)
 	}
 	smp_num_cpus = cpucount + 1;
 
-	if (smp_b_stepping)
-		printk(KERN_WARNING "WARNING: SMP operation may be unreliable with B stepping processors.\n");
 	Dprintk("Boot done.\n");
 
 	/*

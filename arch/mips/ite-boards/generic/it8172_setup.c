@@ -34,6 +34,7 @@
 #include <linux/console.h>
 #include <linux/mc146818rtc.h>
 #include <linux/serial_reg.h>
+#include <linux/root_dev.h>
 
 #include <asm/cpu.h>
 #include <asm/bootinfo.h>
@@ -149,7 +150,7 @@ void __init it8172_setup(void)
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+	ROOT_DEV = Root_RAM0;
 #endif
 
 	/*

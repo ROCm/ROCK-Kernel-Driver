@@ -24,6 +24,7 @@
 #include <linux/seq_file.h>
 #include <linux/blk.h>
 #include <linux/console.h>
+#include <linux/root_dev.h>
 
 #include <asm/io.h>
 #include <asm/open_pic.h>
@@ -319,14 +320,14 @@ lopec_setup_arch(void)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
-		ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+		ROOT_DEV = Root_RAM0;
 	else
 #elif defined(CONFIG_ROOT_NFS)
-        	ROOT_DEV = to_kdev_t(0x00ff);
+        	ROOT_DEV = Root_NFS;
 #elif defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-	        ROOT_DEV = to_kdev_t(0x0301);
+	        ROOT_DEV = Root_HDA1;
 #else
-        	ROOT_DEV = to_kdev_t(0x0801);
+        	ROOT_DEV = Root_SDA1;
 #endif
 
 #ifdef CONFIG_DUMMY_CONSOLE

@@ -92,7 +92,7 @@ static int v1_commit_dqblk(struct dquot *dquot)
 					sizeof(struct v1_disk_dqblk), &offset);
 	if (ret != sizeof(struct v1_disk_dqblk)) {
 		printk(KERN_WARNING "VFS: dquota write failed on dev %s\n",
-			kdevname(dquot->dq_sb->s_dev));
+			dquot->dq_sb->s_id);
 		if (ret >= 0)
 			ret = -EIO;
 		goto out;
@@ -145,7 +145,7 @@ static int v1_check_quota_file(struct super_block *sb, int type)
 		return 1;	/* Probably not new format */
 	if (le32_to_cpu(dqhead.dqh_magic) != quota_magics[type])
 		return 1;	/* Definitely not new format */
-	printk(KERN_INFO "VFS: %s: Refusing to turn on old quota format on given file. It probably contains newer quota format.\n", kdevname(sb->s_dev));
+	printk(KERN_INFO "VFS: %s: Refusing to turn on old quota format on given file. It probably contains newer quota format.\n", sb->s_id);
         return 0;		/* Seems like a new format file -> refuse it */
 }
 

@@ -33,6 +33,8 @@
 #ifdef  CONFIG_BLK_DEV_PS2
 
 #define MAJOR_NR PS2ESDI_MAJOR
+#define DEVICE_NAME "PS/2 ESDI"
+#define DEVICE_NR(device) (minor(device) >> 6)
 
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -503,14 +505,12 @@ static void do_ps2esdi_request(request_queue_t * q)
 
 	/* standard procedure to ensure that requests are really on the
 	   list + sanity checks.                     */
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	if (isa_virt_to_bus(CURRENT->buffer + CURRENT->current_nr_sectors * 512) > 16 * MB) {
 		printk("%s: DMA above 16MB not supported\n", DEVICE_NAME);
-		end_request(FAIL);
+		end_request(CURRENT, FAIL);
 	}			/* check for above 16Mb dmas */
 	else if ((DEVICE_NR(CURRENT->rq_dev) < ps2esdi_drives) &&
 	    (CURRENT->sector + CURRENT->current_nr_sectors <=
@@ -536,7 +536,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 			break;
 		default:
 			printk("%s: Unknown command\n", DEVICE_NAME);
-			end_request(FAIL);
+			end_request(CURRENT, FAIL);
 			break;
 		}		/* handle different commands */
 	}
@@ -544,7 +544,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 	else {
 		printk("Grrr. error. ps2esdi_drives: %d, %lu %lu\n", ps2esdi_drives,
 		       CURRENT->sector, ps2esdi[minor(CURRENT->rq_dev)].nr_sects);
-		end_request(FAIL);
+		end_request(CURRENT, FAIL);
 	}
 
 }				/* main strategy routine */
@@ -609,7 +609,7 @@ static void ps2esdi_readwrite(int cmd, u_char drive, u_int block, u_int count)
 	if (ps2esdi_out_cmd_blk(cmd_blk)) {
 		printk("%s: Controller failed\n", DEVICE_NAME);
 		if ((++CURRENT->errors) >= MAX_RETRIES)
-			end_request(FAIL);
+			end_request(CURRENT, FAIL);
 	}
 	/* check for failure to put out the command block */ 
 	else {
@@ -984,7 +984,7 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 	}
 	if(ending != -1) {
 		spin_lock_irqsave(&ps2esdi_lock, flags);
-		end_request(ending);
+		end_request(CURRENT, ending);
 		do_ps2esdi_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		spin_unlock_irqrestore(&ps2esdi_lock, flags);
 	}

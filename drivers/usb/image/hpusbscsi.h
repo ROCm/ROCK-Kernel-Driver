@@ -20,25 +20,25 @@ struct hpusbscsi
         int ep_in;
         int ep_int;
         int interrupt_interval;
-
+	int number;
+	int fragment;
         struct Scsi_Host *host;
-        Scsi_Host_Template ctempl;
-        int number;
+
 	scsi_callback scallback;
 	Scsi_Cmnd *srb;
-	u8 sense_command[SENSE_COMMAND_SIZE];
 
-        int use_count;
+
         wait_queue_head_t pending;
         wait_queue_head_t deathrow;
 
         struct urb *dataurb;
         struct urb *controlurb;
-        int fragment;
+
 
         int state;
         int current_data_pipe;
-
+	Scsi_Host_Template ctempl;
+	u8 sense_command[SENSE_COMMAND_SIZE];
         u8 scsi_state_byte;
 };
 
