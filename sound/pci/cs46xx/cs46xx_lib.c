@@ -2319,6 +2319,36 @@ static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 };
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
+/* set primary cs4294 codec into Extended Audio Mode */
+static int snd_cs46xx_front_dup_get(snd_kcontrol_t *kcontrol, 
+				    snd_ctl_elem_value_t *ucontrol)
+{
+	cs46xx_t *chip = snd_kcontrol_chip(kcontrol);
+	unsigned short val;
+	val = snd_ac97_read(chip->ac97[CS46XX_PRIMARY_CODEC_INDEX], AC97_CSR_ACMODE);
+	ucontrol->value.integer.value[0] = (val & 0x200) ? 0 : 1;
+	return 0;
+}
+
+static int snd_cs46xx_front_dup_put(snd_kcontrol_t *kcontrol, 
+				    snd_ctl_elem_value_t *ucontrol)
+{
+	cs46xx_t *chip = snd_kcontrol_chip(kcontrol);
+	return snd_ac97_update_bits(chip->ac97[CS46XX_PRIMARY_CODEC_INDEX],
+				    AC97_CSR_ACMODE, 0x200,
+				    ucontrol->value.integer.value[0] ? 0 : 0x200);
+}
+
+static snd_kcontrol_new_t snd_cs46xx_front_dup_ctl = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Duplicate Front",
+	.info = snd_mixer_boolean_info,
+	.get = snd_cs46xx_front_dup_get,
+	.put = snd_cs46xx_front_dup_put,
+};
+#endif
+
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
 /* Only available on the Hercules Game Theater XP soundcard */
 static snd_kcontrol_new_t snd_hercules_controls[] __devinitdata = {
 {
@@ -2465,10 +2495,11 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	if (chip->nr_ac97_codecs == 1) {
 		unsigned int id2 = chip->ac97[CS46XX_PRIMARY_CODEC_INDEX]->id & 0xffff;
 		if (id2 == 0x592b || id2 == 0x592d) {
-			/* set primary cs4294 codec into Extended Audio Mode */
-			snd_printdd("setting EAM bit on cs4294 CODEC\n");
-			snd_cs46xx_codec_write(chip, AC97_CSR_ACMODE, 0x200,
-					       CS46XX_PRIMARY_CODEC_INDEX);
+			err = snd_ctl_add(card, snd_ctl_new1(&snd_cs46xx_front_dup_ctl, chip));
+			if (err < 0)
+				return err;
+			snd_ac97_write_cache(chip->ac97[CS46XX_PRIMARY_CODEC_INDEX],
+					     AC97_CSR_ACMODE, 0x200);
 		}
 	}
 	/* do soundcard specific mixer setup */
