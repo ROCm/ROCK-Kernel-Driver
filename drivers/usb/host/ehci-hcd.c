@@ -476,7 +476,7 @@ done2:
 			ehci_ready (ehci);
 		ehci_reset (ehci);
 		bus->root_hub = 0;
-		usb_free_dev (udev); 
+		usb_put_dev (udev); 
 		retval = -ENODEV;
 		goto done2;
 	}

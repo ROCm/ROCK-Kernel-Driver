@@ -876,7 +876,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 
 		/* Reset the device, and detect its speed */
 		if (usb_hub_port_reset(hub, port, dev, delay)) {
-			usb_free_dev(dev);
+			usb_put_dev(dev);
 			break;
 		}
 
@@ -928,7 +928,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 			goto done;
 
 		/* Free the configuration if there was an error */
-		usb_free_dev(dev);
+		usb_put_dev(dev);
 
 		/* Switch to a long reset time */
 		delay = HUB_LONG_RESET_TIME;

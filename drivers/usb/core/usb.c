@@ -716,7 +716,7 @@ struct usb_device *usb_get_dev (struct usb_device *dev)
 }
 
 /**
- * usb_free_dev - free a usb device structure when all users of it are finished.
+ * usb_put_dev - free a usb device structure when all users of it are finished.
  * @dev: device that's been disconnected
  * Context: !in_interrupt ()
  *
@@ -727,7 +727,7 @@ struct usb_device *usb_get_dev (struct usb_device *dev)
  * gone, everything is cleaned up, so it's time to get rid of these last
  * records of this device.
  */
-void usb_free_dev(struct usb_device *dev)
+void usb_put_dev(struct usb_device *dev)
 {
 	if (atomic_dec_and_test(&dev->refcnt)) {
 		if (dev->bus->op->deallocate)
@@ -737,7 +737,6 @@ void usb_free_dev(struct usb_device *dev)
 		kfree (dev);
 	}
 }
-
 
 /**
  * usb_get_current_frame_number - return current bus frame number
@@ -1454,7 +1453,7 @@ EXPORT_SYMBOL(usb_device_probe);
 EXPORT_SYMBOL(usb_device_remove);
 
 EXPORT_SYMBOL(usb_alloc_dev);
-EXPORT_SYMBOL(usb_free_dev);
+EXPORT_SYMBOL(usb_put_dev);
 EXPORT_SYMBOL(usb_get_dev);
 EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 

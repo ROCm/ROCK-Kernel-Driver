@@ -261,8 +261,7 @@ struct usb_device {
 
 extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *);
 extern struct usb_device *usb_get_dev(struct usb_device *dev);
-extern void usb_free_dev(struct usb_device *);
-#define usb_put_dev usb_free_dev
+extern void usb_put_dev(struct usb_device *dev);
 
 /* mostly for devices emulating SCSI over USB */
 extern int usb_reset_device(struct usb_device *dev);
