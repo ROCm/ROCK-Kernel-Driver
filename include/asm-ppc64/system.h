@@ -196,7 +196,7 @@ __xchg(volatile void *ptr, unsigned long x, int size)
 static __inline__ unsigned long
 __cmpxchg_u32(volatile int *p, int old, int new)
 {
-	int prev;
+	unsigned int prev;
 
 	__asm__ __volatile__ (
 	EIEIO_ON_SMP
@@ -218,7 +218,7 @@ __cmpxchg_u32(volatile int *p, int old, int new)
 static __inline__ unsigned long
 __cmpxchg_u64(volatile long *p, unsigned long old, unsigned long new)
 {
-	int prev;
+	unsigned long prev;
 
 	__asm__ __volatile__ (
 	EIEIO_ON_SMP
