@@ -16,18 +16,11 @@ struct concap_proto *isdn_concap_new(int);
 
 extern struct isdn_netif_ops isdn_x25_ops;
 
-void isdn_x25_cleanup(isdn_net_dev *p);
 void isdn_x25_open(struct net_device *dev);
 void isdn_x25_close(struct net_device *dev);
 int  isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev);
-void isdn_x25_realrm(isdn_net_dev *p);
 
 #else
-
-static inline void
-isdn_x25_cleanup(isdn_net_dev *p)
-{
-}
 
 static inline void
 isdn_x25_open(struct net_device *dev)
@@ -43,11 +36,6 @@ static inline int
 isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	return 0;
-}
-
-static inline void
-isdn_x25_realrm(isdn_net_dev *p)
-{
 }
 
 #endif

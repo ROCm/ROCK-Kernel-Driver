@@ -17,6 +17,7 @@
 #include "isdn_net.h"
 #include "isdn_ciscohdlck.h"
 
+#include <linux/if_arp.h>
 #include <linux/inetdevice.h>
 
 /* 
@@ -394,6 +395,7 @@ struct isdn_netif_ops ciscohdlck_ops = {
 	.hard_header         = isdn_ciscohdlck_header,
 	.do_ioctl            = isdn_ciscohdlck_dev_ioctl,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.type                = ARPHRD_CISCO,
 	.receive             = isdn_ciscohdlck_receive,
 	.connected           = isdn_ciscohdlck_connected,
 	.disconnected        = isdn_ciscohdlck_disconnected,

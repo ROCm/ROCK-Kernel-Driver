@@ -203,10 +203,10 @@ register_isdn_netif(int encap, struct isdn_netif_ops *ops)
 
 /* Prototypes */
 
-int isdn_net_force_dial_lp(isdn_net_local *);
+static int isdn_net_force_dial_lp(isdn_net_local *);
 static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void do_dialout(isdn_net_local *lp);
-
+static int isdn_net_set_encap(isdn_net_dev *p, int encap);
 static int isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
@@ -1520,7 +1520,7 @@ isdn_net_findif(char *name)
  * This is called from the userlevel-routine below or
  * from isdn_net_start_xmit().
  */
-int
+static int
 isdn_net_force_dial_lp(isdn_net_local *lp)
 {
 	int slot;
@@ -1606,7 +1606,6 @@ isdn_net_new(char *name, struct net_device *master)
 	strcpy(netdev->dev.name, name);
 	netdev->dev.priv = &netdev->local;
 	netdev->dev.init = isdn_net_init;
-	netdev->local.p_encap = ISDN_NET_ENCAP_RAWIP;
 	if (master) {
 		/* Device shall be a slave */
 		struct net_device *p = (((isdn_net_local *) master->priv)->slave);
@@ -1653,6 +1652,7 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->local.exclusive = -1;
 	netdev->local.ppp_slot = -1;
 	netdev->local.pppbind = -1;
+	netdev->local.p_encap = -1;
 	skb_queue_head_init(&netdev->local.super_tx_queue);
 	netdev->local.l2_proto = ISDN_PROTO_L2_X75I;
 	netdev->local.l3_proto = ISDN_PROTO_L3_TRANS;
@@ -1678,6 +1678,7 @@ isdn_net_new(char *name, struct net_device *master)
 	spin_lock_init(&netdev->local.lock);
 	INIT_LIST_HEAD(&netdev->local.phone[0]);
 	INIT_LIST_HEAD(&netdev->local.phone[1]);
+	isdn_net_set_encap(netdev, ISDN_NET_ENCAP_RAWIP);
 
 	/* Put into to netdev-chain */
 	list_add(&netdev->global_list, &isdn_net_devs);
@@ -1709,12 +1710,12 @@ isdn_net_newslave(char *parm)
 }
 
 static int
-isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
+isdn_net_set_encap(isdn_net_dev *p, int encap)
 {
 	isdn_net_local *lp = &p->local;
 	int retval = 0;
 
-	if (lp->p_encap == cfg->p_encap){
+	if (lp->p_encap == encap){
 		/* nothing to do */
 		retval = 0;
 		goto out;
@@ -1723,30 +1724,34 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 		retval = -EBUSY;
 		goto out;
 	}
-	switch (lp->p_encap) {
-	case ISDN_NET_ENCAP_X25IFACE:
-		isdn_x25_cleanup(p);
-		break;
-	}
+	if (lp->ops && lp->ops->cleanup)
+		lp->ops->cleanup(lp);
 
-	if (cfg->p_encap < 0 || cfg->p_encap >= ISDN_NET_ENCAP_NR) {
+	if (encap < 0 || encap >= ISDN_NET_ENCAP_NR) {
 		lp->p_encap = -1;
 		lp->ops = NULL;
 		retval = -EINVAL;
 		goto out;
 	}
+
+	lp->p_encap = encap;
+	lp->ops = netif_ops[encap];
+
 	p->dev.hard_header         = lp->ops->hard_header;
 	p->dev.rebuild_header      = lp->ops->rebuild_header;
 	p->dev.do_ioctl            = lp->ops->do_ioctl;
 	p->dev.hard_header_cache   = lp->ops->hard_header_cache;
 	p->dev.header_cache_update = lp->ops->header_cache_update;
-		
-	lp->p_encap = cfg->p_encap;
-	lp->ops = netif_ops[lp->p_encap];
+	p->dev.flags               = lp->ops->flags;
+	p->dev.type                = lp->ops->type;
+	p->dev.addr_len            = lp->ops->addr_len;
+	if (lp->ops->init)
+		retval = lp->ops->init(lp);
 
-	if (retval != 0)
+	if (retval != 0) {
 		lp->p_encap = -1;
-
+		lp->ops = NULL;
+	}
  out:
 	return retval;
 }
@@ -1854,7 +1859,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 		goto out;
 	}
 
-	retval = isdn_net_set_encap(p, cfg);
+	retval = isdn_net_set_encap(p, cfg->p_encap);
 	if (retval)
 		goto out;
 
@@ -2163,7 +2168,7 @@ isdn_net_realrm(isdn_net_dev *p)
 		restore_flags(flags);
 		return -EBUSY;
 	}
-	isdn_x25_realrm(p);
+	isdn_net_set_encap(p, -1);
 
 	/* Free all phone-entries */
 	isdn_net_rmallphone(p);
@@ -2271,6 +2276,7 @@ isdn_iptyp_receive(isdn_net_dev *p, isdn_net_local *olp,
 static struct isdn_netif_ops iptyp_ops = {
 	.hard_header         = isdn_iptyp_header,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.type                = ARPHRD_PPP,
 	.addr_len            = 2,
 	.receive             = isdn_iptyp_receive,
 };
@@ -2303,6 +2309,7 @@ isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp,
 static struct isdn_netif_ops uihdlc_ops = {
 	.hard_header         = isdn_uihdlc_header,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.type                = ARPHRD_HDLC,
 	.addr_len            = 2,
 	.receive             = isdn_uihdlc_receive,
 };
@@ -2324,6 +2331,7 @@ isdn_rawip_receive(isdn_net_dev *p, isdn_net_local *olp,
 
 static struct isdn_netif_ops rawip_ops = {
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.type                = ARPHRD_PPP,
 	.receive             = isdn_rawip_receive,
 };
 

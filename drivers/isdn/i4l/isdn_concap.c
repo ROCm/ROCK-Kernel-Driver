@@ -107,45 +107,18 @@ struct concap_proto * isdn_concap_new( int encap )
 	return NULL;
 }
 
-void isdn_x25_cleanup(isdn_net_dev *p)
-{
-	isdn_net_local *lp = &p->local;
-	struct concap_proto * cprot = p -> cprot;
-	unsigned long flags;
-	
-	/* delete old encapsulation protocol if present ... */
-	save_flags(flags);
-	cli(); /* avoid races with incoming events trying to
-		  call cprot->pops methods */
-	if( cprot && cprot -> pops )
-		cprot -> pops -> proto_del ( cprot );
-	p -> cprot = NULL;
-	lp -> dops = NULL;
-	restore_flags(flags);
-}
-
 void isdn_x25_open(struct net_device *dev)
 {
+	struct concap_proto * cprot =
+		( (isdn_net_local *) dev->priv ) -> netdev -> cprot;
+	struct concap_proto * dops =
+		( (isdn_net_local *) dev->priv ) -> dops;
 	unsigned long flags;
-
-	isdn_net_local *lp = dev->priv;
-
-	/* ... ,  prepare for configuration of new one ... */
-	switch ( lp->p_encap ){
-	case ISDN_NET_ENCAP_X25IFACE:
-		lp -> dops = &isdn_concap_reliable_dl_dops;
-	}
-	/* ... and allocate new one ... */
-	p -> cprot = isdn_concap_new( cfg -> p_encap );
-	/* p -> cprot == NULL now if p_encap is not supported
-	   by means of the concap_proto mechanism */
-	if (!p->cprot)
-		return;
 
 	save_flags(flags);
 	cli();                  /* Avoid glitch on writes to CMD regs */
-	if( p -> cprot -> pops && lp -> dops )
-		p -> cprot -> pops -> restart ( p -> cprot, dev, lp -> dops );
+	if( cprot -> pops && dops )
+		cprot -> pops -> restart ( cprot, dev, dops );
 	restore_flags(flags);
 }
 
@@ -220,6 +193,46 @@ isdn_x25_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb)
 			}
 }
 
+static void
+isdn_x25_init(struct net_device *dev)
+{
+	unsigned long flags;
+
+	isdn_net_local *lp = dev->priv;
+
+	/* ... ,  prepare for configuration of new one ... */
+	switch ( lp->p_encap ){
+	case ISDN_NET_ENCAP_X25IFACE:
+		lp -> dops = &isdn_concap_reliable_dl_dops;
+	}
+	/* ... and allocate new one ... */
+	p -> cprot = isdn_concap_new( cfg -> p_encap );
+	/* p -> cprot == NULL now if p_encap is not supported
+	   by means of the concap_proto mechanism */
+	if (!p->cprot)
+		return -EINVAL;
+
+	return 0;
+}
+
+static void
+isdn_x25_cleanup(isdn_net_dev *p)
+{
+	isdn_net_local *lp = &p->local;
+	struct concap_proto * cprot = p -> cprot;
+	unsigned long flags;
+	
+	/* delete old encapsulation protocol if present ... */
+	save_flags(flags);
+	cli(); /* avoid races with incoming events trying to
+		  call cprot->pops methods */
+	if( cprot && cprot -> pops )
+		cprot -> pops -> proto_del ( cprot );
+	p -> cprot = NULL;
+	lp -> dops = NULL;
+	restore_flags(flags);
+}
+
 void isdn_x25_realrm(isdn_net_dev *p)
 {
 	if( p -> cprot && p -> cprot -> pops )
@@ -232,6 +245,8 @@ struct isdn_netif_ops isdn_x25_ops = {
 	.receive             = isdn_x25_receive,
 	.connected           = isdn_x25_connected,
 	.disconnected        = isdn_x25_disconnected,
+	.init                = isdn_x25_init,
+	.cleanup             = isdn_x25_cleanup,
 };
 
 #endif /* CONFIG_ISDN_X25 */
