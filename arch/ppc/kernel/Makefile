@@ -67,7 +67,7 @@ obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
 					todc_time.o
 obj-$(CONFIG_EV64260)		+= gt64260_common.o gt64260_pic.o \
 					indirect_pci.o todc_time.o pci_auto.o
-obj-$(CONFIG_GEMINI)		+= open_pic.o
+obj-$(CONFIG_GEMINI)		+= open_pic.o i8259.o
 obj-$(CONFIG_K2)		+= i8259.o indirect_pci.o todc_time.o \
 					pci_auto.o
 obj-$(CONFIG_LOPEC)		+= mpc10x_common.o indirect_pci.o pci_auto.o \
