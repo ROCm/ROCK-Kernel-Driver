@@ -35,7 +35,15 @@ struct files_struct {
 
 extern void FASTCALL(__fput(struct file *));
 extern void FASTCALL(fput(struct file *));
+
+static inline void fput_light(struct file *file, int fput_needed)
+{
+	if (unlikely(fput_needed))
+		fput(file);
+}
+
 extern struct file * FASTCALL(fget(unsigned int fd));
+extern struct file * FASTCALL(fget_light(unsigned int fd, int *fput_needed));
 extern void FASTCALL(set_close_on_exec(unsigned int fd, int flag));
 extern void put_filp(struct file *);
 extern int get_unused_fd(void);
