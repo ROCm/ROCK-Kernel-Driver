@@ -1113,6 +1113,8 @@ void __exit acpiphp_glue_exit(void)
 
 		kfree(bridge);
 	}
+
+	acpi_pci_unregister_driver(&acpi_pci_hp_driver);
 }
 
 
