@@ -827,8 +827,8 @@ static inline int e100_exec_cb(struct nic *nic, struct sk_buff *skb,
 	cb->prev->command &= cpu_to_le16(~cb_s);
 
 	while(nic->cb_to_send != nic->cb_to_use) {
-		if(unlikely((err = e100_exec_cmd(nic, nic->cuc_cmd,
-			nic->cb_to_send->dma_addr)))) {
+		if(unlikely(e100_exec_cmd(nic, nic->cuc_cmd,
+			nic->cb_to_send->dma_addr))) {
 			/* Ok, here's where things get sticky.  It's
 			 * possible that we can't schedule the command
 			 * because the controller is too busy, so
