@@ -851,6 +851,7 @@ ahd_linux_detect(Scsi_Host_Template *template)
 {
 	struct	ahd_softc *ahd;
 	int     found;
+	int	error = 0;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	/*
@@ -902,7 +903,9 @@ ahd_linux_detect(Scsi_Host_Template *template)
 	ahd_list_lockinit();
 
 #ifdef CONFIG_PCI
-	ahd_linux_pci_init();
+	error = ahd_linux_pci_init();
+	if (error)
+		return error;
 #endif
 
 	/*
@@ -919,7 +922,7 @@ ahd_linux_detect(Scsi_Host_Template *template)
 	spin_lock_irq(&io_request_lock);
 #endif
 	aic79xx_detect_complete++;
-	return (found);
+	return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
@@ -5079,7 +5082,7 @@ static int __init
 ahd_linux_init(void)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-       return (ahd_linux_detect(&aic79xx_driver_template) ? 0 : -ENODEV);
+	return ahd_linux_detect(&aic79xx_driver_template);
 #else
 	scsi_register_module(MODULE_SCSI_HA, &aic79xx_driver_template);
 	if (aic79xx_driver_template.present == 0) {
