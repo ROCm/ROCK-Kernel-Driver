@@ -940,7 +940,7 @@ __group_complete_signal(int sig, struct task_struct *p, unsigned int mask)
 	return;
 }
 
-static inline int
+static int
 __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	unsigned int mask;
