@@ -1910,9 +1910,10 @@ static struct file_operations auerswald_fops =
    class based it might be necessary to parse some more USB descriptors because
    the device properties can differ in a wide range.
 */
-static void *auerswald_probe (struct usb_device *usbdev, unsigned int ifnum,
-			      const struct usb_device_id *id)
+static int auerswald_probe (struct usb_interface *intf,
+			    const struct usb_device_id *id)
 {
+	struct usb_device *usbdev = interface_to_usbdev(intf);
 	pauerswald_t cp = NULL;
 	DECLARE_WAIT_QUEUE_HEAD (wqh);
 	unsigned int dtindex;
@@ -1920,14 +1921,16 @@ static void *auerswald_probe (struct usb_device *usbdev, unsigned int ifnum,
 	char *pbuf;
 	int ret;
 
-	dbg ("probe: vendor id 0x%x, device id 0x%x ifnum:%d",
-	     usbdev->descriptor.idVendor, usbdev->descriptor.idProduct, ifnum);
+	dbg ("probe: vendor id 0x%x, device id 0x%x",
+	     usbdev->descriptor.idVendor, usbdev->descriptor.idProduct);
 
 	/* See if the device offered us matches that we can accept */
-	if (usbdev->descriptor.idVendor != ID_AUERSWALD) return NULL;
+	if (usbdev->descriptor.idVendor != ID_AUERSWALD)
+		return -ENODEV;
 
         /* we use only the first -and only- interface */
-        if (ifnum != 0) return NULL;
+        if (intf->altsetting->bInterfaceNumber != 0)
+		return -ENODEV;
 
 	/* prevent module unloading while sleeping */
 	MOD_INC_USE_COUNT;
@@ -2044,12 +2047,13 @@ static void *auerswald_probe (struct usb_device *usbdev, unsigned int ifnum,
 	}
 
 	/* all OK */
-	return cp;
+	dev_set_drvdata (&intf->dev, cp);
+	return 0;
 
 	/* Error exit: clean up the memory */
 pfail:	auerswald_delete (cp);
 	MOD_DEC_USE_COUNT;
-	return NULL;
+	return -EIO;
 }
 
 
@@ -2065,10 +2069,14 @@ pfail:	auerswald_delete (cp);
    this device. So especially the usb_device structure must not be used
    any longer by the usb driver.
 */
-static void auerswald_disconnect (struct usb_device *usbdev, void *driver_context)
+static void auerswald_disconnect (struct usb_interface *intf)
 {
-	pauerswald_t cp = (pauerswald_t) driver_context;
+	pauerswald_t cp = dev_get_drvdata (&intf->dev);
 	unsigned int u;
+
+	dev_set_drvdata (&intf->dev, NULL);
+	if (!cp)
+		return;
 
 	down (&cp->mutex);
 	info ("device /dev/usb/%s now disconnecting", cp->name);

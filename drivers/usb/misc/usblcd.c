@@ -245,20 +245,21 @@ file_operations usb_lcd_fops = {
 	.release =	close_lcd,
 };
 
-static void *probe_lcd(struct usb_device *dev, unsigned int ifnum)
+static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct lcd_usb_data *lcd = &lcd_instance;
 	int i;
 	int retval;
 	
 	if (dev->descriptor.idProduct != 0x0001  ) {
 		warn(KERN_INFO "USBLCD model not supported.");
-		return NULL;
+		return -ENODEV;
 	}
 
 	if (lcd->present == 1) {
 		warn(KERN_INFO "Multiple USBLCDs are not supported!");
-		return NULL;
+		return -ENODEV;
 	}
 
 	i = dev->descriptor.bcdDevice;
@@ -270,7 +271,7 @@ static void *probe_lcd(struct usb_device *dev, unsigned int ifnum)
 	retval = usb_register_dev(&usb_lcd_fops, USBLCD_MINOR, 1, &lcd->minor);
 	if (retval) {
 		err("Not able to get a minor for this device.");
-		return NULL;
+		return -ENOMEM;
 	}
 	
 	lcd->present = 1;
@@ -278,38 +279,42 @@ static void *probe_lcd(struct usb_device *dev, unsigned int ifnum)
 
 	if (!(lcd->obuf = (char *) kmalloc(OBUF_SIZE, GFP_KERNEL))) {
 		err("probe_lcd: Not enough memory for the output buffer");
-		return NULL;
+		return -ENOMEM;
 	}
 	dbg("probe_lcd: obuf address:%p", lcd->obuf);
 
 	if (!(lcd->ibuf = (char *) kmalloc(IBUF_SIZE, GFP_KERNEL))) {
 		err("probe_lcd: Not enough memory for the input buffer");
 		kfree(lcd->obuf);
-		return NULL;
+		return -ENOMEM;
 	}
 	dbg("probe_lcd: ibuf address:%p", lcd->ibuf);
 
-	return lcd;
+	dev_set_drvdata (&intf->dev, lcd);
+	return 0;
 }
 
-static void disconnect_lcd(struct usb_device *dev, void *ptr)
+static void disconnect_lcd(struct usb_interface *intf)
 {
-	struct lcd_usb_data *lcd = (struct lcd_usb_data *) ptr;
+	struct lcd_usb_data *lcd = dev_get_drvdata (&intf->dev);
 
-	usb_deregister_dev(1, lcd->minor);
+	dev_set_drvdata (&intf->dev, NULL);
+	if (lcd) {
+		usb_deregister_dev(1, lcd->minor);
 
-	if (lcd->isopen) {
-		lcd->isopen = 0;
-		/* better let it finish - the release will do whats needed */
-		lcd->lcd_dev = NULL;
-		return;
+		if (lcd->isopen) {
+			lcd->isopen = 0;
+			/* better let it finish - the release will do whats needed */
+			lcd->lcd_dev = NULL;
+			return;
+		}
+		kfree(lcd->ibuf);
+		kfree(lcd->obuf);
+
+		info("USBLCD disconnected.");
+
+		lcd->present = 0;
 	}
-	kfree(lcd->ibuf);
-	kfree(lcd->obuf);
-
-	info("USBLCD disconnected.");
-
-	lcd->present = 0;
 }
 
 static struct usb_device_id id_table [] = {

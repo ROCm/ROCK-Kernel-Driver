@@ -450,9 +450,10 @@ file_operations usb_rio_fops = {
 	.release =	close_rio,
 };
 
-static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
-		       const struct usb_device_id *id)
+static int probe_rio(struct usb_interface *intf,
+		     const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct rio_usb_data *rio = &rio_instance;
 	int retval;
 
@@ -461,7 +462,7 @@ static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
 	retval = usb_register_dev(&usb_rio_fops, RIO_MINOR, 1, &rio->minor);
 	if (retval) {
 		err("Not able to get a minor for this device.");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	rio->present = 1;
@@ -469,14 +470,14 @@ static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
 
 	if (!(rio->obuf = (char *) kmalloc(OBUF_SIZE, GFP_KERNEL))) {
 		err("probe_rio: Not enough memory for the output buffer");
-		return NULL;
+		return -ENOMEM;
 	}
 	dbg("probe_rio: obuf address:%p", rio->obuf);
 
 	if (!(rio->ibuf = (char *) kmalloc(IBUF_SIZE, GFP_KERNEL))) {
 		err("probe_rio: Not enough memory for the input buffer");
 		kfree(rio->obuf);
-		return NULL;
+		return -ENOMEM;
 	}
 	dbg("probe_rio: ibuf address:%p", rio->ibuf);
 
@@ -490,31 +491,35 @@ static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
 
 	init_MUTEX(&(rio->lock));
 
-	return rio;
+	dev_set_drvdata (&intf->dev, rio);
+	return 0;
 }
 
-static void disconnect_rio(struct usb_device *dev, void *ptr)
+static void disconnect_rio(struct usb_interface *intf)
 {
-	struct rio_usb_data *rio = (struct rio_usb_data *) ptr;
+	struct rio_usb_data *rio = dev_get_drvdata (&intf->dev);
 
-	devfs_unregister(rio->devfs);
-	usb_deregister_dev(1, rio->minor);
+	dev_set_drvdata (&intf->dev, NULL);
+	if (rio) {
+		devfs_unregister(rio->devfs);
+		usb_deregister_dev(1, rio->minor);
 
-	down(&(rio->lock));
-	if (rio->isopen) {
-		rio->isopen = 0;
-		/* better let it finish - the release will do whats needed */
-		rio->rio_dev = NULL;
+		down(&(rio->lock));
+		if (rio->isopen) {
+			rio->isopen = 0;
+			/* better let it finish - the release will do whats needed */
+			rio->rio_dev = NULL;
+			up(&(rio->lock));
+			return;
+		}
+		kfree(rio->ibuf);
+		kfree(rio->obuf);
+
+		info("USB Rio disconnected.");
+
+		rio->present = 0;
 		up(&(rio->lock));
-		return;
 	}
-	kfree(rio->ibuf);
-	kfree(rio->obuf);
-
-	info("USB Rio disconnected.");
-
-	rio->present = 0;
-	up(&(rio->lock));
 }
 
 static struct usb_device_id rio_table [] = {
