@@ -3041,7 +3041,7 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 	kdev_t rdev = to_kdev_t(bdev->bd_dev);
 
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
-		major(dev),minor(dev),major(rdev),minor(rdev),
+		MD_MAJOR,mdidx(mddev),major(rdev),minor(rdev),
 		__builtin_return_address(0),__builtin_return_address(1),
 		__builtin_return_address(2),__builtin_return_address(3));
 

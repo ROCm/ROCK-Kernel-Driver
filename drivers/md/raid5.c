@@ -809,6 +809,8 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 	spin_unlock_irq(&conf->device_lock);
 	spin_unlock(&sh->lock);
 
+	PRINTK("added bi b#%lu to stripe s#%lu, disk %d.\n", bi->bi_sector, sh->sector, dd_idx);
+
 	if (forwrite) {
 		/* check if page is coverred */
 		sector_t sector = sh->dev[dd_idx].sector;
@@ -822,8 +824,6 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 		if (sector >= sh->dev[dd_idx].sector + STRIPE_SECTORS)
 			set_bit(R5_OVERWRITE, &sh->dev[dd_idx].flags);
 	}
-
-	PRINTK("added bi b#%lu to stripe s#%lu, disk %d.\n", bi->bi_sector, sh->sector, dd_idx);
 }
 
 
@@ -1586,7 +1586,7 @@ static int run (mddev_t *mddev)
 	}
 
 	memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
-		 conf->raid_disks * ((sizeof(struct buffer_head) + PAGE_SIZE))) / 1024;
+		 conf->raid_disks * ((sizeof(struct bio) + PAGE_SIZE))) / 1024;
 	if (grow_stripes(conf, conf->max_nr_stripes)) {
 		printk(KERN_ERR "raid5: couldn't allocate %dkB for buffers\n", memory);
 		shrink_stripes(conf);
