@@ -267,7 +267,7 @@ out_unlock:
 out:
 	transport->dst = dst;
 	if (dst)
-		transport->pmtu = dst->pmtu;
+		transport->pmtu = dst_pmtu(dst);
 	else
 		transport->pmtu = SCTP_DEFAULT_MAXSEGMENT;
 }
