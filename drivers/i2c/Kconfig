@@ -59,17 +59,7 @@ config I2C_ALGOPCF
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-algo-pcf.
 
-config I2C_KEYWEST
-	tristate "Powermac Keywest I2C interface"
-	depends on I2C && PPC_PMAC
-	help
-	  This supports the use of the I2C interface in the combo-I/O
-	  chip on recent Apple machines.  Say Y if you have such a machine.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-keywest.
-
-config ITE_I2C_ALGO
+config I2C_ALGOITE
 	tristate "ITE I2C Algorithm"
 	depends on MIPS_ITE8172 && I2C
 	help
@@ -80,32 +70,9 @@ config ITE_I2C_ALGO
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-algo-ite.
 
-config ITE_I2C_ADAP
-	tristate "ITE I2C Adapter"
-	depends on ITE_I2C_ALGO
-	help
-	  This supports the ITE8172 I2C peripheral found on some MIPS
-	  systems. Say Y if you have one of these. You should also say Y for
-	  the ITE I2C driver algorithm support above.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-adap-ite.
-
 config I2C_ALGO8XX
 	tristate "MPC8xx CPM I2C interface"
 	depends on 8xx && I2C
-
-config I2C_RPXLITE
-	tristate "Embedded Planet RPX Lite/Classic suppoort"
-	depends on (RPXLITE || RPXCLASSIC) && I2C_ALGO8XX
-
-config I2C_IBM_IIC
-	tristate "IBM IIC I2C"
-	depends on IBM_OCP && I2C
-
-config I2C_IOP3XX
-	tristate "Intel XScale IOP3xx on-chip I2C interface"
-	depends on ARCH_IOP3XX && I2C
 
 	source drivers/i2c/busses/Kconfig
 	source drivers/i2c/chips/Kconfig
