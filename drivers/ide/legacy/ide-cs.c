@@ -411,6 +411,8 @@ void ide_release(u_long arg)
     DEBUG(0, "ide_release(0x%p)\n", link);
 
     if (info->ndev) {
+	/* FIXME: if this fails we need to queue the cleanup somehow
+	   -- need to investigate the required PCMCIA magic */
 	ide_unregister(info->hd);
 	/* deal with brain dead IDE resource management */
 	request_region(link->io.BasePort1, link->io.NumPorts1,
