@@ -826,11 +826,12 @@ out:
  *
  * Returns error number or 0 on success.  
  */
-int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
+int journal_get_undo_access(handle_t *handle, struct buffer_head *bh)
 {
 	journal_t *journal = handle->h_transaction->t_journal;
 	int err;
 	struct journal_head *jh = journal_add_journal_head(bh);
+	char *committed_data = NULL;
 
 	JBUFFER_TRACE(jh, "entry");
 	lock_journal(journal);
@@ -842,33 +843,37 @@ int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
 	if (err)
 		goto out;
 
-	/*
-	 * lock_journal() prevents jh->b_committed_data from getting set
-	 * by two CPUs at the same time.
-	 */
+repeat:
+	if (!jh->b_committed_data) {
+		committed_data = jbd_kmalloc(jh2bh(jh)->b_size, GFP_NOFS);
+		if (!committed_data) {
+			printk(KERN_EMERG "%s: No memory for committed data\n",
+				__FUNCTION__);
+			err = -ENOMEM;
+			goto out;
+		}
+	}
+
+	jbd_lock_bh_state(bh);
 	if (!jh->b_committed_data) {
 		/* Copy out the current buffer contents into the
 		 * preserved, committed copy. */
 		JBUFFER_TRACE(jh, "generate b_committed data");
-		jh->b_committed_data = jbd_kmalloc(jh2bh(jh)->b_size, 
-						   GFP_NOFS);
-		if (!jh->b_committed_data) {
-			printk(KERN_EMERG
-			       "%s: No memory for committed data!\n",
-			       __FUNCTION__);
-			err = -ENOMEM;
-			goto out;
+		if (!committed_data) {
+			jbd_unlock_bh_state(bh);
+			goto repeat;
 		}
-		
-		memcpy (jh->b_committed_data, jh2bh(jh)->b_data,
-				jh2bh(jh)->b_size);
-	}
 
+		jh->b_committed_data = committed_data;
+		committed_data = NULL;
+		memcpy(jh->b_committed_data, bh->b_data, bh->b_size);
+	}
+	jbd_unlock_bh_state(bh);
 out:
-	if (!err)
-		J_ASSERT_JH(jh, jh->b_committed_data);
 	journal_put_journal_head(jh);
 	unlock_journal(journal);
+	if (committed_data)
+		kfree(committed_data);
 	return err;
 }
 
