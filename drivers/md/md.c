@@ -2410,7 +2410,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 	 * Commands creating/starting a new array:
 	 */
 
-	mddev = inode->i_bdev->bd_inode->u.generic_ip;
+	mddev = inode->i_bdev->bd_disk->private_data;
 
 	if (!mddev) {
 		BUG();
@@ -2602,29 +2602,26 @@ abort:
 static int md_open(struct inode *inode, struct file *file)
 {
 	/*
-	 * Succeed if we can find or allocate a mddev structure.
+	 * Succeed if we can lock the mddev, which confirms that
+	 * it isn't being stopped right now.
 	 */
-	mddev_t *mddev = mddev_find(iminor(inode));
-	int err = -ENOMEM;
-
-	if (!mddev)
-		goto out;
+	mddev_t *mddev = inode->i_bdev->bd_disk->private_data;
+	int err;
 
 	if ((err = mddev_lock(mddev)))
-		goto put;
+		goto out;
 
 	err = 0;
+	mddev_get(mddev);
 	mddev_unlock(mddev);
-	inode->i_bdev->bd_inode->u.generic_ip = mddev_get(mddev);
- put:
-	mddev_put(mddev);
+
  out:
 	return err;
 }
 
 static int md_release(struct inode *inode, struct file * file)
 {
- 	mddev_t *mddev = inode->i_bdev->bd_inode->u.generic_ip;
+ 	mddev_t *mddev = inode->i_bdev->bd_disk->private_data;
 
 	if (!mddev)
 		BUG();
