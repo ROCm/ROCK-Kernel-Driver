@@ -1055,6 +1055,11 @@ xfs_sync_inodes(
 			continue;
 		}
 
+		if (VN_BAD(vp)) {
+			ip = ip->i_mnext;
+			continue;
+		}
+
 		if (XFS_FORCED_SHUTDOWN(mp) && !(flags & SYNC_CLOSE)) {
 			XFS_MOUNT_IUNLOCK(mp);
 			kmem_free(ipointer, sizeof(xfs_iptr_t));

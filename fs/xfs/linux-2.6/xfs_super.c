@@ -141,7 +141,7 @@ xfs_set_inodeops(
 	vnode_t			*vp = LINVFS_GET_VP(inode);
 
 	if (vp->v_type == VNON) {
-		make_bad_inode(inode);
+		vn_mark_bad(vp);
 	} else if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &linvfs_file_inode_operations;
 		inode->i_fop = &linvfs_file_operations;
@@ -223,20 +223,16 @@ xfs_initialize_vnode(
 		bhv_insert(VN_BHV_HEAD(vp), inode_bhv);
 	}
 
-	vp->v_type = IFTOVT(ip->i_d.di_mode);
-
-	/* Have we been called during the new inode create process,
-	 * in which case we are too early to fill in the Linux inode.
+	/*
+	 * We need to set the ops vectors, and unlock the inode, but if
+	 * we have been called during the new inode create process, it is
+	 * too early to fill in the Linux inode.  We will get called a
+	 * second time once the inode is properly set up, and then we can
+	 * finish our work.
 	 */
-	if (vp->v_type == VNON)
-		return;
-
-	xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
-
-	/* For new inodes we need to set the ops vectors,
-	 * and unlock the inode.
-	 */
-	if (unlock && (inode->i_state & I_NEW)) {
+	if (ip->i_d.di_mode != 0 && unlock && (inode->i_state & I_NEW)) {
+		vp->v_type = IFTOVT(ip->i_d.di_mode);
+		xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
 		xfs_set_inodeops(inode);
 		unlock_new_inode(inode);
 	}
