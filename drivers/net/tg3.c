@@ -213,8 +213,30 @@ static void tg3_write_indirect_reg32(struct tg3 *tp, u32 off, u32 val)
 	}
 }
 
+
+static inline void _tw32_rx_mbox(struct tg3 *tp, u32 off, u32 val)
+{
+	unsigned long mbox = tp->regs + off;
+	writel(val, mbox);
+	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
+		readl(mbox);
+}
+
+static inline void _tw32_tx_mbox(struct tg3 *tp, u32 off, u32 val)
+{
+	unsigned long mbox = tp->regs + off;
+	writel(val, mbox);
+	if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
+		writel(val, mbox);
+	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
+		readl(mbox);
+}
+
+#define tw32_mailbox(reg, val)  writel(((val) & 0xffffffff), tp->regs + (reg))
+#define tw32_rx_mbox(reg, val)  _tw32_rx_mbox(tp, reg, val)
+#define tw32_tx_mbox(reg, val)  _tw32_tx_mbox(tp, reg, val)
+
 #define tw32(reg,val)		tg3_write_indirect_reg32(tp,(reg),(val))
-#define tw32_mailbox(reg, val)	writel(((val) & 0xffffffff), tp->regs + (reg))
 #define tw16(reg,val)		writew(((val) & 0xffff), tp->regs + (reg))
 #define tw8(reg,val)		writeb(((val) & 0xff), tp->regs + (reg))
 #define tr32(reg)		readl(tp->regs + (reg))
@@ -2325,25 +2347,19 @@ next_pkt_nopost:
 
 	/* ACK the status ring. */
 	tp->rx_rcb_ptr = rx_rcb_ptr;
-	tw32_mailbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW,
+	tw32_rx_mbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW,
 		     (rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp)));
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW);
 
 	/* Refill RX ring(s). */
 	if (work_mask & RXD_OPAQUE_RING_STD) {
 		sw_idx = tp->rx_std_ptr % TG3_RX_RING_SIZE;
-		tw32_mailbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
+		tw32_rx_mbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
 			     sw_idx);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW);
 	}
 	if (work_mask & RXD_OPAQUE_RING_JUMBO) {
 		sw_idx = tp->rx_jumbo_ptr % TG3_RX_JUMBO_RING_SIZE;
-		tw32_mailbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
+		tw32_rx_mbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
 			     sw_idx);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW);
 	}
 
 	return received;
@@ -2795,32 +2811,17 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 
 	/* Packets are ready, update Tx producer idx local and on card. */
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tw32_mailbox((MAILBOX_SNDHOST_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
-			tw32_mailbox((MAILBOX_SNDHOST_PROD_IDX_0 +
-				      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDHOST_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	} else {
 		/* First, make sure tg3 sees last descriptor fully
 		 * in SRAM.
 		 */
 		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
+			tr32(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW);
 
-		tw32_mailbox((MAILBOX_SNDNIC_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDNIC_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_TXD_MBOX_HWBUG)
-			tw32_mailbox((MAILBOX_SNDNIC_PROD_IDX_0 +
-				      TG3_64BIT_REG_LOW), entry);
-
-		/* Now post the mailbox write itself.  */
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	}
 
 	tp->tx_prod = entry;
@@ -2965,11 +2966,8 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * the double-write bug tests.
 	 */
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tw32_mailbox((MAILBOX_SNDHOST_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDHOST_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	} else {
 		/* First, make sure tg3 sees last descriptor fully
 		 * in SRAM.
@@ -2978,13 +2976,8 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
 			     TG3_64BIT_REG_LOW);
 
-		tw32_mailbox((MAILBOX_SNDNIC_PROD_IDX_0 +
+		tw32_tx_mbox((MAILBOX_SNDNIC_PROD_IDX_0 +
 			      TG3_64BIT_REG_LOW), entry);
-
-		/* Now post the mailbox write itself.  */
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
 	}
 
 	tp->tx_prod = entry;
@@ -4797,9 +4790,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tp->tx_prod = 0;
 	tp->tx_cons = 0;
 	tw32_mailbox(MAILBOX_SNDHOST_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
-	tw32_mailbox(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW);
+	tw32_tx_mbox(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
 
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
 		tg3_set_bdinfo(tp, NIC_SRAM_SEND_RCB,
@@ -4826,9 +4817,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 	tp->rx_rcb_ptr = 0;
-	tw32_mailbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW, 0);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW);
+	tw32_rx_mbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW, 0);
 
 	tg3_set_bdinfo(tp, NIC_SRAM_RCV_RET_RCB,
 		       tp->rx_rcb_mapping,
@@ -4837,19 +4826,13 @@ static int tg3_reset_hw(struct tg3 *tp)
 		       0);
 
 	tp->rx_std_ptr = tp->rx_pending;
-	tw32_mailbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
+	tw32_rx_mbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
 		     tp->rx_std_ptr);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW);
 
-	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE)
-		tp->rx_jumbo_ptr = tp->rx_jumbo_pending;
-	else
-		tp->rx_jumbo_ptr = 0;
-	tw32_mailbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
+	tp->rx_jumbo_ptr = (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) ?
+						tp->rx_jumbo_pending : 0;
+	tw32_rx_mbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
 		     tp->rx_jumbo_ptr);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW);
 
 	/* Initialize MAC address and backoff seed. */
 	__tg3_set_mac_addr(tp);
