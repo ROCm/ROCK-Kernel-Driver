@@ -382,7 +382,7 @@ static struct sparc64_tick_ops hbtick_operations = {
 	.get_compare	=	hbtick_get_compare,
 	.add_tick	=	hbtick_add_tick,
 	.add_compare	=	hbtick_add_compare,
-	.softint_mask	=	1UL << 0,
+	.softint_mask	=	1UL << 16,
 };
 
 /* timer_interrupt() needs to keep up the real-time clock,
