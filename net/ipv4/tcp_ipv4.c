@@ -2137,52 +2137,18 @@ static inline struct tcp_tw_bucket *tw_next(struct tcp_tw_bucket *tw)
 		hlist_entry(tw->tw_node.next, typeof(*tw), tw_node) : NULL;
 }
 
-static void *listening_get_first(struct seq_file *seq)
-{
-	struct tcp_iter_state* st = seq->private;
-	void *rc = NULL;
-
-	for (st->bucket = 0; st->bucket < TCP_LHTABLE_SIZE; ++st->bucket) {
-		struct open_request *req;
-		struct tcp_opt *tp;
-		struct sock *sk = sk_head(&tcp_listening_hash[st->bucket]);
-
-		if (!sk)
-			continue;
-		if (sk->sk_family == st->family) {
-			rc = sk;
-			goto out;
-		}
-	       	tp = tcp_sk(sk);
-		read_lock_bh(&tp->syn_wait_lock);
-		if (tp->listen_opt && tp->listen_opt->qlen) {
-			st->uid		= sock_i_uid(sk);
-			st->syn_wait_sk = sk;
-			st->state	= TCP_SEQ_STATE_OPENREQ;
-			for (st->sbucket = 0; st->sbucket < TCP_SYNQ_HSIZE;
-			     ++st->sbucket) {
-				for (req = tp->listen_opt->syn_table[st->sbucket];
-				     req; req = req->dl_next) {
-					if (req->class->family != st->family)
-						continue;
-					rc = req;
-					goto out;
-				}
-			}
-			st->state = TCP_SEQ_STATE_LISTENING;
-		}
-		read_unlock_bh(&tp->syn_wait_lock);
-	}
-out:
-	return rc;
-}
-
 static void *listening_get_next(struct seq_file *seq, void *cur)
 {
 	struct tcp_opt *tp;
 	struct hlist_node *node;
 	struct sock *sk = cur;
 	struct tcp_iter_state* st = seq->private;
+
+	if (!sk) {
+		st->bucket = 0;
+		sk = sk_head(&tcp_listening_hash[0]);
+		goto get_sk;
+	}
 
 	++st->num;
 
@@ -2237,7 +2203,7 @@ out:
 
 static void *listening_get_idx(struct seq_file *seq, loff_t *pos)
 {
-	void *rc = listening_get_first(seq);
+	void *rc = listening_get_next(seq, NULL);
 
 	while (rc && *pos) {
 		rc = listening_get_next(seq, rc);
