@@ -141,36 +141,6 @@ static struct file_operations socket_file_ops = {
 
 static struct net_proto_family *net_families[NPROTO];
 
-static __inline__ void net_family_bug(int family)
-{
-	printk(KERN_ERR "%d is not yet sock_registered!\n", family);
-	BUG();
-}
-
-int net_family_get(int family)
-{
-	struct net_proto_family *prot = net_families[family];
-	int rc = 1;
-
-	barrier();
-	if (likely(prot != NULL))
-		rc = try_module_get(prot->owner);
-	else
-		net_family_bug(family);
-	return rc;
-}
-
-void net_family_put(int family)
-{
-	struct net_proto_family *prot = net_families[family];
-
-	barrier();
-	if (likely(prot != NULL))
-		module_put(prot->owner);
-	else
-		net_family_bug(family);
-}
-
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 static atomic_t net_family_lockct = ATOMIC_INIT(0);
 static spinlock_t net_family_lock = SPIN_LOCK_UNLOCKED;
@@ -535,11 +505,11 @@ struct file_operations bad_sock_fops = {
 void sock_release(struct socket *sock)
 {
 	if (sock->ops) {
-		const int family = sock->ops->family;
+		struct module *owner = sock->ops->owner;
 
 		sock->ops->release(sock);
 		sock->ops = NULL;
-		net_family_put(family);
+		module_put(owner);
 	}
 
 	if (sock->fasync_list)
@@ -1091,19 +1061,37 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 
 	sock->type  = type;
 
+	/*
+	 * We will call the ->create function, that possibly is in a loadable
+	 * module, so we have to bump that loadable module refcnt first.
+	 */
 	i = -EAFNOSUPPORT;
-	if (!net_family_get(family))
+	if (!try_module_get(net_families[family]->owner))
 		goto out_release;
 
-	if ((i = net_families[family]->create(sock, protocol)) < 0) 
-		goto out_release;
-
+	if ((i = net_families[family]->create(sock, protocol)) < 0)
+		goto out_module_put;
+	/*
+	 * Now to bump the refcnt of the [loadable] module that owns this
+	 * socket at sock_release time we decrement its refcnt.
+	 */
+	if (!try_module_get(sock->ops->owner)) {
+		sock->ops = NULL;
+		goto out_module_put;
+	}
+	/*
+	 * Now that we're done with the ->create function, the [loadable]
+	 * module can have its refcnt decremented
+	 */
+	module_put(net_families[family]->owner);
 	*res = sock;
 	security_socket_post_create(sock, family, type, protocol);
 
 out:
 	net_family_read_unlock();
 	return i;
+out_module_put:
+	module_put(net_families[family]->owner);
 out_release:
 	sock_release(sock);
 	goto out;
@@ -1288,28 +1276,30 @@ asmlinkage long sys_accept(int fd, struct sockaddr *upeer_sockaddr, int *upeer_a
 	if (err)
 		goto out_release;
 
-	err = -EAFNOSUPPORT;
-	if (!net_family_get(sock->ops->family))
-		goto out_release;
+	/*
+	 * We don't need try_module_get here, as the listening socket (sock)
+	 * has the protocol module (sock->ops->owner) held.
+	 */
+	__module_get(sock->ops->owner);
 
 	err = sock->ops->accept(sock, newsock, sock->file->f_flags);
 	if (err < 0)
-		goto out_family_put;
+		goto out_module_put;
 
 	if (upeer_sockaddr) {
 		if(newsock->ops->getname(newsock, (struct sockaddr *)address, &len, 2)<0) {
 			err = -ECONNABORTED;
-			goto out_family_put;
+			goto out_module_put;
 		}
 		err = move_addr_to_user(address, len, upeer_sockaddr, upeer_addrlen);
 		if (err < 0)
-			goto out_family_put;
+			goto out_module_put;
 	}
 
 	/* File flags are not inherited via accept() unlike another OSes. */
 
 	if ((err = sock_map_fd(newsock)) < 0)
-		goto out_family_put;
+		goto out_module_put;
 
 	security_socket_post_accept(sock, newsock);
 
@@ -1317,8 +1307,8 @@ out_put:
 	sockfd_put(sock);
 out:
 	return err;
-out_family_put:
-	net_family_put(sock->ops->family);
+out_module_put:
+	module_put(sock->ops->owner);
 out_release:
 	sock_release(newsock);
 	goto out_put;

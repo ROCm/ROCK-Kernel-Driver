@@ -64,45 +64,9 @@ void pppox_unbind_sock(struct sock *sk)
 	}
 }
 
-static int pppox_release(struct socket *sock)
-{
-	struct sock *sk = sock->sk;
-	int rc = pppox_protos[sk->protocol]->release(sock);
-
-	module_put(pppox_protos[sk->protocol]->owner);
-	return rc;
-}
-
-static void pppox_sk_free(struct sock *sk)
-{
-	pppox_protos[sk->protocol]->sk_free(sk);
-	module_put(pppox_protos[sk->protocol]->owner);
-}
-
-struct sock *pppox_sk_alloc(struct socket *sock, int protocol, int priority,
-			    int zero_it, kmem_cache_t *slab)
-{
-	struct sock *sk = NULL;
-
-	if (!try_module_get(pppox_protos[protocol]->owner))
-		goto out;
-
-	sk = sk_alloc(PF_PPPOX, priority, zero_it, slab);
-	if (sk) {
-		sock_init_data(sock, sk);
-		sk->family   = PF_PPPOX;
-		sk->protocol = protocol;
-		sk->destruct = pppox_sk_free;
-	} else
-		module_put(pppox_protos[protocol]->owner);
-out:
-	return sk;
-}
-
 EXPORT_SYMBOL(register_pppox_proto);
 EXPORT_SYMBOL(unregister_pppox_proto);
 EXPORT_SYMBOL(pppox_unbind_sock);
-EXPORT_SYMBOL(pppox_sk_alloc);
 
 static int pppox_ioctl(struct socket* sock, unsigned int cmd, 
 		       unsigned long arg)
@@ -156,12 +120,10 @@ static int pppox_create(struct socket *sock, int protocol)
 	rc = pppox_protos[protocol]->create(sock);
 	if (!rc) {
 		/* We get to set the ioctl handler. */
-		/* And the release handler, for module refcounting */
 		/* For everything else, pppox is just a shell. */
 		sock->ops->ioctl = pppox_ioctl;
-		sock->ops->release = pppox_release;
-	} else
-		module_put(pppox_protos[protocol]->owner);
+	}
+	module_put(pppox_protos[protocol]->owner);
 out:
 	return rc;
 }

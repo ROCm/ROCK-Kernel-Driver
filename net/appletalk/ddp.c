@@ -1778,6 +1778,7 @@ static struct net_proto_family atalk_family_ops = {
 
 static struct proto_ops SOCKOPS_WRAPPED(atalk_dgram_ops) = {
 	.family		= PF_APPLETALK,
+	.owner		= THIS_MODULE,
 	.release	= atalk_release,
 	.bind		= atalk_bind,
 	.connect	= atalk_connect,

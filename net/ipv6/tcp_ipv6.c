@@ -1309,7 +1309,6 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 #ifdef INET_REFCNT_DEBUG
 		atomic_inc(&inet6_sock_nr);
 #endif
-		MOD_INC_USE_COUNT;
 
 		/* It is tricky place. Until this moment IPv4 tcp
 		   worked with IPv6 af_tcp.af_specific.
@@ -1359,7 +1358,6 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 #ifdef INET_REFCNT_DEBUG
 	atomic_inc(&inet6_sock_nr);
 #endif
-	MOD_INC_USE_COUNT;
 
 	ip6_dst_store(newsk, dst, NULL);
 	sk->route_caps = dst->dev->features&~(NETIF_F_IP_CSUM|NETIF_F_TSO);

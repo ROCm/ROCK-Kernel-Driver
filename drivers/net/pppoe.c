@@ -494,16 +494,21 @@ static int pppoe_create(struct socket *sock)
 	struct sock *sk;
 	struct pppox_opt *po;
 
-	sk = pppox_sk_alloc(sock, PX_PROTO_OE, GFP_KERNEL, 1, NULL);
+	sk = sk_alloc(PF_PPPOX, GFP_KERNEL, 1, NULL);
 	if (!sk)
 		goto out;
 
+	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 	sock->state = SS_UNCONNECTED;
 	sock->ops   = &pppoe_ops;
 
 	sk->backlog_rcv = pppoe_rcv_core;
 	sk->state = PPPOX_NONE;
 	sk->type = SOCK_STREAM;
+	sk->family   = PF_PPPOX;
+	sk->protocol = PX_PROTO_OE;
+	sk->destruct = pppoe_sk_free;
 
 	po = pppox_sk(sk) = kmalloc(sizeof(*po), GFP_KERNEL);
 	if (!po)
@@ -1062,10 +1067,12 @@ static struct file_operations pppoe_seq_fops = {
 };
 #endif /* CONFIG_PROC_FS */
 
-/* ->release and ->ioctl are set at pppox_create */
+/* ->ioctl are set at pppox_create */
 
 struct proto_ops pppoe_ops = {
     .family		= AF_PPPOX,
+    .owner		= THIS_MODULE,
+    .release		= pppoe_release,
     .bind		= sock_no_bind,
     .connect		= pppoe_connect,
     .socketpair		= sock_no_socketpair,
@@ -1084,8 +1091,6 @@ struct proto_ops pppoe_ops = {
 struct pppox_proto pppoe_proto = {
     .create	= pppoe_create,
     .ioctl	= pppoe_ioctl,
-    .release	= pppoe_release,
-    .sk_free	= pppoe_sk_free,
     .owner	= THIS_MODULE,
 };
 

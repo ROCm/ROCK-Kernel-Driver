@@ -1227,7 +1227,7 @@ static struct net_proto_family nr_family_ops = {
 
 static struct proto_ops nr_proto_ops = {
 	.family		=	PF_NETROM,
-
+	.owner		=	THIS_MODULE,
 	.release	=	nr_release,
 	.bind		=	nr_bind,
 	.connect	=	nr_connect,

@@ -1323,7 +1323,7 @@ struct net_proto_family x25_family_ops = {
 
 static struct proto_ops SOCKOPS_WRAPPED(x25_proto_ops) = {
 	.family =	AF_X25,
-
+	.owner =	THIS_MODULE,
 	.release =	x25_release,
 	.bind =		x25_bind,
 	.connect =	x25_connect,
