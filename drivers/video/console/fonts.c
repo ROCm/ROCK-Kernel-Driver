@@ -16,10 +16,10 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
+#include <linux/font.h>
 #if defined(__mc68000__) || defined(CONFIG_APUS)
 #include <asm/setup.h>
 #endif
-#include "font.h"
 
 #define NO_FONTS
 

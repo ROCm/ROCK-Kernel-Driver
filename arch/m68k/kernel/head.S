@@ -21,7 +21,7 @@
 ** 96/04/26 Guenther Kelleter: fixed identity mapping for Falcon with
 ** 			      Magnum- and FX-alternate ram
 ** 98/04/25 Phil Blundell: added HP300 support
-** 1998/08/30 David Kilzer: Added support for fbcon_font_desc structures
+** 1998/08/30 David Kilzer: Added support for font_desc structures
 **            for linux-2.1.115
 ** 9/02/11  Richard Zidlicky: added Q40 support (initial vesion 99/01/01) 
 **
@@ -238,7 +238,7 @@
  *		In theory these could be determined at run time or handed
  *		over by the booter.  But, let's be real, it's a fine hard
  *		coded value.  (But, you will notice the code is run-time
- *		flexible!)  A pointer to the font's struct fbcon_font_desc
+ *		flexible!)  A pointer to the font's struct font_desc
  *		is kept locally in Lconsole_font.  It is used to determine
  *		font size information dynamically.
  *
@@ -3371,7 +3371,7 @@ console_clear_loop:
 	 *	a1 = address of Lconsole_font pointer
 	 */
 	lea	%pc@(L(console_font)),%a1
-	movel	%a0,%a1@	/* store pointer to struct fbcon_font_desc in Lconsole_font */
+	movel	%a0,%a1@	/* store pointer to struct font_desc in Lconsole_font */
 	tstl	%a0
 	jeq	1f
 
@@ -3383,10 +3383,10 @@ console_clear_loop:
 	 */
 		/* ASSERT: a0 = contents of Lconsole_font */
 	movel	%d3,%d0			/* screen width in pixels */
-	divul	%a0@(FBCON_FONT_DESC_WIDTH),%d0		/* d0 = max num chars per row */
+	divul	%a0@(FONT_DESC_WIDTH),%d0		/* d0 = max num chars per row */
 
 	movel	%d4,%d1			 /* screen height in pixels */
-	divul	%a0@(FBCON_FONT_DESC_HEIGHT),%d1	 /* d1 = max num rows */
+	divul	%a0@(FONT_DESC_HEIGHT),%d1	 /* d1 = max num rows */
 
 	movel	%d0,%a2@(Lconsole_struct_num_columns)
 	movel	%d1,%a2@(Lconsole_struct_num_rows)
@@ -3489,7 +3489,7 @@ console_scroll:
 	movel	%pc@(L(console_font)),%a0
 	tstl	%a0
 	jeq	1f
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d5	/* account for # scan lines per character */
+	mulul	%a0@(FONT_DESC_HEIGHT),%d5	/* account for # scan lines per character */
 	addal	%d5,%a2
 
 	/*
@@ -3508,7 +3508,7 @@ console_scroll:
 	lea	%pc@(L(mac_rowbytes)),%a0
 	movel	%a0@,%d6
 	movel	%pc@(L(console_font)),%a0
-	subl	%a0@(FBCON_FONT_DESC_HEIGHT),%d4	/* we're not scrolling the top row! */
+	subl	%a0@(FONT_DESC_HEIGHT),%d4	/* we're not scrolling the top row! */
 	mulul	%d4,%d6		/* scan line bytes x num scan lines */
 	divul	#32,%d6		/* we'll move 8 longs at a time */
 	subq	#1,%d6
@@ -3527,7 +3527,7 @@ console_scroll_loop:
 	lea	%pc@(L(mac_rowbytes)),%a0
 	movel	%a0@,%d6
 	movel	%pc@(L(console_font)),%a0
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d6	/* scan line bytes x font height */
+	mulul	%a0@(FONT_DESC_HEIGHT),%d6	/* scan line bytes x font height */
 	divul	#32,%d6			/* we'll move 8 words at a time */
 	subq	#1,%d6
 
@@ -3612,13 +3612,13 @@ console_not_home:
 
 	/*
 	 *	At this point we make a shift in register usage
-	 *	a0 = address of pointer to font data (fbcon_font_desc)
+	 *	a0 = address of pointer to font data (font_desc)
 	 */
 	movel	%pc@(L(console_font)),%a0
-	movel	%a0@(FBCON_FONT_DESC_DATA),%a1	/* Load fbcon_font_desc.data into a1 */
+	movel	%a0@(FONT_DESC_DATA),%a1	/* Load font_desc.data into a1 */
 	andl	#0x000000ff,%d7
 		/* ASSERT: a0 = contents of Lconsole_font */
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d7	/* d7 = index into font data */
+	mulul	%a0@(FONT_DESC_HEIGHT),%d7	/* d7 = index into font data */
 	addl	%d7,%a1			/* a1 = points to char image */
 
 	/*
@@ -3631,15 +3631,15 @@ console_not_home:
 	 *	d7 = count down for the font's pixel count in height
 	 */
 		/* ASSERT: a0 = contents of Lconsole_font */
-	mulul	%a0@(FBCON_FONT_DESC_WIDTH),%d0
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d1
-	movel	%a0@(FBCON_FONT_DESC_HEIGHT),%d7	/* Load fbcon_font_desc.height into d7 */
+	mulul	%a0@(FONT_DESC_WIDTH),%d0
+	mulul	%a0@(FONT_DESC_HEIGHT),%d1
+	movel	%a0@(FONT_DESC_HEIGHT),%d7	/* Load font_desc.height into d7 */
 	subq	#1,%d7
 console_read_char_scanline:
 	moveb	%a1@+,%d3
 
 		/* ASSERT: a0 = contents of Lconsole_font */
-	movel	%a0@(FBCON_FONT_DESC_WIDTH),%d6	/* Load fbcon_font_desc.width into d6 */
+	movel	%a0@(FONT_DESC_WIDTH),%d6	/* Load font_desc.width into d6 */
 	subql	#1,%d6
 
 console_do_font_scanline:
@@ -3650,7 +3650,7 @@ console_do_font_scanline:
 	dbra	%d6,console_do_font_scanline
 
 		/* ASSERT: a0 = contents of Lconsole_font */
-	subl	%a0@(FBCON_FONT_DESC_WIDTH),%d0
+	subl	%a0@(FONT_DESC_WIDTH),%d0
 	addq	#1,%d1
 	dbra	%d7,console_read_char_scanline
 
@@ -3848,7 +3848,7 @@ L(console_globals):
 	.long	0		/* left edge */
 	.long	0		/* mac putc */
 L(console_font):
-	.long	0		/* pointer to console font (struct fbcon_font_desc) */
+	.long	0		/* pointer to console font (struct font_desc) */
 #endif /* CONSOLE */
 
 #if defined(MMU_PRINT)

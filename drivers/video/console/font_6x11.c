@@ -4,7 +4,7 @@
 /*                                            */
 /**********************************************/
 
-#include "font.h"
+#include <linux/font.h>
 
 #define FONTDATAMAX (11*256)
 

@@ -21,7 +21,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include "font.h"
+#include <linux/font.h>
 
 #include <asm/pgalloc.h>
 #include <asm/hardware.h>

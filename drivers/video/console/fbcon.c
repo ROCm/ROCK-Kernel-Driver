@@ -73,6 +73,7 @@
 #include <linux/fb.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
+#include <linux/font.h>
 #include <linux/smp.h>
 #include <linux/init.h>
 
@@ -95,7 +96,6 @@
 #endif
 
 #include "fbcon.h"
-#include "font.h"
 
 #ifdef FBCONDEBUG
 #  define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)
