@@ -107,5 +107,5 @@ checkbin:
 	@true
 endif
 
-CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h \
-		arch/$(ARCH)/kernel/asm-offsets.s
+CLEAN_FILES += arch/$(ARCH)/kernel/asm-offsets.s
+MRPROPER_FILES += include/asm-$(ARCH)/offsets.h
