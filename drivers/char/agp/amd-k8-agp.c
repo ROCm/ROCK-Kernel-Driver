@@ -228,60 +228,6 @@ static struct gatt_mask amd_8151_masks[] =
 };
 
 
-/*
- * Try to configure an AGP v3 capable setup.
- * If we fail (typically because we don't have an AGP v3
- * card in the system) we fall back to the generic AGP v2
- * routines.
- */
-static void agp_x86_64_agp_enable(u32 mode)
-{
-	struct pci_dev *device = NULL;
-	u32 command, scratch; 
-	u8 cap_ptr;
-	u8 v3_devs=0;
-
-	/* FIXME: If 'mode' is x1/x2/x4 should we call the AGPv2 routines directly ?
-	 * Messy, as some AGPv3 cards can only do x4 as a minimum.
-	 */
-
-	/* PASS1: Count # of devs capable of AGPv3 mode. */
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			pci_read_config_dword(device, cap_ptr, &scratch);
-			scratch &= (1<<20|1<<21|1<<22|1<<23);
-			scratch = scratch>>20;
-			/* AGP v3 capable ? */
-			if (scratch>=3) {
-				v3_devs++;
-				printk (KERN_INFO "AGP: Found AGPv3 capable device at %d:%d:%d\n",
-					device->bus->number, PCI_FUNC(device->devfn), PCI_SLOT(device->devfn));
-			} else {
-				printk (KERN_INFO "AGP: Meh. version %x AGP device found.\n", scratch);
-			}
-		}
-	}
-	/* If not enough, go to AGP v2 setup */
-	if (v3_devs<2) {
-		printk (KERN_INFO "AGP: Only %d devices found, not enough, trying AGPv2\n", v3_devs);
-		return agp_generic_enable(mode);
-	} else {
-		printk (KERN_INFO "AGP: Enough AGPv3 devices found, setting up...\n");
-	}
-
-
-	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &command);
-
-	command = agp_collect_device_status(mode, command);
-	command |= 0x100;
-
-	pci_write_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_COMMAND, command);
-
-	agp_device_command(command, 1);
-}
-
-
 static int __init amd_8151_setup (struct pci_dev *pdev)
 {
 	struct pci_dev *dev;
@@ -298,7 +244,7 @@ static int __init amd_8151_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = amd_8151_cleanup;
 	agp_bridge->tlb_flush = amd_x86_64_tlbflush;
 	agp_bridge->mask_memory = amd_8151_mask_memory;
-	agp_bridge->agp_enable = agp_x86_64_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
