@@ -19,7 +19,7 @@
 #include <linux/pagemap.h>
 #include <linux/writeback.h>
 #include <linux/init.h>
-//#include <linux/sysrq.h>
+#include <linux/sysrq.h>
 #include <linux/backing-dev.h>
 #include <linux/mpage.h>
 
@@ -170,6 +170,8 @@ static void background_writeout(unsigned long _min_pages)
 	const int background_thresh = (dirty_background_ratio * tot) / 100;
 	long min_pages = _min_pages;
 	int nr_to_write;
+
+	CHECK_EMERGENCY_SYNC
 
 	do {
 		struct page_state ps;
