@@ -4447,7 +4447,7 @@ static void __init adapter_init_scsi_host(struct Scsi_Host *host)
  *
  * @acb: The adapter which we are to init.
  **/
-void __init adapter_init_chip(struct AdapterCtlBlk *acb)
+static void __init adapter_init_chip(struct AdapterCtlBlk *acb)
 {
         struct NvRamType *eeprom = &acb->eeprom;
         
