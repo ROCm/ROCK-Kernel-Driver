@@ -152,10 +152,6 @@ void
 acpi_dm_decode_internal_object (
 	union acpi_operand_object       *obj_desc);
 
-void
-acpi_dm_decode_node (
-	struct acpi_namespace_node      *node);
-
 u32
 acpi_dm_block_type (
 	union acpi_parse_object         *op);

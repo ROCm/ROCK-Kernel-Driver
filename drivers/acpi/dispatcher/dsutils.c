@@ -53,6 +53,7 @@
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dsutils")
 
+
 #ifndef ACPI_NO_METHOD_EXECUTION
 
 /*******************************************************************************
@@ -196,7 +197,6 @@ result_not_used:
 			acpi_ps_get_opcode_name (op->common.parent->common.aml_opcode), op));
 
 	return_VALUE (FALSE);
-
 }
 
 
@@ -238,7 +238,6 @@ acpi_ds_delete_result_if_not_used (
 	if (!result_obj) {
 		return_VOID;
 	}
-
 
 	if (!acpi_ds_is_result_used (op, walk_state)) {
 		/*
@@ -389,61 +388,77 @@ acpi_ds_create_operand (
 		 * in name_string
 		 */
 
+
 		/*
-		 * Differentiate between a namespace "create" operation
-		 * versus a "lookup" operation (IMODE_LOAD_PASS2 vs.
-		 * IMODE_EXECUTE) in order to support the creation of
-		 * namespace objects during the execution of control methods.
+		 * Special handling for buffer_field declarations. This is a deferred
+		 * opcode that unfortunately defines the field name as the last
+		 * parameter instead of the first.  We get here when we are performing
+		 * the deferred execution, so the actual name of the field is already
+		 * in the namespace.  We don't want to attempt to look it up again
+		 * because we may be executing in a different scope than where the
+		 * actual opcode exists.
 		 */
-		parent_op = arg->common.parent;
-		op_info = acpi_ps_get_opcode_info (parent_op->common.aml_opcode);
-		if ((op_info->flags & AML_NSNODE) &&
-			(parent_op->common.aml_opcode != AML_INT_METHODCALL_OP) &&
-			(parent_op->common.aml_opcode != AML_REGION_OP) &&
-			(parent_op->common.aml_opcode != AML_INT_NAMEPATH_OP)) {
-			/* Enter name into namespace if not found */
-
-			interpreter_mode = ACPI_IMODE_LOAD_PASS2;
+		if ((walk_state->deferred_node) &&
+			(walk_state->deferred_node->type == ACPI_TYPE_BUFFER_FIELD) &&
+			(arg_index != 0)) {
+			obj_desc = ACPI_CAST_PTR (union acpi_operand_object, walk_state->deferred_node);
+			status = AE_OK;
 		}
+		else    /* All other opcodes */ {
+			/*
+			 * Differentiate between a namespace "create" operation
+			 * versus a "lookup" operation (IMODE_LOAD_PASS2 vs.
+			 * IMODE_EXECUTE) in order to support the creation of
+			 * namespace objects during the execution of control methods.
+			 */
+			parent_op = arg->common.parent;
+			op_info = acpi_ps_get_opcode_info (parent_op->common.aml_opcode);
+			if ((op_info->flags & AML_NSNODE) &&
+				(parent_op->common.aml_opcode != AML_INT_METHODCALL_OP) &&
+				(parent_op->common.aml_opcode != AML_REGION_OP) &&
+				(parent_op->common.aml_opcode != AML_INT_NAMEPATH_OP)) {
+				/* Enter name into namespace if not found */
 
-		else {
-			/* Return a failure if name not found */
-
-			interpreter_mode = ACPI_IMODE_EXECUTE;
-		}
-
-		status = acpi_ns_lookup (walk_state->scope_info, name_string,
-				 ACPI_TYPE_ANY, interpreter_mode,
-				 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
-				 walk_state,
-				 ACPI_CAST_INDIRECT_PTR (struct acpi_namespace_node, &obj_desc));
-		/*
-		 * The only case where we pass through (ignore) a NOT_FOUND
-		 * error is for the cond_ref_of opcode.
-		 */
-		if (status == AE_NOT_FOUND) {
-			if (parent_op->common.aml_opcode == AML_COND_REF_OF_OP) {
-				/*
-				 * For the Conditional Reference op, it's OK if
-				 * the name is not found;  We just need a way to
-				 * indicate this to the interpreter, set the
-				 * object to the root
-				 */
-				obj_desc = ACPI_CAST_PTR (union acpi_operand_object, acpi_gbl_root_node);
-				status = AE_OK;
+				interpreter_mode = ACPI_IMODE_LOAD_PASS2;
 			}
-
 			else {
-				/*
-				 * We just plain didn't find it -- which is a
-				 * very serious error at this point
-				 */
-				status = AE_AML_NAME_NOT_FOUND;
-			}
-		}
+				/* Return a failure if name not found */
 
-		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_NSERROR (name_string, status);
+				interpreter_mode = ACPI_IMODE_EXECUTE;
+			}
+
+			status = acpi_ns_lookup (walk_state->scope_info, name_string,
+					 ACPI_TYPE_ANY, interpreter_mode,
+					 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
+					 walk_state,
+					 ACPI_CAST_INDIRECT_PTR (struct acpi_namespace_node, &obj_desc));
+			/*
+			 * The only case where we pass through (ignore) a NOT_FOUND
+			 * error is for the cond_ref_of opcode.
+			 */
+			if (status == AE_NOT_FOUND) {
+				if (parent_op->common.aml_opcode == AML_COND_REF_OF_OP) {
+					/*
+					 * For the Conditional Reference op, it's OK if
+					 * the name is not found;  We just need a way to
+					 * indicate this to the interpreter, set the
+					 * object to the root
+					 */
+					obj_desc = ACPI_CAST_PTR (union acpi_operand_object, acpi_gbl_root_node);
+					status = AE_OK;
+				}
+				else {
+					/*
+					 * We just plain didn't find it -- which is a
+					 * very serious error at this point
+					 */
+					status = AE_AML_NAME_NOT_FOUND;
+				}
+			}
+
+			if (ACPI_FAILURE (status)) {
+				ACPI_REPORT_NSERROR (name_string, status);
+			}
 		}
 
 		/* Free the namestring created above */
@@ -464,8 +479,6 @@ acpi_ds_create_operand (
 		}
 		ACPI_DEBUGGER_EXEC (acpi_db_display_argument_object (obj_desc, walk_state));
 	}
-
-
 	else {
 		/* Check for null name case */
 
@@ -480,7 +493,6 @@ acpi_ds_create_operand (
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Null namepath: Arg=%p\n", arg));
 		}
-
 		else {
 			opcode = arg->common.aml_opcode;
 		}
