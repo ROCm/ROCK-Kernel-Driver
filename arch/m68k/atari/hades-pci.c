@@ -372,6 +372,8 @@ struct pci_bus_info * __init init_hades_pci(void)
 	 */
 
 	bus = kmalloc(sizeof(struct pci_bus_info), GFP_KERNEL);
+	if (!bus)
+		return NULL;
 	memset(bus, 0, sizeof(struct pci_bus_info));
 
 	/*

@@ -6,7 +6,7 @@
  *   Copyright Digital Equipment Corporation 1996.
  *
  *   This software may be used and distributed according to the terms of
- *   the GNU Public License, incorporated herein by reference.
+ *   the GNU General Public License, incorporated herein by reference.
  *
  * Abstract:
  *   Contains all definitions specified by port specification and required

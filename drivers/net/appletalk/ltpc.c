@@ -215,7 +215,7 @@ static int dma=0;
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -787,6 +787,7 @@ static int sendup_buffer (struct net_device *dev)
 
 	/* toss it onwards */
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	return 0;
 }
 

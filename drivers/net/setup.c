@@ -50,7 +50,7 @@ struct net_probe
 	int status;	/* non-zero if autoprobe has failed */
 };
  
-struct net_probe pci_probes[] __initdata = {
+static struct net_probe pci_probes[] __initdata = {
 	/*
 	 *	Early setup devices
 	 */

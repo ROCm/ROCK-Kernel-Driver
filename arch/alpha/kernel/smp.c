@@ -837,7 +837,7 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 	atomic_set(&data.unstarted_count, smp_num_cpus - 1);
 	atomic_set(&data.unfinished_count, smp_num_cpus - 1);
 
-	/* Aquire the smp_call_function_data mutex.  */
+	/* Acquire the smp_call_function_data mutex.  */
 	if (pointer_lock(&smp_call_function_data, &data, retry))
 		return -EBUSY;
 

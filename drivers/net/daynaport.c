@@ -8,7 +8,7 @@
 	Director, National Security Agency.
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	    TODO:
 
@@ -44,7 +44,7 @@ static int version_printed;
 #include <linux/etherdevice.h>
 #include "8390.h"
 
-int ns8390_probe1(struct net_device *dev, int word16, char *name, int id,
+static int ns8390_probe1(struct net_device *dev, int word16, char *name, int id,
 				  int prom, struct nubus_dev *ndev);
 
 static int ns8390_open(struct net_device *dev);
@@ -144,7 +144,7 @@ enum mac8390_type {
 	NS8390_CABLETRON
 };
 
-int __init ns8390_ident(struct nubus_dev* ndev)
+static int __init ns8390_ident(struct nubus_dev* ndev)
 {
 	/* This really needs to be tested and tested hard.  */
 		
@@ -194,7 +194,7 @@ int __init ns8390_ident(struct nubus_dev* ndev)
  *	Memory probe for 8390 cards
  */
  
-int __init apple_8390_mem_probe(volatile unsigned short *p)
+static int __init apple_8390_mem_probe(volatile unsigned short *p)
 {
 	int i, j;
 	/*
@@ -454,8 +454,7 @@ int __init mac8390_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
-int __init mac8390_ethernet_addr(struct nubus_dev* ndev, 
-				 unsigned char addr[6])
+static int __init mac8390_ethernet_addr(struct nubus_dev* ndev, unsigned char addr[6])
 {
 	struct nubus_dir dir;
 	struct nubus_dirent ent;
@@ -470,8 +469,8 @@ int __init mac8390_ethernet_addr(struct nubus_dev* ndev,
 	return 0;
 }
 
-int __init ns8390_probe1(struct net_device *dev, int word16, char *model_name,
-			 int type, int promoff, struct nubus_dev *ndev)
+static int __init ns8390_probe1(struct net_device *dev, int word16, char *model_name,
+			 	int type, int promoff, struct nubus_dev *ndev)
 {
 	static u32 fwrd4_offsets[16]={
 		0,      4,      8,      12,

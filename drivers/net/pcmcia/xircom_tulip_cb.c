@@ -3,7 +3,7 @@
 	Written/copyright 1994-1999 by Donald Becker.
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	This driver is for the Digital "Tulip" Ethernet adapter interface.
 	It should work with most DEC 21*4*-based chips/ethercards, as well as
@@ -104,7 +104,7 @@ static int csr0 = 0x00A00000 | 0x4800;
 #include <linux/timer.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>

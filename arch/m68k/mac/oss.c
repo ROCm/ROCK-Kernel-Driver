@@ -123,7 +123,7 @@ void oss_irq(int irq, void *dev_id, struct pt_regs *regs)
 /*
  * Nubus IRQ handler, OSS style
  *
- * Unlike the VIA/RBV this is on its own autovector interupt level.
+ * Unlike the VIA/RBV this is on its own autovector interrupt level.
  */
 
 void oss_nubus_irq(int irq, void *dev_id, struct pt_regs *regs)

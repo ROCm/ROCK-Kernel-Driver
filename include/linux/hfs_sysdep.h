@@ -2,7 +2,7 @@
  * linux/include/linux/hfs_sysdep.h
  *
  * Copyright (C) 1996-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains constants, types and inline
  * functions for various system dependent things.

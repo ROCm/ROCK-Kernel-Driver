@@ -339,6 +339,7 @@ sonic_rx(struct net_device *dev)
 	    eth_copy_and_sum(skb, pkt_ptr, pkt_len, 0);
 	    skb->protocol=eth_type_trans(skb,dev);
 	    netif_rx(skb);			/* pass the packet to upper layers */
+	    dev->last_rx = jiffies;
 	    lp->stats.rx_packets++;
 	    lp->stats.rx_bytes += pkt_len;
 	    

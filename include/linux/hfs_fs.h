@@ -2,7 +2,7 @@
  * linux/include/linux/hfs_fs.h
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * The source code distribution of the Columbia AppleTalk Package for
  * UNIX, version 6.0, (CAP) was used as a specification of the

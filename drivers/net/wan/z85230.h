@@ -8,6 +8,8 @@
 #ifndef _Z8530_H
 #define _Z8530_H
 
+#include <linux/tty.h>
+
 /* Conversion routines to/from brg time constants from/to bits
  * per second.
  */

@@ -340,7 +340,7 @@ static void znet_tx_timeout (struct net_device *dev)
 			dev->name);
 	outb (CMD0_RESET, ioaddr);
 	hardware_init (dev);
-	netif_start_queue (dev);
+	netif_wake_queue (dev);
 }
 
 static int znet_send_packet(struct sk_buff *skb, struct net_device *dev)
@@ -585,7 +585,9 @@ static void znet_rx(struct net_device *dev)
 		  }
 		  skb->protocol=eth_type_trans(skb,dev);
 		  netif_rx(skb);
+		  dev->last_rx = jiffies;
 		  lp->stats.rx_packets++;
+		  lp->stats.rx_bytes += pkt_len;
 		}
 		zn.rx_cur = this_rfp_ptr;
 		if (zn.rx_cur >= zn.rx_end)

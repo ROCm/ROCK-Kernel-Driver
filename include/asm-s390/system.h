@@ -12,6 +12,7 @@
 #define __ASM_SYSTEM_H
 
 #include <linux/config.h>
+#include <asm/types.h>
 #ifdef __KERNEL__
 #include <asm/lowcore.h>
 #endif
@@ -40,7 +41,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                         asm volatile (
                                 "   lhi   1,3\n"
                                 "   nr    1,%0\n"     /* isolate last 2 bits */
-                                "   xr    1,%0\n"     /* align ptr */
+                                "   xr    %0,1\n"     /* align ptr */
                                 "   bras  2,0f\n"
                                 "   icm   1,8,%1\n"   /* for ptr&3 == 0 */
                                 "   stcm  0,8,%1\n"
@@ -52,13 +53,13 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "   stcm  0,1,%1\n"
                                 "0: sll   1,3\n"
                                 "   la    2,0(1,2)\n" /* r2 points to an icm */
-                                "   l     0,%1\n"     /* get fullword */
+                                "   l     0,0(%0)\n"  /* get fullword */
                                 "1: lr    1,0\n"      /* cs loop */
                                 "   ex    0,0(2)\n"   /* insert x */
-                                "   cs    0,1,%1\n"
+                                "   cs    0,1,0(%0)\n"
                                 "   jl    1b\n"
                                 "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+a&" (ptr) : "m" (x)
+                                : "+a&" (ptr), "+m" (x) :
                                 : "memory", "0", "1", "2");
                 case 2:
                         if(((__u32)ptr)&1)
@@ -66,7 +67,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                         asm volatile (
                                 "   lhi   1,2\n"
                                 "   nr    1,%0\n"     /* isolate bit 2^1 */
-                                "   xr    1,%0\n"     /* align ptr */
+                                "   xr    %0,1\n"     /* align ptr */
                                 "   bras  2,0f\n"
                                 "   icm   1,12,%1\n"   /* for ptr&2 == 0 */
                                 "   stcm  0,12,%1\n"
@@ -74,13 +75,13 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "   stcm  0,3,%1\n"
                                 "0: sll   1,2\n"
                                 "   la    2,0(1,2)\n" /* r2 points to an icm */
-                                "   l     0,%1\n"     /* get fullword */
+                                "   l     0,0(%0)\n"  /* get fullword */
                                 "1: lr    1,0\n"      /* cs loop */
                                 "   ex    0,0(2)\n"   /* insert x */
-                                "   cs    0,1,%1\n"
+                                "   cs    0,1,0(%0)\n"
                                 "   jl    1b\n"
                                 "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+a&" (ptr) : "m" (x)
+                                : "+a&" (ptr), "+m" (x) :
                                 : "memory", "0", "1", "2");
                         break;
                 case 4:
@@ -115,6 +116,12 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 #define mb()    eieio()
 #define rmb()   eieio()
 #define wmb()   eieio()
+#define smp_mb()       mb()
+#define smp_rmb()      rmb()
+#define smp_wmb()      wmb()
+#define smp_mb__before_clear_bit()     smp_mb()
+#define smp_mb__after_clear_bit()      smp_mb()
+
 
 #define set_mb(var, value)      do { var = value; mb(); } while (0)
 #define set_wmb(var, value)     do { var = value; wmb(); } while (0)
@@ -138,6 +145,27 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 
 #define __restore_flags(x) \
         __asm__ __volatile__("ssm   %0" : : "m" (x) : "memory")
+
+#define __load_psw(psw) \
+	__asm__ __volatile__("lpsw %0" : : "m" (psw));
+
+#define __ctl_load(array, low, high) ({ \
+	__asm__ __volatile__ ( \
+		"   la    1,%0\n" \
+		"   bras  2,0f\n" \
+                "   lctl  0,0,0(1)\n" \
+		"0: ex    %1,0(2)" \
+		: : "m" (array), "a" (((low)<<4)+(high)) : "1", "2" ); \
+	})
+
+#define __ctl_store(array, low, high) ({ \
+	__asm__ __volatile__ ( \
+		"   la    1,%0\n" \
+		"   bras  2,0f\n" \
+		"   stctl 0,0,0(1)\n" \
+		"0: ex    %1,0(2)" \
+		: "=m" (array) : "a" (((low)<<4)+(high)): "1", "2" ); \
+	})
 
 #define __ctl_set_bit(cr, bit) ({ \
         __u8 dummy[16]; \
@@ -220,7 +248,6 @@ extern int save_fp_regs1(s390_fp_regs *fpregs);
 extern void save_fp_regs(s390_fp_regs *fpregs);
 extern int restore_fp_regs1(s390_fp_regs *fpregs);
 extern void restore_fp_regs(s390_fp_regs *fpregs);
-extern void show_crashed_task_info(void);
 #endif
 
 #endif

@@ -760,8 +760,7 @@ again:
 	} else if (q->head_active && !q->plugged)
 		head = head->next;
 
-	el_ret = elevator->elevator_merge_fn(q, &req, head, bh, rw,
-					     max_sectors, max_segments);
+	el_ret = elevator->elevator_merge_fn(q, &req, head, bh, rw,max_sectors);
 	switch (el_ret) {
 
 		case ELEVATOR_BACK_MERGE:

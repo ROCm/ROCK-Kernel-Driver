@@ -27,7 +27,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
         unsigned long pgd;
 
         if (prev != next) {
-                pgd = (__pa(next->pgd) & PAGE_MASK) | _SEGMENT_TABLE;
+	        pgd = (__pa(next->pgd)&PAGE_MASK) | 
+                      (_SEGMENT_TABLE|USER_STD_MASK);
                 /* Load page tables */
                 asm volatile("    lctl  7,7,%0\n"   /* secondary space */
                              "    lctl  13,13,%0\n" /* home space */

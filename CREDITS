@@ -62,6 +62,15 @@ S: Klaproosstraat 72 c 10
 S: B-2610 Wilrijk-Antwerpen
 S: Belgium
 
+N: Anton Altaparmakov
+E: aia21@cus.cam.ac.uk
+W: http://www-stu.christs.cam.ac.uk/~aia21/
+D: NTFS driver maintainer. NTFS fixes and cleanup.
+D: Tiny fixes in linear md device and emu10k1 driver.
+S: Christ's College
+S: Cambridge CB2 3BU
+S: United Kingdom
+
 N: C. Scott Ananian
 E: cananian@alumni.princeton.edu
 W: http://www.pdos.lcs.mit.edu/~cananian
@@ -82,6 +91,14 @@ D: ATAPI CD-Changer support, Major 2.1.x CD-ROM update.
 S: 4538 South Carnegie Tech Street
 S: Salt Lake City, Utah 84120
 S: USA
+
+N: Michael Ang
+E: mang@subcarrier.org
+W: http://www.subcarrier.org/mang
+D: Linux/PA-RISC hacker
+S: 85 Frank St.
+S: Ottawa, Ontario
+S: Canada K2P 0X3
 
 N: H. Peter Anvin
 E: hpa@zytor.com
@@ -160,6 +177,17 @@ D: Author and maintainer of the EATA ISA/EISA/PCI SCSI driver
 S: EMC Corporation
 S: Milano
 S: Italy
+
+N: Paul Bame
+E: bame@debian.org
+E: bame@puffin.external.hp.com
+E: paul_bame@hp.com
+W: http://www.parisc-linux.org
+D: PA-RISC 32 and 64-bit early boot, firmware interface, interrupts, misc
+S: MS42
+S: Hewlett-Packard
+S: 3404 E Harmony Rd
+S: Fort Collins, CO 80525
 
 N: Arindam Banerji
 E: axb@cse.nd.edu
@@ -374,6 +402,12 @@ S: Dept of Computer Science
 S: 5000 Forbes Avenue
 S: Pittsburgh, Pennsylvania 15213
 S: USA
+
+N: Ryan Bradetich
+E: rbradetich@uswest.net
+D: Linux/PA-RISC hacker
+S: 1200 Goldenrod Dr.
+S: Nampa, Idaho 83686
 
 N: Derrick J. Brashear
 E: shadow@dementia.org
@@ -605,6 +639,14 @@ E: terry@albert.vk2ktj.ampr.org (Amateur Radio use only)
 D: trivial hack to add variable address length routing to Rose.
 D: AX25-HOWTO, HAM-HOWTO, IPX-HOWTO, NET-2-HOWTO
 D: ax25-utils maintainer.
+
+N: Helge Deller
+E: deller@gmx.de
+E: hdeller@redhat.de
+D: PA-RISC Linux hacker, LASI-, ASP-, WAX-, LCD/LED-driver
+S: Schimmelsrain 1
+S: D-69231 Rauenberg
+S: Germany
 
 N: Peter Denison
 E: peterd@pnd-pc.demon.co.uk
@@ -964,6 +1006,15 @@ S: University of Stellenbosch
 S: Stellenbosch, Western Cape
 S: South Africa
 
+N: Grant Grundler
+E: grundler@puffin.external.hp.com
+W: http://www.grundler.net/
+W: http://obmouse.sourceforge.net/
+D: obmouse - rewrote Olivier Florent's Omnibook 600 "pop-up" mouse driver
+D: PA-RISC - IO Interrupt/PCI HBA/IO MMU author and architect
+S: Mountain View, California
+S: USA
+
 N: Grant Guenther
 E: grant@torque.net
 W: http://www.torque.net/linux-pp.html
@@ -1109,6 +1160,15 @@ S: Talstr. 1
 S: D - 72072 Tuebingen
 S: Germany
 
+N: Richard Hirst
+E: richard@sleepie.demon.co.uk
+E: rhirst@linuxcare.com
+W: http://www.sleepie.demon.co.uk/
+D: linux-m68k VME support
+D: PA-RISC port, scsi and network drivers
+D: 53c700/53c710 driver author, 82596 driver maintainer
+S: United Kingdom
+
 N: Jauder Ho
 E: jauderho@carumba.com
 W: http://www.carumba.com/
@@ -1184,6 +1244,19 @@ D: Random kernel tweaks and fixes.
 S: Dukelskych bojovniku 1944
 S: Tabor 390 03
 S: Czech Republic
+
+N: David Huggins-Daines
+E: dhd@debian.org
+E: dhd@eradicator.org
+E: dhd@cepstral.com
+D: PA-RISC port
+D: Nubus subsystem
+D: Generic 68k Macintosh framebuffer driver
+D: STI framebuffer tweaks
+D: LTPC driver tweaks
+S: 110 S. 12th St., Apt. A
+S: Pittsburgh, PA 15203-1250
+S: USA
 
 N: Gareth Hughes
 E: gareth@valinux.com
@@ -1735,6 +1808,14 @@ D: XF86_Mach8
 D: XF86_8514
 D: cfdisk (curses based disk partitioning program)
 
+N: John S. Marvin
+E: jsm@fc.hp.com
+D: PA-RISC port
+S: Hewlett Packard
+S: MS 42
+S: 3404 E. Harmony Road
+S: Fort Collins, CO 80528
+
 N: Torben Mathiasen
 E: torben.mathiasen@compaq.com
 E: torben@kernel.dk
@@ -2084,6 +2165,16 @@ E: kirk@speakeasy.org
 W: http://www.speakeasy.org/~kirk/
 D: implemented kmod
 D: modularized BSD Unix domain sockets
+
+N: Martin Kasper Petersen
+E: mkp@linuxcare.com
+E: mkp@mkp.net
+D: PA-RISC port
+D: XFS file system
+D: kiobuf based block I/O work
+S: 314 Frank St.
+S: Ottawa, Ontario
+S: Canada K2P 0X8
 
 N: Mikael Pettersson
 E: mikpe@csd.uu.se
@@ -2876,6 +2967,12 @@ D: Author of process accounting and diskquota
 S: Breeburgsingel 12
 S: 2135 CN Hoofddorp
 S: The Netherlands
+
+N: Matthew Wilcox
+E: matthew@wil.cx
+W: ftp://ftp.uk.linux.org/pub/linux/people/willy/
+D: Linux/PARISC hacker.  Filesystem hacker.  Random other hacking.  Custom
+D: PPC port hacking.
 
 N: G\"unter Windau
 E: gunter@mbfys.kun.nl

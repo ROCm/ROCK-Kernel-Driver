@@ -24,7 +24,7 @@
 #include <linux/string.h>
 #include <linux/random.h>
 #include <linux/smp.h>
-#include <linux/tasks.h>
+#include <linux/threads.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 
@@ -205,6 +205,8 @@ static inline void wait_on_irq(int cpu)
 			if (!local_bh_count(cpu)
 			    && atomic_read(&global_bh_count))
 				continue;
+			/* this works even though global_irq_lock not
+                           a long, but is arch-specific --RR */
 			if (!test_and_set_bit(0,&global_irq_lock))
 				break;
 		}
@@ -243,6 +245,8 @@ void synchronize_irq(void)
 
 static inline void get_irqlock(int cpu)
 {
+	/* this works even though global_irq_lock not a long, but is
+	   arch-specific --RR */
 	if (test_and_set_bit(0,&global_irq_lock)) {
 		/* do we already hold the lock? */
 		if ( cpu == atomic_read(&global_irq_holder))
@@ -398,7 +402,7 @@ void enable_nop(int irq)
 
 void __init init_IRQ(void)
 {
-   s390_init_IRQ();
+        s390_init_IRQ();
 }
 
 

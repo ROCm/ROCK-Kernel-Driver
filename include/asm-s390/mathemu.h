@@ -12,12 +12,12 @@
 
 extern int math_emu_b3(__u8 *, struct pt_regs *);
 extern int math_emu_ed(__u8 *, struct pt_regs *);
-extern void math_emu_ldr(__u8 *);
-extern void math_emu_ler(__u8 *);
-extern void math_emu_std(__u8 *, struct pt_regs *);
-extern void math_emu_ld(__u8 *, struct pt_regs *);
-extern void math_emu_ste(__u8 *, struct pt_regs *);
-extern void math_emu_le(__u8 *, struct pt_regs *);
+extern int math_emu_ldr(__u8 *);
+extern int math_emu_ler(__u8 *);
+extern int math_emu_std(__u8 *, struct pt_regs *);
+extern int math_emu_ld(__u8 *, struct pt_regs *);
+extern int math_emu_ste(__u8 *, struct pt_regs *);
+extern int math_emu_le(__u8 *, struct pt_regs *);
 extern int math_emu_lfpc(__u8 *, struct pt_regs *);
 extern int math_emu_stfpc(__u8 *, struct pt_regs *);
 extern int math_emu_srnm(__u8 *, struct pt_regs *);
@@ -45,4 +45,7 @@ extern __u32  __floatsisf(__u32);
 extern __u64  __extendsfdf2(__u32);
 
 #endif                                 /* __MATHEMU__                      */
+
+
+
 

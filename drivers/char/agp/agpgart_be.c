@@ -133,45 +133,6 @@ void agp_backend_release(void)
 }
 
 /* 
- * Basic Page Allocation Routines -
- * These routines handle page allocation
- * and by default they reserve the allocated 
- * memory.  They also handle incrementing the
- * current_memory_agp value, Which is checked
- * against a maximum value.
- */
-
-static unsigned long agp_alloc_page(void)
-{
-	void *pt;
-
-	pt = (void *) __get_free_page(GFP_KERNEL);
-	if (pt == NULL) {
-		return 0;
-	}
-	atomic_inc(&virt_to_page(pt)->count);
-	set_bit(PG_locked, &virt_to_page(pt)->flags);
-	atomic_inc(&agp_bridge.current_memory_agp);
-	return (unsigned long) pt;
-}
-
-static void agp_destroy_page(unsigned long page)
-{
-	void *pt = (void *) page;
-
-	if (pt == NULL) {
-		return;
-	}
-	atomic_dec(&virt_to_page(pt)->count);
-	clear_bit(PG_locked, &virt_to_page(pt)->flags);
-	wake_up(&virt_to_page(pt)->wait);
-	free_page((unsigned long) pt);
-	atomic_dec(&agp_bridge.current_memory_agp);
-}
-
-/* End Basic Page Allocation Routines */
-
-/* 
  * Generic routines for handling agp_memory structures -
  * They use the basic page allocation routines to do the
  * brunt of the work.
@@ -245,7 +206,7 @@ void agp_free_memory(agp_memory * curr)
 	if (curr->page_count != 0) {
 		for (i = 0; i < curr->page_count; i++) {
 			curr->memory[i] &= ~(0x00000fff);
-			agp_destroy_page((unsigned long)
+			agp_bridge.agp_destroy_page((unsigned long)
 					 phys_to_virt(curr->memory[i]));
 		}
 	}
@@ -290,7 +251,7 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 		return NULL;
 	}
 	for (i = 0; i < page_count; i++) {
-		new->memory[i] = agp_alloc_page();
+		new->memory[i] = agp_bridge.agp_alloc_page();
 
 		if (new->memory[i] == 0) {
 			/* Free this structure */
@@ -803,6 +764,45 @@ static void agp_generic_free_by_type(agp_memory * curr)
 	kfree(curr);
 }
 
+/* 
+ * Basic Page Allocation Routines -
+ * These routines handle page allocation
+ * and by default they reserve the allocated 
+ * memory.  They also handle incrementing the
+ * current_memory_agp value, Which is checked
+ * against a maximum value.
+ */
+
+static unsigned long agp_generic_alloc_page(void)
+{
+	void *pt;
+
+	pt = (void *) __get_free_page(GFP_KERNEL);
+	if (pt == NULL) {
+		return 0;
+	}
+	atomic_inc(&virt_to_page(pt)->count);
+	set_bit(PG_locked, &virt_to_page(pt)->flags);
+	atomic_inc(&agp_bridge.current_memory_agp);
+	return (unsigned long) pt;
+}
+
+static void agp_generic_destroy_page(unsigned long page)
+{
+	void *pt = (void *) page;
+
+	if (pt == NULL) {
+		return;
+	}
+	atomic_dec(&virt_to_page(pt)->count);
+	clear_bit(PG_locked, &virt_to_page(pt)->flags);
+	wake_up(&virt_to_page(pt)->wait);
+	free_page((unsigned long) pt);
+	atomic_dec(&agp_bridge.current_memory_agp);
+}
+
+/* End Basic Page Allocation Routines */
+
 void agp_enable(u32 mode)
 {
 	if (agp_bridge.type == NOT_SUPPORTED) return;
@@ -1018,7 +1018,7 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 			return NULL;
 		}
 	   	MOD_INC_USE_COUNT;
-		new->memory[0] = agp_alloc_page();
+		new->memory[0] = agp_bridge.agp_alloc_page();
 
 		if (new->memory[0] == 0) {
 			/* Free this structure */
@@ -1043,7 +1043,7 @@ static void intel_i810_free_by_type(agp_memory * curr)
 {
 	agp_free_key(curr->key);
    	if(curr->type == AGP_PHYS_MEMORY) {
-	   	agp_destroy_page((unsigned long)
+	   	agp_bridge.agp_destroy_page((unsigned long)
 				 phys_to_virt(curr->memory[0]));
 		vfree(curr->memory);
 	}
@@ -1081,6 +1081,8 @@ static int __init intel_i810_setup(struct pci_dev *i810_dev)
 	agp_bridge.remove_memory = intel_i810_remove_entries;
 	agp_bridge.alloc_by_type = intel_i810_alloc_by_type;
 	agp_bridge.free_by_type = intel_i810_free_by_type;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 
 	return 0;
 }
@@ -1271,6 +1273,8 @@ static int __init intel_generic_setup (struct pci_dev *pdev)
 	agp_bridge.remove_memory = agp_generic_remove_memory;
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 
 	return 0;
 	
@@ -1299,6 +1303,8 @@ static int __init intel_840_setup (struct pci_dev *pdev)
 	agp_bridge.remove_memory = agp_generic_remove_memory;
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 
 	return 0;
 	
@@ -1327,6 +1333,8 @@ static int __init intel_850_setup (struct pci_dev *pdev)
 	agp_bridge.remove_memory = agp_generic_remove_memory;
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 
 	return 0;
 	
@@ -1442,6 +1450,8 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 	agp_bridge.remove_memory = agp_generic_remove_memory;
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 
 	return 0;
 	
@@ -1551,6 +1561,8 @@ static int __init sis_generic_setup (struct pci_dev *pdev)
 	agp_bridge.remove_memory = agp_generic_remove_memory;
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 
 	return 0;
 }
@@ -1924,6 +1936,8 @@ static int __init amd_irongate_setup (struct pci_dev *pdev)
 	agp_bridge.remove_memory = amd_remove_memory;
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 
 	return 0;
 	
@@ -1961,10 +1975,9 @@ static void ali_tlbflush(agp_memory * mem)
 	u32 temp;
 
 	pci_read_config_dword(agp_bridge.dev, ALI_TLBCTRL, &temp);
-	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL,
-			       ((temp & 0xffffff00) | 0x00000090));
-	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL,
-			       ((temp & 0xffffff00) | 0x00000010));
+// clear tag
+	pci_write_config_dword(agp_bridge.dev, ALI_TAGCTRL,
+			((temp & 0xfffffff0) | 0x00000001|0x00000002));
 }
 
 static void ali_cleanup(void)
@@ -1975,10 +1988,13 @@ static void ali_cleanup(void)
 	previous_size = A_SIZE_32(agp_bridge.previous_size);
 
 	pci_read_config_dword(agp_bridge.dev, ALI_TLBCTRL, &temp);
-	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL,
-			       ((temp & 0xffffff00) | 0x00000090));
+// clear tag
+	pci_write_config_dword(agp_bridge.dev, ALI_TAGCTRL,
+			((temp & 0xffffff00) | 0x00000001|0x00000002));
+
+	pci_read_config_dword(agp_bridge.dev,  ALI_ATTBASE, &temp);
 	pci_write_config_dword(agp_bridge.dev, ALI_ATTBASE,
-			       previous_size->size_value);
+			((temp & 0x00000ff0) | previous_size->size_value));
 }
 
 static int ali_configure(void)
@@ -1989,17 +2005,62 @@ static int ali_configure(void)
 	current_size = A_SIZE_32(agp_bridge.current_size);
 
 	/* aperture size and gatt addr */
-	pci_write_config_dword(agp_bridge.dev, ALI_ATTBASE,
-		    agp_bridge.gatt_bus_addr | current_size->size_value);
+	pci_read_config_dword(agp_bridge.dev, ALI_ATTBASE, &temp);
+	temp = (((temp & 0x00000ff0) | (agp_bridge.gatt_bus_addr & 0xfffff000))
+			| (current_size->size_value & 0xf));
+	pci_write_config_dword(agp_bridge.dev, ALI_ATTBASE, temp);
 
 	/* tlb control */
-	pci_read_config_dword(agp_bridge.dev, ALI_TLBCTRL, &temp);
-	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL,
-			       ((temp & 0xffffff00) | 0x00000010));
+
+	/*
+	 *	Question: Jeff, ALi's patch deletes this:
+	 *
+	 *	pci_read_config_dword(agp_bridge.dev, ALI_TLBCTRL, &temp);
+	 *	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL,
+	 *			       ((temp & 0xffffff00) | 0x00000010));
+	 *
+	 *	and replaces it with the following, which seems to duplicate the
+	 *	next couple of lines below it. I suspect this was an oversight,
+	 *	but you might want to check up on this?
+	 */
+	
+	pci_read_config_dword(agp_bridge.dev, ALI_APBASE, &temp);
+	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
 	/* address to map to */
 	pci_read_config_dword(agp_bridge.dev, ALI_APBASE, &temp);
 	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
+
+#if 0
+	if (agp_bridge.type == ALI_M1541) {
+		u32 nlvm_addr = 0;
+
+		switch (current_size->size_value) {
+			case 0:  break;
+			case 1:  nlvm_addr = 0x100000;break;
+			case 2:  nlvm_addr = 0x200000;break;
+			case 3:  nlvm_addr = 0x400000;break;
+			case 4:  nlvm_addr = 0x800000;break;
+			case 6:  nlvm_addr = 0x1000000;break;
+			case 7:  nlvm_addr = 0x2000000;break;
+			case 8:  nlvm_addr = 0x4000000;break;
+			case 9:  nlvm_addr = 0x8000000;break;
+			case 10: nlvm_addr = 0x10000000;break;
+			default: break;
+		}
+		nlvm_addr--;
+		nlvm_addr&=0xfff00000;
+
+		nlvm_addr+= agp_bridge.gart_bus_addr;
+		nlvm_addr|=(agp_bridge.gart_bus_addr>>12);
+		printk(KERN_INFO PFX "nlvm top &base = %8x\n",nlvm_addr);
+	}
+#endif
+
+	pci_read_config_dword(agp_bridge.dev, ALI_TLBCTRL, &temp);
+	temp &= 0xffffff7f;		//enable TLB
+	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL, temp);
+
 	return 0;
 }
 
@@ -2010,6 +2071,74 @@ static unsigned long ali_mask_memory(unsigned long addr, int type)
 	return addr | agp_bridge.masks[0].mask;
 }
 
+static void ali_cache_flush(void)
+{
+	global_cache_flush();
+
+	if (agp_bridge.type == ALI_M1541) {
+		int i, page_count;
+		u32 temp;
+
+		page_count = 1 << A_SIZE_32(agp_bridge.current_size)->page_order;
+		for (i = 0; i < PAGE_SIZE * page_count; i += PAGE_SIZE) {
+			pci_read_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL, &temp);
+			pci_write_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL,
+					(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
+					  (agp_bridge.gatt_bus_addr + i)) |
+					    ALI_CACHE_FLUSH_EN));
+		}
+	}
+}
+
+static unsigned long ali_alloc_page(void)
+{
+	void *pt;
+	u32 temp;
+
+	pt = (void *) __get_free_page(GFP_KERNEL);
+	if (pt == NULL)
+		return 0;
+
+	atomic_inc(&virt_to_page(pt)->count);
+	set_bit(PG_locked, &virt_to_page(pt)->flags);
+	atomic_inc(&agp_bridge.current_memory_agp);
+
+	global_cache_flush();
+
+	if (agp_bridge.type == ALI_M1541) {
+		pci_read_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL, &temp);
+		pci_write_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL,
+				(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
+				  virt_to_phys((void *)pt)) |
+				    ALI_CACHE_FLUSH_EN ));
+	}
+	return (unsigned long) pt;
+}
+
+static void ali_destroy_page(unsigned long page)
+{
+	u32 temp;
+	void *pt = (void *) page;
+
+	if (pt == NULL)
+		return;
+
+	global_cache_flush();
+
+	if (agp_bridge.type == ALI_M1541) {
+		pci_read_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL, &temp);
+		pci_write_config_dword(agp_bridge.dev, ALI_CACHE_FLUSH_CTRL,
+				(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
+				  virt_to_phys((void *)pt)) |
+				    ALI_CACHE_FLUSH_EN));
+	}
+
+	atomic_dec(&virt_to_page(pt)->count);
+	clear_bit(PG_locked, &virt_to_page(pt)->flags);
+	wake_up(&virt_to_page(pt)->wait);
+	free_page((unsigned long) pt);
+	atomic_dec(&agp_bridge.current_memory_agp);
+}
 
 /* Setup function */
 static gatt_mask ali_generic_masks[] =
@@ -2043,13 +2172,15 @@ static int __init ali_generic_setup (struct pci_dev *pdev)
 	agp_bridge.tlb_flush = ali_tlbflush;
 	agp_bridge.mask_memory = ali_mask_memory;
 	agp_bridge.agp_enable = agp_generic_agp_enable;
-	agp_bridge.cache_flush = global_cache_flush;
+	agp_bridge.cache_flush = ali_cache_flush;
 	agp_bridge.create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge.free_gatt_table = agp_generic_free_gatt_table;
 	agp_bridge.insert_memory = agp_generic_insert_memory;
 	agp_bridge.remove_memory = agp_generic_remove_memory;
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
+	agp_bridge.agp_alloc_page = ali_alloc_page;
+	agp_bridge.agp_destroy_page = ali_destroy_page;
 
 	return 0;
 	
@@ -2078,6 +2209,42 @@ static struct {
 		"Ali",
 		"M1541",
 		ali_generic_setup },
+	{ PCI_DEVICE_ID_AL_M1621_0,  
+		PCI_VENDOR_ID_AL,
+		ALI_M1621,
+		"Ali",
+		"M1621",
+		ali_generic_setup },
+	{ PCI_DEVICE_ID_AL_M1631_0,
+		PCI_VENDOR_ID_AL,
+		ALI_M1631,
+		"Ali",
+		"M1631",
+		ali_generic_setup },
+	{ PCI_DEVICE_ID_AL_M1632_0,
+		PCI_VENDOR_ID_AL,
+		ALI_M1632,
+		"Ali",
+		"M1632",
+		ali_generic_setup },
+	{ PCI_DEVICE_ID_AL_M1641_0,
+		PCI_VENDOR_ID_AL,
+		ALI_M1641,
+		"Ali",
+		"M1641",
+		ali_generic_setup },
+	{ PCI_DEVICE_ID_AL_M1647_0,
+		PCI_VENDOR_ID_AL,
+		ALI_M1647,
+		"Ali",
+		"M1647",
+		ali_generic_setup },
+	{ PCI_DEVICE_ID_AL_M1651_0,
+		PCI_VENDOR_ID_AL,
+		ALI_M1651,
+		"Ali",
+		"M1651",
+		ali_generic_setup },  
 	{ 0,
 		PCI_VENDOR_ID_AL,
 		ALI_GENERIC,
@@ -2270,6 +2437,35 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 	while ((i < ARRAY_SIZE (agp_bridge_info)) &&
 	       (agp_bridge_info[i].vendor_id == pdev->vendor)) {
 		if (pdev->device == agp_bridge_info[i].device_id) {
+#ifdef CONFIG_AGP_ALI
+			if (pdev->device == PCI_DEVICE_ID_AL_M1621_0) {
+				u8 hidden_1621_id;
+
+				pci_read_config_byte(pdev, 0xFB, &hidden_1621_id);
+				switch (hidden_1621_id) {
+				case 0x31:
+					agp_bridge_info[i].chipset_name="M1631";
+					break;
+				case 0x32:
+					agp_bridge_info[i].chipset_name="M1632";
+					break;
+				case 0x41:
+					agp_bridge_info[i].chipset_name="M1641";
+					break;
+				case 0x43:
+					break;
+				case 0x47:
+					agp_bridge_info[i].chipset_name="M1647";
+					break;
+				case 0x51:
+					agp_bridge_info[i].chipset_name="M1651";
+					break;
+				default:
+					break;
+				}
+			}
+#endif
+
 			printk (KERN_INFO PFX "Detected %s %s chipset\n",
 				agp_bridge_info[i].vendor_name,
 				agp_bridge_info[i].chipset_name);
@@ -2375,9 +2571,8 @@ static int __init agp_find_supported_device(void)
 			if (i810_dev == NULL) {
 				printk(KERN_ERR PFX "agpgart: Detected an "
 				       "Intel i815, but could not find the"
-				       " secondary device.\n"
-				       "Assuming user has added an external AGP"
-				       " card\n");
+				       " secondary device. Assuming a "
+				       "non-integrated video card.\n");
 				break;
 			}
 			printk(KERN_INFO PFX "agpgart: Detected an Intel i815 "
@@ -2486,7 +2681,7 @@ static int __init agp_backend_initialize(void)
 	}
 
 	if (agp_bridge.needs_scratch_page == TRUE) {
-		agp_bridge.scratch_page = agp_alloc_page();
+		agp_bridge.scratch_page = agp_bridge.agp_alloc_page();
 
 		if (agp_bridge.scratch_page == 0) {
 			printk(KERN_ERR PFX "unable to get memory for "
@@ -2539,7 +2734,7 @@ static int __init agp_backend_initialize(void)
 err_out:
 	if (agp_bridge.needs_scratch_page == TRUE) {
 		agp_bridge.scratch_page &= ~(0x00000fff);
-		agp_destroy_page((unsigned long)
+		agp_bridge.agp_destroy_page((unsigned long)
 				 phys_to_virt(agp_bridge.scratch_page));
 	}
 	if (got_gatt)
@@ -2559,7 +2754,7 @@ static void agp_backend_cleanup(void)
 
 	if (agp_bridge.needs_scratch_page == TRUE) {
 		agp_bridge.scratch_page &= ~(0x00000fff);
-		agp_destroy_page((unsigned long)
+		agp_bridge.agp_destroy_page((unsigned long)
 				 phys_to_virt(agp_bridge.scratch_page));
 	}
 }

@@ -2,7 +2,7 @@
 net-3-driver for the IBM LAN Adapter/A
 
 This is an extension to the Linux operating system, and is covered by the
-same Gnu Public License that covers that work.
+same GNU General Public License that covers that work.
 
 Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de, aarnold@elsa.de)
 
@@ -78,7 +78,7 @@ History:
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/time.h>
@@ -621,6 +621,7 @@ static void irqrx_handler(struct IBMLANA_NETDEV *dev)
 
 				/* bookkeeping */
 
+				dev->last_rx = jiffies;
 				priv->stat.rx_packets++;
 #if (LINUX_VERSION_CODE >= 0x20119)	/* byte counters for kernel >= 2.1.25 */
 				priv->stat.rx_bytes += rda.length;

@@ -670,7 +670,9 @@ again:
 	 */
 	skb->protocol = eth_type_trans(skb, devN);
 	netif_rx(skb);
+	devN->last_rx = jiffies;
 	++privN->stats.rx_packets;
+	privN->stats.rx_bytes += len;
 
 out:
 	cbp->xmit.status = I596_CB_STATUS_C | I596_CB_STATUS_OK;

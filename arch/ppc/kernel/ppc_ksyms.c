@@ -6,6 +6,7 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
+#include <linux/tty.h>
 #include <linux/vt_kern.h>
 #include <linux/nvram.h>
 #include <linux/spinlock.h>

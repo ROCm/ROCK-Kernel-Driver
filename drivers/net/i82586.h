@@ -407,7 +407,7 @@ in case, we leave the space.
 
 /*
  * This software may only be used and distributed
- * according to the terms of the GNU Public License.
+ * according to the terms of the GNU General Public License.
  *
  * For more details, see wavelan.c.
  */

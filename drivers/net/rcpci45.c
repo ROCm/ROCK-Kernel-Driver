@@ -53,7 +53,7 @@
 #include <linux/in.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/timer.h>

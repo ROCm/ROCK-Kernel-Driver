@@ -395,7 +395,7 @@ static int exec_mmap(void)
 
 	mm = mm_alloc();
 	if (mm) {
-		struct mm_struct *active_mm = current->active_mm;
+		struct mm_struct *active_mm;
 
 		if (init_new_context(current, mm)) {
 			mmdrop(mm);
@@ -409,6 +409,7 @@ static int exec_mmap(void)
 		spin_unlock(&mmlist_lock);
 
 		task_lock(current);
+		active_mm = current->active_mm;
 		current->mm = mm;
 		current->active_mm = mm;
 		task_unlock(current);

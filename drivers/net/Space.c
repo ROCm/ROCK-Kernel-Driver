@@ -170,7 +170,7 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
  * drivers that probe for EISA cards (in the ISA group).  These are the
  * EISA only driver probes, and also the legacy PCI probes
  */
-struct devprobe eisa_probes[] __initdata = {
+static struct devprobe eisa_probes[] __initdata = {
 #ifdef CONFIG_DE4X5             /* DEC DE425, DE434, DE435 adapters */
 	{de4x5_probe, 0},
 #endif
@@ -193,7 +193,7 @@ struct devprobe eisa_probes[] __initdata = {
 };
 
 
-struct devprobe mca_probes[] __initdata = {
+static struct devprobe mca_probes[] __initdata = {
 #ifdef CONFIG_ULTRAMCA 
 	{ultramca_probe, 0},
 #endif
@@ -216,7 +216,7 @@ struct devprobe mca_probes[] __initdata = {
  * ISA probes that touch addresses < 0x400 (including those that also
  * look for EISA/PCI/MCA cards in addition to ISA cards).
  */
-struct devprobe isa_probes[] __initdata = {
+static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_EL3		/* ISA, EISA, MCA 3c5x9 */
 	{el3_probe, 0},
 #endif
@@ -319,7 +319,7 @@ struct devprobe isa_probes[] __initdata = {
 	{NULL, 0},
 };
 
-struct devprobe parport_probes[] __initdata = {
+static struct devprobe parport_probes[] __initdata = {
 #ifdef CONFIG_DE600		/* D-Link DE-600 adapter */
 	{de600_probe, 0},
 #endif
@@ -329,7 +329,7 @@ struct devprobe parport_probes[] __initdata = {
 	{NULL, 0},
 };
 
-struct devprobe m68k_probes[] __initdata = {
+static struct devprobe m68k_probes[] __initdata = {
 #ifdef CONFIG_ATARILANCE	/* Lance-based Atari ethernet boards */
 	{atarilance_probe, 0},
 #endif
@@ -367,14 +367,14 @@ struct devprobe m68k_probes[] __initdata = {
 };
 
 
-struct devprobe sgi_probes[] __initdata = {
+static struct devprobe sgi_probes[] __initdata = {
 #ifdef CONFIG_SGISEEQ
 	{sgiseeq_probe, 0},
 #endif
 	{NULL, 0},
 };
 
-struct devprobe mips_probes[] __initdata = {
+static struct devprobe mips_probes[] __initdata = {
 #ifdef CONFIG_MIPS_JAZZ_SONIC
 	{sonic_probe, 0},
 #endif

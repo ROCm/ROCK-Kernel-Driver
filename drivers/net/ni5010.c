@@ -3,7 +3,7 @@
  *	Copyright 1996,1997 Jan-Pascal van Best and Andreas Mohr.
  *
  *	This software may be used and distributed according to the terms
- *	of the GNU Public License, incorporated herein by reference.
+ *	of the GNU General Public License, incorporated herein by reference.
  *
  * 	The authors may be reached as:
  *		jvbest@wi.leidenuniv.nl		a.mohr@mailto.de
@@ -55,7 +55,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -117,7 +117,7 @@ static int	process_xmt_interrupt(struct net_device *dev);
 static void	hardware_send_packet(struct net_device *dev, char *buf, int length);
 static void 	chipset_init(struct net_device *dev, int startp);
 static void	dump_packet(void *buf, int len);
-static void 	show_registers(struct net_device *dev);
+static void 	ni5010_show_registers(struct net_device *dev);
 
 
 int __init ni5010_probe(struct net_device *dev)
@@ -397,7 +397,7 @@ static int ni5010_open(struct net_device *dev)
 	
 	netif_start_queue(dev);
 		
-	if (NI5010_DEBUG) show_registers(dev); 
+	if (NI5010_DEBUG) ni5010_show_registers(dev); 
 
 	PRINTK((KERN_DEBUG "%s: open successful\n", dev->name));
      	return 0;
@@ -551,6 +551,7 @@ static void ni5010_rx(struct net_device *dev)
 		
 	skb->protocol = eth_type_trans(skb,dev);
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	lp->stats.rx_packets++;
 	lp->stats.rx_bytes += lp->i_pkt_size;
 
@@ -625,7 +626,7 @@ static struct net_device_stats *ni5010_get_stats(struct net_device *dev)
 
 	PRINTK2((KERN_DEBUG "%s: entering ni5010_get_stats\n", dev->name));
 	
-	if (NI5010_DEBUG) show_registers(dev);
+	if (NI5010_DEBUG) ni5010_show_registers(dev);
 	
 	/* cli(); */
 	/* Update the statistics from the device registers. */
@@ -676,7 +677,7 @@ static void hardware_send_packet(struct net_device *dev, char *buf, int length)
                 return;
         }
 
-	if (NI5010_DEBUG) show_registers(dev);
+	if (NI5010_DEBUG) ni5010_show_registers(dev);
 
 	if (inb(IE_ISTAT) & IS_EN_XMT) {
 		PRINTK((KERN_WARNING "%s: sending packet while already transmitting, not possible\n", 
@@ -709,7 +710,7 @@ static void hardware_send_packet(struct net_device *dev, char *buf, int length)
 
 	netif_wake_queue(dev);
 	
-	if (NI5010_DEBUG) show_registers(dev);	
+	if (NI5010_DEBUG) ni5010_show_registers(dev);	
 }
 
 static void chipset_init(struct net_device *dev, int startp)
@@ -718,7 +719,7 @@ static void chipset_init(struct net_device *dev, int startp)
 	PRINTK3((KERN_DEBUG "%s: doing NOTHING in chipset_init\n", dev->name));
 }
 
-static void show_registers(struct net_device *dev)
+static void ni5010_show_registers(struct net_device *dev)
 {
 	int ioaddr = dev->base_addr;
 	

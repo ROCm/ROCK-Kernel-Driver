@@ -14,6 +14,7 @@
 #
 
 LD=$(CROSS_COMPILE)ld -m elf_s390
+CPP=$(CC) -E
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
 LDFLAGS=-e start
 LINKFLAGS =-T $(TOPDIR)/arch/s390/vmlinux.lds $(LDFLAGS)

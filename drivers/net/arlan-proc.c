@@ -58,7 +58,7 @@
 }
 
 
-const char *arlan_diagnostic_info_string(struct net_device *dev)
+static const char *arlan_diagnostic_info_string(struct net_device *dev)
 {
 
 	volatile struct arlan_shmem *arlan = ((struct arlan_private *) dev->priv)->card;
@@ -790,7 +790,7 @@ static int arlan_configure(ctl_table * ctl, int write, struct file *filp,
 	return proc_dostring(ctl, write, filp, buffer, lenp);
 }
 
-int arlan_sysctl_reset(ctl_table * ctl, int write, struct file *filp,
+static int arlan_sysctl_reset(ctl_table * ctl, int write, struct file *filp,
 		       void *buffer, size_t * lenp)
 {
 	int pos = 0;

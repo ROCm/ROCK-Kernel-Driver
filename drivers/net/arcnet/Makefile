@@ -22,6 +22,6 @@ obj-$(CONFIG_ARCNET_COM20020) += com20020.o
 obj-$(CONFIG_ARCNET_COM20020_ISA) += com20020-isa.o
 obj-$(CONFIG_ARCNET_COM20020_PCI) += com20020-pci.o
 
-L_TARGET := arcnet.a
+O_TARGET := arcnetdrv.o
 
 include $(TOPDIR)/Rules.make

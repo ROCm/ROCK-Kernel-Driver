@@ -28,7 +28,7 @@
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/string.h>	/* inline memset(), etc. */
-#include <linux/malloc.h>	/* kmalloc(), kfree() */
+#include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/wanpipe.h>	/* WANPIPE common user API definitions */
 #include <linux/if_arp.h>	/* ARPHRD_* defines */
@@ -867,7 +867,7 @@ static void if_tx_timeout (struct net_device *dev)
 		card->devname);
 
 	/* unbusy the interface */
-	netif_start_queue (dev);
+	netif_wake_queue (dev);
 }
 
 

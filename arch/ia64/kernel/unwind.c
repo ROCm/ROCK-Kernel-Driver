@@ -5,7 +5,7 @@
 /*
  * This file implements call frame unwind support for the Linux
  * kernel.  Parsing and processing the unwind information is
- * time-consuming, so this implementation translates the the unwind
+ * time-consuming, so this implementation translates the unwind
  * descriptors into unwind scripts.  These scripts are very simple
  * (basically a sequence of assignments) and efficient to execute.
  * They are cached for later re-use.  Each script is specific for a

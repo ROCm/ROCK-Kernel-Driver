@@ -1105,7 +1105,7 @@ int __init agp_frontend_initialize(void)
 	return 0;
 }
 
-void __exit agp_frontend_cleanup(void)
+static void __exit agp_frontend_cleanup(void)
 {
 	misc_deregister(&agp_miscdev);
 }

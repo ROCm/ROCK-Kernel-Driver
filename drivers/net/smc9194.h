@@ -3,7 +3,7 @@
  . Copyright (C) 1996 by Erik Stahlman 
  .
  . This software may be used and distributed according to the terms
- . of the GNU Public License, incorporated herein by reference.
+ . of the GNU General Public License, incorporated herein by reference.
  .
  . This file contains register information and access macros for 
  . the SMC91xxx chipset.   

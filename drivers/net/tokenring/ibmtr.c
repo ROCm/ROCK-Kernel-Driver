@@ -2,7 +2,7 @@
  *
  *	Written 1993 by Mark Swanson and Peter De Schrijver.
  *	This software may be used and distributed according to the terms
- *	of the GNU Public License, incorporated herein by reference.
+ *	of the GNU General Public License, incorporated herein by reference.
  *
  *	This device driver should work with Any IBM Token Ring Card that does
  *	not use DMA.
@@ -1786,6 +1786,7 @@ static void tr_rx(struct net_device *dev)
 		skb->ip_summed = 1;
 	}
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 }
 
 static int tok_send_packet(struct sk_buff *skb, struct net_device *dev)

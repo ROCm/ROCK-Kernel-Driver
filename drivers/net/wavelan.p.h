@@ -374,7 +374,7 @@
 #include	<linux/netdevice.h>
 #include	<linux/etherdevice.h>
 #include	<linux/skbuff.h>
-#include	<linux/malloc.h>
+#include	<linux/slab.h>
 #include	<linux/timer.h>
 #include	<linux/init.h>
 

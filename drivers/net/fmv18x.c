@@ -20,7 +20,7 @@
 			for testing this driver.
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	This is a device driver for the Fujitsu FMV-181/182/183/184, which
 	is a straight-forward Fujitsu MB86965 implementation.
@@ -44,7 +44,7 @@ static const char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
 #include <asm/system.h>
@@ -526,7 +526,9 @@ static void net_rx(struct net_device *dev)
 
 			skb->protocol=eth_type_trans(skb, dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			lp->stats.rx_packets++;
+			lp->stats.rx_bytes += pkt_len;
 		}
 		if (--boguscount <= 0)
 			break;

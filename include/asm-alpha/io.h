@@ -440,6 +440,22 @@ out:
 	return retval;
 }
 
+
+/*
+ * ISA space is mapped to some machine-specific location on Alpha.
+ * Call into the existing hooks to get the address translated.
+ */
+#define isa_readb(a)			readb(__ioremap(a))
+#define isa_readw(a)			readw(__ioremap(a))
+#define isa_readl(a)			readl(__ioremap(a))
+#define isa_writeb(b,a)			writeb((b),__ioremap(a))
+#define isa_writew(w,a)			writew((w),__ioremap(a))
+#define isa_writel(l,a)			writel((l),__ioremap(a))
+#define isa_memset_io(a,b,c)		memset_io(__ioremap(a),(b),(c))
+#define isa_memcpy_fromio(a,b,c)	memcpy_fromio((a),__ioremap(b),(c))
+#define isa_memcpy_toio(a,b,c)		memcpy_toio(__ioremap(a),(b),(c))
+
+
 /*
  * The Alpha Jensen hardware for some rather strange reason puts
  * the RTC clock at 0x170 instead of 0x70. Probably due to some

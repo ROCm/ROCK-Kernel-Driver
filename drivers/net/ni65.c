@@ -12,7 +12,7 @@
  * driver probes: io: 0x360,0x300,0x320,0x340 / dma: 3,5,6,7
  *
  * This is an extension to the Linux operating system, and is covered by the
- * same Gnu Public License that covers the Linux-kernel.
+ * same GNU General Public License that covers the Linux-kernel.
  *
  * comments/bugs/suggestions can be sent to:
  *   Michael Hipp
@@ -67,7 +67,7 @@
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -1045,6 +1045,7 @@ static void ni65_recv_intr(struct net_device *dev,int csr0)
 				p->stats.rx_bytes += len;
 				skb->protocol=eth_type_trans(skb,dev);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 			}
 			else
 			{

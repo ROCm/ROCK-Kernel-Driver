@@ -71,18 +71,10 @@ out:
 	return error;
 }
 
-/* FIXME: 6 parameters is one too much ... */
-asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
-	unsigned long prot, unsigned long flags,
-	unsigned long fd, unsigned long pgoff)
-{
-	return do_mmap2(addr, len, prot, flags, fd, pgoff);
-}
-
 /*
  * Perform the select(nd, in, out, ex, tv) and mmap() system
- * calls. Linux/i386 didn't use to be able to handle more than
- * 4 system call parameters, so these system calls used a memory
+ * calls. Linux for S/390 isn't able to handle more than 5
+ * system call parameters, so these system calls used a memory
  * block for parameter passing..
  */
 
@@ -94,6 +86,18 @@ struct mmap_arg_struct {
 	unsigned long fd;
 	unsigned long offset;
 };
+
+asmlinkage long sys_mmap2(struct mmap_arg_struct *arg)
+{
+	struct mmap_arg_struct a;
+	int error = -EFAULT;
+
+	if (copy_from_user(&a, arg, sizeof(a)))
+		goto out;
+	error = do_mmap2(a.addr, a.len, a.prot, a.flags, a.fd, a.offset);
+out:
+	return error;
+}
 
 asmlinkage int old_mmap(struct mmap_arg_struct *arg)
 {
@@ -239,7 +243,7 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 
 asmlinkage int sys_pause(void)
 {
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	schedule();
 	return -ERESTARTNOHAND;
 }

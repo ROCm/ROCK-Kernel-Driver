@@ -942,7 +942,7 @@ static void async_lcp_peek(struct asyncppp *ap, unsigned char *data,
 	}
 }
 
-void __exit ppp_async_cleanup(void)
+static void __exit ppp_async_cleanup(void)
 {
 	if (tty_register_ldisc(N_PPP, NULL) != 0)
 		printk(KERN_ERR "failed to unregister PPP line discipline\n");

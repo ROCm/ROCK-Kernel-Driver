@@ -78,12 +78,16 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
 	    bool '    Winbond SL82c105 support' CONFIG_BLK_DEV_SL82C105
 	 fi
       fi
-      if [ "$CONFIG_PMAC" = "y" -o "$CONFIG_ALL_PPC" = "y" ]; then
+      if [ "$CONFIG_ALL_PPC" = "y" ]; then
 	 bool '    Builtin PowerMac IDE support' CONFIG_BLK_DEV_IDE_PMAC
 	 dep_bool '      PowerMac IDE DMA support' CONFIG_BLK_DEV_IDEDMA_PMAC $CONFIG_BLK_DEV_IDE_PMAC
-	 dep_bool '        Use DMA by default' CONFIG_IDEDMA_PMAC_AUTO $CONFIG_BLK_DEV_IDEDMA_PMAC
-	 define_bool CONFIG_BLK_DEV_IDEDMA $CONFIG_BLK_DEV_IDEDMA_PMAC
-	 define_bool CONFIG_BLK_DEV_IDEPCI $CONFIG_BLK_DEV_IDEDMA_PMAC
+	 dep_bool '        Use DMA by default' CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO $CONFIG_BLK_DEV_IDEDMA_PMAC
+	 if [ "$CONFIG_BLK_DEV_IDE_PMAC" = "y" ]; then
+	   define_bool CONFIG_BLK_DEV_IDEDMA $CONFIG_BLK_DEV_IDEDMA_PMAC
+	 fi
+	 if [ "$CONFIG_BLK_DEV_IDEDMA_PMAC" = "y" ]; then
+	   define_bool CONFIG_BLK_DEV_IDEPCI $CONFIG_BLK_DEV_IDEDMA_PMAC
+	 fi
       fi
       if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
 	 dep_bool '    ICS IDE interface support' CONFIG_BLK_DEV_IDE_ICSIDE $CONFIG_ARCH_ACORN
@@ -126,7 +130,7 @@ else
 fi
 
 if [ "$CONFIG_IDEDMA_PCI_AUTO" = "y" -o \
-     "$CONFIG_IDEDMA_PMAC_AUTO" = "y" -o \
+     "$CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO" = "y" -o \
      "$CONFIG_IDEDMA_ICS_AUTO" = "y" ]; then
    define_bool CONFIG_IDEDMA_AUTO y
 else

@@ -738,7 +738,7 @@ ppp_sync_input(struct syncppp *ap, const unsigned char *buf,
 	}
 }
 
-void __exit
+static void __exit
 ppp_sync_cleanup(void)
 {
 	if (tty_register_ldisc(N_SYNC_PPP, NULL) != 0)

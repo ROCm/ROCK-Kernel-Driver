@@ -45,6 +45,7 @@
 __u16 boot_cpu_addr;
 int cpus_initialized = 0;
 unsigned long cpu_initialized = 0;
+volatile int __cpu_logical_map[NR_CPUS]; /* logical cpu to cpu address */
 
 /*
  * Setup options
@@ -80,6 +81,7 @@ static struct resource data_resource = { "Kernel data", 0, 0 };
 void __init cpu_init (void)
 {
         int nr = smp_processor_id();
+        int addr = hard_smp_processor_id();
 
         if (test_and_set_bit(nr,&cpu_initialized)) {
                 printk("CPU#%d ALREADY INITIALIZED!!!!!!!!!\n", nr);
@@ -91,7 +93,7 @@ void __init cpu_init (void)
          * Store processor id in lowcore (used e.g. in timer_interrupt)
          */
         asm volatile ("stidp %0": "=m" (S390_lowcore.cpu_data.cpu_id));
-        S390_lowcore.cpu_data.cpu_addr = hard_smp_processor_id();
+        S390_lowcore.cpu_data.cpu_addr = addr;
         S390_lowcore.cpu_data.cpu_nr = nr;
 
         /*
@@ -158,31 +160,16 @@ void machine_halt(void)
 {
         if (MACHINE_IS_VM && strlen(vmhalt_cmd) > 0)
                 cpcmd(vmhalt_cmd, NULL, 0);
-        disabled_wait(0);
+        signal_processor(smp_processor_id(), sigp_stop_and_store_status);
 }
 
 void machine_power_off(void)
 {
         if (MACHINE_IS_VM && strlen(vmpoff_cmd) > 0)
                 cpcmd(vmpoff_cmd, NULL, 0);
-        disabled_wait(0);
+        signal_processor(smp_processor_id(), sigp_stop_and_store_status);
 }
 #endif
-
-/*
- * Waits for 'delay' microseconds using the tod clock
- */
-void tod_wait(unsigned long delay)
-{
-        uint64_t start_cc, end_cc;
-
-	if (delay == 0)
-		return;
-        asm volatile ("STCK %0" : "=m" (start_cc));
-	do {
-		asm volatile ("STCK %0" : "=m" (end_cc));
-	} while (((end_cc - start_cc)/4096) < delay);
-}
 
 /*
  * Setup function called from init/main.c just after the banner
@@ -192,12 +179,11 @@ void __init setup_arch(char **cmdline_p)
 {
         unsigned long bootmap_size;
         unsigned long memory_start, memory_end;
-        char c = ' ', *to = command_line, *from = COMMAND_LINE;
+        char c = ' ', cn, *to = command_line, *from = COMMAND_LINE;
 	struct resource *res;
 	unsigned long start_pfn, end_pfn;
         static unsigned int smptrap=0;
         unsigned long delay = 0;
-        int len = 0;
 
         if (smptrap)
                 return;
@@ -210,6 +196,7 @@ void __init setup_arch(char **cmdline_p)
          */
         cpu_init();
         boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
+        __cpu_logical_map[0] = boot_cpu_addr;
 
         /*
          * print what head.S has found out about the machine 
@@ -227,10 +214,15 @@ void __init setup_arch(char **cmdline_p)
         rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
         rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
-	/* nasty stuff with PARMAREAs. we use head.S or parameterline
-	  if (!MOUNT_ROOT_RDONLY)
-	  root_mountflags &= ~MS_RDONLY;
-	*/
+        memory_start = (unsigned long) &_end;    /* fixit if use $CODELO etc*/
+	memory_end = MEMORY_SIZE;
+        /*
+         * We need some free virtual space to be able to do vmalloc.
+         * On a machine with 2GB memory we make sure that we have at
+         * least 128 MB free space for vmalloc.
+         */
+        if (memory_end > 1920*1024*1024)
+                memory_end = 1920*1024*1024;
         memory_start = (unsigned long) &_end;    /* fixit if use $CODELO etc*/
 	memory_end = MEMORY_SIZE;                /* detected in head.s */
         init_mm.start_code = PAGE_OFFSET;
@@ -252,7 +244,6 @@ void __init setup_arch(char **cmdline_p)
                  * "mem=XXX[kKmM]" sets memsize 
                  */
                 if (c == ' ' && strncmp(from, "mem=", 4) == 0) {
-                        if (to != command_line) to--;
                         memory_end = simple_strtoul(from+4, &from, 0);
                         if ( *from == 'K' || *from == 'k' ) {
                                 memory_end = memory_end << 10;
@@ -275,16 +266,22 @@ void __init setup_arch(char **cmdline_p)
 				delay = delay*60*1000000;
 				from++;
 			}
-			/* now wait for the requestion amount of time */
-			tod_wait(delay);
+			/* now wait for the requestedn amount of time */
+			udelay(delay);
                 }
-                c = *(from++);
-                if (!c)
+                cn = *(from++);
+                if (!cn)
                         break;
-                if (COMMAND_LINE_SIZE <= ++len)
+                if (cn == '\n')
+                        cn = ' ';  /* replace newlines with space */
+                if (cn == ' ' && c == ' ')
+                        continue;  /* remove additional spaces */
+                c = cn;
+                if (to - command_line >= COMMAND_LINE_SIZE)
                         break;
                 *(to++) = c;
         }
+        if (c == ' ' && to > command_line) to--;
         *to = '\0';
         *cmdline_p = command_line;
 
@@ -317,7 +314,7 @@ void __init setup_arch(char **cmdline_p)
         paging_init();
 #ifdef CONFIG_BLK_DEV_INITRD
         if (INITRD_START) {
-		if (INITRD_START + INITRD_SIZE < memory_end) {
+		if (INITRD_START + INITRD_SIZE <= memory_end) {
 			reserve_bootmem(INITRD_START, INITRD_SIZE);
 			initrd_start = INITRD_START;
 			initrd_end = initrd_start + INITRD_SIZE;
@@ -368,8 +365,8 @@ int get_cpuinfo(char * buffer)
         p += sprintf(p,"vendor_id       : IBM/S390\n"
                        "# processors    : %i\n"
                        "bogomips per cpu: %lu.%02lu\n",
-                       smp_num_cpus, loops_per_sec/500000,
-                       (loops_per_sec/5000)%100);
+                       smp_num_cpus, loops_per_jiffy/(500000/HZ),
+                       (loops_per_jiffy/(5000/HZ))%100);
         for (i = 0; i < smp_num_cpus; i++) {
                 cpuinfo = &safe_get_cpu_lowcore(i).cpu_data;
                 p += sprintf(p,"processor %i: "

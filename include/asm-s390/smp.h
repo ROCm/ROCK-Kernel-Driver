@@ -13,7 +13,7 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/lowcore.h>
-#include <linux/tasks.h>    // FOR NR_CPUS definition only.
+#include <linux/threads.h>  // FOR NR_CPUS definition only.
 #include <linux/kernel.h>   // FOR FASTCALL definition
 
 #define smp_processor_id() (current->processor)
@@ -31,7 +31,6 @@
  
 #define PROC_CHANGE_PENALTY	20		/* Schedule penalty */
 
-extern unsigned long ipi_count;
 extern void count_cpus(void);
 
 extern __inline__ int cpu_logical_map(int cpu)
@@ -67,10 +66,11 @@ typedef struct
 	__u16      cpu;
 } sigp_info;
 
-sigp_ccode smp_ext_call_sync(int cpu, ec_cmd_sig cmd,void *parms);
-sigp_ccode smp_ext_call_async(int cpu, ec_bit_sig sig);
-void smp_ext_call_sync_others(ec_cmd_sig cmd, void *parms);
-void smp_ext_call_async_others(ec_bit_sig sig);
+sigp_ccode
+smp_ext_call(int cpu, void (*callback)(void *info), void *info, int wait);
+void smp_ext_call_others(void (*callback)(void *info), void *info, int wait);
+sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig);
+void smp_ext_bitcall_others(ec_bit_sig sig);
 
 int smp_signal_others(sigp_order_code order_code,__u32 parameter,
                       int spin,sigp_info *info);

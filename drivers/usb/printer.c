@@ -17,6 +17,7 @@
  *	v0.4 - fixes in unidirectional mode
  *	v0.5 - add DEVICE_ID string support
  *	v0.6 - never time out
+ *	v0.? - fixed bulk-IN read and poll (David Paschal, paschal@rcsis.com)
  */
 
 /*
@@ -256,8 +257,8 @@ static unsigned int usblp_poll(struct file *file, struct poll_table_struct *wait
 {
 	struct usblp *usblp = file->private_data;
 	poll_wait(file, &usblp->wait, wait);
-	return ((usblp->bidir || usblp->readurb.status  == -EINPROGRESS) ? 0 : POLLIN  | POLLRDNORM)
-	     		      | (usblp->writeurb.status == -EINPROGRESS  ? 0 : POLLOUT | POLLWRNORM);
+ 	return ((!usblp->bidir || usblp->readurb.status  == -EINPROGRESS) ? 0 : POLLIN  | POLLRDNORM)
+ 			       | (usblp->writeurb.status == -EINPROGRESS  ? 0 : POLLOUT | POLLWRNORM);
 }
 
 static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
@@ -404,6 +405,7 @@ static ssize_t usblp_read(struct file *file, char *buffer, size_t count, loff_t 
 		err("usblp%d: error %d reading from printer",
 			usblp->minor, usblp->readurb.status);
 		usblp->readurb.dev = usblp->dev;
+ 		usblp->readcount = 0;
 		usb_submit_urb(&usblp->readurb);
 		return -EIO;
 	}

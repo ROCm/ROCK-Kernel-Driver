@@ -27,10 +27,58 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 
+/*
+ * This is a bit tricky. It's given that bh and rq are for the same
+ * device, but the next request might of course not be. Run through
+ * the tests below to check if we want to insert here if we can't merge
+ * bh into an existing request
+ */
+inline int bh_rq_in_between(struct buffer_head *bh, struct request *rq,
+			    struct list_head *head)
+{
+	struct list_head *next;
+	struct request *next_rq;
+
+	next = rq->queue.next;
+	if (next == head)
+		return 0;
+
+	/*
+	 * if the device is different (usually on a different partition),
+	 * just check if bh is after rq
+	 */
+	next_rq = blkdev_entry_to_request(next);
+	if (next_rq->rq_dev != rq->rq_dev)
+		return bh->b_rsector > rq->sector;
+
+	/*
+	 * ok, rq, next_rq and bh are on the same device. if bh is in between
+	 * the two, this is the sweet spot
+	 */
+	if (bh->b_rsector < next_rq->sector && bh->b_rsector > rq->sector)
+		return 1;
+
+	/*
+	 * next_rq is ordered wrt rq, but bh is not in between the two
+	 */
+	if (next_rq->sector > rq->sector)
+		return 0;
+
+	/*
+	 * next_rq and rq not ordered, if we happen to be either before
+	 * next_rq or after rq insert here anyway
+	 */
+	if (bh->b_rsector > rq->sector || bh->b_rsector < next_rq->sector)
+		return 1;
+
+	return 0;
+}
+
+
 int elevator_linus_merge(request_queue_t *q, struct request **req,
 			 struct list_head * head,
 			 struct buffer_head *bh, int rw,
-			 int max_sectors, int max_segments)
+			 int max_sectors)
 {
 	struct list_head *entry = &q->queue_head;
 	unsigned int count = bh->b_size >> 9, ret = ELEVATOR_NO_MERGE;
@@ -41,18 +89,16 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 		/*
 		 * simply "aging" of requests in queue
 		 */
-		if (__rq->elevator_sequence-- <= 0) {
-			*req = __rq;
+		if (__rq->elevator_sequence-- <= 0)
 			break;
-		}
 
-		if (!*req && BHRQ_IN_ORDER(bh, __rq))
-			*req = __rq;
 		if (__rq->sem)
 			continue;
-		if (__rq->cmd != rw)
-			continue;
 		if (__rq->rq_dev != bh->b_rdev)
+			continue;
+		if (!*req && bh_rq_in_between(bh, __rq, &q->queue_head))
+			*req = __rq;
+		if (__rq->cmd != rw)
 			continue;
 		if (__rq->nr_sectors + count > max_sectors)
 			continue;
@@ -98,7 +144,7 @@ void elevator_linus_merge_req(struct request *req, struct request *next)
 int elevator_noop_merge(request_queue_t *q, struct request **req,
 			struct list_head * head,
 			struct buffer_head *bh, int rw,
-			int max_sectors, int max_segments)
+			int max_sectors)
 {
 	struct list_head *entry;
 	unsigned int count = bh->b_size >> 9;

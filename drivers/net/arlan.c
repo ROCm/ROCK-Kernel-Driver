@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1997 Cullen Jennings
  *  Copyright (C) 1998 Elmer Joandiu, elmer@ylenurme.ee
- *  Gnu Public License applies
+ *  GNU General Public License applies
  * This module provides support for the Arlan 655 card made by Aironet
  */
 
@@ -32,7 +32,7 @@ static int retries = 5;
 static int async = 1;
 static int tx_queue_len = 1;
 static int arlan_EEPROM_bad;
-int arlan_entry_and_exit_debug;
+static int arlan_entry_and_exit_debug;
 
 #ifdef ARLAN_DEBUGING
 
@@ -87,7 +87,7 @@ EXPORT_SYMBOL(last_arlan);
 #endif
 
 struct arlan_conf_stru arlan_conf[MAX_ARLANS];
-int arlans_found;
+static int arlans_found;
 
 static  int 	arlan_probe_here(struct net_device *dev, int ioaddr);
 static  int 	arlan_open(struct net_device *dev);
@@ -1063,7 +1063,7 @@ static int __init arlan_check_fingerprint(int memaddr)
 
 }
 
-int __init arlan_probe_everywhere(struct net_device *dev)
+static int __init arlan_probe_everywhere(struct net_device *dev)
 {
 	int m;
 	int probed = 0;
@@ -1103,7 +1103,7 @@ int __init arlan_probe_everywhere(struct net_device *dev)
 	return -ENODEV;
 }
 
-int __init arlan_find_devices(void)
+static int __init arlan_find_devices(void)
 {
 	int m;
 	int found = 0;
@@ -1229,7 +1229,7 @@ static int __init
 }
 
 
-int __init arlan_probe_here(struct net_device *dev, int memaddr)
+static int __init arlan_probe_here(struct net_device *dev, int memaddr)
 {
 	volatile struct arlan_shmem *arlan;
 
@@ -1721,7 +1721,9 @@ static void arlan_rx_interrupt(struct net_device *dev, u_char rxStatus, u_short 
 					printk(KERN_WARNING "arlan kernel pkt type trans %x \n", skb->protocol);
 				}
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			priv->stats.rx_packets++;
+			priv->stats.rx_bytes += pkt_len;
 		}
 		break;
 		

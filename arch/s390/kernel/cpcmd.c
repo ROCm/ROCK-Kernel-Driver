@@ -8,7 +8,7 @@
 
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-#include <asm/string.h>
+#include <linux/string.h>
 #include <asm/ebcdic.h>
 
 void cpcmd(char *cmd, char *response, int rlen)
@@ -22,10 +22,10 @@ void cpcmd(char *cmd, char *response, int rlen)
         ASCEBC(obuffer,olen);
 
         if (response != NULL && rlen > 0) {
-                asm volatile ("LRA   2,0(0,%0)\n\t"
+                asm volatile ("LRA   2,0(%0)\n\t"
                               "LR    4,%1\n\t"
                               "O     4,%4\n\t"
-                              "LRA   3,0(0,%2)\n\t"
+                              "LRA   3,0(%2)\n\t"
                               "LR    5,%3\n\t"
                               ".long 0x83240008 # Diagnose 83\n\t"
                               : /* no output */
@@ -34,7 +34,7 @@ void cpcmd(char *cmd, char *response, int rlen)
                               : "2", "3", "4", "5" );
                 EBCASC(response, rlen);
         } else {
-                asm volatile ("LRA   2,0(0,%0)\n\t"
+                asm volatile ("LRA   2,0(%0)\n\t"
                               "LR    3,%1\n\t"
                               ".long 0x83230008 # Diagnose 83\n\t"
                               : /* no output */

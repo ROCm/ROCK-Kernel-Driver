@@ -33,7 +33,7 @@ days (and nights) on the 16th and 17th of October 1999, now known as the
 great USB-October-Revolution started by GA, DF, and TS ;-)
 
 Since the concept is in no way UHCI dependent, we hope that it will also be 
-transfered to the OHCI-driver, so both drivers share a common API.
+transferred to the OHCI-driver, so both drivers share a common API.
 
 1.2. Advantages and disadvantages
 

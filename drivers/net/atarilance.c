@@ -3,7 +3,7 @@
 	Written 1995/96 by Roman Hodek (Roman.Hodek@informatik.uni-erlangen.de)
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	This drivers was written with the following sources of reference:
 	 - The driver for the Riebl Lance card by the TU Vienna.
@@ -53,7 +53,7 @@ static char *version = "atarilance.c: v1.3 04/04/96 "
 #include <linux/string.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 
@@ -515,8 +515,11 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 
   probe_ok:
 	init_etherdev( dev, sizeof(struct lance_private) );
-	if (!dev->priv)
+	if (!dev->priv) {
 		dev->priv = kmalloc( sizeof(struct lance_private), GFP_KERNEL );
+		if (!dev->priv)
+			return 0;
+	}
 	lp = (struct lance_private *)dev->priv;
 	MEM = (struct lance_memory *)memaddr;
 	IO = lp->iobase = (struct lance_ioreg *)ioaddr;
@@ -765,7 +768,7 @@ static void lance_tx_timeout (struct net_device *dev)
 	lance_init_ring(dev);
 	REGA( CSR0 ) = CSR0_INEA | CSR0_INIT | CSR0_STRT;
 	dev->trans_start = jiffies;
-	netif_start_queue (dev);
+	netif_wake_queue (dev);
 }
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -820,9 +823,9 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	head->misc = 0;
 	lp->memcpy_f( PKTBUF_ADDR(head), (void *)skb->data, skb->len );
 	head->flag = TMD1_OWN_CHIP | TMD1_ENP | TMD1_STP;
+	lp->stats.tx_bytes += skb->len;
 	dev_kfree_skb( skb );
 	lp->cur_tx++;
-	lp->stats.tx_bytes += skb->len;
 	while( lp->cur_tx >= TX_RING_SIZE && lp->dirty_tx >= TX_RING_SIZE ) {
 		lp->cur_tx -= TX_RING_SIZE;
 		lp->dirty_tx -= TX_RING_SIZE;
@@ -1028,8 +1031,9 @@ static int lance_rx( struct net_device *dev )
 				lp->memcpy_f( skb->data, PKTBUF_ADDR(head), pkt_len );
 				skb->protocol = eth_type_trans( skb, dev );
 				netif_rx( skb );
+				dev->last_rx = jiffies;
 				lp->stats.rx_packets++;
-				lp->stats.rx_bytes += skb->len;
+				lp->stats.rx_bytes += pkt_len;
 			}
 		}
 

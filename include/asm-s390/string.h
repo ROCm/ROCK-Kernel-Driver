@@ -40,24 +40,29 @@
 #undef __HAVE_ARCH_STRSTR
 
 extern void *memset(void *, int, size_t);
+extern void *memcpy(void *, const void *, size_t);
+extern void *memmove(void *, const void *, size_t);
+extern char *strncpy(char *, const char *, size_t);
+extern int strcmp(const char *,const char *);
 
-extern inline void * memchr(const void * cs,int c,size_t count)
+static inline void * memchr(const void * cs,int c,size_t count)
 {
     void *ptr;
 
     __asm__ __volatile__ ("   lr    0,%2\n"
+                          "   lr    1,%1\n"
                           "   la    %0,0(%3,%1)\n"
-                          "0: srst  %0,%1\n"
+                          "0: srst  %0,1\n"
                           "   jo    0b\n"
                           "   brc   13,1f\n"
                           "   slr   %0,%0\n"
                           "1:"
-                          : "=a" (ptr) : "a" (cs), "d" (c), "d" (count)
-                          : "cc", "0" );
+                          : "=&a" (ptr) : "a" (cs), "d" (c), "d" (count)
+                          : "cc", "0", "1" );
     return ptr;
 }
 
-extern __inline__ char *strcpy(char *dest, const char *src)
+static __inline__ char *strcpy(char *dest, const char *src)
 {
     char *tmp = dest;
 
@@ -69,7 +74,7 @@ extern __inline__ char *strcpy(char *dest, const char *src)
     return tmp;
 }
 
-extern __inline__ size_t strlen(const char *s)
+static __inline__ size_t strlen(const char *s)
 {
     size_t len;
 
@@ -84,7 +89,7 @@ extern __inline__ size_t strlen(const char *s)
     return len;
 }
 
-extern __inline__ char *strcat(char *dest, const char *src)
+static __inline__ char *strcat(char *dest, const char *src)
 {
     char *tmp = dest;
 
@@ -100,8 +105,13 @@ extern __inline__ char *strcat(char *dest, const char *src)
     return tmp;
 }
 
+extern void *alloca(size_t);
 
 #endif /* __KERNEL__ */
 
 #endif /* __S390_STRING_H_ */
+
+
+
+
 

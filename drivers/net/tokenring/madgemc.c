@@ -4,7 +4,7 @@
  *  Written 2000 by Adam Fritzler
  *
  *  This software may be used and distributed according to the terms
- *  of the GNU Public License, incorporated herein by reference.
+ *  of the GNU General Public License, incorporated herein by reference.
  *
  *  This driver module supports the following cards:
  *      - Madge Smart 16/4 Ringnode MC16

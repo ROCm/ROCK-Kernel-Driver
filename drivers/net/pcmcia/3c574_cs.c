@@ -5,7 +5,7 @@
 	David Hinds, dahinds@users.sourceforge.net (from his PC card code).
 
 	This software may be used and distributed according to the terms of
-	the GNU Public License, incorporated herein by reference.
+	the GNU General Public License, incorporated herein by reference.
 
 	This driver derives from Donald Becker's 3c509 core, which has the
 	following copyright:
@@ -75,7 +75,7 @@ earlier 3Com products.
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
@@ -325,8 +325,10 @@ static dev_link_t *tc574_attach(void)
 	ether_setup(dev);
 	dev->open = &el3_open;
 	dev->stop = &el3_close;
+#ifdef HAVE_TX_TIMEOUT
 	dev->tx_timeout = el3_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+#endif
 
 	/* Register with Card Services */
 	link->next = dev_list;
@@ -859,7 +861,7 @@ static void el3_tx_timeout(struct net_device *dev)
 	/* Issue TX_RESET and TX_START commands. */
 	wait_for_completion(dev, TxReset);
 	outw(TxEnable, ioaddr + EL3_CMD);
-	netif_start_queue(dev);
+	netif_wake_queue(dev);
 }
 
 static void pop_tx_status(struct net_device *dev)

@@ -6,7 +6,7 @@
    Based on skeleton.c and heavily on at1700.c by Donald Becker
 
    This software may be used and distributed according to the terms
-   of the GNU Public Licence, incorporated herein by reference.
+   of the GNU General Public License, incorporated herein by reference.
 
    The author may be reached as miku@iki.fi
 
@@ -155,7 +155,7 @@ static char *version =
 #include <linux/ptrace.h>		  
 #include <linux/ioport.h>		  
 #include <linux/in.h>		  
-#include <linux/malloc.h>		  
+#include <linux/slab.h>		  
 #include <linux/string.h>		  
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -1196,6 +1196,7 @@ static void eth16i_rx(struct net_device *dev)
 
 			skb->protocol=eth_type_trans(skb, dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			lp->stats.rx_packets++;
 			lp->stats.rx_bytes += pkt_len;
 

@@ -141,20 +141,19 @@ csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr,
                    unsigned int sum)
 {
 	__asm__ __volatile__ (
-		"    sll   %3,16\n"
-		"    or    %3,%4\n"  /* newproto=proto<<16 in hiword, len in lowword */
-		"    alr   %1,%2\n"  /* saddr+=daddr */
-		"    brc   12,0f\n"
-		"    ahi   %1,1\n"   /* add carry */
-		"0:  alr   %1,%3\n"  /* add saddr+=newproto */
-		"    brc   12,1f\n"
-		"    ahi   %1,1\n"   /* add carry again */
-		"1:  alr   %0,%1\n"  /* sum+=saddr */
+                "    alr   %0,%1\n"  /* sum += saddr */
+                "    brc   12,0f\n"
+		"    ahi   %0,1\n"   /* add carry */
+		"0:  alr   %0,%2\n"  /* sum += daddr */
+                "    brc   12,1f\n"
+                "    ahi   %0,1\n"   /* add carry */
+		"1:  alr   %0,%3\n"  /* sum += (len<<16) + (proto<<8) */
 		"    brc   12,2f\n"
-		"    ahi   %0,1\n"   /* add carry again */
+		"    ahi   %0,1\n"   /* add carry */
 		"2:"
 		: "+&d" (sum)
-		: "d" (saddr), "d" (daddr), "d" (proto), "d" (len)
+		: "d" (saddr), "d" (daddr),
+		  "d" (((unsigned int) len<<16) + (unsigned int) proto)
 		: "cc" );
 	return sum;
 }

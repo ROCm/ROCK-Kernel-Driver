@@ -2516,7 +2516,7 @@ _mul64:
 	cmpi.b		%d0, &0x7		# is src mode Dn or other?
 	bgt.w		mul64_memop		# src is in memory
 
-# multiplier operand in the the data register file.
+# multiplier operand in the data register file.
 # must extract the register number and fetch the operand from the stack.
 mul64_regop:
 	andi.w		&0x7, %d0		# extract Dn

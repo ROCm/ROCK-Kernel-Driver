@@ -230,7 +230,7 @@
  *    IEEE_Addr		Forward transfer address register
  *    IEEE_Status	Port IO signal status register
  *    IEEE_IntStatus	Port interrupts status register
- *    IEEE_FifoLevels   Rx and Tx FIFO interupt generation levels
+ *    IEEE_FifoLevels   Rx and Tx FIFO interrupt generation levels
  *    IEEE_InitTime	Forward timeout counter initial value
  *    IEEE_TimerStatus	Forward timeout counter current value
  *    IEEE_FifoReset	Reset forward transfer FIFO

@@ -6,7 +6,7 @@
  *
  *
  *	This software may be used and distributed according to the terms
- *	of the GNU Public License, incorporated herein by reference.
+ *	of the GNU General Public License, incorporated herein by reference.
  * 
  * The author may be reached as simon@ncm.com, or C/O
  *    NCM

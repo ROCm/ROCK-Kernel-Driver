@@ -5,7 +5,7 @@
 	Copyright 1993 United States Government as represented by the
 	Director, National Security Agency.
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	This driver is for the Allied Telesis AT1500 and HP J2405A, and should work
 	with most other LANCE-based bus-master (NE2100/NE2500) ethercards.
@@ -44,7 +44,7 @@ static const char *version = "lance.c:v1.15ac 1999/11/13 dplatt@3do.com, becker@
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -837,7 +837,7 @@ static void lance_tx_timeout (struct net_device *dev)
 	lance_restart (dev, 0x0043, 1);
 
 	dev->trans_start = jiffies;
-	netif_start_queue (dev);
+	netif_wake_queue (dev);
 }
 
 
@@ -874,6 +874,8 @@ static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	lp->tx_ring[entry].misc = 0x0000;
 
+	lp->stats.tx_bytes += skb->len;
+
 	/* If any part of this buffer is >16M we must copy it to a low-memory
 	   buffer. */
 	if ((u32)virt_to_bus(skb->data) + skb->len > 0x01000000) {
@@ -889,7 +891,6 @@ static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		lp->tx_ring[entry].base = ((u32)virt_to_bus(skb->data) & 0xffffff) | 0x83000000;
 	}
 	lp->cur_tx++;
-	lp->stats.tx_bytes += skb->len;
 
 	/* Trigger an immediate send poll. */
 	outw(0x0000, ioaddr+LANCE_ADDR);
@@ -1087,10 +1088,11 @@ lance_rx(struct net_device *dev)
 				eth_copy_and_sum(skb,
 					(unsigned char *)bus_to_virt((lp->rx_ring[entry].base & 0x00ffffff)),
 					pkt_len,0);
-				lp->stats.rx_bytes+=skb->len;
 				skb->protocol=eth_type_trans(skb,dev);
-				lp->stats.rx_packets++;
 				netif_rx(skb);
+				dev->last_rx = jiffies;
+				lp->stats.rx_packets++;
+				lp->stats.rx_bytes+=pkt_len;
 			}
 		}
 		/* The docs say that the buffer length isn't touched, but Andrew Boyd

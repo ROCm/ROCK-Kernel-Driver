@@ -1526,9 +1526,10 @@ awc_802_11_router_rx(struct net_device * dev,struct awc_fid * rx_buff){
 	rx_buff->skb = NULL;
 	rx_buff->u.rx.payload = NULL;
 	priv->stats.rx_packets++;
-	priv->stats.rx_bytes++;
+	priv->stats.rx_bytes += skb->len;
 	
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	AWC_ENTRY_EXIT_DEBUG("exit\n");
 	return ;
 
@@ -3025,7 +3026,7 @@ void awc_tx_timeout (struct net_device *dev)
 	}
 	restore_flags(flags);
 	dev->trans_start = jiffies;
-	netif_start_queue (dev);
+	netif_wake_queue (dev);
 }
 
 

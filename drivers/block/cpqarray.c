@@ -44,8 +44,8 @@
 
 #define SMART2_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 
-#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.1)"
-#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,1)
+#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.2)"
+#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,2)
 
 /* Embedded module documentation macros - see modules.h */
 /* Original author Chris Frantz - Compaq Computer Corporation */
@@ -1528,7 +1528,7 @@ static int revalidate_allvol(kdev_t dev)
 	ida_gendisk[ctlr].nr_real = 0;
 
 	/*
-	 * Tell the array controller not to give us any interupts while
+	 * Tell the array controller not to give us any interrupts while
 	 * we check the new geometry.  Then turn interrupts back on when
 	 * we're done.
 	 */

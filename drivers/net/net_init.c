@@ -36,7 +36,7 @@
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/if_ether.h>
 #include <linux/string.h>
 #include <linux/netdevice.h>

@@ -136,6 +136,18 @@ int isapnp=0;
 int aha1542[] = {0x330, 11, 4, -1};
 MODULE_PARM(aha1542, "1-4i");
 MODULE_PARM(isapnp, "i");
+
+static struct isapnp_device_id id_table[] __devinitdata = {
+	{
+		ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('A', 'D', 'P'), ISAPNP_FUNCTION(0x1542),
+		0
+	},
+	{0}
+};
+
+MODULE_DEVICE_TABLE(isapnp, id_table);
+
 #else
 int isapnp=1;
 #endif
@@ -947,11 +959,12 @@ fail:
 	return 0;
 }
 
-/* called from init/main.c */
+#ifndef MODULE
+static int setup_idx = 0;
+
 void __init aha1542_setup(char *str, int *ints)
 {
 	const char *ahausage = "aha1542: usage: aha1542=<PORTBASE>[,<BUSON>,<BUSOFF>[,<DMASPEED>]]\n";
-	static int setup_idx = 0;
 	int setup_portbase;
 
 	if (setup_idx >= MAXBOARDS) {
@@ -1004,6 +1017,21 @@ void __init aha1542_setup(char *str, int *ints)
 
 	++setup_idx;
 }
+
+static int __init do_setup(char *str)
+{
+	int ints[4];
+
+	int count=setup_idx;
+
+	get_options(str, sizeof(ints)/sizeof(int), ints);
+	aha1542_setup(str,ints);
+
+	return count<setup_idx;
+}
+
+__setup("aha1542=",do_setup);
+#endif
 
 /* return non-zero on detection */
 int aha1542_detect(Scsi_Host_Template * tpnt)

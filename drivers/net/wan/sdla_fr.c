@@ -114,7 +114,7 @@
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/string.h>	/* inline memset(), etc. */
-#include <linux/malloc.h>	/* kmalloc(), kfree() */
+#include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/wanpipe.h>	/* WANPIPE common user API definitions */
 #include <linux/if_arp.h>	/* ARPHRD_* defines */
@@ -1133,7 +1133,7 @@ static void if_tx_timeout (struct net_device *dev)
 
 	printk (KERN_INFO "%s: Transmit timed out\n", chan->name);
 	chan->drvstats_if_send.if_send_tbusy_timeout++;
-	netif_start_queue (dev);
+	netif_wake_queue (dev);
 
 }
 

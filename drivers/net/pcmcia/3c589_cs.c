@@ -11,7 +11,7 @@
     Written 1994 by Donald Becker.
     Copyright 1993 United States Government as represented by the
     Director, National Security Agency.  This software may be used and
-    distributed according to the terms of the GNU Public License,
+    distributed according to the terms of the GNU General Public License,
     incorporated herein by reference.
     Donald Becker may be reached at becker@cesdis1.gsfc.nasa.gov
 
@@ -22,7 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
@@ -243,8 +243,10 @@ static dev_link_t *tc589_attach(void)
     ether_setup(dev);
     dev->open = &el3_open;
     dev->stop = &el3_close;
+#ifdef HAVE_TX_TIMEOUT
     dev->tx_timeout = el3_tx_timeout;
     dev->watchdog_timeo = TX_TIMEOUT;
+#endif
     
     /* Register with Card Services */
     link->next = dev_list;
@@ -686,7 +688,7 @@ static void el3_tx_timeout(struct net_device *dev)
     /* Issue TX_RESET and TX_START commands. */
     wait_for_completion(dev, TxReset);
     outw(TxEnable, ioaddr + EL3_CMD);
-    netif_start_queue(dev);
+    netif_wake_queue(dev);
 }
 
 static void pop_tx_status(struct net_device *dev)

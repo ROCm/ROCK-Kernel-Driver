@@ -2,7 +2,7 @@
  * linux/fs/hfs/bfind.c
  *
  * Copyright (C) 1995, 1996  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains the code to access records in a btree.
  *

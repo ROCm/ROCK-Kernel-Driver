@@ -129,7 +129,7 @@ void show_trace(unsigned long * stack)
 
 void show_trace_task(struct task_struct *tsk)
 {
-	show_trace(tsk->thread.esp);
+	show_trace(&tsk->thread.esp);
 }
 
 void show_stack(unsigned long * esp)

@@ -2,7 +2,7 @@
  * linux/fs/hfs/bitmap.c
  *
  * Copyright (C) 1996-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * Based on GPLed code Copyright (C) 1995  Michael Dreher
  *

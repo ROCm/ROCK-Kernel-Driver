@@ -21,7 +21,7 @@
     Mariner, with help from Allen Brost. 
 
     This software may be used and distributed according to the terms of
-    the GNU Public License, incorporated herein by reference.
+    the GNU General Public License, incorporated herein by reference.
 
 ======================================================================*/
 
@@ -29,7 +29,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
@@ -363,8 +363,10 @@ static dev_link_t *smc91c92_attach(void)
     ether_setup(dev);
     dev->open = &smc91c92_open;
     dev->stop = &smc91c92_close;
+#ifdef HAVE_TX_TIMEOUT
     dev->tx_timeout = smc_tx_timeout;
     dev->watchdog_timeo = TX_TIMEOUT;
+#endif
     dev->priv = link->priv = link->irq.Instance = smc;
     
     /* Register with Card Services */
@@ -1316,7 +1318,7 @@ static void smc_tx_timeout(struct net_device *dev)
     smc_reset(dev);
     dev->trans_start = jiffies;
     smc->saved_skb = NULL;
-    netif_start_queue(dev);
+    netif_wake_queue(dev);
 }
 
 static int smc_start_xmit(struct sk_buff *skb, struct net_device *dev)

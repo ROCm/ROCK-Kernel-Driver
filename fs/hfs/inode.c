@@ -2,7 +2,7 @@
  * linux/fs/hfs/inode.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains inode-related functions which do not depend on
  * which scheme is being used to represent forks.

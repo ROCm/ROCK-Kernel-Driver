@@ -87,7 +87,7 @@ static char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -633,6 +633,8 @@ pamsnet_probe (dev)
 	/* Initialize the device structure. */
 	if (dev->priv == NULL)
 		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
+	if (!dev->priv)
+		return -ENOMEM;
 	memset(dev->priv, 0, sizeof(struct net_local));
 
 	dev->open		= pamsnet_open;
@@ -794,6 +796,7 @@ pamsnet_poll_rx(struct net_device *dev) {
 			 */
 			memcpy(skb->data, nic_packet->buffer, pkt_len);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			lp->stats.rx_packets++;
 			lp->stats.rx_bytes+=pkt_len;
 		}

@@ -2,7 +2,7 @@
  * linux/fs/hfs/super.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains hfs_read_super(), some of the super_ops and
  * init_module() and cleanup_module().	The remaining super_ops are in

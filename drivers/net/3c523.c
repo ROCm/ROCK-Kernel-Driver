@@ -529,8 +529,8 @@ int __init elmc_probe(struct net_device *dev)
 	}
 	dev->mem_end = dev->mem_start + size;	/* set mem_end showed by 'ifconfig' */
 
-	((struct priv *) (dev->priv))->memtop = bus_to_virt(dev->mem_start) + size;
-	((struct priv *) (dev->priv))->base = (unsigned long) bus_to_virt(dev->mem_start) + size - 0x01000000;
+	pr->memtop = bus_to_virt(dev->mem_start) + size;
+	pr->base = (unsigned long) bus_to_virt(dev->mem_start) + size - 0x01000000;
 	alloc586(dev);
 
 	elmc_id_reset586();	/* make sure it doesn't generate spurious ints */

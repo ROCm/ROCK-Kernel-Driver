@@ -3,7 +3,7 @@
 	Written 1997-1998 by Donald Becker.
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	This driver is for the 3Com ISA EtherLink XL "Corkscrew" 3c515 ethercard.
 
@@ -57,7 +57,7 @@ static int max_interrupt_work = 20;
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <asm/bitops.h>
@@ -599,6 +599,8 @@ static struct net_device *corkscrew_found_device(struct net_device *dev,
 	/* Caution: quad-word alignment required for rings! */
 	dev->priv =
 	    kmalloc(sizeof(struct corkscrew_private), GFP_KERNEL);
+	if (!dev->priv)
+		return NULL;
 	memset(dev->priv, 0, sizeof(struct corkscrew_private));
 	dev = init_etherdev(dev, sizeof(struct corkscrew_private));
 	dev->base_addr = ioaddr;
@@ -1079,6 +1081,7 @@ static int corkscrew_start_xmit(struct sk_buff *skb,
 	}
 	/* Put out the doubleword header... */
 	outl(skb->len, ioaddr + TX_FIFO);
+	vp->stats.tx_bytes += skb->len;
 #ifdef VORTEX_BUS_MASTER
 	if (vp->bus_master) {
 		/* Set the bus-master controller to transfer the packet. */
@@ -1137,7 +1140,6 @@ static int corkscrew_start_xmit(struct sk_buff *skb,
 			outb(0x00, ioaddr + TxStatus);	/* Pop the status stack. */
 		}
 	}
-	vp->stats.tx_bytes += skb->len;
 	return 0;
 }
 
@@ -1340,7 +1342,7 @@ static int corkscrew_rx(struct net_device *dev)
 				netif_rx(skb);
 				dev->last_rx = jiffies;
 				vp->stats.rx_packets++;
-				vp->stats.rx_bytes += skb->len;
+				vp->stats.rx_bytes += pkt_len;
 				/* Wait a limited time to go to next packet. */
 				for (i = 200; i >= 0; i--)
 					if (! (inw(ioaddr + EL3_STATUS) & CmdInProgress)) 

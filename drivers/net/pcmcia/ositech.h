@@ -3,7 +3,7 @@
     (Special thanks to Kevin MacPherson of OSITECH)
 
     This software may be used and distributed according to the terms of
-    the GNU Public License, incorporated herein by reference.
+    the GNU General Public License, incorporated herein by reference.
 */
 
     static const u_char __Xilinx7OD[] = {

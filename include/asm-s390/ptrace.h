@@ -63,8 +63,8 @@ typedef	struct
 	unsigned    storage_alt_space_ctl:1;
 	unsigned    :5;
 	unsigned    :16;
-	__u32   starting_addr;
-	__u32   ending_addr;
+	addr_t      starting_addr;
+	addr_t      ending_addr;
 } per_cr_bits  __attribute__((packed));
 
 typedef struct
@@ -83,12 +83,24 @@ typedef struct
 	unsigned       perc_store_real_address:1;
 	unsigned       :3;
 	unsigned       :1;
-	unsigned       atmid:5;
+	unsigned       atmid_validity_bit:1;
+	unsigned       atmid_psw_bit_32:1;
+	unsigned       atmid_psw_bit_5:1;
+	unsigned       atmid_psw_bit_16:1;
+	unsigned       atmid_psw_bit_17:1;
 	unsigned       si:2;
-	__u32          address;              /* 0x098 */
+	addr_t         address;              /* 0x098 */
 	unsigned       :4;                   /* 0x0a1 */
 	unsigned       access_id:4;           
 } per_lowcore_bits __attribute__((packed));
+
+typedef enum
+{
+	primary_asce,
+	ar_asce,
+	secondary_asce,
+	home_space_asce
+} per_ai_codes;
 
 typedef struct
 {
@@ -134,6 +146,8 @@ struct user_regs_struct
  * this is the way intel does it
  */
 	per_struct per_info;
+	addr_t  ieee_instruction_pointer; 
+	/* Used to give failing instruction back to user for ieee exceptions */
 };
 
 typedef struct user_regs_struct user_regs_struct;
@@ -143,12 +157,8 @@ typedef struct pt_regs pt_regs;
 #ifdef __KERNEL__
 #define user_mode(regs) (((regs)->psw.mask & PSW_PROBLEM_STATE) != 0)
 #define instruction_pointer(regs) ((regs)->psw.addr)
-
-struct thread_struct;
-extern int sprintf_regs(int line,char *buff,struct task_struct * task,
-			struct thread_struct *tss,struct pt_regs * regs);
-extern void show_regs(struct task_struct * task,struct thread_struct *tss,
-		      struct pt_regs * regs);
+extern void show_regs(struct pt_regs * regs);
+extern char *task_show_regs(struct task_struct *task, char *buffer);
 #endif
 
 
@@ -270,8 +280,9 @@ enum
 	PT_CR_9=pt_off(per_info.control_regs.words.cr[0]),
 	PT_CR_10=pt_off(per_info.control_regs.words.cr[1]),
 	PT_CR_11=pt_off(per_info.control_regs.words.cr[2]),
-	PT_LASTOFF=PT_CR_11,
-	PT_ENDREGS=offsetof(user_regs_struct,per_info.lowcore.words.perc_atmid)
+	PT_IEEE_IP=pt_off(ieee_instruction_pointer),
+	PT_LASTOFF=PT_IEEE_IP,
+	PT_ENDREGS=sizeof(user_regs_struct)-1
 };
 
 #define PTRACE_AREA \

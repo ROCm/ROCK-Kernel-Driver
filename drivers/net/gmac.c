@@ -1209,8 +1209,9 @@ gmac_receive(struct net_device *dev)
 				skb->ip_summed = CHECKSUM_NONE;
 			skb->ip_summed = CHECKSUM_NONE;
 			skb->protocol = eth_type_trans(skb, dev);
-			netif_rx(skb);
 			gm->stats.rx_bytes += skb->len;
+			netif_rx(skb);
+			dev->last_rx = jiffies;
 			++gm->stats.rx_packets;
 		}
 		

@@ -91,7 +91,7 @@ typedef struct bmac_reg_entry {
 
 #define N_REG_ENTRIES 31
 
-bmac_reg_entry_t reg_entries[N_REG_ENTRIES] = {
+static bmac_reg_entry_t reg_entries[N_REG_ENTRIES] = {
 	{"MEMADD", MEMADD},
 	{"MEMDATAHI", MEMDATAHI},
 	{"MEMDATALO", MEMDATALO},
@@ -125,10 +125,10 @@ bmac_reg_entry_t reg_entries[N_REG_ENTRIES] = {
 	{"RXCV", RXCV}
 };
 
-struct net_device *bmac_devs = NULL;
+static struct net_device *bmac_devs;
 
 #ifdef CONFIG_PMAC_PBOOK
-int bmac_sleep_notify(struct pmu_sleep_notifier *self, int when);
+static int bmac_sleep_notify(struct pmu_sleep_notifier *self, int when);
 static struct pmu_sleep_notifier bmac_sleep_notifier = {
 	bmac_sleep_notify, SLEEP_LEVEL_NET,
 };
@@ -169,14 +169,14 @@ static void bmac_start(struct net_device *dev);
 #define	DBDMA_SET(x)	( ((x) | (x) << 16) )
 #define	DBDMA_CLEAR(x)	( (x) << 16)
 
-static __inline__ void
+static inline void
 dbdma_st32(volatile unsigned long *a, unsigned long x)
 {
 	__asm__ volatile( "stwbrx %0,0,%1" : : "r" (x), "r" (a) : "memory");
 	return;
 }
 
-static __inline__ unsigned long
+static inline unsigned long
 dbdma_ld32(volatile unsigned long *a)
 {
 	unsigned long swap;
@@ -184,7 +184,7 @@ dbdma_ld32(volatile unsigned long *a)
 	return swap;
 }
 
-void
+static void
 dbdma_stop(volatile struct dbdma_regs *dmap)
 {
 	dbdma_st32((volatile unsigned long *)&dmap->control,
@@ -226,14 +226,14 @@ dbdma_setcmd(volatile struct dbdma_cmd *cp,
 	out_le16(&cp->res_count, 0);
 }
 
-static __inline__
+static inline
 void bmwrite(struct net_device *dev, unsigned long reg_offset, unsigned data )
 {
 	out_le16((void *)dev->base_addr + reg_offset, data);
 }
 
 
-static __inline__
+static inline
 volatile unsigned short bmread(struct net_device *dev, unsigned long reg_offset )
 {
 	return in_le16((void *)dev->base_addr + reg_offset);
@@ -476,7 +476,7 @@ bmac_init_chip(struct net_device *dev)
 }
 
 #ifdef CONFIG_PMAC_PBOOK
-int
+static int
 bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 {
 	struct bmac_data *bp;
@@ -679,7 +679,7 @@ static int bmac_transmit_packet(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-static int rxintcount = 0;
+static int rxintcount;
 
 static void bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -747,7 +747,7 @@ static void bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 	}
 }
 
-static int txintcount = 0;
+static int txintcount;
 
 static void bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -1067,7 +1067,7 @@ static void bmac_set_multicast(struct net_device *dev)
 }
 #endif /* SUNHME_MULTICAST */
 
-static int miscintcount = 0;
+static int miscintcount;
 
 static void bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs)
 {

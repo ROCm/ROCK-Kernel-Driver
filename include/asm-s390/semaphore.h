@@ -36,7 +36,7 @@ struct semaphore {
 #define DECLARE_MUTEX(name) __DECLARE_SEMAPHORE_GENERIC(name,1)
 #define DECLARE_MUTEX_LOCKED(name) __DECLARE_SEMAPHORE_GENERIC(name,0)
 
-extern inline void sema_init (struct semaphore *sem, int val)
+static inline void sema_init (struct semaphore *sem, int val)
 {
 	*sem = (struct semaphore)__SEMAPHORE_INITIALIZER((*sem),val);
 }
@@ -61,13 +61,13 @@ asmlinkage int  __down_interruptible(struct semaphore * sem);
 asmlinkage int  __down_trylock(struct semaphore * sem);
 asmlinkage void __up(struct semaphore * sem);
 
-extern inline void down(struct semaphore * sem)
+static inline void down(struct semaphore * sem)
 {
 	if (atomic_dec_return(&sem->count) < 0)
 		__down(sem);
 }
 
-extern inline int down_interruptible(struct semaphore * sem)
+static inline int down_interruptible(struct semaphore * sem)
 {
 	int ret = 0;
 
@@ -76,7 +76,7 @@ extern inline int down_interruptible(struct semaphore * sem)
 	return ret;
 }
 
-extern inline int down_trylock(struct semaphore * sem)
+static inline int down_trylock(struct semaphore * sem)
 {
 	int ret = 0;
 
@@ -85,7 +85,7 @@ extern inline int down_trylock(struct semaphore * sem)
 	return ret;
 }
 
-extern inline void up(struct semaphore * sem)
+static inline void up(struct semaphore * sem)
 {
 	if (atomic_inc_return(&sem->count) <= 0)
 		__up(sem);
@@ -136,7 +136,7 @@ struct rw_semaphore {
 #define DECLARE_RWSEM_READ_LOCKED(name) __DECLARE_RWSEM_GENERIC(name,RW_LOCK_BIAS-1)
 #define DECLARE_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name,0)
 
-extern inline void init_rwsem(struct rw_semaphore *sem)
+static inline void init_rwsem(struct rw_semaphore *sem)
 {
 	atomic_set(&sem->count, RW_LOCK_BIAS);
 	sem->read_bias_granted = 0;
@@ -149,7 +149,7 @@ extern void __down_read_failed(int, struct rw_semaphore *);
 extern void __down_write_failed(int, struct rw_semaphore *);
 extern void __rwsem_wake(int, struct rw_semaphore *);
 
-extern inline void down_read(struct rw_semaphore *sem)
+static inline void down_read(struct rw_semaphore *sem)
 {
 	int count;
 	count = atomic_dec_return(&sem->count);
@@ -157,7 +157,7 @@ extern inline void down_read(struct rw_semaphore *sem)
 		__down_read_failed(count, sem);
 }
 
-extern inline void down_write(struct rw_semaphore *sem)
+static inline void down_write(struct rw_semaphore *sem)
 {
 	int count;
 	count = atomic_add_return (-RW_LOCK_BIAS, &sem->count);
@@ -169,7 +169,7 @@ extern inline void down_write(struct rw_semaphore *sem)
  * case is when there was a writer waiting, and we've
  * bumped the count to 0: we must wake the writer up.
  */
-extern inline void up_read(struct rw_semaphore *sem)
+static inline void up_read(struct rw_semaphore *sem)
 {
 	int count;
 	count = atomic_inc_return(&sem->count);
@@ -180,7 +180,7 @@ extern inline void up_read(struct rw_semaphore *sem)
 /* releasing the writer is easy -- just release it and
  * wake up any sleepers.
  */
-extern inline void up_write(struct rw_semaphore *sem)
+static inline void up_write(struct rw_semaphore *sem)
 {
 	int count;
 	count = atomic_add_return(RW_LOCK_BIAS, &sem->count);

@@ -29,16 +29,24 @@ extern void hwc_tty_init (void);
 
 void hwc_console_write (struct console *, const char *, unsigned int);
 kdev_t hwc_console_device (struct console *);
+void hwc_console_unblank (void);
 
 #define  HWC_CON_PRINT_HEADER "hwc console driver: "
 
 struct console hwc_console =
 {
 
-	name:		hwc_console_name,
-	write:		hwc_console_write,
-	device:		hwc_console_device,
-	flags:		CON_PRINTBUFFER,
+	hwc_console_name,
+	hwc_console_write,
+	NULL,
+	hwc_console_device,
+	NULL,
+	hwc_console_unblank,
+	NULL,
+	CON_PRINTBUFFER,
+	0,
+	0,
+	NULL
 };
 
 void 
@@ -64,6 +72,12 @@ hwc_console_device (struct console * c)
 	return MKDEV (hwc_console_major, hwc_console_minor);
 }
 
+void 
+hwc_console_unblank (void)
+{
+	hwc_unblank ();
+}
+
 #endif
 
 void __init 
@@ -79,12 +93,12 @@ hwc_console_init (void)
 
 	if (hwc_init () == 0) {
 
+		hwc_tty_init ();
+
 #ifdef CONFIG_HWC_CONSOLE
 
 		register_console (&hwc_console);
 #endif
-
-		hwc_tty_init ();
 	} else
 		panic (HWC_CON_PRINT_HEADER "hwc initialisation failed !");
 

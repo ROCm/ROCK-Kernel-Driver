@@ -453,7 +453,7 @@ e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 	
 	/* Etrax will set busy = 1 until the multi pio transfer has finished
 	 * and tr_rdy = 1 after each succesful word transfer. 
-	 * When the last byte has been transfered Etrax will first set tr_tdy = 1 
+	 * When the last byte has been transferred Etrax will first set tr_tdy = 1 
 	 * and then busy = 0 (not in the same cycle). If we read busy before it
 	 * has been set to 0 we will think that we should transfer more bytes 
 	 * and then tr_rdy would be 0 forever. This is solved by checking busy

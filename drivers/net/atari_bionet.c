@@ -93,7 +93,7 @@ static char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
@@ -374,6 +374,8 @@ bionet_probe(struct net_device *dev){
 
 	if (dev->priv == NULL)
 		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
+	if (!dev->priv)
+		return -ENOMEM;
 	memset(dev->priv, 0, sizeof(struct net_local));
 
 	dev->open		= bionet_open;
@@ -551,6 +553,7 @@ bionet_poll_rx(struct net_device *dev) {
 			memcpy(skb->data, nic_packet->buffer, pkt_len);
 			skb->protocol = eth_type_trans( skb, dev ); 
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			lp->stats.rx_packets++;
 			lp->stats.rx_bytes+=pkt_len;
 

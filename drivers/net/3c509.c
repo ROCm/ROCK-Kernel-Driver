@@ -5,7 +5,7 @@
 	Copyright 1994-1998 by Donald Becker.
 	Copyright 1993 United States Government as represented by the
 	Director, National Security Agency.	 This software may be used and
-	distributed according to the terms of the GNU Public License,
+	distributed according to the terms of the GNU General Public License,
 	incorporated herein by reference.
 
 	This driver is for the 3Com EtherLinkIII series.
@@ -59,7 +59,7 @@ static int max_interrupt_work = 10;
 #include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -889,6 +889,7 @@ el3_rx(struct net_device *dev)
 				outw(RxDiscard, ioaddr + EL3_CMD); /* Pop top Rx packet. */
 				skb->protocol = eth_type_trans(skb,dev);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				lp->stats.rx_packets++;
 				continue;
 			}

@@ -319,4 +319,4 @@ extern inline void *nubus_slot_addr(int slot)
 	return (void *)(0xF0000000|(slot<<24));
 }
 
-#endif LINUX_NUBUS_H
+#endif /* LINUX_NUBUS_H */

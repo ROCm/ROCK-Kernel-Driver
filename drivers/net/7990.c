@@ -21,7 +21,7 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -303,8 +303,10 @@ static int lance_rx (struct net_device *dev)
                                          (unsigned char *)&(ib->rx_buf [lp->rx_new][0]),
                                          len, 0);
                         skb->protocol = eth_type_trans (skb, dev);
-                        netif_rx (skb);
-                        lp->stats.rx_packets++;
+			netif_rx (skb);
+			dev->last_rx = jiffies;
+			lp->stats.rx_packets++;
+			lp->stats.rx_bytes += len;
                 }
 
                 /* Return the packet to the pool */
@@ -492,7 +494,7 @@ void lance_tx_timeout(struct net_device *dev)
 	printk("lance_tx_timeout\n");
 	lance_reset(dev);
 	dev->trans_start = jiffies;
-	netif_start_queue (dev);
+	netif_wake_queue (dev);
 }
 
 

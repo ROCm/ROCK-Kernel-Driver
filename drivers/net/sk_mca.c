@@ -2,7 +2,7 @@
 net-3-driver for the SKNET MCA-based cards
 
 This is an extension to the Linux operating system, and is covered by the
-same Gnu Public License that covers that work.
+same GNU General Public License that covers that work.
 
 Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de, aarnold@elsa.de)
 
@@ -86,7 +86,7 @@ History:
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/time.h>
@@ -654,6 +654,7 @@ static u16 irqrx_handler(struct SKMCA_NETDEV *dev, u16 oldcsr0)
 				priv->stat.rx_bytes += descr.Len;
 #endif
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 			}
 		}
 
@@ -1157,6 +1158,8 @@ int skmca_probe(struct SKMCA_NETDEV *dev)
 	/* allocate structure */
 	priv = dev->priv =
 	    (skmca_priv *) kmalloc(sizeof(skmca_priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
 	priv->slot = slot;
 	priv->macbase = base + 0x3fc0;
 	priv->ioregaddr = base + 0x3ff0;

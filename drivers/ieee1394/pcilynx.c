@@ -1531,7 +1531,7 @@ static void remove_card(struct ti_lynx *lynx)
                 pci_free_consistent(lynx->dev, LOCALRAM_SIZE, lynx->pcl_mem,
                                     lynx->pcl_mem_dma);
 #endif
-        case clear:
+        case clear:;
                 /* do nothing - already freed */
         }
 

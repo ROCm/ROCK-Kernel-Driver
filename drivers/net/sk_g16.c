@@ -2,7 +2,7 @@
  * Copyright (C) 1994 by PJD Weichmann & SWS Bern, Switzerland
  *
  * This software may be used and distributed according to the terms
- * of the GNU Public License, incorporated herein by reference.
+ * of the GNU General Public License, incorporated herein by reference.
  *
  * Module         : sk_g16.c
  *
@@ -65,7 +65,7 @@ static const char *rcsid = "$Id: sk_g16.c,v 1.1 1994/06/30 16:25:15 root Exp $";
 #include <linux/fcntl.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h> 
 #include <linux/delay.h>
 #include <asm/system.h>
@@ -1248,7 +1248,7 @@ static void SK_timeout(struct net_device *dev)
 {
 	printk(KERN_WARNING "%s: xmitter timed out, try to restart!\n", dev->name);
 	SK_lance_init(dev, MODE_NORMAL); /* Reinit LANCE */
-	netif_start_queue(dev);		 /* Clear Transmitter flag */
+	netif_wake_queue(dev);		 /* Clear Transmitter flag */
 	dev->trans_start = jiffies;      /* Mark Start of transmission */
 }
 
@@ -1634,6 +1634,7 @@ static void SK_rxintr(struct net_device *dev)
 	     */
 
 	    writeb(RX_OWN, rmdp->u.s.status);
+	    dev->last_rx = jiffies;
 	    p->stats.rx_packets++;
 	    p->stats.rx_bytes += len;
 

@@ -16,7 +16,7 @@
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 
@@ -279,6 +279,7 @@ static __inline__ int ethertap_rx_skb(struct sk_buff *skb, struct net_device *de
 	lp->stats.rx_packets++;
 	lp->stats.rx_bytes+=len;
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	return len;
 }
 

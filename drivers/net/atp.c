@@ -132,7 +132,7 @@ static int xcvr[NUM_UNITS]; 			/* The data transfer mode. */
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -627,7 +627,6 @@ static void atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 					write_reg_high(ioaddr, CMR2, lp->addr_mode);
 				} else if ((read_status & (CMR1_BufEnb << 3)) == 0) {
 					net_rx(dev);
-					dev->last_rx = jiffies;
 					num_tx_since_rx = 0;
 				} else
 					break;
@@ -785,6 +784,7 @@ static void net_rx(struct net_device *dev)
 		read_block(ioaddr, pkt_len, skb_put(skb,pkt_len), dev->if_port);
 		skb->protocol = eth_type_trans(skb, dev);
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 		lp->stats.rx_packets++;
 		lp->stats.rx_bytes += pkt_len;
 	}

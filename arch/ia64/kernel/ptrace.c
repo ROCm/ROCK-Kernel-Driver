@@ -447,7 +447,7 @@ ia64_poke (struct pt_regs *regs, struct task_struct *child, unsigned long addr, 
  * When new_bsp is zero and force_loadrs_to_zero is 1 (non-zero),
  * loadrs is set to 0, and the bspstore value is set to the old bsp
  * value.  This will cause the stacked registers (r32 and up) to be
- * obtained entirely from the the child's memory space rather than
+ * obtained entirely from the child's memory space rather than
  * from the kernel.  (This makes it easier to write code for
  * modifying the stacked registers in multi-threaded programs.)
  *

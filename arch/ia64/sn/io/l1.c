@@ -1462,7 +1462,7 @@ brl1_intrd( struct eframe_s *ep )
 	isr_reg = READ_L1_UART_REG(sc->nasid, REG_ISR);
     }
 
-    /* uart interrupts were blocked at bedrock when the the interrupt
+    /* uart interrupts were blocked at bedrock when the interrupt
      * was initially answered; reenable them now
      */
     intr_unblock_bit( sc->intr_cpu, UART_INTR );
@@ -2865,7 +2865,7 @@ _elscuart_readc( l1sc_t *sc )
 
 
 /*
- * _elscuart_flush flushes queued output to the the L1.
+ * _elscuart_flush flushes queued output to the L1.
  * This routine blocks until the queue is flushed.
  */
 int

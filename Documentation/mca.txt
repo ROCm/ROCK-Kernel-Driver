@@ -25,7 +25,7 @@ this.  The typical probe code looks like the following:
 	if( MCA_bus ) {
 		slot = mca_find_adapter( ADAPTER_ID, 0 );
 		if( slot == MCA_NOTFOUND ) {
-			return ENODEV;
+			return -ENODEV;
 		}
 		/* optional - see below */
 		mca_set_adapter_name( slot, "adapter name & description" );
@@ -37,7 +37,7 @@ this.  The typical probe code looks like the following:
 		pos4 = mca_read_stored_pos( slot, 4 );
 		pos5 = mca_read_stored_pos( slot, 5 );
 	} else {
-		return ENODEV;
+		return -ENODEV;
 	}
 
 	/* extract configuration from pos[2345] and set everything up */

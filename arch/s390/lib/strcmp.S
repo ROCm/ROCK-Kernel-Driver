@@ -18,8 +18,8 @@ strcmp:
         CLST    2,3
         JO      .-4
         JE      strcmp_equal
-        IC      0,0(0,3)
-        IC      1,0(0,2)
+        IC      0,0(3)
+        IC      1,0(2)
         SR      1,0
 strcmp_equal:
         LR      2,1

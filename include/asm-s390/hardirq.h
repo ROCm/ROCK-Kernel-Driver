@@ -50,14 +50,14 @@
  * Special definitions for s390, always access current PSA.
  */
 #define in_interrupt() ((S390_lowcore.__local_irq_count + S390_lowcore.__local_bh_count) != 0)
-
+  
 #define in_irq() (S390_lowcore.__local_irq_count != 0)
-
+  
 #ifndef CONFIG_SMP
-
+  
 #define hardirq_trylock(cpu)	(local_irq_count(cpu) == 0)
 #define hardirq_endlock(cpu)	do { } while (0)
-
+  
 #define hardirq_enter(cpu)	(local_irq_count(cpu)++)
 #define hardirq_exit(cpu)	(local_irq_count(cpu)--)
 

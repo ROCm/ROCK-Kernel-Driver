@@ -44,7 +44,7 @@ static char version[] = "sb1000.c:v1.1.2 6/01/98 (fventuri@mediaone.net)\n";
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
@@ -76,7 +76,6 @@ static const int SB1000_MRU = 1500; /* octects */
 struct sb1000_private {
 	struct sk_buff *rx_skb[NPIDS];
 	short rx_dlen[NPIDS];
-	unsigned int rx_bytes;
 	unsigned int rx_frames;
 	short rx_error_count;
 	short rx_error_dpc_count;
@@ -887,9 +886,9 @@ printk("cm0: IP identification: %02x%02x  fragment offset: %02x%02x\n", buffer[3
 	/* datagram completed: send to upper level */
 	skb_trim(skb, dlen);
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	stats->rx_bytes+=dlen;
 	stats->rx_packets++;
-	lp->rx_bytes += dlen;
 	lp->rx_skb[ns] = 0;
 	lp->rx_session_id[ns] |= 0x40;
 	return 0;
@@ -974,7 +973,6 @@ sb1000_open(struct net_device *dev)
 	lp->rx_dlen[1] = 0;
 	lp->rx_dlen[2] = 0;
 	lp->rx_dlen[3] = 0;
-	lp->rx_bytes = 0;
 	lp->rx_frames = 0;
 	lp->rx_error_count = 0;
 	lp->rx_error_dpc_count = 0;
@@ -1029,7 +1027,7 @@ static int sb1000_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 	switch (cmd) {
 	case SIOCGCMSTATS:		/* get statistics */
-		stats[0] = lp->rx_bytes;
+		stats[0] = lp->stats.rx_bytes;
 		stats[1] = lp->rx_frames;
 		stats[2] = lp->stats.rx_packets;
 		stats[3] = lp->stats.rx_errors;

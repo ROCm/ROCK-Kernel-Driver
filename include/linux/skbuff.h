@@ -878,6 +878,30 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
 }
 
 /**
+ *	__dev_alloc_skb - allocate an skbuff for sending
+ *	@length: length to allocate
+ *	@gfp_mask: get_free_pages mask, passed to alloc_skb
+ *
+ *	Allocate a new &sk_buff and assign it a usage count of one. The
+ *	buffer has unspecified headroom built in. Users should allocate
+ *	the headroom they think they need without accounting for the
+ *	built in space. The built in space is used for optimisations.
+ *
+ *	%NULL is returned in there is no free memory.
+ */
+ 
+static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
+					      int gfp_mask)
+{
+	struct sk_buff *skb;
+
+	skb = alloc_skb(length+16, gfp_mask);
+	if (skb)
+		skb_reserve(skb,16);
+	return skb;
+}
+
+/**
  *	dev_alloc_skb - allocate an skbuff for sending
  *	@length: length to allocate
  *
@@ -892,12 +916,7 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
  
 static inline struct sk_buff *dev_alloc_skb(unsigned int length)
 {
-	struct sk_buff *skb;
-
-	skb = alloc_skb(length+16, GFP_ATOMIC);
-	if (skb)
-		skb_reserve(skb,16);
-	return skb;
+	return __dev_alloc_skb(length, GFP_ATOMIC);
 }
 
 /**

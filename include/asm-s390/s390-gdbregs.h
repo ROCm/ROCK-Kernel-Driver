@@ -8,13 +8,14 @@
  *  used both by the linux kernel for remote debugging & gdb 
  */
 
-/* Say how long (ordinary) registers are.  This is a piece of bogosity
-   used in push_word and a few other places; REGISTER_RAW_SIZE is the
-   real way to know how big a register is.  */
 #ifndef _S390_GDBREGS_H
 #define _S390_GDBREGS_H
 
+#ifdef __KERNEL__
 #include <asm/s390-regs-common.h>
+#else
+#include <s390/s390-regs-common.h>
+#endif
 #define S390_MAX_INSTR_SIZE 6
 #define NUM_REGS      (2+NUM_GPRS+NUM_ACRS+NUM_CRS+1+NUM_FPRS)
 #define FIRST_ACR     (2+NUM_GPRS)

@@ -28,7 +28,7 @@
 #include <linux/kernel.h>
 #include <linux/major.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/fcntl.h>
 #include <linux/init.h>
@@ -224,6 +224,7 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, const char *buf, 
 	if (tun->flags & TUN_NOCHECKSUM)
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
  
+	skb->dev->last_rx = jiffies;
 	netif_rx(skb);
    
 	tun->stats.rx_packets++;

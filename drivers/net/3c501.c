@@ -4,7 +4,7 @@
 
     Copyright 1993 United States Government as represented by the
     Director, National Security Agency.  This software may be used and
-    distributed according to the terms of the GNU Public License,
+    distributed according to the terms of the GNU General Public License,
     incorporated herein by reference.
 
     This is a device driver for the 3Com Etherlink 3c501.
@@ -101,7 +101,7 @@ static const char *version =
 #include <linux/fcntl.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/config.h>	/* for CONFIG_IP_MULTICAST */
@@ -796,6 +796,7 @@ static void el_receive(struct net_device *dev)
 		insb(DATAPORT, skb_put(skb,pkt_len), pkt_len);
 		skb->protocol=eth_type_trans(skb,dev);
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 		lp->stats.rx_packets++;
 		lp->stats.rx_bytes+=pkt_len;
 	}

@@ -33,9 +33,12 @@ typedef struct {
 	unsigned short int buf_count;
 
 	spinlock_t lock;
+
+	hwc_high_level_calls_t calls;
 } hwc_tty_data_struct;
 
-static hwc_tty_data_struct hwc_tty_data;
+static hwc_tty_data_struct hwc_tty_data =
+{ /* NULL/0 */ };
 static struct tty_driver hwc_tty_driver;
 static struct tty_struct *hwc_tty_table[1];
 static struct termios *hwc_tty_termios[1];
@@ -43,6 +46,9 @@ static struct termios *hwc_tty_termios_locked[1];
 static int hwc_tty_refcount = 0;
 
 extern struct termios tty_std_termios;
+
+void hwc_tty_wake_up (void);
+void hwc_tty_input (unsigned char *, unsigned int);
 
 static int 
 hwc_tty_open (struct tty_struct *tty,
@@ -57,18 +63,11 @@ hwc_tty_open (struct tty_struct *tty,
 	hwc_tty_data.tty = tty;
 	tty->low_latency = 0;
 
-	return 0;
-}
+	hwc_tty_data.calls.wake_up = hwc_tty_wake_up;
+	hwc_tty_data.calls.move_input = hwc_tty_input;
+	hwc_register_calls (&(hwc_tty_data.calls));
 
-void 
-wake_up_hwc_tty (void)
-{
-	if (hwc_tty_data.tty == NULL)
-		return;
-	if ((hwc_tty_data.tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    hwc_tty_data.tty->ldisc.write_wakeup)
-		(hwc_tty_data.tty->ldisc.write_wakeup) (hwc_tty_data.tty);
-	wake_up_interruptible (&hwc_tty_data.tty->write_wait);
+	return 0;
 }
 
 static void 
@@ -80,7 +79,12 @@ hwc_tty_close (struct tty_struct *tty,
 			"do not close hwc tty because of wrong device number");
 		return;
 	}
+	if (tty->count > 1)
+		return;
+
 	hwc_tty_data.tty = NULL;
+
+	hwc_unregister_calls (&(hwc_tty_data.calls));
 }
 
 static int 
@@ -147,7 +151,7 @@ hwc_tty_chars_in_buffer (struct tty_struct *tty)
 static void 
 hwc_tty_flush_buffer (struct tty_struct *tty)
 {
-	wake_up_hwc_tty ();
+	hwc_tty_wake_up ();
 }
 
 static int 
@@ -164,7 +168,18 @@ hwc_tty_ioctl (
 }
 
 void 
-store_hwc_input (unsigned char *buf, unsigned int count)
+hwc_tty_wake_up (void)
+{
+	if (hwc_tty_data.tty == NULL)
+		return;
+	if ((hwc_tty_data.tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+	    hwc_tty_data.tty->ldisc.write_wakeup)
+		(hwc_tty_data.tty->ldisc.write_wakeup) (hwc_tty_data.tty);
+	wake_up_interruptible (&hwc_tty_data.tty->write_wait);
+}
+
+void 
+hwc_tty_input (unsigned char *buf, unsigned int count)
 {
 	struct tty_struct *tty = hwc_tty_data.tty;
 
@@ -208,7 +223,7 @@ store_hwc_input (unsigned char *buf, unsigned int count)
 			tty->flip.count += count;
 		}
 		tty_flip_buffer_push (tty);
-		wake_up_hwc_tty ();
+		hwc_tty_wake_up ();
 	}
 }
 
@@ -238,7 +253,7 @@ hwc_tty_init (void)
 	hwc_tty_driver.termios_locked = hwc_tty_termios_locked;
 
 	hwc_tty_driver.open = hwc_tty_open;
-	hwc_tty_driver.close = NULL /* hwc_tty_close */ ;
+	hwc_tty_driver.close = hwc_tty_close;
 	hwc_tty_driver.write = hwc_tty_write;
 	hwc_tty_driver.put_char = hwc_tty_put_char;
 	hwc_tty_driver.flush_chars = hwc_tty_flush_chars;

@@ -18,7 +18,7 @@
 unsigned long __irq_attempt[NR_IRQS];
 #endif
 
-/* Hack minimum IPL during interupt processing for broken hardware.  */
+/* Hack minimum IPL during interrupt processing for broken hardware.  */
 #ifdef CONFIG_ALPHA_BROKEN_IRQ_MASK
 int __min_ipl;
 #endif

@@ -16,8 +16,9 @@
 #ifndef __ASSEMBLY__
 #include <asm/types.h>
 #endif
-
+#if defined(WANT_S390_TGT_DEFS) || defined(__KERNEL__)
 #define REGISTER_SIZE 4
+#endif
 #define NUM_GPRS      16
 #define GPR_SIZE      4
 #define PSW_MASK_SIZE 4
@@ -40,8 +41,6 @@ typedef struct
         __u32   mask;
         __u32   addr;
 } psw_t __attribute__ ((aligned(8)));
-
-typedef __u32 gpr_t;
 
 /* 2 __u32's are used for floats instead to compile  with a __STRICT_ANSI__ defined */ 
 typedef union
@@ -71,6 +70,13 @@ typedef struct
 	freg_t  fprs[NUM_FPRS];              
 } s390_fp_regs;
 
+#define FPC_EXCEPTION_MASK      0xF8000000
+#define FPC_FLAGS_MASK          0x00F80000
+#define FPC_DXC_MASK            0x0000FF00
+#define FPC_RM_MASK             0x00000003
+#define FPC_VALID_MASK         ((FPC_EXCEPTION_MASK|FPC_FLAGS_MASK| \
+                                 FPC_DXC_MASK|FPC_RM_MASK))
+
 /*
   gdb structures & the kernel have this much always in common
  */
@@ -90,7 +96,9 @@ typedef struct
 #define S390_BREAKPOINT_U16 ((__u16)0x0001)
 #define S390_SYSCALL_OPCODE ((__u16)0x0a00)
 #define S390_SYSCALL_SIZE   2
+#if defined(WANT_S390_TGT_DEFS) || defined(__KERNEL__)
 #define ADDR_BITS_REMOVE(addr) ((addr)&0x7fffffff)
+#endif
 #endif
 #endif
 

@@ -38,7 +38,7 @@ _start:
 #
 # find out memory size
 #
-        mvc   104(8,0),.Lpcmem0          # setup program check handler
+        mvc   104(8),.Lpcmem0          # setup program check handler
         slr   %r3,%r3
         lhi   %r2,1
         sll   %r2,20

@@ -5,7 +5,7 @@
 	Copyright (C) 1994, 1995,1996 by Bao C. Ha.
 
 	This software may be used and distributed
-	according to the terms of the GNU Public License,
+	according to the terms of the GNU General Public License,
 	incorporated herein by reference.
 
 	The author may be reached at bao.ha@srs.gov 
@@ -130,7 +130,7 @@ static const char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/bitops.h>

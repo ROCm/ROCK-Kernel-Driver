@@ -1,16 +1,20 @@
 all: s390-net.o
 
-CFLAFS += 
+CFLAGS += 
 O_TARGET := s390-net.o
-O_OBJS    :=         
-M_OBJS   :=
+
+obj-y    := iucv.o
 
 ifeq ($(CONFIG_CTC),y)
-  O_OBJS += ctc.o
+  obj-y += ctcmain.o fsm.o
+else
+  ifeq ($(CONFIG_CTC),m)
+  obj-m += ctc.o
+ctc.o: ctcmain.o fsm.o
+	$(LD) -r ctcmain.o fsm.o -o $@
+  endif
 endif
 
-ifeq ($(CONFIG_IUCV),y)
-  O_OBJS += iucv.o
-endif
+obj-$(CONFIG_IUCV) += iucv.o netiucv.o
 
 include $(TOPDIR)/Rules.make

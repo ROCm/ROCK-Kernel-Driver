@@ -5,7 +5,7 @@
  * Written 1999 by Yaroslav Polyakov (xenon@granch.ru).
  *
  * This software may be used and distributed according to the terms
- * of the GNU Public License, incorporated herein by reference.
+ * of the GNU General Public License, incorporated herein by reference.
  * 
  *   // Whole developers team:
  *   //   Yaroslav Polyakov (xenon@granch.ru)
@@ -66,7 +66,7 @@
 #include <linux/fcntl.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/spinlock.h>

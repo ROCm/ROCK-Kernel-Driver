@@ -66,10 +66,16 @@ void FixPerRegisters(struct task_struct *task)
 		regs->psw.mask |=PSW_PER_MASK;
 	else
 		regs->psw.mask &= ~PSW_PER_MASK;
-	if(per_info->control_regs.bits.storage_alt_space_ctl)
-		task->thread.user_seg|=USER_STD_MASK;
+	if (per_info->control_regs.bits.em_storage_alteration)
+	{
+		per_info->control_regs.bits.storage_alt_space_ctl=1;
+		//((pgd_t *)__pa(task->mm->pgd))->pgd |= USER_STD_MASK;
+	}
 	else
-		task->thread.user_seg&=~USER_STD_MASK;
+	{
+		per_info->control_regs.bits.storage_alt_space_ctl=0;
+		//((pgd_t *)__pa(task->mm->pgd))->pgd &= ~USER_STD_MASK;
+	}
 }
 
 void set_single_step(struct task_struct *task)
@@ -209,10 +215,10 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	if (request == PTRACE_TRACEME) 
 	{
 		/* are we already being traced? */
-		if (current->flags & PF_PTRACED)
+		if (current->ptrace & PT_PTRACED)
 			goto out;
 		/* set the ptrace bit in the process flags. */
-		current->flags |= PF_PTRACED;
+		current->ptrace |= PT_PTRACED;
 		ret = 0;
 		goto out;
 	}
@@ -237,9 +243,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		     (current->gid != child->sgid)) && !capable(CAP_SYS_PTRACE))
 			goto out;
 		/* the same process cannot be attached many times */
-		if (child->flags & PF_PTRACED)
+		if (child->ptrace & PT_PTRACED)
 			goto out;
-		child->flags |= PF_PTRACED;
+		child->ptrace |= PT_PTRACED;
 
 		write_lock_irqsave(&tasklist_lock, flags);
 		if (child->p_pptr != current) 
@@ -256,16 +262,20 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	}
 	ret = -ESRCH;
 	// printk("child=%lX child->flags=%lX",child,child->flags);
-	if (!(child->flags & PF_PTRACED))
-		goto out;
-	if (child->state != TASK_STOPPED) 
+	/* I added child!=current line so we can get the */
+	/* ieee_instruction_pointer from the user structure DJB */
+	if(child!=current)
 	{
-		if (request != PTRACE_KILL)
+		if (!(child->ptrace & PT_PTRACED))
+			goto out;
+		if (child->state != TASK_STOPPED) 
+		{
+			if (request != PTRACE_KILL)
+				goto out;
+		}
+		if (child->p_pptr != current)
 			goto out;
 	}
-	if (child->p_pptr != current)
-		goto out;
-
 	switch (request) 
 	{
 		/* If I and D space are separate, these will need to be fixed. */
@@ -303,9 +313,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if ((unsigned long) data >= _NSIG)
 			break;
 		if (request == PTRACE_SYSCALL)
-			child->flags |= PF_TRACESYS;
+			child->ptrace |= PT_TRACESYS;
 		else
-			child->flags &= ~PF_TRACESYS;
+			child->ptrace &= ~PT_TRACESYS;
 		child->exit_code = data;
 		/* make sure the single step bit is not set. */
 		clear_single_step(child);
@@ -332,7 +342,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data >= _NSIG)
 			break;
-		child->flags &= ~PF_TRACESYS;
+		child->ptrace &= ~PT_TRACESYS;
 		child->exit_code = data;
 		set_single_step(child);
 		/* give it a chance to run. */
@@ -344,7 +354,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data >= _NSIG)
 			break;
-		child->flags &= ~(PF_PTRACED|PF_TRACESYS);
+		child->ptrace &= ~(PT_PTRACED|PT_TRACESYS);
 		child->exit_code = data;
 		write_lock_irqsave(&tasklist_lock, flags);
 		REMOVE_LINKS(child);
@@ -374,11 +384,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 asmlinkage void syscall_trace(void)
 {
 	lock_kernel();
-	if ((current->flags & (PF_PTRACED|PF_TRACESYS))
-	    != (PF_PTRACED|PF_TRACESYS))
+	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
+	    != (PT_PTRACED|PT_TRACESYS))
 		goto out;
 	current->exit_code = SIGTRAP;
-	current->state = TASK_STOPPED;
+	set_current_state(TASK_STOPPED);
 	notify_parent(current, SIGCHLD);
 	schedule();
 	/*

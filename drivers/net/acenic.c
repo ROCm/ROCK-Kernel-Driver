@@ -2778,7 +2778,7 @@ static struct net_device_stats *ace_get_stats(struct net_device *dev)
 }
 
 
-void __init ace_copy(struct ace_regs *regs, void *src, u32 dest, int size)
+static void __init ace_copy(struct ace_regs *regs, void *src, u32 dest, int size)
 {
 	unsigned long tdest;
 	u32 *wsrc;
@@ -2810,7 +2810,7 @@ void __init ace_copy(struct ace_regs *regs, void *src, u32 dest, int size)
 }
 
 
-void __init ace_clear(struct ace_regs *regs, u32 dest, int size)
+static void __init ace_clear(struct ace_regs *regs, u32 dest, int size)
 {
 	unsigned long tdest;
 	short tsize = 0, i;

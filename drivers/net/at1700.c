@@ -6,7 +6,7 @@
 	Director, National Security Agency.
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
 	Center of Excellence in Space Data and Information Sciences
@@ -34,9 +34,6 @@
 	response to inb()s from other device probes!
 */
 
-static const char *version =
-	"at1700.c:v1.15 4/7/98  Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
-
 #include <linux/config.h>
 #include <linux/module.h>
 
@@ -48,7 +45,7 @@ static const char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
 #include <asm/system.h>
@@ -62,6 +59,9 @@ static const char *version =
 #include <linux/skbuff.h>
 
 #include <linux/mca.h>
+
+static char version[] __initdata =
+	"at1700.c:v1.15 4/7/98  Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 /* Tunable parameters. */
 
@@ -175,7 +175,7 @@ struct at1720_mca_adapters_struct {
 };
 /* rEnE : maybe there are others I don't know off... */
 
-struct at1720_mca_adapters_struct at1720_mca_adapters[] = {
+static struct at1720_mca_adapters_struct at1720_mca_adapters[] = {
 	{ "Allied Telesys AT1720AT",	0x6410 },
 	{ "Allied Telesys AT1720BT", 	0x6413 },
 	{ "Allied Telesys AT1720T",		0x6416 },
@@ -218,7 +218,7 @@ int __init at1700_probe(struct net_device *dev)
    that can be done is checking a few bits and then diving right into an
    EEPROM read. */
 
-static int at1700_probe1(struct net_device *dev, int ioaddr)
+static int __init at1700_probe1(struct net_device *dev, int ioaddr)
 {
 	char fmv_irqmap[4] = {3, 7, 10, 15};
 	char fmv_irqmap_pnp[8] = {3, 4, 5, 7, 9, 10, 11, 15};
@@ -737,7 +737,9 @@ net_rx(struct net_device *dev)
 			insw(ioaddr + DATAPORT, skb_put(skb,pkt_len), (pkt_len + 1) >> 1);
 			skb->protocol=eth_type_trans(skb, dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			lp->stats.rx_packets++;
+			lp->stats.rx_bytes += pkt_len;
 		}
 		if (--boguscount <= 0)
 			break;

@@ -5,7 +5,7 @@
 	Copyright 1994 by Donald Becker.
 	Copyright 1993 United States Government as represented by the
 	Director, National Security Agency.  This software may be used and
-	distributed according to the terms of the GNU Public License,
+	distributed according to the terms of the GNU General Public License,
 	incorporated herein by reference.
 
 	This is a driver for the Cabletron E2100 series ethercards.

@@ -273,7 +273,7 @@ etrax_ethernet_init(struct net_device *dev)
 	return 0;
 }
 
-/* set MAC adress of the interface. called from the core after a
+/* set MAC address of the interface. called from the core after a
  * SIOCSIFADDR ioctl, and from the bootup above.
  */
 
@@ -288,7 +288,7 @@ e100_set_mac_address(struct net_device *dev, void *p)
         memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
 	/* Write it to the hardware.
-	 * Note the way the adress is wrapped:
+	 * Note the way the address is wrapped:
 	 * *R_NETWORK_SA_0 = a0_0 | (a0_1 << 8) | (a0_2 << 16) | (a0_3 << 24);
 	 * *R_NETWORK_SA_1 = a0_4 | (a0_5 << 8);
 	 */
@@ -851,7 +851,7 @@ e100_close(struct net_device *dev)
 	*R_IRQ_MASK0_CLR = 0xe0000; /* clear excessive_col, over/underrun irq mask */
 	*R_IRQ_MASK2_CLR = 0xf; /* clear dma0 and 1 eop and descr irq masks */
 
-	/* Stop the reciever and the transmitter */
+	/* Stop the receiver and the transmitter */
 
 	RESET_DMA(0);
 	RESET_DMA(1);

@@ -8,7 +8,7 @@
  *  http://www.linux-sna.org
  *
  *  This software may be used and distributed according to the terms
- *  of the GNU Public License, incorporated herein by reference.
+ *  of the GNU General Public License, incorporated herein by reference.
  *
  *  The following modules are currently available for card support:
  *	- tmspci (Generic PCI card support)
@@ -84,7 +84,7 @@ static const char *version = "tms380tr.c: v1.07 21/01/2000 by Christoph Goos, Ad
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/time.h>
 #include <asm/system.h>

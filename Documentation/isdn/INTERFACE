@@ -480,7 +480,7 @@ Description of the Interface between Linklevel and Hardwarelevel
     Parameter:
       driver      = driver-Id
       command     = ISDN_CMD_PROT_IO
-      arg         = The lower 8 Bits define the adressed protocol as defined
+      arg         = The lower 8 Bits define the addressed protocol as defined
                     in ISDN_PTYPE..., the upper bits are used to differenciate
                     the protocol specific CMD.  
       
@@ -734,7 +734,7 @@ Description of the Interface between Linklevel and Hardwarelevel
     Parameter:
       driver      = driver-Id
       command     = ISDN_STAT_PROT
-      arg         = The lower 8 Bits define the adressed protocol as defined
+      arg         = The lower 8 Bits define the addressed protocol as defined
                     in ISDN_PTYPE..., the upper bits are used to differenciate
                     the protocol specific STAT.  
       
@@ -748,7 +748,7 @@ Description of the Interface between Linklevel and Hardwarelevel
     loading the driver. The LL has to ignore a disabled channel when searching
     for free channels. The HL driver itself never delivers STAT callbacks for
     disabled channels. 	    
-    The LL returns a nonzero code if the operation was not successfull or the
+    The LL returns a nonzero code if the operation was not successful or the
     selected channel is actually regarded as busy.
 
     Parameter:

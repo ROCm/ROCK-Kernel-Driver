@@ -20,9 +20,9 @@ strncpy:
 	SR      0,0
 strncpy_loop:
         ICM     0,1,0(3)       # ICM sets the cc, IC does not
-	LA      3,1(0,3)
-        STC     0,0(0,1)
-	LA      1,1(0,1)
+	LA      3,1(3)
+        STC     0,0(1)
+	LA      1,1(1)
         JZ      strncpy_exit   # ICM inserted a 0x00
         BRCT    4,strncpy_loop # R4 -= 1, jump to strncpy_loop if >  0
 strncpy_exit:

@@ -518,7 +518,7 @@ failure_in_pipe2:
 	// Other key point:
 	// 	- if you fail on the ld8 in the head, it means you went straight
 	//	  to it, i.e. 8byte alignment within an unexisting page.
-	// Again this comes from the fact that if you crossed just for the the ld8 then
+	// Again this comes from the fact that if you crossed just for the ld8 then
 	// you are 8byte aligned but also 16byte align, therefore you would
 	// either go for the 16byte copy loop OR the ld8 in the tail part.
 	// The combination ld1, ld2, ld4, ld8 where you fail on ld8 is impossible

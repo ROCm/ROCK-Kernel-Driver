@@ -251,7 +251,7 @@ struct ti_ohci {
 	struct video_template *video_tmpl;
 };
 
-inline static int cross_bound(unsigned long addr, unsigned int size)
+static inline int cross_bound(unsigned long addr, unsigned int size)
 {
 	int cross=0;
 	if (size>PAGE_SIZE) {
@@ -266,12 +266,12 @@ inline static int cross_bound(unsigned long addr, unsigned int size)
 /*
  * Register read and write helper functions.
  */
-inline static void reg_write(const struct ti_ohci *ohci, int offset, u32 data)
+static inline void reg_write(const struct ti_ohci *ohci, int offset, u32 data)
 {
         writel(data, ohci->registers + offset);
 }
 
-inline static u32 reg_read(const struct ti_ohci *ohci, int offset)
+static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 {
         return readl(ohci->registers + offset);
 }

@@ -65,7 +65,6 @@ ESP_MAGIC             0x53ee      esp_struct        drivers/char/esp.h
 TTY_MAGIC             0x5401      tty_struct        include/linux/tty.h
 TTY_DRIVER_MAGIC      0x5402      tty_driver        include/linux/tty_driver.h
 TTY_LDISC_MAGIC       0x5403      tty_ldisc         include/linux/tty_ldisc.h
-SCC_MAGIC             0x8530      scc_channel       include/linux/scc.h
 SPECIALIX_MAGIC       0x0907      specialix_port    drivers/char/specialix_io8.h
 CG_MAGIC	      0x090255    ufs_cylinder_group include/linux/ufs_fs.h
 RPORT_MAGIC           0x525001    r_port            drivers/char/rocket_int.h

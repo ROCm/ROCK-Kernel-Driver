@@ -48,7 +48,7 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <asm/system.h>
@@ -1218,7 +1218,7 @@ static int netwave_start_xmit(struct sk_buff *skb, struct net_device *dev) {
  *    This function is the interrupt handler for the Netwave card. This
  *    routine will be called whenever: 
  *	  1. A packet is received.
- *	  2. A packet has successfully been transfered and the unit is
+ *	  2. A packet has successfully been transferred and the unit is
  *	     ready to transmit another packet.
  *	  3. A command has completed execution.
  */
@@ -1350,7 +1350,7 @@ static void netwave_watchdog(struct net_device *dev) {
     DEBUG(1, "%s: netwave_watchdog: watchdog timer expired\n", dev->name);
     netwave_reset(dev);
     dev->trans_start = jiffies;
-    netif_start_queue(dev);
+    netif_wake_queue(dev);
 } /* netwave_watchdog */
 
 static struct net_device_stats *netwave_get_stats(struct net_device *dev) {

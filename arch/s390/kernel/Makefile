@@ -8,47 +8,25 @@
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
 .S.o:
-	$(CC) $(AFLAGS) -traditional -c $< -o $*.o
+	$(CC) -D__ASSEMBLY__ $(AFLAGS) -traditional -c $< -o $*.o
 
 all: kernel.o head.o init_task.o
 
 O_TARGET := kernel.o
-O_OBJS   := lowcore.o entry.o bitmap.o traps.o time.o process.o irq.o \
+
+export-objs	:= s390_ksyms.o
+obj-y	:= lowcore.o entry.o bitmap.o traps.o time.o process.o irq.o \
             setup.o sys_s390.o ptrace.o signal.o cpcmd.o ebcdic.o \
-            semaphore.o s390fpu.o s390io.o s390mach.o s390dyn.o reipl.o
-OX_OBJS := s390_ksyms.o
-MX_OBJS  :=
+            semaphore.o s390fpu.o reipl.o s390_ext.o debug.o
 
-ifdef CONFIG_SMP
-O_OBJS += smp.o
-endif
-
-ifdef CONFIG_PCI
-O_OBJS += bios32.o
-endif
-
-ifdef CONFIG_MCA
-O_OBJS += mca.o
-endif
-
-ifeq ($(CONFIG_MTRR),y)
-OX_OBJS += mtrr.o
-else
-  ifeq ($(CONFIG_MTRR),m)
-  MX_OBJS += mtrr.o
-  endif
-endif
-
-ifeq ($(CONFIG_IEEEFPU_EMULATION),y)
-  O_OBJS += mathemu.o floatlib.o
-endif
+obj-$(CONFIG_MODULES)		+= s390_ksyms.o
+obj-$(CONFIG_SMP)		+= smp.o
+obj-$(CONFIG_IEEEFPU_EMULATION)	+= mathemu.o floatlib.o
 
 #
 # Kernel debugging
 #
-ifdef CONFIG_REMOTE_DEBUG
-O_OBJS += gdb-stub.o #gdb-low.o 
-endif
+obj-$(CONFIG_REMOTE_DEBUG)	+= gdb-stub.o #gdb-low.o 
 
 include $(TOPDIR)/Rules.make
 

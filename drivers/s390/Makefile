@@ -11,19 +11,18 @@ all: io.o
 
 CFLAGS += 
 O_TARGET := io.o
-O_OBJS    :=         
-M_OBJS   :=
 
-SUBDIRS := $(SUBDIRS) arch/s390/drivers/block arch/s390/drivers/char \
-	arch/s390/drivers/misc  arch/s390/drivers/net
-MOD_SUB_DIRS += ./net
+obj-y	:= s390io.o s390mach.o s390dyn.o idals.o ccwcache.o
 
-O_OBJS := block/s390-block.o \
+subdir-y := block char misc net
+subdir-m := $(subdir-y)
+
+obj-y += block/s390-block.o \
   char/s390-char.o \
   misc/s390-misc.o \
   net/s390-net.o 
 
-io.o: $(O_OBJS)
+io.o: $(obj-y)
 
 block/s390-block.o: dummy
 	$(MAKE)  -C block

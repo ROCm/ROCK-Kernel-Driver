@@ -23,8 +23,8 @@
 #define RLIMIT_NOFILE	7		/* max number of open files */
 #define RLIMIT_MEMLOCK	8		/* max locked-in-memory address space */
 #define RLIMIT_AS	9		/* address space limit */
-#define RLIMIT_AS	10		/* maximum file locks held */
-
+#define RLIMIT_LOCKS	10		/* maximum file locks held */
+  
 #define RLIM_NLIMITS	11
 
 /*
@@ -37,17 +37,17 @@
 
 #define INIT_RLIMITS					\
 {							\
-	{ LONG_MAX, LONG_MAX },				\
-	{ LONG_MAX, LONG_MAX },				\
-	{ LONG_MAX, LONG_MAX },				\
-	{ _STK_LIM, LONG_MAX },				\
-	{        0, LONG_MAX },				\
-	{ LONG_MAX, LONG_MAX },				\
-	{ MAX_TASKS_PER_USER, MAX_TASKS_PER_USER },	\
+	{ RLIM_INFINITY, RLIM_INFINITY },		\
+	{ RLIM_INFINITY, RLIM_INFINITY },		\
+	{ RLIM_INFINITY, RLIM_INFINITY },		\
+	{      _STK_LIM, RLIM_INFINITY },		\
+	{             0, RLIM_INFINITY },		\
+	{ RLIM_INFINITY, RLIM_INFINITY },		\
+	{             0,             0 },		\
 	{ INR_OPEN, INR_OPEN },                         \
-	{ LONG_MAX, LONG_MAX },				\
-	{ LONG_MAX, LONG_MAX },				\
-	{ LONG_MAX, LONG_MAX },				\
+	{ RLIM_INFINITY, RLIM_INFINITY },		\
+	{ RLIM_INFINITY, RLIM_INFINITY },		\
+	{ RLIM_INFINITY, RLIM_INFINITY },		\
 }
 
 #endif /* __KERNEL__ */

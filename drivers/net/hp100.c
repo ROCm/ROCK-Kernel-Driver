@@ -96,7 +96,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
@@ -1317,7 +1317,7 @@ static int hp100_init_txpdl( struct net_device *dev, register hp100_ring_t *ring
  * Returns: 0 if unable to allocate skb_buff
  *          1 if successful
  */
-int hp100_build_rx_pdl( hp100_ring_t *ringptr, struct net_device *dev )
+static int hp100_build_rx_pdl( hp100_ring_t *ringptr, struct net_device *dev )
 {
 #ifdef HP100_DEBUG_B
   int ioaddr = dev->base_addr;
@@ -1969,8 +1969,9 @@ static void hp100_rx( struct net_device *dev )
 	  skb->protocol = eth_type_trans( skb, dev );
 
 	  netif_rx( skb );
+	  dev->last_rx = jiffies;
 	  lp->stats.rx_packets++;
-	  lp->stats.rx_bytes += skb->len;
+	  lp->stats.rx_bytes += pkt_len;
       
 #ifdef HP100_DEBUG_RX
 	  printk( "hp100: %s: rx: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
@@ -2076,8 +2077,9 @@ static void hp100_rx_bm( struct net_device *dev )
 														
 	      netif_rx( ptr->skb );              /* Up and away... */
 
+	      dev->last_rx = jiffies;
 	      lp->stats.rx_packets++;
-	      lp->stats.rx_bytes += ptr->skb->len;
+	      lp->stats.rx_bytes += pkt_len;
 	    }
 
           switch ( header & 0x00070000 ) {

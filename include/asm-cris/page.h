@@ -100,7 +100,7 @@ typedef unsigned long pgprot_t;
 /* to index into the page map. our pages all start at physical addr PAGE_OFFSET so
  * we can let the map start there. notice that we subtract PAGE_OFFSET because
  * we start our mem_map there - in other ports they map mem_map physically and
- * use __pa instead. in our system both the physical and virtual adress of DRAM
+ * use __pa instead. in our system both the physical and virtual address of DRAM
  * is too high to let mem_map start at 0, so we do it this way instead (similar
  * to arm and m68k I think)
  */ 

@@ -2,7 +2,7 @@
  * linux/fs/hfs/bitops.c
  *
  * Copyright (C) 1996  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains functions to handle bitmaps in "left-to-right"
  * bit-order such that the MSB of a 32-bit big-endian word is bit 0.

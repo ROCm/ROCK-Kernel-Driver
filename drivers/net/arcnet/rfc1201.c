@@ -14,7 +14,7 @@
  * skeleton.c Written 1993 by Donald Becker.
  * Copyright 1993 United States Government as represented by the
  * Director, National Security Agency.  This software may only be used
- * and distributed according to the terms of the GNU Public License as
+ * and distributed according to the terms of the GNU General Public License as
  * modified by SRC, incorporated herein by reference.
  *
  * **********************
@@ -230,6 +230,7 @@ static void rx(struct net_device *dev, int bufnum,
 
 		skb->protocol = type_trans(skb, dev);
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 	} else {		/* split packet */
 		/*
 		 * NOTE: MSDOS ARP packet correction should only need to apply to
@@ -365,6 +366,7 @@ static void rx(struct net_device *dev, int bufnum,
 
 			skb->protocol = type_trans(skb, dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 		}
 	}
 }

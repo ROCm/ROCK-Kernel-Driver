@@ -84,7 +84,7 @@ static const char *boot_msg =
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
@@ -1958,6 +1958,7 @@ void mac_drv_rx_complete(struct s_smc *smc, volatile struct s_smt_fp_rxd *rxd,
 	skb->dev = bp->dev;	/* pass up device pointer */
 
 	netif_rx(skb);
+	bp->dev->last_rx = jiffies;
 
 	HWM_RX_CHECK(smc, RX_LOW_WATERMARK);
 	return;
@@ -2215,6 +2216,7 @@ int mac_drv_rx_init(struct s_smc *smc, int len, int fc,
 
 	// deliver frame to system
 	skb->protocol = fddi_type_trans(skb, ((skfddi_priv *) & smc->os)->dev);
+	skb->dev->last_rx = jiffies;
 	netif_rx(skb);
 
 	return (0);

@@ -11,7 +11,7 @@
  *	Pentium Pro and Pentium-II/Xeon MP machines.
  *	Original development of Linux SMP code supported by Caldera.
  *
- *	This code is released under the GNU public license version 2 or
+ *	This code is released under the GNU General Public License version 2 or
  *	later.
  *
  *	Fixes

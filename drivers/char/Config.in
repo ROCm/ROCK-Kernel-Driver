@@ -183,7 +183,7 @@ if [ "$CONFIG_AGP" != "n" ]; then
    bool '  VIA chipset support' CONFIG_AGP_VIA
    bool '  AMD Irongate support' CONFIG_AGP_AMD
    bool '  Generic SiS support' CONFIG_AGP_SIS
-   bool '  ALI M1541 support' CONFIG_AGP_ALI
+   bool '  ALI chipset support' CONFIG_AGP_ALI
 fi
 
 source drivers/char/drm/Config.in

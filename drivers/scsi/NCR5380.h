@@ -373,6 +373,6 @@ static __inline__ int NCR5380_pc_dma_residual (struct Scsi_Host *instance) {
 }
 #endif /* defined(i386) || defined(__alpha__) */
 #endif /* defined(REAL_DMA)  */
-#endif __KERNEL_
+#endif /* __KERNEL__ */
 #endif /* ndef ASM */
 #endif /* NCR5380_H */

@@ -12,7 +12,7 @@
 
 
     This software may be used and distributed according to the terms of
-    the GNU Public License, incorporated herein by reference.
+    the GNU General Public License, incorporated herein by reference.
 
     This driver is written for the Digital Equipment Corporation series
     of DEPCA and EtherWORKS ethernet cards:
@@ -241,7 +241,7 @@ static const char *version = "depca.c:v0.51 1999/6/27 davies@maniac.ultranet.com
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -990,11 +990,13 @@ depca_rx(struct net_device *dev)
 	  */
 	  skb->protocol=eth_type_trans(skb,dev);
 	  netif_rx(skb);
- 
+
 	  /*
 	  ** Update stats
 	  */
+	  dev->last_rx = jiffies;
 	  lp->stats.rx_packets++;
+	  lp->stats.rx_bytes += pkt_len;
 	  for (i=1; i<DEPCA_PKT_STAT_SZ-1; i++) {
 	    if (pkt_len < (i*DEPCA_PKT_BIN_SZ)) {
 	      lp->pktStats.bins[i]++;

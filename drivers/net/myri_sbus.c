@@ -17,7 +17,7 @@ static char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -531,7 +531,9 @@ static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 		DRX(("prot[%04x] netif_rx ", skb->protocol));
 		netif_rx(skb);
 
+		dev->last_rx = jiffies;
 		mp->enet_stats.rx_packets++;
+		mp->enet_stats.rx_bytes += len;
 	next:
 		DRX(("NEXT\n"));
 		entry = NEXT_RX(entry);
@@ -592,7 +594,7 @@ static void myri_tx_timeout(struct net_device *dev)
 
 	mp->enet_stats.tx_errors++;
 	myri_init(mp, 0);
-	netif_start_queue(dev);
+	netif_wake_queue(dev);
 }
 
 static int myri_start_xmit(struct sk_buff *skb, struct net_device *dev)

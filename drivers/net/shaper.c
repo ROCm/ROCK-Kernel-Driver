@@ -76,7 +76,7 @@
 #include <linux/ptrace.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/netdevice.h>

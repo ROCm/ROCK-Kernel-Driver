@@ -38,74 +38,80 @@ static __inline__ void atomic_set(atomic_t *v, int i)
 {
         __asm__ __volatile__("st  %1,%0\n\t"
                              "bcr 15,0"
-                             : : "m" (*v), "d" (i) : "memory");
+                             : "=m" (*v) : "d" (i) );
 }
 
 static __inline__ void atomic_add(int i, atomic_t *v)
 {
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    2,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    1,0\n"
                              "   ar    1,%1\n"
-                             "   cs    0,1,%0\n"
+                             "   cs    0,1,0(2)\n"
                              "   jl    0b"
-                             : "+m" (*v) : "d" (i) : "0", "1" );
+                             : "+m" (*v) : "d" (i) : "0", "1", "2", "cc" );
 }
 
 static __inline__ int atomic_add_return (int i, atomic_t *v)
 {
 	int newval;
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    1,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    %1,0\n"
                              "   ar    %1,%2\n"
-                             "   cs    0,%1,%0\n"
+                             "   cs    0,%1,0(1)\n"
                              "   jl    0b"
                              : "+m" (*v), "=&d" (newval)
-			     : "d" (i) : "0", "cc" );
+			     : "d" (i) : "0", "1", "cc" );
 	return newval;
 }
 
 static __inline__ int atomic_add_negative(int i, atomic_t *v)
 {
 	int newval;
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    1,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    %1,0\n"
                              "   ar    %1,%2\n"
-                             "   cs    0,%1,%0\n"
+                             "   cs    0,%1,0(1)\n"
                              "   jl    0b\n"
                              : "+m" (*v), "=&d" (newval)
-                             : "d" (i) : "0", "cc" );
+                             : "d" (i) : "0", "1", "cc" );
         return newval < 0;
 }
 
 static __inline__ void atomic_sub(int i, atomic_t *v)
 {
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    2,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    1,0\n"
                              "   sr    1,%1\n"
-                             "   cs    0,1,%0\n"
+                             "   cs    0,1,0(2)\n"
                              "   jl    0b"
-                             : "+m" (*v) : "d" (i) : "0", "1" );
+                             : "+m" (*v) : "d" (i) : "0", "1", "2", "cc" );
 }
 
 static __inline__ void atomic_inc(volatile atomic_t *v)
 {
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    2,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    1,0\n"
                              "   ahi   1,1\n"
-                             "   cs    0,1,%0\n"
+                             "   cs    0,1,0(2)\n"
                              "   jl    0b"
-                             : "+m" (*v) : : "0", "1" );
+                             : "+m" (*v) : : "0", "1", "2", "cc" );
 }
 
 static __inline__ int atomic_inc_return(volatile atomic_t *v)
 {
         int i;
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    1,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    %1,0\n"
                              "   ahi   %1,1\n"
-                             "   cs    0,%1,%0\n"
+                             "   cs    0,%1,0(1)\n"
                              "   jl    0b"
-                             : "+m" (*v), "=&d" (i) : : "0" );
+                             : "+m" (*v), "=&d" (i) : : "0", "1", "cc" );
         return i;
 }
 
@@ -113,67 +119,74 @@ static __inline__ int atomic_inc_and_test(volatile atomic_t *v)
 {
        int i;
 
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    1,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    %1,0\n"
                              "   ahi   %1,1\n"
-                             "   cs    0,%1,%0\n"
+                             "   cs    0,%1,0(1)\n"
                              "   jl    0b"
-                             : "+m" (*v), "=&d" (i) : : "0" );
+                             : "+m" (*v), "=&d" (i) : : "0", "1", "cc" );
        return i != 0;
 }
 
 static __inline__ void atomic_dec(volatile atomic_t *v)
 {
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    2,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    1,0\n"
                              "   ahi   1,-1\n"
-                             "   cs    0,1,%0\n"
+                             "   cs    0,1,0(2)\n"
                              "   jl    0b"
-                             : "+m" (*v) : : "0", "1" );
+                             : "+m" (*v) : : "0", "1", "2", "cc" );
 }
 
 static __inline__ int atomic_dec_return(volatile atomic_t *v)
 {
         int i;
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    1,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    %1,0\n"
                              "   ahi   %1,-1\n"
-                             "   cs    0,%1,%0\n"
+                             "   cs    0,%1,0(1)\n"
                              "   jl    0b"
-                             : "+m" (*v), "=&d" (i) : : "0" );
+                             : "+m" (*v), "=&d" (i) : : "0", "1", "cc" );
         return i;
 }
 
 static __inline__ int atomic_dec_and_test(volatile atomic_t *v)
 {
         int i;
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    1,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    %1,0\n"
                              "   ahi   %1,-1\n"
-                             "   cs    0,%1,%0\n"
+                             "   cs    0,%1,0(1)\n"
                              "   jl    0b"
-                             : "+m" (*v), "=&d" (i) : : "0");
+                             : "+m" (*v), "=&d" (i) : : "0", "1", "cc" );
         return i == 0;
 }
 
 static __inline__ void atomic_clear_mask(unsigned long mask, atomic_t *v)
 {
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    2,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    1,0\n"
                              "   nr    1,%1\n"
-                             "   cs    0,1,%0\n"
+                             "   cs    0,1,0(2)\n"
                              "   jl    0b"
-                             : "+m" (*v) : "d" (~(mask)) : "0", "1" );
+                             : "+m" (*v) : "d" (~(mask)) 
+                             : "0", "1", "2", "cc" );
 }
 
 static __inline__ void atomic_set_mask(unsigned long mask, atomic_t *v)
 {
-        __asm__ __volatile__("   l     0,%0\n"
+        __asm__ __volatile__("   la    2,%0\n"
+                             "   l     0,%0\n"
                              "0: lr    1,0\n"
                              "   or    1,%1\n"
-                             "   cs    0,1,%0\n"
+                             "   cs    0,1,0(2)\n"
                              "   jl    0b"
-                             : "+m" (*v) : "d" (mask) : "0", "1" );
+                             : "+m" (*v) : "d" (mask) : "0", "1", "2", "cc" );
 }
 
 /*
@@ -186,13 +199,15 @@ atomic_compare_and_swap(int expected_oldval,int new_val,atomic_t *v)
         int retval;
 
         __asm__ __volatile__(
-                "  cs   %2,%3,%1\n"
+                "  la   1,%1\n"
+                "  lr   0,%2\n"
+                "  cs   0,%3,0(1)\n"
                 "  ipm  %0\n"
                 "  srl  %0,28\n"
                 "0:"
                 : "=&r" (retval), "+m" (*v)
                 : "d" (expected_oldval) , "d" (new_val)
-                : "memory", "cc");
+                : "0", "1", "cc");
         return retval;
 }
 
@@ -203,12 +218,20 @@ static __inline__ void
 atomic_compare_and_swap_spin(int expected_oldval,int new_val,atomic_t *v)
 {
         __asm__ __volatile__(
+                "   la  2,%0\n"
                 "0: lr  1,%1\n"
-                "   cs  1,%2,%0\n"
+                "   cs  1,%2,0(2)\n"
                 "   jl  0b\n"
                 : "+m" (*v)
                 : "d" (expected_oldval) , "d" (new_val)
-                : "memory", "cc", "1");
+                : "cc", "1", "2");
+}
+
+#define atomic_compare_and_swap_debug(where,from,to) \
+if (atomic_compare_and_swap ((from), (to), (where))) {\
+	printk (KERN_WARNING"%s/%d atomic counter:%s couldn't be changed from %d(%s) to %d(%s), was %d\n",\
+		__FILE__,__LINE__,#where,(from),#from,(to),#to,atomic_read (where));\
+        atomic_set(where,(to));\
 }
 
 #endif                                 /* __ARCH_S390_ATOMIC __            */

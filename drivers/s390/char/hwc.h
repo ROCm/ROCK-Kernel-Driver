@@ -1,13 +1,13 @@
 /*
  *  drivers/s390/char/hwc.h
- *
+ * 
  *
  *  S390 version
  *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Martin Peschke <peschke@fh-brandenburg.de>
  *
- *
- *
+ * 
+ * 
  */
 
 #ifndef __HWC_H__

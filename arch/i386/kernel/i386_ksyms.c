@@ -13,6 +13,7 @@
 #include <linux/apm_bios.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/tty.h>
 
 #include <asm/semaphore.h>
 #include <asm/processor.h>

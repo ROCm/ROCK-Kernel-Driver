@@ -139,7 +139,6 @@ static int tty_release(struct inode *, struct file *);
 int tty_ioctl(struct inode * inode, struct file * file,
 	      unsigned int cmd, unsigned long arg);
 static int tty_fasync(int fd, struct file * filp, int on);
-extern int sx_init (void);
 extern int vme_scc_init (void);
 extern long vme_scc_console_init(void);
 extern int serial167_init(void);

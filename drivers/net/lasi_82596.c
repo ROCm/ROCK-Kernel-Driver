@@ -60,15 +60,13 @@
    Written 1993 by Donald Becker.
    Copyright 1993 United States Government as represented by the Director,
    National Security Agency. This software may only be used and distributed
-   according to the terms of the GNU Public License as modified by SRC,
+   according to the terms of the GNU General Public License as modified by SRC,
    incorporated herein by reference.
 
    The author may be reached as becker@super.org or
    C/O Supercomputing Research Ctr., 17100 Science Dr., Bowie MD 20715
 
  */
-
-static const char *version = "82596.c $Revision: 1.14 $\n";
 
 #include <linux/module.h>
 
@@ -78,7 +76,7 @@ static const char *version = "82596.c $Revision: 1.14 $\n";
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/netdevice.h>
@@ -96,6 +94,9 @@ static const char *version = "82596.c $Revision: 1.14 $\n";
 #include <asm/pdc.h>
 #include <asm/gsc.h>
 #include <asm/cache.h>
+
+static char version[] __initdata =
+	"82596.c $Revision: 1.14 $\n";
 
 /* DEBUG flags
  */
@@ -374,7 +375,7 @@ struct i596_private {
 	dma_addr_t dma_addr;
 };
 
-char init_setup[] =
+static char init_setup[] =
 {
 	0x8E,			/* length, prefetch on */
 	0xC8,			/* fifo to 8, monitor off */
@@ -790,6 +791,7 @@ memory_squeeze:
 				skb->len = pkt_len;
 				skb->protocol=eth_type_trans(skb,dev);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				lp->stats.rx_packets++;
 				lp->stats.rx_bytes+=pkt_len;
 			}

@@ -100,6 +100,7 @@ nfs_read_inode(struct inode * inode)
 	inode->i_rdev = 0;
 	NFS_FILEID(inode) = 0;
 	NFS_FSID(inode) = 0;
+	NFS_FLAGS(inode) = 0;
 	INIT_LIST_HEAD(&inode->u.nfs_i.read);
 	INIT_LIST_HEAD(&inode->u.nfs_i.dirty);
 	INIT_LIST_HEAD(&inode->u.nfs_i.commit);

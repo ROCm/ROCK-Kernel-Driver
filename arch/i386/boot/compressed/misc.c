@@ -10,6 +10,7 @@
  */
 
 #include <linux/vmalloc.h>
+#include <linux/tty.h>
 #include <asm/io.h>
 /*
  * gzip declarations

@@ -5,7 +5,7 @@
    Modified from the driver which is originally written by Donald Becker.
    
    This software may be used and distributed according to the terms
-   of the GNU Public License (GPL), incorporated herein by reference.
+   of the GNU General Public License (GPL), incorporated herein by reference.
    Drivers based on this skeleton fall under the GPL and must retain
    the authorship (implicit copyright) notice.
    
@@ -44,7 +44,7 @@
 #include <linux/timer.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>

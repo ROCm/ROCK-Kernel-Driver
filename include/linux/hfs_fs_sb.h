@@ -2,7 +2,7 @@
  * linux/include/linux/hfs_fs_sb.h
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file defines the type (struct hfs_sb_info) which contains the
  * HFS-specific information in the in-core superblock.

@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1997 Cullen Jennings
  *  Copyright (C) 1998 Elmer.Joandi@ut.ee, +37-255-13500	
- *  Gnu Public License applies
+ *  GNU General Public License applies
  */
 #include <linux/version.h>
 
@@ -15,7 +15,7 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 

@@ -16,7 +16,7 @@
  *      Director, National Security Agency.
  *
  *      This software may be used and distributed according to the terms
- *      of the GNU Public License, incorporated herein by reference.
+ *      of the GNU General Public License, incorporated herein by reference.
  *
  *	Changes:
  *	19970608	Alan Cox	Allowed dual card type support
@@ -59,7 +59,7 @@ static const char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -851,8 +851,7 @@ static void cops_rx(struct net_device *dev)
 
         /* Send packet to a higher place. */
         netif_rx(skb);
-
-        return;
+	dev->last_rx = jiffies;
 }
 
 static void cops_timeout(struct net_device *dev)

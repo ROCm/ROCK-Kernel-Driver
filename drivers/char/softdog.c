@@ -45,9 +45,7 @@
 
 static int soft_margin = TIMER_MARGIN;	/* in seconds */
 
-#ifdef MODULE
 MODULE_PARM(soft_margin,"i");
-#endif
 
 /*
  *	Our timer
@@ -129,14 +127,10 @@ static ssize_t softdog_write(struct file *file, const char *data, size_t len, lo
 static int softdog_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
-	static struct watchdog_info ident=
-	{
-		0,
-		0,
-		"Software Watchdog"
+	static struct watchdog_info ident = {
+		identity: "Software Watchdog",
 	};
-	switch(cmd)
-	{
+	switch (cmd) {
 		default:
 			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
@@ -152,8 +146,7 @@ static int softdog_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
-static struct file_operations softdog_fops=
-{
+static struct file_operations softdog_fops = {
 	owner:		THIS_MODULE,
 	write:		softdog_write,
 	ioctl:		softdog_ioctl,
@@ -161,12 +154,13 @@ static struct file_operations softdog_fops=
 	release:	softdog_release,
 };
 
-static struct miscdevice softdog_miscdev=
-{
-	WATCHDOG_MINOR,
-	"watchdog",
-	&softdog_fops
+static struct miscdevice softdog_miscdev = {
+	minor:		WATCHDOG_MINOR,
+	name:		"watchdog",
+	fops:		&softdog_fops,
 };
+
+static const char banner[] __initdata = KERN_INFO "Software Watchdog Timer: 0.05, timer margin: %d sec\n";
 
 static int __init watchdog_init(void)
 {
@@ -177,10 +171,10 @@ static int __init watchdog_init(void)
 	if (ret)
 		return ret;
 
-	printk("Software Watchdog Timer: 0.05, timer margin: %d sec\n", soft_margin);
+	printk(banner, soft_margin);
 
 	return 0;
-}	
+}
 
 static void __exit watchdog_exit(void)
 {

@@ -3,7 +3,7 @@
 	Written 1993, 1994 by Donald Becker.
 	Copyright 1993 United States Government as represented by the Director,
 	National Security Agency.  This software may only be used and distributed
-	according to the terms of the GNU Public License as modified by SRC,
+	according to the terms of the GNU General Public License as modified by SRC,
 	incorporated herein by reference.
 
 	The author may be reached as becker@cesdis.gsfc.nasa.gov, or

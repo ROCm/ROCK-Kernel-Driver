@@ -20,7 +20,7 @@ static char *version =
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -438,6 +438,7 @@ static void qe_rx(struct sunqe *qep)
 						 len, 0);
 				skb->protocol = eth_type_trans(skb, qep->dev);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				qep->net_stats.rx_packets++;
 				qep->net_stats.rx_bytes += len;
 			}

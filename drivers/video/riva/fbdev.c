@@ -55,7 +55,7 @@
 
 
 /* version number of this driver */
-#define RIVAFB_VERSION "0.9.2"
+#define RIVAFB_VERSION "0.9.2a"
 
 
 
@@ -206,13 +206,13 @@ MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
  * ------------------------------------------------------------------------- */
 
 #ifdef FBCON_HAS_CFB8
-struct display_switch fbcon_riva8;
+extern struct display_switch fbcon_riva8;
 #endif
 #ifdef FBCON_HAS_CFB16
-struct display_switch fbcon_riva16;
+extern struct display_switch fbcon_riva16;
 #endif
 #ifdef FBCON_HAS_CFB32
-struct display_switch fbcon_riva32;
+extern struct display_switch fbcon_riva32;
 #endif
 
 #if 0
@@ -1230,42 +1230,24 @@ static int riva_setcolreg(unsigned regno, unsigned red, unsigned green,
 	case 16:
 		assert(regno < 16);
 		if (p->var.green.length == 5) {
-#ifdef CONFIG_PREP	/* gggbbbbb 0rrrrrgg */
-			rivainfo->con_cmap.cfb16[regno] =
-			    ((red & 0xf800) >> 9) |
-			    ((green & 0xf800) >> 14) |
-			    ((green & 0xf800) << 2) | ((blue & 0xf800) >> 3);
-#else			/* 0rrrrrgg gggbbbbb */
+			/* 0rrrrrgg gggbbbbb */
 			rivainfo->con_cmap.cfb16[regno] =
 			    ((red & 0xf800) >> 1) |
 			    ((green & 0xf800) >> 6) | ((blue & 0xf800) >> 11);
-#endif
 		} else {
-#ifdef CONFIG_PREP	/* gggbbbbb rrrrrggg */
-			rivainfo->con_cmap.cfb16[regno] =
-			    ((red & 0xf800) >> 8) |
-			    ((green & 0xfc00) >> 13) |
-			    ((green & 0xfc00) << 3) | ((blue & 0xf800) >> 3);
-#else			/* rrrrrggg gggbbbbb */
+			/* rrrrrggg gggbbbbb */
 			rivainfo->con_cmap.cfb16[regno] =
 			    ((red & 0xf800) >> 0) |
 			    ((green & 0xf800) >> 5) | ((blue & 0xf800) >> 11);
-#endif
 		}
 		break;
 #endif /* FBCON_HAS_CFB16 */
 #ifdef FBCON_HAS_CFB32
 	case 32:
 		assert(regno < 16);
-#ifdef CONFIG_PREP
-		rivainfo->con_cmap.cfb32[regno] =
-		    ((red & 0xff00)) |
-		    ((green & 0xff00) << 8) | ((blue & 0xff00) << 16);
-#else
 		rivainfo->con_cmap.cfb32[regno] =
 		    ((red & 0xff00) << 8) |
 		    ((green & 0xff00)) | ((blue & 0xff00) >> 8);
-#endif
 		break;
 #endif /* FBCON_HAS_CFB32 */
 	default:
@@ -1424,28 +1406,18 @@ static int rivafb_set_var(struct fb_var_screeninfo *var, int con,
 		nom = 2;
 		den = 1;
 		if (v.green.length == 5) {
-#ifdef CONFIG_PREP			/* gggbbbbb 0rrrrrgg */
-			v.red.offset = 2;
-			v.green.offset = -3;
-			v.blue.offset = 8;
-#else					/* 0rrrrrgg gggbbbbb */
+			/* 0rrrrrgg gggbbbbb */
 			v.red.offset = 10;
 			v.green.offset = 5;
 			v.blue.offset = 0;
-#endif
 			v.red.length = 5;
 			v.green.length = 5;
 			v.blue.length = 5;
 		} else {
-#ifdef CONFIG_PREP			/* gggbbbbb rrrrrggg */
-			v.red.offset = 3;
-			v.green.offset = -3;
-			v.blue.offset = 8;
-#else					/* rrrrrggg gggbbbbb */
+			/* rrrrrggg gggbbbbb */
 			v.red.offset = 11;
 			v.green.offset = 5;
 			v.blue.offset = 0;
-#endif
 			v.red.length = 5;
 			v.green.length = 6;
 			v.blue.length = 5;
@@ -1457,15 +1429,9 @@ static int rivafb_set_var(struct fb_var_screeninfo *var, int con,
 		v.bits_per_pixel = 32;
 		nom = 4;
 		den = 1;
-#ifdef CONFIG_PREP
-		v.red.offset = 8;
-		v.green.offset = 16;
-		v.blue.offset = 24;
-#else
 		v.red.offset = 16;
 		v.green.offset = 8;
 		v.blue.offset = 0;
-#endif
 		v.red.length = 8;
 		v.green.length = 8;
 		v.blue.length = 8;

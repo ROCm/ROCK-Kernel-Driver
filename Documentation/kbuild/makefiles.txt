@@ -1206,7 +1206,7 @@ people define most variables using "new style" but then fall back to
 
     mod-subdirs
 
-	$(mod-subdirs) is a list of all the the subdirectories that should
+	$(mod-subdirs) is a list of all the subdirectories that should
 	be added to $(subdir-m), too if they appear in $(subdir-y)
 
 	Example:

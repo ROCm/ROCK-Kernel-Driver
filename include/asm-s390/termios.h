@@ -77,18 +77,19 @@ struct termio {
 /*
  * Translate a "termio" structure into a "termios". Ugh.
  */
-#define SET_LOW_TERMIOS_BITS(termios, termio, x) { \
-	unsigned short __tmp; \
-	get_user(__tmp,&(termio)->x); \
-	*(unsigned short *) &(termios)->x = __tmp; \
-}
 
 #define user_termio_to_kernel_termios(termios, termio) \
 ({ \
-	SET_LOW_TERMIOS_BITS(termios, termio, c_iflag); \
-	SET_LOW_TERMIOS_BITS(termios, termio, c_oflag); \
-	SET_LOW_TERMIOS_BITS(termios, termio, c_cflag); \
-	SET_LOW_TERMIOS_BITS(termios, termio, c_lflag); \
+        unsigned short tmp; \
+        get_user(tmp, &(termio)->c_iflag); \
+        (termios)->c_iflag = (0xffff0000 & ((termios)->c_iflag)) | tmp; \
+        get_user(tmp, &(termio)->c_oflag); \
+        (termios)->c_oflag = (0xffff0000 & ((termios)->c_oflag)) | tmp; \
+        get_user(tmp, &(termio)->c_cflag); \
+        (termios)->c_cflag = (0xffff0000 & ((termios)->c_cflag)) | tmp; \
+        get_user(tmp, &(termio)->c_lflag); \
+        (termios)->c_lflag = (0xffff0000 & ((termios)->c_lflag)) | tmp; \
+        get_user((termios)->c_line, &(termio)->c_line); \
 	copy_from_user((termios)->c_cc, (termio)->c_cc, NCC); \
 })
 

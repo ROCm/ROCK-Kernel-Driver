@@ -314,7 +314,7 @@ xbow_attach(devfs_handle_t conn)
 
     /*
      * get the name of this xbow vertex and keep the info.
-     * This is needed during errors and interupts, but as
+     * This is needed during errors and interrupts, but as
      * long as we have it, we can use it elsewhere.
      */
     s = dev_to_name(vhdl, devnm, MAXDEVNAME);

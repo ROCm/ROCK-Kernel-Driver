@@ -2,7 +2,7 @@
  * linux/fs/hfs/file.c
  *
  * Copyright (C) 1995, 1996  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains the file-related functions which are independent of
  * which scheme is being used to represent forks.
@@ -135,9 +135,9 @@ int hfs_get_block(struct inode *inode, long iblock, struct buffer_head *bh_resul
  * This is the read field in the inode_operations structure for
  * "regular" (non-header) files.  The purpose is to transfer up to
  * 'count' bytes from the file corresponding to 'inode', beginning at
- * 'filp->offset' bytes into the file.	The data is transfered to
+ * 'filp->offset' bytes into the file.	The data is transferred to
  * user-space at the address 'buf'.  Returns the number of bytes
- * successfully transfered.  This function checks the arguments, does
+ * successfully transferred.  This function checks the arguments, does
  * some setup and then calls hfs_do_read() to do the actual transfer.  */
 static hfs_rwret_t hfs_file_read(struct file * filp, char * buf, 
 				 hfs_rwarg_t count, loff_t *ppos)
@@ -277,7 +277,7 @@ static inline int xlate_from_user(char *data, const char *buf, int count)
  * hfs_do_read()
  *
  * This function transfers actual data from disk to user-space memory,
- * returning the number of bytes successfully transfered.  'fork' tells
+ * returning the number of bytes successfully transferred.  'fork' tells
  * which file on the disk to read from.  'pos' gives the offset into
  * the Linux file at which to begin the transfer.  Note that this will
  * differ from 'filp->offset' in the case of an AppleDouble header file
@@ -433,7 +433,7 @@ hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
  * hfs_do_write()
  *
  * This function transfers actual data from user-space memory to disk,
- * returning the number of bytes successfully transfered.  'fork' tells
+ * returning the number of bytes successfully transferred.  'fork' tells
  * which file on the disk to write to.  'pos' gives the offset into
  * the Linux file at which to begin the transfer.  Note that this will
  * differ from 'filp->offset' in the case of an AppleDouble header file

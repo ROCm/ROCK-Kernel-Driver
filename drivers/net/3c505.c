@@ -99,7 +99,7 @@
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
 #include <asm/bitops.h>
@@ -689,6 +689,7 @@ static void elp_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 					skb->protocol = eth_type_trans(skb,dev);
 					adapter->stats.rx_bytes += skb->len;
 					netif_rx(skb);
+					dev->last_rx = jiffies;
 				}
 			}
 			adapter->dmaing = 0;

@@ -235,6 +235,7 @@ int ext2_add_entry (struct inode * dir, const char * name, int namelen,
 				return retval;
 			if (dir->i_size <= offset) {
 				if (dir->i_size == 0) {
+					brelse(bh);
 					return -ENOENT;
 				}
 

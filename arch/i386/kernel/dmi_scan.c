@@ -12,6 +12,8 @@ struct dmi_header
 	u16	handle;
 };
 
+#define dmi_printk(x)
+
 static char * __init dmi_string(struct dmi_header *dm, u8 s)
 {
 	u8 *bp=(u8 *)dm;
@@ -73,13 +75,13 @@ int __init dmi_iterate(void (*decode)(struct dmi_header *))
 			u16 len=buf[7]<<8|buf[6];
 			u32 base=buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8];
 
-			printk(KERN_INFO "DMI %d.%d present.\n",
-				buf[14]>>4, buf[14]&0x0F);
-			printk(KERN_INFO "%d structures occupying %d bytes.\n",
+			dmi_printk((KERN_INFO "DMI %d.%d present.\n",
+				buf[14]>>4, buf[14]&0x0F));
+			dmi_printk((KERN_INFO "%d structures occupying %d bytes.\n",
 				buf[13]<<8|buf[12],
-				buf[7]<<8|buf[6]);
-			printk(KERN_INFO "DMI table at 0x%08X.\n",
-				buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8]);
+				buf[7]<<8|buf[6]));
+			dmi_printk((KERN_INFO "DMI table at 0x%08X.\n",
+				buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8]));
 			if(dmi_table(base,len, num, decode)==0)
 				return 0;
 		}
@@ -106,11 +108,11 @@ static void __init dmi_decode(struct dmi_header *dm)
 
 			if(*p && *p!=' ')
 			{
-				printk("BIOS Vendor: %s\n", p);
-				printk("BIOS Version: %s\n", 
-					dmi_string(dm, data[5]));
-				printk("BIOS Release: %s\n",
-					dmi_string(dm, data[8]));
+				dmi_printk(("BIOS Vendor: %s\n", p));
+				dmi_printk(("BIOS Version: %s\n", 
+					dmi_string(dm, data[5])));
+				dmi_printk(("BIOS Release: %s\n",
+					dmi_string(dm, data[8])));
 			}
 				
 			/*
@@ -144,13 +146,13 @@ static void __init dmi_decode(struct dmi_header *dm)
 
 			if(*p && *p!=' ')
 			{
-				printk("System Vendor: %s.\n",p);
-				printk("Product Name: %s.\n",
-					dmi_string(dm, data[5]));
-				printk("Version %s.\n",
-					dmi_string(dm, data[6]));
-				printk("Serial Number %s.\n",
-					dmi_string(dm, data[7]));
+				dmi_printk(("System Vendor: %s.\n",p));
+				dmi_printk(("Product Name: %s.\n",
+					dmi_string(dm, data[5])));
+				dmi_printk(("Version %s.\n",
+					dmi_string(dm, data[6])));
+				dmi_printk(("Serial Number %s.\n",
+					dmi_string(dm, data[7])));
 			}
 			break;
 		case 2:
@@ -158,17 +160,17 @@ static void __init dmi_decode(struct dmi_header *dm)
 
 			if(*p && *p!=' ')
 			{
-				printk("Board Vendor: %s.\n",p);
-				printk("Board Name: %s.\n",
-				dmi_string(dm, data[5]));
-				printk("Board Version: %s.\n",
-					dmi_string(dm, data[6]));
+				dmi_printk(("Board Vendor: %s.\n",p));
+				dmi_printk(("Board Name: %s.\n",
+					dmi_string(dm, data[5])));
+				dmi_printk(("Board Version: %s.\n",
+					dmi_string(dm, data[6])));
 			}
 			break;
 		case 3:
 			p=dmi_string(dm,data[8]);
 			if(*p && *p!=' ')
-				printk("Asset Tag: %s.\n", p);
+				dmi_printk(("Asset Tag: %s.\n", p));
 			break;
 	}
 }

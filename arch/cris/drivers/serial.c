@@ -246,7 +246,7 @@ static int serial_refcount;
 #define SERIAL_DEBUG_LINE 0 /* What serport we want to debug */
 
 /* Enable this to use serial interrupts to handle when you
-   expect the first recieved event on the serial port to
+   expect the first received event on the serial port to
    be an error, break or similar. Used to be able to flash IRMA
    from eLinux */
 //#define SERIAL_HANDLE_EARLY_ERRORS

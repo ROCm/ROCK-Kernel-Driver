@@ -171,6 +171,7 @@ EXPORT_SYMBOL(__down_failed_interruptible);
 EXPORT_SYMBOL(__up_wakeup);
 EXPORT_SYMBOL(down);
 EXPORT_SYMBOL(down_interruptible);
+EXPORT_SYMBOL(down_trylock);
 EXPORT_SYMBOL(up);
 EXPORT_SYMBOL(__down_read_failed);
 EXPORT_SYMBOL(__down_write_failed);

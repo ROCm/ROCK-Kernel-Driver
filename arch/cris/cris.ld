@@ -55,7 +55,7 @@ SECTIONS
   	___initcall_start = .;
   	.initcall.init : { *(.initcall.init) }
   	___initcall_end = .;
-	__vmlinux_end = .;            /* last adress of the physical file */
+	__vmlinux_end = .;            /* last address of the physical file */
   	. = ALIGN(8192);
   	___init_end = .;
 

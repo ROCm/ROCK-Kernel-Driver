@@ -140,7 +140,7 @@ SYMBOL_NAME_LABEL(ret_from_exception)
 	bnes	2f			| if so, skip resched, signals
 	| only allow interrupts when we are really the last one on the
 	| kernel stack, otherwise stack overflow can occur during
-	| heavy interupt load
+	| heavy interrupt load
 	andw	#ALLOWINT,%sr
 	tstl	%curptr@(TASK_NEEDRESCHED)
 	jne	SYMBOL_NAME(reschedule)

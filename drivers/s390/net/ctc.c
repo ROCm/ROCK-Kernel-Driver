@@ -128,7 +128,8 @@ typedef enum {
  *
  */  
 
-static int channel_tab_initialized = 0;     /* channel[] structure initialized */
+/* long req'd by set_bit --RR */
+static long channel_tab_initialized = 0;     /* channel[] structure initialized */
 
 struct devicelist {  
         unsigned int  devno;
@@ -394,7 +395,7 @@ static void channel_scan(void)
         int        m;
         int        c;
         int        irq;
-        dev_info_t temp;
+        s390_dev_info_t temp;
         
         for (m = 0; m < CHANNEL_MEDIA;  m++) { 
                 for (c = 0; c < MAX_CHANNEL_DEVICES; c++){

@@ -826,9 +826,10 @@ static void mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 		skb_put(skb, nb);
 		skb->dev = dev;
 		skb->protocol = eth_type_trans(skb, dev);
-		netif_rx(skb);
-		mp->rx_bufs[i] = 0;
 		mp->stats.rx_bytes += skb->len;
+		netif_rx(skb);
+		dev->last_rx = jiffies;
+		mp->rx_bufs[i] = 0;
 		++mp->stats.rx_packets;
 	    }
 	} else {

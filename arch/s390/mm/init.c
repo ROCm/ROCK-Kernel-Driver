@@ -52,10 +52,10 @@ static unsigned long totalram_pages;
  * data and COW.
  */
 
-pgd_t         swapper_pg_dir[512]   __attribute__ ((__aligned__ (4096)));
-unsigned long empty_bad_page[1024] __attribute__ ((__aligned__ (4096)));
-unsigned long empty_zero_page[1024] __attribute__ ((__aligned__ (4096)));
-pte_t         empty_bad_pte_table[1024] __attribute__ ((__aligned__ (4096)));
+pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
+char  empty_bad_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
+char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
+pte_t empty_bad_pte_table[PTRS_PER_PTE] __attribute__((__aligned__(PAGE_SIZE)));
 
 static int test_access(unsigned long loc)
 {
@@ -104,47 +104,6 @@ static inline void invalidate_page(pte_t *pte)
                 pte_clear(pte++);
 }
 
-void __handle_bad_pmd(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-        pmd_val(*pmd) = _PAGE_TABLE + __pa(get_bad_pte_table());
-}
-
-void __handle_bad_pmd_kernel(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-        pmd_val(*pmd) = _KERNPG_TABLE + __pa(get_bad_pte_table());
-}
-
-pte_t *get_pte_kernel_slow(pmd_t *pmd, unsigned long offset)
-{
-        pte_t *pte;
-
-        pte = (pte_t *) __get_free_page(GFP_KERNEL);
-        if (pmd_none(*pmd)) {
-                if (pte) {
-                        invalidate_page(pte);
-                        pmd_val(pmd[0]) = _KERNPG_TABLE + __pa(pte);
-                        pmd_val(pmd[1]) = _KERNPG_TABLE + __pa(pte)+1024;
-                        pmd_val(pmd[2]) = _KERNPG_TABLE + __pa(pte)+2048;
-                        pmd_val(pmd[3]) = _KERNPG_TABLE + __pa(pte)+3072;
-                        return pte + offset;
-                }
-		pte = get_bad_pte_table();
-                pmd_val(pmd[0]) = _KERNPG_TABLE + __pa(pte);
-                pmd_val(pmd[1]) = _KERNPG_TABLE + __pa(pte)+1024;
-                pmd_val(pmd[2]) = _KERNPG_TABLE + __pa(pte)+2048;
-                pmd_val(pmd[3]) = _KERNPG_TABLE + __pa(pte)+3072;
-                return NULL;
-        }
-        free_page((unsigned long)pte);
-        if (pmd_bad(*pmd)) {
-                __handle_bad_pmd_kernel(pmd);
-                return NULL;
-        }
-        return (pte_t *) pmd_page(*pmd) + offset;
-}
-
 pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
 {
         unsigned long pte;
@@ -167,10 +126,8 @@ pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
                 return NULL;
         }
         free_page(pte);
-        if (pmd_bad(*pmd)) {
-                __handle_bad_pmd(pmd);
-                return NULL;
-        }
+        if (pmd_bad(*pmd))
+		BUG();
         return (pte_t *) pmd_page(*pmd) + offset;
 }
 
@@ -180,7 +137,7 @@ int do_check_pgt_cache(int low, int high)
         if(pgtable_cache_size > high) {
                 do {
                         if(pgd_quicklist)
-                                free_pgd_slow(get_pgd_fast()), freed++;
+                                free_pgd_slow(get_pgd_fast()), freed += 2;
                         if(pmd_quicklist)
                                 free_pmd_slow(get_pmd_fast()), freed++;
                         if(pte_quicklist)
@@ -245,6 +202,7 @@ void __init paging_init(void)
         unsigned long address=0;
         unsigned long pgdir_k = (__pa(swapper_pg_dir) & PAGE_MASK) | _KERNSEG_TABLE;
 	unsigned long end_mem = (unsigned long) __va(max_low_pfn*PAGE_SIZE);
+        static const int ssm_mask = 0x04000000L;
 
 	/* unmap whole virtual address space */
 
@@ -283,8 +241,9 @@ void __init paging_init(void)
         /* enable virtual mapping in kernel mode */
         __asm__ __volatile__("    LCTL  1,1,%0\n"
                              "    LCTL  7,7,%0\n"
-                             "    LCTL  13,13,%0" 
-			     : :"m" (pgdir_k));
+                             "    LCTL  13,13,%0\n"
+                             "    SSM   %1" 
+			     : : "m" (pgdir_k), "m" (ssm_mask));
 
         local_flush_tlb();
 
@@ -378,6 +337,7 @@ void si_meminfo(struct sysinfo *val)
 	val->sharedram = 0;
 	val->freeram = nr_free_pages();
 	val->bufferram = atomic_read(&buffermem_pages);
+	val->totalhigh = 0;
+	val->freehigh = 0;
 	val->mem_unit = PAGE_SIZE;
-	return;
 }

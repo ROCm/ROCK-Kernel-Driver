@@ -129,7 +129,7 @@ typedef union {
 #define ide_release_lock(lock)		do {} while (0)
 #define ide_get_lock(lock, hdlr, data)	do {} while (0)
 
-/* the drive adressing is done through a controller register on the Etrax CPU */
+/* the drive addressing is done through a controller register on the Etrax CPU */
 void OUT_BYTE(unsigned char data, ide_ioreg_t reg);
 unsigned char IN_BYTE(ide_ioreg_t reg);
 

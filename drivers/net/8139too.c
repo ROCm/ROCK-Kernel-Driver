@@ -35,7 +35,7 @@
 	-----<snip>-----
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	Contributors:
 
@@ -1828,6 +1828,7 @@ static void rtl8139_rx_interrupt (struct net_device *dev,
 
 			skb->protocol = eth_type_trans (skb, dev);
 			netif_rx (skb);
+			dev->last_rx = jiffies;
 			tp->stats.rx_bytes += pkt_size;
 			tp->stats.rx_packets++;
 		} else {

@@ -6,7 +6,7 @@
  *   Copyright Digital Equipment Corporation 1996.
  *
  *   This software may be used and distributed according to the terms of
- *   the GNU Public License, incorporated herein by reference.
+ *   the GNU General Public License, incorporated herein by reference.
  *
  * Abstract:
  *   A Linux device driver supporting the Digital Equipment Corporation
@@ -207,7 +207,7 @@
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
@@ -2861,7 +2861,7 @@ static void dfx_rcv_queue_process(
 					netif_rx(skb);
 
 					/* Update the rcv counters */
-
+					bp->dev->last_rx = jiffies;
 					bp->rcv_total_frames++;
 					if (*(p_buff + RCV_BUFF_K_DA) & 0x01)
 						bp->rcv_multicast_frames++;

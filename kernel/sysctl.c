@@ -318,8 +318,10 @@ int do_sysctl(int *name, int nlen, void *oldval, size_t *oldlenp,
 {
 	struct list_head *tmp;
 
-	if (nlen == 0 || nlen >= CTL_MAXNAME)
+	if (nlen <= 0 || nlen >= CTL_MAXNAME)
 		return -ENOTDIR;
+	if ((int) newlen < 0)
+		return -EINVAL;
 	if (oldval) {
 		int old_len;
 		if (!oldlenp || get_user(old_len, oldlenp))

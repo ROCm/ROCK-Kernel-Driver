@@ -116,9 +116,8 @@ int request_dma(unsigned int dmanr, const char *device_id)
 	return -EINVAL;
 }
 
-int free_dma(unsigned int dmanr)
+void free_dma(unsigned int dmanr)
 {
-	return -EINVAL;
 }
 
 int get_dma_list(char *buf)

@@ -3,7 +3,7 @@
 
   Sun3 Lance ethernet driver, by Sam Creasey (sammy@users.qual.net).  
   This driver is a part of the linux kernel, and is thus distributed
-  under the GNU Public License.
+  under the GNU General Public License.
   
   The values used in LANCE_OBIO and LANCE_IRQ seem to be empirically
   true for the correct IRQ and address of the lance registers.  They
@@ -31,7 +31,7 @@ static char *version = "sun3lance.c: v1.1 11/17/1999  Sam Creasey (sammy@oh.veri
 #include <linux/string.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -780,8 +780,9 @@ static int lance_rx( struct net_device *dev )
 
 				skb->protocol = eth_type_trans( skb, dev );
 				netif_rx( skb );
+				dev->last_rx = jiffies;
 				lp->stats.rx_packets++;
-				lp->stats.rx_bytes += skb->len;
+				lp->stats.rx_bytes += pkt_len;
 			}
 		}
 

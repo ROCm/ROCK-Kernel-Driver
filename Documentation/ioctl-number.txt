@@ -82,6 +82,7 @@ Code	Seq#	Include File		Comments
 'B'	C0-FF				advanced bbus
 					<mailto:maassen@uni-freiburg.de>
 'C'	all	linux/soundcard.h
+'D'	all	asm-s390/dasd.h
 'F'	all	linux/fb.h
 'I'	all	linux/isdn.h
 'J'	00-1F	drivers/scsi/gdth_ioctl.h

@@ -15,7 +15,7 @@
  *  assistance and perserverance with the testing of this driver.
  *
  *  This software may be used and distributed according to the terms
- *  of the GNU Public License, incorporated herein by reference.
+ *  of the GNU General Public License, incorporated herein by reference.
  * 
  *  4/27/99 - Alpha Release 0.1.0
  *            First release to the public
@@ -210,6 +210,8 @@ well be fixed with
 			}
 
 			olympic_priv=kmalloc(sizeof (struct olympic_private), GFP_KERNEL);
+			if (!olympic_priv)
+				return 0;
 			memset(olympic_priv, 0, sizeof(struct olympic_private));
 			init_waitqueue_head(&olympic_priv->srb_wait);
 			init_waitqueue_head(&olympic_priv->trb_wait);
@@ -766,6 +768,7 @@ static void olympic_rx(struct net_device *dev)
 						skb->protocol = tr_type_trans(skb,dev);
 						netif_rx(skb) ; 
 					} 
+					dev->last_rx = jiffies ;
 					olympic_priv->olympic_stats.rx_packets++ ; 
 					olympic_priv->olympic_stats.rx_bytes += length ; 
 				} /* if skb == null */
@@ -1276,6 +1279,7 @@ static void olympic_arb_cmd(struct net_device *dev)
 		mac_frame->dev = dev ; 
 		mac_frame->protocol = tr_type_trans(mac_frame,dev);
 		netif_rx(mac_frame) ; 	
+		dev->last_rx = jiffies ;
 
 		/* Now tell the card we have dealt with the received frame */
 

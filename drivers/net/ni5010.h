@@ -2,7 +2,7 @@
  * Racal-Interlan ni5010 Ethernet definitions
  *
  * This is an extension to the Linux operating system, and is covered by the
- * same Gnu Public License that covers that work.
+ * same GNU General Public License that covers that work.
  *
  * copyrights (c) 1996 by Jan-Pascal van Best (jvbest@wi.leidenuniv.nl)
  *

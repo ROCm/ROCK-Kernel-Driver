@@ -3148,6 +3148,7 @@ struct fch_hdr fch;
 	if (skb->protocol == ntohs(ETH_P_ARP))
 		skb->data[1] = 0x06;
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	fi->fc_stats.rx_packets++;
 	LEAVE("rx_net_packet");
 }
@@ -3168,6 +3169,7 @@ struct fch_hdr fch;
 	skb->protocol = fc_type_trans(skb, dev);
 	DPRINTK("protocol = %x", skb->protocol);
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	LEAVE("rx_net_mfs_packet");
 }
 

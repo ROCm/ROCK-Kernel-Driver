@@ -117,6 +117,8 @@ struct agp_bridge_data {
 	int (*remove_memory) (agp_memory *, off_t, int);
 	agp_memory *(*alloc_by_type) (size_t, int);
 	void (*free_by_type) (agp_memory *);
+	unsigned long (*agp_alloc_page) (void);
+	void (*agp_destroy_page) (unsigned long);
 };
 
 #define OUTREG32(mmap, addr, val)   __raw_writel((val), (mmap)+(addr))
@@ -203,6 +205,24 @@ struct agp_bridge_data {
 #ifndef PCI_DEVICE_ID_AL_M1541_0
 #define PCI_DEVICE_ID_AL_M1541_0	0x1541
 #endif
+#ifndef PCI_DEVICE_ID_AL_M1621_0
+#define PCI_DEVICE_ID_AL_M1621_0	0x1621
+#endif
+#ifndef PCI_DEVICE_ID_AL_M1631_0
+#define PCI_DEVICE_ID_AL_M1631_0	0x1631
+#endif
+#ifndef PCI_DEVICE_ID_AL_M1632_0
+#define PCI_DEVICE_ID_AL_M1632_0	0x1632
+#endif
+#ifndef PCI_DEVICE_ID_AL_M1641_0
+#define PCI_DEVICE_ID_AL_M1641_0	0x1641
+#endif
+#ifndef PCI_DEVICE_ID_AL_M1647_0
+#define PCI_DEVICE_ID_AL_M1647_0	0x1647
+#endif
+#ifndef PCI_DEVICE_ID_AL_M1651_0
+#define PCI_DEVICE_ID_AL_M1651_0	0x1651
+#endif
 
 /* intel register */
 #define INTEL_APBASE    0x10
@@ -267,5 +287,9 @@ struct agp_bridge_data {
 #define ALI_AGPCTRL	0xb8
 #define ALI_ATTBASE	0xbc
 #define ALI_TLBCTRL	0xc0
+#define ALI_TAGCTRL	0xc4
+#define ALI_CACHE_FLUSH_CTRL	0xD0
+#define ALI_CACHE_FLUSH_ADDR_MASK	0xFFFFF000
+#define ALI_CACHE_FLUSH_EN	0x100
 
 #endif				/* _AGP_BACKEND_PRIV_H */

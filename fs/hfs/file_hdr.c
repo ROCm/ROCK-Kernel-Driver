@@ -2,7 +2,7 @@
  * linux/fs/hfs/file_hdr.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
- * This file may be distributed under the terms of the GNU Public License.
+ * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains the file_ops and inode_ops for the metadata
  * files under the AppleDouble and Netatalk representations.
@@ -348,9 +348,9 @@ static void set_dates(struct hfs_cat_entry *entry, struct inode *inode,
  * This is the read field in the inode_operations structure for
  * header files.  The purpose is to transfer up to 'count' bytes
  * from the file corresponding to 'inode', beginning at
- * 'filp->offset' bytes into the file.	The data is transfered to
+ * 'filp->offset' bytes into the file.	The data is transferred to
  * user-space at the address 'buf'.  Returns the number of bytes
- * successfully transfered.
+ * successfully transferred.
  */
 /* XXX: what about the entry count changing on us? */
 static hfs_rwret_t hdr_read(struct file * filp, char * buf, 

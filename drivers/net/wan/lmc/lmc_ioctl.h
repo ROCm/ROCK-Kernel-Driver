@@ -13,7 +13,7 @@
   * Matt Thomas (matt@3am-software.com).
   *
   * This software may be used and distributed according to the terms
-  * of the GNU Public License version 2, incorporated herein by reference.
+  * of the GNU General Public License version 2, incorporated herein by reference.
   */
 
 #define LMCIOCGINFO             SIOCDEVPRIVATE+3 /* get current state */

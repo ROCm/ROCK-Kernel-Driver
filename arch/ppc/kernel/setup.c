@@ -12,6 +12,7 @@
 #include <linux/delay.h>
 #include <linux/blk.h>
 #include <linux/ide.h>
+#include <linux/tty.h>
 #include <linux/bootmem.h>
 
 #include <asm/init.h>
