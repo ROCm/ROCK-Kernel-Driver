@@ -18,6 +18,21 @@ CONFIG_QFMT_V2
   need this functionality say Y here. Note that you will need latest
   quota utilities for new quota format with this kernel.
 
+CONFIG_QIFACE_COMPAT
+  This option will enable old quota interface in kernel.
+  If you have old quota tools (version <= 3.04) and you don't want to
+  upgrade them say Y here.
+
+CONFIG_QIFACE_V1
+  This is the oldest quota interface. It was used for old quota format.
+  If you have old quota tools and you use old quota format choose this
+  interface (if unsure, this interface is the best one to choose).
+
+CONFIG_QIFACE_V2
+  This quota interface was used by VFS v0 quota format. If you need
+  support for VFS v0 quota format (eg. you're using quota on ReiserFS)
+  and you don't want to upgrade quota tools, choose this interface.
+
 CONFIG_MINIX_FS
   Minix is a simple operating system used in many classes about OS's.
   The minix file system (method to organize files on a hard disk

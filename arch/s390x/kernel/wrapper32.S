@@ -586,7 +586,7 @@ sys32_quotactl_wrapper:
 	llgtr	%r3,%r3			# const char *
 	lgfr	%r4,%r4			# int
 	llgtr	%r5,%r5			# caddr_t
-	jg	sys_quotactl		# branch to system call
+	jg	sys32_quotactl		# branch to system call
 
 	.globl  sys32_getpgid_wrapper 
 sys32_getpgid_wrapper:
