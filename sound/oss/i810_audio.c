@@ -1080,31 +1080,41 @@ static void __i810_update_lvi(struct i810_state *state, int rec)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	int x, port;
-	
-	port = state->card->iobase;
-	if(rec)
-		port += dmabuf->read_channel->port;
-	else
-		port += dmabuf->write_channel->port;
+	int trigger;
+	int count, fragsize;
+	void (*start)(struct i810_state *);
 
-	if (!dmabuf->enable && dmabuf->ready) {
-		if(rec && dmabuf->count < dmabuf->dmasize &&
-		   (dmabuf->trigger & PCM_ENABLE_INPUT))
-		{
-			__start_adc(state);
-			while( !(inb(port + OFF_CR) & ((1<<4) | (1<<2))) ) ;
-		} else if (!rec && dmabuf->count &&
-			   (dmabuf->trigger & PCM_ENABLE_OUTPUT))
-		{
-			__start_dac(state);
-			while( !(inb(port + OFF_CR) & ((1<<4) | (1<<2))) ) ;
-		}
+	count = dmabuf->count;
+	port = state->card->iobase;
+	if (rec) {
+		port += dmabuf->read_channel->port;
+		trigger = PCM_ENABLE_INPUT;
+		start = __start_adc;
+		count = dmabuf->dmasize - count;
+	} else {
+		port += dmabuf->write_channel->port;
+		trigger = PCM_ENABLE_OUTPUT;
+		start = __start_dac;
 	}
 
-	/* swptr - 1 is the tail of our transfer */
-	x = (dmabuf->dmasize + dmabuf->swptr - 1) % dmabuf->dmasize;
-	x /= dmabuf->fragsize;
-	outb(x, port+OFF_LVI);
+	/* Do not process partial fragments. */
+	fragsize = dmabuf->fragsize;
+	if (count < fragsize)
+		return;
+
+	if (!dmabuf->enable && dmabuf->ready) {
+		if (!(dmabuf->trigger & trigger))
+			return;
+
+		start(state);
+		while (!(inb(port + OFF_CR) & ((1<<4) | (1<<2))))
+			;
+	}
+
+	/* MASKP2(swptr, fragsize) - 1 is the tail of our transfer */
+	x = MODULOP2(MASKP2(dmabuf->swptr, fragsize) - 1, dmabuf->dmasize);
+	x /= fragsize;
+	outb(x, port + OFF_LVI);
 }
 
 static void i810_update_lvi(struct i810_state *state, int rec)
@@ -1124,13 +1134,17 @@ static void i810_update_ptr(struct i810_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	unsigned hwptr;
+	unsigned fragmask, dmamask;
 	int diff;
 
-	/* error handling and process wake up for DAC */
+	fragmask = MASKP2(~0, dmabuf->fragsize);
+	dmamask = MODULOP2(~0, dmabuf->dmasize);
+
+	/* error handling and process wake up for ADC */
 	if (dmabuf->enable == ADC_RUNNING) {
 		/* update hardware pointer */
-		hwptr = i810_get_dma_addr(state, 1);
-		diff = (dmabuf->dmasize + hwptr - dmabuf->hwptr) % dmabuf->dmasize;
+		hwptr = i810_get_dma_addr(state, 1) & fragmask;
+		diff = (hwptr - dmabuf->hwptr) & dmamask;
 #if defined(DEBUG_INTERRUPTS) || defined(DEBUG_MMAP)
 		printk("ADC HWP %d,%d,%d\n", hwptr, dmabuf->hwptr, diff);
 #endif
@@ -1148,14 +1162,14 @@ static void i810_update_ptr(struct i810_state *state)
 				dmabuf->error++;
 			}
 		}
-		if (dmabuf->count > dmabuf->userfragsize)
+		if (diff)
 			wake_up(&dmabuf->wait);
 	}
 	/* error handling and process wake up for DAC */
 	if (dmabuf->enable == DAC_RUNNING) {
 		/* update hardware pointer */
-		hwptr = i810_get_dma_addr(state, 0);
-		diff = (dmabuf->dmasize + hwptr - dmabuf->hwptr) % dmabuf->dmasize;
+		hwptr = i810_get_dma_addr(state, 0) & fragmask;
+		diff = (hwptr - dmabuf->hwptr) & dmamask;
 #if defined(DEBUG_INTERRUPTS) || defined(DEBUG_MMAP)
 		printk("DAC HWP %d,%d,%d\n", hwptr, dmabuf->hwptr, diff);
 #endif
@@ -1178,7 +1192,7 @@ static void i810_update_ptr(struct i810_state *state)
 				dmabuf->error++;
 			}
 		}
-		if (dmabuf->count < (dmabuf->dmasize-dmabuf->userfragsize))
+		if (diff)
 			wake_up(&dmabuf->wait);
 	}
 }
@@ -1195,7 +1209,6 @@ static inline int i810_get_free_write_space(struct i810_state *state)
 		dmabuf->swptr = dmabuf->hwptr;
 	}
 	free = dmabuf->dmasize - dmabuf->count;
-	free -= (dmabuf->hwptr % dmabuf->fragsize);
 	if(free < 0)
 		return(0);
 	return(free);
@@ -1213,10 +1226,25 @@ static inline int i810_get_available_read_data(struct i810_state *state)
 		dmabuf->swptr = dmabuf->hwptr;
 	}
 	avail = dmabuf->count;
-	avail -= (dmabuf->hwptr % dmabuf->fragsize);
 	if(avail < 0)
 		return(0);
 	return(avail);
+}
+
+static inline void fill_partial_frag(struct dmabuf *dmabuf)
+{
+	unsigned fragsize;
+	unsigned swptr, len;
+
+	fragsize = dmabuf->fragsize;
+	swptr = dmabuf->swptr;
+	len = fragsize - MODULOP2(dmabuf->swptr, fragsize);
+	if (len == fragsize)
+		return;
+
+	memset(dmabuf->rawbuf + swptr, '\0', len);
+	dmabuf->swptr = MODULOP2(swptr + len, dmabuf->dmasize);
+	dmabuf->count += len;
 }
 
 static int drain_dac(struct i810_state *state, int signals_allowed)
@@ -1233,6 +1261,22 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
 		stop_dac(state);
 		return 0;
 	}
+
+	spin_lock_irqsave(&state->card->lock, flags);
+
+	fill_partial_frag(dmabuf);
+
+	/* 
+	 * This will make sure that our LVI is correct, that our
+	 * pointer is updated, and that the DAC is running.  We
+	 * have to force the setting of dmabuf->trigger to avoid
+	 * any possible deadlocks.
+	 */
+	dmabuf->trigger = PCM_ENABLE_OUTPUT;
+	i810_update_lvi(state, 0);
+
+	spin_unlock_irqrestore(&state->card->lock, flags);
+
 	add_wait_queue(&dmabuf->wait, &wait);
 	for (;;) {
 
@@ -1255,16 +1299,6 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
 		if (count <= 0)
 			break;
 
-		/* 
-		 * This will make sure that our LVI is correct, that our
-		 * pointer is updated, and that the DAC is running.  We
-		 * have to force the setting of dmabuf->trigger to avoid
-		 * any possible deadlocks.
-		 */
-		if(!dmabuf->enable) {
-			dmabuf->trigger = PCM_ENABLE_OUTPUT;
-			i810_update_lvi(state,0);
-		}
                 if (signal_pending(current) && signals_allowed) {
                         break;
                 }
@@ -1349,11 +1383,10 @@ static void i810_channel_interrupt(struct i810_card *card)
 			if(status & DMA_INT_DCH)
 				printk("DCH -");
 #endif
-			if(dmabuf->enable & DAC_RUNNING)
-				count = dmabuf->count;
-			else
-				count = dmabuf->dmasize - dmabuf->count;
-			if(count > 0) {
+			count = dmabuf->count;
+			if(dmabuf->enable & ADC_RUNNING)
+				count = dmabuf->dmasize - count;
+			if (count >= (int)dmabuf->fragsize) {
 				outb(inb(port+OFF_CR) | 1, port+OFF_CR);
 #ifdef DEBUG_INTERRUPTS
 				printk(" CONTINUE ");
@@ -1525,7 +1558,7 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 			goto done;
 		}
 
-		swptr = (swptr + cnt) % dmabuf->dmasize;
+		swptr = MODULOP2(swptr + cnt, dmabuf->dmasize);
 
 		spin_lock_irqsave(&card->lock, flags);
 
@@ -1559,7 +1592,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 	ssize_t ret;
 	unsigned long flags;
 	unsigned int swptr = 0;
-	int cnt, x;
+	int cnt;
         DECLARE_WAITQUEUE(waita, current);
 
 #ifdef DEBUG2
@@ -1682,10 +1715,6 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 		buffer += cnt;
 		ret += cnt;
 		spin_unlock_irqrestore(&state->card->lock, flags);
-	}
-	if (swptr % dmabuf->fragsize) {
-		x = dmabuf->fragsize - (swptr % dmabuf->fragsize);
-		memset(dmabuf->rawbuf + swptr, '\0', x);
 	}
 ret:
 	i810_update_lvi(state,0);
