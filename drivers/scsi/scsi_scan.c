@@ -1758,7 +1758,7 @@ int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 	shost = scsi_host_hn_get(host);
 	if (!shost)
 		return -ENODEV;
-	if(scsi_find_device(shost, channel, id, lun) != NULL)
+	if(scsi_find_device(shost, channel, id, lun) == NULL)
 		goto out;
 
 	if (scsi_probe_and_add_lun(shost, NULL, channel, id, lun, NULL) ==
