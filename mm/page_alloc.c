@@ -595,6 +595,18 @@ unsigned int nr_used_zone_pages(void)
 	return pages;
 }
 
+#ifdef CONFIG_NUMA
+unsigned int nr_free_pages_pgdat(pg_data_t *pgdat)
+{
+	unsigned int i, sum = 0;
+
+	for (i = 0; i < MAX_NR_ZONES; i++)
+		sum += pgdat->node_zones[i].free_pages;
+
+	return sum;
+}
+#endif
+
 static unsigned int nr_free_zone_pages(int offset)
 {
 	pg_data_t *pgdat;
@@ -721,6 +733,19 @@ void si_meminfo(struct sysinfo *val)
 #endif
 	val->mem_unit = PAGE_SIZE;
 }
+
+#ifdef CONFIG_NUMA
+void si_meminfo_node(struct sysinfo *val, int nid)
+{
+	pg_data_t *pgdat = NODE_DATA(nid);
+
+	val->totalram = pgdat->node_size;
+	val->freeram = nr_free_pages_pgdat(pgdat);
+	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].spanned_pages;
+	val->freehigh = pgdat->node_zones[ZONE_HIGHMEM].free_pages;
+	val->mem_unit = PAGE_SIZE;
+}
+#endif
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
 

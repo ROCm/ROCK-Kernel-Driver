@@ -35,6 +35,34 @@ static ssize_t node_read_cpumap(struct device * dev, char * buf, size_t count, l
 }
 static DEVICE_ATTR(cpumap,S_IRUGO,node_read_cpumap,NULL);
 
+#define K(x) ((x) << (PAGE_SHIFT - 10))
+static ssize_t node_read_meminfo(struct device * dev, char * buf, size_t count, loff_t off)
+{
+	struct sys_root *node = to_root(dev);
+	int nid = node->id;
+	struct sysinfo i;
+	si_meminfo_node(&i, nid);
+	return off ? 0 : sprintf(buf, "\n"
+			"Node %d MemTotal:     %8lu kB\n"
+			"Node %d MemFree:      %8lu kB\n"
+			"Node %d MemUsed:      %8lu kB\n"
+			"Node %d HighTotal:    %8lu kB\n"
+			"Node %d HighFree:     %8lu kB\n"
+			"Node %d LowTotal:     %8lu kB\n"
+			"Node %d LowFree:      %8lu kB\n",
+			nid, K(i.totalram),
+			nid, K(i.freeram),
+			nid, K(i.totalram-i.freeram),
+			nid, K(i.totalhigh),
+			nid, K(i.freehigh),
+			nid, K(i.totalram-i.totalhigh),
+			nid, K(i.freeram-i.freehigh));
+
+	return 0;
+}
+#undef K 
+static DEVICE_ATTR(meminfo,S_IRUGO,node_read_meminfo,NULL);
+
 
 /*
  * register_node - Setup a driverfs device for a node.
@@ -54,6 +82,7 @@ void __init register_node(struct node *node, int num, struct node *parent)
 	node->sysroot.dev.bus = &system_bus_type;
 	if (!sys_register_root(&node->sysroot)){
 		device_create_file(&node->sysroot.dev, &dev_attr_cpumap);
+		device_create_file(&node->sysroot.dev, &dev_attr_meminfo);
 	}
 }
 
