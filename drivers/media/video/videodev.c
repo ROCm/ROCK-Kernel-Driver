@@ -254,7 +254,7 @@ int video_exclusive_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-extern struct file_operations video_fops;
+static struct file_operations video_fops;
 
 /**
  *	video_register_device - register video4linux devices
