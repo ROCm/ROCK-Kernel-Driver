@@ -82,6 +82,8 @@ struct request_list {
 	wait_queue_head_t wait[2];
 };
 
+#define BLK_MAX_CDB	16
+
 /*
  * try to put the fields that are referenced together in the same cacheline
  */
@@ -147,7 +149,7 @@ struct request {
 	 * when request is used as a packet command carrier
 	 */
 	unsigned int cmd_len;
-	unsigned char cmd[16];
+	unsigned char cmd[BLK_MAX_CDB];
 
 	unsigned int data_len;
 	void *data;

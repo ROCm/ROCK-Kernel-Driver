@@ -150,6 +150,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	struct request *rq;
 	struct bio *bio;
 	char sense[SCSI_SENSE_BUFFERSIZE];
+	unsigned char cdb[BLK_MAX_CDB];
 	void *buffer;
 
 	if (hdr->interface_id != 'S')
@@ -165,6 +166,9 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 
 	if (hdr->dxfer_len > (q->max_sectors << 9))
 		return -EIO;
+
+	if (copy_from_user(cdb, hdr->cmdp, hdr->cmd_len))
+		return -EFAULT;
 
 	reading = writing = 0;
 	buffer = NULL;
@@ -216,7 +220,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	 * fill in request structure
 	 */
 	rq->cmd_len = hdr->cmd_len;
-	memcpy(rq->cmd, hdr->cmdp, hdr->cmd_len);
+	memcpy(rq->cmd, cdb, hdr->cmd_len);
 	if (sizeof(rq->cmd) != hdr->cmd_len)
 		memset(rq->cmd + hdr->cmd_len, 0, sizeof(rq->cmd) - hdr->cmd_len);
 
