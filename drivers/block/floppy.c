@@ -135,6 +135,10 @@
  * requires many non-obvious changes in arch dependent code.
  */
 
+/* 2003/07/28 -- Daniele Bellucci <bellucda@tiscali.it>.
+ * Better audit of register_blkdev.
+ */
+
 #define FLOPPY_SANITY_CHECK
 #undef  FLOPPY_SILENT_DCL_CLEAR
 
@@ -4260,10 +4264,8 @@ int __init floppy_init(void)
 	}
 
 	devfs_mk_dir ("floppy");
-	if (register_blkdev(FLOPPY_MAJOR,"fd")) {
-		err = -EBUSY;
+	if ((err = register_blkdev(FLOPPY_MAJOR,"fd")))
 		goto out;
-	}
 
 	floppy_queue = blk_init_queue(do_fd_request, &floppy_lock);
 	blk_queue_max_sectors(floppy_queue, 64);
