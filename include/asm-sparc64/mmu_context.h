@@ -143,6 +143,8 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 
 extern void __flush_tlb_mm(unsigned long, unsigned long);
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 /* Activate a new MM instance for the current task. */
 static inline void activate_mm(struct mm_struct *active_mm, struct mm_struct *mm)
 {

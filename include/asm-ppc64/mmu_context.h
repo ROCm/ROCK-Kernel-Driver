@@ -146,6 +146,8 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	set_bit(cpu, &next->cpu_vm_mask);
 }
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 /*
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.
