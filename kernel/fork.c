@@ -23,6 +23,7 @@
 #include <linux/personality.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
+#include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/security.h>
 
@@ -181,6 +182,7 @@ static inline int dup_mmap(struct mm_struct * mm)
 {
 	struct vm_area_struct * mpnt, *tmp, **pprev;
 	int retval;
+	unsigned long charge = 0;
 
 	flush_cache_mm(current->mm);
 	mm->locked_vm = 0;
@@ -208,6 +210,17 @@ static inline int dup_mmap(struct mm_struct * mm)
 		retval = -ENOMEM;
 		if(mpnt->vm_flags & VM_DONTCOPY)
 			continue;
+
+		/*
+		 * FIXME: shared writable map accounting should be one off
+		 */
+		if (mpnt->vm_flags & VM_ACCOUNT) {
+			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
+			if (!vm_enough_memory(len))
+				goto fail_nomem;
+			charge += len;
+		}
+
 		tmp = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 		if (!tmp)
 			goto fail_nomem;
@@ -248,9 +261,12 @@ static inline int dup_mmap(struct mm_struct * mm)
 	retval = 0;
 	build_mmap_rb(mm);
 
-fail_nomem:
+out:
 	flush_tlb_mm(current->mm);
 	return retval;
+fail_nomem:
+	vm_unacct_memory(charge);
+	goto out;
 }
 
 spinlock_t mmlist_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;

@@ -149,6 +149,7 @@ enum
 	VM_DIRTY_WB_CS=14,	/* dirty_writeback_centisecs */
 	VM_DIRTY_EXPIRE_CS=15,	/* dirty_expire_centisecs */
 	VM_NR_PDFLUSH_THREADS=16, /* nr_pdflush_threads */
+	VM_OVERCOMMIT_RATIO=17, /* percent of RAM to allow overcommit in */
 };
 
 

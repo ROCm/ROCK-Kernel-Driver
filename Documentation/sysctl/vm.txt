@@ -78,7 +78,21 @@ This feature can be very useful because there are a lot of
 programs that malloc() huge amounts of memory "just-in-case"
 and don't use much of it.
 
-Look at: mm/mmap.c::vm_enough_memory() for more information.
+A value  of 2 introduces a new "strict overcommit" policy
+that attempts to prevent any overcommit of memory.
+
+The default value is 0.
+
+See Documentation/vm/overcommit-accounting and
+mm/mmap.c::vm_enough_memory() for more information.
+
+==============================================================
+
+overcommit_ratio:
+
+When overcommit_memory is set to 2, the committed address
+space is not permitted to exceed swap plus this percentage
+of physical RAM.  See above.
 
 ==============================================================
 
