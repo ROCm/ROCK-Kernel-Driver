@@ -140,7 +140,7 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	    && !test_bit(SK_CLOSE, &svsk->sk_flags)
 	    && !test_bit(SK_CONN, &svsk->sk_flags)) {
 		/* Don't enqueue while not enough space for reply */
-		dprintk("svc: socket %p  no space, %d > %ld, not enqueued\n",
+		dprintk("svc: socket %p  no space, %d*2 > %ld, not enqueued\n",
 			svsk->sk_sk, svsk->sk_reserved+serv->sv_bufsz,
 			sock_wspace(svsk->sk_sk));
 		goto out_unlock;
