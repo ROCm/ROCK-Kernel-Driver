@@ -243,7 +243,7 @@ unsigned int mii_check_media (struct mii_if_info *mii,
 
 	/* figure out media and duplex from advertise and LPA values */
 	media = mii_nway_result(lpa & advertise);
-	duplex = (media & (ADVERTISE_100FULL | ADVERTISE_10FULL)) ? 1 : 0;
+	duplex = (media & ADVERTISE_FULL) ? 1 : 0;
 
 	if (ok_to_print)
 		printk(KERN_INFO "%s: link up, %sMbps, %s-duplex, lpa 0x%04X\n",
