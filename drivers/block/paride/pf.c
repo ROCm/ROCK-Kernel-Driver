@@ -422,8 +422,20 @@ static int pf_check_media( kdev_t dev)
 {       return 1;
 }
 
-#define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
-#define	RR(c,r)		(pi_read_regr(PI,c,r))
+static inline int status_reg(int unit)
+{
+	return pi_read_regr(PI, 1, 6);
+}
+
+static inline int read_reg(int unit, int reg)
+{
+	return pi_read_regr(PI, 0, reg);
+}
+
+static inline void write_reg(int unit, int reg, int val)
+{
+	pi_write_regr(PI, 0, reg, val);
+}
 
 #define LUN             (0x20*PF.lun)
 #define DRIVE           (0xa0+0x10*PF.drive)
@@ -433,13 +445,13 @@ static int pf_wait( int unit, int go, int stop, char * fun, char * msg )
 {       int j, r, e, s, p;
 
         j = 0;
-        while ((((r=RR(1,6))&go)||(stop&&(!(r&stop))))&&(j++<PF_SPIN))
+        while ((((r=status_reg(unit))&go)||(stop&&(!(r&stop))))&&(j++<PF_SPIN))
                 udelay(PF_SPIN_DEL);
 
         if ((r&(STAT_ERR&stop))||(j>=PF_SPIN)) {
-           s = RR(0,7);
-           e = RR(0,1);
-           p = RR(0,2);
+           s = read_reg(unit, 7);
+           e = read_reg(unit, 1);
+           p = read_reg(unit, 2);
            if (j >= PF_SPIN) e |= 0x100;
            if (fun) printk("%s: %s %s: alt=0x%x stat=0x%x err=0x%x"
                            " loop=%d phase=%d\n",
@@ -453,23 +465,23 @@ static int pf_command( int unit, char * cmd, int dlen, char * fun )
 
 {       pi_connect(PI);
 
-        WR(0,6,DRIVE);
+        write_reg(unit, 6,DRIVE);
 
         if (pf_wait(unit,STAT_BUSY|STAT_DRQ,0,fun,"before command")) {
                 pi_disconnect(PI);
                 return -1;
         }
 
-        WR(0,4,dlen % 256);
-        WR(0,5,dlen / 256);
-        WR(0,7,0xa0);          /* ATAPI packet command */
+        write_reg(unit, 4,dlen % 256);
+        write_reg(unit, 5,dlen / 256);
+        write_reg(unit, 7,0xa0);          /* ATAPI packet command */
 
         if (pf_wait(unit,STAT_BUSY,STAT_DRQ,fun,"command DRQ")) {
                 pi_disconnect(PI);
                 return -1;
         }
 
-        if (RR(0,2) != 1) {
+        if (read_reg(unit, 2) != 1) {
            printk("%s: %s: command phase error\n",PF.name,fun);
            pi_disconnect(PI);
            return -1;
@@ -487,8 +499,8 @@ static int pf_completion( int unit, char * buf, char * fun )
         r = pf_wait(unit,STAT_BUSY,STAT_DRQ|STAT_READY|STAT_ERR,
 			fun,"completion");
 
-        if ((RR(0,2)&2) && (RR(0,7)&STAT_DRQ)) { 
-                n = (((RR(0,4)+256*RR(0,5))+3)&0xfffc);
+        if ((read_reg(unit, 2)&2) && (read_reg(unit, 7)&STAT_DRQ)) { 
+                n = (((read_reg(unit, 4)+256*read_reg(unit, 5))+3)&0xfffc);
                 pi_read_block(PI,buf,n);
         }
 
@@ -564,21 +576,21 @@ static int pf_reset( int unit )
 	int	expect[5] = {1,1,1,0x14,0xeb};
 
 	pi_connect(PI);
-	WR(0,6,DRIVE);
-	WR(0,7,8);
+	write_reg(unit, 6,DRIVE);
+	write_reg(unit, 7,8);
 
 	pf_sleep(20*HZ/1000);
 
         k = 0;
-        while ((k++ < PF_RESET_TMO) && (RR(1,6)&STAT_BUSY))
+        while ((k++ < PF_RESET_TMO) && (status_reg(unit)&STAT_BUSY))
                 pf_sleep(HZ/10);
 
 	flg = 1;
-	for(i=0;i<5;i++) flg &= (RR(0,i+1) == expect[i]);
+	for(i=0;i<5;i++) flg &= (read_reg(unit, i+1) == expect[i]);
 
 	if (verbose) {
 		printk("%s: Reset (%d) signature = ",PF.name,k);
-		for (i=0;i<5;i++) printk("%3x",RR(0,i+1));
+		for (i=0;i<5;i++) printk("%3x",read_reg(unit, i+1));
 		if (!flg) printk(" (incorrect)");
 		printk("\n");
 	}
@@ -762,7 +774,7 @@ static int pf_ready( void )
 
 {	int	unit = pf_unit;
 
-	return (((RR(1,6)&(STAT_BUSY|pf_mask)) == pf_mask));
+	return (((status_reg(unit)&(STAT_BUSY|pf_mask)) == pf_mask));
 }
 
 static void do_pf_request (request_queue_t * q)
