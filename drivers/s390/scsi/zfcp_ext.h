@@ -31,8 +31,8 @@
 
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
-/* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.61 $"
+
+#define ZFCP_EXT_REVISION "$Revision: 1.62 $"
 
 #include "zfcp_def.h"
 

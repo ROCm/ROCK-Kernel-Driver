@@ -83,8 +83,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.17"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.17"
+#define MPT_LINUX_VERSION_COMMON	"3.01.18"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.18"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -296,23 +296,6 @@ typedef struct _MPT_SGL64_HDR {
 	SGESimple64_t	 sge[1];
 } MPT_SGL64_HDR;
 
-
-/*
- *  Chip-specific stuff... FC929 delineates break between
- *  FC and Parallel SCSI parts. Do NOT re-order.
- */
-
-typedef enum {
-	FC919X = 0x0819,
-	FC929X = 0x0829,
-	FC909 = 0x0909,
-	FC919 = 0x0919,
-	FC929 = 0x0929,
-	C1030 = 0x1030,
-	C1035 = 0x1035,
-	FCUNK = 0xFBAD
-} CHIP_TYPE;
-
 /*
  *  System interface register set
  */
@@ -517,6 +500,7 @@ typedef struct _MPT_ADAPTER
 	char			*prod_name;	/* "LSIFC9x9"         */
 	SYSIF_REGS __iomem	*chip;		/* == c8817000 (mmap) */
 	SYSIF_REGS __iomem	*pio_chip;	/* Programmed IO (downloadboot) */
+	u8			 bus_type;
 	u32			 mem_phys;	/* == f4020000 (mmap) */
 	u32			 pio_mem_phys;	/* Programmed IO (downloadboot) */
 	int			 mem_size;	/* mmap memory size */
@@ -543,7 +527,6 @@ typedef struct _MPT_ADAPTER
 	dma_addr_t		 ChainBufferDMA;
 	struct list_head	 FreeChainQ;
 	spinlock_t		 FreeChainQlock;
-	CHIP_TYPE		 chip_type;
 		/* We (host driver) get to manage our own RequestQueue! */
 	dma_addr_t		 req_frames_dma;
 	MPT_FRAME_HDR		*req_frames;	/* Request msg frames - rounded up! */
@@ -573,12 +556,6 @@ typedef struct _MPT_ADAPTER
 	int			 eventTypes;	/* Event logging parameters */
 	int			 eventContext;	/* Next event context */
 	int			 eventLogSize;	/* Max number of cached events */
-#ifdef MPTSCSIH_DBG_TIMEOUT
-	int			timeout_hard;
-	int			timeout_delta;
-	int			timeout_cnt;
-	int			timeout_maxcnt;
-#endif
 	struct _mpt_ioctl_events *events;	/* pointer to event log */
 	u8			*cached_fw;	/* Pointer to FW */
 	dma_addr_t	 	cached_fw_dma;
@@ -894,6 +871,12 @@ typedef struct _MPT_LOCAL_REPLY {
 #define	TM_STATE_IN_PROGRESS   (1)
 #define	TM_STATE_ERROR	       (2)
 
+typedef enum {
+	FC,
+	SCSI,
+	SAS
+} BUS_TYPE;
+
 typedef struct _MPT_SCSI_HOST {
 	MPT_ADAPTER		 *ioc;
 	int			  port;
@@ -909,7 +892,6 @@ typedef struct _MPT_SCSI_HOST {
 		 */
 	u8			  tmPending;
 	u8			  resetPending;
-	u8			  is_spi;		/* Parallel SCSI i/f */
 	u8			  negoNvram;		/* DV disabled, nego NVRAM */
 	u8			  pad1;
 	u8                        tmState;

@@ -805,6 +805,8 @@ struct aac_adapter_info
 #define AAC_OPT_SGMAP_HOST64		cpu_to_le32(1<<10)
 #define AAC_OPT_ALARM			cpu_to_le32(1<<11)
 #define AAC_OPT_NONDASD			cpu_to_le32(1<<12)
+#define AAC_OPT_SCSI_MANAGED    	cpu_to_le32(1<<13)
+#define AAC_OPT_RAID_SCSI_MODE		cpu_to_le32(1<<14)
 
 struct aac_dev
 {
@@ -877,6 +879,7 @@ struct aac_dev
 	 */
 	u8			nondasd_support; 
 	u8			dac_support;
+	u8			raid_scsi_mode;
 };
 
 #define aac_adapter_interrupt(dev) \

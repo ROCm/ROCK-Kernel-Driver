@@ -30,8 +30,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.86 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.88 $"
 
 #include "zfcp_ext.h"
 
@@ -1737,7 +1736,7 @@ zfcp_fsf_send_els(struct zfcp_send_els *els)
 	adapter = els->adapter;
 
         ret = zfcp_fsf_req_create(adapter, FSF_QTCB_SEND_ELS,
-				  ZFCP_WAIT_FOR_SBAL|ZFCP_REQ_AUTO_CLEANUP,
+				  ZFCP_REQ_AUTO_CLEANUP,
 				  NULL, &lock_flags, &fsf_req);
 	if (ret < 0) {
                 ZFCP_LOG_INFO("error: creation of ELS request failed "
@@ -3094,56 +3093,10 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 	exclusive = bottom->lun_access_info & FSF_UNIT_ACCESS_EXCLUSIVE;
 	readwrite = bottom->lun_access_info & FSF_UNIT_ACCESS_OUTBOUND_TRANSFER;
 
-	if (!adapter->supported_features & FSF_FEATURE_CFDC)
-		goto no_cfdc;
-
 	atomic_clear_mask(ZFCP_STATUS_COMMON_ACCESS_DENIED |
 			  ZFCP_STATUS_UNIT_SHARED |
 			  ZFCP_STATUS_UNIT_READONLY,
 			  &unit->status);
-
-	if (!allowed)
-		atomic_set_mask(ZFCP_STATUS_COMMON_ACCESS_DENIED, &unit->status);
-
-	if (!adapter->supported_features & FSF_FEATURE_LUN_SHARING)
-		goto no_lun_sharing;
-
-	if (!exclusive)
-		atomic_set_mask(ZFCP_STATUS_UNIT_SHARED, &unit->status);
-
-	if (!readwrite) {
-		atomic_set_mask(ZFCP_STATUS_UNIT_READONLY, &unit->status);
-		ZFCP_LOG_NORMAL("Unit 0x%016Lx on port 0x%016Lx on adapter %s "
-				"accessed read-only\n", unit->fcp_lun,
-				unit->port->wwpn, zfcp_get_busid_by_unit(unit));
-	}
-
-	if (exclusive && !readwrite) {
-		ZFCP_LOG_NORMAL("Exclusive access of read-only unit not "
-				"supported\n");
-		zfcp_erp_unit_failed(unit);
-		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
-		goto skip_fsfstatus;
-	}
-	if (!exclusive && readwrite) {
-		ZFCP_LOG_NORMAL("Shared access of read-write unit is not "
-				"supported\n");
-		zfcp_erp_unit_failed(unit);
-		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
-		goto skip_fsfstatus;
-	}
-
- no_lun_sharing:
- no_cfdc:
-	if (!(adapter->supported_features & FSF_FEATURE_CFDC) &&
-	    (adapter->supported_features & FSF_FEATURE_LUN_SHARING)) {
-		ZFCP_LOG_NORMAL("LUN sharing without access control is not "
-				"supported.\n");
-		zfcp_erp_unit_failed(unit);
-		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
-		goto skip_fsfstatus;
-	}
-
 
 	/* evaluate FSF status in QTCB */
 	switch (header->fsf_status) {
@@ -3196,6 +3149,8 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 		}
 		debug_text_event(adapter->erp_dbf, 1, "fsf_s_access");
 		zfcp_erp_unit_access_denied(unit);
+		atomic_clear_mask(ZFCP_STATUS_UNIT_SHARED, &unit->status);
+                atomic_clear_mask(ZFCP_STATUS_UNIT_READONLY, &unit->status);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
