@@ -1551,7 +1551,7 @@ static int m_show(struct seq_file *m, void *p)
 	return 0;
 }
 
-/* Format: modulename size refcount deps
+/* Format: modulename size refcount deps address
 
    Where refcount is a number or -, and deps is a comma-separated list
    of depends or -.

@@ -16,7 +16,7 @@ config HOTPLUG_PCI
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pci_hotplug.o. If you want to compile it
+	  The module will be called pci_hotplug. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  When in doubt, say N.
@@ -30,7 +30,7 @@ config HOTPLUG_PCI_COMPAQ
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpqphp.o. If you want to compile it
+	  The module will be called cpqphp. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  When in doubt, say N.
@@ -54,7 +54,7 @@ config HOTPLUG_PCI_IBM
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpqphp.o. If you want to compile it
+	  The module will be called cpqphp. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  When in doubt, say N.
@@ -68,7 +68,7 @@ config HOTPLUG_PCI_ACPI
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called acpiphp.o. If you want to compile it
+	  The module will be called acpiphp. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  When in doubt, say N.
@@ -82,7 +82,7 @@ config HOTPLUG_PCI_CPCI
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpci_hotplug.o. If you want to compile it
+	  The module will be called cpci_hotplug. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  When in doubt, say N.
@@ -96,7 +96,7 @@ config HOTPLUG_PCI_CPCI_ZT5550
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpcihp_zt5550.o. If you want to compile it
+	  The module will be called cpcihp_zt5550. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  When in doubt, say N.
@@ -111,7 +111,7 @@ config HOTPLUG_PCI_CPCI_GENERIC
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpcihp_generic.o. If you want to compile it
+	  The module will be called cpcihp_generic. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  When in doubt, say N.

@@ -21,7 +21,7 @@ config INPUT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called input.o. If you want to compile it as a
+	  The module will be called input. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 comment "Userland interfaces"
@@ -41,7 +41,7 @@ config INPUT_MOUSEDEV
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mousedev.o. If you want to compile it as
+	  The module will be called mousedev. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config INPUT_MOUSEDEV_PSAUX
@@ -82,7 +82,7 @@ config INPUT_JOYDEV
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called joydev.o. If you want to compile it as a
+	  The module will be called joydev. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config INPUT_TSDEV
@@ -97,7 +97,7 @@ config INPUT_TSDEV
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tsdev.o. If you want to compile it as a
+	  The module will be called tsdev. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config INPUT_TSDEV_SCREEN_X
@@ -119,7 +119,7 @@ config INPUT_EVDEV
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called evdev.o. If you want to compile it as a
+	  The module will be called evdev. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config INPUT_EVBUG
@@ -136,7 +136,7 @@ config INPUT_EVBUG
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called joydev.o. If you want to compile it as a
+	  The module will be called joydev. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 comment "Input I/O drivers"

@@ -19,7 +19,7 @@ config USB_SERIAL
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usbserial.o. If you want to compile it
+	  The module will be called usbserial. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_DEBUG
@@ -72,7 +72,7 @@ config USB_SERIAL_BELKIN
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called belkin_sa.o.  If you want to compile it as
+	  The module will be called belkin_sa.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_WHITEHEAT
@@ -84,7 +84,7 @@ config USB_SERIAL_WHITEHEAT
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called whiteheat.o.  If you want to compile it as
+	  The module will be called whiteheat.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_DIGI_ACCELEPORT
@@ -101,7 +101,7 @@ config USB_SERIAL_DIGI_ACCELEPORT
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called digi_acceleport.o.  If you want to compile
+	  The module will be called digi_acceleport.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 
@@ -116,7 +116,7 @@ config USB_SERIAL_EMPEG
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called empeg.o. If you want to compile it as a
+	  The module will be called empeg. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_FTDI_SIO
@@ -132,7 +132,7 @@ config USB_SERIAL_FTDI_SIO
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ftdi_sio.o.  If you want to compile it as
+	  The module will be called ftdi_sio.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_VISOR
@@ -146,7 +146,7 @@ config USB_SERIAL_VISOR
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called visor.o. If you want to compile it as a
+	  The module will be called visor. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_IPAQ
@@ -160,7 +160,7 @@ config USB_SERIAL_IPAQ
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ipaq.o. If you want to compile it as a
+	  The module will be called ipaq. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_IR
@@ -173,7 +173,7 @@ config USB_SERIAL_IR
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ir-usb.o. If you want to compile it as a
+	  The module will be called ir-usb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_EDGEPORT
@@ -201,7 +201,7 @@ config USB_SERIAL_EDGEPORT
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called io_edgeport.o.  If you want to compile it
+	  The module will be called io_edgeport.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_EDGEPORT_TI
@@ -214,7 +214,7 @@ config USB_SERIAL_EDGEPORT_TI
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called io_ti.o.  If you want to compile it
+	  The module will be called io_ti.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_KEYSPAN_PDA
@@ -227,7 +227,7 @@ config USB_SERIAL_KEYSPAN_PDA
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called keyspan_pda.o. If you want to compile it
+	  The module will be called keyspan_pda. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_KEYSPAN
@@ -243,7 +243,7 @@ config USB_SERIAL_KEYSPAN
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called keyspan.o. If you want to compile it as a
+	  The module will be called keyspan. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_KEYSPAN_USA28
@@ -323,7 +323,7 @@ config USB_SERIAL_KLSI
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called kl5kusb105.o. If you want to compile it as
+	  The module will be called kl5kusb105. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_KOBIL_SCT
@@ -342,7 +342,7 @@ config USB_SERIAL_KOBIL_SCT
           Note that you need a current CT-API.
           This code is also available as a module ( = code which can be
           inserted in and removed from the running kernel whenever you want).
-          The module will be called kobil_sct.o. If you want to compile it as
+          The module will be called kobil_sct. If you want to compile it as
           a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_MCT_U232
@@ -357,7 +357,7 @@ config USB_SERIAL_MCT_U232
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mct_u232.o.  If you want to compile it as
+	  The module will be called mct_u232.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_PL2303
@@ -369,7 +369,7 @@ config USB_SERIAL_PL2303
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pl2303.o.  If you want to compile it as
+	  The module will be called pl2303.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_SAFE
@@ -390,7 +390,7 @@ config USB_SERIAL_CYBERJACK
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cyberjack.o. If you want to compile it as
+	  The module will be called cyberjack. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 	  If unsure, say N.
@@ -405,7 +405,7 @@ config USB_SERIAL_XIRCOM
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called keyspan_pda.o. If you want to compile it
+	  The module will be called keyspan_pda. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_OMNINET
@@ -416,7 +416,7 @@ config USB_SERIAL_OMNINET
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called omninet.o. If you want to compile it as a
+	  The module will be called omninet. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_EZUSB

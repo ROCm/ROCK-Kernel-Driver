@@ -18,14 +18,14 @@ config ZFTAPE
 	  module ( = code which can be inserted in and removed from the
 	  running kernel whenever you want).  In this case you should read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  zftape.o.
+	  zftape.
 
 	  Regardless of whether you say Y or M here, an additional runtime
-	  loadable module called `zft-compressor.o' which contains code to
+	  loadable module called `zft-compressor' which contains code to
 	  support user transparent on-the-fly compression based on Ross
 	  William's lzrw3 algorithm will be produced.  If you have enabled the
 	  kernel module loader (i.e. have said Y to "Kernel module loader
-	  support", above) then `zft-compressor.o' will be loaded
+	  support", above) then `zft-compressor' will be loaded
 	  automatically by zftape when needed.
 
 	  Despite its name, zftape does NOT use compression by default.  The

@@ -620,13 +620,8 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 		t = p;
 		do {
 			rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
+			
 			/*
-			 * This wakeup is only need if in TASK_STOPPED,
-			 * but there can be SMP races with testing for that.
-			 * In the normal SIGCONT case, all will be stopped.
-			 * A spuriously sent SIGCONT will interrupt all running
-			 * threads to check signals even if it's ignored.
-			 *
 			 * If there is a handler for SIGCONT, we must make
 			 * sure that no thread returns to user mode before
 			 * we post the signal, in case it was the only
@@ -636,12 +631,14 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * flag set, the thread will pause and acquire the
 			 * siglock that we hold now and until we've queued
 			 * the pending signal. 
+			 *
+			 * Wake up the stopped thread _after_ setting
+			 * TIF_SIGPENDING
 			 */
-			if (!(t->flags & PF_EXITING)) {
-				if (!sigismember(&t->blocked, SIGCONT))
-					set_tsk_thread_flag(t, TIF_SIGPENDING);
-				wake_up_process(t);
-			}
+			if (!sigismember(&t->blocked, SIGCONT))
+				set_tsk_thread_flag(t, TIF_SIGPENDING);
+			wake_up_state(t, TASK_STOPPED);
+
 			t = next_thread(t);
 		} while (t != p);
 	}
@@ -1559,6 +1556,7 @@ EXPORT_SYMBOL(kill_sl_info);
 EXPORT_SYMBOL(notify_parent);
 EXPORT_SYMBOL(send_sig);
 EXPORT_SYMBOL(send_sig_info);
+EXPORT_SYMBOL(sigprocmask);
 EXPORT_SYMBOL(block_all_signals);
 EXPORT_SYMBOL(unblock_all_signals);
 
@@ -1585,6 +1583,42 @@ long do_no_restart_syscall(struct restart_block *param)
  * used by various programs)
  */
 
+/*
+ * This is also useful for kernel threads that want to temporarily
+ * (or permanently) block certain signals.
+ *
+ * NOTE! Unlike the user-mode sys_sigprocmask(), the kernel
+ * interface happily blocks "unblockable" signals like SIGKILL
+ * and friends.
+ */
+int sigprocmask(int how, sigset_t *set, sigset_t *oldset)
+{
+	int error;
+	sigset_t old_block;
+
+	spin_lock_irq(&current->sighand->siglock);
+	old_block = current->blocked;
+	error = 0;
+	switch (how) {
+	case SIG_BLOCK:
+		sigorsets(&current->blocked, &current->blocked, set);
+		break;
+	case SIG_UNBLOCK:
+		signandsets(&current->blocked, &current->blocked, set);
+		break;
+	case SIG_SETMASK:
+		current->blocked = *set;
+		break;
+	default:
+		error = -EINVAL;
+	}
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+	if (oldset)
+		*oldset = old_block;
+	return error;
+}
+
 asmlinkage long
 sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize)
 {
@@ -1601,27 +1635,7 @@ sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize)
 			goto out;
 		sigdelsetmask(&new_set, sigmask(SIGKILL)|sigmask(SIGSTOP));
 
-		spin_lock_irq(&current->sighand->siglock);
-		old_set = current->blocked;
-
-		error = 0;
-		switch (how) {
-		default:
-			error = -EINVAL;
-			break;
-		case SIG_BLOCK:
-			sigorsets(&new_set, &old_set, &new_set);
-			break;
-		case SIG_UNBLOCK:
-			signandsets(&new_set, &old_set, &new_set);
-			break;
-		case SIG_SETMASK:
-			break;
-		}
-
-		current->blocked = new_set;
-		recalc_sigpending();
-		spin_unlock_irq(&current->sighand->siglock);
+		error = sigprocmask(how, &new_set, &old_set);
 		if (error)
 			goto out;
 		if (oset)

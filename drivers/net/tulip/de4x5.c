@@ -440,7 +440,7 @@
     =========================================================================
 */
 
-static const char *version = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.com\n";
+static char version[] __initdata = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.com\n";
 
 #include <linux/config.h>
 #include <linux/module.h>

@@ -21,7 +21,7 @@ config PARIDE_PD
 	  connected through a parallel port. If you chose to build PARIDE
 	  support into your kernel, you may answer Y here to build in the
 	  parallel port IDE driver, otherwise you should answer M to build
-	  it as a loadable module. The module will be called pd.o. You
+	  it as a loadable module. The module will be called pd. You
 	  must also have at least one parallel port protocol driver in your
 	  system. Among the devices supported by this driver are the SyQuest
 	  EZ-135, EZ-230 and SparQ drives, the Avatar Shark and the backpack
@@ -35,7 +35,7 @@ config PARIDE_PCD
 	  connected through a parallel port. If you chose to build PARIDE
 	  support into your kernel, you may answer Y here to build in the
 	  parallel port ATAPI CD-ROM driver, otherwise you should answer M to
-	  build it as a loadable module. The module will be called pcd.o. You
+	  build it as a loadable module. The module will be called pcd. You
 	  must also have at least one parallel port protocol driver in your
 	  system. Among the devices supported by this driver are the
 	  MicroSolutions backpack CD-ROM drives and the Freecom Power CD. If
@@ -51,7 +51,7 @@ config PARIDE_PF
 	  connected through a parallel port. If you chose to build PARIDE
 	  support into your kernel, you may answer Y here to build in the
 	  parallel port ATAPI disk driver, otherwise you should answer M
-	  to build it as a loadable module. The module will be called pf.o.
+	  to build it as a loadable module. The module will be called pf.
 	  You must also have at least one parallel port protocol driver in
 	  your system. Among the devices supported by this driver are the
 	  MicroSolutions backpack PD/CD drive and the Imation Superdisk
@@ -65,7 +65,7 @@ config PARIDE_PT
 	  connected through a parallel port. If you chose to build PARIDE
 	  support into your kernel, you may answer Y here to build in the
 	  parallel port ATAPI disk driver, otherwise you should answer M
-	  to build it as a loadable module. The module will be called pt.o.
+	  to build it as a loadable module. The module will be called pt.
 	  You must also have at least one parallel port protocol driver in
 	  your system. Among the devices supported by this driver is the
 	  parallel port version of the HP 5GB drive.
@@ -82,7 +82,7 @@ config PARIDE_PG
 	  If you chose to build PARIDE support into your kernel, you may
 	  answer Y here to build in the parallel port generic ATAPI driver,
 	  otherwise you should answer M to build it as a loadable module. The
-	  module will be called pg.o.
+	  module will be called pg.
 
 	  You must also have at least one parallel port protocol driver in
 	  your system.
@@ -106,7 +106,7 @@ config PARIDE_ATEN
 	  parallel port kits made in Hong Kong. If you chose to build PARIDE
 	  support into your kernel, you may answer Y here to build in the
 	  protocol driver, otherwise you should answer M to build it as a
-	  loadable module. The module will be called aten.o. You must also
+	  loadable module. The module will be called aten. You must also
 	  have a high-level driver for the type of device that you want to
 	  support.
 
@@ -125,7 +125,7 @@ config PARIDE_BPCK
 	  If you chose to build PARIDE support into your kernel, you may
 	  answer Y here to build in the protocol driver, otherwise you should
 	  answer M to build it as a loadable module.  The module will be
-	  called bpck.o.  You must also have a high-level driver for the type
+	  called bpck.  You must also have a high-level driver for the type
 	  of device that you want to support.
 
 config PARIDE_BPCK6
@@ -144,7 +144,7 @@ config PARIDE_BPCK6
 	  If you chose to build PARIDE support into your kernel, you may
 	  answer Y here to build in the protocol driver, otherwise you should
 	  answer M to build it as a loadable module.  The module will be
-	  called bpck6.o.  You must also have a high-level driver for the type
+	  called bpck6.  You must also have a high-level driver for the type
 	  of device that you want to support.
 
 config PARIDE_COMM
@@ -155,7 +155,7 @@ config PARIDE_COMM
 	  protocol from DataStor. If you chose to build PARIDE support
 	  into your kernel, you may answer Y here to build in the protocol
 	  driver, otherwise you should answer M to build it as a loadable
-	  module. The module will be called comm.o. You must also have
+	  module. The module will be called comm. You must also have
 	  a high-level driver for the type of device that you want to support.
 
 config PARIDE_DSTR
@@ -166,7 +166,7 @@ config PARIDE_DSTR
 	  protocol from DataStor. If you chose to build PARIDE support
 	  into your kernel, you may answer Y here to build in the protocol
 	  driver, otherwise you should answer M to build it as a loadable
-	  module. The module will be called dstr.o. You must also have
+	  module. The module will be called dstr. You must also have
 	  a high-level driver for the type of device that you want to support.
 
 config PARIDE_FIT2
@@ -178,7 +178,7 @@ config PARIDE_FIT2
 	  (low speed) adapter that is used in some portable hard drives. If
 	  you chose to build PARIDE support into your kernel, you may answer Y
 	  here to build in the protocol driver, otherwise you should answer M
-	  to build it as a loadable module. The module will be called ktti.o.
+	  to build it as a loadable module. The module will be called ktti.
 	  You must also have a high-level driver for the type of device that
 	  you want to support.
 
@@ -192,7 +192,7 @@ config PARIDE_FIT3
 	  devices. If you chose to build PARIDE support into your kernel, you
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module. The module will be
-	  called fit3.o. You must also have a high-level driver for the type
+	  called fit3. You must also have a high-level driver for the type
 	  of device that you want to support.
 
 config PARIDE_EPAT
@@ -205,7 +205,7 @@ config PARIDE_EPAT
 	  Hewlett-Packard, SyQuest, Imation and Avatar. If you chose to build
 	  PARIDE support into your kernel, you may answer Y here to build in
 	  the protocol driver, otherwise you should answer M to build it as a
-	  loadable module. The module will be called epat.o. You must also
+	  loadable module. The module will be called epat. You must also
 	  have a high-level driver for the type of device that you want to
 	  support.
 
@@ -226,7 +226,7 @@ config PARIDE_EPIA
 	  found in some no-name kits. If you chose to build PARIDE support
 	  into your kernel, you may answer Y here to build in the protocol
 	  driver, otherwise you should answer M to build it as a loadable
-	  module. The module will be called epia.o. You must also have a
+	  module. The module will be called epia. You must also have a
 	  high-level driver for the type of device that you want to support.
 
 config PARIDE_FRIQ
@@ -238,7 +238,7 @@ config PARIDE_FRIQ
 	  drive.  If you chose to build PARIDE support into your kernel, you
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module. The module will be
-	  called friq.o. You must also have a high-level driver for the type
+	  called friq. You must also have a high-level driver for the type
 	  of device that you want to support.
 
 config PARIDE_FRPW
@@ -249,7 +249,7 @@ config PARIDE_FRPW
 	  protocol. If you chose to build PARIDE support into your kernel, you
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module. The module will be
-	  called frpw.o. You must also have a high-level driver for the type
+	  called frpw. You must also have a high-level driver for the type
 	  of device that you want to support.
 
 config PARIDE_KBIC
@@ -262,7 +262,7 @@ config PARIDE_KBIC
 	  especially in Europe. If you chose to build PARIDE support into your
 	  kernel, you may answer Y here to build in the protocol driver,
 	  otherwise you should answer M to build it as a loadable module. The
-	  module will be called kbic.o. You must also have a high-level driver
+	  module will be called kbic. You must also have a high-level driver
 	  for the type of device that you want to support.
 
 config PARIDE_KTTI
@@ -274,7 +274,7 @@ config PARIDE_KTTI
 	  used in some 2.5" portable hard drives. If you chose to build PARIDE
 	  support into your kernel, you may answer Y here to build in the
 	  protocol driver, otherwise you should answer M to build it as a
-	  loadable module. The module will be called ktti.o. You must also
+	  loadable module. The module will be called ktti. You must also
 	  have a high-level driver for the type of device that you want to
 	  support.
 
@@ -287,7 +287,7 @@ config PARIDE_ON20
 	  name). If you chose to build PARIDE support into your kernel, you
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module. The module will
-	  be called on20.o. You must also have a high-level driver for the
+	  be called on20. You must also have a high-level driver for the
 	  type of device that you want to support.
 
 config PARIDE_ON26
@@ -299,7 +299,7 @@ config PARIDE_ON26
 	  name). If you chose to build PARIDE support into your kernel, you
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module. The module will be
-	  called on26.o. You must also have a high-level driver for the type
+	  called on26. You must also have a high-level driver for the type
 	  of device that you want to support.
 
 #

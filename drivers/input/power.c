@@ -23,7 +23,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
- * Should you need to contact me, the author, you can do so either by
+ * Should you need to contact me, the author, you can do so by
  * e-mail - mail your message to <jsimmons@transvirtual.com>.
  */
 

@@ -16,7 +16,7 @@ config USB_MDC800
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mdc800.o. If you want to compile it as a
+	  The module will be called mdc800. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SCANNER
@@ -29,7 +29,7 @@ config USB_SCANNER
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scanner.o. If you want to compile it as
+	  The module will be called scanner. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_MICROTEK
@@ -42,7 +42,7 @@ config USB_MICROTEK
 	  Please report failures and successes.
 	  The scanner will appear as a scsi generic device to the rest
 	  of the system. Scsi support is required.
-	  This driver can be compiled as a module, called microtek.o.
+	  This driver can be compiled as a module, called microtek.
 
 config USB_HPUSBSCSI
 	tristate "HP53xx USB scanner support (EXPERIMENTAL)"
@@ -51,5 +51,5 @@ config USB_HPUSBSCSI
 	  Say Y here if you want support for the HP 53xx series of scanners
 	  and the Minolta Scan Dual. This driver is experimental.
 	  The scanner will be accessible as a SCSI device.
-	  This can be compiled as a module, called hpusbscsi.o.
+	  This can be compiled as a module, called hpusbscsi.
 

@@ -1188,34 +1188,31 @@ static int __init
 {
 
 	struct net_device *dev;
+	struct arlan_private *ap;
 
 	ARLAN_DEBUG_ENTRY("arlan_allocate_device");
 
-	if (!devs)
-		dev = init_etherdev(0, sizeof(struct arlan_private));
-	else
-	{
+	if (!devs) {
+		dev = init_etherdev(0, sizeof(struct arlan_private) + sizeof(struct arlan_shmem));
+		if (!dev) {
+			printk(KERN_ERR "ARLAN: init_etherdev failed\n");
+			return 0;
+		}
+		ap = dev->priv;
+		ap->config = dev->priv + sizeof(struct arlan_private);
+		ap->init_etherdev_alloc = 1;
+	} else {
 		dev = devs;
-		dev->priv = kmalloc(sizeof(struct arlan_private), GFP_KERNEL);
-	};
-
-	if (dev == NULL || dev->priv == NULL)
-	{
-		printk(KERN_CRIT "init_etherdev failed ");
-		return 0;
+		dev->priv = kmalloc(sizeof(struct arlan_private) + sizeof(struct arlan_shmem), GFP_KERNEL);
+		if (!dev->priv) {
+			printk(KERN_ERR "ARLAN: kmalloc of dev->priv failed\n");
+			return 0;
+		}
+		ap = dev->priv;
+		ap->config = dev->priv + sizeof(struct arlan_private);
+		memset(ap, 0, sizeof(*ap));
 	}
 
-	memset(dev->priv,0,sizeof(struct arlan_private));
-
-	((struct arlan_private *) dev->priv)->conf =
-	    kmalloc(sizeof(struct arlan_shmem), GFP_KERNEL);
-
-	if (dev == NULL || dev->priv == NULL ||
-	    ((struct arlan_private *) dev->priv)->conf == NULL)
-	{
-		return 0;
-		printk(KERN_CRIT " No memory at arlan_allocate_device \n");
-	}
 	/* Fill in the 'dev' fields. */
 	dev->base_addr = 0;
 	dev->mem_start = 0;
@@ -2017,32 +2014,24 @@ int init_module(void)
 	ARLAN_DEBUG_ENTRY("init_module");
 
 	if (channelSet != channelSetUNKNOWN || channelNumber != channelNumberUNKNOWN || systemId != systemIdUNKNOWN)
-	{
-		printk(KERN_WARNING "arlan: wrong module params for multiple devices\n ");
-		return -1;
-	}
+		return -EINVAL;
+
 	numDevices = arlan_find_devices();
 	if (numDevices == 0)
-	{
-		printk(KERN_ERR "arlan: no devices found \n");
-		return -1;
-	}
+		return -ENODEV;
 
 	siteName = kmalloc(100, GFP_KERNEL);
 	if(siteName==NULL)
-	{
-		printk(KERN_ERR "arlan: No memory for site name.\n");
-		return -1;
-	}
+		return -ENOMEM;
+
 	for (i = 0; i < numDevices && i < MAX_ARLANS; i++)
 	{
 		if (!arlan_allocate_device(i, NULL))
-			return -1;
+			return -ENOMEM;
+
 		if (arlan_device[i] == NULL)
-		{
-			printk(KERN_CRIT "arlan: Not Enough memory \n");
-			return -1;
-		}
+			return -ENOMEM;
+
 		if (probe)
 			arlan_probe_everywhere(arlan_device[i]);
 //		arlan_command(arlan_device[i], ARLAN_COMMAND_POWERDOWN );
@@ -2056,6 +2045,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	int i = 0;
+	struct arlan_private ap;
 
 	ARLAN_DEBUG_ENTRY("cleanup_module");
 
@@ -2069,13 +2059,14 @@ void cleanup_module(void)
 
 //			release_mem_region(virt_to_phys(arlan_device[i]->mem_start), 0x2000 );
 			unregister_netdev(arlan_device[i]);
-			if (arlan_device[i]->priv)
-			{
-				if (((struct arlan_private *) arlan_device[i]->priv)->conf)
-					kfree(((struct arlan_private *) arlan_device[i]->priv)->conf);
+			ap = arlan_device[i]->priv;
+			if (ap->init_etherdev_alloc) {
 				kfree(arlan_device[i]);
+				arlan_device[i] = NULL;
+			} else {
+				kfree(ap);
+				ap = NULL;
 			}
-			arlan_device[i] = NULL;
 		}
 	}
 	ARLAN_DEBUG_EXIT("cleanup_module");

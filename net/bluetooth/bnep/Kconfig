@@ -11,7 +11,7 @@ config BT_BNEP
 	  For more information, see <http://bluez.sourceforge.net>.
 
 	  Say Y here to compile BNEP support into the kernel or say M to
-	  compile it as module (bnep.o).
+	  compile it as module (bnep).
 
 config BT_BNEP_MC_FILTER
 	bool "Multicast filter support"

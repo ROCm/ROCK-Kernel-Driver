@@ -23,7 +23,7 @@ config INPUT_PCSPKR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pcspkr.o. If you want to compile it as a
+	  The module will be called pcspkr. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config INPUT_SPARCSPKR
@@ -37,7 +37,7 @@ config INPUT_SPARCSPKR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pcspkr.o. If you want to compile it as a
+	  The module will be called pcspkr. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config INPUT_M68K_BEEP
@@ -53,7 +53,7 @@ config INPUT_UINPUT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called uinput.o.  If you want to compile it as a
+	  The module will be called uinput.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.	    
 
 config INPUT_GSC

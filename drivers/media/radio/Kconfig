@@ -23,7 +23,7 @@ config RADIO_CADET
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-cadet.o.
+	  will be called radio-cadet.
 
 config RADIO_RTRACK
 	tristate "AIMSlab RadioTrack (aka RadioReveal) support"
@@ -51,7 +51,7 @@ config RADIO_RTRACK
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-aimslab.o.
+	  will be called radio-aimslab.
 
 config RADIO_RTRACK_PORT
 	hex "RadioTrack i/o port (0x20f or 0x30f)"
@@ -76,7 +76,7 @@ config RADIO_RTRACK2
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-rtrack2.o.
+	  will be called radio-rtrack2.
 
 config RADIO_RTRACK2_PORT
 	hex "RadioTrack II i/o port (0x20c or 0x30c)"
@@ -101,7 +101,7 @@ config RADIO_AZTECH
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-aztech.o.
+	  will be called radio-aztech.
 
 config RADIO_AZTECH_PORT
 	hex "Aztech/Packard Bell I/O port (0x350 or 0x358)"
@@ -127,7 +127,7 @@ config RADIO_GEMTEK
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-gemtek.o.
+	  will be called radio-gemtek.
 
 config RADIO_GEMTEK_PORT
 	hex "GemTek i/o port (0x20c, 0x30c, 0x24c or 0x34c)"
@@ -153,7 +153,7 @@ config RADIO_GEMTEK_PCI
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-gemtek-pci.o.
+	  will be called radio-gemtek-pci.
 
 config RADIO_MAXIRADIO
 	tristate "Guillemot MAXI Radio FM 2000 radio"
@@ -170,7 +170,7 @@ config RADIO_MAXIRADIO
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-maxiradio.o.
+	  will be called radio-maxiradio.
 
 config RADIO_MAESTRO
 	tristate "Maestro on board radio"
@@ -187,7 +187,7 @@ config RADIO_MAESTRO
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-maestro.o.
+	  will be called radio-maestro.
 
 config RADIO_MIROPCM20
 	tristate "miroSOUND PCM20 radio"
@@ -205,7 +205,7 @@ config RADIO_MIROPCM20
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called miropcm20.o.
+	  will be called miropcm20.
 
 config RADIO_MIROPCM20_RDS
 	tristate "miroSOUND PCM20 radio RDS user interface (EXPERIMENTAL)"
@@ -221,7 +221,7 @@ config RADIO_MIROPCM20_RDS
 	  availability of RDS is reported over V4L by the basic driver
 	  already.  Here RDS can be read from files in /dev/v4l/rds.
 
-	  As module the driver will be called miropcm20-rds.o.
+	  As module the driver will be called miropcm20-rds.
 
 config RADIO_SF16FMI
 	tristate "SF16FMI Radio"
@@ -240,7 +240,7 @@ config RADIO_SF16FMI
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-sf16fmi.o.
+	  will be called radio-sf16fmi.
 
 config RADIO_TERRATEC
 	tristate "TerraTec ActiveRadio ISA Standalone"
@@ -263,7 +263,7 @@ config RADIO_TERRATEC
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-terratec.o.
+	  will be called radio-terratec.
 
 config RADIO_TERRATEC_PORT
 	hex "Terratec i/o port (normally 0x590)"
@@ -280,7 +280,7 @@ config RADIO_TRUST
 	  This is a driver for the Trust FM radio cards. Say Y if you have
 	  such a card and want to use it under Linux.
 
-	  This driver is also available as a module called radio-trust.o ( =
+	  This driver is also available as a module called radio-trust ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -308,7 +308,7 @@ config RADIO_TYPHOON
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-typhoon.o.
+	  will be called radio-typhoon.
 
 config RADIO_TYPHOON_PROC_FS
 	bool "Support for /proc/radio-typhoon"
@@ -354,7 +354,7 @@ config RADIO_ZOLTRIX
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-zoltrix.o.
+	  will be called radio-zoltrix.
 
 config RADIO_ZOLTRIX_PORT
 	hex "ZOLTRIX I/O port (0x20c or 0x30c)"

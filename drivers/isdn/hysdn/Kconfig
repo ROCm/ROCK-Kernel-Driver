@@ -6,7 +6,7 @@ config HYSDN
 	depends on m && PROC_FS
 	help
 	  Say Y here if you have one of Hypercope's active PCI ISDN cards
-	  Champ, Ergo and Metro. You will then get a module called hysdn.o.
+	  Champ, Ergo and Metro. You will then get a module called hysdn.
 	  Please read the file <file:Documentation/isdn/README.hysdn> for more
 	  information.
 

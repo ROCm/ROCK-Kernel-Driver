@@ -3,7 +3,7 @@ config IRLAN
 	depends on IRDA
 	help
 	  Say Y here if you want to build support for the IrLAN protocol.  If
-	  you want to compile it as a module (irlan.o), say M here and read
+	  you want to compile it as a module (irlan), say M here and read
 	  <file:Documentation/modules.txt>.  IrLAN emulates an Ethernet and
 	  makes it possible to put up a wireless LAN using infrared beams.
 
