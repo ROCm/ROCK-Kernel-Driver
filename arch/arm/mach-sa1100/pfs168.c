@@ -1,7 +1,6 @@
 /*
  * linux/arch/arm/mach-sa1100/pfs168.c
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
