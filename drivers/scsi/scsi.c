@@ -2199,8 +2199,8 @@ static int scsi_bus_match(struct device *scsi_driverfs_dev,
 }
 
 struct bus_type scsi_driverfs_bus_type = {
-        name: "scsi",
-        match: scsi_bus_match,
+        .name	= "scsi",
+        .match	= scsi_bus_match,
 };
 
 static int __init init_scsi(void)

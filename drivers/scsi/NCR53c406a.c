@@ -1070,23 +1070,23 @@ MODULE_LICENSE("GPL");
 
 static Scsi_Host_Template driver_template = 
 {
-     proc_name:         	"NCR53c406a"		/* proc_name */,        
-     name:              	"NCR53c406a"		/* name */,             
-     detect:            	NCR53c406a_detect	/* detect */,           
-     info:              	NCR53c406a_info		/* info */,             
-     command:           	NCR53c406a_command	/* command */,          
-     queuecommand:      	NCR53c406a_queue	/* queuecommand */,     
-     eh_abort_handler:  	NCR53c406a_abort	/* abort */,            
-     eh_bus_reset_handler:      NCR53c406a_bus_reset	/* reset */,            
-     eh_device_reset_handler:   NCR53c406a_device_reset	/* reset */,            
-     eh_host_reset_handler:     NCR53c406a_host_reset	/* reset */,            
-     bios_param:        	NCR53c406a_biosparm	/* biosparm */,         
-     can_queue:         	1			/* can_queue */,        
-     this_id:           	7			/* SCSI ID of the chip */,
-     sg_tablesize:      	32			/*SG_ALL*/ /*SG_NONE*/, 
-     cmd_per_lun:       	1			/* commands per lun */, 
-     unchecked_isa_dma: 	1			/* unchecked_isa_dma */,
-     use_clustering:    	ENABLE_CLUSTERING                               
+     .proc_name         	= "NCR53c406a"		/* proc_name */,        
+     .name              	= "NCR53c406a"		/* name */,             
+     .detect            	= NCR53c406a_detect	/* detect */,           
+     .info              	= NCR53c406a_info		/* info */,             
+     .command           	= NCR53c406a_command	/* command */,          
+     .queuecommand      	= NCR53c406a_queue	/* queuecommand */,     
+     .eh_abort_handler  	= NCR53c406a_abort	/* abort */,            
+     .eh_bus_reset_handler      = NCR53c406a_bus_reset	/* reset */,            
+     .eh_device_reset_handler   = NCR53c406a_device_reset	/* reset */,            
+     .eh_host_reset_handler     = NCR53c406a_host_reset	/* reset */,            
+     .bios_param        	= NCR53c406a_biosparm	/* biosparm */,         
+     .can_queue         	= 1			/* can_queue */,        
+     .this_id           	= 7			/* SCSI ID of the chip */,
+     .sg_tablesize      	= 32			/*SG_ALL*/ /*SG_NONE*/, 
+     .cmd_per_lun       	= 1			/* commands per lun */, 
+     .unchecked_isa_dma 	= 1			/* unchecked_isa_dma */,
+     .use_clustering    	= ENABLE_CLUSTERING                               
 };
 
 #include "scsi_module.c"
