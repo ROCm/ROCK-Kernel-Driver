@@ -139,9 +139,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	if ( p )
 		strcpy(c->x86_model_id, p);
 	
-#ifdef CONFIG_X86_HT
 	detect_ht(c);
-#endif
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);

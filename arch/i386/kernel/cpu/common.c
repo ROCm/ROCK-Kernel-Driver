@@ -437,6 +437,7 @@ void __init dodgy_tsc(void)
 		cpu_devs[X86_VENDOR_CYRIX]->c_init(&boot_cpu_data);
 }
 
+#ifdef CONFIG_X86_HT
 void __init detect_ht(struct cpuinfo_x86 *c)
 {
 	u32 	eax, ebx, ecx, edx;
@@ -478,6 +479,7 @@ void __init detect_ht(struct cpuinfo_x86 *c)
 		       phys_proc_id[cpu]);
 	}
 }
+#endif
 
 void __init print_cpu_info(struct cpuinfo_x86 *c)
 {
