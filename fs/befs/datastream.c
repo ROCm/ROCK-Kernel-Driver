@@ -229,7 +229,7 @@ befs_count_blocks(struct super_block * sb, befs_data_stream * ds)
 	
 	Algorithm:
 	Linear search. Checks each element of array[] to see if it
-	contains the blockno-th filesystem block. This is nessisary
+	contains the blockno-th filesystem block. This is necessary
 	because the block runs map variable amounts of data. Simply
 	keeps a count of the number of blocks searched so far (sum),
 	incrementing this by the length of each block run as we come
