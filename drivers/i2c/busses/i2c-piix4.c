@@ -149,7 +149,7 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 		}
 	}
 
-	if (check_region(piix4_smba, 8)) {
+	if (!request_region(piix4_smba, 8, "piix4-smbus")) {
 		printk
 		    (KERN_ERR "i2c-piix4.o: SMB region 0x%x already in use!\n",
 		     piix4_smba);
@@ -187,9 +187,6 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 			goto END;
 		}
 	}
-
-	/* Everything is happy, let's grab the memory and set things up. */
-	request_region(piix4_smba, 8, "piix4-smbus");
 
 #ifdef DEBUG
 	if ((temp & 0x0E) == 8)
