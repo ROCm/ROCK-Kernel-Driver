@@ -257,31 +257,6 @@ smp_setup_percpu_timer (void)
 	local_cpu_data->prof_multiplier = 1;
 }
 
-/*
- * Architecture specific routine called by the kernel just before init is
- * fired off. This allows the BP to have everything in order [we hope].
- * At the end of this all the APs will hit the system scheduling and off
- * we go. Each AP will jump through the kernel
- * init into idle(). At this point the scheduler will one day take over
- * and give them jobs to do. smp_callin is a standard routine
- * we use to track CPUs as they power up.
- */
-
-static volatile atomic_t smp_commenced = ATOMIC_INIT(0);
-
-static void __init
-smp_commence (void)
-{
-	/*
-	 * Lets the callins below out of their loop.
-	 */
-	Dprintk("Setting commenced=1, go go go\n");
-
-	wmb();
-	atomic_set(&smp_commenced, 1);
-}
-
-
 static void __init
 smp_callin (void)
 {
@@ -361,7 +336,7 @@ fork_by_hand (void)
 	 * don't care about the eip and regs settings since we'll never reschedule the
 	 * forked task.
 	 */
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, 0, 0);
+	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, 0, 0, NULL);
 }
 
 static int __init

@@ -68,10 +68,8 @@ extern ia64_mv_pci_dma_address		sn1_dma_address;
 #define platform_setup		sn1_setup
 #define platform_cpu_init	sn_cpu_init
 #define platform_irq_init	sn1_irq_init
-#define platform_map_nr		sn1_map_nr
 #define platform_send_ipi	sn1_send_IPI
 #define platform_global_tlb_purge       sn1_global_tlb_purge
-#define platform_pci_fixup	sn1_pci_fixup
 #define platform_inb		sn1_inb
 #define platform_inw		sn1_inw
 #define platform_inl		sn1_inl

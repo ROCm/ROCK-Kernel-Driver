@@ -22,8 +22,6 @@ extern ia64_mv_pci_dma_supported sba_dma_supported;
  */
 #define platform_name			"hpzx1"
 #define platform_setup			dig_setup
-#define platform_pci_fixup		hpzx1_pci_fixup
-#define platform_map_nr			map_nr_dense
 #define platform_pci_dma_init		((ia64_mv_pci_dma_init *) machvec_noop)
 #define platform_pci_alloc_consistent	sba_alloc_consistent
 #define platform_pci_free_consistent	sba_free_consistent

@@ -70,24 +70,6 @@
 	mov r19=n;;			/* prepare to save predicates */		\
 	br.sptk.many dispatch_to_fault_handler
 
-/*
- * As we don't (hopefully) use the space available, we need to fill it with
- * nops. the parameter may be used for debugging and is representing the entry
- * number
- */
-#define BREAK_BUNDLE(a)	break.m (a); \
-				break.i (a); \
-				break.i (a)
-/*
- * 4 breaks bundles all together
- */
-#define BREAK_BUNDLE4(a); BREAK_BUNDLE(a); BREAK_BUNDLE(a); BREAK_BUNDLE(a); BREAK_BUNDLE(a)
-
-/*
- * 8 bundles all together (too lazy to use only 4 at a time !)
- */
-#define BREAK_BUNDLE8(a); BREAK_BUNDLE4(a); BREAK_BUNDLE4(a)
-
 	.section .text.ivt,"ax"
 
 	.align 32768	// align on 32KB boundary
@@ -115,6 +97,10 @@ ENTRY(vhpt_miss)
 	 *	- the faulting virtual address has no L1, L2, or L3 mapping
 	 */
 	mov r16=cr.ifa				// get address that caused the TLB miss
+#ifdef CONFIG_HUGETLB_PAGE
+	movl r18=PAGE_SHIFT
+	mov r25=cr.itir
+#endif
 	;;
 	rsm psr.dt				// use physical addressing for data
 	mov r31=pr				// save the predicate registers
@@ -122,8 +108,18 @@ ENTRY(vhpt_miss)
 	shl r21=r16,3				// shift bit 60 into sign bit
 	shr.u r17=r16,61			// get the region number into r17
 	;;
+	shr r22=r21,3
+#ifdef CONFIG_HUGETLB_PAGE
+	extr.u r26=r25,2,6
+	;;
+	cmp.eq p8,p0=HPAGE_SHIFT,r26
+	;;
+(p8)	dep r25=r18,r25,2,6
+(p8)	shr r22=r22,HPAGE_SHIFT-PAGE_SHIFT
+	;;
+#endif
 	cmp.eq p6,p7=5,r17			// is IFA pointing into to region 5?
-	shr.u r18=r16,PGDIR_SHIFT		// get bits 33-63 of the faulting address
+	shr.u r18=r22,PGDIR_SHIFT		// get bits 33-63 of the faulting address
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
 	srlz.d					// ensure "rsm psr.dt" has taken effect
@@ -134,7 +130,7 @@ ENTRY(vhpt_miss)
 (p6)	dep r17=r18,r19,3,(PAGE_SHIFT-3)	// r17=PTA + IFA(33,42)*8
 (p7)	dep r17=r18,r17,3,(PAGE_SHIFT-6)	// r17=PTA + (((IFA(61,63) << 7) | IFA(33,39))*8)
 	cmp.eq p7,p6=0,r21			// unused address bits all zeroes?
-	shr.u r18=r16,PMD_SHIFT			// shift L2 index into position
+	shr.u r18=r22,PMD_SHIFT			// shift L2 index into position
 	;;
 	ld8 r17=[r17]				// fetch the L1 entry (may be 0)
 	;;
@@ -142,7 +138,7 @@ ENTRY(vhpt_miss)
 	dep r17=r18,r17,3,(PAGE_SHIFT-3)	// compute address of L2 page table entry
 	;;
 (p7)	ld8 r20=[r17]				// fetch the L2 entry (may be 0)
-	shr.u r19=r16,PAGE_SHIFT		// shift L3 index into position
+	shr.u r19=r22,PAGE_SHIFT		// shift L3 index into position
 	;;
 (p7)	cmp.eq.or.andcm p6,p7=r20,r0		// was L2 entry NULL?
 	dep r21=r19,r20,3,(PAGE_SHIFT-3)	// compute address of L3 page table entry
@@ -160,6 +156,10 @@ ENTRY(vhpt_miss)
 (p11)	itc.d r18				// insert the data TLB entry
 (p6)	br.cond.spnt.many page_fault		// handle bad address/page not present (page fault)
 	mov cr.ifa=r22
+
+#ifdef CONFIG_HUGETLB_PAGE
+(p8)	mov cr.itir=r25				// change to default page-size for VHPT
+#endif
 
 	/*
 	 * Now compute and insert the TLB entry for the virtual page table.  We never

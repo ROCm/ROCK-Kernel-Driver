@@ -148,8 +148,8 @@ do {										\
 			      "cmp.ne p6,p7=%1,r0;;"				\
 			      "(p6) ssm psr.i;"					\
 			      "(p7) rsm psr.i;;"				\
-			      "srlz.d"						\
-			      : "=&r" (old_psr) : "r"((psr) & IA64_PSR_I)	\
+			      "(p6) srlz.d"					\
+			      : "=r" (old_psr) : "r"((psr) & IA64_PSR_I)	\
 			      : "p6", "p7", "memory");				\
 	if ((old_psr & IA64_PSR_I) && !(psr & IA64_PSR_I)) {			\
 		__asm__ ("mov %0=ip" : "=r"(ip));				\
@@ -173,6 +173,13 @@ do {										\
 
 #define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")
 #define local_save_flags(flags)	__asm__ __volatile__ ("mov %0=psr" : "=r" (flags) :: "memory")
+
+#define irqs_disabled()				\
+({						\
+	unsigned long flags;			\
+	local_save_flags(flags);		\
+	(flags & IA64_PSR_I) == 0;		\
+})
 
 /*
  * Force an unresolved reference if someone tries to use
@@ -367,14 +374,14 @@ struct task_struct;
 extern void ia64_save_extra (struct task_struct *task);
 extern void ia64_load_extra (struct task_struct *task);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_PERFMON)
+#ifdef CONFIG_PERFMON
   DECLARE_PER_CPU(int, pfm_syst_wide);
 # define PERFMON_IS_SYSWIDE() (get_cpu_var(pfm_syst_wide) != 0)
 #else
 # define PERFMON_IS_SYSWIDE() (0)
 #endif
 
-#define __switch_to(prev,next,last) do {							\
+#define __switch_to(prev,next,last) do {						\
 	if (((prev)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID))	\
 	    || IS_IA32_PROCESS(ia64_task_regs(prev)) || PERFMON_IS_SYSWIDE())		\
 		ia64_save_extra(prev);							\

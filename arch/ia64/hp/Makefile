@@ -7,7 +7,6 @@ O_TARGET := hp.o
 
 subdir-$(CONFIG_IA64_GENERIC) += $(ALL_SUB_DIRS)
 subdir-$(CONFIG_IA64_HP_SIM) += sim
-subdir-$(CONFIG_IA64_HP_ZX1) += zx1 common
 
 SUB_DIRS := $(subdir-y)
 obj-y += $(join $(subdir-y),$(subdir-y:%=/%.o))

@@ -86,11 +86,10 @@ endif
 
 HEAD := arch/$(ARCH)/kernel/head.o arch/ia64/kernel/init_task.o
 
-SUBDIRS := arch/$(ARCH)/tools arch/$(ARCH)/kernel arch/$(ARCH)/mm arch/$(ARCH)/lib $(SUBDIRS)
-CORE_FILES := arch/$(ARCH)/kernel/kernel.o arch/$(ARCH)/mm/mm.o $(CORE_FILES)
-
-LIBS := $(TOPDIR)/arch/$(ARCH)/lib/lib.a $(LIBS) \
-	$(TOPDIR)/arch/$(ARCH)/lib/lib.a
+libs-y				+= arch/$(ARCH)/lib/
+core-y				+= arch/$(ARCH)/kernel/ arch/$(ARCH)/mm/
+drivers-$(CONFIG_PCI)		+= arch/$(ARCH)/pci/
+drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/hp/common/ arch/$(ARCH)/hp/zx1/
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
@@ -102,27 +101,11 @@ compressed: vmlinux
 rawboot:
 	@$(MAKEBOOT) rawboot
 
-#
-# My boot writes directly to a specific disk partition, I doubt most
-# people will want to do that without changes..
-#
-msb my-special-boot:
-	@$(MAKEBOOT) msb
-
-bootimage:
-	@$(MAKEBOOT) bootimage
-
-srmboot:
-	@$(MAKEBOOT) srmboot
-
 archclean:
 	@$(MAKEBOOT) clean
 
 archmrproper:
 	@$(MAKE) -C arch/$(ARCH)/tools mrproper
-
-bootpfile:
-	@$(MAKEBOOT) bootpfile
 
 prepare: $(TOPDIR)/include/asm-ia64/offsets.h
 
