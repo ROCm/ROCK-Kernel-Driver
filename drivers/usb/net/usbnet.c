@@ -107,7 +107,13 @@
  *
  *-------------------------------------------------------------------------*/
 
+// #define	DEBUG			// error path messages, extra info
+// #define	VERBOSE			// more; success messages
+
 #include <linux/config.h>
+#ifdef	CONFIG_USB_DEBUG
+#   define DEBUG
+#endif
 #include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/sched.h>
@@ -120,24 +126,14 @@
 #include <linux/mii.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
-
-
-// #define	DEBUG			// error path messages, extra info
-// #define	VERBOSE			// more; success messages
-#define	REALLY_QUEUE
-
-#if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
-#   define DEBUG
-#endif
 #include <linux/usb.h>
-
 #include <asm/io.h>
 #include <asm/scatterlist.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
 
-
 #define DRIVER_VERSION		"25-Aug-2003"
+
 
 /*-------------------------------------------------------------------------*/
 
@@ -148,13 +144,8 @@
  * For high speed, each frame comfortably fits almost 36 max size
  * Ethernet packets (so queues should be bigger).
  */
-#ifdef REALLY_QUEUE
 #define	RX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? 60 : 4)
 #define	TX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? 60 : 4)
-#else
-#define	RX_QLEN(dev)		1
-#define	TX_QLEN(dev)		1
-#endif
 
 // packets are always ethernet inside
 // ... except they can be bigger (limit of 64K with NetChip framing)
@@ -1006,7 +997,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 			if (!info->control || !info->data) {
 				dev_dbg (&intf->dev,
 					"master #%u/%p slave #%u/%p\n",
-					info->u->bMasterInterface0
+					info->u->bMasterInterface0,
 					info->control,
 					info->u->bSlaveInterface0,
 					info->data);
@@ -1142,10 +1133,13 @@ get_ethernet_addr (struct usbnet *dev, struct ether_desc *e)
 	unsigned char	buf [13];
 
 	tmp = usb_string (dev->udev, e->iMACAddress, buf, sizeof buf);
-	if (tmp < 0)
+	if (tmp != 12) {
+		dev_dbg (&dev->udev->dev,
+			"bad MAC string %d fetch, %d\n", e->iMACAddress, tmp);
+		if (tmp >= 0)
+			tmp = -EINVAL;
 		return tmp;
-	else if (tmp != 12)
-		return -EINVAL;
+	}
 	for (i = tmp = 0; i < 6; i++, tmp += 2)
 		dev->net->dev_addr [i] =
 			 (nibble (buf [tmp]) << 4) + nibble (buf [tmp + 1]);
