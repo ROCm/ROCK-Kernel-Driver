@@ -177,10 +177,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 		if (numReg >= PT_FPR0) {
 			if (child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
-		        if (numReg == PT_FPSCR) 
-			        tmp = ((unsigned int *)child->thread.fpscr);
-		        else 
-			        tmp = ((unsigned long int *)child->thread.fpr)[numReg - PT_FPR0];
+			tmp = ((unsigned long int *)child->thread.fpr)[numReg - PT_FPR0];
 		} else { /* register within PT_REGS struct */
 			tmp = get_reg(child, numReg);
 		} 

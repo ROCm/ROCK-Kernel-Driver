@@ -240,14 +240,12 @@ InstructionBreakpointException(struct pt_regs *regs)
 static void parse_fpe(struct pt_regs *regs)
 {
 	siginfo_t info;
-	unsigned int *tmp;
-	unsigned int fpscr;
+	unsigned long fpscr;
 
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	tmp = &current->thread.fpscr;
-	fpscr = *tmp;
+	fpscr = current->thread.fpscr;
 
 	/* Invalid operation */
 	if ((fpscr & FPSCR_VE) && (fpscr & FPSCR_VX))

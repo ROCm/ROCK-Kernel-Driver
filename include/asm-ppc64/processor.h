@@ -652,6 +652,7 @@ struct thread_struct {
 	mm_segment_t	fs;		/* for get_fs() validation */
 	double		fpr[32];	/* Complete floating point set */
 	unsigned long	fpscr;		/* Floating point status */
+	unsigned int	fpexc_mode;	/* Floating-point exception mode */
 };
 
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)
@@ -661,7 +662,8 @@ struct thread_struct {
 	(struct pt_regs *)INIT_SP - 1, /* regs */ \
 	KERNEL_DS, /*fs*/ \
 	{0}, /* fpr */ \
-	0 /* fpscr */ \
+	0, /* fpscr */ \
+	MSR_FE0|MSR_FE1, /* fpexc_mode */ \
 }
 
 /*
@@ -688,6 +690,23 @@ unsigned long get_wchan(struct task_struct *p);
 
 #define KSTK_EIP(tsk)  ((tsk)->thread.regs? (tsk)->thread.regs->nip: 0)
 #define KSTK_ESP(tsk)  ((tsk)->thread.regs? (tsk)->thread.regs->gpr[1]: 0)
+
+/* Get/set floating-point exception mode */
+#define GET_FPEXC_CTL(tsk, adr) get_fpexc_mode((tsk), (adr))
+#define SET_FPEXC_CTL(tsk, val) set_fpexc_mode((tsk), (val))
+
+extern int get_fpexc_mode(struct task_struct *tsk, unsigned long adr);
+extern int set_fpexc_mode(struct task_struct *tsk, unsigned int val);
+
+static inline unsigned int __unpack_fe01(unsigned long msr_bits)
+{
+	return ((msr_bits & MSR_FE0) >> 10) | ((msr_bits & MSR_FE1) >> 8);
+}
+
+static inline unsigned int __pack_fe01(unsigned int fpmode)
+{
+	return ((fpmode << 10) & MSR_FE0) | ((fpmode << 8) & MSR_FE1);
+}
 
 #define cpu_relax()     barrier()
 

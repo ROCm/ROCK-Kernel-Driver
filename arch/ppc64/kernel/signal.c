@@ -55,7 +55,19 @@
  * able to continue 'til the next breakpoint from within the signal
  * handler, even if the handler returns.
  */
+#if 0
 #define MSR_USERCHANGE	(MSR_FE0 | MSR_FE1)
+#else
+/*
+ * glibc tries to set FE0/FE1 via a signal handler. Since it only ever
+ * sets both bits and this is the default setting we now disable this
+ * behaviour. This is done to insure the new prctl which alters FE0/FE1 does
+ * not get overriden by glibc. Setting and clearing FE0/FE1 via signal
+ * handler has always been bogus since load_up_fpu used to set FE0/FE1
+ * unconditionally.
+ */
+#define MSR_USERCHANGE	0
+#endif
 
 /*
  * When we have signals to deliver, we set up on the

@@ -1421,7 +1421,7 @@ _STATIC(load_up_fpu)
 	addi	r4,r4,THREAD	       /* want THREAD of last_task_used_math */
 	SAVE_32FPRS(0, r4)
 	mffs	fr0
-	stfd	fr0,THREAD_FPSCR-4(r4)
+	stfd	fr0,THREAD_FPSCR(r4)
 	ld	r5,PT_REGS(r4)
 	ld	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 	li	r20,MSR_FP|MSR_FE0|MSR_FE1
@@ -1430,10 +1430,12 @@ _STATIC(load_up_fpu)
 1:
 #endif /* CONFIG_SMP */
 	/* enable use of FP after return */
-	ori	r23,r23,MSR_FP|MSR_FE0|MSR_FE1
-	ld	r4, PACACURRENT(r13)
+	ld	r4,PACACURRENT(r13)
 	addi	r5,r4,THREAD		/* Get THREAD */
-	lfd	fr0,THREAD_FPSCR-4(r5)
+	lwz	r4,THREAD_FPEXC_MODE(r5)
+	ori	r23,r23,MSR_FP
+	or	r23,r23,r4
+	lfd	fr0,THREAD_FPSCR(r5)
 	mtfsf	0xff,fr0
 	REST_32FPRS(0, r5)
 #ifndef CONFIG_SMP
@@ -1476,7 +1478,7 @@ _GLOBAL(giveup_fpu)
 	cmpi	0,r5,0
 	SAVE_32FPRS(0, r3)
 	mffs	fr0
-	stfd	fr0,THREAD_FPSCR-4(r3)
+	stfd	fr0,THREAD_FPSCR(r3)
 	beq	1f
 	ld	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 	li	r3,MSR_FP|MSR_FE0|MSR_FE1

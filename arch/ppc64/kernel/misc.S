@@ -460,21 +460,21 @@ _GLOBAL(_get_HID0)
 	blr
 
 _GLOBAL(cvt_fd)
-	lfd	0,-4(r5)	/* load up fpscr value */
+	lfd	0,0(r5)		/* load up fpscr value */
 	mtfsf	0xff,0
 	lfs	0,0(r3)
 	stfd	0,0(r4)
 	mffs	0		/* save new fpscr value */
-	stfd	0,-4(r5)
+	stfd	0,0(r5)
 	blr
 
 _GLOBAL(cvt_df)
-	lfd	0,-4(r5)	/* load up fpscr value */
+	lfd	0,0(r5)		/* load up fpscr value */
 	mtfsf	0xff,0
 	lfd	0,0(r3)
 	stfs	0,0(r4)
 	mffs	0		/* save new fpscr value */
-	stfd	0,-4(r5)
+	stfd	0,0(r5)
 	blr
 
 /*

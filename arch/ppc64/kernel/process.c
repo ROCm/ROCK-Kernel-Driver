@@ -163,8 +163,7 @@ release_thread(struct task_struct *t)
  */
 int
 copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
-	    unsigned long unused,
-	    struct task_struct *p, struct pt_regs *regs)
+	    unsigned long unused, struct task_struct *p, struct pt_regs *regs)
 {
 	struct pt_regs *childregs, *kregs;
 	extern void ret_from_fork(void);
@@ -208,17 +207,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
  	 */
 	kregs->nip = *((unsigned long *)ret_from_fork);
 
-	/*
-	 * copy fpu info - assume lazy fpu switch now always
-	 *  -- Cort
-	 */
-	if (regs->msr & MSR_FP) {
-		giveup_fpu(current);
-		childregs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1);
-	}
-	memcpy(&p->thread.fpr, &current->thread.fpr, sizeof(p->thread.fpr));
-	p->thread.fpscr = current->thread.fpscr;
-
 	return 0;
 }
 
@@ -247,10 +235,38 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 	current->thread.fpscr = 0;
 }
 
+/* XXX temporary */
+#define PR_FP_EXC_PRECISE	3	/* precise exception mode */
+
+int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
+{
+	struct pt_regs *regs = tsk->thread.regs;
+
+	if (val > PR_FP_EXC_PRECISE)
+		return -EINVAL;
+	tsk->thread.fpexc_mode = __pack_fe01(val);
+	if (regs != NULL && (regs->msr & MSR_FP) != 0)
+		regs->msr = (regs->msr & ~(MSR_FE0|MSR_FE1))
+			| tsk->thread.fpexc_mode;
+	return 0;
+}
+
+int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
+{
+	unsigned int val;
+
+	val = __unpack_fe01(tsk->thread.fpexc_mode);
+	return put_user(val, (unsigned int *) adr);
+}
+
 int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
 {
 	struct task_struct *p;
+
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
 	p = do_fork(p1 & ~CLONE_IDLETASK, regs->gpr[1], regs, 0);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
@@ -259,6 +275,10 @@ int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
 	     struct pt_regs *regs)
 {
 	struct task_struct *p;
+
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
 	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
@@ -267,6 +287,10 @@ int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
 			 struct pt_regs *regs)
 {
 	struct task_struct *p;
+
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
 	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
