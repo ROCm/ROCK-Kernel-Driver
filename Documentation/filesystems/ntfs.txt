@@ -168,6 +168,12 @@ ChangeLog
 
 Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.2:
+	- Use default fmask of 0177 so that files are no executable by default.
+	  If you want owner executable files, just use fmask=0077.
+	- Update for kernel 2.5.9 but preserve backwards compatibility with
+	  kernel 2.5.7.
+	- Minor bug fixes, cleanups, and updates.
 2.0.1:
 	- Minor updates, primarily set the executable bit by default on files
 	  so they can be executed.

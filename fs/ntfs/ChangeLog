@@ -36,6 +36,13 @@ ToDo:
 	  directly instead of taking the address of a pointer. A return value
 	  of NULL means the allocation failed. Updated all callers
 	  appropriately.
+	- Update to 2.5.9 kernel (preserving backwards compatibility) by
+	  replacing all occurences of page->buffers with page_buffers(page).
+	- Fix minor bugs in run list merging, also minor cleanup.
+	- Updates to bootsector layout and mft mirror contents descriptions.
+	- Small bug fix in error detection in unistr.c and some cleanups.
+	- Grow name buffer allocations in unistr.c in aligned mutlipled of 64
+	  bytes.
 
 2.0.1 - Minor updates.
 
