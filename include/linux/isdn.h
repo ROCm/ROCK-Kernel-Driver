@@ -255,7 +255,6 @@ typedef struct {
 /*=================== Start of ip-over-ISDN stuff =========================*/
 
 /* Feature- and status-flags for a net-interface */
-#define ISDN_NET_CONNECTED  0x01       /* Bound to ISDN-Channel             */
 #define ISDN_NET_SECURE     0x02       /* Accept calls from phonelist only  */
 #define ISDN_NET_CALLBACK   0x04       /* activate callback                 */
 #define ISDN_NET_CBHUP      0x08       /* hangup before callback            */

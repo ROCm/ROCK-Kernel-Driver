@@ -159,7 +159,7 @@ static inline void isdn_net_device_wake_queue(isdn_net_local *lp)
 
 static inline int isdn_net_bound(isdn_net_local *lp)
 {
-	return lp->flags & ISDN_NET_CONNECTED;
+	return lp->isdn_slot >= 0;
 }
 
 static inline int

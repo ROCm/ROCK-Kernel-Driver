@@ -265,7 +265,6 @@ isdn_net_bind_channel(isdn_net_local * lp, int idx)
 
 	save_flags(flags);
 	cli();
-	lp->flags |= ISDN_NET_CONNECTED;
 	lp->isdn_slot = idx;
 	isdn_slot_set_rx_netdev(lp->isdn_slot, lp->netdev);
 	isdn_slot_set_st_netdev(lp->isdn_slot, lp->netdev);
@@ -297,7 +296,6 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 		isdn_slot_set_st_netdev(lp->isdn_slot, NULL);
 		isdn_slot_free(lp->isdn_slot, ISDN_USAGE_NET);
 	}
-	lp->flags &= ~ISDN_NET_CONNECTED;
 	lp->isdn_slot = -1;
 
 	restore_flags(flags);
@@ -1556,7 +1554,6 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				isdn_slot_set_st_netdev(idx, lp->netdev);
 				lp->isdn_slot = slot;
 				lp->ppp_slot = -1;
-				lp->flags |= ISDN_NET_CONNECTED;
 				
 				lp->outgoing = 0;
 				lp->huptimer = 0;
