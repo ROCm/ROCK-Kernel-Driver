@@ -1376,57 +1376,9 @@ struct rt6_info *addrconf_dst_alloc(struct inet6_dev *idev,
 	ipv6_addr_copy(&rt->rt6i_dst.addr, addr);
 	rt->rt6i_dst.plen = 128;
 
+	atomic_set(&rt->u.dst.__refcnt, 1);
+
 	return rt;
-}
-
-/*
- *	Add address
- */
-
-int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
-{
-	struct inet6_dev *idev;
-	struct rt6_info *rt;
-	int err = 0;
-
-	idev = in6_dev_get(&loopback_dev);
-	if (!idev) {
-		err = -ENODEV;
-		goto out;
-	}
-
-	rt = addrconf_dst_alloc(idev, addr, anycast);
-	if (IS_ERR(rt)) {
-		err = PTR_ERR(rt);
-		goto out;
-	}
-
-	ip6_ins_rt(rt, NULL, NULL);
-
-out:
-	if (idev)
-		in6_dev_put(idev);
-	return err;
-}
-
-/* Delete address. Warning: you should check that this address
-   disappeared before calling this function.
- */
-
-int ip6_rt_addr_del(struct in6_addr *addr, struct net_device *dev)
-{
-	struct rt6_info *rt;
-	int err = -ENOENT;
-
-	rt = rt6_lookup(addr, NULL, loopback_dev.ifindex, 1);
-	if (rt) {
-		if (rt->rt6i_dst.plen == 128)
-			err = ip6_del_rt(rt, NULL, NULL);
-		else
-			dst_release(&rt->u.dst);
-	}
-
-	return err;
 }
 
 static int fib6_ifdown(struct rt6_info *rt, void *arg)

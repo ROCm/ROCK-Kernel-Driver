@@ -472,6 +472,8 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 		printk("Freeing alive inet6 address %p\n", ifp);
 		return;
 	}
+	dst_release(&ifp->rt->u.dst);
+
 	inet6_ifa_count--;
 	kfree(ifp);
 }
@@ -482,25 +484,33 @@ static struct inet6_ifaddr *
 ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	      int scope, unsigned flags)
 {
-	struct inet6_ifaddr *ifa;
+	struct inet6_ifaddr *ifa = NULL;
+	struct rt6_info *rt;
 	int hash;
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	int err = 0;
 
 	spin_lock_bh(&lock);
 
 	/* Ignore adding duplicate addresses on an interface */
 	if (ipv6_chk_same_addr(addr, idev->dev)) {
-		spin_unlock_bh(&lock);
 		ADBG(("ipv6_add_addr: already assigned\n"));
-		return ERR_PTR(-EEXIST);
+		err = -EEXIST;
+		goto out;
 	}
 
 	ifa = kmalloc(sizeof(struct inet6_ifaddr), GFP_ATOMIC);
 
 	if (ifa == NULL) {
-		spin_unlock_bh(&lock);
 		ADBG(("ipv6_add_addr: malloc failed\n"));
-		return ERR_PTR(-ENOBUFS);
+		err = -ENOBUFS;
+		goto out;
+	}
+
+	rt = addrconf_dst_alloc(idev, addr, 0);
+	if (IS_ERR(rt)) {
+		err = PTR_ERR(rt);
+		goto out;
 	}
 
 	memset(ifa, 0, sizeof(struct inet6_ifaddr));
@@ -517,9 +527,8 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	read_lock(&addrconf_lock);
 	if (idev->dead) {
 		read_unlock(&addrconf_lock);
-		spin_unlock_bh(&lock);
-		kfree(ifa);
-		return ERR_PTR(-ENODEV);	/*XXX*/
+		err = -ENODEV;	/*XXX*/
+		goto out;
 	}
 
 	inet6_ifa_count++;
@@ -553,12 +562,20 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	}
 #endif
 
+	ifa->rt = rt;
+
 	in6_ifa_hold(ifa);
 	write_unlock_bh(&idev->lock);
 	read_unlock(&addrconf_lock);
+out:
 	spin_unlock_bh(&lock);
 
-	notifier_call_chain(&inet6addr_chain,NETDEV_UP,ifa);
+	if (unlikely(err == 0))
+		notifier_call_chain(&inet6addr_chain, NETDEV_UP, ifa);
+	else {
+		kfree(ifa);
+		ifa = ERR_PTR(err);
+	}
 
 	return ifa;
 }
@@ -2981,7 +2998,9 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 
 	switch (event) {
 	case RTM_NEWADDR:
-		ip6_rt_addr_add(&ifp->addr, ifp->idev->dev, 0);
+		dst_hold(&ifp->rt->u.dst);
+		if (ip6_ins_rt(ifp->rt, NULL, NULL))
+			dst_release(&ifp->rt->u.dst);
 		break;
 	case RTM_DELADDR:
 		addrconf_leave_solict(ifp->idev->dev, &ifp->addr);
@@ -2992,8 +3011,11 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 			if (!ipv6_addr_any(&addr))
 				ipv6_dev_ac_dec(ifp->idev->dev, &addr);
 		}
-		if (!ipv6_chk_addr(&ifp->addr, ifp->idev->dev, 1))
-			ip6_rt_addr_del(&ifp->addr, ifp->idev->dev);
+		dst_hold(&ifp->rt->u.dst);
+		if (ip6_del_rt(ifp->rt, NULL, NULL))
+			dst_free(&ifp->rt->u.dst);
+		else
+			dst_release(&ifp->rt->u.dst);
 		break;
 	}
 }
