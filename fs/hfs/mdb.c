@@ -100,7 +100,6 @@ struct hfs_mdb *hfs_mdb_get(hfs_sysmdb sys_mdb, int readonly,
 	mdb->magic = HFS_MDB_MAGIC;
 	mdb->sys_mdb = sys_mdb;
 	INIT_LIST_HEAD(&mdb->entry_dirty);
-	hfs_init_waitqueue(&mdb->rename_wait);
 	hfs_init_waitqueue(&mdb->bitmap_wait);
 
 	/* See if this is an HFS filesystem */

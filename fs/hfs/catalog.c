@@ -1346,13 +1346,6 @@ int hfs_cat_move(struct hfs_cat_entry *old_dir, struct hfs_cat_entry *new_dir,
 		return -EINVAL;
 	}
 
-	while (mdb->rename_lock) {
-		hfs_sleep_on(&mdb->rename_wait);
-	}
-	spin_lock(&entry_lock);
-	mdb->rename_lock = 1; /* XXX: should be atomic_inc */
-	spin_unlock(&entry_lock);
-
 	/* keep readers from getting confused by changing dir size */
 	start_write(new_dir);
 	if (old_dir != new_dir) {
@@ -1567,11 +1560,6 @@ done:
 		end_write(old_dir);
 	}
 	end_write(new_dir);
-	spin_lock(&entry_lock);
-	mdb->rename_lock = 0; /* XXX: should use atomic_dec */
-	hfs_wake_up(&mdb->rename_wait);
-	spin_unlock(&entry_lock);
-
 	return error;
 }
 
