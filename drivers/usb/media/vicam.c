@@ -51,19 +51,25 @@
 #define DBG(fmn,args...) do {} while(0)
 #endif
 
-/* Version Information */
-#define DRIVER_VERSION "v1.0"
-#define DRIVER_AUTHOR "Joe Burks, jburks@wavicle.org"
-#define DRIVER_DESC "ViCam WebCam Driver"
+#define DRIVER_AUTHOR           "Joe Burks, jburks@wavicle.org"
+#define DRIVER_DESC             "ViCam WebCam Driver"
 
 /* Define these values to match your device */
 #define USB_VICAM_VENDOR_ID	0x04c1
 #define USB_VICAM_PRODUCT_ID	0x009d
 
-#define VICAM_BYTES_PER_PIXEL 3
-#define VICAM_MAX_READ_SIZE (512*242+128)
-#define VICAM_MAX_FRAME_SIZE (VICAM_BYTES_PER_PIXEL*320*240)
-#define VICAM_FRAMES 2
+#define VICAM_BYTES_PER_PIXEL   3
+#define VICAM_MAX_READ_SIZE     (512*242+128)
+#define VICAM_MAX_FRAME_SIZE    (VICAM_BYTES_PER_PIXEL*320*240)
+#define VICAM_FRAMES            2
+
+#define VICAM_HEADER_SIZE       64
+
+#define clamp( x, l, h )        max_t( __typeof__( x ),         \
+                                       ( l ),                   \
+                                       min_t( __typeof__( x ),  \
+                                              ( h ),            \
+                                              ( x ) ) )
 
 /* Not sure what all the bytes in these char
  * arrays do, but they're necessary to make
@@ -425,7 +431,7 @@ struct vicam_camera {
 static int vicam_probe( struct usb_interface *intf, const struct usb_device_id *id);
 static void vicam_disconnect(struct usb_interface *intf);
 static void read_frame(struct vicam_camera *cam, int framenum);
-static void vicam_decode_color( char *data, char *rgb);
+static void vicam_decode_color(const u8 *, u8 *);
 
 static int __send_control_msg(struct vicam_camera *cam,
 			      u8 request,
@@ -840,106 +846,75 @@ vicam_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-inline int pin(int x)
+static void vicam_decode_color(const u8 *data, u8 *rgb)
 {
-	return((x > 255) ? 255 : ((x < 0) ? 0 : x));
-}
+	/* vicam_decode_color - Convert from Vicam Y-Cr-Cb to RGB
+	 * Copyright (C) 2002 Monroe Williams (monroe@pobox.com)
+	 */
 
-inline void writepixel(char *rgb, int Y, int Cr, int Cb)
-{
-	Y = 1160 * (Y - 16);
-	
-	rgb[2] = pin( ( ( Y + ( 1594 * Cr ) ) + 500 ) / 1300 );
-	rgb[1] = pin( ( ( Y - (  392 * Cb ) - ( 813 * Cr ) ) + 500 ) / 1000 );
-	rgb[0] = pin( ( ( Y + ( 2017 * Cb ) ) + 500 ) / 900 );
-}
-
-#define DATA_HEADER_SIZE 64
-
-// --------------------------------------------------------------------------------
-//	vicam_decode_color - Convert from Vicam Y-Cr-Cb to RGB
-//
-//   Copyright (C) 2002 Monroe Williams (monroe@pobox.com)
-// --------------------------------------------------------------------------------
-
-static void vicam_decode_color( char *data, char *rgb)
-{
-	int x,y;
-	int Cr, Cb;
-	int sign;
-	int prevX, nextX, prevY, nextY;
-	int skip;
-	unsigned char *src;
-	unsigned char *dst;
+	int i, prevY, nextY;
 
 	prevY = 512;
 	nextY = 512;
 
-	src = data + DATA_HEADER_SIZE;
-	dst = rgb;
+	data += VICAM_HEADER_SIZE;
 
-	for(y = 1; y < 241; y += 2)
-	{
-		// even line
-		sign = 1;
+	for( i = 0; i < 240; i++, data += 512 ) {
+		const int y = ( i * 242 ) / 240;
+
+		int j, prevX, nextX;
+		int Y, Cr, Cb;
+
+		if ( y == 242 - 1 ) {
+			nextY = -512;
+		}
+
 		prevX = 1;
 		nextX = 1;
 
-		skip = 0;
+		for ( j = 0; j < 320; j++, rgb += 3 ) {
+			const int x = ( j * 512 ) / 320;
+			const u8 * const src = &data[x];
 
-		dst = rgb + (y-1)*320*3;
-		
-		for(x = 0; x < 512; x++)
-		{
-			if(x == 512-1)
+			if ( x == 512 - 1 ) {
 				nextX = -1;
+			}
 
-			Cr = sign * ((src[prevX] - src[0]) + (src[nextX] - src[0])) >> 1;
-			Cb = sign * ((src[prevY] - src[prevX + prevY]) + (src[prevY] - src[nextX + prevY]) + (src[nextY] - src[prevX + nextY]) + (src[nextY] - src[nextX + nextY])) >> 2;
+			Cr = ( src[prevX] - src[0] ) +
+				( src[nextX] - src[0] );
+			Cr /= 2;
 
-			writepixel(
-					dst + ((x*5)>>3)*3,
-					src[0] + (sign * (Cr >> 1)),
-					Cr,
-					Cb);
+			Cb = ( src[prevY] - src[prevX + prevY] ) +
+				( src[prevY] - src[nextX + prevY] ) +
+				( src[nextY] - src[prevX + nextY] ) +
+				( src[nextY] - src[nextX + nextY] );
+			Cb /= 4;
 
-			src++;
-			sign *= -1;
+			Y = 1160 * ( src[0] + ( Cr / 2 ) - 16 );
+
+			if ( i & 1 ) {
+				int Ct = Cr;
+				Cr = Cb;
+				Cb = Ct;
+			}
+
+			if ( ( x ^ i ) & 1 ) {
+				Cr = -Cr;
+				Cb = -Cb;
+			}
+
+			rgb[0] = clamp( ( ( Y + ( 2017 * Cb ) ) +
+					500 ) / 900, 0, 255 );
+			rgb[1] = clamp( ( ( Y - ( 392 * Cb ) -
+					  ( 813 * Cr ) ) +
+					  500 ) / 1000, 0, 255 );
+			rgb[2] = clamp( ( ( Y + ( 1594 * Cr ) ) +
+					500 ) / 1300, 0, 255 );
+
 			prevX = -1;
 		}
 
 		prevY = -512;
-
-		if(y == (242 - 2))
-			nextY = -512;
-
-		// odd line
-		sign = 1;
-		prevX = 1;
-		nextX = 1;
-
-		skip = 0;
-
-		dst = rgb + (y)*320*3;
-		
-		for(x = 0; x < 512; x++)
-		{
-			if(x == 512-1)
-				nextX = -1;
-			
-			Cr = sign * ((src[prevX + prevY] - src[prevY]) + (src[nextX + prevY] - src[prevY]) + (src[prevX + nextY] - src[nextY]) + (src[nextX + nextY] - src[nextY])) >> 2;
-			Cb = sign * ((src[0] - src[prevX]) + (src[0] - src[nextX])) >> 1;
-
-			writepixel(
-					dst + ((x * 5)>>3)*3,
-					src[0] - (sign * (Cb >> 1)),
-					Cr,
-					Cb);
-
-			src++;
-			sign *= -1;
-			prevX = -1;
-		}
 	}
 }
 
@@ -1030,7 +1005,6 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 		vicam_decode_color(cam->raw_image,
 				   cam->framebuf +
 				   0 * VICAM_MAX_FRAME_SIZE);
-
 	}
 
 	count = min_t(size_t, count, VICAM_MAX_FRAME_SIZE - *ppos);
