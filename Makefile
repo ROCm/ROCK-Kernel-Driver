@@ -637,12 +637,9 @@ MRPROPER_FILES += \
 	sound/oss/pndspini.c \
 	drivers/atm/fore200e_*_fw.c drivers/atm/.fore200e_*.fw \
 	.version .config* config.in config.old \
-	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
-	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
 	.menuconfig.log \
 	include/asm \
-	.hdepend scripts/split-include scripts/docproc \
-	scripts/fixdep $(TOPDIR)/include/linux/modversions.h \
+	.hdepend $(TOPDIR)/include/linux/modversions.h \
 	tags TAGS kernel.spec \
 	.tmpversion
 
@@ -672,6 +669,7 @@ mrproper: clean archmrproper
 		-type f -print | xargs rm -f
 	@rm -f $(MRPROPER_FILES)
 	@rm -rf $(MRPROPER_DIRS)
+	@$(MAKE) -C scripts mrproper
 	@$(MAKE) -f Documentation/DocBook/Makefile mrproper
 
 distclean: mrproper
