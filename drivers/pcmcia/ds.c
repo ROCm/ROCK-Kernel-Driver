@@ -907,15 +907,13 @@ int pcmcia_deregister_client(client_handle_t handle)
 	s = SOCKET(handle);
 	ds_dbg(1, "deregister_client(%p)\n", handle);
 
-	if (handle->state &
-	    (CLIENT_IRQ_REQ|CLIENT_IO_REQ|CLIENT_CONFIG_LOCKED))
-		return CS_IN_USE;
+	if (handle->state & (CLIENT_IRQ_REQ|CLIENT_IO_REQ|CLIENT_CONFIG_LOCKED))
+		goto warn_out;
 	for (i = 0; i < MAX_WIN; i++)
 		if (handle->state & CLIENT_WIN_REQ(i))
-			return CS_IN_USE;
+			goto warn_out;
 
-	if ((handle->state & CLIENT_STALE) ||
-	    (handle->Attributes & INFO_MASTER_CLIENT)) {
+	if (handle->state & CLIENT_STALE) {
 		spin_lock_irqsave(&s->lock, flags);
 		client = &s->clients;
 		while ((*client) && ((*client) != handle))
@@ -934,6 +932,9 @@ int pcmcia_deregister_client(client_handle_t handle)
 	}
 
 	return CS_SUCCESS;
+ warn_out:
+	printk(KERN_WARNING "ds: deregister_client was called too early.\n");
+	return CS_IN_USE;
 } /* deregister_client */
 EXPORT_SYMBOL(pcmcia_deregister_client);
 

@@ -198,13 +198,8 @@ EXPORT_SYMBOL(pcmcia_put_socket);
 static void pcmcia_release_socket(struct class_device *class_dev)
 {
 	struct pcmcia_socket *socket = class_get_devdata(class_dev);
-	client_t *client;
 
-	while (socket->clients) {
-		client = socket->clients;
-		socket->clients = socket->clients->next;
-		kfree(client);
-	}
+	BUG_ON(socket->clients);
 
 	complete(&socket->socket_released);
 }
@@ -357,8 +352,6 @@ static void free_regions(memory_handle_t *list)
 
 static void shutdown_socket(struct pcmcia_socket *s)
 {
-    client_t **c;
-    
     cs_dbg(s, 1, "shutdown_socket\n");
 
     /* Blank out the socket state */
@@ -376,15 +369,7 @@ static void shutdown_socket(struct pcmcia_socket *s)
 	kfree(s->config);
 	s->config = NULL;
     }
-    for (c = &s->clients; *c; ) {
-	if ((*c)->state & CLIENT_UNBOUND) {
-	    client_t *d = *c;
-	    *c = (*c)->next;
-	    kfree(d);
-	} else {
-	    c = &((*c)->next);
-	}
-    }
+    BUG_ON(s->clients);
     free_regions(&s->a_region);
     free_regions(&s->c_region);
 
