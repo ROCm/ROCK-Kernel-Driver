@@ -502,7 +502,7 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 		return PTR_ERR(handle);
 	}
 
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
 	inode = ext3_new_inode (handle, dir, mode);
@@ -533,7 +533,7 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 		return PTR_ERR(handle);
 	}
 
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
 	inode = ext3_new_inode (handle, dir, mode);
@@ -566,7 +566,7 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 		return PTR_ERR(handle);
 	}
 
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
 	inode = ext3_new_inode (handle, dir, S_IFDIR);
@@ -860,7 +860,7 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 	if (!bh)
 		goto end_rmdir;
 
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
 	inode = dentry->d_inode;
@@ -916,7 +916,7 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 		return PTR_ERR(handle);
 	}
 
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
 	retval = -ENOENT;
@@ -975,7 +975,7 @@ static int ext3_symlink (struct inode * dir,
 		return PTR_ERR(handle);
 	}
 
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
 	inode = ext3_new_inode (handle, dir, S_IFLNK|S_IRWXUGO);
@@ -1033,7 +1033,7 @@ static int ext3_link (struct dentry * old_dentry,
 		return PTR_ERR(handle);
 	}
 
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
 	inode->i_ctime = CURRENT_TIME;
@@ -1073,7 +1073,7 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 		return PTR_ERR(handle);
 	}
 
-	if (IS_SYNC(old_dir) || IS_SYNC(new_dir))
+	if (IS_DIRSYNC(old_dir) || IS_DIRSYNC(new_dir))
 		handle->h_sync = 1;
 
 	old_bh = ext3_find_entry (old_dentry, &old_de);

@@ -211,10 +211,15 @@ struct ext2_group_desc
 #define EXT2_ECOMPR_FL			0x00000800 /* Compression error */
 /* End compression flags --- maybe not all used */	
 #define EXT2_BTREE_FL			0x00001000 /* btree format dir */
+#define EXT2_INDEX_FL			0x00001000 /* hash-indexed directory */
+#define EXT2_IMAGIC_FL			0x00002000 /* AFS directory */
+#define EXT2_JOURNAL_DATA_FL		0x00004000 /* Reserved for ext3 */
+#define EXT2_NOTAIL_FL			0x00008000 /* file tail should not be merged */
+#define EXT2_DIRSYNC_FL			0x00010000 /* dirsync behaviour (directories only) */
 #define EXT2_RESERVED_FL		0x80000000 /* reserved for ext2 lib */
 
-#define EXT2_FL_USER_VISIBLE		0x00001FFF /* User visible flags */
-#define EXT2_FL_USER_MODIFIABLE		0x000000FF /* User modifiable flags */
+#define EXT2_FL_USER_VISIBLE		0x00011FFF /* User visible flags */
+#define EXT2_FL_USER_MODIFIABLE		0x000100FF /* User modifiable flags */
 
 /*
  * ioctl commands

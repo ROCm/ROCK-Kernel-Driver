@@ -429,6 +429,9 @@ repeat:
 	ei->i_flags = EXT2_I(dir)->i_flags;
 	if (S_ISLNK(mode))
 		ei->i_flags &= ~(EXT2_IMMUTABLE_FL|EXT2_APPEND_FL);
+	/* dirsync is only applied to directories */
+	if (!S_ISDIR(mode))
+		ei->i_flags &= ~EXT2_DIRSYNC_FL;
 	ei->i_faddr = 0;
 	ei->i_frag_no = 0;
 	ei->i_frag_size = 0;
@@ -443,6 +446,8 @@ repeat:
 	ei->i_dir_start_lookup = 0;
 	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
+	if (ei->i_flags & EXT2_DIRSYNC_FL)
+		inode->i_flags |= S_DIRSYNC;
 	inode->i_generation = EXT2_SB(sb)->s_next_generation++;
 	insert_inode_hash(inode);
 	mark_inode_dirty(inode);

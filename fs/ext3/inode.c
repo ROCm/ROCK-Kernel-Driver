@@ -2160,23 +2160,14 @@ void ext3_read_inode(struct inode * inode)
 	} else 
 		init_special_inode(inode, inode->i_mode,
 				   le32_to_cpu(iloc.raw_inode->i_block[0]));
-	/* inode->i_attr_flags = 0;				unused */
-	if (ei->i_flags & EXT3_SYNC_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_SYNCRONOUS; unused */
+	if (ei->i_flags & EXT3_SYNC_FL)
 		inode->i_flags |= S_SYNC;
-	}
-	if (ei->i_flags & EXT3_APPEND_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_APPEND;	unused */
+	if (ei->i_flags & EXT3_APPEND_FL)
 		inode->i_flags |= S_APPEND;
-	}
-	if (ei->i_flags & EXT3_IMMUTABLE_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_IMMUTABLE;	unused */
+	if (ei->i_flags & EXT3_IMMUTABLE_FL)
 		inode->i_flags |= S_IMMUTABLE;
-	}
-	if (ei->i_flags & EXT3_NOATIME_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_NOATIME;	unused */
+	if (ei->i_flags & EXT3_NOATIME_FL)
 		inode->i_flags |= S_NOATIME;
-	}
 	return;
 	
 bad_inode:

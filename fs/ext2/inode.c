@@ -58,7 +58,7 @@ void ext2_delete_inode (struct inode * inode)
 		goto no_delete;
 	EXT2_I(inode)->i_dtime	= CURRENT_TIME;
 	mark_inode_dirty(inode);
-	ext2_update_inode(inode, IS_SYNC(inode));
+	ext2_update_inode(inode, inode_needs_sync(inode));
 
 	inode->i_size = 0;
 	if (inode->i_blocks)
@@ -905,7 +905,7 @@ do_indirects:
 			;
 	}
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	if (IS_SYNC(inode)) {
+	if (inode_needs_sync(inode)) {
 		sync_mapping_buffers(inode->i_mapping);
 		ext2_sync_inode (inode);
 	} else {
@@ -1039,23 +1039,14 @@ void ext2_read_inode (struct inode * inode)
 		init_special_inode(inode, inode->i_mode,
 				   le32_to_cpu(raw_inode->i_block[0]));
 	brelse (bh);
-	inode->i_attr_flags = 0;
-	if (ei->i_flags & EXT2_SYNC_FL) {
-		inode->i_attr_flags |= ATTR_FLAG_SYNCRONOUS;
+	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
-	}
-	if (ei->i_flags & EXT2_APPEND_FL) {
-		inode->i_attr_flags |= ATTR_FLAG_APPEND;
+	if (ei->i_flags & EXT2_APPEND_FL)
 		inode->i_flags |= S_APPEND;
-	}
-	if (ei->i_flags & EXT2_IMMUTABLE_FL) {
-		inode->i_attr_flags |= ATTR_FLAG_IMMUTABLE;
+	if (ei->i_flags & EXT2_IMMUTABLE_FL)
 		inode->i_flags |= S_IMMUTABLE;
-	}
-	if (ei->i_flags & EXT2_NOATIME_FL) {
-		inode->i_attr_flags |= ATTR_FLAG_NOATIME;
+	if (ei->i_flags & EXT2_NOATIME_FL)
 		inode->i_flags |= S_NOATIME;
-	}
 	return;
 	
 bad_inode:

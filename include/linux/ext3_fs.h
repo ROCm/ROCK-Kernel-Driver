@@ -203,10 +203,12 @@ struct ext3_group_desc
 #define EXT3_INDEX_FL			0x00001000 /* hash-indexed directory */
 #define EXT3_IMAGIC_FL			0x00002000 /* AFS directory */
 #define EXT3_JOURNAL_DATA_FL		0x00004000 /* file data should be journaled */
+#define EXT3_NOTAIL_FL			0x00008000 /* file tail should not be merged */
+#define EXT3_DIRSYNC_FL			0x00010000 /* dirsync behaviour (directories only) */
 #define EXT3_RESERVED_FL		0x80000000 /* reserved for ext3 lib */
 
-#define EXT3_FL_USER_VISIBLE		0x00005FFF /* User visible flags */
-#define EXT3_FL_USER_MODIFIABLE		0x000000FF /* User modifiable flags */
+#define EXT3_FL_USER_VISIBLE		0x00015FFF /* User visible flags */
+#define EXT3_FL_USER_MODIFIABLE		0x000100FF /* User modifiable flags */
 
 /*
  * Inode dynamic state flags
