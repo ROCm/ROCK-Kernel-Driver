@@ -105,7 +105,7 @@ flash_llseek(struct file *file, long long offset, int origin)
 }
 
 static ssize_t
-flash_read(struct file * file, char * buf,
+flash_read(struct file * file, char __user * buf,
 	   size_t count, loff_t *ppos)
 {
 	unsigned long p = file->f_pos;

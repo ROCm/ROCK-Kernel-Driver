@@ -128,7 +128,7 @@ static int d7s_ioctl(struct inode *inode, struct file *f,
 		/* assign device register values
 		 * we mask-out D7S_FLIP if in sol_compat mode
 		 */
-		if (get_user(ireg, (int *) arg))
+		if (get_user(ireg, (int __user *) arg))
 			return -EFAULT;
 		if (0 != sol_compat) {
 			(regs & D7S_FLIP) ? 
@@ -144,7 +144,7 @@ static int d7s_ioctl(struct inode *inode, struct file *f,
 		 * This driver will not misinform you about the state
 		 * of your hardware while in sol_compat mode
 		 */
-		if (put_user(regs, (int *) arg))
+		if (put_user(regs, (int __user *) arg))
 			return -EFAULT;
 		break;
 
