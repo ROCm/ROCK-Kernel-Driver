@@ -35,7 +35,7 @@
  *	1. Lop off bits 61 thru 63 in the virtual address
  */
 #define DATA_VA_TO_PA(addr)							\
-	dep	addr	= 0, addr, 61, 3
+	tpa	addr	= addr
 /*
  * This macro converts a data physical address to a virtual address
  * Right now for simulation purposes the virtual addresses are

@@ -91,17 +91,14 @@ static void raw_v4_hash(struct sock *sk)
 	write_lock_bh(&raw_v4_lock);
 	sk_add_node(sk, head);
 	sock_prot_inc_use(sk->sk_prot);
- 	sock_hold(sk);
 	write_unlock_bh(&raw_v4_lock);
 }
 
 static void raw_v4_unhash(struct sock *sk)
 {
  	write_lock_bh(&raw_v4_lock);
-	if (sk_del_node_init(sk)) {
+	if (sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
-		__sock_put(sk);
-	}
 	write_unlock_bh(&raw_v4_lock);
 }
 

@@ -30,8 +30,8 @@
 #include <asm/sn/sn2/shubio.h>
 
 
-error_state_t error_state_get(devfs_handle_t v);
-error_return_code_t error_state_set(devfs_handle_t v,error_state_t new_state);
+error_state_t error_state_get(vertex_hdl_t v);
+error_return_code_t error_state_set(vertex_hdl_t v,error_state_t new_state);
 
 
 /*
@@ -42,7 +42,7 @@ error_return_code_t error_state_set(devfs_handle_t v,error_state_t new_state);
 /*ARGSUSED*/
 int
 hub_xp_error_handler(
-	devfs_handle_t 	hub_v, 
+	vertex_hdl_t 	hub_v, 
 	nasid_t		nasid, 
 	int		error_code, 
 	ioerror_mode_t	mode, 
@@ -50,7 +50,7 @@ hub_xp_error_handler(
 {
 	/*REFERENCED*/
 	hubreg_t	iio_imem;
-	devfs_handle_t	xswitch;
+	vertex_hdl_t	xswitch;
 	error_state_t	e_state;
 	cnodeid_t	cnode;
 
@@ -148,7 +148,7 @@ is_widget_pio_enabled(ioerror_t *ioerror)
  */
 int
 hub_ioerror_handler(
-	devfs_handle_t 	hub_v, 
+	vertex_hdl_t 	hub_v, 
 	int		error_code,
 	int		mode,
 	struct io_error_s	*ioerror)
@@ -158,6 +158,7 @@ hub_ioerror_handler(
 	int		retval = 0;
 	/*REFERENCED*/
 	iopaddr_t 	p;
+	caddr_t 	cp;
 
 	IOERROR_DUMP("hub_ioerror_handler", error_code, mode, ioerror);
 
@@ -193,14 +194,14 @@ hub_ioerror_handler(
 		 * This is typically true for user mode bus errors while
 		 * accessing I/O space.
 		 */
-		 IOERROR_GETVALUE(p,ioerror,vaddr);
-		 if (p){
+		 IOERROR_GETVALUE(cp,ioerror,vaddr);
+		 if (cp){
 		    /* 
 		     * If neither in small window nor in large window range,
 		     * outright reject it.
 		     */
-		    IOERROR_GETVALUE(p,ioerror,vaddr);
-		    if (NODE_SWIN_ADDR(nasid, (paddr_t)p)){
+		    IOERROR_GETVALUE(cp,ioerror,vaddr);
+		    if (NODE_SWIN_ADDR(nasid, (paddr_t)cp)){
 			iopaddr_t	hubaddr;
 			xwidgetnum_t	widgetnum;
 			iopaddr_t	xtalkaddr;
@@ -216,7 +217,7 @@ hub_ioerror_handler(
 			IOERROR_SETVALUE(ioerror,xtalkaddr,xtalkaddr);
 
 
-		    } else if (NODE_BWIN_ADDR(nasid, (paddr_t)p)){
+		    } else if (NODE_BWIN_ADDR(nasid, (paddr_t)cp)){
 			/* 
 			 * Address corresponds to large window space. 
 			 * Convert it to xtalk address.
@@ -428,11 +429,6 @@ end:
 	return retval;
 }
 
-#define L_BITSMINOR 18
-#define L_MAXMAJ 0x1ff
-#define emajor(x) (int )(((unsigned )(x)>>L_BITSMINOR) & L_MAXMAJ)
-#define dev_is_vertex(dev) (emajor((dev_t)(dev)) == 0)
-
 #define INFO_LBL_ERROR_STATE    "error_state"
 
 #define v_error_state_get(v,s)                                          \
@@ -454,12 +450,12 @@ hwgraph_info_add_LBL(v,INFO_LBL_ERROR_STATE, (arbitrary_info_t)s))
  *                      current state otherwise
  */
 error_state_t
-error_state_get(devfs_handle_t v)
+error_state_get(vertex_hdl_t v)
 {
         error_state_t   s;
 
         /* Check if we have a valid hwgraph vertex */
-        if (!dev_is_vertex(v))
+        if ( v == (vertex_hdl_t)0 )
                 return(ERROR_STATE_NONE);
 
         /* Get the labelled info hanging off the vertex which corresponds
@@ -479,13 +475,13 @@ error_state_get(devfs_handle_t v)
  *                      ERROR_RETURN_CODE_SUCCESS otherwise
  */
 error_return_code_t
-error_state_set(devfs_handle_t v,error_state_t new_state)
+error_state_set(vertex_hdl_t v,error_state_t new_state)
 {
         error_state_t   old_state;
         boolean_t       replace = B_TRUE;
 
         /* Check if we have a valid hwgraph vertex */
-        if (!dev_is_vertex(v))
+        if ( v == (vertex_hdl_t)0 )
                 return(ERROR_RETURN_CODE_GENERAL_FAILURE);
 
 

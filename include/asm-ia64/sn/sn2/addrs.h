@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2001-2002 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2001-2003 Silicon Graphics, Inc.  All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_SN2_ADDRS_H
@@ -57,7 +57,7 @@ typedef union ia64_sn2_pa {
 #define LOCAL_MEM_SPACE		0xc000010000000000	/* Local Memory space */
 #define GLOBAL_MMR_SPACE	0xc000000800000000	/* Global MMR space */
 #define GLOBAL_PHYS_MMR_SPACE	0x0000000800000000	/* Global Physical MMR space */
-#define GET_SPACE		0xc000001000000000	/* GET space */
+#define GET_SPACE		0xe000001000000000	/* GET space */
 #define AMO_SPACE		0xc000002000000000	/* AMO space */
 #define CACHEABLE_MEM_SPACE	0xe000003000000000	/* Cacheable memory space */
 #define UNCACHED                0xc000000000000000      /* UnCacheable memory space */

@@ -673,7 +673,7 @@ static int rtl8150_close(struct net_device *netdev)
 	return res;
 }
 
-static int rtl8150_ethtool_ioctl(struct net_device *netdev, void *uaddr)
+static int rtl8150_ethtool_ioctl(struct net_device *netdev, void __user *uaddr)
 {
 	rtl8150_t *dev;
 	int cmd;
@@ -758,7 +758,7 @@ static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		res = rtl8150_ethtool_ioctl(netdev, rq->ifr_data);
+		res = rtl8150_ethtool_ioctl(netdev, (void __user *)rq->ifr_data);
 		break;
 	case SIOCDEVPRIVATE:
 		data[0] = dev->phy;

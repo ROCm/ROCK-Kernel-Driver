@@ -758,8 +758,7 @@ static int packet_release(struct socket *sock)
 		return 0;
 
 	write_lock_bh(&packet_sklist_lock);
-	if (sk_del_node_init(sk))
-		__sock_put(sk);
+	sk_del_node_init(sk);
 	write_unlock_bh(&packet_sklist_lock);
 
 	/*
@@ -984,7 +983,6 @@ static int packet_create(struct socket *sock, int protocol)
 
 	write_lock_bh(&packet_sklist_lock);
 	sk_add_node(sk, &packet_sklist);
-	sock_hold(sk);
 	write_unlock_bh(&packet_sklist_lock);
 	return(0);
 

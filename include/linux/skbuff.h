@@ -16,6 +16,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/compiler.h>
 #include <linux/time.h>
 #include <linux/cache.h>
 
@@ -1127,7 +1128,11 @@ static inline struct sk_buff *skb_padto(struct sk_buff *skb, unsigned int len)
  *	If there is no free memory -ENOMEM is returned, otherwise zero
  *	is returned and the old skb data released.
  */
-int skb_linearize(struct sk_buff *skb, int gfp);
+extern int __skb_linearize(struct sk_buff *skb, int gfp);
+static inline int __deprecated skb_linearize(struct sk_buff *skb, int gfp)
+{
+	return __skb_linearize(skb, gfp);
+}
 
 static inline void *kmap_skb_frag(const skb_frag_t *frag)
 {

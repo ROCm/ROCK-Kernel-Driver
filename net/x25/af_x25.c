@@ -154,8 +154,7 @@ int x25_addr_aton(unsigned char *p, struct x25_address *called_addr,
 static void x25_remove_socket(struct sock *sk)
 {
 	write_lock_bh(&x25_list_lock);
-	if (sk_del_node_init(sk))
-		sock_put(sk);
+	sk_del_node_init(sk);
 	write_unlock_bh(&x25_list_lock);
 }
 
@@ -219,7 +218,6 @@ static void x25_insert_socket(struct sock *sk)
 {
 	write_lock_bh(&x25_list_lock);
 	sk_add_node(sk, &x25_list);
-	sock_hold(sk);
 	write_unlock_bh(&x25_list_lock);
 }
 

@@ -148,20 +148,17 @@ static int lm85_scaling[] = {  /* .001 Volts */
 #define SCALE(val,from,to)		(((val)*(to) + ((from)/2))/(from))
 #define INS_TO_REG(n,val)		(SENSORS_LIMIT(SCALE(val,lm85_scaling[n],192),0,255))
 #define INSEXT_FROM_REG(n,val,ext)	(SCALE((val)*4 + (ext),192*4,lm85_scaling[n]))
-/*
 #define INS_FROM_REG(n,val)		(INSEXT_FROM_REG(n,val,0))
-*/
-#define INS_FROM_REG(n,val)		( ( (val*4*lm85_scaling[n]) + (192*4/2) ) / (192*4) )
 
 /* FAN speed is measured using 90kHz clock */
 #define FAN_TO_REG(val)		(SENSORS_LIMIT( (val)<=0?0: 5400000/(val),0,65534))
 #define FAN_FROM_REG(val)	((val)==0?-1:(val)==0xffff?0:5400000/(val))
 
-/* Temperature is reported in .01 degC increments */
-#define TEMP_TO_REG(val)		(SENSORS_LIMIT(((val)+50)/100,-127,127))
-#define TEMPEXT_FROM_REG(val,ext)	((val)*100 + (ext)*25)
+/* Temperature is reported in .001 degC increments */
+#define TEMP_TO_REG(val)		(SENSORS_LIMIT(((val)+500)/1000,-127,127))
+#define TEMPEXT_FROM_REG(val,ext)	((val)*1000 + (ext)*250)
 #define TEMP_FROM_REG(val)		(TEMPEXT_FROM_REG(val,0))
-#define EXTTEMP_TO_REG(val)		(SENSORS_LIMIT((val)/25,-127,127))
+#define EXTTEMP_TO_REG(val)		(SENSORS_LIMIT((val)/250,-127,127))
 
 #define PWM_TO_REG(val)			(SENSORS_LIMIT(val,0,255))
 #define PWM_FROM_REG(val)		(val)
@@ -437,10 +434,13 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
+	int	val;
 
-	int val = simple_strtol(buf, NULL, 10);
+	down(&data->update_lock);
+	val = simple_strtol(buf, NULL, 10);
 	data->fan_min[nr] = FAN_TO_REG(val);
 	lm85_write_value(client, LM85_REG_FAN_MIN(nr), data->fan_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -528,10 +528,13 @@ static ssize_t set_pwm(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
+	int	val;
 
-	int val = simple_strtol(buf, NULL, 10);
+	down(&data->update_lock);
+	val = simple_strtol(buf, NULL, 10);
 	data->pwm[nr] = PWM_TO_REG(val);
 	lm85_write_value(client, LM85_REG_PWM(nr), data->pwm[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t show_pwm_enable(struct device *dev, char *buf, int nr)
@@ -590,10 +593,13 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
+	int	val;
 
-	int val = simple_strtol(buf, NULL, 10);
+	down(&data->update_lock);
+	val = simple_strtol(buf, NULL, 10);
 	data->in_min[nr] = INS_TO_REG(nr, val);
 	lm85_write_value(client, LM85_REG_IN_MIN(nr), data->in_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t show_in_max(struct device *dev, char *buf, int nr)
@@ -609,10 +615,13 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
+	int	val;
 
-	int val = simple_strtol(buf, NULL, 10);
+	down(&data->update_lock);
+	val = simple_strtol(buf, NULL, 10);
 	data->in_max[nr] = INS_TO_REG(nr, val);
 	lm85_write_value(client, LM85_REG_IN_MAX(nr), data->in_max[nr]);
+	up(&data->update_lock);
 	return count;
 }
 #define show_in_reg(offset)						\
@@ -673,10 +682,13 @@ static ssize_t set_temp_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
+	int	val;
 
-	int val = simple_strtol(buf, NULL, 10);
+	down(&data->update_lock);
+	val = simple_strtol(buf, NULL, 10);
 	data->temp_min[nr] = TEMP_TO_REG(val);
 	lm85_write_value(client, LM85_REG_TEMP_MIN(nr), data->temp_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
@@ -692,10 +704,13 @@ static ssize_t set_temp_max(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
+	int	val;
 
-	int val = simple_strtol(buf, NULL, 10);
+	down(&data->update_lock);
+	val = simple_strtol(buf, NULL, 10);
 	data->temp_max[nr] = TEMP_TO_REG(val);
 	lm85_write_value(client, LM85_REG_TEMP_MAX(nr), data->temp_max[nr]);
+	up(&data->update_lock);
 	return count;
 }
 #define show_temp_reg(offset)						\

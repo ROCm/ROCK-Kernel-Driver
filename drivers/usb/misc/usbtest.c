@@ -107,7 +107,7 @@ static struct urb *simple_alloc_urb (
 	urb->interval = (udev->speed == USB_SPEED_HIGH)
 			? (INTERRUPT_RATE << 3)
 			: INTERRUPT_RATE;
-	urb->transfer_flags = URB_NO_DMA_MAP;
+	urb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
 	if (usb_pipein (pipe))
 		urb->transfer_flags |= URB_SHORT_NOT_OK;
 	urb->transfer_buffer = usb_buffer_alloc (udev, bytes, SLAB_KERNEL,

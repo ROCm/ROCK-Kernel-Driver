@@ -27,6 +27,9 @@
 
 /*
  * These are *only* valid on the kernel direct mapped RAM memory.
+ * Note: Drivers should NOT use these.  They are the wrong
+ * translation for translating DMA addresses.  Use the driver
+ * DMA support - see dma-mapping.h.
  */
 static inline unsigned long virt_to_phys(void *x)
 {
@@ -38,6 +41,9 @@ static inline void *phys_to_virt(unsigned long x)
 	return (void *)(__phys_to_virt((unsigned long)(x)));
 }
 
+/*
+ * Drivers should NOT use these either.
+ */
 #define __pa(x)			__virt_to_phys((unsigned long)(x))
 #define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
 
@@ -72,7 +78,7 @@ static inline void *phys_to_virt(unsigned long x)
 #define pfn_valid(pfn)		((pfn) >= PHYS_PFN_OFFSET && (pfn) < (PHYS_PFN_OFFSET + max_mapnr))
 
 #define virt_to_page(kaddr)	(pfn_to_page(__pa(kaddr) >> PAGE_SHIFT))
-#define virt_addr_valid(kaddr)	((kaddr) >= PAGE_OFFSET && (kaddr) < (unsigned long)high_memory)
+#define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
 
 #define PHYS_TO_NID(addr)	(0)
 

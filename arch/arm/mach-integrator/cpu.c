@@ -23,6 +23,7 @@
 
 #include <asm/hardware.h>
 #include <asm/io.h>
+#include <asm/hardware/icst525.h>
 
 static struct cpufreq_driver integrator_driver;
 
@@ -31,75 +32,40 @@ static struct cpufreq_driver integrator_driver;
 #define CM_STAT (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_STAT_OFFSET)
 #define CM_LOCK (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
 
-struct vco {
-	unsigned char vdw;
-	unsigned char od;
+static const struct icst525_params lclk_params = {
+	.ref		= 24000,
+	.vco_max	= 320000,
+	.vd_min		= 8,
+	.vd_max		= 132,
+	.rd_min		= 24,
+	.rd_max		= 24,
 };
 
-/*
- * Divisors for each OD setting.
- */
-static unsigned char cc_divisor[8] = { 10, 2, 8, 4, 5, 7, 9, 6 };
-
-static unsigned int vco_to_freq(struct vco vco, int factor)
-{
-	return 2000 * (vco.vdw + 8) / cc_divisor[vco.od] / factor;
-}
-
-/*
- * Divisor indexes in ascending divisor order
- */
-static unsigned char s2od[] = { 1, 3, 4, 7, 5, 2, 6, 0 };
-
-static struct vco freq_to_vco(unsigned int freq_khz, int factor)
-{
-	struct vco vco = {0, 0};
-	unsigned int i, f;
-
-	freq_khz *= factor;
-
-	for (i = 0; i < 8; i++) {
-		f = freq_khz * cc_divisor[s2od[i]];
-		/* f must be between 10MHz and 320MHz */
-		if (f > 10000 && f <= 320000)
-			break;
-	}
-
-	vco.od  = s2od[i];
-	vco.vdw = f / 2000 - 8;
-
-	return vco;
-}
-
+static const struct icst525_params cclk_params = {
+	.ref		= 24000,
+	.vco_max	= 320000,
+	.vd_min		= 12,
+	.vd_max		= 160,
+	.rd_min		= 24,
+	.rd_max		= 24,
+};
 
 /*
  * Validate the speed policy.
  */
 static int integrator_verify_policy(struct cpufreq_policy *policy)
 {
-	struct vco vco;
+	struct icst525_vco vco;
 
 	cpufreq_verify_within_limits(policy, 
 				     policy->cpuinfo.min_freq, 
 				     policy->cpuinfo.max_freq);
 
-	vco = freq_to_vco(policy->max, 1);
+	vco = icst525_khz_to_vco(&cclk_params, policy->max);
+	policy->max = icst525_khz(&cclk_params, vco);
 
-	if (vco.vdw < 4)
-		vco.vdw = 4;
-	if (vco.vdw > 152)
-		vco.vdw = 152;
-
-	policy->max = vco_to_freq(vco, 1);
-
-	vco = freq_to_vco(policy->min, 1);
-
-	if (vco.vdw < 4)
-		vco.vdw = 4;
-	if (vco.vdw > 152)
-		vco.vdw = 152;
-
-	policy->min = vco_to_freq(vco, 1);
+	vco = icst525_khz_to_vco(&cclk_params, policy->min);
+	policy->min = icst525_khz(&cclk_params, vco);
 
 	cpufreq_verify_within_limits(policy, 
 				     policy->cpuinfo.min_freq, 
@@ -115,7 +81,7 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 {
 	unsigned long cpus_allowed;
 	int cpu = policy->cpu;
-	struct vco vco;
+	struct icst525_vco vco;
 	struct cpufreq_freqs freqs;
 	u_int cm_osc;
 
@@ -133,19 +99,20 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 
 	/* get current setting */
 	cm_osc = __raw_readl(CM_OSC);
-	vco.od = (cm_osc >> 8) & 7;
-	vco.vdw = cm_osc & 255;
-	freqs.old = vco_to_freq(vco, 1);
+	vco.s = (cm_osc >> 8) & 7;
+	vco.v = cm_osc & 255;
+	vco.r = 22;
+	freqs.old = icst525_khz(&cclk_params, vco);
 
-	/* freq_to_vco rounds down -- so we need the next larger freq in
-	 * case of CPUFREQ_RELATION_L.
+	/* icst525_khz_to_vco rounds down -- so we need the next
+	 * larger freq in case of CPUFREQ_RELATION_L.
 	 */
 	if (relation == CPUFREQ_RELATION_L)
 		target_freq += 1999;
 	if (target_freq > policy->max)
 		target_freq = policy->max;
-	vco = freq_to_vco(target_freq, 1);
-	freqs.new = vco_to_freq(vco, 1);
+	vco = icst525_khz_to_vco(&cclk_params, target_freq);
+	freqs.new = icst525_khz(&cclk_params, vco);
 
 	freqs.cpu = policy->cpu;
 
@@ -158,7 +125,7 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 
 	cm_osc = __raw_readl(CM_OSC);
 	cm_osc &= 0xfffff800;
-	cm_osc |= vco.vdw | vco.od << 8;
+	cm_osc |= vco.v | vco.s << 8;
 
 	__raw_writel(0xa05f, CM_LOCK);
 	__raw_writel(cm_osc, CM_OSC);
@@ -179,7 +146,7 @@ static int integrator_cpufreq_init(struct cpufreq_policy *policy)
 	unsigned long cpus_allowed;
 	unsigned int cpu = policy->cpu;
 	u_int cm_osc, cm_stat, mem_freq_khz;
-	struct vco vco;
+	struct icst525_vco vco;
 
 	cpus_allowed = current->cpus_allowed;
 
@@ -189,23 +156,26 @@ static int integrator_cpufreq_init(struct cpufreq_policy *policy)
 	/* detect memory etc. */
 	cm_stat = __raw_readl(CM_STAT);
 	cm_osc = __raw_readl(CM_OSC);
-	vco.od  = (cm_osc >> 20) & 7;
-	vco.vdw = (cm_osc >> 12) & 255;
-	mem_freq_khz = vco_to_freq(vco, 2);
+	vco.s = (cm_osc >> 20) & 7;
+	vco.v = (cm_osc >> 12) & 255;
+	vco.r = 22;
+	mem_freq_khz = icst525_khz(&lclk_params, vco) / 2;
 
 	printk(KERN_INFO "CPU%d: Module id: %d\n", cpu, cm_stat & 255);
 	printk(KERN_INFO "CPU%d: Memory clock = %d.%03d MHz\n",
 	       cpu, mem_freq_khz / 1000, mem_freq_khz % 1000);
 
-	vco.od = (cm_osc >> 8) & 7;
-	vco.vdw = cm_osc & 255;
+	vco.s = (cm_osc >> 8) & 7;
+	vco.v = cm_osc & 255;
+	vco.r = 22;
 
 	/* set default policy and cpuinfo */
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.max_freq = 160000;
 	policy->cpuinfo.min_freq = 12000;
 	policy->cpuinfo.transition_latency = 1000; /* 1 ms, assumed */
-	policy->cur = policy->min = policy->max = vco_to_freq(vco, 1); /* current freq */
+	policy->cur = policy->min = policy->max =
+		icst525_khz(&cclk_params, vco); /* current freq */
 
 	set_cpus_allowed(current, cpus_allowed);
 

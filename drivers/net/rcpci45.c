@@ -171,13 +171,14 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * will be assigned to the LAN API layer.
 	 */
 
-	dev = init_etherdev (NULL, sizeof (*pDpa));
+	dev = alloc_etherdev(sizeof(*pDpa));
 	if (!dev) {
 		printk (KERN_ERR
-			"(rcpci45 driver:) init_etherdev alloc failed\n");
+			"(rcpci45 driver:) alloc_etherdev alloc failed\n");
 		error = -ENOMEM;
 		goto err_out;
 	}
+
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
@@ -257,6 +258,9 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->do_ioctl = &RCioctl;
 	dev->set_config = &RCconfig;
 
+	if ((error = register_netdev(dev)))
+		goto err_out_free_region;
+
 	return 0;		/* success */
 
 err_out_free_region:
@@ -265,7 +269,6 @@ err_out_free_msgbuf:
 	pci_free_consistent (pdev, MSG_BUF_SIZE, pDpa->msgbuf,
 			     pDpa->msgbuf_dma);
 err_out_free_dev:
-	unregister_netdev (dev);
 	kfree (dev);
 err_out:
 	card_idx--;
@@ -534,17 +537,6 @@ RCreboot_callback (U32 Status, U32 p1, U32 p2, struct net_device *dev)
 			(PFNCALLBACK) RCreset_callback);
 }
 
-int
-broadcast_packet (unsigned char *address)
-{
-	int i;
-	for (i = 0; i < 6; i++)
-		if (address[i] != 0xff)
-			return 0;
-
-	return 1;
-}
-
 /*
  * RCrecv_callback()
  * 
@@ -717,11 +709,9 @@ rc_timer (unsigned long data)
 
 		if (retry > REBOOT_REINIT_RETRY_LIMIT) {
 			printk (KERN_WARNING "%s unable to reinitialize adapter after reboot\n", dev->name);
-			printk (KERN_WARNING "%s decrementing driver and closing interface\n", dev->name);
+			printk (KERN_WARNING "%s shutting down interface\n", dev->name);
 			RCDisableI2OInterrupts (dev);
 			dev->flags &= ~IFF_UP;
-			MOD_DEC_USE_COUNT;
-			/* FIXME: kill MOD_DEC_USE_COUNT, use dev_put */
 		} else {
 			printk (KERN_INFO "%s: rescheduling timer...\n",
 					dev->name);

@@ -3328,7 +3328,7 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 /* Caller must hold hashbucket lock for this tb with local BH disabled */
 static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
 {
-	if (!hlist_empty(&pp->sk_list)) {
+	if (hlist_empty(&pp->sk_list)) {
 		if (pp->next)
 			pp->next->pprev = pp->pprev;
 		*(pp->pprev) = pp->next;
@@ -3346,7 +3346,7 @@ static __inline__ void __sctp_put_port(struct sock *sk)
 
 	sctp_spin_lock(&head->lock);
 	pp = sctp_sk(sk)->bind_hash;
-	hlist_del(&sk->sk_bind_node);
+	__sk_del_bind_node(sk);
 	sctp_sk(sk)->bind_hash = NULL;
 	inet_sk(sk)->num = 0;
 	sctp_bucket_destroy(pp);

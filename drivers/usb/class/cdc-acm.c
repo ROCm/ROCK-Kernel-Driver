@@ -388,7 +388,7 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 	count = (count > acm->writesize) ? acm->writesize : count;
 
 	if (from_user) {
-		if (copy_from_user(acm->writeurb->transfer_buffer, buf, count))
+		if (copy_from_user(acm->writeurb->transfer_buffer, (void __user *)buf, count))
 			return -EFAULT;
 	} else
 		memcpy(acm->writeurb->transfer_buffer, buf, count);
@@ -548,7 +548,7 @@ static int acm_probe (struct usb_interface *intf,
 	struct usb_host_config *cfacm;
 	struct usb_host_interface *ifcom, *ifdata;
 	struct usb_endpoint_descriptor *epctrl, *epread, *epwrite;
-	int readsize, ctrlsize, minor, i;
+	int readsize, ctrlsize, minor, i, j;
 	unsigned char *buf;
 
 	dev = interface_to_usbdev (intf);
@@ -558,120 +558,123 @@ static int acm_probe (struct usb_interface *intf,
 
 		dbg("probing config %d", cfacm->desc.bConfigurationValue);
 
-		if (cfacm->desc.bNumInterfaces != 2 ||
-		    usb_interface_claimed(cfacm->interface + 0) ||
-		    usb_interface_claimed(cfacm->interface + 1))
+		for (j = 0; j < cfacm->desc.bNumInterfaces - 1; j++) {
+		    
+			if (usb_interface_claimed(cfacm->interface + j) ||
+			    usb_interface_claimed(cfacm->interface + j + 1))
 			continue;
 
-		ifcom = cfacm->interface[0].altsetting + 0;
-		ifdata = cfacm->interface[1].altsetting + 0;
+			ifcom = cfacm->interface[j].altsetting + 0;
+			ifdata = cfacm->interface[j + 1].altsetting + 0;
 
-		if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2) {
-			ifcom = cfacm->interface[1].altsetting + 0;
-			ifdata = cfacm->interface[0].altsetting + 0;
-			if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2)
+			if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2) {
+				ifcom = cfacm->interface[j + 1].altsetting + 0;
+				ifdata = cfacm->interface[j].altsetting + 0;
+				if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2)
+					continue;
+			}
+
+			if (ifcom->desc.bInterfaceClass != 2 || ifcom->desc.bInterfaceSubClass != 2 ||
+			    ifcom->desc.bInterfaceProtocol < 1 || ifcom->desc.bInterfaceProtocol > 6 ||
+			    ifcom->desc.bNumEndpoints < 1)
 				continue;
+
+			epctrl = &ifcom->endpoint[0].desc;
+			epread = &ifdata->endpoint[0].desc;
+			epwrite = &ifdata->endpoint[1].desc;
+
+			if ((epctrl->bEndpointAddress & 0x80) != 0x80 || (epctrl->bmAttributes & 3) != 3 ||
+			   (epread->bmAttributes & 3) != 2 || (epwrite->bmAttributes & 3) != 2 ||
+			   ((epread->bEndpointAddress & 0x80) ^ (epwrite->bEndpointAddress & 0x80)) != 0x80)
+				continue;
+
+			if ((epread->bEndpointAddress & 0x80) != 0x80) {
+				epread = &ifdata->endpoint[1].desc;
+				epwrite = &ifdata->endpoint[0].desc;
+			}
+
+			usb_set_configuration(dev, cfacm->desc.bConfigurationValue);
+
+			for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
+			if (acm_table[minor]) {
+				err("no more free acm devices");
+				return -ENODEV;
+			}
+
+			if (!(acm = kmalloc(sizeof(struct acm), GFP_KERNEL))) {
+				err("out of memory");
+				return -ENOMEM;
+			}
+			memset(acm, 0, sizeof(struct acm));
+
+			ctrlsize = epctrl->wMaxPacketSize;
+			readsize = epread->wMaxPacketSize;
+			acm->writesize = epwrite->wMaxPacketSize;
+			acm->iface = cfacm->interface + j;
+			acm->minor = minor;
+			acm->dev = dev;
+
+			INIT_WORK(&acm->work, acm_softint, acm);
+
+			if (!(buf = kmalloc(ctrlsize + readsize + acm->writesize, GFP_KERNEL))) {
+				err("out of memory");
+				kfree(acm);
+				return -ENOMEM;
+			}
+
+			acm->ctrlurb = usb_alloc_urb(0, GFP_KERNEL);
+			if (!acm->ctrlurb) {
+				err("out of memory");
+				kfree(acm);
+				kfree(buf);
+				return -ENOMEM;
+			}
+			acm->readurb = usb_alloc_urb(0, GFP_KERNEL);
+			if (!acm->readurb) {
+				err("out of memory");
+				usb_free_urb(acm->ctrlurb);
+				kfree(acm);
+				kfree(buf);
+				return -ENOMEM;
+			}
+			acm->writeurb = usb_alloc_urb(0, GFP_KERNEL);
+			if (!acm->writeurb) {
+				err("out of memory");
+				usb_free_urb(acm->readurb);
+				usb_free_urb(acm->ctrlurb);
+				kfree(acm);
+				kfree(buf);
+				return -ENOMEM;
+			}
+
+			usb_fill_int_urb(acm->ctrlurb, dev, usb_rcvintpipe(dev, epctrl->bEndpointAddress),
+				buf, ctrlsize, acm_ctrl_irq, acm, epctrl->bInterval);
+
+			usb_fill_bulk_urb(acm->readurb, dev, usb_rcvbulkpipe(dev, epread->bEndpointAddress),
+				buf += ctrlsize, readsize, acm_read_bulk, acm);
+			acm->readurb->transfer_flags |= URB_NO_FSBR;
+
+			usb_fill_bulk_urb(acm->writeurb, dev, usb_sndbulkpipe(dev, epwrite->bEndpointAddress),
+				buf += readsize, acm->writesize, acm_write_bulk, acm);
+			acm->writeurb->transfer_flags |= URB_NO_FSBR;
+
+			info("ttyACM%d: USB ACM device", minor);
+
+			acm_set_control(acm, acm->ctrlout);
+
+			acm->line.speed = cpu_to_le32(9600);
+			acm->line.databits = 8;
+			acm_set_line(acm, &acm->line);
+
+			usb_driver_claim_interface(&acm_driver, acm->iface + 0, acm);
+			usb_driver_claim_interface(&acm_driver, acm->iface + 1, acm);
+
+			tty_register_device(acm_tty_driver, minor, &intf->dev);
+
+			acm_table[minor] = acm;
+			usb_set_intfdata (intf, acm);
+			return 0;
 		}
-
-		if (ifcom->desc.bInterfaceClass != 2 || ifcom->desc.bInterfaceSubClass != 2 ||
-		    ifcom->desc.bInterfaceProtocol != 1 || ifcom->desc.bNumEndpoints < 1)
-			continue;
-
-		epctrl = &ifcom->endpoint[0].desc;
-		epread = &ifdata->endpoint[0].desc;
-		epwrite = &ifdata->endpoint[1].desc;
-
-		if ((epctrl->bEndpointAddress & 0x80) != 0x80 || (epctrl->bmAttributes & 3) != 3 ||
-		   (epread->bmAttributes & 3) != 2 || (epwrite->bmAttributes & 3) != 2 ||
-		   ((epread->bEndpointAddress & 0x80) ^ (epwrite->bEndpointAddress & 0x80)) != 0x80)
-			continue;
-
-		if ((epread->bEndpointAddress & 0x80) != 0x80) {
-			epread = &ifdata->endpoint[1].desc;
-			epwrite = &ifdata->endpoint[0].desc;
-		}
-
-		usb_set_configuration(dev, cfacm->desc.bConfigurationValue);
-
-		for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
-		if (acm_table[minor]) {
-			err("no more free acm devices");
-			return -ENODEV;
-		}
-
-		if (!(acm = kmalloc(sizeof(struct acm), GFP_KERNEL))) {
-			err("out of memory");
-			return -ENOMEM;
-		}
-		memset(acm, 0, sizeof(struct acm));
-
-		ctrlsize = epctrl->wMaxPacketSize;
-		readsize = epread->wMaxPacketSize;
-		acm->writesize = epwrite->wMaxPacketSize;
-		acm->iface = cfacm->interface;
-		acm->minor = minor;
-		acm->dev = dev;
-
-		INIT_WORK(&acm->work, acm_softint, acm);
-
-		if (!(buf = kmalloc(ctrlsize + readsize + acm->writesize, GFP_KERNEL))) {
-			err("out of memory");
-			kfree(acm);
-			return -ENOMEM;
-		}
-
-		acm->ctrlurb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!acm->ctrlurb) {
-			err("out of memory");
-			kfree(acm);
-			kfree(buf);
-			return -ENOMEM;
-		}
-		acm->readurb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!acm->readurb) {
-			err("out of memory");
-			usb_free_urb(acm->ctrlurb);
-			kfree(acm);
-			kfree(buf);
-			return -ENOMEM;
-		}
-		acm->writeurb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!acm->writeurb) {
-			err("out of memory");
-			usb_free_urb(acm->readurb);
-			usb_free_urb(acm->ctrlurb);
-			kfree(acm);
-			kfree(buf);
-			return -ENOMEM;
-		}
-
-		usb_fill_int_urb(acm->ctrlurb, dev, usb_rcvintpipe(dev, epctrl->bEndpointAddress),
-			buf, ctrlsize, acm_ctrl_irq, acm, epctrl->bInterval);
-
-		usb_fill_bulk_urb(acm->readurb, dev, usb_rcvbulkpipe(dev, epread->bEndpointAddress),
-			buf += ctrlsize, readsize, acm_read_bulk, acm);
-		acm->readurb->transfer_flags |= URB_NO_FSBR;
-
-		usb_fill_bulk_urb(acm->writeurb, dev, usb_sndbulkpipe(dev, epwrite->bEndpointAddress),
-			buf += readsize, acm->writesize, acm_write_bulk, acm);
-		acm->writeurb->transfer_flags |= URB_NO_FSBR;
-
-		info("ttyACM%d: USB ACM device", minor);
-
-		acm_set_control(acm, acm->ctrlout);
-
-		acm->line.speed = cpu_to_le32(9600);
-		acm->line.databits = 8;
-		acm_set_line(acm, &acm->line);
-
-		usb_driver_claim_interface(&acm_driver, acm->iface + 0, acm);
-		usb_driver_claim_interface(&acm_driver, acm->iface + 1, acm);
-
-		tty_register_device(acm_tty_driver, minor, &intf->dev);
-
-		acm_table[minor] = acm;
-		usb_set_intfdata (intf, acm);
-		return 0;
 	}
 
 	return -EIO;

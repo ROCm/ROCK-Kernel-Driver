@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 1999-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 2003 Fenghua Yu <fenghua.yu@intel.com>
+ * 	- Change pt_regs_off() to make it less dependant on pt_regs structure.
  */
 /*
  * This file implements call frame unwind support for the Linux
@@ -25,6 +27,7 @@
  *	  acquired, then the read-write lock must be acquired first.
  */
 #include <linux/bootmem.h>
+#include <linux/elf.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -76,15 +79,13 @@
 # define STAT(x...)
 #endif
 
-#define alloc_reg_state()	kmalloc(sizeof(struct unw_state_record), GFP_ATOMIC)
+#define alloc_reg_state()	kmalloc(sizeof(struct unw_reg_state), GFP_ATOMIC)
 #define free_reg_state(usr)	kfree(usr)
 #define alloc_labeled_state()	kmalloc(sizeof(struct unw_labeled_state), GFP_ATOMIC)
 #define free_labeled_state(usr)	kfree(usr)
 
 typedef unsigned long unw_word;
 typedef unsigned char unw_hash_index_t;
-
-#define struct_offset(str,fld)	((char *)&((str *)NULL)->fld - (char *) 0)
 
 static struct {
 	spinlock_t lock;			/* spinlock for unwind data */
@@ -103,6 +104,8 @@ static struct {
 
 	/* index into unw_frame_info for preserved register i */
 	unsigned short preg_index[UNW_NUM_REGS];
+
+	short pt_regs_offsets[32];
 
 	/* unwind table for the kernel: */
 	struct unw_table kernel_table;
@@ -153,47 +156,78 @@ static struct {
 		UNW_REG_UNAT, UNW_REG_LC, UNW_REG_FPSR, UNW_REG_PRI_UNAT_GR
 	},
 	.preg_index = {
-		struct_offset(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_GR */
-		struct_offset(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_MEM */
-		struct_offset(struct unw_frame_info, bsp_loc)/8,
-		struct_offset(struct unw_frame_info, bspstore_loc)/8,
-		struct_offset(struct unw_frame_info, pfs_loc)/8,
-		struct_offset(struct unw_frame_info, rnat_loc)/8,
-		struct_offset(struct unw_frame_info, psp)/8,
-		struct_offset(struct unw_frame_info, rp_loc)/8,
-		struct_offset(struct unw_frame_info, r4)/8,
-		struct_offset(struct unw_frame_info, r5)/8,
-		struct_offset(struct unw_frame_info, r6)/8,
-		struct_offset(struct unw_frame_info, r7)/8,
-		struct_offset(struct unw_frame_info, unat_loc)/8,
-		struct_offset(struct unw_frame_info, pr_loc)/8,
-		struct_offset(struct unw_frame_info, lc_loc)/8,
-		struct_offset(struct unw_frame_info, fpsr_loc)/8,
-		struct_offset(struct unw_frame_info, b1_loc)/8,
-		struct_offset(struct unw_frame_info, b2_loc)/8,
-		struct_offset(struct unw_frame_info, b3_loc)/8,
-		struct_offset(struct unw_frame_info, b4_loc)/8,
-		struct_offset(struct unw_frame_info, b5_loc)/8,
-		struct_offset(struct unw_frame_info, f2_loc)/8,
-		struct_offset(struct unw_frame_info, f3_loc)/8,
-		struct_offset(struct unw_frame_info, f4_loc)/8,
-		struct_offset(struct unw_frame_info, f5_loc)/8,
-		struct_offset(struct unw_frame_info, fr_loc[16 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[17 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[18 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[19 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[20 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[21 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[22 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[23 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[24 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[25 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[26 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[27 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[28 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[29 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[30 - 16])/8,
-		struct_offset(struct unw_frame_info, fr_loc[31 - 16])/8,
+		offsetof(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_GR */
+		offsetof(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_MEM */
+		offsetof(struct unw_frame_info, bsp_loc)/8,
+		offsetof(struct unw_frame_info, bspstore_loc)/8,
+		offsetof(struct unw_frame_info, pfs_loc)/8,
+		offsetof(struct unw_frame_info, rnat_loc)/8,
+		offsetof(struct unw_frame_info, psp)/8,
+		offsetof(struct unw_frame_info, rp_loc)/8,
+		offsetof(struct unw_frame_info, r4)/8,
+		offsetof(struct unw_frame_info, r5)/8,
+		offsetof(struct unw_frame_info, r6)/8,
+		offsetof(struct unw_frame_info, r7)/8,
+		offsetof(struct unw_frame_info, unat_loc)/8,
+		offsetof(struct unw_frame_info, pr_loc)/8,
+		offsetof(struct unw_frame_info, lc_loc)/8,
+		offsetof(struct unw_frame_info, fpsr_loc)/8,
+		offsetof(struct unw_frame_info, b1_loc)/8,
+		offsetof(struct unw_frame_info, b2_loc)/8,
+		offsetof(struct unw_frame_info, b3_loc)/8,
+		offsetof(struct unw_frame_info, b4_loc)/8,
+		offsetof(struct unw_frame_info, b5_loc)/8,
+		offsetof(struct unw_frame_info, f2_loc)/8,
+		offsetof(struct unw_frame_info, f3_loc)/8,
+		offsetof(struct unw_frame_info, f4_loc)/8,
+		offsetof(struct unw_frame_info, f5_loc)/8,
+		offsetof(struct unw_frame_info, fr_loc[16 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[17 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[18 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[19 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[20 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[21 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[22 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[23 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[24 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[25 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[26 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[27 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[28 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[29 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[30 - 16])/8,
+		offsetof(struct unw_frame_info, fr_loc[31 - 16])/8,
+	},
+	.pt_regs_offsets = {
+		[0] = -1,
+		offsetof(struct pt_regs,  r1),
+		offsetof(struct pt_regs,  r2),
+		offsetof(struct pt_regs,  r3),
+		[4] = -1, [5] = -1, [6] = -1, [7] = -1,
+		offsetof(struct pt_regs,  r8),
+		offsetof(struct pt_regs,  r9),
+		offsetof(struct pt_regs, r10),
+		offsetof(struct pt_regs, r11),
+		offsetof(struct pt_regs, r12),
+		offsetof(struct pt_regs, r13),
+		offsetof(struct pt_regs, r14),
+		offsetof(struct pt_regs, r15),
+		offsetof(struct pt_regs, r16),
+		offsetof(struct pt_regs, r17),
+		offsetof(struct pt_regs, r18),
+		offsetof(struct pt_regs, r19),
+		offsetof(struct pt_regs, r20),
+		offsetof(struct pt_regs, r21),
+		offsetof(struct pt_regs, r22),
+		offsetof(struct pt_regs, r23),
+		offsetof(struct pt_regs, r24),
+		offsetof(struct pt_regs, r25),
+		offsetof(struct pt_regs, r26),
+		offsetof(struct pt_regs, r27),
+		offsetof(struct pt_regs, r28),
+		offsetof(struct pt_regs, r29),
+		offsetof(struct pt_regs, r30),
+		offsetof(struct pt_regs, r31),
 	},
 	.hash = { [0 ... UNW_HASH_SIZE - 1] = -1 },
 #ifdef UNW_DEBUG
@@ -209,7 +243,6 @@ static struct {
 #endif
 };
 
-
 /* Unwind accessors.  */
 
 /*
@@ -218,19 +251,16 @@ static struct {
 static inline unsigned long
 pt_regs_off (unsigned long reg)
 {
-	unsigned long off =0;
+	short off = -1;
 
-	if (reg >= 1 && reg <= 3)
-		off = struct_offset(struct pt_regs, r1) + 8*(reg - 1);
-	else if (reg <= 11)
-		off = struct_offset(struct pt_regs, r8) + 8*(reg - 8);
-	else if (reg <= 15)
-		off = struct_offset(struct pt_regs, r12) + 8*(reg - 12);
-	else if (reg <= 31)
-		off = struct_offset(struct pt_regs, r16) + 8*(reg - 16);
-	else
+	if (reg < ARRAY_SIZE(unw.pt_regs_offsets))
+		off = unw.pt_regs_offsets[reg];
+
+	if (off < 0) {
 		UNW_DPRINT(0, "unwind.%s: bad scratch reg r%lu\n", __FUNCTION__, reg);
-	return off;
+		off = 0;
+	}
+	return (unsigned long) off;
 }
 
 static inline struct pt_regs *
@@ -239,7 +269,10 @@ get_scratch_regs (struct unw_frame_info *info)
 	if (!info->pt) {
 		/* This should not happen with valid unwind info.  */
 		UNW_DPRINT(0, "unwind.%s: bad unwind info: resetting info->pt\n", __FUNCTION__);
-		info->pt = info->sp - 16;
+		if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
+			info->pt = (unsigned long) ((struct pt_regs *) info->psp - 1);
+		else
+			info->pt = info->sp - 16;
 	}
 	UNW_DPRINT(3, "unwind.%s: sp 0x%lx pt 0x%lx\n", __FUNCTION__, info->sp, info->pt);
 	return (struct pt_regs *) info->pt;
@@ -371,12 +404,11 @@ unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	pt = get_scratch_regs(info);
 	switch (regnum) {
 		/* scratch: */
-	      case 0: addr = &pt->b0; break;
-	      case 6: addr = &pt->b6; break;
-	      case 7: addr = &pt->b7; break;
+	      case 0: pt = get_scratch_regs(info); addr = &pt->b0; break;
+	      case 6: pt = get_scratch_regs(info); addr = &pt->b6; break;
+	      case 7: pt = get_scratch_regs(info); addr = &pt->b7; break;
 
 		/* preserved: */
 	      case 1: case 2: case 3: case 4: case 5:
@@ -409,17 +441,17 @@ unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, 
 		return -1;
 	}
 
-	pt = get_scratch_regs(info);
-
 	if (regnum <= 5) {
 		addr = *(&info->f2_loc + (regnum - 2));
 		if (!addr)
 			addr = &info->sw->f2 + (regnum - 2);
 	} else if (regnum <= 15) {
-		if (regnum <= 9)
+		if (regnum <= 11) {
+			pt = get_scratch_regs(info);
 			addr = &pt->f6  + (regnum - 6);
+		}
 		else
-			addr = &info->sw->f10 + (regnum - 10);
+			addr = &info->sw->f12 + (regnum - 12);
 	} else if (regnum <= 31) {
 		addr = info->fr_loc[regnum - 16];
 		if (!addr)
@@ -447,7 +479,6 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	pt = get_scratch_regs(info);
 	switch (regnum) {
 	      case UNW_AR_BSP:
 		addr = info->bsp_loc;
@@ -502,11 +533,23 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		break;
 
 	      case UNW_AR_RSC:
+		pt = get_scratch_regs(info);
 		addr = &pt->ar_rsc;
 		break;
 
 	      case UNW_AR_CCV:
+		pt = get_scratch_regs(info);
 		addr = &pt->ar_ccv;
+		break;
+
+	      case UNW_AR_CSD:
+		pt = get_scratch_regs(info);
+		addr = &pt->ar_csd;
+		break;
+
+	      case UNW_AR_SSD:
+		pt = get_scratch_regs(info);
+		addr = &pt->ar_ssd;
 		break;
 
 	      default:
@@ -782,7 +825,7 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 static inline void
 desc_abi (unsigned char abi, unsigned char context, struct unw_state_record *sr)
 {
-	if (abi == 0 && context == 'i') {
+	if (abi == 3 && context == 'i') {
 		sr->flags |= UNW_FLAG_INTERRUPT_FRAME;
 		UNW_DPRINT(3, "unwind.%s: interrupt frame\n",  __FUNCTION__);
 	}
@@ -1376,8 +1419,8 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 			val = unw.preg_index[UNW_REG_F16 + (rval - 16)];
 		else {
 			opc = UNW_INSN_MOVE_SCRATCH;
-			if (rval <= 9)
-				val = struct_offset(struct pt_regs, f6) + 16*(rval - 6);
+			if (rval <= 11)
+				val = offsetof(struct pt_regs, f6) + 16*(rval - 6);
 			else
 				UNW_DPRINT(0, "unwind.%s: kernel may not touch f%lu\n",
 					   __FUNCTION__, rval);
@@ -1390,11 +1433,11 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 		else {
 			opc = UNW_INSN_MOVE_SCRATCH;
 			if (rval == 0)
-				val = struct_offset(struct pt_regs, b0);
+				val = offsetof(struct pt_regs, b0);
 			else if (rval == 6)
-				val = struct_offset(struct pt_regs, b6);
+				val = offsetof(struct pt_regs, b6);
 			else
-				val = struct_offset(struct pt_regs, b7);
+				val = offsetof(struct pt_regs, b7);
 		}
 		break;
 
@@ -1594,7 +1637,7 @@ build_script (struct unw_frame_info *info)
 	    && sr.curr.reg[UNW_REG_PSP].val != 0) {
 		/* new psp is sp plus frame size */
 		insn.opc = UNW_INSN_ADD;
-		insn.dst = struct_offset(struct unw_frame_info, psp)/8;
+		insn.dst = offsetof(struct unw_frame_info, psp)/8;
 		insn.val = sr.curr.reg[UNW_REG_PSP].val;	/* frame size */
 		script_emit(script, insn);
 	}
@@ -1728,14 +1771,13 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
   lazy_init:
 	off = unw.sw_off[val];
 	s[val] = (unsigned long) state->sw + off;
-	if (off >= struct_offset(struct switch_stack, r4)
-	    && off <= struct_offset(struct switch_stack, r7))
+	if (off >= offsetof(struct switch_stack, r4) && off <= offsetof(struct switch_stack, r7))
 		/*
 		 * We're initializing a general register: init NaT info, too.  Note that
 		 * the offset is a multiple of 8 which gives us the 3 bits needed for
 		 * the type field.
 		 */
-		s[val+1] = (struct_offset(struct switch_stack, ar_unat) - off) | UNW_NAT_MEMSTK;
+		s[val+1] = (offsetof(struct switch_stack, ar_unat) - off) | UNW_NAT_MEMSTK;
 	goto redo;
 }
 
@@ -1799,11 +1841,7 @@ unw_unwind (struct unw_frame_info *info)
 		return -1;
 	}
 	ip = info->ip = *info->rp_loc;
-	if (ip < GATE_ADDR + PAGE_SIZE) {
-		/*
-		 * We don't have unwind info for the gate page, so we consider that part
-		 * of user-space for the purpose of unwinding.
-		 */
+	if (ip < GATE_ADDR) {
 		UNW_DPRINT(2, "unwind.%s: reached user-space (ip=0x%lx)\n", __FUNCTION__, ip);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
@@ -1825,7 +1863,7 @@ unw_unwind (struct unw_frame_info *info)
 		if ((pr & (1UL << pNonSys)) != 0)
 			num_regs = *info->cfm_loc & 0x7f;		/* size of frame */
 		info->pfs_loc =
-			(unsigned long *) (info->pt + struct_offset(struct pt_regs, ar_pfs));
+			(unsigned long *) (info->pt + offsetof(struct pt_regs, ar_pfs));
 		UNW_DPRINT(3, "unwind.%s: interrupt_frame pt 0x%lx\n", __FUNCTION__, info->pt);
 	} else
 		num_regs = (*info->cfm_loc >> 7) & 0x7f;	/* size of locals */
@@ -1876,11 +1914,7 @@ unw_unwind_to_user (struct unw_frame_info *info)
 				   __FUNCTION__, ip);
 			return -1;
 		}
-		/*
-		 * We don't have unwind info for the gate page, so we consider that part
-		 * of user-space for the purpose of unwinding.
-		 */
-		if (ip < GATE_ADDR + PAGE_SIZE)
+		if (ip < GATE_ADDR)
 			return 0;
 	}
 	unw_get_ip(info, &ip);
@@ -2090,30 +2124,41 @@ unw_remove_unwind_table (void *handle)
 	kfree(table);
 }
 
-void
-unw_create_gate_table (void)
+static void __init
+create_gate_table (void)
 {
-	extern char __start_gate_section[], __stop_gate_section[];
-	unsigned long *lp, start, end, segbase = unw.kernel_table.segment_base;
-	const struct unw_table_entry *entry, *first, *unw_table_end;
-	extern int ia64_unw_end;
+	const struct unw_table_entry *entry, *start, *end;
+	unsigned long *lp, segbase = GATE_ADDR;
 	size_t info_size, size;
 	char *info;
+	Elf64_Phdr *punw = NULL, *phdr = (Elf64_Phdr *) (GATE_ADDR + GATE_EHDR->e_phoff);
+	int i;
 
-	start = (unsigned long) __start_gate_section - segbase;
-	end   = (unsigned long) __stop_gate_section - segbase;
-	unw_table_end = (struct unw_table_entry *) &ia64_unw_end;
+	for (i = 0; i < GATE_EHDR->e_phnum; ++i, ++phdr)
+		if (phdr->p_type == PT_IA_64_UNWIND) {
+			punw = phdr;
+			break;
+		}
+
+	if (!punw) {
+		printk("%s: failed to find gate DSO's unwind table!\n", __FUNCTION__);
+		return;
+	}
+
+	start = (const struct unw_table_entry *) punw->p_vaddr;
+	end = (struct unw_table_entry *) ((char *) start + punw->p_memsz);
 	size  = 0;
-	first = lookup(&unw.kernel_table, start);
 
-	for (entry = first; entry < unw_table_end && entry->start_offset < end; ++entry)
+	unw_add_unwind_table("linux-gate.so", segbase, 0, start, end);
+
+	for (entry = start; entry < end; ++entry)
 		size += 3*8 + 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
 	size += 8;	/* reserve space for "end of table" marker */
 
-	unw.gate_table = alloc_bootmem(size);
+	unw.gate_table = kmalloc(size, GFP_KERNEL);
 	if (!unw.gate_table) {
 		unw.gate_table_size = 0;
-		printk(KERN_ERR "unwind: unable to create unwind data for gate page!\n");
+		printk(KERN_ERR "%s: unable to create unwind data for gate page!\n", __FUNCTION__);
 		return;
 	}
 	unw.gate_table_size = size;
@@ -2121,19 +2166,21 @@ unw_create_gate_table (void)
 	lp = unw.gate_table;
 	info = (char *) unw.gate_table + size;
 
-	for (entry = first; entry < unw_table_end && entry->start_offset < end; ++entry, lp += 3) {
+	for (entry = start; entry < end; ++entry, lp += 3) {
 		info_size = 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
 		info -= info_size;
 		memcpy(info, (char *) segbase + entry->info_offset, info_size);
 
-		lp[0] = entry->start_offset - start + GATE_ADDR;	/* start */
-		lp[1] = entry->end_offset - start + GATE_ADDR;		/* end */
-		lp[2] = info - (char *) unw.gate_table;			/* info */
+		lp[0] = segbase + entry->start_offset;		/* start */
+		lp[1] = segbase + entry->end_offset;		/* end */
+		lp[2] = info - (char *) unw.gate_table;		/* info */
 	}
 	*lp = 0;	/* end-of-table marker */
 }
 
-void
+__initcall(create_gate_table);
+
+void __init
 unw_init (void)
 {
 	extern int ia64_unw_start, ia64_unw_end, __gp;
@@ -2174,6 +2221,14 @@ unw_init (void)
 }
 
 /*
+ * DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED
+ *
+ *	This system call has been deprecated.  The new and improved way to get
+ *	at the kernel's unwind info is via the gate DSO.  The address of the
+ *	ELF header for this DSO is passed to user-level via AT_SYSINFO_EHDR.
+ *
+ * DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED
+ *
  * This system call copies the unwind data into the buffer pointed to by BUF and returns
  * the size of the unwind data.  If BUF_SIZE is smaller than the size of the unwind data
  * or if BUF is NULL, nothing is copied, but the system call still returns the size of the

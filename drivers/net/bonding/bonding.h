@@ -104,7 +104,7 @@ typedef struct bonding {
 	struct proc_dir_entry *bond_proc_dir;
 	struct proc_dir_entry *bond_proc_info_file;
 #endif /* CONFIG_PROC_FS */
-	struct bonding *next_bond;
+	struct list_head bond_list;
 	struct net_device *device;
 	struct dev_mc_list *mc_list;
 	unsigned short flags;

@@ -296,13 +296,13 @@ static int usblp_check_status(struct usblp *usblp, int err)
 	}
 
 	status = *usblp->statusbuf;
-	if (~status & LP_PERRORP) {
+
+	if (~status & LP_PERRORP)
 		newerr = 3;
-		if (status & LP_POUTPA)
-			newerr = 1;
-		if (~status & LP_PSELECD)
-			newerr = 2;
-	}
+	if (status & LP_POUTPA)
+		newerr = 1;
+	if (~status & LP_PSELECD)
+		newerr = 2;
 
 	if (newerr != err)
 		info("usblp%d: %s", usblp->minor, usblp_messages[newerr]);
@@ -426,7 +426,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct usblp *usblp = file->private_data;
 	int length, err, i;
-	unsigned char lpstatus, newChannel;
+	unsigned char newChannel;
 	int status;
 	int twoints[2];
 	int retval = 0;
@@ -455,7 +455,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				if (length > _IOC_SIZE(cmd))
 					length = _IOC_SIZE(cmd); /* truncate */
 
-				if (copy_to_user((unsigned char *) arg,
+				if (copy_to_user((void __user *) arg,
 						usblp->device_id_string,
 						(unsigned long) length)) {
 					retval = -EFAULT;
@@ -479,7 +479,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 						twoints[1] |= (1<<i);
 				}
 
-				if (copy_to_user((unsigned char *)arg,
+				if (copy_to_user((void __user *)arg,
 						(unsigned char *)twoints,
 						sizeof(twoints))) {
 					retval = -EFAULT;
@@ -540,7 +540,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				twoints[0] = usblp->dev->bus->busnum;
 				twoints[1] = usblp->dev->devnum;
-				if (copy_to_user((unsigned char *)arg,
+				if (copy_to_user((void __user *)arg,
 						(unsigned char *)twoints,
 						sizeof(twoints))) {
 					retval = -EFAULT;
@@ -560,7 +560,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				twoints[0] = usblp->dev->descriptor.idVendor;
 				twoints[1] = usblp->dev->descriptor.idProduct;
-				if (copy_to_user((unsigned char *)arg,
+				if (copy_to_user((void __user *)arg,
 						(unsigned char *)twoints,
 						sizeof(twoints))) {
 					retval = -EFAULT;
@@ -578,13 +578,13 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		switch (cmd) {
 
 			case LPGETSTATUS:
-				if (usblp_read_status(usblp, &lpstatus)) {
+				if (usblp_read_status(usblp, usblp->statusbuf)) {
 					err("usblp%d: failed reading printer status", usblp->minor);
 					retval = -EIO;
 					goto done;
 				}
-				status = lpstatus;
-				if (copy_to_user ((int *)arg, &status, sizeof(int)))
+				status = *usblp->statusbuf;
+				if (copy_to_user ((void __user *)arg, &status, sizeof(int)))
 					retval = -EFAULT;
 				break;
 
@@ -597,7 +597,7 @@ done:
 	return retval;
 }
 
-static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct usblp *usblp = file->private_data;
@@ -682,7 +682,7 @@ static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, 
 	return count;
 }
 
-static ssize_t usblp_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t usblp_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct usblp *usblp = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -858,8 +858,8 @@ static int usblp_probe(struct usb_interface *intf,
 	}
 
 	usblp->writebuf = usblp->readbuf = NULL;
-	usblp->writeurb->transfer_flags = URB_NO_DMA_MAP;
-	usblp->readurb->transfer_flags = URB_NO_DMA_MAP;
+	usblp->writeurb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
+	usblp->readurb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
 	/* Malloc write & read buffers.  We somewhat wastefully
 	 * malloc both regardless of bidirectionality, because the
 	 * alternate setting can be changed later via an ioctl. */

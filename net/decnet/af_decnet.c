@@ -276,7 +276,7 @@ static void dn_rehash_sock(struct sock *sk)
 		return;
 
 	write_lock_bh(&dn_hash_lock);
-	hlist_del(&sk->sk_node);
+	sk_del_node_init(sk);
 	DN_SK(sk)->addrloc = 0;
 	list = listen_hash(&DN_SK(sk)->addr);
 	sk_add_node(sk, list);

@@ -302,7 +302,7 @@ static void __tcp_put_port(struct sock *sk)
 
 	spin_lock(&head->lock);
 	tb = tcp_sk(sk)->bind_hash;
-	__hlist_del(&sk->sk_bind_node);
+	__sk_del_bind_node(sk);
 	tcp_sk(sk)->bind_hash = NULL;
 	inet->num = 0;
 	tcp_bucket_destroy(tb);
@@ -359,7 +359,7 @@ static __inline__ void __tcp_v4_hash(struct sock *sk, const int listen_possible)
 		lock = &tcp_ehash[sk->sk_hashent].lock;
 		write_lock(lock);
 	}
-	sk_add_node(sk, list);
+	__sk_add_node(sk, list);
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock(lock);
 	if (listen_possible && sk->sk_state == TCP_LISTEN)
@@ -392,7 +392,7 @@ void tcp_unhash(struct sock *sk)
 		write_lock_bh(&head->lock);
 	}
 
-	if (sk_del_node_init(sk))
+	if (__sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
 	write_unlock_bh(lock);
 
@@ -608,7 +608,7 @@ unique:
 	inet->sport = htons(lport);
 	sk->sk_hashent = hash;
 	BUG_TRAP(sk_unhashed(sk));
-	sk_add_node(sk, &head->chain);
+	__sk_add_node(sk, &head->chain);
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock(&head->lock);
 

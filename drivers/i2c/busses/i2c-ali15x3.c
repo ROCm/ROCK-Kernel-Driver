@@ -177,17 +177,18 @@ static int ali15x3_setup(struct pci_dev *ALI15X3_dev)
 	if(force_addr) {
 		dev_info(&ALI15X3_dev->dev, "forcing ISA address 0x%04X\n",
 			ali15x3_smba);
-		if (PCIBIOS_SUCCESSFUL !=
-		    pci_write_config_word(ALI15X3_dev, SMBBA, ali15x3_smba))
-			return -ENODEV;
-		if (PCIBIOS_SUCCESSFUL !=
-		    pci_read_config_word(ALI15X3_dev, SMBBA, &a))
-			return -ENODEV;
+		if (PCIBIOS_SUCCESSFUL != pci_write_config_word(ALI15X3_dev,
+								SMBBA,
+								ali15x3_smba))
+			goto error;
+		if (PCIBIOS_SUCCESSFUL != pci_read_config_word(ALI15X3_dev,
+								SMBBA, &a))
+			goto error;
 		if ((a & ~(ALI15X3_SMB_IOSIZE - 1)) != ali15x3_smba) {
 			/* make sure it works */
 			dev_err(&ALI15X3_dev->dev,
 				"force address failed - not supported?\n");
-			return -ENODEV;
+			goto error;
 		}
 	}
 	/* check if whole device is enabled */
@@ -219,6 +220,9 @@ static int ali15x3_setup(struct pci_dev *ALI15X3_dev)
 	dev_dbg(&ALI15X3_dev->dev, "iALI15X3_smba = 0x%X\n", ali15x3_smba);
 
 	return 0;
+error:
+	release_region(ali15x3_smba, ALI15X3_SMB_IOSIZE);
+	return -ENODEV;
 }
 
 /* Internally used pause function */

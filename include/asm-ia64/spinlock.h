@@ -32,7 +32,7 @@ typedef struct {
  * carefully coded to touch only those registers that spin_lock() marks "clobbered".
  */
 
-#define IA64_SPINLOCK_CLOBBERS "ar.pfs", "p14", "r28", "r29", "r30", "b6", "memory"
+#define IA64_SPINLOCK_CLOBBERS "ar.ccv", "ar.pfs", "p14", "r28", "r29", "r30", "b6", "memory"
 
 static inline void
 _raw_spin_lock (spinlock_t *lock)
@@ -133,8 +133,7 @@ do {											\
 	while (unlikely(ia64_fetchadd(1, (int *) __read_lock_ptr, "acq") < 0)) {	\
 		ia64_fetchadd(-1, (int *) __read_lock_ptr, "rel");			\
 		while (*(volatile int *)__read_lock_ptr < 0)				\
-			barrier();							\
-											\
+			cpu_relax();							\
 	}										\
 } while (0)
 

@@ -155,7 +155,7 @@ tiglusb_release (struct inode *inode, struct file *filp)
 }
 
 static ssize_t
-tiglusb_read (struct file *filp, char *buf, size_t count, loff_t * f_pos)
+tiglusb_read (struct file *filp, char __user *buf, size_t count, loff_t * f_pos)
 {
 	ptiglusb_t s = (ptiglusb_t) filp->private_data;
 	ssize_t ret = 0;
@@ -208,7 +208,7 @@ tiglusb_read (struct file *filp, char *buf, size_t count, loff_t * f_pos)
 }
 
 static ssize_t
-tiglusb_write (struct file *filp, const char *buf, size_t count, loff_t * f_pos)
+tiglusb_write (struct file *filp, const char __user *buf, size_t count, loff_t * f_pos)
 {
 	ptiglusb_t s = (ptiglusb_t) filp->private_data;
 	ssize_t ret = 0;

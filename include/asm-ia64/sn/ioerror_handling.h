@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_IOERROR_HANDLING_H
 #define _ASM_IA64_SN_IOERROR_HANDLING_H
@@ -207,26 +207,17 @@ typedef uint64_t  error_priority_t;
 
 /* Error state interfaces */
 #if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-extern error_return_code_t	error_state_set(devfs_handle_t,error_state_t);
-extern error_state_t		error_state_get(devfs_handle_t);
+extern error_return_code_t	error_state_set(vertex_hdl_t,error_state_t);
+extern error_state_t		error_state_get(vertex_hdl_t);
 #endif
-
-/* System critical graph interfaces */
-
-extern boolean_t		is_sys_critical_vertex(devfs_handle_t);
-extern devfs_handle_t		sys_critical_first_child_get(devfs_handle_t);
-extern devfs_handle_t		sys_critical_next_child_get(devfs_handle_t);
-extern devfs_handle_t		sys_critical_parent_get(devfs_handle_t);
-extern error_return_code_t	sys_critical_graph_vertex_add(devfs_handle_t,
-							     devfs_handle_t new);
 
 /* Error action interfaces */
 
-extern error_return_code_t	error_action_set(devfs_handle_t,
+extern error_return_code_t	error_action_set(vertex_hdl_t,
 						 error_action_f,
 						 error_context_t,
 						 error_priority_t);
-extern error_return_code_t	error_action_perform(devfs_handle_t);
+extern error_return_code_t	error_action_perform(vertex_hdl_t);
 
 
 #define INFO_LBL_ERROR_SKIP_ENV	"error_skip_env"
@@ -243,14 +234,14 @@ hwgraph_info_get_LBL(v, INFO_LBL_ERROR_SKIP_ENV, (arbitrary_info_t *)&l)
 hwgraph_info_remove_LBL(v, INFO_LBL_ERROR_SKIP_ENV, 0)
 
 /* Skip point interfaces */
-extern error_return_code_t	error_skip_point_jump(devfs_handle_t, boolean_t);
-extern error_return_code_t	error_skip_point_clear(devfs_handle_t);
+extern error_return_code_t	error_skip_point_jump(vertex_hdl_t, boolean_t);
+extern error_return_code_t	error_skip_point_clear(vertex_hdl_t);
 
 /* REFERENCED */
 #if defined(CONFIG_SGI_IO_ERROR_HANDLING)
 
 inline static int
-error_skip_point_mark(devfs_handle_t  v)  			 
+error_skip_point_mark(vertex_hdl_t  v)  			 
 {									
 	label_t		*error_env = NULL;	 			
 	int		code = 0;		
@@ -283,10 +274,10 @@ error_skip_point_mark(devfs_handle_t  v)
 
 typedef uint64_t		counter_t;
 
-extern counter_t		error_retry_count_get(devfs_handle_t);
-extern error_return_code_t	error_retry_count_set(devfs_handle_t,counter_t);
-extern counter_t		error_retry_count_increment(devfs_handle_t);
-extern counter_t		error_retry_count_decrement(devfs_handle_t);
+extern counter_t		error_retry_count_get(vertex_hdl_t);
+extern error_return_code_t	error_retry_count_set(vertex_hdl_t,counter_t);
+extern counter_t		error_retry_count_increment(vertex_hdl_t);
+extern counter_t		error_retry_count_decrement(vertex_hdl_t);
 
 /* Except for the PIO Read error typically the other errors are handled in
  * the context of an asynchronous error interrupt.
@@ -298,7 +289,7 @@ extern counter_t		error_retry_count_decrement(devfs_handle_t);
  * thru the calls the io error handling layer.
  */
 #if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-extern boolean_t		is_device_shutdown(devfs_handle_t);
+extern boolean_t		is_device_shutdown(vertex_hdl_t);
 #define IS_DEVICE_SHUTDOWN(_d) 	(is_device_shutdown(_d))
 #endif
 
