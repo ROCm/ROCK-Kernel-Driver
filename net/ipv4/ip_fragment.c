@@ -31,6 +31,8 @@
 #include <linux/ip.h>
 #include <linux/icmp.h>
 #include <linux/netdevice.h>
+#include <linux/jhash.h>
+#include <linux/random.h>
 #include <net/sock.h>
 #include <net/ip.h>
 #include <net/icmp.h>
@@ -97,6 +99,7 @@ struct ipq {
 /* Per-bucket lock is easy to add now. */
 static struct ipq *ipq_hash[IPQ_HASHSZ];
 static rwlock_t ipfrag_lock = RW_LOCK_UNLOCKED;
+static u32 ipfrag_hash_rnd;
 static LIST_HEAD(ipq_lru_list);
 int ip_frag_nqueues = 0;
 
@@ -116,21 +119,51 @@ static __inline__ void ipq_unlink(struct ipq *ipq)
 	write_unlock(&ipfrag_lock);
 }
 
-/*
- * Was:	((((id) >> 1) ^ (saddr) ^ (daddr) ^ (prot)) & (IPQ_HASHSZ - 1))
- *
- * I see, I see evil hand of bigendian mafia. On Intel all the packets hit
- * one hash bucket with this hash function. 8)
- */
-static __inline__ unsigned int ipqhashfn(u16 id, u32 saddr, u32 daddr, u8 prot)
+static unsigned int ipqhashfn(u16 id, u32 saddr, u32 daddr, u8 prot)
 {
-	unsigned int h = saddr ^ daddr;
-
-	h ^= (h>>16)^id;
-	h ^= (h>>8)^prot;
-	return h & (IPQ_HASHSZ - 1);
+	return jhash_3words((u32)id << 16 | prot, saddr, daddr,
+			    ipfrag_hash_rnd) & (IPQ_HASHSZ - 1);
 }
 
+static struct timer_list ipfrag_secret_timer;
+static int ipfrag_secret_interval = 10 * 60 * HZ;
+
+static void ipfrag_secret_rebuild(unsigned long dummy)
+{
+	unsigned long now = jiffies;
+	int i;
+
+	write_lock(&ipfrag_lock);
+	get_random_bytes(&ipfrag_hash_rnd, sizeof(u32));
+	for (i = 0; i < IPQ_HASHSZ; i++) {
+		struct ipq *q;
+
+		q = ipq_hash[i];
+		while (q) {
+			struct ipq *next = q->next;
+			unsigned int hval = ipqhashfn(q->id, q->saddr,
+						      q->daddr, q->protocol);
+
+			if (hval != i) {
+				/* Unlink. */
+				if (q->next)
+					q->next->pprev = q->pprev;
+				*q->pprev = q->next;
+
+				/* Relink to new hash chain. */
+				if ((q->next = ipq_hash[hval]) != NULL)
+					q->next->pprev = &q->next;
+				ipq_hash[hval] = q;
+				q->pprev = &ipq_hash[hval];
+			}
+
+			q = next;
+		}
+	}
+	write_unlock(&ipfrag_lock);
+
+	mod_timer(&ipfrag_secret_timer, now + ipfrag_secret_interval);
+}
 
 atomic_t ip_frag_mem = ATOMIC_INIT(0);	/* Memory used for fragments */
 
@@ -630,4 +663,15 @@ struct sk_buff *ip_defrag(struct sk_buff *skb)
 	IP_INC_STATS_BH(IpReasmFails);
 	kfree_skb(skb);
 	return NULL;
+}
+
+void ipfrag_init(void)
+{
+	ipfrag_hash_rnd = (u32) ((num_physpages ^ (num_physpages>>7)) ^
+				 (jiffies ^ (jiffies >> 6)));
+
+	init_timer(&ipfrag_secret_timer);
+	ipfrag_secret_timer.function = ipfrag_secret_rebuild;
+	ipfrag_secret_timer.expires = jiffies + ipfrag_secret_interval;
+	add_timer(&ipfrag_secret_timer);
 }

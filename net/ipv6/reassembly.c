@@ -38,6 +38,8 @@
 #include <linux/in6.h>
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
+#include <linux/random.h>
+#include <linux/jhash.h>
 
 #include <net/sock.h>
 #include <net/snmp.h>
@@ -99,6 +101,7 @@ struct frag_queue
 
 static struct frag_queue *ip6_frag_hash[IP6Q_HASHSZ];
 static rwlock_t ip6_frag_lock = RW_LOCK_UNLOCKED;
+static u32 ip6_frag_hash_rnd;
 static LIST_HEAD(ip6_frag_lru_list);
 int ip6_frag_nqueues = 0;
 
@@ -118,16 +121,73 @@ static __inline__ void fq_unlink(struct frag_queue *fq)
 	write_unlock(&ip6_frag_lock);
 }
 
-static __inline__ unsigned int ip6qhashfn(u32 id, struct in6_addr *saddr,
-					  struct in6_addr *daddr)
+static unsigned int ip6qhashfn(u32 id, struct in6_addr *saddr,
+			       struct in6_addr *daddr)
 {
-	unsigned int h = saddr->s6_addr32[3] ^ daddr->s6_addr32[3] ^ id;
+	u32 a, b, c;
 
-	h ^= (h>>16);
-	h ^= (h>>8);
-	return h & (IP6Q_HASHSZ - 1);
+	a = saddr->s6_addr32[0];
+	b = saddr->s6_addr32[1];
+	c = saddr->s6_addr32[2];
+
+	a += JHASH_GOLDEN_RATIO;
+	b += JHASH_GOLDEN_RATIO;
+	c += ip6_frag_hash_rnd;
+	__jhash_mix(a, b, c);
+
+	a += saddr->s6_addr32[3];
+	b += daddr->s6_addr32[0];
+	c += daddr->s6_addr32[1];
+	__jhash_mix(a, b, c);
+
+	a += daddr->s6_addr32[2];
+	b += daddr->s6_addr32[3];
+	c += id;
+	__jhash_mix(a, b, c);
+
+	return c & (IP6Q_HASHSZ - 1);
 }
 
+static struct timer_list ip6_frag_secret_timer;
+static int ip6_frag_secret_interval = 10 * 60 * HZ;
+
+static void ip6_frag_secret_rebuild(unsigned long dummy)
+{
+	unsigned long now = jiffies;
+	int i;
+
+	write_lock(&ip6_frag_lock);
+	get_random_bytes(&ip6_frag_hash_rnd, sizeof(u32));
+	for (i = 0; i < IP6Q_HASHSZ; i++) {
+		struct frag_queue *q;
+
+		q = ip6_frag_hash[i];
+		while (q) {
+			struct frag_queue *next = q->next;
+			unsigned int hval = ip6qhashfn(q->id,
+						       &q->saddr,
+						       &q->daddr);
+
+			if (hval != i) {
+				/* Unlink. */
+				if (q->next)
+					q->next->pprev = q->pprev;
+				*q->pprev = q->next;
+
+				/* Relink to new hash chain. */
+				if ((q->next = ip6_frag_hash[hval]) != NULL)
+					q->next->pprev = &q->next;
+				ip6_frag_hash[hval] = q;
+				q->pprev = &ip6_frag_hash[hval];
+			}
+
+			q = next;
+		}
+	}
+	write_unlock(&ip6_frag_lock);
+
+	mod_timer(&ip6_frag_secret_timer, now + ip6_frag_secret_interval);
+}
 
 atomic_t ip6_frag_mem = ATOMIC_INIT(0);
 
@@ -696,4 +756,12 @@ void __init ipv6_frag_init(void)
 {
 	if (inet6_add_protocol(&frag_protocol, IPPROTO_FRAGMENT) < 0)
 		printk(KERN_ERR "ipv6_frag_init: Could not register protocol\n");
+
+	ip6_frag_hash_rnd = (u32) ((num_physpages ^ (num_physpages>>7)) ^
+				   (jiffies ^ (jiffies >> 6)));
+
+	init_timer(&ip6_frag_secret_timer);
+	ip6_frag_secret_timer.function = ip6_frag_secret_rebuild;
+	ip6_frag_secret_timer.expires = jiffies + ip6_frag_secret_interval;
+	add_timer(&ip6_frag_secret_timer);
 }
