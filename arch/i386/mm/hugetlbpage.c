@@ -26,7 +26,6 @@ static long    htlbpagemem;
 int     htlbpage_max;
 static long    htlbzone_pages;
 
-struct vm_operations_struct hugetlb_vm_ops;
 static LIST_HEAD(htlbpage_freelist);
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
@@ -472,7 +471,14 @@ int is_hugepage_mem_enough(size_t size)
 	return 1;
 }
 
-static struct page *hugetlb_nopage(struct vm_area_struct * area, unsigned long address, int unused)
+/*
+ * We cannot handle pagefaults against hugetlb pages at all.  They cause
+ * handle_mm_fault() to try to instantiate regular-sized pages in the
+ * hugegpage VMA.  do_page_fault() is supposed to trap this, so BUG is we get
+ * this far.
+ */
+static struct page *
+hugetlb_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
 {
 	BUG();
 	return NULL;

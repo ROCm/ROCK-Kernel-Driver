@@ -18,7 +18,6 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
-static struct vm_operations_struct hugetlb_vm_ops;
 struct list_head htlbpage_freelist;
 spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 extern long htlbpagemem;
@@ -333,6 +332,14 @@ set_hugetlb_mem_size (int count)
 	return (int) htlbzone_pages;
 }
 
+static struct page *
+hugetlb_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
+{
+	BUG();
+	return NULL;
+}
+
 static struct vm_operations_struct hugetlb_vm_ops = {
-	.close =	zap_hugetlb_resources
+	.nopage =	hugetlb_nopage,
+	.close =	zap_hugetlb_resources,
 };

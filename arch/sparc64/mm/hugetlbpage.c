@@ -619,6 +619,14 @@ int set_hugetlb_mem_size(int count)
 	return (int) htlbzone_pages;
 }
 
+static struct page *
+hugetlb_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
+{
+	BUG();
+	return NULL;
+}
+
 static struct vm_operations_struct hugetlb_vm_ops = {
+	.nopage = hugetlb_nopage,
 	.close	= zap_hugetlb_resources,
 };
