@@ -494,13 +494,6 @@ static int sctp_new(struct ip_conntrack *conntrack,
 	return 1;
 }
 
-static int sctp_exp_matches_pkt(struct ip_conntrack_expect *exp,
-				const struct sk_buff *skb)
-{
-	/* To be implemented */
-	return 0;
-}
-
 struct ip_conntrack_protocol ip_conntrack_protocol_sctp = { 
 	.proto 		 = IPPROTO_SCTP, 
 	.name 		 = "sctp",
@@ -511,7 +504,6 @@ struct ip_conntrack_protocol ip_conntrack_protocol_sctp = {
 	.packet 	 = sctp_packet, 
 	.new 		 = sctp_new, 
 	.destroy 	 = NULL, 
-	.exp_matches_pkt = sctp_exp_matches_pkt, 
 	.me 		 = THIS_MODULE 
 };
 

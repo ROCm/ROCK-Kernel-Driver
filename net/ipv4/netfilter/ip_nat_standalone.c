@@ -55,15 +55,6 @@
 			         : ((hooknum) == NF_IP_LOCAL_IN ? "LOCAL_IN"  \
 				    : "*ERROR*")))
 
-static inline int call_expect(struct ip_conntrack *master,
-			      struct sk_buff **pskb,
-			      unsigned int hooknum,
-			      struct ip_conntrack *ct,
-			      struct ip_nat_info *info)
-{
-	return master->nat.info.helper->expect(pskb, hooknum, ct, info);
-}
-
 static unsigned int
 ip_nat_fn(unsigned int hooknum,
 	  struct sk_buff **pskb,
@@ -131,21 +122,13 @@ ip_nat_fn(unsigned int hooknum,
 		if (!(info->initialized & (1 << maniptype))) {
 			unsigned int ret;
 
-			if (ct->master
-			    && master_ct(ct)->nat.info.helper
-			    && master_ct(ct)->nat.info.helper->expect) {
-				ret = call_expect(master_ct(ct), pskb, 
-						  hooknum, ct, info);
-			} else {
-				/* LOCAL_IN hook doesn't have a chain!  */
-				if (hooknum == NF_IP_LOCAL_IN)
-					ret = alloc_null_binding(ct, info,
-								 hooknum);
-				else
-					ret = ip_nat_rule_find(pskb, hooknum,
-					                       in, out, ct,
-					                       info);
-			}
+			/* LOCAL_IN hook doesn't have a chain!  */
+			if (hooknum == NF_IP_LOCAL_IN)
+				ret = alloc_null_binding(ct, info, hooknum);
+			else
+				ret = ip_nat_rule_find(pskb, hooknum,
+						       in, out, ct,
+						       info);
 
 			if (ret != NF_ACCEPT) {
 				WRITE_UNLOCK(&ip_nat_lock);
@@ -396,4 +379,5 @@ EXPORT_SYMBOL(ip_nat_mangle_udp_packet);
 EXPORT_SYMBOL(ip_nat_used_tuple);
 EXPORT_SYMBOL(ip_nat_find_helper);
 EXPORT_SYMBOL(__ip_nat_find_helper);
+EXPORT_SYMBOL(ip_nat_follow_master);
 MODULE_LICENSE("GPL");

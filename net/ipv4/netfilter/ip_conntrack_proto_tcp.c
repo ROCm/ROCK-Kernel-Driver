@@ -707,9 +707,9 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 
 #ifdef CONFIG_IP_NF_NAT_NEEDED
 /* Update sender->td_end after NAT successfully mangled the packet */
-int ip_conntrack_tcp_update(struct sk_buff *skb,
-			    struct ip_conntrack *conntrack, 
-			    int dir)
+void ip_conntrack_tcp_update(struct sk_buff *skb,
+			     struct ip_conntrack *conntrack, 
+			     enum ip_conntrack_dir dir)
 {
 	struct iphdr *iph = skb->nh.iph;
 	struct tcphdr *tcph = (void *)skb->nh.iph + skb->nh.iph->ihl*4;
@@ -735,8 +735,6 @@ int ip_conntrack_tcp_update(struct sk_buff *skb,
 		sender->td_scale, 
 		receiver->td_end, receiver->td_maxend, receiver->td_maxwin,
 		receiver->td_scale);
-		
-	return 1;
 }
  
 #endif
@@ -1061,22 +1059,6 @@ static int tcp_new(struct ip_conntrack *conntrack,
 	return 1;
 }
   
-static int tcp_exp_matches_pkt(struct ip_conntrack_expect *exp,
-			       const struct sk_buff *skb)
-{
-	const struct iphdr *iph = skb->nh.iph;
-	struct tcphdr *th, _tcph;
-	unsigned int datalen;
-
-	th = skb_header_pointer(skb, iph->ihl * 4,
-				sizeof(_tcph), &_tcph);
-	if (th == NULL)
-		return 0;
-	datalen = skb->len - iph->ihl*4 - th->doff*4;
-
-	return between(exp->seq, ntohl(th->seq), ntohl(th->seq) + datalen);
-}
-
 struct ip_conntrack_protocol ip_conntrack_protocol_tcp =
 {
 	.proto 			= IPPROTO_TCP,
@@ -1087,6 +1069,5 @@ struct ip_conntrack_protocol ip_conntrack_protocol_tcp =
 	.print_conntrack 	= tcp_print_conntrack,
 	.packet 		= tcp_packet,
 	.new 			= tcp_new,
-	.exp_matches_pkt	= tcp_exp_matches_pkt,
 	.error			= tcp_error,
 };

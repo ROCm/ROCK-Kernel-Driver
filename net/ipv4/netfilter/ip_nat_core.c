@@ -490,20 +490,6 @@ manip_pkt(u_int16_t proto,
 	return 1;
 }
 
-static inline int exp_for_packet(struct ip_conntrack_expect *exp,
-			         struct sk_buff *skb)
-{
-	struct ip_conntrack_protocol *proto;
-	int ret = 1;
-
-	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	proto = ip_ct_find_proto(skb->nh.iph->protocol);
-	if (proto->exp_matches_pkt)
-		ret = proto->exp_matches_pkt(exp, skb);
-
-	return ret;
-}
-
 /* Do packet manipulations according to binding. */
 unsigned int
 do_bindings(struct ip_conntrack *ct,
@@ -512,8 +498,7 @@ do_bindings(struct ip_conntrack *ct,
 	    unsigned int hooknum,
 	    struct sk_buff **pskb)
 {
-	unsigned int i;
-	struct ip_nat_helper *helper;
+	int i, ret = NF_ACCEPT;
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	int proto = (*pskb)->nh.iph->protocol;
 
@@ -538,75 +523,32 @@ do_bindings(struct ip_conntrack *ct,
 			}
 		}
 	}
-	helper = info->helper;
-	READ_UNLOCK(&ip_nat_lock);
 
-	if (helper) {
-		struct ip_conntrack_expect *exp = NULL;
-		struct list_head *cur_item;
-		int ret = NF_ACCEPT;
-		int helper_called = 0;
-
+	if (info->helper) {
 		DEBUGP("do_bindings: helper existing for (%p)\n", ct);
 
 		/* Always defragged for helpers */
 		IP_NF_ASSERT(!((*pskb)->nh.iph->frag_off
 			       & htons(IP_MF|IP_OFFSET)));
 
-		/* Have to grab read lock before sibling_list traversal */
-		READ_LOCK(&ip_conntrack_lock);
-		list_for_each_prev(cur_item, &ct->sibling_list) { 
-			exp = list_entry(cur_item, struct ip_conntrack_expect, 
-					 expected_list);
-					 
-			/* if this expectation is already established, skip */
-			if (exp->sibling)
-				continue;
+		ret = info->helper->help(ct, NULL, info, ctinfo, hooknum,pskb);
+	}
+	READ_UNLOCK(&ip_nat_lock);
 
-			if (exp_for_packet(exp, *pskb)) {
-				/* FIXME: May be true multiple times in the
-				 * case of UDP!! */
-				DEBUGP("calling nat helper (exp=%p) for packet\n", exp);
-				ret = helper->help(ct, exp, info, ctinfo, 
-						   hooknum, pskb);
-				if (ret != NF_ACCEPT) {
-					READ_UNLOCK(&ip_conntrack_lock);
-					return ret;
-				}
-				helper_called = 1;
-			}
-		}
-		/* Helper might want to manip the packet even when there is no
-		 * matching expectation for this packet */
-		if (!helper_called && helper->flags & IP_NAT_HELPER_F_ALWAYS) {
-			DEBUGP("calling nat helper for packet without expectation\n");
-			ret = helper->help(ct, NULL, info, ctinfo, 
-					   hooknum, pskb);
-			if (ret != NF_ACCEPT) {
-				READ_UNLOCK(&ip_conntrack_lock);
-				return ret;
-			}
-		}
-		READ_UNLOCK(&ip_conntrack_lock);
-		
-		/* Adjust sequence number only once per packet 
-		 * (helper is called at all hooks) */
-		if (proto == IPPROTO_TCP
-		    && (hooknum == NF_IP_POST_ROUTING
-			|| hooknum == NF_IP_LOCAL_IN)) {
-			DEBUGP("ip_nat_core: adjusting sequence number\n");
-			/* future: put this in a l4-proto specific function,
-			 * and call this function here. */
-			if (!ip_nat_seq_adjust(pskb, ct, ctinfo))
-				ret = NF_DROP;
-		}
+	/* FIXME: NAT/conntrack helpers should set ctinfo &
+	 * CT_INFO_RESYNC on packets, so we don't have to adjust all
+	 * connections with conntrack helpers --RR */
+	if (ct->helper
+	    && proto == IPPROTO_TCP
+	    && (hooknum == NF_IP_POST_ROUTING || hooknum == NF_IP_LOCAL_IN)) {
+		DEBUGP("ip_nat_core: adjusting sequence number\n");
+		/* future: put this in a l4-proto specific function,
+		 * and call this function here. */
+		if (!ip_nat_seq_adjust(pskb, ct, ctinfo))
+			ret = NF_DROP;
+	}
 
-		return ret;
-
-	} else 
-		return NF_ACCEPT;
-
-	/* not reached */
+	return ret;
 }
 
 static inline int tuple_src_equal_dst(const struct ip_conntrack_tuple *t1,

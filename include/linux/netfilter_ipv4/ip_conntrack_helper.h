@@ -25,7 +25,7 @@ struct ip_conntrack_helper
 	
 	/* Function to call when data passes; return verdict, or -1 to
            invalidate. */
-	int (*help)(struct sk_buff *skb,
+	int (*help)(struct sk_buff **pskb,
 		    struct ip_conntrack *ct,
 		    enum ip_conntrack_info conntrackinfo);
 };
@@ -42,8 +42,6 @@ extern struct ip_conntrack_expect *ip_conntrack_expect_alloc(void);
 /* Add an expected connection: can have more than one per connection */
 extern int ip_conntrack_expect_related(struct ip_conntrack_expect *exp,
 				       struct ip_conntrack *related_to);
-extern int ip_conntrack_change_expect(struct ip_conntrack_expect *expect,
-				      struct ip_conntrack_tuple *newtuple);
 extern void ip_conntrack_unexpect_related(struct ip_conntrack_expect *exp);
 
 #endif /*_IP_CONNTRACK_HELPER_H*/

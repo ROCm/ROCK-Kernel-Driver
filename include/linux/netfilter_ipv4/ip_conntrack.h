@@ -3,13 +3,6 @@
 /* Connection state tracking for netfilter.  This is separated from,
    but required by, the NAT layer; it can also be used by an iptables
    extension. */
-
-#include <linux/config.h>
-#include <linux/netfilter_ipv4/ip_conntrack_tuple.h>
-#include <linux/bitops.h>
-#include <linux/compiler.h>
-#include <asm/atomic.h>
-
 enum ip_conntrack_info
 {
 	/* Part of an established connection (either direction). */
@@ -49,6 +42,13 @@ enum ip_conntrack_status {
 	IPS_CONFIRMED = (1 << IPS_CONFIRMED_BIT),
 };
 
+#ifdef __KERNEL__
+#include <linux/config.h>
+#include <linux/netfilter_ipv4/ip_conntrack_tuple.h>
+#include <linux/bitops.h>
+#include <linux/compiler.h>
+#include <asm/atomic.h>
+
 #include <linux/netfilter_ipv4/ip_conntrack_tcp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_icmp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_sctp.h>
@@ -70,20 +70,6 @@ union ip_conntrack_expect_proto {
 #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_irc.h>
 
-/* per expectation: application helper private data */
-union ip_conntrack_expect_help {
-	/* insert conntrack helper private data (expect) here */
-	struct ip_ct_amanda_expect exp_amanda_info;
-	struct ip_ct_ftp_expect exp_ftp_info;
-	struct ip_ct_irc_expect exp_irc_info;
-
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-	union {
-		/* insert nat helper private data (expect) here */
-	} nat;
-#endif
-};
-
 /* per conntrack: application helper private data */
 union ip_conntrack_help {
 	/* insert conntrack helper private data (master) here */
@@ -99,8 +85,6 @@ union ip_conntrack_nat_help {
 	/* insert nat helper private data here */
 };
 #endif
-
-#ifdef __KERNEL__
 
 #include <linux/types.h>
 #include <linux/skbuff.h>
@@ -148,14 +132,17 @@ struct ip_conntrack_expect
 	struct ip_conntrack_tuple tuple, mask;
 
 	/* Function to call after setup and insertion */
-	int (*expectfn)(struct ip_conntrack *new);
+	void (*expectfn)(struct ip_conntrack *new);
 
-	/* At which sequence number did this expectation occur */
-	u_int32_t seq;
-  
+#ifdef CONFIG_IP_NF_NAT_NEEDED
+	/* This is the original per-proto part, used to map the
+	 * expected connection the way the recipient expects. */
+	union ip_conntrack_manip_proto saved_proto;
+	/* Direction relative to the master connection. */
+	enum ip_conntrack_dir dir;
+#endif
+
 	union ip_conntrack_expect_proto proto;
-
-	union ip_conntrack_expect_help help;
 };
 
 struct ip_conntrack_counter
@@ -267,9 +254,9 @@ extern void ip_ct_refresh_acct(struct ip_conntrack *ct,
 
 /* These are for NAT.  Icky. */
 /* Update TCP window tracking data when NAT mangles the packet */
-extern int ip_conntrack_tcp_update(struct sk_buff *skb,
-				   struct ip_conntrack *conntrack,
-				   int dir);
+extern void ip_conntrack_tcp_update(struct sk_buff *skb,
+				    struct ip_conntrack *conntrack,
+				    enum ip_conntrack_dir dir);
 
 /* Call me when a conntrack is destroyed. */
 extern void (*ip_conntrack_destroyed)(struct ip_conntrack *conntrack);

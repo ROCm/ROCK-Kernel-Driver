@@ -196,6 +196,8 @@ ip_nat_mangle_tcp_packet(struct sk_buff **pskb,
 	adjust_tcp_sequence(ntohl(tcph->seq),
 			    (int)rep_len - (int)match_len,
 			    ct, ctinfo);
+	/* Tell connection tracking about seq change, to expand window */
+	ip_conntrack_tcp_update(*pskb, ct, CTINFO2DIR(ctinfo));
 	return 1;
 }
 			
@@ -402,6 +404,49 @@ ip_nat_seq_adjust(struct sk_buff **pskb,
 	ip_conntrack_tcp_update(*pskb, ct, dir);
 
 	return 1;
+}
+
+/* We look at the master's nat fields without ip_nat_lock.  This works
+   because the master's NAT must be fully initialized, because we
+   don't match expectations set up by unconfirmed connections.  We
+   can't grab the lock because we hold the ip_conntrack_lock, and that
+   would be backwards from other locking orders. */
+static void ip_nat_copy_manip(struct ip_nat_info *master,
+			      struct ip_conntrack_expect *exp,
+			      struct ip_conntrack *ct)
+{
+	struct ip_nat_range range;
+	unsigned int i;
+
+	range.flags = IP_NAT_RANGE_MAP_IPS;
+
+	/* Find what master is mapped to (if any), so we can do the same. */
+	for (i = 0; i < master->num_manips; i++) {
+		if (master->manips[i].direction != exp->dir)
+			continue;
+
+		range.min_ip = range.max_ip = master->manips[i].manip.ip;
+
+		/* If this is a DST manip, map port here to where it's
+		 * expected. */
+		if (master->manips[i].maniptype == IP_NAT_MANIP_DST) {
+			range.flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
+			range.min = range.max = exp->saved_proto;
+		}
+		ip_nat_setup_info(ct, &range, master->manips[i].hooknum);
+	}
+}
+
+/* Setup NAT on this expected conntrack so it follows master. */
+/* If we fail to get a free NAT slot, we'll get dropped on confirm */
+void ip_nat_follow_master(struct ip_conntrack *ct)
+{
+	struct ip_nat_info *master = &ct->master->expectant->nat.info;
+
+	/* This must be a fresh one. */
+	BUG_ON(ct->nat.info.initialized);
+
+	ip_nat_copy_manip(master, ct->master, ct);
 }
 
 static inline int

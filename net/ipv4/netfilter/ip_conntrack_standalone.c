@@ -364,8 +364,20 @@ static unsigned int ip_confirm(unsigned int hooknum,
 			       const struct net_device *out,
 			       int (*okfn)(struct sk_buff *))
 {
+	struct ip_conntrack *ct;
+	enum ip_conntrack_info ctinfo;
+
+	/* This is where we call the helper: as the packet goes out. */
+	ct = ip_conntrack_get(*pskb, &ctinfo);
+	if (ct && ct->helper) {
+		unsigned int ret;
+		ret = ct->helper->help(pskb, ct, ctinfo);
+		if (ret != NF_ACCEPT)
+			return ret;
+	}
+
 	/* We've seen it coming out the other side: confirm it */
-	return ip_conntrack_confirm(*pskb);
+	return ip_conntrack_confirm(pskb);
 }
 
 static unsigned int ip_conntrack_defrag(unsigned int hooknum,
@@ -899,7 +911,6 @@ EXPORT_SYMBOL(ip_ct_find_proto);
 EXPORT_SYMBOL(ip_ct_find_helper);
 EXPORT_SYMBOL(ip_conntrack_expect_alloc);
 EXPORT_SYMBOL(ip_conntrack_expect_related);
-EXPORT_SYMBOL(ip_conntrack_change_expect);
 EXPORT_SYMBOL(ip_conntrack_unexpect_related);
 EXPORT_SYMBOL_GPL(ip_conntrack_expect_find_get);
 EXPORT_SYMBOL_GPL(ip_conntrack_expect_put);

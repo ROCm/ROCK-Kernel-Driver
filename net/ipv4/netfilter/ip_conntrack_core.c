@@ -394,13 +394,13 @@ ip_conntrack_find_get(const struct ip_conntrack_tuple *tuple,
 
 /* Confirm a connection given skb; places it in hash table */
 int
-__ip_conntrack_confirm(struct sk_buff *skb)
+__ip_conntrack_confirm(struct sk_buff **pskb)
 {
 	unsigned int hash, repl_hash;
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
 
-	ct = ip_conntrack_get(skb, &ctinfo);
+	ct = ip_conntrack_get(*pskb, &ctinfo);
 
 	/* ipt_REJECT uses ip_conntrack_attach to attach related
 	   ICMP/TCP RST packets in other direction.  Actual packet
@@ -782,16 +782,6 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 		return -ret;
 	}
 
-	if (ret != NF_DROP && ct->helper) {
-		ret = ct->helper->help(*pskb, ct, ctinfo);
-		if (ret == -1) {
-			/* Invalid */
-			CONNTRACK_STAT_INC(invalid);
-			nf_conntrack_put((*pskb)->nfct);
-			(*pskb)->nfct = NULL;
-			return NF_ACCEPT;
-		}
-	}
 	if (set_reply)
 		set_bit(IPS_SEEN_REPLY_BIT, &ct->status);
 
@@ -947,7 +937,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 				       related_to->helper->name,
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
-			ip_conntrack_expect_put(expect);	
+			ip_conntrack_expect_put(expect);
 			return -EPERM;
 		}
 		DEBUGP("ip_conntrack: max number of expected "
@@ -981,7 +971,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 		WRITE_UNLOCK(&ip_conntrack_lock);
 		DEBUGP("expect_related: busy!\n");
 
-		ip_conntrack_expect_put(expect);	
+		ip_conntrack_expect_put(expect);
 		return -EBUSY;
 	}
 
@@ -991,47 +981,6 @@ out:	ip_conntrack_expect_insert(expect, related_to);
 
 	CONNTRACK_STAT_INC(expect_create);
 
-	return ret;
-}
-
-/* Change tuple in an existing expectation */
-int ip_conntrack_change_expect(struct ip_conntrack_expect *expect,
-			       struct ip_conntrack_tuple *newtuple)
-{
-	int ret;
-
-	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	WRITE_LOCK(&ip_conntrack_expect_tuple_lock);
-
-	DEBUGP("change_expect:\n");
-	DEBUGP("exp tuple: "); DUMP_TUPLE(&expect->tuple);
-	DEBUGP("exp mask:  "); DUMP_TUPLE(&expect->mask);
-	DEBUGP("newtuple:  "); DUMP_TUPLE(newtuple);
-	if (expect->ct_tuple.dst.protonum == 0) {
-		/* Never seen before */
-		DEBUGP("change expect: never seen before\n");
-		if (!ip_ct_tuple_equal(&expect->tuple, newtuple) 
-		    && LIST_FIND(&ip_conntrack_expect_list, expect_clash,
-			         struct ip_conntrack_expect *, newtuple, &expect->mask)) {
-			/* Force NAT to find an unused tuple */
-			ret = -1;
-		} else {
-			memcpy(&expect->ct_tuple, &expect->tuple, sizeof(expect->tuple));
-			memcpy(&expect->tuple, newtuple, sizeof(expect->tuple));
-			ret = 0;
-		}
-	} else {
-		/* Resent packet */
-		DEBUGP("change expect: resent packet\n");
-		if (ip_ct_tuple_equal(&expect->tuple, newtuple)) {
-			ret = 0;
-		} else {
-			/* Force NAT to choose again the same port */
-			ret = -1;
-		}
-	}
-	WRITE_UNLOCK(&ip_conntrack_expect_tuple_lock);
-	
 	return ret;
 }
 
