@@ -40,11 +40,7 @@
 #define DRIVER_AUTHOR	"Scott Murray <scottm@somanetworks.com>"
 #define DRIVER_DESC	"CompactPCI Hot Plug Core"
 
-#if !defined(CONFIG_HOTPLUG_CPCI_MODULE)
 #define MY_NAME	"cpci_hotplug"
-#else
-#define MY_NAME	THIS_MODULE->name
-#endif
 
 #define dbg(format, arg...)					\
 	do {							\
@@ -79,7 +75,6 @@ static struct hotplug_slot_ops cpci_hotplug_slot_ops = {
 	.enable_slot = enable_slot,
 	.disable_slot = disable_slot,
 	.set_attention_status = set_attention_status,
-	.hardware_test = NULL,
 	.get_power_status = get_power_status,
 	.get_attention_status = get_attention_status,
 	.get_latch_status = get_latch_status,
@@ -122,8 +117,6 @@ update_latch_status(struct hotplug_slot *hotplug_slot, u8 value)
 {
 	struct hotplug_slot_info info;
 
-	if(!(hotplug_slot && hotplug_slot->info))
-		return -EINVAL;
 	memcpy(&info, hotplug_slot->info, sizeof(struct hotplug_slot_info));
 	info.latch_status = value;
 	return pci_hp_change_slot_info(hotplug_slot, &info);
@@ -134,8 +127,6 @@ update_adapter_status(struct hotplug_slot *hotplug_slot, u8 value)
 {
 	struct hotplug_slot_info info;
 
-	if(!(hotplug_slot && hotplug_slot->info))
-		return -EINVAL;
 	memcpy(&info, hotplug_slot->info, sizeof(struct hotplug_slot_info));
 	info.adapter_status = value;
 	return pci_hp_change_slot_info(hotplug_slot, &info);
@@ -146,9 +137,6 @@ enable_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
-
-	if(slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s", __FUNCTION__, hotplug_slot->name);
 
@@ -164,9 +152,6 @@ disable_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
-
-	if(slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s", __FUNCTION__, hotplug_slot->name);
 
@@ -218,8 +203,6 @@ get_power_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 
-	if(slot == NULL)
-		return -ENODEV;
 	*value = cpci_get_power_status(slot);
 	return 0;
 }
@@ -229,8 +212,6 @@ get_attention_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 
-	if(slot == NULL)
-		return -ENODEV;
 	*value = cpci_get_attention_status(slot);
 	return 0;
 }
@@ -244,8 +225,6 @@ set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
 static int
 get_latch_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
-	if(hotplug_slot == NULL || hotplug_slot->info == NULL)
-		return -ENODEV;
 	*value = hotplug_slot->info->latch_status;
 	return 0;
 }
@@ -253,8 +232,6 @@ get_latch_status(struct hotplug_slot *hotplug_slot, u8 * value)
 static int
 get_adapter_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
-	if(hotplug_slot == NULL || hotplug_slot->info == NULL)
-		return -ENODEV;
 	*value = hotplug_slot->info->adapter_status;
 	return 0;
 }
@@ -262,9 +239,6 @@ get_adapter_status(struct hotplug_slot *hotplug_slot, u8 * value)
 static void release_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if(slot == NULL)
-		return;
 
 	kfree(slot->hotplug_slot->info);
 	kfree(slot->hotplug_slot->name);
