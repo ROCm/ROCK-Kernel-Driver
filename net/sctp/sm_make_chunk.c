@@ -1482,74 +1482,28 @@ malformed:
  * 3rd Level Abstractions
  ********************************************************************/
 
-/* Verify the INIT packet before we process it.  */
-int sctp_verify_init(const sctp_association_t *asoc,
-		     sctp_cid_t cid,
-		     sctp_init_chunk_t *peer_init,
-		     sctp_chunk_t *chunk,
-		     sctp_chunk_t **err_chk_p)
-{
-	union sctp_params param;
-
-	/* FIXME - Verify the fixed fields of the INIT chunk. Also, verify
-	 * the mandatory parameters somewhere here and generate either the
-	 * "Missing mandatory parameter" error or the "Invalid mandatory
-	 * parameter" error.
-	 */
-
-	/* Find unrecognized parameters. */
-
-	sctp_walk_params(param, peer_init, init_hdr.params) {
-
-		if (!sctp_verify_param(asoc, param, cid, chunk, err_chk_p))
-			return 0;
-
-	} /* for (loop through all parameters) */
-
-	return 1;
-}
-
-
-/* Find unrecognized parameters in the chunk.
- * Return values:
- * 	0 - discard the chunk
- * 	1 - continue with the chunk
+/* Do not attempt to handle the HOST_NAME parm.  However, do
+ * send back an indicator to the peer.
  */
-int sctp_verify_param(const sctp_association_t *asoc,
-		      union sctp_params param,
-		      sctp_cid_t cid,
-		      sctp_chunk_t *chunk,
-		      sctp_chunk_t **err_chk_p)
+static int sctp_process_hn_param(const sctp_association_t *asoc,
+				 union sctp_params param,
+				 sctp_chunk_t *chunk,
+				 sctp_chunk_t **err_chk_p)
 {
-	int retval = 1;
+	__u16 len = ntohs(param.p->length);
 
-	/* FIXME - This routine is not looking at each parameter per the
-	 * chunk type, i.e., unrecognized parameters should be further
-	 * identified based on the chunk id.
+	/* Make an ERROR chunk, preparing enough room for
+	 * returning multiple unknown parameters.
 	 */
+	if (!*err_chk_p)
+		*err_chk_p = sctp_make_op_error_space(asoc, chunk, len);
 
-	switch (param.p->type) {
-	case SCTP_PARAM_IPV4_ADDRESS:
-	case SCTP_PARAM_IPV6_ADDRESS:
-	case SCTP_PARAM_COOKIE_PRESERVATIVE:
-	/* FIXME - If we don't support the host name parameter, we should
-	 * generate an error for this - Unresolvable address.
-	 */
-	case SCTP_PARAM_HOST_NAME_ADDRESS:
-	case SCTP_PARAM_SUPPORTED_ADDRESS_TYPES:
-	case SCTP_PARAM_STATE_COOKIE:
-	case SCTP_PARAM_HEARTBEAT_INFO:
-	case SCTP_PARAM_UNRECOGNIZED_PARAMETERS:
-	case SCTP_PARAM_ECN_CAPABLE:
-		break;
-	default:
-		SCTP_DEBUG_PRINTK("Unrecognized param: %d for chunk %d.\n",
-				ntohs(param.p->type), cid);
-		return sctp_process_unk_param(asoc, param, chunk, err_chk_p);
+	if (*err_chk_p)
+		sctp_init_cause(*err_chk_p, SCTP_ERROR_DNS_FAILED,
+				param.v, len);
 
-		break;
-	}
-	return retval;
+	/* Stop processing this chunk. */
+	return 0;
 }
 
 /* RFC 3.2.1 & the Implementers Guide 2.2.
@@ -1578,10 +1532,10 @@ int sctp_verify_param(const sctp_association_t *asoc,
  * 	0 - discard the chunk
  * 	1 - continue with the chunk
  */
-int sctp_process_unk_param(const sctp_association_t *asoc,
-			   union sctp_params param,
-			   sctp_chunk_t *chunk,
-			   sctp_chunk_t **err_chk_p)
+static int sctp_process_unk_param(const sctp_association_t *asoc,
+				  union sctp_params param,
+				  sctp_chunk_t *chunk,
+				  sctp_chunk_t **err_chk_p)
 {
 	int retval = 1;
 
@@ -1600,7 +1554,7 @@ int sctp_process_unk_param(const sctp_association_t *asoc,
 
 		if (*err_chk_p)
 			sctp_init_cause(*err_chk_p, SCTP_ERROR_UNKNOWN_PARAM,
-					(const void *)param.p,
+					param.v,
 					WORD_ROUND(ntohs(param.p->length)));
 
 		break;
@@ -1616,7 +1570,7 @@ int sctp_process_unk_param(const sctp_association_t *asoc,
 
 		if (*err_chk_p) {
 			sctp_init_cause(*err_chk_p, SCTP_ERROR_UNKNOWN_PARAM,
-					(const void *)param.p,
+					param.v,
 					WORD_ROUND(ntohs(param.p->length)));
 		} else {
 			/* If there is no memory for generating the ERROR
@@ -1634,14 +1588,82 @@ int sctp_process_unk_param(const sctp_association_t *asoc,
 	return retval;
 }
 
-/* Unpack the parameters in an INIT packet.
- * FIXME:  There is no return status to allow callers to do
- * error handling.
+/* Find unrecognized parameters in the chunk.
+ * Return values:
+ * 	0 - discard the chunk
+ * 	1 - continue with the chunk
  */
-void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
-		       const sockaddr_storage_t *peer_addr,
-		       sctp_init_chunk_t *peer_init,
-		       int priority)
+static int sctp_verify_param(const sctp_association_t *asoc,
+			     union sctp_params param,
+			     sctp_cid_t cid,
+			     sctp_chunk_t *chunk,
+			     sctp_chunk_t **err_chunk)
+{
+	int retval = 1;
+
+	/* FIXME - This routine is not looking at each parameter per the
+	 * chunk type, i.e., unrecognized parameters should be further
+	 * identified based on the chunk id.
+	 */
+
+	switch (param.p->type) {
+	case SCTP_PARAM_IPV4_ADDRESS:
+	case SCTP_PARAM_IPV6_ADDRESS:
+	case SCTP_PARAM_COOKIE_PRESERVATIVE:
+	case SCTP_PARAM_SUPPORTED_ADDRESS_TYPES:
+	case SCTP_PARAM_STATE_COOKIE:
+	case SCTP_PARAM_HEARTBEAT_INFO:
+	case SCTP_PARAM_UNRECOGNIZED_PARAMETERS:
+	case SCTP_PARAM_ECN_CAPABLE:
+		break;
+
+	case SCTP_PARAM_HOST_NAME_ADDRESS:
+		/* Tell the peer, we won't support this param.  */
+		return sctp_process_hn_param(asoc, param, chunk, err_chunk);
+	default:
+		SCTP_DEBUG_PRINTK("Unrecognized param: %d for chunk %d.\n",
+				ntohs(param.p->type), cid);
+		return sctp_process_unk_param(asoc, param, chunk, err_chunk);
+
+		break;
+	}
+	return retval;
+}
+
+/* Verify the INIT packet before we process it.  */
+int sctp_verify_init(const sctp_association_t *asoc,
+		     sctp_cid_t cid,
+		     sctp_init_chunk_t *peer_init,
+		     sctp_chunk_t *chunk,
+		     sctp_chunk_t **err_chk_p)
+{
+	union sctp_params param;
+
+	/* FIXME - Verify the fixed fields of the INIT chunk. Also, verify
+	 * the mandatory parameters somewhere here and generate either the
+	 * "Missing mandatory parameter" error or the "Invalid mandatory
+	 * parameter" error.
+	 */
+
+	/* Find unrecognized parameters. */
+
+	sctp_walk_params(param, peer_init, init_hdr.params) {
+
+		if (!sctp_verify_param(asoc, param, cid, chunk, err_chk_p))
+			return 0;
+
+	} /* for (loop through all parameters) */
+
+	return 1;
+}
+
+/* Unpack the parameters in an INIT packet into an association.
+ * Returns 0 on failure, else success.
+ */
+int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
+		      const sockaddr_storage_t *peer_addr,
+		      sctp_init_chunk_t *peer_init,
+		      int priority)
 {
 	union sctp_params param;
 	sctp_transport_t *transport;
@@ -1659,14 +1681,14 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	 * be a a better choice than any of the embedded addresses.
 	 */
 	if (peer_addr)
-		sctp_assoc_add_peer(asoc, peer_addr, priority);
+		if(!sctp_assoc_add_peer(asoc, peer_addr, priority))
+			goto nomem;
 
 	/* Process the initialization parameters.  */
 
 	sctp_walk_params(param, peer_init, init_hdr.params) {
 
-		if (!sctp_process_param(asoc, param, peer_addr, cid,
-					priority))
+		if (!sctp_process_param(asoc, param, peer_addr, priority))
                         goto clean_up;
 	}
 
@@ -1732,7 +1754,7 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	 * association to the same value as the Initial TSN.
 	 */
 	asoc->peer.addip_serial = asoc->peer.i.initial_tsn - 1;
-	return;
+	return 1;
 
 clean_up:
 	/* Release the transport structures. */
@@ -1741,7 +1763,10 @@ clean_up:
 		list_del(pos);
 		sctp_transport_free(transport);
 	}
+nomem:
+	return 0;
 }
+
 
 /* Update asoc with the option described in param.
  *
@@ -1755,13 +1780,11 @@ clean_up:
  * structures for the addresses.
  */
 int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
-		       const sockaddr_storage_t *peer_addr,
-		       sctp_cid_t cid, int priority)
+		       const sockaddr_storage_t *peer_addr, int priority)
 {
 	sockaddr_storage_t addr;
-	sctp_addr_param_t *addrparm;
-	int j;
 	int i;
+	__u16 sat;
 	int retval = 1;
 	sctp_scope_t scope;
 
@@ -1770,25 +1793,16 @@ int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
 	 * came from a fresh INIT, and INIT ACK, or were stored in a cookie.
 	 */
 	switch (param.p->type) {
+	case SCTP_PARAM_IPV6_ADDRESS:
+		if( PF_INET6 != asoc->base.sk->family)
+			break;
+		/* Fall through. */
 	case SCTP_PARAM_IPV4_ADDRESS:
-		addrparm = (sctp_addr_param_t *)param.v;
-		sctp_param2sockaddr(&addr, addrparm, asoc->peer.port);
+		sctp_param2sockaddr(&addr, param.addr, asoc->peer.port);
 		scope = sctp_scope(peer_addr);
 		if (sctp_in_scope(&addr, scope))
-			sctp_assoc_add_peer(asoc, &addr, priority);
-		break;
-
-	case SCTP_PARAM_IPV6_ADDRESS:
-		/* Rethink this as we may need to keep for
-		 * restart considerations.
-		 */
-		if (PF_INET6 == asoc->base.sk->family) {
-			addrparm = (sctp_addr_param_t *)param.v;
-			sctp_param2sockaddr(&addr, addrparm, asoc->peer.port);
-			scope = sctp_scope(peer_addr);
-			if (sctp_in_scope(&addr, scope))
-				sctp_assoc_add_peer(asoc, &addr, priority);
-		}
+			if (!sctp_assoc_add_peer(asoc, &addr, priority))
+				return 0;
 		break;
 
 	case SCTP_PARAM_COOKIE_PRESERVATIVE:
@@ -1807,10 +1821,12 @@ int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
 		asoc->peer.ipv4_address = 0;
 		asoc->peer.ipv6_address = 0;
 
-		j = (ntohs(param.p->length) -
-		     sizeof(sctp_paramhdr_t)) /
-			sizeof(__u16);
-		for (i = 0; i < j; ++i) {
+		/* Cycle through address types; avoid divide by 0. */
+		sat = ntohs(param.p->length) - sizeof(sctp_paramhdr_t);
+		if (sat)
+			sat /= sizeof(__u16);
+
+		for (i = 0; i < sat; ++i) {
 			switch (param.sat->types[i]) {
 			case SCTP_PARAM_IPV4_ADDRESS:
 				asoc->peer.ipv4_address = 1;
@@ -1837,13 +1853,11 @@ int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
 		break;
 
 	case SCTP_PARAM_HEARTBEAT_INFO:
-		SCTP_DEBUG_PRINTK("unimplemented "
-				  "SCTP_PARAM_HEARTBEAT_INFO\n");
+		/* Would be odd to receive, but it causes no problems. */
 		break;
 
 	case SCTP_PARAM_UNRECOGNIZED_PARAMETERS:
-		SCTP_DEBUG_PRINTK("unimplemented "
-				  "SCTP_PARAM_UNRECOGNIZED_PARAMETERS\n");
+		/* Rejected during verify stage. */
 		break;
 
 	case SCTP_PARAM_ECN_CAPABLE:
