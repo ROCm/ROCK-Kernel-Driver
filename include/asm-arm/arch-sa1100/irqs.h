@@ -131,10 +131,9 @@
 #ifdef CONFIG_SA1111
 #define NR_IRQS			(S1_BVD1_STSCHG + 1)
 #elif defined(CONFIG_SA1100_GRAPHICSCLIENT) || \
-      defined(CONFIG_SA1100_GRAPHICSMASTER)
+      defined(CONFIG_SA1100_GRAPHICSMASTER) || \
+      defined(CONFIG_SA1100_H3800)
 #define NR_IRQS			(IRQ_BOARD_END)
-#elif defined(CONFIG_SA1100_H3800)
-#define NR_IRQS                 (IRQ_BOARD_END)
 #else
 #define NR_IRQS			(IRQ_BOARD_START)
 #endif
