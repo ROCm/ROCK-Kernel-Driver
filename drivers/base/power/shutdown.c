@@ -34,8 +34,8 @@ int device_detach_shutdown(struct device * dev)
 
 
 /**
- * We handle system devices differently - we suspend and shut them 
- * down first and resume them first. That way, we do anything stupid like
+ * We handle system devices differently - we suspend and shut them
+ * down last and resume them first. That way, we don't do anything stupid like
  * shutting down the interrupt controller before any devices..
  *
  * Note that there are not different stages for power management calls - 
@@ -45,7 +45,7 @@ int device_detach_shutdown(struct device * dev)
 extern int sysdev_shutdown(void);
 
 /**
- * device_shutdown - call ->remove() on each device to shutdown. 
+ * device_shutdown - call ->shutdown() on each device to shutdown.
  */
 void device_shutdown(void)
 {
