@@ -9,13 +9,18 @@
 #define UDP_TIMEOUT (30*HZ)
 #define UDP_STREAM_TIMEOUT (180*HZ)
 
-static int udp_pkt_to_tuple(const void *datah, size_t datalen,
-			    struct ip_conntrack_tuple *tuple)
+static int udp_pkt_to_tuple(const struct sk_buff *skb,
+			     unsigned int dataoff,
+			     struct ip_conntrack_tuple *tuple)
 {
-	const struct udphdr *hdr = datah;
+	struct udphdr hdr;
 
-	tuple->src.u.udp.port = hdr->source;
-	tuple->dst.u.udp.port = hdr->dest;
+	/* Actually only need first 8 bytes. */
+	if (skb_copy_bits(skb, dataoff, &hdr, 8) != 0)
+		return 0;
+
+	tuple->src.u.udp.port = hdr.source;
+	tuple->dst.u.udp.port = hdr.dest;
 
 	return 1;
 }
@@ -46,7 +51,7 @@ static unsigned int udp_print_conntrack(char *buffer,
 
 /* Returns verdict for packet, and may modify conntracktype */
 static int udp_packet(struct ip_conntrack *conntrack,
-		      struct iphdr *iph, size_t len,
+		      const struct sk_buff *skb,
 		      enum ip_conntrack_info conntrackinfo)
 {
 	/* If we've seen traffic both ways, this is some kind of UDP
@@ -62,8 +67,7 @@ static int udp_packet(struct ip_conntrack *conntrack,
 }
 
 /* Called when a new connection for this protocol found. */
-static int udp_new(struct ip_conntrack *conntrack,
-			     struct iphdr *iph, size_t len)
+static int udp_new(struct ip_conntrack *conntrack, const struct sk_buff *skb)
 {
 	return 1;
 }

@@ -11,14 +11,6 @@ DECLARE_LOCK_EXTERN(ip_amanda_lock);
 
 #endif
 
-struct conn {
-	char* match;
-	int matchlen;
-};
-
-#define NUM_MSGS 	3
-
-
 struct ip_ct_amanda_expect
 {
 	u_int16_t port;		/* port number of this expectation */

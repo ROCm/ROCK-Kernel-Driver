@@ -6,7 +6,8 @@
 
 #define GENERIC_TIMEOUT (600*HZ)
 
-static int generic_pkt_to_tuple(const void *datah, size_t datalen,
+static int generic_pkt_to_tuple(const struct sk_buff *skb,
+				unsigned int dataoff,
 				struct ip_conntrack_tuple *tuple)
 {
 	tuple->src.u.all = 0;
@@ -39,17 +40,16 @@ static unsigned int generic_print_conntrack(char *buffer,
 }
 
 /* Returns verdict for packet, or -1 for invalid. */
-static int established(struct ip_conntrack *conntrack,
-		       struct iphdr *iph, size_t len,
-		       enum ip_conntrack_info conntrackinfo)
+static int packet(struct ip_conntrack *conntrack,
+		  const struct sk_buff *skb,
+		  enum ip_conntrack_info conntrackinfo)
 {
 	ip_ct_refresh(conntrack, GENERIC_TIMEOUT);
 	return NF_ACCEPT;
 }
 
 /* Called when a new connection for this protocol found. */
-static int
-new(struct ip_conntrack *conntrack, struct iphdr *iph, size_t len)
+static int new(struct ip_conntrack *conntrack, const struct sk_buff *skb)
 {
 	return 1;
 }
@@ -57,5 +57,5 @@ new(struct ip_conntrack *conntrack, struct iphdr *iph, size_t len)
 struct ip_conntrack_protocol ip_conntrack_generic_protocol
 = { { NULL, NULL }, 0, "unknown",
     generic_pkt_to_tuple, generic_invert_tuple, generic_print_tuple,
-    generic_print_conntrack, established, new, NULL, NULL, NULL };
+    generic_print_conntrack, packet, new, NULL, NULL, NULL };
 
