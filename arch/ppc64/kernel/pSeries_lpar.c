@@ -379,7 +379,10 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	if (lpar_rc != H_Success)
 		return -2;
 
-	return slot;
+	/* Because of iSeries, we have to pass down the secondary
+	 * bucket bit here as well
+	 */
+	return (slot & 7) | (secondary << 3);
 }
 
 static spinlock_t pSeries_lpar_tlbie_lock = SPIN_LOCK_UNLOCKED;

@@ -653,3 +653,5 @@ module_exit(wdtpci_cleanup);
 MODULE_AUTHOR("JP Nollmann, Alan Cox");
 MODULE_DESCRIPTION("Driver for the ICS PCI watchdog cards");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+MODULE_ALIAS_MISCDEV(TEMP_MINOR);

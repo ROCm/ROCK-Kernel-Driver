@@ -1,3 +1,5 @@
+if ARCH_S390
+
 comment "S/390 block device drivers"
 	depends on ARCH_S390
 
@@ -62,3 +64,5 @@ config DASD_CMB
 	  ioctl functions specific to the dasd driver.
 	  This is only needed if you want to use applications written for
 	  linux-2.4 dasd channel measurement facility interface.
+
+endif

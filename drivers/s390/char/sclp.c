@@ -19,6 +19,7 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/init.h>
+#include <linux/cpumask.h>
 #include <asm/s390_ext.h>
 #include <asm/processor.h>
 
@@ -334,6 +335,8 @@ sclp_sync_wait(void)
 	unsigned long psw_mask;
 	unsigned long cr0, cr0_sync;
 
+	/* Need to irq_enter() to prevent BH from executing. */
+	irq_enter();
 	/*
 	 * save cr0
 	 * enable service signal external interruption (cr0.22)
@@ -362,6 +365,7 @@ sclp_sync_wait(void)
 
 	/* restore cr0 */
 	__ctl_load(cr0, 0, 0);
+	irq_exit();
 }
 
 /*
@@ -467,29 +471,45 @@ static struct sclp_register sclp_state_change_event = {
  * SCLP quiesce event handler
  */
 #ifdef CONFIG_SMP
-static cpumask_t cpu_quiesce_map;
-
 static void
 do_load_quiesce_psw(void * __unused)
 {
 	psw_t quiesce_psw;
+	unsigned long status;
+	int i;
 
-	cpu_clear(smp_processor_id(), cpu_quiesce_map);
-	if (smp_processor_id() == 0) {
-		/* Wait for all other cpus to enter do_load_quiesce_psw */
-		while (!cpus_empty(cpu_quiesce_map));
-		/* Quiesce the last cpu with the special psw */
-		quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
-		quiesce_psw.addr = 0xfff;
-		__load_psw(quiesce_psw);
+	if (smp_processor_id() != 0)
+		signal_processor(smp_processor_id(), sigp_stop);
+	/* Wait for all other cpus to enter stopped state */
+	i = 1;
+	while (i < NR_CPUS) {
+		if (!cpu_online(i)) {
+			i++;
+			continue;
+		}
+		switch (signal_processor_ps(&status, 0, i, sigp_sense)) {
+		case sigp_order_code_accepted:
+		case sigp_status_stored:
+			/* Check for stopped and check stop state */
+			if (test_bit(6, &status) || test_bit(4, &status))
+				i++;
+			break;
+		case sigp_busy:
+			break;
+		case sigp_not_operational:
+			i++;
+			break;
+		}
 	}
-	signal_processor(smp_processor_id(), sigp_stop);
+	/* Quiesce the last cpu with the special psw */
+	quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
+	quiesce_psw.addr = 0xfff;
+	__load_psw(quiesce_psw);
 }
 
 static void
 do_machine_quiesce(void)
 {
-	cpu_quiesce_map = cpu_online_map;
 	on_each_cpu(do_load_quiesce_psw, NULL, 0, 0);
 }
 #else

@@ -38,6 +38,7 @@ ccw_device_set_options(struct ccw_device *cdev, unsigned long flags)
 	cdev->private->options.fast = (flags & CCWDEV_EARLY_NOTIFICATION) != 0;
 	cdev->private->options.repall = (flags & CCWDEV_REPORT_ALL) != 0;
 	cdev->private->options.pgroup = (flags & CCWDEV_DO_PATHGROUP) != 0;
+	cdev->private->options.force = (flags & CCWDEV_ALLOW_FORCE) != 0;
 	return 0;
 }
 
@@ -452,6 +453,9 @@ ccw_device_stlck(struct ccw_device *cdev)
 
 	if (!cdev)
 		return -ENODEV;
+
+	if (cdev->drv && !cdev->private->options.force)
+		return -EINVAL;
 
 	sch = to_subchannel(cdev->dev.parent);
 	

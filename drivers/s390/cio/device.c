@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.103 $
+ *   $Revision: 1.107 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -263,10 +263,10 @@ ccw_device_set_offline(struct ccw_device *cdev)
 
 	if (!cdev)
 		return -ENODEV;
-	if (!cdev->online || !cdev->drv)
+	if (!cdev->online)
 		return -EINVAL;
 
-	if (cdev->drv->set_offline) {
+	if (cdev->drv && cdev->drv->set_offline) {
 		ret = cdev->drv->set_offline(cdev);
 		if (ret != 0)
 			return ret;
@@ -292,7 +292,7 @@ ccw_device_set_online(struct ccw_device *cdev)
 
 	if (!cdev)
 		return -ENODEV;
-	if (cdev->online || !cdev->drv)
+	if (cdev->online)
 		return -EINVAL;
 
 	spin_lock_irq(cdev->ccwlock);
@@ -307,7 +307,8 @@ ccw_device_set_online(struct ccw_device *cdev)
 	}
 	if (cdev->private->state != DEV_STATE_ONLINE)
 		return -ENODEV;
-	if (!cdev->drv->set_online || cdev->drv->set_online(cdev) == 0) {
+	if (!cdev->drv || !cdev->drv->set_online ||
+	    cdev->drv->set_online(cdev) == 0) {
 		cdev->online = 1;
 		return 0;
 	}
@@ -326,52 +327,54 @@ static ssize_t
 online_store (struct device *dev, const char *buf, size_t count)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
-	int i;
+	int i, force;
 	char *tmp;
 
-	if (!cdev->drv)
-		return count;
 	if (atomic_compare_and_swap(0, 1, &cdev->private->onoff))
 		return -EAGAIN;
 
-	i = simple_strtoul(buf, &tmp, 16);
-	if (i == 1 && cdev->drv->set_online)
+	if (cdev->drv && !try_module_get(cdev->drv->owner)) {
+		atomic_set(&cdev->private->onoff, 0);
+		return -EINVAL;
+	}
+	if (!strncmp(buf, "force\n", count)) {
+		force = 1;
+		i = 1;
+	} else {
+		force = 0;
+		i = simple_strtoul(buf, &tmp, 16);
+	}
+	if (i == 1) {
+		/* Do device recognition, if needed. */
+		if (cdev->id.cu_type == 0) {
+			ccw_device_recognition(cdev);
+			wait_event(cdev->private->wait_q,
+				   dev_fsm_final_state(cdev));
+		}
 		ccw_device_set_online(cdev);
-	else if (i == 0 && cdev->drv->set_offline) {
+	} else if (i == 0) {
 		if (cdev->private->state == DEV_STATE_DISCONNECTED)
 			ccw_device_remove_disconnected(cdev);
 		else
 			ccw_device_set_offline(cdev);
 	}
-	atomic_set(&cdev->private->onoff, 0);
-	return count;
-}
-
-static void ccw_device_unbox_recog(void *data);
-
-static ssize_t
-stlck_store(struct device *dev, const char *buf, size_t count)
-{
-	struct ccw_device *cdev = to_ccwdev(dev);
-	int ret;
-
-	/* We don't care what was piped to the attribute 8) */
-	ret = ccw_device_stlck(cdev);
-	if (ret != 0) {
-		printk(KERN_WARNING
-		       "Unconditional reserve failed on device %s, rc=%d\n",
-		       dev->bus_id, ret);
-		return ret;
+	if (force && cdev->private->state == DEV_STATE_BOXED) {
+		int ret;
+		ret = ccw_device_stlck(cdev);
+		if (ret)
+			goto out;
+		/* Do device recognition, if needed. */
+		if (cdev->id.cu_type == 0) {
+			ccw_device_recognition(cdev);
+			wait_event(cdev->private->wait_q,
+				   dev_fsm_final_state(cdev));
+		}
+		ccw_device_set_online(cdev);
 	}
-
-	/*
-	 * Device was successfully unboxed.
-	 * Trigger removal of stlck attribute and device recognition.
-	 */
-	INIT_WORK(&cdev->private->kick_work,
-		  ccw_device_unbox_recog, (void *) cdev);
-	queue_work(ccw_device_work, &cdev->private->kick_work);
-	
+	out:
+	if (cdev->drv)
+		module_put(cdev->drv->owner);
+	atomic_set(&cdev->private->onoff, 0);
 	return count;
 }
 
@@ -403,32 +406,8 @@ static DEVICE_ATTR(pimpampom, 0444, pimpampom_show, NULL);
 static DEVICE_ATTR(devtype, 0444, devtype_show, NULL);
 static DEVICE_ATTR(cutype, 0444, cutype_show, NULL);
 static DEVICE_ATTR(online, 0644, online_show, online_store);
-static DEVICE_ATTR(steal_lock, 0200, NULL, stlck_store);
 extern struct device_attribute dev_attr_cmb_enable;
 static DEVICE_ATTR(availability, 0444, available_show, NULL);
-
-/* A device has been unboxed. Start device recognition. */
-static void
-ccw_device_unbox_recog(void *data)
-{
-	struct ccw_device *cdev;
-
-	cdev = (struct ccw_device *)data;
-	if (!cdev)
-		return;
-
-	/* Remove stlck attribute. */
-	device_remove_file(&cdev->dev, &dev_attr_steal_lock);
-
-	spin_lock_irq(cdev->ccwlock);
-
-	/* Device is no longer boxed. */
-	cdev->private->state = DEV_STATE_NOT_OPER;
-
-	/* Finally start device recognition. */
-	ccw_device_recognition(cdev);
-	spin_unlock_irq(cdev->ccwlock);
-}
 
 static struct attribute * subch_attrs[] = {
 	&dev_attr_chpids.attr,
@@ -469,22 +448,6 @@ static inline void
 device_remove_files(struct device *dev)
 {
 	sysfs_remove_group(&dev->kobj, &ccwdev_attr_group);
-}
-
-/*
- * Add a "steal lock" attribute to boxed devices.
- * This allows to trigger an unconditional reserve ccw to eckd dasds
- * (if the device is something else, there should be no problems more than
- * a command reject; we don't have any means of finding out the device's
- * type if it was boxed at ipl/attach for older devices and under VM).
- */
-void
-ccw_device_add_stlck(void *data)
-{
-	struct ccw_device *cdev;
-
-	cdev = (struct ccw_device *)data;
-	device_create_file(&cdev->dev, &dev_attr_steal_lock);
 }
 
 /* this is a simple abstraction for device_register that sets the
@@ -565,8 +528,6 @@ io_subchannel_register(void *data)
 	if (ret)
 		printk(KERN_WARNING "%s: could not add attributes to %s\n",
 		       __func__, sch->dev.bus_id);
-	if (cdev->private->state == DEV_STATE_BOXED)
-		device_create_file(&cdev->dev, &dev_attr_steal_lock);
 	put_device(&cdev->dev);
 out:
 	put_device(&sch->dev);
@@ -935,6 +896,7 @@ ccw_device_remove (struct device *dev)
 			pr_debug("ccw_device_offline returned %d, device %s\n",
 				 ret, cdev->dev.bus_id);
 	}
+	ccw_device_set_timeout(cdev, 0);
 	cdev->drv = 0;
 	return 0;
 }

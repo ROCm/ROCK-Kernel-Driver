@@ -31,7 +31,7 @@
 
 #if KERNEL_ELFDATA != HOST_ELFDATA
 
-static void __endian(const void *src, void *dest, unsigned int size)
+static inline void __endian(const void *src, void *dest, unsigned int size)
 {
 	unsigned int i;
 	for (i = 0; i < size; i++)
