@@ -868,37 +868,43 @@ static unsigned
 itd_complete (
 	struct ehci_hcd	*ehci,
 	struct ehci_itd	*itd,
-	unsigned	uframe,
 	struct pt_regs	*regs
 ) {
 	struct urb				*urb = itd->urb;
 	struct usb_iso_packet_descriptor	*desc;
 	u32					t;
+	unsigned				uframe;
+	int					urb_index = -1;
 
-	/* update status for this uframe's transfers */
-	desc = &urb->iso_frame_desc [itd->index];
+	/* for each uframe with a packet */
+	for (uframe = 0; uframe < 8; uframe++) {
+		if (itd->hw_transaction [uframe] == 0)
+			continue;
+		urb_index = itd->index;
+		desc = &urb->iso_frame_desc [urb_index];
 
-	t = itd->hw_transaction [uframe];
-	itd->hw_transaction [uframe] = 0;
-	if (t & EHCI_ISOC_ACTIVE)
-		desc->status = -EXDEV;
-	else if (t & ISO_ERRS) {
-		urb->error_count++;
-		if (t & EHCI_ISOC_BUF_ERR)
-			desc->status = usb_pipein (urb->pipe)
-				? -ENOSR  /* couldn't read */
-				: -ECOMM; /* couldn't write */
-		else if (t & EHCI_ISOC_BABBLE)
-			desc->status = -EOVERFLOW;
-		else /* (t & EHCI_ISOC_XACTERR) */
-			desc->status = -EPROTO;
+		t = le32_to_cpup (&itd->hw_transaction [uframe]);
+		itd->hw_transaction [uframe] = 0;
 
-		/* HC need not update length with this error */
-		if (!(t & EHCI_ISOC_BABBLE))
-			desc->actual_length += EHCI_ITD_LENGTH (t);
-	} else {
-		desc->status = 0;
-		desc->actual_length += EHCI_ITD_LENGTH (t);
+		/* report transfer status */
+		if (unlikely (t & ISO_ERRS)) {
+			urb->error_count++;
+			if (t & EHCI_ISOC_BUF_ERR)
+				desc->status = usb_pipein (urb->pipe)
+					? -ENOSR  /* hc couldn't read */
+					: -ECOMM; /* hc couldn't write */
+			else if (t & EHCI_ISOC_BABBLE)
+				desc->status = -EOVERFLOW;
+			else /* (t & EHCI_ISOC_XACTERR) */
+				desc->status = -EPROTO;
+
+			/* HC need not update length with this error */
+			if (!(t & EHCI_ISOC_BABBLE))
+				desc->actual_length = EHCI_ITD_LENGTH (t);
+		} else if (likely ((t & EHCI_ISOC_ACTIVE) == 0)) {
+			desc->status = 0;
+			desc->actual_length = EHCI_ITD_LENGTH (t);
+		}
 	}
 
 	vdbg ("itd %p urb %p packet %d/%d trans %x status %d len %d",
@@ -906,7 +912,7 @@ itd_complete (
 		t, desc->status, desc->actual_length);
 
 	/* handle completion now? */
-	if ((itd->index + 1) != urb->number_of_packets)
+	if (likely ((urb_index + 1) != urb->number_of_packets))
 		return 0;
 
 	/*
@@ -986,24 +992,23 @@ scan_periodic (struct ehci_hcd *ehci, struct pt_regs *regs)
 	 * When running, scan from last scan point up to "now"
 	 * else clean up by scanning everything that's left.
 	 * Touches as few pages as possible:  cache-friendly.
-	 * Don't scan ISO entries more than once, though.
 	 */
-	frame = ehci->next_uframe >> 3;
+	now_uframe = ehci->next_uframe;
 	if (HCD_IS_RUNNING (ehci->hcd.state))
-		now_uframe = readl (&ehci->regs->frame_index);
+		clock = readl (&ehci->regs->frame_index) % mod;
 	else
-		now_uframe = (frame << 3) - 1;
-	now_uframe %= mod;
-	clock = now_uframe >> 3;
+		clock = now_uframe + mod - 1;
 
 	for (;;) {
 		union ehci_shadow	q, *q_p;
 		u32			type, *hw_p;
 		unsigned		uframes;
 
+		frame = now_uframe >> 3;
 restart:
 		/* scan schedule to _before_ current frame index */
-		if (frame == clock)
+		if ((frame == (clock >> 3))
+				&& HCD_IS_RUNNING (ehci->hcd.state))
 			uframes = now_uframe & 0x07;
 		else
 			uframes = 8;
@@ -1043,34 +1048,31 @@ restart:
 			case Q_TYPE_ITD:
 				last = (q.itd->hw_next == EHCI_LIST_END);
 
-				/* Unlink each (S)ITD we see, since the ISO
-				 * URB model forces constant rescheduling.
-				 * That complicates sharing uframes in ITDs,
-				 * and means we need to skip uframes the HC
-				 * hasn't yet processed.
-				 */
-				for (uf = 0; uf < uframes; uf++) {
-					if (q.itd->hw_transaction [uf] != 0) {
-						temp = q;
-						*q_p = q.itd->itd_next;
-						*hw_p = q.itd->hw_next;
-						type = Q_NEXT_TYPE (*hw_p);
-
-						/* might free q.itd ... */
-						count += itd_complete (ehci,
-							temp.itd, uf, regs);
-						break;
-					}
-				}
-				/* we might skip this ITD's uframe ... */
-				if (uf == uframes) {
+				/* skip itds for later in the frame */
+				rmb ();
+				for (uf = uframes; uf < 8; uf++) {
+					if (0 == (q.itd->hw_transaction [uf]
+							& ISO_ACTIVE))
+						continue;
 					q_p = &q.itd->itd_next;
 					hw_p = &q.itd->hw_next;
 					type = Q_NEXT_TYPE (q.itd->hw_next);
+					q = *q_p;
+					break;
 				}
+				if (uf != 8)
+					break;
 
-				q = *q_p;
-				break;
+				/* this one's ready ... HC won't cache the
+				 * pointer for much longer, if at all.
+				 */
+				*q_p = q.itd->itd_next;
+				*hw_p = q.itd->hw_next;
+				wmb();
+
+				/* always rescan here; simpler */
+				count += itd_complete (ehci, q.itd, regs);
+				goto restart;
 #ifdef have_split_iso
 			case Q_TYPE_SITD:
 				last = (q.sitd->hw_next == EHCI_LIST_END);
@@ -1104,7 +1106,7 @@ restart:
 
 		// FIXME:  likewise assumes HC doesn't halt mid-scan
 
-		if (frame == clock) {
+		if (now_uframe == clock) {
 			unsigned	now;
 
 			if (!HCD_IS_RUNNING (ehci->hcd.state))
@@ -1115,9 +1117,13 @@ restart:
 				break;
 
 			/* rescan the rest of this frame, then ... */
-			now_uframe = now;
-			clock = now_uframe >> 3;
-		} else
-			frame = (frame + 1) % ehci->periodic_size;
+			clock = now;
+		} else {
+			/* FIXME sometimes we can scan the next frame
+			 * right away, not always inching up on it ...
+			 */
+			now_uframe++;
+			now_uframe %= mod;
+		}
 	} 
 }

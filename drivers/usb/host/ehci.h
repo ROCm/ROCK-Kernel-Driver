@@ -400,8 +400,10 @@ struct ehci_itd {
 #define EHCI_ISOC_BUF_ERR       (1<<30)        /* Data buffer error */
 #define EHCI_ISOC_BABBLE        (1<<29)        /* babble detected */
 #define EHCI_ISOC_XACTERR       (1<<28)        /* XactErr - transaction error */
-#define	EHCI_ITD_LENGTH(tok)	(((tok)>>16) & 0x7fff)
+#define	EHCI_ITD_LENGTH(tok)	(((tok)>>16) & 0x0fff)
 #define	EHCI_ITD_IOC		(1 << 15)	/* interrupt on complete */
+
+#define ISO_ACTIVE	__constant_cpu_to_le32(EHCI_ISOC_ACTIVE)
 
 	u32			hw_bufp [7];	/* see EHCI 3.3.3 */ 
 	u32			hw_bufp_hi [7];	/* Appendix B */
