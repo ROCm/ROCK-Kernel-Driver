@@ -288,10 +288,9 @@ bad_trap_handler:
 	wr	%l0, PSR_ET, %psr
 	WRITE_PAUSE
 
-	mov	%l7, %o0		! trap number
-	mov	%l0, %o1		! psr
+	add	%sp, STACKFRAME_SZ, %o0	! pt_regs
 	call	do_hw_interrupt
-	 mov	%l1, %o2		! pc
+	 mov	%l7, %o1		! trap number
 
 	RESTORE_ALL
 	
