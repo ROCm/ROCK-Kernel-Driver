@@ -1,4 +1,4 @@
-/* airport.c 0.13e
+/* airport.c
  *
  * A driver for "Hermes" chipset based Apple Airport wireless
  * card.

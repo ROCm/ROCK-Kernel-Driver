@@ -1,9 +1,13 @@
-/* orinoco_pci.c 0.13e
+/* orinoco_pci.c
  * 
  * Driver for Prism II devices that have a direct PCI interface
  * (i.e., not in a Pcmcia or PLX bridge)
  *
  * Specifically here we're talking about the Linksys WMP11
+ *
+ * Current maintainers (as of 29 September 2003) are:
+ * 	Pavel Roskin <proski AT gnu.org>
+ * and	David Gibson <hermes AT gibson.dropbear.id.au>
  *
  * Some of this code is borrowed from orinoco_plx.c
  *	Copyright (C) 2001 Daniel Barlow <dan AT telent.net>
@@ -13,7 +17,7 @@
  * This file originally written by:
  *	Copyright (C) 2001 Jean Tourrilhes <jt AT hpl.hp.com>
  * And is now maintained by:
- *	Copyright (C) 2002 David Gibson, IBM Corporation <herme AT gibson.dropbear.id.au>
+ *	(C) Copyright David Gibson, IBM Corp. 2002-2003.
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in
@@ -379,8 +383,10 @@ static struct pci_driver orinoco_pci_driver = {
 };
 
 static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
-	" (David Gibson <hermes@gibson.dropbear.id.au> & Jean Tourrilhes <jt@hpl.hp.com>)";
-MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
+	" (Pavel Roskin <proski@gnu.org>,"
+	" David Gibson <hermes@gibson.dropbear.id.au> &"
+	" Jean Tourrilhes <jt@hpl.hp.com>)";
+MODULE_AUTHOR("Pavel Roskin <proski@gnu.org> & David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using direct PCI interface");
 MODULE_LICENSE("Dual MPL/GPL");
 

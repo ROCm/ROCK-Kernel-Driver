@@ -13,8 +13,8 @@
  * (wvlan_hcf.c) library, and the NetBSD wireless driver (in no
  * particular order).
  *
- * Copyright (C) 2000, David Gibson, Linuxcare Australia <hermes@gibson.dropbear.id.au>
- * Copyright (C) 2001, David Gibson, IBM <hermes@gibson.dropbear.id.au>
+ * Copyright (C) 2000, David Gibson, Linuxcare Australia.
+ * (C) Copyright David Gibson, IBM Corp. 2001-2003.
  * 
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in
@@ -53,7 +53,8 @@
 #include "hermes.h"
 
 MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
-MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
+MODULE_AUTHOR("Pavel Roskin <proski@gnu.org>"
+	" & David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_LICENSE("Dual MPL/GPL");
 
 /* These are maximum timeouts. Most often, card wil react much faster */

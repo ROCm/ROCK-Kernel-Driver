@@ -12,7 +12,8 @@
  * project, the Linux wvlan_cs driver, Lucent's HCF-Light
  * (wvlan_hcf.c) library, and the NetBSD wireless driver.
  *
- * Copyright (C) 2000, David Gibson, Linuxcare Australia <hermes@gibson.dropbear.id.au>
+ * Copyright (C) 2000, David Gibson, Linuxcare Australia.
+ * (C) Copyright David Gibson, IBM Corp. 2001-2003.
  *
  * Portions taken from hfa384x.h, Copyright (C) 1999 AbsoluteValue Systems, Inc. All Rights Reserved.
  *

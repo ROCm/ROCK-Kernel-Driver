@@ -1,18 +1,23 @@
-/* orinoco.c 0.13e	- (formerly known as dldwd_cs.c and orinoco_cs.c)
+/* orinoco.c - (formerly known as dldwd_cs.c and orinoco_cs.c)
  *
  * A driver for Hermes or Prism 2 chipset based PCMCIA wireless
  * adaptors, with Lucent/Agere, Intersil or Symbol firmware.
  *
- * Copyright (C) 2000 David Gibson, Linuxcare Australia <hermes AT gibson.dropbear.id.au>
+ * Current maintainers (as of 29 September 2003) are:
+ * 	Pavel Roskin <proski AT gnu.org>
+ * and	David Gibson <hermes AT gibson.dropbear.id.au>
+ *
+ * (C) Copyright David Gibson, IBM Corporation 2001-2003.
+ * Copyright (C) 2000 David Gibson, Linuxcare Australia.
  *	With some help from :
- * Copyright (C) 2001 Jean Tourrilhes, HP Labs <jt AT hpl.hp.com>
- * Copyright (C) 2001 Benjamin Herrenschmidt <benh AT kernel.crashing.org>
+ * Copyright (C) 2001 Jean Tourrilhes, HP Labs
+ * Copyright (C) 2001 Benjamin Herrenschmidt
  *
  * Based on dummy_cs.c 1.27 2000/06/12 21:27:25
  *
  * Portions based on wvlan_cs.c 1.0.6, Copyright Andreas Neuhaus <andy
  * AT fasta.fh-dortmund.de>
- * http://www.fasta.fh-dortmund.de/users/andy/wvlan/
+ *      http://www.stud.fh-dortmund.de/~andy/wvlan/
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in
@@ -449,7 +454,7 @@
 /* Module information                                               */
 /********************************************************************/
 
-MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
+MODULE_AUTHOR("Pavel Roskin <proski@gnu.org> & David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for Lucent Orinoco, Prism II based and similar wireless cards");
 MODULE_LICENSE("Dual MPL/GPL");
 
@@ -4182,7 +4187,8 @@ EXPORT_SYMBOL(orinoco_interrupt);
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
 static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
-	" (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+	" (David Gibson <hermes@gibson.dropbear.id.au>, "
+	"Pavel Roskin <proski@gnu.org>, et al)";
 
 static int __init init_orinoco(void)
 {

@@ -1,9 +1,14 @@
-/* orinoco_plx.c 0.13e
- * 
+/* orinoco_plx.c
+ *
  * Driver for Prism II devices which would usually be driven by orinoco_cs,
  * but are connected to the PCI bus by a PLX9052.
  *
- * Copyright (C) 2001 Daniel Barlow <dan AT telent.net>
+ * Current maintainers (as of 29 September 2003) are:
+ * 	Pavel Roskin <proski AT gnu.org>
+ * and	David Gibson <hermes AT gibson.dropbear.id.au>
+ *
+ * (C) Copyright David Gibson, IBM Corp. 2001-2003.
+ * Copyright (C) 2001 Daniel Barlow
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in
@@ -331,7 +336,9 @@ static struct pci_driver orinoco_plx_driver = {
 };
 
 static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
-	" (Daniel Barlow <dan@telent.net>, David Gibson <hermes@gibson.dropbear.id.au>)";
+	" (Pavel Roskin <proski@gnu.org>,"
+	" David Gibson <hermes@gibson.dropbear.id.au>,"
+	" Daniel Barlow <dan@telent.net>)";
 MODULE_AUTHOR("Daniel Barlow <dan@telent.net>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using the PLX9052 PCI bridge");
 MODULE_LICENSE("Dual MPL/GPL");

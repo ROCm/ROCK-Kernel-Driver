@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.13e	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -629,7 +629,8 @@ orinoco_cs_event(event_t event, int priority,
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
 static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
-	"(David Gibson <hermes@gibson.dropbear.id.au> and others)";
+	" (David Gibson <hermes@gibson.dropbear.id.au>, "
+	"Pavel Roskin <proski@gnu.org>, et al)";
 
 static struct pcmcia_driver orinoco_driver = {
 	.owner		= THIS_MODULE,
