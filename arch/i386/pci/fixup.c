@@ -282,7 +282,7 @@ static int quirk_pcie_aspm_write(struct pci_bus *bus, unsigned int devfn, int wh
 	return raw_pci_ops->write(0, bus->number, devfn, where, size, value);
 }
 
-struct pci_ops quirk_pcie_aspm_ops = {
+static struct pci_ops quirk_pcie_aspm_ops = {
 	.read = quirk_pcie_aspm_read,
 	.write = quirk_pcie_aspm_write,
 };
@@ -295,7 +295,7 @@ struct pci_ops quirk_pcie_aspm_ops = {
  * the root port in an array for fast indexing. Replace the bus ops
  * with the modified one.
  */
-void pcie_rootport_aspm_quirk(struct pci_dev *pdev)
+static void pcie_rootport_aspm_quirk(struct pci_dev *pdev)
 {
 	int cap_base, i;
 	struct pci_bus  *pbus;
