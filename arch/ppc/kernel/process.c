@@ -65,6 +65,7 @@ union thread_union init_thread_union
 
 /* initial task structure */
 struct task_struct init_task = INIT_TASK(init_task);
+EXPORT_SYMBOL(init_task);
 
 /* only used to get secondary processor up */
 struct task_struct *current_set[NR_CPUS] = {&init_task, };
