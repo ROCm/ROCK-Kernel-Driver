@@ -340,11 +340,17 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
+	unsigned int dma	= drive->using_dma;
 	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command	= WIN_NOP;
 	ata_nsector_t		nsectors;
 
 	nsectors.all		= (u16) rq->nr_sectors;
+
+	if (hwif->no_lba48_dma && lba48 && dma) {
+		if (rq->sector + rq->nr_sectors > 1ULL << 28)
+			dma = 0;
+	}
 
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl, IDE_CONTROL_REG);
@@ -414,7 +420,7 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 	}
 
 	if (rq_data_dir(rq) == READ) {
-		if (drive->using_dma && !hwif->ide_dma_read(drive))
+		if (dma && !hwif->ide_dma_read(drive))
 			return ide_started;
 
 		command = ((drive->mult_count) ?
@@ -425,7 +431,7 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 	} else {
 		ide_startstop_t startstop;
 
-		if (drive->using_dma && !(HWIF(drive)->ide_dma_write(drive)))
+		if (dma && !hwif->ide_dma_write(drive))
 			return ide_started;
 
 		command = ((drive->mult_count) ?
@@ -488,13 +494,19 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 }
 EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
 
-static u8 get_command(ide_drive_t *drive, int cmd, ide_task_t *task)
+static u8 get_command(ide_drive_t *drive, struct request *rq, ide_task_t *task)
 {
 	unsigned int lba48 = (drive->addressing == 1) ? 1 : 0;
+	unsigned int dma = drive->using_dma;
 
-	if (cmd == READ) {
+	if (drive->hwif->no_lba48_dma && lba48 && dma) {
+		if (rq->sector + rq->nr_sectors > 1ULL << 28)
+			dma = 0;
+	}
+
+	if (rq_data_dir(rq) == READ) {
 		task->command_type = IDE_DRIVE_TASK_IN;
-		if (drive->using_dma)
+		if (dma)
 			return lba48 ? WIN_READDMA_EXT : WIN_READDMA;
 		if (drive->mult_count) {
 			task->handler = &task_mulin_intr;
@@ -504,7 +516,7 @@ static u8 get_command(ide_drive_t *drive, int cmd, ide_task_t *task)
 		return lba48 ? WIN_READ_EXT : WIN_READ;
 	} else {
 		task->command_type = IDE_DRIVE_TASK_RAW_WRITE;
-		if (drive->using_dma)
+		if (dma)
 			return lba48 ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 		if (drive->mult_count) {
 			task->prehandler = &pre_task_mulout_intr;
@@ -541,7 +553,7 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 	args.tfRegister[IDE_HCYL_OFFSET]	= (cyl>>8);
 	args.tfRegister[IDE_SELECT_OFFSET]	= head;
 	args.tfRegister[IDE_SELECT_OFFSET]	|= drive->select.all;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq_data_dir(rq), &args);
+	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
 	args.rq					= (struct request *) rq;
 	rq->special				= (ide_task_t *)&args;
 	return do_rw_taskfile(drive, &args);
@@ -565,7 +577,7 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
 	args.tfRegister[IDE_HCYL_OFFSET]	= (block>>=8);
 	args.tfRegister[IDE_SELECT_OFFSET]	= ((block>>8)&0x0f);
 	args.tfRegister[IDE_SELECT_OFFSET]	|= drive->select.all;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq_data_dir(rq), &args);
+	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
 	args.rq					= (struct request *) rq;
 	rq->special				= (ide_task_t *)&args;
 	return do_rw_taskfile(drive, &args);
@@ -595,7 +607,7 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 	args.tfRegister[IDE_LCYL_OFFSET]	= (block>>=8);	/* mid lba */
 	args.tfRegister[IDE_HCYL_OFFSET]	= (block>>=8);	/* hi  lba */
 	args.tfRegister[IDE_SELECT_OFFSET]	= drive->select.all;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq_data_dir(rq), &args);
+	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
 	args.hobRegister[IDE_SECTOR_OFFSET]	= (block>>=8);	/* low lba */
 	args.hobRegister[IDE_LCYL_OFFSET]	= (block>>=8);	/* mid lba */
 	args.hobRegister[IDE_HCYL_OFFSET]	= (block>>=8);	/* hi  lba */
@@ -1538,6 +1550,15 @@ static void idedisk_setup (ide_drive_t *drive)
 		       drive->name, (unsigned long long)drive->capacity64,
 		       sectors_to_MB(drive->capacity64));
 		drive->capacity64 = 1ULL << 28;
+	}
+
+	if (drive->hwif->no_lba48_dma && drive->addressing) {
+		if (drive->capacity64 > 1ULL << 28) {
+			printk(KERN_INFO "%s: cannot use LBA48 DMA - PIO mode will"
+					 " be used for accessing sectors > %u\n",
+					 drive->name, 1 << 28);
+		} else
+			drive->addressing = 0;
 	}
 
 	/*
