@@ -1421,7 +1421,6 @@ config BDI_SWITCH
 config DEBUG_INFO
 	bool "Compile the kernel with debug info"
 	depends on DEBUG_KERNEL
-	default y if BDI_SWITCH || XMON
 	help
           If you say Y here the resulting kernel image will include
 	  debugging info resulting in a larger kernel image.
