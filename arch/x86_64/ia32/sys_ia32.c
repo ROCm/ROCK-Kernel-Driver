@@ -89,27 +89,16 @@
 #define low2highgid(gid) ((gid) == (u16)-1) ? (gid_t)-1 : (gid_t)(gid)
 extern int overflowuid,overflowgid; 
 
-
-extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
-extern asmlinkage long sys_newlstat(char * filename, struct stat * statbuf);
-extern asmlinkage long sys_newfstat(unsigned int fd, struct stat * statbuf);
-
-
-extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
-extern asmlinkage long sys_newlstat(char * filename, struct stat * statbuf);
-extern asmlinkage long sys_newfstat(unsigned int fd, struct stat * statbuf);
-
-
 int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 {
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct compat_stat)) ||
-	    __put_user (kbuf->dev, &ubuf->st_dev) ||
+	    __put_user (old_encode_dev(kbuf->dev), &ubuf->st_dev) ||
 	    __put_user (kbuf->ino, &ubuf->st_ino) ||
 	    __put_user (kbuf->mode, &ubuf->st_mode) ||
 	    __put_user (kbuf->nlink, &ubuf->st_nlink) ||
 	    __put_user (kbuf->uid, &ubuf->st_uid) ||
 	    __put_user (kbuf->gid, &ubuf->st_gid) ||
-	    __put_user (kbuf->rdev, &ubuf->st_rdev) ||
+	    __put_user (old_encode_dev(kbuf->rdev), &ubuf->st_rdev) ||
 	    __put_user (kbuf->size, &ubuf->st_size) ||
 	    __put_user (kbuf->atime.tv_sec, &ubuf->st_atime) ||
 	    __put_user (kbuf->atime.tv_nsec, &ubuf->st_atime_nsec) ||
@@ -127,26 +116,26 @@ int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
    support for 64bit inode numbers. */
 
 static int
-putstat64(struct stat64 *ubuf, struct stat *kbuf)
+cp_stat64(struct stat64 *ubuf, struct kstat *stat)
 {
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct stat64)) ||
-	    __put_user (kbuf->st_dev, &ubuf->st_dev) ||
-	    __put_user (kbuf->st_ino, &ubuf->__st_ino) ||
-	    __put_user (kbuf->st_ino, &ubuf->st_ino) ||
-	    __put_user (kbuf->st_mode, &ubuf->st_mode) ||
-	    __put_user (kbuf->st_nlink, &ubuf->st_nlink) ||
-	    __put_user (kbuf->st_uid, &ubuf->st_uid) ||
-	    __put_user (kbuf->st_gid, &ubuf->st_gid) ||
-	    __put_user (kbuf->st_rdev, &ubuf->st_rdev) ||
-	    __put_user (kbuf->st_size, &ubuf->st_size) ||
-	    __put_user (kbuf->st_atime, &ubuf->st_atime) ||
-	    __put_user (kbuf->st_atime_nsec, &ubuf->st_atime_nsec) ||
-	    __put_user (kbuf->st_mtime, &ubuf->st_mtime) ||
-	    __put_user (kbuf->st_mtime_nsec, &ubuf->st_mtime_nsec) ||
-	    __put_user (kbuf->st_ctime, &ubuf->st_ctime) ||
-	    __put_user (kbuf->st_ctime_nsec, &ubuf->st_ctime_nsec) ||
-	    __put_user (kbuf->st_blksize, &ubuf->st_blksize) ||
-	    __put_user (kbuf->st_blocks, &ubuf->st_blocks))
+	    __put_user(old_encode_dev(stat->dev), &ubuf->st_dev) ||
+	    __put_user (stat->ino, &ubuf->__st_ino) ||
+	    __put_user (stat->ino, &ubuf->st_ino) ||
+	    __put_user (stat->mode, &ubuf->st_mode) ||
+	    __put_user (stat->nlink, &ubuf->st_nlink) ||
+	    __put_user (stat->uid, &ubuf->st_uid) ||
+	    __put_user (stat->gid, &ubuf->st_gid) ||
+	    __put_user (old_encode_dev(stat->rdev), &ubuf->st_rdev) ||
+	    __put_user (stat->size, &ubuf->st_size) ||
+	    __put_user (stat->atime.tv_sec, &ubuf->st_atime) ||
+	    __put_user (stat->atime.tv_nsec, &ubuf->st_atime_nsec) ||
+	    __put_user (stat->mtime.tv_sec, &ubuf->st_mtime) ||
+	    __put_user (stat->mtime.tv_nsec, &ubuf->st_mtime_nsec) ||
+	    __put_user (stat->ctime.tv_sec, &ubuf->st_ctime) ||
+	    __put_user (stat->ctime.tv_nsec, &ubuf->st_ctime_nsec) ||
+	    __put_user (stat->blksize, &ubuf->st_blksize) ||
+	    __put_user (stat->blocks, &ubuf->st_blocks))
 		return -EFAULT;
 	return 0;
 }
@@ -154,49 +143,32 @@ putstat64(struct stat64 *ubuf, struct stat *kbuf)
 asmlinkage long
 sys32_stat64(char * filename, struct stat64 *statbuf)
 {
-	int ret;
-	struct stat s;
-	mm_segment_t old_fs = get_fs();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_newstat(filename, &s);
-	set_fs (old_fs);
-	if (putstat64 (statbuf, &s))
-		return -EFAULT;
+	struct kstat stat;
+	int ret = vfs_stat(filename, &stat);
+	if (!ret)
+		ret = cp_stat64(statbuf, &stat);
 	return ret;
 }
 
 asmlinkage long
 sys32_lstat64(char * filename, struct stat64 *statbuf)
 {
-	int ret;
-	struct stat s;
-	mm_segment_t old_fs = get_fs();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_newlstat(filename, &s);
-	set_fs (old_fs);
-	if (putstat64 (statbuf, &s))
-		return -EFAULT;
+	struct kstat stat;
+	int ret = vfs_lstat(filename, &stat);
+	if (!ret)
+		ret = cp_stat64(statbuf, &stat);
 	return ret;
 }
 
 asmlinkage long
 sys32_fstat64(unsigned int fd, struct stat64 *statbuf)
 {
-	int ret;
-	struct stat s;
-	mm_segment_t old_fs = get_fs();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_newfstat(fd, &s);
-	set_fs (old_fs);
-	if (putstat64 (statbuf, &s))
-		return -EFAULT;
+	struct kstat stat;
+	int ret = vfs_fstat(fd, &stat);
+	if (!ret)
+		ret = cp_stat64(statbuf, &stat);
 	return ret;
 }
-
-
 
 /*
  * Linux/i386 didn't use to be able to handle more than

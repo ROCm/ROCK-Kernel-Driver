@@ -34,7 +34,6 @@ typedef long long       __kernel_loff_t;
 
 #ifndef __s390x__
 
-typedef unsigned short  __kernel_dev_t;
 typedef unsigned long   __kernel_ino_t;
 typedef unsigned short  __kernel_mode_t;
 typedef unsigned short  __kernel_nlink_t;
@@ -51,7 +50,6 @@ typedef unsigned short	__kernel_old_dev_t;
 
 #else /* __s390x__ */
 
-typedef unsigned int    __kernel_dev_t;
 typedef unsigned int    __kernel_ino_t;
 typedef unsigned int    __kernel_mode_t;
 typedef unsigned int    __kernel_nlink_t;

@@ -11,13 +11,13 @@
 #include <linux/types.h>
 
 struct stat {
-	dev_t		st_dev;
+	unsigned long	st_dev;
 	ino_t		st_ino;
 	nlink_t		st_nlink;
 	mode_t		st_mode;
 	uid_t 		st_uid;
 	gid_t 		st_gid;
-	dev_t		st_rdev;
+	unsigned long	st_rdev;
 	off_t		st_size;
 	unsigned long  	st_blksize;
 	unsigned long  	st_blocks;

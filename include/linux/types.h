@@ -17,6 +17,8 @@
 
 #ifndef __KERNEL_STRICT_NAMES
 
+typedef __u16 __kernel_dev_t;
+
 typedef __kernel_fd_set		fd_set;
 typedef __kernel_dev_t		dev_t;
 typedef __kernel_ino_t		ino_t;

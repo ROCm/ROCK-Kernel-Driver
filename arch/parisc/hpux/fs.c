@@ -124,13 +124,13 @@ static int cp_hpux_stat(struct kstat *stat, struct hpux_stat64 *statbuf)
 	struct hpux_stat64 tmp;
 
 	memset(&tmp, 0, sizeof(tmp));
-	tmp.st_dev = stat->dev;
+	tmp.st_dev = old_encode_dev(stat->dev);
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
 	tmp.st_uid = stat->uid;
 	tmp.st_gid = stat->gid;
-	tmp.st_rdev = stat->rdev;
+	tmp.st_rdev = old_encode_dev(stat->rdev);
 	tmp.st_size = stat->size;
 	tmp.st_atime = stat->atime.tv_sec;
 	tmp.st_mtime = stat->mtime.tv_sec;
