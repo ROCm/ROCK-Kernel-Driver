@@ -95,7 +95,6 @@ extern void devfs_auto_unregister (devfs_handle_t master,devfs_handle_t slave);
 extern devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master);
 extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
 extern int devfs_only (void);
-
 extern void devfs_register_tape (devfs_handle_t de);
 extern void devfs_register_series (devfs_handle_t dir, const char *format,
 				   unsigned int num_entries,
@@ -238,7 +237,6 @@ static inline int devfs_only (void)
 {
     return 0;
 }
-
 static inline void devfs_register_tape (devfs_handle_t de)
 {
     return;
