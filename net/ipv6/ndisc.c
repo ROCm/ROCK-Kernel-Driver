@@ -341,64 +341,9 @@ static void pndisc_destructor(struct pneigh_entry *n)
 	ipv6_dev_mc_dec(dev, &maddr);
 }
 
-
-
-static int
-ndisc_build_ll_hdr(struct sk_buff *skb, struct net_device *dev,
-		   struct in6_addr *daddr, struct neighbour *neigh, int len)
-{
-	unsigned char ha[MAX_ADDR_LEN];
-	unsigned char *h_dest = NULL;
-
-	if (dev->hard_header) {
-		if (ipv6_addr_is_multicast(daddr)) {
-			ndisc_mc_map(daddr, ha, dev, 1);
-			h_dest = ha;
-		} else if (neigh) {
-			read_lock_bh(&neigh->lock);
-			if (neigh->nud_state&NUD_VALID) {
-				memcpy(ha, neigh->ha, dev->addr_len);
-				h_dest = ha;
-			}
-			read_unlock_bh(&neigh->lock);
-		} else {
-			neigh = neigh_lookup(&nd_tbl, daddr, dev);
-			if (neigh) {
-				read_lock_bh(&neigh->lock);
-				if (neigh->nud_state&NUD_VALID) {
-					memcpy(ha, neigh->ha, dev->addr_len);
-					h_dest = ha;
-				}
-				read_unlock_bh(&neigh->lock);
-				neigh_release(neigh);
-			}
-		}
-
-		if (dev->hard_header(skb, dev, ETH_P_IPV6, h_dest, NULL, len) < 0)
-			return 0;
-	}
-
-	return 1;
-}
-
-
 /*
  *	Send a Neighbour Advertisement
  */
-
-static int ndisc_output(struct sk_buff *skb)
-{
-	if (skb) {
-		struct neighbour *neigh = (skb->dst ? skb->dst->neighbour : NULL);
-		if (ndisc_build_ll_hdr(skb, skb->dev, &skb->nh.ipv6h->daddr, neigh, skb->len) == 0) {
-			kfree_skb(skb);
-			return -EINVAL;
-		}
-		dev_queue_xmit(skb);
-		return 0;
-	}
-	return -EINVAL;
-}
 
 static inline void ndisc_flow_init(struct flowi *fl, u8 type,
 			    struct in6_addr *saddr, struct in6_addr *daddr)
@@ -442,7 +387,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, src_addr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh, ndisc_output);
+	dst = ndisc_dst_alloc(dev, neigh, daddr, ip6_output2);
 	if (!dst)
 		return;
 
@@ -530,7 +475,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh, ndisc_output);
+	dst = ndisc_dst_alloc(dev, neigh, daddr, ip6_output2);
 	if (!dst)
 		return;
 
@@ -603,7 +548,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 
 	ndisc_flow_init(&fl, NDISC_ROUTER_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, NULL, ndisc_output);
+	dst = ndisc_dst_alloc(dev, NULL, daddr, ip6_output2);
 	if (!dst)
 		return;
 

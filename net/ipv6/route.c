@@ -563,6 +563,7 @@ static struct dst_entry *ndisc_dst_gc_list;
 
 struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
 				  struct neighbour *neigh,
+				  struct in6_addr *addr,
 				  int (*output)(struct sk_buff *))
 {
 	struct rt6_info *rt = ip6_dst_alloc();
@@ -574,11 +575,13 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 		dev_hold(dev);
 	if (neigh)
 		neigh_hold(neigh);
+	else
+		neigh = ndisc_get_neigh(dev, addr);
 
 	rt->rt6i_dev	  = dev;
 	rt->rt6i_nexthop  = neigh;
 	rt->rt6i_expires  = 0;
-	rt->rt6i_flags    = RTF_LOCAL | RTF_NDISC;
+	rt->rt6i_flags    = RTF_LOCAL;
 	rt->rt6i_metric   = 0;
 	atomic_set(&rt->u.dst.__refcnt, 1);
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
@@ -832,7 +835,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 		}
 	}
 
-	rt->rt6i_flags = rtmsg->rtmsg_flags & ~RTF_NDISC;
+	rt->rt6i_flags = rtmsg->rtmsg_flags;
 
 install_route:
 	if (rta && rta[RTA_METRICS-1]) {
@@ -1124,8 +1127,6 @@ out:
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort)
 {
 	struct rt6_info *rt = ip6_dst_alloc();
-
-	BUG_ON(ort->rt6i_flags & RTF_NDISC);
 
 	if (rt) {
 		rt->u.dst.input = ort->u.dst.input;
