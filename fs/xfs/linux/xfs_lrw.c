@@ -225,12 +225,13 @@ xfs_inval_cached_pages(
 	int		write,
 	int		relock)
 {
-	xfs_mount_t	*mp;
+//	xfs_mount_t	*mp;
 
 	if (!VN_CACHED(vp)) {
 		return;
 	}
 
+#if 0
 	mp = io->io_mount;
 
 	/*
@@ -253,12 +254,15 @@ xfs_inval_cached_pages(
 		}
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	}
+#endif
 
 	xfs_inval_cached_trace(io, offset, -1, ctooff(offtoct(offset)), -1);
 	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
+#if 0
 	if (relock) {
 		XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);
 	}
+#endif
 }
 
 ssize_t			/* bytes read, or (-)  error */
@@ -703,12 +707,10 @@ xfs_write(
 		    (size & target->pbr_smask)) {
 			return XFS_ERROR(-EINVAL);
 		}
-		iolock = XFS_IOLOCK_SHARED;
-		locktype = VRWLOCK_WRITE_DIRECT;
-	} else {
-		iolock = XFS_IOLOCK_EXCL;
-		locktype = VRWLOCK_WRITE;
 	}
+
+	iolock = XFS_IOLOCK_EXCL;
+	locktype = VRWLOCK_WRITE;
 
 	if (ioflags & IO_ISLOCKED)
 		iolock = 0;
@@ -784,7 +786,7 @@ start:
 	 * to zero it out up to the new size.
 	 */
 
-	if (!(ioflags & IO_ISDIRECT) && (*offset > isize && isize)) {
+	if (*offset > isize && isize) {
 		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offset,
 			isize, *offset + size);
 		if (error) {
