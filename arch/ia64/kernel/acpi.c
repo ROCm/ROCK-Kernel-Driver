@@ -293,20 +293,20 @@ acpi_parse_nmi_src (acpi_table_entry_header *header, const unsigned long end)
 	return 0;
 }
 
-/* Hook from generic ACPI tables.c */
-void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+static void __init
+acpi_madt_oem_check (char *oem_id, char *oem_table_id)
 {
 	if (!strncmp(oem_id, "IBM", 3) &&
-	    (!strncmp(oem_table_id, "SERMOW", 6))){
+	    (!strncmp(oem_table_id, "SERMOW", 6))) {
 
-		/* Unfortunatly ITC_DRIFT is not yet part of the
+		/*
+		 * Unfortunately ITC_DRIFT is not yet part of the
 		 * official SAL spec, so the ITC_DRIFT bit is not
 		 * set by the BIOS on this hardware.
 		 */
 		sal_platform_features |= IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT;
 
-		/*Start cyclone clock*/
-		cyclone_setup(0);
+		cyclone_setup();
 	}
 }
 

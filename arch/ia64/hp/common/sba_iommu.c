@@ -469,6 +469,14 @@ sba_search_bitmap(struct ioc *ioc, unsigned long bits_wanted)
 	ASSERT(((unsigned long) ioc->res_hint & (sizeof(unsigned long) - 1UL)) == 0);
 	ASSERT(res_ptr < res_end);
 
+	/*
+	 * N.B.  REO/Grande defect AR2305 can cause TLB fetch timeouts
+	 * if a TLB entry is purged while in use.  sba_mark_invalid()
+	 * purges IOTLB entries in power-of-two sizes, so we also
+	 * allocate IOVA space in power-of-two sizes.
+	 */
+	bits_wanted = 1UL << get_iovp_order(bits_wanted << PAGE_SHIFT);
+
 	if (likely(bits_wanted == 1)) {
 		unsigned int bitshiftcnt;
 		for(; res_ptr < res_end ; res_ptr++) {
@@ -675,6 +683,8 @@ sba_free_range(struct ioc *ioc, dma_addr_t iova, size_t size)
 	int bits_not_wanted = size >> iovp_shift;
 	unsigned long m;
 
+	/* Round up to power-of-two size: see AR2305 note above */
+	bits_not_wanted = 1UL << get_iovp_order(bits_not_wanted << PAGE_SHIFT);
 	for (; bits_not_wanted > 0 ; res_ptr++) {
 		
 		if (unlikely(bits_not_wanted > BITS_PER_LONG)) {

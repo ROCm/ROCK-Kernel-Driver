@@ -375,9 +375,10 @@ setup_arch (char **cmdline_p)
 	}
 #endif
 
-	/* enable IA-64 Machine Check Abort Handling */
-	ia64_mca_init();
-
+	/* enable IA-64 Machine Check Abort Handling unless disabled */
+	if (!strstr(saved_command_line, "nomca"))
+		ia64_mca_init();
+	
 	platform_setup(cmdline_p);
 	paging_init();
 }
