@@ -8,7 +8,9 @@
  * Software Foundation; either version 2 of the License, or (at your option) 
  * any later version.
  */
+
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/pfkeyv2.h>
 #include <net/xfrm.h>
@@ -727,3 +729,7 @@ void *pskb_put(struct sk_buff *skb, struct sk_buff *tail, int len)
 	return skb_put(tail, len);
 }
 #endif
+
+EXPORT_SYMBOL_GPL(pskb_put);
+EXPORT_SYMBOL_GPL(skb_cow_data);
+EXPORT_SYMBOL_GPL(skb_to_sgvec);
