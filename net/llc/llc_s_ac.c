@@ -51,14 +51,12 @@ int llc_sap_action_unitdata_ind(struct llc_sap *sap, struct sk_buff *skb)
 int llc_sap_action_send_ui(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-	struct llc_prim_if_block *prim = ev->data.prim.data;
-	struct llc_prim_unit_data *prim_data = &prim->data->udata;
 	int rc;
 
-	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, prim_data->saddr.lsap,
-			    prim_data->daddr.lsap, LLC_PDU_CMD);
+	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, ev->saddr.lsap,
+			    ev->daddr.lsap, LLC_PDU_CMD);
 	llc_pdu_init_as_ui_cmd(skb);
-	rc = lan_hdrs_init(skb, prim_data->saddr.mac, prim_data->daddr.mac);
+	rc = lan_hdrs_init(skb, ev->saddr.mac, ev->daddr.mac);
 	if (!rc)
 		llc_sap_send_pdu(sap, skb);
 	return rc;
@@ -76,14 +74,12 @@ int llc_sap_action_send_ui(struct llc_sap *sap, struct sk_buff *skb)
 int llc_sap_action_send_xid_c(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-	struct llc_prim_if_block *prim = ev->data.prim.data;
-	struct llc_prim_xid *prim_data = &prim->data->xid;
 	int rc;
 
-	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, prim_data->saddr.lsap,
-			    prim_data->daddr.lsap, LLC_PDU_CMD);
+	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, ev->saddr.lsap,
+			    ev->daddr.lsap, LLC_PDU_CMD);
 	llc_pdu_init_as_xid_cmd(skb, LLC_XID_NULL_CLASS_2, 0);
-	rc = lan_hdrs_init(skb, prim_data->saddr.mac, prim_data->daddr.mac);
+	rc = lan_hdrs_init(skb, ev->saddr.mac, ev->daddr.mac);
 	if (!rc)
 		llc_sap_send_pdu(sap, skb);
 	return rc;
@@ -132,14 +128,12 @@ out:
 int llc_sap_action_send_test_c(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-	struct llc_prim_if_block *prim = ev->data.prim.data;
-	struct llc_prim_test *prim_data = &prim->data->test;
 	int rc;
 
-	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, prim_data->saddr.lsap,
-			    prim_data->daddr.lsap, LLC_PDU_CMD);
+	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, ev->saddr.lsap,
+			    ev->daddr.lsap, LLC_PDU_CMD);
 	llc_pdu_init_as_test_cmd(skb);
-	rc = lan_hdrs_init(skb, prim_data->saddr.mac, prim_data->daddr.mac);
+	rc = lan_hdrs_init(skb, ev->saddr.mac, ev->daddr.mac);
 	if (!rc)
 		llc_sap_send_pdu(sap, skb);
 	return rc;

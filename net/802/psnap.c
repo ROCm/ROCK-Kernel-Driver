@@ -51,32 +51,26 @@ out:
 /*
  *	A SNAP packet has arrived
  */
-static int snap_indicate(struct llc_prim_if_block *prim)
+static int snap_rcv(struct sk_buff *skb, struct net_device *dev,
+		    struct packet_type *pt)
 {
-	struct sk_buff *skb;
-	struct datalink_proto *proto;
 	int rc = 1;
-	static struct packet_type psnap_packet_type = {
+	struct datalink_proto *proto = find_snap_client(skb->h.raw);
+	static struct packet_type snap_packet_type = {
 		.type = __constant_htons(ETH_P_SNAP),
 	};
-
-	if (prim->prim != LLC_DATAUNIT_PRIM)
-		goto out;
-
-	skb = prim->data->udata.skb;
-	proto = find_snap_client(skb->h.raw);
 
 	if (proto) {
 		/* Pass the frame on. */
 		skb->h.raw  += 5;
 		skb_pull(skb, 5);
-		rc = proto->rcvfunc(skb, skb->dev, &psnap_packet_type);
+		rc = proto->rcvfunc(skb, dev, &snap_packet_type);
 	} else {
 		skb->sk = NULL;
 		kfree_skb(skb);
 		rc = 1;
 	}
-out:
+
 	return rc;
 }
 
@@ -99,7 +93,7 @@ EXPORT_SYMBOL(unregister_snap_client);
 
 static int __init snap_init(void)
 {
-	snap_sap = llc_sap_open(snap_indicate, NULL, 0xAA);
+	snap_sap = llc_sap_open(0xAA, snap_rcv);
 
 	if (!snap_sap)
 		printk(KERN_CRIT "SNAP - unable to register with 802.2\n");
