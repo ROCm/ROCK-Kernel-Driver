@@ -398,13 +398,18 @@ pipe_poll(struct file *filp, poll_table *wait)
 
 	/* Reading only -- no need for acquiring the semaphore.  */
 	nrbufs = info->nrbufs;
-	mask = (nrbufs > 0) ? POLLIN | POLLRDNORM : 0;
-	mask |= (nrbufs < PIPE_BUFFERS) ? POLLOUT | POLLWRNORM : 0;
+	mask = 0;
+	if (filp->f_mode & FMODE_READ) {
+		mask = (nrbufs > 0) ? POLLIN | POLLRDNORM : 0;
+		if (!PIPE_WRITERS(*inode) && filp->f_version != PIPE_WCOUNTER(*inode))
+			mask |= POLLHUP;
+	}
 
-	if (!PIPE_WRITERS(*inode) && filp->f_version != PIPE_WCOUNTER(*inode))
-		mask |= POLLHUP;
-	if (!PIPE_READERS(*inode))
-		mask |= POLLERR;
+	if (filp->f_mode & FMODE_WRITE) {
+		mask |= (nrbufs < PIPE_BUFFERS) ? POLLOUT | POLLWRNORM : 0;
+		if (!PIPE_READERS(*inode))
+			mask |= POLLERR;
+	}
 
 	return mask;
 }
