@@ -240,10 +240,11 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	int i, max_len, first_word, last_word;
 	void *ptr;
 
+	if(eeprom->len == 0)
+		return -EOPNOTSUPP;
+
 	if(eeprom->magic != (hw->vendor_id | (hw->device_id << 16)))
 		return -EFAULT;
-
-	if(eeprom->len == 0) return 0;
 
 	max_len = e1000_eeprom_size(hw);
 
