@@ -22,7 +22,7 @@
  It provides the alsa kernel half of the usx2y-alsa-jack driver pair.
  The pair uses a hardware dependant alsa-device for mmaped pcm transport.
  Advantage achieved:
-         The usb_hcd places reads/writes pcm data into dma-memory.
+         The usb_hc moves pcm data from/into memory via DMA.
          That memory is mmaped by jack's usx2y driver.
          Jack's usx2y driver is the first/last to read/write pcm data.
          Read/write is a combination of power of 2 period shaping and
@@ -568,7 +568,7 @@ static int snd_usX2Y_usbpcm_open(snd_pcm_substream_t *substream)
 					 snd_pcm_substream_chip(substream))[substream->stream];
 	snd_pcm_runtime_t	*runtime = substream->runtime;
 
-	if (!subs->usX2Y->chip_status & USX2Y_STAT_CHIP_MMAP_PCM_URBS)
+	if (!(subs->usX2Y->chip_status & USX2Y_STAT_CHIP_MMAP_PCM_URBS))
 		return -EBUSY;
 
 	runtime->hw = SNDRV_PCM_STREAM_PLAYBACK == substream->stream ? snd_usX2Y_2c :
