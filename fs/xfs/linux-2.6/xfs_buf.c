@@ -53,12 +53,9 @@
 #include <linux/workqueue.h>
 #include <linux/suspend.h>
 #include <linux/percpu.h>
+#include <linux/blkdev.h>
 
 #include "xfs_linux.h"
-
-#ifndef GFP_READAHEAD
-#define GFP_READAHEAD	(__GFP_NOWARN|__GFP_NORETRY)
-#endif
 
 /*
  * File wide globals
@@ -118,8 +115,8 @@ ktrace_t *pagebuf_trace_buf;
  */
 
 #define pb_to_gfp(flags) \
-	(((flags) & PBF_READ_AHEAD) ? GFP_READAHEAD : \
-	 ((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL)
+	((((flags) & PBF_READ_AHEAD) ? __GFP_NORETRY : \
+	  ((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL) | __GFP_NOWARN)
 
 #define pb_to_km(flags) \
 	 (((flags) & PBF_DONT_BLOCK) ? KM_NOFS : KM_SLEEP)
@@ -387,13 +384,13 @@ _pagebuf_lookup_pages(
 			 */
 			if (!(++retries % 100))
 				printk(KERN_ERR
-					"possible deadlock in %s (mode:0x%x)\n",
+					"XFS: possible memory allocation "
+					"deadlock in %s (mode:0x%x)\n",
 					__FUNCTION__, gfp_mask);
 
 			XFS_STATS_INC(pb_page_retries);
 			pagebuf_daemon_wakeup(0, gfp_mask);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(10);
+			blk_congestion_wait(WRITE, HZ/50);
 			goto retry;
 		}
 
