@@ -11,6 +11,11 @@ struct agp_device_ids sis_agp_device_ids[] __initdata =
 		.chipset_name	= "650",
 	},
 	{
+		.device_id  = PCI_DEVICE_ID_SI_651,
+		.chipset    = SIS_GENERIC,
+		.chipset_name   = "651",
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_SI_645,
 		.chipset	= SIS_GENERIC,
 		.chipset_name	= "645",
