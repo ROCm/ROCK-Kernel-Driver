@@ -20,12 +20,6 @@
 #include <asm/ptrace.h>
 #include <asm/types.h>
 
-/*
- * Default implementation of macro that returns current
- * instruction pointer ("program counter").
- */
-#define current_text_addr() ({ __label__ _l; _l: &&_l;})
-
 /* Machine State Register (MSR) Fields */
 #define MSR_SF_LG	63              /* Enable 64 bit mode */
 #define MSR_ISF_LG	61              /* Interrupt 64b mode valid on 630 */
@@ -410,6 +404,12 @@
 #define XGLUE(a,b) a##b
 #define GLUE(a,b) XGLUE(a,b)
 
+/* iSeries CTRL register (for runlatch) */
+
+#define CTRLT		0x098
+#define CTRLF		0x088
+#define RUNLATCH	0x0001
+
 #ifdef __ASSEMBLY__
 
 #define _GLOBAL(name) \
@@ -438,8 +438,13 @@ name: \
 	.type GLUE(.,name),@function; \
 GLUE(.,name):
 
-#endif /* __ASSEMBLY__ */
+#else /* __ASSEMBLY__ */
 
+/*
+ * Default implementation of macro that returns current
+ * instruction pointer ("program counter").
+ */
+#define current_text_addr() ({ __label__ _l; _l: &&_l;})
 
 /* Macros for setting and retrieving special purpose registers */
 
@@ -461,19 +466,8 @@ GLUE(.,name):
 #define mttbl(v)	asm volatile("mttbl %0":: "r"(v))
 #define mttbu(v)	asm volatile("mttbu %0":: "r"(v))
 
-/* iSeries CTRL register (for runlatch) */
-
-#define CTRLT		0x098
-#define CTRLF		0x088
-#define RUNLATCH	0x0001
-
-/* Size of an exception stack frame contained in the paca. */
-#define EXC_FRAME_SIZE 64
-
 #define mfasr()		({unsigned long rval; \
 			asm volatile("mfasr %0" : "=r" (rval)); rval;})
-
-#ifndef __ASSEMBLY__
 
 static inline void set_tb(unsigned int upper, unsigned int lower)
 {
@@ -484,6 +478,8 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 
 #define __get_SP()	({unsigned long sp; \
 			asm volatile("mr %0,1": "=r" (sp)); sp;})
+
+#ifdef __KERNEL__
 
 extern int have_of;
 
@@ -507,8 +503,6 @@ extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 extern struct task_struct *last_task_used_math;
 extern struct task_struct *last_task_used_altivec;
 
-
-#ifdef __KERNEL__
 /* 64-bit user address space is 41-bits (2TBs user VM) */
 #define TASK_SIZE_USER64 (0x0000020000000000UL)
 
@@ -520,8 +514,6 @@ extern struct task_struct *last_task_used_altivec;
 
 #define TASK_SIZE (test_thread_flag(TIF_32BIT) ? \
 		TASK_SIZE_USER32 : TASK_SIZE_USER64)
-#endif /* __KERNEL__ */
-
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
@@ -627,9 +619,11 @@ static inline void prefetchw(const void *x)
 
 #define spin_lock_prefetch(x)	prefetchw(x)
 
-#endif /* ASSEMBLY */
-
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
+
+#endif /* __KERNEL__ */
+
+#endif /* __ASSEMBLY__ */
 
 /*
  * Number of entries in the SLB. If this ever changes we should handle
