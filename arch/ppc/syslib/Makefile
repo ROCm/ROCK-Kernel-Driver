@@ -64,5 +64,8 @@ obj-$(CONFIG_SPRUCE)		+= cpc700_pic.o indirect_pci.o pci_auto.o \
 obj-$(CONFIG_ZX4500)		+= indirect_pci.o pci_auto.o mpc10x_common.o \
 					i8259.o open_pic.o
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
+ifeq ($(CONFIG_SERIAL_8250)$(CONFIG_PPC_GEN550),yy)
+obj-$(CONFIG_KGDB)		+= gen550_kgdb.o gen550_dbg.o
+obj-$(CONFIG_SERIAL_TEXT_DEBUG)	+= gen550_dbg.o
+endif
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
-
