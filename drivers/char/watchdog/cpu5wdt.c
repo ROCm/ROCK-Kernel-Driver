@@ -134,7 +134,7 @@ static int cpu5wdt_open(struct inode *inode, struct file *file)
 	if ( test_and_set_bit(0, &cpu5wdt_device.inuse) )
 		return -EBUSY;
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int cpu5wdt_release(struct inode *inode, struct file *file)
@@ -198,6 +198,7 @@ static ssize_t cpu5wdt_write(struct file *file, const char __user *buf, size_t c
 
 static struct file_operations cpu5wdt_fops = {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.ioctl		= cpu5wdt_ioctl,
 	.open		= cpu5wdt_open,
 	.write		= cpu5wdt_write,

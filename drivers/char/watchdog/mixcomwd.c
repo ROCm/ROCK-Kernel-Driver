@@ -197,6 +197,7 @@ static int mixcomwd_ioctl(struct inode *inode, struct file *file,
 static struct file_operations mixcomwd_fops=
 {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.write		= mixcomwd_write,
 	.ioctl		= mixcomwd_ioctl,
 	.open		= mixcomwd_open,
