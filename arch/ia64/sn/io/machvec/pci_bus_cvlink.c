@@ -331,7 +331,6 @@ sn_pci_fixup(int arg)
 		extern void sgi_master_io_infr_init(void);
 		extern void sn_init_cpei_timer(void);
 		
-		init_hcl();
 		sgi_master_io_infr_init();
 		
 		for (cnode = 0; cnode < numnodes; cnode++) {
