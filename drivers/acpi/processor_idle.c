@@ -193,8 +193,18 @@ static void acpi_processor_idle (void)
 	 */
 	if (pr->flags.bm_check) {
 		u32		bm_status = 0;
+		unsigned long	diff = jiffies - pr->power.bm_check_timestamp;
 
-		pr->power.bm_activity <<= 1;
+		if (diff > 32)
+			diff = 32;
+
+		while (diff) {
+			/* if we didn't get called, assume there was busmaster activity */
+			diff--;
+			if (diff)
+				pr->power.bm_activity |= 0x1;
+			pr->power.bm_activity <<= 1;
+		}
 
 		acpi_get_register(ACPI_BITREG_BUS_MASTER_STATUS,
 			&bm_status, ACPI_MTX_DO_NOT_LOCK);
@@ -213,6 +223,9 @@ static void acpi_processor_idle (void)
 				|| (inb_p(errata.piix4.bmisx + 0x0A) & 0x01))
 				pr->power.bm_activity++;
 		}
+
+		pr->power.bm_check_timestamp = jiffies;
+
 		/*
 		 * Apply bus mastering demotion policy.  Automatically demote
 		 * to avoid a faulty transition.  Note that the processor
