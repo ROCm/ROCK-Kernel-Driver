@@ -124,7 +124,6 @@ struct _snd_es18xx {
 	spinlock_t mixer_lock;
 	spinlock_t ctrl_lock;
 #ifdef CONFIG_PM
-	struct pm_dev *pm_dev;
 	unsigned char pm_reg;
 #endif
 };
@@ -1610,12 +1609,9 @@ int __devinit snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
 
 /* Power Management support functions */
 #ifdef CONFIG_PM
-static void snd_es18xx_suspend(es18xx_t *chip)
+static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+	es18xx_t *chip = snd_magic_cast(es18xx_t, card->pm_private_data, return -EINVAL);
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -1626,63 +1622,23 @@ static void snd_es18xx_suspend(es18xx_t *chip)
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_SUS);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void snd_es18xx_resume(es18xx_t *chip)
+static int snd_es18xx_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+	es18xx_t *chip = snd_magic_cast(es18xx_t, card->pm_private_data, return -EINVAL);
 
 	/* restore PM register, we won't wake till (not 0x07) i/o activity though */
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_FM);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-/* callback for control API */
-static int snd_es18xx_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	es18xx_t *chip = (es18xx_t *) card->power_state_private_data;
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_es18xx_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_es18xx_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
-static int snd_es18xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	es18xx_t *chip = snd_magic_cast(es18xx_t, dev->data, return 0);
-
-	switch (rqst) {
-	case PM_SUSPEND:
-		snd_es18xx_suspend(chip);
-		break;
-	case PM_RESUME:
-		snd_es18xx_resume(chip);
-		break;
-	}
 	return 0;
 }
 #endif /* CONFIG_PM */
 
 static int snd_es18xx_free(es18xx_t *chip)
 {
-#ifdef CONFIG_PM
-	if (chip->pm_dev)
-		pm_unregister(chip->pm_dev);
-#endif
 	if (chip->res_port) {
 		release_resource(chip->res_port);
 		kfree_nocheck(chip->res_port);
@@ -2150,16 +2106,9 @@ static int __devinit snd_audiodrive_probe(int dev, struct pnp_card_link *pcard,
 		chip->rmidi = rmidi;
 	}
 
-#ifdef CONFIG_PM
 	/* Power Management */
-	chip->pm_dev = pm_register(PM_ISA_DEV, 0, snd_es18xx_pm_callback);
-	if (chip->pm_dev) {
-		chip->pm_dev->data = chip;
-		/* set control api callback */
-		card->set_power_state = snd_es18xx_set_power_state;
-		card->power_state_private_data = chip;
-	}
-#endif
+	snd_card_set_isa_pm_callback(card, snd_es18xx_suspend, snd_es18xx_resume, chip);
+
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;

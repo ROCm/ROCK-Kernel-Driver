@@ -2262,16 +2262,14 @@ static int __devinit snd_ali_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	pci_set_drvdata(pci, codec);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_ali_remove(struct pci_dev *pci)
 {
-	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 

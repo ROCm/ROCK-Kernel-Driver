@@ -152,7 +152,6 @@ struct snd_opl3sa2 {
 	snd_kcontrol_t *master_switch;
 	snd_kcontrol_t *master_volume;
 #ifdef CONFIG_PM
-	struct pm_dev *pm_dev;
 	void (*cs4231_suspend)(cs4231_t *);
 	void (*cs4231_resume)(cs4231_t *);
 #endif
@@ -548,12 +547,9 @@ static int __init snd_opl3sa2_mixer(opl3sa2_t *chip)
 
 /* Power Management support functions */
 #ifdef CONFIG_PM
-static void snd_opl3sa2_suspend(opl3sa2_t *chip)
+static int snd_opl3sa2_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, card->pm_private_data, return -EINVAL);
 
 	snd_pcm_suspend_all(chip->cs4231->pcm); /* stop before saving regs */
 	chip->cs4231_suspend(chip->cs4231);
@@ -562,15 +558,13 @@ static void snd_opl3sa2_suspend(opl3sa2_t *chip)
 	snd_opl3sa2_write(chip, OPL3SA2_PM_CTRL, OPL3SA2_PM_D3);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void snd_opl3sa2_resume(opl3sa2_t *chip)
+static int snd_opl3sa2_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, card->pm_private_data, return -EINVAL);
 	int i;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
 
 	/* power up */
 	snd_opl3sa2_write(chip, OPL3SA2_PM_CTRL, OPL3SA2_PM_D0);
@@ -588,43 +582,8 @@ static void snd_opl3sa2_resume(opl3sa2_t *chip)
 	chip->cs4231_resume(chip->cs4231);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-/* callback for control API */
-static int snd_opl3sa2_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	opl3sa2_t *chip = (opl3sa2_t *) card->power_state_private_data;
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_opl3sa2_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_opl3sa2_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
 	return 0;
 }
-
-static int snd_opl3sa2_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, dev->data, return 0);
-
-	switch (rqst) {
-	case PM_SUSPEND:
-		snd_opl3sa2_suspend(chip);
-		break;
-	case PM_RESUME:
-		snd_opl3sa2_resume(chip);
-		break;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 #ifdef CONFIG_PNP
@@ -689,10 +648,6 @@ static int __init snd_opl3sa2_pnp(int dev, opl3sa2_t *chip,
 
 static int snd_opl3sa2_free(opl3sa2_t *chip)
 {
-#ifdef CONFIG_PM
-	if (chip->pm_dev)
-		pm_unregister(chip->pm_dev);
-#endif
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	if (chip->res_port) {
@@ -817,22 +772,12 @@ static int __devinit snd_opl3sa2_probe(int dev,
 			goto __error;
 	}
 #ifdef CONFIG_PM
-	/* Power Management */
-	chip->pm_dev = pm_register(PM_ISA_DEV, 0, snd_opl3sa2_pm_callback);
-	if (chip->pm_dev) {
-		chip->pm_dev->data = chip;
-		/* remember callbacks for cs4231 - they are called inside
-		 * opl3sa2 pm callback
-		 */
-		chip->cs4231_suspend = chip->cs4231->suspend;
-		chip->cs4231_resume = chip->cs4231->resume;
-		/* now clear callbacks for cs4231 */
-		chip->cs4231->suspend = NULL;
-		chip->cs4231->resume = NULL;
-		/* set control api callback */
-		card->set_power_state = snd_opl3sa2_set_power_state;
-		card->power_state_private_data = chip;
-	}
+	chip->cs4231_suspend = chip->cs4231->suspend;
+	chip->cs4231_resume = chip->cs4231->resume;
+	/* now clear callbacks for cs4231 */
+	chip->cs4231->suspend = NULL;
+	chip->cs4231->resume = NULL;
+	snd_card_set_isa_pm_callback(card, snd_opl3sa2_suspend, snd_opl3sa2_resume, chip);
 #endif
 
 	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",

@@ -2157,13 +2157,11 @@ static int saved_regs_index[] = {
 };
 #define YDSXGR_NUM_SAVED_REGS	ARRAY_SIZE(saved_regs_index)
 
-void snd_ymfpci_suspend(ymfpci_t *chip)
+static int snd_ymfpci_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	ymfpci_t *chip = snd_magic_cast(ymfpci_t, card->pm_private_data, return -EINVAL);
 	unsigned int i;
 	
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
 	snd_pcm_suspend_all(chip->pcm);
 	snd_pcm_suspend_all(chip->pcm2);
 	snd_pcm_suspend_all(chip->pcm_spdif);
@@ -2174,15 +2172,13 @@ void snd_ymfpci_suspend(ymfpci_t *chip)
 	snd_ymfpci_writel(chip, YDSXGR_NATIVEDACOUTVOL, 0);
 	snd_ymfpci_disable_dsp(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-void snd_ymfpci_resume(ymfpci_t *chip)
+static int snd_ymfpci_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	ymfpci_t *chip = snd_magic_cast(ymfpci_t, card->pm_private_data, return -EINVAL);
 	unsigned int i;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
 
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
@@ -2205,25 +2201,6 @@ void snd_ymfpci_resume(ymfpci_t *chip)
 		spin_unlock_irqrestore(&chip->reg_lock, flags);
 	}
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_ymfpci_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, card->power_state_private_data, return -ENXIO);
-
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_ymfpci_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_ymfpci_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -2304,8 +2281,7 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 		snd_ymfpci_free(chip);
 		return -ENOMEM;
 	}
-	card->set_power_state = snd_ymfpci_set_power_state;
-	card->power_state_private_data = chip;
+	snd_card_set_pm_callback(card, snd_ymfpci_suspend, snd_ymfpci_resume, chip);
 #endif
 
 	snd_ymfpci_proc_init(card, chip);

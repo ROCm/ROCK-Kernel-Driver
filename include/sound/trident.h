@@ -488,10 +488,4 @@ int snd_trident_synth_free(trident_t *trident, snd_util_memblk_t *blk);
 int snd_trident_synth_bzero(trident_t *trident, snd_util_memblk_t *blk, int offset, int size);
 int snd_trident_synth_copy_from_user(trident_t *trident, snd_util_memblk_t *blk, int offset, const char *data, int size);
 
-/* Power Management */
-#ifdef CONFIG_PM
-void snd_trident_suspend(trident_t *trident);
-void snd_trident_resume(trident_t *trident);
-#endif
-
 #endif /* __SOUND_TRIDENT_H */

@@ -312,31 +312,14 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int snd_card_ymfpci_suspend(struct pci_dev *pci, u32 state)
-{
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_ymfpci_suspend(chip);
-	return 0;
-}
-static int snd_card_ymfpci_resume(struct pci_dev *pci)
-{
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_ymfpci_resume(chip);
-	return 0;
-}
-#endif
-
 static void __devexit snd_card_ymfpci_remove(struct pci_dev *pci)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -345,10 +328,7 @@ static struct pci_driver driver = {
 	.id_table = snd_ymfpci_ids,
 	.probe = snd_card_ymfpci_probe,
 	.remove = __devexit_p(snd_card_ymfpci_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_card_ymfpci_suspend,
-	.resume = snd_card_ymfpci_resume,
-#endif	
+	SND_PCI_PM_CALLBACKS
 };
 
 static int __init alsa_card_ymfpci_init(void)

@@ -2416,30 +2416,25 @@ static void snd_es1968_start_irq(es1968_t *chip)
 /*
  * PM support
  */
-static void es1968_suspend(es1968_t *chip)
+static int es1968_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	es1968_t *chip = snd_magic_cast(es1968_t, card->pm_private_data, return -EINVAL);
 
 	if (! chip->do_pm)
-		return;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+		return 0;
 
 	snd_pcm_suspend_all(chip->pcm);
 	snd_es1968_bob_stop(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void es1968_resume(es1968_t *chip)
+static int es1968_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	es1968_t *chip = snd_magic_cast(es1968_t, card->pm_private_data, return -EINVAL);
 
 	if (! chip->do_pm)
-		return;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+		return 0;
 
 	/* restore all our config */
 	pci_enable_device(chip->pci);
@@ -2461,41 +2456,8 @@ static void es1968_resume(es1968_t *chip)
 		snd_es1968_bob_start(chip);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_es1968_suspend(struct pci_dev *dev, u32 state)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(dev), return -ENXIO);
-	es1968_suspend(chip);
 	return 0;
 }
-static int snd_es1968_resume(struct pci_dev *dev)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(dev), return -ENXIO);
-	es1968_resume(chip);
-	return 0;
-}
-
-/* callback */
-static int snd_es1968_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, card->power_state_private_data, return -ENXIO);
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		es1968_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		es1968_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 static int snd_es1968_free(es1968_t *chip)
@@ -2637,12 +2599,8 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 
 	snd_es1968_chip_init(chip);
 
-#ifdef CONFIG_PM
-	if (chip->do_pm) {
-		card->set_power_state = snd_es1968_set_power_state;
-		card->power_state_private_data = chip;
-	}
-#endif
+	if (chip->do_pm)
+		snd_card_set_pm_callback(card, es1968_suspend, es1968_resume, chip);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_es1968_free(chip);
@@ -2764,16 +2722,14 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_es1968_remove(struct pci_dev *pci)
 {
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -2782,10 +2738,7 @@ static struct pci_driver driver = {
 	.id_table = snd_es1968_ids,
 	.probe = snd_es1968_probe,
 	.remove = __devexit_p(snd_es1968_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_es1968_suspend,
-	.resume = snd_es1968_resume,
-#endif
+	SND_PCI_PM_CALLBACKS
 };
 
 static int __init alsa_card_es1968_init(void)

@@ -1537,7 +1537,7 @@ static int __devinit snd_atiixp_probe(struct pci_dev *pci,
 	if ((err = snd_card_register(card)) < 0)
 		goto __error;
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 
@@ -1548,9 +1548,7 @@ static int __devinit snd_atiixp_probe(struct pci_dev *pci,
 
 static void __devexit snd_atiixp_remove(struct pci_dev *pci)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 

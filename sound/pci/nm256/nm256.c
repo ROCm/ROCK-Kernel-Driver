@@ -1284,24 +1284,19 @@ snd_nm256_peek_for_sig(nm256_t *chip)
  * APM event handler, so the card is properly reinitialized after a power
  * event.
  */
-static void nm256_suspend(nm256_t *chip)
+static int nm256_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+	nm256_t *chip = snd_magic_cast(nm256_t, card->pm_private_data, return -EINVAL);
 
 	snd_pcm_suspend_all(chip->pcm);
 	chip->coeffs_current = 0;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void nm256_resume(nm256_t *chip)
+static int nm256_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+	nm256_t *chip = snd_magic_cast(nm256_t, card->pm_private_data, return -EINVAL);
 
 	/* Perform a full reset on the hardware */
 	pci_enable_device(chip->pci);
@@ -1311,41 +1306,8 @@ static void nm256_resume(nm256_t *chip)
 	snd_ac97_resume(chip->ac97);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_nm256_suspend(struct pci_dev *dev, u32 state)
-{
-	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return -ENXIO);
-	nm256_suspend(chip);
 	return 0;
 }
-static int snd_nm256_resume(struct pci_dev *dev)
-{
-	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return -ENXIO);
-	nm256_resume(chip);
-	return 0;
-}
-
-/* callback */
-static int snd_nm256_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	nm256_t *chip = snd_magic_cast(nm256_t, card->power_state_private_data, return -ENXIO);
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		nm256_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		nm256_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 static int snd_nm256_free(nm256_t *chip)
@@ -1553,10 +1515,7 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 
 	// pci_set_master(pci); /* needed? */
 	
-#ifdef CONFIG_PM
-	card->set_power_state = snd_nm256_set_power_state;
-	card->power_state_private_data = chip;
-#endif
+	snd_card_set_pm_callback(card, nm256_suspend, nm256_resume, chip);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
 		goto __error;
@@ -1642,16 +1601,14 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 		return err;
 	}
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_nm256_remove(struct pci_dev *pci)
 {
-	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -1661,10 +1618,7 @@ static struct pci_driver driver = {
 	.id_table = snd_nm256_ids,
 	.probe = snd_nm256_probe,
 	.remove = __devexit_p(snd_nm256_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_nm256_suspend,
-	.resume = snd_nm256_resume,
-#endif
+	SND_PCI_PM_CALLBACKS
 };
 
 

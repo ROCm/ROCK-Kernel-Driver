@@ -3784,14 +3784,11 @@ static struct cs_card_type __devinitdata cards[] = {
  * APM support
  */
 #ifdef CONFIG_PM
-void snd_cs46xx_suspend(cs46xx_t *chip)
+static int snd_cs46xx_suspend(snd_card_t *card, unsigned int state)
 {
+	cs46xx_t *chip = snd_magic_cast(cs46xx_t, card->pm_private_data, return -EINVAL);
 	int amp_saved;
 
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
 	snd_pcm_suspend_all(chip->pcm);
 	// chip->ac97_powerdown = snd_cs46xx_codec_read(chip, AC97_POWER_CONTROL);
 	// chip->ac97_general_purpose = snd_cs46xx_codec_read(chip, BA0_AC97_GENERAL_PURPOSE);
@@ -3803,15 +3800,13 @@ void snd_cs46xx_suspend(cs46xx_t *chip)
 	chip->active_ctrl(chip, -chip->amplifier);
 	chip->amplifier = amp_saved; /* restore the status */
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-void snd_cs46xx_resume(cs46xx_t *chip)
+static int snd_cs46xx_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	cs46xx_t *chip = snd_magic_cast(cs46xx_t, card->pm_private_data, return -EINVAL);
 	int amp_saved;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
 
 	pci_enable_device(chip->pci);
 	amp_saved = chip->amplifier;
@@ -3839,25 +3834,6 @@ void snd_cs46xx_resume(cs46xx_t *chip)
 		chip->active_ctrl(chip, -1); /* disable CLKRUN */
 	chip->amplifier = amp_saved;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_cs46xx_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, card->power_state_private_data, return -ENXIO);
-
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_cs46xx_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_cs46xx_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -4010,10 +3986,7 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 
 	snd_cs46xx_proc_init(card, chip);
 
-#ifdef CONFIG_PM
-	card->set_power_state = snd_cs46xx_set_power_state;
-	card->power_state_private_data = chip;
-#endif
+	snd_card_set_pm_callback(card, snd_cs46xx_suspend, snd_cs46xx_resume, chip);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_cs46xx_free(chip);

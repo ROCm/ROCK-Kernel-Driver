@@ -147,9 +147,6 @@ struct _snd_ad1848 {
 	int calibrate_mute;
 	int dma_size;
 	int thinkpad_flag;		/* Thinkpad CS4248 needs some extra help */
-#ifdef CONFIG_PM
-	struct pm_dev *thinkpad_pmstate;
-#endif
 
 	spinlock_t reg_lock;
 	struct semaphore open_mutex;

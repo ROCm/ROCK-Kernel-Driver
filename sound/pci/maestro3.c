@@ -2411,16 +2411,13 @@ static int snd_m3_free(m3_t *chip)
  * APM support
  */
 #ifdef CONFIG_PM
-
-static void m3_suspend(m3_t *chip)
+static int m3_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
-		return;
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+		return 0;
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -2441,17 +2438,16 @@ static void m3_suspend(m3_t *chip)
 	snd_m3_outw(chip, 0xffff, 0x54);
 	snd_m3_outw(chip, 0xffff, 0x56);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void m3_resume(m3_t *chip)
+static int m3_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
-		return;
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+		return 0;
 
 	/* first lets just bring everything back. .*/
 	snd_m3_outw(chip, 0, 0x54);
@@ -2482,41 +2478,8 @@ static void m3_resume(m3_t *chip)
 	snd_m3_amp_enable(chip, 1);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_m3_suspend(struct pci_dev *pci, u32 state)
-{
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return -ENXIO);
-	m3_suspend(chip);
 	return 0;
 }
-static int snd_m3_resume(struct pci_dev *pci)
-{
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return -ENXIO);
-	m3_resume(chip);
-	return 0;
-}
-
-/* callback */
-static int snd_m3_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	m3_t *chip = snd_magic_cast(m3_t, card->power_state_private_data, return -ENXIO);
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		m3_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		m3_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 
@@ -2652,11 +2615,9 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 #ifdef CONFIG_PM
 	chip->suspend_mem = vmalloc(sizeof(u16) * (REV_B_CODE_MEMORY_LENGTH + REV_B_DATA_MEMORY_LENGTH));
 	if (chip->suspend_mem == NULL)
-		snd_printk("can't allocate apm buffer\n");
-	else {
-		card->set_power_state = snd_m3_set_power_state;
-		card->power_state_private_data = chip;
-	}
+		snd_printk(KERN_WARNING "can't allocate apm buffer\n");
+	else
+		snd_card_set_pm_callback(card, m3_suspend, m3_resume, chip);
 #endif
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
@@ -2739,16 +2700,14 @@ snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		printk(KERN_WARNING "maestro3: no midi support.\n");
 #endif
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_m3_remove(struct pci_dev *pci)
 {
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -2757,10 +2716,7 @@ static struct pci_driver driver = {
 	.id_table = snd_m3_ids,
 	.probe = snd_m3_probe,
 	.remove = __devexit_p(snd_m3_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_m3_suspend,
-	.resume = snd_m3_resume,
-#endif
+	SND_PCI_PM_CALLBACKS
 };
 	
 static int __init alsa_card_m3_init(void)

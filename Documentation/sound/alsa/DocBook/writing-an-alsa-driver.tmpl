@@ -511,7 +511,7 @@
           }
 
           // (7)
-          pci_set_drvdata(pci, chip);
+          pci_set_drvdata(pci, card);
           dev++;
           return 0;
   }
@@ -519,10 +519,7 @@
   // destructor -- see "Destructor" sub-section
   static void __devexit snd_mychip_remove(struct pci_dev *pci)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                                     pci_get_drvdata(pci), return);
-          if (chip)
-                  snd_card_free(chip->card);
+          snd_card_free(pci_get_drvdata(pci));
           pci_set_drvdata(pci, NULL);
   }
 ]]>
@@ -691,21 +688,16 @@
           <informalexample>
             <programlisting>
 <![CDATA[
-        pci_set_drvdata(pci, chip);
+        pci_set_drvdata(pci, card);
         dev++;
         return 0;
 ]]>
             </programlisting>
           </informalexample>
 
-          In the above, the chip record is stored. This pointer is
+          In the above, the card record is stored. This pointer is
         referred in the remove callback and power-management
         callbacks, too. 
-	If the card doesn't support the suspend/resume, you can store
-        the card pointer instead of the chip pointer, so that
-        <function>snd_card_free</function> can be called directly
-        without cast in the remove callback.  But anyway, be sure
-        which pointer is used.
         </para>
       </section>
     </section>
@@ -726,21 +718,15 @@
 <![CDATA[
   static void __devexit snd_mychip_remove(struct pci_dev *pci)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                                    pci_get_drvdata(pci), return);
-          if (chip)
-                  snd_card_free(chip->card);
+          snd_card_free(pci_get_drvdata(pci));
           pci_set_drvdata(pci, NULL);
   }
 ]]>
           </programlisting>
         </informalexample>
 
-        The above code assumes that the chip is allocated
-	with snd_magic stuff and
-      has the field to hold the card pointer (see <link
-      linkend="card-management"><citetitle>the next
-      section</citetitle></link>). 
+        The above code assumes that the card pointer is set to the PCI
+	driver data.
       </para>
     </section>
 
@@ -5254,46 +5240,22 @@ struct _snd_pcm_runtime {
     </para>
 
     <para>
-      Basic jobs of suspend/resume are done in
-      <structfield>suspend</structfield> and
-      <structfield>resume</structfield> callbacks of
-      <structname>pci_driver</structname> struct. Unfortunately, the
-      API of these callbacks was changed at the middle time of Linux
-      2.4.x, if you want to keep the support for older kernels, you
-      have to write two different callbacks. The example below is the
-      skeleton callbacks which just call the real suspend and resume
-      functions. 
+      ALSA provides the common power-management layer. Each card driver
+      needs to have only low-level suspend and resume callbacks.
 
       <informalexample>
         <programlisting>
 <![CDATA[
-  #ifndef PCI_OLD_SUSPEND
-  static int snd_my_suspend(struct pci_dev *dev, u32 state)
+  #ifdef CONFIG_PM
+  static int snd_my_suspend(snd_card_t *card, unsigned int state)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                             pci_get_drvdata(dev), return -ENXIO);
-          mychip_suspend(chip);
+          .... // do things for suspsend
           return 0;
   }
-  static int snd_my_resume(struct pci_dev *dev)
+  static int snd_my_resume(snd_card_t *card, unsigned int state)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                             pci_get_drvdata(dev), return -ENXIO);
-          mychip_resume(chip);
+          .... // do things for suspsend
           return 0;
-  }
-  #else
-  static void snd_my_suspend(struct pci_dev *dev)
-  {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                             pci_get_drvdata(dev), return);
-          mychip_suspend(chip);
-  }
-  static void snd_mychip_resume(struct pci_dev *dev)
-  {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                             pci_get_drvdata(dev), return);
-          mychip_resume(chip);
   }
   #endif
 ]]>
@@ -5302,17 +5264,10 @@ struct _snd_pcm_runtime {
     </para>
 
     <para>
-      For keeping the readability of 2.6 source code, it's recommended to
-      separate the above ifdef condition as the patch file in alsa-driver
-      directory.
-      See <filename>alsa-driver/pci/ali5451.c</filename> for example.
-   </para>
-
-    <para>
       The scheme of the real suspend job is as following.
 
       <orderedlist>
-        <listitem><para>Check whether the power-state is already D3hot. If yes, skip the job.</para></listitem>
+        <listitem><para>Retrieve the chip data from pm_private_data field.</para></listitem>
         <listitem><para>Call <function>snd_pcm_suspend_all()</function> to suspend the running PCM streams.</para></listitem>
         <listitem><para>Save the register values if necessary.</para></listitem>
         <listitem><para>Stop the hardware if necessary.</para></listitem>
@@ -5326,12 +5281,11 @@ struct _snd_pcm_runtime {
       <informalexample>
         <programlisting>
 <![CDATA[
-  static void mychip_suspend(mychip_t *chip)
+  static int mychip_suspend(snd_card_t *card, unsigned int state)
   {
-          snd_card_t *card = chip->card;
           // (1)
-          if (card->power_state == SNDRV_CTL_POWER_D3hot)
-                  return;
+          mychip_t *chip = snd_magic_cast(mychip_t, card->pm_private_data,
+                                          return -ENXIO);
           // (2)
           snd_pcm_suspend_all(chip->pcm);
           // (3)
@@ -5340,6 +5294,7 @@ struct _snd_pcm_runtime {
           snd_mychip_stop_hardware(chip);
           // (5)
           snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+          return 0;
   }
 ]]>
         </programlisting>
@@ -5350,8 +5305,7 @@ struct _snd_pcm_runtime {
     The scheme of the real resume job is as following.
 
     <orderedlist>
-    <listitem><para>Check whether the power-state is already D0.
-    If yes, skip the job.</para></listitem>
+    <listitem><para>Retrieve the chip data from pm_private_data field.</para></listitem>
     <listitem><para>Enable the pci device again by calling
     <function>pci_enable_device()</function>.</para></listitem>
     <listitem><para>Re-initialize the chip.</para></listitem>
@@ -5372,10 +5326,9 @@ struct _snd_pcm_runtime {
 <![CDATA[
   static void mychip_resume(mychip_t *chip)
   {
-          snd_card_t *card = chip->card;
           // (1)
-          if (card->power_state == SNDRV_CTL_POWER_D0)
-                  return;
+          mychip_t *chip = snd_magic_cast(mychip_t, card->pm_private_data,
+                                          return -ENXIO);
           // (2)
           pci_enable_device(chip->pci);
           // (3)
@@ -5388,38 +5341,6 @@ struct _snd_pcm_runtime {
           snd_mychip_restart_chip(chip);
           // (7)
           snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-  }
-]]>
-        </programlisting>
-      </informalexample>
-    </para>
-
-    <para>
-      In addition to the callbacks above, you should define a callback
-      for the changes via the ALSA control interface. It's defined
-      like below: 
-
-      <informalexample>
-        <programlisting>
-<![CDATA[
-  static int snd_mychip_set_power_state(snd_card_t *card,
-                                        unsigned int power_state)
-  {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                   card->power_state_private_data, return -ENXIO);
-          switch (power_state) {
-          case SNDRV_CTL_POWER_D0:
-          case SNDRV_CTL_POWER_D1:
-          case SNDRV_CTL_POWER_D2:
-                  mychip_resume(chip);
-                  break;
-          case SNDRV_CTL_POWER_D3hot:
-          case SNDRV_CTL_POWER_D3cold:
-                  mychip_suspend(chip);
-                  break;
-          default:
-                  return -EINVAL;
-          }
           return 0;
   }
 ]]>
@@ -5439,41 +5360,42 @@ struct _snd_pcm_runtime {
   {
           ....
           snd_card_t *card;
+          mychip_t *chip;
           ....
-  #ifdef CONFIG_PM
-          card->set_power_state = snd_mychip_set_power_state;
-          card->power_state_private_data = chip;
-  #endif
+          snd_card_set_pm_callback(card, snd_my_suspend, snd_my_resume, chip);
           ....
   }
 ]]>
         </programlisting>
       </informalexample>
+
+    Here you don't have to put ifdef CONFIG_PM around, since it's already
+    checked in the header and expanded to empty if not needed.
     </para>
 
     <para>
       If you need a space for saving the registers, you'll need to
-    allocate the buffer for it here, too, since you cannot call
-    <function>kmalloc()</function> with
-    <constant>GFP_KERNEL</constant> flag or
-    <function>vmalloc()</function> in the suspend callback.
+    allocate the buffer for it here, too, since it would be fatal
+    if you cannot allocate a memory in the suspend phase.
     The allocated buffer should be released in the corresponding
     destructor.
     </para>
 
     <para>
       And next, set suspend/resume callbacks to the pci_driver,
+      This can be done by passing a macro SND_PCI_PM_CALLBACKS
+      in the pci_driver struct.  This macro is expanded to the correct
+      (global) callbacks if CONFIG_PM is set.
 
       <informalexample>
         <programlisting>
 <![CDATA[
   static struct pci_driver driver = {
           .name = "My Chip",
-          ....
-  #ifdef CONFIG_PM
-          .suspend = snd_mychip_suspend,
-          .resume = snd_mychip_resume,
-  #endif
+          .id_table = snd_my_ids,
+          .probe = snd_my_probe,
+          .remove = __devexit_p(snd_my_remove),
+          SND_PCI_PM_CALLBACKS
   };
 ]]>
         </programlisting>

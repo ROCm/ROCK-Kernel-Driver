@@ -170,43 +170,23 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	pci_set_drvdata(pci, trident);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_trident_remove(struct pci_dev *pci)
 {
-	trident_t *trident = snd_magic_cast(trident_t, pci_get_drvdata(pci), return);
-	if (trident)
-		snd_card_free(trident->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
-
-#ifdef CONFIG_PM
-static int snd_card_trident_suspend(struct pci_dev *pci, u32 state)
-{
-	trident_t *chip = snd_magic_cast(trident_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_trident_suspend(chip);
-	return 0;
-}
-static int snd_card_trident_resume(struct pci_dev *pci)
-{
-	trident_t *chip = snd_magic_cast(trident_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_trident_resume(chip);
-	return 0;
-}
-#endif
 
 static struct pci_driver driver = {
 	.name = "Trident4DWaveAudio",
 	.id_table = snd_trident_ids,
 	.probe = snd_trident_probe,
 	.remove = __devexit_p(snd_trident_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_card_trident_suspend,
-	.resume = snd_card_trident_resume,
-#endif
+	SND_PCI_PM_CALLBACKS
 };
 
 static int __init alsa_card_trident_init(void)

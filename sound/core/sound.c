@@ -466,6 +466,14 @@ EXPORT_SYMBOL(snd_card_file_add);
 EXPORT_SYMBOL(snd_card_file_remove);
 #ifdef CONFIG_PM
 EXPORT_SYMBOL(snd_power_wait);
+EXPORT_SYMBOL(snd_card_set_pm_callback);
+#ifdef CONFIG_PCI
+EXPORT_SYMBOL(snd_card_pci_suspend);
+EXPORT_SYMBOL(snd_card_pci_resume);
+#endif
+#ifdef CONFIG_ISA
+EXPORT_SYMBOL(snd_card_set_isa_pm_callback);
+#endif
 #endif
   /* device.c */
 EXPORT_SYMBOL(snd_device_new);
