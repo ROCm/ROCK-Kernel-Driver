@@ -124,10 +124,10 @@ DRIVERS-y += drivers/base/base.o \
 	drivers/misc/misc.o \
 	drivers/net/net.o \
 	drivers/media/media.o
-DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
+DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/built-in.o
 DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
 DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
-DRIVERS-$(CONFIG_FC4) += drivers/fc4/fc4.a
+DRIVERS-$(CONFIG_FC4) += drivers/fc4/built-in.o
 DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
 DRIVERS-$(CONFIG_FUSION) += drivers/message/message.o
 DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o
@@ -139,16 +139,16 @@ endif
 DRIVERS-$(CONFIG_SOUND) += sound/sound.o
 DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
 DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
-DRIVERS-$(CONFIG_DIO) += drivers/dio/dio.a
+DRIVERS-$(CONFIG_DIO) += drivers/dio/built-in.o
 DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o
 DRIVERS-$(CONFIG_ZORRO) += drivers/zorro/driver.o
 DRIVERS-$(CONFIG_ALL_PPC) += drivers/macintosh/macintosh.o
 DRIVERS-$(CONFIG_MAC) += drivers/macintosh/macintosh.o
 DRIVERS-$(CONFIG_PNP) += drivers/pnp/pnp.o
-DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/sgi.a
+DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/built-in.o
 DRIVERS-$(CONFIG_VT) += drivers/video/video.o
-DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/paride.a
-DRIVERS-$(CONFIG_TC) += drivers/tc/tc.a
+DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/built-in.o
+DRIVERS-$(CONFIG_TC) += drivers/tc/built-in.o
 DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
 DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
 DRIVERS-$(CONFIG_GAMEPORT) += drivers/input/gameport/gamedrv.o
