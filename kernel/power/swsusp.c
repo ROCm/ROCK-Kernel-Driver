@@ -34,38 +34,21 @@
  * For TODOs,FIXMEs also look in Documentation/swsusp.txt
  */
 
-#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/suspend.h>
-#include <linux/smp_lock.h>
-#include <linux/file.h>
-#include <linux/utsname.h>
 #include <linux/version.h>
-#include <linux/delay.h>
 #include <linux/reboot.h>
-#include <linux/bitops.h>
-#include <linux/vt_kern.h>
-#include <linux/kbd_kern.h>
-#include <linux/keyboard.h>
-#include <linux/spinlock.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/swap.h>
-#include <linux/pm.h>
 #include <linux/device.h>
 #include <linux/buffer_head.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
 
-#include <asm/uaccess.h>
 #include <asm/mmu_context.h>
-#include <asm/pgtable.h>
-#include <asm/io.h>
 
 #include "power.h"
 
-unsigned char software_suspend_enabled = 1;
+
+extern int swsusp_arch_suspend(int resume);
 
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
 #define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)
@@ -75,9 +58,6 @@ unsigned char software_suspend_enabled = 1;
 extern char __nosave_begin, __nosave_end;
 
 extern int is_head_of_free_region(struct page *);
-
-/* Locks */
-spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
 
 /* Variables to be preserved over suspend */
 static int pagedir_order_check;
@@ -488,21 +468,30 @@ static int suspend_prepare_image(void)
 	return 0;
 }
 
+
+/**
+ *	suspend_save_image - Prepare and write saved image to swap.
+ *
+ *	IRQs are re-enabled here so we can resume devices and safely write 
+ *	to the swap devices. We disable them again before we leave.
+ *
+ *	The second lock_swapdevices() will unlock ignored swap devices since
+ *	writing is finished.
+ *	It is important _NOT_ to umount filesystems at this point. We want
+ *	them synced (in case something goes wrong) but we DO not want to mark
+ *	filesystem clean: it is not. (And it does not matter, if we resume
+ *	correctly, we'll mark system clean, anyway.)
+ */
+
 static int suspend_save_image(void)
 {
 	int error;
-
+	local_irq_enable();
 	device_resume();
-
 	lock_swapdevices();
 	error = write_suspend_image();
-	lock_swapdevices();	/* This will unlock ignored swap devices since writing is finished */
-
-	/* It is important _NOT_ to umount filesystems at this point. We want
-	 * them synced (in case something goes wrong) but we DO not want to mark
-	 * filesystem clean: it is not. (And it does not matter, if we resume
-	 * correctly, we'll mark system clean, anyway.)
-	 */
+	lock_swapdevices();
+	local_irq_disable();
 	return error;
 }
 
@@ -510,66 +499,49 @@ static int suspend_save_image(void)
  * Magic happens here
  */
 
-void do_magic_resume_1(void)
-{
-	barrier();
-	mb();
-	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
-	PRINTK( "Waiting for DMAs to settle down...\n");
-	/* We do not want some readahead with DMA to corrupt our memory, right?
-	   Do it with disabled interrupts for best effect. That way, if some
-	   driver scheduled DMA, we have good chance for DMA to finish ;-). */
-	mdelay(1000);
-}
-
-void do_magic_resume_2(void)
+int swsusp_resume(void)
 {
 	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
 	
 	/* Even mappings of "global" things (vmalloc) need to be fixed */
 	__flush_tlb_global();
-	spin_unlock_irq(&suspend_pagedir_lock);
+	return 0;
 }
 
-/* do_magic() is implemented in arch/?/kernel/suspend_asm.S, and basically does:
+/* swsusp_arch_suspend() is implemented in arch/?/power/swsusp.S, 
+   and basically does:
 
 	if (!resume) {
-		do_magic_suspend_1();
 		save_processor_state();
 		SAVE_REGISTERS
-		do_magic_suspend_2();
+		swsusp_suspend();
 		return;
 	}
 	GO_TO_SWAPPER_PAGE_TABLES
-	do_magic_resume_1();
 	COPY_PAGES_BACK
 	RESTORE_REGISTERS
 	restore_processor_state();
-	do_magic_resume_2();
+	swsusp_resume();
 
  */
 
-void do_magic_suspend_1(void)
-{
-	mb();
-	barrier();
-	spin_lock_irq(&suspend_pagedir_lock);
-}
 
-int do_magic_suspend_2(void)
+int swsusp_suspend(void)
 {
-	int is_problem;
+	int error;
 	read_swapfiles();
-	is_problem = suspend_prepare_image();
-	spin_unlock_irq(&suspend_pagedir_lock);
-	if (!is_problem)
-		return suspend_save_image();
-	printk(KERN_EMERG "%sSuspend failed, trying to recover...\n", name_suspend);
-	barrier();
-	mb();
-	mdelay(1000);
-	return -EFAULT;
+	error = suspend_prepare_image();
+	if (!error)
+		error = suspend_save_image();
+	if (error) {
+		printk(KERN_EMERG "%sSuspend failed, trying to recover...\n", 
+		       name_suspend);
+		barrier();
+		mb();
+		mdelay(1000);
+	}
+	return error;
 }
 
 /* More restore stuff */
@@ -806,24 +778,23 @@ int swsusp_save(void)
 	printk("swsusp is not supported with high- or discontig-mem.\n");
 	return -EPERM;
 #endif
-	return 0;
+	return arch_prepare_suspend();
 }
 
 
 /**
  *	swsusp_write - Write saved memory image to swap.
  *
- *	do_magic(0) returns after system is resumed.
+ *	swsusp_arch_suspend(0) returns after system is resumed.
  *
- *	do_magic() copies all "used" memory to "free" memory, then
- *	unsuspends all device drivers, and writes memory to disk
+ *	swsusp_arch_suspend() copies all "used" memory to "free" memory, 
+ *	then unsuspends all device drivers, and writes memory to disk
  *	using normal kernel mechanism.
  */
 
 int swsusp_write(void)
 {
-	arch_prepare_suspend();
-	return do_magic(0);
+	return swsusp_arch_suspend(0);
 }
 
 
@@ -873,7 +844,7 @@ int __init swsusp_read(void)
 
 int __init swsusp_restore(void)
 {
-	return do_magic(1);
+	return swsusp_arch_suspend(1);
 }
 
 
