@@ -966,6 +966,7 @@ static struct audioformat *find_format(snd_usb_substream_t *subs, unsigned int f
 {
 	struct list_head *p;
 	struct audioformat *found = NULL;
+	int cur_attr = 0, attr;
 
 	list_for_each(p, &subs->fmt_list) {
 		struct audioformat *fp;
@@ -982,9 +983,37 @@ static struct audioformat *find_format(snd_usb_substream_t *subs, unsigned int f
 			if (i >= fp->nr_rates)
 				continue;
 		}
-		/* find the format with the largest max. packet size */
-		if (! found || fp->maxpacksize > found->maxpacksize)
+		attr = fp->ep_attr & EP_ATTR_MASK;
+		if (! found) {
 			found = fp;
+			cur_attr = attr;
+			continue;
+		}
+		/* avoid async out and adaptive in if the other method
+		 * supports the same format.
+		 * this is a workaround for the case like
+		 * M-audio audiophile USB.
+		 */
+		if (attr != cur_attr) {
+			if ((attr == EP_ATTR_ASYNC &&
+			     subs->direction == SNDRV_PCM_STREAM_PLAYBACK) ||
+			    (attr == EP_ATTR_ADAPTIVE &&
+			     subs->direction == SNDRV_PCM_STREAM_CAPTURE))
+				continue;
+			if ((cur_attr == EP_ATTR_ASYNC &&
+			     subs->direction == SNDRV_PCM_STREAM_PLAYBACK) ||
+			    (cur_attr == EP_ATTR_ADAPTIVE &&
+			     subs->direction == SNDRV_PCM_STREAM_CAPTURE)) {
+				found = fp;
+				cur_attr = attr;
+				continue;
+			}
+		}
+		/* find the format with the largest max. packet size */
+		if (fp->maxpacksize > found->maxpacksize) {
+			found = fp;
+			cur_attr = attr;
+		}
 	}
 	return found;
 }
@@ -1441,7 +1470,7 @@ static int hw_rule_format(snd_pcm_hw_params_t *params,
 		fp = list_entry(p, struct audioformat, list);
 		if (! hw_check_valid_format(params, fp))
 			continue;
-		fbits |= (1UL << fp->format);
+		fbits |= (1ULL << fp->format);
 	}
 
 	oldbits[0] = fmt->bits[0];
@@ -1466,6 +1495,7 @@ static int check_hw_params_convention(snd_usb_substream_t *subs)
 	u32 channels[64];
 	u32 rates[64];
 	u32 cmaster, rmaster;
+	u32 rate_min = 0, rate_max = 0;
 	struct list_head *p;
 
 	memset(channels, 0, sizeof(channels));
@@ -1477,6 +1507,15 @@ static int check_hw_params_convention(snd_usb_substream_t *subs)
 		/* unconventional channels? */
 		if (f->channels > 32)
 			return 1;
+		/* continuous rate min/max matches? */
+		if (f->rates & SNDRV_PCM_RATE_CONTINUOUS) {
+			if (rate_min && f->rate_min != rate_min)
+				return 1;
+			if (rate_max && f->rate_max != rate_max)
+				return 1;
+			rate_min = f->rate_min;
+			rate_max = f->rate_max;
+		}
 		/* combination of continuous rates and fixed rates? */
 		if (rates[f->format] & SNDRV_PCM_RATE_CONTINUOUS) {
 			if (f->rates != rates[f->format])
@@ -2020,10 +2059,20 @@ static int parse_audio_format_i_type(struct usb_device *dev, struct audioformat 
 			pcm_format = SNDRV_PCM_FORMAT_S8;
 			break;
 		case 2:
-			pcm_format = SNDRV_PCM_FORMAT_S16_LE;
+			/* M-Audio audiophile USB workaround */
+			if (dev->descriptor.idVendor == 0x0763 &&
+			    dev->descriptor.idProduct == 0x2003)
+				pcm_format = SNDRV_PCM_FORMAT_S16_BE; /* grrr, big endian!! */
+			else
+				pcm_format = SNDRV_PCM_FORMAT_S16_LE;
 			break;
 		case 3:
-			pcm_format = SNDRV_PCM_FORMAT_S24_3LE;
+			/* M-Audio audiophile USB workaround */
+			if (dev->descriptor.idVendor == 0x0763 &&
+			    dev->descriptor.idProduct == 0x2003)
+				pcm_format = SNDRV_PCM_FORMAT_S24_3BE; /* grrr, big endian!! */
+			else
+				pcm_format = SNDRV_PCM_FORMAT_S24_3LE;
 			break;
 		case 4:
 			pcm_format = SNDRV_PCM_FORMAT_S32_LE;
