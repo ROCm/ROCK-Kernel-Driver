@@ -478,6 +478,8 @@ nfsd4_remove(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_rem
 	int status;
 
 	status = nfsd_unlink(rqstp, current_fh, 0, remove->rm_name, remove->rm_namelen);
+	if (status == nfserr_symlink)
+		return nfserr_notdir;
 	if (!status) {
 		fh_unlock(current_fh);
 		set_change_info(&remove->rm_cinfo, current_fh);
