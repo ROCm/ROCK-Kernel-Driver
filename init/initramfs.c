@@ -514,7 +514,7 @@ void __init populate_rootfs(void)
 			
 			if (!memcmp(data, start_signature, 
 				sizeof(start_signature)-1)) {
-				printk(KERN_INFO " found (at offset %u in initrd)!\n", 
+				printk(" found (at offset %u in initrd)!\n", 
 					data+sizeof(start_signature)-
 					(unsigned char*)initrd_start);
 				dsdt_start_tmp = data+sizeof(start_signature);
@@ -540,7 +540,7 @@ void __init populate_rootfs(void)
 			printk(KERN_INFO "%d bytes allocated and copied for DSDT", data-dsdt_start_tmp);
 		}
 		else{
-			printk(KERN_INFO "No customized DSDT found in initrd!\n");
+			printk("No customized DSDT found in initrd!\n");
 		}
 #endif 
 		
