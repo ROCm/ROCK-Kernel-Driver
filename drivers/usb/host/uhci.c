@@ -1631,8 +1631,7 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 
 	if (urb->status != -EINPROGRESS) {
 		info("uhci_transfer_result: called for URB %p not in flight?", urb);
-		spin_unlock_irqrestore(&urb->lock, flags);
-		return;
+		goto out;
 	}
 
 	switch (usb_pipetype(urb->pipe)) {
@@ -1652,10 +1651,8 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 
 	urbp->status = ret;
 
-	if (ret == -EINPROGRESS) {
-		spin_unlock_irqrestore(&urb->lock, flags);
-		return;
-	}
+	if (ret == -EINPROGRESS)
+		goto out;
 
 	switch (usb_pipetype(urb->pipe)) {
 	case PIPE_CONTROL:
@@ -1669,11 +1666,8 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 		break;
 	case PIPE_INTERRUPT:
 		/* Interrupts are an exception */
-		if (urb->interval) {
-			uhci_add_complete(urb);
-			spin_unlock_irqrestore(&urb->lock, flags);
-			return;		/* <-- note return */
-		}
+		if (urb->interval)
+			goto out_complete;
 
 		/* Release bandwidth for Interrupt or Isoc. transfers */
 		/* Spinlock needed ? */
@@ -1689,8 +1683,10 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 	/* Remove it from uhci->urb_list */
 	list_del_init(&urb->urb_list);
 
+out_complete:
 	uhci_add_complete(urb);
 
+out:
 	spin_unlock_irqrestore(&urb->lock, flags);
 }
 
@@ -2724,6 +2720,7 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 	}
 
 	uhci->dev = dev;
+	uhci->irq = dev->irq;
 	uhci->io_addr = io_addr;
 	uhci->io_size = io_size;
 	pci_set_drvdata(dev, uhci);
@@ -2931,8 +2928,6 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 
 	if (request_irq(dev->irq, uhci_interrupt, SA_SHIRQ, "usb-uhci", uhci))
 		goto err_request_irq;
-
-	uhci->irq = dev->irq;
 
 	/* disable legacy emulation */
 	pci_write_config_word(uhci->dev, USBLEGSUP, USBLEGSUP_DEFAULT);
