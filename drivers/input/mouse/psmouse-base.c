@@ -17,6 +17,8 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
+#include "psmouse.h"
+#include "synaptics.h"
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
@@ -25,48 +27,7 @@ MODULE_LICENSE("GPL");
 
 static int psmouse_noext;
 
-#define PSMOUSE_CMD_SETSCALE11	0x00e6
-#define PSMOUSE_CMD_SETRES	0x10e8
-#define PSMOUSE_CMD_GETINFO	0x03e9
-#define PSMOUSE_CMD_SETSTREAM	0x00ea
-#define PSMOUSE_CMD_POLL	0x03eb	
-#define PSMOUSE_CMD_GETID	0x02f2
-#define PSMOUSE_CMD_SETRATE	0x10f3
-#define PSMOUSE_CMD_ENABLE	0x00f4
-#define PSMOUSE_CMD_RESET_DIS	0x00f6
-#define PSMOUSE_CMD_RESET_BAT	0x02ff
-
-#define PSMOUSE_RET_BAT		0xaa
-#define PSMOUSE_RET_ACK		0xfa
-#define PSMOUSE_RET_NAK		0xfe
-
-struct psmouse {
-	struct input_dev dev;
-	struct serio *serio;
-	char *vendor;
-	char *name;
-	unsigned char cmdbuf[8];
-	unsigned char packet[8];
-	unsigned char cmdcnt;
-	unsigned char pktcnt;
-	unsigned char type;
-	unsigned char model;
-	unsigned long last;
-	char acking;
-	volatile char ack;
-	char error;
-	char devname[64];
-	char phys[32];
-};
-
-#define PSMOUSE_PS2	1
-#define PSMOUSE_PS2PP	2
-#define PSMOUSE_PS2TPP	3
-#define PSMOUSE_GENPS	4
-#define PSMOUSE_IMPS	5
-#define PSMOUSE_IMEX	6
-
-static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2" };
+static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "Synaptics"};
 
 /*
  * psmouse_process_packet() anlyzes the PS/2 mouse packet contents and
@@ -209,6 +170,16 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		goto out;
 	}
 
+	if (psmouse->pktcnt == 1 && psmouse->type == PSMOUSE_SYNAPTICS) {
+		/*
+		 * The synaptics driver has its own resync logic,
+		 * so it needs to receive all bytes one at a time.
+		 */
+		synaptics_process_byte(psmouse, regs);
+		psmouse->pktcnt = 0;
+		goto out;
+	}
+
 	if (psmouse->pktcnt == 1 && psmouse->packet[0] == PSMOUSE_RET_BAT) {
 		serio_rescan(serio);
 		goto out;
@@ -244,7 +215,7 @@ static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
  * then waits for the response and puts it in the param array.
  */
 
-static int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
+int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 {
 	int timeout = 500000; /* 500 msec */
 	int send = (command >> 12) & 0xf;
@@ -343,12 +314,12 @@ static int psmouse_extensions(struct psmouse *psmouse)
        psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
 
        if (param[1] == 0x47) {
-               /* We could do more here. But it's sufficient just
-                  to stop the subsequent probes from screwing the
-                  thing up. */
-               psmouse->vendor = "Synaptics";
-               psmouse->name = "TouchPad";
-               return PSMOUSE_PS2;
+		psmouse->vendor = "Synaptics";
+		psmouse->name = "TouchPad";
+		if (!synaptics_init(psmouse))
+			return PSMOUSE_SYNAPTICS;
+		else
+			return PSMOUSE_PS2;
        }
 
 /*
@@ -598,6 +569,7 @@ static void psmouse_disconnect(struct serio *serio)
 	struct psmouse *psmouse = serio->private;
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
+	synaptics_disconnect(psmouse);
 	kfree(psmouse);
 }
 
