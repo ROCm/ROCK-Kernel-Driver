@@ -3518,6 +3518,13 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 		xaddr = addressXAD(xad);
 
 		/*
+		 * The "data" for a directory is indexed by the block
+		 * device's address space.  This metadata must be invalidated
+		 * here
+		 */
+		if (S_ISDIR(ip->i_mode) && (teof == 0))
+			invalidate_xad_metapages(ip, *xad);
+		/*
 		 * entry beyond eof: continue scan of current page
 		 *          xad
 		 * ---|---=======------->
