@@ -2538,7 +2538,6 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	chip->type = chip_type;
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->substream_lock);
-	spin_lock_init(&chip->bob_lock);
 	INIT_LIST_HEAD(&chip->buf_list);
 	INIT_LIST_HEAD(&chip->substream_list);
 	init_MUTEX(&chip->memory_mutex);
