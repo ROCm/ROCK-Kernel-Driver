@@ -460,7 +460,7 @@ nfsd3_proc_readdir(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 	fh_copy(&resp->fh, &argp->fh);
 	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t) argp->cookie, 
 					nfs3svc_encode_entry,
-					buffer, &count, argp->verf);
+					buffer, &count, argp->verf, NULL);
 	memcpy(resp->verf, argp->verf, 8);
 	resp->count = count;
 
@@ -495,7 +495,7 @@ nfsd3_proc_readdirplus(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 	fh_copy(&resp->fh, &argp->fh);
 	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t) argp->cookie, 
 					nfs3svc_encode_entry_plus,
-					buffer, &count, argp->verf);
+					buffer, &count, argp->verf, NULL);
 	memcpy(resp->verf, argp->verf, 8);
 	resp->count = count;
 

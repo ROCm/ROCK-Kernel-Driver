@@ -1381,7 +1381,7 @@ out_nfserr:
  */
 int
 nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset, 
-             encode_dent_fn func, u32 *buffer, int *countp, u32 *verf)
+             encode_dent_fn func, u32 *buffer, int *countp, u32 *verf, u32 *bmval)
 {
 	u32		*p;
 	int		oldlen, eof, err;
@@ -1402,6 +1402,10 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	cd.buffer = buffer;
 	cd.buflen = *countp; /* count of words */
 	cd.dirfh  = fhp;
+	if (bmval) {
+		cd.bmval[0] = bmval[0];
+		cd.bmval[1] = bmval[1];
+	}
 
 	/*
 	 * Read the directory entries. This silly loop is necessary because
@@ -1417,7 +1421,14 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		if (err < 0)
 			goto out_nfserr;
 
+		err = cd.nfserr;
+		if (err)
+			goto out_close;
 	} while (oldlen != cd.buflen && !cd.eob);
+
+	err = nfserr_readdir_nospc;
+	if (rqstp->rq_vers == 4 && cd.eob && cd.buffer == buffer)
+		goto out_close;
 
 	/* If we didn't fill the buffer completely, we're at EOF */
 	eof = !cd.eob;

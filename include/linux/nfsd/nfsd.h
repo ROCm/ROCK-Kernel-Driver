@@ -55,6 +55,8 @@ struct readdir_cd {
 	char			plus;		/* readdirplus */
 	char			eob;		/* end of buffer */
 	char			dotonly;
+	int			nfserr;		/* v4 only */
+	u32			bmval[2];	/* v4 only */
 };
 typedef int		(*encode_dent_fn)(struct readdir_cd *, const char *,
 						int, loff_t, ino_t, unsigned int);
@@ -119,7 +121,8 @@ int		nfsd_truncate(struct svc_rqst *, struct svc_fh *,
 				unsigned long size);
 int		nfsd_readdir(struct svc_rqst *, struct svc_fh *,
 				loff_t, encode_dent_fn,
-				u32 *buffer, int *countp, u32 *verf);
+				u32 *buffer, int *countp, u32 *verf,
+				u32 *bmval);
 int		nfsd_statfs(struct svc_rqst *, struct svc_fh *,
 				struct statfs *);
 
