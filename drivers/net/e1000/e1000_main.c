@@ -66,31 +66,13 @@ char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
  *
- * Private driver_data field (last one) stores an index into e1000_strings
  * Wildcard entries (PCI_ANY_ID) should come last
  * Last entry must be all 0s
  *
  * { Vendor ID, Device ID, SubVendor ID, SubDevice ID,
- *   Class, Class Mask, String Index }
+ *   Class, Class Mask, private data (not used) }
  */
 static struct pci_device_id e1000_pci_tbl[] __devinitdata = {
-	/* Intel(R) PRO/1000 Network Connection */
-	{0x8086, 0x1000, 0x8086, 0x1000, 0, 0, 0},
-	{0x8086, 0x1001, 0x8086, 0x1003, 0, 0, 0},
-	{0x8086, 0x1004, 0x8086, 0x1004, 0, 0, 0},
-	{0x8086, 0x1008, 0x8086, 0x1107, 0, 0, 0},
-	{0x8086, 0x1009, 0x8086, 0x1109, 0, 0, 0},
-	{0x8086, 0x100C, 0x8086, 0x1112, 0, 0, 0},
-	{0x8086, 0x100E, 0x8086, 0x001E, 0, 0, 0},
-	/* Compaq Gigabit Ethernet Server Adapter */
-	{0x8086, 0x1000, 0x0E11, PCI_ANY_ID, 0, 0, 1},
-	{0x8086, 0x1001, 0x0E11, PCI_ANY_ID, 0, 0, 1},
-	{0x8086, 0x1004, 0x0E11, PCI_ANY_ID, 0, 0, 1},
-	/* IBM Mobile, Desktop & Server Adapters */
-	{0x8086, 0x1000, 0x1014, PCI_ANY_ID, 0, 0, 2},
-	{0x8086, 0x1001, 0x1014, PCI_ANY_ID, 0, 0, 2},
-	{0x8086, 0x1004, 0x1014, PCI_ANY_ID, 0, 0, 2},
-	/* Generic */
 	{0x8086, 0x1000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
@@ -113,12 +95,6 @@ static struct pci_device_id e1000_pci_tbl[] __devinitdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, e1000_pci_tbl);
-
-static char *e1000_strings[] = {
-	"Intel(R) PRO/1000 Network Connection",
-	"HP Gigabit Ethernet Server Adapter",
-	"IBM Mobile, Desktop & Server Adapters"
-};
 
 /* Local Function Prototypes */
 
@@ -439,7 +415,6 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->base_addr = adapter->hw.io_base;
 
 	adapter->bd_number = cards_found;
-	adapter->id_string = e1000_strings[ent->driver_data];
 
 	/* setup the private structure */
 
@@ -500,15 +475,14 @@ e1000_probe(struct pci_dev *pdev,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
 	register_netdev(netdev);
-	memcpy(adapter->ifname, netdev->name, IFNAMSIZ);
-	adapter->ifname[IFNAMSIZ-1] = 0;
 
 	/* we're going to reset, so assume we have no link for now */
 
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
-	printk(KERN_INFO "%s: %s\n", netdev->name, adapter->id_string);
+	printk(KERN_INFO "%s: Intel(R) PRO/1000 Network Connection\n",
+	       netdev->name);
 	e1000_check_options(adapter);
 
 	/* Initial Wake on LAN setting
