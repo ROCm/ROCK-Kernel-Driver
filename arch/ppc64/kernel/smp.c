@@ -466,7 +466,7 @@ static struct call_data_struct {
  * remote CPUs are nearly ready to execute <<func>> or are or have executed.
  *
  * You must not call this function with disabled interrupts or from a
- * hardware interrupt handler, you may call it from a bottom half handler.
+ * hardware interrupt handler or from a bottom half handler.
  */
 int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 			int wait)
@@ -486,7 +486,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	if (wait)
 		atomic_set(&data.finished, 0);
 
-	spin_lock_bh(&call_lock);
+	spin_lock(&call_lock);
 	call_data = &data;
 	/* Send a message to all other CPUs and wait for them to respond */
 	smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION, 0, 0);
@@ -530,7 +530,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
  out:
 	HMT_medium();
-	spin_unlock_bh(&call_lock);
+	spin_unlock(&call_lock);
 	return ret;
 }
 

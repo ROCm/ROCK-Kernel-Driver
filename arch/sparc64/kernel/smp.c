@@ -551,6 +551,10 @@ static struct call_data_struct *call_data;
 
 extern unsigned long xcall_call_function;
 
+/*
+ * You must not call this function with disabled interrupts or from a
+ * hardware interrupt handler or from a bottom half handler.
+ */
 int smp_call_function(void (*func)(void *info), void *info,
 		      int nonatomic, int wait)
 {
@@ -566,7 +570,7 @@ int smp_call_function(void (*func)(void *info), void *info,
 	atomic_set(&data.finished, 0);
 	data.wait = wait;
 
-	spin_lock_bh(&call_lock);
+	spin_lock(&call_lock);
 
 	call_data = &data;
 
@@ -584,12 +588,12 @@ int smp_call_function(void (*func)(void *info), void *info,
 		udelay(1);
 	}
 
-	spin_unlock_bh(&call_lock);
+	spin_unlock(&call_lock);
 
 	return 0;
 
 out_timeout:
-	spin_unlock_bh(&call_lock);
+	spin_unlock(&call_lock);
 	printk("XCALL: Remote cpus not responding, ncpus=%d finished=%d\n",
 	       smp_num_cpus - 1, atomic_read(&data.finished));
 	return 0;
