@@ -885,7 +885,7 @@ static int shmem_getpage(struct inode *inode, unsigned long idx,
 	struct page *swappage;
 	swp_entry_t *entry;
 	swp_entry_t swap;
-	int error, majmin = VM_FAULT_MINOR;
+	int error;
 
 	if (idx >= SHMEM_MAX_INDEX)
 		return -EFBIG;
@@ -923,9 +923,10 @@ repeat:
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
 			/* here we actually do the io */
-			if (majmin == VM_FAULT_MINOR && type)
+			if (type && *type == VM_FAULT_MINOR) {
 				inc_page_state(pgmajfault);
-			majmin = VM_FAULT_MAJOR;
+				*type = VM_FAULT_MAJOR;
+			}
 			swappage = shmem_swapin(info, swap, idx);
 			if (!swappage) {
 				spin_lock(&info->lock);
@@ -1077,15 +1078,10 @@ repeat:
 		SetPageUptodate(filepage);
 	}
 done:
-	if (!*pagep) {
-		if (filepage) {
-			unlock_page(filepage);
-			*pagep = filepage;
-		} else
-			*pagep = ZERO_PAGE(0);
+	if (*pagep != filepage) {
+		unlock_page(filepage);
+		*pagep = filepage;
 	}
-	if (type)
-		*type = majmin;
 	return 0;
 
 failed:
@@ -1442,13 +1438,14 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		if (index == end_index) {
 			nr = i_size & ~PAGE_CACHE_MASK;
 			if (nr <= offset) {
-				page_cache_release(page);
+				if (page)
+					page_cache_release(page);
 				break;
 			}
 		}
 		nr -= offset;
 
-		if (page != ZERO_PAGE(0)) {
+		if (page) {
 			/*
 			 * If users can be writing to this page using arbitrary
 			 * virtual addresses, take care about potential aliasing
@@ -1461,7 +1458,8 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 			 */
 			if (!offset)
 				mark_page_accessed(page);
-		}
+		} else
+			page = ZERO_PAGE(0);
 
 		/*
 		 * Ok, we have the page, and it's up-to-date, so
