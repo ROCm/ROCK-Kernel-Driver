@@ -122,7 +122,7 @@ struct miscdevice isiloader_device = {
 };
 
  
-extern inline int WaitTillCardIsFree(unsigned short base)
+static inline int WaitTillCardIsFree(unsigned short base)
 {
 	unsigned long count=0;
 	while( (!(inw(base+0xe) & 0x1)) && (count++ < 6000000));
@@ -358,7 +358,7 @@ static inline int isicom_paranoia_check(struct isi_port const * port, kdev_t dev
 	return 0;
 }
 			
-extern inline void schedule_bh(struct isi_port * port)
+static inline void schedule_bh(struct isi_port * port)
 {
 	queue_task(&port->bh_tqueue, &tq_isicom);
 	mark_bh(ISICOM_BH);
@@ -823,7 +823,7 @@ static void isicom_config_port(struct isi_port * port)
  
 /* open et all */ 
 
-extern inline void isicom_setup_board(struct isi_board * bp)
+static inline void isicom_setup_board(struct isi_board * bp)
 {
 	int channel;
 	struct isi_port * port;
@@ -1091,7 +1091,7 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
  
 /* close et all */
 
-extern inline void isicom_shutdown_board(struct isi_board * bp)
+static inline void isicom_shutdown_board(struct isi_board * bp)
 {
 	int channel;
 	struct isi_port * port;
@@ -1353,7 +1353,7 @@ static int isicom_chars_in_buffer(struct tty_struct * tty)
 }
 
 /* ioctl et all */
-extern inline void isicom_send_break(struct isi_port * port, unsigned long length)
+static inline void isicom_send_break(struct isi_port * port, unsigned long length)
 {
 	struct isi_board * card = port->card;
 	short wait = 10;

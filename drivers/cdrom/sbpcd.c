@@ -354,6 +354,13 @@
  * Marcin Dalecki
  */
 
+/*
+ * Add bio/kdev_t changes for 2.5.x required to make it work again. 
+ * Still room for improvement in the request handling here if anyone
+ * actually cares.  Bring your own chainsaw.    Paul G.  02/2002
+ */
+
+
 #include <linux/module.h>
 
 #include <linux/version.h>
@@ -462,6 +469,8 @@ MODULE_PARM(sbpcd, "2i");
 MODULE_PARM(max_drives, "i");
 
 #define NUM_PROBE  (sizeof(sbpcd) / sizeof(int))
+
+static spinlock_t sbpcd_lock = SPIN_LOCK_UNLOCKED;
 
 /*==========================================================================*/
 
@@ -4856,21 +4865,19 @@ static void do_sbpcd_request(request_queue_t * q)
 	printk(" do_sbpcd_request[%di](%p:%ld+%ld), Pid:%d, Time:%li\n",
 		xnr, req, req->sector, req->nr_sectors, current->pid, jiffies);
 #endif
-
 	if (blk_queue_empty(q))
 		return;
 
 	req = elv_next_request(q);		/* take out our request so no other */
-	blkdev_dequeue_request(req);	/* task can fuck it up         GTL  */
 
 	if (req -> sector == -1)
 		end_request(req, 0);
 	spin_unlock_irq(q->queue_lock);
 
 	down(&ioctl_read_sem);
-	if (req->cmd != READ)
+	if (rq_data_dir(CURRENT) != READ)
 	{
-		msg(DBG_INF, "bad cmd %d\n", req->cmd);
+		msg(DBG_INF, "bad cmd %d\n", req->cmd[0]);
 		goto err_done;
 	}
 	p = req->rq_disk->private_data;
@@ -5775,6 +5782,12 @@ int __init sbpcd_init(void)
 		if (i>=0) p->CD_changed=1;
 	}
 
+	if (!request_region(CDo_command,4,major_name))
+	{
+		printk(KERN_WARNING "sbpcd: Unable to request region 0x%x\n", CDo_command);
+		return -EIO;
+	}
+
 	/*
 	 * Turn on the CD audio channels.
 	 * The addresses are obtained from SOUND_BASE (see sbpcd.h).
@@ -5795,9 +5808,8 @@ int __init sbpcd_init(void)
 	}
 	blk_init_queue(&sbpcd_queue, do_sbpcd_request, &sbpcd_lock);
 
-	request_region(CDo_command,4,major_name);
-
 	devfs_handle = devfs_mk_dir (NULL, "sbp", NULL);
+
 	for (j=0;j<NR_SBPCD;j++)
 	{
 		struct cdrom_device_info * sbpcd_infop;
@@ -5908,6 +5920,7 @@ void sbpcd_exit(void)
 	msg(DBG_INF, "%s module released.\n", major_name);
 }
 
+
 module_init(__sbpcd_init) /*HACK!*/;
 module_exit(sbpcd_exit);
 
@@ -5922,8 +5935,7 @@ static int sbpcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
         {
                 p->CD_changed=0;
                 msg(DBG_CHK,"medium changed (drive %s)\n", cdi->name);
-		/* BUG! Should invalidate buffers! --AJK */
-		/* Why should it do the above at all?! --mdcki */
+		invalidate_buffers(full_dev);
 		current_drive->diskstate_flags &= ~toc_bit;
 		current_drive->diskstate_flags &= ~cd_size_bit;
 #if SAFE_MIXED

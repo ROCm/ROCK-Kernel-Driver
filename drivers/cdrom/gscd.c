@@ -268,7 +268,7 @@ repeat:
 		goto out;
 
 	if (req->cmd != READ) {
-		printk("GSCD: bad cmd %p\n", req->cmd);
+		printk("GSCD: bad cmd %d\n", req->cmd);
 		end_request(req, 0);
 		goto repeat;
 	}
