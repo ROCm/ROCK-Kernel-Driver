@@ -1041,7 +1041,7 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 
         spin_lock_init(&card->lock);
 
-	dev->driver_data = card;
+	pci_set_drvdata(dev, card);
 
 	if (pci_write_cmd != 0x0F) 	/* If not Memory Write & Invalidate */
 		pci_write_cmd = 0x07;	/* then Memory Write command */
@@ -1100,7 +1100,7 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 */
 static void mm_pci_remove(struct pci_dev *dev)
 {
-	struct cardinfo *card = dev->driver_data;
+	struct cardinfo *card = pci_get_drvdata(dev);
 
 	tasklet_kill(&card->tasklet);
 	iounmap(card->csr_remap);
