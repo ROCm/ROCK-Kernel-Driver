@@ -732,16 +732,15 @@ void do_generic_mapping_read(struct address_space *mapping,
 		goto out;
 
 	end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
-	if (index > end_index)
-		goto out;
-
 	for (;;) {
 		struct page *page;
 		unsigned long nr, ret;
 
 		/* nr is the maximum number of bytes to copy from this page */
 		nr = PAGE_CACHE_SIZE;
-		if (index == end_index) {
+		if (index >= end_index) {
+			if (index > end_index)
+				goto out;
 			nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
 			if (nr <= offset) {
 				goto out;
