@@ -703,7 +703,9 @@ static void __init set_system_time(void)
 	}
 
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_nsec = 0;
+	wall_to_monotonic.tv_sec = -xtime.tv_sec + INITIAL_JIFFIES / HZ;
+	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+	wall_to_monotonic.tv_nsec = 0;
 
 	if (mregs) {
 		tmp = mostek_read(mregs + MOSTEK_CREG);
@@ -741,7 +743,9 @@ void __init clock_probe(void)
 			(unsigned int) (long) &unix_tod);
 		prom_feval(obp_gettod);
 		xtime.tv_sec = unix_tod;
-		xtime.tv_nsec = 0;
+		wall_to_monotonic.tv_sec = -xtime.tv_sec + INITIAL_JIFFIES / HZ;
+		xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+		wall_to_monotonic.tv_nsec = 0;
 		return;
 	}
 
@@ -1097,15 +1101,28 @@ void do_settimeofday(struct timeval *tv)
 	 * made, and then undo it!
 	 */
 	tv->tv_usec -= do_gettimeoffset();
-	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+	tv->tv_usec -= (jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
 
 	while (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
+		tv->tv_usec += USEC_PER_SEC;
 		tv->tv_sec--;
+	}
+	tv->tv_usec *= NSEC_PER_USEC;
+
+	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
+	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_usec;
+
+	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
+		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec++;
+	}
+	if (wall_to_monotonic.tv_nsec < 0) {
+		wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec--;
 	}
 
 	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = (tv->tv_usec * 1000);
+	xtime.tv_nsec = tv->tv_usec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
