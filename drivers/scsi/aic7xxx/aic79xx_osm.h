@@ -788,7 +788,7 @@ ahd_done_unlock(struct ahd_softc *ahd, unsigned long *flags)
 }
 
 static __inline void
-ahd_list_lockinit()
+ahd_list_lockinit(void)
 {
 	spin_lock_init(&ahd_list_spinlock);
 }
