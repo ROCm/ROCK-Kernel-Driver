@@ -138,4 +138,34 @@ Each cache should define a "cache_parse" method which takes a message
 written from user-space and processes it.  It should return an error
 (which propagates back to the write syscall) or 0.
 
+Each cache should also define a "cache_request" method which
+takes a cache item and encodes a request into the buffer
+provided.
 
+
+Note: If a cache has no active readers on the channel, and has had not
+active readers for more than 60 seconds, further requests will not be
+added to the channel but instead all looks that do not find a valid
+entry will fail.  This is partly for backward compatability: The
+previous nfs exports table was deemed to be authoritative and a
+failed lookup meant a definate 'no'.
+
+request/response format
+-----------------------
+
+While each cache is free to use it's own format for requests
+and responses over channel, the following is recommended are
+appropriate and support routines are available to help:
+Each request or response record should be printable ASCII
+with precisely one newline character which should be at the end.
+Fields within the record should be separated by spaces, normally one.
+If spaces, newlines, or nul characters are needed in a field they
+much be quotes.  two mechanisms are available:
+1/ If a field begins '\x' then it must contain an even number of
+   hex digits, and pairs of these digits provide the bytes in the
+   field.
+2/ otherwise a \ in the field must be followed by 3 octal digits
+   which give the code for a byte.  Other characters are treated
+   as them selves.  At the very least, space, newlines nul, and
+   '\' must be quoted in this way.
+   

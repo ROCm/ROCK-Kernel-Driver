@@ -40,6 +40,7 @@ void cache_init(struct cache_head *h)
 }
 
 
+static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h);
 /*
  * This is the generic cache management routine for all
  * the authentication caches.
@@ -55,6 +56,7 @@ int cache_check(struct cache_detail *detail,
 		    struct cache_head *h, struct cache_req *rqstp)
 {
 	int rv;
+	long refresh_age, age;
 
 	/* First decide return status as best we can */
 	if (!test_bit(CACHE_VALID, &h->flags) ||
@@ -69,22 +71,43 @@ int cache_check(struct cache_detail *detail,
 		else rv = 0;
 	}
 
-	/* up-call processing goes here later */
-	/* if cache_pending, initiate upcall if none pending.
-	 * if upcall cannot be initiated, change to CACHE_NEGATIVE
-	 */
-	if (rv == CACHE_PENDING) rv = CACHE_NEGATIVE;
+	/* now see if we want to start an upcall */
+	refresh_age = (h->expiry_time - h->last_refresh);
+	age = CURRENT_TIME - h->last_refresh;
 
-	if (rv == CACHE_PENDING)
+	if (rqstp == NULL) {
+		if (rv == -EAGAIN)
+			rv = -ENOENT;
+	} else if (rv == -EAGAIN || age > refresh_age/2) {
+		dprintk("Want update, refage=%ld, age=%ld\n", refresh_age, age);
+		if (!test_and_set_bit(CACHE_PENDING, &h->flags)) {
+			switch (cache_make_upcall(detail, h)) {
+			case -EINVAL:
+				clear_bit(CACHE_PENDING, &h->flags);
+				if (rv == -EAGAIN) {
+					set_bit(CACHE_NEGATIVE, &h->flags);
+					cache_fresh(detail, h, CURRENT_TIME+CACHE_NEW_EXPIRY);
+					rv = -ENOENT;
+				}
+				break;
+
+			case -EAGAIN:
+				clear_bit(CACHE_PENDING, &h->flags);
+				cache_revisit_request(h);
+				break;
+			}
+		}
+	}
+
+	if (rv == -EAGAIN)
 		cache_defer_req(rqstp, h);
-
-	if (rv == -EAGAIN /* && cannot do upcall */)
-		rv = -ENOENT;
 
 	if (rv && h)
 		detail->cache_put(h, detail);
 	return rv;
 }
+
+static void queue_loose(struct cache_detail *detail, struct cache_head *ch);
 
 void cache_fresh(struct cache_detail *detail,
 		 struct cache_head *head, time_t expiry)
@@ -92,8 +115,10 @@ void cache_fresh(struct cache_detail *detail,
 
 	head->expiry_time = expiry;
 	head->last_refresh = CURRENT_TIME;
-	set_bit(CACHE_VALID, &head->flags);
-	clear_bit(CACHE_PENDING, &head->flags);
+	if (!test_and_set_bit(CACHE_VALID, &head->flags))
+		cache_revisit_request(head);
+	if (test_and_clear_bit(CACHE_PENDING, &head->flags))
+		queue_loose(detail, head);
 }
 
 /*
@@ -155,6 +180,8 @@ void cache_register(struct cache_detail *cd)
 	spin_lock(&cache_list_lock);
 	cd->nextcheck = 0;
 	cd->entries = 0;
+	atomic_set(&cd->readers, 0);
+	cd->last_close = CURRENT_TIME;
 	list_add(&cd->others, &cache_list);
 	spin_unlock(&cache_list_lock);
 }
@@ -639,6 +666,7 @@ cache_open(struct inode *inode, struct file *filp)
 	rp->page = NULL;
 	rp->offset = 0;
 	rp->q.reader = 1;
+	atomic_inc(&cd->readers);
 	spin_lock(&queue_lock);
 	list_add(&rp->q.list, &cd->queue);
 	spin_unlock(&queue_lock);
@@ -672,6 +700,9 @@ cache_release(struct inode *inode, struct file *filp)
 
 	filp->private_data = NULL;
 	kfree(rp);
+
+	cd->last_close = CURRENT_TIME;
+	atomic_dec(&cd->readers);
 	return 0;
 }
 
@@ -686,3 +717,150 @@ struct file_operations cache_file_operations = {
 	.open		= cache_open,
 	.release	= cache_release,
 };
+
+
+static void queue_loose(struct cache_detail *detail, struct cache_head *ch)
+{
+	struct cache_queue *cq;
+	spin_lock(&queue_lock);
+	list_for_each_entry(cq, &detail->queue, list)
+		if (!cq->reader) {
+			struct cache_request *cr = container_of(cq, struct cache_request, q);
+			if (cr->item != ch)
+				continue;
+			if (cr->readers != 0)
+				break;
+			list_del(&cr->q.list);
+			spin_unlock(&queue_lock);
+			detail->cache_put(cr->item, detail);
+			kfree(cr->buf);
+			kfree(cr);
+			return;
+		}
+	spin_unlock(&queue_lock);
+}
+
+/*
+ * Support routines for text-based upcalls.
+ * Fields are separated by spaces.
+ * Fields are either mangled to quote space tab newline slosh with slosh
+ * or a hexified with a leading \x
+ * Record is terminated with newline.
+ *
+ */
+
+void add_word(char **bpp, int *lp, char *str)
+{
+	char *bp = *bpp;
+	int len = *lp;
+	char c;
+
+	if (len < 0) return;
+
+	while ((c=*str++) && len)
+		switch(c) {
+		case ' ':
+		case '\t':
+		case '\n':
+		case '\\':
+			if (len >= 4) {
+				*bp++ = '\\';
+				*bp++ = '0' + ((c & 0300)>>6);
+				*bp++ = '0' + ((c & 0070)>>3);
+				*bp++ = '0' + ((c & 0007)>>0);
+			}
+			len -= 4;
+			break;
+		default:
+			*bp++ = c;
+			len--;
+		}
+	if (c || len <1) len = -1;
+	else {
+		*bp++ = ' ';
+		len--;
+	}
+	*bpp = bp;
+	*lp = len;
+}
+
+void add_hex(char **bpp, int *lp, char *buf, int blen)
+{
+	char *bp = *bpp;
+	int len = *lp;
+
+	if (len < 0) return;
+
+	if (len > 2) {
+		*bp++ = '\\';
+		*bp++ = 'x';
+		len -= 2;
+		while (blen && len >= 2) {
+			unsigned char c = *buf++;
+			*bp++ = '0' + ((c&0xf0)>>4) + (c>=0xa0)*('a'-'0');
+			*bp++ = '0' + (c&0x0f) + ((c&0x0f)>=0x0a)*('a'-'0');
+			len -= 2;
+			blen--;
+		}
+	}
+	if (blen || len<1) len = -1;
+	else {
+		*bp++ = ' ';
+		len--;
+	}
+	*bpp = bp;
+	*lp = len;
+}
+
+			
+
+/*
+ * register an upcall request to user-space.
+ * Each request is at most one page long.
+ */
+static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h)
+{
+
+	char *buf;
+	struct cache_request *crq;
+	char *bp;
+	int len;
+
+	if (detail->cache_request == NULL)
+		return -EINVAL;
+
+	if (atomic_read(&detail->readers) == 0 &&
+	    detail->last_close < CURRENT_TIME - 60)
+		/* nobody is listening */
+		return -EINVAL;
+
+	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!buf)
+		return -EAGAIN;
+
+	crq = kmalloc(sizeof (*crq), GFP_KERNEL);
+	if (!crq) {
+		kfree(buf);
+		return -EAGAIN;
+	}
+
+	bp = buf; len = PAGE_SIZE;
+
+	detail->cache_request(detail, h, &bp, &len);
+
+	if (len < 0) {
+		kfree(buf);
+		kfree(crq);
+		return -EAGAIN;
+	}
+	crq->q.reader = 0;
+	crq->item = cache_get(h);
+	crq->buf = buf;
+	crq->len = PAGE_SIZE - len;
+	crq->readers = 0;
+	spin_lock(&queue_lock);
+	list_add_tail(&crq->q.list, &detail->queue);
+	spin_unlock(&queue_lock);
+	wake_up(&queue_wait);
+	return 0;
+}

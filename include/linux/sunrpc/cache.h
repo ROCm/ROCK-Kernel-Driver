@@ -72,9 +72,9 @@ struct cache_detail {
 	void			(*cache_put)(struct cache_head *,
 					     struct cache_detail*);
 
-	/* request and update functions for interaction with userspace
-	 * will go here
-	 */
+	void			(*cache_request)(struct cache_detail *cd,
+						 struct cache_head *h,
+						 char **bpp, int *blen);
 	int			(*cache_parse)(struct cache_detail *,
 					       char *buf, int len);
 
@@ -90,6 +90,8 @@ struct cache_detail {
 	/* fields for communication over channel */
 	struct list_head	queue;
 	struct proc_dir_entry	*proc_ent;
+	atomic_t		readers;		/* how many time is /chennel open */
+	time_t			last_close;		/* it no readers, when did last close */
 };
 
 
@@ -268,5 +270,8 @@ extern void cache_register(struct cache_detail *cd);
 extern int cache_unregister(struct cache_detail *cd);
 extern struct cache_detail *cache_find(char *name);
 extern void cache_drop(struct cache_detail *detail);
+
+extern void add_word(char **bpp, int *lp, char *str);
+extern void add_hex(char **bpp, int *lp, char *buf, int blen);
 
 #endif /*  _LINUX_SUNRPC_CACHE_H_ */
