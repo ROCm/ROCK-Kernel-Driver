@@ -1,13 +1,5 @@
 #undef DEBUG
 
-#ifdef DEBUG
-# define DBG(x...) printk(x)
-#else
-# define DBG(x...)
-#endif
-
-extern struct list_head global_device_list;
-extern spinlock_t device_lock;
 extern struct semaphore device_sem;
 
 extern int bus_add_device(struct device * dev);
@@ -22,8 +14,8 @@ extern void devclass_remove_device(struct device *);
 extern int devclass_add_driver(struct device_driver *);
 extern void devclass_remove_driver(struct device_driver *);
 
-extern int interface_add(struct device_class *, struct device *);
-extern void interface_remove(struct device_class *, struct device *);
+extern int interface_add_dev(struct device *);
+extern void interface_remove_dev(struct device *);
 
 
 #ifdef CONFIG_HOTPLUG

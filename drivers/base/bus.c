@@ -133,6 +133,91 @@ struct subsystem bus_subsys = {
 
 
 /**
+ *	bus_for_each_dev - device iterator.
+ *	@bus:	bus type.
+ *	@start:	device to start iterating from.
+ *	@data:	data for the callback.
+ *	@fn:	function to be called for each device.
+ *
+ *	Iterate over @bus's list of devices, and call @fn for each,
+ *	passing it @data. If @start is not NULL, we use that device to
+ *	begin iterating from.
+ *
+ *	We check the return of @fn each time. If it returns anything
+ *	other than 0, we break out and return that value.
+ *
+ *	NOTE: The device that returns a non-zero value is not retained
+ *	in any way, nor is its refcount incremented. If the caller needs
+ *	to retain this data, it should do, and increment the reference 
+ *	count in the supplied callback.
+ */
+int bus_for_each_dev(struct bus_type * bus, struct device * start, 
+		     void * data, int (*fn)(struct device *, void *))
+{
+	struct list_head * head, * entry;
+	int error = 0;
+
+	if (!(bus = get_bus(bus)))
+		return -EINVAL;
+
+	head = start ? &start->bus_list : &bus->devices;
+
+	down_read(&bus->subsys.rwsem);
+	list_for_each(entry,head) {
+		struct device * dev = get_device(to_dev(entry));
+		error = fn(dev,data);
+		put_device(dev);
+		if (error)
+			break;
+	}
+	up_read(&bus->subsys.rwsem);
+	return error;
+}
+
+/**
+ *	bus_for_each_drv - driver iterator
+ *	@bus:	bus we're dealing with.
+ *	@start:	driver to start iterating on.
+ *	@data:	data to pass to the callback.
+ *	@fn:	function to call for each driver.
+ *
+ *	This is nearly identical to the device iterator above.
+ *	We iterate over each driver that belongs to @bus, and call
+ *	@fn for each. If @fn returns anything but 0, we break out
+ *	and return it. If @start is not NULL, we use it as the head
+ *	of the list.
+ *
+ *	NOTE: we don't return the driver that returns a non-zero 
+ *	value, nor do we leave the reference count incremented for that
+ *	driver. If the caller needs to know that info, it must set it
+ *	in the callback. It must also be sure to increment the refcount
+ *	so it doesn't disappear before returning to the caller.
+ */
+
+int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
+		     void * data, int (*fn)(struct device_driver *, void *))
+{
+	struct list_head * head, * entry;
+	int error = 0;
+
+	if(!(bus = get_bus(bus)))
+		return -EINVAL;
+
+	head = start ? &start->bus_list : &bus->drivers;
+
+	down_read(&bus->subsys.rwsem);
+	list_for_each(entry,head) {
+		struct device_driver * drv = get_driver(to_drv(entry));
+		error = fn(drv,data);
+		put_driver(drv);
+		if(error)
+			break;
+	}
+	up_read(&bus->subsys.rwsem);
+	return error;
+}
+
+/**
  *	attach - add device to driver.
  *	@dev:	device.
  *	
@@ -190,7 +275,7 @@ static int bus_match(struct device * dev, struct device_driver * drv)
  */
 static int device_attach(struct device * dev)
 {
-	struct bus_type * bus = dev->bus;
+ 	struct bus_type * bus = dev->bus;
 	struct list_head * entry;
 	int error = 0;
 
@@ -454,6 +539,9 @@ static int __init bus_subsys_init(void)
 }
 
 core_initcall(bus_subsys_init);
+
+EXPORT_SYMBOL(bus_for_each_dev);
+EXPORT_SYMBOL(bus_for_each_drv);
 
 EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);

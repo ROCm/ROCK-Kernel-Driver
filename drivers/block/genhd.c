@@ -410,11 +410,11 @@ struct gendisk *alloc_disk(int minors)
 		disk->minors = minors;
 		while (minors >>= 1)
 			disk->minor_shift++;
-		kobject_init(&disk->kobj);
 		disk->kobj.subsys = &block_subsys;
+		kobject_init(&disk->kobj);
 		INIT_LIST_HEAD(&disk->full_list);
+		rand_initialize_disk(disk);
 	}
-	rand_initialize_disk(disk);
 	return disk;
 }
 
