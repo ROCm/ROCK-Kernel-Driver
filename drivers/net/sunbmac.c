@@ -68,7 +68,7 @@ static struct bigmac *root_bigmac_dev;
 
 #define QEC_RESET_TRIES 200
 
-static int qec_global_reset(unsigned long gregs)
+static int qec_global_reset(void __iomem *gregs)
 {
 	int tries = QEC_RESET_TRIES;
 
@@ -88,7 +88,7 @@ static int qec_global_reset(unsigned long gregs)
 
 static void qec_init(struct bigmac *bp)
 {
-	unsigned long gregs = bp->gregs;
+	void __iomem *gregs = bp->gregs;
 	struct sbus_dev *qec_sdev = bp->qec_sdev;
 	u8 bsizes = bp->bigmac_bursts;
 	u32 regval;
@@ -117,7 +117,7 @@ static void qec_init(struct bigmac *bp)
 #define TX_RESET_TRIES     32
 #define RX_RESET_TRIES     32
 
-static void bigmac_tx_reset(unsigned long bregs)
+static void bigmac_tx_reset(void __iomem *bregs)
 {
 	int tries = TX_RESET_TRIES;
 
@@ -137,7 +137,7 @@ static void bigmac_tx_reset(unsigned long bregs)
 	}
 }
 
-static void bigmac_rx_reset(unsigned long bregs)
+static void bigmac_rx_reset(void __iomem *bregs)
 {
 	int tries = RX_RESET_TRIES;
 
@@ -159,7 +159,7 @@ static void bigmac_stop(struct bigmac *bp)
 	bigmac_rx_reset(bp->bregs);
 }
 
-static void bigmac_get_counters(struct bigmac *bp, unsigned long bregs)
+static void bigmac_get_counters(struct bigmac *bp, void __iomem *bregs)
 {
 	struct net_device_stats *stats = &bp->enet_stats;
 
@@ -244,7 +244,7 @@ static void bigmac_init_rings(struct bigmac *bp, int from_irq)
 #define MGMT_CLKON  (MGMT_PAL_INT_MDIO|MGMT_PAL_EXT_MDIO|MGMT_PAL_OENAB|MGMT_PAL_DCLOCK)
 #define MGMT_CLKOFF (MGMT_PAL_INT_MDIO|MGMT_PAL_EXT_MDIO|MGMT_PAL_OENAB)
 
-static void idle_transceiver(unsigned long tregs)
+static void idle_transceiver(void __iomem *tregs)
 {
 	int i = 20;
 
@@ -256,7 +256,7 @@ static void idle_transceiver(unsigned long tregs)
 	}
 }
 
-static void write_tcvr_bit(struct bigmac *bp, unsigned long tregs, int bit)
+static void write_tcvr_bit(struct bigmac *bp, void __iomem *tregs, int bit)
 {
 	if (bp->tcvr_type == internal) {
 		bit = (bit & 1) << 3;
@@ -279,7 +279,7 @@ static void write_tcvr_bit(struct bigmac *bp, unsigned long tregs, int bit)
 	}
 }
 
-static int read_tcvr_bit(struct bigmac *bp, unsigned long tregs)
+static int read_tcvr_bit(struct bigmac *bp, void __iomem *tregs)
 {
 	int retval = 0;
 
@@ -302,7 +302,7 @@ static int read_tcvr_bit(struct bigmac *bp, unsigned long tregs)
 	return retval;
 }
 
-static int read_tcvr_bit2(struct bigmac *bp, unsigned long tregs)
+static int read_tcvr_bit2(struct bigmac *bp, void __iomem *tregs)
 {
 	int retval = 0;
 
@@ -325,7 +325,7 @@ static int read_tcvr_bit2(struct bigmac *bp, unsigned long tregs)
 }
 
 static void put_tcvr_byte(struct bigmac *bp,
-			  unsigned long tregs,
+			  void __iomem *tregs,
 			  unsigned int byte)
 {
 	int shift = 4;
@@ -336,7 +336,7 @@ static void put_tcvr_byte(struct bigmac *bp,
 	} while (shift >= 0);
 }
 
-static void bigmac_tcvr_write(struct bigmac *bp, unsigned long tregs,
+static void bigmac_tcvr_write(struct bigmac *bp, void __iomem *tregs,
 			      int reg, unsigned short val)
 {
 	int shift;
@@ -376,7 +376,7 @@ static void bigmac_tcvr_write(struct bigmac *bp, unsigned long tregs,
 }
 
 static unsigned short bigmac_tcvr_read(struct bigmac *bp,
-				       unsigned long tregs,
+				       void __iomem *tregs,
 				       int reg)
 {
 	unsigned short retval = 0;
@@ -444,7 +444,7 @@ static unsigned short bigmac_tcvr_read(struct bigmac *bp,
 
 static void bigmac_tcvr_init(struct bigmac *bp)
 {
-	unsigned long tregs = bp->tregs;
+	void __iomem *tregs = bp->tregs;
 	u32 mpal;
 
 	idle_transceiver(tregs);
@@ -482,7 +482,7 @@ static void bigmac_tcvr_init(struct bigmac *bp)
 
 static int bigmac_init(struct bigmac *, int);
 
-static int try_next_permutation(struct bigmac *bp, unsigned long tregs)
+static int try_next_permutation(struct bigmac *bp, void __iomem *tregs)
 {
 	if (bp->sw_bmcr & BMCR_SPEED100) {
 		int timeout;
@@ -518,7 +518,7 @@ static int try_next_permutation(struct bigmac *bp, unsigned long tregs)
 static void bigmac_timer(unsigned long data)
 {
 	struct bigmac *bp = (struct bigmac *) data;
-	unsigned long tregs = bp->tregs;
+	void __iomem *tregs = bp->tregs;
 	int restart_timer = 0;
 
 	bp->timer_ticks++;
@@ -573,7 +573,7 @@ static void bigmac_timer(unsigned long data)
  */
 static void bigmac_begin_auto_negotiation(struct bigmac *bp)
 {
-	unsigned long tregs = bp->tregs;
+	void __iomem *tregs = bp->tregs;
 	int timeout;
 
 	/* Grab new software copies of PHY registers. */
@@ -612,9 +612,9 @@ static void bigmac_begin_auto_negotiation(struct bigmac *bp)
 
 static int bigmac_init(struct bigmac *bp, int from_irq)
 {
-	unsigned long gregs        = bp->gregs;
-	unsigned long cregs        = bp->creg;
-	unsigned long bregs        = bp->bregs;
+	void __iomem *gregs        = bp->gregs;
+	void __iomem *cregs        = bp->creg;
+	void __iomem *bregs        = bp->bregs;
 	unsigned char *e = &bp->dev->dev_addr[0];
 
 	/* Latch current counters into statistics. */
@@ -987,7 +987,7 @@ static struct net_device_stats *bigmac_get_stats(struct net_device *dev)
 static void bigmac_set_multicast(struct net_device *dev)
 {
 	struct bigmac *bp = (struct bigmac *) dev->priv;
-	unsigned long bregs = bp->bregs;
+	void __iomem *bregs = bp->bregs;
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
 	int i;
