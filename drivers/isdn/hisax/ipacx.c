@@ -41,10 +41,8 @@ static void dch_bh(void *data);
 static void dch_empty_fifo(struct IsdnCardState *cs, int count);
 static void dch_fill_fifo(struct IsdnCardState *cs);
 static inline void dch_int(struct IsdnCardState *cs);
-static void __devinit dch_setstack(struct PStack *st, struct IsdnCardState *cs);
-static void __devinit dch_init(struct IsdnCardState *cs);
 static void bch_l2l1(struct PStack *st, int pr, void *arg);
-static void bch_empty_fifo(struct BCState *bcs, int count);
+static void ipacx_bc_empty_fifo(struct BCState *bcs, int count);
 static void bch_int(struct IsdnCardState *cs, u8 hscx);
 static void bch_mode(struct BCState *bcs, int mode, int bc);
 static void bch_close_state(struct BCState *bcs);
@@ -57,18 +55,16 @@ static inline u8
 ipacx_bc_read_reg(struct BCState *bcs, u8 addr)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	return cs->bc_hw_ops->read_reg(cs, hscx, addr);
+	return cs->bc_hw_ops->read_reg(cs, bcs->unit, addr);
 }
 
 static inline void
 ipacx_bc_write_reg(struct BCState *bcs, u8 addr, u8 val)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->bc_hw_ops->write_reg(cs, hscx, addr, val);
+	cs->bc_hw_ops->write_reg(cs, bcs->unit, addr, val);
 }
 
 static inline u8
@@ -305,33 +301,8 @@ dch_bh(void *data)
 static void 
 dch_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u8 *ptr;
-
-	if ((cs->debug &L1_DEB_ISAC) && !(cs->debug &L1_DEB_ISAC_FIFO))
-		debugl1(cs, "dch_empty_fifo()");
-
-  // message too large, remove
-	if ((cs->rcvidx + count) >= MAX_DFRAME_LEN_L1) {
-		if (cs->debug &L1_DEB_WARN)
-			debugl1(cs, "dch_empty_fifo() incoming message too large");
-	  ipacx_write_reg(cs, IPACX_CMDRD, 0x80); // RMC
-		cs->rcvidx = 0;
-		return;
-	}
-  
-	ptr = cs->rcvbuf + cs->rcvidx;
-	cs->rcvidx += count;
-  
-	ipacx_read_fifo(cs, ptr, count);
+	recv_empty_fifo_d(cs, count);
 	ipacx_write_reg(cs, IPACX_CMDRD, 0x80); // RMC
-  
-	if (cs->debug &L1_DEB_ISAC_FIFO) {
-		char *t = cs->dlog;
-
-		t += sprintf(t, "dch_empty_fifo() cnt %d", count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, cs->dlog);
-	}
 }
 
 //----------------------------------------------------------
@@ -372,7 +343,6 @@ dch_fill_fifo(struct IsdnCardState *cs)
 static inline void 
 dch_int(struct IsdnCardState *cs)
 {
-	struct sk_buff *skb;
 	u8 istad, rstad;
 	int count;
 
@@ -383,32 +353,25 @@ dch_int(struct IsdnCardState *cs)
 		if ((rstad &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstad &0x80))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "dch_int(): invalid frame");
+					debugl1(cs, "dch_int(): invalid frame");
 			if ((rstad &0x40))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "dch_int(): RDO");
+					debugl1(cs, "dch_int(): RDO");
 			if (!(rstad &0x20))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "dch_int(): CRC error");
-	    ipacx_write_reg(cs, IPACX_CMDRD, 0x80);  // RMC
+					debugl1(cs, "dch_int(): CRC error");
+			ipacx_write_reg(cs, IPACX_CMDRD, 0x80);  // RMC
+			cs->rcvidx = 0;
 		} else {  // received frame ok
 			count = ipacx_read_reg(cs, IPACX_RBCLD);
-      if (count) count--; // RSTAB is last byte
+			// FIXME this looks flaky
+			if (count) count--; // RSTAB is last byte
 			count &= D_FIFO_SIZE-1;
-			if (count == 0) count = D_FIFO_SIZE;
+			if (count == 0)
+				count = D_FIFO_SIZE;
 			dch_empty_fifo(cs, count);
-			if ((count = cs->rcvidx) > 0) {
-	      cs->rcvidx = 0;
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "HiSax dch_int(): receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), cs->rcvbuf, count);
-					skb_queue_tail(&cs->rq, skb);
-				}
-			}
-    }
-	  cs->rcvidx = 0;
-		sched_d_event(cs, D_RCVBUFREADY);
+			recv_rme_d(cs);
+		}
 	}
 
 	if (istad &0x40) {  // RPF
@@ -431,11 +394,19 @@ dch_int(struct IsdnCardState *cs)
 
 //----------------------------------------------------------
 //----------------------------------------------------------
-static void __devinit
+static int
 dch_setstack(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = dch_l2l1;
+	return 0;
 }
+
+static struct dc_l1_ops ipacx_dc_l1_ops = {
+	.fill_fifo  = dch_fill_fifo,
+	.open       = dch_setstack,
+	.bh_func    = dch_bh,
+	.dbusy_func = dbusy_timer_handler,
+};
 
 //----------------------------------------------------------
 //----------------------------------------------------------
@@ -444,17 +415,12 @@ dch_init(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
 
-	INIT_WORK(&cs->work, dch_bh, cs);
-	cs->setstack_d      = dch_setstack;
-	cs->DC_Send_Data = dch_fill_fifo;
-	cs->dbusytimer.function = (void *) dbusy_timer_handler;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
+	dc_l1_init(cs, &ipacx_dc_l1_ops);
 
-  ipacx_write_reg(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
-  ipacx_write_reg(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
-  ipacx_write_reg(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
-  ipacx_write_reg(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
+	ipacx_write_reg(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
+	ipacx_write_reg(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
+	ipacx_write_reg(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
+	ipacx_write_reg(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
 }
 
 
@@ -501,49 +467,17 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 // Read B channel fifo to receive buffer
 //----------------------------------------------------------
 static void
-bch_empty_fifo(struct BCState *bcs, int count)
+ipacx_bc_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *ptr, hscx;
-	struct IsdnCardState *cs;
-	int cnt;
-
-	cs = bcs->cs;
-  hscx = bcs->hw.hscx.hscx;
-	if ((cs->debug &L1_DEB_HSCX) && !(cs->debug &L1_DEB_HSCX_FIFO))
-		debugl1(cs, "bch_empty_fifo()");
-
-  // message too large, remove
-	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug &L1_DEB_WARN)
-			debugl1(cs, "bch_empty_fifo() incoming packet too large");
-	  ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
-		bcs->hw.hscx.rcvidx = 0;
-		return;
-	}
-  
-  // Read data uninterruptible
-	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
-	cnt = count;
-	while (cnt--) *ptr++ = ipacx_bc_read_reg(bcs, IPACX_RFIFOB); 
+	recv_empty_fifo_b(bcs, count);
 	ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
-  
-	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
-	bcs->hw.hscx.rcvidx += count;
-  
-	if (cs->debug &L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "bch_empty_fifo() B-%d cnt %d", hscx, count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 //----------------------------------------------------------
 // Fill buffer to transmit FIFO
 //----------------------------------------------------------
-void
-ipacx_fill_fifo(struct BCState *bcs)
+static void
+ipacx_bc_fill_fifo(struct BCState *bcs)
 {
 	int more, count;
 	unsigned char *p;
@@ -573,7 +507,6 @@ bch_int(struct IsdnCardState *cs, u8 hscx)
 {
 	u8 istab;
 	struct BCState *bcs;
-	struct sk_buff *skb;
 	int count;
 	u8 rstab;
 
@@ -586,48 +519,28 @@ bch_int(struct IsdnCardState *cs, u8 hscx)
 		if ((rstab &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstab &0x80))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "bch_int() B-%d: invalid frame", hscx);
+					debugl1(cs, "bch_int() B-%d: invalid frame", hscx);
 			if ((rstab &0x40) && (bcs->mode != L1_MODE_NULL))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "bch_int() B-%d: RDO mode=%d", hscx, bcs->mode);
+					debugl1(cs, "bch_int() B-%d: RDO mode=%d", hscx, bcs->mode);
 			if (!(rstab &0x20))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "bch_int() B-%d: CRC error", hscx);
-	    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
-		} 
-    else {  // received frame ok
+					debugl1(cs, "bch_int() B-%d: CRC error", hscx);
+			ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
+			bcs->rcvidx = 0;
+		}  else {  // received frame ok
 			count = ipacx_bc_read_reg(bcs, IPACX_RBCLB) &(B_FIFO_SIZE-1);
-			if (count == 0) count = B_FIFO_SIZE;
-			bch_empty_fifo(bcs, count);
-			if ((count = bcs->hw.hscx.rcvidx - 1) > 0) {
-				if (cs->debug &L1_DEB_HSCX_FIFO)
-					debugl1(cs, "bch_int Frame %d", count);
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "HiSax bch_int(): receive frame out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), bcs->hw.hscx.rcvbuf, count);
-					skb_queue_tail(&bcs->rqueue, skb);
-				}
-			}
+			if (count == 0)
+				count = B_FIFO_SIZE;
+
+			ipacx_bc_empty_fifo(bcs, count);
+			recv_rme_b(bcs);
 		}
-		bcs->hw.hscx.rcvidx = 0;
-		sched_b_event(bcs, B_RCVBUFREADY);
 	}
   
 	if (istab &0x40) {	// RPF
-		bch_empty_fifo(bcs, B_FIFO_SIZE);
-
-		if (bcs->mode == L1_MODE_TRANS) { // queue every chunk
-			// receive transparent audio data
-			if (!(skb = dev_alloc_skb(B_FIFO_SIZE)))
-				printk(KERN_WARNING "HiSax bch_int(): receive transparent out of memory\n");
-			else {
-				memcpy(skb_put(skb, B_FIFO_SIZE), bcs->hw.hscx.rcvbuf, B_FIFO_SIZE);
-				skb_queue_tail(&bcs->rqueue, skb);
-			}
-			bcs->hw.hscx.rcvidx = 0;
-			sched_b_event(bcs, B_RCVBUFREADY);
-		}
+		ipacx_bc_empty_fifo(bcs, B_FIFO_SIZE);
+		recv_rpf_b(bcs);
 	}
   
 	if (istab &0x20) {	// RFO
@@ -651,7 +564,7 @@ static void
 bch_mode(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int hscx = bcs->hw.hscx.hscx;
+	int hscx = bcs->unit;
 
         bc = bc ? 1 : 0;  // in case bc is greater than 1
 	if (cs->debug & L1_DEB_HSCX)
@@ -699,23 +612,7 @@ static void
 bch_close_state(struct BCState *bcs)
 {
 	bch_mode(bcs, 0, bcs->channel);
-	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.hscx.rcvbuf) {
-			kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
-		}
-		if (bcs->blog) {
-			kfree(bcs->blog);
-			bcs->blog = NULL;
-		}
-		skb_queue_purge(&bcs->rqueue);
-		skb_queue_purge(&bcs->squeue);
-		if (bcs->tx_skb) {
-			dev_kfree_skb_any(bcs->tx_skb);
-			bcs->tx_skb = NULL;
-			clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		}
-	}
+	bc_close(bcs);
 }
 
 //----------------------------------------------------------
@@ -723,30 +620,7 @@ bch_close_state(struct BCState *bcs)
 static int
 bch_open_state(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.hscx.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax open_bchstate(): No memory for hscx.rcvbuf\n");
-			clear_bit(BC_FLG_INIT, &bcs->Flag);
-			return (1);
-		}
-		if (!(bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax open_bchstate: No memory for bcs->blog\n");
-			clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
-			return (2);
-		}
-		skb_queue_head_init(&bcs->rqueue);
-		skb_queue_head_init(&bcs->squeue);
-	}
-	bcs->tx_skb = NULL;
-	clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	bcs->event = 0;
-	bcs->hw.hscx.rcvidx = 0;
-	bcs->tx_cnt = 0;
-	return (0);
+	return bc_open(bcs);
 }
 
 //----------------------------------------------------------
@@ -769,9 +643,7 @@ bch_setstack(struct PStack *st, struct BCState *bcs)
 static void __devinit
 bch_init(struct IsdnCardState *cs, int hscx)
 {
-	cs->bcs[hscx].BC_SetStack   = bch_setstack;
-	cs->bcs[hscx].BC_Close      = bch_close_state;
-	cs->bcs[hscx].hw.hscx.hscx  = hscx;
+	cs->bcs[hscx].unit          = hscx;
 	cs->bcs[hscx].cs            = cs;
 	bch_mode(cs->bcs + hscx, 0, hscx);
 }
@@ -821,7 +693,9 @@ clear_pending_ints(struct IsdnCardState *cs)
 }
 
 static struct bc_l1_ops ipacx_bc_l1_ops = {
-	.fill_fifo = ipacx_fill_fifo,
+	.fill_fifo = ipacx_bc_fill_fifo,
+	.open      = bch_setstack,
+	.close     = bch_close_state,
 };
 
 //----------------------------------------------------------

@@ -24,6 +24,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include "isdnl1.h"
 #define HISAX_STATUS_BUFSIZE 4096
 #define INCLUDE_INLINE_FUNCS
 
@@ -825,9 +826,9 @@ static void closecard(int cardnr)
 {
 	struct IsdnCardState *csta = cards[cardnr].cs;
 
-	if (csta->bcs->BC_Close != NULL) {
-		csta->bcs->BC_Close(csta->bcs + 1);
-		csta->bcs->BC_Close(csta->bcs);
+	if (csta->bc_l1_ops->close) {
+		csta->bc_l1_ops->close(csta->bcs + 1);
+		csta->bc_l1_ops->close(csta->bcs);
 	}
 
 	skb_queue_purge(&csta->rq);
@@ -840,11 +841,11 @@ static void closecard(int cardnr)
 		dev_kfree_skb(csta->tx_skb);
 		csta->tx_skb = NULL;
 	}
-	if (csta->DC_Close != NULL) {
-		csta->DC_Close(csta);
-	}
-	if (csta->cardmsg)
-		csta->cardmsg(csta, CARD_RELEASE, NULL);
+	if (csta->dc_l1_ops->close)
+		csta->dc_l1_ops->close(csta);
+
+	if (csta->card_ops->release)
+		csta->card_ops->release(csta);
 	if (csta->dbusytimer.function != NULL) // FIXME?
 		del_timer(&csta->dbusytimer);
 	ll_unload(csta);
@@ -854,19 +855,18 @@ static int __devinit init_card(struct IsdnCardState *cs)
 {
 	int irq_cnt, cnt = 3;
 
-	if (!cs->irq)
-		return cs->cardmsg(cs, CARD_INIT, NULL);
+	cs->card_ops->init(cs);
 
 	irq_cnt = kstat_irqs(cs->irq);
 	printk(KERN_INFO "%s: IRQ %d count %d\n", CardType[cs->typ],
 	       cs->irq, irq_cnt);
-	if (request_irq(cs->irq, cs->irq_func, cs->irq_flags, "HiSax", cs)) {
+	if (request_irq(cs->irq, cs->card_ops->irq_func, cs->irq_flags, "HiSax", cs)) {
 		printk(KERN_WARNING "HiSax: couldn't get interrupt %d\n",
 		       cs->irq);
 		return 1;
 	}
 	while (cnt) {
-		cs->cardmsg(cs, CARD_INIT, NULL);
+		cs->card_ops->init(cs);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		/* Timeout 10ms */
 		schedule_timeout((10 * HZ) / 1000);
@@ -880,11 +880,13 @@ static int __devinit init_card(struct IsdnCardState *cs)
 				free_irq(cs->irq, cs);
 				return 2;
 			} else {
-				cs->cardmsg(cs, CARD_RESET, NULL);
+				if (cs->card_ops->reset)
+					cs->card_ops->reset(cs);
 				cnt--;
 			}
 		} else {
-			cs->cardmsg(cs, CARD_TEST, NULL);
+			if (cs->card_ops->test)
+				cs->card_ops->test(cs);
 			return 0;
 		}
 	}
@@ -1747,6 +1749,10 @@ static void hisax_bc_close(struct BCState *bcs);
 static void hisax_bh(void *data);
 static void EChannel_proc_rcv(struct hisax_d_if *d_if);
 
+static struct dc_l1_ops hisax_l1_ops = {
+	.bh_func = hisax_bh,
+};
+
 int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 		   char *name, int protocol)
 {
@@ -1777,12 +1783,12 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cs->hw.hisax_d_if = hisax_d_if;
 	cs->cardmsg = hisax_cardmsg;
 	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
-	INIT_WORK(&cs->work, hisax_bh, cs);
+	dc_l1_init(cs, &hisax_l1_ops);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
-	for (i = 0; i < 2; i++) {
-		cs->bcs[i].BC_SetStack = hisax_bc_setstack;
-		cs->bcs[i].BC_Close = hisax_bc_close;
+	cs->bc_l1_ops->open = hisax_bc_setstack;
+	cs->bc_l1_ops->close = hisax_bc_close;
 
+	for (i = 0; i < 2; i++) {
 		b_if[i]->ifc.l1l2 = hisax_b_l1l2;
 
 		hisax_d_if->b_if[i] = b_if[i];

@@ -57,7 +57,7 @@ w6692_write_reg(struct IsdnCardState *cs, u8 offset, u8 value)
 	outb(value, cs->hw.w6692.iobase + offset);
 }
 
-static inline void
+static void
 w6692_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	insb(cs->hw.w6692.iobase + W_D_RFIFO, data, size);
@@ -68,6 +68,10 @@ w6692_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	outsb(cs->hw.w6692.iobase + W_D_XFIFO, data, size);
 }
+
+static struct dc_hw_ops w6692_dc_hw_ops = {
+	.read_fifo = w6692_read_fifo,
+};
 
 static inline u8
 w6692_bc_read_reg(struct IsdnCardState *cs, int bchan, u8 offset)
@@ -80,6 +84,16 @@ w6692_bc_write_reg(struct IsdnCardState *cs, int bchan, u8 offset, u8 value)
 {
 	outb(value, cs->hw.w6692.iobase + (bchan ? 0x40 : 0) + offset);
 }
+
+static void
+w6692_bc_read_fifo(struct IsdnCardState *cs, int bchan, u8 *data, int len)
+{
+	insb(cs->hw.w6692.iobase + W_B_RFIFO + (bchan ? 0x40:0), data, len);
+}
+
+static struct bc_hw_ops w6692_bc_hw_ops = {
+	.read_fifo  = w6692_bc_read_fifo,
+};
 
 static char *W6692Ver[] __initdata =
 {"W6692 V00", "W6692 V01", "W6692 V10",
@@ -171,30 +185,8 @@ W6692_bh(void *data)
 static void
 W6692_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u8 *ptr;
-
-	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
-		debugl1(cs, "W6692_empty_fifo");
-
-	if ((cs->rcvidx + count) >= MAX_DFRAME_LEN_L1) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "W6692_empty_fifo overrun %d",
-				cs->rcvidx + count);
-		w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RACK);
-		cs->rcvidx = 0;
-		return;
-	}
-	ptr = cs->rcvbuf + cs->rcvidx;
-	cs->rcvidx += count;
-	w6692_read_fifo(cs, ptr, count);
+	recv_empty_fifo_d(cs, count);
 	w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RACK);
-	if (cs->debug & L1_DEB_ISAC_FIFO) {
-		char *t = cs->dlog;
-
-		t += sprintf(t, "W6692_empty_fifo cnt %d", count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, cs->dlog);
-	}
 }
 
 static void
@@ -221,31 +213,8 @@ W6692_fill_fifo(struct IsdnCardState *cs)
 static void
 W6692B_empty_fifo(struct BCState *bcs, int count)
 {
-	u8 *ptr;
-	struct IsdnCardState *cs = bcs->cs;
-
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "W6692B_empty_fifo");
-
-	if (bcs->hw.w6692.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "W6692B_empty_fifo: incoming packet too large");
-		w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
-		bcs->hw.w6692.rcvidx = 0;
-		return;
-	}
-	ptr = bcs->hw.w6692.rcvbuf + bcs->hw.w6692.rcvidx;
-	bcs->hw.w6692.rcvidx += count;
-	READW6692BFIFO(cs, bcs->channel, ptr, count);
-	w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "W6692B_empty_fifo %c cnt %d",
-			     bcs->channel + '1', count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
+	recv_empty_fifo_b(bcs, count);
+	w6692_bc_write_reg(bcs->cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
 }
 
 static void
@@ -276,7 +245,6 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 	u8 val;
 	u8 r;
 	struct BCState *bcs;
-	struct sk_buff *skb;
 	int count;
 
 	bcs = (cs->bcs->channel == bchan) ? cs->bcs : (cs->bcs+1);
@@ -298,38 +266,18 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "W6692 B CRC error");
 			w6692_bc_write_reg(cs, bchan, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RRST | W_B_CMDR_RACT);
+			bcs->rcvidx = 0;
 		} else {
 			count = w6692_bc_read_reg(cs, bchan, W_B_RBCL) & (W_B_FIFO_THRESH - 1);
 			if (count == 0)
 				count = W_B_FIFO_THRESH;
 			W6692B_empty_fifo(bcs, count);
-			if ((count = bcs->hw.w6692.rcvidx) > 0) {
-				if (cs->debug & L1_DEB_HSCX_FIFO)
-					debugl1(cs, "W6692 Bchan Frame %d", count);
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "W6692: Bchan receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), bcs->hw.w6692.rcvbuf, count);
-					skb_queue_tail(&bcs->rqueue, skb);
-				}
-			}
+			recv_rme_b(bcs);
 		}
-		bcs->hw.w6692.rcvidx = 0;
-		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & W_B_EXI_RMR) {	/* RMR */
 		W6692B_empty_fifo(bcs, W_B_FIFO_THRESH);
-		if (bcs->mode == L1_MODE_TRANS) {
-			/* receive audio data */
-			if (!(skb = dev_alloc_skb(W_B_FIFO_THRESH)))
-				printk(KERN_WARNING "HiSax: receive out of memory\n");
-			else {
-				memcpy(skb_put(skb, W_B_FIFO_THRESH), bcs->hw.w6692.rcvbuf, W_B_FIFO_THRESH);
-				skb_queue_tail(&bcs->rqueue, skb);
-			}
-			bcs->hw.w6692.rcvidx = 0;
-			sched_b_event(bcs, B_RCVBUFREADY);
-		}
+		recv_rpf_b(bcs);
 	}
 	if (val & W_B_EXI_XFR) {	/* XFR */
 		xmit_xpr_b(bcs);
@@ -340,11 +288,10 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 }
 
 static void
-W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+w6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val, exval, v1;
-	struct sk_buff *skb;
 	unsigned int count;
 	int icnt = 5;
 
@@ -369,23 +316,14 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "W6692 D-channel ABORT");
 			w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RACK | W_D_CMDR_RRST);
+			cs->rcvidx = 0;
 		} else {
 			count = w6692_read_reg(cs, W_D_RBCL) & (W_D_FIFO_THRESH - 1);
 			if (count == 0)
 				count = W_D_FIFO_THRESH;
 			W6692_empty_fifo(cs, count);
-			if ((count = cs->rcvidx) > 0) {
-				cs->rcvidx = 0;
-				if (!(skb = alloc_skb(count, GFP_ATOMIC)))
-					printk(KERN_WARNING "HiSax: D receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), cs->rcvbuf, count);
-					skb_queue_tail(&cs->rq, skb);
-				}
-			}
+			recv_rme_d(cs);
 		}
-		cs->rcvidx = 0;
-		sched_d_event(cs, D_RCVBUFREADY);
 	}
 	if (val & W_INT_D_RMR) {	/* RMR */
 		W6692_empty_fifo(cs, W_D_FIFO_THRESH);
@@ -518,15 +456,11 @@ W6692_l1hw(struct PStack *st, int pr, void *arg)
 	}
 }
 
-static void
+static int
 setstack_W6692(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = W6692_l1hw;
-}
-
-static void
-DC_Close_W6692(struct IsdnCardState *cs)
-{
+	return 0;
 }
 
 static void
@@ -560,7 +494,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				debugl1(cs, "D-Channel Busy no skb");
 			}
 			w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_XRST);	/* Transmitter reset */
-			cs->irq_func(cs->irq, cs, NULL);
+			cs->card_ops->irq_func(cs->irq, cs, NULL); /* FIXME? */
 		}
 	}
 }
@@ -632,52 +566,13 @@ static void
 close_w6692state(struct BCState *bcs)
 {
 	W6692Bmode(bcs, 0, bcs->channel);
-	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.w6692.rcvbuf) {
-			kfree(bcs->hw.w6692.rcvbuf);
-			bcs->hw.w6692.rcvbuf = NULL;
-		}
-		if (bcs->blog) {
-			kfree(bcs->blog);
-			bcs->blog = NULL;
-		}
-		skb_queue_purge(&bcs->rqueue);
-		skb_queue_purge(&bcs->squeue);
-		if (bcs->tx_skb) {
-			dev_kfree_skb_any(bcs->tx_skb);
-			bcs->tx_skb = NULL;
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		}
-	}
+	bc_close(bcs);
 }
 
 static int
 open_w6692state(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.w6692.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-			       "HiSax: No memory for w6692.rcvbuf\n");
-			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			return (1);
-		}
-		if (!(bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-			       "HiSax: No memory for bcs->blog\n");
-			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.w6692.rcvbuf);
-			bcs->hw.w6692.rcvbuf = NULL;
-			return (2);
-		}
-		skb_queue_head_init(&bcs->rqueue);
-		skb_queue_head_init(&bcs->squeue);
-	}
-	bcs->tx_skb = NULL;
-	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	bcs->event = 0;
-	bcs->hw.w6692.rcvidx = 0;
-	bcs->tx_cnt = 0;
-	return (0);
+	return bc_open(bcs);
 }
 
 static int
@@ -694,7 +589,8 @@ setstack_w6692(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
-void resetW6692(struct IsdnCardState *cs)
+static int
+w6692_reset(struct IsdnCardState *cs)
 {
 	w6692_write_reg(cs, W_D_CTL, W_D_CTL_SRST);
 	schedule_timeout((10*HZ)/1000);
@@ -714,66 +610,64 @@ void resetW6692(struct IsdnCardState *cs)
 		w6692_write_reg(cs, W_PCTL, 0x80);
 		w6692_write_reg(cs, W_XDATA, 0x00);
 	}
+	return 0;
 }
 
-void __init initW6692(struct IsdnCardState *cs, int part)
+static void
+w6692_init(struct IsdnCardState *cs)
 {
-	if (part & 1) {
-		INIT_WORK(&cs->work, W6692_bh, cs);
-		cs->setstack_d = setstack_W6692;
-		cs->DC_Close = DC_Close_W6692;
-		cs->dbusytimer.function = (void *) dbusy_timer_handler;
-		cs->dbusytimer.data = (long) cs;
-		init_timer(&cs->dbusytimer);
-		resetW6692(cs);
-		ph_command(cs, W_L1CMD_RST);
-		cs->dc.w6692.ph_state = W_L1CMD_RST;
-		W6692_new_ph(cs);
-		ph_command(cs, W_L1CMD_ECK);
+	w6692_reset(cs);
+	ph_command(cs, W_L1CMD_RST);
+	cs->dc.w6692.ph_state = W_L1CMD_RST;
+	W6692_new_ph(cs);
+	ph_command(cs, W_L1CMD_ECK);
+	
+	W6692Bmode(cs->bcs, 0, 0);
+	W6692Bmode(cs->bcs + 1, 0, 0);
 
-		cs->bcs[0].BC_SetStack = setstack_w6692;
-		cs->bcs[1].BC_SetStack = setstack_w6692;
-		cs->bcs[0].BC_Close = close_w6692state;
-		cs->bcs[1].BC_Close = close_w6692state;
-		W6692Bmode(cs->bcs, 0, 0);
-		W6692Bmode(cs->bcs + 1, 0, 0);
-	}
-	if (part & 2) {
-		/* Reenable all IRQ */
-		w6692_write_reg(cs, W_IMASK, 0x18);
-		w6692_write_reg(cs, W_D_EXIM, 0x00);
-		w6692_bc_write_reg(cs, 0, W_B_EXIM, 0x00);
-		w6692_bc_write_reg(cs, 1, W_B_EXIM, 0x00);
-		/* Reset D-chan receiver and transmitter */
-		w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RRST | W_D_CMDR_XRST);
-	}
+	/* Reenable all IRQ */
+	w6692_write_reg(cs, W_IMASK, 0x18);
+	w6692_write_reg(cs, W_D_EXIM, 0x00);
+	w6692_bc_write_reg(cs, 0, W_B_EXIM, 0x00);
+	w6692_bc_write_reg(cs, 1, W_B_EXIM, 0x00);
+	/* Reset D-chan receiver and transmitter */
+	w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RRST | W_D_CMDR_XRST);
+}
+
+
+static void
+w6692_release(struct IsdnCardState *cs)
+{
+	w6692_write_reg(cs, W_IMASK, 0xff);
+	release_region(cs->hw.w6692.iobase, 256);
+	if (cs->subtyp == W6692_USR)
+		w6692_write_reg(cs, W_XDATA, 0x04);
 }
 
 static int
 w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			resetW6692(cs);
-			return (0);
-		case CARD_RELEASE:
-			w6692_write_reg(cs, W_IMASK, 0xff);
-			release_region(cs->hw.w6692.iobase, 256);
-			if (cs->subtyp == W6692_USR) {
-				w6692_write_reg(cs, W_XDATA, 0x04);
-			}
-			return (0);
-		case CARD_INIT:
-			initW6692(cs, 3);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
 
+static struct card_ops w6692_ops = {
+	.init     = w6692_init,
+	.reset    = w6692_reset,
+	.release  = w6692_release,
+	.irq_func = w6692_interrupt,
+};
+
+static struct dc_l1_ops w6692_dc_l1_ops = {
+	.fill_fifo  = W6692_fill_fifo,
+	.open       = setstack_W6692,
+	.bh_func    = W6692_bh,
+	.dbusy_func = dbusy_timer_handler,
+};
+
 static struct bc_l1_ops w6692_bc_l1_ops = {
 	.fill_fifo = W6692B_fill_fifo,
+	.open      = setstack_w6692,
+	.close     = close_w6692state,
 };
 
 static int id_idx ;
@@ -864,11 +758,13 @@ setup_w6692(struct IsdnCard *card)
 	       id_list[cs->subtyp].card_name, cs->irq,
 	       cs->hw.w6692.iobase);
 
+	cs->dc_hw_ops = &w6692_dc_hw_ops;
+	cs->bc_hw_ops = &w6692_bc_hw_ops;
+	dc_l1_init(cs, &w6692_dc_l1_ops);
 	cs->bc_l1_ops = &w6692_bc_l1_ops;
-	cs->DC_Send_Data = &W6692_fill_fifo;
 	cs->cardmsg = &w6692_card_msg;
-	cs->irq_func = &W6692_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &w6692_ops;
 	W6692Version(cs, "W6692:");
 	printk(KERN_INFO "W6692 ISTA=0x%X\n", w6692_read_reg(cs, W_ISTA));
 	printk(KERN_INFO "W6692 IMASK=0x%X\n", w6692_read_reg(cs, W_IMASK));

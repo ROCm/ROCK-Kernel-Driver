@@ -132,8 +132,8 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-release_io_isurf(struct IsdnCardState *cs)
+static void
+isurf_release(struct IsdnCardState *cs)
 {
 	release_region(cs->hw.isurf.reset, 1);
 	iounmap((unsigned char *)cs->hw.isurf.isar);
@@ -156,21 +156,6 @@ reset_isurf(struct IsdnCardState *cs, u8 chips)
 static int
 ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_isurf(cs, ISURF_RESET);
-			return(0);
-		case CARD_RELEASE:
-			release_io_isurf(cs);
-			return(0);
-		case CARD_INIT:
-			writeb(0, cs->hw.isurf.isar+ISAR_IRQBIT);mb();
-			initisac(cs);
-			initisar(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
@@ -189,6 +174,28 @@ isurf_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 	}
 	return(isar_auxcmd(cs, ic));
 }
+
+static void
+isurf_init(struct IsdnCardState *cs)
+{
+	writeb(0, cs->hw.isurf.isar + ISAR_IRQBIT);
+	initisac(cs);
+	initisar(cs);
+}
+
+static int
+isurf_reset(struct IsdnCardState *cs)
+{
+	reset_isurf(cs, ISURF_RESET);
+	return 0;
+}
+
+static struct card_ops isurf_ops = {
+	.init     = isurf_init,
+	.reset    = isurf_reset,
+	.release  = isurf_release,
+	.irq_func = isurf_interrupt,
+};
 
 #ifdef __ISAPNP__
 static struct pci_bus *pnp_surf __devinitdata = NULL;
@@ -283,8 +290,8 @@ setup_isurf(struct IsdnCard *card)
 	       cs->irq);
 
 	cs->cardmsg = &ISurf_card_msg;
-	cs->irq_func = &isurf_interrupt;
 	cs->auxcmd = &isurf_auxcmd;
+	cs->card_ops = &isurf_ops;
 	cs->dc_hw_ops = &isac_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;
@@ -296,7 +303,7 @@ setup_isurf(struct IsdnCard *card)
 	if (ver < 0) {
 		printk(KERN_WARNING
 			"ISurf: wrong ISAR version (ret = %d)\n", ver);
-		release_io_isurf(cs);
+		isurf_release(cs);
 		return (0);
 	}
 	return (1);

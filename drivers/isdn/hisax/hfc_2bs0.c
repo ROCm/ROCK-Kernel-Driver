@@ -546,6 +546,8 @@ init_send(struct BCState *bcs)
 
 static struct bc_l1_ops hfc_l1_ops = {
 	.fill_fifo = hfc_fill_fifo,
+	.open      = setstack_hfc,
+	.close     = close_hfcstate,
 };
 
 void __init
@@ -554,10 +556,6 @@ inithfc(struct IsdnCardState *cs)
 	init_send(&cs->bcs[0]);
 	init_send(&cs->bcs[1]);
 	cs->bc_l1_ops = &hfc_l1_ops;
-	cs->bcs[0].BC_SetStack = setstack_hfc;
-	cs->bcs[1].BC_SetStack = setstack_hfc;
-	cs->bcs[0].BC_Close = close_hfcstate;
-	cs->bcs[1].BC_Close = close_hfcstate;
 	mode_hfc(cs->bcs, 0, 0);
 	mode_hfc(cs->bcs + 1, 0, 0);
 }

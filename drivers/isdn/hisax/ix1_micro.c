@@ -141,49 +141,13 @@ static struct bc_hw_ops hscx_ops = {
 };
 
 static void
-ix1micro_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 val;
-
-	spin_lock(&cs->lock);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
-}
-
-void
-release_io_ix1micro(struct IsdnCardState *cs)
+ix1_release(struct IsdnCardState *cs)
 {
 	if (cs->hw.ix1.cfg_reg)
 		release_region(cs->hw.ix1.cfg_reg, 4);
 }
 
-static void
+static int
 ix1_reset(struct IsdnCardState *cs)
 {
 	int cnt;
@@ -195,26 +159,21 @@ ix1_reset(struct IsdnCardState *cs)
 		HZDELAY(1);	/* wait >=10 ms */
 	}
 	byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 0);
+	return 0;
 }
 
 static int
 ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			ix1_reset(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_ix1micro(cs);
-			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
+
+static struct card_ops ix1_ops = {
+	.init     = inithscxisac,
+	.reset    = ix1_reset,
+	.release  = ix1_release,
+	.irq_func = hscxisac_irq,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id itk_ids[] __initdata = {
@@ -307,12 +266,12 @@ setup_ix1micro(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &ix1_card_msg;
-	cs->irq_func = &ix1micro_interrupt;
+	cs->card_ops = &ix1_ops;
 	ISACVersion(cs, "ix1-Micro:");
 	if (HscxVersion(cs, "ix1-Micro:")) {
 		printk(KERN_WARNING
 		    "ix1-Micro: wrong HSCX versions check IO address\n");
-		release_io_ix1micro(cs);
+		ix1_release(cs);
 		return (0);
 	}
 	return (1);

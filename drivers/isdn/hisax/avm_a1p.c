@@ -192,35 +192,34 @@ avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 static int
 AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
-			HZDELAY(HZ / 5 + 1);
-			byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,ASL0_W_RESET);
-			HZDELAY(HZ / 5 + 1);
-			byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
-			return 0;
-
-		case CARD_RELEASE:
-			/* free_irq is done in HiSax_closecard(). */
-		        /* free_irq(cs->irq, cs); */
-			return 0;
-
-		case CARD_INIT:
-			byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,ASL0_W_TDISABLE|ASL0_W_TRESET|ASL0_W_IRQENABLE);
-			inithscxisac(cs);
-			return 0;
-
-		case CARD_TEST:
-			/* we really don't need it for the PCMCIA Version */
-			return 0;
-
-		default:
-			/* all card drivers ignore others, so we do the same */
-			return 0;
-	}
 	return 0;
 }
+
+static void
+avm_a1p_init(struct IsdnCardState *cs)
+{
+	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,
+		ASL0_W_TDISABLE|ASL0_W_TRESET|ASL0_W_IRQENABLE);
+	inithscxisac(cs);
+}
+
+static int
+avm_a1p_reset(struct IsdnCardState *cs)
+{
+	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
+	HZDELAY(HZ / 5 + 1);
+	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,ASL0_W_RESET);
+	HZDELAY(HZ / 5 + 1);
+	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
+
+	return 0;
+}
+
+static struct card_ops avm_a1p_ops = {
+	.init     = avm_a1p_init,
+	.reset    = avm_a1p_reset,
+	.irq_func = avm_a1p_interrupt,
+};
 
 int __devinit
 setup_avm_a1_pcmcia(struct IsdnCard *card)
@@ -259,7 +258,7 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &AVM_card_msg;
-	cs->irq_func = &avm_a1p_interrupt;
+	cs->card_ops = &avm_a1p_ops;
 
 	ISACVersion(cs, "AVM A1 PCMCIA:");
 	if (HscxVersion(cs, "AVM A1 PCMCIA:")) {
