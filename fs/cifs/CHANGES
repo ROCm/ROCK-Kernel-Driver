@@ -1,3 +1,8 @@
+Version 0.80
+-----------
+Fix oops on stopping oplock thread when removing cifs when
+built as module.
+
 Version 0.79
 ------------
 Fix mount options for ro (readonly), uid, gid and file and directory mode. 
