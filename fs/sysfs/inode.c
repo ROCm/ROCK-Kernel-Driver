@@ -33,7 +33,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/backing-dev.h>
-#include <linux/sysfs.h>
+#include <linux/kobject.h>
 
 #include <asm/uaccess.h>
 
@@ -42,7 +42,6 @@
 
 static struct super_operations sysfs_ops;
 static struct file_operations sysfs_file_operations;
-static struct inode_operations sysfs_dir_inode_operations;
 static struct address_space_operations sysfs_aops;
 
 static struct vfsmount *sysfs_mount;
@@ -51,45 +50,6 @@ static struct backing_dev_info sysfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
-
-static int sysfs_readpage(struct file *file, struct page * page)
-{
-	if (!PageUptodate(page)) {
-		void *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		SetPageUptodate(page);
-	}
-	unlock_page(page);
-	return 0;
-}
-
-static int sysfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
-{
-	if (!PageUptodate(page)) {
-		void *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		SetPageUptodate(page);
-	}
-	return 0;
-}
-
-static int sysfs_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
-{
-	struct inode *inode = page->mapping->host;
-	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-
-	set_page_dirty(page);
-	if (pos > inode->i_size)
-		inode->i_size = pos;
-	return 0;
-}
-
 
 static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 {
@@ -113,7 +73,7 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 			inode->i_fop = &sysfs_file_operations;
 			break;
 		case S_IFDIR:
-			inode->i_op = &sysfs_dir_inode_operations;
+			inode->i_op = &simple_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
 
 			/* directory inodes start off with i_nlink == 2 (for "." entry) */
@@ -182,29 +142,6 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 	return error;
 }
 
-static inline int sysfs_positive(struct dentry *dentry)
-{
-	return (dentry->d_inode && !d_unhashed(dentry));
-}
-
-static int sysfs_empty(struct dentry *dentry)
-{
-	struct list_head *list;
-
-	spin_lock(&dcache_lock);
-
-	list_for_each(list, &dentry->d_subdirs) {
-		struct dentry *de = list_entry(list, struct dentry, d_child);
-		if (sysfs_positive(de)) {
-			spin_unlock(&dcache_lock);
-			return 0;
-		}
-	}
-
-	spin_unlock(&dcache_lock);
-	return 1;
-}
-
 static int sysfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
@@ -217,30 +154,35 @@ static int sysfs_unlink(struct inode *dir, struct dentry *dentry)
 }
 
 /**
- * sysfs_read_file - "read" data from a file.
- * @file:	file pointer
- * @buf:	buffer to fill
- * @count:	number of bytes to read
- * @ppos:	starting offset in file
+ *	sysfs_read_file - read an attribute. 
+ *	@file:	file pointer.
+ *	@buf:	buffer to fill.
+ *	@count:	number of bytes to read.
+ *	@ppos:	starting offset in file.
  *
- * Userspace wants data from a file. It is up to the creator of the file to
- * provide that data.
- * There is a struct device_attribute embedded in file->private_data. We
- * obtain that and check if the read callback is implemented. If so, we call
- * it, passing the data field of the file entry.
- * Said callback is responsible for filling the buffer and returning the number
- * of bytes it put in it. We update @ppos correctly.
+ *	Userspace wants to read an attribute file. The attribute descriptor
+ *	is in the file's ->d_fsdata. The target object is in the directory's
+ *	->d_fsdata. 
+ *
+ *	We allocate a %PAGE_SIZE buffer, and pass it to the object's ->show()
+ *	method (along with the object). We loop doing this until @count is 
+ *	satisfied, or ->show() returns %0. 
  */
+
 static ssize_t
 sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct driver_dir_entry * dir;
+	struct sysfs_ops * ops = NULL;
+	struct kobject * kobj;
 	unsigned char *page;
 	ssize_t retval = 0;
 
-	dir = file->f_dentry->d_parent->d_fsdata;
-	if (!dir->ops->show)
+	kobj = file->f_dentry->d_parent->d_fsdata;
+	if (kobj)
+		ops = kobj->dir.ops;
+
+	if (!ops || !ops->show)
 		return 0;
 
 	if (count > PAGE_SIZE)
@@ -253,7 +195,7 @@ sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	while (count > 0) {
 		ssize_t len;
 
-		len = dir->ops->show(dir,attr,page,count,*ppos);
+		len = ops->show(kobj,attr,page,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -277,27 +219,32 @@ sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 }
 
 /**
- * sysfs_write_file - "write" to a file
- * @file:	file pointer
- * @buf:	data to write
- * @count:	number of bytes
- * @ppos:	starting offset
+ *	sysfs_write_file - write an attribute.
+ *	@file:	file pointer
+ *	@buf:	data to write
+ *	@count:	number of bytes
+ *	@ppos:	starting offset
  *
- * Similarly to sysfs_read_file, we act essentially as a bit pipe.
- * We check for a "write" callback in file->private_data, and pass
- * @buffer, @count, @ppos, and the file entry's data to the callback.
- * The number of bytes written is returned, and we handle updating
- * @ppos properly.
+ *	Identical to sysfs_read_file(), though going the opposite direction.
+ *	We allocate a %PAGE_SIZE buffer and copy in the userspace buffer. We
+ *	pass that to the object's ->store() method until we reach @count or 
+ *	->store() returns %0 or less.
  */
+
 static ssize_t
 sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct driver_dir_entry * dir;
+	struct sysfs_ops * ops = NULL;
+	struct kobject * kobj;
 	ssize_t retval = 0;
 	char * page;
 
-	dir = file->f_dentry->d_parent->d_fsdata;
+	kobj = file->f_dentry->d_parent->d_fsdata;
+	if (kobj)
+		ops = kobj->dir.ops;
+	if (!ops || !ops->store)
+		return 0;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -312,7 +259,7 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	while (count > 0) {
 		ssize_t len;
 
-		len = dir->ops->store(dir,attr,page + retval,count,*ppos);
+		len = ops->store(kobj,attr,page + retval,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -329,77 +276,42 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	return retval;
 }
 
-static loff_t
-sysfs_file_lseek(struct file *file, loff_t offset, int orig)
-{
-	loff_t retval = -EINVAL;
-
-	down(&file->f_dentry->d_inode->i_sem);
-	switch(orig) {
-	case 0:
-		if (offset > 0) {
-			file->f_pos = offset;
-			retval = file->f_pos;
-		}
-		break;
-	case 1:
-		if ((offset + file->f_pos) > 0) {
-			file->f_pos += offset;
-			retval = file->f_pos;
-		}
-		break;
-	default:
-		break;
-	}
-	up(&file->f_dentry->d_inode->i_sem);
-	return retval;
-}
-
 static int sysfs_open_file(struct inode * inode, struct file * filp)
 {
-	struct driver_dir_entry * dir;
+	struct kobject * kobj;
 	int error = 0;
 
-	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
-	if (dir) {
+	kobj = filp->f_dentry->d_parent->d_fsdata;
+	if ((kobj = kobject_get(kobj))) {
 		struct attribute * attr = filp->f_dentry->d_fsdata;
-		if (attr && dir->ops) {
-			if (dir->ops->open)
-				error = dir->ops->open(dir);
-			goto Done;
-		}
-	}
-	error = -EINVAL;
- Done:
+		if (!attr)
+			error = -EINVAL;
+	} else
+		error = -EINVAL;
 	return error;
 }
 
 static int sysfs_release(struct inode * inode, struct file * filp)
 {
-	struct driver_dir_entry * dir;
-	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
-	if (dir->ops->close)
-		dir->ops->close(dir);
+	struct kobject * kobj = filp->f_dentry->d_parent->d_fsdata;
+	if (kobj) 
+		kobject_put(kobj);
 	return 0;
 }
 
 static struct file_operations sysfs_file_operations = {
 	.read		= sysfs_read_file,
 	.write		= sysfs_write_file,
-	.llseek		= sysfs_file_lseek,
+	.llseek		= generic_file_llseek,
 	.open		= sysfs_open_file,
 	.release	= sysfs_release,
 };
 
-static struct inode_operations sysfs_dir_inode_operations = {
-	.lookup		= simple_lookup,
-};
-
 static struct address_space_operations sysfs_aops = {
-	.readpage	= sysfs_readpage,
+	.readpage	= simple_readpage,
 	.writepage	= fail_writepage,
-	.prepare_write	= sysfs_prepare_write,
-	.commit_write	= sysfs_commit_write
+	.prepare_write	= simple_prepare_write,
+	.commit_write	= simple_commit_write
 };
 
 static struct super_operations sysfs_ops = {
@@ -464,6 +376,7 @@ static int __init sysfs_init(void)
 
 core_initcall(sysfs_init);
 
+
 static struct dentry * get_dentry(struct dentry * parent, const char * name)
 {
 	struct qstr qstr;
@@ -474,137 +387,160 @@ static struct dentry * get_dentry(struct dentry * parent, const char * name)
 	return lookup_hash(&qstr,parent);
 }
 
+
 /**
- * sysfs_create_dir - create a directory in the filesystem
- * @entry:	directory entry
- * @parent:	parent directory entry
+ *	sysfs_create_dir - create a directory for an object.
+ *	@parent:	parent parent object.
+ *	@kobj:		object we're creating directory for. 
  */
-int
-sysfs_create_dir(struct driver_dir_entry * entry,
-		    struct driver_dir_entry * parent)
+
+int sysfs_create_dir(struct kobject * kobj)
 {
 	struct dentry * dentry = NULL;
-	struct dentry * parent_dentry;
+	struct dentry * parent;
 	int error = 0;
 
-	if (!entry)
+	if (!kobj)
 		return -EINVAL;
 
-	parent_dentry = parent ? parent->dentry : NULL;
-
-	if (!parent_dentry)
-		if (sysfs_mount && sysfs_mount->mnt_sb)
-			parent_dentry = sysfs_mount->mnt_sb->s_root;
-
-	if (!parent_dentry)
+	if (kobj->parent)
+		parent = kobj->parent->dir.dentry;
+	else if (sysfs_mount && sysfs_mount->mnt_sb)
+		parent = sysfs_mount->mnt_sb->s_root;
+	else
 		return -EFAULT;
 
-	down(&parent_dentry->d_inode->i_sem);
-	dentry = get_dentry(parent_dentry,entry->name);
+	down(&parent->d_inode->i_sem);
+	dentry = get_dentry(parent,kobj->name);
 	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *) entry;
-		entry->dentry = dentry;
-		error = sysfs_mkdir(parent_dentry->d_inode,dentry,entry->mode);
+		dentry->d_fsdata = (void *)kobj;
+		kobj->dir.dentry = dentry;
+		error = sysfs_mkdir(parent->d_inode,dentry,
+				    (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO));
 	} else
 		error = PTR_ERR(dentry);
-	up(&parent_dentry->d_inode->i_sem);
+	up(&parent->d_inode->i_sem);
 
 	return error;
 }
 
-/**
- * sysfs_create_file - create a file
- * @entry:	structure describing the file
- * @parent:	directory to create it in
- */
-int
-sysfs_create_file(struct attribute * entry,
-		     struct driver_dir_entry * parent)
-{
-	struct dentry * dentry;
-	int error = 0;
-
-	if (!entry || !parent)
-		return -EINVAL;
-
-	if (!parent->dentry)
-		return -EINVAL;
-
-	down(&parent->dentry->d_inode->i_sem);
-	dentry = get_dentry(parent->dentry,entry->name);
-	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)entry;
-		error = sysfs_create(parent->dentry->d_inode,dentry,entry->mode);
-	} else
-		error = PTR_ERR(dentry);
-	up(&parent->dentry->d_inode->i_sem);
-	return error;
-}
 
 /**
- * sysfs_create_symlink - make a symlink
- * @parent:	directory we're creating in 
- * @entry:	entry describing link
- * @target:	place we're symlinking to
- * 
+ *	sysfs_create_file - create an attribute file for an object.
+ *	@kobj:	object we're creating for. 
+ *	@attr:	atrribute descriptor.
  */
-int sysfs_create_symlink(struct driver_dir_entry * parent, 
-			    char * name, char * target)
+
+int sysfs_create_file(struct kobject * kobj, struct attribute * attr)
 {
 	struct dentry * dentry;
+	struct dentry * parent;
 	int error = 0;
 
-	if (!parent || !parent->dentry)
+	if (!kobj || !attr)
 		return -EINVAL;
 
-	down(&parent->dentry->d_inode->i_sem);
-	dentry = get_dentry(parent->dentry,name);
-	if (!IS_ERR(dentry))
-		error = sysfs_symlink(parent->dentry->d_inode,dentry,target);
+	if (kobj->parent)
+		parent = kobj->parent->dir.dentry;
 	else
+		return -ENOENT;
+
+	down(&parent->d_inode->i_sem);
+	dentry = get_dentry(parent,attr->name);
+	if (!IS_ERR(dentry)) {
+		dentry->d_fsdata = (void *)attr;
+		error = sysfs_create(parent->d_inode,dentry,attr->mode);
+	} else
 		error = PTR_ERR(dentry);
-	up(&parent->dentry->d_inode->i_sem);
+	up(&parent->d_inode->i_sem);
 	return error;
 }
 
+
 /**
- * sysfs_remove_file - exported file removal
- * @dir:	directory the file supposedly resides in
- * @name:	name of the file
- *
- * Try and find the file in the dir's list.
- * If it's there, call __remove_file() (above) for the dentry.
+ *	sysfs_create_symlink - make a symlink
+ *	@kobj:	object who's directory we're creating in. 
+ *	@name:	name of the symlink.
+ *	@target:	path we're pointing to.
  */
-void sysfs_remove_file(struct driver_dir_entry * dir, const char * name)
+
+int sysfs_create_link(struct kobject * kobj, char * name, char * target)
 {
 	struct dentry * dentry;
+	int error;
 
-	if (!dir->dentry)
-		return;
+	if (kobj) {
+		struct dentry * parent = kobj->dir.dentry;
 
-	down(&dir->dentry->d_inode->i_sem);
-	dentry = get_dentry(dir->dentry,name);
-	if (!IS_ERR(dentry)) {
+		down(&parent->d_inode->i_sem);
+		dentry = get_dentry(parent,name);
+		if (!IS_ERR(dentry))
+			error = sysfs_symlink(parent->d_inode,dentry,target);
+		else
+			error = PTR_ERR(dentry);
+		up(&parent->d_inode->i_sem);
+	} else
+		error = -EINVAL;
+	return error;
+}
+
+
+static void hash_and_remove(struct dentry * dir, const char * name)
+{
+	struct dentry * victim;
+
+	down(&dir->d_inode->i_sem);
+	victim = get_dentry(dir,name);
+	if (!IS_ERR(victim)) {
 		/* make sure dentry is really there */
-		if (dentry->d_inode && 
-		    (dentry->d_parent->d_inode == dir->dentry->d_inode)) {
-			sysfs_unlink(dir->dentry->d_inode,dentry);
+		if (victim->d_inode && 
+		    (victim->d_parent->d_inode == dir->d_inode)) {
+			sysfs_unlink(dir->d_inode,victim);
 		}
 	}
-	up(&dir->dentry->d_inode->i_sem);
+	up(&dir->d_inode->i_sem);
 }
 
+
 /**
- * sysfs_remove_dir - exportable directory removal
- * @dir:	directory to remove
+ *	sysfs_remove_file - remove an object attribute.
+ *	@kobj:	object we're acting for.
+ *	@attr:	attribute descriptor.
  *
- * To make sure we don't orphan anyone, first remove
- * all the children in the list, then do clean up the directory.
+ *	Hash the attribute name and kill the victim.
  */
-void sysfs_remove_dir(struct driver_dir_entry * dir)
+
+void sysfs_remove_file(struct kobject * kobj, struct attribute * attr)
+{
+	hash_and_remove(kobj->dir.dentry,attr->name);
+}
+
+
+/**
+ *	sysfs_remove_link - remove symlink in object's directory.
+ *	@kobj:	object we're acting for.
+ *	@name:	name of the symlink to remove.
+ */
+
+void sysfs_remove_link(struct kobject * kobj, char * name)
+{
+	hash_and_remove(kobj->dir.dentry,name);
+}
+
+
+/**
+ *	sysfs_remove_dir - remove an object's directory.
+ *	@kobj:	object. 
+ *
+ *	The only thing special about this is that we remove any files in 
+ *	the directory before we remove the directory, and we've inlined
+ *	what used to be sysfs_rmdir() below, instead of calling separately.
+ */
+
+void sysfs_remove_dir(struct kobject * kobj)
 {
 	struct list_head * node, * next;
-	struct dentry * dentry = dir->dentry;
+	struct dentry * dentry = kobj->dir.dentry;
 	struct dentry * parent;
 
 	if (!dentry)
@@ -622,7 +558,7 @@ void sysfs_remove_dir(struct driver_dir_entry * dir)
 	}
 
 	d_invalidate(dentry);
-	if (sysfs_empty(dentry)) {
+	if (simple_empty(dentry)) {
 		dentry->d_inode->i_nlink -= 2;
 		dentry->d_inode->i_flags |= S_DEAD;
 		parent->d_inode->i_nlink--;
@@ -635,8 +571,9 @@ void sysfs_remove_dir(struct driver_dir_entry * dir)
 }
 
 EXPORT_SYMBOL(sysfs_create_file);
-EXPORT_SYMBOL(sysfs_create_symlink);
-EXPORT_SYMBOL(sysfs_create_dir);
 EXPORT_SYMBOL(sysfs_remove_file);
+EXPORT_SYMBOL(sysfs_create_link);
+EXPORT_SYMBOL(sysfs_remove_link);
+EXPORT_SYMBOL(sysfs_create_dir);
 EXPORT_SYMBOL(sysfs_remove_dir);
 MODULE_LICENSE("GPL");
