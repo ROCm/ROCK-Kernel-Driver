@@ -712,7 +712,7 @@ csum_page(struct page *page, int offset, int copy)
 /*
  *	ip_append_data() and ip_append_page() can make one large IP datagram
  *	from many pieces of data. Each pieces will be holded on the socket
- *	until ip_push_pending_frames() is called. Eache pieces can be a page
+ *	until ip_push_pending_frames() is called. Each piece can be a page
  *	or non-page data.
  *	
  *	Not only UDP, other transport protocols - e.g. raw sockets - can use
@@ -1002,7 +1002,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	int mtu;
 	int len;
 	int err;
-	unsigned int maxfraglen, fragheaderlen;
+	unsigned int maxfraglen, fragheaderlen, fraggap = 0;
 
 	if (inet->hdrincl)
 		return -EPERM;
@@ -1024,12 +1024,26 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	mtu = inet->cork.fragsize;
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);
-	maxfraglen = ((mtu-fragheaderlen) & ~7) + fragheaderlen;
 
 	if (inet->cork.length + size > 0xFFFF - fragheaderlen) {
 		ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport, mtu);
 		return -EMSGSIZE;
 	}
+
+	/*
+	 * Let's try using as much space as possible to avoid generating
+	 * additional unnecessary small fragment of length 
+	 * (mtu-fragheaderlen)%8 if mtu-fragheaderlen is not 0 modulo 8.
+	 * -- yoshfuji
+	 */
+	if (fragheaderlen + inet->cork.length + size <= mtu)
+		maxfraglen = mtu;
+	else
+		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen;
+
+	if (fragheaderlen + inet->cork.length <= mtu &&
+	    fragheaderlen + inet->cork.length + size > mtu)
+		fraggap = 1;
 
 	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
 		return -EINVAL;
@@ -1039,12 +1053,19 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	while (size > 0) {
 		int i;
 		if ((len = maxfraglen - skb->len) <= 0) {
+			struct sk_buff *skb_prev;
 			char *data;
 			struct iphdr *iph;
-			BUG_TRAP(len == 0);
+			int alloclen;
 
-			skb = sock_wmalloc(sk, fragheaderlen + hh_len + 15, 1,
-					   sk->sk_allocation);
+			BUG_TRAP(fraggap || len == 0);
+
+			skb_prev = skb;
+			if (fraggap)
+				fraggap = -len;
+
+			alloclen = fragheaderlen + hh_len + fraggap + 15;
+			skb = sock_wmalloc(sk, alloclen, 1, sk->sk_allocation);
 			if (unlikely(!skb)) {
 				err = -ENOBUFS;
 				goto error;
@@ -1060,10 +1081,16 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 			/*
 			 *	Find where to start putting bytes.
 			 */
-			data = skb_put(skb, fragheaderlen);
+			data = skb_put(skb, fragheaderlen + fraggap);
 			skb->nh.iph = iph = (struct iphdr *)data;
 			data += fragheaderlen;
 			skb->h.raw = data;
+
+			if (fraggap) {
+				skb_copy_bits(skb_prev, maxfraglen,
+					      data, fraggap);
+				skb_trim(skb_prev, maxfraglen);
+			}
 
 			/*
 			 * Put the packet on the pending queue.
