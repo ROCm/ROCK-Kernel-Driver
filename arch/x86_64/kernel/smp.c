@@ -368,7 +368,7 @@ void smp_kdb_stop(void)
 }
 
 
-void dump_send_ipi(int (*dump_ipi_handler)(struct pt_regs *));
+/* void dump_send_ipi(int (*dump_ipi_handler)(struct pt_regs *)); */
 void dump_send_ipi(void)
 {
 	send_IPI_allbutself(DUMP_VECTOR);
