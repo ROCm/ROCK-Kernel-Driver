@@ -39,8 +39,12 @@ struct hl_host_info {
 
 
 static LIST_HEAD(hl_drivers);
-static rwlock_t hl_drivers_lock = RW_LOCK_UNLOCKED;
+static DECLARE_RWSEM(hl_drivers_sem);
 
+static LIST_HEAD(hl_irqs);
+static rwlock_t hl_irqs_lock = RW_LOCK_UNLOCKED;
+
+static LIST_HEAD(addr_space);
 static rwlock_t addr_space_lock = RW_LOCK_UNLOCKED;
 
 /* addr_space list will have zero and max already included as bounds */
@@ -238,19 +242,21 @@ static int highlevel_for_each_host_reg(struct hpsb_host *host, void *__data)
 
 void hpsb_register_highlevel(struct hpsb_highlevel *hl)
 {
-	unsigned long flags;
-
         INIT_LIST_HEAD(&hl->addr_list);
 	INIT_LIST_HEAD(&hl->host_info_list);
 
 	rwlock_init(&hl->host_info_lock);
 
-	write_lock_irqsave(&hl_drivers_lock, flags);
+	down_write(&hl_drivers_sem);
         list_add_tail(&hl->hl_list, &hl_drivers);
-	write_unlock_irqrestore(&hl_drivers_lock, flags);
+	up_write(&hl_drivers_sem);
 
 	if (hl->add_host)
 		nodemgr_for_each_host(hl, highlevel_for_each_host_reg);
+
+	write_lock(&hl_irqs_lock);
+	list_add_tail(&hl->irq_list, &hl_irqs);
+	write_unlock(&hl_irqs_lock);
 
         return;
 }
@@ -279,9 +285,13 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl)
         }
 	write_unlock_irqrestore(&addr_space_lock, flags);
 
-	write_lock_irqsave(&hl_drivers_lock, flags);
+	write_lock(&hl_irqs_lock);
+	list_del(&hl->irq_list);
+	write_unlock(&hl_irqs_lock);
+
+	down_write(&hl_drivers_sem);
         list_del(&hl->hl_list);
-	write_unlock_irqrestore(&hl_drivers_lock, flags);
+	up_write(&hl_drivers_sem);
 
         if (hl->remove_host)
 		nodemgr_for_each_host(hl, highlevel_for_each_host_unreg);
@@ -395,38 +405,31 @@ void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
 
 void highlevel_add_host(struct hpsb_host *host)
 {
-        struct list_head *entry;
         struct hpsb_highlevel *hl;
 
-        init_hpsb_highlevel(host);
-
-        read_lock(&hl_drivers_lock);
-        list_for_each(entry, &hl_drivers) {
-                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
+	down_read(&hl_drivers_sem);
+        list_for_each_entry(hl, &hl_drivers, hl_list) {
 		if (hl->add_host)
 			hl->add_host(host);
         }
-        read_unlock(&hl_drivers_lock);
+	up_read(&hl_drivers_sem);
 }
 
 void highlevel_remove_host(struct hpsb_host *host)
 {
-        struct list_head *entry;
         struct hpsb_highlevel *hl;
 	struct list_head *lh, *next;
 	struct hpsb_address_serve *as;
 	unsigned long flags;
 
-	read_lock(&hl_drivers_lock);
-	list_for_each(entry, &hl_drivers) {
-                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
-
+	down_read(&hl_drivers_sem);
+	list_for_each_entry(hl, &hl_drivers, hl_list) {
 		if (hl->remove_host) {
 			hl->remove_host(host);
 			hpsb_destroy_hostinfo(hl, host);
 		}
         }
-	read_unlock(&hl_drivers_lock);
+	up_read(&hl_drivers_sem);
 
 	/* Free up 1394 address space left behind by high level drivers. */
 	write_lock_irqsave(&addr_space_lock, flags);
@@ -442,58 +445,42 @@ void highlevel_remove_host(struct hpsb_host *host)
 
 void highlevel_host_reset(struct hpsb_host *host)
 {
-        struct list_head *entry;
         struct hpsb_highlevel *hl;
 
-	read_lock(&hl_drivers_lock);
-	list_for_each(entry, &hl_drivers) {
-                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
-
+	read_lock(&hl_irqs_lock);
+	list_for_each_entry(hl, &hl_irqs, hl_list) {
                 if (hl->host_reset)
                         hl->host_reset(host);
         }
-	read_unlock(&hl_drivers_lock);
+	read_unlock(&hl_irqs_lock);
 }
 
-void highlevel_iso_receive(struct hpsb_host *host, void *data,
-			   size_t length)
+void highlevel_iso_receive(struct hpsb_host *host, void *data, size_t length)
 {
-        struct list_head *entry;
         struct hpsb_highlevel *hl;
         int channel = (((quadlet_t *)data)[0] >> 8) & 0x3f;
 
-        read_lock(&hl_drivers_lock);
-        entry = hl_drivers.next;
-
-        while (entry != &hl_drivers) {
-                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
-                if (hl->iso_receive) {
+        read_lock(&hl_irqs_lock);
+	list_for_each_entry(hl, &hl_irqs, irq_list) {
+                if (hl->iso_receive)
                         hl->iso_receive(host, channel, data, length);
-                }
-                entry = entry->next;
         }
-        read_unlock(&hl_drivers_lock);
+        read_unlock(&hl_irqs_lock);
 }
 
 void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
 			   void *data, size_t length)
 {
-        struct list_head *entry;
         struct hpsb_highlevel *hl;
         int cts = ((quadlet_t *)data)[0] >> 4;
 
-        read_lock(&hl_drivers_lock);
-        entry = hl_drivers.next;
-
-        while (entry != &hl_drivers) {
-                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
-                if (hl->fcp_request) {
+        read_lock(&hl_irqs_lock);
+	list_for_each_entry(hl, &hl_irqs, irq_list) {
+                if (hl->fcp_request)
                         hl->fcp_request(host, nodeid, direction, cts, data,
-                                            length);
-                }
-                entry = entry->next;
+					length);
         }
-        read_unlock(&hl_drivers_lock);
+        read_unlock(&hl_irqs_lock);
 }
 
 int highlevel_read(struct hpsb_host *host, int nodeid, void *data,
