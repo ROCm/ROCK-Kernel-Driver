@@ -74,7 +74,6 @@ static int dsp_buffer_init(struct saa7134_dev *dev)
 
 	if (!dev->oss.bufsize)
 		BUG();
-	videobuf_dma_init(&dev->oss.dma);
 	err = videobuf_dma_init_kernel(&dev->oss.dma, PCI_DMA_FROMDEVICE,
 				       dev->oss.bufsize >> PAGE_SHIFT);
 	if (0 != err)
