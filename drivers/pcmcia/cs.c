@@ -2151,9 +2151,8 @@ static int __init init_pcmcia_cs(void)
 {
     printk(KERN_INFO "%s\n", release);
     printk(KERN_INFO "  %s\n", options);
-    class_register(&pcmcia_socket_class);
 
-    return 0;
+    return class_register(&pcmcia_socket_class);
 }
 
 static void __exit exit_pcmcia_cs(void)
