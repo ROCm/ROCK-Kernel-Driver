@@ -302,7 +302,6 @@ enum RTL8139_registers {
 	IntrMask = 0x3C,
 	IntrStatus = 0x3E,
 	TxConfig = 0x40,
-	ChipVersion = 0x43,
 	RxConfig = 0x44,
 	Timer = 0x48,		/* A general-purpose counter. */
 	RxMissed = 0x4C,	/* 24 bits valid, write clears. */
@@ -499,9 +498,13 @@ typedef enum {
 	CH_8139 = 0,
 	CH_8139_K,
 	CH_8139A,
+	CH_8139A_G,
 	CH_8139B,
 	CH_8130,
 	CH_8139C,
+	CH_8100,
+	CH_8100B_8139D,
+	CH_8101,
 } chip_t;
 
 enum chip_flags {
@@ -509,43 +512,65 @@ enum chip_flags {
 	HasLWake = (1 << 1),
 };
 
+#define HW_REVID(b30, b29, b28, b27, b26, b23, b22) \
+	(b30<<30 | b29<<29 | b28<<28 | b27<<27 | b26<<26 | b23<<23 | b22<<22)
+#define HW_REVID_MASK	HW_REVID(1, 1, 1, 1, 1, 1, 1)
 
 /* directly indexed by chip_t, above */
 const static struct {
 	const char *name;
-	u8 version; /* from RTL8139C docs */
+	u32 version; /* from RTL8139C/RTL8139D docs */
 	u32 flags;
 } rtl_chip_info[] = {
 	{ "RTL-8139",
-	  0x40,
+	  HW_REVID(1, 0, 0, 0, 0, 0, 0),
 	  HasHltClk,
 	},
 
 	{ "RTL-8139 rev K",
-	  0x60,
+	  HW_REVID(1, 1, 0, 0, 0, 0, 0),
 	  HasHltClk,
 	},
 
 	{ "RTL-8139A",
-	  0x70,
+	  HW_REVID(1, 1, 1, 0, 0, 0, 0),
+	  HasHltClk, /* XXX undocumented? */
+	},
+
+	{ "RTL-8139A rev G",
+	  HW_REVID(1, 1, 1, 0, 0, 1, 0),
 	  HasHltClk, /* XXX undocumented? */
 	},
 
 	{ "RTL-8139B",
-	  0x78,
+	  HW_REVID(1, 1, 1, 1, 0, 0, 0),
 	  HasLWake,
 	},
 
 	{ "RTL-8130",
-	  0x7C,
+	  HW_REVID(1, 1, 1, 1, 1, 0, 0),
 	  HasLWake,
 	},
 
 	{ "RTL-8139C",
-	  0x74,
+	  HW_REVID(1, 1, 1, 0, 1, 0, 0),
 	  HasLWake,
 	},
 
+	{ "RTL-8100",
+	  HW_REVID(1, 1, 1, 1, 0, 1, 0),
+ 	  HasLWake,
+ 	},
+
+	{ "RTL-8100B/8139D",
+	  HW_REVID(1, 1, 1, 0, 1, 0, 1),
+	  HasLWake,
+	},
+
+	{ "RTL-8101",
+	  HW_REVID(1, 1, 1, 0, 1, 1, 1),
+	  HasLWake,
+	},
 };
 
 struct rtl_extra_stats {
@@ -750,7 +775,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	unsigned int i;
 	u32 pio_start, pio_end, pio_flags, pio_len;
 	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
-	u32 tmp;
+	u32 version;
 
 	assert (pdev != NULL);
 
@@ -852,9 +877,9 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	}
 
 	/* identify chip attached to board */
-	tmp = RTL_R8 (ChipVersion);
+	version = RTL_R32 (TxConfig) & HW_REVID_MASK;
 	for (i = 0; i < ARRAY_SIZE (rtl_chip_info); i++)
-		if (tmp == rtl_chip_info[i].version) {
+		if (version == rtl_chip_info[i].version) {
 			tp->chipset = i;
 			goto match;
 		}
