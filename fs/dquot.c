@@ -45,6 +45,10 @@
  *		Added dynamic quota structure allocation
  *		Jan Kara <jack@suse.cz> 12/2000
  *
+ *		Rewritten quota interface. Implemented new quota format and
+ *		formats registering.
+ *		Jan Kara, <jack@suse.cz>, 2001,2002
+ *
  * (C) Copyright 1994 - 1997 Marco van Wieringen 
  */
 
@@ -1295,7 +1299,7 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	int error;
 
 	if (!fmt)
-		return -EINVAL;
+		return -ESRCH;
 	if (is_enabled(dqopt, type)) {
 		error = -EBUSY;
 		goto out_fmt;
@@ -1437,7 +1441,7 @@ int vfs_set_dqblk(struct super_block *sb, int type, qid_t id, struct if_dqblk *d
 }
 
 /* Generic routine for getting common part of quota file information */
-int vfs_get_info(struct super_block *sb, int type, struct if_dqinfo *ii)
+int vfs_get_dqinfo(struct super_block *sb, int type, struct if_dqinfo *ii)
 {
 	struct mem_dqinfo *mi = sb_dqopt(sb)->info + type;
 
@@ -1449,7 +1453,7 @@ int vfs_get_info(struct super_block *sb, int type, struct if_dqinfo *ii)
 }
 
 /* Generic routine for setting common part of quota file information */
-int vfs_set_info(struct super_block *sb, int type, struct if_dqinfo *ii)
+int vfs_set_dqinfo(struct super_block *sb, int type, struct if_dqinfo *ii)
 {
 	struct mem_dqinfo *mi = sb_dqopt(sb)->info + type;
 
@@ -1467,8 +1471,8 @@ struct quotactl_ops vfs_quotactl_ops = {
 	quota_on:	vfs_quota_on,
 	quota_off:	vfs_quota_off,
 	quota_sync:	vfs_quota_sync,
-	get_info:	vfs_get_info,
-	set_info:	vfs_set_info,
+	get_info:	vfs_get_dqinfo,
+	set_info:	vfs_set_dqinfo,
 	get_dqblk:	vfs_get_dqblk,
 	set_dqblk:	vfs_set_dqblk
 };
