@@ -48,7 +48,7 @@
 	#define MY_NAME	THIS_MODULE->name
 #endif
 
-#define dbg(fmt, arg...) do { if (debug) printk(KERN_DEBUG "%s: %s: " fmt, MY_NAME, __FUNCTION__, ## arg); } while (0)
+#define dbg(fmt, arg...) do { if (debug) printk(KERN_DEBUG "%s: %s: " fmt , MY_NAME , __FUNCTION__ , ## arg); } while (0)
 #define err(format, arg...) printk(KERN_ERR "%s: " format , MY_NAME , ## arg)
 #define info(format, arg...) printk(KERN_INFO "%s: " format , MY_NAME , ## arg)
 #define warn(format, arg...) printk(KERN_WARNING "%s: " format , MY_NAME , ## arg)
@@ -109,6 +109,9 @@ static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int de
 		case S_IFDIR:
 			inode->i_op = &pcihpfs_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
+
+			/* directory inodes start off with i_nlink == 2 (for "." entry) */
+			inode->i_nlink++;
 			break;
 		}
 	}
@@ -227,71 +230,71 @@ static int default_open (struct inode *inode, struct file *filp)
 }
 
 static struct file_operations default_file_operations = {
-	read:		default_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read =		default_read_file,
+	.write =	default_write_file,
+	.open =		default_open,
+	.llseek =	default_file_lseek,
 };
 
 /* file ops for the "power" files */
 static ssize_t power_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static ssize_t power_write_file (struct file *file, const char *buf, size_t count, loff_t *ppos);
 static struct file_operations power_file_operations = {
-	read:		power_read_file,
-	write:		power_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read =		power_read_file,
+	.write =	power_write_file,
+	.open =		default_open,
+	.llseek =	default_file_lseek,
 };
 
 /* file ops for the "attention" files */
 static ssize_t attention_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static ssize_t attention_write_file (struct file *file, const char *buf, size_t count, loff_t *ppos);
 static struct file_operations attention_file_operations = {
-	read:		attention_read_file,
-	write:		attention_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read =		attention_read_file,
+	.write =	attention_write_file,
+	.open =		default_open,
+	.llseek =	default_file_lseek,
 };
 
 /* file ops for the "latch" files */
 static ssize_t latch_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static struct file_operations latch_file_operations = {
-	read:		latch_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read =		latch_read_file,
+	.write =	default_write_file,
+	.open =		default_open,
+	.llseek =	default_file_lseek,
 };
 
 /* file ops for the "presence" files */
 static ssize_t presence_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static struct file_operations presence_file_operations = {
-	read:		presence_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read =		presence_read_file,
+	.write =	default_write_file,
+	.open =		default_open,
+	.llseek =	default_file_lseek,
 };
 
 /* file ops for the "test" files */
 static ssize_t test_write_file (struct file *file, const char *buf, size_t count, loff_t *ppos);
 static struct file_operations test_file_operations = {
-	read:		default_read_file,
-	write:		test_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read =		default_read_file,
+	.write =	test_write_file,
+	.open =		default_open,
+	.llseek =	default_file_lseek,
 };
 
 static struct inode_operations pcihpfs_dir_inode_operations = {
-	create:		pcihpfs_create,
-	lookup:		simple_lookup,
-	unlink:		pcihpfs_unlink,
-	mkdir:		pcihpfs_mkdir,
-	rmdir:		pcihpfs_rmdir,
-	mknod:		pcihpfs_mknod,
+	.create =	pcihpfs_create,
+	.lookup =	simple_lookup,
+	.unlink =	pcihpfs_unlink,
+	.mkdir =	pcihpfs_mkdir,
+	.rmdir =	pcihpfs_rmdir,
+	.mknod =	pcihpfs_mknod,
 };
 
 static struct super_operations pcihpfs_ops = {
-	statfs:		simple_statfs,
-	drop_inode:	generic_delete_inode,
+	.statfs =	simple_statfs,
+	.drop_inode =	generic_delete_inode,
 };
 
 static int pcihpfs_fill_super(struct super_block *sb, void *data, int silent)
@@ -327,10 +330,10 @@ static struct super_block *pcihpfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type pcihpfs_type = {
-	owner:		THIS_MODULE,
-	name:		"pcihpfs",
-	get_sb:		pcihpfs_get_sb,
-	kill_sb:	kill_litter_super,
+	.owner =	THIS_MODULE,
+	.name =		"pcihpfs",
+	.get_sb =	pcihpfs_get_sb,
+	.kill_sb =	kill_litter_super,
 };
 
 static int get_mount (void)

@@ -81,15 +81,15 @@ static int get_latch_status	(struct hotplug_slot *slot, u8 *value);
 static int get_adapter_status	(struct hotplug_slot *slot, u8 *value);
 
 static struct hotplug_slot_ops cpqphp_hotplug_slot_ops = {
-	owner:			THIS_MODULE,
-	set_attention_status:	set_attention_status,
-	enable_slot:		process_SI,
-	disable_slot:		process_SS,
-	hardware_test:		hardware_test,
-	get_power_status:	get_power_status,
-	get_attention_status:	get_attention_status,
-	get_latch_status:	get_latch_status,
-	get_adapter_status:	get_adapter_status,
+	.owner =		THIS_MODULE,
+	.set_attention_status =	set_attention_status,
+	.enable_slot =		process_SI,
+	.disable_slot =		process_SS,
+	.hardware_test =	hardware_test,
+	.get_power_status =	get_power_status,
+	.get_attention_status =	get_attention_status,
+	.get_latch_status =	get_latch_status,
+	.get_adapter_status =	get_adapter_status,
 };
 
 
@@ -1387,14 +1387,14 @@ static void unload_cpqphpd(void)
 static struct pci_device_id hpcd_pci_tbl[] __devinitdata = {
 	{
 	/* handle any PCI Hotplug controller */
-	class:          ((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00),
-	class_mask:     ~0,
+	.class =        ((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00),
+	.class_mask =   ~0,
 	
 	/* no matter who makes it */
-	vendor:         PCI_ANY_ID,
-	device:         PCI_ANY_ID,
-	subvendor:      PCI_ANY_ID,
-	subdevice:      PCI_ANY_ID,
+	.vendor =       PCI_ANY_ID,
+	.device =       PCI_ANY_ID,
+	.subvendor =    PCI_ANY_ID,
+	.subdevice =    PCI_ANY_ID,
 	
 	}, { /* end: all zeroes */ }
 };
@@ -1404,9 +1404,9 @@ MODULE_DEVICE_TABLE(pci, hpcd_pci_tbl);
 
 
 static struct pci_driver cpqhpc_driver = {
-	name:		"pci_hotplug",
-	id_table:	hpcd_pci_tbl,
-	probe:		cpqhpc_probe,
+	.name =		"pci_hotplug",
+	.id_table =	hpcd_pci_tbl,
+	.probe =	cpqhpc_probe,
 	/* remove:	cpqhpc_remove_one, */
 };
 

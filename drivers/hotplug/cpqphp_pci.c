@@ -232,17 +232,17 @@ static int unconfigure_visit_pci_dev_phase1 (struct pci_dev_wrapped *wrapped_dev
 
 
 static struct pci_visit configure_functions = {
-	visit_pci_dev:		configure_visit_pci_dev,
+	.visit_pci_dev =	configure_visit_pci_dev,
 };
 
 
 static struct pci_visit unconfigure_functions_phase1 = {
-	post_visit_pci_dev:	unconfigure_visit_pci_dev_phase1
+	.post_visit_pci_dev =	unconfigure_visit_pci_dev_phase1
 };
 
 static struct pci_visit unconfigure_functions_phase2 = {
-	post_visit_pci_bus:	unconfigure_visit_pci_bus_phase2,               
-	post_visit_pci_dev:	unconfigure_visit_pci_dev_phase2
+	.post_visit_pci_bus =	unconfigure_visit_pci_bus_phase2,               
+	.post_visit_pci_dev =	unconfigure_visit_pci_dev_phase2
 };
 
 
