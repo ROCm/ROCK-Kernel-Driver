@@ -218,6 +218,14 @@ void fastcall flush_workqueue(struct workqueue_struct *wq)
 			continue;
 		cwq = wq->cpu_wq + cpu;
 
+		if (cwq->thread == current) {
+			/*
+			 * Probably keventd trying to flush its own queue.
+			 * So simply run it by hand rather than deadlocking.
+			 */
+			run_workqueue(cwq);
+			continue;
+		}
 		spin_lock_irq(&cwq->lock);
 		sequence_needed = cwq->insert_sequence;
 
