@@ -69,8 +69,9 @@ static int hdlc_rcv(struct sk_buff *skb, struct net_device *dev,
 
 
 
-void hdlc_set_carrier(int on, hdlc_device *hdlc)
+void hdlc_set_carrier(int on, struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	on = on ? 1 : 0;
 
 #ifdef DEBUG_LINK
@@ -82,7 +83,7 @@ void hdlc_set_carrier(int on, hdlc_device *hdlc)
 	if (hdlc->carrier == on)
 		goto carrier_exit; /* no change in DCD line level */
 
-	printk(KERN_INFO "%s: carrier %s\n", hdlc_to_name(hdlc),
+	printk(KERN_INFO "%s: carrier %s\n", dev->name,
 	       on ? "ON" : "off");
 	hdlc->carrier = on;
 
@@ -92,14 +93,14 @@ void hdlc_set_carrier(int on, hdlc_device *hdlc)
 	if (hdlc->carrier) {
 		if (hdlc->proto.start)
 			hdlc->proto.start(hdlc);
-		else if (!netif_carrier_ok(&hdlc->netdev))
-			netif_carrier_on(&hdlc->netdev);
+		else if (!netif_carrier_ok(dev))
+			netif_carrier_on(dev);
 
 	} else { /* no carrier */
 		if (hdlc->proto.stop)
 			hdlc->proto.stop(hdlc);
-		else if (netif_carrier_ok(&hdlc->netdev))
-			netif_carrier_off(&hdlc->netdev);
+		else if (netif_carrier_ok(dev))
+			netif_carrier_off(dev);
 	}
 
  carrier_exit:

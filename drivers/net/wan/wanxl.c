@@ -172,7 +172,7 @@ static inline void wanxl_cable_intr(port_t *port)
 	printk(KERN_INFO "%s: %s%s module, %s cable%s%s\n",
 	       port_name(port), pm, dte, cable, dsr, dcd);
 
-	hdlc_set_carrier(value & STATUS_CABLE_DCD, &port->hdlc);
+	hdlc_set_carrier(value & STATUS_CABLE_DCD, port_to_dev(port));
 }
 
 

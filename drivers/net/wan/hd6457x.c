@@ -250,7 +250,7 @@ static void sca_init_sync_port(port_t *port)
 	}
 
 	hdlc_set_carrier(!(sca_in(get_msci(port) + ST3, card) & ST3_DCD),
-			 dev_to_hdlc(port_to_dev(port)));
+			 port_to_dev(port));
 }
 
 
@@ -274,7 +274,7 @@ static inline void sca_msci_intr(port_t *port)
 
 	if (stat & ST1_CDCD)
 		hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD),
-				 dev_to_hdlc(port_to_dev(port)));
+				 port_to_dev(port));
 }
 #endif
 
@@ -579,7 +579,7 @@ static void sca_open(struct net_device *dev)
    - all DMA interrupts
 */
 
-	hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD), dev_to_hdlc(dev));
+	hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD), dev);
 
 #ifdef __HD64570_H
 	/* MSCI TX INT and RX INT A IRQ enable */

@@ -139,7 +139,7 @@ static void sca_msci_intr(port_t *port)
 
 	if (stat & ST1_CDCD)
 		hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD),
-				 dev_to_hdlc(dev));
+				 dev);
 }
 
 
@@ -193,7 +193,7 @@ static int c101_open(struct net_device *dev)
 	sca_out(IE1_UDRN, MSCI0_OFFSET + IE1, port);
 	sca_out(IE0_TXINT, MSCI0_OFFSET + IE0, port);
 
-	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, port) & ST3_DCD), dev_to_hdlc(dev));
+	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, port) & ST3_DCD), dev);
 	printk(KERN_DEBUG "0x%X\n", sca_in(MSCI1_OFFSET + ST3, port));
 
 	/* enable MSCI1 CDCD interrupt */
@@ -371,8 +371,7 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 	}
 
 	sca_init_sync_port(card); /* Set up C101 memory */
-	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD),
-			 dev_to_hdlc(dev));
+	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD), dev);
 
 	printk(KERN_INFO "%s: Moxa C101 on IRQ%u,"
 	       " using %u TX + %u RX packets rings\n",
