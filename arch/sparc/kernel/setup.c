@@ -43,7 +43,6 @@
 #include <asm/kdebug.h>
 #include <asm/mbus.h>
 #include <asm/idprom.h>
-#include <asm/softirq.h>
 #include <asm/hardirq.h>
 #include <asm/machines.h>
 

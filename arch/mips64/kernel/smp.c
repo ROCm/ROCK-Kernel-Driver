@@ -6,12 +6,12 @@
 #include <linux/timex.h>
 #include <linux/sched.h>
 #include <linux/cache.h>
+#include <linux/interrupt.h>
 
 #include <asm/atomic.h>
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/mmu_context.h>
 #include <asm/irq.h>
 
