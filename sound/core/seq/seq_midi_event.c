@@ -108,8 +108,6 @@ static struct extra_event_list_t {
 	/*{SNDRV_SEQ_EVENT_REGPARAM, extra_decode_rpn},*/
 };
 
-#define numberof(ary)	(sizeof(ary)/sizeof(ary[0]))
-
 /*
  *  new/delete record
  */
@@ -349,16 +347,16 @@ static void songpos_event(snd_midi_event_t *dev, snd_seq_event_t *ev)
  */
 long snd_midi_event_decode(snd_midi_event_t *dev, unsigned char *buf, long count, snd_seq_event_t *ev)
 {
-	int cmd, type;
+	unsigned int cmd, type;
 
 	if (ev->type == SNDRV_SEQ_EVENT_NONE)
 		return -ENOENT;
 
-	for (type = 0; type < numberof(status_event); type++) {
+	for (type = 0; type < ARRAY_SIZE(status_event); type++) {
 		if (ev->type == status_event[type].event)
 			goto __found;
 	}
-	for (type = 0; type < numberof(extra_event); type++) {
+	for (type = 0; type < ARRAY_SIZE(extra_event); type++) {
 		if (ev->type == extra_event[type].event)
 			return extra_event[type].decode(dev, buf, count, ev);
 	}

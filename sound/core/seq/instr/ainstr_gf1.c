@@ -58,7 +58,7 @@ static int snd_seq_gf1_copy_wave_from_stream(snd_gf1_ops_t *ops,
 	unsigned int real_size;
 	
 	gfp_mask = atomic ? GFP_ATOMIC : GFP_KERNEL;
-	if (*len < sizeof(xp))
+	if (*len < (long)sizeof(xp))
 		return -EINVAL;
 	if (copy_from_user(&xp, *data, sizeof(xp)))
 		return -EFAULT;
@@ -95,7 +95,7 @@ static int snd_seq_gf1_copy_wave_from_stream(snd_gf1_ops_t *ops,
 	wp->scale_frequency = le16_to_cpu(xp.scale_frequency);
 	wp->scale_factor = le16_to_cpu(xp.scale_factor);
 	real_size = snd_seq_gf1_size(wp->size, wp->format);
-	if (real_size > *len) {
+	if ((long)real_size > *len) {
 		kfree(wp);
 		return -ENOMEM;
 	}
@@ -152,7 +152,7 @@ static int snd_seq_gf1_put(void *private_data, snd_seq_kinstr_t *instr,
 		return -EINVAL;
 	gfp_mask = atomic ? GFP_ATOMIC : GFP_KERNEL;
 	/* copy instrument data */
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -EINVAL;
 	if (copy_from_user(&ix, instr_data, sizeof(ix)))
 		return -EFAULT;
@@ -168,7 +168,7 @@ static int snd_seq_gf1_put(void *private_data, snd_seq_kinstr_t *instr,
 	ip->effect2 = ix.effect2;
 	ip->effect2_depth = ix.effect2_depth;
 	/* copy layers */
-	while (len > sizeof(__u32)) {
+	while (len > (long)sizeof(__u32)) {
 		__u32 stype;
 
 		if (copy_from_user(&stype, instr_data, sizeof(stype)))
@@ -202,7 +202,7 @@ static int snd_seq_gf1_copy_wave_to_stream(snd_gf1_ops_t *ops,
 	unsigned int real_size;
 	
 	for (wp = ip->wave; wp; wp = wp->next) {
-		if (*len < sizeof(xp))
+		if (*len < (long)sizeof(xp))
 			return -ENOMEM;
 		memset(&xp, 0, sizeof(xp));
 		xp.stype = GF1_STRU_WAVE;
@@ -238,7 +238,7 @@ static int snd_seq_gf1_copy_wave_to_stream(snd_gf1_ops_t *ops,
 		*data += sizeof(xp);
 		*len -= sizeof(xp);
 		real_size = snd_seq_gf1_size(wp->size, wp->format);
-		if (*len < real_size)
+		if (*len < (long)real_size)
 			return -ENOMEM;
 		if (ops->get_sample) {
 			err = ops->get_sample(ops->private_data, wp,
@@ -261,7 +261,7 @@ static int snd_seq_gf1_get(void *private_data, snd_seq_kinstr_t *instr,
 	
 	if (cmd != SNDRV_SEQ_INSTR_GET_CMD_FULL)
 		return -EINVAL;
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -ENOMEM;
 	memset(&ix, 0, sizeof(ix));
 	ip = (gf1_instrument_t *)KINSTR_DATA(instr);

@@ -176,7 +176,7 @@ snd_emux_create_port(snd_emux_t *emu, char *name,
 	}
 
 	p->chset.port = snd_seq_event_port_attach(emu->client, callback,
-						  cap, type, name);
+						  cap, type, max_channels, name);
 
 	return p;
 }

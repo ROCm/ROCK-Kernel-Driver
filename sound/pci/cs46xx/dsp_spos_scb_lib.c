@@ -162,7 +162,7 @@ static void _dsp_unlink_scb (cs46xx_t *chip,dsp_scb_descriptor_t * scb)
 
 static void _dsp_clear_sample_buffer (cs46xx_t *chip, u32 sample_buffer_addr, int dword_count) 
 {
-	u32 dst = chip->region.idx[2].remap_addr + sample_buffer_addr;
+	unsigned long dst = chip->region.idx[2].remap_addr + sample_buffer_addr;
 	int i;
   
 	for (i = 0; i < dword_count ; ++i ) {

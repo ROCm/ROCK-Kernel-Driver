@@ -751,7 +751,8 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 			      unsigned int ctl_mask, int control,
 			      usb_audio_term_t *iterm, int unitid)
 {
-	int len = 0, mapped_name = 0;
+	unsigned int len = 0;
+	int mapped_name = 0;
 	int nameid = desc[desc[0] - 1];
 	snd_kcontrol_t *kctl;
 	usb_mixer_elem_info_t *cval;
@@ -927,9 +928,9 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 				 int in_ch, int unitid)
 {
 	usb_mixer_elem_info_t *cval;
-	int num_ins = desc[4];
-	int num_outs = desc[5 + num_ins];
-	int i, len;
+	unsigned int num_ins = desc[4];
+	unsigned int num_outs = desc[5 + num_ins];
+	unsigned int i, len;
 	snd_kcontrol_t *kctl;
 	usb_audio_term_t iterm;
 
@@ -1240,7 +1241,7 @@ static int mixer_ctl_selector_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
 	uinfo->value.enumerated.items = cval->max;
-	if (uinfo->value.enumerated.item >= cval->max)
+	if ((int)uinfo->value.enumerated.item >= cval->max)
 		uinfo->value.enumerated.item = cval->max - 1;
 	strcpy(uinfo->value.enumerated.name, itemlist[uinfo->value.enumerated.item]);
 	return 0;
@@ -1325,8 +1326,9 @@ static void usb_mixer_selector_elem_free(snd_kcontrol_t *kctl)
  */
 static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned char *desc)
 {
-	int num_ins = desc[4];
-	int i, err, nameid, len;
+	unsigned int num_ins = desc[4];
+	unsigned int i, nameid, len;
+	int err;
 	usb_mixer_elem_info_t *cval;
 	snd_kcontrol_t *kctl;
 	char **namelist;

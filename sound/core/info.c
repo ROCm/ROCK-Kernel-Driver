@@ -796,20 +796,20 @@ int snd_info_get_line(snd_info_buffer_t * buffer, char *line, int len)
 	while (--len > 0) {
 		c = *buffer->curr++;
 		if (c == '\n') {
-			if ((buffer->curr - buffer->buffer) >= buffer->size) {
+			if ((buffer->curr - buffer->buffer) >= (long)buffer->size) {
 				buffer->stop = 1;
 			}
 			break;
 		}
 		*line++ = c;
-		if ((buffer->curr - buffer->buffer) >= buffer->size) {
+		if ((buffer->curr - buffer->buffer) >= (long)buffer->size) {
 			buffer->stop = 1;
 			break;
 		}
 	}
 	while (c != '\n' && !buffer->stop) {
 		c = *buffer->curr++;
-		if ((buffer->curr - buffer->buffer) >= buffer->size) {
+		if ((buffer->curr - buffer->buffer) >= (long)buffer->size) {
 			buffer->stop = 1;
 		}
 	}

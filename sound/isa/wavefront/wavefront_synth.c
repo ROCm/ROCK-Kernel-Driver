@@ -877,7 +877,7 @@ wavefront_send_sample (snd_wavefront_t *dev,
 	u32 length;
 	u16 *data_end = 0;
 	unsigned int i;
-	const int max_blksize = 4096/2;
+	const unsigned int max_blksize = 4096/2;
 	unsigned int written;
 	unsigned int blocksize;
 	int dma_ack;
@@ -944,7 +944,7 @@ wavefront_send_sample (snd_wavefront_t *dev,
 	if (header->size) {
 		dev->freemem = wavefront_freemem (dev);
 
-		if (dev->freemem < header->size) {
+		if (dev->freemem < (int)header->size) {
 			snd_printk ("insufficient memory to "
 				    "load %d byte sample.\n",
 				    header->size);

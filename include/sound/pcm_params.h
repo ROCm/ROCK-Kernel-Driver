@@ -129,7 +129,7 @@ INLINE void snd_mask_reset(snd_mask_t *mask, unsigned int val)
 
 INLINE void snd_mask_set_range(snd_mask_t *mask, unsigned int from, unsigned int to)
 {
-	int i;
+	unsigned int i;
 	assert(to <= SNDRV_MASK_BITS && from <= to);
 	for (i = from; i <= to; i++)
 		mask->bits[MASK_OFS(i)] |= MASK_BIT(i);
@@ -137,7 +137,7 @@ INLINE void snd_mask_set_range(snd_mask_t *mask, unsigned int from, unsigned int
 
 INLINE void snd_mask_reset_range(snd_mask_t *mask, unsigned int from, unsigned int to)
 {
-	int i;
+	unsigned int i;
 	assert(to <= SNDRV_MASK_BITS && from <= to);
 	for (i = from; i <= to; i++)
 		mask->bits[MASK_OFS(i)] &= ~MASK_BIT(i);

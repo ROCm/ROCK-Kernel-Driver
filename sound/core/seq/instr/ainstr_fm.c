@@ -44,7 +44,7 @@ static int snd_seq_fm_put(void *private_data, snd_seq_kinstr_t *instr,
 	if (cmd != SNDRV_SEQ_INSTR_PUT_CMD_CREATE)
 		return -EINVAL;
 	/* copy instrument data */
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -EINVAL;
 	if (copy_from_user(&ix, instr_data, sizeof(ix)))
 		return -EFAULT;
@@ -85,7 +85,7 @@ static int snd_seq_fm_get(void *private_data, snd_seq_kinstr_t *instr,
 	
 	if (cmd != SNDRV_SEQ_INSTR_GET_CMD_FULL)
 		return -EINVAL;
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -ENOMEM;
 	memset(&ix, 0, sizeof(ix));
 	ip = (fm_instrument_t *)KINSTR_DATA(instr);

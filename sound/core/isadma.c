@@ -73,12 +73,13 @@ void snd_dma_disable(unsigned long dma)
 }
 
 /**
- * snd_dma_residue - return the residue count of the given DMA
+ * snd_dma_pointer - return the current pointer to DMA transfer buffer in bytes
  * @dma: the dma number
+ * @size: the dma transfer size
  *
- * Returns the residue count of the given DMA transfer.
+ * Returns the current pointer in DMA tranfer buffer in bytes
  */
-unsigned int snd_dma_residue(unsigned long dma)
+unsigned int snd_dma_pointer(unsigned long dma, unsigned int size)
 {
 	unsigned long flags;
 	unsigned int result;
@@ -91,5 +92,9 @@ unsigned int snd_dma_residue(unsigned long dma)
 	if (!isa_dma_bridge_buggy)
 		enable_dma(dma);
 	release_dma_lock(flags);
-	return result;
+#ifdef CONFIG_SND_DEBUG
+	if (result > size)
+		snd_printk(KERN_ERR "pointer (0x%x) for DMA #%ld is greater than transfer size (0x%x)\n", result, dma, size);
+#endif
+	return result >= size ? 0 : result;
 }

@@ -195,7 +195,7 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
 		} else if (r.data[2] == 1) {
 			pd = (unsigned short *) &r.data[3];
 		} else {
-			if (r.data[2] > sizeof (page_data)) {
+			if (r.data[2] > (long)sizeof (page_data)) {
 				snd_printk ("cannot write "
 					    "> 255 bytes to FX\n");
 				return -EIO;

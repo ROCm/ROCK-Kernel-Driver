@@ -365,7 +365,7 @@ static snd_pcm_uframes_t snd_sb8_playback_pointer(snd_pcm_substream_t * substrea
 
 	if (chip->mode != SB_MODE_PLAYBACK_8)
 		return 0;
-	ptr = chip->p_dma_size - snd_dma_residue(chip->dma8);
+	ptr = snd_dma_pointer(chip->dma8, chip->p_dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -376,7 +376,7 @@ static snd_pcm_uframes_t snd_sb8_capture_pointer(snd_pcm_substream_t * substream
 
 	if (chip->mode != SB_MODE_CAPTURE_8)
 		return 0;
-	ptr = chip->c_dma_size - snd_dma_residue(chip->dma8);
+	ptr = snd_dma_pointer(chip->dma8, chip->c_dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 

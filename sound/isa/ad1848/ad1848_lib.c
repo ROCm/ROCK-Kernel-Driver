@@ -605,7 +605,7 @@ static snd_pcm_uframes_t snd_ad1848_playback_pointer(snd_pcm_substream_t * subst
 	
 	if (!(chip->image[AD1848_IFACE_CTRL] & AD1848_PLAYBACK_ENABLE))
 		return 0;
-	ptr = chip->dma_size - snd_dma_residue(chip->dma);
+	ptr = snd_dma_pointer(chip->dma, chip->dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -616,7 +616,7 @@ static snd_pcm_uframes_t snd_ad1848_capture_pointer(snd_pcm_substream_t * substr
 
 	if (!(chip->image[AD1848_IFACE_CTRL] & AD1848_CAPTURE_ENABLE))
 		return 0;
-	ptr = chip->dma_size - snd_dma_residue(chip->dma);
+	ptr = snd_dma_pointer(chip->dma, chip->dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -1178,7 +1178,8 @@ int snd_ad1848_mixer(ad1848_t *chip)
 {
 	snd_card_t *card;
 	snd_pcm_t *pcm;
-	int err, idx;
+	unsigned int idx;
+	int err;
 
 	snd_assert(chip != NULL && chip->pcm != NULL, return -EINVAL);
 

@@ -1623,7 +1623,8 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 {
 	snd_card_t *card = ensoniq->card;
 	ak4531_t ak4531;
-	int err, idx;
+	unsigned int idx;
+	int err;
 
 	/* try reset AK4531 */
 	outw(ES_1370_CODEC_WRITE(AK4531_RESET, 0x02), ES_REG(ensoniq, 1370_CODEC));
@@ -1657,7 +1658,7 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 
 static int snd_ensoniq_joy_enable(ensoniq_t *ensoniq)
 {
-	static int last_jiffies = 0;
+	static unsigned long last_jiffies = 0;
 	unsigned long flags;
 
 	if (!request_region(ensoniq->gameport.io, 8, "ens137x: gameport")) {

@@ -196,7 +196,7 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 			err = -ENXIO;
 			goto __error;
 		}
-		if (subdevice >= 0 && subdevice >= rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT].substream_count) {
+		if (subdevice >= 0 && (unsigned int)subdevice >= rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT].substream_count) {
 			err = -ENODEV;
 			goto __error;
 		}
@@ -211,7 +211,7 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 			err = -ENXIO;
 			goto __error;
 		}
-		if (subdevice >= 0 && subdevice >= rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT].substream_count) {
+		if (subdevice >= 0 && (unsigned int)subdevice >= rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT].substream_count) {
 			err = -ENODEV;
 			goto __error;
 		}
@@ -562,7 +562,7 @@ int snd_rawmidi_info_select(snd_card_t *card, snd_rawmidi_info_t *info)
 		return -ENXIO;
 	list_for_each(list, &pstr->substreams) {
 		substream = list_entry(list, snd_rawmidi_substream_t, list);
-		if (substream->number == info->subdevice)
+		if ((unsigned int)substream->number == info->subdevice)
 			return snd_rawmidi_info(substream, info);
 	}
 	return -ENXIO;
@@ -851,7 +851,7 @@ int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, const unsigned char
 		count1 = runtime->buffer_size - runtime->hw_ptr;
 		if (count1 > count)
 			count1 = count;
-		if (count1 > runtime->buffer_size - runtime->avail)
+		if (count1 > (int)(runtime->buffer_size - runtime->avail))
 			count1 = runtime->buffer_size - runtime->avail;
 		memcpy(runtime->buffer + runtime->hw_ptr, buffer, count1);
 		runtime->hw_ptr += count1;
@@ -862,7 +862,7 @@ int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, const unsigned char
 		if (count > 0) {
 			buffer += count1;
 			count1 = count;
-			if (count1 > runtime->buffer_size - runtime->avail) {
+			if (count1 > (int)(runtime->buffer_size - runtime->avail)) {
 				count1 = runtime->buffer_size - runtime->avail;
 				runtime->xruns = count - count1;
 			}
@@ -896,7 +896,7 @@ static long snd_rawmidi_kernel_read1(snd_rawmidi_substream_t *substream,
 		if (count1 > count)
 			count1 = count;
 		spin_lock_irqsave(&runtime->lock, flags);
-		if (count1 > runtime->avail)
+		if (count1 > (int)runtime->avail)
 			count1 = runtime->avail;
 		if (kernel) {
 			memcpy(buf + result, runtime->buffer + runtime->appl_ptr, count1);
@@ -1031,7 +1031,7 @@ int snd_rawmidi_transmit_peek(snd_rawmidi_substream_t * substream, unsigned char
 		count1 = runtime->buffer_size - runtime->hw_ptr;
 		if (count1 > count)
 			count1 = count;
-		if (count1 > runtime->buffer_size - runtime->avail)
+		if (count1 > (int)(runtime->buffer_size - runtime->avail))
 			count1 = runtime->buffer_size - runtime->avail;
 		memcpy(buffer, runtime->buffer + runtime->hw_ptr, count1);
 		count -= count1;
@@ -1112,7 +1112,7 @@ static long snd_rawmidi_kernel_write1(snd_rawmidi_substream_t * substream, const
 	result = 0;
 	spin_lock_irqsave(&runtime->lock, flags);
 	if (substream->append) {
-		if (runtime->avail < count) {
+		if ((long)runtime->avail < count) {
 			spin_unlock_irqrestore(&runtime->lock, flags);
 			return -EAGAIN;
 		}
@@ -1121,7 +1121,7 @@ static long snd_rawmidi_kernel_write1(snd_rawmidi_substream_t * substream, const
 		count1 = runtime->buffer_size - runtime->appl_ptr;
 		if (count1 > count)
 			count1 = count;
-		if (count1 > runtime->avail)
+		if (count1 > (long)runtime->avail)
 			count1 = runtime->avail;
 		if (kernel) {
 			memcpy(runtime->buffer + runtime->appl_ptr, buf, count1);
@@ -1195,7 +1195,7 @@ static ssize_t snd_rawmidi_write(struct file *file, const char *buf, size_t coun
 			continue;
 		result += count1;
 		buf += count1;
-		if (count1 < count && (file->f_flags & O_NONBLOCK))
+		if ((size_t)count1 < count && (file->f_flags & O_NONBLOCK))
 			break;
 		count -= count1;
 	}
@@ -1480,7 +1480,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 	}
 #ifdef CONFIG_SND_OSSEMUL
 	rmidi->ossreg = 0;
-	if (rmidi->device == midi_map[rmidi->card->number]) {
+	if ((int)rmidi->device == midi_map[rmidi->card->number]) {
 		if (snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI,
 					    rmidi->card, 0, &snd_rawmidi_reg, name) < 0) {
 			snd_printk(KERN_ERR "unable to register OSS rawmidi device %i:%i\n", rmidi->card->number, 0);
@@ -1491,7 +1491,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 #endif
 		}
 	}
-	if (rmidi->device == amidi_map[rmidi->card->number]) {
+	if ((int)rmidi->device == amidi_map[rmidi->card->number]) {
 		if (snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI,
 					    rmidi->card, 1, &snd_rawmidi_reg, name) < 0) {
 			snd_printk(KERN_ERR "unable to register OSS rawmidi device %i:%i\n", rmidi->card->number, 1);
@@ -1554,13 +1554,13 @@ static int snd_rawmidi_dev_unregister(snd_device_t *device)
 	}
 #ifdef CONFIG_SND_OSSEMUL
 	if (rmidi->ossreg) {
-		if (rmidi->device == midi_map[rmidi->card->number]) {
+		if ((int)rmidi->device == midi_map[rmidi->card->number]) {
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI, rmidi->card, 0);
 #ifdef SNDRV_OSS_INFO_DEV_MIDI
 			snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_MIDI, rmidi->card->number);
 #endif
 		}
-		if (rmidi->device == amidi_map[rmidi->card->number])
+		if ((int)rmidi->device == amidi_map[rmidi->card->number])
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_MIDI, rmidi->card, 1);
 		rmidi->ossreg = 0;
 	}

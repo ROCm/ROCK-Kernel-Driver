@@ -685,7 +685,7 @@ snd_rme32_playback_hw_params(snd_pcm_substream_t * substream,
 	if ((rme32->rcreg & RME32_RCR_KMODE) &&
 	    (rate = snd_rme32_capture_getrate(rme32, &dummy)) > 0) {
 		/* AutoSync */
-		if (params_rate(params) != rate) {
+		if ((int)params_rate(params) != rate) {
 			spin_unlock_irq(&rme32->lock);
 			return -EIO;
 		}
@@ -750,7 +750,7 @@ snd_rme32_capture_hw_params(snd_pcm_substream_t * substream,
 		return err;
 	}
 	if ((rate = snd_rme32_capture_getrate(rme32, &isadat)) > 0) {
-                if (params_rate(params) != rate) {
+                if ((int)params_rate(params) != rate) {
                         spin_unlock_irqrestore(&rme32->lock, flags);
                         return -EIO;                    
                 }
@@ -1633,7 +1633,7 @@ snd_rme32_get_inputtype_control(snd_kcontrol_t * kcontrol,
 {
 	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
-	int items = 3;
+	unsigned int items = 3;
 
 	spin_lock_irqsave(&rme32->lock, flags);
 	ucontrol->value.enumerated.item[0] = snd_rme32_getinputtype(rme32);
@@ -1681,7 +1681,7 @@ snd_rme32_put_inputtype_control(snd_kcontrol_t * kcontrol,
 	val = ucontrol->value.enumerated.item[0] % items;
 
 	spin_lock_irqsave(&rme32->lock, flags);
-	change = val != snd_rme32_getinputtype(rme32);
+	change = val != (unsigned int)snd_rme32_getinputtype(rme32);
 	snd_rme32_setinputtype(rme32, val);
 	spin_unlock_irqrestore(&rme32->lock, flags);
 	return change;
@@ -1729,7 +1729,7 @@ snd_rme32_put_clockmode_control(snd_kcontrol_t * kcontrol,
 
 	val = ucontrol->value.enumerated.item[0] % 3;
 	spin_lock_irqsave(&rme32->lock, flags);
-	change = val != snd_rme32_getclockmode(rme32);
+	change = val != (unsigned int)snd_rme32_getclockmode(rme32);
 	snd_rme32_setclockmode(rme32, val);
 	spin_unlock_irqrestore(&rme32->lock, flags);
 	return change;

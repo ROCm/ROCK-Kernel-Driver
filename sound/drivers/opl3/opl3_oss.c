@@ -101,6 +101,7 @@ static int snd_opl3_oss_create_port(opl3_t * opl3)
 							  SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC |
 							  SNDRV_SEQ_PORT_TYPE_MIDI_GM |
 							  SNDRV_SEQ_PORT_TYPE_SYNTH,
+							  voices,
 							  name);
 	if (opl3->oss_chset->port < 0) {
 		snd_midi_channel_free_set(opl3->oss_chset);
@@ -228,7 +229,7 @@ static int snd_opl3_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format,
 
 		mm_segment_t fs;
 
-		if (count < sizeof(sbi)) {
+		if (count < (int)sizeof(sbi)) {
 			snd_printk("FM Error: Patch record too short\n");
 			return -EINVAL;
 		}

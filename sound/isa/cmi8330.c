@@ -285,7 +285,8 @@ static int __init cmi8330_add_sb_mixers(sb_t *chip)
 
 static int __init snd_cmi8330_mixer(snd_card_t *card, struct snd_cmi8330 *acard)
 {
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	strcpy(card->mixername, "CMI8330/C3D");
 

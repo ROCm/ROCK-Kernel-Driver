@@ -107,9 +107,13 @@ MODULE_PARM_SYNTAX(omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 #define PCI_DEVICE_ID_VT1724		0x1724
 #endif
 
+enum {
+	TYPE_ICE1712, TYPE_VT1724
+};
+
 static struct pci_device_id snd_ice1712_ids[] __devinitdata = {
-	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_ICE_1712, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* ICE1712 */
-	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_VT1724, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	   /* VT1724 */
+	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_ICE_1712, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_ICE1712 },   /* ICE1712 */
+	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_VT1724, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_VT1724 },	   /* VT1724 */
 	{ 0, }
 };
 
@@ -2701,9 +2705,10 @@ static int snd_ice1712_dev_free(snd_device_t *device)
 }
 
 static int __devinit snd_ice1712_create(snd_card_t * card,
-				     struct pci_dev *pci,
-				     int omni,
-				     ice1712_t ** r_ice1712)
+					struct pci_dev *pci,
+					int vt1724,
+					int omni,
+					ice1712_t ** r_ice1712)
 {
 	ice1712_t *ice;
 	int err;
@@ -2717,7 +2722,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 	/* VT1724 does not have 28bit DMA transfer limit */
-	if (pci->device==PCI_DEVICE_ID_ICE_1712) {
+	if (! vt1724) {
 		/* check, if we can restrict PCI DMA transfers to 28 bits */
 		if (!pci_dma_supported(pci, 0x0fffffff)) {
 			snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
@@ -2725,13 +2730,13 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 		}
 		pci_set_dma_mask(pci, 0x0fffffff);
 	}
-	else pci_set_dma_mask(pci, 0xffffffff); 
+	else
+		pci_set_dma_mask(pci, 0xffffffff); 
 
 	ice = snd_magic_kcalloc(ice1712_t, 0, GFP_KERNEL);
 	if (ice == NULL)
 		return -ENOMEM;
-	if (pci->device==PCI_DEVICE_ID_VT1724)
-		ice->vt1724=1;
+	ice->vt1724 = vt1724 ? 1 : 0;
 	ice->omni = omni ? 1 : 0;
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
@@ -2873,6 +2878,7 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 	snd_card_t *card;
 	ice1712_t *ice;
 	int pcm_dev = 0, err;
+	int chip_type;
 	struct snd_ice1712_card_info **tbl, *c;
 
 	if (dev >= SNDRV_CARDS)
@@ -2886,7 +2892,8 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 	if (card == NULL)
 		return -ENOMEM;
 
-	if (pci->device==PCI_DEVICE_ID_ICE_1712) {
+	chip_type = pci_id->driver_data;
+	if (chip_type == TYPE_ICE1712) {
 		strcpy(card->driver, "ICE1712");
 		strcpy(card->shortname, "ICEnsemble ICE1712");
 	} else {
@@ -2894,7 +2901,7 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 		strcpy(card->shortname, "ICEnsemble ICE1724");
 	}
 	
-	if ((err = snd_ice1712_create(card, pci, omni[dev], &ice)) < 0) {
+	if ((err = snd_ice1712_create(card, pci, chip_type, omni[dev], &ice)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
