@@ -250,7 +250,39 @@ static ssize_t serio_show_driver(struct device *dev, char *buf)
 {
 	return sprintf(buf, "%s\n", dev->driver ? dev->driver->name : "(none)");
 }
-static DEVICE_ATTR(driver, S_IRUGO, serio_show_driver, NULL);
+
+static ssize_t serio_rebind_driver(struct device *dev, const char *buf, size_t count)
+{
+	struct serio *serio = to_serio_port(dev);
+	struct device_driver *drv;
+	struct kobject *k;
+	int retval;
+
+	retval = down_interruptible(&serio_sem);
+	if (retval)
+		return retval;
+
+	retval = count;
+	if (!strncmp(buf, "none", count)) {
+		serio_disconnect_port(serio);
+	} else if (!strncmp(buf, "reconnect", count)) {
+		serio_reconnect_port(serio);
+	} else if (!strncmp(buf, "rescan", count)) {
+		serio_disconnect_port(serio);
+		serio_connect_port(serio, NULL);
+	} else if ((k = kset_find_obj(&serio_bus.drivers, buf)) != NULL) {
+		drv = container_of(k, struct device_driver, kobj);
+		serio_disconnect_port(serio);
+		serio_connect_port(serio, to_serio_driver(drv));
+	} else {
+		retval = -EINVAL;
+	}
+
+	up(&serio_sem);
+
+	return retval;
+}
+static DEVICE_ATTR(driver, S_IWUSR | S_IRUGO, serio_show_driver, serio_rebind_driver);
 
 static void serio_release_port(struct device *dev)
 {
