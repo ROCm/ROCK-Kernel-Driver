@@ -134,6 +134,8 @@ struct ircomm_cb *ircomm_open(notify_t *notify, __u8 service_type, int line)
 	return self;
 }
 
+EXPORT_SYMBOL(ircomm_open);
+
 /*
  * Function ircomm_close_instance (self)
  *
@@ -187,6 +189,8 @@ int ircomm_close(struct ircomm_cb *self)
         return __ircomm_close(self);
 }
 
+EXPORT_SYMBOL(ircomm_close);
+
 /*
  * Function ircomm_connect_request (self, service_type)
  *
@@ -216,6 +220,8 @@ int ircomm_connect_request(struct ircomm_cb *self, __u8 dlsap_sel,
 
 	return ret;
 }
+
+EXPORT_SYMBOL(ircomm_connect_request);
 
 /*
  * Function ircomm_connect_indication (self, qos, skb)
@@ -269,6 +275,8 @@ int ircomm_connect_response(struct ircomm_cb *self, struct sk_buff *userdata)
 	return ret;
 }	
 
+EXPORT_SYMBOL(ircomm_connect_response);
+
 /*
  * Function connect_confirm (self, skb)
  *
@@ -311,6 +319,8 @@ int ircomm_data_request(struct ircomm_cb *self, struct sk_buff *skb)
 
 	return ret;
 }
+
+EXPORT_SYMBOL(ircomm_data_request);
 
 /*
  * Function ircomm_data_indication (self, skb)
@@ -387,6 +397,8 @@ int ircomm_control_request(struct ircomm_cb *self, struct sk_buff *skb)
 	return ret;
 }
 
+EXPORT_SYMBOL(ircomm_control_request);
+
 /*
  * Function ircomm_control_indication (self, skb)
  *
@@ -438,6 +450,8 @@ int ircomm_disconnect_request(struct ircomm_cb *self, struct sk_buff *userdata)
 	return ret;
 }
 
+EXPORT_SYMBOL(ircomm_disconnect_request);
+
 /*
  * Function disconnect_indication (self, skb)
  *
@@ -478,6 +492,8 @@ void ircomm_flow_request(struct ircomm_cb *self, LOCAL_FLOW flow)
 
 	irttp_flow_request(self->tsap, flow);
 }
+
+EXPORT_SYMBOL(ircomm_flow_request);
 
 #ifdef CONFIG_PROC_FS
 /*
@@ -542,4 +558,3 @@ void cleanup_module(void)
 	ircomm_cleanup();
 }
 #endif /* MODULE */
-

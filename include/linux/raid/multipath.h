@@ -7,6 +7,7 @@ struct multipath_info {
 	int		number;
 	int		raid_disk;
 	kdev_t		dev;
+	struct block_device *bdev;
 
 	/*
 	 * State bits:
@@ -25,7 +26,7 @@ struct multipath_private_data {
 	int			working_disks;
 	mdk_thread_t		*thread;
 	struct multipath_info	*spare;
-	md_spinlock_t		device_lock;
+	spinlock_t		device_lock;
 
 	/* buffer pool */
 	/* buffer_heads that we have pre-allocated have b_pprev -> &freebh
@@ -36,7 +37,7 @@ struct multipath_private_data {
 	struct multipath_bh	*freer1;
 	int			freer1_blocked;
 	int			freer1_cnt;
-	md_wait_queue_head_t	wait_buffer;
+	wait_queue_head_t	wait_buffer;
 };
 
 typedef struct multipath_private_data multipath_conf_t;
@@ -60,8 +61,8 @@ struct multipath_bh {
 	int			cmd;
 	unsigned long		state;
 	mddev_t			*mddev;
-	struct buffer_head	*master_bh;
-	struct buffer_head	bh_req;
+	struct bio		*master_bio;
+	struct bio		*bio;
 	struct multipath_bh	*next_mp; /* next for retry or in free list */
 };
 /* bits for multipath_bh.state */

@@ -60,7 +60,7 @@ typedef void (bio_destructor_t) (struct bio *);
 struct bio {
 	sector_t		bi_sector;
 	struct bio		*bi_next;	/* request queue link */
-	kdev_t			bi_dev;		/* will be block device */
+	struct block_device	*bi_bdev;
 	unsigned long		bi_flags;	/* status, command, etc */
 	unsigned long		bi_rw;		/* bottom bits READ/WRITE,
 						 * top bits priority

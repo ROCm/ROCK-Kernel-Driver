@@ -18,7 +18,6 @@ isdn-objs-$(CONFIG_ISDN_PPP)		+= isdn_ppp.o
 isdn-objs-$(CONFIG_ISDN_X25)		+= isdn_concap.o isdn_x25iface.o
 isdn-objs-$(CONFIG_ISDN_AUDIO)		+= isdn_audio.o
 isdn-objs-$(CONFIG_ISDN_TTY_FAX)	+= isdn_ttyfax.o
-isdn-objs-$(CONFIG_ISDN_WITH_ABC)	+= isdn_dwabc.o
 
 isdn-objs				+= $(isdn-objs-y)
 

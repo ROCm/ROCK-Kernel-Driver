@@ -308,8 +308,7 @@ void ata_poll_drive_ready(ide_drive_t *drive)
 
 static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *rq)
 {
-	struct ata_request *ar = rq->special;
-	struct ata_taskfile *args = &ar->ar_task;
+	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
 	/*
@@ -464,35 +463,11 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 		if (args->prehandler != NULL)
 			return args->prehandler(drive, rq);
 	} else {
-		ide_dma_action_t dmaaction;
-		u8 command;
-
-		if (!drive->using_dma)
-			return ide_started;
-
-		command = args->taskfile.command;
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		if (drive->using_tcq) {
-			if (command == WIN_READDMA_QUEUED
-			    || command == WIN_READDMA_QUEUED_EXT
-			    || command == WIN_WRITEDMA_QUEUED
-			    || command == WIN_READDMA_QUEUED_EXT)
-				return ide_start_tag(ide_dma_queued_start, drive, rq->special);
-		}
-#endif
-
-		if (command == WIN_WRITEDMA || command == WIN_WRITEDMA_EXT)
-			dmaaction = ide_dma_write;
-		else if (command == WIN_READDMA || command == WIN_READDMA_EXT)
-			dmaaction = ide_dma_read;
-		else
-			return ide_stopped;
-
-		if (!drive->channel->dmaproc(dmaaction, drive))
-			return ide_started;
-
-		return ide_stopped;
+		/* for dma commands we down set the handler */
+		if (drive->using_dma &&
+		!(drive->channel->dmaproc(((args->taskfile.command == WIN_WRITEDMA)
+					|| (args->taskfile.command == WIN_WRITEDMA_EXT))
+					? ide_dma_write : ide_dma_read, drive)));
 	}
 
 	return ide_started;
@@ -501,15 +476,15 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 /*
  * This is invoked on completion of a WIN_SETMULT cmd.
  */
-ide_startstop_t set_multmode_intr (ide_drive_t *drive)
+ide_startstop_t set_multmode_intr(struct ata_device *drive)
 {
-	byte stat;
+	u8 stat;
 
 	if (OK_STAT(stat=GET_STAT(),READY_STAT,BAD_STAT)) {
 		drive->mult_count = drive->mult_req;
 	} else {
 		drive->mult_req = drive->mult_count = 0;
-		drive->special.b.recalibrate = 1;
+		drive->special_cmd |= ATA_SPECIAL_RECALIBRATE;
 		ide_dump_status(drive, "set_multmode", stat);
 	}
 	return ide_stopped;
@@ -545,30 +520,12 @@ ide_startstop_t recal_intr(ide_drive_t *drive)
 }
 
 /*
- * Quiet handler for commands without a data phase -- handy instead of
- * task_no_data_intr() for commands we _know_ will fail (such as WIN_NOP)
- */
-ide_startstop_t task_no_data_quiet_intr(ide_drive_t *drive)
-{
-	struct ata_request *ar = IDE_CUR_AR(drive);
-	struct ata_taskfile *args = &ar->ar_task;
-
-	ide__sti();	/* local CPU only */
-
-	if (args)
-		ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
-
-	return ide_stopped;
-}
-
-/*
  * Handler for commands without a data phase
  */
 ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 {
-	struct ata_request *ar = IDE_CUR_AR(drive);
-	struct ata_taskfile *args = &ar->ar_task;
-	u8 stat = GET_STAT();
+	struct ata_taskfile *args = HWGROUP(drive)->rq->special;
+	byte stat		= GET_STAT();
 
 	ide__sti();	/* local CPU only */
 
@@ -628,8 +585,7 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 
 static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 {
-	struct ata_request *ar = rq->special;
-	struct ata_taskfile *args = &ar->ar_task;
+	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
@@ -909,7 +865,6 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			return;
 
 		case WIN_NOP:
-			args->handler = task_no_data_quiet_intr;
 			args->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
@@ -924,54 +879,30 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 	}
 }
 
-/*
- * This function is intended to be used prior to invoking ide_do_drive_cmd().
- */
-void init_taskfile_request(struct request *rq)
-{
-	memset(rq, 0, sizeof(*rq));
-	rq->flags = REQ_DRIVE_TASKFILE;
-}
-
 int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
-	struct ata_request star;
-	int ret;
 
-	ata_ar_init(drive, &star);
-	init_taskfile_request(&rq);
+	memset(&rq, 0, sizeof(rq));
+	rq.flags = REQ_DRIVE_ACB;
 	rq.buffer = buf;
-
-	memcpy(&star.ar_task, args, sizeof(*args));
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors
 			= (args->hobfile.sector_count << 8)
 			| args->taskfile.sector_count;
 
-	rq.special = &star;
+	rq.special = args;
 
-	ret = ide_do_drive_cmd(drive, &rq, ide_wait);
-
-	/*
-	 * copy back status etc
-	 */
-	memcpy(args, &star.ar_task, sizeof(*args));
-	return ret;
+	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
 /*
  * Implement generic ioctls invoked from userspace to imlpement specific
  * functionality.
  *
- * FIXME:
- *
- * 1. Rewrite hdparm to use the ide_task_ioctl function.
- *
- * 2. Publish it.
- *
- * 3. Kill this and HDIO_DRIVE_CMD alltogether.
+ * Unfortunately every single low level programm out there is using this
+ * interface.
  */
 
 int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
@@ -979,22 +910,19 @@ int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 	int err = 0;
 	u8 vals[4];
 	u8 *argbuf = vals;
-	byte xfer_rate = 0;
+	u8 xfer_rate = 0;
 	int argsize = 4;
 	struct ata_taskfile args;
 	struct request rq;
 
-	/*
-	 * First phase.
-	 */
-	if (NULL == (void *) arg) {
-		struct request rq;
-		ide_init_drive_cmd(&rq);
-		return ide_do_drive_cmd(drive, &rq, ide_wait);
-	}
+	ide_init_drive_cmd(&rq);
 
-	/*
-	 * Second phase.
+	/* Wait for drive ready.
+	 */
+	if (!arg)
+		return ide_do_drive_cmd(drive, &rq, ide_wait);
+
+	/* Second phase.
 	 */
 	if (copy_from_user(vals, (void *)arg, 4))
 		return -EFAULT;
@@ -1016,6 +944,8 @@ int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 		memset(argbuf + 4, 0, argsize - 4);
 	}
 
+	/* Always make sure the transfer reate has been setup.
+	 */
 	if (set_transfer(drive, &args)) {
 		xfer_rate = vals[1];
 		if (ide_ata66_check(drive, &args))
@@ -1024,7 +954,6 @@ int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 
 	/* Issue ATA command and wait for completion.
 	 */
-	ide_init_drive_cmd(&rq);
 	rq.buffer = argbuf;
 	err = ide_do_drive_cmd(drive, &rq, ide_wait);
 
@@ -1034,44 +963,22 @@ int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 			drive->channel->speedproc(drive, xfer_rate);
 		ide_driveid_update(drive);
 	}
+
 abort:
 	if (copy_to_user((void *)arg, argbuf, argsize))
 		err = -EFAULT;
+
 	if (argsize > 4)
 		kfree(argbuf);
 
 	return err;
 }
 
-int ide_task_ioctl(ide_drive_t *drive, unsigned long arg)
-{
-	int err = 0;
-	u8 args[7];
-	u8 *argbuf;
-	int argsize = 7;
-	struct request rq;
-
-	argbuf = args;
-
-	if (copy_from_user(args, (void *)arg, 7))
-		return -EFAULT;
-
-	ide_init_drive_cmd(&rq);
-	rq.flags = REQ_DRIVE_TASK;
-	rq.buffer = argbuf;
-	err = ide_do_drive_cmd(drive, &rq, ide_wait);
-	if (copy_to_user((void *)arg, argbuf, argsize))
-		err = -EFAULT;
-	return err;
-}
-
 EXPORT_SYMBOL(drive_is_ready);
-
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
 EXPORT_SYMBOL(atapi_read);
 EXPORT_SYMBOL(atapi_write);
-
 EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(recal_intr);
 EXPORT_SYMBOL(set_geometry_intr);
@@ -1079,6 +986,4 @@ EXPORT_SYMBOL(set_multmode_intr);
 EXPORT_SYMBOL(task_no_data_intr);
 EXPORT_SYMBOL(ide_raw_taskfile);
 EXPORT_SYMBOL(ide_cmd_type_parser);
-
 EXPORT_SYMBOL(ide_cmd_ioctl);
-EXPORT_SYMBOL(ide_task_ioctl);

@@ -115,13 +115,14 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
  *
  * Returns zero on success, else negative errno
  */
-int blk_set_readahead(kdev_t dev, unsigned sectors)
+int blk_set_readahead(struct block_device *bdev, unsigned sectors)
 {
 	int ret = -EINVAL;
-	request_queue_t *q = blk_get_queue(dev);
+	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
 	if (q) {
 		q->ra_sectors = sectors;
+		blk_put_queue(q);
 		ret = 0;
 	}
 	return ret;
@@ -139,13 +140,15 @@ int blk_set_readahead(kdev_t dev, unsigned sectors)
  * Will return zero if the queue has never had its readahead
  * setting altered.
  */
-unsigned blk_get_readahead(kdev_t dev)
+unsigned blk_get_readahead(struct block_device *bdev)
 {
 	unsigned ret = 0;
-	request_queue_t *q = blk_get_queue(dev);
+	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
-	if (q)
+	if (q) {
 		ret = q->ra_sectors;
+		blk_put_queue(q);
+	}
 	return ret;
 }
 
@@ -184,6 +187,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
+	q->ra_sectors = VM_MAX_READAHEAD << (10 - 9);	/* kbytes->sectors */
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 
@@ -334,7 +338,7 @@ void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
 
 static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
 			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
-			   "REQ_DONTPREP", "REQ_DRIVE_CMD", "REQ_DRIVE_TASK",
+			   "REQ_DONTPREP", "REQ_DRIVE_CMD",
 			   "REQ_DRIVE_ACB", "REQ_PC", "REQ_BLOCK_PC",
 			   "REQ_SENSE", "REQ_SPECIAL" };
 
@@ -363,7 +367,7 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
  */
 int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
 {
-	int hard_sect = get_hardsect_size(rq->rq_dev);
+	int hard_sect = queue_hardsect_size(q);
 	sector_t block = rq->hard_sector / (hard_sect >> 9);
 	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
 
@@ -851,7 +855,6 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
-	q->ra_sectors		= 0;		/* Use VM default */
 
 	blk_queue_segment_boundary(q, 0xffffffff);
 
@@ -1251,7 +1254,7 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->rq_dev = bio->bi_dev;
+	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
@@ -1270,23 +1273,19 @@ end_io:
  */
 static inline void blk_partition_remap(struct bio *bio)
 {
-	int major, minor, drive, minor0;
+	struct block_device *bdev = bio->bi_bdev;
 	struct gendisk *g;
-	kdev_t dev0;
 
-	major = major(bio->bi_dev);
-	if ((g = get_gendisk(bio->bi_dev))) {
-		minor = minor(bio->bi_dev);
-		drive = (minor >> g->minor_shift);
-		minor0 = (drive << g->minor_shift); /* whole disk device */
-		/* that is, minor0 = (minor & ~((1<<g->minor_shift)-1)); */
-		dev0 = mk_kdev(major, minor0);
-		if (!kdev_same(dev0, bio->bi_dev)) {
-			bio->bi_dev = dev0;
-			bio->bi_sector += g->part[minor].start_sect;
-		}
-		/* lots of checks are possible */
-	}
+	if (bdev == bdev->bd_contains)
+		return;
+
+	g = get_gendisk(to_kdev_t(bdev->bd_dev));
+	if (!g)
+		BUG();
+
+	bio->bi_sector += g->part[minor(to_kdev_t((bdev->bd_dev)))].start_sect;
+	bio->bi_bdev = bdev->bd_contains;
+	/* lots of checks are possible */
 }
 
 /**
@@ -1321,7 +1320,7 @@ void generic_make_request(struct bio *bio)
 	int ret, nr_sectors = bio_sectors(bio);
 
 	/* Test device or partition size, when known. */
-	maxsector = (blkdev_size_in_bytes(bio->bi_dev) >> 9);
+	maxsector = bio->bi_bdev->bd_inode->i_size >> 9;
 	if (maxsector) {
 		sector_t sector = bio->bi_sector;
 
@@ -1333,7 +1332,8 @@ void generic_make_request(struct bio *bio)
 			printk(KERN_INFO
 			       "attempt to access beyond end of device\n");
 			printk(KERN_INFO "%s: rw=%ld, want=%ld, limit=%Lu\n",
-			       kdevname(bio->bi_dev), bio->bi_rw,
+			       kdevname(to_kdev_t(bio->bi_bdev->bd_dev)),
+			       bio->bi_rw,
 			       sector + nr_sectors,
 			       (long long) maxsector);
 
@@ -1351,11 +1351,12 @@ void generic_make_request(struct bio *bio)
 	 * Stacking drivers are expected to know what they are doing.
 	 */
 	do {
-		q = blk_get_queue(bio->bi_dev);
+		q = blk_get_queue(to_kdev_t(bio->bi_bdev->bd_dev));
 		if (!q) {
 			printk(KERN_ERR
 			       "generic_make_request: Trying to access nonexistent block-device %s (%Lu)\n",
-			       kdevname(bio->bi_dev), (long long) bio->bi_sector);
+			       kdevname(to_kdev_t(bio->bi_bdev->bd_dev)),
+			       (long long) bio->bi_sector);
 end_io:
 			bio->bi_end_io(bio);
 			break;
@@ -1442,7 +1443,7 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio = bio_alloc(GFP_NOIO, 1);
 
 	bio->bi_sector = bh->b_blocknr * (bh->b_size >> 9);
-	bio->bi_dev = bh->b_dev;
+	bio->bi_bdev = bh->b_bdev;
 	bio->bi_io_vec[0].bv_page = bh->b_page;
 	bio->bi_io_vec[0].bv_len = bh->b_size;
 	bio->bi_io_vec[0].bv_offset = bh_offset(bh);
@@ -1498,10 +1499,10 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	if (!nr)
 		return;
 
-	major = major(bhs[0]->b_dev);
+	major = major(to_kdev_t(bhs[0]->b_bdev->bd_dev));
 
 	/* Determine correct block size for this device. */
-	correct_size = get_hardsect_size(bhs[0]->b_dev);
+	correct_size = bdev_hardsect_size(bhs[0]->b_bdev);
 
 	/* Verify requested block sizes. */
 	for (i = 0; i < nr; i++) {
@@ -1509,15 +1510,15 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 		if (bh->b_size & (correct_size - 1)) {
 			printk(KERN_NOTICE "ll_rw_block: device %s: "
 			       "only %d-char blocks implemented (%u)\n",
-			       kdevname(bhs[0]->b_dev),
+			       bdevname(bhs[0]->b_bdev),
 			       correct_size, bh->b_size);
 			goto sorry;
 		}
 	}
 
-	if ((rw & WRITE) && is_read_only(bhs[0]->b_dev)) {
+	if ((rw & WRITE) && is_read_only(to_kdev_t(bhs[0]->b_bdev->bd_dev))) {
 		printk(KERN_NOTICE "Can't write to read-only device %s\n",
-		       kdevname(bhs[0]->b_dev));
+		       bdevname(bhs[0]->b_bdev));
 		goto sorry;
 	}
 

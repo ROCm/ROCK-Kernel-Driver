@@ -1109,7 +1109,7 @@ pmac_ide_build_dmatable(ide_drive_t *drive, int ix, int wr)
 		udelay(1);
 
 	/* Build sglist */
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
+	if (rq->flags & REQ_DRIVE_ACB) {
 		pmac_ide[ix].sg_nents = i = pmac_raw_build_sglist(ix, rq);
 	} else {
 		pmac_ide[ix].sg_nents = i = pmac_ide_build_sglist(ix, rq);
@@ -1386,7 +1386,7 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			return 0;
 		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
-		if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
+		if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) &&
 		    (drive->addressing == 1)) {
 			struct ata_taskfile *args = HWGROUP(drive)->rq->special;
 			OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);

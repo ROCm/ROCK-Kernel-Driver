@@ -92,8 +92,8 @@ static void change_protection(struct vm_area_struct *vma, unsigned long start, u
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (start && (start < end));
-	spin_unlock(&current->mm->page_table_lock);
 	flush_tlb_range(vma, beg, end);
+	spin_unlock(&current->mm->page_table_lock);
 	return;
 }
 

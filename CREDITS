@@ -785,9 +785,8 @@ S: Blacksburg, Virginia 24061
 S: USA
 
 N: Randy Dunlap
-E: rddunlap@osdlab.org
-W: http://home.att.net/~randy.dunlap/
-W: http://home.att.net/~rddunlap/
+E: rddunlap@osdl.org
+W: http://www.xenotime.net/linux/linux.html
 W: http://www.linux-usb.org
 D: Linux-USB subsystem, USB core/UHCI/printer/storage drivers
 D: x86 SMP, ACPI, bootflag hacking
