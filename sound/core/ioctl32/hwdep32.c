@@ -36,24 +36,24 @@ struct sndrv_hwdep_dsp_image32 {
 
 static inline int _snd_ioctl32_hwdep_dsp_image(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
-	struct sndrv_hwdep_dsp_image data;
-	struct sndrv_hwdep_dsp_image32 data32;
-	mm_segment_t oldseg;
-	int err;
+	struct sndrv_hwdep_dsp_image __user *data, *dst;
+	struct sndrv_hwdep_dsp_image32 __user *data32, *src;
+	compat_caddr_t ptr;
 
-	if (copy_from_user(&data32, (void __user *)arg, sizeof(data32)))
+	data32 = compat_ptr(arg);
+	data = compat_alloc_user_space(sizeof(*data));
+
+	/* index and name */
+	if (copy_in_user(data, data32, 4 + 64))
 		return -EFAULT;
-	memset(&data, 0, sizeof(data));
-	data.index = data32.index;
-	memcpy(data.name, data32.name, sizeof(data.name));
-	data.image = compat_ptr(data32.image);
-	data.length = data32.length;
-	data.driver_data = data32.driver_data;
-	oldseg = get_fs();
-	set_fs(KERNEL_DS);
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
-	set_fs(oldseg);
-	return err;
+	if (__get_user(ptr, &data32->image) ||
+	    __put_user(compat_ptr(ptr), &data->image))
+		return -EFAULT;
+	src = data32;
+	dst = data;
+	COPY_CVT(length);
+	COPY_CVT(driver_data);
+	return file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);
 }
 
 DEFINE_ALSA_IOCTL_ENTRY(hwdep_dsp_image, hwdep_dsp_image, SNDRV_HWDEP_IOCTL_DSP_LOAD);

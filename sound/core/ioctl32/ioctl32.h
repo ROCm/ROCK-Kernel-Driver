@@ -28,20 +28,37 @@
 
 #include <linux/compat.h>
 
-#define COPY(x)  (dst->x = src->x)
-#define CPTR(x)	 (dst->x = compat_ptr(src->x))
+#define COPY(x) \
+	do { \
+		if (copy_in_user(&dst->x, &src->x, sizeof(dst->x))) \
+			return -EFAULT; \
+	} while (0)
+
+#define COPY_ARRAY(x) \
+	do { \
+		if (copy_in_user(dst->x, src->x, sizeof(dst->x))) \
+			return -EFAULT; \
+	} while (0)
+
+#define COPY_CVT(x) \
+	do { \
+		__typeof__(src->x) __val_tmp; \
+		if (get_user(__val_tmp, &src->x) || \
+		    put_user(__val_tmp, &dst->x))\
+			return -EFAULT; \
+	} while (0)
 
 #define convert_from_32(type, dstp, srcp)\
 {\
-	struct sndrv_##type *dst = dstp;\
-	struct sndrv_##type##32 *src = srcp;\
+	struct sndrv_##type __user *dst = dstp;\
+	struct sndrv_##type##32 __user *src = srcp;\
 	CVT_##sndrv_##type();\
 }
 
 #define convert_to_32(type, dstp, srcp)\
 {\
-	struct sndrv_##type *src = srcp;\
-	struct sndrv_##type##32 *dst = dstp;\
+	struct sndrv_##type __user *src = srcp;\
+	struct sndrv_##type##32 __user *dst = dstp;\
 	CVT_##sndrv_##type();\
 }
 
@@ -49,65 +66,19 @@
 #define DEFINE_ALSA_IOCTL(type) \
 static inline int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
 {\
-	struct sndrv_##type##32 data32;\
-	struct sndrv_##type data;\
-	mm_segment_t oldseg;\
+	struct sndrv_##type##32 __user *data32;\
+	struct sndrv_##type __user *data;\
 	int err;\
-	if (copy_from_user(&data32, (void __user *)arg, sizeof(data32)))\
-		return -EFAULT;\
-	memset(&data, 0, sizeof(data));\
-	convert_from_32(type, &data, &data32);\
-	oldseg = get_fs();\
-	set_fs(KERNEL_DS);\
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);\
-	set_fs(oldseg);\
+	data32 = compat_ptr(arg);\
+	data = compat_alloc_user_space(sizeof(*data));\
+	convert_from_32(type, data, data32);\
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);\
 	if (err < 0) \
 		return err;\
 	if (native_ctl & (_IOC_READ << _IOC_DIRSHIFT)) {\
-		convert_to_32(type, &data32, &data);\
-		if (copy_to_user((void __user *)arg, &data32, sizeof(data32)))\
-			return -EFAULT;\
+		convert_to_32(type, data32, data);\
 	}\
 	return 0;\
-}
-
-#define DEFINE_ALSA_IOCTL_BIG(type) \
-static inline int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
-{\
-	struct sndrv_##type##32 *data32;\
-	struct sndrv_##type *data;\
-	mm_segment_t oldseg;\
-	int err;\
-	data32 = kmalloc(sizeof(*data32), GFP_KERNEL); \
-	data = kmalloc(sizeof(*data), GFP_KERNEL); \
-	if (data32 == NULL || data == NULL) { \
-		err = -ENOMEM; \
-		goto __end; \
-	}\
-	if (copy_from_user(data32, (void __user *)arg, sizeof(*data32))) { \
-		err = -EFAULT; \
-		goto __end; \
-	}\
-	memset(data, 0, sizeof(*data));\
-	convert_from_32(type, data, data32);\
-	oldseg = get_fs();\
-	set_fs(KERNEL_DS);\
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);\
-	set_fs(oldseg);\
-	if (err < 0) \
-		goto __end;\
-	err = 0;\
-	if (native_ctl & (_IOC_READ << _IOC_DIRSHIFT)) {\
-		convert_to_32(type, data32, data);\
-		if (copy_to_user((void __user *)arg, data32, sizeof(*data32)))\
-			err = -EFAULT;\
-	}\
-      __end:\
-      	if (data)\
-      		kfree(data);\
-      	if (data32)\
-      		kfree(data32);\
-	return err;\
 }
 
 #define DEFINE_ALSA_IOCTL_ENTRY(name,type,native_ctl) \

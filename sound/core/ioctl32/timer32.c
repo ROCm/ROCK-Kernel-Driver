@@ -41,9 +41,9 @@ struct sndrv_timer_info32 {
 {\
 	COPY(flags);\
 	COPY(card);\
-	memcpy(dst->id, src->id, sizeof(src->id));\
-	memcpy(dst->name, src->name, sizeof(src->name));\
-	COPY(resolution);\
+	COPY_ARRAY(id);\
+	COPY_ARRAY(name);\
+	COPY_CVT(resolution);\
 }
 
 struct sndrv_timer_status32 {
@@ -57,8 +57,8 @@ struct sndrv_timer_status32 {
 
 #define CVT_sndrv_timer_status()\
 {\
-	COPY(tstamp.tv_sec);\
-	COPY(tstamp.tv_nsec);\
+	COPY_CVT(tstamp.tv_sec);\
+	COPY_CVT(tstamp.tv_nsec);\
 	COPY(resolution);\
 	COPY(lost);\
 	COPY(overrun);\
