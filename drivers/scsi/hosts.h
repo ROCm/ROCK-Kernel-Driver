@@ -620,13 +620,9 @@ extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
  * The generics driver has been updated to resize as required.  So as the tape
  * driver. Two down, two more to go.
  */
-#ifndef CONFIG_SD_EXTRA_DEVS
-#define CONFIG_SD_EXTRA_DEVS 2
-#endif
 #ifndef CONFIG_SR_EXTRA_DEVS
 #define CONFIG_SR_EXTRA_DEVS 2
 #endif
-#define SD_EXTRA_DEVS CONFIG_SD_EXTRA_DEVS
 #define SR_EXTRA_DEVS CONFIG_SR_EXTRA_DEVS
 
 
