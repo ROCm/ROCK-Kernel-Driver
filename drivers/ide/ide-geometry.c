@@ -83,7 +83,6 @@ void probe_cmos_for_drives (ide_hwif_t *hwif)
 }
 
 
-extern ide_drive_t * get_info_ptr(kdev_t);
 extern unsigned long current_capacity (ide_drive_t *);
 
 /*
@@ -147,18 +146,14 @@ static void ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int 
  * Returns 1 if the geometry translation was successful.
  */
 
-int ide_xlate_1024 (kdev_t i_rdev, int xparm, int ptheads, const char *msg)
+int ide_xlate_1024 (struct block_device *bdev, int xparm, int ptheads, const char *msg)
 {
-	ide_drive_t *drive;
+	ide_drive_t *drive = bdev->bd_disk->private_data;
 	const char *msg1 = "";
 	int heads = 0;
 	int c, h, s;
 	int transl = 1;		/* try translation */
 	int ret = 0;
-
-	drive = get_info_ptr(i_rdev);
-	if (!drive)
-		return 0;
 
 	/* remap? */
 	if (drive->remap_0_to_1 != 2) {
