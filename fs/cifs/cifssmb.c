@@ -1463,13 +1463,17 @@ querySymLinkRetry:
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cFYI(1, ("Send error in QuerySymLinkInfo = %d", rc));
-	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		__u16 count = le16_to_cpu(pSMBr->t2.DataCount);
-		if ((pSMBr->ByteCount < 2) || (data_offset > 512))
+	} else {
+		/* decode response */
+
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+		if (rc || (pSMBr->ByteCount < 2))
 		/* BB also check enough total bytes returned */
 			rc = -EIO;	/* bad smb */
 		else {
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
+			__u16 count = le16_to_cpu(pSMBr->t2.DataCount);
+
 			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
 				name_len = UniStrnlen((wchar_t *) ((char *)
 					&pSMBr->hdr.Protocol +data_offset),
@@ -1644,13 +1648,12 @@ QPathInfoRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QPathInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		/* BB also check enough total bytes returned */
-		/* BB we need to improve the validity checking
-		of these trans2 responses */
-		if ((pSMBr->ByteCount < 40) || (data_offset > 512)) 
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
+		if (rc || (pSMBr->ByteCount < 40)) 
 			rc = -EIO;	/* bad smb */
 		else if (pFindData){
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			memcpy((char *) pFindData,
 			       (char *) &pSMBr->hdr.Protocol +
 			       data_offset, sizeof (FILE_ALL_INFO));
@@ -1729,15 +1732,12 @@ UnixQPathInfoRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QPathInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		/* BB also check if enough total bytes returned */
-		if ((pSMBr->ByteCount < sizeof(FILE_UNIX_BASIC_INFO)) || 
-			(data_offset > 512) || 
-			(data_offset < sizeof(struct smb_hdr))) {
-			cFYI(1,("UnixQPathinfo invalid data offset %d bytes returned %d",
-					(int)data_offset,bytes_returned));
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
+		if (rc || (pSMBr->ByteCount < sizeof(FILE_UNIX_BASIC_INFO))) {
 			rc = -EIO;	/* bad smb */
 		} else {
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			memcpy((char *) pFindData,
 			       (char *) &pSMBr->hdr.Protocol +
 			       data_offset,
@@ -2041,26 +2041,25 @@ findFirst2Retry:
 		if (rc == -EAGAIN)
 			goto findFirst2Retry;
 	} else { /* decode response */
+		/* BB remember to free buffer if error BB */
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+		if(rc == 0) {
+			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
+				*pUnicodeFlag = TRUE;
+			else
+				*pUnicodeFlag = FALSE;
 
-		/* BB fixme - Add safety check parm and data fields 
-		and do it for all transact SMBs - 
-		and remember to free buffer if error BB */
+			if(ppfindData)
+				*ppfindData = (char *) &pSMBr->hdr.Protocol + 
+					le16_to_cpu(pSMBr->t2.DataOffset);
 
-		if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
-			*pUnicodeFlag = TRUE;
-		else
-			*pUnicodeFlag = FALSE;
+			parms = (T2_FFIRST_RSP_PARMS *)((char *) &pSMBr->hdr.Protocol +
+			       le16_to_cpu(pSMBr->t2.ParameterOffset));
 
-		if(ppfindData)
-			*ppfindData = (char *) &pSMBr->hdr.Protocol + 
-				le16_to_cpu(pSMBr->t2.DataOffset);
-
-		parms = (T2_FFIRST_RSP_PARMS *)((char *) &pSMBr->hdr.Protocol +
-		       le16_to_cpu(pSMBr->t2.ParameterOffset));
-
-		*pEndOfSearchFlag = parms->EndofSearch;
-		*searchCount  = parms->SearchCount;
-		*searchHandle = parms->SearchHandle;
+			*pEndOfSearchFlag = parms->EndofSearch;
+			*searchCount  = parms->SearchCount;
+			*searchHandle = parms->SearchHandle;
+		}
 
 	}
 
@@ -2148,19 +2147,23 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 		else
 			cFYI(1, ("FindNext returned = %d", rc));
 	} else {		/* decode response */
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
 		/* BB add safety checks for these memcpys */
-		if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
-			*pUnicodeFlag = TRUE;
-		else
-			*pUnicodeFlag = FALSE;
-		memcpy(findParms,
-		       (char *) &pSMBr->hdr.Protocol +
-		       le16_to_cpu(pSMBr->t2.ParameterOffset),
-		       sizeof (T2_FNEXT_RSP_PARMS));
-		response_data =
-		    (char *) &pSMBr->hdr.Protocol +
-		    le16_to_cpu(pSMBr->t2.DataOffset);
-		memcpy(findData,response_data,le16_to_cpu(pSMBr->t2.DataCount));
+		if(rc == 0) {
+			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
+				*pUnicodeFlag = TRUE;
+			else
+				*pUnicodeFlag = FALSE;
+			memcpy(findParms,
+			       (char *) &pSMBr->hdr.Protocol +
+			       le16_to_cpu(pSMBr->t2.ParameterOffset),
+			       sizeof (T2_FNEXT_RSP_PARMS));
+			response_data =
+			    (char *) &pSMBr->hdr.Protocol +
+			    le16_to_cpu(pSMBr->t2.DataOffset);
+			memcpy(findData,response_data,le16_to_cpu(pSMBr->t2.DataCount));
+		}
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);
@@ -2321,14 +2324,17 @@ getDFSRetry:
 		cFYI(1, ("Send error in GetDFSRefer = %d", rc));
 	} else {		/* decode response */
 /* BB Add logic to parse referrals here */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		__u16 data_count = le16_to_cpu(pSMBr->t2.DataCount);
-		cFYI(1,
-		     ("Decoding GetDFSRefer response.  BCC: %d  Offset %d",
-		      pSMBr->ByteCount, data_offset));
-		if ((pSMBr->ByteCount < 17) || (data_offset > 512))	/* BB also check enough total bytes returned */
-			rc = -EIO;	/* bad smb */
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
+		if (rc || (pSMBr->ByteCount < 17))      /* BB also check enough total bytes returned */
+			rc = -EIO;      /* bad smb */
 		else {
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset); 
+			__u16 data_count = le16_to_cpu(pSMBr->t2.DataCount);
+
+			cFYI(1,
+			     ("Decoding GetDFSRefer response.  BCC: %d  Offset %d",
+			      pSMBr->ByteCount, data_offset));
 			referrals = 
 			    (struct dfs_referral_level_3 *) 
 					(8 /* sizeof start of data block */ +
@@ -2454,13 +2460,16 @@ QFSInfoRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		cFYI(1,
-		     ("Decoding qfsinfo response.  BCC: %d  Offset %d",
-		      pSMBr->ByteCount, data_offset));
-		if ((pSMBr->ByteCount < 24) || (data_offset > 512))	/* BB also check enough total bytes returned */
+                rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
+		if (rc || (pSMBr->ByteCount < 24)) /* BB alsO CHEck enough total bytes returned */
 			rc = -EIO;	/* bad smb */
 		else {
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
+			cFYI(1,
+				("Decoding qfsinfo response.  BCC: %d  Offset %d",
+				pSMBr->ByteCount, data_offset));
+
 			response_data =
 			    (FILE_SYSTEM_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
@@ -2536,10 +2545,12 @@ QFSAttributeRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSAttributeInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {	/* BB also check enough bytes returned */
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
+		if (rc || (pSMBr->ByteCount < 13)) {	/* BB also check enough bytes returned */
 			rc = -EIO;	/* bad smb */
 		} else {
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			response_data =
 			    (FILE_SYSTEM_ATTRIBUTE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
@@ -2605,11 +2616,12 @@ QFSDeviceRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QFSDeviceInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		if ((pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO))
-                 || (data_offset > 512))
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
+		if (rc || (pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO)))
 			rc = -EIO;	/* bad smb */
 		else {
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			response_data =
 			    (FILE_SYSTEM_DEVICE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
@@ -2674,10 +2686,12 @@ QFSUnixRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSUnixInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
-		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
+		if (rc || (pSMBr->ByteCount < 13)) {
 			rc = -EIO;	/* bad smb */
 		} else {
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			response_data =
 			    (FILE_SYSTEM_UNIX_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
@@ -3253,11 +3267,12 @@ QAllEAsRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QueryAllEAs = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
 		/* BB also check enough total bytes returned */
 		/* BB we need to improve the validity checking
 		of these trans2 responses */
-		if ((pSMBr->ByteCount < 4) || (data_offset > 512)) 
+		if (rc || (pSMBr->ByteCount < 4)) 
 			rc = -EIO;	/* bad smb */
 	   /* else if (pFindData){
 			memcpy((char *) pFindData,
@@ -3269,6 +3284,7 @@ QAllEAsRetry:
 			   of list */
 			/* check that each element of each entry does not
 			   go beyond end of list */
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			struct fealist * ea_response_data;
 			rc = 0;
 			/* validate_trans2_offsets() */
@@ -3395,11 +3411,12 @@ QEARetry:
 	if (rc) {
 		cFYI(1, ("Send error in Query EA = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+
 		/* BB also check enough total bytes returned */
 		/* BB we need to improve the validity checking
 		of these trans2 responses */
-		if ((pSMBr->ByteCount < 4) || (data_offset > 512)) 
+		if (rc || (pSMBr->ByteCount < 4)) 
 			rc = -EIO;	/* bad smb */
 	   /* else if (pFindData){
 			memcpy((char *) pFindData,
@@ -3411,6 +3428,7 @@ QEARetry:
 			   of list */
 			/* check that each element of each entry does not
 			   go beyond end of list */
+			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			struct fealist * ea_response_data;
 			rc = -ENOENT;
 			/* validate_trans2_offsets() */
