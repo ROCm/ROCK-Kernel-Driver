@@ -6,6 +6,7 @@
 #define _PPC_MACHDEP_H
 
 #include <linux/config.h>
+#include <linux/init.h>
 
 #ifdef CONFIG_APUS
 #include <asm-m68k/machdep.h>
@@ -129,7 +130,14 @@ struct smp_ops_t {
 	int   (*probe)(void);
 	void  (*kick_cpu)(int nr);
 	void  (*setup_cpu)(int nr);
+	void  (*space_timers)(int nr);
+	void  (*take_timebase)(void);
+	void  (*give_timebase)(void);
 };
+
+/* Poor default implementations */
+extern void __devinit smp_generic_give_timebase(void);
+extern void __devinit smp_generic_take_timebase(void);
 #endif /* CONFIG_SMP */
 
 #endif /* _PPC_MACHDEP_H */

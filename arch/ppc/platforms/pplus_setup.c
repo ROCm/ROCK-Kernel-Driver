@@ -309,6 +309,8 @@ static struct smp_ops_t pplus_smp_ops = {
 	smp_pplus_probe,
 	smp_pplus_kick_cpu,
 	smp_pplus_setup_cpu,
+	.give_timebase = smp_generic_give_timebase,
+	.take_timebase = smp_generic_take_timebase,
 };
 #endif /* CONFIG_SMP */
 

@@ -612,6 +612,8 @@ struct smp_ops_t psurge_smp_ops __pmacdata = {
 	smp_psurge_probe,
 	smp_psurge_kick_cpu,
 	smp_psurge_setup_cpu,
+	.give_timebase = smp_generic_give_timebase,
+	.take_timebase = smp_generic_take_timebase,
 };
 
 /* Core99 Macs (dual G4s) */
@@ -620,4 +622,6 @@ struct smp_ops_t core99_smp_ops __pmacdata = {
 	smp_core99_probe,
 	smp_core99_kick_cpu,
 	smp_core99_setup_cpu,
+	.give_timebase = smp_generic_give_timebase,
+	.take_timebase = smp_generic_take_timebase,
 };
