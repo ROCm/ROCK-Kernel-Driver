@@ -223,12 +223,10 @@ static  const char tlan_banner[] = "ThunderLAN driver v1.15\n";
 static  int tlan_have_pci;
 static  int tlan_have_eisa;
 
-const char *media[] = {
+static const char *media[] = {
 	"10BaseT-HD ", "10BaseT-FD ","100baseTx-HD ", 
 	"100baseTx-FD", "100baseT4", NULL
 };
-
-int media_map[] = { 0x0020, 0x0040, 0x0080, 0x0100, 0x0200,};
 
 static struct board {
 	const char	*deviceLabel;
