@@ -36,6 +36,7 @@
 #include <linux/interrupt.h>
 #include <linux/serio.h>
 #include <linux/errno.h>
+#include <linux/err.h>
 
 #include <asm/io.h>
 
@@ -58,10 +59,12 @@ MODULE_LICENSE("GPL");
 
 #define CT82C710_IRQ          12
 
-static struct serio *ct82c710_port;
-static int ct82c710_data;
-static int ct82c710_status;
+#define CT82C710_DATA         ct82c710_iores.start
+#define CT82C710_STATUS       (ct82c710_iores.start + 1)
 
+static struct serio *ct82c710_port;
+static struct platform_device *ct82c710_device;
+static struct resource ct82c710_iores;
 
 /*
  * Interrupt handler for the 82C710 mouse port. A character
@@ -70,7 +73,7 @@ static int ct82c710_status;
 
 static irqreturn_t ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs)
 {
-	return serio_interrupt(ct82c710_port, inb(ct82c710_data), 0, regs);
+	return serio_interrupt(ct82c710_port, inb(CT82C710_DATA), 0, regs);
 }
 
 /*
@@ -81,10 +84,10 @@ static int ct82c170_wait(void)
 {
 	int timeout = 60000;
 
-	while ((inb(ct82c710_status) & (CT82C710_RX_FULL | CT82C710_TX_IDLE | CT82C710_DEV_IDLE))
+	while ((inb(CT82C710_STATUS) & (CT82C710_RX_FULL | CT82C710_TX_IDLE | CT82C710_DEV_IDLE))
 		       != (CT82C710_DEV_IDLE | CT82C710_TX_IDLE) && timeout) {
 
-		if (inb_p(ct82c710_status) & CT82C710_RX_FULL) inb_p(ct82c710_data);
+		if (inb_p(CT82C710_STATUS) & CT82C710_RX_FULL) inb_p(CT82C710_DATA);
 
 		udelay(1);
 		timeout--;
@@ -98,7 +101,7 @@ static void ct82c710_close(struct serio *serio)
 	if (ct82c170_wait())
 		printk(KERN_WARNING "ct82c710.c: Device busy in close()\n");
 
-	outb_p(inb_p(ct82c710_status) & ~(CT82C710_ENABLE | CT82C710_INTS_ON), ct82c710_status);
+	outb_p(inb_p(CT82C710_STATUS) & ~(CT82C710_ENABLE | CT82C710_INTS_ON), CT82C710_STATUS);
 
 	if (ct82c170_wait())
 		printk(KERN_WARNING "ct82c710.c: Device busy in close()\n");
@@ -113,21 +116,21 @@ static int ct82c710_open(struct serio *serio)
 	if (request_irq(CT82C710_IRQ, ct82c710_interrupt, 0, "ct82c710", NULL))
 		return -1;
 
-	status = inb_p(ct82c710_status);
+	status = inb_p(CT82C710_STATUS);
 
 	status |= (CT82C710_ENABLE | CT82C710_RESET);
-	outb_p(status, ct82c710_status);
+	outb_p(status, CT82C710_STATUS);
 
 	status &= ~(CT82C710_RESET);
-	outb_p(status, ct82c710_status);
+	outb_p(status, CT82C710_STATUS);
 
 	status |= CT82C710_INTS_ON;
-	outb_p(status, ct82c710_status);	/* Enable interrupts */
+	outb_p(status, CT82C710_STATUS);	/* Enable interrupts */
 
 	while (ct82c170_wait()) {
 		printk(KERN_ERR "ct82c710: Device busy in open()\n");
 		status &= ~(CT82C710_ENABLE | CT82C710_INTS_ON);
-		outb_p(status, ct82c710_status);
+		outb_p(status, CT82C710_STATUS);
 		free_irq(CT82C710_IRQ, NULL);
 		return -1;
 	}
@@ -142,7 +145,7 @@ static int ct82c710_open(struct serio *serio)
 static int ct82c710_write(struct serio *port, unsigned char c)
 {
 	if (ct82c170_wait()) return -1;
-	outb_p(c, ct82c710_data);
+	outb_p(c, CT82C710_DATA);
 	return 0;
 }
 
@@ -162,8 +165,9 @@ static int __init ct82c710_probe(void)
 		return -1;				/* No: no 82C710 here */
 
 	outb_p(0x0d, 0x390);				/* Write index */
-	ct82c710_data = inb_p(0x391) << 2;		/* Get mouse I/O address */
-	ct82c710_status = ct82c710_data + 1;
+	ct82c710_iores.start = inb_p(0x391) << 2;	/* Get mouse I/O address */
+	ct82c710_iores.end = ct82c710_iores.start + 1;
+	ct82c710_iores.flags = IORESOURCE_IO;
 	outb_p(0x0f, 0x390);
 	outb_p(0x0f, 0x391);				/* Close config mode */
 
@@ -181,8 +185,9 @@ static struct serio * __init ct82c710_allocate_port(void)
 		serio->open = ct82c710_open;
 		serio->close = ct82c710_close;
 		serio->write = ct82c710_write;
+		serio->dev.parent = &ct82c710_device->dev;
 		strlcpy(serio->name, "C&T 82c710 mouse port", sizeof(serio->name));
-		snprintf(serio->phys, sizeof(serio->phys), "isa%04x/serio0", ct82c710_data);
+		snprintf(serio->phys, sizeof(serio->phys), "isa%04lx/serio0", CT82C710_DATA);
 	}
 
 	return serio;
@@ -193,18 +198,19 @@ int __init ct82c710_init(void)
 	if (ct82c710_probe())
 		return -ENODEV;
 
-	if (request_region(ct82c710_data, 2, "ct82c710"))
-		return -EBUSY;
+	ct82c710_device = platform_device_register_simple("ct82c710", -1, &ct82c710_iores, 1);
+	if (IS_ERR(ct82c710_device))
+		return PTR_ERR(ct82c710_device);
 
 	if (!(ct82c710_port = ct82c710_allocate_port())) {
-		release_region(ct82c710_data, 2);
+		platform_device_unregister(ct82c710_device);
 		return -ENOMEM;
 	}
 
 	serio_register_port(ct82c710_port);
 
-	printk(KERN_INFO "serio: C&T 82c710 mouse port at %#x irq %d\n",
-		ct82c710_data, CT82C710_IRQ);
+	printk(KERN_INFO "serio: C&T 82c710 mouse port at %#lx irq %d\n",
+		CT82C710_DATA, CT82C710_IRQ);
 
 	return 0;
 }
@@ -212,7 +218,7 @@ int __init ct82c710_init(void)
 void __exit ct82c710_exit(void)
 {
 	serio_unregister_port(ct82c710_port);
-	release_region(ct82c710_data, 2);
+	platform_device_unregister(ct82c710_device);
 }
 
 module_init(ct82c710_init);

@@ -35,6 +35,7 @@
 #include <linux/init.h>
 #include <linux/serio.h>
 #include <linux/interrupt.h>
+#include <linux/err.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -49,6 +50,7 @@ MODULE_LICENSE("GPL");
 
 spinlock_t q40kbd_lock = SPIN_LOCK_UNLOCKED;
 static struct serio *q40kbd_port;
+static struct platform_device *q40kbd_device;
 
 static irqreturn_t q40kbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -120,9 +122,10 @@ static struct serio * __init q40kbd_allocate_port(void)
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 		memset(serio, 0, sizeof(struct serio));
-		serio->type	= SERIO_8042;
-		serio->open	= q40kbd_open;
-		serio->close	= q40kbd_close;
+		serio->type		= SERIO_8042;
+		serio->open		= q40kbd_open;
+		serio->close		= q40kbd_close;
+		serio->dev.parent	= &q40kbd_device->dev;
 		strlcpy(serio->name, "Q40 Kbd Port", sizeof(serio->name));
 		strlcpy(serio->phys, "Q40", sizeof(serio->phys));
 	}
@@ -135,8 +138,14 @@ static int __init q40kbd_init(void)
 	if (!MACH_IS_Q40)
 		return -EIO;
 
-	if (!(q40kbd_port = q40kbd_allocate_port()))
+	q40kbd_device = platform_device_register_simple("q40kbd", -1, NULL, 0);
+	if (IS_ERR(q40kbd_device))
+		return PTR_ERR(q40kbd_device);
+
+	if (!(q40kbd_port = q40kbd_allocate_port())) {
+		platform_device_unregister(q40kbd_device);
 		return -ENOMEM;
+	}
 
 	serio_register_port(q40kbd_port);
 	printk(KERN_INFO "serio: Q40 kbd registered\n");
@@ -147,6 +156,7 @@ static int __init q40kbd_init(void)
 static void __exit q40kbd_exit(void)
 {
 	serio_unregister_port(q40kbd_port);
+	platform_device_unregister(q40kbd_device);
 }
 
 module_init(q40kbd_init);
