@@ -46,6 +46,5 @@ typedef void     *voidp;
 
 #include <linux/types.h> /* for off_t */
 #include <linux/unistd.h>    /* for SEEK_* and off_t */
-#define z_off_t  off_t
 
 #endif /* _ZCONF_H */
