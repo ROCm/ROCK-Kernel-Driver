@@ -36,6 +36,8 @@
 #include <asm/desc.h>
 #include <asm/proto.h>
 
+#define __apicdebuginit  __init
+
 int sis_apic_bug; /* not actually supported, dummy for compile */
 
 #undef APIC_LOCKUP_DEBUG
@@ -292,13 +294,13 @@ static int __init ioapic_pirq_setup(char *str)
 		pirq_entries[i] = -1;
 
 	pirqs_enabled = 1;
-	printk(KERN_INFO "PIRQ redirection, working around broken MP-BIOS.\n");
+	apic_printk(APIC_VERBOSE, "PIRQ redirection, working around broken MP-BIOS.\n");
 	max = MAX_PIRQS;
 	if (ints[0] < MAX_PIRQS)
 		max = ints[0];
 
 	for (i = 0; i < max; i++) {
-		printk(KERN_DEBUG "... PIRQ%d -> IRQ %d\n", i, ints[i+1]);
+		apic_printk(APIC_VERBOSE, "... PIRQ%d -> IRQ %d\n", i, ints[i+1]);
 		/*
 		 * PIRQs are mapped upside down, usually.
 		 */
@@ -357,10 +359,10 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
 {
 	int apic, i, best_guess = -1;
 
-	Dprintk("querying PCI -> IRQ mapping bus:%d, slot:%d, pin:%d.\n",
+	apic_printk(APIC_DEBUG, "querying PCI -> IRQ mapping bus:%d, slot:%d, pin:%d.\n",
 		bus, slot, pin);
 	if (mp_bus_id_to_pci_bus[bus] == -1) {
-		printk(KERN_WARNING "PCI BIOS passed nonexistent PCI bus %d!\n", bus);
+		apic_printk(APIC_VERBOSE, "PCI BIOS passed nonexistent PCI bus %d!\n", bus);
 		return -1;
 	}
 	for (i = 0; i < mp_irq_entries; i++) {
@@ -402,7 +404,7 @@ static int __init EISA_ELCR(unsigned int irq)
 		unsigned int port = 0x4d0 + (irq >> 3);
 		return (inb(port) >> (irq & 7)) & 1;
 	}
-	printk(KERN_INFO "Broken MPtable reports ISA irq %d\n", irq);
+	apic_printk(APIC_VERBOSE, "Broken MPtable reports ISA irq %d\n", irq);
 	return 0;
 }
 
@@ -625,10 +627,10 @@ static int pin_2_irq(int idx, int apic, int pin)
 	if ((pin >= 16) && (pin <= 23)) {
 		if (pirq_entries[pin-16] != -1) {
 			if (!pirq_entries[pin-16]) {
-				printk(KERN_DEBUG "disabling PIRQ%d\n", pin-16);
+				apic_printk(APIC_VERBOSE, "disabling PIRQ%d\n", pin-16);
 			} else {
 				irq = pirq_entries[pin-16];
-				printk(KERN_DEBUG "using PIRQ%d -> IRQ %d\n",
+				apic_printk(APIC_VERBOSE, "using PIRQ%d -> IRQ %d\n",
 						pin-16, irq);
 			}
 		}
@@ -719,7 +721,7 @@ void __init setup_IO_APIC_irqs(void)
 	int apic, pin, idx, irq, first_notcon = 1, vector;
 	unsigned long flags;
 
-	printk(KERN_DEBUG "init IO_APIC IRQs\n");
+	apic_printk(APIC_VERBOSE, KERN_DEBUG "init IO_APIC IRQs\n");
 
 	for (apic = 0; apic < nr_ioapics; apic++) {
 	for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
@@ -737,10 +739,10 @@ void __init setup_IO_APIC_irqs(void)
 		idx = find_irq_entry(apic,pin,mp_INT);
 		if (idx == -1) {
 			if (first_notcon) {
-				printk(KERN_DEBUG " IO-APIC (apicid-pin) %d-%d", mp_ioapics[apic].mpc_apicid, pin);
+				apic_printk(APIC_VERBOSE, KERN_DEBUG " IO-APIC (apicid-pin) %d-%d", mp_ioapics[apic].mpc_apicid, pin);
 				first_notcon = 0;
 			} else
-				printk(", %d-%d", mp_ioapics[apic].mpc_apicid, pin);
+				apic_printk(APIC_VERBOSE, ", %d-%d", mp_ioapics[apic].mpc_apicid, pin);
 			continue;
 		}
 
@@ -775,7 +777,7 @@ void __init setup_IO_APIC_irqs(void)
 	}
 
 	if (!first_notcon)
-		printk(" not connected.\n");
+		apic_printk(APIC_VERBOSE," not connected.\n");
 }
 
 /*
@@ -825,13 +827,9 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 
 void __init UNEXPECTED_IO_APIC(void)
 {
-#if 0
-	printk(KERN_WARNING " WARNING: unexpected IO-APIC, please mail\n");
-	printk(KERN_WARNING "          to linux-smp@vger.kernel.org\n");
-#endif
 }
 
-void __init print_IO_APIC(void)
+void __apicdebuginit print_IO_APIC(void)
 {
 	int apic, i;
 	union IO_APIC_reg_00 reg_00;
@@ -839,7 +837,10 @@ void __init print_IO_APIC(void)
 	union IO_APIC_reg_02 reg_02;
 	unsigned long flags;
 
- 	printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
+	if (apic_verbosity == APIC_QUIET)
+		return;
+
+	printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
 	for (i = 0; i < nr_ioapics; i++)
 		printk(KERN_DEBUG "number of IO-APIC #%d registers: %d.\n",
 		       mp_ioapics[i].mpc_apicid, nr_ioapic_registers[i]);
@@ -955,10 +956,13 @@ void __init print_IO_APIC(void)
 	return;
 }
 
-static void print_APIC_bitfield (int base)
+static __apicdebuginit void print_APIC_bitfield (int base)
 {
 	unsigned int v;
 	int i, j;
+
+	if (apic_verbosity == APIC_QUIET)
+		return;
 
 	printk(KERN_DEBUG "0123456789abcdef0123456789abcdef\n" KERN_DEBUG);
 	for (i = 0; i < 8; i++) {
@@ -973,9 +977,12 @@ static void print_APIC_bitfield (int base)
 	}
 }
 
-void /*__init*/ print_local_APIC(void * dummy)
+void __apicdebuginit print_local_APIC(void * dummy)
 {
 	unsigned int v, ver, maxlvt;
+
+	if (apic_verbosity == APIC_QUIET)
+		return;
 
 	printk("\n" KERN_DEBUG "printing local APIC contents on CPU#%d/%d:\n",
 		smp_processor_id(), hard_smp_processor_id());
@@ -1058,11 +1065,14 @@ void print_all_local_APICs (void)
 	on_each_cpu(print_local_APIC, NULL, 1, 1);
 }
 
-void /*__init*/ print_PIC(void)
+void __apicdebuginit print_PIC(void)
 {
 	extern spinlock_t i8259A_lock;
 	unsigned int v;
 	unsigned long flags;
+
+	if (apic_verbosity == APIC_QUIET)
+		return;
 
 	printk(KERN_DEBUG "\nprinting PIC contents\n");
 
@@ -1160,9 +1170,9 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		old_id = mp_ioapics[apic].mpc_apicid;
 
 		if (mp_ioapics[apic].mpc_apicid >= 0xf) {
-			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
+			apic_printk(APIC_QUIET,KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
 				apic, mp_ioapics[apic].mpc_apicid);
-			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
+			apic_printk(APIC_QUIET,KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
 				reg_00.bits.ID);
 			mp_ioapics[apic].mpc_apicid = reg_00.bits.ID;
 		}
@@ -1205,7 +1215,7 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		 * Read the right value from the MPC table and
 		 * write it into the ID register.
 	 	 */
-		printk(KERN_INFO "...changing IO-APIC physical APIC ID to %d ...",
+		apic_printk(APIC_VERBOSE,KERN_INFO "...changing IO-APIC physical APIC ID to %d ...",
 				mp_ioapics[apic].mpc_apicid);
 
 		reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
@@ -1222,7 +1232,7 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		if (reg_00.bits.ID != mp_ioapics[apic].mpc_apicid)
 			panic("could not set ID!\n");
 		else
-			printk(" ok.\n");
+			apic_printk(APIC_VERBOSE," ok.\n");
 	}
 }
 
@@ -1671,7 +1681,7 @@ static inline void check_timer(void)
 	pin1 = find_isa_irq_pin(0, mp_INT);
 	pin2 = find_isa_irq_pin(0, mp_ExtINT);
 
-	printk(KERN_INFO "..TIMER: vector=0x%02X pin1=%d pin2=%d\n", vector, pin1, pin2);
+	apic_printk(APIC_VERBOSE,KERN_INFO "..TIMER: vector=0x%02X pin1=%d pin2=%d\n", vector, pin1, pin2);
 
 	if (pin1 != -1) {
 		/*
@@ -1689,12 +1699,12 @@ static inline void check_timer(void)
 			return;
 		}
 		clear_IO_APIC_pin(0, pin1);
-		printk(KERN_ERR "..MP-BIOS bug: 8254 timer not connected to IO-APIC\n");
+		apic_printk(APIC_QUIET,KERN_ERR "..MP-BIOS bug: 8254 timer not connected to IO-APIC\n");
 	}
 
-	printk(KERN_INFO "...trying to set up timer (IRQ0) through the 8259A ... ");
+	apic_printk(APIC_VERBOSE,KERN_INFO "...trying to set up timer (IRQ0) through the 8259A ... ");
 	if (pin2 != -1) {
-		printk("\n..... (found pin %d) ...", pin2);
+		apic_printk(APIC_VERBOSE,"\n..... (found pin %d) ...", pin2);
 		/*
 		 * legacy devices should be connected to IO APIC #0
 		 */
@@ -1720,7 +1730,7 @@ static inline void check_timer(void)
 		nmi_watchdog = 0;
 	}
 
-	printk(KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
+	apic_printk(APIC_VERBOSE, KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
 
 	disable_8259A_irq(0);
 	irq_desc[0].handler = &lapic_irq_type;
@@ -1728,13 +1738,13 @@ static inline void check_timer(void)
 	enable_8259A_irq(0);
 
 	if (timer_irq_works()) {
-		printk(" works.\n");
+		apic_printk(APIC_QUIET, " works.\n");
 		return;
 	}
 	apic_write_around(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_FIXED | vector);
-	printk(" failed.\n");
+	apic_printk(APIC_VERBOSE," failed.\n");
 
-	printk(KERN_INFO "...trying to set up timer as ExtINT IRQ...");
+	apic_printk(APIC_VERBOSE, KERN_INFO "...trying to set up timer as ExtINT IRQ...");
 
 	init_8259A(0);
 	make_8259A_irq(0);
@@ -1743,10 +1753,10 @@ static inline void check_timer(void)
 	unlock_ExtINT_logic();
 
 	if (timer_irq_works()) {
-		printk(" works.\n");
+		apic_printk(APIC_VERBOSE," works.\n");
 		return;
 	}
-	printk(" failed :(.\n");
+	apic_printk(APIC_VERBOSE," failed :(.\n");
 	panic("IO-APIC + timer doesn't work! Try using the 'noapic' kernel parameter\n");
 }
 
@@ -1768,7 +1778,7 @@ void __init setup_IO_APIC(void)
 	else
 		io_apic_irqs = ~PIC_IRQS;
 
-	printk("ENABLING IO-APIC IRQs\n");
+	apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
 
 	/*
 	 * Set up the IO-APIC IRQ routing table.
@@ -1815,7 +1825,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	if (apic_id >= IO_APIC_MAX_ID) {
-		printk(KERN_WARNING "IOAPIC[%d]: Invalid apic_id %d, trying "
+		apic_printk(APIC_QUIET, KERN_WARNING "IOAPIC[%d]: Invalid apic_id %d, trying "
 			"%d\n", ioapic, apic_id, reg_00.bits.ID);
 		apic_id = reg_00.bits.ID;
 	}
@@ -1834,7 +1844,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 		if (i == IO_APIC_MAX_ID)
 			panic("Max apic_id exceeded!\n");
 
-		printk(KERN_WARNING "IOAPIC[%d]: apic_id %d already used, "
+		apic_printk(APIC_VERBOSE, KERN_WARNING "IOAPIC[%d]: apic_id %d already used, "
 			"trying %d\n", ioapic, apic_id, i);
 
 		apic_id = i;
@@ -1855,7 +1865,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 			panic("IOAPIC[%d]: Unable change apic_id!\n", ioapic);
 	}
 
-	printk(KERN_INFO "IOAPIC[%d]: Assigned apic_id %d\n", ioapic, apic_id);
+	apic_printk(APIC_VERBOSE,KERN_INFO "IOAPIC[%d]: Assigned apic_id %d\n", ioapic, apic_id);
 
 	return apic_id;
 }
@@ -1893,7 +1903,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 	unsigned long flags;
 
 	if (!IO_APIC_IRQ(irq)) {
-		printk(KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ 0\n",
+		apic_printk(APIC_QUIET,KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ 0\n",
 			ioapic);
 		return -EINVAL;
 	}
@@ -1921,7 +1931,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
 	entry.vector = assign_irq_vector(irq);
 
-	printk(KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
+	apic_printk(APIC_VERBOSE,KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
 		"IRQ %d Mode:%i Active:%i)\n", ioapic, 
 	       mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
 	       edge_level, active_high_low);
