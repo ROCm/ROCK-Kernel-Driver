@@ -1430,7 +1430,7 @@ static int
 shmctl32 (int first, int second, void *uptr)
 {
 	int err = -EFAULT, err2;
-	struct shmid_ds s;
+
 	struct shmid64_ds s64;
 	struct shmid_ds32 *up32 = (struct shmid_ds32 *)uptr;
 	struct shmid64_ds32 *up64 = (struct shmid64_ds32 *)uptr;
@@ -1482,19 +1482,19 @@ shmctl32 (int first, int second, void *uptr)
 
 	      case IPC_SET:
 		if (version == IPC_64) {
-			err = get_user(s.shm_perm.uid, &up64->shm_perm.uid);
-			err |= get_user(s.shm_perm.gid, &up64->shm_perm.gid);
-			err |= get_user(s.shm_perm.mode, &up64->shm_perm.mode);
+			err = get_user(s64.shm_perm.uid, &up64->shm_perm.uid);
+			err |= get_user(s64.shm_perm.gid, &up64->shm_perm.gid);
+			err |= get_user(s64.shm_perm.mode, &up64->shm_perm.mode);
 		} else {
-			err = get_user(s.shm_perm.uid, &up32->shm_perm.uid);
-			err |= get_user(s.shm_perm.gid, &up32->shm_perm.gid);
-			err |= get_user(s.shm_perm.mode, &up32->shm_perm.mode);
+			err = get_user(s64.shm_perm.uid, &up32->shm_perm.uid);
+			err |= get_user(s64.shm_perm.gid, &up32->shm_perm.gid);
+			err |= get_user(s64.shm_perm.mode, &up32->shm_perm.mode);
 		}
 		if (err)
 			break;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_shmctl(first, second, &s);
+		err = sys_shmctl(first, second, &s64);
 		set_fs(old_fs);
 		break;
 
