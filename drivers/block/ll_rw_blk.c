@@ -573,6 +573,8 @@ static int
 init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 {
 	int bits, i;
+	struct request **tag_index;
+	unsigned long *tag_map;
 
 	if (depth > q->nr_requests * 2) {
 		depth = q->nr_requests * 2;
@@ -580,29 +582,31 @@ init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 				__FUNCTION__, depth);
 	}
 
-	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
-	if (!tags->tag_index)
+	tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
+	if (!tag_index)
 		goto fail;
 
 	bits = (depth / BLK_TAGS_PER_LONG) + 1;
-	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
-	if (!tags->tag_map)
+	tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
+	if (!tag_map)
 		goto fail;
 
-	memset(tags->tag_index, 0, depth * sizeof(struct request *));
-	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
+	memset(tag_index, 0, depth * sizeof(struct request *));
+	memset(tag_map, 0, bits * sizeof(unsigned long));
 	tags->max_depth = depth;
 	tags->real_max_depth = bits * BITS_PER_LONG;
+	tags->tag_index = tag_index;
+	tags->tag_map = tag_map;
 
 	/*
 	 * set the upper bits if the depth isn't a multiple of the word size
 	 */
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
-		__set_bit(i, tags->tag_map);
+		__set_bit(i, tag_map);
 
 	return 0;
 fail:
-	kfree(tags->tag_index);
+	kfree(tag_index);
 	return -ENOMEM;
 }
 
