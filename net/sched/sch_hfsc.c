@@ -1798,9 +1798,6 @@ hfsc_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
 	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
 
-#ifdef CONFIG_NET_CLS_ACT
-	sch->stats.reqs++;
-#endif
 	__skb_queue_head(&q->requeue, skb);
 	sch->q.qlen++;
 	return NET_XMIT_SUCCESS;

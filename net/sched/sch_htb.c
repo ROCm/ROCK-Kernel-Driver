@@ -763,9 +763,6 @@ static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
     struct htb_class *cl = htb_classify(skb,sch, &ret);
     struct sk_buff *tskb;
 
-#ifdef CONFIG_NET_CLS_ACT
-	sch->stats.reqs++;
-#endif
     if (cl == HTB_DIRECT || !cl) {
 	/* enqueue to helper queue */
 	if (q->direct_queue.qlen < q->direct_qlen && cl) {
