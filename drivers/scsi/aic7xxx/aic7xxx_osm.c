@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#169 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#170 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -2666,6 +2666,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		{
+			u_int xportflags;
 			u_int spi3data;
 
 			if (memcmp(targ->inq_data, targ->dv_buffer,
@@ -2682,6 +2683,10 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state+1);
 			targ->flags |= AHC_INQ_VALID;
 			if (ahc_linux_user_dv_setting(ahc) == 0)
+				break;
+
+			xportflags = targ->inq_data->flags;
+			if ((xportflags & (SID_Sync|SID_WBus16)) == 0)
 				break;
 
 			spi3data = targ->inq_data->spi3data;

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#104 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#105 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2813,6 +2813,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		{
+			u_int xportflags;
 			u_int spi3data;
 
 			if (memcmp(targ->inq_data, targ->dv_buffer,
@@ -2829,6 +2830,10 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 			AHD_SET_DV_STATE(ahd, targ, targ->dv_state+1);
 			targ->flags |= AHD_INQ_VALID;
 			if (ahd_linux_user_dv_setting(ahd) == 0)
+				break;
+
+			xportflags = targ->inq_data->flags;
+			if ((xportflags & (SID_Sync|SID_WBus16)) == 0)
 				break;
 
 			spi3data = targ->inq_data->spi3data;
