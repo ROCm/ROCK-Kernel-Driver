@@ -165,10 +165,8 @@ void pmd_ctor(void *pmd, kmem_cache_t *cache, unsigned long flags)
  * against pageattr.c; it is the unique case in which a valid change
  * of kernel pagetables can't be lazily synchronized by vmalloc faults.
  * vmalloc faults work because attached pagetables are never freed.
- * If the locking proves to be non-performant, a ticketing scheme with
- * checks at dup_mmap(), exec(), and other mmlist addition points
- * could be used. The locking scheme was chosen on the basis of
- * manfred's recommendations and having no core impact whatsoever.
+ * The locking scheme was chosen on the basis of manfred's
+ * recommendations and having no core impact whatsoever.
  * -- wli
  */
 spinlock_t pgd_lock = SPIN_LOCK_UNLOCKED;

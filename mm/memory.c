@@ -289,8 +289,15 @@ skip_copy_pte_range:
 					goto cont_copy_pte_range_noset;
 				/* pte contains position in swap, so copy. */
 				if (!pte_present(pte)) {
-					if (!pte_file(pte))
+					if (!pte_file(pte)) {
 						swap_duplicate(pte_to_swp_entry(pte));
+						if (list_empty(&dst->mmlist)) {
+							spin_lock(&mmlist_lock);
+							list_add(&dst->mmlist,
+								 &src->mmlist);
+							spin_unlock(&mmlist_lock);
+						}
+					}
 					set_pte(dst_pte, pte);
 					goto cont_copy_pte_range_noset;
 				}
