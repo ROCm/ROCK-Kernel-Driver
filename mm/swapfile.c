@@ -7,6 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/mman.h>
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
@@ -289,10 +290,10 @@ static int exclusive_swap_page(struct page *page)
 		/* Is the only swap cache user the cache itself? */
 		if (p->swap_map[swp_offset(entry)] == 1) {
 			/* Recheck the page count with the swapcache lock held.. */
-			spin_lock(&swapper_space.tree_lock);
+			spin_lock_irq(&swapper_space.tree_lock);
 			if (page_count(page) == 2)
 				retval = 1;
-			spin_unlock(&swapper_space.tree_lock);
+			spin_unlock_irq(&swapper_space.tree_lock);
 		}
 		swap_info_put(p);
 	}
@@ -360,13 +361,13 @@ int remove_exclusive_swap_page(struct page *page)
 	retval = 0;
 	if (p->swap_map[swp_offset(entry)] == 1) {
 		/* Recheck the page count with the swapcache lock held.. */
-		spin_lock(&swapper_space.tree_lock);
+		spin_lock_irq(&swapper_space.tree_lock);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		spin_unlock(&swapper_space.tree_lock);
+		spin_unlock_irq(&swapper_space.tree_lock);
 	}
 	swap_info_put(p);
 
@@ -390,12 +391,12 @@ void free_swap_and_cache(swp_entry_t entry)
 	p = swap_info_get(entry);
 	if (p) {
 		if (swap_entry_free(p, swp_offset(entry)) == 1) {
-			spin_lock(&swapper_space.tree_lock);
+			spin_lock_irq(&swapper_space.tree_lock);
 			page = radix_tree_lookup(&swapper_space.page_tree,
 				entry.val);
 			if (page && TestSetPageLocked(page))
 				page = NULL;
-			spin_unlock(&swapper_space.tree_lock);
+			spin_unlock_irq(&swapper_space.tree_lock);
 		}
 		swap_info_put(p);
 	}
@@ -427,19 +428,19 @@ void free_swap_and_cache(swp_entry_t entry)
 /* vma->vm_mm->page_table_lock is held */
 static void
 unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	vma->vm_mm->rss++;
 	get_page(page);
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
-	*pte_chainp = page_add_rmap(page, dir, *pte_chainp);
+	page_add_anon_rmap(page, vma, address);
 	swap_free(entry);
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
+static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	unsigned long address, unsigned long size, unsigned long offset,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	pte_t * pte;
 	unsigned long end;
@@ -464,10 +465,10 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		 * Test inline before going to call unuse_pte.
 		 */
 		if (unlikely(pte_same(*pte, swp_pte))) {
-			unuse_pte(vma, offset + address, pte,
-					entry, page, pte_chainp);
+			unuse_pte(vma, offset + address, pte, entry, page);
 			pte_unmap(pte);
-			return 1;
+			/* add 1 since address may be 0 */
+			return 1 + offset + address;
 		}
 		address += PAGE_SIZE;
 		pte++;
@@ -477,12 +478,13 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
+static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	unsigned long address, unsigned long size,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	pmd_t * pmd;
 	unsigned long offset, end;
+	unsigned long foundaddr;
 
 	if (pgd_none(*dir))
 		return 0;
@@ -500,9 +502,10 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	if (address >= end)
 		BUG();
 	do {
-		if (unuse_pmd(vma, pmd, address, end - address,
-				offset, entry, page, pte_chainp))
-			return 1;
+		foundaddr = unuse_pmd(vma, pmd, address, end - address,
+						offset, entry, page);
+		if (foundaddr)
+			return foundaddr;
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address && (address < end));
@@ -510,17 +513,19 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static int unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+static unsigned long unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
+	swp_entry_t entry, struct page *page)
 {
 	unsigned long start = vma->vm_start, end = vma->vm_end;
+	unsigned long foundaddr;
 
 	if (start >= end)
 		BUG();
 	do {
-		if (unuse_pgd(vma, pgdir, start, end - start,
-				entry, page, pte_chainp))
-			return 1;
+		foundaddr = unuse_pgd(vma, pgdir, start, end - start,
+						entry, page);
+		if (foundaddr)
+			return foundaddr;
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		pgdir++;
 	} while (start && (start < end));
@@ -531,23 +536,27 @@ static int unuse_process(struct mm_struct * mm,
 			swp_entry_t entry, struct page* page)
 {
 	struct vm_area_struct* vma;
-	struct pte_chain *pte_chain;
-
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain)
-		return -ENOMEM;
+	unsigned long foundaddr = 0;
 
 	/*
 	 * Go through process' page directory.
 	 */
+	down_read(&mm->mmap_sem);
 	spin_lock(&mm->page_table_lock);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		pgd_t * pgd = pgd_offset(mm, vma->vm_start);
-		if (unuse_vma(vma, pgd, entry, page, &pte_chain))
-			break;
+		if (!is_vm_hugetlb_page(vma)) {
+			pgd_t * pgd = pgd_offset(mm, vma->vm_start);
+			foundaddr = unuse_vma(vma, pgd, entry, page);
+			if (foundaddr)
+				break;
+		}
 	}
 	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
+	up_read(&mm->mmap_sem);
+	/*
+	 * Currently unuse_process cannot fail, but leave error handling
+	 * at call sites for now, since we change it from time to time.
+	 */
 	return 0;
 }
 
@@ -649,7 +658,7 @@ static int try_to_unuse(unsigned int type)
 		 */
 		swap_map = &si->swap_map[i];
 		entry = swp_entry(type, i);
-		page = read_swap_cache_async(entry);
+		page = read_swap_cache_async(entry, NULL, 0);
 		if (!page) {
 			/*
 			 * Either swap_duplicate() failed because entry

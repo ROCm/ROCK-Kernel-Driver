@@ -22,6 +22,7 @@
 #include <linux/security.h>
 #include <linux/mount.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 extern int __init init_rootfs(void);
 
@@ -465,6 +466,8 @@ out:
 	return retval;
 }
 
+#ifdef __ARCH_WANT_SYS_OLDUMOUNT
+
 /*
  *	The 2.0 compatible umount. No flags. 
  */
@@ -473,6 +476,8 @@ asmlinkage long sys_oldumount(char __user * name)
 {
 	return sys_umount(name,0);
 }
+
+#endif
 
 static int mount_is_safe(struct nameidata *nd)
 {
@@ -1201,9 +1206,7 @@ void __init mnt_init(unsigned long mempages)
 	int i;
 
 	mnt_cache = kmem_cache_create("mnt_cache", sizeof(struct vfsmount),
-					0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!mnt_cache)
-		panic("Cannot create vfsmount cache");
+			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
 	order = 0; 
 	mount_hashtable = (struct list_head *)

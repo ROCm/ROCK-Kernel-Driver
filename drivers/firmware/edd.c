@@ -40,7 +40,6 @@
 #include <linux/limits.h>
 #include <linux/device.h>
 #include <linux/pci.h>
-#include <linux/device.h>
 #include <linux/blkdev.h>
 #include <linux/edd.h>
 

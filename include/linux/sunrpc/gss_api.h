@@ -75,7 +75,7 @@ struct gss_api_mech {
 	struct gss_api_ops	*gm_ops;
 	/* pseudoflavors supported by this mechanism: */
 	int			gm_pf_num;
-	struct pf_desc		gm_pfs[];
+	struct pf_desc *	gm_pfs;
 };
 
 /* and must provide the following operations: */

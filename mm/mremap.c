@@ -15,7 +15,6 @@
 #include <linux/swap.h>
 #include <linux/fs.h>
 #include <linux/highmem.h>
-#include <linux/rmap.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
@@ -56,16 +55,18 @@ end:
 	return pte;
 }
 
-static inline int page_table_present(struct mm_struct *mm, unsigned long addr)
+static pte_t *get_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd))
-		return 0;
+		return NULL;
 	pmd = pmd_offset(pgd, addr);
-	return pmd_present(*pmd);
+	if (!pmd_present(*pmd))
+		return NULL;
+	return pte_offset_map(pmd, addr);
 }
 
 static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
@@ -79,38 +80,27 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-static void
-copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
-	     pte_t *src, pte_t *dst, struct pte_chain **pte_chainp)
-{
-	pte_t pte = ptep_clear_flush(vma, old_addr, src);
-	set_pte(dst, pte);
-
-	if (pte_present(pte)) {
-		unsigned long pfn = pte_pfn(pte);
-		if (pfn_valid(pfn)) {
-			struct page *page = pfn_to_page(pfn);
-			page_remove_rmap(page, src);
-			*pte_chainp = page_add_rmap(page, dst, *pte_chainp);
-		}
-	}
-}
-
 static int
 move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		unsigned long new_addr)
 {
+	struct address_space *mapping = NULL;
 	struct mm_struct *mm = vma->vm_mm;
 	int error = 0;
 	pte_t *src, *dst;
-	struct pte_chain *pte_chain;
 
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain) {
-		error = -ENOMEM;
-		goto out;
+	if (vma->vm_file) {
+		/*
+		 * Subtle point from Rajesh Venkatasubramanian: before
+		 * moving file-based ptes, we must lock vmtruncate out,
+		 * since it might clean the dst vma before the src vma,
+		 * and we propagate stale pages into the dst afterward.
+		 */
+		mapping = vma->vm_file->f_mapping;
+		spin_lock(&mapping->i_mmap_lock);
 	}
 	spin_lock(&mm->page_table_lock);
+
 	src = get_one_pte_map_nested(mm, old_addr);
 	if (src) {
 		/*
@@ -118,22 +108,29 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 * memory allocation.  If it does then we need to drop the
 		 * atomic kmap
 		 */
-		if (!page_table_present(mm, new_addr)) {
+		dst = get_one_pte_map(mm, new_addr);
+		if (unlikely(!dst)) {
 			pte_unmap_nested(src);
-			src = NULL;
-		}
-		dst = alloc_one_pte_map(mm, new_addr);
-		if (src == NULL)
+			if (mapping)
+				spin_unlock(&mapping->i_mmap_lock);
+			dst = alloc_one_pte_map(mm, new_addr);
+			if (mapping && !spin_trylock(&mapping->i_mmap_lock)) {
+				spin_unlock(&mm->page_table_lock);
+				spin_lock(&mapping->i_mmap_lock);
+				spin_lock(&mm->page_table_lock);
+			}
 			src = get_one_pte_map_nested(mm, old_addr);
+		}
 		/*
 		 * Since alloc_one_pte_map can drop and re-acquire
 		 * page_table_lock, we should re-check the src entry...
 		 */
 		if (src) {
-			if (dst)
-				copy_one_pte(vma, old_addr, src,
-						dst, &pte_chain);
-			else
+			if (dst) {
+				pte_t pte;
+				pte = ptep_clear_flush(vma, old_addr, src);
+				set_pte(dst, pte);
+			} else
 				error = -ENOMEM;
 			pte_unmap_nested(src);
 		}
@@ -141,13 +138,14 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 			pte_unmap(dst);
 	}
 	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
-out:
+	if (mapping)
+		spin_unlock(&mapping->i_mmap_lock);
 	return error;
 }
 
 static unsigned long move_page_tables(struct vm_area_struct *vma,
-	unsigned long new_addr, unsigned long old_addr, unsigned long len)
+		unsigned long new_addr, unsigned long old_addr,
+		unsigned long len)
 {
 	unsigned long offset;
 
@@ -161,6 +159,7 @@ static unsigned long move_page_tables(struct vm_area_struct *vma,
 	for (offset = 0; offset < len; offset += PAGE_SIZE) {
 		if (move_one_page(vma, old_addr+offset, new_addr+offset) < 0)
 			break;
+		cond_resched();
 	}
 	return offset;
 }
@@ -170,7 +169,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		unsigned long new_len, unsigned long new_addr)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	struct address_space *mapping = NULL;
 	struct vm_area_struct *new_vma;
 	unsigned long vm_flags = vma->vm_flags;
 	unsigned long new_pgoff;
@@ -190,16 +188,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	if (!new_vma)
 		return -ENOMEM;
 
-	if (vma->vm_file) {
-		/*
-		 * Subtle point from Rajesh Venkatasubramanian: before
-		 * moving file-based ptes, we must lock vmtruncate out,
-		 * since it might clean the dst vma before the src vma,
-		 * and we propagate stale pages into the dst afterward.
-		 */
-		mapping = vma->vm_file->f_mapping;
-		down(&mapping->i_shared_sem);
-	}
 	moved_len = move_page_tables(vma, new_addr, old_addr, old_len);
 	if (moved_len < old_len) {
 		/*
@@ -213,8 +201,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		old_addr = new_addr;
 		new_addr = -ENOMEM;
 	}
-	if (mapping)
-		up(&mapping->i_shared_sem);
 
 	/* Conceal VM_ACCOUNT so old reservation is not undone */
 	if (vm_flags & VM_ACCOUNT) {
@@ -368,9 +354,10 @@ unsigned long do_mremap(unsigned long addr,
 		/* can we just expand the current mapping? */
 		if (max_addr - addr >= new_len) {
 			int pages = (new_len - old_len) >> PAGE_SHIFT;
-			spin_lock(&vma->vm_mm->page_table_lock);
-			vma->vm_end = addr + new_len;
-			spin_unlock(&vma->vm_mm->page_table_lock);
+
+			vma_adjust(vma, vma->vm_start,
+				addr + new_len, vma->vm_pgoff, NULL);
+
 			current->mm->total_vm += pages;
 			if (vma->vm_flags & VM_LOCKED) {
 				current->mm->locked_vm += pages;

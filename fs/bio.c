@@ -808,9 +808,7 @@ static void __init biovec_init_pools(void)
 		size = bp->nr_vecs * sizeof(struct bio_vec);
 
 		bp->slab = kmem_cache_create(bp->name, size, 0,
-						SLAB_HWCACHE_ALIGN, NULL, NULL);
-		if (!bp->slab)
-			panic("biovec: can't init slab cache\n");
+				SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
 		if (i >= scale)
 			pool_entries >>= 1;
@@ -825,16 +823,16 @@ static void __init biovec_init_pools(void)
 static int __init init_bio(void)
 {
 	bio_slab = kmem_cache_create("bio", sizeof(struct bio), 0,
-					SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!bio_slab)
-		panic("bio: can't create slab cache\n");
-	bio_pool = mempool_create(BIO_POOL_SIZE, mempool_alloc_slab, mempool_free_slab, bio_slab);
+				SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
+	bio_pool = mempool_create(BIO_POOL_SIZE, mempool_alloc_slab,
+				mempool_free_slab, bio_slab);
 	if (!bio_pool)
 		panic("bio: can't create mempool\n");
 
 	biovec_init_pools();
 
-	bio_split_pool = mempool_create(BIO_SPLIT_ENTRIES, bio_pair_alloc, bio_pair_free, NULL);
+	bio_split_pool = mempool_create(BIO_SPLIT_ENTRIES,
+				bio_pair_alloc, bio_pair_free, NULL);
 	if (!bio_split_pool)
 		panic("bio: can't create split pool\n");
 

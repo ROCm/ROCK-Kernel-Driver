@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.55 2004/04/08 01:17:58 armin Exp $
+/* $Id: divasmain.c,v 1.55.4.1 2004/05/21 12:15:00 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -41,7 +41,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.55 $";
+static char *main_revision = "$Revision: 1.55.4.1 $";
 
 static int major;
 
@@ -157,7 +157,7 @@ MODULE_DEVICE_TABLE(pci, divas_pci_tbl);
 
 static int divas_init_one(struct pci_dev *pdev,
 			  const struct pci_device_id *ent);
-static void divas_remove_one(struct pci_dev *pdev);
+static void __devexit divas_remove_one(struct pci_dev *pdev);
 
 static struct pci_driver diva_pci_driver = {
 	.name     = "divas",

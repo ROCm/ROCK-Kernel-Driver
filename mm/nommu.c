@@ -572,10 +572,6 @@ unsigned long get_unmapped_area(struct file *file, unsigned long addr,
 	return -ENOMEM;
 }
 
-void pte_chain_init(void)
-{
-}
-
 void swap_unplug_io_fn(struct backing_dev_info *)
 {
 }

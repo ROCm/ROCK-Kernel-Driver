@@ -25,6 +25,8 @@
 #include <linux/rcupdate.h>
 #include <linux/workqueue.h>
 
+#include <asm/unistd.h>
+
 #include "util.h"
 
 /**
@@ -507,7 +509,8 @@ int ipc_checkid(struct ipc_ids* ids, struct kern_ipc_perm* ipcp, int uid)
 	return 0;
 }
 
-#if !defined(__ia64__) && !defined(__x86_64__) && !defined(__hppa__)
+#ifdef __ARCH_WANT_IPC_PARSE_VERSION
+
 
 /**
  *	ipc_parse_version	-	IPC call version
@@ -528,4 +531,4 @@ int ipc_parse_version (int *cmd)
 	}
 }
 
-#endif /* __ia64__ */
+#endif /* __ARCH_WANT_IPC_PARSE_VERSION */

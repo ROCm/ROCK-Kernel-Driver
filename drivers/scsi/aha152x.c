@@ -240,8 +240,6 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <linux/blkdev.h>
-#include "scsi.h"
-#include "hosts.h"
 #include <asm/system.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -259,6 +257,7 @@
 #include <scsi/scsicam.h>
 
 #include "scsi.h"
+#include "hosts.h"
 #include "aha152x.h"
 
 

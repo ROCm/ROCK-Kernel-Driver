@@ -323,16 +323,8 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 	if (ia32_restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
+	if (sys32_sigaltstack(&frame->uc.uc_stack, NULL, regs) == -EFAULT)
 		goto badframe;
-	/* It is more difficult to avoid calling this function than to
-	   call it and ignore errors.  */
-	{
-		mm_segment_t oldds = get_fs(); 
-		set_fs(KERNEL_DS); 
-		do_sigaltstack(&st, NULL, regs.rsp);
-		set_fs(oldds);  
-	}
 
 	return eax;
 

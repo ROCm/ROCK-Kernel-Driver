@@ -116,6 +116,12 @@
 #define SIOCBONDINFOQUERY      0x8994	/* rtn info about bond state    */
 #define SIOCBONDCHANGEACTIVE   0x8995   /* update to a new active slave */
 			
+/* bridge calls */
+#define SIOCBRADDBR     0x89a0		/* create new bridge device     */
+#define SIOCBRDELBR     0x89a1		/* remove bridge device         */
+#define SIOCBRADDIF	0x89a2		/* add interface to bridge      */
+#define SIOCBRDELIF	0x89a3		/* remove interface from bridge */
+
 /* Device private ioctl calls */
 
 /*

@@ -20,13 +20,11 @@ static void init_hwif_piix(ide_hwif_t *);
 		.name		= name_str,		\
 		.init_setup	= init_setup_piix,	\
 		.init_chipset	= init_chipset_piix,	\
-		.init_iops	= NULL,			\
 		.init_hwif	= init_hwif_piix,	\
 		.channels	= 2,			\
 		.autodma	= AUTODMA,		\
 		.enablebits	= {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, \
 		.bootable	= ON_BOARD,		\
-		.extra		= 0,			\
 	}
 
 /*
@@ -43,14 +41,11 @@ static ide_pci_device_t piix_pci_info[] __devinitdata = {
 		.device		= PCI_DEVICE_ID_INTEL_82371MX,
 		.name		= "MPIIX",
 		.init_setup	= init_setup_piix,
-		.init_chipset	= NULL,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_piix,
 		.channels	= 2,
 		.autodma	= NODMA,
 		.enablebits	= {{0x6D,0x80,0x80}, {0x6F,0x80,0x80}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	},
 
 	/* 3  */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_82371SB_1,  "PIIX3"),
@@ -70,14 +65,7 @@ static ide_pci_device_t piix_pci_info[] __devinitdata = {
 	/* 17 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_82801DB_10, "ICH4"),
 	/* 18 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_82801EB_1,  "ICH5-SATA"),
 	/* 19 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_ESB_2,      "ICH5"),
-	/* 20 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_ICH6_19,     "ICH6"),
-	{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.init_setup	= NULL,
-		.bootable	= EOL,
-	}
+	/* 20 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_ICH6_19,    "ICH6")
 };
 
 #endif /* PIIX_H */

@@ -44,6 +44,7 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define SLAB_STORE_USER		0x00010000UL	/* store the last owner for bug hunting */
 #define SLAB_RECLAIM_ACCOUNT	0x00020000UL	/* track pages allocated to indicate
 						   what is reclaimable later*/
+#define SLAB_PANIC		0x00040000UL	/* panic if kmem_cache_create() fails */
 
 /* flags passed to a constructor func */
 #define	SLAB_CTOR_CONSTRUCTOR	0x001UL		/* if not set, then deconstructor */

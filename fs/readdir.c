@@ -14,6 +14,7 @@
 #include <linux/fs.h>
 #include <linux/dirent.h>
 #include <linux/security.h>
+#include <linux/unistd.h>
 
 #include <asm/uaccess.h>
 
@@ -52,7 +53,7 @@ EXPORT_SYMBOL(vfs_readdir);
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 #define ROUND_UP(x) (((x)+sizeof(long)-1) & ~(sizeof(long)-1))
 
-#ifndef __ia64__
+#ifdef __ARCH_WANT_OLD_READDIR
 
 struct old_linux_dirent {
 	unsigned long	d_ino;
@@ -115,7 +116,7 @@ out:
 	return error;
 }
 
-#endif /* !__ia64__ */
+#endif /* __ARCH_WANT_OLD_READDIR */
 
 /*
  * New, all-improved, singing, dancing, iBCS2-compliant getdents()

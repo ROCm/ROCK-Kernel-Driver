@@ -497,8 +497,6 @@ extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, u
 
 #include <asm-generic/pgtable.h>
 
-typedef pte_t *pte_addr_t;
-
 #endif /* !(__ASSEMBLY__) */
 
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
