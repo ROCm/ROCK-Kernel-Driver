@@ -105,7 +105,7 @@ isl_upload_firmware(islpci_private *priv)
 			       "%s: firmware '%s' size is not multiple of 32bit, aborting!\n",
 			       "prism54", priv->firmware);
 			release_firmware(fw_entry);
-			return EILSEQ; /* Illegal byte sequence  */;
+			return -EILSEQ; /* Illegal byte sequence  */;
 		}
 
 		while (fw_len > 0) {
@@ -141,6 +141,10 @@ isl_upload_firmware(islpci_private *priv)
 		}
 
 		BUG_ON(fw_len != 0);
+
+		/* Firmware version is at offset 40 (also for "newmac") */
+		printk(KERN_DEBUG "%s: firmware version: %.8s\n",
+		       priv->ndev->name, fw_entry->data + 40);
 
 		release_firmware(fw_entry);
 	}
