@@ -72,7 +72,8 @@ static void mce_log(struct mce *mce)
 
 static void print_mce(struct mce *m)
 {
-	printk(KERN_EMERG 
+	printk(KERN_EMERG "\n"
+	       KERN_EMERG 
 	       "CPU %d: Machine Check Exception: %16Lx Bank %d: %016Lx\n",
 	       m->cpu, m->mcgstatus, m->bank, m->status);
 	if (m->rip) {
@@ -101,7 +102,7 @@ static void mce_panic(char *msg, struct mce *backup, unsigned long start)
 		if (time_before(tsc, start))
 			continue;
 		print_mce(&mcelog.entry[i]); 
-		if (mcelog.entry[i].tsc == backup->tsc)
+		if (backup && mcelog.entry[i].tsc == backup->tsc)
 			backup = NULL;
 	}
 	if (backup)
