@@ -45,25 +45,6 @@ static int __init cachesize_setup(char *str)
 }
 __setup("cachesize=", cachesize_setup);
 
-#ifndef CONFIG_X86_TSC
-static int tsc_disable __initdata = 0;
-
-static int __init tsc_setup(char *str)
-{
-	tsc_disable = 1;
-	return 1;
-}
-#else
-#define tsc_disable 0
-
-static int __init tsc_setup(char *str)
-{
-	printk("notsc: Kernel compiled with CONFIG_X86_TSC, cannot disable TSC.\n");
-	return 1;
-}
-#endif
-__setup("notsc", tsc_setup);
-
 int __init get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;

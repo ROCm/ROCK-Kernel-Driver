@@ -19,6 +19,9 @@
 #include <linux/config.h>
 #include <linux/threads.h>
 
+/* flag for disabling the tsc */
+extern int tsc_disable;
+
 struct desc_struct {
 	unsigned long a,b;
 };
