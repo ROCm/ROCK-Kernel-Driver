@@ -1174,6 +1174,12 @@ for writeout by the pdflush daemons.  It is expressed in 100'ths of a second.
 Data which has been dirty in-memory for longer than this interval will be
 written out next time a pdflush daemon wakes up.
 
+legacy_va_layout
+----------------
+
+If non-zero, this sysctl disables the new 32-bit mmap mmap layout - the kernel
+will use the legacy (2.4) layout for all processes.
+
 lower_zone_protection
 ---------------------
 

@@ -26,6 +26,12 @@ extern void * high_memory;
 extern unsigned long vmalloc_earlyreserve;
 extern int page_cluster;
 
+#ifdef CONFIG_SYSCTL
+extern int sysctl_legacy_va_layout;
+#else
+#define sysctl_legacy_va_layout 0
+#endif
+
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
