@@ -146,7 +146,8 @@ nfs_idmap_id(struct nfs_server *server, u_int8_t type, char *name,
 	struct idmap *idmap = server->idmap;
 	struct idmap_msg *im;
 	DECLARE_WAITQUEUE(wq, current);
-	int ret = -1, hashtype = IDMAP_HASH_TYPE_NAME, xnamelen = namelen;
+	int ret = -1, hashtype = IDMAP_HASH_TYPE_NAME;
+	u_int xnamelen = namelen;
 
 	if (idmap == NULL)
 		return (-1);
@@ -169,15 +170,6 @@ nfs_idmap_id(struct nfs_server *server, u_int8_t type, char *name,
 
 	memset(im, 0, sizeof(*im));
 	memcpy(im->im_name, name, namelen);
-	/* Make sure the string is NULL terminated */
-	if (namelen != xnamelen) {
-		/* We cannot fit a NULL character */
-		if (namelen == IDMAP_NAMESZ) {
-			ret = -1;
-			goto out;
-		}
-		im->im_name[namelen] = '\0';
-	} 
 
 	im->im_type = type;
 	im->im_conv = IDMAP_CONV_NAMETOID;

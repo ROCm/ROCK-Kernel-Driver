@@ -241,8 +241,8 @@ encode_attrs(struct xdr_stream *xdr, struct iattr *iap,
 {
 	char owner_name[256];
 	char owner_group[256];
-	int owner_namelen = 0;
-	int owner_grouplen = 0;
+	int owner_namelen = sizeof(owner_name);
+	int owner_grouplen = sizeof(owner_group);
 	uint32_t *p;
 	uint32_t *q;
 	int len;
@@ -1476,7 +1476,7 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 		READ_BUF(dummy32);
 		len += (XDR_QUADLEN(dummy32) << 2);
 		if ((status = nfs_idmap_id(server, IDMAP_TYPE_USER,
-			 (char *)p, len, &nfp->uid)) == -1) {
+			 (char *)p, dummy32, &nfp->uid)) == -1) {
 			dprintk("read_attrs: gss_get_num failed!\n");
 			/* goto out; */
 			nfp->uid = -2;
@@ -1494,7 +1494,7 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 		READ_BUF(dummy32);
 		len += (XDR_QUADLEN(dummy32) << 2);
 		if ((status = nfs_idmap_id(server, IDMAP_TYPE_GROUP,
-			 (char *)p, len, &nfp->gid)) == -1) {
+			 (char *)p, dummy32, &nfp->gid)) == -1) {
 			dprintk("read_attrs: gss_get_num failed!\n");
 			nfp->gid = -2;
 			/* goto out; */
