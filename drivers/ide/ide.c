@@ -2364,12 +2364,6 @@ void ide_unregister_driver(ide_driver_t *driver)
 			printk(KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
 			BUG();
 		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-#ifdef CONFIG_PROC_FS
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, driver->proc);
-#endif
 		ata_attach(drive);
 	}
 }
