@@ -217,12 +217,15 @@ typedef struct {
 #define ST0_RXRDY     0x01	/* RX ready */
 
 #define ST1_UDRN      0x80	/* MSCI TX underrun */
+#define ST1_CDCD      0x04	/* DCD level changed */
 
 #define ST3_CTS       0x08	/* modem input - /CTS */
 #define ST3_DCD       0x04	/* modem input - /DCD */
 
 #define IE0_TXINT     0x80	/* TX INT MSCI interrupt enable */
+#define IE0_RXINTA    0x40	/* RX INT A MSCI interrupt enable */
 #define IE1_UDRN      0x80	/* TX underrun MSCI interrupt enable */
+#define IE1_CDCD      0x04	/* DCD level changed */
 
 #define DCR_ABORT     0x01	/* Software abort command */
 #define DCR_CLEAR_EOF 0x02	/* Clear EOF interrupt */

@@ -14,7 +14,6 @@
  *    Moxa C101 User's Manual
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -31,8 +30,11 @@
 #include "hd64570.h"
 
 
-static const char* version = "Moxa C101 driver version: 1.14";
+static const char* version = "Moxa C101 driver version: 1.15";
 static const char* devname = "C101";
+
+#undef DEBUG_PKT
+#define DEBUG_RINGS
 
 #define C101_PAGE 0x1D00
 #define C101_DTR 0x1E00
@@ -95,7 +97,8 @@ static card_t **new_card = &first_card;
 #define winsize(card)		   (C101_WINDOW_SIZE)
 #define win0base(card)		   ((card)->win0base)
 #define winbase(card)      	   ((card)->win0base + 0x2000)
-#define get_port(card, port)	   ((port) == 0 ? (card) : NULL)
+#define get_port(card, port)	   (card)
+static void sca_msci_intr(port_t *port);
 
 
 static inline u8 sca_get_page(card_t *card)
@@ -116,9 +119,30 @@ static inline void openwin(card_t *card, u8 page)
 #include "hd6457x.c"
 
 
+static void sca_msci_intr(port_t *port)
+{
+	card_t* card = port_to_card(port);
+	u8 stat = sca_in(MSCI1_OFFSET + ST1, card); /* read MSCI ST1 status */
+
+	/* Reset MSCI TX underrun status bit */
+	sca_out(stat & ST1_UDRN, MSCI0_OFFSET + ST1, card);
+
+	if (stat & ST1_UDRN) {
+		port->hdlc.stats.tx_errors++; /* TX Underrun error detected */
+		port->hdlc.stats.tx_fifo_errors++;
+	}
+
+	/* Reset MSCI CDCD status bit - uses ch#2 DCD input */
+	sca_out(stat & ST1_CDCD, MSCI1_OFFSET + ST1, card);
+
+	if (stat & ST1_CDCD)
+		hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD),
+				 &port->hdlc);
+}
+
+
 static void c101_set_iface(port_t *port)
 {
-	u8 msci = get_msci(port);
 	u8 rxs = port->rxs & CLK_BRG_MASK;
 	u8 txs = port->txs & CLK_BRG_MASK;
 
@@ -145,8 +169,8 @@ static void c101_set_iface(port_t *port)
 
 	port->rxs = rxs;
 	port->txs = txs;
-	sca_out(rxs, msci + RXS, port);
-	sca_out(txs, msci + TXS, port);
+	sca_out(rxs, MSCI1_OFFSET + RXS, port);
+	sca_out(txs, MSCI1_OFFSET + TXS, port);
 	sca_set_port(port);
 }
 
@@ -164,6 +188,17 @@ static int c101_open(struct net_device *dev)
 	writeb(1, port->win0base + C101_DTR);
 	sca_out(0, MSCI1_OFFSET + CTL, port); /* RTS uses ch#2 output */
 	sca_open(hdlc);
+	/* DCD is connected to port 2 !@#$%^& - disable MSCI0 CDCD interrupt */
+	sca_out(IE1_UDRN, MSCI0_OFFSET + IE1, port);
+	sca_out(IE0_TXINT, MSCI0_OFFSET + IE0, port);
+
+	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, port) & ST3_DCD), hdlc);
+	printk(KERN_DEBUG "0x%X\n", sca_in(MSCI1_OFFSET + ST3, port));
+
+	/* enable MSCI1 CDCD interrupt */
+	sca_out(IE1_CDCD, MSCI1_OFFSET + IE1, port);
+	sca_out(IE0_RXINTA, MSCI1_OFFSET + IE0, port);
+	sca_out(0x48, IER0, port); /* TXINT #0 and RXINT #1 */
 	c101_set_iface(port);
 	return 0;
 }
@@ -189,9 +224,14 @@ static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 
-#ifdef CONFIG_HDLC_DEBUG_RINGS
+#ifdef DEBUG_RINGS
 	if (cmd == SIOCDEVPRIVATE) {
 		sca_dump_rings(hdlc);
+		printk(KERN_DEBUG "MSCI1: ST: %02x %02x %02x %02x\n",
+		       sca_in(MSCI1_OFFSET + ST0, port),
+		       sca_in(MSCI1_OFFSET + ST1, port),
+		       sca_in(MSCI1_OFFSET + ST2, port),
+		       sca_in(MSCI1_OFFSET + ST3, port));
 		return 0;
 	}
 #endif
@@ -298,9 +338,6 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 
 	card->tx_ring_buffers = TX_RING_BUFFERS;
 	card->rx_ring_buffers = RX_RING_BUFFERS;
-	printk(KERN_DEBUG "c101: using %u TX + %u RX packets rings\n",
-	       card->tx_ring_buffers, card->rx_ring_buffers);
-
 	card->buff_offset = C101_WINDOW_SIZE; /* Bytes 1D00-1FFF reserved */
 
 	readb(card->win0base + C101_PAGE); /* Resets SCA? */
@@ -333,6 +370,13 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 	}
 
 	sca_init_sync_port(card); /* Set up C101 memory */
+	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD),
+			 &card->hdlc);
+
+	printk(KERN_INFO "%s: Moxa C101 on IRQ%u,"
+	       " using %u TX + %u RX packets rings\n",
+	       hdlc_to_name(&card->hdlc), card->irq,
+	       card->tx_ring_buffers, card->rx_ring_buffers);
 
 	*new_card = card;
 	new_card = &card->next_card;

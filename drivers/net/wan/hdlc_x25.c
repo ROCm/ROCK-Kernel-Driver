@@ -9,7 +9,6 @@
  * as published by the Free Software Foundation.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -199,12 +198,13 @@ int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 			return result;
 
 		hdlc_proto_detach(hdlc);
+		memset(&hdlc->proto, 0, sizeof(hdlc->proto));
 
-		hdlc->open = x25_open;
-		hdlc->stop = x25_close;
-		hdlc->netif_rx = x25_rx;
-		hdlc->type_trans = NULL;
-		hdlc->proto = IF_PROTO_X25;
+		hdlc->proto.open = x25_open;
+		hdlc->proto.close = x25_close;
+		hdlc->proto.netif_rx = x25_rx;
+		hdlc->proto.type_trans = NULL;
+		hdlc->proto.id = IF_PROTO_X25;
 		dev->hard_start_xmit = x25_xmit;
 		dev->hard_header = NULL;
 		dev->type = ARPHRD_X25;

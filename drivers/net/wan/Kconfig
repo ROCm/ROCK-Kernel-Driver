@@ -401,37 +401,6 @@ config FARSYNC
 	  should add "alias hdlcX farsync" to /etc/modules.conf for each
 	  interface, where X is 0, 1, 2, ...
 
-config HDLC_DEBUG_PKT
-	bool "Debug received/transmitted packets"
-	depends on HDLC
-	help
-	  This option is for developers only - do NOT use on production
-	  systems.
-
-config HDLC_DEBUG_HARD_HEADER
-	bool "Debug hard_header routines"
-	depends on HDLC
-	help
-	  This option is for developers only - do NOT use on production
-	  systems.
-
-config HDLC_DEBUG_ECN
-	bool "Debug FECN/BECN conditions"
-	depends on HDLC
-	help
-	  This option is for developers only - do NOT use on production
-	  systems.
-
-config HDLC_DEBUG_RINGS
-	bool "Debug RX/TX packet rings"
-	depends on HDLC
-	help
-	  If you answer Y here you will be able to get a diagnostic dump of
-	  port's TX and RX packet rings, using "sethdlc hdlcX private"
-	  command. It does not affect normal operations.
-
-	  If unsure, say Y here.
-
 config DLCI
 	tristate "Frame relay DLCI support"
 	depends on WAN
