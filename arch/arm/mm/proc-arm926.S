@@ -576,10 +576,6 @@ arm926_processor_functions:
 	.word	cpu_arm926_set_pmd
 	.word	cpu_arm926_set_pte
 
-	/* misc */
-	.word	armv4_clear_user_page
-	.word	armv4_copy_user_page
-
 	.size	arm926_processor_functions, . - arm926_processor_functions
 
 	.type	cpu_arm926_info, #object
@@ -613,4 +609,5 @@ __arm926_proc_info:
 	.long	cpu_arm926_info
 	.long	arm926_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v4_user_fns
 	.size	__arm926_proc_info, . - __arm926_proc_info

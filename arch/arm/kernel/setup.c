@@ -76,6 +76,9 @@ struct processor processor;
 #ifdef MULTI_TLB
 struct cpu_tlb_fns cpu_tlb;
 #endif
+#ifdef MULTI_USER
+struct cpu_user_fns cpu_user;
+#endif
 
 unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
@@ -247,6 +250,9 @@ static void __init setup_processor(void)
 #endif
 #ifdef MULTI_TLB
 	cpu_tlb = *list->tlb;
+#endif
+#ifdef MULTI_USER
+	cpu_user = *list->user;
 #endif
 
 	printk("Processor: %s %s revision %d\n",

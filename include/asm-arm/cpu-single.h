@@ -39,8 +39,6 @@
 #define cpu_set_pgd			__cpu_fn(CPU_NAME,_set_pgd)
 #define cpu_set_pmd			__cpu_fn(CPU_NAME,_set_pmd)
 #define cpu_set_pte			__cpu_fn(CPU_NAME,_set_pte)
-#define cpu_copy_user_page		__cpu_fn(MMU_ARCH,_copy_user_page)
-#define cpu_clear_user_page		__cpu_fn(MMU_ARCH,_clear_user_page)
 
 #ifndef __ASSEMBLY__
 
@@ -72,9 +70,6 @@ extern void cpu_icache_invalidate_page(void *virt_page);
 extern void cpu_set_pgd(unsigned long pgd_phys);
 extern void cpu_set_pmd(pmd_t *pmdp, pmd_t pmd);
 extern void cpu_set_pte(pte_t *ptep, pte_t pte);
-
-extern void cpu_copy_user_page(void *to, void *from, unsigned long u_addr);
-extern void cpu_clear_user_page(void *page, unsigned long u_addr);
 
 extern volatile void cpu_reset(unsigned long addr);
 

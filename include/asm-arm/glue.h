@@ -147,4 +147,60 @@
 #error Unknown data abort handler type
 #endif
 
+
+/*
+ *	User Space Model
+ *	================
+ *
+ *	This section selects the correct set of functions for dealing with
+ *	page-based copying and clearing for user space for the particular
+ *	processor(s) we're building for.
+ *
+ *	We have the following to choose from:
+ *	  v3		- ARMv3
+ *	  v4		- ARMv4 without minicache
+ *	  v4_mc		- ARMv4 with minicache
+ *	  v5te_mc	- ARMv5TE with minicache
+ */
+#undef _USER
+#undef MULTI_USER
+
+#if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
+# ifdef _USER
+#  define MULTI_USER 1
+# else
+#  define _USER v3
+# endif
+#endif
+
+#if defined(CONFIG_CPU_ARM720T) || defined(CONFIG_CPU_ARM920T) || \
+    defined(CONFIG_CPU_ARM922T) || defined(CONFIG_CPU_ARM926T) || \
+    defined(CONFIG_CPU_SA110)   || defined(CONFIG_CPU_ARM1020)
+# ifdef _USER
+#  define MULTI_USER 1
+# else
+#  define _USER v4
+# endif
+#endif
+
+#if defined(CONFIG_CPU_SA1100)
+# ifdef _USER
+#  define MULTI_USER 1
+# else
+#  define _USER v4_mc
+# endif
+#endif
+
+#if defined(CONFIG_CPU_XSCALE)
+# ifdef _USER
+#  define MULTI_USER 1
+# else
+#  define _USER v5te_mc
+# endif
+#endif
+
+#ifndef _USER
+#error Unknown user operations model
+#endif
+
 #endif

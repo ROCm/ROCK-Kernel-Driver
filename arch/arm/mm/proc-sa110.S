@@ -565,10 +565,6 @@ ENTRY(sa110_processor_functions)
 	.word	cpu_sa110_set_pmd
 	.word	cpu_sa110_set_pte
 
-	/* misc */
-	.word	armv4_clear_user_page
-	.word	armv4_copy_user_page
-
 	.size	sa110_processor_functions, . - sa110_processor_functions
 
 	.type	cpu_sa110_info, #object
@@ -610,10 +606,6 @@ ENTRY(sa1100_processor_functions)
 	.word	cpu_sa1100_set_pmd
 	.word	cpu_sa1100_set_pte
 
-	/* misc */
-	.word	armv4_mc_clear_user_page
-	.word	armv4_mc_copy_user_page
-
 	.size	sa1100_processor_functions, . - sa1100_processor_functions
 
 cpu_sa1100_info:
@@ -651,6 +643,7 @@ __sa110_proc_info:
 	.long	cpu_sa110_info
 	.long	sa110_processor_functions
 	.long	v4wb_tlb_fns
+	.long	v4_user_fns
 	.size	__sa110_proc_info, . - __sa110_proc_info
 
 	.type	__sa1100_proc_info,#object
@@ -665,6 +658,7 @@ __sa1100_proc_info:
 	.long	cpu_sa1100_info
 	.long	sa1100_processor_functions
 	.long	v4wb_tlb_fns
+	.long	v4_mc_user_fns
 	.size	__sa1100_proc_info, . - __sa1100_proc_info
 
 	.type	__sa1110_proc_info,#object
@@ -679,4 +673,5 @@ __sa1110_proc_info:
 	.long	cpu_sa1110_info
 	.long	sa1100_processor_functions
 	.long	v4wb_tlb_fns
+	.long	v4_mc_user_fns
 	.size	__sa1110_proc_info, . - __sa1110_proc_info

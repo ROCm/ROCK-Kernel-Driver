@@ -28,7 +28,6 @@
 
 /*
  * CPU_NAME - the prefix for CPU related functions
- * MMU_ARCH - the prefix for copy_user_page/clear_user_page
  */
 
 #ifdef CONFIG_CPU_32
@@ -39,7 +38,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm6
-#   define MMU_ARCH armv3
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM710
@@ -48,7 +46,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm7
-#   define MMU_ARCH armv3
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM720T
@@ -57,7 +54,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm720
-#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM920T
@@ -66,7 +62,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm920
-#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM922T
@@ -75,7 +70,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm922
-#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM926T
@@ -84,7 +78,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm926
-#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_SA110
@@ -93,7 +86,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_sa110
-#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_SA1100
@@ -102,7 +94,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_sa1100
-#   define MMU_ARCH armv4_mc
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM1020
@@ -111,7 +102,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_arm1020
-#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_XSCALE
@@ -120,7 +110,6 @@
 #   define MULTI_CPU
 #  else
 #   define CPU_NAME cpu_xscale
-#   define MMU_ARCH armv5te
 #  endif
 # endif
 #endif

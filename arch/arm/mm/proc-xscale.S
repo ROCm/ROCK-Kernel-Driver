@@ -722,10 +722,6 @@ ENTRY(xscale_processor_functions)
 	.word	cpu_xscale_set_pmd
 	.word	cpu_xscale_set_pte
 
-	/* misc */
-	.word	armv5te_clear_user_page
-	.word	armv5te_copy_user_page
-
 	.size	xscale_processor_functions, . - xscale_processor_functions
 
 	.type	cpu_80200_info, #object
@@ -765,6 +761,7 @@ __80200_proc_info:
 	.long	cpu_80200_info
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v5te_mc_user_fns
 	.size	__80200_proc_info, . - __80200_proc_info
 
 	.type	__pxa250_proc_info,#object
@@ -779,6 +776,7 @@ __pxa250_proc_info:
 	.long	cpu_pxa250_info
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v5te_mc_user_fns
 	.size	__cotulla_proc_info, . - __cotulla_proc_info
 	.size	__pxa250_proc_info, . - __pxa250_proc_info
 

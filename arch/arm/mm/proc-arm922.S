@@ -539,10 +539,6 @@ arm922_processor_functions:
 	.word	cpu_arm922_set_pmd
 	.word	cpu_arm922_set_pte
 
-	/* misc */
-	.word	armv4_clear_user_page
-	.word	armv4_copy_user_page
-
 	.size	arm922_processor_functions, . - arm922_processor_functions
 
 	.type	cpu_arm922_info, #object
@@ -576,4 +572,5 @@ __arm922_proc_info:
 	.long	cpu_arm922_info
 	.long	arm922_processor_functions
 	.long	v4wbi_tlb_fns
+	.long	v4_user_fns
 	.size	__arm922_proc_info, . - __arm922_proc_info
