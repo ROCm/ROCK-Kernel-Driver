@@ -58,21 +58,24 @@ static int scsi_scan(struct Scsi_Host *shost, const char *str)
  * shost_show_function: macro to create an attr function that can be used to
  * show a non-bit field.
  */
-#define shost_show_function(field, format_string)			\
+#define shost_show_function(name, field, format_string)			\
 static ssize_t								\
-show_##field (struct class_device *class_dev, char *buf)		\
+show_##name (struct class_device *class_dev, char *buf)			\
 {									\
 	struct Scsi_Host *shost = class_to_shost(class_dev);		\
-	return snprintf (buf, 20, format_string, shost->field);	\
+	return snprintf (buf, 20, format_string, shost->field);		\
 }
 
 /*
  * shost_rd_attr: macro to create a function and attribute variable for a
  * read only field.
  */
-#define shost_rd_attr(field, format_string)				\
-	shost_show_function(field, format_string)			\
-static CLASS_DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
+#define shost_rd_attr2(name, field, format_string)			\
+	shost_show_function(name, field, format_string)			\
+static CLASS_DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
+
+#define shost_rd_attr(field, format_string) \
+shost_rd_attr2(field, field, format_string)
 
 /*
  * Create the actual show/store functions and data structures.
@@ -96,6 +99,7 @@ shost_rd_attr(host_busy, "%hu\n");
 shost_rd_attr(cmd_per_lun, "%hd\n");
 shost_rd_attr(sg_tablesize, "%hu\n");
 shost_rd_attr(unchecked_isa_dma, "%d\n");
+shost_rd_attr2(proc_name, hostt->proc_name, "%s\n");
 
 static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	&class_device_attr_unique_id,
@@ -103,6 +107,7 @@ static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	&class_device_attr_cmd_per_lun,
 	&class_device_attr_sg_tablesize,
 	&class_device_attr_unchecked_isa_dma,
+	&class_device_attr_proc_name,
 	&class_device_attr_scan,
 	NULL
 };
