@@ -12,12 +12,9 @@
  * Modifications:
  *	24-Aug-2004 BJD  Start of S3C2440 CPU support
  *	04-Nov-2004 BJD  Added s3c2440_init_uarts()
+ *	04-Jan-2004 BJD  Moved uart init to cpu code
 */
-
-struct s3c2410_uartcfg;
 
 extern void s3c2440_init_irq(void);
 
 extern void s3c2440_init_time(void);
-
-extern void s3c2440_init_uarts(struct s3c2410_uartcfg *cfg, int no);

@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/mach-bast.c
  *
- * Copyright (c) 2003,2004 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
@@ -20,6 +20,7 @@
  *     18-Jan-2003 BJD  Added serial port configuration
  *     05-Oct-2004 BJD  Power management code
  *     04-Nov-2004 BJD  Updated serial port clocks
+ *     04-Jan-2004 BJD  New uart init call
 */
 
 #include <linux/kernel.h>
@@ -262,7 +263,7 @@ void __init bast_map_io(void)
 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
 
 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
-	s3c2410_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
+	s3c24xx_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
 	s3c24xx_set_board(&bast_board);
 	usb_simtec_init();
 }

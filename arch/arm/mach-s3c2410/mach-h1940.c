@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/mach-h1940.c
  *
- * Copyright (c) 2003,2004 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.handhelds.org/projects/h1940.html
@@ -20,6 +20,7 @@
  *     04-Sep-2004 BJD  Changed uart init, renamed ipaq_ -> h1940_
  *     18-Oct-2004 BJD  Updated new board structure name
  *     04-Nov-2004 BJD  Change for new serial clock
+ *     04-Jan-2005 BJD  Updated uart init call
 */
 
 #include <linux/kernel.h>
@@ -102,7 +103,7 @@ static struct s3c24xx_board h1940_board __initdata = {
 void __init h1940_map_io(void)
 {
 	s3c24xx_init_io(h1940_iodesc, ARRAY_SIZE(h1940_iodesc));
-	s3c2410_init_uarts(h1940_uartcfgs, ARRAY_SIZE(h1940_uartcfgs));
+	s3c24xx_init_uarts(h1940_uartcfgs, ARRAY_SIZE(h1940_uartcfgs));
 	s3c24xx_set_board(&h1940_board);
 }
 
