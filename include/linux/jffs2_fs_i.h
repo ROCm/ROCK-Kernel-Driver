@@ -1,9 +1,10 @@
-/* $Id: jffs2_fs_i.h,v 1.12 2002/03/06 13:59:21 dwmw2 Exp $ */
+/* $Id: jffs2_fs_i.h,v 1.15 2002/11/12 09:42:49 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_I
 #define _JFFS2_FS_I
 
 #include <linux/version.h>
+#include <linux/rbtree.h>
 
 struct jffs2_inode_info {
 	/* We need an internal semaphore similar to inode->i_sem.
@@ -18,7 +19,7 @@ struct jffs2_inode_info {
 	uint32_t highest_version;
 
 	/* List of data fragments which make up the file */
-	struct jffs2_node_frag *fraglist;
+	struct rb_root fragtree;
 
 	/* There may be one datanode which isn't referenced by any of the
 	   above fragments, if it contains a metadata update but no actual

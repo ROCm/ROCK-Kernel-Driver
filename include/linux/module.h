@@ -49,21 +49,6 @@ extern struct module __this_module;
 #define THIS_MODULE ((struct module *)0)
 #endif
 
-#ifdef CONFIG_MODULES
-/* Get/put a kernel symbol (calls must be symmetric) */
-void *__symbol_get(const char *symbol);
-void *__symbol_get_gpl(const char *symbol);
-#define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
-
-/* For every exported symbol, place a struct in the __ksymtab section */
-#define EXPORT_SYMBOL(sym)				\
-	const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__ksymtab")))		\
-	= { (unsigned long)&sym, #sym }
-
-#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-#define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
-
 struct kernel_symbol_group
 {
 	/* Links us into the global symbol list */
@@ -83,6 +68,22 @@ struct exception_table
 	unsigned int num_entries;
 	const struct exception_table_entry *entry;
 };
+
+
+#ifdef CONFIG_MODULES
+/* Get/put a kernel symbol (calls must be symmetric) */
+void *__symbol_get(const char *symbol);
+void *__symbol_get_gpl(const char *symbol);
+#define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
+
+/* For every exported symbol, place a struct in the __ksymtab section */
+#define EXPORT_SYMBOL(sym)				\
+	const struct kernel_symbol __ksymtab_##sym	\
+	__attribute__((section("__ksymtab")))		\
+	= { (unsigned long)&sym, #sym }
+
+#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
+#define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
 
 struct module_ref
 {
@@ -301,6 +302,14 @@ extern int module_dummy_usage;
 	int __initfn(void)
 #define cleanup_module(voidarg) __exitfn(void)
 #endif
+
+/*
+ * The exception and symbol tables, and the lock
+ * to protect them.
+ */
+extern spinlock_t modlist_lock;
+extern struct list_head extables;
+extern struct list_head symbols;
 
 /* Use symbol_get and symbol_put instead.  You'll thank me. */
 #define HAVE_INTER_MODULE

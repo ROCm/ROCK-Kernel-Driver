@@ -873,8 +873,8 @@ xdr_error:					\
 } while (0)
 #define READTIME(x)       do {			\
 	p++;					\
-	(x) = (u64)ntohl(*p++) << 32;		\
-	(x) |= ntohl(*p++);			\
+	(x.tv_sec) = ntohl(*p++);		\
+	(x.tv_nsec) = ntohl(*p++);		\
 } while (0)
 #define COPYMEM(x,nbytes) do {			\
 	memcpy((x), p, nbytes);			\
@@ -1228,19 +1228,19 @@ decode_getattr(struct nfs4_compound *cp, int nfserr, struct nfs4_getattr *getatt
                 READ_BUF(12);
                 len += 12;
                 READTIME(nfp->atime);
-                dprintk("read_attrs: atime=%d\n", (int)nfp->atime);
+                dprintk("read_attrs: atime=%ld\n", (long)nfp->atime.tv_sec);
         }
         if (bmval1 & FATTR4_WORD1_TIME_METADATA) {
                 READ_BUF(12);
                 len += 12;
                 READTIME(nfp->ctime);
-                dprintk("read_attrs: ctime=%d\n", (int)nfp->ctime);
+                dprintk("read_attrs: ctime=%ld\n", (long)nfp->ctime.tv_sec);
         }
         if (bmval1 & FATTR4_WORD1_TIME_MODIFY) {
                 READ_BUF(12);
                 len += 12;
                 READTIME(nfp->mtime);
-                dprintk("read_attrs: mtime=%d\n", (int)nfp->mtime);
+                dprintk("read_attrs: mtime=%ld\n", (long)nfp->mtime.tv_sec);
         }
         if (len != attrlen)
                 goto xdr_error;

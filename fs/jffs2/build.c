@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.35 2002/05/20 14:56:37 dwmw2 Exp $
+ * $Id: build.c,v 1.42 2002/09/09 16:29:08 dwmw2 Exp $
  *
  */
 
@@ -43,8 +43,9 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 		return ret;
 
 	D1(printk(KERN_DEBUG "Scanned flash completely\n"));
-	/* Now build the data map for each inode, marking obsoleted nodes
-	   as such, and also increase nlink of any children. */
+	D1(jffs2_dump_block_lists(c));
+
+	/* Now scan the directory tree, increasing nlink according to every dirent found. */
 	for_each_inode(i, c, ic) {
 		D1(printk(KERN_DEBUG "Pass 1: ino #%u\n", ic->ino));
 		ret = jffs2_build_inode_pass1(c, ic);
@@ -52,8 +53,10 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 			D1(printk(KERN_WARNING "Eep. jffs2_build_inode_pass1 for ino %d returned %d\n", ic->ino, ret));
 			return ret;
 		}
+		cond_resched();
 	}
 	D1(printk(KERN_DEBUG "Pass 1 complete\n"));
+	D1(jffs2_dump_block_lists(c));
 
 	/* Next, scan for inodes with nlink == 0 and remove them. If
 	   they were directories, then decrement the nlink of their
@@ -68,6 +71,8 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 			if (ic->nlink)
 				continue;
 			
+			/* XXX: Can get high latency here. Move the cond_resched() from the end of the loop? */
+
 			ret = jffs2_build_remove_unlinked_inode(c, ic);
 			if (ret)
 				break;
@@ -75,115 +80,52 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 		   and furthermore that it had children and their nlink has now
 		   gone to zero too. So we have to restart the scan. */
 		} 
-	} while(ret == -EAGAIN);
+		D1(jffs2_dump_block_lists(c));
+
+		cond_resched();
 	
+	} while(ret == -EAGAIN);
+
 	D1(printk(KERN_DEBUG "Pass 2 complete\n"));
 	
 	/* Finally, we can scan again and free the dirent nodes and scan_info structs */
 	for_each_inode(i, c, ic) {
-		struct jffs2_scan_info *scan = ic->scan;
 		struct jffs2_full_dirent *fd;
 		D1(printk(KERN_DEBUG "Pass 3: ino #%u, ic %p, nodes %p\n", ic->ino, ic, ic->nodes));
-		if (!scan) {
-			if (ic->nlink) {
-				D1(printk(KERN_WARNING "Why no scan struct for ino #%u which has nlink %d?\n", ic->ino, ic->nlink));
-			}
-			continue;
-		}
-		ic->scan = NULL;
-		while(scan->dents) {
-			fd = scan->dents;
-			scan->dents = fd->next;
+
+		while(ic->scan_dents) {
+			fd = ic->scan_dents;
+			ic->scan_dents = fd->next;
 			jffs2_free_full_dirent(fd);
 		}
-		kfree(scan);
+		ic->scan_dents = NULL;
+		cond_resched();
 	}
 	D1(printk(KERN_DEBUG "Pass 3 complete\n"));
+	D1(jffs2_dump_block_lists(c));
 
 	/* Rotate the lists by some number to ensure wear levelling */
 	jffs2_rotate_lists(c);
 
 	return ret;
 }
-	
+
 int jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2_inode_cache *ic)
 {
-	struct jffs2_tmp_dnode_info *tn;
 	struct jffs2_full_dirent *fd;
-	struct jffs2_node_frag *fraglist = NULL;
-	struct jffs2_tmp_dnode_info *metadata = NULL;
 
 	D1(printk(KERN_DEBUG "jffs2_build_inode building inode #%u\n", ic->ino));
+
 	if (ic->ino > c->highest_ino)
 		c->highest_ino = ic->ino;
 
-	if (!ic->scan->tmpnodes && ic->ino != 1) {
-		D1(printk(KERN_DEBUG "jffs2_build_inode: ino #%u has no data nodes!\n", ic->ino));
-	}
-	/* Build the list to make sure any obsolete nodes are marked as such */
-	while(ic->scan->tmpnodes) {
-		tn = ic->scan->tmpnodes;
-		ic->scan->tmpnodes = tn->next;
-		
-		if (metadata && tn->version > metadata->version) {
-			D1(printk(KERN_DEBUG "jffs2_build_inode_pass1 ignoring old metadata at 0x%08x\n",
-				  metadata->fn->raw->flash_offset &~3));
-			
-			jffs2_mark_node_obsolete(c, metadata->fn->raw);
-			jffs2_free_full_dnode(metadata->fn);
-			jffs2_free_tmp_dnode_info(metadata);
-			metadata = NULL;
-		}
-			
-		if (tn->fn->size) {
-			jffs2_add_full_dnode_to_fraglist (c, &fraglist, tn->fn);
-			jffs2_free_tmp_dnode_info(tn);
-		} else {
-			if (!metadata) {
-				metadata = tn;
-			} else {
-				/* This will only happen if it has the _same_ version
-				   number as the existing metadata node. */
-				D1(printk(KERN_DEBUG "jffs2_build_inode_pass1 ignoring new metadata at 0x%08x\n",
-					  tn->fn->raw->flash_offset &~3));
-				
-				jffs2_mark_node_obsolete(c, tn->fn->raw);
-				jffs2_free_full_dnode(tn->fn);
-				jffs2_free_tmp_dnode_info(tn);
-			}
-		}
-	}
-
-	if (ic->scan->version) {
-		/* It's a regular file, so truncate it to the last known
-		   i_size, if necessary */
-		D1(printk(KERN_DEBUG "jffs2_build_inode_pass1 truncating fraglist to 0x%08x\n", ic->scan->isize));
-		jffs2_truncate_fraglist(c, &fraglist, ic->scan->isize);
-	}
-	
-	/* OK. Now clear up */
-	if (metadata) {
-		jffs2_free_full_dnode(metadata->fn);
-		jffs2_free_tmp_dnode_info(metadata);
-	}
-	metadata = NULL;
-	
-	while (fraglist) {
-		struct jffs2_node_frag *frag;
-		frag = fraglist;
-		fraglist = fraglist->next;
-		
-		if (frag->node && !(--frag->node->frags)) {
-			jffs2_free_full_dnode(frag->node);
-		}
-		jffs2_free_node_frag(frag);
-	}
-
-	/* Now for each child, increase nlink */
-	for(fd=ic->scan->dents; fd; fd = fd->next) {
+	/* For each child, increase nlink */
+	for(fd=ic->scan_dents; fd; fd = fd->next) {
 		struct jffs2_inode_cache *child_ic;
 		if (!fd->ino)
 			continue;
+		
+		/* XXX: Can get high latency here with huge directories */
 
 		child_ic = jffs2_get_ino_cache(c, fd->ino);
 		if (!child_ic) {
@@ -212,26 +154,33 @@ int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inod
 	struct jffs2_full_dirent *fd;
 	int ret = 0;
 
-	if(!ic->scan) {
-		D1(printk(KERN_DEBUG "ino #%u was already removed\n", ic->ino));
-		return 0;
-	}
-
 	D1(printk(KERN_DEBUG "JFFS2: Removing ino #%u with nlink == zero.\n", ic->ino));
 	
 	for (raw = ic->nodes; raw != (void *)ic; raw = raw->next_in_ino) {
-		D1(printk(KERN_DEBUG "obsoleting node at 0x%08x\n", raw->flash_offset&~3));
+		D1(printk(KERN_DEBUG "obsoleting node at 0x%08x\n", ref_offset(raw)));
 		jffs2_mark_node_obsolete(c, raw);
 	}
 
-	if (ic->scan->dents) {
-		printk(KERN_NOTICE "Inode #%u was a directory with children - removing those too...\n", ic->ino);
-	
-		while(ic->scan->dents) {
+	if (ic->scan_dents) {
+		int whinged = 0;
+		D1(printk(KERN_DEBUG "Inode #%u was a directory which may have children...\n", ic->ino));
+
+		while(ic->scan_dents) {
 			struct jffs2_inode_cache *child_ic;
 
-			fd = ic->scan->dents;
-			ic->scan->dents = fd->next;
+			fd = ic->scan_dents;
+			ic->scan_dents = fd->next;
+
+			if (!fd->ino) {
+				/* It's a deletion dirent. Ignore it */
+				D1(printk(KERN_DEBUG "Child \"%s\" is a deletion dirent, skipping...\n", fd->name));
+				jffs2_free_full_dirent(fd);
+				continue;
+			}
+			if (!whinged) {
+				whinged = 1;
+				printk(KERN_NOTICE "Inode #%u was a directory with children - removing those too...\n", ic->ino);
+			}
 
 			D1(printk(KERN_DEBUG "Removing child \"%s\", ino #%u\n",
 				  fd->name, fd->ino));
@@ -239,6 +188,7 @@ int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inod
 			child_ic = jffs2_get_ino_cache(c, fd->ino);
 			if (!child_ic) {
 				printk(KERN_NOTICE "Cannot remove child \"%s\", ino #%u, because it doesn't exist\n", fd->name, fd->ino);
+				jffs2_free_full_dirent(fd);
 				continue;
 			}
 			jffs2_free_full_dirent(fd);
@@ -246,8 +196,6 @@ int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inod
 		}
 		ret = -EAGAIN;
 	}
-	kfree(ic->scan);
-	ic->scan = NULL;
 
 	/*
 	   We don't delete the inocache from the hash list and free it yet. 
@@ -271,6 +219,8 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 		c->blocks[i].offset = i * c->sector_size;
 		c->blocks[i].free_size = c->sector_size;
 		c->blocks[i].dirty_size = 0;
+		c->blocks[i].wasted_size = 0;
+		c->blocks[i].unchecked_size = 0;
 		c->blocks[i].used_size = 0;
 		c->blocks[i].first_node = NULL;
 		c->blocks[i].last_node = NULL;

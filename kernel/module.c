@@ -37,21 +37,6 @@
 #define DEBUGP(fmt , a...)
 #endif
 
-extern const struct exception_table_entry __start___ex_table[];
-extern const struct exception_table_entry __stop___ex_table[];
-extern const struct kernel_symbol __start___ksymtab[];
-extern const struct kernel_symbol __stop___ksymtab[];
-
-/* Protects extables and symbol tables */
-spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
-
-/* The exception and symbol tables: start with kernel only. */
-LIST_HEAD(extables);
-static LIST_HEAD(symbols);
-
-static struct exception_table kernel_extable;
-static struct kernel_symbol_group kernel_symbols;
-
 /* List of modules, protected by module_mutex */
 static DECLARE_MUTEX(module_mutex);
 LIST_HEAD(modules); /* FIXME: Accessed w/o lock on oops by some archs */
@@ -1139,7 +1124,7 @@ sys_init_module(void *umod,
 
 	/* Now it's a first class citizen! */
 	spin_lock_irq(&modlist_lock);
-	list_add(&mod->symbols.list, &kernel_symbols.list);
+	list_add_tail(&mod->symbols.list, &symbols);
 	spin_unlock_irq(&modlist_lock);
 	list_add(&mod->list, &modules);
 
@@ -1270,19 +1255,6 @@ struct seq_operations modules_op = {
 	.stop	= m_stop,
 	.show	= m_show
 };
-
-void __init extable_init(void)
-{
-	/* Add kernel symbols to symbol table */
-	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
-	kernel_symbols.syms = __start___ksymtab;
-	list_add(&kernel_symbols.list, &symbols);
-
-	/* Add kernel exception table to exception tables */
-	kernel_extable.num_entries = (__stop___ex_table -__start___ex_table);
-	kernel_extable.entry = __start___ex_table;
-	list_add(&kernel_extable.list, &extables);
-}
 
 /* Obsolete lvalue for broken code which asks about usage */
 int module_dummy_usage = 1;
