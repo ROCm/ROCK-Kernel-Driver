@@ -527,7 +527,7 @@ struct b44 {
 	struct net_device_stats	stats;
 	struct b44_hw_stats	hw_stats;
 
-	volatile void __iomem   *regs;
+	void __iomem		*regs;
 	struct pci_dev		*pdev;
 	struct net_device	*dev;
 
