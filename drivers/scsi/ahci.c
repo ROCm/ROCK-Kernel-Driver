@@ -363,8 +363,7 @@ static void ahci_port_stop(struct ata_port *ap)
 	/* spec says 500 msecs for each PORT_CMD_{START,FIS_RX} bit, so
 	 * this is slightly incorrect.
 	 */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout((HZ / 2) + 1);
+	msleep(500);
 
 	ap->private_data = NULL;
 	pci_free_consistent(pdev, AHCI_PORT_PRIV_DMA_SZ,
@@ -719,8 +718,7 @@ static int ahci_host_init(struct ata_probe_ent *probe_ent)
 	/* reset must complete within 1 second, or
 	 * the hardware should be considered fried.
 	 */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ + 1);
+	ssleep(1);
 
 	tmp = readl(mmio + HOST_CTL);
 	if (tmp & HOST_RESET) {
@@ -798,8 +796,7 @@ static int ahci_host_init(struct ata_probe_ent *probe_ent)
 			/* spec says 500 msecs for each bit, so
 			 * this is slightly incorrect.
 			 */
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((HZ / 2) + 1);
+			msleep(500);
 		}
 
 		writel(PORT_CMD_SPIN_UP, port_mmio + PORT_CMD);
