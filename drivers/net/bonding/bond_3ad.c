@@ -124,6 +124,7 @@
 
 static struct mac_addr null_mac_addr = {{0, 0, 0, 0, 0, 0}};
 static u16 ad_ticks_per_sec;
+static const int ad_delta_in_ticks = (AD_TIMER_INTERVAL * HZ) / 1000;
 
 // ================= 3AD api to bonding and kernel code ==================
 static u16 __get_link_speed(struct port *port);
@@ -2123,7 +2124,6 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 {
 	struct port *port;
 	struct aggregator *aggregator;
-	int delta_in_ticks = AD_TIMER_INTERVAL * HZ / 1000;
 
 	read_lock(&bond->lock);
 
@@ -2170,7 +2170,7 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 	}
 
 re_arm:
-	mod_timer(&(BOND_AD_INFO(bond).ad_timer), jiffies + delta_in_ticks);
+	mod_timer(&(BOND_AD_INFO(bond).ad_timer), jiffies + ad_delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
 }
@@ -2355,7 +2355,7 @@ int bond_3ad_get_active_agg_info(struct bonding *bond, struct ad_info *ad_info)
 int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 {
 	struct slave *slave, *start_at;
-	struct bonding *bond = (struct bonding *)dev->priv;
+	struct bonding *bond = dev->priv;
 	struct ethhdr *data = (struct ethhdr *)skb->data;
 	int slave_agg_no;
 	int slaves_in_agg;
@@ -2436,7 +2436,7 @@ free_out:
 
 int bond_3ad_lacpdu_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type* ptype)
 {
-	struct bonding *bond = (struct bonding *)dev->priv;
+	struct bonding *bond = dev->priv;
 	struct slave *slave = NULL;
 	int ret = NET_RX_DROP;
 

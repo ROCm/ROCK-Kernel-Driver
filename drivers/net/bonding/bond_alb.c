@@ -92,6 +92,7 @@
 #define RLB_PROMISC_TIMEOUT	10*ALB_TIMER_TICKS_PER_SEC
 
 static const u8 mac_bcast[ETH_ALEN] = {0xff,0xff,0xff,0xff,0xff,0xff};
+static const int alb_delta_in_ticks = HZ / ALB_TIMER_TICKS_PER_SEC;
 
 #pragma pack(1)
 struct learning_pkt {
@@ -347,7 +348,7 @@ static void rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 
 static int rlb_arp_recv(struct sk_buff *skb, struct net_device *bond_dev, struct packet_type *ptype)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct arp_pkt *arp = (struct arp_pkt *)skb->data;
 	int res = NET_RX_DROP;
 
@@ -1169,7 +1170,7 @@ void bond_alb_deinitialize(struct bonding *bond)
 
 int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct ethhdr *eth_data = (struct ethhdr *)skb->mac.raw = skb->data;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *tx_slave = NULL;
@@ -1281,7 +1282,6 @@ void bond_alb_monitor(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *slave;
-	int delta_in_ticks = HZ / ALB_TIMER_TICKS_PER_SEC;
 	int i;
 
 	read_lock(&bond->lock);
@@ -1382,7 +1382,7 @@ void bond_alb_monitor(struct bonding *bond)
 	}
 
 re_arm:
-	mod_timer(&(bond_info->alb_timer), jiffies + delta_in_ticks);
+	mod_timer(&(bond_info->alb_timer), jiffies + alb_delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
 }
@@ -1526,7 +1526,7 @@ void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave
 
 int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct sockaddr *sa = addr;
 	struct slave *slave, *swap_slave;
 	int res;

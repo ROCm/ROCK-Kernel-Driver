@@ -1173,7 +1173,7 @@ static int bond_sethwaddr(struct net_device *bond_dev, struct net_device *slave_
 /* enslave device <slave> to bond device <master> */
 static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *new_slave = NULL;
 	struct dev_mc_list *dmi;
 	struct sockaddr addr;
@@ -1556,7 +1556,7 @@ err_free:
  */
 static int bond_release(struct net_device *bond_dev, struct net_device *slave_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave;
 	struct sockaddr addr;
 	int mac_addr_differ;
@@ -1706,7 +1706,7 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
  */
 static int bond_release_all(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave;
 	struct net_device *slave_dev;
 	struct sockaddr addr;
@@ -1819,7 +1819,7 @@ out:
  */
 static int bond_ioctl_change_active(struct net_device *bond_dev, struct net_device *slave_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *old_active = NULL;
 	struct slave *new_active = NULL;
 	int res = 0;
@@ -1910,7 +1910,7 @@ static int bond_ethtool_ioctl(struct net_device *bond_dev, struct ifreq *ifr)
 
 static int bond_info_query(struct net_device *bond_dev, struct ifbond *info)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 
 	info->bond_mode = bond_mode;
 	info->miimon = miimon;
@@ -1924,7 +1924,7 @@ static int bond_info_query(struct net_device *bond_dev, struct ifbond *info)
 
 static int bond_slave_info_query(struct net_device *bond_dev, struct ifslave *info)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave;
 	int i, found = 0;
 
@@ -1960,10 +1960,10 @@ static int bond_slave_info_query(struct net_device *bond_dev, struct ifslave *in
 /* this function is called regularly to monitor each slave's link. */
 static void bond_mii_monitor(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave, *oldcurrent;
 	int do_failover = 0;
-	int delta_in_ticks = miimon * HZ / 1000;
+	int delta_in_ticks = (miimon * HZ) / 1000;
 	int i;
 
 	read_lock(&bond->lock);
@@ -2215,10 +2215,10 @@ static void bond_arp_send_all(struct slave *slave)
  */
 static void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave, *oldcurrent;
 	int do_failover = 0;
-	int delta_in_ticks = arp_interval * HZ / 1000;
+	int delta_in_ticks = (arp_interval * HZ) / 1000;
 	int i;
 
 	read_lock(&bond->lock);
@@ -2349,9 +2349,9 @@ out:
  */
 static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave;
-	int delta_in_ticks = arp_interval * HZ / 1000;
+	int delta_in_ticks = (arp_interval * HZ) / 1000;
 	int i;
 
 	read_lock(&bond->lock);
@@ -2860,7 +2860,7 @@ static int bond_event_changename(struct bonding *bond)
 
 static int bond_master_netdev_event(unsigned long event, struct net_device *bond_dev)
 {
-	struct bonding *event_bond = (struct bonding *)bond_dev->priv;
+	struct bonding *event_bond = bond_dev->priv;
 
 	switch (event) {
 	case NETDEV_CHANGENAME:
@@ -2983,7 +2983,7 @@ static void bond_unregister_lacpdu(struct bonding *bond)
 
 static int bond_open(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct timer_list *mii_timer = &bond->mii_timer;
 	struct timer_list *arp_timer = &bond->arp_timer;
 
@@ -3045,7 +3045,7 @@ static int bond_open(struct net_device *bond_dev)
 
 static int bond_close(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 
 	write_lock_bh(&bond->lock);
 
@@ -3101,7 +3101,7 @@ static int bond_close(struct net_device *bond_dev)
 
 static struct net_device_stats *bond_get_stats(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct net_device_stats *stats = &(bond->stats), *sstats;
 	struct slave *slave;
 	int i;
@@ -3178,7 +3178,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 		}
 
 		if (mii->reg_num == 1) {
-			struct bonding *bond = (struct bonding *)bond_dev->priv;
+			struct bonding *bond = bond_dev->priv;
 			mii->val_out = 0;
 			read_lock_bh(&bond->lock);
 			read_lock(&bond->curr_slave_lock);
@@ -3295,7 +3295,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 
 static void bond_set_multicast_list(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct dev_mc_list *dmi;
 
 	write_lock_bh(&bond->lock);
@@ -3348,7 +3348,7 @@ static void bond_set_multicast_list(struct net_device *bond_dev)
  */
 static int bond_change_mtu(struct net_device *bond_dev, int new_mtu)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave, *stop_at;
 	int res = 0;
 	int i;
@@ -3428,7 +3428,7 @@ unwind:
  */
 static int bond_set_mac_address(struct net_device *bond_dev, void *addr)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct sockaddr *sa = addr, tmp_sa;
 	struct slave *slave, *stop_at;
 	int res = 0;
@@ -3502,7 +3502,7 @@ unwind:
 
 static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave, *start_at;
 	int i;
 
@@ -3552,7 +3552,7 @@ free_out:
  */
 static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 
 	/* if we are sending arp packets, try to at least
 	   identify our own ip address */
@@ -3598,7 +3598,7 @@ free_out:
  */
 static int bond_xmit_xor(struct sk_buff *skb, struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct ethhdr *data = (struct ethhdr *)skb->data;
 	struct slave *slave, *start_at;
 	int slave_no;
@@ -3648,7 +3648,7 @@ free_out:
  */
 static int bond_xmit_broadcast(struct sk_buff *skb, struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	struct slave *slave, *start_at;
 	struct net_device *tx_dev = NULL;
 	int i;
@@ -3722,7 +3722,7 @@ static int bond_accept_fastpath(struct net_device *bond_dev, struct dst_entry *d
  */
 static int __init bond_init(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 	int count;
 
 	dprintk("Begin bond_init for %s\n", bond_dev->name);
@@ -3820,7 +3820,7 @@ static int __init bond_init(struct net_device *bond_dev)
  */
 static inline void bond_deinit(struct net_device *bond_dev)
 {
-	struct bonding *bond = (struct bonding *)bond_dev->priv;
+	struct bonding *bond = bond_dev->priv;
 
 	list_del(&bond->bond_list);
 
