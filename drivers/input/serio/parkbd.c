@@ -43,14 +43,14 @@ MODULE_PARM(parkbd_mode, "1i");
 #define PARKBD_CLOCK	0x01	/* Strobe & Ack */
 #define PARKBD_DATA	0x02	/* AutoFd & Busy */
 
-static int parkbd = 0;
+static int parkbd;
 static int parkbd_mode = SERIO_8042;
 
-static int parkbd_buffer = 0;
-static int parkbd_counter = 0;
-static int parkbd_last = 0;
-static int parkbd_writing = 0;
-static unsigned long parkbd_start = 0;
+static int parkbd_buffer;
+static int parkbd_counter;
+static unsigned long parkbd_last;
+static int parkbd_writing;
+static unsigned long parkbd_start;
 
 static struct pardevice *parkbd_dev;
 
