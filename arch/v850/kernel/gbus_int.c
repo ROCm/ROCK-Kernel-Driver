@@ -113,9 +113,7 @@ static irqreturn_t gbus_int_handle_irq (int irq, void *dev_id,
 		/* Only pay attention to enabled interrupts.  */
 		status &= enable;
 		if (status) {
-			unsigned base_irq
-				= IRQ_GBUS_INT (w * GBUS_INT_BITS_PER_WORD);
-			irq = base_irq;
+			irq = IRQ_GBUS_INT (w * GBUS_INT_BITS_PER_WORD);
 			do {
 				/* There's an active interrupt in word
 				   W, find out which one, and call its
