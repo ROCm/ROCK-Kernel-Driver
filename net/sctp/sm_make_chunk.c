@@ -1731,7 +1731,7 @@ int sctp_verify_init(const struct sctp_association *asoc,
 	sctp_walk_params(param, peer_init, init_hdr.params) {
 
 		if (!sctp_verify_param(asoc, param, cid, chunk, errp))
-			return 0;
+			return 1;
 
 	} /* for (loop through all parameters) */
 

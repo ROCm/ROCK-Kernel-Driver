@@ -767,6 +767,7 @@ static struct sctp_association *__sctp_rcv_init_lookup(struct sk_buff *skb,
 	sctp_chunkhdr_t *ch;
 	union sctp_params params;
 	sctp_init_chunk_t *init;
+	struct sctp_transport *transport;
 
 	ch = (sctp_chunkhdr_t *) skb->data;
 
@@ -806,7 +807,7 @@ static struct sctp_association *__sctp_rcv_init_lookup(struct sk_buff *skb,
 			continue;
 
 		sctp_param2sockaddr(paddr, params.addr, ntohs(sh->source), 0);
-		asoc = __sctp_lookup_association(laddr, paddr, transportp);
+		asoc = __sctp_lookup_association(laddr, paddr, &transport);
 		if (asoc)
 			return asoc;
 	}
