@@ -1868,11 +1868,30 @@ static void run(void)
 static irqreturn_t intr(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	struct Scsi_Host *shpnt = lookup_irq(irqno);
+	unsigned char rev, dmacntrl0;
 
 	if (!shpnt) {
 		printk(KERN_ERR "aha152x: catched interrupt %d for unknown controller.\n", irqno);
 		return IRQ_NONE;
 	}
+
+	/*
+	 * Read a couple of registers that are known to not be all 1's. If
+	 * we read all 1's (-1), that means that either:
+	 *
+	 * a. The host adapter chip has gone bad, and we cannot control it,
+	 *	OR
+	 * b. The host adapter is a PCMCIA card that has been ejected
+	 *
+	 * In either case, we cannot do anything with the host adapter at
+	 * this point in time. So just ignore the interrupt and return.
+	 * In the latter case, the interrupt might actually be meant for
+	 * someone else sharing this IRQ, and that driver will handle it.
+	 */
+	rev = GETPORT(REV);
+	dmacntrl0 = GETPORT(DMACNTRL0);
+	if ((rev == 0xFF) && (dmacntrl0 == 0xFF))
+		return IRQ_NONE;
 
 	/* no more interrupts from the controller, while we're busy.
 	   INTEN is restored by the BH handler */

@@ -54,12 +54,52 @@ static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	NULL
 };
 
+static void scsi_host_cls_release(struct class_device *class_dev)
+{
+	struct Scsi_Host *shost;
+
+	shost = class_to_shost(class_dev);
+	put_device(&shost->shost_gendev);
+}
+
+static void scsi_host_dev_release(struct device *dev)
+{
+	struct Scsi_Host *shost;
+	struct device *parent;
+
+	parent = dev->parent;
+	shost = dev_to_shost(dev);
+	scsi_free_shost(shost);
+	put_device(parent);
+}
+
 struct class shost_class = {
 	.name		= "scsi_host",
+	.release	= scsi_host_cls_release,
 };
 
-static struct class sdev_class = {
+static void scsi_device_cls_release(struct class_device *class_dev)
+{
+	struct scsi_device *sdev;
+
+	sdev = class_to_sdev(class_dev);
+	put_device(&sdev->sdev_gendev);
+}
+
+static void scsi_device_dev_release(struct device *dev)
+{
+	struct scsi_device *sdev;
+	struct device *parent;
+
+	parent = dev->parent;
+	sdev = to_scsi_device(dev);
+	scsi_free_sdev(sdev);
+	put_device(parent);
+}
+
+struct class sdev_class = {
 	.name		= "scsi_device",
+	.release	= scsi_device_cls_release,
 };
 
 /* all probing is done in the individual ->probe routines */
@@ -109,7 +149,7 @@ void scsi_sysfs_unregister(void)
  */
 #define sdev_show_function(field, format_string)				\
 static ssize_t								\
-show_##field (struct device *dev, char *buf)				\
+sdev_show_##field (struct device *dev, char *buf)				\
 {									\
 	struct scsi_device *sdev;					\
 	sdev = to_scsi_device(dev);					\
@@ -122,7 +162,7 @@ show_##field (struct device *dev, char *buf)				\
  */
 #define sdev_rd_attr(field, format_string)				\
 	sdev_show_function(field, format_string)				\
-static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
+static DEVICE_ATTR(field, S_IRUGO, sdev_show_##field, NULL)
 
 
 /*
@@ -140,7 +180,7 @@ sdev_store_##field (struct device *dev, const char *buf, size_t count)	\
 	snscanf (buf, 20, format_string, &sdev->field);			\
 	return count;							\
 }									\
-static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, sdev_store_##field)
+static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, sdev_show_##field, sdev_store_##field)
 
 /*
  * sdev_rd_attr: create a function and attribute variable for a
@@ -162,7 +202,7 @@ sdev_store_##field (struct device *dev, const char *buf, size_t count)	\
 	}								\
 	return ret;							\
 }									\
-static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, sdev_store_##field)
+static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, sdev_show_##field, sdev_store_##field)
 
 /*
  * scsi_sdev_check_buf_bit: return 0 if buf is "0", return 1 if buf is "1",
@@ -218,15 +258,6 @@ static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	NULL
 };
 
-static void scsi_device_release(struct device *dev)
-{
-	struct scsi_device *sdev;
-
-	sdev = to_scsi_device(dev);
-	if (!sdev)
-		return;
-	scsi_free_sdev(sdev);
-}
 
 static struct device_attribute *attr_overridden(
 		struct device_attribute **attrs,
@@ -275,12 +306,13 @@ int scsi_device_register(struct scsi_device *sdev)
 {
 	int error = 0, i;
 
+	set_bit(SDEV_ADD, &sdev->sdev_state);
 	device_initialize(&sdev->sdev_gendev);
 	sprintf(sdev->sdev_gendev.bus_id,"%d:%d:%d:%d",
 		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
 	sdev->sdev_gendev.parent = &sdev->host->shost_gendev;
 	sdev->sdev_gendev.bus = &scsi_bus_type;
-	sdev->sdev_gendev.release = scsi_device_release;
+	sdev->sdev_gendev.release = scsi_device_dev_release;
 
 	class_device_initialize(&sdev->sdev_classdev);
 	sdev->sdev_classdev.dev = &sdev->sdev_gendev;
@@ -293,19 +325,24 @@ int scsi_device_register(struct scsi_device *sdev)
 		printk(KERN_INFO "error 1\n");
 		return error;
 	}
+
+	get_device(sdev->sdev_gendev.parent);
+
 	error = class_device_add(&sdev->sdev_classdev);
 	if (error) {
 		printk(KERN_INFO "error 2\n");
-		device_unregister(&sdev->sdev_gendev);
+		goto clean_device;
 		return error;
 	}
+
+	get_device(&sdev->sdev_gendev);
 
 	if (sdev->host->hostt->sdev_attrs) {
 		for (i = 0; sdev->host->hostt->sdev_attrs[i]; i++) {
 			error = attr_add(&sdev->sdev_gendev,
 					sdev->host->hostt->sdev_attrs[i]);
 			if (error)
-				scsi_device_unregister(sdev);
+				scsi_remove_device(sdev);
 		}
 	}
 	
@@ -315,21 +352,40 @@ int scsi_device_register(struct scsi_device *sdev)
 			error = device_create_file(&sdev->sdev_gendev,
 					scsi_sysfs_sdev_attrs[i]);
 			if (error)
-				scsi_device_unregister(sdev);
+				scsi_remove_device(sdev);
 		}
 	}
 
 	return error;
+
+clean_device:
+	device_del(&sdev->sdev_gendev);
+	put_device(&sdev->sdev_gendev);
+	return error;
+
 }
 
 /**
- * scsi_device_unregister - unregister a device from the scsi bus
+ * scsi_remove_device - unregister a device from the scsi bus
  * @sdev:	scsi_device to unregister
  **/
-void scsi_device_unregister(struct scsi_device *sdev)
+void scsi_remove_device(struct scsi_device *sdev)
 {
+	struct class *class = class_get(&sdev_class);
+
 	class_device_unregister(&sdev->sdev_classdev);
-	device_unregister(&sdev->sdev_gendev);
+
+	if (class) {
+		down_write(&class->subsys.rwsem);
+		set_bit(SDEV_DEL, &sdev->sdev_state);
+		if (sdev->access_count == 0)
+			device_del(&sdev->sdev_gendev);
+		up_write(&class->subsys.rwsem);
+	}
+
+	put_device(&sdev->sdev_gendev);
+
+	class_put(&sdev_class);
 }
 
 int scsi_register_driver(struct device_driver *drv)
@@ -346,16 +402,6 @@ int scsi_register_interface(struct class_interface *intf)
 	return class_interface_register(intf);
 }
 
-static void scsi_host_release(struct device *dev)
-{
-	struct Scsi_Host *shost;
-
-	shost = dev_to_shost(dev);
-	if (!shost)
-		return;
-
-	scsi_free_shost(shost);
-}
 
 void scsi_sysfs_init_host(struct Scsi_Host *shost)
 {
@@ -364,7 +410,7 @@ void scsi_sysfs_init_host(struct Scsi_Host *shost)
 		shost->host_no);
 	snprintf(shost->shost_gendev.name, DEVICE_NAME_SIZE, "%s",
 		shost->hostt->proc_name);
-	shost->shost_gendev.release = scsi_host_release;
+	shost->shost_gendev.release = scsi_host_dev_release;
 
 	class_device_initialize(&shost->shost_classdev);
 	shost->shost_classdev.dev = &shost->shost_gendev;
@@ -426,10 +472,14 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
 	if (error)
 		return error;
 
+	set_bit(SHOST_ADD, &shost->shost_state);
+	get_device(shost->shost_gendev.parent);
+
 	error = class_device_add(&shost->shost_classdev);
 	if (error)
 		goto clean_device;
 
+	get_device(&shost->shost_gendev);
 	if (shost->hostt->shost_attrs) {
 		for (i = 0; shost->hostt->shost_attrs[i]; i++) {
 			error = class_attr_add(&shost->shost_classdev,
@@ -465,6 +515,11 @@ clean_device:
  **/
 void scsi_sysfs_remove_host(struct Scsi_Host *shost)
 {
-	class_device_del(&shost->shost_classdev);
+	unsigned long flags;
+	spin_lock_irqsave(shost->host_lock, flags);
+	set_bit(SHOST_DEL, &shost->shost_state);
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	class_device_unregister(&shost->shost_classdev);
 	device_del(&shost->shost_gendev);
 }

@@ -84,7 +84,7 @@ int scsi_eh_scmd_add(struct scsi_cmnd *scmd, int eh_flag)
 	 */
 	scmd->serial_number_at_timeout = scmd->serial_number;
 	list_add_tail(&scmd->eh_entry, &shost->eh_cmd_q);
-	shost->in_recovery = 1;
+	set_bit(SHOST_RECOVERY, &shost->shost_state);
 	shost->host_failed++;
 	scsi_eh_wakeup(shost);
 	spin_unlock_irqrestore(shost->host_lock, flags);
@@ -187,7 +187,7 @@ void scsi_times_out(struct scsi_cmnd *scmd)
  **/
 int scsi_block_when_processing_errors(struct scsi_device *sdev)
 {
-	wait_event(sdev->host->host_wait, (sdev->host->in_recovery == 0));
+	wait_event(sdev->host->host_wait, (!test_bit(SHOST_RECOVERY, &sdev->host->shost_state)));
 
 	SCSI_LOG_ERROR_RECOVERY(5, printk("%s: rtn: %d\n", __FUNCTION__,
 					  sdev->online));
@@ -1389,7 +1389,7 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	SCSI_LOG_ERROR_RECOVERY(3, printk("%s: waking up host to restart\n",
 					  __FUNCTION__));
 
-	shost->in_recovery = 0;
+	clear_bit(SHOST_RECOVERY, &shost->shost_state);
 
 	wake_up(&shost->host_wait);
 
@@ -1599,7 +1599,6 @@ void scsi_error_handler(void *data)
 	 * that's fine.  If the user sent a signal to this thing, we are
 	 * potentially in real danger.
 	 */
-	shost->in_recovery = 0;
 	shost->eh_active = 0;
 	shost->ehandler = NULL;
 

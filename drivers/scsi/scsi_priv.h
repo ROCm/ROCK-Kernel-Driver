@@ -90,11 +90,15 @@ extern void scsi_exit_queue(void);
 
 /* scsi_proc.c */
 #ifdef CONFIG_PROC_FS
+extern void scsi_proc_hostdir_add(struct scsi_host_template *);
+extern void scsi_proc_hostdir_rm(struct scsi_host_template *);
 extern void scsi_proc_host_add(struct Scsi_Host *);
 extern void scsi_proc_host_rm(struct Scsi_Host *);
 extern int scsi_init_procfs(void);
 extern void scsi_exit_procfs(void);
 #else
+# define scsi_proc_hostdir_add(sht)	do { } while (0)
+# define scsi_proc_hostdir_rm(sht)	do { } while (0)
 # define scsi_proc_host_add(shost)	do { } while (0)
 # define scsi_proc_host_rm(shost)	do { } while (0)
 # define scsi_init_procfs()		(0)
@@ -109,7 +113,6 @@ extern void scsi_rescan_device(struct device *);
 
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);
-extern void scsi_device_unregister(struct scsi_device *);
 extern void scsi_sysfs_init_host(struct Scsi_Host *);
 extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_sysfs_remove_host(struct Scsi_Host *);
@@ -117,6 +120,7 @@ extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
 
 extern struct class shost_class;
+extern struct class sdev_class;
 extern struct bus_type scsi_bus_type;
 
 #endif /* _SCSI_PRIV_H */

@@ -268,9 +268,6 @@ static Scsi_Host_Template ips_driver_template = {
 	.sg_tablesize		= IPS_MAX_SG,
 	.cmd_per_lun		= 3,
 	.use_clustering		= ENABLE_CLUSTERING,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20) || (defined CONFIG_HIGHIO)
-	.highmem_io		= 1,
-#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	.use_new_eh_code	= 1,
 #endif

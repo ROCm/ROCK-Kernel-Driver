@@ -696,7 +696,6 @@ typedef struct
 
   ULONG port_id;     // a FC 24-bit address of port (lower 8 bits = al_pa)
 
-  Scsi_Cmnd ScsiCmnd;   // command buffer for Report Luns
 #define REPORT_LUNS_PL 256  
   UCHAR ReportLunsPayload[REPORT_LUNS_PL];
   
