@@ -962,7 +962,6 @@ extern unsigned int   drm_cards_limit;
 extern drm_minor_t    *drm_minors;
 extern struct class_simple *drm_class;
 extern struct proc_dir_entry *drm_proc_root;
-extern struct file_operations drm_stub_fops;
 
 				/* Proc support (drm_proc.h) */
 extern int            drm_proc_init(drm_device_t *dev,

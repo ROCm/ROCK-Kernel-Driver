@@ -34,5 +34,25 @@
 #define	MCFINT_UART2		15		/* Interrupt number for UART2 */
 #define	MCFINT_PIT1		36		/* Interrupt number for PIT1 */
 
+/*
+ *	SDRAM configuration registers.
+ */
+#ifdef CONFIG_M5271EVB
+#define	MCFSIM_DCR		0x40		/* SDRAM control */
+#define	MCFSIM_DACR0		0x48		/* SDRAM base address 0 */
+#define	MCFSIM_DMR0		0x4c		/* SDRAM address mask 0 */
+#define	MCFSIM_DACR1		0x50		/* SDRAM base address 1 */
+#define	MCFSIM_DMR1		0x54		/* SDRAM address mask 1 */
+#else
+#define	MCFSIM_DMR		0x40		/* SDRAM mode */
+#define	MCFSIM_DCR		0x44		/* SDRAM control */
+#define	MCFSIM_DCFG1		0x48		/* SDRAM configuration 1 */
+#define	MCFSIM_DCFG2		0x4c		/* SDRAM configuration 2 */
+#define	MCFSIM_DBAR0		0x50		/* SDRAM base address 0 */
+#define	MCFSIM_DMR0		0x54		/* SDRAM address mask 0 */
+#define	MCFSIM_DBAR1		0x58		/* SDRAM base address 1 */
+#define	MCFSIM_DMR1		0x5c		/* SDRAM address mask 1 */
+#endif
+
 /****************************************************************************/
 #endif	/* m527xsim_h */

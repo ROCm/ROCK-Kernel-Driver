@@ -2240,7 +2240,7 @@ static int sis900_suspend(struct pci_dev *pci_dev, u32 state)
 	/* Stop the chip's Tx and Rx Status Machine */
 	outl(RxDIS | TxDIS | inl(ioaddr + cr), ioaddr + cr);
 
-	pci_set_power_state(pci_dev, 3);
+	pci_set_power_state(pci_dev, PCI_D3hot);
 	pci_save_state(pci_dev);
 
 	return 0;
@@ -2255,7 +2255,7 @@ static int sis900_resume(struct pci_dev *pci_dev)
 	if(!netif_running(net_dev))
 		return 0;
 	pci_restore_state(pci_dev);
-	pci_set_power_state(pci_dev, 0);
+	pci_set_power_state(pci_dev, PCI_D0);
 
 	sis900_init_rxfilter(net_dev);
 
