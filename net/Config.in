@@ -34,14 +34,14 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    bool 'Asynchronous Transfer Mode (ATM) (EXPERIMENTAL)' CONFIG_ATM
    if [ "$CONFIG_ATM" = "y" ]; then
       if [ "$CONFIG_INET" = "y" ]; then
-	 bool '  Classical IP over ATM' CONFIG_ATM_CLIP
+	 bool '  Classical IP over ATM (EXPERIMENTAL)' CONFIG_ATM_CLIP
 	 if [ "$CONFIG_ATM_CLIP" = "y" ]; then
-	    bool '    Do NOT send ICMP if no neighbour' CONFIG_ATM_CLIP_NO_ICMP
+	    bool '    Do NOT send ICMP if no neighbour (EXPERIMENTAL)' CONFIG_ATM_CLIP_NO_ICMP
 	 fi
       fi
-      tristate '  LAN Emulation (LANE) support' CONFIG_ATM_LANE
+      tristate '  LAN Emulation (LANE) support (EXPERIMENTAL)' CONFIG_ATM_LANE
       if [ "$CONFIG_INET" = "y" -a "$CONFIG_ATM_LANE" != "n" ]; then
-	 tristate '    Multi-Protocol Over ATM (MPOA) support' CONFIG_ATM_MPOA
+	 tristate '    Multi-Protocol Over ATM (MPOA) support (EXPERIMENTAL)' CONFIG_ATM_MPOA
       fi
    fi
 fi
