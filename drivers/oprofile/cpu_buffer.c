@@ -26,8 +26,6 @@
 
 struct oprofile_cpu_buffer cpu_buffer[NR_CPUS] __cacheline_aligned;
 
-static unsigned long buffer_size;
- 
 static void __free_cpu_buffers(int num)
 {
 	int i;
@@ -47,7 +45,7 @@ int alloc_cpu_buffers(void)
 {
 	int i;
  
-	buffer_size = fs_cpu_buffer_size;
+	unsigned long buffer_size = fs_cpu_buffer_size;
  
 	for (i=0; i < NR_CPUS; ++i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
@@ -59,12 +57,12 @@ int alloc_cpu_buffers(void)
 		if (!b->buffer)
 			goto fail;
  
-		spin_lock_init(&b->int_lock);
-		b->pos = 0;
 		b->last_task = 0;
 		b->last_is_kernel = -1;
+		b->buffer_size = buffer_size;
+		b->tail_pos = 0;
+		b->head_pos = 0;
 		b->sample_received = 0;
-		b->sample_lost_locked = 0;
 		b->sample_lost_overflow = 0;
 		b->sample_lost_task_exit = 0;
 	}
@@ -80,11 +78,41 @@ void free_cpu_buffers(void)
 	__free_cpu_buffers(NR_CPUS);
 }
 
- 
-/* Note we can't use a semaphore here as this is supposed to
- * be safe from any context. Instead we trylock the CPU's int_lock.
- * int_lock is taken by the processing code in sync_cpu_buffers()
- * so we avoid disturbing that.
+
+/* compute number of available slots in cpu_buffer queue */
+static unsigned long nr_available_slots(struct oprofile_cpu_buffer const * b)
+{
+	unsigned long head = b->head_pos;
+	unsigned long tail = b->tail_pos;
+
+	if (tail == head)
+		return b->buffer_size;
+
+	if (tail > head)
+		return tail - head;
+
+	return tail + (b->buffer_size - head);
+}
+
+
+static void increment_head(struct oprofile_cpu_buffer * b)
+{
+	unsigned long new_head = b->head_pos + 1;
+
+	/* Ensure anything written to the slot before we
+	 * increment is visible */
+	wmb();
+
+	if (new_head < (b->buffer_size))
+		b->head_pos = new_head;
+	else
+		b->head_pos = 0;
+}
+
+
+/* This must be safe from any context. It's safe writing here
+ * because of the head/tail separation of the writer and reader
+ * of the CPU buffer.
  *
  * is_kernel is needed because on some architectures you cannot
  * tell if you are in kernel or user space simply by looking at
@@ -101,14 +129,10 @@ void oprofile_add_sample(unsigned long eip, unsigned int is_kernel,
 
 	cpu_buf->sample_received++;
  
-	if (!spin_trylock(&cpu_buf->int_lock)) {
-		cpu_buf->sample_lost_locked++;
-		return;
-	}
 
-	if (cpu_buf->pos > buffer_size - 2) {
+	if (nr_available_slots(cpu_buf) < 3) {
 		cpu_buf->sample_lost_overflow++;
-		goto out;
+		return;
 	}
 
 	task = current;
@@ -116,18 +140,18 @@ void oprofile_add_sample(unsigned long eip, unsigned int is_kernel,
 	/* notice a switch from user->kernel or vice versa */
 	if (cpu_buf->last_is_kernel != is_kernel) {
 		cpu_buf->last_is_kernel = is_kernel;
-		cpu_buf->buffer[cpu_buf->pos].eip = ~0UL;
-		cpu_buf->buffer[cpu_buf->pos].event = is_kernel;
-		cpu_buf->pos++;
+		cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
+		cpu_buf->buffer[cpu_buf->head_pos].event = is_kernel;
+		increment_head(cpu_buf);
 	}
 
 	/* notice a task switch */
 	if (cpu_buf->last_task != task) {
 		cpu_buf->last_task = task;
 		if (!(task->flags & PF_EXITING)) {
-			cpu_buf->buffer[cpu_buf->pos].eip = ~0UL;
-			cpu_buf->buffer[cpu_buf->pos].event = (unsigned long)task;
-			cpu_buf->pos++;
+			cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
+			cpu_buf->buffer[cpu_buf->head_pos].event = (unsigned long)task;
+			increment_head(cpu_buf);
 		}
 	}
  
@@ -138,23 +162,20 @@ void oprofile_add_sample(unsigned long eip, unsigned int is_kernel,
 	 */
 	if (task->flags & PF_EXITING) {
 		cpu_buf->sample_lost_task_exit++;
-		goto out;
+		return;
 	}
  
-	cpu_buf->buffer[cpu_buf->pos].eip = eip;
-	cpu_buf->buffer[cpu_buf->pos].event = event;
-	cpu_buf->pos++;
-out:
-	spin_unlock(&cpu_buf->int_lock);
+	cpu_buf->buffer[cpu_buf->head_pos].eip = eip;
+	cpu_buf->buffer[cpu_buf->head_pos].event = event;
+	increment_head(cpu_buf);
 }
+
 
 /* resets the cpu buffer to a sane state - should be called with 
  * cpu_buf->int_lock held
  */
 void cpu_buffer_reset(struct oprofile_cpu_buffer *cpu_buf)
 {
-	cpu_buf->pos = 0;
-
 	/* reset these to invalid values; the next sample
 	 * collected will populate the buffer with proper
 	 * values to initialize the buffer
@@ -162,4 +183,3 @@ void cpu_buffer_reset(struct oprofile_cpu_buffer *cpu_buf)
 	cpu_buf->last_is_kernel = -1;
 	cpu_buf->last_task = 0;
 }
-

@@ -389,7 +389,7 @@ static unsigned long reset_value[NUM_COUNTERS_NON_HT];
 
 static void p4_fill_in_addresses(struct op_msrs * const msrs)
 {
-	int i; 
+	unsigned int i; 
 	unsigned int addr, stag;
 
 	setup_num_counters();
