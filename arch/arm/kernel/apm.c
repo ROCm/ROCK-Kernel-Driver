@@ -46,7 +46,13 @@
 /*
  * Maximum number of events stored
  */
-#define APM_MAX_EVENTS		20
+#define APM_MAX_EVENTS		16
+
+struct apm_queue {
+	unsigned int		event_head;
+	unsigned int		event_tail;
+	apm_event_t		events[APM_MAX_EVENTS];
+};
 
 /*
  * The per-file APM data
@@ -65,9 +71,7 @@ struct apm_user {
 	unsigned int		suspends_read;
 	unsigned int		standbys_read;
 
-	int			event_head;
-	int			event_tail;
-	apm_event_t		events[APM_MAX_EVENTS];
+	struct apm_queue	queue;
 };
 
 /*
@@ -110,28 +114,37 @@ static void __apm_get_power_status(struct apm_power_info *info)
 void (*apm_get_power_status)(struct apm_power_info *) = __apm_get_power_status;
 EXPORT_SYMBOL(apm_get_power_status);
 
-static int queue_empty(struct apm_user *as)
+
+/*
+ * APM event queue management.
+ */
+static inline int queue_empty(struct apm_queue *q)
 {
-	return as->event_head == as->event_tail;
+	return q->event_head == q->event_tail;
 }
 
-static apm_event_t get_queued_event(struct apm_user *as)
+static inline apm_event_t queue_get_event(struct apm_queue *q)
 {
-	as->event_tail = (as->event_tail + 1) % APM_MAX_EVENTS;
-	return as->events[as->event_tail];
+	q->event_tail = (q->event_tail + 1) % APM_MAX_EVENTS;
+	return q->events[q->event_tail];
 }
 
-static void queue_event_one_user(struct apm_user *as, apm_event_t event)
+static void queue_add_event(struct apm_queue *q, apm_event_t event)
 {
-	as->event_head = (as->event_head + 1) % APM_MAX_EVENTS;
-	if (as->event_head == as->event_tail) {
+	q->event_head = (q->event_head + 1) % APM_MAX_EVENTS;
+	if (q->event_head == q->event_tail) {
 		static int notified;
 
 		if (notified++ == 0)
 		    printk(KERN_ERR "apm: an event queue overflowed\n");
-		as->event_tail = (as->event_tail + 1) % APM_MAX_EVENTS;
+		q->event_tail = (q->event_tail + 1) % APM_MAX_EVENTS;
 	}
-	as->events[as->event_head] = event;
+	q->events[q->event_head] = event;
+}
+
+static void queue_event_one_user(struct apm_user *as, apm_event_t event)
+{
+	queue_add_event(&as->queue, event);
 
 	if (!as->suser || !as->writer)
 		return;
@@ -198,14 +211,13 @@ static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t 
 	if (count < sizeof(apm_event_t))
 		return -EINVAL;
 
-	if (queue_empty(as) && nonblock)
+	if (queue_empty(&as->queue) && nonblock)
 		return -EAGAIN;
 
-	wait_event_interruptible(apm_waitqueue, !queue_empty(as));
+	wait_event_interruptible(apm_waitqueue, !queue_empty(&as->queue));
 
-	while ((i >= sizeof(event)) && !queue_empty(as)) {
-		event = get_queued_event(as);
-		printk("  apm_read: event=%d\n", event);
+	while ((i >= sizeof(event)) && !queue_empty(&as->queue)) {
+		event = queue_get_event(&as->queue);
 
 		ret = -EFAULT;
 		if (copy_to_user(buf, &event, sizeof(event)))
@@ -235,10 +247,10 @@ static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t 
 
 static unsigned int apm_poll(struct file *fp, poll_table * wait)
 {
-	struct apm_user * as = fp->private_data;
+	struct apm_user *as = fp->private_data;
 
 	poll_wait(fp, &apm_waitqueue, wait);
-	return queue_empty(as) ? 0 : POLLIN | POLLRDNORM;
+	return queue_empty(&as->queue) ? 0 : POLLIN | POLLRDNORM;
 }
 
 /*
