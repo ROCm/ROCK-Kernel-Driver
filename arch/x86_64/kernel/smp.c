@@ -305,12 +305,12 @@ static void __smp_call_function (void (*func) (void *info), void *info,
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_VECTOR);
 
-	if (!wait)
-		return;
-
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		cpu_relax();
+
+	if (!wait)
+		return;
 
 	while (atomic_read(&data.finished) != cpus)
 		cpu_relax();
