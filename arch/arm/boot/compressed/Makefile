@@ -65,8 +65,8 @@ endif
 
 SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/LOAD_ADDR/$(ZRELADDR)/;s/BSS_START/$(ZBSSADDR)/
 
-EXTRA_TARGETS := vmlinux vmlinux.lds piggy piggy.gz\
-                 piggy.o font.o head.o $(OBJS)
+targets       := vmlinux vmlinux.lds piggy piggy.gz piggy.o \
+                 font.o head.o $(OBJS)
 EXTRA_CFLAGS  := $(CFLAGS_BOOT) -fpic
 EXTRA_AFLAGS  := -traditional
 
@@ -94,8 +94,6 @@ $(obj)/font.o: $(FONTC)
 
 $(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in Makefile arch/arm/boot/Makefile .config
 	@sed "$(SEDFLAGS)" < $< > $@
-
-clean-files := $(addprefix $(obj)/,vmlinux piggy* vmlinux.lds)
 
 $(obj)/misc.o: $(obj)/misc.c include/asm/arch/uncompress.h lib/inflate.c
 

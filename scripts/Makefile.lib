@@ -86,6 +86,7 @@ host-cshobjs	:= $(sort $(foreach m,$(host-cshlib),$($(m:.so=-objs))))
 
 EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
 build-targets	:= $(addprefix $(obj)/,$(build-targets))
+targets		:= $(addprefix $(obj)/,$(targets))
 obj-y		:= $(addprefix $(obj)/,$(obj-y))
 obj-m		:= $(addprefix $(obj)/,$(obj-m))
 subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))

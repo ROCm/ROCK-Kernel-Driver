@@ -29,6 +29,7 @@ subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 # Add subdir path
 
 EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
+targets		:= $(addprefix $(obj)/,$(targets))
 clean-files	:= $(addprefix $(obj)/,$(clean-files))
 host-progs	:= $(addprefix $(obj)/,$(host-progs))
 subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))

@@ -32,4 +32,4 @@ quiet_cmd_elfconfig = MKELF   $@
 $(obj)/elfconfig.h: $(obj)/empty.o $(obj)/mk_elfconfig FORCE
 	$(call if_changed,elfconfig)
 
-targets += $(obj)/elfconfig.h
+targets += elfconfig.h

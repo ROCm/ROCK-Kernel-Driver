@@ -25,8 +25,8 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
-EXTRA_TARGETS	:= vmlinux.bin bootsect bootsect.o \
-		   setup setup.o bzImage
+targets		:= vmlinux.bin bootsect bootsect.o \
+		   setup setup.o bzImage mtools.conf
 
 EXTRA_CFLAGS := -m32
 
