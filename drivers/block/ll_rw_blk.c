@@ -1510,6 +1510,8 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 	if (unlikely(--req->ref_count))
 		return;
 
+	elv_completed_request(req->q, req);
+
 	req->rq_status = RQ_INACTIVE;
 	req->q = NULL;
 	req->rl = NULL;

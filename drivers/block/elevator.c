@@ -371,6 +371,14 @@ int elv_may_queue(request_queue_t *q, int rw)
 	return 1;
 }
 
+void elv_completed_request(request_queue_t *q, struct request *rq)
+{
+	elevator_t *e = &q->elevator;
+
+	if (e->elevator_completed_req_fn)
+		e->elevator_completed_req_fn(q, rq);
+}
+
 int elv_register_queue(struct gendisk *disk)
 {
 	request_queue_t *q = disk->queue;
@@ -418,5 +426,6 @@ EXPORT_SYMBOL(__elv_add_request);
 EXPORT_SYMBOL(elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);
 EXPORT_SYMBOL(elv_queue_empty);
+EXPORT_SYMBOL(elv_completed_request);
 EXPORT_SYMBOL(elevator_exit);
 EXPORT_SYMBOL(elevator_init);
