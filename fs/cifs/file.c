@@ -143,6 +143,10 @@ cifs_open(struct inode *inode, struct file *file)
 	/* Also refresh inode by passing in file_info buf returned by SMBOpen 
 	   and calling get_inode_info with returned buf (at least 
 	   helps non-Unix server case */
+
+	/* BB we can not do this if this is the second open of a file 
+	and the first handle has writebehind data, we might be 
+	able to simply do a filemap_fdatawrite/filemap_fdatawait first */
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
 		if (full_path)
@@ -263,7 +267,7 @@ static int cifs_relock_file(struct cifsFileInfo * cifsFile)
 	return rc;
 }
 
-static int cifs_reopen_file(struct inode *inode, struct file *file)
+static int cifs_reopen_file(struct inode *inode, struct file *file, int can_flush)
 {
 	int rc = -EACCES;
 	int xid, oplock;
@@ -275,7 +279,6 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	int desiredAccess = 0x20197;
 	int disposition = FILE_OPEN;
 	__u16 netfid;
-	FILE_ALL_INFO * buf = NULL;
 
 	if(inode == NULL)
 		return -EBADF;
@@ -328,21 +331,23 @@ and we can never tell if the caller already has the rename_sem */
 	else
 		oplock = FALSE;
 
-		/* BB pass O_SYNC flag through on file attributes .. BB */
+	
+	/* Can not refresh inode by passing in file_info buf to be returned
+	 by SMBOpen and then calling get_inode_info with returned buf 
+	 since file might have write behind data that needs to be flushed 
+	 and server version of file size can be stale. If we 
+	 knew for sure that inode was not dirty locally we could do this */
 
-		/* Also refresh inode by passing in file_info buf returned by SMBOpen
-		   and calling get_inode_info with returned buf (at least
-		   helps non-Unix server case */
-	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+/*	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
 		up(&pCifsFile->fh_sem);
 		if (full_path)
 			kfree(full_path);
 		FreeXid(xid);
 		return -ENOMEM;
-	}
+	}*/
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
-				CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
+				CREATE_NOT_DIR, &netfid, &oplock, NULL, cifs_sb->local_nls);
 	if (rc) {
 		up(&pCifsFile->fh_sem);
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
@@ -353,13 +358,25 @@ and we can never tell if the caller already has the rename_sem */
 		up(&pCifsFile->fh_sem);
 		pCifsInode = CIFS_I(inode);
 		if(pCifsInode) {
-			if (pTcon->ses->capabilities & CAP_UNIX)
-				rc = cifs_get_inode_info_unix(&inode,
+			if(can_flush) {
+				filemap_fdatawrite(inode->i_mapping);
+				filemap_fdatawait(inode->i_mapping);
+			/* temporarily disable caching while we
+			go to server to get inode info */
+				pCifsInode->clientCanCacheAll = FALSE;
+				pCifsInode->clientCanCacheRead = FALSE;
+				if (pTcon->ses->capabilities & CAP_UNIX)
+					rc = cifs_get_inode_info_unix(&inode,
 						full_path, inode->i_sb);
-			else
-				rc = cifs_get_inode_info(&inode,
-						full_path, buf, inode->i_sb);
-
+				else
+					rc = cifs_get_inode_info(&inode,
+						full_path, NULL, inode->i_sb);
+			} /* else we are writing out data to server already
+			and could deadlock if we tried to flush data, and 
+			since we do not know if we have data that would
+			invalidate the current end of file on the server
+			we can not go to the server to get the new
+			inod info */
 			if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 				pCifsInode->clientCanCacheAll =  TRUE;
 				pCifsInode->clientCanCacheRead = TRUE;
@@ -375,8 +392,6 @@ and we can never tell if the caller already has the rename_sem */
 		}
 	}
 
-	if (buf)
-		kfree(buf);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
@@ -612,7 +627,11 @@ cifs_write(struct file * file, const char *write_data,
 					FreeXid(xid);
 					return total_written;
 				}
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				/* we could deadlock if we called
+				 filemap_fdatawait from here so tell
+				reopen_file not to flush data to server now */
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,FALSE);
 				if(rc != 0)
 					break;
 			}
@@ -829,7 +848,7 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 			cFYI(1,(" SetEOF (commit write) rc = %d",rc));
 		}*/
 	}
-        if (!PageUptodate(page)) {
+	if (!PageUptodate(page)) {
 		position =  ((loff_t)page->index << PAGE_CACHE_SHIFT) + offset;
 		/* can not rely on (or let) writepage write this data */
 		if(to < offset) {
@@ -968,7 +987,8 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,TRUE);
 				if(rc != 0)
 					break;
 			}
@@ -1123,7 +1143,8 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file, TRUE);
 				if(rc != 0)
 					break;
 			}
@@ -1263,6 +1284,49 @@ cifs_readpage(struct file *file, struct page *page)
 	return rc;
 }
 
+/* We do not want to update the file size from server for inodes
+   open for write - to avoid races with writepage extending
+   the file - in the future we could consider allowing
+   refreshing the inode only on increases in the file size 
+   but this is tricky to do without racing with writebehind
+   page caching in the current Linux kernel design */
+   
+int is_size_safe_to_change(struct cifsInodeInfo * cifsInode)
+{
+	struct list_head *tmp;
+	struct list_head *tmp1;
+	struct cifsFileInfo *open_file = NULL;
+	int rc = TRUE;
+
+	if(cifsInode == NULL)
+		return rc;
+
+	read_lock(&GlobalSMBSeslock); 
+	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
+		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		if(open_file == NULL)
+			break;
+		if(open_file->closePend)
+			continue;
+	/* We check if file is open for writing,   
+	BB we could supplement this with a check to see if file size
+	changes have been flushed to server - ie inode metadata dirty */
+		if((open_file->pfile) && 
+	   ((open_file->pfile->f_flags & O_RDWR) || 
+		(open_file->pfile->f_flags & O_WRONLY))) {
+			 rc = FALSE;
+			 break;
+		}
+		if(tmp->next == NULL) {
+			cFYI(1,("File instance %p removed",tmp));
+			break;
+		}
+	}
+	read_unlock(&GlobalSMBSeslock);
+	return rc;
+}
+
+
 void
 fill_in_inode(struct inode *tmp_inode,
 	      FILE_DIRECTORY_INFO * pfindData, int *pobject_type)
@@ -1322,11 +1386,15 @@ fill_in_inode(struct inode *tmp_inode,
 		atomic_set(&cifsInfo->inUse,1);
 	}
 
-	i_size_write(tmp_inode,pfindData->EndOfFile);
+	if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		client is writing to it due to potential races */
+		i_size_write(tmp_inode,pfindData->EndOfFile);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, even though the reported blocksize is larger */
-	tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+	}
 
 	if (pfindData->AllocationSize < pfindData->EndOfFile)
 		cFYI(1, ("Possible sparse file: allocation size less than end of file "));
@@ -1398,12 +1466,17 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	tmp_inode->i_nlink = le64_to_cpu(pfindData->Nlinks);
 
 	pfindData->NumOfBytes = le64_to_cpu(pfindData->NumOfBytes);
-	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
-	i_size_write(tmp_inode,pfindData->EndOfFile);
+
+	if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		client is writing to it due to potential races */
+		pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
+		i_size_write(tmp_inode,pfindData->EndOfFile);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, not the real blocksize */
-	tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
+	}
 
 	if (S_ISREG(tmp_inode->i_mode)) {
 		cFYI(1, ("File inode"));
@@ -1547,9 +1620,9 @@ cifs_filldir_unix(struct qstr *pqstring,
 	pqstring->len = strnlen(pUnixFindData->FileName, MAX_PATHCONF);
 
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
-        if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
-                return -ENOMEM;
-        }
+	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
+		return -ENOMEM;
+	}
 
 	unix_fill_in_inode(tmp_inode, pUnixFindData, &object_type);
 	rc = filldir(direntry, pUnixFindData->FileName, pqstring->len,

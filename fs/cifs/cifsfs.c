@@ -426,7 +426,7 @@ cifs_get_sb(struct file_system_type *fs_type,
 }
 
 static ssize_t
-cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
+cifs_read_wrapper(struct file * file, char __user *read_data, size_t read_size,
           loff_t * poffset)
 {
 	if(file == NULL)
@@ -455,7 +455,7 @@ cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
 }
 
 static ssize_t
-cifs_write_wrapper(struct file * file, const char *write_data,
+cifs_write_wrapper(struct file * file, const char __user *write_data,
            size_t write_size, loff_t * poffset) 
 {
 	ssize_t written;

@@ -247,4 +247,8 @@ extern int CIFSSMBCopy(int xid,
 extern int CIFSSMBNotify(const int xid, struct cifsTconInfo *tcon, 
 			const int notify_subdirs,const __u16 netfid,__u32 filter,
 			const struct nls_table *nls_codepage);
+extern int CIFSSMBQAllEAs(const int xid, struct cifsTconInfo *tcon,
+		 const unsigned char *searchName,
+		 char * EAData, size_t size,
+		 const struct nls_table *nls_codepage);
 #endif			/* _CIFSPROTO_H */

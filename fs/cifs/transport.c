@@ -120,6 +120,7 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	 unsigned int smb_buf_length, struct sockaddr *sin)
 {
 	int rc = 0;
+	int i = 0;
 	struct msghdr smb_msg;
 	struct iovec iov;
 	mm_segment_t temp_fs;
@@ -151,6 +152,14 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	while(iov.iov_len > 0) {
 		rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
 		if ((rc == -ENOSPC) || (rc == -EAGAIN)) {
+			i++;
+			if(i > 60) {
+				cERROR(1,
+				   ("sends on sock %p stuck for 30 seconds",
+				    ssocket));
+				rc = -EAGAIN;
+				break;
+			}
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ/2);
 			continue;
@@ -259,7 +268,17 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	midQ->midState = MID_REQUEST_SUBMITTED;
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
 		      (struct sockaddr *) &(ses->server->addr.sockAddr));
-	up(&ses->server->tcpSem);
+	if(rc < 0) {
+		DeleteMidQEntry(midQ);
+		up(&ses->server->tcpSem);
+		/* If not lock req, update # of requests on wire to server */
+		if(long_op < 3) {
+			atomic_dec(&ses->server->inFlight); 
+			wake_up(&ses->server->request_q);
+		}
+		return rc;
+	} else
+		up(&ses->server->tcpSem);
 	if (long_op == -1)
 		goto cifs_no_response_exit;
 	else if (long_op == 2) /* writes past end of file can take looooong time */
