@@ -16,6 +16,10 @@
 #include <platforms/est8260.h>
 #endif
 
+#ifdef CONFIG_SBC82xx
+#include <platforms/sbc82xx.h>
+#endif
+
 #ifdef CONFIG_SBS8260
 #include <platforms/sbs8260.h>
 #endif

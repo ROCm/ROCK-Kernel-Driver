@@ -62,6 +62,8 @@ do {								\
 #include <linux/netfilter_ipv4/lockhelp.h>
 #include <linux/netfilter_ipv4/listhelp.h>
 
+static DECLARE_MUTEX(arpt_mutex);
+
 struct arpt_table_info {
 	unsigned int size;
 	unsigned int number;

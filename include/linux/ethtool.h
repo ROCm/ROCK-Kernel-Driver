@@ -351,6 +351,8 @@ struct ethtool_ops {
 	int	(*phys_id)(struct net_device *, u32);
 	int	(*get_stats_count)(struct net_device *);
 	void	(*get_ethtool_stats)(struct net_device *, struct ethtool_stats *, u64 *);
+	int	(*begin)(struct net_device *);
+	void	(*complete)(struct net_device *);
 };
 
 /* CMDs currently supported */
