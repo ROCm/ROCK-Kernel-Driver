@@ -1467,7 +1467,9 @@ static struct __initdata pci_driver agp_intel_pci_driver = {
 	.probe		= agp_intel_probe,
 };
 
-static int __init agp_intel_init(void)
+/* intel_agp_init() must not be declared static for explicit
+   early initialization to work (ie i810fb) */
+int __init agp_intel_init(void)
 {
 	int ret_val;
 	static int agp_initialised=0;
