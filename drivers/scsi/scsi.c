@@ -534,7 +534,7 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 /*
  * Per-CPU I/O completion queue.
  */
-static struct list_head done_q[NR_CPUS] __cacheline_aligned;
+static DEFINE_PER_CPU(struct list_head, scsi_done_q);
 
 /**
  * scsi_done - Enqueue the finished SCSI command into the done queue.
@@ -552,7 +552,6 @@ static struct list_head done_q[NR_CPUS] __cacheline_aligned;
 void scsi_done(struct scsi_cmnd *cmd)
 {
 	unsigned long flags;
-	int cpu;
 
 	/*
 	 * We don't have to worry about this one timing out any more.
@@ -579,8 +578,7 @@ void scsi_done(struct scsi_cmnd *cmd)
 	 * and need no spinlock.
 	 */
 	local_irq_save(flags);
-	cpu = smp_processor_id();
-	list_add_tail(&cmd->eh_entry, &done_q[cpu]);
+	list_add_tail(&cmd->eh_entry, &__get_cpu_var(scsi_done_q));
 	raise_softirq_irqoff(SCSI_SOFTIRQ);
 	local_irq_restore(flags);
 }
@@ -599,7 +597,7 @@ static void scsi_softirq(struct softirq_action *h)
 	LIST_HEAD(local_q);
 
 	local_irq_disable();
-	list_splice_init(&done_q[smp_processor_id()], &local_q);
+	list_splice_init(&__get_cpu_var(scsi_done_q), &local_q);
 	local_irq_enable();
 
 	while (!list_empty(&local_q)) {
@@ -1007,7 +1005,7 @@ static int __init init_scsi(void)
 		goto cleanup_sysctl;
 
 	for (i = 0; i < NR_CPUS; i++)
-		INIT_LIST_HEAD(&done_q[i]);
+		INIT_LIST_HEAD(&per_cpu(scsi_done_q, i));
 
 	devfs_mk_dir("scsi");
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
