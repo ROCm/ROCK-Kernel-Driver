@@ -905,6 +905,7 @@ int agp_generic_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 		readl(agp_bridge->gatt_table+i);	/* PCI Posting. */
 	}
 
+	global_cache_flush();
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
