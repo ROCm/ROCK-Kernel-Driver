@@ -98,6 +98,9 @@ static struct ata_port_operations svia_sata_ops = {
 	.eng_timeout		= ata_eng_timeout,
 
 	.irq_handler		= ata_interrupt,
+
+	.port_start		= ata_port_start,
+	.port_stop		= ata_port_stop,
 };
 
 static struct ata_port_info svia_port_info[] = {
