@@ -141,17 +141,3 @@ xfs-y				+= $(addprefix support/, \
 xfs-y				+= xfs_dmops.o \
 				   xfs_qmops.o
 
-# If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
-# a module and kdb modules are being compiled then xfsidbg must be a module, to
-# follow xfs.  If xfs is built in then xfsidbg tracks the kdb module state.
-# This must come after the main xfs code so xfs initialises before xfsidbg.
-# KAO
-ifneq ($(CONFIG_KDB_MODULES),)
-  ifeq ($(CONFIG_XFS_FS),y)
-    obj-$(CONFIG_KDB_MODULES)	+= xfsidbg.o
-  else
-    obj-$(CONFIG_XFS_FS)	+= xfsidbg.o
-  endif
-endif
-
-CFLAGS_xfsidbg.o += -Iarch/$(ARCH)/kdb
