@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-mpeg.c,v 1.14 2004/10/25 11:26:36 kraxel Exp $
+ * $Id: cx88-mpeg.c,v 1.18 2005/01/04 13:34:11 kraxel Exp $
  *
  *  Support for the mpeg transport stream transfers
  *  PCI function #2 of the cx2388x.
@@ -24,6 +24,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
@@ -93,7 +94,7 @@ static int cx8802_start_dma(struct cx8802_dev    *dev,
 	q->count = 1;
 
 	/* enable irqs */
-	cx_set(MO_PCI_INTMSK, 0x00fc04);
+	cx_set(MO_PCI_INTMSK, core->pci_irqmask | 0x04);
 	cx_write(MO_TS_INTMSK,  0x1f0011);
 
 	/* start dma */
@@ -292,19 +293,18 @@ static irqreturn_t cx8802_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct cx8802_dev *dev = dev_id;
 	struct cx88_core *core = dev->core;
-	u32 status, mask;
+	u32 status;
 	int loop, handled = 0;
 
 	for (loop = 0; loop < 10; loop++) {
-		status = cx_read(MO_PCI_INTSTAT) & (~0x1f | 0x04);
-		mask   = cx_read(MO_PCI_INTMSK);
-		if (0 == (status & mask))
+		status = cx_read(MO_PCI_INTSTAT) & (core->pci_irqmask | 0x04);
+		if (0 == status)
 			goto out;
 		handled = 1;
 		cx_write(MO_PCI_INTSTAT, status);
 
-		if (status & mask & ~0x1f)
-			cx88_irq(core,status,mask);
+		if (status & core->pci_irqmask)
+			cx88_core_irq(core,status);
 		if (status & 0x04)
 			cx8802_mpeg_irq(dev);
 	};
@@ -323,6 +323,7 @@ static irqreturn_t cx8802_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 int cx8802_init_common(struct cx8802_dev *dev)
 {
+	struct cx88_core *core = dev->core;
 	int err;
 
 	/* pci init */
@@ -343,7 +344,7 @@ int cx8802_init_common(struct cx8802_dev *dev)
 
 	/* initialize driver struct */
         init_MUTEX(&dev->lock);
-	dev->slock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->slock);
 
 	/* init dma queue */
 	INIT_LIST_HEAD(&dev->mpegq.active);
@@ -367,6 +368,7 @@ int cx8802_init_common(struct cx8802_dev *dev)
 		       dev->core->name, dev->pci->irq);
 		return err;
 	}
+	cx_set(MO_PCI_INTMSK, core->pci_irqmask);
 
 #if 0 /* FIXME */
 	/* register i2c bus + load i2c helpers */

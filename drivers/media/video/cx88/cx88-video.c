@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-video.c,v 1.46 2004/11/07 14:44:59 kraxel Exp $
+ * $Id: cx88-video.c,v 1.52 2005/01/04 13:34:11 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * video4linux video interface
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kmod.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -428,7 +429,7 @@ static int start_video_dma(struct cx8800_dev    *dev,
 	q->count = 1;
 
 	/* enable irqs */
-	cx_set(MO_PCI_INTMSK, 0x00fc01);
+	cx_set(MO_PCI_INTMSK, core->pci_irqmask | 0x01);
 	cx_set(MO_VID_INTMSK, 0x0f0011);
 
 	/* enable capture */
@@ -1002,7 +1003,7 @@ static int video_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-video_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
+video_read(struct file *file, char *data, size_t count, loff_t *ppos)
 {
 	struct cx8800_fh *fh = file->private_data;
 
@@ -1083,6 +1084,8 @@ static int video_release(struct inode *inode, struct file *file)
 		res_free(dev,fh,RESOURCE_VBI);
 	}
 
+	videobuf_mmap_free(&fh->vidq);
+	videobuf_mmap_free(&fh->vbiq);
 	file->private_data = NULL;
 	kfree(fh);
 	return 0;
@@ -1880,19 +1883,18 @@ static irqreturn_t cx8800_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct cx8800_dev *dev = dev_id;
 	struct cx88_core *core = dev->core;
-	u32 status, mask;
+	u32 status;
 	int loop, handled = 0;
 
 	for (loop = 0; loop < 10; loop++) {
-		status = cx_read(MO_PCI_INTSTAT) & (~0x1f | 0x01);
-		mask   = cx_read(MO_PCI_INTMSK);
-		if (0 == (status & mask))
+		status = cx_read(MO_PCI_INTSTAT) & (core->pci_irqmask | 0x01);
+		if (0 == status)
 			goto out;
 		cx_write(MO_PCI_INTSTAT, status);
 		handled = 1;
 
-		if (status & mask & ~0x1f)
-			cx88_irq(core,status,mask);
+		if (status & core->pci_irqmask)
+			cx88_core_irq(core,status);
 		if (status & 0x01)
 			cx8800_vid_irq(dev);
 	};
@@ -2026,7 +2028,7 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 
 	/* initialize driver struct */
         init_MUTEX(&dev->lock);
-	dev->slock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->slock);
 	core->tvnorm = tvnorms;
 
 	/* init video dma queues */
@@ -2055,6 +2057,7 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 		       core->name,pci_dev->irq);
 		goto fail_core;
 	}
+	cx_set(MO_PCI_INTMSK, core->pci_irqmask);
 
 	/* load and configure helper modules */
 	if (TUNER_ABSENT != core->tuner_type)

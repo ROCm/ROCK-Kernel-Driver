@@ -1,5 +1,5 @@
 /*
- * $Id: tuner.c,v 1.31 2004/11/10 11:07:24 kraxel Exp $
+ * $Id: tuner.c,v 1.34 2005/01/04 16:31:20 kraxel Exp $
  */
 
 #include <linux/module.h>
@@ -264,6 +264,11 @@ static struct tunertype tuners[] = {
           16*172.00,16*448.00,0x01,0x02,0x08,0x8e,732},
 	{ "Philips PAL/SECAM_D (FM 1256 I-H3)", Philips, PAL,
 	  16*160.00,16*442.00,0x01,0x02,0x04,0x8e,623 },
+
+	{ "Thomson DDT 7610 ATSC/NTSC)", THOMSON, ATSC,
+	  16*157.25,16*454.00,0x39,0x3a,0x3c,0x8e,732},
+	{ "Philips FQ1286", Philips, NTSC,
+	  16*160.00,16*454.00,0x41,0x42,0x04,0x8e,940}, // UHF band untested
 
 };
 #define TUNERS ARRAY_SIZE(tuners)
@@ -663,7 +668,8 @@ static void mt2050_set_if_freq(struct i2c_client *c,unsigned int freq, unsigned 
 	int ret;
 	unsigned char buf[6];
 
-	dprintk("mt2050_set_if_freq freq=%d\n",freq);
+	dprintk("mt2050_set_if_freq freq=%d if1=%d if2=%d\n",
+		freq,if1,if2);
 
 	f_lo1=freq+if1;
 	f_lo1=(f_lo1/1000000)*1000000;
@@ -727,6 +733,10 @@ static void mt2050_set_tv_freq(struct i2c_client *c, unsigned int freq)
                 // PAL
                 if2 = 38900*1000;
         }
+#if 0
+	// testing for DVB ...
+	if2 = 36166667;
+#endif
 	mt2050_set_if_freq(c, freq*62500, if2);
 	mt2050_set_antenna(c, tv_antenna);
 }

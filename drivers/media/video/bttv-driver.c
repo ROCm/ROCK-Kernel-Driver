@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-driver.c,v 1.27 2004/11/07 14:44:59 kraxel Exp $
+    $Id: bttv-driver.c,v 1.34 2005/01/07 13:11:19 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
 
@@ -27,6 +27,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -105,6 +106,7 @@ module_param(adc_crush,         int, 0444);
 module_param(whitecrush_upper,  int, 0444);
 module_param(whitecrush_lower,  int, 0444);
 module_param(vcr_hack,          int, 0444);
+
 module_param_array(radio, int, NULL, 0444);
 
 MODULE_PARM_DESC(radio,"The TV card supports radio, default is 0 (no)");
@@ -1063,7 +1065,7 @@ static void init_bt848(struct bttv *btv)
 	init_irqreg(btv);
 }
 
-void bttv_reinit_bt848(struct bttv *btv)
+static void bttv_reinit_bt848(struct bttv *btv)
 {
 	unsigned long flags;
 
@@ -1267,7 +1269,7 @@ void bttv_gpio_tracking(struct bttv *btv, char *comment)
 	       btv->c.nr,outbits,data & outbits, data & ~outbits, comment);
 }
 
-void bttv_field_count(struct bttv *btv)
+static void bttv_field_count(struct bttv *btv)
 {
 	int need_count = 0;
 
@@ -1467,7 +1469,7 @@ static const char *v4l1_ioctls[] = {
 	"SMICROCODE", "GVBIFMT", "SVBIFMT" };
 #define V4L1_IOCTLS ARRAY_SIZE(v4l1_ioctls)
 
-int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
+static int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 {
 	switch (cmd) {
         case BTTV_VERSION:
@@ -2531,9 +2533,11 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 			V4L2_CAP_VIDEO_CAPTURE |
 			V4L2_CAP_VIDEO_OVERLAY |
 			V4L2_CAP_VBI_CAPTURE |
-			V4L2_CAP_TUNER |
 			V4L2_CAP_READWRITE |
 			V4L2_CAP_STREAMING;
+		if (bttv_tvcards[btv->c.type].tuner != UNSET &&
+		    bttv_tvcards[btv->c.type].tuner != TUNER_ABSENT)
+			cap->capabilities |= V4L2_CAP_TUNER;
 		return 0;
 	}
 
@@ -2988,6 +2992,9 @@ static int bttv_release(struct inode *inode, struct file *file)
 		free_btres(btv,fh,RESOURCE_VBI);
 	}
 
+	/* free stuff */
+	videobuf_mmap_free(&fh->cap);
+	videobuf_mmap_free(&fh->vbi);
 	v4l2_prio_close(&btv->prio,&fh->prio);
 	file->private_data = NULL;
 	kfree(fh);
@@ -3717,8 +3724,8 @@ static int __devinit bttv_probe(struct pci_dev *dev,
 	/* initialize structs / fill in defaults */
         init_MUTEX(&btv->lock);
         init_MUTEX(&btv->reslock);
-        btv->s_lock    = SPIN_LOCK_UNLOCKED;
-        btv->gpio_lock = SPIN_LOCK_UNLOCKED;
+        spin_lock_init(&btv->s_lock);
+        spin_lock_init(&btv->gpio_lock);
         init_waitqueue_head(&btv->gpioq);
         init_waitqueue_head(&btv->i2c_queue);
         INIT_LIST_HEAD(&btv->c.subs);

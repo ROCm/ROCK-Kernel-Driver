@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/i2c.h>
 #include <linux/types.h>
@@ -27,6 +28,7 @@
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = {
+	0x84 >>1,
 	0x86 >>1,
 	0x96 >>1,
 	I2C_CLIENT_END,
@@ -437,14 +439,14 @@ static int tda9887_set_pinnacle(struct tda9887 *t, char *buf)
 {
 	unsigned int bCarrierMode = UNSET;
 
-	if (t->std & V4L2_STD_PAL) {
+	if (t->std & V4L2_STD_625_50) {
 		if ((1 == t->pinnacle_id) || (7 == t->pinnacle_id)) {
 			bCarrierMode = cIntercarrier;
 		} else {
 			bCarrierMode = cQSS;
 		}
 	}
-	if (t->std & V4L2_STD_NTSC) {
+	if (t->std & V4L2_STD_525_60) {
                 if ((5 == t->pinnacle_id) || (6 == t->pinnacle_id)) {
 			bCarrierMode = cIntercarrier;
 		} else {

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-core.c,v 1.15 2004/10/25 11:26:36 kraxel Exp $
+ * $Id: cx88-core.c,v 1.23 2005/01/04 13:34:11 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * driver core
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
@@ -61,6 +62,10 @@ MODULE_PARM_DESC(card,"card type");
 static unsigned int nicam = 0;
 module_param(nicam,int,0644);
 MODULE_PARM_DESC(nicam,"tv audio is nicam");
+
+static unsigned int nocomb = 0;
+module_param(nocomb,int,0644);
+MODULE_PARM_DESC(nocomb,"disable comb filter");
 
 #define dprintk(level,fmt, arg...)	if (core_debug >= level)	\
 	printk(KERN_DEBUG "%s: " fmt, core->name , ## arg)
@@ -462,6 +467,7 @@ int cx88_risc_decode(u32 risc)
 	return incr[risc >> 28] ? incr[risc >> 28] : 1;
 }
 
+#if 0 /* currently unused, but useful for debugging */
 void cx88_risc_disasm(struct cx88_core *core,
 		      struct btcx_riscmem *risc)
 {
@@ -479,6 +485,7 @@ void cx88_risc_disasm(struct cx88_core *core,
 			break;
 	}
 }
+#endif
 
 void cx88_sram_channel_dump(struct cx88_core *core,
 			    struct sram_channel *ch)
@@ -579,10 +586,19 @@ void cx88_print_irqbits(char *name, char *tag, char **strings,
 
 /* ------------------------------------------------------------------ */
 
-void cx88_irq(struct cx88_core *core, u32 status, u32 mask)
+int cx88_core_irq(struct cx88_core *core, u32 status)
 {
-	cx88_print_irqbits(core->name, "irq pci",
-			   cx88_pci_irqs, status, mask);
+	int handled = 0;
+
+	if (status & (1<<18)) {
+		cx88_ir_irq(core);
+		handled++;
+	}
+	if (!handled)
+		cx88_print_irqbits(core->name, "irq pci",
+				   cx88_pci_irqs, status,
+				   core->pci_irqmask);
+	return handled;
 }
 
 void cx88_wakeup(struct cx88_core *core,
@@ -800,6 +816,8 @@ int cx88_set_scale(struct cx88_core *core, unsigned int width, unsigned int heig
 		value |= (1 << 0); // 3-tap interpolation
 	if (width < 193)
 		value |= (1 << 1); // 5-tap interpolation
+	if (nocomb)
+		value |= (3 << 5); // disable comb filter
 
 	cx_write(MO_FILTER_EVEN,  value);
 	cx_write(MO_FILTER_ODD,   value);
@@ -969,6 +987,9 @@ int cx88_set_tvnorm(struct cx88_core *core, struct cx88_tvnorm *norm)
 	cx_write(MO_VBI_PACKET, ((1 << 11) | /* (norm_vdelay(norm)   << 11) | */
 				 norm_vbipack(norm)));
 
+	// this is needed as well to set all tvnorm parameter
+	cx88_set_scale(core, 320, 240, V4L2_FIELD_INTERLACED);
+
 	// audio
 	set_tvaudio(core);
 
@@ -1105,9 +1126,10 @@ struct cx88_core* cx88_core_get(struct pci_dev *pci)
 		goto fail_unlock;
 
 	memset(core,0,sizeof(*core));
+	atomic_inc(&core->refcount);
 	core->pci_bus  = pci->bus->number;
 	core->pci_slot = PCI_SLOT(pci->devfn);
-	atomic_inc(&core->refcount);
+	core->pci_irqmask = 0x00fc00;
 
 	core->nr = cx88_devcount++;
 	sprintf(core->name,"cx88[%d]",core->nr);
@@ -1150,6 +1172,7 @@ struct cx88_core* cx88_core_get(struct pci_dev *pci)
 	cx88_reset(core);
 	cx88_i2c_init(core,pci);
 	cx88_card_setup(core);
+	cx88_ir_init(core,pci);
 
 	up(&devlist);
 	return core;
@@ -1170,6 +1193,7 @@ void cx88_core_put(struct cx88_core *core, struct pci_dev *pci)
 		return;
 
 	down(&devlist);
+	cx88_ir_fini(core);
 	if (0 == core->i2c_rc)
 		i2c_bit_del_bus(&core->i2c_adap);
 	list_del(&core->devlist);
@@ -1187,7 +1211,7 @@ EXPORT_SYMBOL(cx88_vid_irqs);
 EXPORT_SYMBOL(cx88_mpeg_irqs);
 EXPORT_SYMBOL(cx88_print_irqbits);
 
-EXPORT_SYMBOL(cx88_irq);
+EXPORT_SYMBOL(cx88_core_irq);
 EXPORT_SYMBOL(cx88_wakeup);
 EXPORT_SYMBOL(cx88_reset);
 EXPORT_SYMBOL(cx88_shutdown);
@@ -1196,8 +1220,6 @@ EXPORT_SYMBOL(cx88_risc_buffer);
 EXPORT_SYMBOL(cx88_risc_databuffer);
 EXPORT_SYMBOL(cx88_risc_stopper);
 EXPORT_SYMBOL(cx88_free_buffer);
-
-EXPORT_SYMBOL(cx88_risc_disasm);
 
 EXPORT_SYMBOL(cx88_sram_channels);
 EXPORT_SYMBOL(cx88_sram_channel_setup);

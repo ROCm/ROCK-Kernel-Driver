@@ -1,5 +1,5 @@
 /*
- * $Id: ir-kbd-gpio.c,v 1.10 2004/09/15 16:15:24 kraxel Exp $
+ * $Id: ir-kbd-gpio.c,v 1.11 2004/10/25 11:26:36 kraxel Exp $
  *
  * Copyright (c) 2003 Gerd Knorr
  * Copyright (c) 2003 Pavel Machek
@@ -366,7 +366,7 @@ static int ir_probe(struct device *dev)
 		break;
 
 	case BTTV_AVDVBT_761:
-	/* case BTTV_AVDVBT_771: */
+	case BTTV_AVDVBT_771:
 		ir_codes         = ir_codes_avermedia_dvbt;
 		ir->mask_keycode = 0x0f00c0;
 		ir->mask_keydown = 0x000020;

@@ -77,6 +77,7 @@
 #define TUNER_MICROTUNE_4042FI5  49	/* FusionHDTV 3 Gold - 4042 FI5 (3X 8147) */
 #define TUNER_TCL_2002N          50
 #define TUNER_PHILIPS_FM1256_IH3   51
+#define TUNER_THOMSON_DTT7610    52
 
 #define NOTUNER 0
 #define PAL     1	/* PAL_BG */
@@ -97,6 +98,7 @@
 #define HITACHI 9
 #define Panasonic 10
 #define TCL     11
+#define THOMSON 12
 
 #define TUNER_SET_TYPE               _IOW('t',1,int)    /* set tuner type */
 #define TUNER_SET_TVFREQ             _IOW('t',2,int)    /* set tv freq */

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-cards.c,v 1.47 2004/11/03 09:04:50 kraxel Exp $
+ * $Id: cx88-cards.c,v 1.55 2005/01/03 18:56:19 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * card-specific stuff.
@@ -32,7 +32,8 @@
 
 #include "cx88.h"
 #ifdef WITH_DVB
-#include "cx22702.h"
+# include "dvb-pll.h"
+# include "cx22702.h"
 #endif
 
 /* ------------------------------------------------------------------ */
@@ -91,7 +92,7 @@ struct cx88_board cx88_boards[] = {
 	},
 	[CX88_BOARD_PIXELVIEW] = {
 		.name           = "PixelView",
-		.tuner_type     = UNSET,
+		.tuner_type     = 5,
 		.input          = {{
 			.type   = CX88_VMUX_TELEVISION,
 			.vmux   = 0,
@@ -223,20 +224,26 @@ struct cx88_board cx88_boards[] = {
                 },
         },
         [CX88_BOARD_LEADTEK_PVR2000] = {
+		// gpio values for PAL version from regspy by DScaler
                 .name           = "Leadtek PVR 2000",
                 .tuner_type     = 38,
+		.tda9887_conf   = TDA9887_PRESENT,
                 .input          = {{
                         .type   = CX88_VMUX_TELEVISION,
                         .vmux   = 0,
+                        .gpio0  = 0x0000bde6,
                 },{
                         .type   = CX88_VMUX_COMPOSITE1,
                         .vmux   = 1,
+                        .gpio0  = 0x0000bde6,
                 },{
                         .type   = CX88_VMUX_SVIDEO,
                         .vmux   = 2,
+                        .gpio0  = 0x0000bde6,
                 }},
                 .radio = {
                         .type   = CX88_RADIO,
+                        .gpio0  = 0x0000bd62,
                 },
 		.blackbird = 1,
         },
@@ -320,14 +327,15 @@ struct cx88_board cx88_boards[] = {
                 .name           = "KWorld/VStream XPert DVB-T",
 		.tuner_type     = TUNER_ABSENT,
                 .input          = {{
-                        .type   = CX88_VMUX_DVB,
-                        .vmux   = 0,
-                },{
                         .type   = CX88_VMUX_COMPOSITE1,
                         .vmux   = 1,
+			.gpio0  = 0x0700,
+			.gpio2  = 0x0101,
                 },{
                         .type   = CX88_VMUX_SVIDEO,
                         .vmux   = 2,
+			.gpio0  = 0x0700,
+			.gpio2  = 0x0101,
                 }},
 		.dvb            = 1,
 	},
@@ -452,6 +460,22 @@ struct cx88_board cx88_boards[] = {
 		}},
 		.dvb            = 1,
 	},
+	[CX88_BOARD_DNTV_LIVE_DVB_T] = {
+		.name	        = "digitalnow DNTV Live! DVB-T",
+		.tuner_type     = TUNER_ABSENT,
+		.input	        = {{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0  = 0x00000700,
+			.gpio2  = 0x00000101,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0x00000700,
+			.gpio2  = 0x00000101,
+		}},
+		.dvb            = 1,
+	},
 };
 const unsigned int cx88_bcount = ARRAY_SIZE(cx88_boards);
 
@@ -543,6 +567,18 @@ struct cx88_subid cx88_subids[] = {
 		.subvendor = 0x18AC,
 		.subdevice = 0xDB10,
 		.card      = CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS,
+	},{
+                .subvendor = 0x1554,
+                .subdevice = 0x4811,
+                .card      = CX88_BOARD_PIXELVIEW,
+	},{
+		.subvendor = 0x7063,
+		.subdevice = 0x3000, /* HD-3000 card */
+		.card      = CX88_BOARD_PCHDTV_HD3000,
+	},{
+		.subvendor = 0x17DE,
+		.subdevice = 0xA8A6,
+		.card      = CX88_BOARD_DNTV_LIVE_DVB_T,
 	}
 };
 const unsigned int cx88_idcount = ARRAY_SIZE(cx88_subids);
@@ -632,11 +668,13 @@ static struct {
 	{ TUNER_LG_PAL_FM,     "LG TPI8PSB01D"},
 	{ TUNER_LG_PAL,        "LG TPI8PSB11D"},
 	{ TUNER_LG_PAL_I_FM,   "LG TAPC-I001D"},
-	{ TUNER_LG_PAL_I,      "LG TAPC-I701D"}
+	{ TUNER_LG_PAL_I,      "LG TAPC-I701D"},
+	{ TUNER_THOMSON_DTT7610,  "DTT-7610"}
 };
 
 static void hauppauge_eeprom(struct cx88_core *core, u8 *eeprom_data)
 {
+#if 0
 	unsigned int blk2,tuner,radio,model;
 
 	if (eeprom_data[0] != 0x84 || eeprom_data[2] != 0) {
@@ -663,6 +701,13 @@ static void hauppauge_eeprom(struct cx88_core *core, u8 *eeprom_data)
 	       core->name, model, (tuner < ARRAY_SIZE(hauppauge_tuner)
 				   ? hauppauge_tuner[tuner].name : "?"),
 	       core->tuner_type, radio ? "yes" : "no");
+#else
+	struct tveeprom tv;
+
+	tveeprom_hauppauge_analog(&tv, eeprom_data);
+	core->tuner_type = tv.tuner_type;
+	core->has_radio  = tv.has_radio;
+#endif
 }
 
 #ifdef WITH_DVB
@@ -670,7 +715,6 @@ static int hauppauge_eeprom_dvb(struct cx88_core *core, u8 *ee)
 {
 	int model;
 	int tuner;
-	char *tname;
 
 	/* Make sure we support the board model */
 	model = ee[0x1f] << 24 | ee[0x1e] << 16 | ee[0x1d] << 8 | ee[0x1c];
@@ -689,23 +733,20 @@ static int hauppauge_eeprom_dvb(struct cx88_core *core, u8 *ee)
 	/* Make sure we support the tuner */
 	tuner = ee[0x2d];
 	switch(tuner) {
-	case 0x4B:
-		tname = "Thomson DTT 7595";
-		core->pll_type = PLLTYPE_DTT7595;
-		break;
-	case 0x4C:
-		tname = "Thomson DTT 7592";
-		core->pll_type = PLLTYPE_DTT7592;
+	case 0x4B: /* ddt 7595 */
+	case 0x4C: /* dtt 7592 */
+		core->pll_desc = &dvb_pll_thomson_dtt759x;
 		break;
 	default:
 		printk("%s: error: unknown hauppauge tuner 0x%02x\n",
 		       core->name, tuner);
 		return -ENODEV;
 	}
-	printk(KERN_INFO "%s: hauppauge eeprom: model=%d, tuner=%s (%d)\n",
-	       core->name, model, tname, tuner);
+	printk(KERN_INFO "%s: hauppauge eeprom: model=%d, tuner=%d (%s)\n",
+	       core->name, model, tuner, 
+	       core->pll_desc ? core->pll_desc->name : "UNKNOWN");
 
-	core->pll_addr = 0x61;
+	core->pll_addr   = 0x61;
 	core->demod_addr = 0x43;
 }
 #endif
@@ -763,36 +804,6 @@ static void gdi_eeprom(struct cx88_core *core, u8 *eeprom_data)
 
 /* ----------------------------------------------------------------------- */
 
-static int
-i2c_eeprom(struct i2c_client *c, unsigned char *eedata, int len)
-{
-	unsigned char buf;
-	int err;
-
-	c->addr = 0xa0 >> 1;
-	buf = 0;
-	if (1 != (err = i2c_master_send(c,&buf,1))) {
-		printk(KERN_INFO "cx88: Huh, no eeprom present (err=%d)?\n",
-		       err);
-		return -1;
-	}
-	if (len != (err = i2c_master_recv(c,eedata,len))) {
-		printk(KERN_WARNING "cx88: i2c eeprom read error (err=%d)\n",
-		       err);
-		return -1;
-	}
-#if 0
-	for (i = 0; i < len; i++) {
-		if (0 == (i % 16))
-			printk(KERN_INFO "cx88 ee: %02x:",i);
-		printk(" %02x",eedata[i]);
-		if (15 == (i % 16))
-			printk("\n");
-	}
-#endif
-	return 0;
-}
-
 void cx88_card_list(struct cx88_core *core, struct pci_dev *pci)
 {
 	int i;
@@ -823,39 +834,62 @@ void cx88_card_setup(struct cx88_core *core)
 {
 	static u8 eeprom[128];
 
+	if (0 == core->i2c_rc) {
+		core->i2c_client.addr = 0xa0 >> 1;
+		tveeprom_read(&core->i2c_client,eeprom,sizeof(eeprom));
+	}
+
 	switch (core->board) {
 	case CX88_BOARD_HAUPPAUGE:
 		if (0 == core->i2c_rc)
-			i2c_eeprom(&core->i2c_client,eeprom,sizeof(eeprom));
-		hauppauge_eeprom(core,eeprom+8);
+			hauppauge_eeprom(core,eeprom+8);
 		break;
 	case CX88_BOARD_GDI:
 		if (0 == core->i2c_rc)
-			i2c_eeprom(&core->i2c_client,eeprom,sizeof(eeprom));
-		gdi_eeprom(core,eeprom);
+			gdi_eeprom(core,eeprom);
 		break;
 	case CX88_BOARD_WINFAST2000XP:
 		if (0 == core->i2c_rc)
-			i2c_eeprom(&core->i2c_client,eeprom,sizeof(eeprom));
-		leadtek_eeprom(core,eeprom);
-		break;
-	case CX88_BOARD_DVICO_FUSIONHDTV_DVB_T1:
-		/* Tuner reset is hooked to  the tuner out of reset */
-		cx_set(MO_GP0_IO, 0x00000101);
-		cx_clear(MO_GP0_IO, 0x00000001);
-		msleep(1);
-		cx_set(MO_GP0_IO, 0x00000101);
+			leadtek_eeprom(core,eeprom);
 		break;
 #ifdef WITH_DVB
 	case CX88_BOARD_HAUPPAUGE_DVB_T1:
 		if (0 == core->i2c_rc)
-			i2c_eeprom(&core->i2c_client,eeprom,sizeof(eeprom));
-		hauppauge_eeprom_dvb(core,eeprom);
+			hauppauge_eeprom_dvb(core,eeprom);
 		break;
 	case CX88_BOARD_CONEXANT_DVB_T1:
-		core->pll_type   = PLLTYPE_DTT7579;
+		core->pll_desc   = &dvb_pll_thomson_dtt7579;
 		core->pll_addr   = 0x60;
 		core->demod_addr = 0x43;
+		break;
+	case CX88_BOARD_DVICO_FUSIONHDTV_DVB_T1:
+		/* GPIO0:0 is hooked to mt352 reset pin */
+		cx_set(MO_GP0_IO, 0x00000101);
+		cx_clear(MO_GP0_IO, 0x00000001);
+		msleep(1);
+		cx_set(MO_GP0_IO, 0x00000101);
+		core->pll_addr = 0x61;
+		core->pll_desc = &dvb_pll_lg_z201;
+		break;
+	case CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS:
+		/* GPIO0:0 is hooked to mt352 reset pin */
+		cx_set(MO_GP0_IO, 0x00000101);
+		cx_clear(MO_GP0_IO, 0x00000001);
+		msleep(1);
+		cx_set(MO_GP0_IO, 0x00000101);
+		core->pll_addr = 0x60;
+		core->pll_desc = &dvb_pll_thomson_dtt7579;
+		break;
+	case CX88_BOARD_KWORLD_DVB_T:
+	case CX88_BOARD_DNTV_LIVE_DVB_T:
+		cx_set(MO_GP0_IO, 0x00000707);
+		cx_set(MO_GP2_IO, 0x00000101);
+		cx_clear(MO_GP2_IO, 0x00000001);
+		msleep(1);
+		cx_clear(MO_GP0_IO, 0x00000007);
+		cx_set(MO_GP2_IO, 0x00000101);
+		core->pll_addr = 0x61;
+		core->pll_desc = &dvb_pll_unknown_1;
 		break;
 #endif
 	}

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-blackbird.c,v 1.17 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: cx88-blackbird.c,v 1.23 2004/12/10 12:33:39 kraxel Exp $
  *
  *  Support for a cx23416 mpeg encoder via cx2388x host port.
  *  "blackbird" reference design.
@@ -25,6 +25,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/delay.h>
@@ -207,10 +208,6 @@ static int register_write(struct cx88_core *core, u32 address, u32 value)
 	cx_read(P1_RADDR0);
 
 	return wait_ready_gpio0_bit1(core,1);
-#if 0
-	udelay(1000); /* without this, things don't go right (subsequent memory_write()'s don't get through */
-	/* ? would this be safe here? set_current_state(TASK_INTERRUPTIBLE); schedule_timeout(1); */
-#endif
 }
 
 
@@ -283,7 +280,7 @@ static int blackbird_api_cmd(struct cx8802_dev *dev, u32 command,
 	timeout = jiffies + msecs_to_jiffies(10);
 	for (;;) {
 		memory_read(dev->core, dev->mailbox, &flag);
-		if (0 == (flag & 4))
+		if (0 != (flag & 4))
 			break;
 		if (time_after(jiffies,timeout)) {
 			dprintk(0, "ERROR: API Mailbox timeout\n");
@@ -324,7 +321,7 @@ static int blackbird_find_mailbox(struct cx8802_dev *dev)
 			signaturecnt = 0;
 		if (4 == signaturecnt) {
 			dprintk(1, "Mailbox signature found\n");
-			return i;
+			return i+1;
 		}
 	}
 	dprintk(0, "Mailbox signature values not found!\n");
@@ -427,7 +424,8 @@ static void blackbird_codec_settings(struct cx8802_dev *dev)
         blackbird_api_cmd(dev, IVTV_API_ASSIGN_FRAMERATE, 1, 0, 0);
 
         /* assign frame size */
-        blackbird_api_cmd(dev, IVTV_API_ASSIGN_FRAME_SIZE, 2, 0, 480, 720);
+        blackbird_api_cmd(dev, IVTV_API_ASSIGN_FRAME_SIZE, 2, 0,
+			  dev->height, dev->width);
 
         /* assign aspect ratio */
         blackbird_api_cmd(dev, IVTV_API_ASSIGN_ASPECT_RATIO, 1, 0, 2);
@@ -629,8 +627,8 @@ static int mpeg_do_ioctl(struct inode *inode, struct file *file,
 
 		memset(f,0,sizeof(*f));
 		f->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		f->fmt.pix.width        = 720;
-		f->fmt.pix.height       = 576;
+		f->fmt.pix.width        = dev->width;
+		f->fmt.pix.height       = dev->height;
 		f->fmt.pix.pixelformat  = V4L2_PIX_FMT_MPEG;
 		f->fmt.pix.sizeimage    = 1024 * 512 /* FIXME: BUFFER_SIZE */;
 	}
@@ -694,6 +692,10 @@ static int mpeg_open(struct inode *inode, struct file *file)
 	file->private_data = fh;
 	fh->dev      = dev;
 
+	/* FIXME: locking against other video device */
+	cx88_set_scale(dev->core, dev->width, dev->height,
+		       V4L2_FIELD_INTERLACED);
+	
 	videobuf_queue_init(&fh->mpegq, &blackbird_qops,
 			    dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VIDEO_CAPTURE,
@@ -715,6 +717,7 @@ static int mpeg_release(struct inode *inode, struct file *file)
 	if (fh->mpegq.reading)
 		videobuf_read_stop(&fh->mpegq);
 
+	videobuf_mmap_free(&fh->mpegq);
 	file->private_data = NULL;
 	kfree(fh);
 	return 0;
@@ -821,6 +824,8 @@ static int __devinit blackbird_probe(struct pci_dev *pci_dev,
 	memset(dev,0,sizeof(*dev));
 	dev->pci = pci_dev;
 	dev->core = core;
+	dev->width = 720;
+	dev->height = 480;
 
 	err = cx8802_init_common(dev);
 	if (0 != err)

@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-vbi.c,v 1.7 2004/11/07 13:17:15 kraxel Exp $
+    $Id: bttv-vbi.c,v 1.8 2004/12/10 12:33:39 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
     vbi interface
@@ -22,6 +22,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>

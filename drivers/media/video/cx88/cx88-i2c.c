@@ -1,5 +1,5 @@
 /*
-    $Id: cx88-i2c.c,v 1.18 2004/10/13 10:39:00 kraxel Exp $
+    $Id: cx88-i2c.c,v 1.19 2004/12/10 12:33:39 kraxel Exp $
 
     cx88-i2c.c  --  all the i2c code is here
 
@@ -25,6 +25,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 
 #include <asm/io.h>

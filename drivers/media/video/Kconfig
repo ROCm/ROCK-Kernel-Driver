@@ -16,6 +16,7 @@ config VIDEO_BT848
 	select VIDEO_BUF
 	select VIDEO_IR
 	select VIDEO_TUNER
+	select VIDEO_TVEEPROM
 	---help---
 	  Support for BT848 based frame grabber/overlay boards. This includes
 	  the Miro, Hauppauge and STB boards. Please read the material in
@@ -303,11 +304,14 @@ config VIDEO_HEXIUM_GEMINI
 
 config VIDEO_CX88
 	tristate "Conexant 2388x (bt878 successor) support"
-	depends on VIDEO_DEV && PCI && EXPERIMENTAL
+	depends on VIDEO_DEV && PCI && I2C && EXPERIMENTAL
 	select I2C_ALGOBIT
+	select FW_LOADER
 	select VIDEO_BTCX
 	select VIDEO_BUF
 	select VIDEO_TUNER
+	select VIDEO_TVEEPROM
+	select VIDEO_IR
 	---help---
 	  This is a video4linux driver for Conexant 2388x based
 	  TV cards.
@@ -317,7 +321,7 @@ config VIDEO_CX88
 
 config VIDEO_CX88_DVB
 	tristate "DVB Support for cx2388x based TV cards"
-	depends on VIDEO_CX88 && DVB_CORE && BROKEN
+	depends on VIDEO_CX88 && DVB_CORE
 	select VIDEO_BUF_DVB
 	---help---
 	  This adds support for DVB cards based on the

@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-cards.c,v 1.32 2004/11/07 13:17:14 kraxel Exp $
+    $Id: bttv-cards.c,v 1.41 2005/01/07 13:58:49 kraxel Exp $
 
     bttv-cards.c
 
@@ -29,18 +29,19 @@
 #include <linux/config.h>
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kmod.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/vmalloc.h>
-#if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
-# include <linux/firmware.h>
-#endif
+#include <linux/firmware.h>
 
 #include <asm/io.h>
 
 #include "bttvp.h"
+#if 0 /* not working yet */
 #include "bt832.h"
+#endif
 
 /* fwd decl */
 static void boot_msp34xx(struct bttv *btv, int pin);
@@ -76,6 +77,9 @@ static void PXC200_muxsel(struct bttv *btv, unsigned int input);
 static void picolo_tetra_muxsel(struct bttv *btv, unsigned int input);
 static void picolo_tetra_init(struct bttv *btv);
 
+static void tibetCS16_muxsel(struct bttv *btv, unsigned int input);
+static void tibetCS16_init(struct bttv *btv);
+
 static void sigmaSLC_muxsel(struct bttv *btv, unsigned int input);
 static void sigmaSQ_muxsel(struct bttv *btv, unsigned int input);
 
@@ -84,12 +88,13 @@ static int tea5757_read(struct bttv *btv);
 static int tea5757_write(struct bttv *btv, int value);
 static void identify_by_eeprom(struct bttv *btv,
 			       unsigned char eeprom_data[256]);
+static int __devinit pvr_boot(struct bttv *btv);
 
 /* config variables */
 static unsigned int triton1=0;
 static unsigned int vsfx=0;
 static unsigned int latency = UNSET;
-unsigned int no_overlay=-1;
+static unsigned int no_overlay=-1;
 
 static unsigned int card[BTTV_MAX]   = { [ 0 ... (BTTV_MAX-1) ] = UNSET };
 static unsigned int pll[BTTV_MAX]    = { [ 0 ... (BTTV_MAX-1) ] = UNSET };
@@ -2156,6 +2161,33 @@ struct tvcard bttv_tvcards[] = {
 	.tuner_type     = TUNER_PHILIPS_NTSC_M,
 	.has_radio      = 0,
 	// .has_remote     = 1,
+},{
+	/* Rick C <cryptdragoon@gmail.com> */
+        .name           = "Super TV Tuner",
+        .video_inputs   = 4,
+        .audio_inputs   = 1,
+        .tuner          = 0,
+        .svhs           = 2,
+        .muxsel         = { 2, 3, 1, 0},
+        .tuner_type     = TUNER_PHILIPS_NTSC,
+        .gpiomask       = 0x008007,
+        .audiomux       = { 0, 0x000001,0,0, 0},
+        .needs_tvaudio  = 1,
+        .has_radio      = 1,
+},{
+		/* Chris Fanning <video4linux@haydon.net> */
+		.name           = "Tibet Systems 'Progress DVR' CS16",
+		.video_inputs   = 16,
+		.audio_inputs   = 0,
+		.tuner          = -1,
+		.svhs           = -1,
+		.muxsel         = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 },
+		.pll		= PLL_28,
+		.no_msp34xx     = 1,
+		.no_tda9875     = 1,
+		.no_tda7432	= 1,
+		.tuner_type     = -1,
+		.muxsel_hook    = tibetCS16_muxsel,
 }};
 
 const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
@@ -2499,7 +2531,7 @@ static void sigmaSLC_muxsel(struct bttv *btv, unsigned int input)
 
 /* ----------------------------------------------------------------------- */
 
-void bttv_reset_audio(struct bttv *btv)
+static void bttv_reset_audio(struct bttv *btv)
 {
 	/*
 	 * BT878A has a audio-reset register.
@@ -2542,6 +2574,8 @@ void __devinit bttv_init_card1(struct bttv *btv)
 		btv->use_i2c_hw = 1;
 		break;
 	}
+	if (!bttv_tvcards[btv->c.type].has_dvb)
+		bttv_reset_audio(btv);
 }
 
 /* initialization part two -- after registering i2c bus */
@@ -2645,6 +2679,9 @@ void __devinit bttv_init_card2(struct bttv *btv)
 	case BTTV_LMLBT4:
 		init_lmlbt4x(btv);
 		break;
+	case BTTV_TIBET_CS16:
+		tibetCS16_init(btv);
+		break;
 	}
 
 	/* pll configuration */
@@ -2680,6 +2717,8 @@ void __devinit bttv_init_card2(struct bttv *btv)
                 }
         }
 	btv->pll.pll_current = -1;
+
+	bttv_reset_audio(btv);
 
 	/* tuner configuration (from card list / autodetect / insmod option) */
  	if (UNSET != bttv_tvcards[btv->c.type].tuner_type)
@@ -2837,6 +2876,7 @@ static void modtec_eeprom(struct bttv *btv)
 
 static void __devinit hauppauge_eeprom(struct bttv *btv)
 {
+#if 0
 	unsigned int blk2,tuner,radio,model;
 
 	if (eeprom_data[0] != 0x84 || eeprom_data[2] != 0)
@@ -2862,6 +2902,13 @@ static void __devinit hauppauge_eeprom(struct bttv *btv)
 		       btv->c.nr, model, (tuner < ARRAY_SIZE(hauppauge_tuner)
 					  ? hauppauge_tuner[tuner].name : "?"),
 		       btv->tuner_type, radio ? "yes" : "no");
+#else
+	struct tveeprom tv;
+
+	tveeprom_hauppauge_analog(&tv, eeprom_data);
+	btv->tuner_type = tv.tuner_type;
+	btv->has_radio  = tv.has_radio;
+#endif
 }
 
 static int terratec_active_radio_upgrade(struct bttv *btv)
@@ -2947,7 +2994,7 @@ static int __devinit pvr_altera_load(struct bttv *btv, u8 *micro, u32 microlen)
 	return 0;
 }
 
-int __devinit pvr_boot(struct bttv *btv)
+static int __devinit pvr_boot(struct bttv *btv)
 {
         const struct firmware *fw_entry;
 	int rc;
@@ -3167,6 +3214,7 @@ static void __devinit boot_msp34xx(struct bttv *btv, int pin)
 
 static void __devinit boot_bt832(struct bttv *btv)
 {
+#if 0 /* not working yet */
 	int resetbit=0;
 
 	switch (btv->c.type) {
@@ -3195,6 +3243,7 @@ static void __devinit boot_bt832(struct bttv *btv)
 	// bt832 on pixelview changes from i2c 0x8a to 0x88 after
 	// being reset as above. So we must follow by this:
 	bttv_call_i2c_clients(btv, BT832_REATTACH, NULL);
+#endif
 }
 
 /* ----------------------------------------------------------------------- */
@@ -3883,6 +3932,47 @@ static void rv605_muxsel(struct bttv *btv, unsigned int input)
 	mdelay(1);
 	gpio_bits(0x480,0x080);
 	mdelay(1);
+}
+
+/* Tibet Systems 'Progress DVR' CS16 muxsel helper [Chris Fanning]
+ *
+ * The CS16 (available on eBay cheap) is a PCI board with four Fusion
+ * 878A chips, a PCI bridge, an Atmel microcontroller, four sync seperator
+ * chips, ten eight input analog multiplexors, a not chip and a few
+ * other components.
+ *
+ * 16 inputs on a secondary bracket are provided and can be selected
+ * from each of the four capture chips.  Two of the eight input
+ * multiplexors are used to select from any of the 16 input signals.
+ *
+ * Unsupported hardware capabilities:
+ *  . A video output monitor on the secondary bracket can be selected from
+ *    one of the 878A chips.
+ *  . Another passthrough but I haven't spent any time investigating it.
+ *  . Digital I/O (logic level connected to GPIO) is available from an
+ *    onboard header.
+ *
+ * The on chip input mux should always be set to 2.
+ * GPIO[16:19] - Video input selection
+ * GPIO[0:3]   - Video output monitor select (only available from one 878A)
+ * GPIO[?:?]   - Digital I/O.
+ *
+ * There is an ATMEL microcontroller with an 8031 core on board.  I have not
+ * determined what function (if any) it provides.  With the microcontroller
+ * and sync seperator chips a guess is that it might have to do with video
+ * switching and maybe some digital I/O.
+ */
+static void tibetCS16_muxsel(struct bttv *btv, unsigned int input)
+{
+	/* video mux */
+	gpio_bits(0x0f0000, input << 16);
+}
+
+static void tibetCS16_init(struct bttv *btv)
+{
+	/* enable gpio bits, mask obtained via btSpy */
+	gpio_inout(0xffffff, 0x0f7fff);
+	gpio_write(0x0f7fff);
 }
 
 // The Grandtec X-Guard framegrabber card uses two Dual 4-channel

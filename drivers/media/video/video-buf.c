@@ -1,5 +1,5 @@
 /*
- * $Id: video-buf.c,v 1.15 2004/11/07 14:45:00 kraxel Exp $
+ * $Id: video-buf.c,v 1.17 2004/12/10 12:33:40 kraxel Exp $
  *
  * generic helper functions for video4linux capture buffers, to handle
  * memory management and PCI DMA.  Right now bttv + saa7134 use it.
@@ -20,6 +20,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
@@ -892,6 +893,7 @@ void videobuf_read_stop(struct videobuf_queue *q)
 	int i;
 
 	videobuf_queue_cancel(q);
+	videobuf_mmap_free(q);
 	INIT_LIST_HEAD(&q->stream);
 	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
 		if (NULL == q->bufs[i])

@@ -1,5 +1,5 @@
 /*
-    $Id: cx88-tvaudio.c,v 1.24 2004/10/25 11:51:00 kraxel Exp $
+    $Id: cx88-tvaudio.c,v 1.27 2005/01/07 13:11:19 kraxel Exp $
 
     cx88x-audio.c - Conexant CX23880/23881 audio downstream driver driver
 
@@ -37,6 +37,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -646,7 +647,7 @@ void cx88_set_tvaudio(struct cx88_core *core)
 	case WW_BTSC:
 		set_audio_standard_BTSC(core,0);
 		break;
-	// case WW_NICAM_I:
+//	case WW_NICAM_I:
 	case WW_NICAM_BGDKL:
 		set_audio_standard_NICAM(core);
 		break;

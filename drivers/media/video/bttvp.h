@@ -1,5 +1,5 @@
 /*
-    $Id: bttvp.h,v 1.12 2004/10/25 11:26:36 kraxel Exp $
+    $Id: bttvp.h,v 1.15 2004/12/14 15:33:30 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
 
@@ -43,6 +43,7 @@
 #include <media/video-buf.h>
 #include <media/audiochip.h>
 #include <media/tuner.h>
+#include <media/tveeprom.h>
 #include <media/ir-common.h>
 
 #include "bt848.h"
@@ -240,11 +241,6 @@ extern unsigned int bttv_gpio;
 extern void bttv_gpio_tracking(struct bttv *btv, char *comment);
 extern int init_bttv_i2c(struct bttv *btv);
 extern int fini_bttv_i2c(struct bttv *btv);
-extern int pvr_boot(struct bttv *btv);
-
-extern int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg);
-extern void bttv_reinit_bt848(struct bttv *btv);
-extern void bttv_field_count(struct bttv *btv);
 
 #define vprintk  if (bttv_verbose) printk
 #define dprintk  if (bttv_debug >= 1) printk
