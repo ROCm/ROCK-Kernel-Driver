@@ -108,13 +108,27 @@ acpi_processor_set_performance (
 	u32			value = 0;
 	int			i = 0;
 	struct cpufreq_freqs    cpufreq_freqs;
+	cpumask_t		saved_mask;
+	int			retval;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_set_performance");
 
+	/*
+	 * TBD: Use something other than set_cpus_allowed.
+	 * As set_cpus_allowed is a bit racy, 
+	 * with any other set_cpus_allowed for this process.
+	 */
+	saved_mask = current->cpus_allowed;
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	if (smp_processor_id() != cpu) {
+		return_VALUE(-EAGAIN);
+	}
+	
 	if (state == data->acpi_data.state) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 			"Already at target state (P%d)\n", state));
-		return_VALUE(0);
+		retval = 0;
+		goto migrate_end;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Transitioning from P%d to P%d\n",
@@ -144,7 +158,8 @@ acpi_processor_set_performance (
 	if (ret) {
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN,
 			"Invalid port width 0x%04x\n", bit_width));
-		return_VALUE(ret);
+		retval = ret;
+		goto migrate_end;
 	}
 
 	/*
@@ -166,7 +181,8 @@ acpi_processor_set_performance (
 		if (ret) {	
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
 				"Invalid port width 0x%04x\n", bit_width));
-			return_VALUE(ret);
+			retval = ret;
+			goto migrate_end;
 		}
 		if (value == (u32) data->acpi_data.states[state].status)
 			break;
@@ -183,7 +199,8 @@ acpi_processor_set_performance (
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_PRECHANGE);
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Transition failed\n"));
-		return_VALUE(-ENODEV);
+		retval = -ENODEV;
+		goto migrate_end;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
@@ -192,7 +209,10 @@ acpi_processor_set_performance (
 
 	data->acpi_data.state = state;
 
-	return_VALUE(0);
+	retval = 0;
+migrate_end:
+	set_cpus_allowed(current, saved_mask);
+	return_VALUE(retval);
 }
 
 
@@ -266,6 +286,69 @@ acpi_cpufreq_guess_freq (
 	
 }
 
+
+/* 
+ * acpi_processor_cpu_init_pdc_est - let BIOS know about the SMP capabilities
+ * of this driver
+ * @perf: processor-specific acpi_io_data struct
+ * @cpu: CPU being initialized
+ *
+ * To avoid issues with legacy OSes, some BIOSes require to be informed of
+ * the SMP capabilities of OS P-state driver. Here we set the bits in _PDC 
+ * accordingly, for Enhanced Speedstep. Actual call to _PDC is done in
+ * driver/acpi/processor.c
+ */
+static void 
+acpi_processor_cpu_init_pdc_est(
+		struct acpi_processor_performance *perf, 
+		unsigned int cpu,
+		struct acpi_object_list *obj_list
+		)
+{
+	union acpi_object *obj;
+	u32 *buf;
+	struct cpuinfo_x86 *c = cpu_data + cpu;
+	ACPI_FUNCTION_TRACE("acpi_processor_cpu_init_pdc_est");
+
+	if (!cpu_has(c, X86_FEATURE_EST))
+		return_VOID;
+
+	/* Initialize pdc. It will be used later. */
+	if (!obj_list)
+		return_VOID;
+		
+	if (!(obj_list->count && obj_list->pointer))
+		return_VOID;
+
+	obj = obj_list->pointer;
+	if ((obj->buffer.length == 12) && obj->buffer.pointer) {
+		buf = (u32 *)obj->buffer.pointer;
+       		buf[0] = ACPI_PDC_REVISION_ID;
+       		buf[1] = 1;
+       		buf[2] = ACPI_PDC_EST_CAPABILITY_SMP;
+		perf->pdc = obj_list;
+	}
+	return_VOID;
+}
+ 
+
+/* CPU specific PDC initialization */
+static void 
+acpi_processor_cpu_init_pdc(
+		struct acpi_processor_performance *perf, 
+		unsigned int cpu,
+		struct acpi_object_list *obj_list
+		)
+{
+	struct cpuinfo_x86 *c = cpu_data + cpu;
+	ACPI_FUNCTION_TRACE("acpi_processor_cpu_init_pdc");
+	perf->pdc = NULL;
+	if (cpu_has(c, X86_FEATURE_EST))
+		acpi_processor_cpu_init_pdc_est(perf, cpu, obj_list);
+	return_VOID;
+}
+
+
 static int
 acpi_cpufreq_cpu_init (
 	struct cpufreq_policy   *policy)
@@ -275,7 +358,14 @@ acpi_cpufreq_cpu_init (
 	struct cpufreq_acpi_io	*data;
 	unsigned int		result = 0;
 
+	union acpi_object		arg0 = {ACPI_TYPE_BUFFER};
+	u32				arg0_buf[3];
+	struct acpi_object_list 	arg_list = {1, &arg0};
+
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_cpu_init");
+	/* setup arg_list for _PDC settings */
+        arg0.buffer.length = 12;
+        arg0.buffer.pointer = (u8 *) arg0_buf;
 
 	data = kmalloc(sizeof(struct cpufreq_acpi_io), GFP_KERNEL);
 	if (!data)
@@ -284,7 +374,10 @@ acpi_cpufreq_cpu_init (
 
 	acpi_io_data[cpu] = data;
 
+	acpi_processor_cpu_init_pdc(&data->acpi_data, cpu, &arg_list);
 	result = acpi_processor_register_performance(&data->acpi_data, cpu);
+	data->acpi_data.pdc = NULL;
+
 	if (result)
 		goto err_free;
 

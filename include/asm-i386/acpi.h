@@ -102,6 +102,12 @@ __acpi_release_global_lock (unsigned int *lock)
         :"0"(n_hi), "1"(n_lo))
 
 
+/*
+ * Refer Intel ACPI _PDC support document for bit definitions
+ */
+#define ACPI_PDC_EST_CAPABILITY_SMP 	0xa
+#define ACPI_PDC_EST_CAPABILITY_MSR	0x1
+
 #ifdef CONFIG_ACPI_BOOT 
 extern int acpi_lapic;
 extern int acpi_ioapic;
@@ -177,6 +183,8 @@ extern unsigned long acpi_wakeup_address;
 extern void acpi_reserve_bootmem(void);
 
 #endif /*CONFIG_ACPI_SLEEP*/
+
+extern u8 x86_acpiid_to_apicid[];
 
 #endif /*__KERNEL__*/
 
