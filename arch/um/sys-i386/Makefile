@@ -1,6 +1,6 @@
 obj-y = bugs.o checksum.o fault.o ksyms.o ldt.o ptrace.o ptrace_user.o \
-	semaphore.o sigcontext.o syscalls.o sysrq.o bitops.o
-bitops-y = ../../i386/lib/bitops.o
+	semaphore.o sigcontext.o syscalls.o sysrq.o arch_i386.o
+arch_i386-y = ../../i386/lib/bitops.o ../../i386/lib/memcpy.o
 
 obj-$(CONFIG_HIGHMEM) += highmem.o
 obj-$(CONFIG_MODULES) += module.o

@@ -37,7 +37,6 @@ struct line {
 	struct list_head chan_list;
 	int valid;
 	int count;
-	struct tty_struct *tty;
 	struct semaphore sem;
 	char *buffer;
 	char *head;
@@ -53,8 +52,6 @@ struct line {
 	  init_pri :	INIT_STATIC, \
 	  chan_list : 	{ }, \
 	  valid :	1, \
-	  count :	0, \
-	  tty :		NULL, \
 	  sem : 	{ }, \
 	  buffer :	NULL, \
 	  head :	NULL, \
@@ -69,18 +66,23 @@ struct lines {
 
 #define LINES_INIT(n) {  num :		n }
 
-extern void line_close(struct line *lines, struct tty_struct *tty);
+extern void line_close(struct tty_struct *tty, struct file * filp);
 extern int line_open(struct line *lines, struct tty_struct *tty, 
 		     struct chan_opts *opts);
 extern int line_setup(struct line *lines, int num, char *init, 
 		      int all_allowed);
-extern int line_write(struct line *line, struct tty_struct *tty, int from_user,
-		      const char *buf, int len);
+extern int line_write(struct tty_struct *tty, int from_user,
+		      const unsigned char *buf, int len);
+extern void line_put_char(struct tty_struct *tty, unsigned char ch);
+extern void line_set_termios(struct tty_struct *tty, struct termios * old);
+extern int line_chars_in_buffer(struct tty_struct *tty);
 extern int line_write_room(struct tty_struct *tty);
+extern int line_ioctl(struct tty_struct *tty, struct file * file,
+		      unsigned int cmd, unsigned long arg);
 extern char *add_xterm_umid(char *base);
-extern int line_setup_irq(int fd, int input, int output, void *data);
+extern int line_setup_irq(int fd, int input, int output, struct tty_struct *tty);
 extern void line_close_chan(struct line *line);
-extern void line_disable(struct line *line, int current_irq);
+extern void line_disable(struct tty_struct *tty, int current_irq);
 extern struct tty_driver * line_register_devfs(struct lines *set, 
 				struct line_driver *line_driver, 
 				struct tty_operations *driver,

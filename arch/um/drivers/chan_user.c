@@ -101,7 +101,7 @@ static int winch_thread(void *arg)
 	}
 }
 
-static int winch_tramp(int fd, void *device_data, int *fd_out)
+static int winch_tramp(int fd, struct tty_struct *tty, int *fd_out)
 {
 	struct winch_data data;
 	unsigned long stack;
@@ -135,7 +135,7 @@ static int winch_tramp(int fd, void *device_data, int *fd_out)
 	return(pid);
 }
 
-void register_winch(int fd, void *device_data)
+void register_winch(int fd, struct tty_struct *tty)
 {
 	int pid, thread, thread_fd;
 	int count;
@@ -146,10 +146,10 @@ void register_winch(int fd, void *device_data)
 
 	pid = tcgetpgrp(fd);
 	if(!CHOOSE_MODE_PROC(is_tracer_winch, is_skas_winch, pid, fd, 
-			     device_data) && (pid == -1)){
-		thread = winch_tramp(fd, device_data, &thread_fd);
+			     tty) && (pid == -1)){
+		thread = winch_tramp(fd, tty, &thread_fd);
 		if(fd != -1){
-			register_winch_irq(thread_fd, fd, thread, device_data);
+			register_winch_irq(thread_fd, fd, thread, tty);
 
 			count = os_write_file(thread_fd, &c, sizeof(c));
 			if(count != sizeof(c))

@@ -93,8 +93,8 @@ static int __init create_pid_file(void)
 	fd = os_open_file(file, of_create(of_excl(of_rdwr(OPENFLAGS()))), 
 			  0644);
 	if(fd < 0){
-		printf("Open of machine pid file \"%s\" failed - "
-		       "err = %d\n", file, -fd);
+		printf("Open of machine pid file \"%s\" failed: %s\n",
+		       file, strerror(-fd));
 		return 0;
 	}
 
@@ -248,7 +248,7 @@ static int __init make_uml_dir(void)
 	strcpy(uml_dir, dir);
 	
 	if((mkdir(uml_dir, 0777) < 0) && (errno != EEXIST)){
-	        printf("Failed to mkdir %s - errno = %i\n", uml_dir, errno);
+	        printf("Failed to mkdir %s: %s\n", uml_dir, strerror(errno));
 		return(-1);
 	}
 	return 0;
@@ -265,8 +265,8 @@ static int __init make_umid(int (*printer)(const char *fmt, ...))
 		strcat(tmp, "XXXXXX");
 		fd = mkstemp(tmp);
 		if(fd < 0){
-			(*printer)("make_umid - mkstemp failed, errno = %d\n",
-				   errno);
+			(*printer)("make_umid - mkstemp(%s) failed: %s\n",
+				   tmp,strerror(errno));
 			return(1);
 		}
 
@@ -304,15 +304,14 @@ __uml_setup("uml_dir=", set_uml_dir,
 "    The location to place the pid and umid files.\n\n"
 );
 
-__uml_postsetup(make_uml_dir);
-
 static int __init make_umid_setup(void)
 {
-	return(make_umid(printf));
+	/* one function with the ordering we need ... */
+	make_uml_dir();
+	make_umid(printf);
+	return create_pid_file();
 }
-
 __uml_postsetup(make_umid_setup);
-__uml_postsetup(create_pid_file);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

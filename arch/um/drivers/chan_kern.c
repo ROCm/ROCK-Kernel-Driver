@@ -187,7 +187,7 @@ int open_chan(struct list_head *chans)
 	return(err);
 }
 
-void chan_enable_winch(struct list_head *chans, void *line)
+void chan_enable_winch(struct list_head *chans, struct tty_struct *tty)
 {
 	struct list_head *ele;
 	struct chan *chan;
@@ -195,13 +195,13 @@ void chan_enable_winch(struct list_head *chans, void *line)
 	list_for_each(ele, chans){
 		chan = list_entry(ele, struct chan, list);
 		if(chan->primary && chan->output && chan->ops->winch){
-			register_winch(chan->fd, line);
+			register_winch(chan->fd, tty);
 			return;
 		}
 	}
 }
 
-void enable_chan(struct list_head *chans, void *data)
+void enable_chan(struct list_head *chans, struct tty_struct *tty)
 {
 	struct list_head *ele;
 	struct chan *chan;
@@ -210,7 +210,7 @@ void enable_chan(struct list_head *chans, void *data)
 		chan = list_entry(ele, struct chan, list);
 		if(!chan->opened) continue;
 
-		line_setup_irq(chan->fd, chan->input, chan->output, data);
+		line_setup_irq(chan->fd, chan->input, chan->output, tty);
 	}
 }
 
@@ -238,21 +238,23 @@ int write_chan(struct list_head *chans, const char *buf, int len,
 	       int write_irq)
 {
 	struct list_head *ele;
-	struct chan *chan;
+	struct chan *chan = NULL;
 	int n, ret = 0;
 
-	list_for_each(ele, chans){
+	list_for_each(ele, chans) {
 		chan = list_entry(ele, struct chan, list);
-		if(!chan->output || (chan->ops->write == NULL)) continue;
+		if (!chan->output || (chan->ops->write == NULL))
+			continue;
 		n = chan->ops->write(chan->fd, buf, len, chan->data);
-		if(chan->primary){
+		if (chan->primary) {
 			ret = n;
-			if((ret == -EAGAIN) || ((ret >= 0) && (ret < len))){
+			if ((ret == -EAGAIN) || ((ret >= 0) && (ret < len))){
 				reactivate_fd(chan->fd, write_irq);
-				if(ret == -EAGAIN) ret = 0;
+				if (ret == -EAGAIN)
+					ret = 0;
 			}
 		}
-	}
+	}	
 	return(ret);
 }
 
@@ -270,6 +272,20 @@ int console_write_chan(struct list_head *chans, const char *buf, int len)
 		if(chan->primary) ret = n;
 	}
 	return(ret);
+}
+
+int console_open_chan(struct line *line, struct console *co, struct chan_opts *opts)
+{
+	if (!list_empty(&line->chan_list))
+		return 0;
+
+	if (0 != parse_chan_pair(line->init_str, &line->chan_list,
+				 line->init_pri, co->index, opts))
+		return -1;
+	if (0 != open_chan(&line->chan_list))
+		return -1;
+	printk("Console initialized on /dev/%s%d\n",co->name,co->index);
+	return 0;
 }
 
 int chan_window_size(struct list_head *chans, unsigned short *rows_out,
@@ -514,7 +530,7 @@ int chan_out_fd(struct list_head *chans)
 }
 
 void chan_interrupt(struct list_head *chans, struct work_struct *task,
-		    struct tty_struct *tty, int irq, void *dev)
+		    struct tty_struct *tty, int irq)
 {
 	struct list_head *ele, *next;
 	struct chan *chan;
@@ -540,7 +556,7 @@ void chan_interrupt(struct list_head *chans, struct work_struct *task,
 			if(chan->primary){
 				if(tty != NULL) 
 					tty_hangup(tty);
-				line_disable(dev, irq);
+				line_disable(tty, irq);
 				close_chan(chans);
 				free_chan(chans);
 				return;

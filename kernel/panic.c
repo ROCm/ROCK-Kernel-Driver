@@ -37,6 +37,17 @@ static int __init panic_setup(char *str)
 }
 __setup("panic=", panic_setup);
 
+#ifdef __arch_um__
+extern void abort(void);
+static int dump_core = 0;
+static int __init dump_core_setup(char *str)
+{
+	dump_core = simple_strtoul(str, NULL, 0);
+	return 1;
+}
+__setup("core=", dump_core_setup);
+#endif
+
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -60,6 +71,10 @@ NORET_TYPE void panic(const char * fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printk(KERN_EMERG "Kernel panic: %s\n",buf);
+#ifdef __arch_um__
+	if (dump_core)
+		abort();
+#endif
 	if (in_interrupt())
 		printk(KERN_EMERG "In interrupt handler - not syncing\n");
 	else if (!current->pid)

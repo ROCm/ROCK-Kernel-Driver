@@ -129,6 +129,7 @@ static int uml_net_open(struct net_device *dev)
 	spin_lock(&opened_lock);
 	list_add(&lp->list, &opened);
 	spin_unlock(&opened_lock);
+	while((err = uml_net_rx(dev)) > 0) ; /* clear buffer */
  out:
 	spin_unlock(&lp->lock);
 	return(err);
