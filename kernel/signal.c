@@ -157,7 +157,7 @@ int max_queued_signals = 1024;
 	 sigtestsetmask(&current->signal->shared_pending.signal, \
 						  M(SIGCONT) | M(SIGKILL)))
 
-static inline int sig_ignored(struct task_struct *t, int sig)
+static int sig_ignored(struct task_struct *t, int sig)
 {
 	void * handler;
 
