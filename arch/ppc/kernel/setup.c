@@ -15,6 +15,7 @@
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/cpu.h>
 
 #include <asm/residual.h>
 #include <asm/io.h>
