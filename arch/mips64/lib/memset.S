@@ -52,7 +52,6 @@ LEAF(memset)
 1:
 
 FEXPORT(__bzero)
-	.type	__bzero, @function
 	sltiu	t0, a2, 8			/* very small region? */
 	bnez	t0, small_memset
 	 andi	t0, a0, 7			/* aligned? */
@@ -82,7 +81,7 @@ FEXPORT(__bzero)
 	.set	noreorder
 
 memset_partial:
-	la	t1, 2f				/* where to start */
+	PTR_LA	t1, 2f				/* where to start */
 	.set	noat
 	dsrl	AT, t0, 1
 	dsubu	t1, AT
@@ -90,8 +89,12 @@ memset_partial:
 	jr	t1
 	 daddu	a0, t0				/* dest ptr */
 
+	.set	push
+	.set	noreorder
+	.set	nomacro
 	F_FILL64(a0, -64, a1, partial_fixup)	/* ... but first do dwds ... */
-2:	andi	a2, 7				/* 0 <= n <= 7 to go */
+2:	.set	pop
+	andi	a2, 7				/* 0 <= n <= 7 to go */
 
 	beqz	a2, 1f
 	 daddu	a0, a2				/* What's left */
@@ -121,14 +124,16 @@ first_fixup:
 	 nop
 
 fwd_fixup:
-	ld	t0, THREAD_BUADDR($28)
+	ld	t2, TI_TASK($28)
+	ld	t0, THREAD_BUADDR(t2)
 	andi	a2, 0x3f
 	daddu	a2, t1
 	jr	ra
 	 dsubu	a2, t0
 
 partial_fixup:
-	ld	t0, THREAD_BUADDR($28)
+	ld	t2, TI_TASK($28)
+	ld	t0, THREAD_BUADDR(t2)
 	andi	a2, 7
 	daddu	a2, t1
 	jr	ra

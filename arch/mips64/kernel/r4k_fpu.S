@@ -31,7 +31,7 @@
 
 	.set	noreorder
 	/* Save floating point context */
-LEAF(save_fp_context)
+LEAF(_save_fp_context)
 	mfc0	t1, CP0_STATUS
 	sll	t2, t1,5
 
@@ -79,7 +79,7 @@ LEAF(save_fp_context)
 
 	jr	ra
 	 li	v0, 0					# success
-	END(save_fp_context)
+	END(_save_fp_context)
 
 /*
  * Restore FPU state:
@@ -90,7 +90,7 @@ LEAF(save_fp_context)
  * frame on the current content of c0_status, not on the content of the
  * stack frame which might have been changed by the user.
  */
-LEAF(restore_fp_context)
+LEAF(_restore_fp_context)
 	mfc0	t1, CP0_STATUS
 	sll	t0, t1,5
 	bgez	t0, 1f
@@ -139,7 +139,7 @@ LEAF(restore_fp_context)
 	ctc1	t0, fcr31
 	jr	ra
 	 li	v0, 0					# success
-	END(restore_fp_context)
+	END(_restore_fp_context)
 
 	.type	fault@function
 	.ent	fault

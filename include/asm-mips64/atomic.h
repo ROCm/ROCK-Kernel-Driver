@@ -88,6 +88,7 @@ extern __inline__ int atomic_add_return(int i, atomic_t * v)
 		"sc\t%0,%2\n\t"
 		"beqz\t%0,1b\n\t"
 		"addu\t%0,%1,%3\n\t"
+		"sync\n\t"
 		".set\treorder"
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
@@ -107,6 +108,7 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
 		"sc\t%0,%2\n\t"
 		"beqz\t%0,1b\n\t"
 		"subu\t%0,%1,%3\n\t"
+		"sync\n\t"
 		".set\treorder"
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
@@ -138,8 +140,8 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  * and returns true if the result is zero, or false for all
  * other cases.  Note that the guaranteed
  * useful range of an atomic_t is only 24 bits.
- * atomic_inc_and_test is currently not implemented for mips64.
  */
+#define atomic_inc_and_test(v) (atomic_inc_return(v) == 0)
 
 /*
  * atomic_dec_and_test - decrement by 1 and test
@@ -179,15 +181,14 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  * if the result is negative, or false when
  * result is greater than or equal to zero.  Note that the guaranteed
  * useful range of an atomic_t is only 24 bits.
- *
- * atomic_add_negative is currently not implemented for mips64.
  */
+#define atomic_add_negative(i,v) (atomic_add_return(i, (v)) < 0)
 
 /* Atomic operations are already serializing */
-#define smp_mb__before_atomic_dec()	barrier()
-#define smp_mb__after_atomic_dec()	barrier()
-#define smp_mb__before_atomic_inc()	barrier()
-#define smp_mb__after_atomic_inc()	barrier()
+#define smp_mb__before_atomic_dec()	smp_mb()
+#define smp_mb__after_atomic_dec()	smp_mb()
+#define smp_mb__before_atomic_inc()	smp_mb()
+#define smp_mb__after_atomic_inc()	smp_mb()
 
 #endif /* defined(__KERNEL__) */
 

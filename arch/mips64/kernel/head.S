@@ -10,7 +10,6 @@
  * Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999 Ralf Baechle
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
-#define __ASSEMBLY__
 #include <linux/config.h>
 #include <linux/init.h>
 #include <asm/asm.h>
@@ -27,7 +26,7 @@
 #if defined(CONFIG_ARC64) || defined(CONFIG_MAPPED_KERNEL)
 	/* We get launched at a XKPHYS address but the kernel is linked to
 	   run at a KSEG0 address, so jump there.  */
-	la	t0, \@f
+	PTR_LA	t0, \@f
 	jr	t0
 \@:
 #endif
@@ -35,13 +34,13 @@
 
 #ifdef CONFIG_SGI_IP27
 	/*
-	 * outputs the local nasid into t1.
+	 * outputs the local nasid into res.  IP27 stuff.
 	 */
-	.macro GET_NASID_ASM
-	dli	t1, LOCAL_HUB_ADDR(NI_STATUS_REV_ID)
-	ld	t1, (t1)
-	and	t1, NSRI_NODEID_MASK
-	dsrl	t1, NSRI_NODEID_SHFT
+	.macro GET_NASID_ASM res
+	dli	\res, LOCAL_HUB_ADDR(NI_STATUS_REV_ID)
+	ld	\res, (\res)
+	and	\res, NSRI_NODEID_MASK
+	dsrl	\res, NSRI_NODEID_SHFT
 	.endm
 #endif /* CONFIG_SGI_IP27 */
 
@@ -97,7 +96,7 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 	xori	sp, 0xf
 
 #ifdef CONFIG_SGI_IP27
-	GET_NASID_ASM
+	GET_NASID_ASM	t1
 	move	t2, t1				# text and data are here
 	MAPPED_KERNEL_SETUP_TLB
 #endif /* IP27 */
@@ -106,39 +105,39 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 
 	CLI					# disable interrupts
 
-	mfc0	t0, CP0_STATUS
+	PTR_LA	$28, init_thread_union		# init current pointer
+	daddiu	sp, $28, KERNEL_STACK_SIZE-32
+	set_saved_sp	sp, t0, t1
+
 	/*
-	 * On IP27, I am seeing the TS bit set when the
-	 * kernel is loaded. Maybe because the kernel is
-	 * in ckseg0 and not xkphys? Clear it anyway ...
+	 * The firmware/bootloader passes argc/argp/envp
+	 * to us as arguments.  But clear bss first because
+	 * the romvec and other important info is stored there
+	 * by prom_init().
 	 */
-	li	t1, ~(ST0_TS|ST0_CU1|ST0_CU2|ST0_CU3)
-	and	t0, t1
-	or	t0, (ST0_CU0|ST0_KX|ST0_SX|ST0_FR) # Bogosity: cu0 indicates kernel
-	mtc0	t0, CP0_STATUS			   # thread in copy_thread.
+	PTR_LA	t0, __bss_start
+	sd	zero, (t0)
+	PTR_LA	t1, __bss_stop - 8
+1:
+	daddiu	t0, 8
+	sd	zero, (t0)
+	bne	t0, t1, 1b
 
-	la	$28, init_task_union		# init current pointer
-	daddiu	t0, $28, KERNEL_STACK_SIZE-32
-	sd	t0, kernelsp
-	dsubu	sp, t0, 4*SZREG			# init stack pointer
-	move	t0, $28
-#ifdef CONFIG_SMP
-	mtc0	t0, CP0_WATCHLO
-	dsrl32	t0, t0, 0
-	mtc0	t0, CP0_WATCHHI
-#endif
-	/* Note that all firmware passed argument registers still
-	   have their values.  */
-	jal	prom_init			# initialize firmware
+	dsubu	sp, 4*SZREG			# init stack pointer
 
-	jal	start_kernel
-1:	b	1b				# just in case ...
+	j	init_arch
 	END(kernel_entry)
 
+#ifdef CONFIG_SMP
+/*
+ * SMP slave cpus entry point.  Board specific code for bootstrap calls this
+ * function after setting up the stack and gp registers.
+ */
+NESTED(smp_bootstrap, 16, sp)
 #ifdef CONFIG_SGI_IP27
-NESTED(bootstrap, 16, sp)
-	GET_NASID_ASM
-	li	t0, KLDIR_OFFSET + (KLI_KERN_VARS * KLDIR_ENT_SIZE) + KLDIR_OFF_POINTER + K0BASE
+	GET_NASID_ASM	t1
+	li	t0, KLDIR_OFFSET + (KLI_KERN_VARS * KLDIR_ENT_SIZE) + \
+		    KLDIR_OFF_POINTER + K0BASE
 	dsll	t1, NASID_SHFT
 	or	t0, t0, t1
 	ld	t0, 0(t0)			# t0 points to kern_vars struct
@@ -146,19 +145,27 @@ NESTED(bootstrap, 16, sp)
 	lh	t2, KV_RW_NASID_OFFSET(t0)
 	MAPPED_KERNEL_SETUP_TLB
 	ARC64_TWIDDLE_PC
-	CLI
-	mfc0	t0, CP0_STATUS
-	li	t1, ~(ST0_CU1|ST0_CU2|ST0_CU3)
-	and	t0, t1
-	or	t0, (ST0_CU0|ST0_KX|ST0_SX|ST0_FR) # Bogosity: cu0 indicates kernel
-	mtc0	t0, CP0_STATUS			   # thread in copy_thread.
-	jal	cboot
-	END(bootstrap)
 #endif /* CONFIG_SGI_IP27 */
+
+	CLI
+
+	/*
+	 * For the moment set ST0_KU so the CPU will not spit fire when
+	 * executing 64-bit instructions.  The full initialization of the
+	 * CPU's status register is done later in per_cpu_trap_init().
+	 */
+        mfc0	t0, CP0_STATUS
+        or	t0, ST0_KX
+	mtc0	t0, CP0_STATUS
+
+	jal	start_secondary
+
+	END(smp_bootstrap)
+#endif /* CONFIG_SMP */
 
 	__FINIT
 
-	.comm	kernelsp, 8, 8			# current stackpointer
+	declare_saved_sp
 
 #undef PAGE_SIZE
 #define PAGE_SIZE	0x1000
@@ -171,12 +178,12 @@ NESTED(bootstrap, 16, sp)
 	.endm
 
 	.data
-	.align	12
+	.align	PAGE_SHIFT
 
 	page	swapper_pg_dir, 1
 	page	invalid_pte_table, 0
 	page	invalid_pmd_table, 1
-	page	kptbl, KPTBL_PAGE_ORDER
+	page	kptbl, _PGD_ORDER
 	.globl	ekptbl
 	page	kpmdtbl, 0
 ekptbl:

@@ -8,11 +8,8 @@
  * Copyright (C) 1994, 1995, 1996, by Andreas Busse
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
-#include <linux/config.h>
 #include <asm/asm.h>
-#include <asm/bootinfo.h>
 #include <asm/cachectl.h>
-#include <asm/current.h>
 #include <asm/fpregdef.h>
 #include <asm/mipsregs.h>
 #include <asm/offset.h>
@@ -21,15 +18,32 @@
 #include <asm/processor.h>
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
+#include <asm/thread_info.h>
 
 #include <asm/asmmacro.h>
 
 	.set	mips3
 
-/*
- * task_struct *resume(task_struct *prev, task_struct *next)
+/* 
+ * Offset to the current process status flags, the first 32 bytes of the
+ * stack are not used.
  */
-	.set	noreorder
+#define ST_OFF (KERNEL_STACK_SIZE - 32 - PT_SIZE + PT_STATUS)
+
+/*
+ * FPU context is saved iff the process has used it's FPU in the current
+ * time slice as indicated by TIF_USEDFPU.  In any case, the CU1 bit for user
+ * space STATUS register should be 0, so that a process *always* starts its 
+ * userland with FPU disabled after each context switch.
+ *
+ * FPU will be enabled as soon as the process accesses FPU again, through
+ * do_cpu() trap.
+ */
+
+/*
+ * task_struct *resume(task_struct *prev, task_struct *next,
+ *                     struct thread_info *next_ti))
+ */
 	.align	5
 	LEAF(resume)
 	mfc0	t1, CP0_STATUS
@@ -38,86 +52,85 @@
 	sd	ra, THREAD_REG31(a0)
 
 	/*
+	 * check if we need to save FPU registers
+	 */
+	ld	t3, TASK_THREAD_INFO(a0)
+	ld	t0, TI_FLAGS(t3)
+	li	t1, TIF_USEDFPU
+	and	t2, t0, t1
+	beqz	t2, 1f
+	nor	t1, zero, t1
+
+	and	t0, t0, t1
+	sd	t0, TI_FLAGS(t3)
+
+	/*
+	 * clear saved user stack CU1 bit
+	 */
+	ld	t0, ST_OFF(t3)
+	li	t1, ~ST0_CU1
+	and	t0, t0, t1
+	sd	t0, ST_OFF(t3)
+
+	
+	sll	t2, t0, 5
+	bgez	t2, 2f
+	sdc1	$f0, (THREAD_FPU + 0x00)(a0)
+        fpu_save_16odd a0
+2:
+        fpu_save_16even a0 t1                   # clobbers t1
+1:
+
+	/*
 	 * The order of restoring the registers takes care of the race
 	 * updating $28, $29 and kernelsp without disabling ints.
 	 */
-	move	$28, a1
-	cpu_restore_nonscratch $28
-#ifndef CONFIG_SMP
-	daddiu	t0, $28, KERNEL_STACK_SIZE-32
-	sd	t0, kernelsp
-#else
-	mtc0	a1, CP0_WATCHLO
-	dsrl32	a1, a1, 0
-	mtc0	a1, CP0_WATCHHI
-#endif
+	move	$28, a2
+	cpu_restore_nonscratch a1
+
+	daddiu	t1, $28, KERNEL_STACK_SIZE-32
+	set_saved_sp	t1, t0, t2
+
 	mfc0	t1, CP0_STATUS		/* Do we really need this? */
 	li	a3, 0xff00
 	and	t1, a3
-	ld	a2, THREAD_STATUS($28)
+	ld	a2, THREAD_STATUS(a1)
 	nor	a3, $0, a3
 	and	a2, a3
 	or	a2, t1
 	mtc0	a2, CP0_STATUS
+	move	v0, a0
 	jr	ra
-	 move	v0, a0
 	END(resume)
-
-/*
- * Do lazy fpu context switch.  Saves FPU context to the process in a0
- * and loads the new context of the current process.
- */
-
-#define ST_OFF (KERNEL_STACK_SIZE - 32 - PT_SIZE + PT_STATUS)
-
-LEAF(lazy_fpu_switch)
-	mfc0	t0, CP0_STATUS			# enable cp1
-	li	t3, 0x20000000
-	or	t0, t3
-	mtc0	t0, CP0_STATUS
-
-	beqz	a0, 2f				# Save floating point state
-	 nor	t3, zero, t3
-
-	ld	t1, ST_OFF(a0)			# last thread loses fpu
-	and	t1, t3
-	sd	t1, ST_OFF(a0)
-	sll	t2, t1, 5
-	bgez	t2, 1f
-	 sdc1	$f0, (THREAD_FPU + 0x00)(a0)
-	fpu_save_16odd a0
-1:
-	fpu_save_16even a0 t1			# clobbers t1
-2:
-
-	beqz	a1, 3f
-
-	sll	t0, t0, 5			# load new fp state
-	bgez	t0, 1f
-	 ldc1	$f0, (THREAD_FPU + 0x00)($28)
-	fpu_restore_16odd $28
-1:
-	.set	reorder
-	fpu_restore_16even $28, t0		# clobbers t0
-3:
-	jr	ra
-	END(lazy_fpu_switch)
 
 /*
  * Save a thread's fp context.
  */
-	.set	noreorder
-LEAF(save_fp)
+LEAF(_save_fp)
 	mfc0	t0, CP0_STATUS
 	sll	t1, t0, 5
 	bgez	t1, 1f				# 16 register mode?
-	 nop
 	fpu_save_16odd a0
 1:
 	fpu_save_16even a0 t1			# clobbers t1
+	sdc1	$f0, (THREAD_FPU + 0x00)(a0)
 	jr	ra
-	 sdc1	$f0, (THREAD_FPU + 0x00)(a0)
-	END(save_fp)
+	END(_save_fp)
+
+/*
+ * Restore a thread's fp context.
+ */
+LEAF(_restore_fp)
+	mfc0	t0, CP0_STATUS
+	sll	t1, t0, 5
+	bgez	t1, 1f				# 16 register mode?
+
+	fpu_restore_16odd a0
+1:	fpu_restore_16even a0, t0		# clobbers t0
+	 ldc1	$f0, (THREAD_FPU + 0x00)(a0)
+
+	jr	ra
+	END(_restore_fp)
 
 /*
  * Load the FPU with signalling NANS.  This bit pattern we're using has
@@ -129,18 +142,19 @@ LEAF(save_fp)
 
 #define FPU_DEFAULT  0x00000000
 
-LEAF(init_fpu)
+LEAF(_init_fpu)
 	mfc0	t0, CP0_STATUS
-	li	t1, 0x20000000
+	li	t1, ST0_CU1
 	or	t0, t1
 	mtc0	t0, CP0_STATUS
+	FPU_ENABLE_HAZARD
 	sll	t0, t0, 5
 
 	li	t1, FPU_DEFAULT
 	ctc1	t1, fcr31
 
+	li	t0, -1				# SNaN
 	bgez	t0, 1f				# 16 / 32 register mode?
-	 li	t0, -1
 
 	dmtc1	t0, $f1
 	dmtc1	t0, $f3
@@ -174,6 +188,6 @@ LEAF(init_fpu)
 	dmtc1	t0, $f24
 	dmtc1	t0, $f26
 	dmtc1	t0, $f28
+	dmtc1	t0, $f30
 	jr	ra
-	 dmtc1	t0, $f30
-	END(init_fpu)
+	END(_init_fpu)

@@ -1,11 +1,11 @@
 /*
+ * Format of an instruction in memory.
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Format of an instruction in memory.
- *
- * Copyright (C) 1996 by Ralf Baechle
+ * Copyright (C) 1996, 2000 by Ralf Baechle
  */
 #ifndef _ASM_INST_H
 #define _ASM_INST_H
@@ -21,7 +21,7 @@ enum major_op {
 	cop0_op, cop1_op, cop2_op, cop1x_op,
 	beql_op, bnel_op, blezl_op, bgtzl_op,
 	daddi_op, daddiu_op, ldl_op, ldr_op,
-	major_1c_op, major_1d_op, major_1e_op, major_1f_op,
+	major_1c_op, jalx_op, major_1e_op, major_1f_op,
 	lb_op, lh_op, lwl_op, lw_op,
 	lbu_op, lhu_op, lwr_op, lwu_op,
 	sb_op, sh_op, swl_op, sw_op,
@@ -77,6 +77,13 @@ enum cop_op {
 	dmtc_op       = 0x05, ctc_op        = 0x06,
 	bc_op         = 0x08, cop_op        = 0x10,
 	copm_op       = 0x18
+};
+
+/*
+ * rt field of cop.bc_op opcodes
+ */
+enum bcop_op {
+	bcf_op, bct_op, bcfl_op, bctl_op
 };
 
 /*
@@ -300,5 +307,65 @@ union mips_instruction {
 	struct f_format f_format;
         struct ma_format ma_format;
 };
+
+/* HACHACHAHCAHC ...  */
+
+/* In case some other massaging is needed, keep MIPSInst as wrapper */
+
+#define MIPSInst(x) x
+
+#define I_OPCODE_SFT	26
+#define MIPSInst_OPCODE(x) (MIPSInst(x) >> I_OPCODE_SFT)
+
+#define I_JTARGET_SFT	0
+#define MIPSInst_JTARGET(x) (MIPSInst(x) & 0x03ffffff)
+
+#define I_RS_SFT	21
+#define MIPSInst_RS(x) ((MIPSInst(x) & 0x03e00000) >> I_RS_SFT)
+
+#define I_RT_SFT	16
+#define MIPSInst_RT(x) ((MIPSInst(x) & 0x001f0000) >> I_RT_SFT)
+
+#define I_IMM_SFT	0
+#define MIPSInst_SIMM(x) ((int)((short)(MIPSInst(x) & 0xffff)))
+#define MIPSInst_UIMM(x) (MIPSInst(x) & 0xffff)
+
+#define I_CACHEOP_SFT	18
+#define MIPSInst_CACHEOP(x) ((MIPSInst(x) & 0x001c0000) >> I_CACHEOP_SFT)
+
+#define I_CACHESEL_SFT	16
+#define MIPSInst_CACHESEL(x) ((MIPSInst(x) & 0x00030000) >> I_CACHESEL_SFT)
+
+#define I_RD_SFT	11
+#define MIPSInst_RD(x) ((MIPSInst(x) & 0x0000f800) >> I_RD_SFT)
+
+#define I_RE_SFT	6
+#define MIPSInst_RE(x) ((MIPSInst(x) & 0x000007c0) >> I_RE_SFT)
+
+#define I_FUNC_SFT	0
+#define MIPSInst_FUNC(x) (MIPSInst(x) & 0x0000003f)
+
+#define I_FFMT_SFT	21
+#define MIPSInst_FFMT(x) ((MIPSInst(x) & 0x01e00000) >> I_FFMT_SFT)
+
+#define I_FT_SFT	16
+#define MIPSInst_FT(x) ((MIPSInst(x) & 0x001f0000) >> I_FT_SFT)
+
+#define I_FS_SFT	11
+#define MIPSInst_FS(x) ((MIPSInst(x) & 0x0000f800) >> I_FS_SFT)
+
+#define I_FD_SFT	6
+#define MIPSInst_FD(x) ((MIPSInst(x) & 0x000007c0) >> I_FD_SFT)
+
+#define I_FR_SFT	21
+#define MIPSInst_FR(x) ((MIPSInst(x) & 0x03e00000) >> I_FR_SFT)
+
+#define I_FMA_FUNC_SFT	2
+#define MIPSInst_FMA_FUNC(x) ((MIPSInst(x) & 0x0000003c) >> I_FMA_FUNC_SFT)
+
+#define I_FMA_FFMT_SFT	0
+#define MIPSInst_FMA_FFMT(x) (MIPSInst(x) & 0x00000003)
+
+typedef unsigned int mips_instruction;
 
 #endif /* _ASM_INST_H */
