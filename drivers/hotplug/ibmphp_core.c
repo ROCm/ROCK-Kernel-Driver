@@ -1584,7 +1584,7 @@ static int __init ibmphp_init (void)
 	bus = ibmphp_find_bus (0);
 	if (!bus) {
 		err ("Can't find the root pci bus, can not continue\n");
-		rc -ENODEV;
+		rc = -ENODEV;
 		goto error;
 	}
 	memcpy (ibmphp_pci_bus, bus, sizeof (*ibmphp_pci_bus));
