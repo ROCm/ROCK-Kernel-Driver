@@ -138,6 +138,22 @@ linvfs_aio_write(
 	return linvfs_writev(iocb->ki_filp, &iov, 1, &iocb->ki_pos);
 }
 
+STATIC ssize_t
+linvfs_sendfile(
+	struct file		*filp,
+	loff_t			*ppos,
+	size_t			count,
+	read_actor_t		actor,
+	void			*target)
+{
+	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+	int			error;
+
+	VOP_SENDFILE(vp, filp, ppos, count, actor, target, NULL, error);
+
+	return error;
+}
+
 
 STATIC int
 linvfs_open(
@@ -348,6 +364,7 @@ struct file_operations linvfs_file_operations = {
 	.writev		= linvfs_writev,
 	.aio_read	= linvfs_aio_read,
 	.aio_write	= linvfs_aio_write,
+	.sendfile	= linvfs_sendfile,
 	.ioctl		= linvfs_ioctl,
 	.mmap		= linvfs_file_mmap,
 	.open		= linvfs_open,

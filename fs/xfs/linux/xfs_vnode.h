@@ -180,6 +180,9 @@ typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct file *,
 typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct file *,
 				const struct iovec *, unsigned long,
 				loff_t *, struct cred *);
+typedef ssize_t (*vop_sendfile_t)(bhv_desc_t *, struct file *,
+				loff_t *, size_t, read_actor_t,
+				void *, struct cred *);
 typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 typedef int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
@@ -232,6 +235,7 @@ typedef struct vnodeops {
 	vop_open_t		vop_open;
 	vop_read_t		vop_read;
 	vop_write_t		vop_write;
+	vop_sendfile_t		vop_sendfile;
 	vop_ioctl_t		vop_ioctl;
 	vop_getattr_t		vop_getattr;
 	vop_setattr_t		vop_setattr;
@@ -281,6 +285,12 @@ typedef struct vnodeops {
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,file,iov,segs,offset,cr);\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define VOP_SENDFILE(vp,f,of,cnt,act,targ,cr,rv)			\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_sendfile, vp)((vp)->v_fbhv,f,of,cnt,act,targ,cr);\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_BMAP(vp,of,sz,rw,b,n,rv)					\
