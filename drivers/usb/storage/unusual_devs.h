@@ -237,14 +237,6 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 		US_SC_8070, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY | US_FL_START_STOP ),
 
-/* Submitted by Lars Gemeinhardt <linux-usb@gemeinhardt.info>
- * Needed for START_STOP flag */
-UNUSUAL_DEV(  0x0547, 0x2810, 0x0001, 0x0001,
-                "Mello",
-                "MP3 Player",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_START_STOP),
-
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
