@@ -37,9 +37,6 @@
 
 /* General customization:
  */
-#define __HAVE_CTX_BITMAP	1
-#define __HAVE_SG		1
-#define __HAVE_PCI_DMA		1
 
 #define DRIVER_AUTHOR		"Gareth Hughes, Keith Whitwell, others."
 

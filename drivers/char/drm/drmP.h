@@ -86,22 +86,15 @@
 #define DRIVER_USE_AGP     0x1
 #define DRIVER_REQUIRE_AGP 0x2
 #define DRIVER_USE_MTRR    0x4
+#define DRIVER_PCI_DMA     0x8
+#define DRIVER_SG          0x10
 
-#ifndef __HAVE_CTX_BITMAP
-#define __HAVE_CTX_BITMAP	0
-#endif
 #ifndef __HAVE_DMA
 #define __HAVE_DMA		0
 #endif
 #ifndef __HAVE_IRQ
 #define __HAVE_IRQ		0
 #endif
-
-#define __REALLY_HAVE_SG	(__HAVE_SG)
-
-
-/*@}*/
-
 
 /***********************************************************************/
 /** \name Begin the DRM... */
@@ -827,10 +820,8 @@ extern int	     DRM(rmctx)( struct inode *inode, struct file *filp,
 extern int	     DRM(context_switch)(drm_device_t *dev, int old, int new);
 extern int	     DRM(context_switch_complete)(drm_device_t *dev, int new);
 
-#if __HAVE_CTX_BITMAP
 extern int	     DRM(ctxbitmap_init)( drm_device_t *dev );
 extern void	     DRM(ctxbitmap_cleanup)( drm_device_t *dev );
-#endif
 
 extern int	     DRM(setsareactx)( struct inode *inode, struct file *filp,
 				       unsigned int cmd, unsigned long arg );
@@ -957,14 +948,12 @@ extern int            DRM(proc_cleanup)(int minor,
 					struct proc_dir_entry *root,
 					struct proc_dir_entry *dev_root);
 
-#ifdef __HAVE_SG
 				/* Scatter Gather Support (drm_scatter.h) */
 extern void           DRM(sg_cleanup)(drm_sg_mem_t *entry);
 extern int            DRM(sg_alloc)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
 extern int            DRM(sg_free)(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
-#endif
 
                                /* ATI PCIGART support (ati_pcigart.h) */
 extern int            DRM(ati_pcigart_init)(drm_device_t *dev,

@@ -2582,7 +2582,7 @@ static void radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
 
 void radeon_driver_register_fns(struct drm_device *dev)
 {	
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR;
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG;
 	dev->dev_priv_size = sizeof(drm_radeon_buf_priv_t);
 	dev->fn_tbl.prerelease = radeon_driver_prerelease;
 	dev->fn_tbl.pretakedown = radeon_driver_pretakedown;

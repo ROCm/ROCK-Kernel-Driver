@@ -36,14 +36,6 @@
 #include <linux/vmalloc.h>
 #include "drmP.h"
 
-#ifndef __HAVE_PCI_DMA
-#define __HAVE_PCI_DMA		0
-#endif
-
-#ifndef __HAVE_SG
-#define __HAVE_SG		0
-#endif
-
 /**
  * Compute size order.  Returns the exponent of the smaller power of two which
  * is greater or equal to given number.
@@ -519,7 +511,6 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 }
 #endif /* __OS_HAS_AGP */
 
-#if __HAVE_PCI_DMA
 int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg )
 {
@@ -544,6 +535,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	drm_buf_t **temp_buflist;
 	drm_buf_desc_t __user *argp = (void __user *)arg;
 
+	if (!drm_core_check_feature(dev, DRIVER_PCI_DMA)) return -EINVAL;
 	if ( !dma ) return -EINVAL;
 
 	if ( copy_from_user( &request, argp, sizeof(request) ) )
@@ -749,9 +741,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	return 0;
 
 }
-#endif /* __HAVE_PCI_DMA */
 
-#if __HAVE_SG
 int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
                      unsigned int cmd, unsigned long arg )
 {
@@ -774,6 +764,8 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 	int i;
 	drm_buf_t **temp_buflist;
 
+	if (!drm_core_check_feature(dev, DRIVER_SG)) return -EINVAL;
+	
 	if ( !dma ) return -EINVAL;
 
 	if ( copy_from_user( &request, argp, sizeof(request) ) )
@@ -915,7 +907,6 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 	atomic_dec( &dev->buf_alloc );
 	return 0;
 }
-#endif /* __HAVE_SG */
 
 /**
  * Add buffers for DMA transfers (ioctl).
@@ -945,16 +936,10 @@ int DRM(addbufs)( struct inode *inode, struct file *filp,
 		return DRM(addbufs_agp)( inode, filp, cmd, arg );
 	else
 #endif
-#if __HAVE_SG
 	if ( request.flags & _DRM_SG_BUFFER )
 		return DRM(addbufs_sg)( inode, filp, cmd, arg );
 	else
-#endif
-#if __HAVE_PCI_DMA
 		return DRM(addbufs_pci)( inode, filp, cmd, arg );
-#else
-		return -EINVAL;
-#endif
 }
 
 
@@ -1186,7 +1171,7 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 
 	if ( request.count >= dma->buf_count ) {
 		if ((drm_core_has_AGP(dev) && (dma->flags & _DRM_DMA_USE_AGP)) ||
-		    (__HAVE_SG && (dma->flags & _DRM_DMA_USE_SG)) ) {
+		    (drm_core_check_feature(dev, DRIVER_SG) && (dma->flags & _DRM_DMA_USE_SG)) ) {
 			drm_map_t *map = dev->agp_buffer_map;
 
 			if ( !map ) {
