@@ -123,19 +123,19 @@ typedef u32		compat_sigset_word;
  */
 typedef	u32		compat_uptr_t;
 
-static inline void *compat_ptr(compat_uptr_t uptr)
+static inline void __user *compat_ptr(compat_uptr_t uptr)
 {
-	return (void *)(unsigned long)(uptr & 0x7fffffffUL);
+	return (void __user *)(unsigned long)(uptr & 0x7fffffffUL);
 }
 
-static inline void *compat_alloc_user_space(long len)
+static inline void __user *compat_alloc_user_space(long len)
 {
 	unsigned long stack;
 
 	stack = KSTK_ESP(current);
 	if (test_thread_flag(TIF_31BIT))
 		stack &= 0x7fffffffUL;
-	return (void *) (stack - len);
+	return (void __user *) (stack - len);
 }
 
 struct compat_ipc64_perm {
