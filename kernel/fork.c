@@ -34,6 +34,7 @@
 #include <linux/ptrace.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
+#include <linux/rmap.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -419,9 +420,14 @@ struct mm_struct * mm_alloc(void)
 	mm = allocate_mm();
 	if (mm) {
 		memset(mm, 0, sizeof(*mm));
-		return mm_init(mm);
+		mm = mm_init(mm);
+		if (mm && exec_rmap(mm)) {
+			mm_free_pgd(mm);
+			free_mm(mm);
+			mm = NULL;
+		}
 	}
-	return NULL;
+	return mm;
 }
 
 /*
@@ -448,6 +454,7 @@ void mmput(struct mm_struct *mm)
 		spin_unlock(&mmlist_lock);
 		exit_aio(mm);
 		exit_mmap(mm);
+		exit_rmap(mm);
 		mmdrop(mm);
 	}
 }
@@ -550,6 +557,12 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	memcpy(mm, oldmm, sizeof(*mm));
 	if (!mm_init(mm))
 		goto fail_nomem;
+
+	if (dup_rmap(mm, oldmm)) {
+		mm_free_pgd(mm);
+		free_mm(mm);
+		goto fail_nomem;
+	}
 
 	if (init_new_context(tsk,mm))
 		goto fail_nocontext;
@@ -1262,4 +1275,5 @@ void __init proc_caches_init(void)
 	mm_cachep = kmem_cache_create("mm_struct",
 			sizeof(struct mm_struct), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
+	init_rmap();
 }

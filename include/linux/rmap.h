@@ -35,12 +35,25 @@ static inline void page_dup_rmap(struct page *page)
 }
 
 /*
+ * Called from kernel/fork.c to manage anonymous memory
+ */
+void init_rmap(void);
+int exec_rmap(struct mm_struct *);
+int dup_rmap(struct mm_struct *, struct mm_struct *oldmm);
+void exit_rmap(struct mm_struct *);
+
+/*
  * Called from mm/vmscan.c to handle paging out
  */
 int fastcall page_referenced(struct page *);
 int fastcall try_to_unmap(struct page *);
 
 #else	/* !CONFIG_MMU */
+
+#define init_rmap()		do {} while (0)
+#define exec_rmap(mm)		(0)
+#define dup_rmap(mm, oldmm)	(0)
+#define exit_rmap(mm)		do {} while (0)
 
 #define page_referenced(page)	TestClearPageReferenced(page)
 #define try_to_unmap(page)	SWAP_FAIL
