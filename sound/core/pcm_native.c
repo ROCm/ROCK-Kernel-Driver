@@ -20,7 +20,6 @@
  */
 
 #include <sound/driver.h>
-#include <linux/version.h>
 #include <linux/mm.h>
 #include <linux/file.h>
 #include <linux/slab.h>
