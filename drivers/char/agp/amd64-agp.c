@@ -26,13 +26,13 @@
 #define GPTE_COHERENT	2
 
 /* Aperture control register bits. */
-#define GARTEN		1<<0
-#define DISGARTCPU	1<<4
-#define DISGARTIO	1<<5
+#define GARTEN		(1<<0)
+#define DISGARTCPU	(1<<4)
+#define DISGARTIO	(1<<5)
 
 /* GART cache control register bits. */
-#define INVGART		1<<0
-#define GARTPTEERR	1<<1
+#define INVGART		(1<<0)
+#define GARTPTEERR	(1<<1)
 
 static int nr_garts;
 static struct pci_dev * hammers[MAX_HAMMER_GARTS];
