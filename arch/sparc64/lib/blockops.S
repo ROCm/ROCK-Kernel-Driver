@@ -338,97 +338,6 @@ copy_page_using_blkcommit:
 	 stda		%f16, [%o0] ASI_BLK_COMMIT_P
 #endif
 
-	.align		32
-	.globl		_clear_page
-	.type		_clear_page,@function
-_clear_page:	/* %o0=dest */
-	VISEntryHalf
-	ba,pt		%xcc, clear_page_common
-	 clr		%o4
-
-	.align		32
-	.globl		clear_user_page
-	.type		clear_user_page,@function
-clear_user_page:	/* %o0=dest, %o1=vaddr */
-	VISEntryHalf
-	sethi		%hi(PAGE_SIZE), %g3
-	sethi		%uhi(PAGE_OFFSET), %g2
-	sllx		%g2, 32, %g2
-	sub		%o0, %g2, %g1
-	and		%o1, %g3, %o0
-	mov		TLB_TAG_ACCESS, %o2
-	sethi		%uhi(_PAGE_VALID | _PAGE_SZBITS), %g3
-	sethi		%hi(TLBTEMP_BASE), %o3
-	sllx		%g3, 32, %g3
-	or		%g3, (_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W), %g3
-	or		%g1, %g3, %g1
-	add		%o0, %o3, %o0
-#define FIX_INSN_2	0x96102068 /* mov (13 << 3), %o3 */
-cheetah_patch_2:
-	mov		TLBTEMP_ENT2, %o3
-	rdpr		%pstate, %g3
-	wrpr		%g3, PSTATE_IE, %pstate
-
-	/* Spitfire Errata #32 workaround */
-	mov		PRIMARY_CONTEXT, %g5
-	stxa		%g0, [%g5] ASI_DMMU
-	membar		#Sync
-
-	ldxa		[%o3] ASI_DTLB_TAG_READ, %g5
-
-	/* Spitfire Errata #32 workaround */
-	mov		PRIMARY_CONTEXT, %g7
-	stxa		%g0, [%g7] ASI_DMMU
-	membar		#Sync
-
-	ldxa		[%o3] ASI_DTLB_DATA_ACCESS, %g0
-	ldxa		[%o3] ASI_DTLB_DATA_ACCESS, %g7
-	stxa		%o0, [%o2] ASI_DMMU
-	stxa		%g1, [%o3] ASI_DTLB_DATA_ACCESS
-	membar		#Sync
-
-	mov		1, %o4
-
-clear_page_common:
-	membar		#StoreLoad | #StoreStore | #LoadStore	! LSU	Group
-	fzero		%f0				! FPA	Group
-	sethi		%hi(PAGE_SIZE/256), %o1		! IEU0
-	fzero		%f2				! FPA	Group
-	or		%o1, %lo(PAGE_SIZE/256), %o1	! IEU0
-	faddd		%f0, %f2, %f4			! FPA	Group
-	fmuld		%f0, %f2, %f6			! FPM
-	faddd		%f0, %f2, %f8			! FPA	Group
-	fmuld		%f0, %f2, %f10			! FPM
-
-	faddd		%f0, %f2, %f12			! FPA	Group
-	fmuld		%f0, %f2, %f14			! FPM
-1:	stda		%f0, [%o0 + %g0] ASI_BLK_P	! Store	Group
-	add		%o0, 0x40, %o0			! IEU0
-	stda		%f0, [%o0 + %g0] ASI_BLK_P	! Store	Group
-	add		%o0, 0x40, %o0			! IEU0
-	stda		%f0, [%o0 + %g0] ASI_BLK_P	! Store	Group
-
-	add		%o0, 0x40, %o0			! IEU0	Group
-	stda		%f0, [%o0 + %g0] ASI_BLK_P	! Store	Group
-	subcc		%o1, 1, %o1			! IEU1
-	bne,pt		%icc, 1b			! CTI
-	 add		%o0, 0x40, %o0			! IEU0	Group
-	membar		#Sync				! LSU	Group
-	VISExitHalf
-
-	brnz,pt		%o4, 1f
-	 nop
-
-	retl
-	 nop
-
-1:
-	stxa		%g5, [%o2] ASI_DMMU
-	stxa		%g7, [%o3] ASI_DTLB_DATA_ACCESS
-	membar		#Sync
-	jmpl		%o7 + 0x8, %g0
-	 wrpr		%g3, 0x0, %pstate
-
 	.globl		cheetah_patch_pgcopyops
 cheetah_patch_pgcopyops:
 	sethi		%hi(FIX_INSN_1), %g1
@@ -437,15 +346,8 @@ cheetah_patch_pgcopyops:
 	or		%g2, %lo(cheetah_patch_1), %g2
 	stw		%g1, [%g2]
 	flush		%g2
-	sethi		%hi(FIX_INSN_2), %g1
-	or		%g1, %lo(FIX_INSN_2), %g1
-	sethi		%hi(cheetah_patch_2), %g2
-	or		%g2, %lo(cheetah_patch_2), %g2
-	stw		%g1, [%g2]
-	flush		%g2
 	retl
 	 nop
 
-#undef FIX_INSN1
-#undef FIX_INSN2
+#undef FIX_INSN_1
 #undef PAGE_SIZE_REM

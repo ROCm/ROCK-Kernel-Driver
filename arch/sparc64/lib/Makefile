@@ -5,7 +5,7 @@
 EXTRA_AFLAGS := -ansi
 EXTRA_CFLAGS := -Werror
 
-lib-y := PeeCeeI.o blockops.o strlen.o strncmp.o \
+lib-y := PeeCeeI.o blockops.o clear_page.o strlen.o strncmp.o \
 	 memscan.o strncpy_from_user.o strlen_user.o memcmp.o checksum.o \
 	 VIScopy.o VISbzero.o VISmemset.o VIScsum.o VIScsumcopy.o \
 	 VIScsumcopyusr.o VISsave.o atomic.o rwlock.o bitops.o \
