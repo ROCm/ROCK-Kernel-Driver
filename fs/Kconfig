@@ -1342,6 +1342,7 @@ config NFS_ACL
 	bool "NFS_ACL protocol extension"
 	depends on NFS_V3
 	select QSORT
+	select NFSACL
 	help
 	  Implement the NFS_ACL protocol extension for manipulating POSIX
 	  Access Control Lists.  The server must also implement the NFS_ACL
@@ -1422,6 +1423,7 @@ config NFSD_ACL
 	bool "NFS_ACL protocol extension"
 	depends on NFSD_V3
 	select QSORT
+	select NFSACL
 	help
 	  Implement the NFS_ACL protocol extension for manipulating POSIX
 	  Access Control Lists on exported file systems.  The clients must
