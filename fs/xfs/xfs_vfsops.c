@@ -1582,31 +1582,35 @@ xfs_vget(
 	vnode_t		**vpp,
 	fid_t		*fidp)
 {
-	xfs_fid_t	*xfid;
+	xfs_mount_t	*mp = XFS_BHVTOM(bdp);
+	xfs_fid_t	*xfid = (struct xfs_fid *)fidp;
 	xfs_inode_t	*ip;
 	int		error;
 	xfs_ino_t	ino;
 	unsigned int	igen;
-	xfs_mount_t	*mp;
 
-	xfid  = (struct xfs_fid *)fidp;
-	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
-		ino  = xfid->xfs_fid_ino;
-		igen = xfid->xfs_fid_gen;
-	} else {
-		/*
-		 * Invalid.  Since handles can be created in user space
-		 * and passed in via gethandle(), this is not cause for
-		 * a panic.
-		 */
+	/*
+	 * Invalid.  Since handles can be created in user space and passed in
+	 * via gethandle(), this is not cause for a panic.
+	 */
+	if (xfid->xfs_fid_len != sizeof(*xfid) - sizeof(xfid->xfs_fid_len))
 		return XFS_ERROR(EINVAL);
-	}
-	mp = XFS_BHVTOM(bdp);
+
+	ino  = xfid->xfs_fid_ino;
+	igen = xfid->xfs_fid_gen;
+
+	/*
+	 * NFS can sometimes send requests for ino 0.  Fail them gracefully.
+	 */
+	if (ino == 0)
+		return XFS_ERROR(ESTALE);
+
 	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
 	if (error) {
 		*vpp = NULL;
 		return error;
 	}
+
 	if (ip == NULL) {
 		*vpp = NULL;
 		return XFS_ERROR(EIO);

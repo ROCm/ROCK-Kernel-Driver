@@ -570,7 +570,6 @@ linvfs_get_parent(
 	int			error;
 	vnode_t			*vp, *cvp;
 	struct dentry		*parent;
-	struct inode		*ip = NULL;
 	struct dentry		dotdot;
 
 	dotdot.d_name.name = "..";
@@ -580,21 +579,13 @@ linvfs_get_parent(
 	cvp = NULL;
 	vp = LINVFS_GET_VP(child->d_inode);
 	VOP_LOOKUP(vp, &dotdot, &cvp, 0, NULL, NULL, error);
-
-	if (!error) {
-		ASSERT(cvp);
-		ip = LINVFS_GET_IP(cvp);
-		if (!ip) {
-			VN_RELE(cvp);
-			return ERR_PTR(-EACCES);
-		}
-	}
-	if (error)
+	if (unlikely(error))
 		return ERR_PTR(-error);
-	parent = d_alloc_anon(ip);
-	if (!parent) {
+
+	parent = d_alloc_anon(LINVFS_GET_IP(cvp));
+	if (unlikely(!parent)) {
 		VN_RELE(cvp);
-		parent = ERR_PTR(-ENOMEM);
+		return ERR_PTR(-ENOMEM);
 	}
 	return parent;
 }

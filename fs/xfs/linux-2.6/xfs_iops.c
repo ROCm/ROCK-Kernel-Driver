@@ -225,26 +225,21 @@ linvfs_lookup(
 	struct dentry	*dentry,
 	struct nameidata *nd)
 {
-	struct inode	*ip = NULL;
-	vnode_t		*vp, *cvp = NULL;
+	struct vnode	*vp = LINVFS_GET_VP(dir), *cvp;
 	int		error;
 
 	if (dentry->d_name.len >= MAXNAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	vp = LINVFS_GET_VP(dir);
 	VOP_LOOKUP(vp, dentry, &cvp, 0, NULL, NULL, error);
-	if (!error) {
-		ASSERT(cvp);
-		ip = LINVFS_GET_IP(cvp);
-		if (!ip) {
-			VN_RELE(cvp);
-			return ERR_PTR(-EACCES);
-		}
+	if (error) {
+		if (unlikely(error != ENOENT))
+			return ERR_PTR(-error);
+		d_add(dentry, NULL);
+		return NULL;
 	}
-	if (error && (error != ENOENT))
-		return ERR_PTR(-error);
-	return d_splice_alias(ip, dentry);
+
+	return d_splice_alias(LINVFS_GET_IP(cvp), dentry);
 }
 
 STATIC int
