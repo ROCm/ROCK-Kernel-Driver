@@ -110,6 +110,15 @@ static unsigned long next_heartbeat;
 static unsigned long wdt_is_open;
 static int wdt_expect_close;
 
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
 static spinlock_t wdt_spinlock;
 /*
  *	Whack the dog
@@ -172,12 +181,12 @@ static void wdt_startup(void)
 
 static void wdt_turnoff(void)
 {
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-	/* Stop the timer */
-	del_timer(&timer);
-	wdt_config(0);
-	printk(OUR_NAME ": Watchdog timer is now disabled...\n");
-#endif
+	if (!nowayout) {
+		/* Stop the timer */
+		del_timer(&timer);
+		wdt_config(0);
+		printk(OUR_NAME ": Watchdog timer is now disabled...\n");
+	}
 }
 
 
@@ -226,9 +235,9 @@ static int fop_open(struct inode * inode, struct file * file)
 				return -EBUSY;
 			/* Good, fire up the show */
 			wdt_startup();
-#ifdef CONFIG_WATCHDOG_NOWAYOUT
-			MOD_INC_USE_COUNT;
-#endif	
+			if (nowayout)
+				MOD_INC_USE_COUNT;
+
 			return 0;
 		default:
 			return -ENODEV;
@@ -260,9 +269,9 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	static struct watchdog_info ident=
 	{
-		0,
-		1,
-		"SC520"
+		.options = WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "SC520"
 	};
 	
 	switch(cmd)
