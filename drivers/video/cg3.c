@@ -29,8 +29,6 @@
  * Local functions.
  */
 
-static int cg3_check_var(struct fb_var_screeninfo *, struct fb_info *);
-static int cg3_set_par(struct fb_info *);
 static int cg3_setcolreg(unsigned, unsigned, unsigned, unsigned,
 			 unsigned, struct fb_info *);
 static int cg3_blank(int, struct fb_info *);
@@ -43,8 +41,6 @@ static int cg3_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 
 static struct fb_ops cg3_ops = {
 	.owner			= THIS_MODULE,
-	.fb_check_var		= cg3_check_var,
-	.fb_set_par		= cg3_set_par,
 	.fb_setcolreg		= cg3_setcolreg,
 	.fb_blank		= cg3_blank,
 	.fb_fillrect		= cfb_fillrect,
@@ -125,39 +121,6 @@ struct cg3_par {
 	struct sbus_dev		*sdev;
 	struct list_head	list;
 };
-
-/**
- *      cg3_check_var - Optional function.  Validates a var passed in.
- *      @var: frame buffer variable screen structure
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int cg3_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	if (var->bits_per_pixel != 8)
-		return -EINVAL;
-
-	if (var->xres_virtual != var->xres || var->yres_virtual != var->yres)
-		return -EINVAL;
-	if (var->nonstd)
-		return -EINVAL;
-	if ((var->vmode & FB_VMODE_MASK) != FB_VMODE_NONINTERLACED)
-		return -EINVAL;
-
-	if (var->xres != info->var.xres || var->yres != info->var.yres)
-		return -EINVAL;
-
-	return 0;
-}
-
-/**
- *      cg3_set_par - Optional function.  Alters the hardware state.
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int
-cg3_set_par(struct fb_info *info)
-{
-	return 0;
-}
 
 /**
  *      cg3_setcolreg - Optional function. Sets a color register.
@@ -445,7 +408,6 @@ static void cg3_init_one(struct sbus_dev *sdev)
 		return;
 	}
 
-	cg3_set_par(&all->info);
 	cg3_init_fix(&all->info, linebytes);
 
 	if (register_framebuffer(&all->info) < 0) {

@@ -27,8 +27,6 @@
  * Local functions.
  */
 
-static int ffb_check_var(struct fb_var_screeninfo *, struct fb_info *);
-static int ffb_set_par(struct fb_info *);
 static int ffb_setcolreg(unsigned, unsigned, unsigned, unsigned,
 			 unsigned, struct fb_info *);
 static int ffb_blank(int, struct fb_info *);
@@ -46,8 +44,6 @@ static int ffb_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 
 static struct fb_ops ffb_ops = {
 	.owner			= THIS_MODULE,
-	.fb_check_var		= ffb_check_var,
-	.fb_set_par		= ffb_set_par,
 	.fb_setcolreg		= ffb_setcolreg,
 	.fb_blank		= ffb_blank,
 	.fb_fillrect		= ffb_fillrect,
@@ -673,41 +669,6 @@ static void ffb_fixup_var_rgb(struct fb_var_screeninfo *var)
 }
 
 /**
- *      ffb_check_var - Optional function.  Validates a var passed in.
- *      @var: frame buffer variable screen structure
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int ffb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	if (var->bits_per_pixel != 32)
-		return -EINVAL;
-
-	if (var->xres_virtual != var->xres || var->yres_virtual != var->yres)
-		return -EINVAL;
-	if (var->nonstd)
-		return -EINVAL;
-	if ((var->vmode & FB_VMODE_MASK) != FB_VMODE_NONINTERLACED)
-		return -EINVAL;
-
-	if (var->xres != info->var.xres || var->yres != info->var.yres)
-		return -EINVAL;
-
-	ffb_fixup_var_rgb(var);
-
-	return 0;
-}
-
-/**
- *      ffb_set_par - Optional function.  Alters the hardware state.
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int
-ffb_set_par(struct fb_info *info)
-{
-	return 0;
-}
-
-/**
  *      ffb_setcolreg - Optional function. Sets a color register.
  *      @regno: boolean, 0 copy local, 1 get_user() function
  *      @red: frame buffer colormap structure
@@ -972,7 +933,6 @@ static void ffb_init_one(int node, int parent)
 		return;
 	}
 
-	ffb_set_par(&all->info);
 	ffb_init_fix(&all->info);
 
 	if (register_framebuffer(&all->info) < 0) {

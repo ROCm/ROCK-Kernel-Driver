@@ -27,8 +27,6 @@
  * Local functions.
  */
 
-static int p9100_check_var(struct fb_var_screeninfo *, struct fb_info *);
-static int p9100_set_par(struct fb_info *);
 static int p9100_setcolreg(unsigned, unsigned, unsigned, unsigned,
 			   unsigned, struct fb_info *);
 static int p9100_blank(int, struct fb_info *);
@@ -41,8 +39,6 @@ static int p9100_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 
 static struct fb_ops p9100_ops = {
 	.owner			= THIS_MODULE,
-	.fb_check_var		= p9100_check_var,
-	.fb_set_par		= p9100_set_par,
 	.fb_setcolreg		= p9100_setcolreg,
 	.fb_blank		= p9100_blank,
 	.fb_fillrect		= cfb_fillrect,
@@ -141,39 +137,6 @@ struct p9100_par {
 	struct sbus_dev		*sdev;
 	struct list_head	list;
 };
-
-/**
- *      p9100_check_var - Optional function.  Validates a var passed in.
- *      @var: frame buffer variable screen structure
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int p9100_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	if (var->bits_per_pixel != 8)
-		return -EINVAL;
-
-	if (var->xres_virtual != var->xres || var->yres_virtual != var->yres)
-		return -EINVAL;
-	if (var->nonstd)
-		return -EINVAL;
-	if ((var->vmode & FB_VMODE_MASK) != FB_VMODE_NONINTERLACED)
-		return -EINVAL;
-
-	if (var->xres != info->var.xres || var->yres != info->var.yres)
-		return -EINVAL;
-
-	return 0;
-}
-
-/**
- *      p9100_set_par - Optional function.  Alters the hardware state.
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int
-p9100_set_par(struct fb_info *info)
-{
-	return 0;
-}
 
 /**
  *      p9100_setcolreg - Optional function. Sets a color register.
@@ -344,7 +307,6 @@ static void p9100_init_one(struct sbus_dev *sdev)
 		return;
 	}
 
-	p9100_set_par(&all->info);
 	p9100_init_fix(&all->info, linebytes);
 
 	if (register_framebuffer(&all->info) < 0) {
