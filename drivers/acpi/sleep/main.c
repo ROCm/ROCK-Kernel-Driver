@@ -1,7 +1,7 @@
 /*
  * sleep.c - ACPI sleep support.
  * 
- *  Copyright (c) 2000-2002 Patrick Mochel
+ *  Copyright (c) 2000-2003 Patrick Mochel
  *
  *  Portions are
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
@@ -10,29 +10,15 @@
 
 #include <linux/delay.h>
 #include <linux/irq.h>
-#include <linux/pm.h>
 #include <linux/device.h>
 #include <linux/suspend.h>
-
-#include <asm/acpi.h>
-
 #include <acpi/acpi_bus.h>
-#include <acpi/acpi_drivers.h>
-
 #include "sleep.h"
 
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("sleep")
 
 u8 sleep_states[ACPI_S_STATE_COUNT];
-
-static void
-acpi_power_off (void)
-{
-	acpi_enter_sleep_state_prep(ACPI_STATE_S5);
-	ACPI_DISABLE_IRQS();
-	acpi_enter_sleep_state(ACPI_STATE_S5);
-}
 
 /**
  * acpi_system_restore_state - OS-specific restoration of state
@@ -265,7 +251,6 @@ acpi_suspend (
 
 static int __init acpi_sleep_init(void)
 {
-	acpi_status		status = AE_OK;
 	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_system_add_fs");
@@ -275,6 +260,7 @@ static int __init acpi_sleep_init(void)
 
 	printk(KERN_INFO PREFIX "(supports");
 	for (i=0; i<ACPI_S_STATE_COUNT; i++) {
+		acpi_status status;
 		u8 type_a, type_b;
 		status = acpi_get_sleep_type_data(i, &type_a, &type_b);
 		if (ACPI_SUCCESS(status)) {
@@ -285,16 +271,6 @@ static int __init acpi_sleep_init(void)
 	printk(")\n");
 
 	acpi_sleep_proc_init();
-
-	/* Install the soft-off (S5) handler. */
-	if (sleep_states[ACPI_STATE_S5]) {
-		pm_power_off = acpi_power_off;
-
-		/* workaround: some systems don't claim S4 support, but they
-                   do support S5 (power-down). That is all we need, so
-		   indicate support. */
-		sleep_states[ACPI_STATE_S4] = 1;
-	}
 
 	return_VALUE(0);
 }

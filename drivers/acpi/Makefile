@@ -30,6 +30,7 @@ obj-$(CONFIG_ACPI_INTERPRETER)	+= osl.o utils.o \
 #
 # ACPI Bus and Device Drivers
 #
+obj-y				+= sleep/
 obj-$(CONFIG_ACPI_BUS)		+= bus.o
 obj-$(CONFIG_ACPI_AC) 		+= ac.o
 obj-$(CONFIG_ACPI_BATTERY)	+= battery.o
@@ -42,7 +43,6 @@ obj-$(CONFIG_ACPI_PROCESSOR)	+= processor.o
 obj-$(CONFIG_ACPI_THERMAL)	+= thermal.o
 obj-$(CONFIG_ACPI_SYSTEM)	+= system.o event.o
 obj-$(CONFIG_ACPI_DEBUG)	+= debug.o
-obj-$(CONFIG_ACPI_SLEEP)	+= sleep/
 obj-$(CONFIG_ACPI_NUMA)		+= numa.o
 obj-$(CONFIG_ACPI_TOSHIBA)	+= toshiba_acpi.o
 obj-$(CONFIG_ACPI_BUS)		+= scan.o 
