@@ -288,7 +288,7 @@ static void init_hwif_data(ide_hwif_t *hwif, unsigned int index)
 
 		drive->type			= ATA_DISK;
 		drive->select.all		= (unit<<4)|0xa0;
-		drive->hwif			= hwif;
+		drive->channel			= hwif;
 		drive->ctl			= 0x08;
 		drive->ready_stat		= READY_STAT;
 		drive->bad_wstat		= BAD_W_STAT;
@@ -737,11 +737,6 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 		ide_task_t *args = (ide_task_t *) rq->special;
 		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
 		if (args) {
-			if (args->tf_in_flags.b.data) {
-				unsigned short data			= IN_WORD(IDE_DATA_REG);
-				args->tfRegister[IDE_DATA_OFFSET]	= (data) & 0xFF;
-				args->hobRegister[IDE_DATA_OFFSET_HOB]	= (data >> 8) & 0xFF;
-			}
 			args->tfRegister[IDE_ERROR_OFFSET]   = err;
 			args->tfRegister[IDE_NSECTOR_OFFSET] = IN_BYTE(IDE_NSECTOR_REG);
 			args->tfRegister[IDE_SECTOR_OFFSET]  = IN_BYTE(IDE_SECTOR_REG);

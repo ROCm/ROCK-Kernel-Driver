@@ -71,6 +71,9 @@ enum {
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 
+# define BAD_DMA_DRIVE		0
+# define GOOD_DMA_DRIVE		1
+
 typedef struct {
 	int	accessTime;
 	int	cycleTime;

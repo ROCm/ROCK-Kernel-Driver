@@ -664,6 +664,7 @@ static int pdc202xx_new_tune_chipset (ide_drive_t *drive, byte speed)
 			OUT_BYTE(0xac, datareg);
 			break;
 		default:
+			;
 	}
 
 	if (!drive->init_speed)

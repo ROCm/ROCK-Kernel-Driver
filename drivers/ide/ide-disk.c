@@ -189,8 +189,6 @@ static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, un
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
 	ide_cmd_type_parser(&args);
-	args.rq	= rq;
-	args.block = block;
 	rq->special = &args;
 
 	return ata_taskfile(drive,
@@ -198,7 +196,7 @@ static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, un
 			(struct hd_drive_hob_hdr *) &args.hobRegister,
 			args.handler,
 			args.prehandler,
-			args.rq);
+			rq);
 }
 
 static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
@@ -235,8 +233,6 @@ static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
 	ide_cmd_type_parser(&args);
-	args.rq = rq;
-	args.block = block;
 	rq->special = &args;
 
 	return ata_taskfile(drive,
@@ -244,7 +240,7 @@ static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, 
 			(struct hd_drive_hob_hdr *) &args.hobRegister,
 			args.handler,
 			args.prehandler,
-			args.rq);
+			rq);
 }
 
 /*
@@ -298,8 +294,6 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
 	ide_cmd_type_parser(&args);
-	args.rq = rq;
-	args.block = block;
 	rq->special = &args;
 
 	return ata_taskfile(drive,
@@ -307,7 +301,7 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 			(struct hd_drive_hob_hdr *) &args.hobRegister,
 			args.handler,
 			args.prehandler,
-			args.rq);
+			rq);
 }
 
 /*

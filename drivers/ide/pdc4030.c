@@ -658,9 +658,6 @@ ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigne
 	/* We don't use the generic inerrupt handlers here? */
 	args.prehandler		= NULL;
 	args.handler		= NULL;
-	args.rq			= rq;
-	args.block		= block;
-	rq->special		= NULL;
 	rq->special		= &args;
 
 	return do_pdc4030_io(drive, &args);

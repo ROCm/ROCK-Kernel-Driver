@@ -927,7 +927,7 @@ void ide_cmd_type_parser(ide_task_t *args)
 /*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
-static void ide_init_drive_taskfile (struct request *rq)
+static void init_taskfile_request(struct request *rq)
 {
 	memset(rq, 0, sizeof(*rq));
 	rq->flags = REQ_DRIVE_TASKFILE;
@@ -935,11 +935,12 @@ static void ide_init_drive_taskfile (struct request *rq)
 
 /*
  * This is kept for internal use only !!!
- * This is an internal call and nobody in user-space has a damn
+ * This is an internal call and nobody in user-space has a
  * reason to call this taskfile.
  *
  * ide_raw_taskfile is the one that user-space executes.
  */
+
 int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf)
 {
 	struct request rq;
@@ -965,7 +966,8 @@ int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, st
 	args.hobRegister[IDE_SELECT_OFFSET_HOB]  = hobfile->device_head;
 	args.hobRegister[IDE_CONTROL_OFFSET_HOB] = hobfile->control;
 
-	ide_init_drive_taskfile(&rq);
+	init_taskfile_request(&rq);
+
 	/* This is kept for internal use only !!! */
 	ide_cmd_type_parser(&args);
 	if (args.command_type != IDE_DRIVE_TASK_NO_DATA)
@@ -973,59 +975,26 @@ int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, st
 
 	rq.buffer = buf;
 	rq.special = &args;
+
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
 int ide_raw_taskfile(ide_drive_t *drive, ide_task_t *args, byte *buf)
 {
 	struct request rq;
-	ide_init_drive_taskfile(&rq);
+	init_taskfile_request(&rq);
 	rq.buffer = buf;
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors = (args->hobRegister[IDE_NSECTOR_OFFSET_HOB] << 8) | args->tfRegister[IDE_NSECTOR_OFFSET];
 
 	rq.special = args;
+
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
 /*
- *  The taskfile glue table
- *
- *  reqtask.data_phase	reqtask.req_cmd
- *			args.command_type		args.handler
- *
- *  TASKFILE_P_OUT_DMAQ	??				??
- *  TASKFILE_P_IN_DMAQ	??				??
- *  TASKFILE_P_OUT_DMA	??				??
- *  TASKFILE_P_IN_DMA	??				??
- *  TASKFILE_P_OUT	??				??
- *  TASKFILE_P_IN	??				??
- *
- *  TASKFILE_OUT_DMAQ	IDE_DRIVE_TASK_RAW_WRITE	NULL
- *  TASKFILE_IN_DMAQ	IDE_DRIVE_TASK_IN		NULL
- *
- *  TASKFILE_OUT_DMA	IDE_DRIVE_TASK_RAW_WRITE	NULL
- *  TASKFILE_IN_DMA	IDE_DRIVE_TASK_IN		NULL
- *
- *  TASKFILE_IN_OUT	??				??
- *
- *  TASKFILE_MULTI_OUT	IDE_DRIVE_TASK_RAW_WRITE	task_mulout_intr
- *  TASKFILE_MULTI_IN	IDE_DRIVE_TASK_IN		task_mulin_intr
- *
- *  TASKFILE_OUT	IDE_DRIVE_TASK_RAW_WRITE	task_out_intr
- *  TASKFILE_OUT	IDE_DRIVE_TASK_OUT		task_out_intr
- *
- *  TASKFILE_IN		IDE_DRIVE_TASK_IN		task_in_intr
- *  TASKFILE_NO_DATA	IDE_DRIVE_TASK_NO_DATA		task_no_data_intr
- *
- *			IDE_DRIVE_TASK_SET_XFER		task_no_data_intr
- *			IDE_DRIVE_TASK_INVALID
- *
- */
-
-/*
- * Issue ATA command and wait for completion. use for implementing commands in
+ * Issue ATA command and wait for completion. Use for implementing commands in
  * kernel.
  *
  * The caller has to make sure buf is never NULL!
