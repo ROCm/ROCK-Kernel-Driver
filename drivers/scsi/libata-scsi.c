@@ -1156,6 +1156,7 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 
 	switch(scsicmd[0]) {
 		/* no-op's, complete with success */
+		case SYNCHRONIZE_CACHE:		/* FIXME: temporary */
 		case REZERO_UNIT:
 		case SEEK_6:
 		case SEEK_10:
