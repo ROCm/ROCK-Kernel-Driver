@@ -516,6 +516,7 @@ static int nr_release(struct socket *sock)
 
 	if (sk == NULL) return 0;
 
+	sock_hold(sk);
 	lock_sock(sk);
 	nr = nr_sk(sk);
 
@@ -551,6 +552,7 @@ static int nr_release(struct socket *sock)
 
 	sock->sk   = NULL;	
 	release_sock(sk);
+	sock_put(sk);
 
 	return 0;
 }
