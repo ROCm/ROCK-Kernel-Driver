@@ -109,7 +109,7 @@ static struct hlist_head *fz_hash_alloc(int divisor)
 {
 	unsigned long size = divisor * sizeof(struct hlist_head);
 
-	if (divisor <= 1024) {
+	if (size <= PAGE_SIZE) {
 		return kmalloc(size, GFP_KERNEL);
 	} else {
 		return (struct hlist_head *)
@@ -141,11 +141,12 @@ static inline void fn_rebuild_zone(struct fn_zone *fz,
 
 static void fz_hash_free(struct hlist_head *hash, int divisor)
 {
-	if (divisor <= 1024)
+	unsigned long size = divisor * sizeof(struct hlist_head);
+
+	if (size <= PAGE_SIZE)
 		kfree(hash);
 	else
-		free_pages((unsigned long) hash,
-			   get_order(divisor * sizeof(struct hlist_head)));
+		free_pages((unsigned long)hash, get_order(size));
 }
 
 static void fn_rehash_zone(struct fn_zone *fz)
