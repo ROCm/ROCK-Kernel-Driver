@@ -10,7 +10,7 @@
 EXTRA_AFLAGS	:= -traditional
 USE_STANDARD_AS_RULE	:= true
 
-all: first_rule kernel.o head.o init_task.o
+all: kernel.o head.o init_task.o
 
 O_TARGET := kernel.o
 
@@ -36,9 +36,5 @@ ifdef CONFIG_VISWS
 obj-y += setup-visws.o
 obj-$(CONFIG_X86_VISWS_APIC)	+= visws_apic.o
 endif
-
-kernel-subdir-$(CONFIG_PCI)	+= pci
-subdir-y			:= $(kernel-subdir-y)
-obj-y				+= $(foreach dir,$(subdir-y),$(dir)/$(dir).o)
 
 include $(TOPDIR)/Rules.make

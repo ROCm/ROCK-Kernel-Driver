@@ -38,7 +38,7 @@
 #include <asm/uaccess.h>
 #include "cpqphp.h"
 #include "cpqphp_nvram.h"
-#include "../../arch/i386/kernel/pci/pci.h"	/* horrible hack showing how processor dependant we are... */
+#include "../../arch/i386/pci/pci.h"	/* horrible hack showing how processor dependant we are... */
 
 
 /* Global variables */
