@@ -108,5 +108,6 @@ obj-$(CONFIG_SND_VXP440) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-hwd
 obj-$(CONFIG_SND_VX222) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-hwdep.o
 obj-$(CONFIG_SND_BT87X) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_MIXART) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-hwdep.o
+obj-$(CONFIG_SND_PDAUDIOCF) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 
 obj-m := $(sort $(obj-m))

@@ -1179,6 +1179,16 @@ Module parameters
 
     The power-management is supported.
 
+  Module snd-pdaudiocf
+  --------------------
+
+    Module for Sound Core PDAudioCF soundcard.
+
+    irq_mask	  - IRQ mask (PCMCIA type)
+    irq_list	  - List of available interrupts for this soundcard
+
+    Note: the driver is build only when CONFIG_ISA is set.
+
 
 Configuring Non-ISAPNP Cards
 ============================
