@@ -1196,8 +1196,10 @@ static struct file_operations proc_pid_attr_operations = {
 	.write		= proc_pid_attr_write,
 };
 
-static struct file_operations proc_attr_operations;
-static struct inode_operations proc_attr_inode_operations;
+static struct file_operations proc_tid_attr_operations;
+static struct inode_operations proc_tid_attr_inode_operations;
+static struct file_operations proc_tgid_attr_operations;
+static struct inode_operations proc_tgid_attr_inode_operations;
 #endif
 
 /* SMP-safe */
@@ -1304,10 +1306,14 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			break;
 #ifdef CONFIG_SECURITY
 		case PROC_TID_ATTR:
+			inode->i_nlink = 2;
+			inode->i_op = &proc_tid_attr_inode_operations;
+			inode->i_fop = &proc_tid_attr_operations;
+			break;
 		case PROC_TGID_ATTR:
 			inode->i_nlink = 2;
-			inode->i_op = &proc_attr_inode_operations;
-			inode->i_fop = &proc_attr_operations;
+			inode->i_op = &proc_tgid_attr_inode_operations;
+			inode->i_fop = &proc_tgid_attr_operations;
 			break;
 		case PROC_TID_ATTR_CURRENT:
 		case PROC_TGID_ATTR_CURRENT:

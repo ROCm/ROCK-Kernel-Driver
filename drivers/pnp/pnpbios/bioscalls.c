@@ -23,41 +23,7 @@
 #include <asm/system.h>
 #include <asm/byteorder.h>
 
-
-/* PnP BIOS signature: "$PnP" */
-#define PNP_SIGNATURE   (('$' << 0) + ('P' << 8) + ('n' << 16) + ('P' << 24))
-
-#pragma pack(1)
-union pnp_bios_expansion_header {
-	struct {
-		u32 signature;    /* "$PnP" */
-		u8 version;	  /* in BCD */
-		u8 length;	  /* length in bytes, currently 21h */
-		u16 control;	  /* system capabilities */
-		u8 checksum;	  /* all bytes must add up to 0 */
-
-		u32 eventflag;    /* phys. address of the event flag */
-		u16 rmoffset;     /* real mode entry point */
-		u16 rmcseg;
-		u16 pm16offset;   /* 16 bit protected mode entry */
-		u32 pm16cseg;
-		u32 deviceID;	  /* EISA encoded system ID or 0 */
-		u16 rmdseg;	  /* real mode data segment */
-		u32 pm16dseg;	  /* 16 bit pm data segment base */
-	} fields;
-	char chars[0x21];	  /* To calculate the checksum */
-};
-#pragma pack()
-
-static union pnp_bios_expansion_header * pnp_bios_hdr = NULL;
-
-/*
- * Call this only after init time
- */
-static int pnp_bios_present(void)
-{
-	return (pnp_bios_hdr != NULL);
-}
+#include "pnpbios.h"
 
 static struct {
 	u16	offset;
@@ -557,10 +523,10 @@ static int pnp_bios_write_escd(char *data, u32 nvram_base)
 
 
 /*
- * Probing and Initialization
+ * Initialization
  */
 
-static void pnpbios_prepare_bios_calls(union pnp_bios_expansion_header *header)
+void pnpbios_calls_init(union pnp_bios_install_struct *header)
 {
 	int i;
 	spin_lock_init(&pnp_bios_lock);
@@ -575,53 +541,4 @@ static void pnpbios_prepare_bios_calls(union pnp_bios_expansion_header *header)
 		Q_SET_SEL(i, PNP_CS16, header->fields.pm16cseg, 64 * 1024);
 		Q_SET_SEL(i, PNP_DS, header->fields.pm16dseg, 64 * 1024);
 	}
-}
-
-int pnpbios_probe_installation(void)
-{
-	union pnp_bios_expansion_header *check;
-	u8 sum;
-	int length, i;
-
-	printk(KERN_INFO "PnPBIOS: Scanning system for PnP BIOS support...\n");
-
-	/*
- 	 * Search the defined area (0xf0000-0xffff0) for a valid PnP BIOS
-	 * structure and, if one is found, sets up the selectors and
-	 * entry points
-	 */
-	for (check = (union pnp_bios_expansion_header *) __va(0xf0000);
-	     check < (union pnp_bios_expansion_header *) __va(0xffff0);
-	     ((void *) (check)) += 16) {
-		if (check->fields.signature != PNP_SIGNATURE)
-			continue;
-		printk(KERN_INFO "PnPBIOS: Found PnP BIOS installation structure at 0x%p\n", check);
-		length = check->fields.length;
-		if (!length) {
-			printk(KERN_ERR "PnPBIOS: installation structure is invalid, skipping\n");
-			continue;
-		}
-		for (sum = 0, i = 0; i < length; i++)
-			sum += check->chars[i];
-		if (sum) {
-			printk(KERN_ERR "PnPBIOS: installation structure is corrupted, skipping\n");
-			continue;
-		}
-		if (check->fields.version < 0x10) {
-			printk(KERN_WARNING "PnPBIOS: PnP BIOS version %d.%d is not supported\n",
-			       check->fields.version >> 4,
-			       check->fields.version & 15);
-			continue;
-		}
-		printk(KERN_INFO "PnPBIOS: PnP BIOS version %d.%d, entry 0x%x:0x%x, dseg 0x%x\n",
-                       check->fields.version >> 4, check->fields.version & 15,
-		       check->fields.pm16cseg, check->fields.pm16offset,
-		       check->fields.pm16dseg);
-		pnp_bios_hdr = check;
-		pnpbios_prepare_bios_calls(check);
-		return 1;
-	}
-
-	printk(KERN_INFO "PnPBIOS: PnP BIOS support was not detected.\n");
-	return 0;
 }
