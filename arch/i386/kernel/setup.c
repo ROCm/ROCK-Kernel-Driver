@@ -1168,7 +1168,7 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
  */
 static void __init register_memory(void)
 {
-	unsigned long gapsize;
+	unsigned long gapstart, gapsize;
 	unsigned long long last;
 	int	      i;
 
@@ -1184,8 +1184,12 @@ static void __init register_memory(void)
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 
-	/* Tell the PCI layer not to allocate too close to the RAM area.. */
+	/*
+	 * Search for the bigest gap in the low 32 bits of the e820
+	 * memory space.
+	 */
 	last = 0x100000000ull;
+	gapstart = 0x10000000;
 	gapsize = 0x400000;
 	i = e820.nr_map;
 	while (--i >= 0) {
@@ -1201,13 +1205,25 @@ static void __init register_memory(void)
 
 			if (gap > gapsize) {
 				gapsize = gap;
-				pci_mem_start = ((unsigned long) end + 0xfffff) & ~0xfffff;
+				gapstart = end;
 			}
 		}
 		if (start < last)
 			last = start;
 	}
-	printk("Allocating PCI resources starting at %08lx\n", pci_mem_start);
+
+	/*
+	 * Start allocating dynamic PCI memory a bit into the gap,
+	 * aligned up to the nearest megabyte.
+	 *
+	 * Question: should we try to pad it up a bit (do something
+	 * like " + (gapsize >> 3)" in there too?). We now have the
+	 * technology.
+	 */
+	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
+
+	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
+		pci_mem_start, gapstart, gapsize);
 }
 
 /* Use inline assembly to define this because the nops are defined 
