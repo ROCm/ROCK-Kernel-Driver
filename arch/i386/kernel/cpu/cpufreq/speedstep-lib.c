@@ -252,11 +252,10 @@ unsigned int speedstep_detect_processor (void)
 			 * specific.
 			 * M-P4-Ms may have either ebx=0xe or 0xf [see above]
 			 * M-P4/533 have either ebx=0xe or 0xf. [25317607.pdf]
-			 * So, how to distinguish all those processors with
-			 * ebx=0xf? I don't know. Sort them out, and wait
-			 * for someone to complain.
+			 * also, M-P4M HTs have ebx=0x8, too
+			 * For now, they are distinguished by the model_id string
 			 */
-			if (ebx == 0x0e)
+		        if ((ebx == 0x0e) || (strstr(c->x86_model_id,"Mobile Intel(R) Pentium(R) 4") != NULL)) 
 				return SPEEDSTEP_PROCESSOR_P4M;
 			break;
 		default:
@@ -321,9 +320,7 @@ EXPORT_SYMBOL_GPL(speedstep_detect_processor);
 unsigned int speedstep_get_freqs(unsigned int processor,
 				  unsigned int *low_speed,
 				  unsigned int *high_speed,
-				  void (*set_state) (unsigned int state,
-						     unsigned int notify)
-				 )
+				  void (*set_state) (unsigned int state))
 {
 	unsigned int prev_speed;
 	unsigned int ret = 0;
@@ -340,7 +337,7 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	local_irq_save(flags);
 
 	/* switch to low state */
-	set_state(SPEEDSTEP_LOW, 0);
+	set_state(SPEEDSTEP_LOW);
 	*low_speed = speedstep_get_processor_frequency(processor);
 	if (!*low_speed) {
 		ret = -EIO;
@@ -348,7 +345,7 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	}
 
 	/* switch to high state */
-	set_state(SPEEDSTEP_HIGH, 0);
+	set_state(SPEEDSTEP_HIGH);
 	*high_speed = speedstep_get_processor_frequency(processor);
 	if (!*high_speed) {
 		ret = -EIO;
@@ -362,7 +359,7 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 
 	/* switch to previous state, if necessary */
 	if (*high_speed != prev_speed)
-		set_state(SPEEDSTEP_LOW, 0);
+		set_state(SPEEDSTEP_LOW);
 
  out:
 	local_irq_restore(flags);
