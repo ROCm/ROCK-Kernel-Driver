@@ -39,8 +39,8 @@ typedef struct {
  * - ( bit 26 is the PREEMPT_ACTIVE flag. )
  *
  * PREEMPT_MASK: 0x000000ff
- * HARDIRQ_MASK: 0x0000ff00
- * SOFTIRQ_MASK: 0x00ff0000
+ * SOFTIRQ_MASK: 0x0000ff00
+ * HARDIRQ_MASK: 0x00ff0000
  */
 
 #define PREEMPT_BITS    8
