@@ -183,8 +183,16 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 			struct net_device *dev = sprt->rt6i_dev;
 			if (dev->ifindex == oif)
 				return sprt;
-			if (dev->flags&IFF_LOOPBACK)
+			if (dev->flags & IFF_LOOPBACK) {
+				if (sprt->rt6i_idev->dev->ifindex != oif) {
+					if (strict && oif)
+						continue;
+					if (local && (!oif || 
+						      local->rt6i_idev->dev->ifindex == oif))
+						continue;
+				}
 				local = sprt;
+			}
 		}
 
 		if (local)
