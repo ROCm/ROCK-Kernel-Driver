@@ -362,6 +362,14 @@ void sctp_association_free(struct sctp_association *asoc)
 
 	asoc->eyecatcher = 0;
 
+	/* Free any cached ASCONF_ACK chunk. */
+	if (asoc->addip_last_asconf_ack)
+		sctp_chunk_free(asoc->addip_last_asconf_ack);
+
+	/* Free any cached ASCONF chunk. */
+	if (asoc->addip_last_asconf)
+		sctp_chunk_free(asoc->addip_last_asconf);
+
 	sctp_association_put(asoc);
 }
 
@@ -523,6 +531,45 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 		asoc->peer.retran_path = peer;
 
 	return peer;
+}
+
+/* Delete a transport address from an association.  */
+void sctp_assoc_del_peer(struct sctp_association *asoc,
+			 const union sctp_addr *addr)
+{
+	struct list_head	*pos;
+	struct list_head	*temp;
+	struct sctp_transport	*peer = NULL;
+	struct sctp_transport	*transport;
+
+	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
+		transport = list_entry(pos, struct sctp_transport, transports);
+		if (sctp_cmp_addr_exact(addr, &transport->ipaddr)) {
+			peer = transport;
+			list_del(pos);
+			break;
+		}
+	}
+
+	/* The address we want delete is not in the association. */
+	if (!peer)
+		return;
+
+	/* Get the first transport of asoc. */ 
+	pos = asoc->peer.transport_addr_list.next;
+	transport = list_entry(pos, struct sctp_transport, transports);
+
+	/* Update any entries that match the peer to be deleted. */  
+	if (asoc->peer.primary_path == peer)
+		sctp_assoc_set_primary(asoc, transport);
+	if (asoc->peer.active_path == peer)
+		asoc->peer.active_path = transport;
+	if (asoc->peer.retran_path == peer)
+		asoc->peer.retran_path = transport;
+	if (asoc->peer.last_data_from == peer)
+		asoc->peer.last_data_from = transport;
+
+	sctp_transport_free(peer);
 }
 
 /* Lookup a transport by address. */
