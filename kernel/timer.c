@@ -630,6 +630,7 @@ unsigned long wall_jiffies;
  * This spinlock protect us from races in SMP while playing with xtime. -arca
  */
 rwlock_t xtime_lock = RW_LOCK_UNLOCKED;
+unsigned long last_time_offset;
 
 static inline void update_times(void)
 {
@@ -647,6 +648,7 @@ static inline void update_times(void)
 		wall_jiffies += ticks;
 		update_wall_time(ticks);
 	}
+	last_time_offset = 0;
 	write_unlock_irq(&xtime_lock);
 	calc_load(ticks);
 }

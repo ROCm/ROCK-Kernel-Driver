@@ -39,6 +39,7 @@ struct timezone sys_tz;
 /* The xtime_lock is not only serializing the xtime read/writes but it's also
    serializing all accesses to the global NTP variables now. */
 extern rwlock_t xtime_lock;
+extern unsigned long last_time_offset;
 
 #if !defined(__alpha__) && !defined(__ia64__)
 
@@ -82,6 +83,7 @@ asmlinkage long sys_stime(int * tptr)
 	write_lock_irq(&xtime_lock);
 	xtime.tv_sec = value;
 	xtime.tv_usec = 0;
+	last_time_offset = 0;
 	time_adjust = 0;	/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
@@ -127,6 +129,7 @@ inline static void warp_clock(void)
 {
 	write_lock_irq(&xtime_lock);
 	xtime.tv_sec += sys_tz.tz_minuteswest * 60;
+	last_time_offset = 0;
 	write_unlock_irq(&xtime_lock);
 }
 
@@ -386,6 +389,7 @@ leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
 	txc->calcnt	   = pps_calcnt;
 	txc->errcnt	   = pps_errcnt;
 	txc->stbcnt	   = pps_stbcnt;
+	last_time_offset = 0;
 	write_unlock_irq(&xtime_lock);
 	do_gettimeofday(&txc->time);
 	return(result);
