@@ -290,7 +290,7 @@
 				DPRINTK("match[%d]: 0x%p/0x%p(0x%x), %d/%d\n",i,
 				    list[i].start,start,1 << order,list[i].order,order);
 				list[i] = list[--len];
-				start = (unsigned long)start & ~ (1 << order);
+				start = (void __iomem *) (((unsigned long)start) & ~ (1 << order));
 				order++;
 				i = -1;
 				continue;
@@ -2141,7 +2141,7 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 
 		if (!tx->send) continue;
 		if (!--left) {
-			return sprintf(page,"tx[%d]:    0x%p-0x%p "
+			return sprintf(page,"tx[%d]:    0x%06d-0x%06ild "
 			    "(%6ld bytes), rsv %d cps, shp %d cps%s\n",i,
 			    tx->send-eni_dev->ram,
 			    tx->send-eni_dev->ram+tx->words*4-1,tx->words*4,
@@ -2167,7 +2167,7 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 			if (--left) continue;
 			length = sprintf(page,"vcc %4d: ",vcc->vci);
 			if (eni_vcc->rx) {
-				length += sprintf(page+length,"0x%p-0x%p "
+				length += sprintf(page+length,"0x%06d-0x%06ld "
 				    "(%6ld bytes)",
 				    eni_vcc->recv-eni_dev->ram,
 				    eni_vcc->recv-eni_dev->ram+eni_vcc->words*4-1,
@@ -2185,11 +2185,11 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 	read_unlock(&vcc_sklist_lock);
 	for (i = 0; i < eni_dev->free_len; i++) {
 		struct eni_free *fe = eni_dev->free_list+i;
-		unsigned long offset;
+		void __iomem *offset;
 
 		if (--left) continue;
 		offset = eni_dev->ram+eni_dev->base_diff;
-		return sprintf(page,"free      0x%p-0x%p (%6d bytes)\n",
+		return sprintf(page,"free      0x%06ld-0x%06ld (%6d bytes)\n",
 		    fe->start-offset,fe->start-offset+(1 << fe->order)-1,
 		    1 << fe->order);
 	}

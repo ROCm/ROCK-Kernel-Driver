@@ -2054,7 +2054,7 @@ static int tx_init(struct atm_dev *dev)
         IF_INIT(printk("CBR_TAB_BEG = 0x%x, CBR_TAB_END = 0x%x, CBR_PTR = 0x%x\n",
           readw(iadev->seg_reg+CBR_TAB_BEG), readw(iadev->seg_reg+CBR_TAB_END),
           readw(iadev->seg_reg+CBR_TAB_END+1));)
-        tmp16 = (u_short) (iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize);
+        tmp16 = (u_short) ((unsigned long)iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize);
 
         /* Initialize the CBR Schedualing Table */
         memset((caddr_t)(iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize), 
@@ -2288,7 +2288,8 @@ static int reset_sar(struct atm_dev *dev)
 static int __init ia_init(struct atm_dev *dev)
 {  
 	IADEV *iadev;  
-	unsigned long real_base, base;  
+	unsigned long real_base;
+	void __iomem *base;
 	unsigned short command;  
 	unsigned char revision;  
 	int error, i; 
@@ -2344,7 +2345,7 @@ static int __init ia_init(struct atm_dev *dev)
 	udelay(10);  
 	  
 	/* mapping the physical address to a virtual address in address space */  
-	base=(unsigned long)ioremap((unsigned long)real_base,iadev->pci_map_size);  /* ioremap is not resolved ??? */  
+	base = ioremap((unsigned long)real_base,iadev->pci_map_size);  /* ioremap is not resolved ??? */  
 	  
 	if (!base)  
 	{  
@@ -2372,7 +2373,7 @@ static int __init ia_init(struct atm_dev *dev)
 	iadev->dma = (u32 *) (base + PHY_BASE);  
 	/* RAM - Segmentation RAm and Reassembly RAM */  
 	iadev->ram = (u32 *) (base + ACTUAL_RAM_BASE);  
-	iadev->seg_ram =  (base + ACTUAL_SEG_RAM_BASE);  
+	iadev->seg_ram =  (base + ACTUAL_SEG_RAM_BASE); 
 	iadev->reass_ram = (base + ACTUAL_REASS_RAM_BASE);  
   
 	/* lets print out the above */  

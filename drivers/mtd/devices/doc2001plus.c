@@ -371,7 +371,7 @@ static void DoC_ScanChips(struct DiskOnChip *this)
 		printk(KERN_NOTICE "Setting DiskOnChip Millennium Plus interleave to %s\n",
 		       this->interleave?"on (16-bit)":"off (8-bit)");
 		conf ^= 4;
-		WriteDOC(this->virtadr, conf, Mplus_Configuration);
+		WriteDOC(conf, this->virtadr, Mplus_Configuration);
 	}
 
 	/* For each floor, find the number of valid chips it contains */

@@ -413,7 +413,7 @@ static int __init init_dnpc(void)
 	}
 	simple_map_init(&dnpc_map);
 
-	printk("FLASH virtual address: 0x%lx\n", dnpc_map.virt);
+	printk("FLASH virtual address: 0x%p\n", dnpc_map.virt);
 
 	mymtd = do_map_probe("jedec_probe", &dnpc_map);
 

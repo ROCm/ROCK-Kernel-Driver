@@ -64,7 +64,7 @@ static struct mtd_info *mymtd;
 
 int __init init_pnc2000(void)
 {
-	printk(KERN_NOTICE "Photron PNC-2000 flash mapping: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
+	printk(KERN_NOTICE "Photron PNC-2000 flash mapping: %x at %p\n", WINDOW_SIZE, WINDOW_ADDR);
 
 	simple_map_init(&pnc_map);
 

@@ -252,7 +252,7 @@ static void doc2000_readbuf_dword(struct mtd_info *mtd,
 {
 	struct nand_chip *this = mtd->priv;
 	struct doc_priv *doc = (void *)this->priv;
-	unsigned long docptr = doc->virtadr;
+	void __iomem * docptr = doc->virtadr;
  	int i;
 
 	if (debug) printk("readbuf_dword of %d bytes: ", len);
@@ -305,7 +305,7 @@ static uint16_t __init doc200x_ident_chip(struct mtd_info *mtd, int nr)
 			uint32_t dword;
 			uint8_t byte[4];
 		} ident;
-		unsigned long docptr = doc->virtadr;
+		void __iomem * docptr = doc->virtadr;
 
 		doc200x_hwcontrol(mtd, NAND_CTL_SETCLE);
 		doc2000_write_byte(mtd, NAND_CMD_READID);

@@ -49,11 +49,11 @@ always fail.  So we don't do it.  I just hope it doesn't break anything.
 #define WINDOW_LENGTH (1 << WINDOW_SHIFT)
 /* The bits for the offset into the window. */
 #define WINDOW_MASK (WINDOW_LENGTH-1)
-#define PAGE_IO (void __iomem *)0x22
+#define PAGE_IO 0x22
 #define PAGE_IO_SIZE 2
 
 static volatile int page_in_window = -1; // Current page in window.
-static unsigned long iomapadr;
+static void __iomem * iomapadr;
 static spinlock_t elan_104nc_spin = SPIN_LOCK_UNLOCKED;
 
 /* partition_info gives details on the logical partitions that the split the 
@@ -182,7 +182,7 @@ static void cleanup_elan_104nc(void)
 		map_destroy( all_mtd );
 	}
 
-	iounmap((void *)iomapadr);
+	iounmap(iomapadr);
 }
 
 int __init init_elan_104nc(void)
@@ -190,7 +190,7 @@ int __init init_elan_104nc(void)
 	/* Urg! We use I/O port 0x22 without request_region()ing it,
 	   because it's already allocated to the PIC. */
 
-  	iomapadr = (unsigned long)ioremap(WINDOW_START, WINDOW_LENGTH);
+  	iomapadr = ioremap(WINDOW_START, WINDOW_LENGTH);
 	if (!iomapadr) {
 		printk( KERN_ERR"%s: failed to ioremap memory region\n",
 			elan_104nc_map.name );

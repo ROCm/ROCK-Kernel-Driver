@@ -55,7 +55,7 @@ static inline void __iomem * addr(struct map_info *map, unsigned long ofs)
 	if (offset >= (4*1024*1024)) {
 		offset += 0x400000;
 	}
-	return map->map_priv_1 + 0x400000 + offset;
+	return (void __iomem *)map->map_priv_1 + 0x400000 + offset;
 }
 
 static inline unsigned long dbg_addr(struct map_info *map, unsigned long addr)
@@ -167,7 +167,7 @@ static int ichxrom_set_lock_state(struct mtd_info *mtd, loff_t ofs, size_t len,
 	start = start & ~0xFFFF;
 	end = end & ~0xFFFF;
 	while (start <= end) {
-		unsigned long ctrl_addr;
+		void __iomem * ctrl_addr;
 		ctrl_addr = addr(map, start) - 0x400000 + 2;
 		writeb(state, ctrl_addr);
 		start = start + 0x10000;
