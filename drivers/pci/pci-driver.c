@@ -235,7 +235,7 @@ store_new_id(struct device_driver * driver, const char * buf, size_t count)
 		driver_data : 0UL;
 
 	spin_lock(&pdrv->dynids.lock);
-	list_add(&pdrv->dynids.list, &dynid->node);
+	list_add_tail(&pdrv->dynids.list, &dynid->node);
 	spin_unlock(&pdrv->dynids.lock);
 
 	bus = get_bus(pdrv->driver.bus);
@@ -315,6 +315,22 @@ pci_init_dynids(struct pci_dynids *dynids)
 	INIT_LIST_HEAD(&dynids->list);
 }
 
+static void
+pci_free_dynids(struct pci_driver *drv)
+{
+	struct list_head *pos, *n;
+	struct dynid *dynid;
+
+	spin_lock(&drv->dynids.lock);
+	list_for_each_safe(pos, n, &drv->dynids.list) {
+		dynid = list_entry(pos, struct dynid, node);
+		list_del(&dynid->node);
+		kfree(dynid);
+	}
+	spin_unlock(&drv->dynids.lock);
+}
+
+
 /**
  * pci_register_driver - register a new pci driver
  * @drv: the driver structure to register
@@ -363,6 +379,7 @@ void
 pci_unregister_driver(struct pci_driver *drv)
 {
 	driver_unregister(&drv->driver);
+	pci_free_dynids(drv);
 }
 
 static struct pci_driver pci_compat_driver = {
