@@ -18,6 +18,7 @@
 #include <linux/kmod.h>
 #include <linux/interrupt.h>
 #include "base.h"
+#include "fs/fs.h"
 
 /*
  * hotplugging invokes what /proc/sys/kernel/hotplug says (normally
@@ -32,14 +33,16 @@
 int dev_hotplug (struct device *dev, const char *action)
 {
 	char *argv [3], **envp, *buffer, *scratch;
+	char *dev_path;
 	int retval;
 	int i = 0;
+	int dev_length;
 
 	pr_debug ("%s\n", __FUNCTION__);
 	if (!dev)
 		return -ENODEV;
 
-	if (!dev->bus || !dev->bus->hotplug)
+	if (!dev->bus)
 		return -ENODEV;
 
 	if (!hotplug_path [0])
@@ -66,6 +69,18 @@ int dev_hotplug (struct device *dev, const char *action)
 		return -ENOMEM;
 	}
 
+	dev_length = get_devpath_length (dev);
+	dev_length += strlen("root");
+	dev_path = kmalloc (dev_length, GFP_KERNEL);
+	if (!dev_path) {
+		kfree (buffer);
+		kfree (envp);
+		return -ENOMEM;
+	}
+	memset (dev_path, 0x00, dev_length);
+	strcpy (dev_path, "root");
+	fill_devpath (dev, dev_path, dev_length);
+
 	/* only one standardized param to hotplug command: the bus name */
 	argv [0] = hotplug_path;
 	argv [1] = dev->bus->name;
@@ -77,26 +92,33 @@ int dev_hotplug (struct device *dev, const char *action)
 
 	scratch = buffer;
 
-	/* action:  add, remove */
 	envp [i++] = scratch;
 	scratch += sprintf (scratch, "ACTION=%s", action) + 1;
 
-	/* have the bus specific function set up the rest of the environment */
-	retval = dev->bus->hotplug (dev, &envp[i], NUM_ENVP - i,
-				    scratch, BUFFER_SIZE - (scratch - buffer));
-	if (retval) {
-		pr_debug ("%s - hotplug() returned %d\n", __FUNCTION__, retval);
-		goto exit;
+	envp [i++] = scratch;
+	scratch += sprintf (scratch, "DEVICE=%s", dev_path) + 1;
+	
+	if (dev->bus->hotplug) {
+		/* have the bus specific function add its stuff */
+		retval = dev->bus->hotplug (dev, &envp[i], NUM_ENVP - i,
+					    scratch,
+					    BUFFER_SIZE - (scratch - buffer));
+		if (retval) {
+			pr_debug ("%s - hotplug() returned %d\n",
+				  __FUNCTION__, retval);
+			goto exit;
+		}
 	}
 
 	pr_debug ("%s: %s %s %s %s %s %s\n", __FUNCTION__, argv [0], argv[1],
-		  action, envp[0], envp[1], envp[2]);
+		  envp[0], envp[1], envp[2], envp[3]);
 	retval = call_usermodehelper (argv [0], argv, envp);
 	if (retval)
 		pr_debug ("%s - call_usermodehelper returned %d\n",
 			  __FUNCTION__, retval);
 
 exit:
+	kfree (dev_path);
 	kfree (buffer);
 	kfree (envp);
 	return retval;
