@@ -22,7 +22,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <linux/sys.h>
+#include <asm/unistd.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>

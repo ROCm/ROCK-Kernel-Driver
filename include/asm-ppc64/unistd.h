@@ -251,6 +251,9 @@
 #define __NR_sys_epoll_wait	238
 #define __NR_remap_file_pages	239
 
+#define NR_syscalls		260
+
+#ifndef __ASSEMBLY__
 #ifdef __KERNEL_SYSCALLS__
 
 /*
@@ -283,5 +286,7 @@ extern pid_t waitpid(pid_t pid, int *wait_stat, int options);
  * but it doesn't work on all toolchains, so we just do it by hand
  */
 #define cond_syscall(x) asm(".weak\t." #x "\n\t.set\t." #x ",.sys_ni_syscall");
+
+#endif		/* __ASSEMBLY__ */
 
 #endif /* _ASM_PPC_UNISTD_H_ */
