@@ -15,10 +15,14 @@
  * there are eight internal interrupts for the on-chip serial port
  * (SPU), DMA controller, and JTAG controller.
  *
- * The PowerPC 405 cores' Universal Interrupt Controller (UIC) has 32
- * possible interrupts as well. There are seven, configurable external
- * interrupt pins and there are 17 internal interrupts for the on-chip
- * serial port, DMA controller, on-chip Ethernet controller, PCI, etc.
+ * The PowerPC 405/440 cores' Universal Interrupt Controller (UIC) has
+ * 32 possible interrupts as well.  Depending on the core and SoC
+ * implementation, a portion of the interrrupts are used for on-chip
+ * peripherals and a portion of the interrupts are available to be
+ * configured for external devices generating interrupts.
+ *
+ * The PowerNP and 440GP (and most likely future implementations) have
+ * cascaded UICs.
  *
  */
 
@@ -30,11 +34,9 @@
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/irq.h>
-#include <asm/ibm4xx.h>
 #include <asm/ppc4xx_pic.h>
 
 /* Global Variables */
-
 struct hw_interrupt_type *ppc4xx_pic;
 
 /* Six of one, half dozen of the other....#ifdefs, separate files,
@@ -128,7 +130,11 @@ ppc403_aic_disable_and_ack(unsigned int irq)
 	mtdcr(DCRN_EXISR, (1 << (31 - bit)));
 }
 
-#else				/* !CONFIG_403 */
+#else
+
+#ifndef UIC1
+#define UIC1 UIC0
+#endif
 
 static void
 ppc405_uic_enable(unsigned int irq)
@@ -137,9 +143,18 @@ ppc405_uic_enable(unsigned int irq)
 
 	bit = irq & 0x1f;
 	word = irq >> 5;
-
+#ifdef UIC_DEBUG	
+	printk("ppc405_uic_enable - irq %d word %d bit 0x%x\n",irq, word , bit);
+#endif
 	ppc_cached_irq_mask[word] |= 1 << (31 - bit);
-	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
+	switch (word){
+		case 0:
+			mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+		break;
+		case 1:
+			mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+		break;
+	}
 }
 
 static void
@@ -149,9 +164,18 @@ ppc405_uic_disable(unsigned int irq)
 
 	bit = irq & 0x1f;
 	word = irq >> 5;
-
+#ifdef UIC_DEBUG	
+	printk("ppc405_uic_disable - irq %d word %d bit 0x%x\n",irq, word , bit);
+#endif
 	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
-	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
+	switch (word){
+		case 0:
+			mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+		break;
+		case 1:
+			mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+		break;
+	}
 }
 
 static void
@@ -162,9 +186,20 @@ ppc405_uic_disable_and_ack(unsigned int irq)
 	bit = irq & 0x1f;
 	word = irq >> 5;
 
+#ifdef UIC_DEBUG	
+printk("ppc405_uic_disable_and_ack - irq %d word %d bit 0x%x\n",irq, word , bit);
+#endif
 	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
-	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
-	mtdcr(DCRN_UIC0_SR, (1 << (31 - bit)));
+	switch (word){
+		case 0:
+			mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+			mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - bit)));
+		break;
+		case 1:	
+			mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+			mtdcr(DCRN_UIC_SR(UIC1), (1 << (31 - bit)));
+		break;
+	}
 }
 
 static void
@@ -176,23 +211,49 @@ ppc405_uic_end(unsigned int irq)
 	bit = irq & 0x1f;
 	word = irq >> 5;
 
-	tr_bits = mfdcr(DCRN_UIC0_TR);
+#ifdef UIC_DEBUG	
+	printk("ppc405_uic_end - irq %d word %d bit 0x%x\n",irq, word , bit);
+#endif
+
+	switch (word){
+		case 0:
+			tr_bits = mfdcr(DCRN_UIC_TR(UIC0));
+		break;
+		case 1:
+			tr_bits = mfdcr(DCRN_UIC_TR(UIC1));
+		break;
+	}
+
 	if ((tr_bits & (1 << (31 - bit))) == 0) {
 		/* level trigger */
-		mtdcr(DCRN_UIC0_SR, 1 << (31 - bit));
+		switch (word){
+			case 0:
+				mtdcr(DCRN_UIC_SR(UIC0), 1 << (31 - bit));
+			break;
+			case 1:
+				mtdcr(DCRN_UIC_SR(UIC1), 1 << (31 - bit));
+			break;
+		}
 	}
 
 	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
 		ppc_cached_irq_mask[word] |= 1 << (31 - bit);
-		mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
+		switch (word){
+			case 0:
+				mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+			break;
+			case 1:
+				mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+			break;
+		}
 	}
 }
 
 static struct hw_interrupt_type ppc405_uic = {
-#if defined (CONFIG_405GP)
-	"405GP UIC",
+#if (NR_UICS == 1)
+	"IBM UIC",
 #else
-	"NP405 UIC",
+	"IBM UIC Cascade",
 #endif
 	NULL,
 	NULL,
@@ -206,16 +267,27 @@ static struct hw_interrupt_type ppc405_uic = {
 int
 ppc405_pic_get_irq(struct pt_regs *regs)
 {
-	int irq;
+	int irq, cas_irq;
 	unsigned long bits;
-
+	cas_irq = 0;
 	/*
 	 * Only report the status of those interrupts that are actually
 	 * enabled.
 	 */
 
-	bits = mfdcr(DCRN_UIC0_MSR);
+	bits = mfdcr(DCRN_UIC_MSR(UIC0));
 
+#if (NR_UICS > 1) 
+	if (bits & UIC_CASCADE_MASK){
+		bits = mfdcr(DCRN_UIC_MSR(UIC1));
+		cas_irq = 32 - ffs(bits);
+		irq = 32 + cas_irq;
+	} else {
+		irq = 32 - ffs(bits);
+		if (irq == 32)
+			irq= -1;
+	}
+#else
 	/*
 	 * Walk through the interrupts from highest priority to lowest, and
 	 * report the first pending interrupt found.
@@ -223,9 +295,13 @@ ppc405_pic_get_irq(struct pt_regs *regs)
 	 * result from 32.
 	 */
 	irq = 32 - ffs(bits);
-
-	if (irq == NR_AIC_IRQS)
+#endif
+	if (irq == (NR_UIC_IRQS * NR_UICS))
 		irq = -1;
+
+#ifdef UIC_DEBUG
+printk("ppc405_pic_get_irq - irq %d bit 0x%x\n",irq, bits);
+#endif
 
 	return (irq);
 }
@@ -239,18 +315,31 @@ ppc4xx_pic_init(void)
 	 * explicity requested.
 	 */
 	ppc_cached_irq_mask[0] = 0;
+	ppc_cached_irq_mask[1] = 0;
 
-#ifdef CONFIG_403
+#if defined CONFIG_403
 	mtdcr(DCRN_EXIER, ppc_cached_irq_mask[0]);
 
 	ppc4xx_pic = &ppc403_aic;
 	ppc_md.get_irq = ppc403_pic_get_irq;
 #else
-	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[0]);
+#if  (NR_UICS > 1) 
+	ppc_cached_irq_mask[0] |= 1 << (31 - UIC0_UIC1NC ); /* enable cascading interrupt */
+	mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[0]);
+	mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[1]);
 
 	/* Set all interrupts to non-critical.
 	 */
-	mtdcr(DCRN_UIC0_CR, 0);
+	mtdcr(DCRN_UIC_CR(UIC0), 0);
+	mtdcr(DCRN_UIC_CR(UIC1), 0);
+
+#else	
+	mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[0]);
+
+	/* Set all interrupts to non-critical.
+	 */
+	mtdcr(DCRN_UIC_CR(UIC0), 0);
+#endif
 
 	ppc4xx_pic = &ppc405_uic;
 	ppc_md.get_irq = ppc405_pic_get_irq;
