@@ -47,8 +47,8 @@
 			- ethtool support
 		v1.18b 1Mar2002 Zwane Mwaikambo <zwane@commfireservices.com>
 			- Power Management support
-                v1.18c 1Mar2002 David Ruggiero <jdr@farfalle.com>
-                        - Full duplex support
+		v1.18c 1Mar2002 David Ruggiero <jdr@farfalle.com>
+			- Full duplex support
 */
 
 #define DRV_NAME	"3c509"
@@ -500,10 +500,10 @@ no_pnp:
 	memcpy(dev->dev_addr, phys_addr, sizeof(phys_addr));
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
-        
+
 	if (dev->mem_start & 0x05) { /* xcvr codes 1/3/4/12 */
 		dev->if_port = (dev->mem_start & 0x0f);
-        } else { /* xcvr codes 0/8 */
+	} else { /* xcvr codes 0/8 */
 		/* use eeprom value, but save user's full-duplex selection */
 		dev->if_port = (if_port | (dev->mem_start & 0x08) );
 	}

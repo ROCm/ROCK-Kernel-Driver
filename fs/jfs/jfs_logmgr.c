@@ -1202,8 +1202,6 @@ int lmLogInit(struct jfs_log * log)
 	/*
 	 * validate log superblock
 	 */
-
-
 	if (!test_bit(log_INLINELOG, &log->flag))
 		log->l2bsize = 12;	/* XXX kludge alert XXX */
 	if ((rc = lbmRead(log, 1, &bpsuper)))

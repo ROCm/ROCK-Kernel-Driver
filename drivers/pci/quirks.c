@@ -90,7 +90,7 @@ static void __init quirk_triton(struct pci_dev *dev)
  *	VIA Apollo KT133 needs PCI latency patch
  *	Made according to a windows driver based patch by George E. Breese
  *	see PCI Latency Adjust on http://www.viahardware.com/download/viatweak.shtm
- *      Also see http://home.tiscalinet.de/au-ja/review-kt133a-1-en.html for
+ *      Also see http://www.au-ja.org/review-kt133a-1-en.phtml for
  *      the info on which Mr Breese based his work.
  *
  *	Updated based on further information from the site and also on

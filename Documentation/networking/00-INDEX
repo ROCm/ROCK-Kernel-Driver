@@ -44,6 +44,10 @@ dgrs.txt
 	- the Digi International RightSwitch SE-X Ethernet driver
 dmfe.txt
 	- info on the Davicom DM9102(A)/DM9132/DM9801 fast ethernet driver.
+e100.txt
+	- info on Intel's EtherExpress PRO/100 line of 10/100 boards
+e1000.txt
+	- info on Intel's E1000 line of gigabit ethernet boards
 eql.txt
 	- serial IP load balancing
 ethertap.txt

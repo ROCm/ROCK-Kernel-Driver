@@ -1,17 +1,17 @@
 /*
  * Keyboard mappings for DEC LK201/401/501 keyboards
- * 
+ *
  * 17.05.99 Michael Engel (engel@unix-ag.org)
  *
  * DEC US keyboards generate keycodes in the range 0x55 - 0xfb
  *
- * This conflicts with Linux scancode conventions which define 
+ * This conflicts with Linux scancode conventions which define
  * 0x00-0x7f as "normal" and 0x80-0xff as "shifted" scancodes, so we
  * have to remap the keycodes to 0x00-0x7f with the scancodeRemap
  * array. The generated scancode is simply the number of the key counted
  * from the left upper to the right lower corner of the keyboard ...
  *
- * These scancodes are then being remapped (I hope ;-)) with the 
+ * These scancodes are then being remapped (I hope ;-)) with the
  * lk501*map[] arrays which define scancode -> Linux code mapping
  *
  * Oh man is this horrible ;-)
@@ -91,7 +91,7 @@ unsigned char scancodeRemap[256] = {
 /* ----- 								*/
 /* 60 */ 0,		0,		0,		0,
 /* ----- F6		F7		F8		F9		*/
-/* 64 */ 0x06,		0x07,		0x08,		0x09, 
+/* 64 */ 0x06,		0x07,		0x08,		0x09,
 /* ----- F10								*/
 /* 68 */ 0x0a,		0,		0,		0,
 /* ----- 								*/
