@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.27 $
+ * $Revision: 1.28 $
  */
 
 #include <linux/config.h>
@@ -525,6 +525,9 @@ dasd_delete_device(struct dasd_device *device)
 	/* Disconnect dasd_device structure from ccw_device structure. */
 	cdev = device->cdev;
 	device->cdev = NULL;
+
+	/* Disconnect dasd_devmap structure from ccw_device structure. */
+	cdev->dev.driver_data = NULL;
 
 	/* Put ccw_device structure. */
 	put_device(&cdev->dev);

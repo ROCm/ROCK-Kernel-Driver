@@ -686,7 +686,7 @@ vmlinux.64: vmlinux
 		--change-addresses=0xa800000080000000 $< $@
 endif
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/mips/boot $(1)
+makeboot =$(Q)$(MAKE) $(build)=arch/mips/boot $(1)
 
 ifdef CONFIG_SGI_IP27
 all:	vmlinux.64
@@ -708,9 +708,9 @@ CLEAN_FILES += vmlinux.ecoff \
 	       vmlinux.rm200
 
 archclean:
-	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/boot
-	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/baget
-	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/lasat
+	@$(MAKE) $(clean)=arch/mips/boot
+	@$(MAKE) $(clean)=arch/mips/baget
+	@$(MAKE) $(clean)=arch/mips/lasat
 
 # Generate <asm/offset.h 
 #

@@ -92,8 +92,8 @@ static int store_updates_sp(struct pt_regs *regs)
  * the error_code parameter is ESR for a data fault, 0 for an instruction
  * fault.
  */
-void do_page_fault(struct pt_regs *regs, unsigned long address,
-		   unsigned long error_code)
+int do_page_fault(struct pt_regs *regs, unsigned long address,
+		  unsigned long error_code)
 {
 	struct vm_area_struct * vma;
 	struct mm_struct *mm = current->mm;
@@ -119,21 +119,20 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_fault_handler && TRAP(regs) == 0x300) {
 		debugger_fault_handler(regs);
-		return;
+		return 0;
 	}
 #if !defined(CONFIG_4xx)
 	if (error_code & 0x00400000) {
 		/* DABR match */
 		if (debugger_dabr_match(regs))
-			return;
+			return 0;
 	}
 #endif /* !CONFIG_4xx */
 #endif /* CONFIG_XMON || CONFIG_KGDB */
 
-	if (in_atomic() || mm == NULL) {
-		bad_page_fault(regs, address, SIGSEGV);
-		return;
-	}
+	if (in_atomic() || mm == NULL)
+		return SIGSEGV;
+
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -229,7 +228,7 @@ good_area:
 			_tlbie(address);
 			pte_unmap(ptep);
 			up_read(&mm->mmap_sem);
-			return;
+			return 0;
 		}
 		if (ptep != NULL)
 			pte_unmap(ptep);
@@ -271,7 +270,7 @@ good_area:
 	 * -- Cort
 	 */
 	pte_misses++;
-	return;
+	return 0;
 
 bad_area:
 	up_read(&mm->mmap_sem);
@@ -284,11 +283,10 @@ bad_area:
 		info.si_code = code;
 		info.si_addr = (void *) address;
 		force_sig_info(SIGSEGV, &info, current);
-		return;
+		return 0;
 	}
 
-	bad_page_fault(regs, address, SIGSEGV);
-	return;
+	return SIGSEGV;
 
 /*
  * We ran out of memory, or some other thing happened to us that made
@@ -304,8 +302,7 @@ out_of_memory:
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
-	bad_page_fault(regs, address, SIGKILL);
-	return;
+	return SIGKILL;
 
 do_sigbus:
 	up_read(&mm->mmap_sem);
@@ -315,13 +312,14 @@ do_sigbus:
 	info.si_addr = (void *)address;
 	force_sig_info (SIGBUS, &info, current);
 	if (!user_mode(regs))
-		bad_page_fault(regs, address, SIGBUS);
+		return SIGBUS;
+	return 0;
 }
 
 /*
  * bad_page_fault is called when we have a bad access from the kernel.
- * It is called from do_page_fault above and from some of the procedures
- * in traps.c.
+ * It is called from the DSI and ISI handlers in head.S and from some
+ * of the procedures in traps.c.
  */
 void
 bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)

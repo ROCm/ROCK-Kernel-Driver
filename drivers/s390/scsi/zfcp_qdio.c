@@ -28,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_QDIO_C_REVISION "$Revision: 1.18 $"
+#define ZFCP_QDIO_C_REVISION "$Revision: 1.19 $"
 
 #include "zfcp_ext.h"
 
@@ -682,12 +682,6 @@ zfcp_qdio_sbale_fill(struct zfcp_fsf_req *fsf_req, unsigned long sbtype,
 	sbale = zfcp_qdio_sbale_curr(fsf_req);
 	sbale->addr = addr;
 	sbale->length = length;
-
-#ifdef ZFCP_STAT_REQSIZES
-        if (sbtype == SBAL_FLAGS0_TYPE_READ)
-                zfcp_statistics_inc(&zfcp_data.read_sg_head, length);
-        else    zfcp_statistics_inc(&zfcp_data.write_sg_head, length);
-#endif
 }
 
 /**
@@ -770,18 +764,7 @@ zfcp_qdio_sbals_from_sg(struct zfcp_fsf_req *fsf_req, unsigned long sbtype,
 	/* assume that no other SBALEs are to follow in the same SBAL */
 	sbale = zfcp_qdio_sbale_curr(fsf_req);
 	sbale->flags |= SBAL_FLAGS_LAST_ENTRY;
-
 out:
-#ifdef ZFCP_STAT_REQSIZES
-	if (sbtype == SBAL_FLAGS0_TYPE_READ) {
-		zfcp_statistics_inc(&zfcp_data.read_sguse_head, sg_count);
-		zfcp_statistics_inc(&zfcp_data.read_req_head, bytes);
-	} else	{
-		zfcp_statistics_inc(&zfcp_data.write_sguse_head, sg_count);
-        	zfcp_statistics_inc(&zfcp_data.write_req_head, bytes);
-	}
-#endif
-
 	return bytes;
 }
 

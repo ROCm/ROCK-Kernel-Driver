@@ -324,6 +324,12 @@ L:	linux-hams@vger.kernel.org
 W:	http://www.baycom.org/~tom/ham/ham.html
 S:	Maintained
 
+BEFS FILE SYSTEM
+P:	Sergey S. Kostyliov
+M:	rathamahata@php4.ru
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
 BERKSHIRE PRODUCTS PC WATCHDOG DRIVER
 P:	Kenji Hollis
 W:	http://ftp.bitgate.com/pcwd/

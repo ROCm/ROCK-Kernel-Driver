@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.9 $)
+ * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.10 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to procfs.
@@ -21,7 +21,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_PROC_C = "$Revision: 1.9 $";
+const char *VERSION_QETH_PROC_C = "$Revision: 1.10 $";
 
 /***** /proc/qeth *****/
 #define QETH_PROCFILE_NAME "qeth"
@@ -237,9 +237,11 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 		   card->perf_stats.bufs_sent_pack
 		  );
 	seq_printf(s, "  Packing state changes no pkg.->packing : %i/%i\n"
+		      "  Watermarks L/H                         : %i/%i\n"
 		      "  Current buffer usage (outbound q's)    : "
 		      "%i/%i/%i/%i\n\n",
 		        card->perf_stats.sc_dp_p, card->perf_stats.sc_p_dp,
+			QETH_LOW_WATERMARK_PACK, QETH_HIGH_WATERMARK_PACK,
 			atomic_read(&card->qdio.out_qs[0]->used_buffers),
 			(card->qdio.no_out_queues > 1)?
 				atomic_read(&card->qdio.out_qs[1]->used_buffers)
@@ -251,20 +253,26 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 				atomic_read(&card->qdio.out_qs[3]->used_buffers)
 				: 0
 		  );
-	seq_printf(s, "  Inbound time (in us)                   : %i\n"
-		      "  Inbound count                          : %i\n"
-		      "  Inboud do_QDIO count                   : %i\n"
+	seq_printf(s, "  Inbound handler time (in us)           : %i\n"
+		      "  Inbound handler count                  : %i\n"
+		      "  Inbound do_QDIO time (in us)           : %i\n"
+		      "  Inbound do_QDIO count                  : %i\n\n"
+		      "  Outbound handler time (in us)          : %i\n"
+		      "  Outbound handler count                 : %i\n\n"
 		      "  Outbound time (in us, incl QDIO)       : %i\n"
 		      "  Outbound count                         : %i\n"
-		      "  Outbound do_QDIO count                 : %i\n"
-		      "  Watermarks L/H                         : %i/%i\n\n",
+		      "  Outbound do_QDIO time (in us)          : %i\n"
+		      "  Outbound do_QDIO count                 : %i\n",
 		        card->perf_stats.inbound_time,
 			card->perf_stats.inbound_cnt,
-			card->perf_stats.inbound_do_qdio,
+		        card->perf_stats.inbound_do_qdio_time,
+			card->perf_stats.inbound_do_qdio_cnt,
+			card->perf_stats.outbound_handler_time,
+			card->perf_stats.outbound_handler_cnt,
 			card->perf_stats.outbound_time,
 			card->perf_stats.outbound_cnt,
-			card->perf_stats.outbound_do_qdio,
-			QETH_LOW_WATERMARK_PACK, QETH_HIGH_WATERMARK_PACK
+		        card->perf_stats.outbound_do_qdio_time,
+			card->perf_stats.outbound_do_qdio_cnt
 		  );
 
 	return 0;

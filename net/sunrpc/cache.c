@@ -214,6 +214,7 @@ void cache_register(struct cache_detail *cd)
 	cd->entries = 0;
 	atomic_set(&cd->readers, 0);
 	cd->last_close = 0;
+	cd->last_warn = -1;
 	list_add(&cd->others, &cache_list);
 	spin_unlock(&cache_list_lock);
 
@@ -652,12 +653,13 @@ cache_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	return err ? err :  count;
 }
 
+static char write_buf[8192]; /* protected by queue_io_sem */
+
 static ssize_t
 cache_write(struct file *filp, const char *buf, size_t count,
 	    loff_t *ppos)
 {
 	int err;
-	char *page;
 	struct cache_detail *cd = PDE(filp->f_dentry->d_inode)->data;
 
 	if (ppos != &filp->f_pos)
@@ -665,31 +667,22 @@ cache_write(struct file *filp, const char *buf, size_t count,
 
 	if (count == 0)
 		return 0;
-	if (count > PAGE_SIZE)
+	if (count >= sizeof(write_buf))
 		return -EINVAL;
 
 	down(&queue_io_sem);
 
-	page = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (page == NULL) {
+	if (copy_from_user(write_buf, buf, count)) {
 		up(&queue_io_sem);
-		return -ENOMEM;
-	}
-
-	if (copy_from_user(page, buf, count)) {
-		up(&queue_io_sem);
-		kfree(page);
 		return -EFAULT;
 	}
-	if (count < PAGE_SIZE)
-		page[count] = '\0';
+	write_buf[count] = '\0';
 	if (cd->cache_parse)
-		err = cd->cache_parse(cd, page, count);
+		err = cd->cache_parse(cd, write_buf, count);
 	else
 		err = -EINVAL;
 
 	up(&queue_io_sem);
-	kfree(page);
 	return err ? err : count;
 }
 
@@ -913,7 +906,15 @@ void qword_addhex(char **bpp, int *lp, char *buf, int blen)
 	*lp = len;
 }
 
-			
+void warn_no_listener(struct cache_detail *detail)
+{
+	if (detail->last_warn != detail->last_close) {
+		detail->last_warn = detail->last_close;
+		printk(KERN_WARNING "nfsd: nobody listening for %s upcall;"
+				" has some daemon %s?\n", detail->name,
+		      		detail->last_close?"died" : "not been started");
+	}
+}
 
 /*
  * register an upcall request to user-space.
@@ -931,9 +932,10 @@ static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h)
 		return -EINVAL;
 
 	if (atomic_read(&detail->readers) == 0 &&
-	    detail->last_close < get_seconds() - 60)
-		/* nobody is listening */
-		return -EINVAL;
+	    detail->last_close < get_seconds() - 30) {
+			warn_no_listener(detail);
+			return -EINVAL;
+	}
 
 	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!buf)

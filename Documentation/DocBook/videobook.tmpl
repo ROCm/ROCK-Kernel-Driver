@@ -232,7 +232,6 @@ static int radio_open(stuct video_device *dev, int flags)
         if(users)
                 return -EBUSY;
         users++;
-        MOD_INC_USE_COUNT;
         return 0;
 }
 
@@ -248,7 +247,6 @@ static int radio_open(stuct video_device *dev, int flags)
 static int radio_close(struct video_device *dev)
 {
         users--;
-        MOD_DEC_USE_COUNT;
 }
 
   </programlisting>
@@ -954,7 +952,6 @@ static int camera_open(stuct video_device *dev, int flags)
         if(request_irq(irq, camera_irq, 0, "camera", dev)&lt;0)
                 return -EBUSY;
         users++;
-        MOD_INC_USE_COUNT;
         return 0;
 }
 
@@ -963,7 +960,6 @@ static int camera_close(struct video_device *dev)
 {
         users--;
         free_irq(irq, dev);
-        MOD_DEC_USE_COUNT;
 }
   </programlisting>
   <para>

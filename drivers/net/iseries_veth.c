@@ -940,7 +940,7 @@ static HvLpIndexMap veth_transmit_to_many(struct sk_buff *skb,
 	for (i = 0; i < HVMAXARCHITECTEDLPS; i++) {
 		struct sk_buff *clone;
 
-		if (! lpmask & (1<<i))
+		if ((lpmask & (1 << i)) == 0)
 			continue;
 
 		clone = skb_clone(skb, GFP_ATOMIC);
@@ -994,6 +994,7 @@ static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			veth_error("%s: Tx while skb was pending!\n",
 				   dev->name);
 			dev_kfree_skb(skb);
+                       spin_unlock_irqrestore(&port->pending_gate, flags);
 			return 1;
 		}
 

@@ -833,8 +833,10 @@ static ssize_t sel_write_bool(struct file *filep, const char *buf,
 		goto out;
 	}
 	page = (char*)__get_free_page(GFP_KERNEL);
-	if (!page)
-		return -ENOMEM;
+	if (!page) {
+		length = -ENOMEM;
+		goto out;
+	}
 	memset(page, 0, PAGE_SIZE);
 
 	if (copy_from_user(page, buf, count))
@@ -889,8 +891,10 @@ static ssize_t sel_commit_bools_write(struct file *filep, const char *buf,
 		goto out;
 	}
 	page = (char*)__get_free_page(GFP_KERNEL);
-	if (!page)
-		return -ENOMEM;
+	if (!page) {
+		length = -ENOMEM;
+		goto out;
+	}
 
 	memset(page, 0, PAGE_SIZE);
 

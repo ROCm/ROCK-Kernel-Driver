@@ -353,7 +353,7 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	unsigned orig_next_size;
 	unsigned actual;
 	int first_access=0;
-	unsigned long preoffset=0;
+	unsigned long average;
 
 	/*
 	 * Here we detect the case where the application is performing
@@ -394,10 +394,17 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 		if (ra->serial_cnt <= (max * 2))
 			ra->serial_cnt++;
 	} else {
-		ra->average = (ra->average + ra->serial_cnt) / 2;
+		/*
+		 * to avoid rounding errors, ensure that 'average'
+		 * tends towards the value of ra->serial_cnt.
+		 */
+		average = ra->average;
+		if (average < ra->serial_cnt) {
+			average++;
+		}
+		ra->average = (average + ra->serial_cnt) / 2;
 		ra->serial_cnt = 1;
 	}
-	preoffset = ra->prev_page;
 	ra->prev_page = offset;
 
 	if (offset >= ra->start && offset <= (ra->start + ra->size)) {
@@ -457,18 +464,13 @@ do_io:
 		 * ahead window and get some I/O underway for the new
 		 * current window.
 		 */
-		if (!first_access && preoffset >= ra->start &&
-				preoffset < (ra->start + ra->size)) {
-			 /* Heuristic:  If 'n' pages were
-			  * accessed in the current window, there
-			  * is a high probability that around 'n' pages
-			  * shall be used in the next current window.
-			  *
-			  * To minimize lazy-readahead triggered
-			  * in the next current window, read in
-			  * an extra page.
+		if (!first_access) {
+			 /* Heuristic: there is a high probability
+			  * that around  ra->average number of
+			  * pages shall be accessed in the next
+			  * current window.
 			  */
-			ra->next_size = preoffset - ra->start + 2;
+			ra->next_size = min(ra->average , (unsigned long)max);
 		}
 		ra->start = offset;
 		ra->size = ra->next_size;
@@ -492,21 +494,19 @@ do_io:
 		 */
 		if (ra->ahead_start == 0) {
 			/*
-			 * if the average io-size is less than maximum
+			 * If the average io-size is more than maximum
 			 * readahead size of the file the io pattern is
 			 * sequential. Hence  bring in the readahead window
 			 * immediately.
-			 * Else the i/o pattern is random. Bring
-			 * in the readahead window only if the last page of
-			 * the current window is accessed (lazy readahead).
+			 * If the average io-size is less than maximum
+			 * readahead size of the file the io pattern is
+			 * random. Hence don't bother to readahead.
 			 */
-			unsigned long average = ra->average;
-
+			average = ra->average;
 			if (ra->serial_cnt > average)
-				average = (ra->serial_cnt + ra->average) / 2;
+				average = (ra->serial_cnt + ra->average + 1) / 2;
 
-			if ((average >= max) || (offset == (ra->start +
-							ra->size - 1))) {
+			if (average > max) {
 				ra->ahead_start = ra->start + ra->size;
 				ra->ahead_size = ra->next_size;
 				actual = do_page_cache_readahead(mapping, filp,

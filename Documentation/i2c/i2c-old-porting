@@ -386,7 +386,6 @@ based on the above guide (for clarity).
 +	if(client == NULL) 
  		return -ENOMEM;
 -
--	MOD_INC_USE_COUNT;
 +	client_template.adapter = adap;
 +	client_template.addr = addr;
 +	memcpy(client, &client_template, sizeof(*client));
@@ -432,7 +431,6 @@ based on the above guide (for clarity).
  
 +	init_MUTEX(&decoder->lock);
 +	i2c_attach_client(client);
-+	MOD_INC_USE_COUNT;
  	/* setup and implicit mode 0 select has been performed */
  	return 0;
  }
@@ -463,7 +461,6 @@ based on the above guide (for clarity).
 +	kfree(decoder);
 +	kfree(client);
  
- 	MOD_DEC_USE_COUNT;
  	return 0;
  }
  
@@ -593,12 +590,15 @@ based on the above guide (for clarity).
 -	I2C_SAA7110, I2C_SAA7110+1,	/* Addr range */
 -
 -	saa7110_attach,
-+	IF_NAME,			/* name */
-+	I2C_DRIVERID_SAA7110,	/* in i2c.h */
-+	I2C_DF_NOTIFY,	/* Addr range */
-+	saa7110_probe,
- 	saa7110_detach,
- 	saa7110_command
+-	saa7110_detach,
+-	saa7110_command
++	.owner		= THIS_MODULE,
++	.name		= IF_NAME,
++	.id		= I2C_DRIVERID_SAA7110,
++	.flags		= I2C_DF_NOTIFY,
++	.attach_adapter	= saa7110_probe,
++	.detach_adapter	= saa7110_detach,
++	.command	= saa7110_command,
  };
 +static struct i2c_client client_template = {
 +	"saa7110_client",

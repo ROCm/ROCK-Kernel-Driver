@@ -35,6 +35,8 @@
  *    Added support for: C102, CI-132, CI-134, CP-132, CP-114, CT-114 cards
  *                        by Damian Wrobel <dwrobel@ertel.com.pl>
  *
+ *    Added support for serial card CP104
+ *			  by James Nelson Provident Solutions <linux-info@provident-solutions.com>
  */
 
 #include <linux/config.h>
@@ -116,6 +118,9 @@
 #ifndef PCI_DEVICE_ID_C104
 #define PCI_DEVICE_ID_C104	0x1040
 #endif
+#ifndef PCI_DEVICE_ID_CP104
+#define PCI_DEVICE_ID_CP104	0x1041
+#endif
 #ifndef PCI_DEVICE_ID_CP132
 #define PCI_DEVICE_ID_CP132	0x1320
 #endif
@@ -139,6 +144,7 @@ enum {
 	MXSER_BOARD_CI104J,
 	MXSER_BOARD_C168_PCI,
 	MXSER_BOARD_C104_PCI,
+	MXSER_BOARD_CP104_PCI,
 	MXSER_BOARD_C102_ISA,
 	MXSER_BOARD_CI132,
 	MXSER_BOARD_CI134,
@@ -154,6 +160,7 @@ static char *mxser_brdname[] =
 	"CI-104J series",
 	"C168H/PCI series",
 	"C104H/PCI series",
+	"CP104/PCI series",
 	"C102 series",
 	"CI-132 series",
 	"CI-134 series",
@@ -168,6 +175,7 @@ static int mxser_numports[] =
 	4,
 	4,
 	8,
+	4,
 	4,
 	2,
 	2,
@@ -195,6 +203,8 @@ static struct pci_device_id mxser_pcibrds[] = {
 	  MXSER_BOARD_C168_PCI },
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C104, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
 	  MXSER_BOARD_C104_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP104, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+	  MXSER_BOARD_CP104_PCI },
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP132, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 	  MXSER_BOARD_CP132_PCI },
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP114, PCI_ANY_ID, PCI_ANY_ID, 0, 0,

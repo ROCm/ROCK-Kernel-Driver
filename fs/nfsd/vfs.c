@@ -141,10 +141,11 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	/* Obtain dentry and export. */
 	err = fh_verify(rqstp, fhp, S_IFDIR, MAY_EXEC);
 	if (err)
-		goto out;
+		return err;
 
 	dparent = fhp->fh_dentry;
 	exp  = fhp->fh_export;
+	exp_get(exp);
 
 	err = nfserr_acces;
 
@@ -208,7 +209,9 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	err = fh_compose(resfh, exp, dentry, fhp);
 	if (!err && !dentry->d_inode)
 		err = nfserr_noent;
+	dput(dentry);
 out:
+	exp_put(exp);
 	return err;
 
 out_nfserr:
@@ -859,7 +862,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		char *fname, int flen, struct iattr *iap,
 		int type, dev_t rdev, struct svc_fh *resfhp)
 {
-	struct dentry	*dentry, *dchild;
+	struct dentry	*dentry, *dchild = NULL;
 	struct inode	*dirp;
 	int		err;
 
@@ -965,6 +968,8 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (!err)
 		err = fh_update(resfhp);
 out:
+	if (dchild && !IS_ERR(dchild))
+		dput(dchild);
 	return err;
 
 out_nfserr:
@@ -982,7 +987,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		struct svc_fh *resfhp, int createmode, u32 *verifier,
 	        int *truncp)
 {
-	struct dentry	*dentry, *dchild;
+	struct dentry	*dentry, *dchild = NULL;
 	struct inode	*dirp;
 	int		err;
 	__u32		v_mtime=0, v_atime=0;
@@ -1111,6 +1116,8 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 
  out:
 	fh_unlock(fhp);
+	if (dchild && !IS_ERR(dchild))
+		dput(dchild);
  	return err;
  
  out_nfserr:
@@ -1212,16 +1219,18 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		if (EX_ISSYNC(fhp->fh_export))
 			nfsd_sync_dir(dentry);
 		if (iap) {
-			iap->ia_valid &= ATTR_MODE /* ~(ATTR_MODE|ATTR_UID|ATTR_GID)*/;
+			iap->ia_valid &= ATTR_MODE; /* Only the MODE ATTRibute is 
+						     * even vaguely meaningful */
 			if (iap->ia_valid) {
 				iap->ia_valid |= ATTR_CTIME;
 				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
 					| S_IFLNK;
-				err = notify_change(dnew, iap);
-				if (err)
-					err = nfserrno(err);
-				else if (EX_ISSYNC(fhp->fh_export))
-					write_inode_now(dentry->d_inode, 1);
+				if (notify_change(dnew, iap)==0)
+					if (EX_ISSYNC(fhp->fh_export))
+						write_inode_now(dentry->d_inode, 1);
+				/* errors from notify_change are not
+				 * propagated to client
+				 */
 		       }
 		}
 	} else

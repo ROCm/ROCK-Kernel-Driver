@@ -543,7 +543,7 @@ retry:
 	sk = netlink_getsockbypid(ssk, pid);
 	if (IS_ERR(sk)) {
 		kfree_skb(skb);
-		return PTR_ERR(skb);
+		return PTR_ERR(sk);
 	}
 	err = netlink_attachskb(sk, skb, nonblock, timeo);
 	if (err == 1)

@@ -367,7 +367,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		printk(KERN_ERR "fh_compose: called with maxsize %d! %s/%s\n",
 		       fhp->fh_maxsize, parent->d_name.name, dentry->d_name.name);
 
-	fhp->fh_dentry = dentry; /* our internal copy */
+	fhp->fh_dentry = dget(dentry); /* our internal copy */
 	fhp->fh_export = exp;
 	cache_get(&exp->h);
 

@@ -212,6 +212,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	nfserr = fh_compose(newfhp, dirfhp->fh_export, dchild, dirfhp);
 	if (!nfserr && !dchild->d_inode)
 		nfserr = nfserr_noent;
+	dput(dchild);
 	if (nfserr) {
 		if (nfserr != nfserr_noent)
 			goto out_unlock;
@@ -588,6 +589,7 @@ nfserrno (int errno)
 		{ nfserr_jukebox, -ETIMEDOUT },
 		{ nfserr_dropit, -EAGAIN },
 		{ nfserr_dropit, -ENOMEM },
+		{ nfserr_badname, -ESRCH },
 		{ -1, -EIO }
 	};
 	int	i;

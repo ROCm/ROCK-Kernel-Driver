@@ -452,6 +452,29 @@ ppc_swapcontext:
 	b	sys_swapcontext
 
 /*
+ * Top-level page fault handling.
+ * This is in assembler because if do_page_fault tells us that
+ * it is a bad kernel page fault, we want to save the non-volatile
+ * registers before calling bad_page_fault.
+ */
+	.globl	handle_page_fault
+handle_page_fault:
+	stw	r4,_DAR(r1)
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	do_page_fault
+	cmpwi	r3,0
+	beq+	ret_from_except
+	SAVE_NVGPRS(r1)
+	lwz	r0,TRAP(r1)
+	clrrwi	r0,r0,1
+	stw	r0,TRAP(r1)
+	mr	r5,r3
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	lwz	r4,_DAR(r1)
+	bl	bad_page_fault
+	b	ret_from_except_full
+
+/*
  * This routine switches between two different tasks.  The process
  * state of one is saved on its kernel stack.  Then the state
  * of the other is restored from its kernel stack.  The memory

@@ -106,8 +106,6 @@ alpha_fp_emul (unsigned long pc)
 	__u32 insn;
 	long si_code;
 
-	MOD_INC_USE_COUNT;
-
 	get_user(insn, (__u32*)pc);
 	fc     = (insn >>  0) & 0x1f;	/* destination register */
 	fb     = (insn >> 16) & 0x1f;
@@ -320,7 +318,6 @@ done:
 			if (_fex & IEEE_TRAP_ENABLE_INV) si_code = FPE_FLTINV;
 		}
 
-		MOD_DEC_USE_COUNT;
 		return si_code;
 	}
 
@@ -328,13 +325,11 @@ done:
 	   requires that the result *always* be written... so we do the write
 	   immediately after the operations above.  */
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 
 bad_insn:
 	printk(KERN_ERR "alpha_fp_emul: Invalid FP insn %#x at %#lx\n",
 	       insn, pc);
-	MOD_DEC_USE_COUNT;
 	return -1;
 }
 
@@ -343,8 +338,6 @@ alpha_fp_emul_imprecise (struct pt_regs *regs, unsigned long write_mask)
 {
 	unsigned long trigger_pc = regs->pc - 4;
 	unsigned long insn, opcode, rc, si_code = 0;
-
-	MOD_INC_USE_COUNT;
 
 	/*
 	 * Turn off the bits corresponding to registers that are the
@@ -403,6 +396,5 @@ alpha_fp_emul_imprecise (struct pt_regs *regs, unsigned long write_mask)
 	}
 
 egress:
-	MOD_DEC_USE_COUNT;
 	return si_code;
 }

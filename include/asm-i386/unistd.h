@@ -288,8 +288,9 @@
 #define __NR_mq_timedreceive	(__NR_mq_open+3)
 #define __NR_mq_notify		(__NR_mq_open+4)
 #define __NR_mq_getsetattr	(__NR_mq_open+5)
+#define __NR_sys_kexec_load	283
 
-#define NR_syscalls 283
+#define NR_syscalls 284
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
 

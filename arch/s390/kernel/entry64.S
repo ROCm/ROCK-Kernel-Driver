@@ -231,7 +231,7 @@ sysc_noemu:
 #endif
 	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         lgf     %r8,0(%r7,%r10)   # load address of system call routine
-        jo      sysc_tracesys
+        jnz     sysc_tracesys
         basr    %r14,%r8          # call sys_xxxx
         stg     %r2,SP_R2(%r15)   # store return value (change R2 on stack)
                                   # ATTENTION: check sys_execve_glue before
@@ -319,7 +319,7 @@ sysc_tracego:
         stg     %r2,SP_R2(%r15)     # store return value
 sysc_tracenogo:
 	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
-        jno     sysc_return
+        jz      sysc_return
 	la	%r2,SP_PTREGS(%r15)    # load pt_regs
 	la	%r3,1
 	larl	%r14,sysc_return    # return point is sysc_return
@@ -551,7 +551,7 @@ pgm_svcper_noemu:
 #endif
 	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         lgf     %r8,0(%r7,%r10)   # load address of system call routine
-        jo      pgm_tracesys
+        jnz     pgm_tracesys
         basr    %r14,%r8          # call sys_xxxx
         stg     %r2,SP_R2(%r15)   # store return value (change R2 on stack)
                                   # ATTENTION: check sys_execve_glue before
@@ -592,7 +592,7 @@ pgm_svc_go:
         stg     %r2,SP_R2(%r15)     # store return value
 pgm_svc_nogo:
 	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
-        jno     pgm_svcret
+        jz      pgm_svcret
 	la	%r2,SP_PTREGS(%r15)    # load pt_regs
 	la	%r3,1
 	larl	%r14,pgm_svcret     # return point is sysc_return

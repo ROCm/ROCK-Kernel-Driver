@@ -1205,8 +1205,11 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 		if (transfer_to[cnt] == NODQUOT)
 			continue;
 
-		dquot_decr_inodes(transfer_from[cnt], 1);
-		dquot_decr_space(transfer_from[cnt], space);
+		/* Due to IO error we might not have transfer_from[] structure */
+		if (transfer_from[cnt]) {
+			dquot_decr_inodes(transfer_from[cnt], 1);
+			dquot_decr_space(transfer_from[cnt], space);
+		}
 
 		dquot_incr_inodes(transfer_to[cnt], 1);
 		dquot_incr_space(transfer_to[cnt], space);

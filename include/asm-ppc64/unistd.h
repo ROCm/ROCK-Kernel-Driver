@@ -278,8 +278,9 @@
 #define __NR_mq_timedreceive	265
 #define __NR_mq_notify		266
 #define __NR_mq_getsetattr	267
+#define __NR_kexec_load		268
 
-#define __NR_syscalls		268
+#define __NR_syscalls		269
 #ifdef __KERNEL__
 #define NR_syscalls	__NR_syscalls
 #endif

@@ -1656,7 +1656,7 @@ fore200e_close(struct atm_vcc* vcc)
     vcc->itf = vcc->vci = vcc->vpi = 0;
 
     fore200e_vcc = FORE200E_VCC(vcc);
-    FORE200E_VCC(vcc) = NULL;
+    vcc->dev_data = NULL;
 
     spin_unlock_irqrestore(&fore200e->q_lock, flags);
 

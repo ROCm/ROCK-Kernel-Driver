@@ -163,10 +163,8 @@ void sirdev_write_complete(struct sir_dev *dev)
 			}
 			dev->tx_buff.len = 0;
 		}
-		if (dev->tx_buff.len > 0) {
-			spin_unlock_irqrestore(&dev->tx_lock, flags);
-			return;
-		}
+		if (dev->tx_buff.len > 0)
+			goto done;	/* more data to send later */
 	}
 
 	if (unlikely(dev->raw_tx != 0)) {
@@ -179,7 +177,7 @@ void sirdev_write_complete(struct sir_dev *dev)
 
 		IRDA_DEBUG(3, "%s(), raw-tx done\n", __FUNCTION__);
 		dev->raw_tx = 0;
-		return;
+		goto done;	/* no post-frame handling in raw mode */
 	}
 
 	/* we have finished now sending this skb.
@@ -224,6 +222,7 @@ void sirdev_write_complete(struct sir_dev *dev)
 		netif_wake_queue(dev->netdev);
 	}
 
+done:
 	spin_unlock_irqrestore(&dev->tx_lock, flags);
 }
 

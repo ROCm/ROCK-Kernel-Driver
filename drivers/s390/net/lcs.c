@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.80 $	 $Date: 2004/05/13 08:22:06 $
+ *    $Revision: 1.81 $	 $Date: 2004/05/14 13:54:33 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.80 $"
+#define VERSION_LCS_C  "$Revision: 1.81 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -1898,8 +1898,10 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	lcs_setup_card(card);
 	rc = lcs_detect(card);
 	if (rc) {
+		LCS_DBF_TEXT(2, setup, "dtctfail");
+		PRINT_WARN("Detection of LCS card failed with return code "
+			   "%d (0x%x)\n", rc, rc);
 		lcs_stopcard(card);
-		lcs_cleanup_card(card);
 		goto out;
 	}
 	if (card->dev) {
@@ -1962,7 +1964,6 @@ out:
 
 	ccw_device_set_offline(card->read.ccwdev);
 	ccw_device_set_offline(card->write.ccwdev);
-	lcs_cleanup_card(card);
 	return -ENODEV;
 }
 

@@ -511,8 +511,8 @@ static int
 nfs_xdr_readlinkargs(struct rpc_rqst *req, u32 *p, struct nfs_readlinkargs *args)
 {
 	struct rpc_auth *auth = req->rq_task->tk_auth;
+	unsigned int count = args->count - 5;
 	unsigned int replen;
-	u32 count = args->count - 4;
 
 	p = xdr_encode_fhandle(p, args->fh);
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
@@ -547,12 +547,15 @@ nfs_xdr_readlinkres(struct rpc_rqst *req, u32 *p, void *dummy)
 	strlen = (u32*)kmap_atomic(rcvbuf->pages[0], KM_USER0);
 	/* Convert length of symlink */
 	len = ntohl(*strlen);
-	if (len > rcvbuf->page_len)
-		len = rcvbuf->page_len;
+	if (len > rcvbuf->page_len) {
+		dprintk(KERN_WARNING "nfs: server returned giant symlink!\n");
+		kunmap_atomic(strlen, KM_USER0);
+		return -ENAMETOOLONG;
+	}
 	*strlen = len;
 	/* NULL terminate the string we got */
 	string = (char *)(strlen + 1);
-	string[len] = 0;
+	string[len] = '\0';
 	kunmap_atomic(strlen, KM_USER0);
 	return 0;
 }

@@ -412,30 +412,6 @@ Description of the Interface between Linklevel and Hardwarelevel
     Returnvalue:
       current protocol-Id (one of the constants ISDN_L3_PROTO)
 
-  ISDN_CMD_LOCK:
-
-    With this command the HL-driver is told, that it will be used by the
-    LL and therefore may not be unloaded. The HL-driver should use
-    MOD_INC_USE_COUNT to tell that to the kernel.
-
-    Parameter:
-      driver      = driver-Id.
-      command     = ISDN_CMD_LOCK
-      arg         = unused.
-      parm        = unused.
-
-  ISDN_CMD_UNLOCK:
-
-    With this command the HL-driver is told, that it is no more used by the
-    LL and therefore may be unloaded. The HL-driver should use
-    DEC_INC_USE_COUNT to tell that to the kernel.
-
-    Parameter:
-      driver      = driver-Id.
-      command     = ISDN_CMD_UNLOCK
-      arg         = unused.
-      parm        = unused.
-
   ISDN_CMD_PROCEED: 
 
     With this command, the HL-driver is told to proceed with a incoming call.

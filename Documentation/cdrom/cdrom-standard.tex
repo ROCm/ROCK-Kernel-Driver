@@ -352,11 +352,6 @@ user commands {\tt {dd}} or {\tt {cat}}.
 \item[1] Open for $ioctl$ commands, as done by audio-CD playing
 programs.
 \end{itemize}
-In case the driver supports modules, the call $MOD_INC_USE_COUNT$
-should be performed exactly once, if the $open()$ was successful. The
-return value is negative on error, and zero on success. The
-open-for-ioctl call can only fail if there is no hardware.
-
 Notice that any strategic code (closing tray upon $open()$, etc.)\ is
 done by the calling routine in \cdromc, so the low-level routine
 should only be concerned with proper initialization, such as spinning

@@ -78,9 +78,8 @@ full_name_hash(const unsigned char *name, unsigned int len)
 
 struct dcookie_struct;
 
-/*
- * On x86, dentries are a multiple of 16 bytes, with 16-byte alignment.
- */
+#define DNAME_INLINE_LEN_MIN 36
+
 struct dentry {
 	atomic_t d_count;
 	unsigned int d_flags;		/* protected by d_lock */
@@ -107,7 +106,7 @@ struct dentry {
  	struct rcu_head d_rcu;
 	struct dcookie_struct *d_cookie; /* cookie, if any */
 	struct hlist_node d_hash;	/* lookup hash list */	
-	unsigned char d_iname[0];	/* small names */
+	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names */
 };
 
 struct dentry_operations {
