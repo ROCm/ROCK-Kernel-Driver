@@ -11,48 +11,42 @@
    required to allow inlining of cmpfn. */
 #define LIST_FIND(head, cmpfn, type, args...)		\
 ({							\
-	const struct list_head *__i = (head);		\
+	const struct list_head *__i, *__j = NULL;	\
 							\
 	ASSERT_READ_LOCK(head);				\
-	do {						\
-		__i = __i->next;			\
-		if (__i == (head)) {			\
-			__i = NULL;			\
+	list_for_each(__i, (head))			\
+		if (cmpfn((const type)__i , ## args)) {	\
+			__j = __i;			\
 			break;				\
 		}					\
-	} while (!cmpfn((const type)__i , ## args));	\
-	(type)__i;					\
+	(type)__j;					\
 })
 
-#define LIST_FIND_W(head, cmpfn, type, args...)	\
-({						\
-	const struct list_head *__i = (head);	\
-						\
-	ASSERT_WRITE_LOCK(head);		\
-	do {					\
-		__i = __i->next;		\
-		if (__i == (head)) {		\
-			__i = NULL;		\
-			break;			\
-		}				\
-	} while (!cmpfn((type)__i , ## args));	\
-	(type)__i;				\
+#define LIST_FIND_W(head, cmpfn, type, args...)		\
+({							\
+	const struct list_head *__i, *__j = NULL;	\
+							\
+	ASSERT_WRITE_LOCK(head);			\
+	list_for_each(__i, (head))			\
+		if (cmpfn((type)__i , ## args)) {	\
+			__j = __i;			\
+			break;				\
+		}					\
+	(type)__j;					\
 })
 
 /* Just like LIST_FIND but we search backwards */
 #define LIST_FIND_B(head, cmpfn, type, args...)		\
 ({							\
-	const struct list_head *__i = (head);		\
+	const struct list_head *__i, *__j = NULL;	\
 							\
 	ASSERT_READ_LOCK(head);				\
-	do {						\
-		__i = __i->prev;			\
-		if (__i == (head)) {			\
-			__i = NULL;			\
+	list_for_each_prev(__i, (head))			\
+		if (cmpfn((const type)__i , ## args)) {	\
+			__j = __i;			\
 			break;				\
 		}					\
-	} while (!cmpfn((const type)__i , ## args));	\
-	(type)__i;					\
+	(type)__j;					\
 })
 
 static inline int
@@ -100,9 +94,9 @@ list_prepend(struct list_head *head, void *new)
 do {								\
 	struct list_head *__i;					\
 	ASSERT_WRITE_LOCK(head);				\
-	for (__i = (head)->next;				\
-	     !cmpfn((new), (typeof (new))__i) && __i != (head);	\
-	     __i = __i->next);					\
+	list_for_each(__i, (head))				\
+		if ((new), (typeof (new))__i)			\
+			break;					\
 	list_add((struct list_head *)(new), __i->prev);		\
 } while(0)
 

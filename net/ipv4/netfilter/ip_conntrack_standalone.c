@@ -275,6 +275,7 @@ static struct nf_hook_ops ip_conntrack_local_in_ops = {
 
 /* From ip_conntrack_core.c */
 extern int ip_conntrack_max;
+extern unsigned int ip_conntrack_htable_size;
 
 /* From ip_conntrack_proto_tcp.c */
 extern unsigned long ip_ct_tcp_timeout_syn_sent;
@@ -305,6 +306,14 @@ static ctl_table ip_ct_sysctl_table[] = {
 		.data		= &ip_conntrack_max,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_IPV4_NF_CONNTRACK_BUCKETS,
+		.procname	= "ip_conntrack_buckets",
+		.data		= &ip_conntrack_htable_size,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{
