@@ -47,6 +47,9 @@ static struct input_dev rpcmouse_dev = {
 		.product = 0x0001,
 		.version = 0x0100,
 	},
+	.cdev	= {
+		.class_id = "rpcmouse",
+	},
 };
 
 static irqreturn_t rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)

@@ -47,6 +47,7 @@ struct joydev {
 	struct input_handle handle;
 	wait_queue_head_t wait;
 	struct list_head list;
+
 	struct js_corr corr[ABS_MAX];
 	struct JS_DATA_SAVE_TYPE glue;
 	int nabs;
@@ -145,7 +146,7 @@ static void joydev_free(struct joydev *joydev)
 {
 	devfs_remove("input/js%d", joydev->minor);
 	joydev_table[joydev->minor] = NULL;
-	class_simple_device_remove(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + joydev->minor));
+	input_class_remove_handle(&joydev->handle);
 	kfree(joydev);
 }
 
@@ -232,8 +233,10 @@ static ssize_t joydev_read(struct file *file, char __user *buf, size_t count, lo
 		&& list->head == list->tail && (file->f_flags & O_NONBLOCK))
 			return -EAGAIN;
 
-	retval = wait_event_interruptible(list->joydev->wait, list->joydev->exist
-		&& (list->startup < joydev->nabs + joydev->nkey || list->head != list->tail));
+	retval = wait_event_interruptible(list->joydev->wait,
+		 			  !list->joydev->exist ||
+					  list->startup < joydev->nabs + joydev->nkey ||
+					  list->head != list->tail);
 
 	if (retval)
 		return retval;
@@ -407,6 +410,7 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	joydev->handle.name = joydev->name;
 	joydev->handle.handler = handler;
 	joydev->handle.private = joydev;
+	joydev->handle.minor_base = JOYDEV_MINOR_BASE;
 	sprintf(joydev->name, "js%d", minor);
 
 	for (i = 0; i < ABS_MAX; i++)
@@ -453,9 +457,8 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/js%d", minor);
-	class_simple_device_add(input_class,
-				MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
-				dev->dev, "js%d", minor);
+
+	input_class_add_handle(&joydev->handle);
 
 	return &joydev->handle;
 }

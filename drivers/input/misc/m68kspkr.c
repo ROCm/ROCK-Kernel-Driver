@@ -66,6 +66,7 @@ static int __init m68kspkr_init(void)
 	m68kspkr_dev.id.vendor = 0x001f;
 	m68kspkr_dev.id.product = 0x0001;
 	m68kspkr_dev.id.version = 0x0100;
+	sprintf(m68kspkr_dev.cdev.class_id,"m68kspeaker");
 
 	input_register_device(&m68kspkr_dev);
 

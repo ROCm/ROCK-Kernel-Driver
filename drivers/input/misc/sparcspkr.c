@@ -26,6 +26,7 @@ static char *sparcspkr_isa_name = "Sparc ISA Speaker";
 static char *sparcspkr_ebus_name = "Sparc EBUS Speaker";
 static char *sparcspkr_phys = "sparc/input0";
 static struct input_dev sparcspkr_dev;
+static int sparcspkr_num;
 
 spinlock_t beep_lock = SPIN_LOCK_UNLOCKED;
 
@@ -88,6 +89,7 @@ static int __init init_ebus_beep(struct linux_ebus_device *edev)
 
 	sparcspkr_dev.name = sparcspkr_ebus_name;
 	sparcspkr_dev.event = ebus_spkr_event;
+	sprintf(sparcspkr_dev.cdev.class_id,"sparcspeaker%d", sparcspkr_num++);
 
 	input_register_device(&sparcspkr_dev);
 
@@ -142,6 +144,7 @@ static int __init init_isa_beep(struct sparc_isa_device *isa_dev)
 	sparcspkr_dev.name = sparcspkr_isa_name;
 	sparcspkr_dev.event = isa_spkr_event;
 	sparcspkr_dev.id.bustype = BUS_ISA;
+	sprintf(sparcspkr_dev.cdev.class_id,"sparcspeaker%d", sparcspkr_num++);
 
 	input_register_device(&sparcspkr_dev);
 

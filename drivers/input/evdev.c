@@ -29,8 +29,9 @@ struct evdev {
 	char name[16];
 	struct input_handle handle;
 	wait_queue_head_t wait;
-	struct evdev_list *grab;
 	struct list_head list;
+
+	struct evdev_list *grab;
 };
 
 struct evdev_list {
@@ -92,7 +93,7 @@ static int evdev_flush(struct file * file)
 static void evdev_free(struct evdev *evdev)
 {
 	devfs_remove("input/event%d", evdev->minor);
-	class_simple_device_remove(MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + evdev->minor));
+	input_class_remove_handle(&evdev->handle);
 	evdev_table[evdev->minor] = NULL;
 	kfree(evdev);
 }
@@ -424,15 +425,18 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 	evdev->handle.name = evdev->name;
 	evdev->handle.handler = handler;
 	evdev->handle.private = evdev;
+	evdev->handle.minor_base = EVDEV_MINOR_BASE;
 	sprintf(evdev->name, "event%d", minor);
 
 	evdev_table[minor] = evdev;
 
+	printk(KERN_DEBUG "%s: evdev %p handle %p name %s\n", __FUNCTION__, 
+	       evdev, &evdev->handle, evdev->name);
+
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/event%d", minor);
-	class_simple_device_add(input_class,
-				MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + minor),
-				dev->dev, "event%d", minor);
+	
+	input_class_add_handle(&evdev->handle);
 
 	return &evdev->handle;
 }

@@ -20,6 +20,7 @@ struct dc_mouse {
 	int open;
 };
 
+static int dc_mouse_num;
 
 static void dc_mouse_callback(struct mapleq *mq)
 {
@@ -83,6 +84,7 @@ static int dc_mouse_connect(struct maple_device *dev)
 
 	mouse->dev.name = dev->product_name;
 	mouse->dev.id.bustype = BUS_MAPLE;
+	sprintf(mouse->dev.cdev.class_id,"dcmouse%d", dc_mouse_num++);
 	
 	input_register_device(&mouse->dev);
 

@@ -12,6 +12,7 @@
 #ifdef __KERNEL__
 #include <linux/time.h>
 #include <linux/list.h>
+#include <linux/device.h>
 #else
 #include <sys/time.h>
 #include <sys/ioctl.h>
@@ -527,6 +528,8 @@ struct input_absinfo {
 #define MSC_SERIAL		0x00
 #define MSC_PULSELED		0x01
 #define MSC_GESTURE		0x02
+#define MSC_RAW			0x03
+#define MSC_SCAN		0x04
 #define MSC_MAX			0x07
 
 /*
@@ -827,6 +830,7 @@ struct input_dev {
 
 	struct input_handle *grab;
 	struct device *dev;
+	struct class_device cdev;
 
 	struct list_head	h_list;
 	struct list_head	node;
@@ -900,10 +904,10 @@ struct input_handle {
 
 	int open;
 	char *name;
-
+	int minor_base;
 	struct input_dev *dev;
 	struct input_handler *handler;
-
+	struct class_device     class_dev;
 	struct list_head	d_node;
 	struct list_head	h_node;
 };
@@ -912,6 +916,19 @@ struct input_handle {
 #define to_handler(n) container_of(n,struct input_handler,node);
 #define to_handle(n) container_of(n,struct input_handle,d_node)
 #define to_handle_h(n) container_of(n,struct input_handle,h_node)
+#define class_to_handle(n) container_of(n,struct input_handle, class_dev);
+
+struct gendev {
+	int exist;
+	int open;
+	int minor;
+	char name[16];
+	struct input_handle handle;
+	wait_queue_head_t wait;
+	struct list_head list;
+};
+
+#define to_gendev(n) container_of(n,struct gendev, handle)
 
 static inline void init_input_dev(struct input_dev *dev)
 {
@@ -924,6 +941,9 @@ void input_unregister_device(struct input_dev *);
 
 void input_register_handler(struct input_handler *);
 void input_unregister_handler(struct input_handler *);
+
+int input_class_add_handle(struct input_handle *handle);
+void input_class_remove_handle(struct input_handle *handle);
 
 int input_grab_device(struct input_handle *);
 void input_release_device(struct input_handle *);
@@ -981,8 +1001,6 @@ static inline void input_set_abs_params(struct input_dev *dev, int axis, int min
 
 	dev->absbit[LONG(axis)] |= BIT(axis);
 }
-
-extern struct class_simple *input_class;
 
 #endif
 #endif

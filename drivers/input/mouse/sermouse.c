@@ -37,13 +37,17 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Serial mouse driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Serial mouse driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static char *sermouse_protocols[] = { "None", "Mouse Systems Mouse", "Sun Mouse", "Microsoft Mouse",
 					"Logitech M+ Mouse", "Microsoft MZ Mouse", "Logitech MZ+ Mouse",
 					"Logitech MZ++ Mouse"};
+
+static int sermouse_num;
 
 struct sermouse {
 	struct input_dev dev;
@@ -228,6 +232,7 @@ static void sermouse_disconnect(struct serio *serio)
 {
 	struct sermouse *sermouse = serio->private;
 	input_unregister_device(&sermouse->dev);
+	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(sermouse);
 }
@@ -237,7 +242,7 @@ static void sermouse_disconnect(struct serio *serio)
  * an unhandled serio port is found.
  */
 
-static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
+static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct sermouse *sermouse;
 	unsigned char c;
@@ -278,8 +283,10 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 	sermouse->dev.id.vendor = sermouse->type;
 	sermouse->dev.id.product = c;
 	sermouse->dev.id.version = 0x0100;
+	sermouse->dev.dev = get_device(&serio->dev);
+	sprintf(sermouse->dev.cdev.class_id,"sermouse%d", sermouse_num++);
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(sermouse);
 		return;
 	}
@@ -289,21 +296,25 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 	printk(KERN_INFO "input: %s on %s\n", sermouse_protocols[sermouse->type], serio->phys);
 }
 
-static struct serio_dev sermouse_dev = {
-	.interrupt =	sermouse_interrupt,
-	.connect =	sermouse_connect,
-	.disconnect =	sermouse_disconnect
+static struct serio_driver sermouse_drv = {
+	.driver		= {
+		.name	= "sermouse",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= sermouse_interrupt,
+	.connect	= sermouse_connect,
+	.disconnect	= sermouse_disconnect,
 };
 
 int __init sermouse_init(void)
 {
-	serio_register_device(&sermouse_dev);
+	serio_register_driver(&sermouse_drv);
 	return 0;
 }
 
 void __exit sermouse_exit(void)
 {
-	serio_unregister_device(&sermouse_dev);
+	serio_unregister_driver(&sermouse_drv);
 }
 
 module_init(sermouse_init);

@@ -37,8 +37,10 @@
 #include <linux/serio.h>
 #include <linux/workqueue.h>
 
+#define DRIVER_DESC	"Sun keyboard driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Sun keyboard driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static unsigned char sunkbd_keycode[128] = {
@@ -67,6 +69,8 @@ static unsigned char sunkbd_keycode[128] = {
 #define SUNKBD_LAYOUT_5_MASK	0x20
 #define SUNKBD_RELEASE		0x80
 #define SUNKBD_KEY		0x7f
+
+static int sunkbd_num;
 
 /*
  * Per-keyboard data.
@@ -221,7 +225,7 @@ static void sunkbd_reinit(void *data)
  * sunkbd_connect() probes for a Sun keyboard and fills the necessary structures.
  */
 
-static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
+static void sunkbd_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct sunkbd *sunkbd;
 	int i;
@@ -257,7 +261,7 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = sunkbd;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(sunkbd);
 		return;
 	}
@@ -283,6 +287,8 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 	sunkbd->dev.id.vendor = SERIO_SUNKBD;
 	sunkbd->dev.id.product = sunkbd->type;
 	sunkbd->dev.id.version = 0x0100;
+	sunkbd->dev.dev = get_device(&serio->dev);
+	sprintf(sunkbd->dev.cdev.class_id,"sunkbd%d", sunkbd_num++);
 
 	input_register_device(&sunkbd->dev);
 
@@ -297,14 +303,19 @@ static void sunkbd_disconnect(struct serio *serio)
 {
 	struct sunkbd *sunkbd = serio->private;
 	input_unregister_device(&sunkbd->dev);
+	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(sunkbd);
 }
 
-static struct serio_dev sunkbd_dev = {
-	.interrupt =	sunkbd_interrupt,
-	.connect =	sunkbd_connect,
-	.disconnect =	sunkbd_disconnect
+static struct serio_driver sunkbd_drv = {
+	.driver		= {
+		.name	= "sunkbd",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= sunkbd_interrupt,
+	.connect	= sunkbd_connect,
+	.disconnect	= sunkbd_disconnect,
 };
 
 /*
@@ -313,13 +324,13 @@ static struct serio_dev sunkbd_dev = {
 
 int __init sunkbd_init(void)
 {
-	serio_register_device(&sunkbd_dev);
+	serio_register_driver(&sunkbd_drv);
 	return 0;
 }
 
 void __exit sunkbd_exit(void)
 {
-	serio_unregister_device(&sunkbd_dev);
+	serio_unregister_driver(&sunkbd_drv);
 }
 
 module_init(sunkbd_init);

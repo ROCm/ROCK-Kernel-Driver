@@ -814,6 +814,69 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801CA_12,	as
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_12,	asus_hides_smbus_lpc );
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801EB_0,	asus_hides_smbus_lpc );
 
+#define UHCI_USBLEGSUP		0xc0		/* legacy support */
+#define UHCI_USBCMD		0		/* command register */
+#define UHCI_USBINTR		4		/* interrupt register */
+#define UHCI_USBLEGSUP_DEFAULT	0x2000		/* only PIRQ enable set */
+#define UHCI_USBCMD_GRESET	0x0004		/* Global reset */
+
+#define OHCI_CONTROL		0x04
+#define OHCI_CMDSTATUS		0x08
+#define OHCI_INTRENABLE		0x10
+#define OHCI_OCR		(1 << 3)	/* ownership change request */
+#define OHCI_CTRL_IR		(1 << 8)	/* interrupt routing */
+#define OHCI_INTR_OC		(1 << 30)	/* ownership change */
+
+#if defined(__i386__) || defined(__x86_64__)
+static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
+{
+
+	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x00)) { /* UHCI */
+		int i;
+		unsigned long base = 0;;
+
+		for (i = 0; i < PCI_ROM_RESOURCE; i++) 
+			if ((pci_resource_flags(pdev, i) & IORESOURCE_IO)) {
+				base = pci_resource_start(pdev, i);
+				break;
+			}
+
+		if (!base)
+			return;
+
+		outw(0, base + UHCI_USBINTR);
+		outw(UHCI_USBCMD_GRESET, base + UHCI_USBCMD);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+       		schedule_timeout((HZ*50+999) / 1000);
+		outw(0, base + UHCI_USBCMD);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout((HZ*10+999) / 1000);
+
+		pci_write_config_word(pdev, UHCI_USBLEGSUP, UHCI_USBLEGSUP_DEFAULT);
+	}
+
+	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x10)) { /* OHCI */
+		char *base = ioremap_nocache(pci_resource_start(pdev, 0),
+							pci_resource_len(pdev, 0));
+		if (base == NULL) return;
+
+		if (readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
+			int temp = 500;     /* arbitrary: five seconds */
+			writel(OHCI_INTR_OC, base + OHCI_INTRENABLE);
+			writel(OHCI_OCR, base + OHCI_CMDSTATUS);
+			while (temp && readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
+				temp--;
+				set_current_state(TASK_UNINTERRUPTIBLE);
+				schedule_timeout( HZ / 100);
+			}
+		}
+		iounmap(base);
+	}
+}
+#endif
+
+DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID,	PCI_ANY_ID,	quirk_usb_disable_smm_bios);
+
 /*
  * SiS 96x south bridge: BIOS typically hides SMBus device...
  */

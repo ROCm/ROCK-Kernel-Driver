@@ -116,6 +116,9 @@ static struct input_dev logibm_dev = {
 		.product = 0x0001,
 		.version = 0x0100,
 	},
+	.cdev    = {
+		.class_id  = "logibm",
+	},
 };
 
 static irqreturn_t logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)

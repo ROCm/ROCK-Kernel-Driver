@@ -247,9 +247,9 @@ config JOYSTICK_AMIGA
 	  To compile this driver as a module, choose M here: the
 	  module will be called amijoy.
 
-config INPUT_JOYDUMP
+config JOYSTICK_JOYDUMP
 	tristate "Gameport data dumper"
-	depends on INPUT && INPUT_JOYSTICK
+	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
 	help
 	  Say Y here if you want to dump data from your joystick into the system
 	  log for debugging purposes. Say N if you are making a production

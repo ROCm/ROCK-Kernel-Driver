@@ -82,8 +82,10 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Serial DEC VSXXX-AA/GA mouse / DEC tablet driver"
+
 MODULE_AUTHOR ("Jan-Benedict Glaw <jbglaw@lug-owl.de>");
-MODULE_DESCRIPTION ("Serial DEC VSXXX-AA/GA mouse / DEC tablet driver");
+MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
 
 #undef VSXXXAA_DEBUG
@@ -104,7 +106,7 @@ MODULE_LICENSE ("GPL");
 #define VSXXXAA_PACKET_POR	0xa0
 #define MATCH_PACKET_TYPE(data, type)	(((data) & VSXXXAA_PACKET_MASK) == type)
 
-
+static int vsxxxaa_num;
 
 struct vsxxxaa {
 	struct input_dev dev;
@@ -477,12 +479,13 @@ vsxxxaa_disconnect (struct serio *serio)
 	struct vsxxxaa *mouse = serio->private;
 
 	input_unregister_device (&mouse->dev);
+	put_device(&serio->dev);
 	serio_close (serio);
 	kfree (mouse);
 }
 
 static void
-vsxxxaa_connect (struct serio *serio, struct serio_dev *dev)
+vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 {
 	struct vsxxxaa *mouse;
 
@@ -524,7 +527,7 @@ vsxxxaa_connect (struct serio *serio, struct serio_dev *dev)
 	mouse->dev.id.bustype = BUS_RS232;
 	mouse->serio = serio;
 
-	if (serio_open (serio, dev)) {
+	if (serio_open (serio, drv)) {
 		kfree (mouse);
 		return;
 	}
@@ -535,28 +538,35 @@ vsxxxaa_connect (struct serio *serio, struct serio_dev *dev)
 	 */
 	mouse->serio->write (mouse->serio, 'T'); /* Test */
 
+	mouse->dev.dev = get_device(&serio->dev);
+	sprintf(mouse->dev.cdev.class_id,"decmouse%d", vsxxxaa_num++);
+
 	input_register_device (&mouse->dev);
 
 	printk (KERN_INFO "input: %s on %s\n", mouse->name, mouse->phys);
 }
 
-static struct serio_dev vsxxxaa_dev = {
-	.connect = vsxxxaa_connect,
-	.interrupt = vsxxxaa_interrupt,
-	.disconnect = vsxxxaa_disconnect,
+static struct serio_driver vsxxxaa_drv = {
+	.driver		= {
+		.name	= "vsxxxaa",
+	},
+	.description	= DRIVER_DESC,
+	.connect	= vsxxxaa_connect,
+	.interrupt	= vsxxxaa_interrupt,
+	.disconnect	= vsxxxaa_disconnect,
 };
 
 int __init
 vsxxxaa_init (void)
 {
-	serio_register_device (&vsxxxaa_dev);
+	serio_register_driver(&vsxxxaa_drv);
 	return 0;
 }
 
 void __exit
 vsxxxaa_exit (void)
 {
-	serio_unregister_device (&vsxxxaa_dev);
+	serio_unregister_driver(&vsxxxaa_drv);
 }
 
 module_init (vsxxxaa_init);

@@ -25,6 +25,8 @@
 #include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
 
+#define INPUT_DEBUG
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input core");
 MODULE_LICENSE("GPL");
@@ -40,7 +42,8 @@ EXPORT_SYMBOL(input_close_device);
 EXPORT_SYMBOL(input_accept_process);
 EXPORT_SYMBOL(input_flush_device);
 EXPORT_SYMBOL(input_event);
-EXPORT_SYMBOL(input_class);
+EXPORT_SYMBOL(input_class_add_handle);
+EXPORT_SYMBOL(input_class_remove_handle);
 
 #define INPUT_DEVICES	256
 
@@ -340,52 +343,27 @@ static struct input_device_id *input_match_device(struct input_device_id *id, st
 			SPRINTF_BIT_A(bit, name, max); \
 	} while (0)
 
-static void input_call_hotplug(char *verb, struct input_dev *dev)
+static int __input_hotplug(struct input_dev *dev, char **envp, int num_envp,
+			   char *buffer, int buffer_size)
 {
-	char *argv[3], **envp, *buf, *scratch;
-	int i = 0, j, value;
+	char *scratch;
+	int i = 0, j;
+	scratch = buffer;
 
-	if (!hotplug_path[0]) {
-		printk(KERN_ERR "input.c: calling hotplug without a hotplug agent defined\n");
-		return;
-	}
-	if (in_interrupt()) {
-		printk(KERN_ERR "input.c: calling hotplug from interrupt\n");
-		return;
-	}
-	if (!current->fs->root) {
-		printk(KERN_WARNING "input.c: calling hotplug without valid filesystem\n");
-		return;
-	}
-	if (!(envp = (char **) kmalloc(20 * sizeof(char *), GFP_KERNEL))) {
-		printk(KERN_ERR "input.c: not enough memory allocating hotplug environment\n");
-		return;
-	}
-	if (!(buf = kmalloc(1024, GFP_KERNEL))) {
-		kfree (envp);
-		printk(KERN_ERR "input.c: not enough memory allocating hotplug environment\n");
-		return;
-	}
-
-	argv[0] = hotplug_path;
-	argv[1] = "input";
-	argv[2] = NULL;
-
-	envp[i++] = "HOME=/";
-	envp[i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-
-	scratch = buf;
-
-	envp[i++] = scratch;
-	scratch += sprintf(scratch, "ACTION=%s", verb) + 1;
+	if (!dev)
+		return -ENODEV;
 
 	envp[i++] = scratch;
 	scratch += sprintf(scratch, "PRODUCT=%x/%x/%x/%x",
 		dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version) + 1;
 
+#ifdef INPUT_DEBUG
+	printk(KERN_DEBUG "%s: PRODUCT %x/%x/%x/%x\n", __FUNCTION__,
+	       dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
+#endif
 	if (dev->name) {
 		envp[i++] = scratch;
-		scratch += sprintf(scratch, "NAME=%s", dev->name) + 1;
+		scratch += sprintf(scratch, "NAME=\"%s\"", dev->name) + 1;
 	}
 
 	if (dev->phys) {
@@ -404,29 +382,134 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 
 	envp[i++] = NULL;
 
+	return 0;
+}
+
+int input_hotplug(struct class_device *cdev, char **envp, int num_envp,
+		  char *buffer, int buffer_size)
+{
+	struct input_dev *dev;
+
+	if (!cdev)
+		return -ENODEV;
 #ifdef INPUT_DEBUG
-	printk(KERN_DEBUG "input.c: calling %s %s [%s %s %s %s %s]\n",
-		argv[0], argv[1], envp[0], envp[1], envp[2], envp[3], envp[4]);
+	printk(KERN_DEBUG "%s: entered for dev %p\n", __FUNCTION__, 
+	       &cdev->dev);
 #endif
 
-	value = call_usermodehelper(argv [0], argv, envp, 0);
+	dev = container_of(cdev,struct input_dev,cdev);
 
-	kfree(buf);
-	kfree(envp);
-
-#ifdef INPUT_DEBUG
-	if (value != 0)
-		printk(KERN_DEBUG "input.c: hotplug returned %d\n", value);
-#endif
+	return __input_hotplug(dev, envp, num_envp, buffer, buffer_size);
 }
 
 #endif
+
+#define INPUT_ATTR_BIT_B(bit, max) \
+	do { \
+		for (i = NBITS(max) - 1; i >= 0; i--) \
+			if (dev->bit[i]) break; \
+		for (; i >= 0; i--) \
+			len += sprintf(buf + len, "%lx ", dev->bit[i]); \
+		if (len) len += sprintf(buf + len, "\n"); \
+	} while (0)
+
+#define INPUT_ATTR_BIT_B2(bit, max, ev) \
+	do { \
+		if (test_bit(ev, dev->evbit)) \
+			INPUT_ATTR_BIT_B(bit, max); \
+	} while (0)
+
+
+static ssize_t input_class_show_ev(struct class_device *class_dev, char *buf)
+{
+	struct input_dev *dev = container_of(class_dev, struct input_dev,cdev);
+	int i, len = 0;
+
+	INPUT_ATTR_BIT_B(evbit, EV_MAX);
+	return len;
+}
+
+#define INPUT_CLASS_ATTR_BIT(_name,_bit) \
+static ssize_t input_class_show_##_bit(struct class_device *class_dev, \
+				       char *buf) \
+{ \
+	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev); \
+        int i, len = 0; \
+\
+	INPUT_ATTR_BIT_B2(_bit##bit, _name##_MAX, EV_##_name); \
+	return len; \
+}
+
+INPUT_CLASS_ATTR_BIT(KEY,key)
+INPUT_CLASS_ATTR_BIT(REL,rel)
+INPUT_CLASS_ATTR_BIT(ABS,abs)
+INPUT_CLASS_ATTR_BIT(MSC,msc)
+INPUT_CLASS_ATTR_BIT(LED,led)
+INPUT_CLASS_ATTR_BIT(SND,snd)
+INPUT_CLASS_ATTR_BIT(FF,ff)
+
+static ssize_t input_class_show_phys(struct class_device *class_dev, char *buf)
+{
+	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev);
+
+	return sprintf(buf, "%s\n", dev->phys ? dev->phys : "(none)" );
+}
+
+static ssize_t input_class_show_name(struct class_device *class_dev, char *buf)
+{
+	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev);
+
+	return sprintf(buf, "%s\n", dev->name ? dev->name : "(none)" );
+}
+
+static ssize_t input_class_show_product(struct class_device *class_dev, char *buf)
+{
+	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev);
+
+	return sprintf(buf, "%x/%x/%x/%x\n", dev->id.bustype, dev->id.vendor, 
+		       dev->id.product, dev->id.version);
+}
+
+static struct class_device_attribute input_device_class_attrs[] = {
+	__ATTR( product, S_IRUGO, input_class_show_product, NULL) ,
+	__ATTR( phys, S_IRUGO, input_class_show_phys, NULL ),
+	__ATTR( name, S_IRUGO, input_class_show_name, NULL) ,
+	__ATTR( ev, S_IRUGO, input_class_show_ev, NULL) ,
+	__ATTR( key, S_IRUGO, input_class_show_key, NULL) ,
+	__ATTR( rel, S_IRUGO, input_class_show_rel, NULL) ,
+	__ATTR( abs, S_IRUGO, input_class_show_abs, NULL) ,
+	__ATTR( msc, S_IRUGO, input_class_show_msc, NULL) ,
+	__ATTR( led, S_IRUGO, input_class_show_led, NULL) ,
+	__ATTR( snd, S_IRUGO, input_class_show_snd, NULL) ,
+	__ATTR( ff, S_IRUGO, input_class_show_ff, NULL) ,
+	__ATTR_NULL,
+};
+
+static void input_device_class_release( struct class_device *class_dev )
+{
+	put_device(class_dev->dev);
+}
+
+static struct class input_device_class = {
+	.name =		"input_device",
+	.hotplug = 	input_hotplug,
+	.release = 	input_device_class_release,
+	.class_dev_attrs = input_device_class_attrs,
+};
 
 void input_register_device(struct input_dev *dev)
 {
 	struct input_handle *handle;
 	struct input_handler *handler;
 	struct input_device_id *id;
+
+	dev->cdev.class = &input_device_class;
+	
+	dev->cdev.dev = get_device(dev->dev);
+	if (class_device_register(&dev->cdev)) {
+		put_device(dev->dev);
+		return;
+	}
 
 	set_bit(EV_SYN, dev->evbit);
 
@@ -452,10 +535,6 @@ void input_register_device(struct input_dev *dev)
 				if ((handle = handler->connect(handler, dev, id)))
 					input_link_handle(handle);
 
-#ifdef CONFIG_HOTPLUG
-	input_call_hotplug("add", dev);
-#endif
-
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;
 	wake_up(&input_devices_poll_wait);
@@ -480,11 +559,9 @@ void input_unregister_device(struct input_dev *dev)
 		handle->handler->disconnect(handle);
 	}
 
-#ifdef CONFIG_HOTPLUG
-	input_call_hotplug("remove", dev);
-#endif
-
 	list_del_init(&dev->node);
+
+	class_device_unregister(&dev->cdev);
 
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;
@@ -720,15 +797,85 @@ static int __init input_proc_init(void)
 static inline int input_proc_init(void) { return 0; }
 #endif
 
-struct class_simple *input_class;
+static ssize_t input_class_show_dev(struct class_device *class_dev, char *buf)
+{
+	dev_t dev;
+	struct input_handle *handle = class_to_handle(class_dev);
+	struct gendev *gdev = to_gendev(handle);
+
+	dev = MKDEV(INPUT_MAJOR,handle->minor_base + gdev->minor);
+	return print_dev_t(buf, dev);
+}
+
+static struct class_device_attribute input_class_attrs[] = {
+	__ATTR( dev, S_IRUGO, input_class_show_dev, NULL),
+	__ATTR_NULL,
+};
+
+static void input_class_release(struct class_device *cdev)
+{
+	put_device(cdev->dev);
+}
+
+static struct class input_class = {
+	.name =		"input",
+	.release = 	input_class_release,
+	.class_dev_attrs = input_class_attrs,
+};
+
+int input_class_add_handle(struct input_handle *handle)
+{
+	struct gendev *gdev = to_gendev(handle);
+	struct device *hdev = NULL;
+	int retval;
+
+#ifdef INPUT_DEBUG
+	printk(KERN_DEBUG "%s: add handle for %s, minor %d (%p, %p)\n", 
+	       __FUNCTION__, gdev->name, gdev->minor,
+	       handle, handle->dev);
+#endif
+	handle->class_dev.class = &input_class;
+	if (handle->dev)
+		hdev = get_device(handle->dev->dev);
+
+#ifdef INPUT_DEBUG
+	if (hdev)
+		printk(KERN_DEBUG "%s: bus %p driver %p\n",
+		       __FUNCTION__, hdev->bus, hdev->driver);
+#endif
+
+	handle->class_dev.dev = hdev;
+	snprintf(handle->class_dev.class_id, BUS_ID_SIZE, "%s", gdev->name);
+	
+	retval = class_device_register(&handle->class_dev);
+	if (retval) {
+		if (hdev)
+			put_device(handle->dev->dev);
+		return retval;
+	}
+	return 0;
+}
+
+void input_class_remove_handle(struct input_handle *handle)
+{
+	put_device(handle->class_dev.dev);
+	class_device_unregister(&handle->class_dev);
+}
 
 static int __init input_init(void)
 {
 	int retval = -ENOMEM;
 
-	input_class = class_simple_create(THIS_MODULE, "input");
-	if (IS_ERR(input_class))
-		return PTR_ERR(input_class);
+	retval = class_register(&input_class);
+	if (retval)
+		return retval;
+
+	retval = class_register(&input_device_class);
+	if (retval) {
+		class_unregister(&input_class);
+		return retval;
+	}
+
 	input_proc_init();
 	retval = register_chrdev(INPUT_MAJOR, "input", &input_fops);
 	if (retval) {
@@ -736,7 +883,8 @@ static int __init input_init(void)
 		remove_proc_entry("devices", proc_bus_input_dir);
 		remove_proc_entry("handlers", proc_bus_input_dir);
 		remove_proc_entry("input", proc_bus);
-		class_simple_destroy(input_class);
+		class_unregister(&input_device_class);
+		class_unregister(&input_class);
 		return retval;
 	}
 
@@ -746,7 +894,8 @@ static int __init input_init(void)
 		remove_proc_entry("handlers", proc_bus_input_dir);
 		remove_proc_entry("input", proc_bus);
 		unregister_chrdev(INPUT_MAJOR, "input");
-		class_simple_destroy(input_class);
+		class_unregister(&input_device_class);
+		class_unregister(&input_class);
 	}
 	return retval;
 }
@@ -759,7 +908,8 @@ static void __exit input_exit(void)
 
 	devfs_remove("input");
 	unregister_chrdev(INPUT_MAJOR, "input");
-	class_simple_destroy(input_class);
+	class_unregister(&input_device_class);
+	class_unregister(&input_class);
 }
 
 subsys_initcall(input_init);

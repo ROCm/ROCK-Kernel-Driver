@@ -32,8 +32,10 @@
 #include <linux/init.h>
 #include <linux/serio.h>
 
+#define DRIVER_DESC	"Newton keyboard driver"
+
 MODULE_AUTHOR("Justin Cormack <j.cormack@doc.ic.ac.uk>");
-MODULE_DESCRIPTION("Newton keyboard driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 #define NKBD_KEY	0x7f
@@ -56,6 +58,8 @@ static unsigned char nkbd_keycode[128] = {
 };
 
 static char *nkbd_name = "Newton Keyboard";
+
+static int nkbd_num;
 
 struct nkbd {
 	unsigned char keycode[128];
@@ -82,7 +86,7 @@ irqreturn_t nkbd_interrupt(struct serio *serio,
 
 }
 
-void nkbd_connect(struct serio *serio, struct serio_dev *dev)
+void nkbd_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct nkbd *nkbd;
 	int i;
@@ -106,7 +110,7 @@ void nkbd_connect(struct serio *serio, struct serio_dev *dev)
 	nkbd->dev.private = nkbd;
 	serio->private = nkbd;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(nkbd);
 		return;
 	}
@@ -124,6 +128,8 @@ void nkbd_connect(struct serio *serio, struct serio_dev *dev)
 	nkbd->dev.id.vendor = SERIO_NEWTON;
 	nkbd->dev.id.product = 0x0001;
 	nkbd->dev.id.version = 0x0100;
+	nkbd->dev.dev = get_device(&serio->dev);
+	sprintf(nkbd->dev.cdev.class_id,"nkbd%d",nkbd_num++);
 
 	input_register_device(&nkbd->dev);
 
@@ -134,25 +140,30 @@ void nkbd_disconnect(struct serio *serio)
 {
 	struct nkbd *nkbd = serio->private;
 	input_unregister_device(&nkbd->dev);
+	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(nkbd);
 }
 
-struct serio_dev nkbd_dev = {
-	.interrupt =	nkbd_interrupt,
-	.connect =	nkbd_connect,
-	.disconnect =	nkbd_disconnect
+struct serio_driver nkbd_drv = {
+	.driver		= {
+		.name	= "newtonkbd",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= nkbd_interrupt,
+	.connect	= nkbd_connect,
+	.disconnect	= nkbd_disconnect,
 };
 
 int __init nkbd_init(void)
 {
-	serio_register_device(&nkbd_dev);
+	serio_register_driver(&nkbd_drv);
 	return 0;
 }
 
 void __exit nkbd_exit(void)
 {
-	serio_unregister_device(&nkbd_dev);
+	serio_unregister_driver(&nkbd_drv);
 }
 
 module_init(nkbd_init);

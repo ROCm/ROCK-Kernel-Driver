@@ -222,6 +222,7 @@ static int __init amikbd_init(void)
 	amikbd_dev.id.vendor = 0x0001;
 	amikbd_dev.id.product = 0x0001;
 	amikbd_dev.id.version = 0x0100;
+	sprintf(amikbd_dev.cdev.class_id,"amikbd");
 
 	input_register_device(&amikbd_dev);
 

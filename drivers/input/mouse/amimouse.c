@@ -121,6 +121,7 @@ static int __init amimouse_init(void)
 	amimouse_dev.id.vendor = 0x0001;
 	amimouse_dev.id.product = 0x0002;
 	amimouse_dev.id.version = 0x0100;
+	sprintf(amimouse_dev.cdev.class_id,"amimouse");
 
 	input_register_device(&amimouse_dev);
 

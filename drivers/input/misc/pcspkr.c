@@ -78,6 +78,7 @@ static int __init pcspkr_init(void)
 	pcspkr_dev.id.vendor = 0x001f;
 	pcspkr_dev.id.product = 0x0001;
 	pcspkr_dev.id.version = 0x0100;
+	sprintf(pcspkr_dev.cdev.class_id,"pcspeaker");
 
 	input_register_device(&pcspkr_dev);
 
