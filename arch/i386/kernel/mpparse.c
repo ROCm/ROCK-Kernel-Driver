@@ -1017,6 +1017,8 @@ void __init mp_config_acpi_legacy_irqs (void)
 	}
 }
 
+#ifndef CONFIG_ACPI_HT_ONLY
+
 /* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
 
 extern FADT_DESCRIPTOR acpi_fadt;
@@ -1038,7 +1040,7 @@ void __init mp_config_ioapic_for_sci(int irq)
 	status = acpi_get_firmware_table("APIC", 1, ACPI_LOGICAL_ADDRESSING,
 		(acpi_table_header **) &madt);
 	if (ACPI_SUCCESS(status)) {
-		madt_end = (unsigned long)madt + madt->header.length;
+		madt_end = (void *) (unsigned long)madt + madt->header.length;
 
 		entry = (struct acpi_table_int_src_ovr *)
                 ((unsigned long) madt + sizeof(struct acpi_table_madt));
@@ -1059,6 +1061,8 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 	io_apic_set_pci_routing(ioapic, ioapic_pin, irq);
 }
+
+#endif /*CONFIG_ACPI_HT_ONLY*/
 
 #ifdef CONFIG_ACPI_PCI
 
