@@ -15,9 +15,6 @@
 struct proc_dir_entry;
 struct pt_regs;
 
-/* parse command line */
-int __init profile_setup(char * str);
-
 /* init basic kernel profiler */
 void __init profile_init(void);
 void profile_tick(int, struct pt_regs *);
@@ -27,13 +24,6 @@ void create_prof_cpu_mask(struct proc_dir_entry *);
 #else
 #define create_prof_cpu_mask(x)			do { (void)(x); } while (0)
 #endif
-
-extern unsigned int * prof_buffer;
-extern unsigned long prof_len;
-extern unsigned long prof_shift;
-extern int prof_on;
-extern cpumask_t prof_cpu_mask;
-
 
 enum profile_type {
 	EXIT_TASK,

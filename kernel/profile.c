@@ -12,13 +12,12 @@
 #include <linux/profile.h>
 #include <asm/sections.h>
 
-unsigned int * prof_buffer;
-unsigned long prof_len;
-unsigned long prof_shift;
-int prof_on;
-cpumask_t prof_cpu_mask = CPU_MASK_ALL;
+static unsigned int *prof_buffer;
+static unsigned long prof_len, prof_shift;
+static int prof_on;
+static cpumask_t prof_cpu_mask = CPU_MASK_ALL;
 
-int __init profile_setup(char * str)
+static int __init profile_setup(char * str)
 {
 	int par;
 
@@ -36,6 +35,7 @@ int __init profile_setup(char * str)
 	}
 	return 1;
 }
+__setup("profile=", profile_setup);
 
 
 void __init profile_init(void)
