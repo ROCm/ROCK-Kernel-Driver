@@ -614,9 +614,7 @@ static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *vcc)
 {
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave (&instance->sndqlock, flags);
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
 		if (!instance->send_ctx[i].skb)
 			continue;
@@ -628,7 +626,6 @@ int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *v
 			instance->send_ctx[i].skb = NULL;
 		}
 	}
-	spin_unlock_irqrestore (&instance->sndqlock, flags);
 
 	return 0;
 }
