@@ -145,9 +145,18 @@ EXPORT_SYMBOL(pppoatm_ioctl_set);
 #endif
 
 #if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
-int (*br2684_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
+static DECLARE_MUTEX(br2684_ioctl_mutex);
+
+static int (*br2684_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
+
+void br2684_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long))
+{
+	down(&br2684_ioctl_mutex);
+	br2684_ioctl_hook = hook;
+	up(&br2684_ioctl_mutex);
+}
 #ifdef CONFIG_ATM_BR2684_MODULE
-EXPORT_SYMBOL(br2684_ioctl_hook);
+EXPORT_SYMBOL(br2684_ioctl_set);
 #endif
 #endif
 
@@ -880,11 +889,12 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		goto done;
 #endif
 #if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
-	if (br2684_ioctl_hook) {
+	down(&br2684_ioctl_mutex);
+	if (br2684_ioctl_hook)
 		error = br2684_ioctl_hook(vcc, cmd, arg);
-		if (error != -ENOIOCTLCMD)
-			goto done;
-	}
+	up(&br2684_ioctl_mutex);
+	if (error != -ENOIOCTLCMD)
+		goto done;
 #endif
 
 	error = atm_dev_ioctl(cmd, arg);
