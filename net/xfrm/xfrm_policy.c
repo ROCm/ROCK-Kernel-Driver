@@ -80,22 +80,24 @@ int xfrm_unregister_type(struct xfrm_type *type, unsigned short family)
 
 struct xfrm_type *xfrm_get_type(u8 proto, unsigned short family)
 {
-	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
+	struct xfrm_policy_afinfo *afinfo;
 	struct xfrm_type_map *typemap;
 	struct xfrm_type *type;
 	int modload_attempted = 0;
 
+retry:
+	afinfo = xfrm_policy_get_afinfo(family);
 	if (unlikely(afinfo == NULL))
 		return NULL;
 	typemap = afinfo->type_map;
 
-retry:
 	read_lock(&typemap->lock);
 	type = typemap->map[proto];
 	if (unlikely(type && !try_module_get(type->owner)))
 		type = NULL;
 	read_unlock(&typemap->lock);
 	if (!type && !modload_attempted) {
+		xfrm_policy_put_afinfo(afinfo);
 		request_module("xfrm-type-%d-%d",
 			       (int) family, (int) proto);
 		modload_attempted = 1;
