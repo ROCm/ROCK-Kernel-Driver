@@ -15,6 +15,8 @@ obj-y :=	open.o read_write.o file_table.o buffer.o \
 		filesystems.o namespace.o seq_file.o xattr.o libfs.o \
 		fs-writeback.o mpage.o direct-io.o aio.o eventpoll.o
 
+obj-$(CONFIG_COMPAT) += compat.o
+
 ifneq ($(CONFIG_NFSD),n)
 ifneq ($(CONFIG_NFSD),)
 obj-y += nfsctl.o

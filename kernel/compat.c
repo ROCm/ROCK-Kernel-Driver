@@ -83,25 +83,6 @@ asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
 	return -ERESTART_RESTARTBLOCK;
 }
 
-/*
- * Not all architectures have sys_utime, so implement this in terms
- * of sys_utimes.
- */
-asmlinkage long compat_sys_utime(char *filename, struct compat_utimbuf *t)
-{
-	struct timeval tv[2];
-
-	if (t) {
-		if (get_user(tv[0].tv_sec, &t->actime) ||
-		    get_user(tv[1].tv_sec, &t->modtime))
-			return -EFAULT;
-		tv[0].tv_usec = 0;
-		tv[1].tv_usec = 0;
-	}
-	return do_utimes(filename, t ? tv : NULL);
-}
-
-
 static inline long get_compat_itimerval(struct itimerval *o,
 		struct compat_itimerval *i)
 {
