@@ -28,6 +28,9 @@
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
+extern unsigned long wall_jiffies;
+
+
 static inline int set_rtc_mmss(unsigned long nowtime)
 {
 	if (mach_set_clock_mmss)
@@ -65,6 +68,8 @@ static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 	/* may need to kick the hardware timer */
 	if (mach_tick)
 	  mach_tick();
+
+	write_seqlock(&xtime_lock);
 
 	do_timer(regs);
 
@@ -108,6 +113,8 @@ static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 	    }
 	}
 #endif /* CONFIG_HEARTBEAT */
+
+	write_sequnlock(&xtime_lock);
 }
 
 void time_init(void)
@@ -133,17 +140,18 @@ void time_init(void)
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
-	unsigned long seq;
+	unsigned long lost, seq;
 	unsigned long usec, sec;
 
 	do {
 		seq = read_seqbegin_irqsave(&xtime_lock, flags);
-
 		usec = mach_gettimeoffset ? mach_gettimeoffset() : 0;
+		lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * (1000000 / HZ);
 		sec = xtime.tv_sec;
 		usec += (xtime.tv_nsec / 1000);
 	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
-
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
