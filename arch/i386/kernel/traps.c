@@ -725,8 +725,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 		if (tsk->ptrace & PT_DTRACE) {
 			regs->eflags &= ~TF_MASK;
 			tsk->ptrace &= ~PT_DTRACE;
-			if (!tsk->ptrace & PT_DTRACE)
-				goto clear_TF;
 		}
 	}
 
