@@ -1,4 +1,4 @@
-%option backup nostdinit noyywrap full ecs
+%option backup nostdinit noyywrap never-interactive full ecs
 %option 8bit backup nodefault perf-report perf-report
 %x COMMAND HELP STRING PARAM
 %{
@@ -83,8 +83,6 @@ n	[A-Za-z0-9_]
 
 .	{
 	unput(yytext[0]);
-	//printf("new config: ");
-	//symbol_end(NULL);
 	BEGIN(COMMAND);
 }
 
@@ -144,31 +142,43 @@ n	[A-Za-z0-9_]
 		return T_WORD;
 	}
 	.
+	<<EOF>> {
+		BEGIN(INITIAL);
+	}
 }
 
 <STRING>{
-	[^'"\n\\]+	{
+	[^'"\\\n]+/\n	{
 		append_string(yytext, yyleng);
+		zconflval.string = text;
+		return T_STRING;
+	}
+	[^'"\\\n]+	{
+		append_string(yytext, yyleng);
+	}
+	\\.?/\n	{
+		append_string(yytext+1, yyleng);
+		zconflval.string = text;
+		return T_STRING;
+	}
+	\\.?	{
+		append_string(yytext+1, yyleng);
 	}
 	\'|\"	{
 		if (str == yytext[0]) {
 			BEGIN(PARAM);
 			zconflval.string = text;
-			//printf("s:%s\n", text);
 			return T_STRING;
 		} else
 			append_string(yytext, 1);
 	}
-	\\[ \t]*\n	append_string(yytext+yyleng-1, 1); current_file->lineno++;
-	\\[ \t]*	append_string(yytext+1, yyleng-1);
-	\\.		append_string(yytext+1, 1);
 	\n	{
-		//printf(":%d: open string!\n", current_file->lineno+1);
-		exit(0);
+		printf("%s:%d:warning: multi-line strings not supported\n", zconf_curname(), zconf_lineno());
+		BEGIN(INITIAL);
+		return T_EOL;
 	}
 	<<EOF>>	{
-		//printf(":%d: open string!\n", current_file->lineno+1);
-		exit(0);
+		BEGIN(INITIAL);
 	}
 }
 
@@ -221,6 +231,7 @@ n	[A-Za-z0-9_]
 		zconf_endfile();
 		return T_EOF;
 	}
+	fclose(yyin);
 	yyterminate();
 }
 
@@ -245,7 +256,6 @@ void zconf_initscan(const char *name)
 		printf("can't find file %s\n", name);
 		exit(1);
 	}
-	//fprintf(stderr, "zconf_initscan: %s\n", name);
 
 	current_buf = malloc(sizeof(*current_buf));
 	memset(current_buf, 0, sizeof(*current_buf));
@@ -271,8 +281,6 @@ void zconf_nextfile(const char *name)
 	buf->parent = current_buf;
 	current_buf = buf;
 
-	//fprintf(stderr, "zconf_nextfile: %s\n", name);
-
 	if (file->flags & FILE_BUSY) {
 		printf("recursive scan (%s)?\n", name);
 		exit(1);
@@ -297,6 +305,7 @@ static struct buffer *zconf_endfile(void)
 
 	parent = current_buf->parent;
 	if (parent) {
+		fclose(yyin);
 		yy_delete_buffer(YY_CURRENT_BUFFER);
 		yy_switch_to_buffer(parent->state);
 	}

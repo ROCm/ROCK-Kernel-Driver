@@ -17,6 +17,10 @@
 #include <qheader.h>
 #include <qfiledialog.h>
 #include <qregexp.h>
+#if QT_VERSION >= 300
+#include <qsettings.h>
+#endif
+
 #include <stdlib.h>
 
 #include "lkc.h"
@@ -26,6 +30,9 @@
 #include "images.c"
 
 static QApplication *configApp;
+#if QT_VERSION >= 300
+static QSettings *configSettings;
+#endif
 
 /*
  * update all the children of a menu entry
@@ -613,6 +620,25 @@ ConfigView::ConfigView(void)
 	QMenuBar* menu;
 	QSplitter* split1;
 	QSplitter* split2;
+	bool ok;
+	int x, y, width, height;
+
+	QWidget *d = configApp->desktop();
+
+#if QT_VERSION >= 300
+	width = configSettings->readNumEntry("/kconfig/qconf/window width", d->width() - 64);
+	height = configSettings->readNumEntry("/kconfig/qconf/window height", d->height() - 64);
+	resize(width, height);
+	x = configSettings->readNumEntry("/kconfig/qconf/window x", 0, &ok);
+	if (ok)
+		y = configSettings->readNumEntry("/kconfig/qconf/window y", 0, &ok);
+	if (ok)
+		move(x, y);
+#else
+	width = d->width() - 64;
+	height = d->height() - 64;
+	resize(width, height);
+#endif
 
 	showDebug = false;
 
@@ -1046,6 +1072,9 @@ int main(int ac, char** av)
 #endif
 
 	configApp = new QApplication(ac, av);
+#if QT_VERSION >= 300
+	configSettings = new QSettings;
+#endif
 	if (ac > 1 && av[1][0] == '-') {
 		switch (av[1][1]) {
 		case 'a':
@@ -1063,11 +1092,20 @@ int main(int ac, char** av)
 	fixup_rootmenu(&rootmenu);
 	conf_read(NULL);
 	//zconfdump(stdout);
+
 	v = new ConfigView();
 
 	//zconfdump(stdout);
 	v->show();
 	configApp->connect(configApp, SIGNAL(lastWindowClosed()), SLOT(quit()));
 	configApp->exec();
+
+#if QT_VERSION >= 300
+	configSettings->writeEntry("/kconfig/qconf/window x", v->pos().x());
+	configSettings->writeEntry("/kconfig/qconf/window y", v->pos().y());
+	configSettings->writeEntry("/kconfig/qconf/window width", v->size().width());
+	configSettings->writeEntry("/kconfig/qconf/window height", v->size().height());
+	delete configSettings;
+#endif
 	return 0;
 }
