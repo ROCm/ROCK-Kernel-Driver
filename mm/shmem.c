@@ -2164,5 +2164,3 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	vma->vm_ops = &shmem_vm_ops;
 	return 0;
 }
-
-EXPORT_SYMBOL(shmem_file_setup);
