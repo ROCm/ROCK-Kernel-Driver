@@ -1031,32 +1031,28 @@ static void unmap_region(struct mm_struct *mm,
 }
 
 /*
- * Create a list of vma's touched by the unmap,
- * removing them from the VM lists as we go..
+ * Create a list of vma's touched by the unmap, removing them from the mm's
+ * vma list as we go..
  *
  * Called with the page_table_lock held.
  */
-static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
-	struct vm_area_struct *mpnt,
-	struct vm_area_struct *prev,
-	unsigned long end)
+static void
+detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
+	struct vm_area_struct *prev, unsigned long end)
 {
-	struct vm_area_struct **npp, *touched;
+	struct vm_area_struct **insertion_point;
+	struct vm_area_struct *tail_vma = NULL;
 
-	npp = (prev ? &prev->vm_next : &mm->mmap);
-
-	touched = NULL;
+	insertion_point = (prev ? &prev->vm_next : &mm->mmap);
 	do {
-		struct vm_area_struct *next = mpnt->vm_next;
-		mpnt->vm_next = touched;
-		touched = mpnt;
-		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+		rb_erase(&vma->vm_rb, &mm->mm_rb);
 		mm->map_count--;
-		mpnt = next;
-	} while (mpnt && mpnt->vm_start < end);
-	*npp = mpnt;
-	mm->mmap_cache = NULL;	/* Kill the cache. */
-	return touched;
+		tail_vma = vma;
+		vma = vma->vm_next;
+	} while (vma && vma->vm_start < end);
+	*insertion_point = vma;
+	tail_vma->vm_next = NULL;
+	mm->mmap_cache = NULL;		/* Kill the cache. */
 }
 
 /*
@@ -1152,7 +1148,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	 * Remove the vma's, and unmap the actual pages
 	 */
 	spin_lock(&mm->page_table_lock);
-	mpnt = touched_by_munmap(mm, mpnt, prev, end);
+	detach_vmas_to_be_unmapped(mm, mpnt, prev, end);
 	unmap_region(mm, mpnt, prev, start, end);
 	spin_unlock(&mm->page_table_lock);
 
