@@ -397,8 +397,18 @@ static void lease_break_callback(struct file_lock *fl)
 	kill_fasync(&fl->fl_fasync, SIGIO, POLL_MSG);
 }
 
+static void lease_release_private_callback(struct file_lock *fl)
+{
+	if (!fl->fl_file)
+		return;
+
+	f_delown(fl->fl_file);
+	fl->fl_file->f_owner.signum = 0;
+}
+
 struct lock_manager_operations lease_manager_ops = {
 	.fl_break = lease_break_callback,
+	.fl_release_private = lease_release_private_callback,
 };
 
 /*
@@ -1056,13 +1066,8 @@ static int lease_modify(struct file_lock **before, int arg)
 	if (error)
 		return error;
 	locks_wake_up_blocks(fl);
-	if (arg == F_UNLCK) {
-		struct file *filp = fl->fl_file;
-
-		f_delown(filp);
-		filp->f_owner.signum = 0;
+	if (arg == F_UNLCK)
 		locks_delete_lock(before);
-	}
 	return 0;
 }
 
