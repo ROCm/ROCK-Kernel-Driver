@@ -17,6 +17,13 @@
  */
 
 #include <linux/config.h>
+
+#ifdef CONFIG_USB_DEBUG
+	#define DEBUG
+#else
+	#undef DEBUG
+#endif
+
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -30,12 +37,6 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-
-#ifdef CONFIG_USB_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 
 #include <linux/usb.h>
 
@@ -70,6 +71,7 @@
  *
  * HISTORY:
  *
+ * 2002-11-29	Correct handling for hw async_next register.
  * 2002-08-06	Handling for bulk and interrupt transfers is mostly shared;
  *	only scheduling is different, no arbitrary limitations.
  * 2002-07-25	Sanity check PCI reads, mostly for better cardbus support,
@@ -92,7 +94,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Sep-23"
+#define DRIVER_VERSION "2002-Nov-29"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -114,7 +116,7 @@ static const char	hcd_name [] = "ehci-hcd";
 #define	EHCI_TUNE_MULT_TT	1
 
 #define EHCI_WATCHDOG_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
-#define EHCI_ASYNC_JIFFIES	(HZ/3)		/* async idle timeout */
+#define EHCI_ASYNC_JIFFIES	(HZ/20)		/* async idle timeout */
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -215,7 +217,7 @@ static void ehci_ready (struct ehci_hcd *ehci)
 
 	/* wait for any schedule enables/disables to take effect */
 	temp = 0;
-	if (ehci->async)
+	if (ehci->async->qh_next.qh)
 		temp = STS_ASS;
 	if (ehci->next_uframe != -1)
 		temp |= STS_PSS;
@@ -260,7 +262,7 @@ static void ehci_watchdog (unsigned long param)
 	spin_lock_irqsave (&ehci->lock, flags);
 	/* guard against lost IAA, which wedges everything */
 	ehci_irq (&ehci->hcd);
- 	/* unlink the last qh after it's idled a while */
+ 	/* stop async processing after it's idled a while */
  	if (ehci->async_idle) {
  		start_unlink_async (ehci, ehci->async);
  		ehci->async_idle = 0;
@@ -287,12 +289,13 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 			pci_read_config_dword (ehci->hcd.pdev, where, &cap);
 		} while ((cap & (1 << 16)) && msec);
 		if (cap & (1 << 16)) {
-			info ("BIOS handoff failed (%d, %04x)", where, cap);
+			dev_info (*ehci->hcd.controller,
+				"BIOS handoff failed (%d, %04x)\n",
+				where, cap);
 			return 1;
 		} 
-		dbg ("BIOS handoff succeeded");
-	} else
-		dbg ("BIOS handoff not needed");
+		ehci_dbg (ehci, "BIOS handoff succeeded\n");
+	}
 	return 0;
 }
 
@@ -323,14 +326,15 @@ static int ehci_start (struct usb_hcd *hcd)
 		u32		cap;
 
 		pci_read_config_dword (ehci->hcd.pdev, temp, &cap);
-		dbg ("capability %04x at %02x", cap, temp);
+		ehci_dbg (ehci, "capability %04x at %02x\n", cap, temp);
 		switch (cap & 0xff) {
 		case 1:			/* BIOS/SMM/... handoff */
 			if (bios_handoff (ehci, temp, cap) != 0)
 				return -EOPNOTSUPP;
 			break;
 		case 0:			/* illegal reserved capability */
-			warn ("illegal capability!");
+			dev_warn (*ehci->hcd.controller,
+					"illegal capability!\n");
 			cap = 0;
 			/* FALLTHROUGH */
 		default:		/* unknown */
@@ -360,7 +364,6 @@ static int ehci_start (struct usb_hcd *hcd)
 	else					// N microframes cached
 		ehci->i_thresh = 2 + HCC_ISOC_THRES (hcc_params);
 
-	ehci->async = 0;
 	ehci->reclaim = 0;
 	ehci->next_uframe = -1;
 
@@ -373,6 +376,21 @@ static int ehci_start (struct usb_hcd *hcd)
 	}
 	writel (INTR_MASK, &ehci->regs->intr_enable);
 	writel (ehci->periodic_dma, &ehci->regs->frame_list);
+
+	/*
+	 * dedicate a qh for the async ring head, since we couldn't unlink
+	 * a 'real' qh without stopping the async schedule [4.8].  use it
+	 * as the 'reclamation list head' too.
+	 */
+	ehci->async->qh_next.qh = 0;
+	ehci->async->hw_next = QH_NEXT (ehci->async->qh_dma);
+	ehci->async->hw_info1 = cpu_to_le32 (QH_HEAD);
+	ehci->async->hw_token = cpu_to_le32 (QTD_STS_HALT);
+	ehci->async->hw_qtd_next = EHCI_LIST_END;
+	ehci->async->qh_state = QH_STATE_LINKED;
+	ehci_qtd_free (ehci, ehci->async->dummy);
+	ehci->async->dummy = 0;
+	writel ((u32)ehci->async->qh_dma, &ehci->regs->async_next);
 
 	/*
 	 * hcc_params controls whether ehci->regs->segment must (!!!)
@@ -388,7 +406,8 @@ static int ehci_start (struct usb_hcd *hcd)
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
 		if (!pci_set_dma_mask (ehci->hcd.pdev, 0xffffffffffffffffULL))
-			info ("enabled 64bit PCI DMA (DAC)");
+			dev_info (*ehci->hcd.controller,
+				"enabled 64bit PCI DMA (DAC)\n");
 	}
 
 	/* clear interrupt enables, set irq latency */
@@ -435,10 +454,10 @@ done2:
         /* PCI Serial Bus Release Number is at 0x60 offset */
 	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
 	temp = readw (&ehci->caps->hci_version);
-	info ("USB %x.%x support enabled, EHCI rev %x.%02x, %s %s",
-	      ((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
-	       temp >> 8, temp & 0xff,
-	       hcd_name, DRIVER_VERSION);
+	dev_info (*hcd->controller,
+		"USB %x.%x enabled, EHCI %x.%02x, driver %s\n",
+		((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
+		temp >> 8, temp & 0xff, DRIVER_VERSION);
 
 	/*
 	 * From here on, khubd concurrently accesses the root
@@ -470,13 +489,13 @@ static void ehci_stop (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
-	dbg ("%s: stop", hcd_to_bus (hcd)->bus_name);
+	ehci_dbg (ehci, "stop\n");
 
 	/* no more interrupts ... */
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
 	if (in_interrupt ())		/* should not happen!! */
-		err ("stopped %s!", RUN_CONTEXT);
+		dev_err (*hcd->controller, "stopped %s!\n", RUN_CONTEXT);
 	else
 		del_timer_sync (&ehci->watchdog);
 	ehci_reset (ehci);
@@ -492,9 +511,9 @@ static void ehci_stop (struct usb_hcd *hcd)
 	ehci_mem_cleanup (ehci);
 
 #ifdef	EHCI_STATS
-	dbg ("irq normal %ld err %ld reclaim %ld",
+	ehci_dbg (ehci, "irq normal %ld err %ld reclaim %ld\n",
 		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim);
-	dbg ("complete %ld unlink %ld",
+	ehci_dbg (ehci, "complete %ld unlink %ld\n",
 		ehci->stats.complete, ehci->stats.unlink);
 #endif
 
@@ -738,8 +757,8 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	struct ehci_qh		*qh = (struct ehci_qh *) urb->hcpriv;
 	unsigned long		flags;
 
-	dbg ("%s urb_dequeue %p qh %p state %d",
-		hcd_to_bus (hcd)->bus_name, urb, qh, qh->qh_state);
+	ehci_vdbg (ehci, "urb_dequeue %p qh %p state %d\n",
+		urb, qh, qh->qh_state);
 
 	switch (usb_pipetype (urb->pipe)) {
 	// case PIPE_CONTROL:
@@ -982,7 +1001,6 @@ MODULE_LICENSE ("GPL");
 
 static int __init init (void) 
 {
-	dbg (DRIVER_INFO);
 	if (usb_disabled())
 		return -ENODEV;
 
