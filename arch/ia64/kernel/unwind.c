@@ -1416,7 +1416,7 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 
 	      case UNW_WHERE_FR:
 		if (rval <= 5)
-			val = unw.preg_index[UNW_REG_F2  + (rval -  1)];
+			val = unw.preg_index[UNW_REG_F2  + (rval -  2)];
 		else if (rval >= 16 && rval <= 31)
 			val = unw.preg_index[UNW_REG_F16 + (rval - 16)];
 		else {
