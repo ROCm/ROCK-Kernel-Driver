@@ -1384,7 +1384,7 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 
 	nfs4_setup_compound(cp, data->u.v4.ops, NFS_SERVER(inode), "read [async]");
 	nfs4_setup_putfh(cp, NFS_FH(inode));
-	nfs4_setup_read(cp, req_offset(req) + req->wb_offset,
+	nfs4_setup_read(cp, req_offset(req),
 			count, data->pagevec, req->wb_offset,
 			&data->u.v4.res_eof,
 			&data->u.v4.res_count);
@@ -1437,7 +1437,7 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 
 	nfs4_setup_compound(cp, data->u.v4.ops, NFS_SERVER(inode), "write [async]");
 	nfs4_setup_putfh(cp, NFS_FH(inode));
-	nfs4_setup_write(cp, req_offset(req) + req->wb_offset,
+	nfs4_setup_write(cp, req_offset(req),
 			 count, stable, data->pagevec, req->wb_offset,
 			 &data->u.v4.res_count, &data->verf);
 

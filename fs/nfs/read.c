@@ -178,7 +178,7 @@ nfs_read_rpcsetup(struct list_head *head, struct nfs_read_data *data)
 			inode->i_sb->s_id,
 			(long long)NFS_FILEID(inode),
 			count,
-			(unsigned long long)req_offset(req) + req->wb_offset);
+			(unsigned long long)req_offset(req));
 }
 
 static void
@@ -274,7 +274,7 @@ nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
 
 				if (eof ||
 				    ((fattr->valid & NFS_ATTR_FATTR) &&
-				     ((req_offset(req) + req->wb_offset + count) >= fattr->size)))
+				     ((req_offset(req) + count) >= fattr->size)))
 					SetPageUptodate(page);
 				else
 					if (count < req->wb_bytes)
@@ -292,7 +292,7 @@ nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
                         req->wb_inode->i_sb->s_id,
                         (long long)NFS_FILEID(req->wb_inode),
                         req->wb_bytes,
-                        (long long)(req_offset(req) + req->wb_offset));
+                        (long long)req_offset(req));
 		nfs_clear_request(req);
 		nfs_release_request(req);
 		nfs_unlock_request(req);
