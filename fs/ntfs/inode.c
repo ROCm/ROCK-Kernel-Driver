@@ -25,7 +25,7 @@
 #include <linux/quotaops.h>
 #include <linux/mount.h>
 
-#include "ntfs.h"
+#include "aops.h"
 #include "dir.h"
 #include "debug.h"
 #include "inode.h"
@@ -33,6 +33,7 @@
 #include "malloc.h"
 #include "mft.h"
 #include "time.h"
+#include "ntfs.h"
 
 /**
  * ntfs_test_inode - compare two (possibly fake) inodes for equality
