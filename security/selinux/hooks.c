@@ -3781,7 +3781,7 @@ static int selinux_shm_shmctl(struct shmid_kernel *shp, int cmd)
 }
 
 static int selinux_shm_shmat(struct shmid_kernel *shp,
-			     char *shmaddr, int shmflg)
+			     char __user *shmaddr, int shmflg)
 {
 	u32 perms;
 
