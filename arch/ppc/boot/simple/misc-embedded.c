@@ -8,7 +8,6 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/elf.h>
 #include <linux/string.h>
 #include <asm/bootinfo.h>
 #include <asm/mmu.h>

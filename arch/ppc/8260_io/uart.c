@@ -155,7 +155,7 @@ static unsigned long break_pressed; /* break, really ... */
 static struct serial_state rs_table[] = {
 	/* UART CLK   PORT          IRQ      FLAGS  NUM   */
 	{ 0,     0, PROFF_SMC1, SIU_INT_SMC1,   0,    0 },    /* SMC1 ttyS0 */
-#if USE_SMC2
+#ifdef USE_SMC2
 	{ 0,     0, PROFF_SMC2, SIU_INT_SMC2,   0,    1 },    /* SMC2 ttyS1 */
 #endif
 #ifndef CONFIG_SCC1_ENET
@@ -2565,7 +2565,7 @@ static int __init rs_8xx_init(void)
 	io->iop_pdird |= 0x00400000;
 	io->iop_pdird &= ~0x00800000;
 	io->iop_psord &= ~0x00c00000;
-#if USE_SMC2
+#ifdef USE_SMC2
 	io->iop_ppara |= 0x00c00000;
 	io->iop_pdira |= 0x00400000;
 	io->iop_pdira &= ~0x00800000;

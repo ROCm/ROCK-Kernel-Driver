@@ -27,7 +27,7 @@ struct rw_semaphore {
 #define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
 	spinlock_t		wait_lock;
 	struct list_head	wait_list;
-#if RWSEM_DEBUG
+#ifdef RWSEM_DEBUG
 	int			debug;
 #endif
 };
@@ -35,7 +35,7 @@ struct rw_semaphore {
 /*
  * initialisation
  */
-#if RWSEM_DEBUG
+#ifdef RWSEM_DEBUG
 #define __RWSEM_DEBUG_INIT      , 0
 #else
 #define __RWSEM_DEBUG_INIT	/* */
@@ -59,7 +59,7 @@ static inline void init_rwsem(struct rw_semaphore *sem)
 	sem->count = RWSEM_UNLOCKED_VALUE;
 	spin_lock_init(&sem->wait_lock);
 	INIT_LIST_HEAD(&sem->wait_list);
-#if RWSEM_DEBUG
+#ifdef RWSEM_DEBUG
 	sem->debug = 0;
 #endif
 }

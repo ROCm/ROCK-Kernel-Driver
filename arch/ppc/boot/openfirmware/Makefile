@@ -75,7 +75,7 @@ $(obj)/image.initrd.o: $(obj)/image.o $(images)/ramdisk.image.gz FORCE
 	$(call if_changed,genimage-initrd)
 
 # Create the note section for New-World PowerMacs.
-quit_cmd_mknote  = MKNOTE  $@
+quiet_cmd_mknote = MKNOTE  $@
      cmd_mknote  = $(utils)/mknote > $@
 targets		+= note
 $(obj)/note: $(utils)/mknote FORCE

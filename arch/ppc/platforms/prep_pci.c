@@ -311,11 +311,11 @@ static char Genesis2_pci_IRQ_map[23] __prepdata =
 	0,	/* Slot 7  - unused */
 	0,	/* Slot 8  - unused */
 	0,	/* Slot 9  - unused */
-	0,	/* Slot 10 - Ethernet */
-	0,	/* Slot 11 - Universe PCI - VME Bridge */
-	3,	/* Slot 12 - unused */
-	0,	/* Slot 13 - unused */
-	2,	/* Slot 14 - SCSI */
+	0,	/* Slot 10 - unused */
+	0,	/* Slot 11 - IDE */
+	3,	/* Slot 12 - SCSI */
+	5,	/* Slot 13 - Universe PCI - VME Bridge */
+	2,	/* Slot 14 - Ethernet */
 	0,	/* Slot 15 - unused */
 	9,	/* Slot 16 - PMC 1 */
 	12,	/* Slot 17 - pci */
