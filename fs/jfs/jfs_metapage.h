@@ -57,11 +57,6 @@ typedef struct metapage {
 	struct jfs_log *log;
 } metapage_t;
 
-/*
- * Direct-access address space operations
- */
-extern struct address_space_operations direct_aops;
-
 /* metapage flag */
 #define META_locked	0
 #define META_absolute	1

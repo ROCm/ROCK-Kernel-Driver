@@ -24,9 +24,6 @@
 #include "jfs_debug.h"
 
 
-extern int generic_file_open(struct inode *, struct file *);
-extern loff_t generic_file_llseek(struct file *, loff_t, int origin);
-
 extern int jfs_commit_inode(struct inode *, int);
 
 int jfs_fsync(struct file *file, struct dentry *dentry, int datasync)
@@ -114,11 +111,3 @@ struct file_operations jfs_file_operations = {
  	.sendfile	= generic_file_sendfile,
 	.fsync		= jfs_fsync,
 };
-
-struct inode_operations jfs_special_inode_operations = {
-	.setxattr	= jfs_setxattr,
-	.getxattr	= jfs_getxattr,
-	.listxattr	= jfs_listxattr,
-	.removexattr	= jfs_removexattr,
-};
-
