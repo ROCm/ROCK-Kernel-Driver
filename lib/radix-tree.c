@@ -490,10 +490,10 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
 		for ( ; i < RADIX_TREE_MAP_SIZE; i++) {
 			if (slot->slots[i] != NULL)
 				break;
-			index &= ~((1 << shift) - 1);
-			index += 1 << shift;
+			index &= ~((1U << shift) - 1);
+			index += 1U << shift;
 			if (index == 0)
-				goto out;	/* 32-bit wraparound */
+				goto out;	/* wraparound */
 		}
 		if (i == RADIX_TREE_MAP_SIZE)
 			goto out;
@@ -580,10 +580,10 @@ __lookup_tag(struct radix_tree_root *root, void **results, unsigned long index,
 				BUG_ON(slot->slots[i] == NULL);
 				break;
 			}
-			index &= ~((1 << shift) - 1);
-			index += 1 << shift;
+			index &= ~((1U << shift) - 1);
+			index += 1U << shift;
 			if (index == 0)
-				goto out;	/* 32-bit wraparound */
+				goto out;	/* wraparound */
 		}
 		if (i == RADIX_TREE_MAP_SIZE)
 			goto out;
