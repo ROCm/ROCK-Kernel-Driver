@@ -672,7 +672,7 @@ UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
 		"IBM",
 		"IBM USB Memory Key",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* This Pentax still camera is not conformant
