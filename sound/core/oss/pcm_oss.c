@@ -816,7 +816,7 @@ static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char *bu
 			buf += tmp;
 			bytes -= tmp;
 			xfer += tmp;
-			if (substream->oss.setup == NULL || !substream->oss.setup->wholefrag ||
+			if ((substream->oss.setup != NULL && substream->oss.setup->partialfrag) ||
 			    runtime->oss.buffer_used == runtime->oss.period_bytes) {
 				tmp = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.buffer_used, 1);
 				if (tmp <= 0)
@@ -1311,11 +1311,11 @@ static int snd_pcm_oss_get_caps(snd_pcm_oss_file_t *pcm_oss_file)
 	return result;
 }
 
-static void snd_pcm_oss_simulate_fill(snd_pcm_substream_t *substream)
+static void snd_pcm_oss_simulate_fill(snd_pcm_substream_t *substream, snd_pcm_uframes_t hw_ptr)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t appl_ptr;
-	appl_ptr = runtime->hw_ptr_interrupt + runtime->buffer_size;
+	appl_ptr = hw_ptr + runtime->buffer_size;
 	appl_ptr %= runtime->boundary;
 	runtime->control->appl_ptr = appl_ptr;
 }
@@ -1336,8 +1336,6 @@ static int snd_pcm_oss_set_trigger(snd_pcm_oss_file_t *pcm_oss_file, int trigger
 	if (psubstream) {
 		if ((err = snd_pcm_oss_make_ready(psubstream)) < 0)
 			return err;
-		if (atomic_read(&psubstream->runtime->mmap_count))
-			snd_pcm_oss_simulate_fill(psubstream);
 	}
 	if (csubstream) {
 		if ((err = snd_pcm_oss_make_ready(csubstream)) < 0)
@@ -1348,6 +1346,8 @@ static int snd_pcm_oss_set_trigger(snd_pcm_oss_file_t *pcm_oss_file, int trigger
 		if (trigger & PCM_ENABLE_OUTPUT) {
 			if (runtime->oss.trigger)
 				goto _skip1;
+			if (atomic_read(&psubstream->runtime->mmap_count))
+				snd_pcm_oss_simulate_fill(psubstream, runtime->hw_ptr_interrupt);
 			runtime->oss.trigger = 1;
 			runtime->start_threshold = 1;
 			cmd = SNDRV_PCM_IOCTL_START;
@@ -1466,21 +1466,21 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 	info.ptr = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr % runtime->buffer_size);
 	if (atomic_read(&runtime->mmap_count)) {
 		snd_pcm_sframes_t n;
-		n = runtime->hw_ptr_interrupt - runtime->oss.prev_hw_ptr_interrupt;
+		n = (delay = runtime->hw_ptr_interrupt) - runtime->oss.prev_hw_ptr_interrupt;
 		if (n < 0)
 			n += runtime->boundary;
 		info.blocks = n / runtime->period_size;
-		runtime->oss.prev_hw_ptr_interrupt = runtime->hw_ptr_interrupt;
+		runtime->oss.prev_hw_ptr_interrupt = delay;
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_pcm_oss_simulate_fill(substream);
+			snd_pcm_oss_simulate_fill(substream, delay);
 		info.bytes = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr);
 	} else {
 		delay = snd_pcm_oss_bytes(substream, delay) + fixup;
 		info.blocks = delay / runtime->oss.period_bytes;
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-			info.bytes = runtime->oss.bytes - snd_pcm_oss_bytes(substream, delay);
+			info.bytes = runtime->oss.bytes - delay;
 		else
-			info.bytes = runtime->oss.bytes + snd_pcm_oss_bytes(substream, delay);
+			info.bytes = runtime->oss.bytes + delay;
 	}
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;
@@ -2207,7 +2207,7 @@ static void snd_pcm_oss_proc_read(snd_info_entry_t *entry,
 			    setup->direct ? " direct" : "",
 			    setup->block ? " block" : "",
 			    setup->nonblock ? " non-block" : "",
-			    setup->wholefrag ? " whole-frag" : "",
+			    setup->partialfrag ? " partial-frag" : "",
 			    setup->nosilence ? " no-silence" : "");
 		setup = setup->next;
 	}
@@ -2274,8 +2274,8 @@ static void snd_pcm_oss_proc_write(snd_info_entry_t *entry,
 				template.block = 1;
 			} else if (!strcmp(str, "non-block")) {
 				template.nonblock = 1;
-			} else if (!strcmp(str, "whole-frag")) {
-				template.wholefrag = 1;
+			} else if (!strcmp(str, "partial-frag")) {
+				template.partialfrag = 1;
 			} else if (!strcmp(str, "no-silence")) {
 				template.nosilence = 1;
 			}
