@@ -617,6 +617,14 @@ static int lec_change_mtu(struct net_device *dev, int new_mtu)
         return 0;
 }
 
+static void lec_set_multicast_list(struct net_device *dev)
+{
+	/* by default, all multicast frames arrive over the bus.
+         * eventually support selective multicast service
+         */
+        return;
+}
+
 static void 
 lec_init(struct net_device *dev)
 {
@@ -626,7 +634,7 @@ lec_init(struct net_device *dev)
         dev->hard_start_xmit = lec_send_packet;
 
         dev->get_stats = lec_get_stats;
-        dev->set_multicast_list = NULL;
+        dev->set_multicast_list = lec_set_multicast_list;
         dev->do_ioctl  = NULL;
         printk("%s: Initialized!\n",dev->name);
         return;
