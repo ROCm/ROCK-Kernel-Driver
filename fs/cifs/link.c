@@ -113,6 +113,9 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	/* BB Should we be using page symlink ops here? */
 
 	if (rc == 0) {
+
+/* BB Add special case check for Samba DFS symlinks */
+
 		target_path[PATH_MAX-1] = 0;
 		rc = vfs_follow_link(nd, target_path);
 	}
@@ -186,7 +189,10 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
+	char *tmp_path =  NULL;
 	char * tmpbuffer;
+	unsigned char * referrals = NULL;
+	int num_referrals = 0;
 	int len;
 	__u16 fid;
 
@@ -206,6 +212,7 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 		FreeXid(xid);
 		return -ENOMEM;
 	}
+
 /* BB add read reparse point symlink code and Unix extensions symlink code here BB */
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
 		rc = CIFSSMBUnixQuerySymLink(xid, pTcon, full_path,
@@ -224,8 +231,36 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 			if(CIFSSMBClose(xid, pTcon, fid)) {
 				cFYI(1,("Error closing junction point (open for ioctl)"));
 			}
-		}
+			if(rc == -EIO) {
+				/* Query if DFS Junction */
+				tmp_path =
+					kmalloc(MAX_TREE_SIZE + MAX_PATHCONF + 1,
+						GFP_KERNEL);
+				if (tmp_path) {
+					strncpy(tmp_path, pTcon->treeName, MAX_TREE_SIZE);
+					strncat(tmp_path, full_path, MAX_PATHCONF);
+					rc = get_dfs_path(xid, pTcon->ses, tmp_path,
+						cifs_sb->local_nls, &num_referrals, &referrals);
+					cFYI(1,("Get DFS for %s rc = %d ",tmp_path, rc));
+					if((num_referrals == 0) && (rc == 0))
+						rc = -EACCES;
+					else {
+						cFYI(1,("num referral: %d",num_referrals));
+						if(referrals) {
+							cFYI(1,("referral string: %s ",referrals));
+							strncpy(tmpbuffer, referrals, len-1);
+						}
+					}
 
+					kfree(tmp_path);
+					if(referrals) {
+						kfree(referrals);
+					}
+				}
+				/* BB add code like else decode referrals then memcpy to
+				  tmpbuffer and free referrals string array BB */
+			}
+		}
 	}
 	/* BB Anything else to do to handle recursive links? */
 	/* BB Should we be using page ops here? */
@@ -238,10 +273,12 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 		      rc));
 	}
 
-	if (tmpbuffer)
+	if (tmpbuffer) {
 		kfree(tmpbuffer);
-	if (full_path)
+	}
+	if (full_path) {
 		kfree(full_path);
+	}
 	FreeXid(xid);
 	return rc;
 }

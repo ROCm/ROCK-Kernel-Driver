@@ -572,10 +572,31 @@ int
 connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 		    const char *old_path, const struct nls_table *nls_codepage)
 {
+	unsigned char *referrals = NULL;
+	unsigned int num_referrals;
+	int rc = 0;
+
+	rc = get_dfs_path(xid, pSesInfo,old_path, nls_codepage, 
+			&num_referrals, &referrals);
+
+	/* BB Add in code to: if valid refrl, if not ip address contact
+		the helper that resolves tcp names, mount to it, try to 
+		tcon to it unmount it if fail */
+
+	/* BB free memory for referrals string BB */
+
+	return rc;
+}
+
+int
+get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
+			const char *old_path, const struct nls_table *nls_codepage, 
+			unsigned int *pnum_referrals, unsigned char ** preferrals)
+{
 	char *temp_unc;
 	int rc = 0;
-	int num_referrals = 0;
-	unsigned char *referrals = NULL;
+
+	*pnum_referrals = 0;
 
 	if (pSesInfo->ipc_tid == 0) {
 		temp_unc = kmalloc(2 /* for slashes */ +
@@ -594,11 +615,10 @@ connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 		kfree(temp_unc);
 	}
 	if (rc == 0)
-		rc = CIFSGetDFSRefer(xid, pSesInfo, old_path, &referrals,
-				     &num_referrals, nls_codepage);
+		rc = CIFSGetDFSRefer(xid, pSesInfo, old_path, preferrals,
+				     pnum_referrals, nls_codepage);
 
-	return -ENODEV;	/* BB remove and add return code processing */
-
+	return rc;
 }
 
 int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_table * nls_info)
