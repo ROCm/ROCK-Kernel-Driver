@@ -291,8 +291,6 @@ void disable_hlt(void)
 
 EXPORT_SYMBOL(disable_hlt);
 
-extern int signal_frame_size;
-
 void *um_kmalloc(int size)
 {
 	return(kmalloc(size, GFP_KERNEL));

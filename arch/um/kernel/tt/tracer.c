@@ -25,7 +25,6 @@
 #include "mem_user.h"
 #include "process.h"
 #include "kern_util.h"
-#include "frame.h"
 #include "chan_user.h"
 #include "ptrace_user.h"
 #include "mode.h"
@@ -186,7 +185,6 @@ int tracer(int (*init_proc)(void *), void *sp)
 	int last_index, proc_id = 0, n, err, old_tracing = 0, strace = 0;
 	int pt_syscall_parm, local_using_sysemu;
 
-	capture_signal_stack();
 	signal(SIGPIPE, SIG_IGN);
 	setup_tracer_winch();
 	tracing_pid = os_getpid();
