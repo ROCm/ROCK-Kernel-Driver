@@ -1053,7 +1053,7 @@ int pcmcia_bind_mtd(mtd_bind_t *req)
 
 /*====================================================================*/
 
-int pcmcia_deregister_clientR(client_handle_t handle)
+int pcmcia_deregister_client(client_handle_t handle)
 {
     client_t **client;
     struct pcmcia_socket *s;
