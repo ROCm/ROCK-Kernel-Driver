@@ -84,6 +84,14 @@
 # endif
 #endif
 
+#ifdef CONFIG_CPU_COPY_V6
+# ifdef _USER
+#  define MULTI_USER 1
+# else
+#  define _USER v6
+# endif
+#endif
+
 #ifndef _USER
 #error Unknown user operations model
 #endif

@@ -66,6 +66,15 @@
 	msr	cpsr_c, \mode
 	.endm
 
+#if __LINUX_ARM_ARCH__ >= 6
+	.macro	disable_irq, temp
+	cpsid	i
+	.endm
+
+	.macro	enable_irq, temp
+	cpsie	i
+	.endm
+#else
 	.macro	disable_irq, temp
 	set_cpsr_c \temp, #PSR_I_BIT | MODE_SVC
 	.endm
@@ -73,6 +82,7 @@
 	.macro	enable_irq, temp
 	set_cpsr_c \temp, #MODE_SVC
 	.endm
+#endif
 
 	.macro	save_user_regs
 	sub	sp, sp, #S_FRAME_SIZE
