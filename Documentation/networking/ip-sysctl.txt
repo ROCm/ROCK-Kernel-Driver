@@ -182,10 +182,7 @@ tcp_max_syn_backlog - INTEGER
 	still did not receive an acknowledgement from connecting client.
 	Default value is 1024 for systems with more than 128Mb of memory,
 	and 128 for low memory machines. If server suffers of overload,
-	try to increase this number. Warning! If you make it greater
-	than 1024, it would be better to change TCP_SYNQ_HSIZE in
-	include/net/tcp.h to keep TCP_SYNQ_HSIZE*16<=tcp_max_syn_backlog
-	and to recompile kernel.
+	try to increase this number.
 
 tcp_window_scaling - BOOLEAN
 	Enable window scaling as defined in RFC1323.
