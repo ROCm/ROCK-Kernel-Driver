@@ -2852,26 +2852,23 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	ret = -ESRCH;
 	read_lock(&tasklist_lock);
 	child = find_task_by_pid(pid);
+	if (child)
+		get_task_struct(child);
 	read_unlock(&tasklist_lock);
 	if (!child)
 		goto out;
 	ret = -EPERM;
 	if (pid == 1)		/* no messing around with init! */
-		goto out;
+		goto out_tsk;
 
 	if (request == PTRACE_ATTACH) {
 		ret = sys_ptrace(request, pid, addr, data, arg4, arg5, arg6, arg7, stack);
-		goto out;
+		goto out_tsk;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED))
-		goto out;
-	if (child->state != TASK_STOPPED) {
-		if (request != PTRACE_KILL)
-			goto out;
-	}
-	if (child->parent != current)
-		goto out;
+
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0)
+		goto out_tsk;
 
 	switch (request) {
 	      case PTRACE_PEEKTEXT:
@@ -2881,12 +2878,12 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 			ret = put_user(value, (unsigned int *) A(data));
 		else
 			ret = -EIO;
-		goto out;
+		goto out_tsk;
 
 	      case PTRACE_POKETEXT:
 	      case PTRACE_POKEDATA:	/* write the word at location addr */
 		ret = ia32_poke(regs, child, addr, data);
-		goto out;
+		goto out_tsk;
 
 	      case PTRACE_PEEKUSR:	/* read word at addr in USER area */
 		ret = -EIO;
@@ -2961,6 +2958,8 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		break;
 
 	}
+  out_tsk:
+	free_task_struct(child);
   out:
 	unlock_kernel();
 	return ret;
