@@ -269,7 +269,7 @@ static struct sock *ipxitf_find_socket(struct ipx_interface *intrfc,
 
 #ifdef CONFIG_IPX_INTERN
 static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
-						unsigned char *node,
+						unsigned char *ipx_node,
 						unsigned short port)
 {
 	struct sock *s;
@@ -282,7 +282,7 @@ static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
 		struct ipx_opt *ipxs = ipx_sk(s);
 
 		if (ipxs->port == port &&
-		    !memcmp(node, ipxs->node, IPX_NODE_LEN))
+		    !memcmp(ipx_node, ipxs->node, IPX_NODE_LEN))
 			goto found;
 	}
 	s = NULL;
