@@ -21,9 +21,11 @@
  *			created test case so that I was able to fix nasty bug
  *		Wilfried Weissmann
  *			spotted bug in dequeue code and helped with fix
+ *		Jiri Fojtasek
+ *			fixed requeue routine
  *		and many others. thanks.
  *
- * $Id: sch_htb.c,v 1.24 2003/07/28 15:25:23 devik Exp devik $
+ * $Id: sch_htb.c,v 1.25 2003/12/07 11:08:25 devik Exp devik $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -74,7 +76,7 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x3000f	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x30010	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -708,7 +710,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
     sch->q.qlen++;
     sch->stats.packets++; sch->stats.bytes += skb->len;
-    HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",htb_classid(cl),skb);
+    HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",(cl && cl != HTB_DIRECT)?cl->classid:0,skb);
     return NET_XMIT_SUCCESS;
 }
 
@@ -717,16 +719,18 @@ static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
     struct htb_sched *q = (struct htb_sched *)sch->data;
     struct htb_class *cl = htb_classify(skb,sch);
+    struct sk_buff *tskb;
 
     if (cl == HTB_DIRECT || !cl) {
 	/* enqueue to helper queue */
 	if (q->direct_queue.qlen < q->direct_qlen && cl) {
-	    __skb_queue_tail(&q->direct_queue, skb);
-	    q->direct_pkts++;
+	    __skb_queue_head(&q->direct_queue, skb);
 	} else {
-	    kfree_skb (skb);
-	    sch->stats.drops++;
-	    return NET_XMIT_DROP;
+            __skb_queue_head(&q->direct_queue, skb);
+            tskb = __skb_dequeue_tail(&q->direct_queue);
+            kfree_skb (tskb);
+            sch->stats.drops++;
+            return NET_XMIT_CN;	
 	}
     } else if (cl->un.leaf.q->ops->requeue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
 	sch->stats.drops++;
@@ -736,7 +740,7 @@ static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 	    htb_activate (q,cl);
 
     sch->q.qlen++;
-    HTB_DBG(1,1,"htb_req_ok cl=%X skb=%p\n",htb_classid(cl),skb);
+    HTB_DBG(1,1,"htb_req_ok cl=%X skb=%p\n",(cl && cl != HTB_DIRECT)?cl->classid:0,skb);
     return NET_XMIT_SUCCESS;
 }
 
@@ -1487,7 +1491,7 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 		cl->magic = HTB_CMAGIC;
 #endif
 
-		/* create leaf qdisc early because it uses kmalloc(GPF_KERNEL)
+		/* create leaf qdisc early because it uses kmalloc(GFP_KERNEL)
 		   so that can't be used inside of sch_tree_lock
 		   -- thanks to Karlis Peisenieks */
 		new_q = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops);
