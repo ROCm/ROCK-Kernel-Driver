@@ -249,17 +249,14 @@ static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
 
 	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
 
-	read_lock(&ctl->card->control_rwlock);
 	kctl = snd_ctl_find_id(ctl->card, id);
 	if (! kctl) {
-		read_unlock(&ctl->card->control_rwlock);
 		return -ENXIO;
 	}
 	info.id = *id;
 	err = kctl->info(kctl, &info);
 	if (err >= 0)
 		err = info.type;
-	read_unlock(&ctl->card->control_rwlock);
 	return err;
 }
 
