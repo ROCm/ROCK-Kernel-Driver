@@ -30,6 +30,12 @@
  */
 #define TASK_SIZE	(0xFFFFFFFF)
 
+/*
+ * This decides where the kernel will search for a free chunk of vm
+ * space during mmap's.  We won't be using it.
+ */
+#define TASK_UNMAPPED_BASE	0
+
 
 #ifndef __ASSEMBLY__
 
