@@ -1354,9 +1354,9 @@ no_new_page:
 }
 
 /*
- * Helper function for unmap_mapping_range().
+ * Helper functions for unmap_mapping_range().
  */
-static inline void unmap_mapping_range_list(struct prio_tree_root *root,
+static inline void unmap_mapping_range_tree(struct prio_tree_root *root,
 					    struct zap_details *details)
 {
 	struct vm_area_struct *vma;
@@ -1377,6 +1377,24 @@ static inline void unmap_mapping_range_list(struct prio_tree_root *root,
 		zap_page_range(vma,
 			((zba - vba) << PAGE_SHIFT) + vma->vm_start,
 			(zea - zba + 1) << PAGE_SHIFT, details);
+	}
+}
+
+static inline void unmap_mapping_range_list(struct list_head *head,
+					    struct zap_details *details)
+{
+	struct vm_area_struct *vma;
+
+	/*
+	 * In nonlinear VMAs there is no correspondence between virtual address
+	 * offset and file offset.  So we must perform an exhaustive search
+	 * across *all* the pages in each nonlinear VMA, not just the pages
+	 * whose virtual address lies outside the file truncation point.
+	 */
+	list_for_each_entry(vma, head, shared.vm_set.list) {
+		details->nonlinear_vma = vma;
+		zap_page_range(vma, vma->vm_start,
+				vma->vm_end - vma->vm_start, details);
 	}
 }
 
@@ -1424,23 +1442,9 @@ void unmap_mapping_range(struct address_space *mapping,
 	mapping->truncate_count++;
 
 	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
-		unmap_mapping_range_list(&mapping->i_mmap, &details);
-
-	/*
-	 * In nonlinear VMAs there is no correspondence between virtual address
-	 * offset and file offset.  So we must perform an exhaustive search
-	 * across *all* the pages in each nonlinear VMA, not just the pages
-	 * whose virtual address lies outside the file truncation point.
-	 */
-	if (unlikely(!list_empty(&mapping->i_mmap_nonlinear))) {
-		struct vm_area_struct *vma;
-		list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
-						shared.vm_set.list) {
-			details.nonlinear_vma = vma;
-			zap_page_range(vma, vma->vm_start,
-				vma->vm_end - vma->vm_start, &details);
-		}
-	}
+		unmap_mapping_range_tree(&mapping->i_mmap, &details);
+	if (unlikely(!list_empty(&mapping->i_mmap_nonlinear)))
+		unmap_mapping_range_list(&mapping->i_mmap_nonlinear, &details);
 	spin_unlock(&mapping->i_mmap_lock);
 }
 EXPORT_SYMBOL(unmap_mapping_range);
