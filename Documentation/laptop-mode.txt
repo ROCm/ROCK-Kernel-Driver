@@ -279,7 +279,13 @@ parse_mount_opts_wfstab () {
 	fi
 }
 
-KLEVEL="$(uname -r | cut -c1-3)"
+KLEVEL=$(
+           uname -r |
+             (
+	       IFS="." read a b c
+	       echo $a.$b
+	     )
+	 )
 case "$KLEVEL" in
 	"2.4"|"2.6")
 		true
