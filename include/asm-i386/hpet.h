@@ -102,5 +102,15 @@ extern int is_hpet_capable(void);
 extern int hpet_readl(unsigned long a);
 extern void hpet_writel(unsigned long d, unsigned long a);
 
+#ifdef CONFIG_RTC
+#define CONFIG_HPET_EMULATE_RTC 	1
+extern int hpet_mask_rtc_irq_bit(unsigned long bit_mask);
+extern int hpet_set_rtc_irq_bit(unsigned long bit_mask);
+extern int hpet_set_alarm_time(unsigned char hrs, unsigned char min, unsigned char sec);
+extern int hpet_set_periodic_freq(unsigned long freq);
+extern int hpet_rtc_dropped_irq(void);
+extern int hpet_rtc_timer_init(void);
+extern irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+#endif /* CONFIG_RTC */
 #endif /* CONFIG_HPET_TIMER */
 #endif /* _I386_HPET_H */

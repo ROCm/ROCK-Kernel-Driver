@@ -24,10 +24,6 @@ outb_p((addr),RTC_PORT(0)); \
 outb_p((val),RTC_PORT(1)); \
 })
 
-#ifdef CONFIG_HPET_TIMER
-#define RTC_IRQ 0
-#else
 #define RTC_IRQ 8
-#endif
 
 #endif /* _ASM_MC146818RTC_H */
