@@ -900,8 +900,9 @@ cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
 # - If they are equal no change, and no timestamp update
 
 define filechk
-	@echo '  CHK     $@';
-	@set -e; $(filechk_$(1)) > $@.tmp
+	@set -e;				\
+	echo '  CHK     $@';			\
+	$(filechk_$(1)) < $< > $@.tmp;		\
 	if [ -r $@ ] && cmp -s $@ $@.tmp; then	\
 		rm -f $@.tmp;			\
 	else					\
