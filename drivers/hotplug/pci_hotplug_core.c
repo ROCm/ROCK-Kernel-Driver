@@ -67,8 +67,6 @@ static int debug;
 
 //////////////////////////////////////////////////////////////////
 
-static spinlock_t list_lock;
-
 static LIST_HEAD(pci_hotplug_slot_list);
 
 static struct subsystem hotplug_slots_subsys;
@@ -531,23 +529,16 @@ int pci_hp_register (struct hotplug_slot *slot)
 	if ((slot->info == NULL) || (slot->ops == NULL))
 		return -EINVAL;
 
-	/* make sure we have not already registered this slot */
-	spin_lock (&list_lock);
-	if (get_slot_from_name (slot->name) != NULL) {
-		spin_unlock (&list_lock);
-		return -EINVAL;
-	}
-
 	strncpy(slot->kobj.name, slot->name, KOBJ_NAME_LEN);
 	kobj_set_kset_s(slot, hotplug_slots_subsys);
 
+	/* this can fail if we have already registered a slot with the same name */
 	if (kobject_register(&slot->kobj)) {
 		err("Unable to register kobject");
 		return -EINVAL;
 	}
 		
 	list_add (&slot->slot_list, &pci_hotplug_slot_list);
-	spin_unlock (&list_lock);
 
 	result = fs_add_slot (slot);
 	dbg ("Added slot %s to the list\n", slot->name);
@@ -570,16 +561,11 @@ int pci_hp_deregister (struct hotplug_slot *slot)
 	if (slot == NULL)
 		return -ENODEV;
 
-	/* make sure we have this slot in our list before trying to delete it */
-	spin_lock (&list_lock);
 	temp = get_slot_from_name (slot->name);
 	if (temp != slot) {
-		spin_unlock (&list_lock);
 		return -ENODEV;
 	}
-
 	list_del (&slot->slot_list);
-	spin_unlock (&list_lock);
 
 	fs_remove_slot (slot);
 	dbg ("Removed slot %s from the list\n", slot->name);
@@ -638,8 +624,6 @@ int pci_hp_change_slot_info (struct hotplug_slot *slot, struct hotplug_slot_info
 static int __init pci_hotplug_init (void)
 {
 	int result;
-
-	spin_lock_init(&list_lock);
 
 	kset_set_kset_s(&hotplug_slots_subsys, pci_bus_type.subsys);
 	result = subsystem_register(&hotplug_slots_subsys);
