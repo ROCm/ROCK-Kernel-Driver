@@ -181,7 +181,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
-#define XFS_BUF_ISPINNED(bp)   pagebuf_ispin(bp)
+#define XFS_BUF_ISPINNED(bp)	pagebuf_ispin(bp)
 
 #define XFS_BUF_VALUSEMA(bp)	pagebuf_lock_value(bp)
 #define XFS_BUF_CPSEMA(bp)	(pagebuf_cond_lock(bp) == 0)
@@ -191,13 +191,11 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target)	\
-	(bp)->pb_target = (target)
-
+		(bp)->pb_target = (target)
 #define XFS_BUF_TARGET(bp)	((bp)->pb_target)
+#define XFS_BUFTARG_NAME(target)	\
+		pagebuf_target_name(target)
 
-#define XFS_BUFTARG_NAME(target) \
-	({ char __b[BDEVNAME_SIZE]; bdevname((target->pbr_bdev), __b); __b; })
-	
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)

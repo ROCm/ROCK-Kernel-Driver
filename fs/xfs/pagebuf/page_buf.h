@@ -334,4 +334,7 @@ extern void pagebuf_trace(
 # define pagebuf_trace(pb, id, ptr, ra)	do { } while (0)
 #endif
 
+#define pagebuf_target_name(target)	\
+	({ char __b[BDEVNAME_SIZE]; bdevname((target)->pbr_bdev, __b); __b; })
+
 #endif /* __PAGE_BUF_H__ */
