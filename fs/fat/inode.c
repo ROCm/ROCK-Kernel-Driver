@@ -997,6 +997,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	}
 
 	sbi->clusters = total_clusters;
+	/* check the free_clusters, it's not necessarily correct */
+	if (sbi->free_clusters != -1 && sbi->free_clusters > sbi->clusters)
+		sbi->free_clusters = -1;
 
 	brelse(bh);
 
