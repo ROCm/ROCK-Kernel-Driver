@@ -10,6 +10,7 @@
 
 #include <linux/mm.h>
 
+#include <asm/intrinsics.h>
 #include <asm/mmu_context.h>
 #include <asm/page.h>
 
@@ -77,7 +78,7 @@ flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 	flush_tlb_range(vma, (addr & PAGE_MASK), (addr & PAGE_MASK) + PAGE_SIZE);
 #else
 	if (vma->vm_mm == current->active_mm)
-		asm volatile ("ptc.l %0,%1" :: "r"(addr), "r"(PAGE_SHIFT << 2) : "memory");
+		ia64_ptcl(addr, (PAGE_SHIFT << 2));
 	else
 		vma->vm_mm->context = 0;
 #endif

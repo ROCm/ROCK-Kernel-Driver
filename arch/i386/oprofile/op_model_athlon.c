@@ -20,12 +20,12 @@
 #define NUM_COUNTERS 4
 #define NUM_CONTROLS 4
 
-#define CTR_READ(l,h,msrs,c) do {rdmsr(msrs->counters.addrs[(c)], (l), (h));} while (0)
-#define CTR_WRITE(l,msrs,c) do {wrmsr(msrs->counters.addrs[(c)], -(unsigned int)(l), -1);} while (0)
+#define CTR_READ(l,h,msrs,c) do {rdmsr(msrs->counters[(c)].addr, (l), (h));} while (0)
+#define CTR_WRITE(l,msrs,c) do {wrmsr(msrs->counters[(c)].addr, -(unsigned int)(l), -1);} while (0)
 #define CTR_OVERFLOWED(n) (!((n) & (1U<<31)))
 
-#define CTRL_READ(l,h,msrs,c) do {rdmsr(msrs->controls.addrs[(c)], (l), (h));} while (0)
-#define CTRL_WRITE(l,h,msrs,c) do {wrmsr(msrs->controls.addrs[(c)], (l), (h));} while (0)
+#define CTRL_READ(l,h,msrs,c) do {rdmsr(msrs->controls[(c)].addr, (l), (h));} while (0)
+#define CTRL_WRITE(l,h,msrs,c) do {wrmsr(msrs->controls[(c)].addr, (l), (h));} while (0)
 #define CTRL_SET_ACTIVE(n) (n |= (1<<22))
 #define CTRL_SET_INACTIVE(n) (n &= ~(1<<22))
 #define CTRL_CLEAR(x) (x &= (1<<21))
@@ -39,15 +39,15 @@ static unsigned long reset_value[NUM_COUNTERS];
  
 static void athlon_fill_in_addresses(struct op_msrs * const msrs)
 {
-	msrs->counters.addrs[0] = MSR_K7_PERFCTR0;
-	msrs->counters.addrs[1] = MSR_K7_PERFCTR1;
-	msrs->counters.addrs[2] = MSR_K7_PERFCTR2;
-	msrs->counters.addrs[3] = MSR_K7_PERFCTR3;
+	msrs->counters[0].addr = MSR_K7_PERFCTR0;
+	msrs->counters[1].addr = MSR_K7_PERFCTR1;
+	msrs->counters[2].addr = MSR_K7_PERFCTR2;
+	msrs->counters[3].addr = MSR_K7_PERFCTR3;
 
-	msrs->controls.addrs[0] = MSR_K7_EVNTSEL0;
-	msrs->controls.addrs[1] = MSR_K7_EVNTSEL1;
-	msrs->controls.addrs[2] = MSR_K7_EVNTSEL2;
-	msrs->controls.addrs[3] = MSR_K7_EVNTSEL3;
+	msrs->controls[0].addr = MSR_K7_EVNTSEL0;
+	msrs->controls[1].addr = MSR_K7_EVNTSEL1;
+	msrs->controls[2].addr = MSR_K7_EVNTSEL2;
+	msrs->controls[3].addr = MSR_K7_EVNTSEL3;
 }
 
  

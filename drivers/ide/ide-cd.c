@@ -3330,10 +3330,6 @@ static ide_driver_t ide_cdrom_driver = {
 	.drives			= LIST_HEAD_INIT(ide_cdrom_driver.drives),
 	.start_power_step	= ide_cdrom_start_power_step,
 	.complete_power_step	= ide_cdrom_complete_power_step,
-	.gen_driver		= {
-		.suspend	= generic_ide_suspend,
-		.resume		= generic_ide_resume,
-	}
 };
 
 static int idecd_open(struct inode * inode, struct file * file)

@@ -200,7 +200,7 @@ efi_unimplemented (void)
 #ifdef SGI_SN2
 
 #undef cpu_physical_id
-#define cpu_physical_id(cpuid)                  ((ia64_get_lid() >> 16) & 0xffff)
+#define cpu_physical_id(cpuid)                  ((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff)
 
 void
 fprom_send_cpei(void) {
@@ -224,14 +224,14 @@ fprom_send_cpei(void) {
 #endif
 
 
-static long
+static struct sal_ret_values
 sal_emulator (long index, unsigned long in1, unsigned long in2,
 	      unsigned long in3, unsigned long in4, unsigned long in5,
 	      unsigned long in6, unsigned long in7)
 {
-	register long r9 asm ("r9") = 0;
-	register long r10 asm ("r10") = 0;
-	register long r11 asm ("r11") = 0;
+	long r9  = 0;
+	long r10 = 0;
+	long r11 = 0;
 	long status;
 
 	/*
@@ -338,7 +338,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	}
 
 	asm volatile ("" :: "r"(r9), "r"(r10), "r"(r11));
-	return status;
+	return ((struct sal_ret_values) {status, r9, r10, r11});
 }
 
 

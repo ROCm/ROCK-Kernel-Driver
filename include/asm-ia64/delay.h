@@ -5,7 +5,7 @@
  * Delay routines using a pre-computed "cycles/usec" value.
  *
  * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
@@ -17,12 +17,14 @@
 #include <linux/sched.h>
 #include <linux/compiler.h>
 
+#include <asm/intrinsics.h>
 #include <asm/processor.h>
 
 static __inline__ void
 ia64_set_itm (unsigned long val)
 {
-	__asm__ __volatile__("mov cr.itm=%0;; srlz.d;;" :: "r"(val) : "memory");
+	ia64_setreg(_IA64_REG_CR_ITM, val);
+	ia64_srlz_d();
 }
 
 static __inline__ unsigned long
@@ -30,20 +32,23 @@ ia64_get_itm (void)
 {
 	unsigned long result;
 
-	__asm__ __volatile__("mov %0=cr.itm;; srlz.d;;" : "=r"(result) :: "memory");
+	result = ia64_getreg(_IA64_REG_CR_ITM);
+	ia64_srlz_d();
 	return result;
 }
 
 static __inline__ void
 ia64_set_itv (unsigned long val)
 {
-	__asm__ __volatile__("mov cr.itv=%0;; srlz.d;;" :: "r"(val) : "memory");
+	ia64_setreg(_IA64_REG_CR_ITV, val);
+	ia64_srlz_d();
 }
 
 static __inline__ void
 ia64_set_itc (unsigned long val)
 {
-	__asm__ __volatile__("mov ar.itc=%0;; srlz.d;;" :: "r"(val) : "memory");
+	ia64_setreg(_IA64_REG_AR_ITC, val);
+	ia64_srlz_d();
 }
 
 static __inline__ unsigned long
@@ -51,10 +56,13 @@ ia64_get_itc (void)
 {
 	unsigned long result;
 
-	__asm__ __volatile__("mov %0=ar.itc" : "=r"(result) :: "memory");
+	result = ia64_getreg(_IA64_REG_AR_ITC);
+	ia64_barrier();
 #ifdef CONFIG_ITANIUM
-	while (unlikely((__s32) result == -1))
-		__asm__ __volatile__("mov %0=ar.itc" : "=r"(result) :: "memory");
+	while (unlikely((__s32) result == -1)) {
+		result = ia64_getreg(_IA64_REG_AR_ITC);
+		ia64_barrier();
+	}
 #endif
 	return result;
 }
@@ -62,15 +70,11 @@ ia64_get_itc (void)
 static __inline__ void
 __delay (unsigned long loops)
 {
-        unsigned long saved_ar_lc;
-
 	if (loops < 1)
 		return;
 
-	__asm__ __volatile__("mov %0=ar.lc;;" : "=r"(saved_ar_lc));
-	__asm__ __volatile__("mov ar.lc=%0;;" :: "r"(loops - 1));
-        __asm__ __volatile__("1:\tbr.cloop.sptk.few 1b;;");
-	__asm__ __volatile__("mov ar.lc=%0" :: "r"(saved_ar_lc));
+	while (loops--)
+		ia64_nop(0);
 }
 
 static __inline__ void

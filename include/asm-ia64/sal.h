@@ -804,6 +804,10 @@ ia64_sal_update_pal (u64 param_buf, u64 scratch_buf, u64 scratch_buf_size,
 
 extern unsigned long sal_platform_features;
 
+struct sal_ret_values {
+	long r8; long r9; long r10; long r11;
+};
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PAL_H */

@@ -94,9 +94,14 @@ int cifs_verify_signature(struct smb_hdr * cifs_pdu, const char * mac_key,
 	if (cifs_pdu->Command == SMB_COM_NEGOTIATE)
 		return 0;
 
+	if (cifs_pdu->Command == SMB_COM_LOCKING_ANDX) {
+		struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)cifs_pdu;
+	        if(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE)
+			return 0;
+	}
+
 	/* BB what if signatures are supposed to be on for session but server does not
 		send one? BB */
-	/* BB also do not verify oplock breaks for signature */
 	
 	/* Do not need to verify session setups with signature "BSRSPYL "  */
 	if(memcmp(cifs_pdu->Signature.SecuritySignature,"BSRSPYL ",8)==0)

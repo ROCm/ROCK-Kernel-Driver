@@ -14,8 +14,6 @@ static void runtime_resume(struct device * dev)
 {
 	if (!dev->power.power_state)
 		return;
-
-	power_up_device(dev);
 	resume_device(dev);
 }
 
@@ -55,19 +53,11 @@ int dpm_runtime_suspend(struct device * dev, u32 state)
 	if (dev->power.power_state)
 		dpm_runtime_resume(dev);
 
-	error = suspend_device(dev,state);
-	if (!error) {
-		error = power_down_device(dev,state);
-		if (error)
-			goto ErrResume;
+	if (!(error = suspend_device(dev,state)))
 		dev->power.power_state = state;
-	}
  Done:
 	up(&dpm_sem);
 	return error;
- ErrResume:
-	resume_device(dev);
-	goto Done;
 }
 
 

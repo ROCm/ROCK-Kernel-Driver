@@ -41,6 +41,11 @@ void pm_restore_console(void)
 	console_loglevel = orig_loglevel;
 #ifdef SUSPEND_CONSOLE
 	set_console(orig_fgconsole);
+
+	/* FIXME: 
+	 * This following part is left over from swsusp. Is it really needed?
+	 */
+	update_screen(fg_console);
 #endif
 	return;
 }

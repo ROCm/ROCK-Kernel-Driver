@@ -10,6 +10,7 @@
  *			Also removed cacheflush_time as it's entirely unused.
  */
 
+#include <asm/intrinsics.h>
 #include <asm/processor.h>
 
 typedef unsigned long cycles_t;
@@ -32,7 +33,7 @@ get_cycles (void)
 {
 	cycles_t ret;
 
-	__asm__ __volatile__ ("mov %0=ar.itc" : "=r"(ret));
+	ret = ia64_getreg(_IA64_REG_AR_ITC);
 	return ret;
 }
 

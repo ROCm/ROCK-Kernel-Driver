@@ -1241,8 +1241,6 @@ typedef struct ide_driver_s {
 #define DRIVER(drive)		((drive)->driver)
 
 extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
-extern int generic_ide_suspend(struct device *dev, u32 state, u32 level);
-extern int generic_ide_resume(struct device *dev, u32 level);
 
 /*
  * IDE modules.

@@ -96,8 +96,8 @@ ia64_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbi
 			/*
 			 * Flush ALAT entries also.
 			 */
-			asm volatile ("ptc.ga %0,%1;;srlz.i;;" :: "r"(start), "r"(nbits<<2)
-				      : "memory");
+			ia64_ptcga(start, (nbits<<2));
+			ia64_srlz_i();
 			start += (1UL << nbits);
 		} while (start < end);
 	}
@@ -118,15 +118,13 @@ local_flush_tlb_all (void)
 	local_irq_save(flags);
 	for (i = 0; i < count0; ++i) {
 		for (j = 0; j < count1; ++j) {
-			asm volatile ("ptc.e %0" :: "r"(addr));
+			ia64_ptce(addr);
 			addr += stride1;
 		}
 		addr += stride0;
 	}
 	local_irq_restore(flags);
-	ia64_insn_group_barrier();
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
-	ia64_insn_group_barrier();
 }
 
 void
@@ -157,14 +155,12 @@ flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long 
 	platform_global_tlb_purge(start, end, nbits);
 # else
 	do {
-		asm volatile ("ptc.l %0,%1" :: "r"(start), "r"(nbits<<2) : "memory");
+		ia64_ptcl(start, (nbits<<2));
 		start += (1UL << nbits);
 	} while (start < end);
 # endif
 
-	ia64_insn_group_barrier();
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
-	ia64_insn_group_barrier();
 }
 
 void __init

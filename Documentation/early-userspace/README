@@ -1,0 +1,75 @@
+Early userspace support
+=======================
+
+Last update: 2003-08-21
+
+
+"Early userspace" is a set of libraries and programs that provide
+various pieces of functionality that are important enough to be
+available while a Linux kernel is coming up, but that don't need to be
+run inside the kernel itself.
+
+It consists of several major infrastructure components:
+
+- gen_init_cpio, a program that builds a cpio-format archive
+  containing a root filesystem image.  This archive is compressed, and
+  the compressed image is linked into the kernel image.
+- initramfs, a chunk of code that unpacks the compressed cpio image
+  midway through the kernel boot process.
+- klibc, a userspace C library, currently packaged separately, that is
+  optimised for correctness and small size.
+
+The cpio file format used by initramfs is the "newc" (aka "cpio -c")
+format, and is documented in the file "buffer-format.txt".  If you
+want to generate your own cpio files directly instead of hacking on
+gen_init_cpio, you will need to short-circuit the build process in
+usr/ so that gen_init_cpio does not get run, then simply pop your own
+initramfs_data.cpio.gz file into place.
+
+
+Where's this all leading?
+=========================
+
+The klibc distribution contains some of the necessary software to make
+early userspace useful.  The klibc distribution is currently
+maintained separately from the kernel, but this may change early in
+the 2.7 era (it missed the boat for 2.5).
+
+You can obtain somewhat infrequent snapshots of klibc from
+ftp://ftp.kernel.org/pub/linux/libs/klibc/
+
+For active users, you are better off using the klibc BitKeeper
+repositories, at http://klibc.bkbits.net/
+
+The standalone klibc distribution currently provides three components,
+in addition to the klibc library:
+
+- ipconfig, a program that configures network interfaces.  It can
+  configure them statically, or use DHCP to obtain information
+  dynamically (aka "IP autoconfiguration").
+- nfsmount, a program that can mount an NFS filesystem.
+- kinit, the "glue" that uses ipconfig and nfsmount to replace the old
+  support for IP autoconfig, mount a filesystem over NFS, and continue
+  system boot using that filesystem as root.
+
+kinit is built as a single statically linked binary to save space.
+
+Eventually, several more chunks of kernel functionality will hopefully
+move to early userspace:
+
+- Almost all of init/do_mounts* (the beginning of this is already in
+  place)
+- ACPI table parsing
+- Insert unwieldy subsystem that doesn't really need to be in kernel
+  space here
+
+If kinit doesn't meet your current needs and you've got bytes to burn,
+the klibc distribution includes a small Bourne-compatible shell (ash)
+and a number of other utilities, so you can replace kinit and build
+custom initramfs images that meet your needs exactly.
+
+For questions and help, you can sign up for the early userspace
+mailing list at http://www.zytor.com/mailman/listinfo/klibc
+
+
+Bryan O'Sullivan <bos@serpentine.com>
