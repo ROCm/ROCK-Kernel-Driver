@@ -1422,9 +1422,10 @@ speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* workaround for hardware bug on 10 mbit half duplex */
 
-	if ((sp->partner == 0) || (sp->chip_id == 1)) {
+	if ((sp->partner == 0) && (sp->chip_id == 1)) {
 		wait_for_cmd_done(ioaddr + SCBCmd);
 		outb(0 , ioaddr + SCBCmd);
+		udelay(1);
 	}
 
 	/* Trigger the command unit resume. */
