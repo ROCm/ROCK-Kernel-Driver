@@ -185,7 +185,7 @@ ippp_ccp_alloc(int proto, void *priv,
 	       void (*xmit_reset)(void *priv, int proto, unsigned char code,
 				  unsigned char id, unsigned char *data, 
 				  int len),
-	       void (*kick_up)(void *priv, unsigned int flags))
+	       void (*kick_up)(void *priv))
 {
 	struct ippp_ccp *ccp;
 
@@ -228,6 +228,12 @@ ippp_ccp_set_mru(struct ippp_ccp *ccp, unsigned int mru)
 {
 	ccp->mru = mru;
 	return 0;
+}
+
+unsigned int
+ippp_ccp_get_flags(struct ippp_ccp *ccp);
+{
+	return idev->ccp->compflags & (SC_DC_ERROR|SC_DC_FERROR);
 }
 
 /*
@@ -322,8 +328,9 @@ ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb_in, int *proto)
 			ippp_ccp_reset_xmit(ccp, &rsparm);
 			break;
 		case DECOMP_FATALERROR:
+			ccp->compflags |= SC_DC_FERROR;
 			/* Kick ipppd to recognize the error */
-			ccp->kick_up(ccp->priv, SC_DC_FERROR);
+			ccp->kick_up(ccp->priv);
 			break;
 		}
 		kfree_skb(skb);

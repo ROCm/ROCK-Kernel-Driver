@@ -49,7 +49,7 @@ isdn_ppp_send_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 
 /* New CCP stuff */
 static void
-isdn_ppp_ccp_kick_up(void *priv, unsigned int flags);
+isdn_ppp_ccp_kick_up(void *priv);
 
 static void
 isdn_ppp_ccp_xmit_reset(void *priv, int proto, unsigned char code,
@@ -438,6 +438,7 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned lon
 	int r;
 	struct ipppd *is;
 	struct isdn_ppp_comp_data data;
+	unsigned int cfg;
 
 	is = (struct ipppd *) file->private_data;
 	idev = is->idev;
@@ -488,7 +489,8 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned lon
 		case PPPIOCGFLAGS:	/* get configuration flags */
 			if (!idev)
 				return -ENODEV;
-			if ((r = set_arg((void *) arg, &idev->pppcfg, sizeof(idev->pppcfg) )))
+			cfg = idev->pppcfg | ippp_ccp_get_flags(idev->ccp);
+			if ((r = set_arg((void *) arg, &cfg, sizeof(cfg) )))
 				return r;
 			break;
 		case PPPIOCSFLAGS:	/* set configuration flags */
@@ -498,8 +500,10 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned lon
 				return r;
 			}
 			if ((val & SC_ENABLE_IP) && !(idev->pppcfg & SC_ENABLE_IP)) {
+				idev->pppcfg = val;
 				/* OK .. we are ready to send buffers */
 				isdn_net_online(idev);
+				break;
 			}
 			idev->pppcfg = val;
 			break;
@@ -1926,15 +1930,14 @@ isdn_ppp_hangup_slave(char *name)
 /* Push an empty CCP Data Frame up to the daemon to wake it up and let it
    generate a CCP Reset-Request or tear down CCP altogether */
 
-static void isdn_ppp_ccp_kick_up(void *priv, unsigned int flags)
+static void isdn_ppp_ccp_kick_up(void *priv)
 {
 	isdn_net_dev *idev = priv;
 
-	idev->pppcfg |= flags;
 	isdn_ppp_fill_rq(NULL, 0, PPP_COMP, idev->ppp_slot);
 }
 
-static void isdn_ppp_ccp_lp_kick_up(void *priv, unsigned int flags)
+static void isdn_ppp_ccp_lp_kick_up(void *priv)
 {
 	isdn_net_local *lp = priv;
 	isdn_net_dev *idev;
@@ -1944,7 +1947,6 @@ static void isdn_ppp_ccp_lp_kick_up(void *priv, unsigned int flags)
 		return;
 	}
 	idev = list_entry(lp->online.next, isdn_net_dev, online);
-	idev->pppcfg |= flags;
 	isdn_ppp_fill_rq(NULL, 0, PPP_COMP, idev->ppp_slot);
 }
 
