@@ -934,6 +934,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	return 0;
 }
 
+extern unsigned int default_distrib_server;
 /* Activate a secondary processor. */
 int __devinit start_secondary(void *unused)
 {
@@ -956,6 +957,15 @@ int __devinit start_secondary(void *unused)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		vpa_init(cpu); 
 	}
+
+#ifdef CONFIG_IRQ_ALL_CPUS
+	/* Put the calling processor into the GIQ.  This is really only
+	 * necessary from a secondary thread as the OF start-cpu interface
+	 * performs this function for us on primary threads.
+	 */
+	/* TODO: 9005 is #defined in rtas-proc.c -- move to a header */
+	rtas_set_indicator(9005, default_distrib_server, 1);
+#endif
 #endif
 
 	local_irq_enable();

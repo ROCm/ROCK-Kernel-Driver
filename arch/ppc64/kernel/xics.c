@@ -91,7 +91,8 @@ static struct xics_ipl *xics_per_cpu[NR_CPUS];
 static int xics_irq_8259_cascade = 0;
 static int xics_irq_8259_cascade_real = 0;
 static unsigned int default_server = 0xFF;
-static unsigned int default_distrib_server = 0;
+/* also referenced in smp.c... */
+unsigned int default_distrib_server = 0;
 
 /*
  * XICS only has a single IPI, so encode the messages per CPU
