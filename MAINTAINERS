@@ -1852,8 +1852,10 @@ L:	ultralinux@vger.kernel.org
 S:	Maintained
 
 SPARC (sparc32):
+P:	Keith M. Wesolowski
+M:	wesolows@foobazco.org
 L:	sparclinux@vger.kernel.org
-S:	Unmaintained - please send patches to mailing list
+S:	Maintained
 
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff
