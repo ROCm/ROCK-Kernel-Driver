@@ -71,7 +71,7 @@ config USB_ACM
 	  driver.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called acm.
+	  module will be called cdc-acm.
 
 config USB_PRINTER
 	tristate "USB Printer support"

@@ -110,10 +110,9 @@
 	;;										\
 	dep	temp1 = -1, temp1, PSR_MC, 1;						\
 	;;										\
-	movl	temp2 = start_addr;							\
 	mov	cr.ipsr = temp1;							\
 	;;										\
-	INST_VA_TO_PA(temp2);								\
+	LOAD_PHYSICAL(p0, temp2, start_addr);						\
 	;;										\
 	mov	cr.iip = temp2;								\
 	mov	cr.ifs = r0;								\

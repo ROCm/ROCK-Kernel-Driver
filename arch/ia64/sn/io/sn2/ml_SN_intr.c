@@ -285,7 +285,6 @@ static cpuid_t intr_cpu_choose_node(void)
 cpuid_t intr_heuristic(vertex_hdl_t dev, int req_bit, int *resp_bit)
 {
 	cpuid_t		cpuid;
-	cpuid_t		candidate = CPU_NONE;
 	vertex_hdl_t	pconn_vhdl;
 	pcibr_soft_t	pcibr_soft;
 	int 		bit;
@@ -293,30 +292,32 @@ cpuid_t intr_heuristic(vertex_hdl_t dev, int req_bit, int *resp_bit)
 	/* XXX: gross layering violation.. */
 	if (hwgraph_edge_get(dev, EDGE_LBL_PCI, &pconn_vhdl) == GRAPH_SUCCESS) {
 		pcibr_soft = pcibr_soft_get(pconn_vhdl);
-		if (pcibr_soft && pcibr_soft->bsi_err_intr)
-			candidate = ((hub_intr_t)pcibr_soft->bsi_err_intr)->i_cpuid;
-	}
-
-	if (candidate != CPU_NONE) {
-		/*
-		 * The cpu was chosen already when we assigned
-		 * the error interrupt.
-		 */
-		bit = intr_reserve_level(candidate, req_bit);
-		if (bit >= 0) {
-			*resp_bit = bit;
-			return candidate;
+		if (pcibr_soft && pcibr_soft->bsi_err_intr) {
+			/*
+			 * The cpu was chosen already when we assigned
+			 * the error interrupt.
+			 */
+			cpuid = ((hub_intr_t)pcibr_soft->bsi_err_intr)->i_cpuid;
+			goto done;
 		}
-
-		printk("Cannot target interrupt to target node (%ld).\n",candidate);
-		return CPU_NONE;
 	}
 
 	/*
 	 * Need to choose one.  Try the controlling c-brick first.
 	 */
 	cpuid = intr_cpu_choose_from_node(master_node_get(dev));
-	if (cpuid != CPU_NONE)
-		return cpuid;
-	return intr_cpu_choose_node();
+	if (cpuid == CPU_NONE)
+		cpuid = intr_cpu_choose_node();
+
+ done:
+	if (cpuid != CPU_NONE) {
+		bit = intr_reserve_level(cpuid, req_bit);
+		if (bit >= 0) {
+			*resp_bit = bit;
+			return cpuid;
+		}
+	}
+
+	printk("Cannot target interrupt to target cpu (%ld).\n", cpuid);
+	return CPU_NONE;
 }

@@ -795,7 +795,7 @@ acpi_ut_remove_allocation (
 
 	ACPI_MEMSET (&allocation->user_space, 0xEA, allocation->size);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Freeing size %X\n", allocation->size));
+	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Freeing size 0%X\n", allocation->size));
 
 	status = acpi_ut_release_mutex (ACPI_MTX_MEMORY);
 	return_ACPI_STATUS (status);

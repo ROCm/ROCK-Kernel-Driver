@@ -8,6 +8,8 @@
 # Copyright (C) 1995-2002 Russell King
 #
 
+MKIMAGE         := $(srctree)/scripts/mkuboot.sh
+
 # Note: the following conditions must always be true:
 #   ZRELADDR == virt_to_phys(TEXTADDR)
 #   PARAMS_PHYS must be with 4MB of ZRELADDR
@@ -42,12 +44,14 @@ initrd_phys-$(CONFIG_ARCH_CDB89712)	:= 0x00700000
 ifeq ($(CONFIG_ARCH_SA1100),y)
    zreladdr-$(CONFIG_SA1111)		:= 0xc0208000
 endif
+params_phys-$(CONFIG_ARCH_SA1100)	:= 0xc0000100
+initrd_phys-$(CONFIG_ARCH_SA1100)	:= 0xc0800000
    zreladdr-$(CONFIG_ARCH_PXA)		:= 0xa0008000
    zreladdr-$(CONFIG_ARCH_ANAKIN)	:= 0x20008000
    zreladdr-$(CONFIG_ARCH_IOP3XX)	:= 0xa0008000
-params-phys-$(CONFIG_ARCH_IOP3XX)	:= 0xa0000100
+params_phys-$(CONFIG_ARCH_IOP3XX)	:= 0xa0000100
    zreladdr-$(CONFIG_ARCH_ADIFCC)	:= 0xc0008000
-params-phys-$(CONFIG_ARCH_ADIFCC)	:= 0xc0000100
+params_phys-$(CONFIG_ARCH_ADIFCC)	:= 0xc0000100
 
 ZRELADDR    := $(zreladdr-y)
 ZTEXTADDR   := $(ztextaddr-y)
@@ -78,6 +82,16 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
 	@echo '  Kernel: $@ is ready'
 
+quite_cmd_uimage = UIMAGE $@
+      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+		   -C none -a $(ZRELADDR) -e $(ZRELADDR) \
+		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
+
+targets += uImage
+$(obj)/uImage:	$(obj)/zImage
+	$(call if_changed,uimage)
+	@echo '  Image $@ is ready'
+
 $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
 	$(call if_changed,objcopy)
 	@echo '  Kernel: $@ is ready'
@@ -86,7 +100,7 @@ $(obj)/compressed/vmlinux: vmlinux FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
 
 $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
+	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
 
 .PHONY: initrd
 initrd:

@@ -418,8 +418,9 @@ repeat:
  			data = timer->data;
 
 			list_del(&timer->entry);
-			timer->base = NULL;
 			set_running_timer(base, timer);
+			smp_wmb();
+			timer->base = NULL;
 			spin_unlock_irq(&base->lock);
 			fn(data);
 			spin_lock_irq(&base->lock);

@@ -456,7 +456,7 @@ static struct net_device_stats * dvb_net_get_stats(struct net_device *dev)
 }
 
 
-static int dvb_net_init_dev (struct net_device *dev)
+static void dvb_net_setup(struct net_device *dev)
 {
 	ether_setup(dev);
 
@@ -472,10 +472,7 @@ static int dvb_net_init_dev (struct net_device *dev)
 	dev->hard_header_cache  = NULL;
 
 	dev->flags |= IFF_NOARP;
-
-	return 0;
 }
-
 
 static int get_if(struct dvb_net *dvbnet)
 {
@@ -496,7 +493,6 @@ static int get_if(struct dvb_net *dvbnet)
 static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
 {
         struct net_device *net;
-	struct dmx_demux *demux;
 	struct dvb_net_priv *priv;
 	int result;
 	int if_num;
@@ -504,25 +500,20 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
 	if ((if_num = get_if(dvbnet)) < 0)
 		return -EINVAL;
 
-	net = &dvbnet->device[if_num];
-	demux = dvbnet->demux;
-	
-	memset(net, 0, sizeof(struct net_device));
-
-	memcpy(net->name, "dvb0_0", 7);
-	net->name[3]   = dvbnet->dvbdev->adapter->num + '0';
-	net->name[5]   = if_num + '0';
-	net->addr_len  		= 6;
-	memcpy(net->dev_addr, dvbnet->dvbdev->adapter->proposed_mac, 6);
-	net->next      = NULL;
-	net->init      = dvb_net_init_dev;
-
-	if (!(net->priv = kmalloc(sizeof(struct dvb_net_priv), GFP_KERNEL)))
+	net = alloc_netdev(sizeof(struct dvb_net_priv), "dvb",
+			   dvb_net_setup);
+	if (!net)
 		return -ENOMEM;
 	
+	sprintf(net->name, "dvb%d_%d", dvbnet->dvbdev->adapter->num, if_num);
+
+	net->addr_len  		= 6;
+	memcpy(net->dev_addr, dvbnet->dvbdev->adapter->proposed_mac, 6);
+
+	dvbnet->device[if_num] = net;
+	
 	priv = net->priv;
-	memset(priv, 0, sizeof(struct dvb_net_priv));
-	priv->demux = demux;
+        priv->demux = dvbnet->demux;
         priv->pid = pid;
 	priv->rx_mode = RX_MODE_UNI;
 
@@ -532,6 +523,7 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
         net->base_addr = pid;
                 
 	if ((result = register_netdev(net)) < 0) {
+		kfree(net);
 		return result;
 	}
 
@@ -541,18 +533,20 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
 
 static int dvb_net_remove_if(struct dvb_net *dvbnet, int num)
 {
-	struct dvb_net_priv *priv = dvbnet->device[num].priv;
+	struct net_device *net = dvbnet->device[num];
+	struct dvb_net_priv *priv = net->priv;
 
 	if (!dvbnet->state[num])
 		return -EINVAL;
 	if (priv->in_use)
 		return -EBUSY;
 
-	dvb_net_stop(&dvbnet->device[num]);
+	dvb_net_stop(net);
 	flush_scheduled_work();
-	kfree(priv);
-	unregister_netdev(&dvbnet->device[num]);
+        unregister_netdev(net);
 	dvbnet->state[num]=0;
+	free_netdev(net);
+
 	return 0;
 }
 

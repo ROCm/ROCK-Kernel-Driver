@@ -1,4 +1,4 @@
-/* $Id: jffs2_fs_sb.h,v 1.37 2003/01/17 16:04:44 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.45 2003/10/08 11:46:27 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
@@ -14,6 +14,8 @@
 
 #define JFFS2_SB_FLAG_RO 1
 #define JFFS2_SB_FLAG_MOUNTING 2
+
+struct jffs2_inodirty;
 
 /* A struct for the overall file system control.  Pointers to
    jffs2_sb_info structs are named `c' in the source code.  
@@ -52,6 +54,15 @@ struct jffs2_sb_info {
 	uint32_t nr_free_blocks;
 	uint32_t nr_erasing_blocks;
 
+	/* Number of free blocks there must be before we... */
+	uint8_t resv_blocks_write;	/* ... allow a normal filesystem write */
+	uint8_t resv_blocks_deletion;	/* ... allow a normal filesystem deletion */
+	uint8_t resv_blocks_gctrigger;	/* ... wake up the GC thread */
+	uint8_t resv_blocks_gcbad;	/* ... pick a block from the bad_list to GC */
+	uint8_t resv_blocks_gcmerge;	/* ... merge pages when garbage collecting */
+
+	uint32_t nospc_dirty_size;
+
 	uint32_t nr_blocks;
 	struct jffs2_eraseblock *blocks;	/* The whole array of blocks. Used for getting blocks 
 						 * from the offset (blocks[ofs / sector_size]) */
@@ -84,13 +95,20 @@ struct jffs2_sb_info {
 	   to an obsoleted node. I don't like this. Alternatives welcomed. */
 	struct semaphore erase_free_sem;
 
+#ifdef CONFIG_JFFS2_FS_NAND
 	/* Write-behind buffer for NAND flash */
 	unsigned char *wbuf;
 	uint32_t wbuf_ofs;
 	uint32_t wbuf_len;
 	uint32_t wbuf_pagesize;
-	struct work_struct wbuf_task;		/* task for timed wbuf flush */
-	struct timer_list wbuf_timer;		/* timer for flushing wbuf */
+	struct jffs2_inodirty *wbuf_inodes;
+
+	/* Information about out-of-band area usage... */
+	struct nand_oobinfo *oobinfo;
+	uint32_t badblock_pos;
+	uint32_t fsdata_pos;
+	uint32_t fsdata_len;
+#endif
 
 	/* OS-private pointer for getting back to master superblock info */
 	void *os_priv;

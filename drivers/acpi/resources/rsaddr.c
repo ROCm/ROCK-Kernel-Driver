@@ -94,6 +94,12 @@ acpi_rs_address16_resource (
 	buffer += 1;
 	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
+	/* Validate minimum descriptor length */
+
+	if (temp16 < 13) {
+		return_ACPI_STATUS (AE_AML_BAD_RESOURCE_LENGTH);
+	}
+
 	*bytes_consumed = temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_ADDRESS16;
 
@@ -199,8 +205,11 @@ acpi_rs_address16_resource (
 	 * pointer to where the null terminated string goes:
 	 * Each Interrupt takes 32-bits + the 5 bytes of the
 	 * stream that are default.
+	 *
+	 * Note: Some resource descriptors will have an additional null, so
+	 * we add 1 to the length.
 	 */
-	if (*bytes_consumed > 16) {
+	if (*bytes_consumed > (16 + 1)) {
 		/* Dereference the Index */
 
 		temp8 = *buffer;
@@ -401,7 +410,7 @@ acpi_rs_address16_stream (
 
 		/*
 		 * Buffer needs to be set to the length of the sting + one for the
-		 *  terminating null
+		 * terminating null
 		 */
 		buffer += (acpi_size)(ACPI_STRLEN (linked_list->data.address16.resource_source.string_ptr) + 1);
 	}
@@ -470,8 +479,14 @@ acpi_rs_address32_resource (
 	 */
 	buffer += 1;
 	ACPI_MOVE_16_TO_16 (&temp16, buffer);
-	*bytes_consumed = temp16 + 3;
 
+	/* Validate minimum descriptor length */
+
+	if (temp16 < 23) {
+		return_ACPI_STATUS (AE_AML_BAD_RESOURCE_LENGTH);
+	}
+
+	*bytes_consumed = temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_ADDRESS32;
 
 	/*
@@ -578,8 +593,11 @@ acpi_rs_address32_resource (
 	 * This will leave us pointing to the Resource Source Index
 	 * If it is present, then save it off and calculate the
 	 * pointer to where the null terminated string goes:
+	 *
+	 * Note: Some resource descriptors will have an additional null, so
+	 * we add 1 to the length.
 	 */
-	if (*bytes_consumed > 26) {
+	if (*bytes_consumed > (26 + 1)) {
 		/* Dereference the Index */
 
 		temp8 = *buffer;
@@ -616,8 +634,8 @@ acpi_rs_address32_resource (
 
 		/*
 		 * In order for the struct_size to fall on a 32-bit boundary,
-		 *  calculate the length of the string and expand the
-		 *  struct_size to the next 32-bit boundary.
+		 * calculate the length of the string and expand the
+		 * struct_size to the next 32-bit boundary.
 		 */
 		temp8 = (u8) (index + 1);
 		struct_size += ACPI_ROUND_UP_to_32_bITS (temp8);
@@ -848,6 +866,12 @@ acpi_rs_address64_resource (
 	buffer += 1;
 	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
+	/* Validate minimum descriptor length */
+
+	if (temp16 < 43) {
+		return_ACPI_STATUS (AE_AML_BAD_RESOURCE_LENGTH);
+	}
+
 	*bytes_consumed = temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_ADDRESS64;
 
@@ -958,8 +982,11 @@ acpi_rs_address64_resource (
 	 * pointer to where the null terminated string goes:
 	 * Each Interrupt takes 32-bits + the 5 bytes of the
 	 * stream that are default.
+	 *
+	 * Note: Some resource descriptors will have an additional null, so
+	 * we add 1 to the length.
 	 */
-	if (*bytes_consumed > 46) {
+	if (*bytes_consumed > (46 + 1)) {
 		/* Dereference the Index */
 
 		temp8 = *buffer;
@@ -992,7 +1019,6 @@ acpi_rs_address64_resource (
 		 * Add the terminating null
 		 */
 		*temp_ptr = 0x00;
-
 		output_struct->data.address64.resource_source.string_length = index + 1;
 
 		/*
@@ -1064,7 +1090,6 @@ acpi_rs_address64_stream (
 	/*
 	 * Set a pointer to the Length field - to be filled in later
 	 */
-
 	length_field = ACPI_CAST_PTR (u16, buffer);
 	buffer += 2;
 
@@ -1161,7 +1186,7 @@ acpi_rs_address64_stream (
 
 		/*
 		 * Buffer needs to be set to the length of the sting + one for the
-		 *  terminating null
+		 * terminating null
 		 */
 		buffer += (acpi_size)(ACPI_STRLEN (linked_list->data.address64.resource_source.string_ptr) + 1);
 	}

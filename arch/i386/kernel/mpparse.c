@@ -337,6 +337,16 @@ static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable, \
 		}
        }
 }
+
+static inline void mps_oem_check(struct mp_config_table *mpc, char *oem,
+		char *productid)
+{
+	if (strncmp(oem, "IBM NUMA", 8))
+		printk("Warning!  May not be a NUMA-Q system!\n");
+	if (mpc->mpc_oemptr)
+		smp_read_mpc_oem((struct mp_config_oemtable *) mpc->mpc_oemptr,
+				mpc->mpc_oemsize);
+}
 #endif	/* CONFIG_X86_NUMAQ */
 
 /*

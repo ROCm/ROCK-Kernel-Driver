@@ -314,12 +314,9 @@ typedef struct urb_priv {
 	struct ed		*ed;
 	__u16			length;		// # tds in this request
 	__u16			td_cnt;		// tds already serviced
-	int   			state;
 	struct td		*td [0];	// all TDs in this request
 
 } urb_priv_t;
-
-#define URB_DEL 1
 
 #define TD_HASH_SIZE    64    /* power'o'two */
 // sizeof (struct td) ~= 64 == 2^6 ... 
@@ -365,8 +362,6 @@ struct ohci_hcd {
 	/*
 	 * driver state
 	 */
-	int			disabled;	/* e.g. got a UE, we're hung */
-	int			sleeping;
 	int			load [NUM_INTS];
 	u32 			hc_control;	/* copy of hc control reg */
 

@@ -107,7 +107,6 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Tune flags
  */
-#define IDE_TUNE_BIOS		3
 #define IDE_TUNE_NOAUTO		2
 #define IDE_TUNE_AUTO		1
 #define IDE_TUNE_DEFAULT	0
@@ -722,8 +721,7 @@ typedef struct ide_drive_s {
 	unsigned nice0		: 1;	/* give obvious excess bandwidth */
 	unsigned nice2		: 1;	/* give a share in our own bandwidth */
 	unsigned doorlocking	: 1;	/* for removable only: door lock/unlock works */
-	unsigned autotune	: 3;	/* 1=autotune, 2=noautotune, 
-					   3=biostimings, 0=default */
+	unsigned autotune	: 2;	/* 0=default, 1=autotune, 2=noautotune */
 	unsigned remap_0_to_1	: 1;	/* 0=noremap, 1=remap 0->1 (for EZDrive) */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */

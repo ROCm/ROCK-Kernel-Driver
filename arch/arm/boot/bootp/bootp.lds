@@ -16,10 +16,10 @@ SECTIONS
   .text : {
    _stext = .;
    *(.start)
-   kernel.o
+   arch/arm/boot/bootp/kernel.o
    . = ALIGN(32);
    initrd_start = .;
-   initrd.o
+   arch/arm/boot/bootp/initrd.o
    initrd_len = . - initrd_start;
    . = ALIGN(32);
    _etext = .;

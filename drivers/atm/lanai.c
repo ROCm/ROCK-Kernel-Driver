@@ -2432,11 +2432,11 @@ static int lanai_open(struct atm_vcc *atmvcc)
 	return result;
 }
 
+#if 0
 /* ioctl operations for card */
 /* NOTE: these are all DEBUGGING ONLY currently */
 static int lanai_ioctl(struct atm_dev *atmdev, unsigned int cmd, void *arg)
 {
-#if 0
 	int result = 0;
 	struct lanai_dev *lanai = (struct lanai_dev *) atmdev->dev_data;
 	switch(cmd) {
@@ -2514,11 +2514,10 @@ static int lanai_ioctl(struct atm_dev *atmdev, unsigned int cmd, void *arg)
 			result = -ENOIOCTLCMD;
 	}
 	return result;
-#else /* !0 */
-	(void) atmdev; (void) cmd; (void) arg;	/* no compiler warnings */
-	return -ENOIOCTLCMD;
-#endif /* 0 */
 }
+#else /* !0 */
+#define lanai_ioctl NULL
+#endif /* 0 */
 
 static int lanai_send(struct atm_vcc *atmvcc, struct sk_buff *skb)
 {

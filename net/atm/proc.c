@@ -219,10 +219,10 @@ static void vcc_info(struct seq_file *seq, struct atm_vcc *vcc)
 		default:
 			seq_printf(seq, "%3d", vcc->sk->sk_family);
 	}
-	seq_printf(seq, " %04lx  %5d %7d/%7d %7d/%7d [%d] 0x%x\n", vcc->flags, vcc->sk->sk_err,
+	seq_printf(seq, " %04lx  %5d %7d/%7d %7d/%7d [%d]\n", vcc->flags, vcc->sk->sk_err,
 		atomic_read(&vcc->sk->sk_wmem_alloc),vcc->sk->sk_sndbuf,
 		atomic_read(&vcc->sk->sk_rmem_alloc),vcc->sk->sk_rcvbuf,
-		atomic_read(&vcc->sk->sk_refcnt), vcc->sk->sk_hashent);
+		atomic_read(&vcc->sk->sk_refcnt));
 }
 
 static void svc_info(struct seq_file *seq, struct atm_vcc *vcc)
@@ -320,7 +320,7 @@ static int vcc_seq_show(struct seq_file *seq, void *v)
  	if (v == (void *)1) {
  		seq_printf(seq, sizeof(void *) == 4 ? "%-8s%s" : "%-16s%s",
  			"Address ", "Itf VPI VCI   Fam Flags Reply "
- 			"Send buffer     Recv buffer\n");
+ 			"Send buffer     Recv buffer      [refcnt]\n");
  	} else {
  		struct vcc_state *state = seq->private;
  		struct atm_vcc *vcc = atm_sk(state->sk);

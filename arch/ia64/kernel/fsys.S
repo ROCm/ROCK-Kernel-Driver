@@ -4,6 +4,7 @@
  * Copyright (C) 2003 Hewlett-Packard Co
  * 	David Mosberger-Tang <davidm@hpl.hp.com>
  *
+ * 25-Sep-03 davidm	Implement fsys_rt_sigprocmask().
  * 18-Feb-03 louisk	Implement fsys_gettimeofday().
  * 28-Feb-03 davidm	Fixed several bugs in fsys_gettimeofday().  Tuned it some more,
  *			probably broke it along the way... ;-)
@@ -15,6 +16,7 @@
 #include <asm/percpu.h>
 #include <asm/thread_info.h>
 #include <asm/sal.h>
+#include <asm/signal.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
 
@@ -48,8 +50,7 @@ ENTRY(fsys_ni_syscall)
 	.body
 	mov r8=ENOSYS
 	mov r10=-1
-	MCKINLEY_E9_WORKAROUND
-	br.ret.sptk.many b6
+	FSYS_RETURN
 END(fsys_ni_syscall)
 
 ENTRY(fsys_getpid)
@@ -66,8 +67,7 @@ ENTRY(fsys_getpid)
 	;;
 	cmp.ne p8,p0=0,r9
 (p8)	br.spnt.many fsys_fallback_syscall
-	MCKINLEY_E9_WORKAROUND
-	br.ret.sptk.many b6
+	FSYS_RETURN
 END(fsys_getpid)
 
 ENTRY(fsys_getppid)
@@ -114,8 +114,7 @@ ENTRY(fsys_getppid)
 	mov r18=0			// i must not leak kernel bits...
 	mov r19=0			// i must not leak kernel bits...
 #endif
-	MCKINLEY_E9_WORKAROUND
-	br.ret.sptk.many b6
+	FSYS_RETURN
 END(fsys_getppid)
 
 ENTRY(fsys_set_tid_address)
@@ -141,8 +140,7 @@ ENTRY(fsys_set_tid_address)
 	;;
 	mov r17=0			// i must not leak kernel bits...
 	mov r18=0			// i must not leak kernel bits...
-	MCKINLEY_E9_WORKAROUND
-	br.ret.sptk.many b6
+	FSYS_RETURN
 END(fsys_set_tid_address)
 
 /*
@@ -199,7 +197,7 @@ ENTRY(fsys_gettimeofday)
 
 	adds r10=IA64_CPUINFO_ITM_DELTA_OFFSET, r10
 (p7)	tnat.nz p6,p0=r33
-(p6)	br.cond.spnt.few .fail
+(p6)	br.cond.spnt.few .fail_einval
 
 	adds r8=IA64_CPUINFO_NSEC_PER_CYC_OFFSET, r3
 	movl r24=2361183241434822607	// for division hack (only for / 1000)
@@ -225,8 +223,8 @@ ENTRY(fsys_gettimeofday)
 	 * to store the result.  That's OK as long as the stores are also
 	 * protect by EX().
 	 */
-EX(.fail, probe.w.fault r32, 3)		// this must come _after_ NaT-check
-EX(.fail, probe.w.fault r10, 3)		// this must come _after_ NaT-check
+EX(.fail_efault, probe.w.fault r32, 3)		// this must come _after_ NaT-check
+EX(.fail_efault, probe.w.fault r10, 3)		// this must come _after_ NaT-check
 	nop 0
 
 	ldf8 f10=[r8]			// f10 <- local_cpu_data->nsec_per_cyc value
@@ -311,14 +309,13 @@ EX(.fail, probe.w.fault r10, 3)		// this must come _after_ NaT-check
 (p7)	br.spnt.many 1b
 
 	// finally: r2 = sec, r3 = usec
-EX(.fail, st8 [r32]=r2)
+EX(.fail_efault, st8 [r32]=r2)
 	adds r9=8, r32
 	mov r8=r0			// success
 	;;
-EX(.fail, st8 [r9]=r3)			// store them in the timeval struct
+EX(.fail_efault, st8 [r9]=r3)		// store them in the timeval struct
 	mov r10=0
-	MCKINLEY_E9_WORKAROUND
-	br.ret.sptk.many b6		// return to caller
+	FSYS_RETURN
 	/*
 	 * Note: We are NOT clearing the scratch registers here.  Since the only things
 	 *	 in those registers are time-related variables and some addresses (which
@@ -326,11 +323,182 @@ EX(.fail, st8 [r9]=r3)			// store them in the timeval struct
 	 *	 and we should be fine.
 	 */
 
-.fail:	adds r8=EINVAL, r0		// r8 = EINVAL
-	adds r10=-1, r0			// r10 = -1
-	MCKINLEY_E9_WORKAROUND
-	br.ret.spnt.many b6		// return with r8 set to EINVAL
+.fail_einval:
+	mov r8=EINVAL			// r8 = EINVAL
+	mov r10=-1			// r10 = -1
+	FSYS_RETURN
+
+.fail_efault:
+	mov r8=EFAULT			// r8 = EFAULT
+	mov r10=-1			// r10 = -1
+	FSYS_RETURN
 END(fsys_gettimeofday)
+
+/*
+ * long fsys_rt_sigprocmask (int how, sigset_t *set, sigset_t *oset, size_t sigsetsize).
+ */
+#if _NSIG_WORDS != 1
+# error Sorry, fsys_rt_sigprocmask() needs to be updated for _NSIG_WORDS != 1.
+#endif
+ENTRY(fsys_rt_sigprocmask)
+	.prologue
+	.altrp b6
+	.body
+
+	mf					// ensure reading of current->blocked is ordered
+	add r2=IA64_TASK_BLOCKED_OFFSET,r16
+	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
+	;;
+	/*
+	 * Since we're only reading a single word, we can do it
+	 * atomically without acquiring current->sighand->siglock.  To
+	 * be on the safe side, we need a fully-ordered load, though:
+	 */
+	ld8.acq r3=[r2]				// read/prefetch current->blocked
+	ld4 r9=[r9]
+	add r31=IA64_TASK_SIGHAND_OFFSET,r16
+	;;
+#ifdef CONFIG_SMP
+	ld8 r31=[r31]				// r31 <- current->sighand
+#endif
+	and r9=TIF_ALLWORK_MASK,r9
+	tnat.nz p6,p0=r32
+	;;
+	cmp.ne p7,p0=0,r9
+	tnat.nz.or p6,p0=r35
+	tnat.nz p8,p0=r34
+	;;
+	cmp.ne p15,p0=r0,r34			// oset != NULL?
+	cmp.ne.or p6,p0=_NSIG_WORDS*8,r35
+	tnat.nz.or p8,p0=r33
+
+(p6)	br.spnt.few .fail_einval		// fail with EINVAL
+(p7)	br.spnt.many fsys_fallback_syscall	// got pending kernel work...
+(p8)	br.spnt.few .fail_efault		// fail with EFAULT
+	;;
+
+	cmp.eq p6,p7=r0,r33			// set == NULL?
+	add r31=IA64_SIGHAND_SIGLOCK_OFFSET,r31	// r31 <- current->sighand->siglock
+(p6)	br.dpnt.many .store_mask		// -> short-circuit to just reading the signal mask
+
+	/* Argh, we actually have to do some work and _update_ the signal mask: */
+
+EX(.fail_efault, probe.r.fault r33, 3)		// verify user has read-access to *set
+EX(.fail_efault, ld8 r14=[r33])			// r14 <- *set
+	mov r17=(1 << (SIGKILL - 1)) | (1 << (SIGSTOP - 1))
+	;;
+
+	rsm psr.i				// mask interrupt delivery
+	mov ar.ccv=0
+	andcm r14=r14,r17			// filter out SIGKILL & SIGSTOP
+
+#ifdef CONFIG_SMP
+	mov r17=1
+	;;
+	cmpxchg4.acq r18=[r31],r17,ar.ccv	// try to acquire the lock
+	mov r8=EINVAL			// default to EINVAL
+	;;
+	ld8 r3=[r2]			// re-read current->blocked now that we hold the lock
+	cmp4.ne p6,p0=r18,r0
+(p6)	br.cond.spnt.many .lock_contention
+	;;
+#else
+	ld8 r3=[r2]			// re-read current->blocked now that we hold the lock
+	mov r8=EINVAL			// default to EINVAL
+#endif
+	add r18=IA64_TASK_PENDING_OFFSET+IA64_SIGPENDING_SIGNAL_OFFSET,r16
+	add r19=IA64_TASK_SIGNAL_OFFSET,r16
+	cmp4.eq p6,p0=SIG_BLOCK,r32
+	;;
+	ld8 r19=[r19]			// r19 <- current->signal
+	cmp4.eq p7,p0=SIG_UNBLOCK,r32
+	cmp4.eq p8,p0=SIG_SETMASK,r32
+	;;
+	ld8 r18=[r18]			// r18 <- current->pending.signal
+	.pred.rel.mutex p6,p7,p8
+(p6)	or r3=r3,r14			// SIG_BLOCK
+(p7)	andcm r3=r3,r14			// SIG_UNBLOCK
+
+(p8)	mov r3=r14			// SIG_SETMASK
+(p6)	mov r8=0			// clear error code
+	// recalc_sigpending()
+	add r17=IA64_SIGNAL_GROUP_STOP_COUNT_OFFSET,r19
+
+	add r19=IA64_SIGNAL_SHARED_PENDING_OFFSET+IA64_SIGPENDING_SIGNAL_OFFSET,r19
+	;;
+	ld4 r17=[r17]		// r17 <- current->signal->group_stop_count
+(p7)	mov r8=0		// clear error code
+
+	ld8 r19=[r19]		// r19 <- current->signal->shared_pending
+	;;
+	cmp4.gt p6,p7=r17,r0	// p6/p7 <- (current->signal->group_stop_count > 0)?
+(p8)	mov r8=0		// clear error code
+
+	or r18=r18,r19		// r18 <- current->pending | current->signal->shared_pending
+	;;
+	// r18 <- (current->pending | current->signal->shared_pending) & ~current->blocked:
+	andcm r18=r18,r3
+	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
+	;;
+
+(p7)	cmp.ne.or.andcm p6,p7=r18,r0		// p6/p7 <- signal pending
+	mov r19=0					// i must not leak kernel bits...
+(p6)	br.cond.dpnt.many .sig_pending
+	;;
+
+1:	ld4 r17=[r9]				// r17 <- current->thread_info->flags
+	;;
+	mov ar.ccv=r17
+	and r18=~_TIF_SIGPENDING,r17		// r18 <- r17 & ~(1 << TIF_SIGPENDING)
+	;;
+
+	st8 [r2]=r3				// update current->blocked with new mask
+	cmpxchg4.acq r14=[r9],r18,ar.ccv	// current->thread_info->flags <- r18
+	;;
+	cmp.ne p6,p0=r17,r14			// update failed?
+(p6)	br.cond.spnt.few 1b			// yes -> retry
+
+#ifdef CONFIG_SMP
+	st4.rel [r31]=r0			// release the lock
+#endif
+	ssm psr.i
+	cmp.ne p9,p0=r8,r0			// check for bad HOW value
+	;;
+
+	srlz.d					// ensure psr.i is set again
+	mov r18=0					// i must not leak kernel bits...
+(p9)	br.spnt.few .fail_einval		// bail out for bad HOW value
+
+.store_mask:
+EX(.fail_efault, (p15) probe.w.fault r34, 3)	// verify user has write-access to *oset
+EX(.fail_efault, (p15) st8 [r34]=r3)
+	mov r2=0					// i must not leak kernel bits...
+	mov r3=0					// i must not leak kernel bits...
+	mov r8=0				// return 0
+	mov r9=0					// i must not leak kernel bits...
+	mov r14=0					// i must not leak kernel bits...
+	mov r17=0					// i must not leak kernel bits...
+	mov r31=0					// i must not leak kernel bits...
+	FSYS_RETURN
+
+.sig_pending:
+#ifdef CONFIG_SMP
+	st4.rel [r31]=r0			// release the lock
+#endif
+	ssm psr.i
+	;;
+	srlz.d
+	br.sptk.many fsys_fallback_syscall	// with signal pending, do the heavy-weight syscall
+
+#ifdef CONFIG_SMP
+.lock_contention:
+	/* Rather than spinning here, fall back on doing a heavy-weight syscall.  */
+	ssm psr.i
+	;;
+	srlz.d
+	br.sptk.many fsys_fallback_syscall
+#endif
+END(fsys_rt_sigprocmask)
 
 ENTRY(fsys_fallback_syscall)
 	.prologue
@@ -600,7 +768,7 @@ fsyscall_table:
 	data8 0				// sigaltstack
 	data8 0				// rt_sigaction
 	data8 0				// rt_sigpending
-	data8 0				// rt_sigprocmask
+	data8 fsys_rt_sigprocmask	// rt_sigprocmask
 	data8 0				// rt_sigqueueinfo	// 1180
 	data8 0				// rt_sigreturn
 	data8 0				// rt_sigsuspend

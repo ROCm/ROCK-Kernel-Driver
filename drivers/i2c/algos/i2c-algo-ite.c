@@ -779,10 +779,6 @@ int i2c_iic_add_bus(struct i2c_adapter *adap)
 	adap->retries = 3;		/* be replaced by defines	*/
 	adap->flags = 0;
 
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-
 	i2c_add_adapter(adap);
 	iic_init(iic_adap);
 
@@ -815,9 +811,6 @@ int i2c_iic_del_bus(struct i2c_adapter *adap)
 		return res;
 	DEB2(printk("i2c-algo-ite: adapter unregistered: %s\n",adap->name));
 
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

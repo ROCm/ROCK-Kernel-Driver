@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: write.c,v 1.65 2003/01/21 18:11:29 dwmw2 Exp $
+ * $Id: write.c,v 1.75 2003/10/08 11:45:11 dwmw2 Exp $
  *
  */
 
@@ -86,7 +86,7 @@ static void writecheck(struct jffs2_sb_info *c, uint32_t ofs)
 /* jffs2_write_dnode - given a raw_inode, allocate a full_dnode for it, 
    write it to the flash, link it into the existing inode/fragment list */
 
-struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_inode *ri, const unsigned char *data, uint32_t datalen, uint32_t flash_ofs,  uint32_t *writelen)
+struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_inode *ri, const unsigned char *data, uint32_t datalen, uint32_t flash_ofs, int alloc_mode)
 
 {
 	struct jffs2_raw_node_ref *raw;
@@ -94,6 +94,7 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 	size_t retlen;
 	struct iovec vecs[2];
 	int ret;
+	int retried = 0;
 	unsigned long cnt = 2;
 
 	D1(if(je32_to_cpu(ri->hdr_crc) != crc32(0, ri, sizeof(struct jffs2_unknown_node)-4)) {
@@ -120,24 +121,28 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 		jffs2_free_raw_node_ref(raw);
 		return ERR_PTR(-ENOMEM);
 	}
-	raw->flash_offset = flash_ofs;
-	raw->totlen = PAD(sizeof(*ri)+datalen);
-	raw->next_phys = NULL;
 
 	fn->ofs = je32_to_cpu(ri->offset);
 	fn->size = je32_to_cpu(ri->dsize);
 	fn->frags = 0;
-	fn->raw = raw;
 
 	/* check number of valid vecs */
 	if (!datalen || !data)
 		cnt = 1;
+ retry:
+	fn->raw = raw;
 
-	ret = jffs2_flash_writev(c, vecs, cnt, flash_ofs, &retlen);
-		
+	raw->flash_offset = flash_ofs;
+	raw->totlen = PAD(sizeof(*ri)+datalen);
+	raw->next_phys = NULL;
+
+	ret = jffs2_flash_writev(c, vecs, cnt, flash_ofs, &retlen,
+				 (alloc_mode==ALLOC_GC)?0:f->inocache->ino);
+
 	if (ret || (retlen != sizeof(*ri) + datalen)) {
 		printk(KERN_NOTICE "Write of %zd bytes at 0x%08x failed. returned %d, retlen %zd\n", 
 		       sizeof(*ri)+datalen, flash_ofs, ret, retlen);
+
 		/* Mark the space as dirtied */
 		if (retlen) {
 			/* Doesn't belong to any inode */
@@ -155,11 +160,42 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 			printk(KERN_NOTICE "Not marking the space at 0x%08x as dirty because the flash driver returned retlen zero\n", raw->flash_offset);
 			jffs2_free_raw_node_ref(raw);
 		}
+		if (!retried && alloc_mode != ALLOC_NORETRY && (raw = jffs2_alloc_raw_node_ref())) {
+			/* Try to reallocate space and retry */
+			uint32_t dummy;
+			struct jffs2_eraseblock *jeb = &c->blocks[flash_ofs / c->sector_size];
 
+			retried = 1;
+
+			D1(printk(KERN_DEBUG "Retrying failed write.\n"));
+			
+			ACCT_SANITY_CHECK(c,jeb);
+			D1(ACCT_PARANOIA_CHECK(jeb));
+
+			if (alloc_mode == ALLOC_GC) {
+				ret = jffs2_reserve_space_gc(c, sizeof(*ri) + datalen, &flash_ofs, &dummy);
+			} else {
+				/* Locking pain */
+				up(&f->sem);
+				jffs2_complete_reservation(c);
+			
+				ret = jffs2_reserve_space(c, sizeof(*ri) + datalen, &flash_ofs, &dummy, alloc_mode);
+				down(&f->sem);
+			}
+
+			if (!ret) {
+				D1(printk(KERN_DEBUG "Allocated space at 0x%08x to retry failed write.\n", flash_ofs));
+
+				ACCT_SANITY_CHECK(c,jeb);
+				D1(ACCT_PARANOIA_CHECK(jeb));
+
+				goto retry;
+			}
+			D1(printk(KERN_DEBUG "Failed to allocate space to retry failed write: %d!\n", ret));
+			jffs2_free_raw_node_ref(raw);
+		}
 		/* Release the full_dnode which is now useless, and return */
 		jffs2_free_full_dnode(fn);
-		if (writelen)
-			*writelen = retlen;
 		return ERR_PTR(ret?ret:-EIO);
 	}
 	/* Mark the space used */
@@ -184,19 +220,21 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 		  flash_ofs, ref_flags(raw), je32_to_cpu(ri->dsize), 
 		  je32_to_cpu(ri->csize), je32_to_cpu(ri->node_crc),
 		  je32_to_cpu(ri->data_crc), je32_to_cpu(ri->totlen)));
-	if (writelen)
-		*writelen = retlen;
 
-	f->inocache->nodes = raw;
+	if (retried) {
+		ACCT_SANITY_CHECK(c,NULL);
+	}
+
 	return fn;
 }
 
-struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_dirent *rd, const unsigned char *name, uint32_t namelen, uint32_t flash_ofs,  uint32_t *writelen)
+struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_dirent *rd, const unsigned char *name, uint32_t namelen, uint32_t flash_ofs, int alloc_mode)
 {
 	struct jffs2_raw_node_ref *raw;
 	struct jffs2_full_dirent *fd;
 	size_t retlen;
 	struct iovec vecs[2];
+	int retried = 0;
 	int ret;
 
 	D1(printk(KERN_DEBUG "jffs2_write_dirent(ino #%u, name at *0x%p \"%s\"->ino #%u, name_crc 0x%08x)\n", 
@@ -225,11 +263,6 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 		jffs2_free_raw_node_ref(raw);
 		return ERR_PTR(-ENOMEM);
 	}
-	raw->flash_offset = flash_ofs;
-	raw->totlen = PAD(sizeof(*rd)+namelen);
-	raw->next_in_ino = f->inocache->nodes;
-	f->inocache->nodes = raw;
-	raw->next_phys = NULL;
 
 	fd->version = je32_to_cpu(rd->version);
 	fd->ino = je32_to_cpu(rd->ino);
@@ -237,14 +270,22 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 	fd->type = rd->type;
 	memcpy(fd->name, name, namelen);
 	fd->name[namelen]=0;
+
+ retry:
 	fd->raw = raw;
 
-	ret = jffs2_flash_writev(c, vecs, 2, flash_ofs, &retlen);
+	raw->flash_offset = flash_ofs;
+	raw->totlen = PAD(sizeof(*rd)+namelen);
+	raw->next_phys = NULL;
+
+	ret = jffs2_flash_writev(c, vecs, 2, flash_ofs, &retlen,
+				 (alloc_mode==ALLOC_GC)?0:fd->ino);
 	if (ret || (retlen != sizeof(*rd) + namelen)) {
 		printk(KERN_NOTICE "Write of %zd bytes at 0x%08x failed. returned %d, retlen %zd\n", 
 			       sizeof(*rd)+namelen, flash_ofs, ret, retlen);
 		/* Mark the space as dirtied */
 		if (retlen) {
+			raw->next_in_ino = NULL;
 			raw->flash_offset |= REF_OBSOLETE;
 			jffs2_add_physical_node_ref(c, raw);
 			jffs2_mark_node_obsolete(c, raw);
@@ -252,20 +293,53 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 			printk(KERN_NOTICE "Not marking the space at 0x%08x as dirty because the flash driver returned retlen zero\n", raw->flash_offset);
 			jffs2_free_raw_node_ref(raw);
 		}
+		if (!retried && (raw = jffs2_alloc_raw_node_ref())) {
+			/* Try to reallocate space and retry */
+			uint32_t dummy;
+			struct jffs2_eraseblock *jeb = &c->blocks[flash_ofs / c->sector_size];
 
+			retried = 1;
+
+			D1(printk(KERN_DEBUG "Retrying failed write.\n"));
+
+			ACCT_SANITY_CHECK(c,jeb);
+			D1(ACCT_PARANOIA_CHECK(jeb));
+
+			if (alloc_mode == ALLOC_GC) {
+				ret = jffs2_reserve_space_gc(c, sizeof(*rd) + namelen, &flash_ofs, &dummy);
+			} else {
+				/* Locking pain */
+				up(&f->sem);
+				jffs2_complete_reservation(c);
+			
+				ret = jffs2_reserve_space(c, sizeof(*rd) + namelen, &flash_ofs, &dummy, alloc_mode);
+				down(&f->sem);
+			}
+
+			if (!ret) {
+				D1(printk(KERN_DEBUG "Allocated space at 0x%08x to retry failed write.\n", flash_ofs));
+				ACCT_SANITY_CHECK(c,jeb);
+				D1(ACCT_PARANOIA_CHECK(jeb));
+				goto retry;
+			}
+			D1(printk(KERN_DEBUG "Failed to allocate space to retry failed write: %d!\n", ret));
+			jffs2_free_raw_node_ref(raw);
+		}
 		/* Release the full_dnode which is now useless, and return */
 		jffs2_free_full_dirent(fd);
-		if (writelen)
-			*writelen = retlen;
 		return ERR_PTR(ret?ret:-EIO);
 	}
 	/* Mark the space used */
 	raw->flash_offset |= REF_PRISTINE;
 	jffs2_add_physical_node_ref(c, raw);
-	if (writelen)
-		*writelen = retlen;
 
+	raw->next_in_ino = f->inocache->nodes;
 	f->inocache->nodes = raw;
+
+	if (retried) {
+		ACCT_SANITY_CHECK(c,NULL);
+	}
+
 	return fd;
 }
 
@@ -288,7 +362,9 @@ int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		unsigned char comprtype = JFFS2_COMPR_NONE;
 		uint32_t phys_ofs, alloclen;
 		uint32_t datalen, cdatalen;
+		int retried = 0;
 
+	retry:
 		D2(printk(KERN_DEBUG "jffs2_commit_write() loop: 0x%x to write to 0x%x\n", writelen, offset));
 
 		ret = jffs2_reserve_space(c, sizeof(*ri) + JFFS2_MIN_DATA_LEN, &phys_ofs, &alloclen, ALLOC_NORMAL);
@@ -331,7 +407,7 @@ int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 		ri->data_crc = cpu_to_je32(crc32(0, comprbuf, cdatalen));
 
-		fn = jffs2_write_dnode(c, f, ri, comprbuf, cdatalen, phys_ofs, NULL);
+		fn = jffs2_write_dnode(c, f, ri, comprbuf, cdatalen, phys_ofs, ALLOC_NORETRY);
 
 		if (comprtype != JFFS2_COMPR_NONE)
 			kfree(comprbuf);
@@ -340,6 +416,12 @@ int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			ret = PTR_ERR(fn);
 			up(&f->sem);
 			jffs2_complete_reservation(c);
+			if (!retried) {
+				/* Write error to be retried */
+				retried = 1;
+				D1(printk(KERN_DEBUG "Retrying node write in jffs2_write_inode_range()\n"));
+				goto retry;
+			}
 			break;
 		}
 		ret = jffs2_add_full_dnode_to_inode(c, f, fn);
@@ -381,7 +463,6 @@ int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, str
 	struct jffs2_full_dnode *fn;
 	struct jffs2_full_dirent *fd;
 	uint32_t alloclen, phys_ofs;
-	uint32_t writtenlen;
 	int ret;
 
 	/* Try to reserve enough space for both node and dirent. 
@@ -397,7 +478,7 @@ int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, str
 	ri->data_crc = cpu_to_je32(0);
 	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 
-	fn = jffs2_write_dnode(c, f, ri, NULL, 0, phys_ofs, &writtenlen);
+	fn = jffs2_write_dnode(c, f, ri, NULL, 0, phys_ofs, ALLOC_NORMAL);
 
 	D1(printk(KERN_DEBUG "jffs2_do_create created file with mode 0x%x\n",
 		  jemode_to_cpu(ri->mode)));
@@ -414,22 +495,14 @@ int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, str
 	*/
 	f->metadata = fn;
 
-	/* Work out where to put the dirent node now. */
-	writtenlen = PAD(writtenlen);
-	phys_ofs += writtenlen;
-	alloclen -= writtenlen;
 	up(&f->sem);
-
-	if (alloclen < sizeof(*rd)+namelen) {
-		/* Not enough space left in this chunk. Get some more */
-		jffs2_complete_reservation(c);
-		ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
+	jffs2_complete_reservation(c);
+	ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_NORMAL);
 		
-		if (ret) {
-			/* Eep. */
-			D1(printk(KERN_DEBUG "jffs2_reserve_space() for dirent failed\n"));
-			return ret;
-		}
+	if (ret) {
+		/* Eep. */
+		D1(printk(KERN_DEBUG "jffs2_reserve_space() for dirent failed\n"));
+		return ret;
 	}
 
 	rd = jffs2_alloc_raw_dirent();
@@ -455,7 +528,7 @@ int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, str
 	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
 	rd->name_crc = cpu_to_je32(crc32(0, name, namelen));
 
-	fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, &writtenlen);
+	fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, ALLOC_NORMAL);
 
 	jffs2_free_raw_dirent(rd);
 	
@@ -513,7 +586,7 @@ int jffs2_do_unlink(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f,
 	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
 	rd->name_crc = cpu_to_je32(crc32(0, name, namelen));
 
-	fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, NULL);
+	fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, ALLOC_DELETION);
 	
 	jffs2_free_raw_dirent(rd);
 
@@ -598,7 +671,7 @@ int jffs2_do_link (struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, uint
 	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
 	rd->name_crc = cpu_to_je32(crc32(0, name, namelen));
 
-	fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, NULL);
+	fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, ALLOC_NORMAL);
 	
 	jffs2_free_raw_dirent(rd);
 

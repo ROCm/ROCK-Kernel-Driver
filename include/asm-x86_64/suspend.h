@@ -1,14 +1,15 @@
 /*
- * Copyright 2001-2002 Pavel Machek <pavel@suse.cz>
+ * Copyright 2001-2003 Pavel Machek <pavel@suse.cz>
  * Based on code
  * Copyright 2001 Patrick Mochel <mochel@osdl.org>
  */
 #include <asm/desc.h>
 #include <asm/i387.h>
 
-static inline void
+static inline int
 arch_prepare_suspend(void)
 {
+	return 0;
 }
 
 /* Image of the saved processor state. If you touch this, fix acpi_wakeup.S. */

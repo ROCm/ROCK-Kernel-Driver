@@ -181,26 +181,8 @@ __after_mmu_off:
 	bl	setup_disp_bat
 #endif
 #else /* CONFIG_POWER4 */
-/*
- * Load up the SDR1 and segment register values now
- * since we don't have the BATs.
- * Also make sure we are running in 32-bit mode.
- */
 	bl	reloc_offset
-	addis	r14,r3,_SDR1@ha		/* get the value from _SDR1 */
-	lwz	r14,_SDR1@l(r14)	/* assume hash table below 4GB */
-	mtspr	SDR1,r14
-	slbia
-	lis	r4,0x2000		/* set pseudo-segment reg 12 */
-	ori	r5,r4,0x0ccc
-	mtsr	12,r5
-	ori	r4,r4,0x0888		/* set pseudo-segment reg 8 */
-	mtsr	8,r4			/* (for access to serial port) */
-	mfmsr	r0
-	clrldi	r0,r0,1
-	sync
-	mtmsr	r0
-	isync
+	bl	initial_mm_power4
 #endif /* CONFIG_POWER4 */
 
 /*
@@ -1637,6 +1619,34 @@ setup_disp_bat:
 #endif /* !defined(CONFIG_APUS) && defined(CONFIG_BOOTX_TEXT) */
 
 #else /* CONFIG_POWER4 */
+/*
+ * Load up the SDR1 and segment register values now
+ * since we don't have the BATs.
+ * Also make sure we are running in 32-bit mode.
+ */
+
+initial_mm_power4:
+	addis	r14,r3,_SDR1@ha		/* get the value from _SDR1 */
+	lwz	r14,_SDR1@l(r14)	/* assume hash table below 4GB */
+	mtspr	SDR1,r14
+	slbia
+	lis	r4,0x2000		/* set pseudo-segment reg 12 */
+	ori	r5,r4,0x0ccc
+	mtsr	12,r5
+	ori	r5,r4,0x0888		/* set pseudo-segment reg 8 */
+	mtsr	8,r5			/* (for access to serial port) */
+	ori	r5,r4,0x0999		/* set pseudo-segment reg 8 */
+	mtsr	9,r5			/* (for access to screen) */
+	mfmsr	r0
+	clrldi	r0,r0,1
+	sync
+	mtmsr	r0
+	isync
+	blr
+
+/*
+ * On 970 (G5), we pre-set a few bits in HID0 & HID1
+ */
 ppc970_setup_hid:
 	li	r0,0
 	sync

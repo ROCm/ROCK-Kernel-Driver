@@ -77,12 +77,11 @@
 (p6)	movl	r10=IA64_MCA_SAME_CONTEXT;		\
 (p6)	add     _tmp=0x18,_tmp;;			\
 (p6)	ld8	r9=[_tmp],0x10;				\
-(p6)	movl	r22=ia64_mca_min_state_save_info;;	\
+(p6)	mov	r22=r0;;				\
 (p7)	ld8	r8=[_tmp],0x08;;			\
 (p7)	ld8	r9=[_tmp],0x08;;			\
 (p7)	ld8     r10=[_tmp],0x08;;			\
-(p7)	ld8     r22=[_tmp],0x08;;			\
-	DATA_VA_TO_PA(r22)
+(p7)	ld8     r22=[_tmp],0x08;;
 	// now _tmp is pointing to SAL rtn save location
 
 
@@ -97,7 +96,6 @@
 	.global ia64_init_stack
 	.global ia64_mca_sal_data_area
 	.global ia64_tlb_functional
-	.global ia64_mca_min_state_save_info
 
 	.text
 	.align 16
@@ -265,15 +263,15 @@ cSaveCRs:
 	add		r4=8,r2                  // duplicate r2 in r4
 	add		r6=2*8,r2                // duplicate r2 in r4
 
-	mov		r3=cr0                      // cr.dcr
-	mov		r5=cr1                      // cr.itm
-	mov		r7=cr2;;                    // cr.iva
+	mov		r3=cr.dcr
+	mov		r5=cr.itm
+	mov		r7=cr.iva;;
 
 	st8		[r2]=r3,8*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;            // 48 byte rements
 
-	mov		r3=cr8;;                    // cr.pta
+	mov		r3=cr.pta;;
 	st8		[r2]=r3,8*8;;            // 64 byte rements
 
 // if PSR.ic=0, reading interruption registers causes an illegal operation fault
@@ -286,23 +284,23 @@ begin_skip_intr_regs:
 	add		r4=8,r2                  // duplicate r2 in r4
 	add		r6=2*8,r2                // duplicate r2 in r6
 
-	mov		r3=cr16                     // cr.ipsr
-	mov		r5=cr17                     // cr.isr
-        mov     r7=r0;;                     // cr.ida => cr18 (reserved)
+	mov		r3=cr.ipsr
+	mov		r5=cr.isr
+	mov		r7=r0;;
 	st8		[r2]=r3,3*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;
 
-	mov		r3=cr19                     // cr.iip
-	mov		r5=cr20                     // cr.idtr
-	mov		r7=cr21;;                   // cr.iitr
+	mov		r3=cr.iip
+	mov		r5=cr.ifa
+	mov		r7=cr.itir;;
 	st8		[r2]=r3,3*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;
 
-	mov		r3=cr22                     // cr.iipa
-	mov		r5=cr23                     // cr.ifs
-	mov		r7=cr24;;                   // cr.iim
+	mov		r3=cr.iipa
+	mov		r5=cr.ifs
+	mov		r7=cr.iim;;
 	st8		[r2]=r3,3*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;
@@ -311,104 +309,101 @@ begin_skip_intr_regs:
 	st8		[r2]=r3,160;;               // 160 byte rement
 
 SkipIntrRegs:
-	st8		[r2]=r0,168                 // another 168 byte .
+	st8		[r2]=r0,152;;               // another 152 byte .
 
-	mov		r3=cr66;;                   // cr.lid
-	st8		[r2]=r3,40                  // 40 byte rement
+	add		r4=8,r2                     // duplicate r2 in r4
+	add		r6=2*8,r2                   // duplicate r2 in r6
 
-	mov		r3=cr71;;                   // cr.ivr
-	st8		[r2]=r3,8
+	mov		r3=cr.lid
+//	mov		r5=cr.ivr                     // cr.ivr, don't read it
+	mov		r7=cr.tpr;;
+	st8		[r2]=r3,3*8
+	st8		[r4]=r5,3*8
+	st8		[r6]=r7,3*8;;
 
-	mov		r3=cr72;;                   // cr.tpr
-	st8		[r2]=r3,24                  // 24 byte increment
+	mov		r3=r0                       // cr.eoi => cr67
+	mov		r5=r0                       // cr.irr0 => cr68
+	mov		r7=r0;;                     // cr.irr1 => cr69
+	st8		[r2]=r3,3*8
+	st8		[r4]=r5,3*8
+	st8		[r6]=r7,3*8;;
 
-	mov		r3=r0;;                     // cr.eoi => cr75
-	st8		[r2]=r3,168                 // 168 byte inc.
+	mov		r3=r0                       // cr.irr2 => cr70
+	mov		r5=r0                       // cr.irr3 => cr71
+	mov		r7=cr.itv;;
+	st8		[r2]=r3,3*8
+	st8		[r4]=r5,3*8
+	st8		[r6]=r7,3*8;;
 
-	mov		r3=r0;;                     // cr.irr0 => cr96
-	st8		[r2]=r3,16               // 16 byte inc.
+	mov		r3=cr.pmv
+	mov		r5=cr.cmcv;;
+	st8		[r2]=r3,7*8
+	st8		[r4]=r5,7*8;;
 
-	mov		r3=r0;;                     // cr.irr1 => cr98
-	st8		[r2]=r3,16               // 16 byte inc.
+	mov		r3=r0                       // cr.lrr0 => cr80
+	mov		r5=r0;;                     // cr.lrr1 => cr81
+	st8		[r2]=r3,23*8
+	st8		[r4]=r5,23*8;;
 
-	mov		r3=r0;;                     // cr.irr2 => cr100
-	st8		[r2]=r3,16               // 16 byte inc
-
-	mov		r3=r0;;                     // cr.irr3 => cr100
-	st8		[r2]=r3,16               // 16b inc.
-
-	mov		r3=r0;;                     // cr.itv => cr114
-	st8		[r2]=r3,16               // 16 byte inc.
-
-	mov		r3=r0;;                     // cr.pmv => cr116
-	st8		[r2]=r3,8
-
-	mov		r3=r0;;                     // cr.lrr0 => cr117
-	st8		[r2]=r3,8
-
-	mov		r3=r0;;                     // cr.lrr1 => cr118
-	st8		[r2]=r3,8
-
-	mov		r3=r0;;                     // cr.cmcv => cr119
-	st8		[r2]=r3,8*10;;
+	adds		r2=25*8,r2;;
 
 cSaveARs:
 // save ARs
 	add		r4=8,r2                  // duplicate r2 in r4
 	add		r6=2*8,r2                // duplicate r2 in r6
 
-	mov		r3=ar0                      // ar.kro
-	mov		r5=ar1                      // ar.kr1
-	mov		r7=ar2;;                    // ar.kr2
+	mov		r3=ar.k0
+	mov		r5=ar.k1
+	mov		r7=ar.k2;;
 	st8		[r2]=r3,3*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;
 
-	mov		r3=ar3                      // ar.kr3
-	mov		r5=ar4                      // ar.kr4
-	mov		r7=ar5;;                    // ar.kr5
+	mov		r3=ar.k3
+	mov		r5=ar.k4
+	mov		r7=ar.k5;;
 	st8		[r2]=r3,3*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;
 
-	mov		r3=ar6                      // ar.kr6
-	mov		r5=ar7                      // ar.kr7
+	mov		r3=ar.k6
+	mov		r5=ar.k7
 	mov		r7=r0;;                     // ar.kr8
 	st8		[r2]=r3,10*8
 	st8		[r4]=r5,10*8
 	st8		[r6]=r7,10*8;;           // rement by 72 bytes
 
-	mov		r3=ar16                     // ar.rsc
-	mov		ar16=r0			    // put RSE in enforced lazy mode
-	mov		r5=ar17                     // ar.bsp
+	mov		r3=ar.rsc
+	mov		ar.rsc=r0			    // put RSE in enforced lazy mode
+	mov		r5=ar.bsp
 	;;
-	mov		r7=ar18;;                   // ar.bspstore
+	mov		r7=ar.bspstore;;
 	st8		[r2]=r3,3*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;
 
-	mov		r3=ar19;;                   // ar.rnat
+	mov		r3=ar.rnat;;
 	st8		[r2]=r3,8*13             // increment by 13x8 bytes
 
-	mov		r3=ar32;;                   // ar.ccv
+	mov		r3=ar.ccv;;
 	st8		[r2]=r3,8*4
 
-	mov		r3=ar36;;                   // ar.unat
+	mov		r3=ar.unat;;
 	st8		[r2]=r3,8*4
 
-	mov		r3=ar40;;                   // ar.fpsr
+	mov		r3=ar.fpsr;;
 	st8		[r2]=r3,8*4
 
-	mov		r3=ar44;;                   // ar.itc
+	mov		r3=ar.itc;;
 	st8		[r2]=r3,160                 // 160
 
-	mov		r3=ar64;;                   // ar.pfs
+	mov		r3=ar.pfs;;
 	st8		[r2]=r3,8
 
-	mov		r3=ar65;;                   // ar.lc
+	mov		r3=ar.lc;;
 	st8		[r2]=r3,8
 
-	mov		r3=ar66;;                   // ar.ec
+	mov		r3=ar.ec;;
 	st8		[r2]=r3
 	add		r2=8*62,r2               //padding
 
@@ -417,7 +412,8 @@ cSaveARs:
 	movl		r4=0x00;;
 
 cStRR:
-	mov		r3=rr[r4];;
+	dep.z		r5=r4,61,3;;
+	mov		r3=rr[r5];;
 	st8		[r2]=r3,8
 	add		r4=1,r4
 	br.cloop.sptk.few	cStRR
@@ -501,12 +497,12 @@ restore_CRs:
 	ld8		r3=[r2],8*8
 	ld8		r5=[r4],3*8
 	ld8		r7=[r6],3*8;;            // 48 byte increments
-	mov		cr0=r3                      // cr.dcr
-	mov		cr1=r5                      // cr.itm
-	mov		cr2=r7;;                    // cr.iva
+	mov		cr.dcr=r3
+	mov		cr.itm=r5
+	mov		cr.iva=r7;;
 
 	ld8		r3=[r2],8*8;;            // 64 byte increments
-//      mov		cr8=r3                      // cr.pta
+//      mov		cr.pta=r3
 
 
 // if PSR.ic=1, reading interruption registers causes an illegal operation fault
@@ -523,64 +519,66 @@ begin_rskip_intr_regs:
 	ld8		r3=[r2],3*8
 	ld8		r5=[r4],3*8
 	ld8		r7=[r6],3*8;;
-	mov		cr16=r3                     // cr.ipsr
-	mov		cr17=r5                     // cr.isr is read only
-//      mov     cr18=r7;;                   // cr.ida (reserved - don't restore)
+	mov		cr.ipsr=r3
+//	mov		cr.isr=r5                   // cr.isr is read only
 
 	ld8		r3=[r2],3*8
 	ld8		r5=[r4],3*8
 	ld8		r7=[r6],3*8;;
-	mov		cr19=r3                     // cr.iip
-	mov		cr20=r5                     // cr.idtr
-	mov		cr21=r7;;                   // cr.iitr
+	mov		cr.iip=r3
+	mov		cr.ifa=r5
+	mov		cr.itir=r7;;
 
 	ld8		r3=[r2],3*8
 	ld8		r5=[r4],3*8
 	ld8		r7=[r6],3*8;;
-	mov		cr22=r3                     // cr.iipa
-	mov		cr23=r5                     // cr.ifs
-	mov		cr24=r7                     // cr.iim
+	mov		cr.iipa=r3
+	mov		cr.ifs=r5
+	mov		cr.iim=r7
 
 	ld8		r3=[r2],160;;               // 160 byte increment
-	mov		cr25=r3                     // cr.iha
+	mov		cr.iha=r3
 
 rSkipIntrRegs:
-	ld8		r3=[r2],168;;               // another 168 byte inc.
+	ld8		r3=[r2],152;;               // another 152 byte inc.
 
-	ld8		r3=[r2],40;;                // 40 byte increment
-	mov		cr66=r3                     // cr.lid
+	add		r4=8,r2                     // duplicate r2 in r4
+	add		r6=2*8,r2;;                 // duplicate r2 in r6
 
-	ld8		r3=[r2],8;;
-//      mov		cr71=r3                     // cr.ivr is read only
-	ld8		r3=[r2],24;;                // 24 byte increment
-	mov		cr72=r3                     // cr.tpr
+	ld8		r3=[r2],8*3
+	ld8		r5=[r4],8*3
+	ld8		r7=[r6],8*3;;
+	mov		cr.lid=r3
+//	mov		cr.ivr=r5                   // cr.ivr is read only
+	mov		cr.tpr=r7;;
 
-	ld8		r3=[r2],168;;               // 168 byte inc.
-//      mov		cr75=r3                     // cr.eoi
+	ld8		r3=[r2],8*3
+	ld8		r5=[r4],8*3
+	ld8		r7=[r6],8*3;;
+//	mov		cr.eoi=r3
+//	mov		cr.irr0=r5                  // cr.irr0 is read only
+//	mov		cr.irr1=r7;;                // cr.irr1 is read only
 
-	ld8		r3=[r2],16;;             // 16 byte inc.
-//      mov		cr96=r3                     // cr.irr0 is read only
+	ld8		r3=[r2],8*3
+	ld8		r5=[r4],8*3
+	ld8		r7=[r6],8*3;;
+//	mov		cr.irr2=r3                  // cr.irr2 is read only
+//	mov		cr.irr3=r5                  // cr.irr3 is read only
+	mov		cr.itv=r7;;
 
-	ld8		r3=[r2],16;;             // 16 byte inc.
-//      mov		cr98=r3                     // cr.irr1 is read only
+	ld8		r3=[r2],8*7
+	ld8		r5=[r4],8*7;;
+	mov		cr.pmv=r3
+	mov		cr.cmcv=r5;;
 
-	ld8		r3=[r2],16;;             // 16 byte inc
-//      mov		cr100=r3                    // cr.irr2 is read only
+	ld8		r3=[r2],8*23
+	ld8		r5=[r4],8*23;;
+	adds		r2=8*23,r2
+	adds		r4=8*23,r4;;
+//	mov		cr.lrr0=r3
+//	mov		cr.lrr1=r5
 
-	ld8		r3=[r2],16;;             // 16b inc.
-//      mov		cr102=r3                    // cr.irr3 is read only
-
-	ld8		r3=[r2],16;;             // 16 byte inc.
-//      mov		cr114=r3                    // cr.itv
-
-	ld8		r3=[r2],8;;
-//      mov		cr116=r3                    // cr.pmv
-	ld8		r3=[r2],8;;
-//      mov		cr117=r3                    // cr.lrr0
-	ld8		r3=[r2],8;;
-//      mov		cr118=r3                    // cr.lrr1
-	ld8		r3=[r2],8*10;;
-//      mov		cr119=r3                    // cr.cmcv
+	adds		r2=8*2,r2;;
 
 restore_ARs:
 	add		r4=8,r2                  // duplicate r2 in r4
@@ -589,67 +587,67 @@ restore_ARs:
 	ld8		r3=[r2],3*8
 	ld8		r5=[r4],3*8
 	ld8		r7=[r6],3*8;;
-	mov		ar0=r3                      // ar.kro
-	mov		ar1=r5                      // ar.kr1
-	mov		ar2=r7;;                    // ar.kr2
+	mov		ar.k0=r3
+	mov		ar.k1=r5
+	mov		ar.k2=r7;;
 
 	ld8		r3=[r2],3*8
 	ld8		r5=[r4],3*8
 	ld8		r7=[r6],3*8;;
-	mov		ar3=r3                      // ar.kr3
-	mov		ar4=r5                      // ar.kr4
-	mov		ar5=r7;;                    // ar.kr5
+	mov		ar.k3=r3
+	mov		ar.k4=r5
+	mov		ar.k5=r7;;
 
 	ld8		r3=[r2],10*8
 	ld8		r5=[r4],10*8
 	ld8		r7=[r6],10*8;;
-	mov		ar6=r3                      // ar.kr6
-	mov		ar7=r5                      // ar.kr7
-//      mov		ar8=r6                      // ar.kr8
+	mov		ar.k6=r3
+	mov		ar.k7=r5
 	;;
 
 	ld8		r3=[r2],3*8
 	ld8		r5=[r4],3*8
 	ld8		r7=[r6],3*8;;
-//      mov		ar16=r3                     // ar.rsc
-//      mov		ar17=r5                     // ar.bsp is read only
-	mov		ar16=r0			    // make sure that RSE is in enforced lazy mode
+//	mov		ar.rsc=r3
+//	mov		ar.bsp=r5                   // ar.bsp is read only
+	mov		ar.rsc=r0			    // make sure that RSE is in enforced lazy mode
 	;;
-	mov		ar18=r7;;                   // ar.bspstore
+	mov		ar.bspstore=r7;;
 
 	ld8		r9=[r2],8*13;;
-	mov		ar19=r9                     // ar.rnat
+	mov		ar.rnat=r9
 
-	mov		ar16=r3			    // ar.rsc
+	mov		ar.rsc=r3
 	ld8		r3=[r2],8*4;;
-	mov		ar32=r3                     // ar.ccv
-
-	ld8		r3=[r2],8*4;;
-	mov		ar36=r3                     // ar.unat
+	mov		ar.ccv=r3
 
 	ld8		r3=[r2],8*4;;
-	mov		ar40=r3                     // ar.fpsr
+	mov		ar.unat=r3
+
+	ld8		r3=[r2],8*4;;
+	mov		ar.fpsr=r3
 
 	ld8		r3=[r2],160;;               // 160
-//      mov		ar44=r3                     // ar.itc
+//      mov		ar.itc=r3
 
 	ld8		r3=[r2],8;;
-	mov		ar64=r3                     // ar.pfs
+	mov		ar.pfs=r3
 
 	ld8		r3=[r2],8;;
-	mov		ar65=r3                     // ar.lc
+	mov		ar.lc=r3
 
 	ld8		r3=[r2];;
-	mov		ar66=r3                     // ar.ec
+	mov		ar.ec=r3
 	add		r2=8*62,r2;;             // padding
 
 restore_RRs:
 	mov		r5=ar.lc
 	mov		ar.lc=0x08-1
-	movl		r4=0x00
+	movl		r4=0x00;;
 cStRRr:
+	dep.z		r7=r4,61,3
 	ld8		r3=[r2],8;;
-//      mov		rr[r4]=r3                   // what are its access previledges?
+	mov		rr[r7]=r3                   // what are its access previledges?
 	add		r4=1,r4
 	br.cloop.sptk.few	cStRRr
 	;;

@@ -524,7 +524,7 @@ acpi_ex_opcode_1A_0T_1R (
 	acpi_integer                    value;
 
 
-	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Examine the AML opcode */

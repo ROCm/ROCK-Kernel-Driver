@@ -160,10 +160,10 @@ acpi_ex_read_data_from_field (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Obj=%p Type=%X Buf=%p Len=%X\n",
+		"field_read [TO]:  Obj %p, Type %X, Buf %p, byte_len %X\n",
 		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, (u32) length));
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"field_write: bit_len=%X bit_off=%X byte_off=%X\n",
+		"field_read [FROM]: bit_len %X, bit_off %X, byte_off %X\n",
 		obj_desc->common_field.bit_length,
 		obj_desc->common_field.start_field_bit_offset,
 		obj_desc->common_field.base_byte_offset));
@@ -335,10 +335,13 @@ acpi_ex_write_data_to_field (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Obj=%p Type=%X Buf=%p Len=%X\n",
-		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, length));
+		"field_write [FROM]: Obj %p (%s:%X), Buf %p, byte_len %X\n",
+		source_desc, acpi_ut_get_type_name (ACPI_GET_OBJECT_TYPE (source_desc)),
+		ACPI_GET_OBJECT_TYPE (source_desc), buffer, length));
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"field_read: bit_len=%X bit_off=%X byte_off=%X\n",
+		"field_write [TO]:  Obj %p (%s:%X), bit_len %X, bit_off %X, byte_off %X\n",
+		obj_desc, acpi_ut_get_type_name (ACPI_GET_OBJECT_TYPE (obj_desc)),
+		ACPI_GET_OBJECT_TYPE (obj_desc),
 		obj_desc->common_field.bit_length,
 		obj_desc->common_field.start_field_bit_offset,
 		obj_desc->common_field.base_byte_offset));

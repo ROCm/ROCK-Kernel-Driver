@@ -7847,7 +7847,7 @@ void mgsl_sppp_init(struct mgsl_struct *info)
 	d->tx_timeout = mgsl_sppp_tx_timeout;
 	d->watchdog_timeo = 10*HZ;
 
-	if (register_netdev(d) == -1) {
+	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);
 		return;
@@ -8020,8 +8020,8 @@ int mgsl_sppp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 #endif /* ifdef CONFIG_SYNCLINK_SYNCPPP */
 
-static int __init synclink_init_one (struct pci_dev *dev,
-				     const struct pci_device_id *ent)
+static int __devinit synclink_init_one (struct pci_dev *dev,
+					const struct pci_device_id *ent)
 {
 	struct mgsl_struct *info;
 

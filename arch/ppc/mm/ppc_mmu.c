@@ -211,6 +211,17 @@ void __init MMU_init_hw(void)
 #define MIN_N_HPTEG	1024		/* min 64kB hash table */
 #endif
 
+#ifdef CONFIG_POWER4
+	/* The hash table has already been allocated and initialized
+	   in prom.c */
+	n_hpteg = Hash_size >> LG_HPTEG_SIZE;
+	lg_n_hpteg = __ilog2(n_hpteg);
+
+	/* Remove the hash table from the available memory */
+	if (Hash)
+		reserve_phys_mem(__pa(Hash), Hash_size);
+
+#else /* CONFIG_POWER4 */
 	/*
 	 * Allow 1 HPTE (1/8 HPTEG) for each page of memory.
 	 * This is less than the recommended amount, but then
@@ -224,13 +235,7 @@ void __init MMU_init_hw(void)
 		++lg_n_hpteg;		/* round up if not power of 2 */
 		n_hpteg = 1 << lg_n_hpteg;
 	}
-
 	Hash_size = n_hpteg << LG_HPTEG_SIZE;
-	Hash_mask = n_hpteg - 1;
-	hmask = Hash_mask >> (16 - LG_HPTEG_SIZE);
-	mb2 = mb = 32 - LG_HPTEG_SIZE - lg_n_hpteg;
-	if (lg_n_hpteg > 16)
-		mb2 = 16 - LG_HPTEG_SIZE;
 
 	/*
 	 * Find some memory for the hash table.
@@ -240,6 +245,7 @@ void __init MMU_init_hw(void)
 	cacheable_memzero(Hash, Hash_size);
 	_SDR1 = __pa(Hash) | SDR1_LOW_BITS;
 	Hash_end = (PTE *) ((unsigned long)Hash + Hash_size);
+#endif /* CONFIG_POWER4 */
 
 	printk("Total memory = %ldMB; using %ldkB for hash table (at %p)\n",
 	       total_memory >> 20, Hash_size >> 10, Hash);
@@ -249,6 +255,12 @@ void __init MMU_init_hw(void)
 	 * Patch up the instructions in hashtable.S:create_hpte
 	 */
 	if ( ppc_md.progress ) ppc_md.progress("hash:patch", 0x345);
+	Hash_mask = n_hpteg - 1;
+	hmask = Hash_mask >> (16 - LG_HPTEG_SIZE);
+	mb2 = mb = 32 - LG_HPTEG_SIZE - lg_n_hpteg;
+	if (lg_n_hpteg > 16)
+		mb2 = 16 - LG_HPTEG_SIZE;
+
 	hash_page_patch_A[0] = (hash_page_patch_A[0] & ~0xffff)
 		| ((unsigned int)(Hash) >> 16);
 	hash_page_patch_A[1] = (hash_page_patch_A[1] & ~0x7c0) | (mb << 6);

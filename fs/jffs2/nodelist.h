@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.h,v 1.93 2003/02/24 21:47:28 dwmw2 Exp $
+ * $Id: nodelist.h,v 1.104 2003/10/08 11:45:11 dwmw2 Exp $
  *
  */
 
@@ -29,7 +29,7 @@
 #endif
 
 #ifndef CONFIG_JFFS2_FS_DEBUG
-#define CONFIG_JFFS2_FS_DEBUG 2
+#define CONFIG_JFFS2_FS_DEBUG 1
 #endif
 
 #if CONFIG_JFFS2_FS_DEBUG > 0
@@ -201,10 +201,11 @@ struct jffs2_eraseblock
 };
 
 #define ACCT_SANITY_CHECK(c, jeb) do { \
-	if (jeb->used_size + jeb->dirty_size + jeb->free_size + jeb->wasted_size + jeb->unchecked_size != c->sector_size) { \
-		printk(KERN_NOTICE "Eeep. Space accounting for block at 0x%08x is screwed\n", jeb->offset); \
+		struct jffs2_eraseblock *___j = jeb; \
+		if ((___j) && ___j->used_size + ___j->dirty_size + ___j->free_size + ___j->wasted_size + ___j->unchecked_size != c->sector_size) { \
+		printk(KERN_NOTICE "Eeep. Space accounting for block at 0x%08x is screwed\n", ___j->offset); \
 		printk(KERN_NOTICE "free 0x%08x + dirty 0x%08x + used %08x + wasted %08x + unchecked %08x != total %08x\n", \
-		jeb->free_size, jeb->dirty_size, jeb->used_size, jeb->wasted_size, jeb->unchecked_size, c->sector_size); \
+		___j->free_size, ___j->dirty_size, ___j->used_size, ___j->wasted_size, ___j->unchecked_size, c->sector_size); \
 		BUG(); \
 	} \
 	if (c->used_size + c->dirty_size + c->free_size + c->erasing_size + c->bad_size + c->wasted_size + c->unchecked_size != c->flash_size) { \
@@ -215,15 +216,46 @@ struct jffs2_eraseblock
 	} \
 } while(0)
 
+static inline void paranoia_failed_dump(struct jffs2_eraseblock *jeb)
+{
+	struct jffs2_raw_node_ref *ref;
+	int i=0;
+
+	printk(KERN_NOTICE);
+	for (ref = jeb->first_node; ref; ref = ref->next_phys) {
+		printk("%08x->", ref_offset(ref));
+		if (++i == 8) {
+			i = 0;
+			printk("\n" KERN_NOTICE);
+		}
+	}
+	printk("\n");
+}
+
+
 #define ACCT_PARANOIA_CHECK(jeb) do { \
 		uint32_t my_used_size = 0; \
 		uint32_t my_unchecked_size = 0; \
 		struct jffs2_raw_node_ref *ref2 = jeb->first_node; \
 		while (ref2) { \
+			if (unlikely(ref2->flash_offset < jeb->offset || \
+				     ref2->flash_offset > jeb->offset + c->sector_size)) { \
+				printk(KERN_NOTICE "Node %08x shouldn't be in block at %08x!\n", \
+				       ref_offset(ref2), jeb->offset); \
+				paranoia_failed_dump(jeb); \
+				BUG(); \
+			} \
 			if (ref_flags(ref2) == REF_UNCHECKED) \
 				my_unchecked_size += ref2->totlen; \
 			else if (!ref_obsolete(ref2)) \
 				my_used_size += ref2->totlen; \
+			if (unlikely((!ref2->next_phys) != (ref2 == jeb->last_node))) { \
+				printk("ref for node at %p (phys %08x) has next_phys->%p (%08x), last_node->%p (phys %08x)\n", \
+				       ref2, ref_offset(ref2), ref2->next_phys, ref_offset(ref2->next_phys), \
+				       jeb->last_node, ref_offset(jeb->last_node)); \
+				paranoia_failed_dump(jeb); \
+				BUG(); \
+			} \
 			ref2 = ref2->next_phys; \
 		} \
 		if (my_used_size != jeb->used_size) { \
@@ -239,14 +271,7 @@ struct jffs2_eraseblock
 #define ALLOC_NORMAL	0	/* Normal allocation */
 #define ALLOC_DELETION	1	/* Deletion node. Best to allow it */
 #define ALLOC_GC	2	/* Space requested for GC. Give it or die */
-
-#define JFFS2_RESERVED_BLOCKS_BASE 3						/* Number of free blocks there must be before we... */
-#define JFFS2_RESERVED_BLOCKS_WRITE (JFFS2_RESERVED_BLOCKS_BASE + 2)		/* ... allow a normal filesystem write */
-#define JFFS2_RESERVED_BLOCKS_DELETION (JFFS2_RESERVED_BLOCKS_BASE)		/* ... allow a normal filesystem deletion */
-#define JFFS2_RESERVED_BLOCKS_GCTRIGGER (JFFS2_RESERVED_BLOCKS_BASE + 3)	/* ... wake up the GC thread */
-#define JFFS2_RESERVED_BLOCKS_GCBAD (JFFS2_RESERVED_BLOCKS_BASE + 1)		/* ... pick a block from the bad_list to GC */
-#define JFFS2_RESERVED_BLOCKS_GCMERGE (JFFS2_RESERVED_BLOCKS_BASE)		/* ... merge pages when garbage collecting */
-
+#define ALLOC_NORETRY	3	/* For jffs2_write_dnode: On failure, return -EAGAIN instead of retrying */
 
 /* How much dirty space before it goes on the very_dirty_list */
 #define VERYDIRTY(c, size) ((size) >= ((c)->sector_size / 2))
@@ -314,8 +339,9 @@ void jffs2_dump_block_lists(struct jffs2_sb_info *c);
 
 /* write.c */
 int jffs2_do_new_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, uint32_t mode, struct jffs2_raw_inode *ri);
-struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_inode *ri, const unsigned char *data, uint32_t datalen, uint32_t flash_ofs,  uint32_t *writelen);
-struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_dirent *rd, const unsigned char *name, uint32_t namelen, uint32_t flash_ofs,  uint32_t *writelen);
+
+struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_inode *ri, const unsigned char *data, uint32_t datalen, uint32_t flash_ofs, int alloc_mode);
+struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_dirent *rd, const unsigned char *name, uint32_t namelen, uint32_t flash_ofs, int alloc_mode);
 int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			    struct jffs2_raw_inode *ri, unsigned char *buf, 
 			    uint32_t offset, uint32_t writelen, uint32_t *retlen);
@@ -383,7 +409,8 @@ void jffs2_erase_pending_trigger(struct jffs2_sb_info *c);
 
 #ifdef CONFIG_JFFS2_FS_NAND
 /* wbuf.c */
-int jffs2_flush_wbuf(struct jffs2_sb_info *c, int pad);
+int jffs2_flush_wbuf_gc(struct jffs2_sb_info *c, uint32_t ino);
+int jffs2_flush_wbuf_pad(struct jffs2_sb_info *c);
 int jffs2_check_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 int jffs2_write_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 int jffs2_nand_read_failcnt(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);

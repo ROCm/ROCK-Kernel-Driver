@@ -90,7 +90,7 @@ match_sid(const struct sk_buff *skb, pid_t sid)
 	read_lock(&tasklist_lock);
 	do_each_thread(g, p) {
 		struct files_struct *files;
-		if (process_session(p) != sid)
+		if (p->session != sid)
 			continue;
 
 		task_lock(p);

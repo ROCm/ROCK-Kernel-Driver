@@ -13,6 +13,10 @@
  * made in setup.S, copied to safe structures in setup.c,
  * and presents it in sysfs.
  *
+ * Please see http://domsch.com/linux/edd30/results.html for
+ * the list of BIOSs which have been reported to implement EDD.
+ * If you don't see yours listed, please send a report as described there.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License v2.0 as published by
  * the Free Software Foundation
@@ -55,7 +59,7 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
 MODULE_LICENSE("GPL");
 
-#define EDD_VERSION "0.09 2003-Jan-22"
+#define EDD_VERSION "0.10 2003-Oct-11"
 #define EDD_DEVICE_NAME_SIZE 16
 #define REPORT_URL "http://domsch.com/linux/edd30/results.html"
 
@@ -75,8 +79,6 @@ struct edd_attribute {
 /* forward declarations */
 static int edd_dev_is_type(struct edd_device *edev, const char *type);
 static struct pci_dev *edd_get_pci_dev(struct edd_device *edev);
-static struct scsi_device *edd_find_matching_scsi_device(struct edd_device *edev);
-static int kernel_has_scsi(void);
 
 static struct edd_device *edd_devices[EDDMAXNR];
 
@@ -118,41 +120,6 @@ static struct sysfs_ops edd_attr_ops = {
 	.show = edd_attr_show,
 };
 
-static int
-edd_dump_raw_data(char *b, int count, void *data, int length)
-{
-	char *orig_b = b;
-	char hexbuf[80], ascbuf[20], *h, *a, c;
-	unsigned char *p = data;
-	unsigned long column = 0;
-	int length_printed = 0, d;
-	const char maxcolumn = 16;
-	while (length_printed < length && count > 0) {
-		h = hexbuf;
-		a = ascbuf;
-		for (column = 0;
-		     column < maxcolumn && length_printed < length; column++) {
-			h += sprintf(h, "%02x ", (unsigned char) *p);
-			if (!isprint(*p))
-				c = '.';
-			else
-				c = *p;
-			a += sprintf(a, "%c", c);
-			p++;
-			length_printed++;
-		}
-		/* pad out the line */
-		for (; column < maxcolumn; column++) {
-			h += sprintf(h, "   ");
-			a += sprintf(a, " ");
-		}
-		d = snprintf(b, count, "%s\t%s\n", hexbuf, ascbuf);
-		b += d;
-		count -= d;
-	}
-	return (b - orig_b);
-}
-
 static ssize_t
 edd_show_host_bus(struct edd_device *edev, char *buf)
 {
@@ -161,7 +128,7 @@ edd_show_host_bus(struct edd_device *edev, char *buf)
 	int i;
 
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	for (i = 0; i < 4; i++) {
@@ -205,7 +172,7 @@ edd_show_interface(struct edd_device *edev, char *buf)
 	int i;
 
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	for (i = 0; i < 8; i++) {
@@ -255,105 +222,28 @@ edd_show_interface(struct edd_device *edev, char *buf)
 }
 
 /**
- * edd_show_raw_data() - unparses EDD information, returned to user-space
+ * edd_show_raw_data() - copies raw data to buffer for userspace to parse
  *
- * Returns: number of bytes written, or 0 on failure
+ * Returns: number of bytes written, or -EINVAL on failure
  */
 static ssize_t
 edd_show_raw_data(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
-	int i, warn_padding = 0, nonzero_path = 0,
-		len = sizeof (*info) - 4, found_pci=0;
-	uint8_t checksum = 0, c = 0;
-	char *p = buf;
-	struct pci_dev *pci_dev=NULL;
-	struct scsi_device *sd;
+	ssize_t len = sizeof (*info) - 4;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	if (!(info->params.key == 0xBEDD || info->params.key == 0xDDBE))
 		len = info->params.length;
 
-	p += snprintf(p, left, "int13 fn48 returned data:\n\n");
-	p += edd_dump_raw_data(p, left, ((char *) info) + 4, len);
+	/* In case of buggy BIOSs */
+	if (len > (sizeof(*info) - 4))
+		len = sizeof(*info) - 4;
 
-	/* Spec violation.  Adaptec AIC7899 returns 0xDDBE
-	   here, when it should be 0xBEDD.
-	 */
-	p += snprintf(p, left, "\n");
-	if (info->params.key == 0xDDBE) {
-		p += snprintf(p, left,
-			     "Warning: Spec violation.  Key should be 0xBEDD, is 0xDDBE\n");
-	}
-
-	if (!(info->params.key == 0xBEDD || info->params.key == 0xDDBE)) {
-		goto out;
-	}
-
-	for (i = 30; i <= 73; i++) {
-		c = *(((uint8_t *) info) + i + 4);
-		if (c)
-			nonzero_path++;
-		checksum += c;
-	}
-
-	if (checksum) {
-		p += snprintf(p, left,
-			     "Warning: Spec violation.  Device Path checksum invalid.\n");
-	}
-
-	if (!nonzero_path) {
-		p += snprintf(p, left, "Error: Spec violation.  Empty device path.\n");
-		goto out;
-	}
-
-	for (i = 0; i < 4; i++) {
-		if (!isprint(info->params.host_bus_type[i])) {
-			warn_padding++;
-		}
-	}
-	for (i = 0; i < 8; i++) {
-		if (!isprint(info->params.interface_type[i])) {
-			warn_padding++;
-		}
-	}
-
-	if (warn_padding) {
-		p += snprintf(p, left,
-			     "Warning: Spec violation.  Padding should be 0x20.\n");
-	}
-
-	if (edd_dev_is_type(edev, "PCI")) {
-		pci_dev = edd_get_pci_dev(edev);
-		if (!pci_dev) {
-			p += snprintf(p, left, "Error: BIOS says this is a PCI device, but the OS doesn't know\n");
-			p += snprintf(p, left, "  about a PCI device at %02x:%02x.%d\n",
-				     info->params.interface_path.pci.bus,
-				     info->params.interface_path.pci.slot,
-				     info->params.interface_path.pci.function);
-		}
-		else {
-			found_pci++;
-		}
-	}
-
-	if (found_pci && kernel_has_scsi() && edd_dev_is_type(edev, "SCSI")) {
-		sd = edd_find_matching_scsi_device(edev);
-		if (!sd) {
-			p += snprintf(p, left, "Error: BIOS says this is a SCSI device, but\n");
-			p += snprintf(p, left, "  the OS doesn't know about this SCSI device.\n");
-			p += snprintf(p, left, "  Do you have it's driver module loaded?\n");
-		}
-	}
-
-out:
-	p += snprintf(p, left, "\nPlease check %s\n", REPORT_URL);
-	p += snprintf(p, left, "to see if this device has been reported.  If not,\n");
-	p += snprintf(p, left, "please send the information requested there.\n");
-
-	return (p - buf);
+	memcpy(buf, ((char *)info) + 4, len);
+	return len;
 }
 
 static ssize_t
@@ -362,7 +252,7 @@ edd_show_version(struct edd_device *edev, char *buf)
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	p += snprintf(p, left, "0x%02x\n", info->version);
@@ -375,7 +265,7 @@ edd_show_extensions(struct edd_device *edev, char *buf)
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	if (info->interface_support & EDD_EXT_FIXED_DISK_ACCESS) {
@@ -399,7 +289,7 @@ edd_show_info_flags(struct edd_device *edev, char *buf)
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	if (info->params.info_flags & EDD_INFO_DMA_BOUNDARY_ERROR_TRANSPARENT)
@@ -427,7 +317,7 @@ edd_show_default_cylinders(struct edd_device *edev, char *buf)
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	p += snprintf(p, left, "0x%x\n", info->params.num_default_cylinders);
@@ -440,7 +330,7 @@ edd_show_default_heads(struct edd_device *edev, char *buf)
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	p += snprintf(p, left, "0x%x\n", info->params.num_default_heads);
@@ -453,7 +343,7 @@ edd_show_default_sectors_per_track(struct edd_device *edev, char *buf)
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	p += snprintf(p, left, "0x%x\n", info->params.sectors_per_track);
@@ -466,7 +356,7 @@ edd_show_sectors(struct edd_device *edev, char *buf)
 	struct edd_info *info = edd_dev_get_info(edev);
 	char *p = buf;
 	if (!edev || !info || !buf) {
-		return 0;
+		return -EINVAL;
 	}
 
 	p += snprintf(p, left, "0x%llx\n", info->params.number_of_sectors);
@@ -489,7 +379,7 @@ edd_has_default_cylinders(struct edd_device *edev)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	if (!edev || !info)
-		return 0;
+		return -EINVAL;
 	return info->params.num_default_cylinders > 0;
 }
 
@@ -498,7 +388,7 @@ edd_has_default_heads(struct edd_device *edev)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	if (!edev || !info)
-		return 0;
+		return -EINVAL;
 	return info->params.num_default_heads > 0;
 }
 
@@ -507,7 +397,7 @@ edd_has_default_sectors_per_track(struct edd_device *edev)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
 	if (!edev || !info)
-		return 0;
+		return -EINVAL;
 	return info->params.sectors_per_track > 0;
 }
 
@@ -739,22 +629,7 @@ edd_create_symlink_to_scsidev(struct edd_device *edev)
 	return rc;
 }
 
-static int kernel_has_scsi(void)
-{
-	return 1;
-}
-
 #else
-static int kernel_has_scsi(void)
-{
-	return 0;
-}
-
-static struct scsi_device *
-edd_find_matching_scsi_device(struct edd_device *edev)
-{
-	return NULL;
-}
 static int
 edd_create_symlink_to_scsidev(struct edd_device *edev)
 {
@@ -776,11 +651,11 @@ static void edd_populate_dir(struct edd_device * edev)
 	int i;
 
 	for (i = 0; (attr = edd_attrs[i]) && !error; i++) {
-		if (!attr->test || 
+		if (!attr->test ||
 		    (attr->test && attr->test(edev)))
 			error = sysfs_create_file(&edev->kobj,&attr->attr);
 	}
-	
+
 	if (!error) {
 		edd_create_symlink_to_pcidev(edev);
 		edd_create_symlink_to_scsidev(edev);
@@ -820,6 +695,7 @@ edd_init(void)
 
 	printk(KERN_INFO "BIOS EDD facility v%s, %d devices found\n",
 	       EDD_VERSION, eddnr);
+	printk(KERN_INFO "Please report your BIOS at %s\n", REPORT_URL);
 
 	if (!eddnr) {
 		printk(KERN_INFO "EDD information not available.\n");

@@ -94,18 +94,20 @@ do {						\
 
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+extern int ia64_pfn_valid (unsigned long pfn);
+#else
+# define ia64_pfn_valid(pfn) 1
+#endif
+
 #ifndef CONFIG_DISCONTIGMEM
-# ifdef CONFIG_VIRTUAL_MEM_MAP
-   extern int ia64_pfn_valid (unsigned long pfn);
-#  define pfn_valid(pfn)	(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
-# else
-#  define pfn_valid(pfn)	((pfn) < max_mapnr)
-# endif
-#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#define pfn_valid(pfn)		(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
 #define page_to_pfn(page)	((unsigned long) (page - mem_map))
 #define pfn_to_page(pfn)	(mem_map + (pfn))
+#endif /* CONFIG_DISCONTIGMEM */
+
 #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
-#endif
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
 typedef union ia64_va {
 	struct {

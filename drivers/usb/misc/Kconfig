@@ -15,7 +15,7 @@ config USB_EMI26
 	  USB Audio driver.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called audio.
+	  module will be called emi26.
 
 config USB_TIGL
 	tristate "Texas Instruments Graph Link USB (aka SilverLink) cable support"

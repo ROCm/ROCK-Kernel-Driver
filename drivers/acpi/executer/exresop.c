@@ -224,6 +224,7 @@ acpi_ex_resolve_operands (
 				case AML_REF_OF_OP:
 				case AML_ARG_OP:
 				case AML_LOCAL_OP:
+				case AML_LOAD_OP:   /* ddb_handle from LOAD_OP or LOAD_TABLE_OP */
 
 					ACPI_DEBUG_ONLY_MEMBERS (ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 						"Reference Opcode: %s\n", op_info->name)));
@@ -231,8 +232,9 @@ acpi_ex_resolve_operands (
 
 				default:
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-						"Unknown Reference Opcode %X\n",
-						obj_desc->reference.opcode));
+						"Unknown Reference Opcode %X [%s]\n",
+						obj_desc->reference.opcode,
+						(acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name));
 
 					return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 				}
@@ -376,6 +378,13 @@ acpi_ex_resolve_operands (
 			/* Any operand type will do */
 
 			type_needed = ACPI_TYPE_ANY;
+			break;
+
+		case ARGI_DDBHANDLE:
+
+			/* Need an operand of type ACPI_TYPE_DDB_HANDLE */
+
+			type_needed = ACPI_TYPE_LOCAL_REFERENCE;
 			break;
 
 

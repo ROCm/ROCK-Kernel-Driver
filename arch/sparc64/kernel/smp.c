@@ -720,8 +720,9 @@ void smp_flush_dcache_page_impl(struct page *page, int cpu)
 void flush_dcache_page_all(struct mm_struct *mm, struct page *page)
 {
 	cpumask_t mask = cpu_online_map;
-	cpu_clear(smp_processor_id(), mask);
 	u64 data0;
+
+	cpu_clear(smp_processor_id(), mask);
 
 #ifdef CONFIG_DEBUG_DCFLUSH
 	atomic_inc(&dcpage_flushes);

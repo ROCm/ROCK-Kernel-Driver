@@ -1312,32 +1312,24 @@ static struct ethtool_ops sparc_lance_ethtool_ops = {
 	.get_link		= sparc_lance_get_link,
 };
 
-static int __init sparc_lance_init(struct net_device *dev,
-				   struct sbus_dev *sdev,
+static int __init sparc_lance_init(struct sbus_dev *sdev,
 				   struct sbus_dma *ledma,
 				   struct sbus_dev *lebuffer)
 {
 	static unsigned version_printed;
-	struct lance_private *lp = NULL;
+	struct net_device *dev;
+	struct lance_private *lp;
 	int    i;
 
-	if (dev == NULL) {
-		dev = init_etherdev (0, sizeof (struct lance_private) + 8);
-	} else {
-		dev->priv = kmalloc(sizeof (struct lance_private) + 8,
-				    GFP_KERNEL);
-		if (dev->priv == NULL)
-			return -ENOMEM;
-		memset(dev->priv, 0, sizeof (struct lance_private) + 8);
-	}
+	dev = alloc_etherdev(sizeof(struct lance_private) + 8);
+	if (!dev)
+		return -ENOMEM;
+
+	lp = dev->priv;
+
 	if (sparc_lance_debug && version_printed++ == 0)
 		printk (KERN_INFO "%s", version);
 
-	printk(KERN_INFO "%s: LANCE ", dev->name);
-
-	/* Make certain the data structures used by the LANCE are aligned. */
-	dev->priv = (void *)(((unsigned long)dev->priv + 7) & ~7);
-	lp = (struct lance_private *) dev->priv;
 	spin_lock_init(&lp->lock);
 
 	/* Copy the IDPROM ethernet address to the device structure, later we
@@ -1345,16 +1337,13 @@ static int __init sparc_lance_init(struct net_device *dev,
 	 * initialization block.
 	 */
 	for (i = 0; i < 6; i++)
-		printk("%2.2x%c", dev->dev_addr[i] = idprom->id_ethaddr[i],
-		       i == 5 ? ' ': ':');
-	printk("\n");
+		dev->dev_addr[i] = idprom->id_ethaddr[i];
 
 	/* Get the IO region */
 	lp->lregs = sbus_ioremap(&sdev->resource[0], 0,
 				 LANCE_REG_SIZE, lancestr);
 	if (lp->lregs == 0UL) {
-		printk(KERN_ERR "%s: Cannot map SunLance registers.\n",
-		       dev->name);
+		printk(KERN_ERR "SunLance: Cannot map registers.\n");
 		goto fail;
 	}
 
@@ -1364,8 +1353,7 @@ static int __init sparc_lance_init(struct net_device *dev,
 			sbus_ioremap(&lebuffer->resource[0], 0,
 				     sizeof(struct lance_init_block), "lebuffer");
 		if (lp->init_block == NULL) {
-			printk(KERN_ERR "%s: Cannot map SunLance PIO buffer.\n",
-			       dev->name);
+			printk(KERN_ERR "SunLance: Cannot map PIO buffer.\n");
 			goto fail;
 		}
 		lp->init_block_dvma = 0;
@@ -1379,8 +1367,7 @@ static int __init sparc_lance_init(struct net_device *dev,
 					      &lp->init_block_dvma);
 		if (lp->init_block == NULL ||
 		    lp->init_block_dvma == 0) {
-			printk(KERN_ERR "%s: Cannot allocate consistent DMA memory.\n",
-			       dev->name);
+			printk(KERN_ERR "SunLance: Cannot allocate consistent DMA memory.\n");
 			goto fail;
 		}
 		lp->pio_buffer = 0;
@@ -1418,8 +1405,7 @@ static int __init sparc_lance_init(struct net_device *dev,
 		if (prop[0] == 0) {
 			int topnd, nd;
 
-			printk(KERN_INFO "%s: using auto-carrier-detection.\n",
-			       dev->name);
+			printk(KERN_INFO "SunLance: using auto-carrier-detection.\n");
 
 			/* Is this found at /options .attributes in all
 			 * Prom versions? XXX
@@ -1438,10 +1424,10 @@ static int __init sparc_lance_init(struct net_device *dev,
 				       sizeof(prop));
 
 			if (strcmp(prop, "true")) {
-				printk(KERN_NOTICE "%s: warning: overriding option "
-				       "'tpe-link-test?'\n", dev->name);
-				printk(KERN_NOTICE "%s: warning: mail any problems "
-				       "to ecd@skynet.be\n", dev->name);
+				printk(KERN_NOTICE "SunLance: warning: overriding option "
+				       "'tpe-link-test?'\n");
+				printk(KERN_NOTICE "SunLance: warning: mail any problems "
+				       "to ecd@skynet.be\n");
 				auxio_set_lte(AUXIO_LTE_ON);
 			}
 no_link_test:
@@ -1467,8 +1453,7 @@ no_link_test:
 
 	/* This should never happen. */
 	if ((unsigned long)(lp->init_block->brx_ring) & 0x07) {
-		printk(KERN_ERR "%s: ERROR: Rx and Tx rings not on even boundary.\n",
-		       dev->name);
+		printk(KERN_ERR "SunLance: ERROR: Rx and Tx rings not on even boundary.\n");
 		goto fail;
 	}
 
@@ -1486,7 +1471,6 @@ no_link_test:
 	dev->irq = sdev->irqs[0];
 
 	dev->dma = 0;
-	ether_setup(dev);
 
 	/* We cannot sleep if the chip is busy during a
 	 * multicast list update event, because such events
@@ -1497,15 +1481,27 @@ no_link_test:
 	lp->multicast_timer.data = (unsigned long) dev;
 	lp->multicast_timer.function = &lance_set_multicast_retry;
 
-	dev->ifindex = dev_new_index();
+	if (register_netdev(dev)) {
+		printk(KERN_ERR "SunLance: Cannot register device.\n");
+		goto fail;
+	}
+
 	lp->next_module = root_lance_dev;
 	root_lance_dev = lp;
+
+	printk(KERN_INFO "%s: LANCE ", dev->name);
+
+	for (i = 0; i < 6; i++)
+		printk("%2.2x%c", dev->dev_addr[i],
+		       i == 5 ? ' ': ':');
+	printk("\n");
 
 	return 0;
 
 fail:
 	if (lp != NULL)
 		lance_free_hwresources(lp);
+	free_netdev(dev);
 	return -ENODEV;
 }
 
@@ -1543,7 +1539,7 @@ static int __init sparc_lance_probe(void)
 		memset(&sdev, 0, sizeof(sdev));
 		sdev.reg_addrs[0].phys_addr = sun4_eth_physaddr;
 		sdev.irqs[0] = 6;
-		return sparc_lance_init(NULL, &sdev, 0, 0);
+		return sparc_lance_init(&sdev, 0, 0);
 	}
 	return -ENODEV;
 }
@@ -1555,7 +1551,6 @@ static int __init sparc_lance_probe(void)
 {
 	struct sbus_bus *bus;
 	struct sbus_dev *sdev = 0;
-	struct net_device *dev = NULL;
 	struct sbus_dma *ledma = 0;
 	static int called;
 	int cards = 0, v;
@@ -1568,25 +1563,23 @@ static int __init sparc_lance_probe(void)
 
 	for_each_sbus (bus) {
 		for_each_sbusdev (sdev, bus) {
-			if (cards)
-				dev = NULL;
 			if (strcmp(sdev->prom_name, "le") == 0) {
 				cards++;
-				if ((v = sparc_lance_init(dev, sdev, 0, 0)))
+				if ((v = sparc_lance_init(sdev, 0, 0)))
 					return v;
 				continue;
 			}
 			if (strcmp(sdev->prom_name, "ledma") == 0) {
 				cards++;
 				ledma = find_ledma(sdev);
-				if ((v = sparc_lance_init(dev, sdev->child,
+				if ((v = sparc_lance_init(sdev->child,
 							  ledma, 0)))
 					return v;
 				continue;
 			}
 			if (strcmp(sdev->prom_name, "lebuffer") == 0){
 				cards++;
-				if ((v = sparc_lance_init(dev, sdev->child,
+				if ((v = sparc_lance_init(sdev->child,
 							  0, sdev)))
 					return v;
 				continue;

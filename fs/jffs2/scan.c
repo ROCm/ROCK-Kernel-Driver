@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.100 2003/06/05 14:42:24 dwmw2 Exp $
+ * $Id: scan.c,v 1.104 2003/10/11 14:52:48 dwmw2 Exp $
  *
  */
 #include <linux/kernel.h>
@@ -65,6 +65,16 @@ static int jffs2_scan_dirent_node(struct jffs2_sb_info *c, struct jffs2_eraseblo
 #define BLK_STATE_ALLDIRTY	4
 #define BLK_STATE_BADBLOCK	5
 
+static inline int min_free(struct jffs2_sb_info *c)
+{
+	uint32_t min = 2 * sizeof(struct jffs2_raw_inode);
+#ifdef CONFIG_JFFS2_FS_NAND
+	if (!jffs2_can_mark_obsolete(c) && min < c->wbuf_pagesize)
+		return c->wbuf_pagesize;
+#endif
+	return min;
+
+}
 int jffs2_scan_medium(struct jffs2_sb_info *c)
 {
 	int i, ret;
@@ -106,7 +116,7 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 		ret = jffs2_scan_eraseblock(c, jeb, buf_size?flashbuf:(flashbuf+jeb->offset), buf_size);
 
 		if (ret < 0)
-			return ret;
+			goto out;
 
 		ACCT_PARANOIA_CHECK(jeb);
 
@@ -151,8 +161,7 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
                            Later when we do snapshots, this must be the most recent block,
                            not the one with most free space.
                         */
-                        if (jeb->free_size > 2*sizeof(struct jffs2_raw_inode) && 
-			    (jffs2_can_mark_obsolete(c) || jeb->free_size > c->wbuf_pagesize) &&
+                        if (jeb->free_size > min_free(c) && 
 			    (!c->nextblock || c->nextblock->free_size < jeb->free_size)) {
                                 /* Better candidate for the next writes to go to */
                                 if (c->nextblock) {
@@ -210,7 +219,7 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 		c->dirty_size -= c->nextblock->dirty_size;
 		c->nextblock->dirty_size = 0;
 	}
-
+#ifdef CONFIG_JFFS2_FS_NAND
 	if (!jffs2_can_mark_obsolete(c) && c->nextblock && (c->nextblock->free_size & (c->wbuf_pagesize-1))) {
 		/* If we're going to start writing into a block which already 
 		   contains data, and the end of the data isn't page-aligned,
@@ -226,21 +235,25 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 		c->nextblock->free_size -= skip;
 		c->free_size -= skip;
 	}
+#endif
 	if (c->nr_erasing_blocks) {
 		if ( !c->used_size && ((empty_blocks+bad_blocks)!= c->nr_blocks || bad_blocks == c->nr_blocks) ) {
 			printk(KERN_NOTICE "Cowardly refusing to erase blocks on filesystem with no valid JFFS2 nodes\n");
 			printk(KERN_NOTICE "empty_blocks %d, bad_blocks %d, c->nr_blocks %d\n",empty_blocks,bad_blocks,c->nr_blocks);
-			return -EIO;
+			ret = -EIO;
+			goto out;
 		}
 		jffs2_erase_pending_trigger(c);
 	}
+	ret = 0;
+ out:
 	if (buf_size)
 		kfree(flashbuf);
 #ifndef __ECOS
 	else 
 		c->mtd->unpoint(c->mtd, flashbuf, 0, c->mtd->size);
 #endif
-	return 0;
+	return ret;
 }
 
 static int jffs2_fill_scan_buf (struct jffs2_sb_info *c, unsigned char *buf,
@@ -672,6 +685,7 @@ static int jffs2_scan_inode_node(struct jffs2_sb_info *c, struct jffs2_erasebloc
 			       ofs, je32_to_cpu(ri->node_crc), crc);
 			/* We believe totlen because the CRC on the node _header_ was OK, just the node itself failed. */
 			DIRTY_SPACE(PAD(je32_to_cpu(ri->totlen)));
+			jffs2_free_raw_node_ref(raw);
 			return 0;
 		}
 		ic = jffs2_scan_make_ino_cache(c, ino);

@@ -226,6 +226,7 @@ static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 static inline char * task_sig(struct task_struct *p, char *buffer)
 {
 	sigset_t pending, shpending, blocked, ignored, caught;
+	int num_threads = 0;
 
 	sigemptyset(&pending);
 	sigemptyset(&shpending);
@@ -241,9 +242,12 @@ static inline char * task_sig(struct task_struct *p, char *buffer)
 		shpending = p->signal->shared_pending.signal;
 		blocked = p->blocked;
 		collect_sigign_sigcatch(p, &ignored, &caught);
+		num_threads = atomic_read(&p->signal->count);
 		spin_unlock_irq(&p->sighand->siglock);
 	}
 	read_unlock(&tasklist_lock);
+
+	buffer += sprintf(buffer, "Threads:\t%d\n", num_threads);
 
 	/* render them all */
 	buffer = render_sigset_t("SigPnd:\t", &pending, buffer);
@@ -296,6 +300,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	char state;
 	int res;
 	pid_t ppid;
+	int num_threads = 0;
 	struct mm_struct *mm;
 
 	state = *get_task_state(task);
@@ -304,9 +309,9 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	mm = task->mm;
 	if(mm)
 		mm = mmgrab(mm);
-	if (process_tty(task)) {
-		tty_pgrp = process_tty(task)->pgrp;
-		tty_nr = new_encode_dev(tty_devnum(process_tty(task)));
+	if (task->tty) {
+		tty_pgrp = task->tty->pgrp;
+		tty_nr = new_encode_dev(tty_devnum(task->tty));
 	}
 	task_unlock(task);
 	if (mm) {
@@ -324,6 +329,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	read_lock(&tasklist_lock);
 	if (task->sighand) {
 		spin_lock_irq(&task->sighand->siglock);
+		num_threads = atomic_read(&task->signal->count);
 		collect_sigign_sigcatch(task, &sigign, &sigcatch);
 		spin_unlock_irq(&task->sighand->siglock);
 	}
@@ -338,14 +344,14 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	ppid = task->pid ? task->real_parent->pid : 0;
 	read_unlock(&tasklist_lock);
 	res = sprintf(buffer,"%d (%s) %c %d %d %d %d %d %lu %lu \
-%lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld %llu %lu %ld %lu %lu %lu %lu %lu \
+%lu %lu %lu %lu %lu %ld %ld %ld %ld %d %ld %llu %lu %ld %lu %lu %lu %lu %lu \
 %lu %lu %lu %lu %lu %lu %lu %lu %d %d %lu %lu\n",
 		task->pid,
 		task->comm,
 		state,
 		ppid,
 		process_group(task),
-		process_session(task),
+		task->session,
 		tty_nr,
 		tty_pgrp,
 		task->flags,
@@ -359,7 +365,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		jiffies_to_clock_t(task->cstime),
 		priority,
 		nice,
-		0UL /* removed */,
+		num_threads,
 		jiffies_to_clock_t(task->it_real_value),
 		(unsigned long long)
 		    jiffies_64_to_clock_t(task->start_time - INITIAL_JIFFIES),

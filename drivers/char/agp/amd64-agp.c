@@ -248,7 +248,7 @@ struct agp_bridge_driver amd_8151_driver = {
 };
 
 /* Some basic sanity checks for the aperture. */
-static int __init aperture_valid(u64 aper, u32 size)
+static int __devinit aperture_valid(u64 aper, u32 size)
 { 
 	static int not_first_call; 
 	u32 pfn, c;
@@ -297,7 +297,7 @@ static int __init aperture_valid(u64 aper, u32 size)
  * to allocate that much memory. But at least error out cleanly instead of
  * crashing.
  */ 
-static __init int fix_northbridge(struct pci_dev *nb, struct pci_dev *agp, 
+static __devinit int fix_northbridge(struct pci_dev *nb, struct pci_dev *agp, 
 								 u16 cap)
 {
 	u32 aper_low, aper_hi;
@@ -339,7 +339,7 @@ static __init int fix_northbridge(struct pci_dev *nb, struct pci_dev *agp,
 	return 0;
 } 
 
-static __init int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
+static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 {
 	struct pci_dev *loop_dev = NULL;
 	int i = 0;
@@ -365,8 +365,8 @@ static __init int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	return i == 0 ? -1 : 0;
 }
 
-static int __init agp_amd64_probe(struct pci_dev *pdev,
-				  const struct pci_device_id *ent)
+static int __devinit agp_amd64_probe(struct pci_dev *pdev,
+				     const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
 	u8 rev_id;

@@ -58,7 +58,7 @@ static inline void isync(void)
 
 #define HMT_LOW
 #define HMT_MEDIUM
-#define HMT_LOW
+#define HMT_HIGH
 #endif
 
 #endif

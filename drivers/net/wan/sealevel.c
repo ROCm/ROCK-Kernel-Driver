@@ -31,6 +31,7 @@
 
 struct slvl_device
 {
+	void *if_ptr;	/* General purpose pointer (used by SPPP) */
 	struct z8530_channel *chan;
 	struct ppp_device pppdev;
 	int channel;
@@ -238,6 +239,7 @@ static inline struct slvl_device *slvl_alloc(int iobase, int irq)
 		return NULL;
 
 	sv = d->priv;
+	sv->if_ptr = &sv->pppdev;
 	sv->pppdev.dev = d;
 	d->base_addr = iobase;
 	d->irq = irq;

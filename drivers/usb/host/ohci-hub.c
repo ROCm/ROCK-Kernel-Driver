@@ -73,7 +73,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 
 	ports = roothub_a (ohci) & RH_A_NDP; 
 	if (ports > MAX_ROOT_PORTS) {
-		if (ohci->disabled)
+		if (!HCD_IS_RUNNING(ohci->hcd.state))
 			return -ESHUTDOWN;
 		ohci_err (ohci, "bogus NDP=%d, rereads as NDP=%d\n",
 			ports, readl (&ohci->regs->roothub.a) & RH_A_NDP);

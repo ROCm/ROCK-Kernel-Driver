@@ -73,6 +73,14 @@ static inline int decode_access_size(unsigned int insn)
 	else {
 		printk("Impossible unaligned trap. insn=%08x\n", insn);
 		die_if_kernel("Byte sized unaligned access?!?!", current_thread_info()->kregs);
+
+		/* GCC should never warn that control reaches the end
+		 * of this function without returning a value because
+		 * die_if_kernel() is marked with attribute 'noreturn'.
+		 * Alas, some versions do...
+		 */
+
+		return 0;
 	}
 }
 

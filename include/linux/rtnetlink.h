@@ -352,8 +352,10 @@ enum
 
 struct ifa_cacheinfo
 {
-	__s32	ifa_prefered;
-	__s32	ifa_valid;
+	__u32	ifa_prefered;
+	__u32	ifa_valid;
+	__u32	cstamp; /* created timestamp, hundredths of seconds */
+	__u32	tstamp; /* updated timestamp, hundredths of seconds */
 };
 
 

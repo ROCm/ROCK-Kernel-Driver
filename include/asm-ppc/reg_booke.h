@@ -59,14 +59,10 @@ do {						\
 #define SPRN_SPRG5R	0x105	/* Special Purpose Register General 5 Read */
 #define SPRN_SPRG6R	0x106	/* Special Purpose Register General 6 Read */
 #define SPRN_SPRG7R	0x107	/* Special Purpose Register General 7 Read */
-#define SPRN_TBRL	0x10C	/* Time Base Read Lower Register (user, R/O) */
-#define SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
 #define SPRN_SPRG4W	0x114	/* Special Purpose Register General 4 Write */
 #define SPRN_SPRG5W	0x115	/* Special Purpose Register General 5 Write */
 #define SPRN_SPRG6W	0x116	/* Special Purpose Register General 6 Write */
 #define SPRN_SPRG7W	0x117	/* Special Purpose Register General 7 Write */
-#define SPRN_TBWL	0x11C	/* Time Base Lower Register (super, R/W) */
-#define SPRN_TBWU	0x11D	/* Time Base Upper Register (super, R/W) */
 #define SPRN_DBCR2	0x136	/* Debug Control Register 2 */
 #define SPRN_IAC3	0x13A	/* Instruction Address Compare 3 */
 #define SPRN_IAC4	0x13B	/* Instruction Address Compare 4 */
@@ -252,10 +248,6 @@ do {						\
 #define SPRG5W	SPRN_SPRG5W
 #define SPRG6W	SPRN_SPRG6W
 #define SPRG7W	SPRN_SPRG7W
-#define TBRL	SPRN_TBRL	/* Time Base Read Lower Register */
-#define TBRU	SPRN_TBRU	/* Time Base Read Upper Register */
-#define TBWL	SPRN_TBWL	/* Time Base Write Lower Register */
-#define TBWU	SPRN_TBWU	/* Time Base Write Upper Register */
 
 /*
  * The IBM-403 is an even more odd special case, as it is much

@@ -322,6 +322,10 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	if ((err = i2c_attach_client(new_client)))
 		goto error3;
 
+	/* Initialize the ADM1021 chip */
+	adm1021_init_client(new_client);
+
+	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_temp_max1);
 	device_create_file(&new_client->dev, &dev_attr_temp_min1);
 	device_create_file(&new_client->dev, &dev_attr_temp_input1);
@@ -332,8 +336,6 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	if (data->type == adm1021)
 		device_create_file(&new_client->dev, &dev_attr_die_code);
 
-	/* Initialize the ADM1021 chip */
-	adm1021_init_client(new_client);
 	return 0;
 
 error3:

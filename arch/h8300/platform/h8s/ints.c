@@ -1,5 +1,5 @@
 /*
- * linux/arch/h8300/platform/h8sh/ints.c
+ * linux/arch/h8300/platform/h8s/ints.c
  *
  * Yoshinori Sato <ysato@users.sourceforge.jp>
  *
@@ -20,7 +20,6 @@
 #include <linux/kernel_stat.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
-#include <linux/slab.h>
 #include <linux/bootmem.h>
 #include <linux/random.h>
 
@@ -75,7 +74,7 @@ const static struct irq_pins irq_assign_table1[16]={
 	{H8300_GPIO_P2,H8300_GPIO_B6},{H8300_GPIO_P2,H8300_GPIO_B7},
 };
 
-static int use_kmalloc;
+static short use_kmalloc = 0;
 
 extern unsigned long *interrupt_redirect_table;
 

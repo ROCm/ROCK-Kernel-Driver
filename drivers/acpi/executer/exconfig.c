@@ -92,6 +92,9 @@ acpi_ex_add_table (
 
 	/* Install the new table into the local data structures */
 
+	ACPI_MEMSET (&table_info, 0, sizeof (struct acpi_table_desc));
+
+	table_info.type        = 5;
 	table_info.pointer     = table;
 	table_info.length      = (acpi_size) table->length;
 	table_info.allocation  = ACPI_MEM_ALLOCATED;
@@ -178,7 +181,7 @@ acpi_ex_load_table_op (
 			return_ACPI_STATUS (status);
 		}
 
-		/* Not found, return an Integer=0 and AE_OK */
+		/* Table not found, return an Integer=0 and AE_OK */
 
 		ddb_handle = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ddb_handle) {
@@ -248,9 +251,11 @@ acpi_ex_load_table_op (
 				 walk_state);
 		if (ACPI_FAILURE (status)) {
 			(void) acpi_ex_unload_table (ddb_handle);
+			return_ACPI_STATUS (status);
 		}
 	}
 
+	*return_desc = ddb_handle;
 	return_ACPI_STATUS  (status);
 }
 
@@ -417,7 +422,7 @@ acpi_status
 acpi_ex_unload_table (
 	union acpi_operand_object       *ddb_handle)
 {
-	acpi_status                     status = AE_NOT_IMPLEMENTED;
+	acpi_status                     status = AE_OK;
 	union acpi_operand_object       *table_desc = ddb_handle;
 	struct acpi_table_desc          *table_info;
 

@@ -55,9 +55,6 @@
 #include <asm/machdep.h>
 #include <asm/paca.h>
 
-void enable_irq(unsigned int irq_nr);
-void disable_irq(unsigned int irq_nr);
-
 #ifdef CONFIG_SMP
 extern void iSeries_smp_message_recv( struct pt_regs * );
 #endif
@@ -123,7 +120,7 @@ setup_irq(unsigned int irq, struct irqaction * new)
 
 	if (!shared) {
 		desc->depth = 0;
-		desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING);
+		desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING | IRQ_INPROGRESS);
 		unmask_irq(irq);
 	}
 	spin_unlock_irqrestore(&desc->lock,flags);
@@ -139,6 +136,8 @@ inline void synchronize_irq(unsigned int irq)
 	while (irq_desc[irq].status & IRQ_INPROGRESS)
 		cpu_relax();
 }
+
+EXPORT_SYMBOL(synchronize_irq);
 
 #endif /* CONFIG_SMP */
 
@@ -244,7 +243,7 @@ EXPORT_SYMBOL(free_irq);
  *	This function may be called from IRQ context.
  */
  
- void disable_irq_nosync(unsigned int irq)
+inline void disable_irq_nosync(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
@@ -257,6 +256,8 @@ EXPORT_SYMBOL(free_irq);
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
+
+EXPORT_SYMBOL(disable_irq_nosync);
 
 /**
  *	disable_irq - disable an irq and wait for completion
@@ -273,9 +274,13 @@ EXPORT_SYMBOL(free_irq);
  
 void disable_irq(unsigned int irq)
 {
+	irq_desc_t *desc = irq_desc + irq;
 	disable_irq_nosync(irq);
-	synchronize_irq(irq);
+	if (desc->action)
+		synchronize_irq(irq);
 }
+
+EXPORT_SYMBOL(disable_irq);
 
 /**
  *	enable_irq - enable interrupt handling on an irq
@@ -295,7 +300,7 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = desc->status & ~IRQ_DISABLED;
+		unsigned int status = desc->status & ~(IRQ_DISABLED | IRQ_INPROGRESS);
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;
@@ -308,10 +313,13 @@ void enable_irq(unsigned int irq)
 		desc->depth--;
 		break;
 	case 0:
-		printk("enable_irq(%u) unbalanced\n", irq);
+		printk("enable_irq(%u) unbalanced from %p\n", irq,
+		       __builtin_return_address(0));
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
+
+EXPORT_SYMBOL(enable_irq);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
@@ -668,7 +676,7 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 static unsigned int parse_hex_value (const char *buffer,
 		unsigned long count, cpumask_t *ret)
 {
-	unsigned char hexnum [HEX_DIGITS];
+	unsigned char hexnum[HEX_DIGITS];
 	cpumask_t value = CPU_MASK_NONE;
 	int i;
 
@@ -680,7 +688,7 @@ static unsigned int parse_hex_value (const char *buffer,
 		return -EFAULT;
 
 	/*
-	 * Parse the first 16 characters as a hex string, any non-hex char
+	 * Parse the first HEX_DIGITS characters as a hex string, any non-hex char
 	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
 	 */
 
@@ -699,7 +707,6 @@ static unsigned int parse_hex_value (const char *buffer,
 		for (k = 0; k < 4; ++k)
 			if (test_bit(k, (unsigned long *)&c))
 				cpu_set(k, value);
-
 	}
 out:
 	*ret = value;
@@ -716,6 +723,8 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 		return -EIO;
 
 	err = parse_hex_value(buffer, count, &new_value);
+	if (err)
+		return err;
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
@@ -741,7 +750,7 @@ static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 	return sprintf (page, "%08lx\n", *mask);
 }
 
-static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
+static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
 					unsigned long count, void *data)
 {
 	cpumask_t *mask = (cpumask_t *)data;
@@ -789,10 +798,12 @@ static void register_irq_proc (unsigned int irq)
 	/* create /proc/irq/1234/smp_affinity */
 	entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
 
-	entry->nlink = 1;
-	entry->data = (void *)(long)irq;
-	entry->read_proc = irq_affinity_read_proc;
-	entry->write_proc = irq_affinity_write_proc;
+	if (entry) {
+		entry->nlink = 1;
+		entry->data = (void *)(long)irq;
+		entry->read_proc = irq_affinity_read_proc;
+		entry->write_proc = irq_affinity_write_proc;
+	}
 
 	smp_affinity_entry[irq] = entry;
 }
@@ -809,6 +820,9 @@ void init_irq_proc (void)
 
 	/* create /proc/irq/prof_cpu_mask */
 	entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir);
+
+	if (!entry)
+		return;
 
 	entry->nlink = 1;
 	entry->data = (void *)&prof_cpu_mask;

@@ -237,17 +237,17 @@
 #define __NR_epoll_wait			1245
 #define __NR_restart_syscall		1246
 #define __NR_semtimedop			1247
-#define __NR_sys_timer_create		1248
-#define __NR_sys_timer_settime		1249
-#define __NR_sys_timer_gettime		1250
-#define __NR_sys_timer_getoverrun	1251
-#define __NR_sys_timer_delete		1252
-#define __NR_sys_clock_settime		1253
-#define __NR_sys_clock_gettime		1254
-#define __NR_sys_clock_getres		1255
-#define __NR_sys_clock_nanosleep	1256
-#define __NR_sys_fstatfs64		1257
-#define __NR_sys_statfs64		1258
+#define __NR_timer_create		1248
+#define __NR_timer_settime		1249
+#define __NR_timer_gettime		1250
+#define __NR_timer_getoverrun		1251
+#define __NR_timer_delete		1252
+#define __NR_clock_settime		1253
+#define __NR_clock_gettime		1254
+#define __NR_clock_getres		1255
+#define __NR_clock_nanosleep		1256
+#define __NR_fstatfs64			1257
+#define __NR_statfs64			1258
 
 #ifdef __KERNEL__
 
