@@ -34,6 +34,7 @@
 #include <asm/io.h>
 #include <asm/delay.h>
 #include <asm/uaccess.h>
+#include <asm/msr.h>
 
 #include <linux/acpi.h>
 #include <acpi/processor.h>
@@ -58,6 +59,48 @@ struct cpufreq_acpi_io {
 
 static struct cpufreq_acpi_io	*acpi_io_data[NR_CPUS];
 
+enum {
+	FFH_NOT_PRESENT,
+	FFH_INTEL_EST,
+};
+
+static int
+acpi_processor_ffh_capability(unsigned int cpu)
+{
+		struct cpuinfo_x86 *c = cpu_data + cpu;
+
+		if (cpu_has(c, X86_FEATURE_EST))
+			return FFH_INTEL_EST;
+		return FFH_NOT_PRESENT;
+}
+
+
+static int
+acpi_processor_write_ffh_est(
+	u32	msr_addr,
+	u8	bit_width,
+	u32	value)
+{
+	msr_addr = MSR_IA32_PERF_CTL;
+	bit_width = 0x10;
+	wrmsr(msr_addr, value & ((1U << bit_width) - 1), 0);
+	return 0;
+}
+
+
+static int
+acpi_processor_write_ffh(
+	u32	hw_addr,
+	u8	bit_width,
+	u32	value)
+{
+	switch(acpi_processor_ffh_capability(smp_processor_id())) {
+	    case FFH_INTEL_EST:
+		return acpi_processor_write_ffh_est(hw_addr, bit_width, value);
+	}
+	return -ENODEV;
+}
+
 
 static int
 acpi_processor_write_port(
@@ -76,6 +119,55 @@ acpi_processor_write_port(
 	}
 	return 0;
 }
+
+
+static int
+acpi_processor_write_pstate(
+	u8	space_id,
+	u64	port,
+	u8	bit_width,
+	u32	value)
+{
+	switch(space_id) {
+	    case ACPI_ADR_SPACE_SYSTEM_IO:
+		return acpi_processor_write_port(port, bit_width, value);
+	    case ACPI_ADR_SPACE_FIXED_HARDWARE:
+		return acpi_processor_write_ffh(port, bit_width, value);
+	    default:
+		return -ENODEV;
+	}
+}
+
+
+static int
+acpi_processor_read_ffh_est(
+	u32	msr_addr,
+	u8	bit_width,
+	u32	*ret)
+{
+	u32 unused_hi;
+
+	msr_addr = MSR_IA32_PERF_STATUS;
+	bit_width = 0x10;
+	rdmsr(msr_addr, *ret, unused_hi);
+	*ret = (*ret) & ((1U << bit_width) - 1);
+	return 0;
+}
+
+
+static int
+acpi_processor_read_ffh(
+	u32	hw_addr,
+	u8	bit_width,
+	u32	*ret)
+{
+	switch(acpi_processor_ffh_capability(smp_processor_id())) {
+	    case FFH_INTEL_EST:
+		return acpi_processor_read_ffh_est(hw_addr, bit_width, ret);
+	}
+	return -ENODEV;
+}
+
 
 static int
 acpi_processor_read_port(
@@ -96,25 +188,59 @@ acpi_processor_read_port(
 	return 0;
 }
 
+
+static int
+acpi_processor_read_pstate(
+	u8      space_id,
+	u64     port,
+	u8      bit_width,
+	u32     *ret)
+{
+	switch(space_id) {
+		case ACPI_ADR_SPACE_SYSTEM_IO:
+			return acpi_processor_read_port(port, bit_width, ret);
+		case ACPI_ADR_SPACE_FIXED_HARDWARE:
+			return acpi_processor_read_ffh(port, bit_width, ret);
+		default:
+			return -ENODEV;
+	}
+}
+
+
 static int
 acpi_processor_set_performance (
 	struct cpufreq_acpi_io	*data,
 	unsigned int		cpu,
 	int			state)
 {
-	u16			port = 0;
+	u64			port = 0;
+	u8			space_id;
 	u8			bit_width = 0;
 	int			ret = 0;
 	u32			value = 0;
 	int			i = 0;
 	struct cpufreq_freqs    cpufreq_freqs;
+	cpumask_t		saved_mask;
+	int			retval;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_set_performance");
 
+	/*
+	 * TBD: Use something other than set_cpus_allowed.
+	 * As set_cpus_allowed is a bit racy, 
+	 * with any other set_cpus_allowed for this process.
+	 */
+	saved_mask = current->cpus_allowed;
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	if (smp_processor_id() != cpu) {
+		return_VALUE(-EAGAIN);
+	}
+	
 	if (state == data->acpi_data.state) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 			"Already at target state (P%d)\n", state));
-		return_VALUE(0);
+		retval = 0;
+		goto migrate_end;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Transitioning from P%d to P%d\n",
@@ -133,18 +259,20 @@ acpi_processor_set_performance (
 	 * control_register.
 	 */
 
+	space_id = data->acpi_data.control_register.space_id;
 	port = data->acpi_data.control_register.address;
 	bit_width = data->acpi_data.control_register.bit_width;
 	value = (u32) data->acpi_data.states[state].control;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Writing 0x%08x to port 0x%04x\n", value, port));
+		"Writing 0x%08x to port 0x%Lx\n", value, port));
 
-	ret = acpi_processor_write_port(port, bit_width, value);
+	ret = acpi_processor_write_pstate(space_id, port, bit_width, value);
 	if (ret) {
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN,
-			"Invalid port width 0x%04x\n", bit_width));
-		return_VALUE(ret);
+			"Frequency change attempt failed\n"));
+		retval = ret;
+		goto migrate_end;
 	}
 
 	/*
@@ -154,19 +282,21 @@ acpi_processor_set_performance (
 	 * giving up.
 	 */
 
+	space_id = data->acpi_data.control_register.space_id;
 	port = data->acpi_data.status_register.address;
 	bit_width = data->acpi_data.status_register.bit_width;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Looking for 0x%08x from port 0x%04x\n",
+		"Looking for 0x%x from port 0x%Lx\n",
 		(u32) data->acpi_data.states[state].status, port));
 
 	for (i=0; i<100; i++) {
-		ret = acpi_processor_read_port(port, bit_width, &value);
+		ret = acpi_processor_read_pstate(space_id, port, bit_width, &value);
 		if (ret) {	
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
-				"Invalid port width 0x%04x\n", bit_width));
-			return_VALUE(ret);
+				"Frequency status read attempt failed\n"));
+			retval = ret;
+			goto migrate_end;
 		}
 		if (value == (u32) data->acpi_data.states[state].status)
 			break;
@@ -183,7 +313,8 @@ acpi_processor_set_performance (
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_PRECHANGE);
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Transition failed\n"));
-		return_VALUE(-ENODEV);
+		retval = -ENODEV;
+		goto migrate_end;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
@@ -192,7 +323,10 @@ acpi_processor_set_performance (
 
 	data->acpi_data.state = state;
 
-	return_VALUE(0);
+	retval = 0;
+migrate_end:
+	set_cpus_allowed(current, saved_mask);
+	return_VALUE(retval);
 }
 
 
@@ -219,6 +353,66 @@ acpi_cpufreq_target (
 	result = acpi_processor_set_performance (data, policy->cpu, next_state);
 
 	return_VALUE(result);
+}
+
+
+static void acpi_processor_cpu_init_pdc_est(struct acpi_processor_performance *perf, unsigned int cpu)
+{
+	struct acpi_object_list *obj_list;
+	union acpi_object *obj;
+	u32 *buf;
+	struct cpuinfo_x86 *c = cpu_data + cpu;
+	ACPI_FUNCTION_TRACE("acpi_processor_est_init_pdc");
+
+	if (!cpu_has(c, X86_FEATURE_EST))
+		return_VOID;
+
+	/* allocate and initialize pdc. It will be used later. */
+	obj_list = (struct acpi_object_list *)kmalloc(sizeof(struct acpi_object_list), GFP_KERNEL);
+	if (!obj_list) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "kmalloc for _PDC failed\n"));
+		return_VOID;
+	}
+
+	obj = (union acpi_object *)kmalloc(sizeof(union acpi_object), GFP_KERNEL);
+	if (!obj) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "kmalloc for _PDC failed\n"));
+		kfree(obj_list);
+		return_VOID;
+	}
+
+	buf = (u32 *)kmalloc(12, GFP_KERNEL);
+	if (!buf) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "kmalloc for _PDC failed\n"));
+		kfree(obj);
+		kfree(obj_list);
+		return_VOID;
+	}
+
+	buf[0] = ACPI_PDC_REVISION_ID;
+	buf[1] = 1;
+	/*
+	 * Refer ACPI _PDC support document for bit definitions
+	 */
+	buf[2] = 0xb;
+	obj->type = ACPI_TYPE_BUFFER;
+	obj->buffer.length = 12;
+	obj->buffer.pointer = (u8 *)buf;
+	obj_list->count = 1;
+	obj_list->pointer = obj;
+	perf->pdc = obj_list;
+	return_VOID;
+}
+ 
+
+/* CPU specific PDC initialization */
+static void acpi_processor_cpu_init_pdc(struct acpi_processor_performance *perf, unsigned int cpu)
+{
+	struct cpuinfo_x86 *c = cpu_data + cpu;
+	ACPI_FUNCTION_TRACE("acpi_processor_cpu_init_pdc");
+	if (cpu_has(c, X86_FEATURE_EST))
+		acpi_processor_cpu_init_pdc_est(perf, cpu);
+	return_VOID;
 }
 
 
@@ -256,6 +450,8 @@ acpi_cpufreq_cpu_init (
 
 	acpi_io_data[cpu] = data;
 
+	acpi_processor_cpu_init_pdc(&data->acpi_data, cpu);
+
 	result = acpi_processor_register_performance(&data->acpi_data, cpu);
 	if (result)
 		goto err_free;
@@ -268,11 +464,15 @@ acpi_cpufreq_cpu_init (
 	}
 	if ((data->acpi_data.control_register.space_id != ACPI_ADR_SPACE_SYSTEM_IO) ||
 	    (data->acpi_data.status_register.space_id != ACPI_ADR_SPACE_SYSTEM_IO)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unsupported address space [%d, %d]\n",
+		if (!((data->acpi_data.control_register.space_id == ACPI_ADR_SPACE_FIXED_HARDWARE) &&
+	    	      (data->acpi_data.status_register.space_id == ACPI_ADR_SPACE_FIXED_HARDWARE)) && 
+		      (acpi_processor_ffh_capability(cpu) != FFH_NOT_PRESENT)) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unsupported address space [%d, %d]\n",
 				  (u32) (data->acpi_data.control_register.space_id),
 				  (u32) (data->acpi_data.status_register.space_id)));
-		result = -ENODEV;
-		goto err_unreg;
+			result = -ENODEV;
+			goto err_unreg;
+		}
 	}
 
 	/* alloc freq_table */

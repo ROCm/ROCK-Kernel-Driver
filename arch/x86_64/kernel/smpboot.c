@@ -813,6 +813,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	x86_cpu_to_apicid[0] = boot_cpu_id;
 
+	x86_cpu_to_apicid[0] = boot_cpu_id;
+
 	/*
 	 * Now scan the CPU present map and fire up the other CPUs.
 	 */
