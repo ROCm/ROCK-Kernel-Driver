@@ -432,7 +432,6 @@ EXPORT_SYMBOL(probe_irq_off);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(del_timer_sync);
 #endif
-EXPORT_SYMBOL(add_timer);
 EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(mod_timer);
 EXPORT_SYMBOL(__mod_timer);
