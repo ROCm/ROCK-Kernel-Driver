@@ -2030,7 +2030,6 @@ static int init_planb(struct planb *pb)
 {
 	unsigned char saa_rev;
 	int i, result;
-	unsigned long flags;
 
 	memset ((void *) &pb->win, 0, sizeof (struct planb_window));
 	/* Simple sanity check */
@@ -2096,7 +2095,6 @@ static int init_planb(struct planb *pb)
 	/* clear interrupt mask */
 	pb->intr_mask = PLANB_CLR_IRQ;
 
-	save_flags(flags); cli();
         result = request_irq(pb->irq, planb_irq, 0, "PlanB", (void *)pb);
         if (result < 0) {
 	        if (result==-EINVAL)
@@ -2105,11 +2103,9 @@ static int init_planb(struct planb *pb)
 		else if (result==-EBUSY)
 			printk(KERN_ERR "PlanB: I don't know why, "
 					"but IRQ %d is busy\n", (int)pb->irq);
-		restore_flags(flags);
 		return result;
 	}
 	disable_irq(pb->irq);
-	restore_flags(flags);
         
 	/* Now add the template and register the device unit. */
 	memcpy(&pb->video_dev,&planb_template,sizeof(planb_template));
