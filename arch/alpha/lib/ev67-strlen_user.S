@@ -30,7 +30,7 @@
 #define EX(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda v0, $exception-99b(zero);	\
 	.previous
 
@@ -56,9 +56,7 @@ __strlen_user:
 
 	.align 4
 __strnlen_user:
-	ldgp	$29,0($27)	# E E : we do exceptions -- we need the gp.
-				/* Decomposes into lda/ldah */
-	.prologue 1
+	.prologue 0
 	EX( ldq_u t0, 0(a0) )	# L : load first quadword (a0 may be misaligned)
 	lda     t1, -1(zero)	# E :
 

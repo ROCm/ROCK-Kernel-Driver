@@ -638,7 +638,7 @@ do_entUna(void * va, unsigned long opcode, unsigned long reg,
 got_exception:
 	/* Ok, we caught the exception, but we don't want it.  Is there
 	   someone to pass it along to?  */
-	if ((fixup = search_exception_table(pc, regs.gp)) != 0) {
+	if ((fixup = search_exception_table(pc)) != 0) {
 		unsigned long newpc;
 		newpc = fixup_exception(una_reg, fixup, pc);
 

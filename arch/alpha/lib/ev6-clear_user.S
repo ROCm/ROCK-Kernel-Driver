@@ -47,7 +47,7 @@
 #define EX(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda $31, $exception-99b($31); 	\
 	.previous
 
@@ -62,9 +62,6 @@
 
 				# Pipeline info : Slotting & Comments
 __do_clear_user:
-	ldgp	$29,0($27)	# we do exceptions -- we need the gp.
-				# Macro instruction becomes ldah/lda
-				# .. .. E  E	:
 	and	$6, 7, $4	# .. E  .. ..	: find dest head misalignment
 	beq	$0, $zerolength # U  .. .. ..	:  U L U L
 
