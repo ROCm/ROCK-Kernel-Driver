@@ -213,6 +213,16 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 			fl->proto = nexthdr;
 			return;
 
+		case IPPROTO_ICMPV6:
+			if (pskb_may_pull(skb, skb->nh.raw + offset + 2 - skb->data)) {
+				u8 *icmp = (u8 *)exthdr;
+
+				fl->fl_icmp_type = icmp[0];
+				fl->fl_icmp_code = icmp[1];
+			}
+			fl->proto = nexthdr;
+			return;
+
 		/* XXX Why are there these headers? */
 		case IPPROTO_AH:
 		case IPPROTO_ESP:
