@@ -65,7 +65,7 @@
 
 
 #define DRIVER_DESC	"USB Host+Gadget Emulator"
-#define DRIVER_VERSION	"14 Mar 2004"
+#define DRIVER_VERSION	"29 Oct 2004"
 
 static const char	driver_name [] = "dummy_hcd";
 static const char	driver_desc [] = "USB Host+Gadget Emulator";
@@ -161,11 +161,9 @@ struct dummy {
 	 * MASTER/HOST side support
 	 */
 	struct usb_hcd			hcd;
-	struct platform_device		pdev;
 	struct timer_list		timer;
 	u32				port_status;
-	int				started;
-	struct completion		released;
+	unsigned			started:1;
 	unsigned			resuming:1;
 	unsigned long			re_timeout;
 
@@ -179,7 +177,7 @@ static inline struct dummy *hcd_to_dummy (struct usb_hcd *hcd)
 
 static inline struct device *dummy_dev (struct dummy *dum)
 {
-	return &dum->pdev.dev;
+	return dum->hcd.self.controller;
 }
 
 static inline struct dummy *ep_to_dummy (struct dummy_ep *ep)
@@ -197,7 +195,7 @@ static inline struct dummy *gadget_dev_to_dummy (struct device *dev)
 	return container_of (dev, struct dummy, gadget.dev);
 }
 
-static struct dummy	*the_controller;
+static struct dummy			*the_controller;
 
 /*-------------------------------------------------------------------------*/
 
@@ -205,6 +203,7 @@ static struct dummy	*the_controller;
  * This "hardware" may look a bit odd in diagnostics since it's got both
  * host and device sides; and it binds different drivers to each side.
  */
+static struct platform_device		the_pdev;
 
 static struct device_driver dummy_driver = {
 	.name		= (char *) driver_name,
@@ -654,17 +653,11 @@ DEVICE_ATTR (function, S_IRUGO, show_function, NULL);
 static void
 dummy_udc_release (struct device *dev)
 {
-	struct dummy	*dum = gadget_dev_to_dummy (dev);
-
-	complete (&dum->released);
 }
 
 static void
-dummy_hc_release (struct device *dev)
+dummy_pdev_release (struct device *dev)
 {
-	struct dummy	*dum = dev_get_drvdata (dev);
-
-	complete (&dum->released);
 }
 
 static int
@@ -686,9 +679,7 @@ static void
 dummy_unregister_udc (struct dummy *dum)
 {
 	device_remove_file (&dum->gadget.dev, &dev_attr_function);
-	init_completion (&dum->released);
 	device_unregister (&dum->gadget.dev);
-	wait_for_completion (&dum->released);
 }
 
 int
@@ -1571,7 +1562,8 @@ static struct usb_hcd *dummy_alloc (void)
 
 	dum = kmalloc (sizeof *dum, SLAB_KERNEL);
 	if (dum == NULL)
-		return 0;
+		return NULL;
+	the_controller = dum;
 	memset (dum, 0, sizeof *dum);
 	return &dum->hcd;
 }
@@ -1583,6 +1575,7 @@ static void dummy_free (struct usb_hcd *hcd)
 	dum = hcd_to_dummy (hcd);
 	WARN_ON (dum->driver != 0);
 	kfree (dum);
+	the_controller = NULL;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1616,7 +1609,8 @@ show_urb (char *buf, size_t size, struct urb *urb)
 static ssize_t
 show_urbs (struct device *dev, char *buf)
 {
-	struct dummy		*dum = dev_get_drvdata(dev);
+	struct usb_hcd		*hcd = dev_get_drvdata (dev);
+	struct dummy		*dum = hcd_to_dummy (hcd);
 	struct urb		*urb;
 	size_t			size = 0;
 	unsigned long		flags;
@@ -1639,13 +1633,9 @@ show_urbs (struct device *dev, char *buf)
 }
 static DEVICE_ATTR (urbs, S_IRUGO, show_urbs, NULL);
 
-
-static const struct hc_driver dummy_hcd;
-
 static int dummy_start (struct usb_hcd *hcd)
 {
 	struct dummy		*dum;
-	struct usb_bus		*bus;
 	struct usb_device	*root;
 	int			retval;
 
@@ -1658,66 +1648,13 @@ static int dummy_start (struct usb_hcd *hcd)
 	 */
 	spin_lock_init (&dum->lock);
 
-	retval = driver_register (&dummy_driver);
-	if (retval < 0)
-		return retval;
-
-	dum->pdev.name = "hc";
-	dum->pdev.dev.driver = &dummy_driver;
-	dev_set_drvdata(&dum->pdev.dev, dum);
-	dum->pdev.dev.release = dummy_hc_release;
-	retval = platform_device_register (&dum->pdev);
-	if (retval < 0) {
-		driver_unregister (&dummy_driver);
-		return retval;
-	}
-	dev_info (dummy_dev(dum), "%s, driver " DRIVER_VERSION "\n",
-			driver_desc);
-
-	hcd->self.controller = &dum->pdev.dev;
-
-	/* FIXME 'urbs' should be a per-device thing, maybe in usbcore */
-	device_create_file (dummy_dev(dum), &dev_attr_urbs);
-
 	init_timer (&dum->timer);
 	dum->timer.function = dummy_timer;
 	dum->timer.data = (unsigned long) dum;
 
-	/* root hub will appear as another device */
-	hcd->driver = (struct hc_driver *) &dummy_hcd;
-	hcd->description = dummy_hcd.description;
-	hcd->product_desc = "Dummy host controller";
-
-	bus = hcd_to_bus (hcd);
-	bus->bus_name = dummy_dev(dum)->bus_id;
-	usb_bus_init (bus);
-	bus->op = &usb_hcd_operations;
-	bus->hcpriv = &dum->hcd;
-
-	/* FIXME don't require the pci-based buffer/alloc impls;
-	 * the "generic dma" implementation still requires them,
-	 * it's not very generic yet.
-	 */
-	if ((retval = hcd_buffer_create (hcd)) != 0) {
-clean0:
-		init_completion (&dum->released);
-		platform_device_unregister (&dum->pdev);
-		wait_for_completion (&dum->released);
-		driver_unregister (&dummy_driver);
-		return retval;
-	}
-
-	INIT_LIST_HEAD (&hcd->dev_list);
-	usb_register_bus (bus);
-
-	root = usb_alloc_dev (0, bus, 0);
-	if (!root) {
-		retval = -ENOMEM;
-clean1:
-		hcd_buffer_destroy (hcd);
-		usb_deregister_bus (bus);
-		goto clean0;
-	}
+	root = usb_alloc_dev (0, &hcd->self, 0);
+	if (!root)
+		return -ENOMEM;
 
 	/* root hub enters addressed state... */
 	hcd->state = USB_STATE_RUNNING;
@@ -1726,53 +1663,41 @@ clean1:
 	/* ...then configured, so khubd sees us. */
 	if ((retval = hcd_register_root (root, hcd)) != 0) {
 		usb_put_dev (root);
-clean2:
+clean:
 		hcd->state = USB_STATE_QUIESCING;
-		goto clean1;
+		return retval;
 	}
 
 	/* only show a low-power port: just 8mA */
 	hub_set_power_budget (root, 8);
 
-	dum->started = 1;
-
 	if ((retval = dummy_register_udc (dum)) != 0) {
-		dum->started = 0;
-		usb_disconnect (&bus->root_hub);
-		goto clean2;
+		usb_disconnect (&hcd->self.root_hub);
+		goto clean;
 	}
+
+	/* FIXME 'urbs' should be a per-device thing, maybe in usbcore */
+	device_create_file (dummy_dev(dum), &dev_attr_urbs);
+
+	dum->started = 1;
 	return 0;
 }
 
 static void dummy_stop (struct usb_hcd *hcd)
 {
 	struct dummy		*dum;
-	struct usb_bus		*bus;
 
 	dum = hcd_to_dummy (hcd);
 	if (!dum->started)
 		return;
 	dum->started = 0;
 
+	device_remove_file (dummy_dev(dum), &dev_attr_urbs);
+
 	usb_gadget_unregister_driver (dum->driver);
 	dummy_unregister_udc (dum);
 
-	bus = hcd_to_bus (hcd);
-	hcd->state = USB_STATE_QUIESCING;
-	dev_dbg (dummy_dev(dum), "remove root hub\n");
-	usb_disconnect (&bus->root_hub);
-
-	hcd_buffer_destroy (hcd);
-	usb_deregister_bus (bus);
-
 	dev_info (dummy_dev(dum), "stopped\n");
-
-	device_remove_file (hcd->self.controller, &dev_attr_urbs);
-	init_completion (&dum->released);
-	platform_device_unregister (&dum->pdev);
-	wait_for_completion (&dum->released);
-
-	driver_unregister (&dummy_driver);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1801,33 +1726,128 @@ static const struct hc_driver dummy_hcd = {
 	.hub_control = 		dummy_hub_control,
 };
 
+static void dummy_remove (struct device *dev);
+
+static int dummy_probe (struct device *dev)
+{
+	struct usb_hcd		*hcd;
+	struct dummy		*dum;
+	int			retval;
+
+	dev_info (dev, "%s, driver " DRIVER_VERSION "\n", driver_desc);
+
+	hcd = dummy_alloc ();
+	if (hcd == NULL) {
+		dev_dbg (dev, "hcd_alloc failed\n");
+		return -ENOMEM;
+	}
+
+	dev_set_drvdata (dev, hcd);
+	dum = hcd_to_dummy (hcd);
+
+	hcd->driver = (struct hc_driver *) &dummy_hcd;
+	hcd->description = dummy_hcd.description;
+	hcd->self.controller = dev;
+
+	/* FIXME don't require the pci-based buffer/alloc impls;
+	 * the "generic dma" implementation still requires them,
+	 * it's not very generic yet.
+	 */
+	retval = hcd_buffer_create (hcd);
+	if (retval != 0) {
+		dev_dbg (dev, "pool alloc failed\n");
+		goto err1;
+	}
+
+	usb_bus_init (&hcd->self);
+	hcd->self.op = &usb_hcd_operations;
+	hcd->self.hcpriv = hcd;
+	hcd->self.bus_name = dev->bus_id;
+	hcd->product_desc = "Dummy host controller";
+
+	INIT_LIST_HEAD (&hcd->dev_list);
+
+	usb_register_bus (&hcd->self);
+
+	if ((retval = dummy_start (hcd)) < 0) 
+		dummy_remove (dev);
+	return retval;
+
+err1:
+	hcd->driver->hcd_free (hcd);
+	dev_set_drvdata (dev, NULL);
+	return retval;
+}
+
+static void dummy_remove (struct device *dev)
+{
+	struct usb_hcd		*hcd;
+	struct dummy		*dum;
+
+	hcd = dev_get_drvdata (dev);
+	dum = hcd_to_dummy (hcd);
+
+	hcd->state = USB_STATE_QUIESCING;
+
+	dev_dbg (dev, "roothub graceful disconnect\n");
+	usb_disconnect (&hcd->self.root_hub);
+
+	hcd->driver->stop (hcd);
+	hcd->state = USB_STATE_HALT;
+
+	hcd_buffer_destroy (hcd);
+
+	dev_set_drvdata (dev, NULL);
+	usb_deregister_bus (&hcd->self);
+
+	hcd->driver->hcd_free (hcd);
+}
+
+/*-------------------------------------------------------------------------*/
+
+static int dummy_pdev_detect (void)
+{
+	int			retval;
+
+	retval = driver_register (&dummy_driver);
+	if (retval < 0)
+		return retval;
+
+	the_pdev.name = "hc";
+	the_pdev.dev.driver = &dummy_driver;
+	the_pdev.dev.release = dummy_pdev_release;
+
+	retval = platform_device_register (&the_pdev);
+	if (retval < 0)
+		driver_unregister (&dummy_driver);
+	return retval;
+}
+
+static void dummy_pdev_remove (void)
+{
+	platform_device_unregister (&the_pdev);
+	driver_unregister (&dummy_driver);
+}
+
 /*-------------------------------------------------------------------------*/
 
 static int __init init (void)
 {
-	struct usb_hcd		*hcd;
-	int			value;
+	int	retval;
 
 	if (usb_disabled ())
 		return -ENODEV;
-	if ((hcd = dummy_alloc ()) == 0)
-		return -ENOMEM;
-
-	the_controller = hcd_to_dummy (hcd);
-	value = dummy_start (hcd);
-
-	if (value != 0) {
-		dummy_free (hcd);
-		the_controller = 0;
-	}
-	return value;
+	if ((retval = dummy_pdev_detect ()) != 0)
+		return retval;
+	if ((retval = dummy_probe (&the_pdev.dev)) != 0)
+		dummy_pdev_remove ();
+	return retval;
 }
 module_init (init);
 
 static void __exit cleanup (void)
 {
-	dummy_stop (&the_controller->hcd);
-	dummy_free (&the_controller->hcd);
-	the_controller = 0;
+	dummy_remove (&the_pdev.dev);
+	dummy_pdev_remove ();
 }
 module_exit (cleanup);
