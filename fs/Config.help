@@ -950,6 +950,33 @@ CONFIG_VXFS_FS
   module, say M here and read <file:Documentation/modules.txt>.  If
   unsure, say N.
 
+CIFS (Common Internet File System) support
+CONFIG_CIFS
+  This is the client VFS module for the Common Internet File System
+  (CIFS) protocol which is the successor to the Server Message Block 
+  (SMB) protocol, the native file sharing mechanism for most early
+  PC operating systems.  CIFS is fully supported by current network
+  file servers such as Windows 2000 (including Windows NT version 4 
+  and Windows XP) as well by Samba (which provides excellent CIFS
+  server support for Linux and many other operating systems).  For
+  production systems the smbfs module may be used instead of this
+  cifs module since smbfs is currently more stable and provides
+  support for older servers.  The intent of this module is to provide the
+  most advanced network file system function for CIFS compliant servers, 
+  including support for dfs (heirarchical name space), secure per-user
+  session establishment, safe distributed caching (oplock), optional
+  packet signing, Unicode and other internationalization improvements, and
+  optional Winbind (nsswitch) integration.  This module is in an early
+  development stage, so unless you are specifically interested in this
+  filesystem, just say N.
+
+CIFS Debugging
+CONFIG_CIFS_DEBUG
+  If you are experiencing any problems with the CIFS filesystem, say
+  Y here.  This will result in additional debugging messages to be
+  written to the system log.  Under normal circumstances, this
+  results in very little overhead.  
+
 CONFIG_SMB_FS
   SMB (Server Message Block) is the protocol Windows for Workgroups
   (WfW), Windows 95/98, Windows NT and OS/2 Lan Manager use to share

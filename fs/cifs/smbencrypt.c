@@ -1,0 +1,454 @@
+/* 
+   Unix SMB/Netbios implementation.
+   Version 1.9.
+   SMB parameters and setup
+   Copyright (C) Andrew Tridgell 1992-2000
+   Copyright (C) Luke Kenneth Casson Leighton 1996-2000
+   Modified by Jeremy Allison 1995.
+   Modified by Steve French (sfrench@us.ibm.com) 2002
+   
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2 of the License, or
+   (at your option) any later version.
+   
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+   
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+*/
+
+extern int DEBUGLEVEL;
+
+#include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/string.h>
+#include <linux/kernel.h>
+#include <linux/random.h>
+#include "cifs_unicode.h"
+#include "cifspdu.h"
+#include "md5.h"
+#include "cifs_debug.h"
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+/* following came from the other byteorder.h to avoid include conflicts */
+#define CVAL(buf,pos) (((unsigned char *)(buf))[pos])
+#define SSVALX(buf,pos,val) (CVAL(buf,pos)=(val)&0xFF,CVAL(buf,pos+1)=(val)>>8)
+#define SIVALX(buf,pos,val) (SSVALX(buf,pos,val&0xFFFF),SSVALX(buf,pos+2,val>>16))
+#define SSVAL(buf,pos,val) SSVALX((buf),(pos),((__u16)(val)))
+#define SIVAL(buf,pos,val) SIVALX((buf),(pos),((__u32)(val)))
+
+/*The following definitions come from  lib/md4.c  */
+
+void mdfour(unsigned char *out, unsigned char *in, int n);
+
+/*The following definitions come from  libsmb/smbdes.c  */
+
+void E_P16(unsigned char *p14, unsigned char *p16);
+void E_P24(unsigned char *p21, unsigned char *c8, unsigned char *p24);
+void D_P16(unsigned char *p14, unsigned char *in, unsigned char *out);
+void E_old_pw_hash(unsigned char *p14, unsigned char *in, unsigned char *out);
+void cred_hash1(unsigned char *out, unsigned char *in, unsigned char *key);
+void cred_hash2(unsigned char *out, unsigned char *in, unsigned char *key);
+void cred_hash3(unsigned char *out, unsigned char *in, unsigned char *key,
+		int forw);
+void SamOEMhash(unsigned char *data, unsigned char *key, int val);
+
+/*The following definitions come from  libsmb/smbencrypt.c  */
+
+void SMBencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24);
+void E_md4hash(const unsigned char *passwd, unsigned char *p16);
+void nt_lm_owf_gen(char *pwd, unsigned char nt_p16[16], unsigned char p16[16]);
+void SMBOWFencrypt(unsigned char passwd[16], unsigned char *c8,
+		   unsigned char p24[24]);
+void NTLMSSPOWFencrypt(unsigned char passwd[8],
+		       unsigned char *ntlmchalresp, unsigned char p24[24]);
+void SMBNTencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24);
+int make_oem_passwd_hash(char data[516], const char *passwd,
+			 unsigned char old_pw_hash[16], int unicode);
+int decode_pw_buffer(char in_buffer[516], char *new_pwrd,
+		     int new_pwrd_size, __u32 * new_pw_len);
+
+/*
+   This implements the X/Open SMB password encryption
+   It takes a password, a 8 byte "crypt key" and puts 24 bytes of 
+   encrypted password into p24 */
+/* Note that password must be uppercased and null terminated */
+void
+SMBencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24)
+{
+	unsigned char p14[15], p21[21];
+
+	memset(p21, '\0', 21);
+	memset(p14, '\0', 14);
+	strncpy((char *) p14, (char *) passwd, 14);
+
+/*	strupper((char *)p14); *//* BB at least uppercase the easy range */
+	E_P16(p14, p21);
+
+	SMBOWFencrypt(p21, c8, p24);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("SMBencrypt: lm#, challenge, response\n"));
+	dump_data(100, (char *) p21, 16);
+	dump_data(100, (char *) c8, 8);
+	dump_data(100, (char *) p24, 24);
+#endif
+}
+
+/* Routines for Windows NT MD4 Hash functions. */
+static int
+_my_wcslen(__u16 * str)
+{
+	int len = 0;
+	while (*str++ != 0)
+		len++;
+	return len;
+}
+
+/*
+ * Convert a string into an NT UNICODE string.
+ * Note that regardless of processor type 
+ * this must be in intel (little-endian)
+ * format.
+ */
+
+static int
+_my_mbstowcs(__u16 * dst, const unsigned char *src, int len)
+{				/* not a very good conversion routine - change/fix */
+	int i;
+	__u16 val;
+
+	for (i = 0; i < len; i++) {
+		val = *src;
+		SSVAL(dst, 0, val);
+		dst++;
+		src++;
+		if (val == 0)
+			break;
+	}
+	return i;
+}
+
+/* 
+ * Creates the MD4 Hash of the users password in NT UNICODE.
+ */
+
+void
+E_md4hash(const unsigned char *passwd, unsigned char *p16)
+{
+	int len;
+	__u16 wpwd[129];
+
+	/* Password cannot be longer than 128 characters */
+	len = strlen((char *) passwd);
+	if (len > 128)
+		len = 128;
+	/* Password must be converted to NT unicode */
+	_my_mbstowcs(wpwd, passwd, len);
+	wpwd[len] = 0;		/* Ensure string is null terminated */
+	/* Calculate length in bytes */
+	len = _my_wcslen(wpwd) * sizeof (__u16);
+
+	mdfour(p16, (unsigned char *) wpwd, len);
+}
+
+/* Does both the NT and LM owfs of a user's password */
+void
+nt_lm_owf_gen(char *pwd, unsigned char nt_p16[16], unsigned char p16[16])
+{
+	char passwd[514];
+
+	memset(passwd, '\0', 514);
+	if (strlen(pwd) < 513)
+		strcpy(passwd, pwd);
+	else
+		memcpy(passwd, pwd, 512);
+	/* Calculate the MD4 hash (NT compatible) of the password */
+	memset(nt_p16, '\0', 16);
+	E_md4hash(passwd, nt_p16);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("nt_lm_owf_gen: pwd, nt#\n"));
+	dump_data(120, passwd, strlen(passwd));
+	dump_data(100, (char *) nt_p16, 16);
+#endif
+
+	/* Mangle the passwords into Lanman format */
+	passwd[14] = '\0';
+/*	strupper(passwd); */
+
+	/* Calculate the SMB (lanman) hash functions of the password */
+
+	memset(p16, '\0', 16);
+	E_P16((unsigned char *) passwd, (unsigned char *) p16);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("nt_lm_owf_gen: pwd, lm#\n"));
+	dump_data(120, passwd, strlen(passwd));
+	dump_data(100, (char *) p16, 16);
+#endif
+	/* clear out local copy of user's password (just being paranoid). */
+	memset(passwd, '\0', sizeof (passwd));
+}
+
+/* Does the NTLMv2 owfs of a user's password */
+void
+ntv2_owf_gen(const unsigned char owf[16], const char *user_n,
+	     const char *domain_n, unsigned char kr_buf[16],
+	     const struct nls_table *nls_codepage)
+{
+	wchar_t user_u[1024];
+	wchar_t dom_u[1024];
+	struct HMACMD5Context ctx;
+
+	/* push_ucs2(NULL, user_u, user_n, (user_l+1)*2, STR_UNICODE|STR_NOALIGN|STR_TERMINATE|STR_UPPER);
+	   push_ucs2(NULL, dom_u, domain_n, (domain_l+1)*2, STR_UNICODE|STR_NOALIGN|STR_TERMINATE|STR_UPPER); */
+
+    /* do not think it is supposed to be uppercased */
+	int user_l = cifs_strtoUCS(user_u, user_n, 511, nls_codepage);
+	int domain_l = cifs_strtoUCS(dom_u, domain_n, 511, nls_codepage);
+
+	user_l++;		/* trailing null */
+	domain_l++;
+
+	hmac_md5_init_limK_to_64(owf, 16, &ctx);
+	hmac_md5_update((const unsigned char *) user_u, user_l * 2, &ctx);
+	hmac_md5_update((const unsigned char *) dom_u, domain_l * 2, &ctx);
+	hmac_md5_final(kr_buf, &ctx);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("ntv2_owf_gen: user, domain, owfkey, kr\n"));
+	dump_data(100, user_u, user_l * 2);
+	dump_data(100, dom_u, domain_l * 2);
+	dump_data(100, owf, 16);
+	dump_data(100, kr_buf, 16);
+#endif
+}
+
+/* Does the des encryption from the NT or LM MD4 hash. */
+void
+SMBOWFencrypt(unsigned char passwd[16], unsigned char *c8,
+	      unsigned char p24[24])
+{
+	unsigned char p21[21];
+
+	memset(p21, '\0', 21);
+
+	memcpy(p21, passwd, 16);
+	E_P24(p21, c8, p24);
+}
+
+/* Does the des encryption from the FIRST 8 BYTES of the NT or LM MD4 hash. */
+void
+NTLMSSPOWFencrypt(unsigned char passwd[8],
+		  unsigned char *ntlmchalresp, unsigned char p24[24])
+{
+	unsigned char p21[21];
+
+	memset(p21, '\0', 21);
+	memcpy(p21, passwd, 8);
+	memset(p21 + 8, 0xbd, 8);
+
+	E_P24(p21, ntlmchalresp, p24);
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("NTLMSSPOWFencrypt: p21, c8, p24\n"));
+	dump_data(100, (char *) p21, 21);
+	dump_data(100, (char *) ntlmchalresp, 8);
+	dump_data(100, (char *) p24, 24);
+#endif
+}
+
+/* Does the NT MD4 hash then des encryption. */
+
+void
+SMBNTencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24)
+{
+	unsigned char p21[21];
+
+	memset(p21, '\0', 21);
+
+	E_md4hash(passwd, p21);
+	SMBOWFencrypt(p21, c8, p24);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("SMBNTencrypt: nt#, challenge, response\n"));
+	dump_data(100, (char *) p21, 16);
+	dump_data(100, (char *) c8, 8);
+	dump_data(100, (char *) p24, 24);
+#endif
+}
+
+int
+make_oem_passwd_hash(char data[516], const char *passwd,
+		     unsigned char old_pw_hash[16], int unicode)
+{
+	int new_pw_len = strlen(passwd) * (unicode ? 2 : 1);
+
+	if (new_pw_len > 512) {
+		cERROR(1,
+		       ("CIFS make_oem_passwd_hash: new password is too long.\n"));
+		return FALSE;
+	}
+
+	/*
+	 * Now setup the data area.
+	 * We need to generate a random fill
+	 * for this area to make it harder to
+	 * decrypt. JRA.
+	 *
+	 */
+	get_random_bytes(data, sizeof (data));
+	if (unicode) {
+		/* Note that passwd should be in DOS oem character set. */
+		/*  dos_struni2( &data[512 - new_pw_len], passwd, 512); */
+		cifs_strtoUCS((wchar_t *) & data[512 - new_pw_len], passwd, 512,	/* struct nls_table */
+			      load_nls_default());
+		/* BB call unload_nls now or get nls differntly */
+	} else {
+		/* Note that passwd should be in DOS oem character set. */
+		strcpy(&data[512 - new_pw_len], passwd);
+	}
+	SIVAL(data, 512, new_pw_len);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("make_oem_passwd_hash\n"));
+	dump_data(100, data, 516);
+#endif
+	SamOEMhash((unsigned char *) data, (unsigned char *) old_pw_hash, TRUE);
+
+	return TRUE;
+}
+
+/* Does the md5 encryption from the NT hash for NTLMv2. */
+void
+SMBOWFencrypt_ntv2(const unsigned char kr[16],
+		   const struct data_blob srv_chal,
+		   const struct data_blob cli_chal, unsigned char resp_buf[16])
+{
+	struct HMACMD5Context ctx;
+
+	hmac_md5_init_limK_to_64(kr, 16, &ctx);
+	hmac_md5_update(srv_chal.data, srv_chal.length, &ctx);
+	hmac_md5_update(cli_chal.data, cli_chal.length, &ctx);
+	hmac_md5_final(resp_buf, &ctx);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("SMBOWFencrypt_ntv2: srv_chal, cli_chal, resp_buf\n"));
+	dump_data(100, srv_chal.data, srv_chal.length);
+	dump_data(100, cli_chal.data, cli_chal.length);
+	dump_data(100, resp_buf, 16);
+#endif
+}
+
+void
+SMBsesskeygen_ntv2(const unsigned char kr[16],
+		   const unsigned char *nt_resp, __u8 sess_key[16])
+{
+	struct HMACMD5Context ctx;
+
+	hmac_md5_init_limK_to_64(kr, 16, &ctx);
+	hmac_md5_update(nt_resp, 16, &ctx);
+	hmac_md5_final((unsigned char *) sess_key, &ctx);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("SMBsesskeygen_ntv2:\n"));
+	dump_data(100, sess_key, 16);
+#endif
+}
+
+void
+SMBsesskeygen_ntv1(const unsigned char kr[16],
+		   const unsigned char *nt_resp, __u8 sess_key[16])
+{
+	mdfour((unsigned char *) sess_key, (unsigned char *) kr, 16);
+
+#ifdef DEBUG_PASSWORD
+	DEBUG(100, ("SMBsesskeygen_ntv1:\n"));
+	dump_data(100, sess_key, 16);
+#endif
+}
+
+/***********************************************************
+ encode a password buffer.  The caller gets to figure out 
+ what to put in it.
+************************************************************/
+int
+encode_pw_buffer(char buffer[516], char *new_pw, int new_pw_length)
+{
+	get_random_bytes(buffer, sizeof (buffer));
+
+	memcpy(&buffer[512 - new_pw_length], new_pw, new_pw_length);
+
+	/* 
+	 * The length of the new password is in the last 4 bytes of
+	 * the data buffer.
+	 */
+	SIVAL(buffer, 512, new_pw_length);
+
+	return TRUE;
+}
+
+/***********************************************************
+ SMB signing - setup the MAC key.
+************************************************************/
+
+void
+cli_calculate_mac_key(__u8 * mac_key, int *pmac_key_len,
+		      const char *ntpasswd, const unsigned char resp[24])
+{
+	/* Get first 16 bytes. */
+	E_md4hash(ntpasswd, mac_key);
+	memcpy(mac_key + 16, resp, 24);
+	*pmac_key_len = 40;
+
+	/* Reset the sequence number in case we had a previous (aborted) attempt */
+/*	cli->sign_info.send_seq_num = 0; */
+}
+
+/***********************************************************
+ SMB signing - calculate a MAC to send.
+************************************************************/
+
+void
+cli_caclulate_sign_mac(struct smb_hdr *outbuf, __u8 * mac_key,
+		       int mac_key_len, __u32 * send_seq_num,
+		       __u32 * reply_seq_num)
+{
+	unsigned char calc_md5_mac[16];
+	struct MD5Context md5_ctx;
+
+/*	if (!cli->sign_info.use_smb_signing) {
+		return;
+	} */
+
+	/*
+	 * Firstly put the sequence number into the first 4 bytes.
+	 * and zero out the next 4 bytes.
+	 */
+/*
+	SIVAL(outbuf, smb_ss_field, *send_seq_num);
+	SIVAL(outbuf, smb_ss_field + 4, 0); */
+
+	/* Calculate the 16 byte MAC and place first 8 bytes into the field. */
+	MD5Init(&md5_ctx);
+	MD5Update(&md5_ctx, mac_key, mac_key_len);
+	MD5Update(&md5_ctx, outbuf->Protocol,
+		  be32_to_cpu(outbuf->smb_buf_length));
+	MD5Final(calc_md5_mac, &md5_ctx);
+
+	memcpy(outbuf->SecuritySignature, calc_md5_mac, 8);
+	(*send_seq_num)++;
+	*reply_seq_num = *send_seq_num;
+	(*send_seq_num)++;
+}
