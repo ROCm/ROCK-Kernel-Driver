@@ -43,9 +43,6 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("82C710 C&T mouse port chip driver");
 MODULE_LICENSE("GPL");
 
-static char ct82c710_name[] = "C&T 82c710 mouse port";
-static char ct82c710_phys[16];
-
 /*
  * ct82c710 interface
  */
@@ -61,10 +58,20 @@ static char ct82c710_phys[16];
 
 #define CT82C710_IRQ          12
 
+static struct serio *ct82c710_port;
 static int ct82c710_data;
 static int ct82c710_status;
 
-static irqreturn_t ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs);
+
+/*
+ * Interrupt handler for the 82C710 mouse port. A character
+ * is waiting in the 82C710.
+ */
+
+static irqreturn_t ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs)
+{
+	return serio_interrupt(ct82c710_port, inb(ct82c710_data), 0, regs);
+}
 
 /*
  * Wait for device to send output char and flush any input char.
@@ -139,26 +146,6 @@ static int ct82c710_write(struct serio *port, unsigned char c)
 	return 0;
 }
 
-static struct serio ct82c710_port =
-{
-	.type	= SERIO_8042,
-	.name	= ct82c710_name,
-	.phys	= ct82c710_phys,
-	.write	= ct82c710_write,
-	.open	= ct82c710_open,
-	.close	= ct82c710_close,
-};
-
-/*
- * Interrupt handler for the 82C710 mouse port. A character
- * is waiting in the 82C710.
- */
-
-static irqreturn_t ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs)
-{
-	return serio_interrupt(&ct82c710_port, inb(ct82c710_data), 0, regs);
-}
-
 /*
  * See if we can find a 82C710 device. Read mouse address.
  */
@@ -183,6 +170,24 @@ static int __init ct82c710_probe(void)
 	return 0;
 }
 
+static struct serio * __init ct82c710_allocate_port(void)
+{
+	struct serio *serio;
+
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (serio) {
+		memset(serio, 0, sizeof(struct serio));
+		serio->type = SERIO_8042;
+		serio->open = ct82c710_open;
+		serio->close = ct82c710_close;
+		serio->write = ct82c710_write;
+		strlcpy(serio->name, "C&T 82c710 mouse port", sizeof(serio->name));
+		snprintf(serio->phys, sizeof(serio->phys), "isa%04x/serio0", ct82c710_data);
+	}
+
+	return serio;
+}
+
 int __init ct82c710_init(void)
 {
 	if (ct82c710_probe())
@@ -191,9 +196,12 @@ int __init ct82c710_init(void)
 	if (request_region(ct82c710_data, 2, "ct82c710"))
 		return -EBUSY;
 
-	sprintf(ct82c710_phys, "isa%04x/serio0", ct82c710_data);
+	if (!(ct82c710_port = ct82c710_allocate_port())) {
+		release_region(ct82c710_data, 2);
+		return -ENOMEM;
+	}
 
-	serio_register_port(&ct82c710_port);
+	serio_register_port(ct82c710_port);
 
 	printk(KERN_INFO "serio: C&T 82c710 mouse port at %#x irq %d\n",
 		ct82c710_data, CT82C710_IRQ);
@@ -203,7 +211,7 @@ int __init ct82c710_init(void)
 
 void __exit ct82c710_exit(void)
 {
-	serio_unregister_port(&ct82c710_port);
+	serio_unregister_port(ct82c710_port);
 	release_region(ct82c710_data, 2);
 }
 

@@ -37,8 +37,10 @@
 #include <linux/serio.h>
 #include <linux/workqueue.h>
 
+#define DRIVER_DESC	"Sun keyboard driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Sun keyboard driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static unsigned char sunkbd_keycode[128] = {
@@ -221,7 +223,7 @@ static void sunkbd_reinit(void *data)
  * sunkbd_connect() probes for a Sun keyboard and fills the necessary structures.
  */
 
-static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
+static void sunkbd_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct sunkbd *sunkbd;
 	int i;
@@ -257,7 +259,7 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = sunkbd;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(sunkbd);
 		return;
 	}
@@ -301,10 +303,14 @@ static void sunkbd_disconnect(struct serio *serio)
 	kfree(sunkbd);
 }
 
-static struct serio_dev sunkbd_dev = {
-	.interrupt =	sunkbd_interrupt,
-	.connect =	sunkbd_connect,
-	.disconnect =	sunkbd_disconnect
+static struct serio_driver sunkbd_drv = {
+	.driver		= {
+		.name	= "sunkbd",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= sunkbd_interrupt,
+	.connect	= sunkbd_connect,
+	.disconnect	= sunkbd_disconnect,
 };
 
 /*
@@ -313,13 +319,13 @@ static struct serio_dev sunkbd_dev = {
 
 int __init sunkbd_init(void)
 {
-	serio_register_device(&sunkbd_dev);
+	serio_register_driver(&sunkbd_drv);
 	return 0;
 }
 
 void __exit sunkbd_exit(void)
 {
-	serio_unregister_device(&sunkbd_dev);
+	serio_unregister_driver(&sunkbd_drv);
 }
 
 module_init(sunkbd_init);

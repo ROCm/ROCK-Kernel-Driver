@@ -35,8 +35,10 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Logitech WingMan Warrior joystick driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Logitech WingMan Warrior joystick driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -139,7 +141,7 @@ static void warrior_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void warrior_connect(struct serio *serio, struct serio_dev *dev)
+static void warrior_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct warrior *warrior;
 	int i;
@@ -185,7 +187,7 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = warrior;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(warrior);
 		return;
 	}
@@ -199,10 +201,14 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev warrior_dev = {
-	.interrupt =	warrior_interrupt,
-	.connect =	warrior_connect,
-	.disconnect =	warrior_disconnect,
+static struct serio_driver warrior_drv = {
+	.driver		= {
+		.name	= "warrior",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= warrior_interrupt,
+	.connect	= warrior_connect,
+	.disconnect	= warrior_disconnect,
 };
 
 /*
@@ -211,13 +217,13 @@ static struct serio_dev warrior_dev = {
 
 int __init warrior_init(void)
 {
-	serio_register_device(&warrior_dev);
+	serio_register_driver(&warrior_drv);
 	return 0;
 }
 
 void __exit warrior_exit(void)
 {
-	serio_unregister_device(&warrior_dev);
+	serio_unregister_driver(&warrior_drv);
 }
 
 module_init(warrior_init);

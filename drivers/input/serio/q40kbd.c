@@ -47,43 +47,98 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Q40 PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 
-static struct serio q40kbd_port =
-{
-	.type	= SERIO_8042,
-	.name	= "Q40 kbd port",
-	.phys	= "Q40",
-	.write	= NULL,
-};
+spinlock_t q40kbd_lock = SPIN_LOCK_UNLOCKED;
+static struct serio *q40kbd_port;
 
-static irqreturn_t q40kbd_interrupt(int irq, void *dev_id,
-				    struct pt_regs *regs)
+static irqreturn_t q40kbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&q40kbd_lock, flags);
+
 	if (Q40_IRQ_KEYB_MASK & master_inb(INTERRUPT_REG))
-		serio_interrupt(&q40kbd_port, master_inb(KEYCODE_REG), 0, regs);
+		serio_interrupt(q40kbd_port, master_inb(KEYCODE_REG), 0, regs);
 
 	master_outb(-1, KEYBOARD_UNLOCK_REG);
+
+	spin_unlock_irqrestore(&q40kbd_lock, flags);
+
 	return IRQ_HANDLED;
+}
+
+/*
+ * q40kbd_flush() flushes all data that may be in the keyboard buffers
+ */
+
+static void q40kbd_flush(void)
+{
+ 	int maxread = 100;
+	unsigned long flags;
+
+	spin_lock_irqsave(&q40kbd_lock, flags);
+
+ 	while (maxread-- && (Q40_IRQ_KEYB_MASK & master_inb(INTERRUPT_REG)))
+ 		master_inb(KEYCODE_REG);
+
+	spin_unlock_irqrestore(&q40kbd_lock, flags);
+}
+
+/*
+ * q40kbd_open() is called when a port is open by the higher layer.
+ * It allocates the interrupt and enables in in the chip.
+ */
+
+static int q40kbd_open(struct serio *port)
+{
+	q40kbd_flush();
+
+	if (request_irq(Q40_IRQ_KEYBOARD, q40kbd_interrupt, 0, "q40kbd", NULL)) {
+		printk(KERN_ERR "q40kbd.c: Can't get irq %d.\n", Q40_IRQ_KEYBOARD);
+		return -1;
+	}
+
+ 	/* off we go */
+ 	master_outb(-1, KEYBOARD_UNLOCK_REG);
+ 	master_outb(1, KEY_IRQ_ENABLE_REG);
+
+ 	return 0;
+}
+
+static void q40kbd_close(struct serio *port)
+{
+	master_outb(0, KEY_IRQ_ENABLE_REG);
+	master_outb(-1, KEYBOARD_UNLOCK_REG);
+	free_irq(Q40_IRQ_KEYBOARD, NULL);
+
+	q40kbd_flush();
+}
+
+static struct serio * __init q40kbd_allocate_port(void)
+{
+	struct serio *serio;
+
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (serio) {
+		memset(serio, 0, sizeof(struct serio));
+		serio->type	= SERIO_8042;
+		serio->open	= q40kbd_open;
+		serio->close	= q40kbd_close;
+		strlcpy(serio->name, "Q40 Kbd Port", sizeof(serio->name));
+		strlcpy(serio->phys, "Q40", sizeof(serio->phys));
+	}
+
+	return serio;
 }
 
 static int __init q40kbd_init(void)
 {
-	int maxread = 100;
-
 	if (!MACH_IS_Q40)
 		return -EIO;
 
-	/* allocate the IRQ */
-	request_irq(Q40_IRQ_KEYBOARD, q40kbd_interrupt, 0, "q40kbd", NULL);
+	if (!(q40kbd_port = q40kbd_allocate_port()))
+		return -ENOMEM;
 
-	/* flush any pending input */
-	while (maxread-- && (Q40_IRQ_KEYB_MASK & master_inb(INTERRUPT_REG)))
-		master_inb(KEYCODE_REG);
-
-	/* off we go */
-	master_outb(-1,KEYBOARD_UNLOCK_REG);
-	master_outb(1,KEY_IRQ_ENABLE_REG);
-
-	serio_register_port(&q40kbd_port);
+	serio_register_port(q40kbd_port);
 	printk(KERN_INFO "serio: Q40 kbd registered\n");
 
 	return 0;
@@ -91,11 +146,7 @@ static int __init q40kbd_init(void)
 
 static void __exit q40kbd_exit(void)
 {
-	master_outb(0,KEY_IRQ_ENABLE_REG);
-	master_outb(-1,KEYBOARD_UNLOCK_REG);
-
-	serio_unregister_port(&q40kbd_port);
-	free_irq(Q40_IRQ_KEYBOARD, NULL);
+	serio_unregister_port(q40kbd_port);
 }
 
 module_init(q40kbd_init);
