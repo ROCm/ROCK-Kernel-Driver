@@ -1322,7 +1322,7 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 
 	if (!printed) {
 		printed = 1;
-		printk("Using %s elevator\n", chosen_elevator->elevator_name);
+		printk("Using %s io scheduler\n", chosen_elevator->elevator_name);
 	}
 
 	if (elevator_init(q, chosen_elevator))
