@@ -25,7 +25,7 @@
 
 #define RPC_RTO_MAX (60*HZ)
 #define RPC_RTO_INIT (HZ/5)
-#define RPC_RTO_MIN (2)
+#define RPC_RTO_MIN (HZ/10)
 
 void
 rpc_init_rtt(struct rpc_rtt *rt, unsigned long timeo)
@@ -41,8 +41,6 @@ rpc_init_rtt(struct rpc_rtt *rt, unsigned long timeo)
 		rt->srtt[i] = init;
 		rt->sdrtt[i] = RPC_RTO_INIT;
 	}
-
-	atomic_set(&rt->ntimeouts, 0);
 }
 
 /*
@@ -52,7 +50,7 @@ rpc_init_rtt(struct rpc_rtt *rt, unsigned long timeo)
 void
 rpc_update_rtt(struct rpc_rtt *rt, unsigned timer, long m)
 {
-	unsigned long *srtt, *sdrtt;
+	long *srtt, *sdrtt;
 
 	if (timer-- == 0)
 		return;
@@ -64,14 +62,14 @@ rpc_update_rtt(struct rpc_rtt *rt, unsigned timer, long m)
 	if (m == 0)
 		m = 1L;
 
-	srtt = &rt->srtt[timer];
+	srtt = (long *)&rt->srtt[timer];
 	m -= *srtt >> 3;
 	*srtt += m;
 
 	if (m < 0)
 		m = -m;
 
-	sdrtt = &rt->sdrtt[timer];
+	sdrtt = (long *)&rt->sdrtt[timer];
 	m -= *sdrtt >> 2;
 	*sdrtt += m;
 
@@ -101,7 +99,7 @@ rpc_calc_rto(struct rpc_rtt *rt, unsigned timer)
 	if (timer-- == 0)
 		return rt->timeo;
 
-	res = (rt->srtt[timer] >> 3) + rt->sdrtt[timer];
+	res = ((rt->srtt[timer] + 7) >> 3) + rt->sdrtt[timer];
 	if (res > RPC_RTO_MAX)
 		res = RPC_RTO_MAX;
 
