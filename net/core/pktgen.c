@@ -647,6 +647,7 @@ static void inject(struct pktgen_info* info)
 	info->do_run_run = 1; /* Cranke yeself! */
 	info->idle_acc = 0;
 	info->sofar = 0;
+	info->errors = 0;
 	lcount = info->count;
 
 
