@@ -1456,7 +1456,7 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 	
 	board = SX_BOARD(minor(tty->device));
 
-	if (board > SX_NBOARD || !(sx_board[board].flags & SX_BOARD_PRESENT))
+	if (board >= SX_NBOARD || !(sx_board[board].flags & SX_BOARD_PRESENT))
 		return -ENODEV;
 	
 	bp = &sx_board[board];
@@ -2363,7 +2363,7 @@ int specialix_init(void)
 		struct pci_dev *pdev = NULL;
 
 		i=0;
-		while (i <= SX_NBOARD) {
+		while (i < SX_NBOARD) {
 			if (sx_board[i].flags & SX_BOARD_PRESENT) {
 				i++;
 				continue;

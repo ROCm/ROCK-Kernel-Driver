@@ -351,7 +351,7 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 		return 0;
 
 	family = ((struct rtgenmsg*)NLMSG_DATA(nlh))->rtgen_family;
-	if (family > NPROTO) {
+	if (family >= NPROTO) {
 		*errp = -EAFNOSUPPORT;
 		return -1;
 	}

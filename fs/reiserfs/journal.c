@@ -735,8 +735,7 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
   }
 
   mark_buffer_dirty(jl->j_commit_bh) ;
-  ll_rw_block(WRITE, 1, &(jl->j_commit_bh)) ;
-  wait_on_buffer(jl->j_commit_bh) ;
+  sync_dirty_buffer(jl->j_commit_bh) ;
   if (!buffer_uptodate(jl->j_commit_bh)) {
     reiserfs_panic(s, "journal-615: buffer write failed\n") ;
   }
@@ -828,8 +827,7 @@ static int _update_journal_header_block(struct super_block *p_s_sb, unsigned lon
     jh->j_first_unflushed_offset = cpu_to_le32(offset) ;
     jh->j_mount_id = cpu_to_le32(SB_JOURNAL(p_s_sb)->j_mount_id) ;
     set_buffer_dirty(SB_JOURNAL(p_s_sb)->j_header_bh) ;
-    ll_rw_block(WRITE, 1, &(SB_JOURNAL(p_s_sb)->j_header_bh)) ;
-    wait_on_buffer((SB_JOURNAL(p_s_sb)->j_header_bh)) ; 
+    sync_dirty_buffer(SB_JOURNAL(p_s_sb)->j_header_bh) ;
     if (!buffer_uptodate(SB_JOURNAL(p_s_sb)->j_header_bh)) {
       printk( "reiserfs: journal-837: IO error during journal replay\n" );
       return -EIO ;
