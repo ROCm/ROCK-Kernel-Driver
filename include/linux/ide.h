@@ -796,31 +796,6 @@ typedef struct ide_drive_s {
 	struct gendisk *disk;
 } ide_drive_t;
 
-typedef struct ide_pio_ops_s {
-	void (*ata_input_data)(ide_drive_t *, void *, u32);
-	void (*ata_output_data)(ide_drive_t *, void *, u32);
-
-	void (*atapi_input_bytes)(ide_drive_t *, void *, u32);
-	void (*atapi_output_bytes)(ide_drive_t *, void *, u32);
-} ide_pio_ops_t;
-
-typedef struct ide_dma_ops_s {
-	/* insert dma operations here! */
-	int (*ide_dma_read)(ide_drive_t *drive);
-	int (*ide_dma_write)(ide_drive_t *drive);
-	int (*ide_dma_begin)(ide_drive_t *drive);
-	int (*ide_dma_end)(ide_drive_t *drive);
-	int (*ide_dma_check)(ide_drive_t *drive);
-	int (*ide_dma_on)(ide_drive_t *drive);
-	int (*ide_dma_off_quietly)(ide_drive_t *drive);
-	int (*ide_dma_test_irq)(ide_drive_t *drive);
-	int (*ide_dma_host_on)(ide_drive_t *drive);
-	int (*ide_dma_host_off)(ide_drive_t *drive);
-	int (*ide_dma_verbose)(ide_drive_t *drive);
-	int (*ide_dma_lostirq)(ide_drive_t *drive);
-	int (*ide_dma_timeout)(ide_drive_t *drive);
-} ide_dma_ops_t;
-
 /*
  * mapping stuff, prepare for highmem...
  * 
@@ -913,15 +888,11 @@ typedef struct hwif_s {
 //	u8	(*ratefilter)(ide_drive_t *, u8);
 #endif
 
-#if 0
-	ide_pio_ops_t	*pioops;
-#else
 	void (*ata_input_data)(ide_drive_t *, void *, u32);
 	void (*ata_output_data)(ide_drive_t *, void *, u32);
 
 	void (*atapi_input_bytes)(ide_drive_t *, void *, u32);
 	void (*atapi_output_bytes)(ide_drive_t *, void *, u32);
-#endif
 
 	int (*ide_dma_read)(ide_drive_t *drive);
 	int (*ide_dma_write)(ide_drive_t *drive);
