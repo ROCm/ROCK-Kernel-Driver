@@ -63,9 +63,9 @@
 
 /* command block wrapper */
 struct bulk_cb_wrap {
-	u32	Signature;		/* contains 'USBC' */
+	__le32	Signature;		/* contains 'USBC' */
 	u32	Tag;			/* unique per command id */
-	u32	DataTransferLength;	/* size of data */
+	__le32	DataTransferLength;	/* size of data */
 	u8	Flags;			/* direction in bit 0 */
 	u8	Lun;			/* LUN normally 0 */
 	u8	Length;			/* of of the CDB */
@@ -79,9 +79,9 @@ struct bulk_cb_wrap {
 
 /* command status wrapper */
 struct bulk_cs_wrap {
-	u32	Signature;		/* should = 'USBS' */
+	__le32	Signature;		/* should = 'USBS' */
 	u32	Tag;			/* same as original command */
-	u32	Residue;		/* amount not transferred */
+	__le32	Residue;		/* amount not transferred */
 	u8	Status;			/* see below */
 };
 
@@ -1692,8 +1692,8 @@ static int ub_sync_read_cap(struct ub_dev *sc, struct ub_capacity *ret)
 	}
 
 	/* sd.c special-cases sector size of 0 to mean 512. Needed? Safe? */
-	nsec = be32_to_cpu(*(u32 *)p) + 1;
-	bsize = be32_to_cpu(*(u32 *)(p + 4));
+	nsec = be32_to_cpu(*(__be32 *)p) + 1;
+	bsize = be32_to_cpu(*(__be32 *)(p + 4));
 	switch (bsize) {
 	case 512:	shift = 0;	break;
 	case 1024:	shift = 1;	break;
