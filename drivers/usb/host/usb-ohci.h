@@ -403,6 +403,7 @@ typedef struct ohci {
 
 	/* PCI device handle, settings, ... */
 	struct pci_dev	*ohci_dev;
+	const char	*slot_name;
 	u8		pci_latency;
 	struct pci_pool	*td_cache;
 	struct pci_pool	*dev_cache;
@@ -422,6 +423,10 @@ struct ohci_device {
 
 // #define ohci_to_usb(ohci)	((ohci)->usb)
 #define usb_to_ohci(usb)	((struct ohci_device *)(usb)->hcpriv)
+
+/* For initializing controller (mask in an HCFS mode too) */
+#define OHCI_CONTROL_INIT \
+	(OHCI_CTRL_CBSR & 0x3) | OHCI_CTRL_IE | OHCI_CTRL_PLE
 
 /* hcd */
 /* endpoint */
@@ -447,11 +452,6 @@ static int rh_init_int_timer(struct urb * urb);
 #	define OHCI_MEM_FLAGS	0
 #endif
  
-#ifndef CONFIG_PCI
-#	error "usb-ohci currently requires PCI-based controllers"
-	/* to support non-PCI OHCIs, you need custom bus/mem/... glue */
-#endif
-
 
 /* Recover a TD/ED using its collision chain */
 static void *
@@ -640,4 +640,9 @@ dev_free (struct ohci *hc, struct ohci_device *dev)
 {
 	pci_pool_free (hc->dev_cache, dev, dev->dma);
 }
+
+extern spinlock_t usb_ed_lock;
+extern void dl_done_list (ohci_t * ohci, td_t * td_list);
+extern td_t * dl_reverse_done_list (ohci_t * ohci);
+
 

@@ -391,13 +391,14 @@ int __init ite_gpio_init(void)
 {
 	int i;
 
-	misc_register(&ite_gpio_miscdev);
+	if (misc_register(&ite_gpio_miscdev))
+		return -ENODEV;
 
-	if (check_region(ite_gpio_base, 0x1c) < 0 ) {
-           return -ENODEV;
-        } else {
-           request_region(ite_gpio_base, 0x1c, "ITE GPIO");
-        }     
+	if (!request_region(ite_gpio_base, 0x1c, "ITE GPIO"))
+	{
+		misc_deregister(&ite_gpio_miscdev);
+		return -EIO;
+	}
 
 	/* initialize registers */
         ITE_GPACR = 0xffff;
@@ -407,13 +408,18 @@ int __init ite_gpio_init(void)
         ITE_GPBICR = 0x00ff;
         ITE_GPCICR = 0x00ff;
         ITE_GCR = 0;
-
+	
 	for (i = 0; i < MAX_GPIO_LINE; i++) {
 		ite_gpio_irq_pending[i]=0;	
 		init_waitqueue_head(&ite_gpio_wait[i]);
 	}
-	if (request_irq(ite_gpio_irq, ite_gpio_irq_handler, SA_SHIRQ, "gpio", 0) < 0)
+
+	if (request_irq(ite_gpio_irq, ite_gpio_irq_handler, SA_SHIRQ, "gpio", 0) < 0) {
+		misc_deregister(&ite_gpio_miscdev);
+		release_region(ite_gpio_base, 0x1c);
 		return 0;
+	}
+
 	printk("GPIO at 0x%x (irq = %d)\n", ite_gpio_base, ite_gpio_irq);
 
 	return 0;

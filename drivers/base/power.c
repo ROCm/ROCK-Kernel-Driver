@@ -113,7 +113,7 @@ void device_shutdown(void)
 		put_device(prev);
 
 		if (dev->driver && dev->driver->remove)
-			dev->driver->remove(dev,REMOVE_FREE_RESOURCES);
+			dev->driver->remove(dev);
 
 		spin_lock(&device_lock);
 		prev = dev;

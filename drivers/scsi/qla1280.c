@@ -806,8 +806,8 @@ qla1280_do_device_init(struct pci_dev *pdev,
 	struct scsi_qla_host *ha;
 	struct device_reg *reg;
 
-	printk("qla1x160: Initializing ISP12160 on PCI bus %i, dev %i\n",
-	       pdev->bus->number, PCI_SLOT(pdev->devfn));
+	printk("qla1x160: Initializing ISP12160 on PCI bus %i, dev %i, irq %i\n",
+	       pdev->bus->number, PCI_SLOT(pdev->devfn), pdev->irq);
 
 	host = scsi_register(template, sizeof(struct scsi_qla_host));
 	if (!host) {

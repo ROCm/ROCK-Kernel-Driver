@@ -174,7 +174,12 @@ void __init smp_store_cpu_info(int id)
 		if ((c->x86_model==7) && (c->x86_mask==0))
 			goto valid_k7;
 
-		/* Athlon 662, Duron 671, and Athlon >model 7 have capability bit */
+		/*
+		 * Athlon 662, Duron 671, and Athlon >model 7 have capability bit.
+		 * It's worth noting that the A5 stepping (662) of some Athlon XP's
+		 * have the MP bit set.
+		 * See http://www.heise.de/newsticker/data/jow-18.10.01-000 for more.
+		 */
 		if (((c->x86_model==6) && (c->x86_mask>=2)) ||
 		    ((c->x86_model==7) && (c->x86_mask>=1)) ||
 		     (c->x86_model> 7))
@@ -632,7 +637,7 @@ static inline void inquire_remote_apic(int apicid)
 }
 #endif
 
-static int wakeup_secondary_via_NMI(int logical_apicid)
+static int __init wakeup_secondary_via_NMI(int logical_apicid)
 /* 
  * Poke the other CPU in the eye to wake it up. Remember that the normal
  * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
@@ -680,7 +685,7 @@ static int wakeup_secondary_via_NMI(int logical_apicid)
 	return (send_status | accept_status);
 }
 
-static int wakeup_secondary_via_INIT(int phys_apicid, unsigned long start_eip)
+static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int maxlvt, timeout, num_starts, j;

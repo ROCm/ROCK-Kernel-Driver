@@ -20,6 +20,19 @@
 #define IDEFLOPPY_PC_BUFFER_SIZE	256
 #define IDETAPE_PC_BUFFER_SIZE		256
 
+/*
+ * Packet flags bits.
+ */
+
+#define	PC_ABORT		0	/* set when an error is considered normal - we won't retry */
+#define PC_WAIT_FOR_DSC		1	/* 1 when polling for DSC on a media access command */
+#define PC_DMA_RECOMMENDED	2	/* 1 when we prefer to use DMA if possible */
+#define	PC_DMA_IN_PROGRESS	3	/* 1 while DMA in progress */
+#define	PC_DMA_ERROR		4	/* 1 when encountered problem during DMA */
+#define	PC_WRITING		5	/* data direction */
+#define	PC_SUPPRESS_ERROR	6	/* suppress error reporting */
+#define PC_TRANSFORM		7	/* transform SCSI commands */
+
 /* This struct get's shared between different drivers.
  */
 struct atapi_packet_command {

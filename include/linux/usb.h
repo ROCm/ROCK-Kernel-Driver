@@ -713,6 +713,8 @@ struct usb_driver {
 	/* void (*resume)(struct usb_device *dev); */
 };
 
+extern struct bus_type usb_bus_type;
+
 /*
  * use these in module_init()/module_exit()
  * and don't forget MODULE_DEVICE_TABLE(usb, ...)

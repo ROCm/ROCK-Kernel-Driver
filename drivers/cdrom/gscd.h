@@ -15,11 +15,10 @@
    Appropriate settings are: 0x300, 0x310, 0x320, 0x330, 0x340, 0x350, 0x360
    0x370, 0x380, 0x390, 0x3A0, 0x3B0, 0x3C0, 0x3D0, 0x3E0, 0x3F0             */
 
-/* insert here the I/O port address */
+/* insert here the I/O port address and extent */
 #define GSCD_BASE_ADDR	        0x340
+#define GSCD_IO_EXTENT          4
 
-/* change this to set the dma-channel */
-#define GSCD_DMA_CHANNEL        3                  /* not used */ 
 
 /************** nothing to set up below here *********************/
 

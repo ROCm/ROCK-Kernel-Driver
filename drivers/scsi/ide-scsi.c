@@ -1,9 +1,6 @@
 /*
- * linux/drivers/scsi/ide-scsi.c	Version 0.9		Jul   4, 1999
- *
  * Copyright (C) 1996 - 1999 Gadi Oxman <gadio@netvision.net.il>
  */
-
 /*
  * Emulation of a SCSI host adapter for IDE ATAPI devices.
  *
@@ -48,19 +45,17 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
+#include <scsi/sg.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include "sd.h"
-#include <scsi/sg.h>
 
-#define IDESCSI_DEBUG_LOG		0
-
-/*
- *	Packet command status bits.
+/* FIXME: Right now we always register a single scsi host for every single
+ * device. We should be just registering a single scsi host per ATA host chip
+ * and deal properly with channels! The reentrancy efforts are therefore not
+ * quite right done now.
  */
-#define PC_DMA_IN_PROGRESS		0	/* 1 while DMA in progress */
-#define PC_WRITING			1	/* Data direction */
-#define PC_TRANSFORM			2	/* transform SCSI commands */
 
 /*
  *	SCSI command transformation layer
@@ -213,7 +208,7 @@ static inline void idescsi_transform_pc2(struct ata_device *drive, struct atapi_
 		kfree(atapi_buf);
 }
 
-static inline void idescsi_free_bio (struct bio *bio)
+static inline void idescsi_free_bio(struct bio *bio)
 {
 	struct bio *bhp;
 
@@ -234,15 +229,10 @@ static void hexdump(u8 *x, int len)
 	printk("]\n");
 }
 
-static inline idescsi_scsi_t *idescsi_private(struct Scsi_Host *host)
-{
-	return (idescsi_scsi_t*) &host[1];
-}
-
 static int idescsi_end_request(struct ata_device *drive, struct request *rq, int uptodate)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = idescsi_private(host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
 	struct atapi_packet_command *pc = (struct atapi_packet_command *) rq->special;
 	int log = test_bit(IDESCSI_LOG_CMD, &scsi->log);
 	u8 *scsi_buf;
@@ -277,7 +267,7 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 	spin_lock_irqsave(host->host_lock, flags);
 	pc->s.done(pc->s.scsi_cmd);
 	spin_unlock_irqrestore(host->host_lock, flags);
-	idescsi_free_bio (rq->bio);
+	idescsi_free_bio(rq->bio);
 	kfree(pc); kfree(rq);
 	scsi->pc = NULL;
 
@@ -295,20 +285,20 @@ static inline unsigned long get_timeout(struct atapi_packet_command *pc)
 static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request *rq)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = idescsi_private(host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
 	byte status, ireason;
 	int bcount;
 	struct atapi_packet_command *pc=scsi->pc;
 	unsigned int temp;
 
-#if IDESCSI_DEBUG_LOG
+#ifdef DEBUG
 	printk (KERN_INFO "ide-scsi: Reached idescsi_pc_intr interrupt handler\n");
-#endif /* IDESCSI_DEBUG_LOG */
+#endif
 
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
-#if IDESCSI_DEBUG_LOG
+#ifdef DEBUG
 		printk ("ide-scsi: %s: DMA complete\n", drive->name);
-#endif /* IDESCSI_DEBUG_LOG */
+#endif
 		pc->actually_transferred=pc->request_transfer;
 		udma_stop(drive);
 	}
@@ -351,7 +341,7 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 				ide_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
 				return ide_started;
 			}
-#if IDESCSI_DEBUG_LOG
+#ifdef DEBUG
 			printk (KERN_NOTICE "ide-scsi: The scsi wants to send us more data than expected - allowing transfer\n");
 #endif
 		}
@@ -379,7 +369,7 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct request *rq)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = idescsi_private(host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
 	struct atapi_packet_command *pc = scsi->pc;
 	byte ireason;
 	ide_startstop_t startstop;
@@ -405,7 +395,7 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 		struct atapi_packet_command *pc)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = idescsi_private(host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
 	int bcount;
 	int dma_ok = 0;
 
@@ -447,9 +437,16 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
  */
 static ide_startstop_t idescsi_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-#if IDESCSI_DEBUG_LOG
-	printk (KERN_INFO "rq_status: %d, rq_dev: %u, cmd: %d, errors: %d\n",rq->rq_status,(unsigned int) rq->rq_dev,rq->cmd,rq->errors);
-	printk (KERN_INFO "sector: %ld, nr_sectors: %ld, current_nr_sectors: %ld\n",rq->sector,rq->nr_sectors,rq->current_nr_sectors);
+#ifdef DEBUG
+	printk(KERN_INFO "rq_status: %d, cmd: %d, errors: %d\n",
+			rq->rq_status,
+			(unsigned int)
+			rq->cmd,
+			rq->errors);
+	printk(KERN_INFO "sector: %lu, nr_sectors: %lu, current_nr_sectors: %lu\n",
+			rq->sector,
+			rq->nr_sectors,
+			rq->current_nr_sectors);
 #endif
 
 	if (rq->flags & REQ_SPECIAL) {
@@ -466,7 +463,7 @@ static int idescsi_open(struct inode *inode, struct file *filp, struct ata_devic
 	return 0;
 }
 
-static void idescsi_ide_release(struct inode *inode, struct file *filp, struct ata_device *drive)
+static void idescsi_release(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	MOD_DEC_USE_COUNT;
 }
@@ -478,7 +475,9 @@ static int idescsi_cleanup (struct ata_device *drive)
 	if (ide_unregister_subdriver (drive)) {
 		return 1;
 	}
+	kfree((idescsi_scsi_t *) host->hostdata[0]);
 	scsi_unregister(host);
+
 	return 0;
 }
 
@@ -493,34 +492,32 @@ static void idescsi_attach(struct ata_device *drive);
 /*
  *	IDE subdriver functions, registered with ide.c
  */
-static struct ata_operations idescsi_driver = {
+static struct ata_operations ata_ops = {
 	owner:			THIS_MODULE,
 	attach:			idescsi_attach,
 	cleanup:		idescsi_cleanup,
-	standby:		NULL,
 	do_request:		idescsi_do_request,
 	end_request:		idescsi_end_request,
-	ioctl:			NULL,
 	open:			idescsi_open,
-	release:		idescsi_ide_release,
-	check_media_change:	NULL,
+	release:		idescsi_release,
 	revalidate:		idescsi_revalidate,
-	capacity:		NULL,
 };
 
-int idescsi_detect (Scsi_Host_Template *host_template)
+static int idescsi_detect(Scsi_Host_Template *host_template)
 {
-	return register_ata_driver(&idescsi_driver);
+	return register_ata_driver(&ata_ops);
 }
 
-const char *idescsi_info (struct Scsi_Host *host)
+static const char *idescsi_info(struct Scsi_Host *host)
 {
-	return "SCSI host adapter emulation for IDE ATAPI devices";
+	static const char *msg = "SCSI host adapter emulation for ATAPI devices";
+
+	return msg;
 }
 
-int idescsi_ioctl (Scsi_Device *dev, int cmd, void *arg)
+static int idescsi_ioctl(Scsi_Device *dev, int cmd, void *arg)
 {
-	idescsi_scsi_t *scsi = idescsi_private(dev->host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) dev->host->hostdata[0];
 
 	if (cmd == SG_SET_TRANSFORM) {
 		if (arg)
@@ -530,10 +527,11 @@ int idescsi_ioctl (Scsi_Device *dev, int cmd, void *arg)
 		return 0;
 	} else if (cmd == SG_GET_TRANSFORM)
 		return put_user(test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform), (int *) arg);
+
 	return -EINVAL;
 }
 
-static inline struct bio *idescsi_kmalloc_bio (int count)
+static inline struct bio *idescsi_kmalloc_bio(int count)
 {
 	struct bio *bh, *bhp, *first_bh;
 
@@ -552,7 +550,8 @@ static inline struct bio *idescsi_kmalloc_bio (int count)
 	}
 	return first_bh;
 abort:
-	idescsi_free_bio (first_bh);
+	idescsi_free_bio(first_bh);
+
 	return NULL;
 }
 
@@ -587,7 +586,7 @@ static inline struct bio *idescsi_dma_bio(struct ata_device *drive, struct atapi
 	if (segments) {
 		if ((first_bh = bh = idescsi_kmalloc_bio (segments)) == NULL)
 			return NULL;
-#if IDESCSI_DEBUG_LOG
+#ifdef DEBUG
 		printk ("ide-scsi: %s: building DMA table, %d segments, %dkB total\n", drive->name, segments, pc->request_transfer >> 10);
 #endif
 		while (segments--) {
@@ -601,7 +600,7 @@ static inline struct bio *idescsi_dma_bio(struct ata_device *drive, struct atapi
 	} else {
 		if ((first_bh = bh = idescsi_kmalloc_bio (1)) == NULL)
 			return NULL;
-#if IDESCSI_DEBUG_LOG
+#ifdef DEBUG
 		printk ("ide-scsi: %s: building DMA table for a single buffer (%dkB)\n", drive->name, pc->request_transfer >> 10);
 #endif
 		bh->bi_io_vec[0].bv_page = virt_to_page(pc->s.scsi_cmd->request_buffer);
@@ -615,16 +614,16 @@ static inline struct bio *idescsi_dma_bio(struct ata_device *drive, struct atapi
 static inline int should_transform(struct ata_device *drive, Scsi_Cmnd *cmd)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = idescsi_private(host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
 
 	if (major(cmd->request.rq_dev) == SCSI_GENERIC_MAJOR)
 		return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);
 }
 
-int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static int idescsi_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
-	idescsi_scsi_t *scsi = idescsi_private(cmd->host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) cmd->host->hostdata[0];
 	struct ata_device *drive = scsi->drive;
 	struct request *rq = NULL;
 	struct atapi_packet_command *pc = NULL;
@@ -684,14 +683,14 @@ abort:
 
 /* FIXME: This needs further investigation.
  */
-int idescsi_device_reset (Scsi_Cmnd *cmd)
+static int idescsi_device_reset(Scsi_Cmnd *cmd)
 {
 	return SUCCESS;
 }
 
-int idescsi_bios (Disk *disk, kdev_t dev, int *parm)
+static int idescsi_bios(Disk *disk, kdev_t dev, int *parm)
 {
-	idescsi_scsi_t *scsi = idescsi_private(disk->device->host);
+	idescsi_scsi_t *scsi = (idescsi_scsi_t *) disk->device->host->hostdata[0];
 	struct ata_device *drive = scsi->drive;
 
 	if (drive->bios_cyl && drive->bios_head && drive->bios_sect) {
@@ -702,7 +701,7 @@ int idescsi_bios (Disk *disk, kdev_t dev, int *parm)
 	return 0;
 }
 
-static Scsi_Host_Template idescsi_template = {
+static Scsi_Host_Template template = {
 	module:		THIS_MODULE,
 	name:		"idescsi",
 	detect:		idescsi_detect,
@@ -713,7 +712,7 @@ static Scsi_Host_Template idescsi_template = {
 	info:		idescsi_info,
 	ioctl:		idescsi_ioctl,
 	queuecommand:	idescsi_queue,
-	eh_device_reset_handler: 
+	eh_device_reset_handler:
 			idescsi_device_reset,
 	bios_param:	idescsi_bios,
 	can_queue:	10,
@@ -722,7 +721,8 @@ static Scsi_Host_Template idescsi_template = {
 	cmd_per_lun:	5,
 	use_clustering:	DISABLE_CLUSTERING,
 	emulated:	1,
-	proc_name:	"ide-scsi",
+	/* FIXME: Buggy generic SCSI code doesn't remove /proc/entires! */
+	proc_name:	"atapi"
 };
 
 /*
@@ -737,9 +737,8 @@ static void idescsi_attach(struct ata_device *drive)
 	if (drive->type == ATA_DISK)
 		return;
 
-	host = scsi_register(&idescsi_template, sizeof(idescsi_scsi_t));
-
-	if(host == NULL) {
+	host = scsi_register(&template, sizeof(idescsi_scsi_t));
+	if (!host) {
 		printk (KERN_ERR
 			"ide-scsi: %s: Can't allocate a scsi host structure\n",
 			drive->name);
@@ -747,8 +746,9 @@ static void idescsi_attach(struct ata_device *drive)
 	}
 
 	host->max_lun = drive->last_lun + 1;
+	host->max_id = 1;
 
-	if (ide_register_subdriver (drive, &idescsi_driver)) {
+	if (ide_register_subdriver(drive, &ata_ops)) {
 		printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
 		scsi_unregister(host);
 		return;
@@ -757,28 +757,29 @@ static void idescsi_attach(struct ata_device *drive)
 	drive->driver_data = host;
 	drive->ready_stat = 0;
 
-	scsi = idescsi_private(host);
-	memset (scsi, 0, sizeof (idescsi_scsi_t));
+	scsi = kmalloc(sizeof(*scsi), GFP_ATOMIC);
+	host->hostdata[0] = (unsigned long) scsi;
+	memset(scsi,0, sizeof (*scsi));
 	scsi->drive = drive;
 
 	if (drive->id && (drive->id->config & 0x0060) == 0x20)
 		set_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags);
 	set_bit(IDESCSI_TRANSFORM, &scsi->transform);
 	clear_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
-#if IDESCSI_DEBUG_LOG
+#ifdef DEBUG
 	set_bit(IDESCSI_LOG_CMD, &scsi->log);
 #endif
 }
 
 static int __init init_idescsi_module(void)
 {
-	return scsi_register_host(&idescsi_template);
+	return scsi_register_host(&template);
 }
 
 static void __exit exit_idescsi_module(void)
 {
-	unregister_ata_driver(&idescsi_driver);
-	scsi_unregister_host(&idescsi_template);
+	unregister_ata_driver(&ata_ops);
+	scsi_unregister_host(&template);
 }
 
 module_init(init_idescsi_module);

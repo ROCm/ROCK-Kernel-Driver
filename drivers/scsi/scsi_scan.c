@@ -25,16 +25,16 @@
 /*
  * Flags for irregular SCSI devices that need special treatment
  */
-#define BLIST_NOLUN     	0x001	/* Don't scan for LUNs */
-#define BLIST_FORCELUN  	0x002	/* Known to have LUNs, force sanning */
-#define BLIST_BORKEN    	0x004	/* Flag for broken handshaking */
-#define BLIST_KEY       	0x008	/* Needs to be unlocked by special command */
-#define BLIST_SINGLELUN 	0x010	/* LUNs should better not be used in parallel */
+#define BLIST_NOLUN		0x001	/* Don't scan for LUNs */
+#define BLIST_FORCELUN		0x002	/* Known to have LUNs, force sanning */
+#define BLIST_BORKEN		0x004	/* Flag for broken handshaking */
+#define BLIST_KEY		0x008	/* Needs to be unlocked by special command */
+#define BLIST_SINGLELUN		0x010	/* LUNs should better not be used in parallel */
 #define BLIST_NOTQ		0x020	/* Buggy Tagged Command Queuing */
-#define BLIST_SPARSELUN 	0x040	/* Non consecutive LUN numbering */
+#define BLIST_SPARSELUN		0x040	/* Non consecutive LUN numbering */
 #define BLIST_MAX5LUN		0x080	/* Avoid LUNS >= 5 */
-#define BLIST_ISDISK    	0x100	/* Treat as (removable) disk */
-#define BLIST_ISROM     	0x200	/* Treat as (removable) CD-ROM */
+#define BLIST_ISDISK		0x100	/* Treat as (removable) disk */
+#define BLIST_ISROM		0x200	/* Treat as (removable) CD-ROM */
 #define BLIST_LARGELUN		0x400	/* LUNs larger than 7 despite reporting as SCSI 2 */
 #define BLIST_INQUIRY_36	0x800	/* override additional length field */
 #define BLIST_INQUIRY_58	0x1000	/* ... for broken inquiry responses */
@@ -86,7 +86,7 @@ static struct dev_info device_list[] =
 	{"MAXTOR", "MXT-1240S", "I1.2", BLIST_NOLUN},		/* Locks up when LUN>0 polled */
 	{"MAXTOR", "XT-4170S", "B5A", BLIST_NOLUN},		/* Locks-up sometimes when LUN>0 polled. */
 	{"MAXTOR", "XT-8760S", "B7B", BLIST_NOLUN},		/* guess what? */
-	{"MEDIAVIS", "RENO CD-ROMX2A", "2.03", BLIST_NOLUN},	/*Responds to all lun */
+	{"MEDIAVIS", "RENO CD-ROMX2A", "2.03", BLIST_NOLUN},	/* Responds to all lun */
 	{"NEC", "CD-ROM DRIVE:841", "1.0", BLIST_NOLUN},	/* Locks-up when LUN>0 polled. */
 	{"PHILIPS", "PCA80SC", "V4-2", BLIST_NOLUN},		/* Responds to all lun */
 	{"RODIME", "RO3000S", "2.33", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
@@ -98,7 +98,7 @@ static struct dev_info device_list[] =
 								 * SCSI code to reset bus.*/
 	{"SEAGATE", "ST296", "921", BLIST_NOLUN},		/* Responds to all lun */
 	{"SEAGATE", "ST1581", "6538", BLIST_NOLUN},		/* Responds to all lun */
-	{"SONY", "CD-ROM CDU-541", "4.3d", BLIST_NOLUN},	
+	{"SONY", "CD-ROM CDU-541", "4.3d", BLIST_NOLUN},
 	{"SONY", "CD-ROM CDU-55S", "1.0i", BLIST_NOLUN},
 	{"SONY", "CD-ROM CDU-561", "1.7x", BLIST_NOLUN},
 	{"SONY", "CD-ROM CDU-8012", "*", BLIST_NOLUN},
@@ -120,8 +120,7 @@ static struct dev_info device_list[] =
 	{"HP", "C1790A", "", BLIST_NOLUN},			/* scanjet iip */
 	{"HP", "C2500A", "", BLIST_NOLUN},			/* scanjet iicx */
 	{"YAMAHA", "CDR100", "1.00", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"YAMAHA", "CDR102", "1.00", BLIST_NOLUN},		/* Locks up if polled for lun != 0  
-								 * extra reset */
+	{"YAMAHA", "CDR102", "1.00", BLIST_NOLUN},		/* Locks up if polled for lun != 0 extra reset */
 	{"YAMAHA", "CRW8424S", "1.0", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
 	{"YAMAHA", "CRW6416S", "1.0c", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
 	{"MITSUMI", "CD-R CR-2201CS", "6119", BLIST_NOLUN},	/* Locks up if polled for lun != 0 */
@@ -453,7 +452,7 @@ void scan_scsis(struct Scsi_Host *shpnt,
 		else
 			lun0_sl = find_lun0_scsi_level(channel, dev, shpnt);
 		scan_scsis_single(channel, dev, lun, lun0_sl, &SDpnt, shpnt,
-			       	  scsi_result);
+				  scsi_result);
 		if (SDpnt != oldSDpnt) {
 
 			/* it could happen the blockdevice hasn't yet been inited */

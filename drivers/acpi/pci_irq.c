@@ -325,20 +325,16 @@ acpi_pci_irq_enable (
 	 * values override any BIOS-assinged IRQs set during boot.
 	 */
  	irq = acpi_pci_irq_lookup(0, dev->bus->number, PCI_SLOT(dev->devfn), pin);
+ 
+	/*
+	 * If no PRT entry was found, we'll try to derive an IRQ from the
+	 * device's parent bridge.
+	 */
+	if (!irq)
+ 		irq = acpi_pci_irq_derive(dev, pin);
+ 
 	if (irq)
 		dev->irq = irq;
-
-	/*
-	 * If no PRT entry was found and the device wasn't assigned an IRQ 
-	 * during boot we'll try to derive an IRQ from the device's parent 
-	 * bridge.
-	 */
-	if (!dev->irq && dev->bus->self) {
-		irq = acpi_pci_irq_derive(dev, pin);
-		if (irq)
-			dev->irq = irq;
-	}
-
 		
 	if (!dev->irq) {
 		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s\n", ('A' + pin), dev->slot_name);
