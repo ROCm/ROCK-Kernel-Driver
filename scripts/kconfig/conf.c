@@ -73,6 +73,13 @@ static void conf_askvalue(struct symbol *sym, const char *def)
 	line[0] = '\n';
 	line[1] = 0;
 
+	if (!sym_is_changable(sym)) {
+		printf("%s\n", def);
+		line[0] = '\n';
+		line[1] = 0;
+		return;
+	}
+
 	switch (input_mode) {
 	case ask_new:
 	case ask_silent:
@@ -82,12 +89,6 @@ static void conf_askvalue(struct symbol *sym, const char *def)
 		}
 		check_stdin();
 	case ask_all:
-		if (!sym_is_changable(sym)) {
-			printf("%s\n", def);
-			line[0] = '\n';
-			line[1] = 0;
-			return;
-		}
 		fflush(stdout);
 		fgets(line, 128, stdin);
 		return;
