@@ -58,6 +58,7 @@ extern void bte_init_node (nodepda_t *, cnodeid_t);
 extern void bte_init_cpu (void);
 extern void sn_timer_init(void);
 extern unsigned long last_time_offset;
+extern void init_platform_hubinfo(nodepda_t **nodepdaindr);
 extern void (*ia64_mark_idle)(int);
 extern void snidle(int);
 
@@ -220,6 +221,8 @@ sn_setup(char **cmdline_p)
 	int major = sn_sal_rev_major(), minor = sn_sal_rev_minor();
 	extern nasid_t snia_get_master_baseio_nasid(void);
 	extern void sn_cpu_init(void);
+	extern nasid_t snia_get_console_nasid(void);
+
 
 	MAX_DMA_ADDRESS = PAGE_OFFSET + MAX_PHYS_MEMORY;
 

@@ -25,10 +25,8 @@
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn2/shub_mmr.h>
 #include <asm/sn/sn_cpuid.h>
-
-
-typedef void pci_bridge_t;
-
+#include <asm/sn/pci/pcibr.h>
+#include <asm/sn/pci/pcibr_private.h>
 
 /* ARGSUSED */
 void
@@ -39,11 +37,15 @@ hub_intr_init(vertex_hdl_t hubv)
 xwidgetnum_t
 hub_widget_id(nasid_t nasid)
 {
-        hubii_wcr_t     ii_wcr; /* the control status register */
-        
-        ii_wcr.wcr_reg_value = REMOTE_HUB_L(nasid,IIO_WCR);
-        
-        return ii_wcr.wcr_fields_s.wcr_widget_id;
+
+	if (!(nasid & 1)) {
+        	hubii_wcr_t     ii_wcr; /* the control status register */
+        	ii_wcr.wcr_reg_value = REMOTE_HUB_L(nasid,IIO_WCR);
+        	return ii_wcr.wcr_fields_s.wcr_widget_id;
+	} else {
+		/* ICE does not have widget id. */
+		return(-1);
+	}
 }
 
 static hub_intr_t
@@ -52,7 +54,7 @@ do_hub_intr_alloc(vertex_hdl_t dev,
 		vertex_hdl_t owner_dev,
 		int uncond_nothread)
 {
-	cpuid_t		cpu = 0;
+	cpuid_t		cpu;
 	int		vector;
 	hub_intr_t	intr_hdl;
 	cnodeid_t	cnode;
@@ -97,7 +99,7 @@ do_hub_intr_alloc(vertex_hdl_t dev,
 	intr_hdl->i_bit = vector;
 	intr_hdl->i_flags |= HUB_INTR_IS_ALLOCED;
 
-	return(intr_hdl);
+	return intr_hdl;
 }
 
 hub_intr_t
@@ -186,4 +188,74 @@ hub_intr_disconnect(hub_intr_t intr_hdl)
 	rv = intr_disconnect_level(cpu, bit);
 	ASSERT(rv == 0);
 	intr_hdl->i_flags &= ~HUB_INTR_IS_CONNECTED;
+}
+
+/* 
+ * Redirect an interrupt to another cpu.
+ */
+
+void
+sn_shub_redirect_intr(pcibr_intr_t intr, unsigned long cpu)
+{
+	unsigned long bit;
+	int cpuphys, slice;
+	nasid_t nasid;
+	unsigned long xtalk_addr;
+	void		*bridge = intr->bi_soft->bs_base;
+	int		irq;
+	int		i;
+	int		old_cpu;
+	int		new_cpu;
+
+	cpuphys = cpu_physical_id(cpu);
+	slice = cpu_physical_id_to_slice(cpuphys);
+	nasid = cpu_physical_id_to_nasid(cpuphys);
+
+	for (i = CPUS_PER_NODE - 1; i >= 0; i--) {
+		new_cpu = nasid_slice_to_cpuid(nasid, i);
+		if (new_cpu == NR_CPUS) {
+			continue;
+		}
+
+		if (!cpu_online(new_cpu)) {
+			continue;
+		}
+		break;
+	}
+
+	if (enable_shub_wars_1_1() && slice != i) {
+		printk("smp_affinity WARNING: SHUB 1.1 present: cannot target cpu %d, targeting cpu %d instead.\n",(int)cpu, new_cpu);
+		cpu = new_cpu;
+		slice = i;
+	}
+
+	if (slice) {    
+		xtalk_addr = SH_II_INT1 | ((unsigned long)nasid << 36) | (1UL << 47);
+	} else {
+		xtalk_addr = SH_II_INT0 | ((unsigned long)nasid << 36) | (1UL << 47);
+	}
+
+	for (bit = 0; bit < 8; bit++) {
+		if (intr->bi_ibits & (1 << bit) ) {
+			/* Disable interrupts. */
+			pcireg_intr_enable_bit_clr(bridge, bit);
+			/* Reset Host address (Interrupt destination) */
+			pcireg_intr_addr_addr_set(bridge, bit, xtalk_addr);
+			/* Enable interrupt */
+			pcireg_intr_enable_bit_set(bridge, bit);
+			/* Force an interrupt, just in case. */
+			pcireg_force_intr_set(bridge, bit);
+		}
+	}
+	irq = intr->bi_irq;
+	old_cpu = intr->bi_cpu;
+	if (pdacpu(cpu)->sn_first_irq == 0 || pdacpu(cpu)->sn_first_irq > irq) {
+		pdacpu(cpu)->sn_first_irq = irq;
+	}
+	if (pdacpu(cpu)->sn_last_irq < irq) {
+		pdacpu(cpu)->sn_last_irq = irq;
+	}
+	pdacpu(old_cpu)->sn_num_irqs--;
+	pdacpu(cpu)->sn_num_irqs++;
+	intr->bi_cpu = (int)cpu;
 }

@@ -121,6 +121,7 @@ sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
         pcibr_intr_list_t p = pcibr_intr_list[irq];
         pcibr_intr_t intr; 
 	int	cpu;
+        extern void sn_shub_redirect_intr(pcibr_intr_t intr, unsigned long cpu);
         extern void sn_tio_redirect_intr(pcibr_intr_t intr, unsigned long cpu);
                 
 	if (p == NULL)
@@ -132,6 +133,11 @@ sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 		return; 
 
 	cpu = first_cpu(mask);
+	if (IS_PIC_SOFT(intr->bi_soft) ) {
+		sn_shub_redirect_intr(intr, cpu);
+	} else { 
+		return; 
+	}
 	(void) set_irq_affinity_info(irq, cpu_physical_id(intr->bi_cpu), redir);
 #endif /* CONFIG_SMP */
 }

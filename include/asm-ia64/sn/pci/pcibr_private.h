@@ -43,6 +43,10 @@ cfg_p pcibr_slot_config_addr(bridge_t *, pciio_slot_t, int);
 cfg_p pcibr_func_config_addr(bridge_t *, pciio_bus_t bus, pciio_slot_t, pciio_function_t, int);
 unsigned pcibr_slot_config_get(bridge_t *, pciio_slot_t, int);
 unsigned pcibr_func_config_get(bridge_t *, pciio_slot_t, pciio_function_t, int);
+extern void pcireg_intr_enable_bit_clr(void *, uint64_t);
+extern void pcireg_intr_enable_bit_set(void *, uint64_t);
+extern void pcireg_intr_addr_addr_set(void *, int, uint64_t);
+extern void pcireg_force_intr_set(void *, int);
 void pcibr_debug(uint32_t, vertex_hdl_t, char *, ...);
 void pcibr_slot_config_set(bridge_t *, pciio_slot_t, int, unsigned);
 void pcibr_func_config_set(bridge_t *, pciio_slot_t, pciio_function_t, int, 
@@ -303,6 +307,9 @@ struct pcibr_intr_wrap_s {
 #define PV856866 (1 << 1) /* PIC: avoid rrb's 0/1/8/9. */
 #define PV862253 (1 << 1) /* PIC: don't enable write req RAM parity checking */
 #define PV867308 (3 << 1) /* PIC: make LLP error interrupts FATAL for PIC */
+
+/* Bridgetype macros given a pcibr_soft structure */
+#define IS_PIC_SOFT(ps)     (ps->bs_bridge_type == PCIBR_BRIDGETYPE_PIC)
 
 
 /* defines for pcibr_soft_s->bs_bridge_mode */
