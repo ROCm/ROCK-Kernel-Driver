@@ -98,15 +98,16 @@ xfs_ihash_free(xfs_mount_t *mp)
 
 /*
  * Initialize the inode cluster hash table for the newly mounted file system.
- * Its size is based on the ihash table size, with at least a page of entries.
+ * Its size is derived from the ihash table size.
  */
 void
 xfs_chash_init(xfs_mount_t *mp)
 {
 	uint	i;
 
-	mp->m_chsize = max_t(uint, NBPP / sizeof(xfs_chash_t), mp->m_ihsize /
+	mp->m_chsize = max_t(uint, 1, mp->m_ihsize /
 			 (XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog));
+	mp->m_chsize = min_t(uint, mp->m_chsize, mp->m_ihsize);
 	mp->m_chash = (xfs_chash_t *)kmem_zalloc(mp->m_chsize
 						 * sizeof(xfs_chash_t),
 						 KM_SLEEP);
