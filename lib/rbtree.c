@@ -1,6 +1,7 @@
 /*
   Red Black Trees
   (C) 1999  Andrea Arcangeli <andrea@suse.de>
+  (C) 2002  David Woodhouse <dwmw2@infradead.org>
   
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -294,3 +295,70 @@ void rb_erase(rb_node_t * node, rb_root_t * root)
 		__rb_erase_color(child, parent, root);
 }
 EXPORT_SYMBOL(rb_erase);
+
+rb_node_t *rb_next(rb_node_t *node)
+{
+	/* If we have a right-hand child, go down and then left as far
+	   as we can. */
+	if (node->rb_right) {
+		node = node->rb_right; 
+		while (node->rb_left)
+			node=node->rb_left;
+		return node;
+	}
+
+	/* No right-hand children.  Everything down and left is
+	   smaller than us, so any 'next' node must be in the general
+	   direction of our parent. Go up the tree; any time the
+	   ancestor is a right-hand child of its parent, keep going
+	   up. First time it's a left-hand child of its parent, said
+	   parent is our 'next' node. */
+	while (node->rb_parent && node == node->rb_parent->rb_right)
+		node = node->rb_parent;
+
+	return node->rb_parent;
+}
+EXPORT_SYMBOL(rb_next);
+
+rb_node_t *rb_prev(rb_node_t *node)
+{
+	/* If we have a left-hand child, go down and then right as far
+	   as we can. */
+	if (node->rb_left) {
+		node = node->rb_left; 
+		while (node->rb_right)
+			node=node->rb_right;
+		return node;
+	}
+
+	/* No left-hand children. Go up till we find an ancestor which
+	   is a right-hand child of its parent */
+	while (node->rb_parent && node == node->rb_parent->rb_left)
+		node = node->rb_parent;
+
+	return node->rb_parent;
+}
+EXPORT_SYMBOL(rb_prev);
+
+void rb_replace_node(rb_node_t *victim, rb_node_t *new, rb_root_t *root)
+{
+	rb_node_t *parent = victim->rb_parent;
+
+	/* Set the surrounding nodes to point to the replacement */
+	if (parent) {
+		if (victim == parent->rb_left)
+			parent->rb_left = new;
+		else
+			parent->rb_right = new;
+	} else {
+		root->rb_node = new;
+	}
+	if (victim->rb_left)
+		victim->rb_left->rb_parent = new;
+	if (victim->rb_right)
+		victim->rb_right->rb_parent = new;
+
+	/* Copy the pointers/colour from the victim to the replacement */
+	*new = *victim;
+}
+EXPORT_SYMBOL(rb_replace_node);
