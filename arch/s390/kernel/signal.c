@@ -146,7 +146,7 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 
 
 /* Returns non-zero on fault. */
-static int save_sigregs(struct pt_regs *regs,_sigregs *sregs)
+static int save_sigregs(struct pt_regs *regs, _sigregs *sregs)
 {
 	int err;
   
@@ -158,18 +158,18 @@ static int save_sigregs(struct pt_regs *regs,_sigregs *sregs)
 	 * to merge them with the emulated registers.
 	 */
 	save_fp_regs(&current->thread.fp_regs);
-	return __copy_to_user(&sregs->fpregs, &current->thread.fp_regs, 
+	return __copy_to_user(&sregs->fpregs, &current->thread.fp_regs,
 			      sizeof(s390_fp_regs));
 }
 
 /* Returns positive number on error */
-static int restore_sigregs(struct pt_regs *regs,_sigregs *sregs)
+static int restore_sigregs(struct pt_regs *regs, _sigregs *sregs)
 {
 	int err;
 
 	err = __copy_from_user(regs, &sregs->regs, sizeof(_s390_regs_common));
 	regs->psw.mask = PSW_USER_BITS | (regs->psw.mask & PSW_MASK_CC);
-	regs->psw.addr |= PSW_ADDR_AMODE31;
+	regs->psw.addr |= PSW_ADDR_AMODE;
 	if (err)
 		return err;
 
@@ -299,9 +299,11 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-                regs->gprs[14] = (__u32) ka->sa.sa_restorer | PSW_ADDR_AMODE31;
+                regs->gprs[14] = (unsigned long)
+			ka->sa.sa_restorer | PSW_ADDR_AMODE;
 	} else {
-                regs->gprs[14] = (__u32) frame->retcode | PSW_ADDR_AMODE31;
+                regs->gprs[14] = (unsigned long)
+			frame->retcode | PSW_ADDR_AMODE;
 		if (__put_user(S390_SYSCALL_OPCODE | __NR_sigreturn, 
 	                       (u16 *)(frame->retcode)))
 			goto give_sigsegv;
@@ -312,12 +314,12 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (__u32) frame;
-	regs->psw.addr = (__u32) ka->sa.sa_handler | PSW_ADDR_AMODE31;
+	regs->gprs[15] = (unsigned long) frame;
+	regs->psw.addr = (unsigned long) ka->sa.sa_handler | PSW_ADDR_AMODE;
 	regs->psw.mask = PSW_USER_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (__u32) &frame->sc;
+	regs->gprs[3] = (unsigned long) &frame->sc;
 
 	/* We forgot to include these in the sigcontext.
 	   To avoid breaking binary compatibility, they are passed as args. */
@@ -357,9 +359,11 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-                regs->gprs[14] = (__u32) ka->sa.sa_restorer | PSW_ADDR_AMODE31;
+                regs->gprs[14] = (unsigned long)
+			ka->sa.sa_restorer | PSW_ADDR_AMODE;
 	} else {
-                regs->gprs[14] = (__u32) frame->retcode | PSW_ADDR_AMODE31;
+                regs->gprs[14] = (unsigned long)
+			frame->retcode | PSW_ADDR_AMODE;
 		err |= __put_user(S390_SYSCALL_OPCODE | __NR_rt_sigreturn, 
 	                          (u16 *)(frame->retcode));
 	}
@@ -369,13 +373,13 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (__u32) frame;
-	regs->psw.addr = (__u32) ka->sa.sa_handler | PSW_ADDR_AMODE31;
+	regs->gprs[15] = (unsigned long) frame;
+	regs->psw.addr = (unsigned long) ka->sa.sa_handler | PSW_ADDR_AMODE;
 	regs->psw.mask = PSW_USER_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (__u32) &frame->info;
-	regs->gprs[4] = (__u32) &frame->uc;
+	regs->gprs[3] = (unsigned long) &frame->info;
+	regs->gprs[4] = (unsigned long) &frame->uc;
 	return;
 
 give_sigsegv:
@@ -461,6 +465,13 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 	if (!oldset)
 		oldset = &current->blocked;
+#ifdef CONFIG_S390_SUPPORT 
+	if (test_thread_flag(TIF_31BIT)) {
+		extern asmlinkage int do_signal32(struct pt_regs *regs,
+						  sigset_t *oldset); 
+		return do_signal32(regs, oldset);
+        }
+#endif 
 
 	signr = get_signal_to_deliver(&info, regs, NULL);
 	if (signr > 0) {

@@ -171,7 +171,7 @@ static inline void do_store_status(void)
 
         /* store status of all processors in their lowcores (real 0) */
         for (i =  0; i < NR_CPUS; i++) {
-                if (!cpu_online(i) || smp_processor_id() == i)
+                if (!cpu_online(i) || smp_processor_id() == i) 
 			continue;
 		low_core_addr = (unsigned long) lowcore_ptr[i];
 		do {
@@ -310,13 +310,11 @@ static sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig)
  */
 static void smp_ext_bitcall_others(ec_bit_sig sig)
 {
-        struct _lowcore *lowcore;
         int i;
 
         for (i = 0; i < NR_CPUS; i++) {
                 if (!cpu_online(i) || smp_processor_id() == i)
                         continue;
-                lowcore = lowcore_ptr[i];
                 /*
                  * Set signaling bit in lowcore of target cpu and kick it
                  */
@@ -326,6 +324,7 @@ static void smp_ext_bitcall_others(ec_bit_sig sig)
         }
 }
 
+#ifndef CONFIG_ARCH_S390X
 /*
  * this function sends a 'purge tlb' signal to another CPU.
  */
@@ -338,6 +337,7 @@ void smp_ptlb_all(void)
 {
         on_each_cpu(smp_ptlb_callback, NULL, 0, 1);
 }
+#endif /* ! CONFIG_ARCH_S390X */
 
 /*
  * this function sends a 'reschedule' IPI to another CPU.
@@ -356,8 +356,8 @@ typedef struct
 {
 	__u16 start_ctl;
 	__u16 end_ctl;
-	__u32 orvals[16];
-	__u32 andvals[16];
+	unsigned long orvals[16];
+	unsigned long andvals[16];
 } ec_creg_mask_parms;
 
 /*
@@ -365,25 +365,14 @@ typedef struct
  */
 void smp_ctl_bit_callback(void *info) {
 	ec_creg_mask_parms *pp;
-	u32 cregs[16];
+	unsigned long cregs[16];
 	int i;
 	
 	pp = (ec_creg_mask_parms *) info;
-	asm volatile ("   bras  1,0f\n"
-		      "   stctl 0,0,0(%0)\n"
-		      "0: ex    %1,0(1)\n"
-		      : : "a" (cregs+pp->start_ctl),
-		          "a" ((pp->start_ctl<<4) + pp->end_ctl)
-		      : "memory", "1" );
+	__ctl_store(cregs[pp->start_ctl], pp->start_ctl, pp->end_ctl);
 	for (i = pp->start_ctl; i <= pp->end_ctl; i++)
 		cregs[i] = (cregs[i] & pp->andvals[i]) | pp->orvals[i];
-	asm volatile ("   bras  1,0f\n"
-		      "   lctl 0,0,0(%0)\n"
-		      "0: ex    %1,0(1)\n"
-		      : : "a" (cregs+pp->start_ctl),
-		          "a" ((pp->start_ctl<<4) + pp->end_ctl)
-		      : "memory", "1" );
-	return;
+	__ctl_load(cregs[pp->start_ctl], pp->start_ctl, pp->end_ctl);
 }
 
 /*
@@ -395,7 +384,7 @@ void smp_ctl_set_bit(int cr, int bit) {
 	parms.start_ctl = cr;
 	parms.end_ctl = cr;
 	parms.orvals[cr] = 1 << bit;
-	parms.andvals[cr] = 0xFFFFFFFF;
+	parms.andvals[cr] = -1L;
 	preempt_disable();
 	smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         __ctl_set_bit(cr, bit);
@@ -410,8 +399,8 @@ void smp_ctl_clear_bit(int cr, int bit) {
 
 	parms.start_ctl = cr;
 	parms.end_ctl = cr;
-	parms.orvals[cr] = 0x00000000;
-	parms.andvals[cr] = ~(1 << bit);
+	parms.orvals[cr] = 0;
+	parms.andvals[cr] = ~(1L << bit);
 	preempt_disable();
 	smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         __ctl_clear_bit(cr, bit);
@@ -493,7 +482,7 @@ int __cpu_up(unsigned int cpu)
 	 *  Set prefix page for new cpu
 	 */
 
-	ccode = signal_processor_p((u32)(lowcore_ptr[cpu]),
+	ccode = signal_processor_p((unsigned long)(lowcore_ptr[cpu]),
 				   cpu, sigp_set_prefix);
 	if (ccode){
 		printk("sigp_set_prefix failed for cpu %d "
@@ -501,7 +490,6 @@ int __cpu_up(unsigned int cpu)
 		       (int) cpu, (int) ccode);
 		return -EIO;
 	}
-
 
         /* We can't use kernel_thread since we must _avoid_ to reschedule
            the child. */
@@ -521,15 +509,13 @@ int __cpu_up(unsigned int cpu)
 
         cpu_lowcore = lowcore_ptr[cpu];
 	cpu_lowcore->save_area[15] = idle->thread.ksp;
-	cpu_lowcore->kernel_stack = (__u32) idle->thread_info + (2*PAGE_SIZE);
-        __asm__ __volatile__("la    1,%0\n\t"
-			     "stctl 0,15,0(1)\n\t"
-			     "la    1,%1\n\t"
-                             "stam  0,15,0(1)"
-                             : "=m" (cpu_lowcore->cregs_save_area[0]),
-                               "=m" (cpu_lowcore->access_regs_save_area[0])
-                             : : "1", "memory");
-
+	cpu_lowcore->kernel_stack = (unsigned long)
+		idle->thread_info + (THREAD_SIZE);
+	__ctl_store(cpu_lowcore->cregs_save_area[0], 0, 15);
+	__asm__ __volatile__("la    1,%0\n\t"
+			     "stam  0,15,0(1)"
+			     : "=m" (cpu_lowcore->access_regs_save_area[0])
+			     : : "1", "memory");
         eieio();
         signal_processor(cpu,sigp_restart);
 
@@ -551,7 +537,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
                 panic("Couldn't request external interrupt 0x1202");
         smp_check_cpus(max_cpus);
         memset(lowcore_ptr,0,sizeof(lowcore_ptr));  
-
         /*
          *  Initialize prefix pages and stacks for all possible cpus
          */
@@ -561,15 +546,16 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (!cpu_possible(i))
 			continue;
 		lowcore_ptr[i] = (struct _lowcore *)
-			__get_free_page(GFP_KERNEL|GFP_DMA);
-		async_stack = __get_free_pages(GFP_KERNEL,1);
-		if (lowcore_ptr[i] == NULL || async_stack == 0UL)
+			__get_free_pages(GFP_KERNEL|GFP_DMA, 
+					sizeof(void*) == 8 ? 1 : 0);
+		async_stack = __get_free_pages(GFP_KERNEL,ASYNC_ORDER);
+		if (lowcore_ptr[i] == NULL || async_stack == 0ULL)
 			panic("smp_boot_cpus failed to allocate memory\n");
 
                 memcpy(lowcore_ptr[i], &S390_lowcore, sizeof(struct _lowcore));
-		lowcore_ptr[i]->async_stack = async_stack + (2 * PAGE_SIZE);
+		lowcore_ptr[i]->async_stack = async_stack + (ASYNC_SIZE);
 	}
-	set_prefix((u32) lowcore_ptr[smp_processor_id()]);
+	set_prefix((u32)(unsigned long) lowcore_ptr[smp_processor_id()]);
 }
 
 void __devinit smp_prepare_boot_cpu(void)

@@ -4,11 +4,14 @@
  *  S390 version
  */
 #include <linux/config.h>
+#include <linux/highuid.h>
 #include <linux/module.h>
+#include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include <asm/checksum.h>
 #include <asm/delay.h>
+#include <asm/pgalloc.h>
 #include <asm/setup.h>
 #if CONFIG_IP_MULTICAST
 #include <net/arp.h>
@@ -48,6 +51,28 @@ EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(strrchr);
 EXPORT_SYMBOL_NOVERS(strstr);
 EXPORT_SYMBOL_NOVERS(strpbrk);
+
+/*
+ * binfmt_elf loader 
+ */
+extern int dump_fpu (struct pt_regs * regs, s390_fp_regs *fpregs);
+EXPORT_SYMBOL(dump_fpu);
+EXPORT_SYMBOL(overflowuid);
+EXPORT_SYMBOL(overflowgid);
+
+#ifdef CONFIG_S390_SUPPORT
+/*
+ * Dynamically add/remove 31 bit ioctl conversion functions.
+ */
+extern int register_ioctl32_conversion(unsigned int cmd,
+				       int (*handler)(unsigned int, 
+						      unsigned int,
+						      unsigned long,
+						      struct file *));
+int unregister_ioctl32_conversion(unsigned int cmd);
+EXPORT_SYMBOL(register_ioctl32_conversion);
+EXPORT_SYMBOL(unregister_ioctl32_conversion);
+#endif
 
 /*
  * misc.

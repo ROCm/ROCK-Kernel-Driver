@@ -56,7 +56,11 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
 	unsigned long bc;
 
 	bc = *((unsigned long *) tsk->thread.ksp);
+#ifndef CONFIG_ARCH_S390X
 	return *((unsigned long *) (bc+56));
+#else
+	return *((unsigned long *) (bc+112));
+#endif
 }
 
 /*
@@ -79,6 +83,7 @@ void default_idle(void)
 	 */
 	wait_psw.mask = PSW_KERNEL_BITS | PSW_MASK_MCHECK | PSW_MASK_WAIT |
 		PSW_MASK_IO | PSW_MASK_EXT;
+#ifndef CONFIG_ARCH_S390X
 	asm volatile (
 		"    basr %0,0\n"
 		"0:  la   %0,1f-0b(%0)\n"
@@ -92,6 +97,18 @@ void default_idle(void)
 		"    lpsw 0(%1)\n"
 		"2:"
 		: "=&a" (reg) : "a" (&wait_psw) : "memory", "cc" );
+#else /* CONFIG_ARCH_S390X */
+	asm volatile (
+		"    larl  %0,0f\n"
+		"    stg   %0,8(%1)\n"
+		"    lpswe 0(%1)\n"
+		"0:  larl  %0,1f\n"
+		"    stg   %0,8(%1)\n"
+		"    ni    1(%1),0xf9\n"
+		"    lpswe 0(%1)\n"
+		"1:"
+		: "=&a" (reg) : "a" (&wait_psw) : "memory", "cc" );
+#endif /* CONFIG_ARCH_S390X */
 }
 
 int cpu_idle(void)
@@ -109,9 +126,9 @@ void show_regs(struct pt_regs *regs)
 	struct task_struct *tsk = current;
 
         printk("CPU:    %d    %s\n", tsk->thread_info->cpu, print_tainted());
-        printk("Process %s (pid: %d, task: %08lx, ksp: %08x)\n",
-	       current->comm, current->pid, (unsigned long) tsk,
-	       tsk->thread.ksp);
+        printk("Process %s (pid: %d, task: %p, ksp: %p)\n",
+	       current->comm, current->pid, (void *) tsk,
+	       (void *) tsk->thread.ksp);
 
 	show_registers(regs);
 	/* Show stack backtrace if pt_regs is from kernel mode */
@@ -120,6 +137,9 @@ void show_regs(struct pt_regs *regs)
 }
 
 extern void kernel_thread_starter(void);
+
+#ifndef CONFIG_ARCH_S390X
+
 __asm__(".align 4\n"
 	"kernel_thread_starter:\n"
 	"    l     15,0(8)\n"
@@ -130,6 +150,20 @@ __asm__(".align 4\n"
 	"    sr    2,2\n"
 	"    br    11\n");
 
+#else /* CONFIG_ARCH_S390X */
+
+__asm__(".align 4\n"
+	"kernel_thread_starter:\n"
+	"    lg    15,0(8)\n"
+	"    sgr   15,7\n"
+	"    stosm 48(15),3\n"
+	"    lgr   2,10\n"
+	"    basr  14,9\n"
+	"    sgr   2,2\n"
+	"    br    11\n");
+
+#endif /* CONFIG_ARCH_S390X */
+
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	struct task_struct *p;
@@ -137,7 +171,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 
 	memset(&regs, 0, sizeof(regs));
 	regs.psw.mask = PSW_KERNEL_BITS;
-	regs.psw.addr = (__u32) kernel_thread_starter | PSW_ADDR_AMODE31;
+	regs.psw.addr = (unsigned long) kernel_thread_starter | PSW_ADDR_AMODE;
 	regs.gprs[7] = STACK_FRAME_OVERHEAD;
 	regs.gprs[8] = __LC_KERNEL_STACK;
 	regs.gprs[9] = (unsigned long) fn;
@@ -180,8 +214,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
             unsigned long glue2;
             unsigned long scratch[2];
             unsigned long gprs[10];    /* gprs 6 -15                       */
-            unsigned long fprs[4];     /* fpr 4 and 6                      */
-            unsigned long empty[4];
+            unsigned int  fprs[4];     /* fpr 4 and 6                      */
+            unsigned int  empty[4];
             struct pt_regs childregs;
           } *frame;
 
@@ -198,7 +232,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
         frame->gprs[8] = (unsigned long) ret_from_fork;
 
         /* fake return stack for resume(), don't go back to schedule */
-        frame->gprs[9]  = (unsigned long) frame;
+        frame->gprs[9] = (unsigned long) frame;
+#ifndef CONFIG_ARCH_S390X
         /*
 	 * save fprs to current->thread.fp_regs to merge them with
 	 * the emulated registers and then copy the result to the child.
@@ -207,14 +242,31 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 	memcpy(&p->thread.fp_regs, &current->thread.fp_regs,
 	       sizeof(s390_fp_regs));
         p->thread.user_seg = __pa((unsigned long) p->mm->pgd) | _SEGMENT_TABLE;
-	/* start process with ar4 pointing to the correct address space */
+	/* Set a new TLS ?  */
+	if (clone_flags & CLONE_SETTLS)
+		frame->childregs.acrs[0] = regs->gprs[6];
+#else /* CONFIG_ARCH_S390X */
+	/* Save the fpu registers to new thread structure. */
+	save_fp_regs(&p->thread.fp_regs);
+        p->thread.user_seg = __pa((unsigned long) p->mm->pgd) | _REGION_TABLE;
+	/* Set a new TLS ?  */
+	if (clone_flags & CLONE_SETTLS) {
+		if (test_thread_flag(TIF_31BIT)) {
+			frame->childregs.acrs[0] =
+				(unsigned int) regs->gprs[6];
+		} else {
+			frame->childregs.acrs[0] =
+				(unsigned int)(regs->gprs[6] >> 32);
+			frame->childregs.acrs[1] =
+				(unsigned int) regs->gprs[6];
+		}
+	}
+#endif /* CONFIG_ARCH_S390X */
+	/* start new process with ar4 pointing to the correct address space */
 	p->thread.ar4 = get_fs().ar4;
         /* Don't copy debug registers */
         memset(&p->thread.per_info,0,sizeof(p->thread.per_info));
 
-	/* Set a new TLS ?  */
-	if (clone_flags & CLONE_SETTLS)
-		frame->childregs.acrs[0] = regs->gprs[6];
         return 0;
 }
 
@@ -292,12 +344,16 @@ out:
  */
 int dump_fpu (struct pt_regs * regs, s390_fp_regs *fpregs)
 {
+#ifndef CONFIG_ARCH_S390X
         /*
 	 * save fprs to current->thread.fp_regs to merge them with
 	 * the emulated registers and then copy the result to the dump.
 	 */
 	save_fp_regs(&current->thread.fp_regs);
 	memcpy(fpregs, &current->thread.fp_regs, sizeof(s390_fp_regs));
+#else /* CONFIG_ARCH_S390X */
+	save_fp_regs(fpregs);
+#endif /* CONFIG_ARCH_S390X */
 	return 1;
 }
 
@@ -339,16 +395,22 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
 	stack_page = (unsigned long) p->thread_info;
 	r15 = p->thread.ksp;
-        if (!stack_page || r15 < stack_page || r15 >= 8188+stack_page)
-                return 0;
-        bc = (*(unsigned long *) r15) & 0x7fffffff;
+	if (!stack_page || r15 < stack_page ||
+	    r15 >= THREAD_SIZE - sizeof(unsigned long) + stack_page)
+		return 0;
+	bc = (*(unsigned long *) r15) & PSW_ADDR_INSN;
 	do {
-                if (bc < stack_page || bc >= 8188+stack_page)
-                        return 0;
-		r14 = (*(unsigned long *) (bc+56)) & 0x7fffffff;
+		if (bc < stack_page ||
+		    bc >= THREAD_SIZE - sizeof(unsigned long) + stack_page)
+			return 0;
+#ifndef CONFIG_ARCH_S390X
+		r14 = (*(unsigned long *) (bc+56)) & PSW_ADDR_INSN;
+#else
+		r14 = *(unsigned long *) (bc+112);
+#endif
 		if (r14 < first_sched || r14 >= last_sched)
 			return r14;
-		bc = (*(unsigned long *) bc) & 0x7fffffff;
+		bc = (*(unsigned long *) bc) & PSW_ADDR_INSN;
 	} while (count++ < 16);
 	return 0;
 }

@@ -324,15 +324,22 @@ void __init setup_arch(char **cmdline_p)
         /*
          * print what head.S has found out about the machine 
          */
+#ifndef CONFIG_ARCH_S390X
 	printk((MACHINE_IS_VM) ?
 	       "We are running under VM (31 bit mode)\n" :
 	       "We are running native (31 bit mode)\n");
 	printk((MACHINE_HAS_IEEE) ?
 	       "This machine has an IEEE fpu\n" :
 	       "This machine has no IEEE fpu\n");
+#else /* CONFIG_ARCH_S390X */
+	printk((MACHINE_IS_VM) ?
+	       "We are running under VM (64 bit mode)\n" :
+	       "We are running native (64 bit mode)\n");
+#endif /* CONFIG_ARCH_S390X */
 
         ROOT_DEV = Root_RAM0;
         memory_start = (unsigned long) &_end;    /* fixit if use $CODELO etc*/
+#ifndef CONFIG_ARCH_S390X
 	memory_end = memory_size & ~0x400000UL;  /* align memory end to 4MB */
         /*
          * We need some free virtual space to be able to do vmalloc.
@@ -341,6 +348,9 @@ void __init setup_arch(char **cmdline_p)
          */
         if (memory_end > 1920*1024*1024)
                 memory_end = 1920*1024*1024;
+#else /* CONFIG_ARCH_S390X */
+	memory_end = memory_size & ~0x200000UL;  /* detected in head.s */
+#endif /* CONFIG_ARCH_S390X */
         init_mm.start_code = PAGE_OFFSET;
         init_mm.end_code = (unsigned long) &_etext;
         init_mm.end_data = (unsigned long) &_edata;
@@ -461,26 +471,46 @@ void __init setup_arch(char **cmdline_p)
         /*
          * Setup lowcore for boot cpu
          */
+#ifndef CONFIG_ARCH_S390X
 	lc = (struct _lowcore *) __alloc_bootmem(PAGE_SIZE, PAGE_SIZE, 0);
 	memset(lc, 0, PAGE_SIZE);
+#else /* CONFIG_ARCH_S390X */
+	lc = (struct _lowcore *) __alloc_bootmem(2*PAGE_SIZE, 2*PAGE_SIZE, 0);
+	memset(lc, 0, 2*PAGE_SIZE);
+#endif /* CONFIG_ARCH_S390X */
 	lc->restart_psw.mask = PSW_BASE_BITS;
-	lc->restart_psw.addr = PSW_ADDR_AMODE31 + (__u32) restart_int_handler;
+	lc->restart_psw.addr =
+		PSW_ADDR_AMODE + (unsigned long) restart_int_handler;
 	lc->external_new_psw.mask = PSW_KERNEL_BITS;
-	lc->external_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) ext_int_handler;
+	lc->external_new_psw.addr =
+		PSW_ADDR_AMODE + (unsigned long) ext_int_handler;
 	lc->svc_new_psw.mask = PSW_KERNEL_BITS;
-	lc->svc_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) system_call;
+	lc->svc_new_psw.addr = PSW_ADDR_AMODE + (unsigned long) system_call;
 	lc->program_new_psw.mask = PSW_KERNEL_BITS;
-	lc->program_new_psw.addr = PSW_ADDR_AMODE31 + (__u32)pgm_check_handler;
-        lc->mcck_new_psw.mask = PSW_KERNEL_BITS;
-	lc->mcck_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) mcck_int_handler;
+	lc->program_new_psw.addr =
+		PSW_ADDR_AMODE + (unsigned long)pgm_check_handler;
+	lc->mcck_new_psw.mask = PSW_KERNEL_BITS;
+	lc->mcck_new_psw.addr =
+		PSW_ADDR_AMODE + (unsigned long) mcck_int_handler;
 	lc->io_new_psw.mask = PSW_KERNEL_BITS;
-	lc->io_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) io_int_handler;
+	lc->io_new_psw.addr = PSW_ADDR_AMODE + (unsigned long) io_int_handler;
 	lc->ipl_device = S390_lowcore.ipl_device;
+	lc->jiffy_timer = -1LL;
+#ifndef CONFIG_ARCH_S390X
 	lc->kernel_stack = ((__u32) &init_thread_union) + 8192;
 	lc->async_stack = (__u32)
 		__alloc_bootmem(2*PAGE_SIZE, 2*PAGE_SIZE, 0) + 8192;
-	lc->jiffy_timer = -1LL;
 	set_prefix((__u32) lc);
+#else /* CONFIG_ARCH_S390X */
+	lc->kernel_stack = ((__u64) &init_thread_union) + 16384;
+	lc->async_stack = (__u64)
+		__alloc_bootmem(4*PAGE_SIZE, 4*PAGE_SIZE, 0) + 16384;
+	if (MACHINE_HAS_DIAG44)
+		lc->diag44_opcode = 0x83000044;
+	else
+		lc->diag44_opcode = 0x07000700;
+	set_prefix((__u32)(__u64) lc);
+#endif /* CONFIG_ARCH_S390X */
         cpu_init();
         __cpu_logical_map[0] = S390_lowcore.cpu_data.cpu_addr;
 

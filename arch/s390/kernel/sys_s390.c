@@ -24,15 +24,24 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
+#ifdef CONFIG_ARCH_S390X
+#include <linux/personality.h>
+#endif /* CONFIG_ARCH_S390X */
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
+
+#ifndef CONFIG_ARCH_S390X
+#define __SYS_RETTYPE int
+#else
+#define __SYS_RETTYPE long
+#endif /* CONFIG_ARCH_S390X */
 
 /*
  * sys_pipe() is the normal C calling standard for creating
  * a pipe. It's not the way Unix traditionally does this, though.
  */
-asmlinkage int sys_pipe(unsigned long * fildes)
+asmlinkage __SYS_RETTYPE sys_pipe(unsigned long * fildes)
 {
 	int fd[2];
 	int error;
@@ -51,7 +60,7 @@ static inline long do_mmap2(
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	int error = -EBADF;
+	__SYS_RETTYPE error = -EBADF;
 	struct file * file = NULL;
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
@@ -99,10 +108,10 @@ out:
 	return error;
 }
 
-asmlinkage int old_mmap(struct mmap_arg_struct *arg)
+asmlinkage __SYS_RETTYPE old_mmap(struct mmap_arg_struct *arg)
 {
 	struct mmap_arg_struct a;
-	int error = -EFAULT;
+	__SYS_RETTYPE error = -EFAULT;
 
 	if (copy_from_user(&a, arg, sizeof(a)))
 		goto out;
@@ -118,6 +127,7 @@ out:
 
 extern asmlinkage int sys_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 
+#ifndef CONFIG_ARCH_S390X
 struct sel_arg_struct {
 	unsigned long n;
 	fd_set *inp, *outp, *exp;
@@ -132,22 +142,61 @@ asmlinkage int old_select(struct sel_arg_struct *arg)
 		return -EFAULT;
 	/* sys_select() does the appropriate kernel locking */
 	return sys_select(a.n, a.inp, a.outp, a.exp, a.tvp);
+
 }
+#else /* CONFIG_ARCH_S390X */
+unsigned long
+arch_get_unmapped_area(struct file *filp, unsigned long addr,
+		       unsigned long len, unsigned long pgoff,
+		       unsigned long flags)
+{
+	struct vm_area_struct *vma;
+	unsigned long end;
+
+	if (test_thread_flag(TIF_31BIT)) { 
+		if (!addr) 
+			addr = 0x40000000; 
+		end = 0x80000000;		
+	} else { 
+		if (!addr) 
+			addr = TASK_SIZE / 2;
+		end = TASK_SIZE; 
+	}
+
+	if (len > end)
+		return -ENOMEM;
+	addr = PAGE_ALIGN(addr);
+
+	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
+		if (end - len < addr)
+			return -ENOMEM;
+		if (!vma || addr + len <= vma->vm_start)
+			return addr;
+		addr = vma->vm_end;
+	}
+}
+#endif /* CONFIG_ARCH_S390X */
 
 /*
  * sys_ipc() is the de-multiplexer for the SysV IPC calls..
  *
  * This is really horribly ugly.
  */
-asmlinkage int sys_ipc (uint call, int first, int second, 
-                        int third, void *ptr)
+asmlinkage __SYS_RETTYPE sys_ipc (uint call, int first, int second, 
+				  unsigned long third, void *ptr,
+				  unsigned long fifth)
 {
         struct ipc_kludge tmp;
 	int ret;
 
         switch (call) {
         case SEMOP:
-                return sys_semop (first, (struct sembuf *)ptr, second);
+		return sys_semtimedop (first, (struct sembuf *) ptr, second,
+				       NULL);
+	case SEMTIMEDOP:
+		return sys_semtimedop(first, (struct sembuf *) ptr, second,
+				      (const struct timespec *) fifth);
         case SEMGET:
                 return sys_semget (first, second, third);
         case SEMCTL: {
@@ -191,7 +240,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		return sys_shmctl (first, second,
                                    (struct shmid_ds *) ptr);
 	default:
-		return -EINVAL;
+		return -ENOSYS;
 
 	}
         
@@ -212,6 +261,7 @@ asmlinkage int sys_uname(struct old_utsname * name)
 	return err?-EFAULT:0;
 }
 
+#ifndef CONFIG_ARCH_S390X
 asmlinkage int sys_olduname(struct oldold_utsname * name)
 {
 	int error;
@@ -243,6 +293,36 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 
 asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
 {
-  return -ENOSYS;
+	return -ENOSYS;
 }
 
+#else /* CONFIG_ARCH_S390X */
+
+extern asmlinkage int sys_newuname(struct new_utsname * name);
+
+asmlinkage int s390x_newuname(struct new_utsname * name)
+{
+	int ret = sys_newuname(name);
+
+	if (current->personality == PER_LINUX32 && !ret) {
+		ret = copy_to_user(name->machine, "s390\0\0\0\0", 8);
+		if (ret) ret = -EFAULT;
+	}
+	return ret;
+}
+
+extern asmlinkage long sys_personality(unsigned long);
+
+asmlinkage int s390x_personality(unsigned long personality)
+{
+	int ret;
+
+	if (current->personality == PER_LINUX32 && personality == PER_LINUX)
+		personality = PER_LINUX32;
+	ret = sys_personality(personality);
+	if (ret == PER_LINUX32)
+		ret = PER_LINUX;
+
+	return ret;
+}
+#endif /* CONFIG_ARCH_S390X */
