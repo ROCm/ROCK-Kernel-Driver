@@ -235,7 +235,7 @@ static int skel_open (struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 			
-	dev = dev_get_drvdata (&interface->dev);
+	dev = usb_get_intfdata(interface);
 	if (!dev)
 		return -ENODEV;
 
