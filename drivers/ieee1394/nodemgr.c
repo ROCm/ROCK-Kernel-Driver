@@ -19,6 +19,7 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/moduleparam.h>
+#include <linux/suspend.h>
 #include <asm/atomic.h>
 
 #include "ieee1394_types.h"
@@ -1475,15 +1476,22 @@ static int nodemgr_host_thread(void *__hi)
 
 	/* Sit and wait for a signal to probe the nodes on the bus. This
 	 * happens when we get a bus reset. */
-	while (!down_interruptible(&hi->reset_sem) &&
-	       !down_interruptible(&nodemgr_serialize)) {
+	while (1) {
 		unsigned int generation = 0;
 		int i;
 
-		if (hi->kill_me) {
-			up(&nodemgr_serialize);
-			goto caught_signal;
+		if (down_interruptible(&hi->reset_sem) ||
+		    down_interruptible(&nodemgr_serialize)) {
+			if (current->flags & PF_FREEZE) {
+				refrigerator(0);
+				continue;
+			}
+			printk("nodemgr: received unexpected signal?!\n" );
+			break;
 		}
+
+		if (hi->kill_me)
+			break;
 
 		/* Pause for 1/4 second in 1/16 second intervals,
 		 * to make sure things settle down. */
@@ -1535,6 +1543,7 @@ static int nodemgr_host_thread(void *__hi)
 
 		up(&nodemgr_serialize);
 	}
+	printk("nodemgr: Exiting due to no down\n");
 
 caught_signal:
 	HPSB_VERBOSE("NodeMgr: Exiting thread");
