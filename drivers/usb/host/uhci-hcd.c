@@ -1255,7 +1255,9 @@ static struct urb *uhci_find_urb_ep(struct uhci_hcd *uhci, struct urb *urb)
 	return NULL;
 }
 
-static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
+static int uhci_urb_enqueue(struct usb_hcd *hcd,
+		struct usb_host_endpoint *ep,
+		struct urb *urb, int mem_flags)
 {
 	int ret;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
@@ -2293,44 +2295,13 @@ static struct usb_hcd *uhci_hcd_alloc(void)
 	return &uhci->hcd;
 }
 
-/* Are there any URBs for a particular device/endpoint on a given list? */
-static int urbs_for_ep_list(struct list_head *head,
-		struct hcd_dev *hdev, int ep)
-{
-	struct urb_priv *urbp;
-
-	list_for_each_entry(urbp, head, urb_list) {
-		struct urb *urb = urbp->urb;
-
-		if (hdev == urb->dev->hcpriv && ep ==
-				(usb_pipeendpoint(urb->pipe) |
-				 usb_pipein(urb->pipe)))
-			return 1;
-	}
-	return 0;
-}
-
-/* Are there any URBs for a particular device/endpoint? */
-static int urbs_for_ep(struct uhci_hcd *uhci, struct hcd_dev *hdev, int ep)
-{
-	int rc;
-
-	spin_lock_irq(&uhci->schedule_lock);
-	rc = (urbs_for_ep_list(&uhci->urb_list, hdev, ep) ||
-			urbs_for_ep_list(&uhci->complete_list, hdev, ep) ||
-			urbs_for_ep_list(&uhci->urb_remove_list, hdev, ep));
-	spin_unlock_irq(&uhci->schedule_lock);
-	return rc;
-}
-
 /* Wait until all the URBs for a particular device/endpoint are gone */
 static void uhci_hcd_endpoint_disable(struct usb_hcd *hcd,
-		struct hcd_dev *hdev, int endpoint)
+		struct usb_host_endpoint *ep)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
-	wait_event_interruptible(uhci->waitqh,
-			!urbs_for_ep(uhci, hdev, endpoint));
+	wait_event_interruptible(uhci->waitqh, list_empty(&ep->urb_list));
 }
 
 static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
