@@ -71,27 +71,27 @@ static __inline__ void atomic_dec(volatile atomic_t *v)
 static __inline__ int atomic_dec_and_test(volatile atomic_t *v)
 {
 	unsigned long flags;
-	int result;
+	int val;
 
 	__save_flags_cli(flags);
-	v->counter -= 1;
-	result = (v->counter == 0);
+	val = v->counter;
+	v->counter = val -= 1;
 	__restore_flags(flags);
 
-	return result;
+	return val == 0;
 }
 
 static inline int atomic_add_negative(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
-	int result;
+	int val;
 
 	__save_flags_cli(flags);
-	v->counter += i;
-	result = (v->counter < 0);
+	val = v->counter;
+	v->counter = val += i;
 	__restore_flags(flags);
 
-	return result;
+	return val < 0;
 }
 
 static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *addr)

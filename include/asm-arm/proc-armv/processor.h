@@ -22,21 +22,6 @@
 
 #define KERNEL_STACK_SIZE	PAGE_SIZE
 
-struct cpu_context_save {
-	unsigned long cpsr;
-	unsigned long r4;
-	unsigned long r5;
-	unsigned long r6;
-	unsigned long r7;
-	unsigned long r8;
-	unsigned long r9;
-	unsigned long sl;
-	unsigned long fp;
-	unsigned long pc;
-};
-
-#define INIT_CSS (struct cpu_context_save){ SVC_MODE, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-
 #define INIT_EXTRA_THREAD_INFO						\
 	cpu_domain:	  domain_val(DOMAIN_USER, DOMAIN_CLIENT) |	\
 			  domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) |	\
@@ -58,7 +43,7 @@ struct cpu_context_save {
 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
 })
 
-#define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1021])
-#define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1019])
+#define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1019])
+#define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1017])
 
 #endif

@@ -158,7 +158,7 @@ static int clps7111fb_blank(int blank, struct fb_info *info)
 			clps_writeb(clps_readb(PDDR) & ~EDB_PD1_LCD_DC_DC_EN, PDDR);
 
 			/* Delay for a little while (half a second). */
-			for (i=0; i<65536*4; i++);
+			udelay(100);
 
 			/* Power off the LCD panel. */
 			clps_writeb(clps_readb(PDDR) & ~EDB_PD2_LCDEN, PDDR);
@@ -169,24 +169,24 @@ static int clps7111fb_blank(int blank, struct fb_info *info)
 		}
 	} else {
 		if (machine_is_edb7211()) {
-				int i;
+			int i;
 
-				/* Power up the LCD controller. */
-				clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN,
-						SYSCON1);
+			/* Power up the LCD controller. */
+			clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN,
+					SYSCON1);
 
-				/* Power up the LCD panel. */
-				clps_writeb(clps_readb(PDDR) | EDB_PD2_LCDEN, PDDR);
+			/* Power up the LCD panel. */
+			clps_writeb(clps_readb(PDDR) | EDB_PD2_LCDEN, PDDR);
 
-				/* Delay for a little while. */
-				for (i=0; i<65536*4; i++);
+			/* Delay for a little while. */
+			udelay(100);
 
-				/* Power up the LCD DC-DC converter. */
-				clps_writeb(clps_readb(PDDR) | EDB_PD1_LCD_DC_DC_EN,
-						PDDR);
+			/* Power up the LCD DC-DC converter. */
+			clps_writeb(clps_readb(PDDR) | EDB_PD1_LCD_DC_DC_EN,
+					PDDR);
 
-				/* Turn on the LCD backlight. */
-				clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
+			/* Turn on the LCD backlight. */
+			clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 		}
 	}
 	return 0;
