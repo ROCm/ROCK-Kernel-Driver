@@ -1,9 +1,9 @@
 /*
- * include/asm-v850/nb85e_utils.h -- Utility functions associated with
- *	the NB85E cpu core
+ * include/asm-v850/v850e_utils.h -- Utility functions associated with
+ *	V850E CPUs
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -12,10 +12,7 @@
  * Written by Miles Bader <miles@gnu.org>
  */
 
-/* Note: these functions are often associated with the N85E cpu core,
-   but not always, which is why they're not in `nb85e.c'.  */
-
-#include <asm/nb85e_utils.h>
+#include <asm/v850e_utils.h>
 
 /* Calculate counter clock-divider and count values to attain the
    desired frequency RATE from the base frequency BASE_FREQ.  The

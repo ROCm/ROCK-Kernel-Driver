@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/as85ep1.h -- AS85EP1 evaluation CPU chip/board
  *
- *  Copyright (C) 2001,2002  NEC Corporation
- *  Copyright (C) 2001,2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -14,8 +14,9 @@
 #ifndef __V850_AS85EP1_H__
 #define __V850_AS85EP1_H__
 
+#include <asm/v850e.h>
 
-#define CPU_ARCH 	"v850e"
+
 #define CPU_MODEL	"as85ep1"
 #define CPU_MODEL_LONG	"NEC V850E/AS85EP1"
 #define PLATFORM	"AS85EP1"
@@ -86,9 +87,6 @@
 #define AS85EP1_PORT_PMC(n)	(*(volatile u8 *)AS85EP1_PORT_PMC_ADDR(n))
 
 
-/* NB85E-style interrupt system.  */
-#include <asm/nb85e_intc.h>
-
 /* Hardware-specific interrupt numbers (in the kernel IRQ namespace).  */
 #define IRQ_INTCCC(n)	(0x0C + (n))
 #define IRQ_INTCCC_NUM	8
@@ -110,12 +108,12 @@ extern void as85ep1_init_irqs (void);
 
 
 /* AS85EP1 UART details (basically the same as the V850E/MA1, but 2 channels).  */
-#define NB85E_UART_NUM_CHANNELS		2
-#define NB85E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 4)
-#define NB85E_UART_CHIP_NAME 		"V850E/NA85E"
+#define V850E_UART_NUM_CHANNELS		2
+#define V850E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 4)
+#define V850E_UART_CHIP_NAME 		"V850E/NA85E"
 
 /* This is a function that gets called before configuring the UART.  */
-#define NB85E_UART_PRE_CONFIGURE	as85ep1_uart_pre_configure
+#define V850E_UART_PRE_CONFIGURE	as85ep1_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void as85ep1_uart_pre_configure (unsigned chan,
 					unsigned cflags, unsigned baud);
@@ -124,9 +122,9 @@ extern void as85ep1_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART, but only for channel 1. */
 
 /* CTS for UART channel 1 is pin P54 (bit 4 of port 5).  */
-#define NB85E_UART_CTS(chan)   ((chan) == 1 ? !(AS85EP1_PORT_IO(5) & 0x10) : 1)
+#define V850E_UART_CTS(chan)   ((chan) == 1 ? !(AS85EP1_PORT_IO(5) & 0x10) : 1)
 /* RTS for UART channel 1 is pin P53 (bit 3 of port 5).  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   if (chan == 1) {						      \
 		   unsigned old = AS85EP1_PORT_IO(5); 			      \
@@ -139,16 +137,16 @@ extern void as85ep1_uart_pre_configure (unsigned chan,
 
 
 /* Timer C details.  */
-#define NB85E_TIMER_C_BASE_ADDR		0xFFFFF600
+#define V850E_TIMER_C_BASE_ADDR		0xFFFFF600
 
 /* Timer D details (the AS85EP1 actually has 5 of these; should change later). */
-#define NB85E_TIMER_D_BASE_ADDR		0xFFFFF540
-#define NB85E_TIMER_D_TMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x0)
-#define NB85E_TIMER_D_CMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x2)
-#define NB85E_TIMER_D_TMCD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x4)
+#define V850E_TIMER_D_BASE_ADDR		0xFFFFF540
+#define V850E_TIMER_D_TMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x0)
+#define V850E_TIMER_D_CMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x2)
+#define V850E_TIMER_D_TMCD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x4)
 
-#define NB85E_TIMER_D_BASE_FREQ		SYS_CLOCK_FREQ
-#define NB85E_TIMER_D_TMCD_CS_MIN	2 /* min 2^2 divider */
+#define V850E_TIMER_D_BASE_FREQ		SYS_CLOCK_FREQ
+#define V850E_TIMER_D_TMCD_CS_MIN	2 /* min 2^2 divider */
 
 
 /* For <asm/param.h> */

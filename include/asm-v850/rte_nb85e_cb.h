@@ -17,6 +17,21 @@
 #include <asm/rte_cb.h>		/* Common defs for Midas RTE-CB boards.  */
 
 
+#define PLATFORM		"rte-v850e/nb85e-cb"
+#define PLATFORM_LONG		"Midas lab RTE-V850E/NB85E-CB"
+
+#define CPU_CLOCK_FREQ		50000000 /* 50MHz */
+
+/* 1MB of onboard SRAM.  Note that the monitor ROM uses parts of this
+   for its own purposes, so care must be taken.  */
+#define SRAM_ADDR		0x03C00000
+#define SRAM_SIZE		0x00100000 /* 1MB */
+
+/* 16MB of onbard SDRAM.  */
+#define SDRAM_ADDR		0x01000000
+#define SDRAM_SIZE		0x01000000 /* 16MB */
+
+
 /* CPU addresses of GBUS memory spaces.  */
 #define GCS0_ADDR		0x00400000 /* GCS0 - Common SRAM (2MB) */
 #define GCS0_SIZE		0x00400000 /*   4MB */
@@ -39,20 +54,8 @@
 #define IRQ_GINT(n)		(10 + (n))
 #define IRQ_GINT_NUM		3
 
-
-#define PLATFORM	"rte-v850e/nb85e-cb"
-#define PLATFORM_LONG	"Midas lab RTE-V850E/NB85E-CB"
-
-#define CPU_CLOCK_FREQ	50000000 /* 50MHz */
-
-/* 1MB of onboard SRAM.  Note that the monitor ROM uses parts of this
-   for its own purposes, so care must be taken.  */
-#define SRAM_ADDR	0x03C00000
-#define SRAM_SIZE	0x00100000 /* 1MB */
-
-/* 16MB of onbard SDRAM.  */
-#define SDRAM_ADDR	0x01000000
-#define SDRAM_SIZE	0x01000000 /* 16MB */
+/* Used by <asm/rte_cb.h> to derive NUM_MACH_IRQS.  */
+#define NUM_RTE_CB_IRQS		NUM_CPU_IRQS
 
 
 #ifdef CONFIG_ROM_KERNEL
@@ -86,8 +89,8 @@
 
 /* Override the basic TEG UART pre-initialization so that we can
    initialize extra stuff.  */
-#undef NB85E_UART_PRE_CONFIGURE	/* should be defined by <asm/teg.h> */
-#define NB85E_UART_PRE_CONFIGURE	rte_nb85e_cb_uart_pre_configure
+#undef V850E_UART_PRE_CONFIGURE	/* should be defined by <asm/teg.h> */
+#define V850E_UART_PRE_CONFIGURE	rte_nb85e_cb_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void rte_nb85e_cb_uart_pre_configure (unsigned chan,
 					     unsigned cflags, unsigned baud);
@@ -96,9 +99,9 @@ extern void rte_nb85e_cb_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART. */
 
 /* CTS is pin P00.  */
-#define NB85E_UART_CTS(chan)	(! (TEG_PORT0_IO & 0x1))
+#define V850E_UART_CTS(chan)	(! (TEG_PORT0_IO & 0x1))
 /* RTS is pin P02.  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   unsigned old = TEG_PORT0_IO;					      \
 	   TEG_PORT0_IO = val ? (old & ~0x4) : (old | 0x4);		      \
