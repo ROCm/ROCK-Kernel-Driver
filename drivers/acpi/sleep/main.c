@@ -18,6 +18,8 @@
 
 u8 sleep_states[ACPI_S_STATE_COUNT];
 
+static struct pm_ops acpi_pm_ops;
+
 extern void do_suspend_lowlevel_s4bios(int);
 extern void do_suspend_lowlevel(int);
 
@@ -85,6 +87,7 @@ static int acpi_pm_enter(u32 state)
 {
 	acpi_status status = AE_OK;
 	unsigned long flags = 0;
+	u32 acpi_state = acpi_suspend_states[state];
 
 	ACPI_FLUSH_CPU_CACHE();
 	local_irq_save(flags);
@@ -92,7 +95,7 @@ static int acpi_pm_enter(u32 state)
 	{
 	case PM_SUSPEND_STANDBY:
 		barrier();
-		status = acpi_enter_sleep_state(acpi_suspend_states[state]);
+		status = acpi_enter_sleep_state(acpi_state);
 		break;
 
 	case PM_SUSPEND_MEM:
@@ -100,7 +103,10 @@ static int acpi_pm_enter(u32 state)
 		break;
 
 	case PM_SUSPEND_DISK:
-		do_suspend_lowlevel_s4bios(0);
+		if (acpi_pm_ops.pm_disk_mode == PM_DISK_PLATFORM)
+			status = acpi_enter_sleep_state(acpi_state);
+		else
+			do_suspend_lowlevel_s4bios(0);
 		break;
 	default:
 		return -EINVAL;
