@@ -55,7 +55,7 @@ END(ia64_pal_default_handler)
  */
 GLOBAL_ENTRY(ia64_pal_call_static)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(6)
-	alloc loc1 = ar.pfs,6,90,0,0
+	alloc loc1 = ar.pfs,5,5,0,0
 	movl loc2 = pal_entry_point
 1:	{
 	  mov r28 = in0
@@ -66,7 +66,9 @@ GLOBAL_ENTRY(ia64_pal_call_static)
 	ld8 loc2 = [loc2]		// loc2 <- entry point
 	tbit.nz p6,p7 = in4, 0
 	adds r8 = 1f-1b,r8
+	mov loc4=ar.rsc			// save RSE configuration
 	;;
+	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	mov loc3 = psr
 	mov loc0 = rp
 	.body
@@ -82,6 +84,7 @@ GLOBAL_ENTRY(ia64_pal_call_static)
 	mov rp = r8
 	br.cond.sptk.many b7
 1:	mov psr.l = loc3
+	mov ar.rsc = loc4		// restore RSE configuration
 	mov ar.pfs = loc1
 	mov rp = loc0
 	;;
@@ -98,7 +101,7 @@ END(ia64_pal_call_static)
  */
 GLOBAL_ENTRY(ia64_pal_call_stacked)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
-	alloc loc1 = ar.pfs,5,4,87,0
+	alloc loc1 = ar.pfs,4,4,4,0
 	movl loc2 = pal_entry_point
 
 	mov r28  = in0			// Index MUST be copied to r28
@@ -145,7 +148,7 @@ END(ia64_pal_call_stacked)
 
 GLOBAL_ENTRY(ia64_pal_call_phys_static)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(6)
-	alloc loc1 = ar.pfs,6,90,0,0
+	alloc loc1 = ar.pfs,4,7,0,0
 	movl loc2 = pal_entry_point
 1:	{
 	  mov r28  = in0		// copy procedure index
