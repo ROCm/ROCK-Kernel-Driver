@@ -185,9 +185,9 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			break;
 
 		case HID_UP_LED:
-			if (usage->hid - 1 >= LED_MAX)
+			if (((usage->hid - 1) & 0xffff) >= LED_MAX)
 				goto ignore;
-			map_led(usage->hid - 1);
+			map_led((usage->hid - 1) & 0xffff);
 			break;
 
 		case HID_UP_DIGITIZER:
@@ -491,6 +491,9 @@ static int hidinput_input_event(struct input_dev *dev, unsigned int type, unsign
 
 	if (type == EV_FF)
 		return hid_ff_event(hid, dev, type, code, value);
+
+	if (type != EV_LED)
+		return -1;
 
 	if ((offset = hid_find_field(hid, type, code, &field)) == -1) {
 		warn("event field not found");
