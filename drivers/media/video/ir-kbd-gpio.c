@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2003 Gerd Knorr
  * Copyright (c) 2003 Pavel Machek
@@ -32,47 +33,45 @@
 /* ---------------------------------------------------------------------- */
 
 static IR_KEYTAB_TYPE ir_codes_avermedia[IR_KEYTAB_SIZE] = {
-	[ 17 ] = KEY_KP0, 
-	[ 20 ] = KEY_KP1, 
-	[ 12 ] = KEY_KP2, 
-	[ 28 ] = KEY_KP3, 
-	[ 18 ] = KEY_KP4, 
-	[ 10 ] = KEY_KP5, 
-	[ 26 ] = KEY_KP6, 
-	[ 22 ] = KEY_KP7, 
-	[ 14 ] = KEY_KP8, 
-	[ 30 ] = KEY_KP9, 
+	[ 34 ] = KEY_KP0,
+	[ 40 ] = KEY_KP1,
+	[ 24 ] = KEY_KP2,
+	[ 56 ] = KEY_KP3,
+	[ 36 ] = KEY_KP4,
+	[ 20 ] = KEY_KP5,
+	[ 52 ] = KEY_KP6,
+	[ 44 ] = KEY_KP7,
+	[ 28 ] = KEY_KP8,
+	[ 60 ] = KEY_KP9,
 
-	[ 24 ] = KEY_EJECTCD,     // Unmarked on my controller
+	[ 48 ] = KEY_EJECTCD,     // Unmarked on my controller
 	[  0 ] = KEY_POWER, 
-	[  9 ] = BTN_LEFT,        // DISPLAY/L
-	[ 25 ] = BTN_RIGHT,       // LOOP/R
-	[  5 ] = KEY_MUTE, 
-	[ 19 ] = KEY_RECORD, 
-	[ 11 ] = KEY_PAUSE, 
-	[ 27 ] = KEY_STOP, 
-	[ 15 ] = KEY_VOLUMEDOWN, 
-	[ 31 ] = KEY_VOLUMEUP, 
+	[ 18 ] = BTN_LEFT,        // DISPLAY/L
+	[ 50 ] = BTN_RIGHT,       // LOOP/R
+	[ 10 ] = KEY_MUTE,
+	[ 38 ] = KEY_RECORD,
+	[ 22 ] = KEY_PAUSE,
+	[ 54 ] = KEY_STOP,
+	[ 30 ] = KEY_VOLUMEDOWN,
+	[ 62 ] = KEY_VOLUMEUP,
 
-	[ 16 ] = KEY_TUNER,       // TV/FM
-	[  8 ] = KEY_CD, 
-	[  4 ] = KEY_VIDEO, 
-	[  2 ] = KEY_AUDIO, 
-	[  6 ] = KEY_ZOOM,        // full screen
-	[  1 ] = KEY_INFO,        // preview 
-	[ 21 ] = KEY_SEARCH,      // autoscan
-	[ 13 ] = KEY_STOP,        // freeze 
-	[ 29 ] = KEY_RECORD,      // capture 
-	[  3 ] = KEY_PLAY,        // unmarked
-	[ 23 ] = KEY_RED,         // unmarked
-	[  7 ] = KEY_GREEN,       // unmarked
+	[ 32 ] = KEY_TUNER,       // TV/FM
+	[ 16 ] = KEY_CD,
+	[  8 ] = KEY_VIDEO,
+	[  4 ] = KEY_AUDIO,
+	[ 12 ] = KEY_ZOOM,        // full screen
+	[  2 ] = KEY_INFO,        // preview
+	[ 42 ] = KEY_SEARCH,      // autoscan
+	[ 26 ] = KEY_STOP,        // freeze
+	[ 58 ] = KEY_RECORD,      // capture
+	[  6 ] = KEY_PLAY,        // unmarked
+	[ 46 ] = KEY_RED,         // unmarked
+	[ 14 ] = KEY_GREEN,       // unmarked
 
-#if 0
-	[ 16 ] = KEY_YELLOW,      // unmarked
-	[  8 ] = KEY_CHANNELDOWN, 
-	[ 24 ] = KEY_CHANNELUP, 
-	[  0 ] = KEY_BLUE,        // unmarked
-#endif
+	[ 33 ] = KEY_YELLOW,      // unmarked
+	[ 17 ] = KEY_CHANNELDOWN,
+	[ 49 ] = KEY_CHANNELUP,
+	[  1 ] = KEY_BLUE,        // unmarked
 };
 
 static IR_KEYTAB_TYPE winfast_codes[IR_KEYTAB_SIZE] = {
@@ -280,8 +279,9 @@ static int ir_probe(struct device *dev)
 	case BTTV_AVPHONE98:
 	case BTTV_AVERMEDIA98:
 		ir_codes         = ir_codes_avermedia;
-		ir->mask_keycode = 0xf80000;
+		ir->mask_keycode = 0xf88000;
 		ir->mask_keydown = 0x010000;
+		ir->polling      = 50; // ms
 		break;
 
 	case BTTV_PXELVWPLTVPAK:
@@ -300,7 +300,7 @@ static int ir_probe(struct device *dev)
 
 	case BTTV_WINFAST2000:
 		ir_codes         = winfast_codes;
-		ir->mask_keycode = 0x8f8;
+		ir->mask_keycode = 0x1f8;
 		break;
 	case BTTV_MAGICTVIEW061:
 	case BTTV_MAGICTVIEW063:
