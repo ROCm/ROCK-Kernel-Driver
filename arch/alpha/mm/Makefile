@@ -2,7 +2,7 @@
 # Makefile for the linux alpha-specific parts of the memory manager.
 #
 
-CFLAGS	+= -Werror
+EXTRA_CFLAGS := -Werror
 
 obj-y	:= init.o fault.o extable.o remap.o
 

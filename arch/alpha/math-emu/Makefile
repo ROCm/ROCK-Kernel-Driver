@@ -2,6 +2,6 @@
 # Makefile for the FPU instruction emulation.
 #
 
-CFLAGS += -Iinclude/math-emu -w
+EXTRA_CFLAGS := -w
 
 obj-$(CONFIG_MATHEMU) += math.o qrnnd.o
