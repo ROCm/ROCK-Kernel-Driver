@@ -67,6 +67,7 @@
 #include "../scsi/scsi.h"
 #include "../scsi/hosts.h"
 
+#include "csr1212.h"
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "ieee1394_core.h"
@@ -77,7 +78,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1096 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1113 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -745,6 +746,7 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 		SBP2_ERR("failed to add scsi host");
 		scsi_host_put(hi->scsi_host);
 		hpsb_destroy_hostinfo(&sbp2_highlevel, host);
+		return NULL;
 	}
 
 	return hi;
@@ -990,6 +992,9 @@ alloc_fail:
 		return PTR_ERR(sdev);
 	}
 
+	sdev->hostdata = scsi_id;
+	scsi_id->sdev = sdev;
+
 	return 0;
 }
 
@@ -999,7 +1004,6 @@ alloc_fail:
 static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
-	struct scsi_device *sdev;
 
 	SBP2_DEBUG("sbp2_remove_device");
 
@@ -1007,12 +1011,9 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 	sbp2scsi_complete_all_commands(scsi_id, DID_NO_CONNECT);
 
 	/* Remove it from the scsi layer now */
-	/* XXX(hch): why can't we simply cache the scsi_device
-	   	     in struct scsi_id_instance_data? */
-	sdev = scsi_device_lookup(hi->scsi_host, 0, scsi_id->id, 0);
-	if (sdev) {
-		scsi_remove_device(sdev);
-		scsi_device_put(sdev);
+	if (scsi_id->sdev) {
+		scsi_remove_device(scsi_id->sdev);
+		scsi_device_put(scsi_id->sdev);
 	}
 
 	sbp2util_remove_command_orb_pool(scsi_id);
@@ -1538,6 +1539,8 @@ static int sbp2_set_busy_timeout(struct scsi_id_instance_data *scsi_id)
 static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 				      struct unit_directory *ud)
 {
+	struct csr1212_keyval *kv;
+	struct csr1212_dentry *dentry;
 	struct scsi_id_instance_data *scsi_id;
 	struct list_head *lh;
 	u64 management_agent_addr;
@@ -1554,29 +1557,46 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 	firmware_revision = 0x0;
 
 	/* Handle different fields in the unit directory, based on keys */
-	for (i = 0; i < ud->length; i++) {
-		switch (CONFIG_ROM_KEY(ud->quadlets[i])) {
-		case SBP2_CSR_OFFSET_KEY:
-			/* Save off the management agent address */
-			management_agent_addr =
-				CSR_REGISTER_BASE + 
-				(CONFIG_ROM_VALUE(ud->quadlets[i]) << 2);
+	csr1212_for_each_dir_entry(ud->ne->csr, kv, ud->ud_kv, dentry) {
+		switch (kv->key.id) {
+		case CSR1212_KV_ID_DEPENDENT_INFO:
+			if (kv->key.type == CSR1212_KV_TYPE_CSR_OFFSET) {
+				/* Save off the management agent address */
+				management_agent_addr =
+					CSR1212_REGISTER_SPACE_BASE +
+					(kv->value.csr_offset << 2);
 
-			SBP2_DEBUG("sbp2_management_agent_addr = %x",
-				   (unsigned int) management_agent_addr);
+				SBP2_DEBUG("sbp2_management_agent_addr = %x",
+					   (unsigned int) management_agent_addr);
+			} else {
+				/*
+				 * Device type and lun (used for
+				 * detemining type of sbp2 device)
+				 */
+				scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+				if (!scsi_id) {
+					SBP2_ERR("Out of memory adding scsi_id, not all LUN's will be added");
+					break;
+				}
+				memset(scsi_id, 0, sizeof(*scsi_id));
+
+				scsi_id->sbp2_device_type_and_lun = kv->value.immediate;
+				SBP2_DEBUG("sbp2_device_type_and_lun = %x",
+					   (unsigned int) scsi_id->sbp2_device_type_and_lun);
+				list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
+			}
 			break;
 
 		case SBP2_COMMAND_SET_SPEC_ID_KEY:
 			/* Command spec organization */
-			command_set_spec_id
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
+			command_set_spec_id = kv->value.immediate;
 			SBP2_DEBUG("sbp2_command_set_spec_id = %x",
 				   (unsigned int) command_set_spec_id);
 			break;
 
 		case SBP2_COMMAND_SET_KEY:
 			/* Command set used by sbp2 device */
-			command_set = CONFIG_ROM_VALUE(ud->quadlets[i]);
+			command_set = kv->value.immediate;
 			SBP2_DEBUG("sbp2_command_set = %x",
 				   (unsigned int) command_set);
 			break;
@@ -1586,35 +1606,14 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 			 * Unit characterisitcs (orb related stuff
 			 * that I'm not yet paying attention to)
 			 */
-			unit_characteristics
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
+			unit_characteristics = kv->value.immediate;
 			SBP2_DEBUG("sbp2_unit_characteristics = %x",
 				   (unsigned int) unit_characteristics);
 			break;
 
-		case SBP2_DEVICE_TYPE_AND_LUN_KEY:
-			/*
-			 * Device type and lun (used for
-			 * detemining type of sbp2 device)
-			 */
-			scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
-			if (!scsi_id) {
-				SBP2_ERR("Out of memory adding scsi_id, not all LUN's will be added");
-				break;
-			}
-			memset(scsi_id, 0, sizeof(*scsi_id));
-
-			scsi_id->sbp2_device_type_and_lun
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
-			SBP2_DEBUG("sbp2_device_type_and_lun = %x",
-				   (unsigned int) scsi_id->sbp2_device_type_and_lun);
-			list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
-			break;
-
 		case SBP2_FIRMWARE_REVISION_KEY:
 			/* Firmware revision */
-			firmware_revision
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
+			firmware_revision = kv->value.immediate;
 			if (force_inquiry_hack)
 				SBP2_INFO("sbp2_firmware_revision = %x",
 				   (unsigned int) firmware_revision);
@@ -1727,7 +1726,7 @@ static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id)
 	/* Payload size is the lesser of what our speed supports and what
 	 * our host supports.  */
 	scsi_id->max_payload_size = min(sbp2_speedto_max_payload[scsi_id->speed_code],
-					(u8)(((be32_to_cpu(hi->host->csr.rom[2]) >> 12) & 0xf) - 1));
+					(u8)(hi->host->csr.max_rec - 1));
 
 	SBP2_ERR("Node " NODE_BUS_FMT ": Max speed [%s] - Max payload [%u]",
 		 NODE_BUS_ARGS(hi->host, scsi_id->ne->nodeid),
@@ -2849,6 +2848,27 @@ static const char *sbp2scsi_info (struct Scsi_Host *host)
         return "SCSI emulation for IEEE-1394 SBP-2 Devices";
 }
 
+static ssize_t sbp2_sysfs_ieee1394_guid_show(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev;
+	struct scsi_id_instance_data *scsi_id;
+
+	if (!(sdev = to_scsi_device(dev)))
+		return 0;
+
+	if (!(scsi_id = sdev->hostdata))
+		return 0;
+
+	return sprintf(buf, "%016Lx\n", (unsigned long long)scsi_id->ne->guid);
+}
+
+static DEVICE_ATTR(ieee1394_guid, S_IRUGO, sbp2_sysfs_ieee1394_guid_show, NULL);
+
+static struct device_attribute *sbp2_sysfs_sdev_attrs[] = {
+	&dev_attr_ieee1394_guid,
+	NULL
+};
+
 MODULE_AUTHOR("Ben Collins <bcollins@debian.org>");
 MODULE_DESCRIPTION("IEEE-1394 SBP-2 protocol driver");
 MODULE_SUPPORTED_DEVICE(SBP2_DEVICE_NAME);
@@ -2871,6 +2891,7 @@ static Scsi_Host_Template scsi_driver_template = {
 	.cmd_per_lun =			SBP2_MAX_CMDS_PER_LUN,
 	.can_queue = 			SBP2_MAX_SCSI_QUEUE,
 	.emulated =			1,
+	.sdev_attrs =			sbp2_sysfs_sdev_attrs,
 };
 
 static int sbp2_module_init(void)
