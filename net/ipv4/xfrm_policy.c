@@ -917,7 +917,7 @@ xfrm_policy_ok(struct xfrm_tmpl *tmpl, struct sec_path *sp, int idx)
 	return -1;
 }
 
-static inline void
+static void
 _decode_session(struct sk_buff *skb, struct flowi *fl)
 {
 	struct iphdr *iph = skb->nh.iph;

@@ -286,7 +286,7 @@ fail:
 /* Get rid of any references to a local port held by the
  * given sock.
  */
-__inline__ void __tcp_put_port(struct sock *sk)
+static void __tcp_put_port(struct sock *sk)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct tcp_bind_hashbucket *head = &tcp_bhash[tcp_bhashfn(inet->num)];
@@ -308,7 +308,7 @@ __inline__ void __tcp_put_port(struct sock *sk)
 	spin_unlock(&head->lock);
 }
 
-void tcp_put_port(struct sock *sk)
+__inline__ void tcp_put_port(struct sock *sk)
 {
 	local_bh_disable();
 	__tcp_put_port(sk);
