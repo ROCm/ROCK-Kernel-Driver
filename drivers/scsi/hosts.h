@@ -543,6 +543,13 @@ extern int scsi_unregister_device(struct Scsi_Device_Template *);
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
 
+/*
+ * host_busy inc/dec/test functions
+ */
+extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
+extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
+extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
+
 
 /*
  * This is an ugly hack.  If we expect to be able to load devices at run time,

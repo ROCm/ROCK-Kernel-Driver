@@ -428,7 +428,6 @@ extern void scsi_add_timer(Scsi_Cmnd * SCset, int timeout,
 			   void (*complete) (Scsi_Cmnd *));
 extern int scsi_delete_timer(Scsi_Cmnd * SCset);
 extern void scsi_error_handler(void *host);
-extern int scsi_sense_valid(Scsi_Cmnd *);
 extern int scsi_decide_disposition(Scsi_Cmnd * SCpnt);
 extern int scsi_block_when_processing_errors(Scsi_Device *);
 extern void scsi_sleep(int);
@@ -701,6 +700,7 @@ struct scsi_cmnd {
 	struct scsi_cmnd *reset_chain;
 
 	int eh_state;		/* Used for state tracking in error handlr */
+	int eh_eflags;		/* Used by error handlr */
 	void (*done) (struct scsi_cmnd *);	/* Mid-level done function */
 	/*
 	   A SCSI Command is assigned a nonzero serial_number when internal_cmnd
@@ -939,5 +939,27 @@ static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
 
         return (Scsi_Cmnd *)req->special;
 }
+
+#define scsi_eh_eflags_chk(scp, flags) (scp->eh_eflags & flags)
+
+#define scsi_eh_eflags_set(scp, flags) do { \
+	scp->eh_eflags |= flags; \
+	} while(0)
+
+#define scsi_eh_eflags_clr(scp, flags) do { \
+	scp->eh_eflags &= ~flags; \
+	} while(0)
+
+#define scsi_eh_eflags_clr_all(scp) (scp->eh_eflags = 0)
+
+/*
+ * Scsi Error Handler Flags
+ */
+#define SCSI_EH_CMD_ERR	0x0001	/* Orig cmd error'd */
+#define SCSI_EH_CMD_FAILED	0x0002	/* Orig cmd error type failed */
+#define SCSI_EH_CMD_TIMEOUT	0x0004	/* Orig cmd error type timeout */
+#define SCSI_EH_REC_TIMEOUT	0x0008	/* Recovery cmd timeout */
+
+#define SCSI_SENSE_VALID(scmd) ((scmd->sense_buffer[0] & 0x70) == 0x70)
 
 #endif
