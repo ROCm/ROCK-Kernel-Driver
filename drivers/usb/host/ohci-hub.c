@@ -43,6 +43,7 @@
 
 static void dl_done_list (struct ohci_hcd *, struct pt_regs *);
 static void finish_unlinks (struct ohci_hcd *, u16 , struct pt_regs *);
+static int ohci_restart (struct ohci_hcd *ohci);
 
 static int ohci_hub_suspend (struct usb_hcd *hcd)
 {

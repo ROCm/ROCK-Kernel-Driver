@@ -140,7 +140,6 @@ static const char	hcd_name [] = "ohci_hcd";
 
 static void ohci_dump (struct ohci_hcd *ohci, int verbose);
 static int ohci_init (struct ohci_hcd *ohci);
-static int ohci_restart (struct ohci_hcd *ohci);
 static void ohci_stop (struct usb_hcd *hcd);
 
 #include "ohci-hub.c"
