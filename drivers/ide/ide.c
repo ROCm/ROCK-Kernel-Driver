@@ -1804,7 +1804,7 @@ extern void init_pdc4030(void);
 #endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 static int __initdata probe_ali14xx;
-extern void init_ali14xx(void);
+extern int ali14xx_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 static int __initdata probe_umc8672;
@@ -2601,7 +2601,7 @@ int __init ide_init (void)
 #endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 	if (probe_ali14xx)
-		init_ali14xx();
+		(void)ali14xx_init();
 #endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 	if (probe_umc8672)
