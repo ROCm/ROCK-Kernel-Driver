@@ -299,7 +299,6 @@ static int __init init_slots(void)
 		if (!slot->hotplug_slot->name)
 			goto error_info;
 
-		slot->magic = SLOT_MAGIC;
 		slot->number = i;
 
 		slot->hotplug_slot->private = slot;

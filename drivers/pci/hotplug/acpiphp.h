@@ -47,7 +47,6 @@
 #define info(format, arg...) printk(KERN_INFO "%s: " format, MY_NAME , ## arg)
 #define warn(format, arg...) printk(KERN_WARNING "%s: " format, MY_NAME , ## arg)
 
-#define SLOT_MAGIC	0x67267322
 /* name size which is used for entries in pcihpfs */
 #define SLOT_NAME_SIZE	KOBJ_NAME_LEN		/* {_SUN} */
 
@@ -59,7 +58,6 @@ struct pci_resource;
  * struct slot - slot information for each *physical* slot
  */
 struct slot {
-	u32 magic;
 	u8 number;
 	struct hotplug_slot	*hotplug_slot;
 	struct list_head	slot_list;
