@@ -19,7 +19,7 @@ static struct sysdev_class node_class = {
 static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 {
 	struct node *node_dev = to_node(dev);
-	cpumask_t mask = node_dev->cpumap;
+	cpumask_t mask = node_to_cpumask(node_dev->sysdev.id);
 	int len;
 
 	/* 2004/06/03: buf currently PAGE_SIZE, need > 1 char per 4 bits. */
@@ -111,7 +111,6 @@ int __init register_node(struct node *node, int num, struct node *parent)
 {
 	int error;
 
-	node->cpumap = node_to_cpumask(num);
 	node->sysdev.id = num;
 	node->sysdev.cls = &node_class;
 	error = sysdev_register(&node->sysdev);
