@@ -757,7 +757,6 @@ xfs_qm_idtodq(
 	}
 
 	*O_dqpp = dqp;
-	ASSERT(! XFS_DQ_IS_LOCKED(dqp));
 	return (0);
 
  error0:
@@ -1006,7 +1005,6 @@ xfs_qm_dqget(
 	/*
 	 * Dquot lock comes after hashlock in the lock ordering
 	 */
-	ASSERT(! XFS_DQ_IS_LOCKED(dqp));
 	if (ip) {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		if (! XFS_IS_DQTYPE_ON(mp, type)) {

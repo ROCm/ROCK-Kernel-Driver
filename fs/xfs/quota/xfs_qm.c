@@ -806,7 +806,6 @@ xfs_qm_dqattach_one(
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	if (! dolock) {
 		xfs_dqunlock(dqp);
-		ASSERT(!udqhint || !XFS_DQ_IS_LOCKED(udqhint));
 		goto done;
 	}
 	if (! udqhint)
@@ -814,7 +813,6 @@ xfs_qm_dqattach_one(
 
 	ASSERT(udqhint);
 	ASSERT(dolock);
-	ASSERT(! XFS_DQ_IS_LOCKED(udqhint));
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	if (! xfs_qm_dqlock_nowait(udqhint)) {
 		xfs_dqunlock(dqp);
@@ -826,14 +824,10 @@ xfs_qm_dqattach_one(
 	if (udqhint) {
 		if (dolock)
 			ASSERT(XFS_DQ_IS_LOCKED(udqhint));
-		else
-			ASSERT(! XFS_DQ_IS_LOCKED(udqhint));
 	}
 	if (! error) {
 		if (dolock)
 			ASSERT(XFS_DQ_IS_LOCKED(dqp));
-		else
-			ASSERT(! XFS_DQ_IS_LOCKED(dqp));
 	}
 #endif
 	return (error);
@@ -860,9 +854,6 @@ xfs_qm_dqattach_grouphint(
 	if (locked) {
 		ASSERT(XFS_DQ_IS_LOCKED(udq));
 		ASSERT(XFS_DQ_IS_LOCKED(gdq));
-	} else {
-		ASSERT(! XFS_DQ_IS_LOCKED(udq));
-		ASSERT(! XFS_DQ_IS_LOCKED(gdq));
 	}
 #endif
 	if (! locked)
@@ -890,15 +881,12 @@ xfs_qm_dqattach_grouphint(
 		 */
 		xfs_qm_dqrele(tmp);
 
-		ASSERT(! XFS_DQ_IS_LOCKED(udq));
-		ASSERT(! XFS_DQ_IS_LOCKED(gdq));
 		xfs_dqlock(udq);
 		xfs_dqlock(gdq);
 
 	} else {
 		ASSERT(XFS_DQ_IS_LOCKED(udq));
 		if (! locked) {
-			ASSERT(! XFS_DQ_IS_LOCKED(gdq));
 			xfs_dqlock(gdq);
 		}
 	}
@@ -1006,14 +994,10 @@ xfs_qm_dqattach(
 		if (ip->i_udquot) {
 			if (flags & XFS_QMOPT_DQLOCK)
 				ASSERT(XFS_DQ_IS_LOCKED(ip->i_udquot));
-			else
-				ASSERT(! XFS_DQ_IS_LOCKED(ip->i_udquot));
 		}
 		if (ip->i_gdquot) {
 			if (flags & XFS_QMOPT_DQLOCK)
 				ASSERT(XFS_DQ_IS_LOCKED(ip->i_gdquot));
-			else
-				ASSERT(! XFS_DQ_IS_LOCKED(ip->i_gdquot));
 		}
 		if (XFS_IS_UQUOTA_ON(mp))
 			ASSERT(ip->i_udquot);
