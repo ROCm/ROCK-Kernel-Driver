@@ -46,9 +46,9 @@ static void flush_x86_64_tlb(struct pci_dev *dev)
 {
 	u32 tmp;
 
-	pci_read_config_dword (dev, AMD_X86_64_GARTCACHECTL, &tmp);
+	pci_read_config_dword (dev, AMD64_GARTCACHECTL, &tmp);
 	tmp |= INVGART;
-	pci_write_config_dword (dev, AMD_X86_64_GARTCACHECTL, tmp);
+	pci_write_config_dword (dev, AMD64_GARTCACHECTL, tmp);
 }
 
 static void amd_x86_64_tlbflush(struct agp_memory *temp)
@@ -135,7 +135,7 @@ static int amd_x86_64_fetch_size(void)
 	if (dev==NULL)
 		return 0;
 
-	pci_read_config_dword(dev, AMD_X86_64_GARTAPERTURECTL, &temp);
+	pci_read_config_dword(dev, AMD64_GARTAPERTURECTL, &temp);
 	temp = (temp & 0xe);
 	values = A_SIZE_32(x86_64_aperture_sizes);
 
@@ -162,7 +162,7 @@ static u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
 	u64 addr, aper_base;
 
 	/* Address to map to */
-	pci_read_config_dword (hammer, AMD_X86_64_GARTAPERTUREBASE, &tmp);
+	pci_read_config_dword (hammer, AMD64_GARTAPERTUREBASE, &tmp);
 	aperturebase = tmp << 25;
 	aper_base = (aperturebase & PCI_BASE_ADDRESS_MEM_MASK);
 
@@ -171,13 +171,13 @@ static u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
 	addr >>= 12;
 	tmp = (u32) addr<<4;
 	tmp &= ~0xf;
-	pci_write_config_dword (hammer, AMD_X86_64_GARTTABLEBASE, tmp);
+	pci_write_config_dword (hammer, AMD64_GARTTABLEBASE, tmp);
 
 	/* Enable GART translation for this hammer. */
-	pci_read_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, &tmp);
+	pci_read_config_dword(hammer, AMD64_GARTAPERTURECTL, &tmp);
 	tmp |= GARTEN;
 	tmp &= ~(DISGARTCPU | DISGARTIO);
-	pci_write_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, tmp);
+	pci_write_config_dword(hammer, AMD64_GARTAPERTURECTL, tmp);
 
 	/* keep CPU's coherent. */
 	flush_x86_64_tlb (hammer);
@@ -216,9 +216,9 @@ static void amd_8151_cleanup(void)
 
 	for_each_nb() {
 		/* disable gart translation */
-		pci_read_config_dword (hammers[gart_iterator], AMD_X86_64_GARTAPERTURECTL, &tmp);
-		tmp &= ~(AMD_X86_64_GARTEN);
-		pci_write_config_dword (hammers[gart_iterator], AMD_X86_64_GARTAPERTURECTL, tmp);
+		pci_read_config_dword (hammers[gart_iterator], AMD64_GARTAPERTURECTL, &tmp);
+		tmp &= ~AMD64_GARTEN;
+		pci_write_config_dword (hammers[gart_iterator], AMD64_GARTAPERTURECTL, tmp);
 	}
 }
 

@@ -297,11 +297,12 @@ struct agp_bridge_data {
 #define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
 #define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
 
-#define AMD_X86_64_GARTAPERTURECTL	0x90
-#define AMD_X86_64_GARTAPERTUREBASE	0x94
-#define AMD_X86_64_GARTTABLEBASE	0x98
-#define AMD_X86_64_GARTCACHECTL		0x9c
-#define AMD_X86_64_GARTEN		1<<0
+/* AMD64 registers */
+#define AMD64_GARTAPERTURECTL	0x90
+#define AMD64_GARTAPERTUREBASE	0x94
+#define AMD64_GARTTABLEBASE	0x98
+#define AMD64_GARTCACHECTL		0x9c
+#define AMD64_GARTEN		1<<0
 
 /* ALi registers */
 #define ALI_AGPCTRL			0xb8
