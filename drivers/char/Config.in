@@ -58,8 +58,6 @@ if [ "$CONFIG_IT8712" = "y" ]; then
    if [ "$CONFIG_QTRONIX_KEYBOARD" = "y" ]; then
      define_bool CONFIG_IT8172_CIR y
    else
-     bool '    Enable PS2 Keyboard Support' CONFIG_PC_KEYB
-   fi
    bool 'Enable Smart Card Reader 0 Support ' CONFIG_IT8172_SCR0
    bool 'Enable Smart Card Reader 1 Support ' CONFIG_IT8172_SCR1
 fi
@@ -89,7 +87,6 @@ source drivers/i2c/Config.in
 mainmenu_option next_comment
 comment 'Mice'
    tristate 'Bus Mouse Support' CONFIG_BUSMOUSE
-   bool 'PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
 endmenu
 
 tristate 'QIC-02 tape support' CONFIG_QIC02_TAPE

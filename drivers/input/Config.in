@@ -8,7 +8,6 @@ comment 'Input device support'
 tristate 'Input core support' CONFIG_INPUT
 
 comment 'Userland interfaces'
-dep_tristate '  Keyboard interface' CONFIG_INPUT_KEYBDEV $CONFIG_INPUT
 dep_tristate '  Mouse interface' CONFIG_INPUT_MOUSEDEV $CONFIG_INPUT
 dep_mbool '    Provide legacy /dev/psaux device' CONFIG_INPUT_MOUSEDEV_PSAUX $CONFIG_INPUT
 if [ "$CONFIG_INPUT_MOUSEDEV" != "n" ]; then
