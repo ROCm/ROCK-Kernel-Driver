@@ -586,11 +586,6 @@ $(SUBDIRS): prepare-all scripts
 prepare1:
 ifneq ($(KBUILD_SRC),)
 	@echo '  Using $(srctree) as source for kernel'
-	$(Q)if [ -h $(srctree)/include/asm -o -f $(srctree)/.config ]; then \
-		echo "  $(srctree) is not clean, please run 'make mrproper'";\
-		echo "  in the '$(srctree)' directory.";\
-		/bin/false; \
-	fi;
 	$(Q)if [ ! -d include2 ]; then mkdir -p include2; fi;
 	$(Q)ln -fsn $(srctree)/include/asm-$(ARCH) include2/asm
 endif
@@ -805,7 +800,7 @@ CLEAN_FILES +=	vmlinux System.map \
 		kernel.spec .tmp*
 
 # Files removed with 'make mrproper'
-MRPROPER_FILES += .version .config .config.old tags TAGS cscope*
+MRPROPER_FILES += .version .config .config.old tags TAGS cscope* modversions*
 
 # clean - Delete all intermediate files
 #
