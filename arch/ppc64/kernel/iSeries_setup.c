@@ -314,13 +314,13 @@ static void __init iSeries_parse_cmdline(void)
 	 * If the init RAM disk has been configured and there is
 	 * a non-zero starting address for it, set it up
 	 */
-	if (naca->xRamDisk) {
-		initrd_start = (unsigned long)__va(naca->xRamDisk);
-		initrd_end = initrd_start + naca->xRamDiskSize * PAGE_SIZE;
+	if (naca.xRamDisk) {
+		initrd_start = (unsigned long)__va(naca.xRamDisk);
+		initrd_end = initrd_start + naca.xRamDiskSize * PAGE_SIZE;
 		initrd_below_start_ok = 1;	// ramdisk in kernel space
 		ROOT_DEV = Root_RAM0;
-		if (((rd_size * 1024) / PAGE_SIZE) < naca->xRamDiskSize)
-			rd_size = (naca->xRamDiskSize * PAGE_SIZE) / 1024;
+		if (((rd_size * 1024) / PAGE_SIZE) < naca.xRamDiskSize)
+			rd_size = (naca.xRamDiskSize * PAGE_SIZE) / 1024;
 	} else
 #endif /* CONFIG_BLK_DEV_INITRD */
 	{
@@ -813,9 +813,9 @@ static void __init iSeries_fixup_klimit(void)
 	 * Change klimit to take into account any ram disk
 	 * that may be included
 	 */
-	if (naca->xRamDisk)
-		klimit = KERNELBASE + (u64)naca->xRamDisk +
-			(naca->xRamDiskSize * PAGE_SIZE);
+	if (naca.xRamDisk)
+		klimit = KERNELBASE + (u64)naca.xRamDisk +
+			(naca.xRamDiskSize * PAGE_SIZE);
 	else {
 		/*
 		 * No ram disk was included - check and see if there

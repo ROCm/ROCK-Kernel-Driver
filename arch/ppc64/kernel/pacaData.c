@@ -18,11 +18,8 @@
 
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpQueue.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 
-struct naca_struct *naca;
-EXPORT_SYMBOL(naca);
 struct systemcfg *systemcfg;
 EXPORT_SYMBOL(systemcfg);
 

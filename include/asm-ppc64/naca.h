@@ -21,12 +21,11 @@ struct naca_struct {
 	u64   xRamDiskSize;		/* In pages                  0x10 */
 };
 
-extern struct naca_struct *naca;
+extern struct naca_struct naca;
 
 #endif /* __ASSEMBLY__ */
 
 #define NACA_PAGE      0x4
 #define NACA_PHYS_ADDR (NACA_PAGE<<PAGE_SHIFT)
-#define NACA_VIRT_ADDR (KERNELBASE+NACA_PHYS_ADDR)
 
 #endif /* _NACA_H */

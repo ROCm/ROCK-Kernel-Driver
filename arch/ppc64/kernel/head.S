@@ -512,17 +512,15 @@ _GLOBAL(do_stab_bolted_Pseries)
 	 */
 	. = NACA_PHYS_ADDR
 	.globl __end_interrupts
-	.globl __start_naca
 __end_interrupts:
-__start_naca:
 #ifdef CONFIG_PPC_ISERIES
+	.globl naca
+naca:
 	.llong itVpdAreas
 #endif
 
 	. = SYSTEMCFG_PHYS_ADDR
-	.globl __end_naca
 	.globl __start_systemcfg
-__end_naca:
 __start_systemcfg:
 	. = (SYSTEMCFG_PHYS_ADDR + PAGE_SIZE)
 	.globl __end_systemcfg
@@ -1270,10 +1268,6 @@ _STATIC(__start_initialization_iSeries)
 	SET_REG_TO_CONST(r4, SYSTEMCFG_VIRT_ADDR)
 	std	r4,0(r9)		/* set the systemcfg pointer */
 
-	LOADADDR(r9,naca)
-	SET_REG_TO_CONST(r4, NACA_VIRT_ADDR)
-	std	r4,0(r9)		/* set the naca pointer */
-
 	bl	.iSeries_early_setup
 
 	/* relocation is on at this point */
@@ -1873,12 +1867,6 @@ _STATIC(start_here_multiplatform)
 	li	r27,SYSTEMCFG_PHYS_ADDR
 	std	r27,0(r6)	 	/* set the value of systemcfg	*/
 
-	/* setup the naca pointer which is needed by *tab_initialize	*/
-	LOADADDR(r6,naca)
-	sub	r6,r6,r26		/* addr of the variable naca	*/
-	li	r27,NACA_PHYS_ADDR
-	std	r27,0(r6)	 	/* set the value of naca	*/
-
 #ifdef CONFIG_HMT
 	/* Start up the second thread on cpu 0 */
 	mfspr	r3,PVR
@@ -2014,11 +2002,6 @@ _STATIC(start_here_common)
 	LOADADDR(r9,systemcfg)
 	SET_REG_TO_CONST(r8, SYSTEMCFG_VIRT_ADDR)
 	std	r8,0(r9)
-
-	/* setup the naca pointer */
-	LOADADDR(r9,naca)
-	SET_REG_TO_CONST(r8, NACA_VIRT_ADDR)
-	std	r8,0(r9)		/* set the value of the naca ptr */
 
 	LOADADDR(r26, boot_cpuid)
 	lwz	r26,0(r26)

@@ -44,7 +44,7 @@ struct HvReleaseData hvReleaseData = {
 	0xc8a5d9c4,	/* desc = "HvRD" ebcdic */
 	sizeof(struct HvReleaseData),
 	offsetof(struct naca_struct, xItVpdAreas),
-	(struct naca_struct *)(NACA_VIRT_ADDR), /* 64-bit Naca address */
+	&naca,		/* 64-bit Naca address */
 	0x6000,		/* offset of LparMap within loadarea (see head.S) */
 	0,
 	1,		/* tags inactive       */
