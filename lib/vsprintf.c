@@ -172,50 +172,41 @@ static char * number(char * buf, char * end, long long num, int base, int size, 
 	if (!(type&(ZEROPAD+LEFT))) {
 		while(size-->0) {
 			if (buf <= end)
-				*buf = ' ';
-			++buf;
+				*buf++ = ' ';
 		}
 	}
 	if (sign) {
 		if (buf <= end)
-			*buf = sign;
-		++buf;
+			*buf++ = sign;
 	}
 	if (type & SPECIAL) {
 		if (base==8) {
 			if (buf <= end)
-				*buf = '0';
-			++buf;
+				*buf++ = '0';
 		} else if (base==16) {
 			if (buf <= end)
-				*buf = '0';
-			++buf;
+				*buf++ = '0';
 			if (buf <= end)
-				*buf = digits[33];
-			++buf;
+				*buf++ = digits[33];
 		}
 	}
 	if (!(type & LEFT)) {
 		while (size-- > 0) {
 			if (buf <= end)
-				*buf = c;
-			++buf;
+				*buf++ = c;
 		}
 	}
 	while (i < precision--) {
 		if (buf <= end)
-			*buf = '0';
-		++buf;
+			*buf++ = '0';
 	}
 	while (i-- > 0) {
 		if (buf <= end)
-			*buf = tmp[i];
-		++buf;
+			*buf++ = tmp[i];
 	}
 	while (size-- > 0) {
 		if (buf <= end)
-			*buf = ' ';
-		++buf;
+			*buf++ = ' ';
 	}
 	return buf;
 }
@@ -247,6 +238,10 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 				/* 'z' support added 23/7/1999 S.H.    */
 				/* 'z' changed to 'Z' --davidm 1/25/99 */
 
+	/* Enforce absolute minimum size: one character + the trailing 0 */
+	if (size < 2)
+		return 0;
+
 	str = buf;
 	end = buf + size - 1;
 
@@ -258,8 +253,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 	for (; *fmt ; ++fmt) {
 		if (*fmt != '%') {
 			if (str <= end)
-				*str = *fmt;
-			++str;
+				*str++ = *fmt;
 			continue;
 		}
 
@@ -323,18 +317,15 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 				if (!(flags & LEFT)) {
 					while (--field_width > 0) {
 						if (str <= end)
-							*str = ' ';
-						++str;
+							*str++ = ' ';
 					}
 				}
 				c = (unsigned char) va_arg(args, int);
 				if (str <= end)
-					*str = c;
-				++str;
+					*str++ = c;
 				while (--field_width > 0) {
 					if (str <= end)
-						*str = ' ';
-					++str;
+						*str++ = ' ';
 				}
 				continue;
 
@@ -348,19 +339,16 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 				if (!(flags & LEFT)) {
 					while (len < field_width--) {
 						if (str <= end)
-							*str = ' ';
-						++str;
+							*str++ = ' ';
 					}
 				}
 				for (i = 0; i < len; ++i) {
 					if (str <= end)
-						*str = *s;
-					++str; ++s;
+						*str++ = *s++;
 				}
 				while (len < field_width--) {
 					if (str <= end)
-						*str = ' ';
-					++str;
+						*str++ = ' ';
 				}
 				continue;
 
@@ -392,8 +380,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
 			case '%':
 				if (str <= end)
-					*str = '%';
-				++str;
+					*str++ = '%';
 				continue;
 
 				/* integer number formats - set up the flags and "break" */
@@ -415,12 +402,10 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
 			default:
 				if (str <= end)
-					*str = '%';
-				++str;
+					*str++ = '%';
 				if (*fmt) {
 					if (str <= end)
-						*str = *fmt;
-					++str;
+						*str++ = *fmt;
 				} else {
 					--fmt;
 				}
