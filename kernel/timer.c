@@ -1040,7 +1040,7 @@ static long nanosleep_restart(struct restart_block *restart)
 		jiffies_to_timespec(expire, &t);
 
 		ret = -ERESTART_RESTARTBLOCK;
-		if (copy_to_user(rmtp, &t, sizeof(t)))
+		if (rmtp && copy_to_user(rmtp, &t, sizeof(t)))
 			ret = -EFAULT;
 		/* The 'restart' block is already filled in */
 	}
@@ -1067,7 +1067,7 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 	if (expire) {
 		struct restart_block *restart;
 		jiffies_to_timespec(expire, &t);
-		if (copy_to_user(rmtp, &t, sizeof(t)))
+		if (rmtp && copy_to_user(rmtp, &t, sizeof(t)))
 			return -EFAULT;
 
 		restart = &current_thread_info()->restart_block;
