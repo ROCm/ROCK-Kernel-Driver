@@ -419,10 +419,11 @@ static void __init isapnp_skip_bytes(int count)
 
 static void isapnp_parse_id(struct pnp_dev * dev, unsigned short vendor, unsigned short device)
 {
-	struct pnp_id * id = isapnp_alloc(sizeof(struct pnp_id));
-	if (!id)
-		return;
+	struct pnp_id * id;
 	if (!dev)
+		return;
+	id = isapnp_alloc(sizeof(struct pnp_id));
+	if (!id)
 		return;
 	sprintf(id->id, "%c%c%c%x%x%x%x",
 			'A' + ((vendor >> 2) & 0x3f) - 1,
