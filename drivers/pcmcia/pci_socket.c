@@ -196,9 +196,9 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 	pci_socket_t *socket = pci_get_drvdata(dev);
 
 	/* note: we are already unregistered from the cs core */
+	class_device_unregister(&socket->cls_d.class_dev);
 	if (socket->op && socket->op->close)
 		socket->op->close(socket);
-	class_device_unregister(&socket->cls_d.class_dev);
 	pci_set_drvdata(dev, NULL);
 }
 
