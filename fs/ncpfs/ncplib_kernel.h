@@ -66,6 +66,7 @@ static inline void ncp_inode_close(struct inode *inode) {
 	atomic_dec(&NCP_FINFO(inode)->opened);
 }
 
+void ncp_extract_file_info(void* src, struct nw_info_struct* target);
 int ncp_obtain_info(struct ncp_server *server, struct inode *, char *,
 		struct nw_info_struct *target);
 int ncp_lookup_volume(struct ncp_server *, char *, struct nw_info_struct *);
@@ -84,6 +85,11 @@ int ncp_initialize_search(struct ncp_server *, struct inode *,
 int ncp_search_for_file_or_subdir(struct ncp_server *server,
 			      struct nw_search_sequence *seq,
 			      struct nw_info_struct *target);
+int ncp_search_for_fileset(struct ncp_server *server,
+			   struct nw_search_sequence *seq,
+			   int* more, int* cnt,
+			   char* buffer, size_t bufsize,
+			   char** rbuf, size_t* rsize);
 
 int ncp_ren_or_mov_file_or_subdir(struct ncp_server *server,
 			      struct inode *, char *, struct inode *, char *);

@@ -687,6 +687,9 @@ ncp_do_readdir(struct file *filp, void *dirent, filldir_t filldir,
 	struct nw_search_sequence seq;
 	struct ncp_entry_info entry;
 	int err;
+	void* buf;
+	int more;
+	size_t bufsize;
 
 	DPRINTK("ncp_do_readdir: %s/%s, fpos=%ld\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
@@ -700,16 +703,56 @@ ncp_do_readdir(struct file *filp, void *dirent, filldir_t filldir,
 		DPRINTK("ncp_do_readdir: init failed, err=%d\n", err);
 		return;
 	}
+#ifdef USE_OLD_SLOW_DIRECTORY_LISTING
 	for (;;) {
 		err = ncp_search_for_file_or_subdir(server, &seq, &entry.i);
 		if (err) {
 			DPRINTK("ncp_do_readdir: search failed, err=%d\n", err);
-			return;
+			break;
 		}
 		entry.volume = entry.i.volNumber;
 		if (!ncp_fill_cache(filp, dirent, filldir, ctl, &entry))
-			return;
+			break;
 	}
+#else
+	/* We MUST NOT use server->buffer_size handshaked with server if we are
+	   using UDP, as for UDP server uses max. buffer size determined by
+	   MTU, and for TCP server uses hardwired value 65KB (== 66560 bytes). 
+	   So we use 128KB, just to be sure, as there is no way how to know
+	   this value in advance. */
+	bufsize = 131072;
+	buf = vmalloc(bufsize);
+	if (!buf)
+		return;
+	do {
+		int cnt;
+		char* rpl;
+		size_t rpls;
+
+		err = ncp_search_for_fileset(server, &seq, &more, &cnt, buf, bufsize, &rpl, &rpls);
+		if (err)		/* Error */
+			break;
+		if (!cnt)		/* prevent endless loop */
+			break;
+		while (cnt--) {
+			size_t onerpl;
+			
+			if (rpls < offsetof(struct nw_info_struct, entryName))
+				break;	/* short packet */
+			ncp_extract_file_info(rpl, &entry.i);
+			onerpl = offsetof(struct nw_info_struct, entryName) + entry.i.nameLen;
+			if (rpls < onerpl)
+				break;	/* short packet */
+			rpl += onerpl;
+			rpls -= onerpl;
+			entry.volume = entry.i.volNumber;
+			if (!ncp_fill_cache(filp, dirent, filldir, ctl, &entry))
+				break;
+		}
+	} while (more);
+	vfree(buf);
+#endif
+	return;
 }
 
 int ncp_conn_logged_in(struct super_block *sb)
