@@ -200,7 +200,7 @@ static void sctp_get_local_addr_list(sctp_protocol_t *proto)
 /* Free the existing local addresses.  */
 static void __sctp_free_local_addr_list(sctp_protocol_t *proto)
 {
-	astruct sockaddr_storage_list *addr;
+	struct sockaddr_storage_list *addr;
 	list_t *pos, *temp;
 
 	list_for_each_safe(pos, temp, &proto->local_addr_list) {
