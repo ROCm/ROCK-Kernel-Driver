@@ -210,7 +210,7 @@ static __inline__ int is_write_locked(rwlock_t *rw)
 }
 
 #define spin_lock_init(x)      do { *(x) = SPIN_LOCK_UNLOCKED; } while(0)
-#define spin_unlock_wait(x)    do { barrier(); } while(spin_is_locked(x))
+#define spin_unlock_wait(x)    do { cpu_relax(); } while(spin_is_locked(x))
 
 #define rwlock_init(x)         do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 

@@ -708,7 +708,7 @@ static inline unsigned int __pack_fe01(unsigned int fpmode)
 	return ((fpmode << 10) & MSR_FE0) | ((fpmode << 8) & MSR_FE1);
 }
 
-#define cpu_relax()     barrier()
+#define cpu_relax()	do { HMT_low(); HMT_medium(); barrier(); } while (0)
 
 /*
  * Prefetch macros.
