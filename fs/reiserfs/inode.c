@@ -14,6 +14,8 @@
 #include <linux/mpage.h>
 #include <linux/writeback.h>
 
+extern int reiserfs_default_io_size; /* default io size devuned in super.c */
+
 /* args for the create parameter of reiserfs_get_block */
 #define GET_BLOCK_NO_CREATE 0 /* don't create new blocks or convert tails */
 #define GET_BLOCK_CREATE 1    /* add anything you need to find block */
@@ -908,7 +910,7 @@ static void init_inode (struct inode * inode, struct path * path)
 
 
     copy_key (INODE_PKEY (inode), &(ih->ih_key));
-    inode->i_blksize = PAGE_SIZE;
+    inode->i_blksize = reiserfs_default_io_size;
 
     INIT_LIST_HEAD(&(REISERFS_I(inode)->i_prealloc_list ));
     REISERFS_I(inode)->i_flags = 0;
@@ -1598,7 +1600,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     }
     // these do not go to on-disk stat data
     inode->i_ino = le32_to_cpu (ih.ih_key.k_objectid);
-    inode->i_blksize = PAGE_SIZE;
+    inode->i_blksize = reiserfs_default_io_size;
   
     // store in in-core inode the key of stat data and version all
     // object items will have (directory items will have old offset
