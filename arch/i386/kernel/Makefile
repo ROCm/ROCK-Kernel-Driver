@@ -28,6 +28,7 @@ obj-$(CONFIG_SOFTWARE_SUSPEND)	+= suspend.o
 obj-$(CONFIG_X86_NUMAQ)		+= numaq.o
 obj-$(CONFIG_PROFILING)		+= profile.o
 obj-$(CONFIG_EDD)             	+= edd.o
+obj-$(CONFIG_MODULES)		+= module.o
 
 EXTRA_AFLAGS   := -traditional
 
