@@ -83,7 +83,7 @@ struct auth_domain {
 struct auth_ops {
 	char *	name;
 	int	flavour;
-	int	(*accept)(struct svc_rqst *rq, u32 *authp, int proc);
+	int	(*accept)(struct svc_rqst *rq, u32 *authp);
 	int	(*release)(struct svc_rqst *rq);
 	void	(*domain_release)(struct auth_domain *);
 };
@@ -99,7 +99,7 @@ extern struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR];
 #define	SVC_PENDING	8
 
 
-extern int	svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp, int proc);
+extern int	svc_authenticate(struct svc_rqst *rqstp, u32 *authp);
 extern int	svc_authorise(struct svc_rqst *rqstp);
 extern int	svc_auth_register(rpc_authflavor_t flavor, struct auth_ops *aops);
 extern void	svc_auth_unregister(rpc_authflavor_t flavor);
