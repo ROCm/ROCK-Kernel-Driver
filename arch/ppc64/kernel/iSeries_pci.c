@@ -277,6 +277,7 @@ void __init iSeries_pci_final_fixup(void)
 		} else
 			printk("PCI: Device Tree not found for 0x%016lX\n",
 					(unsigned long)pdev);
+		pdev->irq = node->Irq;
 	}
 	iSeries_IoMmTable_Status();
 	iSeries_activate_IRQs();
@@ -423,8 +424,6 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 					      Bus, SubBus, AgentId, HvRc);
 				continue;
 			}
-			printk("connected bus unit at bus %d subbus 0x%x agentid 0x%x (idsel=%d func=%d)\n",
-			       Bus, SubBus, AgentId, IdSel, Function);
 
 			HvRc = HvCallPci_configLoad16(Bus, SubBus, AgentId,
 						      PCI_VENDOR_ID, &VendorId);
@@ -437,8 +436,8 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 
 			/* FoundDevice: 0x18.28.10 = 0x12AE */
 			PPCDBG(PPCDBG_BUSWALK,
-			       "PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X\n",
-			       Bus, SubBus, AgentId, VendorId);
+			       "PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X, irq %d\n",
+			       Bus, SubBus, AgentId, VendorId, Irq);
 			HvRc = HvCallPci_configStore8(Bus, SubBus, AgentId,
 						      PCI_INTERRUPT_LINE, Irq);  
 			if (HvRc != 0)
