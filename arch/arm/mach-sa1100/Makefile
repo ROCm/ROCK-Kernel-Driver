@@ -11,8 +11,8 @@ obj-n :=
 obj-  :=
 led-y := leds.o
 
-export-objs :=	dma.o generic.o irq.o pcipool.o sa1111.o sa1111-pcibuf.o \
-		usb_ctl.o usb_recv.o usb_send.o pm.o
+export-objs :=	dma.o generic.o pcipool.o pm.o sa1111.o sa1111-pcibuf.o \
+		usb_ctl.o usb_recv.o usb_send.o
 
 # This needs to be cleaned up.  We probably need to have SA1100
 # and SA1110 config symbols.
