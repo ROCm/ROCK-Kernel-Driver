@@ -337,21 +337,33 @@ static void pcd_release(struct cdrom_device_info *cdi)
 {
 }
 
-#define WR(c,r,v)       pi_write_regr(PI,c,r,v)
-#define RR(c,r)         (pi_read_regr(PI,c,r))
+static inline int status_reg(int unit)
+{
+	return pi_read_regr(PI, 1, 6);
+}
+
+static inline int read_reg(int unit, int reg)
+{
+	return pi_read_regr(PI, 0, reg);
+}
+
+static inline void write_reg(int unit, int reg, int val)
+{
+	pi_write_regr(PI, 0, reg, val);
+}
 
 static int pcd_wait( int unit, int go, int stop, char * fun, char * msg )
 
 {	int j, r, e, s, p;
 
 	j = 0;
-	while ((((r=RR(1,6))&go)||(stop&&(!(r&stop))))&&(j++<PCD_SPIN))
+	while ((((r=status_reg(unit))&go)||(stop&&(!(r&stop))))&&(j++<PCD_SPIN))
 		udelay(PCD_DELAY);
 
 	if ((r&(IDE_ERR&stop))||(j>=PCD_SPIN)) {
-	   s = RR(0,7);
-	   e = RR(0,1);
-	   p = RR(0,2);
+	   s = read_reg(unit,7);
+	   e = read_reg(unit,1);
+	   p = read_reg(unit,2);
        	   if (j >= PCD_SPIN) e |= 0x100;
            if (fun) printk("%s: %s %s: alt=0x%x stat=0x%x err=0x%x"
 			   " loop=%d phase=%d\n",
@@ -362,29 +374,29 @@ static int pcd_wait( int unit, int go, int stop, char * fun, char * msg )
 }
 
 static int pcd_command( int unit, char * cmd, int dlen, char * fun )
+{
+	pi_connect(PI);
 
-{	pi_connect(PI);
-
-        WR(0,6,0xa0 + 0x10*PCD.drive);
+	write_reg(unit, 6, 0xa0 + 0x10*PCD.drive);
 
 	if (pcd_wait(unit,IDE_BUSY|IDE_DRQ,0,fun,"before command")) {
 		pi_disconnect(PI);
 		return -1;
 	}
 
-        WR(0,4,dlen % 256);
-        WR(0,5,dlen / 256);
-        WR(0,7,0xa0);          /* ATAPI packet command */
+	write_reg(unit, 4, dlen % 256);
+	write_reg(unit, 5, dlen / 256);
+	write_reg(unit, 7, 0xa0);		 /* ATAPI packet command */
 
         if (pcd_wait(unit,IDE_BUSY,IDE_DRQ,fun,"command DRQ")) {
 		pi_disconnect(PI);
 		return -1;
 	}
 
-        if (RR(0,2) != 1) {
-           printk("%s: %s: command phase error\n",PCD.name,fun);
-	   pi_disconnect(PI);
-           return -1;
+        if (read_reg(unit,2) != 1) {
+		printk("%s: %s: command phase error\n",PCD.name,fun);
+		pi_disconnect(PI);
+		return -1;
         }
 
 	pi_write_block(PI,cmd,12);
@@ -401,10 +413,10 @@ static int pcd_completion( int unit, char * buf,  char * fun )
 	if (!pcd_wait(unit,IDE_BUSY,IDE_DRQ|IDE_READY|IDE_ERR,
 						fun,"completion")) {
 	    r = 0;
-	    while (RR(0,7)&IDE_DRQ) {
-	        d = (RR(0,4)+256*RR(0,5));
+	    while (read_reg(unit,7)&IDE_DRQ) {
+	        d = (read_reg(unit,4)+256*read_reg(unit,5));
 	        n = ((d+3)&0xfffc);
-	        p = RR(0,2)&3;
+	        p = read_reg(unit,2)&3;
 
 	        if ((p == 2) && (n > 0) && (j == 0)) {
 		    pi_read_block(PI,buf,n);
@@ -523,21 +535,21 @@ static int pcd_reset( int unit )
 	int	expect[5] = {1,1,1,0x14,0xeb};
 
 	pi_connect(PI);
-	WR(0,6,0xa0 + 0x10*PCD.drive);
-	WR(0,7,8);
+	write_reg(unit, 6, 0xa0 + 0x10*PCD.drive);
+	write_reg(unit, 7, 8);
 
 	pcd_sleep(20*HZ/1000);  		/* delay a bit */
 
 	k = 0;
-	while ((k++ < PCD_RESET_TMO) && (RR(1,6)&IDE_BUSY))
+	while ((k++ < PCD_RESET_TMO) && (status_reg(unit)&IDE_BUSY))
 		pcd_sleep(HZ/10);
 
 	flg = 1;
-	for(i=0;i<5;i++) flg &= (RR(0,i+1) == expect[i]);
+	for(i=0;i<5;i++) flg &= (read_reg(unit,i+1) == expect[i]);
 
 	if (verbose) {
 		printk("%s: Reset (%d) signature = ",PCD.name,k);
-		for (i=0;i<5;i++) printk("%3x",RR(0,i+1));
+		for (i=0;i<5;i++) printk("%3x",read_reg(unit,i+1));
 		if (!flg) printk(" (incorrect)");
 		printk("\n");
 	}
@@ -715,7 +727,7 @@ static int pcd_ready( void )
 
 {	int	unit = pcd_unit;
 
-	return (((RR(1,6)&(IDE_BUSY|IDE_DRQ))==IDE_DRQ)) ;
+	return (((status_reg(unit)&(IDE_BUSY|IDE_DRQ))==IDE_DRQ)) ;
 }
 
 static void pcd_transfer( void )
