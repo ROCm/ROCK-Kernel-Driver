@@ -115,7 +115,7 @@ static void *malloc(int size)
 {
 	void *p;
 
-	if (size <0) error("Malloc error\n");
+	if (size <0) error("Malloc error");
 
 	free_mem_ptr = (free_mem_ptr + 3) & ~3;	/* Align */
 

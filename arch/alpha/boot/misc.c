@@ -106,8 +106,8 @@ static void *malloc(int size)
 {
 	void *p;
 
-	if (size <0) error("Malloc error\n");
-	if (free_mem_ptr <= 0) error("Memory error\n");
+	if (size <0) error("Malloc error");
+	if (free_mem_ptr <= 0) error("Memory error");
 
 	free_mem_ptr = (free_mem_ptr + 3) & ~3;	/* Align */
 
@@ -140,7 +140,7 @@ static void gzip_release(void **ptr)
 int fill_inbuf(void)
 {
 	if (insize != 0)
-		error("ran out of input data\n");
+		error("ran out of input data");
 
 	inbuf = input_data;
 	insize = input_data_size;

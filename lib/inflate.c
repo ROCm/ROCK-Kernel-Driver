@@ -871,7 +871,7 @@ DEBG("dyn5a ");
   {
 DEBG("dyn5b ");
     if (i == 1) {
-      error(" incomplete literal tree\n");
+      error("incomplete literal tree");
       huft_free(tl);
     }
     return i;                   /* incomplete code set */
@@ -882,7 +882,7 @@ DEBG("dyn5c ");
   {
 DEBG("dyn5d ");
     if (i == 1) {
-      error(" incomplete distance tree\n");
+      error("incomplete distance tree");
 #ifdef PKZIP_BUG_WORKAROUND
       i = 0;
     }
@@ -1097,15 +1097,15 @@ static int gunzip(void)
 
     flags  = (uch)get_byte();
     if ((flags & ENCRYPTED) != 0) {
-	    error("Input is encrypted\n");
+	    error("Input is encrypted");
 	    return -1;
     }
     if ((flags & CONTINUATION) != 0) {
-	    error("Multi part input\n");
+	    error("Multi part input");
 	    return -1;
     }
     if ((flags & RESERVED) != 0) {
-	    error("Input has invalid flags\n");
+	    error("Input has invalid flags");
 	    return -1;
     }
     (ulg)get_byte();	/* Get timestamp */

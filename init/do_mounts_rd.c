@@ -332,7 +332,7 @@ static int __init fill_inbuf(void)
 	
 	insize = read(crd_infd, inbuf, INBUFSIZ);
 	if (insize == 0) {
-		error("RAMDISK: ran out of compressed data\n");
+		error("RAMDISK: ran out of compressed data");
 		return -1;
 	}
 
@@ -369,7 +369,7 @@ static void __init flush_window(void)
 
 static void __init error(char *x)
 {
-	printk(KERN_ERR "%s", x);
+	printk(KERN_ERR "%s\n", x);
 	exit_code = 1;
 	unzip_error = 1;
 }
