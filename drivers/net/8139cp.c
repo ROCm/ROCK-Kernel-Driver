@@ -41,11 +41,15 @@
 	  for this to be supported, one must(?) turn on packet padding.
 	* Support external MII transceivers
 
+	NOTES:
+	* TX checksumming is considered experimental.  It is off by
+	  default, use ethtool to turn it on.
+
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.5"
-#define DRV_RELDATE		"Aug 26, 2003"
+#define DRV_VERSION		"1.0"
+#define DRV_RELDATE		"Aug 30, 2003"
 
 
 #include <linux/config.h>
@@ -67,9 +71,6 @@
 #include <linux/udp.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-
-/* experimental TX checksumming feature enable/disable */
-#undef CP_TX_CHECKSUM
 
 /* VLAN tagging feature enable/disable */
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
@@ -789,7 +790,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		txd->addr = cpu_to_le64(mapping);
 		wmb();
 
-#ifdef CP_TX_CHECKSUM
 		if (skb->ip_summed == CHECKSUM_HW) {
 			const struct iphdr *ip = skb->nh.iph;
 			if (ip->protocol == IPPROTO_TCP)
@@ -803,7 +803,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 			else
 				BUG();
 		} else
-#endif
 			txd->opts1 = cpu_to_le32(eor | len | DescOwn |
 						 FirstFrag | LastFrag);
 		wmb();
@@ -817,9 +816,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		u32 first_len, first_eor;
 		dma_addr_t first_mapping;
 		int frag, first_entry = entry;
-#ifdef CP_TX_CHECKSUM
 		const struct iphdr *ip = skb->nh.iph;
-#endif
 
 		/* We must give this initial chunk to the device last.
 		 * Otherwise we could race with the device.
@@ -845,7 +842,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 						  this_frag->page_offset),
 						 len, PCI_DMA_TODEVICE);
 			eor = (entry == (CP_TX_RING_SIZE - 1)) ? RingEnd : 0;
-#ifdef CP_TX_CHECKSUM
+
 			if (skb->ip_summed == CHECKSUM_HW) {
 				ctrl = eor | len | DescOwn | IPCS;
 				if (ip->protocol == IPPROTO_TCP)
@@ -855,7 +852,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 				else
 					BUG();
 			} else
-#endif
 				ctrl = eor | len | DescOwn;
 
 			if (frag == skb_shinfo(skb)->nr_frags - 1)
@@ -880,7 +876,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		txd->addr = cpu_to_le64(first_mapping);
 		wmb();
 
-#ifdef CP_TX_CHECKSUM
 		if (skb->ip_summed == CHECKSUM_HW) {
 			if (ip->protocol == IPPROTO_TCP)
 				txd->opts1 = cpu_to_le32(first_eor | first_len |
@@ -893,7 +888,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 			else
 				BUG();
 		} else
-#endif
 			txd->opts1 = cpu_to_le32(first_eor | first_len |
 						 FirstFrag | DescOwn);
 		wmb();
@@ -1793,9 +1787,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	dev->tx_timeout = cp_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 #endif
-#ifdef CP_TX_CHECKSUM
-	dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
-#endif
+
 #if CP_VLAN_TAG_USED
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 	dev->vlan_rx_register = cp_vlan_rx_register;
