@@ -1,7 +1,6 @@
 //#define dprintk(x) printk x
 #define dprintk(x)
 
-#include "compat.h"
 /*------------------------------------------------------------------------------
  *              D E F I N E S
  *----------------------------------------------------------------------------*/
@@ -1461,12 +1460,8 @@ struct aac_aifcmd {
  */
 static inline u32 cap_to_cyls(sector_t capacity, u32 divisor)
 {
-#ifdef CONFIG_LBD
-	do_div(capacity, divisor);
-#else
-	capacity /= divisor;
-#endif
-	return (u32) capacity;
+	sector_div(capacity, divisor);
+	return (u32)capacity;
 }
 
 const char *aac_driverinfo(struct Scsi_Host *);

@@ -33,7 +33,6 @@
 #include <linux/completion.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
-#define MAJOR_NR SCSI_DISK0_MAJOR	/* For DEVICE_NR() */
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -967,9 +966,7 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 		memset(inq_data_ptr, 0, sizeof (struct inquiry_data));
 
 		inq_data_ptr->inqd_ver = 2;	/* claim compliance to SCSI-2 */
- 		if(!strstr(UTS_RELEASE,"BOOT")){  // If this is not a RH driver disk kernel
-			inq_data_ptr->inqd_dtq = 0x80;	/* set RMB bit to one indicating that the medium is removable */
-		}
+		inq_data_ptr->inqd_dtq = 0x80;	/* set RMB bit to one indicating that the medium is removable */
 		inq_data_ptr->inqd_rdf = 2;	/* A response data format value of two indicates that the data shall be in the format specified in SCSI-2 */
 		inq_data_ptr->inqd_len = 31;
 		/*Format for "pad2" is  RelAdr | WBus32 | WBus16 |  Sync  | Linked |Reserved| CmdQue | SftRe */

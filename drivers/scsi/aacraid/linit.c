@@ -62,9 +62,7 @@
 
 MODULE_AUTHOR("Red Hat Inc and Adaptec");
 MODULE_DESCRIPTION("Supports Dell PERC2, 2/Si, 3/Si, 3/Di, Adaptec Advanced Raid Products, and HP NetRAID-4M devices. http://domsch.com/linux/ or http://linux.adaptec.com");
-#if LINUX_VERSION_CODE  > KERNEL_VERSION(2,4,7)   
 MODULE_LICENSE("GPL");
-#endif
 MODULE_PARM(nondasd, "i");
 MODULE_PARM_DESC(nondasd, "Control scanning of hba for nondasd devices. 0=off, 1=on");
 MODULE_PARM(paemode, "i");
