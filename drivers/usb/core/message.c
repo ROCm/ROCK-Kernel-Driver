@@ -1116,8 +1116,8 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
 	struct usb_host_config *cp = NULL;
-	struct usb_interface *new_interfaces[USB_MAXINTERFACES];
-	int n;
+	struct usb_interface **new_interfaces = NULL;
+	int n, nintf;
 
 	/* dev->serialize guards all config changes */
 
@@ -1139,9 +1139,17 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 
 	/* Allocate memory for new interfaces before doing anything else,
 	 * so that if we run out then nothing will have changed. */
-	n = 0;
+	n = nintf = 0;
 	if (cp) {
-		for (; n < cp->desc.bNumInterfaces; ++n) {
+		nintf = cp->desc.bNumInterfaces;
+		new_interfaces = kmalloc(nintf * sizeof(*new_interfaces),
+				GFP_KERNEL);
+		if (!new_interfaces) {
+			dev_err(&dev->dev, "Out of memory");
+			return -ENOMEM;
+		}
+
+		for (; n < nintf; ++n) {
 			new_interfaces[n] = kmalloc(
 					sizeof(struct usb_interface),
 					GFP_KERNEL);
@@ -1151,6 +1159,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 free_interfaces:
 				while (--n >= 0)
 					kfree(new_interfaces[n]);
+				kfree(new_interfaces);
 				return ret;
 			}
 		}
@@ -1173,11 +1182,10 @@ free_interfaces:
 	else {
 		dev->state = USB_STATE_CONFIGURED;
 
-		/* re-initialize hc/hcd/usbcore interface/endpoint state.
-		 * this triggers binding of drivers to interfaces; and
-		 * maybe probe() calls will choose different altsettings.
+		/* Initialize the new interface structures and the
+		 * hc/hcd/usbcore interface/endpoint state.
 		 */
-		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+		for (i = 0; i < nintf; ++i) {
 			struct usb_interface_cache *intfc;
 			struct usb_interface *intf;
 			struct usb_host_interface *alt;
@@ -1212,12 +1220,15 @@ free_interfaces:
 				 configuration,
 				 alt->desc.bInterfaceNumber);
 		}
+		kfree(new_interfaces);
 
-		/* Now that all interfaces are setup, probe() calls
-		 * may claim() any interface that's not yet bound.
-		 * Many class drivers need that: CDC, audio, video, etc.
+		/* Now that all the interfaces are set up, register them
+		 * to trigger binding of drivers to interfaces.  probe()
+		 * routines may install different altsettings and may
+		 * claim() any interfaces not yet bound.  Many class drivers
+		 * need that: CDC, audio, video, etc.
 		 */
-		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+		for (i = 0; i < nintf; ++i) {
 			struct usb_interface *intf = cp->interface[i];
 			struct usb_interface_descriptor *desc;
 
