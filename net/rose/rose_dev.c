@@ -135,7 +135,6 @@ static int rose_set_mac_address(struct net_device *dev, void *addr)
 
 static int rose_open(struct net_device *dev)
 {
-	MOD_INC_USE_COUNT;
 	netif_start_queue(dev);
 	rose_add_loopback_node((rose_address *)dev->dev_addr);
 	return 0;
@@ -145,7 +144,6 @@ static int rose_close(struct net_device *dev)
 {
 	netif_stop_queue(dev);
 	rose_del_loopback_node((rose_address *)dev->dev_addr);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -169,6 +167,7 @@ static struct net_device_stats *rose_get_stats(struct net_device *dev)
 
 int rose_init(struct net_device *dev)
 {
+	SET_MODULE_OWNER(dev);
 	dev->mtu		= ROSE_MAX_PACKET_SIZE - 2;
 	dev->hard_start_xmit	= rose_xmit;
 	dev->open		= rose_open;

@@ -1434,7 +1434,7 @@ static void net_tx_action(struct softirq_action *h)
 }
 
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
-int (*br_handle_frame_hook)(struct sk_buff *skb) = NULL;
+int (*br_handle_frame_hook)(struct sk_buff *skb);
 
 static __inline__ int handle_bridge(struct sk_buff *skb,
 				     struct packet_type *pt_prev)

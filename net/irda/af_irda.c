@@ -1132,9 +1132,6 @@ static int irda_create(struct socket *sock, int protocol)
 	self->nslots = DISCOVERY_DEFAULT_SLOTS;
 	self->daddr = DEV_ADDR_ANY;	/* Until we get connected */
 	self->saddr = 0x0;		/* so IrLMP assign us any link */
-
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -1177,9 +1174,6 @@ void irda_destroy_socket(struct irda_sock *self)
 	}
 #endif /* CONFIG_IRDA_ULTRA */
 	kfree(self);
-	MOD_DEC_USE_COUNT;
-
-	return;
 }
 
 /*
@@ -2409,6 +2403,7 @@ bed:
 static struct net_proto_family irda_family_ops = {
 	.family = PF_IRDA,
 	.create = irda_create,
+	.owner	= THIS_MODULE,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_stream_ops) = {
