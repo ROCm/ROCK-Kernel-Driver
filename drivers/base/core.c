@@ -175,7 +175,7 @@ int device_register(struct device *dev)
 	INIT_LIST_HEAD(&dev->intf_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
-	
+	dev->present = 1;
 	spin_lock(&device_lock);
 	if (dev->parent) {
 		get_device_locked(dev->parent);
@@ -219,7 +219,7 @@ int device_register(struct device *dev)
 struct device * get_device_locked(struct device * dev)
 {
 	struct device * ret = dev;
-	if (dev && atomic_read(&dev->refcount) > 0)
+	if (dev && dev->present && atomic_read(&dev->refcount) > 0)
 		atomic_inc(&dev->refcount);
 	else
 		ret = NULL;
@@ -241,8 +241,35 @@ struct device * get_device(struct device * dev)
  */
 void put_device(struct device * dev)
 {
+	struct device * parent;
 	if (!atomic_dec_and_lock(&dev->refcount,&device_lock))
 		return;
+	parent = dev->parent;
+	dev->parent = NULL;
+	spin_unlock(&device_lock);
+
+	BUG_ON(dev->present);
+
+	if (dev->release)
+		dev->release(dev);
+
+	if (parent)
+		put_device(parent);
+}
+
+/**
+ * device_unregister - unlink device
+ * @dev:	device going away
+ *
+ * The device has been removed from the system, so we disavow knowledge
+ * of it. It might not be the final reference to the device, so we mark
+ * it as !present, so no more references to it can be acquired.
+ * In the end, we decrement the final reference count for it.
+ */
+void device_unregister(struct device * dev)
+{
+	spin_lock(&device_lock);
+	dev->present = 0;
 	list_del_init(&dev->node);
 	list_del_init(&dev->g_list);
 	list_del_init(&dev->bus_list);
@@ -267,11 +294,7 @@ void put_device(struct device * dev)
 	/* remove the driverfs directory */
 	device_remove_dir(dev);
 
-	if (dev->release)
-		dev->release(dev);
-
-	if (dev->parent)
-		put_device(dev->parent);
+	put_device(dev);
 }
 
 static int __init device_init(void)
@@ -287,5 +310,6 @@ static int __init device_init(void)
 core_initcall(device_init);
 
 EXPORT_SYMBOL(device_register);
+EXPORT_SYMBOL(device_unregister);
 EXPORT_SYMBOL(get_device);
 EXPORT_SYMBOL(put_device);

@@ -59,7 +59,7 @@ int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 		BUG();
 		return -EIO;
 	}
-	if (!(iblock % MSDOS_SB(sb)->cluster_size)) {
+	if (!((unsigned long)iblock % MSDOS_SB(sb)->cluster_size)) {
 		int error;
 
 		error = fat_add_cluster(inode);

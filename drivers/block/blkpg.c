@@ -68,17 +68,22 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 {
 	struct gendisk *g;
 	long long ppstart, pplength;
-	long pstart, plength;
 	int part, i;
 
-	/* convert bytes to sectors, check for fit in a hd_struct */
+	/* convert bytes to sectors */
 	ppstart = (p->start >> 9);
 	pplength = (p->length >> 9);
-	pstart = ppstart;
-	plength = pplength;
-	if (pstart != ppstart || plength != pplength
-	    || pstart < 0 || plength < 0)
-		return -EINVAL;
+
+	/* check for fit in a hd_struct */ 
+	if (sizeof(sector_t) == sizeof(long) && 
+	    sizeof(long long) > sizeof(long)) {
+		long pstart, plength;
+		pstart = ppstart;
+		plength = pplength;
+		if (pstart != ppstart || plength != pplength
+		    || pstart < 0 || plength < 0)
+			return -EINVAL;
+	}
 
 	/* find the drive major */
 	g = get_gendisk(bdev->bd_dev, &part);
@@ -101,13 +106,13 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 
 	/* overlap? */
 	for (i = 0; i < (1<<g->minor_shift) - 1; i++)
-		if (!(pstart+plength <= g->part[i].start_sect ||
-		      pstart >= g->part[i].start_sect + g->part[i].nr_sects))
+		if (!(ppstart+pplength <= g->part[i].start_sect ||
+		      ppstart >= g->part[i].start_sect + g->part[i].nr_sects))
 			return -EBUSY;
 
 	/* all seems OK */
-	g->part[p->pno - 1].start_sect = pstart;
-	g->part[p->pno - 1].nr_sects = plength;
+	g->part[p->pno - 1].start_sect = ppstart;
+	g->part[p->pno - 1].nr_sects = pplength;
 	update_partition(g, p->pno);
 	return 0;
 }
@@ -259,10 +264,17 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			intval = bdev_hardsect_size(bdev);
 			return put_user(intval, (int *) arg);
 
-		case BLKGETSIZE:
+		case BLKGETSIZE: 
+		{
+			unsigned long ret;
 			/* size in sectors, works up to 2 TB */
 			ullval = bdev->bd_inode->i_size;
-			return put_user((unsigned long)(ullval >> 9), (unsigned long *) arg);
+			ret = ullval >> 9;
+			if ((u64)ret != (ullval >> 9))
+				return -EFBIG;
+			return put_user(ret, (unsigned long *) arg);
+		}
+		
 		case BLKGETSIZE64:
 			/* size in bytes */
 			ullval = bdev->bd_inode->i_size;

@@ -6981,9 +6981,9 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
     if(device->tagged_supported) {
       if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
       {
-        printk(INFO_LEAD "Enabled tagged queuing, queue depth %d.\n",
+        printk(INFO_LEAD "Enabled tagged queuing on secondary lun, queue depth +%d.\n",
                p->host_no, device->channel, device->id,
-               device->lun, device->queue_depth);
+               device->lun, p->dev_lun_queue_depth[tindex]);
       }
       p->dev_max_queue_depth[tindex] += p->dev_lun_queue_depth[tindex];
       p->dev_temp_queue_depth[tindex] += p->dev_lun_queue_depth[tindex];
@@ -7083,7 +7083,7 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
         {
               printk(INFO_LEAD "Enabled tagged queuing, queue depth %d.\n",
                 p->host_no, device->channel, device->id,
-                device->lun, device->queue_depth);
+                device->lun, p->dev_lun_queue_depth[tindex]);
         }
         p->dev_max_queue_depth[tindex] = p->dev_lun_queue_depth[tindex];
         p->dev_temp_queue_depth[tindex] = p->dev_lun_queue_depth[tindex];
@@ -11812,13 +11812,13 @@ aic7xxx_biosparam(Disk *disk, struct block_device *bdev, int geom[])
   
   heads = 64;
   sectors = 32;
-  cylinders = disk->capacity / (heads * sectors);
+  cylinders = (unsigned long)disk->capacity / (heads * sectors);
 
   if ((p->flags & AHC_EXTEND_TRANS_A) && (cylinders > 1024))
   {
     heads = 255;
     sectors = 63;
-    cylinders = disk->capacity / (heads * sectors);
+    cylinders = (unsigned long)disk->capacity / (heads * sectors);
   }
 
   geom[0] = heads;

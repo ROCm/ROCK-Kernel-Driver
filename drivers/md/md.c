@@ -103,7 +103,7 @@ static ctl_table raid_root_table[] = {
 static void md_recover_arrays(void);
 static mdk_thread_t *md_recovery_thread;
 
-int md_size[MAX_MD_DEVS];
+sector_t md_size[MAX_MD_DEVS];
 
 static struct block_device_operations md_fops;
 static devfs_handle_t devfs_handle;
@@ -243,35 +243,35 @@ static mdk_rdev_t * find_rdev(mddev_t * mddev, dev_t dev)
 	return NULL;
 }
 
-static unsigned int calc_dev_sboffset(struct block_device *bdev)
+static sector_t calc_dev_sboffset(struct block_device *bdev)
 {
-	unsigned int size = bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
+	sector_t size = bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
 	return MD_NEW_SIZE_BLOCKS(size);
 }
 
-static unsigned int calc_dev_size(struct block_device *bdev, mddev_t *mddev)
+static sector_t calc_dev_size(struct block_device *bdev, mddev_t *mddev)
 {
-	unsigned int size;
+	sector_t size;
 
 	if (mddev->persistent)
 		size = calc_dev_sboffset(bdev);
 	else
 		size = bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
 	if (mddev->chunk_size)
-		size &= ~(mddev->chunk_size/1024 - 1);
+		size &= ~((sector_t)mddev->chunk_size/1024 - 1);
 	return size;
 }
 
-static unsigned int zoned_raid_size(mddev_t *mddev)
+static sector_t zoned_raid_size(mddev_t *mddev)
 {
-	unsigned int mask;
+	sector_t mask;
 	mdk_rdev_t * rdev;
 	struct list_head *tmp;
 
 	/*
 	 * do size and offset calculations.
 	 */
-	mask = ~(mddev->chunk_size/1024 - 1);
+	mask = ~((sector_t)mddev->chunk_size/1024 - 1);
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		rdev->size &= mask;
@@ -362,7 +362,7 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 
 static int read_disk_sb(mdk_rdev_t * rdev)
 {
-	unsigned long sb_offset;
+	sector_t sb_offset;
 
 	if (!rdev->sb) {
 		MD_BUG();
@@ -614,9 +614,9 @@ static void print_sb(mdp_super_t *sb)
 
 static void print_rdev(mdk_rdev_t *rdev)
 {
-	printk(KERN_INFO "md: rdev %s, SZ:%08ld F:%d S:%d DN:%d ",
+	printk(KERN_INFO "md: rdev %s, SZ:%08llu F:%d S:%d DN:%d ",
 		bdev_partition_name(rdev->bdev),
-		rdev->size, rdev->faulty, rdev->in_sync, rdev->desc_nr);
+		(unsigned long long)rdev->size, rdev->faulty, rdev->in_sync, rdev->desc_nr);
 	if (rdev->sb) {
 		printk(KERN_INFO "md: rdev superblock:\n");
 		print_sb(rdev->sb);
@@ -698,7 +698,8 @@ static int uuid_equal(mdk_rdev_t *rdev1, mdk_rdev_t *rdev2)
 
 static int write_disk_sb(mdk_rdev_t * rdev)
 {
-	unsigned long sb_offset, size;
+	sector_t sb_offset;
+	sector_t size;
 
 	if (!rdev->sb) {
 		MD_BUG();
@@ -715,8 +716,10 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 
 	sb_offset = calc_dev_sboffset(rdev->bdev);
 	if (rdev->sb_offset != sb_offset) {
-		printk(KERN_INFO "%s's sb offset has changed from %ld to %ld, skipping\n",
-		       bdev_partition_name(rdev->bdev), rdev->sb_offset, sb_offset);
+		printk(KERN_INFO "%s's sb offset has changed from %llu to %llu, skipping\n",
+		       bdev_partition_name(rdev->bdev), 
+		    (unsigned long long)rdev->sb_offset, 
+		    (unsigned long long)sb_offset);
 		goto skip;
 	}
 	/*
@@ -726,12 +729,14 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	 */
 	size = calc_dev_size(rdev->bdev, rdev->mddev);
 	if (size != rdev->size) {
-		printk(KERN_INFO "%s's size has changed from %ld to %ld since import, skipping\n",
-		       bdev_partition_name(rdev->bdev), rdev->size, size);
+		printk(KERN_INFO "%s's size has changed from %llu to %llu since import, skipping\n",
+		       bdev_partition_name(rdev->bdev),
+		       (unsigned long long)rdev->size, 
+		       (unsigned long long)size);
 		goto skip;
 	}
 
-	printk(KERN_INFO "(write) %s's sb offset: %ld\n", bdev_partition_name(rdev->bdev), sb_offset);
+	printk(KERN_INFO "(write) %s's sb offset: %llu\n", bdev_partition_name(rdev->bdev), (unsigned long long)sb_offset);
 
 	if (!sync_page_io(rdev->bdev, sb_offset<<1, MD_SB_BYTES, rdev->sb_page, WRITE))
 		goto fail;
@@ -929,7 +934,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int on_disk)
 {
 	int err;
 	mdk_rdev_t *rdev;
-	unsigned int size;
+	sector_t size;
 
 	rdev = (mdk_rdev_t *) kmalloc(sizeof(*rdev), GFP_KERNEL);
 	if (!rdev) {
@@ -1209,9 +1214,9 @@ static int device_size_calculation(mddev_t * mddev)
 		rdev->size = calc_dev_size(rdev->bdev, mddev);
 		if (rdev->size < mddev->chunk_size / 1024) {
 			printk(KERN_WARNING
-				"md: Dev %s smaller than chunk_size: %ldk < %dk\n",
+				"md: Dev %s smaller than chunk_size: %lluk < %dk\n",
 				bdev_partition_name(rdev->bdev),
-				rdev->size, mddev->chunk_size / 1024);
+				(unsigned long long)rdev->size, mddev->chunk_size / 1024);
 			return -EINVAL;
 		}
 	}
@@ -1401,6 +1406,12 @@ static int do_md_run(mddev_t * mddev)
 	mddev->pers = pers[pnum];
 
 	blk_queue_make_request(&mddev->queue, mddev->pers->make_request);
+	printk("%s: setting max_sectors to %d, segment boundary to %d\n",
+	       disk->disk_name,
+	       chunk_size >> 9,
+	       (chunk_size>>1)-1);
+	blk_queue_max_sectors(&mddev->queue, chunk_size >> 9);
+	blk_queue_segment_boundary(&mddev->queue, (chunk_size>>1) - 1);
 	mddev->queue.queuedata = mddev;
 
 	err = mddev->pers->run(mddev);
@@ -1872,7 +1883,7 @@ static int get_disk_info(mddev_t * mddev, void * arg)
 
 static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 {
-	int size;
+	sector_t size;
 	mdk_rdev_t *rdev;
 	dev_t dev;
 	dev = MKDEV(info->major,info->minor);
@@ -2025,8 +2036,9 @@ static int hot_add_disk(mddev_t * mddev, dev_t dev)
 	size = calc_dev_size(rdev->bdev, mddev);
 
 	if (size < mddev->size) {
-		printk(KERN_WARNING "md%d: disk size %d blocks < array size %ld\n",
-				mdidx(mddev), size, mddev->size);
+		printk(KERN_WARNING "md%d: disk size %llu blocks < array size %llu\n",
+				mdidx(mddev), (unsigned long long)size, 
+				(unsigned long long)mddev->size);
 		err = -ENOSPC;
 		goto abort_export;
 	}
@@ -2628,7 +2640,8 @@ static int status_resync(char * page, mddev_t * mddev)
 static int md_status_read_proc(char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int sz = 0, j, size;
+	int sz = 0, j;
+	sector_t size;
 	struct list_head *tmp, *tmp2;
 	mdk_rdev_t *rdev;
 	mddev_t *mddev;
@@ -2662,10 +2675,10 @@ static int md_status_read_proc(char *page, char **start, off_t off,
 
 		if (!list_empty(&mddev->disks)) {
 			if (mddev->pers)
-				sz += sprintf(page + sz, "\n      %d blocks",
-						 md_size[mdidx(mddev)]);
+				sz += sprintf(page + sz, "\n      %llu blocks",
+						 (unsigned long long)md_size[mdidx(mddev)]);
 			else
-				sz += sprintf(page + sz, "\n      %d blocks", size);
+				sz += sprintf(page + sz, "\n      %llu blocks", (unsigned long long)size);
 		}
 
 		if (!mddev->pers) {

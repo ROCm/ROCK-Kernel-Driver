@@ -1183,7 +1183,7 @@ typedef struct ide_driver_s {
 	int		(*suspend)(ide_drive_t *);
 	int		(*resume)(ide_drive_t *);
 	int		(*flushcache)(ide_drive_t *);
-	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, unsigned long);
+	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, sector_t);
 	int		(*end_request)(ide_drive_t *, int, int);
 	u8		(*sense)(ide_drive_t *, const char *, u8);
 	ide_startstop_t	(*error)(ide_drive_t *, const char *, u8);

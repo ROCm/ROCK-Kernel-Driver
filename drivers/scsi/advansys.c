@@ -6140,7 +6140,7 @@ advansys_biosparam(Disk *dp, struct block_device *dep, int ip[])
                 ip[1] = 32;
         }
     }
-    ip[2] = dp->capacity / (ip[0] * ip[1]);
+    ip[2] = (unsigned long)dp->capacity / (ip[0] * ip[1]);
     ASC_DBG(1, "advansys_biosparam: end\n");
     return 0;
 }

@@ -2576,7 +2576,6 @@ static void __init amb_check_args (void) {
 
 /********** module stuff **********/
 
-#ifdef MODULE
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
 MODULE_LICENSE("GPL");
@@ -2597,7 +2596,7 @@ MODULE_PARM_DESC(pci_lat, "PCI latency in bus cycles");
 
 /********** module entry **********/
 
-int init_module (void) {
+static int __init amb_module_init (void) {
   int devs;
   
   PRINTD (DBG_FLOW|DBG_INIT, "init_module");
@@ -2631,7 +2630,7 @@ int init_module (void) {
 
 /********** module exit **********/
 
-void cleanup_module (void) {
+static void __exit amb_module_exit (void) {
   amb_dev * dev;
   
   PRINTD (DBG_FLOW|DBG_INIT, "cleanup_module");
@@ -2659,38 +2658,5 @@ void cleanup_module (void) {
   return;
 }
 
-#else
-
-/********** monolithic entry **********/
-
-int __init amb_detect (void) {
-  int devs;
-  
-  // sanity check - cast needed as printk does not support %Zu
-  if (sizeof(amb_mem) != 4*16 + 4*12) {
-    PRINTK (KERN_ERR, "Fix amb_mem (is %lu words).",
-	    (unsigned long) sizeof(amb_mem));
-    return 0;
-  }
-  
-  show_version();
-  
-  amb_check_args();
-  
-  // get the juice
-  devs = amb_probe();
-  
-  if (devs) {
-    init_timer (&housekeeping);
-    housekeeping.function = do_housekeeping;
-    // paranoia
-    housekeeping.data = 1;
-    set_timer (&housekeeping, 0);
-  } else {
-    PRINTK (KERN_INFO, "no (usable) adapters found");
-  }
-  
-  return devs;
-}
-
-#endif
+module_init(amb_module_init);
+module_exit(amb_module_exit);

@@ -1806,8 +1806,7 @@ static const struct atmdev_ops ops = {
 	.change_qos	= zatm_change_qos,
 };
 
-
-int __init zatm_detect(void)
+static int __init zatm_module_init(void)
 {
 	struct atm_dev *dev;
 	struct zatm_dev *zatm_dev;
@@ -1841,36 +1840,18 @@ int __init zatm_detect(void)
 			    zatm_dev),GFP_KERNEL);
 			if (!zatm_dev) {
 				printk(KERN_EMERG "zatm.c: memory shortage\n");
-				return devs;
+				goto out;
 			}
 		}
 	}
+out:
 	kfree(zatm_dev);
-	return devs;
-}
 
-
-#ifdef MODULE
- 
-MODULE_LICENSE("GPL");
-
-int init_module(void)
-{
-	if (!zatm_detect()) {
-		printk(KERN_ERR DEV_LABEL ": no adapter found\n");
-		return -ENXIO;
-	}
+	/* XXX: currently the driver is not unloadable.. */
 	MOD_INC_USE_COUNT;
 	return 0;
 }
- 
- 
-void cleanup_module(void)
-{
-	/*
-	 * Well, there's no way to get rid of the driver yet, so we don't
-	 * have to clean up, right ? :-)
-	 */
-}
- 
-#endif
+
+MODULE_LICENSE("GPL");
+
+module_init(zatm_module_init);

@@ -2882,27 +2882,16 @@ static int __init lanai_detect_1(unsigned int vendor, unsigned int device)
 	return count;
 }
 
-#ifdef MODULE
-static
-#endif
-int __init lanai_detect(void)
+static int __init lanai_module_init(void)
 {
-	return lanai_detect_1(PCI_VENDOR_ID_EF, PCI_VENDOR_ID_EF_ATM_LANAI2) +
-	       lanai_detect_1(PCI_VENDOR_ID_EF, PCI_VENDOR_ID_EF_ATM_LANAIHB);
+	if (lanai_detect_1(PCI_VENDOR_ID_EF, PCI_VENDOR_ID_EF_ATM_LANAI2) +
+	    lanai_detect_1(PCI_VENDOR_ID_EF, PCI_VENDOR_ID_EF_ATM_LANAIHB))
+		return 0;
+	printk(KERN_ERR DEV_LABEL ": no adaptor found\n");
+	return -ENODEV;
 }
 
-#ifdef MODULE
-
-int init_module(void)
-{
-	if (lanai_detect() == 0) {
-		printk(KERN_ERR DEV_LABEL ": no adaptor found\n");
-		return -ENODEV;
-	}
-	return 0;
-}
-
-void cleanup_module(void)
+static void __exit lanai_module_exit(void)
 {
 	/* We'll only get called when all the interfaces are already
 	 * gone, so there isn't much to do
@@ -2910,8 +2899,9 @@ void cleanup_module(void)
 	DPRINTK("cleanup_module()\n");
 }
 
+module_init(lanai_module_init);
+module_exit(lanai_module_exit);
+
 MODULE_AUTHOR("Mitchell Blank Jr <mitch@sfgoth.com>");
 MODULE_DESCRIPTION("Efficient Networks Speedstream 3010 driver");
 MODULE_LICENSE("GPL");
-
-#endif /* MODULE */

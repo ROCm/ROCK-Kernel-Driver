@@ -479,9 +479,10 @@ struct inode *ext3_orphan_get (struct super_block * sb, ino_t ino)
 			!(inode = iget(sb, ino)) || is_bad_inode(inode) ||
 			NEXT_ORPHAN(inode) > max_ino) {
 		ext3_warning(sb, __FUNCTION__,
-			     "bad orphan inode %ld!  e2fsck was run?\n", ino);
-		printk(KERN_NOTICE "ext3_test_bit(bit=%d, block=%ld) = %d\n",
-			bit, bitmap_bh->b_blocknr,
+			     "bad orphan inode %lu!  e2fsck was run?\n", (unsigned long)ino);
+		printk(KERN_NOTICE "ext3_test_bit(bit=%d, block=%llu) = %d\n",
+		       bit, 
+			(unsigned long long)bitmap_bh->b_blocknr, 
 			ext3_test_bit(bit, bitmap_bh->b_data));
 		printk(KERN_NOTICE "inode=%p\n", inode);
 		if (inode) {

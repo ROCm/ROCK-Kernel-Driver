@@ -19,3 +19,4 @@ obj-$(CONFIG_BLK_DEV_MD)	+= md.o
 obj-$(CONFIG_BLK_DEV_LVM)	+= lvm-mod.o
 
 include $(TOPDIR)/Rules.make
+

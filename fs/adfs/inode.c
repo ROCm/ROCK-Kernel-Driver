@@ -67,7 +67,7 @@ static int adfs_prepare_write(struct file *file, struct page *page, unsigned int
 		&ADFS_I(page->mapping->host)->mmu_private);
 }
 
-static int _adfs_bmap(struct address_space *mapping, long block)
+static sector_t _adfs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping, block, adfs_get_block);
 }

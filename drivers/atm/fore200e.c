@@ -96,11 +96,9 @@ extern const struct fore200e_bus fore200e_bus[];
 static struct fore200e* fore200e_boards = NULL;
 
 
-#ifdef MODULE
 MODULE_AUTHOR("Christophe Lizzi - credits to Uwe Dannowski and Heikki Vatiainen");
 MODULE_DESCRIPTION("FORE Systems 200E-series ATM driver - version " FORE200E_VERSION);
 MODULE_SUPPORTED_DEVICE("PCA-200E, SBA-200E");
-#endif
 
 
 static const int fore200e_rx_buf_nbr[ BUFFER_SCHEME_NBR ][ BUFFER_MAGN_NBR ] = {
@@ -2583,9 +2581,8 @@ fore200e_init(struct fore200e* fore200e)
     return 0;
 }
 
-
-int __init
-fore200e_detect(void)
+static int __init
+fore200e_module_init(void)
 {
     const struct fore200e_bus* bus;
     struct       fore200e*     fore200e;
@@ -2618,23 +2615,24 @@ fore200e_detect(void)
 	}
     }
 
-    return link;
+    if (link)
+        return 0;
+    return -ENODEV;
 }
 
 
-#ifdef MODULE
-static void
-fore200e_cleanup(struct fore200e** head)
+static void __exit
+fore200e_module_cleanup(void)
 {
-    struct fore200e* fore200e = *head;
+    while (fore200e_boards) {
+        struct fore200e* fore200e = fore200e_boards;
 
-    fore200e_shutdown(fore200e);
-
-    *head = fore200e->next;
-
-    kfree(fore200e);
+	fore200e_shutdown(fore200e);
+	fore200e_boards = fore200e->next;
+	kfree(fore200e);
+    }
+    DPRINTK(1, "module being removed\n");
 }
-#endif
 
 
 static int
@@ -2907,27 +2905,8 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
     return 0;
 }
 
-
-#ifdef MODULE
-static int __init
-fore200e_module_init(void)
-{
-    DPRINTK(1, "module loaded\n");
-    return fore200e_detect() == 0;
-}
-
-static void __exit
-fore200e_module_cleanup(void)
-{
-    while (fore200e_boards) {
-	fore200e_cleanup(&fore200e_boards);
-    }
-    DPRINTK(1, "module being removed\n");
-}
-
 module_init(fore200e_module_init);
 module_exit(fore200e_module_cleanup);
-#endif
 
 
 static const struct atmdev_ops fore200e_ops =

@@ -66,6 +66,7 @@ EXPORT_SYMBOL(scsi_do_req);
 EXPORT_SYMBOL(scsi_report_bus_reset);
 EXPORT_SYMBOL(scsi_block_requests);
 EXPORT_SYMBOL(scsi_unblock_requests);
+EXPORT_SYMBOL(scsi_adjust_queue_depth);
 
 EXPORT_SYMBOL(scsi_get_host_dev);
 EXPORT_SYMBOL(scsi_free_host_dev);

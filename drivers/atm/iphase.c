@@ -40,9 +40,6 @@
 
 *******************************************************************************/
 
-#ifdef IA_MODULE
-#define MODULE
-#endif
 #include <linux/version.h>
 #include <linux/module.h>  
 #include <linux/kernel.h>  
@@ -88,13 +85,11 @@ static int IA_RX_BUF = DFL_RX_BUFFERS, IA_RX_BUF_SZ = DFL_RX_BUF_SZ;
 static u32 IADebugFlag = /* IF_IADBG_ERR | IF_IADBG_CBR| IF_IADBG_INIT_ADAPTER
             |IF_IADBG_ABR | IF_IADBG_EVENT*/ 0; 
 
-#ifdef MODULE
 MODULE_PARM(IA_TX_BUF, "i");
 MODULE_PARM(IA_TX_BUF_SZ, "i");
 MODULE_PARM(IA_RX_BUF, "i");
 MODULE_PARM(IA_RX_BUF_SZ, "i");
 MODULE_PARM(IADebugFlag, "i");
-#endif
 
 MODULE_LICENSE("GPL");
 
@@ -1162,10 +1157,7 @@ static int rx_pkt(struct atm_dev *dev)
 	   goto out_free_desc;
         }
 		  
-#if LINUX_VERSION_CODE >= 0x20312
         if (!(skb = atm_alloc_charge(vcc, len, GFP_ATOMIC))) {
-#else
-        if (atm_charge(vcc, atm_pdu2truesize(len))) {
 	   /* lets allocate an skb for now */  
 	   skb = alloc_skb(len, GFP_ATOMIC);  
 	   if (!skb)  
@@ -1178,7 +1170,6 @@ static int rx_pkt(struct atm_dev *dev)
         }
         else {
            IF_EVENT(printk("IA: Rx over the rx_quota %ld\n", vcc->rx_quota);)
-#endif
            if (vcc->vci < 32)
               printk("Drop control packets\n");
 	      goto out_free_desc;
@@ -1323,11 +1314,7 @@ static void rx_dle_intr(struct atm_dev *dev)
           {
              atomic_inc(&vcc->stats->rx_err);
              dev_kfree_skb_any(skb);
-#if LINUX_VERSION_CODE >= 0x20312
              atm_return(vcc, atm_guess_pdu2truesize(len));
-#else
-             atm_return(vcc, atm_pdu2truesize(len));
-#endif
              goto INCR_DLE;
            }
           // get real pkt length  pwang_test
@@ -1341,11 +1328,7 @@ static void rx_dle_intr(struct atm_dev *dev)
              IF_ERR(printk("rx_dle_intr: Bad  AAL5 trailer %d (skb len %d)", 
                                                             length, skb->len);)
              dev_kfree_skb_any(skb);
-#if LINUX_VERSION_CODE >= 0x20312
              atm_return(vcc, atm_guess_pdu2truesize(len));
-#else
-             atm_return(vcc, atm_pdu2truesize(len));
-#endif 
              goto INCR_DLE;
           }
           skb_trim(skb, length);
@@ -2168,13 +2151,8 @@ static int tx_init(struct atm_dev *dev)
         writew(0xaa00, iadev->seg_reg+ABRUBR_ARB); 
 
         iadev->close_pending = 0;
-#if LINUX_VERSION_CODE >= 0x20303
         init_waitqueue_head(&iadev->close_wait);
         init_waitqueue_head(&iadev->timeout_wait);
-#else
-        iadev->close_wait = NULL;
-        iadev->timeout_wait = NULL;
-#endif 
 	skb_queue_head_init(&iadev->tx_dma_q);  
 	ia_init_rtn_q(&iadev->tx_return_q);  
 
@@ -2286,11 +2264,7 @@ static int reset_sar(struct atm_dev *dev)
 }  
 	  
 	  
-#if LINUX_VERSION_CODE >= 0x20312
 static int __init ia_init(struct atm_dev *dev)
-#else
-__initfunc(static int ia_init(struct atm_dev *dev))
-#endif  
 {  
 	IADEV *iadev;  
 	unsigned long real_base, base;  
@@ -2459,11 +2433,7 @@ static unsigned char ia_phy_get(struct atm_dev *dev, unsigned long addr)
 	return readl(INPH_IA_DEV(dev)->phy+addr);  
 }  
 
-#if LINUX_VERSION_CODE >= 0x20312
 static int __init ia_start(struct atm_dev *dev)
-#else
-__initfunc(static int ia_start(struct atm_dev *dev))
-#endif  
 {  
 	IADEV *iadev;  
 	int error = 1;  
@@ -2559,7 +2529,7 @@ __initfunc(static int ia_start(struct atm_dev *dev))
            SUNI_RSOP_CIE_LOSE - 0x04
         */
         ia_phy_put(dev, ia_phy_get(dev,0x10) | 0x04, 0x10);         
-#ifndef MODULE
+#if 0
 	error = dev->phy->start(dev);  
 	if (error) {
           free_irq(iadev->irq, dev);
@@ -2709,7 +2679,7 @@ static int ia_open(struct atm_vcc *vcc, short vpi, int vci)
   
 	set_bit(ATM_VF_READY,&vcc->flags);
 
-#ifndef MODULE
+#if 0
         {
            static u8 first = 1; 
            if (first) {
@@ -3167,11 +3137,7 @@ static const struct atmdev_ops ops = {
 };  
 	  
   
-#if LINUX_VERSION_CODE >= 0x20312
-int __init ia_detect(void)
-#else
-__initfunc(int ia_detect(void)) 
-#endif 
+static int __init ia_detect(void)
 {  
 	struct atm_dev *dev;  
 	IADEV *iadev;  
@@ -3228,10 +3194,7 @@ __initfunc(int ia_detect(void))
 	return index;  
 }  
   
-
-#ifdef MODULE  
-  
-int init_module(void)  
+static int __init ia_module_init(void)
 {  
 	IF_EVENT(printk(">ia init_module\n");)  
 	if (!ia_detect()) {  
@@ -3245,7 +3208,7 @@ int init_module(void)
 }  
   
   
-void cleanup_module(void)  
+static void __exit ia_module_exit(void)
 {  
 	struct atm_dev *dev;  
 	IADEV *iadev;  
@@ -3295,7 +3258,7 @@ void cleanup_module(void)
                ia_dev[i] =  NULL;
               _ia_dev[i] = NULL;
         }
-}  
+}
 
-#endif  
-
+module_init(ia_module_init);
+module_exit(ia_module_exit);

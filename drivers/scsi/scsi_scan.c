@@ -1477,6 +1477,12 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 		if (sdt->detect)
 			sdev->attached += (*sdt->detect) (sdev);
 
+	if (sdev->host->hostt->slave_attach != NULL)
+		if (sdev->host->hostt->slave_attach(sdev) != 0) {
+			printk(KERN_INFO "scsi_add_lun: failed low level driver attach, setting device offline");
+			sdev->online = FALSE;
+		}
+
 	if (sdevnew != NULL)
 		*sdevnew = sdev;
 
@@ -2026,17 +2032,6 @@ static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
 		 */
 		if (shost->select_queue_depths != NULL)
 			(shost->select_queue_depths) (shost, shost->host_queue);
-		if (shost->hostt->slave_attach != NULL)
-			if ((shost->hostt->slave_attach) (sdev) != 0) {
-				/*
-				 * Low level driver failed to attach this
-				 * device, we've got to kick it back out
-				 * now as a result :-(
-				 */
-				printk("scsi_scan_selected_lun: slave_attach "
-					"failed, marking device OFFLINE.\n");
-				sdev->online = FALSE;
-			}
 
 		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
 			if (sdt->init && sdt->dev_noticed)

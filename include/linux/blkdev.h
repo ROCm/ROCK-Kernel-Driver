@@ -37,7 +37,7 @@ struct request {
 	int errors;
 	sector_t sector;
 	unsigned long nr_sectors;
-	unsigned long hard_sector;	/* the hard_* are block layer
+	sector_t hard_sector;		/* the hard_* are block layer
 					 * internals, no driver should
 					 * touch them
 					 */
@@ -394,12 +394,28 @@ extern inline unsigned int block_size(struct block_device *bdev)
 
 typedef struct {struct page *v;} Sector;
 
-unsigned char *read_dev_sector(struct block_device *, unsigned long, Sector *);
+unsigned char *read_dev_sector(struct block_device *, sector_t, Sector *);
 
 static inline void put_dev_sector(Sector p)
 {
 	page_cache_release(p.v);
 }
+
+#ifdef CONFIG_LBD
+# include <asm/div64.h>
+# define sector_div(a, b) do_div(a, b)
+#else
+# define sector_div(n, b)( \
+{ \
+	int _res; \
+	_res = (n) % (b); \
+	(n) /= (b); \
+	_res; \
+} \
+)
+#endif 
+ 
+
 
 extern atomic_t nr_iowait_tasks;
 void io_schedule(void);
