@@ -2089,7 +2089,6 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 }
 
 #ifndef __ARCH_HAS_4LEVEL_HACK
-#if (PTRS_PER_PUD > 1)
 /*
  * Allocate page upper directory.
  *
@@ -2101,29 +2100,30 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
  */
 pud_t fastcall *__pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
-	pud_t *new;
+	if (PTRS_PER_PUD > 1) {
+		pud_t *new;
 
-	spin_unlock(&mm->page_table_lock);
-	new = pud_alloc_one(mm, address);
-	spin_lock(&mm->page_table_lock);
-	if (!new)
-		return NULL;
+		spin_unlock(&mm->page_table_lock);
+		new = pud_alloc_one(mm, address);
+		spin_lock(&mm->page_table_lock);
+		if (!new)
+			return NULL;
 
-	/*
-	 * Because we dropped the lock, we should re-check the
-	 * entry, as somebody else could have populated it..
-	 */
-	if (pgd_present(*pgd)) {
-		pud_free(new);
-		goto out;
+		/*
+		 * Because we dropped the lock, we should re-check the
+		 * entry, as somebody else could have populated it..
+		 */
+		if (pgd_present(*pgd)) {
+			pud_free(new);
+			goto out;
+		}
+		pgd_populate(mm, pgd, new);
+	out:
+		return pud_offset(pgd, address);
 	}
-	pgd_populate(mm, pgd, new);
-out:
-	return pud_offset(pgd, address);
+	return NULL;
 }
-#endif
 
-#if (PTRS_PER_PMD > 1)
 /*
  * Allocate page middle directory.
  *
@@ -2135,27 +2135,29 @@ out:
  */
 pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
 {
-	pmd_t *new;
+	if (PTRS_PER_PMD > 1) {
+		pmd_t *new;
 
-	spin_unlock(&mm->page_table_lock);
-	new = pmd_alloc_one(mm, address);
-	spin_lock(&mm->page_table_lock);
-	if (!new)
-		return NULL;
+		spin_unlock(&mm->page_table_lock);
+		new = pmd_alloc_one(mm, address);
+		spin_lock(&mm->page_table_lock);
+		if (!new)
+			return NULL;
 
-	/*
-	 * Because we dropped the lock, we should re-check the
-	 * entry, as somebody else could have populated it..
-	 */
-	if (pud_present(*pud)) {
-		pmd_free(new);
-		goto out;
+		/*
+		 * Because we dropped the lock, we should re-check the
+		 * entry, as somebody else could have populated it..
+		 */
+		if (pud_present(*pud)) {
+			pmd_free(new);
+			goto out;
+		}
+		pud_populate(mm, pud, new);
+	out:
+		return pmd_offset(pud, address);
 	}
-	pud_populate(mm, pud, new);
-out:
-	return pmd_offset(pud, address);
+	return NULL;
 }
-#endif
 #else
 pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
 {
