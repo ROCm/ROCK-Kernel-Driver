@@ -105,7 +105,7 @@ static void dump_hci_status(struct usb_hcd *hcd, const char *label)
 }
 #endif
 
-static void usb_hcd_sa1111_hcim_irq (int irq, void *__hcd, struct pt_regs * r)
+static irqreturn_t usb_hcd_sa1111_hcim_irq (int irq, void *__hcd, struct pt_regs * r)
 {
 	struct usb_hcd *hcd = __hcd;
 //	unsigned long status = sa1111_readl(hcd->regs + SA1111_USB_STATUS);
@@ -120,7 +120,7 @@ static void usb_hcd_sa1111_hcim_irq (int irq, void *__hcd, struct pt_regs * r)
 	}
 #endif
 
-	usb_hcd_irq(irq, hcd, r);
+	return usb_hcd_irq(irq, hcd, r);
 }
 
 /*-------------------------------------------------------------------------*/
