@@ -902,6 +902,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
 	ac97.private_free = snd_intel8x0_mixer_free_ac97;
+	ac97.scaps = AC97_SCAP_SKIP_AUDIO;
 
 	glob_sta = igetdword(chip, ICHREG(GLOB_STA));
 	bus.write = snd_intel8x0_codec_write;
@@ -1085,6 +1086,8 @@ static int intel8x0m_suspend(snd_card_t *card, unsigned int state)
 
 	for (i = 0; i < chip->pcm_devs; i++)
 		snd_pcm_suspend_all(chip->pcm[i]);
+	if (chip->ac97)
+		snd_ac97_suspend(chip->ac97);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
