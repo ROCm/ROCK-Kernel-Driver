@@ -2019,7 +2019,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	 * timeslice. This makes it possible for interactive tasks
 	 * to use up their timeslices at their highest priority levels.
 	 */
-	if (unlikely(rt_task(p))) {
+	if (rt_task(p)) {
 		/*
 		 * RR tasks need a special form of timeslice management.
 		 * FIFO tasks have no timeslices.
@@ -3015,7 +3015,7 @@ asmlinkage long sys_sched_yield(void)
 	 * (special rule: RT tasks will just roundrobin in the active
 	 *  array.)
 	 */
-	if (unlikely(rt_task(current)))
+	if (rt_task(current))
 		target = rq->active;
 
 	dequeue_task(current, array);
