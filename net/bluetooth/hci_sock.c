@@ -319,7 +319,8 @@ static inline void hci_sock_cmsg(struct sock *sk, struct msghdr *msg, struct sk_
         	put_cmsg(msg, SOL_HCI, HCI_CMSG_TSTAMP, sizeof(skb->stamp), &skb->stamp);
 }
  
-static int hci_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, int flags)
+static int hci_sock_recvmsg(struct kiocb *iocb, struct socket *sock, 
+			    struct msghdr *msg, size_t len, int flags)
 {
 	int noblock = flags & MSG_DONTWAIT;
 	struct sock *sk = sock->sk;
@@ -355,7 +356,8 @@ static int hci_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 	return err ? : copied;
 }
 
-static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len)
+static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock, 
+			    struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct hci_dev *hdev;
@@ -370,9 +372,9 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_NOSIGNAL|MSG_ERRQUEUE))
 		return -EINVAL;
 
-	if (len < 4)
+	if (len < 4 || len > HCI_MAX_FRAME_SIZE)
 		return -EINVAL;
-	
+
 	lock_sock(sk);
 
 	if (!(hdev = hci_pi(sk)->hdev)) {

@@ -482,12 +482,12 @@ static int rfcomm_sock_getname(struct socket *sock, struct sockaddr *addr, int *
 }
 
 static int rfcomm_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
-			       struct msghdr *msg, int len)
+			       struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct rfcomm_dlc *d = rfcomm_pi(sk)->dlc;
 	struct sk_buff *skb;
-	int err, size;
+	int err;
 	int sent = 0;
 
 	if (msg->msg_flags & MSG_OOB)
@@ -501,7 +501,7 @@ static int rfcomm_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	lock_sock(sk);
 
 	while (len) {
-		size = min_t(uint, len, d->mtu);
+		size_t size = min(len, d->mtu);
 		
 		skb = sock_alloc_send_skb(sk, size + RFCOMM_SKB_RESERVE,
 				msg->msg_flags & MSG_DONTWAIT, &err);
@@ -556,10 +556,11 @@ static long rfcomm_sock_data_wait(struct sock *sk, long timeo)
 }
 
 static int rfcomm_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
-			       struct msghdr *msg, int size, int flags)
+			       struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
-	int target, err = 0, copied = 0;
+	int err = 0;
+	size_t target, copied = 0;
 	long timeo;
 
 	if (flags & MSG_OOB)
