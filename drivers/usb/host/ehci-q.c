@@ -426,23 +426,25 @@ static void qtd_list_free (
 		list_del (&qtd->qtd_list);
 		if (unmapped != 2) {
 			int	direction;
+			size_t	size;
 
 			/* for ctrl unmap twice: SETUP and DATA;
 			 * else (bulk, intr) just once: DATA
 			 */
-			if (!unmapped++ && usb_pipecontrol (urb->pipe))
+			if (!unmapped++ && usb_pipecontrol (urb->pipe)) {
 				direction = PCI_DMA_TODEVICE;
-			else {
+				size = sizeof (struct usb_ctrlrequest);
+			} else {
 				direction = usb_pipein (urb->pipe)
 					? PCI_DMA_FROMDEVICE
 					: PCI_DMA_TODEVICE;
+				size = qtd->urb->transfer_buffer_length;
 				unmapped++;
 			}
 			if (qtd->buf_dma)
 				pci_unmap_single (ehci->hcd.pdev,
 					qtd->buf_dma,
-					qtd->urb->transfer_buffer_length,
-					direction);
+					size, direction);
 		}
 		ehci_qtd_free (ehci, qtd);
 	}
