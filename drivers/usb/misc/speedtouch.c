@@ -88,15 +88,12 @@
 #define SPEEDTOUCH_VENDORID		0x06b9
 #define SPEEDTOUCH_PRODUCTID		0x4061
 
-#define UDSL_OBUF_SIZE			32768
-#define UDSL_MINOR			48
 #define UDSL_NUMBER_RCV_URBS		1
 #define UDSL_NUMBER_SND_URBS		1
 #define UDSL_RECEIVE_BUFFER_SIZE	64*53
 /* max should be (1500 IP mtu + 2 ppp bytes + 32 * 5 cellheader overhead) for
  * PPPoA and (1500 + 14 + 32*5 cellheader overhead) for PPPoE */
 #define UDSL_MAX_AAL5_MRU		2048
-#define UDSL_SEND_CONTEXTS		8
 
 #define UDSL_IOCTL_START		1
 #define UDSL_IOCTL_STOP			2
