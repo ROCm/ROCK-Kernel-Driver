@@ -256,7 +256,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 	}
 
-	if (!(cpu_online_map & (1<<cpu_id)))
+	if (!(cpu_online_map & (1UL << cpu_id)))
 		return 0;
 
 #ifdef CONFIG_SMP
