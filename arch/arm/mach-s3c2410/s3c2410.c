@@ -151,19 +151,19 @@ void __init s3c2410_init_uarts(struct s3c2410_uartcfg *cfg, int no)
  *
  * register the standard cpu IO areas, and any passed in from the
  * machine specific initialisation.
- *
- * this function also sets the initial clock frequencies from the
- * settings passed in
 */
 
 void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 {
-	unsigned long tmp;
-
 	/* register our io-tables */
 
 	iotable_init(s3c2410_iodesc, ARRAY_SIZE(s3c2410_iodesc));
 	iotable_init(mach_desc, mach_size);
+}
+
+void __init s3c2410_init_clocks(int xtal)
+{
+	unsigned long tmp;
 
 	/* now we've got our machine bits initialised, work out what
 	 * clocks we've got */
@@ -188,7 +188,7 @@ void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 	 * console to use them
 	 */
 
-	s3c2410_init_clocks();
+	s3c24xx_setup_clocks();
 }
 
 int __init s3c2410_init(void)
