@@ -1122,17 +1122,6 @@ static int __init check_sig(void)
 	return error;
 }
 
-
-int __init verify(void)
-{
-	int error;
-
-	if (!(error = check_sig()))
-		error = check_header();
-	return error;
-}
-
-
 /**
  *	swsusp_read_data - Read image pages from swap.
  *
@@ -1194,13 +1183,14 @@ static int __init read_suspend_image(void)
 {
 	int error = 0;
 
-	if ((error = verify()))
+	if ((error = check_sig()))
+		return error;
+	if ((error = check_header()))
 		return error;
 	if ((error = read_pagedir()))
 		return error;
-	if ((error = data_read())) {
-		free_pages((unsigned long)pagedir_nosave,pagedir_order);
-	}
+	if ((error = data_read()))
+		free_pages((unsigned long)pagedir_nosave, pagedir_order);
 	return error;
 }
 
