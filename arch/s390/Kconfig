@@ -312,6 +312,15 @@ config DEBUG_INFO
 	  Say Y here only if you plan to use gdb to debug the kernel.
 	  If you don't debug the kernel, you can say N.
 	  
+config CRASH_DUMP
+	bool "Crash dump support"
+	depends on DEBUG_KERNEL
+	default n
+	help
+	  Say Y here to enable saving an image of system memory when a
+	  panic or other error occurs. Dumps can also be forced with
+	  the SysRq+d key if MAGIC_SYSRQ is enabled.
+
 config DEBUG_SPINLOCK_SLEEP
 	bool "Sleep-inside-spinlock checking"
 	help

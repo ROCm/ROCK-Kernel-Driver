@@ -10,10 +10,6 @@
 #include <linux/module.h>
 #include <linux/timer.h>
 
-MODULE_AUTHOR("IBM Corp.");
-MODULE_DESCRIPTION("generic FSM");
-MODULE_LICENSE("GPL");
-
 fsm_instance *
 init_fsm(char *name, const char **state_names, const char **event_names, int nr_states,
 		int nr_events, const fsm_node *tmpl, int tmpl_len, int order)

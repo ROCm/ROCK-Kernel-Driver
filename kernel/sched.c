@@ -175,46 +175,8 @@ static inline unsigned int task_timeslice(task_t *p)
 	return BASE_TIMESLICE(p);
 }
 
-/*
- * These are the runqueue data structures:
- */
 
-#define BITMAP_SIZE ((((MAX_PRIO+1+7)/8)+sizeof(long)-1)/sizeof(long))
-
-typedef struct runqueue runqueue_t;
-
-struct prio_array {
-	int nr_active;
-	unsigned long bitmap[BITMAP_SIZE];
-	struct list_head queue[MAX_PRIO];
-};
-
-/*
- * This is the main, per-CPU runqueue data structure.
- *
- * Locking rule: those places that want to lock multiple runqueues
- * (such as the load balancing or the thread migration code), lock
- * acquire operations must be ordered by ascending &runqueue.
- */
-struct runqueue {
-	spinlock_t lock;
-	unsigned long nr_running, nr_switches, expired_timestamp,
-			nr_uninterruptible;
-	task_t *curr, *idle;
-	struct mm_struct *prev_mm;
-	prio_array_t *active, *expired, arrays[2];
-	int prev_cpu_load[NR_CPUS];
-#ifdef CONFIG_NUMA
-	atomic_t *node_nr_running;
-	int prev_node_load[MAX_NUMNODES];
-#endif
-	task_t *migration_thread;
-	struct list_head migration_queue;
-
-	atomic_t nr_iowait;
-};
-
-static DEFINE_PER_CPU(struct runqueue, runqueues);
+DEFINE_PER_CPU(struct runqueue, runqueues);
 
 #define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))
 #define this_rq()		(&__get_cpu_var(runqueues))

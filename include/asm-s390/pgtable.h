@@ -284,7 +284,6 @@ extern char empty_zero_page[PAGE_SIZE];
 #define PAGE_RO_SHARED	  __pgprot(_PAGE_RO)
 #define PAGE_RO_PRIVATE	  __pgprot(_PAGE_RO|_PAGE_ISCLEAN)
 #define PAGE_COPY	  __pgprot(_PAGE_RO|_PAGE_ISCLEAN)
-#define PAGE_READONLY	  __pgprot(_PAGE_RO)
 #define PAGE_SHARED	  __pgprot(0)
 #define PAGE_KERNEL	  __pgprot(_PAGE_ISCLEAN)
 

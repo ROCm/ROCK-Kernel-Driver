@@ -165,7 +165,7 @@ ip_fast_csum(unsigned char *iph, unsigned int ihl)
 		"    sr   %0,%0\n"   /* set sum to zero */
                 "0:  cksm %0,%1\n"   /* do checksum on longs */
                 "    jo   0b\n"
-                : "=&d" (sum), "+&a" (rp) : : "cc" );
+                : "=&d" (sum), "+&a" (rp) : : "cc", "memory" );
 #else /* __s390x__ */
         __asm__ __volatile__ (
 		"    slgr %0,%0\n"   /* set sum to zero */
@@ -175,7 +175,7 @@ ip_fast_csum(unsigned char *iph, unsigned int ihl)
                 "    jo   0b\n"
                 : "=&d" (sum)
                 : "d" (iph), "d" (ihl*4)
-                : "cc", "2", "3" );
+                : "cc", "2", "3", "memory" );
 #endif /* __s390x__ */
         return csum_fold(sum);
 }

@@ -101,6 +101,16 @@ extern void tc_init(void);
 int system_running;
 
 /*
+ * The kernel_magic value represents the address of _end, which allows
+ * namelist tools to "match" each other respectively.  That way a tool
+ * that looks at /dev/mem can verify that it is using the right System.map
+ * file -- if kernel_magic doesn't equal the namelist value of _end,
+ * something's wrong.
+ */
+extern unsigned long _end;
+unsigned long *kernel_magic = &_end;
+
+/*
  * Boot command-line arguments
  */
 #define MAX_INIT_ARGS 8

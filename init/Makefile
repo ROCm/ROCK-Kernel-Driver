@@ -9,6 +9,9 @@ mounts-$(CONFIG_BLK_DEV_RAM)	+= do_mounts_rd.o
 mounts-$(CONFIG_BLK_DEV_INITRD)	+= do_mounts_initrd.o
 mounts-$(CONFIG_BLK_DEV_MD)	+= do_mounts_md.o
 
+extra-$(CONFIG_CRASH_DUMP)	+= kerntypes.o
+CFLAGS_kerntypes.o		:= -gstabs
+
 # files to be removed upon make clean
 clean-files := ../include/linux/compile.h
 
@@ -24,3 +27,4 @@ $(obj)/version.o: include/linux/compile.h
 include/linux/compile.h: FORCE
 	@echo '  CHK     $@'
 	@sh $(srctree)/scripts/mkcompile_h $@ "$(UTS_MACHINE)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"
+
