@@ -103,6 +103,16 @@ config BRIDGE_EBT_PKTTYPE
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+config BRIDGE_EBT_STP
+	tristate "ebt: STP filter support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds the Spanning Tree Protocol match, which
+	  allows STP header field filtering.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 config BRIDGE_EBT_SNAT
 	tristate "ebt: snat target support"
 	depends on BRIDGE_NF_EBTABLES
