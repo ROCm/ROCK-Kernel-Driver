@@ -105,9 +105,10 @@ typedef enum {
 
 typedef enum {
 	SCTP_EVENT_NO_PENDING_TSN = 0,
+	SCTP_EVENT_ICMP_PROTO_UNREACH,
 } sctp_event_other_t;
 
-#define SCTP_EVENT_OTHER_MAX		SCTP_EVENT_NO_PENDING_TSN
+#define SCTP_EVENT_OTHER_MAX		SCTP_EVENT_ICMP_PROTO_UNREACH
 #define SCTP_NUM_OTHER_TYPES		(SCTP_EVENT_OTHER_MAX + 1)
 
 /* These are primitive requests from the ULP.  */

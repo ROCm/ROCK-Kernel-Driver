@@ -173,6 +173,10 @@ void sctp_err_finish(struct sock *, struct sctp_endpoint *,
 			    struct sctp_association *);
 void sctp_icmp_frag_needed(struct sock *, struct sctp_association *,
 			   struct sctp_transport *t, __u32 pmtu);
+void sctp_icmp_proto_unreachable(struct sock *sk,
+				 struct sctp_endpoint *ep,
+				 struct sctp_association *asoc,
+				 struct sctp_transport *t);
 
 /*
  *  Section:  Macros, externs, and inlines

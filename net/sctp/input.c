@@ -288,6 +288,31 @@ void sctp_icmp_frag_needed(struct sock *sk, struct sctp_association *asoc,
 	}
 }
 
+/*
+ * SCTP Implementer's Guide, 2.37 ICMP handling procedures
+ *
+ * ICMP8) If the ICMP code is a "Unrecognized next header type encountered"
+ *        or a "Protocol Unreachable" treat this message as an abort
+ *        with the T bit set.
+ *
+ * This function sends an event to the state machine, which will abort the
+ * association.
+ *
+ */
+void sctp_icmp_proto_unreachable(struct sock *sk,
+                           struct sctp_endpoint *ep,
+                           struct sctp_association *asoc,
+                           struct sctp_transport *t)
+{
+	SCTP_DEBUG_PRINTK("%s\n",  __FUNCTION__);
+
+	sctp_do_sm(SCTP_EVENT_T_OTHER,
+		   SCTP_ST_OTHER(SCTP_EVENT_ICMP_PROTO_UNREACH),
+		   asoc->state, asoc->ep, asoc, NULL,
+		   GFP_ATOMIC);
+
+}
+
 /* Common lookup code for icmp/icmpv6 error handler. */
 struct sock *sctp_err_lookup(int family, struct sk_buff *skb,
 			     struct sctphdr *sctphdr,
@@ -437,7 +462,13 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 			sctp_icmp_frag_needed(sk, asoc, transport, info);
 			goto out_unlock;
 		}
-
+		else {
+			if (ICMP_PROT_UNREACH == code) {
+				sctp_icmp_proto_unreachable(sk, ep, asoc,
+							    transport);
+				goto out_unlock;
+			}
+		}
 		err = icmp_err_convert[code].errno;
 		break;
 	case ICMP_TIME_EXCEEDED:

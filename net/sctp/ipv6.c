@@ -122,6 +122,12 @@ SCTP_STATIC void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	case ICMPV6_PKT_TOOBIG:
 		sctp_icmp_frag_needed(sk, asoc, transport, ntohl(info));
 		goto out_unlock;
+	case ICMPV6_PARAMPROB:
+		if (ICMPV6_UNK_NEXTHDR == code) {
+			sctp_icmp_proto_unreachable(sk, ep, asoc, transport);
+			goto out_unlock;
+		}
+		break;
 	default:
 		break;
 	}

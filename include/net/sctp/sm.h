@@ -165,6 +165,7 @@ sctp_state_fn_t sctp_sf_do_prm_asconf;
 sctp_state_fn_t sctp_sf_do_9_2_start_shutdown;
 sctp_state_fn_t sctp_sf_do_9_2_shutdown_ack;
 sctp_state_fn_t sctp_sf_ignore_other;
+sctp_state_fn_t sctp_sf_cookie_wait_icmp_abort;
 
 /* Prototypes for timeout event state functions.  */
 sctp_state_fn_t sctp_sf_do_6_3_3_rtx;
@@ -251,6 +252,8 @@ struct sctp_chunk *sctp_make_fwdtsn(const struct sctp_association *asoc,
 
 void sctp_chunk_assign_tsn(struct sctp_chunk *);
 void sctp_chunk_assign_ssn(struct sctp_chunk *);
+
+void sctp_stop_t1_and_abort(sctp_cmd_seq_t *commands, __u16 error);
 
 /* Prototypes for statetable processing. */
 

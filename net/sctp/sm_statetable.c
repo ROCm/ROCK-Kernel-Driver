@@ -727,8 +727,31 @@ static const sctp_sm_table_entry_t primitive_event_table[SCTP_NUM_PRIMITIVE_TYPE
 	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
 }
 
+#define TYPE_SCTP_OTHER_ICMP_PROTO_UNREACH  { \
+	/* SCTP_STATE_EMPTY */ \
+	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
+	/* SCTP_STATE_CLOSED */ \
+	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
+	/* SCTP_STATE_COOKIE_WAIT */ \
+	{.fn = sctp_sf_cookie_wait_icmp_abort, \
+	 .name = "sctp_sf_cookie_wait_icmp_abort"}, \
+	/* SCTP_STATE_COOKIE_ECHOED */ \
+	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
+	/* SCTP_STATE_ESTABLISHED */ \
+	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
+	/* SCTP_STATE_SHUTDOWN_PENDING */ \
+	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
+	/* SCTP_STATE_SHUTDOWN_SENT */ \
+	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
+	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
+	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
+	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
+	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
+}
+
 static const sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STATES] = {
 	TYPE_SCTP_OTHER_NO_PENDING_TSN,
+	TYPE_SCTP_OTHER_ICMP_PROTO_UNREACH,
 };
 
 #define TYPE_SCTP_EVENT_TIMEOUT_NONE { \

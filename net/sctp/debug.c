@@ -154,6 +154,7 @@ const char *sctp_pname(const sctp_subtype_t id)
 
 static const char *sctp_other_tbl[] = {
 	"NO_PENDING_TSN",
+        "ICMP_PROTO_UNREACH",
 };
 
 /* Lookup "other" debug name. */
@@ -161,7 +162,7 @@ const char *sctp_oname(const sctp_subtype_t id)
 {
 	if (id.other < 0)
 		return "illegal 'other' event";
-	if (id.other < SCTP_EVENT_OTHER_MAX)
+	if (id.other <= SCTP_EVENT_OTHER_MAX)
 		return sctp_other_tbl[id.other];
 	return "unknown 'other' event";
 }

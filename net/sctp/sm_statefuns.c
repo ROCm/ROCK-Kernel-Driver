@@ -2123,27 +2123,30 @@ sctp_disposition_t sctp_sf_cookie_wait_abort(const struct sctp_endpoint *ep,
 	if (!sctp_vtag_verify_either(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
-	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
-			SCTP_STATE(SCTP_STATE_CLOSED));
-	SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
-	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
-			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
-
 	/* Check that chunk header looks valid.  */
 	len = ntohs(chunk->chunk_hdr->length);
 	if (len >= sizeof(struct sctp_chunkhdr) + sizeof(struct sctp_errhdr))
 		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
 
-	/* CMD_INIT_FAILED will DELETE_TCB. */
-	sctp_add_cmd_sf(commands, SCTP_CMD_INIT_FAILED, SCTP_U32(error));
-
+ 	sctp_stop_t1_and_abort(commands, error);
 	return SCTP_DISPOSITION_ABORT;
 }
 
 /*
+ * Process an incoming ICMP as an ABORT.  (COOKIE-WAIT state)
+ */
+sctp_disposition_t sctp_sf_cookie_wait_icmp_abort(const struct sctp_endpoint *ep,
+					const struct sctp_association *asoc,
+					const sctp_subtype_t type,
+					void *arg,
+					sctp_cmd_seq_t *commands)
+{
+	sctp_stop_t1_and_abort(commands, SCTP_ERROR_NO_ERROR);
+ 	return SCTP_DISPOSITION_ABORT;
+}
+
+/*
  * Process an ABORT.  (COOKIE-ECHOED state)
- *
- * See sctp_sf_do_9_1_abort() above.
  */
 sctp_disposition_t sctp_sf_cookie_echoed_abort(const struct sctp_endpoint *ep,
 					       const struct sctp_association *asoc,
@@ -2155,6 +2158,23 @@ sctp_disposition_t sctp_sf_cookie_echoed_abort(const struct sctp_endpoint *ep,
 	 * common function with the COOKIE-WAIT state.
 	 */
 	return sctp_sf_cookie_wait_abort(ep, asoc, type, arg, commands);
+}
+
+/*
+ * Stop T1 timer and abort association with "INIT failed".
+ *
+ * This is common code called by several sctp_sf_*_abort() functions above.
+ */
+void sctp_stop_t1_and_abort(sctp_cmd_seq_t *commands, __u16 error)
+{
+	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
+			SCTP_STATE(SCTP_STATE_CLOSED));
+	SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
+	/* CMD_INIT_FAILED will DELETE_TCB. */
+	sctp_add_cmd_sf(commands, SCTP_CMD_INIT_FAILED,
+			SCTP_U32(error));
 }
 
 /*
