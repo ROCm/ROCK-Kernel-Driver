@@ -1139,7 +1139,8 @@ vicam_create_proc_entry(struct vicam_camera *cam)
 
 	cam->proc_dir = create_proc_entry(name, S_IFDIR, vicam_proc_root);
 
-	if ( !cam->proc_dir ) return; // We should probably return an error here
+	if ( !cam->proc_dir )
+		return; // FIXME: We should probably return an error here
 	
 	ent =
 	    create_proc_entry("shutter", S_IFREG | S_IRUGO, cam->proc_dir);

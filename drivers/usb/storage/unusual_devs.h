@@ -332,6 +332,15 @@ UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
                 US_SC_8070, US_PR_CBI, NULL,
                 US_FL_FIX_INQUIRY ),
 
+/* Pentax Optio S digital camera
+ * submitted by Stefan M. Brandl <smb@smbnet.de>
+ */
+UNUSUAL_DEV( 0x0a17, 0x0006, 0x0000, 0xffff,
+		"Pentax",
+		"Optio S",
+		US_SC_8070, US_PR_CB, NULL,
+		US_FL_MODE_XLATE|US_FL_FIX_INQUIRY),
+
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
 		"In-System",

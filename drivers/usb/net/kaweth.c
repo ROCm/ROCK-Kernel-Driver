@@ -811,7 +811,8 @@ static void kaweth_async_set_rx_mode(struct kaweth_device *kaweth)
 {
 	__u16 packet_filter_bitmap = kaweth->packet_filter_bitmap;
 	kaweth->packet_filter_bitmap = 0;
-	if(packet_filter_bitmap == 0) return;
+	if (packet_filter_bitmap == 0)
+		return;
 
 	{
 	int result;

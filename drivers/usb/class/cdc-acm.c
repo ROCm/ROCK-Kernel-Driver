@@ -252,7 +252,8 @@ static void acm_read_bulk(struct urb *urb, struct pt_regs *regs)
 	unsigned char *data = urb->transfer_buffer;
 	int i = 0;
 
-	if (!ACM_READY(acm)) return;
+	if (!ACM_READY(acm))
+		return;
 
 	if (urb->status)
 		dbg("nonzero read bulk status received: %d", urb->status);
@@ -286,7 +287,8 @@ static void acm_write_bulk(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = (struct acm *)urb->context;
 
-	if (!ACM_READY(acm)) return;
+	if (!ACM_READY(acm))
+		return;
 
 	if (urb->status)
 		dbg("nonzero write bulk status received: %d", urb->status);
@@ -299,7 +301,8 @@ static void acm_softint(void *private)
 	struct acm *acm = private;
 	struct tty_struct *tty = acm->tty;
 
-	if (!ACM_READY(acm)) return;
+	if (!ACM_READY(acm))
+		return;
 
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
 		(tty->ldisc.write_wakeup)(tty);
@@ -315,7 +318,8 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 {
 	struct acm *acm = acm_table[tty->index];
 
-	if (!acm || !acm->dev) return -EINVAL;
+	if (!acm || !acm->dev)
+		return -EINVAL;
 
 	tty->driver_data = acm;
 	acm->tty = tty;
@@ -350,7 +354,8 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 {
 	struct acm *acm = tty->driver_data;
 
-	if (!acm || !acm->used) return;
+	if (!acm || !acm->used)
+		return;
 
 	if (!--acm->used) {
 		if (acm->dev) {
@@ -373,9 +378,12 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 {
 	struct acm *acm = tty->driver_data;
 
-	if (!ACM_READY(acm)) return -EINVAL;
-	if (acm->writeurb->status == -EINPROGRESS) return 0;
-	if (!count) return 0;
+	if (!ACM_READY(acm))
+		return -EINVAL;
+	if (acm->writeurb->status == -EINPROGRESS)
+		return 0;
+	if (!count)
+		return 0;
 
 	count = (count > acm->writesize) ? acm->writesize : count;
 
@@ -397,28 +405,32 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 static int acm_tty_write_room(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
-	if (!ACM_READY(acm)) return -EINVAL;
+	if (!ACM_READY(acm))
+		return -EINVAL;
 	return acm->writeurb->status == -EINPROGRESS ? 0 : acm->writesize;
 }
 
 static int acm_tty_chars_in_buffer(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
-	if (!ACM_READY(acm)) return -EINVAL;
+	if (!ACM_READY(acm))
+		return -EINVAL;
 	return acm->writeurb->status == -EINPROGRESS ? acm->writeurb->transfer_buffer_length : 0;
 }
 
 static void acm_tty_throttle(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
-	if (!ACM_READY(acm)) return;
+	if (!ACM_READY(acm))
+		return;
 	acm->throttle = 1;
 }
 
 static void acm_tty_unthrottle(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
-	if (!ACM_READY(acm)) return;
+	if (!ACM_READY(acm))
+		return;
 	acm->throttle = 0;
 	if (acm->readurb->status != -EINPROGRESS)
 		acm_read_bulk(acm->readurb, NULL);
@@ -427,7 +439,8 @@ static void acm_tty_unthrottle(struct tty_struct *tty)
 static void acm_tty_break_ctl(struct tty_struct *tty, int state)
 {
 	struct acm *acm = tty->driver_data;
-	if (!ACM_READY(acm)) return;
+	if (!ACM_READY(acm))
+		return;
 	if (acm_send_break(acm, state ? 0xffff : 0))
 		dbg("send break failed");
 }
@@ -496,7 +509,8 @@ static void acm_tty_set_termios(struct tty_struct *tty, struct termios *termios_
 	struct acm_line newline;
 	int newctrl = acm->ctrlout;
 
-	if (!ACM_READY(acm)) return;
+	if (!ACM_READY(acm))
+		return;
 
 	newline.speed = cpu_to_le32p(acm_tty_speed +
 		(termios->c_cflag & CBAUD & ~CBAUDEX) + (termios->c_cflag & CBAUDEX ? 15 : 0));
