@@ -1,6 +1,7 @@
-/* net/atm/common.c - ATM sockets (common part for PVC and SVC) */
+/* ATM ioctl handling */
 
 /* Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA */
+/* 2003 John Levon  <levon@movementarian.org> */
 
 
 #include <linux/config.h>
@@ -18,7 +19,7 @@
 #ifdef CONFIG_ATM_CLIP
 #include <net/atmclip.h>	/* for clip_create */
 #endif
-#include "resources.h"		/* atm_find_dev */
+#include "resources.h"
 #include "signaling.h"		/* for WAITING and sigd_attach */
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
@@ -153,11 +154,32 @@ EXPORT_SYMBOL(br2684_ioctl_set);
 #endif
 #endif
 
+static DECLARE_MUTEX(ioctl_mutex);
+static LIST_HEAD(ioctl_list);
+
+
+void register_atm_ioctl(struct atm_ioctl *ioctl)
+{
+	down(&ioctl_mutex);
+	list_add_tail(&ioctl->list, &ioctl_list);
+	up(&ioctl_mutex);
+}
+
+void deregister_atm_ioctl(struct atm_ioctl *ioctl)
+{
+	down(&ioctl_mutex);
+	list_del(&ioctl->list);
+	up(&ioctl_mutex);
+}
+
+EXPORT_SYMBOL(register_atm_ioctl);
+EXPORT_SYMBOL(deregister_atm_ioctl);
 
 int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct atm_vcc *vcc;
 	int error;
+	struct list_head * pos;
 
 	vcc = ATM_SD(sock);
 	switch (cmd) {
@@ -396,6 +418,22 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			break;
 	}
 	error = -ENOIOCTLCMD;
+
+	down(&ioctl_mutex);
+	list_for_each(pos, &ioctl_list) {
+		struct atm_ioctl * ic = list_entry(pos, struct atm_ioctl, list);
+		if (try_module_get(ic->owner)) {
+			error = ic->ioctl(sock, cmd, arg);
+			module_put(ic->owner);
+			if (error != -ENOIOCTLCMD)
+				break;
+		}
+	}
+	up(&ioctl_mutex);
+
+	if (error != -ENOIOCTLCMD)
+		goto done;
+
 #if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
 	down(&pppoatm_ioctl_mutex);
 	if (pppoatm_ioctl_hook)

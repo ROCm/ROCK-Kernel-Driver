@@ -445,6 +445,28 @@ int atm_pcr_goal(struct atm_trafprm *tp);
 
 void vcc_release_async(struct atm_vcc *vcc, int reply);
 
+struct atm_ioctl {
+	struct module *owner;
+	/* A module reference is kept if appropriate over this call.
+	 * Return -ENOIOCTLCMD if you don't handle it. */
+	int (*ioctl)(struct socket *, unsigned int cmd, unsigned long arg);
+	struct list_head list;
+};
+
+/**
+ * register_atm_ioctl - register handler for ioctl operations
+ *
+ * Special (non-device) handlers of ioctl's should
+ * register here. If you're a normal device, you should
+ * set .ioctl in your atmdev_ops instead.
+ */
+void register_atm_ioctl(struct atm_ioctl *);
+
+/**
+ * deregister_atm_ioctl - remove the ioctl handler
+ */
+void deregister_atm_ioctl(struct atm_ioctl *);
+
 #endif /* __KERNEL__ */
 
 #endif
