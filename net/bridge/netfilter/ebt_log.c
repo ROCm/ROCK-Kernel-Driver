@@ -78,23 +78,29 @@ static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
 
 	if ((info->bitmask & EBT_LOG_IP) && skb->mac.ethernet->h_proto ==
 	   htons(ETH_P_IP)){
-		if (skb_copy_bits(skb, 0, &u.iph, sizeof(u.iph))) {
+		struct iphdr _iph, *ih;
+
+		ih = skb_header_pointer(skb, 0, sizeof(_iph), &_iph);
+		if (ih == NULL) {
 			printk(" INCOMPLETE IP header");
 			goto out;
 		}
 		printk(" IP SRC=%u.%u.%u.%u IP DST=%u.%u.%u.%u,",
-		   NIPQUAD(u.iph.saddr), NIPQUAD(u.iph.daddr));
+		   NIPQUAD(ih->saddr), NIPQUAD(ih->daddr));
 		printk(" IP tos=0x%02X, IP proto=%d", u.iph.tos,
-		       u.iph.protocol);
-		if (u.iph.protocol == IPPROTO_TCP ||
-		    u.iph.protocol == IPPROTO_UDP) {
-			if (skb_copy_bits(skb, u.iph.ihl*4, &u.ports,
-			    sizeof(u.ports))) {
+		       ih->protocol);
+		if (ih->protocol == IPPROTO_TCP ||
+		    ih->protocol == IPPROTO_UDP) {
+			struct tcpudphdr _ports, *pptr;
+
+			pptr = skb_header_pointer(skb, ih->ihl*4,
+						  sizeof(_ports), &_ports);
+			if (pptr == NULL) {
 				printk(" INCOMPLETE TCP/UDP header");
 				goto out;
 			}
-			printk(" SPT=%u DPT=%u", ntohs(u.ports.src),
-			   ntohs(u.ports.dst));
+			printk(" SPT=%u DPT=%u", ntohs(pptr->src),
+			   ntohs(pptr->dst));
 		}
 		goto out;
 	}
@@ -102,32 +108,38 @@ static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
 	if ((info->bitmask & EBT_LOG_ARP) &&
 	    ((skb->mac.ethernet->h_proto == __constant_htons(ETH_P_ARP)) ||
 	    (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_RARP)))) {
-		if (skb_copy_bits(skb, 0, &u.arph, sizeof(u.arph))) {
+		struct arphdr _arph, *ah;
+
+		ah = skb_header_pointer(skb, 0, sizeof(_arph), &_arph);
+		if (ah == NULL) {
 			printk(" INCOMPLETE ARP header");
 			goto out;
 		}
 		printk(" ARP HTYPE=%d, PTYPE=0x%04x, OPCODE=%d",
-		       ntohs(u.arph.ar_hrd), ntohs(u.arph.ar_pro),
-		       ntohs(u.arph.ar_op));
+		       ntohs(ah->ar_hrd), ntohs(ah->ar_pro),
+		       ntohs(ah->ar_op));
 
 		/* If it's for Ethernet and the lengths are OK,
 		 * then log the ARP payload */
-		if (u.arph.ar_hrd == __constant_htons(1) &&
-		    u.arph.ar_hln == ETH_ALEN &&
-		    u.arph.ar_pln == sizeof(uint32_t)) {
-			if (skb_copy_bits(skb, sizeof(u.arph), &u.arpp,
-			    sizeof(u.arpp))) {
+		if (ah->ar_hrd == __constant_htons(1) &&
+		    ah->ar_hln == ETH_ALEN &&
+		    ah->ar_pln == sizeof(uint32_t)) {
+			struct arppayload _arpp, *ap;
+
+			ap = skb_header_pointer(skb, sizeof(u.arph),
+						sizeof(_arpp), &_arpp);
+			if (ap == NULL) {
 				printk(" INCOMPLETE ARP payload");
 				goto out;
 			}
 			printk(" ARP MAC SRC=");
-			print_MAC(u.arpp.mac_src);
+			print_MAC(ap->mac_src);
 			printk(" ARP IP SRC=%u.%u.%u.%u",
-			       myNIPQUAD(u.arpp.ip_src));
+			       myNIPQUAD(ap->ip_src));
 			printk(" ARP MAC DST=");
-			print_MAC(u.arpp.mac_dst);
+			print_MAC(ap->mac_dst);
 			printk(" ARP IP DST=%u.%u.%u.%u",
-			       myNIPQUAD(u.arpp.ip_dst));
+			       myNIPQUAD(ap->ip_dst));
 		}
 	}
 out:

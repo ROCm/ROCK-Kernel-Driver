@@ -20,30 +20,38 @@ static int ebt_target_reply(struct sk_buff **pskb, unsigned int hooknr,
    const void *data, unsigned int datalen)
 {
 	struct ebt_arpreply_info *info = (struct ebt_arpreply_info *)data;
-	u32 sip, dip;
-	struct arphdr ah;
-	unsigned char sha[ETH_ALEN];
+	u32 _sip, *siptr, _dip, *diptr;
+	struct arphdr _ah, *ap;
+	unsigned char _sha[ETH_ALEN], *shp;
 	struct sk_buff *skb = *pskb;
 
-	if (skb_copy_bits(skb, 0, &ah, sizeof(ah)))
+	ap = skb_header_pointer(skb, 0, sizeof(_ah), &_ah);
+	if (ap == NULL)
 		return EBT_DROP;
 
-	if (ah.ar_op != __constant_htons(ARPOP_REQUEST) || ah.ar_hln != ETH_ALEN
-	    || ah.ar_pro != __constant_htons(ETH_P_IP) || ah.ar_pln != 4)
+	if (ap->ar_op != __constant_htons(ARPOP_REQUEST) ||
+	    ap->ar_hln != ETH_ALEN ||
+	    ap->ar_pro != __constant_htons(ETH_P_IP) ||
+	    ap->ar_pln != 4)
 		return EBT_CONTINUE;
 
-	if (skb_copy_bits(skb, sizeof(ah), &sha, ETH_ALEN))
+	shp = skb_header_pointer(skb, sizeof(_ah), ETH_ALEN, &_sha);
+	if (shp == NULL)
 		return EBT_DROP;
 
-	if (skb_copy_bits(skb, sizeof(ah) + ETH_ALEN, &sip, sizeof(sip)))
+	siptr = skb_header_pointer(skb, sizeof(_ah) + ETH_ALEN,
+				   sizeof(_sip), &_sip);
+	if (siptr == NULL)
 		return EBT_DROP;
 
-	if (skb_copy_bits(skb, sizeof(ah) + 2 * ETH_ALEN + sizeof(sip),
-	    &dip, sizeof(dip)))
+	diptr = skb_header_pointer(skb,
+				   sizeof(_ah) + 2 * ETH_ALEN + sizeof(_sip),
+				   sizeof(_dip), &_dip);
+	if (diptr == NULL)
 		return EBT_DROP;
 
-	arp_send(ARPOP_REPLY, ETH_P_ARP, sip, (struct net_device *)in,
-	         dip, sha, info->mac, sha);
+	arp_send(ARPOP_REPLY, ETH_P_ARP, *siptr, (struct net_device *)in,
+	         *diptr, shp, info->mac, shp);
 
 	return info->target;
 }

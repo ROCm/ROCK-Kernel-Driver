@@ -139,10 +139,12 @@ static int is_ineligible(struct sk_buff *skb)
 	if (ptr < 0)
 		return 0;
 	if (nexthdr == IPPROTO_ICMPV6) {
-		u8 type;
-		if (skb_copy_bits(skb, ptr+offsetof(struct icmp6hdr, icmp6_type),
-				  &type, 1)
-		    || !(type & ICMPV6_INFOMSG_MASK))
+		u8 _type, *tp;
+		tp = skb_header_pointer(skb,
+			ptr+offsetof(struct icmp6hdr, icmp6_type),
+			sizeof(_type), &_type);
+		if (tp == NULL ||
+		    !(*tp & ICMPV6_INFOMSG_MASK))
 			return 1;
 	}
 	return 0;
@@ -200,12 +202,13 @@ static inline int icmpv6_xrlim_allow(struct sock *sk, int type,
 
 static __inline__ int opt_unrec(struct sk_buff *skb, __u32 offset)
 {
-	u8 optval;
+	u8 _optval, *op;
 
 	offset += skb->nh.raw - skb->data;
-	if (skb_copy_bits(skb, offset, &optval, 1))
+	op = skb_header_pointer(skb, offset, sizeof(_optval), &_optval);
+	if (op == NULL)
 		return 1;
-	return (optval&0xC0) == 0x80;
+	return (*op & 0xC0) == 0x80;
 }
 
 int icmpv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct icmp6hdr *thdr, int len)

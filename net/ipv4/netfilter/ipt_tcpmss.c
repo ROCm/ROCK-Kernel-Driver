@@ -27,37 +27,45 @@ mssoption_match(u_int16_t min, u_int16_t max,
 		int invert,
 		int *hotdrop)
 {
-	struct tcphdr tcph;
+	struct tcphdr _tcph, *th;
 	/* tcp.doff is only 4 bits, ie. max 15 * 4 bytes */
-	u8 opt[15 * 4 - sizeof(tcph)];
+	u8 _opt[15 * 4 - sizeof(_tcph)], *op;
 	unsigned int i, optlen;
 
 	/* If we don't have the whole header, drop packet. */
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) < 0)
+	th = skb_header_pointer(skb, skb->nh.iph->ihl * 4,
+				sizeof(_tcph), &_tcph);
+	if (th == NULL)
 		goto dropit;
 
 	/* Malformed. */
-	if (tcph.doff*4 < sizeof(tcph))
+	if (th->doff*4 < sizeof(*th))
 		goto dropit;
 
-	optlen = tcph.doff*4 - sizeof(tcph);
+	optlen = th->doff*4 - sizeof(*th);
+	if (!optlen)
+		goto out;
+
 	/* Truncated options. */
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4+sizeof(tcph), opt, optlen)<0)
+	op = skb_header_pointer(skb, skb->nh.iph->ihl * 4 + sizeof(*th),
+				optlen, _opt);
+	if (op == NULL)
 		goto dropit;
 
 	for (i = 0; i < optlen; ) {
-		if (opt[i] == TCPOPT_MSS
+		if (op[i] == TCPOPT_MSS
 		    && (optlen - i) >= TCPOLEN_MSS
-		    && opt[i+1] == TCPOLEN_MSS) {
+		    && op[i+1] == TCPOLEN_MSS) {
 			u_int16_t mssval;
 
-			mssval = (opt[i+2] << 8) | opt[i+3];
+			mssval = (op[i+2] << 8) | op[i+3];
 			
 			return (mssval >= min && mssval <= max) ^ invert;
 		}
-		if (opt[i] < 2) i++;
-		else i += opt[i+1]?:1;
+		if (op[i] < 2) i++;
+		else i += op[i+1]?:1;
 	}
+out:
 	return invert;
 
  dropit:

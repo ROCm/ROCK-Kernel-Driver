@@ -753,7 +753,7 @@ udp_data_ready(struct sock *sk, int len)
 	struct rpc_rqst *rovr;
 	struct sk_buff	*skb;
 	int err, repsize, copied;
-	u32 xid;
+	u32 _xid, *xp;
 
 	read_lock(&sk->sk_callback_lock);
 	dprintk("RPC:      udp_data_ready...\n");
@@ -777,12 +777,14 @@ udp_data_ready(struct sock *sk, int len)
 	}
 
 	/* Copy the XID from the skb... */
-	if (skb_copy_bits(skb, sizeof(struct udphdr), &xid, sizeof(xid)) < 0)
+	xp = skb_header_pointer(skb, sizeof(struct udphdr),
+				sizeof(_xid), &_xid);
+	if (xp == NULL)
 		goto dropit;
 
 	/* Look up and lock the request corresponding to the given XID */
 	spin_lock(&xprt->sock_lock);
-	rovr = xprt_lookup_rqst(xprt, xid);
+	rovr = xprt_lookup_rqst(xprt, *xp);
 	if (!rovr)
 		goto out_unlock;
 	task = rovr->rq_task;

@@ -3,7 +3,7 @@
  *
  * ARC4 Cipher Algorithm
  *
- * Jon Oberheide <jon@focalhost.com>
+ * Jon Oberheide <jon@oberheide.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -100,4 +100,4 @@ module_exit(arc4_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("ARC4 Cipher Algorithm");
-MODULE_AUTHOR("Jon Oberheide <jon@focalhost.com>");
+MODULE_AUTHOR("Jon Oberheide <jon@oberheide.org>");

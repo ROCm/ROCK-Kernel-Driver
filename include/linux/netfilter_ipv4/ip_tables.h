@@ -336,7 +336,6 @@ ipt_get_target(struct ipt_entry *e)
  *	Main firewall chains definitions and global var's definitions.
  */
 #ifdef __KERNEL__
-static DECLARE_MUTEX(ipt_mutex);
 
 #include <linux/init.h>
 extern void ipt_init(void) __init;

@@ -283,21 +283,18 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 #ifndef CONFIG_NET_CLS_ACT
 #ifndef CONFIG_NETFILTER
 	printk("You MUST compile classifier actions into the kernel\n");
-	goto error;
+	return -EINVAL;
 #else
 	printk("Ingress scheduler: Classifier actions prefered over netfilter\n");
 #endif
 #endif
                                                                                 
-	if (NULL == p)
-		goto error;
-
 #ifndef CONFIG_NET_CLS_ACT
 #ifdef CONFIG_NETFILTER
 	if (!nf_registered) {
 		if (nf_register_hook(&ing_ops) < 0) {
 			printk("ingress qdisc registration error \n");
-			goto error;
+			return -EINVAL;
 		}
 		nf_registered++;
 	}
@@ -305,12 +302,8 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 #endif
 
 	DPRINTK("ingress_init(sch %p,[qdisc %p],opt %p)\n",sch,p,opt);
-	memset(p, 0, sizeof(*p));
-	p->filter_list = NULL;
 	p->q = &noop_qdisc;
 	return 0;
-error:
-	return -EINVAL;
 }
 
 
@@ -346,9 +339,6 @@ static void ingress_destroy(struct Qdisc *sch)
 		p->filter_list = tp->next;
 		tcf_destroy(tp);
 	}
-	memset(p, 0, sizeof(*p));
-	p->filter_list = NULL;
-
 #if 0
 /* for future use */
 	qdisc_destroy(p->q);

@@ -152,7 +152,7 @@ static inline int __vlan_hwaccel_rx(struct sk_buff *skb,
 	skb->real_dev = skb->dev;
 	skb->dev = grp->vlan_devices[vlan_tag & VLAN_VID_MASK];
 	if (skb->dev == NULL) {
-		kfree_skb(skb);
+		dev_kfree_skb_any(skb);
 
 		/* Not NET_RX_DROP, this is not being dropped
 		 * due to congestion.

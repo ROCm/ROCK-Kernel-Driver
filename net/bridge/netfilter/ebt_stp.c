@@ -122,26 +122,30 @@ static int ebt_filter_stp(const struct sk_buff *skb, const struct net_device *in
    const struct net_device *out, const void *data, unsigned int datalen)
 {
 	struct ebt_stp_info *info = (struct ebt_stp_info *)data;
-	struct stp_header stph;
+	struct stp_header _stph, *sp;
 	uint8_t header[6] = {0x42, 0x42, 0x03, 0x00, 0x00, 0x00};
-	if (skb_copy_bits(skb, 0, &stph, sizeof(stph)))
+
+	sp = skb_header_pointer(skb, 0, sizeof(_stph), &_stph);
+	if (sp == NULL)
 		return EBT_NOMATCH;
 
 	/* The stp code only considers these */
-	if (memcmp(&stph, header, sizeof(header)))
+	if (memcmp(sp, header, sizeof(header)))
 		return EBT_NOMATCH;
 
 	if (info->bitmask & EBT_STP_TYPE
-	    && FWINV(info->type != stph.type, EBT_STP_TYPE))
+	    && FWINV(info->type != sp->type, EBT_STP_TYPE))
 		return EBT_NOMATCH;
 
-	if (stph.type == BPDU_TYPE_CONFIG &&
+	if (sp->type == BPDU_TYPE_CONFIG &&
 	    info->bitmask & EBT_STP_CONFIG_MASK) {
-		struct stp_config_pdu stpc;
+		struct stp_config_pdu _stpc, *st;
 
-		if (skb_copy_bits(skb, sizeof(stph), &stpc, sizeof(stpc)))
-		    return EBT_NOMATCH;
-		return ebt_filter_config(info, &stpc);
+		st = skb_header_pointer(skb, sizeof(_stph),
+					sizeof(_stpc), &_stpc);
+		if (st == NULL)
+			return EBT_NOMATCH;
+		return ebt_filter_config(info, st);
 	}
 	return EBT_MATCH;
 }

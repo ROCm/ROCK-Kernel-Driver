@@ -191,10 +191,13 @@ extern int		 aarp_send_ddp(struct net_device *dev,
 extern void		 aarp_send_probe(struct net_device *dev,
 					 struct atalk_addr *addr);
 extern void		 aarp_device_down(struct net_device *dev);
+extern void		 aarp_probe_network(struct atalk_iface *atif);
+extern int 		 aarp_proxy_probe_network(struct atalk_iface *atif,
+				     struct atalk_addr *sa);
+extern void		 aarp_proxy_remove(struct net_device *dev,
+					   struct atalk_addr *sa);
 
-#ifdef MODULE
-extern void aarp_cleanup_module(void);
-#endif /* MODULE */
+extern void		aarp_cleanup_module(void);
 
 #define at_sk(__sk) ((struct atalk_sock *)(__sk)->sk_protinfo)
 
@@ -209,8 +212,28 @@ extern rwlock_t atalk_interfaces_lock;
 
 extern struct atalk_route atrtr_default;
 
+extern struct file_operations atalk_seq_arp_fops;
+
+extern int sysctl_aarp_expiry_time;
+extern int sysctl_aarp_tick_time;
+extern int sysctl_aarp_retransmit_limit;
+extern int sysctl_aarp_resolve_time;
+
+#ifdef CONFIG_SYSCTL
+extern void atalk_register_sysctl(void);
+extern void atalk_unregister_sysctl(void);
+#else
+#define atalk_register_sysctl()		do { } while(0)
+#define atalk_unregister_sysctl()	do { } while(0)
+#endif
+
+#ifdef CONFIG_PROC_FS
 extern int atalk_proc_init(void);
 extern void atalk_proc_exit(void);
+#else
+#define atalk_proc_init()	0
+#define atalk_proc_exit()	do { } while(0)
+#endif /* CONFIG_PROC_FS */
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_ATALK_H__ */

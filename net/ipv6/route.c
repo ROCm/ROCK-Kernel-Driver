@@ -155,7 +155,16 @@ static void ip6_dst_destroy(struct dst_entry *dst)
 
 static void ip6_dst_ifdown(struct dst_entry *dst, int how)
 {
-	ip6_dst_destroy(dst);
+	struct rt6_info *rt = (struct rt6_info *)dst;
+	struct inet6_dev *idev = rt->rt6i_idev;
+
+	if (idev != NULL && idev->dev != &loopback_dev) {
+		struct inet6_dev *loopback_idev = in6_dev_get(&loopback_dev);
+		if (loopback_idev != NULL) {
+			rt->rt6i_idev = loopback_idev;
+			in6_dev_put(idev);
+		}
+	}
 }
 
 /*
@@ -174,8 +183,16 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 			struct net_device *dev = sprt->rt6i_dev;
 			if (dev->ifindex == oif)
 				return sprt;
-			if (dev->flags&IFF_LOOPBACK)
+			if (dev->flags & IFF_LOOPBACK) {
+				if (sprt->rt6i_idev->dev->ifindex != oif) {
+					if (strict && oif)
+						continue;
+					if (local && (!oif || 
+						      local->rt6i_idev->dev->ifindex == oif))
+						continue;
+				}
 				local = sprt;
+			}
 		}
 
 		if (local)
@@ -336,13 +353,13 @@ struct rt6_info *rt6_lookup(struct in6_addr *daddr, struct in6_addr *saddr,
 	return NULL;
 }
 
-/* rt6_ins is called with FREE rt6_lock.
+/* ip6_ins_rt is called with FREE rt6_lock.
    It takes new route entry, the addition fails by any reason the
    route is freed. In any case, if caller does not hold it, it may
    be destroyed.
  */
 
-static int rt6_ins(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
+int ip6_ins_rt(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 {
 	int err;
 
@@ -390,7 +407,7 @@ static struct rt6_info *rt6_cow(struct rt6_info *ort, struct in6_addr *daddr,
 
 		dst_hold(&rt->u.dst);
 
-		err = rt6_ins(rt, NULL, NULL);
+		err = ip6_ins_rt(rt, NULL, NULL);
 		if (err == 0)
 			return rt;
 
@@ -608,8 +625,13 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 				  struct in6_addr *addr,
 				  int (*output)(struct sk_buff **))
 {
-	struct rt6_info *rt = ip6_dst_alloc();
+	struct rt6_info *rt;
+	struct inet6_dev *idev = in6_dev_get(dev);
 
+	if (unlikely(idev == NULL))
+		return NULL;
+
+	rt = ip6_dst_alloc();
 	if (unlikely(rt == NULL))
 		goto out;
 
@@ -620,7 +642,7 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 		neigh = ndisc_get_neigh(dev, addr);
 
 	rt->rt6i_dev	  = dev;
-	rt->rt6i_idev     = in6_dev_get(dev);
+	rt->rt6i_idev     = idev;
 	rt->rt6i_nexthop  = neigh;
 	atomic_set(&rt->u.dst.__refcnt, 1);
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
@@ -731,8 +753,9 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	int err;
 	struct rtmsg *r;
 	struct rtattr **rta;
-	struct rt6_info *rt;
+	struct rt6_info *rt = NULL;
 	struct net_device *dev = NULL;
+	struct inet6_dev *idev = NULL;
 	int addr_type;
 
 	rta = (struct rtattr **) _rtattr;
@@ -744,9 +767,13 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 		return -EINVAL;
 #endif
 	if (rtmsg->rtmsg_ifindex) {
+		err = -ENODEV;
 		dev = dev_get_by_index(rtmsg->rtmsg_ifindex);
 		if (!dev)
-			return -ENODEV;
+			goto out;
+		idev = in6_dev_get(dev);
+		if (!idev)
+			goto out;
 	}
 
 	if (rtmsg->rtmsg_metric == 0)
@@ -793,10 +820,17 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	 */
 	if ((rtmsg->rtmsg_flags&RTF_REJECT) ||
 	    (dev && (dev->flags&IFF_LOOPBACK) && !(addr_type&IPV6_ADDR_LOOPBACK))) {
-		if (dev)
+		if (dev && dev != &loopback_dev) {
 			dev_put(dev);
-		dev = &loopback_dev;
-		dev_hold(dev);
+			in6_dev_put(idev);
+			dev = &loopback_dev;
+			dev_hold(dev);
+			idev = in6_dev_get(dev);
+			if (!idev) {
+				err = -ENODEV;
+				goto out;
+			}
+		}
 		rt->u.dst.output = ip6_pkt_discard_out;
 		rt->u.dst.input = ip6_pkt_discard;
 		rt->u.dst.error = -ENETUNREACH;
@@ -838,7 +872,9 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 				}
 			} else {
 				dev = grt->rt6i_dev;
+				idev = grt->rt6i_idev;
 				dev_hold(dev);
+				in6_dev_hold(grt->rt6i_idev);
 			}
 			if (!(grt->rt6i_flags&RTF_GATEWAY))
 				err = 0;
@@ -900,8 +936,8 @@ install_route:
 	if (!rt->u.dst.metrics[RTAX_ADVMSS-1])
 		rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.dev = dev;
-	rt->rt6i_idev = in6_dev_get(dev);
-	return rt6_ins(rt, nlh, _rtattr);
+	rt->rt6i_idev = idev;
+	return ip6_ins_rt(rt, nlh, _rtattr);
 
 out:
 	if (dev)
@@ -1054,7 +1090,7 @@ source_ok:
 	nrt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(neigh->dev);
 	nrt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&nrt->u.dst));
 
-	if (rt6_ins(nrt, NULL, NULL))
+	if (ip6_ins_rt(nrt, NULL, NULL))
 		goto out;
 
 	if (rt->rt6i_flags&RTF_CACHE) {
@@ -1144,7 +1180,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 		nrt->rt6i_flags |= RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 		nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
-		rt6_ins(nrt, NULL, NULL);
+		ip6_ins_rt(nrt, NULL, NULL);
 	}
 
 out:
@@ -1303,23 +1339,26 @@ int ip6_pkt_discard_out(struct sk_buff **pskb)
 }
 
 /*
- *	Add address
+ *	Allocate a dst for local (unicast / anycast) address.
  */
 
-int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
+struct rt6_info *addrconf_dst_alloc(struct inet6_dev *idev,
+				    const struct in6_addr *addr,
+				    int anycast)
 {
 	struct rt6_info *rt = ip6_dst_alloc();
 
 	if (rt == NULL)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	dev_hold(&loopback_dev);
+	in6_dev_hold(idev);
 
 	rt->u.dst.flags = DST_HOST;
 	rt->u.dst.input = ip6_input;
 	rt->u.dst.output = ip6_output;
 	rt->rt6i_dev = &loopback_dev;
-	rt->rt6i_idev = in6_dev_get(&loopback_dev);
+	rt->rt6i_idev = idev;
 	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = ipv6_get_hoplimit(rt->rt6i_dev);
@@ -1331,34 +1370,15 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
 	rt->rt6i_nexthop = ndisc_get_neigh(rt->rt6i_dev, &rt->rt6i_gateway);
 	if (rt->rt6i_nexthop == NULL) {
 		dst_free((struct dst_entry *) rt);
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	ipv6_addr_copy(&rt->rt6i_dst.addr, addr);
 	rt->rt6i_dst.plen = 128;
-	rt6_ins(rt, NULL, NULL);
 
-	return 0;
-}
+	atomic_set(&rt->u.dst.__refcnt, 1);
 
-/* Delete address. Warning: you should check that this address
-   disappeared before calling this function.
- */
-
-int ip6_rt_addr_del(struct in6_addr *addr, struct net_device *dev)
-{
-	struct rt6_info *rt;
-	int err = -ENOENT;
-
-	rt = rt6_lookup(addr, NULL, loopback_dev.ifindex, 1);
-	if (rt) {
-		if (rt->rt6i_dst.plen == 128)
-			err = ip6_del_rt(rt, NULL, NULL);
-		else
-			dst_release(&rt->u.dst);
-	}
-
-	return err;
+	return rt;
 }
 
 static int fib6_ifdown(struct rt6_info *rt, void *arg)

@@ -3,9 +3,9 @@
  *
  * Blowfish Cipher Algorithm, by Bruce Schneier.
  * http://www.counterpane.com/blowfish.html
- * 
- * Adapated from Kerneli implementation.
- * 
+ *
+ * Adapted from Kerneli implementation.
+ *
  * Copyright (c) Herbert Valerio Riedel <hvr@hvrlab.org>
  * Copyright (c) Kyle McMartin <kyle@debian.org>
  * Copyright (c) 2002 James Morris <jmorris@intercode.com.au>

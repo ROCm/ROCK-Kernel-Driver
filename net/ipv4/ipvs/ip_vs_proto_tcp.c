@@ -29,19 +29,20 @@ static struct ip_vs_conn *
 tcp_conn_in_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
 		const struct iphdr *iph, unsigned int proto_off, int inverse)
 {
-	__u16 ports[2];
+	__u16 _ports[2], *pptr;
 
-	if (skb_copy_bits(skb, proto_off, ports, sizeof(ports)) < 0)
+	pptr = skb_header_pointer(skb, proto_off, sizeof(_ports), _ports);
+	if (pptr == NULL)
 		return NULL;
 
 	if (likely(!inverse)) {
 		return ip_vs_conn_in_get(iph->protocol,
-					 iph->saddr, ports[0],
-					 iph->daddr, ports[1]);
+					 iph->saddr, pptr[0],
+					 iph->daddr, pptr[1]);
 	} else {
 		return ip_vs_conn_in_get(iph->protocol,
-					 iph->daddr, ports[1],
-					 iph->saddr, ports[0]);
+					 iph->daddr, pptr[1],
+					 iph->saddr, pptr[0]);
 	}
 }
 
@@ -49,19 +50,20 @@ static struct ip_vs_conn *
 tcp_conn_out_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
 		 const struct iphdr *iph, unsigned int proto_off, int inverse)
 {
-	__u16 ports[2];
+	__u16 _ports[2], *pptr;
 
-	if (skb_copy_bits(skb, proto_off, ports, sizeof(ports)) < 0)
+	pptr = skb_header_pointer(skb, proto_off, sizeof(_ports), _ports);
+	if (pptr == NULL)
 		return NULL;
 
 	if (likely(!inverse)) {
 		return ip_vs_conn_out_get(iph->protocol,
-					  iph->saddr, ports[0],
-					  iph->daddr, ports[1]);
+					  iph->saddr, pptr[0],
+					  iph->daddr, pptr[1]);
 	} else {
 		return ip_vs_conn_out_get(iph->protocol,
-					  iph->daddr, ports[1],
-					  iph->saddr, ports[0]);
+					  iph->daddr, pptr[1],
+					  iph->saddr, pptr[0]);
 	}
 }
 
@@ -72,16 +74,18 @@ tcp_conn_schedule(struct sk_buff *skb,
 		  int *verdict, struct ip_vs_conn **cpp)
 {
 	struct ip_vs_service *svc;
-	struct tcphdr tcph;
+	struct tcphdr _tcph, *th;
 
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) < 0) {
+	th = skb_header_pointer(skb, skb->nh.iph->ihl*4,
+				sizeof(_tcph), &_tcph);
+	if (th == NULL) {
 		*verdict = NF_DROP;
 		return 0;
 	}
 
-	if (tcph.syn &&
+	if (th->syn &&
 	    (svc = ip_vs_service_get(skb->nfmark, skb->nh.iph->protocol,
-				     skb->nh.iph->daddr, tcph.dest))) {
+				     skb->nh.iph->daddr, th->dest))) {
 		if (ip_vs_todrop()) {
 			/*
 			 * It seems that we are very loaded.
@@ -483,13 +487,15 @@ tcp_state_transition(struct ip_vs_conn *cp, int direction,
 		     const struct sk_buff *skb,
 		     struct ip_vs_protocol *pp)
 {
-	struct tcphdr tcph;
+	struct tcphdr _tcph, *th;
 
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) < 0)
+	th = skb_header_pointer(skb, skb->nh.iph->ihl*4,
+				sizeof(_tcph), &_tcph);
+	if (th == NULL)
 		return 0;
 
 	spin_lock(&cp->lock);
-	set_tcp_state(pp, cp, direction, &tcph);
+	set_tcp_state(pp, cp, direction, th);
 	spin_unlock(&cp->lock);
 
 	return 1;
