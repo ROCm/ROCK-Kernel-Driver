@@ -924,20 +924,29 @@ sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
 	} while (the_result && retries);
 
 	if (the_result) {
-		printk(KERN_ERR "%s : MODE SENSE failed.\n"
-		       "%s : status = %x, message = %02x, host = %d, driver = %02x \n",
-		       diskname, diskname,
-		       status_byte(the_result),
-		       msg_byte(the_result),
-		       host_byte(the_result),
-		       driver_byte(the_result)
-		    );
-		if (driver_byte(the_result) & DRIVER_SENSE)
-			print_req_sense("sd", SRpnt);
-		else
-			printk(KERN_ERR "%s : sense not available. \n", diskname);
-
-		printk(KERN_ERR "%s : assuming drive cache: write through\n", diskname);
+		if(status_byte(the_result) == CHECK_CONDITION
+		   && (SRpnt->sr_sense_buffer[0] & 0x70) == 0x70
+		   && (SRpnt->sr_sense_buffer[2] & 0x0f) == ILLEGAL_REQUEST
+		   /* The next are ASC 0x24 ASCQ 0x00: Invalid field in CDB */
+		   && SRpnt->sr_sense_buffer[12] == 0x24
+		   && SRpnt->sr_sense_buffer[13] == 0x00) {
+			printk(KERN_NOTICE "SCSI device %s: cache data unavailable\n");
+		} else {
+			printk(KERN_ERR "%s : MODE SENSE failed.\n"
+			       "%s : status = %x, message = %02x, host = %d, driver = %02x \n",
+			       diskname, diskname,
+			       status_byte(the_result),
+			       msg_byte(the_result),
+			       host_byte(the_result),
+			       driver_byte(the_result)
+			       );
+			if (driver_byte(the_result) & DRIVER_SENSE)
+				print_req_sense("sd", SRpnt);
+			else
+				printk(KERN_ERR "%s : sense not available. \n", diskname);
+			
+			printk(KERN_ERR "%s : assuming drive cache: write through\n", diskname);
+		}
 		sdkp->WCE = 0;
 		sdkp->RCD = 0;
 	} else {
