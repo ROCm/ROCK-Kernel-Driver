@@ -2,15 +2,15 @@
 #define _GDTH_H
 
 /*
- * Header file for the GDT ISA/EISA/PCI Disk Array Controller driver for Linux
+ * Header file for the GDT Disk Array/Storage RAID controllers driver for Linux
  * 
- * gdth.h Copyright (C) 1995-01 ICP vortex Computersysteme GmbH, Achim Leubner
+ * gdth.h Copyright (C) 1995-02 ICP vortex, an Intel company, Achim Leubner
  * See gdth.c for further informations and 
  * below for supported controller types
  *
- * <achim@vortex.de>
+ * <achim.leubner@intel.com>
  *
- * $Id: gdth.h,v 1.44 2001/08/21 11:19:05 achim Exp $
+ * $Id: gdth.h,v 1.46 2002/02/05 09:39:53 achim Exp $
  */
 
 #include <linux/version.h>
@@ -29,9 +29,9 @@
 /* defines, macros */
 
 /* driver version */
-#define GDTH_VERSION_STR        "2.03"
+#define GDTH_VERSION_STR        "2.05"
 #define GDTH_VERSION            2
-#define GDTH_SUBVERSION         3
+#define GDTH_SUBVERSION         5
 
 /* protocol version */
 #define PROTOCOL_VERSION        1
@@ -265,6 +265,7 @@
 #define S_CACHE_UNKNOWN 12                      /* cache serv.: drive unknown */
 #define S_RAW_SCSI      12                      /* raw serv.: target error */
 #define S_RAW_ILL       0xff                    /* raw serv.: illegal */
+#define S_CACHE_RESERV	-24			/* cache: reserv. conflict */	
 
 /* timeout values */
 #define INIT_RETRIES    100000                  /* 100000 * 1ms = 100s */

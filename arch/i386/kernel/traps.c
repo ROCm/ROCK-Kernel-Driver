@@ -276,8 +276,11 @@ static inline unsigned long get_cr2(void)
 static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
-	if (vm86 && regs->eflags & VM_MASK)
-		goto vm86_trap;
+	if (regs->eflags & VM_MASK) {
+		if (vm86)
+			goto vm86_trap;
+		goto trap_signal;
+	}
 
 	if (!(regs->xcs & 3))
 		goto kernel_trap;
