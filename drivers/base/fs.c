@@ -127,6 +127,11 @@ int device_bus_link(struct device * dev)
 	return error;
 }
 
+void device_remove_symlink(struct driver_dir_entry * dir, const char * name)
+{
+	driverfs_remove_file(dir,name);
+}
+
 int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * parent)
 {
 	dir->mode  = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
