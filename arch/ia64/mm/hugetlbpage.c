@@ -95,6 +95,31 @@ set_huge_pte (struct mm_struct *mm, struct vm_area_struct *vma,
 	set_pte(page_table, entry);
 	return;
 }
+/*
+ * This function checks for proper alignment of input addr and len parameters.
+ */
+int is_aligned_hugepage_range(unsigned long addr, unsigned long len)
+{
+	if (len & ~HPAGE_MASK)
+		return -EINVAL;
+	if (addr & ~HPAGE_MASK)
+		return -EINVAL;
+	if (REGION_NUMBER(addr) != REGION_HPAGE)
+		return -EINVAL;
+
+	return 0;
+}
+/* This function checks if the address and address+len falls out of HugeTLB region.  It
+ * return -EINVAL if any part of address range falls in HugeTLB region.
+ */
+int  is_invalid_hugepage_range(unsigned long addr, unsigned long len)
+{
+	if (REGION_NUMBER(addr) == REGION_HPAGE)
+		return -EINVAL;
+	if (REGION_NUMBER(addr+len) == REGION_HPAGE)
+		return -EINVAL;
+	return 0;
+}
 
 int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma)
@@ -158,6 +183,39 @@ back1:
 	return i;
 }
 
+struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
+{
+	if (mm->used_hugetlb) {
+		if (REGION_NUMBER(addr) == REGION_HPAGE) {
+			struct vm_area_struct *vma = find_vma(mm, addr);
+			if (vma && is_vm_hugetlb_page(vma))
+				return vma;
+		}
+	}
+	return NULL;
+}
+
+struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma, unsigned long addr, int write)
+{
+	struct page *page;
+	pte_t *ptep;
+
+	ptep = huge_pte_offset(mm, addr);
+	page = pte_page(*ptep);
+	page += ((addr & ~HPAGE_MASK) >> PAGE_SHIFT);
+	get_page(page);
+	return page;
+}
+int pmd_huge(pmd_t pmd)
+{
+	return 0;
+}
+struct page *
+follow_huge_pmd(struct mm_struct *mm, unsigned long address, pmd_t *pmd, int write)
+{
+	return NULL;
+}
+
 void free_huge_page(struct page *page)
 {
 	BUG_ON(page_count(page));
@@ -189,8 +247,6 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsig
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
-	spin_lock(&htlbpage_lock);
-	spin_unlock(&htlbpage_lock);
 	for (address = start; address < end; address += HPAGE_SIZE) {
 		pte = huge_pte_offset(mm, address);
 		if (pte_none(*pte))
@@ -242,8 +298,12 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				ret = -ENOMEM;
 				goto out;
 			}
-			add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
 			unlock_page(page);
+			if (ret) {
+				free_huge_page(page);
+				goto out;
+			}
 		}
 		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
 	}
@@ -287,8 +347,8 @@ int try_to_free_low(int count)
 				break;
 		}
 		page = list_entry(p, struct page, list);
-		if ((page_zone(page))->name[0] != 'H') // Look for non-Highmem
-				map = page;
+		if (!PageHighMem(page))
+			map = page;
 	}
 	if (map) {
 		list_del(&map->list);
@@ -302,8 +362,8 @@ int try_to_free_low(int count)
 
 int set_hugetlb_mem_size(int count)
 {
-	int j, lcount;
-	struct page *page, *map;
+	int  lcount;
+	struct page *page ;
 	extern long htlbzone_pages;
 	extern struct list_head htlbpage_freelist;
 
@@ -402,5 +462,4 @@ static struct page *hugetlb_nopage(struct vm_area_struct * area, unsigned long a
 
 struct vm_operations_struct hugetlb_vm_ops = {
 	.nopage =	hugetlb_nopage,
-	.close =	zap_hugetlb_resources,
 };

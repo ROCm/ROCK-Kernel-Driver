@@ -123,6 +123,9 @@ typedef union ia64_va {
 # define htlbpage_to_page(x)	((REGION_NUMBER(x) << 61)				\
 				 | (REGION_OFFSET(x) >> (HPAGE_SHIFT-PAGE_SHIFT)))
 # define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+extern int  is_invalid_hugepage_range(unsigned long addr, unsigned long len);
+#else
+#define is_invalid_hugepage_range(addr, len) 0
 #endif
 
 static __inline__ int
