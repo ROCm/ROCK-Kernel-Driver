@@ -322,7 +322,7 @@ struct parport_driver {
 	const char *name;
 	void (*attach) (struct parport *);
 	void (*detach) (struct parport *);
-	struct parport_driver *next;
+	struct list_head list;
 };
 
 /* parport_register_port registers a new parallel port at the given

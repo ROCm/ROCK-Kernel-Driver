@@ -48,7 +48,7 @@ static spinlock_t parportlist_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(all_ports);
 static spinlock_t full_list_lock = SPIN_LOCK_UNLOCKED;
 
-static struct parport_driver *driver_chain = NULL;
+static LIST_HEAD(drivers);
 
 static DECLARE_MUTEX(registration_lock);
 
@@ -105,16 +105,16 @@ static void attach_driver_chain(struct parport *port)
 {
 	/* caller has exclusive registration_lock */
 	struct parport_driver *drv;
-	for (drv = driver_chain; drv; drv = drv->next)
+	list_for_each_entry(drv, &drivers, list)
 		drv->attach(port);
 }
 
 /* Call detach(port) for each registered driver. */
 static void detach_driver_chain(struct parport *port)
 {
-	/* caller has exclusive registration_lock */
 	struct parport_driver *drv;
-	for (drv = driver_chain; drv; drv = drv->next)
+	/* caller has exclusive registration_lock */
+	list_for_each_entry(drv, &drivers, list)
 		drv->detach (port);
 }
 
@@ -161,8 +161,7 @@ int parport_register_driver (struct parport_driver *drv)
 	down(&registration_lock);
 	list_for_each_entry(port, &portlist, list)
 		drv->attach(port);
-	drv->next = driver_chain;
-	driver_chain = drv;
+	list_add(&drv->list, &drivers);
 	up(&registration_lock);
 
 	return 0;
@@ -185,28 +184,12 @@ int parport_register_driver (struct parport_driver *drv)
  *	finished by the time this function returns.
  **/
 
-void parport_unregister_driver (struct parport_driver *arg)
+void parport_unregister_driver (struct parport_driver *drv)
 {
-	struct parport_driver *drv, *olddrv = NULL;
 	struct parport *port;
 
 	down(&registration_lock);
-	drv = driver_chain;
-	while (drv) {
-		if (drv == arg) {
-			if (olddrv)
-				olddrv->next = drv->next;
-			else
-				driver_chain = drv->next;
-			break;
-		}
-		olddrv = drv;
-		drv = drv->next;
-	}
-
-	/* Call the driver's detach routine for each
-	 * port to clean up any resources that the
-	 * attach routine acquired. */
+	list_del_init(&drv->list);
 	list_for_each_entry(port, &portlist, list)
 		drv->detach(port);
 	up(&registration_lock);
