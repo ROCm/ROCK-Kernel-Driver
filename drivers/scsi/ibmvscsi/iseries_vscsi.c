@@ -154,6 +154,8 @@ int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2)
 int __init ibmvscsi_module_init(void)
 {
 	iseries_vscsi_dev.archdata = to_vio_dev(iSeries_vio_dev)->archdata;
+	iseries_vscsi_dev.iommu_table =
+		to_vio_dev(iSeries_vio_dev)->iommu_table;
 	if (device_register(&iseries_vscsi_dev.dev)) {
 		printk(KERN_ERR "ibmvscsi: failed to register device\n");
 		return 1;
