@@ -2407,7 +2407,7 @@ err_pci_set_dma_mask:
 	return retval;
 }
 
-static void __devexit uhci_stop(struct usb_hcd *hcd)
+static void uhci_stop(struct usb_hcd *hcd)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
@@ -2488,7 +2488,7 @@ static const struct hc_driver uhci_driver = {
 	suspend:		uhci_suspend,
 	resume:			uhci_resume,
 #endif
-	stop:			__devexit_p(uhci_stop),
+	stop:			uhci_stop,
 
 	hcd_alloc:		uhci_hcd_alloc,
 	hcd_free:		uhci_hcd_free,
