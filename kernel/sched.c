@@ -152,6 +152,7 @@ struct runqueue {
 	unsigned long nr_running, nr_switches, expired_timestamp,
 			nr_uninterruptible;
 	task_t *curr, *idle;
+	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
 	int prev_nr_running[NR_CPUS];
 #ifdef CONFIG_NUMA
@@ -388,7 +389,10 @@ static inline void resched_task(task_t *p)
  * wait_task_inactive - wait for a thread to unschedule.
  *
  * The caller must ensure that the task *will* unschedule sometime soon,
- * else this function might spin for a *long* time.
+ * else this function might spin for a *long* time. This function can't
+ * be called with interrupts off, or it may introduce deadlock with
+ * smp_call_function() if an IPI is sent by the same process we are
+ * waiting to become inactive.
  */
 void wait_task_inactive(task_t * p)
 {
@@ -556,12 +560,37 @@ void sched_exit(task_t * p)
 }
 
 /**
+ * finish_task_switch - clean up after a task-switch
+ * @prev: the thread we just switched away from.
+ *
+ * We enter this with the runqueue still locked, and finish_arch_switch()
+ * will unlock it along with doing any other architecture-specific cleanup
+ * actions.
+ *
+ * Note that we may have delayed dropping an mm in context_switch(). If
+ * so, we finish that here outside of the runqueue lock.  (Doing it
+ * with the lock held can cause deadlocks; see schedule() for
+ * details.)
+ */
+static inline void finish_task_switch(task_t *prev)
+{
+	runqueue_t *rq = this_rq();
+	struct mm_struct *mm = rq->prev_mm;
+
+	rq->prev_mm = NULL;
+	finish_arch_switch(rq, prev);
+	if (mm)
+		mmdrop(mm);
+}
+
+/**
  * schedule_tail - first thing a freshly forked thread must call.
  * @prev: the thread we just switched away from.
  */
 asmlinkage void schedule_tail(task_t *prev)
 {
-	finish_arch_switch(this_rq(), prev);
+	finish_task_switch(prev);
+
 	if (current->set_child_tid)
 		put_user(current->pid, current->set_child_tid);
 }
@@ -570,7 +599,7 @@ asmlinkage void schedule_tail(task_t *prev)
  * context_switch - switch to the new MM and the new
  * thread's register state.
  */
-static inline task_t * context_switch(task_t *prev, task_t *next)
+static inline task_t * context_switch(runqueue_t *rq, task_t *prev, task_t *next)
 {
 	struct mm_struct *mm = next->mm;
 	struct mm_struct *oldmm = prev->active_mm;
@@ -584,7 +613,8 @@ static inline task_t * context_switch(task_t *prev, task_t *next)
 
 	if (unlikely(!prev->mm)) {
 		prev->active_mm = NULL;
-		mmdrop(oldmm);
+		WARN_ON(rq->prev_mm);
+		rq->prev_mm = oldmm;
 	}
 
 	/* Here we just switch the register state and the stack. */
@@ -1227,10 +1257,10 @@ switch_tasks:
 		rq->curr = next;
 	
 		prepare_arch_switch(rq, next);
-		prev = context_switch(prev, next);
+		prev = context_switch(rq, prev, next);
 		barrier();
-		rq = this_rq();
-		finish_arch_switch(rq, prev);
+
+		finish_task_switch(prev);
 	} else
 		spin_unlock_irq(&rq->lock);
 
