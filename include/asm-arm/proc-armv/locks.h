@@ -67,7 +67,7 @@
 "	blle	" #wake				\
 	:					\
 	: "r" (ptr), "I" (1)			\
-	: "ip", "lr", "cc");			\
+	: "ip", "lr", "cc", "memory");		\
 	})
 
 /*
@@ -133,7 +133,7 @@
 "	bleq	" #wake				\
 	:					\
 	: "r" (ptr), "I" (1)			\
-	: "ip", "lr", "cc");			\
+	: "ip", "lr", "cc", "memory");		\
 	})
 
 #endif

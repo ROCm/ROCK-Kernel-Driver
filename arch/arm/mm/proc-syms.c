@@ -27,7 +27,6 @@ EXPORT_SYMBOL(cpu_dcache_invalidate_range);
 EXPORT_SYMBOL(cpu_icache_invalidate_range);
 EXPORT_SYMBOL(cpu_icache_invalidate_page);
 EXPORT_SYMBOL(cpu_set_pgd);
-EXPORT_SYMBOL(cpu_flush_pmd);
 EXPORT_SYMBOL(cpu_set_pte);
 #else
 EXPORT_SYMBOL(processor);

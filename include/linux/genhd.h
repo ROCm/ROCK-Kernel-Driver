@@ -367,6 +367,11 @@ extern void blk_register_region(dev_t dev, unsigned long range,
 			void *data);
 extern void blk_unregister_region(dev_t dev, unsigned long range);
 
+static inline struct block_device *bdget_disk(struct gendisk *disk, int index)
+{
+	return bdget(MKDEV(disk->major, disk->first_minor) + index);
+}
+
 #endif
 
 #endif
