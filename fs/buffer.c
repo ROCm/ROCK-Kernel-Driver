@@ -1448,11 +1448,11 @@ EXPORT_SYMBOL(create_empty_buffers);
  * wait on that I/O in bforget() - it's more efficient to wait on the I/O
  * only if we really need to.  That happens here.
  */
-static void unmap_underlying_metadata(struct buffer_head *bh)
+void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 {
 	struct buffer_head *old_bh;
 
-	old_bh = __get_hash_table(bh->b_bdev, bh->b_blocknr, 0);
+	old_bh = __get_hash_table(bdev, block, 0);
 	if (old_bh) {
 #if 0	/* This happens.  Later. */
 		if (buffer_dirty(old_bh))
@@ -1548,7 +1548,8 @@ static int __block_write_full_page(struct inode *inode,
 			if (buffer_new(bh)) {
 				/* blockdev mappings never come here */
 				clear_buffer_new(bh);
-				unmap_underlying_metadata(bh);
+				unmap_underlying_metadata(bh->b_bdev,
+							bh->b_blocknr);
 			}
 		}
 		bh = bh->b_this_page;
@@ -1689,7 +1690,8 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 				goto out;
 			if (buffer_new(bh)) {
 				clear_buffer_new(bh);
-				unmap_underlying_metadata(bh);
+				unmap_underlying_metadata(bh->b_bdev,
+							bh->b_blocknr);
 				if (PageUptodate(page)) {
 					if (!buffer_mapped(bh))
 						buffer_error();
@@ -2191,7 +2193,8 @@ int generic_direct_IO(int rw, struct inode *inode,
 			}
 		} else {
 			if (buffer_new(&bh))
-				unmap_underlying_metadata(&bh);
+				unmap_underlying_metadata(bh.b_bdev,
+							bh.b_blocknr);
 			if (!buffer_mapped(&bh))
 				BUG();
 		}

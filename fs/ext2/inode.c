@@ -622,7 +622,7 @@ ext2_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 	int err;
 
 	ret = write_mapping_buffers(mapping);
-	err = generic_writeback_mapping(mapping, nr_to_write);
+	err = mpage_writeback_mapping(mapping, nr_to_write, ext2_get_block);
 	if (!ret)
 		ret = err;
 	return ret;
