@@ -341,21 +341,6 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 	}
 }
 
-#if 0
-/* This one could be later extended to handle CMD IDE and be used by some kind
- * of /proc interface. I want to be able to get the devicetree path of a block
- * device for yaboot configuration
- */
-struct device_node*
-pmac_ide_get_devnode(struct ata_device *drive)
-{
-	int i = pmac_ide_find(drive);
-	if (i < 0)
-		return NULL;
-	return pmac_ide[i].node;
-}
-#endif
-
 /* Setup timings for the selected drive (master/slave). I still need to verify if this
  * is enough, I beleive selectproc will be called whenever an IDE command is started,
  * but... */
@@ -1365,7 +1350,7 @@ static int pmac_udma_start(struct ata_device *drive, struct request *rq)
 	 */
 	ix = pmac_ide_find(drive);
 	if (ix < 0)
-		return ide_started;
+		return ide_stopped;
 
 	dma = pmac_ide[ix].dma_regs;
 	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||

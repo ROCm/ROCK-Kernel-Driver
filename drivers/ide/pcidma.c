@@ -415,7 +415,7 @@ void udma_destroy_table(struct ata_channel *ch)
  *
  * Channel lock should be held.
  */
-int udma_pci_start(struct ata_device *drive, struct request *rq)
+void udma_pci_start(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 	unsigned long dma_base = ch->dma_base;

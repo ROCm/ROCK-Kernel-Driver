@@ -140,7 +140,7 @@ struct chipset_bus_clock_list_entry {
 	unsigned int	chipset_settings;
 };
 
-/* key for bus clock timings
+/* key for bus clock timings for HPT370
  * bit
  * 0:3    data_high_time. inactive time of DIOW_/DIOR_ for PIO and MW
  *        DMA. cycles = value + 1
@@ -409,26 +409,6 @@ static struct chipset_bus_clock_list_entry thirty_three_base_hpt374[] = {
 };
 
 #if 0
-static struct chipset_bus_clock_list_entry fifty_base_hpt374[] = {
-	{	XFER_UDMA_6,	},
-	{	XFER_UDMA_5,	},
-	{	XFER_UDMA_4,	},
-	{	XFER_UDMA_3,	},
-	{	XFER_UDMA_2,	},
-	{	XFER_UDMA_1,	},
-	{	XFER_UDMA_0,	},
-	{	XFER_MW_DMA_2,	},
-	{	XFER_MW_DMA_1,	},
-	{	XFER_MW_DMA_0,	},
-	{	XFER_PIO_4,	},
-	{	XFER_PIO_3,	},
-	{	XFER_PIO_2,	},
-	{	XFER_PIO_1,	},
-	{	XFER_PIO_0,	},
-	{	0,	}
-};
-#endif
-#if 0
 static struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
 	{	XFER_UDMA_6,	0x12406231	},	/* checkme */
 	{	XFER_UDMA_5,	0x12446231	},
@@ -678,21 +658,13 @@ static int hpt3xx_tune_chipset(struct ata_device *drive, u8 speed)
 	} else {
                 hpt366_tune_chipset(drive, speed);
         }
-	drive->current_speed = speed;
+
 	return ide_config_drive_speed(drive, speed);
 }
 
 static void hpt3xx_tune_drive(struct ata_device *drive, u8 pio)
 {
-	u8 speed;
-	switch(pio) {
-		case 4:		speed = XFER_PIO_4;break;
-		case 3:		speed = XFER_PIO_3;break;
-		case 2:		speed = XFER_PIO_2;break;
-		case 1:		speed = XFER_PIO_1;break;
-		default:	speed = XFER_PIO_0;break;
-	}
-	(void) hpt3xx_tune_chipset(drive, speed);
+	(void) hpt3xx_tune_chipset(drive, XFER_PIO_0 + min_t(u8, pio, 4));
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA

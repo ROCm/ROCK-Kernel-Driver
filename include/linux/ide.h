@@ -680,8 +680,7 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
 		bio_kunmap_irq(to, flags);
 }
 
-extern ide_startstop_t ata_special_intr(struct ata_device *, struct request *);
-extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
+extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *, char *);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
@@ -785,7 +784,7 @@ static inline void udma_irq_lost(struct ata_device *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
 extern void udma_pci_enable(struct ata_device *drive, int on, int verbose);
-extern int udma_pci_start(struct ata_device *drive, struct request *rq);
+extern void udma_pci_start(struct ata_device *drive, struct request *rq);
 extern int udma_pci_stop(struct ata_device *drive);
 extern int udma_pci_init(struct ata_device *drive, struct request *rq);
 extern int udma_pci_irq_status(struct ata_device *drive);
