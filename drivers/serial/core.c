@@ -1490,8 +1490,7 @@ uart_block_til_ready(struct file *filp, struct uart_state *state)
 		return -ERESTARTSYS;
 
 	if (!info->tty || tty_hung_up_p(filp))
-		return (port->flags & UPF_HUP_NOTIFY) ?
-			-EAGAIN : -ERESTARTSYS;
+		return -EAGAIN;
 
 	return 0;
 }
@@ -1596,8 +1595,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	 * If the port is in the middle of closing, bail out now.
 	 */
 	if (tty_hung_up_p(filp)) {
-		retval = (state->port->flags & UPF_HUP_NOTIFY) ?
-			-EAGAIN : -ERESTARTSYS;
+		retval = -EAGAIN;
 		state->count--;
 		up(&state->sem);
 		goto fail;
