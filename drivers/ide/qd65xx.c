@@ -1,6 +1,4 @@
 /*
- *  linux/drivers/ide/qd65xx.c		Version 0.07	Sep 30, 2001
- *
  *  Copyright (C) 1996-2001  Linus Torvalds & author (see below)
  */
 
@@ -9,23 +7,19 @@
  *  Version 0.04	Added second channel tuning
  *  Version 0.05	Enhanced tuning ; added qd6500 support
  *  Version 0.06	Added dos driver's list
- *  Version 0.07	Second channel bug fix 
+ *  Version 0.07	Second channel bug fix
  *
  * QDI QD6500/QD6580 EIDE controller fast support
  *
  * Please set local bus speed using kernel parameter idebus
- * 	for example, "idebus=33" stands for 33Mhz VLbus
+ *	for example, "idebus=33" stands for 33Mhz VLbus
  * To activate controller support, use "ide0=qd65xx"
  * To enable tuning, use "ide0=autotune"
  * To enable second channel tuning (qd6580 only), use "ide1=autotune"
- */
-
-/*
+ *
  * Rewritten from the work of Colten Edwards <pje120@cs.usask.ca> by
  * Samuel Thibault <samuel.thibault@fnac.net>
  */
-
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -262,7 +256,7 @@ static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 
 	if (drive->id && !qd_find_disk_type(drive,&active_time,&recovery_time)) {
 		pio = ide_get_best_pio_mode(drive, pio, 255, &d);
-		pio = IDE_MIN(pio,4);
+		pio = min(pio,4);
 
 		switch (pio) {
 			case 0: break;

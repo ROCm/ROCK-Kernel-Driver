@@ -1,10 +1,6 @@
 /*
- *  linux/drivers/ide/ide-probe.c	Version 1.07	March 18, 2001
- *
  *  Copyright (C) 1994-1998  Linus Torvalds & authors (see below)
- */
-
-/*
+ *
  *  Mostly written by Mark Lord <mlord@pobox.com>
  *                and Gadi Oxman <gadio@netvision.net.il>
  *                and Andre Hedrick <andre@linux-ide.org>
@@ -26,10 +22,8 @@
  *			 with new flag : drive->ata_flash : 1;
  * Version 1.06		stream line request queue and prep for cascade project.
  * Version 1.07		max_sect <= 255; slower disks would get behind and
- * 			then fall over when they get to 256.	Paul G.
+ *			then fall over when they get to 256.	Paul G.
  */
-
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -94,7 +88,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 		printk("%s: EATA SCSI HBA %.10s\n", drive->name, id->model);
 		goto err_misc;
 	}
-#endif /* CONFIG_SCSI_EATA_DMA || CONFIG_SCSI_EATA_PIO */
+#endif
 
 	/*
 	 *  WIN_IDENTIFY returns little-endian info,
@@ -128,7 +122,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 			printk(" -- not supported on 2nd Promise port\n");
 			goto err_misc;
 		}
-#endif /* CONFIG_BLK_DEV_PDC4030 */
+#endif
 		switch (type) {
 			case ATA_FLOPPY:
 				if (!strstr(id->model, "CD-ROM")) {
@@ -186,7 +180,11 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	}
 	drive->type = ATA_DISK;
 	printk("ATA DISK drive\n");
-	QUIRK_LIST(HWIF(drive),drive);
+
+	/* Initialize our quirk list. */
+	if (HWIF(drive)->quirkproc)
+		drive->quirk_list = HWIF(drive)->quirkproc(drive);
+
 	return;
 
 err_misc:
@@ -282,24 +280,15 @@ static int try_to_identify (ide_drive_t *drive, byte cmd)
 
 	if (autoprobe) {
 		int irq;
-		OUT_BYTE(drive->ctl|2,IDE_CONTROL_REG);	/* mask device irq */
-		(void) GET_STAT();			/* clear drive IRQ */
+		OUT_BYTE(drive->ctl | 0x02, IDE_CONTROL_REG);	/* mask device irq */
+		GET_STAT();			/* clear drive IRQ */
 		udelay(5);
 		irq = probe_irq_off(cookie);
 		if (!HWIF(drive)->irq) {
-			if (irq > 0) {
+			if (irq > 0)
 				HWIF(drive)->irq = irq;
-			} else {	/* Mmmm.. multiple IRQs.. don't know which was ours */
+			else	/* Mmmm.. multiple IRQs.. don't know which was ours */
 				printk("%s: IRQ probe failed (0x%lx)\n", drive->name, cookie);
-#ifdef CONFIG_BLK_DEV_CMD640
-#ifdef CMD640_DUMP_REGS
-				if (HWIF(drive)->chipset == ide_cmd640) {
-					printk("%s: Hmmm.. probably a driver problem.\n", drive->name);
-					CMD640_DUMP_REGS;
-				}
-#endif /* CMD640_DUMP_REGS */
-#endif /* CONFIG_BLK_DEV_CMD640 */
-			}
 		}
 	}
 	return retval;
@@ -522,11 +511,11 @@ static void probe_hwif (ide_hwif_t *hwif)
 	if (hwif->noprobe)
 		return;
 
-	if ((hwif->chipset != ide_4drives || !hwif->mate->present) &&
+	if (
 #if CONFIG_BLK_DEV_PDC4030
 	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
-#endif /* CONFIG_BLK_DEV_PDC4030 */
-	    (hwif_check_regions(hwif))) {
+#endif
+	    hwif_check_regions(hwif)) {
 		int msgout = 0;
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
 			ide_drive_t *drive = &hwif->drives[unit];
@@ -552,9 +541,7 @@ static void probe_hwif (ide_hwif_t *hwif)
 		probe_for_drive (drive);
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
-			if (hwif->chipset != ide_4drives || !hwif->mate->present) {
-				hwif_register(hwif);
-			}
+			hwif_register(hwif);
 		}
 	}
 	if (hwif->io_ports[IDE_CONTROL_OFFSET] && hwif->reset) {
@@ -581,32 +568,6 @@ static void probe_hwif (ide_hwif_t *hwif)
 		}
 	}
 }
-
-#if MAX_HWIFS > 1
-/*
- * save_match() is used to simplify logic in init_irq() below.
- *
- * A loophole here is that we may not know about a particular
- * hwif's irq until after that hwif is actually probed/initialized..
- * This could be a problem for the case where an hwif is on a
- * dual interface that requires serialization (eg. cmd640) and another
- * hwif using one of the same irqs is initialized beforehand.
- *
- * This routine detects and reports such situations, but does not fix them.
- */
-static void save_match (ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
-{
-	ide_hwif_t *m = *match;
-
-	if (m && m->hwgroup && m->hwgroup != new->hwgroup) {
-		if (!new->hwgroup)
-			return;
-		printk("%s: potential irq problem with %s and %s\n", hwif->name, new->name, m->name);
-	}
-	if (!m || m->irq != hwif->irq) /* don't undo a prior perfect match */
-		*match = new;
-}
-#endif /* MAX_HWIFS > 1 */
 
 /*
  * init request queue
@@ -636,6 +597,33 @@ static void ide_init_queue(ide_drive_t *drive)
 	blk_queue_max_phys_segments(q, PRD_ENTRIES);
 }
 
+#if MAX_HWIFS > 1
+
+/*
+ * This is used to simplify logic in init_irq() below.
+ *
+ * A loophole here is that we may not know about a particular hwif's irq until
+ * after that hwif is actually probed/initialized..  This could be a problem
+ * for the case where an hwif is on a dual interface that requires
+ * serialization (eg. cmd640) and another hwif using one of the same irqs is
+ * initialized beforehand.
+ *
+ * This routine detects and reports such situations, but does not fix them.
+ */
+static void save_match(ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
+{
+	ide_hwif_t *m = *match;
+
+	if (m && m->hwgroup && m->hwgroup != new->hwgroup) {
+		if (!new->hwgroup)
+			return;
+		printk("%s: potential irq problem with %s and %s\n", hwif->name, new->name, m->name);
+	}
+	if (!m || m->irq != hwif->irq) /* don't undo a prior perfect match */
+		*match = new;
+}
+#endif
+
 /*
  * This routine sets up the irq for an ide interface, and creates a new
  * hwgroup for the irq/hwif if none was previously assigned.
@@ -656,15 +644,14 @@ static int init_irq (ide_hwif_t *hwif)
 	ide_hwgroup_t *hwgroup, *new_hwgroup;
 	ide_hwif_t *match = NULL;
 
-	
-	/* Allocate the buffer and potentially sleep first */
-	
-	new_hwgroup = kmalloc(sizeof(ide_hwgroup_t),GFP_KERNEL);
-	
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
 
+	/* Allocate the buffer and potentially sleep first */
+
+	new_hwgroup = kmalloc(sizeof(ide_hwgroup_t),GFP_KERNEL);
+
+	spin_lock_irqsave(&ide_lock, flags);
 	hwif->hwgroup = NULL;
+
 #if MAX_HWIFS > 1
 	/*
 	 * Group up with any other hwifs that share our irq(s).
@@ -674,9 +661,8 @@ static int init_irq (ide_hwif_t *hwif)
 		if (h->hwgroup) {  /* scan only initialized hwif's */
 			if (hwif->irq == h->irq) {
 				hwif->sharing_irq = h->sharing_irq = 1;
-				if (hwif->chipset != ide_pci || h->chipset != ide_pci) {
+				if (hwif->chipset != ide_pci || h->chipset != ide_pci)
 					save_match(hwif, h, &match);
-				}
 			}
 			if (hwif->serialized) {
 				if (hwif->mate && hwif->mate->irq == h->irq)
@@ -688,7 +674,7 @@ static int init_irq (ide_hwif_t *hwif)
 			}
 		}
 	}
-#endif /* MAX_HWIFS > 1 */
+#endif
 	/*
 	 * If we are still without a hwgroup, then form a new one
 	 */
@@ -699,7 +685,7 @@ static int init_irq (ide_hwif_t *hwif)
 	} else {
 		hwgroup = new_hwgroup;
 		if (!hwgroup) {
-			restore_flags(flags);	/* all CPUs */
+			spin_unlock_irqrestore(&ide_lock, flags);
 			return 1;
 		}
 		memset(hwgroup, 0, sizeof(ide_hwgroup_t));
@@ -719,9 +705,9 @@ static int init_irq (ide_hwif_t *hwif)
 	if (!match || match->irq != hwif->irq) {
 #ifdef CONFIG_IDEPCI_SHARE_IRQ
 		int sa = IDE_CHIPSET_IS_PCI(hwif->chipset) ? SA_SHIRQ : SA_INTERRUPT;
-#else /* !CONFIG_IDEPCI_SHARE_IRQ */
+#else
 		int sa = IDE_CHIPSET_IS_PCI(hwif->chipset) ? SA_INTERRUPT|SA_SHIRQ : SA_INTERRUPT;
-#endif /* CONFIG_IDEPCI_SHARE_IRQ */
+#endif
 
 		if (hwif->io_ports[IDE_CONTROL_OFFSET])
 			OUT_BYTE(0x08, hwif->io_ports[IDE_CONTROL_OFFSET]); /* clear nIEN */
@@ -729,13 +715,13 @@ static int init_irq (ide_hwif_t *hwif)
 		if (ide_request_irq(hwif->irq, &ide_intr, sa, hwif->name, hwgroup)) {
 			if (!match)
 				kfree(hwgroup);
-			restore_flags(flags);	/* all CPUs */
+			spin_unlock_irqrestore(&ide_lock, flags);
 			return 1;
 		}
 	}
 
 	/*
-	 * Everything is okay, so link us into the hwgroup
+	 * Everything is okay, so link us into the hwgroup.
 	 */
 	hwif->hwgroup = hwgroup;
 	hwif->next = hwgroup->hwif->next;
@@ -757,7 +743,7 @@ static int init_irq (ide_hwif_t *hwif)
 		printk("%s : Adding missed hwif to hwgroup!!\n", hwif->name);
 #endif
 	}
-	restore_flags(flags);	/* all CPUs; safe now that hwif->hwgroup is set up */
+	spin_unlock_irqrestore(&ide_lock, flags);
 
 #if !defined(__mc68000__) && !defined(CONFIG_APUS) && !defined(__sparc__)
 	printk("%s at 0x%03x-0x%03x,0x%03x on irq %d", hwif->name,

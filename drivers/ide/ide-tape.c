@@ -1504,7 +1504,7 @@ static void idetape_input_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsigne
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = IDE_MIN (bio->bi_size - pc->b_count, bcount);
+		count = min(bio->bi_size - pc->b_count, bcount);
 		atapi_input_bytes (drive, bio_data(bio) + pc->b_count, count);
 		bcount -= count;
 		pc->b_count += bio->bi_size;
@@ -1529,7 +1529,7 @@ static void idetape_output_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsign
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = IDE_MIN (pc->b_count, bcount);
+		count = min(pc->b_count, bcount);
 		atapi_output_bytes (drive, bio_data(bio), count);
 		bcount -= count;
 		pc->b_data += count;
@@ -1559,7 +1559,7 @@ static void idetape_update_buffers (idetape_pc_t *pc)
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = IDE_MIN (bio->bi_size, bcount);
+		count = min(bio->bi_size, bcount);
 		pc->b_count = count;
 		if (pc->b_count == bio->bi_size)
 			bio = bio->bi_next;
@@ -1759,8 +1759,8 @@ static void idetape_increase_max_pipeline_stages (ide_drive_t *drive)
 #endif /* IDETAPE_DEBUG_LOG */
 
 	tape->max_stages += increase;
-	tape->max_stages = IDE_MAX(tape->max_stages, tape->min_pipeline);
-	tape->max_stages = IDE_MIN(tape->max_stages, tape->max_pipeline);
+	tape->max_stages = max(tape->max_stages, tape->min_pipeline);
+	tape->max_stages = min(tape->max_stages, tape->max_pipeline);
 }
 
 /*
@@ -2084,7 +2084,7 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 
 	if (!status.b.drq) {						/* No more interrupts */
 		cmd_time = (jiffies - tape->cmd_start_time) * 1000 / HZ;
-		tape->max_cmd_time = IDE_MAX(cmd_time, tape->max_cmd_time);
+		tape->max_cmd_time = max(cmd_time, tape->max_cmd_time);
 #if IDETAPE_DEBUG_LOG
 		if (tape->debug_level >= 2)
 			printk (KERN_INFO "ide-tape: Packet command completed, %d bytes transferred\n", pc->actually_transferred);
@@ -2442,7 +2442,7 @@ static void calculate_speeds(ide_drive_t *drive)
 			tape->uncontrolled_pipeline_head_time = jiffies;
 		}
 	}
-	tape->pipeline_head_speed = IDE_MAX(tape->uncontrolled_pipeline_head_speed, tape->controlled_pipeline_head_speed);
+	tape->pipeline_head_speed = max(tape->uncontrolled_pipeline_head_speed, tape->controlled_pipeline_head_speed);
 	if (tape->speed_control == 0) {
 		tape->max_insert_speed = 5000;
 	} else if (tape->speed_control == 1) {
@@ -2459,7 +2459,7 @@ static void calculate_speeds(ide_drive_t *drive)
 			(tape->pipeline_head_speed * full / 100 - tape->pipeline_head_speed * empty / 100) * tape->nr_pending_stages / tape->max_stages;
 	} else
 		tape->max_insert_speed = tape->speed_control;
-	tape->max_insert_speed = IDE_MAX(tape->max_insert_speed, 500);
+	tape->max_insert_speed = max(tape->max_insert_speed, 500);
 }
 
 static ide_startstop_t idetape_media_access_finished (ide_drive_t *drive)
@@ -2920,7 +2920,7 @@ static void idetape_copy_stage_from_user (idetape_tape_t *tape, idetape_stage_t 
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = IDE_MIN (bio->bi_size - tape->b_count, n);
+		count = min(bio->bi_size - tape->b_count, n);
 		copy_from_user (bio_data(bio) + tape->b_count, buf, count);
 		n -= count;
 		bio->bi_size += count;
@@ -2946,7 +2946,7 @@ static void idetape_copy_stage_to_user (idetape_tape_t *tape, char *buf, idetape
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = IDE_MIN (tape->b_count, n);
+		count = min(tape->b_count, n);
 		copy_to_user (buf, tape->b_data, count);
 		n -= count;
 		tape->b_data += count;
@@ -3878,7 +3878,7 @@ static void idetape_empty_write_pipeline (ide_drive_t *drive)
 					printk(KERN_INFO "ide-tape: bug, bio NULL\n");
 					break;
 				}
-				min = IDE_MIN(i, bio->bi_size - atomic_read(&bio->bi_cnt));
+				min = min(i, bio->bi_size - atomic_read(&bio->bi_cnt));
 				memset(bio_data(bio) + bio->bi_size, 0, min);
 				atomic_add(min, &bio->bi_cnt);
 				i -= min;
@@ -4149,11 +4149,11 @@ static void idetape_pad_zeros (ide_drive_t *drive, int bcount)
 	
 	while (bcount) {
 		bio = tape->merge_stage->bio;
-		count = IDE_MIN (tape->stage_size, bcount);
+		count = min(tape->stage_size, bcount);
 		bcount -= count;
 		blocks = count / tape->tape_block_size;
 		while (count) {
-			atomic_set(&bio->bi_cnt, IDE_MIN (count, bio->bi_size));
+			atomic_set(&bio->bi_cnt, min(count, bio->bi_size));
 			memset (bio_data(bio), 0, bio->bi_size);
 			count -= atomic_read(&bio->bi_cnt);
 			bio = bio->bi_next;
@@ -4596,7 +4596,7 @@ static ssize_t idetape_chrdev_read (struct file *file, char *buf,
 	if (count == 0)
 		return (0);
 	if (tape->merge_stage_size) {
-		actually_read = IDE_MIN (tape->merge_stage_size, count);
+		actually_read = min(tape->merge_stage_size, count);
 		idetape_copy_stage_to_user (tape, buf, tape->merge_stage, actually_read);
 		buf += actually_read;
 		tape->merge_stage_size -= actually_read;
@@ -4615,7 +4615,7 @@ static ssize_t idetape_chrdev_read (struct file *file, char *buf,
 		bytes_read=idetape_add_chrdev_read_request (drive, tape->capabilities.ctl);
 		if (bytes_read <= 0)
 			goto finish;
-		temp = IDE_MIN (count, bytes_read);
+		temp = min(count, bytes_read);
 		idetape_copy_stage_to_user (tape, buf, tape->merge_stage, temp);
 		actually_read += temp;
 		tape->merge_stage_size = bytes_read-temp;
@@ -4890,7 +4890,7 @@ static ssize_t idetape_chrdev_write (struct file *file, const char *buf,
 			tape->merge_stage_size = 0;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		actually_written = IDE_MIN (tape->stage_size - tape->merge_stage_size, count);
+		actually_written = min(tape->stage_size - tape->merge_stage_size, count);
 		idetape_copy_stage_from_user (tape, tape->merge_stage, buf, actually_written);
 		buf += actually_written;
 		tape->merge_stage_size += actually_written;
@@ -6049,7 +6049,7 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	 *	Select the "best" DSC read/write polling frequency
 	 *	and pipeline size.
 	 */
-	speed = IDE_MAX (tape->capabilities.speed, tape->capabilities.max_speed);
+	speed = max(tape->capabilities.speed, tape->capabilities.max_speed);
 
 	tape->max_stages = speed * 1000 * 10 / tape->stage_size;
 
@@ -6075,7 +6075,7 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	 *	Ensure that the number we got makes sense; limit
 	 *	it within IDETAPE_DSC_RW_MIN and IDETAPE_DSC_RW_MAX.
 	 */
-	tape->best_dsc_rw_frequency = IDE_MAX (IDE_MIN (t, IDETAPE_DSC_RW_MAX), IDETAPE_DSC_RW_MIN);
+	tape->best_dsc_rw_frequency = max(min(t, IDETAPE_DSC_RW_MAX), IDETAPE_DSC_RW_MIN);
 	printk (KERN_INFO "ide-tape: %s <-> %s: %dKBps, %d*%dkB buffer, %dkB pipeline, %lums tDSC%s\n",
 		drive->name, tape->name, tape->capabilities.speed, (tape->capabilities.buffer_size * 512) / tape->stage_size,
 		tape->stage_size / 1024, tape->max_stages * tape->stage_size / 1024,

@@ -161,7 +161,6 @@ static int proc_ide_read_imodel
 		case ide_trm290:	name = "trm290";	break;
 		case ide_cmd646:	name = "cmd646";	break;
 		case ide_cy82c693:	name = "cy82c693";	break;
-		case ide_4drives:	name = "4drives";	break;
 		case ide_pmac:		name = "mac-io";	break;
 		default:		name = "(unknown)";	break;
 	}
@@ -298,8 +297,8 @@ static int proc_ide_write_settings
 			}
 			if (*p != ':')
 				goto parse_error;
-			len = IDE_MIN(p - start, MAX_LEN);
-			strncpy(name, start, IDE_MIN(len, MAX_LEN));
+			len = min(p - start, MAX_LEN);
+			strncpy(name, start, min(len, MAX_LEN));
 			name[len] = 0;
 
 			if (n > 0) {
@@ -307,7 +306,7 @@ static int proc_ide_write_settings
 				p++;
 			} else
 				goto parse_error;
-			
+
 			digits = 0;
 			while (n > 0 && (d = ide_getdigit(*p)) >= 0) {
 				val = (val * 10) + d;

@@ -94,8 +94,6 @@
  * device can't do DMA handshaking for some stupid reason. We don't need to do that.
  */ 
 
-#undef REALLY_SLOW_IO           /* most systems can safely undef this */
-
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>

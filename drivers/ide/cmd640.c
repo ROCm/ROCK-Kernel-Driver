@@ -1,12 +1,10 @@
 /*
- *  linux/drivers/ide/cmd640.c		Version 1.02  Sep 01, 1996
- *
  *  Copyright (C) 1995-1996  Linus Torvalds & authors (see below)
  */
 
 /*
  *  Original authors:	abramov@cecmow.enet.dec.com (Igor Abramov)
- *  			mlord@pobox.com (Mark Lord)
+ *			mlord@pobox.com (Mark Lord)
  *
  *  See linux/MAINTAINERS for address of current maintainer.
  *
@@ -98,7 +96,6 @@
  *			 (patch courtesy of Zoltan Hidvegi)
  */
 
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
 #define CMD640_PREFETCH_MASKS 1
 
 #include <linux/config.h>

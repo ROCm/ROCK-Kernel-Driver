@@ -138,7 +138,7 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 			idescsi_discard_data (drive, bcount);
 			return;
 		}
-		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
+		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
 		atapi_input_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
@@ -160,7 +160,7 @@ static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsign
 			idescsi_output_zeros (drive, bcount);
 			return;
 		}
-		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
+		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
 		atapi_output_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
@@ -290,7 +290,7 @@ static int idescsi_end_request(ide_drive_t *drive, int uptodate)
 			if (!test_bit(PC_WRITING, &pc->flags) && pc->actually_transferred && pc->actually_transferred <= 1024 && pc->buffer) {
 				printk(", rst = ");
 				scsi_buf = pc->scsi_cmd->request_buffer;
-				hexdump(scsi_buf, IDE_MIN(16, pc->scsi_cmd->request_bufflen));
+				hexdump(scsi_buf, min(16, pc->scsi_cmd->request_bufflen));
 			} else printk("\n");
 		}
 	}
@@ -307,7 +307,7 @@ static int idescsi_end_request(ide_drive_t *drive, int uptodate)
 
 static inline unsigned long get_timeout(idescsi_pc_t *pc)
 {
-	return IDE_MAX(WAIT_CMD, pc->timeout - jiffies);
+	return max(WAIT_CMD, pc->timeout - jiffies);
 }
 
 /*
@@ -431,7 +431,7 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	scsi->pc=pc;							/* Set the current packet command */
 	pc->actually_transferred=0;					/* We haven't transferred any data yet */
 	pc->current_position=pc->buffer;
-	bcount = IDE_MIN (pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
+	bcount = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	if (drive->using_dma && rq->bio)
 		dma_ok=!HWIF(drive)->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
@@ -613,9 +613,9 @@ int idescsi_detect (Scsi_Host_Template *host_template)
 	host = scsi_register(host_template, 0);
 	if(host == NULL)
 		return 0;
-		
+
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++)
-		last_lun = IDE_MAX(last_lun, idescsi_drives[id]->last_lun);
+		last_lun = max(last_lun, idescsi_drives[id]->last_lun);
 	host->max_id = id;
 	host->max_lun = last_lun + 1;
 	host->can_queue = host->cmd_per_lun * id;

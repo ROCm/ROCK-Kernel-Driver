@@ -1,10 +1,6 @@
 /*
- *  linux/drivers/ide/ide-disk.c	Version 1.13	Nov 28, 2001
- *
  *  Copyright (C) 1994-1998  Linus Torvalds & authors (see below)
- */
-
-/*
+ *
  *  Mostly written by Mark Lord <mlord@pobox.com>
  *                and Gadi Oxman <gadio@netvision.net.il>
  *                and Andre Hedrick <andre@linux-ide.org>
@@ -33,8 +29,6 @@
  */
 
 #define IDEDISK_VERSION	"1.13"
-
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -720,7 +714,7 @@ static int get_smart_values(ide_drive_t *drive, byte *buf)
 	taskfile.low_cylinder	= SMART_LCYL_PASS;
 	taskfile.high_cylinder	= SMART_HCYL_PASS;
 	taskfile.command	= WIN_SMART;
-	(void) smart_enable(drive);
+	smart_enable(drive);
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
 }
 
@@ -735,7 +729,7 @@ static int get_smart_thresholds(ide_drive_t *drive, byte *buf)
 	taskfile.low_cylinder	= SMART_LCYL_PASS;
 	taskfile.high_cylinder	= SMART_HCYL_PASS;
 	taskfile.command	= WIN_SMART;
-	(void) smart_enable(drive);
+	smart_enable(drive);
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
 }
 
@@ -844,7 +838,7 @@ static int write_cache (ide_drive_t *drive, int arg)
 	if (!(drive->id->cfs_enable_2 & 0x3000))
 		return 1;
 
-	(void) ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 	drive->wcache = arg;
 	return 0;
 }
@@ -870,7 +864,7 @@ static int set_acoustic (ide_drive_t *drive, int arg)
 	taskfile.sector_count	= arg;
 
 	taskfile.command	= WIN_SETFEATURES;
-	(void) ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 	drive->acoustic = arg;
 	return 0;
 }
