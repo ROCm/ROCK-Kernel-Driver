@@ -205,9 +205,9 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define LOG_LOCK(log)		mutex_spinlock(&(log)->l_icloglock)
 #define LOG_UNLOCK(log, s)	mutex_spinunlock(&(log)->l_icloglock, s)
 
-#define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
-#define xlog_exit(s)		{cmn_err(CE_PANIC, s); }
-#define xlog_warn(s)		{cmn_err(CE_WARN, s); }
+#define xlog_panic(args...)	cmn_err(CE_PANIC, ## args)
+#define xlog_exit(args...)	cmn_err(CE_PANIC, ## args)
+#define xlog_warn(args...)	cmn_err(CE_WARN, ## args)
 
 /*
  * In core log state

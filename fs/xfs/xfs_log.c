@@ -414,19 +414,6 @@ xfs_log_release_iclog(xfs_mount_t *mp,
 }
 
 /*
- * Initialize log manager data.  This routine is intended to be called when
- * a system boots up.  It is not a per filesystem initialization.
- *
- * As you can see, we currently do nothing.
- */
-int
-xfs_log_init(void)
-{
-	return( 0 );
-}
-
-
-/*
  *  1. Reserve an amount of on-disk log space and return a ticket corresponding
  *	to the reservation.
  *  2. Potentially, push buffers at tail of log to disk.
