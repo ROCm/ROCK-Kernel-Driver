@@ -721,32 +721,7 @@ source "fs/Kconfig"
 
 if !IA64_HP_SIM
 
-
-menu "Console drivers"
-	depends on VT
-
-config VGA_CONSOLE
-	bool "VGA text console"
-	help
-	  Saying Y here will allow you to use Linux in text mode through a
-	  display that complies with the generic VGA standard. Virtually
-	  everyone wants that.
-
-	  The program SVGATextMode can be used to utilize SVGA video cards to
-	  their full potential in text mode. Download it from
-	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
-
-	  Say Y.
-
 source "drivers/video/Kconfig"
-
-config PCI_CONSOLE
-	bool
-	depends on FB
-	default y
-
-endmenu
-
 
 menu "Sound"
 
