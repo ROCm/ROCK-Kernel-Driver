@@ -98,7 +98,6 @@ do_settimeofday (struct timeval *tv)
 		 * it!
 		 */
 		nsec -= gettimeoffset();
-		nsec -= (jiffies - wall_jiffies ) * (1000000000 / HZ);
 
 		while (nsec < 0) {
 			nsec += 1000000000;
