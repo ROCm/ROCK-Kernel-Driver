@@ -237,7 +237,7 @@ struct resource * __request_region(struct resource *parent, unsigned long start,
 	return res;
 }
 
-int __check_region(struct resource *parent, unsigned long start, unsigned long n)
+int deprecated __check_region(struct resource *parent, unsigned long start, unsigned long n)
 {
 	struct resource * res;
 
