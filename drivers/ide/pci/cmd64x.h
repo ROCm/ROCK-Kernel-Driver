@@ -83,7 +83,7 @@ static unsigned int init_chipset_cmd64x(struct pci_dev *, const char *);
 static void init_hwif_cmd64x(ide_hwif_t *);
 static void init_dma_cmd64x(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t cmd64x_chipsets[] __initdata = {
+static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_CMD,
 		device:		PCI_DEVICE_ID_CMD_643,

@@ -29,7 +29,7 @@ static unsigned int init_chipset_sis5513(struct pci_dev *, const char *);
 static void init_hwif_sis5513(ide_hwif_t *);
 static void init_dma_sis5513(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t sis5513_chipsets[] __initdata = {
+static ide_pci_device_t sis5513_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_SI,
 		device:		PCI_DEVICE_ID_SI_5513,

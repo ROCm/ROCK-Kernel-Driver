@@ -530,6 +530,7 @@ static int __devinit aec62xx_init_one(struct pci_dev *dev, const struct pci_devi
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

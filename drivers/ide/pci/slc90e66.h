@@ -31,7 +31,7 @@ static unsigned int init_chipset_slc90e66(struct pci_dev *, const char *);
 static void init_hwif_slc90e66(ide_hwif_t *);
 static void init_dma_slc90e66(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t slc90e66_chipsets[] __initdata = {
+static ide_pci_device_t slc90e66_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_EFAR,
 		device:		PCI_DEVICE_ID_EFAR_SLC90E66_1,

@@ -438,6 +438,7 @@ static int __devinit cy82c693_init_one(struct pci_dev *dev, const struct pci_dev
 		dev2 = pci_find_slot(dev->bus->number, dev->devfn + 1);
 		ide_setup_pci_devices(dev, dev2, d);
 	}
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

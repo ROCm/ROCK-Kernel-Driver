@@ -9,7 +9,7 @@ static void init_setup_opti621(struct pci_dev *, ide_pci_device_t *);
 static void init_hwif_opti621(ide_hwif_t *);
 static void init_dma_opti621(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t opti621_chipsets[] __initdata = {
+static ide_pci_device_t opti621_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_OPTI,
 		device:		PCI_DEVICE_ID_OPTI_82C621,

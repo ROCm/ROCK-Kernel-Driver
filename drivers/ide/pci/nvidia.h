@@ -29,7 +29,7 @@ static unsigned int init_chipset_nforce(struct pci_dev *, const char *);
 static void init_hwif_nforce(ide_hwif_t *);
 static void init_dma_nforce(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t nvidia_chipsets[] __initdata = {
+static ide_pci_device_t nvidia_chipsets[] __devinitdata = {
 	{
 		vendor:		PCI_VENDOR_ID_NVIDIA,
 		device:		PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
