@@ -138,7 +138,8 @@ sim710_probe_common(struct device *dev, unsigned long base_addr,
 		goto out_unregister;
 	}
 
-	scsi_add_host(host, dev);
+	scsi_add_host(host, dev); /* XXX handle failure */
+	scsi_scan_host(host);
 	hostdata->dev = dev;
 
 	return 0;

@@ -254,7 +254,8 @@ static void fdomain_config(dev_link_t *link)
 	goto cs_failed;
     }
  
-    scsi_add_host(host, NULL);
+    scsi_add_host(host, NULL); /* XXX handle failure */
+    scsi_scan_host(host);
 
     sprintf(info->node.dev_name, "scsi%d", host->host_no);
     link->dev = &info->node;

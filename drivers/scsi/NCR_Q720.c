@@ -85,6 +85,7 @@ NCR_Q720_probe_one(struct NCR_Q720_private *p, int siop,
 	__u8 scsr1 = readb(vaddr + NCR_Q720_SCSR_OFFSET + 1);
 	__u8 differential = readb(vaddr + NCR_Q720_SCSR_OFFSET) & 0x20;
 	__u8 version;
+	int error;
 
 	scsi_id = scsr1 >> 4;
 	/* enable burst length 16 (FIXME: should allow this) */
@@ -120,9 +121,12 @@ NCR_Q720_probe_one(struct NCR_Q720_private *p, int siop,
 	scsr1 &= ~0x01;
 	writeb(scsr1, vaddr + NCR_Q720_SCSR_OFFSET + 1);
 
-	scsi_add_host(p->hosts[siop], p->dev);
-
-	return 0;
+	error = scsi_add_host(p->hosts[siop], p->dev);
+	if (error)
+		ncr53c8xx_release(p->hosts[siop]);
+	else
+		scsi_scan_host(p->hosts[siop]);
+	return error;
 
  fail:
 	return -ENODEV;

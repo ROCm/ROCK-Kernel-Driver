@@ -978,8 +978,10 @@ static int idescsi_attach(ide_drive_t *drive)
 		idescsi_setup (drive, idescsi);
 		drive->disk->fops = &idescsi_ops;
 		err = scsi_add_host(host, &idescsi_primary);
-		if (!err)
+		if (!err) {
+			scsi_scan_host(host);
 			return 0;
+		}
 		/* fall through on error */
 		ide_unregister_subdriver(drive);
 	}

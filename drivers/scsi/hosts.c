@@ -81,19 +81,15 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
-	error = scsi_sysfs_add_host(shost, dev);
-
 	if (!shost->can_queue) {
 		printk(KERN_ERR "%s: can_queue = 0 no longer supported\n",
 				sht->name);
 		error = -EINVAL;
 	}
 
-	if (!error) {
+	error = scsi_sysfs_add_host(shost, dev);
+	if (!error)
 		scsi_proc_host_add(shost);
-		scsi_scan_host(shost);
-	}
-			
 	return error;
 }
 

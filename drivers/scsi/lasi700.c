@@ -128,7 +128,8 @@ lasi700_driver_callback(struct parisc_device *dev)
 	}
 
 	dev_set_drvdata(&dev->dev, host);
-	scsi_add_host(host, &dev->dev);
+	scsi_add_host(host, &dev->dev); /* XXX handle failure */
+	scsi_scan_host(host);
 
 	return 0;
 

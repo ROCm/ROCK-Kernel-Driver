@@ -477,6 +477,7 @@ struct Scsi_Host {
 
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
 extern int scsi_add_host(struct Scsi_Host *, struct device *);
+extern void scsi_scan_host(struct Scsi_Host *);
 extern int scsi_remove_host(struct Scsi_Host *);
 extern void scsi_host_get(struct Scsi_Host *);
 extern void scsi_host_put(struct Scsi_Host *t);

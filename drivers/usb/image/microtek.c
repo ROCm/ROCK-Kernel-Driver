@@ -817,7 +817,8 @@ static int mts_usb_probe(struct usb_interface *intf,
 		goto out_free_urb;
 
 	new_desc->host->hostdata[0] = (unsigned long)new_desc;
-	scsi_add_host(new_desc->host, NULL);
+	scsi_add_host(new_desc->host, NULL); /* XXX handle failure */
+	scsi_scan_host(new_desc->host);
 
 	usb_set_intfdata(intf, new_desc);
 	return 0;

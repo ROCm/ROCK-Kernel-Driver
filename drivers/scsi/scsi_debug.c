@@ -1701,7 +1701,8 @@ static int sdebug_driver_probe(struct device * dev)
                 printk(KERN_ERR "%s: scsi_add_host failed\n", __FUNCTION__);
                 error = -ENODEV;
 		scsi_host_put(hpnt);
-        }
+        } else
+		scsi_scan_host(hpnt);
 
 
         return error;

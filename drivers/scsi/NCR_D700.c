@@ -218,7 +218,8 @@ NCR_D700_probe_one(struct NCR_D700_private *p, int siop,
 		goto irq_failed;
 	}
 
-	scsi_add_host(host, p->dev);
+	scsi_add_host(host, p->dev); /* XXX handle failure */
+	scsi_scan_host(host);
 
 	p->hosts[siop] = host;
 	hostdata->dev = p->dev;

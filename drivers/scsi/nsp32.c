@@ -1820,7 +1820,8 @@ static int nsp32_detect(struct pci_dev *pdev)
 		goto free_irq;
         }
 
-	scsi_add_host(host, &pdev->dev);
+	scsi_add_host(host, &pdev->dev); /* XXX handle failure */
+	scsi_scan_host(host);
 	pci_set_drvdata(pdev, host);
 	return 0;
 
