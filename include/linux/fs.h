@@ -28,7 +28,7 @@
 
 struct poll_table_struct;
 struct nameidata;
-
+struct vfsmount;
 
 /*
  * It's silly to have NR_OPEN bigger than NR_FILE, but you can change
@@ -271,10 +271,9 @@ struct iattr {
 #define ATTR_FLAG_NODIRATIME	16 	/* Don't update atime for directory */
 
 /*
- * Includes for diskquotas and mount structures.
+ * Includes for diskquotas.
  */
 #include <linux/quota.h>
-#include <linux/mount.h>
 
 /*
  * oh the beauties of C type declarations.
@@ -1340,11 +1339,6 @@ extern struct inode_operations simple_dir_inode_operations;
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned int real_root_dev;
 #endif
-
-extern ssize_t char_read(struct file *, char *, size_t, loff_t *);
-extern ssize_t block_read(struct file *, char *, size_t, loff_t *);
-extern ssize_t char_write(struct file *, const char *, size_t, loff_t *);
-extern ssize_t block_write(struct file *, const char *, size_t, loff_t *);
 
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);
