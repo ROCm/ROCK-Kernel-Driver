@@ -126,12 +126,16 @@ __asm__(
 );
 
 #define Q_SET_SEL(cpu, selname, address, size) \
+do { \
 set_base(cpu_gdt_table[cpu][(selname) >> 3], __va((u32)(address))); \
-set_limit(&cpu_gdt_table[cpu][(selname) >> 3], size)
+set_limit(cpu_gdt_table[cpu][(selname) >> 3], size); \
+} while(0)
 
 #define Q2_SET_SEL(cpu, selname, address, size) \
+do { \
 set_base(cpu_gdt_table[cpu][(selname) >> 3], (u32)(address)); \
-set_limit(&cpu_gdt_table[cpu][(selname) >> 3], size)
+set_limit(cpu_gdt_table[cpu][(selname) >> 3], size); \
+} while(0)
 
 /*
  * At some point we want to use this stack frame pointer to unwind
