@@ -45,6 +45,10 @@ MODULE_PARM_DESC(disable_clkrun, "If PC card doesn't function properly, please t
 static int yenta_probe_cb_irq(struct yenta_socket *socket);
 
 
+static unsigned int override_bios;
+module_param(override_bios, uint, 0000);
+MODULE_PARM_DESC (override_bios, "yenta ignore bios resource allocation");
+
 /*
  * Generate easy-to-use ways of reading a cardbus sockets
  * regular memory space ("cb_xxx"), configuration space
@@ -554,7 +558,7 @@ static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned typ
 
 	start = config_readl(socket, offset) & mask;
 	end = config_readl(socket, offset+4) | ~mask;
-	if (start && end > start) {
+	if (start && end > start && !override_bios) {
 		res->start = start;
 		res->end = end;
 		if (request_resource(root, res) == 0)
