@@ -555,7 +555,7 @@ not_worth_the_effort:
 	return;
 }
 
-int balanced_irq(void *unused)
+static int balanced_irq(void *unused)
 {
 	int i;
 	unsigned long prev_balance_time = jiffies;
@@ -568,17 +568,17 @@ int balanced_irq(void *unused)
 		pending_irq_balance_cpumask[i] = cpumask_of_cpu(0);
 	}
 
-repeat:
-	set_current_state(TASK_INTERRUPTIBLE);
-	time_remaining = schedule_timeout(time_remaining);
-	if (time_after(jiffies, prev_balance_time+balanced_irq_interval)) {
-		Dprintk("balanced_irq: calling do_irq_balance() %lu\n",
-					jiffies);
-		do_irq_balance();
-		prev_balance_time = jiffies;
-		time_remaining = balanced_irq_interval;
+	for ( ; ; ) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		time_remaining = schedule_timeout(time_remaining);
+		if (time_after(jiffies,
+				prev_balance_time+balanced_irq_interval)) {
+			do_irq_balance();
+			prev_balance_time = jiffies;
+			time_remaining = balanced_irq_interval;
+		}
 	}
-	goto repeat;
+	return 0;
 }
 
 static int __init balanced_irq_init(void)
