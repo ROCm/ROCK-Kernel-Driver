@@ -35,7 +35,7 @@ MODULE_PARM(atkbd_softrepeat, "1i");
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
-#if defined(__i386__) || defined (__x86_64__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__hppa__)
 static int atkbd_reset;
 #else
 static int atkbd_reset = 1;
@@ -46,6 +46,10 @@ static int atkbd_softrepeat;
  * Scancode to keycode tables. These are just the default setting, and
  * are loadable via an userland utility.
  */
+
+#if defined(__hppa__)
+#include "hpps2atkbd.h"
+#else
 
 static unsigned char atkbd_set2_keycode[512] = {
 
@@ -69,6 +73,8 @@ static unsigned char atkbd_set2_keycode[512] = {
 
 	  0,  0,  0, 65, 99,
 };
+
+#endif
 
 static unsigned char atkbd_set3_keycode[512] = {
 
