@@ -132,7 +132,11 @@ void __wait_on_buffer(struct buffer_head * bh)
 	do {
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 		if (buffer_locked(bh)) {
-			blk_run_address_space(bh->b_bdev->bd_inode->i_mapping);
+			struct block_device *bd;
+			smp_mb();
+			bd = bh->b_bdev;
+			if (bd)
+				blk_run_address_space(bd->bd_inode->i_mapping);
 			io_schedule();
 		}
 	} while (buffer_locked(bh));

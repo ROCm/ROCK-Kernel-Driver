@@ -177,6 +177,7 @@ void md_unplug_mddev(mddev_t *mddev)
 		}
 	}
 }
+EXPORT_SYMBOL(md_unplug_mddev);
 
 static void md_unplug_all(request_queue_t *q)
 {

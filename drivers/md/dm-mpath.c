@@ -248,7 +248,7 @@ static void dispatch_failed_ios(void *data)
 		next = bio->bi_next;
 		bio->bi_next = NULL;
 
-		bio->bi_rw |= BIO_RW_SYNC;
+		bio->bi_rw |= (1 << BIO_RW_SYNC);
 
 		r = map_io(m, bio);
 		if (r)

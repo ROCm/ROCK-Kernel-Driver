@@ -481,7 +481,7 @@ static void dispatch_io(int rw, unsigned int num_regions,
 	struct dpages old_pages = *dp;
 
 	if (sync)
-		rw |= BIO_RW_SYNC;
+		rw |= (1 << BIO_RW_SYNC);
 
 	/*
 	 * For multiple regions we need to be careful to rewind
