@@ -250,7 +250,59 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 
 	if (!sk->sk_zapped)
 		goto out;
-	/* bind to a specific sap, optional. */
+	rc = -ENODEV;
+	llc->dev = dev_getfirstbyhwtype(addr->sllc_arphrd);
+	if (!llc->dev)
+		goto out;
+	rc = -EUSERS;
+	llc->laddr.lsap = llc_ui_autoport();
+	if (!llc->laddr.lsap)
+		goto out;
+	rc = -EBUSY; /* some other network layer is using the sap */
+	sap = llc_sap_open(llc->laddr.lsap, NULL);
+	if (!sap)
+		goto out;
+	memcpy(llc->laddr.mac, llc->dev->dev_addr, IFHWADDRLEN);
+	memcpy(&llc->addr, addr, sizeof(llc->addr));
+	/* assign new connection to its SAP */
+	llc_sap_add_socket(sap, sk);
+	rc = sk->sk_zapped = 0;
+out:
+	return rc;
+}
+
+/**
+ *	llc_ui_bind - bind a socket to a specific address.
+ *	@sock: Socket to bind an address to.
+ *	@uaddr: Address the user wants the socket bound to.
+ *	@addrlen: Length of the uaddr structure.
+ *
+ *	Bind a socket to a specific address. For llc a user is able to bind to
+ *	a specific sap only or mac + sap. If the user only specifies a sap and
+ *	a null dmac (all zeros) the user is attempting to bind to an entire
+ *	sap. This will stop anyone else on the local system from using that
+ *	sap. If someone else has a mac + sap open the bind to null + sap will
+ *	fail.
+ *	If the user desires to bind to a specific mac + sap, it is possible to
+ *	have multiple sap connections via multiple macs.
+ *	Bind and autobind for that matter must enforce the correct sap usage
+ *	otherwise all hell will break loose.
+ *	Returns: 0 upon success, negative otherwise.
+ */
+static int llc_ui_bind(struct socket *sock, struct sockaddr *uaddr, int addrlen)
+{
+	struct sockaddr_llc *addr = (struct sockaddr_llc *)uaddr;
+	struct sock *sk = sock->sk;
+	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sap *sap;
+	int rc = -EINVAL;
+
+	dprintk("%s: binding %02X\n", __FUNCTION__, addr->sllc_sap);
+	if (!sk->sk_zapped || addrlen != sizeof(*addr))
+		goto out;
+	rc = -EAFNOSUPPORT;
+	if (addr->sllc_family != AF_LLC)
+		goto out;
 	if (!addr->sllc_sap) {
 		rc = -EUSERS;
 		addr->sllc_sap = llc_ui_autoport();
@@ -283,48 +335,11 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 		}
 	}
 	llc->laddr.lsap = addr->sllc_sap;
-	if (llc->dev)
-		memcpy(llc->laddr.mac, llc->dev->dev_addr, IFHWADDRLEN);
+	memcpy(llc->laddr.mac, addr->sllc_mac, IFHWADDRLEN);
 	memcpy(&llc->addr, addr, sizeof(llc->addr));
 	/* assign new connection to its SAP */
 	llc_sap_add_socket(sap, sk);
 	rc = sk->sk_zapped = 0;
-out:
-	return rc;
-}
-
-/**
- *	llc_ui_bind - bind a socket to a specific address.
- *	@sock: Socket to bind an address to.
- *	@uaddr: Address the user wants the socket bound to.
- *	@addrlen: Length of the uaddr structure.
- *
- *	Bind a socket to a specific address. For llc a user is able to bind to
- *	a specific sap only or mac + sap. If the user only specifies a sap and
- *	a null dmac (all zeros) the user is attempting to bind to an entire
- *	sap. This will stop anyone else on the local system from using that
- *	sap. If someone else has a mac + sap open the bind to null + sap will
- *	fail.
- *	If the user desires to bind to a specific mac + sap, it is possible to
- *	have multiple sap connections via multiple macs.
- *	Bind and autobind for that matter must enforce the correct sap usage
- *	otherwise all hell will break loose.
- *	Returns: 0 upon success, negative otherwise.
- */
-static int llc_ui_bind(struct socket *sock, struct sockaddr *uaddr, int addrlen)
-{
-	struct sockaddr_llc *addr = (struct sockaddr_llc *)uaddr;
-	struct sock *sk = sock->sk;
-	int rc = -EINVAL;
-
-	dprintk("%s: binding %02X\n", __FUNCTION__, addr->sllc_sap);
-	if (!sk->sk_zapped || addrlen != sizeof(*addr))
-		goto out;
-	rc = -EAFNOSUPPORT;
-	if (addr->sllc_family != AF_LLC)
-		goto out;
-	/* use autobind, to avoid code replication. */
-	rc = llc_ui_autobind(sock, addr);
 out:
 	return rc;
 }
@@ -399,15 +414,7 @@ static int llc_ui_connect(struct socket *sock, struct sockaddr *uaddr,
 		llc->daddr.lsap = addr->sllc_sap;
 		memcpy(llc->daddr.mac, addr->sllc_mac, IFHWADDRLEN);
 	}
-	if (!llc->dev) {
-		rc = -ENODEV;
-		dev = dev_getfirstbyhwtype(addr->sllc_arphrd);
-		if (!dev)
-			goto out;
-		llc->dev = dev;
-		memcpy(llc->laddr.mac, llc->dev->dev_addr, IFHWADDRLEN);
-	} else
-		dev = llc->dev;
+	dev = llc->dev;
 	if (sk->sk_type != SOCK_STREAM)
 		goto out;
 	rc = -EALREADY;
@@ -610,7 +617,7 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	int rc = -EOPNOTSUPP;
 
 	dprintk("%s: accepting on %02X\n", __FUNCTION__,
-	        llc_sk(sk)->addr.sllc_sap);
+	        llc_sk(sk)->laddr.lsap);
 	lock_sock(sk);
 	if (sk->sk_type != SOCK_STREAM)
 		goto out;
@@ -622,7 +629,7 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	if (rc)
 		goto out;
 	dprintk("%s: got a new connection on %02X\n", __FUNCTION__,
-	        llc_sk(sk)->addr.sllc_sap);
+	        llc_sk(sk)->laddr.lsap);
 	skb = skb_dequeue(&sk->sk_receive_queue);
 	rc = -EINVAL;
 	if (!skb->sk)
@@ -747,13 +754,7 @@ static int llc_ui_sendmsg(struct kiocb *iocb, struct socket *sock,
 		if (rc)
 			goto release;
 	}
-	if (!llc->dev) {
-		rc = -ENODEV;
-		dev = dev_getfirstbyhwtype(addr->sllc_arphrd);
-		if (!dev)
-			goto release;
-	} else
-		dev = llc->dev;
+	dev = llc->dev;
 	hdrlen = dev->hard_header_len + llc_ui_header_len(sk, addr);
 	size = hdrlen + len;
 	if (size > dev->mtu)
