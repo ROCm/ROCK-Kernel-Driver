@@ -2289,13 +2289,39 @@ int cpqhp_process_SS (struct controller *ctrl, struct pci_func *func)
 	return rc;
 }
 
+/**
+ * switch_leds: switch the leds, go from one site to the other.
+ * @ctrl: controller to use
+ * @num_of_slots: number of slots to use
+ * @direction: 1 to start from the left side, 0 to start right.
+ */
+void switch_leds(struct controller *ctrl, const int num_of_slots,
+			u32 *work_LED, const int direction)
+{
+	int loop;
 
+	for (loop = 0; loop < num_of_slots; loop++) {
+		if (direction)
+			*work_LED = *work_LED >> 1;
+		else
+			*work_LED = *work_LED << 1;
+		writel(*work_LED, ctrl->hpc_reg + LED_CONTROL);
+
+		set_SOGO(ctrl);
+
+		/* Wait for SOGO interrupt */
+		wait_for_ctrl_irq(ctrl);
+
+		/* Get ready for next iteration */
+		long_delay((2*HZ)/10);
+	}
+}
 
 /**
  * hardware_test - runs hardware tests
  *
  * For hot plug ctrl folks to play with.
- * test_num is the number entered in the GUI
+ * test_num is the number written to the "test" file in sysfs
  *
  */
 int cpqhp_hardware_test(struct controller *ctrl, int test_num)
@@ -2309,113 +2335,26 @@ int cpqhp_hardware_test(struct controller *ctrl, int test_num)
 
 	switch (test_num) {
 		case 1:
-			// Do stuff here!
+			/* Do stuff here! */
 
-			// Do that funky LED thing
+			/* Do that funky LED thing */
 			/* so we can restore them later */
 			save_LED = readl(ctrl->hpc_reg + LED_CONTROL);
 			work_LED = 0x01010101;
 			writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-			for (loop = 0; loop < num_of_slots; loop++) {
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				work_LED = work_LED << 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				long_delay((2*HZ)/10);
-			}
-			for (loop = 0; loop < num_of_slots; loop++) {
-				work_LED = work_LED >> 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				long_delay((2*HZ)/10);
-			}
-			for (loop = 0; loop < num_of_slots; loop++) {
-				work_LED = work_LED << 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				long_delay((2*HZ)/10);
-			}
-			for (loop = 0; loop < num_of_slots; loop++) {
-				work_LED = work_LED >> 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				long_delay((2*HZ)/10);
-			}
+			switch_leds(ctrl, num_of_slots, &work_LED, 0);
+			switch_leds(ctrl, num_of_slots, &work_LED, 1);
+			switch_leds(ctrl, num_of_slots, &work_LED, 0);
+			switch_leds(ctrl, num_of_slots, &work_LED, 1);
 
 			work_LED = 0x01010000;
 			writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-			for (loop = 0; loop < num_of_slots; loop++) {
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				work_LED = work_LED << 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				long_delay((2*HZ)/10);
-			}
-			for (loop = 0; loop < num_of_slots; loop++) {
-				work_LED = work_LED >> 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				long_delay((2*HZ)/10);
-			}
+			switch_leds(ctrl, num_of_slots, &work_LED, 0);
+			switch_leds(ctrl, num_of_slots, &work_LED, 1);
 			work_LED = 0x00000101;
 			writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-			for (loop = 0; loop < num_of_slots; loop++) {
-				work_LED = work_LED << 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				long_delay((2*HZ)/10);
-			}
-			for (loop = 0; loop < num_of_slots; loop++) {
-				work_LED = work_LED >> 1;
-				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
-				
-				set_SOGO(ctrl);
-
-				// Wait for SOGO interrupt
-				wait_for_ctrl_irq (ctrl);
-
-				// Get ready for next iteration
-				long_delay((2*HZ)/10);
-			}
-
+			switch_leds(ctrl, num_of_slots, &work_LED, 0);
+			switch_leds(ctrl, num_of_slots, &work_LED, 1);
 
 			work_LED = 0x01010000;
 			writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
@@ -2444,7 +2383,7 @@ int cpqhp_hardware_test(struct controller *ctrl, int test_num)
 			}
 
 			/* put it back the way it was */
-			writel (save_LED, ctrl->hpc_reg + LED_CONTROL);
+			writel(save_LED, ctrl->hpc_reg + LED_CONTROL);
 
 			set_SOGO(ctrl);
 
