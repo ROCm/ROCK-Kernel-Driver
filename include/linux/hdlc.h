@@ -176,7 +176,7 @@ int hdlc_raw_eth_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 int hdlc_cisco_ioctl(struct net_device *dev, struct ifreq *ifr);
 int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 int hdlc_fr_ioctl(struct net_device *dev, struct ifreq *ifr);
-int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
+int hdlc_x25_ioctl(struct net_device *dev, struct ifreq *ifr);
 
 
 /* Exported from hdlc.o */

@@ -94,7 +94,6 @@ static void x25_data_transmit(struct net_device *dev, struct sk_buff *skb)
 
 static int x25_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
 	int result;
 
 
@@ -114,7 +113,7 @@ static int x25_xmit(struct sk_buff *skb, struct net_device *dev)
 			else
 				printk(KERN_ERR "%s: LAPB connect request "
 				       "failed, error code = %i\n",
-				       hdlc_to_name(hdlc), result);
+				       dev->name, result);
 		}
 		break;
 
@@ -126,7 +125,7 @@ static int x25_xmit(struct sk_buff *skb, struct net_device *dev)
 			else
 				printk(KERN_ERR "%s: LAPB disconnect request "
 				       "failed, error code = %i\n",
-				       hdlc_to_name(hdlc), result);
+				       dev->name, result);
 		}
 		break;
 
@@ -186,9 +185,9 @@ static int x25_rx(struct sk_buff *skb)
 
 
 
-int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
+int hdlc_x25_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	int result;
 
 	switch (ifr->ifr_settings.type) {
