@@ -605,6 +605,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		unsigned char old_cmd_len;
 		unsigned char old_cmnd[MAX_COMMAND_SIZE];
 		unsigned long old_serial_number;
+		int old_resid;
 
 		US_DEBUGP("Issuing auto-REQUEST_SENSE\n");
 
@@ -645,9 +646,12 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		srb->serial_number ^= 0x80000000;
 
 		/* issue the auto-sense command */
+		old_resid = srb->resid;
+		srb->resid = 0;
 		temp_result = us->transport(us->srb, us);
 
 		/* let's clean up right away */
+		srb->resid = old_resid;
 		srb->request_buffer = old_request_buffer;
 		srb->request_bufflen = old_request_bufflen;
 		srb->use_sg = old_sg;
