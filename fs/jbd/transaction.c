@@ -633,9 +633,10 @@ repeat:
 		 * disk then we cannot do copy-out here. */
 
 		if (jh->b_jlist == BJ_Shadow) {
-			DEFINE_WAIT_BIT(wait, &bh->b_state, BH_Lock);
-			wait_queue_head_t *wqh
-					= bit_waitqueue(&bh->b_state, BH_Lock);
+			DEFINE_WAIT_BIT(wait, &bh->b_state, BH_Unshadow);
+			wait_queue_head_t *wqh;
+
+			wqh = bit_waitqueue(&bh->b_state, BH_Unshadow);
 
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			jbd_unlock_bh_state(bh);

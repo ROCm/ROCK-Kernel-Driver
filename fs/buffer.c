@@ -52,13 +52,6 @@ init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
 	bh->b_private = private;
 }
 
-void wake_up_buffer(struct buffer_head *bh)
-{
-	smp_mb();
-	wake_up_bit(&bh->b_state, BH_Lock);
-}
-EXPORT_SYMBOL(wake_up_buffer);
-
 static int sync_buffer(void *word)
 {
 	struct block_device *bd;
@@ -83,8 +76,8 @@ EXPORT_SYMBOL(__lock_buffer);
 void fastcall unlock_buffer(struct buffer_head *bh)
 {
 	clear_buffer_locked(bh);
-	smp_mb__after_clear_bit();
-	wake_up_buffer(bh);
+	smp_mb();
+	wake_up_bit(&bh->b_state, BH_Lock);
 }
 
 /*
