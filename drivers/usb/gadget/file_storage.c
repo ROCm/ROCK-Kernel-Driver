@@ -2501,7 +2501,7 @@ static int send_status(struct fsg_dev *fsg)
 		/* Store and send the Bulk-only CSW */
 		csw->Signature = __constant_cpu_to_le32(USB_BULK_CS_SIG);
 		csw->Tag = fsg->tag;
-		csw->Residue = fsg->residue;
+		csw->Residue = cpu_to_le32(fsg->residue);
 		csw->Status = status;
 
 		bh->inreq->length = USB_BULK_CS_WRAP_LEN;
@@ -2947,7 +2947,7 @@ static int received_cbw(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 		fsg->data_dir = DATA_DIR_TO_HOST;
 	else
 		fsg->data_dir = DATA_DIR_FROM_HOST;
-	fsg->data_size = cbw->DataTransferLength;
+	fsg->data_size = le32_to_cpu(cbw->DataTransferLength);
 	if (fsg->data_size == 0)
 		fsg->data_dir = DATA_DIR_NONE;
 	fsg->lun = cbw->Lun;
