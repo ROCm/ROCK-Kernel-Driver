@@ -1513,10 +1513,6 @@ int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 {
 	struct metapage *mp;
 	pxd_t *pxd;
-	int rc;
-	s64 xaddr;
-	int xflag;
-	s32 xlen;
 
 	mp = tlck->mp;
 
@@ -1541,13 +1537,7 @@ int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		return 0;
 	}
 
-	rc = xtLookup(tlck->ip, mp->index, 1, &xflag, &xaddr, &xlen, 1);
-	if (rc || (xlen == 0)) {
-		jERROR(1, ("dataLog: can't find physical address\n"));
-		return 0;
-	}
-
-	PXDaddress(pxd, xaddr);
+	PXDaddress(pxd, mp->index);
 	PXDlength(pxd, mp->logical_size >> tblk->sb->s_blocksize_bits);
 
 	lrd->backchain = cpu_to_le32(lmLog(log, tblk, lrd, tlck));

@@ -200,6 +200,28 @@ static void dtLinelockFreelist(dtpage_t * p, int m, struct dt_lock ** dtlock);
 #define ciToUpper(c)	UniStrupr((c)->name)
 
 /*
+ *	read_index_page()
+ *
+ *	Reads a page of a directory's index table.
+ *	Having metadata mapped into the directory inode's address space
+ *	presents a multitude of problems.  We avoid this by mapping to
+ *	the absolute address space outside of the *_metapage routines
+ */
+static struct metapage *read_index_page(struct inode *inode, s64 blkno)
+{
+	int rc;
+	s64 xaddr;
+	int xflag;
+	s32 xlen;
+
+	rc = xtLookup(inode, blkno, 1, &xflag, &xaddr, &xlen, 1);
+	if (rc || (xlen == 0))
+		return NULL;
+
+	return read_metapage(inode, xaddr, PSIZE, 1);
+}
+
+/*
  *	find_index()
  *
  *	Returns dtree page containing directory table entry for specified
@@ -208,7 +230,7 @@ static void dtLinelockFreelist(dtpage_t * p, int m, struct dt_lock ** dtlock);
  *	mp must be released by caller.
  */
 static struct dir_table_slot *find_index(struct inode *ip, u32 index,
-					 struct metapage ** mp)
+					 struct metapage ** mp, s64 *lblock)
 {
 	struct jfs_inode_info *jfs_ip = JFS_IP(ip);
 	s64 blkno;
@@ -243,12 +265,14 @@ static struct dir_table_slot *find_index(struct inode *ip, u32 index,
 		blkno = ((offset + 1) >> L2PSIZE) <<
 		    JFS_SBI(ip->i_sb)->l2nbperpage;
 
-		if (*mp && ((*mp)->index != blkno)) {
+		if (*mp && (*lblock != blkno)) {
 			release_metapage(*mp);
 			*mp = 0;
 		}
-		if (*mp == 0)
-			*mp = read_metapage(ip, blkno, PSIZE, 0);
+		if (*mp == 0) {
+			*lblock = blkno;
+			*mp = read_index_page(ip, blkno);
+		}
 		if (*mp == 0) {
 			jERROR(1,
 			       ("free_index: error reading directory table\n"));
@@ -368,7 +392,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		ip->i_size = PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
-		if ((mp = get_metapage(ip, 0, ip->i_blksize, 0)) == 0) {
+		if ((mp = read_index_page(ip, 0)) == 0) {
 			jERROR(1, ("add_index: get_metapage failed!\n"));
 			xtTruncate(tid, ip, 0, COMMIT_PWMAP);
 			return -1;
@@ -411,12 +435,12 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		ip->i_size += PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
-		if ((mp = get_metapage(ip, blkno, PSIZE, 0)))
+		if ((mp = read_index_page(ip, blkno)))
 			memset(mp->data, 0, PSIZE);	/* Just looks better */
 		else
 			xtTruncate(tid, ip, offset, COMMIT_PWMAP);
 	} else
-		mp = read_metapage(ip, blkno, PSIZE, 0);
+		mp = read_index_page(ip, blkno);
 
 	if (mp == 0) {
 		jERROR(1, ("add_index: get/read_metapage failed!\n"));
@@ -445,9 +469,10 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 static void free_index(tid_t tid, struct inode *ip, u32 index, u32 next)
 {
 	struct dir_table_slot *dirtab_slot;
+	s64 lblock;
 	struct metapage *mp = 0;
 
-	dirtab_slot = find_index(ip, index, &mp);
+	dirtab_slot = find_index(ip, index, &mp, &lblock);
 
 	if (dirtab_slot == 0)
 		return;
@@ -470,11 +495,11 @@ static void free_index(tid_t tid, struct inode *ip, u32 index, u32 next)
  *	Changes an entry in the directory index table
  */
 static void modify_index(tid_t tid, struct inode *ip, u32 index, s64 bn,
-			 int slot, struct metapage ** mp)
+			 int slot, struct metapage ** mp, u64 *lblock)
 {
 	struct dir_table_slot *dirtab_slot;
 
-	dirtab_slot = find_index(ip, index, mp);
+	dirtab_slot = find_index(ip, index, mp, lblock);
 
 	if (dirtab_slot == 0)
 		return;
@@ -497,10 +522,11 @@ static void modify_index(tid_t tid, struct inode *ip, u32 index, s64 bn,
 static int read_index(struct inode *ip, u32 index,
 		     struct dir_table_slot * dirtab_slot)
 {
+	s64 lblock;
 	struct metapage *mp = 0;
 	struct dir_table_slot *slot;
 
-	slot = find_index(ip, index, &mp);
+	slot = find_index(ip, index, &mp, &lblock);
 	if (slot == 0) {
 		return -EIO;
 	}
@@ -1491,12 +1517,14 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	 * Update directory index table for entries now in right page
 	 */
 	if ((rp->header.flag & BT_LEAF) && DO_INDEX(ip)) {
+		s64 lblock;
+
 		mp = 0;
 		stbl = DT_GETSTBL(rp);
 		for (n = 0; n < rp->header.nextindex; n++) {
 			ldtentry = (struct ldtentry *) & rp->slot[stbl[n]];
 			modify_index(tid, ip, le32_to_cpu(ldtentry->index),
-				     rbn, n, &mp);
+				     rbn, n, &mp, &lblock);
 		}
 		if (mp)
 			release_metapage(mp);
@@ -1616,6 +1644,8 @@ static int dtExtendPage(tid_t tid,
 		 * Update directory index table to reflect new page address
 		 */
 		if (DO_INDEX(ip)) {
+			s64 lblock;
+
 			mp = 0;
 			stbl = DT_GETSTBL(sp);
 			for (n = 0; n < sp->header.nextindex; n++) {
@@ -1623,7 +1653,7 @@ static int dtExtendPage(tid_t tid,
 				    (struct ldtentry *) & sp->slot[stbl[n]];
 				modify_index(tid, ip,
 					     le32_to_cpu(ldtentry->index),
-					     xaddr, n, &mp);
+					     xaddr, n, &mp, &lblock);
 			}
 			if (mp)
 				release_metapage(mp);
@@ -1911,6 +1941,7 @@ static int dtSplitRoot(tid_t tid,
 	 * Update directory index table for entries now in right page
 	 */
 	if ((rp->header.flag & BT_LEAF) && DO_INDEX(ip)) {
+		s64 lblock;
 		struct metapage *mp = 0;
 		struct ldtentry *ldtentry;
 
@@ -1918,7 +1949,7 @@ static int dtSplitRoot(tid_t tid,
 		for (n = 0; n < rp->header.nextindex; n++) {
 			ldtentry = (struct ldtentry *) & rp->slot[stbl[n]];
 			modify_index(tid, ip, le32_to_cpu(ldtentry->index),
-				     rbn, n, &mp);
+				     rbn, n, &mp, &lblock);
 		}
 		if (mp)
 			release_metapage(mp);
@@ -2120,6 +2151,8 @@ int dtDelete(tid_t tid,
 		 * Update directory index table for entries moved in stbl
 		 */
 		if (DO_INDEX(ip) && index < p->header.nextindex) {
+			s64 lblock;
+
 			imp = 0;
 			stbl = DT_GETSTBL(p);
 			for (i = index; i < p->header.nextindex; i++) {
@@ -2127,7 +2160,7 @@ int dtDelete(tid_t tid,
 				    (struct ldtentry *) & p->slot[stbl[i]];
 				modify_index(tid, ip,
 					     le32_to_cpu(ldtentry->index),
-					     bn, i, &imp);
+					     bn, i, &imp, &lblock);
 			}
 			if (imp)
 				release_metapage(imp);
@@ -2769,12 +2802,6 @@ void dtInitRoot(tid_t tid, struct inode *ip, u32 idotdot)
 			set_cflag(COMMIT_Stale, ip);
 
 			tblk->xflag = xflag_save;
-			/*
-			 * Tells jfs_metapage code that the metadata pages
-			 * for the index table are no longer useful, and
-			 * remove them from page cache.
-			 */
-			invalidate_inode_metapages(ip);
 		} else
 			ip->i_size = 1;
 
@@ -3919,6 +3946,8 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 		memmove(stbl + index + 1, stbl + index, nextindex - index);
 
 		if ((p->header.flag & BT_LEAF) && data->leaf.ip) {
+			s64 lblock;
+
 			/*
 			 * Need to update slot number for entries that moved
 			 * in the stbl
@@ -3928,7 +3957,7 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 				lh = (struct ldtentry *) & (p->slot[stbl[n]]);
 				modify_index(data->leaf.tid, data->leaf.ip,
 					     le32_to_cpu(lh->index), bn, n,
-					     &mp);
+					     &mp, &lblock);
 			}
 			if (mp)
 				release_metapage(mp);

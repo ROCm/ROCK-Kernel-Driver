@@ -317,8 +317,6 @@ struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
 		mp->page = 0;
 		mp->logical_size = size;
 		add_to_hash(mp, hash_ptr);
-		if (!absolute)
-			list_add(&mp->inode_list, &JFS_IP(inode)->mp_list);
 		spin_unlock(&meta_lock);
 
 		if (new) {
@@ -351,8 +349,6 @@ struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
 freeit:
 	spin_lock(&meta_lock);
 	remove_from_hash(mp, hash_ptr);
-	if (!absolute)
-		list_del(&mp->inode_list);
 	free_metapage(mp);
 	spin_unlock(&meta_lock);
 	return NULL;
@@ -457,8 +453,6 @@ void release_metapage(struct metapage * mp)
 		spin_unlock(&meta_lock);
 	} else {
 		remove_from_hash(mp, meta_hash(mp->mapping, mp->index));
-		if (!test_bit(META_absolute, &mp->flag))
-			list_del(&mp->inode_list);
 		spin_unlock(&meta_lock);
 
 		if (mp->page) {
@@ -505,7 +499,8 @@ void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 	struct metapage **hash_ptr;
 	unsigned long lblock;
 	int l2BlocksPerPage = PAGE_CACHE_SHIFT - ip->i_blkbits;
-	struct address_space *mapping = ip->i_mapping;
+	/* All callers are interested in block device's mapping */
+	struct address_space *mapping = ip->i_sb->s_bdev->bd_inode->i_mapping;
 	struct metapage *mp;
 	struct page *page;
 
@@ -533,26 +528,6 @@ void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 			}
 		}
 	}
-}
-
-void invalidate_inode_metapages(struct inode *inode)
-{
-	struct list_head *ptr;
-	struct metapage *mp;
-
-	spin_lock(&meta_lock);
-	list_for_each(ptr, &JFS_IP(inode)->mp_list) {
-		mp = list_entry(ptr, struct metapage, inode_list);
-		clear_bit(META_dirty, &mp->flag);
-		set_bit(META_discard, &mp->flag);
-		kunmap(mp->page);
-		page_cache_release(mp->page);
-		INCREMENT(mpStat.pagefree);
-		mp->data = 0;
-		mp->page = 0;
-	}
-	spin_unlock(&meta_lock);
-	truncate_inode_pages(inode->i_mapping, 0);
 }
 
 #ifdef CONFIG_JFS_STATISTICS
