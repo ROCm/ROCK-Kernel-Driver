@@ -1599,7 +1599,7 @@ struct net_device *init_atmel_card( unsigned short irq, int port, char *firmware
 	
 	netif_carrier_off(dev);
 	
-	create_proc_read_entry ("driver/atmel", 0, 0, atmel_read_proc, priv);	
+	create_proc_read_entry ("driver/atmel", 0, NULL, atmel_read_proc, priv);	
 	
 	printk(KERN_INFO "%s: Atmel at76c50x wireless. Version %d.%d simon@thekelleys.org.uk\n",
 	       dev->name, DRIVER_MAJOR, DRIVER_MINOR);

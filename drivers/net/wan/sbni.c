@@ -349,7 +349,7 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 
 	if( sbni_card_probe( ioaddr ) ) {
 		release_region( ioaddr, SBNI_IO_EXTENT );
-		return  0;
+		return NULL;
 	}
 
 	outb( 0, ioaddr + CSR0 );
@@ -368,7 +368,7 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 			printk( KERN_ERR "%s: can't detect device irq!\n",
 				dev->name );
 			release_region( ioaddr, SBNI_IO_EXTENT );
-			return  0;
+			return NULL;
 		}
 	} else if( irq == 2 )
 		irq = 9;
@@ -381,7 +381,7 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 	if( !nl ) {
 		printk( KERN_ERR "%s: unable to get memory!\n", dev->name );
 		release_region( ioaddr, SBNI_IO_EXTENT );
-		return  0;
+		return NULL;
 	}
 
 	dev->priv = nl;

@@ -270,7 +270,7 @@ static void airo_detach(dev_link_t *link)
 	if ( ((local_info_t*)link->priv)->eth_dev ) {
 		stop_airo_card( ((local_info_t*)link->priv)->eth_dev, 0 );
 	}
-	((local_info_t*)link->priv)->eth_dev = 0;   
+	((local_info_t*)link->priv)->eth_dev = NULL;   
 	
 	/* Break the link with Card Services */
 	if (link->handle)

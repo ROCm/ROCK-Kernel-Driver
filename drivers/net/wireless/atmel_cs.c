@@ -612,7 +612,7 @@ static void atmel_release(dev_link_t *link)
 	
 	if (dev) 
 		stop_atmel_card(dev, 0);
-	((local_info_t*)link->priv)->eth_dev = 0; 
+	((local_info_t*)link->priv)->eth_dev = NULL; 
 	
 	/* Don't bother checking to see if these succeed or not */
 	pcmcia_release_configuration(link->handle);

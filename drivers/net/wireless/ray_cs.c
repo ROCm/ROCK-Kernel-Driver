@@ -2914,7 +2914,7 @@ static int __init init_ray_cs(void)
     DEBUG(1, "raylink init_module register_pcmcia_driver returns 0x%x\n",rc);
 
 #ifdef CONFIG_PROC_FS
-    proc_mkdir("driver/ray_cs", 0);
+    proc_mkdir("driver/ray_cs", NULL);
 
     create_proc_info_entry("driver/ray_cs/ray_cs", 0, NULL, &ray_cs_proc_read);
     raycs_write("driver/ray_cs/essid", write_essid, NULL);

@@ -2707,7 +2707,7 @@ static void strip_close(struct tty_struct *tty)
 
 	unregister_netdev(strip_info->dev);
 
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 	strip_info->tty = NULL;
 	printk(KERN_INFO "STRIP: device \"%s\" closed down\n",
 	       strip_info->dev->name);

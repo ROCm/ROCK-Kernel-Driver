@@ -556,7 +556,7 @@ SK_VPD_PARA *p)		/* parameter description struct */
 	if (*v != (char)RES_ID) {
 		SK_DBG_MSG(pAC, SK_DBGMOD_VPD, SK_DBGCAT_ERR | SK_DBGCAT_FATAL,
 			("Error: 0x%x missing\n", RES_ID));
-		return(0);
+		return NULL;
 	}
 
 	if (strcmp(key, VPD_NAME) == 0) {
@@ -600,7 +600,7 @@ SK_VPD_PARA *p)		/* parameter description struct */
 			("Key/Len Encoding error\n"));
 	}
 #endif /* DEBUG */
-	return(0);
+	return NULL;
 }
 
 /*
@@ -751,7 +751,7 @@ int		op)			/* operation to do: ADD_KEY or OWR_KEY */
 	vpd_size = pAC->vpd.vpd_size;
 
 	rtv = 0;
-	ip = 0;
+	ip = NULL;
 	if (type == VPD_RW_KEY) {
 		/* end tag is "RW" */
 		free = pAC->vpd.v.vpd_free_rw;

@@ -4939,7 +4939,7 @@ static int smctr_send_rq_init(struct net_device *dev)
                 tmf->dc_sc = DC_RPS | SC_RS;
                 tmf->vl    = 4;
 
-                smctr_make_8025_hdr(dev, 0L, tmf, AC_FC_RQ_INIT);
+                smctr_make_8025_hdr(dev, NULL, tmf, AC_FC_RQ_INIT);
 
                 tsv = (MAC_SUB_VECTOR *)((__u32)tmf + sizeof(MAC_HEADER));
                 smctr_make_product_id(dev, tsv);

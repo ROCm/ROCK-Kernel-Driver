@@ -634,7 +634,7 @@ static int rr_init1(struct net_device *dev)
 	for (i = 0; i < TX_RING_ENTRIES; i++) {
 		rrpriv->tx_ring[i].size = 0;
 		set_rraddr(&rrpriv->tx_ring[i].addr, 0);
-		rrpriv->tx_skbuff[i] = 0;
+		rrpriv->tx_skbuff[i] = NULL;
 	}
 	rrpriv->info->tx_ctrl.entry_size = sizeof(struct tx_desc);
 	rrpriv->info->tx_ctrl.entries = TX_RING_ENTRIES;
@@ -744,7 +744,7 @@ static int rr_init1(struct net_device *dev)
 			rrpriv->rx_ring[i].size = 0;
 			set_rraddr(&rrpriv->rx_ring[i].addr, 0);
 			dev_kfree_skb(skb);
-			rrpriv->rx_skbuff[i] = 0;
+			rrpriv->rx_skbuff[i] = NULL;
 		}
 	}
 	return ecode;
