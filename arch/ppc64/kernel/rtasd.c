@@ -486,7 +486,7 @@ static int __init rtas_init(void)
 	/* No RTAS, only warn if we are on a pSeries box  */
 	if (rtas_token("event-scan") == RTAS_UNKNOWN_SERVICE) {
 		if (systemcfg->platform & PLATFORM_PSERIES);
-			printk(KERN_ERR "rtasd: no RTAS on system\n");
+			printk(KERN_ERR "rtasd: no event-scan on system\n");
 		return 1;
 	}
 
