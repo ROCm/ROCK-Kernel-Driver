@@ -460,7 +460,7 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 # 	if .config is newer than include/linux/autoconf.h, someone tinkered
 # 	with it and forgot to run make oldconfig
 
-include/linux/autoconf.h: .config scripts
+include/linux/autoconf.h: .config scripts/fixdep
 	$(Q)$(MAKE) $(build)=scripts/kconfig scripts/kconfig/conf
 	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
@@ -804,7 +804,7 @@ help:
 
 # Documentation targets
 # ---------------------------------------------------------------------------
-sgmldocs psdocs pdfdocs htmldocs: scripts
+sgmldocs psdocs pdfdocs htmldocs: scripts/docproc FORCE
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
