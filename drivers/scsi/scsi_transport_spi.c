@@ -44,8 +44,8 @@ static void transport_class_release(struct class_device *class_dev);
 #define SPI_MAX_ECHO_BUFFER_SIZE	4096
 
 /* Private data accessors (keep these out of the header file) */
-#define spi_dv_pending(x) (((struct spi_transport_attrs *)&(x)->transport_data)->dv_pending)
-#define spi_dv_sem(x) (((struct spi_transport_attrs *)&(x)->transport_data)->dv_sem)
+#define spi_dv_pending(x) (((struct spi_transport_attrs *)&(x)->sdev_data)->dv_pending)
+#define spi_dv_sem(x) (((struct spi_transport_attrs *)&(x)->sdev_data)->dv_sem)
 
 struct spi_internal {
 	struct scsi_transport_template t;
@@ -127,7 +127,7 @@ show_spi_transport_##field(struct class_device *cdev, char *buf)	\
 	struct scsi_device *sdev = transport_class_to_sdev(cdev);	\
 	struct spi_transport_attrs *tp;					\
 	struct spi_internal *i = to_spi_internal(sdev->host->transportt); \
-	tp = (struct spi_transport_attrs *)&sdev->transport_data;	\
+	tp = (struct spi_transport_attrs *)&sdev->sdev_data;		\
 	if (i->f->get_##field)						\
 		i->f->get_##field(sdev);				\
 	return snprintf(buf, 20, format_string, tp->field);		\
@@ -185,7 +185,7 @@ static ssize_t show_spi_transport_period(struct class_device *cdev, char *buf)
 	const char *str;
 	struct spi_internal *i = to_spi_internal(sdev->host->transportt);
 
-	tp = (struct spi_transport_attrs *)&sdev->transport_data;
+	tp = (struct spi_transport_attrs *)&sdev->sdev_data;
 
 	if (i->f->get_period)
 		i->f->get_period(sdev);
@@ -666,10 +666,10 @@ spi_attach_transport(struct spi_function_template *ft)
 	memset(i, 0, sizeof(struct spi_internal));
 
 
-	i->t.attrs = &i->attrs[0];
-	i->t.class = &spi_transport_class;
-	i->t.setup = &spi_setup_transport_attrs;
-	i->t.size = sizeof(struct spi_transport_attrs);
+	i->t.device_attrs = &i->attrs[0];
+	i->t.device_class = &spi_transport_class;
+	i->t.device_setup = &spi_setup_transport_attrs;
+	i->t.device_size = sizeof(struct spi_transport_attrs);
 	i->f = ft;
 
 	SETUP_ATTRIBUTE(period);

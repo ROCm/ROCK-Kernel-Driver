@@ -202,10 +202,11 @@ static void print_inquiry(unsigned char *inq_result)
 static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	       	uint channel, uint id, uint lun, void *hostdata)
 {
-	struct scsi_device *sdev, *device;
+	struct scsi_device *sdev;
 	unsigned long flags;
 
-	sdev = kmalloc(sizeof(*sdev) + shost->transportt->size, GFP_ATOMIC);
+	sdev = kmalloc(sizeof(*sdev) + shost->transportt->device_size,
+		       GFP_ATOMIC);
 	if (!sdev)
 		goto out;
 
@@ -256,45 +257,28 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 			goto out_free_queue;
 	}
 
-	if (shost->transportt->setup) {
-		if (shost->transportt->setup(sdev))
+	if (shost->transportt->device_setup) {
+		if (shost->transportt->device_setup(sdev))
 			goto out_cleanup_slave;
 	}
 
 	if (get_device(&sdev->host->shost_gendev) == NULL ||
 	    scsi_sysfs_device_initialize(sdev) != 0)
-		goto out_cleanup_transport;
+		goto out_cleanup_slave;
 
-	/*
-	 * If there are any same target siblings, add this to the
-	 * sibling list
-	 */
-	spin_lock_irqsave(shost->host_lock, flags);
-	list_for_each_entry(device, &shost->__devices, siblings) {
-		if (device->id == sdev->id &&
-		    device->channel == sdev->channel) {
-			list_add_tail(&sdev->same_target_siblings,
-				      &device->same_target_siblings);
-			sdev->scsi_level = device->scsi_level;
-			break;
-		}
-	}
 
-	/*
-	 * If there wasn't another lun already configured at this
-	 * target, then default this device to SCSI_2 until we
-	 * know better
-	 */
-	if (!sdev->scsi_level)
-		sdev->scsi_level = SCSI_2;
+	/* NOTE: this target initialisation code depends critically on
+	 * lun scanning being sequential. */
+	if (scsi_sysfs_target_initialize(sdev))
+		goto out_remove_siblings;
 
-	list_add_tail(&sdev->siblings, &shost->__devices);
-	spin_unlock_irqrestore(shost->host_lock, flags);
 	return sdev;
 
-out_cleanup_transport:
-	if (shost->transportt->cleanup)
-		shost->transportt->cleanup(sdev);
+out_remove_siblings:
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_del(&sdev->siblings);
+	list_del(&sdev->same_target_siblings);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 out_cleanup_slave:
 	if (shost->hostt->slave_destroy)
 		shost->hostt->slave_destroy(sdev);
@@ -586,11 +570,6 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	if (*bflags & BLIST_NOSTARTONADD)
 		sdev->no_start_on_add = 1;
 
-	/* NOTE: this target initialisation code depends critically on
-	 * lun scanning being sequential. */
-	if(scsi_sysfs_target_initialize(sdev))
-		return SCSI_SCAN_NO_RESPONSE;
-
 	if (*bflags & BLIST_SINGLELUN)
 		sdev->single_lun = 1;
 
@@ -733,8 +712,6 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	} else {
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
-		if (sdev->host->transportt->cleanup)
-			sdev->host->transportt->cleanup(sdev);
 		put_device(&sdev->sdev_gendev);
 	}
  out:
@@ -1293,7 +1270,5 @@ void scsi_free_host_dev(struct scsi_device *sdev)
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
-	if (sdev->host->transportt->cleanup)
-		sdev->host->transportt->cleanup(sdev);
 	put_device(&sdev->sdev_gendev);
 }

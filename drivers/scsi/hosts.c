@@ -82,6 +82,8 @@ void scsi_remove_host(struct Scsi_Host *shost)
 	set_bit(SHOST_DEL, &shost->shost_state);
 
 	class_device_unregister(&shost->shost_classdev);
+	if (shost->transport_classdev.class)
+		class_device_unregister(&shost->transport_classdev);
 	device_del(&shost->shost_gendev);
 }
 
@@ -154,6 +156,7 @@ static void scsi_host_dev_release(struct device *dev)
 
 	scsi_proc_hostdir_rm(shost->hostt);
 	scsi_destroy_command_freelist(shost);
+	kfree(shost->shost_data);
 
 	/*
 	 * Some drivers (eg aha1542) do scsi_register()/scsi_unregister()
@@ -278,15 +281,26 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	snprintf(shost->shost_classdev.class_id, BUS_ID_SIZE, "host%d",
 		  shost->host_no);
 
+	if (shost->transportt->host_size &&
+	    (shost->shost_data = kmalloc(shost->transportt->host_size,
+					 GFP_KERNEL)) == NULL)
+		goto fail_destroy_freelist;
+
+	if (shost->transportt->host_setup)
+		shost->transportt->host_setup(shost);
+
 	shost->eh_notify = &complete;
 	rval = kernel_thread(scsi_error_handler, shost, 0);
 	if (rval < 0)
-		goto fail_destroy_freelist;
+		goto fail_free_shost_data;
 	wait_for_completion(&complete);
 	shost->eh_notify = NULL;
+
 	scsi_proc_hostdir_add(shost->hostt);
 	return shost;
 
+ fail_free_shost_data:
+	kfree(shost->shost_data);
  fail_destroy_freelist:
 	scsi_destroy_command_freelist(shost);
  fail_kfree:

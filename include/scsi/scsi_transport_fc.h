@@ -31,9 +31,9 @@ struct fc_transport_attrs {
 };
 
 /* accessor functions */
-#define fc_port_id(x)	(((struct fc_transport_attrs *)&(x)->transport_data)->port_id)
-#define fc_node_name(x)	(((struct fc_transport_attrs *)&(x)->transport_data)->node_name)
-#define fc_port_name(x)	(((struct fc_transport_attrs *)&(x)->transport_data)->port_name)
+#define fc_port_id(x)	(((struct fc_transport_attrs *)&(x)->sdev_data)->port_id)
+#define fc_node_name(x)	(((struct fc_transport_attrs *)&(x)->sdev_data)->node_name)
+#define fc_port_name(x)	(((struct fc_transport_attrs *)&(x)->sdev_data)->port_name)
 
 /* The functions by which the transport class and the driver communicate */
 struct fc_function_template {

@@ -58,22 +58,6 @@ struct Scsi_Host;
  */
 #define SCAN_WILD_CARD	~0
 
-/*
- * scsi_target: representation of a scsi target, for now, this is only
- * used for single_lun devices. If no one has active IO to the target,
- * starget_sdev_user is NULL, else it points to the active sdev.
- */
-struct scsi_target {
-	struct scsi_device	*starget_sdev_user;
-	struct device		dev;
-};
-
-#define to_scsi_target(d)	container_of(d, struct scsi_target, dev)
-static inline struct scsi_target *scsi_target(struct scsi_device *sdev)
-{
-	return to_scsi_target(sdev->sdev_gendev.parent);
-}
-
 /* hosts.c */
 extern int scsi_init_hosts(void);
 extern void scsi_exit_hosts(void);

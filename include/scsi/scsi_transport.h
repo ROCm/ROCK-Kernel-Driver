@@ -24,18 +24,27 @@ struct scsi_transport_template {
 	/* The NULL terminated list of transport attributes
 	 * that should be exported.
 	 */
-	struct class_device_attribute **attrs;
+	struct class_device_attribute **device_attrs;
+	struct class_device_attribute **target_attrs;
+	struct class_device_attribute **host_attrs;
+
 
 	/* The transport class that the device is in */
-	struct class *class;
+	struct class *device_class;
+	struct class *target_class;
+	struct class *host_class;
 
-	/* Constructor/Destructor functions */
-	int (* setup)(struct scsi_device *);
-	void (* cleanup)(struct scsi_device *);
+	/* Constructor functions */
+	int (*device_setup)(struct scsi_device *);
+	int (*target_setup)(struct scsi_target *);
+	int (*host_setup)(struct Scsi_Host *);
+
 	/* The size of the specific transport attribute structure (a
 	 * space of this size will be left at the end of the
-	 * scsi_device structure */
-	int	size;
+	 * scsi_* structure */
+	int	device_size;
+	int	target_size;
+	int	host_size;
 };
 
 #endif /* SCSI_TRANSPORT_H */

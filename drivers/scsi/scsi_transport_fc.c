@@ -84,7 +84,7 @@ show_fc_transport_##field (struct class_device *cdev, char *buf)	\
 	struct scsi_device *sdev = transport_class_to_sdev(cdev);	\
 	struct fc_transport_attrs *tp;					\
 	struct fc_internal *i = to_fc_internal(sdev->host->transportt);	\
-	tp = (struct fc_transport_attrs *)&sdev->transport_data;	\
+	tp = (struct fc_transport_attrs *)&sdev->sdev_data;		\
 	if (i->f->get_##field)						\
 		i->f->get_##field(sdev);				\
 	return snprintf(buf, 20, format_string, cast tp->field);	\
@@ -156,10 +156,10 @@ fc_attach_transport(struct fc_function_template *ft)
 
 	memset(i, 0, sizeof(struct fc_internal));
 
-	i->t.attrs = &i->attrs[0];
-	i->t.class = &fc_transport_class;
-	i->t.setup = &fc_setup_transport_attrs;
-	i->t.size = sizeof(struct fc_transport_attrs);
+	i->t.device_attrs = &i->attrs[0];
+	i->t.device_class = &fc_transport_class;
+	i->t.device_setup = &fc_setup_transport_attrs;
+	i->t.device_size = sizeof(struct fc_transport_attrs);
 	i->f = ft;
 
 	SETUP_ATTRIBUTE_RD(port_id);

@@ -41,16 +41,16 @@ struct spi_transport_attrs {
 };
 
 /* accessor functions */
-#define spi_period(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->period)
-#define spi_offset(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->offset)
-#define spi_width(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->width)
-#define spi_iu(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->iu)
-#define spi_dt(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->dt)
-#define spi_qas(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->qas)
-#define spi_wr_flow(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->wr_flow)
-#define spi_rd_strm(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->rd_strm)
-#define spi_rti(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->rti)
-#define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->pcomp_en)
+#define spi_period(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->period)
+#define spi_offset(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->offset)
+#define spi_width(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->width)
+#define spi_iu(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->iu)
+#define spi_dt(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->dt)
+#define spi_qas(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->qas)
+#define spi_wr_flow(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->wr_flow)
+#define spi_rd_strm(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->rd_strm)
+#define spi_rti(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->rti)
+#define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->pcomp_en)
 
 /* The functions by which the transport class and the driver communicate */
 struct spi_function_template {
