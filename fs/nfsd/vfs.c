@@ -135,6 +135,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 				dput(dentry);
 				dentry = dget(dparent);
 			} else {
+				exp_put(exp);
 				exp = exp2;
 			}
 			mntput(mnt);
@@ -157,11 +158,14 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 			exp2 = exp_get_by_name(exp->ex_client, mnt, mounts);
 			if (exp2 && EX_CROSSMNT(exp2)) {
 				/* successfully crossed mount point */
+				exp_put(exp);
 				exp = exp2;
 				dput(dentry);
 				dentry = mounts;
-			} else
+			} else {
+				if (exp2) exp_put(exp2);
 				dput(mounts);
+			}
 			mntput(mnt);
 		}
 	}

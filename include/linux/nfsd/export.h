@@ -46,7 +46,7 @@
 #ifdef __KERNEL__
 
 struct svc_export {
-	struct list_head	ex_hash;
+	struct cache_head	h;
 	struct auth_domain *	ex_client;
 	int			ex_flags;
 	struct vfsmount *	ex_mnt;
@@ -61,7 +61,7 @@ struct svc_export {
  * for type 0 (dev/ino), one for type 1 (fsid)
  */
 struct svc_expkey {
-	struct list_head	ek_hash;
+	struct cache_head	h;
 
 	struct auth_domain *	ek_client;
 	int			ek_fsidtype;
@@ -98,14 +98,30 @@ int			exp_rootfh(struct auth_domain *,
 int			exp_pseudoroot(struct auth_domain *, struct svc_fh *fhp);
 int			nfserrno(int errno);
 
+extern void expkey_put(struct cache_head *item, struct cache_detail *cd);
+extern void svc_export_put(struct cache_head *item, struct cache_detail *cd);
+extern struct cache_detail svc_export_cache, svc_expkey_cache;
+
+static inline void exp_put(struct svc_export *exp)
+{
+	svc_export_put(&exp->h, &svc_export_cache);
+}
+
 static inline struct svc_export *
 exp_find(struct auth_domain *clp, int fsid_type, u32 *fsidv)
 {
 	struct svc_expkey *ek = exp_find_key(clp, fsid_type, fsidv);
-	if (ek)
-		return ek->ek_export;
-	else
-		return NULL;
+	if (ek && !IS_ERR(ek)) {
+		struct svc_export *exp = ek->ek_export;
+		int err;
+		cache_get(&exp->h);
+		expkey_put(&ek->h, &svc_expkey_cache);
+		if (exp &&
+		    (err = cache_check(&svc_export_cache, &exp->h))) 
+			exp = ERR_PTR(err);
+		return exp;
+	} else
+		return ERR_PTR(PTR_ERR(ek));
 }
 
 #endif /* __KERNEL__ */

@@ -86,7 +86,7 @@ u32
 fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 {
 	struct knfsd_fh	*fh = &fhp->fh_handle;
-	struct svc_export *exp;
+	struct svc_export *exp = NULL;
 	struct dentry	*dentry;
 	struct inode	*inode;
 	u32		error = 0;
@@ -144,13 +144,12 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			exp = exp_find(rqstp->rq_client, 0, tfh);
 		}
 
-		/*
-		 * Look up the export entry.
-		 */
-		error = nfserr_stale; 
+		error = nfserr_dropit;
+		if (IS_ERR(exp))
+			goto out;
 
+		error = nfserr_stale; 
 		if (!exp)
-			/* export entry revoked */
 			goto out;
 
 		/* Check if the request originated from a secure port. */
@@ -221,6 +220,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		dentry = fhp->fh_dentry;
 		exp = fhp->fh_export;
 	}
+	cache_get(&exp->h);
 
 	inode = dentry->d_inode;
 
@@ -263,6 +263,8 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	}
 #endif
 out:
+	if (exp && !IS_ERR(exp))
+		exp_put(exp);
 	if (error == nfserr_stale)
 		nfsdstats.fh_stale++;
 	return error;
@@ -344,6 +346,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 
 	fhp->fh_dentry = dentry; /* our internal copy */
 	fhp->fh_export = exp;
+	cache_get(&exp->h);
 
 	if (ref_fh_version == 0xca) {
 		/* old style filehandle please */
@@ -442,6 +445,7 @@ void
 fh_put(struct svc_fh *fhp)
 {
 	struct dentry * dentry = fhp->fh_dentry;
+	struct svc_export * exp = fhp->fh_export;
 	if (dentry) {
 		fh_unlock(fhp);
 		fhp->fh_dentry = NULL;
@@ -451,6 +455,10 @@ fh_put(struct svc_fh *fhp)
 		fhp->fh_post_saved = 0;
 #endif
 		nfsd_nr_put++;
+	}
+	if (exp) {
+		svc_export_put(&exp->h, &svc_export_cache);
+		fhp->fh_export = NULL;
 	}
 	return;
 }
