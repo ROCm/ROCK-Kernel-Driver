@@ -89,10 +89,6 @@ extern void driver_init(void);
 extern void tc_init(void);
 #endif
 
-#if defined(CONFIG_SYSVIPC)
-extern void ipc_init(void);
-#endif
-
 /*
  * Are we up and running (ie do we have all the infrastructure
  * set up)
@@ -448,9 +444,6 @@ asmlinkage void __init start_kernel(void)
 	populate_rootfs();
 #ifdef CONFIG_PROC_FS
 	proc_root_init();
-#endif
-#if defined(CONFIG_SYSVIPC)
-	ipc_init();
 #endif
 	check_bugs();
 	printk("POSIX conformance testing by UNIFIX\n");
