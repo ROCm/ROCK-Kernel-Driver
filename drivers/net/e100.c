@@ -158,7 +158,7 @@
 
 
 #define DRV_NAME		"e100"
-#define DRV_VERSION		"3.0.17"
+#define DRV_VERSION		"3.0.18"
 #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
 #define DRV_COPYRIGHT		"Copyright(c) 1999-2004 Intel Corporation"
 #define PFX			DRV_NAME ": "
@@ -641,7 +641,8 @@ static void e100_eeprom_write(struct nic *nic, u16 addr_len, u16 addr, u16 data)
 
 	/* Three cmds: write/erase enable, write data, write/erase disable */
 	cmd_addr_data[0] = op_ewen << (addr_len - 2);
-	cmd_addr_data[1] = (((op_write << addr_len) | addr) << 16) | data;
+	cmd_addr_data[1] = (((op_write << addr_len) | addr) << 16) |
+		cpu_to_le16(data);
 	cmd_addr_data[2] = op_ewds << (addr_len - 2);
 
 	/* Bit-bang cmds to write word to eeprom */
@@ -668,7 +669,6 @@ static void e100_eeprom_write(struct nic *nic, u16 addr_len, u16 addr, u16 data)
 		writeb(0, &nic->csr->eeprom_ctrl_lo);
 		e100_write_flush(nic); udelay(4);
 	}
-
 };
 
 /* General technique stolen from the eepro100 driver - very clever */
@@ -709,7 +709,7 @@ static u16 e100_eeprom_read(struct nic *nic, u16 *addr_len, u16 addr)
 	writeb(0, &nic->csr->eeprom_ctrl_lo);
 	e100_write_flush(nic); udelay(4);
 
-	return data;
+	return le16_to_cpu(data);
 };
 
 /* Load entire EEPROM image into driver cache and validate checksum */
@@ -724,12 +724,12 @@ static int e100_eeprom_load(struct nic *nic)
 	for(addr = 0; addr < nic->eeprom_wc; addr++) {
 		nic->eeprom[addr] = e100_eeprom_read(nic, &addr_len, addr);
 		if(addr < nic->eeprom_wc - 1)
-			checksum += nic->eeprom[addr];
+			checksum += cpu_to_le16(nic->eeprom[addr]);
 	}
 
 	/* The checksum, stored in the last word, is calculated such that
 	 * the sum of words should be 0xBABA */
-	checksum = 0xBABA - checksum;
+	checksum = le16_to_cpu(0xBABA - checksum);
 	if(checksum != nic->eeprom[nic->eeprom_wc - 1]) {
 		DPRINTK(PROBE, ERR, "EEPROM corrupted\n");
 		return -EAGAIN;
@@ -756,9 +756,10 @@ static int e100_eeprom_save(struct nic *nic, u16 start, u16 count)
 	/* The checksum, stored in the last word, is calculated such that
 	 * the sum of words should be 0xBABA */
 	for(addr = 0; addr < nic->eeprom_wc - 1; addr++)
-		checksum += nic->eeprom[addr];
-	nic->eeprom[nic->eeprom_wc - 1] = 0xBABA - checksum;
-	e100_eeprom_write(nic, addr_len, nic->eeprom_wc - 1, 0xBABA - checksum);
+		checksum += cpu_to_le16(nic->eeprom[addr]);
+	nic->eeprom[nic->eeprom_wc - 1] = le16_to_cpu(0xBABA - checksum);
+	e100_eeprom_write(nic, addr_len, nic->eeprom_wc - 1,
+		nic->eeprom[nic->eeprom_wc - 1]);
 
 	return 0;
 }
@@ -867,12 +868,12 @@ static u16 mdio_ctrl(struct nic *nic, u32 addr, u32 dir, u32 reg, u16 data)
 
 static int mdio_read(struct net_device *netdev, int addr, int reg)
 {
-	return mdio_ctrl(netdev->priv, addr, mdi_read, reg, 0);
+	return mdio_ctrl(netdev_priv(netdev), addr, mdi_read, reg, 0);
 }
 
 static void mdio_write(struct net_device *netdev, int addr, int reg, int data)
 {
-	mdio_ctrl(netdev->priv, addr, mdi_write, reg, data);
+	mdio_ctrl(netdev_priv(netdev), addr, mdi_write, reg, data);
 }
 
 static void e100_get_defaults(struct nic *nic)
@@ -1098,7 +1099,7 @@ static void e100_multi(struct nic *nic, struct cb *cb, struct sk_buff *skb)
 
 static void e100_set_multicast_list(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	DPRINTK(HW, DEBUG, "mc_count=%d, flags=0x%04X\n",
 		netdev->mc_count, netdev->flags);
@@ -1251,7 +1252,7 @@ static inline void e100_xmit_prepare(struct nic *nic, struct cb *cb,
 
 static int e100_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	int err;
 
 	if(nic->flags & ich_10h_workaround) {
@@ -1392,12 +1393,12 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 	if(!(rx->skb = dev_alloc_skb(RFD_BUF_LEN + rx_offset)))
 		return -ENOMEM;
 
-	/* Align, init, and map the RFA. */
+	/* Align, init, and map the RFD. */
 	rx->skb->dev = nic->netdev;
 	skb_reserve(rx->skb, rx_offset);
 	memcpy(rx->skb->data, &nic->blank_rfd, sizeof(struct rfd));
 	rx->dma_addr = pci_map_single(nic->pdev, rx->skb->data,
-		RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
+		RFD_BUF_LEN, PCI_DMA_BIDIRECTIONAL);
 
 	/* Link the RFD to end of RFA by linking previous RFD to
 	 * this one, and clearing EL bit of previous.  */
@@ -1408,7 +1409,7 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 		wmb();
 		prev_rfd->command &= ~cpu_to_le16(cb_el);
 		pci_dma_sync_single_for_device(nic->pdev, rx->prev->dma_addr,
-					       sizeof(struct rfd), PCI_DMA_TODEVICE);
+			sizeof(struct rfd), PCI_DMA_TODEVICE);
 	}
 
 	return 0;
@@ -1426,7 +1427,7 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 
 	/* Need to sync before taking a peek at cb_complete bit */
 	pci_dma_sync_single_for_cpu(nic->pdev, rx->dma_addr,
-				    sizeof(struct rfd), PCI_DMA_FROMDEVICE);
+		sizeof(struct rfd), PCI_DMA_FROMDEVICE);
 	rfd_status = le16_to_cpu(rfd->status);
 
 	DPRINTK(RX_STATUS, DEBUG, "status=0x%04X\n", rfd_status);
@@ -1442,7 +1443,7 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 
 	/* Get data */
 	pci_unmap_single(nic->pdev, rx->dma_addr,
-			 RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
+		RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
 
 	/* Pull off the RFD and put the actual data (minus eth hdr) */
 	skb_reserve(skb, sizeof(struct rfd));
@@ -1545,7 +1546,7 @@ static int e100_rx_alloc_list(struct nic *nic)
 static irqreturn_t e100_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *netdev = dev_id;
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	u8 stat_ack = readb(&nic->csr->scb.stat_ack);
 
 	DPRINTK(INTR, DEBUG, "stat_ack = 0x%02X\n", stat_ack);
@@ -1577,7 +1578,7 @@ static irqreturn_t e100_intr(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef CONFIG_E100_NAPI
 static int e100_poll(struct net_device *netdev, int *budget)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	unsigned int work_to_do = min(netdev->quota, *budget);
 	unsigned int work_done = 0;
 	int tx_cleaned;
@@ -1602,7 +1603,7 @@ static int e100_poll(struct net_device *netdev, int *budget)
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void e100_netpoll(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	e100_disable_irq(nic);
 	e100_intr(nic->pdev->irq, netdev, NULL);
 	e100_enable_irq(nic);
@@ -1611,13 +1612,13 @@ static void e100_netpoll(struct net_device *netdev)
 
 static struct net_device_stats *e100_get_stats(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	return &nic->net_stats;
 }
 
 static int e100_set_mac_address(struct net_device *netdev, void *p)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	struct sockaddr *addr = p;
 
 	if (!is_valid_ether_addr(addr->sa_data))
@@ -1689,12 +1690,12 @@ static void e100_down(struct nic *nic)
 
 static void e100_tx_timeout(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	DPRINTK(TX_ERR, DEBUG, "scb.status=0x%02X\n",
 		readb(&nic->csr->scb.status));
-	e100_down(netdev->priv);
-	e100_up(netdev->priv);
+	e100_down(netdev_priv(netdev));
+	e100_up(netdev_priv(netdev));
 }
 
 static int e100_loopback_test(struct nic *nic, enum loopback loopback_mode)
@@ -1770,13 +1771,13 @@ static void e100_blink_led(unsigned long data)
 
 static int e100_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	return mii_ethtool_gset(&nic->mii, cmd);
 }
 
 static int e100_set_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	int err;
 
 	mdio_write(netdev, nic->mii.phy_id, MII_BMCR, BMCR_RESET);
@@ -1789,7 +1790,7 @@ static int e100_set_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 static void e100_get_drvinfo(struct net_device *netdev,
 	struct ethtool_drvinfo *info)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	strcpy(info->driver, DRV_NAME);
 	strcpy(info->version, DRV_VERSION);
 	strcpy(info->fw_version, "N/A");
@@ -1798,7 +1799,7 @@ static void e100_get_drvinfo(struct net_device *netdev,
 
 static int e100_get_regs_len(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 #define E100_PHY_REGS		0x1C
 #define E100_REGS_LEN		1 + E100_PHY_REGS + \
 	sizeof(nic->mem->dump_buf) / sizeof(u32)
@@ -1808,7 +1809,7 @@ static int e100_get_regs_len(struct net_device *netdev)
 static void e100_get_regs(struct net_device *netdev,
 	struct ethtool_regs *regs, void *p)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	u32 *buff = p;
 	int i;
 
@@ -1829,14 +1830,14 @@ static void e100_get_regs(struct net_device *netdev,
 
 static void e100_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	wol->supported = (nic->mac >= mac_82558_D101_A4) ?  WAKE_MAGIC : 0;
 	wol->wolopts = (nic->flags & wol_magic) ? WAKE_MAGIC : 0;
 }
 
 static int e100_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	if(wol->wolopts != WAKE_MAGIC && wol->wolopts != 0)
 		return -EOPNOTSUPP;
@@ -1854,31 +1855,31 @@ static int e100_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 
 static u32 e100_get_msglevel(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	return nic->msg_enable;
 }
 
 static void e100_set_msglevel(struct net_device *netdev, u32 value)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	nic->msg_enable = value;
 }
 
 static int e100_nway_reset(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	return mii_nway_restart(&nic->mii);
 }
 
 static u32 e100_get_link(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	return mii_link_ok(&nic->mii);
 }
 
 static int e100_get_eeprom_len(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	return nic->eeprom_wc << 1;
 }
 
@@ -1886,7 +1887,7 @@ static int e100_get_eeprom_len(struct net_device *netdev)
 static int e100_get_eeprom(struct net_device *netdev,
 	struct ethtool_eeprom *eeprom, u8 *bytes)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	eeprom->magic = E100_EEPROM_MAGIC;
 	memcpy(bytes, &((u8 *)nic->eeprom)[eeprom->offset], eeprom->len);
@@ -1897,10 +1898,11 @@ static int e100_get_eeprom(struct net_device *netdev,
 static int e100_set_eeprom(struct net_device *netdev,
 	struct ethtool_eeprom *eeprom, u8 *bytes)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	if(eeprom->magic != E100_EEPROM_MAGIC)
 		return -EINVAL;
+
 	memcpy(&((u8 *)nic->eeprom)[eeprom->offset], bytes, eeprom->len);
 
 	return e100_eeprom_save(nic, eeprom->offset >> 1,
@@ -1910,7 +1912,7 @@ static int e100_set_eeprom(struct net_device *netdev,
 static void e100_get_ringparam(struct net_device *netdev,
 	struct ethtool_ringparam *ring)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	struct param_range *rfds = &nic->params.rfds;
 	struct param_range *cbs = &nic->params.cbs;
 
@@ -1927,7 +1929,7 @@ static void e100_get_ringparam(struct net_device *netdev,
 static int e100_set_ringparam(struct net_device *netdev,
 	struct ethtool_ringparam *ring)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	struct param_range *rfds = &nic->params.rfds;
 	struct param_range *cbs = &nic->params.cbs;
 
@@ -1960,7 +1962,7 @@ static int e100_diag_test_count(struct net_device *netdev)
 static void e100_diag_test(struct net_device *netdev,
 	struct ethtool_test *test, u64 *data)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	int i;
 
 	memset(data, 0, E100_TEST_LEN * sizeof(u64));
@@ -1981,7 +1983,7 @@ static void e100_diag_test(struct net_device *netdev,
 
 static int e100_phys_id(struct net_device *netdev, u32 data)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	if(!data || data > (u32)(MAX_SCHEDULE_TIMEOUT / HZ))
 		data = (u32)(MAX_SCHEDULE_TIMEOUT / HZ);
@@ -2017,7 +2019,7 @@ static int e100_get_stats_count(struct net_device *netdev)
 static void e100_get_ethtool_stats(struct net_device *netdev,
 	struct ethtool_stats *stats, u64 *data)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	int i;
 
 	for(i = 0; i < E100_NET_STATS_LEN; i++)
@@ -2072,7 +2074,7 @@ static struct ethtool_ops e100_ethtool_ops = {
 
 static int e100_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	struct mii_ioctl_data *mii = (struct mii_ioctl_data *)&ifr->ifr_data;
 
 	return generic_mii_ioctl(&nic->mii, mii, cmd, NULL);
@@ -2096,7 +2098,7 @@ static void e100_free(struct nic *nic)
 
 static int e100_open(struct net_device *netdev)
 {
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 	int err = 0;
 
 	netif_carrier_off(netdev);
@@ -2107,7 +2109,7 @@ static int e100_open(struct net_device *netdev)
 
 static int e100_close(struct net_device *netdev)
 {
-	e100_down(netdev->priv);
+	e100_down(netdev_priv(netdev));
 	return 0;
 }
 
@@ -2143,7 +2145,7 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 	netdev->poll_controller = e100_netpoll;
 #endif
 
-	nic = netdev->priv;
+	nic = netdev_priv(netdev);
 	nic->netdev = netdev;
 	nic->pdev = pdev;
 	nic->msg_enable = (1 << debug) - 1;
@@ -2209,9 +2211,8 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 
 	if((err = e100_eeprom_load(nic)))
 		goto err_out_free;
-	((u16 *)netdev->dev_addr)[0] = le16_to_cpu(nic->eeprom[0]);
-	((u16 *)netdev->dev_addr)[1] = le16_to_cpu(nic->eeprom[1]);
-	((u16 *)netdev->dev_addr)[2] = le16_to_cpu(nic->eeprom[2]);
+
+	memcpy(netdev->dev_addr, nic->eeprom, ETH_ALEN);
 	if(!is_valid_ether_addr(netdev->dev_addr)) {
 		DPRINTK(PROBE, ERR, "Invalid MAC address from "
 			"EEPROM, aborting.\n");
@@ -2258,7 +2259,7 @@ static void __devexit e100_remove(struct pci_dev *pdev)
 	struct net_device *netdev = pci_get_drvdata(pdev);
 
 	if(netdev) {
-		struct nic *nic = netdev->priv;
+		struct nic *nic = netdev_priv(netdev);
 		unregister_netdev(netdev);
 		e100_free(nic);
 		iounmap(nic->csr);
@@ -2273,7 +2274,7 @@ static void __devexit e100_remove(struct pci_dev *pdev)
 static int e100_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	if(netif_running(netdev))
 		e100_down(nic);
@@ -2291,7 +2292,7 @@ static int e100_suspend(struct pci_dev *pdev, u32 state)
 static int e100_resume(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
-	struct nic *nic = netdev->priv;
+	struct nic *nic = netdev_priv(netdev);
 
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, nic->pm_state);
