@@ -136,6 +136,7 @@ struct jfs_sb_info {
 	u32		logdev;		/* 2: external log device	*/
 	uint		aggregate;	/* volume identifier in log record */
 	pxd_t		logpxd;		/* 8: pxd describing log	*/
+	pxd_t		fsckpxd;	/* 8: pxd describing fsck wkspc */
 	pxd_t		ait2;		/* 8: pxd describing AIT copy	*/
 	char		uuid[16];	/* 16: 128-bit uuid for volume	*/
 	char		loguuid[16];	/* 16: 128-bit uuid for log	*/

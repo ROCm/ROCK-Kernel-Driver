@@ -2373,7 +2373,6 @@ printf("xtUpdate.updateLeft.split p:0x%p\n", p);
 }
 
 
-#ifdef _STILL_TO_PORT
 /*
  *      xtAppend()
  *
@@ -2392,7 +2391,7 @@ printf("xtUpdate.updateLeft.split p:0x%p\n", p);
  * return:
  */
 int xtAppend(tid_t tid,		/* transaction id */
-	     struct inode *ip, int xflag, s64 xoff, s32 maxblocks,	/* @GD1 */
+	     struct inode *ip, int xflag, s64 xoff, s32 maxblocks,	
 	     s32 * xlenp,	/* (in/out) */
 	     s64 * xaddrp,	/* (in/out) */
 	     int flag)
@@ -2460,7 +2459,7 @@ int xtAppend(tid_t tid,		/* transaction id */
 	pxdlist.maxnpxd = pxdlist.npxd = 0;
 	pxd = &pxdlist.pxd[0];
 	nblocks = JFS_SBI(ip->i_sb)->nbperpage;
-	for (; nsplit > 0; nsplit--, pxd++, xaddr += nblocks, maxblocks -= nblocks) {	/* @GD1 */
+	for (; nsplit > 0; nsplit--, pxd++, xaddr += nblocks, maxblocks -= nblocks) {	
 		if ((rc = dbAllocBottomUp(ip, xaddr, (s64) nblocks)) == 0) {
 			PXDaddress(pxd, xaddr);
 			PXDlength(pxd, nblocks);
@@ -2475,7 +2474,7 @@ int xtAppend(tid_t tid,		/* transaction id */
 		goto out;
 	}
 
-	xlen = min(xlen, maxblocks);	/* @GD1 */
+	xlen = min(xlen, maxblocks);	
 
 	/*
 	 * allocate data extent requested
@@ -2528,7 +2527,7 @@ int xtAppend(tid_t tid,		/* transaction id */
 	    cpu_to_le16(le16_to_cpu(p->header.nextindex) + 1);
 
 	xtlck->lwm.offset =
-	    (xtlck->lwm.offset) ? min(index, xtlck->lwm.offset) : index;
+	    (xtlck->lwm.offset) ? min(index,(int) xtlck->lwm.offset) : index;
 	xtlck->lwm.length = le16_to_cpu(p->header.nextindex) -
 	    xtlck->lwm.offset;
 
@@ -2541,7 +2540,7 @@ int xtAppend(tid_t tid,		/* transaction id */
 
 	return rc;
 }
-
+#ifdef _STILL_TO_PORT
 
 /* - TBD for defragmentaion/reorganization -
  *

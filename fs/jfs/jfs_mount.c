@@ -95,7 +95,7 @@ int jfs_mount(struct super_block *sb)
 		goto errout20;
 	}
 
-	ipaimap = diReadSpecial(sb, AGGREGATE_I);
+	ipaimap = diReadSpecial(sb, AGGREGATE_I, 0);
 	if (ipaimap == NULL) {
 		jERROR(1, ("jfs_mount: Faild to read AGGREGATE_I\n"));
 		rc = EIO;
@@ -118,7 +118,7 @@ int jfs_mount(struct super_block *sb)
 	/*
 	 * open aggregate block allocation map
 	 */
-	ipbmap = diReadSpecial(sb, BMAP_I);
+	ipbmap = diReadSpecial(sb, BMAP_I, 0);
 	if (ipbmap == NULL) {
 		rc = EIO;
 		goto errout22;
@@ -148,7 +148,7 @@ int jfs_mount(struct super_block *sb)
 	 * table.
 	 */
 	if ((sbi->mntflag & JFS_BAD_SAIT) == 0) {
-		ipaimap2 = diReadSpecial(sb, AGGREGATE_I + INOSPEREXT);
+		ipaimap2 = diReadSpecial(sb, AGGREGATE_I, 1);
 		if (ipaimap2 == 0) {
 			jERROR(1,
 			       ("jfs_mount: Faild to read AGGREGATE_I\n"));
@@ -178,7 +178,7 @@ int jfs_mount(struct super_block *sb)
 	/*
 	 * open fileset inode allocation map (aka fileset inode)
 	 */
-	ipimap = diReadSpecial(sb, FILESYSTEM_I);
+	ipimap = diReadSpecial(sb, FILESYSTEM_I, 0);
 	if (ipimap == NULL) {
 		jERROR(1, ("jfs_mount: Failed to read FILESYSTEM_I\n"));
 		/* open fileset secondary inode allocation map */
@@ -410,6 +410,7 @@ static int chkSuper(struct super_block *sb)
 		memcpy(sbi->uuid, j_sb->s_uuid, sizeof(sbi->uuid));
 		memcpy(sbi->loguuid, j_sb->s_loguuid, sizeof(sbi->uuid));
 	}
+	sbi->fsckpxd = j_sb->s_fsckpxd;
 	sbi->ait2 = j_sb->s_ait2;
 
       out:

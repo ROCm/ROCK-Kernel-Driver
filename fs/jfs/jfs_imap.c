@@ -285,7 +285,7 @@ int diSync(struct inode *ipimap)
 	filemap_fdatawrite(ipimap->i_mapping);
 	filemap_fdatawait(ipimap->i_mapping);
 
-	diWriteSpecial(ipimap);
+	diWriteSpecial(ipimap, 0);
 
 	return (0);
 }
@@ -450,12 +450,13 @@ int diRead(struct inode *ip)
  * PARAMETERS:
  *      sb - filesystem superblock
  *	inum - aggregate inode number
+ *	secondary - 1 if secondary aggregate inode table
  *
  * RETURN VALUES:
  *      new inode	- success
  *      NULL		- i/o error.
  */
-struct inode *diReadSpecial(struct super_block *sb, ino_t inum)
+struct inode *diReadSpecial(struct super_block *sb, ino_t inum, int secondary)
 {
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 	uint address;
@@ -470,21 +471,16 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum)
 		return ip;
 	}
 
-	/*
-	 * If ip->i_number >= 32 (INOSPEREXT), then read from secondary
-	 * aggregate inode table.
-	 */
-
-	if (inum >= INOSPEREXT) {
-		address =
-		    addressPXD(&sbi->ait2) >> sbi->l2nbperpage;
-		inum -= INOSPEREXT;
-		ASSERT(inum < INOSPEREXT);
+	if (secondary) {
+		address = addressPXD(&sbi->ait2) >> sbi->l2nbperpage;
 		JFS_IP(ip)->ipimap = sbi->ipaimap2;
 	} else {
 		address = AITBL_OFF >> L2PSIZE;
 		JFS_IP(ip)->ipimap = sbi->ipaimap;
 	}
+
+	ASSERT(inum < INOSPEREXT);
+
 	ip->i_ino = inum;
 
 	address += inum >> 3;	/* 8 inodes per 4K page */
@@ -538,11 +534,12 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum)
  *
  * PARAMETERS:
  *      ip - special inode
+ *	secondary - 1 if secondary aggregate inode table
  *
  * RETURN VALUES: none
  */
 
-void diWriteSpecial(struct inode *ip)
+void diWriteSpecial(struct inode *ip, int secondary)
 {
 	struct jfs_sb_info *sbi = JFS_SBI(ip->i_sb);
 	uint address;
@@ -550,24 +547,14 @@ void diWriteSpecial(struct inode *ip)
 	ino_t inum = ip->i_ino;
 	metapage_t *mp;
 
-	/*
-	 * If ip->i_number >= 32 (INOSPEREXT), then write to secondary
-	 * aggregate inode table.
-	 */
-
-	if (!(ip->i_state & I_DIRTY))
-		return;
-
 	ip->i_state &= ~I_DIRTY;
 
-	if (inum >= INOSPEREXT) {
-		address =
-		    addressPXD(&sbi->ait2) >> sbi->l2nbperpage;
-		inum -= INOSPEREXT;
-		ASSERT(inum < INOSPEREXT);
-	} else {
+	if (secondary)
+		address = addressPXD(&sbi->ait2) >> sbi->l2nbperpage;
+	else
 		address = AITBL_OFF >> L2PSIZE;
-	}
+
+	ASSERT(inum < INOSPEREXT);
 
 	address += inum >> 3;	/* 8 inodes per 4K page */
 
@@ -2996,7 +2983,7 @@ duplicateIXtree(struct super_block *sb, s64 blkno, int xlen, s64 * xaddr)
 	/* if AIT2 ipmap2 is bad, do not try to update it */
 	if (JFS_SBI(sb)->mntflag & JFS_BAD_SAIT)	/* s_flag */
 		return;
-	ip = diReadSpecial(sb, FILESYSTEM_I + INOSPEREXT);
+	ip = diReadSpecial(sb, FILESYSTEM_I, 1);
 	if (ip == 0) {
 		JFS_SBI(sb)->mntflag |= JFS_BAD_SAIT;
 		if ((rc = readSuper(sb, &mpsuper)))
