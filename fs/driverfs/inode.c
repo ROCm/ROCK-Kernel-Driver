@@ -767,19 +767,19 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 	down(&dentry->d_parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
-	node = dir->files.next;
-	while (node != &dir->files) {
-		struct driver_file_entry * entry;
-		entry = list_entry(node,struct driver_file_entry,node);
+	node = dentry->d_subdirs.next;
+	while (node != &dentry->d_subdirs) {
+		struct dentry * d = list_entry(node,struct dentry,d_child);
+		struct driver_file_entry * entry = d->d_fsdata;
 
-		list_del_init(node);
-		driverfs_unlink(dentry->d_inode,entry->dentry);
-		dput(entry->dentry);
+		node = node->next;
+
+		list_del_init(&entry->node);
+		driverfs_unlink(dentry->d_inode,d);
+		dput(dentry);
 		put_mount();
-		node = dir->files.next;
 	}
 	up(&dentry->d_inode->i_sem);
-
 	driverfs_rmdir(dentry->d_parent->d_inode,dentry);
 	up(&dentry->d_parent->d_inode->i_sem);
 	dput(dentry);
