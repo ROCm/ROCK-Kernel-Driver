@@ -85,8 +85,7 @@ static struct dst_entry	*ip6_dst_check(struct dst_entry *dst, u32 cookie);
 static struct dst_entry *ip6_negative_advice(struct dst_entry *);
 static int		 ip6_dst_gc(void);
 
-static int		ip6_pkt_indiscard(struct sk_buff *skb);
-static int		ip6_pkt_outdiscard(struct sk_buff *skb);
+static int		ip6_pkt_discard(struct sk_buff *skb);
 static void		ip6_link_failure(struct sk_buff *skb);
 static void		ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
 
@@ -111,8 +110,8 @@ struct rt6_info ip6_null_entry = {
 			.obsolete	= -1,
 			.error		= -ENETUNREACH,
 			.metrics	= { [RTAX_HOPLIMIT - 1] = 255, },
-			.input		= ip6_pkt_indiscard,
-			.output		= ip6_pkt_outdiscard,
+			.input		= ip6_pkt_discard,
+			.output		= ip6_pkt_discard,
 			.ops		= &ip6_dst_ops,
 			.path		= (struct dst_entry*)&ip6_null_entry,
 		}
@@ -770,8 +769,8 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 			dev_put(dev);
 		dev = &loopback_dev;
 		dev_hold(dev);
-		rt->u.dst.output = ip6_pkt_outdiscard;
-		rt->u.dst.input = ip6_pkt_indiscard;
+		rt->u.dst.output = ip6_pkt_discard;
+		rt->u.dst.input = ip6_pkt_discard;
 		rt->u.dst.error = -ENETUNREACH;
 		rt->rt6i_flags = RTF_REJECT|RTF_NONEXTHOP;
 		goto install_route;
@@ -1258,30 +1257,9 @@ int ipv6_route_ioctl(unsigned int cmd, void *arg)
  *	Drop the packet on the floor
  */
 
-static int ip6_pkt_indiscard(struct sk_buff *skb)
+int ip6_pkt_discard(struct sk_buff *skb)
 {
-	struct inet6_dev *idev = NULL;
-
-	if (skb->dev)
-		idev = __in6_dev_get(skb->dev);
-	
-	IP6_INC_STATS(Ip6InNoRoutes);
-	IPV6_INC_STATS(idev, ipStatsInNoRoutes);
-	icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_NOROUTE, 0, skb->dev);
-	kfree_skb(skb);
-	return 0;
-}
-
-
-static int ip6_pkt_outdiscard(struct sk_buff *skb)
-{
-	struct inet6_dev *idev = NULL;
-	
-	if (skb->dev)
-		idev = __in6_dev_get(skb->dev);
-	
 	IP6_INC_STATS(Ip6OutNoRoutes);
-	IPV6_INC_STATS(idev, ipStatsOutNoRoutes);
 	icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_NOROUTE, 0, skb->dev);
 	kfree_skb(skb);
 	return 0;

@@ -2963,101 +2963,6 @@ static void inet6_prefix_notify(int event, struct inet6_dev *idev,
 	netlink_broadcast(rtnl, skb, 0, RTMGRP_IPV6_PREFIX, GFP_ATOMIC);
 }
 
-static unsigned long
-fold_field(void *mib[], int offt)
-{
-        unsigned long res = 0;
-        int i;
- 
-        for (i = 0; i < NR_CPUS; i++) {
-                if (!cpu_possible(i))
-                        continue;
-                res +=
-                    *((unsigned long *) (((void *)per_cpu_ptr(mib[0], i)) +
-                                         offt));
-                res +=
-                    *((unsigned long *) (((void *)per_cpu_ptr(mib[1], i)) +
-                                         offt));
-        }
-        return res;
-}
-
-static int inet6_fill_ipstats(struct sk_buff *skb, struct inet6_dev *idev,
-			       u32 pid, u32 seq, int event)
-{
-	struct ipstatsmsg	*r;
-	struct nlmsghdr 	*nlh;
-	unsigned char		*b = skb->tail;
-	struct ip_stats		ipstats;
-	unsigned long		*array;
-	int 			i, num;
-
-	nlh = NLMSG_PUT(skb, pid, seq, event, sizeof(*r));
-	if (pid) 
-		nlh->nlmsg_flags |= NLM_F_MULTI;
-	r = NLMSG_DATA(nlh);
-	r->ipstats_family = AF_INET6;
-	r->ipstats_ifindex = 0;
-	num = offsetof(struct ip_stats, __pad) / sizeof(unsigned long);
-	memset(&ipstats , 0, sizeof(struct ip_stats));
-	array = (unsigned long *)&ipstats;
-	if (idev == NULL) {
-		/* fill IP mibs system statistics */
-		RTA_PUT(skb, IPSTATS_IFNAME, 3, "all");
-		for (i = 0; i < num; i++, array++) {
-			*array = fold_field((void **)ipv6_stats, 
-					    i * (sizeof(unsigned long)));
-		}
-	} else {
-		/* fill IP mibs interface statistics */
-		r->ipstats_ifindex = idev->dev->ifindex;
-		RTA_PUT(skb, IPSTATS_IFNAME, strlen(idev->dev->name)+1,
-			idev->dev->name);
-		for (i = 0; i < num; i++, array++) {
-			*array = fold_field((void **)idev->stats.ipv6, 
-					    i * (sizeof(unsigned long)));
-		}
-	}
-	RTA_PUT(skb, IPSTATS_COUNTERS, sizeof(struct ip_stats), &ipstats);
-	nlh->nlmsg_len = skb->tail - b;
-	return skb->len;
-
-nlmsg_failure:
-rtattr_failure:
-	skb_trim(skb, b - skb->data);
-	return -1;
-}
-
-static int inet6_dump_ipstats(struct sk_buff *skb, struct netlink_callback *cb)
-{
-	int err, idx = 0;
-	int s_idx = cb->args[0];
-	struct net_device *dev;
-	struct inet6_dev *idev;
-
-	/* fill IP mibs system statistics */
-	inet6_fill_ipstats(skb, NULL, NETLINK_CB(cb->skb).pid,
-			    cb->nlh->nlmsg_seq, RTM_NEWIPSTATS);
-	idx += 1;
-	/* fill IP mibs interface statistics */
-	read_lock(&dev_base_lock);
-	for (dev=dev_base; dev; dev = dev->next, idx++) {
-		if (idx < s_idx)
-			continue;
-		if ((idev = in6_dev_get(dev)) == NULL)
-			continue;
-		err = inet6_fill_ipstats(skb, idev, NETLINK_CB(cb->skb).pid, 
-				cb->nlh->nlmsg_seq, RTM_NEWIPSTATS);
-		in6_dev_put(idev);
-		if (err <= 0)
-			break;
-	}
-	read_unlock(&dev_base_lock);
-	cb->args[0] = idx;
-
-	return skb->len;
-}
-
 static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
 	[RTM_GETLINK - RTM_BASE] = { .dumpit	= inet6_dump_ifinfo, },
 	[RTM_NEWADDR - RTM_BASE] = { .doit	= inet6_rtm_newaddr, },
@@ -3069,7 +2974,6 @@ static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
 	[RTM_DELROUTE - RTM_BASE] = { .doit	= inet6_rtm_delroute, },
 	[RTM_GETROUTE - RTM_BASE] = { .doit	= inet6_rtm_getroute,
 				      .dumpit	= inet6_dump_fib, },
-	[RTM_GETIPSTATS - RTM_BASE] = { .dumpit = inet6_dump_ipstats, },
 };
 
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)

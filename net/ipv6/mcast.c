@@ -1318,8 +1318,6 @@ static void mld_sendpack(struct sk_buff *skb)
 	int err;
 
 	IP6_INC_STATS(Ip6OutRequests);
-	IPV6_INC_STATS(idev, ipStatsOutRequests);
-	IPV6_ADD_STATS(idev, ipStatsOutOctets, skb->len);
 	payload_len = skb->tail - (unsigned char *)skb->nh.ipv6h -
 		sizeof(struct ipv6hdr);
 	mldlen = skb->tail - skb->h.raw;
@@ -1332,13 +1330,10 @@ static void mld_sendpack(struct sk_buff *skb)
 	if (!err) {
 		ICMP6_INC_STATS(idev,Icmp6OutMsgs);
 		IP6_INC_STATS(Ip6OutMcastPkts);
-		IPV6_INC_STATS(idev, ipStatsOutMcastPkts);
-		IPV6_ADD_STATS(idev, ipStatsOutMcastOctets, skb->len);
-	} else {
+	} else
 		IP6_INC_STATS(Ip6OutDiscards);
-		IPV6_INC_STATS(idev, ipStatsOutDiscards);
-	}
-	if (idev)
+
+	if (likely(idev != NULL))
 		in6_dev_put(idev);
 }
 
@@ -1618,9 +1613,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 		     IPV6_TLV_ROUTERALERT, 2, 0, 0,
 		     IPV6_TLV_PADN, 0 };
 
-	idev = in6_dev_get(dev);
 	IP6_INC_STATS(Ip6OutRequests);
-	IPV6_INC_STATS(idev, ipStatsOutRequests);
 	snd_addr = addr;
 	if (type == ICMPV6_MGM_REDUCTION) {
 		snd_addr = &all_routers;
@@ -1635,13 +1628,9 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 
 	if (skb == NULL) {
 		IP6_INC_STATS(Ip6OutDiscards);
-		IPV6_INC_STATS(idev, ipStatsOutDiscards);
-		if (idev)
-			in6_dev_put(idev);
 		return;
 	}
 
-	IPV6_ADD_STATS(idev, ipStatsOutOctets, skb->len);
 	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	if (dev->hard_header) {
 		unsigned char ha[MAX_ADDR_LEN];
@@ -1673,6 +1662,8 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 					   IPPROTO_ICMPV6,
 					   csum_partial((__u8 *) hdr, len, 0));
 
+	idev = in6_dev_get(skb->dev);
+
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, skb->dev,
 		dev_queue_xmit);
 	if (!err) {
@@ -1682,22 +1673,16 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 			ICMP6_INC_STATS(idev, Icmp6OutGroupMembResponses);
 		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
 		IP6_INC_STATS(Ip6OutMcastPkts);
-		IPV6_INC_STATS(idev, ipStatsOutMcastPkts);
-		IPV6_ADD_STATS(idev, ipStatsOutMcastOctets, skb->len);
-	} else {
+	} else
 		IP6_INC_STATS(Ip6OutDiscards);
-		IPV6_INC_STATS(idev, ipStatsOutDiscards);
-	}
+
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
 	return;
 
 out:
 	IP6_INC_STATS(Ip6OutDiscards);
-	IPV6_INC_STATS(idev, ipStatsOutDiscards);
 	kfree_skb(skb);
-	if (likely(idev != NULL))
-		in6_dev_put(idev);
 }
 
 static int ip6_mc_del1_src(struct ifmcaddr6 *pmc, int sfmode,

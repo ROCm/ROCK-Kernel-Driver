@@ -98,43 +98,6 @@ struct ipv6_mib
  	unsigned long	Ip6OutMcastPkts;
 	unsigned long   __pad[0]; 
 };
-
-/*
- * New IP MIBs from draft-ietf-ipv6-rfc2011-update-05.txt 
- */
-struct ip_stats
-{
-	unsigned long	ipStatsInReceives;
-	unsigned long	ipStatsInOctets;
-	unsigned long	ipStatsInHdrErrors;
-	unsigned long	ipStatsInNoRoutes;
-	unsigned long	ipStatsInAddrErrors;
-	unsigned long	ipStatsInUnknownProtos;
-	unsigned long	ipStatsInTruncatedPkts;
-	unsigned long	ipStatsInForwDatagrams;
-	unsigned long	ipStatsReasmReqds;
-	unsigned long	ipStatsReasmOKs;
-	unsigned long	ipStatsReasmFails;
-	unsigned long	ipStatsInDiscards;
-	unsigned long	ipStatsInDelivers;
-	unsigned long	ipStatsOutRequests;
-	unsigned long	ipStatsOutNoRoutes;
-	unsigned long	ipStatsOutForwDatagrams;
-	unsigned long	ipStatsOutDiscards;
-	unsigned long	ipStatsOutFragReqds;
-	unsigned long	ipStatsOutFragOKs;
-	unsigned long	ipStatsOutFragFails;
-	unsigned long	ipStatsOutFragCreates;
-	unsigned long	ipStatsOutTransmits;
-	unsigned long	ipStatsOutOctets;
-	unsigned long	ipStatsInMcastPkts;
-	unsigned long	ipStatsInMcastOctets;
-	unsigned long	ipStatsOutMcastPkts;
-	unsigned long	ipStatsOutMcastOctets;
-	unsigned long	ipStatsInBcastPkts;
-	unsigned long	ipStatsOutBcastPkts;
-	unsigned long   __pad[0]; 
-};
  
 /*
  * RFC 1213:  MIB-II ICMP Group
@@ -372,8 +335,6 @@ struct linux_mib
 	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->field++)
 #define SNMP_DEC_STATS(mib, field) 	\
 	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->field--)
-#define SNMP_ADD_STATS(mib, field, addend)	\
-	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->field += addend)
 #define SNMP_ADD_STATS_BH(mib, field, addend) 	\
 	(per_cpu_ptr(mib[0], smp_processor_id())->field += addend)
 #define SNMP_ADD_STATS_USER(mib, field, addend) 	\

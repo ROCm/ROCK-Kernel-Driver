@@ -453,7 +453,6 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	IP6_INC_STATS(Ip6OutRequests);
-	IPV6_INC_STATS(idev, ipStatsOutRequests);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
 	if (!err) {
 		ICMP6_INC_STATS(idev, Icmp6OutNeighborAdvertisements);
@@ -538,7 +537,6 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	IP6_INC_STATS(Ip6OutRequests);
-	IPV6_INC_STATS(idev, ipStatsOutRequests);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
 	if (!err) {
 		ICMP6_INC_STATS(idev, Icmp6OutNeighborSolicits);
@@ -611,8 +609,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 	/* send it! */
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	IP6_INC_STATS(Ip6OutRequests);
-	IPV6_INC_STATS(idev, ipStatsOutRequests);
+	IP6_INC_STATS(Ip6OutRequests);	
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
 	if (!err) {
 		ICMP6_INC_STATS(idev, Icmp6OutRouterSolicits);
@@ -1339,7 +1336,6 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	buff->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	IP6_INC_STATS(Ip6OutRequests);
-	IPV6_INC_STATS(idev, ipStatsOutRequests);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, buff, NULL, dst->dev, dst_output);
 	if (!err) {
 		ICMP6_INC_STATS(idev, Icmp6OutRedirects);

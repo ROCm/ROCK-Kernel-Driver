@@ -227,9 +227,6 @@ int snmp6_register_dev(struct inet6_dev *idev)
 	if (snmp6_mib_init((void **)idev->stats.icmpv6, sizeof(struct icmpv6_mib),
 			   __alignof__(struct icmpv6_mib)) < 0)
 		goto err_icmp;
-	if (snmp6_mib_init((void **)idev->stats.ipv6, sizeof(struct ip_stats),
-			   __alignof__(struct ip_stats)) < 0)
-		goto err_ip;
 
 	if (!proc_net_devsnmp6) {
 		err = -ENOENT;
@@ -245,11 +242,8 @@ int snmp6_register_dev(struct inet6_dev *idev)
 	return 0;
 
 err_proc:
-	snmp6_mib_free((void **)idev->stats.ipv6);
-err_ip:
 	snmp6_mib_free((void **)idev->stats.icmpv6);
 err_icmp:
-	
 	return err;
 }
 
@@ -262,7 +256,6 @@ int snmp6_unregister_dev(struct inet6_dev *idev)
 	remove_proc_entry(idev->stats.proc_dir_entry->name,
 			  proc_net_devsnmp6);
 	snmp6_mib_free((void **)idev->stats.icmpv6);
-	snmp6_mib_free((void **)idev->stats.ipv6);
 
 	return 0;
 }
@@ -312,13 +305,9 @@ int snmp6_register_dev(struct inet6_dev *idev)
 	if (snmp6_mib_init((void **)idev->stats.icmpv6, sizeof(struct icmpv6_mib),
 			   __alignof__(struct icmpv6_mib)) < 0)
 		goto err_icmp;
-	if (snmp6_mib_init((void **)idev->stats.ipv6, sizeof(struct ip_stats),
-			   __alignof__(struct ip_stats)) < 0)
-		goto err_ip;
 
 	return 0;
-err_ip:
-	snmp6_mib_free((void **)idev->stats.icmpv6);
+
 err_icmp:
 	return err;
 }
@@ -326,7 +315,6 @@ err_icmp:
 int snmp6_unregister_dev(struct inet6_dev *idev)
 {
 	snmp6_mib_free((void **)idev->stats.icmpv6);
-	snmp6_mib_free((void **)idev->stats.ipv6);
 	return 0;
 }
 

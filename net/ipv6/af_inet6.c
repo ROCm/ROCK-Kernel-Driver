@@ -670,9 +670,6 @@ static int __init init_ipv6_mibs(void)
 	if (snmp6_mib_init((void **)ipv6_statistics, sizeof (struct ipv6_mib),
 			   __alignof__(struct ipv6_mib)) < 0)
 		goto err_ip_mib;
-	if (snmp6_mib_init((void **)ipv6_stats, sizeof (struct ip_stats),
-			   __alignof__(struct ip_stats)) < 0)
-		goto err_ip6_mib;
 	if (snmp6_mib_init((void **)icmpv6_statistics, sizeof (struct icmpv6_mib),
 			   __alignof__(struct ipv6_mib)) < 0)
 		goto err_icmp_mib;
@@ -684,8 +681,6 @@ static int __init init_ipv6_mibs(void)
 err_udp_mib:
 	snmp6_mib_free((void **)icmpv6_statistics);
 err_icmp_mib:
-	snmp6_mib_free((void **)ipv6_stats);
-err_ip6_mib:
 	snmp6_mib_free((void **)ipv6_statistics);
 err_ip_mib:
 	return -ENOMEM;
@@ -695,7 +690,6 @@ err_ip_mib:
 static void cleanup_ipv6_mibs(void)
 {
 	snmp6_mib_free((void **)ipv6_statistics);
-	snmp6_mib_free((void **)ipv6_stats);
 	snmp6_mib_free((void **)icmpv6_statistics);
 	snmp6_mib_free((void **)udp_stats_in6);
 }
