@@ -2,7 +2,7 @@ static char *info =
 "1. Magic files\n"
 "\t|--rbce_info - read only file detailing how to setup and use RBCE.\n\n"
 
-"\t|--reclassify - contains nothing. Writing a pid to it reclassifies\n"
+"\t|--rbce_reclassify - contains nothing. Writing a pid to it reclassifies\n"
 "\tthe given task according to the current set of rules.\n"
 "\tWriting 0 to it reclassifies all tasks in the system according to the \n"
 "\tsurrent set of rules. This is typically done by the user/sysadmin \n"
@@ -27,11 +27,11 @@ static char *info =
 
 "\tcmd=\"string\" // basename of the command\n\n"
 
-"\tpathname=\"string\" // full pathname of the command\n\n"
+"\tpath=\"/path/to/string\" // full pathname of the command\n\n"
 
 "\targs=\"string\" // argv[1] - argv[argc] of command\n\n"
 
-"\tapptag=\"string\" // application tag of the task\n\n"
+"\ttag=\"string\" // application tag of the task\n\n"
 
 "\t[+,-]depend=rule_filename\n"
 "\t\t\t// used to chain a rule's terms with existing rules\n"

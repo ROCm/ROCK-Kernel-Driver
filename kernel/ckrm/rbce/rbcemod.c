@@ -1233,7 +1233,6 @@ handle_str:
 			cp += sprintf(cp, "***** no terms defined ***** ");
 		}
 
-		cp += sprintf(cp, "classtype=%d,", rule->classtype);
 		cp += sprintf(cp, "order=%d,state=%d,", rule->order, rule->state);
 		cp += sprintf(cp, "class=%s", rule->target_class ? 
 				rule->target_class->obj.name : "***** REMOVED *****");	
@@ -2213,7 +2212,8 @@ void * rbce_tc_classify(enum ckrm_event event, struct task_struct* tsk)
 		break;
 
 	case CKRM_EVENT_EXEC:
-		cls = rbce_classify(tsk, NULL, RBCE_TERMFLAG_CMD, tc_classtype);
+               cls = rbce_classify(tsk, NULL, RBCE_TERMFLAG_CMD|
+                       RBCE_TERMFLAG_UID|RBCE_TERMFLAG_GID, tc_classtype);
 		break;
 
 	case CKRM_EVENT_UID:
