@@ -66,8 +66,8 @@ ENTRY(v4t_late_abort)
 	add	r6, r6, r2, lsr #3
 	add	r6, r6, r6, lsr #8
 	add	r6, r6, r6, lsr #4
-	and	r6, r6, #15			@ r7 = no. of registers to transfer.
-	and	r5, r8, #15 << 16		@ Extract 'n' form instruction
+	and	r6, r6, #15			@ r6 = no. of registers to transfer.
+	and	r5, r8, #15 << 16		@ Extract 'n' from instruction
 	ldr	r7, [sp, r5, lsr #14]		@ Get register 'Rn'
 	tst	r8, #1 << 23			@ Check U bit
 	subne	r7, r7, r6, lsl #2		@ Undo increment

@@ -244,6 +244,7 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 	 * also get rid of some of the stuff above as well.
 	 */
 	max_low_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
+	max_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
 	mi->end = memend_pfn << PAGE_SHIFT;
 
 	return bootmem_pages;

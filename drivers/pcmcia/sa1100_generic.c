@@ -95,10 +95,11 @@ static struct tq_struct sa1100_pcmcia_task;
  * "Expansion Memory (PCMCIA) Configuration Register (MECR)"
  * that's section 10.2.5 in _my_ version of the manuial ;)
  */
-static int sa1100_pcmcia_default_mecr_timing(unsigned int sock, unsigned int cpu_speed,
-		unsigned int cmd_time )
+static unsigned int
+sa1100_pcmcia_default_mecr_timing(unsigned int sock, unsigned int cpu_speed,
+				  unsigned int cmd_time)
 {
-	return sa1100_pcmcia_mecr_bs( cmd_time, cpu_speed );
+	return sa1100_pcmcia_mecr_bs(cmd_time, cpu_speed);
 }
 
 /* sa1100_pcmcia_set_mecr()
@@ -109,7 +110,7 @@ static int sa1100_pcmcia_default_mecr_timing(unsigned int sock, unsigned int cpu
  * Call board specific BS value calculation to allow boards
  * to tweak the BS values.
  */
-static int sa1100_pcmcia_set_mecr( int sock )
+static int sa1100_pcmcia_set_mecr(int sock)
 {
 	struct sa1100_pcmcia_socket *skt;
 	u32 mecr;
@@ -117,15 +118,15 @@ static int sa1100_pcmcia_set_mecr( int sock )
 	long flags;
 	unsigned int bs;
 
-	if ( sock<0 || sock>SA1100_PCMCIA_MAX_SOCK )
+	if (sock < 0 || sock > SA1100_PCMCIA_MAX_SOCK)
 		return -1;
 
-	skt = PCMCIA_SOCKET( sock );
+	skt = PCMCIA_SOCKET(sock);
 
 	local_irq_save(flags);
 
 	clock = cpufreq_get(0);
-	bs = pcmcia_low_level->socket_get_timing( sock, clock, skt->speed_io);
+	bs = pcmcia_low_level->socket_get_timing(sock, clock, skt->speed_io);
 
 	mecr = MECR;
 	MECR_FAST_SET(mecr, sock, 0);
@@ -136,10 +137,10 @@ static int sa1100_pcmcia_set_mecr( int sock )
 
 	local_irq_restore(flags);
 
-    DEBUG(4, "%s(): FAST%u %lx  BSM%u %lx  BSA%u %lx  BSIO%u %lx\n",
-	  __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
-	  MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock),
-	  sock, MECR_BSIO_GET(mecr, sock));
+	DEBUG(4, "%s(): FAST%u %lx  BSM%u %lx  BSA%u %lx  BSIO%u %lx\n",
+	      __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
+	      MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock),
+	      sock, MECR_BSIO_GET(mecr, sock));
 
 	return 0;
 }
@@ -882,11 +883,11 @@ static struct pccard_operations sa1100_pcmcia_operations = {
  */
 static void sa1100_pcmcia_update_mecr(unsigned int clock)
 {
-  unsigned int sock;
+	unsigned int sock;
 
-  for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
-	  sa1100_pcmcia_set_mecr( sock );
-  }
+	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
+		sa1100_pcmcia_set_mecr(sock);
+	}
 }
 
 /* sa1100_pcmcia_notifier()

@@ -5,6 +5,8 @@
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
+#include <linux/errno.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -133,7 +135,7 @@ int __init pcmcia_neponset_init(void)
 {
 	int ret = -ENODEV;
 
-	if (machine_is_assabet() && machine_has_neponset())
+	if (machine_is_assabet() && sa1111)
 		ret = sa1100_register_pcmcia(&neponset_pcmcia_ops);
 
 	return ret;
