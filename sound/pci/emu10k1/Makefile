@@ -14,7 +14,7 @@ snd-emu10k1-synth-objs := emu10k1_synth.o emu10k1_callback.o emu10k1_patch.o
 #   <empty string> - CONFIG_SND_SEQUENCER is undefined
 #   otherwise parameter #1 value
 #
-sequencer := $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),m,$(if $(CONFIG_SND_SEQUENCER),$(1)))
+sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_EMU10K1) += snd-emu10k1.o

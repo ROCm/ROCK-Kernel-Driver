@@ -520,7 +520,8 @@ DUMMY_CAPSRC("CD Capture Switch", 0, MIXER_ADDR_MASTER)
 int __init snd_card_dummy_new_mixer(snd_card_dummy_t * dummy)
 {
 	snd_card_t *card = dummy->card;
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	snd_assert(dummy != NULL, return -EINVAL);
 	spin_lock_init(&dummy->mixer_lock);

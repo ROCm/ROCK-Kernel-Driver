@@ -461,7 +461,7 @@ static inline int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout)
 	*/
 	
 	for (i = 0; i < timeout; i++)
-		if ((hdsp_read (hdsp, HDSP_fifoStatus) & 0xff) <= count)
+		if ((int)(hdsp_read (hdsp, HDSP_fifoStatus) & 0xff) <= count)
 			return 0;
 
 	snd_printk ("wait for FIFO status <= %d failed after %d iterations\n",
@@ -844,7 +844,6 @@ static int snd_hdsp_midi_output_write (hdsp_midi_t *hmidi)
 {
 	unsigned long flags;
 	int n_pending;
-	int clear_timer = 0;
 	int to_write;
 	int i;
 	unsigned char buf[128];
@@ -856,23 +855,15 @@ static int snd_hdsp_midi_output_write (hdsp_midi_t *hmidi)
 	if (hmidi->output) {
 		if (!snd_rawmidi_transmit_empty (hmidi->output)) {
 			if ((n_pending = snd_hdsp_midi_output_possible (hmidi->hdsp, hmidi->id)) > 0) {
-				if (n_pending > sizeof (buf))
+				if (n_pending > (int)sizeof (buf))
 					n_pending = sizeof (buf);
 				
 				if ((to_write = snd_rawmidi_transmit (hmidi->output, buf, n_pending)) > 0) {
 					for (i = 0; i < to_write; ++i) 
 						snd_hdsp_midi_write_byte (hmidi->hdsp, hmidi->id, buf[i]);
-				} else {
-					clear_timer = 1;
 				}
 			}
-		} else {
-			clear_timer = 1;
 		}
-
-		if (clear_timer && hmidi->istimer && --hmidi->istimer <= 0) {
-			del_timer(&hmidi->timer);
-		} 
 	}
 
 	spin_unlock_irqrestore (&hmidi->lock, flags);
@@ -890,7 +881,7 @@ static int snd_hdsp_midi_input_read (hdsp_midi_t *hmidi)
 
 	if ((n_pending = snd_hdsp_midi_input_available (hmidi->hdsp, hmidi->id)) > 0) {
 		if (hmidi->input) {
-			if (n_pending > sizeof (buf)) {
+			if (n_pending > (int)sizeof (buf)) {
 				n_pending = sizeof (buf);
 			}
 			for (i = 0; i < n_pending; ++i) {
@@ -980,6 +971,8 @@ static void snd_hdsp_midi_output_trigger(snd_rawmidi_substream_t * substream, in
 		}
 	}
 	spin_unlock_irqrestore (&hmidi->lock, flags);
+	if (up)
+		snd_hdsp_midi_output_write(hmidi);
 }
 
 static int snd_hdsp_midi_input_open(snd_rawmidi_substream_t * substream)
@@ -1296,7 +1289,7 @@ static int snd_hdsp_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
 	spin_lock_irqsave(&hdsp->lock, flags);
-	change = val != hdsp_spdif_out(hdsp);
+	change = (int)val != hdsp_spdif_out(hdsp);
 	hdsp_set_spdif_output(hdsp, val);
 	spin_unlock_irqrestore(&hdsp->lock, flags);
 	return change;
@@ -1411,7 +1404,7 @@ static int snd_hdsp_put_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 	max = hdsp->ss_channels == (hdsp->type == Digiface) ? 7 : 6;
 	val = ucontrol->value.enumerated.item[0] % max;
 	spin_lock_irqsave(&hdsp->lock, flags);
-	change = val != hdsp_sync_pref(hdsp);
+	change = (int)val != hdsp_sync_pref(hdsp);
 	hdsp_set_sync_pref(hdsp, val);
 	spin_unlock_irqrestore(&hdsp->lock, flags);
 	return change;
@@ -1515,7 +1508,7 @@ static int snd_hdsp_put_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
 	spin_lock_irqsave(&hdsp->lock, flags);
-	change = val != hdsp_line_out(hdsp);
+	change = (int)val != hdsp_line_out(hdsp);
 	hdsp_set_line_output(hdsp, val);
 	spin_unlock_irqrestore(&hdsp->lock, flags);
 	return change;
@@ -1584,7 +1577,8 @@ static int snd_hdsp_put_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 	gain = ucontrol->value.integer.value[2];
 
 	spin_lock_irqsave(&hdsp->lock, flags);
-	if ((change = gain != hdsp_read_gain(hdsp, addr)))
+	change = gain != hdsp_read_gain(hdsp, addr);
+	if (change)
 		hdsp_write_gain(hdsp, addr, gain);
 	spin_unlock_irqrestore(&hdsp->lock, flags);
 	return change;
@@ -1662,7 +1656,8 @@ static int snd_hdsp_put_playback_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 
 
 	spin_lock_irqsave(&hdsp->lock, flags);
-	if ((change = gain != hdsp_read_gain(hdsp, addr)))
+	change = gain != hdsp_read_gain(hdsp, addr);
+	if (change)
 		hdsp_write_gain(hdsp, addr, gain);
 	spin_unlock_irqrestore(&hdsp->lock, flags);
 	return change;
@@ -1834,7 +1829,8 @@ static snd_kcontrol_new_t snd_hdsp_playback_rms = HDSP_RMS_PLAYBACK;
 
 int snd_hdsp_create_controls(snd_card_t *card, hdsp_t *hdsp)
 {
-	int idx, err, limit;
+	unsigned int idx, limit;
+	int err;
 	snd_kcontrol_t *kctl;
 
 	for (idx = 0; idx < HDSP_CONTROLS; idx++) {
@@ -2402,7 +2398,7 @@ static int snd_hdsp_hw_params(snd_pcm_substream_t *substream,
 		   that matter are the same.
 		 */
 
-		if (params_rate(params) != hdsp_system_sample_rate(hdsp)) {
+		if ((int)params_rate(params) != hdsp_system_sample_rate(hdsp)) {
 			spin_unlock_irq(&hdsp->lock);
 			_snd_pcm_hw_param_setempty(params, SNDRV_PCM_HW_PARAM_RATE);
 			return -EBUSY;
@@ -2578,9 +2574,9 @@ static snd_pcm_hardware_t snd_hdsp_playback_subinfo =
 	.rate_max =		96000,
 	.channels_min =		14,
 	.channels_max =		HDSP_MAX_CHANNELS,
-	.buffer_bytes_max =	1024*1024,
-	.period_bytes_min =	1,
-	.period_bytes_max =	1024*1024,
+	.buffer_bytes_max =	HDSP_CHANNEL_BUFFER_BYTES * HDSP_MAX_CHANNELS,
+	.period_bytes_min =	(64 * 4) *10,
+	.period_bytes_max =	(8192 * 4) * HDSP_MAX_CHANNELS,
 	.periods_min =		2,
 	.periods_max =		2,
 	.fifo_size =		0,
@@ -2603,9 +2599,9 @@ static snd_pcm_hardware_t snd_hdsp_capture_subinfo =
 	.rate_max =		96000,
 	.channels_min =		14,
 	.channels_max =		HDSP_MAX_CHANNELS,
-	.buffer_bytes_max =	1024*1024,
-	.period_bytes_min =	1,
-	.period_bytes_max =	1024*1024,
+	.buffer_bytes_max =	HDSP_CHANNEL_BUFFER_BYTES * HDSP_MAX_CHANNELS,
+	.period_bytes_min =	(64 * 4) * 10,
+	.period_bytes_max =	(8192 * 4) * HDSP_MAX_CHANNELS,
 	.periods_min =		2,
 	.periods_max =		2,
 	.fifo_size =		0,

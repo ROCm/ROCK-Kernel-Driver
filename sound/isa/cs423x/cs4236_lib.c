@@ -270,7 +270,8 @@ int snd_cs4236_create(snd_card_t * card,
 {
 	cs4231_t *chip;
 	unsigned char ver1, ver2;
-	int err, reg;
+	unsigned int reg;
+	int err;
 
 	*rchip = NULL;
 	if (hardware == CS4231_HW_DETECT)
@@ -908,7 +909,8 @@ CS4236_SINGLEC("3D Control - IEC958", 0, 3, 5, 1, 0)
 int snd_cs4236_mixer(cs4231_t *chip)
 {
 	snd_card_t *card;
-	int err, idx, count;
+	unsigned int idx, count;
+	int err;
 	snd_kcontrol_new_t *kcontrol;
 
 	snd_assert(chip != NULL && chip->card != NULL, return -EINVAL);
@@ -942,7 +944,7 @@ int snd_cs4236_mixer(cs4231_t *chip)
 		kcontrol = snd_cs4236_3d_controls_cs4238;
 		break;
 	default:
-		count = -1;
+		count = 0;
 		kcontrol = NULL;
 	}
 	for (idx = 0; idx < count; idx++, kcontrol++) {

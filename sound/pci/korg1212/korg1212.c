@@ -1703,13 +1703,13 @@ static int snd_korg1212_control_route_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 
 	i = kcontrol->private_value;
 
-	if (u->value.enumerated.item[0] != korg1212->sharedBufferPtr->volumeData[i]) {
+	if (u->value.enumerated.item[0] != (unsigned int)korg1212->sharedBufferPtr->volumeData[i]) {
 		korg1212->sharedBufferPtr->routeData[i] = u->value.enumerated.item[0];
 		change = 1;
 	}
 
 	if (i >= 8) {
-		if (u->value.enumerated.item[1] != korg1212->sharedBufferPtr->volumeData[i+1]) {
+		if (u->value.enumerated.item[1] != (unsigned int)korg1212->sharedBufferPtr->volumeData[i+1]) {
 			korg1212->sharedBufferPtr->routeData[i+1] = u->value.enumerated.item[1];
 			change = 1;
 		}
@@ -1905,7 +1905,7 @@ static int __devinit snd_korg1212_create(korg1212_t *korg1212)
 {
         struct pci_dev *pci = korg1212->pci;
         int err;
-        int i;
+        unsigned int i;
 	unsigned ioport_size, iomem_size, iomem2_size;
 	dma_addr_t phys_addr;
 

@@ -126,8 +126,8 @@ static const char *task_state_array[] = {
 	"R (running)",		/*  0 */
 	"S (sleeping)",		/*  1 */
 	"D (disk sleep)",	/*  2 */
-	"T (stopped)",		/*  8 */
-	"Z (zombie)",		/*  4 */
+	"T (stopped)",		/*  4 */
+	"Z (zombie)",		/*  8 */
 	"X (dead)"		/* 16 */
 };
 

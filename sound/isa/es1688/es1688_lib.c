@@ -346,7 +346,7 @@ static int snd_es1688_trigger(es1688_t *chip, int cmd, unsigned char value)
 	}
 #if 0
 	printk("trigger: val = 0x%x, value = 0x%x\n", val, value);
-	printk("trigger: residue = 0x%x\n", get_dma_residue(chip->dma8));
+	printk("trigger: pointer = 0x%x\n", snd_dma_pointer(chip->dma8, chip->dma_size));
 #endif
 	snd_es1688_write(chip, 0xb8, (val & 0xf0) | value);
 	spin_unlock(&chip->reg_lock);
@@ -501,7 +501,7 @@ static snd_pcm_uframes_t snd_es1688_playback_pointer(snd_pcm_substream_t * subst
 	
 	if (chip->trigger_value != 0x05)
 		return 0;
-	ptr = chip->dma_size - snd_dma_residue(chip->dma8);
+	ptr = snd_dma_pointer(chip->dma8, chip->dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -512,7 +512,7 @@ static snd_pcm_uframes_t snd_es1688_capture_pointer(snd_pcm_substream_t * substr
 	
 	if (chip->trigger_value != 0x0f)
 		return 0;
-	ptr = chip->dma_size - snd_dma_residue(chip->dma8);
+	ptr = snd_dma_pointer(chip->dma8, chip->dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -1014,7 +1014,8 @@ static unsigned char snd_es1688_init_table[][2] = {
 int snd_es1688_mixer(es1688_t *chip)
 {
 	snd_card_t *card;
-	int err, idx;
+	unsigned int idx;
+	int err;
 	unsigned char reg, val;
 
 	snd_assert(chip != NULL && chip->card != NULL, return -EINVAL);

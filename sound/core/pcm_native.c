@@ -1911,7 +1911,7 @@ snd_pcm_sframes_t snd_pcm_playback_rewind(snd_pcm_substream_t *substream, snd_pc
 		ret = 0;
 		goto __end;
 	}
-	if (frames > hw_avail)
+	if (frames > (snd_pcm_uframes_t)hw_avail)
 		frames = hw_avail;
 	else
 		frames -= frames % runtime->xfer_align;
@@ -1960,7 +1960,7 @@ snd_pcm_sframes_t snd_pcm_capture_rewind(snd_pcm_substream_t *substream, snd_pcm
 		ret = 0;
 		goto __end;
 	}
-	if (frames > hw_avail)
+	if (frames > (snd_pcm_uframes_t)hw_avail)
 		frames = hw_avail;
 	else
 		frames -= frames % runtime->xfer_align;
@@ -2740,7 +2740,7 @@ int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 	offset = area->vm_offset;
 #endif
 	dma_bytes = PAGE_ALIGN(runtime->dma_bytes);
-	if (size > dma_bytes)
+	if ((size_t)size > dma_bytes)
 		return -EINVAL;
 	if (offset > dma_bytes - size)
 		return -EINVAL;

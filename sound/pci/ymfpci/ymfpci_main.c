@@ -624,7 +624,7 @@ static int snd_ymfpci_playback_prepare(snd_pcm_substream_t * substream)
 	// ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
-	int nvoice;
+	unsigned int nvoice;
 
 	ypcm->period_size = runtime->period_size;
 	ypcm->buffer_size = runtime->buffer_size;
@@ -1662,7 +1662,8 @@ int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 {
 	ac97_t ac97;
 	snd_kcontrol_t *kctl;
-	int err, idx;
+	unsigned int idx;
+	int err;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.write = snd_ymfpci_codec_write;
@@ -1774,16 +1775,16 @@ static int snd_ymfpci_joystick_addr_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 static int snd_ymfpci_joystick_addr_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	ucontrol->value.integer.value[0] = chip->joystick_port;
+	ucontrol->value.enumerated.item[0] = chip->joystick_port;
 	return 0;
 }
 
 static int snd_ymfpci_joystick_addr_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	if (ucontrol->value.integer.value[0] != chip->joystick_port) {
-		snd_assert(ucontrol->value.integer.value[0] >= 0 && ucontrol->value.integer.value[0] < 4, return -EINVAL);
-		chip->joystick_port = ucontrol->value.integer.value[0];
+	if (ucontrol->value.enumerated.item[0] != chip->joystick_port) {
+		snd_assert(ucontrol->value.enumerated.item[0] >= 0 && ucontrol->value.enumerated.item[0] < 4, return -EINVAL);
+		chip->joystick_port = ucontrol->value.enumerated.item[0];
 		setup_joystick_base(chip);
 		return 1;
 	}
@@ -2114,7 +2115,7 @@ static int saved_regs_index[] = {
 void snd_ymfpci_suspend(ymfpci_t *chip)
 {
 	snd_card_t *card = chip->card;
-	int i;
+	unsigned int i;
 	
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		return;
@@ -2133,7 +2134,7 @@ void snd_ymfpci_suspend(ymfpci_t *chip)
 void snd_ymfpci_resume(ymfpci_t *chip)
 {
 	snd_card_t *card = chip->card;
-	int i;
+	unsigned int i;
 
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		return;

@@ -60,7 +60,7 @@ static void snd_sb16_csp_playback_prepare(sb_t *chip, snd_pcm_runtime_t *runtime
 		if (csp->running & SNDRV_SB_CSP_ST_LOADED) {
 			/* manually loaded codec */
 			if ((csp->mode & SNDRV_SB_CSP_MODE_DSP_WRITE) &&
-			    ((1 << runtime->format) == csp->acc_format)) {
+			    ((1U << runtime->format) == csp->acc_format)) {
 				/* Supported runtime PCM format for playback */
 				if (csp->ops.csp_use(csp) == 0) {
 					/* If CSP was successfully acquired */
@@ -108,7 +108,7 @@ static void snd_sb16_csp_capture_prepare(sb_t *chip, snd_pcm_runtime_t *runtime)
 		if (csp->running & SNDRV_SB_CSP_ST_LOADED) {
 			/* manually loaded codec */
 			if ((csp->mode & SNDRV_SB_CSP_MODE_DSP_READ) &&
-			    ((1 << runtime->format) == csp->acc_format)) {
+			    ((1U << runtime->format) == csp->acc_format)) {
 				/* Supported runtime PCM format for capture */
 				if (csp->ops.csp_use(csp) == 0) {
 					/* If CSP was successfully acquired */
@@ -451,7 +451,7 @@ static snd_pcm_uframes_t snd_sb16_playback_pointer(snd_pcm_substream_t * substre
 	size_t ptr;
 
 	dma = (chip->mode & SB_MODE_PLAYBACK_8) ? chip->dma8 : chip->dma16;
-	ptr = chip->p_dma_size - snd_dma_residue(dma);
+	ptr = snd_dma_pointer(dma, chip->p_dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -462,7 +462,7 @@ static snd_pcm_uframes_t snd_sb16_capture_pointer(snd_pcm_substream_t * substrea
 	size_t ptr;
 
 	dma = (chip->mode & SB_MODE_CAPTURE_8) ? chip->dma8 : chip->dma16;
-	ptr = chip->c_dma_size - snd_dma_residue(dma);
+	ptr = snd_dma_pointer(dma, chip->c_dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 

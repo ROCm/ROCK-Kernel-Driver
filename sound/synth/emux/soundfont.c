@@ -122,7 +122,7 @@ snd_soundfont_load(snd_sf_list_t *sflist, const void *data, long count, int clie
 	unsigned long flags;
 	int  rc;
 
-	if (count < sizeof(patch)) {
+	if (count < (long)sizeof(patch)) {
 		snd_printk("patch record too small %ld\n", count);
 		return -EINVAL;
 	}
@@ -406,7 +406,7 @@ load_map(snd_sf_list_t *sflist, const void *data, int count)
 	soundfont_voice_map_t map;
 
 	/* get the link info */
-	if (count < sizeof(map))
+	if (count < (int)sizeof(map))
 		return -EINVAL;
 	if (copy_from_user(&map, data, sizeof(map)))
 		return -EFAULT;
@@ -509,7 +509,7 @@ load_info(snd_sf_list_t *sflist, const void *data, long count)
 	if (is_special_type(sf->type))
 		return -EINVAL;
 
-	if (count < sizeof(hdr)) {
+	if (count < (long)sizeof(hdr)) {
 		printk("Soundfont error: invalid patch zone length\n");
 		return -EINVAL;
 	}
@@ -524,7 +524,7 @@ load_info(snd_sf_list_t *sflist, const void *data, long count)
 		return -EINVAL;
 	}
 
-	if (count < sizeof(soundfont_voice_info_t)*hdr.nvoices) {
+	if (count < (long)sizeof(soundfont_voice_info_t)*hdr.nvoices) {
 		printk("Soundfont Error: patch length(%ld) is smaller than nvoices(%d)\n",
 		       count, hdr.nvoices);
 		return -EINVAL;
@@ -926,7 +926,7 @@ load_guspatch(snd_sf_list_t *sflist, const char *data, long count, int client)
 	int note, sample_id;
 	int rc;
 
-	if (count < sizeof(patch)) {
+	if (count < (long)sizeof(patch)) {
 		snd_printk("patch record too small %ld\n", count);
 		return -EINVAL;
 	}

@@ -28,7 +28,7 @@ OPL3_OBJS = snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
 #   <empty string> - CONFIG_SND_SEQUENCER is undefined
 #   otherwise parameter #1 value
 #
-sequencer := $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),m,$(if $(CONFIG_SND_SEQUENCER),$(1)))
+sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
 
 obj-$(CONFIG_SND_SEQUENCER) += snd-seq.o snd-seq-device.o
 ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)

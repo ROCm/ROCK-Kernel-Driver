@@ -145,7 +145,7 @@ void snd_seq_instr_list_free(snd_seq_kinstr_list_t **list_ptr)
 
 static int instr_free_compare(snd_seq_kinstr_t *instr,
 			      snd_seq_instr_header_t *ifree,
-			      int client)
+			      unsigned int client)
 {
 	switch (ifree->cmd) {
 	case SNDRV_SEQ_INSTR_FREE_CMD_ALL:
@@ -193,7 +193,7 @@ int snd_seq_instr_list_free_cond(snd_seq_kinstr_list_t *list,
 		instr = list->hash[idx];
 		prev = flist = NULL;
 		while (instr) {
-			while (instr && instr_free_compare(instr, ifree, client)) {
+			while (instr && instr_free_compare(instr, ifree, (unsigned int)client)) {
 				prev = instr;
 				instr = instr->next;
 			}
