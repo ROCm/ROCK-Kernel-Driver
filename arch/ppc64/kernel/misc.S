@@ -567,8 +567,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_getpriority
 	.llong .sys32_setpriority
 	.llong .sys_ni_syscall		/* old profil syscall */
-	.llong .sys32_statfs
-	.llong .sys32_fstatfs		/* 100 */
+	.llong .compat_sys_statfs
+	.llong .compat_sys_fstatfs		/* 100 */
 	.llong .sys_ioperm
 	.llong .sys32_socketcall
 	.llong .sys32_syslog
