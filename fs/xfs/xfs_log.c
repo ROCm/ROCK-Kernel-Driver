@@ -838,8 +838,10 @@ xfs_log_need_covered(xfs_mount_t *mp)
 	SPLDECL(s);
 	int		needed = 0, gen;
 	xlog_t		*log = mp->m_log;
+	vfs_t		*vfsp = XFS_MTOVFS(mp);
 
-	if (mp->m_frozen || XFS_FORCED_SHUTDOWN(mp))
+	if (mp->m_frozen || XFS_FORCED_SHUTDOWN(mp) ||
+	    (vfsp->vfs_flag & VFS_RDONLY))
 		return 0;
 
 	s = LOG_LOCK(log);
