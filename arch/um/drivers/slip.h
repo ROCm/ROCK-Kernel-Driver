@@ -9,7 +9,10 @@ struct slip_data {
 	char *addr;
 	char *gate_addr;
 	int slave;
-	char buf[2 * BUF_SIZE];
+	/* two bytes each for a (pathological) max packet of escaped chars + 
+	 * terminating END char + inital END char
+	 */
+	char buf[2 * BUF_SIZE + 2];
 	int pos;
 	int esc;
 };

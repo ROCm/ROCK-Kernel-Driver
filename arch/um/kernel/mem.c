@@ -49,7 +49,7 @@ mmu_gather_t mmu_gathers[NR_CPUS];
 
 int kmalloc_ok = 0;
 
-#define NREGIONS (phys_region_index(0xffffffff) - phys_region_index(0x0))
+#define NREGIONS (phys_region_index(0xffffffff) - phys_region_index(0x0) + 1)
 struct mem_region *regions[NREGIONS] = { [ 0 ... NREGIONS - 1 ] = NULL };
 #define REGION_SIZE ((0xffffffff & ~REGION_MASK) + 1)
 

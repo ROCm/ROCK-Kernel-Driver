@@ -61,7 +61,7 @@ void sigio_handler(int sig, struct uml_pt_regs *regs)
 		for(i = 0; i < pollfds_num; i++){
 			if(pollfds[i].revents != 0){
 				irq_fd->current_events = pollfds[i].revents;
-				pollfds[i].events = 0;
+				pollfds[i].fd = -1;
 			}
 			irq_fd = irq_fd->next;
 		}
@@ -185,7 +185,8 @@ static void free_irq_by_cb(int (*test)(struct irq_fd *, void *), void *arg)
 	while(*prev != NULL){
 		if((*test)(*prev, arg)){
 			struct irq_fd *old_fd = *prev;
-			if(pollfds[i].fd != (*prev)->fd){
+			if((pollfds[i].fd != -1) && 
+			   (pollfds[i].fd != (*prev)->fd)){
 				printk("free_irq_by_cb - mismatch between "
 				       "active_fds and pollfds, fd %d vs %d\n",
 				       (*prev)->fd, pollfds[i].fd);
@@ -250,7 +251,7 @@ static struct irq_fd *find_irq_by_fd(int fd, int irqnum, int *index_out)
 		printk("find_irq_by_fd doesn't have descriptor %d\n", fd);
 		return(NULL);
 	}
-	if(pollfds[i].fd != fd){
+	if((pollfds[i].fd != -1) && (pollfds[i].fd != fd)){
 		printk("find_irq_by_fd - mismatch between active_fds and "
 		       "pollfds, fd %d vs %d, need %d\n", irq->fd, 
 		       pollfds[i].fd, fd);
@@ -283,7 +284,7 @@ void reactivate_fd(int fd, int irqnum)
 
 	irq = find_irq_by_fd(fd, irqnum, &i);
 	if(irq == NULL) return;
-	pollfds[i].events = irq->events;
+	pollfds[i].fd = irq->fd;
 	maybe_sigio_broken(fd, irq->type);
 }
 
@@ -294,7 +295,7 @@ void deactivate_fd(int fd, int irqnum)
 
 	irq = find_irq_by_fd(fd, irqnum, &i);
 	if(irq == NULL) return;
-	pollfds[i].events = 0;
+	pollfds[i].fd = -1;
 }
 
 void forward_ipi(int fd, int pid)
