@@ -407,7 +407,7 @@ struct rtl8169_private {
 
 MODULE_AUTHOR("Realtek");
 MODULE_DESCRIPTION("RealTek RTL-8169 Gigabit Ethernet driver");
-module_param_array(media, int, num_media, 0);
+module_param_array(media, int, &num_media, 0);
 module_param(rx_copybreak, int, 0);
 module_param(use_dac, int, 0);
 MODULE_PARM_DESC(use_dac, "Enable PCI DAC. Unsafe on 32 bit PCI slot.");
