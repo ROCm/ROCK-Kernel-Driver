@@ -1958,14 +1958,10 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
     
 ======================================================================*/
 
-int pcmcia_suspend_card(client_handle_t handle, client_req_t *req)
+int pcmcia_suspend_card(struct pcmcia_socket *skt)
 {
-	struct pcmcia_socket *skt;
 	int ret;
     
-	if (CHECK_HANDLE(handle))
-		return CS_BAD_HANDLE;
-	skt = SOCKET(handle);
 	cs_dbg(skt, 1, "suspending socket\n");
 
 	down(&skt->skt_sem);
@@ -1985,14 +1981,10 @@ int pcmcia_suspend_card(client_handle_t handle, client_req_t *req)
 	return ret;
 } /* suspend_card */
 
-int pcmcia_resume_card(client_handle_t handle, client_req_t *req)
+int pcmcia_resume_card(struct pcmcia_socket *skt)
 {
-	struct pcmcia_socket *skt;
 	int ret;
     
-	if (CHECK_HANDLE(handle))
-		return CS_BAD_HANDLE;
-	skt = SOCKET(handle);
 	cs_dbg(skt, 1, "waking up socket\n");
 
 	down(&skt->skt_sem);
@@ -2018,14 +2010,10 @@ int pcmcia_resume_card(client_handle_t handle, client_req_t *req)
     
 ======================================================================*/
 
-int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
+int pcmcia_eject_card(struct pcmcia_socket *skt)
 {
-	struct pcmcia_socket *skt;
 	int ret;
     
-	if (CHECK_HANDLE(handle))
-		return CS_BAD_HANDLE;
-	skt = SOCKET(handle);
 	cs_dbg(skt, 1, "user eject request\n");
 
 	down(&skt->skt_sem);
@@ -2047,14 +2035,10 @@ int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
 	return ret;
 } /* eject_card */
 
-int pcmcia_insert_card(client_handle_t handle, client_req_t *req)
+int pcmcia_insert_card(struct pcmcia_socket *skt)
 {
-	struct pcmcia_socket *skt;
 	int ret;
 
-	if (CHECK_HANDLE(handle))
-		return CS_BAD_HANDLE;
-	skt = SOCKET(handle);
 	cs_dbg(skt, 1, "user insert request\n");
 
 	down(&skt->skt_sem);
