@@ -579,7 +579,7 @@ int do_IRQ(struct pt_regs *regs)
 	{
 		long sp;
 
-		sp = (unsigned long)_get_SP() & (THREAD_SIZE-1);
+		sp = __get_SP() & (THREAD_SIZE-1);
 
 		if (unlikely(sp < (sizeof(struct thread_info) + 8192))) {
 			printk("do_IRQ: stack overflow: %ld\n",

@@ -383,10 +383,6 @@ _GLOBAL(abs)
 	neg	r3,r3
 10:	blr
 
-_GLOBAL(_get_SP)
-	mr	r3,r1		/* Close enough */
-	blr
-	
 _GLOBAL(_get_PVR)
 	mfspr	r3,PVR
 	blr

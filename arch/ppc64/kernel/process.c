@@ -162,7 +162,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	 * for that first.
 	 */
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_SLB) &&
-	    GET_ESID((unsigned long)_get_SP()) != GET_ESID(PAGE_OFFSET)) {
+	    GET_ESID(__get_SP()) != GET_ESID(PAGE_OFFSET)) {
 		union {
 			unsigned long word0;
 			slb_dword0 data;
@@ -171,7 +171,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 		esid_data.word0 = 0;
 		/* class bit is in valid field for slbie instruction */
 		esid_data.data.v = 1;
-		esid_data.data.esid = GET_ESID((unsigned long)_get_SP());
+		esid_data.data.esid = GET_ESID(__get_SP());
 		asm volatile("isync; slbie %0; isync" : : "r" (esid_data));
 	}
 	local_irq_restore(flags);
@@ -528,7 +528,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 		if (p) {
 			sp = p->thread.ksp;
 		} else {
-			sp = (unsigned long)_get_SP();
+			sp = __get_SP();
 			p = current;
 		}
 	}
@@ -549,7 +549,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 
 void dump_stack(void)
 {
-	show_stack(current, (unsigned long *)_get_SP());
+	show_stack(current, (unsigned long *)__get_SP());
 }
 
 EXPORT_SYMBOL(dump_stack);
