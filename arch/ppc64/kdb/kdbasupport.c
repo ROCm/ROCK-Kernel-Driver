@@ -91,15 +91,15 @@ sysrq_handle_kdb(int key, struct pt_regs *pt_regs, struct kbd_struct *kbd, struc
 static struct sysrq_key_op sysrq_kdb_op = 
 {
 	handler:	(void*)sysrq_handle_kdb,
-	help_msg:	"kDb",
+	help_msg:	"Olaf",
 	action_msg:	"Entering kdb\n",
 };
 
 void
 kdb_map_scc(void)
 {
-	/* register sysrq 'd' */
-	__sysrq_put_key_op('d', &sysrq_kdb_op);
+	/* register sysrq 'o' */
+	__sysrq_put_key_op('o', &sysrq_kdb_op);
 }
 #endif
 

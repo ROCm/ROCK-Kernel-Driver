@@ -475,7 +475,7 @@ config XMON_DEFAULT
 	  kernel but will not be entered when a serious error occurs -
 	  instead the kernel will print an oops message.  Xmon can be
 	  activated by doing "echo 1 >/proc/sys/kernel/xmon" as root,
-	  by pressing alt-sysrq-x, or by giving the xmon=on or xmon=force
+	  by pressing alt-sysrq-A(nton), or by giving the xmon=on or xmon=force
 	  boot command line options.  If in doubt say N.
 
 config KDB
