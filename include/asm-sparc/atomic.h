@@ -48,10 +48,13 @@ static __inline__ int atomic_read(const atomic_t *v)
 #define atomic_set(v, i)	(((v)->counter) = ((i) << 8))
 #endif
 
-static __inline__ int __atomic_add(int i, atomic_t *v)
+static inline int __atomic_add(int i, atomic_t *v)
 {
 	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
+	register int tmp1 asm("g3");
+	register int tmp2 asm("g4");
+	register int tmp3 asm("g7");
 
 	ptr = &v->counter;
 	increment = i;
@@ -60,17 +63,20 @@ static __inline__ int __atomic_add(int i, atomic_t *v)
 	"mov	%%o7, %%g4\n\t"
 	"call	___atomic_add\n\t"
 	" add	%%o7, 8, %%o7\n"
-	: "=&r" (increment)
+	: "=&r" (increment), "=r" (tmp1), "=r" (tmp2), "=r" (tmp3)
 	: "0" (increment), "r" (ptr)
-	: "g3", "g4", "g7", "memory", "cc");
+	: "memory", "cc");
 
 	return increment;
 }
 
-static __inline__ int __atomic_sub(int i, atomic_t *v)
+static inline int __atomic_sub(int i, atomic_t *v)
 {
 	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
+	register int tmp1 asm("g3");
+	register int tmp2 asm("g4");
+	register int tmp3 asm("g7");
 
 	ptr = &v->counter;
 	increment = i;
@@ -79,9 +85,9 @@ static __inline__ int __atomic_sub(int i, atomic_t *v)
 	"mov	%%o7, %%g4\n\t"
 	"call	___atomic_sub\n\t"
 	" add	%%o7, 8, %%o7\n"
-	: "=&r" (increment)
+	: "=&r" (increment), "=r" (tmp1), "=r" (tmp2), "=r" (tmp3)
 	: "0" (increment), "r" (ptr)
-	: "g3", "g4", "g7", "memory", "cc");
+	: "memory", "cc");
 
 	return increment;
 }
