@@ -37,6 +37,11 @@
 #include <linux/blk.h>
 #endif
 
+#ifdef CONFIG_MAGIC_SYSRQ
+#include <linux/sysrq.h>
+#include <linux/reboot.h>
+#endif
+
 #include <linux/notifier.h>
 extern struct notifier_block *panic_notifier_list;
 static int alpha_panic_event(struct notifier_block *, unsigned long, void *);
@@ -538,6 +543,15 @@ setup_arch(char **cmdline_p)
 	if (alpha_using_srm && srmcons_output) {
 		register_srm_console();
 	}
+
+#ifdef CONFIG_MAGIC_SYSRQ
+	/* If we're using SRM, make sysrq-b halt back to the prom,
+	   not auto-reboot.  */
+	if (alpha_using_srm) {
+		struct sysrq_key_op *op = __sysrq_get_key_op('b');
+		op->handler = (void *) machine_halt;
+	}
+#endif
 
 	/*
 	 * Indentify and reconfigure for the current system.
