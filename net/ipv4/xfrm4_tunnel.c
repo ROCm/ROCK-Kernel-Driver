@@ -4,6 +4,7 @@
  */
 
 #include <linux/skbuff.h>
+#include <linux/module.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 #include <net/protocol.h>
@@ -43,6 +44,8 @@ int xfrm4_tunnel_register(struct xfrm_tunnel *handler)
 	return ret;
 }
 
+EXPORT_SYMBOL(xfrm4_tunnel_register);
+
 int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler)
 {
 	int ret;
@@ -59,6 +62,8 @@ int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler)
 
 	return ret;
 }
+
+EXPORT_SYMBOL(xfrm4_tunnel_deregister);
 
 static int ipip_rcv(struct sk_buff *skb)
 {

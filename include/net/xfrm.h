@@ -792,8 +792,6 @@ extern void xfrm4_state_init(void);
 extern void xfrm4_state_fini(void);
 extern void xfrm6_state_init(void);
 extern void xfrm6_state_fini(void);
-extern void xfrm6_tunnel_init(void);
-extern void xfrm6_tunnel_fini(void);
 
 extern int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*), void *);
 extern struct xfrm_state *xfrm_state_alloc(void);

@@ -501,31 +501,32 @@ static struct inet6_protocol xfrm6_tunnel_protocol = {
 	.flags          = INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
 };
 
-void __init xfrm6_tunnel_init(void)
+static int __init xfrm6_tunnel_init(void)
 {
 	X6TPRINTK3(KERN_DEBUG "%s()\n", __FUNCTION__);
 
 	if (xfrm_register_type(&xfrm6_tunnel_type, AF_INET6) < 0) {
 		X6TPRINTK1(KERN_ERR
 			   "xfrm6_tunnel init: can't add xfrm type\n");
-		return;
+		return -EAGAIN;
 	}
 	if (inet6_add_protocol(&xfrm6_tunnel_protocol, IPPROTO_IPV6) < 0) {
 		X6TPRINTK1(KERN_ERR
 			   "xfrm6_tunnel init(): can't add protocol\n");
 		xfrm_unregister_type(&xfrm6_tunnel_type, AF_INET6);
-		return;
+		return -EAGAIN;
 	}
 	if (xfrm6_tunnel_spi_init() < 0) {
 		X6TPRINTK1(KERN_ERR
 			   "xfrm6_tunnel init: failed to initialize spi\n");
 		inet6_del_protocol(&xfrm6_tunnel_protocol, IPPROTO_IPV6);
 		xfrm_unregister_type(&xfrm6_tunnel_type, AF_INET6);
-		return;
+		return -EAGAIN;
 	}
+	return 0;
 }
 
-void __exit xfrm6_tunnel_fini(void)
+static void __exit xfrm6_tunnel_fini(void)
 {
 	X6TPRINTK3(KERN_DEBUG "%s()\n", __FUNCTION__);
 
@@ -537,3 +538,7 @@ void __exit xfrm6_tunnel_fini(void)
 		X6TPRINTK1(KERN_ERR
 			   "xfrm6_tunnel close: can't remove xfrm type\n");
 }
+
+module_init(xfrm6_tunnel_init);
+module_exit(xfrm6_tunnel_fini);
+MODULE_LICENSE("GPL");
