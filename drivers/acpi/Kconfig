@@ -133,7 +133,7 @@ config ACPI_THERMAL
 
 config ACPI_NUMA
 	bool "NUMA support" if NUMA && (IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY && !X86_64)
-	default y if IA64 && IA64_SGI_SN
+	default y if IA64_GENERIC || IA64_SGI_SN2
 
 config ACPI_ASUS
         tristate "ASUS/Medion Laptop Extras"
