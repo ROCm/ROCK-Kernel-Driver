@@ -525,8 +525,11 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
  **/
 void scsi_remove_device(struct scsi_device *sdev)
 {
+	struct Scsi_Host *shost = sdev->host;
+
+	down(&shost->scan_mutex);
 	if (scsi_device_set_state(sdev, SDEV_CANCEL) != 0)
-		return;
+		goto out;
 
 	class_device_unregister(&sdev->sdev_classdev);
 	if (sdev->transport_classdev.class)
@@ -538,6 +541,9 @@ void scsi_remove_device(struct scsi_device *sdev)
 	if (sdev->host->transportt->cleanup)
 		sdev->host->transportt->cleanup(sdev);
 	put_device(&sdev->sdev_gendev);
+
+out:
+	up(&shost->scan_mutex);
 }
 
 int scsi_register_driver(struct device_driver *drv)
