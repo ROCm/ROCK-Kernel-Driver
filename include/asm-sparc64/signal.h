@@ -252,6 +252,9 @@ typedef struct sigaltstack32 {
 	int			ss_flags;
 	__kernel_size_t32	ss_size;
 } stack_t32;
+
+#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 #endif
 
 #endif /* !(__ASSEMBLY__) */

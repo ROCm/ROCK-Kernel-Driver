@@ -544,12 +544,12 @@ setup_frame(struct pt_regs *regs, struct sigregs *frame,
  * OK, we're invoking a handler
  */
 static void
-handle_signal(unsigned long sig, struct k_sigaction *ka,
-	      siginfo_t *info, sigset_t *oldset, struct pt_regs * regs,
-	      unsigned long *newspp, unsigned long frame)
+handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
+	struct pt_regs * regs, unsigned long *newspp, unsigned long frame)
 {
 	struct sigcontext_struct *sc;
         struct rt_sigframe *rt_sf;
+	struct k_sigaction *ka = &current->sig->action[sig-1];
 
 	if (regs->trap == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
@@ -633,6 +633,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 	siginfo_t info;
 	struct k_sigaction *ka;
 	unsigned long frame, newsp;
+	int signr;
 
 	/*
 	 * If the current thread is 32 bit - invoke the
@@ -646,103 +647,9 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 
 	newsp = frame = 0;
 
-	for (;;) {
-		unsigned long signr;
-
-                PPCDBG(PPCDBG_SIGNAL, "do_signal - (pre) dequeueing signal - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-		spin_lock_irq(&current->sigmask_lock);
-		signr = dequeue_signal(&current->blocked, &info);
-		spin_unlock_irq(&current->sigmask_lock);
-                PPCDBG(PPCDBG_SIGNAL, "do_signal - (aft) dequeueing signal - signal=%lx - pid=%ld current=%lx comm=%s \n", signr, current->pid, current, current->comm);
-
-		if (!signr)
-			break;
-
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			/* Let the debugger run.  */
-			current->exit_code = signr;
-			current->state = TASK_STOPPED;
-			notify_parent(current, SIGCHLD);
-			schedule();
-
-			/* We're back.  Did the debugger cancel the sig?  */
-			if (!(signr = current->exit_code))
-				continue;
-			current->exit_code = 0;
-
-			/* The debugger continued.  Ignore SIGSTOP.  */
-			if (signr == SIGSTOP)
-				continue;
-
-			/* Update the siginfo structure.  Is this good?  */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->parent->pid;
-				info.si_uid = current->parent->uid;
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
+	signr = get_signal_to_deliver(&info, regs);
+	if (signr > 0) {
 		ka = &current->sig->action[signr-1];
-
-  
-                PPCDBG(PPCDBG_SIGNAL, "do_signal - ka=%p, action handler=%lx \n", ka, ka->sa.sa_handler);
-
-		if (ka->sa.sa_handler == SIG_IGN) {
-                        PPCDBG(PPCDBG_SIGNAL, "do_signal - into SIG_IGN logic \n");
-			if (signr != SIGCHLD)
-				continue;
-			/* Check for SIGCHLD: it's special.  */
-			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				/* nothing */;
-			continue;
-		}
-
-		if (ka->sa.sa_handler == SIG_DFL) {
-			int exit_code = signr;
-                        PPCDBG(PPCDBG_SIGNAL, "do_signal - into SIG_DFL logic \n");
-
-			/* Init gets no signals it doesn't want.  */
-			if (current->pid == 1)
-				continue;
-
-			switch (signr) {
-			case SIGCONT: case SIGCHLD: case SIGWINCH:
-				continue;
-
-			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(current->pgrp))
-					continue;
-				/* FALLTHRU */
-
-			case SIGSTOP:
-				current->state = TASK_STOPPED;
-				current->exit_code = signr;
-				if (!(current->parent->sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				continue;
-
-			case SIGQUIT: case SIGILL: case SIGTRAP:
-			case SIGABRT: case SIGFPE: case SIGSEGV:
-			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, regs))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			default:
-				sig_exit(signr, exit_code, &info);
-				/* NOTREACHED */
-			}
-		}
-
 		if ( (ka->sa.sa_flags & SA_ONSTACK)
 		     && (! on_sig_stack(regs->gpr[1])))
 			newsp = (current->sas_ss_sp + current->sas_ss_size);
@@ -753,9 +660,8 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		/* Whee!  Actually deliver the signal.  */
   
                 PPCDBG(PPCDBG_SIGNAL, "do_signal - GOING TO RUN SIGNAL HANDLER - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-		handle_signal(signr, ka, &info, oldset, regs, &newsp, frame);
+		handle_signal(signr, &info, oldset, regs, &newsp, frame);
                 PPCDBG(PPCDBG_SIGNAL, "do_signal - after running signal handler - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-                break;
 	}
 
 	if (regs->trap == 0x0C00 /* System Call! */ &&

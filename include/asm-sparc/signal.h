@@ -216,6 +216,8 @@ typedef struct sigaltstack {
 	size_t		ss_size;
 } stack_t;
 
+#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 #endif /* !(__ASSEMBLY__) */
 
 #endif /* !(_ASMSPARC_SIGNAL_H) */

@@ -14,6 +14,8 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
+#include <linux/tty.h>
+#include <linux/binfmts.h>
 
 #include <asm/uaccess.h>
 
@@ -823,6 +825,110 @@ notify_parent(struct task_struct *tsk, int sig)
 	do_notify_parent(tsk, sig);
 	read_unlock(&tasklist_lock);
 }
+
+#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
+int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
+{
+	for (;;) {
+		unsigned long signr;
+		struct k_sigaction *ka;
+
+		spin_lock_irq(&current->sigmask_lock);
+		signr = dequeue_signal(&current->blocked, info);
+		spin_unlock_irq(&current->sigmask_lock);
+
+		if (!signr)
+			break;
+
+		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
+			/* Let the debugger run.  */
+			current->exit_code = signr;
+			set_current_state(TASK_STOPPED);
+			notify_parent(current, SIGCHLD);
+			schedule();
+
+			/* We're back.  Did the debugger cancel the sig?  */
+			signr = current->exit_code;
+			if (signr == 0)
+				continue;
+			current->exit_code = 0;
+
+			/* The debugger continued.  Ignore SIGSTOP.  */
+			if (signr == SIGSTOP)
+				continue;
+
+			/* Update the siginfo structure.  Is this good?  */
+			if (signr != info->si_signo) {
+				info->si_signo = signr;
+				info->si_errno = 0;
+				info->si_code = SI_USER;
+				info->si_pid = current->parent->pid;
+				info->si_uid = current->parent->uid;
+			}
+
+			/* If the (new) signal is now blocked, requeue it.  */
+			if (sigismember(&current->blocked, signr)) {
+				send_sig_info(signr, info, current);
+				continue;
+			}
+		}
+
+		ka = &current->sig->action[signr-1];
+		if (ka->sa.sa_handler == SIG_IGN) {
+			if (signr != SIGCHLD)
+				continue;
+			/* Check for SIGCHLD: it's special.  */
+			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
+				/* nothing */;
+			continue;
+		}
+
+		if (ka->sa.sa_handler == SIG_DFL) {
+			int exit_code = signr;
+
+			/* Init gets no signals it doesn't want.  */
+			if (current->pid == 1)
+				continue;
+
+			switch (signr) {
+			case SIGCONT: case SIGCHLD: case SIGWINCH: case SIGURG:
+				continue;
+
+			case SIGTSTP: case SIGTTIN: case SIGTTOU:
+				if (is_orphaned_pgrp(current->pgrp))
+					continue;
+				/* FALLTHRU */
+
+			case SIGSTOP: {
+				struct signal_struct *sig;
+				set_current_state(TASK_STOPPED);
+				current->exit_code = signr;
+				sig = current->parent->sig;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
+					notify_parent(current, SIGCHLD);
+				schedule();
+				continue;
+			}
+
+			case SIGQUIT: case SIGILL: case SIGTRAP:
+			case SIGABRT: case SIGFPE: case SIGSEGV:
+			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
+				if (do_coredump(signr, regs))
+					exit_code |= 0x80;
+				/* FALLTHRU */
+
+			default:
+				sig_exit(signr, exit_code, info);
+				/* NOTREACHED */
+			}
+		}
+		return signr;
+	}
+	return 0;
+}
+
+#endif
 
 EXPORT_SYMBOL(dequeue_signal);
 EXPORT_SYMBOL(flush_signals);
