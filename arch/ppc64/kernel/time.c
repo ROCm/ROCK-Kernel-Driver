@@ -66,7 +66,7 @@
 
 void smp_local_timer_interrupt(struct pt_regs *);
 
-u64 jiffies_64 = INITIAL_JIFFIES;
+u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
 EXPORT_SYMBOL(jiffies_64);
 
@@ -256,7 +256,7 @@ static void iSeries_tb_recal(void)
  * call will not be needed)
  */
 
-unsigned long tb_last_stamp=0;
+unsigned long tb_last_stamp __cacheline_aligned_in_smp;
 
 /*
  * timer_interrupt - gets called when the decrementer overflows,
