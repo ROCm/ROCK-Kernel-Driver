@@ -16,12 +16,14 @@
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/err.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/protocol.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/hardware/amba.h>
+#include <asm/hardware/clock.h>
 #include <asm/mach/mmc.h>
 
 #include "mmci.h"
@@ -59,7 +61,7 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *req)
 
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 {
-	unsigned int datactrl;
+	unsigned int datactrl, timeout;
 
 	DBG("%s: data: blksz %04x blks %04x flags %08x\n",
 	    host->mmc->host_name, 1 << data->blksz_bits, data->blocks,
@@ -75,7 +77,11 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	host->size = data->blocks << data->blksz_bits;
 	host->data_xfered = 0;
 
-	writel(0x800000, host->base + MMCIDATATIMER);
+	timeout = data->timeout_clks +
+		  ((unsigned long long)data->timeout_ns * host->cclk) /
+		   1000000000ULL;
+
+	writel(timeout, host->base + MMCIDATATIMER);
 	writel(host->size, host->base + MMCIDATALENGTH);
 	writel(datactrl, host->base + MMCIDATACTRL);
 }
@@ -279,14 +285,20 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	struct mmci_host *host = mmc_priv(mmc);
 	u32 clk = 0, pwr = 0;
 
-	DBG("%s: set_ios: clock %dHz busmode %d powermode %d Vdd %d.%02d\n",
+	DBG("%s: set_ios: clock %uHz busmode %u powermode %u Vdd %u\n",
 	    mmc->host_name, ios->clock, ios->bus_mode, ios->power_mode,
-	    ios->vdd / 100, ios->vdd % 100);
+	    ios->vdd);
 
 	if (ios->clock) {
-		clk = host->mclk / (2 * ios->clock) - 1;
-		if (clk > 256)
-			clk = 255;
+		if (ios->clock >= host->mclk) {
+			clk = MCI_CLK_BYPASS;
+			host->cclk = host->mclk;
+		} else {
+			clk = host->mclk / (2 * ios->clock) - 1;
+			if (clk > 256)
+				clk = 255;
+			host->cclk = host->mclk / (2 * (clk + 1));
+		}
 		clk |= MCI_CLK_ENABLE;
 	}
 
@@ -336,38 +348,55 @@ static void mmci_check_status(unsigned long data)
 static int mmci_probe(struct amba_device *dev, void *id)
 {
 	struct mmc_platform_data *plat = dev->dev.platform_data;
-	struct mmci_host *host = NULL;
+	struct mmci_host *host;
 	struct mmc_host *mmc;
 	int ret;
 
 	/* must have platform data */
-	if (!plat)
-		return -EINVAL;
+	if (!plat) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	ret = amba_request_regions(dev, DRIVER_NAME);
 	if (ret)
-		return ret;
+		goto out;
 
 	mmc = mmc_alloc_host(sizeof(struct mmci_host), &dev->dev);
 	if (!mmc) {
 		ret = -ENOMEM;
-		goto out;
+		goto rel_regions;
 	}
 
-	mmc->ops = &mmci_ops;
-	mmc->f_min = (plat->mclk + 511) / 512;
-	mmc->f_max = max(plat->mclk / 2, fmax);
-	mmc->ocr_avail = plat->ocr_mask;
-
 	host = mmc_priv(mmc);
+	host->clk = clk_get(&dev->dev, "MCLK");
+	if (IS_ERR(host->clk)) {
+		ret = PTR_ERR(host->clk);
+		host->clk = NULL;
+		goto host_free;
+	}
+
+	ret = clk_use(host->clk);
+	if (ret)
+		goto clk_free;
+
+	ret = clk_enable(host->clk);
+	if (ret)
+		goto clk_unuse;
+
 	host->plat = plat;
-	host->mclk = plat->mclk;
+	host->mclk = clk_get_rate(host->clk);
 	host->mmc = mmc;
 	host->base = ioremap(dev->res.start, SZ_4K);
 	if (!host->base) {
 		ret = -ENOMEM;
-		goto out;
+		goto clk_disable;
 	}
+
+	mmc->ops = &mmci_ops;
+	mmc->f_min = (host->mclk + 511) / 512;
+	mmc->f_max = min(host->mclk / 2, fmax);
+	mmc->ocr_avail = plat->ocr_mask;
 
 	spin_lock_init(&host->lock);
 
@@ -377,13 +406,11 @@ static int mmci_probe(struct amba_device *dev, void *id)
 
 	ret = request_irq(dev->irq[0], mmci_irq, SA_SHIRQ, DRIVER_NAME " (cmd)", host);
 	if (ret)
-		goto out;
+		goto unmap;
 
 	ret = request_irq(dev->irq[1], mmci_pio_irq, SA_SHIRQ, DRIVER_NAME " (pio)", host);
-	if (ret) {
-		free_irq(dev->irq[0], host);
-		goto out;
-	}
+	if (ret)
+		goto irq0_free;
 
 	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
 	writel(MCI_TXFIFOHALFEMPTYMASK|MCI_RXFIFOHALFFULLMASK, host->base + MMCIMASK1);
@@ -404,12 +431,21 @@ static int mmci_probe(struct amba_device *dev, void *id)
 
 	return 0;
 
- out:
-	if (host && host->base)
-		iounmap(host->base);
-	if (mmc)
-		mmc_free_host(mmc);
+ irq0_free:
+	free_irq(dev->irq[0], host);
+ unmap:
+	iounmap(host->base);
+ clk_disable:
+	clk_disable(host->clk);
+ clk_unuse:
+	clk_unuse(host->clk);
+ clk_free:
+	clk_put(host->clk);
+ host_free:
+	mmc_free_host(mmc);
+ rel_regions:
 	amba_release_regions(dev);
+ out:
 	return ret;
 }
 
@@ -436,6 +472,9 @@ static int mmci_remove(struct amba_device *dev)
 		free_irq(dev->irq[1], host);
 
 		iounmap(host->base);
+		clk_disable(host->clk);
+		clk_unuse(host->clk);
+		clk_put(host->clk);
 
 		mmc_free_host(mmc);
 

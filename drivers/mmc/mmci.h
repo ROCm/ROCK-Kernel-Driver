@@ -16,8 +16,8 @@
 
 #define MMCICLOCK		0x004
 #define MCI_CLK_ENABLE		(1 << 8)
-#define MCI_PWRSAVE		(1 << 9)
-#define MCI_BYPASS		(1 << 10)
+#define MCI_CLK_PWRSAVE		(1 << 9)
+#define MCI_CLK_BYPASS		(1 << 10)
 
 #define MMCIARGUMENT		0x008
 #define MMCICOMMAND		0x00c
@@ -118,18 +118,22 @@
 	
 #define MCI_FIFOHALFSIZE (MCI_FIFOSIZE / 2)
 
+struct clk;
+
 struct mmci_host {
 	void			*base;
 	struct mmc_request	*req;
 	struct mmc_command	*cmd;
 	struct mmc_data		*data;
 	struct mmc_host		*mmc;
+	struct clk		*clk;
 
 	unsigned int		data_xfered;
 
 	spinlock_t		lock;
 
 	unsigned int		mclk;
+	unsigned int		cclk;
 	u32			pwr;
 	struct mmc_platform_data *plat;
 
@@ -139,11 +143,6 @@ struct mmci_host {
 	/* pio stuff */
 	void			*buffer;
 	unsigned int		size;
-
-	/* dma stuff */
-//	struct scatterlist	*sg_list;
-//	int			sg_len;
-//	int			sg_dir;
 };
 
 #define to_mmci_host(mmc)	container_of(mmc, struct mmci_host, mmc)
