@@ -1047,7 +1047,7 @@ static int bdev_write_page(struct block_device *bdev, long pos, void *buf)
 	return 0;
 }
 
-extern kdev_t __init name_to_kdev_t(const char *line);
+extern dev_t __init name_to_dev_t(const char *line);
 
 static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, int noresume)
 {
@@ -1143,7 +1143,7 @@ static int read_suspend_image(const char * specialfile, int noresume)
 	unsigned long scratch_page = 0;
 	int error;
 
-	resume_device = name_to_kdev_t(specialfile);
+	resume_device = to_kdev_t(name_to_dev_t(specialfile));
 	scratch_page = get_zeroed_page(GFP_ATOMIC);
 	cur = (void *) scratch_page;
 	if (cur) {
