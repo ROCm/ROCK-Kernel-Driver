@@ -148,8 +148,7 @@ extern unsigned long empty_zero_page[1024];
 	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_WRITE | _PAGE_READ \
 		| _PAGE_USER | _PAGE_ACCESSED)
 #define PAGE_COPY	\
-	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_USER | _PAGE_ACCESSED)
 #define PAGE_COPY_X	\
 	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_USER \
 		| _PAGE_ACCESSED)
@@ -190,23 +189,23 @@ extern unsigned long empty_zero_page[1024];
  * the same are read. Also, write permissions imply read permissions.
  * This is the closest we can get..
  */
-	/* rwx */
+	/* xwr */
 #define __P000	PAGE_NONE
-#define __P001	PAGE_READONLY_X
-#define __P010	PAGE_COPY_X
-#define __P011	PAGE_COPY_X
-#define __P100	PAGE_READONLY
+#define __P001	PAGE_READONLY
+#define __P010	PAGE_COPY
+#define __P011	PAGE_COPY
+#define __P100	PAGE_READONLY_X
 #define __P101	PAGE_READONLY_X
 #define __P110	PAGE_COPY_X
 #define __P111	PAGE_COPY_X
 
 #define __S000	PAGE_NONE
-#define __S001	PAGE_READONLY_X
+#define __S001	PAGE_READONLY
 #define __S010	PAGE_SHARED
-#define __S011	PAGE_SHARED_X
-#define __S100	PAGE_READONLY
+#define __S011	PAGE_SHARED
+#define __S100	PAGE_READONLY_X
 #define __S101	PAGE_READONLY_X
-#define __S110	PAGE_SHARED
+#define __S110	PAGE_SHARED_X
 #define __S111	PAGE_SHARED_X
 
 /* page table for 0-4MB for everybody */
