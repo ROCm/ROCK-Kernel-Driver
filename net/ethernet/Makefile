@@ -1,28 +1,13 @@
 #
 # Makefile for the Linux Ethernet layer.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definition is now in the main makefile...
 
-O_TARGET := ethernet.o
+OBJS-y	:= eth.o
 
-OBJS	:= eth.o
+OBJS-$(CONFIG_SYSCTL)	+= sysctl_net_ether.o
+OBJS-$(CONFIG_IPX)	+= pe2.o
+OBJS-$(CONFIG_ATALK)	+= pe2.o
 
-ifeq ($(CONFIG_SYSCTL),y)
-OBJS += sysctl_net_ether.o
-endif
-
-ifdef CONFIG_IPX
-OBJ2	:= pe2.o
-endif
-
-ifdef CONFIG_ATALK
-OBJ2	:= pe2.o
-endif
-
-obj-$(CONFIG_NET)	:= $(OBJS) $(OBJ2)
+obj-$(CONFIG_NET)	:= $(OBJS-y)
 
 include $(TOPDIR)/Rules.make
