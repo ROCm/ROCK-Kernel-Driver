@@ -12,7 +12,8 @@
 
 #include <linux/config.h>
 #include <linux/sched.h>
-#include <asm/irq_vectors.h>
+/* include comes from machine specific directory */
+#include "irq_vectors.h"
 
 static __inline__ int irq_cannonicalize(int irq)
 {

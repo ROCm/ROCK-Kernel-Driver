@@ -258,7 +258,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	if ( p )
 		strcpy(c->x86_model_id, p);
 	
-#ifdef CONFIG_SMP
+#ifdef CONFIG_X86_HT
 	if (test_bit(X86_FEATURE_HT, c->x86_capability) && !disable_P4_HT) {
 		extern	int phys_proc_id[NR_CPUS];
 		
