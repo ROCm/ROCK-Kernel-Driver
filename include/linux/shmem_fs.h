@@ -11,7 +11,6 @@ extern atomic_t shmem_nrpages;
 
 struct shmem_inode_info {
 	spinlock_t		lock;
-	struct semaphore 	sem;
 	unsigned long		next_index;
 	swp_entry_t		i_direct[SHMEM_NR_DIRECT]; /* for the first blocks */
 	void		      **i_indirect; /* indirect blocks */
