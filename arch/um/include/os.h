@@ -140,6 +140,7 @@ extern int os_file_size(char *file, long long *size_out);
 extern int os_file_modtime(char *file, unsigned long *modtime);
 extern int os_pipe(int *fd, int stream, int close_on_exec);
 extern int os_set_fd_async(int fd, int owner);
+extern int os_clear_fd_async(int fd);
 extern int os_set_fd_block(int fd, int blocking);
 extern int os_accept_connection(int fd);
 extern int os_create_unix_socket(char *file, int len, int close_on_exec);
@@ -165,6 +166,7 @@ extern int os_protect_memory(void *addr, unsigned long len,
 			     int r, int w, int x);
 extern int os_unmap_memory(void *addr, int len);
 extern void os_flush_stdout(void);
+extern unsigned long long os_usecs(void);
 
 #endif
 

@@ -88,6 +88,7 @@ extern int arch_fixup(unsigned long address, void *sc_ptr);
 extern void forward_pending_sigio(int target);
 extern int can_do_skas(void);
 extern void arch_init_thread(void);
+extern int setjmp_wrapper(void (*proc)(void *, void *), ...);
 
 extern int __raw(int fd, int complain, int now);
 #define raw(fd, complain) __raw((fd), (complain), 1)

@@ -6,13 +6,26 @@
 #include <asm/atomic.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
+#include <asm/semaphore.h>
 
 /*
- * Used for LDT copy/destruction.
+ * Used for LDT initialization/destruction. You cannot copy an LDT with
+ * init_new_context, since it thinks you are passing it a new LDT and won't
+ * deallocate its old content.
  */
 int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
 void destroy_context(struct mm_struct *mm);
 
+/* LDT initialization for a clean environment - needed for SKAS.*/
+static inline void init_new_empty_context(struct mm_struct *mm)
+{
+	init_MUTEX(&mm->context.sem);
+	mm->context.size = 0;
+	arch_pick_mmap_layout(mm);
+}
+
+/* LDT copy for SKAS - for the above problem.*/
+int copy_context(struct mm_struct *mm, struct mm_struct *old_mm);
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
@@ -28,6 +41,10 @@ static inline void switch_mm(struct mm_struct *prev,
 			     struct task_struct *tsk)
 {
 	int cpu = smp_processor_id();
+
+#ifdef CONFIG_SMP
+	prev = cpu_tlbstate[cpu].active_mm;
+#endif
 
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
@@ -50,7 +67,6 @@ static inline void switch_mm(struct mm_struct *prev,
 #ifdef CONFIG_SMP
 	else {
 		per_cpu(cpu_tlbstate, cpu).state = TLBSTATE_OK;
-		BUG_ON(per_cpu(cpu_tlbstate, cpu).active_mm != next);
 
 		if (!cpu_test_and_set(cpu, next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 

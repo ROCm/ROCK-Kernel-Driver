@@ -16,13 +16,10 @@ struct task_struct;
 
 struct mm_struct;
 
-#define current_text_addr() ((void *) 0)
-
 #define cpu_relax()   barrier()
 
 struct thread_struct {
 	int forking;
-	unsigned long kernel_stack;
 	int nsyscalls;
 	struct pt_regs regs;
 	unsigned long cr2;
@@ -73,7 +70,6 @@ struct thread_struct {
 #define INIT_THREAD \
 { \
 	.forking		= 0, \
-	.kernel_stack		= 0, \
 	.nsyscalls		= 0, \
         .regs		   	= EMPTY_REGS, \
 	.cr2			= 0, \

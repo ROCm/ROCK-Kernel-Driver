@@ -92,19 +92,20 @@ change_protection(struct vm_area_struct *vma, unsigned long start,
 {
 	pgd_t *dir;
 	unsigned long beg = start;
+	struct mm_struct * mm = vma->vm_mm;
 
-	dir = pgd_offset(current->mm, start);
+	dir = pgd_offset(mm, start);
 	flush_cache_range(vma, beg, end);
 	if (start >= end)
 		BUG();
-	spin_lock(&current->mm->page_table_lock);
+	spin_lock(&mm->page_table_lock);
 	do {
 		change_pmd_range(dir, start, end - start, newprot);
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (start && (start < end));
 	flush_tlb_range(vma, beg, end);
-	spin_unlock(&current->mm->page_table_lock);
+	spin_unlock(&mm->page_table_lock);
 	return;
 }
 
@@ -187,8 +188,9 @@ fail:
 	return error;
 }
 
-asmlinkage long
-sys_mprotect(unsigned long start, size_t len, unsigned long prot)
+long
+do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
+	     unsigned long prot)
 {
 	unsigned long vm_flags, nstart, end, tmp;
 	struct vm_area_struct *vma, *prev;
@@ -217,9 +219,9 @@ sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 
 	vm_flags = calc_vm_prot_bits(prot);
 
-	down_write(&current->mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 
-	vma = find_vma_prev(current->mm, start, &prev);
+	vma = find_vma_prev(mm, start, &prev);
 	error = -ENOMEM;
 	if (!vma)
 		goto out;
@@ -285,6 +287,11 @@ sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 		}
 	}
 out:
-	up_write(&current->mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	return error;
+}
+
+asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot)
+{
+        return(do_mprotect(current->mm, start, len, prot));
 }

@@ -82,14 +82,21 @@ void unblock_signals(void)
 
 #define SIGIO_BIT 0
 #define SIGVTALRM_BIT 1
+#define SIGPROF_BIT 2
 
-static int enable_mask(sigset_t *mask)
+/*
+ * Inverts the signal mask:
+ * @mask: a sigset_t* point to the mask of blocked signals.
+ * Returns a mask (of different type) of *unblocked* signals.
+ */
+static inline int enable_mask(const sigset_t *mask)
 {
 	int sigs;
 
 	sigs = sigismember(mask, SIGIO) ? 0 : 1 << SIGIO_BIT;
 	sigs |= sigismember(mask, SIGVTALRM) ? 0 : 1 << SIGVTALRM_BIT;
 	sigs |= sigismember(mask, SIGALRM) ? 0 : 1 << SIGVTALRM_BIT;
+	sigs |= sigismember(mask, SIGPROF) ? 0 : 1 << SIGPROF_BIT;
 	return(sigs);
 }
 
@@ -102,18 +109,27 @@ int get_signals(void)
 	return(enable_mask(&mask));
 }
 
+/* Returns the old mask of the old active signals (not sigset_t, but
+ * suitable for set_signals.*/
 int set_signals(int enable)
 {
 	sigset_t mask;
 	int ret;
 
 	sigemptyset(&mask);
-	if(enable & (1 << SIGIO_BIT)) 
+	if(enable & (1 << SIGIO_BIT))
 		sigaddset(&mask, SIGIO);
 	if(enable & (1 << SIGVTALRM_BIT)){
 		sigaddset(&mask, SIGVTALRM);
 		sigaddset(&mask, SIGALRM);
 	}
+	if(enable & (1 << SIGPROF_BIT))
+		sigaddset(&mask, SIGPROF);
+
+	/* This is safe - sigprocmask is guaranteed to copy locally the
+	 * value of new_set, do his work and then, at the end, write to
+	 * old_set.
+	 */
 	if(sigprocmask(SIG_UNBLOCK, &mask, &mask) < 0)
 		panic("Failed to enable signals");
 	ret = enable_mask(&mask);

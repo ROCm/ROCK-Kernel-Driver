@@ -126,6 +126,9 @@ static inline void load_LDT(mm_context_t *pc)
 	put_cpu();
 }
 
+extern int modify_ldt(struct mm_struct * mm, int func, void __user *ptr,
+		      unsigned long bytecount);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif

@@ -46,7 +46,7 @@ void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
 	int flags = 0, pages;
 
 	if(sig_stack != NULL){
-		pages = (1 << UML_CONFIG_KERNEL_STACK_ORDER) - 2;
+		pages = (1 << UML_CONFIG_KERNEL_STACK_ORDER);
 		set_sigstack(sig_stack, pages * page_size());
 		flags = SA_ONSTACK;
 	}
@@ -57,11 +57,7 @@ void init_new_thread_signals(int altstack)
 {
 	int flags = altstack ? SA_ONSTACK : 0;
 
-	/* NODEFER is set here because SEGV isn't turned back on when the
-	 * handler is ready to receive signals.  This causes any segfault
-	 * during a copy_user to kill the process because the fault is blocked.
-	 */
-	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags | SA_NODEFER,
+	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags, 
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGTRAP, (__sighandler_t) sig_handler, flags, 
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
@@ -74,7 +70,7 @@ void init_new_thread_signals(int altstack)
 	set_handler(SIGWINCH, (__sighandler_t) sig_handler, flags, 
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGUSR2, (__sighandler_t) sig_handler, 
-		    SA_NOMASK | flags, -1);
+		    flags, SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	signal(SIGHUP, SIG_IGN);
 
 	init_irq_signals(altstack);
@@ -137,16 +133,6 @@ int start_fork_tramp(void *thread_arg, unsigned long temp_stack,
 		      "status = %d", status);
 
 	return(arg.pid);
-}
-
-void suspend_new_thread(int fd)
-{
-	char c;
-
-	os_stop_process(os_getpid());
-
-	if(os_read_file(fd, &c, sizeof(c)) != sizeof(c))
-		panic("read failed in suspend_new_thread");
 }
 
 static int ptrace_child(void *arg)
@@ -297,7 +283,7 @@ void __init check_ptrace(void)
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)
 {
-	jmp_buf buf;
+	sigjmp_buf buf;
 	int n;
 
 	*jmp_ptr = &buf;

@@ -364,6 +364,20 @@ void deactivate_fd(int fd, int irqnum)
 	irq_unlock(flags);
 }
 
+int deactivate_all_fds(void)
+{
+	struct irq_fd *irq;
+	int err;
+
+	for(irq=active_fds;irq != NULL;irq = irq->next){
+		err = os_clear_fd_async(irq->fd);
+		if(err)
+			return(err);
+	}
+
+	return(0);
+}
+
 void forward_ipi(int fd, int pid)
 {
 	int err;

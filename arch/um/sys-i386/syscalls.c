@@ -3,6 +3,7 @@
  * Licensed under the GPL
  */
 
+#include "linux/sched.h"
 #include "asm/mman.h"
 #include "asm/uaccess.h"
 #include "asm/unistd.h"
@@ -54,6 +55,27 @@ int old_select(struct sel_arg_struct *arg)
 		return -EFAULT;
 	/* sys_select() does the appropriate kernel locking */
 	return sys_select(a.n, a.inp, a.outp, a.exp, a.tvp);
+}
+
+/* The i386 version skips reading from %esi, the fourth argument. So we must do
+ * this, too.
+ */
+int sys_clone(unsigned long clone_flags, unsigned long newsp, int *parent_tid,
+	      int unused, int *child_tid)
+{
+	long ret;
+
+	/* XXX: normal arch do here this pass, and also pass the regs to 
+	 * do_fork, instead of NULL. Currently the arch-independent code 
+	 * ignores these values, while the UML code (actually it's 
+	 * copy_thread) does the right thing. But this should change, 
+	 probably. */
+	/*if (!newsp)
+		newsp = UPT_SP(current->thread.regs);*/
+	current->thread.forking = 1;
+	ret = do_fork(clone_flags, newsp, NULL, 0, parent_tid, child_tid);
+	current->thread.forking = 0;
+	return(ret);
 }
 
 /*

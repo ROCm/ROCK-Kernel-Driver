@@ -127,7 +127,7 @@ void alarm_handler(int sig, struct sigcontext sc)
 
 void do_longjmp(void *b, int val)
 {
-	jmp_buf *buf = b;
+	sigjmp_buf *buf = b;
 
 	siglongjmp(*buf, val);
 }

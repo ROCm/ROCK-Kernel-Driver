@@ -19,6 +19,7 @@
 #include "linux/fs.h"
 #include "linux/namei.h"
 #include "linux/proc_fs.h"
+#include "linux/syscalls.h"
 #include "asm/irq.h"
 #include "asm/uaccess.h"
 #include "user_util.h"
@@ -120,77 +121,50 @@ void mconsole_log(struct mc_request *req)
 
 void mconsole_proc(struct mc_request *req)
 {
-	struct nameidata nd;
-	struct file_system_type *proc;
-	struct super_block *super;
-	struct file *file;
-	int n, err;
-	char *ptr = req->request.data, *buf;
+	char path[64];
+	char *buf;
+	int len;
+	int fd;
+	char *ptr = req->request.data;
 
 	ptr += strlen("proc");
 	while(isspace(*ptr)) ptr++;
+	snprintf(path, sizeof(path), "/proc/%s", ptr);
 
-	proc = get_fs_type("proc");
-	if(proc == NULL){
-		mconsole_reply(req, "procfs not registered", 1, 0);
-		goto out;
-	}
-
-	super = (*proc->get_sb)(proc, 0, NULL, NULL);
-	put_filesystem(proc);
-	if(super == NULL){
-		mconsole_reply(req, "Failed to get procfs superblock", 1, 0);
-		goto out;
-	}
-	up_write(&super->s_umount);
-
-	nd.dentry = super->s_root;
-	nd.mnt = NULL;
-	nd.flags = O_RDONLY + 1;
-	nd.last_type = LAST_ROOT;
-
-	err = link_path_walk(ptr, &nd);
-	if(err){
-		mconsole_reply(req, "Failed to look up file", 1, 0);
-		goto out_kill;
-	}
-
-	file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);
-	if(IS_ERR(file)){
+	fd = sys_open(path, 0, 0);
+	if (fd < 0) {
 		mconsole_reply(req, "Failed to open file", 1, 0);
-		goto out_kill;
+		printk("open %s: %d\n",path,fd);
+		goto out;
 	}
 
 	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if(buf == NULL){
 		mconsole_reply(req, "Failed to allocate buffer", 1, 0);
-		goto out_fput;
+		goto out_close;
 	}
 
-	if((file->f_op != NULL) && (file->f_op->read != NULL)){
-		do {
-			n = (*file->f_op->read)(file, buf, PAGE_SIZE - 1,
-						&file->f_pos);
-			if(n >= 0){
-				buf[n] = '\0';
-				mconsole_reply(req, buf, 0, (n > 0));
-			}
-			else {
-				mconsole_reply(req, "Read of file failed",
-					       1, 0);
-				goto out_free;
-			}
-		} while(n > 0);
+	for (;;) {
+		len = sys_read(fd, buf, PAGE_SIZE-1);
+		if (len < 0) {
+			mconsole_reply(req, "Read of file failed", 1, 0);
+			goto out_free;
+		} else if (len == PAGE_SIZE-1) {
+			buf[len] = '\0';
+			mconsole_reply(req, buf, 0, 1);
+		} else {
+			buf[len] = '\0';
+			mconsole_reply(req, buf, 0, 0);
+			break;
+		}
 	}
-	else mconsole_reply(req, "", 0, 0);
 
  out_free:
 	kfree(buf);
- out_fput:
-	fput(file);
- out_kill:
-	deactivate_super(super);
- out: ;
+ out_close:
+	sys_close(fd);
+ out:
+	/* nothing */;
 }
 
 #define UML_MCONSOLE_HELPTEXT \

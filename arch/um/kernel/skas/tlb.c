@@ -77,7 +77,7 @@ void flush_tlb_kernel_range_skas(unsigned long start, unsigned long end)
 	int updated = 0, err;
 
 	mm = &init_mm;
-	for(addr = start_vm; addr < end_vm;){
+	for(addr = start; addr < end;){
 		pgd = pgd_offset(mm, addr);
 		pmd = pmd_offset(pgd, addr);
 		if(pmd_present(*pmd)){

@@ -28,7 +28,7 @@
 
 void *switch_to_tt(void *prev, void *next, void *last)
 {
-	struct task_struct *from, *to;
+	struct task_struct *from, *to, *prev_sched;
 	unsigned long flags;
 	int err, vtalrm, alrm, prof, cpu;
 	char c;
@@ -71,6 +71,18 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	err = os_read_file(from->thread.mode.tt.switch_pipe[0], &c, sizeof(c));
 	if(err != sizeof(c))
 		panic("read of switch_pipe failed, errno = %d", -err);
+
+	/* If the process that we have just scheduled away from has exited,
+	 * then it needs to be killed here.  The reason is that, even though
+	 * it will kill itself when it next runs, that may be too late.  Its
+	 * stack will be freed, possibly before then, and if that happens,
+	 * we have a use-after-free situation.  So, it gets killed here
+	 * in case it has not already killed itself.
+	 */
+	prev_sched = current->thread.prev_sched;
+	if((prev_sched->state == TASK_ZOMBIE) || 
+	   (prev_sched->state == TASK_DEAD))
+		os_kill_process(prev_sched->thread.mode.tt.extern_pid, 1);
 
 	/* This works around a nasty race with 'jail'.  If we are switching
 	 * between two threads of a threaded app and the incoming process 
@@ -116,6 +128,17 @@ void exit_thread_tt(void)
 	os_close_file(current->thread.mode.tt.switch_pipe[1]);
 }
 
+void suspend_new_thread(int fd)
+{
+	int err;
+	char c;
+
+	os_stop_process(os_getpid());
+	err = os_read_file(fd, &c, sizeof(c));
+	if(err != sizeof(c))
+		panic("read failed in suspend_new_thread, err = %d", -err);
+}
+
 void schedule_tail(task_t *prev);
 
 static void new_thread_handler(int sig)
@@ -150,6 +173,12 @@ static void new_thread_handler(int sig)
 	local_irq_enable();
 	if(!run_kernel_thread(fn, arg, &current->thread.exec_buf))
 		do_exit(0);
+	
+	/* XXX No set_user_mode here because a newly execed process will
+	 * immediately segfault on its non-existent IP, coming straight back
+	 * to the signal handler, which will call set_user_mode on its way
+	 * out.  This should probably change since it's confusing.
+	 */
 }
 
 static int new_thread_proc(void *stack)
@@ -172,6 +201,7 @@ static int new_thread_proc(void *stack)
 	local_irq_disable();
 	init_new_thread_stack(stack, new_thread_handler);
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 	return(0);
 }
 
@@ -215,6 +245,7 @@ int fork_tramp(void *stack)
 	init_new_thread_stack(stack, finish_fork_handler);
 
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 	return(0);
 }
 
@@ -248,8 +279,7 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 
 	clone_flags &= CLONE_VM;
 	p->thread.temp_stack = stack;
-	new_pid = start_fork_tramp((void *) p->thread.kernel_stack, stack,
-				   clone_flags, tramp);
+	new_pid = start_fork_tramp(p->thread_info, stack, clone_flags, tramp);
 	if(new_pid < 0){
 		printk(KERN_ERR "copy_thread : clone failed - errno = %d\n", 
 		       -new_pid);
@@ -267,19 +297,30 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 	current->thread.request.op = OP_FORK;
 	current->thread.request.u.fork.pid = new_pid;
 	os_usr1_process(os_getpid());
-	return(0);
+
+	/* Enable the signal and then disable it to ensure that it is handled
+	 * here, and nowhere else.
+	 */
+	change_sig(SIGUSR1, 1);
+
+	change_sig(SIGUSR1, 0);
+	err = 0;
+ out:
+	return(err);
 }
 
 void reboot_tt(void)
 {
 	current->thread.request.op = OP_REBOOT;
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 }
 
 void halt_tt(void)
 {
 	current->thread.request.op = OP_HALT;
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 }
 
 void kill_off_processes_tt(void)
@@ -306,6 +347,9 @@ void initial_thread_cb_tt(void (*proc)(void *), void *arg)
 		current->thread.request.u.cb.proc = proc;
 		current->thread.request.u.cb.arg = arg;
 		os_usr1_process(os_getpid());
+		change_sig(SIGUSR1, 1);
+
+		change_sig(SIGUSR1, 0);
 	}
 }
 
@@ -412,7 +456,7 @@ static void mprotect_kernel_mem(int w)
 	protect_memory(start, end - start, 1, w, 1, 1);
 
 	start = (unsigned long) UML_ROUND_DOWN(&__bss_start);
-	end = (unsigned long) UML_ROUND_UP(&_end);
+	end = (unsigned long) UML_ROUND_UP(brk_start);
 	protect_memory(start, end - start, 1, w, 1, 1);
 
 	mprotect_kernel_vm(w);
@@ -501,9 +545,9 @@ int start_uml_tt(void)
 	void *sp;
 	int pages;
 
-	pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
-	sp = (void *) init_task.thread.kernel_stack + pages * PAGE_SIZE - 
-		sizeof(unsigned long);
+	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
+	sp = (void *) ((unsigned long) init_task.thread_info) + 
+		pages * PAGE_SIZE - sizeof(unsigned long);
 	return(tracer(start_kernel_proc, sp));
 }
 

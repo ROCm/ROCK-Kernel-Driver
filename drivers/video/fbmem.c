@@ -1056,9 +1056,11 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 #else
 #warning What do we have to do here??
 #endif
+#ifndef CONFIG_USERMODE
 	if (io_remap_page_range(vma, vma->vm_start, off,
 			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
+#endif
 #endif /* !__sparc_v9__ */
 	return 0;
 #endif /* !sparc32 */

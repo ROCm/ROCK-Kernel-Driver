@@ -19,8 +19,10 @@ void sig_handler_common_skas(int sig, void *sc_ptr)
 	struct skas_regs *r;
 	struct signal_info *info;
 	int save_errno = errno;
+	int save_user;
 
 	r = &TASK_REGS(get_current())->skas;
+	save_user = r->is_user;
 	r->is_user = 0;
 	r->fault_addr = SC_FAULT_ADDR(sc);
 	r->fault_type = SC_FAULT_TYPE(sc);
@@ -33,6 +35,7 @@ void sig_handler_common_skas(int sig, void *sc_ptr)
 	(*info->handler)(sig, (union uml_pt_regs *) r);
 
 	errno = save_errno;
+	r->is_user = save_user;
 }
 
 void user_signal(int sig, union uml_pt_regs *regs)

@@ -42,9 +42,9 @@ unsigned long os_process_pc(int pid)
 	}
 	os_close_file(fd);
 	pc = ARBITRARY_ADDR;
-	if(sscanf(buf, "%*d " COMM_SCANF " %*c %*d %*d %*d %*d %*d %*d %*d %*d "
+	if(sscanf(buf, "%*d " COMM_SCANF " %*c %*d %*d %*d %*d %*d %*d %*d "
 		  "%*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d "
-		  "%*d %*d %*d %*d %lu", &pc) != 1){
+		  "%*d %*d %*d %*d %*d %lu", &pc) != 1){
 		printk("os_process_pc - couldn't find pc in '%s'\n", buf);
 	}
 	return(pc);
@@ -96,11 +96,7 @@ void os_kill_process(int pid, int reap_child)
 
 void os_usr1_process(int pid)
 {
-#ifdef __NR_tkill
-	syscall(__NR_tkill, pid, SIGUSR1);
-#else
 	kill(pid, SIGUSR1);
-#endif
 }
 
 int os_getpid(void)

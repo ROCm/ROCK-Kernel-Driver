@@ -187,7 +187,8 @@ int os_sigio_async(int master, int slave)
 
 	if((fcntl(master, F_SETFL, flags | O_NONBLOCK | O_ASYNC) < 0) ||
 	   (fcntl(master, F_SETOWN, os_getpid()) < 0)){
-		printk("fcntl F_SETFL or F_SETOWN failed, errno = %d\n", errno);
+		printk("fcntl F_SETFL or F_SETOWN failed, errno = %d\n", 
+		       errno);
 		return(-errno);
 	}
 
@@ -492,6 +493,16 @@ int os_set_fd_async(int fd, int owner)
 		return(-errno);
 	}
 
+	return(0);
+}
+
+int os_clear_fd_async(int fd)
+{
+	int flags = fcntl(fd, F_GETFL);
+
+	flags &= ~(O_ASYNC | O_NONBLOCK);
+	if(fcntl(fd, F_SETFL, flags) < 0)
+		return(-errno);
 	return(0);
 }
 

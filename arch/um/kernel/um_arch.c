@@ -14,6 +14,7 @@
 #include "linux/bootmem.h"
 #include "linux/spinlock.h"
 #include "linux/utsname.h"
+#include "linux/console.h"
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
@@ -301,12 +302,13 @@ static void __init uml_postsetup(void)
 /* Set during early boot */
 unsigned long brk_start;
 unsigned long end_iomem;
+EXPORT_SYMBOL(end_iomem);
 
 #define MIN_VMALLOC (32 * 1024 * 1024)
 
 int linux_main(int argc, char **argv)
 {
-	unsigned long avail;
+	unsigned long avail, diff;
 	unsigned long virtmem_size, max_physmem;
 	unsigned int i, add;
 
@@ -324,6 +326,16 @@ int linux_main(int argc, char **argv)
 
 	brk_start = (unsigned long) sbrk(0);
 	CHOOSE_MODE_PROC(before_mem_tt, before_mem_skas, brk_start);
+	/* Increase physical memory size for exec-shield users
+	so they actually get what they asked for. This should
+	add zero for non-exec shield users */
+	
+	diff = UML_ROUND_UP(brk_start) - UML_ROUND_UP(&_end);
+	if(diff > 1024 * 1024){
+		printf("Adding %ld bytes to physical memory to account for "
+		       "exec-shield gap\n", diff);
+		physmem_size += UML_ROUND_UP(brk_start) - UML_ROUND_UP(&_end);
+	}
 
 	uml_physmem = uml_start;
 
@@ -380,9 +392,6 @@ int linux_main(int argc, char **argv)
 
   	uml_postsetup();
 
-	init_task.thread.kernel_stack = (unsigned long) &init_thread_info + 
-		2 * PAGE_SIZE;
-
 	task_protections((unsigned long) &init_thread_info);
 	os_flush_stdout();
 
@@ -415,6 +424,9 @@ void __init setup_arch(char **cmdline_p)
  	strcpy(command_line, saved_command_line);
  	*cmdline_p = command_line;
 	setup_hostinfo();
+#if defined(CONFIG_DUMMY_CONSOLE)
+	conswitchp = &dummy_con;
+#endif  
 }
 
 void __init check_bugs(void)

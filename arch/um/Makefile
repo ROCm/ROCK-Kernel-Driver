@@ -6,6 +6,10 @@
 ARCH_DIR = arch/um
 OS := $(shell uname -s)
 
+# We require bash because the vmlinux link and loader script cpp use bash
+# features.
+SHELL := /bin/bash
+
 # Recalculate MODLIB to reflect the EXTRAVERSION changes (via KERNELRELEASE)
 # The way the toplevel Makefile is written EXTRAVERSION is not supposed
 # to be changed outside the toplevel Makefile, but recalculating MODLIB is
@@ -42,13 +46,13 @@ MAKEFILE-$(CONFIG_MODE_TT) += Makefile-tt
 MAKEFILE-$(CONFIG_MODE_SKAS) += Makefile-skas
 
 ifneq ($(MAKEFILE-y),)
-  include $(addprefix $(ARCH_DIR)/,$(MAKEFILE-y))
+  include $(addprefix $(srctree)/$(ARCH_DIR)/,$(MAKEFILE-y))
 endif
 
-include $(ARCH_DIR)/Makefile-$(SUBARCH)
-include $(ARCH_DIR)/Makefile-os-$(OS)
+include $(srctree)/$(ARCH_DIR)/Makefile-$(SUBARCH)
+include $(srctree)/$(ARCH_DIR)/Makefile-os-$(OS)
 
-EXTRAVERSION := $(EXTRAVERSION)-1um
+#EXTRAVERSION := $(EXTRAVERSION)-1um
 
 ARCH_INCLUDE = -I$(ARCH_DIR)/include
 
@@ -120,9 +124,14 @@ export CPPFLAGS_$(LD_SCRIPT-y) = $(CPPFLAGS_vmlinux.lds) -P -C -Uum
 
 LD_SCRIPT-y := $(ARCH_DIR)/kernel/$(LD_SCRIPT-y)
 
+UML_LIBS := -L/usr/lib -lutil
+ifeq ($(CONFIG_X11_FB),y)
+UML_LIBS += -L /usr/X11R6/lib -lX11 -lXext
+endif
+
 linux: vmlinux $(LD_SCRIPT-y)
 	$(CC) -Wl,-T,$(LD_SCRIPT-y) $(LINK-y) $(LINK_WRAPS) \
-		-o linux vmlinux -L/usr/lib -lutil
+		-o linux vmlinux -L/usr/lib $(UML_LIBS)
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))

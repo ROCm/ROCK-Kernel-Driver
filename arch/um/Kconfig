@@ -75,6 +75,13 @@ config NET
 	recommended to read the NET-HOWTO, available from
 	<http://www.tldp.org/docs.html#howto>.
 
+source "drivers/input/Kconfig"
+source "drivers/char/Kconfig"
+source "drivers/video/Kconfig"
+
+config X11_FB
+	bool "X11 Framebuffer driver"
+	depends on FB && !MODE_TT && !STATIC_LINK
 
 source "fs/Kconfig.binfmt"
 

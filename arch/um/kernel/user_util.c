@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <sys/mman.h> 
+#include <setjmp.h>
 #include <sys/stat.h>
 #include <sys/ptrace.h>
 #include <sys/utsname.h>
@@ -88,11 +89,11 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 				       errno);
 			}
 			else if(WIFEXITED(status)) 
-				printk("process exited with status %d\n", 
-				       WEXITSTATUS(status));
+				printk("process %d exited with status %d\n", 
+				       pid, WEXITSTATUS(status));
 			else if(WIFSIGNALED(status))
-				printk("process exited with signal %d\n", 
-				       WTERMSIG(status));
+				printk("process %d exited with signal %d\n", 
+				       pid, WTERMSIG(status));
 			else if((WSTOPSIG(status) == SIGVTALRM) ||
 				(WSTOPSIG(status) == SIGALRM) ||
 				(WSTOPSIG(status) == SIGIO) ||
@@ -108,8 +109,8 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 				ptrace(cont_type, pid, 0, WSTOPSIG(status));
 				continue;
 			}
-			else printk("process stopped with signal %d\n", 
-				    WSTOPSIG(status));
+			else printk("process %d stopped with signal %d\n", 
+				    pid, WSTOPSIG(status));
 			panic("wait_for_stop failed to wait for %d to stop "
 			      "with %d\n", pid, sig);
 		}
@@ -156,6 +157,18 @@ void setup_machinename(char *machine_out)
 
 	uname(&host);
 	strcpy(machine_out, host.machine);
+	/*
+	 * Pretend to be a i586 machine.
+	 *
+	 * This is a temporary workaround for several problems
+	 * triggered by the fact that the current 2.6 uml kernel
+	 * lacks a few system calls required for TLS/NPTL support,
+	 * whereas glibc expects these syscalls being present
+	 * unconditionally when the kernel version is 2.6.x.
+	 *
+	 */
+	if (0 == strcmp(machine_out,"i686"))
+		strcpy(machine_out,"i586");
 }
 
 char host_info[(_UTSNAME_LENGTH + 1) * 4 + _UTSNAME_NODENAME_LENGTH + 1];
@@ -167,6 +180,21 @@ void setup_hostinfo(void)
 	uname(&host);
 	sprintf(host_info, "%s %s %s %s %s", host.sysname, host.nodename,
 		host.release, host.version, host.machine);
+}
+
+int setjmp_wrapper(void (*proc)(void *, void *), ...)
+{
+        va_list args;
+	sigjmp_buf buf;
+	int n;
+
+	n = sigsetjmp(buf, 1);
+	if(n == 0){
+		va_start(args, proc);
+		(*proc)(&buf, &args);
+	}
+	va_end(args);
+	return(n);
 }
 
 /*
