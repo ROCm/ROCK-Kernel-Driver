@@ -215,9 +215,7 @@ struct tcp_tw_bucket {
 	long			tw_ts_recent_stamp;
 	unsigned long		tw_ttd;
 	struct tcp_bind_bucket	*tw_tb;
-	struct tcp_tw_bucket	*tw_next_death;
-	struct tcp_tw_bucket	**tw_pprev_death;
-
+	struct hlist_node	tw_death_node;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	struct in6_addr		tw_v6_daddr;
 	struct in6_addr		tw_v6_rcv_saddr;
@@ -236,8 +234,36 @@ static __inline__ void tw_add_bind_node(struct tcp_tw_bucket *tw,
 	hlist_add_head(&tw->tw_bind_node, list);
 }
 
+static inline int tw_dead_hashed(struct tcp_tw_bucket *tw)
+{
+	return tw->tw_death_node.pprev != NULL;
+}
+
+static __inline__ void tw_dead_node_init(struct tcp_tw_bucket *tw)
+{
+	tw->tw_death_node.pprev = NULL;
+}
+
+static __inline__ void __tw_del_dead_node(struct tcp_tw_bucket *tw)
+{
+	__hlist_del(&tw->tw_death_node);
+	tw_dead_node_init(tw);
+}
+
+static __inline__ int tw_del_dead_node(struct tcp_tw_bucket *tw)
+{
+	if (tw_dead_hashed(tw)) {
+		__tw_del_dead_node(tw);
+		return 1;
+	}
+	return 0;
+}
+
 #define tw_for_each(tw, node, head) \
 	hlist_for_each_entry(tw, node, head, tw_node)
+
+#define tw_for_each_inmate(tw, node, safe, jail) \
+	hlist_for_each_entry_safe(tw, node, safe, jail, tw_death_node)
 
 #define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))
 

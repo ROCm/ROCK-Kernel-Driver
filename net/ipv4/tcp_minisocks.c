@@ -358,7 +358,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		tw->tw_rcv_wnd		= tcp_receive_window(tp);
 		tw->tw_ts_recent	= tp->ts_recent;
 		tw->tw_ts_recent_stamp	= tp->ts_recent_stamp;
-		tw->tw_pprev_death	= NULL;
+		tw_dead_node_init(tw);
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 		if (tw->tw_family == PF_INET6) {
@@ -399,7 +399,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 }
 
 /* Kill off TIME_WAIT sockets once their lifetime has expired. */
-static int tcp_tw_death_row_slot = 0;
+static int tcp_tw_death_row_slot;
 
 static void tcp_twkill(unsigned long);
 
@@ -407,13 +407,14 @@ static void tcp_twkill(unsigned long);
 #define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
 #define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
 
-static struct tcp_tw_bucket *tcp_tw_death_row[TCP_TWKILL_SLOTS];
+static struct hlist_head tcp_tw_death_row[TCP_TWKILL_SLOTS];
 static spinlock_t tw_death_lock = SPIN_LOCK_UNLOCKED;
 static struct timer_list tcp_tw_timer = TIMER_INITIALIZER(tcp_twkill, 0, 0);
 
 static void tcp_twkill(unsigned long dummy)
 {
 	struct tcp_tw_bucket *tw;
+	struct hlist_node *node, *safe;
 	int killed = 0;
 
 	/* NOTE: compare this to previous version where lock
@@ -427,18 +428,13 @@ static void tcp_twkill(unsigned long dummy)
 	if (tcp_tw_count == 0)
 		goto out;
 
-	while((tw = tcp_tw_death_row[tcp_tw_death_row_slot]) != NULL) {
-		tcp_tw_death_row[tcp_tw_death_row_slot] = tw->tw_next_death;
-		if (tw->tw_next_death)
-			tw->tw_next_death->tw_pprev_death = tw->tw_pprev_death;
-		tw->tw_pprev_death = NULL;
+	tw_for_each_inmate(tw, node, safe,
+			   &tcp_tw_death_row[tcp_tw_death_row_slot]) {
+		__tw_del_dead_node(tw);
 		spin_unlock(&tw_death_lock);
-
 		tcp_timewait_kill(tw);
 		tcp_tw_put(tw);
-
 		killed++;
-
 		spin_lock(&tw_death_lock);
 	}
 	tcp_tw_death_row_slot =
@@ -459,11 +455,7 @@ out:
 void tcp_tw_deschedule(struct tcp_tw_bucket *tw)
 {
 	spin_lock(&tw_death_lock);
-	if (tw->tw_pprev_death) {
-		if (tw->tw_next_death)
-			tw->tw_next_death->tw_pprev_death = tw->tw_pprev_death;
-		*tw->tw_pprev_death = tw->tw_next_death;
-		tw->tw_pprev_death  = NULL;
+	if (tw_del_dead_node(tw)) {
 		tcp_tw_put(tw);
 		if (--tcp_tw_count == 0)
 			del_timer(&tcp_tw_timer);
@@ -479,11 +471,11 @@ static int tcp_twcal_jiffie;
 static void tcp_twcal_tick(unsigned long);
 static struct timer_list tcp_twcal_timer =
 		TIMER_INITIALIZER(tcp_twcal_tick, 0, 0);
-static struct tcp_tw_bucket *tcp_twcal_row[TCP_TW_RECYCLE_SLOTS];
+static struct hlist_head tcp_twcal_row[TCP_TW_RECYCLE_SLOTS];
 
 void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 {
-	struct tcp_tw_bucket **tpp;
+	struct hlist_head *list;
 	int slot;
 
 	/* timeout := RTO * 3.5
@@ -515,13 +507,9 @@ void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 	spin_lock(&tw_death_lock);
 
 	/* Unlink it, if it was scheduled */
-	if (tw->tw_pprev_death) {
-		if (tw->tw_next_death)
-			tw->tw_next_death->tw_pprev_death = tw->tw_pprev_death;
-		*tw->tw_pprev_death = tw->tw_next_death;
-		tw->tw_pprev_death  = NULL;
+	if (tw_del_dead_node(tw))
 		tcp_tw_count--;
-	} else
+	else
 		atomic_inc(&tw->tw_refcnt);
 
 	if (slot >= TCP_TW_RECYCLE_SLOTS) {
@@ -535,7 +523,7 @@ void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 		}
 		tw->tw_ttd = jiffies + timeo;
 		slot = (tcp_tw_death_row_slot + slot) & (TCP_TWKILL_SLOTS - 1);
-		tpp = &tcp_tw_death_row[slot];
+		list = &tcp_tw_death_row[slot];
 	} else {
 		tw->tw_ttd = jiffies + (slot << TCP_TW_RECYCLE_TICK);
 
@@ -549,13 +537,10 @@ void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 				mod_timer(&tcp_twcal_timer, jiffies + (slot<<TCP_TW_RECYCLE_TICK));
 			slot = (tcp_twcal_hand + slot)&(TCP_TW_RECYCLE_SLOTS-1);
 		}
-		tpp = &tcp_twcal_row[slot];
+		list = &tcp_twcal_row[slot];
 	}
 
-	if ((tw->tw_next_death = *tpp) != NULL)
-		(*tpp)->tw_pprev_death = &tw->tw_next_death;
-	*tpp = tw;
-	tw->tw_pprev_death = tpp;
+	hlist_add_head(&tw->tw_death_node, list);
 
 	if (tcp_tw_count++ == 0)
 		mod_timer(&tcp_tw_timer, jiffies+TCP_TWKILL_PERIOD);
@@ -579,12 +564,12 @@ void tcp_twcal_tick(unsigned long dummy)
 
 	for (n=0; n<TCP_TW_RECYCLE_SLOTS; n++) {
 		if (time_before_eq(j, now)) {
+			struct hlist_node *node, *safe;
 			struct tcp_tw_bucket *tw;
 
-			while((tw = tcp_twcal_row[slot]) != NULL) {
-				tcp_twcal_row[slot] = tw->tw_next_death;
-				tw->tw_pprev_death  = NULL;
-
+			tw_for_each_inmate(tw, node, safe,
+					   &tcp_twcal_row[slot]) {
+				__tw_del_dead_node(tw);
 				tcp_timewait_kill(tw);
 				tcp_tw_put(tw);
 				killed++;
@@ -596,7 +581,7 @@ void tcp_twcal_tick(unsigned long dummy)
 				tcp_twcal_hand = slot;
 			}
 
-			if (tcp_twcal_row[slot] != NULL) {
+			if (!hlist_empty(&tcp_twcal_row[slot])) {
 				mod_timer(&tcp_twcal_timer, j);
 				goto out;
 			}
