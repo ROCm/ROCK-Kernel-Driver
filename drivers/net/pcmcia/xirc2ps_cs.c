@@ -391,27 +391,26 @@ static int do_stop(struct net_device *dev);
 
 /*=============== Helper functions =========================*/
 static int
-get_tuple_data(int fn, client_handle_t handle, tuple_t *tuple)
+first_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 {
-    int err;
+	int err;
 
-    if ((err=CardServices(fn, handle, tuple)))
+	if ((err = pcmcia_get_first_tuple(handle, tuple)) == 0 &&
+			(err = pcmcia_get_tuple_data(handle, tuple)) == 0)
+		err = pcmcia_parse_tuple(handle, tuple, parse);
 	return err;
-    return CardServices(GetTupleData, handle, tuple);
 }
 
 static int
-get_tuple(int fn, client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
+next_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 {
-    int err;
+	int err;
 
-    if ((err=get_tuple_data(fn, handle, tuple)))
+	if ((err = pcmcia_get_next_tuple(handle, tuple)) == 0 &&
+			(err = pcmcia_get_tuple_data(handle, tuple)) == 0)
+		err = pcmcia_parse_tuple(handle, tuple, parse);
 	return err;
-    return CardServices(ParseTuple, handle, tuple, parse);
 }
-
-#define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
-#define next_tuple(a, b, c)  get_tuple(GetNextTuple, a, b, c)
 
 #define SelectPage(pgnr)   outb((pgnr), ioaddr + XIRCREG_PR)
 #define GetByte(reg)	   ((unsigned)inb(ioaddr + (reg)))
@@ -636,7 +635,7 @@ xirc2ps_attach(void)
     client_reg.event_handler = &xirc2ps_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    if ((err = CardServices(RegisterClient, &link->handle, &client_reg))) {
+    if ((err = pcmcia_register_client(&link->handle, &client_reg))) {
 	cs_error(link->handle, RegisterClient, err);
 	xirc2ps_detach(link);
 	return NULL;
@@ -680,7 +679,7 @@ xirc2ps_detach(dev_link_t * link)
 
     /* Break the link with Card Services */
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
 
     /* Unlink device structure, free it */
     *linkp = link->next;
@@ -887,7 +886,8 @@ xirc2ps_config(dev_link_t * link)
     }
     if (err) { /* not found: try to get the node-id from tuple 0x89 */
 	tuple.DesiredTuple = 0x89;  /* data layout looks like tuple 0x22 */
-	if (!(err = get_tuple_data(GetFirstTuple, handle, &tuple))) {
+	if ((err = pcmcia_get_first_tuple(handle, &tuple)) == 0 &&
+		(err = pcmcia_get_tuple_data(handle, &tuple)) == 0) {
 	    if (tuple.TupleDataLen == 8 && *buf == CISTPL_FUNCE_LAN_NODE_ID)
 		memcpy(&parse, buf, 8);
 	    else
@@ -953,8 +953,7 @@ xirc2ps_config(dev_link_t * link)
 			link->conf.ConfigIndex = cf->index ;
 			link->io.BasePort2 = cf->io.win[0].base;
 			link->io.BasePort1 = ioaddr;
-			if (!(err=CardServices(RequestIO, link->handle,
-								&link->io)))
+			if (!(err=pcmcia_request_io(link->handle, &link->io)))
 			    goto port_found;
 		    }
 		}
@@ -976,8 +975,7 @@ xirc2ps_config(dev_link_t * link)
 			link->io.BasePort1 = link->io.BasePort2
 				    + (pass ? (cf->index & 0x20 ? -24:8)
 					    : (cf->index & 0x20 ?   8:-24));
-			if (!(err=CardServices(RequestIO, link->handle,
-								&link->io)))
+			if (!(err=pcmcia_request_io(link->handle, &link->io)))
 			    goto port_found;
 		    }
 		}
@@ -992,11 +990,11 @@ xirc2ps_config(dev_link_t * link)
 	link->io.NumPorts1 = 16;
 	for (ioaddr = 0x300; ioaddr < 0x400; ioaddr += 0x10) {
 	    link->io.BasePort1 = ioaddr;
-	    if (!(err=CardServices(RequestIO, link->handle, &link->io)))
+	    if (!(err=pcmcia_request_io(link->handle, &link->io)))
 		goto port_found;
 	}
 	link->io.BasePort1 = 0; /* let CS decide */
-	if ((err=CardServices(RequestIO, link->handle, &link->io))) {
+	if ((err=pcmcia_request_io(link->handle, &link->io))) {
 	    cs_error(link->handle, RequestIO, err);
 	    goto config_error;
 	}
@@ -1009,7 +1007,7 @@ xirc2ps_config(dev_link_t * link)
      * Now allocate an interrupt line.	Note that this does not
      * actually assign a handler to the interrupt.
      */
-    if ((err=CardServices(RequestIRQ, link->handle, &link->irq))) {
+    if ((err=pcmcia_request_irq(link->handle, &link->irq))) {
 	cs_error(link->handle, RequestIRQ, err);
 	goto config_error;
     }
@@ -1018,8 +1016,7 @@ xirc2ps_config(dev_link_t * link)
      * This actually configures the PCMCIA socket -- setting up
      * the I/O windows and the interrupt mapping.
      */
-    if ((err=CardServices(RequestConfiguration,
-			  link->handle, &link->conf))) {
+    if ((err=pcmcia_request_configuration(link->handle, &link->conf))) {
 	cs_error(link->handle, RequestConfiguration, err);
 	goto config_error;
     }
@@ -1037,16 +1034,14 @@ xirc2ps_config(dev_link_t * link)
 	reg.Action = CS_WRITE;
 	reg.Offset = CISREG_IOBASE_0;
 	reg.Value = link->io.BasePort2 & 0xff;
-	if ((err = CardServices(AccessConfigurationRegister, link->handle,
-				&reg))) {
+	if ((err = pcmcia_access_configuration_register(link->handle, &reg))) {
 	    cs_error(link->handle, AccessConfigurationRegister, err);
 	    goto config_error;
 	}
 	reg.Action = CS_WRITE;
 	reg.Offset = CISREG_IOBASE_1;
 	reg.Value = (link->io.BasePort2 >> 8) & 0xff;
-	if ((err = CardServices(AccessConfigurationRegister, link->handle,
-				&reg))) {
+	if ((err = pcmcia_access_configuration_register(link->handle, &reg))) {
 	    cs_error(link->handle, AccessConfigurationRegister, err);
 	    goto config_error;
 	}
@@ -1058,15 +1053,14 @@ xirc2ps_config(dev_link_t * link)
 	req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
 	req.Base = req.Size = 0;
 	req.AccessSpeed = 0;
-	link->win = (window_handle_t)link->handle;
-	if ((err = CardServices(RequestWindow, &link->win, &req))) {
+	if ((err = pcmcia_request_window(&link->handle, &req, &link->win))) {
 	    cs_error(link->handle, RequestWindow, err);
 	    goto config_error;
 	}
 	local->dingo_ccr = ioremap(req.Base,0x1000) + 0x0800;
 	mem.CardOffset = 0x0;
 	mem.Page = 0;
-	if ((err = CardServices(MapMemPage, link->win, &mem))) {
+	if ((err = pcmcia_map_mem_page(link->win, &mem))) {
 	    cs_error(link->handle, MapMemPage, err);
 	    goto config_error;
 	}
@@ -1171,11 +1165,11 @@ xirc2ps_release(dev_link_t *link)
 	local_info_t *local = dev->priv;
 	if (local->dingo)
 	    iounmap(local->dingo_ccr - 0x0800);
-	CardServices(ReleaseWindow, link->win);
+	pcmcia_release_window(link->win);
     }
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+    pcmcia_release_configuration(link->handle);
+    pcmcia_release_io(link->handle, &link->io);
+    pcmcia_release_irq(link->handle, &link->irq);
     link->state &= ~DEV_CONFIG;
 
 } /* xirc2ps_release */
@@ -1227,7 +1221,7 @@ xirc2ps_event(event_t event, int priority,
 		netif_device_detach(dev);
 		do_powerdown(dev);
 	    }
-	    CardServices(ReleaseConfiguration, link->handle);
+	    pcmcia_release_configuration(link->handle);
 	}
 	break;
     case CS_EVENT_PM_RESUME:
@@ -1235,7 +1229,7 @@ xirc2ps_event(event_t event, int priority,
 	/* Fall through... */
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG) {
-	    CardServices(RequestConfiguration, link->handle, &link->conf);
+	    pcmcia_request_configuration(link->handle, &link->conf);
 	    if (link->open) {
 		do_reset(dev,1);
 		netif_device_attach(dev);

@@ -53,8 +53,8 @@
  * endian issues in treating two 32 bit numbers as one 64 bit number
  */
 static
-#if defined(__GNUC__) && (__GNUC__ == 2) && (__GNUC_MINOR__ == 95)
-__attribute__((unused))	/* gcc 2.95 miscompiles this when inlined */
+#if defined(__GNUC__) && (__GNUC__ == 2) && ( (__GNUC_MINOR__ == 95) || (__GNUC_MINOR__ == 96))
+__attribute__((unused))	/* gcc 2.95, 2.96 miscompile this when inlined */
 #else
 __inline__
 #endif

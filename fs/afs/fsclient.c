@@ -24,7 +24,7 @@
 
 #define FSFETCHSTATUS		132	/* AFS Fetch file status */
 #define FSFETCHDATA		130	/* AFS Fetch file data */
-#define FSGIVEUPCALLBACKS	147	/* AFS Discard server callback promises */
+#define FSGIVEUPCALLBACKS	147	/* AFS Discard callback promises */
 #define FSGETVOLUMEINFO		148	/* AFS Get root volume information */
 #define FSGETROOTVOLUME		151	/* AFS Get root volume name */
 #define FSLOOKUP		161	/* AFS lookup file in directory */
@@ -54,10 +54,9 @@ static void afs_rxfs_aemap(struct rxrpc_call *call)
  * - this operation doesn't seem to work correctly in OpenAFS server 1.2.2
  */
 #if 0
-int afs_rxfs_get_root_volume(afs_server_t *server, char *buf, size_t *buflen)
+int afs_rxfs_get_root_volume(struct afs_server *server,
+			     char *buf, size_t *buflen)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
 	struct iovec piov[2];
@@ -65,23 +64,25 @@ int afs_rxfs_get_root_volume(afs_server_t *server, char *buf, size_t *buflen)
 	int ret;
 	u32 param[1];
 
-	kenter("%p,%p,%u",server,buf,*buflen);
+	DECLARE_WAITQUEUE(myself, current);
+
+	kenter("%p,%p,%u",server, buf, *buflen);
 
 	/* get hold of the fileserver connection */
-	ret = afs_server_get_fsconn(server,&conn);
-	if (ret<0)
+	ret = afs_server_get_fsconn(server, &conn);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(conn,NULL,NULL,afs_rxfs_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(conn, NULL, NULL, afs_rxfs_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = FSGETROOTVOLUME;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
 	param[0] = htonl(FSGETROOTVOLUME);
@@ -90,14 +91,15 @@ int afs_rxfs_get_root_volume(afs_server_t *server, char *buf, size_t *buflen)
 	piov[0].iov_base = param;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,1,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 1, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		if (call->app_call_state!=RXRPC_CSTATE_CLNT_RCV_REPLY ||
+		if (call->app_call_state != RXRPC_CSTATE_CLNT_RCV_REPLY ||
 		    signal_pending(current))
 			break;
 		schedule();
@@ -111,41 +113,41 @@ int afs_rxfs_get_root_volume(afs_server_t *server, char *buf, size_t *buflen)
 	switch (call->app_call_state) {
 	case RXRPC_CSTATE_ERROR:
 		ret = call->app_errno;
-		kdebug("Got Error: %d",ret);
+		kdebug("Got Error: %d", ret);
 		goto out_unwait;
 
 	case RXRPC_CSTATE_CLNT_GOT_REPLY:
 		/* read the reply */
-		kdebug("Got Reply: qty=%d",call->app_ready_qty);
+		kdebug("Got Reply: qty=%d", call->app_ready_qty);
 
 		ret = -EBADMSG;
 		if (call->app_ready_qty <= 4)
 			goto abort;
 
-		ret = rxrpc_call_read_data(call,NULL,call->app_ready_qty,0);
-		if (ret<0)
+		ret = rxrpc_call_read_data(call, NULL, call->app_ready_qty, 0);
+		if (ret < 0)
 			goto abort;
 
 #if 0
 		/* unmarshall the reply */
 		bp = buffer;
-		for (loop=0; loop<65; loop++)
+		for (loop = 0; loop < 65; loop++)
 			entry->name[loop] = ntohl(*bp++);
 		entry->name[64] = 0;
 
 		entry->type = ntohl(*bp++);
 		entry->num_servers = ntohl(*bp++);
 
-		for (loop=0; loop<8; loop++)
+		for (loop = 0; loop < 8; loop++)
 			entry->servers[loop].addr.s_addr = *bp++;
 
-		for (loop=0; loop<8; loop++)
+		for (loop = 0; loop < 8; loop++)
 			entry->servers[loop].partition = ntohl(*bp++);
 
-		for (loop=0; loop<8; loop++)
+		for (loop = 0; loop < 8; loop++)
 			entry->servers[loop].flags = ntohl(*bp++);
 
-		for (loop=0; loop<3; loop++)
+		for (loop = 0; loop < 3; loop++)
 			entry->volume_ids[loop] = ntohl(*bp++);
 
 		entry->clone_id = ntohl(*bp++);
@@ -162,14 +164,14 @@ int afs_rxfs_get_root_volume(afs_server_t *server, char *buf, size_t *buflen)
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
-	afs_server_release_fsconn(server,conn);
+	afs_server_release_fsconn(server, conn);
  out:
 	kleave("");
 	return ret;
@@ -181,12 +183,10 @@ int afs_rxfs_get_root_volume(afs_server_t *server, char *buf, size_t *buflen)
  * get information about a volume
  */
 #if 0
-int afs_rxfs_get_volume_info(afs_server_t *server,
+int afs_rxfs_get_volume_info(struct afs_server *server,
 			     const char *name,
-			     afs_volume_info_t *vinfo)
+			     struct afs_volume_info *vinfo)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
 	struct iovec piov[3];
@@ -194,27 +194,29 @@ int afs_rxfs_get_volume_info(afs_server_t *server,
 	int ret;
 	u32 param[2], *bp, zero;
 
-	_enter("%p,%s,%p",server,name,vinfo);
+	DECLARE_WAITQUEUE(myself, current);
+
+	_enter("%p,%s,%p", server, name, vinfo);
 
 	/* get hold of the fileserver connection */
-	ret = afs_server_get_fsconn(server,&conn);
-	if (ret<0)
+	ret = afs_server_get_fsconn(server, &conn);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(conn,NULL,NULL,afs_rxfs_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(conn, NULL, NULL, afs_rxfs_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = FSGETVOLUMEINFO;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
 	piov[1].iov_len = strlen(name);
-	piov[1].iov_base = (char*)name;
+	piov[1].iov_base = (char *) name;
 
 	zero = 0;
 	piov[2].iov_len = (4 - (piov[1].iov_len & 3)) & 3;
@@ -227,16 +229,19 @@ int afs_rxfs_get_volume_info(afs_server_t *server,
 	piov[0].iov_base = param;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,3,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 3, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
-	bp = rxrpc_call_alloc_scratch(call,64);
+	bp = rxrpc_call_alloc_scratch(call, 64);
 
-	ret = rxrpc_call_read_data(call,bp,64,RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
-	if (ret<0) {
-		if (ret==-ECONNABORTED) {
+	ret = rxrpc_call_read_data(call, bp, 64,
+				   RXRPC_CALL_READ_BLOCK |
+				   RXRPC_CALL_READ_ALL);
+	if (ret < 0) {
+		if (ret == -ECONNABORTED) {
 			ret = call->app_errno;
 			goto out_unwait;
 		}
@@ -264,7 +269,7 @@ int afs_rxfs_get_volume_info(afs_server_t *server,
 	vinfo->servers[7].addr.s_addr = *bp++;
 
 	ret = -EBADMSG;
-	if (vinfo->nservers>8)
+	if (vinfo->nservers > 8)
 		goto abort;
 
 	/* success */
@@ -272,17 +277,17 @@ int afs_rxfs_get_volume_info(afs_server_t *server,
 
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
-	afs_server_release_fsconn(server,conn);
+	afs_server_release_fsconn(server, conn);
  out:
 	_leave("");
 	return ret;
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 	goto out_unwait;
 
@@ -293,12 +298,10 @@ int afs_rxfs_get_volume_info(afs_server_t *server,
 /*
  * fetch the status information for a file
  */
-int afs_rxfs_fetch_file_status(afs_server_t *server,
-			       afs_vnode_t *vnode,
-			       afs_volsync_t *volsync)
+int afs_rxfs_fetch_file_status(struct afs_server *server,
+			       struct afs_vnode *vnode,
+			       struct afs_volsync *volsync)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
 	struct afs_server_callslot callslot;
 	struct rxrpc_call *call;
 	struct iovec piov[1];
@@ -306,26 +309,30 @@ int afs_rxfs_fetch_file_status(afs_server_t *server,
 	int ret;
 	u32 *bp;
 
-	_enter("%p,{%u,%u,%u}",server,vnode->fid.vid,vnode->fid.vnode,vnode->fid.unique);
+	DECLARE_WAITQUEUE(myself, current);
+
+	_enter("%p,{%u,%u,%u}",
+	       server, vnode->fid.vid, vnode->fid.vnode, vnode->fid.unique);
 
 	/* get hold of the fileserver connection */
-	ret = afs_server_request_callslot(server,&callslot);
-	if (ret<0)
+	ret = afs_server_request_callslot(server, &callslot);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(callslot.conn,NULL,NULL,afs_rxfs_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(callslot.conn, NULL, NULL, afs_rxfs_aemap,
+				&call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = FSFETCHSTATUS;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
-	bp = rxrpc_call_alloc_scratch(call,16);
+	bp = rxrpc_call_alloc_scratch(call, 16);
 	bp[0] = htonl(FSFETCHSTATUS);
 	bp[1] = htonl(vnode->fid.vid);
 	bp[2] = htonl(vnode->fid.vnode);
@@ -335,16 +342,19 @@ int afs_rxfs_fetch_file_status(afs_server_t *server,
 	piov[0].iov_base = bp;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,1,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 1, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
-	bp = rxrpc_call_alloc_scratch(call,120);
+	bp = rxrpc_call_alloc_scratch(call, 120);
 
-	ret = rxrpc_call_read_data(call,bp,120,RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
-	if (ret<0) {
-		if (ret==-ECONNABORTED) {
+	ret = rxrpc_call_read_data(call, bp, 120,
+				   RXRPC_CALL_READ_BLOCK |
+				   RXRPC_CALL_READ_ALL);
+	if (ret < 0) {
+		if (ret == -ECONNABORTED) {
 			ret = call->app_errno;
 			goto out_unwait;
 		}
@@ -370,7 +380,7 @@ int afs_rxfs_fetch_file_status(afs_server_t *server,
 	vnode->status.mtime_server	= ntohl(*bp++);
 	bp++; /* group */
 	bp++; /* sync counter */
-	vnode->status.version		|= ((unsigned long long) ntohl(*bp++)) << 32;
+	vnode->status.version |= ((unsigned long long) ntohl(*bp++)) << 32;
 	bp++; /* spare2 */
 	bp++; /* spare3 */
 	bp++; /* spare4 */
@@ -393,17 +403,17 @@ int afs_rxfs_fetch_file_status(afs_server_t *server,
 
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
-	afs_server_release_callslot(server,&callslot);
+	afs_server_release_callslot(server, &callslot);
  out:
 	_leave("");
 	return ret;
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 	goto out_unwait;
 } /* end afs_rxfs_fetch_file_status() */
@@ -412,19 +422,19 @@ int afs_rxfs_fetch_file_status(afs_server_t *server,
 /*
  * fetch the contents of a file or directory
  */
-int afs_rxfs_fetch_file_data(afs_server_t *server,
-			     afs_vnode_t *vnode,
+int afs_rxfs_fetch_file_data(struct afs_server *server,
+			     struct afs_vnode *vnode,
 			     struct afs_rxfs_fetch_descriptor *desc,
-			     afs_volsync_t *volsync)
+			     struct afs_volsync *volsync)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
 	struct afs_server_callslot callslot;
 	struct rxrpc_call *call;
 	struct iovec piov[1];
 	size_t sent;
 	int ret;
 	u32 *bp;
+
+	DECLARE_WAITQUEUE(myself, current);
 
 	_enter("%p,{fid={%u,%u,%u},sz=%Zu,of=%lu}",
 	       server,
@@ -435,23 +445,23 @@ int afs_rxfs_fetch_file_data(afs_server_t *server,
 	       desc->offset);
 
 	/* get hold of the fileserver connection */
-	ret = afs_server_request_callslot(server,&callslot);
-	if (ret<0)
+	ret = afs_server_request_callslot(server, &callslot);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(callslot.conn,NULL,NULL,afs_rxfs_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(callslot.conn, NULL, NULL, afs_rxfs_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = FSFETCHDATA;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
-	bp = rxrpc_call_alloc_scratch(call,24);
+	bp = rxrpc_call_alloc_scratch(call, 24);
 	bp[0] = htonl(FSFETCHDATA);
 	bp[1] = htonl(desc->fid.vid);
 	bp[2] = htonl(desc->fid.vnode);
@@ -463,17 +473,18 @@ int afs_rxfs_fetch_file_data(afs_server_t *server,
 	piov[0].iov_base = bp;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,1,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 1, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the data count to arrive */
-	ret = rxrpc_call_read_data(call,bp,4,RXRPC_CALL_READ_BLOCK);
-	if (ret<0)
+	ret = rxrpc_call_read_data(call, bp, 4, RXRPC_CALL_READ_BLOCK);
+	if (ret < 0)
 		goto read_failed;
 
 	desc->actual = ntohl(bp[0]);
-	if (desc->actual!=desc->size) {
+	if (desc->actual != desc->size) {
 		ret = -EBADMSG;
 		goto abort;
 	}
@@ -481,16 +492,19 @@ int afs_rxfs_fetch_file_data(afs_server_t *server,
 	/* call the app to read the actual data */
 	rxrpc_call_reset_scratch(call);
 
-	ret = rxrpc_call_read_data(call,desc->buffer,desc->actual,RXRPC_CALL_READ_BLOCK);
-	if (ret<0)
+	ret = rxrpc_call_read_data(call, desc->buffer, desc->actual,
+				   RXRPC_CALL_READ_BLOCK);
+	if (ret < 0)
 		goto read_failed;
 
 	/* wait for the rest of the reply to completely arrive */
 	rxrpc_call_reset_scratch(call);
-	bp = rxrpc_call_alloc_scratch(call,120);
+	bp = rxrpc_call_alloc_scratch(call, 120);
 
-	ret = rxrpc_call_read_data(call,bp,120,RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
-	if (ret<0)
+	ret = rxrpc_call_read_data(call, bp, 120,
+				   RXRPC_CALL_READ_BLOCK |
+				   RXRPC_CALL_READ_ALL);
+	if (ret < 0)
 		goto read_failed;
 
 	/* unmarshall the reply */
@@ -512,7 +526,7 @@ int afs_rxfs_fetch_file_data(afs_server_t *server,
 	vnode->status.mtime_server	= ntohl(*bp++);
 	bp++; /* group */
 	bp++; /* sync counter */
-	vnode->status.version		|= ((unsigned long long) ntohl(*bp++)) << 32;
+	vnode->status.version |= ((unsigned long long) ntohl(*bp++)) << 32;
 	bp++; /* spare2 */
 	bp++; /* spare3 */
 	bp++; /* spare4 */
@@ -538,20 +552,20 @@ int afs_rxfs_fetch_file_data(afs_server_t *server,
 	remove_wait_queue(&call->waitq,&myself);
 	rxrpc_put_call(call);
  out_put_conn:
-	afs_server_release_callslot(server,&callslot);
+	afs_server_release_callslot(server, &callslot);
  out:
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 
  read_failed:
-	if (ret==-ECONNABORTED) {
+	if (ret == -ECONNABORTED) {
 		ret = call->app_errno;
 		goto out_unwait;
 	}
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 	goto out_unwait;
 
@@ -561,10 +575,9 @@ int afs_rxfs_fetch_file_data(afs_server_t *server,
 /*
  * ask the AFS fileserver to discard a callback request on a file
  */
-int afs_rxfs_give_up_callback(afs_server_t *server, afs_vnode_t *vnode)
+int afs_rxfs_give_up_callback(struct afs_server *server,
+			      struct afs_vnode *vnode)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
 	struct afs_server_callslot callslot;
 	struct rxrpc_call *call;
 	struct iovec piov[1];
@@ -572,28 +585,31 @@ int afs_rxfs_give_up_callback(afs_server_t *server, afs_vnode_t *vnode)
 	int ret;
 	u32 *bp;
 
-	_enter("%p,{%u,%u,%u}",server,vnode->fid.vid,vnode->fid.vnode,vnode->fid.unique);
+	DECLARE_WAITQUEUE(myself, current);
+
+	_enter("%p,{%u,%u,%u}",
+	       server, vnode->fid.vid, vnode->fid.vnode, vnode->fid.unique);
 
 	/* get hold of the fileserver connection */
-	ret = afs_server_request_callslot(server,&callslot);
-	if (ret<0)
+	ret = afs_server_request_callslot(server, &callslot);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(callslot.conn,NULL,NULL,afs_rxfs_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(callslot.conn, NULL, NULL, afs_rxfs_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = FSGIVEUPCALLBACKS;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
-	bp = rxrpc_call_alloc_scratch(call,(1+4+4)*4);
+	bp = rxrpc_call_alloc_scratch(call, (1 + 4 + 4) * 4);
 
-	piov[0].iov_len = (1+4+4)*4;
+	piov[0].iov_len = (1 + 4 + 4) * 4;
 	piov[0].iov_base = bp;
 
 	*bp++ = htonl(FSGIVEUPCALLBACKS);
@@ -607,14 +623,15 @@ int afs_rxfs_give_up_callback(afs_server_t *server, afs_vnode_t *vnode)
 	*bp++ = htonl(vnode->cb_type);
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,1,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 1, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		if (call->app_call_state!=RXRPC_CSTATE_CLNT_RCV_REPLY ||
+		if (call->app_call_state != RXRPC_CSTATE_CLNT_RCV_REPLY ||
 		    signal_pending(current))
 			break;
 		schedule();
@@ -640,17 +657,17 @@ int afs_rxfs_give_up_callback(afs_server_t *server, afs_vnode_t *vnode)
 
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
-	afs_server_release_callslot(server,&callslot);
+	afs_server_release_callslot(server, &callslot);
  out:
 	_leave("");
 	return ret;
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 	goto out_unwait;
 } /* end afs_rxfs_give_up_callback() */
@@ -661,14 +678,12 @@ int afs_rxfs_give_up_callback(afs_server_t *server, afs_vnode_t *vnode)
  * - this operation doesn't seem to work correctly in OpenAFS server 1.2.2
  */
 #if 0
-int afs_rxfs_lookup(afs_server_t *server,
-		    afs_vnode_t *dir,
+int afs_rxfs_lookup(struct afs_server *server,
+		    struct afs_vnode *dir,
 		    const char *filename,
-		    afs_vnode_t *vnode,
-		    afs_volsync_t *volsync)
+		    struct afs_vnode *vnode,
+		    struct afs_volsync *volsync)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
 	struct iovec piov[3];
@@ -676,17 +691,20 @@ int afs_rxfs_lookup(afs_server_t *server,
 	int ret;
 	u32 *bp, zero;
 
-	kenter("%p,{%u,%u,%u},%s",server,fid->vid,fid->vnode,fid->unique,filename);
+	DECLARE_WAITQUEUE(myself, current);
+
+	kenter("%p,{%u,%u,%u},%s",
+	       server, fid->vid, fid->vnode, fid->unique, filename);
 
 	/* get hold of the fileserver connection */
-	ret = afs_server_get_fsconn(server,&conn);
-	if (ret<0)
+	ret = afs_server_get_fsconn(server, &conn);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(conn,NULL,NULL,afs_rxfs_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(conn, NULL, NULL, afs_rxfs_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = FSLOOKUP;
@@ -695,14 +713,14 @@ int afs_rxfs_lookup(afs_server_t *server,
 	add_wait_queue(&call->waitq,&myself);
 
 	/* marshall the parameters */
-	bp = rxrpc_call_alloc_scratch(call,20);
+	bp = rxrpc_call_alloc_scratch(call, 20);
 
 	zero = 0;
 
 	piov[0].iov_len = 20;
 	piov[0].iov_base = bp;
 	piov[1].iov_len = strlen(filename);
-	piov[1].iov_base = (char*) filename;
+	piov[1].iov_base = (char *) filename;
 	piov[2].iov_len = (4 - (piov[1].iov_len & 3)) & 3;
 	piov[2].iov_base = &zero;
 
@@ -713,16 +731,19 @@ int afs_rxfs_lookup(afs_server_t *server,
 	*bp++ = htonl(piov[1].iov_len);
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,3,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 3, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
-	bp = rxrpc_call_alloc_scratch(call,220);
+	bp = rxrpc_call_alloc_scratch(call, 220);
 
-	ret = rxrpc_call_read_data(call,bp,220,RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
-	if (ret<0) {
-		if (ret==-ECONNABORTED) {
+	ret = rxrpc_call_read_data(call, bp, 220,
+				   RXRPC_CALL_READ_BLOCK |
+				   RXRPC_CALL_READ_ALL);
+	if (ret < 0) {
+		if (ret == -ECONNABORTED) {
 			ret = call->app_errno;
 			goto out_unwait;
 		}
@@ -752,30 +773,30 @@ int afs_rxfs_lookup(afs_server_t *server,
 	vnode->status.mtime_server	= ntohl(*bp++);
 	bp++; /* group */
 	bp++; /* sync counter */
-	vnode->status.version		|= ((unsigned long long) ntohl(*bp++)) << 32;
+	vnode->status.version |= ((unsigned long long) ntohl(*bp++)) << 32;
 	bp++; /* spare2 */
 	bp++; /* spare3 */
 	bp++; /* spare4 */
 
 	dir->status.if_version		= ntohl(*bp++);
-	dir->status.type			= ntohl(*bp++);
+	dir->status.type		= ntohl(*bp++);
 	dir->status.nlink		= ntohl(*bp++);
-	dir->status.size			= ntohl(*bp++);
+	dir->status.size		= ntohl(*bp++);
 	dir->status.version		= ntohl(*bp++);
 	dir->status.author		= ntohl(*bp++);
 	dir->status.owner		= ntohl(*bp++);
 	dir->status.caller_access	= ntohl(*bp++);
 	dir->status.anon_access		= ntohl(*bp++);
-	dir->status.mode			= ntohl(*bp++);
+	dir->status.mode		= ntohl(*bp++);
 	dir->status.parent.vid		= dirfid->vid;
-	dir->status.parent.vnode		= ntohl(*bp++);
+	dir->status.parent.vnode	= ntohl(*bp++);
 	dir->status.parent.unique	= ntohl(*bp++);
 	bp++; /* seg size */
-	dir->status.mtime_client		= ntohl(*bp++);
-	dir->status.mtime_server		= ntohl(*bp++);
+	dir->status.mtime_client	= ntohl(*bp++);
+	dir->status.mtime_server	= ntohl(*bp++);
 	bp++; /* group */
 	bp++; /* sync counter */
-	dir->status.version		|= ((unsigned long long) ntohl(*bp++)) << 32;
+	dir->status.version |= ((unsigned long long) ntohl(*bp++)) << 32;
 	bp++; /* spare2 */
 	bp++; /* spare3 */
 	bp++; /* spare4 */
@@ -799,17 +820,17 @@ int afs_rxfs_lookup(afs_server_t *server,
 
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
-	afs_server_release_fsconn(server,conn);
+	afs_server_release_fsconn(server, conn);
  out:
 	kleave("");
 	return ret;
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 	goto out_unwait;
 } /* end afs_rxfs_lookup() */

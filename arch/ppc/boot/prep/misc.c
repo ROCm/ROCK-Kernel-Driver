@@ -249,7 +249,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 
 			/* get the info */
 			if (getprop(dev_handle, "reg", mem_info,
-						sizeof(mem_info) != 8))
+						sizeof(mem_info)) != 8)
 				break;
 
 			TotalMemory = mem_info[1];

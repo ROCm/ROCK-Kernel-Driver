@@ -51,8 +51,9 @@ void snd_verbose_printk(const char *file, int line, const char *format, ...)
 		printk("ALSA %s:%d: ", file, line);
 	}
 	va_start(args, format);
-	vsnprintf(tmpbuf, sizeof(tmpbuf), format, args);
+	vsnprintf(tmpbuf, sizeof(tmpbuf)-1, format, args);
 	va_end(args);
+	tmpbuf[sizeof(tmpbuf)-1] = '\0';
 	printk(tmpbuf);
 }
 #endif
@@ -72,8 +73,9 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
 		printk(KERN_DEBUG "ALSA %s:%d: ", file, line);
 	}
 	va_start(args, format);
-	vsnprintf(tmpbuf, sizeof(tmpbuf), format, args);
+	vsnprintf(tmpbuf, sizeof(tmpbuf)-1, format, args);
 	va_end(args);
+	tmpbuf[sizeof(tmpbuf)-1] = '\0';
 	printk(tmpbuf);
 
 }

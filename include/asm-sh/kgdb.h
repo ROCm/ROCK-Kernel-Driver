@@ -18,6 +18,8 @@
 
 #include <asm/ptrace.h>
 
+struct console;
+
 /* Same as pt_regs but has vbr in place of syscall_nr */
 struct kgdb_regs {
         unsigned long regs[16];
@@ -88,6 +90,18 @@ extern int     setjmp(jmp_buf __jmpb);
     asm volatile("trapa   #0xff");                            \
   }                                                           \
 } while (0)
+
+/* KGDB should be able to flush all kernel text space */
+#if defined(CONFIG_CPU_SH4)
+#define kgdb_flush_icache_range(start, end) \
+{									\
+	extern void __flush_purge_region(void *, int);			\
+	__flush_purge_region((void*)(start), (int)(end) - (int)(start));\
+	flush_icache_range((start), (end));				\
+}
+#else
+#define kgdb_flush_icache_range(start, end)	do { } while (0)
+#endif
 
 /* Kernel assert macros */
 #ifdef CONFIG_KGDB_KERNEL_ASSERTS

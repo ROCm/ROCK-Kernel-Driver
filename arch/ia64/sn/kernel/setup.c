@@ -1,33 +1,9 @@
 /*
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
  * Copyright (C) 1999,2001-2003 Silicon Graphics, Inc. All rights reserved.
- * 
- * This program is free software; you can redistribute it and/or modify it 
- * under the terms of version 2 of the GNU General Public License 
- * as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope that it would be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
- * 
- * Further, this software is distributed without any warranty that it is 
- * free of the rightful claim of any third person regarding infringement 
- * or the like.  Any license provided herein, whether implied or 
- * otherwise, applies only to this software file.  Patent licenses, if 
- * any, provided herein do not apply to combinations of this program with 
- * other software, or any other product whatsoever.
- * 
- * You should have received a copy of the GNU General Public 
- * License along with this program; if not, write the Free Software 
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
- * Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pkwy, 
- * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
- * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
 #include <linux/config.h>
@@ -82,6 +58,7 @@ extern void bte_init_node (nodepda_t *, cnodeid_t);
 extern void bte_init_cpu (void);
 extern void sn_timer_init(void);
 extern unsigned long last_time_offset;
+extern void init_platform_hubinfo(nodepda_t **nodepdaindr);
 extern void (*ia64_mark_idle)(int);
 extern void snidle(int);
 
@@ -92,6 +69,8 @@ char sn_system_serial_number_string[128];
 u64 sn_partition_serial_number;
 
 short physical_node_map[MAX_PHYSNODE_ID];
+
+int     numionodes;
 
 /*
  * This is the address of the RRegs in the HSpace of the global
@@ -240,9 +219,10 @@ sn_setup(char **cmdline_p)
 	long status, ticks_per_sec, drift;
 	int pxm;
 	int major = sn_sal_rev_major(), minor = sn_sal_rev_minor();
-	extern void io_sh_swapper(int, int);
-	extern nasid_t get_master_baseio_nasid(void);
+	extern nasid_t snia_get_master_baseio_nasid(void);
 	extern void sn_cpu_init(void);
+	extern nasid_t snia_get_console_nasid(void);
+
 
 	MAX_DMA_ADDRESS = PAGE_OFFSET + MAX_PHYS_MEMORY;
 
@@ -263,11 +243,9 @@ sn_setup(char **cmdline_p)
 		panic("PROM version too old\n");
 	}
 
-	io_sh_swapper(get_nasid(), 0);
-
 	master_nasid = get_nasid();
-	(void)get_console_nasid();
-	(void)get_master_baseio_nasid();
+	(void)snia_get_console_nasid();
+	(void)snia_get_master_baseio_nasid();
 
 	status = ia64_sal_freq_base(SAL_FREQ_BASE_REALTIME_CLOCK, &ticks_per_sec, &drift);
 	if (status != 0 || ticks_per_sec < 100000) {
@@ -312,6 +290,12 @@ sn_setup(char **cmdline_p)
 	 */
 	sn_cpu_init();
 
+	/*
+	 * Setup hubinfo stuff. Has to happen AFTER sn_cpu_init(),
+	 * because it uses the cnode to nasid tables.
+	 */
+	init_platform_hubinfo(nodepdaindr);
+
 #ifdef CONFIG_SMP
 	init_smp_config();
 #endif
@@ -329,6 +313,7 @@ void
 sn_init_pdas(char **cmdline_p)
 {
 	cnodeid_t	cnode;
+	void scan_for_ionodes(void);
 
 	/*
 	 * Make sure that the PDA fits entirely in the same page as the 
@@ -340,6 +325,9 @@ sn_init_pdas(char **cmdline_p)
 	memset(pda->cnodeid_to_nasid_table, -1, sizeof(pda->cnodeid_to_nasid_table));
 	for (cnode=0; cnode<numnodes; cnode++)
 		pda->cnodeid_to_nasid_table[cnode] = pxm_to_nasid(nid_to_pxm_map[cnode]);
+
+	numionodes = numnodes;
+	scan_for_ionodes();
 
         /*
          * Allocate & initalize the nodepda for each node.
@@ -441,4 +429,33 @@ sn_cpu_init(void)
 	}
 
 	bte_init_cpu();
+}
+
+/*
+ * Scan klconfig for ionodes.  Add the nasids to the
+ * physical_node_map and the pda and increment numionodes.
+ */
+
+void
+scan_for_ionodes(void) {
+	int nasid = 0;
+
+	/* Setup ionodes with memory */
+	for (nasid = 0; nasid < MAX_PHYSNODE_ID; nasid +=2) {
+		u64 klgraph_header;
+		cnodeid_t cnodeid;
+
+		if (physical_node_map[nasid] == -1) 
+			continue;
+
+		klgraph_header = cnodeid = -1;
+		klgraph_header = ia64_sn_get_klconfig_addr(nasid);
+		if (klgraph_header <= 0)
+			BUG(); /* All nodes must have klconfig tables! */
+		cnodeid = nasid_to_cnodeid(nasid);
+		root_lboard[cnodeid] = (lboard_t *)
+					NODE_OFFSET_TO_LBOARD( (nasid),
+					((kl_config_hdr_t *)(klgraph_header))->
+					ch_board_info);
+	}
 }

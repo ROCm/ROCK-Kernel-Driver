@@ -211,11 +211,11 @@
 /* Set the copy breakpoint for the copy-only-tiny-frames scheme.
    Setting to > 1512 effectively disables this feature. */
 #ifndef __arm__
-static const int rx_copybreak = 200;
+static int rx_copybreak = 200;
 #else
 /* ARM systems perform better by disregarding the bus-master
    transfer capability of these cards. -- rmk */
-static const int rx_copybreak = 1513;
+static int rx_copybreak = 1513;
 #endif
 /* Allow setting MTU to a larger size, bypassing the normal ethernet setup. */
 static const int mtu = 1500;

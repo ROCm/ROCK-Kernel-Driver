@@ -790,10 +790,10 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall
 	.llong .sys_ni_syscall		/* 225 - reserved for tux */
 	.llong .sys32_sendfile64
-	.llong .sys32_io_setup
+	.llong .compat_sys_io_setup
 	.llong .sys_io_destroy
-	.llong .sys32_io_getevents
-	.llong .sys32_io_submit
+	.llong .compat_sys_io_getevents
+	.llong .compat_sys_io_submit
 	.llong .sys_io_cancel
 	.llong .sys_set_tid_address
 	.llong .ppc32_fadvise64

@@ -6,8 +6,9 @@
  */
 
 #include <asm/types.h>
+#include <linux/compiler.h>
 
-static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
+static __inline__ __attribute_const__ __u32 ___arch__swab32(__u32 x)
 {
 	__asm__("swap.b	%0, %0\n\t"
 		"swap.w %0, %0\n\t"
@@ -17,7 +18,7 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 	return x;
 }
 
-static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
+static __inline__ __attribute_const__ __u16 ___arch__swab16(__u16 x)
 {
 	__asm__("swap.b %0, %0"
 		: "=r" (x)

@@ -112,6 +112,7 @@ config IRQ_ALL_CPUS
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-128)"
+	range 2 128
 	depends on SMP
 	default "32"
 

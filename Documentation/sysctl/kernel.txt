@@ -251,6 +251,25 @@ the different loglevels.
 
 ==============================================================
 
+printk_ratelimit:
+
+Some warning messages are rate limited. printk_ratelimit specifies
+the minimum length of time between these messages, by default we
+allow one every 5 seconds.
+
+A value of 0 will disable rate limiting.
+
+==============================================================
+
+printk_ratelimit_burst:
+
+While long term we enforce one message per printk_ratelimit
+seconds, we do allow a burst of messages to pass through.
+printk_ratelimit_burst specifies the number of messages we can
+send before ratelimiting kicks in.
+
+==============================================================
+
 reboot-cmd: (Sparc only)
 
 ??? This seems to be a way to give an argument to the Sparc

@@ -8,8 +8,6 @@
 /* entry.S is sensitive to the offsets of these fields */
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int __syscall_count;
-	struct task_struct * __ksoftirqd_task;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
@@ -96,28 +94,5 @@ do {									\
 #else
 extern void synchronize_irq(unsigned int irq);
 #endif /* CONFIG_SMP */
-
-/* XXX: MRB-remove
-#define in_interrupt() ({ int __cpu = smp_processor_id(); \
-	(local_irq_count(__cpu) + local_bh_count(__cpu) != 0); })
-
-#define in_irq() (local_irq_count(smp_processor_id()) != 0)
-
-#ifndef CONFIG_SMP
-
-#define hardirq_trylock(cpu)	(local_irq_count(cpu) == 0)
-#define hardirq_endlock(cpu)	do { } while (0)
-
-#define irq_enter(cpu, irq)	(local_irq_count(cpu)++)
-#define irq_exit(cpu, irq)	(local_irq_count(cpu)--)
-
-#define synchronize_irq()	barrier()
-
-#else
-
-#error Super-H SMP is not available
-
-#endif
-*/
 
 #endif /* __ASM_SH_HARDIRQ_H */

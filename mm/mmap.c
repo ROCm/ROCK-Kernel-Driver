@@ -80,11 +80,10 @@ static void remove_shared_vm_struct(struct vm_area_struct *vma)
 	struct file *file = vma->vm_file;
 
 	if (file) {
-		struct inode *inode = file->f_dentry->d_inode;
-
-		down(&inode->i_mapping->i_shared_sem);
-		__remove_shared_vm_struct(vma, inode);
-		up(&inode->i_mapping->i_shared_sem);
+		struct address_space *mapping = file->f_mapping;
+		down(&mapping->i_shared_sem);
+		__remove_shared_vm_struct(vma, file->f_dentry->d_inode);
+		up(&mapping->i_shared_sem);
 	}
 }
 
@@ -235,11 +234,10 @@ static inline void __vma_link_file(struct vm_area_struct *vma)
 
 	file = vma->vm_file;
 	if (file) {
-		struct inode * inode = file->f_dentry->d_inode;
-		struct address_space *mapping = inode->i_mapping;
+		struct address_space *mapping = file->f_mapping;
 
 		if (vma->vm_flags & VM_DENYWRITE)
-			atomic_dec(&inode->i_writecount);
+			atomic_dec(&file->f_dentry->d_inode->i_writecount);
 
 		if (vma->vm_flags & VM_SHARED)
 			list_add_tail(&vma->shared, &mapping->i_mmap_shared);
@@ -265,7 +263,7 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct address_space *mapping = NULL;
 
 	if (vma->vm_file)
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		mapping = vma->vm_file->f_mapping;
 
 	if (mapping)
 		down(&mapping->i_shared_sem);
@@ -383,7 +381,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	if (vm_flags & VM_SPECIAL)
 		return 0;
 
-	i_shared_sem = file ? &inode->i_mapping->i_shared_sem : NULL;
+	i_shared_sem = file ? &file->f_mapping->i_shared_sem : NULL;
 
 	if (!prev) {
 		prev = rb_entry(rb_parent, struct vm_area_struct, vm_rb);
@@ -462,11 +460,11 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
  * The caller must hold down_write(current->mm->mmap_sem).
  */
 
-unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file, 
-			    unsigned long addr, unsigned long len,
-			    unsigned long prot, unsigned long flags,
-			    unsigned long pgoff)
+unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
+			unsigned long len, unsigned long prot,
+			unsigned long flags, unsigned long pgoff)
 {
+	struct mm_struct * mm = current->mm;
 	struct vm_area_struct * vma, * prev;
 	struct inode *inode;
 	unsigned int vm_flags;
@@ -714,7 +712,7 @@ unacct_error:
 	return error;
 }
 
-EXPORT_SYMBOL(__do_mmap_pgoff);
+EXPORT_SYMBOL(do_mmap_pgoff);
 
 /* Get an address range which is currently unmapped.
  * For shmat() with addr=0.
@@ -1207,7 +1205,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		new->vm_ops->open(new);
 
 	if (vma->vm_file)
-		 mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		 mapping = vma->vm_file->f_mapping;
 
 	if (mapping)
 		down(&mapping->i_shared_sem);

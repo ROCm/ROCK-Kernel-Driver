@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -11,17 +10,14 @@
 #include <linux/types.h>
 #include <asm/sn/sgi.h>
 #include <asm/io.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
-#include <asm/sn/pci/bridge.h>
+#include <asm/sn/pci/pic.h>
 #include "asm/sn/ioerror_handling.h"
 #include <asm/sn/xtalk/xbow.h>
 
 /* these get called directly in cdl_add_connpt in fops bypass hack */
-extern int pcibr_attach(vertex_hdl_t);
 extern int xbow_attach(vertex_hdl_t);
 extern int pic_attach(vertex_hdl_t);
-
 
 /*
  *    cdl: Connection and Driver List
@@ -32,14 +28,12 @@ extern int pic_attach(vertex_hdl_t);
  *	IO Infrastructure Drivers e.g. pcibr.
  */
 
-#define MAX_SGI_IO_INFRA_DRVR 7
+#define MAX_SGI_IO_INFRA_DRVR 5
 
 static struct cdl sgi_infrastructure_drivers[MAX_SGI_IO_INFRA_DRVR] =
 {
-	{ XBRIDGE_WIDGET_PART_NUM, XBRIDGE_WIDGET_MFGR_NUM, pcibr_attach /* &pcibr_fops  */},
-	{ BRIDGE_WIDGET_PART_NUM,  BRIDGE_WIDGET_MFGR_NUM,  pcibr_attach /* &pcibr_fops */},
-	{ PIC_WIDGET_PART_NUM_BUS0,  PIC_WIDGET_MFGR_NUM,   pic_attach /* &pic_fops */},
-	{ PIC_WIDGET_PART_NUM_BUS1,  PIC_WIDGET_MFGR_NUM,   pic_attach /* &pic_fops */},
+	{ PIC_WIDGET_PART_NUM_BUS0,  PIC_WIDGET_MFGR_NUM,   pic_attach /* &pcibr_fops */},
+	{ PIC_WIDGET_PART_NUM_BUS1,  PIC_WIDGET_MFGR_NUM,   pic_attach /* &pcibr_fops */},
 	{ XXBOW_WIDGET_PART_NUM,   XXBOW_WIDGET_MFGR_NUM,   xbow_attach /* &xbow_fops */},
 	{ XBOW_WIDGET_PART_NUM,    XBOW_WIDGET_MFGR_NUM,    xbow_attach /* &xbow_fops */},
 	{ PXBOW_WIDGET_PART_NUM,   XXBOW_WIDGET_MFGR_NUM,   xbow_attach /* &xbow_fops */},

@@ -112,8 +112,8 @@ static int next_buffer;
  */
 static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned int len)
 {
-	struct buffer_head * bh_array[BLKS_PER_BUF];
-	struct buffer_head * read_array[BLKS_PER_BUF];
+	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
+	struct page *pages[BLKS_PER_BUF];
 	unsigned i, blocknr, buffer, unread;
 	unsigned long devsize;
 	char *data;
@@ -138,33 +138,36 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 		return read_buffers[i] + blk_offset;
 	}
 
-	devsize = sb->s_bdev->bd_inode->i_size >> 12;
-	if (!devsize)
-		devsize = ~0UL;
+	devsize = mapping->host->i_size >> PAGE_CACHE_SHIFT;
 
 	/* Ok, read in BLKS_PER_BUF pages completely first. */
 	unread = 0;
 	for (i = 0; i < BLKS_PER_BUF; i++) {
-		struct buffer_head *bh;
+		struct page *page = NULL;
 
-		bh = NULL;
 		if (blocknr + i < devsize) {
-			bh = sb_getblk(sb, blocknr + i);
-			if (!buffer_uptodate(bh))
-				read_array[unread++] = bh;
+			page = read_cache_page(mapping, blocknr + i,
+				(filler_t *)mapping->a_ops->readpage,
+				NULL);
+			/* synchronous error? */
+			if (IS_ERR(page))
+				page = NULL;
 		}
-		bh_array[i] = bh;
+		pages[i] = page;
 	}
 
-	if (unread) {
-		ll_rw_block(READ, unread, read_array);
-		do {
-			unread--;
-			wait_on_buffer(read_array[unread]);
-		} while (unread);
+	for (i = 0; i < BLKS_PER_BUF; i++) {
+		struct page *page = pages[i];
+		if (page) {
+			wait_on_page_locked(page);
+			if (!PageUptodate(page)) {
+				/* asynchronous error */
+				page_cache_release(page);
+				pages[i] = NULL;
+			}
+		}
 	}
 
-	/* Ok, copy them to the staging area without sleeping. */
 	buffer = next_buffer;
 	next_buffer = NEXT_BUFFER(buffer);
 	buffer_blocknr[buffer] = blocknr;
@@ -172,10 +175,11 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 
 	data = read_buffers[buffer];
 	for (i = 0; i < BLKS_PER_BUF; i++) {
-		struct buffer_head * bh = bh_array[i];
-		if (bh) {
-			memcpy(data, bh->b_data, PAGE_CACHE_SIZE);
-			brelse(bh);
+		struct page *page = pages[i];
+		if (page) {
+			memcpy(data, kmap(page), PAGE_CACHE_SIZE);
+			kunmap(page);
+			page_cache_release(page);
 		} else
 			memset(data, 0, PAGE_CACHE_SIZE);
 		data += PAGE_CACHE_SIZE;
@@ -201,8 +205,6 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 		return -ENOMEM;
 	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct cramfs_sb_info));
-
-	sb_set_blocksize(sb, PAGE_CACHE_SIZE);
 
 	/* Invalidate the read buffers on mount: think disk change.. */
 	down(&read_mutex);

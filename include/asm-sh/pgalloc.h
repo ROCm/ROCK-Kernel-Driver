@@ -42,18 +42,11 @@ static inline void pgd_free(pgd_t *pgd)
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 					  unsigned long address)
 {
-	int count = 0;
 	pte_t *pte;
 
-   	do {
-		pte = (pte_t *) __get_free_page(GFP_KERNEL | __GFP_REPEAT);
-		if (pte)
-			clear_page(pte);
-		else {
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ);
-		}
-	} while (!pte && (count++ < 10));
+	pte = (pte_t *) __get_free_page(GFP_KERNEL | __GFP_REPEAT);
+	if (pte)
+		clear_page(pte);
 
 	return pte;
 }
@@ -61,18 +54,11 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 static inline struct page *pte_alloc_one(struct mm_struct *mm,
 					 unsigned long address)
 {
-	int count = 0;
 	struct page *pte;
 
-   	do {
-		pte = alloc_pages(GFP_KERNEL, 0);
-		if (pte)
-			clear_page(page_address(pte));
-		else {
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ);
-		}
-	} while (!pte && (count++ < 10));
+   	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
+	if (pte)
+		clear_page(page_address(pte));
 
 	return pte;
 }

@@ -7,11 +7,11 @@ extra-y := vmlinux.lds.s
 
 obj-y = checksum.o config.o exec_kern.o exitcode.o frame_kern.o frame.o \
 	helper.o init_task.o irq.o irq_user.o ksyms.o mem.o mem_user.o \
-	physmem.o process.o process_kern.o ptrace.o reboot.o resource.o \
-	sigio_user.o sigio_kern.o signal_kern.o signal_user.o smp.o \
-	syscall_kern.o syscall_user.o sysrq.o sys_call_table.o tempfile.o \
-	time.o time_kern.o tlb.o trap_kern.o trap_user.o uaccess_user.o \
-	um_arch.o umid.o user_syms.o user_util.o
+	process.o process_kern.o ptrace.o reboot.o resource.o sigio_user.o \
+	sigio_kern.o signal_kern.o signal_user.o smp.o syscall_kern.o \
+	syscall_user.o sysrq.o sys_call_table.o tempfile.o time.o \
+	time_kern.o tlb.o trap_kern.o trap_user.o uaccess_user.o um_arch.o \
+	umid.o user_syms.o user_util.o
 
 obj-$(CONFIG_BLK_DEV_INITRD) += initrd_kern.o initrd_user.o
 obj-$(CONFIG_GPROF)	+= gprof_syms.o
@@ -20,8 +20,6 @@ obj-$(CONFIG_TTY_LOG)	+= tty_log.o
 
 obj-$(CONFIG_MODE_TT) += tt/
 obj-$(CONFIG_MODE_SKAS) += skas/
-
-clean-files	:= config.c
 
 user-objs-$(CONFIG_TTY_LOG) += tty_log.o
 
@@ -47,12 +45,16 @@ $(USER_OBJS) : %.o: %.c
 $(obj)/frame.o: $(src)/frame.c
 	$(CC) $(CFLAGS_$(notdir $@)) -c -o $@ $<
 
-QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; $$config =~ s/\n/\\n"\n"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
+QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
 
 $(obj)/config.c : $(src)/config.c.in $(TOPDIR)/.config
 	$(PERL) -e $(QUOTE) < $(src)/config.c.in > $@
 
 $(obj)/config.o : $(obj)/config.c
+
+clean:
+	rm -f config.c
+	for dir in $(subdir-y) ; do $(MAKE) -C $$dir clean; done
 
 modules:
 

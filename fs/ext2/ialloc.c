@@ -507,7 +507,7 @@ repeat_in_this_group:
 				group = 0;
 			continue;
 		}
-		if (ext2_set_bit_atomic(sb_bgl_lock(EXT2_SB(sb), group),
+		if (ext2_set_bit_atomic(sb_bgl_lock(sbi, group),
 						ino, bitmap_bh->b_data)) {
 			/* we lost this inode */
 			if (++ino >= EXT2_INODES_PER_GROUP(sb)) {
@@ -543,23 +543,23 @@ got:
 		goto fail;
 	}
 
-	percpu_counter_mod(&EXT2_SB(sb)->s_freeinodes_counter, -1);
+	percpu_counter_mod(&sbi->s_freeinodes_counter, -1);
 	if (S_ISDIR(mode))
-		percpu_counter_inc(&EXT2_SB(sb)->s_dirs_counter);
+		percpu_counter_inc(&sbi->s_dirs_counter);
 
-	spin_lock(sb_bgl_lock(EXT2_SB(sb), group));
+	spin_lock(sb_bgl_lock(sbi, group));
 	gdp->bg_free_inodes_count =
                 cpu_to_le16(le16_to_cpu(gdp->bg_free_inodes_count) - 1);
 	if (S_ISDIR(mode)) {
-		if (EXT2_SB(sb)->s_debts[group] < 255)
-			EXT2_SB(sb)->s_debts[group]++;
+		if (sbi->s_debts[group] < 255)
+			sbi->s_debts[group]++;
 		gdp->bg_used_dirs_count =
 			cpu_to_le16(le16_to_cpu(gdp->bg_used_dirs_count) + 1);
 	} else {
-		if (EXT2_SB(sb)->s_debts[group])
-			EXT2_SB(sb)->s_debts[group]--;
+		if (sbi->s_debts[group])
+			sbi->s_debts[group]--;
 	}
-	spin_unlock(sb_bgl_lock(EXT2_SB(sb), group));
+	spin_unlock(sb_bgl_lock(sbi, group));
 
 	sb->s_dirt = 1;
 	mark_buffer_dirty(bh2);
@@ -599,7 +599,9 @@ got:
 	ei->i_dir_start_lookup = 0;
 	ei->i_state = EXT2_STATE_NEW;
 	ext2_set_inode_flags(inode);
-	inode->i_generation = EXT2_SB(sb)->s_next_generation++;
+	spin_lock(&sbi->s_next_gen_lock);
+	inode->i_generation = sbi->s_next_generation++;
+	spin_unlock(&sbi->s_next_gen_lock);
 	insert_inode_hash(inode);
 
 	if (DQUOT_ALLOC_INODE(inode)) {
@@ -636,10 +638,9 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 	int i;	
 
 #ifdef EXT2FS_DEBUG
-	struct ext2_super_block * es;
+	struct ext2_super_block *es;
 	unsigned long bitmap_count = 0;
 	struct buffer_head *bitmap_bh = NULL;
-	int i;
 
 	lock_super (sb);
 	es = EXT2_SB(sb)->s_es;
@@ -656,7 +657,7 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 			continue;
 
 		x = ext2_count_free(bitmap_bh, EXT2_INODES_PER_GROUP(sb) / 8);
-		printk ("group %d: stored = %d, counted = %lu\n",
+		printk("group %d: stored = %d, counted = %u\n",
 			i, le16_to_cpu(desc->bg_free_inodes_count), x);
 		bitmap_count += x;
 	}

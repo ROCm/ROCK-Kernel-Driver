@@ -1586,7 +1586,7 @@ static void wl3501_detach(dev_link_t *link)
 
 	/* Break the link with Card Services */
 	if (link->handle)
-		CardServices(DeregisterClient, link->handle);
+		pcmcia_deregister_client(link->handle);
 
 	/* Unlink device structure, free pieces */
 	*linkp = link->next;
@@ -2083,7 +2083,7 @@ static dev_link_t *wl3501_attach(void)
 	client_reg.event_handler = wl3501_event;
 	client_reg.Version	 = 0x0210;
 	client_reg.event_callback_args.client_data = link;
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret) {
 		cs_error(link->handle, RegisterClient, ret);
 		wl3501_detach(link);
@@ -2097,8 +2097,8 @@ out_link:
 	goto out;
 }
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret = CardServices(last_fn = (fn), args)) != 0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 /**
  * wl3501_config - configure the PCMCIA socket and make eth device available
@@ -2121,12 +2121,12 @@ static void wl3501_config(dev_link_t *link)
 	/* This reads the card's CONFIG tuple to find its config registers. */
 	tuple.Attributes	= 0;
 	tuple.DesiredTuple	= CISTPL_CONFIG;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	tuple.TupleData		= bf;
 	tuple.TupleDataMax	= sizeof(bf);
 	tuple.TupleOffset	= 0;
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigBase	= parse.config.base;
 	link->conf.Present	= parse.config.rmask[0];
 
@@ -2142,7 +2142,7 @@ static void wl3501_config(dev_link_t *link)
 		 * 0x200-0x2ff, and so on, because this seems safer */
 		link->io.BasePort1 = j;
 		link->io.BasePort2 = link->io.BasePort1 + 0x10;
-		i = CardServices(RequestIO, link->handle, &link->io);
+		i = pcmcia_request_io(link->handle, &link->io);
 		if (i == CS_SUCCESS)
 			break;
 	}
@@ -2154,12 +2154,12 @@ static void wl3501_config(dev_link_t *link)
 	/* Now allocate an interrupt line. Note that this does not actually
 	 * assign a handler to the interrupt. */
 
-	CS_CHECK(RequestIRQ, link->handle, &link->irq);
+	CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
 
 	/* This actually configures the PCMCIA socket -- setting up the I/O
 	 * windows and the interrupt mapping.  */
 
-	CS_CHECK(RequestConfiguration, link->handle, &link->conf);
+	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 
 	dev->irq = link->irq.AssignedIRQ;
 	dev->base_addr = link->io.BasePort1;
@@ -2249,9 +2249,9 @@ static void wl3501_release(dev_link_t *link)
 	}
 
 	/* Don't bother checking to see if these succeed or not */
-	CardServices(ReleaseConfiguration, link->handle);
-	CardServices(ReleaseIO, link->handle, &link->io);
-	CardServices(ReleaseIRQ, link->handle, &link->irq);
+	pcmcia_release_configuration(link->handle);
+	pcmcia_release_io(link->handle, &link->io);
+	pcmcia_release_irq(link->handle, &link->irq);
 	link->state &= ~DEV_CONFIG;
 
 	if (link->state & DEV_STALE_CONFIG)
@@ -2301,7 +2301,7 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 		if (link->state & DEV_CONFIG) {
 			if (link->open)
 				netif_device_detach(dev);
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		}
 		break;
 	case CS_EVENT_PM_RESUME:
@@ -2310,8 +2310,7 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (link->state & DEV_CONFIG) {
-			CardServices(RequestConfiguration, link->handle,
-				     &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 			if (link->open) {
 				wl3501_reset(dev);
 				netif_device_attach(dev);

@@ -353,6 +353,13 @@ struct block_device {
 	int			bd_invalidated;
 	struct gendisk *	bd_disk;
 	struct list_head	bd_list;
+	/*
+	 * Private data.  You must have bd_claim'ed the block_device
+	 * to use this.  NOTE:  bd_claim allows an owner to claim
+	 * the same device multiple times, the owner must take special
+	 * care to not mess up bd_private for that case.
+	 */
+	unsigned long		bd_private;
 };
 
 /*
@@ -480,6 +487,8 @@ static inline unsigned imajor(struct inode *inode)
 	return MAJOR(inode->i_rdev);
 }
 
+extern struct block_device *I_BDEV(struct inode *inode);
+
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
@@ -523,9 +532,12 @@ struct file {
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
 
+#ifdef CONFIG_EPOLL
 	/* Used by fs/eventpoll.c to link all the hooks to this file */
 	struct list_head	f_ep_links;
 	spinlock_t		f_ep_lock;
+#endif /* #ifdef CONFIG_EPOLL */
+	struct address_space	*f_mapping;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);
@@ -1124,11 +1136,9 @@ enum {BDEV_FILE, BDEV_SWAP, BDEV_FS, BDEV_RAW};
 extern int register_blkdev(unsigned int, const char *);
 extern int unregister_blkdev(unsigned int, const char *);
 extern struct block_device *bdget(dev_t);
-extern int bd_acquire(struct inode *inode);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern int blkdev_open(struct inode *, struct file *);
-extern int blkdev_close(struct inode *, struct file *);
 extern struct block_device *open_by_devnum(dev_t, unsigned, int);
 extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;
@@ -1296,8 +1306,7 @@ extern int generic_file_readonly_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char __user *, size_t, loff_t *);
-int generic_write_checks(struct inode *inode, struct file *file,
-			loff_t *pos, size_t *count, int isblk);
+int generic_write_checks(struct file *file, loff_t *pos, size_t *count, int isblk);
 extern ssize_t generic_file_write(struct file *, const char __user *, size_t, loff_t *);
 extern ssize_t generic_file_aio_read(struct kiocb *, char __user *, size_t, loff_t);
 extern ssize_t __generic_file_aio_read(struct kiocb *, const struct iovec *, unsigned long, loff_t *);
@@ -1331,7 +1340,7 @@ static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
 					read_descriptor_t * desc,
 					read_actor_t actor)
 {
-	do_generic_mapping_read(filp->f_dentry->d_inode->i_mapping,
+	do_generic_mapping_read(filp->f_mapping,
 				&filp->f_ra,
 				filp,
 				ppos,

@@ -6,7 +6,7 @@
 #ifndef __ASM_SH_TIMEX_H
 #define __ASM_SH_TIMEX_H
 
-#define CLOCK_TICK_RATE	(current_cpu_data.module_clock/4) /* Underlying HZ */
+#define CLOCK_TICK_RATE		(CONFIG_SH_PCLK_FREQ / 4) /* Underlying HZ */
 #define CLOCK_TICK_FACTOR	20	/* Factor of both 1000000 and CLOCK_TICK_RATE */
 #define FINETUNE ((((((long)LATCH * HZ - CLOCK_TICK_RATE) << SHIFT_HZ) * \
 	(1000000/CLOCK_TICK_FACTOR) / (CLOCK_TICK_RATE/CLOCK_TICK_FACTOR)) \

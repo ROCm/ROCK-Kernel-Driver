@@ -217,3 +217,5 @@ void consistent_sync_page(struct page *page, unsigned long offset,
 	consistent_sync((void *)start, size, direction);
 #endif
 }
+
+EXPORT_SYMBOL(consistent_sync_page);

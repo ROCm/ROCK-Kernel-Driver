@@ -1,5 +1,4 @@
-/* $Id: arch.h,v 1.1 2002/02/28 17:31:25 marcelo Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -28,7 +27,7 @@
  * Effectively, it's the maximum number of compact node ids (cnodeid_t).
  * This is not necessarily the same as MAX_NASIDS.
  */
-#define MAX_COMPACT_NODES       128
+#define MAX_COMPACT_NODES       2048
 
 /*
  * MAX_REGIONS refers to the maximum number of hardware partitioned regions.

@@ -307,7 +307,7 @@ static dev_link_t *fmvj18x_attach(void)
     client_reg.event_handler = &fmvj18x_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != 0) {
 	cs_error(link->handle, RegisterClient, ret);
 	fmvj18x_detach(link);
@@ -340,7 +340,7 @@ static void fmvj18x_detach(dev_link_t *link)
 
     /* Break the link with Card Services */
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
     
     /* Unlink device structure, free pieces */
     *linkp = link->next;
@@ -354,8 +354,8 @@ static void fmvj18x_detach(dev_link_t *link)
 
 /*====================================================================*/
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static int mfc_try_io_port(dev_link_t *link)
 {
@@ -369,7 +369,7 @@ static int mfc_try_io_port(dev_link_t *link)
 	    link->io.NumPorts2 = 0;
 	    printk(KERN_NOTICE "fmvj18x_cs: out of resource for serial\n");
 	}
-	ret = CardServices(RequestIO, link->handle, &link->io);
+	ret = pcmcia_request_io(link->handle, &link->io);
 	if (ret == CS_SUCCESS) return ret;
     }
     return ret;
@@ -385,7 +385,7 @@ static int ungermann_try_io_port(dev_link_t *link)
     */
     for (ioaddr = 0x300; ioaddr < 0x3e0; ioaddr += 0x20) {
 	link->io.BasePort1 = ioaddr;
-	ret = CardServices(RequestIO, link->handle, &link->io);
+	ret = pcmcia_request_io(link->handle, &link->io);
 	if (ret == CS_SUCCESS) {
 	    /* calculate ConfigIndex value */
 	    link->conf.ConfigIndex = 
@@ -417,12 +417,12 @@ static void fmvj18x_config(dev_link_t *link)
        registers.
     */
     tuple.DesiredTuple = CISTPL_CONFIG;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
     tuple.TupleData = (u_char *)buf;
     tuple.TupleDataMax = 64;
     tuple.TupleOffset = 0;
-    CS_CHECK(GetTupleData, handle, &tuple);
-    CS_CHECK(ParseTuple, handle, &tuple, &parse);
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+    CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
     
     /* Configure card */
     link->state |= DEV_CONFIG;
@@ -432,16 +432,16 @@ static void fmvj18x_config(dev_link_t *link)
 
     tuple.DesiredTuple = CISTPL_FUNCE;
     tuple.TupleOffset = 0;
-    if (CardServices(GetFirstTuple, handle, &tuple) == CS_SUCCESS) {
+    if (pcmcia_get_first_tuple(handle, &tuple) == CS_SUCCESS) {
 	/* Yes, I have CISTPL_FUNCE. Let's check CISTPL_MANFID */
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigIndex = parse.cftable_entry.index;
 	tuple.DesiredTuple = CISTPL_MANFID;
-	if (CardServices(GetFirstTuple, handle, &tuple) == CS_SUCCESS)
-	    CS_CHECK(GetTupleData, handle, &tuple);
+	if (pcmcia_get_first_tuple(handle, &tuple) == CS_SUCCESS)
+	    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
 	else
 	    buf[0] = 0xffff;
 	switch (le16_to_cpu(buf[0])) {
@@ -449,7 +449,7 @@ static void fmvj18x_config(dev_link_t *link)
 	    cardtype = TDK;
 	    if (le16_to_cpu(buf[1]) == PRODID_TDK_CF010) {
 		cs_status_t status;
-		CardServices(GetStatus, handle, &status);
+		pcmcia_get_status(handle, &status);
 		if (status.CardState & CS_EVENT_3VCARD)
 		    link->conf.Vcc = 33; /* inserted in 3.3V slot */
 	    } else if (le16_to_cpu(buf[1]) == PRODID_TDK_GN3410) {
@@ -478,8 +478,8 @@ static void fmvj18x_config(dev_link_t *link)
     } else {
 	/* old type card */
 	tuple.DesiredTuple = CISTPL_MANFID;
-	if (CardServices(GetFirstTuple, handle, &tuple) == CS_SUCCESS)
-	    CS_CHECK(GetTupleData, handle, &tuple);
+	if (pcmcia_get_first_tuple(handle, &tuple) == CS_SUCCESS)
+	    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
 	else
 	    buf[0] = 0xffff;
 	switch (le16_to_cpu(buf[0])) {
@@ -510,10 +510,10 @@ static void fmvj18x_config(dev_link_t *link)
 	ret = ungermann_try_io_port(link);
 	if (ret != CS_SUCCESS) goto cs_failed;
     } else { 
-	CS_CHECK(RequestIO, link->handle, &link->io);
+	CS_CHECK(RequestIO, pcmcia_request_io(link->handle, &link->io));
     }
-    CS_CHECK(RequestIRQ, link->handle, &link->irq);
-    CS_CHECK(RequestConfiguration, link->handle, &link->conf);
+    CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
+    CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
     if (register_netdev(dev) != 0) {
@@ -546,17 +546,17 @@ static void fmvj18x_config(dev_link_t *link)
     case CONTEC:
 	tuple.DesiredTuple = CISTPL_FUNCE;
 	tuple.TupleOffset = 0;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	tuple.TupleOffset = 0;
-	CS_CHECK(GetTupleData, handle, &tuple);
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
 	if (cardtype == MBH10304) {
 	    /* MBH10304's CIS_FUNCE is corrupted */
 	    node_id = &(tuple.TupleData[5]);
 	    card_name = "FMV-J182";
 	} else {
 	    while (tuple.TupleData[0] != CISTPL_FUNCE_LAN_NODE_ID ) {
-		CS_CHECK(GetNextTuple, handle, &tuple) ;
-		CS_CHECK(GetTupleData, handle, &tuple) ;
+		CS_CHECK(GetNextTuple, pcmcia_get_next_tuple(handle, &tuple));
+		CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
 	    }
 	    node_id = &(tuple.TupleData[2]);
 	    if( cardtype == TDK ) {
@@ -633,8 +633,7 @@ static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id)
     req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
     req.Base = 0; req.Size = 0;
     req.AccessSpeed = 0;
-    link->win = (window_handle_t)link->handle;
-    i = CardServices(RequestWindow, &link->win, &req);
+    i = pcmcia_request_window(&link->handle, &req, &link->win);
     if (i != CS_SUCCESS) {
 	cs_error(link->handle, RequestWindow, i);
 	return -1;
@@ -643,7 +642,7 @@ static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id)
     base = ioremap(req.Base, req.Size);
     mem.Page = 0;
     mem.CardOffset = 0;
-    CardServices(MapMemPage, link->win, &mem);
+    pcmcia_map_mem_page(link->win, &mem);
 
     /*
      *  MBH10304 CISTPL_FUNCE_LAN_NODE_ID format
@@ -668,7 +667,7 @@ static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id)
     }
 
     iounmap(base);
-    j = CardServices(ReleaseWindow, link->win);
+    j = pcmcia_release_window(link->win);
     if (j != CS_SUCCESS)
 	cs_error(link->handle, ReleaseWindow, j);
     return (i != 0x200) ? 0 : -1;
@@ -689,8 +688,7 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
     req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
     req.Base = 0; req.Size = 0;
     req.AccessSpeed = 0;
-    link->win = (window_handle_t)link->handle;
-    i = CardServices(RequestWindow, &link->win, &req);
+    i = pcmcia_request_window(&link->handle, &req, &link->win);
     if (i != CS_SUCCESS) {
 	cs_error(link->handle, RequestWindow, i);
 	return -1;
@@ -699,7 +697,7 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
     base = ioremap(req.Base, req.Size);
     mem.Page = 0;
     mem.CardOffset = 0;
-    CardServices(MapMemPage, link->win, &mem);
+    pcmcia_map_mem_page(link->win, &mem);
 
     ioaddr = dev->base_addr;
     writeb(0x47, base+0x800);	/* Config Option Register of LAN */
@@ -712,7 +710,7 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
     writeb(0x8, base+0x822);	/* Config and Status Register */
 
     iounmap(base);
-    j = CardServices(ReleaseWindow, link->win);
+    j = pcmcia_release_window(link->win);
     if (j != CS_SUCCESS)
 	cs_error(link->handle, ReleaseWindow, j);
     return 0;
@@ -737,10 +735,10 @@ static void fmvj18x_release(dev_link_t *link)
     }
 
     /* Don't bother checking to see if these succeed or not */
-    CardServices(ReleaseWindow, link->win);
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+    pcmcia_release_window(link->win);
+    pcmcia_release_configuration(link->handle);
+    pcmcia_release_io(link->handle, &link->io);
+    pcmcia_release_irq(link->handle, &link->irq);
     
     link->state &= ~DEV_CONFIG;
 
@@ -777,7 +775,7 @@ static int fmvj18x_event(event_t event, int priority,
 	if (link->state & DEV_CONFIG) {
 	    if (link->open)
 		netif_device_detach(dev);
-	    CardServices(ReleaseConfiguration, link->handle);
+	    pcmcia_release_configuration(link->handle);
 	}
 	break;
     case CS_EVENT_PM_RESUME:
@@ -785,7 +783,7 @@ static int fmvj18x_event(event_t event, int priority,
 	/* Fall through... */
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG) {
-	    CardServices(RequestConfiguration, link->handle, &link->conf);
+	    pcmcia_request_configuration(link->handle, &link->conf);
 	    if (link->open) {
 		fjn_reset(dev);
 		netif_device_attach(dev);

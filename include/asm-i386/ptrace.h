@@ -41,23 +41,6 @@ struct pt_regs {
 	int  xss;
 };
 
-
-struct ptrace_faultinfo {
-	int is_write;
-	unsigned long addr;
-};
-
-struct ptrace_ldt {
-	int func;
-  	void *ptr;
-	unsigned long bytecount;
-};
-
-#define PTRACE_FAULTINFO 52
-#define PTRACE_SIGPENDING 53
-#define PTRACE_LDT 54
-#define PTRACE_SWITCH_MM 55
-
 /* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
 #define PTRACE_GETREGS            12
 #define PTRACE_SETREGS            13

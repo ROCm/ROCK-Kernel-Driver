@@ -6,10 +6,10 @@ targets		:= mk_thread_kern.o mk_thread_user.o
 mk_sc-objs	:= mk_sc.o
 
 $(obj)/mk_thread : $(obj)/mk_thread_kern.o $(obj)/mk_thread_user.o
-	$(HOSTCC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 $(obj)/mk_thread_user.o : $(src)/mk_thread_user.c
-	$(HOSTCC) $(USER_CFLAGS) -c -o $@ $<
+	$(CC) $(USER_CFLAGS) -c -o $@ $<
 
 clean :
 	$(RM) -f $(build-targets)

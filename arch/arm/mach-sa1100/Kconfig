@@ -37,9 +37,9 @@ config SA1100_CERF
 	bool "CerfBoard"
 	depends on ARCH_SA1100
 	help
-	  The Intrinsyc CerfBoard is based on the StrongARM 1110.
+	  The Intrinsyc CerfBoard is based on the StrongARM 1110 (Discontinued).
 	  More information is available at:
-	  <http://www.intrinsyc.com/products/referenceplatforms/cerfboard.html>.
+	  <http://www.intrinsyc.com/products/cerfboard/>.
 
 	  Say Y if configuring for an Intrinsyc CerfBoard.
 	  Say N otherwise.
@@ -59,15 +59,6 @@ config SA1100_CERF_FLASH_32MB
 	bool "32MB"
 
 endchoice
-
-config SA1100_CERF_CPLD
-	bool "Cerf w/CPLD support (CerfPDA)"
-	depends on SA1100_CERF
-	help
-	  Say Y here to support the Linux CerfPDA development kit from
-	  Intrinsyc. This is a StrongARM-1110-based reference platform for
-	  designing custom PDAs.  Product info is at
-	  <http://www.intrinsyc.com/products/referencedesigns/cerfpda.asp>.
 
 config SA1100_H3100
 	bool "Compaq iPAQ H3100"

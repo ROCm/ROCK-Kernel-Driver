@@ -342,6 +342,7 @@ struct hid_device {							/* device report descriptor */
 	struct hid_report_enum report_enum[HID_REPORT_TYPES];
 
 	struct usb_device *dev;						/* USB device */
+	struct usb_interface *intf;					/* USB interface */
 	int ifnum;							/* USB interface number */
 
 	unsigned long iofl;						/* I/O flags (CTRL_RUNNING, OUT_RUNNING) */
@@ -448,6 +449,7 @@ int hid_set_field(struct hid_field *, unsigned, __s32);
 void hid_submit_report(struct hid_device *, struct hid_report *, unsigned char dir);
 void hid_init_reports(struct hid_device *hid);
 int hid_find_report_by_usage(struct hid_device *hid, __u32 wanted_usage, struct hid_report **report, int type);
+int hid_wait_io(struct hid_device* hid);
 
 
 #ifdef CONFIG_HID_FF

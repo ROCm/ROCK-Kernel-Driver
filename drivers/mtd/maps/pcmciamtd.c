@@ -125,7 +125,7 @@ static caddr_t remap_window(struct map_info *map, unsigned long to)
 		DEBUG(2, "Remapping window from 0x%8.8x to 0x%8.8x",
 		      dev->offset, mrq.CardOffset);
 		mrq.Page = 0;
-		if( (ret = CardServices(MapMemPage, win, &mrq)) != CS_SUCCESS) {
+		if( (ret = pcmcia_map_mem_page(win, &mrq)) != CS_SUCCESS) {
 			cs_error(dev->link.handle, MapMemPage, ret);
 			return NULL;
 		}
@@ -332,7 +332,7 @@ static void pcmciamtd_set_vpp(struct map_info *map, int on)
 	mod.Vpp1 = mod.Vpp2 = on ? dev->vpp : 0;
 
 	DEBUG(2, "dev = %p on = %d vpp = %d\n", dev, on, dev->vpp);
-	ret = CardServices(ModifyConfiguration, link->handle, &mod);
+	ret = pcmcia_modify_configuration(link->handle, &mod);
 	if(ret != CS_SUCCESS) {
 		cs_error(link->handle, ModifyConfiguration, ret);
 	}
@@ -355,9 +355,9 @@ static void pcmciamtd_release(dev_link_t *link)
 			iounmap(dev->win_base);
 			dev->win_base = NULL;
 		}
-		CardServices(ReleaseWindow, link->win);
+		pcmcia_release_window(link->win);
 	}
-	CardServices(ReleaseConfiguration, link->handle);
+	pcmcia_release_configuration(link->handle);
 	link->state &= ~DEV_CONFIG;
 }
 
@@ -375,14 +375,14 @@ static void card_settings(struct pcmciamtd_dev *dev, dev_link_t *link, int *new_
 	tuple.TupleOffset = 0;
 	tuple.DesiredTuple = RETURN_FIRST_TUPLE;
 
-	rc = CardServices(GetFirstTuple, link->handle, &tuple);
+	rc = pcmcia_get_first_tuple(link->handle, &tuple);
 	while(rc == CS_SUCCESS) {
-		rc = CardServices(GetTupleData, link->handle, &tuple);
+		rc = pcmcia_get_tuple_data(link->handle, &tuple);
 		if(rc != CS_SUCCESS) {
 			cs_error(link->handle, GetTupleData, rc);
 			break;
 		}
-		rc = CardServices(ParseTuple, link->handle, &tuple, &parse);
+		rc = pcmcia_parse_tuple(link->handle, &tuple, &parse);
 		if(rc != CS_SUCCESS) {
 			cs_error(link->handle, ParseTuple, rc);
 			break;
@@ -455,7 +455,7 @@ static void card_settings(struct pcmciamtd_dev *dev, dev_link_t *link, int *new_
 			DEBUG(2, "Unknown tuple code %d", tuple.TupleCode);
 		}
 		
-		rc = CardServices(GetNextTuple, link->handle, &tuple, &parse);
+		rc = pcmcia_get_next_tuple(link->handle, &tuple);
 	}
 	if(!dev->pcmcia_map.size)
 		dev->pcmcia_map.size = MAX_PCMCIA_ADDR;
@@ -489,8 +489,8 @@ static void card_settings(struct pcmciamtd_dev *dev, dev_link_t *link, int *new_
  * MTD device available to the system.
  */
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void pcmciamtd_config(dev_link_t *link)
 {
@@ -512,7 +512,7 @@ static void pcmciamtd_config(dev_link_t *link)
 	link->state |= DEV_CONFIG;
 
 	DEBUG(2, "Validating CIS");
-	ret = CardServices(ValidateCIS, link->handle, &cisinfo);
+	ret = pcmcia_validate_cis(link->handle, &cisinfo);
 	if(ret != CS_SUCCESS) {
 		cs_error(link->handle, GetTupleData, ret);
 	} else {
@@ -547,8 +547,7 @@ static void pcmciamtd_config(dev_link_t *link)
 		int ret;
 		DEBUG(2, "requesting window with size = %dKiB memspeed = %d",
 		      req.Size >> 10, req.AccessSpeed);
-		link->win = (window_handle_t)link->handle;
-		ret = CardServices(RequestWindow, &link->win, &req);
+		ret = pcmcia_request_window(&link->handle, &req, &link->win);
 		DEBUG(2, "ret = %d dev->win_size = %d", ret, dev->win_size);
 		if(ret) {
 			req.Size >>= 1;
@@ -569,7 +568,7 @@ static void pcmciamtd_config(dev_link_t *link)
 	DEBUG(1, "Allocated a window of %dKiB", dev->win_size >> 10);
 		
 	/* Get write protect status */
-	CS_CHECK(GetStatus, link->handle, &status);
+	CS_CHECK(GetStatus, pcmcia_get_status(link->handle, &status));
 	DEBUG(2, "status value: 0x%x window handle = 0x%8.8lx",
 	      status.CardState, (unsigned long)link->win);
 	dev->win_base = ioremap(req.Base, req.Size);
@@ -586,7 +585,7 @@ static void pcmciamtd_config(dev_link_t *link)
 	dev->pcmcia_map.map_priv_2 = (unsigned long)link->win;
 
 	DEBUG(2, "Getting configuration");
-	CS_CHECK(GetConfigurationInfo, link->handle, &t);
+	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(link->handle, &t));
 	DEBUG(2, "Vcc = %d Vpp1 = %d Vpp2 = %d", t.Vcc, t.Vpp1, t.Vpp2);
 	dev->vpp = (vpp) ? vpp : t.Vpp1;
 	link->conf.Attributes = 0;
@@ -608,7 +607,7 @@ static void pcmciamtd_config(dev_link_t *link)
 	link->conf.ConfigIndex = 0;
 	link->conf.Present = t.Present;
 	DEBUG(2, "Setting Configuration");
-	ret = CardServices(RequestConfiguration, link->handle, &link->conf);
+	ret = pcmcia_request_configuration(link->handle, &link->conf);
 	if(ret != CS_SUCCESS) {
 		cs_error(link->handle, RequestConfiguration, ret);
 	}
@@ -757,7 +756,7 @@ static void pcmciamtd_detach(dev_link_t *link)
 	if (link->handle) {
 		int ret;
 		DEBUG(2, "Deregistering with card services");
-		ret = CardServices(DeregisterClient, link->handle);
+		ret = pcmcia_deregister_client(link->handle);
 		if (ret != CS_SUCCESS)
 			cs_error(link->handle, DeregisterClient, ret);
 	}
@@ -804,7 +803,7 @@ static dev_link_t *pcmciamtd_attach(void)
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
 	DEBUG(2, "Calling RegisterClient");
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != 0) {
 		cs_error(link->handle, RegisterClient, ret);
 		pcmciamtd_detach(link);

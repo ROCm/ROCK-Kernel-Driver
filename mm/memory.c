@@ -44,8 +44,8 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/rmap-locking.h>
-#include <linux/init.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -685,25 +685,6 @@ static inline struct page *get_page_map(struct page *page)
 	return page;
 }
 
-#ifdef FIXADDR_START
-static struct vm_area_struct fixmap_vma = {
-	/* Catch users - if there are any valid
-	   ones, we can make this be "&init_mm" or
-	   something.  */
-	.vm_mm = NULL,
-	.vm_page_prot = PAGE_READONLY,
-	.vm_flags = VM_READ | VM_EXEC,
-};
-
-static int init_fixmap_vma(void)
-{
-	fixmap_vma.vm_start = FIXADDR_START;
-	fixmap_vma.vm_end = FIXADDR_TOP;
-	return(0);
-}
-
-__initcall(init_fixmap_vma);
-#endif
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, int len, int write, int force,
@@ -724,14 +705,13 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		struct vm_area_struct *	vma;
 
 		vma = find_extend_vma(mm, start);
-
-#ifdef FIXADDR_START
-		if (!vma && start >= FIXADDR_START && start < FIXADDR_TOP) {
+		if (!vma && in_gate_area(tsk, start)) {
 			unsigned long pg = start & PAGE_MASK;
+			struct vm_area_struct *gate_vma = get_gate_vma(tsk);
 			pgd_t *pgd;
 			pmd_t *pmd;
 			pte_t *pte;
-			if (write) /* user fixmap pages are read-only */
+			if (write) /* user gate pages are read-only */
 				return i ? : -EFAULT;
 			pgd = pgd_offset_k(pg);
 			if (!pgd)
@@ -747,13 +727,12 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				get_page(pages[i]);
 			}
 			if (vmas)
-				vmas[i] = &fixmap_vma;
+				vmas[i] = gate_vma;
 			i++;
 			start += PAGE_SIZE;
 			len--;
 			continue;
 		}
-#endif
 
 		if (!vma || (pages && (vma->vm_flags & VM_IO))
 				|| !(flags & vma->vm_flags))
@@ -1420,7 +1399,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	spin_unlock(&mm->page_table_lock);
 
 	if (vma->vm_file) {
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		mapping = vma->vm_file->f_mapping;
 		sequence = atomic_read(&mapping->truncate_count);
 	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
@@ -1442,10 +1421,8 @@ retry:
 	 */
 	if (write_access && !(vma->vm_flags & VM_SHARED)) {
 		struct page * page = alloc_page(GFP_HIGHUSER);
-		if (!page) {
-			page_cache_release(new_page);
+		if (!page)
 			goto oom;
-		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
 		lru_cache_add_active(page);
@@ -1502,6 +1479,7 @@ retry:
 	spin_unlock(&mm->page_table_lock);
 	goto out;
 oom:
+	page_cache_release(new_page);
 	ret = VM_FAULT_OOM;
 out:
 	pte_chain_free(pte_chain);
@@ -1709,3 +1687,18 @@ struct page * vmalloc_to_page(void * vmalloc_addr)
 }
 
 EXPORT_SYMBOL(vmalloc_to_page);
+
+#if !defined(CONFIG_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR)
+struct vm_area_struct gate_vma;
+
+static int __init gate_vma_init(void)
+{
+	gate_vma.vm_mm = NULL;
+	gate_vma.vm_start = FIXADDR_USER_START;
+	gate_vma.vm_end = FIXADDR_USER_END;
+	gate_vma.vm_page_prot = PAGE_READONLY;
+	gate_vma.vm_flags = 0;
+	return 0;
+}
+__initcall(gate_vma_init);
+#endif

@@ -2547,6 +2547,7 @@ int of_remove_node(struct device_node *np)
 	return 0;
 }
 
+#ifdef CONFIG_PROC_DEVICETREE
 /*
  * Add a node to /proc/device-tree.
  */
@@ -2579,6 +2580,17 @@ static void remove_node_proc_entries(struct device_node *np)
 	if (np->pde)
 		remove_proc_entry(np->pde->name, parent->pde);
 }
+#else /* !CONFIG_PROC_DEVICETREE */
+static void add_node_proc_entries(struct device_node *np)
+{
+	return;
+}
+
+static void remove_node_proc_entries(struct device_node *np)
+{
+	return;
+}
+#endif /* CONFIG_PROC_DEVICETREE */
 
 /*
  * Fix up the uninitialized fields in a new device node:

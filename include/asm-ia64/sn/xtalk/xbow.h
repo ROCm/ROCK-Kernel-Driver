@@ -1,13 +1,12 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc. All Rights Reserved.
  */
-#ifndef _ASM_SN_SN_XTALK_XBOW_H
-#define _ASM_SN_SN_XTALK_XBOW_H
+#ifndef _ASM_IA64_SN_XTALK_XBOW_H
+#define _ASM_IA64_SN_XTALK_XBOW_H
 
 /*
  * xbow.h - header file for crossbow chip and xbow section of xbridge
@@ -64,7 +63,6 @@ typedef uint32_t      xbowreg_t;
 
 /* Register set for each xbow link */
 typedef volatile struct xb_linkregs_s {
-#ifdef LITTLE_ENDIAN
 /* 
  * we access these through synergy unswizzled space, so the address
  * gets twiddled (i.e. references to 0x4 actually go to 0x0 and vv.)
@@ -86,24 +84,6 @@ typedef volatile struct xb_linkregs_s {
     xbowreg_t               filler6;
     xbowreg_t               link_aux_status;
     xbowreg_t               filler7;
-#else
-    xbowreg_t               filler0;	/* filler for proper alignment */
-    xbowreg_t               link_ibf;
-    xbowreg_t               filler1;
-    xbowreg_t               link_control;
-    xbowreg_t               filler2;
-    xbowreg_t               link_status;
-    xbowreg_t               filler3;
-    xbowreg_t               link_arb_upper;
-    xbowreg_t               filler4;
-    xbowreg_t               link_arb_lower;
-    xbowreg_t               filler5;
-    xbowreg_t               link_status_clr;
-    xbowreg_t               filler6;
-    xbowreg_t               link_reset;
-    xbowreg_t               filler7;
-    xbowreg_t               link_aux_status;
-#endif /* LITTLE_ENDIAN */
 } xb_linkregs_t;
 
 typedef volatile struct xbow_s {
@@ -124,7 +104,6 @@ typedef volatile struct xbow_s {
 #define xb_wid_llp                      xb_widget.w_llp_cfg
 #define xb_wid_stat_clr                 xb_widget.w_tflush
 
-#ifdef LITTLE_ENDIAN
 /* 
  * we access these through synergy unswizzled space, so the address
  * gets twiddled (i.e. references to 0x4 actually go to 0x0 and vv.)
@@ -165,43 +144,6 @@ typedef volatile struct xbow_s {
     xbowreg_t               _pad_0000c8;
     /* end of Xbridge only */
     xbowreg_t               _pad_0000d0[12];
-#else
-    /* xbow-specific widget configuration                  0x000058-0x0000FF */
-    xbowreg_t               _pad_000058;
-    xbowreg_t               xb_wid_arb_reload;  /* 0x00005C */
-    xbowreg_t               _pad_000060;
-    xbowreg_t               xb_perf_ctr_a;      /* 0x000064 */
-    xbowreg_t               _pad_000068;
-    xbowreg_t               xb_perf_ctr_b;      /* 0x00006c */
-    xbowreg_t               _pad_000070;
-    xbowreg_t               xb_nic;     /* 0x000074 */
-
-    /* Xbridge only */
-    xbowreg_t               _pad_000078;
-    xbowreg_t               xb_w0_rst_fnc;      /* 0x00007C */
-    xbowreg_t               _pad_000080;
-    xbowreg_t               xb_l8_rst_fnc;      /* 0x000084 */
-    xbowreg_t               _pad_000088;
-    xbowreg_t               xb_l9_rst_fnc;      /* 0x00008c */
-    xbowreg_t               _pad_000090;
-    xbowreg_t               xb_la_rst_fnc;      /* 0x000094 */
-    xbowreg_t               _pad_000098;
-    xbowreg_t               xb_lb_rst_fnc;      /* 0x00009c */
-    xbowreg_t               _pad_0000a0;
-    xbowreg_t               xb_lc_rst_fnc;      /* 0x0000a4 */
-    xbowreg_t               _pad_0000a8;
-    xbowreg_t               xb_ld_rst_fnc;      /* 0x0000ac */
-    xbowreg_t               _pad_0000b0;
-    xbowreg_t               xb_le_rst_fnc;      /* 0x0000b4 */
-    xbowreg_t               _pad_0000b8;
-    xbowreg_t               xb_lf_rst_fnc;      /* 0x0000bc */
-    xbowreg_t               _pad_0000c0;
-    xbowreg_t               xb_lock;            /* 0x0000c4 */
-    xbowreg_t               _pad_0000c8;
-    xbowreg_t               xb_lock_clr;        /* 0x0000cc */
-    /* end of Xbridge only */
-    xbowreg_t               _pad_0000d0[12];
-#endif /* LITTLE_ENDIAN */
 
     /* Link Specific Registers, port 8..15                 0x000100-0x000300 */
     xb_linkregs_t           xb_link_raw[MAX_XBOW_PORTS];
@@ -430,8 +372,6 @@ typedef struct xbow_cfg_s {
 /*
  * Xbow Widget 0 Command error word
  */
-#ifdef LITTLE_ENDIAN
-
 typedef union xbw0_cmdword_u {
     xbowreg_t               cmdword;
     struct {
@@ -449,27 +389,6 @@ typedef union xbw0_cmdword_u {
 
     } xbw0_cmdfield;
 } xbw0_cmdword_t;
-
-#else
-
-typedef union xbw0_cmdword_u {
-    xbowreg_t		    cmdword;
-    struct {
-	uint32_t		destid:4,	/* Desination ID number */
-				srcid:4,	/* Source ID number */
-				pactyp:4,	/* Packet type: */
-				tnum:5,		/* Transaction Number */
-				ct:1,	/* Is it a coherent transaction */
-				ds:2,	/* Data size			*/
-				gbr:1,	/* GBR enable ?			*/
-				vbpm:1,		/* Virtual Backplane message */
-				error:1,	/* Error Occured */
-				barr:1,		/* Barrier operation */
-				rsvd:8;		/* Reserved */
-    } xbw0_cmdfield;
-} xbw0_cmdword_t;
-
-#endif
 
 #define	xbcmd_destid	xbw0_cmdfield.destid
 #define	xbcmd_srcid	xbw0_cmdfield.srcid
@@ -505,7 +424,6 @@ typedef union xbw0_cmdword_u {
 /*
  * Xbow widget 0 Status register format.
  */
-#ifdef LITTLE_ENDIAN
 
 typedef union xbw0_status_u {
     xbowreg_t               statusword;
@@ -524,28 +442,6 @@ typedef union xbw0_status_u {
     } xbw0_stfield;
 } xbw0_status_t;
 
-#else
-
-typedef union xbw0_status_u {
-    xbowreg_t		    statusword;
-    struct {
-	uint32_t		linkXintr:8,	/* link(x) error intr */
-				wid0intr:1,	/* Widget 0 err intr */
-				resvd1:13,
-				src_id:4,	/* source id. Xbridge only */
-				regacc_err:1,	/* Reg Access error	*/
-				/* Xbridge only */
-				w0_recv_tout,	/* receive timeout err */
-				w0_arb_tout,	/* arbiter timeout err */
-				/* End of Xbridge only */
-				xtalk_err:1,	/* Xtalk pkt with error bit */
-				connect_tout:1, /* Connection timeout	*/
-				mult_err:1;	/* Multiple error occurred */
-    } xbw0_stfield;
-} xbw0_status_t;
-
-#endif
-
 #define	xbst_linkXintr		xbw0_stfield.linkXintr
 #define	xbst_w0intr		xbw0_stfield.wid0intr
 #define	xbst_regacc_err		xbw0_stfield.regacc_err
@@ -559,7 +455,6 @@ typedef union xbw0_status_u {
 /*
  * Xbow widget 0 Control register format
  */
-#ifdef LITTLE_ENDIAN
 
 typedef union xbw0_ctrl_u {
     xbowreg_t               ctrlword;
@@ -576,28 +471,6 @@ typedef union xbw0_ctrl_u {
                                 resvd1:24;
     } xbw0_ctrlfield;
 } xbw0_ctrl_t;
-
-#else
-
-typedef union xbw0_ctrl_u {
-    xbowreg_t		    ctrlword;
-    struct {
-	uint32_t
-				resvd1:24,
-				enable_watchdog:1,	/* Xbridge only */
-				enable_w0_tout_cntr:1,	/* Xbridge only */
-				accerr_intr:1,
-				w0_recv_tout_intr:1,	/* Xbridge only */
-				w0_arg_tout_intr:1,	/* Xbridge only */
-				xtalkerr_intr:1,
-				conntout_intr:1,
-				resvd3:1;
-    } xbw0_ctrlfield;
-} xbw0_ctrl_t;
-
-#endif
-
-#ifdef LITTLE_ENDIAN
 
 typedef union xbow_linkctrl_u {
     xbowreg_t               xbl_ctrlword;
@@ -625,36 +498,6 @@ typedef union xbow_linkctrl_u {
     } xb_linkcontrol;
 } xbow_linkctrl_t;
 
-#else
-
-typedef union xbow_linkctrl_u {
-    xbowreg_t		    xbl_ctrlword;
-    struct {
-	uint32_t		alive_intr:1, 
-				rsvd1:1, 
-				perf_mode:2,
-				inbuf_level:3, 
-				send_bm8:1, 
-				force_badllp:1,
-				llp_credit:5, 
-				idest_intr:1, 
-				obuf_intr:1,
-				rsvd2:7, 
-				bwalloc_intr:1, 
-				rcvov_intr:1,
-				trxov_intr:1, 
-				trx_max_retry_intr:1,
-				rcv_err_intr:1, 
-				trx_retry_intr:1, 
-				rsvd3:1,
-				maxto_intr:1, 
-				srcto_intr:1;
-    } xb_linkcontrol;
-} xbow_linkctrl_t;
-
-#endif
-
-
 #define	xbctl_accerr_intr	(xbw0_ctrlfield.accerr_intr)
 #define	xbctl_xtalkerr_intr	(xbw0_ctrlfield.xtalkerr_intr)
 #define	xbctl_cnntout_intr	(xbw0_ctrlfield.conntout_intr)
@@ -666,8 +509,6 @@ typedef union xbow_linkctrl_u {
 /*
  * Xbow Link specific Registers structure definitions.
  */
-
-#ifdef LITTLE_ENDIAN
 
 typedef union xbow_linkX_status_u {
     xbowreg_t               linkstatus;
@@ -689,30 +530,6 @@ typedef union xbow_linkX_status_u {
     } xb_linkstatus;
 } xbwX_stat_t;
 
-#else
-
-typedef union xbow_linkX_status_u {
-    xbowreg_t		    linkstatus;
-    struct {
-	uint32_t		alive:1,
-				resvd1:12,
-				merror:1,
-				illdest:1,
-				ioe:1,		/* Input overallocation error */
-				bw_errport:8,	/* BW allocation error port   */
-				llp_rxovflow:1,
-				llp_txovflow:1,
-				llp_maxtxretry:1,
-				llp_rcverror:1,
-				llp_xmitretry:1,
-				pkt_toutdest:1, /* reserved in Xbridge */
-				pkt_toutconn:1, /* max_req_tout in Xbridge */
-				pkt_toutsrc:1;
-    } xb_linkstatus;
-} xbwX_stat_t;
-
-#endif
-
 #define	link_alive		xb_linkstatus.alive
 #define	link_multierror		xb_linkstatus.merror
 #define	link_illegal_dest	xb_linkstatus.illdest
@@ -721,8 +538,6 @@ typedef union xbow_linkX_status_u {
 #define link_pkt_toutconn	xb_linkstatus.pkt_toutconn  /* Xbow */
 #define link_pkt_toutdest	xb_linkstatus.pkt_toutdest
 #define	link_pkt_toutsrc	xb_linkstatus.pkt_toutsrc
-
-#ifdef LITTLE_ENDIAN
 
 typedef union xbow_aux_linkX_status_u {
     xbowreg_t               aux_linkstatus;
@@ -738,27 +553,6 @@ typedef union xbow_aux_linkX_status_u {
     } xb_aux_linkstatus;
 } xbow_aux_link_status_t;
 
-#else
-
-typedef union xbow_aux_linkX_status_u {
-    xbowreg_t		    aux_linkstatus;
-    struct {
-	uint32_t		rx_err_cnt:8,
-				tx_retry_cnt:8,
-				to_src_loc:8,
-				rsvd1:1,
-				fail_mode:1,
-				wid_present:1,
-				bit_mode_8:1,
-				rsvd2:4;
-    } xb_aux_linkstatus;
-} xbow_aux_link_status_t;
-
-#endif
-
-
-#ifdef LITTLE_ENDIAN
-
 typedef union xbow_perf_count_u {
     xbowreg_t               xb_counter_val;
     struct {
@@ -767,19 +561,6 @@ typedef union xbow_perf_count_u {
 				rsvd:9;
     } xb_perf;
 } xbow_perfcount_t;
-
-#else
-
-typedef union xbow_perf_count_u {
-    xbowreg_t               xb_counter_val;
-    struct {
-	uint32_t              rsvd:9, 
-				link_select:3, 
-				count:20;
-    } xb_perf;
-} xbow_perfcount_t;
-
-#endif
 
 #define XBOW_COUNTER_MASK	0xFFFFF
 
@@ -908,4 +689,4 @@ struct macrofield_s     xbow_macrofield[] =
 #endif				/* MACROFIELD_LINE */
 
 #endif				/* __ASSEMBLY__ */
-#endif                          /* _ASM_SN_SN_XTALK_XBOW_H */
+#endif                          /* _ASM_IA64_SN_XTALK_XBOW_H */

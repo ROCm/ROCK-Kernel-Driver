@@ -1,4 +1,4 @@
-/* $Id: uaccess.h,v 1.9 2003/05/06 23:28:51 lethal Exp $
+/* $Id: uaccess.h,v 1.11 2003/10/13 07:21:20 lethal Exp $
  *
  * User space memory access functions
  *
@@ -140,13 +140,13 @@ static inline int __access_ok(unsigned long addr, unsigned long size)
 }
 #endif /* CONFIG_MMU */
 
-static inline int access_ok(int type, const void *p, unsigned long size)
+static inline int access_ok(int type, const void __user *p, unsigned long size)
 {
 	unsigned long addr = (unsigned long)p;
 	return __access_ok(addr, size);
 }
 
-static inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -171,40 +171,64 @@ static inline int verify_area(int type, const void * addr, unsigned long size)
  * doing multiple accesses to the same area (the user has to do the
  * checks by hand with "access_ok()")
  */
-#define __put_user(x,ptr) __put_user_nocheck((x),(ptr),sizeof(*(ptr)))
-#define __get_user(x,ptr) __get_user_nocheck((x),(ptr),sizeof(*(ptr)))
+#define __put_user(x,ptr) \
+  __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+#define __get_user(x,ptr) \
+  __get_user_nocheck((x),(ptr),sizeof(*(ptr)))
 
 struct __large_struct { unsigned long buf[100]; };
 #define __m(x) (*(struct __large_struct *)(x))
 
-#define __get_user_nocheck(x,ptr,size) ({ \
-long __gu_err; \
-__typeof(*(ptr)) __gu_val; \
-long __gu_addr; \
-__asm__("":"=r" (__gu_val)); \
-__gu_addr = (long) (ptr); \
-__asm__("":"=r" (__gu_err)); \
-switch (size) { \
-case 1: __get_user_asm("b"); break; \
-case 2: __get_user_asm("w"); break; \
-case 4: __get_user_asm("l"); break; \
-default: __get_user_unknown(); break; \
-} x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+#define __get_user_size(x,ptr,size,retval)			\
+do {								\
+	retval = 0;						\
+	switch (size) {						\
+	case 1:							\
+		__get_user_asm(x, ptr, retval, "b");		\
+		break;						\
+	case 2:							\
+		__get_user_asm(x, ptr, retval, "w");		\
+		break;						\
+	case 4:							\
+		__get_user_asm(x, ptr, retval, "l");		\
+		break;						\
+	default:						\
+		__get_user_unknown();				\
+		break;						\
+	}							\
+} while (0)
 
-#define __get_user_check(x,ptr,size)			\
-({ __typeof__(*(ptr)) __val; long __err;		\
- switch(size) {						\
- case 1: __err = __get_user_1(__val, ptr); break;	\
- case 2: __err = __get_user_2(__val, ptr); break;	\
- case 4: __err = __get_user_4(__val, ptr); break;	\
- default: __get_user_unknown(); break;			\
- }							\
- (x) = __val; __err; })
+#define __get_user_nocheck(x,ptr,size)				\
+({								\
+	long __gu_err, __gu_val;				\
+	__get_user_size(__gu_val, (ptr), (size), __gu_err);	\
+	(x) = (__typeof__(*(ptr)))__gu_val;			\
+	__gu_err;						\
+})
 
-#define __get_user_1(x,ptr) ({			\
-long __gu_err;					\
-__typeof__(*(ptr)) __gu_val;			\
-long __gu_addr = (long) (ptr);			\
+#define __get_user_check(x,ptr,size)				\
+({								\
+	long __gu_err, __gu_val;				\
+	switch (size) {						\
+	case 1:							\
+		__get_user_1(__gu_val, (ptr), __gu_err);	\
+		break;						\
+	case 2:							\
+		__get_user_2(__gu_val, (ptr), __gu_err);	\
+		break;						\
+	case 4:							\
+		__get_user_4(__gu_val, (ptr), __gu_err);	\
+		break;						\
+	default:						\
+		__get_user_unknown();				\
+		break;						\
+	}							\
+								\
+	(x) = (__typeof__(*(ptr)))__gu_val;			\
+	__gu_err;						\
+})
+
+#define __get_user_1(x,addr,err) ({		\
 __asm__("stc	r7_bank, %1\n\t"		\
 	"mov.l	@(8,%1), %1\n\t"		\
 	"and	%2, %1\n\t"			\
@@ -222,15 +246,12 @@ __asm__("stc	r7_bank, %1\n\t"		\
 	".section	__ex_table,\"a\"\n\t"	\
 	".long	1b, 0b\n\t"			\
 	".previous"				\
-	: "=&r" (__gu_err), "=&r" (__gu_val)	\
-	: "r" (__gu_addr)			\
+	: "=&r" (err), "=&r" (x)		\
+	: "r" (addr)				\
 	: "t");					\
-x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+})
 
-#define __get_user_2(x,ptr) ({			\
-long __gu_err;					\
-__typeof__(*(ptr)) __gu_val;			\
-long __gu_addr = (long) (ptr);			\
+#define __get_user_2(x,addr,err) ({		\
 __asm__("stc	r7_bank, %1\n\t"		\
 	"mov.l	@(8,%1), %1\n\t"		\
 	"and	%2, %1\n\t"			\
@@ -248,15 +269,12 @@ __asm__("stc	r7_bank, %1\n\t"		\
 	".section	__ex_table,\"a\"\n\t"	\
 	".long	1b, 0b\n\t"			\
 	".previous"				\
-	: "=&r" (__gu_err), "=&r" (__gu_val)	\
-	: "r" (__gu_addr)			\
+	: "=&r" (err), "=&r" (x)		\
+	: "r" (addr)				\
 	: "t");					\
-x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+})
 
-#define __get_user_4(x,ptr) ({			\
-long __gu_err;					\
-__typeof__(*(ptr)) __gu_val;			\
-long __gu_addr = (long) (ptr);			\
+#define __get_user_4(x,addr,err) ({		\
 __asm__("stc	r7_bank, %1\n\t"		\
 	"mov.l	@(8,%1), %1\n\t"		\
 	"and	%2, %1\n\t"			\
@@ -273,12 +291,12 @@ __asm__("stc	r7_bank, %1\n\t"		\
 	".section	__ex_table,\"a\"\n\t"	\
 	".long	1b, 0b\n\t"			\
 	".previous"				\
-	: "=&r" (__gu_err), "=&r" (__gu_val)	\
-	: "r" (__gu_addr)			\
+	: "=&r" (err), "=&r" (x)		\
+	: "r" (addr)				\
 	: "t");					\
-x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+})
 
-#define __get_user_asm(insn) \
+#define __get_user_asm(x, addr, err, insn) \
 ({ \
 __asm__ __volatile__( \
 	"1:\n\t" \
@@ -296,43 +314,50 @@ __asm__ __volatile__( \
 	".section	__ex_table,\"a\"\n\t" \
 	".long	1b, 3b\n\t" \
 	".previous" \
-	:"=&r" (__gu_err), "=&r" (__gu_val) \
-	:"m" (__m(__gu_addr)), "i" (-EFAULT)); })
+	:"=&r" (err), "=&r" (x) \
+	:"m" (__m(addr)), "i" (-EFAULT)); })
 
 extern void __get_user_unknown(void);
 
-#define __put_user_nocheck(x,ptr,size) ({ \
-long __pu_err; \
-__typeof__(*(ptr)) __pu_val; \
-long __pu_addr; \
-__pu_val = (x); \
-__pu_addr = (long) (ptr); \
-__asm__("":"=r" (__pu_err)); \
-switch (size) { \
-case 1: __put_user_asm("b"); break; \
-case 2: __put_user_asm("w"); break; \
-case 4: __put_user_asm("l"); break; \
-case 8: __put_user_u64(__pu_val,__pu_addr,__pu_err); break; \
-default: __put_user_unknown(); break; \
-} __pu_err; })
+#define __put_user_size(x,ptr,size,retval)		\
+do {							\
+	retval = 0;					\
+	switch (size) {					\
+	case 1:						\
+		__put_user_asm(x, ptr, retval, "b");	\
+		break;					\
+	case 2:						\
+		__put_user_asm(x, ptr, retval, "w");	\
+		break;					\
+	case 4:						\
+		__put_user_asm(x, ptr, retval, "l");	\
+		break;					\
+	case 8:						\
+		__put_user_u64(x, ptr, retval);		\
+		break;					\
+	default:					\
+		__put_user_unknown();			\
+	}						\
+} while (0)
 
-#define __put_user_check(x,ptr,size) ({ \
-long __pu_err; \
-__typeof__(*(ptr)) __pu_val; \
-long __pu_addr; \
-__pu_val = (x); \
-__pu_addr = (long) (ptr); \
-__asm__("":"=r" (__pu_err)); \
-if (__access_ok(__pu_addr,size)) { \
-switch (size) { \
-case 1: __put_user_asm("b"); break; \
-case 2: __put_user_asm("w"); break; \
-case 4: __put_user_asm("l"); break; \
-case 8: __put_user_u64(__pu_val,__pu_addr,__pu_err); break; \
-default: __put_user_unknown(); break; \
-} } __pu_err; })
+#define __put_user_nocheck(x,ptr,size)			\
+({							\
+	long __pu_err;					\
+	__put_user_size((x),(ptr),(size),__pu_err);	\
+	__pu_err;					\
+})
 
-#define __put_user_asm(insn) \
+#define __put_user_check(x,ptr,size)				\
+({								\
+	long __pu_err = -EFAULT;				\
+	__typeof__(*(ptr)) *__pu_addr = (ptr);			\
+								\
+	if (__access_ok((unsigned long)__pu_addr,size))		\
+		__put_user_size((x),__pu_addr,(size),__pu_err);	\
+	__pu_err;						\
+})
+
+#define __put_user_asm(x, addr, err, insn) \
 ({ \
 __asm__ __volatile__( \
 	"1:\n\t" \
@@ -350,8 +375,8 @@ __asm__ __volatile__( \
 	".section	__ex_table,\"a\"\n\t" \
 	".long	1b, 3b\n\t" \
 	".previous" \
-	:"=&r" (__pu_err) \
-	:"r" (__pu_val), "m" (__m(__pu_addr)), "i" (-EFAULT) \
+	:"=&r" (err) \
+	:"r" (x), "m" (__m(addr)), "i" (-EFAULT) \
         :"memory"); })
 
 #if defined(__LITTLE_ENDIAN__)
@@ -449,7 +474,7 @@ __cl_size = __clear_user(__cl_addr, __cl_size); \
 __cl_size; })
 
 static __inline__ int
-__strncpy_from_user(unsigned long __dest, unsigned long __src, int __count)
+__strncpy_from_user(unsigned long __dest, unsigned long __user __src, int __count)
 {
 	__kernel_size_t res;
 	unsigned long __dummy, _d, _s;
@@ -498,7 +523,7 @@ __sfu_res = __strncpy_from_user((unsigned long) (dest), __sfu_src, __sfu_count);
 /*
  * Return the size of a string (including the ending 0!)
  */
-static __inline__ long __strnlen_user(const char *__s, long __n)
+static __inline__ long __strnlen_user(const char __user *__s, long __n)
 {
 	unsigned long res;
 	unsigned long __dummy;
@@ -531,7 +556,7 @@ static __inline__ long __strnlen_user(const char *__s, long __n)
 	return res;
 }
 
-static __inline__ long strnlen_user(const char *s, long n)
+static __inline__ long strnlen_user(const char __user *s, long n)
 {
 	if (!access_ok(VERIFY_READ, s, n))
 		return 0;
@@ -539,7 +564,7 @@ static __inline__ long strnlen_user(const char *s, long n)
 		return __strnlen_user(s, n);
 }
 
-static __inline__ long strlen_user(const char *s)
+static __inline__ long strlen_user(const char __user *s)
 {
 	if (!access_ok(VERIFY_READ, s, 0))
 		return 0;
@@ -547,9 +572,24 @@ static __inline__ long strlen_user(const char *s)
 		return __strnlen_user(s, ~0UL >> 1);
 }
 
+/*
+ * The exception table consists of pairs of addresses: the first is the
+ * address of an instruction that is allowed to fault, and the second is
+ * the address at which the program should continue.  No registers are
+ * modified, so it is entirely up to the continuation code to figure out
+ * what to do.
+ *
+ * All the routines below use bits of fixup code that are out of line
+ * with the main instruction path.  This means when everything is well,
+ * we don't even have to jump over them.  Further, they do not intrude
+ * on our cache or tlb entries.
+ */
+
 struct exception_table_entry
 {
 	unsigned long insn, fixup;
 };
+
+extern int fixup_exception(struct pt_regs *regs);
 
 #endif /* __ASM_SH_UACCESS_H */

@@ -153,7 +153,7 @@ static dev_link_t *aha152x_attach(void)
 	CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != 0) {
 	cs_error(link->handle, RegisterClient, ret);
 	aha152x_detach(link);
@@ -181,7 +181,7 @@ static void aha152x_detach(dev_link_t *link)
 	aha152x_release_cs(link);
 
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
     
     /* Unlink device structure, free bits */
     *linkp = link->next;
@@ -191,11 +191,8 @@ static void aha152x_detach(dev_link_t *link)
 
 /*====================================================================*/
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
-
-#define CFG_CHECK(fn, args...) \
-if (CardServices(fn, args) != 0) goto next_entry
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void aha152x_config_cs(dev_link_t *link)
 {
@@ -214,19 +211,20 @@ static void aha152x_config_cs(dev_link_t *link)
     tuple.TupleData = tuple_data;
     tuple.TupleDataMax = 64;
     tuple.TupleOffset = 0;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
-    CS_CHECK(GetTupleData, handle, &tuple);
-    CS_CHECK(ParseTuple, handle, &tuple, &parse);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+    CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
     link->conf.ConfigBase = parse.config.base;
 
     /* Configure card */
     link->state |= DEV_CONFIG;
 
     tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
     while (1) {
-	CFG_CHECK(GetTupleData, handle, &tuple);
-	CFG_CHECK(ParseTuple, handle, &tuple, &parse);
+	if (pcmcia_get_tuple_data(handle, &tuple) != 0 ||
+		pcmcia_parse_tuple(handle, &tuple, &parse) != 0)
+	    goto next_entry;
 	/* For New Media T&J, look for a SCSI window */
 	if (parse.cftable_entry.io.win[0].len >= 0x20)
 	    link->io.BasePort1 = parse.cftable_entry.io.win[0].base;
@@ -236,15 +234,15 @@ static void aha152x_config_cs(dev_link_t *link)
 	if ((parse.cftable_entry.io.nwin > 0) &&
 	    (link->io.BasePort1 < 0xffff)) {
 	    link->conf.ConfigIndex = parse.cftable_entry.index;
-	    i = CardServices(RequestIO, handle, &link->io);
+	    i = pcmcia_request_io(handle, &link->io);
 	    if (i == CS_SUCCESS) break;
 	}
     next_entry:
-	CS_CHECK(GetNextTuple, handle, &tuple);
+	CS_CHECK(GetNextTuple, pcmcia_get_next_tuple(handle, &tuple));
     }
     
-    CS_CHECK(RequestIRQ, handle, &link->irq);
-    CS_CHECK(RequestConfiguration, handle, &link->conf);
+    CS_CHECK(RequestIRQ, pcmcia_request_irq(handle, &link->irq));
+    CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
     
     /* A bad hack... */
     release_region(link->io.BasePort1, link->io.NumPorts1);
@@ -291,9 +289,9 @@ static void aha152x_release_cs(dev_link_t *link)
 	scsi_remove_host(info->host);
 	link->dev = NULL;
     
-	CardServices(ReleaseConfiguration, link->handle);
-	CardServices(ReleaseIO, link->handle, &link->io);
-	CardServices(ReleaseIRQ, link->handle, &link->irq);
+	pcmcia_release_configuration(link->handle);
+	pcmcia_release_io(link->handle, &link->io);
+	pcmcia_release_irq(link->handle, &link->irq);
     
 	link->state &= ~DEV_CONFIG;
 	scsi_unregister(info->host);
@@ -322,7 +320,7 @@ static int aha152x_event(event_t event, int priority,
 	/* Fall through... */
     case CS_EVENT_RESET_PHYSICAL:
 	if (link->state & DEV_CONFIG)
-	    CardServices(ReleaseConfiguration, link->handle);
+	    pcmcia_release_configuration(link->handle);
 	break;
     case CS_EVENT_PM_RESUME:
 	link->state &= ~DEV_SUSPEND;
@@ -330,7 +328,7 @@ static int aha152x_event(event_t event, int priority,
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG) {
 	    Scsi_Cmnd tmp;
-	    CardServices(RequestConfiguration, link->handle, &link->conf);
+	    pcmcia_request_configuration(link->handle, &link->conf);
 	    tmp.device->host = info->host;
 	    aha152x_host_reset(&tmp);
 	}

@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -13,20 +12,6 @@
 #define LABEL_LENGTH_MAX 256		/* Includes NULL char */
 #define INFO_DESC_PRIVATE (-1)      	/* default */
 #define INFO_DESC_EXPORT  0       	/* export info itself */
-
-/*
- * Internal Error codes.
- */
-typedef enum labelcl_error_e {  LABELCL_SUCCESS,          /* 0 */
-                                LABELCL_DUP,              /* 1 */
-                                LABELCL_NOT_FOUND,        /* 2 */
-                                LABELCL_BAD_PARAM,        /* 3 */
-                                LABELCL_HIT_LIMIT,        /* 4 */
-                                LABELCL_CANNOT_ALLOC,     /* 5 */
-                                LABELCL_ILLEGAL_REQUEST,  /* 6 */
-                                LABELCL_IN_USE            /* 7 */
-                                } labelcl_error_t;
-
 
 /*
  * Description of a label entry.

@@ -52,6 +52,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <scsi/scsi_devinfo.h>
+#include <scsi/scsi_host.h>
 
 
 /***********************************************************************
@@ -65,6 +66,16 @@ static const char* host_info(struct Scsi_Host *host)
 
 static int slave_configure (struct scsi_device *sdev)
 {
+	/* Scatter-gather buffers (all but the last) must have a length
+	 * divisible by the bulk maxpacket size.  Otherwise a data packet
+	 * would end up being short, causing a premature end to the data
+	 * transfer.  Since high-speed bulk pipes have a maxpacket size
+	 * of 512, we'll use that as the scsi device queue's DMA alignment
+	 * mask.  Guaranteeing proper alignment of the first buffer will
+	 * have the desired effect because, except at the beginning and
+	 * the end, scatter-gather buffers follow page boundaries. */
+	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
+
 	/* this is to satisify the compiler, tho I don't think the 
 	 * return code is ever checked anywhere. */
 	return 0;
@@ -219,6 +230,21 @@ static int bus_reset( Scsi_Cmnd *srb )
 	return result < 0 ? FAILED : SUCCESS;
 }
 
+/* Report a driver-initiated device reset to the SCSI layer.
+ * Calling this for a SCSI-initiated reset is unnecessary but harmless. */
+void usb_stor_report_device_reset(struct us_data *us)
+{
+	int i;
+
+	scsi_lock(us->host);
+	scsi_report_device_reset(us->host, 0, 0);
+	if (us->flags & US_FL_SCM_MULT_TARG) {
+		for (i = 1; i < us->host->max_id; ++i)
+			scsi_report_device_reset(us->host, 0, i);
+	}
+	scsi_unlock(us->host);
+}
+
 /***********************************************************************
  * /proc/scsi/ functions
  ***********************************************************************/
@@ -227,13 +253,14 @@ static int bus_reset( Scsi_Cmnd *srb )
 #undef SPRINTF
 #define SPRINTF(args...) \
 	do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
+#define DO_FLAG(a) \
+	do { if (us->flags & US_FL_##a) pos += sprintf(pos, " " #a); } while(0)
 
 static int proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off_t offset,
 		int length, int inout)
 {
 	struct us_data *us;
 	char *pos = buffer;
-	unsigned long f;
 
 	/* if someone is sending us data, just throw it away */
 	if (inout)
@@ -256,17 +283,14 @@ static int proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off
 	/* show the device flags */
 	if (pos < buffer + length) {
 		pos += sprintf(pos, "       Quirks:");
-		f = us->flags;
 
-#define DO_FLAG(a)  	if (f & US_FL_##a)  pos += sprintf(pos, " " #a)
 		DO_FLAG(SINGLE_LUN);
 		DO_FLAG(SCM_MULT_TARG);
 		DO_FLAG(FIX_INQUIRY);
 		DO_FLAG(FIX_CAPACITY);
-#undef DO_FLAG
 
 		*(pos++) = '\n';
-		}
+	}
 
 	/*
 	 * Calculate start of next buffer, and return value.
@@ -280,6 +304,79 @@ static int proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off
 	else
 		return (length);
 }
+
+/***********************************************************************
+ * Sysfs interface
+ ***********************************************************************/
+
+/* Output routine for the sysfs info file */
+static ssize_t show_info(struct device *dev, char *buffer)
+{
+	char *pos = buffer;
+	const int length = PAGE_SIZE;
+
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct us_data *us = (struct us_data*)sdev->host->hostdata[0];
+
+	/* print the controller name */
+	SPRINTF("   Host scsi%d: usb-storage\n", sdev->host->host_no);
+
+	/* print product, vendor, and serial number strings */
+	SPRINTF("       Vendor: %s\n", us->vendor);
+	SPRINTF("      Product: %s\n", us->product);
+	SPRINTF("Serial Number: %s\n", us->serial);
+
+	/* show the protocol and transport */
+	SPRINTF("     Protocol: %s\n", us->protocol_name);
+	SPRINTF("    Transport: %s\n", us->transport_name);
+
+	/* show the device flags */
+	if (pos < buffer + length) {
+		pos += sprintf(pos, "       Quirks:");
+
+		DO_FLAG(SINGLE_LUN);
+		DO_FLAG(SCM_MULT_TARG);
+		DO_FLAG(FIX_INQUIRY);
+		DO_FLAG(FIX_CAPACITY);
+
+		*(pos++) = '\n';
+	}
+
+	return (pos - buffer);
+}
+
+static DEVICE_ATTR(info, S_IRUGO, show_info, NULL);
+
+/* Output routine for the sysfs max_sectors file */
+static ssize_t show_max_sectors(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+
+	return sprintf(buf, "%u\n", sdev->request_queue->max_sectors);
+}
+
+/* Input routine for the sysfs max_sectors file */
+static ssize_t store_max_sectors(struct device *dev, const char *buf,
+		size_t count)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	unsigned short ms;
+
+	if (sscanf(buf, "%hu", &ms) > 0 && ms <= SCSI_DEFAULT_MAX_SECTORS) {
+		blk_queue_max_sectors(sdev->request_queue, ms);
+		return strlen(buf);
+	}
+	return -EINVAL;	
+}
+
+static DEVICE_ATTR(max_sectors, S_IRUGO | S_IWUSR, show_max_sectors,
+		store_max_sectors);
+
+static struct device_attribute *sysfs_device_attr_list[] = {
+		&dev_attr_info,
+		&dev_attr_max_sectors,
+		NULL,
+		};
 
 /*
  * this defines our host template, with which we'll allocate hosts
@@ -323,6 +420,9 @@ struct scsi_host_template usb_stor_host_template = {
 
 	/* emulated HBA */
 	.emulated =			TRUE,
+
+	/* sysfs device attributes */
+	.sdev_attrs =			sysfs_device_attr_list,
 
 	/* modify scsi_device bits on probe */
 	.flags = (BLIST_MS_SKIP_PAGE_08 | BLIST_MS_SKIP_PAGE_3F |

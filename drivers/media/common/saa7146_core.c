@@ -137,7 +137,6 @@ static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
 
 char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa7146_pgtable *pt)
 {
-	struct scatterlist *slist = NULL;
 	int pages = (length+PAGE_SIZE-1)/PAGE_SIZE;
 	char *mem = vmalloc_32(length);
 	int slen = 0;
@@ -146,35 +145,36 @@ char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa
 		return NULL;
 	}
 
-	if (!(slist = vmalloc_to_sg(mem, pages))) {
+	if (!(pt->slist = vmalloc_to_sg(mem, pages))) {
 		vfree(mem);
 		return NULL;
 	}
 
 	if (saa7146_pgtable_alloc(pci, pt)) {
-		kfree(slist);
+		kfree(pt->slist);
+		pt->slist = NULL;
 		vfree(mem);
 		return NULL;
 	}
 	
-	slen = pci_map_sg(pci,slist,pages,PCI_DMA_FROMDEVICE);
-	if (0 != saa7146_pgtable_build_single(pci, pt, slist, slen)) {
+	slen = pci_map_sg(pci,pt->slist,pages,PCI_DMA_FROMDEVICE);
+	if (0 != saa7146_pgtable_build_single(pci, pt, pt->slist, slen)) {
 		return NULL;
 	}
 
-	/* fixme: here's a memory leak: slist never gets freed by any other
-	   function ...*/
 	return mem;
 }
 
 void saa7146_pgtable_free(struct pci_dev *pci, struct saa7146_pgtable *pt)
 {
-//fm	DEB_EE(("pci:%p, pt:%p\n",pci,pt));
-
 	if (NULL == pt->cpu)
 		return;
 	pci_free_consistent(pci, pt->size, pt->cpu, pt->dma);
 	pt->cpu = NULL;
+	if (NULL != pt->slist) {
+		kfree(pt->slist);
+		pt->slist = NULL;
+	}
 }
 
 int saa7146_pgtable_alloc(struct pci_dev *pci, struct saa7146_pgtable *pt)
@@ -182,11 +182,8 @@ int saa7146_pgtable_alloc(struct pci_dev *pci, struct saa7146_pgtable *pt)
         u32          *cpu;
         dma_addr_t   dma_addr;
 
-//fm	DEB_EE(("pci:%p, pt:%p\n",pci,pt));
-
 	cpu = pci_alloc_consistent(pci, SAA7146_PGTABLE_SIZE, &dma_addr);
 	if (NULL == cpu) {
-//fm		ERR(("pci_alloc_consistent() failed."));
 		return -ENOMEM;
 	}
 	pt->size = SAA7146_PGTABLE_SIZE;

@@ -5,9 +5,11 @@
 
 #include <stdlib.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <asm/page.h>
@@ -80,8 +82,6 @@ struct signal_info sig_info[] = {
 		     .is_irq 		= 0 },
 	[ SIGILL ] { .handler 		= relay_signal,
 		     .is_irq 		= 0 },
-	[ SIGWINCH ] { .handler		= winch,
-		       .is_irq		= 1 },
 	[ SIGBUS ] { .handler 		= bus_handler,
 		     .is_irq 		= 0 },
 	[ SIGSEGV] { .handler 		= segv_handler,
@@ -123,7 +123,7 @@ void do_longjmp(void *b, int val)
 {
 	jmp_buf *buf = b;
 
-	siglongjmp(*buf, val);
+	longjmp(*buf, val);
 }
 
 /*

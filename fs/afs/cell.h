@@ -61,7 +61,7 @@ struct afs_cell
 	char			name[0];	/* cell name - must go last */
 };
 
-extern int afs_cell_init(void);
+extern int afs_cell_init(char *rootcell);
 
 extern int afs_cell_create(const char *name, char *vllist, struct afs_cell **_cell);
 

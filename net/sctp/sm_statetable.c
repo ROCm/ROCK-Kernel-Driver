@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  *
@@ -921,13 +921,15 @@ const sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t cid,
 	if (state > SCTP_STATE_MAX)
 		return &bug;
 
-	if (cid >= 0 && cid <= SCTP_CID_BASE_MAX) {
+	if (cid >= 0 && cid <= SCTP_CID_BASE_MAX)
 		return &chunk_event_table[cid][state];
-	}
 
-	if (cid >= SCTP_CID_ADDIP_MIN && cid <= SCTP_CID_ADDIP_MAX) {
-		return &addip_chunk_event_table
-			[cid - SCTP_CID_ADDIP_MIN][state];
+	if (sctp_addip_enable) {
+		if (cid == SCTP_CID_ASCONF)
+			return &addip_chunk_event_table[0][state];
+
+		if (cid == SCTP_CID_ASCONF_ACK)
+			return &addip_chunk_event_table[1][state];
 	}
 
 	return &chunk_event_table_unknown[state];

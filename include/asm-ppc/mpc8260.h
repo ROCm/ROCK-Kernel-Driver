@@ -1,15 +1,36 @@
-/* This is the single file included by all MPC8260 build options.
+/*
  * Since there are many different boards and no standard configuration,
  * we have a unique include file for each.  Rather than change every
  * file that has to include MPC8260 configuration, they all include
  * this one and the configuration switching is done here.
  */
 #ifdef __KERNEL__
-#ifndef __CONFIG_8260_DEFS
-#define __CONFIG_8260_DEFS
+#ifndef __ASM_PPC_MPC8260_H__
+#define __ASM_PPC_MPC8260_H__
 
 #include <linux/config.h>
-#include <platforms/mpc82xx.h>
+
+#ifdef CONFIG_8260
+
+#ifdef CONFIG_EST8260
+#include <platforms/est8260.h>
+#endif
+
+#ifdef CONFIG_SBS8260
+#include <platforms/sbs8260.h>
+#endif
+
+#ifdef CONFIG_RPX6
+#include <platforms/rpxsuper.h>
+#endif
+
+#ifdef CONFIG_WILLOW
+#include <platforms/willow.h>
+#endif
+
+#ifdef CONFIG_TQM8260
+#include <platforms/tqm8260.h>
+#endif
 
 /* Make sure the memory translation stuff is there if PCI not used.
  */
@@ -34,10 +55,13 @@
 #define IO_VIRT_ADDR	IO_PHYS_ADDR
 #endif
 
+#ifndef __ASSEMBLY__
 /* The "residual" data board information structure the boot loader
  * hands to us.
  */
 extern unsigned char __res[];
+#endif
 
-#endif /* !__CONFIG_8260_DEFS */
+#endif /* CONFIG_8260 */
+#endif /* !__ASM_PPC_MPC8260_H__ */
 #endif /* __KERNEL__ */

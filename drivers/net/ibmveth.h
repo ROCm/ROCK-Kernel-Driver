@@ -118,7 +118,6 @@ struct ibmveth_adapter {
 #else    
     struct tasklet_struct replenish_task;
 #endif
-    atomic_t in_replenish_task;
     /* adapter specific stats */
     u64 replenish_task_cycles;
     u64 replenish_no_mem;

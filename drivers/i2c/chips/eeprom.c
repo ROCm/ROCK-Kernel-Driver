@@ -6,6 +6,11 @@
     Copyright (C) 2003 Greg Kroah-Hartman <greg@kroah.com>
     Copyright (C) 2003 IBM Corp.
 
+    2004-01-16  Jean Delvare <khali@linux-fr.org>
+    Divide the eeprom in 32-byte (arbitrary) slices. This significantly
+    speeds sensors up, as well as various scripts using the eeprom
+    module.
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -21,12 +26,16 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/* #define DEBUG */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_CHIP
+#define DEBUG	1
+#endif
 
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 
@@ -59,9 +68,10 @@ enum eeprom_nature {
 /* Each client has this additional data */
 struct eeprom_data {
 	struct semaphore update_lock;
-	char valid;			/* !=0 if following fields are valid */
-	unsigned long last_updated;	/* In jiffies */
+	u8 valid;			/* bitfield, bit!=0 if slice is valid */
+	unsigned long last_updated[8];	/* In jiffies, 8 slices */
 	u8 data[EEPROM_SIZE];		/* Register values */
+	enum eeprom_nature nature;
 };
 
 
@@ -81,35 +91,36 @@ static struct i2c_driver eeprom_driver = {
 
 static int eeprom_id = 0;
 
-static void eeprom_update_client(struct i2c_client *client)
+static void eeprom_update_client(struct i2c_client *client, u8 slice)
 {
 	struct eeprom_data *data = i2c_get_clientdata(client);
 	int i, j;
 
 	down(&data->update_lock);
 
-	if ((jiffies - data->last_updated > 300 * HZ) |
-	    (jiffies < data->last_updated) || !data->valid) {
-		dev_dbg(&client->dev, "Starting eeprom update\n");
+	if (!(data->valid & (1 << slice)) ||
+	    (jiffies - data->last_updated[slice] > 300 * HZ) ||
+	    (jiffies < data->last_updated[slice])) {
+		dev_dbg(&client->dev, "Starting eeprom update, slice %u\n", slice);
 
 		if (i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_READ_I2C_BLOCK)) {
-			for (i=0; i < EEPROM_SIZE; i += I2C_SMBUS_I2C_BLOCK_MAX)
+			for (i = slice << 5; i < (slice + 1) << 5; i += I2C_SMBUS_I2C_BLOCK_MAX)
 				if (i2c_smbus_read_i2c_block_data(client, i, data->data + i) != I2C_SMBUS_I2C_BLOCK_MAX)
 					goto exit;
 		} else {
-			if (i2c_smbus_write_byte(client, 0)) {
+			if (i2c_smbus_write_byte(client, slice << 5)) {
 				dev_dbg(&client->dev, "eeprom read start has failed!\n");
 				goto exit;
 			}
-			for (i = 0; i < EEPROM_SIZE; i++) {
+			for (i = slice << 5; i < (slice + 1) << 5; i++) {
 				j = i2c_smbus_read_byte(client);
 				if (j < 0)
 					goto exit;
 				data->data[i] = (u8) j;
 			}
 		}
-		data->last_updated = jiffies;
-		data->valid = 1;
+		data->last_updated[slice] = jiffies;
+		data->valid |= (1 << slice);
 	}
 exit:
 	up(&data->update_lock);
@@ -119,15 +130,27 @@ static ssize_t eeprom_read(struct kobject *kobj, char *buf, loff_t off, size_t c
 {
 	struct i2c_client *client = to_i2c_client(container_of(kobj, struct device, kobj));
 	struct eeprom_data *data = i2c_get_clientdata(client);
-
-	eeprom_update_client(client);
+	u8 slice;
 
 	if (off > EEPROM_SIZE)
 		return 0;
 	if (off + count > EEPROM_SIZE)
 		count = EEPROM_SIZE - off;
 
-	memcpy(buf, &data->data[off], count);
+	/* Only refresh slices which contain requested bytes */
+	for (slice = off >> 5; slice <= (off + count - 1) >> 5; slice++)
+		eeprom_update_client(client, slice);
+
+	/* Hide Vaio security settings to regular users (16 first bytes) */
+	if (data->nature == VAIO && off < 16 && !capable(CAP_SYS_ADMIN)) {
+		int in_row1 = 16 - off;
+		memset(buf, 0, in_row1);
+		if (count - in_row1 > 0)
+			memcpy(buf + in_row1, &data->data[16], count - in_row1);
+	} else {
+		memcpy(buf, &data->data[off], count);
+	}
+
 	return count;
 }
 
@@ -151,7 +174,6 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 	int i, cs;
 	struct i2c_client *new_client;
 	struct eeprom_data *data;
-	enum eeprom_nature nature = UNKNOWN;
 	int err = 0;
 
 	/* Make sure we aren't probing the ISA bus!! This is just a safety check
@@ -199,6 +221,7 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 			goto exit_kfree;
 	}
 
+	data->nature = UNKNOWN;
 	/* Detect the Vaio nature of EEPROMs.
 	   We use the "PCG-" prefix as the signature. */
 	if (address == 0x57) {
@@ -206,17 +229,7 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 		    i2c_smbus_read_byte_data(new_client, 0x81) == 'C' && 
 		    i2c_smbus_read_byte_data(new_client, 0x82) == 'G' &&
 		    i2c_smbus_read_byte_data(new_client, 0x83) == '-')
-			nature = VAIO;
-	}
-
-	/* If this is a VIAO, then we only allow root to read from this file,
-	   as BIOS passwords can be present here in plaintext */
-	switch (nature) {
- 	case VAIO:
-		eeprom_attr.attr.mode = S_IRUSR;
-		break;
-	default:
-		eeprom_attr.attr.mode = S_IRUGO;
+			data->nature = VAIO;
 	}
 
 	/* Fill in the remaining client fields */

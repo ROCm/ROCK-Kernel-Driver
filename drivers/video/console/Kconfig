@@ -6,7 +6,7 @@ menu "Console display driver support"
 
 config VGA_CONSOLE
 	bool "VGA text console" if EMBEDDED || !X86
-	depends on !ARCH_ACORN && !ARCH_EBSA110 && !4xx && !8xx && !SPARC32 && !SPARC64
+	depends on !ARCH_ACORN && !ARCH_EBSA110 && !4xx && !8xx && !SPARC32 && !SPARC64 && !M68K
 	default y
 	help
 	  Saying Y here will allow you to use Linux in text mode through a
@@ -43,6 +43,7 @@ config VIDEO_SELECT
 	  about the Video mode selection support. If unsure, say N.
 
 config MDA_CONSOLE
+	depends on !M68K
 	tristate "MDA text console (dual-headed) (EXPERIMENTAL)"
 	---help---
 	  Say Y here if you have an old MDA or monochrome Hercules graphics

@@ -1919,7 +1919,7 @@ _STATIC(start_here_pSeries)
 
 	/* This is where all platforms converge execution */
 _STATIC(start_here_common)
-	
+
 	/* The following code sets up the SP and TOC now that we are */
 	/* running with translation enabled. */
 

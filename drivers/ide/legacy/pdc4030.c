@@ -443,7 +443,12 @@ read_next:
 static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+#ifdef CONFIG_IDE_TASKFILE_IO
 	struct request *rq = hwgroup->rq;
+#else
+	struct request *rq = &hwgroup->wrq;
+	struct bio *bio = rq->bio;
+#endif
 
 	if ((HWIF(drive)->INB(IDE_STATUS_REG)) & BUSY_STAT) {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
@@ -472,6 +477,8 @@ static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 	while (rq->bio != rq->cbio)
 		(void) DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio));
 #else
+	bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
+	rq = hwgroup->rq;
 	DRIVER(drive)->end_request(drive, 1, rq->hard_nr_sectors);
 #endif
 	return ide_stopped;
@@ -530,7 +537,7 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 			 * all bvecs in this one.
 			 */
 			if (++bio->bi_idx >= bio->bi_vcnt) {
-				bio->bi_idx = 0;
+				bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 				bio = bio->bi_next;
 			}
 
@@ -539,7 +546,8 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 				mcount = 0;
 			} else {
 				rq->bio = bio;
-				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+				rq->nr_cbio_segments = bio_segments(bio);
+				rq->current_nr_sectors = bio_cur_sectors(bio);
 				rq->hard_cur_sectors = rq->current_nr_sectors;
 			}
 		}
@@ -561,6 +569,9 @@ static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 #ifdef CONFIG_IDE_TASKFILE_IO
 	struct request *rq = hwgroup->rq;
+#else
+	struct request *rq = &hwgroup->wrq;
+	struct bio *bio = rq->bio;
 #endif
 
 	if (HWIF(drive)->INB(IDE_NSECTOR_REG) != 0) {
@@ -575,6 +586,9 @@ static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 		}
 		hwgroup->poll_timeout = 0;
 		printk(KERN_ERR "%s: write timed-out!\n",drive->name);
+#ifndef CONFIG_IDE_TASKFILE_IO
+		bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
+#endif
 		return DRIVER(drive)->error(drive, "write timeout",
 				HWIF(drive)->INB(IDE_STATUS_REG));
 	}

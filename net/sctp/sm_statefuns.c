@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2002 Intel Corp.
@@ -46,6 +46,7 @@
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Ardelle Fan	    <ardelle.fan@intel.com>
  *    Ryan Layer	    <rmlayer@us.ibm.com>
+ *    Kevin Gao		    <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -3066,19 +3067,57 @@ sctp_disposition_t sctp_sf_do_8_5_1_E_sa(const struct sctp_endpoint *ep,
 	return sctp_sf_shut_8_4_5(ep, NULL, type, arg, commands);
 }
 
-/*
- * ADDIP Section 4.2 Upon reception of an ASCONF Chunk
- * When an endpoint receive an ASCONF Chunk from the remote peer
- * special procedures MAY be needed to identify the association the
- * ASCONF Chunk is associated with. To properly find the association
- * the following procedures should be L1 to L4 and C1 to C5
- */
+/* ADDIP Section 4.2 Upon reception of an ASCONF Chunk.  */
 sctp_disposition_t sctp_sf_do_asconf(const struct sctp_endpoint *ep,
-				const struct sctp_association *asoc,
-				const sctp_subtype_t type, void *arg,
-				sctp_cmd_seq_t *commands)
+				     const struct sctp_association *asoc,
+				     const sctp_subtype_t type, void *arg,
+				     sctp_cmd_seq_t *commands)
 {
-	// FIXME: Handle the ASCONF chunk
+	struct sctp_chunk	*chunk = arg;
+	struct sctp_chunk	*asconf_ack = NULL;
+	sctp_addiphdr_t		*hdr;
+	__u32			serial;
+
+	hdr = (sctp_addiphdr_t *)chunk->skb->data;
+	serial = ntohl(hdr->serial);
+
+	/* ADDIP 4.2 C1) Compare the value of the serial number to the value
+	 * the endpoint stored in a new association variable
+	 * 'Peer-Serial-Number'. 
+	 */
+	if (serial == asoc->peer.addip_serial + 1) {
+   		/* ADDIP 4.2 C2) If the value found in the serial number is
+		 * equal to the ('Peer-Serial-Number' + 1), the endpoint MUST
+		 * do V1-V5.
+		 */
+		asconf_ack = sctp_process_asconf((struct sctp_association *)
+						 asoc, chunk);
+		if (!asconf_ack)
+			return SCTP_DISPOSITION_NOMEM;
+	} else if (serial == asoc->peer.addip_serial) {
+		/* ADDIP 4.2 C3) If the value found in the serial number is
+		 * equal to the value stored in the 'Peer-Serial-Number'
+		 * IMPLEMENTATION NOTE: As an optimization a receiver may wish
+		 * to save the last ASCONF-ACK for some predetermined period of 		 * time and instead of re-processing the ASCONF (with the same
+		 * serial number) it may just re-transmit the ASCONF-ACK.
+		 */
+		if (asoc->addip_last_asconf_ack)
+			asconf_ack = asoc->addip_last_asconf_ack;
+		else
+			return SCTP_DISPOSITION_DISCARD;
+	} else {
+		/* ADDIP 4.2 C4) Otherwise, the ASCONF Chunk is discarded since 
+		 * it must be either a stale packet or from an attacker.
+		 */	
+		return SCTP_DISPOSITION_DISCARD;
+	}
+
+	/* ADDIP 4.2 C5) In both cases C2 and C3 the ASCONF-ACK MUST be sent
+	 * back to the source address contained in the IP header of the ASCONF
+	 * being responded to.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(asconf_ack));
+	
 	return SCTP_DISPOSITION_CONSUME;
 }
 
@@ -3088,12 +3127,81 @@ sctp_disposition_t sctp_sf_do_asconf(const struct sctp_endpoint *ep,
  * delete IP addresses the D0 to D13 rules should be applied:
  */
 sctp_disposition_t sctp_sf_do_asconf_ack(const struct sctp_endpoint *ep,
-				const struct sctp_association *asoc,
-				const sctp_subtype_t type, void *arg,
-				sctp_cmd_seq_t *commands)
+					 const struct sctp_association *asoc,
+	 				 const sctp_subtype_t type, void *arg,
+					 sctp_cmd_seq_t *commands)
 {
-	// FIXME: Handle the ASCONF-ACK chunk
-	return SCTP_DISPOSITION_CONSUME;
+	struct sctp_chunk	*asconf_ack = arg;
+	struct sctp_chunk	*last_asconf = asoc->addip_last_asconf;
+	struct sctp_chunk	*abort;
+	sctp_addiphdr_t		*addip_hdr;
+	__u32			sent_serial, rcvd_serial;
+
+	addip_hdr = (sctp_addiphdr_t *)asconf_ack->skb->data;
+	rcvd_serial = ntohl(addip_hdr->serial);
+
+	if (last_asconf) {
+		addip_hdr = (sctp_addiphdr_t *)last_asconf->subh.addip_hdr;
+		sent_serial = ntohl(addip_hdr->serial);
+	} else {
+		sent_serial = asoc->addip_serial - 1;
+	}
+
+	/* D0) If an endpoint receives an ASCONF-ACK that is greater than or
+	 * equal to the next serial number to be used but no ASCONF chunk is
+	 * outstanding the endpoint MUST ABORT the association. Note that a
+	 * sequence number is greater than if it is no more than 2^^31-1
+	 * larger than the current sequence number (using serial arithmetic).
+	 */
+	if (ADDIP_SERIAL_gte(rcvd_serial, sent_serial + 1) &&
+	    !(asoc->addip_last_asconf)) {
+		abort = sctp_make_abort(asoc, asconf_ack,
+					sizeof(sctp_errhdr_t));
+		if (abort) {
+			sctp_init_cause(abort, SCTP_ERROR_ASCONF_ACK, NULL, 0);
+			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+					SCTP_CHUNK(abort));
+		}
+		/* We are going to ABORT, so we might as well stop
+		 * processing the rest of the chunks in the packet.
+		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
+		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
+				SCTP_U32(SCTP_ERROR_ASCONF_ACK));
+		SCTP_INC_STATS(SctpAborteds);
+		SCTP_DEC_STATS(SctpCurrEstab);
+		return SCTP_DISPOSITION_ABORT;
+	}
+
+	if ((rcvd_serial == sent_serial) && asoc->addip_last_asconf) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+
+		if (!sctp_process_asconf_ack((struct sctp_association *)asoc,
+					     asconf_ack))
+			return SCTP_DISPOSITION_CONSUME;
+
+		abort = sctp_make_abort(asoc, asconf_ack,
+					sizeof(sctp_errhdr_t));
+		if (abort) {
+			sctp_init_cause(abort, SCTP_ERROR_RSRC_LOW, NULL, 0);
+			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+					SCTP_CHUNK(abort));
+		}
+		/* We are going to ABORT, so we might as well stop
+		 * processing the rest of the chunks in the packet.
+		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
+		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
+				SCTP_U32(SCTP_ERROR_ASCONF_ACK));
+		SCTP_INC_STATS(SctpAborteds);
+		SCTP_DEC_STATS(SctpCurrEstab);
+		return SCTP_DISPOSITION_ABORT;
+	}
+
+	return SCTP_DISPOSITION_DISCARD;
 }
 
 /*
@@ -4269,7 +4377,7 @@ nomem:
 
 /*
  * ADDIP Section 4.1 ASCONF CHunk Procedures
- * If the T-4 RTO timer expires the endpoint should do B1 to B5
+ * If the T4 RTO timer expires the endpoint should do B1 to B5
  */
 sctp_disposition_t sctp_sf_t4_timer_expire(
 	const struct sctp_endpoint *ep,
@@ -4278,7 +4386,55 @@ sctp_disposition_t sctp_sf_t4_timer_expire(
 	void *arg,
 	sctp_cmd_seq_t *commands)
 {
-	// FIXME: need to handle t4 expire
+	struct sctp_chunk *chunk = asoc->addip_last_asconf;
+	struct sctp_transport *transport = chunk->transport;
+
+	/* ADDIP 4.1 B1) Increment the error counters and perform path failure
+	 * detection on the appropriate destination address as defined in
+	 * RFC2960 [5] section 8.1 and 8.2.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_STRIKE, SCTP_TRANSPORT(transport));
+
+	/* Reconfig T4 timer and transport. */
+	sctp_add_cmd_sf(commands, SCTP_CMD_SETUP_T4, SCTP_CHUNK(chunk));
+
+	/* ADDIP 4.1 B2) Increment the association error counters and perform
+	 * endpoint failure detection on the association as defined in
+	 * RFC2960 [5] section 8.1 and 8.2.
+	 * association error counter is incremented in SCTP_CMD_STRIKE.
+	 */
+	if (asoc->overall_error_count >= asoc->max_retrans) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
+				SCTP_U32(SCTP_ERROR_NO_ERROR));
+		SCTP_INC_STATS(SctpAborteds);
+		SCTP_INC_STATS(SctpCurrEstab);
+		return SCTP_DISPOSITION_ABORT;
+	}
+
+	/* ADDIP 4.1 B3) Back-off the destination address RTO value to which
+	 * the ASCONF chunk was sent by doubling the RTO timer value.
+	 * This is done in SCTP_CMD_STRIKE.
+	 */
+
+	/* ADDIP 4.1 B4) Re-transmit the ASCONF Chunk last sent and if possible
+	 * choose an alternate destination address (please refer to RFC2960
+	 * [5] section 6.4.1). An endpoint MUST NOT add new parameters to this
+	 * chunk, it MUST be the same (including its serial number) as the last 
+	 * ASCONF sent.
+	 */
+	sctp_chunk_hold(asoc->addip_last_asconf);
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+			SCTP_CHUNK(asoc->addip_last_asconf));
+
+	/* ADDIP 4.1 B5) Restart the T-4 RTO timer. Note that if a different
+	 * destination is selected, then the RTO used will be that of the new
+	 * destination address.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+
 	return SCTP_DISPOSITION_CONSUME;
 }
 

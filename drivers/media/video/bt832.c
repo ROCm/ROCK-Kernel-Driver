@@ -31,8 +31,8 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 
-#include <media/audiochip.h>
-#include <media/id.h>
+#include "id.h"
+#include "audiochip.h"
 #include "bttv.h"
 #include "bt832.h"
 
@@ -168,7 +168,8 @@ int bt832_init(struct i2c_client *i2c_client_s)
 
 
 
-static int bt832_attach(struct i2c_adapter *adap, int addr, int kind)
+static int bt832_attach(struct i2c_adapter *adap, int addr,
+			  unsigned short flags, int kind)
 {
 	struct bt832 *t;
 
@@ -183,7 +184,7 @@ static int bt832_attach(struct i2c_adapter *adap, int addr, int kind)
                 return -ENOMEM;
 	memset(t,0,sizeof(*t));
 	t->client = client_template;
-        i2c_set_clientdata(&t->client, t);
+        t->client.data = t;
         i2c_attach_client(&t->client);
 
 	if(! bt832_init(&t->client)) {
@@ -196,19 +197,14 @@ static int bt832_attach(struct i2c_adapter *adap, int addr, int kind)
 
 static int bt832_probe(struct i2c_adapter *adap)
 {
-#ifdef I2C_ADAP_CLASS_TV_ANALOG
 	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, bt832_attach);
-#else
-	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848))
-		return i2c_probe(adap, &addr_data, bt832_attach);
-#endif
 	return 0;
 }
 
 static int bt832_detach(struct i2c_client *client)
 {
-	struct bt832 *t = i2c_get_clientdata(client);
+	struct bt832 *t = (struct bt832*)client->data;
 
 	printk("bt832: detach.\n");
 	i2c_detach_client(client);
@@ -219,7 +215,7 @@ static int bt832_detach(struct i2c_client *client)
 static int
 bt832_command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
-	struct bt832 *t = i2c_get_clientdata(client);
+	struct bt832 *t = (struct bt832*)client->data;
 
 	printk("bt832: command %x\n",cmd);
 
@@ -253,9 +249,9 @@ static struct i2c_driver driver = {
 };
 static struct i2c_client client_template =
 {
-	I2C_DEVNAME("bt832"),
-	.flags      = I2C_CLIENT_ALLOW_USE,
-        .driver     = &driver,
+        .name   = "bt832",
+	.flags  = I2C_CLIENT_ALLOW_USE,
+        .driver = &driver,
 };
 
 
@@ -273,10 +269,3 @@ static void bt832_cleanup_module(void)
 module_init(bt832_init_module);
 module_exit(bt832_cleanup_module);
 
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-basic-offset: 8
- * End:
- */

@@ -1,35 +1,9 @@
 /*
- *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
  * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
- * 
- * This program is free software; you can redistribute it and/or modify it 
- * under the terms of version 2 of the GNU General Public License 
- * as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope that it would be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
- * 
- * Further, this software is distributed without any warranty that it is 
- * free of the rightful claim of any third person regarding infringement 
- * or the like.  Any license provided herein, whether implied or 
- * otherwise, applies only to this software file.  Patent licenses, if 
- * any, provided herein do not apply to combinations of this program with 
- * other software, or any other product whatsoever.
- * 
- * You should have received a copy of the GNU General Public 
- * License along with this program; if not, write the Free Software 
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
- * Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pkwy, 
- * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
- * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
 
@@ -39,7 +13,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/sn_private.h>
@@ -89,36 +62,11 @@ bte_crb_error_handler(vertex_hdl_t hub_v, int btenum,
 	 * in the bte handle structure for the thread excercising the
 	 * interface to consume.
 	 */
-	switch (ioe->ie_errortype) {
-	case IIO_ICRB_ECODE_PERR:
-		bte->bh_error = BTEFAIL_POISON;
-		break;
-	case IIO_ICRB_ECODE_WERR:
-		bte->bh_error = BTEFAIL_PROT;
-		break;
-	case IIO_ICRB_ECODE_AERR:
-		bte->bh_error = BTEFAIL_ACCESS;
-		break;
-	case IIO_ICRB_ECODE_TOUT:
-		bte->bh_error = BTEFAIL_TOUT;
-		break;
-	case IIO_ICRB_ECODE_XTERR:
-		bte->bh_error = BTEFAIL_XTERR;
-		break;
-	case IIO_ICRB_ECODE_DERR:
-		bte->bh_error = BTEFAIL_DIR;
-		break;
-	case IIO_ICRB_ECODE_PWERR:
-	case IIO_ICRB_ECODE_PRERR:
-		/* NO BREAK */
-	default:
-		bte->bh_error = BTEFAIL_ERROR;
-	}
-
+	bte->bh_error = ioe->ie_errortype + BTEFAIL_OFFSET;
 	bte->bte_error_count++;
 
-	BTE_PRINTK(("Got an error on cnode %d bte %d\n",
-		    bte->bte_cnode, bte->bte_num));
+	BTE_PRINTK(("Got an error on cnode %d bte %d: HW error type 0x%x\n",
+		    bte->bte_cnode, bte->bte_num, ioe->ie_errortype));
 	bte_error_handler((unsigned long) hinfo->h_nodepda);
 }
 

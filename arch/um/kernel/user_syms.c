@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <dirent.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <errno.h>
 #include <utime.h>
 #include <string.h>
@@ -16,62 +16,6 @@
  * since this includes various user-level headers.
  */
 
-/* Had to update this: this changed in late 2.5 to add CRC and other beasts
- * and was never updated here- 13 Dec 2003-Blaisorblade*/
-
-/* v850 toolchain uses a `_' prefix for all user symbols */
-#ifndef MODULE_SYMBOL_PREFIX
-#define MODULE_SYMBOL_PREFIX ""
-#endif
-
-struct kernel_symbol
-{
-	unsigned long value;
-	const char *name;
-};
-
-#if !defined(UML_CONFIG_MODULES)
-#define EXPORT_SYMBOL(sym)
-#define EXPORT_SYMBOL_GPL(sym)
-#define EXPORT_SYMBOL_NOVERS(sym)
-
-#else /*UML_CONFIG_MODULES*/
-#ifndef __GENKSYMS__
-#ifdef UML_CONFIG_MODVERSIONS
-/* Mark the CRC weak since genksyms apparently decides not to
- * generate a checksums for some symbols */
-#define __CRC_SYMBOL(sym, sec)					\
-	extern void *__crc_##sym __attribute__((weak));		\
-	static const unsigned long __kcrctab_##sym		\
-	__attribute__((section("__kcrctab" sec), unused))	\
-	= (unsigned long) &__crc_##sym;
-#else
-#define __CRC_SYMBOL(sym, sec)
-#endif
-
-/* For every exported symbol, place a struct in the __ksymtab section */
-#define __EXPORT_SYMBOL(sym, sec)				\
-	__CRC_SYMBOL(sym, sec)					\
-	static const char __kstrtab_##sym[]			\
-	__attribute__((section("__ksymtab_strings")))		\
-	= MODULE_SYMBOL_PREFIX #sym;                    	\
-	static const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__ksymtab" sec), unused))	\
-	= { (unsigned long)&sym, __kstrtab_##sym }
-
-#define EXPORT_SYMBOL(sym)					\
-	__EXPORT_SYMBOL(sym, "")
-
-#define EXPORT_SYMBOL_GPL(sym)					\
-	__EXPORT_SYMBOL(sym, "_gpl")
-
-#endif
-
-/* We don't mangle the actual symbol anymore, so no need for
- * special casing EXPORT_SYMBOL_NOVERS.  FIXME: Deprecated */
-#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-#endif
-#if 0
 struct module_symbol
 {
 	unsigned long value;
@@ -83,7 +27,7 @@ struct module_symbol
 #define __MODULE_STRING_1(x)	#x
 #define __MODULE_STRING(x)	__MODULE_STRING_1(x)
 
-#if !defined(AUTOCONF_INCLUDED)
+#if !defined(__AUTOCONF_INCLUDED__)
 
 #define __EXPORT_SYMBOL(sym,str)   error config_must_be_included_before_module
 #define EXPORT_SYMBOL(var)	   error config_must_be_included_before_module
@@ -112,7 +56,6 @@ __attribute__((section("__ksymtab"))) =			\
 
 #define EXPORT_SYMBOL_NOVERS(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(var))
 
-#endif
 #endif
 
 EXPORT_SYMBOL(__errno_location);
@@ -166,7 +109,5 @@ EXPORT_SYMBOL(getuid);
 
 EXPORT_SYMBOL(memset);
 EXPORT_SYMBOL(strstr);
-EXPORT_SYMBOL(printf);
-EXPORT_SYMBOL(strlen);
 
 EXPORT_SYMBOL(find_iomem);

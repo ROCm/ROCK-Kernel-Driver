@@ -9,6 +9,7 @@
  */
 
 #include <asm/types.h>
+#include <linux/compiler.h>
 
 #ifdef __GNUC__
 #ifdef __KERNEL__
@@ -40,7 +41,7 @@ static __inline__ void st_le32(volatile __u32 *addr, const __u32 val)
 }
 
 #if 0
-static __inline__ __const__ __u16 ___arch__swab16(__u16 value)
+static __inline__ __attribute_const__ __u16 ___arch__swab16(__u16 value)
 {
 	__u16 result;
 
@@ -50,7 +51,7 @@ static __inline__ __const__ __u16 ___arch__swab16(__u16 value)
 	return result;
 }
 
-static __inline__ __const__ __u32 ___arch__swab32(__u32 value)
+static __inline__ __attribute_const__ __u32 ___arch__swab32(__u32 value)
 {
 	__u32 result;
 
@@ -62,7 +63,7 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 value)
 	return result;
 }
 
-static __inline__ __const__ __u64 ___arch__swab64(__u64 value)
+static __inline__ __attribute_const__ __u64 ___arch__swab64(__u64 value)
 {
 	__u64 result;
 #error implement me

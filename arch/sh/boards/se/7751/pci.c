@@ -95,12 +95,11 @@ int __init pcibios_init_platform(void)
 
    /*
     * Set the MBR so PCI address is one-to-one with window,
-    * meaning all calls go straight through... use ifdef to
+    * meaning all calls go straight through... use BUG_ON to
     * catch erroneous assumption.
     */
-#if PCIBIOS_MIN_MEM != SH7751_PCI_MEMORY_BASE
-#error One-to-one assumption for PCI memory mapping is wrong!?!?!?
-#endif   
+   BUG_ON(PCIBIOS_MIN_MEM != SH7751_PCI_MEMORY_BASE);
+
    PCIC_WRITE(SH7751_PCIMBR, PCIBIOS_MIN_MEM);
 
    /* Set IOBR for window containing area specified in pci.h */
@@ -125,3 +124,25 @@ int __init pcibios_map_platform_irq(u8 slot, u8 pin)
                 return -1;
         }
 }
+
+static struct resource sh7751_io_resource = {
+	.name   = "SH7751 IO",
+	.start  = SH7751_PCI_IO_BASE,
+	.end    = SH7751_PCI_IO_BASE + SH7751_PCI_IO_SIZE - 1,
+	.flags  = IORESOURCE_IO
+};
+
+static struct resource sh7751_mem_resource = {
+	.name   = "SH7751 mem",
+	.start  = SH7751_PCI_MEMORY_BASE,
+	.end    = SH7751_PCI_MEMORY_BASE + SH7751_PCI_MEM_SIZE - 1,
+	.flags  = IORESOURCE_MEM
+};
+
+extern struct pci_ops sh7751_pci_ops;
+
+struct pci_channel board_pci_channels[] = {
+	{ &sh7751_pci_ops, &sh7751_io_resource, &sh7751_mem_resource, 0, 0xff },
+	{ NULL, NULL, NULL, 0, 0 },
+};
+

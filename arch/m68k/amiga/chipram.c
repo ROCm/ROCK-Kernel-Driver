@@ -19,7 +19,9 @@
 
 unsigned long amiga_chip_size;
 
-static struct resource chipram_res = { "Chip RAM", CHIP_PHYSADDR };
+static struct resource chipram_res = {
+    .name = "Chip RAM", .start = CHIP_PHYSADDR
+};
 static unsigned long chipavail;
 
 

@@ -186,21 +186,8 @@ static inline void mk_fsid_v2(u32 *fsidv, dev_t dev, ino_t ino)
 /*
  * Shorthand for dprintk()'s
  */
-inline static char * SVCFH_fmt(struct svc_fh *fhp)
-{
-	struct knfsd_fh *fh = &fhp->fh_handle;
-	
-	static char buf[80];
-	sprintf(buf, "%d: %08x %08x %08x %08x %08x %08x",
-		fh->fh_size,
-		fh->fh_base.fh_pad[0],
-		fh->fh_base.fh_pad[1],
-		fh->fh_base.fh_pad[2],
-		fh->fh_base.fh_pad[3],
-		fh->fh_base.fh_pad[4],
-		fh->fh_base.fh_pad[5]);
-	return buf;
-}
+extern char * SVCFH_fmt(struct svc_fh *fhp);
+
 /*
  * Function prototypes
  */

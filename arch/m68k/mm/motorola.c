@@ -9,6 +9,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -40,6 +41,7 @@
  * For 68040, this is _PAGE_CACHE040 (cachable, copyback)
  */
 unsigned long mm_cachebits = 0;
+EXPORT_SYMBOL(mm_cachebits);
 #endif
 
 static pte_t * __init kernel_page_table(void)

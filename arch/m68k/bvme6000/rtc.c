@@ -53,6 +53,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		/* Ensure clock and real-time-mode-register are accessible */
 		msr = rtc->msr & 0xc0;
 		rtc->msr = 0x40;
+		memset(&wtime, 0, sizeof(struct rtc_time));
 		do {
 			wtime.tm_sec =  BCD2BIN(rtc->bcd_sec);
 			wtime.tm_min =  BCD2BIN(rtc->bcd_min);
@@ -164,11 +165,10 @@ static struct file_operations rtc_fops = {
 	.release =	rtc_release,
 };
 
-static struct miscdevice rtc_dev=
-{
-	RTC_MINOR,
-	"rtc",
-	&rtc_fops
+static struct miscdevice rtc_dev = {
+	.minor =	RTC_MINOR,
+	.name =		"rtc",
+	.fops =		&rtc_fops
 };
 
 int __init rtc_DP8570A_init(void)

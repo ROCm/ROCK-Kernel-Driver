@@ -107,6 +107,39 @@ config MD_RAID5
 
 	  If unsure, say Y.
 
+config MD_RAID6
+	tristate "RAID-6 mode (EXPERIMENTAL)"
+	depends on BLK_DEV_MD && EXPERIMENTAL
+	---help---
+	  WARNING: RAID-6 is currently highly experimental.  If you
+	  use it, there is no guarantee whatsoever that it won't
+	  destroy your data, eat your disk drives, insult your mother,
+	  or re-appoint George W. Bush.
+
+	  A RAID-6 set of N drives with a capacity of C MB per drive
+	  provides the capacity of C * (N - 2) MB, and protects
+	  against a failure of any two drives. For a given sector
+	  (row) number, (N - 2) drives contain data sectors, and two
+	  drives contains two independent redundancy syndromes.  Like
+	  RAID-5, RAID-6 distributes the syndromes across the drives
+	  in one of the available parity distribution methods.
+
+	  RAID-6 currently requires a specially patched version of
+	  mdadm; the patch is available at:
+
+	  ftp://ftp.kernel.org/pub/linux/kernel/people/hpa/
+
+	  ... and the mdadm source code at ...
+
+	  ftp://ftp.kernel.org/pub/linux/utils/raid/mdadm/
+
+	  If you want to use such a RAID-6 set, say Y.  To compile
+	  this code as a module, choose M here: the module will be
+	  called raid6.
+
+
+	  If unsure, say N.
+
 config MD_MULTIPATH
 	tristate "Multipath I/O support"
 	depends on BLK_DEV_MD

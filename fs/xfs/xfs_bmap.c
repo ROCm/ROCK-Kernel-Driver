@@ -68,9 +68,6 @@
 #include "xfs_trans_space.h"
 #include "xfs_buf_item.h"
 
-#ifdef DEBUG
-ktrace_t	*xfs_bmap_trace_buf;
-#endif
 
 #ifdef XFSDEBUG
 STATIC void
@@ -404,7 +401,7 @@ xfs_bmap_validate_ret(
 #define	xfs_bmap_validate_ret(bno,len,flags,mval,onmap,nmap)
 #endif /* DEBUG */
 
-#if defined(DEBUG) && defined(XFS_RW_TRACE)
+#if defined(XFS_RW_TRACE)
 STATIC void
 xfs_bunmap_trace(
 	xfs_inode_t		*ip,
@@ -414,7 +411,7 @@ xfs_bunmap_trace(
 	inst_t			*ra);
 #else
 #define	xfs_bunmap_trace(ip, bno, len, flags, ra)
-#endif	/* DEBUG && XFS_RW_TRACE */
+#endif	/* XFS_RW_TRACE */
 
 STATIC int
 xfs_bmap_count_tree(
@@ -3543,6 +3540,8 @@ xfs_bmap_search_extents(
 
 
 #ifdef XFS_BMAP_TRACE
+ktrace_t	*xfs_bmap_trace_buf;
+
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
@@ -3575,14 +3574,14 @@ xfs_bmap_trace_addentry(
 		(void *)(__psint_t)cnt,
 		(void *)(__psunsigned_t)(ip->i_ino >> 32),
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
+		(void *)(__psunsigned_t)(r1->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l0),
+		(void *)(__psunsigned_t)(r1->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l1),
+		(void *)(__psunsigned_t)(r2->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l0),
+		(void *)(__psunsigned_t)(r2->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l1)
 		);
 	ASSERT(ip->i_xtrace);
 	ktrace_enter(ip->i_xtrace,
@@ -3592,14 +3591,14 @@ xfs_bmap_trace_addentry(
 		(void *)(__psint_t)cnt,
 		(void *)(__psunsigned_t)(ip->i_ino >> 32),
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
+		(void *)(__psunsigned_t)(r1->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l0),
+		(void *)(__psunsigned_t)(r1->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l1),
+		(void *)(__psunsigned_t)(r2->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l0),
+		(void *)(__psunsigned_t)(r2->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l1)
 		);
 }
 
@@ -3722,7 +3721,7 @@ xfs_bmap_worst_indlen(
 	return rval;
 }
 
-#if defined(DEBUG) && defined(XFS_RW_TRACE)
+#if defined(XFS_RW_TRACE)
 STATIC void
 xfs_bunmap_trace(
 	xfs_inode_t		*ip,
@@ -3742,7 +3741,7 @@ xfs_bunmap_trace(
 		(void *)(__psint_t)((xfs_dfiloff_t)bno & 0xffffffff),
 		(void *)(__psint_t)len,
 		(void *)(__psint_t)flags,
-		(void *)(__psint_t)private.p_cpuid,
+		(void *)(unsigned long)current_cpu(),
 		(void *)ra,
 		(void *)0,
 		(void *)0,

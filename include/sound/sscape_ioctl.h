@@ -8,11 +8,9 @@ struct sscape_bootblock
   unsigned version;
 };
 
-#define SSCAPE_MICROCODE_SIZE  65536
-
 struct sscape_microcode
 {
-  unsigned char *code;
+  unsigned char *code;	/* 65536 chars */
 };
 
 #define SND_SSCAPE_LOAD_BOOTB  _IOWR('P', 100, struct sscape_bootblock)

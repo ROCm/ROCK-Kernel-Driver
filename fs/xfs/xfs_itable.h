@@ -36,15 +36,19 @@
  * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
  * structures (by the dmi library). This is a pointer to a formatter function
  * that will iget the inode and fill in the appropriate structure.
- * see xfs_bulkstat_one() and dm_bulkstat_one() in dmi_xfs.c
+ * see xfs_bulkstat_one() and xfs_dm_bulkstat_one() in dmapi_xfs.c
  */
 typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
 			       struct xfs_trans	*tp,
 			       xfs_ino_t	ino,
 			       void		*buffer,
+			       int		ubsize,
+			       void		*private_data,
 			       xfs_daddr_t	bno,
+			       int		*ubused,
 			       void		*dip,
 			       int		*stat);
+
 /*
  * Values for stat return value.
  */
@@ -69,6 +73,7 @@ xfs_bulkstat(
 	xfs_ino_t	*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
 	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
+	void		*private_data,	/* private data for formatter */
 	size_t		statstruct_size,/* sizeof struct that we're filling */
 	xfs_caddr_t	ubuffer,	/* buffer with inode stats */
 	int		flags,		/* flag to control access method */
@@ -87,7 +92,10 @@ xfs_bulkstat_one(
 	xfs_trans_t		*tp,
 	xfs_ino_t		ino,
 	void			*buffer,
+	int			ubsize,
+	void			*private_data,
 	xfs_daddr_t		bno,
+	int			*ubused,
 	void			*dibuff,
 	int			*stat);
 

@@ -45,6 +45,8 @@
 
 #define SO_ACCEPTCONN		30
 
+#define SO_PEERSEC		31
+
 /* Nast libc5 fixup - bletch */
 #if defined(__KERNEL__)
 /* Socket types. */

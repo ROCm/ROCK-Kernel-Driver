@@ -1,5 +1,5 @@
 /*
- *	$Id: io.c,v 1.1.2.2 2002/01/20 05:03:25 mrbrown Exp $
+ *	$Id: io.c,v 1.4 2003/08/03 03:05:10 lethal Exp $
  *	Copyright (C) 2000 YAEGASHI Takeshi
  *	Typical I/O routines for HD64461 system.
  */
@@ -78,24 +78,6 @@ unsigned int hd64461_inl(unsigned long port)
 	return *(volatile unsigned long*)PORT2ADDR(port);
 }
 
-void hd64461_insb(unsigned long port, void *buffer, unsigned long count)
-{
-	unsigned char *buf=buffer;
-	while(count--) *buf++=inb(port);
-}
-
-void hd64461_insw(unsigned long port, void *buffer, unsigned long count)
-{
-	unsigned short *buf=buffer;
-	while(count--) *buf++=inw(port);
-}
-
-void hd64461_insl(unsigned long port, void *buffer, unsigned long count)
-{
-	unsigned long *buf=buffer;
-	while(count--) *buf++=inl(port);
-}
-
 void hd64461_outb(unsigned char b, unsigned long port)
 {
 	*(volatile unsigned char*)PORT2ADDR(port) = b;
@@ -117,20 +99,3 @@ void hd64461_outl(unsigned int b, unsigned long port)
         *(volatile unsigned long*)PORT2ADDR(port) = b;
 }
 
-void hd64461_outsb(unsigned long port, const void *buffer, unsigned long count)
-{
-	const unsigned char *buf=buffer;
-	while(count--) outb(*buf++, port);
-}
-
-void hd64461_outsw(unsigned long port, const void *buffer, unsigned long count)
-{
-	const unsigned short *buf=buffer;
-	while(count--) outw(*buf++, port);
-}
-
-void hd64461_outsl(unsigned long port, const void *buffer, unsigned long count)
-{
-	const unsigned long *buf=buffer;
-	while(count--) outl(*buf++, port);
-}

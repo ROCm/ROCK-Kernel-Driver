@@ -70,21 +70,22 @@ struct afs_vnode
 	afs_callback_type_t	cb_type;	/* type of callback */
 };
 
-static inline afs_vnode_t *AFS_FS_I(struct inode *inode)
+static inline struct afs_vnode *AFS_FS_I(struct inode *inode)
 {
-	return container_of(inode,afs_vnode_t,vfs_inode);
+	return container_of(inode,struct afs_vnode,vfs_inode);
 }
 
-static inline struct inode *AFS_VNODE_TO_I(afs_vnode_t *vnode)
+static inline struct inode *AFS_VNODE_TO_I(struct afs_vnode *vnode)
 {
 	return &vnode->vfs_inode;
 }
 
-extern int afs_vnode_fetch_status(afs_vnode_t *vnode);
+extern int afs_vnode_fetch_status(struct afs_vnode *vnode);
 
-extern int afs_vnode_fetch_data(afs_vnode_t *vnode, struct afs_rxfs_fetch_descriptor *desc);
+extern int afs_vnode_fetch_data(struct afs_vnode *vnode,
+				struct afs_rxfs_fetch_descriptor *desc);
 
-extern int afs_vnode_give_up_callback(afs_vnode_t *vnode);
+extern int afs_vnode_give_up_callback(struct afs_vnode *vnode);
 
 extern struct afs_timer_ops afs_vnode_cb_timed_out_ops;
 

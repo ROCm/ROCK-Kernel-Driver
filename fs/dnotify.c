@@ -165,6 +165,7 @@ void dnotify_parent(struct dentry *dentry, unsigned long event)
 		spin_unlock(&dentry->d_lock);
 	}
 }
+EXPORT_SYMBOL_GPL(dnotify_parent);
 
 static int __init dnotify_init(void)
 {

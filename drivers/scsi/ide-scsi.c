@@ -788,7 +788,8 @@ static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 
 static int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
-	idescsi_scsi_t *scsi = scsihost_to_idescsi(cmd->device->host);
+	struct Scsi_Host *host = cmd->device->host;
+	idescsi_scsi_t *scsi = scsihost_to_idescsi(host);
 	ide_drive_t *drive = scsi->drive;
 	struct request *rq = NULL;
 	idescsi_pc_t *pc = NULL;
@@ -839,9 +840,9 @@ static int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	rq->special = (char *) pc;
 	rq->bio = idescsi_dma_bio (drive, pc);
 	rq->flags = REQ_SPECIAL;
-	spin_unlock_irq(cmd->device->host->host_lock);
+	spin_unlock_irq(host->host_lock);
 	(void) ide_do_drive_cmd (drive, rq, ide_end);
-	spin_lock_irq(cmd->device->host->host_lock);
+	spin_lock_irq(host->host_lock);
 	return 0;
 abort:
 	if (pc) kfree (pc);

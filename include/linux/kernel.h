@@ -91,6 +91,8 @@ asmlinkage int printk(const char * fmt, ...)
 
 unsigned long int_sqrt(unsigned long);
 
+extern int printk_ratelimit(void);
+
 static inline void console_silent(void)
 {
 	console_loglevel = 0;

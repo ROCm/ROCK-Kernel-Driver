@@ -8,8 +8,6 @@
 #include <linux/security.h>
 #include "xattr.h"
 
-#define XATTR_SECURITY_PREFIX "security."
-
 static size_t
 devpts_xattr_security_list(struct dentry *dentry, char *buffer)
 {

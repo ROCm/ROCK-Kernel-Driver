@@ -449,12 +449,8 @@ do_io:
 			  * accessed in the current window, there
 			  * is a high probability that around 'n' pages
 			  * shall be used in the next current window.
-			  *
-			  * To minimize lazy-readahead triggered
-			  * in the next current window, read in
-			  * an extra page.
 			  */
-			ra->next_size = preoffset - ra->start + 2;
+			ra->next_size = preoffset - ra->start + 1;
 		}
 		ra->start = offset;
 		ra->size = ra->next_size;
@@ -474,13 +470,9 @@ do_io:
 		/*
 		 * This read request is within the current window.  It is time
 		 * to submit I/O for the ahead window while the application is
-		 * about to step into the ahead window.
-		 * Heuristic: Defer reading the ahead window till we hit
-		 * the last page in the current window. (lazy readahead)
-		 * If we read in earlier we run the risk of wasting
-		 * the ahead window.
+		 * crunching through the current window.
 		 */
-		if (ra->ahead_start == 0 && offset == (ra->start + ra->size -1)) {
+		if (ra->ahead_start == 0) {
 			ra->ahead_start = ra->start + ra->size;
 			ra->ahead_size = ra->next_size;
 			actual = do_page_cache_readahead(mapping, filp,

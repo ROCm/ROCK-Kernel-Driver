@@ -91,10 +91,6 @@ int __init hpet_enable(void)
 	    !(id & HPET_ID_LEGSUP))
 		return -1;
 
-	if (((id & HPET_ID_VENDOR) >> HPET_ID_VENDOR_SHIFT) !=
-				HPET_ID_VENDOR_8086)
-		return -1;
-
 	hpet_period = hpet_readl(HPET_PERIOD);
 	if ((hpet_period < HPET_MIN_PERIOD) || (hpet_period > HPET_MAX_PERIOD))
 		return -1;

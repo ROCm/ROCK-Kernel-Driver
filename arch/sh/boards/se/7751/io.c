@@ -201,75 +201,15 @@ void sh7751se_outl(unsigned int value, unsigned long port)
 		maybebadio(outl, port);
 }
 
-void sh7751se_insb(unsigned long port, void *addr, unsigned long count)
-{
-	unsigned char *p = addr;
-	while (count--) *p++ = sh7751se_inb(port);
-}
-
-void sh7751se_insw(unsigned long port, void *addr, unsigned long count)
-{
-	unsigned short *p = addr;
-	while (count--) *p++ = sh7751se_inw(port);
-}
-
 void sh7751se_insl(unsigned long port, void *addr, unsigned long count)
 {
 	maybebadio(insl, port);
-}
-
-void sh7751se_outsb(unsigned long port, const void *addr, unsigned long count)
-{
-	unsigned char *p = (unsigned char*)addr;
-	while (count--) sh7751se_outb(*p++, port);
-}
-
-void sh7751se_outsw(unsigned long port, const void *addr, unsigned long count)
-{
-	unsigned short *p = (unsigned short*)addr;
-	while (count--) sh7751se_outw(*p++, port);
 }
 
 void sh7751se_outsl(unsigned long port, const void *addr, unsigned long count)
 {
 	maybebadio(outsw, port);
 }
-
-/* For read/write calls, just copy generic (pass-thru); PCIMBR is  */
-/* already set up.  For a larger memory space, these would need to */
-/* reset PCIMBR as needed on a per-call basis...                   */
-
-unsigned char sh7751se_readb(unsigned long addr)
-{
-	return *(volatile unsigned char*)addr;
-}
-
-unsigned short sh7751se_readw(unsigned long addr)
-{
-	return *(volatile unsigned short*)addr;
-}
-
-unsigned int sh7751se_readl(unsigned long addr)
-{
-	return *(volatile unsigned long*)addr;
-}
-
-void sh7751se_writeb(unsigned char b, unsigned long addr)
-{
-	*(volatile unsigned char*)addr = b;
-}
-
-void sh7751se_writew(unsigned short b, unsigned long addr)
-{
-	*(volatile unsigned short*)addr = b;
-}
-
-void sh7751se_writel(unsigned int b, unsigned long addr)
-{
-        *(volatile unsigned long*)addr = b;
-}
-
-
 
 /* Map ISA bus address to the real address. Only for PCMCIA.  */
 

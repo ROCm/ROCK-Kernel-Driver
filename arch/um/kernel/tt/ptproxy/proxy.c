@@ -15,6 +15,7 @@ Jeff Dike (jdike@karaya.com) : Modified for integration into uml
 #include <unistd.h>
 #include <signal.h>
 #include <string.h>
+#include <fcntl.h>
 #include <termios.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -292,10 +293,10 @@ void fake_child_exit(void)
 }
 
 char gdb_init_string[] = 
-"att 1 \n\
-b panic \n\
-b stop \n\
-handle SIGWINCH nostop noprint pass \n\
+"att 1
+b panic
+b stop
+handle SIGWINCH nostop noprint pass
 ";
 
 int start_debugger(char *prog, int startup, int stop, int *fd_out)
@@ -303,8 +304,7 @@ int start_debugger(char *prog, int startup, int stop, int *fd_out)
 	int slave, child;
 
 	slave = open_gdb_chan();
-	child = fork();
-	if(child == 0){
+	if((child = fork()) == 0){
 		char *tempname = NULL;
 		int fd;
 
@@ -327,19 +327,18 @@ int start_debugger(char *prog, int startup, int stop, int *fd_out)
 			exit(1);
 #endif
 		}
-		fd = make_tempfile("/tmp/gdb_init-XXXXXX", &tempname, 0);
-		if(fd < 0){
-			printk("start_debugger : make_tempfile failed,"
-			       "err = %d\n", -fd);
+		if((fd = make_tempfile("/tmp/gdb_init-XXXXXX", &tempname, 0)) < 0){
+			printk("start_debugger : make_tempfile failed, errno = %d\n",
+			       errno);
 			exit(1);
 		}
-		os_write_file(fd, gdb_init_string, sizeof(gdb_init_string) - 1);
+		write(fd, gdb_init_string, sizeof(gdb_init_string) - 1);
 		if(startup){
 			if(stop){
-				os_write_file(fd, "b start_kernel\n",
+				write(fd, "b start_kernel\n",
 				      strlen("b start_kernel\n"));
 			}
-			os_write_file(fd, "c\n", strlen("c\n"));
+			write(fd, "c\n", strlen("c\n"));
 		}
 		if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0){
 			printk("start_debugger :  PTRACE_TRACEME failed, "

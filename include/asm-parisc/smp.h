@@ -54,7 +54,7 @@ extern unsigned long cpu_present_mask;
 #define smp_processor_id()	(current_thread_info()->cpu)
 #define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 
-#define cpu_possible(cpu)       cpu_isset(cpu, cpu_present_mask)
+#define cpu_possible_map	cpu_present_map
 
 #endif /* CONFIG_SMP */
 

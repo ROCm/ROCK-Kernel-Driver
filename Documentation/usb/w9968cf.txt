@@ -1,6 +1,7 @@
 
-         W996[87]CF JPEG USB Dual Mode Camera Chip driver for Linux 2.6
-         ==============================================================
+                   W996[87]CF JPEG USB Dual Mode Camera Chip 
+                     Driver for Linux 2.6 (basic version)
+                   =========================================
 
                                - Documentation -
 
@@ -11,15 +12,16 @@ Index
 2. License
 3. Overview
 4. Supported devices
-5. Kernel configuration and third-part module compilation
+5. Module dependencies
 6. Module loading
 7. Module paramaters
-8. Credits
+8. Contact information
+9. Credits
 
 
 1. Copyright
 ============
-Copyright (C) 2002 2003 by Luca Risolia <luca_ing@libero.it>
+Copyright (C) 2002-2004 by Luca Risolia <luca.risolia@studio.unibo.it>
 
 
 2. License
@@ -43,22 +45,24 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ===========
 This driver supports the video streaming capabilities of the devices mounting
 Winbond W9967CF and Winbond W9968CF JPEG USB Dual Mode Camera Chips, when they
-are being commanded by USB.
+are being commanded by USB. OV681 based cameras should be supported as well.
 
-The driver relies on the Video4Linux, USB and I2C core modules of the Linux
-kernel, version 2.6.0 or greater, and is not compatible in any way with
-previous versions. It has been designed to run properly on SMP systems
-as well. At the moment, an additional module, "ovcamchip", is mandatory; it
-provides support for some OmniVision CMOS sensors connected to the W996[87]CF
-chips.
-
-The driver is split into two modules: the basic one, "w9968cf", is needed for
+The driver is divided into two modules: the basic one, "w9968cf", is needed for
 the supported devices to work; the second one, "w9968cf-vpp", is an optional
 module, which provides some useful video post-processing functions like video
-decoding, up-scaling and colour conversions. These routines can't be included
-into official kernels for performance purposes. Once the driver is installed,
+decoding, up-scaling and colour conversions. Once the driver is installed,
 every time an application tries to open a recognized device, "w9968cf" checks
 the presence of the "w9968cf-vpp" module and loads it automatically by default.
+
+Please keep in mind that official kernels do NOT include the second module for
+performance purposes. However it is always recommended to download and install
+the latest and complete release of the driver, replacing the existing one, if
+present: it will be still even possible not to load the "w9968cf-vpp" module at
+all, if you ever want to.
+
+The latest and full-featured version of the W996[87]CF driver can be found at:
+http://go.lamarinapunto.com/ . Please refer to the documentation included in
+that package, if you are going to use it.
 
 Up to 32 cameras can be handled at the same time. They can be connected and
 disconnected from the host many times without turning off the computer, if
@@ -67,18 +71,21 @@ your system supports the hotplug facility.
 To change the default settings for each camera, many paramaters can be passed
 through command line when the module is loaded into memory.
 
-The latest and full featured version of the W996[87]CF driver can be found at:
-http://go.lamarinapunto.com/
+The driver relies on the Video4Linux, USB and I2C core modules of the official
+Linux kernels. It has been designed to run properly on SMP systems as well.
+At the moment, an additional module, "ovcamchip", is mandatory; it provides
+support for some OmniVision CMOS sensors connected to the W996[87]CF chips.
 
-The "ovcamchip" module is part of the OV511 driver, version 2.25, which can be
+The "ovcamchip" module is part of the OV511 driver, version 2.27, which can be
 downloaded from internet:
 http://alpha.dyndns.org/ov511/
-To know how to patch, compile and load it, read the paragraphs below.
+To know how to compile it, read the documentation included in the OV511 
+package.
 
 
 4. Supported devices
 ====================
-At the moment, known W996[87]CF based devices are:
+At the moment, known W996[87]CF and OV681 based devices are:
 - Aroma Digi Pen ADG-5000 Refurbished
 - AVerTV USB
 - Creative Labs Video Blaster WebCam Go
@@ -87,27 +94,26 @@ At the moment, known W996[87]CF based devices are:
 - Ezonics EZ-802 EZMega Cam
 - OPCOM Digi Pen VGA Dual Mode Pen Camera
 
-If you know any other W996[87]CF based cameras, please contact me.
+If you know any other W996[87]CF or OV681 based cameras, please contact me.
 
 The list above does NOT imply that all those devices work with this driver: up
 until now only webcams that have a CMOS sensor supported by the "ovcamchip"
 module work. 
-For a list of supported CMOS sensors, please visit the module author homepage:
-http://alpha.dyndns.org/ov511/
+For a list of supported CMOS sensors, please visit the author's homepage on
+this module: http://alpha.dyndns.org/ov511/
 
 Possible external microcontrollers of those webcams are not supported: this
-means that still images can't be downloaded from the device memory.
+means that still images cannot be downloaded from the device memory.
 
 Furthermore, it's worth to note that I was only able to run tests on my
 "Creative Labs Video Blaster WebCam Go". Donations of other models, for
 additional testing and full support, would be much appreciated.
 
 
-5. Kernel configuration and third-part module compilation
-=========================================================
-As noted above, kernel 2.6.0 is the minimum for this driver; for it to work
-properly, the driver needs kernel support for Video4Linux, USB and I2C, and a
-third-part module for the CMOS sensor.
+5. Module dependencies
+======================
+For it to work properly, the driver needs kernel support for Video4Linux, 
+USB and I2C, and a third-party module for the CMOS sensor.
 
 The following options of the kernel configuration file must be enabled and
 corresponding modules must be compiled:
@@ -126,7 +132,7 @@ The I2C core module can be compiled statically in the kernel as well.
 	#
 	CONFIG_USB=m
 
-In addition, depending on the hardware being used, just one of the modules
+In addition, depending on the hardware being used, only one of the modules
 below is necessary:
 
 	# USB Host Controller Drivers
@@ -137,31 +143,16 @@ below is necessary:
 
 Also, make sure "Enforce bandwidth allocation" is NOT enabled.
 
+And finally:
+
 	# USB Multimedia devices
 	#
 	CONFIG_USB_W9968CF=m
 
 The last module we need is "ovcamchip.o". To obtain it, you have to download
-the OV511 driver, version 2.25 - don't use other versions - which is available
-at http://alpha.dyndns.org/ov511/ . Then you have to download the latest 
-version of the full featured W996[87]CF driver, which contains a patch for the
-"ovcamchip" module; it is available at http://go.lamarinapunto.com .
-Once you have obtained the packages, decompress, patch and compile the 
-"ovcamchip" module. In other words:
-
-	[user@localhost home]$ tar xvzf w9968cf-x.x.tar.gz
-	[user@localhost home]$ tar xvjf ov511-2.25.tar.bz2
-	[user@localhost home]$ cd ov511-2.25
-	[user@localhost ov511-2.25]$ patch -p1 <                              \
-	                             /path/to/w9968cf-x.x/ov511-2.25.patch
-	[user@localhost ov511-2.25]$ make
-
-It's worth to note that the full featured version of the W996[87]CF driver
-can also be installed overwriting the one in the kernel; in this case, read the
-documentation included in the package.
-
-If everything went well, the W996[87]CF driver can be immediatly used (see next
-paragraph).
+the OV511 package, version 2.27 - don't use other versions - and compile it
+according to its documentation. 
+The package is available at http://alpha.dyndns.org/ov511/ .
 
 
 6. Module loading
@@ -169,7 +160,7 @@ paragraph).
 To use the driver, it is necessary to load the "w9968cf" module into memory
 after every other module required.
 
-For example, loading can be done this way, as root:
+Loading can be done this way, from root:
 
 	[root@localhost home]# modprobe usbcore
 	[root@localhost home]# modprobe i2c-core
@@ -191,11 +182,10 @@ explanation about them and which syntax to use, it is recommended to run the
 
 7. Module paramaters
 ====================
-
 Module paramaters are listed below:
 -------------------------------------------------------------------------------
 Name:           vppmod_load
-Type:           int
+Type:           bool
 Syntax:         <0|1>
 Description:    Automatic 'w9968cf-vpp' module loading: 0 disabled, 1 enabled.
                 If enabled, every time an application attempts to open a
@@ -219,7 +209,7 @@ Syntax:         <-1|n[,...]>
 Description:    Specify V4L minor mode number.
                 -1 = use next available
                  n = use minor number n
-                You can specify 32 cameras this way.
+                You can specify up to 32 cameras this way.
                 For example:
                 video_nr=-1,2,-1 would assign minor number 2 to the second
                 recognized camera and use auto for the first one and for every
@@ -236,22 +226,22 @@ Default:        1023
 Name:           max_buffers
 Type:           int array (min = 0, max = 32)
 Syntax:         <n[,...]>
-Description:    Only for advanced users.
+Description:    For advanced users.
                 Specify the maximum number of video frame buffers to allocate
                 for each device, from 2 to 32.
 Default:        2
 -------------------------------------------------------------------------------
 Name:           double_buffer
-Type:           int array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]> 
 Description:    Hardware double buffering: 0 disabled, 1 enabled.
                 It should be enabled if you want smooth video output: if you
-                obtain out of sync. video, disable it at all, or try to
+                obtain out of sync. video, disable it, or try to
                 decrease the 'clockdiv' module paramater value.
 Default:        1 for every device.
 -------------------------------------------------------------------------------
 Name:           clamping
-Type:           int array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]> 
 Description:    Video data clamping: 0 disabled, 1 enabled.
 Default:        0 for every device.
@@ -266,13 +256,13 @@ Description:    Video filter type.
 Default:        0 for every device.
 -------------------------------------------------------------------------------
 Name:           largeview
-Type:           int array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]> 
 Description:    Large view: 0 disabled, 1 enabled.
 Default:        1 for every device.
 -------------------------------------------------------------------------------
 Name:           upscaling
-Type:           int array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]> 
 Description:    Software scaling (for non-compressed video only):
                 0 disabled, 1 enabled.
@@ -319,7 +309,7 @@ Default:        0 for every device. Initial palette is 9 (UYVY).
 Note:           If 'w9968cf-vpp' is not loaded, this paramater is set to 9.
 -------------------------------------------------------------------------------
 Name:           force_rgb
-Type:           int array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]>
 Description:    Read RGB video data instead of BGR:
                 1 = use RGB component ordering.
@@ -328,28 +318,28 @@ Description:    Read RGB video data instead of BGR:
 Default:        0 for every device.
 -------------------------------------------------------------------------------
 Name:           autobright
-Type:           long array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]>
 Description:    CMOS sensor automatically changes brightness:
                 0 = no, 1 = yes
 Default:        0 for every device.
 -------------------------------------------------------------------------------
 Name:           autoexp
-Type:           long array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]>
 Description:    CMOS sensor automatically changes exposure:
                 0 = no, 1 = yes
 Default:        1 for every device.
 -------------------------------------------------------------------------------
 Name:           lightfreq
-Type:           long array (min = 0, max = 32)
+Type:           int array (min = 0, max = 32)
 Syntax:         <50|60[,...]>
 Description:    Light frequency in Hz:
                 50 for European and Asian lighting, 60 for American lighting.
 Default:        50 for every device.
 -------------------------------------------------------------------------------
 Name:           bandingfilter
-Type:           long array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]> 
 Description:    Banding filter to reduce effects of fluorescent 
                 lighting:
@@ -359,7 +349,7 @@ Description:    Banding filter to reduce effects of fluorescent
 Default:        0 for every device.
 -------------------------------------------------------------------------------
 Name:           clockdiv
-Type:           long array (min = 0, max = 32)
+Type:           int array (min = 0, max = 32)
 Syntax:         <-1|n[,...]>
 Description:    Force pixel clock divisor to a specific value (for experts):
                 n may vary from 0 to 127.
@@ -368,21 +358,21 @@ Description:    Force pixel clock divisor to a specific value (for experts):
 Default:        -1 for every device.
 -------------------------------------------------------------------------------
 Name:           backlight
-Type:           long array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]>
 Description:    Objects are lit from behind:
                 0 = no, 1 = yes
 Default:        0 for every device.
 -------------------------------------------------------------------------------
 Name:           mirror
-Type:           long array (min = 0, max = 32)
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]>
 Description:    Reverse image horizontally:
                 0 = no, 1 = yes
 Default:        0 for every device.
 -------------------------------------------------------------------------------
-Name:           sensor_mono
-Type:           long array (min = 0, max = 32)
+Name:           monochrome
+Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]> 
 Description:    The CMOS sensor is monochrome:
                 0 = no, 1 = yes
@@ -423,7 +413,7 @@ Name:           debug
 Type:           int
 Syntax:         <n> 
 Description:    Debugging information level, from 0 to 6:
-                0 = none (be cautious)
+                0 = none (use carefully)
                 1 = critical errors
                 2 = significant informations
                 3 = configuration or general messages
@@ -435,7 +425,7 @@ Description:    Debugging information level, from 0 to 6:
 Default:        2
 -------------------------------------------------------------------------------
 Name:           specific_debug
-Type:           int
+Type:           bool
 Syntax:         <0|1>
 Description:    Enable or disable specific debugging messages:
                 0 = print messages concerning every level <= 'debug' level.
@@ -444,7 +434,16 @@ Default:        0
 -------------------------------------------------------------------------------
 
 
-8. Credits
+8. Contact information
+======================
+I may be contacted by e-mail at <luca.risolia@studio.unibo.it>.
+
+I can accept GPG/PGP encrypted e-mail. My GPG key ID is 'FCE635A4'.
+My public 1024-bit key should be available at your keyserver; the fingerprint
+is: '88E8 F32F 7244 68BA 3958  5D40 99DA 5D2A FCE6 35A4'.
+
+
+9. Credits
 ==========
 The development would not have proceed much further without having looked at
 the source code of other drivers and without the help of several persons; in
@@ -456,8 +455,6 @@ particular:
 - memory management code has been copied from the bttv driver by Ralph Metzler,
   Marcus Metzler and Gerd Knorr;
 
-- the low-level I2C read function has been written by Frédéric Jouault, who
-  also gave me commented logs about sniffed USB traffic taken from another
-  driver for another system;
+- the low-level I2C read function has been written by Frederic Jouault;
 
-- the low-level I2C fast write function has been written by Piotr Czerczak;
+- the low-level I2C fast write function has been written by Piotr Czerczak.

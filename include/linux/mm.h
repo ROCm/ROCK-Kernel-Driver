@@ -223,13 +223,19 @@ struct page {
 		atomic_dec_and_test(&(p)->count);	\
 	})
 
-#define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
 #define __put_page(p)		atomic_dec(&(p)->count)
 
 extern void FASTCALL(__page_cache_release(struct page *));
 
 #ifdef CONFIG_HUGETLB_PAGE
+
+static inline int page_count(struct page *p)
+{
+	if (PageCompound(p))
+		p = (struct page *)p->lru.next;
+	return atomic_read(&(p)->count);
+}
 
 static inline void get_page(struct page *page)
 {
@@ -256,6 +262,8 @@ static inline void put_page(struct page *page)
 }
 
 #else		/* CONFIG_HUGETLB_PAGE */
+
+#define page_count(p)		atomic_read(&(p)->count)
 
 static inline void get_page(struct page *page)
 {
@@ -322,23 +330,33 @@ static inline void put_page(struct page *page)
 /*
  * The zone field is never updated after free_area_init_core()
  * sets it, so none of the operations on it need to be atomic.
- * We'll have up to log2(MAX_NUMNODES * MAX_NR_ZONES) zones
- * total, so we use NODES_SHIFT here to get enough bits.
+ * We'll have up to (MAX_NUMNODES * MAX_NR_ZONES) zones total,
+ * so we use (MAX_NODES_SHIFT + MAX_ZONES_SHIFT) here to get enough bits.
  */
-#define ZONE_SHIFT (BITS_PER_LONG - NODES_SHIFT - MAX_NR_ZONES_SHIFT)
+#define NODEZONE_SHIFT (BITS_PER_LONG - MAX_NODES_SHIFT - MAX_ZONES_SHIFT)
+#define NODEZONE(node, zone)	((node << ZONES_SHIFT) | zone)
+
+static inline unsigned long page_zonenum(struct page *page)
+{
+	return (page->flags >> NODEZONE_SHIFT) & (~(~0UL << ZONES_SHIFT));
+}
+static inline unsigned long page_nodenum(struct page *page)
+{
+	return (page->flags >> (NODEZONE_SHIFT + ZONES_SHIFT));
+}
 
 struct zone;
 extern struct zone *zone_table[];
 
 static inline struct zone *page_zone(struct page *page)
 {
-	return zone_table[page->flags >> ZONE_SHIFT];
+	return zone_table[page->flags >> NODEZONE_SHIFT];
 }
 
-static inline void set_page_zone(struct page *page, unsigned long zone_num)
+static inline void set_page_zone(struct page *page, unsigned long nodezone_num)
 {
-	page->flags &= ~(~0UL << ZONE_SHIFT);
-	page->flags |= zone_num << ZONE_SHIFT;
+	page->flags &= ~(~0UL << NODEZONE_SHIFT);
+	page->flags |= nodezone_num << NODEZONE_SHIFT;
 }
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -445,9 +463,6 @@ void put_dirty_page(struct task_struct *tsk, struct page *page,
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);
 
-extern long do_mprotect(struct mm_struct *mm, unsigned long start, 
-			size_t len, unsigned long prot);
-
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
 int set_page_dirty_lock(struct page *page);
@@ -492,9 +507,6 @@ static inline int set_page_dirty(struct page *page)
 	return __set_page_dirty_buffers(page);
 }
 
-extern long do_mprotect(struct mm_struct *mm, unsigned long start, 
-			size_t len, unsigned long prot);
-
 /*
  * On a two-level page table, this ends up being trivial. Thus the
  * inlining and the symmetry break with pte_alloc_map() that does all
@@ -525,18 +537,9 @@ extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
-extern unsigned long __do_mmap_pgoff(struct mm_struct *mm,
-	struct file *file, unsigned long addr,
+extern unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
 	unsigned long flag, unsigned long pgoff);
-
-static inline unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
-	unsigned long len, unsigned long prot,
-	unsigned long flag, unsigned long pgoff)
-{
-	return __do_mmap_pgoff(current->mm, file, addr, len,
-		               prot, flag, pgoff);
-}
 
 static inline unsigned long do_mmap(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
@@ -637,6 +640,34 @@ static inline void
 kernel_map_pages(struct page *page, int numpages, int enable)
 {
 }
+#endif
+
+#ifndef CONFIG_ARCH_GATE_AREA
+#ifdef AT_SYSINFO_EHDR
+static inline int in_gate_area(struct task_struct *task, unsigned long addr)
+{
+	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
+		return 1;
+	else
+		return 0;
+}
+
+extern struct vm_area_struct gate_vma;
+static inline struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
+{
+	return &gate_vma;
+}
+#else
+static inline int in_gate_area(struct task_struct *task, unsigned long addr)
+{
+	return 0;
+}
+
+static inline struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
+{
+	return NULL;
+}
+#endif
 #endif
 
 #endif /* __KERNEL__ */

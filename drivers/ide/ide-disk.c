@@ -277,7 +277,7 @@ static void ide_multwrite(ide_drive_t *drive, unsigned int mcount)
 			 * all bvecs in this one.
 			 */
 			if (++bio->bi_idx >= bio->bi_vcnt) {
-				bio->bi_idx = 0;
+				bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 				bio = bio->bi_next;
 			}
 
@@ -286,7 +286,8 @@ static void ide_multwrite(ide_drive_t *drive, unsigned int mcount)
 				mcount = 0;
 			} else {
 				rq->bio = bio;
-				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+				rq->nr_cbio_segments = bio_segments(bio);
+				rq->current_nr_sectors = bio_cur_sectors(bio);
 				rq->hard_cur_sectors = rq->current_nr_sectors;
 			}
 		}
@@ -308,6 +309,7 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= &hwgroup->wrq;
+	struct bio *bio		= rq->bio;
 	u8 stat;
 
 	stat = hwif->INB(IDE_STATUS_REG);
@@ -328,14 +330,17 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 			 *	we can end the original request.
 			 */
 			if (!rq->nr_sectors) {	/* all done? */
+				bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 				rq = hwgroup->rq;
 				ide_end_request(drive, 1, rq->nr_sectors);
 				return ide_stopped;
 			}
 		}
+		bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 		/* the original code did this here (?) */
 		return ide_stopped;
 	}
+	bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 	return DRIVER(drive)->error(drive, "multwrite_intr", stat);
 }
 

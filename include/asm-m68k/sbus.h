@@ -20,17 +20,17 @@ extern void *sparc_alloc_io (u32, void *, int, char *, u32, int);
 /* sbus IO functions stolen from include/asm-sparc/io.h for the serial driver */
 /* No SBUS on the Sun3, kludge -- sam */
 
-extern inline void _sbus_writeb(unsigned char val, unsigned long addr)
+static inline void _sbus_writeb(unsigned char val, unsigned long addr)
 {
 	*(volatile unsigned char *)addr = val;
 }
 
-extern inline unsigned char _sbus_readb(unsigned long addr)
+static inline unsigned char _sbus_readb(unsigned long addr)
 {
 	return *(volatile unsigned char *)addr;
 }
 
-extern inline void _sbus_writel(unsigned long val, unsigned long addr)
+static inline void _sbus_writel(unsigned long val, unsigned long addr)
 {
 	*(volatile unsigned long *)addr = val;
 

@@ -9,6 +9,7 @@ SECTIONS
 {
   . = START + SIZEOF_HEADERS;
 
+  . = ALIGN(4096);
   __binary_start = .;
 #ifdef MODE_TT
   .thread_private : {
@@ -25,11 +26,7 @@ SECTIONS
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
   __init_begin = .;
-  .init.text : { 
-	_sinittext = .;
-	*(.init.text)
-	_einittext = .;
-  }
+  .text.init : { *(.text.init) }
   . = ALIGN(4096);
   .text      :
   {
@@ -41,7 +38,7 @@ SECTIONS
 
   #include "asm/common.lds.S"
 
-  init.data : { *(init.data) }
+  .data.init : { *(.data.init) }
   .data    :
   {
     . = ALIGN(KERNEL_STACK_SIZE);		/* init_task */

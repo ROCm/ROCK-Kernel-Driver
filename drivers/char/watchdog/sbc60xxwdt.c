@@ -183,7 +183,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 			 * five months ago... */
 			wdt_expect_close = 0;
 
-			/* scan to see wether or not we got the magic character */
+			/* scan to see whether or not we got the magic character */
 			for(ofs = 0; ofs != count; ofs++)
 			{
 				char c;

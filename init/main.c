@@ -119,7 +119,7 @@ unsigned long *kernel_magic = &_end;
 
 extern void time_init(void);
 /* Default late time init is NULL. archs can override this later. */
-void (*late_time_init)(void) = NULL;
+void (*late_time_init)(void);
 extern void softirq_init(void);
 
 static char *execute_command;
@@ -458,6 +458,7 @@ asmlinkage void __init start_kernel(void)
 	page_address_init();
 	mem_init();
 	kmem_cache_init();
+	sort_main_extable();
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();

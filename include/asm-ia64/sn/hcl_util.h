@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -10,7 +9,7 @@
 #ifndef _ASM_IA64_SN_HCL_UTIL_H
 #define _ASM_IA64_SN_HCL_UTIL_H
 
-extern char * dev_to_name(vertex_hdl_t, char *, uint);
+extern char * dev_to_name(vertex_hdl_t, char *, unsigned int);
 extern int device_master_set(vertex_hdl_t, vertex_hdl_t);
 extern vertex_hdl_t device_master_get(vertex_hdl_t);
 extern cnodeid_t master_node_get(vertex_hdl_t);

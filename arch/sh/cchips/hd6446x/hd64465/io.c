@@ -1,5 +1,5 @@
 /*
- * $Id: io.c,v 1.1.2.2 2002/01/20 05:03:25 mrbrown Exp $
+ * $Id: io.c,v 1.4 2003/08/03 03:05:10 lethal Exp $
  * by Greg Banks <gbanks@pocketpenguins.com>
  * (c) 2000 PocketPenguins Inc
  *
@@ -179,24 +179,6 @@ unsigned int hd64465_inl(unsigned long port)
 	return b;
 }
 
-void hd64465_insb(unsigned long port, void *buffer, unsigned long count)
-{
-	unsigned char *buf=buffer;
-	while(count--) *buf++=inb(port);
-}
-
-void hd64465_insw(unsigned long port, void *buffer, unsigned long count)
-{
-	unsigned short *buf=buffer;
-	while(count--) *buf++=inw(port);
-}
-
-void hd64465_insl(unsigned long port, void *buffer, unsigned long count)
-{
-	unsigned long *buf=buffer;
-	while(count--) *buf++=inl(port);
-}
-
 void hd64465_outb(unsigned char b, unsigned long port)
 {
 	unsigned long addr = PORT2ADDR(port);
@@ -232,20 +214,3 @@ void hd64465_outl(unsigned int b, unsigned long port)
             *(volatile unsigned long*)addr = b;
 }
 
-void hd64465_outsb(unsigned long port, const void *buffer, unsigned long count)
-{
-	const unsigned char *buf=buffer;
-	while(count--) outb(*buf++, port);
-}
-
-void hd64465_outsw(unsigned long port, const void *buffer, unsigned long count)
-{
-	const unsigned short *buf=buffer;
-	while(count--) outw(*buf++, port);
-}
-
-void hd64465_outsl(unsigned long port, const void *buffer, unsigned long count)
-{
-	const unsigned long *buf=buffer;
-	while(count--) outl(*buf++, port);
-}

@@ -1546,6 +1546,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	hid->version = le16_to_cpu(hdesc->bcdHID);
 	hid->country = hdesc->bCountryCode;
 	hid->dev = dev;
+	hid->intf = intf;
 	hid->ifnum = interface->desc.bInterfaceNumber;
 
 	hid->name[0] = 0;

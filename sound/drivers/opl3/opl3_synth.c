@@ -20,6 +20,7 @@
  */
 
 #include <sound/opl3.h>
+#define __SND_OSS_COMPAT__
 #include <sound/asound_fm.h>
 
 /*

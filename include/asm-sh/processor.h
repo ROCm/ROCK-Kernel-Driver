@@ -2,7 +2,7 @@
  * include/asm-sh/processor.h
  *
  * Copyright (C) 1999, 2000  Niibe Yutaka
- * Copyright (C) 2002 Paul Mundt
+ * Copyright (C) 2002, 2003  Paul Mundt
  */
 
 #ifndef __ASM_SH_PROCESSOR_H
@@ -22,20 +22,27 @@
 /* Core Processor Version Register */
 #define CCN_PVR		0xff000030
 #define CCN_PRR		0xff000044
+
 /*
  *  CPU type and hardware bug flags. Kept separately for each CPU.
+ *
+ *  Each one of these also needs a CONFIG_CPU_SUBTYPE_xxx entry
+ *  in arch/sh/Kconfig, as well as an entry in arch/sh/kernel/setup.c
+ *  for parsing the subtype in get_cpu_subtype().
  */
 enum cpu_type {
-	CPU_SH7604,		/* Represents 7604 */
-	CPU_SH7708,		/* Represents 7707, 7708, 7708S, 7708R, 7709 */
-	CPU_SH7729,		/* Represents 7709A, 7729 */
-	CPU_SH7750,     	/* Represents 7750 */
-	CPU_SH7750S,		/* Represents 7750S */
-	CPU_SH7750R,		/* Represents 7750R */
-	CPU_SH7751,		/* Represents 7751 */
-	CPU_SH7751R,		/* Represents 7751R */
-	CPU_ST40RA,		/* Represents ST40RA (formerly ST40STB1) */
-	CPU_ST40GX1,		/* Represents ST40GX1 */
+	/* SH-2 types */
+	CPU_SH7604,
+
+	/* SH-3 types */
+	CPU_SH7707,  CPU_SH7708, CPU_SH7708S, CPU_SH7708R, CPU_SH7709,
+	CPU_SH7709A, CPU_SH7729, CPU_SH7300,
+
+	/* SH-4 types */
+	CPU_SH7750, CPU_SH7750S, CPU_SH7750R, CPU_SH7751, CPU_SH7751R,
+	CPU_SH7760, CPU_ST40RA, CPU_ST40GX1, CPU_SH4_202, CPU_SH4_501,
+
+	/* Unknown subtype */
 	CPU_SH_NONE
 };
 
@@ -55,12 +62,12 @@ struct sh_cpuinfo {
 	unsigned long flags;
 };
 
+extern struct sh_cpuinfo boot_cpu_data;
+
 #ifdef CONFIG_SMP
 extern struct sh_cpuinfo cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 #else
-extern struct sh_cpuinfo boot_cpu_data;
-
 #define cpu_data (&boot_cpu_data)
 #define current_cpu_data boot_cpu_data
 #endif
@@ -87,8 +94,9 @@ extern struct sh_cpuinfo boot_cpu_data;
  * IMASK-bit:
  *     Interrupt level mask
  */
-#define SR_FD    0x00008000
-#define SR_IMASK 0x000000f0
+#define SR_FD		0x00008000
+#define SR_DSP		0x00001000
+#define SR_IMASK	0x000000f0
 
 /*
  * FPU structure and data
@@ -119,7 +127,14 @@ union sh_fpu_union {
 	struct sh_fpu_soft_struct soft;
 };
 
-#define CPU_HAS_FPU	0x0001
+/* 
+ * Processor flags
+ */
+
+#define CPU_HAS_FPU		0x0001	/* Hardware FPU support */
+#define CPU_HAS_P2_FLUSH_BUG	0x0002	/* Need to flush the cache in P2 area */
+#define CPU_HAS_MMU_PAGE_ASSOC	0x0004	/* SH3: TLB way selection bit support */
+#define CPU_HAS_DSP		0x0008	/* SH-DSP: DSP support */
 
 struct thread_struct {
 	unsigned long sp;
@@ -128,15 +143,20 @@ struct thread_struct {
 	unsigned long trap_no, error_code;
 	unsigned long address;
 	/* Hardware debugging registers may come here */
+	unsigned long ubc_pc;
 
 	/* floating point info */
 	union sh_fpu_union fpu;
 };
 
+/* Count of active tasks with UBC settings */
+extern int ubc_usercnt;
+
 #define INIT_THREAD  {						\
 	sizeof(init_stack) + (long) &init_stack, /* sp */	\
 	0,					 /* pc */	\
 	0, 0, 							\
+	0, 							\
 	0, 							\
 	{{{0,}},} 				/* fpu state */	\
 }
@@ -239,6 +259,6 @@ extern unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)  ((tsk)->thread.pc)
 #define KSTK_ESP(tsk)  ((tsk)->thread.sp)
 
-#define cpu_relax()	barrier()
+#define cpu_relax()	__asm__ __volatile__ ("sleep" : : : "memory")
 
 #endif /* __ASM_SH_PROCESSOR_H */

@@ -403,7 +403,6 @@ int cx88_sram_channel_setup(struct cx8800_dev *dev,
 int cx88_risc_decode(u32 risc)
 {
 	static char *instr[16] = {
-		[ 0 ... 15 ]           = "INVALID",
 		[ RISC_SYNC    >> 28 ] = "sync",
 		[ RISC_WRITE   >> 28 ] = "write",
 		[ RISC_WRITEC  >> 28 ] = "writec",
@@ -416,7 +415,6 @@ int cx88_risc_decode(u32 risc)
 		[ RISC_WRITECR >> 28 ] = "writecr",
 	};
 	static int incr[16] = {
-		[ 0 ... 15 ]           = 1,
 		[ RISC_WRITE   >> 28 ] = 2,
 		[ RISC_JUMP    >> 28 ] = 2,
 		[ RISC_WRITERM >> 28 ] = 3,
@@ -431,12 +429,13 @@ int cx88_risc_decode(u32 risc)
 	};
 	int i;
 
-	printk("0x%08x [ %s", risc, instr[risc >> 28]);
+	printk("0x%08x [ %s", risc, instr[risc >> 28] ?
+				instr[risc >> 28] : "INVALID");
 	for (i = ARRAY_SIZE(bits)-1; i >= 0; i--)
 		if (risc & (1 << (i + 12)))
 			printk(" %s",bits[i]);
 	printk(" count=%d ]\n", risc & 0xfff);
-	return incr[risc >> 28];
+	return incr[risc >> 28] ? 1 : incr[risc >> 28];
 }
 
 void cx88_risc_disasm(struct cx8800_dev *dev,

@@ -27,9 +27,6 @@
 #include <media/video-buf.h>
 #include <media/tuner.h>
 #include <media/audiochip.h>
-#if __GNUC__ < 3
-# error gcc 3.x required, sorry.
-#endif
 
 #include "btcx-risc.h"
 #include "cx88-reg.h"

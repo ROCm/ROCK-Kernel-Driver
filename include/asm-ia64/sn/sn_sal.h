@@ -16,7 +16,9 @@
 #include <asm/sal.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/arch.h>
-
+#include <asm/sn/nodepda.h>
+#include <asm/sn/klconfig.h>
+        
 
 // SGI Specific Calls
 #define  SN_SAL_POD_MODE                           0x02000001
@@ -167,28 +169,23 @@ static inline u64
 ia64_sn_get_klconfig_addr(nasid_t nasid)
 {
 	struct ia64_sal_retval ret_stuff;
-	extern u64 klgraph_addr[];
 	int cnodeid;
 
 	cnodeid = nasid_to_cnodeid(nasid);
-	if (klgraph_addr[cnodeid] == 0) {
-		ret_stuff.status = 0;
-		ret_stuff.v0 = 0;
-		ret_stuff.v1 = 0;
-		ret_stuff.v2 = 0;
-		SAL_CALL(ret_stuff, SN_SAL_GET_KLCONFIG_ADDR, (u64)nasid, 0, 0, 0, 0, 0, 0);
+	ret_stuff.status = 0;
+	ret_stuff.v0 = 0;
+	ret_stuff.v1 = 0;
+	ret_stuff.v2 = 0;
+	SAL_CALL(ret_stuff, SN_SAL_GET_KLCONFIG_ADDR, (u64)nasid, 0, 0, 0, 0, 0, 0);
 
-		/*
-	 	* We should panic if a valid cnode nasid does not produce
-	 	* a klconfig address.
-	 	*/
-		if (ret_stuff.status != 0) {
-			panic("ia64_sn_get_klconfig_addr: Returned error %lx\n", ret_stuff.status);
-		}
-
-		klgraph_addr[cnodeid] = ret_stuff.v0;
+	/*
+	 * We should panic if a valid cnode nasid does not produce
+	 * a klconfig address.
+	 */
+	if (ret_stuff.status != 0) {
+		panic("ia64_sn_get_klconfig_addr: Returned error %lx\n", ret_stuff.status);
 	}
-	return(klgraph_addr[cnodeid]);
+	return(ret_stuff.v0);
 }
 
 /*
@@ -597,8 +594,16 @@ static inline int
 sn_change_memprotect(u64 paddr, u64 len, u64 perms, u64 *nasid_array)
 {
 	struct ia64_sal_retval ret_stuff;
-	SAL_CALL(ret_stuff, SN_SAL_MEMPROTECT, paddr, len, nasid_array,
+	int cnodeid;
+	unsigned long irq_flags;
+
+	cnodeid = nasid_to_cnodeid(get_node_number(paddr));
+	spin_lock(&NODEPDA(cnodeid)->bist_lock);
+	local_irq_save(irq_flags);
+	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_MEMPROTECT, paddr, len, nasid_array,
 		 perms, 0, 0, 0);
+	local_irq_restore(irq_flags);
+	spin_unlock(&NODEPDA(cnodeid)->bist_lock);
 	return ret_stuff.status;
 }
 #define SN_MEMPROT_ACCESS_CLASS_0		0x14a080

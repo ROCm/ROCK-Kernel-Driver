@@ -2,6 +2,7 @@
 #define _I386_BYTEORDER_H
 
 #include <asm/types.h>
+#include <linux/compiler.h>
 
 #ifdef __GNUC__
 
@@ -10,7 +11,7 @@
 #include <linux/config.h>
 #endif
 
-static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
+static __inline__ __attribute_const__ __u32 ___arch__swab32(__u32 x)
 {
 #ifdef CONFIG_X86_BSWAP
 	__asm__("bswap %0" : "=r" (x) : "0" (x));
@@ -24,18 +25,7 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 	return x;
 }
 
-/* gcc should generate this for open coded C now too. May be worth switching to 
-   it because inline assembly cannot be scheduled. -AK */
-static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
-{
-	__asm__("xchgb %b0,%h0"		/* swap bytes		*/
-		: "=q" (x)
-		:  "0" (x));
-		return x;
-}
-
-
-static inline __u64 ___arch__swab64(__u64 val) 
+static __inline__ __attribute_const__ __u64 ___arch__swab64(__u64 val)
 { 
 	union { 
 		struct { __u32 a,b; } s;
@@ -54,9 +44,11 @@ static inline __u64 ___arch__swab64(__u64 val)
 	return v.u;	
 } 
 
+/* Do not define swab16.  Gcc is smart enough to recognize "C" version and
+   convert it into rotation or exhange.  */
+
 #define __arch__swab64(x) ___arch__swab64(x)
 #define __arch__swab32(x) ___arch__swab32(x)
-#define __arch__swab16(x) ___arch__swab16(x)
 
 #define __BYTEORDER_HAS_U64__
 

@@ -18,8 +18,7 @@
 
 /*
  * We follow the Alpha convention here:
- *  __inb expands to an inline function call (which either calls via the
- *        mach_vec if generic, or a machine specific implementation)
+ *  __inb expands to an inline function call (which calls via the mv)
  *  _inb  is a real function call (note ___raw fns are _ version of __raw)
  *  inb   by default expands to _inb, but the machine specific code may
  *        define it to __inb if it chooses.
@@ -27,6 +26,8 @@
 
 #include <asm/cache.h>
 #include <asm/system.h>
+#include <asm/addrspace.h>
+#include <asm/machvec.h>
 #include <linux/config.h>
 
 /*
@@ -35,11 +36,13 @@
  */
 
 #ifdef __KERNEL__
-#if defined(CONFIG_SH_GENERIC) || defined(CONFIG_SH_CQREEK) || defined(CONFIG_SH_UNKNOWN)
-
-/* In a generic kernel, we always go through the machine vector.  */
-
-#include <asm/machvec.h>
+/*
+ * Since boards are able to define their own set of I/O routines through
+ * their respective machine vector, we always wrap through the mv.
+ *
+ * Also, in the event that a board hasn't provided its own definition for
+ * a given routine, it will be wrapped to generic code at run-time.
+ */
 
 # define __inb(p)	sh_mv.mv_inb((p))
 # define __inw(p)	sh_mv.mv_inw((p))
@@ -55,12 +58,12 @@
 # define __outw_p(x,p)	sh_mv.mv_outw_p((x),(p))
 # define __outl_p(x,p)	sh_mv.mv_outl_p((x),(p))
 
-#define __insb(p,b,c)	sh_mv.mv_insb((p), (b), (c))
-#define __insw(p,b,c)	sh_mv.mv_insw((p), (b), (c))
-#define __insl(p,b,c)	sh_mv.mv_insl((p), (b), (c))
-#define __outsb(p,b,c)	sh_mv.mv_outsb((p), (b), (c))
-#define __outsw(p,b,c)	sh_mv.mv_outsw((p), (b), (c))
-#define __outsl(p,b,c)	sh_mv.mv_outsl((p), (b), (c))
+# define __insb(p,b,c)	sh_mv.mv_insb((p), (b), (c))
+# define __insw(p,b,c)	sh_mv.mv_insw((p), (b), (c))
+# define __insl(p,b,c)	sh_mv.mv_insl((p), (b), (c))
+# define __outsb(p,b,c)	sh_mv.mv_outsb((p), (b), (c))
+# define __outsw(p,b,c)	sh_mv.mv_outsw((p), (b), (c))
+# define __outsl(p,b,c)	sh_mv.mv_outsl((p), (b), (c))
 
 # define __readb(a)	sh_mv.mv_readb((a))
 # define __readw(a)	sh_mv.mv_readw((a))
@@ -102,204 +105,30 @@
 # define __raw_writew	__writew
 # define __raw_writel	__writel
 
-#else
-
-/* Control operations through platform specific headers */
-# define __WANT_IO_DEF
-
-# include <asm/mach/io.h>
-
-#undef __WANT_IO_DEF
-
-#endif /* GENERIC */
-#endif /* __KERNEL__ */
-
-/* These are always function calls, in both kernel and user space */
-extern unsigned char	_inb (unsigned long port);
-extern unsigned short	_inw (unsigned long port);
-extern unsigned int	_inl (unsigned long port);
-extern void		_outb (unsigned char b, unsigned long port);
-extern void		_outw (unsigned short w, unsigned long port);
-extern void		_outl (unsigned int l, unsigned long port);
-extern unsigned char	_inb_p (unsigned long port);
-extern unsigned short	_inw_p (unsigned long port);
-extern unsigned int	_inl_p (unsigned long port);
-extern void		_outb_p (unsigned char b, unsigned long port);
-extern void		_outw_p (unsigned short w, unsigned long port);
-extern void		_outl_p (unsigned int l, unsigned long port);
-extern void		_insb (unsigned long port, void *dst, unsigned long count);
-extern void		_insw (unsigned long port, void *dst, unsigned long count);
-extern void		_insl (unsigned long port, void *dst, unsigned long count);
-extern void		_outsb (unsigned long port, const void *src, unsigned long count);
-extern void		_outsw (unsigned long port, const void *src, unsigned long count);
-extern void		_outsl (unsigned long port, const void *src, unsigned long count);
-extern unsigned char	_readb(unsigned long addr);
-extern unsigned short	_readw(unsigned long addr);
-extern unsigned int	_readl(unsigned long addr);
-extern void		_writeb(unsigned char b, unsigned long addr);
-extern void		_writew(unsigned short b, unsigned long addr);
-extern void		_writel(unsigned int b, unsigned long addr);
-
-#ifdef __KERNEL__
-extern unsigned char	___raw_readb(unsigned long addr);
-extern unsigned short	___raw_readw(unsigned long addr);
-extern unsigned int	___raw_readl(unsigned long addr);
-extern void		___raw_writeb(unsigned char b, unsigned long addr);
-extern void		___raw_writew(unsigned short b, unsigned long addr);
-extern void		___raw_writel(unsigned int b, unsigned long addr);
-#endif
-
-#ifdef __KERNEL__
 /*
  * The platform header files may define some of these macros to use
  * the inlined versions where appropriate.  These macros may also be
  * redefined by userlevel programs.
  */
-#ifndef inb
-# define inb(p)		_inb(p)
-#endif
-#ifndef inw
-# define inw(p)		_inw(p)
-#endif
-#ifndef inl
-# define inl(p)		_inl(p)
-#endif
-
-#ifndef outb
-# define outb(b,p)	_outb((b),(p))
-#endif
-#ifndef outw
-# define outw(w,p)	_outw((w),(p))
-#endif
-#ifndef outl
-# define outl(l,p)	_outl((l),(p))
-#endif
-
-#ifndef inb_p
-# define inb_p		_inb_p
-#endif
-#ifndef inw_p
-# define inw_p		_inw_p
-#endif
-#ifndef inl_p
-# define inl_p		_inl_p
-#endif
-
-#ifndef outb_p
-# define outb_p		_outb_p
-#endif
-#ifndef outw_p
-# define outw_p		_outw_p
-#endif
-#ifndef outl_p
-# define outl_p		_outl_p
-#endif
-
-#ifndef insb
-# define insb(p,d,c)	_insb((p),(d),(c))
-#endif
-#ifndef insw
-# define insw(p,d,c)	_insw((p),(d),(c))
-#endif
-#ifndef insl
-# define insl(p,d,c)	_insl((p),(d),(c))
-#endif
-#ifndef outsb
-# define outsb(p,s,c)	_outsb((p),(s),(c))
-#endif
-#ifndef outsw
-# define outsw(p,s,c)	_outsw((p),(s),(c))
-#endif
-#ifndef outsl
-# define outsl(p,s,c)	_outsl((p),(s),(c))
-#endif
-
 #ifdef __raw_readb
-# define readb(a)	({ unsigned long r_ = __raw_readb(a); mb(); r_; })
+# define readb(a)	({ unsigned long r_ = __raw_readb((unsigned long)a); mb(); r_; })
 #endif
 #ifdef __raw_readw
-# define readw(a)	({ unsigned long r_ = __raw_readw(a); mb(); r_; })
+# define readw(a)	({ unsigned long r_ = __raw_readw((unsigned long)a); mb(); r_; })
 #endif
 #ifdef __raw_readl
-# define readl(a)	({ unsigned long r_ = __raw_readl(a); mb(); r_; })
+# define readl(a)	({ unsigned long r_ = __raw_readl((unsigned long)a); mb(); r_; })
 #endif
 
 #ifdef __raw_writeb
-# define writeb(v,a)	({ __raw_writeb((v),(a)); mb(); })
+# define writeb(v,a)	({ __raw_writeb((v),(unsigned long)(a)); mb(); })
 #endif
 #ifdef __raw_writew
-# define writew(v,a)	({ __raw_writew((v),(a)); mb(); })
+# define writew(v,a)	({ __raw_writew((v),(unsigned long)(a)); mb(); })
 #endif
 #ifdef __raw_writel
-# define writel(v,a)	({ __raw_writel((v),(a)); mb(); })
+# define writel(v,a)	({ __raw_writel((v),(unsigned long)(a)); mb(); })
 #endif
-
-#ifndef __raw_readb
-# define __raw_readb(a)	___raw_readb((unsigned long)(a))
-#endif
-#ifndef __raw_readw
-# define __raw_readw(a)	___raw_readw((unsigned long)(a))
-#endif
-#ifndef __raw_readl
-# define __raw_readl(a)	___raw_readl((unsigned long)(a))
-#endif
-
-#ifndef __raw_writeb
-# define __raw_writeb(v,a)  ___raw_writeb((v),(unsigned long)(a))
-#endif
-#ifndef __raw_writew
-# define __raw_writew(v,a)  ___raw_writew((v),(unsigned long)(a))
-#endif
-#ifndef __raw_writel
-# define __raw_writel(v,a)  ___raw_writel((v),(unsigned long)(a))
-#endif
-
-#ifndef readb
-# define readb(a)	_readb((unsigned long)(a))
-#endif
-#ifndef readw
-# define readw(a)	_readw((unsigned long)(a))
-#endif
-#ifndef readl
-# define readl(a)	_readl((unsigned long)(a))
-#endif
-
-#ifndef writeb
-# define writeb(v,a)	_writeb((v),(unsigned long)(a))
-#endif
-#ifndef writew
-# define writew(v,a)	_writew((v),(unsigned long)(a))
-#endif
-#ifndef writel
-# define writel(v,a)	_writel((v),(unsigned long)(a))
-#endif
-
-#else 
-
-/* Userspace declarations.  */
-
-extern unsigned char	inb(unsigned long port);
-extern unsigned short	inw(unsigned long port);
-extern unsigned int	inl(unsigned long port);
-extern void		outb(unsigned char b, unsigned long port);
-extern void		outw(unsigned short w, unsigned long port);
-extern void		outl(unsigned int l, unsigned long port);
-extern void		insb(unsigned long port, void *dst, unsigned long count);
-extern void		insw(unsigned long port, void *dst, unsigned long count);
-extern void		insl(unsigned long port, void *dst, unsigned long count);
-extern void		outsb(unsigned long port, const void *src, unsigned long count);
-extern void		outsw(unsigned long port, const void *src, unsigned long count);
-extern void		outsl(unsigned long port, const void *src, unsigned long count);
-extern unsigned char	readb(unsigned long addr);
-extern unsigned short	readw(unsigned long addr);
-extern unsigned long	readl(unsigned long addr);
-extern void		writeb(unsigned char b, unsigned long addr);
-extern void		writew(unsigned short b, unsigned long addr);
-extern void		writel(unsigned int b, unsigned long addr);
-
-#endif /* __KERNEL__ */
-
-#ifdef __KERNEL__
 
 /*
  * If the platform has PC-like I/O, this function converts the offset into
@@ -308,6 +137,20 @@ extern void		writel(unsigned int b, unsigned long addr);
 static __inline__ unsigned long isa_port2addr(unsigned long offset)
 {
 	return __isa_port2addr(offset);
+}
+
+/*
+ * This function provides a method for the generic case where a board-specific
+ * isa_port2addr simply needs to return the port + some arbitrary port base.
+ *
+ * We use this at board setup time to implicitly set the port base, and
+ * as a result, we can use the generic isa_port2addr.
+ */
+static inline void __set_io_port_base(unsigned long pbase)
+{
+	extern unsigned long generic_io_base;
+
+	generic_io_base = pbase;
 }
 
 #define isa_readb(a) readb(isa_port2addr(a))
@@ -360,8 +203,6 @@ static __inline__ void ctrl_outl(unsigned int b, unsigned long addr)
 }
 
 #define IO_SPACE_LIMIT 0xffffffff
-
-#include <asm/addrspace.h>
 
 /*
  * Change virtual addresses to physical addresses and vv.
@@ -449,4 +290,5 @@ out:
     __flush_wback_region(_start,_size)
 
 #endif /* __KERNEL__ */
+
 #endif /* __ASM_SH_IO_H */

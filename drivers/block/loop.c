@@ -55,6 +55,7 @@
 #include <linux/errno.h>
 #include <linux/major.h>
 #include <linux/wait.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
@@ -140,8 +141,7 @@ figure_loop_size(struct loop_device *lo)
 	sector_t x;
 
 	/* Compute loopsize in bytes */
-	size = i_size_read(lo->lo_backing_file->f_dentry->
-				d_inode->i_mapping->host);
+	size = i_size_read(lo->lo_backing_file->f_mapping->host);
 	offset = lo->lo_offset;
 	loopsize = size - offset;
 	if (lo->lo_sizelimit > 0 && lo->lo_sizelimit < loopsize)
@@ -175,7 +175,7 @@ static int
 do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 {
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct address_space_operations *aops = mapping->a_ops;
 	struct page *page;
 	char *kaddr, *data;
@@ -660,6 +660,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	struct file	*file;
 	struct inode	*inode;
 	struct block_device *lo_device = NULL;
+	struct address_space *mapping;
 	unsigned lo_blocksize;
 	int		lo_flags = 0;
 	int		error;
@@ -676,23 +677,24 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	if (!file)
 		goto out;
 
-	error = -EINVAL;
-	inode = file->f_dentry->d_inode;
+	mapping = file->f_mapping;
+	inode = mapping->host;
 
 	if (!(file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
+	error = -EINVAL;
 	if (S_ISBLK(inode->i_mode)) {
-		lo_device = inode->i_bdev;
+		lo_device = I_BDEV(inode);
 		if (lo_device == bdev) {
 			error = -EBUSY;
-			goto out;
+			goto out_putf;
 		}
 		lo_blocksize = block_size(lo_device);
 		if (bdev_read_only(lo_device))
 			lo_flags |= LO_FLAGS_READ_ONLY;
 	} else if (S_ISREG(inode->i_mode)) {
-		struct address_space_operations *aops = inode->i_mapping->a_ops;
+		struct address_space_operations *aops = mapping->a_ops;
 		/*
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
@@ -705,11 +707,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 		lo_blocksize = inode->i_blksize;
 		lo_flags |= LO_FLAGS_DO_BMAP;
-		error = 0;
 	} else
 		goto out_putf;
-
-	get_file(file);
 
 	if (!(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
@@ -725,14 +724,10 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->lo_sizelimit = 0;
 	if (figure_loop_size(lo)) {
 		error = -EFBIG;
-		fput(file);
 		goto out_putf;
 	}
-	lo->old_gfp_mask = mapping_gfp_mask(inode->i_mapping);
-	mapping_set_gfp_mask(inode->i_mapping,
-			     lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
-
-	set_blocksize(bdev, lo_blocksize);
+	lo->old_gfp_mask = mapping_gfp_mask(mapping);
+	mapping_set_gfp_mask(mapping, lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 
@@ -752,15 +747,16 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		blk_queue_max_sectors(lo->lo_queue, q->max_sectors);
 		blk_queue_max_phys_segments(lo->lo_queue,q->max_phys_segments);
 		blk_queue_max_hw_segments(lo->lo_queue, q->max_hw_segments);
+		blk_queue_hardsect_size(lo->lo_queue, queue_hardsect_size(q));
 		blk_queue_max_segment_size(lo->lo_queue, q->max_segment_size);
 		blk_queue_segment_boundary(lo->lo_queue, q->seg_boundary_mask);
 		blk_queue_merge_bvec(lo->lo_queue, q->merge_bvec_fn);
 	}
 
+	set_blocksize(bdev, lo_blocksize);
+
 	kernel_thread(loop_thread, lo, CLONE_KERNEL);
 	down(&lo->lo_sem);
-
-	fput(file);
 	return 0;
 
  out_putf:
@@ -846,7 +842,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	memset(lo->lo_file_name, 0, LO_NAME_SIZE);
 	invalidate_bdev(bdev, 0);
 	set_capacity(disks[lo->lo_number], 0);
-	mapping_set_gfp_mask(filp->f_dentry->d_inode->i_mapping, gfp);
+	mapping_set_gfp_mask(filp->f_mapping, gfp);
 	lo->lo_state = Lo_unbound;
 	fput(filp);
 	/* This is safe: open() is still holding a reference. */
@@ -1124,6 +1120,7 @@ static struct block_device_operations lo_fops = {
 MODULE_PARM(max_loop, "i");
 MODULE_PARM_DESC(max_loop, "Maximum number of loop devices (1-256)");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_BLOCKDEV_MAJOR(LOOP_MAJOR);
 
 int loop_register_transfer(struct loop_func_table *funcs)
 {

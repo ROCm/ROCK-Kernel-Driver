@@ -48,7 +48,7 @@ start_:
 	subc	r3,r3,r5		/* r3 = (r5 <= r3) ? ~0 : 0 */
 	subfe	r3,r3,r3
 	nand	r3,r3,r3
-  
+
 	and.	r5,r5,r3		/* r5 will be cleared if (r5 > r3) */
 	bne+	haveOF
 

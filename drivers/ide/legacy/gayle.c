@@ -29,7 +29,7 @@
      */
 
 #define GAYLE_BASE_4000	0xdd2020	/* A4000/A4000T */
-#define GAYLE_BASE_1200	0xda0000	/* A1200/A600 */
+#define GAYLE_BASE_1200	0xda0000	/* A1200/A600 and E-Matrix 530 */
 
     /*
      *  Offsets from one of the above bases
@@ -118,9 +118,17 @@ void __init gayle_init(void)
     if (!MACH_IS_AMIGA)
 	return;
 
-    if (!(a4000 = AMIGAHW_PRESENT(A4000_IDE)) && !AMIGAHW_PRESENT(A1200_IDE))
-	return;
+    if ((a4000 = AMIGAHW_PRESENT(A4000_IDE)) || AMIGAHW_PRESENT(A1200_IDE))
+	goto found;
 
+#ifdef CONFIG_ZORRO
+    if (zorro_find_device(ZORRO_PROD_MTEC_VIPER_MK_V_E_MATRIX_530_SCSI_IDE,
+			  NULL))
+	goto found;
+#endif
+    return;
+
+found:
     for (i = 0; i < GAYLE_NUM_PROBE_HWIFS; i++) {
 	unsigned long base, ctrlport, irqport;
 	ide_ack_intr_t *ack_intr;
@@ -174,16 +182,5 @@ void __init gayle_init(void)
 	    }
 	} else
 	    release_mem_region(res_start, res_n);
-
-#if 1 /* TESTING */
-	if (i == 1) {
-	    volatile u_short *addr = (u_short *)base;
-	    u_short data;
-	    printk("+++ Probing for IDE doubler... ");
-	    *addr = 0xffff;
-	    data = *addr;
-	    printk("probe returned 0x%02x (PLEASE REPORT THIS!!)\n", data);
-	}
-#endif /* TESTING */
     }
 }

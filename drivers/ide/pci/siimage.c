@@ -767,19 +767,16 @@ static void siimage_reset (ide_drive_t *drive)
  
 static void proc_reports_siimage (struct pci_dev *dev, u8 clocking, const char *name)
 {
-	if(pdev_is_sata(dev))
-		goto sata_skip;
-
-	printk(KERN_INFO "%s: BASE CLOCK ", name);
-	clocking &= 0x03;
-	switch(clocking) {
-		case 0x03: printk("DISABLED !\n"); break;
-		case 0x02: printk("== 2X PCI \n"); break;
-		case 0x01: printk("== 133 \n"); break;
-		case 0x00: printk("== 100 \n"); break;
+	if (!pdev_is_sata(dev)) {
+		printk(KERN_INFO "%s: BASE CLOCK ", name);
+		clocking &= 0x03;
+		switch (clocking) {
+			case 0x03: printk("DISABLED!\n"); break;
+			case 0x02: printk("== 2X PCI\n"); break;
+			case 0x01: printk("== 133\n"); break;
+			case 0x00: printk("== 100\n"); break;
+		}
 	}
-
-sata_skip:
 
 #if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
 	siimage_devs[n_siimage_devs++] = dev;

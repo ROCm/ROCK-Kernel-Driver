@@ -513,7 +513,7 @@ static dev_link_t *netwave_attach(void)
     client_reg.event_handler = &netwave_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != 0) {
 	cs_error(link->handle, RegisterClient, ret);
 	netwave_detach(link);
@@ -555,7 +555,7 @@ static void netwave_detach(dev_link_t *link)
 	
     /* Break the link with Card Services */
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
     
     /* Locate device structure */
     for (linkp = &dev_list; *linkp; linkp = &(*linkp)->next)
@@ -998,8 +998,8 @@ static int netwave_ioctl(struct net_device *dev, /* ioctl device */
  *
  */
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void netwave_pcmcia_config(dev_link_t *link) {
     client_handle_t handle = link->handle;
@@ -1024,9 +1024,9 @@ static void netwave_pcmcia_config(dev_link_t *link) {
     tuple.TupleDataMax = 64;
     tuple.TupleOffset = 0;
     tuple.DesiredTuple = CISTPL_CONFIG;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
-    CS_CHECK(GetTupleData, handle, &tuple);
-    CS_CHECK(ParseTuple, handle, &tuple, &parse);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+    CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
     link->conf.ConfigBase = parse.config.base;
     link->conf.Present = parse.config.rmask[0];
 
@@ -1040,7 +1040,7 @@ static void netwave_pcmcia_config(dev_link_t *link) {
      */
     for (i = j = 0x0; j < 0x400; j += 0x20) {
 	link->io.BasePort1 = j ^ 0x300;
-	i = CardServices(RequestIO, link->handle, &link->io);
+	i = pcmcia_request_io(link->handle, &link->io);
 	if (i == CS_SUCCESS) break;
     }
     if (i != CS_SUCCESS) {
@@ -1052,13 +1052,13 @@ static void netwave_pcmcia_config(dev_link_t *link) {
      *  Now allocate an interrupt line.  Note that this does not
      *  actually assign a handler to the interrupt.
      */
-    CS_CHECK(RequestIRQ, handle, &link->irq);
+    CS_CHECK(RequestIRQ, pcmcia_request_irq(handle, &link->irq));
 
     /*
      *  This actually configures the PCMCIA socket -- setting up
      *  the I/O windows and the interrupt mapping.
      */
-    CS_CHECK(RequestConfiguration, handle, &link->conf);
+    CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
 
     /*
      *  Allocate a 32K memory window.  Note that the dev_link_t
@@ -1071,10 +1071,9 @@ static void netwave_pcmcia_config(dev_link_t *link) {
     req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_CM|WIN_ENABLE;
     req.Base = 0; req.Size = 0x8000;
     req.AccessSpeed = mem_speed;
-    link->win = (window_handle_t)link->handle;
-    CS_CHECK(RequestWindow, &link->win, &req);
+    CS_CHECK(RequestWindow, pcmcia_request_window(&link->handle, &req, &link->win));
     mem.CardOffset = 0x20000; mem.Page = 0; 
-    CS_CHECK(MapMemPage, link->win, &mem);
+    CS_CHECK(MapMemPage, pcmcia_map_mem_page(link->win, &mem));
 
     /* Store base address of the common window frame */
     ramBase = ioremap(req.Base, 0x8000);
@@ -1145,11 +1144,11 @@ static void netwave_release(dev_link_t *link)
     /* Don't bother checking to see if these succeed or not */
     if (link->win) {
 	iounmap(priv->ramBase);
-	CardServices(ReleaseWindow, link->win);
+	pcmcia_release_window(link->win);
     }
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+    pcmcia_release_configuration(link->handle);
+    pcmcia_release_io(link->handle, &link->io);
+    pcmcia_release_irq(link->handle, &link->irq);
 
     link->state &= ~DEV_CONFIG;
 
@@ -1201,7 +1200,7 @@ static int netwave_event(event_t event, int priority,
 	if (link->state & DEV_CONFIG) {
 	    if (link->open)
 		netif_device_detach(dev);
-	    CardServices(ReleaseConfiguration, link->handle);
+	    pcmcia_release_configuration(link->handle);
 	}
 	break;
     case CS_EVENT_PM_RESUME:
@@ -1209,7 +1208,7 @@ static int netwave_event(event_t event, int priority,
 	/* Fall through... */
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG) {
-	    CardServices(RequestConfiguration, link->handle, &link->conf);
+	    pcmcia_request_configuration(link->handle, &link->conf);
 	    if (link->open) {
 		netwave_reset(dev);
 		netif_device_attach(dev);

@@ -97,6 +97,7 @@ config SMP
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
+	range 2 32
 	depends on SMP && ARCH_S390X = 'n'
 	default "32"
 	help
@@ -109,6 +110,7 @@ config NR_CPUS
 	
 config NR_CPUS
 	int "Maximum number of CPUs (2-64)"
+	range 2 64
 	depends on SMP && ARCH_S390X
 	default "64"
 	help

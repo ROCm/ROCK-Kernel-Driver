@@ -150,7 +150,7 @@ static inline int sctp_cacc_skip_3_1(struct sctp_transport *primary,
 	if (!primary->cacc.cycling_changeover) {
 		if (sctp_cacc_skip_3_1_d(primary, transport, count_of_newacks))
 			return 1;
-		if (sctp_cacc_skip_3_1_f(transport, count_of_newacks));
+		if (sctp_cacc_skip_3_1_f(transport, count_of_newacks))
 			return 1;
 		return 0;
 	}

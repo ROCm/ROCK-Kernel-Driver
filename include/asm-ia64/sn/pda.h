@@ -10,7 +10,6 @@
 
 #include <linux/config.h>
 #include <linux/cache.h>
-#include <linux/numa.h>
 #include <asm/percpu.h>
 #include <asm/system.h>
 #include <asm/processor.h>
@@ -61,6 +60,7 @@ typedef struct pda_s {
 	int		sn_lb_int_war_ticks;
 	int		sn_last_irq;
 	int		sn_first_irq;
+	int		sn_num_irqs;			/* number of irqs targeted for this cpu */
 } pda_t;
 
 

@@ -1,5 +1,5 @@
 /*
- *	$Id: setup.c,v 1.1.2.3 2002/11/04 20:33:57 lethal Exp $
+ *	$Id: setup.c,v 1.4 2003/08/03 03:05:10 lethal Exp $
  *	Copyright (C) 2000 YAEGASHI Takeshi
  *	Hitachi HD64461 companion chip support
  */
@@ -76,21 +76,23 @@ static void shutdown_hd64461_irq(unsigned int irq)
 
 
 static struct hw_interrupt_type hd64461_irq_type = {
-	"HD64461-IRQ",
-	startup_hd64461_irq,
-	shutdown_hd64461_irq,
-	enable_hd64461_irq,
-	disable_hd64461_irq,
-	mask_and_ack_hd64461,
-	end_hd64461_irq
+	.typename	= "HD64461-IRQ",
+	.startup	= startup_hd64461_irq,
+	.shutdown	= shutdown_hd64461_irq,
+	.enable		= enable_hd64461_irq,
+	.disable	= disable_hd64461_irq,
+	.ack		= mask_and_ack_hd64461,
+	.end		= end_hd64461_irq,
 };
 
 
-static void hd64461_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t hd64461_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	printk(KERN_INFO
 	       "HD64461: spurious interrupt, nirr: 0x%x nimr: 0x%x\n",
 	       inw(HD64461_NIRR), inw(HD64461_NIMR));
+
+	return IRQ_NONE;
 }
 
 int hd64461_irq_demux(int irq)

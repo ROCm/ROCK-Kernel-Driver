@@ -3039,7 +3039,7 @@ static int addrconf_sysctl_forward_strategy(ctl_table *table,
 static struct addrconf_sysctl_table
 {
 	struct ctl_table_header *sysctl_header;
-	ctl_table addrconf_vars[16];
+	ctl_table addrconf_vars[17];
 	ctl_table addrconf_dev[2];
 	ctl_table addrconf_conf_dir[2];
 	ctl_table addrconf_proto_dir[2];
@@ -3180,6 +3180,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0644,
 			.proc_handler	=	&proc_dointvec,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 	.addrconf_dev = {
 		{

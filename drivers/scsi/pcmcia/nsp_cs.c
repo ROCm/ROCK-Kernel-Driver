@@ -1681,7 +1681,7 @@ static dev_link_t *nsp_cs_attach(void)
 	client_reg.event_handler = &nsp_cs_event;
 	client_reg.Version	 = 0x0210;
 	client_reg.event_callback_args.client_data = link;
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
 		cs_error(link->handle, RegisterClient, ret);
 		nsp_cs_detach(link);
@@ -1721,7 +1721,7 @@ static void nsp_cs_detach(dev_link_t *link)
 
 	/* Break the link with Card Services */
 	if (link->handle) {
-		CardServices(DeregisterClient, link->handle);
+		pcmcia_deregister_client(link->handle);
 	}
 
 	/* Unlink device structure, free bits */
@@ -1737,10 +1737,8 @@ static void nsp_cs_detach(dev_link_t *link)
     is received, to configure the PCMCIA socket, and to make the
     ethernet device available to the system.
 ======================================================================*/
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn),args))!=0) goto cs_failed
-#define CFG_CHECK(fn, args...) \
-if (CardServices(fn, args) != 0) goto next_entry
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 /*====================================================================*/
 static void nsp_cs_config(dev_link_t *link)
 {
@@ -1768,9 +1766,9 @@ static void nsp_cs_config(dev_link_t *link)
 	tuple.TupleData	      = tuple_data;
 	tuple.TupleDataMax    = sizeof(tuple_data);
 	tuple.TupleOffset     = 0;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData,	handle, &tuple);
-	CS_CHECK(ParseTuple,	handle, &tuple, &parse);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+	CS_CHECK(GetTupleData,	pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple,	pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigBase = parse.config.base;
 	link->conf.Present    = parse.config.rmask[0];
 
@@ -1778,16 +1776,17 @@ static void nsp_cs_config(dev_link_t *link)
 	link->state	      |= DEV_CONFIG;
 
 	/* Look up the current Vcc */
-	CS_CHECK(GetConfigurationInfo, handle, &conf);
+	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
 	link->conf.Vcc = conf.Vcc;
 
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	while (1) {
 		cistpl_cftable_entry_t *cfg = &(parse.cftable_entry);
 
-		CFG_CHECK(GetTupleData, handle, &tuple);
-		CFG_CHECK(ParseTuple,	handle, &tuple, &parse);
+		if (pcmcia_get_tuple_data(handle, &tuple) != 0 ||
+				pcmcia_parse_tuple(handle, &tuple, &parse) != 0)
+			goto next_entry;
 
 		if (cfg->flags & CISTPL_CFTABLE_DEFAULT) { dflt = *cfg; }
 		if (cfg->index == 0) { goto next_entry; }
@@ -1842,7 +1841,8 @@ static void nsp_cs_config(dev_link_t *link)
 				link->io.NumPorts2 = io->win[1].len;
 			}
 			/* This reserves IO space but doesn't actually enable it */
-			CFG_CHECK(RequestIO, link->handle, &link->io);
+			if (pcmcia_request_io(link->handle, &link->io) != 0)
+				goto next_entry;
 		}
 
 		if ((cfg->mem.nwin > 0) || (dflt.mem.nwin > 0)) {
@@ -1856,10 +1856,11 @@ static void nsp_cs_config(dev_link_t *link)
 				req.Size = 0x1000;
 			}
 			req.AccessSpeed = 0;
-			link->win = (window_handle_t)link->handle;
-			CFG_CHECK(RequestWindow, &link->win, &req);
+			if (pcmcia_request_window(&link->handle, &req, &link->win) != 0)
+				goto next_entry;
 			map.Page = 0; map.CardOffset = mem->win[0].card_addr;
-			CFG_CHECK(MapMemPage, link->win, &map);
+			if (pcmcia_map_mem_page(link->win, &map) != 0)
+				goto next_entry;
 
 			data->MmioAddress = (unsigned long)ioremap_nocache(req.Base, req.Size);
 			data->MmioLength  = req.Size;
@@ -1871,15 +1872,15 @@ static void nsp_cs_config(dev_link_t *link)
 		nsp_dbg(NSP_DEBUG_INIT, "next");
 
 		if (link->io.NumPorts1) {
-			CardServices(ReleaseIO, link->handle, &link->io);
+			pcmcia_release_io(link->handle, &link->io);
 		}
-		CS_CHECK(GetNextTuple, handle, &tuple);
+		CS_CHECK(GetNextTuple, pcmcia_get_next_tuple(handle, &tuple));
 	}
 
 	if (link->conf.Attributes & CONF_ENABLE_IRQ) {
-		CS_CHECK(RequestIRQ, link->handle, &link->irq);
+		CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
 	}
-	CS_CHECK(RequestConfiguration, handle, &link->conf);
+	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
 
 	if (free_ports) {
 		if (link->io.BasePort1) {
@@ -2007,7 +2008,6 @@ static void nsp_cs_config(dev_link_t *link)
 	return;
 } /* nsp_cs_config */
 #undef CS_CHECK
-#undef CFG_CHECK
 
 
 /*======================================================================
@@ -2042,14 +2042,14 @@ static void nsp_cs_release(dev_link_t *link)
 		if (data != NULL) {
 			iounmap((void *)(data->MmioAddress));
 		}
-		CardServices(ReleaseWindow, link->win);
+		pcmcia_release_window(link->win);
 	}
-	CardServices(ReleaseConfiguration,  link->handle);
+	pcmcia_release_configuration(link->handle);
 	if (link->io.NumPorts1) {
-		CardServices(ReleaseIO,     link->handle, &link->io);
+		pcmcia_release_io(link->handle, &link->io);
 	}
 	if (link->irq.AssignedIRQ) {
-		CardServices(ReleaseIRQ,    link->handle, &link->irq);
+		pcmcia_release_irq(link->handle, &link->irq);
 	}
 	link->state &= ~DEV_CONFIG;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,2))
@@ -2119,7 +2119,7 @@ static int nsp_cs_event(event_t		       event,
 
 		info->stop = 1;
 		if (link->state & DEV_CONFIG) {
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		}
 		break;
 
@@ -2130,7 +2130,7 @@ static int nsp_cs_event(event_t		       event,
 	case CS_EVENT_CARD_RESET:
 		nsp_dbg(NSP_DEBUG_INIT, "event: reset");
 		if (link->state & DEV_CONFIG) {
-			CardServices(RequestConfiguration, link->handle, &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 		}
 		info->stop = 0;
 
@@ -2177,7 +2177,7 @@ static int __init nsp_cs_init(void)
 	servinfo_t serv;
 
 	nsp_msg(KERN_INFO, "loading...");
-	CardServices(GetCardServicesInfo, &serv);
+	pcmcia_get_card_services_info(&serv);
 	if (serv.Revision != CS_RELEASE_CODE) {
 		nsp_msg(KERN_DEBUG, "Card Services release does not match!");
 		return -EINVAL;

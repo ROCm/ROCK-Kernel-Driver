@@ -578,6 +578,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 	wacom->dev.id.vendor = dev->descriptor.idVendor;
 	wacom->dev.id.product = dev->descriptor.idProduct;
 	wacom->dev.id.version = dev->descriptor.bcdDevice;
+	wacom->dev.dev = &intf->dev;
 	wacom->usbdev = dev;
 
 	endpoint = &intf->altsetting[0].endpoint[0].desc;

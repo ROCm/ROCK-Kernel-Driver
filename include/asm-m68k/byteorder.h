@@ -2,10 +2,11 @@
 #define _M68K_BYTEORDER_H
 
 #include <asm/types.h>
+#include <linux/compiler.h>
 
 #ifdef __GNUC__
 
-static __inline__ __const__ __u32 ___arch__swab32(__u32 val)
+static __inline__ __attribute_const__ __u32 ___arch__swab32(__u32 val)
 {
 	__asm__("rolw #8,%0; swap %0; rolw #8,%0" : "=d" (val) : "0" (val));
 	return val;

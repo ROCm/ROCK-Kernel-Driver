@@ -1,16 +1,17 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992-1997, 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
-#ifndef _ASM_SN_XTALK_XTALK_H
-#define _ASM_SN_XTALK_XTALK_H
+#ifndef _ASM_IA64_SN_XTALK_XTALK_H
+#define _ASM_IA64_SN_XTALK_XTALK_H
 #include <linux/config.h>
 
+#ifdef __KERNEL__
 #include "asm/sn/sgi.h"
+#endif
 
 
 /*
@@ -19,7 +20,7 @@
 /*
  * User-level device driver visible types
  */
-typedef int            xwidgetnum_t;	/* xtalk widget number  (0..15) */
+typedef char            xwidgetnum_t;	/* xtalk widget number  (0..15) */
 
 #define XWIDGET_NONE		(-1)
 
@@ -233,15 +234,7 @@ xtalk_widgetdev_enable_f (vertex_hdl_t, int);
 typedef void
 xtalk_widgetdev_shutdown_f (vertex_hdl_t, int);
 
-typedef int
-xtalk_dma_enabled_f (vertex_hdl_t);
-
 /* Error Management */
-
-typedef int
-xtalk_error_devenable_f (vertex_hdl_t xconn_vhdl,
-			 int devnum,
-			 int error_code);
 
 /* Early Action Support */
 typedef caddr_t
@@ -285,9 +278,6 @@ typedef struct xtalk_provider_s {
     /* CONFIGURATION MANAGEMENT */
     xtalk_provider_startup_f *provider_startup;
     xtalk_provider_shutdown_f *provider_shutdown;
-
-    /* Error Management     */
-    xtalk_error_devenable_f *error_devenable;
 } xtalk_provider_t;
 
 /* Crosstalk devices use these standard Crosstalk provider interfaces */
@@ -316,8 +306,6 @@ extern xtalk_provider_startup_f xtalk_provider_startup;
 extern xtalk_provider_shutdown_f xtalk_provider_shutdown;
 extern xtalk_widgetdev_enable_f xtalk_widgetdev_enable;
 extern xtalk_widgetdev_shutdown_f xtalk_widgetdev_shutdown;
-extern xtalk_dma_enabled_f xtalk_dma_enabled;
-extern xtalk_error_devenable_f xtalk_error_devenable;
 extern xtalk_early_piotrans_addr_f xtalk_early_piotrans_addr;
 
 /* error management */
@@ -397,4 +385,4 @@ typedef void		xtalk_iter_f(vertex_hdl_t vhdl);
 extern void		xtalk_iterate(char *prefix, xtalk_iter_f *func);
 
 #endif				/* __KERNEL__ */
-#endif				/* _ASM_SN_XTALK_XTALK_H */
+#endif				/* _ASM_IA64_SN_XTALK_XTALK_H */

@@ -553,15 +553,18 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 		finger_width = 0;
 	}
 
-	/* Post events */
+	/* Post events
+	 * BTN_TOUCH has to be first as mousedev relies on it when doing
+	 * absolute -> relative conversion
+	 */
+	if (hw.z > 30) input_report_key(dev, BTN_TOUCH, 1);
+	if (hw.z < 25) input_report_key(dev, BTN_TOUCH, 0);
+
 	if (hw.z > 0) {
 		input_report_abs(dev, ABS_X, hw.x);
 		input_report_abs(dev, ABS_Y, YMAX_NOMINAL + YMIN_NOMINAL - hw.y);
 	}
 	input_report_abs(dev, ABS_PRESSURE, hw.z);
-
-	if (hw.z > 30) input_report_key(dev, BTN_TOUCH, 1);
-	if (hw.z < 25) input_report_key(dev, BTN_TOUCH, 0);
 
 	input_report_abs(dev, ABS_TOOL_WIDTH, finger_width);
 	input_report_key(dev, BTN_TOOL_FINGER, num_fingers == 1);

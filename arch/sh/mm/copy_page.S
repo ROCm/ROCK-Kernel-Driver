@@ -1,4 +1,4 @@
-/* $Id: copy_page.S,v 1.7 2003/05/04 19:29:54 lethal Exp $
+/* $Id: copy_page.S,v 1.8 2003/08/25 17:03:10 lethal Exp $
  *
  * copy_page, __copy_user_page, __copy_user implementation of SuperH
  *
@@ -9,11 +9,11 @@
 #include <linux/linkage.h>
 
 /*
- * copy_page
+ * copy_page_slow
  * @to: P1 address
  * @from: P1 address
  *
- * void copy_page(void *to, void *from)
+ * void copy_page_slow(void *to, void *from)
  */
 
 /*
@@ -23,7 +23,7 @@
  * r10 --- to
  * r11 --- from
  */
-ENTRY(copy_page)
+ENTRY(copy_page_slow)
 	mov.l	r8,@-r15
 	mov.l	r10,@-r15
 	mov.l	r11,@-r15

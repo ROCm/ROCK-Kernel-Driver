@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <termios.h>
 #include <pty.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
@@ -25,7 +26,7 @@ int pty_output_sigio = 0;
 int pty_close_sigio = 0;
 
 /* Used as a flag during SIGIO testing early in boot */
-static volatile int got_sigio = 0;
+static int got_sigio = 0;
 
 void __init handler(int sig)
 {
@@ -44,7 +45,7 @@ static void openpty_cb(void *arg)
 
 	info->err = 0;
 	if(openpty(&info->master, &info->slave, NULL, NULL, NULL))
-		info->err = -errno;
+		info->err = errno;
 }
 
 void __init check_one_sigio(void (*proc)(int, int))
@@ -52,11 +53,11 @@ void __init check_one_sigio(void (*proc)(int, int))
 	struct sigaction old, new;
 	struct termios tt;
 	struct openpty_arg pty = { .master = -1, .slave = -1 };
-	int master, slave, err;
+	int master, slave, flags;
 
 	initial_thread_cb(openpty_cb, &pty);
 	if(pty.err){
-		printk("openpty failed, errno = %d\n", -pty.err);
+		printk("openpty failed, errno = %d\n", pty.err);
 		return;
 	}
 
@@ -68,16 +69,23 @@ void __init check_one_sigio(void (*proc)(int, int))
 		return;
 	}
 
-	/* XXX These can fail with EINTR */
 	if(tcgetattr(master, &tt) < 0)
 		panic("check_sigio : tcgetattr failed, errno = %d\n", errno);
 	cfmakeraw(&tt);
 	if(tcsetattr(master, TCSADRAIN, &tt) < 0)
 		panic("check_sigio : tcsetattr failed, errno = %d\n", errno);
 
-	err = os_sigio_async(master, slave);
-	if(err < 0)
-		panic("tty_fds : sigio_async failed, err = %d\n", -err);
+	if((flags = fcntl(master, F_GETFL)) < 0)
+		panic("tty_fds : fcntl F_GETFL failed, errno = %d\n", errno);
+
+	if((fcntl(master, F_SETFL, flags | O_NONBLOCK | O_ASYNC) < 0) ||
+	   (fcntl(master, F_SETOWN, os_getpid()) < 0))
+		panic("check_sigio : fcntl F_SETFL or F_SETOWN failed, "
+		      "errno = %d\n", errno);
+
+	if((fcntl(slave, F_SETFL, flags | O_NONBLOCK) < 0))
+		panic("check_sigio : fcntl F_SETFL failed, errno = %d\n", 
+		      errno);
 
 	if(sigaction(SIGIO, NULL, &old) < 0)
 		panic("check_sigio : sigaction 1 failed, errno = %d\n", errno);
@@ -89,8 +97,8 @@ void __init check_one_sigio(void (*proc)(int, int))
 	got_sigio = 0;
 	(*proc)(master, slave);
 		
-	os_close_file(master);
-	os_close_file(slave);
+	close(master);
+	close(slave);
 
 	if(sigaction(SIGIO, &old, NULL) < 0)
 		panic("check_sigio : sigaction 3 failed, errno = %d\n", errno);
@@ -104,25 +112,25 @@ static void tty_output(int master, int slave)
 	printk("Checking that host ptys support output SIGIO...");
 
 	memset(buf, 0, sizeof(buf));
-
-	while(os_write_file(master, buf, sizeof(buf)) > 0) ;
+	while(write(master, buf, sizeof(buf)) > 0) ;
 	if(errno != EAGAIN)
 		panic("check_sigio : write failed, errno = %d\n", errno);
-	while(((n = os_read_file(slave, buf, sizeof(buf))) > 0) && !got_sigio) ;
+
+	while(((n = read(slave, buf, sizeof(buf))) > 0) && !got_sigio) ;
 
 	if(got_sigio){
 		printk("Yes\n");
 		pty_output_sigio = 1;
 	}
-	else if(n == -EAGAIN) printk("No, enabling workaround\n");
-	else panic("check_sigio : read failed, err = %d\n", n);
+	else if(errno == EAGAIN) printk("No, enabling workaround\n");
+	else panic("check_sigio : read failed, errno = %d\n", errno);
 }
 
 static void tty_close(int master, int slave)
 {
 	printk("Checking that host ptys support SIGIO on close...");
 
-	os_close_file(slave);
+	close(slave);
 	if(got_sigio){
 		printk("Yes\n");
 		pty_close_sigio = 1;
@@ -132,8 +140,7 @@ static void tty_close(int master, int slave)
 
 void __init check_sigio(void)
 {
-	if((os_access("/dev/ptmx", OS_ACC_R_OK) < 0) &&
-	   (os_access("/dev/ptyp0", OS_ACC_R_OK) < 0)){
+	if(access("/dev/ptmx", R_OK) && access("/dev/ptyp0", R_OK)){
 		printk("No pseudo-terminals available - skipping pty SIGIO "
 		       "check\n");
 		return;
@@ -194,10 +201,11 @@ static int write_sigio_thread(void *unused)
 			p = &fds->poll[i];
 			if(p->revents == 0) continue;
 			if(p->fd == sigio_private[1]){
-				n = os_read_file(sigio_private[1], &c, sizeof(c));
+				n = read(sigio_private[1], &c, sizeof(c));
 				if(n != sizeof(c))
 					printk("write_sigio_thread : "
-					       "read failed, err = %d\n", -n);
+					       "read failed, errno = %d\n",
+					       errno);
 				tmp = current_poll;
 				current_poll = next_poll;
 				next_poll = tmp;
@@ -210,10 +218,10 @@ static int write_sigio_thread(void *unused)
 					(fds->used - i) * sizeof(*fds->poll));
 			}
 
-			n = os_write_file(respond_fd, &c, sizeof(c));
+			n = write(respond_fd, &c, sizeof(c));
 			if(n != sizeof(c))
 				printk("write_sigio_thread : write failed, "
-				       "err = %d\n", -n);
+				       "errno = %d\n", errno);
 		}
 	}
 }
@@ -244,15 +252,15 @@ static void update_thread(void)
 	char c;
 
 	flags = set_signals(0);
-	n = os_write_file(sigio_private[0], &c, sizeof(c));
+	n = write(sigio_private[0], &c, sizeof(c));
 	if(n != sizeof(c)){
-		printk("update_thread : write failed, err = %d\n", -n);
+		printk("update_thread : write failed, errno = %d\n", errno);
 		goto fail;
 	}
 
-	n = os_read_file(sigio_private[0], &c, sizeof(c));
+	n = read(sigio_private[0], &c, sizeof(c));
 	if(n != sizeof(c)){
-		printk("update_thread : read failed, err = %d\n", -n);
+		printk("update_thread : read failed, errno = %d\n", errno);
 		goto fail;
 	}
 
@@ -263,10 +271,10 @@ static void update_thread(void)
 	if(write_sigio_pid != -1) 
 		os_kill_process(write_sigio_pid, 1);
 	write_sigio_pid = -1;
-	os_close_file(sigio_private[0]);
-	os_close_file(sigio_private[1]);	
-	os_close_file(write_sigio_fds[0]);
-	os_close_file(write_sigio_fds[1]);
+	close(sigio_private[0]);
+	close(sigio_private[1]);	
+	close(write_sigio_fds[0]);
+	close(write_sigio_fds[1]);
 	sigio_unlock();
 	set_signals(flags);
 }
@@ -361,15 +369,15 @@ void write_sigio_workaround(void)
 		goto out;
 
 	err = os_pipe(write_sigio_fds, 1, 1);
-	if(err < 0){
+	if(err){
 		printk("write_sigio_workaround - os_pipe 1 failed, "
-		       "err = %d\n", -err);
+		       "errno = %d\n", -err);
 		goto out;
 	}
 	err = os_pipe(sigio_private, 1, 1);
-	if(err < 0){
+	if(err){
 		printk("write_sigio_workaround - os_pipe 2 failed, "
-		       "err = %d\n", -err);
+		       "errno = %d\n", -err);
 		goto out_close1;
 	}
 	if(setup_initial_poll(sigio_private[1]))
@@ -391,11 +399,11 @@ void write_sigio_workaround(void)
 	os_kill_process(write_sigio_pid, 1);
 	write_sigio_pid = -1;
  out_close2:
-	os_close_file(sigio_private[0]);
-	os_close_file(sigio_private[1]);	
+	close(sigio_private[0]);
+	close(sigio_private[1]);	
  out_close1:
-	os_close_file(write_sigio_fds[0]);
-	os_close_file(write_sigio_fds[1]);
+	close(write_sigio_fds[0]);
+	close(write_sigio_fds[1]);
 	sigio_unlock();
 }
 
@@ -404,16 +412,10 @@ int read_sigio_fd(int fd)
 	int n;
 	char c;
 
-	n = os_read_file(fd, &c, sizeof(c));
+	n = read(fd, &c, sizeof(c));
 	if(n != sizeof(c)){
-		if(n < 0) {
-			printk("read_sigio_fd - read failed, err = %d\n", -n);
-			return(n);
-		} 
-		else { 
-			printk("read_sigio_fd - short read, bytes = %d\n", n);
-			return(-EIO);
-		}
+		printk("read_sigio_fd - read failed, errno = %d\n", errno);
+		return(-errno);
 	}
 	return(n);
 }

@@ -233,6 +233,7 @@ config HAVE_DEC_LOCK
 # to use clustered mode or whatever your big iron needs
 config NR_CPUS
 	int "Maximum number of CPUs (2-8)"
+	range 2 8
 	depends on SMP
 	default "8"
 	help

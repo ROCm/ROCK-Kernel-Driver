@@ -24,10 +24,13 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-extern void clear_page(void *to);
-extern void copy_page(void *to, void *from);
+extern void (*clear_page)(void *to);
+extern void (*copy_page)(void *to, void *from);
 
-#if defined(CONFIG_CPU_SH3)
+extern void clear_page_slow(void *to);
+extern void copy_page_slow(void *to, void *from);
+
+#if defined(CONFIG_CPU_SH2) || defined(CONFIG_CPU_SH3) || !defined(CONFIG_MMU)
 #define clear_user_page(page, vaddr, pg)	clear_page(page)
 #define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 #elif defined(CONFIG_CPU_SH4)
@@ -64,7 +67,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 /*
  * IF YOU CHANGE THIS, PLEASE ALSO CHANGE
  *
- *	arch/sh/vmlinux.lds.S
+ *	arch/sh/kernel/vmlinux.lds.S
  *
  * which has the same constant encoded..
  */

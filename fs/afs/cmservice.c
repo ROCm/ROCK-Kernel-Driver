@@ -94,7 +94,7 @@ static struct rxrpc_service AFSCM_service = {
 	.error_func	= afscm_error,
 	.aemap_func	= afscm_aemap,
 	.ops_begin	= &AFSCM_ops[0],
-	.ops_end	= &AFSCM_ops[sizeof(AFSCM_ops)/sizeof(AFSCM_ops[0])],
+	.ops_end	= &AFSCM_ops[sizeof(AFSCM_ops) / sizeof(AFSCM_ops[0])],
 };
 
 static DECLARE_COMPLETION(kafscmd_alive);
@@ -112,13 +112,13 @@ static int kafscmd_die;
  */
 static int kafscmd(void *arg)
 {
-	DECLARE_WAITQUEUE(myself,current);
+	DECLARE_WAITQUEUE(myself, current);
 
 	struct rxrpc_call *call;
 	_SRXAFSCM_xxxx_t func;
 	int die;
 
-	printk("kAFS: Started kafscmd %d\n",current->pid);
+	printk("kAFS: Started kafscmd %d\n", current->pid);
 
 	daemonize("kafscmd");
 
@@ -128,7 +128,7 @@ static int kafscmd(void *arg)
 	do {
 		if (list_empty(&kafscmd_attention_list)) {
 			set_current_state(TASK_INTERRUPTIBLE);
-			add_wait_queue(&kafscmd_sleepq,&myself);
+			add_wait_queue(&kafscmd_sleepq, &myself);
 
 			for (;;) {
 				set_current_state(TASK_INTERRUPTIBLE);
@@ -140,7 +140,7 @@ static int kafscmd(void *arg)
 				schedule();
 			}
 
-			remove_wait_queue(&kafscmd_sleepq,&myself);
+			remove_wait_queue(&kafscmd_sleepq, &myself);
 			set_current_state(TASK_RUNNING);
 		}
 
@@ -162,7 +162,7 @@ static int kafscmd(void *arg)
 
 		if (call) {
 			/* act upon it */
-			_debug("@@@ Begin Attend Call %p",call);
+			_debug("@@@ Begin Attend Call %p", call);
 
 			func = call->app_user;
 			if (func)
@@ -170,13 +170,13 @@ static int kafscmd(void *arg)
 
 			rxrpc_put_call(call);
 
-			_debug("@@@ End Attend Call %p",call);
+			_debug("@@@ End Attend Call %p", call);
 		}
 
 	} while(!die);
 
 	/* and that's all */
-	complete_and_exit(&kafscmd_dead,0);
+	complete_and_exit(&kafscmd_dead, 0);
 
 } /* end kafscmd() */
 
@@ -184,12 +184,14 @@ static int kafscmd(void *arg)
 /*
  * handle a call coming in to the cache manager
  * - if I want to keep the call, I must increment its usage count
- * - the return value will be negated and passed back in an abort packet if non-zero
+ * - the return value will be negated and passed back in an abort packet if
+ *   non-zero
  * - serialised by virtue of there only being one krxiod
  */
 static int afscm_new_call(struct rxrpc_call *call)
 {
-	_enter("%p{cid=%u u=%d}",call,ntohl(call->call_id),atomic_read(&call->usage));
+	_enter("%p{cid=%u u=%d}",
+	       call, ntohl(call->call_id), atomic_read(&call->usage));
 
 	rxrpc_get_call(call);
 
@@ -209,12 +211,13 @@ static int afscm_new_call(struct rxrpc_call *call)
  */
 static void afscm_attention(struct rxrpc_call *call)
 {
-	_enter("%p{cid=%u u=%d}",call,ntohl(call->call_id),atomic_read(&call->usage));
+	_enter("%p{cid=%u u=%d}",
+	       call, ntohl(call->call_id), atomic_read(&call->usage));
 
 	spin_lock(&kafscmd_attention_lock);
 
 	if (list_empty(&call->app_attn_link)) {
-		list_add_tail(&call->app_attn_link,&kafscmd_attention_list);
+		list_add_tail(&call->app_attn_link, &kafscmd_attention_list);
 		rxrpc_get_call(call);
 	}
 
@@ -222,7 +225,7 @@ static void afscm_attention(struct rxrpc_call *call)
 
 	wake_up(&kafscmd_sleepq);
 
-	_leave(" {u=%d}",atomic_read(&call->usage));
+	_leave(" {u=%d}", atomic_read(&call->usage));
 } /* end afscm_attention() */
 
 /*****************************************************************************/
@@ -243,7 +246,7 @@ static void afscm_error(struct rxrpc_call *call)
 	spin_lock(&kafscmd_attention_lock);
 
 	if (list_empty(&call->app_attn_link)) {
-		list_add_tail(&call->app_attn_link,&kafscmd_attention_list);
+		list_add_tail(&call->app_attn_link, &kafscmd_attention_list);
 		rxrpc_get_call(call);
 	}
 
@@ -301,7 +304,7 @@ int afscm_start(void)
 		wait_for_completion(&kafscmd_alive);
 
 		ret = rxrpc_add_service(afs_transport, &AFSCM_service);
-		if (ret<0)
+		if (ret < 0)
 			goto kill;
 
 #ifdef AFS_AUTOMOUNT_SUPPORT
@@ -336,14 +339,15 @@ void afscm_stop(void)
 
 	down_write(&afscm_sem);
 
-	if (afscm_usage == 0) BUG();
+	BUG_ON(afscm_usage == 0);
 	afscm_usage--;
 
 	if (afscm_usage == 0) {
 		/* don't want more incoming calls */
 		rxrpc_del_service(afs_transport, &AFSCM_service);
 
-		/* abort any calls I've still got open (the afscm_error() will dequeue them) */
+		/* abort any calls I've still got open (the afscm_error() will
+		 * dequeue them) */
 		spin_lock(&afscm_calls_lock);
 		while (!list_empty(&afscm_calls)) {
 			call = list_entry(afscm_calls.next,
@@ -354,7 +358,8 @@ void afscm_stop(void)
 			rxrpc_get_call(call);
 			spin_unlock(&afscm_calls_lock);
 
-			rxrpc_call_abort(call,-ESRCH); /* abort, dequeue and put */
+			rxrpc_call_abort(call, -ESRCH); /* abort, dequeue and
+							 * put */
 
 			_debug("nuking active call %08x.%d",
 			       ntohl(call->conn->conn_id),
@@ -402,11 +407,11 @@ void afscm_stop(void)
  */
 static void _SRXAFSCM_CallBack(struct rxrpc_call *call)
 {
-	afs_server_t *server;
+	struct afs_server *server;
 	size_t count, qty, tmp;
 	int ret = 0, removed;
 
-	_enter("%p{acs=%s}",call,rxrpc_call_states[call->app_call_state]);
+	_enter("%p{acs=%s}", call, rxrpc_call_states[call->app_call_state]);
 
 	server = afs_server_get_from_peer(call->conn->peer);
 
@@ -417,38 +422,41 @@ static void _SRXAFSCM_CallBack(struct rxrpc_call *call)
 	case RXRPC_CSTATE_SRVR_GOT_ARGS:
 		ret = -EBADMSG;
 		qty = call->app_ready_qty;
-		if (qty<8 || qty>50*(6*4)+8)
+		if (qty < 8 || qty > 50 * (6 * 4) + 8)
 			break;
 
 		{
-			afs_callback_t *cb, *pcb;
+			struct afs_callback *cb, *pcb;
 			int loop;
 			u32 *fp, *bp;
 
-			fp = rxrpc_call_alloc_scratch(call,qty);
+			fp = rxrpc_call_alloc_scratch(call, qty);
 
-			/* drag the entire argument block out to the scratch space */
-			ret = rxrpc_call_read_data(call,fp,qty,0);
-			if (ret<0)
+			/* drag the entire argument block out to the scratch
+			 * space */
+			ret = rxrpc_call_read_data(call, fp, qty, 0);
+			if (ret < 0)
 				break;
 
 			/* and unmarshall the parameter block */
 			ret = -EBADMSG;
 			count = ntohl(*fp++);
 			if (count>AFSCBMAX ||
-			    (count*(3*4)+8 != qty && count*(6*4)+8 != qty))
+			    (count * (3 * 4) + 8 != qty &&
+			     count * (6 * 4) + 8 != qty))
 				break;
 
 			bp = fp + count*3;
 			tmp = ntohl(*bp++);
-			if (tmp>0 && tmp!=count)
+			if (tmp > 0 && tmp != count)
 				break;
-			if (tmp==0)
+			if (tmp == 0)
 				bp = NULL;
 
-			pcb = cb = rxrpc_call_alloc_scratch_s(call,afs_callback_t);
+			pcb = cb = rxrpc_call_alloc_scratch_s(
+				call, struct afs_callback);
 
-			for (loop=count-1; loop>=0; loop--) {
+			for (loop = count - 1; loop >= 0; loop--) {
 				pcb->fid.vid	= ntohl(*fp++);
 				pcb->fid.vnode	= ntohl(*fp++);
 				pcb->fid.unique	= ntohl(*fp++);
@@ -466,14 +474,15 @@ static void _SRXAFSCM_CallBack(struct rxrpc_call *call)
 			}
 
 			/* invoke the actual service routine */
-			ret = SRXAFSCM_CallBack(server,count,cb);
-			if (ret<0)
+			ret = SRXAFSCM_CallBack(server, count, cb);
+			if (ret < 0)
 				break;
 		}
 
 		/* send the reply */
-		ret = rxrpc_call_write_data(call,0,NULL,RXRPC_LAST_PACKET,GFP_KERNEL,0,&count);
-		if (ret<0)
+		ret = rxrpc_call_write_data(call, 0, NULL, RXRPC_LAST_PACKET,
+					    GFP_KERNEL, 0, &count);
+		if (ret < 0)
 			break;
 		break;
 
@@ -501,12 +510,12 @@ static void _SRXAFSCM_CallBack(struct rxrpc_call *call)
 		break;
 	}
 
-	if (ret<0)
-		rxrpc_call_abort(call,ret);
+	if (ret < 0)
+		rxrpc_call_abort(call, ret);
 
 	afs_put_server(server);
 
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 
 } /* end _SRXAFSCM_CallBack() */
 
@@ -516,16 +525,17 @@ static void _SRXAFSCM_CallBack(struct rxrpc_call *call)
  */
 static void _SRXAFSCM_InitCallBackState(struct rxrpc_call *call)
 {
-	afs_server_t *server;
+	struct afs_server *server;
 	size_t count;
 	int ret = 0, removed;
 
-	_enter("%p{acs=%s}",call,rxrpc_call_states[call->app_call_state]);
+	_enter("%p{acs=%s}", call, rxrpc_call_states[call->app_call_state]);
 
 	server = afs_server_get_from_peer(call->conn->peer);
 
 	switch (call->app_call_state) {
-		/* we've received the last packet - drain all the data from the call */
+		/* we've received the last packet - drain all the data from the
+		 * call */
 	case RXRPC_CSTATE_SRVR_GOT_ARGS:
 		/* shouldn't be any args */
 		ret = -EBADMSG;
@@ -535,11 +545,12 @@ static void _SRXAFSCM_InitCallBackState(struct rxrpc_call *call)
 	case RXRPC_CSTATE_SRVR_SND_REPLY:
 		/* invoke the actual service routine */
 		ret = SRXAFSCM_InitCallBackState(server);
-		if (ret<0)
+		if (ret < 0)
 			break;
 
-		ret = rxrpc_call_write_data(call,0,NULL,RXRPC_LAST_PACKET,GFP_KERNEL,0,&count);
-		if (ret<0)
+		ret = rxrpc_call_write_data(call, 0, NULL, RXRPC_LAST_PACKET,
+					    GFP_KERNEL, 0, &count);
+		if (ret < 0)
 			break;
 		break;
 
@@ -567,12 +578,12 @@ static void _SRXAFSCM_InitCallBackState(struct rxrpc_call *call)
 		break;
 	}
 
-	if (ret<0)
-		rxrpc_call_abort(call,ret);
+	if (ret < 0)
+		rxrpc_call_abort(call, ret);
 
 	afs_put_server(server);
 
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 
 } /* end _SRXAFSCM_InitCallBackState() */
 
@@ -582,16 +593,17 @@ static void _SRXAFSCM_InitCallBackState(struct rxrpc_call *call)
  */
 static void _SRXAFSCM_Probe(struct rxrpc_call *call)
 {
-	afs_server_t *server;
+	struct afs_server *server;
 	size_t count;
 	int ret = 0, removed;
 
-	_enter("%p{acs=%s}",call,rxrpc_call_states[call->app_call_state]);
+	_enter("%p{acs=%s}", call, rxrpc_call_states[call->app_call_state]);
 
 	server = afs_server_get_from_peer(call->conn->peer);
 
 	switch (call->app_call_state) {
-		/* we've received the last packet - drain all the data from the call */
+		/* we've received the last packet - drain all the data from the
+		 * call */
 	case RXRPC_CSTATE_SRVR_GOT_ARGS:
 		/* shouldn't be any args */
 		ret = -EBADMSG;
@@ -601,11 +613,12 @@ static void _SRXAFSCM_Probe(struct rxrpc_call *call)
 	case RXRPC_CSTATE_SRVR_SND_REPLY:
 		/* invoke the actual service routine */
 		ret = SRXAFSCM_Probe(server);
-		if (ret<0)
+		if (ret < 0)
 			break;
 
-		ret = rxrpc_call_write_data(call,0,NULL,RXRPC_LAST_PACKET,GFP_KERNEL,0,&count);
-		if (ret<0)
+		ret = rxrpc_call_write_data(call, 0, NULL, RXRPC_LAST_PACKET,
+					    GFP_KERNEL, 0, &count);
+		if (ret < 0)
 			break;
 		break;
 
@@ -633,11 +646,11 @@ static void _SRXAFSCM_Probe(struct rxrpc_call *call)
 		break;
 	}
 
-	if (ret<0)
-		rxrpc_call_abort(call,ret);
+	if (ret < 0)
+		rxrpc_call_abort(call, ret);
 
 	afs_put_server(server);
 
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 
 } /* end _SRXAFSCM_Probe() */

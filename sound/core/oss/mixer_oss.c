@@ -30,12 +30,9 @@
 #include <sound/mixer_oss.h>
 #include <linux/soundcard.h>
 
-#define OSS_ALSAEMULVER         _SIOR ('M', 249, int)
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Mixer OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_MIXER);
 
 static int snd_mixer_oss_open(struct inode *inode, struct file *file)
 {
@@ -308,36 +305,34 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 			tmp = snd_mixer_oss_set_recsrc(fmixer, tmp);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 		case OSS_GETVERSION:
 			return put_user(SNDRV_OSS_VERSION, (int *) arg);
-		case OSS_ALSAEMULVER:
-			return put_user(1, (int *) arg);
 		case SOUND_MIXER_READ_DEVMASK:
 			tmp = snd_mixer_oss_devmask(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 		case SOUND_MIXER_READ_STEREODEVS:
 			tmp = snd_mixer_oss_stereodevs(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 		case SOUND_MIXER_READ_RECMASK:
 			tmp = snd_mixer_oss_recmask(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 		case SOUND_MIXER_READ_CAPS:
 			tmp = snd_mixer_oss_caps(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 		case SOUND_MIXER_READ_RECSRC:
 			tmp = snd_mixer_oss_get_recsrc(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 		}
 	}
 	if (cmd & SIOC_IN) {
@@ -346,12 +341,12 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 		tmp = snd_mixer_oss_set_volume(fmixer, cmd & 0xff, tmp);
 		if (tmp < 0)
 			return tmp;
-		return put_user(tmp, (int *)arg);
+		return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 	} else if (cmd & SIOC_OUT) {
 		tmp = snd_mixer_oss_get_volume(fmixer, cmd & 0xff);
 		if (tmp < 0)
 			return tmp;
-		return put_user(tmp, (int *)arg);
+		return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 	}
 	return -ENXIO;
 }
@@ -877,12 +872,7 @@ static void mixer_slot_clear(snd_mixer_oss_slot_t *rslot)
 	rslot->number = idx;
 }
 
-/*
- * build an OSS mixer element.
- * ptr_allocated means the entry is dynamically allocated (change via proc file).
- * when replace_old = 1, the old entry is replaced with the new one.
- */
-static int snd_mixer_oss_build_input(snd_mixer_oss_t *mixer, struct snd_mixer_oss_assign_table *ptr, int ptr_allocated, int replace_old)
+static int snd_mixer_oss_build_input(snd_mixer_oss_t *mixer, struct snd_mixer_oss_assign_table *ptr, int ptr_allocated)
 {
 	struct slot slot;
 	struct slot *pslot;
@@ -890,10 +880,6 @@ static int snd_mixer_oss_build_input(snd_mixer_oss_t *mixer, struct snd_mixer_os
 	snd_mixer_oss_slot_t *rslot;
 	char str[64];	
 	
-	/* check if already assigned */
-	if (mixer->slots[ptr->oss_id].get_volume && ! replace_old)
-		return 0;
-
 	memset(&slot, 0, sizeof(slot));
 	if (snd_mixer_oss_build_test(mixer, &slot, ptr->name, ptr->index,
 				     SNDRV_MIXER_OSS_ITEM_GLOBAL))
@@ -1098,7 +1084,7 @@ static void snd_mixer_oss_proc_write(snd_info_entry_t *entry,
 			goto __unlock;
 		}
 		tbl->index = idx;
-		if (snd_mixer_oss_build_input(mixer, tbl, 1, 1) <= 0) {
+		if (snd_mixer_oss_build_input(mixer, tbl, 1) <= 0) {
 			kfree(tbl->name);
 			kfree(tbl);
 		}
@@ -1141,11 +1127,9 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 {
 	static struct snd_mixer_oss_assign_table table[] = {
 		{ SOUND_MIXER_VOLUME, 	"Master",		0 },
-		{ SOUND_MIXER_VOLUME, 	"Front",		0 }, /* fallback */
 		{ SOUND_MIXER_BASS,	"Tone Control - Bass",	0 },
 		{ SOUND_MIXER_TREBLE,	"Tone Control - Treble", 0 },
 		{ SOUND_MIXER_SYNTH,	"Synth",		0 },
-		{ SOUND_MIXER_SYNTH,	"FM",			0 }, /* fallback */
 		{ SOUND_MIXER_PCM,	"PCM",			0 },
 		{ SOUND_MIXER_SPEAKER,	"PC Speaker", 		0 },
 		{ SOUND_MIXER_LINE,	"Line", 		0 },
@@ -1153,7 +1137,6 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 		{ SOUND_MIXER_CD,	"CD", 			0 },
 		{ SOUND_MIXER_IMIX,	"Monitor Mix", 		0 },
 		{ SOUND_MIXER_ALTPCM,	"PCM",			1 },
-		{ SOUND_MIXER_ALTPCM,	"Wave",			0 }, /* fallback */
 		{ SOUND_MIXER_RECLEV,	"-- nothing --",	0 },
 		{ SOUND_MIXER_IGAIN,	"Capture",		0 },
 		{ SOUND_MIXER_OGAIN,	"Playback",		0 },
@@ -1169,10 +1152,15 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 		{ SOUND_MIXER_RADIO,	"Radio",		0 },
 		{ SOUND_MIXER_MONITOR,	"Monitor",		0 }
 	};
+	static struct snd_mixer_oss_assign_table fm_table = {
+		SOUND_MIXER_SYNTH,	"FM",			0
+	};
 	unsigned int idx;
 	
 	for (idx = 0; idx < sizeof(table) / sizeof(struct snd_mixer_oss_assign_table); idx++)
-		snd_mixer_oss_build_input(mixer, &table[idx], 0, 0);
+		snd_mixer_oss_build_input(mixer, &table[idx], 0);
+	if (mixer->slots[SOUND_MIXER_SYNTH].get_volume == NULL)
+		snd_mixer_oss_build_input(mixer, &fm_table, 0);
 	if (mixer->mask_recsrc) {
 		mixer->get_recsrc = snd_mixer_oss_get_recsrc2;
 		mixer->put_recsrc = snd_mixer_oss_put_recsrc2;

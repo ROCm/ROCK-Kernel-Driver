@@ -46,7 +46,7 @@ static inline void afs_discard_my_signals(void)
 		siginfo_t sinfo;
 
 		spin_lock_irq(&current->sighand->siglock);
-		dequeue_signal(current,&current->blocked,&sinfo);
+		dequeue_signal(current,&current->blocked, &sinfo);
 		spin_unlock_irq(&current->sighand->siglock);
 	}
 }
@@ -74,15 +74,26 @@ extern struct inode_operations afs_file_inode_operations;
 extern struct file_operations afs_file_file_operations;
 
 #ifdef AFS_CACHING_SUPPORT
-extern int afs_cache_get_page_cookie(struct page *page, struct cachefs_page **_page_cookie);
+extern int afs_cache_get_page_cookie(struct page *page,
+				     struct cachefs_page **_page_cookie);
 #endif
 
 /*
  * inode.c
  */
-extern int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inode);
-extern int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat);
+extern int afs_iget(struct super_block *sb, struct afs_fid *fid,
+		    struct inode **_inode);
+extern int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry,
+			     struct kstat *stat);
 extern void afs_clear_inode(struct inode *inode);
+
+/*
+ * key_afs.c
+ */
+#ifdef CONFIG_KEYS
+extern int afs_key_register(void);
+extern void afs_key_unregister(void);
+#endif
 
 /*
  * main.c
@@ -102,7 +113,7 @@ extern struct afs_timer_ops afs_mntpt_expiry_timer_ops;
 extern unsigned long afs_mntpt_expiry_timeout;
 #endif
 
-extern int afs_mntpt_check_symlink(afs_vnode_t *vnode);
+extern int afs_mntpt_check_symlink(struct afs_vnode *vnode);
 
 /*
  * super.c
@@ -110,13 +121,14 @@ extern int afs_mntpt_check_symlink(afs_vnode_t *vnode);
 extern int afs_fs_init(void);
 extern void afs_fs_exit(void);
 
-#define AFS_CB_HASH_COUNT (PAGE_SIZE/sizeof(struct list_head))
+#define AFS_CB_HASH_COUNT (PAGE_SIZE / sizeof(struct list_head))
 
 extern struct list_head afs_cb_hash_tbl[];
 extern spinlock_t afs_cb_hash_lock;
 
 #define afs_cb_hash(SRV,FID) \
-	afs_cb_hash_tbl[((unsigned long)(SRV) + (FID)->vid + (FID)->vnode + (FID)->unique) % \
+	afs_cb_hash_tbl[((unsigned long)(SRV) + \
+			(FID)->vid + (FID)->vnode + (FID)->unique) % \
 			AFS_CB_HASH_COUNT]
 
 /*
@@ -124,7 +136,7 @@ extern spinlock_t afs_cb_hash_lock;
  */
 extern int afs_proc_init(void);
 extern void afs_proc_cleanup(void);
-extern int afs_proc_cell_setup(afs_cell_t *cell);
-extern void afs_proc_cell_remove(afs_cell_t *cell);
+extern int afs_proc_cell_setup(struct afs_cell *cell);
+extern void afs_proc_cell_remove(struct afs_cell *cell);
 
 #endif /* AFS_INTERNAL_H */

@@ -20,6 +20,14 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.6 - Fix minor bug in handling of compressed directories.
+
+	- Fix bug in handling of compressed directories.  A compressed
+	  directory is not really compressed so when we set the ->i_blocks
+	  field of a compressed directory inode we were setting it from the
+	  non-existing field ni->itype.compressed.size which gave random
+	  results...  For directories we now always use ni->allocated_size.
+
 2.1.5 - Fix minor bug in attribute list attribute handling.
 
 	- Fix bug in attribute list handling.  Actually it is not as much a bug

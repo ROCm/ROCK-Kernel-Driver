@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.17 2003/05/27 21:37:11 lethal Exp $
+/* $Id: process.c,v 1.24 2003/11/28 23:05:43 kkojima Exp $
  *
  *  linux/arch/sh/kernel/process.c
  *
@@ -19,6 +19,7 @@
 #include <linux/a.out.h>
 #include <linux/ptrace.h>
 #include <linux/platform.h>
+#include <linux/kallsyms.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -26,6 +27,8 @@
 #include <asm/elf.h>
 
 static int hlt_counter=0;
+
+int ubc_usercnt = 0;
 
 #define HARD_IDLE_TIMEOUT (HZ / 3)
 
@@ -47,19 +50,9 @@ void default_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
-		if (hlt_counter) {
-			while (1)
-				if (need_resched())
-					break;
-		} else {
-			local_irq_disable();
-			while (!need_resched()) {
-				local_irq_enable();
-				asm volatile("sleep" : : : "memory");
-				local_irq_disable();
-			}
-			local_irq_enable();
-		}
+		while (!need_resched())
+			cpu_relax();
+
 		schedule();
 	}
 }
@@ -81,7 +74,7 @@ EXPORT_SYMBOL(machine_restart);
 void machine_halt(void)
 {
 	while (1)
-		asm volatile("sleep" : : : "memory");
+		cpu_relax();
 }
 
 EXPORT_SYMBOL(machine_halt);
@@ -95,8 +88,17 @@ EXPORT_SYMBOL(machine_power_off);
 void show_regs(struct pt_regs * regs)
 {
 	printk("\n");
-	printk("PC  : %08lx SP  : %08lx SR  : %08lx TEA : %08x    %s\n",
-	       regs->pc, regs->regs[15], regs->sr, ctrl_inl(MMU_TEA), print_tainted());
+	printk("Pid : %d, Comm: %20s\n", current->pid, current->comm);
+	print_symbol("PC is at %s\n", regs->pc);
+	printk("PC  : %08lx SP  : %08lx SR  : %08lx ",
+	       regs->pc, regs->regs[15], regs->sr);
+#ifdef CONFIG_MMU
+	printk("TEA : %08x    ", ctrl_inl(MMU_TEA));
+#else
+	printk("                  ");
+#endif
+	printk("%s\n", print_tainted());
+
 	printk("R0  : %08lx R1  : %08lx R2  : %08lx R3  : %08lx\n",
 	       regs->regs[0],regs->regs[1],
 	       regs->regs[2],regs->regs[3]);
@@ -162,7 +164,10 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
  */
 void exit_thread(void)
 {
-	/* Nothing to do. */
+	if (current->thread.ubc_pc) {
+		current->thread.ubc_pc = 0;
+		ubc_usercnt -= 1;
+	}
 }
 
 void flush_thread(void)
@@ -207,7 +212,11 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	struct pt_regs ptregs;
 	
 	ptregs = *(struct pt_regs *)
-		((unsigned long)tsk->thread_info+THREAD_SIZE - sizeof(ptregs));
+		((unsigned long)tsk->thread_info+THREAD_SIZE - sizeof(ptregs)
+#ifdef CONFIG_SH_DSP
+		 - sizeof(struct pt_dspregs)
+#endif
+		 - sizeof(unsigned long));
 	elf_core_copy_regs(regs, &ptregs);
 
 	return 1;
@@ -237,7 +246,12 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 {
 	struct pt_regs *childregs;
 
-	childregs = ((struct pt_regs *)(THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
+	childregs = ((struct pt_regs *)
+		(THREAD_SIZE + (unsigned long) p->thread_info)
+#ifdef CONFIG_SH_DSP
+		- sizeof(struct pt_dspregs)
+#endif
+		- sizeof(unsigned long)) - 1;
 	*childregs = *regs;
 
 	if (user_mode(regs)) {
@@ -254,6 +268,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 	p->thread.sp = (unsigned long) childregs;
 	p->thread.pc = (unsigned long) ret_from_fork;
+
+	p->thread.ubc_pc = 0;
 
 #if defined(CONFIG_CPU_SH4)
 	{
@@ -288,6 +304,27 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->u_fpvalid = dump_fpu(regs, &dump->fpu);
 }
 
+/* Tracing by user break controller.  */
+static void
+ubc_set_tracing(int asid, unsigned long pc)
+{
+	ctrl_outl(pc, UBC_BARA);
+
+	/* We don't have any ASID settings for the SH-2! */
+	if (cpu_data->type != CPU_SH7604)
+		ctrl_outb(asid, UBC_BASRA);
+
+	ctrl_outl(0, UBC_BAMRA);
+
+	if (cpu_data->type == CPU_SH7729) {
+		ctrl_outw(BBR_INST | BBR_READ | BBR_CPU, UBC_BBRA);
+		ctrl_outl(BRCR_PCBA | BRCR_PCTE, UBC_BRCR);
+	} else {
+		ctrl_outw(BBR_INST | BBR_READ, UBC_BBRA);
+		ctrl_outw(BRCR_PCBA, UBC_BRCR);
+	}
+}
+
 /*
  *	switch_to(x,y) should switch tasks from x to y.
  *
@@ -304,6 +341,19 @@ struct task_struct *__switch_to(struct task_struct *prev, struct task_struct *ne
 	asm volatile("ldc	%0, r7_bank"
 		     : /* no output */
 		     : "r" (next->thread_info));
+
+#ifdef CONFIG_MMU
+	/* If no tasks are using the UBC, we're done */
+	if (ubc_usercnt == 0)
+		/* If no tasks are using the UBC, we're done */;
+	else if (next->thread.ubc_pc && next->mm) {
+		ubc_set_tracing(next->mm->context & MMU_CONTEXT_ASID_MASK,
+				next->thread.ubc_pc);
+	} else {
+		ctrl_outw(0, UBC_BBRA);
+		ctrl_outw(0, UBC_BBRB);
+	}
+#endif
 
 	return prev;
 }
@@ -328,7 +378,7 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
 	if (!newsp)
 		newsp = regs.regs[15];
 	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
-			(int *)parent_tidptr, (int *)child_tidptr);
+			(int __user *)parent_tidptr, (int __user *)child_tidptr);
 }
 
 /*
@@ -359,12 +409,15 @@ asmlinkage int sys_execve(char *ufilename, char **uargv,
 	int error;
 	char *filename;
 
-	filename = getname(ufilename);
+	filename = getname((char __user *)ufilename);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
 
-	error = do_execve(filename, uargv, uenvp, &regs);
+	error = do_execve(filename,
+			  (char __user * __user *)uargv,
+			  (char __user * __user *)uenvp,
+			  &regs);
 	if (error == 0)
 		current->ptrace &= ~PT_DTRACE;
 	putname(filename);
@@ -406,6 +459,8 @@ asmlinkage void break_point_trap(unsigned long r4, unsigned long r5,
 	/* Clear tracing.  */
 	ctrl_outw(0, UBC_BBRA);
 	ctrl_outw(0, UBC_BBRB);
+	current->thread.ubc_pc = 0;
+	ubc_usercnt -= 1;
 
 	force_sig(SIGTRAP, current);
 }

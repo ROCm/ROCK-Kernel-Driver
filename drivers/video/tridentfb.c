@@ -723,7 +723,7 @@ static int tridentfb_check_var(struct fb_var_screeninfo *var, struct fb_info *in
 	if (bpp == 24 )
 		bpp = var->bits_per_pixel = 32;
 	/* check whether resolution fits on panel and in memory*/
-	if (var->xres > nativex)
+	if (flatpanel && nativex && var->xres > nativex)
 		return -EINVAL;
 	if (var->xres * var->yres_virtual * bpp/8 > info->fix.smem_len)
 		return -EINVAL;

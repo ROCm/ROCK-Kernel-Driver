@@ -267,6 +267,7 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	xpad->dev.id.vendor = udev->descriptor.idVendor;
 	xpad->dev.id.product = udev->descriptor.idProduct;
 	xpad->dev.id.version = udev->descriptor.bcdDevice;
+	xpad->dev.dev = &intf->dev;
 	xpad->dev.private = xpad;
 	xpad->dev.name = xpad_device[i].name;
 	xpad->dev.phys = xpad->phys;

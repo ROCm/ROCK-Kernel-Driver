@@ -45,6 +45,8 @@
 
 #define SO_ACCEPTCONN		0x401c
 
+#define SO_PEERSEC		0x401d
+
 #if defined(__KERNEL__)
 #define SOCK_STREAM	1	/* stream (connection) socket	*/
 #define SOCK_DGRAM	2	/* datagram (conn.less) socket	*/

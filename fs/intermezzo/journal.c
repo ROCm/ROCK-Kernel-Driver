@@ -2103,12 +2103,11 @@ int presto_journal_unlink(struct rec_info *rec, struct presto_file_set *fset,
 
 int
 presto_journal_close(struct rec_info *rec, struct presto_file_set *fset,
-                     struct file *file, struct dentry *dentry,
+                     struct presto_file_data *fd, struct dentry *dentry,
                      struct presto_version *old_file_ver,
                      struct presto_version *new_file_ver)
 {
         int opcode = KML_OPCODE_CLOSE;
-        struct presto_file_data *fd;
         char *buffer, *path, *logrecord, record[316];
         struct dentry *root;
         int error, size, i;
@@ -2137,7 +2136,6 @@ presto_journal_close(struct rec_info *rec, struct presto_file_set *fset,
 
         root = fset->fset_dentry;
 
-        fd = (struct presto_file_data *)file->private_data;
         if (fd) {
                 open_ngroups = fd->fd_ngroups;
                 for (i = 0; i < fd->fd_ngroups; i++)

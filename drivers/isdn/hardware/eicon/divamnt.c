@@ -1,4 +1,4 @@
-/* $Id: divamnt.c,v 1.28 2003/09/18 06:57:18 schindler Exp $
+/* $Id: divamnt.c,v 1.32 2004/01/15 09:48:13 armin Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * Maint module
@@ -26,7 +26,7 @@
 #include "divasync.h"
 #include "debug_if.h"
 
-static char *main_revision = "$Revision: 1.28 $";
+static char *main_revision = "$Revision: 1.32 $";
 
 static int major;
 
@@ -53,7 +53,7 @@ static struct timeval start_time;
 
 extern int mntfunc_init(int *, void **, unsigned long);
 extern void mntfunc_finit(void);
-extern int maint_read_write(void *buf);
+extern int maint_read_write(void *buf, int count);
 
 /*
  *  helper functions
@@ -363,13 +363,13 @@ static void remove_maint_proc(void)
 static ssize_t divas_maint_write(struct file *file, const char *buf,
 				 size_t count, loff_t * ppos)
 {
-	return (maint_read_write((char *) buf));
+	return (maint_read_write((char *) buf, (int) count));
 }
 
 static ssize_t divas_maint_read(struct file *file, char *buf,
 				size_t count, loff_t * ppos)
 {
-	return (maint_read_write(buf));
+	return (maint_read_write(buf, (int) count));
 }
 
 static struct file_operations divas_maint_fops = {

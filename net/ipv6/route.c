@@ -1974,6 +1974,7 @@ ctl_table ipv6_route_table[] = {
          	.proc_handler	=	&proc_dointvec_jiffies,
 		.strategy	=	&sysctl_jiffies,
 	},
+	{ .ctl_name = 0 }
 };
 
 #endif

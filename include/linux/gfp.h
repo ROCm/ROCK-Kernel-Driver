@@ -63,11 +63,6 @@
  * For the normal case of non-DISCONTIGMEM systems the NODE_DATA() gets
  * optimized to &contig_page_data at compile-time.
  */
-
-#ifndef HAVE_ARCH_FREE_PAGE
-static inline void arch_free_page(struct page *page, int order) { }
-#endif
-
 extern struct page * FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
 static inline struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int order)
 {

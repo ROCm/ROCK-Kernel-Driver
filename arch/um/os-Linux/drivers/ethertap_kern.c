@@ -8,6 +8,7 @@
 #include "linux/init.h"
 #include "linux/netdevice.h"
 #include "linux/etherdevice.h"
+#include "linux/init.h"
 #include "net_kern.h"
 #include "net_user.h"
 #include "etap.h"

@@ -19,6 +19,8 @@
 #ifndef	__ISERIES_SETUP_H__
 #define	__ISERIES_SETUP_H__
 
+#include <linux/irq.h>		/* for irq_desc_t */
+
 extern void iSeries_init_early(void);
 extern void iSeries_init(unsigned long r3, unsigned long ird_start,
 		unsigned long ird_end, unsigned long cline_start,

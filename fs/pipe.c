@@ -650,6 +650,7 @@ int do_pipe(int *fd)
 	d_add(dentry, inode);
 	f1->f_vfsmnt = f2->f_vfsmnt = mntget(mntget(pipe_mnt));
 	f1->f_dentry = f2->f_dentry = dget(dentry);
+	f1->f_mapping = f2->f_mapping = inode->i_mapping;
 
 	/* read file */
 	f1->f_pos = f2->f_pos = 0;

@@ -569,21 +569,15 @@ int usbat_handle_read10(struct us_data *us,
 	}
 
 	// Since we only read in one block at a time, we have to create
-	// a bounce buffer if the transfer uses scatter-gather.  We will
-	// move the data a piece at a time between the bounce buffer and
-	// the actual transfer buffer.  If we're not using scatter-gather,
-	// we can simply update the transfer buffer pointer to get the
-	// same effect.
+	// a bounce buffer and move the data a piece at a time between the
+	// bounce buffer and the actual transfer buffer.
 
 	len = (65535/srb->transfersize) * srb->transfersize;
 	US_DEBUGP("Max read is %d bytes\n", len);
 	len = min(len, srb->request_bufflen);
-	if (srb->use_sg) {
-		buffer = kmalloc(len, GFP_NOIO);
-		if (buffer == NULL) // bloody hell!
-			return USB_STOR_TRANSPORT_FAILED;
-	} else
-		buffer = srb->request_buffer;
+	buffer = kmalloc(len, GFP_NOIO);
+	if (buffer == NULL) // bloody hell!
+		return USB_STOR_TRANSPORT_FAILED;
 	sector = short_pack(data[7+3], data[7+2]);
 	sector <<= 16;
 	sector |= short_pack(data[7+5], data[7+4]);
@@ -621,12 +615,9 @@ int usbat_handle_read10(struct us_data *us,
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			break;
 
-		// Store the data (s-g) or update the pointer (!s-g)
-		if (srb->use_sg)
-			usb_stor_access_xfer_buf(buffer, len, srb,
-					 &sg_segment, &sg_offset, TO_XFER_BUF);
-		else
-			buffer += len;
+		// Store the data in the transfer buffer
+		usb_stor_access_xfer_buf(buffer, len, srb,
+				 &sg_segment, &sg_offset, TO_XFER_BUF);
 
 		// Update the amount transferred and the sector number
 
@@ -635,8 +626,7 @@ int usbat_handle_read10(struct us_data *us,
 
 	} // while transferred != srb->request_bufflen
 
-	if (srb->use_sg)
-		kfree(buffer);
+	kfree(buffer);
 	return result;
 }
 

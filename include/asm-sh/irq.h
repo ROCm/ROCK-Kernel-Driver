@@ -7,6 +7,7 @@
  *
  * Copyright (C) 1999  Niibe Yutaka & Takeshi Yaegashi
  * Copyright (C) 2000  Kazumoto Kojima
+ * Copyright (C) 2003  Paul Mundt
  *
  */
 
@@ -21,6 +22,7 @@
 #define INTC_IPRA	0xffd00004UL
 #define INTC_IPRB	0xffd00008UL
 #define INTC_IPRC	0xffd0000cUL
+#define INTC_IPRD	0xffd00010UL
 #endif
 
 #define TIMER_IRQ	16
@@ -46,6 +48,10 @@
 #define DMTE1_IRQ	35
 #define DMTE2_IRQ	36
 #define DMTE3_IRQ	37
+#define DMTE4_IRQ	44	/* 7751R only */
+#define DMTE5_IRQ	45	/* 7751R only */
+#define DMTE6_IRQ	46	/* 7751R only */
+#define DMTE7_IRQ	47	/* 7751R only */
 #define DMAE_IRQ	38
 #define DMA_IPR_ADDR	INTC_IPRC
 #define DMA_IPR_POS	2
@@ -123,6 +129,8 @@
 #  define ONCHIP_NR_IRQS 48	// Actually 44
 # elif defined(CONFIG_CPU_SUBTYPE_SH7751)
 #  define ONCHIP_NR_IRQS 72
+# elif defined(CONFIG_CPU_SUBTYPE_SH7760)
+#  define ONCHIP_NR_IRQS 110
 # elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 #  define ONCHIP_NR_IRQS 144
 # endif
@@ -194,7 +202,22 @@ extern void make_ipr_irq(unsigned int irq, unsigned int addr,
 			 int pos,  int priority);
 extern void make_imask_irq(unsigned int irq);
 
-#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if defined(CONFIG_CPU_SUBTYPE_SH7604)
+#define INTC_IPRA	0xfffffee2UL
+#define INTC_IPRB	0xfffffe60UL
+
+#define INTC_VCRA	0xfffffe62UL
+#define INTC_VCRB	0xfffffe64UL
+#define INTC_VCRC	0xfffffe66UL
+#define INTC_VCRD	0xfffffe68UL
+
+#define INTC_VCRWDT	0xfffffee4UL
+#define INTC_VCRDIV	0xffffff0cUL
+#define INTC_VCRDMA0	0xffffffa0UL
+#define INTC_VCRDMA1	0xffffffa8UL
+
+#define INTC_ICR	0xfffffee0UL
+#elif defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
 #define INTC_IRR0	0xa4000004UL
 #define INTC_IRR1	0xa4000006UL
 #define INTC_IRR2	0xa4000008UL
@@ -293,61 +316,12 @@ extern void make_intc2_irq(unsigned int irq,unsigned int addr,
  
 #endif                                                                        
        
-#ifdef CONFIG_SH_GENERIC
-
-static __inline__ int irq_demux(int irq)
-{
-	if (sh_mv.mv_irq_demux) {
-		irq = sh_mv.mv_irq_demux(irq);
-	}
-	return __irq_demux(irq);
-}
-
-#elif defined(CONFIG_SH_BIGSUR)
-
-extern int bigsur_irq_demux(int irq);
-#define irq_demux(irq) bigsur_irq_demux(irq)
-
-#elif defined(CONFIG_HD64461)
-
-extern int hd64461_irq_demux(int irq);
-#define irq_demux(irq) hd64461_irq_demux(irq)
-
-#elif defined(CONFIG_HD64465)
-
-extern int hd64465_irq_demux(int irq);
-#define irq_demux(irq) hd64465_irq_demux(irq)
-
-#elif defined(CONFIG_SH_EC3104)
-
-extern int ec3104_irq_demux(int irq);
-#define irq_demux ec3104_irq_demux
-
-#elif defined(CONFIG_SH_CAT68701)
-
-extern int cat68701_irq_demux(int irq);
-#define irq_demux cat68701_irq_demux
-
-#elif defined(CONFIG_SH_DREAMCAST)
-
-extern int systemasic_irq_demux(int irq);
-#define irq_demux systemasic_irq_demux
-
-#elif defined(CONFIG_SH_MPC1211)
-
-extern int mpc1211_irq_demux(int irq);
-#define irq_demux mpc1211_irq_demux
-
-#else
-
-#define irq_demux(irq) __irq_demux(irq)
-
-#endif
-
-static __inline__ int irq_canonicalize(int irq)
+static inline int generic_irq_demux(int irq)
 {
 	return irq;
 }
 
+#define irq_canonicalize(irq)	(irq)
+#define irq_demux(irq)		__irq_demux(sh_mv.mv_irq_demux(irq))
 
 #endif /* __ASM_SH_IRQ_H */
