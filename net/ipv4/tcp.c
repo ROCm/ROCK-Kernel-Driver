@@ -360,14 +360,6 @@ void __tcp_mem_reclaim(struct sock *sk)
 	}
 }
 
-void tcp_rfree(struct sk_buff *skb)
-{
-	struct sock *sk = skb->sk;
-
-	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
-	sk->sk_forward_alloc += skb->truesize;
-}
-
 /*
  * LISTEN is a special case for poll..
  */

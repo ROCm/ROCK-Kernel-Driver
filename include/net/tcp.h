@@ -1955,16 +1955,6 @@ static inline void tcp_writequeue_purge(struct sock *sk)
 	tcp_mem_reclaim(sk);
 }
 
-extern void tcp_rfree(struct sk_buff *skb);
-
-static inline void tcp_set_owner_r(struct sk_buff *skb, struct sock *sk)
-{
-	skb->sk = sk;
-	skb->destructor = tcp_rfree;
-	atomic_add(skb->truesize, &sk->sk_rmem_alloc);
-	sk->sk_forward_alloc -= skb->truesize;
-}
-
 extern void tcp_listen_wlock(void);
 
 /* - We may sleep inside this lock.

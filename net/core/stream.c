@@ -167,3 +167,13 @@ do_interrupted:
 }
 
 EXPORT_SYMBOL(sk_stream_wait_memory);
+
+void sk_stream_rfree(struct sk_buff *skb)
+{
+	struct sock *sk = skb->sk;
+
+	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
+	sk->sk_forward_alloc += skb->truesize;
+}
+
+EXPORT_SYMBOL(sk_stream_rfree);
