@@ -177,7 +177,8 @@ static int change_tramp(char **argv, char *output, int output_len)
 	os_close_file(fds[0]);
 	os_close_file(fds[1]);
 
-	CATCH_EINTR(err = waitpid(pid, NULL, 0));
+	if (pid > 0)
+		CATCH_EINTR(err = waitpid(pid, NULL, 0));
 	return(pid);
 }
 
