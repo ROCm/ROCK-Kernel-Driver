@@ -121,8 +121,8 @@ static int cp_old_stat(struct kstat *stat, struct __old_kernel_stat __user * sta
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
-	SET_OLDSTAT_UID(tmp, stat->uid);
-	SET_OLDSTAT_GID(tmp, stat->gid);
+	SET_UID(tmp.st_uid, stat->uid);
+	SET_GID(tmp.st_gid, stat->gid);
 	tmp.st_rdev = old_encode_dev(stat->rdev);
 #if BITS_PER_LONG == 32
 	if (stat->size > MAX_NON_LFS)
@@ -189,8 +189,8 @@ static int cp_new_stat(struct kstat *stat, struct stat __user *statbuf)
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
-	SET_STAT_UID(tmp, stat->uid);
-	SET_STAT_GID(tmp, stat->gid);
+	SET_UID(tmp.st_uid, stat->uid);
+	SET_GID(tmp.st_gid, stat->gid);
 #if BITS_PER_LONG == 32
 	tmp.st_rdev = old_encode_dev(stat->rdev);
 #else
