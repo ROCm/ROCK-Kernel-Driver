@@ -5,7 +5,7 @@
 mainmenu_option next_comment
 comment 'Input device support'
 
-tristate 'Input core support' CONFIG_INPUT
+define_tristate CONFIG_INPUT y
 
 comment 'Userland interfaces'
 dep_tristate '  Mouse interface' CONFIG_INPUT_MOUSEDEV $CONFIG_INPUT
