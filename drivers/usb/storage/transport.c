@@ -1296,7 +1296,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	struct bulk_cs_wrap bcs;
 	unsigned int transfer_length = usb_stor_transfer_length(srb);
 	int result;
-	int partial;
 
 	/* set up the command wrapper */
 	bcb.Signature = cpu_to_le32(US_BULK_CB_SIGN);
@@ -1316,9 +1315,9 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	US_DEBUGP("Bulk command S 0x%x T 0x%x Trg %d LUN %d L %d F %d CL %d\n",
 		  le32_to_cpu(bcb.Signature), bcb.Tag,
 		  (bcb.Lun >> 4), (bcb.Lun & 0x0F), 
-		  bcb.DataTransferLength, bcb.Flags, bcb.Length);
-	result = usb_stor_bulk_msg(us, &bcb, us->send_bulk_pipe,
-				US_BULK_CB_WRAP_LEN, &partial);
+		  le32_to_cpu(bcb.DataTransferLength), bcb.Flags, bcb.Length);
+	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
+				(char *) &bcb, US_BULK_CB_WRAP_LEN, NULL);
 	US_DEBUGP("Bulk command transfer result=%d\n", result);
 
 	/* did we abort this command? */
@@ -1326,23 +1325,8 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
 		return USB_STOR_TRANSPORT_ABORTED;
 	}
-
-	/* if we stall, we need to clear it before we go on */
-	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
-				us->send_bulk_pipe);
-		result = usb_stor_clear_halt(us, us->send_bulk_pipe);
-
-		/* did we abort this command? */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-			return USB_STOR_TRANSPORT_ABORTED;
-		}
+	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
-	} else if (result) {
-		/* unknown error -- we've got a problem */
-		return USB_STOR_TRANSPORT_ERROR;
-	}
 
 	/* DATA STAGE */
 	/* send/receive data payload, if there is any */
@@ -1366,8 +1350,8 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* get CSW for device status */
 	US_DEBUGP("Attempting to get CSW...\n");
-	result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
-				US_BULK_CS_WRAP_LEN, &partial);
+	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
 
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
@@ -1376,50 +1360,24 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	}
 
 	/* did the attempt to read the CSW fail? */
-	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
-				us->recv_bulk_pipe);
-		result = usb_stor_clear_halt(us, us->recv_bulk_pipe);
-
-		/* did we abort this command? */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-			return USB_STOR_TRANSPORT_ABORTED;
-		}
-		if (result < 0)
-			return USB_STOR_TRANSPORT_ERROR;
+	if (result == USB_STOR_XFER_STALLED) {
 
 		/* get the status again */
 		US_DEBUGP("Attempting to get CSW (2nd try)...\n");
-		result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
-					   US_BULK_CS_WRAP_LEN, &partial);
+		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
 
 		/* did we abort this command? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
 			return USB_STOR_TRANSPORT_ABORTED;
-		}
-
-		/* if it fails again, we need a reset and return an error*/
-		if (result == -EPIPE) {
-			US_DEBUGP("clearing halt for pipe 0x%x\n",
-					us->recv_bulk_pipe);
-			result = usb_stor_clear_halt(us, us->recv_bulk_pipe);
-
-			/* did we abort this command? */
-			if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-				US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-				return USB_STOR_TRANSPORT_ABORTED;
-			}
-			return USB_STOR_TRANSPORT_ERROR;
 		}
 	}
 
 	/* if we still have a failure at this point, we're in trouble */
 	US_DEBUGP("Bulk status result = %d\n", result);
-	if (result) {
+	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
-	}
 
 	/* check bulk status */
 	US_DEBUGP("Bulk status Sig 0x%x T 0x%x R %d Stat 0x%x\n",
@@ -1427,7 +1385,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		  bcs.Residue, bcs.Status);
 	if (bcs.Signature != cpu_to_le32(US_BULK_CS_SIGN) || 
 	    bcs.Tag != bcb.Tag || 
-	    bcs.Status > US_BULK_STAT_PHASE || partial != 13) {
+	    bcs.Status > US_BULK_STAT_PHASE) {
 		US_DEBUGP("Bulk logical error\n");
 		return USB_STOR_TRANSPORT_ERROR;
 	}
