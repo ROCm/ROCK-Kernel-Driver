@@ -49,12 +49,12 @@ static struct super_operations autofs_sops = {
 enum {Opt_err, Opt_fd, Opt_uid, Opt_gid, Opt_pgrp, Opt_minproto, Opt_maxproto};
 
 static match_table_t autofs_tokens = {
-	{Opt_fd, "fd=%d"},
-	{Opt_uid, "uid=%d"},
-	{Opt_gid, "gid=%d"},
-	{Opt_pgrp, "pgrp=%d"},
-	{Opt_minproto, "minproto=%d"},
-	{Opt_maxproto, "maxproto=%d"},
+	{Opt_fd, "fd=%u"},
+	{Opt_uid, "uid=%u"},
+	{Opt_gid, "gid=%u"},
+	{Opt_pgrp, "pgrp=%u"},
+	{Opt_minproto, "minproto=%u"},
+	{Opt_maxproto, "maxproto=%u"},
 	{Opt_err, NULL}
 };
 
