@@ -121,7 +121,8 @@ pb_trace_func(
 STATIC kmem_cache_t *pagebuf_cache;
 STATIC void pagebuf_daemon_wakeup(int);
 STATIC void pagebuf_delwri_queue(page_buf_t *, int);
-STATIC struct workqueue_struct *pagebuf_workqueue;
+STATIC struct workqueue_struct *pagebuf_logio_workqueue;
+STATIC struct workqueue_struct *pagebuf_dataio_workqueue;
 
 /*
  * Pagebuf module configuration parameters, exported via
@@ -786,6 +787,25 @@ pagebuf_get(				/* allocate a buffer		*/
 }
 
 /*
+ * Create a skeletal pagebuf (no pages associated with it).
+ */
+page_buf_t *
+pagebuf_lookup(
+	struct pb_target	*target,
+	loff_t			ioff,
+	size_t			isize,
+	page_buf_flags_t	flags)
+{
+	page_buf_t		*pb;
+
+	pb = pagebuf_allocate(flags);
+	if (pb) {
+		_pagebuf_initialize(pb, target, ioff, isize, flags);
+	}
+	return pb;
+}
+
+/*
  * If we are not low on memory then do the readahead in a deadlock
  * safe manner.
  */
@@ -1131,6 +1151,7 @@ pagebuf_iodone_work(
 void
 pagebuf_iodone(
 	page_buf_t		*pb,
+	int			dataio,
 	int			schedule)
 {
 	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
@@ -1143,7 +1164,8 @@ pagebuf_iodone(
 	if ((pb->pb_iodone) || (pb->pb_flags & PBF_ASYNC)) {
 		if (schedule) {
 			INIT_WORK(&pb->pb_iodone_work, pagebuf_iodone_work, pb);
-			queue_work(pagebuf_workqueue, &pb->pb_iodone_work);
+			queue_work(dataio ? pagebuf_dataio_workqueue :
+				pagebuf_logio_workqueue, &pb->pb_iodone_work);
 		} else {
 			pagebuf_iodone_work(pb);
 		}
@@ -1268,7 +1290,7 @@ bio_end_io_pagebuf(
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb, 1);
+		pagebuf_iodone(pb, 0, 1);
 	}
 
 	bio_put(bio);
@@ -1412,7 +1434,7 @@ io_submitted:
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb, 0);
+		pagebuf_iodone(pb, 0, 0);
 	}
 
 	return 0;
@@ -1734,13 +1756,21 @@ pagebuf_daemon_start(void)
 {
 	int		rval;
 
-	pagebuf_workqueue = create_workqueue("pagebuf");
-	if (!pagebuf_workqueue)
+	pagebuf_logio_workqueue = create_workqueue("xfslogd");
+	if (!pagebuf_logio_workqueue)
 		return -ENOMEM;
 
+	pagebuf_dataio_workqueue = create_workqueue("xfsdatad");
+	if (!pagebuf_dataio_workqueue) {
+		destroy_workqueue(pagebuf_logio_workqueue);
+		return -ENOMEM;
+	}
+
 	rval = kernel_thread(pagebuf_daemon, NULL, CLONE_FS|CLONE_FILES);
-	if (rval < 0)
-		destroy_workqueue(pagebuf_workqueue);
+	if (rval < 0) {
+		destroy_workqueue(pagebuf_logio_workqueue);
+		destroy_workqueue(pagebuf_dataio_workqueue);
+	}
 
 	return rval;
 }
@@ -1756,7 +1786,8 @@ pagebuf_daemon_stop(void)
 	pbd_active = 0;
 	wake_up_interruptible(&pbd_waitq);
 	wait_event_interruptible(pbd_waitq, pbd_active);
-	destroy_workqueue(pagebuf_workqueue);
+	destroy_workqueue(pagebuf_logio_workqueue);
+	destroy_workqueue(pagebuf_dataio_workqueue);
 }
 
 

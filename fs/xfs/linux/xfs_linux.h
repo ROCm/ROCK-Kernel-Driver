@@ -69,6 +69,20 @@
 #define STATIC static
 #endif
 
+/*
+ * State flag for unwritten extent buffers.
+ *
+ * We need to be able to distinguish between these and delayed
+ * allocate buffers within XFS.  The generic IO path code does
+ * not need to distinguish - we use the BH_Delay flag for both
+ * delalloc and these ondisk-uninitialised buffers.
+ */
+BUFFER_FNS(PrivateStart, unwritten);
+static inline void set_buffer_unwritten_io(struct buffer_head *bh)
+{
+	bh->b_end_io = linvfs_unwritten_done;
+}
+
 #define restricted_chown	xfs_params.restrict_chown
 #define irix_sgid_inherit	xfs_params.sgid_inherit
 #define irix_symlink_mode	xfs_params.symlink_mode
