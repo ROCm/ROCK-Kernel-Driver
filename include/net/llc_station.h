@@ -41,7 +41,6 @@ struct llc_station {
 	struct timer_list	    ack_timer;
 	u8			    retry_count;
 	u8			    maximum_retry;
-	u8			    mac_sa[6];
 	struct {
 		struct sk_buff_head list;
 		spinlock_t	    lock;
@@ -49,10 +48,6 @@ struct llc_station {
 	struct sk_buff_head	    mac_pdu_q;
 };
 
-extern void llc_station_state_process(struct llc_station *station,
-				      struct sk_buff *skb);
-extern void llc_station_send_pdu(struct llc_station *station,
-				 struct sk_buff *skb);
 extern int __init llc_station_init(void);
 extern void __exit llc_station_exit(void);
 #endif /* LLC_STATION_H */

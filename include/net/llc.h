@@ -13,6 +13,7 @@
  */
 
 #include <linux/if.h>
+#include <linux/if_ether.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 
@@ -60,9 +61,13 @@ struct llc_sap {
 
 extern struct list_head llc_sap_list;
 extern rwlock_t llc_sap_list_lock;
+extern unsigned char llc_station_mac_sa[ETH_ALEN];
 
 extern int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt);
+
+extern int llc_mac_hdr_init(struct sk_buff *skb,
+			    unsigned char *sa, unsigned char *da);
 
 extern void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
 						   struct sk_buff *skb));
