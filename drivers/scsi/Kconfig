@@ -1172,23 +1172,6 @@ config SCSI_QLOGIC_ISP
 	  To compile this driver as a module, choose M here: the
 	  module will be called qlogicisp.
 
-config SCSI_QLOGIC_FC
-	tristate "Qlogic ISP FC SCSI support"
-	depends on PCI && SCSI
-	help
-	  This is a driver for the QLogic ISP2100 SCSI-FCP host adapter.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called qlogicfc.
-
-config SCSI_QLOGIC_FC_FIRMWARE
-	bool "Include loadable firmware in driver"
-	depends on SCSI_QLOGIC_FC
-  	help
-	  Say Y to include ISP2X00 Fabric Initiator/Target Firmware, with
-	  expanded LUN addressing and FcTape (FCP-2) support, in the
-	  qlogicfc driver. This is required on some platforms.
-
 config SCSI_QLOGIC_1280
 	tristate "Qlogic QLA 1280 SCSI support"
 	depends on PCI && SCSI
