@@ -14,7 +14,7 @@ AWK := awk
 export AWK
 
 OBJCOPYFLAGS := --strip-all
-LDFLAGS_vmlinux := -static -T arch/$(ARCH)/vmlinux.lds.s
+LDFLAGS_vmlinux := -static
 AFLAGS_KERNEL := -mconstant-gp
 EXTRA	=
 
@@ -93,8 +93,6 @@ LIBS := $(TOPDIR)/arch/$(ARCH)/lib/lib.a $(LIBS) \
 	$(TOPDIR)/arch/$(ARCH)/lib/lib.a
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 compressed: vmlinux
 	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux-tmp

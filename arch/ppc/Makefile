@@ -21,7 +21,7 @@ else
 KERNELLOAD	=0xc0000000
 endif
 
-LDFLAGS_vmlinux	= -T arch/ppc/vmlinux.lds -Ttext $(KERNELLOAD) -Bstatic
+LDFLAGS_vmlinux	= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	:= $(CPPFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 AFLAGS		:= $(AFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 CFLAGS		:= $(CFLAGS) -I$(TOPDIR)/arch/$(ARCH) -fsigned-char \

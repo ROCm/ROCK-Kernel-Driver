@@ -42,11 +42,9 @@ endif
 
 #
 # Choosing incompatible machines durings configuration will result in
-# error messages during linking.  Select a default linkscript if
-# none has been choosen above.
+# error messages during linking.
 #
-LINKSCRIPT    = arch/sh/vmlinux.lds.s
-LDFLAGS_vmlinux     += -T $(word 1,$(LINKSCRIPT)) -e _stext
+LDFLAGS_vmlinux     += -e _stext
 
 ifdef LOADADDR
 LDFLAGS_vmlinux     += -Ttext $(word 1,$(LOADADDR))
@@ -69,8 +67,6 @@ ifneq ($(CONFIG_SH_GENERIC)$(CONFIG_SH_STB1_HARP)$(CONFIG_SH_STB1_OVERDRIVE),)
 SUBDIRS += arch/sh/stboards
 CORE_FILES += arch/sh/stboards/stboards.o
 endif
-
-vmlinux: arch/sh/vmlinux.lds.s
 
 AFLAGS_vmlinux.lds.o := -traditional
 

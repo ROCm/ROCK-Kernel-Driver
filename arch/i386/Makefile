@@ -18,7 +18,7 @@
 
 LDFLAGS		:= -m elf_i386
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
-LDFLAGS_vmlinux := -T arch/i386/vmlinux.lds.s -e stext
+LDFLAGS_vmlinux := -e stext
 
 CFLAGS += -pipe
 
@@ -103,8 +103,6 @@ DRIVERS	+= arch/i386/pci/pci.o
 endif
 
 MAKEBOOT = +$(MAKE) -C arch/$(ARCH)/boot
-
-vmlinux: arch/i386/vmlinux.lds.s
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper

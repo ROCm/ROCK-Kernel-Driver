@@ -117,7 +117,6 @@ endif
 #
 ifdef CONFIG_BOOT_ELF32
 CFLAGS += -Wa,-32
-LDFLAGS_vmlinux += -T arch/mips64/vmlinux.lds.s
 endif
 #
 # The 64-bit ELF tools are pretty broken so at this time we generate 64-bit
@@ -125,7 +124,6 @@ endif
 #
 ifdef CONFIG_BOOT_ELF64
 CFLAGS += -Wa,-32
-LDFLAGS_vmlinux += -T arch/mips64/vmlinux.lds.s
 #AS += -64
 #LDFLAGS += -m elf64bmip
 #LDFLAGS_vmlinux += -T arch/mips64/ld.script.elf64
@@ -146,8 +144,6 @@ ifdef CONFIG_CPU_LITTLE_ENDIAN
 else
 64bit-bfd = elf64-bigmips
 endif
-
-vmlinux: arch/mips64/vmlinux.lds.s
 
 AFLAGS_vmlinux.lds.o := -imacros $(srctree)/include/asm-mips64/sn/mapped_kernel.h
 
