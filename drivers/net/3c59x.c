@@ -1803,11 +1803,11 @@ static void vortex_tx_timeout(struct net_device *dev)
 		   dev->name, inb(ioaddr + TxStatus),
 		   inw(ioaddr + EL3_STATUS));
 	EL3WINDOW(4);
-	printk(KERN_ERR "  diagnostics: net %04x media %04x dma %08lx fifo %04x\n",
-			inw(ioaddr + Wn4_NetDiag),
-			inw(ioaddr + Wn4_Media),
-			inl(ioaddr + PktStatus),
-			inw(ioaddr + Wn4_FIFODiag));
+	printk(KERN_ERR "  diagnostics: net %04x media %04x dma %08x fifo %04x\n",
+			(unsigned)inw(ioaddr + Wn4_NetDiag),
+			(unsigned)inw(ioaddr + Wn4_Media),
+			(unsigned)inl(ioaddr + PktStatus),
+			(unsigned)inw(ioaddr + Wn4_FIFODiag));
 	/* Slight code bloat to be user friendly. */
 	if ((inb(ioaddr + TxStatus) & 0x88) == 0x88)
 		printk(KERN_ERR "%s: Transmitter encountered 16 collisions --"
@@ -2643,8 +2643,8 @@ dump_tx_ring(struct net_device *dev)
 					vp->full_bus_master_tx,
 					vp->dirty_tx, vp->dirty_tx % TX_RING_SIZE,
 					vp->cur_tx, vp->cur_tx % TX_RING_SIZE);
-			printk(KERN_ERR "  Transmit list %8.8lx vs. %p.\n",
-				   inl(ioaddr + DownListPtr),
+			printk(KERN_ERR "  Transmit list %8.8x vs. %p.\n",
+				   (unsigned)inl(ioaddr + DownListPtr),
 				   &vp->tx_ring[vp->dirty_tx % TX_RING_SIZE]);
 			issue_and_wait(dev, DownStall);
 			for (i = 0; i < TX_RING_SIZE; i++) {

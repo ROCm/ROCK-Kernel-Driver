@@ -607,8 +607,8 @@ linvfs_direct_IO(
 {
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
-        return generic_direct_IO(rw, inode, iov, offset, nr_segs,
-					linvfs_get_blocks_direct);
+        return generic_direct_IO(rw, inode, NULL,
+			iov, offset, nr_segs, linvfs_get_blocks_direct);
 }
 
 

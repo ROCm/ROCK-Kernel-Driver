@@ -258,7 +258,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define TASK_UNMAPPED_32 0x40000000
 #define TASK_UNMAPPED_64 (TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
-	(test_thread_flags(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
+	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
 
 /*
  * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.

@@ -47,48 +47,6 @@ static struct backing_dev_info ramfs_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-/*
- * Read a page. Again trivial. If it didn't already exist
- * in the page cache, it is zero-filled.
- */
-static int ramfs_readpage(struct file *file, struct page * page)
-{
-	if (!PageUptodate(page)) {
-		char *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		kunmap_atomic(kaddr, KM_USER0);
-		flush_dcache_page(page);
-		SetPageUptodate(page);
-	}
-	unlock_page(page);
-	return 0;
-}
-
-static int ramfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
-{
-	if (!PageUptodate(page)) {
-		char *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		SetPageUptodate(page);
-	}
-	set_page_dirty(page);
-	return 0;
-}
-
-static int ramfs_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
-{
-	struct inode *inode = page->mapping->host;
-	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-
-	if (pos > inode->i_size)
-		inode->i_size = pos;
-	return 0;
-}
-
 struct inode *ramfs_get_inode(struct super_block *sb, int mode, int dev)
 {
 	struct inode * inode = new_inode(sb);
@@ -175,10 +133,10 @@ static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 }
 
 static struct address_space_operations ramfs_aops = {
-	.readpage	= ramfs_readpage,
+	.readpage	= simple_readpage,
 	.writepage	= fail_writepage,
-	.prepare_write	= ramfs_prepare_write,
-	.commit_write	= ramfs_commit_write
+	.prepare_write	= simple_prepare_write,
+	.commit_write	= simple_commit_write
 };
 
 static struct file_operations ramfs_file_operations = {
