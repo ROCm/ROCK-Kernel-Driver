@@ -208,10 +208,8 @@ prio_destroy(struct Qdisc* sch)
 		tcf_destroy(tp);
 	}
 
-	for (prio=0; prio<q->bands; prio++) {
+	for (prio=0; prio<q->bands; prio++)
 		qdisc_destroy(q->queues[prio]);
-		q->queues[prio] = &noop_qdisc;
-	}
 }
 
 static int prio_tune(struct Qdisc *sch, struct rtattr *opt)

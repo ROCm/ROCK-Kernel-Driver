@@ -812,9 +812,7 @@ static void netem_destroy(struct Qdisc *sch)
 	struct netem_sched_data *q = (struct netem_sched_data *)sch->data;
 
 	del_timer_sync(&q->timer);
-
 	qdisc_destroy(q->qdisc);
-	q->qdisc = &noop_qdisc;
 }
 
 static int netem_dump(struct Qdisc *sch, struct sk_buff *skb)

@@ -383,7 +383,6 @@ static void dsmark_destroy(struct Qdisc *sch)
 		tcf_destroy(tp);
 	}
 	qdisc_destroy(p->q);
-	p->q = &noop_qdisc;
 	kfree(p->mask);
 }
 

@@ -393,7 +393,6 @@ static void tbf_destroy(struct Qdisc *sch)
 		qdisc_put_rtab(q->R_tab);
 
 	qdisc_destroy(q->qdisc);
-	q->qdisc = &noop_qdisc;
 }
 
 static int tbf_dump(struct Qdisc *sch, struct sk_buff *skb)

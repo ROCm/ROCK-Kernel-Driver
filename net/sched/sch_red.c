@@ -434,10 +434,6 @@ rtattr_failure:
 	return -1;
 }
 
-static void red_destroy(struct Qdisc *sch)
-{
-}
-
 static struct Qdisc_ops red_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	NULL,
@@ -449,7 +445,6 @@ static struct Qdisc_ops red_qdisc_ops = {
 	.drop		=	red_drop,
 	.init		=	red_init,
 	.reset		=	red_reset,
-	.destroy	=	red_destroy,
 	.change		=	red_change,
 	.dump		=	red_dump,
 	.owner		=	THIS_MODULE,
