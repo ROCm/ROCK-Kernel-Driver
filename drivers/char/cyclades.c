@@ -712,7 +712,7 @@ cy_get_user(unsigned long *addr)
 
 #define	JIFFIES_DIFF(n, j)	((j) - (n))
 
-static struct tty_driver cy_serial_driver;
+static struct tty_driver *cy_serial_driver;
 
 #ifdef CONFIG_ISA
 /* This is the address lookup table. The driver will probe for
@@ -5412,6 +5412,27 @@ done:
     extra ports are ignored.
  */
 
+static struct tty_operations cy_ops = {
+    .open = cy_open,
+    .close = cy_close,
+    .write = cy_write,
+    .put_char = cy_put_char,
+    .flush_chars = cy_flush_chars,
+    .write_room = cy_write_room,
+    .chars_in_buffer = cy_chars_in_buffer,
+    .flush_buffer = cy_flush_buffer,
+    .ioctl = cy_ioctl,
+    .throttle = cy_throttle,
+    .unthrottle = cy_unthrottle,
+    .set_termios = cy_set_termios,
+    .stop = cy_stop,
+    .start = cy_start,
+    .hangup = cy_hangup,
+    .break_ctl = cy_break,
+    .wait_until_sent = cy_wait_until_sent,
+    .read_proc = cyclades_get_proc_info,
+};
+
 int __init
 cy_init(void)
 {
@@ -5423,45 +5444,27 @@ cy_init(void)
   unsigned short chip_number;
   int nports;
 
+    cy_serial_driver = alloc_tty_driver(NR_PORTS);
+    if (!cy_serial_driver)
+	return -ENOMEM;
     show_version();
 
     /* Initialize the tty_driver structure */
     
-    memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
-    cy_serial_driver.magic = TTY_DRIVER_MAGIC;
-    cy_serial_driver.owner = THIS_MODULE;
-    cy_serial_driver.driver_name = "cyclades";
-    cy_serial_driver.name = "ttyC";
-    cy_serial_driver.major = CYCLADES_MAJOR;
-    cy_serial_driver.minor_start = 0;
-    cy_serial_driver.num = NR_PORTS;
-    cy_serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-    cy_serial_driver.subtype = SERIAL_TYPE_NORMAL;
-    cy_serial_driver.init_termios = tty_std_termios;
-    cy_serial_driver.init_termios.c_cflag =
+    cy_serial_driver->owner = THIS_MODULE;
+    cy_serial_driver->driver_name = "cyclades";
+    cy_serial_driver->name = "ttyC";
+    cy_serial_driver->major = CYCLADES_MAJOR;
+    cy_serial_driver->minor_start = 0;
+    cy_serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+    cy_serial_driver->subtype = SERIAL_TYPE_NORMAL;
+    cy_serial_driver->init_termios = tty_std_termios;
+    cy_serial_driver->init_termios.c_cflag =
             B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-    cy_serial_driver.flags = TTY_DRIVER_REAL_RAW;
+    cy_serial_driver->flags = TTY_DRIVER_REAL_RAW;
+    tty_set_operations(cy_serial_driver, &cy_ops);
 
-    cy_serial_driver.open = cy_open;
-    cy_serial_driver.close = cy_close;
-    cy_serial_driver.write = cy_write;
-    cy_serial_driver.put_char = cy_put_char;
-    cy_serial_driver.flush_chars = cy_flush_chars;
-    cy_serial_driver.write_room = cy_write_room;
-    cy_serial_driver.chars_in_buffer = cy_chars_in_buffer;
-    cy_serial_driver.flush_buffer = cy_flush_buffer;
-    cy_serial_driver.ioctl = cy_ioctl;
-    cy_serial_driver.throttle = cy_throttle;
-    cy_serial_driver.unthrottle = cy_unthrottle;
-    cy_serial_driver.set_termios = cy_set_termios;
-    cy_serial_driver.stop = cy_stop;
-    cy_serial_driver.start = cy_start;
-    cy_serial_driver.hangup = cy_hangup;
-    cy_serial_driver.break_ctl = cy_break;
-    cy_serial_driver.wait_until_sent = cy_wait_until_sent;
-    cy_serial_driver.read_proc = cyclades_get_proc_info;
-
-    if (tty_register_driver(&cy_serial_driver))
+    if (tty_register_driver(cy_serial_driver))
             panic("Couldn't register Cyclades serial driver\n");
 
     for (i = 0; i < NR_CARDS; i++) {
@@ -5674,11 +5677,12 @@ cy_cleanup_module(void)
 
     save_flags(flags); cli();
 
-    if ((e1 = tty_unregister_driver(&cy_serial_driver)))
+    if ((e1 = tty_unregister_driver(cy_serial_driver)))
             printk("cyc: failed to unregister Cyclades serial driver(%d)\n",
 		e1);
 
     restore_flags(flags);
+    put_tty_driver(cy_serial_driver);
 
     for (i = 0; i < NR_CARDS; i++) {
         if (cy_card[i].base_addr != 0) {
