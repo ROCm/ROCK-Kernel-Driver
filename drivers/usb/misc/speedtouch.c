@@ -187,8 +187,8 @@ struct udsl_instance_data {
 	struct list_head spare_buffers;
 
 	struct tasklet_struct send_tasklet;
-	struct sk_buff *current_skb;
-	struct udsl_send_buffer *current_buffer;
+	struct sk_buff *current_skb;			/* being emptied */
+	struct udsl_send_buffer *current_buffer;	/* being filled */
 	struct list_head filled_buffers;
 };
 
@@ -329,12 +329,12 @@ static void udsl_complete_receive (struct urb *urb, struct pt_regs *regs)
 	struct udsl_receiver *rcv;
 	unsigned long flags;
 
-	PDEBUG ("udsl_complete_receive entered\n");
-
 	if (!urb || !(rcv = urb->context) || !(instance = rcv->instance)) {
 		PDEBUG ("udsl_complete_receive: bad urb!\n");
 		return;
 	}
+
+	PDEBUG ("udsl_complete_receive entered (urb 0x%p, status %d)\n", urb, urb->status);
 
 	tasklet_schedule (&instance->receive_tasklet);
 	/* may not be in_interrupt() */
@@ -353,6 +353,7 @@ static void udsl_process_receive (unsigned long data)
 	struct urb *urb;
 	struct atmsar_vcc_data *atmsar_vcc = NULL;
 	struct sk_buff *new = NULL, *tmp = NULL;
+	int err;
 
 	PDEBUG ("udsl_process_receive entered\n");
 
@@ -425,9 +426,9 @@ static void udsl_process_receive (unsigned long data)
 					   UDSL_RCV_BUFFER_SIZE * ATM_CELL_SIZE,
 					   udsl_complete_receive,
 					   rcv);
-			if (!usb_submit_urb (urb, GFP_ATOMIC))
+			if (!(err = usb_submit_urb (urb, GFP_ATOMIC)))
 				break;
-			PDEBUG ("udsl_process_receive: submission failed\n");
+			PDEBUG ("udsl_process_receive: submission failed (%d)\n", err);
 			/* fall through */
 		default: /* error or urb unlinked */
 			PDEBUG ("udsl_process_receive: adding to spare_receivers\n");
@@ -491,12 +492,12 @@ static void udsl_complete_send (struct urb *urb, struct pt_regs *regs)
 	struct udsl_sender *snd;
 	unsigned long flags;
 
-	PDEBUG ("udsl_complete_send entered\n");
-
 	if (!urb || !(snd = urb->context) || !(instance = snd->instance)) {
 		PDEBUG ("udsl_complete_send: bad urb!\n");
 		return;
 	}
+
+	PDEBUG ("udsl_complete_send entered (urb 0x%p, status %d)\n", urb, urb->status);
 
 	tasklet_schedule (&instance->send_tasklet);
 	/* may not be in_interrupt() */
@@ -515,6 +516,7 @@ static void udsl_process_send (unsigned long data)
 	struct sk_buff *skb;
 	unsigned char *target;
 	unsigned long flags;
+	int err;
 
 	PDEBUG ("udsl_process_send entered\n");
 
@@ -524,10 +526,10 @@ made_progress:
 		if (!list_empty (&instance->filled_buffers)) {
 			buf = list_entry (instance->filled_buffers.next, struct udsl_send_buffer, list);
 			list_del (&buf->list);
-			PDEBUG ("sending filled buffer\n");
+			PDEBUG ("sending filled buffer (0x%p)\n", buf);
 		} else if ((buf = instance->current_buffer)) {
 			instance->current_buffer = NULL;
-			PDEBUG ("sending current buffer\n");
+			PDEBUG ("sending current buffer (0x%p)\n", buf);
 		} else /* all buffers empty */
 			break;
 
@@ -544,10 +546,10 @@ made_progress:
 				   udsl_complete_send,
 				   snd);
 
-		PDEBUG ("submitting urb, contains %d cells\n", UDSL_SND_BUFFER_SIZE - buf->free_cells);
+		PDEBUG ("submitting urb 0x%p, contains %d cells\n", snd->urb, UDSL_SND_BUFFER_SIZE - buf->free_cells);
 
-		if (usb_submit_urb(snd->urb, GFP_ATOMIC) < 0) {
-			PDEBUG ("submission failed!\n");
+		if ((err = usb_submit_urb(snd->urb, GFP_ATOMIC)) < 0) {
+			PDEBUG ("submission failed (%d)!\n", err);
 			spin_lock_irqsave (&instance->send_lock, flags);
 			list_add (&snd->list, &instance->spare_senders);
 			spin_unlock_irqrestore (&instance->send_lock, flags);
@@ -653,7 +655,7 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 {
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
 
-	PDEBUG ("udsl_atm_send called (skb 0x%p, skb->len %u)\n", skb, skb->len);
+	PDEBUG ("udsl_atm_send called (skb 0x%p, len %u)\n", skb, skb->len);
 
 	if (!instance) {
 		PDEBUG ("NULL instance!\n");
