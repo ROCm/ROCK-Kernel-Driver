@@ -238,9 +238,15 @@ static struct dentry *autofs_root_lookup(struct inode *dir, struct dentry *dentr
 	 * a signal. If so we can force a restart..
 	 */
 	if (dentry->d_flags & DCACHE_AUTOFS_PENDING) {
+		/* See if we were interrupted */
 		if (signal_pending(current)) {
-			unlock_kernel();
-			return ERR_PTR(-ERESTARTNOINTR);
+			sigset_t *sigset = &current->pending.signal;
+			if (sigismember (sigset, SIGKILL) ||
+			    sigismember (sigset, SIGQUIT) ||
+			    sigismember (sigset, SIGINT)) {
+				unlock_kernel();
+				return ERR_PTR(-ERESTARTNOINTR);
+			}
 		}
 	}
 	unlock_kernel();
