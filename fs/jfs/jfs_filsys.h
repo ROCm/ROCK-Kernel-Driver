@@ -125,7 +125,7 @@
 #define MAXBLOCKSIZE		4096
 #define	MAXFILESIZE		((s64)1 << 52)
 
-#define JFS_LINK_MAX		65535	/* nlink_t is unsigned short */
+#define JFS_LINK_MAX		0xffffffff
 
 /* Minimum number of bytes supported for a JFS partition */
 #define MINJFS			(0x1000000)
