@@ -1553,12 +1553,10 @@ int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 void dtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	   struct tlock * tlck)
 {
-	struct inode *ip;
 	struct metapage *mp;
 	struct pxd_lock *pxdlock;
 	pxd_t *pxd;
 
-	ip = tlck->ip;
 	mp = tlck->mp;
 
 	/* initialize as REDOPAGE/NOREDOPAGE record format */
@@ -2894,7 +2892,6 @@ void txQuiesce(struct super_block *sb)
 	struct inode *ip;
 	struct jfs_inode_info *jfs_ip;
 	struct jfs_log *log = JFS_SBI(sb)->log;
-	int rc;
 	tid_t tid;
 
 	set_bit(log_QUIESCE, &log->flag);
@@ -2914,7 +2911,7 @@ restart:
 		TXN_UNLOCK();
 		tid = txBegin(ip->i_sb, COMMIT_INODE | COMMIT_FORCE);
 		down(&jfs_ip->commit_sem);
-		rc = txCommit(tid, 1, &ip, 0);
+		txCommit(tid, 1, &ip, 0);
 		txEnd(tid);
 		up(&jfs_ip->commit_sem);
 		/*
