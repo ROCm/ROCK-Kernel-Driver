@@ -479,9 +479,9 @@ static void shutdown_socket(struct pcmcia_socket *s)
 
     {
 	int status;
-	skt->ops->get_status(skt, &status);
+	s->ops->get_status(s, &status);
 	if (status & SS_POWERON) {
-		printk(KERN_ERR "PCMCIA: socket %p: *** DANGER *** unable to remove socket power\n", skt);
+		printk(KERN_ERR "PCMCIA: socket %p: *** DANGER *** unable to remove socket power\n", s);
 	}
     }
 } /* shutdown_socket */
