@@ -20,6 +20,9 @@
 struct free_pte_ctx;
 static inline void tlb_flush(struct free_pte_ctx *tlb);
 
+/* Avoid pulling in another include just for this */
+#define check_pgt_cache()	do { } while (0)
+
 /* Get the generic bits... */
 #include <asm-generic/tlb.h>
 

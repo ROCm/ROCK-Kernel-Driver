@@ -1,6 +1,6 @@
 #ifdef __KERNEL__
-#ifndef _PPC_MACHDEP_H
-#define _PPC_MACHDEP_H
+#ifndef _PPC64_MACHDEP_H
+#define _PPC64_MACHDEP_H
 
 /*
  * This program is free software; you can redistribute it and/or
@@ -14,7 +14,6 @@
 
 struct pt_regs;
 struct pci_bus;	
-struct pci_dev;
 struct device_node;
 struct TceTable;
 struct rtc_time;
@@ -70,30 +69,25 @@ struct machdep_calls {
 	void		(*setup_residual)(struct seq_file *m, int cpu_id);
 	/* Optional, may be NULL. */
 	void		(*get_cpuinfo)(struct seq_file *m);
-	/* Optional, may be NULL. */
-	unsigned int	(*irq_cannonicalize)(unsigned int irq);
+
 	void		(*init_IRQ)(void);
 	void		(*init_ras_IRQ)(void);
 	int		(*get_irq)(struct pt_regs *);
-	
-	/* A general init function, called by ppc_init in init/main.c.
-	   May be NULL. */
+
+	/* Optional, may be NULL. */
 	void		(*init)(void);
 
 	void		(*restart)(char *cmd);
 	void		(*power_off)(void);
 	void		(*halt)(void);
 
-	long		(*time_init)(void); /* Optional, may be NULL */
 	int		(*set_rtc_time)(struct rtc_time *);
 	void		(*get_rtc_time)(struct rtc_time *);
 	void		(*get_boot_time)(struct rtc_time *);
+
 	void		(*calibrate_decr)(void);
 
-  	void		(*progress)(char *, unsigned short);
-
-	unsigned char 	(*nvram_read_val)(int addr);
-	void		(*nvram_write_val)(int addr, unsigned char val);
+	void		(*progress)(char *, unsigned short);
 
 	/* Debug interface.  Low level I/O to some terminal device */
 	void		(*udbg_putc)(unsigned char c);
@@ -101,31 +95,20 @@ struct machdep_calls {
 	int		(*udbg_getc_poll)(void);
 
 	/* PCI interfaces */
-	int (*pcibios_read_config)(struct device_node *dn, int where, int size, u32 *val);
-	int (*pcibios_write_config)(struct device_node *dn, int where, int size, u32 val);
+	int (*pcibios_read_config)(struct device_node *dn, int where, int size,
+				   u32 *val);
+	int (*pcibios_write_config)(struct device_node *dn, int where,
+				    int size, u32 val);
 
 	/* Called after scanning the bus, before allocating
 	 * resources
 	 */
 	void (*pcibios_fixup)(void);
 
-       /* Called for each PCI bus in the system
-        * when it's probed
-        */
+	/* Called for each PCI bus in the system
+	 * when it's probed
+	 */
 	void (*pcibios_fixup_bus)(struct pci_bus *);
-
-       /* Called when pci_enable_device() is called (initial=0) or
-        * when a device with no assigned resource is found (initial=1).
-        * Returns 0 to allow assignement/enabling of the device
-        */
-        int  (*pcibios_enable_device_hook)(struct pci_dev *, int initial);
-
-	void* (*pci_dev_io_base)(unsigned char bus, unsigned char devfn, int physical);
-	void* (*pci_dev_mem_base)(unsigned char bus, unsigned char devfn);
-	int (*pci_dev_root_bridge)(unsigned char bus, unsigned char devfn);
-
-	/* this is for modules, since _machine can be a define -- Cort */
-	int ppc_machine;
 
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */
@@ -136,7 +119,5 @@ struct machdep_calls {
 extern struct machdep_calls ppc_md;
 extern char cmd_line[512];
 
-extern void setup_pci_ptrs(void);
-
-#endif /* _PPC_MACHDEP_H */
+#endif /* _PPC64_MACHDEP_H */
 #endif /* __KERNEL__ */

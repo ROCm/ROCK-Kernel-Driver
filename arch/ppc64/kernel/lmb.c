@@ -287,7 +287,7 @@ lmb_alloc_base(unsigned long size, unsigned long align, unsigned long max_addr)
 			continue;
 
 		if ( max_addr == LMB_ALLOC_ANYWHERE )
-		base = _ALIGN_DOWN(lmbbase+lmbsize-size, align);
+			base = _ALIGN_DOWN(lmbbase+lmbsize-size, align);
 		else if ( lmbbase < max_addr )
 			base = _ALIGN_DOWN(min(lmbbase+lmbsize,max_addr)-size, align);
 		else

@@ -13,6 +13,7 @@
 #include <linux/threads.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/irq.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>

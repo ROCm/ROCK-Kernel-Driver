@@ -6,7 +6,6 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#define __KERNEL__ 1
 #include <asm/types.h>
 #include <asm/page.h>
 #include <stddef.h>
@@ -248,8 +247,3 @@ msChunks_alloc(unsigned long mem, unsigned long num_chunks, unsigned long chunk_
 
 	return mem;
 }
-
-
-
-
-

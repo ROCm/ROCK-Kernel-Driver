@@ -3,7 +3,7 @@
 
 /*
  * Remove spinlock-based RW semaphores; RW semaphore definitions are
- * now in rwsem.h and we use the the generic lib/rwsem.c implementation.
+ * now in rwsem.h and we use the generic lib/rwsem.c implementation.
  * Rework semaphores to use atomic_dec_if_positive.
  * -- Paul Mackerras (paulus@samba.org)
  */

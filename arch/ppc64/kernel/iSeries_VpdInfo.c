@@ -34,7 +34,6 @@
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/mf.h>
 #include <asm/iSeries/LparData.h>
-#include <asm/iSeries/HvCallPci.h>
 //#include <asm/iSeries/iSeries_VpdInfo.h>
 #include <asm/iSeries/iSeries_pci.h>
 #include "pci.h"
