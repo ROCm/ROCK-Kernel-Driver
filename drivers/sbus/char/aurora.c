@@ -661,8 +661,7 @@ static void aurora_check_modem(struct Aurora_board const * bp, int chip)
 	if (mcr & MCR_CDCHG)  {
 		if (sbus_readb(&bp->r[chip]->r[CD180_MSVR]) & MSVR_CD) 
 			wake_up_interruptible(&port->open_wait);
-		else if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (port->flags & ASYNC_CALLOUT_NOHUP))) 
+		else
 			schedule_task(&port->tqueue_hangup);
 	}
 	
@@ -1334,19 +1333,12 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (port->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		port->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (port->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (port->normal_termios.c_cflag & CLOCAL) 
-			do_clocal = 1;
-	} else {
-		if (C_CLOCAL(tty))  
-			do_clocal = 1;
-	}
+	if (C_CLOCAL(tty))  
+		do_clocal = 1;
 
 	/* Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1367,13 +1359,10 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 			    &bp->r[chip]->r[CD180_CAR]);
 		udelay(1);
 		CD = sbus_readb(&bp->r[chip]->r[CD180_MSVR]) & MSVR_CD;
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE))  {
-			port->MSVR=bp->RTS;
+		port->MSVR=bp->RTS;
 
-			/* auto drops DTR */
-			sbus_writeb(port->MSVR,
-				    &bp->r[chip]->r[CD180_MSVR]);
-		}
+		/* auto drops DTR */
+		sbus_writeb(port->MSVR, &bp->r[chip]->r[CD180_MSVR]);
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) ||
@@ -1384,8 +1373,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 				retval = -ERESTARTSYS;	
 			break;
 		}
-		if (/*!(port->flags & ASYNC_CALLOUT_ACTIVE) &&*/
-		    !(port->flags & ASYNC_CLOSING) &&
+		if (!(port->flags & ASYNC_CLOSING) &&
 		    (do_clocal || CD))
 			break;
 		if (signal_pending(current)) {
@@ -1465,8 +1453,6 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 		restore_flags(flags);
 	}
 
-	port->session = current->session;
-	port->pgrp = current->pgrp;
 #ifdef AURORA_DEBUG
 	printk("aurora_open: end\n");
 #endif
@@ -1520,8 +1506,6 @@ static void aurora_close(struct tty_struct * tty, struct file * filp)
 	 */
 	if (port->flags & ASYNC_NORMAL_ACTIVE)
 		port->normal_termios = *tty->termios;
-/*	if (port->flags & ASYNC_CALLOUT_ACTIVE)
-		port->callout_termios = *tty->termios;*/
 
 	/* Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1578,8 +1562,7 @@ static void aurora_close(struct tty_struct * tty, struct file * filp)
 		}
 		wake_up_interruptible(&port->open_wait);
 	}
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&port->close_wait);
 	restore_flags(flags);
 #ifdef AURORA_DEBUG
@@ -2223,7 +2206,7 @@ static void aurora_hangup(struct tty_struct * tty)
 	aurora_shutdown_port(bp, port);
 	port->event = 0;
 	port->count = 0;
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	port->flags &= ~ASYNC_NORMAL_ACTIVE;
 	port->tty = 0;
 	wake_up_interruptible(&port->open_wait);
 #ifdef AURORA_DEBUG
