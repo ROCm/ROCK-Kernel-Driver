@@ -914,7 +914,7 @@ void __init setup_arch(char **cmdline_p)
 	 * the bootmem allocator) but before get_smp_config (to allow parsing
 	 * of MADT).
 	 */
-	acpi_table_init(*cmdline_p);
+	acpi_boot_init(*cmdline_p);
 #endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
