@@ -71,6 +71,8 @@
 /** 'free' without the overhead of DRM(free)() */
 #define DRM_FREE(x,size) kfree(x)
 
+#define DRM_GET_PRIV_WITH_RETURN(_priv, _filp) _priv = _filp->private_data
+
 /** 
  * Get the pointer to the SAREA.
  *
