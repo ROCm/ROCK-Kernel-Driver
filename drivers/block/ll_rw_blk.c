@@ -2872,3 +2872,4 @@ EXPORT_SYMBOL(blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);
 
 EXPORT_SYMBOL(blk_rq_bio_prep);
+EXPORT_SYMBOL(blk_rq_prep_restart);
