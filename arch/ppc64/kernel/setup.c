@@ -55,6 +55,7 @@
 #include <asm/iommu.h>
 #include <asm/serial.h>
 #include <asm/cache.h>
+#include <asm/page.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -111,6 +112,7 @@ int have_of = 1;
 int boot_cpuid = 0;
 int boot_cpuid_phys = 0;
 dev_t boot_dev;
+u64 ppc64_pft_size;
 
 struct ppc64_caches ppc64_caches;
 
@@ -660,7 +662,7 @@ void __init setup_system(void)
 
 	printk("-----------------------------------------------------\n");
 	printk("naca                          = 0x%p\n", naca);
-	printk("naca->pftSize                 = 0x%lx\n", naca->pftSize);
+	printk("ppc64_pft_size                = 0x%lx\n", ppc64_pft_size);
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
 	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
 	printk("systemcfg                     = 0x%p\n", systemcfg);

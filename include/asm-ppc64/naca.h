@@ -26,8 +26,6 @@ struct naca_struct {
 	u64 log;                        /* Ptr to log buffer         0x30 */
 	u64 serialPortAddr;		/* Phy addr of serial port   0x38 */
 	u64 interrupt_controller;	/* Type of int controller    0x40 */ 
-	u64 unused1;			/* was SLB size in entries   0x48 */
-	u64 pftSize;			/* Log 2 of page table size  0x50 */
 };
 
 extern struct naca_struct *naca;

@@ -41,7 +41,6 @@
 #include <asm/types.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/naca.h>
 #include <asm/machdep.h>
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>
@@ -147,7 +146,7 @@ void __init htab_initialize(void)
 	 * Calculate the required size of the htab.  We want the number of
 	 * PTEGs to equal one half the number of real pages.
 	 */ 
-	htab_size_bytes = 1UL << naca->pftSize;
+	htab_size_bytes = 1UL << ppc64_pft_size;
 	pteg_count = htab_size_bytes >> 7;
 
 	/* For debug, make the HTAB 1/8 as big as it normally would be. */

@@ -33,7 +33,6 @@
 #include <asm/mmu_context.h>
 #include <asm/ppcdebug.h>
 #include <asm/iommu.h>
-#include <asm/naca.h>
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 #include <asm/prom.h>
@@ -368,7 +367,7 @@ static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 
 static void pSeries_lpar_hptab_clear(void)
 {
-	unsigned long size_bytes = 1UL << naca->pftSize;
+	unsigned long size_bytes = 1UL << ppc64_pft_size;
 	unsigned long hpte_count = size_bytes >> 4;
 	unsigned long dummy1, dummy2;
 	int i;
