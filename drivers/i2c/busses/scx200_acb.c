@@ -458,6 +458,7 @@ static int  __init scx200_acb_create(int base, int index)
 	adapter->owner = THIS_MODULE;
 	adapter->id = I2C_ALGO_SMBUS;
 	adapter->algo = &scx200_acb_algorithm;
+	adapter->class = I2C_CLASS_HWMON;
 
 	init_MUTEX(&iface->sem);
 
