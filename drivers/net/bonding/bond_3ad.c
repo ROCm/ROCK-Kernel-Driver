@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -48,7 +48,7 @@
  *	  problem on very high Tx traffic load where packets may get dropped
  *	  by the slave.
  *
- * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ * 2003/12/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Code cleanup and style changes
  */
 
