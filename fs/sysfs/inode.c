@@ -395,9 +395,7 @@ static int check_perm(struct inode * inode, struct file * file)
 	 */
 	if (file->f_mode & FMODE_WRITE) {
 
-		if (!(inode->i_mode & S_IWUGO))
-			goto Eperm;
-		if (!ops->store)
+		if (!(inode->i_mode & S_IWUGO) || !ops->store)
 			goto Eaccess;
 
 	}
@@ -407,9 +405,7 @@ static int check_perm(struct inode * inode, struct file * file)
 	 * must be a show method for it.
 	 */
 	if (file->f_mode & FMODE_READ) {
-		if (!(inode->i_mode & S_IRUGO))
-			goto Eperm;
-		if (!ops->show)
+		if (!(inode->i_mode & S_IRUGO) || !ops->show)
 			goto Eaccess;
 	}
 
@@ -430,9 +426,6 @@ static int check_perm(struct inode * inode, struct file * file)
 	goto Done;
  Eaccess:
 	error = -EACCES;
-	goto Done;
- Eperm:
-	error = -EPERM;
  Done:
 	if (error && kobj)
 		kobject_put(kobj);
