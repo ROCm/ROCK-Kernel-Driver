@@ -2042,23 +2042,30 @@ void journal_file_buffer(struct journal_head *jh,
 
 void __journal_refile_buffer(struct journal_head *jh)
 {
+	int was_dirty;
+
 	assert_spin_locked(&journal_datalist_lock);
-#ifdef __SMP__
-	J_ASSERT_JH(jh, current->lock_depth >= 0);
-#endif
+	J_ASSERT_JH(jh, kernel_locked());
+
+	/* If the buffer is now unused, just drop it. */
+	if (jh->b_next_transaction == NULL) {
+		__journal_unfile_buffer(jh);
+		jh->b_transaction = NULL;
+		return;
+	}
+	
+	/* It has been modified by a later transaction: add it to the
+	 * new transaction's metadata list. */
+
+	was_dirty = test_clear_buffer_jbddirty(jh2bh(jh));
 	__journal_unfile_buffer(jh);
-
-	/* If the buffer is now unused, just drop it.  If it has been
-	   modified by a later transaction, add it to the new
-	   transaction's metadata list. */
-
 	jh->b_transaction = jh->b_next_transaction;
 	jh->b_next_transaction = NULL;
+	__journal_file_buffer(jh, jh->b_transaction, BJ_Metadata);
+	J_ASSERT_JH(jh, jh->b_transaction->t_state == T_RUNNING);
 
-	if (jh->b_transaction != NULL) {
-		__journal_file_buffer(jh, jh->b_transaction, BJ_Metadata);
-		J_ASSERT_JH(jh, jh->b_transaction->t_state == T_RUNNING);
-	}
+	if (was_dirty)
+		set_buffer_jbddirty(jh2bh(jh));
 }
 
 /*
