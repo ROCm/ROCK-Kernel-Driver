@@ -197,7 +197,7 @@ INTELFB_INT_PARAM(probeonly, 0, "Do a minimal probe (debug)");
 INTELFB_INT_PARAM(idonly, 0,
 		  "Just identify without doing anything else (debug)");
 INTELFB_INT_PARAM(bailearly, 0, "Bail out early, depending on value (debug)");
-INTELFB_STR_PARAM(mode, NULL,
+INTELFB_STR_PARAM(mode, 0,
 		  "Initial video mode \"<xres>x<yres>[-<depth>][@<refresh>]\"");
 /***************************************************************
  *                     modules entry points                    *
