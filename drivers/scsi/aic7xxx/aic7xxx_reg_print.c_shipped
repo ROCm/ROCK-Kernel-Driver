@@ -3,7 +3,7 @@
  *		 from the following source files:
  *
  * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.seq#54 $
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.reg#37 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.reg#38 $
  */
 
 #include "aic7xxx_osm.h"

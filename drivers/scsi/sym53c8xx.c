@@ -13230,9 +13230,9 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		return -1;
 	}
 
-#ifdef __powerpc__
+#if defined(__powerpc__) || defined(__hppa__)
 	/*
-	**	Fix-up for power/pc.
+	**	Fix-up for power/pc and hppa.
 	**	Should not be performed by the driver.
 	*/
 	if ((command & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY))

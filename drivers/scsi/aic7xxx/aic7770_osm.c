@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7770_osm.c#12 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7770_osm.c#13 $
  */
 
 #include "aic7xxx_osm.h"
@@ -66,7 +66,7 @@ aic7770_linux_probe(Scsi_Host_Template *template)
 			continue;
 		request_region(eisaBase, AHC_EISA_IOSIZE, "aic7xxx");
 #else
-		if (request_region(eisaBase, AHC_EISA_IOSIZE, "aic7xxx") != 0)
+		if (request_region(eisaBase, AHC_EISA_IOSIZE, "aic7xxx") == 0)
 			continue;
 #endif
 

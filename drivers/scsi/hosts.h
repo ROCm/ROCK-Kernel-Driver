@@ -380,6 +380,7 @@ struct Scsi_Host
     struct scsi_host_cmd_pool *cmd_pool;
     spinlock_t            free_list_lock;
     struct list_head      free_list;   /* backup store of cmd structs */
+    struct list_head      starved_list;
 
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
@@ -470,12 +471,6 @@ struct Scsi_Host
      */
     unsigned reverse_ordering:1;
 
-    /*
-     * Indicates that one or more devices on this host were starved, and
-     * when the device becomes less busy that we need to feed them.
-     */
-    unsigned some_device_starved:1;
-   
     /*
      * Host has rejected a command because it was busy.
      */
