@@ -660,9 +660,9 @@ snd_nm256_capture_pointer(snd_pcm_substream_t * substream)
 	return bytes_to_frames(substream->runtime, curp);
 }
 
+/* Remapped I/O space can be accessible as pointer on i386 */
+/* This might be changed in the future */
 #ifndef __i386__
-/* FIXME: I/O space is not accessible via pointers on all architectures */
-
 /*
  * silence / copy for playback
  */
@@ -757,10 +757,8 @@ snd_nm256_capture_update(nm256_t *chip)
  */
 static snd_pcm_hardware_t snd_nm256_playback =
 {
-	.info =
-#ifdef __i386__
-				SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
-#endif
+	.info =			SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
+				SNDRV_PCM_INFO_MMAP_IOMEM|
 				SNDRV_PCM_INFO_INTERLEAVED |
 				/*SNDRV_PCM_INFO_PAUSE |*/
 				SNDRV_PCM_INFO_RESUME,
@@ -779,10 +777,8 @@ static snd_pcm_hardware_t snd_nm256_playback =
 
 static snd_pcm_hardware_t snd_nm256_capture =
 {
-	.info =
-#ifdef __i386__
-				SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
-#endif
+	.info =			SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
+				SNDRV_PCM_INFO_MMAP_IOMEM|
 				SNDRV_PCM_INFO_INTERLEAVED |
 				/*SNDRV_PCM_INFO_PAUSE |*/
 				SNDRV_PCM_INFO_RESUME,

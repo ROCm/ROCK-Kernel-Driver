@@ -3009,6 +3009,12 @@ static struct vm_operations_struct snd_pcm_vm_ops_data =
 	.nopage =	snd_pcm_mmap_data_nopage,
 };
 
+static struct vm_operations_struct snd_pcm_vm_ops_data_mmio =
+{
+	.open =		snd_pcm_mmap_data_open,
+	.close =	snd_pcm_mmap_data_close,
+};
+
 int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 		      struct vm_area_struct *area)
 {
@@ -3044,6 +3050,14 @@ int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 	area->vm_ops = &snd_pcm_vm_ops_data;
 	area->vm_private_data = substream;
 	area->vm_flags |= VM_RESERVED;
+	if (runtime->hw.info & SNDRV_PCM_INFO_MMAP_IOMEM) {
+		area->vm_ops = &snd_pcm_vm_ops_data_mmio;
+		area->vm_flags |= VM_IO;
+		if (io_remap_page_range(area, area->vm_start,
+					runtime->dma_addr + offset,
+					size, area->vm_page_prot))
+			return -EAGAIN;
+	}
 	atomic_inc(&runtime->mmap_count);
 	return 0;
 }
