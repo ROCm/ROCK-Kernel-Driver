@@ -150,7 +150,7 @@ extern void show_stack(unsigned long *stack);
 extern void show_regs(struct pt_regs *);
 
 void io_schedule(void);
-void io_schedule_timeout(long timeout);
+long io_schedule_timeout(long timeout);
 
 extern void cpu_init (void);
 extern void trap_init(void);
