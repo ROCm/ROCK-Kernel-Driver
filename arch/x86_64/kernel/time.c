@@ -331,7 +331,7 @@ static noinline void handle_lost_ticks(int lost, struct pt_regs *regs)
 	    print_symbol("rip %s)\n", regs->rip);
     }
 
-    if (lost_count == 100 && !warned) {
+    if (lost_count == 1000 && !warned) {
 	    printk(KERN_WARNING
 		   "warning: many lost ticks.\n"
 		   KERN_WARNING "Your time source seems to be instable or "
