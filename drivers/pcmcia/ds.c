@@ -506,34 +506,6 @@ static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
     return 0;
 } /* ds_event */
 
-/*======================================================================
-
-    bind_mtd() connects a memory region with an MTD client.
-    
-======================================================================*/
-
-static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
-{
-	struct pcmcia_socket *s = bus_sock->parent;
-	memory_handle_t region;
-
-	if (mtd_info->Attributes & REGION_TYPE_AM)
-		region = s->a_region;
-	else
-		region = s->c_region;
-
-	while (region) {
-		if (region->info.CardOffset == mtd_info->CardOffset)
-			break;
-		region = region->info.next;
-	}
-	if (!region || (region->mtd != NULL))
-		return -ENODEV;
-
-	strlcpy(region->dev_info, mtd_info->dev_info, DEV_NAME_LEN);
-
-	return 0;
-} /* bind_mtd */
 
 /*======================================================================
 
@@ -1098,8 +1070,6 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 /*====================================================================*/
 
 extern int pcmcia_adjust_resource_info(adjust_t *adj);
-extern int pccard_get_next_region(struct pcmcia_socket *s, region_info_t *rgn);
-extern int pccard_get_first_region(struct pcmcia_socket *s, region_info_t *rgn);
 
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
@@ -1220,10 +1190,21 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 			buf->conf_reg.Function, &buf->conf_reg);
 	break;
     case DS_GET_FIRST_REGION:
-        ret = pccard_get_first_region(s->parent, &buf->region);
-	break;
     case DS_GET_NEXT_REGION:
-	ret = pccard_get_next_region(s->parent, &buf->region);
+    case DS_BIND_MTD:
+	if (!capable(CAP_SYS_ADMIN)) {
+		err = -EPERM;
+		goto free_out;
+	} else {
+		static int printed = 0;
+		if (!printed) {
+			printk(KERN_WARNING "2.6. kernels use pcmciamtd instead of memory_cs.c and do not require special\n");
+			printk(KERN_WARNING "MTD handling any more.\n");
+			printed++;
+		}
+	}
+	ret = -EINVAL;
+	goto free_out;
 	break;
     case DS_GET_FIRST_WINDOW:
 	ret = pcmcia_get_window(s->parent, &buf->win_info.handle, 0,
@@ -1255,13 +1236,6 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	break;
     case DS_UNBIND_REQUEST:
 	err = 0;
-	break;
-    case DS_BIND_MTD:
-	if (!capable(CAP_SYS_ADMIN)) {
-		err = -EPERM;
-		goto free_out;
-	}
-	err = bind_mtd(s, &buf->mtd_info);
 	break;
     default:
 	err = -EINVAL;
