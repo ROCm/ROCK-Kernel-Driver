@@ -36,97 +36,6 @@
 #define LOW_OBP_ADDRESS		0x00000000f0000000
 #define HI_OBP_ADDRESS		0x0000000100000000
 
-#ifndef __ASSEMBLY__
-
-/* Cache and TLB flush operations. */
-
-/* These are the same regardless of whether this is an SMP kernel or not. */
-#define flush_cache_mm(__mm) \
-	do { if ((__mm) == current->mm) flushw_user(); } while(0)
-extern void flush_cache_range(struct vm_area_struct *, unsigned long, unsigned long);
-#define flush_cache_page(vma, page) \
-	flush_cache_mm((vma)->vm_mm)
-
-
-struct page;
-
-/* 
- * On spitfire, the icache doesn't snoop local stores and we don't
- * use block commit stores (which invalidate icache lines) during
- * module load, so we need this.
- */
-extern void flush_icache_range(unsigned long start, unsigned long end);
-
-extern void __flush_dcache_page(void *addr, int flush_icache);
-extern void __flush_icache_page(unsigned long);
-extern void flush_dcache_page_impl(struct page *page);
-#ifdef CONFIG_SMP
-extern void smp_flush_dcache_page_impl(struct page *page, int cpu);
-extern void flush_dcache_page_all(struct mm_struct *mm, struct page *page);
-#else
-#define smp_flush_dcache_page_impl(page,cpu) flush_dcache_page_impl(page)
-#define flush_dcache_page_all(mm,page) flush_dcache_page_impl(page)
-#endif
-
-extern void __flush_dcache_range(unsigned long start, unsigned long end);
-
-extern void __flush_cache_all(void);
-
-extern void __flush_tlb_all(void);
-extern void __flush_tlb_mm(unsigned long context, unsigned long r);
-extern void __flush_tlb_range(unsigned long context, unsigned long start,
-			      unsigned long r, unsigned long end,
-			      unsigned long pgsz, unsigned long size);
-extern void __flush_tlb_page(unsigned long context, unsigned long page, unsigned long r);
-
-#ifndef CONFIG_SMP
-
-#define flush_cache_all()	__flush_cache_all()
-#define flush_tlb_all()		__flush_tlb_all()
-
-#define flush_tlb_mm(__mm) \
-do { if(CTX_VALID((__mm)->context)) \
-	__flush_tlb_mm(CTX_HWBITS((__mm)->context), SECONDARY_CONTEXT); \
-} while(0)
-
-#define flush_tlb_range(__vma, start, end) \
-do { if(CTX_VALID((__vma)->vm_mm->context)) { \
-	unsigned long __start = (start)&PAGE_MASK; \
-	unsigned long __end = PAGE_ALIGN(end); \
-	__flush_tlb_range(CTX_HWBITS((__vma)->vm_mm->context), __start, \
-			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
-			  (__end - __start)); \
-     } \
-} while(0)
-
-#define flush_tlb_page(vma, page) \
-do { struct mm_struct *__mm = (vma)->vm_mm; \
-     if(CTX_VALID(__mm->context)) \
-	__flush_tlb_page(CTX_HWBITS(__mm->context), (page)&PAGE_MASK, \
-			 SECONDARY_CONTEXT); \
-} while(0)
-
-#else /* CONFIG_SMP */
-
-extern void smp_flush_cache_all(void);
-extern void smp_flush_tlb_all(void);
-extern void smp_flush_tlb_mm(struct mm_struct *mm);
-extern void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
-				unsigned long end);
-extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
-
-#define flush_cache_all()	smp_flush_cache_all()
-#define flush_tlb_all()		smp_flush_tlb_all()
-#define flush_tlb_mm(mm)	smp_flush_tlb_mm(mm)
-#define flush_tlb_range(vma, start, end) \
-	smp_flush_tlb_range(vma, start, end)
-#define flush_tlb_page(vma, page) \
-	smp_flush_tlb_page((vma)->vm_mm, page)
-
-#endif /* ! CONFIG_SMP */
-
-#endif /* ! __ASSEMBLY__ */
-
 /* XXX All of this needs to be rethought so we can take advantage
  * XXX cheetah's full 64-bit virtual address space, ie. no more hole
  * XXX in the middle like on spitfire. -DaveM
@@ -372,9 +281,6 @@ extern pgd_t swapper_pg_dir[1];
 
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
-#define flush_icache_page(vma, pg)	do { } while(0)
-#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
-
 /* Make a non-present pseudo-TTE. */
 extern inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 {
@@ -453,11 +359,6 @@ extern unsigned long get_fb_unmapped_area(struct file *filp, unsigned long, unsi
 #define pgtable_cache_init()	do { } while (0)
 
 extern void check_pgt_cache(void);
-
-extern void flush_dcache_page(struct page *page);
-
-/* This is unnecessary on the SpitFire since D-CACHE is write-through. */
-#define flush_page_to_ram(page)			do { } while (0)
 
 #endif /* !(__ASSEMBLY__) */
 
