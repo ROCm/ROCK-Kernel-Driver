@@ -27,6 +27,7 @@ struct request_pm_state;
 struct request_list {
 	int count[2];
 	mempool_t *rq_pool;
+	wait_queue_head_t wait[2];
 };
 
 /*

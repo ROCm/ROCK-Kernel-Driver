@@ -51,6 +51,11 @@ static int queue_nr_requests;
 unsigned long blk_max_low_pfn, blk_max_pfn;
 static wait_queue_head_t congestion_wqh[2];
 
+static inline int batch_requests(void)
+{
+	return min(BLKDEV_MAX_RQ / 8, 8);
+}
+
 /*
  * Return the threshold (number of free requests) at which the queue is
  * considered to be congested.  It include a little hysteresis to keep the
@@ -1180,6 +1185,8 @@ static int blk_init_free_list(request_queue_t *q)
 	struct request_list *rl = &q->rq;
 
 	rl->count[READ] = rl->count[WRITE] = 0;
+	init_waitqueue_head(&rl->wait[READ]);
+	init_waitqueue_head(&rl->wait[WRITE]);
 
 	rl->rq_pool = mempool_create(BLKDEV_MIN_RQ, mempool_alloc_slab, mempool_free_slab, request_cachep);
 
@@ -1325,18 +1332,33 @@ out:
 }
 
 /*
- * No available requests for this queue, unplug the device.
+ * No available requests for this queue, unplug the device and wait for some
+ * requests to become available.
  */
 static struct request *get_request_wait(request_queue_t *q, int rw)
 {
+	DEFINE_WAIT(wait);
 	struct request *rq;
 
 	generic_unplug_device(q);
 	do {
 		rq = get_request(q, rw, GFP_NOIO);
 
-		if (!rq)
-			blk_congestion_wait(rw, HZ / 50);
+		if (!rq) {
+			struct request_list *rl = &q->rq;
+
+			prepare_to_wait_exclusive(&rl->wait[rw], &wait,
+						TASK_UNINTERRUPTIBLE);
+			/*
+			 * If _all_ the requests were suddenly returned then
+			 * no wakeup will be delivered.  So now we're on the
+			 * waitqueue, go check for that.
+			 */
+			rq = get_request(q, rw, GFP_ATOMIC & ~__GFP_HIGH);
+			if (!rq)
+				io_schedule();
+			finish_wait(&rl->wait[rw], &wait);
+		}
 	} while (!rq);
 
 	return rq;
@@ -1498,8 +1520,12 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		blk_free_request(q, req);
 
 		rl->count[rw]--;
-		if ((BLKDEV_MAX_RQ - rl->count[rw]) >= queue_congestion_off_threshold())
+		if ((BLKDEV_MAX_RQ - rl->count[rw]) >=
+				queue_congestion_off_threshold())
 			clear_queue_congested(q, rw);
+		if ((BLKDEV_MAX_RQ - rl->count[rw]) >= batch_requests() &&
+				waitqueue_active(&rl->wait[rw]))
+			wake_up(&rl->wait[rw]);
 	}
 }
 
