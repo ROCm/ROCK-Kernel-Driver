@@ -343,7 +343,69 @@ efivar_write(struct file *file, const char *buffer,
 	return size;
 }
 
+/*
+ * The EFI system table contains pointers to the SAL system table,
+ * HCDP, ACPI, SMBIOS, etc, that may be useful to applications.
+ */
+static ssize_t
+efi_systab_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+{
+	void *data;
+	u8 *proc_buffer;
+	ssize_t size, length;
+	int ret;
+	const int max_nr_entries = 7; 	/* num ptrs to tables we could expose */
+	const int max_line_len = 80;
 
+	if (!efi.systab)
+		return 0;
+
+	proc_buffer = kmalloc(max_nr_entries * max_line_len, GFP_KERNEL);
+	if (!proc_buffer)
+		return -ENOMEM;
+
+	length = 0;
+	if (efi.mps)
+		length += sprintf(proc_buffer + length, "MPS=0x%lx\n", __pa(efi.mps));
+	if (efi.acpi20)
+		length += sprintf(proc_buffer + length, "ACPI20=0x%lx\n", __pa(efi.acpi20));
+	if (efi.acpi)
+		length += sprintf(proc_buffer + length, "ACPI=0x%lx\n", __pa(efi.acpi));
+	if (efi.smbios)
+		length += sprintf(proc_buffer + length, "SMBIOS=0x%lx\n", __pa(efi.smbios));
+	if (efi.sal_systab)
+		length += sprintf(proc_buffer + length, "SAL=0x%lx\n", __pa(efi.sal_systab));
+	if (efi.hcdp)
+		length += sprintf(proc_buffer + length, "HCDP=0x%lx\n", __pa(efi.hcdp));
+	if (efi.boot_info)
+		length += sprintf(proc_buffer + length, "BOOTINFO=0x%lx\n", __pa(efi.boot_info));
+
+	if (*ppos >= length) {
+		ret = 0;
+		goto out;
+	}
+
+	data = proc_buffer + file->f_pos;
+	size = length - file->f_pos;
+	if (size > count)
+		size = count;
+	if (copy_to_user(buffer, data, size)) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	*ppos += size;
+	ret = size;
+
+out:
+	kfree(proc_buffer);
+	return ret;
+}
+
+static struct proc_dir_entry *efi_systab_entry;
+static struct file_operations efi_systab_fops = {
+	.read = efi_systab_read,
+};
 
 static int __init
 efivars_init(void)
@@ -362,6 +424,10 @@ efivars_init(void)
 	*/
 	if (!efi_dir)
 		efi_dir = proc_mkdir("efi", NULL);
+
+	efi_systab_entry = create_proc_entry("systab", S_IRUSR | S_IRGRP, efi_dir);
+	if (efi_systab_entry)
+		efi_systab_entry->proc_fops = &efi_systab_fops;
 
 	efi_vars_dir = proc_mkdir("vars", efi_dir);
 
@@ -406,6 +472,8 @@ efivars_exit(void)
 	efivar_entry_t *efivar;
 
 	spin_lock(&efivars_lock);
+	if (efi_systab_entry)
+		remove_proc_entry(efi_systab_entry->name, efi_dir);
 	list_for_each_safe(pos, n, &efivar_list) {
 		efivar = efivar_entry(pos);
 		remove_proc_entry(efivar->entry->name, efi_vars_dir);
