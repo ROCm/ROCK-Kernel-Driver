@@ -99,12 +99,12 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       if [ "$CONFIG_SIBYTE_SWARM" = "y" ]; then
 	 bool '  SWARM onboard IDE support' CONFIG_BLK_DEV_IDE_SWARM
       fi
-      if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
-	 dep_bool '    ICS IDE interface support' CONFIG_BLK_DEV_IDE_ICSIDE $CONFIG_ARCH_ACORN
-	 dep_bool '      ICS DMA support' CONFIG_BLK_DEV_IDEDMA_ICS $CONFIG_BLK_DEV_IDE_ICSIDE
-	 dep_bool '        Use ICS DMA by default' CONFIG_IDEDMA_ICS_AUTO $CONFIG_BLK_DEV_IDEDMA_ICS
+      if [ "$CONFIG_ARM" = "y" ]; then
+	 dep_tristate '    ICS IDE interface support' CONFIG_BLK_DEV_IDE_ICSIDE $CONFIG_ARCH_ACORN
+	 dep_mbool '      ICS DMA support' CONFIG_BLK_DEV_IDEDMA_ICS $CONFIG_BLK_DEV_IDE_ICSIDE
+	 dep_mbool '        Use ICS DMA by default' CONFIG_IDEDMA_ICS_AUTO $CONFIG_BLK_DEV_IDEDMA_ICS
 	 define_bool CONFIG_BLK_DEV_IDEDMA $CONFIG_BLK_DEV_IDEDMA_ICS
-	 dep_bool '    RapIDE interface support' CONFIG_BLK_DEV_IDE_RAPIDE $CONFIG_ARCH_ACORN
+	 dep_tristate '    RapIDE interface support' CONFIG_BLK_DEV_IDE_RAPIDE $CONFIG_ARCH_ACORN
       fi
       if [ "$CONFIG_AMIGA" = "y" ]; then
 	 dep_bool '  Amiga Gayle IDE interface support' CONFIG_BLK_DEV_GAYLE $CONFIG_AMIGA

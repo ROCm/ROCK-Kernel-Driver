@@ -20,6 +20,7 @@ static int seagate_st0x_device_reset(Scsi_Cmnd *);
 static int seagate_st0x_host_reset(Scsi_Cmnd *);
 
 #define SEAGATE_ST0X  {  detect:         seagate_st0x_detect,			\
+			 release:        seagate_st0x_release,			\
 			 info:           seagate_st0x_info,			\
 			 command:        seagate_st0x_command,			\
 			 queuecommand:   seagate_st0x_queue_command,		\

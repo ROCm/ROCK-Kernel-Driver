@@ -28,18 +28,15 @@
 #ifndef DTC3280_H
 #define DTC3280_H
 
-#ifndef ASM
-int dtc_abort(Scsi_Cmnd *);
-int dtc_biosparam(Disk *, struct block_device *, int*);
-int dtc_detect(Scsi_Host_Template *);
-int dtc_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int dtc_reset(Scsi_Cmnd *, unsigned int reset_flags);
-int dtc_proc_info (char *buffer, char **start, off_t offset,
+static int dtc_abort(Scsi_Cmnd *);
+static int dtc_biosparam(Disk *, struct block_device *, int*);
+static int dtc_detect(Scsi_Host_Template *);
+static int dtc_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int dtc_bus_reset(Scsi_Cmnd *);
+static int dtc_device_reset(Scsi_Cmnd *);
+static int dtc_host_reset(Scsi_Cmnd *);
+static int dtc_proc_info (char *buffer, char **start, off_t offset,
 		   int length, int hostno, int inout);
-
-#ifndef NULL
-#define NULL 0
-#endif
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2
@@ -55,24 +52,26 @@ int dtc_proc_info (char *buffer, char **start, off_t offset,
  * macros when this is being used solely for the host stub.
  */
 
-#define DTC3x80 {				\
-	name:           "DTC 3180/3280 ",	\
-	detect:         dtc_detect,		\
-	queuecommand:   dtc_queue_command,	\
-	abort:          dtc_abort,		\
-	reset:          dtc_reset,		\
-	bios_param:     dtc_biosparam,		\
-	can_queue:      CAN_QUEUE,		\
-	this_id:        7,			\
-	sg_tablesize:   SG_ALL,			\
-	cmd_per_lun:    CMD_PER_LUN ,		\
+#define DTC3x80 {						\
+	name:				"DTC 3180/3280 ",	\
+	detect:				dtc_detect,		\
+	queuecommand:			dtc_queue_command,	\
+	eh_abort_handler:		dtc_abort,		\
+	eh_bus_reset_handler:		dtc_bus_reset,		\
+	eh_device_reset_handler:	dtc_device_reset,	\
+	eh_host_reset_handler:          dtc_host_reset,		\
+	bios_param:     dtc_biosparam,				\
+	can_queue:      CAN_QUEUE,				\
+	this_id:        7,					\
+	sg_tablesize:   SG_ALL,					\
+	cmd_per_lun:    CMD_PER_LUN ,				\
 	use_clustering: DISABLE_CLUSTERING}
 
 #define NCR5380_implementation_fields \
-    volatile unsigned int base
+    unsigned int base
 
 #define NCR5380_local_declare() \
-    volatile unsigned int base
+    unsigned int base
 
 #define NCR5380_setup(instance) \
     base = (unsigned int)(instance)->base
@@ -105,12 +104,13 @@ int dtc_proc_info (char *buffer, char **start, off_t offset,
     isa_writeb(value, DTC_address(reg));} while(0)
 #endif
 
-#define NCR5380_intr dtc_intr
-#define do_NCR5380_intr do_dtc_intr
-#define NCR5380_queue_command dtc_queue_command
-#define NCR5380_abort dtc_abort
-#define NCR5380_reset dtc_reset
-#define NCR5380_proc_info dtc_proc_info 
+#define NCR5380_intr			dtc_intr
+#define NCR5380_queue_command		dtc_queue_command
+#define NCR5380_abort			dtc_abort
+#define NCR5380_bus_reset		dtc_bus_reset
+#define NCR5380_device_reset		dtc_device_reset
+#define NCR5380_host_reset		dtc_host_reset
+#define NCR5380_proc_info		dtc_proc_info 
 
 /* 15 12 11 10
    1001 1100 0000 0000 */
@@ -118,5 +118,4 @@ int dtc_proc_info (char *buffer, char **start, off_t offset,
 #define DTC_IRQS 0x9c00
 
 
-#endif /* ndef ASM */
 #endif /* DTC3280_H */

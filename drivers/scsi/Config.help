@@ -496,9 +496,27 @@ CONFIG_SCSI_FD_MCS
   module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_SCSI_GENERIC_NCR5380
-  This is the generic NCR family of SCSI controllers, not to be
-  confused with the NCR 53c7 or 8xx controllers.  It is explained in
-  section 3.8 of the SCSI-HOWTO, available from
+  This is a driver for the old NCR 53c80 series of SCSI controllers
+  on boards using PIO. Most boards such as the Trantor T130 fit this
+  category, along with a large number of ISA 8bit controllers shipped
+  for free with SCSI scanners. If you have a PAS16, T128 or DMX3191
+  you should select the specific driver for that card rather than
+  generic 5380 support.
+
+  It is explained in section 3.8 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+  of the box, you may have to change some settings in
+  <file:drivers/scsi/g_NCR5380.h>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called g_NCR5380.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_GENERIC_NCR5380_MMIO
+  This is a driver for the old NCR 53c80 series of SCSI controllers
+  on boards using memory mapped I/O. 
+  It is explained in section 3.8 of the SCSI-HOWTO, available from
   <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
   of the box, you may have to change some settings in
   <file:drivers/scsi/g_NCR5380.h>.
@@ -515,11 +533,6 @@ CONFIG_SCSI_GENERIC_NCR53C400
   to pass a command line option to the kernel at boot time if it does
   not detect your card.  See the file
   <file:drivers/scsi/README.g_NCR5380> for details.
-
-CONFIG_SCSI_G_NCR5380_PORT
-  The NCR5380 and NCR53c400 SCSI controllers come in two varieties:
-  port or memory mapped. You should know what you have. The most
-  common card, Trantor T130B, uses port mapped mode.
 
 CONFIG_SCSI_NCR_D700
   This is a driver for the MicroChannel Dual 700 card produced by

@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #endif
 
+#include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/errno.h>
 // #include <linux/etherdevice.h>

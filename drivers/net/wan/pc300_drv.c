@@ -2542,7 +2542,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	int ch = chan->channel;
 	void *arg = (void *) ifr->ifr_data;
-	union line_settings * line = &ifr->ifr_settings->ifs_line;
+	struct if_settings *settings = &ifr->ifr_settings;
 	uclong scabase = card->hw.scabase;
 
 	if (!capable(CAP_NET_ADMIN))
@@ -2741,13 +2741,19 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			}
 
 		case SIOCWANDEV:
-			switch (ifr->ifr_settings->type) {
+			switch (ifr->ifr_settings.type) {
 				case IF_GET_IFACE:
 				{
 					const size_t size = sizeof(sync_serial_settings);
-					ifr->ifr_settings->type = conf->media;
+					ifr->ifr_settings.type = conf->media;
+					if (ifr->ifr_settings.size < size) {
+						/* data size wanted */
+						ifr->ifr_settings.size = size;
+						return -ENOBUFS;
+					}
 	
-					if (copy_to_user(&line->sync, &conf->phys_settings, size)) {
+					if (copy_to_user(settings->ifs_ifsu.sync,
+							 &conf->phys_settings, size)) {
 						return -EFAULT;
 					}
 					return 0;
@@ -2764,7 +2770,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					}
 
 					if (copy_from_user(&conf->phys_settings, 
-									   &line->sync, size)) {
+							   settings->ifs_ifsu.sync, size)) {
 						return -EFAULT;
 					}
 
@@ -2773,7 +2779,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 							cpc_readb(card->hw.scabase + M_REG(MD2, ch)) | 
 							MD2_LOOP_MIR);
 					}
-					conf->media = ifr->ifr_settings->type;
+					conf->media = ifr->ifr_settings.type;
 					return 0;
 				}
 
@@ -2787,7 +2793,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					}
 					
 					if (copy_from_user(&conf->phys_settings, 
-						&line->te1, size)) {
+							   settings->ifs_ifsu.te1, size)) {
 						return -EFAULT;
 					}/* Ignoring HDLC slot_map for a while */
 					
@@ -2796,7 +2802,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 							cpc_readb(card->hw.scabase + M_REG(MD2, ch)) | 
 							MD2_LOOP_MIR);
 					}
-					conf->media = ifr->ifr_settings->type;
+					conf->media = ifr->ifr_settings.type;
 					return 0;
 				}
 				default:

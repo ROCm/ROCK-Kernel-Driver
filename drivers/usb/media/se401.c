@@ -697,7 +697,8 @@ static int se401_set_size(struct usb_se401 *se401, int width, int height)
 static inline void enhance_picture(unsigned char *frame, int len)
 {
 	while (len--) {
-		*frame++=(((*frame^255)*(*frame^255))/255)^255;
+		*frame=(((*frame^255)*(*frame^255))/255)^255;
+		frame++;
 	}
 }
 
@@ -931,7 +932,8 @@ static inline void decode_bayer (struct usb_se401 *se401, struct se401_scratch *
 		/* Fix the top line */
 		framedata+=linelength;
 		for (i=0; i<linelength; i++) {
-			*--framedata=*(framedata+linelength);
+			framedata--;
+			*framedata=*(framedata+linelength);
 		}
 		/* Fix the left side (green is already present) */
 		for (i=0; i<se401->cheight; i++) {

@@ -6,7 +6,7 @@
     the GNU General Public License.
 =========================================================================*/
 
-/* $Id: nsp_debug.c,v 1.8 2001/09/07 04:32:28 elca Exp $ */
+/* $Id: nsp_debug.c,v 1.2 2002/09/20 04:06:58 gotom Exp $ */
 
 /*
  * Show the command data of a command
@@ -87,14 +87,21 @@ static void print_opcodek(unsigned char opcode)
 
 static void print_commandk (unsigned char *command)
 {
-	int i,s;
+	int i, s;
 	printk(KERN_DEBUG);
 	print_opcodek(command[0]);
 	/*printk(KERN_DEBUG __FUNCTION__ " ");*/
-	for ( i = 1, s = COMMAND_SIZE(command[0]); i < s; ++i) {
+	if ((command[0] >> 5) == 6 ||
+	    (command[0] >> 5) == 7 ) {
+		s = 12; /* vender specific */
+	} else {
+		s = COMMAND_SIZE(command[0]);
+	}
+	for ( i = 1; i < s; ++i) {
 		printk("%02x ", command[i]);
 	}
-	switch (COMMAND_SIZE(command[0])) {
+
+	switch (s) {
 	case 6:
 		printk("LBA=%d len=%d",
 		       (((unsigned int)command[1] & 0x0f) << 16) |

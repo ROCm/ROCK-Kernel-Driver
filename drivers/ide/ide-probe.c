@@ -166,6 +166,7 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 						printk("cdrom or floppy?, assuming ");
 					if (drive->media != ide_cdrom) {
 						printk ("FLOPPY");
+						drive->removable = 1;
 						break;
 					}
 				}

@@ -40,6 +40,7 @@
  * Nov 2000, Version 1.14
  * Oct 2001, Version 1.15
  * Jan 2002, Version 1.16
+ * Oct 2002, Version 1.16ac
  *
  * History:
  *    0.6b: first version in official kernel, Linux 1.3.46
@@ -177,6 +178,9 @@
  *         CONFIG_APM_CPU_IDLE now just affects the default value of
  *         idle_threshold (sfr).
  *         Change name of kernel apm daemon (as it no longer idles) (sfr).
+ *   1.16ac: Fix up SMP support somewhat. You can now force SMP on and we
+ *	   make _all_ APM calls on the CPU#0. Fix unsafe sign bug.
+ *	   TODO: determine if its "boot CPU" or "CPU0" we want to lock to.
  *
  * APM 1.1 Reference:
  *
@@ -250,6 +254,7 @@ extern int (*console_blank_hook)(int);
  *	    					powering off
  *	    [no-]debug			log some debugging messages
  *	    [no-]power[-_]off		power off on shutdown
+ *	    [no-]smp			Use apm even on an SMP box
  *	    bounce[-_]interval=<n>	number of ticks to ignore suspend
  *	    				bounces
  *          idle[-_]threshold=<n>       System idle percentage above which to
@@ -396,6 +401,7 @@ static long			clock_cmos_diff;
 static int			got_clock_diff;
 #endif
 static int			debug;
+static int			smp;
 static int			apm_disabled = -1;
 #ifdef CONFIG_SMP
 static int			power_off;
@@ -422,7 +428,7 @@ static struct apm_user *	user_list;
 static spinlock_t		user_list_lock = SPIN_LOCK_UNLOCKED;
 static struct desc_struct	bad_bios_desc = { 0, 0x00409200 };
 
-static char			driver_version[] = "1.16";	/* no spaces */
+static char			driver_version[] = "1.16ac";	/* no spaces */
 
 /*
  *	APM event names taken from the APM 1.2 specification. These are
@@ -499,6 +505,38 @@ static void apm_error(char *str, int err)
 }
 
 /*
+ * Lock APM functionality to physical CPU 0
+ */
+ 
+#ifdef CONFIG_SMP
+
+static unsigned long apm_save_cpus(void)
+{
+	unsigned long x = current->cpus_allowed;
+	/* Some bioses don't like being called from CPU != 0 */
+	set_cpus_allowed(current, 1 << 0);
+	if (unlikely(smp_processor_id() != 0))
+		BUG();
+	return x;
+}
+
+static inline void apm_restore_cpus(unsigned long mask)
+{
+	set_cpus_allowed(current, mask);
+}
+
+#else
+
+/*
+ *	No CPU lockdown needed on a uniprocessor
+ */
+ 
+#define apm_save_cpus()	0
+#define apm_restore_cpus(x)	(void)(x)
+
+#endif
+
+/*
  * These are the actual BIOS calls.  Depending on APM_ZERO_SEGS and
  * apm_info.allow_ints, we are being really paranoid here!  Not only
  * are interrupts disabled, but all the segment registers (except SS)
@@ -571,9 +609,12 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 {
 	APM_DECL_SEGS
 	unsigned long		flags;
+	unsigned long		cpus;
 	int			cpu;
 	struct desc_struct	save_desc_40;
 
+	cpus = apm_save_cpus();
+	
 	cpu = get_cpu();
 	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
 	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
@@ -601,6 +642,8 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	local_irq_restore(flags);
 	cpu_gdt_table[cpu][0x40 / 8] = save_desc_40;
 	put_cpu();
+	apm_restore_cpus(cpus);
+	
 	return *eax & 0xff;
 }
 
@@ -623,9 +666,13 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	u8			error;
 	APM_DECL_SEGS
 	unsigned long		flags;
+	unsigned long		cpus;
 	int			cpu;
 	struct desc_struct	save_desc_40;
 
+
+	cpus = apm_save_cpus();
+	
 	cpu = get_cpu();
 	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
 	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
@@ -657,6 +704,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	local_irq_restore(flags);
 	cpu_gdt_table[smp_processor_id()][0x40 / 8] = save_desc_40;
 	put_cpu();
+	apm_restore_cpus(cpus);
 	return error;
 }
 
@@ -772,7 +820,11 @@ static int apm_do_idle(void)
 	if (apm_bios_call_simple(APM_FUNC_IDLE, 0, 0, &eax)) {
 		static unsigned long t;
 
-		if (time_after(jiffies, t + 10 * HZ)) {
+		/* This always fails on some SMP boards running UP kernels.
+		 * Only report the failure the first 5 times.
+		 */
+		if (++t < 5)
+		{
 			printk(KERN_DEBUG "apm_do_idle failed (%d)\n",
 					(eax >> 8) & 0xff);
 			t = jiffies;
@@ -912,14 +964,16 @@ static void apm_power_off(void)
 #ifdef CONFIG_SMP
 	/* Some bioses don't like being called from CPU != 0 */
 	if (smp_processor_id() != 0) {
-		current->cpus_allowed = 1;
-		schedule();
+		set_cpus_allowed(current, 1 << 0);
 		if (unlikely(smp_processor_id() != 0))
 			BUG();
 	}
 #endif
 	if (apm_info.realmode_power_off)
+	{
+		(void)apm_save_cpus();
 		machine_real_restart(po_bios_call, sizeof(po_bios_call));
+	}
 	else
 		(void) set_system_power_state(APM_STATE_OFF);
 }
@@ -1096,6 +1150,19 @@ static int apm_console_blank(int blank)
 	}
 	if ((error == APM_SUCCESS) || (error == APM_NO_ERROR))
 		return 1;
+	if (error == APM_NOT_ENGAGED) {
+		static int tried;
+		int eng_error;
+		if (tried++ == 0) {
+			eng_error = apm_engage_power_management(APM_DEVICE_ALL, 1);
+			if (eng_error) {
+				apm_error("set display", error);
+				apm_error("engage interface", eng_error);
+				return 0;
+			} else
+				return apm_console_blank(blank);
+		}
+	}
 	apm_error("set display", error);
 	return 0;
 }
@@ -1424,7 +1491,7 @@ static ssize_t do_read(struct file *fp, char *buf, size_t count, loff_t *ppos)
 	as = fp->private_data;
 	if (check_apm_user(as, "read"))
 		return -EIO;
-	if (count < sizeof(apm_event_t))
+	if ((int)count < sizeof(apm_event_t))
 		return -EINVAL;
 	if ((queue_empty(as)) && (fp->f_flags & O_NONBLOCK))
 		return -EAGAIN;
@@ -1693,8 +1760,7 @@ static int apm(void *unused)
 	 * Method suggested by Ingo Molnar.
 	 */
 	if (smp_processor_id() != 0) {
-		current->cpus_allowed = 1;
-		schedule();
+		set_cpus_allowed(current, 1 << 0);
 		if (unlikely(smp_processor_id() != 0))
 			BUG();
 	}
@@ -1746,7 +1812,7 @@ static int apm(void *unused)
 		}
 	}
 
-	if (debug) {
+	if (debug && (num_online_cpus() == 1 || smp )) {
 		error = apm_get_power_status(&bx, &cx, &dx);
 		if (error)
 			printk(KERN_INFO "apm: power status not available\n");
@@ -1790,7 +1856,7 @@ static int apm(void *unused)
 		pm_power_off = apm_power_off;
 	register_sysrq_key('o', &sysrq_poweroff_op);
 
-	if (num_online_cpus() == 1) {
+	if (num_online_cpus() == 1 || smp) {
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
 		console_blank_hook = apm_console_blank;
 #endif
@@ -1832,6 +1898,11 @@ static int __init apm_setup(char *str)
 		if ((strncmp(str, "power-off", 9) == 0) ||
 		    (strncmp(str, "power_off", 9) == 0))
 			power_off = !invert;
+		if (strncmp(str, "smp", 3) == 0)
+		{
+			smp = !invert;
+			idle_threshold = 100;
+		}
 		if ((strncmp(str, "allow-ints", 10) == 0) ||
 		    (strncmp(str, "allow_ints", 10) == 0))
  			apm_info.allow_ints = !invert;
@@ -1934,7 +2005,7 @@ static int __init apm_init(void)
 		printk(KERN_NOTICE "apm: disabled on user request.\n");
 		return -ENODEV;
 	}
-	if ((num_online_cpus() > 1) && !power_off) {
+	if ((num_online_cpus() > 1) && !power_off && !smp) {
 		printk(KERN_NOTICE "apm: disabled - APM is not SMP safe.\n");
 		return -ENODEV;
 	}
@@ -1980,6 +2051,14 @@ static int __init apm_init(void)
 				(apm_info.bios.cseg_16_len - 1) & 0xffff);
 			_set_limit((char *)&cpu_gdt_table[i][APM_DS >> 3],
 				(apm_info.bios.dseg_len - 1) & 0xffff);
+		      /* workaround for broken BIOSes */
+	                if (apm_info.bios.cseg_len <= apm_info.bios.offset)
+        	                _set_limit((char *)&cpu_gdt_table[i][APM_CS >> 3], 64 * 1024 -1);
+                       if (apm_info.bios.dseg_len <= 0x40) { /* 0x40 * 4kB == 64kB */
+                        	/* for the BIOS that assumes granularity = 1 */
+                        	cpu_gdt_table[i][APM_DS >> 3].b |= 0x800000;
+                        	printk(KERN_NOTICE "apm: we set the granularity of dseg.\n");
+        	        }
 		}
 #endif
 	}
@@ -1990,7 +2069,7 @@ static int __init apm_init(void)
 
 	kernel_thread(apm, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND | SIGCHLD);
 
-	if (num_online_cpus() > 1) {
+	if (num_online_cpus() > 1 && !smp ) {
 		printk(KERN_NOTICE
 		   "apm: disabled - APM is not SMP safe (power off active).\n");
 		return 0;
@@ -2058,3 +2137,7 @@ MODULE_PARM_DESC(idle_threshold,
 MODULE_PARM(idle_period, "i");
 MODULE_PARM_DESC(idle_period,
 	"Period (in sec/100) over which to caculate the idle percentage");
+MODULE_PARM(smp, "i");
+MODULE_PARM_DESC(smp,
+	"Set this to enable APM use on an SMP platform. Use with caution on older systems");
+
