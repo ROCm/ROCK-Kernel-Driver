@@ -661,7 +661,7 @@ static struct sa1100fb_mach_info xp860_info __initdata = {
 
 
 static struct sa1100fb_mach_info * __init
-sa1100fb_get_machine_info(struct sa1100_par *par)
+sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 {
 	struct sa1100fb_mach_info *inf = NULL;
 
@@ -683,7 +683,7 @@ sa1100fb_get_machine_info(struct sa1100_par *par)
 #ifdef CONFIG_SA1100_H3XXX
 	if (machine_is_h3600()) {
 		inf = &h3600_info;
-		par->rgb[RGB_16] = &h3600_rgb_16;
+		fbi->rgb[RGB_16] = &h3600_rgb_16;
 	}
 	if (machine_is_h3100()) {
 		inf = &h3100_info;
@@ -705,7 +705,7 @@ sa1100fb_get_machine_info(struct sa1100_par *par)
 #ifdef CONFIG_SA1100_FREEBIRD
 	if (machine_is_freebird()) {
 		inf = &freebird_info;
-		par->rgb[RGB_16] = &freebird_rgb16;
+		fbi->rgb[RGB_16] = &freebird_rgb16;
 	}
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
@@ -758,10 +758,10 @@ sa1100fb_get_machine_info(struct sa1100_par *par)
 	if (machine_is_stork()) {
 #if STORK_TFT
 		inf = &stork_tft_info;
-		par->rgb[RGB_16] = &stork_tft_rgb_16;
+		fbi->rgb[RGB_16] = &stork_tft_rgb_16;
 #else
 		inf = &stork_dstn_info;
-		par->rgb[RGB_16] = &stork_dstn_rgb_16;
+		fbi->rgb[RGB_16] = &stork_dstn_rgb_16;
 #endif
 	}
 #endif
@@ -773,10 +773,10 @@ sa1100fb_get_machine_info(struct sa1100_par *par)
 	return inf;
 }
 
-static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct fb_info *);
-static void set_ctrlr_state(struct sa1100_par *par, u_int state);
+static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_info *);
+static void set_ctrlr_state(struct sa1100fb_info *fbi, u_int state);
 
-static inline void sa1100fb_schedule_task(struct sa1100_par *par, u_int state)
+static inline void sa1100fb_schedule_task(struct sa1100fb_info *fbi, u_int state)
 {
 	unsigned long flags;
 
@@ -789,16 +789,41 @@ static inline void sa1100fb_schedule_task(struct sa1100_par *par, u_int state)
 	 *  2. When we are blanking, but immediately unblank before we have
 	 *     blanked.  We do the "REENABLE" thing here as well, just to be sure.
 	 */
-	if (par->task_state == C_ENABLE && state == C_REENABLE)
+	if (fbi->task_state == C_ENABLE && state == C_REENABLE)
 		state = (u_int) -1;
-	if (par->task_state == C_DISABLE && state == C_ENABLE)
+	if (fbi->task_state == C_DISABLE && state == C_ENABLE)
 		state = C_REENABLE;
 
 	if (state != (u_int)-1) {
-		par->task_state = state;
-		schedule_task(&par->task);
+		fbi->task_state = state;
+		schedule_task(&fbi->task);
 	}
 	local_irq_restore(flags);
+}
+
+/*
+ * Get the VAR structure pointer for the specified console
+ */
+static inline struct fb_var_screeninfo *get_con_var(struct fb_info *info, int con)
+{
+	return (con == info->currcon || con == -1) ? &info->var : &fb_display[con].var;
+}
+
+/*
+ * Get the DISPLAY structure pointer for the specified console
+ */
+static inline struct display *get_con_display(struct fb_info *info, int con)
+{
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	return (con < 0) ? fbi->fb.disp : &fb_display[con];
+}
+
+/*
+ * Get the CMAP pointer for the specified console
+ */
+static inline struct fb_cmap *get_con_cmap(struct fb_info *info, int con)
+{
+	return (con == info->currcon || con == -1) ? &info->cmap : &fb_display[con].cmap;
 }
 
 static inline u_int
@@ -813,13 +838,19 @@ chan_to_field(u_int chan, struct fb_bitfield *bf)
  * Convert bits-per-pixel to a hardware palette PBS value.
  */
 static inline u_int
-palette_pbs(int bpp)
+palette_pbs(struct fb_var_screeninfo *var)
 {
 	int ret = 0;
-	switch (bpp) {
+	switch (var->bits_per_pixel) {
+#ifdef FBCON_HAS_CFB4
 	case 4:  ret = 0 << 12;	break;
+#endif
+#ifdef FBCON_HAS_CFB8
 	case 8:  ret = 1 << 12; break;
+#endif
+#ifdef FBCON_HAS_CFB16
 	case 16: ret = 2 << 12; break;
+#endif
 	}
 	return ret;
 }
@@ -828,18 +859,18 @@ static int
 sa1100fb_setpalettereg(u_int regno, u_int red, u_int green, u_int blue,
 		       u_int trans, struct fb_info *info)
 {
-	struct sa1100_par *par = (struct sa1100_par *) info->par;
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
 	u_int val, ret = 1;
 
-	if (regno < par->palette_size) {
+	if (regno < fbi->palette_size) {
 		val = ((red >> 4) & 0xf00);
 		val |= ((green >> 8) & 0x0f0);
 		val |= ((blue >> 12) & 0x00f);
 
 		if (regno == 0)
-			val |= palette_pbs(info->var.bits_per_pixel);
+			val |= palette_pbs(&fbi->fb.var);
 
-		par->palette_cpu[regno] = val;
+		fbi->palette_cpu[regno] = val;
 		ret = 0;
 	}
 	return ret;
@@ -849,6 +880,8 @@ static int
 sa1100fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		   u_int trans, struct fb_info *info)
 {
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	struct display *disp = get_con_display(info, info->currcon);
 	u_int val;
 	int ret = 1;
 
@@ -857,34 +890,33 @@ sa1100fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	 * rather than the register number.  The register number
 	 * is what you poke into the framebuffer to produce the
 	 * colour you requested.
-	 *
-	if (inverse) {
+	 */
+	if (disp->inverse) {
 		red   = 0xffff - red;
 		green = 0xffff - green;
 		blue  = 0xffff - blue;
 	}
-	*/
 
 	/*
 	 * If greyscale is true, then we convert the RGB value
 	 * to greyscale no mater what visual we are using.
 	 */
-	if (info->var.grayscale)
+	if (fbi->fb.var.grayscale)
 		red = green = blue = (19595 * red + 38470 * green +
 					7471 * blue) >> 16;
 
-	switch (info->fix.visual) {
+	switch (fbi->fb.disp->visual) {
 	case FB_VISUAL_TRUECOLOR:
 		/*
 		 * 12 or 16-bit True Colour.  We encode the RGB value
 		 * according to the RGB bitfield information.
 		 */
 		if (regno < 16) {
-			u16 *pal = info->pseudo_palette;
+			u16 *pal = fbi->fb.pseudo_palette;
 
-			val  = chan_to_field(red, &info->var.red);
-			val |= chan_to_field(green, &info->var.green);
-			val |= chan_to_field(blue, &info->var.blue);
+			val  = chan_to_field(red, &fbi->fb.var.red);
+			val |= chan_to_field(green, &fbi->fb.var.green);
+			val |= chan_to_field(blue, &fbi->fb.var.blue);
 
 			pal[regno] = val;
 			ret = 0;
@@ -931,20 +963,19 @@ sa1100fb_display_dma_period(struct fb_var_screeninfo *var)
  *    bitfields, horizontal timing, vertical timing.
  */
 static int
-sa1100fb_check_var(struct fb_var_screeninfo *var,
-		      struct fb_info *info)
+sa1100fb_validate_var(struct fb_var_screeninfo *var,
+		      struct sa1100fb_info *fbi)
 {
-	struct sa1100_par *par = (struct sa1100_par *) info->par;
-	int rgbidx = RGB_16, ret = -EINVAL;
+	int ret = -EINVAL;
 
 	if (var->xres < MIN_XRES)
 		var->xres = MIN_XRES;
 	if (var->yres < MIN_YRES)
 		var->yres = MIN_YRES;
-	if (var->xres > par->max_xres)
-		var->xres = par->max_xres;
-	if (var->yres > par->max_yres)
-		var->yres = par->max_yres;
+	if (var->xres > fbi->max_xres)
+		var->xres = fbi->max_xres;
+	if (var->yres > fbi->max_yres)
+		var->yres = fbi->max_yres;
 	var->xres_virtual =
 	    var->xres_virtual < var->xres ? var->xres : var->xres_virtual;
 	var->yres_virtual =
@@ -952,22 +983,23 @@ sa1100fb_check_var(struct fb_var_screeninfo *var,
 
 	DPRINTK("var->bits_per_pixel=%d\n", var->bits_per_pixel);
 	switch (var->bits_per_pixel) {
-	case 4: 	rgbidx = RGB_8; ret = 0; break;
-	case 8:		rgbidx = RGB_8; ret = 0; break;
-	case 16:	rgbidx = RGB_16; ret = 0; break;
+#ifdef FBCON_HAS_CFB4
+	case 4:		ret = 0; break;
+#endif
+#ifdef FBCON_HAS_CFB8
+	case 8:		ret = 0; break;
+#endif
+#ifdef FBCON_HAS_CFB16
+	case 16:	ret = 0; break;
+#endif
 	default:
 		break;
 	}
 
-	var->red	= par->rgb[rgbidx]->red;
-	var->green	= par->rgb[rgbidx]->green;
-	var->blue	= par->rgb[rgbidx]->blue;
-	var->transp	= par->rgb[rgbidx]->transp;
-
 #ifdef CONFIG_CPU_FREQ
 	printk(KERN_DEBUG "dma period = %d ps, clock = %d kHz\n",
 		sa1100fb_display_dma_period(var),
-		cpufreq_get());
+		cpufreq_get(smp_processor_id()));
 #endif
 
 	return ret;
@@ -994,26 +1026,24 @@ static inline void sa1100fb_set_truecolor(u_int is_true_color)
 	}
 }
 
-static int 
-sa1100fb_set_par(struct fb_info *info)
+static void
+sa1100fb_hw_set_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 {
-	struct sa1100_par *par = (struct sa1100_par *) info->par;
 	u_long palette_mem_size;
 
-	par->bpp = info->var.bits_per_pixel;
-	par->palette_size = par->bpp == 8 ? 256 : 16;
+	fbi->palette_size = var->bits_per_pixel == 8 ? 256 : 16;
 
-	palette_mem_size = par->palette_size * sizeof(u16);
+	palette_mem_size = fbi->palette_size * sizeof(u16);
 
 	DPRINTK("palette_mem_size = 0x%08lx\n", (u_long) palette_mem_size);
 
-	par->palette_cpu = (u16 *)(par->map_cpu + PAGE_SIZE - palette_mem_size);
-	par->palette_dma = par->map_dma + PAGE_SIZE - palette_mem_size;
+	fbi->palette_cpu = (u16 *)(fbi->map_cpu + PAGE_SIZE - palette_mem_size);
+	fbi->palette_dma = fbi->map_dma + PAGE_SIZE - palette_mem_size;
 
-	fb_set_cmap(&info->cmap, 1, info);
+	fb_set_cmap(&fbi->fb.cmap, 1, &fbi->fb);
 
 	/* Set board control register to handle new color depth */
-	sa1100fb_set_truecolor(info->var.bits_per_pixel >= 16);
+	sa1100fb_set_truecolor(var->bits_per_pixel >= 16);
 
 #ifdef CONFIG_SA1100_OMNIMETER
 #error Do we have to do this here?   We already do it at init time.
@@ -1021,31 +1051,210 @@ sa1100fb_set_par(struct fb_info *info)
 		SetLCDContrast(DefaultLCDContrast);
 #endif
 
-	sa1100fb_activate_var(&info->var, info);
+	sa1100fb_activate_var(var, fbi);
 
-	par->palette_cpu[0] = (par->palette_cpu[0] &
-					 0xcfff) | palette_pbs(info->var.bits_per_pixel);
-	
-	switch (info->var.bits_per_pixel) {
+	fbi->palette_cpu[0] = (fbi->palette_cpu[0] &
+					 0xcfff) | palette_pbs(var);
+
+}
+
+/*
+ * sa1100fb_set_var():
+ *	Set the user defined part of the display for the specified console
+ */
+static int
+sa1100fb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
+{
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	struct fb_var_screeninfo *dvar = get_con_var(&fbi->fb, con);
+	struct display *display = get_con_display(&fbi->fb, con);
+	int err, chgvar = 0, rgbidx;
+
+	DPRINTK("set_var\n");
+
+	/*
+	 * Decode var contents into a par structure, adjusting any
+	 * out of range values.
+	 */
+	err = sa1100fb_validate_var(var, fbi);
+	if (err)
+		return err;
+
+	if (var->activate & FB_ACTIVATE_TEST)
+		return 0;
+
+	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
+		return -EINVAL;
+
+	if (dvar->xres != var->xres)
+		chgvar = 1;
+	if (dvar->yres != var->yres)
+		chgvar = 1;
+	if (dvar->xres_virtual != var->xres_virtual)
+		chgvar = 1;
+	if (dvar->yres_virtual != var->yres_virtual)
+		chgvar = 1;
+	if (dvar->bits_per_pixel != var->bits_per_pixel)
+		chgvar = 1;
+	if (con < 0)
+		chgvar = 0;
+
+	switch (var->bits_per_pixel) {
+#ifdef FBCON_HAS_CFB4
 	case 4:
-		if (par->cmap_static)
-			info->fix.visual = FB_VISUAL_STATIC_PSEUDOCOLOR;
+		if (fbi->cmap_static)
+			display->visual	= FB_VISUAL_STATIC_PSEUDOCOLOR;
 		else
-			info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
-		info->fix.line_length	= info->var.xres / 2;
+			display->visual	= FB_VISUAL_PSEUDOCOLOR;
+		display->line_length	= var->xres / 2;
+		display->dispsw		= &fbcon_cfb4;
+		rgbidx			= RGB_8;
 		break;
+#endif
+#ifdef FBCON_HAS_CFB8
 	case 8:
-		if (par->cmap_static)
-			info->fix.visual = FB_VISUAL_STATIC_PSEUDOCOLOR;
+		if (fbi->cmap_static)
+			display->visual	= FB_VISUAL_STATIC_PSEUDOCOLOR;
 		else
-			info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
-		info->fix.line_length	= info->var.xres;
+			display->visual	= FB_VISUAL_PSEUDOCOLOR;
+		display->line_length	= var->xres;
+		display->dispsw		= &fbcon_cfb8;
+		rgbidx			= RGB_8;
 		break;
+#endif
+#ifdef FBCON_HAS_CFB16
 	case 16:
-		info->fix.visual	= FB_VISUAL_TRUECOLOR;
-		info->fix.line_length	= info->var.xres * 2;
+		display->visual		= FB_VISUAL_TRUECOLOR;
+		display->line_length	= var->xres * 2;
+		display->dispsw		= &fbcon_cfb16;
+		display->dispsw_data	= fbi->fb.pseudo_palette;
+		rgbidx			= RGB_16;
+		break;
+#endif
+	default:
+		rgbidx = 0;
+		display->dispsw = &fbcon_dummy;
 		break;
 	}
+
+	display->next_line	= display->line_length;
+	display->type		= fbi->fb.fix.type;
+	display->type_aux	= fbi->fb.fix.type_aux;
+	display->ypanstep	= fbi->fb.fix.ypanstep;
+	display->ywrapstep	= fbi->fb.fix.ywrapstep;
+	display->can_soft_blank	= 1;
+	display->inverse	= fbi->cmap_inverse;
+
+	*dvar			= *var;
+	dvar->activate		&= ~FB_ACTIVATE_ALL;
+
+	/*
+	 * Copy the RGB parameters for this display
+	 * from the machine specific parameters.
+	 */
+	dvar->red		= fbi->rgb[rgbidx]->red;
+	dvar->green		= fbi->rgb[rgbidx]->green;
+	dvar->blue		= fbi->rgb[rgbidx]->blue;
+	dvar->transp		= fbi->rgb[rgbidx]->transp;
+
+	DPRINTK("RGBT length = %d:%d:%d:%d\n",
+		dvar->red.length, dvar->green.length, dvar->blue.length,
+		dvar->transp.length);
+
+	DPRINTK("RGBT offset = %d:%d:%d:%d\n",
+		dvar->red.offset, dvar->green.offset, dvar->blue.offset,
+		dvar->transp.offset);
+
+	/*
+	 * Update the old var.  The fbcon drivers still use this.
+	 * Once they are using fbi->fb.var, this can be dropped.
+	 */
+	display->var = *dvar;
+
+	/*
+	 * If we are setting all the virtual consoles, also set the
+	 * defaults used to create new consoles.
+	 */
+	if (var->activate & FB_ACTIVATE_ALL)
+		fbi->fb.disp->var = *dvar;
+
+	/*
+	 * If the console has changed and the console has defined
+	 * a changevar function, call that function.
+	 */
+	if (chgvar && info && fbi->fb.changevar)
+		fbi->fb.changevar(con);
+
+	/* If the current console is selected, activate the new var. */
+	if (con != fbi->fb.currcon)
+		return 0;
+
+	sa1100fb_hw_set_var(dvar, fbi);
+
+	return 0;
+}
+
+static int
+__do_set_cmap(struct fb_cmap *cmap, int kspc, int con,
+	      struct fb_info *info)
+{
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	struct fb_cmap *dcmap = get_con_cmap(info, con);
+	int err = 0;
+
+	if (con == -1)
+		con = info->currcon;
+
+	/* no colormap allocated? (we always have "this" colour map allocated) */
+	if (con >= 0)
+		err = fb_alloc_cmap(&fb_display[con].cmap, fbi->palette_size, 0);
+
+	if (!err && con == info->currcon)
+		err = fb_set_cmap(cmap, kspc, info);
+
+	if (!err)
+		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
+
+	return err;
+}
+
+static int
+sa1100fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
+		  struct fb_info *info)
+{
+	struct display *disp = get_con_display(info, con);
+
+	if (disp->visual == FB_VISUAL_TRUECOLOR ||
+	    disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
+		return -EINVAL;
+
+	return __do_set_cmap(cmap, kspc, con, info);
+}
+
+static int
+sa1100fb_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
+{
+	struct display *display = get_con_display(info, con);
+
+	*fix = info->fix;
+
+	fix->line_length = display->line_length;
+	fix->visual	 = display->visual;
+	return 0;
+}
+
+static int
+sa1100fb_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
+{
+	*var = *get_con_var(info, con);
+	return 0;
+}
+
+static int
+sa1100fb_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
+{
+	struct fb_cmap *dcmap = get_con_cmap(info, con);
+	fb_copy_cmap(dcmap, cmap, kspc ? 0 : 2);
 	return 0;
 }
 
@@ -1086,21 +1295,21 @@ sa1100fb_set_par(struct fb_info *info)
  */
 static int sa1100fb_blank(int blank, struct fb_info *info)
 {
-	struct sa1100_par *par = (struct sa1100_par *) info->par;
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
 	int i;
 
-	DPRINTK("sa1100fb_blank: blank=%d fix.id=%s\n", blank,
-		info->fix.id);
+	DPRINTK("sa1100fb_blank: blank=%d info->modename=%s\n", blank,
+		fbi->fb.modename);
 
 	switch (blank) {
 	case VESA_POWERDOWN:
 	case VESA_VSYNC_SUSPEND:
 	case VESA_HSYNC_SUSPEND:
-		if (info->disp->visual == FB_VISUAL_PSEUDOCOLOR ||
-		    info->disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
-			for (i = 0; i < par->palette_size; i++)
+		if (fbi->fb.disp->visual == FB_VISUAL_PSEUDOCOLOR ||
+		    fbi->fb.disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
+			for (i = 0; i < fbi->palette_size; i++)
 				sa1100fb_setpalettereg(i, 0, 0, 0, 0, info);
-		sa1100fb_schedule_task(par, C_DISABLE);
+		sa1100fb_schedule_task(fbi, C_DISABLE);
 		if (sa1100fb_blank_helper)
 			sa1100fb_blank_helper(blank);
 		break;
@@ -1108,29 +1317,82 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 	case VESA_NO_BLANKING:
 		if (sa1100fb_blank_helper)
 			sa1100fb_blank_helper(blank);
-		if (info->disp->visual == FB_VISUAL_PSEUDOCOLOR ||
-		    info->disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
-			fb_set_cmap(&info->cmap, 1, info);
-		sa1100fb_schedule_task(par, C_ENABLE);
+		if (fbi->fb.disp->visual == FB_VISUAL_PSEUDOCOLOR ||
+		    fbi->fb.disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
+			fb_set_cmap(&fbi->fb.cmap, 1, info);
+		sa1100fb_schedule_task(fbi, C_ENABLE);
 	}
 	return 0;
 }
 
 static struct fb_ops sa1100fb_ops = {
 	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_check_var:	sa1100fb_check_var,
-	fb_set_par:	sa1100fb_set_par,
+	fb_get_fix:	sa1100fb_get_fix,
+	fb_get_var:	sa1100fb_get_var,
+	fb_set_var:	sa1100fb_set_var,
+	fb_get_cmap:	sa1100fb_get_cmap,
+	fb_set_cmap:	sa1100fb_set_cmap,
 	fb_setcolreg:	sa1100fb_setcolreg,
 	fb_blank:	sa1100fb_blank,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
 };
+
+/*
+ *  sa1100fb_switch():       
+ *	Change to the specified console.  Palette and video mode
+ *      are changed to the console's stored parameters.
+ *
+ *	Uh oh, this can be called from a tasklet (IRQ)
+ */
+static int sa1100fb_switch(int con, struct fb_info *info)
+{
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	struct display *disp;
+	struct fb_cmap *cmap;
+
+	DPRINTK("con=%d info->modename=%s\n", con, fbi->fb.modename);
+
+	if (con == info->currcon)
+		return 0;
+
+	if (info->currcon >= 0) {
+		disp = fb_display + info->currcon;
+
+		/*
+		 * Save the old colormap and video mode.
+		 */
+		disp->var = fbi->fb.var;
+
+		if (disp->cmap.len)
+			fb_copy_cmap(&fbi->fb.cmap, &disp->cmap, 0);
+	}
+
+	info->currcon = con;
+	disp = fb_display + con;
+
+	/*
+	 * Make sure that our colourmap contains 256 entries.
+	 */
+	fb_alloc_cmap(&fbi->fb.cmap, 256, 0);
+
+	if (disp->cmap.len)
+		cmap = &disp->cmap;
+	else
+		cmap = fb_default_cmap(1 << disp->var.bits_per_pixel);
+
+	fb_copy_cmap(cmap, &fbi->fb.cmap, 0);
+
+	fbi->fb.var = disp->var;
+	fbi->fb.var.activate = FB_ACTIVATE_NOW;
+
+	sa1100fb_set_var(&fbi->fb.var, con, info);
+	return 0;
+}
+
+static int sa1100fb_updatevar(int con, struct fb_info *info)
+{
+	DPRINTK("entered\n");
+	return 0;
+}
 
 /*
  * Calculate the PCD value from the clock rate (in picoseconds).
@@ -1141,7 +1403,7 @@ static inline int get_pcd(unsigned int pixclock)
 	unsigned int pcd;
 
 	if (pixclock) {
-		pcd = cpufreq_get() / 100;
+		pcd = cpufreq_get(0) / 100;
 		pcd *= pixclock;
 		pcd /= 10000000;
 		pcd += 1;	/* make up for integer math truncations */
@@ -1171,9 +1433,8 @@ static inline int get_pcd(unsigned int pixclock)
  *	Configures LCD Controller based on entries in var parameter.  Settings are      
  *	only written to the controller if changes were made.  
  */
-static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct fb_info *info)
+static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 {
-	struct sa1100_par *par = (struct sa1100_par *) info->par;
 	struct sa1100fb_lcd_reg new_regs;
 	u_int half_screen_size, yres, pcd = get_pcd(var->pixclock);
 	u_long flags;
@@ -1190,31 +1451,31 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct fb_info *
 #if DEBUG_VAR
 	if (var->xres < 16        || var->xres > 1024)
 		printk(KERN_ERR "%s: invalid xres %d\n",
-			info->fix.id, var->xres);
+			fbi->fb.fix.id, var->xres);
 	if (var->hsync_len < 1    || var->hsync_len > 64)
 		printk(KERN_ERR "%s: invalid hsync_len %d\n",
-			info->fix.id, var->hsync_len);
+			fbi->fb.fix.id, var->hsync_len);
 	if (var->left_margin < 1  || var->left_margin > 255)
 		printk(KERN_ERR "%s: invalid left_margin %d\n",
-			info->fix.id, var->left_margin);
+			fbi->fb.fix.id, var->left_margin);
 	if (var->right_margin < 1 || var->right_margin > 255)
 		printk(KERN_ERR "%s: invalid right_margin %d\n",
-			info->fix.id, var->right_margin);
+			fbi->fb.fix.id, var->right_margin);
 	if (var->yres < 1         || var->yres > 1024)
 		printk(KERN_ERR "%s: invalid yres %d\n",
-			info->fix.id, var->yres);
+			fbi->fb.fix.id, var->yres);
 	if (var->vsync_len < 1    || var->vsync_len > 64)
 		printk(KERN_ERR "%s: invalid vsync_len %d\n",
-			info->fix.id, var->vsync_len);
+			fbi->fb.fix.id, var->vsync_len);
 	if (var->upper_margin < 0 || var->upper_margin > 255)
 		printk(KERN_ERR "%s: invalid upper_margin %d\n",
-			info->fix.id, var->upper_margin);
+			fbi->fb.fix.id, var->upper_margin);
 	if (var->lower_margin < 0 || var->lower_margin > 255)
 		printk(KERN_ERR "%s: invalid lower_margin %d\n",
-			info->fix.id, var->lower_margin);
+			fbi->fb.fix.id, var->lower_margin);
 #endif
 
-	new_regs.lccr0 = par->lccr0 |
+	new_regs.lccr0 = fbi->lccr0 |
 		LCCR0_LEN | LCCR0_LDM | LCCR0_BAM |
 		LCCR0_ERM | LCCR0_LtlEnd | LCCR0_DMADel(0);
 
@@ -1229,7 +1490,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct fb_info *
 	 * the YRES parameter.
 	 */
 	yres = var->yres;
-	if (par->lccr0 & LCCR0_Dual)
+	if (fbi->lccr0 & LCCR0_Dual)
 		yres /= 2;
 
 	new_regs.lccr2 =
@@ -1238,7 +1499,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct fb_info *
 		LCCR2_BegFrmDel(var->upper_margin) +
 		LCCR2_EndFrmDel(var->lower_margin);
 
-	new_regs.lccr3 = par->lccr3 |
+	new_regs.lccr3 = fbi->lccr3 |
 		(var->sync & FB_SYNC_HOR_HIGH_ACT ? LCCR3_HorSnchH : LCCR3_HorSnchL) |
 		(var->sync & FB_SYNC_VERT_HIGH_ACT ? LCCR3_VrtSnchH : LCCR3_VrtSnchL) |
 		LCCR3_ACBsCntOff;
@@ -1256,23 +1517,23 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct fb_info *
 
 	/* Update shadow copy atomically */
 	local_irq_save(flags);
-	par->dbar1 = par->palette_dma;
-	par->dbar2 = par->screen_dma + half_screen_size;
+	fbi->dbar1 = fbi->palette_dma;
+	fbi->dbar2 = fbi->screen_dma + half_screen_size;
 
-	par->reg_lccr0 = new_regs.lccr0;
-	par->reg_lccr1 = new_regs.lccr1;
-	par->reg_lccr2 = new_regs.lccr2;
-	par->reg_lccr3 = new_regs.lccr3;
+	fbi->reg_lccr0 = new_regs.lccr0;
+	fbi->reg_lccr1 = new_regs.lccr1;
+	fbi->reg_lccr2 = new_regs.lccr2;
+	fbi->reg_lccr3 = new_regs.lccr3;
 	local_irq_restore(flags);
 
 	/*
 	 * Only update the registers if the controller is enabled
 	 * and something has changed.
 	 */
-	if ((LCCR0 != par->reg_lccr0)       || (LCCR1 != par->reg_lccr1) ||
-	    (LCCR2 != par->reg_lccr2)       || (LCCR3 != par->reg_lccr3) ||
-	    (DBAR1 != par->dbar1) || (DBAR2 != par->dbar2))
-		sa1100fb_schedule_task(par, C_REENABLE);
+	if ((LCCR0 != fbi->reg_lccr0)       || (LCCR1 != fbi->reg_lccr1) ||
+	    (LCCR2 != fbi->reg_lccr2)       || (LCCR3 != fbi->reg_lccr3) ||
+	    (DBAR1 != fbi->dbar1) || (DBAR2 != fbi->dbar2))
+		sa1100fb_schedule_task(fbi, C_REENABLE);
 
 	return 0;
 }
@@ -1289,7 +1550,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct fb_info *
  * Also, I'm expecting that the backlight stuff should
  * be handled differently.
  */
-static inline void sa1100fb_backlight_on(struct sa1100_par *par)
+static inline void sa1100fb_backlight_on(struct sa1100fb_info *fbi)
 {
 	DPRINTK("backlight on\n");
 
@@ -1302,7 +1563,7 @@ static inline void sa1100fb_backlight_on(struct sa1100_par *par)
  * Also, I'm expecting that the backlight stuff should
  * be handled differently.
  */
-static inline void sa1100fb_backlight_off(struct sa1100_par *par)
+static inline void sa1100fb_backlight_off(struct sa1100fb_info *fbi)
 {
 	DPRINTK("backlight off\n");
 
@@ -1310,7 +1571,7 @@ static inline void sa1100fb_backlight_off(struct sa1100_par *par)
 		sa1100fb_backlight_power(0);
 }
 
-static inline void sa1100fb_power_up_lcd(struct sa1100_par *par)
+static inline void sa1100fb_power_up_lcd(struct sa1100fb_info *fbi)
 {
 	DPRINTK("LCD power on\n");
 
@@ -1325,7 +1586,7 @@ static inline void sa1100fb_power_up_lcd(struct sa1100_par *par)
 #endif
 }
 
-static inline void sa1100fb_power_down_lcd(struct sa1100_par *par)
+static inline void sa1100fb_power_down_lcd(struct sa1100fb_info *fbi)
 {
 	DPRINTK("LCD power off\n");
 
@@ -1340,7 +1601,7 @@ static inline void sa1100fb_power_down_lcd(struct sa1100_par *par)
 #endif
 }
 
-static void sa1100fb_setup_gpio(struct sa1100_par *par)
+static void sa1100fb_setup_gpio(struct sa1100fb_info *fbi)
 {
 	u_int mask = 0;
 
@@ -1356,12 +1617,12 @@ static void sa1100fb_setup_gpio(struct sa1100_par *par)
 	 * clear LDD15 to 12 for 4 or 8bpp modes with active
 	 * panels.  
 	 */
-	if ((par->reg_lccr0 & LCCR0_CMS) == LCCR0_Color &&
-	    (par->reg_lccr0 & (LCCR0_Dual|LCCR0_Act)) != 0) {
+	if ((fbi->reg_lccr0 & LCCR0_CMS) == LCCR0_Color &&
+	    (fbi->reg_lccr0 & (LCCR0_Dual|LCCR0_Act)) != 0) {
 		mask = GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9  | GPIO_LDD8;
 
-		if (par->bpp > 8 ||
-		    (par->reg_lccr0 & (LCCR0_Dual|LCCR0_Act)) == LCCR0_Dual)
+		if (fbi->fb.var.bits_per_pixel > 8 ||
+		    (fbi->reg_lccr0 & (LCCR0_Dual|LCCR0_Act)) == LCCR0_Dual)
 			mask |= GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12;
 
 	}
@@ -1405,23 +1666,23 @@ static void sa1100fb_setup_gpio(struct sa1100_par *par)
 	}
 }
 
-static void sa1100fb_enable_controller(struct sa1100_par *par)
+static void sa1100fb_enable_controller(struct sa1100fb_info *fbi)
 {
 	DPRINTK("Enabling LCD controller\n");
 
 	/*
 	 * Make sure the mode bits are present in the first palette entry
 	 */
-	par->palette_cpu[0] &= 0xcfff;
-	par->palette_cpu[0] |= palette_pbs(par->bpp);
+	fbi->palette_cpu[0] &= 0xcfff;
+	fbi->palette_cpu[0] |= palette_pbs(&fbi->fb.var);
 
 	/* Sequence from 11.7.10 */
-	LCCR3 = par->reg_lccr3;
-	LCCR2 = par->reg_lccr2;
-	LCCR1 = par->reg_lccr1;
-	LCCR0 = par->reg_lccr0 & ~LCCR0_LEN;
-	DBAR1 = par->dbar1;
-	DBAR2 = par->dbar2;
+	LCCR3 = fbi->reg_lccr3;
+	LCCR2 = fbi->reg_lccr2;
+	LCCR1 = fbi->reg_lccr1;
+	LCCR0 = fbi->reg_lccr0 & ~LCCR0_LEN;
+	DBAR1 = fbi->dbar1;
+	DBAR2 = fbi->dbar2;
 	LCCR0 |= LCCR0_LEN;
 
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
@@ -1447,7 +1708,7 @@ static void sa1100fb_enable_controller(struct sa1100_par *par)
 	DPRINTK("LCCR3 = 0x%08x\n", LCCR3);
 }
 
-static void sa1100fb_disable_controller(struct sa1100_par *par)
+static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -1481,7 +1742,7 @@ static void sa1100fb_disable_controller(struct sa1100_par *par)
 		GPCR |= SHANNON_GPIO_DISP_EN;
 	}	
 
-	add_wait_queue(&par->ctrlr_wait, &wait);
+	add_wait_queue(&fbi->ctrlr_wait, &wait);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 
 	LCSR = 0xffffffff;	/* Clear LCD Status Register */
@@ -1490,7 +1751,7 @@ static void sa1100fb_disable_controller(struct sa1100_par *par)
 
 	schedule_timeout(20 * HZ / 1000);
 	current->state = TASK_RUNNING;
-	remove_wait_queue(&par->ctrlr_wait, &wait);
+	remove_wait_queue(&fbi->ctrlr_wait, &wait);
 }
 
 /*
@@ -1498,12 +1759,12 @@ static void sa1100fb_disable_controller(struct sa1100_par *par)
  */
 static void sa1100fb_handle_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
-	struct sa1100_par *par = dev_id;
+	struct sa1100fb_info *fbi = dev_id;
 	unsigned int lcsr = LCSR;
 
 	if (lcsr & LCSR_LDD) {
 		LCCR0 |= LCCR0_LDM;
-		wake_up(&par->ctrlr_wait);
+		wake_up(&fbi->ctrlr_wait);
 	}
 
 	LCSR = lcsr;
@@ -1514,13 +1775,13 @@ static void sa1100fb_handle_irq(int irq, void *dev_id, struct pt_regs *regs)
  * sleep when disabling the LCD controller, or if we get two contending
  * processes trying to alter state.
  */
-static void set_ctrlr_state(struct sa1100_par *par, u_int state)
+static void set_ctrlr_state(struct sa1100fb_info *fbi, u_int state)
 {
 	u_int old_state;
 
-	down(&par->ctrlr_sem);
+	down(&fbi->ctrlr_sem);
 
-	old_state = par->state;
+	old_state = fbi->state;
 
 	switch (state) {
 	case C_DISABLE_CLKCHANGE:
@@ -1529,8 +1790,8 @@ static void set_ctrlr_state(struct sa1100_par *par, u_int state)
 		 * controller is already disabled, then do nothing.
 		 */
 		if (old_state != C_DISABLE && old_state != C_DISABLE_PM) {
-			par->state = state;
-			sa1100fb_disable_controller(par);
+			fbi->state = state;
+			sa1100fb_disable_controller(fbi);
 		}
 		break;
 
@@ -1540,12 +1801,12 @@ static void set_ctrlr_state(struct sa1100_par *par, u_int state)
 		 * Disable controller
 		 */
 		if (old_state != C_DISABLE) {
-			par->state = state;
+			fbi->state = state;
 
-			sa1100fb_backlight_off(par);
+			sa1100fb_backlight_off(fbi);
 			if (old_state != C_DISABLE_CLKCHANGE)
-				sa1100fb_disable_controller(par);
-			sa1100fb_power_down_lcd(par);
+				sa1100fb_disable_controller(fbi);
+			sa1100fb_power_down_lcd(fbi);
 		}
 		break;
 
@@ -1555,8 +1816,8 @@ static void set_ctrlr_state(struct sa1100_par *par, u_int state)
 		 * do this if we were disabled for the clock change.
 		 */
 		if (old_state == C_DISABLE_CLKCHANGE) {
-			par->state = C_ENABLE;
-			sa1100fb_enable_controller(par);
+			fbi->state = C_ENABLE;
+			sa1100fb_enable_controller(fbi);
 		}
 		break;
 
@@ -1567,9 +1828,9 @@ static void set_ctrlr_state(struct sa1100_par *par, u_int state)
 		 * registers.
 		 */
 		if (old_state == C_ENABLE) {
-			sa1100fb_disable_controller(par);
-			sa1100fb_setup_gpio(par);
-			sa1100fb_enable_controller(par);
+			sa1100fb_disable_controller(fbi);
+			sa1100fb_setup_gpio(fbi);
+			sa1100fb_enable_controller(fbi);
 		}
 		break;
 
@@ -1589,15 +1850,15 @@ static void set_ctrlr_state(struct sa1100_par *par, u_int state)
 		 * turn on the backlight.
 		 */
 		if (old_state != C_ENABLE) {
-			par->state = C_ENABLE;
-			sa1100fb_setup_gpio(par);
-			sa1100fb_power_up_lcd(par);
-			sa1100fb_enable_controller(par);
-			sa1100fb_backlight_on(par);
+			fbi->state = C_ENABLE;
+			sa1100fb_setup_gpio(fbi);
+			sa1100fb_power_up_lcd(fbi);
+			sa1100fb_enable_controller(fbi);
+			sa1100fb_backlight_on(fbi);
 		}
 		break;
 	}
-	up(&par->ctrlr_sem);
+	up(&fbi->ctrlr_sem);
 }
 
 /*
@@ -1606,12 +1867,10 @@ static void set_ctrlr_state(struct sa1100_par *par, u_int state)
  */
 static void sa1100fb_task(void *dummy)
 {
-	struct fb_info *info = dummy;
-	struct sa1100_par *par = (struct sa1100_par *) info->par;
+	struct sa1100fb_info *fbi = dummy;
+	u_int state = xchg(&fbi->task_state, -1);
 
-	u_int state = xchg(&par->task_state, -1);
-
-	set_ctrlr_state(par, state);
+	set_ctrlr_state(fbi, state);
 }
 
 #ifdef CONFIG_CPU_FREQ
@@ -1620,7 +1879,7 @@ static void sa1100fb_task(void *dummy)
  * This, together with the SDRAM bandwidth defines the slowest CPU
  * frequency that can be selected.
  */
-static unsigned int sa1100fb_min_dma_period(struct fb_info *info)
+static unsigned int sa1100fb_min_dma_period(struct sa1100fb_info *fbi)
 {
 	unsigned int min_period = (unsigned int)-1;
 	int i;
@@ -1631,13 +1890,13 @@ static unsigned int sa1100fb_min_dma_period(struct fb_info *info)
 		/*
 		 * Do we own this display?
 		 */
-		if (fb_display[i].fb_info != info)
+		if (fb_display[i].fb_info != &fbi->fb)
 			continue;
 
 		/*
 		 * Ok, calculate its DMA period
 		 */
-		period = sa1100fb_display_dma_period(&info->var);
+		period = sa1100fb_display_dma_period(get_con_var(&fbi->fb, i));
 		if (period < min_period)
 			min_period = period;
 	}
@@ -1654,27 +1913,26 @@ static int
 sa1100fb_clkchg_notifier(struct notifier_block *nb, unsigned long val,
 			 void *data)
 {
-	struct fb_info *info = TO_INF(nb, clockchg);
-	struct sa1100_par *par = (struct sa1100_par *) info->par;
-	struct cpufreq_freqs *mm = data;
+	struct sa1100fb_info *fbi = TO_INF(nb, clockchg);
+	struct cpufreq_minmax *mm = data;
 	u_int pcd;
 
 	switch (val) {
 	case CPUFREQ_MINMAX:
 		printk(KERN_DEBUG "min dma period: %d ps, old clock %d kHz, "
-			"new clock %d kHz\n", sa1100fb_min_dma_period(info),
-			mm->cur, mm->new);
+			"new clock %d kHz\n", sa1100fb_min_dma_period(fbi),
+			mm->cur_freq, mm->new_freq);
 		/* todo: fill in min/max values */
 		break;
 
 	case CPUFREQ_PRECHANGE:
-		set_ctrlr_state(par, C_DISABLE_CLKCHANGE);
+		set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
 		break;
 
 	case CPUFREQ_POSTCHANGE:
-		pcd = get_pcd(info->var.pixclock);
-		par->reg_lccr3 = (par->reg_lccr3 & ~0xff) | LCCR3_PixClkDiv(pcd);
-		set_ctrlr_state(par, C_ENABLE_CLKCHANGE);
+		pcd = get_pcd(fbi->fb.var.pixclock);
+		fbi->reg_lccr3 = (fbi->reg_lccr3 & ~0xff) | LCCR3_PixClkDiv(pcd);
+		set_ctrlr_state(fbi, C_ENABLE_CLKCHANGE);
 		break;
 	}
 	return 0;
@@ -1689,7 +1947,7 @@ sa1100fb_clkchg_notifier(struct notifier_block *nb, unsigned long val,
 static int
 sa1100fb_pm_callback(struct pm_dev *pm_dev, pm_request_t req, void *data)
 {
-	struct sa1100_par *par = pm_dev->data;
+	struct sa1100fb_info *fbi = pm_dev->data;
 
 	DPRINTK("pm_callback: %d\n", req);
 
@@ -1698,10 +1956,10 @@ sa1100fb_pm_callback(struct pm_dev *pm_dev, pm_request_t req, void *data)
 
 		if (state == 0) {
 			/* Enter D0. */
-			set_ctrlr_state(par, C_ENABLE_PM);
+			set_ctrlr_state(fbi, C_ENABLE_PM);
 		} else {
 			/* Enter D1-D3.  Disable the LCD controller.  */
-			set_ctrlr_state(par, C_DISABLE_PM);
+			set_ctrlr_state(fbi, C_DISABLE_PM);
 		}
 	}
 	DPRINTK("done\n");
@@ -1717,142 +1975,133 @@ sa1100fb_pm_callback(struct pm_dev *pm_dev, pm_request_t req, void *data)
  *      cache.  Once this area is remapped, all virtual memory
  *      access to the video memory should occur at the new region.
  */
-static int __init sa1100fb_map_video_memory(struct fb_info *info)
+static int __init sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
 {
-	struct sa1100_par *par= (struct sa1100_par *) info->par;
 	/*
 	 * We reserve one page for the palette, plus the size
 	 * of the framebuffer.
 	 */
-	par->map_size = PAGE_ALIGN(info->fix.smem_len + PAGE_SIZE);
-	par->map_cpu = consistent_alloc(GFP_KERNEL, par->map_size,
-					&par->map_dma);
+	fbi->map_size = PAGE_ALIGN(fbi->fb.fix.smem_len + PAGE_SIZE);
+	fbi->map_cpu = consistent_alloc(GFP_KERNEL, fbi->map_size,
+					&fbi->map_dma);
 
-	if (par->map_cpu) {
-		info->screen_base = par->map_cpu + PAGE_SIZE;
-		par->screen_dma = par->map_dma + PAGE_SIZE;
-		info->fix.smem_start = par->screen_dma;
+	if (fbi->map_cpu) {
+		fbi->fb.screen_base = fbi->map_cpu + PAGE_SIZE;
+		fbi->screen_dma = fbi->map_dma + PAGE_SIZE;
+		fbi->fb.fix.smem_start = fbi->screen_dma;
 	}
 
-	return par->map_cpu ? 0 : -ENOMEM;
+	return fbi->map_cpu ? 0 : -ENOMEM;
 }
 
-/* Fake monspecs to fill in infonfo structure */
+/* Fake monspecs to fill in fbinfo structure */
 static struct fb_monspecs monspecs __initdata = {
 	30000, 70000, 50, 65, 0	/* Generic */
 };
 
 
-static struct fb_info * __init sa1100fb_init_fbinfo(void)
+static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 {
 	struct sa1100fb_mach_info *inf;
-	struct fb_info *info;
-	struct sa1100_par *par;
+	struct sa1100fb_info *fbi;
 
-	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
+	fbi = kmalloc(sizeof(struct sa1100fb_info) + sizeof(struct display) +
 		      sizeof(u16) * 16, GFP_KERNEL);
-	if (!info)
+	if (!fbi)
 		return NULL;
 
-	memset(info, 0, sizeof(struct fb_info) + sizeof(struct display));
+	memset(fbi, 0, sizeof(struct sa1100fb_info) + sizeof(struct display));
 
-	par = kmalloc(sizeof(struct sa1100_par), GFP_KERNEL);
-	memset(par, 0, sizeof(struct sa1100_par));
+	fbi->fb.currcon		= -1;
 
-	info->currcon		= -1;
+	strcpy(fbi->fb.fix.id, SA1100_NAME);
 
-	strcpy(info->fix.id, SA1100_NAME);
+	fbi->fb.fix.type	= FB_TYPE_PACKED_PIXELS;
+	fbi->fb.fix.type_aux	= 0;
+	fbi->fb.fix.xpanstep	= 0;
+	fbi->fb.fix.ypanstep	= 0;
+	fbi->fb.fix.ywrapstep	= 0;
+	fbi->fb.fix.accel	= FB_ACCEL_NONE;
 
-	info->fix.type	= FB_TYPE_PACKED_PIXELS;
-	info->fix.type_aux	= 0;
-	info->fix.xpanstep	= 0;
-	info->fix.ypanstep	= 0;
-	info->fix.ywrapstep	= 0;
-	info->fix.accel	= FB_ACCEL_NONE;
+	fbi->fb.var.nonstd	= 0;
+	fbi->fb.var.activate	= FB_ACTIVATE_NOW;
+	fbi->fb.var.height	= -1;
+	fbi->fb.var.width	= -1;
+	fbi->fb.var.accel_flags	= 0;
+	fbi->fb.var.vmode	= FB_VMODE_NONINTERLACED;
 
-	info->var.nonstd	= 0;
-	info->var.activate	= FB_ACTIVATE_NOW;
-	info->var.height	= -1;
-	info->var.width	= -1;
-	info->var.accel_flags	= 0;
-	info->var.vmode	= FB_VMODE_NONINTERLACED;
+	strcpy(fbi->fb.modename, SA1100_NAME);
+	strcpy(fbi->fb.fontname, "Acorn8x8");
 
-	strcpy(info->modename, info->fix.id);
-	strcpy(info->fontname, "Acorn8x8");
+	fbi->fb.fbops		= &sa1100fb_ops;
+	fbi->fb.changevar	= NULL;
+	fbi->fb.switch_con	= sa1100fb_switch;
+	fbi->fb.updatevar	= sa1100fb_updatevar;
+	fbi->fb.flags		= FBINFO_FLAG_DEFAULT;
+	fbi->fb.node		= NODEV;
+	fbi->fb.monspecs	= monspecs;
+	fbi->fb.currcon		= -1;
+	fbi->fb.disp		= (struct display *)(fbi + 1);
+	fbi->fb.pseudo_palette	= (void *)(fbi->fb.disp + 1);
 
-	info->fbops		= &sa1100fb_ops;
-	info->changevar		= NULL;
-	info->switch_con		= gen_switch;
-	info->updatevar		= gen_update_var;
-	info->flags		= FBINFO_FLAG_DEFAULT;
-	info->node		= NODEV;
-	info->monspecs		= monspecs;
-	info->currcon		= -1;
-	info->disp		= (struct display *)(info + 1);
-	info->pseudo_palette	= (void *)(info->disp + 1);
-	info->par		= par;
+	fbi->rgb[RGB_8]		= &rgb_8;
+	fbi->rgb[RGB_16]	= &def_rgb_16;
 
-	par->rgb[RGB_8]		= &rgb_8;
-	par->rgb[RGB_16]	= &def_rgb_16;
+	inf = sa1100fb_get_machine_info(fbi);
 
-	inf = sa1100fb_get_machine_info(par);
+	fbi->max_xres			= inf->xres;
+	fbi->fb.var.xres		= inf->xres;
+	fbi->fb.var.xres_virtual	= inf->xres;
+	fbi->max_yres			= inf->yres;
+	fbi->fb.var.yres		= inf->yres;
+	fbi->fb.var.yres_virtual	= inf->yres;
+	fbi->max_bpp			= inf->bpp;
+	fbi->fb.var.bits_per_pixel	= inf->bpp;
+	fbi->fb.var.pixclock		= inf->pixclock;
+	fbi->fb.var.hsync_len		= inf->hsync_len;
+	fbi->fb.var.left_margin		= inf->left_margin;
+	fbi->fb.var.right_margin	= inf->right_margin;
+	fbi->fb.var.vsync_len		= inf->vsync_len;
+	fbi->fb.var.upper_margin	= inf->upper_margin;
+	fbi->fb.var.lower_margin	= inf->lower_margin;
+	fbi->fb.var.sync		= inf->sync;
+	fbi->fb.var.grayscale		= inf->cmap_greyscale;
+	fbi->cmap_inverse		= inf->cmap_inverse;
+	fbi->cmap_static		= inf->cmap_static;
+	fbi->lccr0			= inf->lccr0;
+	fbi->lccr3			= inf->lccr3;
+	fbi->state			= C_DISABLE;
+	fbi->task_state			= (u_char)-1;
+	fbi->fb.fix.smem_len		= fbi->max_xres * fbi->max_yres *
+					  fbi->max_bpp / 8;
 
-	par->max_xres			= inf->xres;
-	info->var.xres			= inf->xres;
-	info->var.xres_virtual		= inf->xres;
-	par->max_yres			= inf->yres;
-	info->var.yres			= inf->yres;
-	info->var.yres_virtual		= inf->yres;
-	par->max_bpp			= inf->bpp;
-	info->var.bits_per_pixel	= inf->bpp;
-	info->var.pixclock		= inf->pixclock;
-	info->var.hsync_len		= inf->hsync_len;
-	info->var.left_margin		= inf->left_margin;
-	info->var.right_margin	= inf->right_margin;
-	info->var.vsync_len		= inf->vsync_len;
-	info->var.upper_margin	= inf->upper_margin;
-	info->var.lower_margin	= inf->lower_margin;
-	info->var.sync		= inf->sync;
-	info->var.grayscale		= inf->cmap_greyscale;
-	par->cmap_inverse		= inf->cmap_inverse;
-	par->cmap_static		= inf->cmap_static;
-	par->lccr0			= inf->lccr0;
-	par->lccr3			= inf->lccr3;
-	par->state			= C_DISABLE;
-	par->task_state			= (u_char)-1;
-	info->fix.smem_len		= par->max_xres * par->max_yres *
-					  par->max_bpp / 8;
+	init_waitqueue_head(&fbi->ctrlr_wait);
+	INIT_TQUEUE(&fbi->task, sa1100fb_task, fbi);
+	init_MUTEX(&fbi->ctrlr_sem);
 
-	init_waitqueue_head(&par->ctrlr_wait);
-	INIT_TQUEUE(&par->task, sa1100fb_task, info);
-	init_MUTEX(&par->ctrlr_sem);
-
-	fb_alloc_cmap(&info->cmap, 256, 0);	
-
-	return info;
+	return fbi;
 }
 
 int __init sa1100fb_init(void)
 {
-	struct fb_info *info;
-	struct sa1100_par *par;
+	struct sa1100fb_info *fbi;
 	int ret;
 
 	if (!request_mem_region(0xb0100000, 0x10000, "LCD"))
 		return -EBUSY;
 
-	info = sa1100fb_init_fbinfo();
+	fbi = sa1100fb_init_fbinfo();
 	ret = -ENOMEM;
-	if (!info)
+	if (!fbi)
 		goto failed;
 
 	/* Initialize video memory */
-	ret = sa1100fb_map_video_memory(info);
+	ret = sa1100fb_map_video_memory(fbi);
 	if (ret)
 		goto failed;
 
 	ret = request_irq(IRQ_LCD, sa1100fb_handle_irq, SA_INTERRUPT,
-			  "LCD", info->par);
+			  "LCD", fbi);
 	if (ret) {
 		printk(KERN_ERR "sa1100fb: request_irq failed: %d\n", ret);
 		goto failed;
@@ -1873,32 +2122,30 @@ int __init sa1100fb_init(void)
 	}
 #endif
 
-	gen_set_var(&info->var, -1, info);
+	sa1100fb_set_var(&fbi->fb.var, -1, &fbi->fb);
 
-	ret = register_framebuffer(info);
+	ret = register_framebuffer(&fbi->fb);
 	if (ret < 0)
 		goto failed;
-
-	par = info->par;
 
 #ifdef CONFIG_PM
 	/*
 	 * Note that the console registers this as well, but we want to
 	 * power down the display prior to sleeping.
 	 */
-	par->pm = pm_register(PM_SYS_DEV, PM_SYS_VGA, sa1100fb_pm_callback);
-	if (par->pm)
-		par->pm->data = par;
+	fbi->pm = pm_register(PM_SYS_DEV, PM_SYS_VGA, sa1100fb_pm_callback);
+	if (fbi->pm)
+		fbi->pm->data = fbi;
 #endif
 #ifdef CONFIG_CPU_FREQ
-	info->clockchg.notifier_call = sa1100fb_clkchg_notifier;
-	cpufreq_register_notifier(&info->clockchg);
+	fbi->clockchg.notifier_call = sa1100fb_clkchg_notifier;
+	cpufreq_register_notifier(&fbi->clockchg);
 #endif
 
 	/*
 	 * Ok, now enable the LCD controller
 	 */
-	set_ctrlr_state(par, C_ENABLE);
+	set_ctrlr_state(fbi, C_ENABLE);
 
 	/* This driver cannot be unloaded at the moment */
 	MOD_INC_USE_COUNT;
@@ -1906,8 +2153,8 @@ int __init sa1100fb_init(void)
 	return 0;
 
 failed:
-	if (info)
-		kfree(info);
+	if (fbi)
+		kfree(fbi);
 	release_mem_region(0xb0100000, 0x10000);
 	return ret;
 }

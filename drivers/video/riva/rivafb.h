@@ -3,7 +3,6 @@
 
 #include <linux/config.h>
 #include <linux/fb.h>
-#include <linux/timer.h>
 #include <video/fbcon.h>
 #include <video/fbcon-cfb4.h>
 #include <video/fbcon-cfb8.h>
@@ -28,24 +27,23 @@ struct riva_regs {
 	RIVA_HW_STATE ext;
 };
 
-#define MAX_CURS                32
+typedef struct {
+	unsigned char red, green, blue, transp;
+} riva_cfb8_cmap_t;
 
-struct riva_cursor {
-        int enable;
-        int on;
-        int vbl_cnt;
-        int last_slice_moves, prev_slice_moves;
-        int blink_rate;
-        struct {
-                u16 x, y;
-        } pos, size;
-        unsigned short image[MAX_CURS*MAX_CURS];
-        struct timer_list *timer;
-};
+struct rivafb_info;
+struct rivafb_info {
+	struct fb_info info;	/* kernel framebuffer info */
 
-/* describes the state of a Riva board */
-struct riva_par {
 	RIVA_HW_INST riva;	/* interface to riva_hw.c */
+
+	const char *drvr_name;	/* Riva hardware board type */
+
+	unsigned long ctrl_base_phys;	/* physical control register base addr */
+	unsigned long fb_base_phys;	/* physical framebuffer base addr */
+
+	caddr_t ctrl_base;	/* virtual control register base addr */
+	caddr_t fb_base;	/* virtual framebuffer base addr */
 
 	unsigned ram_amount;	/* amount of RAM on card, in bytes */
 	unsigned dclk_max;	/* max DCLK */
@@ -53,10 +51,34 @@ struct riva_par {
 	struct riva_regs initial_state;	/* initial startup video mode */
 	struct riva_regs current_state;
 
+	struct display disp;
+	int currcon;
+	struct display *currcon_display;
+
+	struct rivafb_info *next;
+
+	struct pci_dev *pd;	/* pointer to board's pci info */
+	unsigned base0_region_size;	/* size of control register region */
+	unsigned base1_region_size;	/* size of framebuffer region */
+
 	struct riva_cursor *cursor;
-        caddr_t ctrl_base;      /* Virtual control register base addr */
+
+	struct display_switch dispsw;
+
+	riva_cfb8_cmap_t palette[256];	/* VGA DAC palette cache */
+
+#if defined(FBCON_HAS_CFB16) || defined(FBCON_HAS_CFB32)
+	union {
+#ifdef FBCON_HAS_CFB16
+		u_int16_t cfb16[16];
+#endif
+#ifdef FBCON_HAS_CFB32
+		u_int32_t cfb32[16];
+#endif
+	} con_cmap;
+#endif				/* FBCON_HAS_CFB16 | FBCON_HAS_CFB32 */
 #ifdef CONFIG_MTRR
-        struct { int vram; int vram_valid; } mtrr;
+	struct { int vram; int vram_valid; } mtrr;
 #endif
 };
 
