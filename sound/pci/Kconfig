@@ -6,6 +6,7 @@ menu "PCI devices"
 config SND_ALI5451
 	tristate "ALi PCI Audio M5451"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
@@ -13,6 +14,7 @@ config SND_ALI5451
 config SND_AZT3328
 	tristate "Aztech AZF3328 / PCI168 (EXPERIMENTAL)"
 	depends on SND && EXPERIMENTAL
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Aztech AZF3328 (PCI168) soundcards.
@@ -28,6 +30,7 @@ config SND_BT87X
 config SND_CS46XX
 	tristate "Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	select GAMEPORT
 	help
@@ -43,6 +46,7 @@ config SND_CS46XX_NEW_DSP
 config SND_CS4281
 	tristate "Cirrus Logic (Sound Fusion) CS4281"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Cirrus Logic CS4281.
@@ -50,6 +54,7 @@ config SND_CS4281
 config SND_EMU10K1
 	tristate "EMU10K1 (SB Live! & Audigy, E-mu APS)"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Sound Blaster PCI 512, Live!,
@@ -103,6 +108,7 @@ config SND_RME9652
 config SND_HDSP
 	tristate "RME Hammerfall DSP Audio"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for RME Hammerfall DSP Audio
@@ -111,6 +117,7 @@ config SND_HDSP
 config SND_TRIDENT
 	tristate "Trident 4D-Wave DX/NX; SiS 7018"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Trident 4D-Wave DX/NX and
@@ -119,6 +126,7 @@ config SND_TRIDENT
 config SND_YMFPCI
 	tristate "Yamaha YMF724/740/744/754"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Yamaha PCI audio chips - 
@@ -127,6 +135,7 @@ config SND_YMFPCI
 config SND_ALS4000
 	tristate "Avance Logic ALS4000"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Avance Logic ALS4000.
@@ -134,6 +143,7 @@ config SND_ALS4000
 config SND_CMIPCI
 	tristate "C-Media 8738, 8338"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for C-Media CMI8338 and 8738 PCI
@@ -142,6 +152,7 @@ config SND_CMIPCI
 config SND_ENS1370
 	tristate "(Creative) Ensoniq AudioPCI 1370"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1370.
@@ -149,6 +160,7 @@ config SND_ENS1370
 config SND_ENS1371
 	tristate "(Creative) Ensoniq AudioPCI 1371/1373"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1371 and
@@ -157,6 +169,7 @@ config SND_ENS1371
 config SND_ES1938
 	tristate "ESS ES1938/1946/1969 (Solo-1)"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ESS Solo-1 (ES1938, ES1946, ES1969)
@@ -165,6 +178,7 @@ config SND_ES1938
 config SND_ES1968
 	tristate "ESS ES1968/1978 (Maestro-1/2/2E)"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ESS Maestro 1/2/2E.
@@ -179,6 +193,7 @@ config SND_MAESTRO3
 config SND_FM801
 	tristate "ForteMedia FM801"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards.
@@ -194,6 +209,7 @@ config SND_FM801_TEA575X
 config SND_ICE1712
 	tristate "ICEnsemble ICE1712 (Envy24)"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ICE1712 (Envy24) based soundcards.
@@ -204,6 +220,7 @@ config SND_ICE1712
 config SND_ICE1724
 	tristate "ICE/VT1724 (Envy24HT)"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ICE/VT1724 (Envy24HT) based
@@ -214,6 +231,7 @@ config SND_ICE1724
 config SND_INTEL8X0
 	tristate "Intel i8x0/MX440, SiS 7012; Ali 5455; NForce Audio; AMD768/8111"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Intel8x0 based soundcards,
@@ -222,6 +240,7 @@ config SND_INTEL8X0
 config SND_SONICVIBES
 	tristate "S3 SonicVibes"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for S3 SonicVibes based soundcards.
@@ -229,6 +248,7 @@ config SND_SONICVIBES
 config SND_VIA82XX
 	tristate "VIA 82C686A/B, 8233 South Bridge"
 	depends on SND
+	select SND_RAWMIDI
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for VIA VT82C686A/B, VT8233 South Bridge.
