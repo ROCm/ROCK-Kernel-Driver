@@ -5,7 +5,7 @@
  *		 2002 Open Source Development Lab
  */
 
-#define DEBUG 0
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
