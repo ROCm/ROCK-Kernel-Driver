@@ -1,10 +1,11 @@
-/* -*- linux-c -*-
- * sysctl_net_netrom.c: sysctl interface to net NET/ROM subsystem.
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Begun April 1, 1996, Mike Shaver.
- * Added /proc/sys/net/netrom directory entry (empty =) ). [MS]
+ * Copyright (C) 1996 Mike Shaver (shaver@zeroknowledge.com)
  */
-
 #include <linux/mm.h>
 #include <linux/sysctl.h>
 #include <linux/init.h>
