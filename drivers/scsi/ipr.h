@@ -939,6 +939,7 @@ struct ipr_cmnd {
 		unsigned long scratch;
 		struct ipr_resource_entry *res;
 		struct ipr_cmnd *sibling;
+		struct scsi_device *sdev;
 	};
 
 	struct ipr_ioa_cfg *ioa_cfg;

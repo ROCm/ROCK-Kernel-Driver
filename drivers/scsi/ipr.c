@@ -2972,6 +2972,7 @@ static int ipr_eh_dev_reset(struct scsi_cmnd * scsi_cmd)
 	cmd_pkt->request_type = IPR_RQTYPE_IOACMD;
 	cmd_pkt->cdb[0] = IPR_RESET_DEVICE;
 
+	ipr_sdev_err(scsi_cmd->device, "Resetting device\n");
 	ipr_send_blocking_cmd(ipr_cmd, ipr_timeout, IPR_DEVICE_RESET_TIMEOUT);
 
 	ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
@@ -3045,6 +3046,7 @@ static void ipr_abort_timeout(struct ipr_cmnd *ipr_cmd)
 		return;
 	}
 
+	ipr_sdev_err(ipr_cmd->sdev, "Abort timed out. Resetting bus\n");
 	reset_cmd = ipr_get_free_ipr_cmnd(ioa_cfg);
 	ipr_cmd->sibling = reset_cmd;
 	reset_cmd->sibling = ipr_cmd;
@@ -3106,7 +3108,9 @@ static int ipr_cancel_op(struct scsi_cmnd * scsi_cmd)
 	cmd_pkt->cdb[3] = (ioarcb_addr >> 16) & 0xff;
 	cmd_pkt->cdb[4] = (ioarcb_addr >> 8) & 0xff;
 	cmd_pkt->cdb[5] = ioarcb_addr & 0xff;
+	ipr_cmd->sdev = scsi_cmd->device;
 
+	ipr_sdev_err(scsi_cmd->device, "Aborting command: %02X\n", scsi_cmd->cmnd[0]);
 	ipr_send_blocking_cmd(ipr_cmd, ipr_abort_timeout, IPR_ABORT_TASK_TIMEOUT);
 	ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
 
