@@ -997,7 +997,7 @@ static void __init flush_window(void)
     
     written = write(crd_outfd, window, outcnt);
     if (written != outcnt && unzip_error == 0) {
-	printk(KERN_ERR "RAMDISK: incomplete write (%d != %d) %d\n",
+	printk(KERN_ERR "RAMDISK: incomplete write (%d != %d) %ld\n",
 	       written, outcnt, bytes_out);
 	unzip_error = 1;
     }
