@@ -1196,11 +1196,7 @@ int zft_compressor_init(void)
 		printk(
 KERN_INFO "(c) 1997 Claus-Justus Heine (claus@momo.math.rwth-aachen.de)\n"
 KERN_INFO "Compressor for zftape (lzrw3 algorithm)\n"
-KERN_INFO "Compiled for kernel version %s"
-#ifdef MODVERSIONS
-		" with versioned symbols"
-#endif
-		"\n", UTS_RELEASE);
+KERN_INFO "Compiled for kernel version %s\n", UTS_RELEASE);
         }
 #else /* !MODULE */
 	/* print a short no-nonsense boot message */

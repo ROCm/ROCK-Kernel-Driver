@@ -119,12 +119,6 @@
  *
  */
 
-/*
- * This is the only file where module.h should
- * embed module global version info.
- */
-#define AHC_MODVERSION_FILE
-
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
 #include <scsi/scsicam.h>
