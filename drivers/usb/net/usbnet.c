@@ -1347,11 +1347,18 @@ done:
 	return skb;
 }
 
-static const struct driver_info	zaurus_info = {
-	.description =	"Sharp Zaurus",
+static const struct driver_info	zaurus_sl5x00_info = {
+	.description =	"Sharp Zaurus SL-5x00",
 	.tx_fixup = 	zaurus_tx_fixup,
 
 	.in = 2, .out = 1,
+	.epsize = 64,
+};
+static const struct driver_info	zaurus_sla300_info = {
+	.description =	"Sharp Zaurus SL-A300",
+	.tx_fixup = 	zaurus_tx_fixup,
+
+	.in = 1, .out = 2,
 	.epsize = 64,
 };
 #endif
@@ -2181,7 +2188,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		dev->driver_info->description);
 
 #ifdef CONFIG_USB_ZAURUS
-	if (dev->driver_info == &zaurus_info) {
+	if (dev->driver_info == &zaurus_sl5x00_info) {
 		int	status;
 		status = usb_set_configuration (xdev, 1);
 		devinfo (dev, "set config --> %d", status);
@@ -2302,7 +2309,17 @@ static const struct usb_device_id	products [] = {
 	.bInterfaceClass	= 0x0a,
 	.bInterfaceSubClass	= 0x00,
 	.bInterfaceProtocol	= 0x00,
-	.driver_info =  (unsigned long) &zaurus_info,
+	.driver_info =  (unsigned long) &zaurus_sl5x00_info,
+},
+{
+	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
+			  | USB_DEVICE_ID_MATCH_DEVICE, 
+	.idVendor		= 0x04DD,
+	.idProduct		= 0x8005,
+	.bInterfaceClass	= 0x02,
+	.bInterfaceSubClass	= 0x0a,
+	.bInterfaceProtocol	= 0x00,
+	.driver_info =  (unsigned long) &zaurus_sla300_info,
 },
 #endif
 
