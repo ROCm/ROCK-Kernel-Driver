@@ -3780,13 +3780,14 @@ static int st_attach(Scsi_Device * SDp)
 	tpnt->try_dio = try_direct_io && !SDp->host->unchecked_isa_dma;
 	bounce_limit = BLK_BOUNCE_HIGH; /* Borrowed from scsi_merge.c */
 	if (SDp->host->highmem_io) {
+		struct device *dev = SDp->host->host_driverfs_dev.parent;
 		if (!PCI_DMA_BUS_IS_PHYS)
 			/* Platforms with virtual-DMA translation
 			 * hardware have no practical limit.
 			 */
 			bounce_limit = BLK_BOUNCE_ANY;
-		else if (SDp->host->pci_dev)
-			bounce_limit = SDp->host->pci_dev->dma_mask;
+		else if (dev && dev->dma_mask)
+			bounce_limit = *dev->dma_mask;
 	} else if (SDp->host->unchecked_isa_dma)
 		bounce_limit = BLK_BOUNCE_ISA;
 	bounce_limit >>= PAGE_SHIFT;
