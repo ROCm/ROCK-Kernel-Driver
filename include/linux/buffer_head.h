@@ -23,7 +23,6 @@ enum bh_state_bits {
 	BH_Async_Read,	/* Is under end_buffer_async_read I/O */
 	BH_Async_Write,	/* Is under end_buffer_async_write I/O */
 
-	BH_JBD,		/* Has an attached ext3 journal_head */
 	BH_Boundary,	/* Block is followed by a discontiguity */
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
