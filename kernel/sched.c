@@ -1,15 +1,19 @@
 /*
- *  linux/kernel/sched.c
+ *  kernel/sched.c
  *
  *  Kernel scheduler and related syscalls
  *
- *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (C) 1991-2002  Linus Torvalds
  *
  *  1996-12-23  Modified by Dave Grothe to fix bugs in semaphores and
  *              make semaphores SMP safe
  *  1998-11-19	Implemented schedule_timeout() and related stuff
  *		by Andrea Arcangeli
- *  1998-12-28  Implemented better SMP scheduling by Ingo Molnar
+ *  2002-01-04	New ultra-scalable O(1) scheduler by Ingo Molnar:
+ *  		hybrid priority-list and round-robin design with
+ *  		an array-switch method of distributing timeslices
+ *  		and per-CPU runqueues.  Additional code by Davide
+ *  		Libenzi, Robert Love, and Rusty Russel.
  */
 
 #include <linux/mm.h>
