@@ -1219,7 +1219,7 @@ static int __init timer_irq_works(void)
 {
 	unsigned int t1 = jiffies;
 
-	sti();
+	__sti();
 	/* Let ten ticks pass... */
 	mdelay((10 * 1000) / HZ);
 

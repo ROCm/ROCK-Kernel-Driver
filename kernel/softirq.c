@@ -61,17 +61,17 @@ static inline void wakeup_softirqd(unsigned cpu)
 
 asmlinkage void do_softirq()
 {
-	int cpu;
 	__u32 pending;
 	long flags;
 	__u32 mask;
+	int cpu;
 
 	if (in_interrupt())
 		return;
 
 	local_irq_save(flags);
-
 	cpu = smp_processor_id();
+
 	pending = softirq_pending(cpu);
 
 	if (pending) {
@@ -111,7 +111,7 @@ restart:
 }
 
 /*
- * This function must run with irq disabled!
+ * This function must run with irqs disabled!
  */
 inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 {
@@ -126,7 +126,7 @@ inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 	 * Otherwise we wake up ksoftirqd to make sure we
 	 * schedule the softirq soon.
 	 */
-	if (!(local_irq_count(cpu) | local_bh_count(cpu)))
+	if (!in_interrupt())
 		wakeup_softirqd(cpu);
 }
 
@@ -290,22 +290,16 @@ spinlock_t global_bh_lock = SPIN_LOCK_UNLOCKED;
 
 static void bh_action(unsigned long nr)
 {
-	int cpu = smp_processor_id();
-
 	if (!spin_trylock(&global_bh_lock))
 		goto resched;
-
-	if (!hardirq_trylock(cpu))
-		goto resched_unlock;
 
 	if (bh_base[nr])
 		bh_base[nr]();
 
-	hardirq_endlock(cpu);
+	hardirq_endlock();
 	spin_unlock(&global_bh_lock);
 	return;
 
-resched_unlock:
 	spin_unlock(&global_bh_lock);
 resched:
 	mark_bh(nr);

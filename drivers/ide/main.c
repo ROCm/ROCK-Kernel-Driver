@@ -1082,18 +1082,18 @@ int ide_unregister_subdriver(struct ata_device *drive)
 {
 	unsigned long flags;
 
-	save_flags(flags);		/* all CPUs */
-	cli();				/* all CPUs */
+	__save_flags(flags); // FIXME: is this safe?
+	__cli();
 
 #if 0
 	if (__MOD_IN_USE(ata_ops(drive)->owner)) {
-		restore_flags(flags);
+		__restore_flags(flags); // FIXME: is this safe?
 		return 1;
 	}
 #endif
 
 	if (drive->usage || drive->busy || !ata_ops(drive)) {
-		restore_flags(flags);	/* all CPUs */
+		__restore_flags(flags);	// FIXME: is this safe?
 		return 1;
 	}
 
@@ -1102,7 +1102,7 @@ int ide_unregister_subdriver(struct ata_device *drive)
 #endif
 	drive->driver = NULL;
 
-	restore_flags(flags);		/* all CPUs */
+	__restore_flags(flags); // FIXME: is this safe?
 
 	return 0;
 }

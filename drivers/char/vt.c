@@ -113,8 +113,8 @@ _kd_mksound(unsigned int hz, unsigned int ticks)
 	if (hz > 20 && hz < 32767)
 		count = 1193180 / hz;
 	
-	save_flags(flags);
-	cli();
+	__save_flags(flags); // FIXME: is this safe?
+	__cli();
 	del_timer(&sound_timer);
 	if (count) {
 		/* enable counter 2 */
@@ -131,7 +131,7 @@ _kd_mksound(unsigned int hz, unsigned int ticks)
 		}
 	} else
 		kd_nosound(0);
-	restore_flags(flags);
+	__restore_flags(flags);
 	return;
 }
 

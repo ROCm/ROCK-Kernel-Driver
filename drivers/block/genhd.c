@@ -184,7 +184,6 @@ int __init device_init(void)
 {
 	rwlock_init(&gendisk_lock);
 	blk_dev_init();
-	sti();
 #ifdef CONFIG_I2O
 	i2o_init();
 #endif

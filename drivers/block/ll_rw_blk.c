@@ -2041,9 +2041,6 @@ int __init blk_dev_init(void)
 #if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_HD)
 	hd_init();
 #endif
-#if defined(__i386__)	/* Do we even need this? */
-	outb_p(0xc, 0x3f2);
-#endif
 
 	return 0;
 };
