@@ -898,6 +898,13 @@ out:
  * scanned twice and there has been zero successful reclaim.  Mark the zone as
  * dead and from now on, only perform a short scan.  Basically we're polling
  * the zone for when the problem goes away.
+ *
+ * kswapd scans the zones in the highmem->normal->dma direction.  It skips
+ * zones which have free_pages > pages_high, but once a zone is found to have
+ * free_pages <= pages_high, we scan that zone and the lower zones regardless
+ * of the number of free pages in the lower zones.  This interoperates with
+ * the page allocator fallback scheme to ensure that aging of pages is balanced
+ * across the zones.
  */
 static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 {
@@ -918,7 +925,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		int all_zones_ok = 1;
 		int pages_scanned = 0;
 
-		for (i = 0; i < pgdat->nr_zones; i++) {
+		for (i = pgdat->nr_zones - 1; i >= 0; i--) {
 			struct zone *zone = pgdat->node_zones + i;
 			int total_scanned = 0;
 			int max_scan;
@@ -930,6 +937,8 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			if (nr_pages == 0) {	/* Not software suspend */
 				if (zone->free_pages <= zone->pages_high)
 					all_zones_ok = 0;
+				if (all_zones_ok)
+					continue;
 			}
 			zone->temp_priority = priority;
 			max_scan = zone->nr_inactive >> priority;
