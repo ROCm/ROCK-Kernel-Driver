@@ -439,6 +439,74 @@ static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int er
 	return 0;
 }
 
+static struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
+{
+	struct bio *b = bio_alloc(gfp_mask, bio->bi_vcnt);
+	unsigned long flags = 0; /* gcc silly */
+	struct bio_vec *bv;
+	int i;
+
+	if (unlikely(!b))
+		return NULL;
+
+	/*
+	 * iterate iovec list and alloc pages + copy data
+	 */
+	__bio_for_each_segment(bv, bio, i, 0) {
+		struct bio_vec *bbv = &b->bi_io_vec[i];
+		char *vfrom, *vto;
+
+		bbv->bv_page = alloc_page(gfp_mask);
+		if (bbv->bv_page == NULL)
+			goto oom;
+
+		bbv->bv_len = bv->bv_len;
+		bbv->bv_offset = bv->bv_offset;
+
+		/*
+		 * if doing a copy for a READ request, no need
+		 * to memcpy page data
+		 */
+		if (!copy)
+			continue;
+
+		if (gfp_mask & __GFP_WAIT) {
+			vfrom = kmap(bv->bv_page);
+			vto = kmap(bbv->bv_page);
+		} else {
+			local_irq_save(flags);
+			vfrom = kmap_atomic(bv->bv_page, KM_BIO_SRC_IRQ);
+			vto = kmap_atomic(bbv->bv_page, KM_BIO_DST_IRQ);
+		}
+
+		memcpy(vto + bbv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
+		if (gfp_mask & __GFP_WAIT) {
+			kunmap(bbv->bv_page);
+			kunmap(bv->bv_page);
+		} else {
+			kunmap_atomic(vto, KM_BIO_DST_IRQ);
+			kunmap_atomic(vfrom, KM_BIO_SRC_IRQ);
+			local_irq_restore(flags);
+		}
+	}
+
+	b->bi_sector = bio->bi_sector;
+	b->bi_bdev = bio->bi_bdev;
+	b->bi_rw = bio->bi_rw;
+
+	b->bi_vcnt = bio->bi_vcnt;
+	b->bi_size = bio->bi_size;
+
+	return b;
+
+oom:
+	while (--i >= 0)
+		__free_page(b->bi_io_vec[i].bv_page);
+
+	bio_put(bio);
+	return NULL;
+}
+
 static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 {
 	struct bio *bio;
