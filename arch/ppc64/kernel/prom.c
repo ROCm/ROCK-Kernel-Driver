@@ -1568,7 +1568,7 @@ finish_node(struct device_node *np, unsigned long mem_start,
 /*
  * Find the interrupt parent of a node.
  */
-static struct device_node * __init
+static struct device_node * __devinit
 intr_parent(struct device_node *p)
 {
 	phandle *parp;
@@ -1583,7 +1583,7 @@ intr_parent(struct device_node *p)
  * Find out the size of each entry of the interrupts property
  * for a node.
  */
-static int __init
+static int __devinit
 prom_n_intr_cells(struct device_node *np)
 {
 	struct device_node *p;
@@ -1611,7 +1611,7 @@ prom_n_intr_cells(struct device_node *np)
  * Map an interrupt from a device up to the platform interrupt
  * descriptor.
  */
-static int __init
+static int __devinit
 map_interrupt(unsigned int **irq, struct device_node **ictrler,
 	      struct device_node *np, unsigned int *ints, int nintrc)
 {
@@ -2561,7 +2561,7 @@ out:
 /*
  * Find the device_node with a given phandle.
  */
-static struct device_node * __init
+static struct device_node * __devinit
 find_phandle(phandle ph)
 {
 	struct device_node *np;
