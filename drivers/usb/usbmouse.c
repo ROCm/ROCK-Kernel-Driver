@@ -122,7 +122,7 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!(mouse = kmalloc(sizeof(struct usb_mouse), GFP_KERNEL))) return NULL;
 	memset(mouse, 0, sizeof(struct usb_mouse));
 
-	mouse->irq = usb_alloc_urb(0);
+	mouse->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!mouse->irq) {
 		kfree(mouse);
 		return NULL;

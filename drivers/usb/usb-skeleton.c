@@ -573,7 +573,8 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 		if (((endpoint->bEndpointAddress & 0x80) == 0x00) &&
 		    ((endpoint->bmAttributes & 3) == 0x02)) {
 			/* we found a bulk out endpoint */
-			dev->write_urb = usb_alloc_urb(0);
+			/* a probe() may sleep and has no restrictions on memory allocations */
+			dev->write_urb = usb_alloc_urb(0, GFP_KERNEL);
 			if (!dev->write_urb) {
 				err("No free urbs available");
 				goto error;

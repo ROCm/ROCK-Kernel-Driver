@@ -181,7 +181,7 @@ static struct async *alloc_async(unsigned int numisoframes)
         if (!as)
                 return NULL;
         memset(as, 0, assize);
-	as->urb = usb_alloc_urb(numisoframes);
+	as->urb = usb_alloc_urb(numisoframes, GFP_KERNEL);
 	if (!as->urb) {
 		kfree(as);
 		return NULL;

@@ -4426,7 +4426,7 @@ ov511_init_isoc(struct usb_ov511 *ov511)
 	}
 
 	for (n = 0; n < OV511_NUMSBUF; n++) {
-		urb = usb_alloc_urb(FRAMES_PER_DESC);
+		urb = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
 	
 		if (!urb) {
 			err("init isoc: usb_alloc_urb ret. NULL");

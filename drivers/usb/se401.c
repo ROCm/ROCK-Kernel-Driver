@@ -644,7 +644,7 @@ static int se401_start_stream(struct usb_se401 *se401)
 	}
 
 	for (i=0; i<SE401_NUMSBUF; i++) {
-		urb=usb_alloc_urb(0);
+		urb=usb_alloc_urb(0, GFP_KERNEL);
 		if(!urb)
 			return ENOMEM;
 
@@ -1465,7 +1465,7 @@ static int se401_init(struct usb_se401 *se401)
 	se401->readcount=0;
 
 	/* Start interrupt transfers for snapshot button */
-	se401->inturb=usb_alloc_urb(0);
+	se401->inturb=usb_alloc_urb(0, GFP_KERNEL);
 	if (!se401->inturb) {
 		info("Allocation of inturb failed");
 		return 1;

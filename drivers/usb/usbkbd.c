@@ -196,12 +196,12 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL))) return NULL;
 	memset(kbd, 0, sizeof(struct usb_kbd));
 
-	kbd->irq = usb_alloc_urb(0);
+	kbd->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!kbd->irq) {
 		kfree(kbd);
 		return NULL;
 	}
-	kbd->led = usb_alloc_urb(0);
+	kbd->led = usb_alloc_urb(0, GFP_KERNEL);
 	if (!kbd->led) {
 		usb_free_urb(kbd->irq);
 		kfree(kbd);

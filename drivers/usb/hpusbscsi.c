@@ -56,12 +56,12 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 		return NULL;
 	DEBUG ("Allocated memory\n");
 	memset (new, 0, sizeof (struct hpusbscsi));
-	new->dataurb = usb_alloc_urb(0);
+	new->dataurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!new->dataurb) {
 		kfree (new);
 		return NULL;
 	}
-	new->controlurb = usb_alloc_urb(0);
+	new->controlurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!new->controlurb) {
 		usb_free_urb (new->dataurb);
 		kfree (new);

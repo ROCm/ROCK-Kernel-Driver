@@ -629,7 +629,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum ,const st
 		/* Here uvd is a fully allocated uvd_t object */
 
 		for(i = 0; i < USBVIDEO_NUMSBUF; i++) {
-			konicawc_data->sts_urb[i] = usb_alloc_urb(FRAMES_PER_DESC);
+			konicawc_data->sts_urb[i] = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
 		}
 
 		switch(size) {

@@ -936,7 +936,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 	}
 
 	memset( new_desc, 0, sizeof(*new_desc) );
-	new_desc->urb = usb_alloc_urb(0);
+	new_desc->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!new_desc->urb) {
 		kfree(new_desc);
 		return NULL;

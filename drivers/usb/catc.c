@@ -694,10 +694,10 @@ static void *catc_probe(struct usb_device *usbdev, unsigned int ifnum, const str
 	catc->timer.data = (long) catc;
 	catc->timer.function = catc_stats_timer;
 
-	catc->ctrl_urb = usb_alloc_urb(0);
-	catc->tx_urb = usb_alloc_urb(0);
-	catc->rx_urb = usb_alloc_urb(0);
-	catc->irq_urb = usb_alloc_urb(0);
+	catc->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
+	catc->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
+	catc->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
+	catc->irq_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if ((!catc->ctrl_urb) || (!catc->tx_urb) || 
 	    (!catc->rx_urb) || (!catc->irq_urb)) {
 		err("No free urbs available.");

@@ -226,7 +226,7 @@ static int dabusb_alloc_buffers (pdabusb_t s)
 		}
 		memset (b, 0, sizeof (buff_t));
 		b->s = s;
-		b->purb = usb_alloc_urb(packets);
+		b->purb = usb_alloc_urb(packets, GFP_KERNEL);
 		if (!b->purb) {
 			err("usb_alloc_urb == NULL");
 			kfree (b);

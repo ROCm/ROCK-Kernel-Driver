@@ -884,7 +884,7 @@ static void * __devinit vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	}
 	memset(vicam, 0, sizeof(*vicam));
 
-	vicam->readurb = usb_alloc_urb(0);
+	vicam->readurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!vicam->readurb) {
 		kfree(vicam);
 		return NULL;

@@ -420,7 +420,7 @@ static int genelink_init (struct usbnet *dev)
 	}
 
 	// allocate irq urb
-	if ((priv->irq_urb = usb_alloc_urb (0)) == 0) {
+	if ((priv->irq_urb = usb_alloc_urb (0, GFP_KERNEL)) == 0) {
 		dbg ("%s: cannot allocate private irq urb per device",
 			dev->net.name);
 		kfree (priv);
@@ -1589,7 +1589,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 		}
 	}
 
-	if (!(urb = usb_alloc_urb (0))) {
+	if (!(urb = usb_alloc_urb (0, GFP_ATOMIC))) {
 		dbg ("no urb");
 		goto drop;
 	}
@@ -1723,7 +1723,7 @@ static void usbnet_bh (unsigned long param)
 			struct urb	*urb;
 			int		i;
 			for (i = 0; i < 3 && dev->rxq.qlen < RX_QLEN; i++) {
-				if ((urb = usb_alloc_urb (0)) != 0)
+				if ((urb = usb_alloc_urb (0, GFP_ATOMIC)) != 0)
 					rx_submit (dev, urb, GFP_ATOMIC);
 			}
 			if (temp != dev->rxq.qlen)

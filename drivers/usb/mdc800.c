@@ -969,9 +969,9 @@ int __init usb_mdc800_init (void)
 	try (mdc800->write_urb_buffer=kmalloc (8, GFP_KERNEL));
 	try (mdc800->download_urb_buffer=kmalloc (64, GFP_KERNEL));
 
-	try (mdc800->irq_urb=usb_alloc_urb (0));
-	try (mdc800->download_urb=usb_alloc_urb (0));
-	try (mdc800->write_urb=usb_alloc_urb (0));
+	try (mdc800->irq_urb=usb_alloc_urb (0, GFP_KERNEL));
+	try (mdc800->download_urb=usb_alloc_urb (0, GFP_KERNEL));
+	try (mdc800->write_urb=usb_alloc_urb (0, GFP_KERNEL));
 
 	/* Register the driver */
 	if (usb_register (&mdc800_usb_driver) < 0)
