@@ -306,8 +306,8 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			else return -ENOSYS;
 
 		case EVIOCGEFFECTS:
-			if (retval = put_user(dev->ff_effects_max, (int*) arg))
-				return -EFAULT;
+			if ((retval = put_user(dev->ff_effects_max, (int*) arg)))
+				return retval;
 			return 0;
 
 		default:
