@@ -892,6 +892,10 @@ static void envctrl_init_i2c_child(struct linux_ebus_child *edev_child,
 		}
 
                 pchild->tables = kmalloc(tbls_size, GFP_KERNEL);
+		if (pchild->tables == NULL){
+			printk("envctrl: Failed to allocate table.\n");
+			return;
+		}
                 len = prom_getproperty(node, "tables",
 				       (char *) pchild->tables, tbls_size);
                 if (len <= 0) {
