@@ -1185,8 +1185,8 @@ D: via-rhine net driver hacking
 
 N: Danny ter Haar
 E: dth@cistron.nl
-D: /proc/procinfo, reboot on panic , kernel pre-patch tester ;)
-S: Cistron Internet Services
+D: /proc/cpuinfo, reboot on panic , kernel pre-patch tester ;)
+S: Cistron
 S: PO-Box 297
 S: 2400 AG, Alphen aan den Rijn
 S: The Netherlands
