@@ -63,6 +63,26 @@
  * Misc macros and definitions
  */
 #define PMU_FIRST_COUNTER	4
+#define PMU_MAX_PMCS		256
+#define PMU_MAX_PMDS		256
+
+/*
+ * type of a PMU register (bitmask).
+ * bitmask structure:
+ * 	bit0   : register implemented
+ * 	bit1   : end marker 
+ * 	bit2-3 : reserved
+ * 	bit4-7 : register type
+ * 	bit8-31: reserved
+ */
+#define PFM_REG_IMPL		0x1 /* register implemented */
+#define PFM_REG_END		0x2 /* end marker */
+#define PFM_REG_MONITOR		(0x1<<4|PFM_REG_IMPL) /* a PMC with a pmc.pm field only */
+#define PFM_REG_COUNTING	(0x2<<4|PFM_REG_IMPL) /* a PMC with a pmc.pm AND pmc.oi, a PMD used as a counter */
+#define PFM_REG_CONTROL		(0x3<<4|PFM_REG_IMPL) /* PMU control register */
+#define	PFM_REG_CONFIG		(0x4<<4|PFM_REG_IMPL) /* refine configuration */
+#define PFM_REG_BUFFER	 	(0x5<<4|PFM_REG_IMPL) /* PMD used as buffer */
+
 
 #define PFM_IS_DISABLED() pmu_conf.pfm_is_disabled
 
@@ -70,13 +90,18 @@
 #define PFM_FL_INHERIT_MASK	(PFM_FL_INHERIT_NONE|PFM_FL_INHERIT_ONCE|PFM_FL_INHERIT_ALL)
 
 /* i assume unsigned */
-#define PMC_IS_IMPL(i)	  (i<pmu_conf.num_pmcs && pmu_conf.impl_regs[i>>6] & (1UL<< (i) %64))
-#define PMD_IS_IMPL(i)	  (i<pmu_conf.num_pmds &&  pmu_conf.impl_regs[4+(i>>6)] & (1UL<<(i) % 64))
+#define PMC_IS_IMPL(i)	  (i< PMU_MAX_PMCS && (pmu_conf.pmc_desc[i].type & PFM_REG_IMPL))
+#define PMD_IS_IMPL(i)	  (i< PMU_MAX_PMDS && (pmu_conf.pmd_desc[i].type & PFM_REG_IMPL))
 
 /* XXX: these three assume that register i is implemented */
 #define PMD_IS_COUNTING(i) (pmu_conf.pmd_desc[i].type == PFM_REG_COUNTING)
 #define PMC_IS_COUNTING(i) (pmu_conf.pmc_desc[i].type == PFM_REG_COUNTING)
 #define PMC_IS_MONITOR(i)  (pmu_conf.pmc_desc[i].type == PFM_REG_MONITOR)
+#define PMC_DFL_VAL(i)     pmu_conf.pmc_desc[i].default_value
+#define PMC_RSVD_MASK(i)   pmu_conf.pmc_desc[i].reserved_mask
+#define PMD_PMD_DEP(i)	   pmu_conf.pmd_desc[i].dep_pmd[0]
+#define PMC_PMD_DEP(i)	   pmu_conf.pmc_desc[i].dep_pmd[0]
+
 
 /* k assume unsigned */
 #define IBR_IS_IMPL(k)	  (k<pmu_conf.num_ibrs)
@@ -176,19 +201,6 @@ typedef struct _pfm_smpl_buffer_desc {
 #define UNLOCK_PSB(p)	spin_unlock(&(p)->psb_lock)
 
 /*
- * The possible type of a PMU register
- */
-typedef enum { 
-	PFM_REG_NOTIMPL, /* not implemented */
-	PFM_REG_NONE, 	 /* end marker */
-	PFM_REG_MONITOR, /* a PMC with a pmc.pm field only */
-	PFM_REG_COUNTING,/* a PMC with a pmc.pm AND pmc.oi, a PMD used as a counter */
-	PFM_REG_CONTROL, /* PMU control register */
-	PFM_REG_CONFIG,  /* refine configuration */
-	PFM_REG_BUFFER	 /* PMD used as buffer */
-} pfm_pmu_reg_type_t;
-
-/*
  * 64-bit software counter structure
  */
 typedef struct {
@@ -283,13 +295,16 @@ typedef struct {
  * dep_pmc[]: a bitmask of dependent PMC registers
  */
 typedef struct {
-	pfm_pmu_reg_type_t	type;
+	unsigned int		type;
 	int			pm_pos;
+	unsigned long		default_value;	/* power-on default value */
+	unsigned long		reserved_mask;	/* bitmask of reserved bits */
 	int			(*read_check)(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
 	int			(*write_check)(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
 	unsigned long		dep_pmd[4];
 	unsigned long		dep_pmc[4];
 } pfm_reg_desc_t;
+
 /* assume cnum is a valid monitor */
 #define PMC_PM(cnum, val)	(((val) >> (pmu_conf.pmc_desc[cnum].pm_pos)) & 0x1)
 #define PMC_WR_FUNC(cnum)	(pmu_conf.pmc_desc[cnum].write_check)
@@ -401,8 +416,6 @@ static ctl_table pfm_sysctl_root[] = {
 };
 static struct ctl_table_header *pfm_sysctl_header;
 
-static unsigned long reset_pmcs[IA64_NUM_PMC_REGS];	/* contains PAL reset values for PMCS */
-
 static void pfm_vm_close(struct vm_area_struct * area);
 
 static struct vm_operations_struct pfm_vm_ops={
@@ -422,7 +435,7 @@ static struct {
 /*
  * forward declarations
  */
-static void ia64_reset_pmu(struct task_struct *);
+static void pfm_reset_pmu(struct task_struct *);
 #ifdef CONFIG_SMP
 static void pfm_fetch_regs(int cpu, struct task_struct *task, pfm_context_t *ctx);
 #endif
@@ -2244,7 +2257,7 @@ pfm_enable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		pfm_lazy_save_regs(PMU_OWNER());
 
 	/* reset all registers to stable quiet state */
-	ia64_reset_pmu(task);
+	pfm_reset_pmu(task);
 
 	/* make sure nothing starts */
 	if (ctx->ctx_fl_system) {
@@ -2307,7 +2320,7 @@ pfm_get_pmc_reset(struct task_struct *task, pfm_context_t *ctx, void *arg, int c
 
 		if (!PMC_IS_IMPL(cnum)) goto abort_mission;
 
-		tmp.reg_value = reset_pmcs[cnum];
+		tmp.reg_value = PMC_DFL_VAL(cnum);
 
 		PFM_REG_RETFLAG_SET(tmp.reg_flags, 0);
 
@@ -2998,6 +3011,8 @@ perfmon_proc_info(char *page)
 		p += sprintf(p, "CPU%-2d recorded samples : %lu\n", i, pfm_stats[i].pfm_recorded_samples_count);
 		p += sprintf(p, "CPU%-2d smpl buffer full : %lu\n", i, pfm_stats[i].pfm_full_smpl_buffer_count);
 		p += sprintf(p, "CPU%-2d owner            : %d\n", i, pmu_owners[i].owner ? pmu_owners[i].owner->pid: -1);
+		p += sprintf(p, "CPU%-2d syst_wide        : %d\n", i, per_cpu(pfm_syst_wide, i));
+		p += sprintf(p, "CPU%-2d dcr_pp           : %d\n", i, per_cpu(pfm_dcr_pp, i));
 	}
 
 	LOCK_PFS();
@@ -3398,11 +3413,10 @@ pfm_load_regs (struct task_struct *task)
  * XXX: make this routine able to work with non current context
  */
 static void
-ia64_reset_pmu(struct task_struct *task)
+pfm_reset_pmu(struct task_struct *task)
 {
 	struct thread_struct *t = &task->thread;
 	pfm_context_t *ctx = t->pfm_context;
-	unsigned long mask;
 	int i;
 
 	if (task != current) {
@@ -3415,30 +3429,27 @@ ia64_reset_pmu(struct task_struct *task)
 
 	/*
 	 * install reset values for PMC. We skip PMC0 (done above)
-	 * XX: good up to 64 PMCS
 	 */
-	mask = pmu_conf.impl_regs[0] >> 1;
-	for(i=1; mask; mask>>=1, i++) {
-		if (mask & 0x1) {
-			ia64_set_pmc(i, reset_pmcs[i]);
-			/*
-			 * When restoring context, we must restore ALL pmcs, even the ones 
-			 * that the task does not use to avoid leaks and possibly corruption
-			 * of the sesion because of configuration conflicts. So here, we 
-			 * initialize the entire set used in the context switch restore routine.
-	 		 */
-			t->pmc[i] = reset_pmcs[i];
-			DBprintk((" pmc[%d]=0x%lx\n", i, reset_pmcs[i]));
-						 
-		}
+	for (i=1; (pmu_conf.pmc_desc[i].type & PFM_REG_END) == 0; i++) {
+		if ((pmu_conf.pmc_desc[i].type & PFM_REG_IMPL) == 0) continue;
+		ia64_set_pmc(i, PMC_DFL_VAL(i));
+		/*
+		 * When restoring context, we must restore ALL pmcs, even the ones 
+		 * that the task does not use to avoid leaks and possibly corruption
+		 * of the sesion because of configuration conflicts. So here, we 
+		 * initialize the entire set used in the context switch restore routine.
+	 	 */
+		t->pmc[i] = PMC_DFL_VAL(i);
+		DBprintk(("pmc[%d]=0x%lx\n", i, t->pmc[i]));
 	}
+
 	/*
 	 * clear reset values for PMD. 
 	 * XXX: good up to 64 PMDS. Suppose that zero is a valid value.
 	 */
-	mask = pmu_conf.impl_regs[4];
-	for(i=0; mask; mask>>=1, i++) {
-		if (mask & 0x1) ia64_set_pmd(i, 0UL);
+	for (i=0; (pmu_conf.pmd_desc[i].type & PFM_REG_END) == 0; i++) {
+		if ((pmu_conf.pmd_desc[i].type & PFM_REG_IMPL) == 0) continue;
+		ia64_set_pmd(i, 0UL);
 		t->pmd[i] = 0UL;
 	}
 
@@ -4119,23 +4130,6 @@ static struct irqaction perfmon_irqaction = {
 };
 
 
-static void
-pfm_pmu_snapshot(void)
-{
-	int i;
-
-	for (i=0; i < IA64_NUM_PMC_REGS; i++) {
-		if (i >= pmu_conf.num_pmcs) break;
-		if (PMC_IS_IMPL(i)) reset_pmcs[i] = ia64_get_pmc(i);
-	}
-#ifdef CONFIG_MCKINLEY
-	/*
-	 * set the 'stupid' enable bit to power the PMU!
-	 */
-	reset_pmcs[4] |= 1UL << 23;
-#endif
-}
-
 /*
  * perfmon initialization routine, called from the initcall() table
  */
@@ -4160,6 +4154,9 @@ perfmon_init (void)
 	}
 
 	pmu_conf.perf_ovfl_val = (1UL << pm_info.pal_perf_mon_info_s.width) - 1;
+	/*
+	 * XXX: use the pfm_*_desc tables instead and simply verify with PAL
+	 */
 	pmu_conf.max_counters  = pm_info.pal_perf_mon_info_s.generic;
 	pmu_conf.num_pmcs      = find_num_pm_regs(pmu_conf.impl_regs);
 	pmu_conf.num_pmds      = find_num_pm_regs(&pmu_conf.impl_regs[4]);
@@ -4184,23 +4181,10 @@ perfmon_init (void)
 	pmu_conf.num_dbrs <<=1;
 
 	/*
-	 * take a snapshot of all PMU registers. PAL is supposed
-	 * to configure them with stable/safe values, i.e., not
-	 * capturing anything.
-	 * We take a snapshot now, before we make any modifications. This
-	 * will become our master copy. Then we will reuse the snapshot
-	 * to reset the PMU in pfm_enable(). Using this technique, perfmon
-	 * does NOT have to know about the specific values to program for
-	 * the PMC/PMD. The safe values may be different from one CPU model to
-	 * the other.
-	 */
-	pfm_pmu_snapshot();
-
-	/*
 	 * setup the register configuration descriptions for the CPU
 	 */
-	pmu_conf.pmc_desc = pmc_desc;
-	pmu_conf.pmd_desc = pmd_desc;
+	pmu_conf.pmc_desc = pfm_pmc_desc;
+	pmu_conf.pmd_desc = pfm_pmd_desc;
 
 	/* we are all set */
 	pmu_conf.pfm_is_disabled = 0;
@@ -4222,11 +4206,34 @@ __initcall(perfmon_init);
 void
 perfmon_init_percpu (void)
 {
+	int i;
+
 	if (smp_processor_id() == 0)
 		register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
 
 	ia64_set_pmv(IA64_PERFMON_VECTOR);
 	ia64_srlz_d();
+
+	/*
+	 * we first initialize the PMU to a stable state.
+	 * the values may have been changed from their power-up
+	 * values by software executed before the kernel took over.
+	 *
+	 * At this point, pmu_conf has not yet been initialized
+	 *
+	 * On McKinley, this code is ineffective until PMC4 is initialized.
+	 */
+	for (i=1; (pfm_pmc_desc[i].type & PFM_REG_END) == 0;  i++) {
+		if ((pfm_pmc_desc[i].type & PFM_REG_IMPL) == 0) continue;
+		ia64_set_pmc(i, PMC_DFL_VAL(i));
+	}
+	for (i=0; (pfm_pmd_desc[i].type & PFM_REG_END) == 0; i++) {
+		if ((pfm_pmd_desc[i].type & PFM_REG_IMPL) == 0) continue;
+		ia64_set_pmd(i, 0UL);
+	}
+	ia64_set_pmc(0,1UL);
+	ia64_srlz_d();
+
 }
 
 #else /* !CONFIG_PERFMON */
