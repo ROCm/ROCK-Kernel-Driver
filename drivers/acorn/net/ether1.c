@@ -99,13 +99,13 @@ ether1_inw_p (struct net_device *dev, int addr, int svflgs)
 	unsigned long flags;
 	unsigned short ret;
 
-	if (svflgs) {
-		save_flags_cli (flags);
-	}
+	if (svflgs)
+		local_irq_save (flags);
+
 	outb (addr >> 12, REG_PAGE);
 	ret = inw (ETHER1_RAM + ((addr & 4095) >> 1));
 	if (svflgs)
-		restore_flags (flags);
+		local_irq_restore (flags);
 	return ret;
 }
 
@@ -114,13 +114,13 @@ ether1_outw_p (struct net_device *dev, unsigned short val, int addr, int svflgs)
 {
 	unsigned long flags;
 
-	if (svflgs) {
-		save_flags_cli (flags);
-	}
+	if (svflgs)
+		local_irq_save (flags);
+
 	outb (addr >> 12, REG_PAGE);
 	outw (val, ETHER1_RAM + ((addr & 4095) >> 1));
 	if (svflgs)
-		restore_flags (flags);
+		local_irq_restore (flags);
 }
 
 /*
@@ -722,7 +722,7 @@ ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 	nop.nop_command = CMD_NOP;
 	nop.nop_link = nopaddr;
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 	ether1_writebuffer (dev, &tx, txaddr, TX_SIZE);
 	ether1_writebuffer (dev, &tbd, tbdaddr, TBD_SIZE);
 	ether1_writebuffer (dev, skb->data, dataddr, len);
@@ -733,7 +733,7 @@ ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 	/* now reset the previous nop pointer */
 	ether1_outw (dev, txaddr, tmp, nop_t, nop_link, NORMALIRQS);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	/* handle transmit */
 	dev->trans_start = jiffies;

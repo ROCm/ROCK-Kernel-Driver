@@ -156,7 +156,7 @@ static void NFTL_setup(struct mtd_info *mtd)
 #if LINUX_VERSION_CODE < 0x20328
 	resetup_one_dev(&nftl_gendisk, firstfree);
 #else
-	grok_partitions(MKDEV(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
+	grok_partitions(mk_kdev(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
 			nftl->nr_sects);
 #endif
 }
@@ -779,7 +779,7 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 	struct NFTLrecord *nftl;
 	int res;
 
-	nftl = NFTLs[MINOR(inode->i_rdev) >> NFTL_PARTN_BITS];
+	nftl = NFTLs[minor(inode->i_rdev) >> NFTL_PARTN_BITS];
 
 	if (!nftl) return -EINVAL;
 
@@ -853,7 +853,7 @@ void nftl_request(RQFUNC_ARG)
 		      (req->cmd == READ) ? "Read " : "Write",
 		      req->sector, req->current_nr_sectors);
 
-		dev = MINOR(req->rq_dev);
+		dev = minor(req->rq_dev);
 		block = req->sector;
 		nsect = req->current_nr_sectors;
 		buffer = req->buffer;
@@ -875,7 +875,7 @@ void nftl_request(RQFUNC_ARG)
 		if (block + nsect > part_table[dev].nr_sects) {
 			/* access past the end of device */
 			printk("nftl%c%d: bad access: block = %d, count = %d\n",
-			       (MINOR(req->rq_dev)>>6)+'a', dev & 0xf, block, nsect);
+			       (minor(req->rq_dev)>>6)+'a', dev & 0xf, block, nsect);
 			up(&nftl->mutex);
 			res = 0; /* fail */
 			goto repeat;
@@ -933,7 +933,7 @@ void nftl_request(RQFUNC_ARG)
 
 static int nftl_open(struct inode *ip, struct file *fp)
 {
-	int nftlnum = MINOR(ip->i_rdev) >> NFTL_PARTN_BITS;
+	int nftlnum = minor(ip->i_rdev) >> NFTL_PARTN_BITS;
 	struct NFTLrecord *thisNFTL;
 	thisNFTL = NFTLs[nftlnum];
 
@@ -947,7 +947,7 @@ static int nftl_open(struct inode *ip, struct file *fp)
 #endif
 	if (!thisNFTL) {
 		DEBUG(MTD_DEBUG_LEVEL2,"ENODEV: thisNFTL = %d, minor = %d, ip = %p, fp = %p\n", 
-		      nftlnum, ip->i_rdev, ip, fp);
+		      nftlnum, minor(ip->i_rdev), ip, fp);
 		return -ENODEV;
 	}
 
@@ -967,7 +967,7 @@ static int nftl_release(struct inode *inode, struct file *fp)
 {
 	struct NFTLrecord *thisNFTL;
 
-	thisNFTL = NFTLs[MINOR(inode->i_rdev) / 16];
+	thisNFTL = NFTLs[minor(inode->i_rdev) / 16];
 
 	DEBUG(MTD_DEBUG_LEVEL2, "NFTL_release\n");
 

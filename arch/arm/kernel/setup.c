@@ -38,6 +38,10 @@
 #define CONFIG_CMDLINE ""
 #endif
 
+#ifdef CONFIG_PREEMPT
+spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+#endif
+
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
 char fpe_type[8];
 
@@ -68,6 +72,9 @@ unsigned int elf_hwcap;
 
 #ifdef MULTI_CPU
 struct processor processor;
+#endif
+#ifdef MULTI_TLB
+struct cpu_tlb_fns cpu_tlb;
 #endif
 
 unsigned char aux_device_present;
@@ -176,7 +183,7 @@ static const char *cache_lockdown[16] = {
 
 static inline void dump_cache(const char *prefix, unsigned int cache)
 {
-	unsigned int mult = 2 + CACHE_M(cache) ? 1 : 0;
+	unsigned int mult = 2 + (CACHE_M(cache) ? 1 : 0);
 
 	printk("%s size %dK associativity %d line length %d sets %d\n",
 		prefix,
@@ -237,6 +244,9 @@ static void __init setup_processor(void)
 
 #ifdef MULTI_CPU
 	processor = *list->proc;
+#endif
+#ifdef MULTI_TLB
+	cpu_tlb = *list->tlb;
 #endif
 
 	printk("Processor: %s %s revision %d\n",
@@ -661,7 +671,7 @@ static const char *proc_arch[16] = {
 static void
 c_show_cache(struct seq_file *m, const char *type, unsigned int cache)
 {
-	unsigned int mult = 2 + CACHE_M(cache) ? 1 : 0;
+	unsigned int mult = 2 + (CACHE_M(cache) ? 1 : 0);
 
 	seq_printf(m, "%s size\t\t: %d\n"
 		      "%s assoc\t\t: %d\n"
@@ -734,7 +744,7 @@ static int c_show(struct seq_file *m, void *v)
 				   cache_types[CACHE_TYPE(cache_info)],
 				   cache_clean[CACHE_TYPE(cache_info)],
 				   cache_lockdown[CACHE_TYPE(cache_info)],
-				   CACHE_S(cache_info) ? "separate I,D" : "unified");
+				   CACHE_S(cache_info) ? "Harvard" : "Unified");
 
 			if (CACHE_S(cache_info)) {
 				c_show_cache(m, "I", CACHE_ISIZE(cache_info));

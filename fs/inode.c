@@ -144,6 +144,8 @@ void inode_init_once(struct inode *inode)
 	INIT_LIST_HEAD(&inode->i_devices);
 	sema_init(&inode->i_sem, 1);
 	spin_lock_init(&inode->i_data.i_shared_lock);
+	INIT_LIST_HEAD(&inode->i_data.i_mmap);
+	INIT_LIST_HEAD(&inode->i_data.i_mmap_shared);
 }
 
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)

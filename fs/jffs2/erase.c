@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: erase.c,v 1.23 2001/09/19 21:51:11 dwmw2 Exp $
+ * $Id: erase.c,v 1.24 2001/12/06 16:38:38 dwmw2 Exp $
  *
  */
 #include <linux/kernel.h>
@@ -214,8 +214,8 @@ static inline void jffs2_remove_node_refs_from_ino_list(struct jffs2_sb_info *c,
 
 	D2({
 		int i=0;
-        struct jffs2_raw_node_ref *this;		
-        printk(KERN_DEBUG "After remove_node_refs_from_ino_list: \n" KERN_DEBUG);
+		struct jffs2_raw_node_ref *this;
+		printk(KERN_DEBUG "After remove_node_refs_from_ino_list: \n" KERN_DEBUG);
 
 		this = ic->nodes;
 	   
@@ -262,7 +262,11 @@ void jffs2_erase_pending_trigger(struct jffs2_sb_info *c)
 
 void jffs2_mark_erased_blocks(struct jffs2_sb_info *c)
 {
-	static struct jffs2_unknown_node marker = {JFFS2_MAGIC_BITMASK, JFFS2_NODETYPE_CLEANMARKER, sizeof(struct jffs2_unknown_node)};
+	static struct jffs2_unknown_node marker = {
+			magic:		JFFS2_MAGIC_BITMASK,
+			nodetype:	JFFS2_NODETYPE_CLEANMARKER,
+			totlen:		sizeof(struct jffs2_unknown_node)
+	};
 	struct jffs2_eraseblock *jeb;
 	struct jffs2_raw_node_ref *marker_ref;
 	unsigned char *ebuf;

@@ -1,8 +1,6 @@
 /* 
  * Driver for PS/2 mouse on IOMD interface
  */
-
-#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/tty.h>

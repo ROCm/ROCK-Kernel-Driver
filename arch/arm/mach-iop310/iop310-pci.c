@@ -52,7 +52,7 @@
 #ifdef DEBUG
 #define  DBG(x...) printk(x)
 #else
-#define  DBG(x...)
+#define  DBG(x...) do { } while (0)
 #endif
 
 extern int (*external_fault)(unsigned long, struct pt_regs *);
@@ -247,7 +247,8 @@ static int iop310_sec_pci_status(void)
 		*IOP310_SATUISR = uisr & 0x0000069f;
 		ret = 1;
 	}
-//if (ret) printk("ERROR (%08lx %08lx)", usr, uisr);
+	if (ret)
+		DBG("ERROR (%08lx %08lx)", usr, uisr);
 	return ret;
 }
 
@@ -256,16 +257,19 @@ iop310_sec_rd_cfg_byte(struct pci_dev *dev, int where, u8 *p)
 {
 	int ret;
 	u8 val;
-//printk("rdb: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn), where);
+
+	DBG("rdb: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
+	    PCI_FUNC(dev->devfn), where);
 	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
 
 	val = (*IOP310_SOCCDR) >> ((where & 3) * 8);
 	__asm__ __volatile__("nop; nop; nop; nop");
-//printk(">= %08lx ", val);
+
+	DBG(">= %08lx ", val);
 	ret = iop310_sec_pci_status();
 	if (ret)
 		val = 0xff;
-//printk("\n");
+	DBG("\n");
 	*p = val;
 
 	return PCIBIOS_SUCCESSFUL;
@@ -276,16 +280,19 @@ iop310_sec_rd_cfg_word(struct pci_dev *dev, int where, u16 *p)
 {
 	int ret;
 	u16 val;
-//printk("rdw: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn), where);
+
+	DBG("rdw: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
+	    PCI_FUNC(dev->devfn), where);
 	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
 
 	val = (*IOP310_SOCCDR) >> ((where & 3) * 8);
 	__asm__ __volatile__("nop; nop; nop; nop");
-//printk(">= %08lx ", val);
+
+	DBG(">= %08lx ", val);
 	ret = iop310_sec_pci_status();
 	if (ret)
 		val = 0xffff;
-//printk("\n");
+	DBG("\n");
 	*p = val;
 
 	return PCIBIOS_SUCCESSFUL;
@@ -296,16 +303,19 @@ iop310_sec_rd_cfg_dword(struct pci_dev *dev, int where, u32 *p)
 {
 	int ret;
 	u32 val;
-//printk("rdl: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn), where);
+
+	DBG("rdl: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
+	    PCI_FUNC(dev->devfn), where);
 	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
 
 	val = *IOP310_SOCCDR;
 	__asm__ __volatile__("nop; nop; nop; nop");
-//printk(">= %08lx ", val);
+
+	DBG(">= %08lx ", val);
 	ret = iop310_sec_pci_status();
 	if (ret)
 		val = 0xffffffff;
-//printk("\n");
+	DBG("\n");
 	*p = val;
 
 	return PCIBIOS_SUCCESSFUL;
@@ -316,12 +326,15 @@ iop310_sec_wr_cfg_byte(struct pci_dev *dev, int where, u8 v)
 {
 	int ret;
 	u32 val;
-//printk("wrb: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn), where);
+
+	DBG("wrb: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
+	    PCI_FUNC(dev->devfn), where);
 	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
 
 	val = *IOP310_SOCCDR;
 	__asm__ __volatile__("nop; nop; nop; nop");
-//printk("<= %08lx", v);
+
+	DBG("<= %08lx", v);
 	ret = iop310_sec_pci_status();
 	if (ret == 0) {
 		where = (where & 3) * 8;
@@ -329,7 +342,7 @@ iop310_sec_wr_cfg_byte(struct pci_dev *dev, int where, u8 v)
 		val |= v << where;
 		*IOP310_SOCCDR = val;
 	}
-//printk("\n");
+	DBG("\n");
 	return PCIBIOS_SUCCESSFUL;
 }
 
@@ -338,12 +351,15 @@ iop310_sec_wr_cfg_word(struct pci_dev *dev, int where, u16 v)
 {
 	int ret;
 	u32 val;
-//printk("wrw: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn), where);
+
+	DBG("wrw: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
+	    PCI_FUNC(dev->devfn), where);
 	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
 
 	val = *IOP310_SOCCDR;
 	__asm__ __volatile__("nop; nop; nop; nop");
-//printk("<= %08lx", v);
+
+	DBG("<= %08lx", v);
 	ret = iop310_sec_pci_status();
 	if (ret == 0) {
 		where = (where & 2) * 8;
@@ -351,18 +367,20 @@ iop310_sec_wr_cfg_word(struct pci_dev *dev, int where, u16 v)
 		val |= v << where;
 		*IOP310_SOCCDR = val;
 	}
-//printk("\n");
+	DBG("\n");
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int
 iop310_sec_wr_cfg_dword(struct pci_dev *dev, int where, u32 v)
 {
-//printk("wrl: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn), where);
+	DBG("wrl: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
+	    PCI_FUNC(dev->devfn), where);
 	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
 	*IOP310_SOCCDR = v;
 	__asm__ __volatile__("nop; nop; nop; nop");
-//printk("<= %08lx\n", v);
+
+	DBG("<= %08lx\n", v);
 	return PCIBIOS_SUCCESSFUL;
 }
 
@@ -381,8 +399,8 @@ static struct pci_ops iop310_secondary_ops = {
  */
 int iop310_pci_abort_handler(unsigned long addr, struct pt_regs *regs)
 {
-//	printk("PCI abort: address = %08x PC = %08x LR = %08lx\n",
-//		addr, regs->ARM_pc, regs->ARM_lr);
+	DBG("PCI abort: address = %08x PC = %08x LR = %08lx\n",
+		addr, regs->ARM_pc, regs->ARM_lr);
 	return 0;
 }
 
@@ -443,11 +461,11 @@ int iop310_setup(int nr, struct pci_sys_data *sys)
 	case 1:
 		res[0].start = IOP310_PCISEC_LOWER_IO + 0x6e000000;
 		res[0].end   = IOP310_PCISEC_LOWER_IO + 0x6e00ffff;
-		res[0].name  = "PCI IO Primary";
+		res[0].name  = "PCI IO Secondary";
 
 		res[1].start = IOP310_PCISEC_LOWER_MEM;
 		res[1].end   = IOP310_PCISEC_LOWER_MEM + IOP310_PCI_WINDOW_SIZE;
-		res[1].name  = "PCI Memory Primary";
+		res[1].name  = "PCI Memory Secondary";
 		break;
 	}
 
@@ -465,18 +483,17 @@ int iop310_setup(int nr, struct pci_sys_data *sys)
 void iop310_init(void)
 {
 	DBG("PCI:  Intel 80312 PCI-to-PCI init code.\n");
-	DBG("  ATU secondary: IOP310_SOMWVR=0x%04x, IOP310_SOIOWVR=0x%04x\n",
-			*IOP310_SOMWVR,
-			*IOP310_SOIOWVR);
-	DBG("  ATU secondary: IOP310_ATUCR=0x%08x\n", *IOP310_ATUCR);
-	DBG("  ATU secondary: IOP310_SIABAR=0x%08x IOP310_SIALR=0x%08x IOP310_SIATVR=%08x\n", *IOP310_SIABAR, *IOP310_SIALR, *IOP310_SIATVR);
-
-	DBG("  ATU primary: IOP310_POMWVR=0x%04x, IOP310_POIOWVR=0x%04x\n",
-			*IOP310_POMWVR,
-			*IOP310_POIOWVR);
-	DBG("  ATU secondary: IOP310_PIABAR=0x%08x IOP310_PIALR=0x%08x IOP310_PIATVR=%08x\n", *IOP310_PIABAR, *IOP310_PIALR, *IOP310_PIATVR);
-
-	DBG("  P2P: IOP310_PCR=0x%04x IOP310_BCR=0x%04x IOP310_EBCR=0x%04x\n", *IOP310_PCR, *IOP310_BCR, *IOP310_EBCR);
+	DBG("  ATU secondary: ATUCR =0x%08x\n", *IOP310_ATUCR);
+	DBG("  ATU secondary: SOMWVR=0x%08x  SOIOWVR=0x%08x\n",
+		*IOP310_SOMWVR,	*IOP310_SOIOWVR);
+	DBG("  ATU secondary: SIABAR=0x%08x  SIALR  =0x%08x SIATVR=%08x\n",
+		*IOP310_SIABAR, *IOP310_SIALR, *IOP310_SIATVR);
+	DBG("  ATU primary:   POMWVR=0x%08x  POIOWVR=0x%08x\n",
+		*IOP310_POMWVR,	*IOP310_POIOWVR);
+	DBG("  ATU primary:   PIABAR=0x%08x  PIALR  =0x%08x PIATVR=%08x\n",
+		*IOP310_PIABAR, *IOP310_PIALR, *IOP310_PIATVR);
+	DBG("  P2P: PCR=0x%04x BCR=0x%04x EBCR=0x%04x\n",
+		*IOP310_PCR, *IOP310_BCR, *IOP310_EBCR);
 
 	/*
 	 * Windows have to be carefully opened via a nice set of calls
@@ -495,6 +512,5 @@ void iop310_init(void)
 	*IOP310_PCR &= 0xfff8;
 
 	external_fault = iop310_pci_abort_handler;
-
 }
 

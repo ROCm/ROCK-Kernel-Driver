@@ -95,6 +95,14 @@ static inline void * ioremap_nocache (unsigned long offset, unsigned long size)
 extern void iounmap(void *addr);
 
 /*
+ * bt_ioremap() and bt_iounmap() are for temporary early boot-time
+ * mappings, before the real ioremap() is functional.
+ * A boot-time mapping is currently limited to at most 16 pages.
+ */
+extern void *bt_ioremap(unsigned long offset, unsigned long size);
+extern void bt_iounmap(void *addr, unsigned long size);
+
+/*
  * ISA I/O bus memory addresses are 1:1 with the physical address.
  */
 #define isa_virt_to_bus virt_to_phys

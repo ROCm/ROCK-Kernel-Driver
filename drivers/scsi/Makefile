@@ -1,7 +1,7 @@
 #
 # Makefile for linux/drivers/scsi
 #
-# 30 May 2000, Christoph Hellwig <chhellwig@gmx.net>
+# 30 May 2000, Christoph Hellwig <hch@infradead.org>
 # Rewritten to use lists instead of if-statements.
 #
 # 20 Sep 2000, Torben Mathiasen <tmm@image.dk>

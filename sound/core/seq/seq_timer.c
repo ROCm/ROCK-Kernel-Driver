@@ -285,7 +285,7 @@ int snd_seq_timer_open(queue_t *q)
 				t = snd_timer_open(str, &tid, q->queue);
 			}
 			if (t == NULL) {
-				snd_printk("fatal error: cannot create timer\n");
+				snd_printk(KERN_ERR "fatal error: cannot create timer\n");
 				return -ENODEV;
 			}
 		}

@@ -116,7 +116,7 @@
 #define I2O_BSA_DSC_VOLUME_CHANGED      0x000D
 #define I2O_BSA_DSC_TIMEOUT             0x000E
 
-#define I2O_UNIT(dev)	(i2ob_dev[MINOR((dev)) & 0xf0])
+#define I2O_UNIT(dev)	(i2ob_dev[minor((dev)) & 0xf0])
 #define I2O_LOCK(unit)	(i2ob_dev[(unit)].req_queue->queue_lock)
 
 /*
@@ -760,7 +760,7 @@ static int i2ob_evt(void *dummy)
 			{
 				u64 size;
 
-				if(do_i2ob_revalidate(MKDEV(MAJOR_NR, unit),0) != -EBUSY)
+				if(do_i2ob_revalidate(mk_kdev(MAJOR_NR, unit),0) != -EBUSY)
 					continue;
 
 	  			if(i2ob_query_device(&i2ob_dev[unit], 0x0004, 0, &size, 8) !=0 )
@@ -869,7 +869,7 @@ static int i2ob_backlog_request(struct i2o_controller *c, struct i2ob_device *de
 		if(i2ob_backlog[c->unit] == NULL)
 			i2ob_backlog_tail[c->unit] = NULL;
 			
-		unit = MINOR(ireq->req->rq_dev);
+		unit = minor(ireq->req->rq_dev);
 		i2ob_send(m, dev, ireq, i2ob[unit].start_sect, unit);
 	}
 	if(i2ob_backlog[c->unit])
@@ -905,7 +905,7 @@ static void i2ob_request(request_queue_t *q)
 		if(req->rq_status == RQ_INACTIVE)
 			return;
 			
-		unit = MINOR(req->rq_dev);
+		unit = minor(req->rq_dev);
 		dev = &i2ob_dev[(unit&0xF0)];
 
 		/* 
@@ -1038,7 +1038,7 @@ static void i2o_block_biosparam(
  
 static int do_i2ob_revalidate(kdev_t dev, int maxu)
 {
-	int minor=MINOR(dev);
+	int minor=minor(dev);
 	int i;
 	
 	minor&=0xF0;
@@ -1053,7 +1053,7 @@ static int do_i2ob_revalidate(kdev_t dev, int maxu)
 	for( i = 15; i>=0 ; i--)
 	{
 		int m = minor+i;
-		invalidate_device(MKDEV(MAJOR_NR, m), 1);
+		invalidate_device(mk_kdev(MAJOR_NR, m), 1);
 		i2ob_gendisk.part[m].start_sect = 0;
 		i2ob_gendisk.part[m].nr_sects = 0;
 	}
@@ -1079,14 +1079,14 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (!inode || !inode->i_rdev)
+	if (!inode || kdev_none(inode->i_rdev))
 		return -EINVAL;
 
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{
 			struct hd_geometry g;
-			int u = MINOR(inode->i_rdev) & 0xF0;
+			int u = minor(inode->i_rdev) & 0xF0;
 			i2o_block_biosparam(i2ob_sizes[u]<<1, 
 				&g.cylinders, &g.heads, &g.sectors);
 			g.start = get_start_sect(inode->i_rdev);
@@ -1121,7 +1121,7 @@ static int i2ob_release(struct inode *inode, struct file *file)
 	struct i2ob_device *dev;
 	int minor;
 
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 	if (minor >= (MAX_I2OB<<4))
 		return -ENODEV;
 	dev = &i2ob_dev[(minor&0xF0)];
@@ -1193,7 +1193,7 @@ static int i2ob_open(struct inode *inode, struct file *file)
 	
 	if (!inode)
 		return -EINVAL;
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 	if (minor >= MAX_I2OB<<4)
 		return -ENODEV;
 	dev=&i2ob_dev[(minor&0xF0)];
@@ -1384,7 +1384,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	 */
 	dev->req_queue = &i2ob_queues[c->unit]->req_queue;
 
-	grok_partitions(MKDEV(MAJOR_NR, unit), (long)(size>>9));
+	grok_partitions(mk_kdev(MAJOR_NR, unit), (long)(size>>9));
 
 	/*
 	 * Register for the events we're interested in and that the
@@ -1704,7 +1704,7 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
  */
 static int i2ob_media_change(kdev_t dev)
 {
-	int i=MINOR(dev);
+	int i=minor(dev);
 	i>>=4;
 	if(i2ob_media_change_flag[i])
 	{
@@ -1883,7 +1883,7 @@ int i2o_block_init(void)
 	 *	Finally see what is actually plugged in to our controllers
 	 */
 	for (i = 0; i < MAX_I2OB; i++)
-		register_disk(&i2ob_gendisk, MKDEV(MAJOR_NR,i<<4), 1<<4,
+		register_disk(&i2ob_gendisk, mk_kdev(MAJOR_NR,i<<4), 1<<4,
 			&i2ob_fops, 0);
 	i2ob_probe();
 

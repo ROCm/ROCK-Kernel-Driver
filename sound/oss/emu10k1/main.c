@@ -1127,7 +1127,7 @@ static struct pci_driver emu10k1_pci_driver = {
 	name:		"emu10k1",
 	id_table:	emu10k1_pci_tbl,
 	probe:		emu10k1_probe,
-	remove:		emu10k1_remove,
+	remove:		__devexit_p(emu10k1_remove),
 };
 
 static int __init emu10k1_init_module(void)

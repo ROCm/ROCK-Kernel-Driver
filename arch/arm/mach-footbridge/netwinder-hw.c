@@ -320,7 +320,7 @@ static inline void wb977_init_gpio(void)
 	 */
 	spin_lock_irqsave(&gpio_lock, flags);
 	gpio_modify_op(-1, GPIO_RED_LED | GPIO_FAN);
-	spin_unlock_irqrestore(&gpio_loc, flags);
+	spin_unlock_irqrestore(&gpio_lock, flags);
 }
 
 /*

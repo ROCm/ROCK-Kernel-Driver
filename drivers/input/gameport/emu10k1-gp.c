@@ -1,13 +1,11 @@
 /*
- * $Id: emu10k1-gp.c,v 1.2 2001/04/24 07:48:56 vojtech Exp $
+ * $Id: emu10k1-gp.c,v 1.8 2002/01/22 20:40:46 vojtech Exp $
  *
  *  Copyright (c) 2001 Vojtech Pavlik
- *
- *  Sponsored by SuSE
  */
 
 /*
- * EMU10k1 - SB Live! - gameport driver for Linux
+ * EMU10k1 - SB Live / Audigy - gameport driver for Linux
  */
 
 /*
@@ -27,7 +25,7 @@
  * 
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <asm/io.h>
@@ -41,6 +39,7 @@
 #include <linux/pci.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("EMU10k1 gameport driver");
 MODULE_LICENSE("GPL");
 
 struct emu {
@@ -48,10 +47,12 @@ struct emu {
 	struct emu *next;
 	struct gameport gameport;
 	int size;
+	char phys[32];
 };
 	
 static struct pci_device_id emu_tbl[] __devinitdata = {
-	{ 0x1102, 0x7002, PCI_ANY_ID, PCI_ANY_ID }, /* SB Live! gameport */
+	{ 0x1102, 0x7002, PCI_ANY_ID, PCI_ANY_ID }, /* SB Live gameport */
+	{ 0x1102, 0x7003, PCI_ANY_ID, PCI_ANY_ID }, /* Audigy gameport */
 	{ 0, }
 };
 
@@ -60,15 +61,10 @@ MODULE_DEVICE_TABLE(pci, emu_tbl);
 static int __devinit emu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	int ioport, iolen;
-	int rc;
-	struct emu *port;
+	struct emu *emu;
         
-	rc = pci_enable_device(pdev);
-	if (rc) {
-		printk(KERN_ERR "emu10k1-gp: Cannot enable emu10k1 gameport (bus %d, devfn %d) error=%d\n",
-			pdev->bus->number, pdev->devfn, rc);
-		return rc;
-	}
+	if (pci_enable_device(pdev))
+		return -EBUSY;
 
 	ioport = pci_resource_start(pdev, 0);
 	iolen = pci_resource_len(pdev, 0);
@@ -76,39 +72,48 @@ static int __devinit emu_probe(struct pci_dev *pdev, const struct pci_device_id 
 	if (!request_region(ioport, iolen, "emu10k1-gp"))
 		return -EBUSY;
 
-	if (!(port = kmalloc(sizeof(struct emu), GFP_KERNEL))) {
+	if (!(emu = kmalloc(sizeof(struct emu), GFP_KERNEL))) {
 		printk(KERN_ERR "emu10k1-gp: Memory allocation failed.\n");
 		release_region(ioport, iolen);
 		return -ENOMEM;
 	}
-	memset(port, 0, sizeof(struct emu));
+	memset(emu, 0, sizeof(struct emu));
 
-	port->gameport.io = ioport;
-	port->size = iolen;
-	port->dev = pdev;
-	pci_set_drvdata(pdev, port);
+	sprintf(emu->phys, "pci%s/gameport0", pdev->slot_name);
 
-	gameport_register_port(&port->gameport);
+	emu->size = iolen;
+	emu->dev = pdev;
 
-	printk(KERN_INFO "gameport%d: Emu10k1 Gameport at %#x size %d speed %d kHz\n",
-		port->gameport.number, port->gameport.io, iolen, port->gameport.speed);
+	emu->gameport.io = ioport;
+	emu->gameport.name = pdev->name;
+	emu->gameport.phys = emu->phys;
+	emu->gameport.idbus = BUS_PCI;
+	emu->gameport.idvendor = pdev->vendor;
+	emu->gameport.idproduct = pdev->device;
+
+	pci_set_drvdata(pdev, emu);
+
+	gameport_register_port(&emu->gameport);
+
+	printk(KERN_INFO "gameport: %s at pci%s speed %d kHz\n",
+		pdev->name, pdev->slot_name, emu->gameport.speed);
 
 	return 0;
 }
 
 static void __devexit emu_remove(struct pci_dev *pdev)
 {
-	struct emu *port = pci_get_drvdata(pdev);
-	gameport_unregister_port(&port->gameport);
-	release_region(port->gameport.io, port->size);
-	kfree(port);
+	struct emu *emu = pci_get_drvdata(pdev);
+	gameport_unregister_port(&emu->gameport);
+	release_region(emu->gameport.io, emu->size);
+	kfree(emu);
 }
 
 static struct pci_driver emu_driver = {
         name:           "Emu10k1 Gameport",
         id_table:       emu_tbl,
         probe:          emu_probe,
-        remove:         emu_remove,
+        remove:         __devexit_p(emu_remove),
 };
 
 int __init emu_init(void)

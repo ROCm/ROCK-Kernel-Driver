@@ -33,7 +33,7 @@ obj-$(CONFIG_SND_INTERWAVE_STB) += snd-ainstr-iw.o snd-ainstr-gf1.o snd-ainstr-s
 obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_OPTI93X) += snd-ainstr-fm.o
-obj-$(CONFIG_SND_SB) += snd-ainstr-fm.o
+obj-$(CONFIG_SND_SB8) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_SB16) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_SBAWE) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_WAVEFRONT) += snd-ainstr-fm.o
@@ -44,6 +44,7 @@ obj-$(CONFIG_SND_ES1938) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_FM801) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_TRIDENT) += snd-ainstr-simple.o
+obj-$(CONFIG_SND_YMFPCI) += snd-ainstr-fm.o
 
 include $(TOPDIR)/Rules.make
 

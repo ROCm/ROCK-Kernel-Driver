@@ -210,7 +210,7 @@ static int __init alsa_card_emu10k1_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("EMU10K1/Audigy soundcard not found or device busy\n");
+		printk(KERN_ERR "EMU10K1/Audigy soundcard not found or device busy\n");
 #endif
 		return err;
 	}

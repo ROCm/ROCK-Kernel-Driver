@@ -699,10 +699,12 @@ encode_entry(struct readdir_cd *cd, const char *name,
 
 		fh_init(&fh, NFS3_FHSIZE);
 		if (isdotent(name, namlen)) {
-			dchild = dparent;
-			if (namlen == 2)
-				dchild = dchild->d_parent;
-			dchild = dget(dchild);
+			if (namlen == 2) {
+				read_lock(&dparent_lock);
+				dchild = dget(dparent->d_parent);
+				read_unlock(&dparent_lock);
+			} else
+				dchild = dget(dparent);
 		} else
 			dchild = lookup_one_len(name, dparent,namlen);
 		if (IS_ERR(dchild))

@@ -681,7 +681,7 @@ int snd_timer_unregister(snd_timer_t *timer)
 	snd_assert(timer != NULL, return -ENXIO);
 	down(&register_mutex);
 	if (! list_empty(&timer->open_list_head)) {
-		snd_printk("timer 0x%lx is busy?\n", (long)timer);
+		snd_printk(KERN_WARNING "timer 0x%lx is busy?\n", (long)timer);
 		list_for_each_safe(p, n, &timer->open_list_head) {
 			list_del_init(p);
 			ti = (snd_timer_instance_t *)list_entry(p, snd_timer_instance_t, open_list);
@@ -1318,10 +1318,10 @@ static int __init alsa_timer_init(void)
 	}
 	snd_timer_proc_entry = entry;
 	if ((err = snd_timer_register_system()) < 0)
-		snd_printk("unable to register system timer (%i)\n", err);
+		snd_printk(KERN_ERR "unable to register system timer (%i)\n", err);
 	if ((err = snd_register_device(SNDRV_DEVICE_TYPE_TIMER,
 					NULL, 0, &snd_timer_reg, "timer"))<0)
-		snd_printk("unable to register timer device (%i)\n", err);
+		snd_printk(KERN_ERR "unable to register timer device (%i)\n", err);
 	return 0;
 }
 

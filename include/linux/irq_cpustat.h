@@ -19,11 +19,13 @@
 
 extern irq_cpustat_t irq_stat[];			/* defined in asm/hardirq.h */
 
+#ifndef __ARCH_IRQ_STAT /* Some architectures can do this more efficiently */ 
 #ifdef CONFIG_SMP
 #define __IRQ_STAT(cpu, member)	(irq_stat[cpu].member)
 #else
 #define __IRQ_STAT(cpu, member)	((void)(cpu), irq_stat[0].member)
 #endif	
+#endif
 
   /* arch independent irq_stat fields */
 #define softirq_pending(cpu)	__IRQ_STAT((cpu), __softirq_pending)

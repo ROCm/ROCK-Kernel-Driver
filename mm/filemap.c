@@ -1399,7 +1399,7 @@ page_ok:
 		 * virtual addresses, take care about potential aliasing
 		 * before reading the page on the kernel side.
 		 */
-		if (mapping->i_mmap_shared != NULL)
+		if (!list_empty(&mapping->i_mmap_shared))
 			flush_dcache_page(page);
 
 		/*

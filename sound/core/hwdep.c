@@ -321,7 +321,7 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 	if ((err = snd_register_device(SNDRV_DEVICE_TYPE_HWDEP,
 				       hwdep->card, hwdep->device,
 				       &snd_hwdep_reg, name)) < 0) {
-		snd_printk("unable to register hardware dependant device %i:%i\n",
+		snd_printk(KERN_ERR "unable to register hardware dependant device %i:%i\n",
 			   hwdep->card->number, hwdep->device);
 		snd_hwdep_devices[idx] = NULL;
 		up(&register_mutex);
@@ -331,12 +331,12 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 	hwdep->ossreg = 0;
 	if (hwdep->oss_type >= 0) {
 		if ((hwdep->oss_type == SNDRV_OSS_DEVICE_TYPE_DMFM) && (hwdep->device != 0)) {
-			snd_printk ("only hwdep device 0 can be registered as OSS direct FM device!\n");
+			snd_printk (KERN_WARNING "only hwdep device 0 can be registered as OSS direct FM device!\n");
 		} else {
 			if (snd_register_oss_device(hwdep->oss_type,
 						    hwdep->card, hwdep->device,
 						    &snd_hwdep_reg, hwdep->oss_dev) < 0) {
-				snd_printk("unable to register OSS compatibility device %i:%i\n",
+				snd_printk(KERN_ERR "unable to register OSS compatibility device %i:%i\n",
 					   hwdep->card->number, hwdep->device);
 			} else {
 				snd_oss_info_register(SNDRV_OSS_INFO_DEV_SYNTH, hwdep->card->number, hwdep->name);

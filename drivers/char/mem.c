@@ -273,6 +273,8 @@ static ssize_t read_kmem(struct file *file, char *buf,
  	return virtr + read;
 }
 
+extern long vwrite(char *buf, char *addr, unsigned long count);
+
 /*
  * This function writes to the *virtual* memory as seen by the kernel.
  */
@@ -280,12 +282,46 @@ static ssize_t write_kmem(struct file * file, const char * buf,
 			  size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
+	ssize_t wrote = 0;
+	ssize_t virtr = 0;
+	char * kbuf; /* k-addr because vwrite() takes vmlist_lock rwlock */
 
-	if (p >= (unsigned long) high_memory)
-		return 0;
-	if (count > (unsigned long) high_memory - p)
-		count = (unsigned long) high_memory - p;
-	return do_write_mem(file, (void*)p, p, buf, count, ppos);
+	if (p < (unsigned long) high_memory) {
+		wrote = count;
+		if (count > (unsigned long) high_memory - p)
+			wrote = (unsigned long) high_memory - p;
+
+		wrote = do_write_mem(file, (void*)p, p, buf, wrote, ppos);
+
+		p += wrote;
+		buf += wrote;
+		count -= wrote;
+	}
+
+	if (count > 0) {
+		kbuf = (char *)__get_free_page(GFP_KERNEL);
+		if (!kbuf)
+			return -ENOMEM;
+		while (count > 0) {
+			int len = count;
+
+			if (len > PAGE_SIZE)
+				len = PAGE_SIZE;
+			if (len && copy_from_user(kbuf, buf, len)) {
+				free_page((unsigned long)kbuf);
+				return -EFAULT;
+			}
+			len = vwrite(kbuf, (char *)p, len);
+			count -= len;
+			buf += len;
+			virtr += len;
+			p += len;
+		}
+		free_page((unsigned long)kbuf);
+	}
+
+ 	*ppos = p;
+ 	return virtr + wrote;
 }
 
 #if !defined(__mc68000__)

@@ -132,7 +132,7 @@ void snd_seq_instr_list_free(snd_seq_kinstr_list_t **list_ptr)
 			}				
 			spin_unlock_irqrestore(&list->lock, flags);
 			if (snd_seq_instr_free(instr, 0)<0)
-				snd_printk("instrument free problem\n");
+				snd_printk(KERN_WARNING "instrument free problem\n");
 		}
 		while ((cluster = list->chash[idx]) != NULL) {
 			list->chash[idx] = cluster->next;
@@ -221,7 +221,7 @@ int snd_seq_instr_list_free_cond(snd_seq_kinstr_list_t *list,
 				schedule_timeout(1);
 			}				
 			if (snd_seq_instr_free(instr, atomic)<0)
-				snd_printk("instrument free problem\n");
+				snd_printk(KERN_WARNING "instrument free problem\n");
 			instr = next;
 		}
 	}
@@ -324,7 +324,7 @@ void snd_seq_instr_free_use(snd_seq_kinstr_list_t *list,
 		return;
 	spin_lock_irqsave(&list->lock, flags);
 	if (instr->use <= 0) {
-		snd_printk("free_use: fatal!!! use = %i, name = '%s'\n", instr->use, instr->name);
+		snd_printk(KERN_ERR "free_use: fatal!!! use = %i, name = '%s'\n", instr->use, instr->name);
 	} else {
 		instr->use--;
 	}

@@ -54,8 +54,9 @@ extern struct svc_program	nfsd_program;
 static void			nfsd(struct svc_rqst *rqstp);
 struct timeval			nfssvc_boot;
 static struct svc_serv 		*nfsd_serv;
-static int			nfsd_busy;
+static atomic_t			nfsd_busy;
 static unsigned long		nfsd_last_call;
+static spinlock_t		nfsd_call_lock = SPIN_LOCK_UNLOCKED;
 
 struct nfsd_list {
 	struct list_head 	list;
@@ -74,7 +75,8 @@ nfsd_svc(unsigned short port, int nrservs)
 	int	error;
 	int	none_left;	
 	struct list_head *victim;
-
+	
+	lock_kernel();
 	dprintk("nfsd: creating service\n");
 	error = -EINVAL;
 	if (nrservs <= 0)
@@ -87,6 +89,7 @@ nfsd_svc(unsigned short port, int nrservs)
 	if (error<0)
 		goto out;
 	if (!nfsd_serv) {
+		atomic_set(&nfsd_busy, 0);
 		nfsd_serv = svc_create(&nfsd_program, NFSD_BUFSIZE, NFSSVC_XDRSIZE);
 		if (nfsd_serv == NULL)
 			goto out;
@@ -94,7 +97,7 @@ nfsd_svc(unsigned short port, int nrservs)
 		if (error < 0)
 			goto failure;
 
-#if 0	/* Don't even pretend that TCP works. It doesn't. */
+#if CONFIG_NFSD_TCP
 		error = svc_makesock(nfsd_serv, IPPROTO_TCP, port);
 		if (error < 0)
 			goto failure;
@@ -125,6 +128,7 @@ nfsd_svc(unsigned short port, int nrservs)
 		nfsd_racache_shutdown();
 	}
  out:
+	unlock_kernel();
 	return error;
 }
 
@@ -135,6 +139,7 @@ update_thread_usage(int busy_threads)
 	unsigned long diff;
 	int decile;
 
+	spin_lock(&nfsd_call_lock);
 	prev_call = nfsd_last_call;
 	nfsd_last_call = jiffies;
 	decile = busy_threads*10/nfsdstats.th_cnt;
@@ -145,6 +150,7 @@ update_thread_usage(int busy_threads)
 		if (decile == 10)
 			nfsdstats.th_fullcnt++;
 	}
+	spin_unlock(&nfsd_call_lock);
 }
 
 /*
@@ -173,6 +179,7 @@ nfsd(struct svc_rqst *rqstp)
 	me.task = current;
 	list_add(&me.list, &nfsd_list);
 
+	unlock_kernel();
 	/*
 	 * The main request loop
 	 */
@@ -188,12 +195,12 @@ nfsd(struct svc_rqst *rqstp)
 		 * recvfrom routine.
 		 */
 		while ((err = svc_recv(serv, rqstp,
-				       MAX_SCHEDULE_TIMEOUT)) == -EAGAIN)
+				       5*60*HZ)) == -EAGAIN)
 		    ;
 		if (err < 0)
 			break;
-		update_thread_usage(nfsd_busy);
-		nfsd_busy++;
+		update_thread_usage(atomic_read(&nfsd_busy));
+		atomic_inc(&nfsd_busy);
 
 		/* Lock the export hash tables for reading. */
 		exp_readlock();
@@ -211,9 +218,9 @@ nfsd(struct svc_rqst *rqstp)
 		svc_process(serv, rqstp);
 
 		/* Unlock export hash tables */
-		exp_unlock();
-		update_thread_usage(nfsd_busy);
-		nfsd_busy--;
+		exp_readunlock();
+		update_thread_usage(atomic_read(&nfsd_busy));
+		atomic_dec(&nfsd_busy);
 	}
 
 	if (err != -EINTR) {
@@ -227,6 +234,8 @@ nfsd(struct svc_rqst *rqstp)
 				break;
 		err = signo;
 	}
+
+	lock_kernel();
 
 	/* Release lockd */
 	lockd_down();

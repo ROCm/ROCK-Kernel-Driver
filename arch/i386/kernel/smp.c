@@ -485,35 +485,6 @@ void flush_tlb_all(void)
 	do_flush_tlb_all_local();
 }
 
-static spinlock_t migration_lock = SPIN_LOCK_UNLOCKED;
-static task_t *new_task;
-
-/*
- * This function sends a 'task migration' IPI to another CPU.
- * Must be called from syscall contexts, with interrupts *enabled*.
- */
-void smp_migrate_task(int cpu, task_t *p)
-{
-	/*
-	 * The target CPU will unlock the migration spinlock:
-	 */
-	_raw_spin_lock(&migration_lock);
-	new_task = p;
-	send_IPI_mask(1 << cpu, TASK_MIGRATION_VECTOR);
-}
-
-/*
- * Task migration callback.
- */
-asmlinkage void smp_task_migration_interrupt(void)
-{
-	task_t *p;
-
-	ack_APIC_irq();
-	p = new_task;
-	_raw_spin_unlock(&migration_lock);
-	sched_task_migrated(p);
-}
 /*
  * this function sends a 'reschedule' IPI to another CPU.
  * it goes straight through and wastes no time serializing

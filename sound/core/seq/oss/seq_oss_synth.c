@@ -111,7 +111,7 @@ snd_seq_oss_synth_register(snd_seq_device_t *dev)
 	unsigned long flags;
 
 	if ((rec = snd_kcalloc(sizeof(*rec), GFP_KERNEL)) == NULL) {
-		snd_printk("can't malloc synth info\n");
+		snd_printk(KERN_ERR "can't malloc synth info\n");
 		return -ENOMEM;
 	}
 	rec->seq_device = -1;
@@ -136,7 +136,7 @@ snd_seq_oss_synth_register(snd_seq_device_t *dev)
 	if (i >= max_synth_devs) {
 		if (max_synth_devs >= SNDRV_SEQ_OSS_MAX_SYNTH_DEVS) {
 			spin_unlock_irqrestore(&register_lock, flags);
-			snd_printk("no more synth slot\n");
+			snd_printk(KERN_ERR "no more synth slot\n");
 			kfree(rec);
 			return -ENOMEM;
 		}
@@ -165,7 +165,7 @@ snd_seq_oss_synth_unregister(snd_seq_device_t *dev)
 	}
 	if (index >= max_synth_devs) {
 		spin_unlock_irqrestore(&register_lock, flags);
-		snd_printk("can't unregister synth\n");
+		snd_printk(KERN_ERR "can't unregister synth\n");
 		return -EINVAL;
 	}
 	synth_devs[index] = NULL;

@@ -10,6 +10,7 @@ obj-$(CONFIG_SOUND) += soundcore.o
 subdir-$(CONFIG_SOUND_PRIME) += oss
 
 ifeq ($(CONFIG_SOUND_PRIME),y)
+  subdir-m += oss
   obj-y += oss/sounddrivers.o
 endif
 

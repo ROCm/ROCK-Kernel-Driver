@@ -354,7 +354,7 @@ vector_IRQ:	ldr	r13, .LCirq			@ I will leave this one in just in case...
 		@
 		adr	lr, 1b
 		orr	lr, lr, #0x08000003		@ Force SVC
-		bne	do_IRQ
+		bne	asm_do_IRQ
 
 		mov	why, #0
 		get_current_task r5
@@ -377,7 +377,7 @@ __irq_svc:	teqp	pc, #0x08000003
 		@
 		adr	lr, 1b
 		orr	lr, lr, #0x08000003		@ Force SVC
-		bne	do_IRQ				@ Returns to 1b
+		bne	asm_do_IRQ			@ Returns to 1b
 		SVC_RESTORE_ALL
 
 __irq_invalid:	mov	r0, sp

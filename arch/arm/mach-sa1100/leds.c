@@ -5,7 +5,6 @@
  * 
  * Copyright (C) 2001 Nicolas Pitre
  */
-#include <linux/config.h>
 #include <linux/init.h>
 
 #include <asm/leds.h>

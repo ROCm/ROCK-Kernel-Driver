@@ -78,10 +78,6 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	dprintk("RPC: creating %s client for %s (xprt %p)\n",
 		program->name, servname, xprt);
 
-#ifdef RPC_DEBUG
-	rpc_register_sysctl();
-#endif
-
 	if (!xprt)
 		goto out;
 	if (vers >= program->nrvers || !(version = program->version[vers]))
@@ -103,7 +99,7 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	clnt->cl_vers     = version->number;
 	clnt->cl_prot     = xprt->prot;
 	clnt->cl_stats    = program->stats;
-	clnt->cl_bindwait = RPC_INIT_WAITQ("bindwait");
+	INIT_RPC_WAITQ(&clnt->cl_bindwait, "bindwait");
 
 	if (!clnt->cl_port)
 		clnt->cl_autobind = 1;

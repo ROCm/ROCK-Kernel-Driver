@@ -1,9 +1,7 @@
 /*
- * $Id: amijoy.c,v 1.5 2000/07/21 22:52:24 vojtech Exp $
+ * $Id: amijoy.c,v 1.13 2002/01/22 20:26:32 vojtech Exp $
  *
- *  Copyright (c) 1998-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1998-2001 Vojtech Pavlik
  */
 
 /*
@@ -26,8 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/types.h>
@@ -40,13 +38,15 @@
 #include <asm/system.h>
 #include <asm/amigahw.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Driver for Amiga joysticks");
 MODULE_PARM(amijoy, "1-2i");
 MODULE_LICENSE("GPL");
 
 static int amijoy[2] = { 0, 1 };
 static int amijoy_used[2] = { 0, 0 };
 static struct input_dev amijoy_dev[2];
+static char *amijoy_phys[2] = { "amijoy/input0", "amijoy/input1" };
 
 static char *amijoy_name = "Amiga joystick";
 
@@ -64,9 +64,9 @@ static void amijoy_interrupt(int irq, void *dummy, struct pt_regs *fp)
 
 			input_report_key(amijoy_dev + i, BTN_TRIGGER, button);
 
-			input_report_abs(amijoy_dev + i, ABS_X, ((data >> 1) & 1) - ((data >> 9) & 1);
+			input_report_abs(amijoy_dev + i, ABS_X, ((data >> 1) & 1) - ((data >> 9) & 1));
 			data = ~(data ^ (data << 1));
-			input_report_abs(amijoy_dev + i, ABS_Y, ((data >> 1) & 1) - ((data >> 9) & 1);
+			input_report_abs(amijoy_dev + i, ABS_Y, ((data >> 1) & 1) - ((data >> 9) & 1));
 		}
 }
 
@@ -133,6 +133,7 @@ static int __init amijoy_init(void)
 			}
 
 			amijoy->dev[i].name = amijoy_name;
+			amijoy->dev[i].phys = amijoy_phys[i];
 			amijoy->dev[i].idbus = BUS_AMIGA;
 			amijoy->dev[i].idvendor = 0x0001;
 			amijoy->dev[i].idproduct = 0x0003;
@@ -141,7 +142,7 @@ static int __init amijoy_init(void)
 			amijoy_dev[i].private = amijoy_used + i;
 
 			input_register_device(amijoy_dev + i);
-			printk(KERN_INFO "input%d: %s at joy%ddat\n", amijoy_dev[i].number, amijoy_name, i);
+			printk(KERN_INFO "input: %s at joy%ddat\n", amijoy_name, i);
 		}
 	return 0;
 }

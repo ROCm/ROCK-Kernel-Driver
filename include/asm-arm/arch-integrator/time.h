@@ -135,6 +135,6 @@ void __init time_init(void)
 	/* 
 	 * Make irqs happen for the system timer
 	 */
-	setup_arm_irq(IRQ_TIMERINT1, &timer_irq);
+	setup_irq(IRQ_TIMERINT1, &timer_irq);
 	gettimeoffset = integrator_gettimeoffset;
 }

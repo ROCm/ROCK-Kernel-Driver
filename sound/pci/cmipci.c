@@ -113,6 +113,7 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 
 #define CM_AC3EN1		0x00100000	/* enable AC3: model 037 */
 #define CM_SPD24SEL		0x00020000	/* 24bit spdif: model 037 */
+#define CM_SPDIF_INVERSE	0x00010000
 
 #define CM_ADCBITLEN_MASK	0x0000C000	
 #define CM_ADCBITLEN_16		0x00000000
@@ -130,6 +131,8 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 #define CM_CH1_SRATE_88K	0x00000400
 #define CM_CH0_SRATE_176K	0x00000200
 #define CM_CH0_SRATE_88K	0x00000100
+
+#define CM_SPDIF_INVERSE2	0x00000080	/* model 055? */
 
 #define CM_CH1FMT_MASK		0x0000000C
 #define CM_CH1FMT_SHIFT		2
@@ -201,6 +204,7 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 #define CM_VIDWPPRT		0x00002000
 #define CM_SFILENB		0x00001000
 #define CM_MMODE_MASK		0x00000E00
+#define CM_SPDIF_SELECT		0x00000100	/* for model > 039 ? */
 #define CM_ENCENTER		0x00000080	/* shared with FLINKON? */
 #define CM_FLINKON		0x00000080
 #define CM_FLINKOFF		0x00000040
@@ -347,7 +351,7 @@ struct snd_stru_cmipci_pcm {
 	unsigned int offset;	/* physical address of the buffer */
 	unsigned int fmt;	/* format bits */
 	int ch;			/* channel (0/1) */
-	int is_dac;		/* is dac? */
+	unsigned int is_dac;		/* is dac? */
 	int bytes_per_frame;
 	int shift;
 	int ac3_shift;	/* extra shift: 1 on soft ac3 mode */
@@ -388,6 +392,9 @@ struct snd_stru_cmipci {
 	unsigned int can_ac3_sw: 1;
 	unsigned int can_ac3_hw: 1;
 	unsigned int can_multi_ch: 1;
+
+	unsigned int spdif_playback_avail: 1;	/* spdif ready? */
+	unsigned int spdif_playback_enabled: 1;	/* spdif switch enabled? */
 	int spdif_counter;	/* for software AC3 */
 
 	unsigned int dig_status;
@@ -1133,11 +1140,13 @@ static void setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up
 		save_mixer_state(cm);
 
 	spin_lock_irqsave(&cm->reg_lock, flags);
+	cm->spdif_playback_avail = up;
 	if (up) {
 		/* they are controlled via "IEC958 Output Switch" */
 		/* snd_cmipci_set_bit(cm, CM_REG_LEGACY_CTRL, CM_ENSPDOUT); */
 		/* snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_SPDO2DAC); */
-		snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_PLAYBACK_SPDF);
+		if (cm->spdif_playback_enabled)
+			snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_PLAYBACK_SPDF);
 		setup_ac3(cm, do_ac3, rate);
 
 		if (rate == 48000)
@@ -2020,7 +2029,7 @@ static snd_kcontrol_new_t snd_cmipci_mixers[] __devinitdata = {
 	CMIPCI_DOUBLE("Mic Capture Switch", SB_DSP4_INPUT_LEFT, SB_DSP4_INPUT_RIGHT, 0, 0, 1, 0, 0),
 	CMIPCI_SB_VOL_MONO("PC Speaker Playback Volume", SB_DSP4_SPEAKER_DEV, 6, 3),
 	CMIPCI_MIXER_VOL_STEREO("Aux Playback Volume", CM_REG_AUX_VOL, 4, 0, 15),
-	CMIPCI_MIXER_SW_STEREO("Aux Playback Switch", CM_REG_MIXER2, CM_VAUXLM_SHIFT, CM_VAUXRM_SHIFT, 0),
+	CMIPCI_MIXER_SW_STEREO("Aux Playback Switch", CM_REG_MIXER2, CM_VAUXLM_SHIFT, CM_VAUXRM_SHIFT, 1),
 	CMIPCI_MIXER_SW_STEREO("Aux Capture Switch", CM_REG_MIXER2, CM_RAUXLEN_SHIFT, CM_RAUXREN_SHIFT, 0),
 	CMIPCI_MIXER_SW_MONO("Mic Boost", CM_REG_MIXER2, CM_MICGAINZ_SHIFT, 1),
 	CMIPCI_MIXER_VOL_MONO("Mic Capture Volume", CM_REG_MIXER2, CM_VADMIC_SHIFT, 7),
@@ -2132,6 +2141,7 @@ DEFINE_BIT_SWITCH_ARG(spdif_in, CM_REG_FUNCTRL1, CM_SPDF_1, 0);
 DEFINE_BIT_SWITCH_ARG(spdif_0, CM_REG_FUNCTRL1, CM_SPDF_0, 0);
 DEFINE_BIT_SWITCH_ARG(spdo_48k, CM_REG_MISC_CTRL, CM_SPDF_AC97|CM_SPDIF48K, 0);
 #endif
+DEFINE_BIT_SWITCH_ARG(spdif_in_1_2, CM_REG_MISC_CTRL, CM_SPDIF_SELECT, 0, 0);
 DEFINE_BIT_SWITCH_ARG(spdif_enable, CM_REG_LEGACY_CTRL, CM_ENSPDOUT, 0, 0);
 DEFINE_BIT_SWITCH_ARG(spdo2dac, CM_REG_FUNCTRL1, CM_SPDO2DAC, 0, 1);
 DEFINE_BIT_SWITCH_ARG(spdi_valid, CM_REG_MISC, CM_SPDVALID, 1, 0);
@@ -2140,7 +2150,8 @@ DEFINE_BIT_SWITCH_ARG(spdif_dac_out, CM_REG_LEGACY_CTRL, CM_DAC2SPDO, 0, 1);
 DEFINE_SWITCH_ARG(spdo_5v, CM_REG_MISC_CTRL, CM_SPDO5V, 0, 0, 0); /* inverse: 0 = 5V */
 DEFINE_BIT_SWITCH_ARG(spdif_loop, CM_REG_FUNCTRL1, CM_SPDFLOOP, 0, 1);
 DEFINE_BIT_SWITCH_ARG(spdi_monitor, CM_REG_MIXER1, CM_CDPLAY, 1, 0);
-DEFINE_BIT_SWITCH_ARG(spdi_phase, CM_REG_MISC, 0x04, 0, 0);
+DEFINE_BIT_SWITCH_ARG(spdi_phase, CM_REG_CHFORMAT, CM_SPDIF_INVERSE, 0, 0);
+DEFINE_BIT_SWITCH_ARG(spdi_phase2, CM_REG_CHFORMAT, CM_SPDIF_INVERSE2, 0, 0);
 #if CM_CH_PLAY == 1
 DEFINE_SWITCH_ARG(exchange_dac, CM_REG_MISC_CTRL, CM_XCHGDAC, 0, 0, 0); /* reversed */
 #else
@@ -2179,9 +2190,20 @@ static int snd_cmipci_spdout_enable_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 
 static int snd_cmipci_spdout_enable_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
+	cmipci_t *chip = snd_kcontrol_chip(kcontrol);
 	int changed;
 	changed = _snd_cmipci_uswitch_put(kcontrol, ucontrol, &cmipci_switch_arg_spdif_enable);
 	changed |= _snd_cmipci_uswitch_put(kcontrol, ucontrol, &cmipci_switch_arg_spdo2dac);
+	if (changed) {
+		if (ucontrol->value.integer.value[0]) {
+			if (chip->spdif_playback_avail)
+				snd_cmipci_set_bit(chip, CM_REG_FUNCTRL1, CM_PLAYBACK_SPDF);
+		} else {
+			if (chip->spdif_playback_avail)
+				snd_cmipci_clear_bit(chip, CM_REG_FUNCTRL1, CM_PLAYBACK_SPDF);
+		}
+	}
+	chip->spdif_playback_enabled = ucontrol->value.integer.value[0];
 	return changed;
 }
 
@@ -2213,17 +2235,19 @@ static snd_kcontrol_new_t snd_cmipci_8738_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("IEC958 5V", spdo_5v),
 	DEFINE_MIXER_SWITCH("IEC958 Loop", spdif_loop),
 	DEFINE_MIXER_SWITCH("IEC958 In Monitor", spdi_monitor),
-	DEFINE_MIXER_SWITCH("IEC958 In Phase Inverse", spdi_phase),
 };
 
 /* only for model 033/037 */
 static snd_kcontrol_new_t snd_cmipci_old_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("IEC958 Mix Analog", spdif_dac_out),
+	DEFINE_MIXER_SWITCH("IEC958 In Phase Inverse", spdi_phase),
 };
 
-/* only for model 039 */
+/* only for model 039 or later */
 static snd_kcontrol_new_t snd_cmipci_extra_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("Line-In As Bass", line_bass),
+	DEFINE_MIXER_SWITCH("IEC958 In Select", spdif_in_1_2),
+	DEFINE_MIXER_SWITCH("IEC958 In Phase Inverse", spdi_phase2),
 };
 
 /* card control switches */
@@ -2283,7 +2307,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 		cm->spdif_pcm_ctl = kctl;
 		if (cm->chip_version <= 37) {
 			sw = snd_cmipci_old_mixer_switches;
-			for (idx = 0; idx < num_controls(snd_cmipci_extra_mixer_switches); idx++, sw++) {
+			for (idx = 0; idx < num_controls(snd_cmipci_old_mixer_switches); idx++, sw++) {
 				err = snd_ctl_add(cm->card, snd_ctl_new1(sw, cm));
 				if (err < 0)
 					return err;
@@ -2573,10 +2597,10 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 
 		if (snd_opl3_create(card, iosynth, iosynth + 2,
 				    OPL3_HW_OPL3, 0, &cm->opl3) < 0) {
-			snd_printk("no OPL device at 0x%lx\n", iosynth);
+			printk(KERN_ERR "cmipci: no OPL device at 0x%lx\n", iosynth);
 		} else {
 			if ((err = snd_opl3_hwdep_new(cm->opl3, 0, 1, &cm->opl3hwdep)) < 0)
-				snd_printk("cannot create OPL3 hwdep\n");
+				printk(KERN_ERR "cmipci: cannot create OPL3 hwdep\n");
 		}
 	}
 
@@ -2609,7 +2633,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_CMIPCI,
 					       iomidi, 0,
 					       cm->irq, 0, &cm->rmidi)) < 0) {
-			snd_printk("cmipci: no UART401 device at 0x%lx\n", iomidi);
+			printk(KERN_ERR "cmipci: no UART401 device at 0x%lx\n", iomidi);
 		}
 	}
 
@@ -2711,7 +2735,7 @@ static int __init alsa_card_cmipci_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("C-Media PCI soundcard not found or device busy\n");
+		printk(KERN_ERR "C-Media PCI soundcard not found or device busy\n");
 #endif
 		return err;
 	}

@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: symlink.c,v 1.5 2001/03/15 15:38:24 dwmw2 Exp $
+ * $Id: symlink.c,v 1.5.2.1 2002/01/15 10:39:06 dwmw2 Exp $
  *
  */
 
@@ -58,16 +58,21 @@ static char *jffs2_getlink(struct dentry *dentry)
 	char *buf;
 	int ret;
 
+	down(&f->sem);
 	if (!f->metadata) {
+		up(&f->sem);
 		printk(KERN_NOTICE "No metadata for symlink inode #%lu\n", dentry->d_inode->i_ino);
 		return ERR_PTR(-EINVAL);
 	}
 	buf = kmalloc(f->metadata->size+1, GFP_USER);
-	if (!buf)
+	if (!buf) {
+		up(&f->sem);
 		return ERR_PTR(-ENOMEM);
+	}
 	buf[f->metadata->size]=0;
 
 	ret = jffs2_read_dnode(JFFS2_SB_INFO(dentry->d_inode->i_sb), f->metadata, buf, 0, f->metadata->size);
+	up(&f->sem);
 	if (ret) {
 		kfree(buf);
 		return ERR_PTR(ret);

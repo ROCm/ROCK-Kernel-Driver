@@ -246,6 +246,16 @@ static int snd_via686a_codec_valid(via686a_t *chip, int secondary)
 	return -EIO;
 }
  
+static void snd_via686a_codec_wait(ac97_t *ac97)
+{
+	via686a_t *chip = snd_magic_cast(via686a_t, ac97->private_data, return);
+	int err;
+	err = snd_via686a_codec_ready(chip, ac97->num);
+	/* here we need to wait fairly for long time.. */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ/2);
+}
+
 static void snd_via686a_codec_write(ac97_t *ac97,
 				    unsigned short reg,
 				    unsigned short val)
@@ -811,6 +821,7 @@ static int __devinit snd_via686a_mixer(via686a_t *chip)
 	ac97.write = snd_via686a_codec_write;
 	ac97.read = snd_via686a_codec_read;
 	ac97.init = snd_via686a_codec_init;
+	ac97.wait = snd_via686a_codec_wait;
 	ac97.private_data = chip;
 	ac97.private_free = snd_via686a_mixer_free_ac97;
 	ac97.clock = chip->ac97_clock;
@@ -1178,7 +1189,7 @@ static int __devinit snd_via686a_probe(struct pci_dev *pci,
 	pci_write_config_byte(pci, 0x43, legacy_cfg);
 	if (legacy & 0x02) {
 		if (check_region(snd_mpu_port[dev], 2)) {
-			snd_printk("unable to get MPU-401 port at 0x%lx, skipping\n", snd_mpu_port[dev]);
+			printk(KERN_WARNING "unable to get MPU-401 port at 0x%lx, skipping\n", snd_mpu_port[dev]);
 			legacy &= ~0x02;
 			pci_write_config_byte(pci, 0x42, legacy);
 			goto __skip_mpu;
@@ -1187,7 +1198,7 @@ static int __devinit snd_via686a_probe(struct pci_dev *pci,
 					snd_mpu_port[dev], 0,
 					pci->irq, 0,
 					&chip->rmidi) < 0) {
-			snd_printk("unable to initialize MPU-401 at 0x%lx, skipping\n", snd_mpu_port[dev]);
+			printk(KERN_WARNING "unable to initialize MPU-401 at 0x%lx, skipping\n", snd_mpu_port[dev]);
 			legacy &= ~0x02;
 			pci_write_config_byte(pci, 0x42, legacy);
 			goto __skip_mpu;
@@ -1239,7 +1250,7 @@ static int __init alsa_card_via686a_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("VIA 82C686A soundcard not found or device busy\n");
+		printk(KERN_ERR "VIA 82C686A soundcard not found or device busy\n");
 #endif
 		return err;
 	}

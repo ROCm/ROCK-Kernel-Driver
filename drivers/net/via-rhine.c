@@ -1754,7 +1754,7 @@ static struct pci_driver via_rhine_driver = {
 	name:		"via-rhine",
 	id_table:	via_rhine_pci_tbl,
 	probe:		via_rhine_init_one,
-	remove:		via_rhine_remove_one,
+	remove:		__devexit_p(via_rhine_remove_one),
 };
 
 

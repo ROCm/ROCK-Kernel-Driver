@@ -1626,7 +1626,7 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 			    SLSB_REG(chip, FMLOWADDR),
 			    SLSB_REG(chip, FMHIGHADDR),
 			    OPL3_HW_OPL3, 1, &opl3) < 0) {
-	        snd_printk("OPL3 not detected at 0x%lx\n",
+		printk(KERN_ERR "es1938: OPL3 not detected at 0x%lx\n",
 			   SLSB_REG(chip, FMLOWADDR));
 	} else {
 	        if ((err = snd_opl3_timer_new(opl3, 0, 1)) < 0) {
@@ -1640,7 +1640,7 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	}
 	if (snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
 				chip->mpu_port, 1, chip->irq, 0, &chip->rmidi) < 0) {
-		snd_printk("unable to initialize MPU-401\n");
+		printk(KERN_ERR "es1938: unable to initialize MPU-401\n");
 	}
 #ifndef LINUX_2_2
 	chip->gameport.io = chip->game_port;
@@ -1683,7 +1683,7 @@ static int __init alsa_card_es1938_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("ESS Solo-1 soundcard not found or device busy\n");
+		printk(KERN_ERR "ESS Solo-1 soundcard not found or device busy\n");
 #endif
 		return err;
 	}

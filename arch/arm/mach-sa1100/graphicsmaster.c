@@ -23,8 +23,6 @@
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 
-#include <asm/arch/irq.h>
-
 #include "generic.h"
 #include "sa1111.h"
 
@@ -130,6 +128,12 @@ static void ADS_unmask_irq0(unsigned int irq)
 	ADS_INT_EN1 |= (1 << (irq - ADS_EXT_IRQ(0)));
 }
 
+static struct irqchip ADS0_chip = {
+	ack:	ADS_mask_and_ack_irq0,
+	mask:	ADS_mask_irq0,
+	unmask:	ADS_unmask_irq0,
+};
+
 static void ADS_mask_and_ack_irq1(unsigned int irq)
 {
 	int mask = (1 << (irq - ADS_EXT_IRQ(8)));
@@ -147,9 +151,15 @@ static void ADS_unmask_irq1(unsigned int irq)
 	ADS_INT_EN2 |= (1 << (irq - ADS_EXT_IRQ(8)));
 }
 
+static struct irqchip ADS1_chip = {
+	ack:	ADS_mask_irq1,
+	mask:	ADS_mask_irq1,
+	unmask:	ADS_mask_irq1,
+};
+
 static void __init graphicsmaster_init_irq(void)
 {
-	int irq;
+	unsigned int irq;
 
 	/* First the standard SA1100 IRQs */
 	sa1100_init_irq();
@@ -162,18 +172,14 @@ static void __init graphicsmaster_init_irq(void)
 	ADS_INT_ST2 = 0xff;
 
 	for (irq = ADS_EXT_IRQ(0); irq <= ADS_EXT_IRQ(7); irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= ADS_mask_and_ack_irq0;
-		irq_desc[irq].mask	= ADS_mask_irq0;
-		irq_desc[irq].unmask	= ADS_unmask_irq0;
+		set_irq_chip(irq, &ADS0_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_PROBE | IRQF_VALID);
 	}
 	for (irq = ADS_EXT_IRQ(8); irq <= ADS_EXT_IRQ(15); irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= ADS_mask_and_ack_irq1;
-		irq_desc[irq].mask	= ADS_mask_irq1;
-		irq_desc[irq].unmask	= ADS_unmask_irq1;
+		set_irq_chip(irq, &ADS1_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_PROBE | IRQF_VALID);
 	}
 	set_GPIO_IRQ_edge(GPIO_GPIO0, GPIO_FALLING_EDGE);
 	setup_arm_irq( IRQ_GPIO0, &ADS_ext_irq );
@@ -193,7 +199,7 @@ fixup_graphicsmaster(struct machine_desc *desc, struct param_struct *params,
 	SET_BANK( 1, 0xc8000000, 16*1024*1024 );
 	mi->nr_banks = 2;
 
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
 	setup_ramdisk( 1, 0, 0, 8192 );
 	setup_initrd( __phys_to_virt(0xc0800000), 4*1024*1024 );
 }
@@ -206,6 +212,8 @@ static struct map_desc graphicsmaster_io_desc[] __initdata = {
   LAST_DESC
 };
 
+#error Old code.  Someone needs to decide what to do about this.
+#if 0
 static int graphicsmaster_uart_open(struct uart_port *port, struct uart_info *info)
 {
 	int	ret = 0;
@@ -226,6 +234,7 @@ static int graphicsmaster_uart_open(struct uart_port *port, struct uart_info *in
 	}
 	return ret;
 }
+#endif
 
 static u_int graphicsmaster_get_mctrl(struct uart_port *port)
 {
@@ -279,7 +288,6 @@ graphicsmaster_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 }
 
 static struct sa1100_port_fns graphicsmaster_port_fns __initdata = {
-	open:		graphicsmaster_uart_open,
 	get_mctrl:	graphicsmaster_get_mctrl,
 	set_mctrl:	graphicsmaster_set_mctrl,
 	pm:		graphicsmaster_uart_pm,

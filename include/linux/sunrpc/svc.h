@@ -27,8 +27,8 @@
  * We currently do not support more than one RPC program per daemon.
  */
 struct svc_serv {
-	struct svc_rqst *	sv_threads;	/* idle server threads */
-	struct svc_sock *	sv_sockets;	/* pending sockets */
+	struct list_head	sv_threads;	/* idle server threads */
+	struct list_head	sv_sockets;	/* pending sockets */
 	struct svc_program *	sv_program;	/* RPC program */
 	struct svc_stat *	sv_stats;	/* RPC statistics */
 	spinlock_t		sv_lock;
@@ -36,7 +36,9 @@ struct svc_serv {
 	unsigned int		sv_bufsz;	/* datagram buffer size */
 	unsigned int		sv_xdrsize;	/* XDR buffer size */
 
-	struct svc_sock *	sv_allsocks;	/* all sockets */
+	struct list_head	sv_permsocks;	/* all permanent sockets */
+	struct list_head	sv_tempsocks;	/* all temporary sockets */
+	int			sv_tmpcnt;	/* count of temporary sockets */
 
 	char *			sv_name;	/* service name */
 };
@@ -89,8 +91,7 @@ struct svc_buf {
  * NOTE: First two items must be prev/next.
  */
 struct svc_rqst {
-	struct svc_rqst *	rq_prev;	/* idle list */
-	struct svc_rqst *	rq_next;
+	struct list_head	rq_list;	/* idle list */
 	struct svc_sock *	rq_sock;	/* socket */
 	struct sockaddr_in	rq_addr;	/* peer address */
 	int			rq_addrlen;
@@ -114,6 +115,10 @@ struct svc_rqst {
 
 	void *			rq_argp;	/* decoded arguments */
 	void *			rq_resp;	/* xdr'd results */
+
+	int			rq_reserved;	/* space on socket outq
+						 * reserved for this request
+						 */
 
 	/* Catering to nfsd */
 	struct svc_client *	rq_client;	/* RPC peer info */
@@ -163,6 +168,7 @@ struct svc_procedure {
 	unsigned int		pc_ressize;	/* result struct size */
 	unsigned int		pc_count;	/* call count */
 	unsigned int		pc_cachetype;	/* cache info (NFS) */
+	unsigned int		pc_xdrressize;	/* maximum size of XDR reply */
 };
 
 /*
@@ -180,5 +186,6 @@ void		   svc_destroy(struct svc_serv *);
 int		   svc_process(struct svc_serv *, struct svc_rqst *);
 int		   svc_register(struct svc_serv *, int, unsigned short);
 void		   svc_wake_up(struct svc_serv *);
+void		   svc_reserve(struct svc_rqst *rqstp, int space);
 
 #endif /* SUNRPC_SVC_H */

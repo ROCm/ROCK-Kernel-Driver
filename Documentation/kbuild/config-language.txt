@@ -30,7 +30,7 @@ Four different configuration programs read Config Language:
     scripts/Configure   make config, make oldconfig
     scripts/Menuconfig  make menuconfig
     scripts/tkparse     make xconfig
-    mconfig             (in development)
+    mconfig             ftp.kernel.org/pub/linux/kernel/people/hch/mconfig/
 
 'Configure' is a bash script which interprets Config.in files by sourcing
 them.  Some of the Config Language commands are native bash commands;
@@ -51,9 +51,6 @@ then hands this TCL/TK program to 'wish', which executes it.
 C program with a bison parser which translates a Config Language script
 into an internal syntax tree and then hands the syntax tree to one of
 several user-interface front ends.
-
-This document describes the behaviour of all four interpreters, even though
-mconfig has not been released at the time of writing.
 
 
 
@@ -489,7 +486,7 @@ is in the way of treating the "m" value as a dependency.
 Configure:  implemented
 Menuconfig: implemented
 XConfig:    implemented
-mconfig:    not implemented
+mconfig:    implemented
 
 Example:
 

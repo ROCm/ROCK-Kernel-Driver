@@ -319,7 +319,7 @@ static int __init alsa_sound_init(void)
 #else
 	if (register_chrdev(snd_major, "alsa", &snd_fops)) {
 #endif
-		snd_printk("unable to register native major device number %d\n", snd_major);
+		snd_printk(KERN_ERR "unable to register native major device number %d\n", snd_major);
 #ifdef CONFIG_SND_OSSEMUL
 		snd_oss_cleanup_module();
 #endif
@@ -349,7 +349,7 @@ static int __init alsa_sound_init(void)
 	}
 #endif
 #ifndef MODULE
-	printk("Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n");
+	printk(KERN_INFO "Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n");
 #endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_APM)
 	pm_init();
@@ -391,7 +391,7 @@ static void __exit alsa_sound_exit(void)
 #else
 	if (unregister_chrdev(snd_major, "alsa") != 0)
 #endif
-		snd_printk("unable to unregister major device number %d\n", snd_major);
+		snd_printk(KERN_ERR "unable to unregister major device number %d\n", snd_major);
 #ifdef CONFIG_DEVFS_FS
 	devfs_unregister(devfs_handle);
 #endif
@@ -455,7 +455,7 @@ EXPORT_SYMBOL(snd_device_new);
 EXPORT_SYMBOL(snd_device_register);
 EXPORT_SYMBOL(snd_device_free);
 EXPORT_SYMBOL(snd_device_free_all);
-  /* misc.c */
+  /* isadma.c */
 #ifdef CONFIG_ISA
 EXPORT_SYMBOL(snd_dma_program);
 EXPORT_SYMBOL(snd_dma_disable);
@@ -494,38 +494,10 @@ EXPORT_SYMBOL(snd_ctl_register_ioctl);
 EXPORT_SYMBOL(snd_ctl_unregister_ioctl);
   /* misc.c */
 EXPORT_SYMBOL(snd_task_name);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-EXPORT_SYMBOL(try_inc_mod_count);
-EXPORT_SYMBOL(snd_compat_mem_region);
-EXPORT_SYMBOL(snd_compat_request_region);
-EXPORT_SYMBOL(snd_compat_release_resource);
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_PCI)
-EXPORT_SYMBOL(snd_pci_compat_match_device);
-EXPORT_SYMBOL(snd_pci_compat_register_driver);
-EXPORT_SYMBOL(snd_pci_compat_unregister_driver);
-EXPORT_SYMBOL(snd_pci_compat_get_size);
-EXPORT_SYMBOL(snd_pci_compat_get_flags);
-EXPORT_SYMBOL(snd_pci_compat_set_power_state);
-EXPORT_SYMBOL(snd_pci_compat_enable_device);
-EXPORT_SYMBOL(snd_pci_compat_find_capability);
-EXPORT_SYMBOL(snd_pci_compat_alloc_consistent);
-EXPORT_SYMBOL(snd_pci_compat_free_consistent);
-EXPORT_SYMBOL(snd_pci_compat_dma_supported);
-EXPORT_SYMBOL(snd_pci_compat_get_dma_mask);
-EXPORT_SYMBOL(snd_pci_compat_set_dma_mask);
-EXPORT_SYMBOL(snd_pci_compat_get_driver_data);
-EXPORT_SYMBOL(snd_pci_compat_set_driver_data);
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_PM)
-EXPORT_SYMBOL(pm_register);
-EXPORT_SYMBOL(pm_unregister);
-EXPORT_SYMBOL(pm_send);
+#ifdef CONFIG_SND_VERBOSE_PRINTK
+EXPORT_SYMBOL(snd_verbose_printk);
 #endif
   /* wrappers */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-EXPORT_SYMBOL(snd_wrapper_kill_fasync);
-#endif
 #ifdef CONFIG_SND_DEBUG_MEMORY
 EXPORT_SYMBOL(snd_wrapper_kmalloc);
 EXPORT_SYMBOL(snd_wrapper_kfree);

@@ -143,7 +143,7 @@ client_port_t *snd_seq_create_port(client_t *client, int port)
 	snd_assert(client, return NULL);
 
 	if (client->num_ports >= SNDRV_SEQ_MAX_PORTS - 1) {
-		snd_printk("too many ports for client %d\n", client->number);
+		snd_printk(KERN_WARNING "too many ports for client %d\n", client->number);
 		return NULL;
 	}
 

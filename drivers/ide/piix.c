@@ -235,8 +235,8 @@ static void piix_tune_drive (ide_drive_t *drive, byte pio)
 			master_data = master_data | 0x0070;
 		pci_read_config_byte(HWIF(drive)->pci_dev, slave_port, &slave_data);
 		slave_data = slave_data & (HWIF(drive)->index ? 0x0f : 0xf0);
-		slave_data = slave_data | ((timings[pio][0] << 2) | (timings[pio][1]
-					   << (HWIF(drive)->index ? 4 : 0)));
+		slave_data = slave_data | (((timings[pio][0] << 2) | timings[pio][1])
+					   << (HWIF(drive)->index ? 4 : 0));
 	} else {
 		master_data = master_data & 0xccf8;
 		if (pio > 1)

@@ -477,8 +477,16 @@ typedef struct lv_bmap {
  * Structure Logical Volume (LV) Version 3
  */
 
-/* core */
-typedef struct lv_v5 {
+struct kern_lv_v5;
+struct user_lv_v5;
+typedef struct user_lv_v5 userlv_t;
+#ifdef __KERNEL__
+typedef struct kern_lv_v5 lv_t;
+#else
+typedef struct user_lv_v5 lv_t;
+#endif
+
+struct user_lv_v5 {
 	char lv_name[NAME_LEN];
 	char vg_name[NAME_LEN];
 	uint lv_access;
@@ -501,15 +509,18 @@ typedef struct lv_v5 {
 	uint lv_read_ahead;
 
 	/* delta to version 1 starts here */
-       struct lv_v5 *lv_snapshot_org;
-       struct lv_v5 *lv_snapshot_prev;
-       struct lv_v5 *lv_snapshot_next;
+	lv_t *lv_snapshot_org;
+	lv_t *lv_snapshot_prev;
+	lv_t *lv_snapshot_next;
 	lv_block_exception_t *lv_block_exception;
 	uint lv_remap_ptr;
 	uint lv_remap_end;
 	uint lv_chunk_size;
 	uint lv_snapshot_minor;
-#ifdef __KERNEL__
+};
+
+struct kern_lv_v5{
+	struct user_lv_v5 u;
 	struct kiobuf *lv_iobuf;
 	sector_t blocks[LVM_MAX_SECTORS];
 	struct kiobuf *lv_COW_table_iobuf;
@@ -520,12 +531,8 @@ typedef struct lv_v5 {
 	wait_queue_head_t lv_snapshot_wait;
 	int	lv_snapshot_use_rate;
 	struct vg_v3	*vg;
-
 	uint lv_allocated_snapshot_le;
-#else
-	char dummy[200];
-#endif
-} lv_t;
+};
 
 /* disk */
 typedef struct lv_disk_v3 {
@@ -679,13 +686,13 @@ static inline ulong div_up(ulong n, ulong size) {
 }
 
 static int inline LVM_GET_COW_TABLE_CHUNKS_PER_PE(vg_t *vg, lv_t *lv) {
-	return vg->pe_size / lv->lv_chunk_size;
+	return vg->pe_size / lv->u.lv_chunk_size;
 }
 
 static int inline LVM_GET_COW_TABLE_ENTRIES_PER_PE(vg_t *vg, lv_t *lv) {
-	ulong chunks = vg->pe_size / lv->lv_chunk_size;
+	ulong chunks = vg->pe_size / lv->u.lv_chunk_size;
 	ulong entry_size = sizeof(lv_COW_table_disk_t);
-	ulong chunk_size = lv->lv_chunk_size * SECTOR_SIZE;
+	ulong chunk_size = lv->u.lv_chunk_size * SECTOR_SIZE;
 	ulong entries = (vg->pe_size * SECTOR_SIZE) /
 		(entry_size + chunk_size);
 

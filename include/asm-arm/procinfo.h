@@ -14,6 +14,9 @@
 
 #include <asm/proc-fns.h>
 
+struct cpu_tlb_fns;
+struct processor;
+
 struct proc_info_item {
 	const char	 *manufacturer;
 	const char	 *cpu_name;
@@ -37,14 +40,13 @@ struct proc_info_list {
 	const char	 *elf_name;
 	unsigned int	 elf_hwcap;
 	struct proc_info_item *info;
-#ifdef MULTI_CPU
 	struct processor *proc;
-#else
-	void		 *unused;
-#endif
+	struct cpu_tlb_fns *tlb;
 };
 
 #endif	/* __ASSEMBLY__ */
+
+#define PROC_INFO_SZ	40
 
 #define HWCAP_SWP	 1
 #define HWCAP_HALF	 2

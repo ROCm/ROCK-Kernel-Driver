@@ -1030,7 +1030,7 @@ static struct pci_driver btaudio_pci_driver = {
         name:     "btaudio",
         id_table: btaudio_pci_tbl,
         probe:    btaudio_probe,
-        remove:   btaudio_remove,
+        remove:   __devexit_p(btaudio_remove),
 };
 
 int btaudio_init_module(void)

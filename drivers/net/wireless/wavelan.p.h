@@ -345,6 +345,12 @@
  *	- Fix spinlock stupid bugs that I left in. The driver is now SMP
  *		compliant and doesn't lockup at startup.
  *
+ * Changes made for release in 2.5.2 :
+ * ---------------------------------
+ *	- Use new driver API for Wireless Extensions :
+ *		o got rid of wavelan_ioctl()
+ *		o use a bunch of iw_handler instead
+ *
  * Wishes & dreams:
  * ----------------
  *	- roaming (see Pcmcia driver)
@@ -379,6 +385,7 @@
 #include	<linux/init.h>
 
 #include <linux/wireless.h>		/* Wireless extensions */
+#include <net/iw_handler.h>		/* Wireless handlers */
 
 /* WaveLAN declarations */
 #include	"i82586.h"
@@ -436,7 +443,7 @@
 /************************ CONSTANTS & MACROS ************************/
 
 #ifdef DEBUG_VERSION_SHOW
-static const char	*version	= "wavelan.c : v23 (SMP + wireless extensions) 05/10/00\n";
+static const char	*version	= "wavelan.c : v24 (SMP + wireless extensions) 11/12/01\n";
 #endif
 
 /* Watchdog temporisation */
@@ -449,11 +456,9 @@ static const char	*version	= "wavelan.c : v23 (SMP + wireless extensions) 05/10/
 
 #define SIOCSIPQTHR	SIOCIWFIRSTPRIV		/* Set quality threshold */
 #define SIOCGIPQTHR	SIOCIWFIRSTPRIV + 1	/* Get quality threshold */
-#define SIOCSIPLTHR	SIOCIWFIRSTPRIV + 2	/* Set level threshold */
-#define SIOCGIPLTHR	SIOCIWFIRSTPRIV + 3	/* Get level threshold */
 
-#define SIOCSIPHISTO	SIOCIWFIRSTPRIV + 6	/* Set histogram ranges */
-#define SIOCGIPHISTO	SIOCIWFIRSTPRIV + 7	/* Get histogram values */
+#define SIOCSIPHISTO	SIOCIWFIRSTPRIV + 2	/* Set histogram ranges */
+#define SIOCGIPHISTO	SIOCIWFIRSTPRIV + 3	/* Get histogram values */
 
 /****************************** TYPES ******************************/
 
@@ -516,12 +521,6 @@ struct net_local
 /**************************** PROTOTYPES ****************************/
 
 /* ----------------------- MISC. SUBROUTINES ------------------------ */
-static inline void
-	wv_splhi(net_local *,		/* Disable interrupts, lock driver */
-		 unsigned long *);	/* flags */
-static inline void
-	wv_splx(net_local *,		/* Enable interrupts, unlock driver */
-		unsigned long *);	/* flags */
 static u_char
 	wv_irq_to_psa(int);
 static int

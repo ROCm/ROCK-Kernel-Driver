@@ -57,40 +57,48 @@ static inline pgd_t *get_pgd_fast(void)
 {
 	unsigned long *ret;
 
+	preempt_disable();
 	if ((ret = pgd_quicklist) != NULL) {
 		pgd_quicklist = (unsigned long *)__pgd_next(ret);
 		ret[1] = ret[2];
 		clean_dcache_entry(ret + 1);
 		pgtable_cache_size--;
 	}
+	preempt_enable();
 	return (pgd_t *)ret;
 }
 
 static inline void free_pgd_fast(pgd_t *pgd)
 {
+	preempt_disable();
 	__pgd_next(pgd) = (unsigned long) pgd_quicklist;
 	pgd_quicklist = (unsigned long *) pgd;
 	pgtable_cache_size++;
+	preempt_enable();
 }
 
 static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long *ret;
 
+	preempt_disable();
 	if((ret = pte_quicklist) != NULL) {
 		pte_quicklist = (unsigned long *)__pte_next(ret);
 		ret[0] = 0;
 		clean_dcache_entry(ret);
 		pgtable_cache_size--;
 	}
+	preempt_enable();
 	return (pte_t *)ret;
 }
 
 static inline void free_pte_fast(pte_t *pte)
 {
+	preempt_disable();
 	__pte_next(pte) = (unsigned long) pte_quicklist;
 	pte_quicklist = (unsigned long *) pte;
 	pgtable_cache_size++;
+	preempt_enable();
 }
 
 #else	/* CONFIG_NO_PGT_CACHE */

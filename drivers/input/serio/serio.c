@@ -1,9 +1,7 @@
 /*
- * $Id: serio.c,v 1.5 2000/06/04 17:44:59 vojtech Exp $
+ * $Id: serio.c,v 1.15 2002/01/22 21:12:03 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
@@ -27,14 +25,16 @@
  * 
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/stddef.h>
 #include <linux/module.h>
 #include <linux/serio.h>
+#include <linux/errno.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Serio abstraction core");
 MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(serio_register_port);
@@ -47,7 +47,6 @@ EXPORT_SYMBOL(serio_rescan);
 
 static struct serio *serio_list;
 static struct serio_dev *serio_dev;
-static int serio_number;
 
 static void serio_find_dev(struct serio *serio)
 {
@@ -69,7 +68,6 @@ void serio_rescan(struct serio *serio)
 
 void serio_register_port(struct serio *serio)
 {
-	serio->number = serio_number++;
 	serio->next = serio_list;	
 	serio_list = serio;
 	serio_find_dev(serio);
@@ -84,8 +82,6 @@ void serio_unregister_port(struct serio *serio)
 
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);
-
-	serio_number--;
 }
 
 void serio_register_device(struct serio_dev *dev)

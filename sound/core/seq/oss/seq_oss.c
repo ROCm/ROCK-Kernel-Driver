@@ -222,7 +222,7 @@ register_device(void)
 					  NULL, 0,
 					  &seq_oss_reg,
 					  SNDRV_SEQ_OSS_DEVNAME)) < 0) {
-		snd_printk("can't register device seq\n");
+		snd_printk(KERN_ERR "can't register device seq\n");
 		up(&register_mutex);
 		return rc;
 	}
@@ -230,7 +230,7 @@ register_device(void)
 					  NULL, 0,
 					  &seq_oss_reg,
 					  SNDRV_SEQ_OSS_DEVNAME)) < 0) {
-		snd_printk("can't register device music\n");
+		snd_printk(KERN_ERR "can't register device music\n");
 		snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_SEQUENCER, NULL, 0);
 		up(&register_mutex);
 		return rc;
@@ -245,11 +245,10 @@ unregister_device(void)
 {
 	down(&register_mutex);
 	debug_printk(("device unregistered\n"));
-	if (snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_MUSIC, NULL, 0) < 0)
-		
-		snd_printk("error unregister device music\n");
+	if (snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_MUSIC, NULL, 0) < 0)		
+		snd_printk(KERN_ERR "error unregister device music\n");
 	if (snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_SEQUENCER, NULL, 0) < 0)
-		snd_printk("error unregister device seq\n");
+		snd_printk(KERN_ERR "error unregister device seq\n");
 	up(&register_mutex);
 }
 

@@ -2643,7 +2643,7 @@ jffs_print_tree(struct jffs_file *first_file, int indent)
 void
 jffs_print_memory_allocation_statistics(void)
 {
-	static long printout = 0;
+	static long printout;
 	printk("________ Memory printout #%ld ________\n", ++printout);
 	printk("no_jffs_file = %ld\n", no_jffs_file);
 	printk("no_jffs_node = %ld\n", no_jffs_node);

@@ -115,7 +115,7 @@ static struct pci_device_id rcpci45_pci_table[] __devinitdata = {
 MODULE_DEVICE_TABLE (pci, rcpci45_pci_table);
 MODULE_LICENSE("GPL");
 
-static void __exit
+static void __devexit
 rcpci45_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
@@ -267,7 +267,7 @@ static struct pci_driver rcpci45_driver = {
 	name:		"rcpci45",
 	id_table:	rcpci45_pci_table,
 	probe:		rcpci45_init_one,
-	remove:		rcpci45_remove_one,
+	remove:		__devexit_p(rcpci45_remove_one),
 };
 
 static int __init

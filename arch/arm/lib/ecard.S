@@ -12,7 +12,7 @@
 #include <asm/assembler.h>
 #include <asm/hardware.h>
 
-#if defined(CONFIG_CPU_26)
+#ifdef CONFIG_CPU_26
 #define CPSR2SPSR(rt)
 #else
 #define CPSR2SPSR(rt) \

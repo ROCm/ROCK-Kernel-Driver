@@ -1104,7 +1104,7 @@ static int __init alsa_card_fm801_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("ForteMedia FM801 soundcard not found or device busy\n");
+		printk(KERN_ERR "ForteMedia FM801 soundcard not found or device busy\n");
 #endif
 		return err;
 	}

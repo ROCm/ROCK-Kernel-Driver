@@ -135,7 +135,7 @@ static int __init alsa_card_ad1848_init(void)
 
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("AD1848 soundcard not found or device busy\n");
+		printk(KERN_ERR "AD1848 soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

@@ -16,12 +16,12 @@
 #include <linux/nmi.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>
+#include <linux/highmem.h>
 #include <linux/smp_lock.h>
+#include <asm/mmu_context.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
-#include <asm/mmu_context.h>
 #include <linux/kernel_stat.h>
-#include <linux/highmem.h>
 
 /*
  * Priority of a process goes from 0 to 139. The 0-99
@@ -127,8 +127,6 @@ typedef struct runqueue runqueue_t;
 
 struct prio_array {
 	int nr_active;
-	spinlock_t *lock;
-	runqueue_t *rq;
 	unsigned long bitmap[BITMAP_SIZE];
 	list_t queue[MAX_PRIO];
 };
@@ -146,6 +144,8 @@ struct runqueue {
 	task_t *curr, *idle;
 	prio_array_t *active, *expired, arrays[2];
 	int prev_nr_running[NR_CPUS];
+	task_t *migration_thread;
+	list_t migration_queue;
 } ____cacheline_aligned;
 
 static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
@@ -156,23 +156,23 @@ static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 #define rt_task(p)		((p)->prio < MAX_RT_PRIO)
 
-static inline runqueue_t *lock_task_rq(task_t *p, unsigned long *flags)
+static inline runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
 {
-	struct runqueue *__rq;
+	struct runqueue *rq;
 
 repeat_lock_task:
 	preempt_disable();
-	__rq = task_rq(p);
-	spin_lock_irqsave(&__rq->lock, *flags);
-	if (unlikely(__rq != task_rq(p))) {
-		spin_unlock_irqrestore(&__rq->lock, *flags);
+	rq = task_rq(p);
+	spin_lock_irqsave(&rq->lock, *flags);
+	if (unlikely(rq != task_rq(p))) {
+		spin_unlock_irqrestore(&rq->lock, *flags);
 		preempt_enable();
 		goto repeat_lock_task;
 	}
-	return __rq;
+	return rq;
 }
 
-static inline void unlock_task_rq(runqueue_t *rq, unsigned long *flags)
+static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 {
 	spin_unlock_irqrestore(&rq->lock, *flags);
 	preempt_enable();
@@ -184,7 +184,7 @@ static inline void unlock_task_rq(runqueue_t *rq, unsigned long *flags)
 static inline void dequeue_task(struct task_struct *p, prio_array_t *array)
 {
 	array->nr_active--;
-	list_del_init(&p->run_list);
+	list_del(&p->run_list);
 	if (list_empty(array->queue + p->prio))
 		__clear_bit(p->prio, array->bitmap);
 }
@@ -289,28 +289,14 @@ repeat:
 		cpu_relax();
 		barrier();
 	}
-	rq = lock_task_rq(p, &flags);
+	rq = task_rq_lock(p, &flags);
 	if (unlikely(rq->curr == p)) {
-		unlock_task_rq(rq, &flags);
+		task_rq_unlock(rq, &flags);
 		preempt_enable();
 		goto repeat;
 	}
-	unlock_task_rq(rq, &flags);
+	task_rq_unlock(rq, &flags);
 	preempt_enable();
-}
-
-/*
- * The SMP message passing code calls this function whenever
- * the new task has arrived at the target CPU. We move the
- * new task into the local runqueue.
- *
- * This function must be called with interrupts disabled.
- */
-void sched_task_migrated(task_t *new_task)
-{
-	wait_task_inactive(new_task);
-	new_task->thread_info->cpu = smp_processor_id();
-	wake_up_process(new_task);
 }
 
 /*
@@ -337,27 +323,27 @@ void kick_if_running(task_t * p)
  * "current->state = TASK_RUNNING" to mark yourself runnable
  * without the overhead of this.
  */
-static int try_to_wake_up(task_t * p, int synchronous)
+static int try_to_wake_up(task_t * p)
 {
 	unsigned long flags;
 	int success = 0;
 	runqueue_t *rq;
 
-	rq = lock_task_rq(p, &flags);
+	rq = task_rq_lock(p, &flags);
 	p->state = TASK_RUNNING;
 	if (!p->array) {
 		activate_task(p, rq);
-		if ((rq->curr == rq->idle) || (p->prio < rq->curr->prio))
+		if (p->prio < rq->curr->prio)
 			resched_task(rq->curr);
 		success = 1;
 	}
-	unlock_task_rq(rq, &flags);
+	task_rq_unlock(rq, &flags);
 	return success;
 }
 
 int wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p, 0);
+	return try_to_wake_up(p);
 }
 
 void wake_up_forked_process(task_t * p)
@@ -366,6 +352,7 @@ void wake_up_forked_process(task_t * p)
 
 	preempt_disable();
 	rq = this_rq();
+	spin_lock_irq(&rq->lock);
 
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
@@ -378,9 +365,9 @@ void wake_up_forked_process(task_t * p)
 		p->sleep_avg = p->sleep_avg * CHILD_PENALTY / 100;
 		p->prio = effective_prio(p);
 	}
-	spin_lock_irq(&rq->lock);
 	p->thread_info->cpu = smp_processor_id();
 	activate_task(p, rq);
+
 	spin_unlock_irq(&rq->lock);
 	preempt_enable();
 }
@@ -861,44 +848,33 @@ asmlinkage void preempt_schedule(void)
  * started to run but is not in state TASK_RUNNING.  try_to_wake_up() returns
  * zero in this (rare) case, and we handle it by continuing to scan the queue.
  */
-static inline void __wake_up_common (wait_queue_head_t *q, unsigned int mode,
-			 	     int nr_exclusive, const int sync)
+static inline void __wake_up_common(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
 	struct list_head *tmp;
+	unsigned int state;
+	wait_queue_t *curr;
 	task_t *p;
 
-	list_for_each(tmp,&q->task_list) {
-		unsigned int state;
-		wait_queue_t *curr = list_entry(tmp, wait_queue_t, task_list);
-
+	list_for_each(tmp, &q->task_list) {
+		curr = list_entry(tmp, wait_queue_t, task_list);
 		p = curr->task;
 		state = p->state;
-		if ((state & mode) &&
-				try_to_wake_up(p, sync) &&
-				((curr->flags & WQ_FLAG_EXCLUSIVE) &&
-					!--nr_exclusive))
-			break;
+		if ((state & mode) && try_to_wake_up(p) &&
+			((curr->flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive))
+				break;
 	}
 }
 
-void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr)
+void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
-	if (q) {
-		unsigned long flags;
-		wq_read_lock_irqsave(&q->lock, flags);
-		__wake_up_common(q, mode, nr, 0);
-		wq_read_unlock_irqrestore(&q->lock, flags);
-	}
-}
+	unsigned long flags;
 
-void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr)
-{
-	if (q) {
-		unsigned long flags;
-		wq_read_lock_irqsave(&q->lock, flags);
-		__wake_up_common(q, mode, nr, 1);
-		wq_read_unlock_irqrestore(&q->lock, flags);
-	}
+	if (unlikely(!q))
+		return;
+
+	wq_read_lock_irqsave(&q->lock, flags);
+	__wake_up_common(q, mode, nr_exclusive);
+	wq_read_unlock_irqrestore(&q->lock, flags);
 }
 
 void complete(struct completion *x)
@@ -907,7 +883,7 @@ void complete(struct completion *x)
 
 	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done++;
-	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, 0);
+	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 
@@ -994,34 +970,6 @@ long sleep_on_timeout(wait_queue_head_t *q, long timeout)
 	return timeout;
 }
 
-/*
- * Change the current task's CPU affinity. Migrate the process to a
- * proper CPU and schedule away if the current CPU is removed from
- * the allowed bitmask.
- */
-void set_cpus_allowed(task_t *p, unsigned long new_mask)
-{
-	new_mask &= cpu_online_map;
-	if (!new_mask)
-		BUG();
-	if (p != current)
-		BUG();
-
-	p->cpus_allowed = new_mask;
-	/*
-	 * Can the task run on the current CPU? If not then
-	 * migrate the process off to a proper CPU.
-	 */
-	if (new_mask & (1UL << smp_processor_id()))
-		return;
-#if CONFIG_SMP
-	current->state = TASK_UNINTERRUPTIBLE;
-	smp_migrate_task(__ffs(new_mask), current);
-
-	schedule();
-#endif
-}
-
 void scheduling_functions_end_here(void) { }
 
 void set_user_nice(task_t *p, long nice)
@@ -1036,7 +984,7 @@ void set_user_nice(task_t *p, long nice)
 	 * We have to be careful, if called from sys_setpriority(),
 	 * the task might be in the middle of scheduling on another CPU.
 	 */
-	rq = lock_task_rq(p, &flags);
+	rq = task_rq_lock(p, &flags);
 	if (rt_task(p)) {
 		p->static_prio = NICE_TO_PRIO(nice);
 		goto out_unlock;
@@ -1056,7 +1004,7 @@ void set_user_nice(task_t *p, long nice)
 			resched_task(rq->curr);
 	}
 out_unlock:
-	unlock_task_rq(rq, &flags);
+	task_rq_unlock(rq, &flags);
 }
 
 #ifndef __alpha__
@@ -1154,7 +1102,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	 * To be able to change p->policy safely, the apropriate
 	 * runqueue lock must be held.
 	 */
-	rq = lock_task_rq(p, &flags);
+	rq = task_rq_lock(p, &flags);
 
 	if (policy < 0)
 		policy = p->policy;
@@ -1189,7 +1137,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	retval = 0;
 	p->policy = policy;
 	p->rt_priority = lp.sched_priority;
-	if (rt_task(p))
+	if (policy != SCHED_OTHER)
 		p->prio = 99 - p->rt_priority;
 	else
 		p->prio = p->static_prio;
@@ -1197,7 +1145,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 		activate_task(p, task_rq(p));
 
 out_unlock:
-	unlock_task_rq(rq, &flags);
+	task_rq_unlock(rq, &flags);
 out_unlock_tasklist:
 	read_unlock_irq(&tasklist_lock);
 
@@ -1477,7 +1425,7 @@ static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 
 void __init init_idle(task_t *idle, int cpu)
 {
-	runqueue_t *idle_rq = cpu_rq(cpu), *rq = idle->array->rq;
+	runqueue_t *idle_rq = cpu_rq(cpu), *rq = cpu_rq(idle->thread_info->cpu);
 	unsigned long flags;
 
 	__save_flags(flags);
@@ -1509,14 +1457,13 @@ void __init sched_init(void)
 		runqueue_t *rq = cpu_rq(i);
 		prio_array_t *array;
 
-		rq->active = rq->arrays + 0;
+		rq->active = rq->arrays;
 		rq->expired = rq->arrays + 1;
 		spin_lock_init(&rq->lock);
+		INIT_LIST_HEAD(&rq->migration_queue);
 
 		for (j = 0; j < 2; j++) {
 			array = rq->arrays + j;
-			array->rq = rq;
-			array->lock = &rq->lock;
 			for (k = 0; k < MAX_PRIO; k++) {
 				INIT_LIST_HEAD(array->queue + k);
 				__clear_bit(k, array->bitmap);
@@ -1545,3 +1492,173 @@ void __init sched_init(void)
 	atomic_inc(&init_mm.mm_count);
 	enter_lazy_tlb(&init_mm, current, smp_processor_id());
 }
+
+#if CONFIG_SMP
+
+/*
+ * This is how migration works:
+ *
+ * 1) we queue a migration_req_t structure in the source CPU's
+ *    runqueue and wake up that CPU's migration thread.
+ * 2) we down() the locked semaphore => thread blocks.
+ * 3) migration thread wakes up (implicitly it forces the migrated
+ *    thread off the CPU)
+ * 4) it gets the migration request and checks whether the migrated
+ *    task is still in the wrong runqueue.
+ * 5) if it's in the wrong runqueue then the migration thread removes
+ *    it and puts it into the right queue.
+ * 6) migration thread up()s the semaphore.
+ * 7) we wake up and the migration is done.
+ */
+
+typedef struct {
+	list_t list;
+	task_t *task;
+	struct semaphore sem;
+} migration_req_t;
+
+/*
+ * Change a given task's CPU affinity. Migrate the process to a
+ * proper CPU and schedule it away if the CPU it's executing on
+ * is removed from the allowed bitmask.
+ *
+ * NOTE: the caller must have a valid reference to the task, the
+ * task must not exit() & deallocate itself prematurely.
+ */
+void set_cpus_allowed(task_t *p, unsigned long new_mask)
+{
+	unsigned long flags;
+	migration_req_t req;
+	runqueue_t *rq;
+
+	new_mask &= cpu_online_map;
+	if (!new_mask)
+		BUG();
+
+	rq = task_rq_lock(p, &flags);
+	p->cpus_allowed = new_mask;
+	/*
+	 * Can the task run on the task's current CPU? If not then
+	 * migrate the process off to a proper CPU.
+	 */
+	if (new_mask & (1UL << p->thread_info->cpu)) {
+		task_rq_unlock(rq, &flags);
+		return;
+	}
+
+	init_MUTEX_LOCKED(&req.sem);
+	req.task = p;
+	list_add(&req.list, &rq->migration_queue);
+	task_rq_unlock(rq, &flags);
+	wake_up_process(rq->migration_thread);
+
+	down(&req.sem);
+}
+
+static volatile unsigned long migration_mask;
+
+static int migration_thread(void * unused)
+{
+	struct sched_param param = { sched_priority: 99 };
+	runqueue_t *rq;
+	int ret;
+
+	daemonize();
+	sigfillset(&current->blocked);
+	set_fs(KERNEL_DS);
+	ret = setscheduler(0, SCHED_FIFO, &param);
+
+	/*
+	 * We have to migrate manually - there is no migration thread
+	 * to do this for us yet :-)
+	 *
+	 * We use the following property of the Linux scheduler. At
+	 * this point no other task is running, so by keeping all
+	 * migration threads running, the load-balancer will distribute
+	 * them between all CPUs equally. At that point every migration
+	 * task binds itself to the current CPU.
+	 */
+
+	/* wait for all migration threads to start up. */
+	while (!migration_mask)
+		yield();
+
+	for (;;) {
+		preempt_disable();
+		if (test_and_clear_bit(smp_processor_id(), &migration_mask))
+			current->cpus_allowed = 1 << smp_processor_id();
+		if (test_thread_flag(TIF_NEED_RESCHED))
+			schedule();
+		if (!migration_mask)
+			break;
+		preempt_enable();
+	}
+	rq = this_rq();
+	rq->migration_thread = current;
+	preempt_enable();
+
+	sprintf(current->comm, "migration_CPU%d", smp_processor_id());
+
+	for (;;) {
+		runqueue_t *rq_src, *rq_dest;
+		struct list_head *head;
+		int cpu_src, cpu_dest;
+		migration_req_t *req;
+		unsigned long flags;
+		task_t *p;
+
+		spin_lock_irqsave(&rq->lock, flags);
+		head = &rq->migration_queue;
+		current->state = TASK_INTERRUPTIBLE;
+		if (list_empty(head)) {
+			spin_unlock_irqrestore(&rq->lock, flags);
+			schedule();
+			continue;
+		}
+		req = list_entry(head->next, migration_req_t, list);
+		list_del_init(head->next);
+		spin_unlock_irqrestore(&rq->lock, flags);
+
+		p = req->task;
+		cpu_dest = __ffs(p->cpus_allowed);
+		rq_dest = cpu_rq(cpu_dest);
+repeat:
+		cpu_src = p->thread_info->cpu;
+		rq_src = cpu_rq(cpu_src);
+
+		double_rq_lock(rq_src, rq_dest);
+		if (p->thread_info->cpu != cpu_src) {
+			double_rq_unlock(rq_src, rq_dest);
+			goto repeat;
+		}
+		if (rq_src == rq) {
+			p->thread_info->cpu = cpu_dest;
+			if (p->array) {
+				deactivate_task(p, rq_src);
+				activate_task(p, rq_dest);
+			}
+		}
+		double_rq_unlock(rq_src, rq_dest);
+
+		up(&req->sem);
+	}
+}
+
+void __init migration_init(void)
+{
+	int cpu;
+
+	for (cpu = 0; cpu < smp_num_cpus; cpu++)
+		if (kernel_thread(migration_thread, NULL,
+				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
+			BUG();
+
+	migration_mask = (1 << smp_num_cpus) - 1;
+
+	for (cpu = 0; cpu < smp_num_cpus; cpu++)
+		while (!cpu_rq(cpu)->migration_thread)
+			schedule_timeout(2);
+	if (migration_mask)
+		BUG();
+}
+#endif

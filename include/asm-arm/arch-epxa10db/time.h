@@ -17,7 +17,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/config.h>
 #include <asm/system.h>
 #include <asm/leds.h>
 #include <asm/arch/hardware.h>
@@ -49,7 +48,7 @@ void __init time_init(void)
 	/* 
 	 * Make irqs happen for the system timer
 	 */
-	setup_arm_irq(IRQ_TIMER0, &timer_irq);
+	setup_irq(IRQ_TIMER0, &timer_irq);
 
 	/* Start the timer */
 	*TIMER0_LIMIT(IO_ADDRESS(EXC_TIMER00_BASE))=(unsigned int)(EXC_AHB2_CLK_FREQUENCY/200);

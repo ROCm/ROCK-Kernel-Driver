@@ -136,7 +136,7 @@ static int __init alsa_card_virmidi_init(void)
 	for (dev = cards = 0; dev < SNDRV_CARDS && snd_enable[dev]; dev++) {
 		if (snd_card_virmidi_probe(dev) < 0) {
 #ifdef MODULE
-			snd_printk("Card-VirMIDI #%i not found or device busy\n", dev + 1);
+			printk(KERN_ERR "Card-VirMIDI #%i not found or device busy\n", dev + 1);
 #endif
 			break;
 		}
@@ -144,7 +144,7 @@ static int __init alsa_card_virmidi_init(void)
 	}
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("Card-VirMIDI soundcard not found or device busy\n");
+		printk(KERN_ERR "Card-VirMIDI soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

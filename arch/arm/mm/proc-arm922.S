@@ -359,62 +359,6 @@ ENTRY(cpu_arm922_icache_invalidate_page)
 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
 	mov	pc, lr
 
-/* ================================== TLB ================================= */
-
-/*
- * cpu_arm922_tlb_invalidate_all()
- *
- * Invalidate all TLB entries
- */
-	.align	5
-ENTRY(cpu_arm922_tlb_invalidate_all)
-	mov	r0, #0
-	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-	mcr	p15, 0, r0, c8, c7, 0		@ invalidate I & D TLBs
-	mov	pc, lr
-
-/*
- * cpu_arm922_tlb_invalidate_range(start, end)
- *
- * invalidate TLB entries covering the specified range
- *
- * start: range start address
- * end:   range end address
- */
-	.align	5
-ENTRY(cpu_arm922_tlb_invalidate_range)
-	mov	r3, #0
-	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
-
-	mov	r3, #PAGESIZE
-	sub	r3, r3, #1
-	bic 	r0, r0, r3
-	bic	r1, r1, r3
-
-1:	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	mcr	p15, 0, r0, c8, c5, 1		@ invalidate I TLB entry
-	add	r0, r0, #PAGESIZE
-	cmp	r0, r1
-	blt	1b
-	mov	pc, lr
-
-/*
- * cpu_arm922_tlb_invalidate_page(page, flags)
- *
- * invalidate the TLB entries for the specified page.
- *
- * page:  page to invalidate
- * flags: non-zero if we include the I TLB
- */
-	.align	5
-ENTRY(cpu_arm922_tlb_invalidate_page)
-	mov	r3, #0
-	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
-	teq	r1, #0
-	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	mcrne	p15, 0, r0, c8, c5, 1		@ invalidate I TLB entry
-	mov	pc, lr
-
 /* =============================== PageTable ============================== */
 
 /*
@@ -590,11 +534,6 @@ arm922_processor_functions:
 	.word	cpu_arm922_icache_invalidate_range
 	.word	cpu_arm922_icache_invalidate_page
 
-	/* tlb */
-	.word	cpu_arm922_tlb_invalidate_all
-	.word	cpu_arm922_tlb_invalidate_range
-	.word	cpu_arm922_tlb_invalidate_page
-
 	/* pgtable */
 	.word	cpu_arm922_set_pgd
 	.word	cpu_arm922_set_pmd
@@ -636,4 +575,5 @@ __arm922_proc_info:
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
 	.long	cpu_arm922_info
 	.long	arm922_processor_functions
+	.long	v4wbi_tlb_fns
 	.size	__arm922_proc_info, . - __arm922_proc_info

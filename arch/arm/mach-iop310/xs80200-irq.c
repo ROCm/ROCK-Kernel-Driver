@@ -10,8 +10,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -22,45 +20,47 @@
 
 #include <asm/mach-types.h>
 
-void
-xs80200_irq_mask (unsigned int irq)
+static void xs80200_irq_mask (unsigned int irq)
 {
-	long INTCTL;
-	asm ("mrc p13, 0, %0, c0, c0, 0" : "=r" (INTCTL));
+	unsigned long intctl;
+	asm ("mrc p13, 0, %0, c0, c0, 0" : "=r" (intctl));
 	switch (irq) {
-	    case IRQ_XS80200_BCU:     INTCTL &= ~(1<<3); break;
-	    case IRQ_XS80200_PMU:     INTCTL &= ~(1<<2); break;
-	    case IRQ_XS80200_EXTIRQ:  INTCTL &= ~(1<<1); break;
-	    case IRQ_XS80200_EXTFIQ:  INTCTL &= ~(1<<0); break;
+	    case IRQ_XS80200_BCU:     intctl &= ~(1<<3); break;
+	    case IRQ_XS80200_PMU:     intctl &= ~(1<<2); break;
+	    case IRQ_XS80200_EXTIRQ:  intctl &= ~(1<<1); break;
+	    case IRQ_XS80200_EXTFIQ:  intctl &= ~(1<<0); break;
 	}
-	asm ("mcr p13, 0, %0, c0, c0, 0" : : "r" (INTCTL));
+	asm ("mcr p13, 0, %0, c0, c0, 0" : : "r" (intctl));
 }
 
-void
-xs80200_irq_unmask (unsigned int irq)
+static void xs80200_irq_unmask (unsigned int irq)
 {
-	long INTCTL;
-	asm ("mrc p13, 0, %0, c0, c0, 0" : "=r" (INTCTL));
+	unsigned long intctl;
+	asm ("mrc p13, 0, %0, c0, c0, 0" : "=r" (intctl));
 	switch (irq) {
-	    case IRQ_XS80200_BCU:	INTCTL |= (1<<3); break;
-	    case IRQ_XS80200_PMU:	INTCTL |= (1<<2); break;
-	    case IRQ_XS80200_EXTIRQ:	INTCTL |= (1<<1); break;
-	    case IRQ_XS80200_EXTFIQ:	INTCTL |= (1<<0); break;
+	    case IRQ_XS80200_BCU:	intctl |= (1<<3); break;
+	    case IRQ_XS80200_PMU:	intctl |= (1<<2); break;
+	    case IRQ_XS80200_EXTIRQ:	intctl |= (1<<1); break;
+	    case IRQ_XS80200_EXTFIQ:	intctl |= (1<<0); break;
 	}
-	asm ("mcr p13, 0, %0, c0, c0, 0" : : "r" (INTCTL));
+	asm ("mcr p13, 0, %0, c0, c0, 0" : : "r" (intctl));
 }
+
+static struct irqchip xs80200_chip = {
+	ack:	xs80200_irq_mask,
+	mask:	xs80200_irq_mask,
+	unmask:	xs80200_irq_unmask,
+};
 
 void __init xs80200_init_irq(void)
 {
-	int i;
+	unsigned int i;
+
+	asm("mcr p13, 0, %0, c0, c0, 0" : : "r" (0));
 
 	for (i = 0; i < NR_XS80200_IRQS; i++) {
-		irq_desc[i].valid	= 1;
-		irq_desc[i].probe_ok	= 0;
-		irq_desc[i].mask_ack	= xs80200_irq_mask;
-		irq_desc[i].mask	= xs80200_irq_mask;
-		irq_desc[i].unmask	= xs80200_irq_unmask;
+		set_irq_chip(i, &xs80200_chip);
+		set_irq_handler(i, do_level_IRQ);
+		set_irq_flags(i, IRQF_VALID);
 	}
 }
-
-

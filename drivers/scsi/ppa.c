@@ -738,7 +738,7 @@ static int ppa_completion(Scsi_Cmnd * cmd)
 	    if (cmd->SCp.buffers_residual--) {
 		cmd->SCp.buffer++;
 		cmd->SCp.this_residual = cmd->SCp.buffer->length;
-		cmd->SCp.ptr = cmd->SCp.buffer->address;
+		cmd->SCp.ptr = page_address(cmd->SCp.buffer->page) + cmd->SCp.buffer->offset;
 	    }
 	}
 	/* Now check to see if the drive is ready to comunicate */
@@ -923,14 +923,14 @@ static int ppa_engine(ppa_struct * tmp, Scsi_Cmnd * cmd)
 	    /* if many buffers are available, start filling the first */
 	    cmd->SCp.buffer = (struct scatterlist *) cmd->request_buffer;
 	    cmd->SCp.this_residual = cmd->SCp.buffer->length;
-	    cmd->SCp.ptr = cmd->SCp.buffer->address;
+	    cmd->SCp.ptr = page_address(cmd->SCp.buffer->page) + cmd->SCp.buffer->offset;
 	} else {
 	    /* else fill the only available buffer */
 	    cmd->SCp.buffer = NULL;
 	    cmd->SCp.this_residual = cmd->request_bufflen;
 	    cmd->SCp.ptr = cmd->request_buffer;
 	}
-	cmd->SCp.buffers_residual = cmd->use_sg;
+	cmd->SCp.buffers_residual = cmd->use_sg - 1;
 	cmd->SCp.phase++;
 
     case 5:			/* Phase 5 - Data transfer stage */

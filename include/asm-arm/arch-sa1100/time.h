@@ -98,7 +98,7 @@ void __init time_init(void)
 	timer_irq.handler = sa1100_timer_interrupt;
 	OSMR0 = 0;		/* set initial match at 0 */
 	OSSR = 0xf;		/* clear status on all timers */
-	setup_arm_irq(IRQ_OST0, &timer_irq);
+	setup_irq(IRQ_OST0, &timer_irq);
 	OIER |= OIER_E0;	/* enable match on timer 0 to cause interrupts */
 	OSCR = 0;		/* initialize free-running timer, force first match */
 }

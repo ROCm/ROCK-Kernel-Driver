@@ -516,7 +516,9 @@ int fat_dentry_to_fh(struct dentry *de, __u32 *fh, int *lenp, int needparent)
 	fh[1] = inode->i_generation;
 	fh[2] = MSDOS_I(inode)->i_location;
 	fh[3] = MSDOS_I(inode)->i_logstart;
+	read_lock(&dparent_lock);
 	fh[4] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
+	read_unlock(&dparent_lock);
 	return 3;
 }
 
@@ -625,6 +627,18 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	}
 
 	b = (struct fat_boot_sector *) bh->b_data;
+	if (!b->reserved) {
+		if (!silent)
+			printk("FAT: bogus number of reserved sectors\n");
+		brelse(bh);
+		goto out_invalid;
+	}
+	if (!b->fats) {
+		if (!silent)
+			printk("FAT: bogus number of FAT structure\n");
+		brelse(bh);
+		goto out_invalid;
+	}
 	if (!b->secs_track) {
 		if (!silent)
 			printk("FAT: bogus sectors-per-track value\n");

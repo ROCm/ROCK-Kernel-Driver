@@ -114,29 +114,33 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	if (isdotent(name, len)) {
 		if (len==1)
 			dentry = dget(dparent);
-		else if (dparent != exp->ex_dentry)
+		else if (dparent != exp->ex_dentry) {
+			read_lock(&dparent_lock);
 			dentry = dget(dparent->d_parent);
-		else  if (!EX_CROSSMNT(exp))
+			read_unlock(&dparent_lock);
+		} else  if (!EX_CROSSMNT(exp))
 			dentry = dget(dparent); /* .. == . just like at / */
 		else {
 			/* checking mountpoint crossing is very different when stepping up */
 			struct svc_export *exp2 = NULL;
-			struct dentry *dp;
+			struct dentry *dp, *old;
 			struct vfsmount *mnt = mntget(exp->ex_mnt);
 			dentry = dget(dparent);
 			while(follow_up(&mnt, &dentry))
 				;
-			dp = dget(dentry->d_parent);
-			dput(dentry);
-			dentry = dp;
+			old = dentry;
+			read_lock(&dparent_lock);
+			dp = dentry->d_parent;
 			for ( ; !exp2 && dp->d_parent != dp; dp=dp->d_parent)
 				exp2 = exp_get_by_name(exp->ex_client, mnt, dp);
 			if (!exp2) {
-				dput(dentry);
 				dentry = dget(dparent);
 			} else {
+				dget(dentry->d_parent);
 				exp = exp2;
 			}
+			read_unlock(&dparent_lock);
+			dput(old);
 			mntput(mnt);
 		}
 	} else {
@@ -545,12 +549,15 @@ nfsd_sync_dir(struct dentry *dp)
  * Obtain the readahead parameters for the file
  * specified by (dev, ino).
  */
+static spinlock_t ra_lock = SPIN_LOCK_UNLOCKED;
+
 static inline struct raparms *
 nfsd_get_raparms(kdev_t dev, ino_t ino)
 {
 	struct raparms	*ra, **rap, **frap = NULL;
 	int depth = 0;
-	
+
+	spin_lock(&ra_lock);
 	for (rap = &raparm_cache; (ra = *rap); rap = &ra->p_next) {
 		if (ra->p_ino == ino && kdev_same(ra->p_dev, dev))
 			goto found;
@@ -559,8 +566,10 @@ nfsd_get_raparms(kdev_t dev, ino_t ino)
 			frap = rap;
 	}
 	depth = nfsdstats.ra_size*11/10;
-	if (!frap)
+	if (!frap) {	
+		spin_unlock(&ra_lock);
 		return NULL;
+	}
 	rap = frap;
 	ra = *frap;
 	ra->p_dev = dev;
@@ -578,6 +587,7 @@ found:
 	}
 	ra->p_count++;
 	nfsdstats.ra_depth[depth*10/nfsdstats.ra_size]++;
+	spin_unlock(&ra_lock);
 	return ra;
 }
 

@@ -268,7 +268,7 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 		goto fail;
 
 	set_bit(BIO_UPTODATE, &sbh->bi_flags);
-	sbh->bi_end_io(sbh, len >> 9);
+	sbh->bi_end_io(sbh);
 	return 0;
  fail:
 	bio_io_error(sbh);

@@ -1,12 +1,10 @@
 /*
- * $Id: db9.c,v 1.6 2000/06/25 10:57:50 vojtech Exp $
+ * $Id: db9.c,v 1.12 2002/01/22 20:27:05 vojtech Exp $
  *
- *  Copyright (c) 1999 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  Based on the work of:
  *	Andree Borrmann		Mats Sjövall
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -29,8 +27,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -40,8 +38,10 @@
 #include <linux/parport.h>
 #include <linux/input.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Atari, Amstrad, Commodore, Amiga, Sega, etc. joystick driver");
 MODULE_LICENSE("GPL");
+
 MODULE_PARM(db9, "2i");
 MODULE_PARM(db9_2, "2i");
 MODULE_PARM(db9_3, "2i");
@@ -87,6 +87,7 @@ struct db9 {
 	struct pardevice *pd;	
 	int mode;
 	int used;
+	char phys[2][32];
 };
 
 static struct db9 *db9_base[3];
@@ -342,11 +343,14 @@ static struct db9 __init *db9_probe(int *config)
 
 	for (i = 0; i < 1 + (db9->mode == DB9_MULTI_0802_2); i++) {
 
+		sprintf(db9->phys[i], "%s/input%d", db9->pd->port->name, i);
+
 		db9->dev[i].private = db9;
 		db9->dev[i].open = db9_open;
 		db9->dev[i].close = db9_close;
 
 		db9->dev[i].name = db9_name[db9->mode];
+		db9->dev[i].phys = db9->phys[i];
 		db9->dev[i].idbus = BUS_PARPORT;
 		db9->dev[i].idvendor = 0x0002;
 		db9->dev[i].idproduct = config[1];
@@ -362,8 +366,7 @@ static struct db9 __init *db9_probe(int *config)
 		db9->dev[i].absmin[ABS_Y] = -1; db9->dev[i].absmax[ABS_Y] = 1;
 
 		input_register_device(db9->dev + i);
-		printk(KERN_INFO "input%d: %s on %s\n",
-			db9->dev[i].number, db9_name[db9->mode], db9->pd->port->name);
+		printk(KERN_INFO "input: %s on %s\n", db9->dev[i].name, db9->pd->port->name);
 	}
 
 	return db9;

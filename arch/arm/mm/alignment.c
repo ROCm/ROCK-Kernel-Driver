@@ -30,6 +30,10 @@
 #include <asm/pgtable.h>
 #include <asm/unaligned.h>
 
+extern void
+do_bad_area(struct task_struct *tsk, struct mm_struct *mm, unsigned long addr,
+	    int error_code, struct pt_regs *regs);
+
 /*
  * 32-bit misaligned trap handler (c) 1998 San Mehat (CCC) -July 1998
  * /proc/sys/debug/alignment, modified and integrated into
@@ -163,9 +167,9 @@ union offset_union {
 #define TYPE_LDST	2
 #define TYPE_DONE	3
 
-#define get8_unaligned_check(val,addr,err)		\
+#define __get8_unaligned_check(ins,val,addr,err)	\
 	__asm__(					\
-	"1:	ldrb	%1, [%2], #1\n"			\
+	"1:	"ins"	%1, [%2], #1\n"			\
 	"2:\n"						\
 	"	.section .fixup,\"ax\"\n"		\
 	"	.align	2\n"				\
@@ -179,39 +183,49 @@ union offset_union {
 	: "=r" (err), "=&r" (val), "=r" (addr)		\
 	: "0" (err), "2" (addr))
 
-#define get8t_unaligned_check(val,addr,err)		\
-	__asm__(					\
-	"1:	ldrbt	%1, [%2], #1\n"			\
-	"2:\n"						\
-	"	.section .fixup,\"ax\"\n"		\
-	"	.align	2\n"				\
-	"3:	mov	%0, #1\n"			\
-	"	b	2b\n"				\
-	"	.previous\n"				\
-	"	.section __ex_table,\"a\"\n"		\
-	"	.align	3\n"				\
-	"	.long	1b, 3b\n"			\
-	"	.previous\n"				\
-	: "=r" (err), "=&r" (val), "=r" (addr)		\
-	: "0" (err), "2" (addr))
-
-#define get16_unaligned_check(val,addr)				\
+#define __get16_unaligned_check(ins,val,addr)			\
 	do {							\
 		unsigned int err = 0, v, a = addr;		\
-		get8_unaligned_check(val,a,err);		\
-		get8_unaligned_check(v,a,err);			\
+		__get8_unaligned_check(ins,val,a,err);		\
+		__get8_unaligned_check(ins,v,a,err);		\
 		val |= v << 8;					\
 		if (err)					\
 			goto fault;				\
 	} while (0)
 
-#define put16_unaligned_check(val,addr)				\
+#define get16_unaligned_check(val,addr) \
+	__get16_unaligned_check("ldrb",val,addr)
+
+#define get16t_unaligned_check(val,addr) \
+	__get16_unaligned_check("ldrbt",val,addr)
+
+#define __get32_unaligned_check(ins,val,addr)			\
+	do {							\
+		unsigned int err = 0, v, a = addr;		\
+		__get8_unaligned_check(ins,val,a,err);		\
+		__get8_unaligned_check(ins,v,a,err);		\
+		val |= v << 8;					\
+		__get8_unaligned_check(ins,v,a,err);		\
+		val |= v << 16;					\
+		__get8_unaligned_check(ins,v,a,err);		\
+		val |= v << 24;					\
+		if (err)					\
+			goto fault;				\
+	} while (0)
+
+#define get32_unaligned_check(val,addr) \
+	__get32_unaligned_check("ldrb",val,addr)
+
+#define get32t_unaligned_check(val,addr) \
+	__get32_unaligned_check("ldrbt",val,addr)
+
+#define __put16_unaligned_check(ins,val,addr)			\
 	do {							\
 		unsigned int err = 0, v = val, a = addr;	\
 		__asm__(					\
-		"1:	strb	%1, [%2], #1\n"			\
+		"1:	"ins"	%1, [%2], #1\n"			\
 		"	mov	%1, %1, lsr #8\n"		\
-		"2:	strb	%1, [%2]\n"			\
+		"2:	"ins"	%1, [%2]\n"			\
 		"3:\n"						\
 		"	.section .fixup,\"ax\"\n"		\
 		"	.align	2\n"				\
@@ -228,6 +242,12 @@ union offset_union {
 		if (err)					\
 			goto fault;				\
 	} while (0)
+
+#define put16_unaligned_check(val,addr)  \
+	__put16_unaligned_check("strb",val,addr)
+
+#define put16t_unaligned_check(val,addr) \
+	__put16_unaligned_check("strbt",val,addr)
 
 #define __put32_unaligned_check(ins,val,addr)			\
 	do {							\
@@ -259,36 +279,8 @@ union offset_union {
 			goto fault;				\
 	} while (0)
 
-#define get32_unaligned_check(val,addr)				\
-	do {							\
-		unsigned int err = 0, v, a = addr;		\
-		get8_unaligned_check(val,a,err);		\
-		get8_unaligned_check(v,a,err);			\
-		val |= v << 8;					\
-		get8_unaligned_check(v,a,err);			\
-		val |= v << 16;					\
-		get8_unaligned_check(v,a,err);			\
-		val |= v << 24;					\
-		if (err)					\
-			goto fault;				\
-	} while (0)
-
 #define put32_unaligned_check(val,addr)	 \
 	__put32_unaligned_check("strb", val, addr)
-
-#define get32t_unaligned_check(val,addr)			\
-	do {							\
-		unsigned int err = 0, v, a = addr;		\
-		get8t_unaligned_check(val,a,err);		\
-		get8t_unaligned_check(v,a,err);			\
-		val |= v << 8;					\
-		get8t_unaligned_check(v,a,err);			\
-		val |= v << 16;					\
-		get8t_unaligned_check(v,a,err);			\
-		val |= v << 24;					\
-		if (err)					\
-			goto fault;				\
-	} while (0)
 
 #define put32t_unaligned_check(val,addr) \
 	__put32_unaligned_check("strbt", val, addr)
@@ -319,6 +311,9 @@ do_alignment_ldrhstrh(unsigned long addr, unsigned long instr, struct pt_regs *r
 
 	ai_half += 1;
 
+	if (user_mode(regs))
+		goto user;
+
 	if (LDST_L_BIT(instr)) {
 		unsigned long val;
 		get16_unaligned_check(val, addr);
@@ -333,12 +328,27 @@ do_alignment_ldrhstrh(unsigned long addr, unsigned long instr, struct pt_regs *r
 
 	return TYPE_LDST;
 
-swp:
+ user:
+ 	if (LDST_L_BIT(instr)) {
+ 		unsigned long val;
+ 		get16t_unaligned_check(val, addr);
+
+ 		/* signed half-word? */
+ 		if (instr & 0x40)
+ 			val = (signed long)((signed short) val);
+
+ 		regs->uregs[rd] = val;
+ 	} else
+ 		put16t_unaligned_check(regs->uregs[rd], addr);
+
+ 	return TYPE_LDST;
+
+ swp:
 	printk(KERN_ERR "Alignment trap: not handling swp instruction\n");
-bad:
+ bad:
 	return TYPE_ERROR;
 
-fault:
+ fault:
 	return TYPE_FAULT;
 }
 
@@ -349,23 +359,27 @@ do_alignment_ldrstr(unsigned long addr, unsigned long instr, struct pt_regs *reg
 
 	ai_word += 1;
 
-	if (!LDST_P_BIT(instr) && LDST_W_BIT(instr))
+	if ((!LDST_P_BIT(instr) && LDST_W_BIT(instr)) || user_mode(regs))
 		goto trans;
 
-	if (LDST_L_BIT(instr))
-		get32_unaligned_check(regs->uregs[rd], addr);
-	else
+	if (LDST_L_BIT(instr)) {
+		unsigned int val;
+		get32_unaligned_check(val, addr);
+		regs->uregs[rd] = val;
+	} else
 		put32_unaligned_check(regs->uregs[rd], addr);
 	return TYPE_LDST;
 
-trans:
-	if (LDST_L_BIT(instr))
-		get32t_unaligned_check(regs->uregs[rd], addr);
-	else
+ trans:
+	if (LDST_L_BIT(instr)) {
+		unsigned int val;
+		get32t_unaligned_check(val, addr);
+		regs->uregs[rd] = val;
+	} else
 		put32t_unaligned_check(regs->uregs[rd], addr);
 	return TYPE_LDST;
 
-fault:
+ fault:
 	return TYPE_FAULT;
 }
 
@@ -431,14 +445,31 @@ do_alignment_ldmstm(unsigned long addr, unsigned long instr, struct pt_regs *reg
 	}
 #endif
 
-	for (regbits = REGMASK_BITS(instr), rd = 0; regbits; regbits >>= 1, rd += 1)
-		if (regbits & 1) {
-			if (LDST_L_BIT(instr))
-				get32_unaligned_check(regs->uregs[rd], eaddr);
-			else
-				put32_unaligned_check(regs->uregs[rd], eaddr);
-			eaddr += 4;
-		}
+	if (user_mode(regs)) {
+		for (regbits = REGMASK_BITS(instr), rd = 0; regbits;
+		     regbits >>= 1, rd += 1)
+			if (regbits & 1) {
+				if (LDST_L_BIT(instr)) {
+					unsigned int val;
+					get32t_unaligned_check(val, eaddr);
+					regs->uregs[rd] = val;
+				} else
+					put32t_unaligned_check(regs->uregs[rd], eaddr);
+				eaddr += 4;
+			}
+	} else {
+		for (regbits = REGMASK_BITS(instr), rd = 0; regbits;
+		     regbits >>= 1, rd += 1)
+			if (regbits & 1) {
+				if (LDST_L_BIT(instr)) {
+					unsigned int val;
+					get32_unaligned_check(val, eaddr);
+					regs->uregs[rd] = val;
+				} else
+					put32_unaligned_check(regs->uregs[rd], eaddr);
+				eaddr += 4;
+			}
+	}
 
 	if (LDST_W_BIT(instr))
 		regs->uregs[rn] = newaddr;
@@ -539,7 +570,7 @@ int do_alignment(unsigned long addr, int error_code, struct pt_regs *regs)
 
 	return 0;
 
-bad_or_fault:
+ bad_or_fault:
 	if (type == TYPE_ERROR)
 		goto bad;
 	regs->ARM_pc -= 4;
@@ -549,7 +580,7 @@ bad_or_fault:
 	do_bad_area(current, current->mm, addr, error_code, regs);
 	return 0;
 
-bad:
+ bad:
 	/*
 	 * Oops, we didn't handle the instruction.
 	 */

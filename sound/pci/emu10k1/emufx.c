@@ -95,12 +95,12 @@ static char *audigy_ins[16] = {
 	/* 0x05 */ NULL,
 	/* 0x06 */ NULL,
 	/* 0x07 */ NULL,
-	/* 0x08 */ NULL,
-	/* 0x09 */ NULL,
+	/* 0x08 */ "Line/Mic 2 Left",
+	/* 0x09 */ "Line/Mic 2 Right",
 	/* 0x0a */ NULL,
 	/* 0x0b */ NULL,
-	/* 0x0c */ NULL,
-	/* 0x0d */ NULL,
+	/* 0x0c */ "Aux2 Left",
+	/* 0x0d */ "Aux2 Right",
 	/* 0x0e */ NULL,
 	/* 0x0f */ NULL
 };
@@ -141,14 +141,14 @@ static char *creative_outs[32] = {
 };
 
 static char *audigy_outs[32] = {
-	/* 0x00 */ NULL,
-	/* 0x01 */ NULL,
-	/* 0x02 */ NULL,
-	/* 0x03 */ NULL,
+	/* 0x00 */ "Digital Front Left",
+	/* 0x01 */ "Digital Front Right",
+	/* 0x02 */ "Digital Center",
+	/* 0x03 */ "Digital LEF",
 	/* 0x04 */ "Headphone Left",
 	/* 0x05 */ "Headphone Right",
-	/* 0x06 */ NULL,
-	/* 0x07 */ NULL,
+	/* 0x06 */ "Digital Rear Left",
+	/* 0x07 */ "Digital Rear Right",
 	/* 0x08 */ "Front Left",
 	/* 0x09 */ "Front Right",
 	/* 0x0a */ "Center",
@@ -157,14 +157,14 @@ static char *audigy_outs[32] = {
 	/* 0x0d */ NULL,
 	/* 0x0e */ "Rear Left",
 	/* 0x0f */ "Rear Right",
-	/* 0x10 */ NULL,
-	/* 0x11 */ NULL,
-	/* 0x12 */ NULL,
-	/* 0x13 */ NULL,
+	/* 0x10 */ "AC97 Front Left",
+	/* 0x11 */ "AC97 Front Right",
+	/* 0x12 */ "ADC Caputre Left",
+	/* 0x13 */ "ADC Capture Right",
 	/* 0x14 */ NULL,
 	/* 0x15 */ NULL,
-	/* 0x16 */ "ADC Capture Left",
-	/* 0x17 */ "ADC Capture Right",
+	/* 0x16 */ NULL,
+	/* 0x17 */ NULL,
 	/* 0x18 */ NULL,
 	/* 0x19 */ NULL,
 	/* 0x1a */ NULL,
@@ -1034,7 +1034,7 @@ static int snd_emu10k1_icode_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	/* stop FX processor - this may be dangerous, but it's better to miss
 	   some samples than generate wrong ones - [jk] */
 	if (emu->audigy)
-		snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg | A_DBG_SINGLE_STEP_ADDR);
+		snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg | A_DBG_SINGLE_STEP);
 	else
 		snd_emu10k1_ptr_write(emu, DBG, 0, emu->fx8010.dbg | EMU10K1_DBG_SINGLE_STEP);
 	/* ok, do the main job */
@@ -1220,36 +1220,34 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	ptr = 0;
 	nctl = 0;
 	playback = 10;
-	capture = playback + 6; /* 5+1 channels */
-	gpr = capture + 2; /* so far only a stereo capture */
+	capture = playback + 10; /* we reserve 10 voices */
+	gpr = capture + 10;
 	tmp = 0x80;
 	
 	/* stop FX processor */
-	snd_emu10k1_ptr_write(emu, A_DBG, 0, (emu->fx8010.dbg = 0) | A_DBG_SINGLE_STEP_ADDR);
-
-#define A_C_ZERO	0x0c0
+	snd_emu10k1_ptr_write(emu, A_DBG, 0, (emu->fx8010.dbg = 0) | A_DBG_SINGLE_STEP);
 
 	/* Wave Playback */
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback), A_C_ZERO, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+1), A_C_ZERO, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback), A_C_00000000, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+1), A_C_00000000, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT));
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "Wave Playback Volume", gpr, 100);
 	gpr += 2;
 
 	/* Wave Surround Playback */
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+2), A_C_ZERO, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT_REAR));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+3), A_C_ZERO, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT_REAR));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+2), A_C_00000000, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+3), A_C_00000000, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT));
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "Wave Surround Playback Volume", gpr, 0);
 	gpr += 2;
 
 	/* Wave Center Playback */
 	/* Center = sub = Left/2 + Right/2 */
 	A_OP(icode, &ptr, iINTERP, A_GPR(tmp), A_FXBUS(FXBUS_PCM_LEFT), 0xcd, A_FXBUS(FXBUS_PCM_RIGHT));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+4), A_C_ZERO, A_GPR(gpr), A_GPR(tmp));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+4), A_C_00000000, A_GPR(gpr), A_GPR(tmp));
 	snd_emu10k1_init_mono_control(&controls[nctl++], "Wave Center Playback Volume", gpr, 0);
 	gpr++;
 
 	/* Wave LFE Playback */
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+5), A_C_ZERO, A_GPR(gpr), A_GPR(tmp));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+5), A_C_00000000, A_GPR(gpr), A_GPR(tmp));
 	snd_emu10k1_init_mono_control(&controls[nctl++], "Wave LFE Playback Volume", gpr, 0);
 	gpr++;
 
@@ -1260,8 +1258,8 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	gpr += 2;
 
 	/* Wave Capture */
-	A_OP(icode, &ptr, iMAC0, A_GPR(capture+0), A_C_ZERO, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT));
-	A_OP(icode, &ptr, iMAC0, A_GPR(capture+1), A_C_ZERO, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT));
+	A_OP(icode, &ptr, iMAC0, A_GPR(capture+0), A_C_00000000, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT));
+	A_OP(icode, &ptr, iMAC0, A_GPR(capture+1), A_C_00000000, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT));
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "Wave Capture Volume", gpr, 0);
 	gpr += 2;
 
@@ -1271,14 +1269,20 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "Music Capture Volume", gpr, 0);
 	gpr += 2;
 
+	/* Surround Playback */
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+2), A_C_00000000, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT_REAR));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+3), A_C_00000000, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT_REAR));
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Surround Playback Volume", gpr, 80);
+	gpr += 2;
+
 	/* Center Playback */
 	A_OP(icode, &ptr, iMAC0, A_GPR(playback+4), A_GPR(playback+4), A_GPR(gpr), A_FXBUS(FXBUS_PCM_CENTER));
-	snd_emu10k1_init_mono_control(&controls[nctl++], "Center Playback Volume", gpr, 0);
+	snd_emu10k1_init_mono_control(&controls[nctl++], "Center Playback Volume", gpr, 80);
 	gpr++;
 
 	/* LFE Playback */
 	A_OP(icode, &ptr, iMAC0, A_GPR(playback+5), A_GPR(playback+5), A_GPR(gpr), A_FXBUS(FXBUS_PCM_LFE));
-	snd_emu10k1_init_mono_control(&controls[nctl++], "LFE Playback Volume", gpr, 0);
+	snd_emu10k1_init_mono_control(&controls[nctl++], "LFE Playback Volume", gpr, 80);
 	gpr++;
 
 	/*
@@ -1286,54 +1290,70 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	 */
 #define A_ADD_VOLUME_IN(var,vol,input) \
 A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
-	if (emu->fx8010.extin_mask & ((1<<A_EXTIN_AC97_L)|(1<<A_EXTIN_AC97_R))) {
-		/* AC'97 Playback Volume */
-		A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_AC97_L);
-		A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_AC97_R);
-		snd_emu10k1_init_stereo_control(&controls[nctl++], "AC97 Playback Volume", gpr, 0);
-		gpr += 2;
-		/* AC'97 Capture Volume */
-		A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_AC97_L);
-		A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_AC97_R);
-		snd_emu10k1_init_stereo_control(&controls[nctl++], "AC97 Capture Volume", gpr, 100);
-		gpr += 2;
-	}
 
-	if (emu->fx8010.extin_mask & ((1<<A_EXTIN_SPDIF_CD_L)|(1<<A_EXTIN_SPDIF_CD_R))) {
-		/* Audigy CD Playback Volume */
-		A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_SPDIF_CD_L);
-		A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_SPDIF_CD_R);
-		snd_emu10k1_init_stereo_control(&controls[nctl++], "Audigy CD Playback Volume", gpr, 0);
-		gpr += 2;
-		/* Audigy CD Capture Volume */
-		A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_SPDIF_CD_L);
-		A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_SPDIF_CD_R);
-		snd_emu10k1_init_stereo_control(&controls[nctl++], "Audigy CD Capture Volume", gpr, 100);
-		gpr += 2;
-	}
+	/* AC'97 Playback Volume */
+	A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_AC97_L);
+	A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_AC97_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "AC97 Playback Volume", gpr, 0);
+	gpr += 2;
+	/* AC'97 Capture Volume */
+	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_AC97_L);
+	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_AC97_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "AC97 Capture Volume", gpr, 100);
+	gpr += 2;
+
+	/* Audigy CD Playback Volume */
+	A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_SPDIF_CD_L);
+	A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_SPDIF_CD_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Audigy CD Playback Volume", gpr, 0);
+	gpr += 2;
+	/* Audigy CD Capture Volume */
+	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_SPDIF_CD_L);
+	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_SPDIF_CD_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Audigy CD Capture Volume", gpr, 0);
+	gpr += 2;
+
+	/* Line2 Playback Volume */
+	A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_LINE2_L);
+	A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_LINE2_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Line2 Playback Volume", gpr, 0);
+	gpr += 2;
+	/* Line2 Capture Volume */
+	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_LINE2_L);
+	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_LINE2_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Line2 Capture Volume", gpr, 0);
+	gpr += 2;
+
+	/* Aux2 Playback Volume */
+	A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_AUX2_L);
+	A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_AUX2_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Aux2 Playback Volume", gpr, 0);
+	gpr += 2;
+	/* Aux2 Capture Volume */
+	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_AUX2_L);
+	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_AUX2_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Aux2 Capture Volume", gpr, 0);
+	gpr += 2;
 
 	/*
 	 * outputs
 	 */
-#define A_PUT_OUTPUT(out,src) A_OP(icode, &ptr, iACC3, A_EXTOUT(out), A_C_ZERO, A_C_ZERO, A_GPR(src))
-#define A_PUT_MONO_OUTPUT(out,src) \
-	if (emu->fx8010.extout_mask & (1<<(out))) A_PUT_OUTPUT(out,src)
+#define A_PUT_OUTPUT(out,src) A_OP(icode, &ptr, iACC3, A_EXTOUT(out), A_C_00000000, A_C_00000000, A_GPR(src))
 #define A_PUT_STEREO_OUTPUT(out1,out2,src) \
-	if (emu->fx8010.extout_mask & ((1<<(out1))|(1<<(out2)))) {\
-		A_PUT_OUTPUT(out1,src);\
-		A_PUT_OUTPUT(out2,src+1);}
+	{A_PUT_OUTPUT(out1,src); A_PUT_OUTPUT(out2,src+1);}
 
 	/* digital outputs */
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_FRONT_L, A_EXTOUT_FRONT_R, playback);
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_REAR_L, A_EXTOUT_REAR_R, playback+2);
-	A_PUT_MONO_OUTPUT(A_EXTOUT_CENTER, playback+4);
-	A_PUT_MONO_OUTPUT(A_EXTOUT_LFE, playback+5);
+	A_PUT_OUTPUT(A_EXTOUT_CENTER, playback+4);
+	A_PUT_OUTPUT(A_EXTOUT_LFE, playback+5);
 
 	/* analog speakers */
-	A_PUT_STEREO_OUTPUT(A_EXTOUT_AFRONT_L, A_EXTOUT_AFRONT_R, playback);
+	//A_PUT_STEREO_OUTPUT(A_EXTOUT_AFRONT_L, A_EXTOUT_AFRONT_R, playback);
+	A_PUT_STEREO_OUTPUT(A_EXTOUT_AC97_L, A_EXTOUT_AC97_R, playback);
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_AREAR_L, A_EXTOUT_AREAR_R, playback+2);
-	A_PUT_MONO_OUTPUT(A_EXTOUT_ACENTER, playback+4);
-	A_PUT_MONO_OUTPUT(A_EXTOUT_ALFE, playback+5);
+	A_PUT_OUTPUT(A_EXTOUT_ACENTER, playback+4);
+	A_PUT_OUTPUT(A_EXTOUT_ALFE, playback+5);
 
 	/* headphone */
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_HEADPHONE_L, A_EXTOUT_HEADPHONE_R, playback);
@@ -1946,7 +1966,7 @@ void snd_emu10k1_free_efx(emu10k1_t *emu)
 {
 	/* stop processor */
 	if (emu->audigy)
-		snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg = A_DBG_SINGLE_STEP_ADDR);
+		snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg = A_DBG_SINGLE_STEP);
 	else
 		snd_emu10k1_ptr_write(emu, DBG, 0, emu->fx8010.dbg = EMU10K1_DBG_SINGLE_STEP);
 }
@@ -2127,7 +2147,7 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (emu->audigy)
-			snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg |= A_DBG_SINGLE_STEP_ADDR);
+			snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg |= A_DBG_SINGLE_STEP);
 		else
 			snd_emu10k1_ptr_write(emu, DBG, 0, emu->fx8010.dbg |= EMU10K1_DBG_SINGLE_STEP);
 		return 0;
@@ -2160,12 +2180,12 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 		if (addr > 0x1ff)
 			return -EINVAL;
 		if (emu->audigy)
-			snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg |= A_DBG_SINGLE_STEP_ADDR | addr);
+			snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg |= A_DBG_SINGLE_STEP | addr);
 		else
 			snd_emu10k1_ptr_write(emu, DBG, 0, emu->fx8010.dbg |= EMU10K1_DBG_SINGLE_STEP | addr);
 		udelay(10);
 		if (emu->audigy)
-			snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg |= A_DBG_SINGLE_STEP_ADDR | A_DBG_STEP_ADDR | addr);
+			snd_emu10k1_ptr_write(emu, A_DBG, 0, emu->fx8010.dbg |= A_DBG_SINGLE_STEP | A_DBG_STEP_ADDR | addr);
 		else
 			snd_emu10k1_ptr_write(emu, DBG, 0, emu->fx8010.dbg |= EMU10K1_DBG_SINGLE_STEP | EMU10K1_DBG_STEP | addr);
 		return 0;

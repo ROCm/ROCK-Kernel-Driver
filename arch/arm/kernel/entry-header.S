@@ -113,7 +113,7 @@
 		msr	cpsr_c, \temp
 		.endm
 
-		.macro	get_current_task, rd
+		.macro	get_thread_info, rd
 		mov	\rd, sp, lsr #13
 		mov	\rd, \rd, lsl #13
 		.endm
@@ -171,7 +171,7 @@
 		.macro	initialise_traps_extra
 		.endm
 
-		.macro	get_current_task, rd
+		.macro	get_thread_info, rd
 		mov	\rd, sp, lsr #13
 		mov	\rd, \rd, lsl #13
 		.endm
@@ -197,10 +197,10 @@
  *
  * We must set at least "tsk" and "why" when calling ret_with_reschedule.
  */
-scno	.req	r7				@ syscall number
-tbl	.req	r8				@ syscall table pointer
-why	.req	r8				@ Linux syscall (!= 0)
-tsk	.req	r9				@ current task
+scno	.req	r7		@ syscall number
+tbl	.req	r8		@ syscall table pointer
+why	.req	r8		@ Linux syscall (!= 0)
+tsk	.req	r9		@ current thread_info
 
 /*
  * Get the system call number.
@@ -214,6 +214,15 @@ tsk	.req	r9				@ current task
 #else
 	mask_pc	lr, lr
 	ldr	scno, [lr, #-4]		@ get SWI instruction
+#endif
+	.endm
+
+	.macro	set_cpsr_c, reg, mode
+#if 1
+	mov	\reg, \mode
+	msr	cpsr_c, \reg
+#else
+	msr	cpsr_c, \mode
 #endif
 	.endm
 

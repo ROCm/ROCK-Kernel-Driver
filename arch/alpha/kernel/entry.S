@@ -489,22 +489,22 @@ alpha_switch_to:
 	.prologue 0
 	bsr	$1,do_switch_stack
 	call_pal PAL_swpctx
-	unop
-	bsr	$1,undo_switch_stack
 	lda	$8,0x3fff
-	mov	$17,$0
+	bsr	$1,undo_switch_stack
 	bic	$30,$8,$8
 	ret	$31,($26),1
 .end alpha_switch_to
 
+#ifdef CONFIG_SMP
 .globl  ret_from_fork
 .align 3
 .ent ret_from_fork
 ret_from_fork:
 	lda	$26,ret_from_sys_call
-	mov	$0,$16
+	mov	$17,$16
 	jmp	$31,schedule_tail
 .end ret_from_fork
+#endif
 
 /*
  * Oh, well.. Disassembling OSF/1 binaries to find out how the

@@ -12,6 +12,8 @@
 #ifndef __ASM_ARCH_ASSABET_H
 #define __ASM_ARCH_ASSABET_H
 
+#include <linux/config.h>
+
 /* System Configuration Register flags */
 
 #define ASSABET_SCR_SDRAM_LOW	(1<<2)	/* SDRAM size (low bit) */
@@ -60,7 +62,7 @@ extern unsigned long SCR_value;
 #ifdef CONFIG_SA1100_ASSABET
 extern void ASSABET_BCR_frob(unsigned int mask, unsigned int set);
 #else
-#define ASSABET_BCR_frob(x)	do { } while (0)
+#define ASSABET_BCR_frob(x,y)	do { } while (0)
 #endif
 
 #define ASSABET_BCR_set(x)	ASSABET_BCR_frob((x), (x))

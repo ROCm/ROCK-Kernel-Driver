@@ -9,8 +9,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/sched.h>
@@ -21,7 +19,6 @@
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
-#include <asm/arch/irq.h>
 
 #include "generic.h"
 
@@ -32,36 +29,153 @@
  * This must be called *before* the appropriate IRQ is registered.
  * Use this instead of directly setting GRER/GFER.
  */
-
 static int GPIO_IRQ_rising_edge;
 static int GPIO_IRQ_falling_edge;
+static int GPIO_IRQ_mask = (1 << 11) - 1;
 
-void set_GPIO_IRQ_edge( int gpio_mask, int edge )
+static void sa1100_manual_rerun(unsigned int irq)
 {
-	int flags;
-
-	local_irq_save(flags);
-	if (edge & GPIO_FALLING_EDGE)
-		GPIO_IRQ_falling_edge |= gpio_mask;
-	else
-		GPIO_IRQ_falling_edge &= ~gpio_mask;
-	if (edge & GPIO_RISING_EDGE)
-		GPIO_IRQ_rising_edge |= gpio_mask;
-	else
-		GPIO_IRQ_rising_edge &= ~gpio_mask;
-	GPDR &= ~gpio_mask;
-	GAFR &= ~gpio_mask;
-	restore_flags(flags);
+	struct pt_regs regs;
+	memset(&regs, 0, sizeof(regs));
+	irq_desc[irq].handle(irq, &irq_desc[irq], &regs);
 }
 
-EXPORT_SYMBOL(set_GPIO_IRQ_edge);
+#define GPIO11_27_MASK(irq)	(1 << GPIO_11_27_IRQ(irq))
 
+static int sa1100_gpio_type(unsigned int irq, unsigned int type)
+{
+	unsigned int mask;
+
+	printk(KERN_DEBUG "IRQ%d: ", irq);
+
+	if (irq <= 10)
+		mask = 1 << irq;
+	else
+		mask = GPIO11_27_MASK(irq);
+
+	if (type & __IRQT_RISEDGE) {
+		printk("rising ");
+		GPIO_IRQ_rising_edge |= mask;
+	} else
+		GPIO_IRQ_rising_edge &= ~mask;
+	if (type & __IRQT_FALEDGE) {
+		printk("falling ");
+		GPIO_IRQ_falling_edge |= mask;
+	} else
+		GPIO_IRQ_falling_edge &= ~mask;
+
+	printk("edges\n");
+
+	GRER = GPIO_IRQ_rising_edge & GPIO_IRQ_mask;
+	GFER = GPIO_IRQ_falling_edge & GPIO_IRQ_mask;
+
+	return 0;
+}
+
+/*
+ * GPIO IRQs must be acknoledged.  This is for IRQs from 0 to 10.
+ */
+static void sa1100_low_gpio_ack(unsigned int irq)
+{
+	GEDR = (1 << irq);
+}
+
+static void sa1100_low_gpio_mask(unsigned int irq)
+{
+	ICMR &= ~(1 << irq);
+}
+
+static void sa1100_low_gpio_unmask(unsigned int irq)
+{
+	ICMR |= 1 << irq;
+}
+
+static struct irqchip sa1100_low_gpio_chip = {
+	ack:		sa1100_low_gpio_ack,
+	mask:		sa1100_low_gpio_mask,
+	unmask:		sa1100_low_gpio_unmask,
+	rerun:		sa1100_manual_rerun,
+	type:		sa1100_gpio_type,
+};
+
+/*
+ * IRQ11 (GPIO11 through 27) handler.  We enter here with the
+ * irq_controller_lock held, and IRQs disabled.  Decode the IRQ
+ * and call the handler.
+ */
+static void
+sa1100_high_gpio_handler(unsigned int irq, struct irqdesc *desc,
+			 struct pt_regs *regs)
+{
+	unsigned int mask;
+
+	mask = GEDR & 0xfffff800;
+	do {
+		/*
+		 * clear down all currently active IRQ sources.
+		 * We will be processing them all.
+		 */
+		GEDR = mask;
+
+		irq = IRQ_GPIO11;
+		desc = irq_desc + irq;
+		mask >>= 11;
+		do {
+			if (mask & 1)
+				desc->handle(irq, desc, regs);
+			mask >>= 1;
+			irq++;
+			desc++;
+		} while (mask);
+
+		mask = GEDR & 0xfffff800;
+	} while (mask);
+}
+
+/*
+ * Like GPIO0 to 10, GPIO11-27 IRQs need to be handled specially.
+ * In addition, the IRQs are all collected up into one bit in the
+ * interrupt controller registers.
+ */
+static void sa1100_high_gpio_ack(unsigned int irq)
+{
+	unsigned int mask = GPIO11_27_MASK(irq);
+
+	GEDR = mask;
+}
+
+static void sa1100_high_gpio_mask(unsigned int irq)
+{
+	unsigned int mask = GPIO11_27_MASK(irq);
+
+	GPIO_IRQ_mask &= ~mask;
+
+	GRER &= ~mask;
+	GFER &= ~mask;
+}
+
+static void sa1100_high_gpio_unmask(unsigned int irq)
+{
+	unsigned int mask = GPIO11_27_MASK(irq);
+
+	GPIO_IRQ_mask |= mask;
+
+	GRER = GPIO_IRQ_rising_edge & GPIO_IRQ_mask;
+	GFER = GPIO_IRQ_falling_edge & GPIO_IRQ_mask;
+}
+
+static struct irqchip sa1100_high_gpio_chip = {
+	ack:		sa1100_high_gpio_ack,
+	mask:		sa1100_high_gpio_mask,
+	unmask:		sa1100_high_gpio_unmask,
+	rerun:		sa1100_manual_rerun,
+	type:		sa1100_gpio_type,
+};
 
 /*
  * We don't need to ACK IRQs on the SA1100 unless they're GPIOs
  * this is for internal IRQs i.e. from 11 to 31.
  */
-
 static void sa1100_mask_irq(unsigned int irq)
 {
 	ICMR &= ~(1 << irq);
@@ -72,115 +186,12 @@ static void sa1100_unmask_irq(unsigned int irq)
 	ICMR |= (1 << irq);
 }
 
-/*
- * GPIO IRQs must be acknoledged.  This is for IRQs from 0 to 10.
- */
-
-static void sa1100_mask_and_ack_GPIO0_10_irq(unsigned int irq)
-{
-	ICMR &= ~(1 << irq);
-	GEDR = (1 << irq);
-}
-
-static void sa1100_mask_GPIO0_10_irq(unsigned int irq)
-{
-	ICMR &= ~(1 << irq);
-}
-
-static void sa1100_unmask_GPIO0_10_irq(unsigned int irq)
-{
-	GRER = (GRER & ~(1 << irq)) | (GPIO_IRQ_rising_edge & (1 << irq));
-	GFER = (GFER & ~(1 << irq)) | (GPIO_IRQ_falling_edge & (1 << irq));
-	ICMR |= (1 << irq);
-}
-
-/*
- * Install handler for GPIO 11-27 edge detect interrupts
- */
-
-static int GPIO_11_27_enabled;		/* enabled i.e. unmasked GPIO IRQs */
-static int GPIO_11_27_spurious;		/* GPIOs that triggered when masked */
-
-static void sa1100_GPIO11_27_demux(int irq, void *dev_id,
-				   struct pt_regs *regs)
-{
-	int i, spurious;
-
-	while ((irq = (GEDR & 0xfffff800))) {
-		/*
-		 * We don't want to clear GRER/GFER when the corresponding
-		 * IRQ is masked because we could miss a level transition
-		 * i.e. an IRQ which need servicing as soon as it is
-		 * unmasked.  However, such situation should happen only
-		 * during the loop below.  Thus all IRQs which aren't
-		 * enabled at this point are considered spurious.  Those
-		 * are cleared but only de-activated if they happen twice.
-		 */
-		spurious = irq & ~GPIO_11_27_enabled;
-		if (spurious) {
-			GEDR = spurious;
-			GRER &= ~(spurious & GPIO_11_27_spurious);
-			GFER &= ~(spurious & GPIO_11_27_spurious);
-			GPIO_11_27_spurious |= spurious;
-			irq ^= spurious;
-			if (!irq) continue;
-		}
-
-		for (i = 11; i <= 27; ++i) {
-			if (irq & (1<<i)) {
-				do_IRQ(IRQ_GPIO11 + i - 11, regs);
-			}
-		}
-	}
-}
-
-static struct irqaction GPIO11_27_irq = {
-	name:		"GPIO 11-27",
-	handler:	sa1100_GPIO11_27_demux,
-	flags:		SA_INTERRUPT
+static struct irqchip sa1100_normal_chip = {
+	ack:		sa1100_mask_irq,
+	mask:		sa1100_mask_irq,
+	unmask:		sa1100_unmask_irq,
+	/* rerun should never be called */
 };
-
-static void sa1100_mask_and_ack_GPIO11_27_irq(unsigned int irq)
-{
-	int mask = (1 << GPIO_11_27_IRQ(irq));
-	GPIO_11_27_spurious &= ~mask;
-	GPIO_11_27_enabled &= ~mask;
-	GEDR = mask;
-}
-
-static void sa1100_mask_GPIO11_27_irq(unsigned int irq)
-{
-	int mask = (1 << GPIO_11_27_IRQ(irq));
-	GPIO_11_27_spurious &= ~mask;
-	GPIO_11_27_enabled &= ~mask;
-}
-
-static void sa1100_unmask_GPIO11_27_irq(unsigned int irq)
-{
-	int mask = (1 << GPIO_11_27_IRQ(irq));
-	if (GPIO_11_27_spurious & mask) {
-		/*
-		 * We don't want to miss an interrupt that would have occurred
-		 * while it was masked.  Simulate it if it is the case.
-		 */
-		int state = GPLR;
-		if (((state & GPIO_IRQ_rising_edge) |
-		     (~state & GPIO_IRQ_falling_edge)) & mask)
-		{
-			/* just in case it gets referenced: */
-			struct pt_regs dummy;
-
-			memzero(&dummy, sizeof(dummy));
-			do_IRQ(irq, &dummy);
-
-			/* we are being called recursively from do_IRQ() */
-			return;
-		}
-	}
-	GPIO_11_27_enabled |= mask;
-	GRER = (GRER & ~mask) | (GPIO_IRQ_rising_edge & mask);
-	GFER = (GFER & ~mask) | (GPIO_IRQ_falling_edge & mask);
-}
 
 static struct resource irq_resource = {
 	name:	"irqs",
@@ -190,7 +201,7 @@ static struct resource irq_resource = {
 
 void __init sa1100_init_irq(void)
 {
-	int irq;
+	unsigned int irq;
 
 	request_resource(&iomem_resource, &irq_resource);
 
@@ -212,33 +223,32 @@ void __init sa1100_init_irq(void)
 	ICCR = 1;
 
 	for (irq = 0; irq <= 10; irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= sa1100_mask_and_ack_GPIO0_10_irq;
-		irq_desc[irq].mask	= sa1100_mask_GPIO0_10_irq;
-		irq_desc[irq].unmask	= sa1100_unmask_GPIO0_10_irq;
+		set_irq_chip(irq, &sa1100_low_gpio_chip);
+		set_irq_handler(irq, do_edge_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
-	for (irq = 11; irq <= 31; irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 0;
-		irq_desc[irq].mask_ack	= sa1100_mask_irq;
-		irq_desc[irq].mask	= sa1100_mask_irq;
-		irq_desc[irq].unmask	= sa1100_unmask_irq;
+	for (irq = 12; irq <= 31; irq++) {
+		set_irq_chip(irq, &sa1100_normal_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_VALID);
 	}
 
 	for (irq = 32; irq <= 48; irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= sa1100_mask_and_ack_GPIO11_27_irq;
-		irq_desc[irq].mask	= sa1100_mask_GPIO11_27_irq;
-		irq_desc[irq].unmask	= sa1100_unmask_GPIO11_27_irq;
+		set_irq_chip(irq, &sa1100_high_gpio_chip);
+		set_irq_handler(irq, do_edge_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
-	setup_arm_irq( IRQ_GPIO11_27, &GPIO11_27_irq );
+
+	/*
+	 * Install handler for GPIO 11-27 edge detect interrupts
+	 */
+	set_irq_chip(IRQ_GPIO11_27, &sa1100_normal_chip);
+	set_irq_chained_handler(IRQ_GPIO11_27, sa1100_high_gpio_handler);
 
 	/*
 	 * We generally don't want the LCD IRQ being
 	 * enabled as soon as we request it.
 	 */
-	irq_desc[IRQ_LCD].noautoenable = 1;
+	set_irq_flags(IRQ_LCD, IRQF_VALID | IRQF_NOAUTOEN);
 }

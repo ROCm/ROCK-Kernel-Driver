@@ -2486,7 +2486,7 @@ static int __init alsa_card_rme96_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("No RME Digi96 cards found\n");
+		printk(KERN_ERR "No RME Digi96 cards found\n");
 #endif
 		return err;
 	}

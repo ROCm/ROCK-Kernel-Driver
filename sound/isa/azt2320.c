@@ -50,6 +50,8 @@
 
 #define chip_t cs4231_t
 
+#define PFX "azt2320: "
+
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
@@ -191,7 +193,7 @@ static int __init snd_card_azt2320_isapnp(int dev, struct snd_card_azt2320 *acar
 		isapnp_resource_change(&pdev->irq_resource[0], snd_irq[dev], 1);
 
 	if (pdev->activate(pdev) < 0) {
-		snd_printk("AUDIO isapnp configure failure\n");
+		printk(KERN_ERR PFX "AUDIO isapnp configure failure\n");
 		return -EBUSY;
 	}
 
@@ -217,7 +219,7 @@ static int __init snd_card_azt2320_isapnp(int dev, struct snd_card_azt2320 *acar
 
 	if (pdev->activate(pdev) < 0) {
 		/* not fatal error */
-		snd_printk("MPU-401 isapnp configure failure\n");
+		printk(KERN_ERR PFX "MPU-401 isapnp configure failure\n");
 		snd_mpu_port[dev] = -1;
 		acard->devmpu = NULL;
 	} else {
@@ -329,7 +331,7 @@ static int __init snd_card_azt2320_probe(int dev)
 				snd_mpu_port[dev], 0,
 				snd_mpu_irq[dev], SA_INTERRUPT,
 				NULL) < 0)
-			snd_printk("no MPU-401 device at 0x%lx\n",
+			printk(KERN_ERR PFX "no MPU-401 device at 0x%lx\n",
 				snd_mpu_port[dev]);
 	}
 
@@ -337,7 +339,7 @@ static int __init snd_card_azt2320_probe(int dev)
 		if (snd_opl3_create(card,
 				    snd_fm_port[dev], snd_fm_port[dev] + 2,
 				    OPL3_HW_AUTO, 0, &opl3) < 0) {
-			snd_printk("no OPL device at 0x%lx-0x%lx\n",
+			printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx\n",
 				snd_fm_port[dev], snd_fm_port[dev] + 2);
 		} else {
 			if ((error = snd_opl3_timer_new(opl3, 1, 2)) < 0) {
@@ -393,11 +395,11 @@ static int __init alsa_card_azt2320_init(void)
 #ifdef __ISAPNP__
 	cards += isapnp_probe_cards(snd_azt2320_pnpids, snd_azt2320_isapnp_detect);
 #else
-	snd_printk("you have to enable ISA PnP support.\n");
+	printk(KERN_ERR PFX "you have to enable ISA PnP support.\n");
 #endif
 #ifdef MODULE
 	if (!cards)
-		snd_printk("no AZT2320 based soundcards found\n");
+		printk(KERN_ERR "no AZT2320 based soundcards found\n");
 #endif
 	return cards ? 0 : -ENODEV;
 }

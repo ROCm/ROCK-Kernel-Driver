@@ -302,12 +302,46 @@ static inline unsigned long ffz(unsigned long word)
 }
 
 /*
+ * ffz = Find First Zero in word. Undefined if no zero exists,
+ * so code should check against ~0UL first..
+ */
+static inline unsigned long __ffs(unsigned long word)
+{
+	int k;
+
+	k = 31;
+	if (word & 0x0000ffff) { k -= 16; word <<= 16; }
+	if (word & 0x00ff0000) { k -= 8;  word <<= 8;  }
+	if (word & 0x0f000000) { k -= 4;  word <<= 4;  }
+	if (word & 0x30000000) { k -= 2;  word <<= 2;  }
+	if (word & 0x40000000) { k -= 1; }
+        return k;
+}
+
+/*
  * ffs: find first bit set. This is defined the same way as
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
 
 #define ffs(x) generic_ffs(x)
+
+/*
+ * Find first bit set in a 168-bit bitmap, where the first
+ * 128 bits are unlikely to be set.
+ */
+static inline int sched_find_first_bit(unsigned long *b)
+{
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (b[3])
+		return __ffs(b[3]) + 96;
+	return __ffs(b[4]) + 128;
+}
 
 /*
  * hweightN: returns the hamming weight (i.e. the number

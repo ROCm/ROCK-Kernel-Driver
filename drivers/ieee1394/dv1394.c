@@ -185,78 +185,19 @@ static inline struct video_card* file_to_video_card(struct file *file)
 /* Memory management functions */
 /*******************************/
 
-#define MDEBUG(x)	do { } while(0)		/* Debug memory management */
-
-/* [DaveM] I've recoded most of this so that:
- * 1) It's easier to tell what is happening
- * 2) It's more portable, especially for translating things
- *    out of vmalloc mapped areas in the kernel.
- * 3) Less unnecessary translations happen.
- *
- * The code used to assume that the kernel vmalloc mappings
- * existed in the page tables of every process, this is simply
- * not guarenteed.  We now use pgd_offset_k which is the
- * defined way to get at the kernel page tables.
- */
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#define page_address(x)	(x)
-#endif
-
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline struct page *uvirt_to_page(pgd_t *pgd, unsigned long adr)
-{
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-	struct page *ret = NULL;
-	
-	if (!pgd_none(*pgd)) {
-                pmd = pmd_offset(pgd, adr);
-                if (!pmd_none(*pmd)) {
-			preempt_disable();
-                        ptep = pte_offset_map(pmd, adr);
-                        pte = *ptep;
-			pte_unmap(pte);
-			preempt_enable();
-                        if(pte_present(pte))
-				ret = pte_page(pte);
-                }
-        }
-	return ret;
-}
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved, and for
- * handling page faults on the rvmalloc()ed buffer
- */
-static inline unsigned long kvirt_to_pa(unsigned long adr) 
-{
-        unsigned long va, kva, ret;
-
-        va = VMALLOC_VMADDR(adr);
-	kva = (unsigned long) page_address(uvirt_to_page(pgd_offset_k(va), va));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-        MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
-        return ret;
-}
-
 static void * rvmalloc(unsigned long size)
 {
 	void * mem;
-	unsigned long adr, page;
-        
+	unsigned long adr;
+
+	size=PAGE_ALIGN(size);
 	mem=vmalloc_32(size);
 	if (mem) {
 		memset(mem, 0, size); /* Clear the ram out, 
 					 no junk to the user */
 	        adr=(unsigned long) mem;
 		while (size > 0) {
-	                page = kvirt_to_pa(adr);
-			mem_map_reserve(virt_to_page(__va(page)));
+			mem_map_reserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -266,13 +207,12 @@ static void * rvmalloc(unsigned long size)
 
 static void rvfree(void * mem, unsigned long size)
 {
-        unsigned long adr, page;
-        
+        unsigned long adr;
+
 	if (mem) {
 	        adr=(unsigned long) mem;
-		while (size > 0) {
-	                page = kvirt_to_pa(adr);
-			mem_map_unreserve(virt_to_page(__va(page)));
+		while ((long) size > 0) {
+			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -1166,9 +1106,9 @@ static int do_dv1394_init(struct video_card *video, struct dv1394_init *init)
 		
 		/* fill the sglist with the kernel addresses of pages in the non-contiguous buffer */
 		for(i = 0; i < video->user_dma.n_pages; i++) {
-			unsigned long va = VMALLOC_VMADDR( (unsigned long) video->user_buf + i * PAGE_SIZE );
+			unsigned long va = (unsigned long) video->user_buf + i * PAGE_SIZE;
 			
-			video->user_dma.sglist[i].page = uvirt_to_page(pgd_offset_k(va), va);
+			video->user_dma.sglist[i].page = vmalloc_to_page((void *)va);
 			video->user_dma.sglist[i].length = PAGE_SIZE;
 		}
 		
@@ -1492,7 +1432,7 @@ static int do_dv1394_shutdown(struct video_card *video, int free_user_buf)
 static struct page * dv1394_nopage(struct vm_area_struct * area, unsigned long address, int write_access)
 {
 	unsigned long offset;
-	unsigned long page, kernel_virt_addr;
+	unsigned long kernel_virt_addr;
 	struct page *ret = NOPAGE_SIGBUS;
 
 	struct video_card *video = (struct video_card*) area->vm_private_data;
@@ -1510,10 +1450,7 @@ static struct page * dv1394_nopage(struct vm_area_struct * area, unsigned long a
 
 	offset = address - area->vm_start;
 	kernel_virt_addr = (unsigned long) video->user_buf + offset;
-
-	page = kvirt_to_pa(kernel_virt_addr);
-	
-	ret = virt_to_page(__va(page));
+	ret = vmalloc_to_page((void *)kernel_virt_addr);
 	get_page(ret);
 
  out:

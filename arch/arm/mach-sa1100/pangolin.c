@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-sa1100/pangolin.c
  */
-
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
@@ -23,7 +23,7 @@ fixup_pangolin(struct machine_desc *desc, struct param_struct *params,
 	SET_BANK( 0, 0xc0000000, 128*1024*1024 );
 	mi->nr_banks = 1;
 
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
 	setup_ramdisk( 1, 0, 0, 16384 );
 	setup_initrd( 0xc0800000, 3*1024*1024 );
 }

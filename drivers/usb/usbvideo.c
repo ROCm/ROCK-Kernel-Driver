@@ -59,32 +59,26 @@ static int usbvideo_default_procfs_write_proc(
 /* Memory management functions */
 /*******************************/
 
-#define MDEBUG(x)	do { } while(0)		/* Debug memory management */
-
 /*
  * Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved.
+ * This is used when initializing the contents of the area.
  */
 unsigned long usbvideo_kvirt_to_pa(unsigned long adr)
 {
 	unsigned long kva, ret;
 
-	kva = page_address(vmalloc_to_page((void *)adr));
+	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
 	ret = __pa(kva);
-	MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
 	return ret;
 }
 
 void *usbvideo_rvmalloc(unsigned long size)
 {
 	void *mem;
-	unsigned long adr, page;
+	unsigned long adr;
 
-	/* Round it off to PAGE_SIZE */
-	size += (PAGE_SIZE - 1);
-	size &= ~(PAGE_SIZE - 1);
-
+	size = PAGE_ALIGN(size);
 	mem = vmalloc_32(size);
 	if (!mem)
 		return NULL;
@@ -92,13 +86,9 @@ void *usbvideo_rvmalloc(unsigned long size)
 	memset(mem, 0, size); /* Clear the ram out, no junk to the user */
 	adr = (unsigned long) mem;
 	while (size > 0) {
-		page = usbvideo_kvirt_to_pa(adr);
-		mem_map_reserve(virt_to_page(__va(page)));
+		mem_map_reserve(vmalloc_to_page((void *)adr));
 		adr += PAGE_SIZE;
-		if (size > PAGE_SIZE)
-			size -= PAGE_SIZE;
-		else
-			size = 0;
+		size -= PAGE_SIZE;
 	}
 
 	return mem;
@@ -106,23 +96,16 @@ void *usbvideo_rvmalloc(unsigned long size)
 
 void usbvideo_rvfree(void *mem, unsigned long size)
 {
-	unsigned long adr, page;
+	unsigned long adr;
 
 	if (!mem)
 		return;
 
-	size += (PAGE_SIZE - 1);
-	size &= ~(PAGE_SIZE - 1);
-
-	adr=(unsigned long) mem;
-	while (size > 0) {
-		page = usbvideo_kvirt_to_pa(adr);
-		mem_map_unreserve(virt_to_page(__va(page)));
+	adr = (unsigned long) mem;
+	while ((long) size > 0) {
+		mem_map_unreserve(vmalloc_to_page((void *)adr));
 		adr += PAGE_SIZE;
-		if (size > PAGE_SIZE)
-			size -= PAGE_SIZE;
-		else
-			size = 0;
+		size -= PAGE_SIZE;
 	}
 	vfree(mem);
 }

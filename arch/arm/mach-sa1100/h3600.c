@@ -19,8 +19,6 @@
  *				   and abstracted EGPIO interface.
  *
  */
-
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -61,7 +59,7 @@ static unsigned int h3600_egpio;
 			  | GPIO_H3100_IR_ON	  \
 			  | GPIO_H3100_IR_FSEL)
 
-void h3100_init_egpio( void )
+static void h3100_init_egpio( void )
 {
 	GPDR |= H3100_DIRECT_EGPIO;
 	GPCR = H3100_DIRECT_EGPIO;   /* Initially all off */
@@ -74,7 +72,7 @@ void h3100_init_egpio( void )
 	H3600_EGPIO = h3600_egpio;
 }
 
-void h3100_control_egpio( enum ipaq_egpio_type x, int setp )
+static void h3100_control_egpio( enum ipaq_egpio_type x, int setp )
 {
 	unsigned int egpio = 0;
 	long	     gpio = 0;
@@ -140,7 +138,7 @@ void h3100_control_egpio( enum ipaq_egpio_type x, int setp )
 	*/
 }
 
-unsigned long h3100_read_egpio( void )
+static unsigned long h3100_read_egpio( void )
 {
 	return h3600_egpio;
 }
@@ -156,13 +154,13 @@ static struct ipaq_model_ops h3100_model_ops __initdata = {
 
 /************************* H3600 *************************/
 
-void h3600_init_egpio( void )
+static void h3600_init_egpio( void )
 {
 	h3600_egpio = EGPIO_H3600_RS232_ON;
 	H3600_EGPIO = h3600_egpio;
 }
 
-void h3600_control_egpio( enum ipaq_egpio_type x, int setp )
+static void h3600_control_egpio( enum ipaq_egpio_type x, int setp )
 {
 	unsigned int egpio = 0;
 	unsigned long flags;
@@ -219,7 +217,7 @@ void h3600_control_egpio( enum ipaq_egpio_type x, int setp )
 	local_irq_restore(flags);
 }
 
-unsigned long h3600_read_egpio( void )
+static unsigned long h3600_read_egpio( void )
 {
 	return h3600_egpio;
 }
@@ -239,7 +237,7 @@ static struct ipaq_model_ops h3600_model_ops __initdata = {
 static unsigned int h3800_asic1_gpio;
 static unsigned int h3800_asic2_gpio;
 
-void h3800_init_egpio(void)
+static void h3800_init_egpio(void)
 {
 	/* Set up ASIC #1 */
 	H3800_ASIC1_GPIO_Direction    = ASIC1_OUTPUTS;		  /* All outputs */
@@ -273,7 +271,7 @@ void h3800_init_egpio(void)
 	H3800_ASIC1_FlashWP_VPP_ON = 0;
 }
 
-void h3800_control_egpio( enum ipaq_egpio_type x, int setp )
+static void h3800_control_egpio( enum ipaq_egpio_type x, int setp )
 {
 	unsigned int set_asic1_egpio = 0;
 	unsigned int clear_asic1_egpio = 0;
@@ -327,7 +325,7 @@ void h3800_control_egpio( enum ipaq_egpio_type x, int setp )
 	local_irq_restore(flags);
 }
 
-unsigned long h3800_read_egpio( void )
+static unsigned long h3800_read_egpio( void )
 {
 	return h3800_asic1_gpio | (h3800_asic2_gpio << 16);
 }

@@ -54,8 +54,6 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/serial_sa1100.h>
 
-#include <asm/arch/irq.h>
-
 #include <linux/serial_core.h>
 
 #include "generic.h"
@@ -227,7 +225,7 @@ static void __init fixup_system3(struct machine_desc *desc,
 {
 	DPRINTK( "%s\n", "START" );
 
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
 	setup_ramdisk( 1, 0, 0, 8192 );
 	setup_initrd( 0xc0800000, 8*1024*1024 );
 }

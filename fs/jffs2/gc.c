@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: gc.c,v 1.52 2001/09/19 21:53:47 dwmw2 Exp $
+ * $Id: gc.c,v 1.52.2.2 2002/02/23 14:25:36 dwmw2 Exp $
  *
  */
 
@@ -266,15 +266,14 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	__u32 alloclen, phys_ofs;
 	int ret;
 
-	if ((inode->i_mode & S_IFMT) == S_IFBLK ||
-	    (inode->i_mode & S_IFMT) == S_IFCHR) {
+	if (S_ISBLK(inode->i_mode) || S_ISCHR(inode->i_mode)) {
 		/* For these, we don't actually need to read the old node */
 		dev =  (major(inode->i_rdev) << 8) | 
 			minor(inode->i_rdev);
 		mdata = (char *)&dev;
 		mdatalen = sizeof(dev);
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_metadata(): Writing %d bytes of kdev_t\n", mdatalen));
-	} else if ((inode->i_mode & S_IFMT) == S_IFLNK) {
+	} else if (S_ISLNK(inode->i_mode)) {
 		mdatalen = fn->size;
 		mdata = kmalloc(fn->size, GFP_KERNEL);
 		if (!mdata) {
@@ -331,7 +330,7 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	jffs2_free_full_dnode(fn);
 	f->metadata = new_fn;
  out:
-	if ((inode->i_mode & S_IFMT) == S_IFLNK)
+	if (S_ISLNK(inode->i_mode))
 		kfree(mdata);
 	return ret;
 }
@@ -466,8 +465,8 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 		ri.ino = inode->i_ino;
 		ri.version = ++f->highest_version;
 		ri.offset = start;
-		ri.csize = end - start;
-		ri.dsize = 0;
+		ri.dsize = end - start;
+		ri.csize = 0;
 		ri.compr = JFFS2_COMPR_ZERO;
 	}
 	ri.mode = inode->i_mode;

@@ -488,7 +488,7 @@ static int __init alsa_card_cmi8330_init(void)
 
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("CMI8330 not found or device busy\n");
+		printk(KERN_ERR "CMI8330 not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

@@ -82,7 +82,7 @@ sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs r
 	spin_lock_irq(&current->sigmask_lock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	regs.rax = -EINTR;
@@ -225,7 +225,7 @@ asmlinkage int sys32_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	
 	if (restore_sigcontext(&regs, &frame->sc, &eax))
@@ -252,7 +252,7 @@ asmlinkage int sys32_rt_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	
 	if (restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))

@@ -11,25 +11,21 @@
  * published by the Free Software Foundation.
  *
  */
-
-
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/time.h>
 #include <linux/init.h>
+#include <linux/timex.h>
 #include <linux/smp.h>
 
-#include <asm/uaccess.h>
+#include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-
-#include <linux/timex.h>
-#include <asm/hardware.h>
-
+#include <asm/uaccess.h>
 #include <asm/mach-types.h>
+#include <asm/mach/irq.h>
 
 static void iq80310_write_timer (u_long val)
 {
@@ -109,14 +105,12 @@ static struct irqaction timer_irq = {
 };
 
 
-extern int setup_arm_irq(int, struct irqaction*);
-
 void __init time_init(void)
 {
 	volatile u_char *timer_en = (volatile u_char *)IQ80310_TIMER_EN;
 
 	gettimeoffset = iq80310_gettimeoffset;
-	setup_arm_irq(IRQ_IQ80310_TIMER, &timer_irq);
+	setup_irq(IRQ_IQ80310_TIMER, &timer_irq);
 	*timer_en = 0;
 	iq80310_write_timer(LATCH);
 	*timer_en |= 2;

@@ -33,15 +33,17 @@ obj-$(CONFIG_SND_HWDEP) += snd-hwdep.o
 subdir-$(CONFIG_SND_MIXER_OSS) += oss
 subdir-$(CONFIG_SND_PCM_OSS) += oss
 ifeq ($(filter $(subdir-y),oss),oss)
+  subdir-m += oss
   obj-y += oss/oss.o
 endif
 
 subdir-$(CONFIG_SND_SEQUENCER) += seq
 ifeq ($(CONFIG_SND_SEQUENCER),y)
-  ifeq ($(CONFIG_SND),y)
-     obj-y += seq/sq.o
-  endif
+  subdir-m += seq
+  obj-y += seq/sq.o
 endif
+
+obj-$(CONFIG_SND_SEQUENCER) += snd-timer.o
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_DUMMY) += snd-pcm.o snd-timer.o snd.o
@@ -69,7 +71,7 @@ obj-$(CONFIG_SND_INTERWAVE_STB) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_OPTI93X) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
-obj-$(CONFIG_SND_SB) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
+obj-$(CONFIG_SND_SB8) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_SB16) += snd-pcm.o snd-timer.o snd.o snd-hwdep.o snd-rawmidi.o
 obj-$(CONFIG_SND_SBAWE) += snd-pcm.o snd-timer.o snd.o snd-hwdep.o snd-rawmidi.o
 obj-$(CONFIG_SND_ES968) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
@@ -79,7 +81,7 @@ obj-$(CONFIG_SND_CMIPCI) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.
 obj-$(CONFIG_SND_CS4281) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ENS1370) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_ENS1371) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
-obj-$(CONFIG_SND_ES1938) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
+obj-$(CONFIG_SND_ES1938) += snd-pcm.o snd-timer.o snd.o snd-hwdep.o snd-rawmidi.o
 obj-$(CONFIG_SND_ES1968) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_FM801) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ICE1712) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o

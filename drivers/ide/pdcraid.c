@@ -102,17 +102,17 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	unsigned int minor;
    	unsigned long sectors;
 
-	if (!inode || !inode->i_rdev) 
+	if (!inode || kdev_none(inode->i_rdev)) 
 		return -EINVAL;
 
-	minor = MINOR(inode->i_rdev)>>SHIFT;
+	minor = minor(inode->i_rdev)>>SHIFT;
 	
 	switch (cmd) {
 
          	case BLKGETSIZE:   /* Return device size */
  			if (!arg)  return -EINVAL;
-			sectors = ataraid_gendisk.part[MINOR(inode->i_rdev)].nr_sects;
-			if (MINOR(inode->i_rdev)&15)
+			sectors = ataraid_gendisk.part[minor(inode->i_rdev)].nr_sects;
+			if (minor(inode->i_rdev)&15)
 				return put_user(sectors, (unsigned long *) arg);
 			return put_user(raid[minor].sectors , (unsigned long *) arg);
 			break;
@@ -127,7 +127,7 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			if (put_user(raid[minor].geom.heads, (byte *) &loc->heads)) return -EFAULT;
 			if (put_user(raid[minor].geom.sectors, (byte *) &loc->sectors)) return -EFAULT;
 			if (put_user(bios_cyl, (unsigned short *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)ataraid_gendisk.part[MINOR(inode->i_rdev)].start_sect,
+			if (put_user((unsigned)ataraid_gendisk.part[minor(inode->i_rdev)].start_sect,
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -139,7 +139,7 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			if (put_user(raid[minor].geom.heads, (byte *) &loc->heads)) return -EFAULT;
 			if (put_user(raid[minor].geom.sectors, (byte *) &loc->sectors)) return -EFAULT;
 			if (put_user(raid[minor].geom.cylinders, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)ataraid_gendisk.part[MINOR(inode->i_rdev)].start_sect,
+			if (put_user((unsigned)ataraid_gendisk.part[minor(inode->i_rdev)].start_sect,
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -463,7 +463,7 @@ static void __init probedisk(int devindex,int device, int raidlevel)
 	major = devlist[devindex].major;
 	minor = devlist[devindex].minor; 
 
-	bdev = bdget(MKDEV(major,minor));
+	bdev = bdget(mk_kdev(major,minor));
 	if (!bdev)
 		return;
 
@@ -491,7 +491,7 @@ static void __init probedisk(int devindex,int device, int raidlevel)
         	     (prom.raid.disk[i].device == prom.raid.device) ) {
 
 			raid[device].disk[i].bdev = bdev;
-			raid[device].disk[i].device = MKDEV(major,minor);
+			raid[device].disk[i].device = mk_kdev(major,minor);
 			raid[device].disk[i].sectors = prom.raid.disk_secs;
 			raid[device].stride = (1<<prom.raid.raid0_shift);
 			raid[device].disks = prom.raid.total_disks;
@@ -551,7 +551,7 @@ static __init int pdcraid_init_one(int device,int raidlevel)
 	for (i=0;i<8;i++) {
 		if (raid[device].disk[i].device!=0) {
 			printk(KERN_INFO "Drive %i is %li Mb (%i / %i) \n",
-				i,raid[device].disk[i].sectors/2048,MAJOR(raid[device].disk[i].device),MINOR(raid[device].disk[i].device));
+				i,raid[device].disk[i].sectors/2048,major(raid[device].disk[i].device),minor(raid[device].disk[i].device));
 			count++;
 		}
 	}

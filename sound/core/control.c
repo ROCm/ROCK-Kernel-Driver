@@ -166,7 +166,7 @@ void snd_ctl_notify(snd_card_t *card, unsigned int mask, snd_ctl_elem_id_t *id)
 			ev->mask = mask;
 			list_add_tail(&ev->list, &ctl->events);
 		} else {
-			snd_printk("No memory available to allocate event\n");
+			snd_printk(KERN_ERR "No memory available to allocate event\n");
 		}
 	_found:
 		wake_up(&ctl->change_sleep);

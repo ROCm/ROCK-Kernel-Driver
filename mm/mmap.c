@@ -101,9 +101,7 @@ static inline void __remove_shared_vm_struct(struct vm_area_struct *vma)
 		struct inode *inode = file->f_dentry->d_inode;
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_inc(&inode->i_writecount);
-		if(vma->vm_next_share)
-			vma->vm_next_share->vm_pprev_share = vma->vm_pprev_share;
-		*vma->vm_pprev_share = vma->vm_next_share;
+		list_del_init(&vma->shared);
 	}
 }
 
@@ -308,20 +306,14 @@ static inline void __vma_link_file(struct vm_area_struct * vma)
 	if (file) {
 		struct inode * inode = file->f_dentry->d_inode;
 		struct address_space *mapping = inode->i_mapping;
-		struct vm_area_struct **head;
 
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_dec(&inode->i_writecount);
 
-		head = &mapping->i_mmap;
 		if (vma->vm_flags & VM_SHARED)
-			head = &mapping->i_mmap_shared;
-      
-		/* insert vma into inode's share list */
-		if((vma->vm_next_share = *head) != NULL)
-			(*head)->vm_pprev_share = &vma->vm_next_share;
-		*head = vma;
-		vma->vm_pprev_share = head;
+			list_add_tail(&vma->shared, &mapping->i_mmap_shared);
+		else
+			list_add_tail(&vma->shared, &mapping->i_mmap);
 	}
 }
 

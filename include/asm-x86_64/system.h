@@ -18,7 +18,7 @@ extern void __switch_to(struct task_struct *prev, struct task_struct *next);
 
 #define prepare_to_switch()	do { } while(0)
 
-#define switch_to(prev,next,last) do {					\
+#define switch_to(prev,next) do {					\
 	asm volatile("pushq %%rbp\n\t"					\
 		     "pushq %%rbx\n\t"					\
 		     "pushq %%r8\n\t"					\
@@ -30,10 +30,10 @@ extern void __switch_to(struct task_struct *prev, struct task_struct *next);
 		     "pushq %%r14\n\t"					\
 		     "pushq %%r15\n\t"					\
 		     "movq %%rsp,%0\n\t"	/* save RSP */		\
-		     "movq %3,%%rsp\n\t"	/* restore RSP */	\
+		     "movq %2,%%rsp\n\t"	/* restore RSP */	\
 		     "leaq 1f(%%rip),%%rbp\n\t"				\
 		     "movq %%rbp,%1\n\t"	/* save RIP */		\
-		     "pushq %4\n\t"		/* setup new RIP */	\
+		     "pushq %3\n\t"		/* setup new RIP */	\
 		     "jmp __switch_to\n\t"		\
 		     "1:\t"		\
 		     "popq %%r15\n\t"				\
@@ -46,8 +46,7 @@ extern void __switch_to(struct task_struct *prev, struct task_struct *next);
 		     "popq %%r8\n\t"					\
 		     "popq %%rbx\n\t"					\
 		     "popq %%rbp\n\t"					\
-		     :"=m" (prev->thread.rsp),"=m" (prev->thread.rip),	\
-		      "=b" (last)					\
+		     :"=m" (prev->thread.rsp),"=m" (prev->thread.rip)	\
 		     :"m" (next->thread.rsp),"m" (next->thread.rip),	\
 		      "b" (prev), "S" (next), "D" (prev));		\
 } while (0)

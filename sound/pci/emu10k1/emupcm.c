@@ -237,8 +237,8 @@ static void snd_emu10k1_pcm_init_voice(emu10k1_t *emu,
 	emu10k1_pcm_mixer_t *mix = &emu->pcm_mixer[substream->number];
 	unsigned int silent_page, tmp;
 	int voice, stereo, w_16;
-	unsigned char attn, send_a, send_b, send_c, send_d;
-	unsigned short send_routing;
+	unsigned char attn, send_amount[8];
+	unsigned char send_routing[8];
 	unsigned long flags;
 	unsigned int pitch_target;
 
@@ -260,15 +260,16 @@ static void snd_emu10k1_pcm_init_voice(emu10k1_t *emu,
 	/* volume parameters */
 	if (extra) {
 		attn = 0;
-		send_routing = emu->audigy ? 0x03020100 : 0x3210;
-		send_a = send_b = send_c = send_d = 0x00;
+		memset(send_routing, 0, sizeof(send_routing));
+		send_routing[0] = 0;
+		send_routing[1] = 1;
+		send_routing[2] = 2;
+		send_routing[3] = 3;
+		memset(send_amount, 0, sizeof(send_amount));
 	} else {
 		tmp = stereo ? (master ? 1 : 2) : 0;
-		send_a = mix->send_volume[tmp][0];
-		send_b = mix->send_volume[tmp][1];
-		send_c = mix->send_volume[tmp][2];
-		send_d = mix->send_volume[tmp][3];
-		send_routing = mix->send_routing[tmp];
+		memcpy(send_routing, &mix->send_routing[tmp][0], 8);
+		memcpy(send_amount, &mix->send_volume[tmp][0], 8);
 	}
 
 	if (master) {
@@ -290,16 +291,29 @@ static void snd_emu10k1_pcm_init_voice(emu10k1_t *emu,
 
 	// setup routing
 	if (emu->audigy) {
-		snd_emu10k1_ptr_write(emu, A_FXRT1, voice, send_routing);
-		snd_emu10k1_ptr_write(emu, A_SENDAMOUNTS, voice, 0); /* no effects */
-		snd_emu10k1_ptr_write(emu, A_FXRT2, voice, 0); /* channels EFGH */
+		snd_emu10k1_ptr_write(emu, A_FXRT1, voice,
+				      ((unsigned int)send_routing[3] << 24) |
+				      ((unsigned int)send_routing[2] << 16) |
+				      ((unsigned int)send_routing[1] << 8) |
+				      (unsigned int)send_routing[0]);
+		snd_emu10k1_ptr_write(emu, A_FXRT2, voice,
+				      ((unsigned int)send_routing[7] << 24) |
+				      ((unsigned int)send_routing[6] << 16) |
+				      ((unsigned int)send_routing[5] << 8) |
+				      (unsigned int)send_routing[4]);
+		snd_emu10k1_ptr_write(emu, A_SENDAMOUNTS, voice,
+				      ((unsigned int)send_amount[4] << 24) |
+				      ((unsigned int)send_amount[5] << 16) |
+				      ((unsigned int)send_amount[6] << 8) |
+				      (unsigned int)send_amount[7]);
 	} else
-		snd_emu10k1_ptr_write(emu, FXRT, voice, send_routing << 16);
+		snd_emu10k1_ptr_write(emu, FXRT, voice,
+				      snd_emu10k1_compose_send_routing(send_routing));
 	// Stop CA
 	// Assumption that PT is already 0 so no harm overwriting
-	snd_emu10k1_ptr_write(emu, PTRX, voice, (send_a << 8) | send_b);
-	snd_emu10k1_ptr_write(emu, DSL, voice, end_addr | (send_d << 24));
-	snd_emu10k1_ptr_write(emu, PSST, voice, start_addr | (send_c << 24));
+	snd_emu10k1_ptr_write(emu, PTRX, voice, (send_amount[0] << 8) | send_amount[1]);
+	snd_emu10k1_ptr_write(emu, DSL, voice, end_addr | (send_amount[3] << 24));
+	snd_emu10k1_ptr_write(emu, PSST, voice, start_addr | (send_amount[2] << 24));
 	pitch_target = emu10k1_calc_pitch_target(runtime->rate);
 	snd_emu10k1_ptr_write(emu, CCCA, voice, evoice->epcm->ccca_start_addr |
 			      emu10k1_select_interprom(pitch_target) |
@@ -753,7 +767,7 @@ static int snd_emu10k1_playback_open(snd_pcm_substream_t * substream)
 	emu10k1_pcm_t *epcm;
 	emu10k1_pcm_mixer_t *mix;
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	int err;
+	int i, err;
 
 	epcm = snd_magic_kcalloc(emu10k1_pcm_t, 0, GFP_KERNEL);
 	if (epcm == NULL)
@@ -773,8 +787,8 @@ static int snd_emu10k1_playback_open(snd_pcm_substream_t * substream)
 		return err;
 	}
 	mix = &emu->pcm_mixer[substream->number];
-	mix->send_routing[0] = mix->send_routing[1] = mix->send_routing[2] =
-		emu->audigy ? 0x03020100 : 0x3210;
+	for (i = 0; i < 4; i++)
+		mix->send_routing[0][i] = mix->send_routing[1][i] = mix->send_routing[2][i] = i;
 	memset(&mix->send_volume, 0, sizeof(mix->send_volume));
 	mix->send_volume[0][0] = mix->send_volume[0][1] =
 	mix->send_volume[1][0] = mix->send_volume[2][1] = 255;

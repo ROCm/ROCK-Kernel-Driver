@@ -1,8 +1,8 @@
 /*
  * PCI HotPlug Controller Core
  *
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001 IBM Corp.
+ * Copyright (c) 2001-2002 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (c) 2001-2002 IBM Corp.
  *
  * All rights reserved.
  *
@@ -22,6 +22,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  * Send feedback to <greg@kroah.com>
+ *
+ * Filesystem portion based on work done by Pat Mochel on ddfs/driverfs
  *
  */
 
@@ -54,7 +56,7 @@
 /* local variables */
 static int debug;
 
-#define DRIVER_VERSION	"0.3"
+#define DRIVER_VERSION	"0.4"
 #define DRIVER_AUTHOR	"Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC	"PCI Hot Plug PCI Core"
 
@@ -74,7 +76,6 @@ struct hotplug_slot_core {
 };
 
 static struct super_operations pcihpfs_ops;
-static struct address_space_operations pcihpfs_aops;
 static struct file_operations pcihpfs_dir_operations;
 static struct file_operations default_file_operations;
 static struct inode_operations pcihpfs_dir_inode_operations;
@@ -112,7 +113,6 @@ static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int de
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_blocks = 0;
 		inode->i_rdev = NODEV;
-		inode->i_mapping->a_ops = &pcihpfs_aops;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		switch (mode & S_IFMT) {
 		default:
@@ -154,18 +154,6 @@ static int pcihpfs_create (struct inode *dir, struct dentry *dentry, int mode)
  	return pcihpfs_mknod (dir, dentry, mode | S_IFREG, 0);
 }
 
-static int pcihpfs_link (struct dentry *old_dentry, struct inode *dir,
-			 struct dentry *dentry)
-{
-	struct inode *inode = old_dentry->d_inode;
-
-	inode->i_nlink++;
-	atomic_inc(&inode->i_count);
- 	dget(dentry);
-	d_instantiate(dentry, inode);
-	return 0;
-}
-
 static inline int pcihpfs_positive (struct dentry *dentry)
 {
 	return dentry->d_inode && !d_unhashed(dentry);
@@ -196,24 +184,10 @@ static int pcihpfs_unlink (struct inode *dir, struct dentry *dentry)
 	if (pcihpfs_empty(dentry)) {
 		struct inode *inode = dentry->d_inode;
 
+		lock_kernel();
 		inode->i_nlink--;
+		unlock_kernel();
 		dput(dentry);
-		error = 0;
-	}
-	return error;
-}
-
-static int pcihpfs_rename (struct inode *old_dir, struct dentry *old_dentry,
-			   struct inode *new_dir, struct dentry *new_dentry)
-{
-	int error = -ENOTEMPTY;
-
-	if (pcihpfs_empty(new_dentry)) {
-		struct inode *inode = new_dentry->d_inode;
-		if (inode) {
-			inode->i_nlink--;
-			dput(new_dentry);
-		}
 		error = 0;
 	}
 	return error;
@@ -238,6 +212,7 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 {
 	loff_t retval = -EINVAL;
 
+	lock_kernel();
 	switch(orig) {
 	case 0:
 		if (offset > 0) {
@@ -254,6 +229,7 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 	default:
 		break;
 	}
+	unlock_kernel();
 	return retval;
 }
 
@@ -265,18 +241,9 @@ static int default_open (struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int default_sync_file (struct file *file, struct dentry *dentry, int datasync)
-{
-	return 0;
-}
-
-static struct address_space_operations pcihpfs_aops = {
-};
-
 static struct file_operations pcihpfs_dir_operations = {
 	read:		generic_read_dir,
 	readdir:	dcache_readdir,
-	fsync:		default_sync_file,
 };
 
 static struct file_operations default_file_operations = {
@@ -284,8 +251,6 @@ static struct file_operations default_file_operations = {
 	write:		default_write_file,
 	open:		default_open,
 	llseek:		default_file_lseek,
-	fsync:		default_sync_file,
-	mmap:		generic_file_mmap,
 };
 
 /* file ops for the "power" files */
@@ -296,8 +261,6 @@ static struct file_operations power_file_operations = {
 	write:		power_write_file,
 	open:		default_open,
 	llseek:		default_file_lseek,
-	fsync:		default_sync_file,
-	mmap:		generic_file_mmap,
 };
 
 /* file ops for the "attention" files */
@@ -308,8 +271,6 @@ static struct file_operations attention_file_operations = {
 	write:		attention_write_file,
 	open:		default_open,
 	llseek:		default_file_lseek,
-	fsync:		default_sync_file,
-	mmap:		generic_file_mmap,
 };
 
 /* file ops for the "latch" files */
@@ -319,8 +280,6 @@ static struct file_operations latch_file_operations = {
 	write:		default_write_file,
 	open:		default_open,
 	llseek:		default_file_lseek,
-	fsync:		default_sync_file,
-	mmap:		generic_file_mmap,
 };
 
 /* file ops for the "presence" files */
@@ -330,8 +289,6 @@ static struct file_operations presence_file_operations = {
 	write:		default_write_file,
 	open:		default_open,
 	llseek:		default_file_lseek,
-	fsync:		default_sync_file,
-	mmap:		generic_file_mmap,
 };
 
 /* file ops for the "test" files */
@@ -341,19 +298,15 @@ static struct file_operations test_file_operations = {
 	write:		test_write_file,
 	open:		default_open,
 	llseek:		default_file_lseek,
-	fsync:		default_sync_file,
-	mmap:		generic_file_mmap,
 };
 
 static struct inode_operations pcihpfs_dir_inode_operations = {
 	create:		pcihpfs_create,
 	lookup:		pcihpfs_lookup,
-	link:		pcihpfs_link,
 	unlink:		pcihpfs_unlink,
 	mkdir:		pcihpfs_mkdir,
 	rmdir:		pcihpfs_rmdir,
 	mknod:		pcihpfs_mknod,
-	rename:		pcihpfs_rename,
 };
 
 static struct super_operations pcihpfs_ops = {
@@ -485,7 +438,7 @@ static int pcihpfs_create_by_name (const char *name, mode_t mode,
 
 	if (!parent) {
 		dbg("Ah! can not find a parent!\n");
-		return -EFAULT;
+		return -EINVAL;
 	}
 
 	*dentry = NULL;
@@ -686,7 +639,7 @@ static ssize_t power_write_file (struct file *file, const char *ubuff, size_t co
 
 		default:
 			err ("Illegal value specified for power\n");
-			retval = -EFAULT;
+			retval = -EINVAL;
 	}
 
 exit:	
@@ -1019,7 +972,7 @@ int pci_hp_register (struct hotplug_slot *slot)
 	if (slot == NULL)
 		return -ENODEV;
 	if ((slot->info == NULL) || (slot->ops == NULL))
-		return -EFAULT;
+		return -EINVAL;
 
 	core = kmalloc (sizeof (struct hotplug_slot_core), GFP_KERNEL);
 	if (!core)
@@ -1030,7 +983,7 @@ int pci_hp_register (struct hotplug_slot *slot)
 	if (get_slot_from_name (slot->name) != NULL) {
 		spin_unlock (&list_lock);
 		kfree (core);
-		return -EFAULT;
+		return -EINVAL;
 	}
 
 	slot->core_priv = core;
@@ -1076,6 +1029,12 @@ int pci_hp_deregister (struct hotplug_slot *slot)
 	return 0;
 }
 
+static inline void update_inode_time (struct inode *inode)
+{
+	if (inode)
+		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+}
+
 /**
  * pci_hp_change_slot_info - changes the slot's information structure in the core
  * @name: the name of the slot whose info has changed
@@ -1089,6 +1048,7 @@ int pci_hp_deregister (struct hotplug_slot *slot)
 int pci_hp_change_slot_info (const char *name, struct hotplug_slot_info *info)
 {
 	struct hotplug_slot *temp;
+	struct hotplug_slot_core *core;
 
 	if (info == NULL)
 		return -ENODEV;
@@ -1099,6 +1059,24 @@ int pci_hp_change_slot_info (const char *name, struct hotplug_slot_info *info)
 		spin_unlock (&list_lock);
 		return -ENODEV;
 	}
+
+	/*
+	 * check all fields in the info structure, and update timestamps
+	 * for the files referring to the fields that have now changed.
+	 */
+	core = temp->core_priv;
+	if ((core->power_dentry) &&
+	    (temp->info->power_status != info->power_status))
+		update_inode_time (core->power_dentry->d_inode);
+	if ((core->attention_dentry) &&
+	    (temp->info->attention_status != info->attention_status))
+		update_inode_time (core->attention_dentry->d_inode);
+	if ((core->latch_dentry) &&
+	    (temp->info->latch_status != info->latch_status))
+		update_inode_time (core->latch_dentry->d_inode);
+	if ((core->adapter_dentry) &&
+	    (temp->info->adapter_status != info->adapter_status))
+		update_inode_time (core->adapter_dentry->d_inode);
 
 	memcpy (temp->info, info, sizeof (struct hotplug_slot_info));
 	spin_unlock (&list_lock);

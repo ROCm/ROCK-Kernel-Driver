@@ -220,7 +220,7 @@ static unsigned short tms_pci_setnselout_pins(struct net_device *dev)
 	return val;
 }
 
-static void __exit tms_pci_detach (struct pci_dev *pdev)
+static void __devexit tms_pci_detach (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
@@ -238,7 +238,7 @@ static struct pci_driver tms_pci_driver = {
 	name:		"tmspci",
 	id_table:	tmspci_pci_tbl,
 	probe:		tms_pci_attach,
-	remove:		tms_pci_detach,
+	remove:		__devexit_p(tms_pci_detach),
 };
 
 static int __init tms_pci_init (void)

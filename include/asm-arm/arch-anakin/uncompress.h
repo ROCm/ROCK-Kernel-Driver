@@ -14,6 +14,7 @@
 #ifndef __ASM_ARCH_UNCOMPRESS_H
 #define __ASM_ARCH_UNCOMPRESS_H
 
+#include <linux/config.h>
 #include <asm/io.h>
 #include <asm/arch/serial_reg.h>
 

@@ -95,7 +95,7 @@ static void dump_instr(struct pt_regs *regs)
 	int i;
 
 	printk("Code: ");
-	for (i = -2; i < 3; i++) {
+	for (i = -4; i < 1; i++) {
 		unsigned int val, bad;
 
 		if (thumb)
@@ -115,7 +115,7 @@ static void dump_instr(struct pt_regs *regs)
 
 static void dump_stack(struct task_struct *tsk, unsigned long sp)
 {
-	dump_mem("Stack: ", sp - 16, 8192+(unsigned long)tsk);
+	dump_mem("Stack: ", sp - 16, 8192+(unsigned long)tsk->thread_info);
 }
 
 static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
@@ -146,7 +146,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 void show_trace_task(struct task_struct *tsk)
 {
 	if (tsk != current) {
-		unsigned int fp = tsk->thread.save->fp;
+		unsigned int fp = thread_saved_fp(tsk);
 		c_backtrace(fp, 0x10);
 	}
 }
@@ -304,16 +304,17 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, int proc_mode)
 
 static int bad_syscall(int n, struct pt_regs *regs)
 {
+	struct thread_info *thread = current_thread_info();
 	siginfo_t info;
 
 	/* You might think just testing `handler' would be enough, but PER_LINUX
 	 * points it to no_lcall7 to catch undercover SVr4 binaries.  Gutted.
 	 */
-	if (current->personality != PER_LINUX && current->exec_domain->handler) {
+	if (current->personality != PER_LINUX && thread->exec_domain->handler) {
 		/* Hand it off to iBCS.  The extra parameter and consequent type 
 		 * forcing is necessary because of the weird ARM calling convention.
 		 */
-		current->exec_domain->handler(n, regs);
+		thread->exec_domain->handler(n, regs);
 		return regs->ARM_r0;
 	}
 

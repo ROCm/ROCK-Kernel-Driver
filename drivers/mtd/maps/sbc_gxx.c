@@ -221,7 +221,7 @@ static struct map_info sbc_gxx_map = {
 /* MTD device for all of the flash. */
 static struct mtd_info *all_mtd;
 
-static void __exit cleanup_sbc_gxx(void)
+static void cleanup_sbc_gxx(void)
 {
 	if( all_mtd ) {
 		del_mtd_partitions( all_mtd );

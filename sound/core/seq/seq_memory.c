@@ -423,7 +423,7 @@ int snd_seq_pool_done(pool_t *pool)
 
 	while (atomic_read(&pool->counter) > 0) {
 		if (max_count == 0) {
-			snd_printk("snd_seq_pool_done timeout: %d cells remain\n", atomic_read(&pool->counter));
+			snd_printk(KERN_WARNING "snd_seq_pool_done timeout: %d cells remain\n", atomic_read(&pool->counter));
 			break;
 		}
 		set_current_state(TASK_UNINTERRUPTIBLE);

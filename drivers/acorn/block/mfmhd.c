@@ -321,14 +321,14 @@ static void console_printf(const char *fmt,...)
 	unsigned long flags;
 	va_list ap;
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 
 	va_start(ap, fmt);
 	vsprintf(buffer, fmt, ap);
 	console_print(buffer);
 	va_end(fmt);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 };	/* console_printf */
 
 #define DBG(x...) console_printf(x)
@@ -746,7 +746,7 @@ static void request_done(int uptodate)
 			/* Yep - a partial access */
 
 			/* and issue the remainder */
-			issue_request(MINOR(CURRENT->rq_dev), PartFragRead_RestartBlock, PartFragRead_SectorsLeft, CURRENT);
+			issue_request(minor(CURRENT->rq_dev), PartFragRead_RestartBlock, PartFragRead_SectorsLeft, CURRENT);
 			return;
 		}
 
@@ -929,7 +929,7 @@ static void mfm_request(void)
 
 		DBG("mfm_request:                 before arg extraction\n");
 
-		dev = MINOR(CURRENT->rq_dev);
+		dev = minor(CURRENT->rq_dev);
 		block = CURRENT->sector;
 		nsect = CURRENT->nr_sectors;
 #ifdef DEBUG
@@ -1187,10 +1187,10 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 	if (!inode || !(dev = inode->i_rdev))
 		return -EINVAL;
 
-	major = MAJOR(dev);
-	minor = MINOR(dev);
+	major = major(dev);
+	minor = minor(dev);
 
-	device = DEVICE_NR(MINOR(inode->i_rdev)), err;
+	device = DEVICE_NR(minor(inode->i_rdev)), err;
 	if (device >= mfm_drives)
 		return -EINVAL;
 
@@ -1231,7 +1231,7 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 
 static int mfm_open(struct inode *inode, struct file *file)
 {
-	int dev = DEVICE_NR(MINOR(inode->i_rdev));
+	int dev = DEVICE_NR(minor(inode->i_rdev));
 
 	if (dev >= mfm_drives)
 		return -ENODEV;
@@ -1249,7 +1249,7 @@ static int mfm_open(struct inode *inode, struct file *file)
  */
 static int mfm_release(struct inode *inode, struct file *file)
 {
-	mfm_info[DEVICE_NR(MINOR(inode->i_rdev))].access_count--;
+	mfm_info[DEVICE_NR(minor(inode->i_rdev))].access_count--;
 	return 0;
 }
 
@@ -1270,7 +1270,7 @@ void mfm_setup(char *str, int *ints)
 void xd_set_geometry(kdev_t dev, unsigned char secsptrack, unsigned char heads,
 		     unsigned long discsize, unsigned int secsize)
 {
-	int drive = MINOR(dev) >> 6;
+	int drive = minor(dev) >> 6;
 
 	if (mfm_info[drive].cylinders == 1) {
 		mfm_info[drive].sectors = secsptrack;
@@ -1338,7 +1338,7 @@ static void mfm_geninit (void)
 
 	for (i = 0; i < mfm_drives; i++) {
 		mfm_geometry (i);
-		register_disk(&mfm_gendisk, MKDEV(MAJOR_NR,i<<6), 1<<6,
+		register_disk(&mfm_gendisk, mk_kdev(MAJOR_NR,i<<6), 1<<6,
 				&mfm_fops,
 				mfm_info[i].cylinders * mfm_info[i].heads *
 				mfm_info[i].sectors / 2);
@@ -1448,23 +1448,23 @@ int mfm_init (void)
  */
 static int mfm_reread_partitions(kdev_t dev)
 {
-	unsigned int start, i, maxp, target = DEVICE_NR(MINOR(dev));
+	unsigned int start, i, maxp, target = DEVICE_NR(minor(dev));
 	unsigned long flags;
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 	if (mfm_info[target].busy || mfm_info[target].access_count > 1) {
-		restore_flags (flags);
+		local_irq_restore (flags);
 		return -EBUSY;
 	}
 	mfm_info[target].busy = 1;
-	restore_flags (flags);
+	local_irq_restore (flags);
 
 	maxp = 1 << mfm_gendisk.minor_shift;
 	start = target << mfm_gendisk.minor_shift;
 
 	for (i = maxp - 1; i >= 0; i--) {
 		int minor = start + i;
-		invalidate_device (MKDEV(MAJOR_NR, minor), 1);
+		invalidate_device (mk_kdev(MAJOR_NR, minor), 1);
 		mfm_gendisk.part[minor].start_sect = 0;
 		mfm_gendisk.part[minor].nr_sects = 0;
 	}

@@ -2,7 +2,7 @@
 #
 # Makefile for the Linux IrDA infrared port device drivers.
 #
-# 9 Aug 2000, Christoph Hellwig <hch@caldera.de>
+# 9 Aug 2000, Christoph Hellwig <hch@infradead.org>
 # Rewritten to use lists instead of if-statements.
 #
 

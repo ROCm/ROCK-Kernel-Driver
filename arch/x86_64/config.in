@@ -29,7 +29,7 @@ define_int CONFIG_X86_L1_CACHE_BYTES 64
 define_int CONFIG_X86_L1_CACHE_SHIFT 6
 define_bool CONFIG_X86_TSC y
 define_bool CONFIG_X86_GOOD_APIC y
-define_bool CONFIG_X86_CMPXCHG
+define_bool CONFIG_X86_CMPXCHG y
 
 tristate '/dev/cpu/*/msr - Model-specific register support' CONFIG_X86_MSR
 tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
@@ -72,6 +72,7 @@ bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
 
 if [ "$CONFIG_HOTPLUG" = "y" ] ; then
    source drivers/pcmcia/Config.in
+   source drivers/hotplug/Config.in
 else
    define_bool CONFIG_PCMCIA n
 fi
@@ -80,8 +81,8 @@ if [ "$CONFIG_PROC_FS" = "y" ]; then
    define_bool CONFIG_KCORE_ELF y
 fi
 # We probably are not going to support a.out, are we? Or should we support a.out in i386 compatibility mode?
-#tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
-tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+		#tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
+		tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 
 bool 'Power Management support' CONFIG_PM

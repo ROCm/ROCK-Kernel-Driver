@@ -219,11 +219,7 @@ static inline int dup_mmap(struct mm_struct * mm)
       
 			/* insert tmp into the share list, just after mpnt */
 			spin_lock(&inode->i_mapping->i_shared_lock);
-			if((tmp->vm_next_share = mpnt->vm_next_share) != NULL)
-				mpnt->vm_next_share->vm_pprev_share =
-					&tmp->vm_next_share;
-			mpnt->vm_next_share = tmp;
-			tmp->vm_pprev_share = &mpnt->vm_next_share;
+			list_add_tail(&tmp->shared, &mpnt->shared);
 			spin_unlock(&inode->i_mapping->i_shared_lock);
 		}
 

@@ -11,7 +11,7 @@
  * 06/13/01: Added 80310 on-chip interrupt sources <dsaxena@mvista.com>
  *
  */
-
+#include <linux/config.h>
 
 /*
  * XS80200 specific IRQs

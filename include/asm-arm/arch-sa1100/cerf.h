@@ -1,6 +1,8 @@
 #ifndef _INCLUDE_CERF_H_
 #define _INCLUDE_CERF_H_
 
+#include <linux/config.h>
+
 #ifdef CONFIG_SA1100_CERF_CPLD
 
 

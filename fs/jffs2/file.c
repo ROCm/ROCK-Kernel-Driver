@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: file.c,v 1.58 2001/09/20 15:28:31 dwmw2 Exp $
+ * $Id: file.c,v 1.58.2.1 2002/02/23 14:25:36 dwmw2 Exp $
  *
  */
 
@@ -102,15 +102,14 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	   must read the original data associated with the node
 	   (i.e. the device numbers or the target name) and write
 	   it out again with the appropriate data attached */
-	if ((inode->i_mode & S_IFMT) == S_IFBLK ||
-	    (inode->i_mode & S_IFMT) == S_IFCHR) {
+	if (S_ISBLK(inode->i_mode) || S_ISCHR(inode->i_mode)) {
 		/* For these, we don't actually need to read the old node */
 		dev =  (major(dentry->d_inode->i_rdev) << 8) | 
 			minor(dentry->d_inode->i_rdev);
 		mdata = (char *)&dev;
 		mdatalen = sizeof(dev);
 		D1(printk(KERN_DEBUG "jffs2_setattr(): Writing %d bytes of kdev_t\n", mdatalen));
-	} else if ((inode->i_mode & S_IFMT) == S_IFLNK) {
+	} else if (S_ISLNK(inode->i_mode)) {
 		mdatalen = f->metadata->size;
 		mdata = kmalloc(f->metadata->size, GFP_USER);
 		if (!mdata)
@@ -125,7 +124,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 
 	ri = jffs2_alloc_raw_inode();
 	if (!ri) {
-		if ((inode->i_mode & S_IFMT) == S_IFLNK)
+		if (S_ISLNK(inode->i_mode))
 			kfree(mdata);
 		return -ENOMEM;
 	}
@@ -133,7 +132,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	ret = jffs2_reserve_space(c, sizeof(*ri) + mdatalen, &phys_ofs, &alloclen, ALLOC_NORMAL);
 	if (ret) {
 		jffs2_free_raw_inode(ri);
-		if ((inode->i_mode & S_IFMT) == S_IFLNK)
+		if (S_ISLNK(inode->i_mode))
 			 kfree(mdata);
 		return ret;
 	}
@@ -177,7 +176,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		ri->data_crc = 0;
 
 	new_metadata = jffs2_write_dnode(inode, ri, mdata, mdatalen, phys_ofs, NULL);
-	if ((inode->i_mode & S_IFMT) == S_IFLNK)
+	if (S_ISLNK(inode->i_mode))
 		kfree(mdata);
 
 	jffs2_complete_reservation(c);

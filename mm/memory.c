@@ -1032,31 +1032,35 @@ no_mem:
 	return -1;
 }
 
-static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
+static void vmtruncate_list(list_t *head, unsigned long pgoff)
 {
-	do {
-		unsigned long start = mpnt->vm_start;
-		unsigned long end = mpnt->vm_end;
-		unsigned long len = end - start;
-		unsigned long diff;
+	unsigned long start, end, len, diff;
+	struct vm_area_struct *vma;
+	list_t *curr;
+
+	list_for_each(curr, head) {
+		vma = list_entry(curr, struct vm_area_struct, shared);
+		start = vma->vm_start;
+		end = vma->vm_end;
+		len = end - start;
 
 		/* mapping wholly truncated? */
-		if (mpnt->vm_pgoff >= pgoff) {
-			zap_page_range(mpnt, start, len);
+		if (vma->vm_pgoff >= pgoff) {
+			zap_page_range(vma, start, len);
 			continue;
 		}
 
 		/* mapping wholly unaffected? */
 		len = len >> PAGE_SHIFT;
-		diff = pgoff - mpnt->vm_pgoff;
+		diff = pgoff - vma->vm_pgoff;
 		if (diff >= len)
 			continue;
 
 		/* Ok, partially affected.. */
 		start += diff << PAGE_SHIFT;
 		len = (len - diff) << PAGE_SHIFT;
-		zap_page_range(mpnt, start, len);
-	} while ((mpnt = mpnt->vm_next_share) != NULL);
+		zap_page_range(vma, start, len);
+	}
 }
 
 /*
@@ -1077,14 +1081,14 @@ int vmtruncate(struct inode * inode, loff_t offset)
 		goto do_expand;
 	inode->i_size = offset;
 	spin_lock(&mapping->i_shared_lock);
-	if (!mapping->i_mmap && !mapping->i_mmap_shared)
+	if (list_empty(&mapping->i_mmap) && list_empty(&mapping->i_mmap_shared))
 		goto out_unlock;
 
 	pgoff = (offset + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	if (mapping->i_mmap != NULL)
-		vmtruncate_list(mapping->i_mmap, pgoff);
-	if (mapping->i_mmap_shared != NULL)
-		vmtruncate_list(mapping->i_mmap_shared, pgoff);
+	if (!list_empty(&mapping->i_mmap))
+		vmtruncate_list(&mapping->i_mmap, pgoff);
+	if (!list_empty(&mapping->i_mmap_shared))
+		vmtruncate_list(&mapping->i_mmap_shared, pgoff);
 
 out_unlock:
 	spin_unlock(&mapping->i_shared_lock);

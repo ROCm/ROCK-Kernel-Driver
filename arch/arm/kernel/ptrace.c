@@ -9,6 +9,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -33,7 +34,7 @@
 /*
  * Breakpoint SWI instruction: SWI &9F0001
  */
-#define BREAKINST	0xef9f0001
+#define BREAKINST_ARM	0xef9f0001
 
 /*
  * Get the address of the live pt_regs for the specified task.
@@ -72,7 +73,7 @@ put_stack_long(struct task_struct *task, int offset, long data)
 
 	newregs = *regs;
 	newregs.uregs[offset] = data;
-	
+
 	if (valid_user_regs(&newregs)) {
 		regs->uregs[offset] = data;
 		ret = 0;
@@ -182,6 +183,20 @@ ptrace_getldrop2(struct task_struct *child, unsigned long insn)
 	return val;
 }
 
+#define OP_MASK	0x01e00000
+#define OP_AND	0x00000000
+#define OP_EOR	0x00200000
+#define OP_SUB	0x00400000
+#define OP_RSB	0x00600000
+#define OP_ADD	0x00800000
+#define OP_ADC	0x00a00000
+#define OP_SBC	0x00c00000
+#define OP_RSC	0x00e00000
+#define OP_ORR	0x01800000
+#define OP_MOV	0x01a00000
+#define OP_BIC	0x01c00000
+#define OP_MVN	0x01e00000
+
 static unsigned long
 get_branch_address(struct task_struct *child, unsigned long pc, unsigned long insn)
 {
@@ -200,21 +215,21 @@ get_branch_address(struct task_struct *child, unsigned long pc, unsigned long in
 
 		aluop1 = ptrace_getrn(child, insn);
 		aluop2 = ptrace_getaluop2(child, insn);
-		ccbit  = get_stack_long(child, REG_PSR) & CC_C_BIT ? 1 : 0;
+		ccbit  = get_stack_long(child, REG_PSR) & PSR_C_BIT ? 1 : 0;
 
-		switch (insn & 0x01e00000) {
-		case 0x00000000: alt = aluop1 & aluop2;		break;
-		case 0x00200000: alt = aluop1 ^ aluop2;		break;
-		case 0x00400000: alt = aluop1 - aluop2;		break;
-		case 0x00600000: alt = aluop2 - aluop1;		break;
-		case 0x00800000: alt = aluop1 + aluop2;		break;
-		case 0x00a00000: alt = aluop1 + aluop2 + ccbit;	break;
-		case 0x00c00000: alt = aluop1 - aluop2 + ccbit;	break;
-		case 0x00e00000: alt = aluop2 - aluop1 + ccbit;	break;
-		case 0x01800000: alt = aluop1 | aluop2;		break;
-		case 0x01a00000: alt = aluop2;			break;
-		case 0x01c00000: alt = aluop1 & ~aluop2;	break;
-		case 0x01e00000: alt = ~aluop2;			break;
+		switch (insn & OP_MASK) {
+		case OP_AND: alt = aluop1 & aluop2;		break;
+		case OP_EOR: alt = aluop1 ^ aluop2;		break;
+		case OP_SUB: alt = aluop1 - aluop2;		break;
+		case OP_RSB: alt = aluop2 - aluop1;		break;
+		case OP_ADD: alt = aluop1 + aluop2;		break;
+		case OP_ADC: alt = aluop1 + aluop2 + ccbit;	break;
+		case OP_SBC: alt = aluop1 - aluop2 + ccbit;	break;
+		case OP_RSC: alt = aluop2 - aluop1 + ccbit;	break;
+		case OP_ORR: alt = aluop1 | aluop2;		break;
+		case OP_MOV: alt = aluop2;			break;
+		case OP_BIC: alt = aluop1 & ~aluop2;		break;
+		case OP_MVN: alt = ~aluop2;			break;
 		}
 		break;
 	}
@@ -275,7 +290,7 @@ get_branch_address(struct task_struct *child, unsigned long pc, unsigned long in
 			base = ptrace_getrn(child, insn);
 
 			if (read_tsk_long(child, base + nr_regs, &alt) == 0)
-				alt = pc_pointer (alt);
+				alt = pc_pointer(alt);
 			break;
 		}
 		break;
@@ -312,7 +327,7 @@ add_breakpoint(struct task_struct *child, struct debug_info *dbg, unsigned long 
 	if (nr < 2) {
 		res = read_tsk_long(child, addr, &dbg->bp[nr].insn);
 		if (res == 0)
-			res = write_tsk_long(child, addr, BREAKINST);
+			res = write_tsk_long(child, addr, BREAKINST_ARM);
 
 		if (res == 0) {
 			dbg->bp[nr].address = addr;
@@ -381,7 +396,7 @@ void __ptrace_cancel_bpt(struct task_struct *child)
 
 		read_tsk_long(child, dbg->bp[i].address, &tmp);
 		write_tsk_long(child, dbg->bp[i].address, dbg->bp[i].insn);
-		if (tmp != BREAKINST)
+		if (tmp != BREAKINST_ARM)
 			printk(KERN_ERR "ptrace_cancel_bpt: weirdness\n");
 	}
 }
@@ -455,9 +470,9 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			if ((unsigned long) data > _NSIG)
 				break;
 			if (request == PTRACE_SYSCALL)
-				child->ptrace |= PT_TRACESYS;
+				set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			else
-				child->ptrace &= ~PT_TRACESYS;
+				clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			child->exit_code = data;
 			/* make sure single-step breakpoint is gone. */
 			__ptrace_cancel_bpt(child);
@@ -490,7 +505,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			if ((unsigned long) data > _NSIG)
 				break;
 			child->thread.debug.nsaved = -1;
-			child->ptrace &= ~PT_TRACESYS;
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			child->exit_code = data;
 			/* give it a chance to run. */
 			wake_up_process(child);
@@ -547,7 +562,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 				break;
 
 			/* we should check child->used_math here */
-			ret = __copy_to_user((void *)data, &child->thread.fpstate,
+			ret = __copy_to_user((void *)data, &child->thread_info->fpstate,
 					     sizeof(struct user_fp)) ? -EFAULT : 0;
 			break;
 		
@@ -560,7 +575,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 				break;
 
 			child->used_math = 1;
-			ret = __copy_from_user(&child->thread.fpstate, (void *)data,
+			ret = __copy_from_user(&child->thread_info->fpstate, (void *)data,
 					   sizeof(struct user_fp)) ? -EFAULT : 0;
 			break;
 
@@ -616,7 +631,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	ret = do_ptrace(request, child, addr, data);
 
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
 	return ret;
@@ -626,8 +641,9 @@ asmlinkage void syscall_trace(int why, struct pt_regs *regs)
 {
 	unsigned long ip;
 
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
-			!= (PT_PTRACED|PT_TRACESYS))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (!(current->ptrace & PT_PTRACED))
 		return;
 
 	/*

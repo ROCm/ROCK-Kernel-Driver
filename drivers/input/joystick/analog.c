@@ -1,9 +1,7 @@
 /*
- * $Id: analog.c,v 1.52 2000/06/07 13:07:06 vojtech Exp $
+ * $Id: analog.c,v 1.68 2002/01/22 20:18:32 vojtech Exp $
  *
- *  Copyright (c) 1996-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1996-2001 Vojtech Pavlik
  */
 
 /*
@@ -26,8 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/config.h>
@@ -41,8 +39,8 @@
 #include <linux/gameport.h>
 #include <asm/timex.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("Analog joystick and gamepad driver for Linux");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Analog joystick and gamepad driver");
 MODULE_LICENSE("GPL");
 
 /*
@@ -95,6 +93,7 @@ MODULE_PARM_DESC(js, "Analog joystick options");
 #define ANALOG_FUZZ_MAGIC	36	/* 36 u*ms/loop */
 
 #define ANALOG_MAX_NAME_LENGTH  128
+#define ANALOG_MAX_PHYS_LENGTH	32
 
 static short analog_axes[] = { ABS_X, ABS_Y, ABS_RUDDER, ABS_THROTTLE };
 static short analog_hats[] = { ABS_HAT0X, ABS_HAT0Y, ABS_HAT1X, ABS_HAT1Y, ABS_HAT2X, ABS_HAT2Y };
@@ -111,6 +110,7 @@ struct analog {
 	int mask;
 	short *buttons;
 	char name[ANALOG_MAX_NAME_LENGTH];
+	char phys[ANALOG_MAX_PHYS_LENGTH];
 };
 
 struct analog_port {
@@ -138,15 +138,29 @@ struct analog_port {
 
 #ifdef __i386__
 #define TSC_PRESENT	(test_bit(X86_FEATURE_TSC, &boot_cpu_data.x86_capability))
-#define GET_TIME(x)	do { if (TSC_PRESENT) rdtscl(x); else { outb(0, 0x43); x = inb(0x40); x |= inb(0x40) << 8; } } while (0)
+#define GET_TIME(x)	do { if (TSC_PRESENT) rdtscl(x); else x = get_time_pit(); } while (0)
 #define DELTA(x,y)	(TSC_PRESENT?((y)-(x)):((x)-(y)+((x)<(y)?1193180L/HZ:0)))
 #define TIME_NAME	(TSC_PRESENT?"TSC":"PIT")
+static unsigned int get_time_pit(void)
+{
+        extern spinlock_t i8253_lock;
+        unsigned long flags;
+        unsigned int count;
+
+        spin_lock_irqsave(&i8253_lock, flags);
+        outb_p(0x00, 0x43);
+        count = inb_p(0x40);
+        count |= inb_p(0x40) << 8;
+        spin_unlock_irqrestore(&i8253_lock, flags);
+
+        return count;
+}
 #elif __x86_64__
 #define GET_TIME(x)	rdtscl(x)
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"TSC"
 #elif __alpha__
-#define GET_TIME(x)	((x) = get_cycles())
+#define GET_TIME(x)	do { x = get_cycles(x); } while (0)
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"PCC"
 #else
@@ -418,10 +432,12 @@ static void analog_init_device(struct analog_port *port, struct analog *analog, 
 	int i, j, t, v, w, x, y, z;
 
 	analog_name(analog);
+	sprintf(analog->phys, "%s/input%d", port->gameport->phys, index);
 
 	analog->buttons = (analog->mask & ANALOG_GAMEPAD) ? analog_pad_btn : analog_joy_btn;
 
 	analog->dev.name = analog->name;
+	analog->dev.phys = analog->phys;
 	analog->dev.idbus = BUS_GAMEPORT;
 	analog->dev.idvendor = GAMEPORT_ID_VENDOR_ANALOG;
 	analog->dev.idproduct = analog->mask >> 4;
@@ -491,15 +507,14 @@ static void analog_init_device(struct analog_port *port, struct analog *analog, 
 
 	input_register_device(&analog->dev);
 
-	printk(KERN_INFO "input%d: %s at gameport%d.%d",
-		analog->dev.number, analog->name, port->gameport->number, index);
+	printk(KERN_INFO "input: %s at %s", analog->name, port->gameport->phys);
 
 	if (port->cooked)
 		printk(" [ADC port]\n");
 	else
 		printk(" [%s timer, %d %sHz clock, %d ns res]\n", TIME_NAME,
 		port->speed > 10000 ? (port->speed + 800) / 1000 : port->speed,
-		port->speed > 10000 ? "M" : "k",
+		port->speed > 10000 ? "M" : "k", 
 		port->speed > 10000 ? (port->loop * 1000) / (port->speed / 1000)
 				    : (port->loop * 1000000) / port->speed);
 }
@@ -519,12 +534,13 @@ static int analog_init_masks(struct analog_port *port)
 
 	if ((port->mask & 3) != 3 && port->mask != 0xc) {
 		printk(KERN_WARNING "analog.c: Unknown joystick device found  "
-			"(data=%#x, gameport%d), probably not analog joystick.\n",
-			port->mask, port->gameport->number);
+			"(data=%#x, %s), probably not analog joystick.\n",
+			port->mask, port->gameport->phys);
 		return -1;
 	}
 
-	i = port->gameport->number < ANALOG_PORTS ? analog_options[port->gameport->number] : 0xff;
+
+	i = analog_options[0]; /* FIXME !!! - need to specify options for different ports */
 
 	analog[0].mask = i & 0xfffff;
 
@@ -604,8 +620,8 @@ static int analog_init_port(struct gameport *gameport, struct gameport_dev *dev,
 		gameport_trigger(gameport);
 		while ((gameport_read(port->gameport) & port->mask) && (v < t)) v++; 
 
-		if (v < (u >> 1) && port->gameport->number < ANALOG_PORTS) {
-			analog_options[port->gameport->number] |=
+		if (v < (u >> 1)) { /* FIXME - more than one port */
+			analog_options[0] |= /* FIXME - more than one port */
 				ANALOG_SAITEK | ANALOG_BTNS_CHF | ANALOG_HBTN_CHF | ANALOG_HAT1_CHF;
 			return 0;
 		}
@@ -666,9 +682,9 @@ static void analog_disconnect(struct gameport *gameport)
 		if (port->analog[i].mask)
 			input_unregister_device(&port->analog[i].dev);
 	gameport_close(gameport);
-	printk(KERN_INFO "analog.c: %d out of %d reads (%d%%) on gameport%d failed\n",
+	printk(KERN_INFO "analog.c: %d out of %d reads (%d%%) on %s failed\n",
 		port->bads, port->reads, port->reads ? (port->bads * 100 / port->reads) : 0,
-		port->gameport->number);
+		port->gameport->phys);
 	kfree(port);
 }
 

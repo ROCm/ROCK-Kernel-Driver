@@ -1,11 +1,12 @@
 /*
  * linux/arch/arm/mach-sa1100/cerf.c
  */
-
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
 
+#include <asm/irq.h>
 #include <asm/hardware.h>
 #include <asm/setup.h>
 
@@ -26,12 +27,12 @@ static void __init cerf_init_irq(void)
 	 */
 #ifdef CONFIG_SA1100_CERF_CPLD
 	/* PDA Full serial port */
-	set_GPIO_IRQ_edge(GPIO_GPIO3, GPIO_RISING_EDGE);
+	set_irq_type(IRQ_GPIO3, IRQT_RISING);
 	/* PDA Bluetooth */
-	set_GPIO_IRQ_edge(GPIO_GPIO2, GPIO_RISING_EDGE);
+	set_irq_type(IRQ_GPIO2, IRQT_RISING);
 #endif /* CONFIG_SA1100_CERF_CPLD */
 
-	set_GPIO_IRQ_edge(GPIO_UCB1200_IRQ, GPIO_RISING_EDGE);
+	set_irq_type(IRQ_GPIO_UCB1200_IRQ, IRQT_RISING);
 }
 
 static void __init
@@ -55,7 +56,7 @@ fixup_cerf(struct machine_desc *desc, struct param_struct *params,
 #error "Undefined memory size for Cerfboard."
 #endif
 
-//	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+//	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
 //	setup_ramdisk(1,  0, 0, 8192);
 //	// Save 2Meg for RAMDisk
 //	setup_initrd(0xc0500000, 3*1024*1024);

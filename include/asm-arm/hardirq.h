@@ -34,6 +34,7 @@ typedef struct {
 #define irq_exit(cpu,irq)	(local_irq_count(cpu)--)
 
 #define synchronize_irq()	do { } while (0)
+#define release_irqlock(cpu)	do { } while (0)
 
 #else
 #error SMP not supported

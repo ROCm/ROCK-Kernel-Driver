@@ -1,3 +1,26 @@
+2002-01-19  Russell King <rmk@arm.linux.org.uk>
+
+	* fpa11.h - Add documentation
+	          - remove userRegisters pointer from this structure.
+	          - add new method to obtain integer register values.
+	* softfloat.c - Remove float128
+	* softfloat.h - Remove float128
+	* softfloat-specialize - Remove float128
+
+	* The FPA11 structure is not a kernel-specific data structure.
+	  It is used by users of ptrace to examine the values of the
+	  floating point registers.  Therefore, any changes to the
+	  FPA11 structure (size or position of elements contained
+	  within) have to be well thought out.
+
+	* Since 128-bit float requires the FPA11 structure to change
+	  size, it has been removed.  128-bit float is currently unused,
+	  and needs various things to be re-worked so that we won't
+	  overflow the available space in the task structure.
+
+	* The changes are designed to break any patch that goes on top
+	  of this code, so that the authors properly review their changes.
+
 1999-08-19  Scott Bambrough  <scottb@netwinder.org>
 
 	* fpmodule.c - Changed version number to 0.95

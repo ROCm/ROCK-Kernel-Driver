@@ -582,11 +582,16 @@ static inline void apic_pm_init2(void) { }
  * Detect and enable local APICs on non-SMP boards.
  * Original code written by Keir Fraser.
  */
+int dont_enable_local_apic __initdata = 0;
 
 static int __init detect_init_APIC (void)
 {
 	u32 h, l, features;
 	extern void get_cpu_vendor(struct cpuinfo_x86*);
+
+	/* Disabled by DMI scan or kernel option? */
+	if (dont_enable_local_apic)
+		return -1;
 
 	/* Workaround for us being called before identify_cpu(). */
 	get_cpu_vendor(&boot_cpu_data);
@@ -903,8 +908,14 @@ int __init calibrate_APIC_clock(void)
 
 static unsigned int calibration_result;
 
+int dont_use_local_apic_timer __initdata = 0;
+
 void __init setup_APIC_clocks (void)
 {
+	/* Disabled by DMI scan or kernel option? */
+	if (dont_use_local_apic_timer)
+		return;
+
 	printk("Using local APIC timer interrupts.\n");
 	using_apic_timer = 1;
 

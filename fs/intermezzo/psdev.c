@@ -789,7 +789,7 @@ static int presto_psdev_ioctl(struct inode *inode, struct file *file,
                 }
 
                 error = lento_mknod(input.name, input.mode,
-                                    MKDEV(input.major,input.minor),&input.info);
+                                    mk_kdev(input.major,input.minor),&input.info);
                 EXIT;
                 return error;
         }

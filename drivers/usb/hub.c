@@ -644,6 +644,49 @@ void usb_hub_port_disable(struct usb_device *hub, int port)
 			port + 1, hub->devpath, ret);
 }
 
+/* USB 2.0 spec, 7.1.7.3 / fig 7-29:
+ *
+ * Between connect detection and reset signaling there must be a delay
+ * of 100ms at least for debounce and power-settling. The corresponding
+ * timer shall restart whenever the downstream port detects a disconnect.
+ * 
+ * Apparently there are some bluetooth and irda-dongles and a number
+ * of low-speed devices which require longer delays of about 200-400ms.
+ * Not covered by the spec - but easy to deal with.
+ *
+ * This implementation uses 400ms minimum debounce timeout and checks
+ * every 10ms for transient disconnects to restart the delay.
+ */
+
+#define HUB_DEBOUNCE_TIMEOUT	400
+#define HUB_DEBOUNCE_STEP	10
+
+/* return: -1 on error, 0 on success, 1 on disconnect.  */
+static int usb_hub_port_debounce(struct usb_device *hub, int port)
+{
+	int ret;
+	unsigned delay_time;
+	u16 portchange, portstatus;
+
+	for (delay_time = 0; delay_time < HUB_DEBOUNCE_TIMEOUT; /* empty */ ) {
+
+		/* wait debounce step increment */
+		wait_ms(HUB_DEBOUNCE_STEP);
+
+		ret = usb_hub_port_status(hub, port, &portstatus, &portchange);
+		if (ret < 0)
+			return -1;
+
+		if ((portchange & USB_PORT_STAT_C_CONNECTION)) {
+			usb_clear_port_feature(hub, port+1, USB_PORT_FEAT_C_CONNECTION);
+			delay_time = 0;
+		}
+		else
+			delay_time += HUB_DEBOUNCE_STEP;
+	}
+	return ((portstatus&USB_PORT_STAT_CONNECTION)) ? 0 : 1;
+}
+
 static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 					u16 portstatus, u16 portchange)
 {
@@ -671,12 +714,16 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		return;
 	}
 
+	if (usb_hub_port_debounce(hub, port)) {
+		err("connect-debounce failed, port %d disabled", port+1);
+		usb_hub_port_disable(hub, port);
+		return;
+	}
+
 	/* Some low speed devices have problems with the quick delay, so */
 	/*  be a bit pessimistic with those devices. RHbug #23670 */
-	if (portstatus & USB_PORT_STAT_LOW_SPEED) {
-		wait_ms(400);
+	if (portstatus & USB_PORT_STAT_LOW_SPEED)
 		delay = HUB_LONG_RESET_TIME;
-	}
 
 	down(&usb_address0_sem);
 

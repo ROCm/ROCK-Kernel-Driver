@@ -377,8 +377,8 @@ struct address_space {
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct inode		*host;		/* owner: inode, block_device */
-	struct vm_area_struct	*i_mmap;	/* list of private mappings */
-	struct vm_area_struct	*i_mmap_shared; /* list of shared mappings */
+	list_t			i_mmap;		/* list of private mappings */
+	list_t			i_mmap_shared;	/* list of private mappings */
 	spinlock_t		i_shared_lock;  /* and spinlock protecting it */
 	int			gfp_mask;	/* how to allocate the pages */
 };
@@ -1511,9 +1511,9 @@ extern int inode_setattr(struct inode *, struct iattr *);
 static inline ino_t parent_ino(struct dentry *dentry)
 {
 	ino_t res;
-	spin_lock(&dcache_lock);
+	read_lock(&dparent_lock);
 	res = dentry->d_parent->d_inode->i_ino;
-	spin_unlock(&dcache_lock);
+	read_unlock(&dparent_lock);
 	return res;
 }
 

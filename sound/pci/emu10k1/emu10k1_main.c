@@ -218,6 +218,10 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	 */
 	outl(inl(emu->port + HCFG) | HCFG_AUDIOENABLE, emu->port + HCFG);
 
+	/* Enable analog/digital outs on audigy */
+	if (emu->audigy)
+		outl(inl(emu->port + A_IOCFG) & ~0x44, emu->port + A_IOCFG);
+
 #if 0
 	{
 	unsigned int tmp;
@@ -274,7 +278,7 @@ static int snd_emu10k1_done(emu10k1_t * emu)
 	snd_emu10k1_ptr_write(emu, TCBS, 0, TCBS_BUFFSIZE_16K);
 	snd_emu10k1_ptr_write(emu, TCB, 0, 0);
 	if (emu->audigy)
-		snd_emu10k1_ptr_write(emu, A_DBG, 0, A_DBG_SINGLE_STEP_ADDR);
+		snd_emu10k1_ptr_write(emu, A_DBG, 0, A_DBG_SINGLE_STEP);
 	else
 		snd_emu10k1_ptr_write(emu, DBG, 0, 0x8000);
 
@@ -625,18 +629,10 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	}
 	
 	emu->fx8010.fxbus_mask = 0x303f;
-	if (extin_mask == 0) {
-		if (emu->audigy)
-			extin_mask = 0x000f;
-		else
-			extin_mask = 0x1fcf;
-	}
-	if (extout_mask == 0) {
-		if (emu->audigy)
-			extout_mask = 0x3fff;
-		else
-			extout_mask = 0x3fff;
-	}
+	if (extin_mask == 0)
+		extin_mask = 0x1fcf;
+	if (extout_mask == 0)
+		extout_mask = 0x3fff;
 	emu->fx8010.extin_mask = extin_mask;
 	emu->fx8010.extout_mask = extout_mask;
 

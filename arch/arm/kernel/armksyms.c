@@ -21,6 +21,7 @@
 #include <linux/pm.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
+#include <linux/smp_lock.h>
 
 #include <asm/byteorder.h>
 #include <asm/elf.h>
@@ -123,6 +124,7 @@ EXPORT_SYMBOL(__bad_xchg);
 EXPORT_SYMBOL(__readwrite_bug);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
+EXPORT_SYMBOL(set_irq_type);
 EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
 
@@ -273,3 +275,7 @@ EXPORT_SYMBOL_NOVERS(__down_trylock_failed);
 EXPORT_SYMBOL_NOVERS(__up_wakeup);
 
 EXPORT_SYMBOL(get_wchan);
+
+#ifdef CONFIG_PREEMPT
+EXPORT_SYMBOL(kernel_flag);
+#endif

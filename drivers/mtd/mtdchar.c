@@ -64,7 +64,7 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 
 static int mtd_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	int devnum = minor >> 1;
 	struct mtd_info *mtd;
 

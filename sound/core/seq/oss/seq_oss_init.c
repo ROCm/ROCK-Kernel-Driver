@@ -184,7 +184,7 @@ snd_seq_oss_open(struct file *file, int level)
 	seq_oss_devinfo_t *dp;
 
 	if ((dp = snd_kcalloc(sizeof(*dp), GFP_KERNEL)) == NULL) {
-		snd_printk("can't malloc device info\n");
+		snd_printk(KERN_ERR "can't malloc device info\n");
 		return -ENOMEM;
 	}
 
@@ -193,7 +193,7 @@ snd_seq_oss_open(struct file *file, int level)
 			break;
 	}
 	if (i >= SNDRV_SEQ_OSS_MAX_CLIENTS) {
-		snd_printk("too many applications\n");
+		snd_printk(KERN_ERR "too many applications\n");
 		return -ENOMEM;
 	}
 
@@ -209,14 +209,14 @@ snd_seq_oss_open(struct file *file, int level)
 	snd_seq_oss_midi_setup(dp);
 
 	if (dp->synth_opened == 0 && dp->max_mididev == 0) {
-		snd_printk("no device found\n");
+		snd_printk(KERN_ERR "no device found\n");
 		kfree(dp);
 		return -ENODEV;
 	}
 
 	/* create port */
 	if ((rc = create_port(dp)) < 0) {
-		snd_printk("can't create port\n");
+		snd_printk(KERN_ERR "can't create port\n");
 		free_devinfo(dp);
 		return rc;
 	}
@@ -259,7 +259,7 @@ snd_seq_oss_open(struct file *file, int level)
 
 	/* initialize timer */
 	if ((dp->timer = snd_seq_oss_timer_new(dp)) == NULL) {
-		snd_printk("can't alloc timer\n");
+		snd_printk(KERN_ERR "can't alloc timer\n");
 		delete_seq_queue(dp);
 		delete_port(dp);
 		return -ENOMEM;

@@ -112,7 +112,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	mm = tsk->mm;
 	info.si_code = SEGV_MAPERR;
 
-	if (address >= TASK_SIZE) 
+	if (address >= TASK_SIZE && !(error_code & 5))
 		goto vmalloc_fault;
 
 

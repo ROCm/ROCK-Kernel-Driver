@@ -24,7 +24,7 @@ struct nfs_unlinkdata {
 };
 
 static struct nfs_unlinkdata	*nfs_deletes;
-static struct rpc_wait_queue	nfs_delete_queue = RPC_INIT_WAITQ("nfs_delete_queue");
+static RPC_WAITQ(nfs_delete_queue, "nfs_delete_queue");
 
 /**
  * nfs_detach_unlinkdata - Remove asynchronous unlink from global list

@@ -224,7 +224,7 @@ do_udf_readdir(struct inode * dir, struct file *filp, filldir_t filldir, void *d
 
 		if ( cfi.fileCharacteristics & FILE_PARENT )
 		{
-			iblock = udf_get_lb_pblock(dir->i_sb, UDF_I_LOCATION(filp->f_dentry->d_parent->d_inode), 0);
+			iblock = parent_ino(filp->f_dentry);
 			flen = 2;
 			memcpy(fname, "..", flen);
 			dt_type = DT_DIR;

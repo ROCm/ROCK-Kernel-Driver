@@ -251,7 +251,7 @@ static int __init alsa_card_gusclassic_init(void)
 	cards += snd_legacy_auto_probe(possible_ports, snd_gusclassic_legacy_auto_probe);
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("GUS Classic soundcard not found or device busy\n");
+		printk(KERN_ERR "GUS Classic soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

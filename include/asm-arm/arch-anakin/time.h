@@ -24,7 +24,7 @@ void __init time_init(void)
 {
 	timer_irq.handler = anakin_timer_interrupt;
 	timer_irq.flags = SA_INTERRUPT;
-	setup_arm_irq(IRQ_TICK, &timer_irq);
+	setup_irq(IRQ_TICK, &timer_irq);
 }
 
 #endif

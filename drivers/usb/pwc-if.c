@@ -179,27 +179,24 @@ static struct video_device pwc_template = {
 /* Private functions */
 
 /* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved.
+ * This is used when initializing the contents of the area.
  */
 static inline unsigned long kvirt_to_pa(unsigned long adr) 
 {
         unsigned long kva, ret;
 
-	kva = page_address(vmalloc_to_page((void *)adr));
+	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
 	ret = __pa(kva);
         return ret;
 }
 
-static void * rvmalloc(signed long size)
+static void * rvmalloc(unsigned long size)
 {
 	void * mem;
-	unsigned long adr, page;
+	unsigned long adr;
 
-        /* Round it off to PAGE_SIZE */
-        size += (PAGE_SIZE - 1);
-        size &= ~(PAGE_SIZE - 1);	
-        
+	size=PAGE_ALIGN(size);
         mem=vmalloc_32(size);
 	if (mem) 
 	{
@@ -207,8 +204,7 @@ static void * rvmalloc(signed long size)
 	        adr=(unsigned long) mem;
 		while (size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_reserve(virt_to_page(__va(page)));
+			mem_map_reserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -216,20 +212,16 @@ static void * rvmalloc(signed long size)
 	return mem;
 }
 
-static void rvfree(void * mem, signed long size)
+static void rvfree(void * mem, unsigned long size)
 {
-        unsigned long adr, page;
-        
-        /* Round it off to PAGE_SIZE */
-        size += (PAGE_SIZE - 1);
-        size &= ~(PAGE_SIZE - 1);	
+        unsigned long adr;
+
 	if (mem) 
 	{
 	        adr=(unsigned long) mem;
-		while (size > 0) 
+		while ((long) size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_unreserve(virt_to_page(__va(page)));
+			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}

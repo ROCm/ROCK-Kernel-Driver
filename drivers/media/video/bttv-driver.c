@@ -172,8 +172,7 @@ static inline unsigned long kvirt_to_bus(unsigned long addr)
 }
 
 /* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved.
+ * This is used when initializing the contents of the area.
  */
 static inline unsigned long kvirt_to_pa(unsigned long addr) 
 {
@@ -183,14 +182,15 @@ static inline unsigned long kvirt_to_pa(unsigned long addr)
         return ret;
 }
 
-static void * rvmalloc(signed long size)
+static void * rvmalloc(unsigned long size)
 {
 	void * mem;
 	unsigned long adr;
 
+	size=PAGE_ALIGN(size);
 	mem=vmalloc_32(size);
 	if (NULL == mem)
-		printk(KERN_INFO "bttv: vmalloc_32(%ld) failed\n",size);
+		printk(KERN_INFO "bttv: vmalloc_32(%lu) failed\n",size);
 	else {
 		/* Clear the ram out, no junk to the user */
 		memset(mem, 0, size);
@@ -205,14 +205,14 @@ static void * rvmalloc(signed long size)
 	return mem;
 }
 
-static void rvfree(void * mem, signed long size)
+static void rvfree(void * mem, unsigned long size)
 {
         unsigned long adr;
         
 	if (mem) 
 	{
 	        adr=(unsigned long) mem;
-		while (size > 0) 
+		while ((long) size > 0)
                 {
 			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
@@ -2798,7 +2798,8 @@ static void bttv_irq(int irq, void *dev_id, struct pt_regs * regs)
  *	Scan for a Bt848 card, request the irq and map the io memory 
  */
 
-static void __devexit bttv_remove(struct pci_dev *pci_dev)
+/* Can't be marked __devexit with a reference from bttv_probe.  */
+static void bttv_remove(struct pci_dev *pci_dev)
 {
         u8 command;
         int j;

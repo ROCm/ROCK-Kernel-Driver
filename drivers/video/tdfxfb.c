@@ -495,7 +495,7 @@ static struct pci_driver tdfxfb_driver = {
 	name:		"tdfxfb",
 	id_table:	tdfxfb_id_table,
 	probe:		tdfxfb_probe,
-	remove:		tdfxfb_remove,
+	remove:		__devexit_p(tdfxfb_remove),
 };
 
 MODULE_DEVICE_TABLE(pci, tdfxfb_id_table);

@@ -23,7 +23,7 @@
 
 #define KERNEL_STACK_SIZE 4096
 
-struct context_save_struct {
+struct cpu_context_save {
 	unsigned long r4;
 	unsigned long r5;
 	unsigned long r6;
@@ -35,7 +35,7 @@ struct context_save_struct {
 	unsigned long pc;
 };
 
-#define INIT_CSS (struct context_save_struct){ 0, 0, 0, 0, 0, 0, 0, 0, SVC26_MODE }
+#define INIT_CSS (struct cpu_context_save){ 0, 0, 0, 0, 0, 0, 0, 0, SVC26_MODE }
 
 typedef struct {
 	void (*put_byte)(void);			/* Special calling convention */
@@ -73,15 +73,5 @@ extern uaccess_t uaccess_user, uaccess_kernel;
 
 #define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1022])
 #define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1020])
-
-/* Allocation and freeing of basic task resources. */
-/*
- * NOTE! The task struct and the stack go together
- */
-extern unsigned long get_page_8k(int priority);
-extern void free_page_8k(unsigned long page);
-
-#define ll_alloc_task_struct()	((struct task_struct *)get_page_8k(GFP_KERNEL))
-#define ll_free_task_struct(p)  free_page_8k((unsigned long)(p))
 
 #endif

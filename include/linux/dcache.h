@@ -126,6 +126,7 @@ d_iput:		no		no		yes
 #define DCACHE_REFERENCED	0x0008  /* Recently used, don't discard. */
 
 extern spinlock_t dcache_lock;
+extern rwlock_t dparent_lock;
 
 /**
  * d_drop - drop a dentry

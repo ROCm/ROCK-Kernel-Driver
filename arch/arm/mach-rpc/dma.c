@@ -188,7 +188,7 @@ static void iomd_enable_dma(dmach_t channel, dma_t *dma)
 		 */
 		if (!dma->using_sg) {
 			dma->buf.dma_address = pci_map_single(NULL,
-				dma->buf.address, dma->buf.length,
+				dma->buf.__address, dma->buf.length,
 				dma->dma_mode == DMA_MODE_READ ?
 				PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
 		}
@@ -275,6 +275,9 @@ static void floppy_enable_dma(dmach_t channel, dma_t *dma)
 	unsigned int fiqhandler_length;
 	struct pt_regs regs;
 
+	if (dma->using_sg)
+		BUG();
+
 	if (dma->dma_mode == DMA_MODE_READ) {
 		extern unsigned char floppy_fiqin_start, floppy_fiqin_end;
 		fiqhandler_start = &floppy_fiqin_start;
@@ -286,7 +289,7 @@ static void floppy_enable_dma(dmach_t channel, dma_t *dma)
 	}
 
 	regs.ARM_r9  = dma->buf.length;
-	regs.ARM_r10 = (unsigned long)dma->buf.address;
+	regs.ARM_r10 = (unsigned long)dma->buf.__address;
 	regs.ARM_fp  = FLOPPYDMA_BASE;
 
 	if (claim_fiq(&fh)) {

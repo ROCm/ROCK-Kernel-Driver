@@ -6,6 +6,7 @@
  * (C) 1998 Russell King
  * (C) 1998 Phil Blundell
  */
+#include <linux/config.h>
 #include <linux/ioport.h>
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -28,7 +29,6 @@ extern unsigned char pckbd_sysrq_xlate[128];
 
 static inline void kbd_init_hw(void)
 {
-	if (have_isa_bridge) {
 		k_setkeycode    = pckbd_setkeycode;
 		k_getkeycode    = pckbd_getkeycode;
 		k_translate     = pckbd_translate;
@@ -39,7 +39,6 @@ static inline void kbd_init_hw(void)
 		k_sysrq_xlate   = pckbd_sysrq_xlate;
 #endif
 		pckbd_init_hw();
-	}
 }
 
 /*
