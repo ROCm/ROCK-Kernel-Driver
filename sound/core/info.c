@@ -115,7 +115,7 @@ int snd_iprintf(snd_info_buffer_t * buffer, char *fmt,...)
 
  */
 
-struct proc_dir_entry *snd_proc_root = NULL;
+static struct proc_dir_entry *snd_proc_root = NULL;
 snd_info_entry_t *snd_seq_root = NULL;
 #ifdef CONFIG_SND_OSSEMUL
 snd_info_entry_t *snd_oss_root = NULL;
@@ -278,18 +278,16 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 		if ((entry->content == SNDRV_INFO_CONTENT_TEXT &&
 		     !entry->c.text.read_size) ||
 		    (entry->content == SNDRV_INFO_CONTENT_DATA &&
-		     entry->c.ops->read == NULL) ||
-		    entry->content == SNDRV_INFO_CONTENT_DEVICE) {
+		     entry->c.ops->read == NULL)) {
 		    	err = -ENODEV;
 		    	goto __error;
 		}
 	}
 	if (mode == O_WRONLY || mode == O_RDWR) {
 		if ((entry->content == SNDRV_INFO_CONTENT_TEXT &&
-					!entry->c.text.write_size) ||
+		     !entry->c.text.write_size) ||
 		    (entry->content == SNDRV_INFO_CONTENT_DATA &&
-		    			entry->c.ops->write == NULL) ||
-		    entry->content == SNDRV_INFO_CONTENT_DEVICE) {
+		     entry->c.ops->write == NULL)) {
 		    	err = -ENODEV;
 		    	goto __error;
 		}

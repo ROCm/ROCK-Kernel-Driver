@@ -449,7 +449,7 @@ static int __devinit aureon_init(ice1712_t *ice)
 
 
 /*
- * Aureon board don't provide the EEPROM data except for the vendor IDs.
+ * Aureon boards don't provide the EEPROM data except for the vendor IDs.
  * hence the driver needs to sets up it properly.
  */
 

@@ -736,7 +736,7 @@ static void snd_pmac_sound_feature(pmac_t *chip, int enable)
 		pmu_suspend();
 		feature_clear(chip->node, FEATURE_Sound_power);
 		feature_clear(chip->node, FEATURE_Sound_CLK_enable);
-		mdelay(1000); /* XXX */
+		big_mdelay(1000); /* XXX */
 		pmu_resume();
 	}
 	if (chip->is_pbook_3400) {

@@ -229,6 +229,13 @@
 #define AC97_CM9739_SPDIF_IN_STATUS	0x68 /* 32bit */
 #define AC97_CM9739_SPDIF_CTRL	0x6c
 
+/* specific - wolfson */
+#define AC97_WM97XX_FMIXER_VOL  0x72
+#define AC97_WM9704_RMIXER_VOL  0x74
+#define AC97_WM9704_TEST        0x5a
+#define AC97_WM9704_RPCM_VOL    0x70
+#define AC97_WM9711_OUT3VOL     0x16
+
 
 /* ac97->scaps */
 #define AC97_SCAP_AUDIO		(1<<0)	/* audio AC'97 codec */
@@ -256,12 +263,20 @@
 
 typedef struct _snd_ac97 ac97_t;
 
+struct snd_ac97_build_ops {
+	int (*build_3d) (ac97_t *ac97);
+	int (*build_specific) (ac97_t *ac97);
+	int (*build_spdif) (ac97_t *ac97);
+	int (*build_post_spdif) (ac97_t *ac97);
+};
+
 struct _snd_ac97 {
 	void (*reset) (ac97_t *ac97);
 	void (*write) (ac97_t *ac97, unsigned short reg, unsigned short val);
 	unsigned short (*read) (ac97_t *ac97, unsigned short reg);
 	void (*wait) (ac97_t *ac97);
 	void (*init) (ac97_t *ac97);
+	struct snd_ac97_build_ops * build_ops;
 	void *private_data;
 	void (*private_free) (ac97_t *ac97);
 	/* --- */

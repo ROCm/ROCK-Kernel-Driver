@@ -389,6 +389,14 @@ static struct snd_ak4xxx_private akm_6fire_priv __devinitdata = {
  * initialize the chip
  */
 
+/* 6fire specific */
+#define PCF9554_REG_INPUT      0
+#define PCF9554_REG_OUTPUT     1
+#define PCF9554_REG_POLARITY   2
+#define PCF9554_REG_CONFIG     3
+
+static int snd_ice1712_6fire_write_pca(ice1712_t *ice, unsigned char reg, unsigned char data);
+
 static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 {
 	int err;
@@ -425,6 +433,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 			snd_printk("PCF9554 initialization failed\n");
 			return err;
 		}
+		snd_ice1712_6fire_write_pca(ice, PCF9554_REG_CONFIG, 0x80);
 		break;
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
@@ -449,10 +458,12 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_EWX2496:
 		if ((err = snd_ice1712_init_cs8427(ice, CS8427_BASE_ADDR)) < 0)
 			return err;
+		snd_cs8427_reg_write(ice->cs8427, CS8427_REG_RECVERRMASK, CS8427_UNLOCK | CS8427_CONF | CS8427_BIP | CS8427_PAR);
 		break;
 	case ICE1712_SUBDEVICE_DMX6FIRE:
 		if ((err = snd_ice1712_init_cs8427(ice, ICE1712_6FIRE_CS8427_ADDR)) < 0)
 			return err;
+		snd_cs8427_reg_write(ice->cs8427, CS8427_REG_RECVERRMASK, CS8427_UNLOCK | CS8427_CONF | CS8427_BIP | CS8427_PAR);
 		break;
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
@@ -749,11 +760,6 @@ static snd_kcontrol_new_t snd_ice1712_ews88d_controls[] __devinitdata = {
 /*
  * DMX 6Fire specific controls
  */
-
-#define PCF9554_REG_INPUT	0
-#define PCF9554_REG_OUTPUT	1
-#define PCF9554_REG_POLARITY	2
-#define PCF9554_REG_CONFIG	3
 
 static int snd_ice1712_6fire_read_pca(ice1712_t *ice, unsigned char reg)
 {
