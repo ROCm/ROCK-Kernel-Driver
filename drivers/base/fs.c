@@ -127,10 +127,11 @@ int device_bus_link(struct device * dev)
 	length = get_devpath_length(dev);
 
 	/* now add the path from the bus directory
-	 * It should be '../..' (one to get to the 'bus' directory,
-	 * and one to get to the root of the fs.
+	 * It should be '../../..' (one to get to the bus's directory,
+	 * one to get to the 'bus' directory, and one to get to the root 
+	 * of the fs.)
 	 */
-	length += strlen("../..");
+	length += strlen("../../..");
 
 	if (length > PATH_MAX)
 		return -ENAMETOOLONG;
@@ -140,7 +141,7 @@ int device_bus_link(struct device * dev)
 	memset(path,0,length);
 
 	/* our relative position */
-	strcpy(path,"../..");
+	strcpy(path,"../../..");
 
 	fill_devpath(dev,path,length);
 	error = create_symlink(&dev->bus->device_dir,dev->bus_id,path);
