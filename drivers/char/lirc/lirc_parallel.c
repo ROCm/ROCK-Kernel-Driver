@@ -50,6 +50,7 @@
 #include <asm/signal.h>
 #include <asm/irq.h>
 #include <asm/system.h>
+#include <asm/div64.h>
 
 #include <asm/uaccess.h>
 #include <linux/poll.h>
@@ -439,7 +440,9 @@ static ssize_t lirc_write(struct file *filep,const char *buf,size_t n,
 	/* ajust values from usecs */
 	for(i=0;i<count;i++)
 	{
-		wbuf[i]=(lirc_t) (((double) wbuf[i])*timer/1000000);
+		uint64_t n = (uint64_t)wbuf[i] * timer;
+		do_div(n, 1000000ul);
+		wbuf[i] = (lirc_t) n;
 	}
 
 	local_save_flags(flags);local_irq_disable();
