@@ -417,14 +417,13 @@ map_err_out:
 		return m;
 	}
 	/* Record wasn't there. Get a new ntfs inode and initialize it. */
-	ni = ntfs_new_extent_inode(base_ni->vol->sb);
+	ni = ntfs_new_extent_inode(base_ni->vol->sb, mft_no);
 	if (!ni) {
 		up(&base_ni->extent_lock);
 		atomic_dec(&base_ni->count);
 		return ERR_PTR(-ENOMEM);
 	}
 	ni->vol = base_ni->vol;
-	ni->mft_no = mft_no;
 	ni->seq_no = seq_no;
 	ni->nr_extents = -1;
 	ni->_INE(base_ntfs_ino) = base_ni;

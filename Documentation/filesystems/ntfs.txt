@@ -247,6 +247,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.13:
+	- Internal changes towards using iget5_locked() in preparation for
+	  fake inodes and small cleanups to ntfs_volume structure.
 2.0.12:
 	- Internal cleanups in address space operations made possible by the
 	  changes introduced in the previous release.

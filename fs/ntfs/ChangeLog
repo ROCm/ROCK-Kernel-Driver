@@ -22,9 +22,24 @@ ToDo:
 	  based attribute i/o is further developed.
 	- CLEANUP: Modularising code in aops.c a bit, e.g. a-la get_block(),
 	  will be cleaner and make code reuse easier.
+	- Modify ntfs_read_locked_inode() to return an error code and update
+	  callers, i.e. ntfs_iget(), to pass that error code up instead of just
+	  using -EIO.
 	- Enable NFS exporting of NTFS.
-	- Use iget5_locked() and friends instead of conventional iget().
 	- Use fake inodes for address space i/o.
+
+2.0.13 - Use iget5_locked() in preparation for fake inodes and small cleanups.
+
+	- Remove nr_mft_bits and the now superfluous union with nr_mft_records
+	  from ntfs_volume structure.
+	- Remove nr_lcn_bits and the now superfluous union with nr_clusters
+	  from ntfs_volume structure.
+	- Use iget5_locked() and friends instead of conventional iget(). Wrap
+	  the call in fs/ntfs/inode.c::ntfs_iget() and update callers of iget()
+	  to use ntfs_iget(). Leave only one iget() call at mount time so we
+	  don't need an ntfs_iget_mount().
+	- Change fs/ntfs/inode.c::ntfs_new_extent_inode() to take mft_no as an
+	  additional argument.
 
 2.0.12 - Initial cleanup of address space operations following 2.0.11 changes.
 
