@@ -589,6 +589,9 @@ open_file:
             break;
     }
 
+    inode->i_ctime = CURRENT_TIME;
+    mark_inode_dirty (inode);
+
 out_filp:
     up (&xinode->i_sem);
     fput(fp);
@@ -1027,6 +1030,9 @@ reiserfs_removexattr (struct dentry *dentry, const char *name)
 
     err = reiserfs_xattr_del (dentry->d_inode, name);
 
+    dentry->d_inode->i_ctime = CURRENT_TIME;
+    mark_inode_dirty (dentry->d_inode);
+
 out:
     reiserfs_read_unlock_xattrs (dentry->d_sb);
     reiserfs_write_unlock_xattr_i (dentry->d_inode);
@@ -1226,6 +1232,24 @@ reiserfs_xattr_unregister_handlers (void)
     write_unlock (&handler_lock);
 }
 
+/* This will catch lookups from the fs root to .reiserfs_priv */
+static int
+xattr_lookup_poison (struct dentry *dentry, struct qstr *q1, struct qstr *name)
+{
+    struct dentry *priv_root = REISERFS_SB(dentry->d_sb)->priv_root;
+    if (name->len == priv_root->d_name.len &&
+        name->hash == priv_root->d_name.hash &&
+        !memcmp (name->name, priv_root->d_name.name, name->len)) {
+            return -ENOENT;
+    }
+    return 0;
+}
+
+static struct dentry_operations xattr_lookup_poison_ops = {
+    .d_compare = xattr_lookup_poison,
+};
+
+
 /* We need to take a copy of the mount flags since things like
  * MS_RDONLY don't get set until *after* we're called.
  * mount_flags != mount_options */
@@ -1279,7 +1303,7 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
         err = PTR_ERR (dentry);
 
       if (!err && dentry) {
-          d_drop (dentry);
+          s->s_root->d_op = &xattr_lookup_poison_ops;
           REISERFS_I(dentry->d_inode)->i_flags |= i_priv_object;
           REISERFS_SB(s)->priv_root = dentry;
       } else if (!(mount_flags & MS_RDONLY)) { /* xattrs are unavailable */

@@ -119,6 +119,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
                 /* Ignore the .reiserfs_priv entry */
                 if (reiserfs_xattrs (inode->i_sb) &&
                     !old_format_only(inode->i_sb) &&
+                    filp->f_dentry == inode->i_sb->s_root &&
                     REISERFS_SB(inode->i_sb)->priv_root &&
                     REISERFS_SB(inode->i_sb)->priv_root->d_inode &&
                     deh_objectid(deh) == le32_to_cpu (INODE_PKEY(REISERFS_SB(inode->i_sb)->priv_root->d_inode)->k_objectid)) {
