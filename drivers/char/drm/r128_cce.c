@@ -613,6 +613,15 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 
 int r128_do_cleanup_cce( drm_device_t *dev )
 {
+
+#if _HAVE_DMA_IRQ
+	/* Make sure interrupts are disabled here because the uninstall ioctl
+	 * may not have been called from userspace and after dev_private
+	 * is freed, it's too late.
+	 */
+	if ( dev->irq ) DRM(irq_uninstall)(dev);
+#endif
+
 	if ( dev->dev_private ) {
 		drm_r128_private_t *dev_priv = dev->dev_private;
 
@@ -648,6 +657,8 @@ int r128_cce_init( DRM_IOCTL_ARGS )
 	drm_r128_init_t init;
 
 	DRM_DEBUG( "\n" );
+
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	DRM_COPY_FROM_USER_IOCTL( init, (drm_r128_init_t *)data, sizeof(init) );
 

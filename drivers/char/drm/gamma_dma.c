@@ -639,6 +639,14 @@ int gamma_do_cleanup_dma( drm_device_t *dev )
 {
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
+#if _HAVE_DMA_IRQ
+	/* Make sure interrupts are disabled here because the uninstall ioctl
+	 * may not have been called from userspace and after dev_private
+	 * is freed, it's too late.
+	 */
+	if ( dev->irq ) DRM(irq_uninstall)(dev);
+#endif
+
 	if ( dev->dev_private ) {
 		drm_gamma_private_t *dev_priv = dev->dev_private;
 
@@ -659,6 +667,8 @@ int gamma_dma_init( struct inode *inode, struct file *filp,
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
 	drm_gamma_init_t init;
+
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	if ( copy_from_user( &init, (drm_gamma_init_t *)arg, sizeof(init) ) )
 		return -EFAULT;
@@ -832,6 +842,8 @@ void DRM(driver_irq_postinstall)( drm_device_t *dev ) {
 void DRM(driver_irq_uninstall)( drm_device_t *dev ) {
 	drm_gamma_private_t *dev_priv =
 				(drm_gamma_private_t *)dev->dev_private;
+	if (!dev_priv)
+		return;
 
 	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
 
