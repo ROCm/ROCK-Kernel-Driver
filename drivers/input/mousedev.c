@@ -39,6 +39,7 @@
 #include <linux/smp_lock.h>
 #include <linux/random.h>
 #include <linux/major.h>
+#include <linux/device.h>
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
 #include <linux/miscdevice.h>
 #endif
@@ -516,8 +517,14 @@ static struct miscdevice psaux_mouse = {
 };
 #endif
 
+static struct device_interface mousedev_intf = {
+	.name		= "mouse",
+	.devclass	= &input_devclass,
+};
+
 static int __init mousedev_init(void)
 {
+	interface_register(&mousedev_intf);
 	input_register_handler(&mousedev_handler);
 
 	memset(&mousedev_mix, 0, sizeof(struct mousedev));
@@ -542,6 +549,7 @@ static void __exit mousedev_exit(void)
 #endif
 	input_unregister_minor(mousedev_mix.devfs);
 	input_unregister_handler(&mousedev_handler);
+	interface_unregister(&mousedev_intf);
 }
 
 module_init(mousedev_init);
