@@ -1462,14 +1462,36 @@ static int agp_intel_resume(struct pci_dev *pdev)
 }
 
 static struct pci_device_id agp_intel_pci_table[] = {
-	{
-	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
-	.class_mask	= ~0,
-	.vendor		= PCI_VENDOR_ID_INTEL,
-	.device		= PCI_ANY_ID,
-	.subvendor	= PCI_ANY_ID,
-	.subdevice	= PCI_ANY_ID,
-	},
+#define ID(x)						\
+	{ 						\
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),	\
+	.class_mask	= ~0,				\
+	.vendor		= PCI_VENDOR_ID_INTEL,		\
+	.device		= x,				\
+	.subvendor	= PCI_ANY_ID,			\
+	.subdevice	= PCI_ANY_ID,			\
+	}
+	ID(PCI_DEVICE_ID_INTEL_82443LX_0),
+	ID(PCI_DEVICE_ID_INTEL_82443BX_0),
+	ID(PCI_DEVICE_ID_INTEL_82443GX_0),
+	ID(PCI_DEVICE_ID_INTEL_82810_MC1),
+	ID(PCI_DEVICE_ID_INTEL_82810_MC3),
+	ID(PCI_DEVICE_ID_INTEL_82810E_MC),
+	ID(PCI_DEVICE_ID_INTEL_82815_MC),
+	ID(PCI_DEVICE_ID_INTEL_82820_HB),
+	ID(PCI_DEVICE_ID_INTEL_82820_UP_HB),
+	ID(PCI_DEVICE_ID_INTEL_82830_HB),
+	ID(PCI_DEVICE_ID_INTEL_82840_HB),
+	ID(PCI_DEVICE_ID_INTEL_82845_HB),
+	ID(PCI_DEVICE_ID_INTEL_82845G_HB),
+	ID(PCI_DEVICE_ID_INTEL_82850_HB),
+	ID(PCI_DEVICE_ID_INTEL_82855PM_HB),
+	ID(PCI_DEVICE_ID_INTEL_82855GM_HB),
+	ID(PCI_DEVICE_ID_INTEL_82860_HB),
+	ID(PCI_DEVICE_ID_INTEL_82865_HB),
+	ID(PCI_DEVICE_ID_INTEL_82875_HB),
+	ID(PCI_DEVICE_ID_INTEL_7505_0),
+	ID(PCI_DEVICE_ID_INTEL_7205_0),	
 	{ }
 };
 
