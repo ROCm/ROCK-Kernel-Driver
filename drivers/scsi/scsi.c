@@ -244,7 +244,13 @@ static struct scsi_cmnd *__scsi_get_command(struct Scsi_Host *shost,
  */
 struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int gfp_mask)
 {
-	struct scsi_cmnd *cmd = __scsi_get_command(dev->host, gfp_mask);
+	struct scsi_cmnd *cmd;
+
+	/* Bail if we can't get a reference to the device */
+	if (!get_device(&dev->sdev_gendev))
+		return NULL;
+
+	cmd = __scsi_get_command(dev->host, gfp_mask);
 
 	if (likely(cmd != NULL)) {
 		unsigned long flags;
@@ -258,7 +264,8 @@ struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int gfp_mask)
 		spin_lock_irqsave(&dev->list_lock, flags);
 		list_add_tail(&cmd->list, &dev->cmd_list);
 		spin_unlock_irqrestore(&dev->list_lock, flags);
-	}
+	} else
+		put_device(&dev->sdev_gendev);
 
 	return cmd;
 }				
@@ -276,7 +283,8 @@ struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int gfp_mask)
  */
 void scsi_put_command(struct scsi_cmnd *cmd)
 {
-	struct Scsi_Host *shost = cmd->device->host;
+	struct scsi_device *sdev = cmd->device;
+	struct Scsi_Host *shost = sdev->host;
 	unsigned long flags;
 	
 	/* serious error if the command hasn't come from a device list */
@@ -294,6 +302,8 @@ void scsi_put_command(struct scsi_cmnd *cmd)
 
 	if (likely(cmd != NULL))
 		kmem_cache_free(shost->cmd_pool->slab, cmd);
+
+	put_device(&sdev->sdev_gendev);
 }
 
 /*
