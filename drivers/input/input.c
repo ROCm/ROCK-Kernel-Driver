@@ -61,8 +61,6 @@ EXPORT_SYMBOL(input_event);
 static LIST_HEAD(input_dev_list);
 static LIST_HEAD(input_handler_list);
 
-static struct input_handler *input_handler;
-
 static struct input_handler *input_table[8];
 static devfs_handle_t input_devfs_handle;
 
@@ -445,7 +443,7 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 
 void input_register_device(struct input_dev *dev)
 {
-	struct input_handler *handler = input_handler;
+	struct list_head * node;
 	struct input_handle *handle;
 	struct input_device_id *id;
 
@@ -473,12 +471,11 @@ void input_register_device(struct input_dev *dev)
 /*
  * Notify handlers.
  */
-
-	while (handler) {
+	list_for_each(node,&input_handler_list) {
+		struct input_handler *handler = container_of(node,struct input_handler,node);
 		if ((id = input_match_device(handler->id_table, dev)))
 			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
-		handler = handler->next;
 	}
 
 /*
@@ -570,9 +567,7 @@ void input_register_handler(struct input_handler *handler)
 /*
  * Add the handler.
  */
-
-	handler->next = input_handler;	
-	input_handler = handler;
+	list_add_tail(&handler->node,&input_handler_list);
 	
 /*
  * Notify it about all existing devices.
@@ -614,8 +609,7 @@ void input_unregister_handler(struct input_handler *handler)
 /*
  * Remove it.
  */
-	input_find_and_remove(struct input_handler, input_handler, handler,
-				next);
+	list_del_init(&handler->node);
 
 /*
  * Remove minors.
@@ -773,13 +767,14 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 
 static int input_handlers_read(char *buf, char **start, off_t pos, int count, int *eof, void *data)
 {
-	struct input_handler *handler = input_handler;
+	struct list_head * node;
 
 	off_t at = 0;
 	int len = 0, cnt = 0;
 	int i = 0;
 
-	while (handler) {
+	list_for_each(node,&input_handler_list) {
+		struct input_handler *handler = container_of(node,struct input_handler,node);
 
 		if (handler->fops)
 			len = sprintf(buf, "N: Number=%d Name=%s Minor=%d\n",
@@ -799,11 +794,9 @@ static int input_handlers_read(char *buf, char **start, off_t pos, int count, in
 			if (cnt >= count)
 				break;
 		}
-
-		handler = handler->next;
 	}
-
-	if (!handler) *eof = 1;
+	if (node == &input_handler_list)
+		*eof = 1;
 
 	return (count > cnt) ? cnt : count;
 }

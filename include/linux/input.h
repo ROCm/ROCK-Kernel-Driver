@@ -871,7 +871,7 @@ struct input_handler {
 	struct input_device_id *id_table;
 
 	struct input_handle *handle;
-	struct input_handler *next;
+	struct list_head	node;
 };
 
 struct input_handle {
