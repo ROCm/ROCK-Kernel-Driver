@@ -1571,7 +1571,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		 */
 
 		/* get the parameters from user space */
-		if (p->ref != 1 && p->ref != -1)
+		if (floppy->ref != 1 && floppy->ref != -1)
 			return -EBUSY;
 		if (copy_from_user(&setprm, (void *) param, sizeof(setprm)))
 			return -EFAULT;
@@ -1618,7 +1618,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 				    printk (KERN_INFO "floppy%d: setting %s %p!\n",
 				        drive, dtp->name, dtp);
 				UDT = dtp;
-				set_capacity(p->disk, UDT->blocks);
+				set_capacity(floppy->disk, UDT->blocks);
 
 				if (cmd == FDDEFPRM) {
 				  /* save settings as permanent default type */
@@ -1664,7 +1664,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		UDT = dtp;
-		set_capacity(p->disk, UDT->blocks);
+		set_capacity(floppy->disk, UDT->blocks);
 
 		return 0;
 	case FDMSGON:
@@ -1678,7 +1678,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 	case FDFMTBEG:
 		return 0;
 	case FDFMTTRK:
-		if (p->ref != 1 && p->ref != -1)
+		if (floppy->ref != 1 && floppy->ref != -1)
 			return -EBUSY;
 		if (copy_from_user(&fmt_desc, (void *) param, sizeof(fmt_desc)))
 			return -EFAULT;
@@ -1687,7 +1687,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		UDT = NULL;
 		/* MSch: invalidate default_params */
 		default_params[drive].blocks  = 0;
-		set_capacity(p->disk, MAX_DISK_SIZE * 2);
+		set_capacity(floppy->disk, MAX_DISK_SIZE * 2);
 	case FDFMTEND:
 	case FDFLUSH:
 		/* invalidate the buffer track to force a reread */
