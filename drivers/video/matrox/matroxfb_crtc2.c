@@ -2,11 +2,11 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
  *
- * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.62 2001/11/29
+ * Version: 1.64 2002/06/10
  *
  */
 
@@ -103,6 +103,7 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		int mode,
 		unsigned int pos) {
 	u_int32_t tmp;
+	u_int32_t datactl;
 	MINFO_FROM(m2info->primary_dev);
 
 	switch (mode) {
@@ -117,12 +118,15 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 			tmp = 0x00800000;
 			break;
 	}
-
 	tmp |= 0x00000001;	/* enable CRTC2 */
+	datactl = 0;
 	if (ACCESS_FBINFO(outputs[1]).src == MATROXFB_SRC_CRTC2) {
 		if (ACCESS_FBINFO(devflags.g450dac)) {
 			tmp |= 0x00000006; /* source from secondary pixel PLL */
-			/* no vidrst */
+			/* no vidrst when in monitor mode */
+			if (ACCESS_FBINFO(outputs[1]).mode != MATROXFB_OUTPUT_MODE_MONITOR) {
+				tmp |=  0xC0001000; /* Enable H/V vidrst */
+			}
 		} else {
 			tmp |= 0x00000002; /* source from VDOCLK */
 			tmp |= 0xC0000000; /* enable vvidrst & hvidrst */
@@ -142,6 +146,10 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		mt->VSyncEnd >>= 1;
 		mt->VTotal >>= 1;
 	}
+	if ((mt->HTotal & 7) == 2) {
+		datactl |= 0x00000010;
+		mt->HTotal &= ~7;
+	}
 	tmp |= 0x10000000;	/* 0x10000000 is VIDRST polarity */
 	mga_outl(0x3C14, ((mt->HDisplay - 8) << 16) | (mt->HTotal - 8));
 	mga_outl(0x3C18, ((mt->HSyncEnd - 8) << 16) | (mt->HSyncStart - 8));
@@ -155,12 +163,14 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 			mga_outl(0x3C2C, pos);			/* field #1 vmemory start */
 			mga_outl(0x3C28, pos + linelen);	/* field #0 vmemory start */
 			linelen <<= 1;
+			m2info->interlaced = 1;
 		} else {
 			mga_outl(0x3C28, pos);		/* vmemory start */
+			m2info->interlaced = 0;
 		}
 		mga_outl(0x3C40, linelen);
 	}
-	mga_outl(0x3C4C, 0);		/* data control */
+	mga_outl(0x3C4C, datactl);	/* data control */
 	if (tmp & 0x02000000) {
 		int i;
 
@@ -208,7 +218,7 @@ static void matroxfb_dh_pan_var(struct matroxfb_dh_fb_info* m2info,
 	linelen = var->xres_virtual * pixelsize;
 	pos = var->yoffset * linelen + var->xoffset * pixelsize;
 	pos += m2info->video.offbase;
-	if (var->vmode & FB_VMODE_INTERLACED) {
+	if (m2info->interlaced) {
 		mga_outl(0x3C2C, pos);
 		mga_outl(0x3C28, pos + linelen);
 	} else {

@@ -425,12 +425,21 @@ CONFIG_FB_MATROX_G450
   support" here in the framebuffer section. G450/G550 secondary head
   and digital output are supported without additional modules.
   
+  The driver starts in monitor mode. You must use the matroxset tool 
+  (available at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to 
+  swap primary and secondary head outputs, or to change output mode.  
+  Secondary head driver always start in 640x480 resolution and you 
+  must use fbset to change it.
+
   Do not forget that second head supports only 16 and 32 bpp
   packed pixels, so it is a good idea to compile them into the kernel
   too. You can use only some font widths, as the driver uses generic
   painting procedures (the secondary head does not use acceleration
   engine).
   
+  G450/G550 hardware can display TV picture only from secondary CRTC,
+  and it performs no scaling, so picture must have 525 or 625 lines.
+
 CONFIG_FB_MATROX_G100A
   Say Y here if you have a Matrox G100, G200 or G400 based
   video card. If you select "Advanced lowlevel driver options", you
