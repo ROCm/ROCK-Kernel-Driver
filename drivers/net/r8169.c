@@ -1186,7 +1186,7 @@ static u32 rtl8169_rx_fill(struct rtl8169_private *tp, struct net_device *dev,
 {
 	u32 cur;
 	
-	for (cur = start; end - start > 0; cur++) {
+	for (cur = start; end - cur > 0; cur++) {
 		int ret, i = cur % NUM_RX_DESC;
 
 		if (tp->Rx_skbuff[i])
