@@ -194,6 +194,9 @@ struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
 
 	memset(&fl, 0, sizeof(fl));
 	ipv6_addr_copy(&fl.fl6_dst, &daddr->v6.sin6_addr);
+	if (ipv6_addr_type(&daddr->v6.sin6_addr) & IPV6_ADDR_LINKLOCAL)
+		fl.oif = daddr->v6.sin6_scope_id;
+	
 
 	SCTP_DEBUG_PRINTK("%s: DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
 			  __FUNCTION__, NIP6(fl.fl6_dst));
