@@ -28,8 +28,8 @@ struct ia64_node_data {
 	struct ia64_node_data	*node_data_ptrs[NR_NODES];
 	short			node_id_map[NR_BANKS];
 };
-	
-	
+
+
 /*
  * Return a pointer to the node_data structure for the executing cpu.
  */

@@ -111,6 +111,7 @@ find_max_pfn (unsigned long start, unsigned long end, void *arg)
 }
 
 #else /* CONFIG_DISCONTIGMEM */
+
 /*
  * efi_memmap_walk() knows nothing about layout of memory across nodes. Find
  * out to which node a block of memory belongs.  Ignore memory that we cannot
@@ -134,8 +135,10 @@ call_pernode_memory (unsigned long start, unsigned long end, void *arg)
 	func = arg;
 
 	if (!num_memblks) {
-		/* this machine doesn't have SRAT, */
-		/* so call func with nid=0, bank=0 */
+		/*
+		 * This machine doesn't have SRAT, so call func with
+		 * nid=0, bank=0.
+		 */
 		if (start < end)
 			(*func)(start, end - start, 0, 0);
 		return;
@@ -150,13 +153,13 @@ call_pernode_memory (unsigned long start, unsigned long end, void *arg)
 				node_memblk[i].bank);
 	}
 }
+
 #endif /* CONFIG_DISCONTIGMEM */
 
 /*
- * Filter incoming memory segments based on the primitive map created from
- * the boot parameters. Segments contained in the map are removed from the 
- * memory ranges. A caller-specified function is called with the memory
- * ranges that remain after filtering.
+ * Filter incoming memory segments based on the primitive map created from the boot
+ * parameters. Segments contained in the map are removed from the memory ranges. A
+ * caller-specified function is called with the memory ranges that remain after filtering.
  * This routine does not assume the incoming segments are sorted.
  */
 int
@@ -239,7 +242,7 @@ find_bootmap_location (unsigned long start, unsigned long end, void *arg)
 	}
 	return 0;
 }
-#endif /* CONFIG_DISCONTIGMEM */
+#endif /* !CONFIG_DISCONTIGMEM */
 
 static void
 sort_regions (struct rsvd_region *rsvd_region, int max)
@@ -306,9 +309,10 @@ find_memory (void)
 
 #ifdef CONFIG_DISCONTIGMEM
 	{
-	extern void discontig_mem_init(void);
-	bootmap_size = max_pfn = 0;	/* stop gcc warnings */
-	discontig_mem_init();
+		extern void discontig_mem_init (void);
+
+		bootmap_size = max_pfn = 0;	/* stop gcc warnings */
+		discontig_mem_init();
 	}
 #else /* !CONFIG_DISCONTIGMEM */
 
@@ -602,8 +606,6 @@ setup_per_cpu_areas (void)
 }
 
 
-static unsigned long boot_cpu_data;
-
 /*
  * cpu_init() initializes state that is per-CPU.  This function acts
  * as a 'CPU state barrier', nothing should get across.
@@ -627,21 +629,26 @@ cpu_init (void)
 		panic("Per-cpu data area too big! (%Zu > %Zu)",
 		      __per_cpu_end - __per_cpu_start, PAGE_SIZE);
 
-#ifdef CONFIG_NUMA
-	/* get_free_pages() cannot be used before cpu_init() done.	*/
-	/* BSP allocates "NR_CPUS" pages for all CPUs to avoid		*/
-	/* that AP calls get_free_pages().				*/
-	if (cpu == 0)
-		boot_cpu_data = (unsigned long)alloc_bootmem_pages(PAGE_SIZE * NR_CPUS);
-	my_cpu_data = (void *)(boot_cpu_data + (cpu * PAGE_SIZE));
+# ifdef CONFIG_NUMA
+	{
+		static unsigned long boot_cpu_data;
 
-	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
-	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
-	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
+		/*
+		 * get_free_pages() cannot be used before cpu_init() done.  BSP allocates
+		 * "NR_CPUS" pages for all CPUs to avoid that AP calls get_zeroed_page().
+		 */
+		if (cpu == 0)
+			boot_cpu_data = (unsigned long)alloc_bootmem_pages(PAGE_SIZE * NR_CPUS);
+		my_cpu_data = (void *)(boot_cpu_data + (cpu * PAGE_SIZE));
 
-	my_cpu_info->node_data = get_node_data_ptr();
-	my_cpu_info->nodeid = boot_get_local_nodeid();
-#else /* !CONFIG_NUMA */
+		memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
+		__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
+		my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
+
+		my_cpu_info->node_data = get_node_data_ptr();
+		my_cpu_info->nodeid = boot_get_local_nodeid();
+	}
+# else /* !CONFIG_NUMA */
 	/*
 	 * On the BSP, the page allocator isn't initialized by the time we get here.  On
 	 * the APs, the bootmem allocator is no longer available...
@@ -653,7 +660,7 @@ cpu_init (void)
 	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
 	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
-#endif /* !CONFIG_NUMA */
+# endif /* !CONFIG_NUMA */
 #else /* !CONFIG_SMP */
 	my_cpu_data = __phys_per_cpu_start;
 #endif /* !CONFIG_SMP */
@@ -669,7 +676,7 @@ cpu_init (void)
 
 #ifdef CONFIG_MCKINLEY
 	{
-#define FEATURE_SET 16
+#		define FEATURE_SET 16
 		struct ia64_pal_retval iprv;
 
 		if (my_cpu_info->family == 0x1f) {

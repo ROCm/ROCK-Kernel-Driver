@@ -391,17 +391,10 @@ count_reserved_pages (u64 start, u64 end, void *arg)
 {
 	unsigned long num_reserved = 0;
 	unsigned long *count = arg;
-	struct page *pg;
 
-#ifdef CONFIG_DISCONTIGMEM
 	for (; start < end; start += PAGE_SIZE)
 		if (PageReserved(virt_to_page(start)))
 			++num_reserved;
-#else
-	for (pg = virt_to_page(start); pg < virt_to_page(end); ++pg)
-		if (PageReserved(pg))
-			++num_reserved;
-#endif
 	*count += num_reserved;
 	return 0;
 }

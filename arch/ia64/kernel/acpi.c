@@ -528,7 +528,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	 * from the other chunks. When the hole is too huge ignore the chunk.
 	 * This restriction should be removed when multiple chunks per node
 	 * is supported.
-	 */ 
+	 */
 	pend = &node_memblk[num_memblks];
 	min_hole_size = 0;
 	for (p = &node_memblk[0]; p < pend; p++) {
