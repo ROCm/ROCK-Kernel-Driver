@@ -968,10 +968,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 {
 	int apicid, cpu, bit;
 
-#ifdef CONFIG_MTRR
-	/*  Must be done before other processors booted  */
-	mtrr_init_boot_cpu ();
-#endif
 	/*
 	 * Initialize the logical to physical CPU number mapping
 	 * and the per-CPU profiling counter/multiplier

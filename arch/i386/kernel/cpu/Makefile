@@ -13,4 +13,6 @@ obj-y	+=	rise.o
 obj-y	+=	nexgen.o
 obj-y	+=	umc.o
 
+obj-$(CONFIG_MTRR)	+= mtrr/
+
 include $(TOPDIR)/Rules.make
