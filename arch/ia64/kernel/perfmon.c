@@ -5065,7 +5065,7 @@ pfm_handle_work(void)
 	  * when returning to user level (PUStk=1), in which case
 	  * there is no risk of kernel stack overflow due to deep
 	  * interrupt nesting.
-	  */                                                                         */
+	  */
 	BUG_ON(flags & IA64_PSR_I);
 	local_irq_enable();
 
