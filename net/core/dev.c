@@ -111,8 +111,6 @@
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO */
-#include <linux/trigevent_hooks.h>
-
 #include <asm/current.h>
 
 /* This define, if set, will randomly drop a packet when congestion
@@ -1387,8 +1385,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 			goto out;
 	}
 
-	TRIG_EVENT(net_pkt_out_hook, skb->protocol);
-
 	/* Grab device queue */
 	spin_lock_bh(&dev->queue_lock);
 	q = dev->qdisc;
@@ -1789,8 +1785,6 @@ int netif_receive_skb(struct sk_buff *skb)
 		do_gettimeofday(&skb->stamp);
 
 	skb_bond(skb);
-
-	TRIG_EVENT(net_pkt_in_hook, skb->protocol);
 
 	__get_cpu_var(netdev_rx_stat).total++;
 

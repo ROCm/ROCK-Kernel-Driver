@@ -555,19 +555,6 @@ syscall_badsys:			! Bad syscall number
 	 nop
 	!
 good_system_call:		! Good syscall number
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	! TODO: for i386 this code only happens when not ptrace'd
-	mov 	r15, r4     	    	! pass pt_regs* as first arg
-	mov.l	__pre_syscall, r11 	! Call pre_syscall()
-	jsr	@r11	    	    	! (will chomp R[0-7])
-	 nop
-	!   	    	    	    	Reload R4-R7 from kernel stack
-	mov.l	@(OFF_R4,r15), r4   ! arg0
-	mov.l	@(OFF_R5,r15), r5
-	mov.l	@(OFF_R6,r15), r6
-	mov.l	@(OFF_R7,r15), r7   ! arg3
-	mov.l	@(OFF_R3,r15), r3   ! syscall_nr
-#endif
 	mov.l	@(TI_FLAGS,r8), r8
 	mov	#_TIF_SYSCALL_TRACE, r10
 	tst	r10, r8
@@ -583,12 +570,6 @@ syscall_call:
 	mov.l	r0, @(OFF_R0,r15)		! save the return value
 	!
 syscall_exit:
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	! TODO: for i386 this code only happens when not ptrace'd
-	mov.l	__post_syscall, r1 	    	! Call post_syscall()
-	jsr	@r1
-	 nop
-#endif
 	CLI()
 	!
 	GET_THREAD_INFO(r8)
@@ -695,13 +676,6 @@ skip_restore:
 5:	.long	0x00001000	! DSP
 7:	.long	0x30000000
 9:
-
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-__pre_syscall:
-	.long	SYMBOL_NAME(pre_syscall)
-__post_syscall:
-	.long	SYMBOL_NAME(post_syscall)
-#endif
 __INV_IMASK:
 	.long	0xffffff0f	! ~(IMASK)
 

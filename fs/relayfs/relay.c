@@ -514,17 +514,6 @@ fileop_notify_default_callback(int rchan_id,
 	return 0;
 }
 
-/*
- * ioctl() default callback.  Does nothing.
- */
-static int
-ioctl_default_callback(int rchan_id,
-		       unsigned int cmd,
-		       unsigned long arg)
-{
-	return 0;
-}
-
 /* relay channel default callbacks */
 static struct rchan_callbacks default_channel_callbacks = {
 	.buffer_start = buffer_start_default_callback,
@@ -533,7 +522,6 @@ static struct rchan_callbacks default_channel_callbacks = {
 	.user_deliver = user_deliver_default_callback,
 	.needs_resize = needs_resize_default_callback,
 	.fileop_notify = fileop_notify_default_callback,
-	.ioctl = ioctl_default_callback,
 };
 
 /**
@@ -991,8 +979,6 @@ relay_open(const char *chanpath,
 		callbacks->needs_resize = needs_resize_default_callback;
 	if (callbacks->fileop_notify == NULL)
 		callbacks->fileop_notify = fileop_notify_default_callback;
-	if (callbacks->ioctl == NULL)
-		callbacks->ioctl = ioctl_default_callback;
 	rchan->callbacks = callbacks;
 
 	/* Just to let the client know the sizes used */

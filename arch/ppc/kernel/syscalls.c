@@ -36,7 +36,6 @@
 #include <linux/utsname.h>
 #include <linux/file.h>
 #include <linux/unistd.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -59,8 +58,6 @@ sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fif
 
 	version = call >> 16; /* hack for backward compatibility */
 	call &= 0xffff;
-
-	TRIG_EVENT(ipc_call_hook, call, first);
 
 	ret = -ENOSYS;
 	switch (call) {

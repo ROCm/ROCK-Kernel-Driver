@@ -39,11 +39,6 @@ ENTRY(__do_softirq)
  */
 ret_fast_syscall:
 	disable_irq r1				@ disable interrupts
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	mov	r7, r0				@ save returned r0
-	bl	SYMBOL_NAME(post_syscall)
-	mov	r0, r7
-#endif
 	ldr	r1, [tsk, #TI_FLAGS]
 	tst	r1, #_TIF_WORK_MASK
 	bne	fast_work_pending
@@ -141,16 +136,6 @@ ENTRY(vector_swi)
 #endif
 	enable_irq ip
 
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	/* zzz note that validity of scno is not yet checked.
-	 * zzz The visualizer checks it.
-	 */
-	add	r0, sp, #S_R0			@ pointer to regs
-	bl	SYMBOL_NAME(pre_syscall)
-	add	r0, sp, #S_R0			@ pointer to regs
-	ldmia	r1, {r0 - r3}			@ have to reload r0 - r3
-#endif
-  
 	str	r4, [sp, #-S_OFF]!		@ push fifth arg
 
 	get_thread_info tsk
@@ -190,9 +175,6 @@ __sys_trace:
 
 __sys_trace_return:
 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	bl	SYMBOL_NAME(post_syscall)
-#endif
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
 	bl	syscall_trace

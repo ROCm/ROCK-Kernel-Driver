@@ -203,18 +203,6 @@ struct rchan_callbacks
         int (*fileop_notify)(int rchan_id,
 			     struct file *filp,
 			     enum relay_fileop fileop);
-
-	/*
-	 * ioctl - called in ioctl context from userspace
-	 * @rchan_id: the channel id
-	 * @cmd: ioctl cmd
-	 * @arg: ioctl cmd arg
-	 *
-	 * The return value is returned as the value from the ioctl call.
-	 *
-	 * See Documentation/filesystems/relayfs.txt for details.
-	 */
-	int (*ioctl) (int rchan_id, unsigned int cmd, unsigned long arg);
 };
 
 /*

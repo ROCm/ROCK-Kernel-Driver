@@ -47,8 +47,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include <linux/trigevent_hooks.h>
-
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
@@ -1270,8 +1268,6 @@ static int do_swap_page(struct mm_struct * mm,
 	ret = VM_FAULT_MINOR;
 	page = lookup_swap_cache(entry);
 	if (!page) {
-		/* LTT - die die die */
-	        TRIG_EVENT(mm_swap_in_hook, address);
  		swapin_readahead(entry, address, vma);
  		page = read_swap_cache_async(entry, vma, address);
 		if (!page) {

@@ -20,7 +20,6 @@
 #include <linux/efi.h>
 #include <linux/profile.h>
 #include <linux/timex.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/machvec.h>
 #include <asm/delay.h>
@@ -258,7 +257,6 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	while (1) {
 
 #ifdef CONFIG_SMP
-		TRIG_EVENT(timer_hook, regs);
 		smp_do_timer(regs);
 #endif
 		new_itm += local_cpu_data->itm_delta;

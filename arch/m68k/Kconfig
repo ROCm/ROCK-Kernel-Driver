@@ -688,19 +688,6 @@ config DEBUG_INFO
 	  Say Y here only if you plan to use gdb to debug the kernel.
 	  If you don't debug the kernel, you can say N.
 	  
-config HOOK
-	tristate "Kernel Hook support"
-	depends on DEBUG_KERNEL 
-	help
-	 The Kernel Hooks Interface is a generalised facility for placing hooks in
-	 arbitrary kernel locations. A hook is a location in the kernel that
-	 calls out of the kernel to a kernel module routine - a hook exit routine.
-	 Read Documentation/hook/HOWTO for more details.
-
-config HOOK_PROCFS
-	bool "/proc interface for hooks" 
-	depends on DEBUG_KERNEL && HOOK
-
 endmenu
 
 source "security/Kconfig"

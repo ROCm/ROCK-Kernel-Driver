@@ -21,7 +21,6 @@
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/highmem.h>
 #include <linux/module.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -254,8 +253,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		goto bad_area_nosemaphore;
 	} 
 
-	TRIG_EVENT(trap_entry_hook, 14, regs->eip);
-
 	mm = tsk->mm;
 
 	/*
@@ -342,7 +339,6 @@ good_area:
 			tsk->thread.screen_bitmap |= 1 << bit;
 	}
 	up_read(&mm->mmap_sem);
-        TRIG_EVENT(trap_exit_hook);
 	return;
 
 /*
@@ -359,10 +355,8 @@ bad_area_nosemaphore:
 		 * Valid to do another page fault here because this one came 
 		 * from user space.
 		 */
-		if (is_prefetch(regs, address)) {
-			TRIG_EVENT(trap_exit_hook);
+		if (is_prefetch(regs, address))
 			return;
-		}
 
 		tsk->thread.cr2 = address;
 		/* Kernel addresses are always protection faults */
@@ -373,7 +367,6 @@ bad_area_nosemaphore:
 		/* info.si_code has been set above */
 		info.si_addr = (void *)address;
 		force_sig_info(SIGSEGV, &info, tsk);
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
@@ -388,7 +381,6 @@ bad_area_nosemaphore:
 
 		if (nr == 6) {
 			do_invalid_op(regs, 0);
-			TRIG_EVENT(trap_exit_hook);
 			return;
 		}
 	}
@@ -396,24 +388,22 @@ bad_area_nosemaphore:
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	if (fixup_exception(regs)) {
-		TRIG_EVENT(trap_exit_hook);
+	if (fixup_exception(regs))
 		return;
-	}
 
 	/* 
 	 * Valid to do another page fault here, because if this fault
 	 * had been triggered by is_prefetch fixup_exception would have 
 	 * handled it.
 	 */
- 	if (is_prefetch(regs, address)) {
-		TRIG_EVENT(trap_exit_hook);
+ 	if (is_prefetch(regs, address))
  		return;
-	}
+
 /*
  * Oops. The kernel tried to access some bad page. We'll have to
  * terminate things with extreme prejudice.
  */
+
 	bust_spinlocks(1);
 
 	if (address < PAGE_SIZE)
@@ -468,10 +458,8 @@ do_sigbus:
 		goto no_context;
 
 	/* User space => ok to do another page fault */
-	if (is_prefetch(regs, address)) {
-		TRIG_EVENT(trap_exit_hook);
+	if (is_prefetch(regs, address))
 		return;
-	}
 
 	tsk->thread.cr2 = address;
 	tsk->thread.error_code = error_code;
@@ -481,7 +469,6 @@ do_sigbus:
 	info.si_code = BUS_ADRERR;
 	info.si_addr = (void *)address;
 	force_sig_info(SIGBUS, &info, tsk);
-	TRIG_EVENT(trap_exit_hook);
 	return;
 
 vmalloc_fault:
@@ -519,10 +506,6 @@ vmalloc_fault:
 		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))
 			goto no_context;
-		TRIG_EVENT(trap_entry_hook, 14, regs->eip);
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
-	TRIG_EVENT(trap_exit_hook);
 }
-

@@ -48,7 +48,6 @@
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/profile.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -281,7 +280,6 @@ int timer_interrupt(struct pt_regs * regs)
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
 
 #ifdef CONFIG_SMP
-		TRIG_EVENT(timer_hook, regs);
 		smp_local_timer_interrupt(regs);
 #endif
 		if (cpu == boot_cpuid) {

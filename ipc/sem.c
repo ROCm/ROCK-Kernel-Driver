@@ -71,9 +71,9 @@
 #include <linux/time.h>
 #include <linux/smp_lock.h>
 #include <linux/security.h>
-#include <linux/trigevent_hooks.h>
 #include <asm/uaccess.h>
 #include "util.h"
+
 
 #define sem_lock(id)	((struct sem_array*)ipc_lock(&sem_ids,id))
 #define sem_unlock(sma)	ipc_unlock(&(sma)->sem_perm)
@@ -238,7 +238,6 @@ asmlinkage long sys_semget (key_t key, int nsems, int semflg)
 	}
 
 	up(&sem_ids.sem);
-	TRIG_EVENT(ipc_sem_create_hook, err, semflg);
 	return err;
 }
 
