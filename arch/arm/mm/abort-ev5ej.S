@@ -28,7 +28,7 @@ ENTRY(v5ej_early_abort)
 	ldrneh	r3, [r2]			@ read aborted thumb instruction
 	ldreq	r3, [r2]			@ read aborted ARM instruction
 	movne	r3, r3, lsl #(21 - 12)		@ move thumb bit 11 to ARM bit 20
-	tst	r2, #1 << 20			@ L = 1 -> write
+	tst	r3, #1 << 20			@ L = 1 -> write
 	orreq	r1, r1, #1 << 8			@ yes.
 1:	mov	pc, lr
 

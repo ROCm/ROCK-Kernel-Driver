@@ -26,9 +26,7 @@
 #define SA1111_v2p( x )         ((x) - SA1111_VBASE + SA1111_BASE)
 
 #ifndef __ASSEMBLY__
-
-extern struct resource sa1111_resource;
-#define _SA1111(x)	((x) + sa1111_resource.start)
+#define _SA1111(x)	((x) + sa1111->resource.start)
 #endif
 
 /*
@@ -51,7 +49,8 @@ extern struct resource sa1111_resource;
  */
 #define __CCREG(x)	__REGP(SA1111_VBASE + (x))
 
-/* System Bus Interface (SBI)
+/*
+ * System Bus Interface (SBI)
  *
  * Registers
  *    SKCR	Control Register
@@ -127,28 +126,37 @@ extern struct resource sa1111_resource;
  *    SKPEN1	PWM1 Enable Register
  *    SKPWM1	PWM1 Clock Register
  */
+#define SA1111_SKPCR	0x0200
+#define SA1111_SKCDR	0x0204
+#define SA1111_SKAUD	0x0208
+#define SA1111_SKPMC	0x020c
+#define SA1111_SKPTC	0x0210
+#define SA1111_SKPEN0	0x0214
+#define SA1111_SKPWN0	0x0218
+#define SA1111_SKPEN1	0x021c
+#define SA1111_SKPWM1	0x0220
 
-#define _SKPCR		_SA1111(0x0200)
-#define _SKCDR		_SA1111(0x0204)
-#define _SKAUD		_SA1111(0x0208)
-#define _SKPMC		_SA1111(0x020c)
-#define _SKPTC		_SA1111(0x0210)
-#define _SKPEN0		_SA1111(0x0214)
-#define _SKPWM0		_SA1111(0x0218)
-#define _SKPEN1		_SA1111(0x021c)
-#define _SKPWM1		_SA1111(0x0220)
+#define _SKPCR		_SA1111(SA1111_SKPCR)
+#define _SKCDR		_SA1111(SA1111_SKCDR)
+#define _SKAUD		_SA1111(SA1111_SKAUD)
+#define _SKPMC		_SA1111(SA1111_SKPMC)
+#define _SKPTC		_SA1111(SA1111_SKPTC)
+#define _SKPEN0		_SA1111(SA1111_SKPEN0)
+#define _SKPWM0		_SA1111(SA1111_SKPWM0)
+#define _SKPEN1		_SA1111(SA1111_SKPEN1)
+#define _SKPWM1		_SA1111(SA1111_SKPWM1)
 
 #if LANGUAGE == C
 
-#define SKPCR		__CCREG(0x0200)
-#define SKCDR		__CCREG(0x0204)
-#define SKAUD		__CCREG(0x0208)
-#define SKPMC		__CCREG(0x020c)
-#define SKPTC		__CCREG(0x0210)
-#define SKPEN0		__CCREG(0x0214)
-#define SKPWM0		__CCREG(0x0218)
-#define SKPEN1		__CCREG(0x021c)
-#define SKPWM1		__CCREG(0x0220)
+#define SKPCR		__CCREG(SA1111_SKPCR)
+#define SKCDR		__CCREG(SA1111_SKCDR)
+#define SKAUD		__CCREG(SA1111_SKAUD)
+#define SKPMC		__CCREG(SA1111_SKPMC)
+#define SKPTC		__CCREG(SA1111_SKPTC)
+#define SKPEN0		__CCREG(SA1111_SKPEN0)
+#define SKPWM0		__CCREG(SA1111_SKPWM0)
+#define SKPEN1		__CCREG(SA1111_SKPEN1)
+#define SKPWM1		__CCREG(SA1111_SKPWM1)
 
 #endif  /* LANGUAGE == C */
 
@@ -674,5 +682,13 @@ extern struct resource sa1111_resource;
 
 #define PCSSR_S0_SLEEP	(1<<0)
 #define PCSSR_S1_SLEEP	(1<<1)
+
+struct sa1111_device {
+	struct device	dev;
+	struct resource	resource;
+	void		*base;
+};
+
+extern struct sa1111_device *sa1111;
 
 #endif  /* _ASM_ARCH_SA1111 */
