@@ -94,6 +94,52 @@ unsigned long __max_memory;
  * include/asm-ppc64/tlb.h file -- tgall
  */
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+DEFINE_PER_CPU(struct pte_freelist_batch *, pte_freelist_cur);
+unsigned long pte_freelist_forced_free;
+
+static void pte_free_smp_sync(void *arg)
+{
+	/* Do nothing, just ensure we sync with all CPUs */
+}
+
+/* This is only called when we are critically out of memory
+ * (and fail to get a page in pte_free_tlb).
+ */
+void pte_free_now(struct page *ptepage)
+{
+	pte_freelist_forced_free++;
+
+	smp_call_function(pte_free_smp_sync, NULL, 0, 1);
+
+	pte_free(ptepage);
+}
+
+static void pte_free_rcu_callback(void *arg)
+{
+	struct pte_freelist_batch *batch = arg;
+	unsigned int i;
+
+	for (i = 0; i < batch->index; i++)
+		pte_free(batch->pages[i]);
+	free_page((unsigned long)batch);
+}
+
+void pte_free_submit(struct pte_freelist_batch *batch)
+{
+	INIT_RCU_HEAD(&batch->rcu);
+	call_rcu(&batch->rcu, pte_free_rcu_callback, batch);
+}
+
+void pte_free_finish(void)
+{
+	/* This is safe as we are holding page_table_lock */
+	struct pte_freelist_batch **batchp = &__get_cpu_var(pte_freelist_cur);
+	
+	if (*batchp == NULL)
+		return;
+	pte_free_submit(*batchp);
+	*batchp = NULL;
+}
 
 void show_mem(void)
 {
