@@ -1789,7 +1789,7 @@ kdb_debugger(struct pt_regs *regs) {
 	} else { /* regs invalid */
 		kdb(KDB_REASON_SILENT,0,regs);
 	}
-	return 0;
+	return 1;
 }
 
 int
