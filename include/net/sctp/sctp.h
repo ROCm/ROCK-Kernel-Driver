@@ -430,12 +430,16 @@ static inline __s32 sctp_jitter(__u32 rto)
 }
 
 /* Break down data chunks at this point.  */
-static inline int sctp_frag_point(int pmtu)
+static inline int sctp_frag_point(const struct sctp_opt *sp, int pmtu)
 {
-	pmtu -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
-	pmtu -= sizeof(struct sctp_sack_chunk);
+	int frag = pmtu;
+	frag -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
+	frag -= sizeof(struct sctp_sack_chunk);
 
-	return pmtu;
+	if (sp->user_frag)
+		frag = min_t(int, frag, sp->user_frag);
+
+	return frag;
 }
 
 /* Walk through a list of TLV parameters.  Don't trust the
@@ -574,21 +578,24 @@ struct sctp6_sock {
 
 #define sctp_sk(__sk) (&((struct sctp_sock *)__sk)->sctp)
 
+/* Is a socket of this style? */
 #define sctp_style(sk, style) __sctp_style((sk), (SCTP_SOCKET_##style))
-int static inline __sctp_style(struct sock *sk, sctp_socket_type_t style)
+int static inline __sctp_style(const struct sock *sk, sctp_socket_type_t style)
 {
 	return sctp_sk(sk)->type == style;
 }
 
+/* Is the association in this state? */
 #define sctp_state(asoc, state) __sctp_state((asoc), (SCTP_STATE_##state))
-int static inline __sctp_state(struct sctp_association *asoc, 
+int static inline __sctp_state(const struct sctp_association *asoc, 
 			       sctp_state_t state)
 {
 	return asoc->state == state;
 }
 
+/* Is the socket in this state? */
 #define sctp_sstate(sk, state) __sctp_sstate((sk), (SCTP_SS_##state))
-int static inline __sctp_sstate(struct sock *sk, sctp_sock_state_t state)
+int static inline __sctp_sstate(const struct sock *sk, sctp_sock_state_t state)
 {
 	return sk->state == state;
 }

@@ -894,10 +894,10 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		SCTP_DEBUG_PRINTK("Just looked up association: "
 				  "%s. \n", asoc->debug_name);
 
-		/* We cannot send a message on a TCP-style SCTP_SS_ESTABLISHED 
+		/* We cannot send a message on a TCP-style SCTP_SS_ESTABLISHED
 		 * socket that has an association in CLOSED state. This can
 		 * happen when an accepted socket has an association that is
-		 * already CLOSED. 
+		 * already CLOSED.
 		 */
 		if (sctp_state(asoc, CLOSED) && sctp_style(sk, TCP)) {
 			err = -EPIPE;
@@ -1082,10 +1082,10 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	list_for_each_safe(pos, temp, &datamsg->chunks) {
 		chunk = list_entry(pos, struct sctp_chunk, frag_list);
 		list_del_init(pos);
-		
+
 		/* Do accounting for the write space.  */
 		sctp_set_owner_w(chunk);
-		
+
 		chunk->transport = chunk_tp;
 
 		/* Send it to the lower layers.  */
@@ -1452,7 +1452,6 @@ static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 }
 
 /*
- *
  * 7.1.5 SCTP_NODELAY
  *
  * Turn on/off any Nagle-like algorithm.  This means that packets are
@@ -1463,14 +1462,62 @@ static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 static int sctp_setsockopt_nodelay(struct sock *sk, char *optval,
 					int optlen)
 {
-	__u8 val;
+	int val;
 
-	if (optlen < sizeof(__u8))
+	if (optlen < sizeof(int))
 		return -EINVAL;
-	if (get_user(val, (__u8 *)optval))
+	if (get_user(val, (int *)optval))
 		return -EFAULT;
 
 	sctp_sk(sk)->nodelay = (val == 0) ? 0 : 1;
+	return 0;
+}
+
+/*
+ * 7.1.16 Set/clear IPv4 mapped addresses (SCTP_I_WANT_MAPPED_V4_ADDR)
+ *
+ * This socket option is a boolean flag which turns on or off mapped V4
+ * addresses.  If this option is turned on and the socket is type
+ * PF_INET6, then IPv4 addresses will be mapped to V6 representation.
+ * If this option is turned off, then no mapping will be done of V4
+ * addresses and a user will receive both PF_INET6 and PF_INET type
+ * addresses on the socket.
+ */
+static int sctp_setsockopt_mappedv4(struct sock *sk, char *optval, int optlen)
+{
+	int val;
+
+	if (optlen < sizeof(int))
+		return -EINVAL;
+	if (get_user(val, (int *)optval))
+		return -EFAULT;
+	/* FIXME: Put real support here. */
+
+	return -ENOPROTOOPT;
+}
+
+/*
+ * 7.1.17 Set the maximum fragrmentation size (SCTP_MAXSEG)
+ *
+ * This socket option specifies the maximum size to put in any outgoing
+ * SCTP chunk.  If a message is larger than this size it will be
+ * fragmented by SCTP into the specified size.  Note that the underlying
+ * SCTP implementation may fragment into smaller sized chunks when the
+ * PMTU of the underlying association is smaller than the value set by
+ * the user.
+ */
+static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
+{
+	int val;
+
+	if (optlen < sizeof(int))
+		return -EINVAL;
+	if (get_user(val, (int *)optval))
+		return -EFAULT;
+	if ((val < 8) || (val > SCTP_MAX_CHUNK_LEN))
+		return -EINVAL;
+	sctp_sk(sk)->user_frag = val;
+
 	return 0;
 }
 
@@ -1563,20 +1610,22 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	case SCTP_INITMSG:
 		retval = sctp_setsockopt_initmsg(sk, optval, optlen);
 		break;
-
 	case SCTP_SET_DEFAULT_SEND_PARAM:
 		retval = sctp_setsockopt_default_send_param(sk, optval,
 							    optlen);
 		break;
-
 	case SCTP_SET_PEER_PRIMARY_ADDR:
 		retval = sctp_setsockopt_peer_prim(sk, optval, optlen);
 		break;
-
 	case SCTP_NODELAY:
 		retval = sctp_setsockopt_nodelay(sk, optval, optlen);
 		break;
-
+	case SCTP_I_WANT_MAPPED_V4_ADDR:
+		retval = sctp_setsockopt_mappedv4(sk, optval, optlen);
+		break;
+	case SCTP_MAXSEG:
+		retval = sctp_setsockopt_maxseg(sk, optval, optlen);
+		break;
 	default:
 		retval = -ENOPROTOOPT;
 		break;
@@ -1703,7 +1752,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	/* Initialize sk's dport and daddr for getpeername() */
 	inet_sk(sk)->dport = htons(asoc->peer.port);
 	af = sctp_get_af_specific(to.sa.sa_family);
-	af->to_sk_daddr(&to, sk); 
+	af->to_sk_daddr(&to, sk);
 
 	timeo = sock_sndtimeo(sk, sk->socket->file->f_flags & O_NONBLOCK);
 	err = sctp_wait_for_connect(asoc, &timeo);
@@ -1861,12 +1910,19 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* Turn on/off any Nagle-like algorithm.  */
 	sp->nodelay           = 1;
 
+	/* Enable by default. */
+	sp->v4mapped          = 1;
+
 	/* Auto-close idle associations after the configured
 	 * number of seconds.  A value of 0 disables this
 	 * feature.  Configure through the SCTP_AUTOCLOSE socket option,
 	 * for UDP-style sockets only.
 	 */
 	sp->autoclose         = 0;
+
+	/* User specified fragmentation limit. */
+	sp->user_frag         = 0;
+
 	sp->pf = sctp_get_pf_specific(sk->family);
 
 	/* Control variables for partial data delivery. */
@@ -1978,6 +2034,10 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_penddata = asoc->peer.tsn_map.pending_data;
 	status.sstat_instrms = asoc->c.sinit_max_instreams;
 	status.sstat_outstrms = asoc->c.sinit_num_ostreams;
+	/* Just in time frag_point update. */
+	if (sctp_sk(sk)->user_frag)
+		asoc->frag_point
+			= min_t(int, asoc->frag_point, sctp_sk(sk)->user_frag);
 	status.sstat_fragmentation_point = asoc->frag_point;
 	status.sstat_primary.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
 	memcpy(&status.sstat_primary.spinfo_address,
@@ -2417,19 +2477,75 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
  */
 
 static int sctp_getsockopt_nodelay(struct sock *sk, int len,
-					char *optval, int *optlen)
+				   char *optval, int *optlen)
 {
-	__u8 val;
+	int val;
 
-	if (len < sizeof(__u8))
+	if (len < sizeof(int))
 		return -EINVAL;
 
-	len = sizeof(__u8);
+	len = sizeof(int);
 	val = (sctp_sk(sk)->nodelay == 1);
 	if (put_user(len, optlen))
 		return -EFAULT;
 	if (copy_to_user(optval, &val, len))
 		return -EFAULT;
+	return 0;
+}
+/*
+ * 7.1.16 Set/clear IPv4 mapped addresses (SCTP_I_WANT_MAPPED_V4_ADDR)
+ *
+ * This socket option is a boolean flag which turns on or off mapped V4
+ * addresses.  If this option is turned on and the socket is type
+ * PF_INET6, then IPv4 addresses will be mapped to V6 representation.
+ * If this option is turned off, then no mapping will be done of V4
+ * addresses and a user will receive both PF_INET6 and PF_INET type
+ * addresses on the socket.
+ */
+static int sctp_getsockopt_mappedv4(struct sock *sk, int len,
+				    char *optval, int *optlen)
+{
+	int val;
+	if (len < sizeof(int))
+		return -EINVAL;
+
+	len = sizeof(int);
+	/* FIXME: Until we have support, return disabled. */
+	val = 0;
+	if (put_user(len, optlen))
+		return -EFAULT;
+	if (copy_to_user(optval, &val, len))
+		return -EFAULT;
+
+	return 0;
+}
+
+/*
+ * 7.1.17 Set the maximum fragrmentation size (SCTP_MAXSEG)
+ *
+ * This socket option specifies the maximum size to put in any outgoing
+ * SCTP chunk.  If a message is larger than this size it will be
+ * fragmented by SCTP into the specified size.  Note that the underlying
+ * SCTP implementation may fragment into smaller sized chunks when the
+ * PMTU of the underlying association is smaller than the value set by
+ * the user.
+ */
+static int sctp_getsockopt_maxseg(struct sock *sk, int len,
+				  char *optval, int *optlen)
+{
+	int val;
+
+	if (len < sizeof(int))
+		return -EINVAL;
+
+	len = sizeof(int);
+
+	val = sctp_sk(sk)->user_frag;
+	if (put_user(len, optlen))
+		return -EFAULT;
+	if (copy_to_user(optval, &val, len))
+		return -EFAULT;
+
 	return 0;
 }
 
@@ -2508,6 +2624,12 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_getsockopt_nodelay(sk, len, optval, optlen);
+		break;
+	case SCTP_I_WANT_MAPPED_V4_ADDR:
+		retval = sctp_getsockopt_mappedv4(sk, len, optval, optlen);
+		break;
+	case SCTP_MAXSEG:
+		retval = sctp_getsockopt_maxseg(sk, len, optval, optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;

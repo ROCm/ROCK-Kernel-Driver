@@ -292,10 +292,12 @@ struct sctp_opt {
 	struct sctp_rtoinfo rtoinfo;
 	struct sctp_paddrparams paddrparam;
 	struct sctp_event_subscribe subscribe;
+	int user_frag;
 	__u32 autoclose;
 	__u8 nodelay;
 	__u8 disable_fragments;
 	__u8 pd_mode;
+	__u8 v4mapped;
 
 	/* Receive to here while partial delivery is in effect. */
 	struct sk_buff_head pd_lobby;

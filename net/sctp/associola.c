@@ -391,13 +391,14 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	struct sctp_opt *sp;
 	unsigned short port;
 
+	sp = sctp_sk(asoc->base.sk);
+
 	/* AF_INET and AF_INET6 share common port field. */
 	port = addr->v4.sin_port;
 
 	/* Set the port if it has not been set yet.  */
-	if (0 == asoc->peer.port) {
+	if (0 == asoc->peer.port)
 		asoc->peer.port = port;
-	}
 
 	/* Check to see if this is a duplicate. */
 	peer = sctp_assoc_lookup_paddr(asoc, addr);
@@ -426,7 +427,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	SCTP_DEBUG_PRINTK("sctp_assoc_add_peer:association %p PMTU set to "
 			  "%d\n", asoc, asoc->pmtu);
 
-	asoc->frag_point = sctp_frag_point(asoc->pmtu);
+	asoc->frag_point = sctp_frag_point(sp, asoc->pmtu);
 
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
@@ -471,7 +472,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	/* Initialize the peer's heartbeat interval based on the
 	 * sock configured value.
 	 */
-	sp = sctp_sk(asoc->base.sk);
+
 	peer->hb_interval = sp->paddrparam.spp_hbinterval * HZ;
 
 	/* Attach the remote transport to our asoc.  */
@@ -985,8 +986,9 @@ void sctp_assoc_sync_pmtu(struct sctp_association *asoc)
 	}
 
 	if (pmtu) {
+		struct sctp_opt *sp = sctp_sk(asoc->base.sk);
 		asoc->pmtu = pmtu;
-		asoc->frag_point = sctp_frag_point(pmtu);
+		asoc->frag_point = sctp_frag_point(sp, pmtu);
 	}
 
 	SCTP_DEBUG_PRINTK("%s: asoc:%p, pmtu:%d, frag_point:%d\n",

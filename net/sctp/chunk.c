@@ -158,6 +158,11 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	max -= sizeof(struct sctp_data_chunk);
 
 	whole = 0;
+
+	/* If user has specified smaller fragmentation, make it so. */
+	if (sctp_sk(asoc->base.sk)->user_frag)
+		max = min_t(int, max, sctp_sk(asoc->base.sk)->user_frag);
+
 	first_len = max;
 
 	/* Encourage Cookie-ECHO bundling. */
@@ -177,7 +182,7 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	over = msg_len % max;
 	offset = 0;
 
-	if (whole && over)
+	if ((whole > 1) || (whole && over))
 		SCTP_INC_STATS_USER(SctpFragUsrMsgs);
 
 	/* Create chunks for all the full sized DATA chunks. */
