@@ -1,5 +1,6 @@
 #ifndef _LINUX_BITOPS_H
 #define _LINUX_BITOPS_H
+#include <asm/types.h>
 #include <asm/bitops.h>
 
 /*
@@ -107,7 +108,25 @@ static inline unsigned int generic_hweight8(unsigned int w)
         return (res & 0x0F) + ((res >> 4) & 0x0F);
 }
 
-#include <asm/bitops.h>
+static inline unsigned long generic_hweight64(u64 w)
+{
+#if BITS_PER_LONG < 64
+	return generic_hweight32((unsigned int)(w >> 32)) +
+				generic_hweight32((unsigned int)w);
+#else
+	u64 res;
+	res = (w & 0x5555555555555555) + ((w >> 1) & 0x5555555555555555);
+	res = (res & 0x3333333333333333) + ((res >> 2) & 0x3333333333333333);
+	res = (res & 0x0F0F0F0F0F0F0F0F) + ((res >> 4) & 0x0F0F0F0F0F0F0F0F);
+	res = (res & 0x00FF00FF00FF00FF) + ((res >> 8) & 0x00FF00FF00FF00FF);
+	res = (res & 0x0000FFFF0000FFFF) + ((res >> 16) & 0x0000FFFF0000FFFF);
+	return (res & 0x00000000FFFFFFFF) + ((res >> 32) & 0x00000000FFFFFFFF);
+#endif
+}
 
+static inline unsigned long hweight_long(unsigned long w)
+{
+	return sizeof(w) == 4 ? generic_hweight32(w) : generic_hweight64(w);
+}
 
 #endif

@@ -614,8 +614,6 @@ static inline int de_thread(struct task_struct *tsk)
 		spin_unlock_irq(lock);
 		schedule();
 		spin_lock_irq(lock);
-		if (oldsig->group_exit_task)
-			BUG();
 	}
 	spin_unlock_irq(lock);
 

@@ -4,8 +4,8 @@
 #include <linux/device.h>
 #include <linux/mmzone.h>
 #include <linux/memblk.h>
+#include <linux/topology.h>
 
-#include <asm/topology.h>
 #include <asm/node.h>
 
 struct i386_memblk {

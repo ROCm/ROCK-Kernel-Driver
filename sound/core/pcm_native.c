@@ -862,7 +862,7 @@ static struct action_ops snd_pcm_action_pause = {
 
 static int snd_pcm_pause(snd_pcm_substream_t *substream, int push)
 {
-	return snd_pcm_action(&snd_pcm_action_pause, substream, 0);
+	return snd_pcm_action(&snd_pcm_action_pause, substream, push);
 }
 
 #ifdef CONFIG_PM

@@ -23,6 +23,7 @@
 #include <linux/capability.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -524,20 +525,22 @@ static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 {
 	loff_t ret;
 
-	lock_kernel();
+	down(&file->f_dentry->d_inode->i_sem);
 	switch (orig) {
 		case 0:
 			file->f_pos = offset;
 			ret = file->f_pos;
+			force_successful_syscall_return();
 			break;
 		case 1:
 			file->f_pos += offset;
 			ret = file->f_pos;
+			force_successful_syscall_return();
 			break;
 		default:
 			ret = -EINVAL;
 	}
-	unlock_kernel();
+	up(&file->f_dentry->d_inode->i_sem);
 	return ret;
 }
 

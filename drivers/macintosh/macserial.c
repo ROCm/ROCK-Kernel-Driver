@@ -2568,11 +2568,8 @@ no_dma:
 	serial_driver.magic = TTY_DRIVER_MAGIC;
 	serial_driver.owner = THIS_MODULE;
 	serial_driver.driver_name = "macserial";
-#ifdef CONFIG_DEVFS_FS
-	serial_driver.name = "tts/";
-#else
+	serial_driver.devfs_name = "tts/";
 	serial_driver.name = "ttyS";
-#endif /* CONFIG_DEVFS_FS */
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;
 	serial_driver.num = zs_channels_found;

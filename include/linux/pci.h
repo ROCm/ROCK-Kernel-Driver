@@ -468,10 +468,6 @@ struct pci_bus {
 
 #define pci_bus_b(n) list_entry(n, struct pci_bus, node)
 
-extern struct list_head pci_root_buses;	/* list of all known PCI buses */
-extern struct list_head pci_devices;	/* list of all devices */
-extern struct bus_type pci_bus_type;
-
 /*
  * Error values that may be returned by PCI functions.
  */
@@ -522,16 +518,17 @@ struct pci_driver {
 /* these external functions are only available when PCI support is enabled */
 #ifdef CONFIG_PCI
 
-static inline int pci_present(void)
-{
-	return !list_empty(&pci_devices);
-}
+extern struct bus_type pci_bus_type;
 
-#define pci_for_each_dev_reverse(dev) \
-	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
+/* Do NOT directly access these two variables, unless you are arch specific pci
+ * code, or pci core code. */
+extern struct list_head pci_root_buses;	/* list of all known PCI buses */
+extern struct list_head pci_devices;	/* list of all devices */
+
 #define pci_for_each_bus(bus) \
 	for(bus = pci_bus_b(pci_root_buses.next); bus != pci_bus_b(&pci_root_buses); bus = pci_bus_b(bus->node.next))
 
+int pci_present(void);
 void pcibios_fixup_bus(struct pci_bus *);
 int pcibios_enable_device(struct pci_dev *, int mask);
 char *pcibios_setup (char *str);
@@ -564,6 +561,7 @@ extern void pci_remove_bus_device(struct pci_dev *dev);
 /* Generic PCI functions exported to card drivers */
 
 struct pci_dev *pci_find_device (unsigned int vendor, unsigned int device, const struct pci_dev *from);
+struct pci_dev *pci_find_device_reverse (unsigned int vendor, unsigned int device, const struct pci_dev *from);
 struct pci_dev *pci_find_subsys (unsigned int vendor, unsigned int device,
 				 unsigned int ss_vendor, unsigned int ss_device,
 				 const struct pci_dev *from);

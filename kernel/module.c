@@ -205,6 +205,167 @@ static struct module *find_module(const char *name)
 	return NULL;
 }
 
+#ifdef CONFIG_SMP
+/* Number of blocks used and allocated. */
+static unsigned int pcpu_num_used, pcpu_num_allocated;
+/* Size of each block.  -ve means used. */
+static int *pcpu_size;
+
+static int split_block(unsigned int i, unsigned short size)
+{
+	/* Reallocation required? */
+	if (pcpu_num_used + 1 > pcpu_num_allocated) {
+		int *new = kmalloc(sizeof(new[0]) * pcpu_num_allocated*2,
+				   GFP_KERNEL);
+		if (!new)
+			return 0;
+
+		memcpy(new, pcpu_size, sizeof(new[0])*pcpu_num_allocated);
+		pcpu_num_allocated *= 2;
+		kfree(pcpu_size);
+		pcpu_size = new;
+	}
+
+	/* Insert a new subblock */
+	memmove(&pcpu_size[i+1], &pcpu_size[i],
+		sizeof(pcpu_size[0]) * (pcpu_num_used - i));
+	pcpu_num_used++;
+
+	pcpu_size[i+1] -= size;
+	pcpu_size[i] = size;
+	return 1;
+}
+
+static inline unsigned int block_size(int val)
+{
+	if (val < 0)
+		return -val;
+	return val;
+}
+
+/* Created by linker magic */
+extern char __per_cpu_start[], __per_cpu_end[];
+
+static void *percpu_modalloc(unsigned long size, unsigned long align)
+{
+	unsigned long extra;
+	unsigned int i;
+	void *ptr;
+
+	BUG_ON(align > SMP_CACHE_BYTES);
+
+	ptr = __per_cpu_start;
+	for (i = 0; i < pcpu_num_used; ptr += block_size(pcpu_size[i]), i++) {
+		/* Extra for alignment requirement. */
+		extra = ALIGN((unsigned long)ptr, align) - (unsigned long)ptr;
+		BUG_ON(i == 0 && extra != 0);
+
+		if (pcpu_size[i] < 0 || pcpu_size[i] < extra + size)
+			continue;
+
+		/* Transfer extra to previous block. */
+		if (pcpu_size[i-1] < 0)
+			pcpu_size[i-1] -= extra;
+		else
+			pcpu_size[i-1] += extra;
+		pcpu_size[i] -= extra;
+		ptr += extra;
+
+		/* Split block if warranted */
+		if (pcpu_size[i] - size > sizeof(unsigned long))
+			if (!split_block(i, size))
+				return NULL;
+
+		/* Mark allocated */
+		pcpu_size[i] = -pcpu_size[i];
+		return ptr;
+	}
+
+	printk(KERN_WARNING "Could not allocate %lu bytes percpu data\n",
+	       size);
+	return NULL;
+}
+
+static void percpu_modfree(void *freeme)
+{
+	unsigned int i;
+	void *ptr = __per_cpu_start + block_size(pcpu_size[0]);
+
+	/* First entry is core kernel percpu data. */
+	for (i = 1; i < pcpu_num_used; ptr += block_size(pcpu_size[i]), i++) {
+		if (ptr == freeme) {
+			pcpu_size[i] = -pcpu_size[i];
+			goto free;
+		}
+	}
+	BUG();
+
+ free:
+	/* Merge with previous? */
+	if (pcpu_size[i-1] >= 0) {
+		pcpu_size[i-1] += pcpu_size[i];
+		pcpu_num_used--;
+		memmove(&pcpu_size[i], &pcpu_size[i+1],
+			(pcpu_num_used - i) * sizeof(pcpu_size[0]));
+		i--;
+	}
+	/* Merge with next? */
+	if (i+1 < pcpu_num_used && pcpu_size[i+1] >= 0) {
+		pcpu_size[i] += pcpu_size[i+1];
+		pcpu_num_used--;
+		memmove(&pcpu_size[i+1], &pcpu_size[i+2],
+			(pcpu_num_used - (i+1)) * sizeof(pcpu_size[0]));
+	}
+}
+
+static unsigned int find_pcpusec(Elf_Ehdr *hdr,
+				 Elf_Shdr *sechdrs,
+				 const char *secstrings)
+{
+	return find_sec(hdr, sechdrs, secstrings, ".data.percpu");
+}
+
+static int percpu_modinit(void)
+{
+	pcpu_num_used = 2;
+	pcpu_num_allocated = 2;
+	pcpu_size = kmalloc(sizeof(pcpu_size[0]) * pcpu_num_allocated,
+			    GFP_KERNEL);
+	/* Static in-kernel percpu data (used). */
+	pcpu_size[0] = -ALIGN(__per_cpu_end-__per_cpu_start, SMP_CACHE_BYTES);
+	/* Free room. */
+	pcpu_size[1] = PERCPU_ENOUGH_ROOM + pcpu_size[0];
+	if (pcpu_size[1] < 0) {
+		printk(KERN_ERR "No per-cpu room for modules.\n");
+		pcpu_num_used = 1;
+	}
+
+	return 0;
+}	
+__initcall(percpu_modinit);
+#else /* ... !CONFIG_SMP */
+static inline void *percpu_modalloc(unsigned long size, unsigned long align)
+{
+	return NULL;
+}
+static inline void percpu_modfree(void *pcpuptr)
+{
+	BUG();
+}
+static inline unsigned int find_pcpusec(Elf_Ehdr *hdr,
+					Elf_Shdr *sechdrs,
+					const char *secstrings)
+{
+	return 0;
+}
+static inline void percpu_modcopy(void *pcpudst, const void *src,
+				  unsigned long size)
+{
+	/* pcpusec should be 0, and size of that section should be 0. */
+	BUG_ON(size != 0);
+}
+#endif /* CONFIG_SMP */
+
 #ifdef CONFIG_MODULE_UNLOAD
 /* Init the unload section of the module. */
 static void module_unload_init(struct module *mod)
@@ -913,6 +1074,8 @@ static void free_module(struct module *mod)
 	/* This may be NULL, but that's OK */
 	module_free(mod, mod->module_init);
 	kfree(mod->args);
+	if (mod->percpu)
+		percpu_modfree(mod->percpu);
 
 	/* Finally, free the core (containing the module structure) */
 	module_free(mod, mod->module_core);
@@ -939,10 +1102,11 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			    unsigned int symindex,
 			    const char *strtab,
 			    unsigned int versindex,
+			    unsigned int pcpuindex,
 			    struct module *mod)
 {
 	Elf_Sym *sym = (void *)sechdrs[symindex].sh_addr;
-	
+	unsigned long secbase;
 	unsigned int i, n = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
 	int ret = 0;
 
@@ -979,10 +1143,12 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			break;
 
 		default:
-			sym[i].st_value 
-				= (unsigned long)
-				(sechdrs[sym[i].st_shndx].sh_addr
-				 + sym[i].st_value);
+			/* Divert to percpu allocation if a percpu var. */
+			if (sym[i].st_shndx == pcpuindex)
+				secbase = (unsigned long)mod->percpu;
+			else
+				secbase = sechdrs[sym[i].st_shndx].sh_addr;
+			sym[i].st_value += secbase;
 			break;
 		}
 	}
@@ -1119,7 +1285,7 @@ static struct module *load_module(void __user *umod,
 	char *secstrings, *args, *modmagic, *strtab = NULL;
 	unsigned int i, symindex = 0, strindex = 0, setupindex, exindex,
 		exportindex, modindex, obsparmindex, infoindex, gplindex,
-		crcindex, gplcrcindex, versindex;
+		crcindex, gplcrcindex, versindex, pcpuindex;
 	long arglen;
 	struct module *mod;
 	long err = 0;
@@ -1194,6 +1360,7 @@ static struct module *load_module(void __user *umod,
 	obsparmindex = find_sec(hdr, sechdrs, secstrings, "__obsparm");
 	versindex = find_sec(hdr, sechdrs, secstrings, "__versions");
 	infoindex = find_sec(hdr, sechdrs, secstrings, ".modinfo");
+	pcpuindex = find_pcpusec(hdr, sechdrs, secstrings);
 
 	/* Don't keep modinfo section */
 	sechdrs[infoindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
@@ -1250,6 +1417,17 @@ static struct module *load_module(void __user *umod,
 	if (err < 0)
 		goto free_mod;
 
+	if (pcpuindex) {
+		/* We have a special allocation for this section. */
+		mod->percpu = percpu_modalloc(sechdrs[pcpuindex].sh_size,
+					      sechdrs[pcpuindex].sh_addralign);
+		if (!mod->percpu) {
+			err = -ENOMEM;
+			goto free_mod;
+		}
+		sechdrs[pcpuindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
+	}
+
 	/* Determine total sizes, and put offsets in sh_entsize.  For now
 	   this is done generically; there doesn't appear to be any
 	   special cases for the architectures. */
@@ -1259,7 +1437,7 @@ static struct module *load_module(void __user *umod,
 	ptr = module_alloc(mod->core_size);
 	if (!ptr) {
 		err = -ENOMEM;
-		goto free_mod;
+		goto free_percpu;
 	}
 	memset(ptr, 0, mod->core_size);
 	mod->module_core = ptr;
@@ -1303,7 +1481,8 @@ static struct module *load_module(void __user *umod,
 	set_license(mod, get_modinfo(sechdrs, infoindex, "license"));
 
 	/* Fix up syms, so that st_value is a pointer to location. */
-	err = simplify_symbols(sechdrs, symindex, strtab, versindex, mod);
+	err = simplify_symbols(sechdrs, symindex, strtab, versindex, pcpuindex,
+			       mod);
 	if (err < 0)
 		goto cleanup;
 
@@ -1341,6 +1520,10 @@ static struct module *load_module(void __user *umod,
 		if (err < 0)
 			goto cleanup;
 	}
+
+	/* Finally, copy percpu area over. */
+	percpu_modcopy(mod->percpu, (void *)sechdrs[pcpuindex].sh_addr,
+		       sechdrs[pcpuindex].sh_size);
 
 #ifdef CONFIG_KALLSYMS
 	mod->symtab = (void *)sechdrs[symindex].sh_addr;
@@ -1383,6 +1566,9 @@ static struct module *load_module(void __user *umod,
 	module_free(mod, mod->module_init);
  free_core:
 	module_free(mod, mod->module_core);
+ free_percpu:
+	if (mod->percpu)
+		percpu_modfree(mod->percpu);
  free_mod:
 	kfree(args);
  free_hdr:

@@ -298,11 +298,13 @@ static snd_kcontrol_new_t snd_ice1712_mixer_digmix_route_ac97 __devinitdata = {
 static void snd_ice1712_set_gpio_dir(ice1712_t *ice, unsigned int data)
 {
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION, data);
+	inb(ICEREG(ice, DATA)); /* dummy read for pci-posting */
 }
 
 static void snd_ice1712_set_gpio_mask(ice1712_t *ice, unsigned int data)
 {
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, data);
+	inb(ICEREG(ice, DATA)); /* dummy read for pci-posting */
 }
 
 static unsigned int snd_ice1712_get_gpio_data(ice1712_t *ice)
@@ -313,6 +315,7 @@ static unsigned int snd_ice1712_get_gpio_data(ice1712_t *ice)
 static void snd_ice1712_set_gpio_data(ice1712_t *ice, unsigned int val)
 {
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, val);
+	inb(ICEREG(ice, DATA)); /* dummy read for pci-posting */
 }
 
 

@@ -281,6 +281,13 @@ L:	linux-atm-general@lists.sourceforge.net
 W:	http://linux-atm.sourceforge.net
 S:	Maintained
 
+ATMEL WIRELESS DRIVER
+P:	Simon Kelley
+M:	simon@thekelleys.org.uk
+W:	http://www.thekelleys.org.uk/atmel
+W:	http://atmelwlandriver.sourceforge.net/
+S:	Maintained
+
 AX.25 NETWORK LAYER
 P:	Ralf Baechle
 M:	ralf@linux-mips.org
@@ -1523,6 +1530,12 @@ M:	reiserfs-dev@namesys.com
 L:	reiserfs-list@namesys.com
 W:	http://www.namesys.com
 S:	Supported
+
+ROCKETPORT DRIVER
+P:	Comtrol Corp.
+M:	support@comtrol.com
+W:	http://www.comtrol.com
+S:	Maintained
 
 ROSE NETWORK LAYER
 P:	Ralf Baechle

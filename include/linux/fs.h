@@ -917,7 +917,6 @@ struct export_operations {
 
 struct file_system_type {
 	const char *name;
-	struct subsystem subsys;
 	int fs_flags;
 	struct super_block *(*get_sb) (struct file_system_type *, int,
 				       const char *, void *);

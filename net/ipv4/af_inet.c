@@ -1068,53 +1068,21 @@ static struct inet_protocol icmp_protocol = {
 
 static int __init init_ipv4_mibs(void)
 {
-	int i;
-
-	net_statistics[0] =
-	    kmalloc_percpu(sizeof (struct linux_mib), GFP_KERNEL);
-	net_statistics[1] =
-	    kmalloc_percpu(sizeof (struct linux_mib), GFP_KERNEL);
-	ip_statistics[0] = kmalloc_percpu(sizeof (struct ip_mib), GFP_KERNEL);
-	ip_statistics[1] = kmalloc_percpu(sizeof (struct ip_mib), GFP_KERNEL);
-	icmp_statistics[0] =
-	    kmalloc_percpu(sizeof (struct icmp_mib), GFP_KERNEL);
-	icmp_statistics[1] =
-	    kmalloc_percpu(sizeof (struct icmp_mib), GFP_KERNEL);
-	tcp_statistics[0] = kmalloc_percpu(sizeof (struct tcp_mib), GFP_KERNEL);
-	tcp_statistics[1] = kmalloc_percpu(sizeof (struct tcp_mib), GFP_KERNEL);
-	udp_statistics[0] = kmalloc_percpu(sizeof (struct udp_mib), GFP_KERNEL);
-	udp_statistics[1] = kmalloc_percpu(sizeof (struct udp_mib), GFP_KERNEL);
+	net_statistics[0] = alloc_percpu(struct linux_mib);
+	net_statistics[1] = alloc_percpu(struct linux_mib);
+	ip_statistics[0] = alloc_percpu(struct ip_mib);
+	ip_statistics[1] = alloc_percpu(struct ip_mib);
+	icmp_statistics[0] = alloc_percpu(struct icmp_mib);
+	icmp_statistics[1] = alloc_percpu(struct icmp_mib);
+	tcp_statistics[0] = alloc_percpu(struct tcp_mib);
+	tcp_statistics[1] = alloc_percpu(struct tcp_mib);
+	udp_statistics[0] = alloc_percpu(struct udp_mib);
+	udp_statistics[1] = alloc_percpu(struct udp_mib);
 	if (!
 	    (net_statistics[0] && net_statistics[1] && ip_statistics[0]
 	     && ip_statistics[1] && tcp_statistics[0] && tcp_statistics[1]
 	     && udp_statistics[0] && udp_statistics[1]))
 		return -ENOMEM;
-
-	/* Set all the per cpu copies of the mibs to zero */
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i)) {
-			memset(per_cpu_ptr(net_statistics[0], i), 0,
-			       sizeof (struct linux_mib));
-			memset(per_cpu_ptr(net_statistics[1], i), 0,
-			       sizeof (struct linux_mib));
-			memset(per_cpu_ptr(ip_statistics[0], i), 0,
-			       sizeof (struct ip_mib));
-			memset(per_cpu_ptr(ip_statistics[1], i), 0,
-			       sizeof (struct ip_mib));
-			memset(per_cpu_ptr(icmp_statistics[0], i), 0,
-			       sizeof (struct icmp_mib));
-			memset(per_cpu_ptr(icmp_statistics[1], i), 0,
-			       sizeof (struct icmp_mib));
-			memset(per_cpu_ptr(tcp_statistics[0], i), 0,
-			       sizeof (struct tcp_mib));
-			memset(per_cpu_ptr(tcp_statistics[1], i), 0,
-			       sizeof (struct tcp_mib));
-			memset(per_cpu_ptr(udp_statistics[0], i), 0,
-			       sizeof (struct udp_mib));
-			memset(per_cpu_ptr(udp_statistics[1], i), 0,
-			       sizeof (struct udp_mib));
-		}
-	}
 
 	(void) tcp_mib_init();
 

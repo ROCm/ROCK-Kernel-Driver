@@ -689,7 +689,6 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 }
 EXPORT_SYMBOL(pci_scan_bus_parented);
 
-EXPORT_SYMBOL(pci_devices);
 EXPORT_SYMBOL(pci_root_buses);
 
 #ifdef CONFIG_HOTPLUG

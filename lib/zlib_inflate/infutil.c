@@ -27,8 +27,8 @@ int zlib_inflate_flush(
 )
 {
   uInt n;
-  Bytef *p;
-  Bytef *q;
+  Byte *p;
+  Byte *q;
 
   /* local copies of source and destination pointers */
   p = z->next_out;

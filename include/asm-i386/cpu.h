@@ -3,8 +3,8 @@
 
 #include <linux/device.h>
 #include <linux/cpu.h>
+#include <linux/topology.h>
 
-#include <asm/topology.h>
 #include <asm/node.h>
 
 struct i386_cpu {
