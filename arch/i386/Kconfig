@@ -430,14 +430,8 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
-config X86_NUMA
-	bool "Multi-node NUMA system support"
-	depends on SMP
-
-#Platform Choices
 config X86_NUMAQ
 	bool "Multiquad (IBM/Sequent) NUMAQ support"
-	depends on X86_NUMA
 	help
 	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
 	  multiquad box. This changes the way that processors are bootstrapped,
@@ -447,7 +441,6 @@ config X86_NUMAQ
 
 config X86_SUMMIT
 	bool "IBM x440 (Summit/EXA) support"
-	depends on X86_NUMA
 	help
 	  This option is needed for IBM systems that use the Summit/EXA chipset.
 	  In particular, it is needed for the x440.
@@ -456,7 +449,7 @@ config X86_SUMMIT
 
 config CLUSTERED_APIC
 	bool
-	depends on X86_NUMA && (X86_NUMAQ || X86_SUMMIT)
+	depends on X86_NUMAQ || X86_SUMMIT
 	default y
 
 # Common NUMA Features
