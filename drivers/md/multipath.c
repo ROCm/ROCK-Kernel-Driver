@@ -312,7 +312,7 @@ static void mark_disk_bad (mddev_t *mddev, int failed)
 	mddev->sb_dirty = 1;
 	md_wakeup_thread(conf->thread);
 	conf->working_disks--;
-	printk (DISK_FAILED, partition_name (multipath->dev),
+	printk (DISK_FAILED, bdev_partition_name (multipath->bdev),
 				 conf->working_disks);
 }
 
@@ -405,7 +405,7 @@ static void print_multipath_conf (multipath_conf_t *conf)
 			printk(" disk%d, s:%d, o:%d, n:%d rd:%d us:%d dev:%s\n",
 				i, tmp->spare,tmp->operational,
 				tmp->number,tmp->raid_disk,tmp->used_slot,
-				partition_name(tmp->dev));
+				bdev_partition_name(tmp->bdev));
 	}
 }
 
@@ -594,7 +594,6 @@ static int multipath_add_disk(mddev_t *mddev, mdp_disk_t *added_desc,
 				break;
 			p->number = added_desc->number;
 			p->raid_disk = added_desc->raid_disk;
-			p->dev = rdev->dev;
 			p->bdev = rdev->bdev;
 			p->operational = 0;
 			p->spare = 1;
@@ -631,7 +630,6 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 			}
 			if (p->spare && i < conf->raid_disks)
 				break;
-			p->dev = NODEV;
 			p->bdev = NULL;
 			p->used_slot = 0;
 			conf->nr_disks--;
@@ -853,7 +851,7 @@ static int multipath_run (mddev_t *mddev)
 		if (rdev->faulty) {
 			/* this is a "should never happen" case and if it */
 			/* ever does happen, a continue; won't help */
-			printk(ERRORS, partition_name(rdev->dev));
+			printk(ERRORS, bdev_partition_name(rdev->bdev));
 			continue;
 		} else {
 			/* this is a "should never happen" case and if it */
@@ -873,7 +871,7 @@ static int multipath_run (mddev_t *mddev)
 		disk = conf->multipaths + disk_idx;
 
 		if (!disk_sync(desc))
-			printk(NOT_IN_SYNC, partition_name(rdev->dev));
+			printk(NOT_IN_SYNC, bdev_partition_name(rdev->bdev));
 
 		/*
 		 * Mark all disks as spare to start with, then pick our
@@ -882,7 +880,6 @@ static int multipath_run (mddev_t *mddev)
 		 */
 		disk->number = desc->number;
 		disk->raid_disk = desc->raid_disk;
-		disk->dev = rdev->dev;
 		disk->bdev = rdev->bdev;
 		atomic_inc(&rdev->bdev->bd_count);
 		disk->operational = 0;
@@ -892,7 +889,7 @@ static int multipath_run (mddev_t *mddev)
 
 		if (disk_active(desc)) {
 			if(!conf->working_disks) {
-				printk(OPERATIONAL, partition_name(rdev->dev),
+				printk(OPERATIONAL, bdev_partition_name(rdev->bdev),
  					desc->raid_disk);
 				disk->operational = 1;
 				disk->spare = 0;
@@ -909,7 +906,7 @@ static int multipath_run (mddev_t *mddev)
 	if(!conf->working_disks && num_rdevs) {
 		desc = &sb->disks[def_rdev->desc_nr];
 		disk = conf->multipaths + desc->raid_disk;
-		printk(OPERATIONAL, partition_name(def_rdev->dev),
+		printk(OPERATIONAL, bdev_partition_name(def_rdev->bdev),
 			disk->raid_disk);
 		disk->operational = 1;
 		disk->spare = 0;

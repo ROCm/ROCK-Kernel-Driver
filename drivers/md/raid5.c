@@ -441,7 +441,6 @@ static void raid5_build_block (struct stripe_head *sh, int i)
 
 static int error(mddev_t *mddev, struct block_device *bdev)
 {
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	mdp_super_t *sb = mddev->sb;
 	struct disk_info *disk;
@@ -467,7 +466,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 			printk (KERN_ALERT
 				"raid5: Disk failure on %s, disabling device."
 				" Operation continuing on %d devices\n",
-				partition_name (dev), conf->working_disks);
+				bdev_partition_name(bdev), conf->working_disks);
 		}
 		return 0;
 	}
@@ -479,7 +478,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 		if (disk->bdev == bdev) {
 			printk (KERN_ALERT
 				"raid5: Disk failure on spare %s\n",
-				partition_name (dev));
+				bdev_partition_name (bdev));
 			if (!conf->spare->operational) {
 				/* probably a SET_DISK_FAULTY ioctl */
 				return -EIO;
@@ -1429,7 +1428,7 @@ static int run (mddev_t *mddev)
 		disk = conf->disks + raid_disk;
 
 		if (disk_faulty(desc)) {
-			printk(KERN_ERR "raid5: disabled device %s (errors detected)\n", partition_name(rdev->dev));
+			printk(KERN_ERR "raid5: disabled device %s (errors detected)\n", bdev_partition_name(rdev->bdev));
 			if (!rdev->faulty) {
 				MD_BUG();
 				goto abort;
@@ -1446,19 +1445,19 @@ static int run (mddev_t *mddev)
 		}
 		if (disk_active(desc)) {
 			if (!disk_sync(desc)) {
-				printk(KERN_ERR "raid5: disabled device %s (not in sync)\n", partition_name(rdev->dev));
+				printk(KERN_ERR "raid5: disabled device %s (not in sync)\n", bdev_partition_name(rdev->bdev));
 				MD_BUG();
 				goto abort;
 			}
 			if (raid_disk > sb->raid_disks) {
-				printk(KERN_ERR "raid5: disabled device %s (inconsistent descriptor)\n", partition_name(rdev->dev));
+				printk(KERN_ERR "raid5: disabled device %s (inconsistent descriptor)\n", bdev_partition_name(rdev->bdev));
 				continue;
 			}
 			if (disk->operational) {
-				printk(KERN_ERR "raid5: disabled device %s (device %d already operational)\n", partition_name(rdev->dev), raid_disk);
+				printk(KERN_ERR "raid5: disabled device %s (device %d already operational)\n", bdev_partition_name(rdev->bdev), raid_disk);
 				continue;
 			}
-			printk(KERN_INFO "raid5: device %s operational as raid disk %d\n", partition_name(rdev->dev), raid_disk);
+			printk(KERN_INFO "raid5: device %s operational as raid disk %d\n", bdev_partition_name(rdev->bdev), raid_disk);
 	
 			disk->number = desc->number;
 			disk->raid_disk = raid_disk;
@@ -1471,7 +1470,7 @@ static int run (mddev_t *mddev)
 			/*
 			 * Must be a spare disk ..
 			 */
-			printk(KERN_INFO "raid5: spare disk %s\n", partition_name(rdev->dev));
+			printk(KERN_INFO "raid5: spare disk %s\n", bdev_partition_name(rdev->bdev));
 			disk->number = desc->number;
 			disk->raid_disk = raid_disk;
 			disk->bdev = rdev->bdev;
@@ -1688,9 +1687,7 @@ static void print_raid5_conf (raid5_conf_t *conf)
 		printk(" disk %d, s:%d, o:%d, n:%d rd:%d us:%d dev:%s\n",
 			i, tmp->spare,tmp->operational,
 			tmp->number,tmp->raid_disk,tmp->used_slot,
-			partition_name(tmp->bdev ?
-					to_kdev_t(tmp->bdev->bd_dev):
-					NODEV));
+			bdev_partition_name(tmp->bdev));
 	}
 }
 

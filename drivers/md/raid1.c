@@ -589,7 +589,7 @@ static void mark_disk_bad(mddev_t *mddev, int failed)
 	md_wakeup_thread(conf->thread);
 	if (!mirror->write_only)
 		conf->working_disks--;
-	printk(DISK_FAILED, partition_name(mirror->dev), conf->working_disks);
+	printk(DISK_FAILED, bdev_partition_name(mirror->bdev), conf->working_disks);
 }
 
 static int error(mddev_t *mddev, struct block_device *bdev)
@@ -640,7 +640,7 @@ static void print_conf(conf_t *conf)
 		printk(" disk %d, s:%d, o:%d, n:%d rd:%d us:%d dev:%s\n",
 			i, tmp->spare, tmp->operational,
 			tmp->number, tmp->raid_disk, tmp->used_slot,
-			partition_name(tmp->dev));
+			bdev_partition_name(tmp->bdev));
 	}
 }
 
@@ -848,7 +848,6 @@ static int raid1_add_disk(mddev_t *mddev, mdp_disk_t *added_desc,
 				break;
 			p->number = added_desc->number;
 			p->raid_disk = added_desc->raid_disk;
-			p->dev = rdev->dev;
 			/* it will be held open by rdev */
 			p->bdev = rdev->bdev;
 			p->operational = 0;
@@ -886,7 +885,6 @@ static int raid1_remove_disk(mddev_t *mddev, int number)
 			}
 			if (p->spare && (i < conf->raid_disks))
 				break;
-			p->dev = NODEV;
 			p->bdev = NULL;
 			p->used_slot = 0;
 			conf->nr_disks--;
@@ -1284,7 +1282,7 @@ static int run(mddev_t *mddev)
 
 	ITERATE_RDEV(mddev, rdev, tmp) {
 		if (rdev->faulty) {
-			printk(ERRORS, partition_name(rdev->dev));
+			printk(ERRORS, bdev_partition_name(rdev->bdev));
 		} else {
 			if (!rdev->sb) {
 				MD_BUG();
@@ -1302,7 +1300,6 @@ static int run(mddev_t *mddev)
 		if (disk_faulty(descriptor)) {
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
-			disk->dev = rdev->dev;
 			disk->bdev = rdev->bdev;
 			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 0;
@@ -1315,27 +1312,26 @@ static int run(mddev_t *mddev)
 		if (disk_active(descriptor)) {
 			if (!disk_sync(descriptor)) {
 				printk(NOT_IN_SYNC,
-					partition_name(rdev->dev));
+					bdev_partition_name(rdev->bdev));
 				continue;
 			}
 			if ((descriptor->number > MD_SB_DISKS) ||
 					(disk_idx > sb->raid_disks)) {
 
 				printk(INCONSISTENT,
-					partition_name(rdev->dev));
+					bdev_partition_name(rdev->bdev));
 				continue;
 			}
 			if (disk->operational) {
 				printk(ALREADY_RUNNING,
-					partition_name(rdev->dev),
+					bdev_partition_name(rdev->bdev),
 					disk_idx);
 				continue;
 			}
-			printk(OPERATIONAL, partition_name(rdev->dev),
+			printk(OPERATIONAL, bdev_partition_name(rdev->bdev),
 					disk_idx);
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
-			disk->dev = rdev->dev;
 			disk->bdev = rdev->bdev;
 			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 1;
@@ -1348,10 +1344,9 @@ static int run(mddev_t *mddev)
 		/*
 		 * Must be a spare disk ..
 		 */
-			printk(SPARE, partition_name(rdev->dev));
+			printk(SPARE, bdev_partition_name(rdev->bdev));
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
-			disk->dev = rdev->dev;
 			disk->bdev = rdev->bdev;
 			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 0;
@@ -1385,7 +1380,6 @@ static int run(mddev_t *mddev)
 				!disk->used_slot) {
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
-			disk->dev = NODEV;
 			disk->bdev = NULL;
 			disk->operational = 0;
 			disk->write_only = 0;
