@@ -1818,28 +1818,27 @@ qla2x00_config_dma_addressing(scsi_qla_host_t *ha)
 	 * assist in setting the proper dma mask.
 	 */
 	if (sizeof(dma_addr_t) > 4) {
-		/* Update our PCI device dma_mask for full 64 bits */
-		if (pci_set_dma_mask(ha->pdev, 0xffffffffffffffffULL) == 0) {
+		if (pci_set_dma_mask(ha->pdev, DMA_64BIT_MASK) == 0) {
 			ha->flags.enable_64bit_addressing = 1;
 			ha->calc_request_entries = qla2x00_calc_iocbs_64;
 			ha->build_scsi_iocbs = qla2x00_build_scsi_iocbs_64;
 
 			if (pci_set_consistent_dma_mask(ha->pdev,
-			    0xffffffffffffffffULL)) {
+			    DMA_64BIT_MASK)) {
 				qla_printk(KERN_DEBUG, ha, 
 				    "Failed to set 64 bit PCI consistent mask; "
 				    "using 32 bit.\n");
 				pci_set_consistent_dma_mask(ha->pdev,
-				    0xffffffffULL);
+				    DMA_32BIT_MASK);
 			}
 		} else {
 			qla_printk(KERN_DEBUG, ha,
 			    "Failed to set 64 bit PCI DMA mask, falling back "
 			    "to 32 bit MASK.\n");
-			pci_set_dma_mask(ha->pdev, 0xffffffff);
+			pci_set_dma_mask(ha->pdev, DMA_32BIT_MASK);
 		}
 	} else {
-		pci_set_dma_mask(ha->pdev, 0xffffffff);
+		pci_set_dma_mask(ha->pdev, DMA_32BIT_MASK);
 	}
 }
 
@@ -2813,6 +2812,7 @@ qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha)
 static uint8_t
 qla2x00_mem_alloc(scsi_qla_host_t *ha)
 {
+	char	name[16];
 	uint8_t   status = 1;
 	int	retry= 10;
 
@@ -2823,9 +2823,9 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		 * bug where available mem is not allocated until after a
 		 * little delay and a retry.
 		 */
-		ha->request_ring = pci_alloc_consistent(ha->pdev,
-		    ((ha->request_q_length + 1) * (sizeof(request_t))),
-		    &ha->request_dma);
+		ha->request_ring = dma_alloc_coherent(&ha->pdev->dev,
+		    (ha->request_q_length + 1) * sizeof(request_t),
+		    &ha->request_dma, GFP_KERNEL);
 		if (ha->request_ring == NULL) {
 			qla_printk(KERN_WARNING, ha,
 			    "Memory Allocation failed - request_ring\n");
@@ -2836,9 +2836,9 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			continue;
 		}
 
-		ha->response_ring = pci_alloc_consistent(ha->pdev,
-		    ((ha->response_q_length + 1) * (sizeof(response_t))),
-		    &ha->response_dma);
+		ha->response_ring = dma_alloc_coherent(&ha->pdev->dev,
+		    (ha->response_q_length + 1) * sizeof(response_t),
+		    &ha->response_dma, GFP_KERNEL);
 		if (ha->response_ring == NULL) {
 			qla_printk(KERN_WARNING, ha,
 			    "Memory Allocation failed - response_ring\n");
@@ -2849,19 +2849,58 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			continue;
 		}
 
-		/* get consistent memory allocated for init control block */
-		ha->init_cb = pci_alloc_consistent(ha->pdev,
-		    sizeof(init_cb_t), &ha->init_cb_dma);
-		if (ha->init_cb == NULL) {
+		ha->gid_list = dma_alloc_coherent(&ha->pdev->dev, GID_LIST_SIZE,
+		    &ha->gid_list_dma, GFP_KERNEL);
+		if (ha->gid_list == NULL) {
 			qla_printk(KERN_WARNING, ha,
-			    "Memory Allocation failed - init_cb\n");
+			    "Memory Allocation failed - gid_list\n");
 
 			qla2x00_mem_free(ha);
 			msleep(100);
 
 			continue;
 		}
-		memset(ha->init_cb, 0, sizeof(init_cb_t));
+
+		ha->rlc_rsp = dma_alloc_coherent(&ha->pdev->dev,
+		    sizeof(rpt_lun_cmd_rsp_t), &ha->rlc_rsp_dma, GFP_KERNEL);
+		if (ha->rlc_rsp == NULL) {
+			qla_printk(KERN_WARNING, ha,
+				"Memory Allocation failed - rlc");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
+
+			continue;
+		}
+
+		snprintf(name, sizeof(name), "qla2xxx_%ld", ha->host_no);
+		ha->s_dma_pool = dma_pool_create(name, &ha->pdev->dev,
+		    DMA_POOL_SIZE, 8, 0);
+		if (ha->s_dma_pool == NULL) {
+			qla_printk(KERN_WARNING, ha,
+			    "Memory Allocation failed - s_dma_pool\n");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
+
+			continue;
+		}
+
+
+		/* Get consistent memory allocated for Get Port Database cmd */
+		ha->iodesc_pd = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
+		    &ha->iodesc_pd_dma);
+		if (ha->iodesc_pd == NULL) {
+			/* error */
+			qla_printk(KERN_WARNING, ha,
+			    "Memory Allocation failed - iodesc_pd\n");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
+
+			continue;
+		}
+		memset(ha->iodesc_pd, 0, PORT_DATABASE_SIZE);
 
 		/* Allocate ioctl related memory. */
 		if (qla2x00_alloc_ioctl_mem(ha)) {
@@ -2888,8 +2927,9 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		/* Allocate memory for SNS commands */
 		if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 			/* Get consistent memory allocated for SNS commands */
-			ha->sns_cmd = pci_alloc_consistent(ha->pdev,
-			    sizeof(struct sns_cmd_pkt), &ha->sns_cmd_dma);
+			ha->sns_cmd = dma_alloc_coherent(&ha->pdev->dev,
+			    sizeof(struct sns_cmd_pkt), &ha->sns_cmd_dma,
+			    GFP_KERNEL);
 			if (ha->sns_cmd == NULL) {
 				/* error */
 				qla_printk(KERN_WARNING, ha,
@@ -2903,8 +2943,8 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			memset(ha->sns_cmd, 0, sizeof(struct sns_cmd_pkt));
 		} else {
 			/* Get consistent memory allocated for MS IOCB */
-			ha->ms_iocb = pci_alloc_consistent(ha->pdev,
-			    sizeof(ms_iocb_entry_t), &ha->ms_iocb_dma);
+			ha->ms_iocb = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
+			    &ha->ms_iocb_dma);
 			if (ha->ms_iocb == NULL) {
 				/* error */
 				qla_printk(KERN_WARNING, ha,
@@ -2921,8 +2961,9 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			 * Get consistent memory allocated for CT SNS
 			 * commands
 			 */
-			ha->ct_sns = pci_alloc_consistent(ha->pdev,
-			    sizeof(struct ct_sns_pkt), &ha->ct_sns_dma);
+			ha->ct_sns = dma_alloc_coherent(&ha->pdev->dev,
+			    sizeof(struct ct_sns_pkt), &ha->ct_sns_dma,
+			    GFP_KERNEL);
 			if (ha->ct_sns == NULL) {
 				/* error */
 				qla_printk(KERN_WARNING, ha,
@@ -3005,52 +3046,67 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 	/* free sp pool */
 	qla2x00_free_sp_pool(ha);
 
-	if (ha->iodesc_pd) {
-		pci_free_consistent(ha->pdev, PORT_DATABASE_SIZE,
-		    ha->iodesc_pd, ha->iodesc_pd_dma);
-	}
+	if (ha->sns_cmd)
+		dma_free_coherent(&ha->pdev->dev, sizeof(struct sns_cmd_pkt),
+		    ha->sns_cmd, ha->sns_cmd_dma);
 
-	if (ha->sns_cmd) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(struct sns_cmd_pkt), ha->sns_cmd, ha->sns_cmd_dma);
-	}
+	if (ha->ct_sns)
+		dma_free_coherent(&ha->pdev->dev, sizeof(struct ct_sns_pkt),
+		    ha->ct_sns, ha->ct_sns_dma);
 
-	if (ha->ct_sns) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(struct ct_sns_pkt), ha->ct_sns, ha->ct_sns_dma);
-	}
-	if (ha->ms_iocb) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(ms_iocb_entry_t), ha->ms_iocb, ha->ms_iocb_dma);
-	}
+	if (ha->ms_iocb)
+		dma_pool_free(ha->s_dma_pool, ha->ms_iocb, ha->ms_iocb_dma);
 
-	if (ha->init_cb) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(init_cb_t), ha->init_cb, ha->init_cb_dma);
-	}
+	if (ha->iodesc_pd)
+		dma_pool_free(ha->s_dma_pool, ha->iodesc_pd, ha->iodesc_pd_dma);
 
-	if (ha->request_ring) {
-		pci_free_consistent(ha->pdev,
-		    ((ha->request_q_length + 1) * (sizeof(request_t))),
-		    ha->request_ring, ha->request_dma);
-	}
+	if (ha->init_cb)
+		dma_pool_free(ha->s_dma_pool, ha->init_cb, ha->init_cb_dma);
 
-	if (ha->response_ring) {
-		pci_free_consistent(ha->pdev,
-		    ((ha->response_q_length + 1) * (sizeof(response_t))),
+	if (ha->s_dma_pool)
+		dma_pool_destroy(ha->s_dma_pool);
+
+	if (ha->rlc_rsp)
+		dma_free_coherent(&ha->pdev->dev,
+		    sizeof(rpt_lun_cmd_rsp_t), ha->rlc_rsp,
+		    ha->rlc_rsp_dma);
+
+	if (ha->gid_list)
+		dma_free_coherent(&ha->pdev->dev, GID_LIST_SIZE, ha->gid_list,
+		    ha->gid_list_dma);
+
+	if (ha->response_ring)
+		dma_free_coherent(&ha->pdev->dev,
+		    (ha->response_q_length + 1) * sizeof(response_t),
 		    ha->response_ring, ha->response_dma);
-	}
 
+	if (ha->request_ring)
+		dma_free_coherent(&ha->pdev->dev,
+		    (ha->request_q_length + 1) * sizeof(request_t),
+		    ha->request_ring, ha->request_dma);
+
+	ha->sns_cmd = NULL;
+	ha->sns_cmd_dma = 0;
+	ha->ct_sns = NULL;
+	ha->ct_sns_dma = 0;
+	ha->ms_iocb = NULL;
+	ha->ms_iocb_dma = 0;
 	ha->iodesc_pd = NULL;
 	ha->iodesc_pd_dma = 0;
-	ha->ct_sns = NULL;
-	ha->ms_iocb = NULL;
-
 	ha->init_cb = NULL;
-	ha->request_ring = NULL;
-	ha->request_dma = 0;
+	ha->init_cb_dma = 0;
+
+	ha->s_dma_pool = NULL;
+
+	ha->rlc_rsp = NULL;
+	ha->rlc_rsp_dma = 0;
+	ha->gid_list = NULL;
+	ha->gid_list_dma = 0;
+
 	ha->response_ring = NULL;
 	ha->response_dma = 0;
+	ha->request_ring = NULL;
+	ha->request_dma = 0;
 
 	list_for_each_safe(fcpl, fcptemp, &ha->fcports) {
 		fcport = list_entry(fcpl, fc_port_t, list);
@@ -3069,16 +3125,15 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 	}
 	INIT_LIST_HEAD(&ha->fcports);
 
-	if (ha->fw_dump) {
+	if (ha->fw_dump)
 		free_pages((unsigned long)ha->fw_dump, ha->fw_dump_order);
-		ha->fw_dump = NULL;
-	}
 
-	if (ha->fw_dump_buffer) {
+	if (ha->fw_dump_buffer)
 		vfree(ha->fw_dump_buffer);
-		ha->fw_dump_reading = 0;
-		ha->fw_dump_buffer = NULL;
-	}
+
+	ha->fw_dump = NULL;
+	ha->fw_dump_reading = 0;
+	ha->fw_dump_buffer = NULL;
 }
 
 /*

@@ -51,8 +51,7 @@ static void qla2x00_update_fcport(scsi_qla_host_t *, fc_port_t *);
 static void qla2x00_lun_discovery(scsi_qla_host_t *, fc_port_t *);
 static int qla2x00_rpt_lun_discovery(scsi_qla_host_t *, fc_port_t *,
     inq_cmd_rsp_t *, dma_addr_t);
-static int qla2x00_report_lun(scsi_qla_host_t *, fc_port_t *,
-    rpt_lun_cmd_rsp_t *, dma_addr_t);
+static int qla2x00_report_lun(scsi_qla_host_t *, fc_port_t *);
 static fc_lun_t *qla2x00_cfg_lun(scsi_qla_host_t *, fc_port_t *, uint16_t,
     inq_cmd_rsp_t *, dma_addr_t);
 static fc_lun_t * qla2x00_add_lun(fc_port_t *, uint16_t);
@@ -690,8 +689,9 @@ qla2x00_resize_request_q(scsi_qla_host_t *ha)
 		return;
 
 	/* Attempt to claim larger area for request queue. */
-	request_ring = pci_alloc_consistent(ha->pdev,
-	    (request_q_length + 1) * sizeof(request_t), &request_dma);
+	request_ring = dma_alloc_coherent(&ha->pdev->dev,
+	    (request_q_length + 1) * sizeof(request_t), &request_dma,
+	    GFP_KERNEL);
 	if (request_ring == NULL)
 		return;
 
@@ -702,7 +702,7 @@ qla2x00_resize_request_q(scsi_qla_host_t *ha)
 	    "(%d -> %d)...\n", ha->request_q_length, request_q_length);
 
 	/* Clear old allocations. */
-	pci_free_consistent(ha->pdev,
+	dma_free_coherent(&ha->pdev->dev,
 	    (ha->request_q_length + 1) * sizeof(request_t), ha->request_ring,
 	    ha->request_dma);
 
@@ -1710,50 +1710,28 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 
 	uint16_t	index;
 	uint16_t	entries;
-	struct dev_id {
-		uint8_t	al_pa;
-		uint8_t	area;
-		uint8_t	domain;		
-		uint8_t	loop_id_2100;	/* ISP2100/ISP2200 -- 4 bytes. */
-		uint16_t loop_id;	/* ISP23XX         -- 6 bytes. */
-	} *id_list;
-#define MAX_ID_LIST_SIZE (sizeof(struct dev_id) * MAX_FIBRE_DEVICES)
-	dma_addr_t	id_list_dma;
 	char		*id_iter;
 	uint16_t	loop_id;
 	uint8_t		domain, area, al_pa;
 
 	found_devs = 0;
 	new_fcport = NULL;
-
 	entries = MAX_FIBRE_DEVICES;
-	id_list = pci_alloc_consistent(ha->pdev, MAX_ID_LIST_SIZE,
-	    &id_list_dma);
-	if (id_list == NULL) {
-		DEBUG2(printk("scsi(%ld): Failed to allocate memory, No local "
-		    "loop\n", ha->host_no));
-
-		qla_printk(KERN_WARNING, ha,
-		    "Memory Allocation failed - port_list");
-
-		ha->mem_err++;
-		return (QLA_MEMORY_ALLOC_FAILED);
-	}
-	memset(id_list, 0, MAX_ID_LIST_SIZE);
 
 	DEBUG3(printk("scsi(%ld): Getting FCAL position map\n", ha->host_no));
 	DEBUG3(qla2x00_get_fcal_position_map(ha, NULL));
 
 	/* Get list of logged in devices. */
-	rval = qla2x00_get_id_list(ha, id_list, id_list_dma, &entries);
-	if (rval != QLA_SUCCESS) {
+	memset(ha->gid_list, 0, GID_LIST_SIZE);
+	rval = qla2x00_get_id_list(ha, ha->gid_list, ha->gid_list_dma,
+	    &entries);
+	if (rval != QLA_SUCCESS)
 		goto cleanup_allocation;
-	}
 
 	DEBUG3(printk("scsi(%ld): Entries in ID list (%d)\n",
 	    ha->host_no, entries));
-	DEBUG3(qla2x00_dump_buffer((uint8_t *)id_list,
-	    entries * sizeof(struct dev_id)));
+	DEBUG3(qla2x00_dump_buffer((uint8_t *)ha->gid_list,
+	    entries * sizeof(struct gid_list_info)));
 
 	/* Allocate temporary fcport for any new fcports discovered. */
 	new_fcport = qla2x00_alloc_fcport(ha, GFP_KERNEL);
@@ -1781,18 +1759,18 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 	}
 
 	/* Add devices to port list. */
-	id_iter = (char *)id_list;
+	id_iter = (char *)ha->gid_list;
 	for (index = 0; index < entries; index++) {
-		domain = ((struct dev_id *)id_iter)->domain;
-		area = ((struct dev_id *)id_iter)->area;
-		al_pa = ((struct dev_id *)id_iter)->al_pa;
+		domain = ((struct gid_list_info *)id_iter)->domain;
+		area = ((struct gid_list_info *)id_iter)->area;
+		al_pa = ((struct gid_list_info *)id_iter)->al_pa;
 		if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
-			loop_id =
-			    (uint16_t)((struct dev_id *)id_iter)->loop_id_2100;
+			loop_id = (uint16_t)
+			    ((struct gid_list_info *)id_iter)->loop_id_2100;
 			id_iter += 4;
 		} else {
-			loop_id =
-			    le16_to_cpu(((struct dev_id *)id_iter)->loop_id);
+			loop_id = le16_to_cpu(
+			    ((struct gid_list_info *)id_iter)->loop_id);
 			id_iter += 6;
 		}
 
@@ -1863,8 +1841,6 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 	}
 
 cleanup_allocation:
-	pci_free_consistent(ha->pdev, MAX_ID_LIST_SIZE, id_list, id_list_dma);
-
 	if (new_fcport)
 		kfree(new_fcport);
 
@@ -1972,7 +1948,7 @@ qla2x00_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport)
 	dma_addr_t	inq_dma;
 	uint16_t	lun;
 
-	inq = pci_alloc_consistent(ha->pdev, sizeof(inq_cmd_rsp_t), &inq_dma);
+	inq = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL, &inq_dma);
 	if (inq == NULL) {
 		qla_printk(KERN_WARNING, ha,
 		    "Memory Allocation failed - INQ\n");
@@ -1988,7 +1964,7 @@ qla2x00_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport)
 		}
 	}
 
-	pci_free_consistent(ha->pdev, sizeof(inq_cmd_rsp_t), inq, inq_dma);
+	dma_pool_free(ha->s_dma_pool, inq, inq_dma);
 }
 
 /*
@@ -2012,8 +1988,6 @@ qla2x00_rpt_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport,
 	int			rval;
 	uint32_t		len, cnt;
 	uint16_t		lun;
-	rpt_lun_cmd_rsp_t	*rlc;
-	dma_addr_t		rlc_dma;
 
 	/* Assume a failed status */
 	rval = QLA_FUNCTION_FAILED;
@@ -2022,30 +1996,19 @@ qla2x00_rpt_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport,
 	if ((fcport->flags & FCF_RLC_SUPPORT) == 0)
 		return (rval);
 
-	rlc = pci_alloc_consistent(ha->pdev, sizeof(rpt_lun_cmd_rsp_t),
-	    &rlc_dma);
-	if (rlc == NULL) {
-		qla_printk(KERN_WARNING, ha,
-			"Memory Allocation failed - RLC");
-		return QLA_MEMORY_ALLOC_FAILED;
-	}
-
-	rval = qla2x00_report_lun(ha, fcport, rlc, rlc_dma);
-	if (rval != QLA_SUCCESS) {
-		pci_free_consistent(ha->pdev, sizeof(rpt_lun_cmd_rsp_t), rlc,
-		    rlc_dma);
+	rval = qla2x00_report_lun(ha, fcport);
+	if (rval != QLA_SUCCESS)
 		return (rval);
-	}
 
 	/* Always add a fc_lun_t structure for lun 0 -- mid-layer requirement */
 	qla2x00_add_lun(fcport, 0);
 
 	/* Configure LUN list. */
-	len = be32_to_cpu(rlc->list.hdr.len);
+	len = be32_to_cpu(ha->rlc_rsp->list.hdr.len);
 	len /= 8;
 	for (cnt = 0; cnt < len; cnt++) {
-		lun = CHAR_TO_SHORT(rlc->list.lst[cnt].lsb,
-		    rlc->list.lst[cnt].msb.b);
+		lun = CHAR_TO_SHORT(ha->rlc_rsp->list.lst[cnt].lsb,
+		    ha->rlc_rsp->list.lst[cnt].msb.b);
 
 		DEBUG3(printk("scsi(%ld): RLC lun = (%d)\n", ha->host_no, lun));
 
@@ -2055,8 +2018,6 @@ qla2x00_rpt_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport,
 		}
 	}
 	atomic_set(&fcport->state, FCS_ONLINE);
-
-	pci_free_consistent(ha->pdev, sizeof(rpt_lun_cmd_rsp_t), rlc, rlc_dma);
 
 	return (rval);
 }
@@ -2068,8 +2029,6 @@ qla2x00_rpt_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport,
  * Input:
  *	ha:		adapter state pointer.
  *	fcport:		FC port structure pointer.
- *	mem:		pointer to dma memory object for report LUN IOCB
- *			packet.
  *
  * Returns:
  *	qla2x00 local function return status code.
@@ -2078,15 +2037,18 @@ qla2x00_rpt_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport,
  *	Kernel context.
  */
 static int
-qla2x00_report_lun(scsi_qla_host_t *ha,
-    fc_port_t *fcport, rpt_lun_cmd_rsp_t *rlc, dma_addr_t rlc_dma)
+qla2x00_report_lun(scsi_qla_host_t *ha, fc_port_t *fcport)
 {
 	int rval;
 	uint16_t retries;
 	uint16_t comp_status;
 	uint16_t scsi_status;
+	rpt_lun_cmd_rsp_t *rlc;
+	dma_addr_t rlc_dma;
 
 	rval = QLA_FUNCTION_FAILED;
+	rlc = ha->rlc_rsp;
+	rlc_dma = ha->rlc_rsp_dma;
 
 	for (retries = 3; retries; retries--) {
 		memset(rlc, 0, sizeof(rpt_lun_cmd_rsp_t));
