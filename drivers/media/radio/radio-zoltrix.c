@@ -320,20 +320,20 @@ static struct zol_device zoltrix_unit;
 
 static struct file_operations zoltrix_fops =
 {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		zol_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= zol_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device zoltrix_radio =
 {
-	owner:		THIS_MODULE,
-	name:		"Zoltrix Radio Plus",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_ZOLTRIX,
-	fops:           &zoltrix_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Zoltrix Radio Plus",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_ZOLTRIX,
+	.fops           = &zoltrix_fops,
 };
 
 static int __init zoltrix_init(void)

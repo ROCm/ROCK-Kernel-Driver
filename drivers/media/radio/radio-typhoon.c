@@ -251,26 +251,26 @@ static int typhoon_ioctl(struct inode *inode, struct file *file,
 
 static struct typhoon_device typhoon_unit =
 {
-	iobase:		CONFIG_RADIO_TYPHOON_PORT,
-	curfreq:	CONFIG_RADIO_TYPHOON_MUTEFREQ,
-	mutefreq:	CONFIG_RADIO_TYPHOON_MUTEFREQ,
+	.iobase		= CONFIG_RADIO_TYPHOON_PORT,
+	.curfreq	= CONFIG_RADIO_TYPHOON_MUTEFREQ,
+	.mutefreq	= CONFIG_RADIO_TYPHOON_MUTEFREQ,
 };
 
 static struct file_operations typhoon_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		typhoon_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= typhoon_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device typhoon_radio =
 {
-	owner:		THIS_MODULE,
-	name:		"Typhoon Radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_TYPHOON,
-	fops:           &typhoon_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Typhoon Radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_TYPHOON,
+	.fops           = &typhoon_fops,
 };
 
 #ifdef CONFIG_RADIO_TYPHOON_PROC_FS
