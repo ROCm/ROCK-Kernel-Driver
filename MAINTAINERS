@@ -2207,6 +2207,13 @@ M:	dbrownell@users.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
+USB W996[87]CF DRIVER
+P:	Luca Risolia
+M:	luca_ing@libero.it
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://go.lamarinapunto.com
+S:	Maintained
+
 USER-MODE LINUX
 P:	Jeff Dike
 M:	jdike@karaya.com

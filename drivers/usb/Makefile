@@ -34,6 +34,7 @@ obj-$(CONFIG_USB_PWC)		+= media/
 obj-$(CONFIG_USB_SE401)		+= media/
 obj-$(CONFIG_USB_STV680)	+= media/
 obj-$(CONFIG_USB_VICAM)		+= media/
+obj-$(CONFIG_USB_W9968CF)	+= media/
 
 obj-$(CONFIG_USB_CATC)		+= net/
 obj-$(CONFIG_USB_KAWETH)	+= net/
@@ -58,4 +59,3 @@ obj-$(CONFIG_USB_SPEEDTOUCH)	+= misc/
 obj-$(CONFIG_USB_TEST)		+= misc/
 obj-$(CONFIG_USB_TIGL)		+= misc/
 obj-$(CONFIG_USB_USS720)	+= misc/
-
