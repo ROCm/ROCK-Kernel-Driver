@@ -218,6 +218,9 @@ struct ata_queued_cmd {
 	struct scsi_cmnd	*scsicmd;
 	void			(*scsidone)(struct scsi_cmnd *);
 
+	struct ata_taskfile	tf;
+	u8			cdb[ATAPI_CDB_LEN];
+
 	unsigned long		flags;		/* ATA_QCFLAG_xxx */
 	unsigned int		tag;
 	unsigned int		n_elem;
@@ -229,7 +232,6 @@ struct ata_queued_cmd {
 	unsigned int		cursg;
 	unsigned int		cursg_ofs;
 
-	struct ata_taskfile	tf;
 	struct scatterlist	sgent;
 	void			*buf_virt;
 
@@ -285,6 +287,7 @@ struct ata_port {
 	unsigned int		mwdma_mask;
 	unsigned int		udma_mask;
 	unsigned int		cbl;	/* cable type; ATA_CBL_xxx */
+	unsigned int		cdb_len;
 
 	struct ata_device	device[ATA_MAX_DEVICES];
 

@@ -1099,10 +1099,13 @@ retry:
 		if (ata_id_is_ata(dev))		/* sanity check */
 			goto err_out_nosup;
 
-		/* see if 16-byte commands supported */
-		tmp = dev->id[0] & 0x3;
-		if (tmp == 1)
-			ap->host->max_cmd_len = 16;
+		rc = atapi_cdb_len(dev->id);
+		if ((rc < 12) || (rc > ATAPI_CDB_LEN)) {
+			printk(KERN_WARNING "ata%u: unsupported CDB len\n", ap->id);
+			goto err_out_nosup;
+		}
+		ap->cdb_len = (unsigned int) rc;
+		ap->host->max_cmd_len = (unsigned char) ap->cdb_len;
 
 		/* print device info to dmesg */
 		printk(KERN_INFO "ata%u: dev %u ATAPI, max %s\n",
@@ -2265,7 +2268,6 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 
 		/* fall through */
 
-	case ATA_PROT_NODATA:
 	default:
 		ata_altstatus(ap);
 		drv_stat = ata_chk_status(ap);
@@ -2520,6 +2522,11 @@ int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 		queue_work(ata_wq, &ap->packet_task);
 		break;
 
+	case ATA_PROT_ATAPI_NODATA:
+		ata_tf_to_host_nolock(ap, &qc->tf);
+		queue_work(ata_wq, &ap->packet_task);
+		break;
+
 	case ATA_PROT_ATAPI_DMA:
 		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
 		ap->ops->bmdma_setup(qc);	    /* set up bmdma */
@@ -2685,6 +2692,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 
 		/* fall through */
 
+	case ATA_PROT_ATAPI_NODATA:
 	case ATA_PROT_NODATA:
 		/* check altstatus */
 		status = ata_altstatus(ap);
@@ -2795,19 +2803,20 @@ static void atapi_packet_task(void *_data)
 
 	/* make sure DRQ is set */
 	status = ata_chk_status(ap);
-	if ((status & ATA_DRQ) == 0)
+	if ((status & (ATA_BUSY | ATA_DRQ)) != ATA_DRQ)
 		goto err_out;
 
 	/* send SCSI cdb */
 	DPRINTK("send cdb\n");
-	ata_data_xfer(ap, qc->scsicmd->cmnd, ap->host->max_cmd_len, 1);
+	assert(ap->cdb_len >= 12);
+	ata_data_xfer(ap, qc->cdb, ap->cdb_len, 1);
 
 	/* if we are DMA'ing, irq handler takes over from here */
 	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA)
 		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
 
 	/* non-data commands are also handled via irq */
-	else if (qc->scsicmd->sc_data_direction == SCSI_DATA_NONE) {
+	else if (qc->tf.protocol == ATA_PROT_ATAPI_NODATA) {
 		/* do nothing */
 	}
 

@@ -147,6 +147,7 @@ enum {
 	ATAPI_PKT_DMA		= (1 << 0),
 	ATAPI_DMADIR		= (1 << 2),	/* ATAPI data dir:
 						   0=to device, 1=to host */
+	ATAPI_CDB_LEN		= 16,
 
 	/* cable types */
 	ATA_CBL_NONE		= 0,
@@ -176,7 +177,8 @@ enum ata_tf_protocols {
 	ATA_PROT_PIO,		/* PIO single sector */
 	ATA_PROT_PIO_MULT,	/* PIO multiple sector */
 	ATA_PROT_DMA,		/* DMA */
-	ATA_PROT_ATAPI,		/* packet command */
+	ATA_PROT_ATAPI,		/* packet command, PIO data xfer*/
+	ATA_PROT_ATAPI_NODATA,	/* packet command, no data */
 	ATA_PROT_ATAPI_DMA,	/* packet command with special DMA sauce */
 };
 
@@ -227,9 +229,20 @@ struct ata_taskfile {
 	  ((u64) dev->id[(n) + 1] << 16) |	\
 	  ((u64) dev->id[(n) + 0]) )
 
+static inline int atapi_cdb_len(u16 *dev_id)
+{
+	u16 tmp = dev_id[0] & 0x3;
+	switch (tmp) {
+	case 0:		return 12;
+	case 1:		return 16;
+	default:	return -1;
+	}
+}
+
 static inline int is_atapi_taskfile(struct ata_taskfile *tf)
 {
 	return (tf->protocol == ATA_PROT_ATAPI) ||
+	       (tf->protocol == ATA_PROT_ATAPI_NODATA) ||
 	       (tf->protocol == ATA_PROT_ATAPI_DMA);
 }
 

@@ -1002,6 +1002,9 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	struct scsi_cmnd *cmd = qc->scsicmd;
 	struct ata_device *dev = qc->dev;
 	int using_pio = (dev->flags & ATA_DFLAG_PIO);
+	int nodata = (cmd->sc_data_direction == SCSI_DATA_NONE);
+
+	memcpy(&qc->cdb, scsicmd, qc->ap->cdb_len);
 
 	qc->complete_fn = atapi_qc_complete;
 
@@ -1013,18 +1016,18 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 	qc->tf.command = ATA_CMD_PACKET;
 
-	/* no data - interrupt-driven */
-	if (cmd->sc_data_direction == SCSI_DATA_NONE)
-		qc->tf.protocol = ATA_PROT_ATAPI;
-
-	/* PIO data xfer */
-	else if (using_pio) {
-		qc->tf.protocol = ATA_PROT_ATAPI;
+	/* no data, or PIO data xfer */
+	if (using_pio || nodata) {
+		if (nodata)
+			qc->tf.protocol = ATA_PROT_ATAPI_NODATA;
+		else
+			qc->tf.protocol = ATA_PROT_ATAPI;
 		qc->tf.lbam = (8 * 1024) & 0xff;
 		qc->tf.lbah = (8 * 1024) >> 8;
+	}
 
 	/* DMA data xfer */
-	} else {
+	else {
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
 		qc->tf.feature |= ATAPI_PKT_DMA;
 
