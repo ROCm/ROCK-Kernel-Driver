@@ -858,7 +858,6 @@ int input_class_add_handle(struct input_handle *handle)
 
 void input_class_remove_handle(struct input_handle *handle)
 {
-	put_device(handle->class_dev.dev);
 	class_device_unregister(&handle->class_dev);
 }
 
