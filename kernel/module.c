@@ -880,7 +880,7 @@ static long get_offset(unsigned long *size, Elf_Shdr *sechdr)
 
 /* Lay out the SHF_ALLOC sections in a way not dissimilar to how ld
    might -- code, read-only data, read-write data, small data.  Tally
-   sizes, and place the offsets into sh_link fields: high bit means it
+   sizes, and place the offsets into sh_entsize fields: high bit means it
    belongs in init. */
 static void layout_sections(struct module *mod,
 			    const Elf_Ehdr *hdr,
@@ -896,7 +896,7 @@ static void layout_sections(struct module *mod,
 	unsigned int m, i;
 
 	for (i = 0; i < hdr->e_shnum; i++)
-		sechdrs[i].sh_link = ~0UL;
+		sechdrs[i].sh_entsize = ~0UL;
 
 	DEBUGP("Core section allocation order:\n");
 	for (m = 0; m < ARRAY_SIZE(masks); ++m) {
@@ -905,10 +905,10 @@ static void layout_sections(struct module *mod,
 
 			if ((s->sh_flags & masks[m][0]) != masks[m][0]
 			    || (s->sh_flags & masks[m][1])
-			    || s->sh_link != ~0UL
+			    || s->sh_entsize != ~0UL
 			    || strstr(secstrings + s->sh_name, ".init"))
 				continue;
-			s->sh_link = get_offset(&mod->core_size, s);
+			s->sh_entsize = get_offset(&mod->core_size, s);
 			DEBUGP("\t%s\n", name);
 		}
 	}
@@ -920,11 +920,11 @@ static void layout_sections(struct module *mod,
 
 			if ((s->sh_flags & masks[m][0]) != masks[m][0]
 			    || (s->sh_flags & masks[m][1])
-			    || s->sh_link != ~0UL
+			    || s->sh_entsize != ~0UL
 			    || !strstr(secstrings + s->sh_name, ".init"))
 				continue;
-			s->sh_link = (get_offset(&mod->init_size, s)
-				      | INIT_OFFSET_MASK);
+			s->sh_entsize = (get_offset(&mod->init_size, s)
+					 | INIT_OFFSET_MASK);
 			DEBUGP("\t%s\n", name);
 		}
 	}
@@ -1066,7 +1066,7 @@ static struct module *load_module(void *umod,
 	if (err < 0)
 		goto free_mod;
 
-	/* Determine total sizes, and put offsets in sh_link.  For now
+	/* Determine total sizes, and put offsets in sh_entsize.  For now
 	   this is done generically; there doesn't appear to be any
 	   special cases for the architectures. */
 	layout_sections(mod, hdr, sechdrs, secstrings);
@@ -1095,11 +1095,11 @@ static struct module *load_module(void *umod,
 		if (!(sechdrs[i].sh_flags & SHF_ALLOC))
 			continue;
 
-		if (sechdrs[i].sh_link & INIT_OFFSET_MASK)
+		if (sechdrs[i].sh_entsize & INIT_OFFSET_MASK)
 			dest = mod->module_init
-				+ (sechdrs[i].sh_link & ~INIT_OFFSET_MASK);
+				+ (sechdrs[i].sh_entsize & ~INIT_OFFSET_MASK);
 		else
-			dest = mod->module_core + sechdrs[i].sh_link;
+			dest = mod->module_core + sechdrs[i].sh_entsize;
 
 		if (sechdrs[i].sh_type != SHT_NOBITS)
 			memcpy(dest, (void *)sechdrs[i].sh_addr,
