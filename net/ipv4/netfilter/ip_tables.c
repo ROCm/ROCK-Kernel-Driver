@@ -1534,7 +1534,7 @@ tcp_match(const struct sk_buff *skb,
 		      IPT_TCP_INV_FLAGS))
 		return 0;
 	if (tcpinfo->option) {
-		if (th->doff * 4 < sizeof(_tcph)) {
+		if (th->doff * 4 <= sizeof(_tcph)) {
 			*hotdrop = 1;
 			return 0;
 		}
