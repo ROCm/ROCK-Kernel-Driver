@@ -760,7 +760,7 @@ static void __init prom_initialize_tce_table(void)
 	unsigned long offset = reloc_offset();
 	char compatible[64], type[64], model[64];
 	char *path = RELOC(prom_scratch);
-	u64 base, vbase, align;
+	u64 base, align;
 	u32 minalign, minsize;
 	u64 tce_entry, *tce_entryp;
 	u64 local_alloc_top, local_alloc_bottom;
@@ -832,12 +832,9 @@ static void __init prom_initialize_tce_table(void)
 		if (base < local_alloc_bottom)
 			local_alloc_bottom = base;
 
-		vbase = (unsigned long)abs_to_virt(base);
-
 		/* Save away the TCE table attributes for later use. */
-		prom_setprop(node, "linux,tce-base", &vbase, sizeof(vbase));
+		prom_setprop(node, "linux,tce-base", &base, sizeof(base));
 		prom_setprop(node, "linux,tce-size", &minsize, sizeof(minsize));
-		prom_setprop(node, "linux,has-tce-table", NULL, 0);
 
 		/* It seems OF doesn't null-terminate the path :-( */
 		memset(path, 0, sizeof(path));
