@@ -3,7 +3,6 @@
                              -------------------
     begin                : Thu Sep 7 2000
     copyright            : (C) 2001 by Adaptec
-    email                : deanna_bonds@adaptec.com
 
     See Documentation/scsi/dpti.txt for history, notes, license info
     and credits
