@@ -430,7 +430,6 @@ static int lance_open( struct net_device *dev )
 	netif_start_queue(dev);
 	
 	DPRINTK( 2, ( "%s: LANCE is open, csr0 %04x\n", dev->name, DREG ));
-	MOD_INC_USE_COUNT;
 
 	return( 0 );
 }
@@ -883,8 +882,6 @@ static int lance_close( struct net_device *dev )
 	/* We stop the LANCE here -- it occasionally polls
 	   memory if we don't. */
 	DREG = CSR0_STOP;
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
