@@ -44,9 +44,16 @@ tl0_stdfmna:	TRAP_NOSAVE(do_stdfmna)
 tl0_privact:	TRAP_NOSAVE(__do_privact)
 tl0_resv038:	BTRAP(0x38) BTRAP(0x39) BTRAP(0x3a) BTRAP(0x3b) BTRAP(0x3c) BTRAP(0x3d)
 tl0_resv03e:	BTRAP(0x3e) BTRAP(0x3f) BTRAP(0x40)
+#ifdef CONFIG_SMP
+tl0_irq1:	TRAP_IRQ(smp_call_function_client, 1)
+tl0_irq2:	TRAP_IRQ(smp_receive_signal_client, 2)
+tl0_irq3:	TRAP_IRQ(smp_penguin_jailcell, 3)
+#else
 tl0_irq1:	BTRAP(0x41)
-tl0_irq2:	TRAP_IRQ(handler_irq, 2)
-tl0_irq3:	TRAP_IRQ(handler_irq, 3)  TRAP_IRQ(handler_irq, 4)
+tl0_irq2:	BTRAP(0x42)
+tl0_irq3:	BTRAP(0x43)
+#endif
+tl0_irq4:	TRAP_IRQ(handler_irq, 4)
 tl0_irq5:	TRAP_IRQ(handler_irq, 5)  TRAP_IRQ(handler_irq, 6)
 tl0_irq7:	TRAP_IRQ(handler_irq, 7)  TRAP_IRQ(handler_irq, 8)
 tl0_irq9:	TRAP_IRQ(handler_irq, 9)  TRAP_IRQ(handler_irq, 10)

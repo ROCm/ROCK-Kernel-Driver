@@ -291,8 +291,8 @@ static unsigned char schizo_pil_table[] = {
 /*0x0c*/0, 0, 0, 0,	/* PCI slot 3  Int A, B, C, D	*/
 /*0x10*/0, 0, 0, 0,	/* PCI slot 4  Int A, B, C, D	*/
 /*0x14*/0, 0, 0, 0,	/* PCI slot 5  Int A, B, C, D	*/
-/*0x18*/3,		/* SCSI				*/
-/*0x19*/3,		/* second SCSI			*/
+/*0x18*/4,		/* SCSI				*/
+/*0x19*/4,		/* second SCSI			*/
 /*0x1a*/0,		/* UNKNOWN			*/
 /*0x1b*/0,		/* UNKNOWN			*/
 /*0x1c*/8,		/* Parallel			*/
@@ -302,7 +302,7 @@ static unsigned char schizo_pil_table[] = {
 /*0x20*/13,		/* Audio Record			*/
 /*0x21*/14,		/* Audio Playback		*/
 /*0x22*/12,		/* Serial			*/
-/*0x23*/2,		/* EBUS I2C 			*/
+/*0x23*/4,		/* EBUS I2C 			*/
 /*0x24*/10,		/* RTC Clock			*/
 /*0x25*/11,		/* Floppy			*/
 /*0x26*/0,		/* UNKNOWN			*/
@@ -344,7 +344,7 @@ static int __init schizo_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 
 	ret = schizo_pil_table[ino];
 	if (ret == 0 && pdev == NULL) {
-		ret = 2;
+		ret = 4;
 	} else if (ret == 0) {
 		switch ((pdev->class >> 16) & 0xff) {
 		case PCI_BASE_CLASS_STORAGE:
@@ -367,7 +367,7 @@ static int __init schizo_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 			break;
 
 		default:
-			ret = 2;
+			ret = 4;
 			break;
 		};
 	}

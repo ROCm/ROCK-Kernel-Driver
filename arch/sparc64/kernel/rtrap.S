@@ -15,7 +15,6 @@
 #include <asm/visasm.h>
 #include <asm/processor.h>
 
-#define		PTREGS_OFF		(STACK_BIAS + REGWIN_SZ)
 #define		RTRAP_PSTATE		(PSTATE_RMO|PSTATE_PEF|PSTATE_PRIV|PSTATE_IE)
 #define		RTRAP_PSTATE_IRQOFF	(PSTATE_RMO|PSTATE_PEF|PSTATE_PRIV)
 #define		RTRAP_PSTATE_AG_IRQOFF	(PSTATE_RMO|PSTATE_PEF|PSTATE_PRIV|PSTATE_AG)
@@ -150,7 +149,7 @@ __handle_signal:
 		 andn			%l1, %l4, %l1
 
 		.align			64
-		.globl			rtrap_irq, rtrap_clr_l6, rtrap, irqsz_patchme
+		.globl			rtrap_irq, rtrap_clr_l6, rtrap, irqsz_patchme, rtrap_xcall
 rtrap_irq:
 #ifdef CONFIG_PREEMPT
 		ldsw			[%g6 + TI_PRE_COUNT], %l0
@@ -165,9 +164,11 @@ irqsz_patchme:	sllx			%l0, 0, %l0
 		lduw			[%l2 + %l0], %l1	! softirq_pending
 		cmp			%l1, 0
 
+		/* mm/ultra.S:xcall_report_regs KNOWS about this load. */
 		bne,pn			%icc, __handle_softirq
 		 ldx			[%sp + PTREGS_OFF + PT_V9_TSTATE], %l1
 __handle_softirq_continue:
+rtrap_xcall:
 		sethi			%hi(0xf << 20), %l4
 		andcc			%l1, TSTATE_PRIV, %l3
 		and			%l1, %l4, %l4
@@ -331,5 +332,3 @@ kern_fpucheck:	ldub			[%g6 + TI_FPDEPTH], %l5
 		wr			%g0, FPRS_DU, %fprs
 		ba,pt			%xcc, rt_continue
 		 stb			%l5, [%g6 + TI_FPDEPTH]
-
-#undef PTREGS_OFF
