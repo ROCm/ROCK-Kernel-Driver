@@ -69,15 +69,19 @@
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/poll.h>
-#include <linux/smp_lock.h>
 #include <linux/wrapper.h>
 #include <linux/fs.h>
+#include <linux/wait.h>
+
+#include <asm/current.h>
+#include <asm/io.h>
+#include <asm/dma.h>
+#include <asm/page.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
+
 //#include "cs_dm.h"
 #include "cs4281_hwdefs.h"
 #include "cs4281pm.h"
@@ -2622,10 +2626,10 @@ static int cs4281_ioctl_mixdev(struct inode *inode, struct file *file,
 //   Mixer file operations struct.
 // ******************************************************************************************
 static /*const */ struct file_operations cs4281_mixer_fops = {
-	llseek:no_llseek,
-	ioctl:cs4281_ioctl_mixdev,
-	open:cs4281_open_mixdev,
-	release:cs4281_release_mixdev,
+	.llseek	 = no_llseek,
+	.ioctl	 = cs4281_ioctl_mixdev,
+	.open	 = cs4281_open_mixdev,
+	.release = cs4281_release_mixdev,
 };
 
 // --------------------------------------------------------------------- 
@@ -3743,14 +3747,14 @@ static int cs4281_open(struct inode *inode, struct file *file)
 //   Wave (audio) file operations struct.
 // ******************************************************************************************
 static /*const */ struct file_operations cs4281_audio_fops = {
-	llseek:no_llseek,
-	read:cs4281_read,
-	write:cs4281_write,
-	poll:cs4281_poll,
-	ioctl:cs4281_ioctl,
-	mmap:cs4281_mmap,
-	open:cs4281_open,
-	release:cs4281_release,
+	.llseek	 = no_llseek,
+	.read	 = cs4281_read,
+	.write	 = cs4281_write,
+	.poll	 = cs4281_poll,
+	.ioctl	 = cs4281_ioctl,
+	.mmap	 = cs4281_mmap,
+	.open	 = cs4281_open,
+	.release = cs4281_release,
 };
 
 // --------------------------------------------------------------------- 
@@ -4092,12 +4096,12 @@ static int cs4281_midi_release(struct inode *inode, struct file *file)
 //   Midi file operations struct.
 // ******************************************************************************************
 static /*const */ struct file_operations cs4281_midi_fops = {
-	llseek:no_llseek,
-	read:cs4281_midi_read,
-	write:cs4281_midi_write,
-	poll:cs4281_midi_poll,
-	open:cs4281_midi_open,
-	release:cs4281_midi_release,
+	.llseek	 = no_llseek,
+	.read	 = cs4281_midi_read,
+	.write	 = cs4281_midi_write,
+	.poll	 = cs4281_midi_poll,
+	.open	 = cs4281_midi_open,
+	.release = cs4281_midi_release,
 };
 
 
@@ -4467,20 +4471,24 @@ static void __devinit cs4281_remove(struct pci_dev *pci_dev)
 }
 
 static struct pci_device_id cs4281_pci_tbl[] __devinitdata = {
-	{PCI_VENDOR_ID_CIRRUS, PCI_DEVICE_ID_CRYSTAL_CS4281,
-	 PCI_ANY_ID, PCI_ANY_ID, 0, 0},
-	{0,}
+	{
+		.vendor    = PCI_VENDOR_ID_CIRRUS,
+		.device    = PCI_DEVICE_ID_CRYSTAL_CS4281,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},
+	{ 0, },
 };
 
 MODULE_DEVICE_TABLE(pci, cs4281_pci_tbl);
 
 struct pci_driver cs4281_pci_driver = {
-	name:"cs4281",
-	id_table:cs4281_pci_tbl,
-	probe:cs4281_probe,
-	remove:cs4281_remove,
-	suspend:CS4281_SUSPEND_TBL,
-	resume:CS4281_RESUME_TBL,
+	.name	  = "cs4281",
+	.id_table = cs4281_pci_tbl,
+	.probe	  = cs4281_probe,
+	.remove	  = cs4281_remove,
+	.suspend  = CS4281_SUSPEND_TBL,
+	.resume	  = CS4281_RESUME_TBL,
 };
 
 int __init cs4281_init_module(void)

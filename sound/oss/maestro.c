@@ -219,14 +219,18 @@
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/poll.h>
 #include <linux/reboot.h>
-#include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <linux/bitops.h>
+#include <linux/wait.h>
+
+#include <asm/current.h>
+#include <asm/dma.h>
+#include <asm/io.h>
+#include <asm/page.h>
+#include <asm/uaccess.h>
 
 #include <linux/pm.h>
 static int maestro_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *d);
@@ -3609,10 +3613,10 @@ static struct pci_device_id maestro_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, maestro_pci_tbl);
 
 static struct pci_driver maestro_pci_driver = {
-	name:"maestro",
-	id_table:maestro_pci_tbl,
-	probe:maestro_probe,
-	remove:maestro_remove,
+	.name	  = "maestro",
+	.id_table = maestro_pci_tbl,
+	.probe	  = maestro_probe,
+	.remove	  = maestro_remove,
 };
 
 int __init init_maestro(void)

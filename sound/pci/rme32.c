@@ -27,11 +27,12 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -40,6 +41,8 @@
 #include <sound/asoundef.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+
+#include <asm/io.h>
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
