@@ -505,7 +505,7 @@ simeth_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	}
 
 	/*
-	 * very simple loop because we get interrupts only when receving
+	 * very simple loop because we get interrupts only when receiving
 	 */
 	while (simeth_rx(dev));
 }

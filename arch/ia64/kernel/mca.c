@@ -1138,7 +1138,7 @@ ia64_mca_cpe_int_caller(void *dummy)
  *  ia64_mca_cpe_poll
  *
  *	Poll for Corrected Platform Errors (CPEs), dynamically adjust
- *	polling interval based on occurance of an event.
+ *	polling interval based on occurrence of an event.
  *
  * Inputs   :   dummy(unused)
  * Outputs  :   None
