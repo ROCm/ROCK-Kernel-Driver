@@ -255,7 +255,6 @@ static ssize_t serio_rebind_driver(struct device *dev, const char *buf, size_t c
 {
 	struct serio *serio = to_serio_port(dev);
 	struct device_driver *drv;
-	struct kobject *k;
 	int retval;
 
 	retval = down_interruptible(&serio_sem);
@@ -270,10 +269,10 @@ static ssize_t serio_rebind_driver(struct device *dev, const char *buf, size_t c
 	} else if (!strncmp(buf, "rescan", count)) {
 		serio_disconnect_port(serio);
 		serio_connect_port(serio, NULL);
-	} else if ((k = kset_find_obj(&serio_bus.drivers, buf)) != NULL) {
-		drv = container_of(k, struct device_driver, kobj);
+	} else if ((drv = driver_find(buf, &serio_bus)) != NULL) {
 		serio_disconnect_port(serio);
 		serio_connect_port(serio, to_serio_driver(drv));
+		put_driver(drv);
 	} else {
 		retval = -EINVAL;
 	}
