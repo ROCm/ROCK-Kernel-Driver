@@ -543,15 +543,25 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 
 #ifdef CONFIG_SMP
+#define SCHED_LOAD_SHIFT 7	/* increase resolution of load calculations */
+#define SCHED_LOAD_SCALE (1UL << SCHED_LOAD_SHIFT)
+
 #define SD_FLAG_NEWIDLE		1	/* Balance when about to become idle */
 #define SD_FLAG_EXEC		2	/* Balance on exec */
 #define SD_FLAG_WAKE		4	/* Balance on task wakeup */
 #define SD_FLAG_FASTMIGRATE	8	/* Sync wakes put task on waking CPU */
-#define SD_FLAG_IDLE		16	/* Should not have all CPUs idle */
 
 struct sched_group {
 	struct sched_group *next;	/* Must be a circular list */
 	cpumask_t cpumask;
+
+	/*
+	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
+	 * single CPU. This should be read only (except for setup). Although
+	 * it will need to be written to at cpu hot(un)plug time, perhaps the
+	 * cpucontrol semaphore will provide enough exclusion?
+	 */
+	unsigned long cpu_power;
 };
 
 struct sched_domain {

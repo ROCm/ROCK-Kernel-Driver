@@ -192,9 +192,6 @@ struct prio_array {
 	struct list_head queue[MAX_PRIO];
 };
 
-#define SCHED_LOAD_SHIFT 7	/* increase resolution of load calculations */
-#define SCHED_LOAD_SCALE (1 << SCHED_LOAD_SHIFT)
-
 /*
  * This is the main, per-CPU runqueue data structure.
  *
@@ -1353,16 +1350,14 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 				unsigned long *imbalance, enum idle_type idle)
 {
 	unsigned long max_load, avg_load, total_load, this_load;
-	int modify, total_nr_cpus, busiest_nr_cpus, this_nr_cpus;
-	enum idle_type package_idle = IDLE;
-	struct sched_group *busiest = NULL, *group = domain->groups;
+	unsigned int total_pwr;
+	int modify;
+	struct sched_group *busiest = NULL, *this = NULL, *group = domain->groups;
 
 	max_load = 0;
 	this_load = 0;
 	total_load = 0;
-	total_nr_cpus = 0;
-	busiest_nr_cpus = 0;
-	this_nr_cpus = 0;
+	total_pwr = 0;
 
 	if (group == NULL)
 		goto out_balanced;
@@ -1393,8 +1388,6 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 			/* Bias balancing toward cpus of our domain */
 			if (local_group) {
 				load = get_high_cpu_load(i, modify);
-				if (!idle_cpu(i))
-					package_idle = NOT_IDLE;
 			} else
 				load = get_low_cpu_load(i, modify);
 
@@ -1406,48 +1399,34 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 			goto nextgroup;
 
 		total_load += avg_load;
+		total_pwr += group->cpu_power;
 
-		/*
-		 * Load is cumulative over SD_FLAG_IDLE domains, but
-		 * spread over !SD_FLAG_IDLE domains. For example, 2
-		 * processes running on an SMT CPU puts a load of 2 on
-		 * that CPU, however 2 processes running on 2 CPUs puts
-		 * a load of 1 on that domain.
-		 *
-		 * This should be configurable so as SMT siblings become
-		 * more powerful, they can "spread" more load - for example,
-		 * the above case might only count as a load of 1.7.
-		 */
-		if (!(domain->flags & SD_FLAG_IDLE)) {
-			avg_load /= nr_cpus;
-			total_nr_cpus += nr_cpus;
-		} else
-			total_nr_cpus++;
-
-		if (avg_load > max_load)
-			max_load = avg_load;
+		/* Adjust by relative CPU power of the group */
+		avg_load = (avg_load << SCHED_LOAD_SHIFT) / group->cpu_power;
 
 		if (local_group) {
 			this_load = avg_load;
-			this_nr_cpus = nr_cpus;
-		} else if (avg_load >= max_load) {
+			this = group;
+			goto nextgroup;
+		}
+		if (avg_load > max_load) {
+			max_load = avg_load;
 			busiest = group;
-			busiest_nr_cpus = nr_cpus;
 		}
 nextgroup:
 		group = group->next;
 	} while (group != domain->groups);
 
-	if (!busiest)
+	if (!busiest || this_load >= max_load)
 		goto out_balanced;
 
-	avg_load = total_load / total_nr_cpus;
+	avg_load = (SCHED_LOAD_SCALE * total_load) / total_pwr;
 
-	if (this_load >= avg_load)
+	if (idle == NOT_IDLE) {
+		if (this_load >= avg_load ||
+			100*max_load <= domain->imbalance_pct*this_load)
 		goto out_balanced;
-
-	if (idle == NOT_IDLE && 100*max_load <= domain->imbalance_pct*this_load)
-		goto out_balanced;
+	}
 
 	/*
 	 * We're trying to get all the cpus to the average_load, so we don't
@@ -1461,15 +1440,44 @@ nextgroup:
 	 * appear as very large values with unsigned longs.
 	 */
 	*imbalance = (min(max_load - avg_load, avg_load - this_load) + 1) / 2;
-	/* Get rid of the scaling factor, rounding *up* as we divide */
-	*imbalance = (*imbalance + SCHED_LOAD_SCALE/2 + 1)
-					>> SCHED_LOAD_SHIFT;
 
-	if (*imbalance == 0)
-		goto out_balanced;
+	if (*imbalance <= SCHED_LOAD_SCALE/2) {
+		unsigned long pwr_now = 0, pwr_move = 0;
+		unsigned long tmp;
+
+		/*
+		 * OK, we don't have enough imbalance to justify moving tasks,
+		 * however we may be able to increase total CPU power used by
+		 * moving them.
+		 */
+
+		pwr_now += busiest->cpu_power*min(SCHED_LOAD_SCALE, max_load);
+		pwr_now += this->cpu_power*min(SCHED_LOAD_SCALE, this_load);
+		pwr_now >>= SCHED_LOAD_SHIFT;
+
+		/* Amount of load we'd subtract */
+		tmp = SCHED_LOAD_SCALE*SCHED_LOAD_SCALE/busiest->cpu_power;
+		if (max_load > tmp)
+			pwr_move += busiest->cpu_power*min(SCHED_LOAD_SCALE,
+							max_load - tmp);
+
+		/* Amount of load we'd add */
+		tmp = SCHED_LOAD_SCALE*SCHED_LOAD_SCALE/this->cpu_power;
+		pwr_move += this->cpu_power*min(this->cpu_power, this_load + tmp);
+		pwr_move >>= SCHED_LOAD_SHIFT;
+
+		/* Move if we gain another 8th of a CPU worth of throughput */
+		if (pwr_move < pwr_now + SCHED_LOAD_SCALE / 8)
+			goto out_balanced;
+		*imbalance = 1;
+		return busiest;
+	}
 
 	/* How many tasks to actually move to equalise the imbalance */
-	*imbalance *= min(busiest_nr_cpus, this_nr_cpus);
+	*imbalance = (*imbalance * min(busiest->cpu_power, this->cpu_power))
+				>> SCHED_LOAD_SHIFT;
+	/* Get rid of the scaling factor, rounding *up* as we divide */
+	*imbalance = (*imbalance + SCHED_LOAD_SCALE/2) >> SCHED_LOAD_SHIFT;
 
 	return busiest;
 
@@ -1550,26 +1558,19 @@ out:
 	if (!balanced && nr_moved == 0)
 		failed = 1;
 
-	if (domain->flags & SD_FLAG_IDLE && failed && busiest &&
+	if (failed && busiest &&
 	   		domain->nr_balance_failed > domain->cache_nice_tries) {
-		int i;
-		for_each_cpu_mask(i, group->cpumask) {
-			int wake = 0;
+		int wake = 0;
 
-			if (!cpu_online(i))
-				continue;
-
-			busiest = cpu_rq(i);
-			spin_lock(&busiest->lock);
-			if (!busiest->active_balance) {
-				busiest->active_balance = 1;
-				busiest->push_cpu = this_cpu;
-				wake = 1;
-			}
-			spin_unlock(&busiest->lock);
-			if (wake)
-				wake_up_process(busiest->migration_thread);
+		spin_lock(&busiest->lock);
+		if (!busiest->active_balance) {
+			busiest->active_balance = 1;
+			busiest->push_cpu = this_cpu;
+			wake = 1;
 		}
+		spin_unlock(&busiest->lock);
+		if (wake)
+			wake_up_process(busiest->migration_thread);
 	}
 
 	if (failed)
@@ -3325,12 +3326,14 @@ static void __init arch_init_sched_domains(void)
 			continue;
 
 		node->cpumask = nodemask;
+		node->cpu_power = SCHED_LOAD_SCALE * cpus_weight(node->cpumask);
 
 		for_each_cpu_mask(j, node->cpumask) {
 			struct sched_group *cpu = &sched_group_cpus[j];
 
 			cpus_clear(cpu->cpumask);
 			cpu_set(j, cpu->cpumask);
+			cpu->cpu_power = SCHED_LOAD_SCALE;
 
 			if (!first_cpu)
 				first_cpu = cpu;
@@ -3377,6 +3380,7 @@ static void __init arch_init_sched_domains(void)
 
 		cpus_clear(cpu->cpumask);
 		cpu_set(i, cpu->cpumask);
+		cpu->cpu_power = SCHED_LOAD_SCALE;
 
 		if (!first_cpu)
 			first_cpu = cpu;

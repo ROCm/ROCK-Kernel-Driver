@@ -1150,7 +1150,6 @@ __init void arch_init_sched_domains(void)
 
 		*phys_domain = SD_CPU_INIT;
 		phys_domain->span = nodemask;
-		phys_domain->flags |= SD_FLAG_IDLE;
 
 		*node_domain = SD_NODE_INIT;
 		node_domain->span = cpu_online_map;
@@ -1170,6 +1169,7 @@ __init void arch_init_sched_domains(void)
 
 			cpu->cpumask = CPU_MASK_NONE;
 			cpu_set(j, cpu->cpumask);
+			cpu->cpu_power = SCHED_LOAD_SCALE;
 
 			if (!first_cpu)
 				first_cpu = cpu;
@@ -1183,6 +1183,7 @@ __init void arch_init_sched_domains(void)
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		int j;
 		cpumask_t nodemask;
+		struct sched_group *node = &sched_group_nodes[i];
 		cpus_and(nodemask, node_to_cpumask(i), cpu_online_map);
 
 		if (cpus_empty(nodemask))
@@ -1198,6 +1199,12 @@ __init void arch_init_sched_domains(void)
 				continue;
 
 			cpu->cpumask = cpu_domain->span;
+			/*
+			 * Make each extra sibling increase power by 10% of
+			 * the basic CPU. This is very arbitrary.
+			 */
+			cpu->cpu_power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE*(cpus_weight(cpu->cpumask)-1) / 10;
+			node->cpu_power += cpu->cpu_power;
 
 			if (!first_cpu)
 				first_cpu = cpu;
@@ -1219,6 +1226,7 @@ __init void arch_init_sched_domains(void)
 			continue;
 
 		cpu->cpumask = nodemask;
+		/* ->cpu_power already setup */
 
 		if (!first_cpu)
 			first_cpu = cpu;
@@ -1227,7 +1235,6 @@ __init void arch_init_sched_domains(void)
 		last_cpu = cpu;
 	}
 	last_cpu->next = first_cpu;
-
 
 	mb();
 	for_each_cpu_mask(i, cpu_online_map) {
@@ -1266,7 +1273,6 @@ __init void arch_init_sched_domains(void)
 
 		*phys_domain = SD_CPU_INIT;
 		phys_domain->span = cpu_online_map;
-		phys_domain->flags |= SD_FLAG_IDLE;
 	}
 
 	/* Set up CPU (sibling) groups */
@@ -1283,6 +1289,7 @@ __init void arch_init_sched_domains(void)
 
 			cpus_clear(cpu->cpumask);
 			cpu_set(j, cpu->cpumask);
+			cpu->cpu_power = SCHED_LOAD_SCALE;
 
 			if (!first_cpu)
 				first_cpu = cpu;
@@ -1303,6 +1310,8 @@ __init void arch_init_sched_domains(void)
 			continue;
 
 		cpu->cpumask = cpu_domain->span;
+		/* See SMT+NUMA setup for comment */
+		cpu->cpu_power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE*(cpus_weight(cpu->cpumask)-1) / 10;
 
 		if (!first_cpu)
 			first_cpu = cpu;
