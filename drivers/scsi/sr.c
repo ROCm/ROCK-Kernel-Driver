@@ -575,6 +575,7 @@ static int sr_probe(struct device *dev)
 		goto fail_put;
 
 	dev_set_drvdata(dev, cd);
+	disk->flags |= GENHD_FL_REMOVABLE;
 	add_disk(disk);
 
 	printk(KERN_DEBUG

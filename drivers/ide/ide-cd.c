@@ -3510,6 +3510,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 
 	cdrom_read_toc(drive, &sense);
 	g->fops = &idecd_ops;
+	g->flags |= GENHD_FL_REMOVABLE;
 	add_disk(g);
 	return 0;
 failed:
