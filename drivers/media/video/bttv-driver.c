@@ -2418,7 +2418,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 		if (0 != retval)
 			goto fh_unlock_and_return;
 		spin_lock_irqsave(&btv->s_lock,flags);
-		buffer_queue(file->private_data,&buf->vb);
+		buffer_queue(&fh->cap,&buf->vb);
 		spin_unlock_irqrestore(&btv->s_lock,flags);
 		up(&fh->cap.lock);
 		return 0;
@@ -2881,11 +2881,11 @@ static unsigned int bttv_poll(struct file *file, poll_table *wait)
 			}
 			fh->cap.read_buf->memory = V4L2_MEMORY_USERPTR;
 			field = videobuf_next_field(&fh->cap);
-			if (0 != fh->cap.ops->buf_prepare(file->private_data,fh->cap.read_buf,field)) {
+			if (0 != fh->cap.ops->buf_prepare(&fh->cap,fh->cap.read_buf,field)) {
 				up(&fh->cap.lock);
 				return POLLERR;
 			}
-			fh->cap.ops->buf_queue(file->private_data,fh->cap.read_buf);
+			fh->cap.ops->buf_queue(&fh->cap,fh->cap.read_buf);
 			fh->cap.read_off = 0;
 		}
 		up(&fh->cap.lock);
@@ -2975,7 +2975,7 @@ static int bttv_release(struct inode *inode, struct file *file)
 		free_btres(btv,fh,RESOURCE_VIDEO);
 	}
 	if (fh->cap.read_buf) {
-		buffer_release(file->private_data,fh->cap.read_buf);
+		buffer_release(&fh->cap,fh->cap.read_buf);
 		kfree(fh->cap.read_buf);
 	}
 
