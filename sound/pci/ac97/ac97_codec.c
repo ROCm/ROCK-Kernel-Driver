@@ -1967,7 +1967,8 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
       __access_ok:
 	ac97->id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;
 	ac97->id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
-	if (ac97->id == 0x00000000 || ac97->id == 0xffffffff) {
+	if (! (ac97->scaps & AC97_SCAP_DETECT_BY_VENDOR) &&
+	    (ac97->id == 0x00000000 || ac97->id == 0xffffffff)) {
 		snd_printk(KERN_ERR "AC'97 %d access is not valid [0x%x], removing mixer.\n", ac97->num, ac97->id);
 		snd_ac97_free(ac97);
 		return -EIO;
