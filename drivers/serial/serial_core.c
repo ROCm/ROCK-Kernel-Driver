@@ -1277,7 +1277,6 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 		if (state->close_delay) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(state->close_delay);
-			set_current_state(TASK_RUNNING);
 		}
 	} else if (!uart_console(port)) {
 		uart_change_pm(state, 3);

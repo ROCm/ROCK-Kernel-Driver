@@ -469,7 +469,6 @@ static int kenvctrld(void *__unused)
 
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(POLL_INTERVAL);
-		current->state = TASK_RUNNING;
 		if (signal_pending(current))
 			break;
 

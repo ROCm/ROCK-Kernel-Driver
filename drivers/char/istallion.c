@@ -1488,7 +1488,6 @@ static void stli_delay(int len)
 	if (len > 0) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(len);
-		set_current_state(TASK_RUNNING);
 	}
 }
 

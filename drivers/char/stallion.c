@@ -1224,7 +1224,6 @@ static void stl_delay(int len)
 	if (len > 0) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(len);
-		current->state = TASK_RUNNING;
 	}
 }
 
