@@ -186,6 +186,7 @@ int os_pipe(int *fds, int stream, int close_on_exec)
 
 int os_set_fd_async(int fd, int owner)
 {
+	/* XXX This should do F_GETFL first */
 	if(fcntl(fd, F_SETFL, O_ASYNC | O_NONBLOCK) < 0){
 		printk("os_set_fd_async : failed to set O_ASYNC and "
 		       "O_NONBLOCK on fd # %d, errno = %d\n", fd, errno);
