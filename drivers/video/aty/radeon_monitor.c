@@ -633,43 +633,25 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
  */
 static void radeon_fixup_panel_info(struct radeonfb_info *rinfo)
 {
+ #ifdef CONFIG_PPC_OF
 	/*
-	 * A few iBook laptop panels seem to need a fixed PLL setting
-	 *
-	 * We should probably do this differently based on the panel
-	 * type/model or eventually some other device-tree informations,
-	 * but these tweaks below work enough for now. --BenH
+	 * LCD Flat panels should use fixed dividers, we enfore that on
+	 * PowerMac only for now...
 	 */
-#ifdef CONFIG_PPC_OF
-	/* iBook2's */
-	if (machine_is_compatible("PowerBook4,3")) {
+	if (!rinfo->panel_info.use_bios_dividers && rinfo->mon1_type == MT_LCD
+	    && rinfo->is_mobility) {
+		int ppll_div_sel = INREG8(CLOCK_CNTL_INDEX + 1) & 0x3;
+		u32 ppll_divn = INPLL(PPLL_DIV_0 + ppll_div_sel);
 		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
-		rinfo->panel_info.post_divider = 0x6;
-		rinfo->panel_info.fbk_divider = 0xad;
+		rinfo->panel_info.fbk_divider = ppll_divn & 0x7ff;
+		rinfo->panel_info.post_divider = (ppll_divn >> 16) & 0x7;
 		rinfo->panel_info.use_bios_dividers = 1;
-	}
-	/* Aluminium PowerBook 15" */
-	if (machine_is_compatible("PowerBook5,4")) {
-		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
-		rinfo->panel_info.post_divider = 0x2;
-		rinfo->panel_info.fbk_divider = 0x8e;
-		rinfo->panel_info.use_bios_dividers = 1;
-	}
-	/* Aluminium PowerBook 17" */
-	if (machine_is_compatible("PowerBook5,3") ||
-	    machine_is_compatible("PowerBook5,5")) {
-		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
-		rinfo->panel_info.post_divider = 0x4;
-		rinfo->panel_info.fbk_divider = 0x80;
-		rinfo->panel_info.use_bios_dividers = 1;
-	}
-	/* iBook G4 */
-        if (machine_is_compatible("PowerBook6,3") ||
-            machine_is_compatible("PowerBook6,5")) {
-		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
-		rinfo->panel_info.post_divider = 0x6;
-		rinfo->panel_info.fbk_divider = 0xad;
-		rinfo->panel_info.use_bios_dividers = 1;
+
+		printk(KERN_DEBUG "radeonfb: Using Firmware dividers 0x%08x "
+		       "from PPLL %d\n",
+		       rinfo->panel_info.fbk_divider |
+		       (rinfo->panel_info.post_divider << 16),
+		       ppll_div_sel);
 	}
 #endif /* CONFIG_PPC_OF */
 }
