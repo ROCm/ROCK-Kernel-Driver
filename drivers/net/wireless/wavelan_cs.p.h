@@ -588,7 +588,6 @@ struct wavepoint_table
 /****************************** TYPES ******************************/
 
 /* Shortcuts */
-typedef struct net_device	device;
 typedef struct net_device_stats	en_stats;
 typedef struct iw_statistics	iw_stats;
 typedef struct iw_quality	iw_qual;
@@ -611,7 +610,7 @@ typedef u_char		mac_addr[WAVELAN_ADDR_SIZE];	/* Hardware address */
 struct net_local
 {
   dev_node_t 	node;		/* ???? What is this stuff ???? */
-  device *	dev;		/* Reverse link... */
+  struct net_device *	dev;		/* Reverse link... */
   spinlock_t	spinlock;	/* Serialize access to the hardware (SMP) */
   dev_link_t *	link;		/* pcmcia structure */
   en_stats	stats;		/* Ethernet interface statistics */
@@ -673,11 +672,11 @@ static inline void
 	hacr_write_slow(u_long,
 		   u_char);
 static void
-	psa_read(device *,	/* Read the Parameter Storage Area */
+	psa_read(struct net_device *,	/* Read the Parameter Storage Area */
 		 int,		/* offset in PSA */
 		 u_char *,	/* buffer to fill */
 		 int),		/* size to read */
-	psa_write(device *,	/* Write to the PSA */
+	psa_write(struct net_device *,	/* Write to the PSA */
 		  int,		/* Offset in psa */
 		  u_char *,	/* Buffer in memory */
 		  int);		/* Length of buffer */
@@ -707,57 +706,57 @@ static void
 		 int);		/* number of registers */
 /* ---------------------- I82593 SUBROUTINES ----------------------- */
 static int
-	wv_82593_cmd(device *,	/* synchronously send a command to i82593 */ 
+	wv_82593_cmd(struct net_device *,	/* synchronously send a command to i82593 */ 
 		     char *,
 		     int,
 		     int);
 static inline int
-	wv_diag(device *);	/* Diagnostique the i82593 */
+	wv_diag(struct net_device *);	/* Diagnostique the i82593 */
 static int
-	read_ringbuf(device *,	/* Read a receive buffer */
+	read_ringbuf(struct net_device *,	/* Read a receive buffer */
 		     int,
 		     char *,
 		     int);
 static inline void
-	wv_82593_reconfig(device *);	/* Reconfigure the controller */
+	wv_82593_reconfig(struct net_device *);	/* Reconfigure the controller */
 /* ------------------- DEBUG & INFO SUBROUTINES ------------------- */
 static inline void
-	wv_init_info(device *);	/* display startup info */
+	wv_init_info(struct net_device *);	/* display startup info */
 /* ------------------- IOCTL, STATS & RECONFIG ------------------- */
 static en_stats	*
-	wavelan_get_stats(device *);	/* Give stats /proc/net/dev */
+	wavelan_get_stats(struct net_device *);	/* Give stats /proc/net/dev */
 /* ----------------------- PACKET RECEPTION ----------------------- */
 static inline int
-	wv_start_of_frame(device *,	/* Seek beggining of current frame */
+	wv_start_of_frame(struct net_device *,	/* Seek beggining of current frame */
 			  int,	/* end of frame */
 			  int);	/* start of buffer */
 static inline void
-	wv_packet_read(device *,	/* Read a packet from a frame */
+	wv_packet_read(struct net_device *,	/* Read a packet from a frame */
 		       int,
 		       int),
-	wv_packet_rcv(device *);	/* Read all packets waiting */
+	wv_packet_rcv(struct net_device *);	/* Read all packets waiting */
 /* --------------------- PACKET TRANSMISSION --------------------- */
 static inline void
-	wv_packet_write(device *,	/* Write a packet to the Tx buffer */
+	wv_packet_write(struct net_device *,	/* Write a packet to the Tx buffer */
 			void *,
 			short);
 static int
 	wavelan_packet_xmit(struct sk_buff *,	/* Send a packet */
-			    device *);
+			    struct net_device *);
 /* -------------------- HARDWARE CONFIGURATION -------------------- */
 static inline int
-	wv_mmc_init(device *);	/* Initialize the modem */
+	wv_mmc_init(struct net_device *);	/* Initialize the modem */
 static int
-	wv_ru_stop(device *),	/* Stop the i82593 receiver unit */
-	wv_ru_start(device *);	/* Start the i82593 receiver unit */
+	wv_ru_stop(struct net_device *),	/* Stop the i82593 receiver unit */
+	wv_ru_start(struct net_device *);	/* Start the i82593 receiver unit */
 static int
-	wv_82593_config(device *);	/* Configure the i82593 */
+	wv_82593_config(struct net_device *);	/* Configure the i82593 */
 static inline int
-	wv_pcmcia_reset(device *);	/* Reset the pcmcia interface */
+	wv_pcmcia_reset(struct net_device *);	/* Reset the pcmcia interface */
 static int
-	wv_hw_config(device *);	/* Reset & configure the whole hardware */
+	wv_hw_config(struct net_device *);	/* Reset & configure the whole hardware */
 static inline void
-	wv_hw_reset(device *);	/* Same, + start receiver unit */
+	wv_hw_reset(struct net_device *);	/* Same, + start receiver unit */
 static inline int
 	wv_pcmcia_config(dev_link_t *);	/* Configure the pcmcia interface */
 static void
@@ -768,11 +767,11 @@ static irqreturn_t
 			  void *,
 			  struct pt_regs *);
 static void
-	wavelan_watchdog(device *);	/* Transmission watchdog */
+	wavelan_watchdog(struct net_device *);	/* Transmission watchdog */
 /* ------------------- CONFIGURATION CALLBACKS ------------------- */
 static int
-	wavelan_open(device *),		/* Open the device */
-	wavelan_close(device *);	/* Close the device */
+	wavelan_open(struct net_device *),		/* Open the device */
+	wavelan_close(struct net_device *);	/* Close the device */
 static dev_link_t *
 	wavelan_attach(void);		/* Create a new device */
 static void
