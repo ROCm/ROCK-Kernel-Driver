@@ -4,6 +4,8 @@
 #define EISA_SIG_LEN   8
 #define EISA_MAX_SLOTS 8
 
+#define EISA_MAX_RESOURCES 4
+
 /* A few EISA constants/offsets... */
 
 #define EISA_DMA1_STATUS            8
@@ -17,6 +19,10 @@
 #define EISA_INT1_EDGE_LEVEL    0x4D0
 #define EISA_INT2_EDGE_LEVEL    0x4D1
 #define EISA_VENDOR_ID_OFFSET   0xC80
+#define EISA_CONFIG_OFFSET      0xC84
+
+#define EISA_CONFIG_ENABLED         1
+#define EISA_CONFIG_FORCED          2
 
 /* The EISA signature, in ASCII form, null terminated */
 struct eisa_device_id {
@@ -26,18 +32,27 @@ struct eisa_device_id {
 
 /* There is not much we can say about an EISA device, apart from
  * signature, slot number, and base address. dma_mask is set by
- * default to 32 bits.*/
+ * default to parent device mask..*/
 
 struct eisa_device {
 	struct eisa_device_id id;
 	int                   slot;
+	int                   state;
 	unsigned long         base_addr;
-	struct resource       res;
+	struct resource       res[EISA_MAX_RESOURCES];
 	u64                   dma_mask;
 	struct device         dev; /* generic device */
 };
 
 #define to_eisa_device(n) container_of(n, struct eisa_device, dev)
+
+static inline int eisa_get_region_index (void *addr)
+{
+	unsigned long x = (unsigned long) addr;
+
+	x &= 0xc00;
+	return (x >> 12);
+}
 
 struct eisa_driver {
 	const struct eisa_device_id *id_table;
@@ -69,6 +84,8 @@ struct eisa_root_device {
 	struct resource *res;
 	unsigned long    bus_base_addr;
 	int		 slots;  /* Max slot number */
+	int		 force_probe; /* Probe even when no slot 0 */
+	u64		 dma_mask; /* from bridge device */
 	int              bus_nr; /* Set by eisa_root_register */
 	struct resource  eisa_root_res;	/* ditto */
 };
