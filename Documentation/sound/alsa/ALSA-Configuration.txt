@@ -1183,6 +1183,15 @@ Module parameters
     Note: for the MPU401 on VIA823x, use snd-mpu401 driver
 	  additonally.  The mpu_port option is for VIA686 chips only.
 
+  Module snd-via82xx-modem
+  ------------------------
+
+    Module for VIA82xx AC97 modem
+
+    ac97_clock	- AC'97 codec clock base (default 48000Hz)
+
+    Module supports up to 8 cards.
+
   Module snd-virmidi
   ------------------
 
