@@ -260,9 +260,11 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	if (!bridge)
 		return -ENOMEM;
 
-	/* Assume here we have an 8151. (Later this assumption will be fixed). */
-	pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
-	switch (rev_id) {
+	if (pdev->vendor == PCI_VENDOR_ID_AMD &&
+	    pdev->device == PCI_DEVICE_ID_AMD_8151_0) {
+
+		pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
+		switch (rev_id) {
 		case 0x01:	revstring="A0";
 				break;
 		case 0x02:	revstring="A1";
@@ -275,15 +277,16 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 				break;
 		default:	revstring="??";
 				break;
-	}
-	printk ("Detected AMD 8151 AGP Bridge rev %s", revstring);
-	/*
-	 * Work around errata.
-	 * Chips before B2 stepping incorrectly reporting v3.5
-	 */
-	if (rev_id < 0x13) {
-		bridge->major_version = 3;
-		bridge->minor_version = 0;
+		}
+		printk ("Detected AMD 8151 AGP Bridge rev %s", revstring);
+		/*
+		 * Work around errata.
+		 * Chips before B2 stepping incorrectly reporting v3.5
+		 */
+		if (rev_id < 0x13) {
+			bridge->major_version = 3;
+			bridge->minor_version = 0;
+		}
 	}
 
 	bridge->driver = &amd_8151_driver;
@@ -327,6 +330,14 @@ static struct pci_device_id agp_amdk8_pci_table[] __initdata = {
 	.class_mask	= ~0,
 	.vendor		= PCI_VENDOR_ID_AMD,
 	.device		= PCI_DEVICE_ID_AMD_8151_0,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_VIA,
+	.device		= PCI_DEVICE_ID_VIA_K8T400M_0,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
