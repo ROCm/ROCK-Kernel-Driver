@@ -106,15 +106,6 @@ static inline void flush_tlb_range(struct vm_area_struct * vma, unsigned long st
 #define TLBSTATE_OK	1
 #define TLBSTATE_LAZY	2
 
-struct tlb_state
-{
-	struct mm_struct *active_mm;
-	int state;
-	char __cacheline_padding[24];
-};
-extern struct tlb_state cpu_tlbstate[NR_CPUS];
-
-
 #endif
 
 #define flush_tlb_kernel_range(start, end) flush_tlb_all()

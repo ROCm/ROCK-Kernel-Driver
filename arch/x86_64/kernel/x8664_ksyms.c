@@ -189,3 +189,5 @@ EXPORT_SYMBOL_NOVERS(do_softirq_thunk);
 
 void out_of_line_bug(void);
 EXPORT_SYMBOL(out_of_line_bug);
+
+EXPORT_SYMBOL(init_level4_pgt);
