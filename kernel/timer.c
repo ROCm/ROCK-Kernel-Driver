@@ -69,11 +69,11 @@ unsigned long event;
 extern int do_setitimer(int, struct itimerval *, struct itimerval *);
 
 /*
- * The 64-bit value is not volatile - you MUST NOT read it
+ * The 64-bit jiffies value is not atomic - you MUST NOT read it
  * without holding read_lock_irq(&xtime_lock).
  * jiffies is defined in the linker script...
  */
-u64 jiffies_64;
+
 
 unsigned int * prof_buffer;
 unsigned long prof_len;

@@ -30,6 +30,8 @@
 
 #include <linux/timex.h>
 
+u64 jiffies_64;
+
 extern rwlock_t xtime_lock;
 
 static int timer_value;
