@@ -9,7 +9,6 @@ else
    dep_tristate '  USB RTL8150 based ethernet device support (EXPERIMENTAL)' CONFIG_USB_RTL8150 $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
    dep_tristate '  USB KLSI KL5USB101-based ethernet device support (EXPERIMENTAL)' CONFIG_USB_KAWETH $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
    dep_tristate '  USB CATC NetMate-based Ethernet device support (EXPERIMENTAL)' CONFIG_USB_CATC $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
-   dep_tristate '  USB Communication Class Ethernet device support (EXPERIMENTAL)' CONFIG_USB_CDCETHER $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
    dep_tristate '  USB-to-USB Networking cable device support (EXPERIMENTAL)' CONFIG_USB_USBNET $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
 fi
 
@@ -18,7 +17,7 @@ fi
 if [ "$CONFIG_USB_PEGASUS" = "y" -o "$CONFIG_USB_RTL8150" = "y" -o "$CONFIG_USB_KAWETH" = "y" ]; then
    define_bool CONFIG_USB_NET y
 fi
-if [ "$CONFIG_USB_CATC" = "y" -o "$CONFIG_USB_CDCETHER" = "y" -o "$CONFIG_USB_USBNET" = "y" ]; then
+if [ "$CONFIG_USB_CATC" = "y" -o "$CONFIG_USB_USBNET" = "y" ]; then
    define_bool CONFIG_USB_NET y
 fi
    

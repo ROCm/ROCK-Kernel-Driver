@@ -16,8 +16,9 @@ dep_tristate '  USB Mass Storage support' CONFIG_USB_STORAGE $CONFIG_USB $CONFIG
    dep_mbool '    HP CD-Writer 82xx support' CONFIG_USB_STORAGE_HP8200e $CONFIG_USB_STORAGE $CONFIG_EXPERIMENTAL
    dep_mbool '    SanDisk SDDR-09 (and other SmartMedia) support' CONFIG_USB_STORAGE_SDDR09 $CONFIG_USB_STORAGE $CONFIG_EXPERIMENTAL
    dep_mbool '    Lexar Jumpshot Compact Flash Reader' CONFIG_USB_STORAGE_JUMPSHOT $CONFIG_USB_STORAGE $CONFIG_EXPERIMENTAL
-dep_tristate '  USB Modem (CDC ACM) support' CONFIG_USB_ACM $CONFIG_USB
-dep_tristate '  USB Printer support' CONFIG_USB_PRINTER $CONFIG_USB
+   dep_tristate '  USB Modem (CDC ACM) support' CONFIG_USB_ACM $CONFIG_USB
+   dep_tristate '  USB CDC Ethernet support (EXPERIMENTAL)' CONFIG_USB_CDCETHER $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB Printer support' CONFIG_USB_PRINTER $CONFIG_USB
 
 comment 'USB Human Interface Devices (HID)'
 dep_tristate '  USB Human Interface Device (full HID) support' CONFIG_USB_HID $CONFIG_USB
@@ -37,7 +38,7 @@ fi
 if [ "$CONFIG_USB_AUDIO" = "y" -o "$CONFIG_USB_BLUETOOTH" = "y" -o "$CONFIG_USB_ACM" = "y" ]; then
    define_bool CONFIG_USB_CLASS y
 fi
-if [ "$CONFIG_USB_PRINTER" = "y" ]; then
+if [ "$CONFIG_USB_CDCETHER" = "y" -o "$CONFIG_USB_PRINTER" = "y" ]; then
    define_bool CONFIG_USB_CLASS y
 fi
 if [ "$CONFIG_USB_HID" = "y" -o "$CONFIG_USB_KBD" = "y" -o "$CONFIG_USB_MOUSE" = "y" ]; then

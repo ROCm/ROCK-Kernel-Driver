@@ -5,7 +5,7 @@
 O_TARGET	:= usbdrv.o
 
 # Object files in subdirectories
-mod-subdirs	:= core host class media net serial scanner misc
+mod-subdirs	:= core host class media net serial image misc
 
 subdir-$(CONFIG_USB)		+= core
 ifeq ($(CONFIG_USB),y)
@@ -59,17 +59,13 @@ ifeq ($(CONFIG_USB_NET),y)
 	obj-y += net/usb-net.o
 endif
 
-subdir-$(CONFIG_USB_MICROTEK)	+= scanner
-subdir-$(CONFIG_USB_HPUSBSCSI)	+= scanner
-subdir-$(CONFIG_USB_SCANNER)	+= scanner
-ifeq ($(CONFIG_USB_MICROTEK),y)
-	obj-y += scanner/usb-scanner.o
-endif
-ifeq ($(CONFIG_USB_HPUSBSCSI),y)
-	obj-y += scanner/usb-scanner.o
-endif
-ifeq ($(CONFIG_USB_SCANNER),y)
-	obj-y += scanner/usb-scanner.o
+subdir-$(CONFIG_USB_DC2XX)	+= image
+subdir-$(CONFIG_USB_MDC800)	+= image
+subdir-$(CONFIG_USB_MICROTEK)	+= image
+subdir-$(CONFIG_USB_HPUSBSCSI)	+= image
+subdir-$(CONFIG_USB_SCANNER)	+= image
+ifeq ($(CONFIG_USB_IMAGE),y)
+	obj-y += image/usb-image.o
 endif
 
 subdir-$(CONFIG_USB_SERIAL)	+= serial
@@ -79,9 +75,7 @@ endif
 
 subdir-$(CONFIG_USB_AUERSWALD)	+= misc
 subdir-$(CONFIG_USB_DABUSB)	+= misc
-subdir-$(CONFIG_USB_DC2XX)	+= misc
 subdir-$(CONFIG_USB_EMI26)	+= misc
-subdir-$(CONFIG_USB_MDC800)	+= misc
 subdir-$(CONFIG_USB_RIO500)	+= misc
 subdir-$(CONFIG_USB_TIGL)	+= misc
 subdir-$(CONFIG_USB_USS720)	+= misc
