@@ -262,6 +262,11 @@ extern void ip_ct_refresh_acct(struct ip_conntrack *ct,
 			       unsigned long extra_jiffies);
 
 /* These are for NAT.  Icky. */
+/* Update TCP window tracking data when NAT mangles the packet */
+extern int ip_conntrack_tcp_update(struct sk_buff *skb,
+				   struct ip_conntrack *conntrack,
+				   int dir);
+
 /* Call me when a conntrack is destroyed. */
 extern void (*ip_conntrack_destroyed)(struct ip_conntrack *conntrack);
 
