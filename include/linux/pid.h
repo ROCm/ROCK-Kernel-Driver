@@ -4,6 +4,7 @@
 enum pid_type
 {
 	PIDTYPE_PID,
+	PIDTYPE_TGID,
 	PIDTYPE_PGID,
 	PIDTYPE_SID,
 	PIDTYPE_MAX
@@ -29,13 +30,12 @@ struct pid_link
 	list_entry(elem, struct task_struct, pids[type].pid_chain)
 
 /*
- * attach_pid() must be called with the tasklist_lock write-held.
- *
- * It might unlock the tasklist_lock for allocation, so this
- * function must be called after installing all other links of
- * a new task.
+ * attach_pid() and link_pid() must be called with the tasklist_lock
+ * write-held.
  */
-extern int FASTCALL(attach_pid(struct task_struct *, enum pid_type, int));
+extern int FASTCALL(attach_pid(struct task_struct *task, enum pid_type type, int nr));
+
+extern void FASTCALL(link_pid(struct task_struct *task, struct pid_link *link, struct pid *pid));
 
 /*
  * detach_pid() must be called with the tasklist_lock write-held.
@@ -50,6 +50,7 @@ extern struct pid *FASTCALL(find_pid(enum pid_type, int));
 
 extern int alloc_pidmap(void);
 extern void FASTCALL(free_pidmap(int));
+extern void switch_exec_pids(struct task_struct *leader, struct task_struct *thread);
 
 #define for_each_task_pid(who, type, task, elem, pid)		\
 	if ((pid = find_pid(type, who)))			\

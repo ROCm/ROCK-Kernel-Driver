@@ -76,7 +76,6 @@
 	.children	= LIST_HEAD_INIT(tsk.children),			\
 	.sibling	= LIST_HEAD_INIT(tsk.sibling),			\
 	.group_leader	= &tsk,						\
-	.thread_group	= LIST_HEAD_INIT(tsk.thread_group),		\
 	.wait_chldexit	= __WAIT_QUEUE_HEAD_INITIALIZER(tsk.wait_chldexit),\
 	.real_timer	= {						\
 		.function	= it_real_fn				\

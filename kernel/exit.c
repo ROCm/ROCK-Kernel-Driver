@@ -34,13 +34,13 @@ static struct dentry * __unhash_process(struct task_struct *p)
 	struct dentry *proc_dentry;
 	nr_threads--;
 	detach_pid(p, PIDTYPE_PID);
+	detach_pid(p, PIDTYPE_TGID);
 	if (thread_group_leader(p)) {
 		detach_pid(p, PIDTYPE_PGID);
 		detach_pid(p, PIDTYPE_SID);
 	}
 
 	REMOVE_LINKS(p);
-	p->pid = 0;
 	proc_dentry = p->proc_dentry;
 	if (unlikely(proc_dentry != NULL)) {
 		spin_lock(&dcache_lock);
@@ -74,6 +74,15 @@ void release_task(struct task_struct * p)
 	write_lock_irq(&tasklist_lock);
 	__exit_sighand(p);
 	proc_dentry = __unhash_process(p);
+
+	/*
+	 * If we are the last non-leader member of the thread
+	 * group, and the leader is zombie, then notify the
+	 * group leader's parent process.
+	 */
+	if (p->group_leader != p && thread_group_empty(p))
+		do_notify_parent(p->group_leader, p->group_leader->exit_signal);
+
 	p->parent->cutime += p->utime + p->cutime;
 	p->parent->cstime += p->stime + p->cstime;
 	p->parent->cmin_flt += p->min_flt + p->cmin_flt;
@@ -670,6 +679,25 @@ asmlinkage long sys_exit(int error_code)
 	do_exit((error_code&0xff)<<8);
 }
 
+task_t *next_thread(task_t *p)
+{
+	struct pid_link *link = p->pids + PIDTYPE_TGID;
+	struct list_head *tmp, *head = &link->pidptr->task_list;
+
+#if CONFIG_SMP
+	if (!p->sig)
+		BUG();
+	if (!spin_is_locked(&p->sig->siglock) &&
+				!rwlock_is_locked(&tasklist_lock))
+		BUG();
+#endif
+	tmp = link->pid_chain.next;
+	if (tmp == head)
+		tmp = head->next;
+
+	return pid_task(tmp, PIDTYPE_TGID);
+}
+
 /*
  * this kills every thread in the thread group. Note that any externally
  * wait4()-ing process will get the correct exit code - even if this 
@@ -679,7 +707,7 @@ asmlinkage long sys_exit_group(int error_code)
 {
 	unsigned int exit_code = (error_code & 0xff) << 8;
 
-	if (!list_empty(&current->thread_group)) {
+	if (!thread_group_empty(current)) {
 		struct signal_struct *sig = current->sig;
 
 		spin_lock_irq(&sig->siglock);

@@ -328,7 +328,6 @@ struct task_struct {
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
 	struct task_struct *group_leader;
-	struct list_head thread_group;
 
 	/* PID/PID hash table linkage. */
 	struct pid_link pids[PIDTYPE_MAX];
@@ -797,34 +796,19 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 #define while_each_thread(g, t) \
 	while ((t = next_thread(t)) != g)
 
-static inline task_t *next_thread(task_t *p)
-{
-	if (!p->sig)
-		BUG();
-#if CONFIG_SMP
-	if (!spin_is_locked(&p->sig->siglock) &&
-				!rwlock_is_locked(&tasklist_lock))
-		BUG();
-#endif
-	return list_entry((p)->thread_group.next, task_t, thread_group);
-}
-
-static inline task_t *prev_thread(task_t *p)
-{
-	if (!p->sig)
-		BUG();
-#if CONFIG_SMP
-	if (!spin_is_locked(&p->sig->siglock) &&
-				!rwlock_is_locked(&tasklist_lock))
-		BUG();
-#endif
-	return list_entry((p)->thread_group.prev, task_t, thread_group);
-}
+extern task_t * FASTCALL(next_thread(task_t *p));
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
+static inline int thread_group_empty(task_t *p)
+{
+	struct pid *pid = p->pids[PIDTYPE_TGID].pidptr;
+
+	return pid->task_list.next->next == &pid->task_list;
+}
+
 #define delay_group_leader(p) \
-	(p->tgid == p->pid && !list_empty(&p->thread_group))
+		(thread_group_leader(p) && !thread_group_empty(p))
 
 extern void unhash_process(struct task_struct *p);
 
