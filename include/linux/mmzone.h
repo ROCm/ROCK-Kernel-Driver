@@ -118,8 +118,8 @@ struct zone {
 	spinlock_t		lru_lock;	
 	struct list_head	active_list;
 	struct list_head	inactive_list;
-	atomic_t		nr_scan_active;
-	atomic_t		nr_scan_inactive;
+	unsigned long		nr_scan_active;
+	unsigned long		nr_scan_inactive;
 	unsigned long		nr_active;
 	unsigned long		nr_inactive;
 	int			all_unreclaimable; /* All pages pinned */

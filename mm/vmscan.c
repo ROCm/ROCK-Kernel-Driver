@@ -789,54 +789,46 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 }
 
 /*
- * Scan `nr_pages' from this zone.  Returns the number of reclaimed pages.
  * This is a basic per-zone page freer.  Used by both kswapd and direct reclaim.
  */
 static void
 shrink_zone(struct zone *zone, struct scan_control *sc)
 {
-	unsigned long scan_active, scan_inactive;
-	int count;
-
-	scan_inactive = (zone->nr_active + zone->nr_inactive) >> sc->priority;
+	unsigned long nr_active;
+	unsigned long nr_inactive;
 
 	/*
-	 * Try to keep the active list 2/3 of the size of the cache.  And
-	 * make sure that refill_inactive is given a decent number of pages.
-	 *
-	 * The "scan_active + 1" here is important.  With pagecache-intensive
-	 * workloads the inactive list is huge, and `ratio' evaluates to zero
-	 * all the time.  Which pins the active list memory.  So we add one to
-	 * `scan_active' just to make sure that the kernel will slowly sift
-	 * through the active list.
+	 * Add one to `nr_to_scan' just to make sure that the kernel will
+	 * slowly sift through the active list.
 	 */
-	if (zone->nr_active >= 4*(zone->nr_inactive*2 + 1)) {
-		/* Don't scan more than 4 times the inactive list scan size */
-		scan_active = 4*scan_inactive;
-	} else {
-		unsigned long long tmp;
+	zone->nr_scan_active += (zone->nr_active >> sc->priority) + 1;
+	nr_active = zone->nr_scan_active;
+	if (nr_active >= SWAP_CLUSTER_MAX)
+		zone->nr_scan_active = 0;
+	else
+		nr_active = 0;
 
-		/* Cast to long long so the multiply doesn't overflow */
+	zone->nr_scan_inactive += (zone->nr_inactive >> sc->priority) + 1;
+	nr_inactive = zone->nr_scan_inactive;
+	if (nr_inactive >= SWAP_CLUSTER_MAX)
+		zone->nr_scan_inactive = 0;
+	else
+		nr_inactive = 0;
 
-		tmp = (unsigned long long)scan_inactive * zone->nr_active;
-		do_div(tmp, zone->nr_inactive*2 + 1);
-		scan_active = (unsigned long)tmp;
-	}
+	while (nr_active || nr_inactive) {
+		if (nr_active) {
+			sc->nr_to_scan = min(nr_active,
+					(unsigned long)SWAP_CLUSTER_MAX);
+			nr_active -= sc->nr_to_scan;
+			refill_inactive_zone(zone, sc);
+		}
 
-	atomic_add(scan_active + 1, &zone->nr_scan_active);
-	count = atomic_read(&zone->nr_scan_active);
-	if (count >= SWAP_CLUSTER_MAX) {
-		atomic_set(&zone->nr_scan_active, 0);
-		sc->nr_to_scan = count;
-		refill_inactive_zone(zone, sc);
-	}
-
-	atomic_add(scan_inactive, &zone->nr_scan_inactive);
-	count = atomic_read(&zone->nr_scan_inactive);
-	if (count >= SWAP_CLUSTER_MAX) {
-		atomic_set(&zone->nr_scan_inactive, 0);
-		sc->nr_to_scan = count;
-		shrink_cache(zone, sc);
+		if (nr_inactive) {
+			sc->nr_to_scan = min(nr_inactive,
+					(unsigned long)SWAP_CLUSTER_MAX);
+			nr_inactive -= sc->nr_to_scan;
+			shrink_cache(zone, sc);
+		}
 	}
 }
 
