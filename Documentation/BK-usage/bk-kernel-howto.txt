@@ -216,7 +216,7 @@ changes.
 
 3) Include a summary and "diffstat -p1" of each changeset that will be
 downloaded, when Linus issues a "bk pull".  The author auto-generates
-these summaries using "bk push -nl <parent> 2>&1", to obtain a listing
+these summaries using "bk changes -L <parent>", to obtain a listing
 of all the pending-to-send changesets, and their commit messages.
 
 It is important to show Linus what he will be downloading when he issues
