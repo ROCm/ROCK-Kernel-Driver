@@ -972,6 +972,12 @@ prep_init_IRQ(void)
 	}
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
+
+	if (have_residual_data) {
+		i8259_init(residual_isapic_addr());
+		return;
+	}
+
 	/* If we have a Raven PCI bridge or a Hawk PCI bridge / Memory
 	 * controller, we poll (as they have a different int-ack address). */
 	early_read_config_dword(NULL, 0, 0, PCI_VENDOR_ID, &pci_viddid);

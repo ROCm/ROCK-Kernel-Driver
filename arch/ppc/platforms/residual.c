@@ -917,6 +917,39 @@ void __init residual_irq_mask(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
 	*irq_edge_mask_hi = irq_mask >> 8;
 }
 
+unsigned int __init residual_isapic_addr(void)
+{
+	PPC_DEVICE *isapic;
+	PnP_TAG_PACKET *pkt;
+	unsigned int addr;
+
+	isapic = residual_find_device(~0, NULL, SystemPeripheral,
+				      ProgrammableInterruptController,
+				      ISA_PIC, 0);
+	if (!isapic)
+		goto unknown;
+
+	pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
+						isapic->AllocatedOffset, 9, 0);
+	if (!pkt)
+		goto unknown;
+
+#define p pkt->L4_Pack.L4_Data.L4_PPCPack
+	/* Must be 32-bit memory address */
+	if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
+		goto unknown;
+
+	/* It doesn't seem to work where length != 1 (what can I say? :-/ ) */
+	if (ld_le32((unsigned int *)(p.PPCData + 12)) != 1)
+		goto unknown;
+
+	addr = ld_le32((unsigned int *) (p.PPCData + 4));
+#undef p
+	return addr;
+unknown:
+	return 0;
+}
+
 PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
 				unsigned packet_tag,
 				int n)
