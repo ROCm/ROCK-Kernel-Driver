@@ -40,7 +40,6 @@
 #include <asm/byteorder.h>
 
 static struct super_operations usbfs_ops;
-static struct address_space_operations usbfs_aops;
 static struct file_operations usbfs_dir_operations;
 static struct file_operations default_file_operations;
 static struct inode_operations usbfs_dir_inode_operations;
@@ -168,7 +167,6 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_blocks = 0;
 		inode->i_rdev = NODEV;
-		inode->i_mapping->a_ops = &usbfs_aops;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		switch (mode & S_IFMT) {
 		default:
@@ -186,7 +184,6 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 	return inode; 
 }
 
-/* SMP-safe */
 static int usbfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
 			int dev)
 {
@@ -209,21 +206,6 @@ static int usbfs_mkdir (struct inode *dir, struct dentry *dentry, int mode)
 static int usbfs_create (struct inode *dir, struct dentry *dentry, int mode)
 {
  	return usbfs_mknod (dir, dentry, mode | S_IFREG, 0);
-}
-
-static int usbfs_link (struct dentry *old_dentry, struct inode *dir,
-		       struct dentry *dentry)
-{
-	struct inode *inode = old_dentry->d_inode;
-
-	if(S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	inode->i_nlink++;
-	atomic_inc(&inode->i_count);
- 	dget(dentry);
-	d_instantiate(dentry, inode);
-	return 0;
 }
 
 static inline int usbfs_positive (struct dentry *dentry)
@@ -256,26 +238,8 @@ static int usbfs_unlink (struct inode *dir, struct dentry *dentry)
 	if (usbfs_empty(dentry)) {
 		struct inode *inode = dentry->d_inode;
 
-		lock_kernel();
 		inode->i_nlink--;
-		unlock_kernel();
 		dput(dentry);
-		error = 0;
-	}
-	return error;
-}
-
-static int usbfs_rename (struct inode *old_dir, struct dentry *old_dentry,
-			 struct inode *new_dir, struct dentry *new_dentry)
-{
-	int error = -ENOTEMPTY;
-
-	if (usbfs_empty(new_dentry)) {
-		struct inode *inode = new_dentry->d_inode;
-		if (inode) {
-			inode->i_nlink--;
-			dput(new_dentry);
-		}
 		error = 0;
 	}
 	return error;
@@ -329,19 +293,9 @@ static int default_open (struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int default_sync_file (struct file *file, struct dentry *dentry,
-			      int datasync)
-{
-	return 0;
-}
-
-static struct address_space_operations usbfs_aops = {
-};
-
 static struct file_operations usbfs_dir_operations = {
 	read:		generic_read_dir,
 	readdir:	dcache_readdir,
-	fsync:		default_sync_file,
 };
 
 static struct file_operations default_file_operations = {
@@ -349,19 +303,14 @@ static struct file_operations default_file_operations = {
 	write:		default_write_file,
 	open:		default_open,
 	llseek:		default_file_lseek,
-	fsync:		default_sync_file,
-	mmap:		generic_file_mmap,
 };
 
 static struct inode_operations usbfs_dir_inode_operations = {
 	create:		usbfs_create,
 	lookup:		usbfs_lookup,
-	link:		usbfs_link,
 	unlink:		usbfs_unlink,
 	mkdir:		usbfs_mkdir,
 	rmdir:		usbfs_rmdir,
-	mknod:		usbfs_mknod,
-	rename:		usbfs_rename,
 };
 
 static struct super_operations usbfs_ops = {
