@@ -372,7 +372,7 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 		return -ENOMEM;
 
 	/* Get a new skb... force flag on. */
-	buff = tcp_alloc_skb(sk, nsize, GFP_ATOMIC);
+	buff = sk_stream_alloc_skb(sk, nsize, GFP_ATOMIC);
 	if (buff == NULL)
 		return -ENOMEM; /* We'll just try again later. */
 	sk_charge_skb(sk, buff);

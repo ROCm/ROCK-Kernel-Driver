@@ -639,8 +639,8 @@ new_segment:
 			if (!sk_stream_memory_free(sk))
 				goto wait_for_sndbuf;
 
-			skb = tcp_alloc_pskb(sk, 0, tp->mss_cache,
-					     sk->sk_allocation);
+			skb = sk_stream_alloc_pskb(sk, 0, tp->mss_cache,
+						   sk->sk_allocation);
 			if (!skb)
 				goto wait_for_memory;
 
@@ -806,8 +806,8 @@ new_segment:
 				if (!sk_stream_memory_free(sk))
 					goto wait_for_sndbuf;
 
-				skb = tcp_alloc_pskb(sk, select_size(sk, tp),
-						     0, sk->sk_allocation);
+				skb = sk_stream_alloc_pskb(sk, select_size(sk, tp),
+							   0, sk->sk_allocation);
 				if (!skb)
 					goto wait_for_memory;
 
@@ -868,7 +868,7 @@ new_segment:
 
 				if (!page) {
 					/* Allocate new cache page. */
-					if (!(page = tcp_alloc_page(sk)))
+					if (!(page = sk_stream_alloc_page(sk)))
 						goto wait_for_memory;
 					off = 0;
 				}
@@ -1778,7 +1778,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 
 	tcp_clear_xmit_timers(sk);
 	__skb_queue_purge(&sk->sk_receive_queue);
-	tcp_writequeue_purge(sk);
+	sk_stream_writequeue_purge(sk);
 	__skb_queue_purge(&tp->out_of_order_queue);
 
 	inet->dport = 0;

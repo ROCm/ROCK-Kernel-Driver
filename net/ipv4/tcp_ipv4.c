@@ -2101,7 +2101,7 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 	tcp_clear_xmit_timers(sk);
 
 	/* Cleanup up the write buffer. */
-  	tcp_writequeue_purge(sk);
+  	sk_stream_writequeue_purge(sk);
 
 	/* Cleans up our, hopefully empty, out_of_order_queue. */
   	__skb_queue_purge(&tp->out_of_order_queue);
@@ -2602,6 +2602,7 @@ struct proto tcp_prot = {
 	.enter_memory_pressure	= tcp_enter_memory_pressure,
 	.sysctl_wmem		= { 4 * 1024, 16 * 1024, 128 * 1024 },
 	.sysctl_rmem		= { 4 * 1024, 87380, 87380 * 2 },
+	.max_header		= MAX_TCP_HEADER,
 };
 
 

@@ -3390,12 +3390,6 @@ static void tcp_ofo_queue(struct sock *sk)
 	}
 }
 
-static inline int tcp_rmem_schedule(struct sock *sk, struct sk_buff *skb)
-{
-	return (int)skb->truesize <= sk->sk_forward_alloc ||
-		sk_stream_mem_schedule(sk, skb->truesize, 1);
-}
-
 static int tcp_prune_queue(struct sock *sk);
 
 static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
@@ -3449,8 +3443,9 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 queue_and_out:
 			if (eaten < 0 &&
 			    (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf ||
-			     !tcp_rmem_schedule(sk, skb))) {
-				if (tcp_prune_queue(sk) < 0 || !tcp_rmem_schedule(sk, skb))
+			     !sk_stream_rmem_schedule(sk, skb))) {
+				if (tcp_prune_queue(sk) < 0 ||
+				    !sk_stream_rmem_schedule(sk, skb))
 					goto drop;
 			}
 			sk_stream_set_owner_r(skb, sk);
@@ -3522,8 +3517,9 @@ drop:
 	TCP_ECN_check_ce(tp, skb);
 
 	if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf ||
-	    !tcp_rmem_schedule(sk, skb)) {
-		if (tcp_prune_queue(sk) < 0 || !tcp_rmem_schedule(sk, skb))
+	    !sk_stream_rmem_schedule(sk, skb)) {
+		if (tcp_prune_queue(sk) < 0 ||
+		    !sk_stream_rmem_schedule(sk, skb))
 			goto drop;
 	}
 

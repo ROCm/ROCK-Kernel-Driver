@@ -1898,7 +1898,7 @@ static int tcp_v6_destroy_sock(struct sock *sk)
 	tcp_clear_xmit_timers(sk);
 
 	/* Cleanup up the write buffer. */
-  	tcp_writequeue_purge(sk);
+  	sk_stream_writequeue_purge(sk);
 
 	/* Cleans up our, hopefully empty, out_of_order_queue. */
   	__skb_queue_purge(&tp->out_of_order_queue);
@@ -2096,6 +2096,7 @@ struct proto tcpv6_prot = {
 	.hash		=	tcp_v6_hash,
 	.unhash		=	tcp_unhash,
 	.get_port	=	tcp_v6_get_port,
+	.max_header	=	MAX_TCP_HEADER,
 };
 
 static struct inet6_protocol tcpv6_protocol = {
