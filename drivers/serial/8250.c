@@ -130,6 +130,7 @@ struct uart_8250_port {
 	struct timer_list	timer;		/* "no irq" timer */
 	struct list_head	list;		/* ports on this IRQ */
 	unsigned int		capabilities;	/* port capabilities */
+	unsigned int		tx_loadsz;	/* transmit fifo load size */
 	unsigned short		rev;
 	unsigned char		acr;
 	unsigned char		ier;
@@ -157,22 +158,22 @@ static struct irq_info irq_lists[NR_IRQS];
  * Here we define the default xmit fifo size used for each type of UART.
  */
 static const struct serial8250_config uart_config[PORT_MAX_8250+1] = {
-	{ "unknown",	1,	0 },
-	{ "8250",	1,	0 },
-	{ "16450",	1,	0 },
-	{ "16550",	1,	0 },
-	{ "16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "Cirrus",	1, 	0 },
-	{ "ST16650",	1,	UART_CLEAR_FIFO | UART_STARTECH },
-	{ "ST16650V2",	32,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "TI16750",	64,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "Startech",	1,	0 },
-	{ "16C950/954",	128,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "ST16654",	64,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "XR16850",	128,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "RSA",	2048,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "NS16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_NATSEMI },
-	{ "XScale",	32,	UART_CLEAR_FIFO | UART_USE_FIFO  },
+	{ "unknown",	1,	1,	0 },
+	{ "8250",	1,	1,	0 },
+	{ "16450",	1,	1,	0 },
+	{ "16550",	1,	1,	0 },
+	{ "16550A",	16,	16,	UART_CLEAR_FIFO | UART_USE_FIFO },
+	{ "Cirrus",	1, 	1,	0 },
+	{ "ST16650",	1,	1,	UART_CLEAR_FIFO | UART_STARTECH },
+	{ "ST16650V2",	32,	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
+	{ "TI16750",	64,	64,	UART_CLEAR_FIFO | UART_USE_FIFO },
+	{ "Startech",	1,	1,	0 },
+	{ "16C950/954",	128,	128,	UART_CLEAR_FIFO | UART_USE_FIFO },
+	{ "ST16654",	64,	32,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
+	{ "XR16850",	128,	128,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
+	{ "RSA",	2048,	2048,	UART_CLEAR_FIFO | UART_USE_FIFO },
+	{ "NS16550A",	16,	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_NATSEMI },
+	{ "XScale",	32,	32,	UART_CLEAR_FIFO | UART_USE_FIFO  },
 };
 
 static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
@@ -712,6 +713,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 
 	up->port.fifosize = uart_config[up->port.type].fifo_size;
 	up->capabilities = uart_config[up->port.type].flags;
+	up->tx_loadsz = uart_config[up->port.type].tx_loadsz;
 
 	if (up->port.type == PORT_UNKNOWN)
 		goto out;
@@ -933,7 +935,7 @@ static _INLINE_ void transmit_chars(struct uart_8250_port *up)
 		return;
 	}
 
-	count = up->port.fifosize;
+	count = up->tx_loadsz;
 	do {
 		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
