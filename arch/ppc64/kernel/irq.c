@@ -403,7 +403,7 @@ typedef struct {
 } ____cacheline_aligned irq_balance_t;
 
 static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
-			= { [ 0 ... NR_IRQS-1 ] = { 1, 0 } };
+			= { [ 0 ... NR_IRQS-1 ] = { 0, 0 } };
 
 #define IDLE_ENOUGH(cpu,now) \
 		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > ((HZ/100)+1)))
