@@ -307,6 +307,8 @@ struct request_queue
 #define QUEUE_FLAG_CLUSTER	0	/* cluster several segments into 1 */
 #define QUEUE_FLAG_QUEUED	1	/* uses generic tag queueing */
 #define QUEUE_FLAG_STOPPED	2	/* queue is stopped */
+#define	QUEUE_FLAG_READFULL	3	/* write queue has been filled */
+#define QUEUE_FLAG_WRITEFULL	4	/* read queue has been filled */
 
 #define blk_queue_plugged(q)	!list_empty(&(q)->plug_list)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
@@ -321,6 +323,30 @@ struct request_queue
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
 
 #define rq_data_dir(rq)		((rq)->flags & 1)
+
+static inline int blk_queue_full(struct request_queue *q, int rw)
+{
+	if (rw == READ)
+		return test_bit(QUEUE_FLAG_READFULL, &q->queue_flags);
+	return test_bit(QUEUE_FLAG_WRITEFULL, &q->queue_flags);
+}
+
+static inline void blk_set_queue_full(struct request_queue *q, int rw)
+{
+	if (rw == READ)
+		set_bit(QUEUE_FLAG_READFULL, &q->queue_flags);
+	else
+		set_bit(QUEUE_FLAG_WRITEFULL, &q->queue_flags);
+}
+
+static inline void blk_clear_queue_full(struct request_queue *q, int rw)
+{
+	if (rw == READ)
+		clear_bit(QUEUE_FLAG_READFULL, &q->queue_flags);
+	else
+		clear_bit(QUEUE_FLAG_WRITEFULL, &q->queue_flags);
+}
+
 
 /*
  * mergeable request must not have _NOMERGE or _BARRIER bit set, nor may

@@ -53,7 +53,7 @@ unsigned long blk_max_low_pfn, blk_max_pfn;
 
 static inline int batch_requests(struct request_queue *q)
 {
-	return q->nr_requests - min(q->nr_requests / 8, 8UL);
+	return q->nr_requests - min(q->nr_requests / 8, 8UL) - 1;
 }
 
 /*
@@ -1309,13 +1309,16 @@ static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
 /*
  * Get a free request, queue_lock must not be held
  */
-static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
+static struct request *
+get_request(request_queue_t *q, int rw, int gfp_mask, int force)
 {
 	struct request *rq = NULL;
 	struct request_list *rl = &q->rq;
 
 	spin_lock_irq(q->queue_lock);
-	if (rl->count[rw] >= q->nr_requests && !elv_may_queue(q, rw)) {
+	if (rl->count[rw] == q->nr_requests)
+		blk_set_queue_full(q, rw);
+	if (blk_queue_full(q, rw) && !force && !elv_may_queue(q, rw)) {
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
@@ -1330,6 +1333,14 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		rl->count[rw]--;
 		if (rl->count[rw] < queue_congestion_off_threshold(q))
                         clear_queue_congested(q, rw);
+
+		if (rl->count[rw] <= batch_requests(q)) {
+			if (waitqueue_active(&rl->wait[rw]))
+				wake_up(&rl->wait[rw]);
+			else
+				blk_clear_queue_full(q, rw);
+		}
+
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
@@ -1366,26 +1377,22 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 {
 	DEFINE_WAIT(wait);
 	struct request *rq;
+	int waited = 0;
 
 	generic_unplug_device(q);
 	do {
-		rq = get_request(q, rw, GFP_NOIO);
+		struct request_list *rl = &q->rq;
+
+		prepare_to_wait_exclusive(&rl->wait[rw], &wait,
+				TASK_UNINTERRUPTIBLE);
+
+		rq = get_request(q, rw, GFP_NOIO, waited);
 
 		if (!rq) {
-			struct request_list *rl = &q->rq;
-
-			prepare_to_wait_exclusive(&rl->wait[rw], &wait,
-						TASK_UNINTERRUPTIBLE);
-			/*
-			 * If _all_ the requests were suddenly returned then
-			 * no wakeup will be delivered.  So now we're on the
-			 * waitqueue, go check for that.
-			 */
-			rq = get_request(q, rw, GFP_NOIO);
-			if (!rq)
-				io_schedule();
-			finish_wait(&rl->wait[rw], &wait);
+			io_schedule();
+			waited = 1;
 		}
+		finish_wait(&rl->wait[rw], &wait);
 	} while (!rq);
 
 	return rq;
@@ -1397,10 +1404,10 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	BUG_ON(rw != READ && rw != WRITE);
 
-	rq = get_request(q, rw, gfp_mask);
-
-	if (!rq && (gfp_mask & __GFP_WAIT))
+	if (gfp_mask & __GFP_WAIT)
 		rq = get_request_wait(q, rw);
+	else
+		rq = get_request(q, rw, gfp_mask, 0);
 
 	return rq;
 }
@@ -1551,9 +1558,13 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		rl->count[rw]--;
 		if (rl->count[rw] < queue_congestion_off_threshold(q))
 			clear_queue_congested(q, rw);
-		if (rl->count[rw] < batch_requests(q) &&
-				waitqueue_active(&rl->wait[rw]))
-			wake_up(&rl->wait[rw]);
+
+		if (rl->count[rw] <= batch_requests(q)) {
+			if (waitqueue_active(&rl->wait[rw]))
+				wake_up(&rl->wait[rw]);
+			else
+				blk_clear_queue_full(q, rw);
+		}
 	}
 }
 
@@ -1796,7 +1807,7 @@ get_rq:
 		freereq = NULL;
 	} else {
 		spin_unlock_irq(q->queue_lock);
-		if ((freereq = get_request(q, rw, GFP_ATOMIC)) == NULL) {
+		if ((freereq = get_request(q, rw, GFP_ATOMIC, 0)) == NULL) {
 			/*
 			 * READA bit set
 			 */
@@ -1904,8 +1915,7 @@ static inline void blk_partition_remap(struct bio *bio)
  * bio happens to be merged with someone else, and may change bi_dev and
  * bi_sector for remaps as it sees fit.  So the values of these fields
  * should NOT be depended on after the call to generic_make_request.
- *
- * */
+ */
 void generic_make_request(struct bio *bio)
 {
 	request_queue_t *q;
@@ -2415,6 +2425,19 @@ queue_requests_store(struct request_queue *q, const char *page, size_t count)
 	else if (rl->count[WRITE] < queue_congestion_off_threshold(q))
 		clear_queue_congested(q, WRITE);
 
+	if (rl->count[READ] >= q->nr_requests) {
+		blk_set_queue_full(q, READ);
+	} else if (rl->count[READ] <= batch_requests(q)) {
+		blk_clear_queue_full(q, READ);
+		wake_up_all(&rl->wait[READ]);
+	}
+
+	if (rl->count[WRITE] >= q->nr_requests) {
+		blk_set_queue_full(q, WRITE);
+	} else if (rl->count[WRITE] <= batch_requests(q)) {
+		blk_clear_queue_full(q, WRITE);
+		wake_up_all(&rl->wait[WRITE]);
+	}
 	return ret;
 }
 
