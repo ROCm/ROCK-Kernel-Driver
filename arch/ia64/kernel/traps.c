@@ -142,7 +142,7 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 
 	switch (break_num) {
 	      case 0: /* unknown error (used by GCC for __builtin_abort()) */
-		die_if_kernel("bad break", regs, break_num);
+		die_if_kernel("bugcheck!", regs, break_num);
 		sig = SIGILL; code = ILL_ILLOPC;
 		break;
 

@@ -23,6 +23,16 @@ CFLAGS_KERNEL	:= -mconstant-gp
 
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
+GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC))
+
+ifeq ($(GAS_STATUS),buggy)
+$(error Sorry, you need a newer version of the assember, one that is built from	\
+	a source-tree that post-dates 18-Dec-2002.  You can find a pre-compiled	\
+	static binary of such an assembler at:					\
+										\
+		ftp://ftp.hpl.hp.com/pub/linux-ia64/gas-030124.tar.gz)
+endif
+
 ifneq ($(GCC_VERSION),2)
 	cflags-y += -frename-registers --param max-inline-insns=5000
 endif
