@@ -6,6 +6,7 @@
 # for more details.
 #
 # Copyright (C) 1995-2001 by Russell King
+# Copyright (c) 2004 Ian Molton
 
 LDFLAGS_vmlinux	:=-p -X
 CPPFLAGS_vmlinux.lds = -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
@@ -20,13 +21,9 @@ ifeq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS		+=-g
 endif
 
-# Force -mno-fpu to be passed to the assembler.  Some versions of gcc don't
-# do this with -msoft-float
-CFLAGS_BOOT	:=-mapcs-26 -mcpu=arm3 -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
-CFLAGS		+=-mapcs-26 -mcpu=arm3 -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
-AFLAGS		+=-mapcs-26 -mcpu=arm3 -mno-fpu -msoft-float -Wa,-mno-fpu
-
-head-y		:= arch/arm26/machine/head.o arch/arm26/kernel/init_task.o
+CFLAGS_BOOT	:=-mapcs-26 -mcpu=arm3 -msoft-float -Uarm
+CFLAGS		+=-mapcs-26 -mcpu=arm3 -msoft-float -Uarm
+AFLAGS		+=-mapcs-26 -mcpu=arm3 -msoft-float
 
 ifeq ($(CONFIG_XIP_KERNEL),y)
   TEXTADDR	 := 0x03880000
@@ -35,6 +32,8 @@ else
   TEXTADDR	 := 0x02080000
   DATAADDR       := .
 endif
+
+head-y          := arch/arm26/kernel/head.o arch/arm26/kernel/init_task.o
 
 ifeq ($(incdir-y),)
 incdir-y :=
@@ -109,6 +108,7 @@ define archhelp
   echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
   echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+  echo  '  xipImage      - eXecute In Place capable image for ROM use (arch/$(ARCH)/boot/xipImage)'
   echo  '  initrd        - Create an initial image'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'
