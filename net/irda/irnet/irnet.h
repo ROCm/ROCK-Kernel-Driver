@@ -229,6 +229,11 @@
  * v14 - 20.2.03 - Jean II
  *	o Add discovery hint bits in the control channel.
  *	o Remove obsolete MOD_INC/DEC_USE_COUNT in favor of .owner
+ *
+ * v15 - 7.4.03 - Jean II
+ *	o Replace spin_lock_irqsave() with spin_lock_bh() so that we can
+ *	  use ppp_unit_number(). It's probably also better overall...
+ *	o Disable call to ppp_unregister_channel(), because we can't do it.
  */
 
 /***************************** INCLUDES *****************************/
@@ -276,6 +281,7 @@
 #undef CONNECT_INDIC_KICK	/* Might mess IrDA, not needed */
 #undef FAIL_SEND_DISCONNECT	/* Might mess IrDA, not needed */
 #undef PASS_CONNECT_PACKETS	/* Not needed ? Safe */
+#undef MISSING_PPP_API		/* Stuff I wish I could do */
 
 /* PPP side of the business */
 #define BLOCK_WHEN_CONNECT	/* Block packets when connecting */
