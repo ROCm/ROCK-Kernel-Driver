@@ -167,6 +167,7 @@ static int			 MptDriverClass[MPT_MAX_PROTOCOL_DRIVERS];
 static MPT_EVHANDLER		 MptEvHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 					/* Reset handler lookup table */
 static MPT_RESETHANDLER		 MptResetHandlers[MPT_MAX_PROTOCOL_DRIVERS];
+static struct mpt_pci_driver 	*MptDeviceDriverHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 
 static int	FusionInitCalled = 0;
 static int	mpt_base_index = -1;
@@ -183,7 +184,6 @@ static irqreturn_t mpt_interrupt(int irq, void *bus_id, struct pt_regs *r);
 static int	mpt_base_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply);
 
 static int	mpt_do_ioc_recovery(MPT_ADAPTER *ioc, u32 reason, int sleepFlag);
-static int	mpt_adapter_install(struct pci_dev *pdev);
 static void	mpt_detect_bound_ports(MPT_ADAPTER *this, struct pci_dev *pdev);
 static void	mpt_adapter_disable(MPT_ADAPTER *ioc, int freeup);
 static void	mpt_adapter_dispose(MPT_ADAPTER *ioc);
@@ -232,8 +232,12 @@ static int	ProcessEventNotification(MPT_ADAPTER *ioc, EventNotificationReply_t *
 static void	mpt_fc_log_info(MPT_ADAPTER *ioc, u32 log_info);
 static void	mpt_sp_log_info(MPT_ADAPTER *ioc, u32 log_info);
 
-int		fusion_init(void);
-static void	fusion_exit(void);
+/* module entry point */
+static int  __devinit mptbase_probe (struct pci_dev *, const struct pci_device_id *);
+static void __devexit mptbase_remove(struct pci_dev *);
+static void mptbase_shutdown(struct device * );
+static int  __init    fusion_init  (void);
+static void __exit    fusion_exit  (void);
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -259,6 +263,30 @@ struct _mpt_ioc_proc_list {
 #define MPT_IOC_PROC_ENTRIES (sizeof(mpt_ioc_proc_list)/sizeof(mpt_ioc_proc_list[0]))
 
 #endif
+
+/****************************************************************************
+ * Supported hardware
+ */
+
+static struct pci_device_id mptbase_pci_table[] = {
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC909,
+		PCI_ANY_ID, PCI_ANY_ID },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC929,
+		PCI_ANY_ID, PCI_ANY_ID },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC919,
+		PCI_ANY_ID, PCI_ANY_ID },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC929X,
+		PCI_ANY_ID, PCI_ANY_ID },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC919X,
+		PCI_ANY_ID, PCI_ANY_ID },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_53C1030,
+		PCI_ANY_ID, PCI_ANY_ID },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_1030_53C1035,
+		PCI_ANY_ID, PCI_ANY_ID },
+	{0}	/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, mptbase_pci_table);
+
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /* 20000207 -sralston
@@ -518,7 +546,7 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
  *	@mf: Pointer to original MPT request frame
  *	@reply: Pointer to MPT reply frame (NULL if TurboReply)
  *
- *	Returns 1 indicating original alloc'd request frame ptr
+	*	Returns 1 indicating original alloc'd request frame ptr
  *	should be freed, or 0 if it shouldn't.
  */
 static int
@@ -802,6 +830,34 @@ mpt_reset_deregister(int cb_idx)
 
 	MptResetHandlers[cb_idx] = NULL;
 }
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/**
+ *	mpt_device_driver_register - Register device driver hooks
+ */
+int
+mpt_device_driver_register(struct mpt_pci_driver * dd_cbfunc, int cb_idx)
+{
+	if (cb_idx < 1 || cb_idx >= MPT_MAX_PROTOCOL_DRIVERS)
+		return -1;
+
+	MptDeviceDriverHandlers[cb_idx] = dd_cbfunc;
+	return 0;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/**
+ *	mpt_device_driver_deregister - DeRegister device driver hooks
+ */
+void
+mpt_device_driver_deregister(int cb_idx)
+{
+	if (cb_idx < 1 || cb_idx >= MPT_MAX_PROTOCOL_DRIVERS)
+		return;
+
+	MptDeviceDriverHandlers[cb_idx] = NULL;
+}
+
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
@@ -1142,88 +1198,6 @@ mpt_adapter_find_next(MPT_ADAPTER *prev)
 	return next;
 }
 
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/*
- *	mpt_pci_scan - Scan PCI devices for MPT adapters.
- *
- *	Returns count of MPT adapters found, keying off of PCI vendor and
- *	device_id's.
- */
-static int __init
-mpt_pci_scan(void)
-{
-	struct pci_dev *pdev = NULL;
-	struct pci_dev *pdev2;
-	int found = 0;
-	int count = 0;
-	int r;
-
-	dprintk((KERN_INFO MYNAM ": Checking for MPT adapters...\n"));
-
-	/*
-	 *  NOTE: The 929, 929X, 1030 and 1035 will appear as 2 separate PCI devices,
-	 *  one for each channel.
-	 */
-	while ((pdev = pci_find_device(PCI_VENDOR_ID_LSI_LOGIC, PCI_ANY_ID, pdev)) != NULL) {
-		pdev2 = NULL;
-		if ((pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC909) &&
-		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC929) &&
-		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC919) &&
-		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC929X) &&
-		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC919X) &&
-		    (pdev->device != MPI_MANUFACTPAGE_DEVID_53C1030) &&
-		    (pdev->device != MPI_MANUFACTPAGE_DEVID_1030_53C1035) &&
-		    1) {
-			dprintk((KERN_INFO MYNAM ": Skipping LSI device=%04xh\n", pdev->device));
-			continue;
-		}
-
-		/* GRRRRR
-		 * dual function devices (929, 929X, 1030, 1035) may be presented in Func 1,0 order,
-		 * but we'd really really rather have them in Func 0,1 order.
-		 * Do some kind of look ahead here...
-		 */
-		if (pdev->devfn & 1) {
-			pdev2 = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev);
-			if (pdev2 && (pdev2->vendor == 0x1000) &&
-			    (PCI_SLOT(pdev2->devfn) == PCI_SLOT(pdev->devfn)) &&
-			    (pdev2->device == pdev->device) &&
-			    (pdev2->bus->number == pdev->bus->number) &&
-			    !(pdev2->devfn & 1)) {
-				dprintk((KERN_INFO MYNAM ": MPT adapter found: PCI bus/dfn=%02x/%02xh, class=%08x, id=%xh\n",
-					pdev2->bus->number, pdev2->devfn, pdev2->class, pdev2->device));
-				found++;
-				if ((r = mpt_adapter_install(pdev2)) == 0)
-					count++;
-			} else {
-				pdev2 = NULL;
-			}
-		}
-
-		dprintk((KERN_INFO MYNAM ": MPT adapter found: PCI bus/dfn=%02x/%02xh, class=%08x, id=%xh\n",
-			 pdev->bus->number, pdev->devfn, pdev->class, pdev->device));
-		found++;
-		if ((r = mpt_adapter_install(pdev)) == 0)
-			count++;
-
-		if (pdev2)
-			pdev = pdev2;
-	}
-
-	printk(KERN_INFO MYNAM ": %d MPT adapter%s found, %d installed.\n",
-		 found, (found==1) ? "" : "s", count);
-
-	if (!found || !count) {
-		fusion_exit();
-		return -ENODEV;
-	}
-
-#ifdef CONFIG_PROC_FS
-	(void) procmpt_create();
-#endif
-
-	return count;
-}
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
@@ -1253,7 +1227,7 @@ mpt_verify_adapter(int iocid, MPT_ADAPTER **iocpp)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
- *	mpt_adapter_install - Install a PCI intelligent MPT adapter.
+ *	mptbase_probe - Install a PCI intelligent MPT adapter.
  *	@pdev: Pointer to pci_dev structure
  *
  *	This routine performs all the steps necessary to bring the IOC of
@@ -1268,8 +1242,8 @@ mpt_verify_adapter(int iocid, MPT_ADAPTER **iocpp)
  *
  *	TODO: Add support for polled controllers
  */
-static int __init
-mpt_adapter_install(struct pci_dev *pdev)
+static int __devinit
+mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	MPT_ADAPTER	*ioc;
 	u8		*mem;
@@ -1291,6 +1265,13 @@ mpt_adapter_install(struct pci_dev *pdev)
 		printk(KERN_WARNING MYNAM ": 32 BIT PCI BUS DMA ADDRESSING NOT SUPPORTED\n");
 		return r;
 	}
+
+	if (!pci_set_consistent_dma_mask(pdev, mask))
+		dprintk((KERN_INFO MYNAM
+			": Using 64 bit consistent mask\n"));
+	else
+		dprintk((KERN_INFO MYNAM
+			": Not using 64 bit consistent mask\n"));
 
 	ioc = kmalloc(sizeof(MPT_ADAPTER), GFP_ATOMIC);
 	if (ioc == NULL) {
@@ -1500,6 +1481,7 @@ mpt_adapter_install(struct pci_dev *pdev)
 		ioc->pci_irq = pdev->irq;
 
 		pci_set_master(pdev);			/* ?? */
+		pci_set_drvdata(pdev, ioc);
 
 #ifndef __sparc__
 		dprintk((KERN_INFO MYNAM ": %s installed at interrupt %d\n", ioc->name, pdev->irq));
@@ -1520,8 +1502,206 @@ mpt_adapter_install(struct pci_dev *pdev)
 				ioc->name, r);
 	}
 
-	return r;
+	if(r != 0 )
+		return r;
+
+
+	/* call per device driver probe entry point */
+	for(ii=0; ii<MPT_MAX_PROTOCOL_DRIVERS; ii++) {
+		if(MptDeviceDriverHandlers[ii] &&
+		  MptDeviceDriverHandlers[ii]->probe) {
+			MptDeviceDriverHandlers[ii]->probe(pdev,id);
+		}
+	}
+
+	return 0;
 }
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptbase_remove - Remove a PCI intelligent MPT adapter.
+ *	@pdev: Pointer to pci_dev structure
+ *
+ */
+
+static void __devexit
+mptbase_remove(struct pci_dev *pdev)
+{
+	MPT_ADAPTER 	*ioc = pci_get_drvdata(pdev);
+	int ii;
+
+	/* call per device driver remove entry point */
+	for(ii=0; ii<MPT_MAX_PROTOCOL_DRIVERS; ii++) {
+		if(MptDeviceDriverHandlers[ii] &&
+		  MptDeviceDriverHandlers[ii]->remove) {
+			MptDeviceDriverHandlers[ii]->remove(pdev);
+		}
+	}
+
+	/* Disable interrupts! */
+	CHIPREG_WRITE32(&ioc->chip->IntMask, 0xFFFFFFFF);
+
+	ioc->active = 0;
+
+	/* Clear any lingering interrupt */
+	CHIPREG_WRITE32(&ioc->chip->IntStatus, 0);
+
+	CHIPREG_READ32(&ioc->chip->IntStatus);
+
+	Q_DEL_ITEM(ioc);
+	mpt_adapter_dispose(ioc);
+
+	mptscsih_sync_irq(ioc->irq);
+	pci_set_drvdata(pdev, NULL);
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptbase_shutdown -
+ *
+ */
+static void
+mptbase_shutdown(struct device * dev)
+{
+	int ii;
+
+	/* call per device driver shutdown entry point */
+	for(ii=0; ii<MPT_MAX_PROTOCOL_DRIVERS; ii++) {
+		if(MptDeviceDriverHandlers[ii] &&
+		  MptDeviceDriverHandlers[ii]->shutdown) {
+			MptDeviceDriverHandlers[ii]->shutdown(dev);
+		}
+	}
+
+}
+
+
+/**************************************************************************
+ * Power Management
+ */
+#ifdef CONFIG_PM
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptbase_suspend - Fusion MPT base driver suspend routine.
+ *
+ *
+ */
+static int
+mptbase_suspend(struct pci_dev *pdev, u32 state)
+{
+	u32 device_state;
+	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
+	int ii;
+
+	switch(state)
+	{
+		case 1: /* S1 */
+			device_state=1; /* D1 */;
+			break;
+		case 3: /* S3 */
+		case 4: /* S4 */
+			device_state=3; /* D3 */;
+			break;
+		default:
+			return -EAGAIN /*FIXME*/;
+			break;
+	}
+
+	printk(MYIOC_s_INFO_FMT
+	"pci-suspend: pdev=0x%p, slot=%s, Entering operating state [D%d]\n",
+		ioc->name, pdev, pci_name(pdev), device_state);
+
+	/* call per device driver suspend entry point */
+	for(ii=0; ii<MPT_MAX_PROTOCOL_DRIVERS; ii++) {
+		if(MptDeviceDriverHandlers[ii] &&
+		  MptDeviceDriverHandlers[ii]->suspend) {
+			MptDeviceDriverHandlers[ii]->suspend(pdev, state);
+		}
+	}
+
+	pci_save_state(pdev, ioc->PciState);
+
+	/* put ioc into READY_STATE */
+	if(SendIocReset(ioc, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, CAN_SLEEP)) {
+		printk(MYIOC_s_ERR_FMT
+		"pci-suspend:  IOC msg unit reset failed!\n", ioc->name);
+	}
+
+	/* disable interrupts */
+	CHIPREG_WRITE32(&ioc->chip->IntMask, 0xFFFFFFFF);
+	ioc->active = 0;
+
+	/* Clear any lingering interrupt */
+	CHIPREG_WRITE32(&ioc->chip->IntStatus, 0);
+
+	pci_disable_device(pdev);
+	pci_set_power_state(pdev, device_state);
+
+	return 0;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptbase_resume - Fusion MPT base driver resume routine.
+ *
+ *
+ */
+static int
+mptbase_resume(struct pci_dev *pdev)
+{
+	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
+	u32 device_state = pdev->current_state;
+	int recovery_state;
+	int ii;
+
+	printk(MYIOC_s_INFO_FMT
+	"pci-resume: pdev=0x%p, slot=%s, Previous operating state [D%d]\n",
+		ioc->name, pdev, pci_name(pdev), device_state);
+
+	pci_set_power_state(pdev, 0);
+	pci_restore_state(pdev, ioc->PciState);
+	pci_enable_device(pdev);
+
+	/* enable interrupts */
+	CHIPREG_WRITE32(&ioc->chip->IntMask, ~(MPI_HIM_RIM));
+	ioc->active = 1;
+
+	/* F/W not running */
+	if(!CHIPREG_READ32(&ioc->chip->Doorbell)) {
+		/* enable domain validation flags */
+		for (ii=0; ii < MPT_MAX_SCSI_DEVICES; ii++) {
+			ioc->spi_data.dvStatus[ii] |= MPT_SCSICFG_NEED_DV;
+		}
+	}
+
+	printk(MYIOC_s_INFO_FMT
+		"pci-resume: ioc-state=0x%x,doorbell=0x%x\n",
+		ioc->name,
+		(mpt_GetIocState(ioc, 1) >> MPI_IOC_STATE_SHIFT),
+		CHIPREG_READ32(&ioc->chip->Doorbell));
+
+	/* bring ioc to operational state */
+	if ((recovery_state = mpt_do_ioc_recovery(ioc,
+	    MPT_HOSTEVENT_IOC_RECOVER, CAN_SLEEP)) != 0) {
+		printk(MYIOC_s_INFO_FMT
+			"pci-resume: Cannot recover, error:[%x]\n",
+			ioc->name, recovery_state);
+	} else {
+		printk(MYIOC_s_INFO_FMT
+			"pci-resume: success\n", ioc->name);
+	}
+
+	/* call per device driver resume entry point */
+	for(ii=0; ii<MPT_MAX_PROTOCOL_DRIVERS; ii++) {
+		if(MptDeviceDriverHandlers[ii] &&
+		  MptDeviceDriverHandlers[ii]->resume) {
+			MptDeviceDriverHandlers[ii]->resume(pdev);
+		}
+	}
+
+	return 0;
+}
+#endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -5851,6 +6031,8 @@ EXPORT_SYMBOL(mpt_event_register);
 EXPORT_SYMBOL(mpt_event_deregister);
 EXPORT_SYMBOL(mpt_reset_register);
 EXPORT_SYMBOL(mpt_reset_deregister);
+EXPORT_SYMBOL(mpt_device_driver_register);
+EXPORT_SYMBOL(mpt_device_driver_deregister);
 EXPORT_SYMBOL(mpt_get_msg_frame);
 EXPORT_SYMBOL(mpt_put_msg_frame);
 EXPORT_SYMBOL(mpt_free_msg_frame);
@@ -5877,16 +6059,32 @@ EXPORT_SYMBOL(mpt_v_ASCQ_TablePtr);
 EXPORT_SYMBOL(mpt_ASCQ_TableSz);
 EXPORT_SYMBOL(mpt_ScsiOpcodesPtr);
 
+
+static struct pci_driver mptbase_driver = {
+	.name		= "mptbase",
+	.id_table	= mptbase_pci_table,
+	.probe		= mptbase_probe,
+	.remove		= __devexit_p(mptbase_remove),
+	.driver         = {
+		.shutdown = mptbase_shutdown,
+        },
+#ifdef CONFIG_PM
+	.suspend	= mptbase_suspend,
+	.resume		= mptbase_resume,
+#endif
+};
+
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  *	fusion_init - Fusion MPT base driver initialization routine.
  *
  *	Returns 0 for success, non-zero for failure.
  */
-int __init
+static int __init
 fusion_init(void)
 {
 	int i;
+	int r;
 
 	if (FusionInitCalled++) {
 		dprintk((KERN_INFO MYNAM ": INFO - Driver late-init entry point called\n"));
@@ -5920,10 +6118,15 @@ fusion_init(void)
 		/* FIXME! */
 	}
 
-	if ((i = mpt_pci_scan()) < 0)
-		return i;
+	r = pci_module_init(&mptbase_driver);
+	if(r)
+		return(r);
 
-	return 0;
+#ifdef CONFIG_PROC_FS
+	(void) procmpt_create();
+#endif
+
+	return r;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -5933,13 +6136,12 @@ fusion_init(void)
  *	This routine frees all resources associated with each MPT adapter
  *	and removes all %MPT_PROCFS_MPTBASEDIR entries.
  */
-static void
+static void __exit
 fusion_exit(void)
 {
-	MPT_ADAPTER *this;
-	struct pci_dev *pdev = NULL;
 
 	dprintk((KERN_INFO MYNAM ": fusion_exit() called!\n"));
+	pci_unregister_driver(&mptbase_driver);
 
 	/* Whups?  20010120 -sralston
 	 *  Moved this *above* removal of all MptAdapters!
@@ -5948,30 +6150,9 @@ fusion_exit(void)
 	(void) procmpt_destroy();
 #endif
 
-	while (! Q_IS_EMPTY(&MptAdapters)) {
-		this = MptAdapters.head;
-
-		/* Disable interrupts! */
-		CHIPREG_WRITE32(&this->chip->IntMask, 0xFFFFFFFF);
-
-		this->active = 0;
-
-		pdev = (struct pci_dev *)this->pcidev;
-		mptscsih_sync_irq(pdev->irq);
-
-		/* Clear any lingering interrupt */
-		CHIPREG_WRITE32(&this->chip->IntStatus, 0);
-
-		CHIPREG_READ32(&this->chip->IntStatus);
-
-		Q_DEL_ITEM(this);
-		mpt_adapter_dispose(this);
-	}
-
 	mpt_reset_deregister(mpt_base_index);
 }
 
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 module_init(fusion_init);
 module_exit(fusion_exit);

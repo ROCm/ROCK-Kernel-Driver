@@ -80,8 +80,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2003 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"2.05.00.06"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.05.00.06"
+#define MPT_LINUX_VERSION_COMMON	"3.00.02"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.00.02"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -179,6 +179,16 @@ typedef enum {
 	MPTDMP_DRIVER,		/* MPT Dynamic Multi-pathing class */
 	MPTUNKNOWN_DRIVER
 } MPT_DRIVER_CLASS;
+
+struct mpt_pci_driver{
+	int  (*probe) (struct pci_dev *dev, const struct pci_device_id *id);
+	void (*remove) (struct pci_dev *dev);
+	int  (*suspend) (struct pci_dev *dev, u32 state);
+#ifdef CONFIG_PM
+	int  (*resume) (struct pci_dev *dev);
+	void (*shutdown) (struct device * dev);
+#endif
+};
 
 /*
  *  MPT adapter / port / bus / device info structures...
@@ -629,6 +639,9 @@ typedef struct _MPT_ADAPTER
 	FCPortPage0_t		 fc_port_page0[2];
 	LANPage0_t		 lan_cnfg_page0;
 	LANPage1_t		 lan_cnfg_page1;
+#ifdef CONFIG_PM
+	u32           		 PciState[64];     /* save PCI state to this area */
+#endif
 	u8			 FirstWhoInit;
 	u8			 upload_fw;	/* If set, do a fw upload */
 	u8			 reload_fw;	/* Force a FW Reload on next reset */
@@ -1001,6 +1014,8 @@ extern int	 mpt_event_register(int cb_idx, MPT_EVHANDLER ev_cbfunc);
 extern void	 mpt_event_deregister(int cb_idx);
 extern int	 mpt_reset_register(int cb_idx, MPT_RESETHANDLER reset_func);
 extern void	 mpt_reset_deregister(int cb_idx);
+extern int	 mpt_device_driver_register(struct mpt_pci_driver * dd_cbfunc, int cb_idx);
+extern void	 mpt_device_driver_deregister(int cb_idx);
 extern int	 mpt_register_ascqops_strings(void *ascqTable, int ascqtbl_sz, const char **opsTable);
 extern void	 mpt_deregister_ascqops_strings(void);
 extern MPT_FRAME_HDR	*mpt_get_msg_frame(int handle, int iocid);
