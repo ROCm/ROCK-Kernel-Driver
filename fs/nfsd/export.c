@@ -781,7 +781,8 @@ exp_unexport(struct nfsctl_export *nxp)
 			expkey_put(&key->h, &svc_expkey_cache);
 		} else
 			dprintk("nfsd: no export %x/%lx for %s\n",
-				nxp->ex_dev, nxp->ex_ino, nxp->ex_client);
+				nxp->ex_dev, (unsigned long) nxp->ex_ino,
+				nxp->ex_client);
 		auth_domain_put(dom);
 		cache_flush();
 	} else
