@@ -950,8 +950,6 @@ static int stir_net_open(struct net_device *netdev)
 		}
 	}
 
-	netif_start_queue(netdev);
-
 	/*
 	 * Now that everything should be initialized properly,
 	 * Open new IrLAP layer instance to take care of us...
@@ -973,6 +971,8 @@ static int stir_net_open(struct net_device *netdev)
 			stir->netdev->name);
 		goto err_out4;
 	}
+
+	netif_start_queue(netdev);
 
 	return 0;
 
