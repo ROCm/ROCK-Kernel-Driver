@@ -44,6 +44,8 @@
 #include <asm/io_apic.h>
 #include <asm/tlbflush.h>
 
+#include <mach_apic.h>
+#include <mach_mpparse.h>
 
 #define PREFIX			"ACPI: "
 
@@ -126,6 +128,8 @@ acpi_parse_madt (
 	printk(KERN_INFO PREFIX "Local APIC address 0x%08x\n",
 		madt->lapic_address);
 
+	acpi_madt_oem_check(madt->header.oem_id, madt->header.oem_table_id);
+	
 	return 0;
 }
 
@@ -430,8 +434,10 @@ acpi_boot_init (
 #endif /*CONFIG_X86_IO_APIC*/
 
 #ifdef CONFIG_X86_LOCAL_APIC
-	if (acpi_lapic && acpi_ioapic)
+	if (acpi_lapic && acpi_ioapic) {
 		smp_found_config = 1;
+		clustered_apic_check();
+	}
 #endif
 
 	return 0;

@@ -19,4 +19,10 @@ static inline void mps_oem_check(struct mp_config_table *mpc, char *oem,
 		x86_summit = 1;
 }
 
+/* Hook from generic ACPI tables.c */
+static inline void acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+{
+	if (!strncmp(oem_id, "IBM", 3) && !strncmp(oem_table_id, "SERVIGIL", 8))
+		x86_summit = 1;
+}
 #endif /* __ASM_MACH_MPPARSE_H */

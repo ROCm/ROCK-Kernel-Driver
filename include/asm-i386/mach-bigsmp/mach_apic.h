@@ -67,11 +67,11 @@ static inline int apicid_to_node(int logical_apicid)
 	return 0;
 }
 
-extern u8 raw_phys_apicid[];
+extern u8 bios_cpu_apicid[];
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return (int) raw_phys_apicid[mps_cpu];
+	return (int) bios_cpu_apicid[mps_cpu];
 }
 
 static inline unsigned long apicid_to_cpu_present(int phys_apicid)

@@ -45,7 +45,7 @@ static inline int apicid_to_node(int logical_apicid)
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	if (x86_summit)
-		return (int) raw_phys_apicid[mps_cpu];
+		return (int) bios_cpu_apicid[mps_cpu];
 	else
 		return mps_cpu;
 }
