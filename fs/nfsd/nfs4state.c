@@ -1784,6 +1784,13 @@ out:
 	return stp;
 }
 
+int
+check_lock_length(u64 offset, u64 length)
+{
+	return ((length == 0)  || ((length != ~(u64)0) &&
+ 	     LOFF_OVERFLOW(offset, length)));
+}
+
 /*
  *  LOCK operation 
  */
@@ -1801,6 +1808,9 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 	dprintk("NFSD: nfsd4_lock: start=%Ld length=%Ld\n",
 		(long long) lock->lk_offset,
 		(long long) lock->lk_length);
+
+	if (check_lock_length(lock->lk_offset, lock->lk_length))
+		 return nfserr_inval;
 
 	lock->lk_stateowner = NULL;
 	nfs4_lock_state();
@@ -1963,6 +1973,9 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	unsigned int strhashval;
 	int status;
 
+	if (check_lock_length(lockt->lt_offset, lockt->lt_length))
+		 return nfserr_inval;
+
 	lockt->lt_stateowner = NULL;
 	nfs4_lock_state();
 
@@ -2049,6 +2062,10 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	dprintk("NFSD: nfsd4_locku: start=%Ld length=%Ld\n",
 		(long long) locku->lu_offset,
 		(long long) locku->lu_length);
+
+	if (check_lock_length(locku->lu_offset, locku->lu_length))
+		 return nfserr_inval;
+
 	nfs4_lock_state();
 									        
 	if ((status = nfs4_preprocess_seqid_op(current_fh, 
