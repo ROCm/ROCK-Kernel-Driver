@@ -40,7 +40,6 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       fi
       tristate '  BMAC (G3 ethernet) support' CONFIG_BMAC
       tristate '  GMAC (G4/iBook ethernet) support' CONFIG_GMAC
-      tristate '  Symbios 53c885 (Synergy ethernet) support' CONFIG_NCR885E
       tristate '  National DP83902AV (Oak ethernet) support' CONFIG_OAKNET
    fi
    if [ "$CONFIG_ZORRO" = "y" ]; then

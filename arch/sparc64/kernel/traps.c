@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.76 2001/04/03 13:46:31 davem Exp $
+/* $Id: traps.c,v 1.78 2001/09/14 19:49:32 kanoj Exp $
  * arch/sparc64/kernel/traps.c
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -31,6 +31,7 @@
 #include <asm/estate.h>
 #include <asm/chafsr.h>
 #include <asm/psrcompat.h>
+#include <asm/processor.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif
@@ -514,21 +515,6 @@ static void cheetah_flush_ecache_line(unsigned long physaddr)
 			     : "r" (physaddr), "r" (alias),
 			       "i" (ASI_PHYS_USE_EC));
 }
-
-#ifdef CONFIG_SMP
-unsigned long cheetah_tune_scheduling(void)
-{
-	unsigned long tick1, tick2, raw;
-
-	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick1));
-	cheetah_flush_ecache();
-	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick2));
-
-	raw = (tick2 - tick1);
-
-	return (raw - (raw >> 2));
-}
-#endif
 
 /* Unfortunately, the diagnostic access to the I-cache tags we need to
  * use to clear the thing interferes with I-cache coherency transactions.
@@ -1431,7 +1417,7 @@ void show_trace_task(struct task_struct *tsk)
 	do {
 		/* Bogus frame pointer? */
 		if (fp < (task_base + sizeof(struct task_struct)) ||
-		    fp >= (task_base + (2 * PAGE_SIZE)))
+		    fp >= (task_base + THREAD_SIZE))
 			break;
 		rw = (struct reg_window *)fp;
 		pc = rw->ins[7];

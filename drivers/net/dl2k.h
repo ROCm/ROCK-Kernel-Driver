@@ -31,10 +31,10 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
-
-#define TX_RING_SIZE	16
-#define TX_QUEUE_LEN	10	/* Limit ring entries actually used.  */
-#define RX_RING_SIZE	16
+#include <linux/time.h>
+#define TX_RING_SIZE	128
+#define TX_QUEUE_LEN	96	/* Limit ring entries actually used.  */
+#define RX_RING_SIZE 	128
 #define TX_TOTAL_SIZE	TX_RING_SIZE*sizeof(struct netdev_desc)
 #define RX_TOTAL_SIZE	RX_RING_SIZE*sizeof(struct netdev_desc)
 
@@ -194,6 +194,8 @@ enum ReceiveMode_bits {
 /* Bits in MACCtrl. */
 enum MACCtrl_bits {
 	DuplexSelect = 0x20,
+	TxFlowControlEnable = 0x80,
+	RxFlowControlEnable = 0x0100,
 	RcvFCS = 0x200,
 	AutoVLANtagging = 0x1000,
 	AutoVLANuntagging = 0x2000,
@@ -576,7 +578,7 @@ struct netdev_private {
 	struct sk_buff *tx_skbuff[TX_RING_SIZE];
 	dma_addr_t tx_ring_dma;
 	dma_addr_t rx_ring_dma;
-	struct pci_dev * pdev;
+	struct pci_dev *pdev;
 	spinlock_t lock;
 	struct net_device_stats stats;
 	unsigned int rx_buf_sz;	/* Based on MTU+slack. */
@@ -587,6 +589,9 @@ struct netdev_private {
 	unsigned int an_enable;	/* Auto-Negotiated Enable */
 	unsigned int chip_id;	/* PCI table chip id */
 	unsigned int jumbo;
+	unsigned int int_count;
+	unsigned int int_timeout;
+	unsigned int coalesce:1;
 	struct netdev_desc *last_tx;	/* Last Tx descriptor used. */
 	unsigned long cur_rx, old_rx;	/* Producer/consumer ring indices */
 	unsigned long cur_tx, old_tx;
@@ -649,11 +654,11 @@ debug_tfd_dump (struct netdev_private *np)
 		for (i = 0; i < TX_RING_SIZE; i++) {
 			desc = &np->tx_ring[i];
 			printk
-				("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-				(u32) np->tx_ring_dma + i*sizeof(*desc),
-				(u32) desc->next_desc, (u32) desc->status, 
-				(u32) (desc->fraginfo >> 32),
-				(u32) desc->fraginfo);
+			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+			     (u32) np->tx_ring_dma + i * sizeof (*desc),
+			     (u32) desc->next_desc, (u32) desc->status,
+			     (u32) (desc->fraginfo >> 32),
+			     (u32) desc->fraginfo);
 			printk ("\n");
 		}
 		printk ("\n");
@@ -670,11 +675,11 @@ debug_rfd_dump (struct netdev_private *np, int flag)
 		for (i = 0; i < RX_RING_SIZE; i++) {
 			desc = &np->rx_ring[i];
 			printk
-				("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-				(u32) np->rx_ring_dma + i*sizeof(*desc),
-				(u32) desc->next_desc, (u32) desc->status, 
-				(u32) (desc->fraginfo >> 32),
-				(u32) desc->fraginfo);
+			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+			     (u32) np->rx_ring_dma + i * sizeof (*desc),
+			     (u32) desc->next_desc, (u32) desc->status,
+			     (u32) (desc->fraginfo >> 32),
+			     (u32) desc->fraginfo);
 			printk ("\n");
 		}
 		printk ("\n");
@@ -714,8 +719,9 @@ debug_pkt_dump (struct netdev_private *np, int pkt_len)
 			(u32) (frame_status >> 32), (u32) frame_status);
 	}
 	if (np->rx_debug == 7) {
-		
-		phead = bus_to_virt(le64_to_cpu(desc->fraginfo & 0xffffffffff));
+
+		phead =
+		    bus_to_virt (le64_to_cpu (desc->fraginfo & 0xffffffffff));
 		for (pchar = phead, i = 0; i < pkt_len; i++, pchar++) {
 			printk ("%02x ", *pchar);
 			if ((i + 1) % 20 == 0)
@@ -730,4 +736,4 @@ debug_pkt_dump (struct netdev_private *np, int pkt_len)
 #define DEBUG_PRINT() {}
 #endif
 
-#endif /* __DL2K_H__ */
+#endif				/* __DL2K_H__ */

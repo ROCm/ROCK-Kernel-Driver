@@ -7,7 +7,7 @@
  *
  *	Based on linux/net/ipv4/ip_sockglue.c
  *
- *	$Id: ipv6_sockglue.c,v 1.39 2001/08/13 18:56:13 davem Exp $
+ *	$Id: ipv6_sockglue.c,v 1.40 2001/09/18 22:29:10 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License

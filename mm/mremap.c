@@ -119,7 +119,6 @@ oops_we_failed:
 	while ((offset += PAGE_SIZE) < len)
 		move_one_page(mm, new_addr + offset, old_addr + offset);
 	zap_page_range(mm, new_addr, len);
-	flush_tlb_range(mm, new_addr, new_addr + len);
 	return -1;
 }
 

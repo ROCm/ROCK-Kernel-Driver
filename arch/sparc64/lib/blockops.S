@@ -1,4 +1,4 @@
-/* $Id: blockops.S,v 1.34 2001/09/03 01:34:18 kanoj Exp $
+/* $Id: blockops.S,v 1.35 2001/09/04 16:39:53 kanoj Exp $
  * blockops.S: UltraSparc block zero optimized routines.
  *
  * Copyright (C) 1996, 1998, 1999, 2000 David S. Miller (davem@redhat.com)
@@ -23,6 +23,14 @@
 #define TLBTEMP_ENT2	(62 << 3)
 #define TLBTEMP_ENTSZ	(1 << 3)
 
+#if (PAGE_SHIFT == 13) || (PAGE_SHIFT == 19)
+#define PAGE_SIZE_REM	0x80
+#elif (PAGE_SHIFT == 16) || (PAGE_SHIFT == 21)
+#define PAGE_SIZE_REM	0x100
+#else
+#error Wrong PAGE_SHIFT specified
+#endif
+
 	.text
 
 	.align		32
@@ -35,7 +43,7 @@ _copy_page: /* %o0=dest, %o1=src */
 	add		%o1, 0x40, %o1
 	ldda		[%o1] ASI_BLK_P, %f16
 	add		%o1, 0x40, %o1
-	sethi		%hi(8192), %o2
+	sethi		%hi(PAGE_SIZE), %o2
 1:	TOUCH(f0, f2, f4, f6, f8, f10, f12, f14)
 	ldda		[%o1] ASI_BLK_P, %f32
 	stda		%f48, [%o0] ASI_BLK_P
@@ -53,13 +61,32 @@ _copy_page: /* %o0=dest, %o1=src */
 	stda		%f48, [%o0] ASI_BLK_P
 	sub		%o2, 0x40, %o2
 	add		%o1, 0x40, %o1
-	cmp		%o2, 0x80
+	cmp		%o2, PAGE_SIZE_REM
 	bne,pt		%xcc, 1b
 	 add		%o0, 0x40, %o0
+#if (PAGE_SHIFT == 16) || (PAGE_SHIFT == 21)
+	TOUCH(f0, f2, f4, f6, f8, f10, f12, f14)
+	ldda		[%o1] ASI_BLK_P, %f32
+	stda		%f48, [%o0] ASI_BLK_P
+	add		%o1, 0x40, %o1
+	sub		%o2, 0x40, %o2
+	add		%o0, 0x40, %o0
+	TOUCH(f16, f18, f20, f22, f24, f26, f28, f30)
+	ldda		[%o1] ASI_BLK_P, %f0
+	stda		%f48, [%o0] ASI_BLK_P
+	add		%o1, 0x40, %o1
+	sub		%o2, 0x40, %o2
+	add		%o0, 0x40, %o0
+	membar		#Sync
+	stda		%f32, [%o0] ASI_BLK_P
+	add		%o0, 0x40, %o0
+	stda		%f0, [%o0] ASI_BLK_P
+#else
 	membar		#Sync
 	stda		%f0, [%o0] ASI_BLK_P
 	add		%o0, 0x40, %o0
 	stda		%f16, [%o0] ASI_BLK_P
+#endif
 	membar		#Sync
 	VISExit
 	retl
@@ -73,7 +100,7 @@ copy_user_page: /* %o0=dest, %o1=src, %o2=vaddr */
 	sub		%o0, %g4, %g1
 	and		%o2, %g3, %o0
 	sethi		%hi(TLBTEMP_BASE), %o3
-	sethi		%uhi(_PAGE_VALID), %g3
+	sethi		%uhi(_PAGE_VALID | _PAGE_SZBITS), %g3
 	sub		%o1, %g4, %g2
 	sllx		%g3, 32, %g3
 	mov		TLB_TAG_ACCESS, %o2
@@ -239,7 +266,7 @@ spitfire_copy_user_page:
 	add		%o1, 0x40, %o1
 	ldda		[%o1] ASI_BLK_P, %f16
 	add		%o1, 0x40, %o1
-	sethi		%hi(8192), %o2
+	sethi		%hi(PAGE_SIZE), %o2
 1:	TOUCH(f0, f2, f4, f6, f8, f10, f12, f14)
 	ldda		[%o1] ASI_BLK_P, %f32
 	stda		%f48, [%o0] ASI_BLK_P
@@ -257,13 +284,32 @@ spitfire_copy_user_page:
 	stda		%f48, [%o0] ASI_BLK_P
 	sub		%o2, 0x40, %o2
 	add		%o1, 0x40, %o1
-	cmp		%o2, 0x80
+	cmp		%o2, PAGE_SIZE_REM
 	bne,pt		%xcc, 1b
 	 add		%o0, 0x40, %o0
+#if (PAGE_SHIFT == 16) || (PAGE_SHIFT == 21)
+	TOUCH(f0, f2, f4, f6, f8, f10, f12, f14)
+	ldda		[%o1] ASI_BLK_P, %f32
+	stda		%f48, [%o0] ASI_BLK_P
+	add		%o1, 0x40, %o1
+	sub		%o2, 0x40, %o2
+	add		%o0, 0x40, %o0
+	TOUCH(f16, f18, f20, f22, f24, f26, f28, f30)
+	ldda		[%o1] ASI_BLK_P, %f0
+	stda		%f48, [%o0] ASI_BLK_P
+	add		%o1, 0x40, %o1
+	sub		%o2, 0x40, %o2
+	add		%o0, 0x40, %o0
+	membar		#Sync
+	stda		%f32, [%o0] ASI_BLK_P
+	add		%o0, 0x40, %o0
+	stda		%f0, [%o0] ASI_BLK_P
+#else
 	membar		#Sync
 	stda		%f0, [%o0] ASI_BLK_P
 	add		%o0, 0x40, %o0
 	stda		%f16, [%o0] ASI_BLK_P
+#endif
 copy_user_page_continue:
 	membar		#Sync
 	VISExit
@@ -286,7 +332,7 @@ copy_page_using_blkcommit:
 	add		%o1, 0x40, %o1
 	ldda		[%o1] ASI_BLK_P, %f16
 	add		%o1, 0x40, %o1
-	sethi		%hi(8192), %o2
+	sethi		%hi(PAGE_SIZE), %o2
 1:	TOUCH(f0, f2, f4, f6, f8, f10, f12, f14)
 	ldda		[%o1] ASI_BLK_P, %f32
 	stda		%f48, [%o0] ASI_BLK_COMMIT_P
@@ -304,14 +350,34 @@ copy_page_using_blkcommit:
 	stda		%f48, [%o0] ASI_BLK_COMMIT_P
 	sub		%o2, 0x40, %o2
 	add		%o1, 0x40, %o1
-	cmp		%o2, 0x80
+	cmp		%o2, PAGE_SIZE_REM
 	bne,pt		%xcc, 1b
 	 add		%o0, 0x40, %o0
+#if (PAGE_SHIFT == 16) || (PAGE_SHIFT == 21)
+	TOUCH(f0, f2, f4, f6, f8, f10, f12, f14)
+	ldda		[%o1] ASI_BLK_P, %f32
+	stda		%f48, [%o0] ASI_BLK_COMMIT_P
+	add		%o1, 0x40, %o1
+	sub		%o2, 0x40, %o2
+	add		%o0, 0x40, %o0
+	TOUCH(f16, f18, f20, f22, f24, f26, f28, f30)
+	ldda		[%o1] ASI_BLK_P, %f0
+	stda		%f48, [%o0] ASI_BLK_COMMIT_P
+	add		%o1, 0x40, %o1
+	sub		%o2, 0x40, %o2
+	add		%o0, 0x40, %o0
+	membar		#Sync
+	stda		%f32, [%o0] ASI_BLK_COMMIT_P
+	add		%o0, 0x40, %o0
+	ba,pt		%xcc, copy_user_page_continue
+	 stda		%f0, [%o0] ASI_BLK_COMMIT_P
+#else
 	membar		#Sync
 	stda		%f0, [%o0] ASI_BLK_COMMIT_P
 	add		%o0, 0x40, %o0
 	ba,pt		%xcc, copy_user_page_continue
 	 stda		%f16, [%o0] ASI_BLK_COMMIT_P
+#endif
 
 	.align		32
 	.globl		_clear_page
@@ -330,7 +396,7 @@ clear_user_page:	/* %o0=dest, %o1=vaddr */
 	sub		%o0, %g4, %g1
 	and		%o1, %g3, %o0
 	mov		TLB_TAG_ACCESS, %o2
-	sethi		%uhi(_PAGE_VALID), %g3
+	sethi		%uhi(_PAGE_VALID | _PAGE_SZBITS), %g3
 	sethi		%hi(TLBTEMP_BASE), %o3
 	sllx		%g3, 32, %g3
 	or		%g3, (_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W), %g3
@@ -364,7 +430,7 @@ cheetah_patch_2:
 clear_page_common:
 	membar		#StoreLoad | #StoreStore | #LoadStore	! LSU	Group
 	fzero		%f0				! FPA	Group
-	mov		32, %o1				! IEU0
+	mov		PAGE_SIZE/256, %o1		! IEU0
 	fzero		%f2				! FPA	Group
 	faddd		%f0, %f2, %f4			! FPA	Group
 	fmuld		%f0, %f2, %f6			! FPM
@@ -418,3 +484,4 @@ cheetah_patch_pgcopyops:
 
 #undef FIX_INSN1
 #undef FIX_INSN2
+#undef PAGE_SIZE_REM

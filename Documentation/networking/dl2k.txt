@@ -187,15 +187,11 @@ media=xxxxxxxxx			- Specifies the media type the NIC operates at.
 				  10mbps_fd	10Mbps full duplex.
 				  100mbps_hd	100Mbps half duplex.
 				  100mbps_fd	100Mbps full duplex.
-				  1000mbps_fd	1000Mbps full duplex.
-				  1000mbps_hd	1000Mbps half duplex.
 				  0		Autosensing active media.
 				  1		10Mbps half duplex.
 				  2		10Mbps full duplex.
 				  3		100Mbps half duplex.
 				  4		100Mbps full duplex.
-				  5		1000Mbps full duplex.
-				  6		1000Mbps half duplex.
 				  By default, the NIC operates at autosense.
 
 vlan=x				- Specifies the VLAN ID. If vlan=0, the
@@ -205,7 +201,16 @@ vlan=x				- Specifies the VLAN ID. If vlan=0, the
 jumbo=x				- Specifies the jumbo frame support. If jumbo=1,
 				  the NIC accept jumbo frames. By default, this
 				  function is disabled.
-
+				  Jumbo frame usually improve the performance
+				  int gigabit.
+				  
+int_count			- Rx frame count each interrupt.
+int_timeout			- Rx DMA wait time for an interrupt. Proper 
+				  values of int_count and int_timeout bring 
+				  a conspicuous performance in the fast machine. 
+				  For P4 1.5GHz systems, a setting of 
+				  int_count=5 and int_timeout=750 is
+				  recommendable.
 Configuration Script Sample
 ===========================
 Here is a sample of a simple configuration script:
@@ -222,7 +227,7 @@ IPADDR=207.200.5.2
 
 Troubleshooting
 ===============
-Q1. Source files contain behind every line.
+Q1. Source files contain ^ M behind every line.
 	Make sure all files are Unix file format (no LF). Try the following
     shell command to convert files.
 

@@ -34,6 +34,9 @@
 #include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 #include <asm/io.h>
+#include <asm/tlb.h>
+
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 /*
  * Cache of MMU context last used.

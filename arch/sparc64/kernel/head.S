@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.78 2001/08/30 03:22:00 kanoj Exp $
+/* $Id: head.S,v 1.81 2001/09/07 23:00:15 kanoj Exp $
  * head.S: Initial boot code for the Sparc64 port of Linux.
  *
  * Copyright (C) 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -472,7 +472,7 @@ tlb_fixup_done:
 
 	wr	%g0, ASI_P, %asi
 	mov	1, %g5
-	sllx	%g5, (PAGE_SHIFT + 1), %g5
+	sllx	%g5, THREAD_SHIFT, %g5
 	sub	%g5, (REGWIN_SZ + STACK_BIAS), %g5
 	add	%g6, %g5, %sp
 	mov	0, %fp

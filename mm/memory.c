@@ -47,6 +47,7 @@
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
+#include <asm/tlb.h>
 
 unsigned long max_mapnr;
 unsigned long num_physpages;
@@ -68,6 +69,24 @@ static inline void copy_cow_page(struct page * from, struct page * to, unsigned 
 }
 
 mem_map_t * mem_map;
+
+/*
+ * Called by TLB shootdown 
+ */
+void __free_pte(pte_t pte)
+{
+	struct page *page = pte_page(pte);
+	if ((!VALID_PAGE(page)) || PageReserved(page))
+		return;
+	/*
+	 * free_page() used to be able to clear swap cache
+	 * entries.  We may now have to do it manually.
+	 */
+	if (pte_dirty(pte) && page->mapping)
+		set_page_dirty(page);
+	free_page_and_swap_cache(page);
+}
+
 
 /*
  * Note: this doesn't free the actual pages themselves. That
@@ -266,37 +285,19 @@ nomem:
 /*
  * Return indicates whether a page was freed so caller can adjust rss
  */
-static inline int free_pte(pte_t pte)
-{
-	if (pte_present(pte)) {
-		struct page *page = pte_page(pte);
-		if ((!VALID_PAGE(page)) || PageReserved(page))
-			return 0;
-		/* 
-		 * free_page() used to be able to clear swap cache
-		 * entries.  We may now have to do it manually.  
-		 */
-		if (pte_dirty(pte) && page->mapping)
-			set_page_dirty(page);
-		free_page_and_swap_cache(page);
-		return 1;
-	}
-	swap_free(pte_to_swp_entry(pte));
-	return 0;
-}
-
 static inline void forget_pte(pte_t page)
 {
 	if (!pte_none(page)) {
 		printk("forget_pte: old mapping existed!\n");
-		free_pte(page);
+		BUG();
 	}
 }
 
-static inline int zap_pte_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size)
+static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
 {
-	pte_t * pte;
-	int freed;
+	unsigned long offset;
+	pte_t * ptep;
+	int freed = 0;
 
 	if (pmd_none(*pmd))
 		return 0;
@@ -305,27 +306,29 @@ static inline int zap_pte_range(struct mm_struct *mm, pmd_t * pmd, unsigned long
 		pmd_clear(pmd);
 		return 0;
 	}
-	pte = pte_offset(pmd, address);
-	address &= ~PMD_MASK;
-	if (address + size > PMD_SIZE)
-		size = PMD_SIZE - address;
-	size >>= PAGE_SHIFT;
-	freed = 0;
-	for (;;) {
-		pte_t page;
-		if (!size)
-			break;
-		page = ptep_get_and_clear(pte);
-		pte++;
-		size--;
-		if (pte_none(page))
+	ptep = pte_offset(pmd, address);
+	offset = address & ~PMD_MASK;
+	if (offset + size > PMD_SIZE)
+		size = PMD_SIZE - offset;
+	size &= PAGE_MASK;
+	for (offset=0; offset < size; ptep++, offset += PAGE_SIZE) {
+		pte_t pte = *ptep;
+		if (pte_none(pte))
 			continue;
-		freed += free_pte(page);
+		if (pte_present(pte)) {
+			freed ++;
+			/* This will eventually call __free_pte on the pte. */
+			tlb_remove_page(tlb, ptep, address + offset);
+		} else {
+			swap_free(pte_to_swp_entry(pte));
+			pte_clear(ptep);
+		}
 	}
+
 	return freed;
 }
 
-static inline int zap_pmd_range(struct mm_struct *mm, pgd_t * dir, unsigned long address, unsigned long size)
+static inline int zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long address, unsigned long size)
 {
 	pmd_t * pmd;
 	unsigned long end;
@@ -339,13 +342,12 @@ static inline int zap_pmd_range(struct mm_struct *mm, pgd_t * dir, unsigned long
 		return 0;
 	}
 	pmd = pmd_offset(dir, address);
-	address &= ~PGDIR_MASK;
 	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
+	if (end > ((address + PGDIR_SIZE) & PGDIR_MASK))
+		end = ((address + PGDIR_SIZE) & PGDIR_MASK);
 	freed = 0;
 	do {
-		freed += zap_pte_range(mm, pmd, address, end - address);
+		freed += zap_pte_range(tlb, pmd, address, end - address);
 		address = (address + PMD_SIZE) & PMD_MASK; 
 		pmd++;
 	} while (address < end);
@@ -357,8 +359,9 @@ static inline int zap_pmd_range(struct mm_struct *mm, pgd_t * dir, unsigned long
  */
 void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size)
 {
+	mmu_gather_t *tlb;
 	pgd_t * dir;
-	unsigned long end = address + size;
+	unsigned long start = address, end = address + size;
 	int freed = 0;
 
 	dir = pgd_offset(mm, address);
@@ -373,11 +376,18 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
 	if (address >= end)
 		BUG();
 	spin_lock(&mm->page_table_lock);
+	flush_cache_range(mm, address, end);
+	tlb = tlb_gather_mmu(mm);
+
 	do {
-		freed += zap_pmd_range(mm, dir, address, end - address);
+		freed += zap_pmd_range(tlb, dir, address, end - address);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
+
+	/* this will flush any remaining tlb entries */
+	tlb_finish_mmu(tlb, start, end);
+
 	/*
 	 * Update rss for the mm_struct (not necessarily current->mm)
 	 * Notice that rss is an unsigned long.
@@ -987,9 +997,7 @@ static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
 
 		/* mapping wholly truncated? */
 		if (mpnt->vm_pgoff >= pgoff) {
-			flush_cache_range(mm, start, end);
 			zap_page_range(mm, start, len);
-			flush_tlb_range(mm, start, end);
 			continue;
 		}
 
@@ -1002,9 +1010,7 @@ static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
 		/* Ok, partially affected.. */
 		start += diff << PAGE_SHIFT;
 		len = (len - diff) << PAGE_SHIFT;
-		flush_cache_range(mm, start, end);
 		zap_page_range(mm, start, len);
-		flush_tlb_range(mm, start, end);
 	} while ((mpnt = mpnt->vm_next_share) != NULL);
 }
 
@@ -1153,14 +1159,11 @@ static int do_swap_page(struct mm_struct * mm,
 	pte = mk_pte(page, vma->vm_page_prot);
 
 	swap_free(entry);
-	if (exclusive_swap_page(page)) {	
-#if 0
-		if (write_access)
-			pte = pte_mkwrite(pte_mkdirty(pte));
-#else
+	if (exclusive_swap_page(page)) {
+		if (vma->vm_flags & VM_WRITE)
+			pte = pte_mkwrite(pte);
+		pte = pte_mkdirty(pte);
 		delete_from_swap_cache_nolock(page);
-		pte = pte_mkwrite(pte_mkdirty(pte));
-#endif
 	}
 	UnlockPage(page);
 

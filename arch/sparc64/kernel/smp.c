@@ -126,7 +126,6 @@ void __init smp_commence(void)
 }
 
 static void smp_setup_percpu_timer(void);
-static void smp_tune_scheduling(void);
 
 static volatile unsigned long callin_flag = 0;
 
@@ -250,7 +249,6 @@ void __init smp_boot_cpus(void)
 	printk("Entering UltraSMPenguin Mode...\n");
 	__sti();
 	smp_store_cpu_info(boot_cpu_id);
-	smp_tune_scheduling();
 	init_idle();
 
 	if (linux_num_cpus == 1)
@@ -1035,89 +1033,6 @@ static inline unsigned long find_flush_base(unsigned long size)
 		p++;
 	}
 	return base;
-}
-
-cycles_t cacheflush_time;
-
-extern unsigned long cheetah_tune_scheduling(void);
-
-static void __init smp_tune_scheduling (void)
-{
-	unsigned long orig_flush_base, flush_base, flags, *p;
-	unsigned int ecache_size, order;
-	cycles_t tick1, tick2, raw;
-
-	/* Approximate heuristic for SMP scheduling.  It is an
-	 * estimation of the time it takes to flush the L2 cache
-	 * on the local processor.
-	 *
-	 * The ia32 chooses to use the L1 cache flush time instead,
-	 * and I consider this complete nonsense.  The Ultra can service
-	 * a miss to the L1 with a hit to the L2 in 7 or 8 cycles, and
-	 * L2 misses are what create extra bus traffic (ie. the "cost"
-	 * of moving a process from one cpu to another).
-	 */
-	printk("SMP: Calibrating ecache flush... ");
-	if (tlb_type == cheetah) {
-		cacheflush_time = cheetah_tune_scheduling();
-		goto report;
-	}
-
-	ecache_size = prom_getintdefault(linux_cpus[0].prom_node,
-					 "ecache-size", (512 * 1024));
-	if (ecache_size > (4 * 1024 * 1024))
-		ecache_size = (4 * 1024 * 1024);
-	orig_flush_base = flush_base =
-		__get_free_pages(GFP_KERNEL, order = get_order(ecache_size));
-
-	if (flush_base != 0UL) {
-		__save_and_cli(flags);
-
-		/* Scan twice the size once just to get the TLB entries
-		 * loaded and make sure the second scan measures pure misses.
-		 */
-		for (p = (unsigned long *)flush_base;
-		     ((unsigned long)p) < (flush_base + (ecache_size<<1));
-		     p += (64 / sizeof(unsigned long)))
-			*((volatile unsigned long *)p);
-
-		/* Now the real measurement. */
-		__asm__ __volatile__("
-		b,pt	%%xcc, 1f
-		 rd	%%tick, %0
-
-		.align	64
-1:		ldx	[%2 + 0x000], %%g1
-		ldx	[%2 + 0x040], %%g2
-		ldx	[%2 + 0x080], %%g3
-		ldx	[%2 + 0x0c0], %%g5
-		add	%2, 0x100, %2
-		cmp	%2, %4
-		bne,pt	%%xcc, 1b
-		 nop
-	
-		rd	%%tick, %1"
-		: "=&r" (tick1), "=&r" (tick2), "=&r" (flush_base)
-		: "2" (flush_base), "r" (flush_base + ecache_size)
-		: "g1", "g2", "g3", "g5");
-
-		__restore_flags(flags);
-
-		raw = (tick2 - tick1);
-
-		/* Dampen it a little, considering two processes
-		 * sharing the cache and fitting.
-		 */
-		cacheflush_time = (raw - (raw >> 2));
-
-		free_pages(orig_flush_base, order);
-	} else {
-		cacheflush_time = ((ecache_size << 2) +
-				   (ecache_size << 1));
-	}
-report:
-	printk("Using heuristic of %d cycles.\n",
-	       (int) cacheflush_time);
 }
 
 /* /proc/profile writes can call this, don't __init it please. */

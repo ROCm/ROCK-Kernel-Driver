@@ -83,6 +83,8 @@
 #include <linux/compiler.h>
 //#include <linux/skbrefill.h>
 
+#include <asm/io.h>
+
 /* Dprintk is used for more interesting debug events */
 #undef Dprintk
 #define	Dprintk			dprintk

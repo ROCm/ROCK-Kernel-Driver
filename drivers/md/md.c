@@ -2143,7 +2143,7 @@ static int get_disk_info (mddev_t * mddev, void * arg)
 		return -EFAULT;
 
 	nr = info.number;
-	if (nr >= mddev->sb->raid_disks+mddev->sb->spare_disks)
+	if (nr >= MD_SB_DISKS)
 		return -EINVAL;
 
 	SET_FROM_SB(major);

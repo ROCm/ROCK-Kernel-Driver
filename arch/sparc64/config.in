@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.149 2001/08/09 17:47:51 davem Exp $
+# $Id: config.in,v 1.150 2001/09/18 00:36:03 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -200,6 +200,9 @@ if [ "$CONFIG_SCSI" != "n" ]; then
       fi
       dep_tristate 'Qlogic ISP SCSI support' CONFIG_SCSI_QLOGIC_ISP $CONFIG_SCSI
       dep_tristate 'Qlogic ISP FC SCSI support' CONFIG_SCSI_QLOGIC_FC $CONFIG_SCSI
+      if [ "$CONFIG_SCSI_QLOGIC_FC" != "n" ]; then
+         define_bool CONFIG_SCSI_QLOGIC_FC_FIRMWARE y
+      fi
    fi
 
    endmenu

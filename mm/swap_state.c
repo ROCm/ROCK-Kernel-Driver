@@ -23,6 +23,17 @@
  */
 static int swap_writepage(struct page *page)
 {
+	/* One for the page cache, one for this user, one for page->buffers */
+	if (page_count(page) > 2 + !!page->buffers)
+		goto in_use;
+	if (swap_count(page) > 1)
+		goto in_use;
+
+	delete_from_swap_cache_nolock(page);
+	UnlockPage(page);
+	return 0;
+
+in_use:
 	rw_swap_page(WRITE, page);
 	return 0;
 }

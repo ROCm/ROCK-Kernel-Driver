@@ -1,4 +1,4 @@
-/* $Id: dtlb_backend.S,v 1.13 2001/08/17 04:55:09 kanoj Exp $
+/* $Id: dtlb_backend.S,v 1.14 2001/09/07 18:26:17 kanoj Exp $
  * dtlb_backend.S: Back end to DTLB miss replacement strategy.
  *                 This is included directly into the trap table.
  *
@@ -24,7 +24,7 @@
 #define VPTE_BITS		(_PAGE_CP | _PAGE_CV | _PAGE_P )
 #define VPTE_SHIFT		(PAGE_SHIFT - 3)
 #define TLB_PMD_SHIFT		(PAGE_SHIFT - 3 + 3)
-#define TLB_PGD_SHIFT		(PAGE_SHIFT - 2 + PAGE_SHIFT - 3 + 3)
+#define TLB_PGD_SHIFT		(PMD_BITS + PAGE_SHIFT - 3 + 3)
 #define TLB_PMD_MASK		(((1 << PMD_BITS) - 1) << 1)
 #define TLB_PGD_MASK		(((1 << (VA_BITS - PAGE_SHIFT - (PAGE_SHIFT - 3) - PMD_BITS)) - 1) << 2)
 

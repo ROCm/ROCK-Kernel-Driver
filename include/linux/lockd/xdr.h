@@ -26,6 +26,7 @@
 /* Lock info passed via NLM */
 struct nlm_lock {
 	char *			caller;
+	int			len; 	/* length of "caller" */
 	struct nfs_fh		fh;
 	struct xdr_netobj	oh;
 	struct file_lock	fl;

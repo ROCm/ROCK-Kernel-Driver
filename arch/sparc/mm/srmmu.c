@@ -1,4 +1,4 @@
-/* $Id: srmmu.c,v 1.230 2001/07/17 16:17:33 anton Exp $
+/* $Id: srmmu.c,v 1.231 2001/09/20 00:35:31 davem Exp $
  * srmmu.c:  SRMMU specific routines for memory management.
  *
  * Copyright (C) 1995 David S. Miller  (davem@caip.rutgers.edu)
@@ -1092,7 +1092,6 @@ static inline void map_kernel(void)
 		map_spbank((unsigned long)__va(sp_banks[i].base_addr), i);
 	}
 
-	init_mm.mmap->vm_start = PAGE_OFFSET;
 	BTFIXUPSET_SIMM13(user_ptrs_per_pgd, PAGE_OFFSET / SRMMU_PGDIR_SIZE);
 }
 

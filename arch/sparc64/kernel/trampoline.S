@@ -1,4 +1,4 @@
-/* $Id: trampoline.S,v 1.21 2001/04/05 12:44:34 davem Exp $
+/* $Id: trampoline.S,v 1.22 2001/09/07 21:04:40 kanoj Exp $
  * trampoline.S: Jump start slave processors on sparc64.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -13,6 +13,7 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/spitfire.h>
+#include <asm/processor.h>
 #include <asm/asm_offsets.h>
 
 	.data
@@ -197,7 +198,7 @@ startup_continue:
 	membar		#Sync
 
 	mov		1, %g5
-	sllx		%g5, (PAGE_SHIFT + 1), %g5
+	sllx		%g5, THREAD_SHIFT, %g5
 	sub		%g5, (REGWIN_SZ + STACK_BIAS), %g5
 	add		%g6, %g5, %sp
 	mov		0, %fp

@@ -2223,9 +2223,7 @@ static long madvise_dontneed(struct vm_area_struct * vma,
 	if (vma->vm_flags & VM_LOCKED)
 		return -EINVAL;
 
-	flush_cache_range(vma->vm_mm, start, end);
 	zap_page_range(vma->vm_mm, start, end - start);
-	flush_tlb_range(vma->vm_mm, start, end);
 	return 0;
 }
 

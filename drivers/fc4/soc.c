@@ -733,7 +733,7 @@ static int __init soc_probe(void)
 	return 0;
 }
 
-static void __exit sco_cleanup(void)
+static void __exit soc_cleanup(void)
 {
 	struct soc *s;
 	int irq;

@@ -1,4 +1,4 @@
-/* $Id: processor.h,v 1.70 2001/03/27 02:36:38 davem Exp $
+/* $Id: processor.h,v 1.75 2001/09/20 00:35:34 davem Exp $
  * include/asm-sparc64/processor.h
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -20,6 +20,7 @@
 #include <asm/ptrace.h>
 #include <asm/signal.h>
 #include <asm/segment.h>
+#include <asm/page.h>
 
 /* Bus types */
 #define EISA_bus 0
@@ -31,12 +32,14 @@
 #define wp_works_ok 1
 #define wp_works_ok__is_a_macro /* for versions in ksyms.c */
 
-/* User lives in his very own context, and cannot reference us. */
-#ifndef __ASSEMBLY__
-#define TASK_SIZE	((unsigned long)-PGDIR_SIZE)
-#else
-#define TASK_SIZE	0xfffffffc00000000
-#endif
+/*
+ * User lives in his very own context, and cannot reference us. Note
+ * that TASK_SIZE is a misnomer, it really gives maximum user virtual 
+ * address that the kernel will allocate out.
+ */
+#define VA_BITS		44
+#define VPTE_SIZE	(1UL << (VA_BITS - PAGE_SHIFT + 3))
+#define TASK_SIZE	((unsigned long)-VPTE_SIZE)
 
 #ifndef __ASSEMBLY__
 
@@ -101,6 +104,16 @@ struct thread_struct {
 /* user_cntd0, user_cndd1, kernel_cntd0, kernel_cntd0, pcr_reg */ \
    0,          0,          0,		 0,            0, \
 }
+
+#ifdef __KERNEL__
+#if PAGE_SHIFT == 13
+#define THREAD_SIZE (2*PAGE_SIZE)
+#define THREAD_SHIFT (PAGE_SHIFT + 1)
+#else /* PAGE_SHIFT == 13 */
+#define THREAD_SIZE PAGE_SIZE
+#define THREAD_SHIFT PAGE_SHIFT
+#endif /* PAGE_SHIFT == 13 */
+#endif /* __KERNEL__ */
 
 #ifndef __ASSEMBLY__
 
@@ -232,7 +245,7 @@ extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 	do { \
 		/* Bogus frame pointer? */ \
 		if (fp < (task_base + sizeof(struct task_struct)) || \
-		    fp >= (task_base + (2 * PAGE_SIZE))) \
+		    fp >= (task_base + THREAD_SIZE)) \
 			break; \
 		rw = (struct reg_window *) fp; \
 		pc = rw->ins[7]; \
@@ -250,10 +263,14 @@ __out:	__ret; \
 #define KSTK_ESP(tsk)  ((tsk)->thread.kregs->u_regs[UREG_FP])
 
 #ifdef __KERNEL__
-#define THREAD_SIZE (2*PAGE_SIZE)
 /* Allocation and freeing of task_struct and kernel stack. */
+#if PAGE_SHIFT == 13
 #define alloc_task_struct()   ((struct task_struct *)__get_free_pages(GFP_KERNEL, 1))
 #define free_task_struct(tsk) free_pages((unsigned long)(tsk),1)
+#else /* PAGE_SHIFT == 13 */
+#define alloc_task_struct()   ((struct task_struct *)__get_free_pages(GFP_KERNEL, 0))
+#define free_task_struct(tsk) free_pages((unsigned long)(tsk),0)
+#endif /* PAGE_SHIFT == 13 */
 #define get_task_struct(tsk)      atomic_inc(&virt_to_page(tsk)->count)
 
 #define init_task	(init_task_union.task)

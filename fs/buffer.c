@@ -845,18 +845,6 @@ static void free_more_memory(void)
 	schedule();
 }
 
-/*
- * We used to try various strange things. Let's not.
- * We'll just try to balance dirty buffers, and possibly
- * launder some pages and do our best to make more memory
- * available.
- */
-static void refill_freelist(int size)
-{
-	if (!grow_buffers(size))
-		free_more_memory();
-}
-
 void init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
 {
 	bh->b_list = BUF_CLEAN;
@@ -1194,7 +1182,10 @@ repeat:
 	 */
 	write_unlock(&hash_table_lock);
 	spin_unlock(&lru_list_lock);
-	refill_freelist(size);
+
+	if (!grow_buffers(size))
+		free_more_memory();
+
 	/* FIXME: getblk should fail if there's no enough memory */
 	goto repeat;
 }

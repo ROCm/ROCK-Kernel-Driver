@@ -76,16 +76,23 @@ static inline int scan_swap_map(struct swap_info_struct *si, unsigned short coun
 	for (offset = si->lowest_bit; offset <= si->highest_bit ; offset++) {
 		if (si->swap_map[offset])
 			continue;
+		si->lowest_bit = offset+1;
 	got_page:
 		if (offset == si->lowest_bit)
 			si->lowest_bit++;
 		if (offset == si->highest_bit)
 			si->highest_bit--;
+		if (si->lowest_bit > si->highest_bit) {
+			si->lowest_bit = si->max;
+			si->highest_bit = 0;
+		}
 		si->swap_map[offset] = count;
 		nr_swap_pages--;
 		si->cluster_next = offset+1;
 		return offset;
 	}
+	si->lowest_bit = si->max;
+	si->highest_bit = 0;
 	return 0;
 }
 
@@ -452,6 +459,7 @@ static int try_to_unuse(unsigned int type)
 		lock_page(page);
 		if (PageSwapCache(page))
 			delete_from_swap_cache_nolock(page);
+		SetPageDirty(page);
 		UnlockPage(page);
 		flush_page_to_ram(page);
 
@@ -492,7 +500,6 @@ static int try_to_unuse(unsigned int type)
 			mmput(start_mm);
 			start_mm = new_start_mm;
 		}
-		ClearPageDirty(page);
 		page_cache_release(page);
 
 		/*
@@ -542,6 +549,7 @@ static int try_to_unuse(unsigned int type)
 asmlinkage long sys_swapoff(const char * specialfile)
 {
 	struct swap_info_struct * p = NULL;
+	unsigned short *swap_map;
 	struct nameidata nd;
 	int i, type, prev;
 	int err;
@@ -611,15 +619,18 @@ asmlinkage long sys_swapoff(const char * specialfile)
 		blkdev_put(nd.dentry->d_inode->i_bdev, BDEV_SWAP);
 	path_release(&nd);
 
+	swap_list_lock();
 	nd.dentry = p->swap_file;
 	p->swap_file = NULL;
 	nd.mnt = p->swap_vfsmnt;
 	p->swap_vfsmnt = NULL;
 	p->swap_device = 0;
 	p->max = 0;
-	vfree(p->swap_map);
+	swap_map = p->swap_map;
 	p->swap_map = NULL;
 	p->flags = 0;
+	swap_list_unlock();
+	vfree(swap_map);
 	err = 0;
 
 out_dput:
@@ -704,13 +715,16 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	lock_kernel();
+	swap_list_lock();
 	p = swap_info;
 	for (type = 0 ; type < nr_swapfiles ; type++,p++)
 		if (!(p->flags & SWP_USED))
 			break;
 	error = -EPERM;
-	if (type >= MAX_SWAPFILES)
+	if (type >= MAX_SWAPFILES) {
+		swap_list_unlock();
 		goto out;
+	}
 	if (type >= nr_swapfiles)
 		nr_swapfiles = type+1;
 	p->flags = SWP_USED;
@@ -729,6 +743,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	} else {
 		p->prio = --least_priority;
 	}
+	swap_list_unlock();
 	error = user_path_walk(specialfile, &nd);
 	if (error)
 		goto bad_swap_2;
@@ -841,10 +856,10 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 		}
 
 		p->lowest_bit  = 1;
-		p->highest_bit = swap_header->info.last_page - 1;
 		maxpages = SWP_OFFSET(SWP_ENTRY(0,~0UL)) - 1;
 		if (maxpages > swap_header->info.last_page)
 			maxpages = swap_header->info.last_page;
+		p->highest_bit = maxpages - 1;
 
 		error = -EINVAL;
 		if (swap_header->info.nr_badpages > MAX_SWAP_BADPAGES)
@@ -884,10 +899,10 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 		goto bad_swap;
 	}
 	p->swap_map[0] = SWAP_MAP_BAD;
+	swap_list_lock();
 	p->max = maxpages;
 	p->flags = SWP_WRITEOK;
 	p->pages = nr_good_pages;
-	swap_list_lock();
 	nr_swap_pages += nr_good_pages;
 	total_swap_pages += nr_good_pages;
 	printk(KERN_INFO "Adding Swap: %dk swap-space (priority %d)\n",
@@ -918,6 +933,7 @@ bad_swap_2:
 		vfree(p->swap_map);
 	nd.mnt = p->swap_vfsmnt;
 	nd.dentry = p->swap_file;
+	swap_list_lock();
 	p->swap_device = 0;
 	p->swap_file = NULL;
 	p->swap_vfsmnt = NULL;
@@ -925,6 +941,7 @@ bad_swap_2:
 	p->flags = 0;
 	if (!(swap_flags & SWAP_FLAG_PREFER))
 		++least_priority;
+	swap_list_unlock();
 	path_release(&nd);
 out:
 	if (swap_header)
@@ -936,27 +953,26 @@ out:
 void si_swapinfo(struct sysinfo *val)
 {
 	unsigned int i;
-	unsigned long freeswap = 0;
-	unsigned long totalswap = 0;
+	unsigned long nr_to_be_unused = 0;
 
+	swap_list_lock();
 	for (i = 0; i < nr_swapfiles; i++) {
 		unsigned int j;
-		if ((swap_info[i].flags & SWP_WRITEOK) != SWP_WRITEOK)
+		if (swap_info[i].flags != SWP_USED)
 			continue;
 		for (j = 0; j < swap_info[i].max; ++j) {
 			switch (swap_info[i].swap_map[j]) {
+				case 0:
 				case SWAP_MAP_BAD:
 					continue;
-				case 0:
-					freeswap++;
 				default:
-					totalswap++;
+					nr_to_be_unused++;
 			}
 		}
 	}
-	val->freeswap = freeswap;
-	val->totalswap = totalswap;
-	return;
+	val->freeswap = nr_swap_pages + nr_to_be_unused;
+	val->totalswap = total_swap_pages + nr_to_be_unused;
+	swap_list_unlock();
 }
 
 /*

@@ -18,6 +18,7 @@
 #include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/blkdev.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 
@@ -365,6 +366,53 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
 }
 
 /*
+ * pseudo-fs
+ */
+
+static struct super_block *bd_read_super(struct super_block *sb, void *data, int silent)
+{
+	static struct super_operations sops = {};
+	struct inode *root = new_inode(sb);
+	if (!root)
+		return NULL;
+	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
+	root->i_uid = root->i_gid = 0;
+	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
+	sb->s_blocksize = 1024;
+	sb->s_blocksize_bits = 10;
+	sb->s_magic = 0x62646576;
+	sb->s_op = &sops;
+	sb->s_root = d_alloc(NULL, &(const struct qstr) { "bdev:", 5, 0 });
+	if (!sb->s_root) {
+		iput(root);
+		return NULL;
+	}
+	sb->s_root->d_sb = sb;
+	sb->s_root->d_parent = sb->s_root;
+	d_instantiate(sb->s_root, root);
+	return sb;
+}
+
+static DECLARE_FSTYPE(bd_type, "bdev", bd_read_super, FS_NOMOUNT);
+
+static struct vfsmount *bd_mnt;
+
+static int get_inode(struct block_device *bdev)
+{
+	if (!bdev->bd_inode) {
+		struct inode *inode = new_inode(bd_mnt->mnt_sb);
+		if (!inode)
+			return -ENOMEM;
+		inode->i_rdev = to_kdev_t(bdev->bd_dev);
+		atomic_inc(&bdev->bd_count);	/* will go away */
+		inode->i_bdev = bdev;
+		inode->i_data.a_ops = &def_blk_aops;
+		bdev->bd_inode = inode;
+	}
+	return 0;
+}
+
+/*
  * bdev cache handling - shamelessly stolen from inode.c
  * We use smaller hashtable, though.
  */
@@ -394,7 +442,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 
 void __init bdev_cache_init(void)
 {
-	int i;
+	int i, err;
 	struct list_head *head = bdev_hashtable;
 
 	i = HASH_SIZE;
@@ -410,6 +458,13 @@ void __init bdev_cache_init(void)
 					 NULL);
 	if (!bdev_cachep)
 		panic("Cannot create bdev_cache SLAB cache");
+	err = register_filesystem(&bd_type);
+	if (err)
+		panic("Cannot register bdev pseudo-fs");
+	bd_mnt = kern_mount(&bd_type);
+	err = PTR_ERR(bd_mnt);
+	if (IS_ERR(bd_mnt))
+		panic("Cannot create bdev pseudo-fs");
 }
 
 /*
@@ -598,18 +653,13 @@ int check_disk_change(kdev_t dev)
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 {
-	struct inode inode_fake;
 	int res;
 	mm_segment_t old_fs = get_fs();
 
 	if (!bdev->bd_op->ioctl)
 		return -EINVAL;
-	memset(&inode_fake, 0, sizeof(inode_fake));
-	inode_fake.i_rdev = to_kdev_t(bdev->bd_dev);
-	inode_fake.i_bdev = bdev;
-	init_waitqueue_head(&inode_fake.i_wait);
 	set_fs(KERNEL_DS);
-	res = bdev->bd_op->ioctl(&inode_fake, NULL, cmd, arg);
+	res = bdev->bd_op->ioctl(bdev->bd_inode, NULL, cmd, arg);
 	set_fs(old_fs);
 	return res;
 }
@@ -619,6 +669,12 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 	int ret = -ENODEV;
 	kdev_t rdev = to_kdev_t(bdev->bd_dev); /* this should become bdev */
 	down(&bdev->bd_sem);
+
+	if (get_inode(bdev)) {
+		up(&bdev->bd_sem);
+		return -ENOMEM;
+	}
+
 	lock_kernel();
 	if (!bdev->bd_op)
 		bdev->bd_op = get_blkfops(MAJOR(rdev));
@@ -631,23 +687,22 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 		 */
 		struct file fake_file = {};
 		struct dentry fake_dentry = {};
-		struct inode *fake_inode = get_empty_inode();
 		ret = -ENOMEM;
-		if (fake_inode) {
-			fake_file.f_mode = mode;
-			fake_file.f_flags = flags;
-			fake_file.f_dentry = &fake_dentry;
-			fake_dentry.d_inode = fake_inode;
-			fake_inode->i_rdev = rdev;
-			ret = 0;
-			if (bdev->bd_op->open)
-				ret = bdev->bd_op->open(fake_inode, &fake_file);
-			if (!ret) {
-				bdev->bd_openers++;
-				atomic_inc(&bdev->bd_count);
-			} else if (!bdev->bd_openers)
-				bdev->bd_op = NULL;
-			iput(fake_inode);
+		fake_file.f_mode = mode;
+		fake_file.f_flags = flags;
+		fake_file.f_dentry = &fake_dentry;
+		fake_dentry.d_inode = bdev->bd_inode;
+		ret = 0;
+		if (bdev->bd_op->open)
+			ret = bdev->bd_op->open(bdev->bd_inode, &fake_file);
+		if (!ret) {
+			bdev->bd_openers++;
+			atomic_inc(&bdev->bd_count);
+		} else if (!bdev->bd_openers) {
+			struct inode *bd_inode = bdev->bd_inode;
+			bdev->bd_op = NULL;
+			bdev->bd_inode = NULL;
+			iput(bd_inode);
 		}
 	}
 	unlock_kernel();
@@ -669,6 +724,12 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	filp->f_flags |= O_LARGEFILE;
 
 	down(&bdev->bd_sem);
+
+	if (get_inode(bdev)) {
+		up(&bdev->bd_sem);
+		return -ENOMEM;
+	}
+
 	lock_kernel();
 	if (!bdev->bd_op)
 		bdev->bd_op = get_blkfops(MAJOR(inode->i_rdev));
@@ -678,20 +739,15 @@ int blkdev_open(struct inode * inode, struct file * filp)
 			ret = bdev->bd_op->open(inode,filp);
 		if (!ret) {
 			bdev->bd_openers++;
-			if (!bdev->bd_cache_openers && bdev->bd_inode)
-				BUG();
-			if (bdev->bd_cache_openers && !bdev->bd_inode)
-				BUG();
-			if (!bdev->bd_cache_openers++)
-				bdev->bd_inode = inode;
-			else {
-				if (bdev->bd_inode != inode && !inode->i_mapping_overload++) {
-					inode->i_mapping = bdev->bd_inode->i_mapping;
-					atomic_inc(&bdev->bd_inode->i_count);
-				}
-			}
-		} else if (!bdev->bd_openers)
+			bdev->bd_cache_openers++;
+			inode->i_mapping = bdev->bd_inode->i_mapping;
+			inode->i_mapping_overload++;
+		} else if (!bdev->bd_openers) {
+			struct inode *bd_inode = bdev->bd_inode;
 			bdev->bd_op = NULL;
+			bdev->bd_inode = NULL;
+			iput(bd_inode);
+		}
 	}	
 	unlock_kernel();
 	up(&bdev->bd_sem);
@@ -702,28 +758,24 @@ int blkdev_put(struct block_device *bdev, int kind)
 {
 	int ret = 0;
 	kdev_t rdev = to_kdev_t(bdev->bd_dev); /* this should become bdev */
+	struct inode *bd_inode = bdev->bd_inode;
+
 	down(&bdev->bd_sem);
 	lock_kernel();
 	if (kind == BDEV_FILE)
-		fsync_dev(rdev);
+		__block_fsync(bd_inode);
 	else if (kind == BDEV_FS)
 		fsync_no_super(rdev);
 	/* only filesystems uses buffer cache for the metadata these days */
 	if (kind == BDEV_FS)
 		invalidate_buffers(rdev);
-	if (bdev->bd_op->release) {
-		struct inode * fake_inode = get_empty_inode();
-		ret = -ENOMEM;
-		if (fake_inode) {
-			fake_inode->i_rdev = rdev;
-			ret = bdev->bd_op->release(fake_inode, NULL);
-			iput(fake_inode);
-		} else
-			printk(KERN_WARNING "blkdev_put: ->release couldn't be run due -ENOMEM\n");
+	if (bdev->bd_op->release)
+		ret = bdev->bd_op->release(bd_inode, NULL);
+	if (!--bdev->bd_openers) {
+		bdev->bd_op = NULL;
+		bdev->bd_inode = NULL;
+		iput(bd_inode);
 	}
-	if (!--bdev->bd_openers)
-		bdev->bd_op = NULL;	/* we can't rely on driver being */
-					/* kind to stay around. */
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	bdput(bdev);
@@ -736,8 +788,6 @@ int blkdev_close(struct inode * inode, struct file * filp)
 	int ret = 0;
 	struct inode * bd_inode = bdev->bd_inode;
 
-	if (bd_inode->i_mapping != inode->i_mapping)
-		BUG();
 	down(&bdev->bd_sem);
 	lock_kernel();
 	/* cache coherency protocol */
@@ -745,11 +795,9 @@ int blkdev_close(struct inode * inode, struct file * filp)
 		struct super_block * sb;
 
 		/* flush the pagecache to disk */
-		__block_fsync(inode);
+		__block_fsync(bd_inode);
 		/* drop the pagecache, uptodate info is on disk by now */
 		truncate_inode_pages(inode->i_mapping, 0);
-		/* forget the bdev pagecache address space */
-		bdev->bd_inode = NULL;
 
 		/* if the fs was mounted ro just throw away most of its caches */
 		sb = get_super(inode->i_rdev);
@@ -782,16 +830,17 @@ int blkdev_close(struct inode * inode, struct file * filp)
 			drop_super(sb);
 		}
 	}
-	if (inode != bd_inode && !--inode->i_mapping_overload) {
+	if (!--inode->i_mapping_overload)
 		inode->i_mapping = &inode->i_data;
-		iput(bd_inode);
-	}
 
 	/* release the device driver */
 	if (bdev->bd_op->release)
 		ret = bdev->bd_op->release(inode, NULL);
-	if (!--bdev->bd_openers)
+	if (!--bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_inode = NULL;
+		iput(bd_inode);
+	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
 

@@ -1,4 +1,4 @@
-/* $Id: creatorfb.c,v 1.35 2001/06/08 21:48:37 davem Exp $
+/* $Id: creatorfb.c,v 1.36 2001/09/19 00:04:33 davem Exp $
  * creatorfb.c: Creator/Creator3D frame buffer driver
  *
  * Copyright (C) 1997,1998,1999 Jakub Jelinek (jj@ultra.linux.cz)

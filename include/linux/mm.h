@@ -487,6 +487,8 @@ static inline int exclusive_swap_page(struct page *page)
 	return count == 3;				/* =3: total */
 }
 
+extern void __free_pte(pte_t);
+
 /* mmap.c */
 extern void lock_vma_mappings(struct vm_area_struct *);
 extern void unlock_vma_mappings(struct vm_area_struct *);

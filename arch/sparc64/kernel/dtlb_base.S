@@ -1,4 +1,4 @@
-/* $Id: dtlb_base.S,v 1.12 2001/08/17 04:55:09 kanoj Exp $
+/* $Id: dtlb_base.S,v 1.14 2001/09/11 02:20:23 kanoj Exp $
  * dtlb_base.S:	Front end to DTLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
@@ -13,10 +13,10 @@
  * %g7	__pa(current->mm->pgd)
  *
  * The VPTE base value is completely magic, but note that
- * nothing else in the kernel other than these TLB miss
+ * few places in the kernel other than these TLB miss
  * handlers know anything about the VPTE mechanism or
- * how it works.  Consider the 44-bit VADDR Ultra-I/II
- * case as an example:
+ * how it works (see VPTE_SIZE, TASK_SIZE and PTRS_PER_PGD).
+ * Consider the 44-bit VADDR Ultra-I/II case as an example:
  *
  * VA[0 :  (1<<43)] produce VPTE index [%g3                        :   0]
  * VA[0 : -(1<<43)] produce VPTE index [%g3-(1<<(43-PAGE_SHIFT+3)) : %g3]
@@ -29,7 +29,7 @@
  * If you're paying attention you'll notice that this means half of
  * the VPTE table is above %g3 and half is below, low VA addresses
  * map progressively upwards from %g3, and high VA addresses map
- * progressively downwards from %g3.  This trick was needed to make
+ * progressively upwards towards %g3.  This trick was needed to make
  * the same 8 instruction handler work both for Spitfire/Blackbird's
  * peculiar VA space hole configuration and the full 64-bit VA space
  * one of Cheetah at the same time.

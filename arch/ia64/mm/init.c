@@ -24,6 +24,9 @@
 #include <asm/sal.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/tlb.h>
+
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 /* References to section boundaries: */
 extern char _stext, _etext, _edata, __init_begin, __init_end;

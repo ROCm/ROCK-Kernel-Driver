@@ -1260,7 +1260,7 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 	if (tulip_debug > 3)
 		printk(KERN_DEBUG "%s: tulip_mwi_config()\n", pdev->slot_name);
 
-	tp->csr0 = 0;
+	tp->csr0 = csr0 = 0;
 
 	/* check for sane cache line size. from acenic.c. */
 	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache);

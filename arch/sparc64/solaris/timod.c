@@ -1,4 +1,4 @@
-/* $Id: timod.c,v 1.15 2001/08/13 18:56:10 davem Exp $
+/* $Id: timod.c,v 1.16 2001/09/18 22:29:06 davem Exp $
  * timod.c: timod emulation.
  *
  * Copyright (C) 1998 Patrik Rak (prak3264@ss1000.ms.mff.cuni.cz)

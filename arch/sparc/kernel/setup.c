@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.124 2001/04/14 21:13:46 davem Exp $
+/*  $Id: setup.c,v 1.125 2001/09/20 00:35:30 davem Exp $
  *  linux/arch/sparc/kernel/setup.c
  *
  *  Copyright (C) 1995  David S. Miller (davem@caip.rutgers.edu)
@@ -441,10 +441,6 @@ void __init setup_arch(char **cmdline_p)
 		breakpoint();
 	}
 
-	/* Due to stack alignment restrictions and assumptions... */
-	init_mm.mmap->vm_page_prot = PAGE_SHARED;
-	init_mm.mmap->vm_start = PAGE_OFFSET;
-	init_mm.mmap->vm_end = PAGE_OFFSET + highest_paddr;
 	init_mm.context = (unsigned long) NO_CONTEXT;
 	init_task.thread.kregs = &fake_swapper_regs;
 

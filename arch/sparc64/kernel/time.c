@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.39 2001/06/08 02:33:37 davem Exp $
+/* $Id: time.c,v 1.40 2001/09/06 02:44:28 davem Exp $
  * time.c: UltraSparc timer and TOD clock support.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -464,6 +464,7 @@ void __init clock_probe(void)
 		if (strcmp(model, "mk48t02") &&
 		    strcmp(model, "mk48t08") &&
 		    strcmp(model, "mk48t59") &&
+		    strcmp(model, "m5819") &&
 		    strcmp(model, "ds1287")) {
 		   	if (node)
 				node = prom_getsibling(node);
@@ -509,12 +510,15 @@ void __init clock_probe(void)
 				if (edev->prom_node == node)
 					break;
 			if (edev == NULL) {
+				if (isa_chain != NULL)
+					goto try_isa_clock;
 				prom_printf("%s: Mostek not probed by EBUS\n",
 					    __FUNCTION__);
 				prom_halt();
 			}
 
-			if (!strcmp(model, "ds1287")) {
+			if (!strcmp(model, "ds1287") ||
+			    !strcmp(model, "m5819")) {
 				ds1287_regs = edev->resource[0].start;
 			} else {
 				mstk48t59_regs = edev->resource[0].start;
@@ -524,6 +528,7 @@ void __init clock_probe(void)
 		} else if (isa_chain != NULL) {
 			struct isa_device *isadev;
 
+try_isa_clock:
 			for_each_isadev(isadev, isa_br)
 				if (isadev->prom_node == node)
 					break;
@@ -531,12 +536,14 @@ void __init clock_probe(void)
 				prom_printf("%s: Mostek not probed by ISA\n");
 				prom_halt();
 			}
-			if (!strcmp(model, "ds1287")) {
+			if (!strcmp(model, "ds1287") ||
+			    !strcmp(model, "m5819")) {
 				ds1287_regs = isadev->resource.start;
 			} else {
 				mstk48t59_regs = isadev->resource.start;
 				mstk48t02_regs = mstk48t59_regs + MOSTEK_48T59_48T02;
 			}
+			break;
 		}
 #endif
 		else {

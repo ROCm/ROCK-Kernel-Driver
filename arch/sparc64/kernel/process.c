@@ -1,4 +1,4 @@
-/*  $Id: process.c,v 1.118 2001/06/03 13:41:13 ecd Exp $
+/*  $Id: process.c,v 1.119 2001/09/07 21:04:40 kanoj Exp $
  *  arch/sparc64/kernel/process.c
  *
  *  Copyright (C) 1995, 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -585,7 +585,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	char *child_trap_frame;
 
 	/* Calculate offset to stack_frame & pt_regs */
-	child_trap_frame = ((char *)p) + ((PAGE_SIZE << 1) - (TRACEREG_SZ+REGWIN_SZ));
+	child_trap_frame = ((char *)p) + (THREAD_SIZE - (TRACEREG_SZ+REGWIN_SZ));
 	memcpy(child_trap_frame, (((struct reg_window *)regs)-1), (TRACEREG_SZ+REGWIN_SZ));
 	t->ksp = ((unsigned long) child_trap_frame) - STACK_BIAS;
 	t->flags |= SPARC_FLAG_NEWCHILD;

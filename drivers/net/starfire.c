@@ -770,7 +770,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 
 #ifdef ZEROCOPY
 	printk(KERN_INFO "%s: scatter-gather and hardware TCP cksumming enabled.\n",
-	       dev->name,
+	       dev->name);
 #else  /* not ZEROCOPY */
 	printk(KERN_INFO "%s: scatter-gather and hardware TCP cksumming disabled.\n",
 	       dev->name);

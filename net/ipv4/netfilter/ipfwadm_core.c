@@ -20,7 +20,7 @@
  *	license in recognition of the original copyright.
  *				-- Alan Cox.
  *
- *	$Id: ipfwadm_core.c,v 1.8 2001/08/13 18:56:12 davem Exp $
+ *	$Id: ipfwadm_core.c,v 1.9 2001/09/18 22:29:10 davem Exp $
  *
  *	Ported from BSD to Linux,
  *		Alan Cox 22/Nov/1994.

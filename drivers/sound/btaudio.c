@@ -32,7 +32,9 @@
 #include <linux/poll.h>
 #include <linux/sound.h>
 #include <linux/soundcard.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
+#include <asm/io.h>
 
 
 /* mmio access */

@@ -1,5 +1,6 @@
 /* credit winbond-840.c
  */
+#include <asm/io.h>
 struct eeprom_ops {
 	void	(*set_cs)(void *ee);
 	void	(*clear_cs)(void *ee);

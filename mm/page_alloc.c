@@ -86,8 +86,7 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		BUG();
 	if (PageInactive(page))
 		BUG();
-	if (PageDirty(page))
-		BUG();
+	page->flags &= ~((1<<PG_referenced) | (1<<PG_dirty));
 
 	if (current->flags & PF_FREE_PAGES)
 		goto local_freelist;
@@ -368,6 +367,7 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 		return NULL;
 	}
 
+ rebalance:
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
 		return page;
@@ -379,10 +379,13 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 			if (!z)
 				break;
 
-			page = rmqueue(z, order);
-			if (page)
-				return page;
+			if (zone_free_pages(z, order) > z->pages_min) {
+				page = rmqueue(z, order);
+				if (page)
+					return page;
+			}
 		}
+		goto rebalance;
 	} else {
 		/* 
 		 * Check that no other task is been killed meanwhile,

@@ -245,6 +245,7 @@ static int shmem_writepage(struct page * page)
 	error = -ENOMEM;
 	if (!swap.val) {
 		activate_page(page);
+		SetPageDirty(page);
 		goto out;
 	}
 
@@ -269,8 +270,8 @@ static int shmem_writepage(struct page * page)
 	info->swapped++;
 
 	spin_unlock(&info->lock);
-out:
 	set_page_dirty(page);
+out:
 	UnlockPage(page);
 	return error;
 }
@@ -311,7 +312,7 @@ repeat:
 	 * cache and swap cache.  We need to recheck the page cache
 	 * under the protection of the info->lock spinlock. */
 
-	page = __find_get_page(mapping, idx, page_hash(mapping, idx));
+	page = find_get_page(mapping, idx);
 	if (page) {
 		if (TryLockPage(page))
 			goto wait_retry;
@@ -324,18 +325,21 @@ repeat:
 		unsigned long flags;
 
 		/* Look it up and read it in.. */
-		page = __find_get_page(&swapper_space, entry->val,
-				       page_hash(&swapper_space, entry->val));
+		page = find_get_page(&swapper_space, entry->val);
 		if (!page) {
+			swp_entry_t swap = *entry;
 			spin_unlock (&info->lock);
 			lock_kernel();
 			swapin_readahead(*entry);
 			page = read_swap_cache_async(*entry);
 			unlock_kernel();
-			if (!page) 
+			if (!page) {
+				if (entry->val != swap.val)
+					goto repeat;
 				return ERR_PTR(-ENOMEM);
+			}
 			wait_on_page(page);
-			if (!Page_Uptodate(page)) {
+			if (!Page_Uptodate(page) && entry->val == swap.val) {
 				page_cache_release(page);
 				return ERR_PTR(-EIO);
 			}
@@ -1243,7 +1247,7 @@ out:
 	return 0;
 found:
 	add_to_page_cache(page, inode->i_mapping, offset + idx);
-	set_page_dirty(page);
+	SetPageDirty(page);
 	SetPageUptodate(page);
 	UnlockPage(page);
 	info->swapped--;

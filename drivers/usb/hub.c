@@ -142,7 +142,7 @@ static int usb_hub_configure(struct usb_hub *hub, struct usb_endpoint_descriptor
 
 	hub->descriptor = kmalloc(sizeof(*hub->descriptor), GFP_KERNEL);
 	if (!hub->descriptor) {
-		err("Unable to kmalloc %d bytes for hub descriptor", sizeof(*hub->descriptor));
+		err("Unable to kmalloc %Zd bytes for hub descriptor", sizeof(*hub->descriptor));
 		return -1;
 	}
 

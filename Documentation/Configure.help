@@ -8809,13 +8809,13 @@ CONFIG_SIS900
   say M here and read Documentation/modules.txt. This is recommended.
   The module will be called sis900.o.
 
-Packet Engines Yellowfin Gigabit-NIC support
+Packet Engines Yellowfin Gigabit-NIC / Symbios 53c885 support
 CONFIG_YELLOWFIN
   Say Y here if you have a Packet Engines G-NIC PCI Gigabit Ethernet
-  adapter. This adapter is used by the Beowulf Linux cluster project.
-  See http://cesdis.gsfc.nasa.gov/linux/drivers/yellowfin.html for
-  more information about this driver in particular and Beowulf in
-  general.
+  adapter or the SYM53C885 Ethernet controller. The Gigabit adapter is
+  used by the Beowulf Linux cluster project.  See
+  http://cesdis.gsfc.nasa.gov/linux/drivers/yellowfin.html for more
+  information about this driver in particular and Beowulf in general.
 
   If you want to compile this driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
@@ -17426,16 +17426,6 @@ CONFIG_GMAC
   and iBook computers. 
 
   This driver is also available as a module called gmac.o ( = code
-  which can be inserted in and removed from the running kernel
-  whenever you want). If you want to compile it as a module, say M
-  here and read Documentation/modules.txt.
-
-Symbios 53c885 (Synergy ethernet) support
-CONFIG_NCR885E
-  This is and Ethernet driver for the dual-function NCR 53C885
-  SCSI/Ethernet controller.
-
-  This driver is also available as a module called ncr885e.o ( = code
   which can be inserted in and removed from the running kernel
   whenever you want). If you want to compile it as a module, say M
   here and read Documentation/modules.txt.

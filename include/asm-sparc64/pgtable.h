@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.145 2001/08/30 03:22:00 kanoj Exp $
+/* $Id: pgtable.h,v 1.146 2001/09/11 02:20:23 kanoj Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -17,6 +17,7 @@
 #include <asm/mmu_context.h>
 #include <asm/system.h>
 #include <asm/page.h>
+#include <asm/processor.h>
 
 /* XXX All of this needs to be rethought so we can take advantage
  * XXX cheetah's full 64-bit virtual address space, ie. no more hole
@@ -31,8 +32,6 @@
  * since the pmd entries are 4 bytes, and each pmd page is a single page 
  * long). Finally, the higher few bits determine pgde#.
  */
-
-#define VA_BITS 	44
 
 /* PMD_SHIFT determines the size of the area a second-level page table can map */
 #define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3))
@@ -65,8 +64,15 @@
 #define PTRS_PER_PMD		((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \
 				 (1UL << (32 - (PAGE_SHIFT-3) - PAGE_SHIFT)) : (REAL_PTRS_PER_PMD)))
 
-/* We cannot use the top 16G because VPTE table lives there. */
-#define PTRS_PER_PGD		((1UL << (VA_BITS - PAGE_SHIFT - (PAGE_SHIFT-3) - PMD_BITS))-1)
+/*
+ * We cannot use the top address range because VPTE table lives there. This
+ * formula finds the total legal virtual space in the processor, subtracts the
+ * vpte size, then aligns it to the number of bytes mapped by one pgde, and
+ * thus calculates the number of pgdes needed.
+ */
+#define PTRS_PER_PGD	(((1UL << VA_BITS) - VPTE_SIZE + (1UL << (PAGE_SHIFT + \
+			(PAGE_SHIFT-3) + PMD_BITS)) - 1) / (1UL << (PAGE_SHIFT + \
+			(PAGE_SHIFT-3) + PMD_BITS)))
 
 /* Kernel has a separate 44bit address space. */
 #define USER_PTRS_PER_PGD	((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \

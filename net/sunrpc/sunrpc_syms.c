@@ -92,6 +92,7 @@ EXPORT_SYMBOL(svc_proc_read);
 EXPORT_SYMBOL(xdr_encode_array);
 EXPORT_SYMBOL(xdr_encode_string);
 EXPORT_SYMBOL(xdr_decode_string);
+EXPORT_SYMBOL(xdr_decode_string_inplace);
 EXPORT_SYMBOL(xdr_decode_netobj);
 EXPORT_SYMBOL(xdr_encode_netobj);
 EXPORT_SYMBOL(xdr_shift_iovec);

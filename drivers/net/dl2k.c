@@ -15,15 +15,13 @@
     0.01	2001/05/03	Create DL2000-based linux driver
     0.02	2001/05/21	Add VLAN and hardware checksum support.
     1.00	2001/06/26	Add jumbo frame support.
+    1.01	2001/08/21	Add two parameters, int_count and int_timeout.
 */
 
 #include "dl2k.h"
 
-
 static char version[] __devinitdata =
-KERN_INFO "D-Link DL2000-based linux driver v1.00 2001/06/26\n";
-
-
+    KERN_INFO "D-Link DL2000-based linux driver v1.01 2001/08/30\n";
 
 #define MAX_UNITS 8
 static int mtu[MAX_UNITS];
@@ -31,6 +29,8 @@ static int vlan[MAX_UNITS];
 static int jumbo[MAX_UNITS];
 static char *media[MAX_UNITS];
 static int copy_thresh;
+static int int_count;		/* Rx frame count each interrupt */
+static int int_timeout;		/* Rx DMA wait time in 64ns increments */
 
 MODULE_AUTHOR ("Edward Peng");
 MODULE_DESCRIPTION ("D-Link DL2000-based Gigabit Ethernet Adapter");
@@ -39,12 +39,15 @@ MODULE_PARM (media, "1-" __MODULE_STRING (MAX_UNITS) "s");
 MODULE_PARM (vlan, "1-" __MODULE_STRING (MAX_UNITS) "i");
 MODULE_PARM (jumbo, "1-" __MODULE_STRING (MAX_UNITS) "i");
 MODULE_PARM (copy_thresh, "i");
+MODULE_PARM (int_count, "i");
+MODULE_PARM (int_timeout, "i");
 
 /* Enable the default interrupts */
 #define EnableInt() \
-writew(RxComplete| RxDMAComplete | HostError | IntRequested | TxComplete| \
-       TxDMAComplete| UpdateStats | LinkEvent, ioaddr + IntEnable)
-static int max_intrloop = 25;
+writew(RxDMAComplete | HostError | IntRequested | TxComplete| \
+       UpdateStats | LinkEvent, ioaddr + IntEnable)
+
+static int max_intrloop = 50;
 static int multicast_filter_limit = 0x40;
 
 static int rio_open (struct net_device *dev);
@@ -169,6 +172,11 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 		}
 		np->vlan = (vlan[card_idx] > 0 && vlan[card_idx] < 4096) ?
 		    vlan[card_idx] : 0;
+		if (int_count != 0 && int_timeout != 0) {
+			np->int_count = int_count;
+			np->int_timeout = int_timeout;
+			np->coalesce = 1;
+		}
 	}
 	dev->open = &rio_open;
 	dev->hard_start_xmit = &start_xmit;
@@ -184,16 +192,16 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 	pci_set_drvdata (pdev, dev);
 
-	ring_space = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
+	ring_space = pci_alloc_consistent (pdev, TX_TOTAL_SIZE, &ring_dma);
 	if (!ring_space)
 		goto err_out_iounmap;
-	np->tx_ring = (struct netdev_desc *)ring_space;
+	np->tx_ring = (struct netdev_desc *) ring_space;
 	np->tx_ring_dma = ring_dma;
 
-	ring_space = pci_alloc_consistent(pdev, RX_TOTAL_SIZE, &ring_dma);
+	ring_space = pci_alloc_consistent (pdev, RX_TOTAL_SIZE, &ring_dma);
 	if (!ring_space)
 		goto err_out_unmap_tx;
-	np->rx_ring = (struct netdev_desc *)ring_space;
+	np->rx_ring = (struct netdev_desc *) ring_space;
 	np->rx_ring_dma = ring_dma;
 
 	/* Parse eeprom data */
@@ -220,26 +228,25 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 	printk (KERN_INFO "%s: %s, %2x:%2x:%2x:%2x:%2x:%2x, IRQ %d\n",
 		dev->name, np->name,
 		dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
-		dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5],
-		irq);
+		dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5], irq);
 	return 0;
 
-err_out_unmap_rx:
-        pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, np->rx_ring_dma);
-err_out_unmap_tx:
-        pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
-err_out_iounmap:
+      err_out_unmap_rx:
+	pci_free_consistent (pdev, RX_TOTAL_SIZE, np->rx_ring, np->rx_ring_dma);
+      err_out_unmap_tx:
+	pci_free_consistent (pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
+      err_out_iounmap:
 #ifndef USE_IO_OPS
 	iounmap ((void *) ioaddr);
 
-err_out_dev:
+      err_out_dev:
 #endif
 	kfree (dev);
 
-err_out_res:
+      err_out_res:
 	pci_release_regions (pdev);
 
-err_out_disable:
+      err_out_disable:
 	pci_disable_device (pdev);
 	return err;
 }
@@ -364,17 +371,20 @@ rio_open (struct net_device *dev)
 		writeb (dev->dev_addr[i], ioaddr + StationAddr0 + i);
 
 	set_multicast (dev);
-
+	if (np->coalesce) {
+		writel (np->int_count | np->int_timeout << 16,
+			ioaddr + RxDMAIntCtrl);
+	}
 	/* Set RIO to poll every N*320nsec. */
 	writeb (0xff, ioaddr + RxDMAPollPeriod);
 	writeb (0xff, ioaddr + TxDMAPollPeriod);
 	netif_start_queue (dev);
 	writel (StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl);
-
 	/* VLAN supported */
 	if (np->vlan) {
 		/* priority field in RxDMAIntCtrl  */
-		writel (0x7 << 10, ioaddr + RxDMAIntCtrl);
+		writel (readl(ioaddr + RxDMAIntCtrl) | 0x7 << 10, 
+			ioaddr + RxDMAIntCtrl);
 		/* VLANId */
 		writew (np->vlan, ioaddr + VLANId);
 		/* Length/Type should be 0x8100 */
@@ -428,8 +438,11 @@ alloc_list (struct net_device *dev)
 
 	/* Initialize Rx descriptors */
 	for (i = 0; i < RX_RING_SIZE; i++) {
-		np->rx_ring[i].next_desc = cpu_to_le64(np->rx_ring_dma +
-			((i+1)%RX_RING_SIZE)*sizeof(struct netdev_desc));
+		np->rx_ring[i].next_desc = cpu_to_le64 (np->rx_ring_dma +
+							((i +
+							  1) % RX_RING_SIZE) *
+							sizeof (struct
+								netdev_desc));
 		np->rx_ring[i].status = 0;
 		np->rx_ring[i].fraginfo = 0;
 		np->rx_skbuff[i] = 0;
@@ -449,9 +462,10 @@ alloc_list (struct net_device *dev)
 		skb->dev = dev;	/* Mark as being used by this device. */
 		skb_reserve (skb, 2);	/* 16 byte align the IP header. */
 		/* Rubicon now supports 40 bits of addressing space. */
-		np->rx_ring[i].fraginfo = cpu_to_le64(pci_map_single(
-			np->pdev, skb->tail, np->rx_buf_sz, 
-			PCI_DMA_FROMDEVICE));
+		np->rx_ring[i].fraginfo =
+		    cpu_to_le64 (pci_map_single
+				 (np->pdev, skb->tail, np->rx_buf_sz,
+				  PCI_DMA_FROMDEVICE));
 		np->rx_ring[i].fraginfo |= cpu_to_le64 (np->rx_buf_sz) << 48;
 	}
 
@@ -491,22 +505,26 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 #endif
 	if (np->vlan) {
 		txdesc->status |=
-			cpu_to_le64 (VLANTagInsert) |
-			(cpu_to_le64 (np->vlan) << 32) |
-			(cpu_to_le64 (skb->priority) << 45);
+		    cpu_to_le64 (VLANTagInsert) |
+		    (cpu_to_le64 (np->vlan) << 32) |
+		    (cpu_to_le64 (skb->priority) << 45);
 	}
 
 	/* Send one packet each time at 10Mbps mode */
+	/* Tx coalescing loop do not exceed 8 */
 	if (entry % 0x08 == 0 || np->speed == 10)
 		txdesc->status |= cpu_to_le64 (TxIndicate);
-	txdesc->fraginfo = cpu_to_le64 (pci_map_single(np->pdev, skb->data, 
-		skb->len, PCI_DMA_TODEVICE));
+	txdesc->fraginfo = cpu_to_le64 (pci_map_single (np->pdev, skb->data,
+							skb->len,
+							PCI_DMA_TODEVICE));
 	txdesc->fraginfo |= cpu_to_le64 (skb->len) << 48;
 
 	/* Chain the last descriptor's pointer to this one */
 	if (np->last_tx)
 		np->last_tx->next_desc = cpu_to_le64 (np->tx_ring_dma +
-			entry*sizeof(struct netdev_desc));
+						      entry *
+						      sizeof (struct
+							      netdev_desc));
 	np->last_tx = txdesc;
 
 	/* Clear TFDDone, then TxDMA start to send this descriptor */
@@ -517,7 +535,6 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 	/* TxDMAPollNow */
 	writel (readl (ioaddr + DMACtrl) | 0x00001000, ioaddr + DMACtrl);
 	np->cur_tx++;
-
 	if (np->cur_tx - np->old_tx < TX_QUEUE_LEN - 1 && np->speed != 10) {
 		/* do nothing */
 	} else {
@@ -527,19 +544,19 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 	/* The first TFDListPtr */
 	if (readl (dev->base_addr + TFDListPtr0) == 0) {
-		writel (np->tx_ring_dma + entry*sizeof(struct netdev_desc),
+		writel (np->tx_ring_dma + entry * sizeof (struct netdev_desc),
 			dev->base_addr + TFDListPtr0);
 		writel (0, dev->base_addr + TFDListPtr1);
 	}
-	
+
 	spin_lock_irqsave (&np->lock, flags);
 	if (np->old_tx > TX_RING_SIZE) {
 		tx_shift = TX_RING_SIZE;
 		np->old_tx -= tx_shift;
 		np->cur_tx -= tx_shift;
 	}
-	spin_unlock_irqrestore (&np->lock, flags);	
-	
+	spin_unlock_irqrestore (&np->lock, flags);
+
 	/* NETDEV WATCHDOG timer */
 	dev->trans_start = jiffies;
 	return 0;
@@ -558,7 +575,9 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 	np = dev->priv;
 	spin_lock (&np->lock);
 	while (1) {
-		int_status = readw (ioaddr + IntStatus);
+		int_status = readw (ioaddr + IntStatus) &
+		    (HostError | TxComplete | IntRequested |
+		     UpdateStats | LinkEvent | RxDMAComplete);
 		writew (int_status & (HostError | TxComplete | RxComplete |
 				      IntRequested | UpdateStats | LinkEvent |
 				      TxDMAComplete | RxDMAComplete | RFDListEnd
@@ -566,38 +585,33 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 		if (int_status == 0)
 			break;
 		/* Processing received packets */
-		receive_packet (dev);
+		if (int_status & RxDMAComplete)
+			receive_packet (dev);
 		/* TxComplete interrupt */
 		if (int_status & TxComplete) {
-			int cnt = 20;
 			int tx_status = readl (ioaddr + TxStatus);
-			while (tx_status & 0x80) {	/* TxComplete */
-				/* Handle TxError */
-				if (tx_status & 0x01)
-					tx_error (dev, tx_status);
-				tx_status = readl (ioaddr + TxStatus);
-				/* too much TxError */
-				if (--cnt < 0)
-					break;
-			}
+			if (tx_status & 0x01)
+				tx_error (dev, tx_status);
 			/* Send one packet each time at 10Mbps mode */
 			if (np->speed == 10) {
 				np->tx_full = 0;
 				netif_wake_queue (dev);
 			}
-		}
-		/* Free used tx skbuffs */
-		for (; np->cur_tx - np->old_tx > 0; np->old_tx++) {
-			int entry = np->old_tx % TX_RING_SIZE;
-			struct sk_buff *skb;
 
-			if (!(np->tx_ring[entry].status & TFDDone))
-				break;
-			skb = np->tx_skbuff[entry];
-                	pci_unmap_single(np->pdev, np->tx_ring[entry].fraginfo,
-				skb->len, PCI_DMA_TODEVICE);
-			dev_kfree_skb_irq (skb);
-			np->tx_skbuff[entry] = 0;
+			/* Free used tx skbuffs */
+			for (; np->cur_tx - np->old_tx > 0; np->old_tx++) {
+				int entry = np->old_tx % TX_RING_SIZE;
+				struct sk_buff *skb;
+
+				if (!(np->tx_ring[entry].status & TFDDone))
+					break;
+				skb = np->tx_skbuff[entry];
+				pci_unmap_single (np->pdev,
+						  np->tx_ring[entry].fraginfo,
+						  skb->len, PCI_DMA_TODEVICE);
+				dev_kfree_skb_irq (skb);
+				np->tx_skbuff[entry] = 0;
+			}
 		}
 		/* If the ring is no longer full, clear tx_full and 
 		   call netif_wake_queue() */
@@ -605,7 +619,6 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 			np->tx_full = 0;
 			netif_wake_queue (dev);
 		}
-
 		/* Handle uncommon events */
 		if (int_status &
 		    (IntRequested | HostError | LinkEvent | UpdateStats))
@@ -615,7 +628,7 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 		   be caught by rio_error() to recovery the interrupts */
 		if (--cnt < 0) {
 			get_stats (dev);
-			writel (1000, ioaddr + CountDown);
+			writel (1, ioaddr + CountDown);
 			writew (IntRequested, ioaddr + IntEnable);
 			break;
 		}
@@ -641,16 +654,34 @@ tx_error (struct net_device *dev, int tx_status)
 	/* Ttransmit Underrun */
 	if (tx_status & 0x10) {
 		np->stats.tx_fifo_errors++;
+		writew (readw (ioaddr + TxStartThresh) + 0x10,
+			ioaddr + TxStartThresh);
 		/* Transmit Underrun need to set TxReset, DMARest, FIFOReset */
-		writew (TxReset | DMAReset | FIFOReset, ioaddr + ASICCtrl + 2);
+		writew (TxReset | DMAReset | FIFOReset | NetworkReset,
+			ioaddr + ASICCtrl + 2);
 		/* Wait for ResetBusy bit clear */
 		for (i = 50; i > 0; i--) {
 			if ((readw (ioaddr + ASICCtrl + 2) & ResetBusy) == 0)
 				break;
 			mdelay (1);
 		}
+		/* Free completed descriptors */
+		for (; np->cur_tx - np->old_tx > 0; np->old_tx++) {
+			int entry = np->old_tx % TX_RING_SIZE;
+			struct sk_buff *skb;
+			if (!(np->tx_ring[entry].status & TFDDone))
+				break;
+
+			skb = np->tx_skbuff[entry];
+			pci_unmap_single (np->pdev, np->tx_ring[entry].fraginfo,
+					  skb->len, PCI_DMA_TODEVICE);
+			dev_kfree_skb_irq (skb);
+			np->tx_skbuff[entry] = 0;
+		}
+
 		/* Reset TFDListPtr */
-		writel (np->tx_ring_dma + frame_id*sizeof(struct netdev_desc),
+		writel (np->tx_ring_dma +
+			np->old_tx * sizeof (struct netdev_desc),
 			dev->base_addr + TFDListPtr0);
 		writel (0, dev->base_addr + TFDListPtr1);
 
@@ -691,7 +722,6 @@ receive_packet (struct net_device *dev)
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int cnt = np->old_rx + RX_RING_SIZE - np->cur_rx;
 	int rx_shift;
-
 	if (np->old_rx > RX_RING_SIZE) {
 		rx_shift = RX_RING_SIZE;
 		np->old_rx -= rx_shift;
@@ -702,25 +732,24 @@ receive_packet (struct net_device *dev)
 	while (1) {
 		struct netdev_desc *desc = &np->rx_ring[entry];
 		int pkt_len;
-		u64 frame_status; 
+		u64 frame_status;
 
-		if (!(desc->status & RFDDone) || 
-			!(desc->status & FrameStart) ||
-			!(desc->status & FrameEnd))
+		if (!(desc->status & RFDDone) ||
+		    !(desc->status & FrameStart) || !(desc->status & FrameEnd))
 			break;
 
 		/* Chip omits the CRC. */
-		pkt_len = le64_to_cpu (desc->status & 0xffff);	
+		pkt_len = le64_to_cpu (desc->status & 0xffff);
 		frame_status = le64_to_cpu (desc->status);
 		if (--cnt < 0)
 			break;
 		DEBUG_PKT_DUMP (np, pkt_len);
-                pci_dma_sync_single(np->pdev, desc->fraginfo, np->rx_buf_sz,
-			PCI_DMA_FROMDEVICE);
+		pci_dma_sync_single (np->pdev, desc->fraginfo, np->rx_buf_sz,
+				     PCI_DMA_FROMDEVICE);
 		/* Update rx error statistics, drop packet. */
 		if (frame_status & 0x003f0000) {
 			np->stats.rx_errors++;
-			if (frame_status & 0x00100000)
+			if (frame_status & 0x00300000)
 				np->stats.rx_length_errors++;
 			if (frame_status & 0x00010000)
 				np->stats.rx_fifo_errors++;
@@ -733,8 +762,9 @@ receive_packet (struct net_device *dev)
 
 			/* Small skbuffs for short packets */
 			if (pkt_len > copy_thresh) {
-                		pci_unmap_single(np->pdev, desc->fraginfo,
-					np->rx_buf_sz, PCI_DMA_FROMDEVICE);
+				pci_unmap_single (np->pdev, desc->fraginfo,
+						  np->rx_buf_sz,
+						  PCI_DMA_FROMDEVICE);
 				skb_put (skb = np->rx_skbuff[entry], pkt_len);
 				np->rx_skbuff[entry] = NULL;
 			} else if ((skb = dev_alloc_skb (pkt_len + 2)) != NULL) {
@@ -757,8 +787,8 @@ receive_packet (struct net_device *dev)
 			dev->last_rx = jiffies;
 		}
 		entry = (++np->cur_rx) % RX_RING_SIZE;
-	}
 
+	}
 	/* Re-allocate skbuffs to fill the descriptor ring */
 	for (; np->cur_rx - np->old_rx > 0; np->old_rx++) {
 		struct sk_buff *skb;
@@ -777,14 +807,16 @@ receive_packet (struct net_device *dev)
 			skb->dev = dev;
 			/* 16 byte align the IP header */
 			skb_reserve (skb, 2);
-			np->rx_ring[entry].fraginfo = cpu_to_le64(pci_map_single(
-				np->pdev, skb->tail, np->rx_buf_sz, 
-				PCI_DMA_FROMDEVICE));
+			np->rx_ring[entry].fraginfo =
+			    cpu_to_le64 (pci_map_single
+					 (np->pdev, skb->tail, np->rx_buf_sz,
+					  PCI_DMA_FROMDEVICE));
 		}
 		np->rx_ring[entry].fraginfo |=
 		    cpu_to_le64 (np->rx_buf_sz) << 48;
 		np->rx_ring[entry].status = 0;
 	}
+
 	/* RxDMAPollNow */
 	writel (readl (dev->base_addr + DMACtrl) | 0x00000010,
 		dev->base_addr + DMACtrl);
@@ -801,7 +833,6 @@ rio_error (struct net_device *dev, int int_status)
 
 	/* Stop the down counter and recovery the interrupt */
 	if (int_status & IntRequested) {
-
 		writew (0, ioaddr + IntEnable);
 		writel (0, ioaddr + CountDown);
 		/* Enable default interrupts */
@@ -939,10 +970,9 @@ set_multicast (struct net_device *dev)
 	if (dev->flags & IFF_PROMISC) {
 		/* Receive all frames promiscuously. */
 		rx_mode |= ReceiveAllFrames;
-	} else
-	    if (((dev->flags & IFF_MULTICAST)
-		 && (dev->mc_count > multicast_filter_limit))
-		|| (dev->flags & IFF_ALLMULTI)) {
+	} else if (((dev->flags & IFF_MULTICAST)
+		    && (dev->mc_count > multicast_filter_limit))
+		   || (dev->flags & IFF_ALLMULTI)) {
 		/* Receive broadcast and multicast frames */
 		rx_mode |= ReceiveBroadcast | ReceiveMulticast | ReceiveUnicast;
 	} else if ((dev->flags & IFF_MULTICAST) & (dev->mc_count > 0)) {
@@ -1013,19 +1043,20 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		netif_wake_queue (dev);
 		break;
 	case SIOCDEVPRIVATE + 7:
-		printk ("tx_full=%x cur_tx=%lx old_tx=%lx cur_rx=%lx old_rx=%lx\n",
-			np->tx_full, np->cur_tx, np->old_tx,
-			np->cur_rx, np->old_rx);
+		printk
+		    ("tx_full=%x cur_tx=%lx old_tx=%lx cur_rx=%lx old_rx=%lx\n",
+		     np->tx_full, np->cur_tx, np->old_tx, np->cur_rx,
+		     np->old_rx);
 		break;
 	case SIOCDEVPRIVATE + 8:
 		for (i = 0; i < TX_RING_SIZE; i++) {
 			desc = &np->tx_ring[i];
 			printk
-				("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-				(u32) (np->tx_ring_dma + i*sizeof(*desc)),
-				(u32) desc->next_desc,
-				(u32) desc->status, (u32) (desc->fraginfo >> 32),
-				(u32) desc->fraginfo);
+			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+			     (u32) (np->tx_ring_dma + i * sizeof (*desc)),
+			     (u32) desc->next_desc,
+			     (u32) desc->status, (u32) (desc->fraginfo >> 32),
+			     (u32) desc->fraginfo);
 			printk ("\n");
 		}
 		printk ("\n");
@@ -1126,7 +1157,7 @@ rio_ioctl_ext (struct net_device *dev, struct ioctl_data *iodata)
 	}
 	return 0;
 
-invalid_cmd:
+      invalid_cmd:
 	return -1;
 }
 #endif
@@ -1213,7 +1244,7 @@ mii_read (struct net_device *dev, int phy_addr, int reg_num)
 	mii_getbit (dev);
 	return (retval >> 1) & 0xffff;
 
-err_out:
+      err_out:
 	return 0;
 }
 static int
@@ -1224,7 +1255,7 @@ mii_write (struct net_device *dev, int phy_addr, int reg_num, u16 data)
 	/* Preamble */
 	mii_send_bits (dev, 0xffffffff, 32);
 	/* ST(2), OP(2), ADDR(5), REG#(5), TA(2), Data(16) total 32 bits */
-	/* ST,OP,AAAAA,RRRRR,TA = 0101xxxxxxxxxx10'b = 0x0502 for write */
+	/* ST,OP,AAAAA,RRRRR,TA = 0101xxxxxxxxxx10'b = 0x5002 for write */
 	cmd = (0x5002 << 16) | (phy_addr << 23) | (reg_num << 18) | data;
 	mii_send_bits (dev, cmd, 32);
 	/* End cycle */
@@ -1436,8 +1467,8 @@ rio_close (struct net_device *dev)
 		np->rx_ring[i].fraginfo = 0;
 		skb = np->rx_skbuff[i];
 		if (skb) {
-                	pci_unmap_single(np->pdev, np->rx_ring[i].fraginfo, 
-				skb->len, PCI_DMA_FROMDEVICE);
+			pci_unmap_single (np->pdev, np->rx_ring[i].fraginfo,
+					  skb->len, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb (skb);
 			np->rx_skbuff[i] = 0;
 		}
@@ -1445,12 +1476,13 @@ rio_close (struct net_device *dev)
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		skb = np->tx_skbuff[i];
 		if (skb) {
-                	pci_unmap_single(np->pdev, np->tx_ring[i].fraginfo, 
-				skb->len, PCI_DMA_TODEVICE);
+			pci_unmap_single (np->pdev, np->tx_ring[i].fraginfo,
+					  skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb (skb);
 			np->tx_skbuff[i] = 0;
 		}
 	}
+
 	return 0;
 }
 
@@ -1463,10 +1495,10 @@ rio_remove1 (struct pci_dev *pdev)
 		struct netdev_private *np = dev->priv;
 
 		unregister_netdev (dev);
-        	pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, 
-			np->rx_ring_dma);
-        	pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, 
-			np->tx_ring_dma);
+		pci_free_consistent (pdev, RX_TOTAL_SIZE, np->rx_ring,
+				     np->rx_ring_dma);
+		pci_free_consistent (pdev, TX_TOTAL_SIZE, np->tx_ring,
+				     np->tx_ring_dma);
 #ifndef USE_IO_OPS
 		iounmap ((char *) (dev->base_addr));
 #endif
@@ -1478,10 +1510,10 @@ rio_remove1 (struct pci_dev *pdev)
 }
 
 static struct pci_driver rio_driver = {
-	name:		"dl2k",
-	id_table:	rio_pci_tbl,
-	probe:		rio_probe1,
-	remove:		rio_remove1,
+	name:"dl2k",
+	id_table:rio_pci_tbl,
+	probe:rio_probe1,
+	remove:rio_remove1,
 };
 
 static int __init

@@ -36,8 +36,19 @@
 #define NFSDDBG_FACILITY	NFSDDBG_SVC
 #define NFSD_BUFSIZE		(1024 + NFSSVC_MAXBLKSIZE)
 
+/* these signals will be delivered to an nfsd thread 
+ * when handling a request
+ */
 #define ALLOWED_SIGS	(sigmask(SIGKILL))
-#define SHUTDOWN_SIGS	(sigmask(SIGKILL) | sigmask(SIGINT) | sigmask(SIGQUIT))
+/* these signals will be delivered to an nfsd thread
+ * when not handling a request. i.e. when waiting
+ */
+#define SHUTDOWN_SIGS	(sigmask(SIGKILL) | sigmask(SIGHUP) | sigmask(SIGINT) | sigmask(SIGQUIT))
+/* if the last thread dies with SIGHUP, then the exports table is
+ * left unchanged ( like 2.4-{0-9} ).  Any other signal will clear
+ * the exports table (like 2.2).
+ */
+#define	SIG_NOCLEAN	SIGHUP
 
 extern struct svc_program	nfsd_program;
 static void			nfsd(struct svc_rqst *rqstp);
@@ -103,7 +114,7 @@ nfsd_svc(unsigned short port, int nrservs)
 		struct nfsd_list *nl =
 			list_entry(victim,struct nfsd_list, list);
 		victim = victim->next;
-		send_sig(SIGKILL, nl->task, 1);
+		send_sig(SIG_NOCLEAN, nl->task, 1);
 		nrservs++;
 	}
  failure:
@@ -214,7 +225,7 @@ nfsd(struct svc_rqst *rqstp)
 			if (sigismember(&current->pending.signal, signo) &&
 			    !sigismember(&current->blocked, signo))
 				break;
-		printk(KERN_WARNING "nfsd: terminating on signal %d\n", signo);
+		err = signo;
 	}
 
 	/* Release lockd */
@@ -222,6 +233,12 @@ nfsd(struct svc_rqst *rqstp)
 
 	/* Check if this is last thread */
 	if (serv->sv_nrthreads==1) {
+		
+		printk(KERN_WARNING "nfsd: last server has exited\n");
+		if (err != SIG_NOCLEAN) {
+			printk(KERN_WARNING "nfsd: unexporting all filesystems\n");
+			nfsd_export_shutdown();
+		}
 		nfsd_serv = NULL;
 	        nfsd_racache_shutdown();	/* release read-ahead cache */
 	}

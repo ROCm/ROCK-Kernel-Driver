@@ -411,11 +411,13 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 			int (*writepage)(struct page *);
 
 			writepage = page->mapping->a_ops->writepage;
-			if (gfp_mask & __GFP_FS && writepage) {
+			if ((gfp_mask & __GFP_FS) && writepage) {
+				ClearPageDirty(page);
+				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
 
-				ClearPageDirty(page);
 				writepage(page);
+				page_cache_release(page);
 
 				spin_lock(&pagemap_lru_lock);
 				continue;
@@ -435,15 +437,20 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 
 			if (try_to_free_buffers(page, gfp_mask)) {
 				if (!page->mapping) {
-					UnlockPage(page);
-
 					/*
 					 * Account we successfully freed a page
 					 * of buffer cache.
 					 */
 					atomic_dec(&buffermem_pages);
 
+					/*
+					 * We must not allow an anon page
+					 * with no buffers to be visible on
+					 * the LRU, so we unlock the page after
+					 * taking the lru lock
+					 */
 					spin_lock(&pagemap_lru_lock);
+					UnlockPage(page);
 					__lru_cache_del(page);
 
 					/* effectively free the page here */
@@ -518,9 +525,20 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 	return nr_pages;
 }
 
-static void refill_inactive(int nr_pages)
+/*
+ * This moves pages from the active list to
+ * the inactive list.
+ *
+ * We move them the other way when we see the
+ * reference bit on the page.
+ */
+static void balance_inactive(int nr_pages)
 {
 	struct list_head * entry;
+
+	/* If we have more inactive pages than active don't do anything */
+	if (nr_active_pages < nr_inactive_pages)
+		return;
 
 	spin_lock(&pagemap_lru_lock);
 	entry = active_list.prev;
@@ -529,9 +547,6 @@ static void refill_inactive(int nr_pages)
 
 		page = list_entry(entry, struct page, lru);
 		entry = entry->prev;
-
-		if (!page->buffers && page_count(page) != 1)
-			continue;
 
 		del_page_from_active_list(page);
 		add_page_to_inactive_list(page);
@@ -548,7 +563,7 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 	if (nr_pages <= 0)
 		return 0;
 
-	refill_inactive(nr_pages / 2);
+	balance_inactive(nr_pages);
 	nr_pages = shrink_cache(&inactive_list, &max_scan, nr_inactive_pages, nr_pages, classzone, gfp_mask);
 	if (nr_pages <= 0)
 		return 0;

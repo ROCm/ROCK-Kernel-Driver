@@ -28,8 +28,7 @@
 #include <asm/io.h>
 #include <linux/blk.h>
 #include <linux/highmem.h>
-#include <linux/raid/md.h>
-
+#include <linux/slab.h>
 #include <linux/module.h>
 
 /*

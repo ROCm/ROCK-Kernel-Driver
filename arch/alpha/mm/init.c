@@ -32,6 +32,9 @@
 #include <asm/dma.h>
 #include <asm/mmu_context.h>
 #include <asm/console.h>
+#include <asm/tlb.h>
+
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 unsigned long totalram_pages;
 

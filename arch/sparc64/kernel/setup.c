@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.65 2001/06/03 13:41:13 ecd Exp $
+/*  $Id: setup.c,v 1.66 2001/09/20 00:35:31 davem Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -500,10 +500,6 @@ void __init setup_arch(char **cmdline_p)
 	rd_doload = ((ram_flags & RAMDISK_LOAD_FLAG) != 0);	
 #endif
 
-	/* Due to stack alignment restrictions and assumptions... */
-	init_mm.mmap->vm_page_prot = PAGE_SHARED;
-	init_mm.mmap->vm_start = PAGE_OFFSET;
-	init_mm.mmap->vm_end = PAGE_OFFSET + highest_paddr;
 	init_task.thread.kregs = &fake_swapper_regs;
 
 #ifdef CONFIG_IP_PNP

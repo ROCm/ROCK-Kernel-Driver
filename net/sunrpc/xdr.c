@@ -87,6 +87,19 @@ xdr_decode_string(u32 *p, char **sp, int *lenp, int maxlen)
 	return p + XDR_QUADLEN(len);
 }
 
+u32 *
+xdr_decode_string_inplace(u32 *p, char **sp, int *lenp, int maxlen)
+{
+	unsigned int	len;
+
+	if ((len = ntohl(*p++)) > maxlen)
+		return NULL;
+	*lenp = len;
+	*sp = p;
+	return p + XDR_QUADLEN(len);
+}
+
+
 /*
  * Realign the iovec if the server missed out some reply elements
  * (such as post-op attributes,...)

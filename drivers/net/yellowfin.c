@@ -33,6 +33,10 @@
 	* Various cleanups
 	* Update yellowfin_timer to correctly calculate duplex.
 	(suggested by Manfred Spraul)
+
+	LK1.1.4 (val@nmt.edu):
+	* Fix three endian-ness bugs
+	* Support dual function SYM53C885E ethernet chip
 	
 */
 
@@ -276,7 +280,7 @@ static struct pci_id_info pci_id_tbl[] = {
 	 PCI_IOTYPE, YELLOWFIN_SIZE,
 	 FullTxStatus | IsGigabit | HasMulticastBug | HasMACAddrBug},
 	{"Symbios SYM83C885", { 0x07011000, 0xffffffff},
-	 PCI_IOTYPE, YELLOWFIN_SIZE, HasMII },
+	 PCI_IOTYPE, YELLOWFIN_SIZE, HasMII | IsGigabit | FullTxStatus },
 	{0,},
 };
 
@@ -315,7 +319,7 @@ struct yellowfin_desc {
 };
 
 struct tx_status_words {
-#if defined(__powerpc__)
+#ifdef __BIG_ENDIAN
 	u16 tx_errs;
 	u16 tx_cnt;
 	u16 paused;
@@ -325,7 +329,7 @@ struct tx_status_words {
 	u16 tx_errs;
 	u16 total_tx_cnt;
 	u16 paused;
-#endif
+#endif /* __BIG_ENDIAN */
 };
 
 /* Bits in yellowfin_desc.cmd */
@@ -785,8 +789,8 @@ static void yellowfin_init_ring(struct net_device *dev)
 			break;
 		skb->dev = dev;		/* Mark as being used by this device. */
 		skb_reserve(skb, 2);	/* 16 byte align the IP header. */
-		yp->rx_ring[i].addr = pci_map_single(yp->pci_dev, skb->tail,
-			yp->rx_buf_sz, PCI_DMA_FROMDEVICE);
+		yp->rx_ring[i].addr = cpu_to_le32(pci_map_single(yp->pci_dev,
+			skb->tail, yp->rx_buf_sz, PCI_DMA_FROMDEVICE));
 	}
 	yp->rx_ring[i-1].dbdma_cmd = cpu_to_le32(CMD_STOP);
 	yp->dirty_rx = (unsigned int)(i - RX_RING_SIZE);
@@ -1109,7 +1113,7 @@ static int yellowfin_rx(struct net_device *dev)
 		buf_addr = rx_skb->tail;
 		data_size = (le32_to_cpu(desc->dbdma_cmd) - 
 			le32_to_cpu(desc->result_status)) & 0xffff;
-		frame_status = get_unaligned((s16*)&(buf_addr[data_size - 2]));
+		frame_status = le16_to_cpu(get_unaligned((s16*)&(buf_addr[data_size - 2])));
 		if (yellowfin_debug > 4)
 			printk(KERN_DEBUG "  yellowfin_rx() status was %4.4x.\n",
 				   frame_status);
@@ -1206,8 +1210,8 @@ static int yellowfin_rx(struct net_device *dev)
 			yp->rx_skbuff[entry] = skb;
 			skb->dev = dev;	/* Mark as being used by this device. */
 			skb_reserve(skb, 2);	/* Align IP on 16 byte boundaries */
-			yp->rx_ring[entry].addr = pci_map_single(yp->pci_dev,
-				skb->tail, yp->rx_buf_sz, PCI_DMA_FROMDEVICE);
+			yp->rx_ring[entry].addr = cpu_to_le32(pci_map_single(yp->pci_dev,
+				skb->tail, yp->rx_buf_sz, PCI_DMA_FROMDEVICE));
 		}
 		yp->rx_ring[entry].dbdma_cmd = cpu_to_le32(CMD_STOP);
 		yp->rx_ring[entry].result_status = 0;	/* Clear complete bit. */

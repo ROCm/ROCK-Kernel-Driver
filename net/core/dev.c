@@ -2445,8 +2445,12 @@ int register_netdevice(struct net_device *dev)
 	dev->iflink = -1;
 
 	/* Init, if this function is available */
-	if (dev->init && dev->init(dev) != 0)
+	if (dev->init && dev->init(dev) != 0) {
+#ifdef CONFIG_NET_DIVERT
+		free_divert_blk(dev);
+#endif
 		return -EIO;
+	}
 
 	dev->ifindex = dev_new_index();
 	if (dev->iflink == -1)
@@ -2455,6 +2459,9 @@ int register_netdevice(struct net_device *dev)
 	/* Check for existence, and append to tail of chain */
 	for (dp=&dev_base; (d=*dp) != NULL; dp=&d->next) {
 		if (d == dev || strcmp(d->name, dev->name) == 0) {
+#ifdef CONFIG_NET_DIVERT
+			free_divert_blk(dev);
+#endif
 			return -EEXIST;
 		}
 	}

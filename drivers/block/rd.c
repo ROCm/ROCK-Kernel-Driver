@@ -420,7 +420,6 @@ static int rd_open(struct inode * inode, struct file * filp)
 			/* bdev->bd_sem is held by caller */
 			bdev->bd_openers++;
 			bdev->bd_cache_openers++;
-			bdev->bd_inode = inode;
 		}
 	}
 
