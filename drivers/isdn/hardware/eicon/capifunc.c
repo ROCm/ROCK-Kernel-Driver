@@ -1,4 +1,4 @@
-/* $Id: capifunc.c,v 1.59 2004/03/21 17:27:32 armin Exp $
+/* $Id: capifunc.c,v 1.60 2004/03/22 16:28:27 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -447,7 +447,7 @@ static void divacapi_remove_card(DESCRIPTOR * d)
 /*
  * remove cards
  */
-static void DIVA_EXIT_FUNCTION divacapi_remove_cards(void)
+static void divacapi_remove_cards(void)
 {
 	DESCRIPTOR d;
 	struct list_head *tmp;
