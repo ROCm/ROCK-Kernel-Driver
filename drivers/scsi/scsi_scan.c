@@ -28,7 +28,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
-
 #include <linux/blk.h>
 
 #include "scsi.h"
@@ -365,34 +364,60 @@ static void print_inquiry(unsigned char *inq_result)
 		printk("\n");
 }
 
-/**
- * scsi_initialize_merge_fn() -ƣinitialize merge function for a host
- * @sd:		host descriptor
- */
-static void scsi_initialize_merge_fn(struct scsi_device *sd)
+u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 {
-	request_queue_t *q = sd->request_queue;
-	struct Scsi_Host *sh = sd->host;
-	struct device *dev = scsi_get_device(sh);
-	u64 bounce_limit;
+	if (shost->highmem_io) {
+		struct device *host_dev = scsi_get_device(shost);
 
-	if (sh->highmem_io) {
-		if (dev && dev->dma_mask && PCI_DMA_BUS_IS_PHYS) {
-			bounce_limit = *dev->dma_mask;
-		} else {
-			/*
-			 * Platforms with virtual-DMA translation
- 			 * hardware have no practical limit.
-			 */
-			bounce_limit = BLK_BOUNCE_ANY;
-		}
-	} else if (sh->unchecked_isa_dma) {
-		bounce_limit = BLK_BOUNCE_ISA;
-	} else {
-		bounce_limit = BLK_BOUNCE_HIGH;
+		if (PCI_DMA_BUS_IS_PHYS && host_dev && host_dev->dma_mask)
+			return *host_dev->dma_mask;
+
+		/*
+		 * Platforms with virtual-DMA translation
+ 		 * hardware have no practical limit.
+		 */
+		return BLK_BOUNCE_ANY;
+	} else if (shost->unchecked_isa_dma)
+		return BLK_BOUNCE_ISA;
+
+	return BLK_BOUNCE_HIGH;
+}
+
+static request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost)
+{
+	request_queue_t *q;
+
+	q = kmalloc(sizeof(*q), GFP_ATOMIC);
+	if (!q)
+		return NULL;
+	memset(q, 0, sizeof(*q));
+
+	if (!shost->max_sectors) {
+		/*
+		 * Driver imposes no hard sector transfer limit.
+		 * start at machine infinity initially.
+		 */
+		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
 	}
 
-	blk_queue_bounce_limit(q, bounce_limit);
+	blk_init_queue(q, scsi_request_fn, shost->host_lock);
+	blk_queue_prep_rq(q, scsi_prep_fn);
+
+	blk_queue_max_hw_segments(q, shost->sg_tablesize);
+	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
+	blk_queue_max_sectors(q, shost->max_sectors);
+	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
+
+	if (!shost->use_clustering)
+		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
+
+	return q;
+}
+
+static void scsi_free_queue(request_queue_t *q)
+{
+	blk_cleanup_queue(q);
+	kfree(q);
 }
 
 /**
@@ -435,19 +460,15 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		 */
 		sdev->borken = 1;
 
-		if(!q || *q == NULL) {
-			sdev->request_queue = kmalloc(sizeof(struct request_queue), GFP_ATOMIC);
-			if(sdev->request_queue == NULL) {
+		if (!q || *q == NULL) {
+			sdev->request_queue = scsi_alloc_queue(shost);
+			if (!sdev->request_queue)
 				goto out_bail;
-			}
-			memset(sdev->request_queue, 0,
-				       	sizeof(struct request_queue));
-			scsi_initialize_queue(sdev, shost);
-			scsi_initialize_merge_fn(sdev);
 		} else {
 			sdev->request_queue = *q;
 			*q = NULL;
 		}
+
 		sdev->request_queue->queuedata = sdev;
 		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
 		scsi_build_commandblocks(sdev);
@@ -488,13 +509,12 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	}
 out_bail:
 	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-	if(q && sdev->request_queue) {
+	if (q && sdev->request_queue) {
 		*q = sdev->request_queue;
 		sdev->request_queue = NULL;
-	} else if(sdev->request_queue) {
-		blk_cleanup_queue(sdev->request_queue);
-		kfree(sdev->request_queue);
-	}
+	} else if (sdev->request_queue)
+		scsi_free_queue(sdev->request_queue);
+
 	scsi_release_commandblocks(sdev);
 	kfree(sdev);
 	return NULL;
@@ -513,14 +533,12 @@ static void scsi_free_sdev(struct scsi_device *sdev)
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
 
-	if(sdev->request_queue != NULL) {
-		blk_cleanup_queue(sdev->request_queue);
-		kfree(sdev->request_queue);
-	}
+	if (sdev->request_queue)
+		scsi_free_queue(sdev->request_queue);
 	scsi_release_commandblocks(sdev);
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
-	if (sdev->inquiry != NULL)
+	if (sdev->inquiry)
 		kfree(sdev->inquiry);
 	kfree(sdev);
 }
@@ -1946,10 +1964,9 @@ void scsi_scan_host(struct Scsi_Host *shost)
 			scsi_scan_target(shost, &q, channel, order_id);
 		}
 	}
-	if(q) {
-		blk_cleanup_queue(q);
-		kfree(q);
-	}
+
+	if (q)
+		scsi_free_queue(q);
 }
 
 void scsi_forget_host(struct Scsi_Host *shost)

@@ -147,49 +147,6 @@ LIST_HEAD(scsi_dev_info_list);
 extern void scsi_times_out(Scsi_Cmnd * SCpnt);
 void scsi_build_commandblocks(Scsi_Device * SDpnt);
 
-/*
- * Function:    scsi_initialize_queue()
- *
- * Purpose:     Sets up the block queue for a device.
- *
- * Arguments:   SDpnt   - device for which we need a handler function.
- *
- * Returns:     Nothing
- *
- * Lock status: No locking assumed or required.
- */
-void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
-{
-	request_queue_t *q = SDpnt->request_queue;
-
-	/*
-	 * tell block layer about assigned host_lock for this host
-	 */
-	blk_init_queue(q, scsi_request_fn, SHpnt->host_lock);
-
-	/* Hardware imposed limit. */
-	blk_queue_max_hw_segments(q, SHpnt->sg_tablesize);
-
-	/*
-	 * scsi_alloc_sgtable max
-	 */
-	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
-
-	if(!SHpnt->max_sectors)
-		/* driver imposes no hard sector transfer limit.
-		 * start at machine infinity initially */
-		SHpnt->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
-
-	/* FIXME: we should also adjust this limit later on
-	 * after we know what the device capabilities are */
-	blk_queue_max_sectors(q, SHpnt->max_sectors);
-
-	if (!SHpnt->use_clustering)
-		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
-
-        blk_queue_prep_rq(q, scsi_prep_fn);
-}
-
 #ifdef MODULE
 MODULE_PARM(scsi_logging_level, "i");
 MODULE_PARM_DESC(scsi_logging_level, "SCSI logging level; should be zero or nonzero");

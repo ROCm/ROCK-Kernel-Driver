@@ -18,8 +18,6 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#72 $
- *
  * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
@@ -55,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#72 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#111 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -65,26 +63,32 @@
 #include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
-#include <linux/interrupt.h>
 #include <linux/ioport.h>
-#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/version.h>
+#ifndef AHC_MODVERSION_FILE
+#define __NO_VERSION__
+#endif
 #include <linux/module.h>
 #include <asm/byteorder.h>
-#include <asm/io.h>
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+#include <linux/interrupt.h> /* For tasklet support. */
 #include <linux/config.h>
+#include <linux/slab.h>
+#else
+#include <linux/malloc.h>
 #endif
 
 /* Core SCSI definitions */
-#include "../scsi.h"
-#include "../hosts.h"
+#define AIC_LIB_PREFIX ahc
+#include "scsi.h"
+#include "hosts.h"
+#include "aiclib.h"
 
 /* Name space conflict with BSD queue macros */
 #ifdef LIST_HEAD
@@ -94,6 +98,20 @@
 #include "cam.h"
 #include "queue.h"
 #include "scsi_message.h"
+
+/*********************************** Debugging ********************************/
+#ifdef CONFIG_AIC7XXX_DEBUG_ENABLE
+#ifdef CONFIG_AIC7XXX_DEBUG_MASK
+#define AHC_DEBUG 1
+#define AHC_DEBUG_OPTS CONFIG_AIC7XXX_DEBUG_MASK
+#else
+/*
+ * Compile in debugging code, but do not enable any printfs.
+ */
+#define AHC_DEBUG 1
+#endif
+/* No debugging code. */
+#endif
 
 /************************* Forward Declarations *******************************/
 struct ahc_softc;
@@ -134,8 +152,9 @@ typedef Scsi_Cmnd      *ahc_io_ctx_t;
 
 /************************* Configuration Data *********************************/
 extern int aic7xxx_no_probe;
+extern int aic7xxx_allow_memio;
 extern int aic7xxx_detect_complete;
-extern Scsi_Host_Template* aic7xxx_driver_template;
+extern Scsi_Host_Template aic7xxx_driver_template;
 
 /***************************** Bus Space/DMA **********************************/
 
@@ -236,176 +255,52 @@ int	ahc_dmamap_unload(struct ahc_softc *, bus_dma_tag_t, bus_dmamap_t);
  */
 #define ahc_dmamap_sync(ahc, dma_tag, dmamap, offset, len, op)
 
-/************************** SCSI Constants/Structures *************************/
-#define SCSI_REV_2 2
-#define	SCSI_STATUS_OK			0x00
-#define	SCSI_STATUS_CHECK_COND		0x02
-#define	SCSI_STATUS_COND_MET		0x04
-#define	SCSI_STATUS_BUSY		0x08
-#define SCSI_STATUS_INTERMED		0x10
-#define SCSI_STATUS_INTERMED_COND_MET	0x14
-#define SCSI_STATUS_RESERV_CONFLICT	0x18
-#define SCSI_STATUS_CMD_TERMINATED	0x22
-#define SCSI_STATUS_QUEUE_FULL		0x28
-
-/*
- * 6 byte request sense CDB format.
- */
-struct scsi_sense
-{
-	uint8_t opcode;
-	uint8_t byte2;
-	uint8_t unused[2];
-	uint8_t length;
-	uint8_t control;
-};
-
-struct scsi_sense_data
-{
-	uint8_t	error_code;
-	uint8_t	segment;
-	uint8_t	flags;
-	uint8_t	info[4];
-	uint8_t	extra_len;
-	uint8_t	cmd_spec_info[4];
-	uint8_t add_sense_code;
-	uint8_t add_sense_code_qual;
-	uint8_t	fru;
-	uint8_t	sense_key_spec[3];
-	uint8_t	extra_bytes[14];
-};
-
-struct scsi_inquiry
-{ 
-	u_int8_t opcode;
-	u_int8_t byte2;
-#define	SI_EVPD 0x01
-	u_int8_t page_code;
-	u_int8_t reserved;
-	u_int8_t length;
-	u_int8_t control;
-};
-
-struct scsi_inquiry_data
-{
-	uint8_t device;
-#define	SID_TYPE(inq_data) ((inq_data)->device & 0x1f)
-#define	SID_QUAL(inq_data) (((inq_data)->device & 0xE0) >> 5)
-#define	SID_QUAL_LU_CONNECTED	0x00	/*
-					 * The specified peripheral device
-					 * type is currently connected to
-					 * logical unit.  If the target cannot
-					 * determine whether or not a physical
-					 * device is currently connected, it
-					 * shall also use this peripheral
-					 * qualifier when returning the INQUIRY
-					 * data.  This peripheral qualifier
-					 * does not mean that the device is
-					 * ready for access by the initiator.
-					 */
-#define	SID_QUAL_LU_OFFLINE	0x01	/*
-					 * The target is capable of supporting
-					 * the specified peripheral device type
-					 * on this logical unit; however, the
-					 * physical device is not currently
-					 * connected to this logical unit.
-					 */
-#define SID_QUAL_RSVD		0x02
-#define	SID_QUAL_BAD_LU		0x03	/*
-					 * The target is not capable of
-					 * supporting a physical device on
-					 * this logical unit. For this
-					 * peripheral qualifier the peripheral
-					 * device type shall be set to 1Fh to
-					 * provide compatibility with previous
-					 * versions of SCSI. All other
-					 * peripheral device type values are
-					 * reserved for this peripheral
-					 * qualifier.
-					 */
-#define	SID_QUAL_IS_VENDOR_UNIQUE(inq_data) ((SID_QUAL(inq_data) & 0x08) != 0)
-	uint8_t dev_qual2;
-#define	SID_QUAL2	0x7F
-#define	SID_IS_REMOVABLE(inq_data) (((inq_data)->dev_qual2 & 0x80) != 0)
-	uint8_t version;
-#define SID_ANSI_REV(inq_data) ((inq_data)->version & 0x07)
-#define		SCSI_REV_0		0
-#define		SCSI_REV_CCS		1
-#define		SCSI_REV_2		2
-#define		SCSI_REV_SPC		3
-#define		SCSI_REV_SPC2		4
-
-#define SID_ECMA	0x38
-#define SID_ISO		0xC0
-	uint8_t response_format;
-#define SID_AENC	0x80
-#define SID_TrmIOP	0x40
-	uint8_t additional_length;
-	uint8_t reserved[2];
-	uint8_t flags;
-#define	SID_SftRe	0x01
-#define	SID_CmdQue	0x02
-#define	SID_Linked	0x08
-#define	SID_Sync	0x10
-#define	SID_WBus16	0x20
-#define	SID_WBus32	0x40
-#define	SID_RelAdr	0x80
-#define SID_VENDOR_SIZE   8
-	char	 vendor[SID_VENDOR_SIZE];
-#define SID_PRODUCT_SIZE  16
-	char	 product[SID_PRODUCT_SIZE];
-#define SID_REVISION_SIZE 4
-	char	 revision[SID_REVISION_SIZE];
-	/*
-	 * The following fields were taken from SCSI Primary Commands - 2
-	 * (SPC-2) Revision 14, Dated 11 November 1999
-	 */
-#define	SID_VENDOR_SPECIFIC_0_SIZE	20
-	u_int8_t vendor_specific0[SID_VENDOR_SPECIFIC_0_SIZE];
-	/*
-	 * An extension of SCSI Parallel Specific Values
-	 */
-#define	SID_SPI_IUS		0x01
-#define	SID_SPI_QAS		0x02
-#define	SID_SPI_CLOCK_ST	0x00
-#define	SID_SPI_CLOCK_DT	0x04
-#define	SID_SPI_CLOCK_DT_ST	0x0C
-#define	SID_SPI_MASK		0x0F
-	uint8_t spi3data;
-	uint8_t reserved2;
-	/*
-	 * Version Descriptors, stored 2 byte values.
-	 */
-	uint8_t version1[2];
-	uint8_t version2[2];
-	uint8_t version3[2];
-	uint8_t version4[2];
-	uint8_t version5[2];
-	uint8_t version6[2];
-	uint8_t version7[2];
-	uint8_t version8[2];
-
-	uint8_t reserved3[22];
-
-#define	SID_VENDOR_SPECIFIC_1_SIZE	160
-	uint8_t vendor_specific1[SID_VENDOR_SPECIFIC_1_SIZE];
-};
+/************************** Timer DataStructures ******************************/
+typedef struct timer_list ahc_timer_t;
 
 /********************************** Includes **********************************/
-/* Host template and function declarations referenced by the template. */
-#include "aic7xxx_linux_host.h"
-
-/* Core driver definitions */
+#if CONFIG_AIC7XXX_REG_PRETTY_PRINT
+#define AIC_DEBUG_REGISTERS 1
+#else
+#define AIC_DEBUG_REGISTERS 0
+#endif
 #include "aic7xxx.h"
 
-/* SMP support */
+/***************************** Timer Facilities *******************************/
+#define ahc_timer_init init_timer
+#define ahc_timer_stop del_timer
+typedef void ahc_linux_callback_t (u_long);  
+static __inline void ahc_timer_reset(ahc_timer_t *timer, int usec,
+				     ahc_callback_t *func, void *arg);
+static __inline void ahc_scb_timer_reset(struct scb *scb, u_int usec);
+
+static __inline void
+ahc_timer_reset(ahc_timer_t *timer, int usec, ahc_callback_t *func, void *arg)
+{
+	struct ahc_softc *ahc;
+
+	ahc = (struct ahc_softc *)arg;
+	del_timer(timer);
+	timer->data = (u_long)arg;
+	timer->expires = jiffies + (usec * HZ)/1000000;
+	timer->function = (ahc_linux_callback_t*)func;
+	add_timer(timer);
+}
+
+static __inline void
+ahc_scb_timer_reset(struct scb *scb, u_int usec)
+{
+	mod_timer(&scb->io_ctx->eh_timeout, jiffies + (usec * HZ)/1000000);
+}
+
+/***************************** SMP support ************************************/
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #include <linux/spinlock.h>
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION  "6.2.4"
+#define AIC7XXX_DRIVER_VERSION "6.2.24"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -452,8 +347,9 @@ typedef enum {
 	AHC_DEV_ON_RUN_LIST	 = 0x08, /* Queued to be run later */
 	AHC_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
 	AHC_DEV_Q_TAGGED	 = 0x20, /* Allow full SCSI2 command queueing */
-	AHC_DEV_PERIODIC_OTAG	 = 0x40	 /* Send OTAG to prevent starvation */
-} ahc_dev_flags;
+	AHC_DEV_PERIODIC_OTAG	 = 0x40, /* Send OTAG to prevent starvation */
+	AHC_DEV_SLAVE_CONFIGURED = 0x80	 /* slave_configure() has been called */
+} ahc_linux_dev_flags;
 
 struct ahc_linux_target;
 struct ahc_linux_device {
@@ -464,7 +360,7 @@ struct ahc_linux_device {
 	 * The number of transactions currently
 	 * queued to the device.
 	 */
-	int		active;
+	int			active;
 
 	/*
 	 * The currently allowed number of 
@@ -474,18 +370,18 @@ struct ahc_linux_device {
 	 * mode where the device may have more
 	 * than one outstanding active transaction.
 	 */
-	int		openings;
+	int			openings;
 
 	/*
 	 * A positive count indicates that this
 	 * device's queue is halted.
 	 */
-	u_int		qfrozen;
+	u_int			qfrozen;
 	
 	/*
 	 * Cumulative command counter.
 	 */
-	u_long		commands_issued;
+	u_long			commands_issued;
 
 	/*
 	 * The number of tagged transactions when
@@ -493,21 +389,26 @@ struct ahc_linux_device {
 	 * that have been successfully received by
 	 * this device since the last QUEUE FULL.
 	 */
-	u_int		tag_success_count;
+	u_int			tag_success_count;
 #define AHC_TAG_SUCCESS_INTERVAL 50
 
-	ahc_dev_flags	flags;
+	ahc_linux_dev_flags	flags;
+
+	/*
+	 * Per device timer.
+	 */
+	struct timer_list	timer;
 
 	/*
 	 * The high limit for the tags variable.
 	 */
-	u_int		maxtags;
+	u_int			maxtags;
 
 	/*
 	 * The computed number of tags outstanding
 	 * at the time of the last QUEUE FULL event.
 	 */
-	u_int		tags_on_last_queuefull;
+	u_int			tags_on_last_queuefull;
 
 	/*
 	 * How many times we have seen a queue full
@@ -515,7 +416,7 @@ struct ahc_linux_device {
 	 * to stop our adaptive queue depth algorithm
 	 * on devices with a fixed number of tags.
 	 */
-	u_int		last_queuefull_same_count;
+	u_int			last_queuefull_same_count;
 #define AHC_LOCK_TAGS_COUNT 50
 
 	/*
@@ -527,19 +428,54 @@ struct ahc_linux_device {
 	 * if the AHC_DEV_PERIODIC_OTAG flag is set
 	 * on this device.
 	 */
-	u_int		commands_since_idle_or_otag;
+	u_int			commands_since_idle_or_otag;
 #define AHC_OTAG_THRESH	500
 
-	int		lun;
-	struct		ahc_linux_target *target;
+	int			lun;
+	Scsi_Device	       *scsi_device;
+	struct			ahc_linux_target *target;
 };
 
+typedef enum {
+	AHC_DV_REQUIRED		 = 0x01
+} ahc_linux_targ_flags;
+
+/* DV States */
+typedef enum {
+	AHC_DV_STATE_EXIT = 0,
+	AHC_DV_STATE_INQ_SHORT_ASYNC,
+	AHC_DV_STATE_TUR,
+	AHC_DV_STATE_INQ_ASYNC,
+	AHC_DV_STATE_INQ_ASYNC_VERIFY,
+	AHC_DV_STATE_REBD,
+	AHC_DV_STATE_INQ_VERIFY,
+	AHC_DV_STATE_WEB,
+	AHC_DV_STATE_REB,
+	AHC_DV_STATE_SU,
+	AHC_DV_STATE_BUSY
+} ahc_dv_state;
+
 struct ahc_linux_target {
-	struct	ahc_linux_device *devices[AHC_NUM_LUNS];
-	int	channel;
-	int	target;
-	int	refcount;
-	struct	ahc_transinfo last_tinfo;
+	struct ahc_linux_device	 *devices[AHC_NUM_LUNS];
+	int			  channel;
+	int			  target;
+	int			  refcount;
+	struct ahc_transinfo	  last_tinfo;
+	struct ahc_softc	 *ahc;
+	ahc_linux_targ_flags	  flags;
+	struct scsi_inquiry_data *inq_data;
+	/*
+	 * The next "fallback" period to use for narrow/wide transfers.
+	 */
+	u_int			  dv_next_narrow_period;
+	u_int			  dv_next_wide_period;
+	u_int			  dv_max_ppr_options;
+	u_int			  dv_last_ppr_options;
+	u_int			  dv_echo_size;
+	ahc_dv_state		  dv_state;
+	u_int			  dv_state_retry;
+	char			 *dv_buffer;
+	char			 *dv_buffer1;
 };
 
 /********************* Definitions Required by the Core ***********************/
@@ -554,12 +490,19 @@ struct ahc_linux_target {
 /*
  * Per-SCB OSM storage.
  */
+typedef enum {
+	AHC_UP_EH_SEMAPHORE
+} ahc_linux_scb_flags;
+
 struct scb_platform_data {
 	struct ahc_linux_device	*dev;
+	bus_addr_t		 buf_busaddr;
 	uint32_t		 xfer_len;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 	uint32_t		 resid;		/* Transfer residual */
 #endif
+	uint32_t		 sense_resid;	/* Auto-Sense residual */
+	ahc_linux_scb_flags	 flags;
 };
 
 /*
@@ -568,7 +511,16 @@ struct scb_platform_data {
  * alignment restrictions of the various platforms supported by
  * this driver.
  */
+typedef enum {
+	AHC_DV_WAIT_SIMQ_EMPTY	 = 0x01,
+	AHC_DV_WAIT_SIMQ_RELEASE = 0x02,
+	AHC_DV_ACTIVE		 = 0x04,
+	AHC_DV_SHUTDOWN		 = 0x08,
+	AHC_RUN_CMPLT_Q_TIMER	 = 0x10
+} ahc_linux_softc_flags;
+
 TAILQ_HEAD(ahc_completeq, ahc_cmd);
+
 struct ahc_platform_data {
 	/*
 	 * Fields accessed from interrupt context.
@@ -577,14 +529,28 @@ struct ahc_platform_data {
 	TAILQ_HEAD(, ahc_linux_device) device_runq;
 	struct ahc_completeq	 completeq;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
+	spinlock_t		 spin_lock;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+	struct tasklet_struct	 runq_tasklet;
+#endif
 	u_int			 qfrozen;
+	pid_t			 dv_pid;
+	struct timer_list	 completeq_timer;
 	struct timer_list	 reset_timer;
 	struct semaphore	 eh_sem;
+	struct semaphore	 dv_sem;
+	struct semaphore	 dv_cmd_sem;	/* XXX This needs to be in
+						 * the target struct
+						 */
 	struct Scsi_Host        *host;		/* pointer to scsi host */
+#define AHC_LINUX_NOIRQ	((uint32_t)~0)
 	uint32_t		 irq;		/* IRQ for this adapter */
 	uint32_t		 bios_address;
 	uint32_t		 mem_busaddr;	/* Mem Base Addr */
 	bus_addr_t		 hw_dma_mask;
+	ahc_linux_softc_flags	 flags;
 };
 
 /************************** OS Utility Wrappers *******************************/
@@ -706,56 +672,116 @@ static __inline void ahc_lockinit(struct ahc_softc *);
 static __inline void ahc_lock(struct ahc_softc *, unsigned long *flags);
 static __inline void ahc_unlock(struct ahc_softc *, unsigned long *flags);
 
+/* Lock acquisition and release of the above lock in midlayer entry points. */
+static __inline void ahc_midlayer_entrypoint_lock(struct ahc_softc *,
+						  unsigned long *flags);
+static __inline void ahc_midlayer_entrypoint_unlock(struct ahc_softc *,
+						    unsigned long *flags);
+
 /* Lock held during command compeletion to the upper layer */
 static __inline void ahc_done_lockinit(struct ahc_softc *);
 static __inline void ahc_done_lock(struct ahc_softc *, unsigned long *flags);
 static __inline void ahc_done_unlock(struct ahc_softc *, unsigned long *flags);
 
+/* Lock held during ahc_list manipulation and ahc softc frees */
+extern spinlock_t ahc_list_spinlock;
+static __inline void ahc_list_lockinit(void);
+static __inline void ahc_list_lock(unsigned long *flags);
+static __inline void ahc_list_unlock(unsigned long *flags);
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 static __inline void
 ahc_lockinit(struct ahc_softc *ahc)
 {
-	spin_lock_init(ahc->platform_data->host->host_lock);
+	spin_lock_init(&ahc->platform_data->spin_lock);
 }
 
 static __inline void
 ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
 {
 	*flags = 0;
-	spin_lock_irqsave(ahc->platform_data->host->host_lock, *flags);
+	spin_lock_irqsave(&ahc->platform_data->spin_lock, *flags);
 }
 
 static __inline void
 ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
-	spin_unlock_irqrestore(ahc->platform_data->host->host_lock, *flags);
+	spin_unlock_irqrestore(&ahc->platform_data->spin_lock, *flags);
+}
+
+static __inline void
+ahc_midlayer_entrypoint_lock(struct ahc_softc *ahc, unsigned long *flags)
+{
+	/*
+	 * In 2.5.X, the midlayer takes our lock just before
+	 * calling us, so avoid locking again.
+	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	ahc_lock(ahc, flags);
+#endif
+}
+
+static __inline void
+ahc_midlayer_entrypoint_unlock(struct ahc_softc *ahc, unsigned long *flags)
+{
+	/*
+	 * In 2.5.X, the midlayer takes our lock just before
+	 * calling us and unlocks when we return, so let it do the unlock.
+	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	ahc_unlock(ahc, flags);
+#endif
 }
 
 static __inline void
 ahc_done_lockinit(struct ahc_softc *ahc)
 {
-	/* We don't own the iorequest lock, so we don't initialize it. */
+	/*
+	 * In 2.5.X, our own lock is held during completions.
+	 * In previous versions, the io_request_lock is used.
+	 * In either case, we can't initialize this lock again.
+	 */
 }
 
 static __inline void
 ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
 {
-	struct Scsi_Host *host = ahc->platform_data->host;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	*flags = 0;
-	spin_lock_irqsave(host->host_lock, *flags);
+	spin_lock_irqsave(&io_request_lock, *flags);
+#endif
 }
 
 static __inline void
 ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
-	struct Scsi_Host *host = ahc->platform_data->host;
-
-	spin_unlock_irqrestore(host->host_lock, *flags);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_unlock_irqrestore(&io_request_lock, *flags);
+#endif
 }
 
-#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */
+static __inline void
+ahc_list_lockinit()
+{
+	spin_lock_init(&ahc_list_spinlock);
+}
 
+static __inline void
+ahc_list_lock(unsigned long *flags)
+{
+	*flags = 0;
+	spin_lock_irqsave(&ahc_list_spinlock, *flags);
+}
+
+static __inline void
+ahc_list_unlock(unsigned long *flags)
+{
+	spin_unlock_irqrestore(&ahc_list_spinlock, *flags);
+}
+
+#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,93) */
+
+static __inline void
 ahc_lockinit(struct ahc_softc *ahc)
 {
 }
@@ -774,6 +800,7 @@ ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
 	restore_flags(*flags);
 }
 
+static __inline void
 ahc_done_lockinit(struct ahc_softc *ahc)
 {
 }
@@ -791,6 +818,25 @@ ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
 static __inline void
 ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
+}
+
+static __inline void
+ahc_list_lockinit()
+{
+}
+
+static __inline void
+ahc_list_lock(unsigned long *flags)
+{
+	*flags = 0;
+	save_flags(*flags);
+	cli();
+}
+
+static __inline void
+ahc_list_unlock(unsigned long *flags)
+{
+	restore_flags(*flags);
 }
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */
 
@@ -846,7 +892,8 @@ void ahc_power_state_change(struct ahc_softc *ahc,
 			    ahc_power_state new_state);
 /**************************** VL/EISA Routines ********************************/
 int			 aic7770_linux_probe(Scsi_Host_Template *);
-int			 aic7770_map_registers(struct ahc_softc *ahc);
+int			 aic7770_map_registers(struct ahc_softc *ahc,
+					       u_int port);
 int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
 
 /******************************* PCI Routines *********************************/
@@ -959,38 +1006,99 @@ ahc_flush_device_writes(struct ahc_softc *ahc)
 #define pci_unmap_single(pdev, buffer, buflen, direction)
 #endif
 
-/*********************** Transaction Access Wrappers **************************/
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
+#define ahc_pci_set_dma_mask pci_set_dma_mask
+#else
+/*
+ * Always "return" 0 for success.
+ */
+#define ahc_pci_set_dma_mask(dev_softc, mask)  			\
+	(((dev_softc)->dma_mask = mask) && 0)
+#endif
+/**************************** Proc FS Support *********************************/
+int	ahc_linux_proc_info(char *, char **, off_t, int, int, int);
+
+/*************************** Domain Validation ********************************/
+#define AHC_DV_CMD(cmd) ((cmd)->scsi_done == ahc_linux_dv_complete)
+#define AHC_DV_SIMQ_FROZEN(ahc)					\
+	((((ahc)->platform_data->flags & AHC_DV_ACTIVE) != 0)	\
+	 && (ahc)->platform_data->qfrozen == 1)
+
+/*********************** Transaction Access Wrappers *************************/
+static __inline void ahc_cmd_set_transaction_status(Scsi_Cmnd *, uint32_t);
 static __inline void ahc_set_transaction_status(struct scb *, uint32_t);
+static __inline void ahc_cmd_set_scsi_status(Scsi_Cmnd *, uint32_t);
+static __inline void ahc_set_scsi_status(struct scb *, uint32_t);
+static __inline uint32_t ahc_cmd_get_transaction_status(Scsi_Cmnd *cmd);
+static __inline uint32_t ahc_get_transaction_status(struct scb *);
+static __inline uint32_t ahc_cmd_get_scsi_status(Scsi_Cmnd *cmd);
+static __inline uint32_t ahc_get_scsi_status(struct scb *);
+static __inline void ahc_set_transaction_tag(struct scb *, int, u_int);
+static __inline u_long ahc_get_transfer_length(struct scb *);
+static __inline int ahc_get_transfer_dir(struct scb *);
+static __inline void ahc_set_residual(struct scb *, u_long);
+static __inline void ahc_set_sense_residual(struct scb *scb, u_long resid);
+static __inline u_long ahc_get_residual(struct scb *);
+static __inline u_long ahc_get_sense_residual(struct scb *);
+static __inline int ahc_perform_autosense(struct scb *);
+static __inline uint32_t ahc_get_sense_bufsize(struct ahc_softc *,
+					       struct scb *);
+static __inline void ahc_notify_xfer_settings_change(struct ahc_softc *,
+						     struct ahc_devinfo *);
+static __inline void ahc_platform_scb_free(struct ahc_softc *ahc,
+					   struct scb *scb);
+static __inline void ahc_freeze_scb(struct scb *scb);
+
+static __inline
+void ahc_cmd_set_transaction_status(Scsi_Cmnd *cmd, uint32_t status)
+{
+	cmd->result &= ~(CAM_STATUS_MASK << 16);
+	cmd->result |= status << 16;
+}
+
 static __inline
 void ahc_set_transaction_status(struct scb *scb, uint32_t status)
 {
-	scb->io_ctx->result &= ~(CAM_STATUS_MASK << 16);
-	scb->io_ctx->result |= status << 16;
+	ahc_cmd_set_transaction_status(scb->io_ctx,status);
 }
 
-static __inline void ahc_set_scsi_status(struct scb *, uint32_t);
+static __inline
+void ahc_cmd_set_scsi_status(Scsi_Cmnd *cmd, uint32_t status)
+{
+	cmd->result &= ~0xFFFF;
+	cmd->result |= status;
+}
+
 static __inline
 void ahc_set_scsi_status(struct scb *scb, uint32_t status)
 {
-	scb->io_ctx->result &= ~0xFFFF;
-	scb->io_ctx->result |= status;
+	ahc_cmd_set_scsi_status(scb->io_ctx, status);
 }
 
-static __inline uint32_t ahc_get_transaction_status(struct scb *);
+static __inline
+uint32_t ahc_cmd_get_transaction_status(Scsi_Cmnd *cmd)
+{
+	return ((cmd->result >> 16) & CAM_STATUS_MASK);
+}
+
 static __inline
 uint32_t ahc_get_transaction_status(struct scb *scb)
 {
-	return ((scb->io_ctx->result >> 16) & CAM_STATUS_MASK);
+	return (ahc_cmd_get_transaction_status(scb->io_ctx));
 }
 
-static __inline uint32_t ahc_get_scsi_status(struct scb *);
+static __inline
+uint32_t ahc_cmd_get_scsi_status(Scsi_Cmnd *cmd)
+{
+	return (cmd->result & 0xFFFF);
+}
+
 static __inline
 uint32_t ahc_get_scsi_status(struct scb *scb)
 {
-	return (scb->io_ctx->result & 0xFFFF);
+	return (ahc_cmd_get_scsi_status(scb->io_ctx));
 }
 
-static __inline void ahc_set_transaction_tag(struct scb *, int, u_int);
 static __inline
 void ahc_set_transaction_tag(struct scb *scb, int enabled, u_int type)
 {
@@ -1000,14 +1108,12 @@ void ahc_set_transaction_tag(struct scb *scb, int enabled, u_int type)
 	 */
 }
 
-static __inline u_long ahc_get_transfer_length(struct scb *);
 static __inline
 u_long ahc_get_transfer_length(struct scb *scb)
 {
 	return (scb->platform_data->xfer_len);
 }
 
-static __inline int ahc_get_transfer_dir(struct scb *);
 static __inline
 int ahc_get_transfer_dir(struct scb *scb)
 {
@@ -1032,7 +1138,6 @@ int ahc_get_transfer_dir(struct scb *scb)
 #endif
 }
 
-static __inline void ahc_set_residual(struct scb *, u_long);
 static __inline
 void ahc_set_residual(struct scb *scb, u_long resid)
 {
@@ -1043,14 +1148,12 @@ void ahc_set_residual(struct scb *scb, u_long resid)
 #endif
 }
 
-static __inline void ahc_set_sense_residual(struct scb *, u_long);
 static __inline
 void ahc_set_sense_residual(struct scb *scb, u_long resid)
 {
-	/* This can't be reported in Linux */
+	scb->platform_data->sense_resid = resid;
 }
 
-static __inline u_long ahc_get_residual(struct scb *);
 static __inline
 u_long ahc_get_residual(struct scb *scb)
 {
@@ -1061,7 +1164,12 @@ u_long ahc_get_residual(struct scb *scb)
 #endif
 }
 
-static __inline int ahc_perform_autosense(struct scb *);
+static __inline
+u_long ahc_get_sense_residual(struct scb *scb)
+{
+	return (scb->platform_data->sense_resid);
+}
+
 static __inline
 int ahc_perform_autosense(struct scb *scb)
 {
@@ -1079,8 +1187,6 @@ ahc_get_sense_bufsize(struct ahc_softc *ahc, struct scb *scb)
 	return (sizeof(struct scsi_sense_data));
 }
 
-static __inline void ahc_notify_xfer_settings_change(struct ahc_softc *,
-						     struct ahc_devinfo *);
 static __inline void
 ahc_notify_xfer_settings_change(struct ahc_softc *ahc,
 				struct ahc_devinfo *devinfo)
@@ -1088,8 +1194,6 @@ ahc_notify_xfer_settings_change(struct ahc_softc *ahc,
 	/* Nothing to do here for linux */
 }
 
-static __inline void ahc_platform_scb_free(struct ahc_softc *ahc,
-					   struct scb *scb);
 static __inline void
 ahc_platform_scb_free(struct ahc_softc *ahc, struct scb *scb)
 {
@@ -1099,11 +1203,14 @@ ahc_platform_scb_free(struct ahc_softc *ahc, struct scb *scb)
 int	ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg);
 void	ahc_platform_free(struct ahc_softc *ahc);
 void	ahc_platform_freeze_devq(struct ahc_softc *ahc, struct scb *scb);
-static __inline void	ahc_freeze_scb(struct scb *scb);
+
 static __inline void
 ahc_freeze_scb(struct scb *scb)
 {
-	/* Noting to do here for linux */
+	if ((scb->io_ctx->result & (CAM_DEV_QFRZN << 16)) == 0) {
+                scb->io_ctx->result |= CAM_DEV_QFRZN << 16;
+                scb->platform_data->dev->qfrozen++;
+        }
 }
 
 void	ahc_platform_set_tags(struct ahc_softc *ahc,

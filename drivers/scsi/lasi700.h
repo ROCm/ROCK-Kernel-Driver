@@ -55,12 +55,6 @@ static int lasi700_release(struct Scsi_Host *host);
 	.hversion_rev	= HVERSION_REV_ANY_ID,	\
 }
 
-#define LASI700_DRIVER {			\
-	.name		= "Lasi SCSI",		\
-	.id_table	= lasi700_scsi_tbl,	\
-	.probe		= lasi700_driver_callback,\
-}
-
 #define LASI700_CLOCK	25
 #define LASI710_CLOCK	40
 #define LASI_SCSI_CORE_OFFSET 0x100

@@ -277,15 +277,10 @@ config SCSI_AACRAID
 	tristate "Adaptec AACRAID support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && SCSI && PCI
 
-choice
-	prompt "Adaptec AIC7xxx support"
-	optional
-	depends on SCSI
-
-source "drivers/scsi/aic7xxx/Kconfig"
+source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
 
 config SCSI_AIC7XXX_OLD
-	tristate "Old driver"
+	tristate "Adaptec AIC7xxx support (old driver)"
 	help
 	  WARNING This driver is an older aic7xxx driver and is no longer
 	  under active development.  Adaptec, Inc. is writing a new driver to
@@ -325,8 +320,7 @@ config SCSI_AIC7XXX_OLD
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called aic7xxx_old.o.
 
-endchoice
-
+source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
 
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O
@@ -896,11 +890,6 @@ config 53C700_MEM_MAPPED
 	default y
 
 config 53C700_LE_ON_BE
-	bool
-	depends on SCSI_LASI700
-	default y
-
-config 53C700_USE_CONSISTENT
 	bool
 	depends on SCSI_LASI700
 	default y
@@ -1550,24 +1539,18 @@ config SCSI_NSP32
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called nsp32.o.
 
-#
-# Note - this is a very special 'host' adapter that simulates the presence of some disks.
-# It can come in very handy for troubleshooting.  Anyone else is welcome to use it - all
-# you do is hack it to simulate the condition you want to test for, and then use it.
-#
-# The actual configuration in any kernel release could change at any time as I hack it to
-# simulate various conditions that I am testing.
-#
 config SCSI_DEBUG
-	tristate "SCSI debugging host simulator (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && SCSI
+	tristate "SCSI debugging host simulator"
+	depends on SCSI
 	help
-	  This is a host adapter simulator that can be programmed to simulate
-	  a large number of conditions that could occur on a real bus. The
-	  advantage is that many hard to reproduce problems can be tested in a
-	  controlled environment where there is reduced risk of losing
-	  important data. This is primarily of use to people trying to debug
-	  the middle and upper layers of the SCSI subsystem. If unsure, say N.
+	  This is a host adapter simulator that can simulate multiple hosts
+	  each with multiple dummy SCSI devices (disks). It defaults to one
+	  host adapter with one dummy SCSI disk. Each dummy disk uses kernel
+	  RAM as storage (i.e. it is a ramdisk). To save space when multiple
+	  dummy disks are simulated, they share the same kernel RAM for 
+	  their storage. See http://www.torque.net/sg/sdebug.html for more
+	  information. This driver is primarily of use to those testing the
+	  SCSI and block subsystems. If unsure, say N.
 
 config SCSI_MESH
 	tristate "MESH (Power Mac internal SCSI) support"

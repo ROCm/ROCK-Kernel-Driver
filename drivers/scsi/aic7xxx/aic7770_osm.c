@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7770_linux.c#9 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7770_osm.c#11 $
  */
 
 #include "aic7xxx_osm.h"
@@ -54,9 +54,6 @@ aic7770_linux_probe(Scsi_Host_Template *template)
 	int i, slot;
 	int eisaBase;
 	int found;
-
-	if (aic7xxx_no_probe)
-		return (0);
 
 	eisaBase = 0x1000 + AHC_EISA_SLOT_OFFSET;
 	found = 0;
@@ -103,10 +100,9 @@ aic7770_linux_probe(Scsi_Host_Template *template)
 				 */
 				break;
 			}
-			ahc->tag = BUS_SPACE_PIO;
-			ahc->bsh.ioport = eisaBase;
-			error = aic7770_config(ahc, entry);
+			error = aic7770_config(ahc, entry, eisaBase);
 			if (error != 0) {
+				ahc->bsh.ioport = 0;
 				ahc_free(ahc);
 				continue;
 			}
@@ -120,18 +116,19 @@ aic7770_linux_probe(Scsi_Host_Template *template)
 }
 
 int
-aic7770_map_registers(struct ahc_softc *ahc)
+aic7770_map_registers(struct ahc_softc *ahc, u_int port)
 {
 	/*
 	 * Lock out other contenders for our i/o space.
 	 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
-	request_region(ahc->bsh.ioport, AHC_EISA_IOSIZE, "aic7xxx");
+	request_region(port, AHC_EISA_IOSIZE, "aic7xxx");
 #else
-	if (request_region(ahc->bsh.ioport, AHC_EISA_IOSIZE, "aic7xxx") == 0)
+	if (request_region(port, AHC_EISA_IOSIZE, "aic7xxx") == 0)
 		return (ENOMEM);
 #endif
-
+	ahc->tag = BUS_SPACE_PIO;
+	ahc->bsh.ioport = port;
 	return (0);
 }
 
@@ -145,9 +142,9 @@ aic7770_map_int(struct ahc_softc *ahc, u_int irq)
 	if ((ahc->flags & AHC_EDGE_INTERRUPT) == 0)
 		shared = SA_SHIRQ;
 
-	ahc->platform_data->irq = irq;
-	error = request_irq(ahc->platform_data->irq, ahc_linux_isr,
-			    shared, "aic7xxx", ahc);
+	error = request_irq(irq, ahc_linux_isr, shared, "aic7xxx", ahc);
+	if (error == 0)
+		ahc->platform_data->irq = irq;
 	
 	return (-error);
 }

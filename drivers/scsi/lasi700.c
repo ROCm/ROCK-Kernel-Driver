@@ -114,7 +114,11 @@ static struct parisc_device_id lasi700_scsi_tbl[] = {
 
 MODULE_DEVICE_TABLE(parisc, lasi700_scsi_tbl);
 
-static struct parisc_driver lasi700_driver = LASI700_DRIVER;
+static struct parisc_driver lasi700_driver = {
+	.name =		"Lasi SCSI",
+	.id_table =	lasi700_scsi_tbl,
+	.probe =	lasi700_driver_callback,
+};
 
 static int __init
 lasi700_detect(Scsi_Host_Template *tpnt)
@@ -145,6 +149,7 @@ lasi700_driver_callback(struct parisc_device *dev)
 	} else {
 		driver_name = "lasi710";
 	}
+	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s", driver_name);
 	if(hostdata == NULL) {
 		printk(KERN_ERR "%s: Failed to allocate host data\n",
 		       driver_name);
@@ -168,12 +173,14 @@ lasi700_driver_callback(struct parisc_device *dev)
 		hostdata->chip710 = 1;
 		hostdata->dmode_extra = DMODE_FC2;
 	}
-	hostdata->pci_dev = ccio_get_fake(dev);
+	hostdata->dev = &dev->dev;
+	dma_set_mask(&dev->dev, 0xffffffffUL);
 	if((host = NCR_700_detect(host_tpnt, hostdata)) == NULL) {
 		kfree(hostdata);
 		release_mem_region(host->base, 64);
 		return 1;
 	}
+	scsi_set_device(host, &dev->dev);
 	host->irq = dev->irq;
 	if(request_irq(dev->irq, NCR_700_intr, SA_SHIRQ, driver_name, host)) {
 		printk(KERN_ERR "%s: irq problem, detaching\n",

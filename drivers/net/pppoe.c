@@ -5,15 +5,15 @@
  * PPPoE --- PPP over Ethernet (RFC 2516)
  *
  *
- * Version:    0.6.11
+ * Version:	0.7.0
  *
  * 220102 :	Fix module use count on failure in pppoe_create, pppox_sk -acme
- * 030700 :     Fixed connect logic to allow for disconnect.
+ * 030700 :	Fixed connect logic to allow for disconnect.
  * 270700 :	Fixed potential SMP problems; we must protect against
  *		simultaneous invocation of ppp_input
  *		and ppp_unregister_channel.
  * 040800 :	Respect reference count mechanisms on net-devices.
- * 200800 :     fix kfree(skb) in pppoe_rcv (acme)
+ * 200800 :	fix kfree(skb) in pppoe_rcv (acme)
  *		Module reference count is decremented in the right spot now,
  *		guards against sock_put not actually freeing the sk
  *		in pppoe_release.
@@ -30,13 +30,14 @@
  *		the original skb that was passed in on success, never on
  *		failure.  Delete the copy of the skb on failure to avoid
  *		a memory leak.
- * 081001 :     Misc. cleanup (licence string, non-blocking, prevent
- *              reference of device on close).
- * 121301 :     New ppp channels interface; cannot unregister a channel
- *              from interrupts.  Thus, we mark the socket as a ZOMBIE
- *              and do the unregistration later.
+ * 081001 :	Misc. cleanup (licence string, non-blocking, prevent
+ *		reference of device on close).
+ * 121301 :	New ppp channels interface; cannot unregister a channel
+ *		from interrupts.  Thus, we mark the socket as a ZOMBIE
+ *		and do the unregistration later.
  * 081002 :	seq_file support for proc stuff -acme
- *
+ * 111602 :	Merge all 2.4 fixes into 2.5/2.6 tree.  Label 2.5/2.6
+ *		as version 0.7.  Spacing cleanup.
  * Author:	Michal Ostrowski <mostrows@speakeasy.net>
  * Contributors:
  * 		Arnaldo Carvalho de Melo <acme@conectiva.com.br>
@@ -381,8 +382,8 @@ abort_kfree:
  *
  ***********************************************************************/
 static int pppoe_rcv(struct sk_buff *skb,
-		      struct net_device *dev,
-		      struct packet_type *pt)
+		     struct net_device *dev,
+		     struct packet_type *pt)
 
 {
 	struct pppoe_hdr *ph = (struct pppoe_hdr *) skb->nh.raw;
@@ -398,7 +399,7 @@ static int pppoe_rcv(struct sk_buff *skb,
 	}
 
 	sk = po->sk;
-        bh_lock_sock(sk);
+	bh_lock_sock(sk);
 
 	/* Socket state is unknown, must put skb into backlog. */
 	if (sock_owned_by_user(sk) != 0) {
@@ -443,8 +444,10 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 		 * what kind of SKB it is during backlog rcv.
 		 */
 		if (sock_owned_by_user(sk) == 0) {
+			/* We're no longer connect at the PPPOE layer,
+			 * and must wait for ppp channel to disconnect us.
+			 */
 			sk->state = PPPOX_ZOMBIE;
-			pppox_unbind_sock(sk);
 		}
 
 		bh_unlock_sock(sk);
@@ -583,8 +586,7 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	if ((sk->state & PPPOX_CONNECTED) && sp->sa_addr.pppoe.sid)
 		goto end;
 
-	/* Check for already disconnected sockets,
-	   on attempts to disconnect */
+	/* Check for already disconnected sockets, on attempts to disconnect */
 	error = -EALREADY;
 	if((sk->state & PPPOX_DEAD) && !sp->sa_addr.pppoe.sid )
 		goto end;
@@ -596,7 +598,8 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		/* Delete the old binding */
 		delete_item(po->pppoe_pa.sid,po->pppoe_pa.remote);
 
-		dev_put(po->pppoe_dev);
+		if(po->pppoe_dev)
+			dev_put(po->pppoe_dev);
 
 		memset(po, 0, sizeof(struct pppox_opt));
 		po->sk = sk;
@@ -994,7 +997,7 @@ static int pppoe_seq_show(struct seq_file *seq, void *v)
 		   po->pppoe_pa.remote[2], po->pppoe_pa.remote[3],
 		   po->pppoe_pa.remote[4], po->pppoe_pa.remote[5], dev_name);
 out:
-  	return 0;
+	return 0;
 }
 
 static __inline__ struct pppox_opt *pppoe_get_idx(loff_t pos)
@@ -1064,10 +1067,10 @@ static int pppoe_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations pppoe_seq_fops = {
-	.open           = pppoe_seq_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release        = seq_release,
+	.open		= pppoe_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 #endif /* CONFIG_PROC_FS */
 

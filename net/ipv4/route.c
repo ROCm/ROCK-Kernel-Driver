@@ -86,6 +86,7 @@
 #include <linux/mroute.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/random.h>
+#include <linux/rcupdate.h>
 #include <net/protocol.h>
 #include <net/ip.h>
 #include <net/route.h>
@@ -178,7 +179,7 @@ __u8 ip_tos2prio[16] = {
 
 /* The locking scheme is rather straight forward:
  *
- * 1) A BH protected rwlocks protect buckets of the central route hash.
+ * 1) Read-Copy Update protects the buckets of the central route hash.
  * 2) Only writers remove entries, and they hold the lock
  *    as they look at rtable reference counts.
  * 3) Only readers acquire references to rtable entries,
@@ -188,7 +189,7 @@ __u8 ip_tos2prio[16] = {
 
 struct rt_hash_bucket {
 	struct rtable	*chain;
-	rwlock_t	lock;
+	spinlock_t	lock;
 } __attribute__((__aligned__(8)));
 
 static struct rt_hash_bucket 	*rt_hash_table;
@@ -220,11 +221,11 @@ static struct rtable *rt_cache_get_first(struct seq_file *seq)
 	struct rt_cache_iter_state *st = seq->private;
 
 	for (st->bucket = rt_hash_mask; st->bucket >= 0; --st->bucket) {
-		read_lock_bh(&rt_hash_table[st->bucket].lock);
+		rcu_read_lock();
 		r = rt_hash_table[st->bucket].chain;
 		if (r)
 			break;
-		read_unlock_bh(&rt_hash_table[st->bucket].lock);
+		rcu_read_unlock();
 	}
 	return r;
 }
@@ -233,12 +234,13 @@ static struct rtable *rt_cache_get_next(struct seq_file *seq, struct rtable *r)
 {
 	struct rt_cache_iter_state *st = seq->private;
 
+	read_barrier_depends();
 	r = r->u.rt_next;
 	while (!r) {
-		read_unlock_bh(&rt_hash_table[st->bucket].lock);
+		rcu_read_unlock();
 		if (--st->bucket < 0)
 			break;
-		read_lock_bh(&rt_hash_table[st->bucket].lock);
+		rcu_read_lock();
 		r = rt_hash_table[st->bucket].chain;
 	}
 	return r;
@@ -276,7 +278,7 @@ static void rt_cache_seq_stop(struct seq_file *seq, void *v)
 	if (v && v != (void *)1) {
 		struct rt_cache_iter_state *st = seq->private;
 
-		read_unlock_bh(&rt_hash_table[st->bucket].lock);
+		rcu_read_unlock();
 	}
 }
 
@@ -406,13 +408,13 @@ void __init rt_cache_proc_exit(void)
   
 static __inline__ void rt_free(struct rtable *rt)
 {
-	dst_free(&rt->u.dst);
+	call_rcu(&rt->u.dst.rcu_head, (void (*)(void *))dst_free, &rt->u.dst);
 }
 
 static __inline__ void rt_drop(struct rtable *rt)
 {
 	ip_rt_put(rt);
-	dst_free(&rt->u.dst);
+	call_rcu(&rt->u.dst.rcu_head, (void (*)(void *))dst_free, &rt->u.dst);
 }
 
 static __inline__ int rt_fast_clean(struct rtable *rth)
@@ -465,7 +467,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 		i = (i + 1) & rt_hash_mask;
 		rthp = &rt_hash_table[i].chain;
 
-		write_lock(&rt_hash_table[i].lock);
+		spin_lock(&rt_hash_table[i].lock);
 		while ((rth = *rthp) != NULL) {
 			if (rth->u.dst.expires) {
 				/* Entry is expired even if it is in use */
@@ -484,7 +486,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 			*rthp = rth->u.rt_next;
 			rt_free(rth);
 		}
-		write_unlock(&rt_hash_table[i].lock);
+		spin_unlock(&rt_hash_table[i].lock);
 
 		/* Fallback loop breaker. */
 		if ((jiffies - now) > 0)
@@ -507,11 +509,11 @@ static void SMP_TIMER_NAME(rt_run_flush)(unsigned long dummy)
 	rt_deadline = 0;
 
 	for (i = rt_hash_mask; i >= 0; i--) {
-		write_lock_bh(&rt_hash_table[i].lock);
+		spin_lock_bh(&rt_hash_table[i].lock);
 		rth = rt_hash_table[i].chain;
 		if (rth)
 			rt_hash_table[i].chain = NULL;
-		write_unlock_bh(&rt_hash_table[i].lock);
+		spin_unlock_bh(&rt_hash_table[i].lock);
 
 		for (; rth; rth = next) {
 			next = rth->u.rt_next;
@@ -635,7 +637,7 @@ static int rt_garbage_collect(void)
 
 			k = (k + 1) & rt_hash_mask;
 			rthp = &rt_hash_table[k].chain;
-			write_lock_bh(&rt_hash_table[k].lock);
+			spin_lock_bh(&rt_hash_table[k].lock);
 			while ((rth = *rthp) != NULL) {
 				if (!rt_may_expire(rth, tmo, expire)) {
 					tmo >>= 1;
@@ -646,7 +648,7 @@ static int rt_garbage_collect(void)
 				rt_free(rth);
 				goal--;
 			}
-			write_unlock_bh(&rt_hash_table[k].lock);
+			spin_unlock_bh(&rt_hash_table[k].lock);
 			if (goal <= 0)
 				break;
 		}
@@ -714,7 +716,7 @@ static int rt_intern_hash(unsigned hash, struct rtable *rt, struct rtable **rp)
 restart:
 	rthp = &rt_hash_table[hash].chain;
 
-	write_lock_bh(&rt_hash_table[hash].lock);
+	spin_lock_bh(&rt_hash_table[hash].lock);
 	while ((rth = *rthp) != NULL) {
 		if (compare_keys(&rth->fl, &rt->fl)) {
 			/* Put it first */
@@ -725,7 +727,7 @@ restart:
 			rth->u.dst.__use++;
 			dst_hold(&rth->u.dst);
 			rth->u.dst.lastuse = now;
-			write_unlock_bh(&rt_hash_table[hash].lock);
+			spin_unlock_bh(&rt_hash_table[hash].lock);
 
 			rt_drop(rt);
 			*rp = rth;
@@ -741,7 +743,7 @@ restart:
 	if (rt->rt_type == RTN_UNICAST || rt->fl.iif == 0) {
 		int err = arp_bind_neighbour(&rt->u.dst);
 		if (err) {
-			write_unlock_bh(&rt_hash_table[hash].lock);
+			spin_unlock_bh(&rt_hash_table[hash].lock);
 
 			if (err != -ENOBUFS) {
 				rt_drop(rt);
@@ -782,7 +784,7 @@ restart:
 	}
 #endif
 	rt_hash_table[hash].chain = rt;
-	write_unlock_bh(&rt_hash_table[hash].lock);
+	spin_unlock_bh(&rt_hash_table[hash].lock);
 	*rp = rt;
 	return 0;
 }
@@ -849,7 +851,7 @@ static void rt_del(unsigned hash, struct rtable *rt)
 {
 	struct rtable **rthp;
 
-	write_lock_bh(&rt_hash_table[hash].lock);
+	spin_lock_bh(&rt_hash_table[hash].lock);
 	ip_rt_put(rt);
 	for (rthp = &rt_hash_table[hash].chain; *rthp;
 	     rthp = &(*rthp)->u.rt_next)
@@ -858,7 +860,7 @@ static void rt_del(unsigned hash, struct rtable *rt)
 			rt_free(rt);
 			break;
 		}
-	write_unlock_bh(&rt_hash_table[hash].lock);
+	spin_unlock_bh(&rt_hash_table[hash].lock);
 }
 
 void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
@@ -897,10 +899,11 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
 
 			rthp=&rt_hash_table[hash].chain;
 
-			read_lock(&rt_hash_table[hash].lock);
+			rcu_read_lock();
 			while ((rth = *rthp) != NULL) {
 				struct rtable *rt;
 
+				read_barrier_depends();
 				if (rth->fl.fl4_dst != daddr ||
 				    rth->fl.fl4_src != skeys[i] ||
 				    rth->fl.fl4_tos != tos ||
@@ -918,7 +921,7 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
 					break;
 
 				dst_clone(&rth->u.dst);
-				read_unlock(&rt_hash_table[hash].lock);
+				rcu_read_unlock();
 
 				rt = dst_alloc(&ipv4_dst_ops);
 				if (rt == NULL) {
@@ -929,6 +932,7 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
 
 				/* Copy all the information. */
 				*rt = *rth;
+ 				INIT_RCU_HEAD(&rt->u.dst.rcu_head);
 				rt->u.dst.__use		= 1;
 				atomic_set(&rt->u.dst.__refcnt, 1);
 				if (rt->u.dst.dev)
@@ -964,7 +968,7 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
 					ip_rt_put(rt);
 				goto do_next;
 			}
-			read_unlock(&rt_hash_table[hash].lock);
+			rcu_read_unlock();
 		do_next:
 			;
 		}
@@ -1144,9 +1148,10 @@ unsigned short ip_rt_frag_needed(struct iphdr *iph, unsigned short new_mtu)
 	for (i = 0; i < 2; i++) {
 		unsigned hash = rt_hash_code(daddr, skeys[i], tos);
 
-		read_lock(&rt_hash_table[hash].lock);
+		rcu_read_lock();
 		for (rth = rt_hash_table[hash].chain; rth;
 		     rth = rth->u.rt_next) {
+			read_barrier_depends();
 			if (rth->fl.fl4_dst == daddr &&
 			    rth->fl.fl4_src == skeys[i] &&
 			    rth->rt_dst  == daddr &&
@@ -1182,7 +1187,7 @@ unsigned short ip_rt_frag_needed(struct iphdr *iph, unsigned short new_mtu)
 				}
 			}
 		}
-		read_unlock(&rt_hash_table[hash].lock);
+		rcu_read_unlock();
 	}
 	return est_mtu ? : new_mtu;
 }
@@ -1736,8 +1741,9 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 	tos &= IPTOS_RT_MASK;
 	hash = rt_hash_code(daddr, saddr ^ (iif << 5), tos);
 
-	read_lock(&rt_hash_table[hash].lock);
+	rcu_read_lock();
 	for (rth = rt_hash_table[hash].chain; rth; rth = rth->u.rt_next) {
+		read_barrier_depends();
 		if (rth->fl.fl4_dst == daddr &&
 		    rth->fl.fl4_src == saddr &&
 		    rth->fl.iif == iif &&
@@ -1750,12 +1756,12 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;
 			rt_cache_stat[smp_processor_id()].in_hit++;
-			read_unlock(&rt_hash_table[hash].lock);
+			rcu_read_unlock();
 			skb->dst = (struct dst_entry*)rth;
 			return 0;
 		}
 	}
-	read_unlock(&rt_hash_table[hash].lock);
+	rcu_read_unlock();
 
 	/* Multicast recognition logic is moved from route cache to here.
 	   The problem was that too many Ethernet cards have broken/missing
@@ -2100,8 +2106,9 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 
 	hash = rt_hash_code(flp->fl4_dst, flp->fl4_src ^ (flp->oif << 5), flp->fl4_tos);
 
-	read_lock_bh(&rt_hash_table[hash].lock);
+	rcu_read_lock();
 	for (rth = rt_hash_table[hash].chain; rth; rth = rth->u.rt_next) {
+		read_barrier_depends();
 		if (rth->fl.fl4_dst == flp->fl4_dst &&
 		    rth->fl.fl4_src == flp->fl4_src &&
 		    rth->fl.iif == 0 &&
@@ -2115,12 +2122,12 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;
 			rt_cache_stat[smp_processor_id()].out_hit++;
-			read_unlock_bh(&rt_hash_table[hash].lock);
+			rcu_read_unlock();
 			*rp = rth;
 			return 0;
 		}
 	}
-	read_unlock_bh(&rt_hash_table[hash].lock);
+	rcu_read_unlock();
 
 	return ip_route_output_slow(rp, flp);
 }
@@ -2328,9 +2335,10 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 		if (h < s_h) continue;
 		if (h > s_h)
 			s_idx = 0;
-		read_lock_bh(&rt_hash_table[h].lock);
+		rcu_read_lock();
 		for (rt = rt_hash_table[h].chain, idx = 0; rt;
 		     rt = rt->u.rt_next, idx++) {
+			read_barrier_depends();
 			if (idx < s_idx)
 				continue;
 			skb->dst = dst_clone(&rt->u.dst);
@@ -2338,12 +2346,12 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 					 cb->nlh->nlmsg_seq,
 					 RTM_NEWROUTE, 1) <= 0) {
 				dst_release(xchg(&skb->dst, NULL));
-				read_unlock_bh(&rt_hash_table[h].lock);
+				rcu_read_unlock();
 				goto done;
 			}
 			dst_release(xchg(&skb->dst, NULL));
 		}
-		read_unlock_bh(&rt_hash_table[h].lock);
+		rcu_read_unlock();
 	}
 
 done:
@@ -2627,7 +2635,7 @@ int __init ip_rt_init(void)
 
 	rt_hash_mask--;
 	for (i = 0; i <= rt_hash_mask; i++) {
-		rt_hash_table[i].lock = RW_LOCK_UNLOCKED;
+		rt_hash_table[i].lock = SPIN_LOCK_UNLOCKED;
 		rt_hash_table[i].chain = NULL;
 	}
 

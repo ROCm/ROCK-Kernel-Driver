@@ -207,13 +207,13 @@ static struct pktgen_info pginfos[MAX_PKTGEN];
 
 
 /** Convert to miliseconds */
-inline __u64 tv_to_ms(const struct timeval* tv) {
+static inline __u64 tv_to_ms(const struct timeval* tv) {
 	__u64 ms = tv->tv_usec / 1000;
 	ms += (__u64)tv->tv_sec * (__u64)1000;
 	return ms;
 }
 
-inline __u64 getCurMs(void) {
+static inline __u64 getCurMs(void) {
 	struct timeval tv;
 	do_gettimeofday(&tv);
 	return tv_to_ms(&tv);
@@ -1277,7 +1277,7 @@ static int proc_write(struct file *file, const char *user_buffer,
 }
 
 
-int create_proc_dir(void)
+static int create_proc_dir(void)
 {
 	int     len;
 	/*  does proc_dir already exists */
@@ -1295,7 +1295,7 @@ int create_proc_dir(void)
 	return 1;
 }
 
-int remove_proc_dir(void)
+static int remove_proc_dir(void)
 {
 	remove_proc_entry(PG_PROC_DIR, proc_net);
 	return 1;

@@ -46,7 +46,7 @@
 #define MSG_IDENTIFY_DISCFLAG	0x40 
 #define MSG_IDENTIFY(lun, disc)	(((disc) ? 0xc0 : MSG_IDENTIFYFLAG) | (lun))
 #define MSG_ISIDENTIFY(m)	((m) & MSG_IDENTIFYFLAG)
-#define MSG_IDENTIFY_LUNMASK	0x03F 
+#define MSG_IDENTIFY_LUNMASK	0x3F 
 
 /* Extended messages (opcode and length) */
 #define MSG_EXT_SDTR		0x01
@@ -60,6 +60,11 @@
 
 #define MSG_EXT_PPR		0x04 /* SPI3 */
 #define MSG_EXT_PPR_LEN		0x06
-#define MSG_EXT_PPR_QAS_REQ	0x04
-#define MSG_EXT_PPR_DT_REQ	0x02
+#define	MSG_EXT_PPR_PCOMP_EN	0x80
+#define	MSG_EXT_PPR_RTI		0x40
+#define	MSG_EXT_PPR_RD_STRM	0x20
+#define	MSG_EXT_PPR_WR_FLOW	0x10
+#define	MSG_EXT_PPR_HOLD_MCS	0x08
+#define	MSG_EXT_PPR_QAS_REQ	0x04
+#define	MSG_EXT_PPR_DT_REQ	0x02
 #define MSG_EXT_PPR_IU_REQ	0x01
