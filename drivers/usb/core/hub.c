@@ -103,21 +103,23 @@ static int usb_set_port_feature(struct usb_device *dev, int port, int feature)
 /*
  * USB 2.0 spec Section 11.24.2.6
  */
-static int usb_get_hub_status(struct usb_device *dev, void *data)
+static int usb_get_hub_status(struct usb_device *dev,
+		struct usb_hub_status *data)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RT_HUB, 0, 0,
-		data, sizeof(struct usb_hub_status), HZ);
+		data, sizeof(*data), HZ);
 }
 
 /*
  * USB 2.0 spec Section 11.24.2.7
  */
-static int usb_get_port_status(struct usb_device *dev, int port, void *data)
+static int usb_get_port_status(struct usb_device *dev, int port,
+		struct usb_port_status *data)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RT_PORT, 0, port,
-		data, sizeof(struct usb_hub_status), HZ);
+		data, sizeof(*data), HZ);
 }
 
 /* completion function, fires on port status changes and various faults */
@@ -272,15 +274,47 @@ static void usb_hub_power_on(struct usb_hub *hub)
 	wait_ms(hub->descriptor->bPwrOn2PwrGood * 2);
 }
 
+static int usb_hub_hub_status(struct usb_hub *hub,
+		u16 *status, u16 *change)
+{
+	struct usb_device *dev = interface_to_usbdev (hub->intf);
+	int ret;
+
+	ret = usb_get_hub_status(dev, &hub->status->hub);
+	if (ret < 0)
+		dev_err (hubdev (dev),
+			"%s failed (err = %d)\n", __FUNCTION__, ret);
+	else {
+		*status = le16_to_cpu(hub->status->hub.wHubStatus);
+		*change = le16_to_cpu(hub->status->hub.wHubChange); 
+		ret = 0;
+	}
+	return ret;
+}
+
 static int usb_hub_configure(struct usb_hub *hub,
 	struct usb_endpoint_descriptor *endpoint)
 {
 	struct usb_device *dev = interface_to_usbdev (hub->intf);
 	struct device *hub_dev;
-	struct usb_hub_status hubstatus;
+	u16 hubstatus, hubchange;
 	unsigned int pipe;
 	int maxp, ret;
 	char *message;
+
+	hub->buffer = kmalloc(sizeof(*hub->buffer), GFP_KERNEL);
+	if (!hub->buffer) {
+		message = "can't kmalloc hub irq buffer";
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	hub->status = kmalloc(sizeof(*hub->status), GFP_KERNEL);
+	if (!hub->status) {
+		message = "can't kmalloc hub status buffer";
+		ret = -ENOMEM;
+		goto fail;
+	}
 
 	hub->descriptor = kmalloc(sizeof(*hub->descriptor), GFP_KERNEL);
 	if (!hub->descriptor) {
@@ -396,27 +430,25 @@ static int usb_hub_configure(struct usb_hub *hub,
 	dev_dbg(hub_dev, "hub controller current requirement: %dmA\n",
 		hub->descriptor->bHubContrCurrent);
 
-	ret = usb_get_hub_status(dev, &hubstatus);
+	ret = usb_hub_hub_status(hub, &hubstatus, &hubchange);
 	if (ret < 0) {
 		message = "can't get hub status";
 		goto fail;
 	}
 
-	le16_to_cpus(&hubstatus.wHubStatus);
-
 	dev_dbg(hub_dev, "local power source is %s\n",
-		(hubstatus.wHubStatus & HUB_STATUS_LOCAL_POWER)
+		(hubstatus & HUB_STATUS_LOCAL_POWER)
 		? "lost (inactive)" : "good");
 
 	dev_dbg(hub_dev, "%sover-current condition exists\n",
-		(hubstatus.wHubStatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
+		(hubstatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
 
 	/* Start the interrupt endpoint */
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
-	if (maxp > sizeof(hub->buffer))
-		maxp = sizeof(hub->buffer);
+	if (maxp > sizeof(*hub->buffer))
+		maxp = sizeof(*hub->buffer);
 
 	hub->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!hub->urb) {
@@ -425,7 +457,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 		goto fail;
 	}
 
-	usb_fill_int_urb(hub->urb, dev, pipe, hub->buffer, maxp, hub_irq,
+	usb_fill_int_urb(hub->urb, dev, pipe, *hub->buffer, maxp, hub_irq,
 		hub, endpoint->bInterval);
 	ret = usb_submit_urb(hub->urb, GFP_KERNEL);
 	if (ret) {
@@ -482,6 +514,16 @@ static void hub_disconnect(struct usb_interface *intf)
 	if (hub->descriptor) {
 		kfree(hub->descriptor);
 		hub->descriptor = NULL;
+	}
+
+	if (hub->status) {
+		kfree(hub->status);
+		hub->status = NULL;
+	}
+
+	if (hub->buffer) {
+		kfree(hub->buffer);
+		hub->buffer = NULL;
 	}
 
 	/* Free the memory */
@@ -641,25 +683,20 @@ static void usb_hub_disconnect(struct usb_device *dev)
 	err("cannot disconnect hub %s", dev->devpath);
 }
 
-static int usb_hub_port_status(struct usb_device *hub, int port,
+static int usb_hub_port_status(struct usb_device *dev, int port,
 			       u16 *status, u16 *change)
 {
-	struct usb_port_status *portsts;
-	int ret = -ENOMEM;
+	struct usb_hub *hub = usb_get_intfdata (dev->actconfig->interface);
+	int ret;
 
-	portsts = kmalloc(sizeof(*portsts), GFP_NOIO);
-	if (portsts) {
-		ret = usb_get_port_status(hub, port + 1, portsts);
-		if (ret < 0)
-			dev_err (hubdev (hub),
-				"%s failed (err = %d)\n", __FUNCTION__,
-				ret);
-		else {
-			*status = le16_to_cpu(portsts->wPortStatus);
-			*change = le16_to_cpu(portsts->wPortChange); 
-			ret = 0;
-		}
-		kfree(portsts);
+	ret = usb_get_port_status(dev, port + 1, &hub->status->port);
+	if (ret < 0)
+		dev_err (hubdev (dev),
+			"%s failed (err = %d)\n", __FUNCTION__, ret);
+	else {
+		*status = le16_to_cpu(hub->status->port.wPortStatus);
+		*change = le16_to_cpu(hub->status->port.wPortChange); 
+		ret = 0;
 	}
 	return ret;
 }
@@ -955,7 +992,6 @@ static void usb_hub_events(void)
 	struct list_head *tmp;
 	struct usb_device *dev;
 	struct usb_hub *hub;
-	struct usb_hub_status hubsts;
 	u16 hubstatus;
 	u16 hubchange;
 	u16 portstatus;
@@ -1064,11 +1100,9 @@ static void usb_hub_events(void)
 		} /* end for i */
 
 		/* deal with hub status changes */
-		if (usb_get_hub_status(dev, &hubsts) < 0)
+		if (usb_hub_hub_status(hub, &hubstatus, &hubchange) < 0)
 			dev_err (&hub->intf->dev, "get_hub_status failed\n");
 		else {
-			hubstatus = le16_to_cpup(&hubsts.wHubStatus);
-			hubchange = le16_to_cpup(&hubsts.wHubChange);
 			if (hubchange & HUB_CHANGE_LOCAL_POWER) {
 				dev_dbg (&hub->intf->dev, "power change\n");
 				usb_clear_hub_feature(dev, C_HUB_LOCAL_POWER);
