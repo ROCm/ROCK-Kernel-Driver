@@ -198,9 +198,9 @@ cg3_blank(int blank, struct fb_info *info)
 
 	switch (blank) {
 	case 0: /* Unblanking */
-		val = sbus_readl(&regs->control);
+		val = sbus_readb(&regs->control);
 		val |= CG3_CR_ENABLE_VIDEO;
-		sbus_writel(val, &regs->control);
+		sbus_writeb(val, &regs->control);
 		par->flags &= ~CG3_FLAG_BLANKED;
 		break;
 
@@ -208,9 +208,9 @@ cg3_blank(int blank, struct fb_info *info)
 	case 2: /* VESA blank (vsync off) */
 	case 3: /* VESA blank (hsync off) */
 	case 4: /* Poweroff */
-		val = sbus_readl(&regs->control);
+		val = sbus_readb(&regs->control);
 		val |= CG3_CR_ENABLE_VIDEO;
-		sbus_writel(val, &regs->control);
+		sbus_writeb(val, &regs->control);
 		par->flags |= CG3_FLAG_BLANKED;
 		break;
 	}
