@@ -64,7 +64,7 @@ SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/LOAD_ADDR/$(ZRELADDR)/;s/BSS_START/$(ZBS
 targets       := vmlinux vmlinux.lds piggy piggy.gz piggy.o \
                  font.o head.o $(OBJS)
 EXTRA_CFLAGS  := -fpic
-EXTRA_AFLAGS  := -traditional
+EXTRA_AFLAGS  :=
 
 LDFLAGS_vmlinux := -p -X \
 	$(shell $(CC) $(CFLAGS) --print-libgcc-file-name) -T
