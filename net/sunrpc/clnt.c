@@ -419,38 +419,53 @@ call_reserveresult(struct rpc_task *task)
 
 	dprintk("RPC: %4d call_reserveresult (status %d)\n",
 				task->tk_pid, task->tk_status);
+
 	/*
 	 * After a call to xprt_reserve(), we must have either
 	 * a request slot or else an error status.
 	 */
-	if ((task->tk_status >= 0 && !task->tk_rqstp) ||
-	    (task->tk_status < 0 && task->tk_rqstp))
-		printk(KERN_ERR "call_reserveresult: status=%d, request=%p??\n",
-		 task->tk_status, task->tk_rqstp);
+	task->tk_status = 0;
+	if (status >= 0) {
+		if (task->tk_rqstp) {
+			task->tk_action = call_allocate;
+			return;
+		}
 
-	if (task->tk_status >= 0) {
-		task->tk_action = call_allocate;
+		printk(KERN_ERR "%s: status=%d, but no request slot, exiting\n",
+				__FUNCTION__, status);
+		rpc_exit(task, -EIO);
 		return;
 	}
 
-	task->tk_status = 0;
+	/*
+	 * Even though there was an error, we may have acquired
+	 * a request slot somehow.  Make sure not to leak it.
+	 */
+	if (task->tk_rqstp) {
+		printk(KERN_ERR "%s: status=%d, request allocated anyway\n",
+				__FUNCTION__, status);
+		xprt_release(task);
+	}
+
 	switch (status) {
 	case -EAGAIN:
 	case -ENOBUFS:
 		task->tk_timeout = task->tk_client->cl_timeout.to_resrvval;
 		task->tk_action = call_reserve;
-		break;
+		return;
 	case -ETIMEDOUT:
-		dprintk("RPC: task timed out\n");
+		dprintk("RPC: timed out while reserving request slot\n");
 		task->tk_action = call_timeout;
+		return;
+	case -EIO:
+		/* probably a shutdown */
 		break;
 	default:
-		if (!task->tk_rqstp) {
-			printk(KERN_INFO "RPC: task has no request, exit EIO\n");
-			rpc_exit(task, -EIO);
-		} else
-			rpc_exit(task, status);
+		printk(KERN_ERR "%s: unrecognized error %d, exiting\n",
+				__FUNCTION__, status);
+		break;
 	}
+	rpc_exit(task, status);
 }
 
 /*
