@@ -202,7 +202,7 @@ show_fc_host_##field (struct class_device *cdev, char *buf)		\
 	struct Scsi_Host *shost = transport_class_to_shost(cdev);	\
 	struct fc_host_attrs *tp;					\
 	struct fc_internal *i = to_fc_internal(shost->transportt);	\
-	tp = (struct fc_host_attrs *)&shost->shost_data;		\
+	tp = (struct fc_host_attrs *)shost->shost_data;		\
 	if (i->f->get_host_##field)					\
 		i->f->get_host_##field(shost);				\
 	return snprintf(buf, 20, format_string, cast tp->field);	\

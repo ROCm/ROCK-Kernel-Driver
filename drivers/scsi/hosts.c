@@ -98,7 +98,7 @@ void scsi_remove_host(struct Scsi_Host *shost)
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
 	struct scsi_host_template *sht = shost->hostt;
-	int error;
+	int error = -EINVAL;
 
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
@@ -106,7 +106,7 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	if (!shost->can_queue) {
 		printk(KERN_ERR "%s: can_queue = 0 no longer supported\n",
 				sht->name);
-		return -EINVAL;
+		goto out;
 	}
 
 	if (!shost->shost_gendev.parent)
@@ -124,6 +124,14 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 		goto out_del_gendev;
 
 	get_device(&shost->shost_gendev);
+
+	if (shost->transportt->host_size &&
+	    (shost->shost_data = kmalloc(shost->transportt->host_size,
+					 GFP_KERNEL)) == NULL)
+		goto out_del_classdev;
+
+	if (shost->transportt->host_setup)
+		shost->transportt->host_setup(shost);
 
 	error = scsi_sysfs_add_host(shost);
 	if (error)
@@ -224,10 +232,8 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->max_id = 8;
 	shost->max_lun = 8;
 
-	/* Give each shost a default transportt if the driver
-	 * doesn't yet support Transport Attributes */
-	if (!shost->transportt) 
-		shost->transportt = &blank_transport_template;
+	/* Give each shost a default transportt */
+	shost->transportt = &blank_transport_template;
 
 	/*
 	 * All drivers right now should be able to handle 12 byte
@@ -281,26 +287,16 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	snprintf(shost->shost_classdev.class_id, BUS_ID_SIZE, "host%d",
 		  shost->host_no);
 
-	if (shost->transportt->host_size &&
-	    (shost->shost_data = kmalloc(shost->transportt->host_size,
-					 GFP_KERNEL)) == NULL)
-		goto fail_destroy_freelist;
-
-	if (shost->transportt->host_setup)
-		shost->transportt->host_setup(shost);
-
 	shost->eh_notify = &complete;
 	rval = kernel_thread(scsi_error_handler, shost, 0);
 	if (rval < 0)
-		goto fail_free_shost_data;
+		goto fail_destroy_freelist;
 	wait_for_completion(&complete);
 	shost->eh_notify = NULL;
 
 	scsi_proc_hostdir_add(shost->hostt);
 	return shost;
 
- fail_free_shost_data:
-	kfree(shost->shost_data);
  fail_destroy_freelist:
 	scsi_destroy_command_freelist(shost);
  fail_kfree:

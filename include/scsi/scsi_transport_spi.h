@@ -81,7 +81,7 @@ struct spi_host_attrs {
 #define spi_support_qas(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->support_qas)
 
 #define spi_flags(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->flags)
-#define spi_signalling(h)	(((struct spi_host_attrs *)&(h)->shost_data)->signalling)
+#define spi_signalling(h)	(((struct spi_host_attrs *)(h)->shost_data)->signalling)
 
 
 

@@ -49,9 +49,9 @@ struct fc_host_attrs {
 };
 
 #define fc_host_link_down_tmo(x) \
-	(((struct fc_host_attrs *)&(x)->shost_data)->link_down_tmo)
+	(((struct fc_host_attrs *)(x)->shost_data)->link_down_tmo)
 #define fc_host_link_down_timer(x) \
-	(((struct fc_host_attrs *)&(x)->shost_data)->link_down_timer)
+	(((struct fc_host_attrs *)(x)->shost_data)->link_down_timer)
 
 
 /* The functions by which the transport class and the driver communicate */
