@@ -860,7 +860,6 @@ extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 
 /* Backwards compat, remove in 2.7.x */
 #define pci_dma_sync_single	pci_dma_sync_single_for_cpu
-#define pci_dma_sync_sg		pci_dma_sync_sg_for_cpu
 
 /*
  *  If the system does not have PCI, clearly these return errors.  Define

@@ -1559,7 +1559,7 @@ mbox_post_cmd(adapter_t *adapter, scb_t *scb)
 					PCI_DMA_TODEVICE);
 		}
 		else {
-			pci_dma_sync_sg(adapter->pdev, scb->scp->request_buffer,
+			pci_dma_sync_sg_for_cpu(adapter->pdev, scb->scp->request_buffer,
 				scb->scp->use_sg, PCI_DMA_TODEVICE);
 		}
 	}
@@ -2345,7 +2345,7 @@ megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
 
 	case MRAID_DMA_WSG:
 		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_sg(adapter->pdev,
+			pci_dma_sync_sg_for_cpu(adapter->pdev,
 					scb->scp->request_buffer,
 					scb->scp->use_sg, PCI_DMA_FROMDEVICE);
 		}
