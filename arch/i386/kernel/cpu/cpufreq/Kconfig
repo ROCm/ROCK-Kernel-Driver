@@ -78,21 +78,21 @@ config X86_POWERNOW_K6
 
 	  If in doubt, say N.
 
-config X86_POWERNOW_K8
-	tristate "AMD Opteron/Athlon64 PowerNow!"
-	depends on CPU_FREQ_TABLE
-	help
-	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
-
-	  For details, take a look at linux/Documentation/cpu-freq. 
-
-	  If in doubt, say N.
-
 config X86_POWERNOW_K7
 	tristate "AMD Mobile Athlon/Duron PowerNow!"
 	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for mobile AMD K7 mobile processors.
+
+	  For details, take a look at linux/Documentation/cpu-freq. 
+
+	  If in doubt, say N.
+
+config X86_POWERNOW_K8
+	tristate "AMD Opteron/Athlon64 PowerNow!"
+	depends on CPU_FREQ_TABLE
+	help
+	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
 
 	  For details, take a look at linux/Documentation/cpu-freq. 
 
