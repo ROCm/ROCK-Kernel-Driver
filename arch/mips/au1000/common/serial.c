@@ -126,7 +126,7 @@ static char *serial_name = "Serial driver";
 
 static DECLARE_TASK_QUEUE(tq_serial);
 
-static struct tty_driver serial_driver;
+static struct tty_driver *serial_driver;
 
 static struct timer_list serial_timer;
 
@@ -188,7 +188,7 @@ static struct serial_state rs_table[RS_TABLE_SIZE] = {
 
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) printk("(%s): [%x], refc=%d, serc=%d, ttyc=%d -> %s\n", \
- tty->name, (info->flags), serial_driver.refcount, info->count,tty->count,s)
+ tty->name, (info->flags), serial_driver->refcount, info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -2495,6 +2495,28 @@ void unregister_serial(int line);
 EXPORT_SYMBOL(register_serial);
 EXPORT_SYMBOL(unregister_serial);
 
+static struct tty_operations serial_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.put_char = rs_put_char,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.break_ctl = rs_break,
+	.send_xchar = rs_send_xchar,
+	.wait_until_sent = rs_wait_until_sent,
+	.read_proc = rs_read_proc,
+};
+
 
 /*
  * The serial driver boot-time initialization code!
@@ -2503,6 +2525,10 @@ static int __init rs_init(void)
 {
 	int i;
 	struct serial_state * state;
+
+	serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!serial_driver)
+		return -ENOMEM;
 
 	init_bh(SERIAL_BH, do_serial_bh);
 	init_timer(&serial_timer);
@@ -2529,42 +2555,20 @@ static int __init rs_init(void)
 
 	/* Initialize the tty_driver structure */
 	
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.driver_name = "serial";
-	serial_driver.devfs_name = "tts/";
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64 + SERIAL_DEV_OFFSET;
-	serial_driver.num = NR_PORTS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->driver_name = "serial";
+	serial_driver->devfs_name = "tts/";
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64 + SERIAL_DEV_OFFSET;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.put_char = rs_put_char;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-	serial_driver.break_ctl = rs_break;
-	serial_driver.send_xchar = rs_send_xchar;
-	serial_driver.wait_until_sent = rs_wait_until_sent;
-	serial_driver.read_proc = rs_read_proc;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	tty_set_operations(serial_driver, &serial_ops);
 	
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
 
 	for (i = 0, state = rs_table; i < NR_PORTS; i++,state++) {
@@ -2600,7 +2604,7 @@ static int __init rs_init(void)
 		       (state->flags & ASYNC_FOURPORT) ? " FourPort" : "",
 		       state->port, state->irq,
 		       uart_config[state->type].name);
-		tty_register_device(&serial_driver, state->line, NULL);
+		tty_register_device(serial_driver, state->line, NULL);
 	}
 	return 0;
 }
@@ -2687,7 +2691,7 @@ int register_serial(struct serial_struct *req)
 	      state->iomem_base ? "iomem" : "port",
 	      state->iomem_base ? (unsigned long)state->iomem_base :
 	      state->port, state->irq, uart_config[state->type].name);
-	tty_register_device(&serial_driver, state->line, NULL); 
+	tty_register_device(serial_driver, state->line, NULL); 
 	return state->line + SERIAL_DEV_OFFSET;
 }
 
@@ -2713,8 +2717,7 @@ void unregister_serial(int line)
 	/* These will be hidden, because they are devices that will no longer
 	 * be available to the system. (ie, PCMCIA modems, once ejected)
 	 */
-	tty_unregister_device(&serial_driver, state->line);
-	tty_unregister_device(&callout_driver, state->line);
+	tty_unregister_device(serial_driver, state->line);
 	restore_flags(flags);
 }
 
@@ -2729,10 +2732,11 @@ static void __exit rs_fini(void)
 	del_timer_sync(&serial_timer);
 	save_flags(flags); cli();
         remove_bh(SERIAL_BH);
-	if ((e1 = tty_unregister_driver(&serial_driver)))
+	if ((e1 = tty_unregister_driver(serial_driver)))
 		printk("serial: failed to unregister serial driver (%d)\n",
 		       e1);
 	restore_flags(flags);
+	put_tty_driver(serial_driver);
 
 	for (i = 0; i < NR_PORTS; i++) {
 		if ((info = rs_table[i].info)) {
@@ -2832,7 +2836,7 @@ static void serial_console_write(struct console *co, const char *s,
 static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index - SERIAL_DEV_OFFSET;
-	return &serial_driver;
+	return serial_driver;
 }
 
 /*
