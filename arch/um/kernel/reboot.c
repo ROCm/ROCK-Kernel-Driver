@@ -15,6 +15,7 @@
 #ifdef CONFIG_SMP
 static void kill_idlers(int me)
 {
+#ifdef CONFIG_MODE_TT
 	struct task_struct *p;
 	int i;
 
@@ -23,6 +24,7 @@ static void kill_idlers(int me)
 		if((p != NULL) && (p->thread.mode.tt.extern_pid != me))
 			os_kill_process(p->thread.mode.tt.extern_pid, 0);
 	}
+#endif
 }
 #endif
 

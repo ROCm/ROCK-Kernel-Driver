@@ -279,7 +279,7 @@ void capture_signal_stack(void)
 	struct sc_frame_raw raw_sc;
 	struct si_frame_raw raw_si;
 	void *stack, *sigstack;
-	unsigned long top, sig_top, base;
+	unsigned long top, base;
 
 	stack = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
 		     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -292,7 +292,6 @@ void capture_signal_stack(void)
 	}
 
 	top = (unsigned long) stack + PAGE_SIZE - sizeof(void *);
-	sig_top = (unsigned long) sigstack + PAGE_SIZE;
 
 	/* Get the sigcontext, no sigrestorer layout */
 	raw_sc.restorer = 0;

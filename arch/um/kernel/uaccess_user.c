@@ -20,7 +20,7 @@ unsigned long __do_user_copy(void *to, const void *from, int n,
 
 	jmp_buf jbuf;
 	*fault_catcher = &jbuf;
-	if(setjmp(jbuf) == 0){
+	if(sigsetjmp(jbuf, 1) == 0){
 		(*op)(to, from, n);
 		ret = 0;
 		*faulted_out = 0;

@@ -79,17 +79,26 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 #ifdef AT_SYSINFO_EHDR
 
 static struct vm_area_struct gate_vmarea = {
-	/* Do _not_ mark this area as readable, cuz not the entire range may be readable
-	   (e.g., due to execute-only pages or holes) and the tools that read
-	   /proc/PID/maps should read the interesting bits from the gate-DSO file
-	   instead.  */
-	.vm_start = FIXADDR_USER_START,
-	.vm_end = FIXADDR_USER_END
+	/*
+	 * we cannot initialize fields right here, because on some
+	 * architectures (on UML to be precise), FIXADDR_USER_* are not
+	 * constant. See build_gate_map() below.
+	 */
 };
 
 # define gate_map()	&gate_vmarea
+static inline void build_gate_map(void)
+{
+	/* Do _not_ mark this area as readable, cuz not the entire range may
+	   be readable (e.g., due to execute-only pages or holes) and the
+	   tools that read /proc/PID/maps should read the interesting bits
+	   from the gate-DSO file instead.  */
+	gate_vmarea.vm_start = FIXADDR_USER_START;
+	gate_vmarea.vm_end   = FIXADDR_USER_END;
+}
 #else
 # define gate_map()	NULL
+# define build_gate_map()
 #endif
 
 static int show_map(struct seq_file *m, void *v)
@@ -137,6 +146,8 @@ static void *m_start(struct seq_file *m, loff_t *pos)
 
 	if (!mm)
 		return NULL;
+
+	build_gate_map();
 
 	down_read(&mm->mmap_sem);
 	map = mm->mmap;

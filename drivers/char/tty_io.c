@@ -2434,12 +2434,18 @@ static struct cdev ptmx_cdev;
 static struct cdev vc0_cdev;
 #endif
 
+static int tty_initialized;
+
 /*
  * Ok, now we can initialize the rest of the tty devices and can count
  * on memory allocations, interrupts etc..
  */
-static int __init tty_init(void)
+int __init tty_init(void)
 {
+        if (tty_initialized)
+                return 0;
+	tty_initialized = 1;
+
 	strcpy(tty_cdev.kobj.name, "dev.tty");
 	cdev_init(&tty_cdev, &tty_fops);
 	if (cdev_add(&tty_cdev, MKDEV(TTYAUX_MAJOR, 0), 1) ||

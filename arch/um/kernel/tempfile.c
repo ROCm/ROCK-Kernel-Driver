@@ -28,6 +28,7 @@ static void __init find_tempdir(void)
 	}
 	if((dir == NULL) || (*dir == '\0')) 
 		dir = "/tmp";
+
 	tempdir = malloc(strlen(dir) + 2);
 	if(tempdir == NULL){
 		fprintf(stderr, "Failed to malloc tempdir, "
@@ -49,7 +50,8 @@ int make_tempfile(const char *template, char **out_tempname, int do_unlink)
 	else
 		*tempname = 0;
 	strcat(tempname, template);
-	if((fd = mkstemp(tempname)) < 0){
+	fd = mkstemp(tempname);
+	if(fd < 0){
 		fprintf(stderr, "open - cannot create %s: %s\n", tempname, 
 			strerror(errno));
 		return -1;
@@ -59,7 +61,8 @@ int make_tempfile(const char *template, char **out_tempname, int do_unlink)
 		return -1;
 	}
 	if(out_tempname){
-		if((*out_tempname = strdup(tempname)) == NULL){
+		*out_tempname = strdup(tempname);
+		if(*out_tempname == NULL){
 			perror("strdup");
 			return -1;
 		}

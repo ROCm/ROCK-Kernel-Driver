@@ -41,13 +41,11 @@
 #include <media/video-buf.h>
 #include <media/audiochip.h>
 #include <media/tuner.h>
+#include <media/ir-common.h>
 
 #include "bt848.h"
 #include "bttv.h"
 #include "btcx-risc.h"
-#ifdef CONFIG_VIDEO_IR
-#include "ir-common.h"
-#endif
 
 #ifdef __KERNEL__
 
@@ -219,11 +217,14 @@ void bttv_vbi_setlines(struct bttv_fh *fh, struct bttv *btv, int lines);
 extern struct videobuf_queue_ops bttv_vbi_qops;
 
 /* ---------------------------------------------------------- */
-/* bttv-input.c                                               */
+/* bttv-gpio.c */
 
-int bttv_input_init(struct bttv *btv);
-void bttv_input_fini(struct bttv *btv);
-void bttv_input_irq(struct bttv *btv);
+
+extern struct bus_type bttv_sub_bus_type;
+int bttv_sub_add_device(struct bttv_core *core, char *name);
+int bttv_sub_del_devices(struct bttv_core *core);
+void bttv_gpio_irq(struct bttv_core *core);
+
 
 /* ---------------------------------------------------------- */
 /* bttv-driver.c                                              */
@@ -263,7 +264,6 @@ struct bttv_pll_info {
 	unsigned int pll_current;  /* Currently programmed ofreq */
 };
 
-#ifdef CONFIG_VIDEO_IR
 /* for gpio-connected remote control */
 struct bttv_input {
 	struct input_dev      dev;
@@ -273,36 +273,46 @@ struct bttv_input {
 	u32                   mask_keycode;
 	u32                   mask_keydown;
 };
-#endif
+
+struct bttv_suspend_state {
+	u32  pci_cfg[64 / sizeof(u32)];
+	u32  gpio_enable;
+	u32  gpio_data;
+	int  disabled;
+	struct bttv_buffer_set set;
+};
 
 struct bttv {
+	struct bttv_core c;
+
 	/* pci device config */
-	struct pci_dev *dev;
 	unsigned short id;
 	unsigned char revision;
 	unsigned char *bt848_mmio;   /* pointer to mmio */
 
 	/* card configuration info */
-        unsigned int nr;       /* dev nr (for printk("bttv%d: ...");  */
-	char name[8];          /* dev name */
 	unsigned int cardid;   /* pci subsystem id (bt878 based ones) */
-	unsigned int type;     /* card type (pointer into tvcards[])  */
         unsigned int tuner_type;  /* tuner chip type */
         unsigned int pinnacle_id;
 	unsigned int svhs;
 	struct bttv_pll_info pll;
 	int triton1;
+	int gpioirq;
 
-	/* gpio interface */
+	/* old gpio interface */
 	wait_queue_head_t gpioq;
 	int shutdown;
 	void (*audio_hook)(struct bttv *btv, struct video_audio *v, int set);
-	
+
+	/* new gpio interface */
+	spinlock_t gpio_lock;
+
 	/* i2c layer */
-	struct i2c_adapter         i2c_adap;
 	struct i2c_algo_bit_data   i2c_algo;
 	struct i2c_client          i2c_client;
 	int                        i2c_state, i2c_rc;
+	int                        i2c_done;
+	wait_queue_head_t          i2c_queue;
 
 	/* video4linux (1) */
 	struct video_device *video_dev;
@@ -311,9 +321,7 @@ struct bttv {
 
 	/* infrared remote */
 	int has_remote;
-#ifdef CONFIG_VIDEO_IR
 	struct bttv_input *remote;
-#endif
 
 	/* locking */
 	spinlock_t s_lock;
@@ -339,6 +347,8 @@ struct bttv {
 	int opt_chroma_agc;
 	int opt_adc_crush;
 	int opt_vcr_hack;
+	int opt_whitecrush_upper;
+	int opt_whitecrush_lower;
 
 	/* radio data/state */
 	int has_radio;
@@ -371,6 +381,11 @@ struct bttv {
 	unsigned long cap_ctl;
 	unsigned long dma_on;
 	struct timer_list timeout;
+	struct bttv_suspend_state state;
+
+	/* stats */
+	unsigned int irq_total;
+	unsigned int irq_me;
 	unsigned int errors;
 
 	unsigned int users;

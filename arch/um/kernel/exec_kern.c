@@ -32,10 +32,15 @@ void start_thread(struct pt_regs *regs, unsigned long eip, unsigned long esp)
 	CHOOSE_MODE_PROC(start_thread_tt, start_thread_skas, regs, eip, esp);
 }
 
+extern void log_exec(char **argv, void *tty);
+
 static int execve1(char *file, char **argv, char **env)
 {
         int error;
 
+#ifdef CONFIG_TTY_LOG
+	log_exec(argv, current->tty);
+#endif
         error = do_execve(file, argv, env, &current->thread.regs);
         if (error == 0){
                 current->ptrace &= ~PT_DTRACE;

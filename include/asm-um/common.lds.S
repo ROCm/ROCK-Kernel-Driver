@@ -1,3 +1,5 @@
+#include <asm-generic/vmlinux.lds.h>
+
   .fini      : { *(.fini)    } =0x9090
   _etext = .;
   PROVIDE (etext = .);
@@ -67,6 +69,10 @@
   }
   __initcall_end = .;
 
+  __con_initcall_start = .;
+  .con_initcall.init : { *(.con_initcall.init) }
+  __con_initcall_end = .;
+
   __uml_initcall_start = .;
   .uml.initcall.init : { *(.uml.initcall.init) }
   __uml_initcall_end = .;
@@ -80,7 +86,33 @@
   .uml.exitcall : { *(.uml.exitcall.exit) }
   __uml_exitcall_end = .;
 
-  . = ALIGN(4096);
+  . = ALIGN(4);
+  __alt_instructions = .;
+  .altinstructions : { *(.altinstructions) } 
+  __alt_instructions_end = .; 
+  .altinstr_replacement : { *(.altinstr_replacement) } 
+  /* .exit.text is discard at runtime, not link time, to deal with references
+     from .altinstructions and .eh_frame */
+  .exit.text : { *(.exit.text) }
+  .exit.data : { *(.exit.data) }
+ 
+  __preinit_array_start = .;
+  .preinit_array : { *(.preinit_array) }
+  __preinit_array_end = .;
+  __init_array_start = .;
+  .init_array : { *(.init_array) }
+  __init_array_end = .;
+  __fini_array_start = .;
+  .fini_array : { *(.fini_array) }
+  __fini_array_end = .;
+
+   . = ALIGN(4096);
   __initramfs_start = .;
   .init.ramfs : { *(.init.ramfs) }
   __initramfs_end = .;
+
+  /* Sections to be discarded */
+  /DISCARD/ : {
+ 	*(.exitcall.exit)
+  }
+ 

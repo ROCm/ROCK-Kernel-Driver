@@ -67,6 +67,7 @@
 #include <linux/ust.h>
 #endif
 
+
 #include <linux/videodev.h>
 
 MODULE_AUTHOR("Bill Dirks, Justin Schoeman, Gerd Knorr");
@@ -100,9 +101,11 @@ v4l2_video_std_fps(struct v4l2_standard *vs)
 int v4l2_video_std_construct(struct v4l2_standard *vs,
 			     int id, char *name)
 {
-	memset(vs, 0, sizeof(struct v4l2_standard));
+	u32 index = vs->index;
 
-	vs->id = id;
+	memset(vs, 0, sizeof(struct v4l2_standard));
+	vs->index = index;
+	vs->id    = id;
 	if (id & (V4L2_STD_NTSC | V4L2_STD_PAL_M)) {
 		vs->frameperiod.numerator = 1001;
 		vs->frameperiod.denominator = 30000;
@@ -118,6 +121,66 @@ int v4l2_video_std_construct(struct v4l2_standard *vs,
 
 
 /* ----------------------------------------------------------------- */
+/* priority handling                                                 */
+
+#define V4L2_PRIO_VALID(val) (val == V4L2_PRIORITY_BACKGROUND   || \
+			      val == V4L2_PRIORITY_INTERACTIVE  || \
+			      val == V4L2_PRIORITY_RECORD)
+
+int v4l2_prio_init(struct v4l2_prio_state *global)
+{
+	memset(global,0,sizeof(*global));
+	return 0;
+}
+	
+int v4l2_prio_change(struct v4l2_prio_state *global, enum v4l2_priority *local,
+		     enum v4l2_priority new)
+{
+	if (!V4L2_PRIO_VALID(new))
+		return -EINVAL;
+	if (*local == new)
+		return 0;
+
+	atomic_inc(&global->prios[new]);
+	if (V4L2_PRIO_VALID(*local))
+		atomic_dec(&global->prios[*local]);
+	*local = new;
+	return 0;
+}
+
+int v4l2_prio_open(struct v4l2_prio_state *global, enum v4l2_priority *local)
+{
+	return v4l2_prio_change(global,local,V4L2_PRIORITY_DEFAULT);
+}
+
+int v4l2_prio_close(struct v4l2_prio_state *global, enum v4l2_priority *local)
+{
+	if (V4L2_PRIO_VALID(*local))
+		atomic_dec(&global->prios[*local]);
+	return 0;
+}
+
+enum v4l2_priority v4l2_prio_max(struct v4l2_prio_state *global)
+{
+	if (atomic_read(&global->prios[V4L2_PRIORITY_RECORD]) > 0)
+		return V4L2_PRIORITY_RECORD;
+	if (atomic_read(&global->prios[V4L2_PRIORITY_INTERACTIVE]) > 0)
+		return V4L2_PRIORITY_INTERACTIVE;
+	if (atomic_read(&global->prios[V4L2_PRIORITY_BACKGROUND]) > 0)
+		return V4L2_PRIORITY_BACKGROUND;
+	return V4L2_PRIORITY_UNSET;
+}
+
+int v4l2_prio_check(struct v4l2_prio_state *global, enum v4l2_priority *local)
+{
+	if (*local < v4l2_prio_max(global))
+		return -EBUSY;
+	return 0;
+}
+
+
+/* ----------------------------------------------------------------- */
+/* some arrays for pretty-printing debug messages                    */
 
 char *v4l2_field_names[] = {
 	[V4L2_FIELD_ANY]        = "any",
@@ -198,6 +261,13 @@ char *v4l2_ioctl_names[256] = {
 
 EXPORT_SYMBOL(v4l2_video_std_fps);
 EXPORT_SYMBOL(v4l2_video_std_construct);
+
+EXPORT_SYMBOL(v4l2_prio_init);
+EXPORT_SYMBOL(v4l2_prio_change);
+EXPORT_SYMBOL(v4l2_prio_open);
+EXPORT_SYMBOL(v4l2_prio_close);
+EXPORT_SYMBOL(v4l2_prio_max);
+EXPORT_SYMBOL(v4l2_prio_check);
 
 EXPORT_SYMBOL(v4l2_field_names);
 EXPORT_SYMBOL(v4l2_type_names);

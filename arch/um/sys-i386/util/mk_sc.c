@@ -38,6 +38,7 @@ int main(int argc, char **argv)
   SC_OFFSET("SC_ERR", err);
   SC_OFFSET("SC_CR2", cr2);
   SC_OFFSET("SC_FPSTATE", fpstate);
+  SC_OFFSET("SC_SIGMASK", oldmask);
   SC_FP_OFFSET("SC_FP_CW", cw);
   SC_FP_OFFSET("SC_FP_SW", sw);
   SC_FP_OFFSET("SC_FP_TAG", tag);

@@ -39,7 +39,7 @@ MODULE_PARM(vbibufs,"i");
 MODULE_PARM_DESC(vbibufs,"number of vbi buffers, range 2-32");
 
 #define dprintk(fmt, arg...)	if (vbi_debug) \
-	printk(KERN_DEBUG "%s/vbi: " fmt, dev->name, ## arg)
+	printk(KERN_DEBUG "%s/vbi: " fmt, dev->name , ## arg)
 
 /* ------------------------------------------------------------------ */
 

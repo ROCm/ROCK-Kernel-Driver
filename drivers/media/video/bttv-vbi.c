@@ -44,7 +44,7 @@ MODULE_PARM_DESC(vbi_debug,"vbi code debug messages, default is 0 (no)");
 # undef dprintk
 #endif
 #define dprintk(fmt, arg...)	if (vbi_debug) \
-	printk(KERN_DEBUG "bttv%d/vbi: " fmt, btv->nr, ## arg)
+	printk(KERN_DEBUG "bttv%d/vbi: " fmt, btv->c.nr , ## arg)
 
 /* ----------------------------------------------------------------------- */
 /* vbi risc code + mm                                                      */
@@ -87,7 +87,7 @@ static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 		return -EINVAL;
 
 	if (STATE_NEEDS_INIT == buf->vb.state) {
-		if (0 != (rc = videobuf_iolock(btv->dev, &buf->vb, NULL)))
+		if (0 != (rc = videobuf_iolock(btv->c.pci, &buf->vb, NULL)))
 			goto fail;
 		if (0 != (rc = vbi_buffer_risc(btv,buf,fh->lines)))
 			goto fail;

@@ -8,7 +8,7 @@
 
 #include "sysdep/ptrace.h"
 
-extern int userspace_pid;
+extern int userspace_pid[];
 
 extern void switch_threads(void *me, void *next);
 extern void thread_wait(void *sw, void *fb);
@@ -32,7 +32,7 @@ extern int singlestepping_skas(void);
 extern int new_mm(int from);
 extern void save_registers(union uml_pt_regs *regs);
 extern void restore_registers(union uml_pt_regs *regs);
-extern void start_userspace(void);
+extern void start_userspace(int cpu);
 extern void init_registers(int pid);
 
 #endif
