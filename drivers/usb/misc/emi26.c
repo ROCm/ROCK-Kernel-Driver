@@ -236,8 +236,7 @@ struct usb_driver emi26_driver = {
 
 static int __init emi26_init (void)
 {
-	usb_register (&emi26_driver);
-	return 0;
+	return usb_register(&emi26_driver);
 }
 
 static void __exit emi26_exit (void)
