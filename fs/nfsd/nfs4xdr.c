@@ -1830,7 +1830,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	struct nfsd4_readdir *cd = container_of(ccd, struct nfsd4_readdir, common);
 	int buflen;
 	u32 *p = cd->buffer;
-	int nfserr = 0;
+	int nfserr = nfserr_toosmall;
 
 	/* In nfsv4, "." and ".." never make it onto the wire.. */
 	if (name && isdotent(name, namlen)) {
@@ -1843,7 +1843,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 
 	buflen = cd->buflen - 4 - XDR_QUADLEN(namlen);
 	if (buflen < 0)
-		goto nospc;
+		goto fail;
 
 	*p++ = xdr_one;                             /* mark entry present */
 	cd->offset = p;                             /* remember pointer */
@@ -1858,8 +1858,10 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		p += buflen;
 		goto out;
 	}
-	if (nfserr == nfserr_resource)
-		goto nospc;
+	if (nfserr == nfserr_resource) {
+		nfserr = nfserr_toosmall;
+		goto fail;
+	}
 
 	/*
 	 * If we get here, we experienced a miscellaneous
@@ -1870,13 +1872,12 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	 * then in accordance with the spec, we fail the
 	 * entire READDIR operation(!)
 	 */
-	if (!(cd->rd_bmval[0] & FATTR4_WORD0_RDATTR_ERROR)) {
-		cd->common.err = nfserr;
-		return -EINVAL;
-	}
+	if (!(cd->rd_bmval[0] & FATTR4_WORD0_RDATTR_ERROR))
+		goto fail;
+	nfserr = nfserr_toosmall;
 	p = nfsd4_encode_rdattr_error(p, buflen, nfserr);
 	if (p == NULL)
-		goto out_nospc;
+		goto fail;
 
 out:
 	cd->buflen -= (p - cd->buffer);
@@ -1884,8 +1885,8 @@ out:
 	cd->common.err = nfs_ok;
 	return 0;
 
-nospc:
-	cd->common.err = nfserr_toosmall;
+fail:
+	cd->common.err = nfserr;
 	return -EINVAL;
 }
 
