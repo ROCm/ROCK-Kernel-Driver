@@ -183,7 +183,7 @@ static int check_apm_user(struct apm_user *as, const char *func)
 static ssize_t do_read(struct file *fp, char *buf, size_t count, loff_t *ppos)
 {
 	struct apm_user *	as;
-	int			i;
+	size_t			i;
 	apm_event_t		event;
 	DECLARE_WAITQUEUE(wait, current);
 
