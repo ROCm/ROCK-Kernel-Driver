@@ -76,23 +76,8 @@ static struct pci_device_id pciidlist[] = {
 	i810_PCI_IDS
 };
 
-static drm_ioctl_desc_t ioctls[] = {
-	[DRM_IOCTL_NR(DRM_I810_INIT)]    = { i810_dma_init,    1, 1 },
-	[DRM_IOCTL_NR(DRM_I810_VERTEX)]  = { i810_dma_vertex,  1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_CLEAR)]   = { i810_clear_bufs,  1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_FLUSH)]   = { i810_flush_ioctl, 1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_GETAGE)]  = { i810_getage,      1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_GETBUF)]  = { i810_getbuf,      1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_SWAP)]    = { i810_swap_bufs,   1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_COPY)]    = { i810_copybuf,     1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_DOCOPY)]  = { i810_docopy,      1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_OV0INFO)] = { i810_ov0_info,    1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_FSTATUS)] = { i810_fstatus,     1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_OV0FLIP)] = { i810_ov0_flip,    1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_MC)]      = { i810_dma_mc,      1, 1 },
-	[DRM_IOCTL_NR(DRM_I810_RSTATUS)] = { i810_rstatus,     1, 0 },
-	[DRM_IOCTL_NR(DRM_I810_FLIP)]    = { i810_flip_bufs,   1, 0 }
-};
+extern drm_ioctl_desc_t i810_ioctls[];
+extern int i810_max_ioctl;
 
 static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE,
@@ -105,8 +90,7 @@ static struct drm_driver driver = {
 	.get_reg_ofs = drm_core_get_reg_ofs,
 	.postinit = postinit,
 	.version = version,
-	.ioctls = ioctls,
-	.num_ioctls = DRM_ARRAY_SIZE(ioctls),
+	.ioctls = i810_ioctls,
 	.fops = {
 		.owner = THIS_MODULE,
 		.open = drm_open,
@@ -124,6 +108,7 @@ static struct drm_driver driver = {
 
 static int __init i810_init(void)
 {
+	driver.num_ioctls = i810_max_ioctl;
 	return drm_init(&driver);
 }
 

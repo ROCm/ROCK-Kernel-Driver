@@ -77,22 +77,8 @@ static struct pci_device_id pciidlist[] = {
 	i830_PCI_IDS
 };
 
-static drm_ioctl_desc_t ioctls[] = {
-	[DRM_IOCTL_NR(DRM_I830_INIT)]     = { i830_dma_init,    1, 1 },
-	[DRM_IOCTL_NR(DRM_I830_VERTEX)]   = { i830_dma_vertex,  1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_CLEAR)]    = { i830_clear_bufs,  1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_FLUSH)]    = { i830_flush_ioctl, 1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_GETAGE)]   = { i830_getage,      1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_GETBUF)]   = { i830_getbuf,      1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_SWAP)]     = { i830_swap_bufs,   1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_COPY)]     = { i830_copybuf,     1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_DOCOPY)]   = { i830_docopy,      1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_FLIP)]     = { i830_flip_bufs,   1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_IRQ_EMIT)] = { i830_irq_emit,    1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_IRQ_WAIT)] = { i830_irq_wait,    1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_GETPARAM)] = { i830_getparam,    1, 0 },
-	[DRM_IOCTL_NR(DRM_I830_SETPARAM)] = { i830_setparam,    1, 0 } 
-};
+extern drm_ioctl_desc_t i830_ioctls[];
+extern int i830_max_ioctl;
 
 static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE,
@@ -114,8 +100,7 @@ static struct drm_driver driver = {
 #endif
 	.postinit = postinit,
 	.version = version,
-	.ioctls = ioctls,
-	.num_ioctls = DRM_ARRAY_SIZE(ioctls),
+	.ioctls = i830_ioctls,
 	.fops = {
 		.owner = THIS_MODULE,
 		.open = drm_open,
@@ -134,6 +119,7 @@ static struct drm_driver driver = {
 
 static int __init i830_init(void)
 {
+	driver.num_ioctls = i830_max_ioctl;
 	return drm_init(&driver);
 }
 

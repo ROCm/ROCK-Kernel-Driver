@@ -145,7 +145,8 @@
 #define RADEON_EMIT_PP_TEX_SIZE_1                   74
 #define RADEON_EMIT_PP_TEX_SIZE_2                   75
 #define R200_EMIT_RB3D_BLENDCOLOR                   76
-#define RADEON_MAX_STATE_PACKETS                    77
+#define R200_EMIT_TCL_POINT_SPRITE_CNTL             77
+#define RADEON_MAX_STATE_PACKETS                    78
 
 
 /* Commands understood by cmd_buffer ioctl.  More can be added but
@@ -192,7 +193,10 @@ typedef union {
 #define RADEON_FRONT			0x1
 #define RADEON_BACK			0x2
 #define RADEON_DEPTH			0x4
-#define RADEON_STENCIL                  0x8
+#define RADEON_STENCIL			0x8
+#define RADEON_CLEAR_FASTZ		0x80000000
+#define RADEON_USE_HIERZ		0x40000000
+#define RADEON_USE_COMP_ZBUF		0x20000000
 
 /* Primitive types
  */
@@ -226,6 +230,8 @@ typedef union {
 
 #define RADEON_MAX_TEXTURE_LEVELS	12
 #define RADEON_MAX_TEXTURE_UNITS	3
+
+#define RADEON_MAX_SURFACES		8
 
 /* Blits have strict offset rules.  All blit offset must be aligned on
  * a 1K-byte boundary.
@@ -361,6 +367,7 @@ typedef struct {
         int pfState;                /* number of 3d windows (0,1,2ormore) */
         int pfCurrentPage;	    /* which buffer is being displayed? */
 	int crtc2_base;		    /* CRTC2 frame offset */
+	int tiling_enabled;	/* set by drm, read by 2d + 3d clients */
 } drm_radeon_sarea_t;
 
 
@@ -399,6 +406,8 @@ typedef struct {
 #define DRM_RADEON_IRQ_WAIT   0x17
 #define DRM_RADEON_CP_RESUME  0x18
 #define DRM_RADEON_SETPARAM   0x19
+#define DRM_RADEON_SURF_ALLOC 0x1a
+#define DRM_RADEON_SURF_FREE  0x1b
 
 #define DRM_IOCTL_RADEON_CP_INIT    DRM_IOW( DRM_COMMAND_BASE + DRM_RADEON_CP_INIT, drm_radeon_init_t)
 #define DRM_IOCTL_RADEON_CP_START   DRM_IO(  DRM_COMMAND_BASE + DRM_RADEON_CP_START)
@@ -425,12 +434,15 @@ typedef struct {
 #define DRM_IOCTL_RADEON_IRQ_WAIT   DRM_IOW( DRM_COMMAND_BASE + DRM_RADEON_IRQ_WAIT, drm_radeon_irq_wait_t)
 #define DRM_IOCTL_RADEON_CP_RESUME  DRM_IO(  DRM_COMMAND_BASE + DRM_RADEON_CP_RESUME)
 #define DRM_IOCTL_RADEON_SETPARAM   DRM_IOW( DRM_COMMAND_BASE + DRM_RADEON_SETPARAM, drm_radeon_setparam_t)
+#define DRM_IOCTL_RADEON_SURF_ALLOC DRM_IOW( DRM_COMMAND_BASE + DRM_RADEON_SURF_ALLOC, drm_radeon_surface_alloc_t)
+#define DRM_IOCTL_RADEON_SURF_FREE  DRM_IOW( DRM_COMMAND_BASE + DRM_RADEON_SURF_FREE, drm_radeon_surface_free_t)
 
 typedef struct drm_radeon_init {
 	enum {
 		RADEON_INIT_CP    = 0x01,
 		RADEON_CLEANUP_CP = 0x02,
-		RADEON_INIT_R200_CP = 0x03
+		RADEON_INIT_R200_CP = 0x03,
+		RADEON_INIT_R300_CP = 0x04
 	} func;
 	unsigned long sarea_priv_offset;
 	int is_pci;
@@ -623,7 +635,19 @@ typedef struct drm_radeon_setparam {
 	int64_t      value;
 } drm_radeon_setparam_t;
 
-#define RADEON_SETPARAM_FB_LOCATION    1 /* determined framebuffer location */
+#define RADEON_SETPARAM_FB_LOCATION    1	/* determined framebuffer location */
+#define RADEON_SETPARAM_SWITCH_TILING  2	/* enable/disable color tiling */
 
+/* 1.14: Clients can allocate/free a surface
+ */
+typedef struct drm_radeon_surface_alloc {
+	unsigned int address;
+	unsigned int size;
+	unsigned int flags;
+} drm_radeon_surface_alloc_t;
+
+typedef struct drm_radeon_surface_free {
+	unsigned int address;
+} drm_radeon_surface_free_t;
 
 #endif
