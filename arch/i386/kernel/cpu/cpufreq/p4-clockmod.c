@@ -27,6 +27,7 @@
 #include <linux/smp.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
+#include <linux/cpumask.h>
 
 #include <asm/processor.h> 
 #include <asm/msr.h>
