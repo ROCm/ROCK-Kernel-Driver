@@ -30,7 +30,7 @@ static void *atalk_seq_interface_start(struct seq_file *seq, loff_t *pos)
 {
 	loff_t l = *pos;
 
-	spin_lock_bh(&atalk_interfaces_lock);
+	read_lock_bh(&atalk_interfaces_lock);
 	return l ? atalk_get_interface_idx(--l) : (void *)1;
 }
 
@@ -53,7 +53,7 @@ out:
 
 static void atalk_seq_interface_stop(struct seq_file *seq, void *v)
 {
-	spin_unlock_bh(&atalk_interfaces_lock);
+	read_unlock_bh(&atalk_interfaces_lock);
 }
 
 static int atalk_seq_interface_show(struct seq_file *seq, void *v)
@@ -154,7 +154,7 @@ static void *atalk_seq_socket_start(struct seq_file *seq, loff_t *pos)
 {
 	loff_t l = *pos;
 
-	spin_lock_bh(&atalk_sockets_lock);
+	read_lock_bh(&atalk_sockets_lock);
 	return l ? atalk_get_socket_idx(--l) : (void *)1;
 }
 
@@ -177,7 +177,7 @@ out:
 
 static void atalk_seq_socket_stop(struct seq_file *seq, void *v)
 {
-	spin_unlock_bh(&atalk_sockets_lock);
+	read_unlock_bh(&atalk_sockets_lock);
 }
 
 static int atalk_seq_socket_show(struct seq_file *seq, void *v)
