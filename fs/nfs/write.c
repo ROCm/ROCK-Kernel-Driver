@@ -74,7 +74,6 @@
 static struct nfs_page * nfs_update_request(struct file*, struct inode *,
 					    struct page *,
 					    unsigned int, unsigned int);
-static void	nfs_strategy(struct inode *inode);
 
 static kmem_cache_t *nfs_wdata_cachep;
 static mempool_t *nfs_wdata_mempool;
@@ -122,6 +121,52 @@ void nfs_commit_release(struct rpc_task *task)
 {
 	struct nfs_write_data	*wdata = (struct nfs_write_data *)task->tk_calldata;
 	nfs_commit_free(wdata);
+}
+
+/* Adjust the file length if we're writing beyond the end */
+static void nfs_grow_file(struct page *page, unsigned int offset, unsigned int count)
+{
+	struct inode *inode = page->mapping->host;
+	loff_t end, i_size = i_size_read(inode);
+	unsigned long end_index = (i_size - 1) >> PAGE_CACHE_SHIFT;
+
+	if (i_size > 0 && page->index < end_index)
+		return;
+	end = ((loff_t)page->index << PAGE_CACHE_SHIFT) + ((loff_t)offset+count);
+	if (i_size >= end)
+		return;
+	i_size_write(inode, end);
+}
+
+/* We can set the PG_uptodate flag if we see that a write request
+ * covers the full page.
+ */
+static void nfs_mark_uptodate(struct page *page, unsigned int base, unsigned int count)
+{
+	loff_t end_offs;
+
+	if (PageUptodate(page))
+		return;
+	if (base != 0)
+		return;
+	if (count == PAGE_CACHE_SIZE) {
+		SetPageUptodate(page);
+		return;
+	}
+
+	end_offs = i_size_read(page->mapping->host) - 1;
+	if (end_offs < 0)
+		return;
+	/* Is this the last page? */
+	if (page->index != (unsigned long)(end_offs >> PAGE_CACHE_SHIFT))
+		return;
+	/* This is the last page: set PG_uptodate if we cover the entire
+	 * extent of the data, then zero the rest of the page.
+	 */
+	if (count == (unsigned int)(end_offs & (PAGE_CACHE_SIZE - 1)) + 1) {
+		memclear_highpage_flush(page, count, PAGE_CACHE_SIZE - count);
+		SetPageUptodate(page);
+	}
 }
 
 /*
@@ -178,14 +223,11 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 	        wdata.args.pgbase += result;
 		written += result;
 		count -= result;
-
-		/*
-		 * If we've extended the file, update the inode
-		 * now so we don't invalidate the cache.
-		 */
-		if (wdata.args.offset > i_size_read(inode))
-			i_size_write(inode, wdata.args.offset);
 	} while (count);
+	/* Update file length */
+	nfs_grow_file(page, offset, written);
+	/* Set the PG_uptodate flag? */
+	nfs_mark_uptodate(page, offset, written);
 
 	if (PageError(page))
 		ClearPageError(page);
@@ -202,18 +244,17 @@ static int nfs_writepage_async(struct file *file, struct inode *inode,
 		struct page *page, unsigned int offset, unsigned int count)
 {
 	struct nfs_page	*req;
-	loff_t		end;
 	int		status;
 
 	req = nfs_update_request(file, inode, page, offset, count);
 	status = (IS_ERR(req)) ? PTR_ERR(req) : 0;
 	if (status < 0)
 		goto out;
+	/* Update file length */
+	nfs_grow_file(page, offset, count);
+	/* Set the PG_uptodate flag? */
+	nfs_mark_uptodate(page, offset, count);
 	nfs_unlock_request(req);
-	nfs_strategy(inode);
-	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
-	if (i_size_read(inode) < end)
-		i_size_write(inode, end);
  out:
 	return status;
 }
@@ -603,46 +644,6 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 	return req;
 }
 
-/*
- * This is the strategy routine for NFS.
- * It is called by nfs_updatepage whenever the user wrote up to the end
- * of a page.
- *
- * We always try to submit a set of requests in parallel so that the
- * server's write code can gather writes. This is mainly for the benefit
- * of NFSv2.
- *
- * We never submit more requests than we think the remote can handle.
- * For UDP sockets, we make sure we don't exceed the congestion window;
- * for TCP, we limit the number of requests to 8.
- *
- * NFS_STRATEGY_PAGES gives the minimum number of requests for NFSv2 that
- * should be sent out in one go. This is for the benefit of NFSv2 servers
- * that perform write gathering.
- *
- * FIXME: Different servers may have different sweet spots.
- * Record the average congestion window in server struct?
- */
-#define NFS_STRATEGY_PAGES      8
-static void
-nfs_strategy(struct inode *inode)
-{
-	unsigned int	dirty, wpages;
-
-	dirty  = NFS_I(inode)->ndirty;
-	wpages = NFS_SERVER(inode)->wpages;
-#if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-	if (NFS_PROTO(inode)->version == 2) {
-		if (dirty >= NFS_STRATEGY_PAGES * wpages)
-			nfs_flush_file(inode, NULL, 0, 0, 0);
-	} else if (dirty >= wpages)
-		nfs_flush_file(inode, NULL, 0, 0, 0);
-#else
-	if (dirty >= NFS_STRATEGY_PAGES * wpages)
-		nfs_flush_file(inode, NULL, 0, 0, 0);
-#endif
-}
-
 int
 nfs_flush_incompatible(struct file *file, struct page *page)
 {
@@ -678,7 +679,6 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 	struct dentry	*dentry = file->f_dentry;
 	struct inode	*inode = page->mapping->host;
 	struct nfs_page	*req;
-	loff_t		end;
 	int		status = 0;
 
 	dprintk("NFS:      nfs_updatepage(%s/%s %d@%Ld)\n",
@@ -699,6 +699,27 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 		return status;
 	}
 
+	/* If we're not using byte range locks, and we know the page
+	 * is entirely in cache, it may be more efficient to avoid
+	 * fragmenting write requests.
+	 */
+	if (PageUptodate(page) && inode->i_flock == NULL) {
+		loff_t end_offs = i_size_read(inode) - 1;
+		unsigned long end_index = end_offs >> PAGE_CACHE_SHIFT;
+
+		count += offset;
+		offset = 0;
+		if (unlikely(end_offs < 0)) {
+			/* Do nothing */
+		} else if (page->index == end_index) {
+			unsigned int pglen;
+			pglen = (unsigned int)(end_offs & (PAGE_CACHE_SIZE-1)) + 1;
+			if (count < pglen)
+				count = pglen;
+		} else if (page->index < end_index)
+			count = PAGE_CACHE_SIZE;
+	}
+
 	/*
 	 * Try to find an NFS request corresponding to this page
 	 * and update it.
@@ -717,20 +738,12 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 		goto done;
 
 	status = 0;
-	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
-	if (i_size_read(inode) < end)
-		i_size_write(inode, end);
 
-	/* If we wrote past the end of the page.
-	 * Call the strategy routine so it can send out a bunch
-	 * of requests.
-	 */
-	if (req->wb_pgbase == 0 && req->wb_bytes == PAGE_CACHE_SIZE) {
-		SetPageUptodate(page);
-		nfs_unlock_request(req);
-		nfs_strategy(inode);
-	} else
-		nfs_unlock_request(req);
+	/* Update file length */
+	nfs_grow_file(page, offset, count);
+	/* Set the PG_uptodate flag? */
+	nfs_mark_uptodate(page, req->wb_pgbase, req->wb_bytes);
+	nfs_unlock_request(req);
 done:
         dprintk("NFS:      nfs_updatepage returns %d (isize %Ld)\n",
 			status, (long long)i_size_read(inode));
