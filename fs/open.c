@@ -496,7 +496,10 @@ asmlinkage long sys_access(const char __user * filename, int mode)
 		LOOKUP_FOLLOW|LOOKUP_ACCESS,
 		nd,
 		path,
-		.mode = mode)
+		.mode = mode,
+		.actual.fsuid = old_fsuid,
+		.actual.fsgid = old_fsgid,
+		.actual.pcaps = &old_cap)
 
 		res = permission(nd.dentry->d_inode, mode, &nd);
 		/* SuS v2 requires we report a read only fs too */

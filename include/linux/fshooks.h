@@ -9,6 +9,7 @@
 
 #ifdef CONFIG_FSHOOKS
 
+#include <linux/poll.h>
 #include <linux/rwsem.h>
 
 enum FShook {
@@ -62,7 +63,7 @@ extern struct fshook_list fshooks[fshook_COUNT];
 member_type(struct fshook_generic_info, result) fshook_run_pre(enum FShook type, fshook_info_t info);
 void fshook_run_post(fshook_info_t info, member_type(struct fshook_generic_info, result) result);
 
-/* there must not be semicolons after the invocations of FSHOOK_BEGN/FSHOOK_END */
+/* there must not be semicolons after the invocations of FSHOOK_BEGIN/FSHOOK_END */
 #define FSHOOK_BEGIN(type, result, args...) { \
 		struct fshook_##type##_info info = { args }; \
 		\
@@ -79,23 +80,26 @@ void fshook_run_post(fshook_info_t info, member_type(struct fshook_generic_info,
 			fshook_run_post(&info, result); \
 	}
 
-#define FSHOOK_BEGIN_USER_WALK_COMMON(type, err, walk, args...) { \
+#define FSHOOK_BEGIN_USER_WALK_COMMON(type, err, walk, nd, args...) { \
 		struct fshook_##type##_info info = { args }; \
-		if (!(err = walk) \
-		    && (!fshooks[FSHOOK_##type].first \
-		        || !(err = (__typeof__(err))fshook_run_pre(FSHOOK_##type, &info)))) {
+		if (!(err = walk)) { \
+			if(unlikely(fshooks[FSHOOK_##type].first \
+		        && (err = (__typeof__(err))fshook_run_pre(FSHOOK_##type, &info)) != 0)) \
+				path_release(&nd); \
+			else {
 
 #define FSHOOK_BEGIN_USER_WALK(type, err, path, flags, nd, field, args...) \
-		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, flags, &nd, &info.field), args)
+		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, flags, &nd, &info.field), nd, args)
 
 #define FSHOOK_BEGIN_USER_PATH_WALK(type, err, path, nd, field, args...) \
-		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, LOOKUP_FOLLOW, &nd, &info.field), args)
+		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, LOOKUP_FOLLOW, &nd, &info.field), nd, args)
 
 #define FSHOOK_BEGIN_USER_PATH_WALK_LINK(type, err, path, nd, field, args...) \
-		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, 0, &nd, &info.field), args)
+		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, 0, &nd, &info.field), nd, args)
 
 #define FSHOOK_END_USER_WALK(type, err, field) \
-			(void)(&info != (struct fshook_##type##_info *)-1L); \
+				(void)(&info != (struct fshook_##type##_info *)-1L); \
+			} \
 		} \
 		else if (!IS_ERR(info.field) && fshooks[FSHOOK_##type].first) { \
 			__typeof__(err) fshook_err = (__typeof__(err))fshook_run_pre(FSHOOK_##type, &info); \
@@ -140,6 +144,11 @@ void fshook_run_post(fshook_info_t info, member_type(struct fshook_generic_info,
 FSHOOK_DEFINE(access,
 	const char *path;
 	int mode;
+	struct {
+		uid_t fsuid;
+		gid_t fsgid;
+		const kernel_cap_t *pcaps;
+	} actual;
 )
 
 FSHOOK_DEFINE(chdir,
@@ -167,6 +176,22 @@ FSHOOK_DEFINE(close,
 	int fd;
 )
 
+FSHOOK_DEFINE(dup,
+	int fd;
+)
+
+FSHOOK_DEFINE(dup2,
+	int oldfd;
+	int newfd;
+)
+
+FSHOOK_DEFINE(fadvise,
+	int fd;
+	loff_t offset;
+	loff_t len;
+	int advice;
+)
+
 FSHOOK_DEFINE(fchdir,
 	int fd;
 )
@@ -182,6 +207,12 @@ FSHOOK_DEFINE(fchown,
 	gid_t gid;
 )
 
+FSHOOK_DEFINE(fcntl,
+	int fd;
+	unsigned cmd;
+	unsigned long arg;
+)
+
 FSHOOK_DEFINE(fgetxattr,
 	int fd;
 	const char __user *name;
@@ -189,6 +220,11 @@ FSHOOK_DEFINE(fgetxattr,
 
 FSHOOK_DEFINE(flistxattr,
 	int fd;
+)
+
+FSHOOK_DEFINE(flock,
+	int fd;
+	unsigned cmd;
 )
 
 FSHOOK_DEFINE(frmxattr,
@@ -212,6 +248,11 @@ FSHOOK_DEFINE(fstatfs,
 	int fd;
 )
 
+FSHOOK_DEFINE(fsync,
+	int fd;
+	boolean_t data;
+)
+
 FSHOOK_DEFINE(ftruncate,
 	int fd;
 	loff_t length;
@@ -228,7 +269,7 @@ FSHOOK_DEFINE(ioctl,
 	unsigned cmd;
 	union {
 		unsigned long value;
-		void __user *ptr;
+		const void __user *ptr;
 	} arg;
 )
 
@@ -242,6 +283,13 @@ FSHOOK_DEFINE(listxattr,
 	boolean_t link;
 )
 
+FSHOOK_DEFINE(lseek,
+	int fd;
+	unsigned whence;
+	loff_t offset;
+	const loff_t *poffs;
+)
+
 FSHOOK_DEFINE(mkdir,
 	const char *dirname;
 	mode_t mode;
@@ -251,6 +299,15 @@ FSHOOK_DEFINE(mknod,
 	const char *path;
 	mode_t mode;
 	dev_t dev;
+)
+
+FSHOOK_DEFINE(mmap,
+	const unsigned long *paddr;
+	unsigned long length;
+	unsigned prot;
+	unsigned flags;
+	int fd;
+	loff_t offset;
 )
 
 FSHOOK_DEFINE(mount,
@@ -267,14 +324,67 @@ FSHOOK_DEFINE(open,
 	int mode;
 )
 
+FSHOOK_DEFINE(pipe,
+	const int *fds;
+)
+
+FSHOOK_DEFINE(pivot_root,
+	const char *oldpath;
+	const char *newpath;
+)
+
+FSHOOK_DEFINE(poll,
+	int n;
+	const struct poll_list *list;
+	long timeout;
+)
+
+FSHOOK_DEFINE(pread,
+	int fd;
+	const void __user *buffer;
+	size_t length;
+	loff_t offset;
+	const ssize_t *plen;
+)
+
+FSHOOK_DEFINE(pwrite,
+	int fd;
+	const void __user *buffer;
+	size_t length;
+	loff_t offset;
+	const ssize_t *plen;
+)
+
+FSHOOK_DEFINE(readahead,
+	int fd;
+	loff_t offset;
+	size_t length;
+)
+
+FSHOOK_DEFINE(read,
+	int fd;
+	const void __user *buffer;
+	size_t length;
+	const ssize_t *plen;
+)
+
+FSHOOK_DEFINE(readdir,
+	int fd;
+	const void __user *buffer;
+	unsigned count;
+	boolean_t large;
+	boolean_t legacy;
+)
+
 FSHOOK_DEFINE(readlink,
 	const char *path;
 )
 
-FSHOOK_DEFINE(rmxattr,
-	const char *path;
-	const char __user *name;
-	boolean_t link;
+FSHOOK_DEFINE(readv,
+	int fd;
+	const struct iovec __user *vector;
+	unsigned long count;
+	const ssize_t *plen;
 )
 
 FSHOOK_DEFINE(rename,
@@ -284,6 +394,26 @@ FSHOOK_DEFINE(rename,
 
 FSHOOK_DEFINE(rmdir,
 	const char *dirname;
+)
+
+FSHOOK_DEFINE(rmxattr,
+	const char *path;
+	const char __user *name;
+	boolean_t link;
+)
+
+FSHOOK_DEFINE(select,
+	int n;
+	const fd_set_bits *fds;
+	long timeout;
+)
+
+FSHOOK_DEFINE(sendfile,
+	int infd;
+	int outfd;
+	size_t length;
+	const loff_t *poffs;
+	const ssize_t *plen;
 )
 
 FSHOOK_DEFINE(setxattr,
@@ -309,6 +439,9 @@ FSHOOK_DEFINE(symlink,
 	const char *newpath;
 )
 
+FSHOOK_DEFINE(sync,
+)
+
 FSHOOK_DEFINE(truncate,
 	const char *filename;
 	loff_t length;
@@ -327,6 +460,20 @@ FSHOOK_DEFINE(utimes,
 	const char *path;
 	const struct timeval *atime;
 	const struct timeval *mtime;
+)
+
+FSHOOK_DEFINE(write,
+	int fd;
+	const void __user *buffer;
+	size_t length;
+	const ssize_t *plen;
+)
+
+FSHOOK_DEFINE(writev,
+	int fd;
+	const struct iovec __user *vector;
+	unsigned long count;
+	const ssize_t *plen;
 )
 
 #undef FSHOOK_DEFINE

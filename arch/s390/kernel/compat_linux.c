@@ -20,6 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/fs.h> 
+#include <linux/fshooks.h> 
 #include <linux/mm.h> 
 #include <linux/file.h> 
 #include <linux/signal.h>
@@ -1852,9 +1853,20 @@ static inline long do_mmap2(
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	struct file * file = NULL;
-	unsigned long error = -EBADF;
+	unsigned long error;
 
+	FSHOOK_BEGIN(mmap,
+		error,
+		.paddr = (error = addr, &error),
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = pgoff << PAGE_SHIFT)
+
+	struct file * file = NULL;
+
+	error = -EBADF;
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
@@ -1874,6 +1886,8 @@ static inline long do_mmap2(
 	if (file)
 		fput(file);
 out:    
+	FSHOOK_END(mmap, !IS_ERR(void *)error) ? 0 : error)
+
 	return error;
 }
 

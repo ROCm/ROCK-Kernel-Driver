@@ -13,6 +13,7 @@
 #include <linux/dnotify.h>
 #include <linux/security.h>
 #include <linux/module.h>
+#include <linux/fshooks.h>
 
 #include <asm/uaccess.h>
 
@@ -126,6 +127,14 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 	off_t retval;
 	struct file * file;
 	int fput_needed;
+	loff_t res;
+
+	FSHOOK_BEGIN(lseek,
+		retval,
+		.fd = fd,
+		.offset = offset,
+		.poffs = &res,
+		.whence = origin)
 
 	retval = -EBADF;
 	file = fget_light(fd, &fput_needed);
@@ -134,13 +143,15 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 
 	retval = -EINVAL;
 	if (origin <= 2) {
-		loff_t res = llseek(file, offset, origin);
+		res = llseek(file, offset, origin);
 		retval = res;
 		if (res != (loff_t)retval)
 			retval = -EOVERFLOW;	/* LFS: should only happen on 32 bit platforms */
 	}
 	fput_light(file, fput_needed);
 bad:
+	FSHOOK_END(lseek, retval >= 0 ? 0 : retval)
+
 	return retval;
 }
 EXPORT_SYMBOL_GPL(sys_lseek);
@@ -154,6 +165,13 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 	struct file * file;
 	loff_t offset;
 	int fput_needed;
+
+	FSHOOK_BEGIN(lseek,
+		retval,
+		.fd = fd,
+		.offset = ((loff_t)offset_high << 32) | offset_low,
+		.poffs = &offset,
+		.whence = origin)
 
 	retval = -EBADF;
 	file = fget_light(fd, &fput_needed);
@@ -176,6 +194,8 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 out_putf:
 	fput_light(file, fput_needed);
 bad:
+	FSHOOK_END(lseek, retval >= 0 ? 0 : retval)
+
 	return retval;
 }
 #endif
@@ -271,14 +291,19 @@ EXPORT_SYMBOL(vfs_write);
 asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 {
 	struct file *file;
-	ssize_t ret = -EBADF;
+	ssize_t ret;
 	int fput_needed;
 
+	FSHOOK_BEGIN(read, ret, .fd = fd, .buffer = buf, .length = count, .plen = &ret)
+
+	ret = -EBADF;
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_read(file, buf, count, &file->f_pos);
 		fput_light(file, fput_needed);
 	}
+
+	FSHOOK_END(read, ret >= 0 ? 0 : ret)
 
 	return ret;
 }
@@ -287,14 +312,19 @@ EXPORT_SYMBOL_GPL(sys_read);
 asmlinkage ssize_t sys_write(unsigned int fd, const char __user * buf, size_t count)
 {
 	struct file *file;
-	ssize_t ret = -EBADF;
+	ssize_t ret;
 	int fput_needed;
 
+	FSHOOK_BEGIN(write, ret, .fd = fd, .buffer = buf, .length = count, .plen = &ret)
+
+	ret = -EBADF;
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_write(file, buf, count, &file->f_pos);
 		fput_light(file, fput_needed);
 	}
+
+	FSHOOK_END(write, ret >= 0 ? 0 : ret)
 
 	return ret;
 }
@@ -303,17 +333,25 @@ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
 			     size_t count, loff_t pos)
 {
 	struct file *file;
-	ssize_t ret = -EBADF;
+	ssize_t ret;
 	int fput_needed;
 
-	if (pos < 0)
-		return -EINVAL;
+	FSHOOK_BEGIN(pread, ret, .fd = fd, .offset = pos, .buffer = buf, .length = count, .plen = &ret)
+
+	ret = -EBADF;
+	if (pos < 0) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_read(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}
+
+out:
+	FSHOOK_END(pread, ret >= 0 ? 0 : ret)
 
 	return ret;
 }
@@ -322,17 +360,25 @@ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char __user *buf,
 			      size_t count, loff_t pos)
 {
 	struct file *file;
-	ssize_t ret = -EBADF;
+	ssize_t ret;
 	int fput_needed;
 
-	if (pos < 0)
-		return -EINVAL;
+	FSHOOK_BEGIN(pwrite, ret, .fd = fd, .offset = pos, .buffer = buf, .length = count, .plen = &ret)
+
+	ret = -EBADF;
+	if (pos < 0) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_write(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}
+
+out:
+	FSHOOK_END(pwrite, ret >= 0 ? 0 : ret)
 
 	return ret;
 }
@@ -509,14 +555,19 @@ asmlinkage ssize_t
 sys_readv(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 {
 	struct file *file;
-	ssize_t ret = -EBADF;
+	ssize_t ret;
 	int fput_needed;
 
+	FSHOOK_BEGIN(readv, ret, .fd = fd, .vector = vec, .count = vlen, .plen = &ret)
+
+	ret = -EBADF;
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_readv(file, vec, vlen, &file->f_pos);
 		fput_light(file, fput_needed);
 	}
+
+	FSHOOK_END(readv, ret >= 0 ? 0 : ret)
 
 	return ret;
 }
@@ -525,14 +576,19 @@ asmlinkage ssize_t
 sys_writev(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 {
 	struct file *file;
-	ssize_t ret = -EBADF;
+	ssize_t ret;
 	int fput_needed;
 
+	FSHOOK_BEGIN(writev, ret, .fd = fd, .vector = vec, .count = vlen, .plen = &ret)
+
+	ret = -EBADF;
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_writev(file, vec, vlen, &file->f_pos);
 		fput_light(file, fput_needed);
 	}
+
+	FSHOOK_END(writev, ret >= 0 ? 0 : ret)
 
 	return ret;
 }
@@ -545,6 +601,14 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	loff_t pos;
 	ssize_t retval;
 	int fput_needed_in, fput_needed_out;
+
+	FSHOOK_BEGIN(sendfile,
+		retval,
+		.infd = in_fd,
+		.outfd = out_fd,
+		.length = count,
+		.poffs = ppos,
+		.plen = &retval)
 
 	/*
 	 * Get input file, and verify that it is ok..
@@ -616,6 +680,8 @@ fput_out:
 fput_in:
 	fput_light(in_file, fput_needed_in);
 out:
+	FSHOOK_END(sendfile, retval >= 0 ? 0 : retval)
+
 	return retval;
 }
 

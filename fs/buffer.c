@@ -21,6 +21,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/mm.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
@@ -350,8 +351,12 @@ static void do_sync(unsigned long wait)
 
 asmlinkage long sys_sync(void)
 {
+	int ret = 0;
+
+	FSHOOK_BEGIN(sync, ret)
 	do_sync(1);
-	return 0;
+	FSHOOK_END(sync, ret)
+	return ret;
 }
 
 void emergency_sync(void)
@@ -392,6 +397,8 @@ asmlinkage long sys_fsync(unsigned int fd)
 	struct address_space *mapping;
 	int ret, err;
 
+	FSHOOK_BEGIN(fsync, ret, .fd = fd, .data = false)
+
 	ret = -EBADF;
 	file = fget(fd);
 	if (!file)
@@ -421,6 +428,8 @@ asmlinkage long sys_fsync(unsigned int fd)
 out_putf:
 	fput(file);
 out:
+	FSHOOK_END(fsync, ret)
+
 	return ret;
 }
 
@@ -429,6 +438,8 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	struct file * file;
 	struct address_space *mapping;
 	int ret, err;
+
+	FSHOOK_BEGIN(fsync, ret, .fd = fd, .data = true)
 
 	ret = -EBADF;
 	file = fget(fd);
@@ -456,6 +467,8 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 out_putf:
 	fput(file);
 out:
+	FSHOOK_END(fsync, ret)
+
 	return ret;
 }
 

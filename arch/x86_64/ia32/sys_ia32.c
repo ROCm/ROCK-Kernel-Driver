@@ -211,13 +211,26 @@ sys32_mmap(struct mmap_arg_struct *arg)
 	if (copy_from_user(&a, arg, sizeof(a)))
 		return -EFAULT;
 
-	if (a.offset & ~PAGE_MASK)
-		return -EINVAL; 
+	FSHOOK_BEGIN(mmap,
+		retval,
+		.paddr = (retval = a.addr, &retval),
+		.length = a.len,
+		.prot = a.prot,
+		.flags = a.flags,
+		.fd = a.fd,
+		.offset = a.offset)
+
+	if (a.offset & ~PAGE_MASK) {
+		retval = -EINVAL;
+		goto out;
+	}
 
 	if (!(a.flags & MAP_ANONYMOUS)) {
 		file = fget(a.fd);
-		if (!file)
-			return -EBADF;
+		if (!file) {
+			retval = -EBADF;
+			goto out;
+		}
 	}
 	
 	if (a.prot & PROT_READ) 
@@ -230,6 +243,8 @@ sys32_mmap(struct mmap_arg_struct *arg)
 		fput(file);
 
 	up_write(&mm->mmap_sem); 
+out:
+	FSHOOK_END(mmap, !IS_ERR((void *)retval) ? 0 : retval)
 
 	return retval;
 }
@@ -1238,11 +1253,22 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 	unsigned long error;
 	struct file * file = NULL;
 
+	FSHOOK_BEGIN(mmap,
+		error,
+		.paddr = (error = addr, &error),
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = (loff_t)pgoff << PAGE_SHIFT)
+
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
-		if (!file)
-			return -EBADF;
+		if (!file) {
+			error = -EBADF;
+			goto out;
+		}
 	}
 
 	if (prot & PROT_READ)
@@ -1254,6 +1280,9 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 
 	if (file)
 		fput(file);
+out:
+	FSHOOK_END(mmap, !IS_ERR((void *)error) ? 0 : error)
+
 	return error;
 }
 

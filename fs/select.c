@@ -21,6 +21,7 @@
 #include <linux/personality.h> /* for STICKY_TIMEOUTS */
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/aio.h>
 
 #include <asm/uaccess.h>
@@ -213,12 +214,14 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	int retval, i;
 	long __timeout = *timeout;
 
+	FSHOOK_BEGIN(select, retval, .n = n, .fds = fds, .timeout = __timeout)
+
  	spin_lock(&current->files->file_lock);
 	retval = max_select_fd(n, fds);
 	spin_unlock(&current->files->file_lock);
 
 	if (retval < 0)
-		return retval;
+		goto out;
 	n = retval;
 
 	poll_initwait(&table);
@@ -297,6 +300,9 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	 * Up-to-date the caller timeout.
 	 */
 	*timeout = __timeout;
+out:
+	FSHOOK_END(select, retval)
+
 	return retval;
 }
 
@@ -464,6 +470,8 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 
 	if (!timeout)
 		pt = NULL;
+
+	FSHOOK_BEGIN(poll, count, .n = nfds, .list = list, .timeout = timeout)
  
 	for (;;) {
 		struct poll_list *walk;
@@ -482,6 +490,9 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 		timeout = schedule_timeout(timeout);
 	}
 	__set_current_state(TASK_RUNNING);
+
+	FSHOOK_END(poll, count)
+
 	return count;
 }
 

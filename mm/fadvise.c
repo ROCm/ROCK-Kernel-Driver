@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
@@ -29,8 +30,12 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 	pgoff_t end_index;
 	int ret = 0;
 
-	if (!file)
-		return -EBADF;
+	FSHOOK_BEGIN(fadvise, ret, .fd = fd, .offset = offset, .len = len, .advice = advice)
+
+	if (!file) {
+		ret = -EBADF;
+		goto out_no_put;
+	}
 
 	mapping = file->f_mapping;
 	if (!mapping || len < 0) {
@@ -74,6 +79,10 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 	}
 out:
 	fput(file);
+
+out_no_put:
+	FSHOOK_END(fadvise, ret)
+
 	return ret;
 }
 

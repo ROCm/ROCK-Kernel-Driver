@@ -139,7 +139,7 @@ f(adjtimex,	T_pointer_rw(struct timex)),
 f(sethostname,	T_array(char, 1, __NEW_UTS_LEN), T_size_t),
 f(setdomainname, T_array(char, 1, __NEW_UTS_LEN), T_size_t),
 f(reboot,	T_int, T_int, T_uint, T_any_ptr),
-f(init_module,	T_any_ptr, T_ulong, U_string),
+f(init_module,	U_array(unsigned char, 1, 0 /* 64 * 1024 * 1024 */), T_ulong, U_string),
 f(delete_module, T_string),
 f(mount,	T_string, T_path, T_string, T_ulong, T_any_ptr),
 f(umount,	T_path, T_int),
@@ -217,7 +217,7 @@ audit_fshook_pre(fshook_info_t info, void *ctx)
 
 	switch(info.gen->type) {
 	case FSHOOK_access:
-		audit_intercept(AUDIT_access, info.access->path, info.access->mode);
+		audit_intercept(AUDIT_access, info.access->path, info.access->mode, info.access->actual.fsuid, info.access->actual.fsgid);
 		break;
 	case FSHOOK_chdir:
 		audit_intercept(AUDIT_chdir, info.chdir->dirname);
@@ -266,7 +266,7 @@ audit_fshook_pre(fshook_info_t info, void *ctx)
 		audit_intercept(AUDIT_link, info.link->oldpath, info.link->newpath);
 		break;
 	case FSHOOK_mkdir:
-		audit_intercept(AUDIT_mkdir, info.mkdir->dirname);
+		audit_intercept(AUDIT_mkdir, info.mkdir->dirname, info.mkdir->mode);
 		break;
 	case FSHOOK_mknod:
 		audit_intercept(AUDIT_mknod, info.mknod->path, info.mknod->mode, info.mknod->dev);
@@ -526,8 +526,16 @@ audit_get_args(enum audit_call code, va_list varg, struct aud_syscall_data *sc)
 		printk(KERN_ERR "audit: internal inconsistency: argument of type %u\n", entry->sy_args[i].sa_type);
 		return -EINVAL;
 	}
-
-	return code != AUDIT_ioctl ? 0 : audit_get_ioctlargs(sc);
+	switch (code) {
+	case AUDIT_ioctl:
+		return audit_get_ioctlargs(sc);
+	case AUDIT_access:
+		sc->raw_args[i] = va_arg(varg, uid_t);
+		sc->raw_args[i + 1] = va_arg(varg, gid_t);
+		/* FALLTHROUGH */
+	default:
+		return 0;
+	}
 }
 
 /*

@@ -16,6 +16,7 @@
 #include <linux/file.h>
 #include <linux/utsname.h>
 #include <linux/personality.h>
+#include <linux/fshooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -42,6 +43,16 @@ long sys_mmap(unsigned long addr, unsigned long len, unsigned long prot, unsigne
 	unsigned long fd, unsigned long off)
 {
 	long error;
+
+	FSHOOK_BEGIN(mmap,
+		error,
+		.paddr = &addr,
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = off)
+
 	struct file * file;
 
 	error = -EINVAL;
@@ -57,12 +68,14 @@ long sys_mmap(unsigned long addr, unsigned long len, unsigned long prot, unsigne
 			goto out;
 	}
 	down_write(&current->mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags, off >> PAGE_SHIFT);
+	addr = error = do_mmap_pgoff(file, addr, len, prot, flags, off >> PAGE_SHIFT);
 	up_write(&current->mm->mmap_sem);
 
 	if (file)
 		fput(file);
 out:
+	FSHOOK_END(mmap, !IS_ERR((void *)error) ? 0 : error)
+
 	return error;
 }
 

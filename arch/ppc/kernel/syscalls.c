@@ -36,6 +36,7 @@
 #include <linux/utsname.h>
 #include <linux/file.h>
 #include <linux/unistd.h>
+#include <linux/fshooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -162,9 +163,20 @@ do_mmap2(unsigned long addr, size_t len,
 	 unsigned long prot, unsigned long flags,
 	 unsigned long fd, unsigned long pgoff)
 {
-	struct file * file = NULL;
-	int ret = -EBADF;
+	int ret;
 
+	FSHOOK_BEGIN(mmap,
+		ret,
+		.paddr = &addr,
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = (loff_t)pgoff << PAGE_SHIFT)
+
+	struct file * file = NULL;
+
+	ret = -EBADF;
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		if (!(file = fget(fd)))
@@ -172,11 +184,13 @@ do_mmap2(unsigned long addr, size_t len,
 	}
 
 	down_write(&current->mm->mmap_sem);
-	ret = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	addr = ret = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
 	if (file)
 		fput(file);
 out:
+	FSHOOK_END(mmap, !IS_ERR((void *)ret) ? 0 : ret)
+
 	return ret;
 }
 

@@ -297,21 +297,21 @@ audit_kill_process(int error)
 	complete_and_exit(NULL, SIGKILL);
 }
 
-#if defined(CONFIG_X86)
-#define AUDIT_ARCH AUDIT_ARCH_I386
-#elif defined(CONFIG_X86)
-#define AUDIT_ARCH AUDIT_ARCH_PPC
-#elif defined(CONFIG_PPC)
-#define AUDIT_ARCH AUDIT_ARCH_PPC64
-#define AUDIT_ARCH32 AUDIT_ARCH_PPC
-#elif defined(CONFIG_X86_64)
+#if defined(CONFIG_X86_64)
 #define AUDIT_ARCH AUDIT_ARCH_X86_64
 #define AUDIT_ARCH32 AUDIT_ARCH_I386
-#elif defined(CONFIG_S390)
-#define AUDIT_ARCH AUDIT_ARCH_S390
-#elif defined(CONFIG_S390X)
+#elif defined(CONFIG_X86)
+#define AUDIT_ARCH AUDIT_ARCH_I386
+#elif defined(CONFIG_PPC64)
+#define AUDIT_ARCH AUDIT_ARCH_PPC64
+#define AUDIT_ARCH32 AUDIT_ARCH_PPC
+#elif defined(CONFIG_PPC)
+#define AUDIT_ARCH AUDIT_ARCH_PPC
+#elif defined(CONFIG_ARCH_S390X)
 #define AUDIT_ARCH AUDIT_ARCH_S390X
 #define AUDIT_ARCH32 AUDIT_ARCH_S390
+#elif defined(CONFIG_ARCH_S390)
+#define AUDIT_ARCH AUDIT_ARCH_S390
 #elif defined(CONFIG_IA64)
 #define AUDIT_ARCH AUDIT_ARCH_IA64
 #define AUDIT_ARCH32 AUDIT_ARCH_I386

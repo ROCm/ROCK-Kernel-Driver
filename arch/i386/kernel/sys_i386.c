@@ -19,6 +19,7 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
+#include <linux/fshooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -46,9 +47,20 @@ long do_mmap2(struct mm_struct *mm,
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	int error = -EBADF;
+	int error;
+
+	FSHOOK_BEGIN(mmap,
+		error,
+		.paddr = &addr,
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = (loff_t)pgoff << PAGE_SHIFT)
+
 	struct file * file = NULL;
 
+	error = -EBADF;
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
@@ -57,12 +69,14 @@ long do_mmap2(struct mm_struct *mm,
 	}
 
 	down_write(&mm->mmap_sem);
-	error = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
+	addr = error = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
 	up_write(&mm->mmap_sem);
 
 	if (file)
 		fput(file);
 out:
+	FSHOOK_END(mmap, !IS_ERR((void *)error) ? 0 : error)
+
 	return error;
 }
 

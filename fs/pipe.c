@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/mount.h>
 #include <linux/pipe_fs_i.h>
 #include <linux/uio.h>
@@ -671,12 +672,15 @@ fail_inode:
 
 int do_pipe(int *fd)
 {
+	int error;
+
+	FSHOOK_BEGIN(pipe, error, .fds = fd)
+
 	struct qstr this;
 	char name[32];
 	struct dentry *dentry;
 	struct inode * inode;
 	struct file *f1, *f2;
-	int error;
 	int i,j;
 
 	error = -ENFILE;
@@ -733,7 +737,8 @@ int do_pipe(int *fd)
 	fd_install(j, f2);
 	fd[0] = i;
 	fd[1] = j;
-	return 0;
+	error = 0;
+	goto no_files;
 
 close_f12_inode_i_j:
 	put_unused_fd(j);
@@ -749,6 +754,8 @@ close_f12:
 close_f1:
 	put_filp(f1);
 no_files:
+	FSHOOK_END(pipe, error)
+
 	return error;	
 }
 

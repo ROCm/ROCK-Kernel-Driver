@@ -28,6 +28,7 @@
 #ifdef CONFIG_ARCH_S390X
 #include <linux/personality.h>
 #endif /* CONFIG_ARCH_S390X */
+#include <linux/fshooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -55,9 +56,20 @@ static inline long do_mmap2(
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	long error = -EBADF;
+	long error;
+
+	FSHOOK_BEGIN(mmap,
+		error,
+		.paddr = (error = addr, &error),
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = pgoff << PAGE_SHIFT)
+
 	struct file * file = NULL;
 
+	error = -EBADF;
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
@@ -72,6 +84,8 @@ static inline long do_mmap2(
 	if (file)
 		fput(file);
 out:
+	FSHOOK_END(mmap, !IS_ERR((void *)error) ? 0 : error)
+
 	return error;
 }
 

@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/file.h>
 #include <linux/dnotify.h>
 #include <linux/smp_lock.h>
@@ -150,10 +151,15 @@ static int dupfd(struct file *file, unsigned int start)
 
 asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 {
-	int err = -EBADF;
-	struct file * file, *tofree;
+	int err;
+	struct file * file = NULL;
 	struct files_struct * files = current->files;
 
+	FSHOOK_BEGIN(dup2, err, .oldfd = oldfd, .newfd = newfd)
+
+	struct file * tofree;
+
+	err = -EBADF;
 	spin_lock(&files->file_lock);
 	if (!(file = fcheck(oldfd)))
 		goto out_unlock;
@@ -191,6 +197,9 @@ asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 		filp_close(tofree, files);
 	err = newfd;
 out:
+
+	FSHOOK_END(dup2, err)
+
 	return err;
 out_unlock:
 	spin_unlock(&files->file_lock);
@@ -204,11 +213,18 @@ out_fput:
 
 asmlinkage long sys_dup(unsigned int fildes)
 {
-	int ret = -EBADF;
+	int ret;
+
+	FSHOOK_BEGIN(dup, ret, .fd = fildes)
+
 	struct file * file = fget(fildes);
+	ret = -EBADF;
 
 	if (file)
 		ret = dupfd(file, 0);
+
+	FSHOOK_END(dup, ret)
+
 	return ret;
 }
 
@@ -364,22 +380,24 @@ static long do_fcntl(int fd, unsigned int cmd,
 asmlinkage long sys_fcntl(int fd, unsigned int cmd, unsigned long arg)
 {	
 	struct file *filp;
-	long err = -EBADF;
+	long err;
 
+	FSHOOK_BEGIN(fcntl, err, .fd = fd, .cmd = cmd, .arg = arg)
+
+	err = -EBADF;
 	filp = fget(fd);
 	if (!filp)
 		goto out;
 
 	err = security_file_fcntl(filp, cmd, arg);
-	if (err) {
-		fput(filp);
-		return err;
-	}
-
-	err = do_fcntl(fd, cmd, arg, filp);
+	if (!err)
+		err = do_fcntl(fd, cmd, arg, filp);
 
  	fput(filp);
 out:
+
+	FSHOOK_END(fcntl, err)
+
 	return err;
 }
 
@@ -389,19 +407,16 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 	struct file * filp;
 	long err;
 
+	FSHOOK_BEGIN(fcntl, err, .fd = fd, .cmd = cmd, .arg = arg)
+
 	err = -EBADF;
 	filp = fget(fd);
 	if (!filp)
 		goto out;
 
 	err = security_file_fcntl(filp, cmd, arg);
-	if (err) {
-		fput(filp);
-		return err;
-	}
-	err = -EBADF;
-	
-	switch (cmd) {
+
+	if (!err) switch (cmd) {
 		case F_GETLK64:
 			err = fcntl_getlk64(filp, (struct flock64 __user *) arg);
 			break;
@@ -413,8 +428,12 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 			err = do_fcntl(fd, cmd, arg, filp);
 			break;
 	}
+
 	fput(filp);
 out:
+
+	FSHOOK_END(fcntl, err)
+
 	return err;
 }
 #endif

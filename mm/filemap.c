@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/aio.h>
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
@@ -1215,6 +1216,8 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 	ssize_t ret;
 	struct file *file;
 
+	FSHOOK_BEGIN(readahead, ret, .fd = fd, .offset = offset, .length = count)
+
 	ret = -EBADF;
 	file = fget(fd);
 	if (file) {
@@ -1227,6 +1230,9 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 		}
 		fput(file);
 	}
+
+	FSHOOK_END(readahead, ret)
+
 	return ret;
 }
 

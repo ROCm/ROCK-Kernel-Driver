@@ -117,6 +117,7 @@
 #include <linux/capability.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/security.h>
@@ -1320,6 +1321,8 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	int can_sleep, unlock;
 	int error;
 
+	FSHOOK_BEGIN(flock, error, .fd = fd, .cmd = cmd)
+
 	error = -EBADF;
 	filp = fget(fd);
 	if (!filp)
@@ -1362,6 +1365,8 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
  out_putf:
 	fput(filp);
  out:
+	FSHOOK_END(flock, error)
+
 	return error;
 }
 

@@ -37,6 +37,7 @@
 #include <linux/file.h>
 #include <linux/init.h>
 #include <linux/personality.h>
+#include <linux/fshooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -174,9 +175,20 @@ unsigned long sys_mmap(unsigned long addr, size_t len,
 		       unsigned long prot, unsigned long flags,
 		       unsigned long fd, off_t offset)
 {
-	struct file * file = NULL;
-	unsigned long ret = -EBADF;
+	unsigned long ret;
 
+	FSHOOK_BEGIN(mmap,
+		ret,
+		.paddr = (ret = addr, &ret),
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = offset)
+
+	struct file * file = NULL;
+
+	ret = -EBADF;
 	if (!(flags & MAP_ANONYMOUS)) {
 		if (!(file = fget(fd)))
 			goto out;
@@ -190,6 +202,8 @@ unsigned long sys_mmap(unsigned long addr, size_t len,
 		fput(file);
 
 out:
+	FSHOOK_END(mmap, !IS_ERR((void *)ret) ? 0 : ret)
+
 	return ret;
 }
 

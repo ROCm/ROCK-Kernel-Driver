@@ -1029,22 +1029,44 @@ asmlinkage long sys_pivot_root(const char __user *new_root, const char __user *p
 
 	lock_kernel();
 
+#ifdef CONFIG_FSHOOKS
+	{
+	const char *new_path;
+	int new_error;
+
+	new_error = __user_walk(new_root, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &new_nd, &new_path);
+	if (new_error) {
+		if (IS_ERR(new_path)) {
+			error = new_error;
+			goto out0;
+		}
+		memset(&new_nd, 0, sizeof(new_nd));
+	}
+#else
 	error = __user_walk(new_root, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &new_nd, 0);
 	if (error)
 		goto out0;
-	error = -EINVAL;
-	if (!check_mnt(new_nd.mnt))
-		goto out1;
+#endif
 
-	error = __user_walk(put_old, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &old_nd, 0);
+	FSHOOK_BEGIN_USER_WALK(pivot_root,
+		error,
+		put_old,
+		LOOKUP_FOLLOW|LOOKUP_DIRECTORY,
+		old_nd,
+		oldpath,
+		.newpath = new_path)
+
+#ifdef CONFIG_FSHOOKS
+	if (new_error)
+		error = new_error;
+	else
+#endif
+	if (!check_mnt(new_nd.mnt))
+		error = -EINVAL;
+	else
+		error = security_sb_pivotroot(&old_nd, &new_nd);
 	if (error)
 		goto out1;
-
-	error = security_sb_pivotroot(&old_nd, &new_nd);
-	if (error) {
-		path_release(&old_nd);
-		goto out1;
-	}
 
 	read_lock(&current->fs->lock);
 	user_nd.mnt = mntget(current->fs->rootmnt);
@@ -1082,8 +1104,11 @@ asmlinkage long sys_pivot_root(const char __user *new_root, const char __user *p
 		}
 		if (!is_subdir(tmp->mnt_mountpoint, new_nd.dentry))
 			goto out3;
-	} else if (!is_subdir(old_nd.dentry, new_nd.dentry))
-		goto out3;
+	} else if (!is_subdir(old_nd.dentry, new_nd.dentry)) {
+out3:
+		spin_unlock(&vfsmount_lock);
+		goto out2;
+	}
 	detach_mnt(new_nd.mnt, &parent_nd);
 	detach_mnt(user_nd.mnt, &root_parent);
 	attach_mnt(user_nd.mnt, &old_nd);
@@ -1098,15 +1123,19 @@ out2:
 	up(&old_nd.dentry->d_inode->i_sem);
 	up_write(&current->namespace->sem);
 	path_release(&user_nd);
-	path_release(&old_nd);
 out1:
+	path_release(&old_nd);
+
+	FSHOOK_END_USER_WALK(pivot_root, error, oldpath)
+#ifdef CONFIG_FSHOOKS
+	putname(new_path);
+	}
+#endif
+
 	path_release(&new_nd);
 out0:
 	unlock_kernel();
 	return error;
-out3:
-	spin_unlock(&vfsmount_lock);
-	goto out2;
 }
 
 static void __init init_mount_tree(void)

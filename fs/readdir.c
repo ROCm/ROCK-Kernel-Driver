@@ -12,6 +12,7 @@
 #include <linux/file.h>
 #include <linux/smp_lock.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/dirent.h>
 #include <linux/security.h>
 
@@ -98,6 +99,8 @@ asmlinkage long old_readdir(unsigned int fd, struct old_linux_dirent __user * di
 	struct file * file;
 	struct readdir_callback buf;
 
+	FSHOOK_BEGIN(readdir, error, .fd = fd, .buffer = dirent, .count = count, .legacy = true)
+
 	error = -EBADF;
 	file = fget(fd);
 	if (!file)
@@ -112,6 +115,8 @@ asmlinkage long old_readdir(unsigned int fd, struct old_linux_dirent __user * di
 
 	fput(file);
 out:
+	FSHOOK_END(readdir, error)
+
 	return error;
 }
 
@@ -178,6 +183,8 @@ asmlinkage long sys_getdents(unsigned int fd, struct linux_dirent __user * diren
 	struct getdents_callback buf;
 	int error;
 
+	FSHOOK_BEGIN(readdir, error, .fd = fd, .buffer = dirent, .count = count)
+
 	error = -EFAULT;
 	if (!access_ok(VERIFY_WRITE, dirent, count))
 		goto out;
@@ -207,6 +214,8 @@ asmlinkage long sys_getdents(unsigned int fd, struct linux_dirent __user * diren
 out_putf:
 	fput(file);
 out:
+	FSHOOK_END(readdir, error)
+
 	return error;
 }
 
@@ -264,6 +273,8 @@ asmlinkage long sys_getdents64(unsigned int fd, struct linux_dirent64 __user * d
 	struct getdents_callback64 buf;
 	int error;
 
+	FSHOOK_BEGIN(readdir, error, .fd = fd, .buffer = dirent, .count = count, .large = true)
+
 	error = -EFAULT;
 	if (!access_ok(VERIFY_WRITE, dirent, count))
 		goto out;
@@ -292,5 +303,7 @@ asmlinkage long sys_getdents64(unsigned int fd, struct linux_dirent64 __user * d
 out_putf:
 	fput(file);
 out:
+	FSHOOK_END(readdir, error)
+
 	return error;
 }

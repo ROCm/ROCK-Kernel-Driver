@@ -8,6 +8,7 @@
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/sched.h>
@@ -185,14 +186,27 @@ sys_pipe (long arg0, long arg1, long arg2, long arg3,
 static inline unsigned long
 do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, unsigned long pgoff)
 {
+	int error;
+
+	FSHOOK_BEGIN(mmap,
+		error,
+		.paddr = &addr,
+		.length = len,
+		.prot = prot,
+		.flags = flags,
+		.fd = fd,
+		.offset = (loff_t)pgoff << PAGE_SHIFT)
+
 	unsigned long roff;
 	struct file *file = 0;
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
-		if (!file)
-			return -EBADF;
+		if (!file) {
+			addr = -EBADF;
+			goto no_file;
+		}
 
 		if (!file->f_op || !file->f_op->mmap) {
 			addr = -ENODEV;
@@ -231,6 +245,9 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 
 out:	if (file)
 		fput(file);
+no_file:
+	FSHOOK_END(mmap, !IS_ERR((void *)addr) ? 0 : addr, addr = error)
+
 	return addr;
 }
 
