@@ -144,17 +144,17 @@ static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
  */
 #define ITERATE_MDDEV(mddev,tmp)					\
 									\
-	for (spin_lock(&all_mddevs_lock), 				\
-		     (tmp = all_mddevs.next),				\
-		     (mddev = NULL);					\
-	     (void)(tmp != &all_mddevs &&				\
-			mddev_get(list_entry(tmp, mddev_t, all_mddevs))),\
-		     spin_unlock(&all_mddevs_lock),			\
-		     (mddev ? mddev_put(mddev):(void)NULL),		\
-		     (mddev = list_entry(tmp, mddev_t, all_mddevs)),	\
-		     (tmp != &all_mddevs);				\
-	     spin_lock(&all_mddevs_lock),				\
-		     (tmp = tmp->next)					\
+	for (({ spin_lock(&all_mddevs_lock); 				\
+		tmp = all_mddevs.next;					\
+		mddev = NULL;});					\
+	     ({ if (tmp != &all_mddevs)					\
+			mddev_get(list_entry(tmp, mddev_t, all_mddevs));\
+		spin_unlock(&all_mddevs_lock);				\
+		if (mddev) mddev_put(mddev);				\
+		mddev = list_entry(tmp, mddev_t, all_mddevs);		\
+		tmp != &all_mddevs;});					\
+	     ({ spin_lock(&all_mddevs_lock);				\
+		tmp = tmp->next;})					\
 		)
 
 static mddev_t *mddev_map[MAX_MD_DEVS];
