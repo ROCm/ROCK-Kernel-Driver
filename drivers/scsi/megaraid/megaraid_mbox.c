@@ -9,8 +9,8 @@
  *	   as published by the Free Software Foundation; either version
  *	   2 of the License, or (at your option) any later version.
  *
- * FILE		: megaraid.c
- * Version	: v2.20.2.0 (July 22 2004)
+ * FILE		: megaraid_mbox.c
+ * Version	: v2.20.3.1 (August 24 2004)
  *
  * Authors:
  * 	Atul Mukker		<Atul.Mukker@lsil.com>
@@ -82,24 +82,25 @@ static void megaraid_mbox_shutdown(struct device *);
 static int megaraid_io_attach(adapter_t *);
 static void megaraid_io_detach(adapter_t *);
 
+static int megaraid_init_mbox(adapter_t *);
+static void megaraid_fini_mbox(adapter_t *);
+
 static int megaraid_alloc_cmd_packets(adapter_t *);
 static void megaraid_free_cmd_packets(adapter_t *);
 
 static int megaraid_mbox_setup_dma_pools(adapter_t *);
 static void megaraid_mbox_teardown_dma_pools(adapter_t *);
 
-static int megaraid_init_mbox(adapter_t *);
-static void megaraid_fini_mbox(adapter_t *);
-
 static int megaraid_abort_handler(struct scsi_cmnd *);
 static int megaraid_reset_handler(struct scsi_cmnd *);
+
 static int mbox_post_sync_cmd(adapter_t *, uint8_t []);
 static int mbox_post_sync_cmd_fast(adapter_t *, uint8_t []);
-
+static int megaraid_busywait_mbox(mraid_device_t *);
 static int megaraid_mbox_product_info(adapter_t *);
 static int megaraid_mbox_extended_cdb(adapter_t *);
-static int megaraid_mbox_support_random_del(adapter_t *);
 static int megaraid_mbox_support_ha(adapter_t *, uint16_t *);
+static int megaraid_mbox_support_random_del(adapter_t *);
 static int megaraid_mbox_get_max_sg(adapter_t *);
 static void megaraid_mbox_enum_raid_scsi(adapter_t *);
 static void megaraid_mbox_flush_cache(adapter_t *);
@@ -109,27 +110,16 @@ static void megaraid_mbox_setup_device_map(adapter_t *);
 
 static int megaraid_queue_command(struct scsi_cmnd *,
 		void (*)(struct scsi_cmnd *));
-
-static inline scb_t *megaraid_mbox_build_cmd(adapter_t *, struct scsi_cmnd *,
-		int *);
-static inline scb_t *megaraid_alloc_scb(adapter_t *, struct scsi_cmnd *);
-static inline void megaraid_dealloc_scb(adapter_t *, scb_t *);
-static inline void megaraid_mbox_prepare_pthru(adapter_t *, scb_t *,
+static scb_t *megaraid_mbox_build_cmd(adapter_t *, struct scsi_cmnd *, int *);
+static void megaraid_mbox_runpendq(adapter_t *, scb_t *);
+static void megaraid_mbox_prepare_pthru(adapter_t *, scb_t *,
 		struct scsi_cmnd *);
-static inline void megaraid_mbox_prepare_epthru(adapter_t *, scb_t *,
+static void megaraid_mbox_prepare_epthru(adapter_t *, scb_t *,
 		struct scsi_cmnd *);
-static inline int megaraid_mbox_mksgl(adapter_t *, scb_t *);
-
-static inline void megaraid_mbox_runpendq(adapter_t *, scb_t *);
-static inline int mbox_post_cmd(adapter_t *, scb_t *);
-
-static void megaraid_mbox_dpc(unsigned long);
-static inline void megaraid_mbox_sync_scb(adapter_t *, scb_t *);
 
 static irqreturn_t megaraid_isr(int, void *, struct pt_regs *);
-static inline int megaraid_ack_sequence(adapter_t *);
 
-static inline int megaraid_busywait_mbox(mraid_device_t *);
+static void megaraid_mbox_dpc(unsigned long);
 
 static int megaraid_cmm_register(adapter_t *);
 static int megaraid_cmm_unregister(adapter_t *);
@@ -771,7 +761,7 @@ megaraid_io_attach(adapter_t *adapter)
 		return -1;
 	}
 
-	SCSIHOST2ADAP(host)	= (caddr_t )adapter;
+	SCSIHOST2ADAP(host)	= (caddr_t)adapter;
 	adapter->host		= host;
 
 	// export the parameters required by the mid-layer
@@ -1377,6 +1367,217 @@ megaraid_mbox_teardown_dma_pools(adapter_t *adapter)
 
 
 /**
+ * megaraid_alloc_scb - detach and return a scb from the free list
+ * @adapter	: controller's soft state
+ *
+ * return the scb from the head of the free list. NULL if there are none
+ * available
+ **/
+static inline scb_t *
+megaraid_alloc_scb(adapter_t *adapter, struct scsi_cmnd *scp)
+{
+	struct list_head	*head = &adapter->kscb_pool;
+	scb_t			*scb = NULL;
+	unsigned long		flags;
+
+	// detach scb from free pool
+	spin_lock_irqsave(SCSI_FREE_LIST_LOCK(adapter), flags);
+
+	if (list_empty(head)) {
+		spin_unlock_irqrestore(SCSI_FREE_LIST_LOCK(adapter), flags);
+		return NULL;
+	}
+
+	scb = list_entry(head->next, scb_t, list);
+	list_del_init(&scb->list);
+
+	spin_unlock_irqrestore(SCSI_FREE_LIST_LOCK(adapter), flags);
+
+	scb->state	= SCB_ACTIVE;
+	scb->scp	= scp;
+	scb->dma_type	= MRAID_DMA_NONE;
+
+	return scb;
+}
+
+
+/**
+ * megaraid_dealloc_scb - return the scb to the free pool
+ * @adapter	: controller's soft state
+ * @scb		: scb to be freed
+ *
+ * return the scb back to the free list of scbs. The caller must 'flush' the
+ * SCB before calling us. E.g., performing pci_unamp and/or pci_sync etc.
+ * NOTE NOTE: Make sure the scb is not on any list before calling this
+ * routine.
+ **/
+static inline void
+megaraid_dealloc_scb(adapter_t *adapter, scb_t *scb)
+{
+	unsigned long		flags;
+
+	// put scb in the free pool
+	scb->state	= SCB_FREE;
+	scb->scp	= NULL;
+	spin_lock_irqsave(SCSI_FREE_LIST_LOCK(adapter), flags);
+
+	list_add(&scb->list, &adapter->kscb_pool);
+
+	spin_unlock_irqrestore(SCSI_FREE_LIST_LOCK(adapter), flags);
+
+	return;
+}
+
+
+/**
+ * megaraid_mbox_mksgl - make the scatter-gather list
+ * @adapter	- controller's soft state
+ * @scb		- scsi control block
+ *
+ * prepare the scatter-gather list
+ */
+static inline int
+megaraid_mbox_mksgl(adapter_t *adapter, scb_t *scb)
+{
+	struct scatterlist	*sgl;
+	mbox_ccb_t		*ccb;
+	struct page		*page;
+	unsigned long		offset;
+	struct scsi_cmnd	*scp;
+	int			sgcnt;
+	int			i;
+
+
+	scp	= scb->scp;
+	ccb	= (mbox_ccb_t *)scb->ccb;
+
+	// no mapping required if no data to be transferred
+	if (!scp->request_buffer || !scp->request_bufflen)
+		return 0;
+
+	if (!scp->use_sg) {	/* scatter-gather list not used */
+
+		page = virt_to_page(scp->request_buffer);
+
+		offset = ((unsigned long)scp->request_buffer & ~PAGE_MASK);
+
+		ccb->buf_dma_h = pci_map_page(adapter->pdev, page, offset,
+						  scp->request_bufflen,
+						  scb->dma_direction);
+		scb->dma_type = MRAID_DMA_WBUF;
+
+		/*
+		 * We need to handle special 64-bit commands that need a
+		 * minimum of 1 SG
+		 */
+		sgcnt = 1;
+		ccb->sgl64[0].address	= ccb->buf_dma_h;
+		ccb->sgl64[0].length	= scp->request_bufflen;
+
+		return sgcnt;
+	}
+
+	sgl = (struct scatterlist *)scp->request_buffer;
+
+	// The number of sg elements returned must not exceed our limit
+	sgcnt = pci_map_sg(adapter->pdev, sgl, scp->use_sg,
+			scb->dma_direction);
+
+	if (sgcnt > adapter->sglen) {
+		con_log(CL_ANN, (KERN_CRIT
+			"megaraid critical: too many sg elements:%d\n",
+			sgcnt));
+		BUG();
+	}
+
+	scb->dma_type = MRAID_DMA_WSG;
+
+	for (i = 0; i < sgcnt; i++, sgl++) {
+		ccb->sgl64[i].address	= sg_dma_address(sgl);
+		ccb->sgl64[i].length	= sg_dma_len(sgl);
+	}
+
+	// Return count of SG nodes
+	return sgcnt;
+}
+
+
+/**
+ * mbox_post_cmd - issue a mailbox command
+ * @adapter	- controller's soft state
+ * @scb		- command to be issued
+ *
+ * post the command to the controller if mailbox is availble.
+ */
+static inline int
+mbox_post_cmd(adapter_t *adapter, scb_t *scb)
+{
+	mraid_device_t	*raid_dev = ADAP2RAIDDEV(adapter);
+	mbox64_t	*mbox64;
+	mbox_t		*mbox;
+	mbox_ccb_t	*ccb;
+	unsigned long	flags;
+	unsigned int	i = 0;
+
+
+	ccb	= (mbox_ccb_t *)scb->ccb;
+	mbox	= raid_dev->mbox;
+	mbox64	= raid_dev->mbox64;
+
+	/*
+	 * Check for busy mailbox. If it is, return failure - the caller
+	 * should retry later.
+	 */
+	spin_lock_irqsave(MAILBOX_LOCK(raid_dev), flags);
+
+	if (unlikely(mbox->busy)) {
+		do {
+			udelay(1);
+			i++;
+			rmb();
+		} while(mbox->busy && (i < max_mbox_busy_wait));
+
+		if (mbox->busy) {
+
+			spin_unlock_irqrestore(MAILBOX_LOCK(raid_dev), flags);
+
+			return -1;
+		}
+	}
+
+
+	// Copy this command's mailbox data into "adapter's" mailbox
+	memcpy((caddr_t)mbox64, (caddr_t)ccb->mbox64, 22);
+	mbox->cmdid = scb->sno;
+
+	adapter->outstanding_cmds++;
+
+	if (scb->dma_direction == PCI_DMA_TODEVICE) {
+		if (!scb->scp->use_sg) {	// sg list not used
+			pci_dma_sync_single(adapter->pdev, ccb->buf_dma_h,
+					scb->scp->request_bufflen,
+					PCI_DMA_TODEVICE);
+		}
+		else {
+			pci_dma_sync_sg(adapter->pdev, scb->scp->request_buffer,
+				scb->scp->use_sg, PCI_DMA_TODEVICE);
+		}
+	}
+
+	mbox->busy	= 1;	// Set busy
+	mbox->poll	= 0;
+	mbox->ack	= 0;
+	wmb();
+
+	WRINDOOR(raid_dev, raid_dev->mbox_dma | 0x1);
+
+	spin_unlock_irqrestore(MAILBOX_LOCK(raid_dev), flags);
+
+	return 0;
+}
+
+
+/**
  * megaraid_queue_command - generic queue entry point for all LLDs
  * @scp		: pointer to the scsi command to be executed
  * @done	: callback routine to be called after the cmd has be completed
@@ -1434,7 +1635,7 @@ megaraid_queue_command(struct scsi_cmnd *scp, void (* done)(struct scsi_cmnd *))
  * convert the command issued by mid-layer to format understood by megaraid
  * firmware. We also complete certain command without sending them to firmware
  */
-static inline scb_t *
+static scb_t *
 megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 {
 	mraid_device_t		*rdev = ADAP2RAIDDEV(adapter);
@@ -1803,237 +2004,6 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 
 
 /**
- * megaraid_alloc_scb - detach and return a scb from the free list
- * @adapter	: controller's soft state
- *
- * return the scb from the head of the free list. NULL if there are none
- * available
- **/
-static inline scb_t *
-megaraid_alloc_scb(adapter_t *adapter, struct scsi_cmnd *scp)
-{
-	struct list_head	*head = &adapter->kscb_pool;
-	scb_t			*scb = NULL;
-	unsigned long		flags;
-
-	// detach scb from free pool
-	spin_lock_irqsave(SCSI_FREE_LIST_LOCK(adapter), flags);
-
-	if (list_empty(head)) {
-		spin_unlock_irqrestore(SCSI_FREE_LIST_LOCK(adapter), flags);
-		return NULL;
-	}
-
-	scb = list_entry(head->next, scb_t, list);
-	list_del_init(&scb->list);
-
-	spin_unlock_irqrestore(SCSI_FREE_LIST_LOCK(adapter), flags);
-
-	scb->state	= SCB_ACTIVE;
-	scb->scp	= scp;
-	scb->dma_type	= MRAID_DMA_NONE;
-
-	return scb;
-}
-
-
-/**
- * megaraid_dealloc_scb - return the scb to the free pool
- * @adapter	: controller's soft state
- * @scb		: scb to be freed
- *
- * return the scb back to the free list of scbs. The caller must 'flush' the
- * SCB before calling us. E.g., performing pci_unamp and/or pci_sync etc.
- * NOTE NOTE: Make sure the scb is not on any list before calling this
- * routine.
- **/
-static inline void
-megaraid_dealloc_scb(adapter_t *adapter, scb_t *scb)
-{
-	unsigned long		flags;
-
-	// put scb in the free pool
-	scb->state	= SCB_FREE;
-	scb->scp	= NULL;
-	spin_lock_irqsave(SCSI_FREE_LIST_LOCK(adapter), flags);
-
-	list_add(&scb->list, &adapter->kscb_pool);
-
-	spin_unlock_irqrestore(SCSI_FREE_LIST_LOCK(adapter), flags);
-
-	return;
-}
-
-
-/**
- * megaraid_mbox_prepare_pthru - prepare a command for physical devices
- * @adapter	- pointer to controller's soft state
- * @scb		- scsi control block
- * @scp		- scsi command from the mid-layer
- *
- * prepare a command for the scsi physical devices
- */
-static inline void
-megaraid_mbox_prepare_pthru(adapter_t *adapter, scb_t *scb,
-		struct scsi_cmnd *scp)
-{
-	mbox_ccb_t		*ccb;
-	mraid_passthru_t	*pthru;
-	uint8_t			channel;
-	uint8_t			target;
-
-	ccb	= (mbox_ccb_t *)scb->ccb;
-	pthru	= ccb->pthru;
-	channel	= scb->dev_channel;
-	target	= scb->dev_target;
-
-	pthru->timeout		= 1;	// 0=6sec, 1=60sec, 2=10min, 3=3hrs
-	pthru->ars		= 1;
-	pthru->islogical	= 0;
-	pthru->channel		= 0;
-	pthru->target		= (channel << 4) | target;
-	pthru->logdrv		= SCP2LUN(scp);
-	pthru->reqsenselen	= 14;
-	pthru->cdblen		= scp->cmd_len;
-
-	memcpy(pthru->cdb, scp->cmnd, scp->cmd_len);
-
-	if (scp->request_bufflen) {
-		pthru->dataxferlen	= scp->request_bufflen;
-		pthru->dataxferaddr	= ccb->sgl_dma_h;
-		pthru->numsge		= megaraid_mbox_mksgl(adapter, scb);
-	}
-	else {
-		pthru->dataxferaddr	= 0;
-		pthru->dataxferlen	= 0;
-		pthru->numsge		= 0;
-	}
-	return;
-}
-
-
-/**
- * megaraid_mbox_prepare_epthru - prepare a command for physical devices
- * @adapter	- pointer to controller's soft state
- * @scb		- scsi control block
- * @scp		- scsi command from the mid-layer
- *
- * prepare a command for the scsi physical devices. This rountine prepares
- * commands for devices which can take extended CDBs (>10 bytes)
- */
-static inline void
-megaraid_mbox_prepare_epthru(adapter_t *adapter, scb_t *scb,
-		struct scsi_cmnd *scp)
-{
-	mbox_ccb_t		*ccb;
-	mraid_epassthru_t	*epthru;
-	uint8_t			channel;
-	uint8_t			target;
-
-	ccb	= (mbox_ccb_t *)scb->ccb;
-	epthru	= ccb->epthru;
-	channel	= scb->dev_channel;
-	target	= scb->dev_target;
-
-	epthru->timeout		= 1;	// 0=6sec, 1=60sec, 2=10min, 3=3hrs
-	epthru->ars		= 1;
-	epthru->islogical	= 0;
-	epthru->channel		= 0;
-	epthru->target		= (channel << 4) | target;
-	epthru->logdrv		= SCP2LUN(scp);
-	epthru->reqsenselen	= 14;
-	epthru->cdblen		= scp->cmd_len;
-
-	memcpy(epthru->cdb, scp->cmnd, scp->cmd_len);
-
-	if (scp->request_bufflen) {
-		epthru->dataxferlen	= scp->request_bufflen;
-		epthru->dataxferaddr	= ccb->sgl_dma_h;
-		epthru->numsge		= megaraid_mbox_mksgl(adapter, scb);
-	}
-	else {
-		epthru->dataxferaddr	= 0;
-		epthru->dataxferlen	= 0;
-		epthru->numsge		= 0;
-	}
-	return;
-}
-
-
-/**
- * megaraid_mbox_mksgl - make the scatter-gather list
- * @adapter	- controller's soft state
- * @scb		- scsi control block
- *
- * prepare the scatter-gather list
- */
-static inline int
-megaraid_mbox_mksgl(adapter_t *adapter, scb_t *scb)
-{
-	struct scatterlist	*sgl;
-	mbox_ccb_t		*ccb;
-	struct page		*page;
-	unsigned long		offset;
-	struct scsi_cmnd	*scp;
-	int			sgcnt;
-	int			i;
-
-
-	scp	= scb->scp;
-	ccb	= (mbox_ccb_t *)scb->ccb;
-
-	// no mapping required if no data to be transferred
-	if (!scp->request_buffer || !scp->request_bufflen)
-		return 0;
-
-	if (!scp->use_sg) {	/* scatter-gather list not used */
-
-		page = virt_to_page(scp->request_buffer);
-
-		offset = ((unsigned long)scp->request_buffer & ~PAGE_MASK);
-
-		ccb->buf_dma_h = pci_map_page(adapter->pdev, page, offset,
-						  scp->request_bufflen,
-						  scb->dma_direction);
-		scb->dma_type = MRAID_DMA_WBUF;
-
-		/*
-		 * We need to handle special 64-bit commands that need a
-		 * minimum of 1 SG
-		 */
-		sgcnt = 1;
-		ccb->sgl64[0].address	= ccb->buf_dma_h;
-		ccb->sgl64[0].length	= scp->request_bufflen;
-
-		return sgcnt;
-	}
-
-	sgl = (struct scatterlist *)scp->request_buffer;
-
-	// The number of sg elements returned must not exceed our limit
-	sgcnt = pci_map_sg(adapter->pdev, sgl, scp->use_sg,
-			scb->dma_direction);
-
-	if (sgcnt > adapter->sglen) {
-		con_log(CL_ANN, (KERN_CRIT
-			"megaraid critical: too many sg elements:%d\n",
-			sgcnt));
-		BUG();
-	}
-
-	scb->dma_type = MRAID_DMA_WSG;
-
-	for (i = 0; i < sgcnt; i++, sgl++) {
-		ccb->sgl64[i].address	= sg_dma_address(sgl);
-		ccb->sgl64[i].length	= sg_dma_len(sgl);
-	}
-
-	// Return count of SG nodes
-	return sgcnt;
-}
-
-
-/**
  * megaraid_mbox_runpendq - execute commands queued in the pending queue
  * @adapter	: controller's soft state
  * @scb		: SCB to be queued in the pending list
@@ -2046,7 +2016,7 @@ megaraid_mbox_mksgl(adapter_t *adapter, scb_t *scb)
  * out from the head of the pending list. If it is successfully issued, the
  * next SCB is at the head now.
  */
-static inline void
+static void
 megaraid_mbox_runpendq(adapter_t *adapter, scb_t *scb_q)
 {
 	scb_t			*scb;
@@ -2110,102 +2080,97 @@ megaraid_mbox_runpendq(adapter_t *adapter, scb_t *scb_q)
 
 
 /**
- * mbox_post_cmd - issue a mailbox command
- * @adapter	- controller's soft state
- * @scb		- command to be issued
+ * megaraid_mbox_prepare_pthru - prepare a command for physical devices
+ * @adapter	- pointer to controller's soft state
+ * @scb		- scsi control block
+ * @scp		- scsi command from the mid-layer
  *
- * post the command to the controller if mailbox is availble.
+ * prepare a command for the scsi physical devices
  */
-static inline int
-mbox_post_cmd(adapter_t *adapter, scb_t *scb)
+static void
+megaraid_mbox_prepare_pthru(adapter_t *adapter, scb_t *scb,
+		struct scsi_cmnd *scp)
 {
-	mraid_device_t	*raid_dev = ADAP2RAIDDEV(adapter);
-	mbox64_t	*mbox64;
-	mbox_t		*mbox;
-	mbox_ccb_t	*ccb;
-	unsigned long	flags;
-	unsigned int	i = 0;
-
+	mbox_ccb_t		*ccb;
+	mraid_passthru_t	*pthru;
+	uint8_t			channel;
+	uint8_t			target;
 
 	ccb	= (mbox_ccb_t *)scb->ccb;
-	mbox	= raid_dev->mbox;
-	mbox64	= raid_dev->mbox64;
+	pthru	= ccb->pthru;
+	channel	= scb->dev_channel;
+	target	= scb->dev_target;
 
-	/*
-	 * Check for busy mailbox. If it is, return failure - the caller
-	 * should retry later.
-	 */
-	spin_lock_irqsave(MAILBOX_LOCK(raid_dev), flags);
+	pthru->timeout		= 1;	// 0=6sec, 1=60sec, 2=10min, 3=3hrs
+	pthru->ars		= 1;
+	pthru->islogical	= 0;
+	pthru->channel		= 0;
+	pthru->target		= (channel << 4) | target;
+	pthru->logdrv		= SCP2LUN(scp);
+	pthru->reqsenselen	= 14;
+	pthru->cdblen		= scp->cmd_len;
 
-	if (unlikely(mbox->busy)) {
-		do {
-			udelay(1);
-			i++;
-			rmb();
-		} while(mbox->busy && (i < max_mbox_busy_wait));
+	memcpy(pthru->cdb, scp->cmnd, scp->cmd_len);
 
-		if (mbox->busy) {
-
-			spin_unlock_irqrestore(MAILBOX_LOCK(raid_dev), flags);
-
-			return -1;
-		}
+	if (scp->request_bufflen) {
+		pthru->dataxferlen	= scp->request_bufflen;
+		pthru->dataxferaddr	= ccb->sgl_dma_h;
+		pthru->numsge		= megaraid_mbox_mksgl(adapter, scb);
 	}
-
-
-	// Copy this command's mailbox data into "adapter's" mailbox
-	memcpy((caddr_t)mbox64, (caddr_t)ccb->mbox64, 22);
-	mbox->cmdid = scb->sno;
-
-	adapter->outstanding_cmds++;
-
-	if (scb->dma_direction == PCI_DMA_TODEVICE) {
-		if (!scb->scp->use_sg) {	// sg list not used
-			pci_dma_sync_single(adapter->pdev, ccb->buf_dma_h,
-					scb->scp->request_bufflen,
-					PCI_DMA_TODEVICE);
-		}
-		else {
-			pci_dma_sync_sg(adapter->pdev, scb->scp->request_buffer,
-				scb->scp->use_sg, PCI_DMA_TODEVICE);
-		}
+	else {
+		pthru->dataxferaddr	= 0;
+		pthru->dataxferlen	= 0;
+		pthru->numsge		= 0;
 	}
-
-	mbox->busy	= 1;	// Set busy
-	mbox->poll	= 0;
-	mbox->ack	= 0;
-	wmb();
-
-	WRINDOOR(raid_dev, raid_dev->mbox_dma | 0x1);
-
-	spin_unlock_irqrestore(MAILBOX_LOCK(raid_dev), flags);
-
-	return 0;
+	return;
 }
 
 
 /**
- * megaraid_isr - isr for memory based mailbox based controllers
- * @irq		- irq
- * @devp	- pointer to our soft state
- * @regs	- unused
+ * megaraid_mbox_prepare_epthru - prepare a command for physical devices
+ * @adapter	- pointer to controller's soft state
+ * @scb		- scsi control block
+ * @scp		- scsi command from the mid-layer
  *
- * Interrupt service routine for memory-mapped mailbox controllers.
+ * prepare a command for the scsi physical devices. This rountine prepares
+ * commands for devices which can take extended CDBs (>10 bytes)
  */
-static irqreturn_t
-megaraid_isr(int irq, void *devp, struct pt_regs *regs)
+static void
+megaraid_mbox_prepare_epthru(adapter_t *adapter, scb_t *scb,
+		struct scsi_cmnd *scp)
 {
-	adapter_t	*adapter = devp;
-	int		handled;
+	mbox_ccb_t		*ccb;
+	mraid_epassthru_t	*epthru;
+	uint8_t			channel;
+	uint8_t			target;
 
-	handled = megaraid_ack_sequence(adapter);
+	ccb	= (mbox_ccb_t *)scb->ccb;
+	epthru	= ccb->epthru;
+	channel	= scb->dev_channel;
+	target	= scb->dev_target;
 
-	/* Loop through any pending requests */
-	if (!adapter->quiescent) {
-		megaraid_mbox_runpendq(adapter, 0);
+	epthru->timeout		= 1;	// 0=6sec, 1=60sec, 2=10min, 3=3hrs
+	epthru->ars		= 1;
+	epthru->islogical	= 0;
+	epthru->channel		= 0;
+	epthru->target		= (channel << 4) | target;
+	epthru->logdrv		= SCP2LUN(scp);
+	epthru->reqsenselen	= 14;
+	epthru->cdblen		= scp->cmd_len;
+
+	memcpy(epthru->cdb, scp->cmnd, scp->cmd_len);
+
+	if (scp->request_bufflen) {
+		epthru->dataxferlen	= scp->request_bufflen;
+		epthru->dataxferaddr	= ccb->sgl_dma_h;
+		epthru->numsge		= megaraid_mbox_mksgl(adapter, scb);
 	}
-
-	return IRQ_RETVAL(handled);
+	else {
+		epthru->dataxferaddr	= 0;
+		epthru->dataxferlen	= 0;
+		epthru->numsge		= 0;
+	}
+	return;
 }
 
 
@@ -2323,6 +2288,79 @@ megaraid_ack_sequence(adapter_t *adapter)
 	return handled;
 }
 
+
+/**
+ * megaraid_isr - isr for memory based mailbox based controllers
+ * @irq		- irq
+ * @devp	- pointer to our soft state
+ * @regs	- unused
+ *
+ * Interrupt service routine for memory-mapped mailbox controllers.
+ */
+static irqreturn_t
+megaraid_isr(int irq, void *devp, struct pt_regs *regs)
+{
+	adapter_t	*adapter = devp;
+	int		handled;
+
+	handled = megaraid_ack_sequence(adapter);
+
+	/* Loop through any pending requests */
+	if (!adapter->quiescent) {
+		megaraid_mbox_runpendq(adapter, 0);
+	}
+
+	return IRQ_RETVAL(handled);
+}
+
+
+/**
+ * megaraid_mbox_sync_scb - sync kernel buffers
+ * @adapter	: controller's soft state
+ * @scb		: pointer to the resource packet
+ *
+ * DMA sync if required.
+ */
+static inline void
+megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
+{
+	mbox_ccb_t	*ccb;
+
+	ccb	= (mbox_ccb_t *)scb->ccb;
+
+	switch (scb->dma_type) {
+
+	case MRAID_DMA_WBUF:
+		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
+			pci_dma_sync_single(adapter->pdev,
+					ccb->buf_dma_h,
+					scb->scp->request_bufflen,
+					PCI_DMA_FROMDEVICE);
+		}
+
+		pci_unmap_page(adapter->pdev, ccb->buf_dma_h,
+			scb->scp->request_bufflen, scb->dma_direction);
+
+		break;
+
+	case MRAID_DMA_WSG:
+		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
+			pci_dma_sync_sg(adapter->pdev,
+					scb->scp->request_buffer,
+					scb->scp->use_sg, PCI_DMA_FROMDEVICE);
+		}
+
+		pci_unmap_sg(adapter->pdev, scb->scp->request_buffer,
+			scb->scp->use_sg, scb->dma_direction);
+
+		break;
+
+	default:
+		break;
+	}
+
+	return;
+}
 
 
 /**
@@ -2543,55 +2581,6 @@ megaraid_mbox_dpc(unsigned long devp)
 		spin_lock(adapter->host_lock);
 		scp->scsi_done(scp);
 		spin_unlock(adapter->host_lock);
-	}
-
-	return;
-}
-
-
-/**
- * megaraid_mbox_sync_scb - sync kernel buffers
- * @adapter	: controller's soft state
- * @scb		: pointer to the resource packet
- *
- * DMA sync if required.
- */
-static inline void
-megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
-{
-	mbox_ccb_t	*ccb;
-
-	ccb	= (mbox_ccb_t *)scb->ccb;
-
-	switch (scb->dma_type) {
-
-	case MRAID_DMA_WBUF:
-		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_single(adapter->pdev,
-					ccb->buf_dma_h,
-					scb->scp->request_bufflen,
-					PCI_DMA_FROMDEVICE);
-		}
-
-		pci_unmap_page(adapter->pdev, ccb->buf_dma_h,
-			scb->scp->request_bufflen, scb->dma_direction);
-
-		break;
-
-	case MRAID_DMA_WSG:
-		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_sg(adapter->pdev,
-					scb->scp->request_buffer,
-					scb->scp->use_sg, PCI_DMA_FROMDEVICE);
-		}
-
-		pci_unmap_sg(adapter->pdev, scb->scp->request_buffer,
-			scb->scp->use_sg, scb->dma_direction);
-
-		break;
-
-	default:
-		break;
 	}
 
 	return;
@@ -2895,7 +2884,7 @@ mbox_post_sync_cmd(adapter_t *adapter, uint8_t raw_mbox[])
 	mbox64_t	*mbox64;
 	mbox_t		*mbox;
 	uint8_t		status;
-	long		i;
+	int		i;
 
 
 	mbox64	= raid_dev->mbox64;
@@ -2935,23 +2924,24 @@ mbox_post_sync_cmd(adapter_t *adapter, uint8_t raw_mbox[])
 
 		if (i == 1000) {
 			con_log(CL_ANN, (KERN_NOTICE
-				"megaraid mailbox: wait for FW to boot."));
+				"megaraid mailbox: wait for FW to boot      "));
 
 			for (i = 0; (mbox->numstatus == 0xFF) &&
 					(i < MBOX_RESET_WAIT); i++) {
 				rmb();
-				con_log(CL_ANN, ("."));
+				con_log(CL_ANN, ("\b\b\b\b\b[%03d]",
+							MBOX_RESET_WAIT - i));
 				msleep(1000);
 			}
 
 			if (i == MBOX_RESET_WAIT) {
 
-				con_log(CL_ANN, (KERN_WARNING
+				con_log(CL_ANN, (
 				"\nmegaraid mailbox: status not available\n"));
 
 				return -1;
 			}
-			con_log(CL_ANN, ("[ok]\n"));
+			con_log(CL_ANN, ("\b\b\b\b\b[ok] \n"));
 		}
 	}
 
@@ -3069,7 +3059,7 @@ mbox_post_sync_cmd_fast(adapter_t *adapter, uint8_t raw_mbox[])
  * wait until the controller's mailbox is available to accept more commands.
  * wait for at most 1 second
  */
-static inline int
+static int
 megaraid_busywait_mbox(mraid_device_t *raid_dev)
 {
 	mbox_t	*mbox = raid_dev->mbox;

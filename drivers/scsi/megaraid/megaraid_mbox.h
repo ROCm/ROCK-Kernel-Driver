@@ -9,7 +9,7 @@
  *	   as published by the Free Software Foundation; either version
  *	   2 of the License, or (at your option) any later version.
  *
- * FILE		: megaraid.h
+ * FILE		: megaraid_mbox.h
  */
 
 #ifndef _MEGARAID_H_
@@ -21,8 +21,8 @@
 #include "megaraid_ioctl.h"
 
 
-#define MEGARAID_VERSION	"2.20.3.0"
-#define MEGARAID_EXT_VERSION	"(Release Date: Thu Aug 19 09:58:33 EDT 2004)"
+#define MEGARAID_VERSION	"2.20.3.1"
+#define MEGARAID_EXT_VERSION	"(Release Date: Tue Aug 24 09:43:35 EDT 2004)"
 
 
 /*

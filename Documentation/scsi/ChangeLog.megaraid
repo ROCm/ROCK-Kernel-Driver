@@ -1,3 +1,38 @@
+Release Date	: Tue Aug 24 09:43:35 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.3.1 (scsi module), 2.20.2.0 (cmm module)
+Older Version	: 2.20.3.0 (scsi module), 2.20.2.0 (cmm module)
+
+i.	Function reordering so that inline functions are defined before they
+	are actually used. It is now mandatory for GCC 3.4.1 (current stable)
+
+	Declare some heavy-weight functions to be non-inlined,
+	megaraid_mbox_build_cmd, megaraid_mbox_runpendq,
+	megaraid_mbox_prepare_pthru, megaraid_mbox_prepare_epthru,
+	megaraid_busywait_mbox
+
+		- Andrew Morton <akpm@osdl.org>, 08.19.2004
+		linux-scsi mailing list
+
+	"Something else to clean up after inclusion: every instance of an
+	inline function is actually rendered as a full function call, because
+	the function is always used before it is defined.  Atul, please
+	re-arrange the code to eliminate the need for most (all) of the
+	function prototypes at the top of each file, and define (not just
+	declare with a prototype) each inline function before its first use"
+
+		- Matt Domsch <Matt_Domsch@dell.com>, 07.27.2004
+		linux-scsi mailing list
+
+
+ii.	Display elapsed time (countdown) while waiting for FW to boot.
+
+iii.	Module compilation reorder in Makefile so that unresolved symbols do
+	not occur when driver is compiled non-modular.
+
+		Patrick J. LoPresti <patl@users.sourceforge.net>, 8.22.2004
+		linux-scsi mailing list
+
+
 Release Date	: Thu Aug 19 09:58:33 EDT 2004 - Atul Mukker <atulm@lsil.com>
 Current Version	: 2.20.3.0 (scsi module), 2.20.2.0 (cmm module)
 Older Version	: 2.20.2.0 (scsi module), 2.20.1.0 (cmm module)
