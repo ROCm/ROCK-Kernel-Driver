@@ -615,7 +615,7 @@ static int __init viocd_init(void)
 				VIOCD_DEVICE_DEVFS "%d", deviceno);
 		gendisk->queue = viocd_queue;
 		gendisk->fops = &viocd_fops;
-		gendisk->flags = GENHD_FL_CD;
+		gendisk->flags = GENHD_FL_CD|GENHD_FL_REMOVABLE;
 		set_capacity(gendisk, 0);
 		gendisk->private_data = d;
 		d->viocd_disk = gendisk;
