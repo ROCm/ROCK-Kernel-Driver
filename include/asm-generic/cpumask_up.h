@@ -6,7 +6,7 @@
 #define cpu_set(cpu, map)		do { (void)(cpu); cpus_coerce(map) = 1UL; } while (0)
 #define cpu_clear(cpu, map)		do { (void)(cpu); cpus_coerce(map) = 0UL; } while (0)
 #define cpu_isset(cpu, map)		((void)(cpu), cpus_coerce(map) != 0UL)
-#define cpu_test_and_set(cpu, map)	((void)(cpu), test_and_set_bit(0, (map).mask))
+#define cpu_test_and_set(cpu, map)	((void)(cpu), test_and_set_bit(0, &(map)))
 
 #define cpus_and(dst, src1, src2)					\
 	do {								\
