@@ -988,7 +988,7 @@ static struct sock *netlink_seq_socket_idx(struct seq_file *seq, loff_t pos)
 static void *netlink_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&nl_table_lock);
-	return *pos ? netlink_seq_socket_idx(seq, *pos - 1) : (void *) 1;
+	return *pos ? netlink_seq_socket_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *netlink_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -997,7 +997,7 @@ static void *netlink_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	++*pos;
 
-	if (v == (void *) 1) 
+	if (v == SEQ_START_TOKEN)
 		return netlink_seq_socket_idx(seq, 0);
 		
 	s = sk_next(v);
@@ -1023,7 +1023,7 @@ static void netlink_seq_stop(struct seq_file *seq, void *v)
 
 static int netlink_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1) 
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq,
 			 "sk       Eth Pid    Groups   "
 			 "Rmem     Wmem     Dump     Locks\n");
