@@ -258,6 +258,7 @@ static int b1pciv4_add_card(struct capi_driver *driver,
 		goto err;
 	}
 	memset(card, 0, sizeof(avmcard));
+	spin_lock_init(&card->lock);
 
         card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
 	if (!card->dma) {
