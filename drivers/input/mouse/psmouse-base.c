@@ -389,6 +389,10 @@ static int psmouse_extensions(struct psmouse *psmouse)
  */
 			psmouse_max_proto = PSMOUSE_IMEX;
 		}
+/*
+ * Make sure that touchpad is in relative mode, gestures (taps) are enabled
+ */
+		synaptics_reset(psmouse);
 	}
 
 	if (psmouse_max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {

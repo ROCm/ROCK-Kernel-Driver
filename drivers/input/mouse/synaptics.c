@@ -357,9 +357,15 @@ static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
 	clear_bit(REL_Y, dev->relbit);
 }
 
+void synaptics_reset(struct psmouse *psmouse)
+{
+	/* reset touchpad back to relative mode, gestures enabled */
+	synaptics_mode_cmd(psmouse, 0);
+}
+
 static void synaptics_disconnect(struct psmouse *psmouse)
 {
-	synaptics_mode_cmd(psmouse, 0);
+	synaptics_reset(psmouse);
 	kfree(psmouse->private);
 }
 
