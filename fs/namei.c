@@ -1260,7 +1260,6 @@ int open_namei(const char * pathname, int flag, int mode, struct nameidata *nd)
 		error = path_lookup(pathname, lookup_flags(flag)|LOOKUP_OPEN, nd);
 		if (error)
 			return error;
-		dentry = nd->dentry;
 		goto ok;
 	}
 
