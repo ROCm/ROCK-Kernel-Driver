@@ -364,10 +364,21 @@ int __init nmi_init(struct oprofile_operations ** ops)
 	switch (vendor) {
 		case X86_VENDOR_AMD:
 			/* Needs to be at least an Athlon (or hammer in 32bit mode) */
-			if (family < 6)
+
+			switch (family) {
+			default:
 				return -ENODEV;
-			model = &op_athlon_spec;
-			nmi_ops.cpu_type = "i386/athlon";
+			case 6:
+				model = &op_athlon_spec;
+				nmi_ops.cpu_type = "i386/athlon";
+				break;
+#if defined(CONFIG_X86_64)
+			case 0xf:
+				model = &op_athlon_spec;
+				nmi_ops.cpu_type = "x86-64/hammer";
+				break;
+#endif /* CONFIG_X86_64 */
+			}
 			break;
  
 #if !defined(CONFIG_X86_64)
