@@ -12,6 +12,10 @@ ToDo/Notes:
 	  OTOH, perhaps i_sem, which is held accross generic_file_write is
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
+	  UPDATE: The above is all ok as it is due to i_sem held.  The only
+	  thing that needs to be checked is ntfs_writepage() which does not
+	  hold i_sem.  It cannot change i_size but it needs to cope with a
+	  concurrent i_size change.
 	- Implement mft.c::sync_mft_mirror_umount().  We currently will just
 	  leave the volume dirty on umount if the final iput(vol->mft_ino)
 	  causes a write of any mirrored mft records due to the mft mirror
@@ -42,7 +46,7 @@ ToDo/Notes:
 	  mount time as this cannot work with the current implementation.
 	- Check for location of attribute name and improve error handling in
 	  general in fs/ntfs/inode.c::ntfs_read_locked_inode() and friends.
-	- In fs/ntfs/aops.c::ntfs_writepage(), if t he page is fully outside
+	- In fs/ntfs/aops.c::ntfs_writepage(), if the page is fully outside
 	  i_size, i.e. race with truncate, invalidate the buffers on the page
 	  so that they become freeable and hence the page does not leak.
 	- Implement extension of resident files in the regular file write code
@@ -50,6 +54,8 @@ ToDo/Notes:
 	  this only works until the data attribute becomes too big for the mft
 	  record after which we abort the write returning -EOPNOTSUPP from
 	  ntfs_prepare_write().
+	- Remove unused function fs/ntfs/runlist.c::ntfs_rl_merge().  (Adrian
+	  Bunk)
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
