@@ -580,7 +580,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 static void __serial_close(struct usb_serial_port *port, struct file *filp)
 {
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not opened");
+		dbg ("%s - port not opened", __FUNCTION__);
 		return;
 	}
 
@@ -719,7 +719,7 @@ static void serial_throttle (struct tty_struct * tty)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg ("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 

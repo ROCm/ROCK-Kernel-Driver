@@ -394,7 +394,8 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 	/* send it down the pipe */
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
-		err(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
+		err("%s - usb_submit_urb(write bulk) failed with status = %d",
+		    __FUNCTION__, status);
 		count = status;
 	} else {
 		bytes_out += count;
@@ -742,16 +743,17 @@ static void visor_set_termios (struct usb_serial_port *port, struct termios *old
 	if (cflag & CRTSCTS)
 		dbg("%s - RTS/CTS is enabled", __FUNCTION__);
 	else
-		dbg(__FUNCTION__ " - RTS/CTS is disabled");
+		dbg("%s - RTS/CTS is disabled", __FUNCTION__);
 	
 	/* determine software flow control */
 	if (I_IXOFF(port->tty))
-		dbg(__FUNCTION__ " - XON/XOFF is enabled, XON = %2x, XOFF = %2x", START_CHAR(port->tty), STOP_CHAR(port->tty));
+		dbg("%s - XON/XOFF is enabled, XON = %2x, XOFF = %2x",
+		    __FUNCTION__, START_CHAR(port->tty), STOP_CHAR(port->tty));
 	else
-		dbg(__FUNCTION__ " - XON/XOFF is disabled");
+		dbg("%s - XON/XOFF is disabled", __FUNCTION__);
 
 	/* get the baud rate wanted */
-	dbg(__FUNCTION__ " - baud rate = %d", tty_get_baud_rate(port->tty));
+	dbg("%s - baud rate = %d", __FUNCTION__, tty_get_baud_rate(port->tty));
 
 	return;
 }

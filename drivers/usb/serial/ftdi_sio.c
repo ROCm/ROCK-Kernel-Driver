@@ -462,7 +462,7 @@ static void ftdi_sio_write_bulk_callback (struct urb *urb)
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial;
 
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
 	if (port_paranoia_check (port, "ftdi_sio_write_bulk_callback")) {
 		return;
@@ -634,8 +634,8 @@ static __u16 translate_baudrate_to_ftdi(unsigned int cflag, enum ftdi_type ftdi_
 		case B38400: urb_value = ftdi_sio_b38400; dbg("Set to 38400") ; break;
 		case B57600: urb_value = ftdi_sio_b57600; dbg("Set to 57600") ; break;
 		case B115200: urb_value = ftdi_sio_b115200; dbg("Set to 115200") ; break;
-		default: dbg(__FUNCTION__ " FTDI_SIO does not support the baudrate (%d) requested",
-			     (cflag & CBAUD)); 
+		default: dbg("%s - FTDI_SIO does not support the baudrate (%d) requested",
+			     __FUNCTION__, (cflag & CBAUD)); 
 		   break;
 		}
 	} else { /* it is 8U232AM */
@@ -654,8 +654,8 @@ static __u16 translate_baudrate_to_ftdi(unsigned int cflag, enum ftdi_type ftdi_
 		case B230400: urb_value = ftdi_8U232AM_48MHz_b230400; dbg("Set to 230400") ; break;
 		case B460800: urb_value = ftdi_8U232AM_48MHz_b460800; dbg("Set to 460800") ; break;
 		case B921600: urb_value = ftdi_8U232AM_48MHz_b921600; dbg("Set to 921600") ; break;
-		default: dbg(__FUNCTION__ " The baudrate (%d) requested is not implemented",
-			     (cflag & CBAUD)); 
+		default: dbg("%s - The baudrate (%d) requested is not implemented",
+			     __FUNCTION__, (cflag & CBAUD)); 
 		   break;
 		}
 	}
@@ -685,10 +685,11 @@ static void ftdi_sio_break_ctl( struct usb_serial_port *port, int break_state )
 			    FTDI_SIO_SET_DATA_REQUEST_TYPE,
 			    urb_value , 0,
 			    buf, 0, WDR_TIMEOUT) < 0) {
-		err(__FUNCTION__ " FAILED to enable/disable break state (state was %d)",break_state);
+		err("%s - FAILED to enable/disable break state (state was %d)",
+		    __FUNCTION__, break_state);
 	}	   
 
-	dbg(__FUNCTION__ " break state is %d - urb is %d",break_state, urb_value);
+	dbg("%s - break state is %d - urb is %d", __FUNCTION__, break_state, urb_value);
 	
 }
 
@@ -778,7 +779,7 @@ static void ftdi_sio_set_termios (struct usb_serial_port *port, struct termios *
 				    FTDI_SIO_SET_BAUDRATE_REQUEST_TYPE,
 				    urb_value, 0, 
 				    buf, 0, 100) < 0) {
-			err(__FUNCTION__ " urb failed to set baurdrate");
+			err("%s urb failed to set baurdrate", __FUNCTION__);
 		}
 	}
 	/* Set flow control */
