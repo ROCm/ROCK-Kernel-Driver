@@ -412,7 +412,6 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 	return 0;
 }
 
-#ifdef	ETHTOOL_PHYS_ID
 
 /* toggle LED 4 times per second = 2 "blinks" per second */
 #define E1000_ID_INTERVAL	(HZ/4)
@@ -458,7 +457,6 @@ e1000_ethtool_led_blink(struct e1000_adapter *adapter, struct ethtool_value *id)
 
 	return 0;
 }
-#endif	/* ETHTOOL_PHYS_ID */
 
 int
 e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
@@ -516,14 +514,12 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		e1000_up(adapter);
 		return 0;
 	}
-#ifdef	ETHTOOL_PHYS_ID
 	case ETHTOOL_PHYS_ID: {
 		struct ethtool_value id;
 		if(copy_from_user(&id, addr, sizeof(id)))
 			return -EFAULT;
 		return e1000_ethtool_led_blink(adapter, &id);
 	}
-#endif	/* ETHTOOL_PHYS_ID */
 	case ETHTOOL_GLINK: {
 		struct ethtool_value link = {ETHTOOL_GLINK};
 		link.data = netif_carrier_ok(netdev);

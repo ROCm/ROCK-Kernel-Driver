@@ -107,17 +107,13 @@ e1000_reset_hw(struct e1000_hw *hw)
     uint32_t ctrl_ext;
     uint32_t icr;
     uint32_t manc;
-    uint16_t pci_cmd_word;
 
     DEBUGFUNC("e1000_reset_hw");
     
     /* For 82542 (rev 2.0), disable MWI before issuing a device reset */
     if(hw->mac_type == e1000_82542_rev2_0) {
-        if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE) {
-            DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
-            pci_cmd_word = hw->pci_cmd_word & ~CMD_MEM_WRT_INVALIDATE;
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &pci_cmd_word);
-        }
+        DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
+        e1000_pci_clear_mwi(hw);
     }
 
     /* Clear interrupt mask to stop board from generating interrupts */
@@ -130,6 +126,7 @@ e1000_reset_hw(struct e1000_hw *hw)
      */
     E1000_WRITE_REG(hw, RCTL, 0);
     E1000_WRITE_REG(hw, TCTL, E1000_TCTL_PSP);
+    E1000_WRITE_FLUSH(hw);
 
     /* The tbi_compatibility_on Flag must be cleared when Rctl is cleared. */
     hw->tbi_compatibility_on = FALSE;
@@ -159,6 +156,7 @@ e1000_reset_hw(struct e1000_hw *hw)
         ctrl_ext = E1000_READ_REG(hw, CTRL_EXT);
         ctrl_ext |= E1000_CTRL_EXT_EE_RST;
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
+        E1000_WRITE_FLUSH(hw);
         /* Wait for EEPROM reload */
         msec_delay(2);
     } else {
@@ -180,7 +178,7 @@ e1000_reset_hw(struct e1000_hw *hw)
     /* If MWI was previously enabled, reenable it. */
     if(hw->mac_type == e1000_82542_rev2_0) {
         if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE)
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &hw->pci_cmd_word);
+            e1000_pci_set_mwi(hw);
     }
 }
 
@@ -201,7 +199,6 @@ e1000_init_hw(struct e1000_hw *hw)
     uint32_t ctrl, status;
     uint32_t i;
     int32_t ret_val;
-    uint16_t pci_cmd_word;
     uint16_t pcix_cmd_word;
     uint16_t pcix_stat_hi_word;
     uint16_t cmd_mmrbc;
@@ -244,12 +241,10 @@ e1000_init_hw(struct e1000_hw *hw)
 
     /* For 82542 (rev 2.0), disable MWI and put the receiver into reset */
     if(hw->mac_type == e1000_82542_rev2_0) {
-        if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE) {
-            DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
-            pci_cmd_word = hw->pci_cmd_word & ~CMD_MEM_WRT_INVALIDATE;
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &pci_cmd_word);
-        }
+        DEBUGOUT("Disabling MWI on 82542 rev 2.0\n");
+        e1000_pci_clear_mwi(hw);
         E1000_WRITE_REG(hw, RCTL, E1000_RCTL_RST);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(5);
     }
 
@@ -261,9 +256,10 @@ e1000_init_hw(struct e1000_hw *hw)
     /* For 82542 (rev 2.0), take the receiver out of reset and enable MWI */
     if(hw->mac_type == e1000_82542_rev2_0) {
         E1000_WRITE_REG(hw, RCTL, 0);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(1);
         if(hw->pci_cmd_word & CMD_MEM_WRT_INVALIDATE)
-            e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &hw->pci_cmd_word);
+            e1000_pci_set_mwi(hw);
     }
 
     /* Zero out the Multicast HASH table */
@@ -509,6 +505,7 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
 
     E1000_WRITE_REG(hw, TXCW, txcw);
     E1000_WRITE_REG(hw, CTRL, ctrl);
+    E1000_WRITE_FLUSH(hw);
 
     hw->txcw = txcw;
     msec_delay(1);
@@ -1122,6 +1119,7 @@ e1000_config_collision_dist(struct e1000_hw *hw)
     tctl |= E1000_COLLISION_DISTANCE << E1000_COLD_SHIFT;
 
     E1000_WRITE_REG(hw, TCTL, tctl);
+    E1000_WRITE_FLUSH(hw);
 }
 
 /******************************************************************************
@@ -1719,6 +1717,7 @@ e1000_raise_mdi_clk(struct e1000_hw *hw,
      * bit), and then delay 2 microseconds.
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl | E1000_CTRL_MDC));
+    E1000_WRITE_FLUSH(hw);
     usec_delay(2);
 }
 
@@ -1736,6 +1735,7 @@ e1000_lower_mdi_clk(struct e1000_hw *hw,
      * bit), and then delay 2 microseconds.
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl & ~E1000_CTRL_MDC));
+    E1000_WRITE_FLUSH(hw);
     usec_delay(2);
 }
 
@@ -1778,6 +1778,7 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
         else ctrl &= ~E1000_CTRL_MDIO;
 
         E1000_WRITE_REG(hw, CTRL, ctrl);
+        E1000_WRITE_FLUSH(hw);
 
         usec_delay(2);
 
@@ -1786,9 +1787,6 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
 
         mask = mask >> 1;
     }
-
-    /* Clear the data bit just before leaving this routine. */
-    ctrl &= ~E1000_CTRL_MDIO;
 }
 
 /******************************************************************************
@@ -1819,6 +1817,7 @@ e1000_shift_in_mdi_bits(struct e1000_hw *hw)
     ctrl &= ~E1000_CTRL_MDIO;
 
     E1000_WRITE_REG(hw, CTRL, ctrl);
+    E1000_WRITE_FLUSH(hw);
 
     /* Raise and Lower the clock before reading in the data. This accounts for
      * the turnaround bits. The first clock occurred when we clocked out the
@@ -1838,9 +1837,6 @@ e1000_shift_in_mdi_bits(struct e1000_hw *hw)
 
     e1000_raise_mdi_clk(hw, &ctrl);
     e1000_lower_mdi_clk(hw, &ctrl);
-
-    /* Clear the MDIO bit just before leaving this routine. */
-    ctrl &= ~E1000_CTRL_MDIO;
 
     return data;
 }
@@ -2015,8 +2011,10 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
          */
         ctrl = E1000_READ_REG(hw, CTRL);
         E1000_WRITE_REG(hw, CTRL, ctrl | E1000_CTRL_PHY_RST);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(10);
         E1000_WRITE_REG(hw, CTRL, ctrl);
+        E1000_WRITE_FLUSH(hw);
     } else {
         /* Read the Extended Device Control Register, assert the PHY_RESET_DIR
          * bit to put the PHY into reset. Then, take it out of reset.
@@ -2025,9 +2023,11 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
         ctrl_ext |= E1000_CTRL_EXT_SDP4_DIR;
         ctrl_ext &= ~E1000_CTRL_EXT_SDP4_DATA;
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
+        E1000_WRITE_FLUSH(hw);
         msec_delay(10);
         ctrl_ext |= E1000_CTRL_EXT_SDP4_DATA;
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
+        E1000_WRITE_FLUSH(hw);
     }
     usec_delay(150);
 }
@@ -2230,6 +2230,7 @@ e1000_raise_ee_clk(struct e1000_hw *hw,
      */
     *eecd = *eecd | E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 }
 
@@ -2248,6 +2249,7 @@ e1000_lower_ee_clk(struct e1000_hw *hw,
      */
     *eecd = *eecd & ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 }
 
@@ -2285,6 +2287,7 @@ e1000_shift_out_ee_bits(struct e1000_hw *hw,
             eecd |= E1000_EECD_DI;
 
         E1000_WRITE_REG(hw, EECD, eecd);
+        E1000_WRITE_FLUSH(hw);
 
         usec_delay(50);
 
@@ -2379,21 +2382,25 @@ e1000_standby_eeprom(struct e1000_hw *hw)
     /* Deselct EEPROM */
     eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 
     /* Clock high */
     eecd |= E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 
     /* Select EEPROM */
     eecd |= E1000_EECD_CS;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 
     /* Clock low */
     eecd &= ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 }
 
@@ -2412,11 +2419,13 @@ e1000_clock_eeprom(struct e1000_hw *hw)
     /* Rising edge of clock */
     eecd |= E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 
     /* Falling edge of clock */
     eecd &= ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
+    E1000_WRITE_FLUSH(hw);
     usec_delay(50);
 }
 

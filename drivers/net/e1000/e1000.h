@@ -109,9 +109,7 @@
 #include <linux/list.h>
 #include <linux/reboot.h>
 #include <linux/ethtool.h>
-#ifdef NETIF_F_HW_VLAN_TX
 #include <linux/if_vlan.h>
-#endif
 
 #define BAR_0		0
 #define BAR_1		1
@@ -199,9 +197,7 @@ struct e1000_adapter {
 #ifdef CONFIG_PROC_FS
 	struct list_head proc_list_head;
 #endif
-#ifdef NETIF_F_HW_VLAN_TX
 	struct vlan_group *vlgrp;
-#endif
 	char *id_string;
 	uint32_t bd_number;
 	uint32_t rx_buffer_len;
@@ -212,10 +208,8 @@ struct e1000_adapter {
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
 
-#ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;
 	unsigned long led_status;
-#endif
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;

@@ -264,6 +264,8 @@ void e1000_reset_adaptive(struct e1000_hw *hw);
 void e1000_update_adaptive(struct e1000_hw *hw);
 void e1000_tbi_adjust_stats(struct e1000_hw *hw, struct e1000_hw_stats *stats, uint32_t frame_len, uint8_t * mac_addr);
 void e1000_get_bus_info(struct e1000_hw *hw);
+void e1000_pci_set_mwi(struct e1000_hw *hw);
+void e1000_pci_clear_mwi(struct e1000_hw *hw);
 void e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 /* Port I/O is only supported on 82544 and newer */
