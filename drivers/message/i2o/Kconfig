@@ -3,6 +3,7 @@ menu "I2O device support"
 
 config I2O
 	tristate "I2O support"
+	depends on PCI
 	---help---
 	  The Intelligent Input/Output (I2O) architecture allows hardware
 	  drivers to be split into two parts: an operating system specific
