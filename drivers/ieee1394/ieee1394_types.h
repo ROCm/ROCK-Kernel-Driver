@@ -8,6 +8,8 @@
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/string.h>
+
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 

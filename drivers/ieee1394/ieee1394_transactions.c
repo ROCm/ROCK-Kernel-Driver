@@ -11,8 +11,10 @@
 
 #include <linux/sched.h>
 #include <linux/bitops.h>
-#include <asm/errno.h>
+#include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+
+#include <asm/errno.h>
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
