@@ -570,10 +570,6 @@ int __ide_dma_on (ide_drive_t *drive)
 	if (HWIF(drive)->ide_dma_host_on(drive))
 		return 1;
 
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-	HWIF(drive)->ide_dma_queued_on(drive);
-#endif
-
 	return 0;
 }
 

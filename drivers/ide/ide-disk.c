@@ -1665,6 +1665,10 @@ static void idedisk_setup (ide_drive_t *drive)
 	drive->no_io_32bit = id->dword_io ? 1 : 0;
 	if (drive->id->cfs_enable_2 & 0x3000)
 		write_cache(drive, (id->cfs_enable_2 & 0x3000));
+
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+	HWIF(drive)->ide_dma_queued_on(drive);
+#endif
 }
 
 static int idedisk_cleanup (ide_drive_t *drive)
