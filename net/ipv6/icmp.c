@@ -530,8 +530,7 @@ static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 
 	rcu_read_lock();
-	ipprot = inet6_protos[hash];
-	smp_read_barrier_depends();
+	ipprot = rcu_dereference(inet6_protos[hash]);
 	if (ipprot && ipprot->err_handler)
 		ipprot->err_handler(skb, NULL, type, code, inner_offset, info);
 	rcu_read_unlock();

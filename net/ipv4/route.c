@@ -237,9 +237,8 @@ static struct rtable *rt_cache_get_first(struct seq_file *seq)
 
 static struct rtable *rt_cache_get_next(struct seq_file *seq, struct rtable *r)
 {
-	struct rt_cache_iter_state *st = seq->private;
+	struct rt_cache_iter_state *st = rcu_dereference(seq->private);
 
-	smp_read_barrier_depends();
 	r = r->u.rt_next;
 	while (!r) {
 		rcu_read_unlock_bh();
@@ -1004,10 +1003,9 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
 			rthp=&rt_hash_table[hash].chain;
 
 			rcu_read_lock();
-			while ((rth = *rthp) != NULL) {
+			while ((rth = rcu_dereference(*rthp)) != NULL) {
 				struct rtable *rt;
 
-				smp_read_barrier_depends();
 				if (rth->fl.fl4_dst != daddr ||
 				    rth->fl.fl4_src != skeys[i] ||
 				    rth->fl.fl4_tos != tos ||
@@ -1259,9 +1257,8 @@ unsigned short ip_rt_frag_needed(struct iphdr *iph, unsigned short new_mtu)
 		unsigned hash = rt_hash_code(daddr, skeys[i], tos);
 
 		rcu_read_lock();
-		for (rth = rt_hash_table[hash].chain; rth;
-		     rth = rth->u.rt_next) {
-			smp_read_barrier_depends();
+		for (rth = rcu_dereference(rt_hash_table[hash].chain); rth;
+		     rth = rcu_dereference(rth->u.rt_next)) {
 			if (rth->fl.fl4_dst == daddr &&
 			    rth->fl.fl4_src == skeys[i] &&
 			    rth->rt_dst  == daddr &&
@@ -1864,8 +1861,8 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 	hash = rt_hash_code(daddr, saddr ^ (iif << 5), tos);
 
 	rcu_read_lock();
-	for (rth = rt_hash_table[hash].chain; rth; rth = rth->u.rt_next) {
-		smp_read_barrier_depends();
+	for (rth = rcu_dereference(rt_hash_table[hash].chain); rth;
+	     rth = rcu_dereference(rth->u.rt_next)) {
 		if (rth->fl.fl4_dst == daddr &&
 		    rth->fl.fl4_src == saddr &&
 		    rth->fl.iif == iif &&
@@ -2232,8 +2229,8 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 	hash = rt_hash_code(flp->fl4_dst, flp->fl4_src ^ (flp->oif << 5), flp->fl4_tos);
 
 	rcu_read_lock_bh();
-	for (rth = rt_hash_table[hash].chain; rth; rth = rth->u.rt_next) {
-		smp_read_barrier_depends();
+	for (rth = rcu_dereference(rt_hash_table[hash].chain); rth;
+		rth = rcu_dereference(rth->u.rt_next)) {
 		if (rth->fl.fl4_dst == flp->fl4_dst &&
 		    rth->fl.fl4_src == flp->fl4_src &&
 		    rth->fl.iif == 0 &&
@@ -2464,9 +2461,8 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 		if (h > s_h)
 			s_idx = 0;
 		rcu_read_lock_bh();
-		for (rt = rt_hash_table[h].chain, idx = 0; rt;
-		     rt = rt->u.rt_next, idx++) {
-			smp_read_barrier_depends();
+		for (rt = rcu_dereference(rt_hash_table[h].chain), idx = 0; rt;
+		     rt = rcu_dereference(rt->u.rt_next), idx++) {
 			if (idx < s_idx)
 				continue;
 			skb->dst = dst_clone(&rt->u.dst);

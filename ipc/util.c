@@ -100,7 +100,7 @@ int ipc_findkey(struct ipc_ids* ids, key_t key)
 	int max_id = ids->max_id;
 
 	/*
-	 * read_barrier_depends is not needed here
+	 * rcu_dereference() is not needed here
 	 * since ipc_ids.sem is held
 	 */
 	for (id = 0; id <= max_id; id++) {
@@ -171,7 +171,7 @@ int ipc_addid(struct ipc_ids* ids, struct kern_ipc_perm* new, int size)
 	size = grow_ary(ids,size);
 
 	/*
-	 * read_barrier_depends() is not needed here since
+	 * rcu_dereference()() is not needed here since
 	 * ipc_ids.sem is held
 	 */
 	for (id = 0; id < size; id++) {
@@ -220,7 +220,7 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 		BUG();
 
 	/* 
-	 * do not need a read_barrier_depends() here to force ordering
+	 * do not need a rcu_dereference()() here to force ordering
 	 * on Alpha, since the ipc_ids.sem is held.
 	 */	
 	p = ids->entries[lid].p;
@@ -515,13 +515,12 @@ struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
 	 * Note: The following two read barriers are corresponding
 	 * to the two write barriers in grow_ary(). They guarantee 
 	 * the writes are seen in the same order on the read side. 
-	 * smp_rmb() has effect on all CPUs.  read_barrier_depends() 
+	 * smp_rmb() has effect on all CPUs.  rcu_dereference()
 	 * is used if there are data dependency between two reads, and 
 	 * has effect only on Alpha.
 	 */
 	smp_rmb(); /* prevent indexing old array with new size */
-	entries = ids->entries;
-	read_barrier_depends(); /*prevent seeing new array unitialized */
+	entries = rcu_dereference(ids->entries);
 	out = entries[lid].p;
 	if(out == NULL) {
 		rcu_read_unlock();

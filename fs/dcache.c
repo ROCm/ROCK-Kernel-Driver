@@ -613,7 +613,7 @@ void shrink_dcache_parent(struct dentry * parent)
  *
  * Prune the dentries that are anonymous
  *
- * parsing d_hash list does not read_barrier_depends() as it
+ * parsing d_hash list does not hlist_for_each_rcu() as it
  * done under dcache_lock.
  *
  */
@@ -970,11 +970,10 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 
 	rcu_read_lock();
 	
-	hlist_for_each (node, head) { 
+	hlist_for_each_rcu(node, head) {
 		struct dentry *dentry; 
 		struct qstr *qstr;
 
-		smp_read_barrier_depends();
 		dentry = hlist_entry(node, struct dentry, d_hash);
 
 		smp_rmb();
@@ -1001,8 +1000,7 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		if (dentry->d_parent != parent)
 			goto next;
 
-		qstr = &dentry->d_name;
-		smp_read_barrier_depends();
+		qstr = rcu_dereference(&dentry->d_name);
 		if (parent->d_op && parent->d_op->d_compare) {
 			if (parent->d_op->d_compare(parent, qstr, name))
 				goto next;
@@ -1055,7 +1053,7 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 	spin_lock(&dcache_lock);
 	base = d_hash(dparent, dentry->d_name.hash);
 	hlist_for_each(lhp,base) { 
-		/* read_barrier_depends() not required for d_hash list
+		/* hlist_for_each_rcu() not required for d_hash list
 		 * as it is parsed under dcache_lock
 		 */
 		if (dentry == hlist_entry(lhp, struct dentry, d_hash)) {

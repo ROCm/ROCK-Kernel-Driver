@@ -783,13 +783,12 @@ void nf_log_packet(int pf,
 	nf_logfn *logfn;
 	
 	rcu_read_lock();
-	logfn = nf_logging[pf];
+	logfn = rcu_dereference(nf_logging[pf]);
 	if (logfn) {
 		va_start(args, fmt);
 		vsnprintf(prefix, sizeof(prefix), fmt, args);
 		va_end(args);
 		/* We must read logging before nf_logfn[pf] */
-		smp_read_barrier_depends();
 		logfn(hooknum, skb, in, out, prefix);
 	} else if (!reported) {
 		printk(KERN_WARNING "nf_log_packet: can\'t log yet, "

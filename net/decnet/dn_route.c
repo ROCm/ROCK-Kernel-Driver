@@ -1,4 +1,3 @@
-
 /*
  * DECnet       An implementation of the DECnet protocol suite for the LINUX
  *              operating system.  DECnet is implemented using the  BSD Socket
@@ -1175,8 +1174,8 @@ static int __dn_route_output_key(struct dst_entry **pprt, const struct flowi *fl
 
 	if (!(flags & MSG_TRYHARD)) {
 		rcu_read_lock_bh();
-		for(rt = dn_rt_hash_table[hash].chain; rt; rt = rt->u.rt_next) {
-			smp_read_barrier_depends();
+		for(rt = rcu_dereference(dn_rt_hash_table[hash].chain); rt;
+			rt = rcu_dereference(rt->u.rt_next)) {
 			if ((flp->fld_dst == rt->fl.fld_dst) &&
 			    (flp->fld_src == rt->fl.fld_src) &&
 #ifdef CONFIG_DECNET_ROUTE_FWMARK
@@ -1454,8 +1453,8 @@ int dn_route_input(struct sk_buff *skb)
 		return 0;
 
 	rcu_read_lock();
-	for(rt = dn_rt_hash_table[hash].chain; rt != NULL; rt = rt->u.rt_next) {
-		read_barrier_depends();
+	for(rt = rcu_dereference(dn_rt_hash_table[hash].chain); rt != NULL;
+	    rt = rcu_dereference(rt->u.rt_next)) {
 		if ((rt->fl.fld_src == cb->src) &&
 	 	    (rt->fl.fld_dst == cb->dst) &&
 		    (rt->fl.oif == 0) &&
@@ -1648,8 +1647,9 @@ int dn_cache_dump(struct sk_buff *skb, struct netlink_callback *cb)
 		if (h > s_h)
 			s_idx = 0;
 		rcu_read_lock_bh();
-		for(rt = dn_rt_hash_table[h].chain, idx = 0; rt; rt = rt->u.rt_next, idx++) {
-			smp_read_barrier_depends();
+		for(rt = rcu_dereference(dn_rt_hash_table[h].chain), idx = 0;
+			rt;
+			rt = rcu_dereference(rt->u.rt_next), idx++) {
 			if (idx < s_idx)
 				continue;
 			skb->dst = dst_clone(&rt->u.dst);
@@ -1692,9 +1692,8 @@ static struct dn_route *dn_rt_cache_get_first(struct seq_file *seq)
 
 static struct dn_route *dn_rt_cache_get_next(struct seq_file *seq, struct dn_route *rt)
 {
-	struct dn_rt_cache_iter_state *s = seq->private;
+	struct dn_rt_cache_iter_state *s = rcu_dereference(seq->private);
 
-	smp_read_barrier_depends();
 	rt = rt->u.rt_next;
 	while(!rt) {
 		rcu_read_unlock_bh();

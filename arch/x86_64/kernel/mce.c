@@ -48,8 +48,7 @@ static void mce_log(struct mce *mce)
 	mce->finished = 0;
 	smp_wmb();
 	for (;;) {
-		entry = mcelog.next;
-		read_barrier_depends();
+		entry = rcu_dereference(mcelog.next);
 		/* When the buffer fills up discard new entries. Assume 
 		   that the earlier errors are the more interesting. */
 		if (entry >= MCE_LOG_LEN) {
@@ -333,9 +332,8 @@ static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize, loff
 	int i, err;
 
 	down(&mce_read_sem); 
-	next = mcelog.next;
-	read_barrier_depends();
-		
+	next = rcu_dereference(mcelog.next);
+
 	/* Only supports full reads right now */
 	if (*off != 0 || usize < MCE_LOG_LEN*sizeof(struct mce)) { 
 		up(&mce_read_sem);

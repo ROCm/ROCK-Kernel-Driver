@@ -56,8 +56,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	dest = skb->mac.ethernet->h_dest;
 
 	rcu_read_lock();
-	p = skb->dev->br_port;
-	smp_read_barrier_depends();
+	p = rcu_dereference(skb->dev->br_port);
 
 	if (p == NULL || p->state == BR_STATE_DISABLED) {
 		kfree_skb(skb);

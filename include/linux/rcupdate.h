@@ -222,6 +222,22 @@ static inline int rcu_pending(int cpu)
  */
 #define rcu_read_unlock_bh()	local_bh_enable()
 
+/**
+ * rcu_dereference - fetch an RCU-protected pointer in an
+ * RCU read-side critical section.  This pointer may later
+ * be safely dereferenced.
+ *
+ * Inserts memory barriers on architectures that require them
+ * (currently only the Alpha), and, more importantly, documents
+ * exactly which pointers are protected by RCU.
+ */
+
+#define rcu_dereference(p)     ({ \
+				typeof(p) _________p1 = p; \
+				smp_read_barrier_depends(); \
+				(_________p1); \
+				})
+
 extern void rcu_init(void);
 extern void rcu_check_callbacks(int cpu, int user);
 extern void rcu_restart_cpu(int cpu);
