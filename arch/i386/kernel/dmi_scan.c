@@ -162,6 +162,8 @@ enum
 
 static char *dmi_ident[DMI_STRING_MAX];
 
+#ifdef CONFIG_ACPI_BOOT
+
 /* print some information suitable for a blacklist entry. */
 static void dmi_dump_system(void)
 { 
@@ -175,6 +177,8 @@ static void dmi_dump_system(void)
 	       dmi_ident[DMI_BOARD_VENDOR], dmi_ident[DMI_BOARD_NAME],
 	       dmi_ident[DMI_BOARD_VERSION]); 
 } 
+
+#endif
 
 /*
  *	Save a DMI string
