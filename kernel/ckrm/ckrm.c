@@ -557,7 +557,7 @@ ckrm_release_core_class(struct ckrm_core_class *core)
 	/* need to make sure that the classgot really dropped */
 	if (atomic_read(&core->refcnt) != 1) {
 		printk("class <%s> deletion delayed refcnt=%d jif=%ld\n",
-		       core->name,core->refcnt,jiffies);
+		       core->name,atomic_read(&core->refcnt),jiffies);
 		core->magic = 0;  /* just so we have a ref point */
 	}
 	ckrm_core_drop(core);

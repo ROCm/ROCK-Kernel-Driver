@@ -529,7 +529,7 @@ ckrm_reclassify_class_tasks(struct ckrm_task_class *cls)
 	down(&async_serializer);   // protect again race condition
 
 
-	printk("\t%s: start %p:%s:%d\n",__FUNCTION__,cls,cls->core.name, cls->core.refcnt);
+	printk("\t%s: start %p:%s:%d\n",__FUNCTION__,cls,cls->core.name, atomic_read(&cls->core.refcnt));
 	// If no CE registered for this classtype, following will be needed repeatedly;
 	ce_regd =  class_core(cls)->classtype->ce_regd;
 	cnode = &(class_core(cls)->hnode);
@@ -563,7 +563,7 @@ next_task:
 		put_task_struct(tsk);
 		goto next_task;
 	}
-	printk("\t%s: stop  %p:%s:%d\n",__FUNCTION__,cls,cls->core.name, cls->core.refcnt);
+	printk("\t%s: stop  %p:%s:%d\n",__FUNCTION__,cls,cls->core.name, atomic_read(&cls->core.refcnt));
 	ckrm_core_drop(class_core(cls));
 	class_unlock(class_core(cls));
 
@@ -637,7 +637,7 @@ ckrm_free_task_class(struct ckrm_core_class *core)
  		return 0;
 	}
 
-	printk("%s: stop  %p:%s:%d\n",__FUNCTION__,core,core->name, core->refcnt);
+	printk("%s: stop  %p:%s:%d\n",__FUNCTION__,core,core->name, atomic_read(&core->refcnt));
 	taskcls = class_type(struct ckrm_task_class, core);
 
 	ce_protect(&CT_taskclass);
