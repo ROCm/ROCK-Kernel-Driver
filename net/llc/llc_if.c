@@ -32,16 +32,15 @@ static int llc_sap_req(struct llc_prim_if_block *prim);
 static int llc_unitdata_req_handler(struct llc_prim_if_block *prim);
 static int llc_test_req_handler(struct llc_prim_if_block *prim);
 static int llc_xid_req_handler(struct llc_prim_if_block *prim);
-static int llc_disc_req_handler(struct llc_prim_if_block *prim);
 static int llc_rst_req_handler(struct llc_prim_if_block *prim);
 static int llc_flowcontrol_req_handler(struct llc_prim_if_block *prim);
 
 /* table of request handler functions */
 static llc_prim_call_t llc_req_prim[LLC_NBR_PRIMITIVES] = {
 	[LLC_DATAUNIT_PRIM]	= llc_unitdata_req_handler,
-	[LLC_CONN_PRIM]		= NULL, /* replaced by + llc_establish_connection */
+	[LLC_CONN_PRIM]		= NULL, /* replaced by llc_establish_connection */
 	[LLC_DATA_PRIM]		= NULL, /* replaced by llc_build_and_send_pkt */
-	[LLC_DISC_PRIM]		= llc_disc_req_handler,
+	[LLC_DISC_PRIM]		= NULL, /* replaced by llc_send_disc */
 	[LLC_RESET_PRIM]	= llc_rst_req_handler,
 	[LLC_FLOWCONTROL_PRIM]	= llc_flowcontrol_req_handler,
 	[LLC_XID_PRIM]		= llc_xid_req_handler,
@@ -307,23 +306,23 @@ out_put:
 }
 
 /**
- *	llc_disc_req_handler - Called by upper layer to close a connection
- *	@prim: pointer to structure that contains service parameters.
+ *	llc_send_disc - Called by upper layer to close a connection
+ *	@sk: connection to be closed
  *
  *	Upper layer calls this when it wants to close an established LLC
  *	connection with a remote machine. This function packages a proper event
  *	and sends it to connection component state machine. Returns 0 for
  *	success, 1 otherwise.
  */
-static int llc_disc_req_handler(struct llc_prim_if_block *prim)
+int llc_send_disc(struct sock *sk)
 {
 	u16 rc = 1;
 	struct llc_conn_state_ev *ev;
 	struct sk_buff *skb;
-	struct sock* sk = prim->data->disc.sk;
 
 	sock_hold(sk);
-	if (llc_sk(sk)->state == LLC_CONN_STATE_ADM ||
+	if (sk->type != SOCK_STREAM || sk->state != TCP_ESTABLISHED ||
+	    llc_sk(sk)->state == LLC_CONN_STATE_ADM ||
 	    llc_sk(sk)->state == LLC_CONN_OUT_OF_SVC)
 		goto out;
 	/*
@@ -333,11 +332,12 @@ static int llc_disc_req_handler(struct llc_prim_if_block *prim)
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
 		goto out;
-	ev = llc_conn_ev(skb);
+	sk->state	   = TCP_CLOSING;
+	ev		   = llc_conn_ev(skb);
 	ev->type	   = LLC_CONN_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_DISC_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = prim;
+	ev->data.prim.data = NULL;
 	rc = llc_conn_state_process(sk, skb);
 out:
 	sock_put(sk);

@@ -125,36 +125,6 @@ static __inline__ u8 llc_ui_header_len(struct sock *sk,
 }
 
 /**
- *	llc_ui_send_disc - send disc command to llc layer
- *	@sk: Socket with valid llc information.
- *
- *	Send a disconnect command to the llc layer for an established
- *	llc2 connection.
- *	Returns 0 upon success, non-zero if action did not succeed.
- */
-static int llc_ui_send_disc(struct sock *sk)
-{
-	struct llc_opt *llc = llc_sk(sk);
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
-	int rc = 0;
-
-	if (sk->type != SOCK_STREAM || sk->state != TCP_ESTABLISHED) {
-		rc = 1;
-		goto out;
-	}
-	sk->state	    = TCP_CLOSING;
-	prim.data	    = &prim_data;
-	prim.sap	    = llc->sap;
-	prim.prim	    = LLC_DISC_PRIM;
-	prim_data.disc.sk   = sk;
-	prim_data.disc.link = llc->link;
-	rc = llc->sap->req(&prim);
-out:
-	return rc;
-}
-
-/**
  *	llc_ui_send_data - send data via reliable llc2 connection
  *	@sk: Connection the socket is using.
  *	@skb: Data the user wishes to send.
@@ -424,7 +394,7 @@ static int llc_ui_release(struct socket *sock)
 	llc = llc_sk(sk);
 	dprintk("%s: closing local(%02X) remote(%02X)\n", __FUNCTION__,
 		llc->laddr.lsap, llc->daddr.lsap);
-	if (!llc_ui_send_disc(sk))
+	if (!llc_send_disc(sk))
 		llc_ui_wait_for_disc(sk, sk->rcvtimeo);
 	llc_sap_unassign_sock(llc->sap, sk);
 	release_sock(sk);
@@ -614,7 +584,7 @@ static int llc_ui_shutdown(struct socket *sock, int how)
 	rc = -EINVAL;
 	if (how != 2)
 		goto out;
-	rc = llc_ui_send_disc(sk);
+	rc = llc_send_disc(sk);
 	if (!rc)
 		rc = llc_ui_wait_for_disc(sk, sk->rcvtimeo);
 	/* Wake up anyone sleeping in poll */
@@ -1349,33 +1319,6 @@ out:;
 }
 
 /**
- *	llc_ui_ind_disc - handle DISC indication
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle DISC indication.
- */
-static void llc_ui_ind_disc(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_disc *prim_data = &prim->data->disc;
-	struct sock* sk = prim_data->sk;
-
-	sock_hold(sk);
-	if (sk->type != SOCK_STREAM || sk->state != TCP_ESTABLISHED) {
-		dprintk("%s: bad socket...\n", __FUNCTION__);
-		goto out_put;
-	}
-	sk->shutdown	   = SHUTDOWN_MASK;
-	sk->socket->state  = SS_UNCONNECTED;
-	sk->state	   = TCP_CLOSE;
-	if (!sk->dead) {
-		sk->state_change(sk);
-		sk->dead = 1;
-	}
-out_put:
-	sock_put(sk);
-}
-
-/**
  *	llc_ui_indicate - LLC user interface hook into the LLC layer.
  *	@prim: Primitive block provided by the llc layer.
  *
@@ -1401,33 +1344,14 @@ static int llc_ui_indicate(struct llc_prim_if_block *prim)
 				"is gone for ->ind()...\n", __FUNCTION__);
 			break;
 		case LLC_DISC_PRIM:
-			llc_ui_ind_disc(prim);		break;
+			dprintk("%s: shouldn't happen, LLC_DISC_PRIM "
+				"is gone for ->ind()...\n", __FUNCTION__);
+			break;
 		case LLC_RESET_PRIM:
 		case LLC_FLOWCONTROL_PRIM:
 		default:				break;
 	}
 	return 0;
-}
-
-/**
- *	llc_ui_conf_disc - handle DISC confirm.
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle DISC confirm.
- */
-static void llc_ui_conf_disc(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_disc *prim_data = &prim->data->disc;
-	struct sock* sk = prim_data->sk;
-
-	sock_hold(sk);
-	if (sk->type != SOCK_STREAM || sk->state != TCP_CLOSING)
-		goto out_put;
-	sk->socket->state      = SS_UNCONNECTED;
-	sk->state	       = TCP_CLOSE;
-	sk->state_change(sk);
-out_put:
-	sock_put(sk);
 }
 
 /**
@@ -1450,10 +1374,12 @@ static int llc_ui_confirm(struct llc_prim_if_block *prim)
 				"is gone for ->conf()...\n", __FUNCTION__);
 			break;
 		case LLC_DISC_PRIM:
-			llc_ui_conf_disc(prim);		break;
+			dprintk("%s: shouldn't happen, LLC_DISC_PRIM "
+				"is gone for ->conf()...\n", __FUNCTION__);
+			break;
 		case LLC_RESET_PRIM:			break;
 		default:
-			printk(KERN_ERR "%s: unknown prim %d\n", __FUNCTION__,
+			printk(KERN_ERR "%s: prim not supported%d\n", __FUNCTION__,
 			       prim->prim);
 			break;
 	}

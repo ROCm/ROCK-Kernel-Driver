@@ -60,9 +60,10 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	struct llc_prim_if_block *cfm_prim = ev->cfm_prim;
 
 	/*
-	 * FIXME: this will vanish as soon I get rid of the double sock crap
+	 * FIXME: this will vanish as soon I get rid of the last prim crap
 	 */
-	if (flag != LLC_DATA_PRIM + 1 && flag != LLC_CONN_PRIM + 1)
+	if (flag != LLC_DATA_PRIM + 1 && flag != LLC_CONN_PRIM + 1 &&
+	    flag != LLC_DISC_PRIM + 1)
 		llc_conn_free_ev(skb);
 	else if (ind_prim && cfm_prim)
 		skb_get(skb);
@@ -76,7 +77,7 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 		 */
 		switch (flag) {
 		case LLC_DATA_PRIM + 1:
-			if (sock_queue_rcv_skb(skb->sk, skb)) {
+			if (sock_queue_rcv_skb(sk, skb)) {
 				/*
 				 * FIXME: have to sync the LLC state
 				 *        machine wrt mem usage with
@@ -97,17 +98,35 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 			sk->state_change(parent);
 		}
 			break;
+		case LLC_DISC_PRIM + 1:
+			sock_hold(sk);
+			if (sk->type == SOCK_STREAM && sk->state == TCP_ESTABLISHED) {
+				sk->shutdown       = SHUTDOWN_MASK;
+				sk->socket->state  = SS_UNCONNECTED;
+				sk->state          = TCP_CLOSE;
+				if (!sk->dead) {
+					sk->state_change(sk);
+					sk->dead = 1;
+				}
+			}
+			sock_put(sk);
+			break;
 		default:
 			llc->sap->ind(ind_prim);
 		}
 	}
 	if (!cfm_prim)  /* confirmation not required */
 		goto out;
-	/* data and conn confirm have preconditions */
 	/* FIXME: see FIXMEs above */
-	if (flag == LLC_CONN_PRIM + 1) {
-		struct sock *sk = skb->sk;
-
+	switch (flag) {
+	case LLC_DATA_PRIM + 1:
+		if (!llc_data_accept_state(llc->state))
+			/* In this state, we can send I pdu */
+			sk->write_space(sk);
+		else
+			rc = llc->failed_data_req = 1;
+		break;
+	case LLC_CONN_PRIM + 1:
 		if (sk->type != SOCK_STREAM || sk->state != TCP_SYN_SENT)
 			goto out_kfree_skb;
 		if (ev->status) {
@@ -118,17 +137,22 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 			sk->state         = TCP_ESTABLISHED;
 		}
 		sk->state_change(sk);
-		goto out_kfree_skb;
-	} else if (flag != LLC_DATA_PRIM + 1) {
+		break;
+	case LLC_DISC_PRIM + 1:
+		sock_hold(sk);
+		if (sk->type != SOCK_STREAM || sk->state != TCP_CLOSING) {
+			sock_put(sk);
+			goto out_kfree_skb;
+		}
+		sk->socket->state = SS_UNCONNECTED;
+		sk->state         = TCP_CLOSE;
+		sk->state_change(sk);
+		sock_put(sk);
+		break;
+	default:
 		llc->sap->conf(cfm_prim);
 		goto out;
 	}
-	if (!llc_data_accept_state(llc->state)) {
-		/* In this state, we can send I pdu */
-		if (skb->sk)
-			skb->sk->write_space(skb->sk);
-	} else
-		rc = llc->failed_data_req = 1;
 out_kfree_skb:
 	kfree_skb(skb);
 out:

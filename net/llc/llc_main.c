@@ -315,8 +315,6 @@ void llc_sk_reset(struct sock *sk)
 static int llc_rtn_all_conns(struct llc_sap *sap)
 {
 	int rc = 0;
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
 	struct list_head *entry, *tmp;
 
 	spin_lock_bh(&sap->sk_list.lock);
@@ -325,12 +323,8 @@ static int llc_rtn_all_conns(struct llc_sap *sap)
 	list_for_each_safe(entry, tmp, &sap->sk_list.list) {
 		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
 
-		prim.sap = sap;
-		prim_data.disc.sk = llc->sk;
-		prim.prim = LLC_DISC_PRIM;
-		prim.data = &prim_data;
 		llc->state = LLC_CONN_STATE_TEMP;
-		if (sap->req(&prim))
+		if (llc_send_disc(llc->sk))
 			rc = 1;
 	}
 out:

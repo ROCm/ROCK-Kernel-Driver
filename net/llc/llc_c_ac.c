@@ -134,19 +134,15 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct sk_buff *skb)
 		rc = 1;
 	}
 	if (!rc) {
-		struct llc_opt *llc = llc_sk(sk);
-		struct llc_sap *sap = llc->sap;
-		struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-		union llc_u_prim_data *prim_data = prim->data;
-
-		prim_data->disc.sk     = sk;
-		prim_data->disc.reason = reason;
-		prim_data->disc.link   = llc->link;
-		prim->data	       = prim_data;
-		prim->prim	       = LLC_DISC_PRIM;
-		prim->sap	       = llc->sap;
-		ev->flag	       = 1;
-		ev->ind_prim	       = prim;
+		/*
+		 * FIXME: ev needs reason field,
+		 * perhaps the ev->status is enough,
+		 * have to check,
+		 * better way to signal its a disc
+		 */
+		/* prim_data->disc.reason = reason; */
+		ev->flag     = LLC_DISC_PRIM + 1;
+		ev->ind_prim = (void *)1;
 	}
 	return rc;
 }
@@ -154,19 +150,11 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_disc_confirm(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->disc.sk     = sk;
-	prim_data->disc.reason = ev->status;
-	prim_data->disc.link   = llc->link;
-	prim->data	       = prim_data;
-	prim->prim	       = LLC_DISC_PRIM;
-	prim->sap	       = sap;
-	ev->flag	       = 1;
-	ev->cfm_prim	       = prim;
+	/* here we use the ev->status, humm */
+	/* prim_data->disc.reason = ev->status; */
+	ev->flag     = LLC_DISC_PRIM + 1;
+	ev->cfm_prim = (void *)1;
 	return 0;
 }
 

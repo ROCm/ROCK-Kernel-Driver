@@ -65,13 +65,6 @@ struct llc_addr {
 	u8 mac[IFHWADDRLEN];
 };
 
-/* Primitive-specific data */
-struct llc_prim_disc {
-	struct sock *sk;
-	u16	     link;
-	u8	     reason;		/* not used by request */
-};
-
 struct llc_prim_reset {
 	struct sock *sk;
 	u16	     link;
@@ -108,7 +101,6 @@ struct llc_prim_test {
 };
 
 union llc_u_prim_data {
-	struct llc_prim_disc	  disc;
 	struct llc_prim_reset	  res;
 	struct llc_prim_flow_ctrl fc;
 	struct llc_prim_unit_data udata;	/* unit data */
@@ -133,4 +125,5 @@ extern void llc_sap_close(struct llc_sap *sap);
 extern int llc_establish_connection(struct sock *sk, u8 *lmac,
 				    u8 *dmac, u8 dsap);
 extern int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb);
+extern int llc_send_disc(struct sock *sk);
 #endif /* LLC_IF_H */
