@@ -2383,13 +2383,17 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
 void account_steal_time(struct task_struct *p, cputime_t steal)
 {
 	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
-	cputime64_t steal64 = cputime_to_cputime64(steal);
+	cputime64_t tmp = cputime_to_cputime64(steal);
 	runqueue_t *rq = this_rq();
 
-	if (p == rq->idle)
-		cpustat->system = cputime64_add(cpustat->system, steal64);
-	else
-		cpustat->steal = cputime64_add(cpustat->steal, steal64);
+	if (p == rq->idle) {
+		p->stime = cputime_add(p->stime, steal);
+		if (atomic_read(&rq->nr_iowait) > 0)
+			cpustat->iowait = cputime64_add(cpustat->iowait, tmp);
+		else
+			cpustat->idle = cputime64_add(cpustat->idle, tmp);
+	} else
+		cpustat->steal = cputime64_add(cpustat->steal, tmp);
 }
 
 /*
