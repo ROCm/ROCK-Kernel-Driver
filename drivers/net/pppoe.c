@@ -5,7 +5,7 @@
  * PPPoE --- PPP over Ethernet (RFC 2516)
  *
  *
- * Version:    0.6.10
+ * Version:    0.6.11
  *
  * 220102 :	Fix module use count on failure in pppoe_create, pppox_sk -acme
  * 030700 :     Fixed connect logic to allow for disconnect.
@@ -35,6 +35,7 @@
  * 121301 :     New ppp channels interface; cannot unregister a channel
  *              from interrupts.  Thus, we mark the socket as a ZOMBIE
  *              and do the unregistration later.
+ * 081002 :	seq_file support for proc stuff -acme
  *
  * Author:	Michal Ostrowski <mostrows@speakeasy.net>
  * Contributors:
@@ -75,6 +76,7 @@
 #include <linux/notifier.h>
 #include <linux/file.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 
 
@@ -974,63 +976,102 @@ end:
 	return error;
 }
 
-int pppoe_proc_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+static int pppoe_seq_show(struct seq_file *seq, void *v)
 {
 	struct pppox_opt *po;
-	int len = 0;
-	off_t pos = 0;
-	off_t begin = 0;
-	int size;
-	int i;
+	char *dev_name;
 
-	len += sprintf(buffer,
-		       "Id       Address              Device\n");
-	pos = len;
+	if (v == (void *)1) {
+		seq_puts(seq, "Id       Address              Device\n");
+		goto out;
+	}
 
-	write_lock_bh(&pppoe_hash_lock);
+	po = v;
+	dev_name = po->pppoe_pa.dev;
 
-	for (i = 0; i < PPPOE_HASH_SIZE; i++) {
-		po = item_hash_table[i];
-		while (po) {
-			char *dev = po->pppoe_pa.dev;
-
-			size = sprintf(buffer + len,
-				       "%08X %02X:%02X:%02X:%02X:%02X:%02X %8s\n",
-				       po->pppoe_pa.sid,
-				       po->pppoe_pa.remote[0],
-				       po->pppoe_pa.remote[1],
-				       po->pppoe_pa.remote[2],
-				       po->pppoe_pa.remote[3],
-				       po->pppoe_pa.remote[4],
-				       po->pppoe_pa.remote[5],
-				       dev);
-			len += size;
-			pos += size;
-			if (pos < offset) {
-				len = 0;
-				begin = pos;
-			}
-
-			if (pos > offset + length)
-				break;
-
-			po = po->next;
-		}
-
-		if (po)
-			break;
-  	}
-	write_unlock_bh(&pppoe_hash_lock);
-
-  	*start = buffer + (offset - begin);
-  	len -= (offset - begin);
-  	if (len > length)
-  		len = length;
-	if (len < 0)
-		len = 0;
-  	return len;
+	seq_printf(seq, "%08X %02X:%02X:%02X:%02X:%02X:%02X %8s\n",
+		   po->pppoe_pa.sid,
+		   po->pppoe_pa.remote[0], po->pppoe_pa.remote[1],
+		   po->pppoe_pa.remote[2], po->pppoe_pa.remote[3],
+		   po->pppoe_pa.remote[4], po->pppoe_pa.remote[5], dev_name);
+out:
+  	return 0;
 }
 
+static __inline__ struct pppox_opt *pppoe_get_idx(loff_t pos)
+{
+	struct pppox_opt *po = NULL;
+	int i = 0;
+
+	for (; i < PPPOE_HASH_SIZE; i++) {
+		po = item_hash_table[i];
+		while (po) {
+			if (!pos--)
+				goto out;
+			po = po->next;
+		}
+	}
+out:
+	return po;
+}
+
+static void *pppoe_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	loff_t l = *pos;
+
+	read_lock_bh(&pppoe_hash_lock);
+	return l ? pppoe_get_idx(--l) : (void *)1;
+}
+
+static void *pppoe_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct pppox_opt *po;
+
+	++*pos;
+	if (v == (void *)1) {
+		po = pppoe_get_idx(0);
+		goto out;
+	}
+	po = v;
+	po = po->next;
+	if (!po) {
+		int hash = hash_item(po->pppoe_pa.sid, po->pppoe_pa.remote);
+
+		while (++hash < PPPOE_HASH_SIZE) {
+			po = item_hash_table[hash];
+			if (po)
+				break;
+		}
+	}
+out:
+	return po;
+}
+
+static void pppoe_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock_bh(&pppoe_hash_lock);
+}
+
+struct seq_operations pppoe_seq_ops = {
+	.start		= pppoe_seq_start,
+	.next		= pppoe_seq_next,
+	.stop		= pppoe_seq_stop,
+	.show		= pppoe_seq_show,
+};
+
+static int pppoe_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &pppoe_seq_ops);
+}
+
+static struct file_operations pppoe_seq_fops = {
+	.open           = pppoe_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = seq_release,
+};
+#endif /* CONFIG_PROC_FS */
 
 struct proto_ops pppoe_ops = {
     .family		= AF_PPPOX,
@@ -1061,13 +1102,28 @@ int __init pppoe_init(void)
 {
  	int err = register_pppox_proto(PX_PROTO_OE, &pppoe_proto);
 
-	if (err == 0) {
-		dev_add_pack(&pppoes_ptype);
-		dev_add_pack(&pppoed_ptype);
-		register_netdevice_notifier(&pppoe_notifier);
-		proc_net_create("pppoe", 0, pppoe_proc_info);
-	}
+	if (err)
+		goto out;
+#ifdef CONFIG_PROC_FS
+{
+	struct proc_dir_entry *p = create_proc_entry("pppoe", S_IRUGO,
+						     proc_net);
+	err = -ENOMEM;
+	if (!p)
+		goto out_unregister;
+	
+	p->proc_fops = &pppoe_seq_fops;
+	err = 0;
+}
+#endif /* CONFIG_PROC_FS */
+	dev_add_pack(&pppoes_ptype);
+	dev_add_pack(&pppoed_ptype);
+	register_netdevice_notifier(&pppoe_notifier);
+out:
 	return err;
+out_unregister:
+	unregister_pppox_proto(PX_PROTO_OE);
+	goto out;
 }
 
 void __exit pppoe_exit(void)
@@ -1076,7 +1132,7 @@ void __exit pppoe_exit(void)
 	dev_remove_pack(&pppoes_ptype);
 	dev_remove_pack(&pppoed_ptype);
 	unregister_netdevice_notifier(&pppoe_notifier);
-	proc_net_remove("pppoe");
+	remove_proc_entry("pppoe", proc_net);
 }
 
 module_init(pppoe_init);
