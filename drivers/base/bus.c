@@ -529,6 +529,7 @@ int bus_add_driver(struct device_driver * drv)
 		down_write(&bus->subsys.rwsem);
 		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
+		module_add_driver(drv->owner, drv);
 
 		driver_add_attrs(bus, drv);
 	}
@@ -553,6 +554,7 @@ void bus_remove_driver(struct device_driver * drv)
 		pr_debug("bus %s: remove driver %s\n", drv->bus->name, drv->name);
 		driver_detach(drv);
 		up_write(&drv->bus->subsys.rwsem);
+		module_remove_driver(drv);
 		kobject_unregister(&drv->kobj);
 		put_bus(drv->bus);
 	}
