@@ -210,7 +210,7 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
 
         pos += size; len += size;
 	cciss_proc_tape_report(ctlr, buffer, &pos, &len);
-	for(i=0; i<h->highest_lun; i++) {
+	for(i=0; i<=h->highest_lun; i++) {
 		sector_t tmp;
 
                 drv = &h->drv[i];
@@ -991,7 +991,7 @@ static int revalidate_allvol(ctlr_info_t *host)
 		drive_info_struct *drv = &(host->drv[i]);
 		if (!drv->nr_blocks)
 			continue;
-		blk_queue_hardsect_size(host->queue, drv->block_size);
+		blk_queue_hardsect_size(drv->queue, drv->block_size);
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -2016,7 +2016,7 @@ static irqreturn_t do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	CommandList_struct *c;
 	unsigned long flags;
 	__u32 a, a1;
-
+	int j;
 
 	/* Is this interrupt for us? */
 	if (( h->access.intr_pending(h) == 0) || (h->interrupts_enabled == 0))
@@ -2062,11 +2062,18 @@ static irqreturn_t do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
-
 	/*
 	 * See if we can queue up some more IO
+	 * check every disk that exists on this controller 
+	 * and start it's IO
 	 */
-	blk_start_queue(h->queue);
+	for(j=0;j < NWD; j++) {
+		/* make sure the disk has been added and the drive is real */
+		/* because this can be called from the middle of init_one */
+		if(!(h->gendisk[j]->queue) || !(h->drv[j].nr_blocks) )
+			continue;
+		blk_start_queue(h->gendisk[j]->queue);
+	}
 	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
 	return IRQ_HANDLED;
 }
@@ -2513,7 +2520,6 @@ static void free_hba(int i)
 static int __devinit cciss_init_one(struct pci_dev *pdev,
 	const struct pci_device_id *ent)
 {
-	request_queue_t *q;
 	int i;
 	int j;
 
@@ -2571,13 +2577,6 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 	}
 
 	spin_lock_init(&hba[i]->lock);
-	q = blk_init_queue(do_cciss_request, &hba[i]->lock);
-	if (!q)
-		goto clean4;
-
-	q->backing_dev_info.ra_pages = READ_AHEAD;
-	hba[i]->queue = q;
-	q->queuedata = hba[i];
 
 	/* Initialize the pdev driver private data. 
 		have it point to hba[i].  */
@@ -2599,6 +2598,19 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 
 	cciss_procinit(i);
 
+	for(j=0; j<NWD; j++) {
+		drive_info_struct *drv = &(hba[i]->drv[j]);
+		struct gendisk *disk = hba[i]->gendisk[j];
+		request_queue_t *q;
+
+	        q = blk_init_queue(do_cciss_request, &hba[i]->lock);
+		if (!q) {
+			printk(KERN_ERR 
+			   "cciss:  unable to allocate queue for disk %d\n",
+			   j);
+			break;
+		}
+		drv->queue = q;
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 
 	/* This is a hardware imposed limit. */
@@ -2609,21 +2621,17 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 
 	blk_queue_max_sectors(q, 512);
 
-
-	for(j=0; j<NWD; j++) {
-		drive_info_struct *drv = &(hba[i]->drv[j]);
-		struct gendisk *disk = hba[i]->gendisk[j];
-
+		q->queuedata = hba[i];
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
 		sprintf(disk->devfs_name, "cciss/host%d/target%d", i, j);
 		disk->major = COMPAQ_CISS_MAJOR + i;
 		disk->first_minor = j << NWD_SHIFT;
 		disk->fops = &cciss_fops;
-		disk->queue = hba[i]->queue;
+		disk->queue = q;
 		disk->private_data = drv;
 		if( !(drv->nr_blocks))
 			continue;
-		blk_queue_hardsect_size(hba[i]->queue, drv->block_size);
+		blk_queue_hardsect_size(q, drv->block_size);
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -2693,9 +2701,9 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 		struct gendisk *disk = hba[i]->gendisk[j];
 		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
+			blk_cleanup_queue(disk->queue);
 	}
 
-	blk_cleanup_queue(hba[i]->queue);
 	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof(CommandList_struct),
 			    hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);
 	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof( ErrorInfo_struct),
