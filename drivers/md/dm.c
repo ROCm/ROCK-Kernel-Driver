@@ -347,18 +347,15 @@ static struct bio *split_bvec(struct bio *bio, sector_t sector,
 	struct bio_vec *bv = bio->bi_io_vec + idx;
 
 	clone = bio_alloc(GFP_NOIO, 1);
+	memcpy(clone->bi_io_vec, bv, sizeof(*bv));
 
-	if (clone) {
-		memcpy(clone->bi_io_vec, bv, sizeof(*bv));
-
-		clone->bi_sector = sector;
-		clone->bi_bdev = bio->bi_bdev;
-		clone->bi_rw = bio->bi_rw;
-		clone->bi_vcnt = 1;
-		clone->bi_size = to_bytes(len);
-		clone->bi_io_vec->bv_offset = offset;
-		clone->bi_io_vec->bv_len = clone->bi_size;
-	}
+	clone->bi_sector = sector;
+	clone->bi_bdev = bio->bi_bdev;
+	clone->bi_rw = bio->bi_rw;
+	clone->bi_vcnt = 1;
+	clone->bi_size = to_bytes(len);
+	clone->bi_io_vec->bv_offset = offset;
+	clone->bi_io_vec->bv_len = clone->bi_size;
 
 	return clone;
 }
@@ -432,11 +429,6 @@ static void __clone_and_map(struct clone_info *ci)
 
 		clone = split_bvec(bio, ci->sector, ci->idx,
 				   bv->bv_offset, max);
-		if (!clone) {
-			dec_pending(ci->io, -ENOMEM);
-			return;
-		}
-
 		__map_bio(ti, clone, ci->io);
 
 		ci->sector += max;
@@ -446,11 +438,6 @@ static void __clone_and_map(struct clone_info *ci)
 		len = to_sector(bv->bv_len) - max;
 		clone = split_bvec(bio, ci->sector, ci->idx,
 				   bv->bv_offset + to_bytes(max), len);
-		if (!clone) {
-			dec_pending(ci->io, -ENOMEM);
-			return;
-		}
-
 		__map_bio(ti, clone, ci->io);
 
 		ci->sector += len;
