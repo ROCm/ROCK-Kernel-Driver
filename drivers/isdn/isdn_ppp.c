@@ -9,7 +9,7 @@
  *
  */
 
-#include <linux/config.h>
+#include <linux/module.h>
 #include <linux/isdn.h>
 #include <linux/smp_lock.h>
 #include <linux/poll.h>
@@ -269,7 +269,7 @@ isdn_ppp_get_slot(void)
  * isdn_ppp_open
  */
 
-int
+static int
 isdn_ppp_open(struct inode *ino, struct file *file)
 {
 	uint minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
@@ -322,7 +322,7 @@ isdn_ppp_open(struct inode *ino, struct file *file)
 /*
  * release ippp device
  */
-int
+static int
 isdn_ppp_release(struct inode *ino, struct file *file)
 {
 	uint minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
@@ -418,7 +418,7 @@ set_arg(void *b, void *val,int len)
 /*
  * ippp device ioctl
  */
-int
+static int
 isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	unsigned long val;
@@ -579,7 +579,7 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 	return 0;
 }
 
-unsigned int
+static unsigned int
 isdn_ppp_poll(struct file *file, poll_table * wait)
 {
 	unsigned int mask;
@@ -690,8 +690,8 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
  *           reports, that there is data
  */
 
-int
-isdn_ppp_read(struct file *file, char *buf, int count, loff_t *off)
+static int
+isdn_ppp_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
 	struct ippp_struct *is;
 	struct ippp_buf_queue *b;
@@ -745,8 +745,8 @@ isdn_ppp_read(struct file *file, char *buf, int count, loff_t *off)
  * ipppd wanna write a packet to the card .. non-blocking
  */
 
-int
-isdn_ppp_write(struct file *file, const char *buf, int count, loff_t *off)
+static int
+isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
 	isdn_net_local *lp;
 	struct ippp_struct *is;
@@ -829,6 +829,18 @@ isdn_ppp_write(struct file *file, const char *buf, int count, loff_t *off)
 	unlock_kernel();
 	return retval;
 }
+
+struct file_operations isdn_ppp_fops =
+{
+	owner:		THIS_MODULE,
+	llseek:		no_llseek,
+	read:		isdn_ppp_read,
+	write:		isdn_ppp_write,
+	poll:		isdn_ppp_poll,
+	ioctl:		isdn_ppp_ioctl,
+	open:		isdn_ppp_open,
+	release:	isdn_ppp_release,
+};
 
 /*
  * init memory, structures etc.

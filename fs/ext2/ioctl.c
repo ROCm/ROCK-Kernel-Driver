@@ -7,8 +7,7 @@
  * Universite Pierre et Marie Curie (Paris VI)
  */
 
-#include <linux/fs.h>
-#include <linux/ext2_fs.h>
+#include "ext2.h"
 #include <linux/sched.h>
 #include <asm/uaccess.h>
 
@@ -16,13 +15,14 @@
 int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		unsigned long arg)
 {
+	struct ext2_inode_info *ei = EXT2_I(inode);
 	unsigned int flags;
 
 	ext2_debug ("cmd = %u, arg = %lu\n", cmd, arg);
 
 	switch (cmd) {
 	case EXT2_IOC_GETFLAGS:
-		flags = inode->u.ext2_i.i_flags & EXT2_FL_USER_VISIBLE;
+		flags = ei->i_flags & EXT2_FL_USER_VISIBLE;
 		return put_user(flags, (int *) arg);
 	case EXT2_IOC_SETFLAGS: {
 		unsigned int oldflags;
@@ -36,7 +36,7 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		if (get_user(flags, (int *) arg))
 			return -EFAULT;
 
-		oldflags = inode->u.ext2_i.i_flags;
+		oldflags = ei->i_flags;
 
 		/*
 		 * The IMMUTABLE and APPEND_ONLY flags can only be changed by
@@ -51,7 +51,7 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 
 		flags = flags & EXT2_FL_USER_MODIFIABLE;
 		flags |= oldflags & ~EXT2_FL_USER_MODIFIABLE;
-		inode->u.ext2_i.i_flags = flags;
+		ei->i_flags = flags;
 
 		if (flags & EXT2_SYNC_FL)
 			inode->i_flags |= S_SYNC;

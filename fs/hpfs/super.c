@@ -148,10 +148,56 @@ int hpfs_statfs(struct super_block *s, struct statfs *buf)
 	return 0;
 }
 
+static kmem_cache_t * hpfs_inode_cachep;
+
+static struct inode *hpfs_alloc_inode(struct super_block *sb)
+{
+	struct hpfs_inode_info *ei;
+	ei = (struct hpfs_inode_info *)kmem_cache_alloc(hpfs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void hpfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(hpfs_inode_cachep, hpfs_i(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct hpfs_inode_info *ei = (struct hpfs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		init_MUTEX(&ei->i_sem);
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+ 
+static int init_inodecache(void)
+{
+	hpfs_inode_cachep = kmem_cache_create("hpfs_inode_cache",
+					     sizeof(struct hpfs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (hpfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(hpfs_inode_cachep))
+		printk(KERN_INFO "hpfs_inode_cache: not all structures were freed\n");
+}
+
 /* Super operations */
 
 static struct super_operations hpfs_sops =
 {
+	alloc_inode:	hpfs_alloc_inode,
+	destroy_inode:	hpfs_destroy_inode,
         read_inode:	hpfs_read_inode,
 	delete_inode:	hpfs_delete_inode,
 	put_super:	hpfs_put_super,
@@ -545,8 +591,8 @@ struct super_block *hpfs_read_super(struct super_block *s, void *options,
 		s->s_root->d_inode->i_atime = local_to_gmt(s, de->read_date);
 		s->s_root->d_inode->i_mtime = local_to_gmt(s, de->write_date);
 		s->s_root->d_inode->i_ctime = local_to_gmt(s, de->creation_date);
-		s->s_root->d_inode->i_hpfs_ea_size = de->ea_size;
-		s->s_root->d_inode->i_hpfs_parent_dir = s->s_root->d_inode->i_ino;
+		hpfs_i(s->s_root->d_inode)->i_ea_size = de->ea_size;
+		hpfs_i(s->s_root->d_inode)->i_parent_dir = s->s_root->d_inode->i_ino;
 		if (s->s_root->d_inode->i_size == -1) s->s_root->d_inode->i_size = 2048;
 		if (s->s_root->d_inode->i_blocks == -1) s->s_root->d_inode->i_blocks = 5;
 	}
@@ -568,12 +614,23 @@ DECLARE_FSTYPE_DEV(hpfs_fs_type, "hpfs", hpfs_read_super);
 
 static int __init init_hpfs_fs(void)
 {
-	return register_filesystem(&hpfs_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&hpfs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_hpfs_fs(void)
 {
 	unregister_filesystem(&hpfs_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

@@ -67,6 +67,7 @@
 
 static int ufs_trunc_direct (struct inode * inode)
 {
+	struct ufs_inode_info *ufsi = UFS_I(inode);
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
 	struct buffer_head * bh;
@@ -86,7 +87,7 @@ static int ufs_trunc_direct (struct inode * inode)
 	retry = 0;
 	
 	frag1 = DIRECT_FRAGMENT;
-	frag4 = min_t(u32, UFS_NDIR_FRAGMENT, inode->u.ufs_i.i_lastfrag);
+	frag4 = min_t(u32, UFS_NDIR_FRAGMENT, ufsi->i_lastfrag);
 	frag2 = ((frag1 & uspi->s_fpbmask) ? ((frag1 | uspi->s_fpbmask) + 1) : frag1);
 	frag3 = frag4 & ~uspi->s_fpbmask;
 	block1 = block2 = 0;
@@ -107,7 +108,7 @@ static int ufs_trunc_direct (struct inode * inode)
 	/*
 	 * Free first free fragments
 	 */
-	p = inode->u.ufs_i.i_u1.i_data + ufs_fragstoblks (frag1);
+	p = ufsi->i_u1.i_data + ufs_fragstoblks (frag1);
 	tmp = fs32_to_cpu(sb, *p);
 	if (!tmp )
 		ufs_panic (sb, "ufs_trunc_direct", "internal error");
@@ -132,7 +133,7 @@ next1:
 	 * Free whole blocks
 	 */
 	for (i = block1 ; i < block2; i++) {
-		p = inode->u.ufs_i.i_u1.i_data + i;
+		p = ufsi->i_u1.i_data + i;
 		tmp = fs32_to_cpu(sb, *p);
 		if (!tmp)
 			continue;
@@ -170,7 +171,7 @@ next2:;
 	/*
 	 * Free last free fragments
 	 */
-	p = inode->u.ufs_i.i_u1.i_data + ufs_fragstoblks (frag3);
+	p = ufsi->i_u1.i_data + ufs_fragstoblks (frag3);
 	tmp = fs32_to_cpu(sb, *p);
 	if (!tmp )
 		ufs_panic(sb, "ufs_truncate_direct", "internal error");
@@ -360,6 +361,7 @@ static int ufs_trunc_dindirect (struct inode * inode, unsigned offset, u32 * p)
 
 static int ufs_trunc_tindirect (struct inode * inode)
 {
+	struct ufs_inode_info *ufsi = UFS_I(inode);
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
 	struct ufs_buffer_head * tind_bh;
@@ -375,7 +377,7 @@ static int ufs_trunc_tindirect (struct inode * inode)
 	
 	tindirect_block = (DIRECT_BLOCK > (UFS_NDADDR + uspi->s_apb + uspi->s_2apb))
 		? ((DIRECT_BLOCK - UFS_NDADDR - uspi->s_apb - uspi->s_2apb) >> uspi->s_2apbshift) : 0;
-	p = inode->u.ufs_i.i_u1.i_data + UFS_TIND_BLOCK;
+	p = ufsi->i_u1.i_data + UFS_TIND_BLOCK;
 	if (!(tmp = fs32_to_cpu(sb, *p)))
 		return 0;
 	tind_bh = ubh_bread (sb, tmp, uspi->s_bsize);
@@ -422,6 +424,7 @@ static int ufs_trunc_tindirect (struct inode * inode)
 		
 void ufs_truncate (struct inode * inode)
 {
+	struct ufs_inode_info *ufsi = UFS_I(inode);
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
 	struct buffer_head * bh;
@@ -439,9 +442,9 @@ void ufs_truncate (struct inode * inode)
 	while (1) {
 		retry = ufs_trunc_direct(inode);
 		retry |= ufs_trunc_indirect (inode, UFS_IND_BLOCK,
-			(u32 *) &inode->u.ufs_i.i_u1.i_data[UFS_IND_BLOCK]);
+			(u32 *) &ufsi->i_u1.i_data[UFS_IND_BLOCK]);
 		retry |= ufs_trunc_dindirect (inode, UFS_IND_BLOCK + uspi->s_apb,
-			(u32 *) &inode->u.ufs_i.i_u1.i_data[UFS_DIND_BLOCK]);
+			(u32 *) &ufsi->i_u1.i_data[UFS_DIND_BLOCK]);
 		retry |= ufs_trunc_tindirect (inode);
 		if (!retry)
 			break;
@@ -460,7 +463,7 @@ void ufs_truncate (struct inode * inode)
 		}
 	}
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	inode->u.ufs_i.i_lastfrag = DIRECT_FRAGMENT;
+	ufsi->i_lastfrag = DIRECT_FRAGMENT;
 	mark_inode_dirty(inode);
 	UFSD(("EXIT\n"))
 }

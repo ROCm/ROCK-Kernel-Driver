@@ -11,6 +11,7 @@
 
 #include <linux/fs.h>
 #include <linux/hpfs_fs.h>
+#include <linux/hpfs_fs_i.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -302,6 +303,11 @@ int hpfs_unlink(struct inode *, struct dentry *);
 int hpfs_rmdir(struct inode *, struct dentry *);
 int hpfs_symlink_readpage(struct file *, struct page *);
 int hpfs_rename(struct inode *, struct dentry *, struct inode *, struct dentry *);
+
+static inline struct hpfs_inode_info *hpfs_i(struct inode *inode)
+{
+	return list_entry(inode, struct hpfs_inode_info, vfs_inode);
+}
 
 /* super.c */
 

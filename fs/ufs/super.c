@@ -953,7 +953,51 @@ int ufs_statfs (struct super_block * sb, struct statfs * buf)
 	return 0;
 }
 
+static kmem_cache_t * ufs_inode_cachep;
+
+static struct inode *ufs_alloc_inode(struct super_block *sb)
+{
+	struct ufs_inode_info *ei;
+	ei = (struct ufs_inode_info *)kmem_cache_alloc(ufs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void ufs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(ufs_inode_cachep, UFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct ufs_inode_info *ei = (struct ufs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	ufs_inode_cachep = kmem_cache_create("ufs_inode_cache",
+					     sizeof(struct ufs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (ufs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(ufs_inode_cachep))
+		printk(KERN_INFO "ufs_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations ufs_super_ops = {
+	alloc_inode:	ufs_alloc_inode,
+	destroy_inode:	ufs_destroy_inode,
 	read_inode:	ufs_read_inode,
 	write_inode:	ufs_write_inode,
 	delete_inode:	ufs_delete_inode,
@@ -967,15 +1011,27 @@ static DECLARE_FSTYPE_DEV(ufs_fs_type, "ufs", ufs_read_super);
 
 static int __init init_ufs_fs(void)
 {
-	return register_filesystem(&ufs_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&ufs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_ufs_fs(void)
 {
 	unregister_filesystem(&ufs_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;
 
 module_init(init_ufs_fs)
 module_exit(exit_ufs_fs)
+MODULE_LICENSE("GPL");

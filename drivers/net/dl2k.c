@@ -1040,6 +1040,8 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		miidata->out_value = mii_read (dev, phy_addr, miidata->reg_num);
 		break;
 	case SIOCDEVPRIVATE + 2:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		mii_write (dev, phy_addr, miidata->reg_num, miidata->in_value);
 		break;
 	case SIOCDEVPRIVATE + 3:

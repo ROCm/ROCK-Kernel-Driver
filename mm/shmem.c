@@ -26,6 +26,7 @@
 #include <linux/pagemap.h>
 #include <linux/string.h>
 #include <linux/locks.h>
+#include <linux/slab.h>
 #include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
@@ -385,7 +386,7 @@ static int shmem_unuse_inode (struct shmem_inode_info *info, swp_entry_t entry, 
 	return 0;
 found:
 	delete_from_swap_cache(page);
-	add_to_page_cache(page, info->inode->i_mapping, offset + idx);
+	add_to_page_cache(page, info->vfs_inode.i_mapping, offset + idx);
 	SetPageDirty(page);
 	SetPageUptodate(page);
 	info->swapped--;
@@ -685,9 +686,13 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_mapping->a_ops = &shmem_aops;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		info = SHMEM_I(inode);
-		info->inode = inode;
 		spin_lock_init (&info->lock);
 		sema_init (&info->sem, 1);
+		info->next_index = 0;
+		memset (info->i_direct, 0, sizeof(info->i_direct));
+		info->i_indirect = NULL;
+		info->swapped = 0;
+		info->locked = 0;
 		switch (mode & S_IFMT) {
 		default:
 			init_special_inode(inode, mode, dev);
@@ -1308,7 +1313,48 @@ static struct super_block *shmem_read_super(struct super_block * sb, void * data
 	return sb;
 }
 
+static kmem_cache_t * shmem_inode_cachep;
 
+static struct inode *shmem_alloc_inode(struct super_block *sb)
+{
+	struct shmem_inode_info *p;
+	p = (struct shmem_inode_info *)kmem_cache_alloc(shmem_inode_cachep, SLAB_KERNEL);
+	if (!p)
+		return NULL;
+	return &p->vfs_inode;
+}
+
+static void shmem_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct shmem_inode_info *p = (struct shmem_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		inode_init_once(&p->vfs_inode);
+	}
+}
+ 
+static int init_inodecache(void)
+{
+	shmem_inode_cachep = kmem_cache_create("shmem_inode_cache",
+					     sizeof(struct shmem_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (shmem_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(shmem_inode_cachep))
+		printk(KERN_INFO "shmem_inode_cache: not all structures were freed\n");
+}
 
 static struct address_space_operations shmem_aops = {
 	writepage:	shmem_writepage,
@@ -1350,6 +1396,8 @@ static struct inode_operations shmem_dir_inode_operations = {
 };
 
 static struct super_operations shmem_ops = {
+	alloc_inode:	shmem_alloc_inode,
+	destroy_inode:	shmem_destroy_inode,
 #ifdef CONFIG_TMPFS
 	statfs:		shmem_statfs,
 	remount_fs:	shmem_remount_fs,
@@ -1376,30 +1424,45 @@ static int __init init_shmem_fs(void)
 	int error;
 	struct vfsmount * res;
 
-	if ((error = register_filesystem(&tmpfs_fs_type))) {
+	error = init_inodecache();
+	if (error)
+		goto out3;
+
+	error = register_filesystem(&tmpfs_fs_type);
+	if (error) {
 		printk (KERN_ERR "Could not register tmpfs\n");
-		return error;
+		goto out2;
 	}
 #ifdef CONFIG_TMPFS
-	if ((error = register_filesystem(&shmem_fs_type))) {
+	error = register_filesystem(&shmem_fs_type);
+	if (error) {
 		printk (KERN_ERR "Could not register shm fs\n");
-		return error;
+		goto out1;
 	}
 	devfs_mk_dir (NULL, "shm", NULL);
 #endif
 	res = kern_mount(&tmpfs_fs_type);
 	if (IS_ERR (res)) {
+		error = PTR_ERR(res);
 		printk (KERN_ERR "could not kern_mount tmpfs\n");
-		unregister_filesystem(&tmpfs_fs_type);
-		return PTR_ERR(res);
+		goto out;
 	}
 	shm_mnt = res;
 
 	/* The internal instance should not do size checking */
-	if ((error = shmem_set_size(SHMEM_SB(res->mnt_sb), ULONG_MAX, ULONG_MAX)))
-		printk (KERN_ERR "could not set limits on internal tmpfs\n");
-
+	shmem_set_size(SHMEM_SB(res->mnt_sb), ULONG_MAX, ULONG_MAX);
 	return 0;
+
+out:
+#ifdef CONFIG_TMPFS
+	unregister_filesystem(&shmem_fs_type);
+out1:
+#endif
+	unregister_filesystem(&tmpfs_fs_type);
+out2:
+	destroy_inodecache();
+out3:
+	return error;
 }
 
 static void __exit exit_shmem_fs(void)
@@ -1409,6 +1472,7 @@ static void __exit exit_shmem_fs(void)
 #endif
 	unregister_filesystem(&tmpfs_fs_type);
 	mntput(shm_mnt);
+	destroy_inodecache();
 }
 
 module_init(init_shmem_fs)

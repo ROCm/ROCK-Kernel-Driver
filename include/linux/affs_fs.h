@@ -6,6 +6,8 @@
 
 #include <linux/types.h>
 
+#include <linux/affs_fs_i.h>
+
 #define AFFS_SUPER_MAGIC 0xadff
 
 struct affs_date;

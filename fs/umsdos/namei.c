@@ -28,12 +28,12 @@
 
 static inline void u_sleep_on (struct inode *dir)
 {
-	sleep_on (&dir->u.umsdos_i.dir_info.p);
+	sleep_on (&UMSDOS_I(dir)->dir_info.p);
 }
 
 static inline void u_wake_up (struct inode *dir)
 {
-    	wake_up (&dir->u.umsdos_i.dir_info.p);
+    	wake_up (&UMSDOS_I(dir)->dir_info.p);
 }
 
 /*
@@ -47,9 +47,9 @@ static int umsdos_waitcreate (struct inode *dir)
 {
 	int ret = 0;
 
-	if (dir->u.umsdos_i.dir_info.creating
-	    && dir->u.umsdos_i.dir_info.pid != current->pid) {
-	    	PRINTK (("creating && dir_info.pid=%lu, current->pid=%u\n", dir->u.umsdos_i.dir_info.pid, current->pid));
+	if (UMSDOS_I(dir)->dir_info.creating
+	    && UMSDOS_I(dir)->dir_info.pid != current->pid) {
+	    	PRINTK (("creating && dir_info.pid=%lu, current->pid=%u\n", UMSDOS_I(dir)->dir_info.pid, current->pid));
 	    	u_sleep_on (dir);
 		ret = 1;
 	}
@@ -61,7 +61,7 @@ static int umsdos_waitcreate (struct inode *dir)
  */
 static void umsdos_waitlookup (struct inode *dir)
 {
-	while (dir->u.umsdos_i.dir_info.looking) {
+	while (UMSDOS_I(dir)->dir_info.looking) {
 	    	u_sleep_on (dir);
 	}
 }
@@ -104,8 +104,8 @@ void umsdos_lockcreate (struct inode *dir)
 	 * if we (the process) own the lock
 	 */
 	while (umsdos_waitcreate (dir) != 0);
-	dir->u.umsdos_i.dir_info.creating++;
-	dir->u.umsdos_i.dir_info.pid = current->pid;
+	UMSDOS_I(dir)->dir_info.creating++;
+	UMSDOS_I(dir)->dir_info.pid = current->pid;
 	umsdos_waitlookup (dir);
 }
 
@@ -124,10 +124,10 @@ static void umsdos_lockcreate2 (struct inode *dir1, struct inode *dir2)
 		if (umsdos_waitcreate (dir1) == 0
 		    && umsdos_waitcreate (dir2) == 0) {
 			/* We own both now */
-			dir1->u.umsdos_i.dir_info.creating++;
-			dir1->u.umsdos_i.dir_info.pid = current->pid;
-			dir2->u.umsdos_i.dir_info.creating++;
-			dir2->u.umsdos_i.dir_info.pid = current->pid;
+			UMSDOS_I(dir1)->dir_info.creating++;
+			UMSDOS_I(dir1)->dir_info.pid = current->pid;
+			UMSDOS_I(dir2)->dir_info.creating++;
+			UMSDOS_I(dir2)->dir_info.pid = current->pid;
 			break;
 		}
 	}
@@ -141,7 +141,7 @@ static void umsdos_lockcreate2 (struct inode *dir1, struct inode *dir2)
 void umsdos_startlookup (struct inode *dir)
 {
 	while (umsdos_waitcreate (dir) != 0);
-	dir->u.umsdos_i.dir_info.looking++;
+	UMSDOS_I(dir)->dir_info.looking++;
 }
 
 /*
@@ -149,10 +149,10 @@ void umsdos_startlookup (struct inode *dir)
  */
 void umsdos_unlockcreate (struct inode *dir)
 {
-	dir->u.umsdos_i.dir_info.creating--;
-	if (dir->u.umsdos_i.dir_info.creating < 0) {
-		printk ("UMSDOS: dir->u.umsdos_i.dir_info.creating < 0: %d"
-			,dir->u.umsdos_i.dir_info.creating);
+	UMSDOS_I(dir)->dir_info.creating--;
+	if (UMSDOS_I(dir)->dir_info.creating < 0) {
+		printk ("UMSDOS: UMSDOS_I(dir)->dir_info.creating < 0: %d"
+			,UMSDOS_I(dir)->dir_info.creating);
 	}
     	u_wake_up (dir);
 }
@@ -162,10 +162,10 @@ void umsdos_unlockcreate (struct inode *dir)
  */
 void umsdos_endlookup (struct inode *dir)
 {
-	dir->u.umsdos_i.dir_info.looking--;
-	if (dir->u.umsdos_i.dir_info.looking < 0) {
-		printk ("UMSDOS: dir->u.umsdos_i.dir_info.looking < 0: %d"
-			,dir->u.umsdos_i.dir_info.looking);
+	UMSDOS_I(dir)->dir_info.looking--;
+	if (UMSDOS_I(dir)->dir_info.looking < 0) {
+		printk ("UMSDOS: UMSDOS_I(dir)->dir_info.looking < 0: %d"
+			,UMSDOS_I(dir)->dir_info.looking);
 	}
     	u_wake_up (dir);
 }
@@ -618,7 +618,7 @@ temp->d_parent->d_name.name, temp->d_name.name, ret);
 			goto cleanup;
 		}
 		/* mark the inode as a hardlink */
-		oldinode->u.umsdos_i.i_is_hlink = 1;
+		UMSDOS_I(oldinode)->i_is_hlink = 1;
 
 		/*
 		 * Capture the path to the hidden link.
@@ -667,7 +667,7 @@ olddentry->d_parent->d_name.name, olddentry->d_name.name));
 	 * the dentry for its real name, not the visible name.
 	 * N.B. make sure it's the hidden inode ...
 	 */
-	if (!oldinode->u.umsdos_i.i_is_hlink)
+	if (!UMSDOS_I(oldinode)->i_is_hlink)
 		printk("UMSDOS_link: %s/%s hidden, ino=%ld not hlink??\n",
 			olddentry->d_parent->d_name.name,
 			olddentry->d_name.name, oldinode->i_ino);
@@ -721,7 +721,7 @@ out_unlock:
 
 
 #ifdef UMSDOS_PARANOIA
-if (!oldinode->u.umsdos_i.i_is_hlink)
+if (!UMSDOS_I(oldinode)->i_is_hlink)
 printk("UMSDOS_link: %s/%s, ino=%ld, not marked as hlink!\n",
 olddentry->d_parent->d_name.name, olddentry->d_name.name, oldinode->i_ino);
 #endif

@@ -390,3 +390,5 @@ void khttpd_cleanup(void)
 
 	module_init(khttpd_init)
 	module_exit(khttpd_cleanup)
+
+MODULE_LICENSE("GPL");

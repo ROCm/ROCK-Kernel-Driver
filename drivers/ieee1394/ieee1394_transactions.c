@@ -246,7 +246,7 @@ int hpsb_packet_success(struct hpsb_packet *packet)
                                  packet->node_id);
                         return -EAGAIN;
                 }
-                HPSB_PANIC("reached unreachable code 1 in " __FUNCTION__);
+                HPSB_PANIC("reached unreachable code 1 in %s", __FUNCTION__);
 
         case ACK_BUSY_X:
         case ACK_BUSY_A:
@@ -290,7 +290,7 @@ int hpsb_packet_success(struct hpsb_packet *packet)
                 return -EAGAIN;
         }
 
-        HPSB_PANIC("reached unreachable code 2 in " __FUNCTION__);
+        HPSB_PANIC("reached unreachable code 2 in %s", __FUNCTION__);
 }
 
 

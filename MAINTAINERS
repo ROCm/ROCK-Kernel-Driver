@@ -412,6 +412,12 @@ W:	http://www.sucs.swan.ac.uk/~rohan/DECnet/index.html
 L:	linux-decnet-user@lists.sourceforge.net
 S:	Maintained
 
+DELL LAPTOP SMM DRIVER
+P:	Massimo Dal Zotto
+M:	dz@debian.org
+W:	http://www.debian.org/~dz/i8k/
+S:	Maintained
+
 DEVICE NUMBER REGISTRY
 P:	H. Peter Anvin
 M:	hpa@zytor.com
@@ -926,6 +932,12 @@ L:     linux-LVM@sistina.com
 W:     http://www.sistina.com/lvm
 S:     Maintained 
 
+LSILOGIC/SYMBIOS/NCR 53C8XX and 53C1010 PCI-SCSI drivers
+P:	Gerard Roudier
+M:	groudier@free.fr
+L:	linux-scsi@vger.kernel.org
+S:	Maintained
+
 M68K
 P:	Jes Sorensen
 M:	jes@trained-monkey.org
@@ -1008,6 +1020,11 @@ S:	Maintained
 MULTISOUND SOUND DRIVER
 P:	Andrew Veliath
 M:	andrewtv@usa.net
+S:	Maintained
+
+NATSEMI ETHERNET DRIVER (DP8381x)
+P: Tim Hockin
+M:	thockin@hockin.org
 S:	Maintained
 
 NCP FILESYSTEM
@@ -1133,8 +1150,8 @@ L:	linux-scsi@vger.rutgers.edu
 S:	Maintained
 
 OPL3-SA2, SA3, and SAx DRIVER
-P:	Scott Murray
-M:	scott@spiteful.org
+P:	Zwane Mwaikambo
+M:	zwane@commfireservices.com
 L:	linux-sound@vger.kernel.org
 S:	Maintained
 

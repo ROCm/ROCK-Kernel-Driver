@@ -468,29 +468,23 @@ static int vicam_v4l_open(struct video_device *vdev, int flags)
 	int err = 0;
 	
 	dbg("vicam_v4l_open");
-
-	MOD_INC_USE_COUNT; 
+ 
 	down(&vicam->sem);
 
-	if (vicam->open_count)		/* Maybe not needed? */
-		err = -EBUSY;
+	vicam->fbuf = rvmalloc(vicam->maxframesize * VICAM_NUMFRAMES);
+	if (!vicam->fbuf)
+		err=-ENOMEM;
 	else {
-		vicam->fbuf = rvmalloc(vicam->maxframesize * VICAM_NUMFRAMES);
-		if (!vicam->fbuf)
-			err=-ENOMEM;
-		else {
-			vicam->open_count = 1;
-		}
-#ifdef BLINKING
-		vicam_sndctrl(1, vicam, VICAM_REQ_CAMERA_POWER, 0x01, NULL, 0);
-		info ("led on");
-		vicam_sndctrl(1, vicam, VICAM_REQ_LED_CONTROL, 0x01, NULL, 0);
-#endif
+		vicam->open_count = 1;
 	}
+#ifdef BLINKING
+	vicam_sndctrl(1, vicam, VICAM_REQ_CAMERA_POWER, 0x01, NULL, 0);
+	info ("led on");
+	vicam_sndctrl(1, vicam, VICAM_REQ_LED_CONTROL, 0x01, NULL, 0);
+#endif
 
 	up(&vicam->sem);
-	if (err)
-		MOD_DEC_USE_COUNT;
+	
 	return err;
 }
 
@@ -515,7 +509,6 @@ static void vicam_v4l_close(struct video_device *vdev)
 	up(&vicam->sem);
 	/* Why does se401.c have a usbdevice check here? */
 	/* If device is unplugged while open, I guess we only may unregister now */
-	MOD_DEC_USE_COUNT;
 }
 
 static long vicam_v4l_read(struct video_device *vdev, char *user_buf, unsigned long buflen, int noblock)
@@ -717,6 +710,7 @@ static int vicam_v4l_init(struct video_device *dev)
 
 /* FIXME - vicam_template - important */
 static struct video_device vicam_template = {
+	owner:		THIS_MODULE,
 	name:		"vicam USB camera",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_SE401, /* need to ask for own id */
@@ -938,6 +932,7 @@ static void vicam_disconnect(struct usb_device *udev, void *ptr)
 
 /* usb specific object needed to register this driver with the usb subsystem */
 static struct usb_driver vicam_driver = {
+	owner:		THIS_MODULE,
 	name:		"vicam",
 	probe:		vicam_probe,
 	disconnect:	vicam_disconnect,
@@ -984,3 +979,4 @@ static void __exit usb_vicam_exit(void)
 
 module_init(usb_vicam_init);
 module_exit(usb_vicam_exit);
+

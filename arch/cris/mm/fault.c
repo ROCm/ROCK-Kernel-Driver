@@ -6,6 +6,20 @@
  *  Authors:  Bjorn Wesen 
  * 
  *  $Log: fault.c,v $
+ *  Revision 1.2  2001/12/18 13:35:22  bjornw
+ *  Applied the 2.4.13->2.4.16 CRIS patch to 2.5.1 (is a copy of 2.4.15).
+ *
+ *  Revision 1.20  2001/11/22 13:34:06  bjornw
+ *  * Bug workaround (LX TR89): force a rerun of the whole of an interrupted
+ *    unaligned write, because the second half of the write will be corrupted
+ *    otherwise. Affected unaligned writes spanning not-yet mapped pages.
+ *  * Optimization: use the wr_rd bit in R_MMU_CAUSE to know whether a miss
+ *    was due to a read or a write (before we didn't know this until the next
+ *    restart of the interrupted instruction, thus wasting one fault-irq)
+ *
+ *  Revision 1.19  2001/11/12 19:02:10  pkj
+ *  Fixed compiler warnings.
+ *
  *  Revision 1.18  2001/07/18 22:14:32  bjornw
  *  Enable interrupts in the bulk of do_page_fault
  *
@@ -78,7 +92,14 @@ asmlinkage void do_page_fault(unsigned long address, struct pt_regs *regs,
 			      int error_code);
 
 /* debug of low-level TLB reload */
+#undef DEBUG
+
+#ifdef DEBUG
+#define D(x) x
+#else
 #define D(x)
+#endif
+
 /* debug of higher-level faults */
 #define DPG(x)
 
@@ -94,9 +115,12 @@ void
 handle_mmu_bus_fault(struct pt_regs *regs)
 {
 	int cause, select;
+#ifdef DEBUG
 	int index;
 	int page_id;
-	int miss, we, acc, inv;  
+	int acc, inv;
+#endif
+	int miss, we, writeac;
 	pmd_t *pmd;
 	pte_t pte;
 	int errcode;
@@ -106,75 +130,83 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 	select = *R_TLB_SELECT;
 
 	address = cause & PAGE_MASK; /* get faulting address */
-	
-	D(page_id = IO_EXTRACT(R_MMU_CAUSE,  page_id,   cause));
-	D(acc     = IO_EXTRACT(R_MMU_CAUSE,  acc_excp,  cause));
-	D(inv     = IO_EXTRACT(R_MMU_CAUSE,  inv_excp,  cause));  
-	D(index  =  IO_EXTRACT(R_TLB_SELECT, index,     select));
+
+#ifdef DEBUG
+	page_id = IO_EXTRACT(R_MMU_CAUSE,  page_id,   cause);
+	acc     = IO_EXTRACT(R_MMU_CAUSE,  acc_excp,  cause);
+	inv     = IO_EXTRACT(R_MMU_CAUSE,  inv_excp,  cause);  
+	index   = IO_EXTRACT(R_TLB_SELECT, index,     select);
+#endif
 	miss    = IO_EXTRACT(R_MMU_CAUSE,  miss_excp, cause);
 	we      = IO_EXTRACT(R_MMU_CAUSE,  we_excp,   cause);
-	
-	/* Note: the reason we don't set errcode's r/w flag here
-	 * using the 'we' flag, is because the latter is only given
-	 * if there is a write-protection exception, not given as a
-	 * general r/w access mode flag. It is currently not possible
-	 * to get this from the MMU (TODO: check if this is the case
-	 * for LXv2).
-	 * 
-	 * The page-fault code won't care, but there will be two page-
-	 * faults instead of one for the case of a write to a non-tabled
-	 * page (miss, then write-protection).
+	writeac = IO_EXTRACT(R_MMU_CAUSE,  wr_rd,     cause);
+
+	/* ETRAX 100LX TR89 bugfix: if the second half of an unaligned
+	 * write causes a MMU-fault, it will not be restarted correctly.
+	 * This could happen if a write crosses a page-boundary and the
+	 * second page is not yet COW'ed or even loaded. The workaround
+	 * is to clear the unaligned bit in the CPU status record, so 
+	 * that the CPU will rerun both the first and second halves of
+	 * the instruction. This will not have any sideeffects unless
+	 * the first half goes to any device or memory that can't be
+	 * written twice, and which is mapped through the MMU.
+	 *
+	 * We only need to do this for writes.
 	 */
 
-	errcode = 0;
+	if(writeac)
+		regs->csrinstr &= ~(1 << 5);
+	
+	/* Set errcode's R/W flag according to the mode which caused the
+	 * fault
+	 */
 
-	D(printk("bus_fault from IRP 0x%x: addr 0x%x, miss %d, inv %d, we %d, acc %d, "
-		 "idx %d pid %d\n",
+	errcode = writeac << 1;
+
+	D(printk("bus_fault from IRP 0x%lx: addr 0x%lx, miss %d, inv %d, we %d, acc %d, dx %d pid %d\n",
 		 regs->irp, address, miss, inv, we, acc, index, page_id));
 
 	/* for a miss, we need to reload the TLB entry */
 
-	if(miss) {
-
+	if (miss) {
 		/* see if the pte exists at all
 		 * refer through current_pgd, dont use mm->pgd
 		 */
-		
+
 		pmd = (pmd_t *)(current_pgd + pgd_index(address));
-		if(pmd_none(*pmd))
+		if (pmd_none(*pmd))
 			goto dofault;
-		if(pmd_bad(*pmd)) {
-			printk("bad pgdir entry 0x%x at 0x%x\n", *pmd, pmd);
+		if (pmd_bad(*pmd)) {
+			printk("bad pgdir entry 0x%lx at 0x%p\n", *(unsigned long*)pmd, pmd);
 			pmd_clear(pmd);
 			return;
 		}
 		pte = *pte_offset(pmd, address);
-		if(!pte_present(pte))
+		if (!pte_present(pte))
 			goto dofault;
-		
-		D(printk(" found pte %x pg %x ", pte_val(pte), pte_page(pte)));
-		D(
-		  {
-			  if(pte_val(pte) & _PAGE_SILENT_WRITE)
-				  printk("Silent-W ");
-			  if(pte_val(pte) & _PAGE_KERNEL)
-				  printk("Kernel ");
-			  if(pte_val(pte) & _PAGE_SILENT_READ)
-				  printk("Silent-R ");
-			  if(pte_val(pte) & _PAGE_GLOBAL)
-				  printk("Global ");
-			  if(pte_val(pte) & _PAGE_PRESENT)
-				  printk("Present ");
-			  if(pte_val(pte) & _PAGE_ACCESSED)
-				  printk("Accessed ");
-			  if(pte_val(pte) & _PAGE_MODIFIED)
-				  printk("Modified ");
-			  if(pte_val(pte) & _PAGE_READ)
-				  printk("Readable ");
-			  if(pte_val(pte) & _PAGE_WRITE)
-				  printk("Writeable ");
-			  printk("\n");
-		  });
+
+#ifdef DEBUG
+		printk(" found pte %lx pg %p ", pte_val(pte), pte_page(pte));
+		if (pte_val(pte) & _PAGE_SILENT_WRITE)
+			printk("Silent-W ");
+		if (pte_val(pte) & _PAGE_KERNEL)
+			printk("Kernel ");
+		if (pte_val(pte) & _PAGE_SILENT_READ)
+			printk("Silent-R ");
+		if (pte_val(pte) & _PAGE_GLOBAL)
+			printk("Global ");
+		if (pte_val(pte) & _PAGE_PRESENT)
+			printk("Present ");
+		if (pte_val(pte) & _PAGE_ACCESSED)
+			printk("Accessed ");
+		if (pte_val(pte) & _PAGE_MODIFIED)
+			printk("Modified ");
+		if (pte_val(pte) & _PAGE_READ)
+			printk("Readable ");
+		if (pte_val(pte) & _PAGE_WRITE)
+			printk("Writeable ");
+		printk("\n");
+#endif
 
 		/* load up the chosen TLB entry
 		 * this assumes the pte format is the same as the TLB_LO layout.
@@ -189,10 +221,10 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 	} 
 
 	errcode = 1 | (we << 1);
-	
+
  dofault:
 	/* leave it to the MM system fault handler below */
-	D(printk("do_page_fault %p errcode %d\n", address, errcode));
+	D(printk("do_page_fault %lx errcode %d\n", address, errcode));
 	do_page_fault(address, regs, errcode);
 }
 
@@ -221,20 +253,19 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
 	int writeaccess;
-	int fault;
 	unsigned long fixup;
 	siginfo_t info;
 
 	tsk = current;
 
-        /*
-         * We fault-in kernel-space virtual memory on-demand. The
-         * 'reference' page table is init_mm.pgd.
-         *
-         * NOTE! We MUST NOT take any locks for this case. We may
-         * be in an interrupt or a critical region, and should
-         * only copy the information from the master page table,
-         * nothing more.
+	/*
+	 * We fault-in kernel-space virtual memory on-demand. The
+	 * 'reference' page table is init_mm.pgd.
+	 *
+	 * NOTE! We MUST NOT take any locks for this case. We may
+	 * be in an interrupt or a critical region, and should
+	 * only copy the information from the master page table,
+	 * nothing more.
 	 *
 	 * NOTE2: This is done so that, when updating the vmalloc
 	 * mappings we don't have to walk all processes pgdirs and
@@ -243,13 +274,13 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 * bit set so sometimes the TLB can use a lingering entry.
 	 *
 	 * This verifies that the fault happens in kernel space
-         * and that the fault was not a protection error (error_code & 1).
-         */
+	 * and that the fault was not a protection error (error_code & 1).
+	 */
 
-        if (address >= VMALLOC_START &&
+	if (address >= VMALLOC_START &&
 	    !(error_code & 1) &&
 	    !user_mode(regs))
-                goto vmalloc_fault;
+		goto vmalloc_fault;
 
 	/* we can and should enable interrupts at this point */
 	sti();
@@ -312,28 +343,27 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 */
 
 	switch (handle_mm_fault(mm, vma, address, writeaccess)) {
-        case 1:
-                tsk->min_flt++;
-                break;
-        case 2:
-                tsk->maj_flt++;
-                break;
-        case 0:
-                goto do_sigbus;
-        default:
-                goto out_of_memory;
+	case 1:
+		tsk->min_flt++;
+		break;
+	case 2:
+		tsk->maj_flt++;
+		break;
+	case 0:
+		goto do_sigbus;
+	default:
+		goto out_of_memory;
 	}
 
 	up_read(&mm->mmap_sem);
 	return;
-	
+
 	/*
 	 * Something tried to access memory that isn't in our memory map..
 	 * Fix it, but check if it's kernel or user first..
 	 */
 
  bad_area:
-
 	up_read(&mm->mmap_sem);
 
  bad_area_nosemaphore:
@@ -361,10 +391,10 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 *  code)
 	 */
 
-        if ((fixup = search_exception_table(regs->irp)) != 0) {
+	if ((fixup = search_exception_table(regs->irp)) != 0) {
 		/* Adjust the instruction pointer in the stackframe */
 
-                regs->irp = fixup;
+		regs->irp = fixup;
 
 		/* We do not want to return by restoring the CPU-state
 		 * anymore, so switch frame-types (see ptrace.h)
@@ -372,9 +402,9 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 
 		regs->frametype = CRIS_FRAME_NORMAL;
 
-		D(printk("doing fixup to 0x%x\n", fixup));
-                return;
-        }
+		D(printk("doing fixup to 0x%lx\n", fixup));
+		return;
+	}
 
 	/*
 	 * Oops. The kernel tried to access some bad page. We'll have to
@@ -397,9 +427,9 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 */
 
  out_of_memory:
-        up_read(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", tsk->comm);
-	if(user_mode(regs))
+	if (user_mode(regs))
 		do_exit(SIGKILL);
 	goto no_context;
 
@@ -407,40 +437,40 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	up_read(&mm->mmap_sem);
 
 	/*
-         * Send a sigbus, regardless of whether we were in kernel
-         * or user mode.
-         */
+	 * Send a sigbus, regardless of whether we were in kernel
+	 * or user mode.
+	 */
 	info.si_code = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
 	info.si_addr = (void *)address;
 	force_sig_info(SIGBUS, &info, tsk);
-	
-        /* Kernel mode? Handle exceptions or die */
-        if (!user_mode(regs))
-                goto no_context;
-        return;
+
+	/* Kernel mode? Handle exceptions or die */
+	if (!user_mode(regs))
+		goto no_context;
+	return;
 
 vmalloc_fault:
-        {
-                /*
-                 * Synchronize this task's top level page-table
-                 * with the 'reference' page table.
+	{
+		/*
+		 * Synchronize this task's top level page-table
+		 * with the 'reference' page table.
 		 *
 		 * Use current_pgd instead of tsk->active_mm->pgd
 		 * since the latter might be unavailable if this
 		 * code is executed in a misfortunately run irq
 		 * (like inside schedule() between switch_mm and
 		 *  switch_to...).
-                 */
+		 */
 
-                int offset = pgd_index(address);
-                pgd_t *pgd, *pgd_k;
-                pmd_t *pmd, *pmd_k;
+		int offset = pgd_index(address);
+		pgd_t *pgd, *pgd_k;
+		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
-                pgd = current_pgd + offset;
-                pgd_k = init_mm.pgd + offset;
+		pgd = (pgd_t *)current_pgd + offset;
+		pgd_k = init_mm.pgd + offset;
 
 		/* Since we're two-level, we don't need to do both
 		 * set_pgd and set_pmd (they do the same thing). If
@@ -454,13 +484,13 @@ vmalloc_fault:
 		 * it exists.
 		 */
 
-                pmd = pmd_offset(pgd, address);
-                pmd_k = pmd_offset(pgd_k, address);
+		pmd = pmd_offset(pgd, address);
+		pmd_k = pmd_offset(pgd_k, address);
 
-                if (!pmd_present(*pmd_k))
-                        goto bad_area_nosemaphore;
+		if (!pmd_present(*pmd_k))
+			goto bad_area_nosemaphore;
 
-                set_pmd(pmd, *pmd_k);
+		set_pmd(pmd, *pmd_k);
 
 		/* Make sure the actual PTE exists as well to
 		 * catch kernel vmalloc-area accesses to non-mapped
@@ -468,10 +498,10 @@ vmalloc_fault:
 		 * silently loop forever.
 		 */
 
-                pte_k = pte_offset(pmd_k, address);
-                if (!pte_present(*pte_k))
-                        goto no_context;
+		pte_k = pte_offset(pmd_k, address);
+		if (!pte_present(*pte_k))
+			goto no_context;
 
-                return;
-        }
+		return;
+	}
 }

@@ -355,7 +355,7 @@ void hpfs_set_ea(struct inode *inode, struct fnode *fnode, char *key, char *data
 	if (hpfs_ea_write(s, fnode->ea_secno, fnode->ea_anode, fnode->ea_size_l + 5 + h[1], size, data)) goto bail;
 	fnode->ea_size_l = pos;
 	ret:
-	inode->i_hpfs_ea_size += 5 + strlen(key) + size;
+	hpfs_i(inode)->i_ea_size += 5 + strlen(key) + size;
 	return;
 	bail:
 	if (fnode->ea_secno)

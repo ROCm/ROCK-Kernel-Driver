@@ -12,6 +12,9 @@
 *!                                 don't use PB_I2C if DS1302 uses same bits,
 *!                                 use PB.
 *! $Log: i2c.c,v $
+*! Revision 1.1.1.1  2001/12/17 13:59:27  bjornw
+*! Import of Linux 2.5.1
+*!
 *! Revision 1.7  2001/04/04 13:11:36  markusl
 *! Updated according to review remarks
 *!
@@ -43,7 +46,7 @@
 *! (C) Copyright 1999, 2000, 2001 Axis Communications AB, LUND, SWEDEN
 *!
 *!***************************************************************************/
-/* $Id: i2c.c,v 1.7 2001/04/04 13:11:36 markusl Exp $ */
+/* $Id: i2c.c,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $ */
 /****************** INCLUDE FILES SECTION ***********************************/
 
 #include <linux/module.h>

@@ -121,12 +121,16 @@ static void qnx4_write_inode(struct inode *inode, int unused)
 
 static struct super_block *qnx4_read_super(struct super_block *, void *, int);
 static void qnx4_put_super(struct super_block *sb);
+static struct inode *qnx4_alloc_inode(struct super_block *sb);
+static void qnx4_destroy_inode(struct inode *inode);
 static void qnx4_read_inode(struct inode *);
 static int qnx4_remount(struct super_block *sb, int *flags, char *data);
 static int qnx4_statfs(struct super_block *, struct statfs *);
 
 static struct super_operations qnx4_sops =
 {
+	alloc_inode:	qnx4_alloc_inode,
+	destroy_inode:	qnx4_destroy_inode,
 	read_inode:	qnx4_read_inode,
 #ifdef CONFIG_QNX4FS_RW
 	write_inode:	qnx4_write_inode,
@@ -227,16 +231,16 @@ unsigned long qnx4_block_map( struct inode *inode, long iblock )
 	unsigned long block = 0;
 	struct buffer_head *bh = 0;
 	struct qnx4_xblk *xblk = 0;
-	struct qnx4_inode_info *qnx4_inode = &inode->u.qnx4_i;
-	qnx4_nxtnt_t nxtnt = le16_to_cpu(qnx4_inode->i_num_xtnts);
+	struct qnx4_inode_entry *qnx4_inode = qnx4_raw_inode(inode);
+	qnx4_nxtnt_t nxtnt = le16_to_cpu(qnx4_inode->di_num_xtnts);
 
-	if ( iblock < le32_to_cpu(qnx4_inode->i_first_xtnt.xtnt_size) ) {
+	if ( iblock < le32_to_cpu(qnx4_inode->di_first_xtnt.xtnt_size) ) {
 		// iblock is in the first extent. This is easy.
-		block = le32_to_cpu(qnx4_inode->i_first_xtnt.xtnt_blk) + iblock - 1;
+		block = le32_to_cpu(qnx4_inode->di_first_xtnt.xtnt_blk) + iblock - 1;
 	} else {
 		// iblock is beyond first extent. We have to follow the extent chain.
-		i_xblk = le32_to_cpu(qnx4_inode->i_xblk);
-		offset = iblock - le32_to_cpu(qnx4_inode->i_first_xtnt.xtnt_size);
+		i_xblk = le32_to_cpu(qnx4_inode->di_xblk);
+		offset = iblock - le32_to_cpu(qnx4_inode->di_first_xtnt.xtnt_size);
 		ix = 0;
 		while ( --nxtnt > 0 ) {
 			if ( ix == 0 ) {
@@ -417,10 +421,12 @@ static int qnx4_readpage(struct file *file, struct page *page)
 {
 	return block_read_full_page(page,qnx4_get_block);
 }
-static int qnx4_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
+static int qnx4_prepare_write(struct file *file, struct page *page,
+			      unsigned from, unsigned to)
 {
-	return cont_prepare_write(page,from,to,qnx4_get_block,
-		&page->mapping->host->u.qnx4_i.mmu_private);
+	struct qnx4_inode_info *qnx4_inode = qnx4_i(page->mapping->host);
+	return cont_prepare_write(page, from, to, qnx4_get_block,
+				  &qnx4_inode->mmu_private);
 }
 static int qnx4_bmap(struct address_space *mapping, long block)
 {
@@ -441,6 +447,7 @@ static void qnx4_read_inode(struct inode *inode)
 	struct qnx4_inode_entry *raw_inode;
 	int block, ino;
 	struct super_block *sb = inode->i_sb;
+	struct qnx4_inode_entry *qnx4_inode = qnx4_raw_inode(inode);
 
 	ino = inode->i_ino;
 	inode->i_mode = 0;
@@ -472,35 +479,92 @@ static void qnx4_read_inode(struct inode *inode)
 	inode->i_blocks  = le32_to_cpu(raw_inode->di_first_xtnt.xtnt_size);
 	inode->i_blksize = QNX4_DIR_ENTRY_SIZE;
 
-	memcpy(&inode->u.qnx4_i, (struct qnx4_inode_info *) raw_inode, QNX4_DIR_ENTRY_SIZE);
+	memcpy(qnx4_inode, raw_inode, QNX4_DIR_ENTRY_SIZE);
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &qnx4_file_inode_operations;
 		inode->i_fop = &qnx4_file_operations;
 		inode->i_mapping->a_ops = &qnx4_aops;
-		inode->u.qnx4_i.mmu_private = inode->i_size;
+		qnx4_i(inode)->mmu_private = inode->i_size;
 	} else if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &qnx4_dir_inode_operations;
 		inode->i_fop = &qnx4_dir_operations;
 	} else if (S_ISLNK(inode->i_mode)) {
 		inode->i_op = &page_symlink_inode_operations;
 		inode->i_mapping->a_ops = &qnx4_aops;
-		inode->u.qnx4_i.mmu_private = inode->i_size;
+		qnx4_i(inode)->mmu_private = inode->i_size;
 	} else
 		printk("qnx4: bad inode %d on dev %s\n",ino,sb->s_id);
 	brelse(bh);
+}
+
+static kmem_cache_t *qnx4_inode_cachep;
+
+static struct inode *qnx4_alloc_inode(struct super_block *sb)
+{
+	struct qnx4_inode_info *ei;
+	ei = kmem_cache_alloc(qnx4_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void qnx4_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(qnx4_inode_cachep, qnx4_i(inode));
+}
+
+static void init_once(void *foo, kmem_cache_t * cachep,
+		      unsigned long flags)
+{
+	struct qnx4_inode_info *ei = (struct qnx4_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY | SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+
+static int init_inodecache(void)
+{
+	qnx4_inode_cachep = kmem_cache_create("qnx4_inode_cache",
+					     sizeof(struct qnx4_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (qnx4_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(qnx4_inode_cachep))
+		printk(KERN_INFO
+		       "qnx4_inode_cache: not all structures were freed\n");
 }
 
 static DECLARE_FSTYPE_DEV(qnx4_fs_type, "qnx4", qnx4_read_super);
 
 static int __init init_qnx4_fs(void)
 {
+	int err;
+
+	err = init_inodecache();
+	if (err)
+		return err;
+
+	err = register_filesystem(&qnx4_fs_type);
+	if (err) {
+		destroy_inodecache();
+		return err;
+	}
+
 	printk("QNX4 filesystem 0.2.2 registered.\n");
-	return register_filesystem(&qnx4_fs_type);
+	return 0;
 }
 
 static void __exit exit_qnx4_fs(void)
 {
 	unregister_filesystem(&qnx4_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

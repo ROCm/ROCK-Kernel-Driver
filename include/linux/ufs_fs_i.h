@@ -26,6 +26,7 @@ struct ufs_inode_info {
 	__u32	i_oeftflag;
 	__u16	i_osync;
 	__u32	i_lastfrag;
+	struct inode vfs_inode;
 };
 
 #endif /* _LINUX_UFS_FS_I_H */

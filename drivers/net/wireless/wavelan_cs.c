@@ -4,7 +4,7 @@
  *		Jean II - HPLB '96
  *
  * Reorganisation and extension of the driver.
- * Original copyright follow. See wavelan_cs.h for details.
+ * Original copyright follow. See wavelan_cs.p.h for details.
  *
  * This code is derived from Anthony D. Joseph's code and all the changes here
  * are also under the original copyright below.
@@ -56,7 +56,7 @@
  *
  */
 
-#include "wavelan_cs.h"		/* Private header */
+#include "wavelan_cs.p.h"		/* Private header */
 
 /************************* MISC SUBROUTINES **************************/
 /*

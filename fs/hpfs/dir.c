@@ -27,11 +27,12 @@ loff_t hpfs_dir_lseek(struct file *filp, loff_t off, int whence)
 	loff_t pos;
 	struct quad_buffer_head qbh;
 	struct inode *i = filp->f_dentry->d_inode;
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
 	struct super_block *s = i->i_sb;
 	/*printk("dir lseek\n");*/
 	if (new_off == 0 || new_off == 1 || new_off == 11 || new_off == 12 || new_off == 13) goto ok;
 	hpfs_lock_inode(i);
-	pos = ((loff_t) hpfs_de_as_down_as_possible(s, i->i_hpfs_dno) << 4) + 1;
+	pos = ((loff_t) hpfs_de_as_down_as_possible(s, hpfs_inode->i_dno) << 4) + 1;
 	while (pos != new_off) {
 		if (map_pos_dirent(i, &pos, &qbh)) hpfs_brelse4(&qbh);
 		else goto fail;
@@ -49,6 +50,7 @@ loff_t hpfs_dir_lseek(struct file *filp, loff_t off, int whence)
 int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
 	struct quad_buffer_head qbh;
 	struct hpfs_dirent *de;
 	int lc;
@@ -59,7 +61,7 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	if (inode->i_sb->s_hpfs_chk) {
 		if (hpfs_chk_sectors(inode->i_sb, inode->i_ino, 1, "dir_fnode"))
 			return -EFSERROR;
-		if (hpfs_chk_sectors(inode->i_sb, inode->i_hpfs_dno, 4, "dir_dnode"))
+		if (hpfs_chk_sectors(inode->i_sb, hpfs_inode->i_dno, 4, "dir_dnode"))
 			return -EFSERROR;
 	}
 	if (inode->i_sb->s_hpfs_chk >= 2) {
@@ -72,9 +74,9 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			e = 1;
 			hpfs_error(inode->i_sb, "not a directory, fnode %08x",inode->i_ino);
 		}
-		if (inode->i_hpfs_dno != fno->u.external[0].disk_secno) {
+		if (hpfs_inode->i_dno != fno->u.external[0].disk_secno) {
 			e = 1;
-			hpfs_error(inode->i_sb, "corrupted inode: i_hpfs_dno == %08x, fnode -> dnode == %08x", inode->i_hpfs_dno, fno->u.external[0].disk_secno);
+			hpfs_error(inode->i_sb, "corrupted inode: i_dno == %08x, fnode -> dnode == %08x", hpfs_inode->i_dno, fno->u.external[0].disk_secno);
 		}
 		brelse(bh);
 		if (e) return -EFSERROR;
@@ -115,14 +117,14 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			filp->f_pos = 11;
 		}
 		if (filp->f_pos == 11) {
-			if (filldir(dirent, "..", 2, filp->f_pos, inode->i_hpfs_parent_dir, DT_DIR) < 0) {
+			if (filldir(dirent, "..", 2, filp->f_pos, hpfs_inode->i_parent_dir, DT_DIR) < 0) {
 				hpfs_unlock_inode(inode);
 				return 0;
 			}
 			filp->f_pos = 1;
 		}
 		if (filp->f_pos == 1) {
-			filp->f_pos = ((loff_t) hpfs_de_as_down_as_possible(inode->i_sb, inode->i_hpfs_dno) << 4) + 1;
+			filp->f_pos = ((loff_t) hpfs_de_as_down_as_possible(inode->i_sb, hpfs_inode->i_dno) << 4) + 1;
 			hpfs_add_pos(inode, &filp->f_pos);
 			filp->f_version = inode->i_version;
 		}
@@ -180,6 +182,7 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	ino_t ino;
 	int err;
 	struct inode *result = NULL;
+	struct hpfs_inode_info *hpfs_result;
 
 	if ((err = hpfs_chk_name((char *)name, &len))) {
 		if (err == -ENAMETOOLONG) return ERR_PTR(-ENAMETOOLONG);
@@ -191,7 +194,7 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	 * '.' and '..' will never be passed here.
 	 */
 
-	de = map_dirent(dir, dir->i_hpfs_dno, (char *) name, len, NULL, &qbh);
+	de = map_dirent(dir, hpfs_i(dir)->i_dno, (char *) name, len, NULL, &qbh);
 
 	/*
 	 * This is not really a bailout, just means file not found.
@@ -215,7 +218,8 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 		hpfs_error(dir->i_sb, "hpfs_lookup: can't get inode");
 		goto bail1;
 	}
-	if (!de->directory) result->i_hpfs_parent_dir = dir->i_ino;
+	hpfs_result = hpfs_i(result);
+	if (!de->directory) hpfs_result->i_parent_dir = dir->i_ino;
 	hpfs_unlock_iget(dir->i_sb);
 
 	hpfs_decide_conv(result, (char *)name, len);
@@ -235,14 +239,14 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 			result->i_ctime = 1;
 		result->i_mtime = local_to_gmt(dir->i_sb, de->write_date);
 		result->i_atime = local_to_gmt(dir->i_sb, de->read_date);
-		result->i_hpfs_ea_size = de->ea_size;
-		if (!result->i_hpfs_ea_mode && de->read_only)
+		hpfs_result->i_ea_size = de->ea_size;
+		if (!hpfs_result->i_ea_mode && de->read_only)
 			result->i_mode &= ~0222;
 		if (!de->directory) {
 			if (result->i_size == -1) {
 				result->i_size = de->file_size;
 				result->i_data.a_ops = &hpfs_aops;
-				result->u.hpfs_i.mmu_private = result->i_size;
+				hpfs_i(result)->mmu_private = result->i_size;
 			/*
 			 * i_blocks should count the fnode and any anodes.
 			 * We count 1 for the fnode and don't bother about

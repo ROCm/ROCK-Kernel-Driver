@@ -632,7 +632,7 @@ dch_nt_l2l1(struct PStack *st, int pr, void *arg)
 			st->l1.l1hw(st, pr, arg);
 			break;
 		case (PH_ACTIVATE | REQUEST):
-			st->l1.l1l2(st, PH_ACTIVATE | CONFIRM, NULL);
+			L1L2(st, PH_ACTIVATE | CONFIRM, NULL);
 			break;
 		case (PH_TESTLOOP | REQUEST):
 			if (1 & (long) arg)
@@ -676,7 +676,7 @@ hfcsx_auxcmd(struct IsdnCardState *cs, isdn_ctrl * ic)
 		cs->dc.hfcsx.ph_state = 1;
 		cs->hw.hfcsx.nt_mode = 1;
 		cs->hw.hfcsx.nt_timer = 0;
-		cs->stlist->l2.l2l1 = dch_nt_l2l1;
+		cs->stlist->l1.l2l1 = dch_nt_l2l1;
 		restore_flags(flags);
 		debugl1(cs, "NT mode activated");
 		return (0);
@@ -1008,7 +1008,7 @@ HFCSX_l1hw(struct PStack *st, int pr, void *arg)
 #endif
 			if (!cs->tx_skb) {
 				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+				L1L2(st, PH_PULL | CONFIRM, NULL);
 			} else
 				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
@@ -1248,7 +1248,7 @@ hfcsx_l2l1(struct PStack *st, int pr, void *arg)
 		case (PH_PULL | REQUEST):
 			if (!st->l1.bcs->tx_skb) {
 				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+				L1L2(st, PH_PULL | CONFIRM, NULL);
 			} else
 				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
@@ -1264,7 +1264,7 @@ hfcsx_l2l1(struct PStack *st, int pr, void *arg)
 			test_and_clear_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
 			test_and_clear_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 			mode_hfcsx(st->l1.bcs, 0, st->l1.bc);
-			st->l1.l1l2(st, PH_DEACTIVATE | CONFIRM, NULL);
+			L1L2(st, PH_DEACTIVATE | CONFIRM, NULL);
 			break;
 	}
 }
@@ -1314,7 +1314,7 @@ setstack_2b(struct PStack *st, struct BCState *bcs)
 	if (open_hfcsxstate(st->l1.hardware, bcs))
 		return (-1);
 	st->l1.bcs = bcs;
-	st->l2.l2l1 = hfcsx_l2l1;
+	st->l1.l2l1 = hfcsx_l2l1;
 	setstack_manager(st);
 	bcs->st = st;
 	setstack_l1_B(st);

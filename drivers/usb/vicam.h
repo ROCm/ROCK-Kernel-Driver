@@ -68,7 +68,7 @@ struct usb_vicam
 	/* v4l stuff */
 	char *camera_name;
 	char *fbuf;
-	urb_t *urb[VICAM_NUMSBUF];
+	struct urb *urb[VICAM_NUMSBUF];
 	int sizes;
 	int *width;
 	int *height;

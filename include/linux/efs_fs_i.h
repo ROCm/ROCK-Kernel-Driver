@@ -61,6 +61,7 @@ struct efs_inode_info {
 	int		lastextent;
 
 	efs_extent	extents[EFS_DIRECTEXTENTS];
+	struct inode	vfs_inode;
 };
 
 #endif	/* __EFS_FS_I_H__ */

@@ -46,7 +46,7 @@
 
 struct cpia_sbuf {
 	char *data;
-	urb_t *urb;
+	struct urb *urb;
 };
 
 #define FRAMEBUF_LEN (CPIA_MAX_FRAME_SIZE+100)
@@ -168,7 +168,7 @@ static void cpia_usb_complete(struct urb *urb)
 static int cpia_usb_open(void *privdata)
 {
 	struct usb_cpia *ucpia = (struct usb_cpia *) privdata;
-	urb_t *urb;
+	struct urb *urb;
 	int ret, retval = 0, fx, err;
   
 	if (!ucpia)

@@ -108,7 +108,7 @@ W6692_bh(struct IsdnCardState *cs)
 			debugl1(cs, "D-Channel Busy cleared");
 		stptr = cs->stlist;
 		while (stptr != NULL) {
-			stptr->l1.l1l2(stptr, PH_PAUSE | CONFIRM, NULL);
+			L1L2(stptr, PH_PAUSE | CONFIRM, NULL);
 			stptr = stptr->next;
 		}
 	}
@@ -614,7 +614,7 @@ W6692_l1hw(struct PStack *st, int pr, void *arg)
 #endif
 			if (!cs->tx_skb) {
 				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+				L1L2(st, PH_PULL | CONFIRM, NULL);
 			} else
 				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
@@ -687,7 +687,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 			test_and_set_bit(FLG_L1_DBUSY, &cs->HW_Flags);
 			stptr = cs->stlist;
 			while (stptr != NULL) {
-				stptr->l1.l1l2(stptr, PH_PAUSE | INDICATION, NULL);
+				L1L2(stptr, PH_PAUSE | INDICATION, NULL);
 				stptr = stptr->next;
 			}
 		} else {
@@ -772,7 +772,7 @@ W6692_l2l1(struct PStack *st, int pr, void *arg)
 		case (PH_PULL | REQUEST):
 			if (!st->l1.bcs->tx_skb) {
 				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+				L1L2(st, PH_PULL | CONFIRM, NULL);
 			} else
 				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
@@ -788,7 +788,7 @@ W6692_l2l1(struct PStack *st, int pr, void *arg)
 			test_and_clear_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
 			test_and_clear_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 			W6692Bmode(st->l1.bcs, 0, st->l1.bc);
-			st->l1.l1l2(st, PH_DEACTIVATE | CONFIRM, NULL);
+			L1L2(st, PH_DEACTIVATE | CONFIRM, NULL);
 			break;
 	}
 }
@@ -852,7 +852,7 @@ setstack_w6692(struct PStack *st, struct BCState *bcs)
 	if (open_w6692state(st->l1.hardware, bcs))
 		return (-1);
 	st->l1.bcs = bcs;
-	st->l2.l2l1 = W6692_l2l1;
+	st->l1.l2l1 = W6692_l2l1;
 	setstack_manager(st);
 	bcs->st = st;
 	setstack_l1_B(st);

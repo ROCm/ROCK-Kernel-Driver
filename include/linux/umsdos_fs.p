@@ -93,3 +93,8 @@ int UMSDOS_rename (struct inode *old_dir,
 /* rdir.c 22/03/95 03.31.42 */
 struct dentry *umsdos_rlookup_x (struct inode *dir, struct dentry *dentry, int nopseudo);
 struct dentry *UMSDOS_rlookup (struct inode *dir, struct dentry *dentry);
+
+static inline struct umsdos_inode_info *UMSDOS_I(struct inode *inode)
+{
+	return &inode->u.umsdos_i;
+}

@@ -105,8 +105,14 @@ typedef unsigned long pgprot_t;
  * to arm and m68k I think)
  */ 
 
-#define virt_to_page(kaddr)    (mem_map + (((unsigned long)kaddr - PAGE_OFFSET) >> PAGE_SHIFT))
-#define VALID_PAGE(page)       ((page - mem_map) < max_mapnr)
+#define virt_to_page(kaddr)    (mem_map + (((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT))
+#define VALID_PAGE(page)       (((page) - mem_map) < max_mapnr)
+
+/* convert a page (based on mem_map and forward) to a physical address
+ * do this by figuring out the virtual address and then use __pa
+ */
+
+#define page_to_phys(page)     __pa((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
 
 /* from linker script */
 

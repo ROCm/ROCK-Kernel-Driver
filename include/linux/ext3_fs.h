@@ -443,7 +443,10 @@ struct ext3_super_block {
 
 #ifdef __KERNEL__
 #define EXT3_SB(sb)	(&((sb)->u.ext3_sb))
-#define EXT3_I(inode)	(&((inode)->u.ext3_i))
+static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
+{
+	return list_entry(inode, struct ext3_inode_info, vfs_inode);
+}
 #else
 /* Assume that user mode programs are passing in an ext3fs superblock, not
  * a kernel struct super_block.  This will allow us to call the feature-test
@@ -451,7 +454,7 @@ struct ext3_super_block {
 #define EXT3_SB(sb)	(sb)
 #endif
 
-#define NEXT_ORPHAN(inode) (inode)->u.ext3_i.i_dtime
+#define NEXT_ORPHAN(inode) EXT3_I(inode)->i_dtime
 
 /*
  * Codes for operating systems
@@ -620,7 +623,7 @@ extern int ext3_check_dir_entry(const char *, struct inode *,
 extern int ext3_sync_file (struct file *, struct dentry *, int);
 
 /* ialloc.c */
-extern struct inode * ext3_new_inode (handle_t *, const struct inode *, int);
+extern struct inode * ext3_new_inode (handle_t *, struct inode *, int);
 extern void ext3_free_inode (handle_t *, struct inode *);
 extern struct inode * ext3_orphan_get (struct super_block *, ino_t);
 extern unsigned long ext3_count_free_inodes (struct super_block *);

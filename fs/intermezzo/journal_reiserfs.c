@@ -101,7 +101,7 @@ void presto_reiserfs_trans_commit(struct presto_file_set *fset, void *handle)
 void presto_reiserfs_journal_file_data(struct inode *inode)
 {
 #ifdef EXT3_JOURNAL_DATA_FL
-        inode->u.ext3_i.i_flags |= EXT3_JOURNAL_DATA_FL;
+        EXT3_I(inode)->i_flags |= EXT3_JOURNAL_DATA_FL;
 #else
 #warning You must have a facility to enable journaled writes for recovery!
 #endif

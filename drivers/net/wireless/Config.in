@@ -2,6 +2,12 @@
 # Wireless LAN device configuration
 #
 
+comment 'Wireless ISA/PCI cards support' 
+
+# Good old obsolete Wavelan.
+tristate '  AT&T/Lucent old WaveLAN & DEC RoamAbout DS ISA support' CONFIG_WAVELAN
+
+# 802.11b cards
 if [ "$CONFIG_ISA" = "y" -o "$CONFIG_PCI" = "y" ]; then
    tristate '  Cisco/Aironet 34X/35X/4500/4800 ISA and PCI cards' CONFIG_AIRO
 fi
@@ -18,8 +24,13 @@ fi
 
 # If Pcmcia is compiled in, offer Pcmcia cards...
 if [ "$CONFIG_PCMCIA" != "n" ]; then
-   comment 'Wireless Pcmcia cards support' 
+   comment 'Wireless Pcmcia/Cardbus cards support' 
 
+# Obsolete cards
+   dep_tristate '  Xircom Netwave AirSurfer Pcmcia wireless support' CONFIG_PCMCIA_NETWAVE $CONFIG_PCMCIA
+   dep_tristate '  AT&T/Lucent old Wavelan Pcmcia wireless support' CONFIG_PCMCIA_WAVELAN $CONFIG_PCMCIA
+
+# 802.11b cards
    dep_tristate '  Hermes PCMCIA card support' CONFIG_PCMCIA_HERMES $CONFIG_HERMES
    tristate '  Cisco/Aironet 34X/35X/4500/4800 PCMCIA cards' CONFIG_AIRO_CS
 fi

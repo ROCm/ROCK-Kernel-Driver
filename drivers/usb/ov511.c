@@ -3875,7 +3875,7 @@ ov511_postprocess(struct usb_ov511 *ov511, struct ov511_frame *frame)
  **********************************************************************/
 
 static int 
-ov511_move_data(struct usb_ov511 *ov511, urb_t *urb)
+ov511_move_data(struct usb_ov511 *ov511, struct urb *urb)
 {
 	unsigned char *cdata;
 	int data_size, num, offset, i, totlen = 0;
@@ -4108,7 +4108,7 @@ check_middle:
 }
 
 static int 
-ov518_move_data(struct usb_ov511 *ov511, urb_t *urb)
+ov518_move_data(struct usb_ov511 *ov511, struct urb *urb)
 {
 	unsigned char *cdata;
 	int i, data_size, totlen = 0;
@@ -4369,7 +4369,7 @@ ov511_isoc_irq(struct urb *urb)
 static int 
 ov511_init_isoc(struct usb_ov511 *ov511)
 {
-	urb_t *urb;
+	struct urb *urb;
 	int fx, err, n, size;
 
 	PDEBUG(3, "*** Initializing capture ***");

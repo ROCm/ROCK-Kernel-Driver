@@ -18,9 +18,11 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/proc_fs.h>
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
+#include <asm/smplock.h>
 
 #include "ieee1394_types.h"
 #include "ieee1394.h"
@@ -135,12 +137,8 @@ void free_hpsb_packet(struct hpsb_packet *packet)
 
 int hpsb_reset_bus(struct hpsb_host *host, int type)
 {
-        if (!host->initialized) {
-                return 1;
-        }
-
         if (!host->in_bus_reset) {
-                host->template->devctl(host, RESET_BUS, type);
+                host->ops->devctl(host, RESET_BUS, type);
                 return 0;
         } else {
                 return 1;
@@ -151,8 +149,8 @@ int hpsb_reset_bus(struct hpsb_host *host, int type)
 int hpsb_bus_reset(struct hpsb_host *host)
 {
         if (host->in_bus_reset) {
-                HPSB_NOTICE(__FUNCTION__ 
-                            " called while bus reset already in progress");
+                HPSB_NOTICE("%s called while bus reset already in progress",
+			    __FUNCTION__);
                 return 1;
         }
 
@@ -171,10 +169,10 @@ int hpsb_bus_reset(struct hpsb_host *host)
  * Verify num_of_selfids SelfIDs and return number of nodes.  Return zero in
  * case verification failed.
  */
-static int check_selfids(struct hpsb_host *host, unsigned int num_of_selfids)
+static int check_selfids(struct hpsb_host *host)
 {
         int nodeid = -1;
-        int rest_of_selfids = num_of_selfids;
+        int rest_of_selfids = host->selfid_count;
         struct selfid *sid = (struct selfid *)host->topology_map;
         struct ext_selfid *esid;
         int esid_seq = 23;
@@ -318,15 +316,18 @@ void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid)
 
 void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
 {
-        host->node_id = 0xffc0 | phyid;
-        host->in_bus_reset = 0;
+	if (!host->in_bus_reset)
+		HPSB_NOTICE("SelfID completion called outside of bus reset!");
+
+        host->node_id = LOCAL_BUS | phyid;
         host->is_root = isroot;
 
-        host->node_count = check_selfids(host, host->selfid_count);
+        host->node_count = check_selfids(host);
         if (!host->node_count) {
                 if (host->reset_retries++ < 20) {
                         /* selfid stage did not complete without error */
                         HPSB_NOTICE("Error in SelfID stage, resetting");
+			host->in_bus_reset = 0;
                         hpsb_reset_bus(host, LONG_RESET);
                         return;
                 } else {
@@ -346,8 +347,9 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
         }
 
         host->reset_retries = 0;
-        atomic_inc(&host->generation);
-        if (isroot) host->template->devctl(host, ACT_CYCLE_MASTER, 1);
+        if (isroot) host->ops->devctl(host, ACT_CYCLE_MASTER, 1);
+	atomic_inc(&host->generation);
+	host->in_bus_reset = 0;
         highlevel_host_reset(host);
 }
 
@@ -402,7 +404,7 @@ int hpsb_send_packet(struct hpsb_packet *packet)
 {
         struct hpsb_host *host = packet->host;
 
-        if (!host->initialized || host->in_bus_reset 
+        if (host->is_shutdown || host->in_bus_reset
             || (packet->generation != get_hpsb_generation(host))) {
                 return 0;
         }
@@ -431,7 +433,7 @@ int hpsb_send_packet(struct hpsb_packet *packet)
         }
 #endif
 
-        return host->template->transmit_packet(host, packet);
+        return host->ops->transmit_packet(host, packet);
 }
 
 static void send_packet_nocare(struct hpsb_packet *packet)
@@ -727,7 +729,7 @@ void abort_requests(struct hpsb_host *host)
         struct list_head *lh;
         LIST_HEAD(llist);
 
-        host->template->devctl(host, CANCEL_REQUESTS, 0);
+        host->ops->devctl(host, CANCEL_REQUESTS, 0);
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
         list_splice(&host->pending_packets, &llist);
@@ -786,10 +788,228 @@ void abort_timedouts(struct hpsb_host *host)
 }
 
 
+/*
+ * character device dispatching (see ieee1394_core.h)
+ * Dan Maas <dmaas@dcine.com>
+ */
+
+static struct {
+	struct file_operations *file_ops;
+	struct module *module;
+} ieee1394_chardevs[16];
+
+static rwlock_t ieee1394_chardevs_lock = RW_LOCK_UNLOCKED;
+
+static int ieee1394_dispatch_open(struct inode *inode, struct file *file);
+
+static struct file_operations ieee1394_chardev_ops = {
+	OWNER_THIS_MODULE
+	open: ieee1394_dispatch_open,
+};
+
+devfs_handle_t ieee1394_devfs_handle;
+
+
+/* claim a block of minor numbers */
+int ieee1394_register_chardev(int blocknum,
+			      struct module *module,
+			      struct file_operations *file_ops)
+{
+	int retval;
+	
+	if( (blocknum < 0) || (blocknum > 15) )
+		return -EINVAL;
+
+	write_lock(&ieee1394_chardevs_lock);
+
+	if(ieee1394_chardevs[blocknum].file_ops == NULL) {
+		/* grab the minor block */
+		ieee1394_chardevs[blocknum].file_ops = file_ops;
+		ieee1394_chardevs[blocknum].module = module;
+		
+		retval = 0;
+
+		V22_COMPAT_MOD_INC_USE_COUNT;
+	} else {
+		/* block already taken */
+		retval = -EBUSY;
+	}
+	
+	write_unlock(&ieee1394_chardevs_lock);
+
+	return retval;
+}
+
+/* release a block of minor numbers */
+void ieee1394_unregister_chardev(int blocknum)
+{
+	if( (blocknum < 0) || (blocknum > 15) )
+		return;
+	
+	write_lock(&ieee1394_chardevs_lock);
+	
+	if(ieee1394_chardevs[blocknum].file_ops) {
+		ieee1394_chardevs[blocknum].file_ops = NULL;
+		ieee1394_chardevs[blocknum].module = NULL;
+		V22_COMPAT_MOD_DEC_USE_COUNT;
+	}
+	
+	write_unlock(&ieee1394_chardevs_lock);
+}
+
+/* the point of entry for open() on any ieee1394 character device */
+static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
+{
+	struct file_operations *file_ops;
+	struct module *module;
+	int blocknum;
+	int retval = -ENODEV;
+
+	/*
+	  Maintaining correct module reference counts is tricky here!
+
+	  For Linux v2.2:
+
+	  The task-specific driver is expected to maintain its own
+	  reference count via V22_COMPAT_MOD_[INC,DEC]_USE_COUNT.
+	  We don't need to do anything special.
+	  
+	  For Linux v2.4 and later:
+	  
+	  The key thing to remember is that the VFS increments the
+	  reference count of ieee1394 before it calls
+	  ieee1394_dispatch_open().
+
+	  If the open() succeeds, then we need to transfer this extra
+	  reference to the task-specific driver module (e.g. raw1394).
+	  The VFS will deref the driver module automatically when the
+	  file is later released.
+
+	  If the open() fails, then the VFS will drop the
+	  reference count of whatever module file->f_op->owner points
+	  to, immediately after this function returns.
+
+	  The comments below refer to the 2.4 case, since the 2.2
+	  case is trivial.
+	  
+	*/
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
+	/* 2.2 */
+#define INCREF(mod) do {} while (0)
+#define DECREF(mod) do {} while (0)
+#else
+	/* 2.4 */
+#define INCREF(mod_) do { struct module *mod = (struct module*) mod_; \
+                          if(mod != NULL) __MOD_INC_USE_COUNT(mod); } while(0)
+#define DECREF(mod_) do { struct module *mod = (struct module*) mod_; \
+                          if(mod != NULL) __MOD_DEC_USE_COUNT(mod); } while(0)
+#endif
+	
+        /* shift away lower four bits of the minor
+	   to get the index of the ieee1394_driver
+	   we want */
+	
+	blocknum = (minor(inode->i_rdev) >> 4) & 0xF;
+
+	/* printk("ieee1394_dispatch_open(%d)", blocknum); */
+
+	/* lock the whole kernel here, to prevent a driver from
+	   being unloaded between the file_ops lookup and the open */
+
+	lock_kernel();
+
+	read_lock(&ieee1394_chardevs_lock);
+	file_ops = ieee1394_chardevs[blocknum].file_ops;
+	module = ieee1394_chardevs[blocknum].module;
+	read_unlock(&ieee1394_chardevs_lock);
+
+	if(file_ops == NULL) {
+		goto out_fail;
+	}
+
+	/* redirect all subsequent requests to the driver's
+	   own file_operations */
+	file->f_op = file_ops;
+
+	/* bump the reference count of the driver that
+	   will receive the open() */
+	INCREF(module);
+	
+	/* at this point BOTH ieee1394 and the task-specific driver have
+	   an extra reference */
+
+	/* follow through with the open() */
+	retval = file_ops->open(inode, file);
+
+	if(retval) {
+		
+		/* if the open() failed, then we need to drop the
+                   extra reference we gave to the task-specific
+                   driver */
+
+		DECREF(module);
+		goto out_fail;
+		
+	} else {
+
+		/* if the open() succeeded, then ieee1394 will be left
+		   with an extra module reference, so we discard it here.*/
+
+		DECREF(THIS_MODULE);
+
+		/* the task-specific driver still has the extra
+		   reference we gave it. This extra reference prevents
+		   the module from unloading while the file is open,
+		   and will be dropped by the VFS when the file is
+		   released. */
+		
+		unlock_kernel();
+		return 0;
+	}
+	       
+out_fail:
+	/* point the file's f_ops back to ieee1394. The VFS will then
+	   decrement ieee1394's reference count immediately after this
+	   function returns. */
+	
+	file->f_op = &ieee1394_chardev_ops;
+	unlock_kernel();
+	return retval;
+
+#undef INCREF
+#undef DECREF
+	     
+}
+
+struct proc_dir_entry *ieee1394_procfs_entry;
+
 static int __init ieee1394_init(void)
 {
 	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
 					      0, 0, NULL, NULL);
+
+	ieee1394_devfs_handle = devfs_mk_dir(NULL, "ieee1394", NULL);
+
+	if (register_chrdev(IEEE1394_MAJOR, "ieee1394", &ieee1394_chardev_ops)) {
+		HPSB_ERR("unable to register character device major %d!\n", IEEE1394_MAJOR);
+		devfs_unregister(ieee1394_devfs_handle);
+		return -ENODEV;
+	}
+
+#ifdef CONFIG_PROC_FS
+	/* Must be done before we start everything else, since the drivers
+	 * may use it.  */
+	ieee1394_procfs_entry = proc_mkdir( "ieee1394", proc_bus);
+	if (ieee1394_procfs_entry == NULL) {
+		HPSB_ERR("unable to create /proc/bus/ieee1394\n");
+		unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
+		devfs_unregister(ieee1394_devfs_handle);
+		return -ENOMEM;
+	}
+	ieee1394_procfs_entry->owner = THIS_MODULE;
+#endif
+
 	init_hpsb_highlevel();
 	init_csr();
 	if (!disable_nodemgr)
@@ -807,6 +1027,13 @@ static void __exit ieee1394_cleanup(void)
 
 	cleanup_csr();
 	kmem_cache_destroy(hpsb_packet_cache);
+
+	unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
+	
+	/* it's ok to pass a NULL devfs_handle to devfs_unregister */
+	devfs_unregister(ieee1394_devfs_handle);
+	
+	remove_proc_entry("ieee1394", proc_bus);
 }
 
 module_init(ieee1394_init);
@@ -815,9 +1042,11 @@ module_exit(ieee1394_cleanup);
 /* Exported symbols */
 EXPORT_SYMBOL(hpsb_register_lowlevel);
 EXPORT_SYMBOL(hpsb_unregister_lowlevel);
-EXPORT_SYMBOL(hpsb_get_host);
-EXPORT_SYMBOL(hpsb_inc_host_usage);
-EXPORT_SYMBOL(hpsb_dec_host_usage);
+EXPORT_SYMBOL(hpsb_alloc_host);
+EXPORT_SYMBOL(hpsb_add_host);
+EXPORT_SYMBOL(hpsb_remove_host);
+EXPORT_SYMBOL(hpsb_ref_host);
+EXPORT_SYMBOL(hpsb_unref_host);
 EXPORT_SYMBOL(hpsb_speedto_str);
 
 EXPORT_SYMBOL(alloc_hpsb_packet);
@@ -867,7 +1096,6 @@ EXPORT_SYMBOL(highlevel_lock64);
 EXPORT_SYMBOL(highlevel_add_host);
 EXPORT_SYMBOL(highlevel_remove_host);
 EXPORT_SYMBOL(highlevel_host_reset);
-EXPORT_SYMBOL(highlevel_add_one_host);
 
 EXPORT_SYMBOL(hpsb_guid_get_entry);
 EXPORT_SYMBOL(hpsb_nodeid_get_entry);
@@ -876,3 +1104,9 @@ EXPORT_SYMBOL(hpsb_guid_fill_packet);
 EXPORT_SYMBOL(hpsb_register_protocol);
 EXPORT_SYMBOL(hpsb_unregister_protocol);
 EXPORT_SYMBOL(hpsb_release_unit_directory);
+
+EXPORT_SYMBOL(ieee1394_register_chardev);
+EXPORT_SYMBOL(ieee1394_unregister_chardev);
+EXPORT_SYMBOL(ieee1394_devfs_handle);
+
+EXPORT_SYMBOL(ieee1394_procfs_entry);

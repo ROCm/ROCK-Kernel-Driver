@@ -91,7 +91,6 @@ struct hpsb_address_ops {
 void init_hpsb_highlevel(void);
 
 void highlevel_add_host(struct hpsb_host *host);
-void highlevel_add_one_host(struct hpsb_host *host);
 void highlevel_remove_host(struct hpsb_host *host);
 void highlevel_host_reset(struct hpsb_host *host);
 

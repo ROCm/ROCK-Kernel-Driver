@@ -1124,6 +1124,18 @@ isdn_status_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 #undef cfg
 }
 
+static struct file_operations isdn_status_fops =
+{
+	owner:		THIS_MODULE,
+	llseek:		no_llseek,
+	read:		isdn_status_read,
+	write:		isdn_status_write,
+	poll:		isdn_status_poll,
+	ioctl:		isdn_status_ioctl,
+	open:		isdn_status_open,
+	release:	isdn_status_release,
+};
+
 /*
  * /dev/isdnctrlX
  */
@@ -1650,155 +1662,62 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 #undef cfg
 }
 
+static struct file_operations isdn_ctrl_fops =
+{
+	owner:		THIS_MODULE,
+	llseek:		no_llseek,
+	read:		isdn_ctrl_read,
+	write:		isdn_ctrl_write,
+	poll:		isdn_ctrl_poll,
+	ioctl:		isdn_ctrl_ioctl,
+	open:		isdn_ctrl_open,
+	release:	isdn_ctrl_release,
+};
+
 /*
- *
+ * file_operations for major 43, /dev/isdn*
+ * stolen from drivers/char/misc.c
  */
 
-static ssize_t
-isdn_read(struct file *file, char *buf, size_t count, loff_t * off)
+static int
+isdn_open(struct inode * inode, struct file * file)
 {
-	uint minor = minor(file->f_dentry->d_inode->i_rdev);
-
-	if (minor < ISDN_MINOR_CTRL)
-		return -ENODEV;
+	int minor = minor(inode->i_rdev);
+	int err = -ENODEV;
+	struct file_operations *old_fops, *new_fops = NULL;
 	
-	if (minor <= ISDN_MINOR_CTRLMAX)
-		return isdn_ctrl_read(file, buf, count, off);
-
+	if (minor >= ISDN_MINOR_CTRL && minor <= ISDN_MINOR_CTRLMAX)
+		new_fops = fops_get(&isdn_ctrl_fops);
 #ifdef CONFIG_ISDN_PPP
-	if (minor <= ISDN_MINOR_PPPMAX)
-		return isdn_ppp_read(file, buf, count, off);
+	else if (minor >= ISDN_MINOR_PPP && minor <= ISDN_MINOR_PPPMAX)
+		new_fops = fops_get(&isdn_ppp_fops);
 #endif
+	else if (minor == ISDN_MINOR_STATUS)
+		new_fops = fops_get(&isdn_status_fops);
 
-	if (minor == ISDN_MINOR_STATUS)
-		return isdn_status_read(file, buf, count, off);
+	if (!new_fops)
+		goto out;
 
-	return -ENODEV;
-}
-
-static ssize_t
-isdn_write(struct file *file, const char *buf, size_t count, loff_t * off)
-{
-	uint minor = minor(file->f_dentry->d_inode->i_rdev);
-
-	if (minor < ISDN_MINOR_CTRL)
-		return -ENODEV;
-
-	if (minor <= ISDN_MINOR_CTRLMAX)
-		return isdn_ctrl_write(file, buf, count, off);
-
-#ifdef CONFIG_ISDN_PPP
-	if (minor <= ISDN_MINOR_PPPMAX)
-		return isdn_ppp_write(file, buf, count, off);
-#endif
-
-	if (minor == ISDN_MINOR_STATUS)
-		return isdn_status_write(file, buf, count, off);
-
-	return -ENODEV;
-}
-
-static unsigned int
-isdn_poll(struct file *file, poll_table * wait)
-{
-	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
-
-	if (minor < ISDN_MINOR_CTRL)
-		return POLLERR;
-
-	if (minor <= ISDN_MINOR_CTRLMAX)
-		return isdn_ctrl_poll(file, wait);
-
-#ifdef CONFIG_ISDN_PPP
-	if (minor <= ISDN_MINOR_PPPMAX)
-		return isdn_ppp_poll(file, wait);
-#endif
-
-	if (minor == ISDN_MINOR_STATUS)
-		return isdn_status_poll(file, wait);
-
-	return POLLERR;
-}
-
-static int
-isdn_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
-{
-	uint minor = minor(inode->i_rdev);
-
-	if (minor == ISDN_MINOR_STATUS)
-		return isdn_status_ioctl(inode, file, cmd, arg);
-
-	if (minor < ISDN_MINOR_CTRL)
-		return -ENODEV;
-
-	if (minor <= ISDN_MINOR_CTRLMAX)
-		return isdn_ctrl_ioctl(inode, file, cmd, arg);
-
-#ifdef CONFIG_ISDN_PPP
-	if (minor <= ISDN_MINOR_PPPMAX)
-		return isdn_ppp_ioctl(inode, file, cmd, arg);
-#endif
-
-	return -ENODEV;
-}
-
-/*
- * Open the device code.
- */
-static int
-isdn_open(struct inode *ino, struct file *filep)
-{
-	uint minor = minor(ino->i_rdev);
-
-	if (minor < ISDN_MINOR_CTRL)
-		return -ENODEV;
-
-	if (minor <= ISDN_MINOR_CTRLMAX)
-		return isdn_ctrl_open(ino, filep);
-
-	if (minor == ISDN_MINOR_STATUS)
-		return isdn_status_open(ino, filep);
-
-#ifdef CONFIG_ISDN_PPP
-	if (minor <= ISDN_MINOR_PPPMAX)
-		return isdn_ppp_open(ino, filep);
-#endif
-
-	return -ENODEV;
-}
-
-static int
-isdn_close(struct inode *ino, struct file *filep)
-{
-	uint minor = minor(ino->i_rdev);
-
-	if (minor == ISDN_MINOR_STATUS)
-		return isdn_status_release(ino, filep);
-
-	if (minor < ISDN_MINOR_CTRL)
-		return -ENODEV;
-
-	if (minor <= ISDN_MINOR_CTRLMAX)
-		return isdn_ctrl_release(ino, filep);
-
-#ifdef CONFIG_ISDN_PPP
-	if (minor <= ISDN_MINOR_PPPMAX)
-		return isdn_ppp_release(ino, filep);
-#endif
-
-	return -ENODEV;
+	err = 0;
+	old_fops = file->f_op;
+	file->f_op = new_fops;
+	if (file->f_op->open) {
+		err = file->f_op->open(inode,file);
+		if (err) {
+			fops_put(file->f_op);
+			file->f_op = fops_get(old_fops);
+		}
+	}
+	fops_put(old_fops);
+	
+ out:
+	return err;
 }
 
 static struct file_operations isdn_fops =
 {
 	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		isdn_read,
-	write:		isdn_write,
-	poll:		isdn_poll,
-	ioctl:		isdn_ioctl,
 	open:		isdn_open,
-	release:	isdn_close,
 };
 
 char *
@@ -2253,7 +2172,7 @@ static void isdn_register_devfs(int k)
 	sprintf (buf, "isdn%d", k);
 	dev->devfs_handle_isdnX[k] =
 	    devfs_register (devfs_handle, buf, DEVFS_FL_DEFAULT,
-			    ISDN_MAJOR, ISDN_MINOR_B + k,0600 | S_IFCHR,
+			    ISDN_MAJOR, k,0600 | S_IFCHR,
 			    &isdn_fops, NULL);
 	sprintf (buf, "isdnctrl%d", k);
 	dev->devfs_handle_isdnctrlX[k] =

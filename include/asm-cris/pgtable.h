@@ -3,6 +3,12 @@
  * HISTORY:
  *
  * $Log: pgtable.h,v $
+ * Revision 1.14  2001/12/10 03:08:50  bjornw
+ * Added pgtable_cache_init dummy
+ *
+ * Revision 1.13  2001/11/12 18:05:38  pkj
+ * Added declaration of paging_init().
+ *
  * Revision 1.12  2001/08/11 00:28:00  bjornw
  * PAGE_CHG_MASK and PAGE_NONE had somewhat untraditional values
  *
@@ -105,6 +111,8 @@
  * This file contains the functions and defines necessary to modify and use
  * the CRIS page table tree.
  */
+
+extern void paging_init(void);
 
 /* The cache doesn't need to be flushed when TLB entries change because 
  * the cache is mapped to physical memory, not virtual memory
@@ -507,6 +515,6 @@ static inline void update_mmu_cache(struct vm_area_struct * vma,
 /*
  * No page table caches to initialise
  */
-#define pgtable_cache_init()	do { } while (0)
+#define pgtable_cache_init()   do { } while (0)
 
 #endif /* _CRIS_PGTABLE_H */

@@ -158,8 +158,8 @@ typedef struct {
 	dma_addr_t setup_packet_dma;
 	dma_addr_t transfer_buffer_dma;
 	unsigned long started;
-	urb_t *next_queued_urb;         // next queued urb for this EP
-	urb_t *prev_queued_urb;
+	struct urb *next_queued_urb;	// next queued urb for this EP
+	struct urb *prev_queued_urb;
 	uhci_desc_t *bottom_qh;
 	uhci_desc_t *next_qh;       	// next helper QH
 	char use_loop;

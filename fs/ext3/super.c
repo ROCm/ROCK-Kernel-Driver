@@ -376,7 +376,10 @@ static int ext3_blkdev_remove(struct ext3_sb_info *sbi)
 	return ret;
 }
 
-#define orphan_list_entry(l) list_entry((l), struct inode, u.ext3_i.i_orphan)
+static inline struct inode *orphan_list_entry(struct list_head *l)
+{
+	return &list_entry(l, struct ext3_inode_info, i_orphan)->vfs_inode;
+}
 
 static void dump_orphan_list(struct super_block *sb, struct ext3_sb_info *sbi)
 {
@@ -444,7 +447,54 @@ void ext3_put_super (struct super_block * sb)
 	return;
 }
 
+static kmem_cache_t * ext3_inode_cachep;
+
+static struct inode *ext3_alloc_inode(struct super_block *sb)
+{
+	struct ext3_inode_info *ei;
+	ei = (struct ext3_inode_info *)kmem_cache_alloc(ext3_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void ext3_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(ext3_inode_cachep, EXT3_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct ext3_inode_info *ei = (struct ext3_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		INIT_LIST_HEAD(&ei->i_orphan);
+		init_rwsem(&ei->truncate_sem);
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+ 
+static int init_inodecache(void)
+{
+	ext3_inode_cachep = kmem_cache_create("ext3_inode_cache",
+					     sizeof(struct ext3_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (ext3_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(ext3_inode_cachep))
+		printk(KERN_INFO "ext3_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations ext3_sops = {
+	alloc_inode:	ext3_alloc_inode,
+	destroy_inode:	ext3_destroy_inode,
 	read_inode:	ext3_read_inode,	/* BKL held */
 	write_inode:	ext3_write_inode,	/* BKL not held.  Don't need */
 	dirty_inode:	ext3_dirty_inode,	/* BKL not held.  We take it */
@@ -1723,12 +1773,23 @@ static DECLARE_FSTYPE_DEV(ext3_fs_type, "ext3", ext3_read_super);
 
 static int __init init_ext3_fs(void)
 {
-        return register_filesystem(&ext3_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+        err = register_filesystem(&ext3_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_ext3_fs(void)
 {
 	unregister_filesystem(&ext3_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

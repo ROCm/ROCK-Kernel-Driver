@@ -22,6 +22,15 @@
 #ifndef SBP2_H
 #define SBP2_H
 
+/* Some compatibility code */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+#define SCSI_REGISTER_HOST(tmpl)	scsi_register_module(MODULE_SCSI_HA, tmpl)
+#define SCSI_UNREGISTER_HOST(tmpl)	scsi_unregister_module(MODULE_SCSI_HA, tmpl)
+#else
+#define SCSI_REGISTER_HOST(tmpl)	scsi_register_host(tmpl)
+#define SCSI_UNREGISTER_HOST(tmpl)	scsi_unregister_host(tmpl)
+#endif
+
 #define SBP2_DEVICE_NAME		"sbp2"
 #define SBP2_DEVICE_NAME_SIZE		4
 
@@ -36,6 +45,7 @@
 #define ORB_DIRECTION_READ_FROM_MEDIA   0x1
 #define ORB_DIRECTION_NO_DATA_TRANSFER  0x2
 
+#define ORB_SET_NULL_PTR(value)			((value & 0x1) << 31)
 #define ORB_SET_NOTIFY(value)                   ((value & 0x1) << 31)
 #define ORB_SET_RQ_FMT(value)                   ((value & 0x3) << 29)
 #define ORB_SET_NODE_ID(value)			((value & 0xffff) << 16)
@@ -199,6 +209,9 @@ struct sbp2_status_block {
 #define SBP2_DEVICE_TYPE_AND_LUN_KEY				0x14
 #define SBP2_FIRMWARE_REVISION_KEY				0x3c
 
+#define SBP2_DEVICE_TYPE(q)			(((q) >> 16) & 0x1f)
+#define SBP2_DEVICE_LUN(q)			((q) & 0xffff)
+
 #define SBP2_AGENT_STATE_OFFSET					0x00ULL
 #define SBP2_AGENT_RESET_OFFSET					0x04ULL
 #define SBP2_ORB_POINTER_OFFSET					0x08ULL
@@ -218,15 +231,6 @@ struct sbp2_status_block {
 #define SBP2_UNIT_SPEC_ID_ENTRY					0x0000609e
 #define SBP2_SW_VERSION_ENTRY					0x00010483
 
-/*
- * Miscellaneous general config rom related defines
- */
-
-#define CONFIG_ROM_INITIAL_MEMORY_SPACE 			0xfffff0000000ULL
-
-#define CONFIG_ROM_BASE_ADDRESS					0xfffff0000400ULL
-#define CONFIG_ROM_ROOT_DIR_BASE				0xfffff0000414ULL
-#define CONFIG_ROM_UNIT_DIRECTORY_OFFSET			0xfffff0000424ULL
 
 #define SBP2_128KB_BROKEN_FIRMWARE				0xa0b800
 #define SBP2_BROKEN_FIRMWARE_MAX_TRANSFER			0x20000
@@ -252,7 +256,8 @@ struct sbp2_status_block {
 #endif
 
 /*
- * SCSI direction table... since the scsi stack doesn't specify direction...   =(
+ * SCSI direction table... 
+ * (now used as a back-up in case the direction passed down from above is "unknown")
  *
  * DIN = IN data direction
  * DOU = OUT data direction
@@ -306,21 +311,27 @@ struct sbp2_request_packet {
 
 };
 
+
+/* This is the two dma types we use for cmd_dma below */
+#define CMD_DMA_NONE   0x0
+#define CMD_DMA_PAGE   0x1
+#define CMD_DMA_SINGLE 0x2
+
 /* 
  * Encapsulates all the info necessary for an outstanding command. 
  */
 struct sbp2_command_info {
 
 	struct list_head list;
-	struct sbp2_command_orb command_orb;
-	dma_addr_t command_orb_dma;
+	struct sbp2_command_orb command_orb ____cacheline_aligned;
+	dma_addr_t command_orb_dma ____cacheline_aligned;
 	Scsi_Cmnd *Current_SCpnt;
 	void (*Current_done)(Scsi_Cmnd *);
 	unsigned int linked;
 
 	/* Also need s/g structure for each sbp2 command */
-	struct sbp2_unrestricted_page_table scatter_gather_element[SBP2_MAX_SG_ELEMENTS];
-	dma_addr_t sge_dma;
+	struct sbp2_unrestricted_page_table scatter_gather_element[SBP2_MAX_SG_ELEMENTS] ____cacheline_aligned;
+	dma_addr_t sge_dma ____cacheline_aligned;
 	void *sge_buffer;
 	dma_addr_t cmd_dma;
 	int dma_type;
@@ -340,6 +351,7 @@ struct scsi_id_instance_data {
 	 * Various sbp2 specific structures
 	 */
 	struct sbp2_command_orb *last_orb;
+	dma_addr_t last_orb_dma;
 	struct sbp2_login_orb *login_orb;
 	dma_addr_t login_orb_dma;
 	struct sbp2_login_response *login_response;
@@ -401,6 +413,13 @@ struct sbp2scsi_host_info {
 	 */
 	spinlock_t sbp2_command_lock;
 	spinlock_t sbp2_request_packet_lock;
+
+	/*
+	 * This is the scsi host we register with the scsi mid level.
+	 * We keep a reference to it here, so we can unregister it
+	 * when the hpsb_host is removed.
+	 */
+	struct Scsi_Host *scsi_host;
 
 	/*
 	 * Lists keeping track of inuse/free sbp2_request_packets. These structures are
@@ -480,7 +499,8 @@ static int sbp2_create_command_orb(struct sbp2scsi_host_info *hi,
 				   unchar *scsi_cmd,
 				   unsigned int scsi_use_sg,
 				   unsigned int scsi_request_bufflen,
-				   void *scsi_request_buffer, int dma_dir);
+				   void *scsi_request_buffer, 
+				   unsigned char scsi_dir);
 static int sbp2_link_orb_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id,
 				 struct sbp2_command_info *command);
 static int sbp2_send_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id,
@@ -498,17 +518,16 @@ static int sbp2_max_speed_and_size(struct sbp2scsi_host_info *hi, struct scsi_id
 /*
  * Scsi interface related prototypes
  */
-static const char *sbp2scsi_info (struct Scsi_Host *host);
 static int sbp2scsi_detect (Scsi_Host_Template *tpnt);
+static const char *sbp2scsi_info (struct Scsi_Host *host);
 void sbp2scsi_setup(char *str, int *ints);
 static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]);
 static int sbp2scsi_abort (Scsi_Cmnd *SCpnt); 
-static int sbp2scsi_reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags); 
+static int sbp2scsi_reset (Scsi_Cmnd *SCpnt); 
 static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
 static void sbp2scsi_complete_all_commands(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, 
 					   u32 status);
 static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, 
 				      u32 scsi_status, Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
-static void sbp2scsi_register_scsi_host(struct sbp2scsi_host_info *hi);
 
 #endif /* SBP2_H */

@@ -104,6 +104,10 @@ Tips:
 	If you are sure the driver is not a hotplug driver then use only 
 	__init/exit __initdata/exitdata.
 
+        Pointers to functions marked as __devexit must be created using
+        __devexit_p(function_name).  That will generate the function
+        name or NULL if the __devexit function will be discarded.
+
 
 2. How to find PCI devices manually (the old style)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -204,7 +204,7 @@ filp->f_dentry->d_name.name, entry.name);
 		if (!inode)
 			goto remove_name;
 #ifdef UMSDOS_DEBUG_VERBOSE
-if (inode->u.umsdos_i.i_is_hlink)
+if (UMSDOS_I(inode)->i_is_hlink)
 printk("umsdos_readdir_x: %s/%s already resolved, ino=%ld\n",
 dret->d_parent->d_name.name, dret->d_name.name, inode->i_ino);
 #endif
@@ -214,7 +214,7 @@ dret->d_parent->d_name.name, info.fake.fname, dret->d_inode->i_ino,
 entry.flags));
 		/* check whether to resolve a hard-link */
 		if ((entry.flags & UMSDOS_HLINK) &&
-		    !inode->u.umsdos_i.i_is_hlink) {
+		    !UMSDOS_I(inode)->i_is_hlink) {
 			dret = umsdos_solve_hlink (dret);
 			ret = PTR_ERR(dret);
 			if (IS_ERR(dret))
@@ -361,9 +361,9 @@ void umsdos_lookup_patch_new(struct dentry *dentry, struct umsdos_info *info)
 	/*
 	 * This part of the initialization depends only on i_patched.
 	 */
-	if (inode->u.umsdos_i.i_patched)
+	if (UMSDOS_I(inode)->i_patched)
 		goto out;
-	inode->u.umsdos_i.i_patched = 1;
+	UMSDOS_I(inode)->i_patched = 1;
 	if (S_ISREG (entry->mode))
 		entry->mtime = inode->i_mtime;
 	inode->i_mode = entry->mode;
@@ -498,7 +498,7 @@ dret->d_parent->d_name.name, dret->d_name.name, dret->d_inode->i_ino);
 
 	/* Check for a hard link */
 	if ((info.entry.flags & UMSDOS_HLINK) &&
-	    !inode->u.umsdos_i.i_is_hlink) {
+	    !UMSDOS_I(inode)->i_is_hlink) {
 		dret = umsdos_solve_hlink (dret);
 		ret = PTR_ERR(dret);
 		if (IS_ERR(dret))
@@ -756,7 +756,7 @@ dir->d_parent->d_name.name, dir->d_name.name, start, real);
 	if (!IS_ERR(dentry_dst)) {
 		struct inode *inode = dentry_dst->d_inode;
 		if (inode) {
-			inode->u.umsdos_i.i_is_hlink = 1;
+			UMSDOS_I(inode)->i_is_hlink = 1;
 #ifdef UMSDOS_DEBUG_VERBOSE
 printk ("umsdos_solve_hlink: resolved link %s/%s, ino=%ld\n",
 dentry_dst->d_parent->d_name.name, dentry_dst->d_name.name, inode->i_ino);

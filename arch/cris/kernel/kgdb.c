@@ -18,6 +18,9 @@
 *! Jul 21 1999  Bjorn Wesen     eLinux port
 *!
 *! $Log: kgdb.c,v $
+*! Revision 1.1.1.1  2001/12/17 13:59:27  bjornw
+*! Import of Linux 2.5.1
+*!
 *! Revision 1.6  2001/10/09 13:10:03  matsfg
 *! Added $ on registers and removed some underscores
 *!
@@ -55,7 +58,7 @@
 *!
 *!---------------------------------------------------------------------------
 *!
-*! $Id: kgdb.c,v 1.6 2001/10/09 13:10:03 matsfg Exp $
+*! $Id: kgdb.c,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
 *!
 *! (C) Copyright 1999, Axis Communications AB, LUND, SWEDEN
 *!

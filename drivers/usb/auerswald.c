@@ -176,7 +176,7 @@ struct  auerchain;                      /* forward for circular reference */
 typedef struct
 {
         struct auerchain *chain;        /* pointer to the chain to which this element belongs */
-        urb_t * urbp;                   /* pointer to attached urb */
+        struct urb * urbp;                   /* pointer to attached urb */
         void *context;                  /* saved URB context */
         usb_complete_t complete;        /* saved URB completion function */
         struct list_head list;          /* to include element into a list */
@@ -200,7 +200,7 @@ typedef struct
         unsigned int len;               /* number of characters in data buffer */
 	unsigned int retries;		/* for urb retries */
         struct usb_ctrlrequest *dr;	/* for setup data in control messages */
-        urb_t * urbp;                   /* USB urb */
+        struct urb * urbp;                   /* USB urb */
         struct auerbufctl *list;        /* pointer to list */
         struct list_head buff_list;     /* reference to next buffer in list */
 } auerbuf_t,*pauerbuf_t;
@@ -237,7 +237,7 @@ typedef struct
 	int			open_count;	    /* count the number of open character channels */
         char 			dev_desc[AUSI_DLEN];/* for storing a textual description */
         unsigned int 		maxControlLength;   /* max. Length of control paket (without header) */
-        urb_t * 		inturbp;            /* interrupt urb */
+        struct urb * 		inturbp;            /* interrupt urb */
         char *			intbufp;            /* data buffer for interrupt urb */
 	unsigned int 		irqsize;	    /* size of interrupt endpoint 1 */
         struct auerchain 	controlchain;  	    /* for chaining of control messages */
@@ -274,7 +274,7 @@ typedef struct
 
 /*-------------------------------------------------------------------*/
 /* Forwards */
-static void auerswald_ctrlread_complete (urb_t * urb);
+static void auerswald_ctrlread_complete (struct urb * urb);
 static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp);
 
 
@@ -283,7 +283,7 @@ static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp);
 /* --------------------------                                        */
 
 /* completion function for chained urbs */
-static void auerchain_complete (urb_t * urb)
+static void auerchain_complete (struct urb * urb)
 {
 	unsigned long flags;
         int result;
@@ -350,7 +350,7 @@ static void auerchain_complete (urb_t * urb)
    this function may be called from completion context or from user space!
    early = 1 -> submit in front of chain
 */
-static int auerchain_submit_urb_list (pauerchain_t acp, urb_t * urb, int early)
+static int auerchain_submit_urb_list (pauerchain_t acp, struct urb * urb, int early)
 {
         int result;
         unsigned long flags;
@@ -424,7 +424,7 @@ static int auerchain_submit_urb_list (pauerchain_t acp, urb_t * urb, int early)
 /* submit function for chained urbs
    this function may be called from completion context or from user space!
 */
-static int auerchain_submit_urb (pauerchain_t acp, urb_t * urb)
+static int auerchain_submit_urb (pauerchain_t acp, struct urb * urb)
 {
 	return auerchain_submit_urb_list (acp, urb, 0);
 }
@@ -433,10 +433,10 @@ static int auerchain_submit_urb (pauerchain_t acp, urb_t * urb)
    the result is 0 if the urb is cancelled, or -EINPROGRESS if
    USB_ASYNC_UNLINK is set and the function is successfully started.
 */
-static int auerchain_unlink_urb (pauerchain_t acp, urb_t * urb)
+static int auerchain_unlink_urb (pauerchain_t acp, struct urb * urb)
 {
 	unsigned long flags;
-        urb_t * urbp;
+        struct urb * urbp;
         pauerchainelement_t acep;
         struct list_head *tmp;
 
@@ -492,7 +492,7 @@ static int auerchain_unlink_urb (pauerchain_t acp, urb_t * urb)
 static void auerchain_unlink_all (pauerchain_t acp)
 {
 	unsigned long flags;
-        urb_t * urbp;
+        struct urb * urbp;
         pauerchainelement_t acep;
 
         dbg ("auerchain_unlink_all called");
@@ -598,7 +598,7 @@ ac_fail:/* free the elements */
 
 
 /* completion handler for synchronous chained URBs */
-static void auerchain_blocking_completion (urb_t *urb)
+static void auerchain_blocking_completion (struct urb *urb)
 {
 	wait_queue_head_t *wakeup = (wait_queue_head_t *)urb->context;
 	wake_up (wakeup);
@@ -606,7 +606,7 @@ static void auerchain_blocking_completion (urb_t *urb)
 
 
 /* Starts chained urb and waits for completion or timeout */
-static int auerchain_start_wait_urb (pauerchain_t acp, urb_t *urb, int timeout, int* actual_length)
+static int auerchain_start_wait_urb (pauerchain_t acp, struct urb *urb, int timeout, int* actual_length)
 {
 	DECLARE_WAITQUEUE (wait, current);
 	DECLARE_WAIT_QUEUE_HEAD (wqh);
@@ -675,7 +675,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 {
 	int ret;
 	struct usb_ctrlrequest *dr;
-	urb_t *urb;
+	struct urb *urb;
         int length;
 
         dbg ("auerchain_control_msg");
@@ -858,7 +858,7 @@ static int auerswald_status_retry (int status)
 }
 
 /* Completion of asynchronous write block */
-static void auerchar_ctrlwrite_complete (urb_t * urb)
+static void auerchar_ctrlwrite_complete (struct urb * urb)
 {
 	pauerbuf_t bp = (pauerbuf_t) urb->context;
 	pauerswald_t cp = ((pauerswald_t)((char *)(bp->list)-(unsigned long)(&((pauerswald_t)0)->bufctl)));
@@ -871,7 +871,7 @@ static void auerchar_ctrlwrite_complete (urb_t * urb)
 }
 
 /* Completion handler for dummy retry packet */
-static void auerswald_ctrlread_wretcomplete (urb_t * urb)
+static void auerswald_ctrlread_wretcomplete (struct urb * urb)
 {
         pauerbuf_t bp = (pauerbuf_t) urb->context;
         pauerswald_t cp;
@@ -910,7 +910,7 @@ static void auerswald_ctrlread_wretcomplete (urb_t * urb)
 }
 
 /* completion handler for receiving of control messages */
-static void auerswald_ctrlread_complete (urb_t * urb)
+static void auerswald_ctrlread_complete (struct urb * urb)
 {
         unsigned int  serviceid;
         pauerswald_t  cp;
@@ -980,7 +980,7 @@ static void auerswald_ctrlread_complete (urb_t * urb)
    messages from the USB device.
 */
 /* int completion handler. */
-static void auerswald_int_complete (urb_t * urb)
+static void auerswald_int_complete (struct urb * urb)
 {
         unsigned long flags;
         unsigned  int channelid;

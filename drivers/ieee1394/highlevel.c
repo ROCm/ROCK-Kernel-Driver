@@ -44,9 +44,10 @@ struct hpsb_highlevel *hpsb_register_highlevel(const char *name,
         hl->op = ops;
 
         write_lock_irq(&hl_drivers_lock);
-        hl_all_hosts(hl, 1);
         list_add_tail(&hl->hl_list, &hl_drivers);
         write_unlock_irq(&hl_drivers_lock);
+
+        hl_all_hosts(hl->op->add_host);
 
         return hl;
 }
@@ -73,8 +74,10 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl)
 
         write_lock_irq(&hl_drivers_lock);
         list_del(&hl->hl_list);
-        hl_all_hosts(hl, 0);
         write_unlock_irq(&hl_drivers_lock);
+
+        if (hl->op->remove_host)
+		hl_all_hosts(hl->op->remove_host);
 
         kfree(hl);
 }
@@ -87,7 +90,7 @@ int hpsb_register_addrspace(struct hpsb_highlevel *hl,
         int retval = 0;
 
         if (((start|end) & 3) || (start >= end) || (end > 0x1000000000000ULL)) {
-                HPSB_ERR(__FUNCTION__ " called with invalid addresses");
+                HPSB_ERR("%s called with invalid addresses", __FUNCTION__);
                 return 0;
         }
 
@@ -131,12 +134,12 @@ void hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                          unsigned int channel)
 {
         if (channel > 63) {
-                HPSB_ERR(__FUNCTION__ " called with invalid channel");
+                HPSB_ERR("%s called with invalid channel", __FUNCTION__);
                 return;
         }
 
         if (host->iso_listen_count[channel]++ == 0) {
-                host->template->devctl(host, ISO_LISTEN_CHANNEL, channel);
+                host->ops->devctl(host, ISO_LISTEN_CHANNEL, channel);
         }
 }
 
@@ -144,46 +147,58 @@ void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                            unsigned int channel)
 {
         if (channel > 63) {
-                HPSB_ERR(__FUNCTION__ " called with invalid channel");
+                HPSB_ERR("%s called with invalid channel", __FUNCTION__);
                 return;
         }
 
         if (--host->iso_listen_count[channel] == 0) {
-                host->template->devctl(host, ISO_UNLISTEN_CHANNEL, channel);
+                host->ops->devctl(host, ISO_UNLISTEN_CHANNEL, channel);
         }
 }
 
 
-#define DEFINE_MULTIPLEXER(Function)			\
-void highlevel_##Function(struct hpsb_host *host)	\
-{							\
-	struct list_head *lh;				\
-	void (*funcptr)(struct hpsb_host*);		\
-	read_lock(&hl_drivers_lock);			\
-	list_for_each(lh, &hl_drivers) {		\
-		funcptr = list_entry(lh, struct hpsb_highlevel, hl_list) \
-				->op->Function;		\
-		if (funcptr) funcptr(host);		\
-	}						\
-	read_unlock(&hl_drivers_lock);			\
+void highlevel_add_host(struct hpsb_host *host)
+{
+        struct list_head *entry;
+        struct hpsb_highlevel *hl;
+
+        read_lock(&hl_drivers_lock);
+        list_for_each(entry, &hl_drivers) {
+                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
+
+		hl->op->add_host(host);
+        }
+        read_unlock(&hl_drivers_lock);
 }
 
-DEFINE_MULTIPLEXER(add_host)
-DEFINE_MULTIPLEXER(remove_host)
-DEFINE_MULTIPLEXER(host_reset)
-#undef DEFINE_MULTIPLEXER
-
-/* Add one host to our list */
-void highlevel_add_one_host (struct hpsb_host *host)
+void highlevel_remove_host(struct hpsb_host *host)
 {
-	if (host->template->initialize_host)
-		if (!host->template->initialize_host(host))
-			goto fail;
-	host->initialized = 1;
-	highlevel_add_host (host);
-	hpsb_reset_bus (host, LONG_RESET);
-fail:
-	host->template->number_of_hosts++;
+        struct list_head *entry;
+        struct hpsb_highlevel *hl;
+
+        write_lock_irq(&hl_drivers_lock);
+	list_for_each(entry, &hl_drivers) {
+                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
+
+		if (hl->op->remove_host)
+			hl->op->remove_host(host);
+        }
+        write_unlock_irq(&hl_drivers_lock);
+}
+
+void highlevel_host_reset(struct hpsb_host *host)
+{
+        struct list_head *entry;
+        struct hpsb_highlevel *hl;
+
+	read_lock(&hl_drivers_lock);
+	list_for_each(entry, &hl_drivers) {
+                hl = list_entry(entry, struct hpsb_highlevel, hl_list);
+
+                if (hl->op->host_reset)
+                        hl->op->host_reset(host);
+        }
+	read_unlock(&hl_drivers_lock);
 }
 
 void highlevel_iso_receive(struct hpsb_host *host, quadlet_t *data,
@@ -242,12 +257,11 @@ int highlevel_read(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 
         while (as->start <= addr) {
                 if (as->end > addr) {
-                        partlength = MIN((unsigned int)(as->end - addr),
-                                         length);
+                        partlength = min(as->end - addr, (u64) length);
 
                         if (as->op->read != NULL) {
-                                rcode = as->op->read(host, nodeid, buffer, addr,
-                                                     partlength);
+                                rcode = as->op->read(host, nodeid, buffer,
+						     addr, partlength);
                         } else {
                                 rcode = RCODE_TYPE_ERROR;
                         }
@@ -288,12 +302,11 @@ int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
 
         while (as->start <= addr) {
                 if (as->end > addr) {
-                        partlength = MIN((unsigned int)(as->end - addr),
-                                         length);
+                        partlength = min(as->end - addr, (u64) length);
 
                         if (as->op->write != NULL) {
-                                rcode = as->op->write(host, nodeid, destid, data,
-						      addr, partlength);
+                                rcode = as->op->write(host, nodeid, destid,
+						      data, addr, partlength);
                         } else {
                                 rcode = RCODE_TYPE_ERROR;
                         }

@@ -297,7 +297,7 @@ static void usb_d_out(struct st5481_adapter *adapter, int buf_nr)
 	unsigned int num_packets, packet_offset;
 	int len, buf_size, bytes_sent;
 	struct sk_buff *skb;
-	iso_packet_descriptor_t *desc;
+	struct usb_iso_packet_descriptor *desc;
 
 	if (d_out->fsm.state != ST_DOUT_NORMAL)
 		return;

@@ -315,14 +315,15 @@ region_locked(struct inode *inode, struct nfs_page *req)
 static inline void
 nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	if (!list_empty(&req->wb_hash))
 		return;
 	if (!NFS_WBACK_BUSY(req))
 		printk(KERN_ERR "NFS: unlocked request attempted hashed!\n");
-	if (list_empty(&inode->u.nfs_i.writeback))
+	if (list_empty(&nfsi->writeback))
 		igrab(inode);
-	inode->u.nfs_i.npages++;
-	list_add(&req->wb_hash, &inode->u.nfs_i.writeback);
+	nfsi->npages++;
+	list_add(&req->wb_hash, &nfsi->writeback);
 	req->wb_count++;
 }
 
@@ -332,6 +333,7 @@ nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 static inline void
 nfs_inode_remove_request(struct nfs_page *req)
 {
+	struct nfs_inode *nfsi;
 	struct inode *inode;
 	spin_lock(&nfs_wreq_lock);
 	if (list_empty(&req->wb_hash)) {
@@ -343,10 +345,11 @@ nfs_inode_remove_request(struct nfs_page *req)
 	inode = req->wb_inode;
 	list_del(&req->wb_hash);
 	INIT_LIST_HEAD(&req->wb_hash);
-	inode->u.nfs_i.npages--;
-	if ((inode->u.nfs_i.npages == 0) != list_empty(&inode->u.nfs_i.writeback))
+	nfsi = NFS_I(inode);
+	nfsi->npages--;
+	if ((nfsi->npages == 0) != list_empty(&nfsi->writeback))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.npages.\n");
-	if (list_empty(&inode->u.nfs_i.writeback)) {
+	if (list_empty(&nfsi->writeback)) {
 		spin_unlock(&nfs_wreq_lock);
 		iput(inode);
 	} else
@@ -360,9 +363,10 @@ nfs_inode_remove_request(struct nfs_page *req)
 static inline struct nfs_page *
 _nfs_find_request(struct inode *inode, struct page *page)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	struct list_head	*head, *next;
 
-	head = &inode->u.nfs_i.writeback;
+	head = &nfsi->writeback;
 	next = head->next;
 	while (next != head) {
 		struct nfs_page *req = nfs_inode_wb_entry(next);
@@ -393,10 +397,11 @@ static inline void
 nfs_mark_request_dirty(struct nfs_page *req)
 {
 	struct inode *inode = req->wb_inode;
+	struct nfs_inode *nfsi = NFS_I(inode);
 
 	spin_lock(&nfs_wreq_lock);
-	nfs_list_add_request(req, &inode->u.nfs_i.dirty);
-	inode->u.nfs_i.ndirty++;
+	nfs_list_add_request(req, &nfsi->dirty);
+	nfsi->ndirty++;
 	__nfs_del_lru(req);
 	__nfs_add_lru(&NFS_SERVER(inode)->lru_dirty, req);
 	spin_unlock(&nfs_wreq_lock);
@@ -409,8 +414,8 @@ nfs_mark_request_dirty(struct nfs_page *req)
 static inline int
 nfs_dirty_request(struct nfs_page *req)
 {
-	struct inode *inode = req->wb_inode;
-	return !list_empty(&req->wb_list) && req->wb_list_head == &inode->u.nfs_i.dirty;
+	struct nfs_inode *nfsi = NFS_I(req->wb_inode);
+	return !list_empty(&req->wb_list) && req->wb_list_head == &nfsi->dirty;
 }
 
 #ifdef CONFIG_NFS_V3
@@ -421,10 +426,11 @@ static inline void
 nfs_mark_request_commit(struct nfs_page *req)
 {
 	struct inode *inode = req->wb_inode;
+	struct nfs_inode *nfsi = NFS_I(inode);
 
 	spin_lock(&nfs_wreq_lock);
-	nfs_list_add_request(req, &inode->u.nfs_i.commit);
-	inode->u.nfs_i.ncommit++;
+	nfs_list_add_request(req, &nfsi->commit);
+	nfsi->ncommit++;
 	__nfs_del_lru(req);
 	__nfs_add_lru(&NFS_SERVER(inode)->lru_commit, req);
 	spin_unlock(&nfs_wreq_lock);
@@ -440,6 +446,7 @@ nfs_mark_request_commit(struct nfs_page *req)
 static int
 nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_start, unsigned int npages)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	struct list_head	*p, *head;
 	unsigned long		idx_end;
 	unsigned int		res = 0;
@@ -451,7 +458,7 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 		idx_end = idx_start + npages - 1;
 
 	spin_lock(&nfs_wreq_lock);
-	head = &inode->u.nfs_i.writeback;
+	head = &nfsi->writeback;
 	p = head->next;
 	while (p != head) {
 		unsigned long pg_idx;
@@ -494,13 +501,13 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 int
 nfs_scan_lru_dirty_timeout(struct nfs_server *server, struct list_head *dst)
 {
-	struct inode *inode;
+	struct nfs_inode *nfsi;
 	int npages;
 
 	npages = nfs_scan_lru_timeout(&server->lru_dirty, dst, server->wpages);
 	if (npages) {
-		inode = nfs_list_entry(dst->next)->wb_inode;
-		inode->u.nfs_i.ndirty -= npages;
+		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
+		nfsi->ndirty -= npages;
 	}
 	return npages;
 }
@@ -517,13 +524,13 @@ nfs_scan_lru_dirty_timeout(struct nfs_server *server, struct list_head *dst)
 int
 nfs_scan_lru_dirty(struct nfs_server *server, struct list_head *dst)
 {
-	struct inode *inode;
+	struct nfs_inode *nfsi;
 	int npages;
 
 	npages = nfs_scan_lru(&server->lru_dirty, dst, server->wpages);
 	if (npages) {
-		inode = nfs_list_entry(dst->next)->wb_inode;
-		inode->u.nfs_i.ndirty -= npages;
+		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
+		nfsi->ndirty -= npages;
 	}
 	return npages;
 }
@@ -542,10 +549,11 @@ nfs_scan_lru_dirty(struct nfs_server *server, struct list_head *dst)
 static int
 nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, unsigned long idx_start, unsigned int npages)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	int	res;
-	res = nfs_scan_list(&inode->u.nfs_i.dirty, dst, file, idx_start, npages);
-	inode->u.nfs_i.ndirty -= res;
-	if ((inode->u.nfs_i.ndirty == 0) != list_empty(&inode->u.nfs_i.dirty))
+	res = nfs_scan_list(&nfsi->dirty, dst, file, idx_start, npages);
+	nfsi->ndirty -= res;
+	if ((nfsi->ndirty == 0) != list_empty(&nfsi->dirty))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.ndirty.\n");
 	return res;
 }
@@ -565,14 +573,14 @@ nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, un
 int
 nfs_scan_lru_commit_timeout(struct nfs_server *server, struct list_head *dst)
 {
-	struct inode *inode;
+	struct nfs_inode *nfsi;
 	int npages;
 
 	npages = nfs_scan_lru_timeout(&server->lru_commit, dst, 1);
 	if (npages) {
-		inode = nfs_list_entry(dst->next)->wb_inode;
-		npages += nfs_scan_list(&inode->u.nfs_i.commit, dst, NULL, 0, 0);
-		inode->u.nfs_i.ncommit -= npages;
+		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
+		npages += nfs_scan_list(&nfsi->commit, dst, NULL, 0, 0);
+		nfsi->ncommit -= npages;
 	}
 	return npages;
 }
@@ -592,14 +600,14 @@ nfs_scan_lru_commit_timeout(struct nfs_server *server, struct list_head *dst)
 int
 nfs_scan_lru_commit(struct nfs_server *server, struct list_head *dst)
 {
-	struct inode *inode;
+	struct nfs_inode *nfsi;
 	int npages;
 
 	npages = nfs_scan_lru(&server->lru_commit, dst, 1);
 	if (npages) {
-		inode = nfs_list_entry(dst->next)->wb_inode;
-		npages += nfs_scan_list(&inode->u.nfs_i.commit, dst, NULL, 0, 0);
-		inode->u.nfs_i.ncommit -= npages;
+		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
+		npages += nfs_scan_list(&nfsi->commit, dst, NULL, 0, 0);
+		nfsi->ncommit -= npages;
 	}
 	return npages;
 }
@@ -618,10 +626,11 @@ nfs_scan_lru_commit(struct nfs_server *server, struct list_head *dst)
 static int
 nfs_scan_commit(struct inode *inode, struct list_head *dst, struct file *file, unsigned long idx_start, unsigned int npages)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	int	res;
-	res = nfs_scan_list(&inode->u.nfs_i.commit, dst, file, idx_start, npages);
-	inode->u.nfs_i.ncommit -= res;
-	if ((inode->u.nfs_i.ncommit == 0) != list_empty(&inode->u.nfs_i.commit))
+	res = nfs_scan_list(&nfsi->commit, dst, file, idx_start, npages);
+	nfsi->ncommit -= res;
+	if ((nfsi->ncommit == 0) != list_empty(&nfsi->commit))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.ncommit.\n");
 	return res;
 }
@@ -738,7 +747,7 @@ nfs_strategy(struct inode *inode)
 {
 	unsigned int	dirty, wpages;
 
-	dirty  = inode->u.nfs_i.ndirty;
+	dirty  = NFS_I(inode)->ndirty;
 	wpages = NFS_SERVER(inode)->wpages;
 #ifdef CONFIG_NFS_V3
 	if (NFS_PROTO(inode)->version == 2) {
@@ -889,6 +898,7 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 static int
 nfs_flush_one(struct list_head *head, struct inode *inode, int how)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	struct rpc_clnt 	*clnt = NFS_CLIENT(inode);
 	struct nfs_write_data	*data;
 	struct rpc_task		*task;
@@ -913,7 +923,7 @@ nfs_flush_one(struct list_head *head, struct inode *inode, int how)
 	if (nfsvers < 3)
 		data->args.stable = NFS_FILE_SYNC;
 	else if (stable) {
-		if (!inode->u.nfs_i.ncommit)
+		if (!nfsi->ncommit)
 			data->args.stable = NFS_FILE_SYNC;
 		else
 			data->args.stable = NFS_DATA_SYNC;

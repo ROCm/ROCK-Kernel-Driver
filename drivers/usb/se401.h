@@ -197,8 +197,8 @@ struct usb_se401 {
 
 	char *fbuf;		/* Videodev buffer area */
 
-	urb_t *urb[SE401_NUMSBUF];
-	urb_t *inturb;
+	struct urb *urb[SE401_NUMSBUF];
+	struct urb *inturb;
 	
 	int button;
 	int buttonpressed;

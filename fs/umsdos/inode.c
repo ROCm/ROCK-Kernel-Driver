@@ -34,7 +34,7 @@ void UMSDOS_put_inode (struct inode *inode)
 	PRINTK ((KERN_DEBUG 
 		"put inode %p (%lu) pos %lu count=%d\n"
 		 ,inode, inode->i_ino
-		 ,inode->u.umsdos_i.pos
+		 ,UMSDOS_I(inode)->pos
 		 ,atomic_read(&inode->i_count)));
 
 	if (inode == pseudo_root) {
@@ -42,7 +42,7 @@ void UMSDOS_put_inode (struct inode *inode)
 	}
 
 	if (atomic_read(&inode->i_count) == 1)
-		inode->u.umsdos_i.i_patched = 0;
+		UMSDOS_I(inode)->i_patched = 0;
 }
 
 
@@ -67,15 +67,16 @@ void UMSDOS_put_super (struct super_block *sb)
 void umsdos_setup_dir(struct dentry *dir)
 {
 	struct inode *inode = dir->d_inode;
+	struct umsdos_inode_info *ui = UMSDOS_I(inode);
 
 	if (!S_ISDIR(inode->i_mode))
 		printk(KERN_ERR "umsdos_setup_dir: %s/%s not a dir!\n",
 			dir->d_parent->d_name.name, dir->d_name.name);
 
-	init_waitqueue_head (&inode->u.umsdos_i.dir_info.p);
-	inode->u.umsdos_i.dir_info.looking = 0;
-	inode->u.umsdos_i.dir_info.creating = 0;
-	inode->u.umsdos_i.dir_info.pid = 0;
+	init_waitqueue_head (&ui->dir_info.p);
+	ui->dir_info.looking = 0;
+	ui->dir_info.creating = 0;
+	ui->dir_info.pid = 0;
 
 	inode->i_op = &umsdos_rdir_inode_operations;
 	inode->i_fop = &umsdos_rdir_operations;
@@ -96,7 +97,7 @@ void umsdos_set_dirinfo_new (struct dentry *dentry, off_t f_pos)
 	struct inode *inode = dentry->d_inode;
 	struct dentry *demd;
 
-	inode->u.umsdos_i.pos = f_pos;
+	UMSDOS_I(inode)->pos = f_pos;
 
 	/* now check the EMD file */
 	demd = umsdos_get_emd_dentry(dentry->d_parent);
@@ -233,7 +234,7 @@ int umsdos_notify_change_locked(struct dentry *dentry, struct iattr *attr)
 	int offs;
 
 Printk(("UMSDOS_notify_change: entering for %s/%s (%d)\n",
-dentry->d_parent->d_name.name, dentry->d_name.name, inode->u.umsdos_i.i_patched));
+dentry->d_parent->d_name.name, dentry->d_name.name, UMSDOS_I(inode)->i_patched));
 
 	if (inode->i_nlink == 0)
 		goto out;
@@ -265,9 +266,9 @@ dentry->d_parent->d_name.name, dentry->d_name.name, inode->u.umsdos_i.i_patched)
 
 	/* Read only the start of the entry since we don't touch the name */
 	mapping = demd->d_inode->i_mapping;
-	offs = inode->u.umsdos_i.pos & ~PAGE_CACHE_MASK;
+	offs = UMSDOS_I(inode)->pos & ~PAGE_CACHE_MASK;
 	ret = -ENOMEM;
-	page=grab_cache_page(mapping,inode->u.umsdos_i.pos>>PAGE_CACHE_SHIFT);
+	page=grab_cache_page(mapping,UMSDOS_I(inode)->pos>>PAGE_CACHE_SHIFT);
 	if (!page)
 		goto out_dput;
 	ret=mapping->a_ops->prepare_write(NULL,page,offs,offs+UMSDOS_REC_SIZE);

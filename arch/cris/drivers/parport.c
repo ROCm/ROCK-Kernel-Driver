@@ -1,4 +1,4 @@
-/* $Id: parport.c,v 1.8 2001/09/26 11:51:52 bjornw Exp $
+/* $Id: parport.c,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
  * 
  * Elinux parallel port driver
  * NOTE!

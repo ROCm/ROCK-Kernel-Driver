@@ -4,6 +4,8 @@
  * Copyright 2000 (C) Stephen Rothwell
  */
 
+#include <linux/fs.h>
+
 struct dnotify_struct {
 	struct dnotify_struct *	dn_next;
 	int			dn_magic;

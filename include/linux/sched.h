@@ -141,6 +141,7 @@ typedef struct task_struct task_t;
 
 extern void sched_init(void);
 extern void init_idle(void);
+extern void idle_startup_done(void);
 extern void show_state(void);
 extern void cpu_init (void);
 extern void trap_init(void);
@@ -148,6 +149,8 @@ extern void update_process_times(int user);
 extern void update_one_process(struct task_struct *p, unsigned long user,
 			       unsigned long system, int cpu);
 extern void scheduler_tick(struct task_struct *p);
+extern void sched_task_migrated(struct task_struct *p);
+extern void smp_migrate_task(int cpu, task_t *task);
 
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX
 extern signed long FASTCALL(schedule_timeout(signed long timeout));

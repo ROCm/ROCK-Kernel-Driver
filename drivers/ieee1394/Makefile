@@ -16,6 +16,7 @@ obj-$(CONFIG_IEEE1394_OHCI1394) += ohci1394.o
 obj-$(CONFIG_IEEE1394_VIDEO1394) += video1394.o
 obj-$(CONFIG_IEEE1394_RAWIO) += raw1394.o
 obj-$(CONFIG_IEEE1394_SBP2) += sbp2.o
+obj-$(CONFIG_IEEE1394_DV1394) += dv1394.o
 
 include $(TOPDIR)/Rules.make
 

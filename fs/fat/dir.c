@@ -744,8 +744,8 @@ int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
 	if ((dir->i_ino == MSDOS_ROOT_INO) && (MSDOS_SB(sb)->fat_bits != 32)) 
 		return -ENOSPC;
 	new_bh = fat_extend_dir(dir);
-	if (!new_bh)
-		return -ENOSPC;
+	if (IS_ERR(new_bh))
+		return PTR_ERR(new_bh);
 	fat_brelse(sb, new_bh);
 	do {
 		fat_get_entry(dir, &curr, bh, de, ino);
@@ -761,7 +761,10 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 	struct msdos_dir_entry *de;
 	__u16 date, time;
 
-	if ((bh = fat_extend_dir(dir)) == NULL) return -ENOSPC;
+	bh = fat_extend_dir(dir);
+	if (IS_ERR(bh))
+		return PTR_ERR(bh);
+
 	/* zeroed out, so... */
 	fat_date_unix2dos(dir->i_mtime,&time,&date);
 	de = (struct msdos_dir_entry*)&bh->b_data[0];

@@ -46,6 +46,10 @@ ifeq ($(CONFIG_USB_EHCI_HCD),y)
 	obj-y += hcd/ehci-hcd.o
 endif
 
+ifeq ($(CONFIG_USB_OHCI_HCD),y)
+	obj-y += hcd/ohci-hcd.o
+endif
+
 obj-$(CONFIG_USB_UHCI)		+= usb-uhci.o
 obj-$(CONFIG_USB_UHCI_ALT)	+= uhci.o
 obj-$(CONFIG_USB_OHCI)		+= usb-ohci.o
@@ -85,6 +89,7 @@ obj-$(CONFIG_USB_AUERSWALD)	+= auerswald.o
 mod-subdirs	:= serial hcd
 
 subdir-$(CONFIG_USB_EHCI_HCD)	+= hcd
+subdir-$(CONFIG_USB_OHCI_HCD)	+= hcd
 subdir-$(CONFIG_USB_SERIAL)	+= serial
 subdir-$(CONFIG_USB_STORAGE)	+= storage
 

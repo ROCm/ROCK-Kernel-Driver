@@ -1,4 +1,4 @@
-/* $Id: ide.c,v 1.19 2001/05/09 12:53:16 johana Exp $
+/* $Id: ide.c,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
  *
  * Etrax specific IDE functions, like init and PIO-mode setting etc.
  * Almost the entire ide.c is used for the rest of the Etrax ATA driver.
@@ -8,6 +8,9 @@
  *             Mikael Starvik     (pio setup stuff)
  *
  * $Log: ide.c,v $
+ * Revision 1.1.1.1  2001/12/17 13:59:27  bjornw
+ * Import of Linux 2.5.1
+ *
  * Revision 1.19  2001/05/09 12:53:16  johana
  * Added #include <asm/dma.h>
  *

@@ -35,6 +35,9 @@ tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 bool 'Use kernel gdb debugger' CONFIG_ETRAX_KGDB
 
 bool 'Enable Etrax100 watchdog' CONFIG_ETRAX_WATCHDOG
+if [ "$CONFIG_ETRAX_WATCHDOG" = "y" ]; then
+	bool 'Disable watchdog during Oops printouts' CONFIG_ETRAX_WATCHDOG_NICE_DOGGY
+fi
 
 endmenu
 
@@ -250,6 +253,6 @@ bool 'Kernel profiling support' CONFIG_PROFILE
 if [ "$CONFIG_PROFILE" = "y" ]; then
   int ' Profile shift count' CONFIG_PROFILE_SHIFT 2
 fi
-endmenu
 
 source lib/Config.in
+endmenu

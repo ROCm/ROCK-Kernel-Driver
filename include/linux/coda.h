@@ -99,6 +99,7 @@ typedef unsigned long long u_quad_t;
 
 
 #if defined(__linux__)
+#include <linux/time.h>
 #define cdev_t u_quad_t
 #ifndef __KERNEL__
 #if !defined(_UQUAD_T_) && (!defined(__GLIBC__) || __GLIBC__ < 2)

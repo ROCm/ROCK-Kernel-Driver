@@ -40,8 +40,8 @@ struct ti_lynx {
                 u32 product;
         } phyic;
 
-        enum { clear, have_host_struct,  have_intr, have_aux_buf, have_pcl_mem,
-               have_1394_buffers, have_iomappings } state;
+        enum { clear, have_intr, have_aux_buf, have_pcl_mem,
+               have_1394_buffers, have_iomappings, is_host } state;
         
         /* remapped memory spaces */
         void *registers;

@@ -766,7 +766,7 @@ static void stv680_video_irq (struct urb *urb)
 
 static int stv680_start_stream (struct usb_stv *stv680)
 {
-	urb_t *urb;
+	struct urb *urb;
 	int err = 0, i;
 
 	stv680->streaming = 1;

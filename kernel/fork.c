@@ -747,23 +747,16 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	if (p->ptrace & PT_PTRACED)
 		send_sig(SIGSTOP, p, 1);
 
-#define RUN_CHILD_FIRST 1
-#if RUN_CHILD_FIRST
 	wake_up_forked_process(p);		/* do this last */
-#else
-	wake_up_process(p);			/* do this last */
-#endif
 	++total_forks;
 	if (clone_flags & CLONE_VFORK)
 		wait_for_completion(&vfork);
-#if RUN_CHILD_FIRST
 	else
 		/*
 		 * Let the child process run first, to avoid most of the
 		 * COW overhead when the child exec()s afterwards.
 		 */
 		current->need_resched = 1;
-#endif
 
 fork_out:
 	return retval;

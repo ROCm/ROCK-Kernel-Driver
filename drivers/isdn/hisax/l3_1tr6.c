@@ -223,7 +223,7 @@ l3_1tr6_setup(struct l3_process *pc, u_char pr, void *arg)
 			l3_debug(pc->st, tmp);
 		}
 		newl3state(pc, 6);
-		pc->st->l3.l3l4(pc->st, CC_SETUP | INDICATION, pc);
+		L3L4(pc->st, CC_SETUP | INDICATION, pc);
 	} else
 		release_l3_process(pc);
 }
@@ -253,7 +253,7 @@ l3_1tr6_setup_ack(struct l3_process *pc, u_char pr, void *arg)
 	}
 	dev_kfree_skb(skb);
 	L3AddTimer(&pc->timer, T304, CC_T304);
-	pc->st->l3.l3l4(pc->st, CC_MORE_INFO | INDICATION, pc);
+	L3L4(pc->st, CC_MORE_INFO | INDICATION, pc);
 }
 
 static void
@@ -285,7 +285,7 @@ l3_1tr6_call_sent(struct l3_process *pc, u_char pr, void *arg)
 	dev_kfree_skb(skb);
 	L3AddTimer(&pc->timer, T310, CC_T310);
 	newl3state(pc, 3);
-	pc->st->l3.l3l4(pc->st, CC_PROCEEDING | INDICATION, pc);
+	L3L4(pc->st, CC_PROCEEDING | INDICATION, pc);
 }
 
 static void
@@ -296,7 +296,7 @@ l3_1tr6_alert(struct l3_process *pc, u_char pr, void *arg)
 	dev_kfree_skb(skb);
 	L3DelTimer(&pc->timer);	/* T304 */
 	newl3state(pc, 4);
-	pc->st->l3.l3l4(pc->st, CC_ALERTING | INDICATION, pc);
+	L3L4(pc->st, CC_ALERTING | INDICATION, pc);
 }
 
 static void
@@ -316,7 +316,7 @@ l3_1tr6_info(struct l3_process *pc, u_char pr, void *arg)
 		}
 		if (tmpcharge > pc->para.chargeinfo) {
 			pc->para.chargeinfo = tmpcharge;
-			pc->st->l3.l3l4(pc->st, CC_CHARGE | INDICATION, pc);
+			L3L4(pc->st, CC_CHARGE | INDICATION, pc);
 		}
 		if (pc->st->l3.debug & L3_DEB_CHARGE) {
 			sprintf(tmp, "charging info %d", pc->para.chargeinfo);
@@ -349,7 +349,7 @@ l3_1tr6_connect(struct l3_process *pc, u_char pr, void *arg)
 	newl3state(pc, 10);
 	dev_kfree_skb(skb);
 	pc->para.chargeinfo = 0;
-	pc->st->l3.l3l4(pc->st, CC_SETUP | CONFIRM, pc);
+	L3L4(pc->st, CC_SETUP | CONFIRM, pc);
 }
 
 static void
@@ -379,7 +379,7 @@ l3_1tr6_rel(struct l3_process *pc, u_char pr, void *arg)
 	StopAllL3Timer(pc);
 	newl3state(pc, 0);
 	l3_1TR6_message(pc, MT_N1_REL_ACK, PROTO_DIS_N1);
-	pc->st->l3.l3l4(pc->st, CC_RELEASE | INDICATION, pc);
+	L3L4(pc->st, CC_RELEASE | INDICATION, pc);
 	release_l3_process(pc);
 }
 
@@ -392,7 +392,7 @@ l3_1tr6_rel_ack(struct l3_process *pc, u_char pr, void *arg)
 	StopAllL3Timer(pc);
 	newl3state(pc, 0);
 	pc->para.cause = NO_CAUSE;
-	pc->st->l3.l3l4(pc->st, CC_RELEASE | CONFIRM, pc);
+	L3L4(pc->st, CC_RELEASE | CONFIRM, pc);
 	release_l3_process(pc);
 }
 
@@ -414,7 +414,7 @@ l3_1tr6_disc(struct l3_process *pc, u_char pr, void *arg)
 		}
 		if (tmpcharge > pc->para.chargeinfo) {
 			pc->para.chargeinfo = tmpcharge;
-			pc->st->l3.l3l4(pc->st, CC_CHARGE | INDICATION, pc);
+			L3L4(pc->st, CC_CHARGE | INDICATION, pc);
 		}
 		if (pc->st->l3.debug & L3_DEB_CHARGE) {
 			sprintf(tmp, "charging info %d", pc->para.chargeinfo);
@@ -447,7 +447,7 @@ l3_1tr6_disc(struct l3_process *pc, u_char pr, void *arg)
 	}
 	dev_kfree_skb(skb);
 	newl3state(pc, 12);
-	pc->st->l3.l3l4(pc->st, CC_DISCONNECT | INDICATION, pc);
+	L3L4(pc->st, CC_DISCONNECT | INDICATION, pc);
 }
 
 
@@ -464,7 +464,7 @@ l3_1tr6_connect_ack(struct l3_process *pc, u_char pr, void *arg)
 	newl3state(pc, 10);
 	pc->para.chargeinfo = 0;
 	L3DelTimer(&pc->timer);
-	pc->st->l3.l3l4(pc->st, CC_SETUP_COMPL | INDICATION, pc);
+	L3L4(pc->st, CC_SETUP_COMPL | INDICATION, pc);
 }
 
 static void
@@ -573,7 +573,7 @@ l3_1tr6_t304(struct l3_process *pc, u_char pr, void *arg)
 	L3DelTimer(&pc->timer);
 	pc->para.cause = 0xE6;
 	l3_1tr6_disconnect_req(pc, pr, NULL);
-	pc->st->l3.l3l4(pc->st, CC_SETUP_ERR, pc);
+	L3L4(pc->st, CC_SETUP_ERR, pc);
 }
 
 static void
@@ -618,7 +618,7 @@ l3_1tr6_t310(struct l3_process *pc, u_char pr, void *arg)
 	L3DelTimer(&pc->timer);
 	pc->para.cause = 0xE6;
 	l3_1tr6_disconnect_req(pc, pr, NULL);
-	pc->st->l3.l3l4(pc->st, CC_SETUP_ERR, pc);
+	L3L4(pc->st, CC_SETUP_ERR, pc);
 }
 
 static void
@@ -627,7 +627,7 @@ l3_1tr6_t313(struct l3_process *pc, u_char pr, void *arg)
 	L3DelTimer(&pc->timer);
 	pc->para.cause = 0xE6;
 	l3_1tr6_disconnect_req(pc, pr, NULL);
-	pc->st->l3.l3l4(pc->st, CC_CONNECT_ERR, pc);
+	L3L4(pc->st, CC_CONNECT_ERR, pc);
 }
 
 static void
@@ -643,7 +643,7 @@ static void
 l3_1tr6_t308_2(struct l3_process *pc, u_char pr, void *arg)
 {
 	L3DelTimer(&pc->timer);
-	pc->st->l3.l3l4(pc->st, CC_RELEASE_ERR, pc);
+	L3L4(pc->st, CC_RELEASE_ERR, pc);
 	release_l3_process(pc);
 }
 
@@ -652,7 +652,7 @@ l3_1tr6_dl_reset(struct l3_process *pc, u_char pr, void *arg)
 {
         pc->para.cause = CAUSE_LocalProcErr;
         l3_1tr6_disconnect_req(pc, pr, NULL);
-        pc->st->l3.l3l4(pc->st, CC_SETUP_ERR, pc);
+        L3L4(pc->st, CC_SETUP_ERR, pc);
 }
 
 static void
@@ -661,7 +661,7 @@ l3_1tr6_dl_release(struct l3_process *pc, u_char pr, void *arg)
         newl3state(pc, 0);
         pc->para.cause = 0x1b;          /* Destination out of order */
         pc->para.loc = 0;
-        pc->st->l3.l3l4(pc->st, CC_RELEASE | INDICATION, pc);
+        L3L4(pc->st, CC_RELEASE | INDICATION, pc);
         release_l3_process(pc);
 }
 
@@ -946,8 +946,8 @@ setstack_1tr6(struct PStack *st)
 {
 	char tmp[64];
 
-	st->lli.l4l3 = down1tr6;
-	st->l2.l2l3 = up1tr6;
+	st->l3.l4l3 = down1tr6;
+	st->l3.l2l3 = up1tr6;
 	st->l3.l3ml3 = man1tr6;
 	st->l3.N303 = 0;
 

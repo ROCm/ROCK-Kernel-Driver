@@ -1,4 +1,4 @@
-/* $Id: gpio.c,v 1.11 2001/10/30 14:39:12 johana Exp $
+/* $Id: gpio.c,v 1.2 2001/12/18 13:35:15 bjornw Exp $
  *
  * Etrax general port I/O device
  *
@@ -9,6 +9,13 @@
  *             Johan Adolfsson  (read/set directions, write)
  *
  * $Log: gpio.c,v $
+ * Revision 1.2  2001/12/18 13:35:15  bjornw
+ * Applied the 2.4.13->2.4.16 CRIS patch to 2.5.1 (is a copy of 2.4.15).
+ *
+ * Revision 1.12  2001/11/12 19:42:15  pkj
+ * * Corrected return values from gpio_leds_ioctl().
+ * * Fixed compiler warnings.
+ *
  * Revision 1.11  2001/10/30 14:39:12  johana
  * Added D() around gpio_write printk.
  *
@@ -74,7 +81,9 @@
 
 static char gpio_name[] = "etrax gpio";
 
+#if 0
 static wait_queue_head_t *gpio_wq;
+#endif
 
 static int gpio_ioctl(struct inode *inode, struct file *file,
 		      unsigned int cmd, unsigned long arg);
@@ -143,7 +152,7 @@ gpio_poll(struct file *filp,
 {
 	/* TODO poll on alarms! */
 #if 0
-        if(!ANYTHING_WANTED) {
+        if (!ANYTHING_WANTED) {
 		D(printk("gpio_select sleeping task\n"));
 	        select_wait(&gpio_wq, table);
 	        return 0;
@@ -160,16 +169,14 @@ static ssize_t gpio_write(struct file * file, const char * buf, size_t count,
 	unsigned char data, clk_mask, data_mask, write_msb;
 	unsigned long flags;
 	ssize_t retval = count;
-	if (verify_area(VERIFY_READ, buf, count))
-	{
+	if (verify_area(VERIFY_READ, buf, count)) {
 		return -EFAULT;
 	}
 	clk_mask = priv->clk_mask;
 	data_mask = priv->data_mask;
 	/* It must have been configured using the IO_CFG_WRITE_MODE */
 	/* Perhaps a better error code? */
-	if (clk_mask == 0 || data_mask == 0) 
-	{
+	if (clk_mask == 0 || data_mask == 0) {
 		return -EPERM;
 	}
 	write_msb = priv->write_msb;
@@ -178,7 +185,7 @@ static ssize_t gpio_write(struct file * file, const char * buf, size_t count,
 		int i;
 		data = *buf++;
 		if (priv->write_msb) {
-			for (i = 7; i>=0;i--) {
+			for (i = 7; i >= 0;i--) {
 				save_flags(flags); cli();
 				*priv->port = *priv->shadow &= ~clk_mask;
 				if (data & 1<<i)
@@ -190,7 +197,7 @@ static ssize_t gpio_write(struct file * file, const char * buf, size_t count,
 				restore_flags(flags);
 			}
 		} else {
-			for (i = 0; i<=7;i++) {
+			for (i = 0; i <= 7;i++) {
 				save_flags(flags); cli();
 				*priv->port = *priv->shadow &= ~clk_mask;
 				if (data & 1<<i)
@@ -212,13 +219,13 @@ gpio_open(struct inode *inode, struct file *filp)
 	struct gpio_private *priv;
 	int p = MINOR(inode->i_rdev);
 
-	if(p >= NUM_PORTS && p != LEDS)
+	if (p >= NUM_PORTS && p != LEDS)
 		return -EINVAL;
 
 	priv = (struct gpio_private *)kmalloc(sizeof(struct gpio_private), 
 					      GFP_KERNEL);
 
-	if(!priv)
+	if (!priv)
 		return -ENOMEM;
 
 	priv->minor = p;
@@ -254,10 +261,10 @@ gpio_release(struct inode *inode, struct file *filp)
 
 	/* unlink from alarmlist and free the private structure */
 
-	if(p == todel) {
+	if (p == todel) {
 		alarmlist = todel->next;
 	} else {
-		while(p->next != todel)
+		while (p->next != todel)
 			p = p->next;
 		p->next = todel->next;
 	}
@@ -280,7 +287,7 @@ gpio_ioctl(struct inode *inode, struct file *file,
 {
 	unsigned long flags;
 	struct gpio_private *priv = (struct gpio_private *)file->private_data;
-	if(_IOC_TYPE(cmd) != ETRAXGPIO_IOCTYPE) {
+	if (_IOC_TYPE(cmd) != ETRAXGPIO_IOCTYPE) {
 		return -EINVAL;
 	}
 
@@ -353,7 +360,7 @@ gpio_ioctl(struct inode *inode, struct file *file,
 			if (!((priv->clk_mask & priv->changeable_bits) &&
 			      (priv->data_mask & priv->changeable_bits) &&
 			      (priv->clk_mask & *priv->dir_shadow) &&
-			      (priv->data_mask & *priv->dir_shadow)) )
+			      (priv->data_mask & *priv->dir_shadow)))
 			{
 				priv->clk_mask = 0;
 				priv->data_mask = 0;
@@ -361,7 +368,7 @@ gpio_ioctl(struct inode *inode, struct file *file,
 			}
 			break;
 		default:
-			if(priv->minor == LEDS)
+			if (priv->minor == LEDS)
 				return gpio_leds_ioctl(cmd, arg);
                         else
 				return -EINVAL;
@@ -375,6 +382,7 @@ gpio_leds_ioctl(unsigned int cmd, unsigned long arg)
 {
 	unsigned char green;
 	unsigned char red;
+
 	switch (_IOC_NR(cmd)) {
 		case IO_LEDACTIVE_SET:
 			green = ((unsigned char) arg) & 1;
@@ -382,14 +390,20 @@ gpio_leds_ioctl(unsigned int cmd, unsigned long arg)
 			LED_ACTIVE_SET_G(green);
 			LED_ACTIVE_SET_R(red);
 			break;
-                case IO_LED_SETBIT:                 
-                        LED_BIT_SET(arg);
-                       break;
-                case IO_LED_CLRBIT:
-                        LED_BIT_CLR(arg);
+
+		case IO_LED_SETBIT:                 
+			LED_BIT_SET(arg);
+			break;
+
+		case IO_LED_CLRBIT:
+			LED_BIT_CLR(arg);
+			break;
+
 		default:
 			return -EINVAL;
 	}
+
+	return 0;
 }
 
 struct file_operations gpio_fops = {
@@ -406,30 +420,32 @@ struct file_operations gpio_fops = {
 static __init int
 gpio_init(void)
 {
-	int res,i;
+	extern void init_ioremap(void);
+	int res;
+#if defined (CONFIG_ETRAX_CSP0_LEDS)
+	int i;
+#endif
 
 	/* do the formalities */
 
 	res = register_chrdev(GPIO_MAJOR, gpio_name, &gpio_fops);
-	if(res < 0) {
+	if (res < 0) {
 		printk(KERN_ERR "gpio: couldn't get a major number.\n");
 		return res;
 	}
 
         /* Clear all leds */
-#if defined (CONFIG_ETRAX_CSP0_LEDS) ||  defined (CONFIG_ETRAX_PA_LEDS)         || defined (CONFIG_ETRAX_PB_LEDS) 
-
-        init_ioremap();
-        LED_NETWORK_SET(0);
-        LED_ACTIVE_SET(0);
-        LED_DISK_READ(0);
-        LED_DISK_WRITE(0);        
+#if defined (CONFIG_ETRAX_CSP0_LEDS) ||  defined (CONFIG_ETRAX_PA_LEDS) || defined (CONFIG_ETRAX_PB_LEDS) 
+	init_ioremap();
+	LED_NETWORK_SET(0);
+	LED_ACTIVE_SET(0);
+	LED_DISK_READ(0);
+	LED_DISK_WRITE(0);        
 
 #if defined (CONFIG_ETRAX_CSP0_LEDS)
-        for( i = 0; i < 32; i ++)
-        {
-            LED_BIT_SET(i);
-        }
+	for (i = 0; i < 32; i++) {
+		LED_BIT_SET(i);
+	}
 #endif
 
 #endif

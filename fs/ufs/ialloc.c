@@ -142,7 +142,7 @@ void ufs_free_inode (struct inode * inode)
  * For other inodes, search forward from the parent directory's block
  * group to find a free inode.
  */
-struct inode * ufs_new_inode (const struct inode * dir,	int mode)
+struct inode * ufs_new_inode(struct inode * dir, int mode)
 {
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
@@ -151,6 +151,7 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 	struct ufs_cylinder_group * ucg;
 	struct inode * inode;
 	unsigned cg, bit, i, j, start;
+	struct ufs_inode_info *ufsi;
 
 	UFSD(("ENTER\n"))
 	
@@ -161,6 +162,7 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 	inode = new_inode(sb);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
+	ufsi = UFS_I(inode);
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 
@@ -261,8 +263,13 @@ cg_found:
 	inode->i_blksize = PAGE_SIZE;	/* This is the optimal IO size (for stat), not the fs block size */
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-	inode->u.ufs_i.i_flags = dir->u.ufs_i.i_flags;
-	inode->u.ufs_i.i_lastfrag = 0;
+	ufsi->i_flags = UFS_I(dir)->i_flags;
+	ufsi->i_lastfrag = 0;
+	ufsi->i_gen = 0;
+	ufsi->i_shadow = 0;
+	ufsi->i_osync = 0;
+	ufsi->i_oeftflag = 0;
+	memset(&ufsi->i_u1, 0, sizeof(ufsi->i_u1));
 
 	insert_inode_hash(inode);
 	mark_inode_dirty(inode);

@@ -28,7 +28,7 @@ struct shmem_inode_info {
 	unsigned long		swapped;
 	int			locked;     /* into memory */
 	struct list_head	list;
-	struct inode	       *inode;
+	struct inode		vfs_inode;
 };
 
 struct shmem_sb_info {
@@ -39,6 +39,9 @@ struct shmem_sb_info {
 	spinlock_t    stat_lock;
 };
 
-#define SHMEM_I(inode)  (&inode->u.shmem_i)
+static inline struct shmem_inode_info *SHMEM_I(struct inode *inode)
+{
+	return list_entry(inode, struct shmem_inode_info, vfs_inode);
+}
 
 #endif

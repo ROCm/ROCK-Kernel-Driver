@@ -610,7 +610,7 @@ static void se401_send_size(struct usb_se401 *se401, int width, int height)
 */
 static int se401_start_stream(struct usb_se401 *se401)
 {
-	urb_t *urb;
+	struct urb *urb;
 	int err=0, i;
 	se401->streaming=1;
 

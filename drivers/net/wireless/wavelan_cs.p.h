@@ -10,8 +10,8 @@
  * be included only on wavelan_cs.c !!!
  */
 
-#ifndef WAVELAN_CS_H
-#define WAVELAN_CS_H
+#ifndef WAVELAN_CS_P_H
+#define WAVELAN_CS_P_H
 
 /************************** DOCUMENTATION **************************/
 /*
@@ -76,7 +76,7 @@
  *	The detection code of the wavelan chech that the first 3
  *	octets of the MAC address fit the company code. This type of
  *	detection work well for AT&T cards (because the AT&T code is
- *	hardcoded in wavelan.h), but of course will fail for other
+ *	hardcoded in wavelan_cs.h), but of course will fail for other
  *	manufacturer.
  *
  *	If you are sure that your card is derived from the wavelan,
@@ -86,7 +86,7 @@
  *		b) With the driver :
  *			o compile the kernel with DEBUG_CONFIG_INFO enabled
  *			o Boot and look the card messages
- *	2) Set your MAC code (3 octets) in MAC_ADDRESSES[][3] (wavelan.h)
+ *	2) Set your MAC code (3 octets) in MAC_ADDRESSES[][3] (wavelan_cs.h)
  *	3) Compile & verify
  *	4) Send me the MAC code - I will include it in the next version...
  *
@@ -111,9 +111,9 @@
 /*
  * wavelan_cs.c :	The actual code for the driver - C functions
  *
- * wavelan_cs.h :	Private header : local types / vars for the driver
+ * wavelan_cs.p.h :	Private header : local types / vars for the driver
  *
- * wavelan.h :		Description of the hardware interface & structs
+ * wavelan_cs.h :	Description of the hardware interface & structs
  *
  * i82593.h :		Description if the Ethernet controller
  */
@@ -428,7 +428,7 @@
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
 
-#ifdef CONFIG_NET_PCMCIA_RADIO
+#ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Wireless extensions */
 #endif
 
@@ -443,7 +443,7 @@
 /* Wavelan declarations */
 #include "i82593.h"	/* Definitions for the Intel chip */
 
-#include "wavelan.h"	/* Others bits of the hardware */
+#include "wavelan_cs.h"	/* Others bits of the hardware */
 
 /************************** DRIVER OPTIONS **************************/
 /*
@@ -821,5 +821,5 @@ MODULE_PARM(do_roaming, "i");
 
 MODULE_LICENSE("GPL");
 
-#endif	/* WAVELAN_CS_H */
+#endif	/* WAVELAN_CS_P_H */
 

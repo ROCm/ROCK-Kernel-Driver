@@ -63,47 +63,6 @@
  */
 #define NFS_SUPER_MAGIC			0x6969
 
-static inline struct nfs_inode_info *NFS_I(struct inode *inode)
-{
-	return &inode->u.nfs_i;
-}
-
-#define NFS_FH(inode)			(&(inode)->u.nfs_i.fh)
-#define NFS_SERVER(inode)		(&(inode)->i_sb->u.nfs_sb.s_server)
-#define NFS_CLIENT(inode)		(NFS_SERVER(inode)->client)
-#define NFS_PROTO(inode)		(NFS_SERVER(inode)->rpc_ops)
-#define NFS_REQUESTLIST(inode)		(NFS_SERVER(inode)->rw_requests)
-#define NFS_ADDR(inode)			(RPC_PEERADDR(NFS_CLIENT(inode)))
-#define NFS_CONGESTED(inode)		(RPC_CONGESTED(NFS_CLIENT(inode)))
-#define NFS_COOKIEVERF(inode)		((inode)->u.nfs_i.cookieverf)
-#define NFS_READTIME(inode)		((inode)->u.nfs_i.read_cache_jiffies)
-#define NFS_CACHE_CTIME(inode)		((inode)->u.nfs_i.read_cache_ctime)
-#define NFS_CACHE_MTIME(inode)		((inode)->u.nfs_i.read_cache_mtime)
-#define NFS_CACHE_ISIZE(inode)		((inode)->u.nfs_i.read_cache_isize)
-#define NFS_NEXTSCAN(inode)		((inode)->u.nfs_i.nextscan)
-#define NFS_CACHEINV(inode) \
-do { \
-	NFS_READTIME(inode) = jiffies - NFS_MAXATTRTIMEO(inode) - 1; \
-} while (0)
-#define NFS_ATTRTIMEO(inode)		((inode)->u.nfs_i.attrtimeo)
-#define NFS_MINATTRTIMEO(inode) \
-	(S_ISDIR(inode->i_mode)? NFS_SERVER(inode)->acdirmin \
-			       : NFS_SERVER(inode)->acregmin)
-#define NFS_MAXATTRTIMEO(inode) \
-	(S_ISDIR(inode->i_mode)? NFS_SERVER(inode)->acdirmax \
-			       : NFS_SERVER(inode)->acregmax)
-#define NFS_ATTRTIMEO_UPDATE(inode)	((inode)->u.nfs_i.attrtimeo_timestamp)
-
-#define NFS_FLAGS(inode)		((inode)->u.nfs_i.flags)
-#define NFS_REVALIDATING(inode)		(NFS_FLAGS(inode) & NFS_INO_REVALIDATING)
-#define NFS_STALE(inode)		(NFS_FLAGS(inode) & NFS_INO_STALE)
-
-#define NFS_FILEID(inode)		((inode)->u.nfs_i.fileid)
-#define NFS_FSID(inode)			((inode)->u.nfs_i.fsid)
-
-/* Inode Flags */
-#define NFS_USE_READDIRPLUS(inode)	((NFS_FLAGS(inode) & NFS_INO_ADVISE_RDPLUS) ? 1 : 0)
-
 /*
  * These are the default flags for swap requests
  */
@@ -124,6 +83,134 @@ do { \
 #define FLUSH_WAIT		2	/* wait for completion */
 #define FLUSH_STABLE		4	/* commit to stable storage */
 
+#ifdef __KERNEL__
+
+/*
+ * nfs fs inode data in memory
+ */
+struct nfs_inode {
+	/*
+	 * The 64bit 'inode number'
+	 */
+	__u64 fsid;
+	__u64 fileid;
+
+	/*
+	 * NFS file handle
+	 */
+	struct nfs_fh		fh;
+
+	/*
+	 * Various flags
+	 */
+	unsigned short		flags;
+
+	/*
+	 * read_cache_jiffies is when we started read-caching this inode,
+	 * and read_cache_mtime is the mtime of the inode at that time.
+	 * attrtimeo is for how long the cached information is assumed
+	 * to be valid. A successful attribute revalidation doubles
+	 * attrtimeo (up to acregmax/acdirmax), a failure resets it to
+	 * acregmin/acdirmin.
+	 *
+	 * We need to revalidate the cached attrs for this inode if
+	 *
+	 *	jiffies - read_cache_jiffies > attrtimeo
+	 *
+	 * and invalidate any cached data/flush out any dirty pages if
+	 * we find that
+	 *
+	 *	mtime != read_cache_mtime
+	 */
+	unsigned long		read_cache_jiffies;
+	__u64			read_cache_ctime;
+	__u64			read_cache_mtime;
+	__u64			read_cache_isize;
+	unsigned long		attrtimeo;
+	unsigned long		attrtimeo_timestamp;
+
+	/*
+	 * This is the cookie verifier used for NFSv3 readdir
+	 * operations
+	 */
+	__u32			cookieverf[2];
+
+	/*
+	 * This is the list of dirty unwritten pages.
+	 */
+	struct list_head	read;
+	struct list_head	dirty;
+	struct list_head	commit;
+	struct list_head	writeback;
+
+	unsigned int		nread,
+				ndirty,
+				ncommit,
+				npages;
+
+	/* Flush daemon info */
+	struct inode		*hash_next,
+				*hash_prev;
+	unsigned long		nextscan;
+
+	/* Credentials for shared mmap */
+	struct rpc_cred		*mm_cred;
+
+	struct inode		vfs_inode;
+};
+
+/*
+ * Legal inode flag values
+ */
+#define NFS_INO_STALE		0x0001		/* possible stale inode */
+#define NFS_INO_ADVISE_RDPLUS   0x0002          /* advise readdirplus */
+#define NFS_INO_REVALIDATING	0x0004		/* revalidating attrs */
+#define NFS_IS_SNAPSHOT		0x0010		/* a snapshot file */
+#define NFS_INO_FLUSH		0x0020		/* inode is due for flushing */
+#define NFS_INO_NEW		0x0040		/* hadn't been filled yet */
+
+static inline struct nfs_inode *NFS_I(struct inode *inode)
+{
+	return list_entry(inode, struct nfs_inode, vfs_inode);
+}
+
+#define NFS_FH(inode)			(&NFS_I(inode)->fh)
+#define NFS_SERVER(inode)		(&(inode)->i_sb->u.nfs_sb.s_server)
+#define NFS_CLIENT(inode)		(NFS_SERVER(inode)->client)
+#define NFS_PROTO(inode)		(NFS_SERVER(inode)->rpc_ops)
+#define NFS_REQUESTLIST(inode)		(NFS_SERVER(inode)->rw_requests)
+#define NFS_ADDR(inode)			(RPC_PEERADDR(NFS_CLIENT(inode)))
+#define NFS_CONGESTED(inode)		(RPC_CONGESTED(NFS_CLIENT(inode)))
+#define NFS_COOKIEVERF(inode)		(NFS_I(inode)->cookieverf)
+#define NFS_READTIME(inode)		(NFS_I(inode)->read_cache_jiffies)
+#define NFS_CACHE_CTIME(inode)		(NFS_I(inode)->read_cache_ctime)
+#define NFS_CACHE_MTIME(inode)		(NFS_I(inode)->read_cache_mtime)
+#define NFS_CACHE_ISIZE(inode)		(NFS_I(inode)->read_cache_isize)
+#define NFS_NEXTSCAN(inode)		(NFS_I(inode)->nextscan)
+#define NFS_CACHEINV(inode) \
+do { \
+	NFS_READTIME(inode) = jiffies - NFS_MAXATTRTIMEO(inode) - 1; \
+} while (0)
+#define NFS_ATTRTIMEO(inode)		(NFS_I(inode)->attrtimeo)
+#define NFS_MINATTRTIMEO(inode) \
+	(S_ISDIR(inode->i_mode)? NFS_SERVER(inode)->acdirmin \
+			       : NFS_SERVER(inode)->acregmin)
+#define NFS_MAXATTRTIMEO(inode) \
+	(S_ISDIR(inode->i_mode)? NFS_SERVER(inode)->acdirmax \
+			       : NFS_SERVER(inode)->acregmax)
+#define NFS_ATTRTIMEO_UPDATE(inode)	(NFS_I(inode)->attrtimeo_timestamp)
+
+#define NFS_FLAGS(inode)		(NFS_I(inode)->flags)
+#define NFS_REVALIDATING(inode)		(NFS_FLAGS(inode) & NFS_INO_REVALIDATING)
+#define NFS_STALE(inode)		(NFS_FLAGS(inode) & NFS_INO_STALE)
+#define NFS_NEW(inode)			(NFS_FLAGS(inode) & NFS_INO_NEW)
+
+#define NFS_FILEID(inode)		(NFS_I(inode)->fileid)
+#define NFS_FSID(inode)			(NFS_I(inode)->fsid)
+
+/* Inode Flags */
+#define NFS_USE_READDIRPLUS(inode)	((NFS_FLAGS(inode) & NFS_INO_ADVISE_RDPLUS) ? 1 : 0)
+
 static inline
 loff_t page_offset(struct page *page)
 {
@@ -136,7 +223,6 @@ unsigned long page_index(struct page *page)
 	return page->index;
 }
 
-#ifdef __KERNEL__
 /*
  * linux/fs/nfs/inode.c
  */
@@ -220,13 +306,13 @@ extern int  nfs_scan_lru_commit_timeout(struct nfs_server *, struct list_head *)
 static inline int
 nfs_have_read(struct inode *inode)
 {
-	return !list_empty(&inode->u.nfs_i.read);
+	return !list_empty(&NFS_I(inode)->read);
 }
 
 static inline int
 nfs_have_writebacks(struct inode *inode)
 {
-	return !list_empty(&inode->u.nfs_i.writeback);
+	return !list_empty(&NFS_I(inode)->writeback);
 }
 
 static inline int

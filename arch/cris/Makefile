@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.22 2001/10/01 14:42:38 bjornw Exp $
+# $Id: Makefile,v 1.3 2002/01/21 15:21:23 bjornw Exp $
 # cris/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -29,18 +29,17 @@ LD = if [ ! -e $(LD_SCRIPT).tmp -o $(LD_SCRIPT) -nt $(LD_SCRIPT).tmp ]; then \
               -e s/@CONFIG_ETRAX_DRAM_SIZE_M@/$(CONFIG_ETRAX_DRAM_SIZE)/ \
               < $(LD_SCRIPT) > $(LD_SCRIPT).tmp; \
      else true; \
-     fi && $(CROSS_COMPILE)gcc -mlinux -nostdlib
+     fi && $(CROSS_COMPILE)ld -mcrislinux
 
-LINKFLAGS = -mlinux -T $(LD_SCRIPT).tmp
+LINKFLAGS = -T $(LD_SCRIPT).tmp
 
 # objcopy is used to make binary images from the resulting linked file
 
 OBJCOPY := $(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
 
-# normally, gcc on a linux box adds __linux__ but we do it "manually"
-# -mlinux enables -march=v10, -fno-underscores among others
+# -mlinux enables -march=v10, -fno-underscores, -D__linux__ among others
 
-CFLAGS := $(CFLAGS) -mlinux -fno-strict-aliasing -pipe -D__linux__
+CFLAGS := $(CFLAGS) -mlinux -pipe
 
 ifdef CONFIG_ETRAX_KGDB
 CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS)) -g
@@ -57,7 +56,7 @@ ifdef CONFIG_ETRAX_AXISFLASHMAP
 # each others config options
 SUBDIRS += arch/cris/boot/rescue
 endif
-CORE_FILES += arch/cris/kernel/kernel.o arch/cris/mm/mm.o
+CORE_FILES := arch/cris/kernel/kernel.o arch/cris/mm/mm.o $(CORE_FILES)
 DRIVERS += arch/cris/drivers/drivers.o
 LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LIBGCC)

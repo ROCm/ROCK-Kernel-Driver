@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.20 2001/10/03 08:21:39 jonashg Exp $
+/* $Id: process.c,v 1.3 2002/01/21 15:22:49 bjornw Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
@@ -8,6 +8,15 @@
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: process.c,v $
+ *  Revision 1.3  2002/01/21 15:22:49  bjornw
+ *  current->counter is gone
+ *
+ *  Revision 1.22  2001/11/13 09:40:43  orjanf
+ *  Added dump_fpu (needed for core dumps).
+ *
+ *  Revision 1.21  2001/11/12 18:26:21  pkj
+ *  Fixed compiler warnings.
+ *
  *  Revision 1.20  2001/10/03 08:21:39  jonashg
  *  cause_of_death does not exist if CONFIG_SVINTO_SIM is defined.
  *
@@ -57,6 +66,7 @@
 #include <linux/slab.h>
 #include <linux/user.h>
 #include <linux/a.out.h>
+#include <linux/elfcore.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 
@@ -77,7 +87,6 @@
  * setup.
  */
 
-static struct vm_area_struct init_mmap = INIT_MMAP;
 static struct fs_struct init_fs = INIT_FS;
 static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS;
@@ -135,14 +144,15 @@ void hard_reset_now (void)
 	 * code to know about it than the watchdog handler in entry.S and
 	 * this code, implementing hard reset through the watchdog.
 	 */
+#if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
 	extern int cause_of_death;
+#endif
 
 	printk("*** HARD RESET ***\n");
 	cli();
 
 #if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
 	cause_of_death = 0xbedead;
-
 #else
 	/* Since we dont plan to keep on reseting the watchdog,
 	   the key can be arbitrary hence three */
@@ -243,9 +253,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
  */
 void dump_thread(struct pt_regs * regs, struct user * dump)
 {
-	int i;
 #if 0
-/* changed the size calculations - should hopefully work better. lbt */
+	int i;
+
+	/* changed the size calculations - should hopefully work better. lbt */
 	dump->magic = CMAGIC;
 	dump->start_code = 0;
 	dump->start_stack = regs->esp & ~(PAGE_SIZE - 1);
@@ -263,6 +274,12 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 
 	dump->u_fpvalid = dump_fpu (regs, &dump->i387);
 #endif 
+}
+
+/* Fill in the fpu structure for a core dump. */
+int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
+{
+        return 0;
 }
 
 /* 

@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <linux/version.h>
 #include <linux/list.h>
+#include <linux/init.h>
 #include <asm/byteorder.h>
 
 
@@ -18,6 +19,16 @@
 
 #define INIT_TQ_LINK(tq) INIT_LIST_HEAD(&(tq).list)
 #define INIT_TQ_HEAD(tq) INIT_LIST_HEAD(&(tq))
+#endif
+
+/* The great kdev_t changeover in 2.5.x */
+#include <linux/kdev_t.h>
+#ifndef minor
+#define minor(dev) MINOR(dev)
+#endif
+
+#ifndef __devexit_p
+#define __devexit_p(x) x
 #endif
 
 /* This showed up around this time */

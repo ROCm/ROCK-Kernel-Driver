@@ -462,6 +462,7 @@ int __init start_secondary(void *unused)
 	 * things done here to the most necessary things.
 	 */
 	cpu_init();
+	init_idle();
 	smp_callin();
 	while (!atomic_read(&smp_commenced))
 		rep_nop();
@@ -470,8 +471,8 @@ int __init start_secondary(void *unused)
 	 * the local TLBs too.
 	 */
 	local_flush_tlb();
+	idle_startup_done();
 
-	init_idle();
 	return cpu_idle();
 }
 

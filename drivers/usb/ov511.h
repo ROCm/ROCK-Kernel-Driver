@@ -366,7 +366,7 @@ struct ov511_i2c_struct {
 
 struct ov511_sbuf {
 	char *data;
-	urb_t *urb;
+	struct urb *urb;
 };
 
 enum {

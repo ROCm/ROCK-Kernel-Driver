@@ -3,6 +3,9 @@ Memory management for CRIS/MMU
 HISTORY:
 
 $Log: README.mm,v $
+Revision 1.1.1.1  2001/12/17 13:59:27  bjornw
+Import of Linux 2.5.1
+
 Revision 1.1  2000/07/10 16:25:21  bjornw
 Initial revision
 

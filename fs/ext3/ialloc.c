@@ -293,7 +293,7 @@ error_return:
  * group to find a free inode.
  */
 struct inode * ext3_new_inode (handle_t *handle,
-				const struct inode * dir, int mode)
+				struct inode * dir, int mode)
 {
 	struct super_block * sb;
 	struct buffer_head * bh;
@@ -304,6 +304,7 @@ struct inode * ext3_new_inode (handle_t *handle,
 	struct ext3_group_desc * gdp;
 	struct ext3_group_desc * tmp;
 	struct ext3_super_block * es;
+	struct ext3_inode_info *ei;
 	int err = 0;
 
 	/* Cannot create files in a deleted directory */
@@ -314,7 +315,7 @@ struct inode * ext3_new_inode (handle_t *handle,
 	inode = new_inode(sb);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
-	init_rwsem(&inode->u.ext3_i.truncate_sem);
+	ei = EXT3_I(inode);
 
 	lock_super (sb);
 	es = sb->u.ext3_sb.s_es;
@@ -346,7 +347,7 @@ repeat:
 		/*
 		 * Try to place the inode in its parent directory
 		 */
-		i = dir->u.ext3_i.i_block_group;
+		i = EXT3_I(dir)->i_block_group;
 		tmp = ext3_get_group_desc (sb, i, &bh2);
 		if (tmp && le16_to_cpu(tmp->bg_free_inodes_count))
 			gdp = tmp;
@@ -372,7 +373,7 @@ repeat:
 			/*
 			 * That failed: try linear search for a free inode
 			 */
-			i = dir->u.ext3_i.i_block_group + 1;
+			i = EXT3_I(dir)->i_block_group + 1;
 			for (j = 2; j < sb->u.ext3_sb.s_groups_count; j++) {
 				if (++i >= sb->u.ext3_sb.s_groups_count)
 					i = 0;
@@ -479,31 +480,37 @@ repeat:
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-	inode->u.ext3_i.i_flags = dir->u.ext3_i.i_flags & ~EXT3_INDEX_FL;
+
+	memset(ei->i_data, 0, sizeof(ei->i_data));
+	ei->i_next_alloc_block = 0;
+	ei->i_next_alloc_goal = 0;
+	ei->i_dir_start_lookup = 0;
+	ei->i_disksize = 0;
+
+	ei->i_flags = EXT3_I(dir)->i_flags & ~EXT3_INDEX_FL;
 	if (S_ISLNK(mode))
-		inode->u.ext3_i.i_flags &= ~(EXT3_IMMUTABLE_FL|EXT3_APPEND_FL);
+		ei->i_flags &= ~(EXT3_IMMUTABLE_FL|EXT3_APPEND_FL);
 #ifdef EXT3_FRAGMENTS
-	inode->u.ext3_i.i_faddr = 0;
-	inode->u.ext3_i.i_frag_no = 0;
-	inode->u.ext3_i.i_frag_size = 0;
+	ei->i_faddr = 0;
+	ei->i_frag_no = 0;
+	ei->i_frag_size = 0;
 #endif
-	inode->u.ext3_i.i_file_acl = 0;
-	inode->u.ext3_i.i_dir_acl = 0;
-	inode->u.ext3_i.i_dtime = 0;
-	INIT_LIST_HEAD(&inode->u.ext3_i.i_orphan);
+	ei->i_file_acl = 0;
+	ei->i_dir_acl = 0;
+	ei->i_dtime = 0;
 #ifdef EXT3_PREALLOCATE
-	inode->u.ext3_i.i_prealloc_count = 0;
+	ei->i_prealloc_count = 0;
 #endif
-	inode->u.ext3_i.i_block_group = i;
+	ei->i_block_group = i;
 	
-	if (inode->u.ext3_i.i_flags & EXT3_SYNC_FL)
+	if (ei->i_flags & EXT3_SYNC_FL)
 		inode->i_flags |= S_SYNC;
 	if (IS_SYNC(inode))
 		handle->h_sync = 1;
 	insert_inode_hash(inode);
 	inode->i_generation = event++;
 
-	inode->u.ext3_i.i_state = EXT3_STATE_NEW;
+	ei->i_state = EXT3_STATE_NEW;
 	err = ext3_mark_inode_dirty(handle, inode);
 	if (err) goto fail;
 	

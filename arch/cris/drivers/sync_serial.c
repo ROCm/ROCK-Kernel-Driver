@@ -711,7 +711,7 @@ static void start_dma(struct sync_port* port, const char* data, int count)
 {
 	port->out_descr.hw_len = 0;
 	port->out_descr.next = 0;
-	port->out_descr.ctrl = d_int | d_eol | d_eop;
+	port->out_descr.ctrl = d_int | d_eol | d_eop | d_wait;
 	port->out_descr.sw_len = count;
 	port->out_descr.buf = virt_to_phys(port->out_buffer);
 	port->out_descr.status = 0;

@@ -9,8 +9,9 @@
 
 typedef unsigned long elf_greg_t;
 
-/* These probably need fixing.  */
-#define ELF_NGREG (sizeof (struct pt_regs) / sizeof(elf_greg_t))
+/* Note that NGREG is defined to ELF_NGREG in include/linux/elfcore.h, and is
+   thus exposed to user-space. */
+#define ELF_NGREG (sizeof (struct user_regs_struct) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
 /* A placeholder; CRIS does not have any fp regs.  */
@@ -45,7 +46,52 @@ typedef unsigned long elf_fpregset_t;
 	(_r)->r1 = 0;  (_r)->r0 = 0;  (_r)->mof = 0; (_r)->srp = 0; \
 } while (0)
 
-#undef USE_ELF_CORE_DUMP
+#define USE_ELF_CORE_DUMP
+
+/* The additional layer below is because the stack pointer is missing in 
+   the pt_regs struct, but needed in a core dump. pr_reg is a elf_gregset_t,
+   and should be filled in according to the layout of the user_regs_struct
+   struct; regs is a pt_regs struct. We dump all registers, though several are
+   obviously unnecessary. That way there's less need for intelligence at 
+   the receiving end (i.e. gdb). */
+#define ELF_CORE_COPY_REGS(pr_reg, regs)                   \
+	pr_reg[0] = regs->r0;                              \
+	pr_reg[1] = regs->r1;                              \
+	pr_reg[2] = regs->r2;                              \
+	pr_reg[3] = regs->r3;                              \
+	pr_reg[4] = regs->r4;                              \
+	pr_reg[5] = regs->r5;                              \
+	pr_reg[6] = regs->r6;                              \
+	pr_reg[7] = regs->r7;                              \
+	pr_reg[8] = regs->r8;                              \
+	pr_reg[9] = regs->r9;                              \
+	pr_reg[10] = regs->r10;                            \
+	pr_reg[11] = regs->r11;                            \
+	pr_reg[12] = regs->r12;                            \
+	pr_reg[13] = regs->r13;                            \
+	pr_reg[14] = rdusp();               /* sp */       \
+	pr_reg[15] = regs->irp;             /* pc */       \
+	pr_reg[16] = 0;                     /* p0 */       \
+	pr_reg[17] = rdvr();                /* vr */       \
+	pr_reg[18] = 0;                     /* p2 */       \
+	pr_reg[19] = 0;                     /* p3 */       \
+	pr_reg[20] = 0;                     /* p4 */       \
+	pr_reg[21] = (regs->dccr & 0xffff); /* ccr */      \
+	pr_reg[22] = 0;                     /* p6 */       \
+	pr_reg[23] = regs->mof;             /* mof */      \
+	pr_reg[24] = 0;                     /* p8 */       \
+	pr_reg[25] = 0;                     /* ibr */      \
+	pr_reg[26] = 0;                     /* irp */      \
+	pr_reg[27] = regs->srp;             /* srp */      \
+	pr_reg[28] = 0;                     /* bar */      \
+	pr_reg[29] = regs->dccr;            /* dccr */     \
+	pr_reg[30] = 0;                     /* brp */      \
+	pr_reg[31] = rdusp();               /* usp */      \
+	pr_reg[32] = 0;                     /* csrinstr */ \
+	pr_reg[33] = 0;                     /* csraddr */  \
+	pr_reg[34] = 0;                     /* csrdata */
+
+
 #define ELF_EXEC_PAGESIZE	8192
 
 /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical

@@ -23,14 +23,14 @@
 
 static int ext3_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
-	char *s = (char *)dentry->d_inode->u.ext3_i.i_data;
-	return vfs_readlink(dentry, buffer, buflen, s);
+	struct ext3_inode_info *ei = EXT3_I(dentry->d_inode);
+	return vfs_readlink(dentry, buffer, buflen, (char*)ei->i_data);
 }
 
 static int ext3_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	char *s = (char *)dentry->d_inode->u.ext3_i.i_data;
-	return vfs_follow_link(nd, s);
+	struct ext3_inode_info *ei = EXT3_I(dentry->d_inode);
+	return vfs_follow_link(nd, (char*)ei->i_data);
 }
 
 struct inode_operations ext3_fast_symlink_inode_operations = {

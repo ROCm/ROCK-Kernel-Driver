@@ -278,6 +278,10 @@ struct net_device
 	struct net_device_stats* (*get_stats)(struct net_device *dev);
 	struct iw_statistics*	(*get_wireless_stats)(struct net_device *dev);
 
+	/* List of functions to handle Wireless Extensions (instead of ioctl).
+	 * See <net/iw_handler.h> for details. Jean II */
+	struct iw_handler_def *	wireless_handlers;
+
 	/*
 	 * This marks the end of the "visible" part of the structure. All
 	 * fields hereafter are internal to the system, and may change at

@@ -591,7 +591,7 @@ modem_l2l1(struct PStack *st, int pr, void *arg)
 		}
 	} else if (pr == (PH_ACTIVATE | REQUEST)) {
 		test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
-		st->l1.l1l2(st, PH_ACTIVATE | CONFIRM, NULL);
+		L1L2(st, PH_ACTIVATE | CONFIRM, NULL);
 		set_arcofi(st->l1.bcs->cs, st->l1.bc);
 		mstartup(st->l1.bcs->cs);
 		modem_set_dial(st->l1.bcs->cs, test_bit(FLG_ORIG, &st->l2.flag));
@@ -617,7 +617,7 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 		case L1_MODE_TRANS:
 			if (open_hscxstate(st->l1.hardware, bcs))
 				return (-1);
-			st->l2.l2l1 = hscx_l2l1;
+			st->l1.l2l1 = hscx_l2l1;
 			break;
 		case L1_MODE_MODEM:
 			bcs->mode = L1_MODE_MODEM;
@@ -632,7 +632,7 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 			bcs->hw.hscx.rcvidx = 0;
 			bcs->tx_cnt = 0;
 			bcs->cs->hw.elsa.bcs = bcs;
-			st->l2.l2l1 = modem_l2l1;
+			st->l1.l2l1 = modem_l2l1;
 			break;
 	}
 	st->l1.bcs = bcs;

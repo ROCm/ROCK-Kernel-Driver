@@ -203,9 +203,9 @@ struct Layer1 {
 	long Flags;
 	struct FsmInst l1m;
 	struct FsmTimer	timer;
-	void (*l1l2) (struct PStack *, int, void *);
 	void (*l1hw) (struct PStack *, int, void *);
 	void (*l1tei) (struct PStack *, int, void *);
+	void (*l2l1) (struct PStack *, int, void *);
 	int mode, bc;
 	int delay;
 };
@@ -247,8 +247,8 @@ struct Layer2 {
 	struct sk_buff *windowar[MAX_WINDOW];
 	struct sk_buff_head i_queue;
 	struct sk_buff_head ui_queue;
-	void (*l2l1) (struct PStack *, int, void *);
-	void (*l2l3) (struct PStack *, int, void *);
+	void (*l3l2) (struct PStack *, int, void *);
+	void (*l1l2) (struct PStack *, int, void *);
 	void (*l2tei) (struct PStack *, int, void *);
 	struct FsmInst l2m;
 	struct FsmTimer t200, t203;
@@ -258,9 +258,10 @@ struct Layer2 {
 };
 
 struct Layer3 {
-	void (*l3l4) (struct PStack *, int, void *);
+	void (*l4l3) (struct PStack *, int, void *);
+        int  (*l4l3_proto) (struct PStack *, isdn_ctrl *);
         void (*l3ml3) (struct PStack *, int, void *);
-	void (*l3l2) (struct PStack *, int, void *);
+	void (*l2l3) (struct PStack *, int, void *);
 	struct FsmInst l3m;
         struct FsmTimer l3m_timer;
 	struct sk_buff_head squeue;
@@ -272,8 +273,7 @@ struct Layer3 {
 };
 
 struct LLInterface {
-	void (*l4l3) (struct PStack *, int, void *);
-        int  (*l4l3_proto) (struct PStack *, isdn_ctrl *);
+	void (*l3l4) (struct PStack *, int, void *);
 	void *userdata;
 	void (*l1writewakeup) (struct PStack *, int);
 	void (*l2writewakeup) (struct PStack *, int);
@@ -1348,3 +1348,40 @@ char *HiSax_getrev(const char *revision);
 int TeiNew(void);
 void TeiFree(void);
 int certification_check(int output);
+
+static inline void
+L2L1(struct PStack *st, int pr, void *arg)
+{
+	st->l1.l2l1(st, pr, arg);
+}
+
+static inline void
+L1L2(struct PStack *st, int pr, void *arg)
+{
+	st->l2.l1l2(st, pr, arg);
+}
+
+static inline void
+L3L2(struct PStack *st, int pr, void *arg)
+{
+	st->l2.l3l2(st, pr, arg);
+}
+
+static inline void
+L2L3(struct PStack *st, int pr, void *arg)
+{
+	st->l3.l2l3(st, pr, arg);
+}
+
+static inline void
+L3L4(struct PStack *st, int pr, void *arg)
+{
+	st->lli.l3l4(st, pr, arg);
+}
+
+static inline void
+L4L3(struct PStack *st, int pr, void *arg)
+{
+	st->l3.l4l3(st, pr, arg);
+}
+

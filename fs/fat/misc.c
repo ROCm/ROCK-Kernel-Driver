@@ -131,14 +131,13 @@ int fat_add_cluster(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
 	int count, nr, limit, last, curr, file_cluster;
-	int cluster_size = MSDOS_SB(sb)->cluster_size;
-	int res = -ENOSPC;
+	int cluster_bits = MSDOS_SB(sb)->cluster_bits;
 	
 	lock_fat(sb);
 	
 	if (MSDOS_SB(sb)->free_clusters == 0) {
 		unlock_fat(sb);
-		return res;
+		return -ENOSPC;
 	}
 	limit = MSDOS_SB(sb)->clusters;
 	nr = limit; /* to keep GCC happy */
@@ -150,7 +149,7 @@ int fat_add_cluster(struct inode *inode)
 	if (count >= limit) {
 		MSDOS_SB(sb)->free_clusters = 0;
 		unlock_fat(sb);
-		return res;
+		return -ENOSPC;
 	}
 	
 	MSDOS_SB(sb)->prev_free = (count + MSDOS_SB(sb)->prev_free + 1) % limit;
@@ -174,13 +173,20 @@ int fat_add_cluster(struct inode *inode)
 	*/
 	last = file_cluster = 0;
 	if ((curr = MSDOS_I(inode)->i_start) != 0) {
+		int max_cluster = MSDOS_I(inode)->mmu_private >> cluster_bits;
+
 		fat_cache_lookup(inode, INT_MAX, &last, &curr);
 		file_cluster = last;
-		while (curr && curr != -1){
+		while (curr && curr != -1) {
 			file_cluster++;
-			if (!(curr = fat_access(sb, last = curr,-1))) {
+			if (!(curr = fat_access(sb, last = curr, -1))) {
 				fat_fs_panic(sb, "File without EOF");
-				return res;
+				return -EIO;
+			}
+			if (file_cluster > max_cluster) {
+				fat_fs_panic(sb,"inode %lu: bad cluster counts",
+					     inode->i_ino);
+				return -EIO;
 			}
 		}
 	}
@@ -192,14 +198,12 @@ int fat_add_cluster(struct inode *inode)
 		MSDOS_I(inode)->i_logstart = nr;
 		mark_inode_dirty(inode);
 	}
-	if (file_cluster
-	    != inode->i_blocks / cluster_size / (sb->s_blocksize / 512)) {
+	if (file_cluster != (inode->i_blocks >> (cluster_bits - 9))) {
 		printk ("file_cluster badly computed!!! %d <> %ld\n",
-			file_cluster,
-			inode->i_blocks / cluster_size / (sb->s_blocksize / 512));
+			file_cluster, inode->i_blocks >> (cluster_bits - 9));
 		fat_cache_inval_inode(inode);
 	}
-	inode->i_blocks += (1 << MSDOS_SB(sb)->cluster_bits) / 512;
+	inode->i_blocks += (1 << cluster_bits) >> 9;
 
 	return nr;
 }
@@ -213,24 +217,23 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 
 	if (MSDOS_SB(sb)->fat_bits != 32) {
 		if (inode->i_ino == MSDOS_ROOT_INO)
-			return res;
+			return ERR_PTR(-ENOSPC);
 	}
 
 	nr = fat_add_cluster(inode);
 	if (nr < 0)
-		return res;
+		return ERR_PTR(nr);
 	
 	sector = MSDOS_SB(sb)->data_start + (nr - 2) * cluster_size;
 	last_sector = sector + cluster_size;
-	if (MSDOS_SB(sb)->cvf_format && MSDOS_SB(sb)->cvf_format->zero_out_cluster)
+	if (MSDOS_SB(sb)->cvf_format
+	    && MSDOS_SB(sb)->cvf_format->zero_out_cluster) {
+		res = ERR_PTR(-EIO);
 		MSDOS_SB(sb)->cvf_format->zero_out_cluster(inode, nr);
-	else {
+	} else {
 		for ( ; sector < last_sector; sector++) {
-#ifdef DEBUG
-			printk("zeroing sector %d\n", sector);
-#endif
 			if (!(bh = fat_getblk(sb, sector)))
-				printk("getblk failed\n");
+				printk("FAT: fat_getblk() failed\n");
 			else {
 				memset(bh->b_data, 0, sb->s_blocksize);
 				fat_set_uptodate(sb, bh, 1);
@@ -241,6 +244,8 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 					fat_brelse(sb, bh);
 			}
 		}
+		if (res == NULL)
+			res = ERR_PTR(-EIO);
 	}
 	if (inode->i_size & (sb->s_blocksize - 1)) {
 		fat_fs_panic(sb, "Odd directory size");
@@ -484,12 +489,11 @@ static int raw_scan_nonroot(struct super_block *sb,int start,const char *name,
     **res_de)
 {
 	int count, cluster;
-	unsigned long dir_size;
+	unsigned long dir_size = 0;
 
 #ifdef DEBUG
 	printk("raw_scan_nonroot: start=%d\n",start);
 #endif
-	dir_size = 0;
 	do {
 		for (count = 0; count < MSDOS_SB(sb)->cluster_size; count++) {
 			if ((cluster = raw_scan_sector(sb,(start-2)*

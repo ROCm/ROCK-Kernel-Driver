@@ -630,7 +630,7 @@ itd_complete (struct ehci_hcd *ehci, struct ehci_itd *itd, unsigned long flags)
 	if (!(urb->transfer_flags & EHCI_STATE_UNLINK)
 			&& ehci->hcd.state != USB_STATE_HALT) {
 		int			i;
-		iso_packet_descriptor_t	*desc;
+		struct usb_iso_packet_descriptor	*desc;
 		struct ehci_itd		*first_itd = urb->hcpriv;
 
 		/* update status for this frame's transfers */

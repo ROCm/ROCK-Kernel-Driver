@@ -10,7 +10,7 @@ EXTRA_CFLAGS      += -DHISAX_MAX_CARDS=$(CONFIG_HISAX_MAX_CARDS)
 
 # Objects that export symbols.
 
-export-objs	  := config.o fsm.o hisax_isac.o
+export-objs	  := config.o fsm.o hisax_isac.o hisax_hscx.o
 
 # Multipart objects.
 
@@ -63,6 +63,7 @@ obj-$(CONFIG_HISAX_SEDLBAUER_CS)	+= sedlbauer_cs.o
 obj-$(CONFIG_HISAX_ELSA_CS)		+= elsa_cs.o
 obj-$(CONFIG_HISAX_ST5481)		+= hisax_st5481.o
 obj-$(CONFIG_HISAX_FRITZ_PCIPNP)        += hisax_isac.o hisax_fcpcipnp.o
+obj-$(CONFIG_HISAX_FRITZ_CLASSIC)       += hisax_isac.o hisax_hscx.o hisax_fcclassic.o
 
 CERT := $(shell md5sum -c md5sums.asc >> /dev/null;echo $$?)
 CFLAGS_cert.o := -DCERTIFICATION=$(CERT)

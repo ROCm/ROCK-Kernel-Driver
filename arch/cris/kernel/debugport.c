@@ -12,6 +12,9 @@
  *    init_etrax_debug()
  *
  * $Log: debugport.c,v $
+ * Revision 1.2  2002/01/21 15:21:50  bjornw
+ * Update for kdev_t changes
+ *
  * Revision 1.6  2001/04/17 13:58:39  orjanf
  * * Renamed CONFIG_KGDB to CONFIG_ETRAX_KGDB.
  *
@@ -214,7 +217,7 @@ enableDebugIRQ(void)
 static kdev_t 
 console_device(struct console *c)
 {
-         return MKDEV(TTY_MAJOR, 64 + c->index);
+         return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 static int __init 
@@ -224,17 +227,16 @@ console_setup(struct console *co, char *options)
 }
 
 static struct console sercons = {
-        "ttyS",
-        console_write,
-        NULL,
-        console_device,
-        NULL,
-	NULL,
-	console_setup,
-	CON_PRINTBUFFER,
-	DEBUG_PORT_IDX,
-	0,
-	NULL
+        name:    "ttyS",
+        write:   console_write,
+        read:    NULL,
+        device:  console_device,
+        unblank: NULL,
+	setup:   console_setup,
+	flags:   CON_PRINTBUFFER,
+	index:   DEBUG_PORT_IDX,
+	cflag:   0,
+	next:    NULL
 };
 
 /*

@@ -142,13 +142,13 @@ int qnx4_set_bitmap(struct super_block *sb, long block, int busy)
 
 static void qnx4_clear_inode(struct inode *inode)
 {
-	struct qnx4_inode_info *qnx4_ino = &inode->u.qnx4_i;
-
-	memset(qnx4_ino->i_reserved, 0, sizeof qnx4_ino->i_reserved);
-	qnx4_ino->i_size = 0;
-	qnx4_ino->i_num_xtnts = 0;
-	qnx4_ino->i_mode = 0;
-	qnx4_ino->i_status = 0;
+	struct qnx4_inode_entry *qnx4_ino = qnx4_raw_inode(inode);
+	/* What for? */
+	memset(qnx4_ino->di_fname, 0, sizeof qnx4_ino->di_fname);
+	qnx4_ino->di_size = 0;
+	qnx4_ino->di_num_xtnts = 0;
+	qnx4_ino->di_mode = 0;
+	qnx4_ino->di_status = 0;
 }
 
 void qnx4_free_inode(struct inode *inode)

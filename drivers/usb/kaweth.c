@@ -953,7 +953,7 @@ struct usb_api_data {
 /*-------------------------------------------------------------------*
  * completion handler for compatibility wrappers (sync control/bulk) *
  *-------------------------------------------------------------------*/
-static void usb_api_blocking_completion(urb_t *urb)
+static void usb_api_blocking_completion(struct urb *urb)
 {
         struct usb_api_data *awd = (struct usb_api_data *)urb->context;
 
@@ -966,7 +966,7 @@ static void usb_api_blocking_completion(urb_t *urb)
  *-------------------------------------------------------------------*/
 
 // Starts urb and waits for completion or timeout
-static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
+static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 {
         DECLARE_WAITQUEUE(wait, current);
 	struct usb_api_data awd;
@@ -1017,7 +1017,7 @@ int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
                             struct usb_ctrlrequest *cmd, void *data, int len,
 			    int timeout)
 {
-        urb_t *urb;
+        struct urb *urb;
         int retv;
         int length;
 

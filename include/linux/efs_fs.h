@@ -37,13 +37,11 @@ static const char cprt[] = "EFS: "EFS_VERSION" - (c) 1999 Al Smith <Al.Smith@aes
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
 
-#ifdef _EFS_USE_GENERIC
-#define INODE_INFO(i) (struct efs_inode_info *)	&((i)->u.generic_ip)
-#define SUPER_INFO(s) (struct efs_sb_info *)	&((s)->u.generic_sbp)
-#else
-#define INODE_INFO(i)				&((i)->u.efs_i)
+static inline struct efs_inode_info *INODE_INFO(struct inode *inode)
+{
+	return list_entry(inode, struct efs_inode_info, vfs_inode);
+}
 #define SUPER_INFO(s)				&((s)->u.efs_sb)
-#endif
 
 extern struct inode_operations efs_dir_inode_operations;
 extern struct file_operations efs_dir_operations;

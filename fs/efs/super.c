@@ -12,21 +12,78 @@
 #include <linux/efs_fs.h>
 #include <linux/efs_vh.h>
 #include <linux/efs_fs_sb.h>
+#include <linux/slab.h>
 
 static DECLARE_FSTYPE_DEV(efs_fs_type, "efs", efs_read_super);
 
+static kmem_cache_t * efs_inode_cachep;
+
+static struct inode *efs_alloc_inode(struct super_block *sb)
+{
+	struct efs_inode_info *ei;
+	ei = (struct efs_inode_info *)kmem_cache_alloc(efs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void efs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(efs_inode_cachep, INODE_INFO(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct efs_inode_info *ei = (struct efs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	efs_inode_cachep = kmem_cache_create("efs_inode_cache",
+					     sizeof(struct efs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (efs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(efs_inode_cachep))
+		printk(KERN_INFO "efs_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations efs_superblock_operations = {
+	alloc_inode:	efs_alloc_inode,
+	destroy_inode:	efs_destroy_inode,
 	read_inode:	efs_read_inode,
 	statfs:		efs_statfs,
 };
 
 static int __init init_efs_fs(void) {
+	int err;
 	printk("EFS: "EFS_VERSION" - http://aeschi.ch.eu.org/efs/\n");
-	return register_filesystem(&efs_fs_type);
+	err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&efs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_efs_fs(void) {
 	unregister_filesystem(&efs_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

@@ -520,7 +520,8 @@ static void uhci_append_queued_urb(struct uhci *uhci, struct urb *eurb, struct u
 
 	lltd = list_entry(lurbp->td_list.prev, struct uhci_td, list);
 
-	uhci_fixup_toggle(urb, uhci_toggle(lltd->info) ^ 1);
+	usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe),
+		uhci_fixup_toggle(urb, uhci_toggle(lltd->info) ^ 1));
 
 	/* All qh's in the queue need to link to the next queue */
 	urbp->qh->link = eurbp->qh->link;
@@ -556,6 +557,7 @@ static void uhci_delete_queued_urb(struct uhci *uhci, struct urb *urb)
 
 	/* Fix up the toggle for the next URB's */
 	if (!urbp->queued)
+		/* We set the toggle when we unlink */
 		toggle = usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe));
 	else {
 		/* If we're in the middle of the queue, grab the toggle */
@@ -1683,8 +1685,8 @@ static void uhci_unlink_generic(struct uhci *uhci, struct urb *urb)
 
 		/* Control and Isochronous ignore the toggle, so this */
 		/* is safe for all types */
-		if (!(td->status & TD_CTRL_ACTIVE) &&
-		    (uhci_actual_length(td->status) < uhci_expected_length(td->info) ||
+		if ((!(td->status & TD_CTRL_ACTIVE) &&
+		    (uhci_actual_length(td->status) < uhci_expected_length(td->info)) ||
 		    tmp == head)) {
 			usb_settoggle(urb->dev, uhci_endpoint(td->info),
 				uhci_packetout(td->info),

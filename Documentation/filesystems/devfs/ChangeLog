@@ -1869,3 +1869,11 @@ Changes for patch v206
 - Added support for multiple Compaq cpqarray controllers
 
 - Fixed (rare, old) race in <devfs_lookup>
+===============================================================================
+Changes for patch v207
+
+- Fixed deadlock bug in <devfs_d_revalidate_wait>
+
+- Tag VFS deletable in <devfs_mk_symlink> if handle ignored
+
+- Updated README from master HTML file

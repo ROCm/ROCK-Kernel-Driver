@@ -110,8 +110,7 @@ static int badness(struct task_struct *p)
 
 /*
  * Simple selection loop. We chose the process with the highest
- * number of 'points'. We need the locks to make sure that the
- * list of task structs doesn't change while we look the other way.
+ * number of 'points'. We expect the caller will lock the tasklist.
  *
  * (not docbooked, we don't want this one cluttering up the manual)
  */
@@ -121,7 +120,6 @@ static struct task_struct * select_bad_process(void)
 	struct task_struct *p = NULL;
 	struct task_struct *chosen = NULL;
 
-	read_lock(&tasklist_lock);
 	for_each_task(p) {
 		if (p->pid) {
 			int points = badness(p);
@@ -131,7 +129,6 @@ static struct task_struct * select_bad_process(void)
 			}
 		}
 	}
-	read_unlock(&tasklist_lock);
 	return chosen;
 }
 
@@ -170,14 +167,16 @@ void oom_kill_task(struct task_struct *p)
  */
 static void oom_kill(void)
 {
-	struct task_struct *p = select_bad_process(), *q;
+	struct task_struct *p, *q;
+	
+	read_lock(&tasklist_lock);
+	p = select_bad_process();
 
 	/* Found nothing?!?! Either we hang forever, or we panic. */
 	if (p == NULL)
 		panic("Out of memory and no killable processes...\n");
 
 	/* kill all processes that share the ->mm (i.e. all threads) */
-	read_lock(&tasklist_lock);
 	for_each_task(q) {
 		if(q->mm == p->mm) oom_kill_task(q);
 	}
@@ -197,7 +196,7 @@ static void oom_kill(void)
  */
 void out_of_memory(void)
 {
-	static unsigned long first, last, count;
+	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
 
 	/*
@@ -234,8 +233,18 @@ void out_of_memory(void)
 		return;
 
 	/*
+	 * If we just killed a process, wait a while
+	 * to give that task a chance to exit. This
+	 * avoids killing multiple processes needlessly.
+	 */
+	since = now - lastkill;
+	if (since < HZ*5)
+		return;
+
+	/*
 	 * Ok, really out of memory. Kill something.
 	 */
+	lastkill = now;
 	oom_kill();
 
 reset:

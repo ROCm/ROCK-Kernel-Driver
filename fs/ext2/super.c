@@ -19,8 +19,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/string.h>
-#include <linux/fs.h>
-#include <linux/ext2_fs.h>
+#include "ext2.h"
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/locks.h>
@@ -148,7 +147,51 @@ void ext2_put_super (struct super_block * sb)
 	return;
 }
 
+static kmem_cache_t * ext2_inode_cachep;
+
+static struct inode *ext2_alloc_inode(struct super_block *sb)
+{
+	struct ext2_inode_info *ei;
+	ei = (struct ext2_inode_info *)kmem_cache_alloc(ext2_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void ext2_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(ext2_inode_cachep, EXT2_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct ext2_inode_info *ei = (struct ext2_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	ext2_inode_cachep = kmem_cache_create("ext2_inode_cache",
+					     sizeof(struct ext2_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (ext2_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(ext2_inode_cachep))
+		printk(KERN_INFO "ext2_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations ext2_sops = {
+	alloc_inode:	ext2_alloc_inode,
+	destroy_inode:	ext2_destroy_inode,
 	read_inode:	ext2_read_inode,
 	write_inode:	ext2_write_inode,
 	put_inode:	ext2_put_inode,
@@ -804,12 +847,23 @@ static DECLARE_FSTYPE_DEV(ext2_fs_type, "ext2", ext2_read_super);
 
 static int __init init_ext2_fs(void)
 {
-        return register_filesystem(&ext2_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+        err = register_filesystem(&ext2_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_ext2_fs(void)
 {
 	unregister_filesystem(&ext2_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

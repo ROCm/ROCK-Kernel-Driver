@@ -22,8 +22,7 @@
  * we can depend on generic_block_fdatasync() to sync the data blocks.
  */
 
-#include <linux/fs.h>
-#include <linux/ext2_fs.h>
+#include "ext2.h"
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 

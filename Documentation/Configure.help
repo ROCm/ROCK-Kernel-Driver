@@ -8144,6 +8144,19 @@ CONFIG_IEEE1394_VIDEO1394
   this option only if you have an IEEE 1394 video device connected to
   an OHCI-1394 card.
 
+OHCI-DV I/O support
+CONFIG_IEEE1394_DV1394
+  This driver allows you to transmit and receive DV (digital video)
+  streams on an OHCI-1394 card using a simple frame-oriented
+  interface.
+
+  The user-space API for dv1394 is documented in dv1394.h.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called dv1394.o.
+
 SBP-2 support (Harddisks etc.)
 CONFIG_IEEE1394_SBP2
   This option enables you to use SBP-2 devices connected to your IEEE

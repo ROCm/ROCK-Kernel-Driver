@@ -111,7 +111,7 @@ struct td {
   	__u8 index;
   	struct ed * ed;
   	struct td * next_dl_td;
-  	urb_t * urb;
+  	struct urb * urb;
 
 	dma_addr_t td_dma;
 	dma_addr_t data_dma;
@@ -430,12 +430,12 @@ static int ep_unlink(ohci_t * ohci, ed_t * ed);
 static ed_t * ep_add_ed(struct usb_device * usb_dev, unsigned int pipe, int interval, int load, int mem_flags);
 static void ep_rm_ed(struct usb_device * usb_dev, ed_t * ed);
 /* td */
-static void td_fill(ohci_t * ohci, unsigned int info, dma_addr_t data, int len, urb_t * urb, int index);
-static void td_submit_urb(urb_t * urb);
+static void td_fill(ohci_t * ohci, unsigned int info, dma_addr_t data, int len, struct urb * urb, int index);
+static void td_submit_urb(struct urb * urb);
 /* root hub */
-static int rh_submit_urb(urb_t * urb);
-static int rh_unlink_urb(urb_t * urb);
-static int rh_init_int_timer(urb_t * urb);
+static int rh_submit_urb(struct urb * urb);
+static int rh_unlink_urb(struct urb * urb);
+static int rh_init_int_timer(struct urb * urb);
 
 /*-------------------------------------------------------------------------*/
 

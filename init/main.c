@@ -290,8 +290,6 @@ static void __init parse_options(char *line)
 extern void setup_arch(char **);
 extern void cpu_idle(void);
 
-unsigned long wait_init_idle;
-
 #ifndef CONFIG_SMP
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -305,6 +303,16 @@ static void __init smp_init(void)
 
 #else
 
+static unsigned long __initdata wait_init_idle;
+
+void __init idle_startup_done(void)
+{
+	clear_bit(smp_processor_id(), &wait_init_idle);
+	while (wait_init_idle) {
+		cpu_relax();
+		barrier();
+	}
+}
 
 /* Called by boot processor to activate the rest. */
 static void __init smp_init(void)
@@ -315,6 +323,7 @@ static void __init smp_init(void)
 
 	smp_threads_ready=1;
 	smp_commence();
+	idle_startup_done();
 }
 
 #endif
@@ -411,20 +420,13 @@ asmlinkage void __init start_kernel(void)
 	check_bugs();
 	printk("POSIX conformance testing by UNIFIX\n");
 
+	init_idle();
 	/* 
 	 *	We count on the initial thread going ok 
 	 *	Like idlers init is an unlocked kernel thread, which will
 	 *	make syscalls (and thus be locked).
 	 */
 	smp_init();
-
-	/*
-	 * Finally, we wait for all other CPU's, and initialize this
-	 * thread that will become the idle thread for the boot CPU.
-	 * After this, the scheduler is fully initialized, and we can
-	 * start creating and running new threads.
-	 */
-	init_idle();
 
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();

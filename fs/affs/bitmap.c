@@ -155,16 +155,16 @@ affs_alloc_block(struct inode *inode, u32 goal)
 
 	pr_debug("AFFS: balloc(inode=%lu,goal=%u): ", inode->i_ino, goal);
 
-	if (inode->u.affs_i.i_pa_cnt) {
-		pr_debug("%d\n", inode->u.affs_i.i_lastalloc+1);
-		inode->u.affs_i.i_pa_cnt--;
-		return ++inode->u.affs_i.i_lastalloc;
+	if (AFFS_I(inode)->i_pa_cnt) {
+		pr_debug("%d\n", AFFS_I(inode)->i_lastalloc+1);
+		AFFS_I(inode)->i_pa_cnt--;
+		return ++AFFS_I(inode)->i_lastalloc;
 	}
 
 	if (!goal || goal > AFFS_SB->s_partition_size) {
 		if (goal)
 			affs_warning(sb, "affs_balloc", "invalid goal %d", goal);
-		//if (!inode->u.affs_i.i_last_block)
+		//if (!AFFS_I(inode)->i_last_block)
 		//	affs_warning(sb, "affs_balloc", "no last alloc block");
 		goal = AFFS_SB->s_reserved;
 	}
@@ -233,16 +233,16 @@ find_bit:
 	bit = ffs(tmp) - 1;
 	blk += bit + AFFS_SB->s_reserved;
 	mask2 = mask = 1 << (bit & 31);
-	inode->u.affs_i.i_lastalloc = blk;
+	AFFS_I(inode)->i_lastalloc = blk;
 
 	/* prealloc as much as possible within this word */
 	while ((mask2 <<= 1)) {
 		if (!(tmp & mask2))
 			break;
-		inode->u.affs_i.i_pa_cnt++;
+		AFFS_I(inode)->i_pa_cnt++;
 		mask |= mask2;
 	}
-	bm->bm_free -= inode->u.affs_i.i_pa_cnt + 1;
+	bm->bm_free -= AFFS_I(inode)->i_pa_cnt + 1;
 
 	*data = cpu_to_be32(tmp & ~mask);
 

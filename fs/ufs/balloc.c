@@ -271,7 +271,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 			unlock_super (sb);
 			return (unsigned)-1;
 		}
-		if (fragment < inode->u.ufs_i.i_lastfrag) {
+		if (fragment < UFS_I(inode)->i_lastfrag) {
 			UFSD(("EXIT (ALREADY ALLOCATED)\n"))
 			unlock_super (sb);
 			return 0;
@@ -310,7 +310,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 			*p = cpu_to_fs32(sb, result);
 			*err = 0;
 			inode->i_blocks += count << uspi->s_nspfshift;
-			inode->u.ufs_i.i_lastfrag = max_t(u32, inode->u.ufs_i.i_lastfrag, fragment + count);
+			UFS_I(inode)->i_lastfrag = max_t(u32, UFS_I(inode)->i_lastfrag, fragment + count);
 			NULLIFY_FRAGMENTS
 		}
 		unlock_super(sb);
@@ -325,7 +325,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 	if (result) {
 		*err = 0;
 		inode->i_blocks += count << uspi->s_nspfshift;
-		inode->u.ufs_i.i_lastfrag = max_t(u32, inode->u.ufs_i.i_lastfrag, fragment + count);
+		UFS_I(inode)->i_lastfrag = max_t(u32, UFS_I(inode)->i_lastfrag, fragment + count);
 		NULLIFY_FRAGMENTS
 		unlock_super(sb);
 		UFSD(("EXIT, result %u\n", result))
@@ -378,7 +378,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 		*p = cpu_to_fs32(sb, result);
 		*err = 0;
 		inode->i_blocks += count << uspi->s_nspfshift;
-		inode->u.ufs_i.i_lastfrag = max_t(u32, inode->u.ufs_i.i_lastfrag, fragment + count);
+		UFS_I(inode)->i_lastfrag = max_t(u32, UFS_I(inode)->i_lastfrag, fragment + count);
 		NULLIFY_FRAGMENTS
 		unlock_super(sb);
 		if (newcount < request)

@@ -419,7 +419,7 @@ prot_to_mode(u32 prot)
 void
 mode_to_prot(struct inode *inode)
 {
-	u32 prot = AFFS_INODE->i_protect;
+	u32 prot = AFFS_I(inode)->i_protect;
 	mode_t mode = inode->i_mode;
 
 	if (!(mode & S_IXUSR))
@@ -441,7 +441,7 @@ mode_to_prot(struct inode *inode)
 	if (mode & S_IWOTH)
 		prot |= FIBF_OTR_WRITE;
 
-	AFFS_INODE->i_protect = prot;
+	AFFS_I(inode)->i_protect = prot;
 }
 
 void

@@ -118,7 +118,7 @@ struct usb_stv {
 	int removed;		/* device disconnected */
 	int streaming;		/* Are we streaming video? */
 	char *fbuf;		/* Videodev buffer area */
-	urb_t *urb[STV680_NUMSBUF];	/* # of queued bulk transfers */
+	struct urb *urb[STV680_NUMSBUF];	/* # of queued bulk transfers */
 	int curframe;		/* Current receiving frame */
 	struct stv680_frame frame[STV680_NUMFRAMES];	/* # frames supported by v4l part */
 	int readcount;

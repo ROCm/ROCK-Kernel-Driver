@@ -3,7 +3,16 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-21-DEC-2001
+20-JAN-2002
+
+
+Document languages:
+
+
+
+
+
+
 
 -----------------------------------------------------------------------------
 
@@ -69,6 +78,7 @@ Alternatives to devfs
 What I don't like about devfs
 How to report bugs
 Strange kernel messages
+Compilation problems with devfsd
 
 
 Other resources
@@ -837,8 +847,8 @@ device nodes. You can do this in your boot scripts. All your drivers
 will now work as before.
 
 Hopefully for most people devfs will have enough support so that they
-can mount devfs directly over /dev without loosing most functionality
-(i.e. loosing access to various devices). As of 22-JAN-1998 (devfs
+can mount devfs directly over /dev without losing most functionality
+(i.e. losing access to various devices). As of 22-JAN-1998 (devfs
 patch version 10) I am now running this way. All the devices I have
 are available in devfs, so I don't lose anything.
 
@@ -1477,6 +1487,7 @@ Alternatives to devfs
 What I don't like about devfs
 How to report bugs
 Strange kernel messages
+Compilation problems with devfsd
 
 
 
@@ -1677,7 +1688,7 @@ unallocated major numbers. USB will also need to push beyond the 8 bit
 minor limitation
 
 
-simplying increasing the device number size is insufficient. Apart
+simply increasing the device number size is insufficient. Apart
 from causing a lot of pain, it doesn't solve the management issues
 of a /dev with thousands or more device nodes
 
@@ -1828,6 +1839,29 @@ The solution is the same as above.
 
 
 
+
+Compilation problems with devfsd
+
+Usually, you can compile devfsd just by typing in
+make in the source directory, followed by a make
+install (as root). Sometimes, you may have problems, particularly
+on broken configurations.
+
+
+
+error messages relating to DEVFSD_NOTIFY_DELETE
+
+This happened because you have an ancient set of kernel headers
+installed in /usr/include/linux or /usr/src/linux.
+Install kernel 2.4.10 or later. You may need to pass the
+KERNEL_DIR variable to make (if you did not install
+the new kernel sources as /usr/src/linux), or you may copy
+the devfs_fs.h file in the kernel source tree into
+/usr/include/linux.
+
+
+
+
 -----------------------------------------------------------------------------
 
 
@@ -1882,9 +1916,25 @@ This document has been translated into other languages.
 
 
 
+The document master (in English) by rgooch@atnf.csiro.au is
+available at
+
+http://www.atnf.csiro.au/~rgooch/linux/docs/devfs.html
+
+
+
 A Korean translation by viatoris@nownuri.net is available at
 
-http://home.nownuri.net/~viatoris/devfs/devfs.html 
+http://home.nownuri.net/~viatoris/devfs/devfs.html
+
+A newer version is under construcation at
+
+http://viatoris.new21.org/devfs/devfs.html
 
 
 
+
+-----------------------------------------------------------------------------
+Most flags courtesy of ITA's 
+Flags of All Countries
+used with permission. 

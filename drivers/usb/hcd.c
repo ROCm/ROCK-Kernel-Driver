@@ -606,7 +606,7 @@ clean_2:
 			return retval;
 		}
 	}
-	dev->driver_data = hcd;
+	pci_set_drvdata(dev, hcd);
 	hcd->driver = driver;
 	hcd->description = driver->description;
 	hcd->pdev = dev;
@@ -689,7 +689,7 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	struct usb_hcd		*hcd;
 	struct usb_device	*hub;
 
-	hcd = (struct usb_hcd *) dev->driver_data;
+	hcd = pci_get_drvdata(dev);
 	if (!hcd)
 		return;
 	info ("remove: %s, state %x", hcd->bus_name, hcd->state);
@@ -769,7 +769,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 	struct usb_hcd		*hcd;
 	int			retval;
 
-	hcd = (struct usb_hcd *) dev->driver_data;
+	hcd = pci_get_drvdata(dev);
 	info ("suspend %s to state %d", hcd->bus_name, state);
 
 	pci_save_state (dev, hcd->pci_state);
@@ -798,7 +798,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	struct usb_hcd		*hcd;
 	int			retval;
 
-	hcd = (struct usb_hcd *) dev->driver_data;
+	hcd = pci_get_drvdata(dev);
 	info ("resume %s", hcd->bus_name);
 
 	/* guard against multiple resumes (APM bug?) */

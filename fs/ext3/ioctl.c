@@ -18,13 +18,14 @@
 int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		unsigned long arg)
 {
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	unsigned int flags;
 
 	ext3_debug ("cmd = %u, arg = %lu\n", cmd, arg);
 
 	switch (cmd) {
 	case EXT3_IOC_GETFLAGS:
-		flags = inode->u.ext3_i.i_flags & EXT3_FL_USER_VISIBLE;
+		flags = ei->i_flags & EXT3_FL_USER_VISIBLE;
 		return put_user(flags, (int *) arg);
 	case EXT3_IOC_SETFLAGS: {
 		handle_t *handle = NULL;
@@ -42,7 +43,7 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		if (get_user(flags, (int *) arg))
 			return -EFAULT;
 
-		oldflags = inode->u.ext3_i.i_flags;
+		oldflags = ei->i_flags;
 
 		/* The JOURNAL_DATA flag is modifiable only by root */
 		jflag = flags & EXT3_JOURNAL_DATA_FL;
@@ -79,7 +80,7 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		
 		flags = flags & EXT3_FL_USER_MODIFIABLE;
 		flags |= oldflags & ~EXT3_FL_USER_MODIFIABLE;
-		inode->u.ext3_i.i_flags = flags;
+		ei->i_flags = flags;
 
 		if (flags & EXT3_SYNC_FL)
 			inode->i_flags |= S_SYNC;

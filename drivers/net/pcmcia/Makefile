@@ -27,8 +27,6 @@ obj-$(CONFIG_PCMCIA_AXNET)	+= axnet_cs.o
 
 # 16-bit wireless client drivers
 obj-$(CONFIG_PCMCIA_RAYCS)	+= ray_cs.o
-obj-$(CONFIG_PCMCIA_NETWAVE)	+= netwave_cs.o
-obj-$(CONFIG_PCMCIA_WAVELAN)	+= wavelan_cs.o
 obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_cs.o
 
 # Cardbus client drivers

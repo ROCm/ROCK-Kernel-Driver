@@ -93,32 +93,32 @@ affs_adjust_bitmapchecksum(struct buffer_head *bh, u32 val)
 static inline void
 affs_lock_link(struct inode *inode)
 {
-	down(&AFFS_INODE->i_link_lock);
+	down(&AFFS_I(inode)->i_link_lock);
 }
 static inline void
 affs_unlock_link(struct inode *inode)
 {
-	up(&AFFS_INODE->i_link_lock);
+	up(&AFFS_I(inode)->i_link_lock);
 }
 static inline void
 affs_lock_dir(struct inode *inode)
 {
-	down(&AFFS_INODE->i_hash_lock);
+	down(&AFFS_I(inode)->i_hash_lock);
 }
 static inline void
 affs_unlock_dir(struct inode *inode)
 {
-	up(&AFFS_INODE->i_hash_lock);
+	up(&AFFS_I(inode)->i_hash_lock);
 }
 static inline void
 affs_lock_ext(struct inode *inode)
 {
-	down(&AFFS_INODE->i_ext_lock);
+	down(&AFFS_I(inode)->i_ext_lock);
 }
 static inline void
 affs_unlock_ext(struct inode *inode)
 {
-	up(&AFFS_INODE->i_ext_lock);
+	up(&AFFS_I(inode)->i_ext_lock);
 }
 
 #ifdef __LITTLE_ENDIAN

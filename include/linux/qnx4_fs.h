@@ -97,6 +97,12 @@ struct qnx4_super_block {
 #define QNX4DEBUG(X) (void) 0
 #endif
 
+struct qnx4_inode_info {
+	struct qnx4_inode_entry raw;
+	unsigned long mmu_private;
+	struct inode vfs_inode;
+};
+
 extern struct dentry *qnx4_lookup(struct inode *dir, struct dentry *dentry);
 extern unsigned long qnx4_count_free_blocks(struct super_block *sb);
 extern unsigned long qnx4_block_map(struct inode *inode, long iblock);
@@ -119,6 +125,16 @@ extern int qnx4_rmdir(struct inode *dir, struct dentry *dentry);
 extern int qnx4_sync_file(struct file *file, struct dentry *dentry, int);
 extern int qnx4_sync_inode(struct inode *inode);
 extern int qnx4_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh, int create);
+
+static inline struct qnx4_inode_info *qnx4_i(struct inode *inode)
+{
+	return list_entry(inode, struct qnx4_inode_info, vfs_inode);
+}
+
+static inline struct qnx4_inode_entry *qnx4_raw_inode(struct inode *inode)
+{
+	return &qnx4_i(inode)->raw;
+}
 
 #endif				/* __KERNEL__ */
 

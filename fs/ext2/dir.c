@@ -21,8 +21,7 @@
  * and moved here. AV
  */
 
-#include <linux/fs.h>
-#include <linux/ext2_fs.h>
+#include "ext2.h"
 #include <linux/pagemap.h>
 
 typedef struct ext2_dir_entry_2 ext2_dirent;
@@ -306,12 +305,13 @@ struct ext2_dir_entry_2 * ext2_find_entry (struct inode * dir,
 	unsigned long start, n;
 	unsigned long npages = dir_pages(dir);
 	struct page *page = NULL;
+	struct ext2_inode_info *ei = EXT2_I(dir);
 	ext2_dirent * de;
 
 	/* OFFSET_CACHE */
 	*res_page = NULL;
 
-	start = dir->u.ext2_i.i_dir_start_lookup;
+	start = ei->i_dir_start_lookup;
 	if (start >= npages)
 		start = 0;
 	n = start;
@@ -336,7 +336,7 @@ struct ext2_dir_entry_2 * ext2_find_entry (struct inode * dir,
 
 found:
 	*res_page = page;
-	dir->u.ext2_i.i_dir_start_lookup = n;
+	ei->i_dir_start_lookup = n;
 	return de;
 }
 

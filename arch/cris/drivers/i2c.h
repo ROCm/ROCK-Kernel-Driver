@@ -1,4 +1,4 @@
-/* $Id: i2c.h,v 1.3 2001/03/19 12:43:01 markusl Exp $ */
+/* $Id: i2c.h,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $ */
 
 /* High level I2C actions */
 int i2c_writereg(unsigned char theSlave, unsigned char theReg, unsigned char theValue);

@@ -89,7 +89,7 @@ icc_bh(struct IsdnCardState *cs)
 			debugl1(cs, "D-Channel Busy cleared");
 		stptr = cs->stlist;
 		while (stptr != NULL) {
-			stptr->l1.l1l2(stptr, PH_PAUSE | CONFIRM, NULL);
+			L1L2(stptr, PH_PAUSE | CONFIRM, NULL);
 			stptr = stptr->next;
 		}
 	}
@@ -506,7 +506,7 @@ ICC_l1hw(struct PStack *st, int pr, void *arg)
 #endif
 			if (!cs->tx_skb) {
 				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+				L1L2(st, PH_PULL | CONFIRM, NULL);
 			} else
 				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
@@ -603,7 +603,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 			test_and_set_bit(FLG_L1_DBUSY, &cs->HW_Flags);
 			stptr = cs->stlist;
 			while (stptr != NULL) {
-				stptr->l1.l1l2(stptr, PH_PAUSE | INDICATION, NULL);
+				L1L2(stptr, PH_PAUSE | INDICATION, NULL);
 				stptr = stptr->next;
 			}
 		} else {

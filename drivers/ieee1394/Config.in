@@ -19,6 +19,7 @@ if [ "$CONFIG_PCI" = "y" -a "$CONFIG_EXPERIMENTAL" = "y" ]; then
 	comment "Protocol Drivers"
 	dep_tristate '  OHCI-1394 Video support' CONFIG_IEEE1394_VIDEO1394 $CONFIG_IEEE1394_OHCI1394
 	dep_tristate '  SBP-2 support (Harddisks etc.)' CONFIG_IEEE1394_SBP2 $CONFIG_SCSI $CONFIG_IEEE1394
+	dep_tristate '  OHCI-DV I/O support' CONFIG_IEEE1394_DV1394 $CONFIG_IEEE1394_OHCI1394
 	dep_tristate '  Raw IEEE1394 I/O support' CONFIG_IEEE1394_RAWIO $CONFIG_IEEE1394
 
 	bool 'Excessive debugging output' CONFIG_IEEE1394_VERBOSEDEBUG

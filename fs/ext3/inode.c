@@ -196,7 +196,7 @@ void ext3_delete_inode (struct inode * inode)
 	 * (Well, we could do this if we need to, but heck - it works)
 	 */
 	ext3_orphan_del(handle, inode);
-	inode->u.ext3_i.i_dtime	= CURRENT_TIME;
+	EXT3_I(inode)->i_dtime	= CURRENT_TIME;
 
 	/* 
 	 * One subtle ordering requirement: if anything has gone wrong
@@ -220,13 +220,14 @@ no_delete:
 void ext3_discard_prealloc (struct inode * inode)
 {
 #ifdef EXT3_PREALLOCATE
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	lock_kernel();
 	/* Writer: ->i_prealloc* */
-	if (inode->u.ext3_i.i_prealloc_count) {
-		unsigned short total = inode->u.ext3_i.i_prealloc_count;
-		unsigned long block = inode->u.ext3_i.i_prealloc_block;
-		inode->u.ext3_i.i_prealloc_count = 0;
-		inode->u.ext3_i.i_prealloc_block = 0;
+	if (ei->i_prealloc_count) {
+		unsigned short total = ei->i_prealloc_count;
+		unsigned long block = ei->i_prealloc_block;
+		ei->i_prealloc_count = 0;
+		ei->i_prealloc_block = 0;
 		/* Writer: end */
 		ext3_free_blocks (inode, block, total);
 	}
@@ -243,13 +244,14 @@ static int ext3_alloc_block (handle_t *handle,
 	unsigned long result;
 
 #ifdef EXT3_PREALLOCATE
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	/* Writer: ->i_prealloc* */
-	if (inode->u.ext3_i.i_prealloc_count &&
-	    (goal == inode->u.ext3_i.i_prealloc_block ||
-	     goal + 1 == inode->u.ext3_i.i_prealloc_block))
+	if (ei->i_prealloc_count &&
+	    (goal == ei->i_prealloc_block ||
+	     goal + 1 == ei->i_prealloc_block))
 	{
-		result = inode->u.ext3_i.i_prealloc_block++;
-		inode->u.ext3_i.i_prealloc_count--;
+		result = ei->i_prealloc_block++;
+		ei->i_prealloc_count--;
 		/* Writer: end */
 		ext3_debug ("preallocation hit (%lu/%lu).\n",
 			    ++alloc_hits, ++alloc_attempts);
@@ -259,8 +261,8 @@ static int ext3_alloc_block (handle_t *handle,
 			    alloc_hits, ++alloc_attempts);
 		if (S_ISREG(inode->i_mode))
 			result = ext3_new_block (inode, goal, 
-				 &inode->u.ext3_i.i_prealloc_count,
-				 &inode->u.ext3_i.i_prealloc_block, err);
+				 &ei->i_prealloc_count,
+				 &ei->i_prealloc_block, err);
 		else
 			result = ext3_new_block (inode, goal, 0, 0, err);
 		/*
@@ -394,7 +396,7 @@ static Indirect *ext3_get_branch(struct inode *inode, int depth, int *offsets,
 
 	*err = 0;
 	/* i_data is not going away, no lock needed */
-	add_chain (chain, NULL, inode->u.ext3_i.i_data + *offsets);
+	add_chain (chain, NULL, EXT3_I(inode)->i_data + *offsets);
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
@@ -437,7 +439,8 @@ no_block:
 
 static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 {
-	u32 *start = ind->bh ? (u32*) ind->bh->b_data : inode->u.ext3_i.i_data;
+	struct ext3_inode_info *ei = EXT3_I(inode);
+	u32 *start = ind->bh ? (u32*) ind->bh->b_data : ei->i_data;
 	u32 *p;
 
 	/* Try to find previous block */
@@ -453,8 +456,7 @@ static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 	 * It is going to be refered from inode itself? OK, just put it into
 	 * the same cylinder group then.
 	 */
-	return (inode->u.ext3_i.i_block_group * 
-		EXT3_BLOCKS_PER_GROUP(inode->i_sb)) +
+	return (ei->i_block_group * EXT3_BLOCKS_PER_GROUP(inode->i_sb)) +
 	       le32_to_cpu(inode->i_sb->u.ext3_sb.s_es->s_first_data_block);
 }
 
@@ -474,14 +476,15 @@ static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 static int ext3_find_goal(struct inode *inode, long block, Indirect chain[4],
 			  Indirect *partial, unsigned long *goal)
 {
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	/* Writer: ->i_next_alloc* */
-	if (block == inode->u.ext3_i.i_next_alloc_block + 1) {
-		inode->u.ext3_i.i_next_alloc_block++;
-		inode->u.ext3_i.i_next_alloc_goal++;
+	if (block == ei->i_next_alloc_block + 1) {
+		ei->i_next_alloc_block++;
+		ei->i_next_alloc_goal++;
 	}
 #ifdef SEARCH_FROM_ZERO
-	inode->u.ext3_i.i_next_alloc_block = 0;
-	inode->u.ext3_i.i_next_alloc_goal = 0;
+	ei->i_next_alloc_block = 0;
+	ei->i_next_alloc_goal = 0;
 #endif
 	/* Writer: end */
 	/* Reader: pointers, ->i_next_alloc* */
@@ -490,8 +493,8 @@ static int ext3_find_goal(struct inode *inode, long block, Indirect chain[4],
 		 * try the heuristic for sequential allocation,
 		 * failing that at least try to get decent locality.
 		 */
-		if (block == inode->u.ext3_i.i_next_alloc_block)
-			*goal = inode->u.ext3_i.i_next_alloc_goal;
+		if (block == ei->i_next_alloc_block)
+			*goal = ei->i_next_alloc_goal;
 		if (!*goal)
 			*goal = ext3_find_near(inode, partial);
 #ifdef SEARCH_FROM_ZERO
@@ -619,6 +622,7 @@ static int ext3_splice_branch(handle_t *handle, struct inode *inode, long block,
 {
 	int i;
 	int err = 0;
+	struct ext3_inode_info *ei = EXT3_I(inode);
 
 	/*
 	 * If we're splicing into a [td]indirect block (as opposed to the
@@ -641,11 +645,11 @@ static int ext3_splice_branch(handle_t *handle, struct inode *inode, long block,
 	/* That's it */
 
 	*where->p = where->key;
-	inode->u.ext3_i.i_next_alloc_block = block;
-	inode->u.ext3_i.i_next_alloc_goal = le32_to_cpu(where[num-1].key);
+	ei->i_next_alloc_block = block;
+	ei->i_next_alloc_goal = le32_to_cpu(where[num-1].key);
 #ifdef SEARCH_FROM_ZERO
-	inode->u.ext3_i.i_next_alloc_block = 0;
-	inode->u.ext3_i.i_next_alloc_goal = 0;
+	ei->i_next_alloc_block = 0;
+	ei->i_next_alloc_goal = 0;
 #endif
 	/* Writer: end */
 
@@ -729,6 +733,7 @@ static int ext3_get_block_handle(handle_t *handle, struct inode *inode,
 	unsigned long goal;
 	int left;
 	int depth = ext3_block_to_path(inode, iblock, offsets);
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	loff_t new_size;
 
 	J_ASSERT(handle != NULL || create == 0);
@@ -780,7 +785,7 @@ out:
 	/*
 	 * Block out ext3_truncate while we alter the tree
 	 */
-	down_read(&inode->u.ext3_i.truncate_sem);
+	down_read(&ei->truncate_sem);
 	err = ext3_alloc_branch(handle, inode, left, goal,
 					offsets+(partial-chain), partial);
 
@@ -792,7 +797,7 @@ out:
 	if (!err)
 		err = ext3_splice_branch(handle, inode, iblock, chain,
 					 partial, left);
-	up_read(&inode->u.ext3_i.truncate_sem);
+	up_read(&ei->truncate_sem);
 	if (err == -EAGAIN)
 		goto changed;
 	if (err)
@@ -805,8 +810,8 @@ out:
 	 * truncate is in progress.  It is racy between multiple parallel
 	 * instances of get_block, but we have the BKL.
 	 */
-	if (new_size > inode->u.ext3_i.i_disksize)
-		inode->u.ext3_i.i_disksize = new_size;
+	if (new_size > ei->i_disksize)
+		ei->i_disksize = new_size;
 
 	bh_result->b_state |= (1UL << BH_New);
 	goto got_it;
@@ -916,7 +921,7 @@ struct buffer_head *ext3_bread(handle_t *handle, struct inode * inode,
 		struct buffer_head *tmp_bh;
 
 		for (i = 1;
-		     inode->u.ext3_i.i_prealloc_count &&
+		     EXT3_I(inode)->i_prealloc_count &&
 		     i < EXT3_SB(inode->i_sb)->s_es->s_prealloc_dir_blocks;
 		     i++) {
 			/*
@@ -1126,8 +1131,8 @@ static int ext3_commit_write(struct file *file, struct page *page,
 			kunmap(page);
 		}
 	}
-	if (inode->i_size > inode->u.ext3_i.i_disksize) {
-		inode->u.ext3_i.i_disksize = inode->i_size;
+	if (inode->i_size > EXT3_I(inode)->i_disksize) {
+		EXT3_I(inode)->i_disksize = inode->i_size;
 		ret2 = ext3_mark_inode_dirty(handle, inode);
 		if (!ret) 
 			ret = ret2;
@@ -1826,7 +1831,8 @@ static void ext3_free_branches(handle_t *handle, struct inode *inode,
 void ext3_truncate(struct inode * inode)
 {
 	handle_t *handle;
-	u32 *i_data = inode->u.ext3_i.i_data;
+	struct ext3_inode_info *ei = EXT3_I(inode);
+	u32 *i_data = ei->i_data;
 	int addr_per_block = EXT3_ADDR_PER_BLOCK(inode->i_sb);
 	int offsets[4];
 	Indirect chain[4];
@@ -1878,13 +1884,13 @@ void ext3_truncate(struct inode * inode)
 	 * on-disk inode. We do this via i_disksize, which is the value which
 	 * ext3 *really* writes onto the disk inode.
 	 */
-	inode->u.ext3_i.i_disksize = inode->i_size;
+	ei->i_disksize = inode->i_size;
 
 	/*
 	 * From here we block out all ext3_get_block() callers who want to
 	 * modify the block allocation tree.
 	 */
-	down_write(&inode->u.ext3_i.truncate_sem);
+	down_write(&ei->truncate_sem);
 
 	if (n == 1) {		/* direct blocks */
 		ext3_free_data(handle, inode, NULL, i_data+offsets[0],
@@ -1948,7 +1954,7 @@ do_indirects:
 		case EXT3_TIND_BLOCK:
 			;
 	}
-	up_write(&inode->u.ext3_i.truncate_sem);
+	up_write(&ei->truncate_sem);
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	ext3_mark_inode_dirty(handle, inode);
 
@@ -2041,6 +2047,7 @@ void ext3_read_inode(struct inode * inode)
 {
 	struct ext3_iloc iloc;
 	struct ext3_inode *raw_inode;
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	struct buffer_head *bh;
 	int block;
 	
@@ -2048,7 +2055,6 @@ void ext3_read_inode(struct inode * inode)
 		goto bad_inode;
 	bh = iloc.bh;
 	raw_inode = iloc.raw_inode;
-	init_rwsem(&inode->u.ext3_i.truncate_sem);
 	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
 	inode->i_uid = (uid_t)le16_to_cpu(raw_inode->i_uid_low);
 	inode->i_gid = (gid_t)le16_to_cpu(raw_inode->i_gid_low);
@@ -2061,7 +2067,12 @@ void ext3_read_inode(struct inode * inode)
 	inode->i_atime = le32_to_cpu(raw_inode->i_atime);
 	inode->i_ctime = le32_to_cpu(raw_inode->i_ctime);
 	inode->i_mtime = le32_to_cpu(raw_inode->i_mtime);
-	inode->u.ext3_i.i_dtime = le32_to_cpu(raw_inode->i_dtime);
+
+	ei->i_state = 0;
+	ei->i_next_alloc_block = 0;
+	ei->i_next_alloc_goal = 0;
+	ei->i_dir_start_lookup = 0;
+	ei->i_dtime = le32_to_cpu(raw_inode->i_dtime);
 	/* We now have enough fields to check if the inode was active or not.
 	 * This is needed because nfsd might try to access dead inodes
 	 * the test is that same one that e2fsck uses
@@ -2084,33 +2095,33 @@ void ext3_read_inode(struct inode * inode)
 					 * size */  
 	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
 	inode->i_version = ++event;
-	inode->u.ext3_i.i_flags = le32_to_cpu(raw_inode->i_flags);
+	ei->i_flags = le32_to_cpu(raw_inode->i_flags);
 #ifdef EXT3_FRAGMENTS
-	inode->u.ext3_i.i_faddr = le32_to_cpu(raw_inode->i_faddr);
-	inode->u.ext3_i.i_frag_no = raw_inode->i_frag;
-	inode->u.ext3_i.i_frag_size = raw_inode->i_fsize;
+	ei->i_faddr = le32_to_cpu(raw_inode->i_faddr);
+	ei->i_frag_no = raw_inode->i_frag;
+	ei->i_frag_size = raw_inode->i_fsize;
 #endif
-	inode->u.ext3_i.i_file_acl = le32_to_cpu(raw_inode->i_file_acl);
+	ei->i_file_acl = le32_to_cpu(raw_inode->i_file_acl);
 	if (!S_ISREG(inode->i_mode)) {
-		inode->u.ext3_i.i_dir_acl = le32_to_cpu(raw_inode->i_dir_acl);
+		ei->i_dir_acl = le32_to_cpu(raw_inode->i_dir_acl);
 	} else {
 		inode->i_size |=
 			((__u64)le32_to_cpu(raw_inode->i_size_high)) << 32;
 	}
-	inode->u.ext3_i.i_disksize = inode->i_size;
+	ei->i_disksize = inode->i_size;
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
 #ifdef EXT3_PREALLOCATE
-	inode->u.ext3_i.i_prealloc_count = 0;
+	ei->i_prealloc_count = 0;
 #endif
-	inode->u.ext3_i.i_block_group = iloc.block_group;
+	ei->i_block_group = iloc.block_group;
 
 	/*
 	 * NOTE! The in-memory inode i_data array is in little-endian order
 	 * even on big-endian machines: we do NOT byteswap the block numbers!
 	 */
 	for (block = 0; block < EXT3_N_BLOCKS; block++)
-		inode->u.ext3_i.i_data[block] = iloc.raw_inode->i_block[block];
-	INIT_LIST_HEAD(&inode->u.ext3_i.i_orphan);
+		ei->i_data[block] = iloc.raw_inode->i_block[block];
+	INIT_LIST_HEAD(&ei->i_orphan);
 
 	brelse (iloc.bh);
 
@@ -2135,19 +2146,19 @@ void ext3_read_inode(struct inode * inode)
 		init_special_inode(inode, inode->i_mode,
 				   le32_to_cpu(iloc.raw_inode->i_block[0]));
 	/* inode->i_attr_flags = 0;				unused */
-	if (inode->u.ext3_i.i_flags & EXT3_SYNC_FL) {
+	if (ei->i_flags & EXT3_SYNC_FL) {
 		/* inode->i_attr_flags |= ATTR_FLAG_SYNCRONOUS; unused */
 		inode->i_flags |= S_SYNC;
 	}
-	if (inode->u.ext3_i.i_flags & EXT3_APPEND_FL) {
+	if (ei->i_flags & EXT3_APPEND_FL) {
 		/* inode->i_attr_flags |= ATTR_FLAG_APPEND;	unused */
 		inode->i_flags |= S_APPEND;
 	}
-	if (inode->u.ext3_i.i_flags & EXT3_IMMUTABLE_FL) {
+	if (ei->i_flags & EXT3_IMMUTABLE_FL) {
 		/* inode->i_attr_flags |= ATTR_FLAG_IMMUTABLE;	unused */
 		inode->i_flags |= S_IMMUTABLE;
 	}
-	if (inode->u.ext3_i.i_flags & EXT3_NOATIME_FL) {
+	if (ei->i_flags & EXT3_NOATIME_FL) {
 		/* inode->i_attr_flags |= ATTR_FLAG_NOATIME;	unused */
 		inode->i_flags |= S_NOATIME;
 	}
@@ -2169,6 +2180,7 @@ static int ext3_do_update_inode(handle_t *handle,
 				struct ext3_iloc *iloc)
 {
 	struct ext3_inode *raw_inode = iloc->raw_inode;
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	struct buffer_head *bh = iloc->bh;
 	int err = 0, rc, block;
 
@@ -2186,7 +2198,7 @@ static int ext3_do_update_inode(handle_t *handle,
  * Fix up interoperability with old kernels. Otherwise, old inodes get
  * re-used with the upper 16 bits of the uid/gid intact
  */
-		if(!inode->u.ext3_i.i_dtime) {
+		if(!ei->i_dtime) {
 			raw_inode->i_uid_high =
 				cpu_to_le16(high_16_bits(inode->i_uid));
 			raw_inode->i_gid_high =
@@ -2204,34 +2216,34 @@ static int ext3_do_update_inode(handle_t *handle,
 		raw_inode->i_gid_high = 0;
 	}
 	raw_inode->i_links_count = cpu_to_le16(inode->i_nlink);
-	raw_inode->i_size = cpu_to_le32(inode->u.ext3_i.i_disksize);
+	raw_inode->i_size = cpu_to_le32(ei->i_disksize);
 	raw_inode->i_atime = cpu_to_le32(inode->i_atime);
 	raw_inode->i_ctime = cpu_to_le32(inode->i_ctime);
 	raw_inode->i_mtime = cpu_to_le32(inode->i_mtime);
 	raw_inode->i_blocks = cpu_to_le32(inode->i_blocks);
-	raw_inode->i_dtime = cpu_to_le32(inode->u.ext3_i.i_dtime);
-	raw_inode->i_flags = cpu_to_le32(inode->u.ext3_i.i_flags);
+	raw_inode->i_dtime = cpu_to_le32(ei->i_dtime);
+	raw_inode->i_flags = cpu_to_le32(ei->i_flags);
 #ifdef EXT3_FRAGMENTS
-	raw_inode->i_faddr = cpu_to_le32(inode->u.ext3_i.i_faddr);
-	raw_inode->i_frag = inode->u.ext3_i.i_frag_no;
-	raw_inode->i_fsize = inode->u.ext3_i.i_frag_size;
+	raw_inode->i_faddr = cpu_to_le32(ei->i_faddr);
+	raw_inode->i_frag = ei->i_frag_no;
+	raw_inode->i_fsize = ei->i_frag_size;
 #else
 	/* If we are not tracking these fields in the in-memory inode,
 	 * then preserve them on disk, but still initialise them to zero
 	 * for new inodes. */
-	if (EXT3_I(inode)->i_state & EXT3_STATE_NEW) {
+	if (ei->i_state & EXT3_STATE_NEW) {
 		raw_inode->i_faddr = 0;
 		raw_inode->i_frag = 0;
 		raw_inode->i_fsize = 0;
 	}
 #endif
-	raw_inode->i_file_acl = cpu_to_le32(inode->u.ext3_i.i_file_acl);
+	raw_inode->i_file_acl = cpu_to_le32(ei->i_file_acl);
 	if (!S_ISREG(inode->i_mode)) {
-		raw_inode->i_dir_acl = cpu_to_le32(inode->u.ext3_i.i_dir_acl);
+		raw_inode->i_dir_acl = cpu_to_le32(ei->i_dir_acl);
 	} else {
 		raw_inode->i_size_high =
-			cpu_to_le32(inode->u.ext3_i.i_disksize >> 32);
-		if (inode->u.ext3_i.i_disksize > 0x7fffffffULL) {
+			cpu_to_le32(ei->i_disksize >> 32);
+		if (ei->i_disksize > 0x7fffffffULL) {
 			struct super_block *sb = inode->i_sb;
 			if (!EXT3_HAS_RO_COMPAT_FEATURE(sb,
 					EXT3_FEATURE_RO_COMPAT_LARGE_FILE) ||
@@ -2259,13 +2271,13 @@ static int ext3_do_update_inode(handle_t *handle,
 		raw_inode->i_block[0] =
 			cpu_to_le32(kdev_t_to_nr(inode->i_rdev));
 	else for (block = 0; block < EXT3_N_BLOCKS; block++)
-		raw_inode->i_block[block] = inode->u.ext3_i.i_data[block];
+		raw_inode->i_block[block] = ei->i_data[block];
 
 	BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
 	rc = ext3_journal_dirty_metadata(handle, bh);
 	if (!err)
 		err = rc;
-	EXT3_I(inode)->i_state &= ~EXT3_STATE_NEW;
+	ei->i_state &= ~EXT3_STATE_NEW;
 
 out_brelse:
 	brelse (bh);
@@ -2373,7 +2385,7 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 		}
 		
 		error = ext3_orphan_add(handle, inode);
-		inode->u.ext3_i.i_disksize = attr->ia_size;
+		EXT3_I(inode)->i_disksize = attr->ia_size;
 		rc = ext3_mark_inode_dirty(handle, inode);
 		if (!error)
 			error = rc;
@@ -2616,9 +2628,9 @@ int ext3_change_inode_journal_flag(struct inode *inode, int val)
 	 */
 
 	if (val)
-		inode->u.ext3_i.i_flags |= EXT3_JOURNAL_DATA_FL;
+		EXT3_I(inode)->i_flags |= EXT3_JOURNAL_DATA_FL;
 	else
-		inode->u.ext3_i.i_flags &= ~EXT3_JOURNAL_DATA_FL;
+		EXT3_I(inode)->i_flags &= ~EXT3_JOURNAL_DATA_FL;
 
 	journal_unlock_updates(journal);
 

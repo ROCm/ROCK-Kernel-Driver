@@ -73,6 +73,7 @@ struct ext3_inode_info {
 	 * by other means, so we have truncate_sem.
 	 */
 	struct rw_semaphore truncate_sem;
+	struct inode vfs_inode;
 };
 
 #endif	/* _LINUX_EXT3_FS_I */

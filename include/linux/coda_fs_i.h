@@ -24,6 +24,7 @@ struct coda_inode_info {
 	unsigned int       c_contcount; /* refcount for container file */
         struct coda_cred   c_cached_cred; /* credentials of cached perms */
         unsigned int       c_cached_perm; /* cached access permissions */
+	struct inode	   vfs_inode;
 };
 
 /* flags */

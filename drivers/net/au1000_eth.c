@@ -1141,6 +1141,8 @@ static int au1000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		//data[3] = mdio_read(ioaddr, data[0], data[1]); 
 		return 0;
 		case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		//mdio_write(ioaddr, data[0], data[1], data[2]);
 		return 0;
 		default:

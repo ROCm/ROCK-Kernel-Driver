@@ -78,7 +78,54 @@ affs_write_super(struct super_block *sb)
 	pr_debug("AFFS: write_super() at %lu, clean=%d\n", CURRENT_TIME, clean);
 }
 
+static kmem_cache_t * affs_inode_cachep;
+
+static struct inode *affs_alloc_inode(struct super_block *sb)
+{
+	struct affs_inode_info *ei;
+	ei = (struct affs_inode_info *)kmem_cache_alloc(affs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void affs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(affs_inode_cachep, AFFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct affs_inode_info *ei = (struct affs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		init_MUTEX(&ei->i_link_lock);
+		init_MUTEX(&ei->i_ext_lock);
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+ 
+static int init_inodecache(void)
+{
+	affs_inode_cachep = kmem_cache_create("affs_inode_cache",
+					     sizeof(struct affs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (affs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(affs_inode_cachep))
+		printk(KERN_INFO "affs_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations affs_sops = {
+	alloc_inode:	affs_alloc_inode,
+	destroy_inode:	affs_destroy_inode,
 	read_inode:	affs_read_inode,
 	write_inode:	affs_write_inode,
 	put_inode:	affs_put_inode,
@@ -490,12 +537,23 @@ static DECLARE_FSTYPE_DEV(affs_fs_type, "affs", affs_read_super);
 
 static int __init init_affs_fs(void)
 {
-	return register_filesystem(&affs_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&affs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_affs_fs(void)
 {
 	unregister_filesystem(&affs_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

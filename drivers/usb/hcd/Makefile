@@ -6,7 +6,7 @@
 O_TARGET	:=
 
 obj-$(CONFIG_USB_EHCI_HCD)			+= ehci-hcd.o
-# obj-$(CONFIG_USB_OHCI_HCD)			+= ohci-hcd.o
+obj-$(CONFIG_USB_OHCI_HCD)			+= ohci-hcd.o
 # obj-$(CONFIG_USB_UHCI_HCD)			+= uhci-hcd.o
 
 # Extract lists of the multi-part drivers.

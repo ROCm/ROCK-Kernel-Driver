@@ -29,8 +29,7 @@
  *        David S. Miller (davem@caip.rutgers.edu), 1995
  */
 
-#include <linux/fs.h>
-#include <linux/ext2_fs.h>
+#include "ext2.h"
 #include <linux/pagemap.h>
 
 /*
@@ -134,7 +133,7 @@ static int ext2_symlink (struct inode * dir, struct dentry * dentry,
 	if (IS_ERR(inode))
 		goto out;
 
-	if (l > sizeof (inode->u.ext2_i.i_data)) {
+	if (l > sizeof (EXT2_I(inode)->i_data)) {
 		/* slow symlink */
 		inode->i_op = &page_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
@@ -144,7 +143,7 @@ static int ext2_symlink (struct inode * dir, struct dentry * dentry,
 	} else {
 		/* fast symlink */
 		inode->i_op = &ext2_fast_symlink_inode_operations;
-		memcpy((char*)&inode->u.ext2_i.i_data,symname,l);
+		memcpy((char*)(EXT2_I(inode)->i_data),symname,l);
 		inode->i_size = l-1;
 	}
 	mark_inode_dirty(inode);

@@ -113,7 +113,7 @@ Printk ((KERN_DEBUG "umsdos_rlookup_x: patch_dentry_inode %s/%s\n",
 dentry->d_parent->d_name.name, dentry->d_name.name));
 /* only patch if needed (because we get called even for lookup
    (not only rlookup) stuff sometimes, like in umsdos_covered() */
-		if (dentry->d_inode->u.umsdos_i.i_patched == 0)	
+		if (UMSDOS_I(dentry->d_inode)->i_patched == 0)	
 		umsdos_patch_dentry_inode(dentry, 0);
 
 	}

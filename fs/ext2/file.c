@@ -18,8 +18,7 @@
  * 	(jj@sunsite.ms.mff.cuni.cz)
  */
 
-#include <linux/fs.h>
-#include <linux/ext2_fs.h>
+#include "ext2.h"
 #include <linux/sched.h>
 
 /*

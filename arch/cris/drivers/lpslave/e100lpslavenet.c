@@ -1,4 +1,4 @@
-/* $Id: e100lpslavenet.c,v 1.4 2001/06/21 16:55:26 olof Exp $
+/* $Id: e100lpslavenet.c,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
  *
  * e100lpslavenet.c: A network driver for the ETRAX 100LX slave controller.
  *
@@ -7,6 +7,9 @@
  * The outline of this driver comes from skeleton.c.
  *
  * $Log: e100lpslavenet.c,v $
+ * Revision 1.1.1.1  2001/12/17 13:59:27  bjornw
+ * Import of Linux 2.5.1
+ *
  * Revision 1.4  2001/06/21 16:55:26  olof
  * Minimized par port setup time to gain bandwidth
  *

@@ -109,11 +109,11 @@ struct keyspan_serial_private {
 
 	const keyspan_device_details	*device_details;
 
-	urb_t		*instat_urb;
+	struct urb	*instat_urb;
 	char		instat_buf[INSTAT_BUFLEN];
 
 	/* XXX this one probably will need a lock */
-	urb_t		*glocont_urb;
+	struct urb	*glocont_urb;
 	char		glocont_buf[GLOCONT_BUFLEN];
 };
 
@@ -128,18 +128,18 @@ struct keyspan_port_private {
 	const keyspan_device_details	*device_details;
 
 	/* Input endpoints and buffer for this port */
-	urb_t		*in_urbs[2];
+	struct urb	*in_urbs[2];
 	char		in_buffer[2][64];
 	/* Output endpoints and buffer for this port */
-	urb_t		*out_urbs[2];
+	struct urb	*out_urbs[2];
 	char		out_buffer[2][64];
 
 	/* Input ack endpoint */
-	urb_t		*inack_urb;
+	struct urb	*inack_urb;
 	char		inack_buffer[1];
 
 	/* Output control endpoint */
-	urb_t		*outcont_urb;
+	struct urb	*outcont_urb;
 	char		outcont_buffer[64];
 
 	/* Settings for the port */
@@ -324,7 +324,7 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 	const keyspan_device_details	*d_details;
 	int				flip;
 	int 				left, todo;
-	urb_t 				*this_urb;
+	struct urb			*this_urb;
 	int 				err;
 
 	p_priv = (struct keyspan_port_private *)(port->private);
@@ -853,7 +853,7 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial 		*serial = port->serial;
 	const keyspan_device_details	*d_details;
 	int				i, already_active, err;
-	urb_t *urb;
+	struct urb			*urb;
 
 	s_priv = (struct keyspan_serial_private *)(serial->private);
 	p_priv = (struct keyspan_port_private *)(port->private);
@@ -890,7 +890,7 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	return (0);
 }
 
-static inline void stop_urb(urb_t *urb)
+static inline void stop_urb(struct urb *urb)
 {
 	if (urb && urb->status == -EINPROGRESS) {
 		urb->transfer_flags &= ~USB_ASYNC_UNLINK;
@@ -1041,11 +1041,11 @@ static int keyspan_fake_startup (struct usb_serial *serial)
 }
 
 /* Helper functions used by keyspan_setup_urbs */
-static urb_t *keyspan_setup_urb(struct usb_serial *serial, int endpoint,
-				int dir, void *ctx, char *buf, int len,
-				void (*callback)(urb_t *))
+static struct urb *keyspan_setup_urb(struct usb_serial *serial, int endpoint,
+				     int dir, void *ctx, char *buf, int len,
+				     void (*callback)(struct urb *))
 {
-	urb_t *urb;
+	struct urb *urb;
 
 	if (endpoint == -1)
 		return NULL;		/* endpoint not needed */
@@ -1066,12 +1066,12 @@ static urb_t *keyspan_setup_urb(struct usb_serial *serial, int endpoint,
 }
 
 static struct callbacks {
-	void	(*instat_callback)(urb_t *);
-	void	(*glocont_callback)(urb_t *);
-	void	(*indat_callback)(urb_t *);
-	void	(*outdat_callback)(urb_t *);
-	void	(*inack_callback)(urb_t *);
-	void	(*outcont_callback)(urb_t *);
+	void	(*instat_callback)(struct urb *);
+	void	(*glocont_callback)(struct urb *);
+	void	(*indat_callback)(struct urb *);
+	void	(*outdat_callback)(struct urb *);
+	void	(*inack_callback)(struct urb *);
+	void	(*outcont_callback)(struct urb *);
 } keyspan_callbacks[] = {
 	{
 		/* msg_usa26 callbacks */
@@ -1295,7 +1295,7 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 	struct keyspan_port_private 		*p_priv;
 	const  keyspan_device_details		*d_details;
 	int 					outcont_urb;
-	urb_t *this_urb;
+	struct urb				*this_urb;
 	int err;
 
 	dbg ("%s reset=%d\n", __FUNCTION__, reset_port); 
@@ -1430,7 +1430,7 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 	struct keyspan_serial_private	 	*s_priv;
 	struct keyspan_port_private 		*p_priv;
 	const  keyspan_device_details		*d_details;
-	urb_t *this_urb;
+	struct urb				*this_urb;
 	int err;
 
 	s_priv = (struct keyspan_serial_private *)(serial->private);
@@ -1516,7 +1516,7 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 	struct keyspan_port_private 		*p_priv;
 	const  keyspan_device_details		*d_details;
 	int 					glocont_urb;
-	urb_t 					*this_urb;
+	struct urb				*this_urb;
 	int 					err;
 	int					device_port;
 

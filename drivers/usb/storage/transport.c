@@ -369,7 +369,7 @@ int usb_stor_clear_halt(struct usb_device *dev, int pipe)
 /* This is the completion handler which will wake us up when an URB
  * completes.
  */
-static void usb_stor_blocking_completion(urb_t *urb)
+static void usb_stor_blocking_completion(struct urb *urb)
 {
 	struct completion *urb_done_ptr = (struct completion *)urb->context;
 

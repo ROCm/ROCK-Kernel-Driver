@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.8 2001/10/03 17:15:15 bjornw Exp $
+/* $Id: head.S,v 1.2 2001/12/18 13:35:12 bjornw Exp $
  * 
  * Rescue code, made to reside at the beginning of the
  * flash-memory. when it starts, it checks a partition
@@ -114,7 +114,7 @@
 
 #define NOP_DI 0xf025050f
 #define RAM_INIT_MAGIC 0x56902387
-		
+
 	.text
 	
 	;; This is the entry point of the rescue code
@@ -144,7 +144,13 @@ jtcd:	move.d	[jumptarget], $r0
 jumptarget:	
 	.dword	0xffffffff	; can be overwritten later to insert new code
 	
-no_newjump:	
+no_newjump:
+#ifdef CONFIG_ETRAX_ETHERNET		
+	;; Start MII clock to make sure it is running when tranceiver is reset
+	move.d 0x3, $r0    ; enable = on, phy = mii_clk
+	move.d $r0, [R_NETWORK_GEN_CONFIG]
+#endif
+	
 	;; We need to setup the bus registers before we start using the DRAM
 #include "../../lib/dram_init.S"
 

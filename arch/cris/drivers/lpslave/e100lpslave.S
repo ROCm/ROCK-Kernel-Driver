@@ -1,4 +1,4 @@
-	;; $Id: e100lpslave.S,v 1.3 2001/06/21 16:55:26 olof Exp $
+	;; $Id: e100lpslave.S,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
 	;;
 	;; Etrax100 slave network<->parport forwarder
 	;;

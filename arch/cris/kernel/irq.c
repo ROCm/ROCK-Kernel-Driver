@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.17 2001/07/25 16:08:01 bjornw Exp $
+/* $Id: irq.c,v 1.2 2001/12/18 13:35:20 bjornw Exp $
  *
  *	linux/arch/cris/kernel/irq.c
  *
@@ -138,7 +138,7 @@ set_break_vector(int n, irqvectptr addr)
 /* IRQ0 and 1 are special traps */
 void hwbreakpoint(void);
 void IRQ1_interrupt(void);
-BUILD_IRQ(2, 0x04)             /* the timer interrupt */
+BUILD_TIMER_IRQ(2, 0x04)       /* the timer interrupt is somewhat special */
 BUILD_IRQ(3, 0x08)
 BUILD_IRQ(4, 0x10)
 BUILD_IRQ(5, 0x20)

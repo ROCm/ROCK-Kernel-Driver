@@ -407,24 +407,35 @@ static int init_coda_psdev(void)
 MODULE_AUTHOR("Peter J. Braam <braam@cs.cmu.edu>");
 MODULE_LICENSE("GPL");
 
+extern int coda_init_inodecache(void);
+extern void coda_destroy_inodecache(void);
 static int __init init_coda(void)
 {
 	int status;
 	printk(KERN_INFO "Coda Kernel/Venus communications, v5.3.15, coda@cs.cmu.edu\n");
 
+	status = coda_init_inodecache();
+	if (status)
+		goto out2;
 	status = init_coda_psdev();
 	if ( status ) {
 		printk("Problem (%d) in init_coda_psdev\n", status);
-		return status;
+		goto out1;
 	}
 	
 	status = register_filesystem(&coda_fs_type);
 	if (status) {
 		printk("coda: failed to register filesystem!\n");
-		devfs_unregister(devfs_handle);
-		devfs_unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
-		coda_sysctl_clean();
+		goto out;
 	}
+	return 0;
+out:
+	devfs_unregister(devfs_handle);
+	devfs_unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
+	coda_sysctl_clean();
+out1:
+	coda_destroy_inodecache();
+out2:
 	return status;
 }
 
@@ -439,6 +450,7 @@ static void __exit exit_coda(void)
 	devfs_unregister(devfs_handle);
 	devfs_unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
 	coda_sysctl_clean();
+	coda_destroy_inodecache();
 }
 
 module_init(init_coda);

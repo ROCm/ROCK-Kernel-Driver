@@ -94,7 +94,7 @@ MODULE_DEVICE_TABLE (usb, pegasus_ids);
 
 static int update_eth_regs_async( pegasus_t * );
 /* Aargh!!! I _really_ hate such tweaks */
-static void ctrl_callback( urb_t *urb )
+static void ctrl_callback( struct urb *urb )
 {
 	pegasus_t	*pegasus = urb->context;
 

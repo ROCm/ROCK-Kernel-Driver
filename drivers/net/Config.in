@@ -292,7 +292,6 @@ comment 'Wireless LAN (non-hamradio)'
 bool 'Wireless LAN (non-hamradio)' CONFIG_NET_RADIO
 if [ "$CONFIG_NET_RADIO" = "y" ]; then
    dep_tristate '  STRIP (Metricom starmode radio IP)' CONFIG_STRIP $CONFIG_INET
-   tristate '  AT&T WaveLAN & DEC RoamAbout DS support' CONFIG_WAVELAN
    tristate '  Aironet Arlan 655 & IC2200 DS support' CONFIG_ARLAN
    tristate '  Aironet 4500/4800 series adapters' CONFIG_AIRONET4500
    dep_tristate '   Aironet 4500/4800 ISA/PCI/PNP/365 support ' CONFIG_AIRONET4500_NONCS $CONFIG_AIRONET4500

@@ -90,7 +90,7 @@ static int sync_direct(struct inode *inode, int wait)
 
 	for (i = 0; i < 7; i++) {
 		rc = sync_block(inode,
-				(unsigned short *) inode->u.qnx4_i.i_first_xtnt.xtnt_blk + i, wait);
+				(unsigned short *) qnx4_raw_inode(inode)->di_first_xtnt.xtnt_blk + i, wait);
 		if (rc > 0)
 			break;
 		if (rc)

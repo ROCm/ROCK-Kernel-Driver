@@ -1776,7 +1776,7 @@ read_done:
 /*
  * Make all of the blocks of data contiguous
  */
-static int usbvideo_CompressIsochronous(uvd_t *uvd, urb_t *urb)
+static int usbvideo_CompressIsochronous(uvd_t *uvd, struct urb *urb)
 {
 	char *cdata;
 	int i, totlen = 0;
@@ -1891,7 +1891,7 @@ int usbvideo_StartDataPump(uvd_t *uvd)
 	/* We double buffer the Iso lists */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
 		int j, k;
-		urb_t *urb = uvd->sbuf[i].urb;
+		struct urb *urb = uvd->sbuf[i].urb;
 		urb->dev = dev;
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp);

@@ -20,8 +20,9 @@ char *text_prefix[]={
 
 void hpfs_decide_conv(struct inode *inode, unsigned char *name, unsigned len)
 {
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
 	int i;
-	if (inode->i_hpfs_conv != CONV_AUTO) return;
+	if (hpfs_inode->i_conv != CONV_AUTO) return;
 	for (i = 0; *text_postfix[i]; i++) {
 		int l = strlen(text_postfix[i]);
 		if (l <= len)
@@ -34,10 +35,10 @@ void hpfs_decide_conv(struct inode *inode, unsigned char *name, unsigned len)
 			if (!hpfs_compare_names(inode->i_sb, text_prefix[i], l, name, l, 0))
 				goto text;
 	}
-	inode->i_hpfs_conv = CONV_BINARY;
+	hpfs_inode->i_conv = CONV_BINARY;
 	return;
 	text:
-	inode->i_hpfs_conv = CONV_TEXT;
+	hpfs_inode->i_conv = CONV_TEXT;
 	return;
 }
 

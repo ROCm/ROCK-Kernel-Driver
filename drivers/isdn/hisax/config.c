@@ -1776,7 +1776,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cs->hw.hisax_d_if = hisax_d_if;
 	cs->cardmsg = hisax_cardmsg;
 	cs->tqueue.routine = (void *) (void *) hisax_bh;
-	cs->channel[0].d_st->l2.l2l1 = hisax_d_l2l1;
+	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
 	for (i = 0; i < 2; i++) {
 		cs->bcs[i].BC_SetStack = hisax_bc_setstack;
 		cs->bcs[i].BC_Close = hisax_bc_close;
@@ -1823,7 +1823,7 @@ static void hisax_bh(struct IsdnCardState *cs)
 		else
 			pr = PH_DEACTIVATE | INDICATION;
 		for (st = cs->stlist; st; st = st->next)
-			st->l1.l1l2(st, pr, NULL);
+			L1L2(st, pr, NULL);
 		
 	}
 }
@@ -1876,7 +1876,7 @@ static void hisax_d_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		clear_bit(FLG_L1_DBUSY, &cs->HW_Flags);
 		for (st = cs->stlist; st; st = st->next) {
 			if (test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags)) {
-				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+				L1L2(st, PH_PULL | CONFIRM, NULL);
 				break;
 			}
 		}
@@ -1901,10 +1901,10 @@ static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg)
 	// FIXME use isdnl1?
 	switch (pr) {
 	case PH_ACTIVATE | INDICATION:
-		st->l1.l1l2(st, pr, NULL);
+		L1L2(st, pr, NULL);
 		break;
 	case PH_DEACTIVATE | INDICATION:
-		st->l1.l1l2(st, pr, NULL);
+		L1L2(st, pr, NULL);
 		bcs->hw.b_if = NULL;
 		break;
 	case PH_DATA | INDICATION:
@@ -1922,7 +1922,7 @@ static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		}
 		clear_bit(BC_FLG_BUSY, &bcs->Flag);
 		if (test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags)) {
-			st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+			L1L2(st, PH_PULL | CONFIRM, NULL);
 		}
 		break;
 	default:
@@ -1953,7 +1953,7 @@ static void hisax_d_l2l1(struct PStack *st, int pr, void *arg)
 		break;
 	case PH_PULL | REQUEST:
 		if (!test_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+			L1L2(st, PH_PULL | CONFIRM, NULL);
 		else
 			set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 		break;
@@ -1988,7 +1988,7 @@ static void hisax_b_l2l1(struct PStack *st, int pr, void *arg)
 		break;
 	case PH_PULL | REQUEST:
 		if (!test_bit(BC_FLG_BUSY, &bcs->Flag))
-			st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+			L1L2(st, PH_PULL | CONFIRM, NULL);
 		else
 			set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 		break;
@@ -2009,7 +2009,7 @@ static int hisax_bc_setstack(struct PStack *st, struct BCState *bcs)
 	hisax_d_if->b_if[st->l1.bc]->bcs = bcs;
 
 	st->l1.bcs = bcs;
-	st->l2.l2l1 = hisax_b_l2l1;
+	st->l1.l2l1 = hisax_b_l2l1;
 	setstack_manager(st);
 	bcs->st = st;
 	setstack_l1_B(st);

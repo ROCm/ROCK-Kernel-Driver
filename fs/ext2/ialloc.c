@@ -13,8 +13,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/fs.h>
-#include <linux/ext2_fs.h>
+#include "ext2.h"
 #include <linux/locks.h>
 #include <linux/quotaops.h>
 
@@ -311,7 +310,7 @@ found:
 	return group;
 }
 
-struct inode * ext2_new_inode (const struct inode * dir, int mode)
+struct inode * ext2_new_inode(struct inode * dir, int mode)
 {
 	struct super_block * sb;
 	struct buffer_head * bh;
@@ -321,6 +320,7 @@ struct inode * ext2_new_inode (const struct inode * dir, int mode)
 	struct inode * inode;
 	struct ext2_group_desc * desc;
 	struct ext2_super_block * es;
+	struct ext2_inode_info *ei;
 	int err;
 
 	sb = dir->i_sb;
@@ -328,13 +328,14 @@ struct inode * ext2_new_inode (const struct inode * dir, int mode)
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 
+	ei = EXT2_I(inode);
 	lock_super (sb);
 	es = sb->u.ext2_sb.s_es;
 repeat:
 	if (S_ISDIR(mode))
-		group = find_group_dir(sb, dir->u.ext2_i.i_block_group);
+		group = find_group_dir(sb, EXT2_I(dir)->i_block_group);
 	else 
-		group = find_group_other(sb, dir->u.ext2_i.i_block_group);
+		group = find_group_other(sb, EXT2_I(dir)->i_block_group);
 
 	err = -ENOSPC;
 	if (group == -1)
@@ -385,15 +386,26 @@ repeat:
 	inode->i_blksize = PAGE_SIZE;	/* This is the optimal IO size (for stat), not the fs block size */
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-	inode->u.ext2_i.i_new_inode = 1;
-	inode->u.ext2_i.i_flags = dir->u.ext2_i.i_flags;
+	memset(ei->i_data, 0, sizeof(ei->i_data));
+	ei->i_flags = EXT2_I(dir)->i_flags;
 	if (S_ISLNK(mode))
-		inode->u.ext2_i.i_flags &= ~(EXT2_IMMUTABLE_FL|EXT2_APPEND_FL);
-	inode->u.ext2_i.i_block_group = group;
-	if (inode->u.ext2_i.i_flags & EXT2_SYNC_FL)
+		ei->i_flags &= ~(EXT2_IMMUTABLE_FL|EXT2_APPEND_FL);
+	ei->i_faddr = 0;
+	ei->i_frag_no = 0;
+	ei->i_osync = 0;
+	ei->i_file_acl = 0;
+	ei->i_dir_acl = 0;
+	ei->i_dtime = 0;
+	ei->i_block_group = group;
+	ei->i_next_alloc_block = 0;
+	ei->i_next_alloc_goal = 0;
+	ei->i_prealloc_block = 0;
+	ei->i_prealloc_count = 0;
+	ei->i_dir_start_lookup = 0;
+	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
-	insert_inode_hash(inode);
 	inode->i_generation = sb->u.ext2_sb.s_next_generation++;
+	insert_inode_hash(inode);
 	mark_inode_dirty(inode);
 
 	unlock_super (sb);

@@ -125,6 +125,13 @@ running once the system is up.
 
 	BusLogic=	[HW,SCSI]
 
+	cachesize=	[BUGS=ix86] Override level 2 CPU cache size detection.
+			Sometimes CPU hardware bugs make them report the cache
+			size incorrectly. The kernel will attempt work arounds
+			to fix known problems, but for some CPUs it is not
+			possible to determine what the correct size should be.
+			This option provides an override for these situations.
+
 	cdu31a=		[HW,CD]
 
 	chandev=	[HW,NET] 

@@ -22,6 +22,8 @@
 #define FTDI_VID	0x0403	/* Vendor Id */
 #define FTDI_SIO_PID	0x8372	/* Product Id SIO application of 8U100AX  */
 #define FTDI_8U232AM_PID 0x6001 /* Similar device to SIO above */
+#define FTDI_NF_RIC_VID	0x0DCD	/* Vendor Id */
+#define FTDI_NF_RIC_PID	0x0001	/* Product Id */
 
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */

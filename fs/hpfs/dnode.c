@@ -23,39 +23,43 @@ static loff_t get_pos(struct dnode *d, struct hpfs_dirent *fde)
 
 void hpfs_add_pos(struct inode *inode, loff_t *pos)
 {
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
 	int i = 0;
 	loff_t **ppos;
-	if (inode->i_hpfs_rddir_off)
-		for (; inode->i_hpfs_rddir_off[i]; i++)
-			if (inode->i_hpfs_rddir_off[i] == pos) return;
+
+	if (hpfs_inode->i_rddir_off)
+		for (; hpfs_inode->i_rddir_off[i]; i++)
+			if (hpfs_inode->i_rddir_off[i] == pos) return;
 	if (!(i&0x0f)) {
 		if (!(ppos = kmalloc((i+0x11) * sizeof(loff_t*), GFP_KERNEL))) {
 			printk("HPFS: out of memory for position list\n");
 			return;
 		}
-		if (inode->i_hpfs_rddir_off) {
-			memcpy(ppos, inode->i_hpfs_rddir_off, i * sizeof(loff_t));
-			kfree(inode->i_hpfs_rddir_off);
+		if (hpfs_inode->i_rddir_off) {
+			memcpy(ppos, hpfs_inode->i_rddir_off, i * sizeof(loff_t));
+			kfree(hpfs_inode->i_rddir_off);
 		}
-		inode->i_hpfs_rddir_off = ppos;
+		hpfs_inode->i_rddir_off = ppos;
 	}
-	inode->i_hpfs_rddir_off[i] = pos;
-	inode->i_hpfs_rddir_off[i + 1] = NULL;
+	hpfs_inode->i_rddir_off[i] = pos;
+	hpfs_inode->i_rddir_off[i + 1] = NULL;
 }
 
 void hpfs_del_pos(struct inode *inode, loff_t *pos)
 {
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
 	loff_t **i, **j;
-	if (!inode->i_hpfs_rddir_off) goto not_f;
-	for (i = inode->i_hpfs_rddir_off; *i; i++) if (*i == pos) goto fnd;
+
+	if (!hpfs_inode->i_rddir_off) goto not_f;
+	for (i = hpfs_inode->i_rddir_off; *i; i++) if (*i == pos) goto fnd;
 	goto not_f;
 	fnd:
 	for (j = i + 1; *j; j++) ;
 	*i = *(j - 1);
 	*(j - 1) = NULL;
-	if (j - 1 == inode->i_hpfs_rddir_off) {
-		kfree(inode->i_hpfs_rddir_off);
-		inode->i_hpfs_rddir_off = NULL;
+	if (j - 1 == hpfs_inode->i_rddir_off) {
+		kfree(hpfs_inode->i_rddir_off);
+		hpfs_inode->i_rddir_off = NULL;
 	}
 	return;
 	not_f:
@@ -66,9 +70,11 @@ void hpfs_del_pos(struct inode *inode, loff_t *pos)
 static void for_all_poss(struct inode *inode, void (*f)(loff_t *, loff_t, loff_t),
 			 loff_t p1, loff_t p2)
 {
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
 	loff_t **i;
-	if (!inode->i_hpfs_rddir_off) return;
-	for (i = inode->i_hpfs_rddir_off; *i; i++) (*f)(*i, p1, p2);
+
+	if (!hpfs_inode->i_rddir_off) return;
+	for (i = hpfs_inode->i_rddir_off; *i; i++) (*f)(*i, p1, p2);
 	return;
 }
 
@@ -339,7 +345,7 @@ int hpfs_add_to_dnode(struct inode *i, dnode_secno dno, unsigned char *name, uns
 	fnode->u.external[0].disk_secno = rdno;
 	mark_buffer_dirty(bh);
 	brelse(bh);
-	d->up = ad->up = i->i_hpfs_dno = rdno;
+	d->up = ad->up = hpfs_i(i)->i_dno = rdno;
 	d->root_dnode = ad->root_dnode = 0;
 	hpfs_mark_4buffers_dirty(&qbh);
 	hpfs_brelse4(&qbh);
@@ -363,13 +369,14 @@ int hpfs_add_to_dnode(struct inode *i, dnode_secno dno, unsigned char *name, uns
 int hpfs_add_dirent(struct inode *i, unsigned char *name, unsigned namelen,
 		    struct hpfs_dirent *new_de, int cdepth)
 {
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
 	struct dnode *d;
 	struct hpfs_dirent *de, *de_end;
 	struct quad_buffer_head qbh;
 	dnode_secno dno;
 	int c;
 	int c1, c2 = 0;
-	dno = i->i_hpfs_dno;
+	dno = hpfs_inode->i_dno;
 	down:
 	if (i->i_sb->s_hpfs_chk)
 		if (hpfs_stop_cycles(i->i_sb, dno, &c1, &c2, "hpfs_add_dirent")) return 1;
@@ -494,6 +501,7 @@ static secno move_to_top(struct inode *i, dnode_secno from, dnode_secno to)
 
 static void delete_empty_dnode(struct inode *i, dnode_secno dno)
 {
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
 	struct quad_buffer_head qbh;
 	struct dnode *dnode;
 	dnode_secno down, up, ndown;
@@ -538,7 +546,7 @@ static void delete_empty_dnode(struct inode *i, dnode_secno dno)
 				mark_buffer_dirty(bh);
 				brelse(bh);
 			}
-			i->i_hpfs_dno = down;
+			hpfs_inode->i_dno = down;
 			for_all_poss(i, hpfs_pos_subst, ((loff_t)dno << 4) | 1, (loff_t) 12);
 			return;
 		}

@@ -175,11 +175,11 @@ if [ "$CONFIG_ETRAX_GPIO" = "y" ]; then
   hex  '  PB user changeable bits mask' CONFIG_ETRAX_PB_CHANGEABLE_BITS FF
 fi
 
-bool 'ARTPEC-1 support' CONFIG_JULIETTE
-
-if [ "$CONFIG_JULIETTE" = "y" ]; then
-   source arch/cris/drivers/juliette/Config.in
-fi
+#bool 'ARTPEC-1 support' CONFIG_JULIETTE
+#
+#if [ "$CONFIG_JULIETTE" = "y" ]; then
+#   source arch/cris/drivers/juliette/Config.in
+#fi
 
 bool 'USB host' CONFIG_ETRAX_USB_HOST
 if [ "$CONFIG_ETRAX_USB_HOST" = "y" ]; then

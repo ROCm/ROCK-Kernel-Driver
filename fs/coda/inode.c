@@ -39,9 +39,60 @@ static void coda_clear_inode(struct inode *);
 static void coda_put_super(struct super_block *);
 static int coda_statfs(struct super_block *sb, struct statfs *buf);
 
+static kmem_cache_t * coda_inode_cachep;
+
+static struct inode *coda_alloc_inode(struct super_block *sb)
+{
+	struct coda_inode_info *ei;
+	ei = (struct coda_inode_info *)kmem_cache_alloc(coda_inode_cachep, SLAB_KERNEL);
+	memset(&ei->c_fid, 0, sizeof(struct ViceFid));
+	ei->c_flags = 0;
+	INIT_LIST_HEAD(&ei->c_cilist);
+	ei->c_container = NULL;
+	ei->c_contcount = 0;
+	memset(&ei->c_cached_cred, 0, sizeof(struct coda_cred));
+	ei->c_cached_perm = 0;
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void coda_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(coda_inode_cachep, ITOC(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct coda_inode_info *ei = (struct coda_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+int coda_init_inodecache(void)
+{
+	coda_inode_cachep = kmem_cache_create("coda_inode_cache",
+					     sizeof(struct coda_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (coda_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+void coda_destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(coda_inode_cachep))
+		printk(KERN_INFO "coda_inode_cache: not all structures were freed\n");
+}
+
 /* exported operations */
 struct super_operations coda_super_operations =
 {
+	alloc_inode:	coda_alloc_inode,
+	destroy_inode:	coda_destroy_inode,
 	read_inode:	coda_read_inode,
 	clear_inode:	coda_clear_inode,
 	put_super:	coda_put_super,
@@ -188,28 +239,7 @@ static void coda_read_inode(struct inode *inode)
 
         if (!sbi) BUG();
 
-#if 0
-	/* check if the inode is already initialized */
-	if (inode->u.generic_ip) {
-            printk("coda_read_inode: initialized inode");
-            return;
-        }
-
-	inode->u.generic_ip = cii_alloc();
-	if (!inode->u.generic_ip) {
-		CDEBUG(D_CNODE, "coda_read_inode: failed to allocate inode info\n");
-		make_bad_inode(inode);
-		return;
-	}
-	memset(inode->u.generic_ip, 0, sizeof(struct coda_inode_info));
-#endif
-
 	cii = ITOC(inode);
-	if (!coda_isnullfid(&cii->c_fid)) {
-            printk("coda_read_inode: initialized inode");
-            return;
-        }
-
 	list_add(&cii->c_cilist, &sbi->sbi_cihead);
 }
 
@@ -226,11 +256,6 @@ static void coda_clear_inode(struct inode *inode)
         list_del_init(&cii->c_cilist);
 	inode->i_mapping = &inode->i_data;
 	coda_cache_clear_inode(inode);
-
-#if 0
-	cii_free(inode->u.generic_ip);
-	inode->u.generic_ip = NULL;
-#endif
 }
 
 int coda_notify_change(struct dentry *de, struct iattr *iattr)

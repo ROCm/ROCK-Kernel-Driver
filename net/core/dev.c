@@ -102,6 +102,7 @@
 #include <linux/module.h>
 #if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
+#include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
 #ifdef CONFIG_PLIP
 extern int plip_init(void);
@@ -1796,122 +1797,6 @@ static int dev_proc_stats(char *buffer, char **start, off_t offset,
 #endif	/* CONFIG_PROC_FS */
 
 
-#ifdef WIRELESS_EXT
-#ifdef CONFIG_PROC_FS
-
-/*
- * Print one entry of /proc/net/wireless
- * This is a clone of /proc/net/dev (just above)
- */
-static int sprintf_wireless_stats(char *buffer, struct net_device *dev)
-{
-	/* Get stats from the driver */
-	struct iw_statistics *stats = (dev->get_wireless_stats ?
-				       dev->get_wireless_stats(dev) :
-				       (struct iw_statistics *) NULL);
-	int size;
-
-	if (stats != (struct iw_statistics *) NULL) {
-		size = sprintf(buffer,
-			       "%6s: %04x  %3d%c  %3d%c  %3d%c  %6d %6d %6d %6d %6d   %6d\n",
-			       dev->name,
-			       stats->status,
-			       stats->qual.qual,
-			       stats->qual.updated & 1 ? '.' : ' ',
-			       stats->qual.level,
-			       stats->qual.updated & 2 ? '.' : ' ',
-			       stats->qual.noise,
-			       stats->qual.updated & 4 ? '.' : ' ',
-			       stats->discard.nwid,
-			       stats->discard.code,
-			       stats->discard.fragment,
-			       stats->discard.retries,
-			       stats->discard.misc,
-			       stats->miss.beacon);
-		stats->qual.updated = 0;
-	}
-	else
-		size = 0;
-
-	return size;
-}
-
-/*
- * Print info for /proc/net/wireless (print all entries)
- * This is a clone of /proc/net/dev (just above)
- */
-static int dev_get_wireless_info(char * buffer, char **start, off_t offset,
-			  int length)
-{
-	int		len = 0;
-	off_t		begin = 0;
-	off_t		pos = 0;
-	int		size;
-	
-	struct net_device *	dev;
-
-	size = sprintf(buffer,
-		       "Inter-| sta-|   Quality        |   Discarded packets               | Missed\n"
-		       " face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon\n"
-			);
-	
-	pos += size;
-	len += size;
-
-	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev != NULL; dev = dev->next) {
-		size = sprintf_wireless_stats(buffer + len, dev);
-		len += size;
-		pos = begin + len;
-
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-		if (pos > offset + length)
-			break;
-	}
-	read_unlock(&dev_base_lock);
-
-	*start = buffer + (offset - begin);	/* Start of wanted data */
-	len -= (offset - begin);		/* Start slop */
-	if (len > length)
-		len = length;			/* Ending slop */
-	if (len < 0)
-		len = 0;
-
-	return len;
-}
-#endif	/* CONFIG_PROC_FS */
-
-/*
- *	Allow programatic access to /proc/net/wireless even if /proc
- *	doesn't exist... Also more efficient...
- */
-static inline int dev_iwstats(struct net_device *dev, struct ifreq *ifr)
-{
-	/* Get stats from the driver */
-	struct iw_statistics *stats = (dev->get_wireless_stats ?
-				       dev->get_wireless_stats(dev) :
-				       (struct iw_statistics *) NULL);
-
-	if (stats != (struct iw_statistics *) NULL) {
-		struct iwreq *	wrq = (struct iwreq *)ifr;
-
-		/* Copy statistics to the user buffer */
-		if(copy_to_user(wrq->u.data.pointer, stats,
-				sizeof(struct iw_statistics)))
-			return -EFAULT;
-
-		/* Check if we need to clear the update flag */
-		if(wrq->u.data.flags != 0)
-			stats->qual.updated = 0;
-		return(0);
-	} else
-		return -EOPNOTSUPP;
-}
-#endif	/* WIRELESS_EXT */
-
 /**
  *	netdev_set_master	-	set up master/slave pair
  *	@slave: slave device
@@ -2209,11 +2094,6 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			notifier_call_chain(&netdev_chain, NETDEV_CHANGENAME, dev);
 			return 0;
 
-#ifdef WIRELESS_EXT
-		case SIOCGIWSTATS:
-			return dev_iwstats(dev, ifr);
-#endif	/* WIRELESS_EXT */
-
 		/*
 		 *	Unknown or private ioctl
 		 */
@@ -2238,17 +2118,6 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 				}
 				return -EOPNOTSUPP;
 			}
-
-#ifdef WIRELESS_EXT
-			if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {
-				if (dev->do_ioctl) {
-					if (!netif_device_present(dev))
-						return -ENODEV;
-					return dev->do_ioctl(dev, ifr, cmd);
-				}
-				return -EOPNOTSUPP;
-			}
-#endif	/* WIRELESS_EXT */
 
 	}
 	return -EINVAL;
@@ -2431,7 +2300,8 @@ int dev_ioctl(unsigned int cmd, void *arg)
 				}
 				dev_load(ifr.ifr_name);
 				rtnl_lock();
-				ret = dev_ifsioc(&ifr, cmd);
+				/* Follow me in net/core/wireless.c */
+				ret = wireless_process_ioctl(&ifr, cmd);
 				rtnl_unlock();
 				if (!ret && IW_IS_GET(cmd) &&
 				    copy_to_user(arg, &ifr, sizeof(struct ifreq)))
@@ -2856,6 +2726,7 @@ int __init net_dev_init(void)
 	proc_net_create("dev", 0, dev_get_info);
 	create_proc_read_entry("net/softnet_stat", 0, 0, dev_proc_stats, NULL);
 #ifdef WIRELESS_EXT
+	/* Available in net/core/wireless.c */
 	proc_net_create("wireless", 0, dev_get_wireless_info);
 #endif	/* WIRELESS_EXT */
 #endif	/* CONFIG_PROC_FS */

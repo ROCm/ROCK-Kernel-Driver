@@ -1,4 +1,4 @@
-/* $Id: dram_init.S,v 1.10 2001/10/04 12:00:21 martinnn Exp $
+/* $Id: dram_init.S,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
  * 
  * DRAM/SDRAM initialization - alter with care
  * This file is intended to be included from other assembler files
@@ -11,6 +11,9 @@
  * Authors:  Mikael Starvik (starvik@axis.com)	
  * 
  * $Log: dram_init.S,v $
+ * Revision 1.1.1.1  2001/12/17 13:59:27  bjornw
+ * Import of Linux 2.5.1
+ *
  * Revision 1.10  2001/10/04 12:00:21  martinnn
  * Added missing underscores.
  *

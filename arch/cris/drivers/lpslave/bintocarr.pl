@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: bintocarr.pl,v 1.4 2001/08/08 08:18:13 bjarne Exp $
+# $Id: bintocarr.pl,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
 # Copy of mkjulbin.pl made by Olof
 # convert a binary stdin to a C-file containing a char array of the input
 # first argument is the symbol name

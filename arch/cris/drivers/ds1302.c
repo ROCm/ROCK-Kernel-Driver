@@ -7,6 +7,9 @@
 *! Functions exported: ds1302_readreg, ds1302_writereg, ds1302_init, get_rtc_status
 *!
 *! $Log: ds1302.c,v $
+*! Revision 1.1.1.1  2001/12/17 13:59:27  bjornw
+*! Import of Linux 2.5.1
+*!
 *! Revision 1.11  2001/06/14 12:35:52  jonashg
 *! The ATA hack is back. It is unfortunately the only way to set g27 to output.
 *!
@@ -82,7 +85,7 @@
 *!
 *! (C) Copyright 1999, 2000, 2001  Axis Communications AB, LUND, SWEDEN
 *!
-*! $Id: ds1302.c,v 1.11 2001/06/14 12:35:52 jonashg Exp $
+*! $Id: ds1302.c,v 1.1.1.1 2001/12/17 13:59:27 bjornw Exp $
 *!
 *!***************************************************************************/
 

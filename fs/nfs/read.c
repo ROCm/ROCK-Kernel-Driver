@@ -156,10 +156,11 @@ static inline void
 nfs_mark_request_read(struct nfs_page *req)
 {
 	struct inode *inode = req->wb_inode;
+	struct nfs_inode *nfsi = NFS_I(inode);
 
 	spin_lock(&nfs_wreq_lock);
-	nfs_list_add_request(req, &inode->u.nfs_i.read);
-	inode->u.nfs_i.nread++;
+	nfs_list_add_request(req, &nfsi->read);
+	nfsi->nread++;
 	__nfs_add_lru(&NFS_SERVER(inode)->lru_read, req);
 	spin_unlock(&nfs_wreq_lock);
 }
@@ -167,6 +168,7 @@ nfs_mark_request_read(struct nfs_page *req)
 static int
 nfs_readpage_async(struct file *file, struct inode *inode, struct page *page)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	struct nfs_page	*new;
 
 	new = nfs_create_request(file, inode, page, 0, PAGE_CACHE_SIZE);
@@ -174,7 +176,7 @@ nfs_readpage_async(struct file *file, struct inode *inode, struct page *page)
 		return PTR_ERR(new);
 	nfs_mark_request_read(new);
 
-	if (inode->u.nfs_i.nread >= NFS_SERVER(inode)->rpages ||
+	if (nfsi->nread >= NFS_SERVER(inode)->rpages ||
 	    page_index(page) == (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT)
 		nfs_pagein_inode(inode, 0, 0);
 	return 0;
@@ -318,13 +320,13 @@ nfs_pagein_list(struct list_head *head, int rpages)
 int
 nfs_scan_lru_read_timeout(struct nfs_server *server, struct list_head *dst)
 {
-	struct inode *inode;
+	struct nfs_inode *nfsi;
 	int npages;
 
 	npages = nfs_scan_lru_timeout(&server->lru_read, dst, server->rpages);
 	if (npages) {
-		inode = nfs_list_entry(dst->next)->wb_inode;
-		inode->u.nfs_i.nread -= npages;
+		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
+		nfsi->nread -= npages;
 	}
 	return npages;
 }
@@ -341,13 +343,13 @@ nfs_scan_lru_read_timeout(struct nfs_server *server, struct list_head *dst)
 int
 nfs_scan_lru_read(struct nfs_server *server, struct list_head *dst)
 {
-	struct inode *inode;
+	struct nfs_inode *nfsi;
 	int npages;
 
 	npages = nfs_scan_lru(&server->lru_read, dst, server->rpages);
 	if (npages) {
-		inode = nfs_list_entry(dst->next)->wb_inode;
-		inode->u.nfs_i.nread -= npages;
+		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
+		nfsi->nread -= npages;
 	}
 	return npages;
 }
@@ -365,10 +367,11 @@ nfs_scan_lru_read(struct nfs_server *server, struct list_head *dst)
 static int
 nfs_scan_read(struct inode *inode, struct list_head *dst, unsigned long idx_start, unsigned int npages)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	int	res;
-	res = nfs_scan_list(&inode->u.nfs_i.read, dst, NULL, idx_start, npages);
-	inode->u.nfs_i.nread -= res;
-	if ((inode->u.nfs_i.nread == 0) != list_empty(&inode->u.nfs_i.read))
+	res = nfs_scan_list(&nfsi->read, dst, NULL, idx_start, npages);
+	nfsi->nread -= res;
+	if ((nfsi->nread == 0) != list_empty(&nfsi->read))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.nread.\n");
 	return res;
 }

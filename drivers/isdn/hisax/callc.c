@@ -250,7 +250,6 @@ lli_leased_in(struct FsmInst *fi, int event, void *arg)
 	}
 }
 
-
 /*
  * Dial out
  */
@@ -264,7 +263,7 @@ lli_init_bchan_out(struct FsmInst *fi, int event, void *arg)
 		link_debug(chanp, 0, "STAT_DCONN");
 	HL_LL(chanp, ISDN_STAT_DCONN);
 	init_b_st(chanp, 0);
-	chanp->b_st->lli.l4l3(chanp->b_st, DL_ESTABLISH | REQUEST, NULL);
+	L4L3(chanp->b_st, DL_ESTABLISH | REQUEST, NULL);
 }
 
 static void
@@ -281,7 +280,7 @@ lli_prep_dialout(struct FsmInst *fi, int event, void *arg)
 		lli_init_bchan_out(fi, event, arg);
 	} else {
 		FsmChangeState(fi, ST_OUT_DIAL);
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_SETUP | REQUEST, chanp);
+		L4L3(chanp->d_st, CC_SETUP | REQUEST, chanp);
 	}
 }
 
@@ -299,7 +298,7 @@ lli_resume(struct FsmInst *fi, int event, void *arg)
 		lli_init_bchan_out(fi, event, arg);
 	} else {
 		FsmChangeState(fi, ST_OUT_DIAL);
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_RESUME | REQUEST, chanp);
+		L4L3(chanp->d_st, CC_RESUME | REQUEST, chanp);
 	}
 }
 
@@ -366,33 +365,33 @@ lli_deliver_call(struct FsmInst *fi, int event, void *arg)
 			case 1:	/* OK, someone likes this call */
 				FsmDelTimer(&chanp->drel_timer, 61);
 				FsmChangeState(fi, ST_IN_ALERT_SENT);
-				chanp->d_st->lli.l4l3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
+				L4L3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
 				break;
 			case 5: /* direct redirect */
 			case 4: /* Proceeding desired */
 				FsmDelTimer(&chanp->drel_timer, 61);
 				FsmChangeState(fi, ST_IN_PROCEED_SEND);
-				chanp->d_st->lli.l4l3(chanp->d_st, CC_PROCEED_SEND | REQUEST, chanp->proc);
+				L4L3(chanp->d_st, CC_PROCEED_SEND | REQUEST, chanp->proc);
 				if (ret == 5) {
 					memcpy(&chanp->setup, &ic.parm.setup, sizeof(setup_parm));
-					chanp->d_st->lli.l4l3(chanp->d_st, CC_REDIR | REQUEST, chanp->proc);
+					L4L3(chanp->d_st, CC_REDIR | REQUEST, chanp->proc);
 				}
 				break;
 			case 2:	/* Rejecting Call */
 				break;
 			case 3:	/* incomplete number */
 				FsmDelTimer(&chanp->drel_timer, 61);
-				chanp->d_st->lli.l4l3(chanp->d_st, CC_MORE_INFO | REQUEST, chanp->proc);
+				L4L3(chanp->d_st, CC_MORE_INFO | REQUEST, chanp->proc);
 				break;
 			case 0:	/* OK, nobody likes this call */
 			default:	/* statcallb problems */
-				chanp->d_st->lli.l4l3(chanp->d_st, CC_IGNORE | REQUEST, chanp->proc);
+				L4L3(chanp->d_st, CC_IGNORE | REQUEST, chanp->proc);
 				chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
 				FsmChangeState(fi, ST_NULL);
 				break;
 		}
 	} else {
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_IGNORE | REQUEST, chanp->proc);
+		L4L3(chanp->d_st, CC_IGNORE | REQUEST, chanp->proc);
 		chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
 	}
 }
@@ -403,7 +402,7 @@ lli_send_dconnect(struct FsmInst *fi, int event, void *arg)
 	struct Channel *chanp = fi->userdata;
 
 	FsmChangeState(fi, ST_IN_WAIT_CONN_ACK);
-	chanp->d_st->lli.l4l3(chanp->d_st, CC_SETUP | RESPONSE, chanp->proc);
+	L4L3(chanp->d_st, CC_SETUP | RESPONSE, chanp->proc);
 }
 
 static void
@@ -412,7 +411,7 @@ lli_send_alert(struct FsmInst *fi, int event, void *arg)
 	struct Channel *chanp = fi->userdata;
 
 	FsmChangeState(fi, ST_IN_ALERT_SENT);
-	chanp->d_st->lli.l4l3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
+	L4L3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
 }
 
 static void
@@ -420,7 +419,7 @@ lli_send_redir(struct FsmInst *fi, int event, void *arg)
 {
 	struct Channel *chanp = fi->userdata;
 
-	chanp->d_st->lli.l4l3(chanp->d_st, CC_REDIR | REQUEST, chanp->proc);
+	L4L3(chanp->d_st, CC_REDIR | REQUEST, chanp->proc);
 }
 
 static void
@@ -435,7 +434,7 @@ lli_init_bchan_in(struct FsmInst *fi, int event, void *arg)
 	chanp->l2_active_protocol = chanp->l2_protocol;
 	chanp->incoming = !0;
 	init_b_st(chanp, !0);
-	chanp->b_st->lli.l4l3(chanp->b_st, DL_ESTABLISH | REQUEST, NULL);
+	L4L3(chanp->b_st, DL_ESTABLISH | REQUEST, NULL);
 }
 
 static void
@@ -448,9 +447,9 @@ lli_setup_rsp(struct FsmInst *fi, int event, void *arg)
 	} else {
 		FsmChangeState(fi, ST_IN_WAIT_CONN_ACK);
 #ifdef WANT_ALERT
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
+		L4L3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
 #endif
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_SETUP | RESPONSE, chanp->proc);
+		L4L3(chanp->d_st, CC_SETUP | RESPONSE, chanp->proc);
 	}
 }
 
@@ -461,7 +460,7 @@ lli_suspend(struct FsmInst *fi, int event, void *arg)
 {
 	struct Channel *chanp = fi->userdata;
 
-	chanp->d_st->lli.l4l3(chanp->d_st, CC_SUSPEND | REQUEST, chanp->proc);
+	L4L3(chanp->d_st, CC_SUSPEND | REQUEST, chanp->proc);
 }
 
 /* Call clearing */
@@ -493,8 +492,7 @@ lli_disconnect_req(struct FsmInst *fi, int event, void *arg)
 		FsmChangeState(fi, ST_WAIT_DRELEASE);
 		if (chanp->proc)
 			chanp->proc->para.cause = 0x10;	/* Normal Call Clearing */
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_DISCONNECT | REQUEST,
-			chanp->proc);
+		L4L3(chanp->d_st, CC_DISCONNECT | REQUEST, chanp->proc);
 	}
 }
 
@@ -509,8 +507,7 @@ lli_disconnect_reject(struct FsmInst *fi, int event, void *arg)
 		FsmChangeState(fi, ST_WAIT_DRELEASE);
 		if (chanp->proc)
 			chanp->proc->para.cause = 0x15;	/* Call Rejected */
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_DISCONNECT | REQUEST,
-			chanp->proc);
+		L4L3(chanp->d_st, CC_DISCONNECT | REQUEST, chanp->proc);
 	}
 }
 
@@ -542,12 +539,12 @@ lli_reject_req(struct FsmInst *fi, int event, void *arg)
 #ifndef ALERT_REJECT
 	if (chanp->proc)
 		chanp->proc->para.cause = 0x15;	/* Call Rejected */
-	chanp->d_st->lli.l4l3(chanp->d_st, CC_REJECT | REQUEST, chanp->proc);
+	L4L3(chanp->d_st, CC_REJECT | REQUEST, chanp->proc);
 	lli_dhup_close(fi, event, arg);
 #else
 	FsmRestartTimer(&chanp->drel_timer, 40, EV_HANGUP, NULL, 63);
 	FsmChangeState(fi, ST_IN_ALERT_SENT);
-	chanp->d_st->lli.l4l3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
+	L4L3(chanp->d_st, CC_ALERTING | REQUEST, chanp->proc);
 #endif
 }
 
@@ -558,7 +555,7 @@ lli_disconn_bchan(struct FsmInst *fi, int event, void *arg)
 
 	chanp->data_open = 0;
 	FsmChangeState(fi, ST_WAIT_BRELEASE);
-	chanp->b_st->lli.l4l3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
+	L4L3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
 }
 
 static void
@@ -613,7 +610,7 @@ lli_release_bchan(struct FsmInst *fi, int event, void *arg)
 
 	chanp->data_open = 0;
 	FsmChangeState(fi, ST_WAIT_BREL_DISC);
-	chanp->b_st->lli.l4l3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
+	L4L3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
 }
 
 
@@ -643,7 +640,7 @@ lli_abort(struct FsmInst *fi, int event, void *arg)
 	struct Channel *chanp = fi->userdata;
 
 	chanp->data_open = 0;
-	chanp->b_st->lli.l4l3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
+	L4L3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
 	lli_bhup_dhup(fi, event, arg);
 }
  
@@ -656,8 +653,7 @@ lli_release_req(struct FsmInst *fi, int event, void *arg)
 		lli_leased_hup(fi, chanp);
 	} else {
 		FsmChangeState(fi, ST_WAIT_D_REL_CNF);
-		chanp->d_st->lli.l4l3(chanp->d_st, CC_RELEASE | REQUEST,
-			chanp->proc);
+		L4L3(chanp->d_st, CC_RELEASE | REQUEST,	chanp->proc);
 	}
 }
 
@@ -768,7 +764,7 @@ lli_failure_a(struct FsmInst *fi, int event, void *arg)
 	struct Channel *chanp = fi->userdata;
 
 	chanp->data_open = 0;
-	chanp->b_st->lli.l4l3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
+	L4L3(chanp->b_st, DL_RELEASE | REQUEST, NULL);
 	lli_bhup_fail(fi, event, arg);
 }
 
@@ -942,7 +938,7 @@ dchan_l3l4(struct PStack *st, int pr, void *arg)
 	if (pr == (CC_SETUP | INDICATION)) {
 		if (!(chanp = selectfreechannel(pc->st, pc->para.bchannel))) {
 			pc->para.cause = 0x11;	/* User busy */
-			pc->st->lli.l4l3(pc->st, CC_REJECT | REQUEST, pc);
+			L4L3(pc->st, CC_REJECT | REQUEST, pc);
 		} else {
 			chanp->proc = pc;
 			pc->chan = chanp;
@@ -1025,16 +1021,16 @@ init_PStack(struct PStack **stp) {
 	if (!*stp)
 		return -ENOMEM;
 	(*stp)->next = NULL;
-	(*stp)->l1.l1l2 = dummy_pstack;
 	(*stp)->l1.l1hw = dummy_pstack;
 	(*stp)->l1.l1tei = dummy_pstack;
+	(*stp)->l1.l2l1 = dummy_pstack;
+	(*stp)->l2.l1l2 = dummy_pstack;
 	(*stp)->l2.l2tei = dummy_pstack;
-	(*stp)->l2.l2l1 = dummy_pstack;
-	(*stp)->l2.l2l3 = dummy_pstack;
-	(*stp)->l3.l3l2 = dummy_pstack;
+	(*stp)->l2.l3l2 = dummy_pstack;
+	(*stp)->l3.l2l3 = dummy_pstack;
 	(*stp)->l3.l3ml3 = dummy_pstack;
-	(*stp)->l3.l3l4 = dummy_pstack;
-	(*stp)->lli.l4l3 = dummy_pstack;
+	(*stp)->l3.l4l3 = dummy_pstack;
+	(*stp)->lli.l3l4 = dummy_pstack;
 	(*stp)->ma.layer = dummy_pstack;
 	return 0;
 }
@@ -1073,7 +1069,7 @@ init_d_st(struct Channel *chanp)
 	setstack_l3dc(st, chanp);
 	st->lli.userdata = chanp;
 	st->lli.l2writewakeup = NULL;
-	st->l3.l3l4 = dchan_l3l4;
+	st->lli.l3l4 = dchan_l3l4;
 
 	return 0;
 }
@@ -1147,8 +1143,7 @@ CallcNewChan(struct IsdnCardState *csta) {
 	printk(KERN_INFO "HiSax: MAX_WAITING_CALLS added\n");
 	if (test_bit(FLG_PTP, &csta->channel->d_st->l2.flag)) {
 		printk(KERN_INFO "LAYER2 WATCHING ESTABLISH\n");
-		csta->channel->d_st->lli.l4l3(csta->channel->d_st,
-			DL_ESTABLISH | REQUEST, NULL);
+		L4L3(csta->channel->d_st, DL_ESTABLISH | REQUEST, NULL);
 	}
 	return (0);
 }
@@ -1317,7 +1312,7 @@ init_b_st(struct Channel *chanp, int incoming)
 			sprintf(tmp, "Ch%d X.75", chanp->chan);
 			setstack_isdnl2(st, tmp);
 			setstack_l3bc(st, chanp);
-			st->l2.l2l3 = lldata_handler;
+			st->l3.l2l3 = lldata_handler;
 			st->lli.userdata = chanp;
 			st->lli.l1writewakeup = NULL;
 			st->lli.l2writewakeup = ll_writewakeup;
@@ -1329,7 +1324,7 @@ init_b_st(struct Channel *chanp, int incoming)
 		case (ISDN_PROTO_L2_TRANS):
 		case (ISDN_PROTO_L2_MODEM):
 		case (ISDN_PROTO_L2_FAX):
-			st->l1.l1l2 = lltrans_handler;
+			st->l2.l1l2 = lltrans_handler;
 			st->lli.userdata = chanp;
 			st->lli.l1writewakeup = ll_writewakeup;
 			setstack_transl2(st);
@@ -1352,7 +1347,7 @@ leased_l4l3(struct PStack *st, int pr, void *arg)
 			dev_kfree_skb(skb);
 			break;
 		case (DL_ESTABLISH | REQUEST):
-			st->l2.l2l1(st, PH_ACTIVATE | REQUEST, NULL);
+			L2L1(st, PH_ACTIVATE | REQUEST, NULL);
 			break;
 		case (DL_RELEASE | REQUEST):
 			break;
@@ -1650,16 +1645,15 @@ HiSax_command(isdn_ctrl * ic)
 						HiSax_putstatus(csta, "Card",
 							"%d channel %d set leased mode\n",
 							csta->cardnr + 1, num + 1);
-						chanp->d_st->l1.l1l2 = leased_l1l2;
-						chanp->d_st->lli.l4l3 = leased_l4l3;
-						chanp->d_st->lli.l4l3(chanp->d_st,
-							DL_ESTABLISH | REQUEST, NULL);
+						chanp->d_st->l2.l1l2 = leased_l1l2;
+						chanp->d_st->l3.l4l3 = leased_l4l3;
+						L4L3(chanp->d_st, DL_ESTABLISH | REQUEST, NULL);
 					}
 					break;
 				case (6):	/* set B-channel test loop */
 					num = *(unsigned int *) ic->parm.num;
 					if (csta->stlist)
-						csta->stlist->l2.l2l1(csta->stlist,
+						csta->stlist->l1.l2l1(csta->stlist,
 							PH_TESTLOOP | REQUEST, (void *) (long)num);
 					break;
 				case (7):	/* set card in PTP mode */
@@ -1673,8 +1667,7 @@ HiSax_command(isdn_ctrl * ic)
 						HiSax_putstatus(csta, "set card ", "in PTP mode");
 						printk(KERN_DEBUG "HiSax: set card in PTP mode\n");
 						printk(KERN_INFO "LAYER2 WATCHING ESTABLISH\n");
-						csta->channel[0].d_st->lli.l4l3(csta->channel[0].d_st,
-							DL_ESTABLISH | REQUEST, NULL);
+						L4L3(csta->channel[0].d_st, DL_ESTABLISH | REQUEST, NULL);
 					} else {
 						test_and_clear_bit(FLG_PTP, &csta->channel[0].d_st->l2.flag);
 						test_and_clear_bit(FLG_FIXED_TEI, &csta->channel[0].d_st->l2.flag);
@@ -1698,8 +1691,7 @@ HiSax_command(isdn_ctrl * ic)
 						printk(KERN_DEBUG "HiSax: set card in FIXED TEI (%d) mode\n",
 							num);
 					}
-					chanp->d_st->lli.l4l3(chanp->d_st,
-						DL_ESTABLISH | REQUEST, NULL);
+					L4L3(chanp->d_st, DL_ESTABLISH | REQUEST, NULL);
 					break;
 #ifdef MODULE
 				case (55):
@@ -1764,7 +1756,7 @@ HiSax_command(isdn_ctrl * ic)
 		case (ISDN_CMD_PROT_IO):
 			for (st = csta->stlist; st; st = st->next)
 				if (st->protocol == (ic->arg & 0xFF))
-					return(st->lli.l4l3_proto(st, ic));
+					return(st->l3.l4l3_proto(st, ic));
 			return(-EINVAL);
 			break;
 		default:
@@ -1820,10 +1812,10 @@ HiSax_writebuf_skb(int id, int chan, int ack, struct sk_buff *skb)
 			if (!ack)
 				nskb->pkt_type = PACKET_NOACK;
 			if (chanp->l2_active_protocol == ISDN_PROTO_L2_X75I)
-				st->l3.l3l2(st, DL_DATA | REQUEST, nskb);
+				L3L2(st, DL_DATA | REQUEST, nskb);
 			else {
 				chanp->bcs->tx_cnt += len;
-				st->l2.l2l1(st, PH_DATA | REQUEST, nskb);
+				st->l1.l2l1(st, PH_DATA | REQUEST, nskb);
 			}
 			dev_kfree_skb(skb);
 		} else

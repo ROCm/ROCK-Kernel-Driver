@@ -37,11 +37,7 @@ struct prio_array {
  *
  * Locking rule: those places that want to lock multiple runqueues
  * (such as the load balancing or the process migration code), lock
- * acquire operations must be ordered by the runqueue's cpu id.
- *
- * The RT event id is used to avoid calling into the the RT scheduler
- * if there is a RT task active in an SMP system but there is no
- * RT scheduling activity otherwise.
+ * acquire operations must be ordered by ascending &runqueue.
  */
 struct runqueue {
 	spinlock_t lock;
@@ -57,24 +53,28 @@ static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
 #define this_rq()		cpu_rq(smp_processor_id())
 #define task_rq(p)		cpu_rq((p)->cpu)
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
-#define rq_cpu(rq)		((rq) - runqueues)
 #define rt_task(p)		((p)->policy != SCHED_OTHER)
 
 
-#define lock_task_rq(rq,p,flags)				\
-do {								\
-repeat_lock_task:						\
-	rq = task_rq(p);					\
-	spin_lock_irqsave(&rq->lock, flags);			\
-	if (unlikely(rq_cpu(rq) != (p)->cpu)) {			\
-		spin_unlock_irqrestore(&rq->lock, flags);	\
-		goto repeat_lock_task;				\
-	}							\
-} while (0)
+static inline runqueue_t *lock_task_rq(task_t *p, unsigned long *flags)
+{
+	struct runqueue *__rq;
 
-#define unlock_task_rq(rq,p,flags)				\
-	spin_unlock_irqrestore(&rq->lock, flags)
+repeat_lock_task:
+	__rq = task_rq(p);
+	spin_lock_irqsave(&__rq->lock, *flags);
+	if (unlikely(__rq != task_rq(p))) {
+		spin_unlock_irqrestore(&__rq->lock, *flags);
+		goto repeat_lock_task;
+	}
+	return __rq;
+}
 
+static inline void unlock_task_rq(runqueue_t *rq, task_t *p,
+							unsigned long *flags)
+{
+	spin_unlock_irqrestore(&rq->lock, *flags);
+}
 /*
  * Adding/removing a task to/from a priority array:
  */
@@ -95,21 +95,26 @@ static inline void enqueue_task(struct task_struct *p, prio_array_t *array)
 }
 
 /*
- * A task is 'heavily interactive' if it has reached the
- * bottom 25% of the SCHED_OTHER priority range - in this
+ * A task is 'heavily interactive' if it either has reached the
+ * bottom 25% of the SCHED_OTHER priority range, or if it is below
+ * its default priority by at least 3 priority levels. In this
  * case we favor it by reinserting it on the active array,
  * even after it expired its current timeslice.
+ *
+ * A task is a 'CPU hog' if it's either in the upper 25% of the
+ * SCHED_OTHER priority range, or if's not an interactive task.
  *
  * A task can get a priority bonus by being 'somewhat
  * interactive' - and it will get a priority penalty for
  * being a CPU hog.
  *
- * CPU-hog penalties cannot go more than 5 above the default
- * priority level. Priority bonus cannot go below the minimum
- * priority level.
  */
-#define PRIO_INTERACTIVE (MAX_RT_PRIO + MAX_USER_PRIO/3)
-#define TASK_INTERACTIVE(p) ((p)->prio <= PRIO_INTERACTIVE)
+#define PRIO_INTERACTIVE	(MAX_RT_PRIO + MAX_USER_PRIO/4)
+#define PRIO_CPU_HOG		(MAX_RT_PRIO + MAX_USER_PRIO*3/4)
+
+#define TASK_INTERACTIVE(p) (((p)->prio <= PRIO_INTERACTIVE) ||		\
+	(((p)->prio < PRIO_CPU_HOG) &&					\
+		((p)->prio <= NICE_TO_PRIO((p)->__nice)-3)))
 
 static inline int effective_prio(task_t *p)
 {
@@ -117,9 +122,18 @@ static inline int effective_prio(task_t *p)
 
 	/*
 	 * Here we scale the actual sleep average [0 .... MAX_SLEEP_AVG]
-	 * into the 20 ... -20 bonus/penalty range.
+	 * into the 19 ... -18 bonus/penalty range.
+	 *
+	 * We take off the 10% from the full 0...39 priority range so that:
+	 *
+	 * 1) nice +19 CPU hogs do not preempt nice 0 CPU hogs just yet.
+	 * 2) nice -20 interactive tasks do not get preempted by
+	 *    nice 0 interactive tasks.
+	 *
+	 * Both properties are important to certain applications.
 	 */
-	bonus = MAX_USER_PRIO * p->sleep_avg / MAX_SLEEP_AVG - MAX_USER_PRIO/2;
+	bonus = MAX_USER_PRIO*9/10 * p->sleep_avg / MAX_SLEEP_AVG -
+							MAX_USER_PRIO*9/10/2;
 	prio = NICE_TO_PRIO(p->__nice) - bonus;
 	if (prio < MAX_RT_PRIO)
 		prio = MAX_RT_PRIO;
@@ -130,9 +144,10 @@ static inline int effective_prio(task_t *p)
 
 static inline void activate_task(task_t *p, runqueue_t *rq)
 {
+	unsigned long sleep_time = jiffies - p->sleep_timestamp;
 	prio_array_t *array = rq->active;
 
-	if (!rt_task(p)) {
+	if (!rt_task(p) && sleep_time) {
 		/*
 		 * This code gives a bonus to interactive tasks. We update
 		 * an 'average sleep time' value here, based on
@@ -140,7 +155,7 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 		 * the higher the average gets - and the higher the priority
 		 * boost gets as well.
 		 */
-		p->sleep_avg += jiffies - p->sleep_timestamp;
+		p->sleep_avg += sleep_time;
 		if (p->sleep_avg > MAX_SLEEP_AVG)
 			p->sleep_avg = MAX_SLEEP_AVG;
 		p->prio = effective_prio(p);
@@ -185,12 +200,26 @@ repeat:
 		cpu_relax();
 		barrier();
 	}
-	lock_task_rq(rq, p, flags);
+	rq = lock_task_rq(p, &flags);
 	if (unlikely(rq->curr == p)) {
-		unlock_task_rq(rq, p, flags);
+		unlock_task_rq(rq, p, &flags);
 		goto repeat;
 	}
-	unlock_task_rq(rq, p, flags);
+	unlock_task_rq(rq, p, &flags);
+}
+
+/*
+ * The SMP message passing code calls this function whenever
+ * the new task has arrived at the target CPU. We move the
+ * new task into the local runqueue.
+ *
+ * This function must be called with interrupts disabled.
+ */
+void sched_task_migrated(task_t *new_task)
+{
+	wait_task_inactive(new_task);
+	new_task->cpu = smp_processor_id();
+	wake_up_process(new_task);
 }
 
 /*
@@ -223,7 +252,7 @@ static int try_to_wake_up(task_t * p, int synchronous)
 	int success = 0;
 	runqueue_t *rq;
 
-	lock_task_rq(rq, p, flags);
+	rq = lock_task_rq(p, &flags);
 	p->state = TASK_RUNNING;
 	if (!p->array) {
 		activate_task(p, rq);
@@ -231,11 +260,11 @@ static int try_to_wake_up(task_t * p, int synchronous)
 			resched_task(rq->curr);
 		success = 1;
 	}
-	unlock_task_rq(rq, p, flags);
+	unlock_task_rq(rq, p, &flags);
 	return success;
 }
 
-inline int wake_up_process(task_t * p)
+int wake_up_process(task_t * p)
 {
 	return try_to_wake_up(p, 0);
 }
@@ -246,9 +275,8 @@ void wake_up_forked_process(task_t * p)
 
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
-		p->prio += MAX_USER_PRIO/10;
-		if (p->prio > MAX_PRIO-1)
-			p->prio = MAX_PRIO-1;
+		p->sleep_avg = (p->sleep_avg * 4) / 5;
+		p->prio = effective_prio(p);
 	}
 	spin_lock_irq(&rq->lock);
 	activate_task(p, rq);
@@ -310,18 +338,6 @@ unsigned long nr_context_switches(void)
 		sum += cpu_rq(i)->nr_switches;
 
 	return sum;
-}
-
-static inline unsigned long max_rq_len(void)
-{
-	unsigned long i, curr, max = 0;
-
-	for (i = 0; i < smp_num_cpus; i++) {
-		curr = cpu_rq(i)->nr_running;
-		if (curr > max)
-			max = curr;
-	}
-	return max;
 }
 
 /*
@@ -406,7 +422,7 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	 * Ok, lets do some actual balancing:
 	 */
 
-	if (rq_cpu(busiest) < this_cpu) {
+	if (busiest < this_rq) {
 		spin_unlock(&this_rq->lock);
 		spin_lock(&busiest->lock);
 		spin_lock(&this_rq->lock);
@@ -492,8 +508,7 @@ out_unlock:
 
 static inline void idle_tick(void)
 {
-	if ((jiffies % IDLE_REBALANCE_TICK) ||
-			likely(this_rq()->curr == NULL))
+	if (jiffies % IDLE_REBALANCE_TICK)
 		return;
 	spin_lock(&this_rq()->lock);
 	load_balance(this_rq(), 1);
@@ -509,7 +524,7 @@ void scheduler_tick(task_t *p)
 	unsigned long now = jiffies;
 	runqueue_t *rq = this_rq();
 
-	if (p == rq->idle || !rq->idle)
+	if (p == rq->idle)
 		return idle_tick();
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
@@ -538,7 +553,7 @@ void scheduler_tick(task_t *p)
 	 * do not update a process's priority until it either
 	 * goes to sleep or uses up its timeslice. This makes
 	 * it possible for interactive tasks to use up their
-	 * timeslices at their high priority levels.
+	 * timeslices at their highest priority levels.
 	 */
 	if (p->sleep_avg)
 		p->sleep_avg--;
@@ -562,29 +577,26 @@ void scheduling_functions_start_here(void) { }
  */
 asmlinkage void schedule(void)
 {
-	task_t *prev, *next;
+	task_t *prev = current, *next;
+	runqueue_t *rq = this_rq();
 	prio_array_t *array;
-	runqueue_t *rq;
 	list_t *queue;
 	int idx;
 
 	if (unlikely(in_interrupt()))
 		BUG();
-need_resched_back:
-	prev = current;
 	release_kernel_lock(prev, smp_processor_id());
-	rq = this_rq();
 	spin_lock_irq(&rq->lock);
 
 	switch (prev->state) {
-		case TASK_INTERRUPTIBLE:
-			if (unlikely(signal_pending(prev))) {
-				prev->state = TASK_RUNNING;
-				break;
-			}
-		default:
-			deactivate_task(prev, rq);
-		case TASK_RUNNING:
+	case TASK_INTERRUPTIBLE:
+		if (unlikely(signal_pending(prev))) {
+			prev->state = TASK_RUNNING;
+			break;
+		}
+	default:
+		deactivate_task(prev, rq);
+	case TASK_RUNNING:
 	}
 pick_next_task:
 	if (unlikely(!rq->nr_running)) {
@@ -615,7 +627,6 @@ switch_tasks:
 	if (likely(prev != next)) {
 		rq->nr_switches++;
 		rq->curr = next;
-		next->cpu = prev->cpu;
 		context_switch(prev, next);
 		/*
 		 * The runqueue pointer might be from another CPU
@@ -628,8 +639,6 @@ switch_tasks:
 	spin_unlock_irq(&rq->lock);
 
 	reacquire_kernel_lock(current);
-	if (need_resched())
-		goto need_resched_back;
 	return;
 }
 
@@ -782,47 +791,23 @@ long sleep_on_timeout(wait_queue_head_t *q, long timeout)
  */
 void set_cpus_allowed(task_t *p, unsigned long new_mask)
 {
-	runqueue_t *this_rq = this_rq(), *target_rq;
-	unsigned long this_mask = 1UL << smp_processor_id();
-	int target_cpu;
-
 	new_mask &= cpu_online_map;
 	if (!new_mask)
 		BUG();
+
 	p->cpus_allowed = new_mask;
 	/*
 	 * Can the task run on the current CPU? If not then
 	 * migrate the process off to a proper CPU.
 	 */
-	if (new_mask & this_mask)
+	if (new_mask & (1UL << smp_processor_id()))
 		return;
-	target_cpu = ffz(~new_mask);
-	target_rq = cpu_rq(target_cpu);
-	if (target_cpu < smp_processor_id()) {
-		spin_lock_irq(&target_rq->lock);
-		spin_lock(&this_rq->lock);
-	} else {
-		spin_lock_irq(&this_rq->lock);
-		spin_lock(&target_rq->lock);
-	}
-	dequeue_task(p, p->array);
-	this_rq->nr_running--;
-	target_rq->nr_running++;
-	enqueue_task(p, target_rq->active);
-	target_rq->curr->need_resched = 1;
-	spin_unlock(&target_rq->lock);
+#if CONFIG_SMP
+	smp_migrate_task(ffz(~new_mask), current);
 
-	/*
-	 * The easiest solution is to context switch into
-	 * the idle thread - which will pick the best task
-	 * afterwards:
-	 */
-	this_rq->nr_switches++;
-	this_rq->curr = this_rq->idle;
-	this_rq->idle->need_resched = 1;
-	context_switch(current, this_rq->idle);
-	barrier();
-	spin_unlock_irq(&this_rq()->lock);
+	current->state = TASK_UNINTERRUPTIBLE;
+	schedule();
+#endif
 }
 
 void scheduling_functions_end_here(void) { }
@@ -839,7 +824,7 @@ void set_user_nice(task_t *p, long nice)
 	 * We have to be careful, if called from sys_setpriority(),
 	 * the task might be in the middle of scheduling on another CPU.
 	 */
-	lock_task_rq(rq, p, flags);
+	rq = lock_task_rq(p, &flags);
 	if (rt_task(p)) {
 		p->__nice = nice;
 		goto out_unlock;
@@ -853,7 +838,7 @@ void set_user_nice(task_t *p, long nice)
 	if (array) {
 		enqueue_task(p, array);
 		/*
-		 * If the task is runnable and lowered its priority,
+		 * If the task is running and lowered its priority,
 		 * or increased its priority then reschedule its CPU:
 		 */
 		if ((nice < p->__nice) ||
@@ -861,7 +846,7 @@ void set_user_nice(task_t *p, long nice)
 			resched_task(rq->curr);
 	}
 out_unlock:
-	unlock_task_rq(rq, p, flags);
+	unlock_task_rq(rq, p, &flags);
 }
 
 #ifndef __alpha__
@@ -938,7 +923,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	 * To be able to change p->policy safely, the apropriate
 	 * runqueue lock must be held.
 	 */
-	lock_task_rq(rq,p,flags);
+	rq = lock_task_rq(p, &flags);
 
 	if (policy < 0)
 		policy = p->policy;
@@ -981,7 +966,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 		activate_task(p, task_rq(p));
 
 out_unlock:
-	unlock_task_rq(rq,p,flags);
+	unlock_task_rq(rq, p, &flags);
 out_unlock_tasklist:
 	read_unlock_irq(&tasklist_lock);
 
@@ -1224,14 +1209,12 @@ void show_state(void)
 	read_unlock(&tasklist_lock);
 }
 
-extern unsigned long wait_init_idle;
-
 static inline void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
 {
 	if (rq1 == rq2)
 		spin_lock(&rq1->lock);
 	else {
-		if (rq_cpu(rq1) < rq_cpu(rq2)) {
+		if (rq1 < rq2) {
 			spin_lock(&rq1->lock);
 			spin_lock(&rq2->lock);
 		} else {
@@ -1260,16 +1243,11 @@ void __init init_idle(void)
 	this_rq->curr = this_rq->idle = current;
 	deactivate_task(current, rq);
 	current->array = NULL;
-	current->prio = MAX_PRIO-1;
+	current->prio = MAX_PRIO;
 	current->state = TASK_RUNNING;
-	clear_bit(smp_processor_id(), &wait_init_idle);
 	double_rq_unlock(this_rq, rq);
-	while (wait_init_idle) {
-		cpu_relax();
-		barrier();
-	}
 	current->need_resched = 1;
-	__sti();
+	__restore_flags(flags);
 }
 
 extern void init_timervecs(void);
@@ -1308,7 +1286,7 @@ void __init sched_init(void)
 	 */
 	rq = this_rq();
 	rq->curr = current;
-	rq->idle = NULL;
+	rq->idle = current;
 	wake_up_process(current);
 
 	init_timervecs();

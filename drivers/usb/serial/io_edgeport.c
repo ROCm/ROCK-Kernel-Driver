@@ -2456,7 +2456,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 {
 	struct edgeport_serial *edge_serial = (struct edgeport_serial *)edge_port->port->serial->private;
 	int status = 0;
-	urb_t *urb;
+	struct urb *urb;
 	int timeout;
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);

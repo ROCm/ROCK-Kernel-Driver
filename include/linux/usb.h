@@ -576,13 +576,12 @@ extern void usb_deregister(struct usb_driver *);
 					/* ... less overhead for QUEUE_BULK */
 #define USB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
 
-typedef struct
-{
+struct usb_iso_packet_descriptor {
 	unsigned int offset;
 	unsigned int length;		/* expected length */
 	unsigned int actual_length;
 	unsigned int status;
-} iso_packet_descriptor_t;
+};
 
 struct urb;
 
@@ -741,10 +740,8 @@ struct urb
 	int timeout;			/* (in) timeout, in jiffies */
 	void *context;			/* (in) context for completion */
 	usb_complete_t complete;	/* (in) completion routine */
-	iso_packet_descriptor_t iso_frame_desc[0];	/* (in) ISO ONLY */
+	struct usb_iso_packet_descriptor iso_frame_desc[0];	/* (in) ISO ONLY */
 };
-
-typedef struct urb urb_t;
 
 /**
  * usb_fill_control_urb - initializes a control urb

@@ -297,13 +297,13 @@ struct usb_audio_state;
 #define FLG_CONNECTED    32
 
 struct my_data_urb {
-	urb_t urb;
-	iso_packet_descriptor_t isoframe[DESCFRAMES];
+	struct urb urb;
+	struct usb_iso_packet_descriptor isoframe[DESCFRAMES];
 };
 
 struct my_sync_urb {
-	urb_t urb;
-	iso_packet_descriptor_t isoframe[SYNCFRAMES];
+	struct urb urb;
+	struct usb_iso_packet_descriptor isoframe[SYNCFRAMES];
 };
 
 

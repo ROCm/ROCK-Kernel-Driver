@@ -1,6 +1,6 @@
 /*  devfs (Device FileSystem) driver.
 
-    Copyright (C) 1998-2001  Richard Gooch
+    Copyright (C) 1998-2002  Richard Gooch
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -604,6 +604,10 @@
     20020113   Richard Gooch <rgooch@atnf.csiro.au>
 	       Fixed (rare, old) race in <devfs_lookup>.
   v1.9
+    20020120   Richard Gooch <rgooch@atnf.csiro.au>
+	       Fixed deadlock bug in <devfs_d_revalidate_wait>.
+	       Tag VFS deletable in <devfs_mk_symlink> if handle ignored.
+  v1.10
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -636,7 +640,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.9 (20020113)"
+#define DEVFS_VERSION            "1.10 (20020120)"
 
 #define DEVFS_NAME "devfs"
 
@@ -781,7 +785,7 @@ struct devfs_entry
     umode_t mode;
     unsigned short namelen;      /*  I think 64k+ filenames are a way off... */
     unsigned char hide:1;
-    unsigned char vfs_created:1; /*  Whether created by driver or VFS        */
+    unsigned char vfs_deletable:1;/*  Whether the VFS may delete the entry   */
     char name[1];                /*  This is just a dummy: the allocated array
 				     is bigger. This is NULL-terminated      */
 };
@@ -1774,7 +1778,8 @@ int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
     DPRINTK (DEBUG_REGISTER, "(%s)\n", name);
     err = devfs_do_symlink (dir, name, flags, link, &de, info);
     if (err) return err;
-    if (handle != NULL) *handle = de;
+    if (handle == NULL) de->vfs_deletable = TRUE;
+    else *handle = de;
     devfsd_notify (de, DEVFSD_NOTIFY_REGISTERED, flags & DEVFS_FL_WAIT);
     return 0;
 }   /*  End Function devfs_mk_symlink  */
@@ -1817,7 +1822,7 @@ devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name, void *info)
 	{
 	    PRINTK ("(%s): using old entry in dir: %p \"%s\"\n",
 		    name, dir, dir->name);
-	    old->vfs_created = FALSE;
+	    old->vfs_deletable = FALSE;
 	    devfs_put (dir);
 	    return old;
 	}
@@ -2878,13 +2883,16 @@ static int devfs_d_revalidate_wait (struct dentry *dentry, int flags)
     struct devfs_lookup_struct *lookup_info = dentry->d_fsdata;
     DECLARE_WAITQUEUE (wait, current);
 
-    if ( !dentry->d_inode && is_devfsd_or_child (fs_info) )
+    if ( is_devfsd_or_child (fs_info) )
     {
 	devfs_handle_t de = lookup_info->de;
 	struct inode *inode;
 
-	DPRINTK (DEBUG_I_LOOKUP, "(%s): dentry: %p de: %p by: \"%s\"\n",
-		 dentry->d_name.name, dentry, de, current->comm);
+	DPRINTK (DEBUG_I_LOOKUP,
+		 "(%s): dentry: %p inode: %p de: %p by: \"%s\"\n",
+		 dentry->d_name.name, dentry, dentry->d_inode, de,
+		 current->comm);
+	if (dentry->d_inode) return 1;
 	if (de == NULL)
 	{
 	    read_lock (&parent->u.dir.lock);
@@ -3015,7 +3023,7 @@ static int devfs_unlink (struct inode *dir, struct dentry *dentry)
     de = get_devfs_entry_from_vfs_inode (inode);
     DPRINTK (DEBUG_I_UNLINK, "(%s): de: %p\n", dentry->d_name.name, de);
     if (de == NULL) return -ENOENT;
-    if (!de->vfs_created) return -EPERM;
+    if (!de->vfs_deletable) return -EPERM;
     write_lock (&de->parent->u.dir.lock);
     unhooked = _devfs_unhook (de);
     write_unlock (&de->parent->u.dir.lock);
@@ -3044,7 +3052,7 @@ static int devfs_symlink (struct inode *dir, struct dentry *dentry,
     DPRINTK (DEBUG_DISABLED, "(%s): errcode from <devfs_do_symlink>: %d\n",
 	     dentry->d_name.name, err);
     if (err < 0) return err;
-    de->vfs_created = TRUE;
+    de->vfs_deletable = TRUE;
     de->inode.uid = current->euid;
     de->inode.gid = current->egid;
     de->inode.atime = CURRENT_TIME;
@@ -3073,7 +3081,7 @@ static int devfs_mkdir (struct inode *dir, struct dentry *dentry, int mode)
     if (parent == NULL) return -ENOENT;
     de = _devfs_alloc_entry (dentry->d_name.name, dentry->d_name.len, mode);
     if (!de) return -ENOMEM;
-    de->vfs_created = TRUE;
+    de->vfs_deletable = TRUE;
     if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 )
 	return err;
     de->inode.uid = current->euid;
@@ -3103,7 +3111,7 @@ static int devfs_rmdir (struct inode *dir, struct dentry *dentry)
     de = get_devfs_entry_from_vfs_inode (inode);
     if (de == NULL) return -ENOENT;
     if ( !S_ISDIR (de->mode) ) return -ENOTDIR;
-    if (!de->vfs_created) return -EPERM;
+    if (!de->vfs_deletable) return -EPERM;
     /*  First ensure the directory is empty and will stay thay way  */
     write_lock (&de->u.dir.lock);
     de->u.dir.no_more_additions = TRUE;
@@ -3137,7 +3145,7 @@ static int devfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
     if (parent == NULL) return -ENOENT;
     de = _devfs_alloc_entry (dentry->d_name.name, dentry->d_name.len, mode);
     if (!de) return -ENOMEM;
-    de->vfs_created = TRUE;
+    de->vfs_deletable = TRUE;
     if ( S_ISBLK (mode) || S_ISCHR (mode) )
     {
 	de->u.fcb.u.device.major = MAJOR (rdev);

@@ -53,7 +53,7 @@ struct async {
 	unsigned int signr;
 	void *userbuffer;
         void *userurb;
-        urb_t urb;
+        struct urb urb;
 };
 
 static loff_t usbdev_lseek(struct file *file, loff_t offset, int orig)
@@ -170,7 +170,7 @@ extern inline unsigned int ld2(unsigned int x)
 
 static struct async *alloc_async(unsigned int numisoframes)
 {
-        unsigned int assize = sizeof(struct async) + numisoframes * sizeof(iso_packet_descriptor_t);
+        unsigned int assize = sizeof(struct async) + numisoframes * sizeof(struct usb_iso_packet_descriptor);
         struct async *as = kmalloc(assize, GFP_KERNEL);
         if (!as)
                 return NULL;

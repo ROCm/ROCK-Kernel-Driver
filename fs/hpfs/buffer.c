@@ -47,38 +47,72 @@ void hpfs_unlock_iget(struct super_block *s)
 
 void hpfs_lock_inode(struct inode *i)
 {
-	if (i) down(&i->i_hpfs_sem);
+	if (i) {
+		struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
+		down(&hpfs_inode->i_sem);
+	}
 }
 
 void hpfs_unlock_inode(struct inode *i)
 {
-	if (i) up(&i->i_hpfs_sem);
+	if (i) {
+		struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
+		up(&hpfs_inode->i_sem);
+	}
 }
 
 void hpfs_lock_2inodes(struct inode *i1, struct inode *i2)
 {
-	if (!i1) { if (i2) down(&i2->i_hpfs_sem); return; }
-	if (!i2) { if (i1) down(&i1->i_hpfs_sem); return; }
+	struct hpfs_inode_info *hpfs_i1 = NULL, *hpfs_i2 = NULL;
+
+	if (!i1) {
+		if (i2) {
+			hpfs_i2 = hpfs_i(i2);
+			down(&hpfs_i2->i_sem);
+		}
+		return;
+	}
+	if (!i2) {
+		if (i1) {
+			hpfs_i1 = hpfs_i(i1);
+			down(&hpfs_i1->i_sem);
+		}
+		return;
+	}
 	if (i1->i_ino < i2->i_ino) {
-		down(&i1->i_hpfs_sem);
-		down(&i2->i_hpfs_sem);
+		down(&hpfs_i1->i_sem);
+		down(&hpfs_i2->i_sem);
 	} else if (i1->i_ino > i2->i_ino) {
-		down(&i2->i_hpfs_sem);
-		down(&i1->i_hpfs_sem);
-	} else down(&i1->i_hpfs_sem);
+		down(&hpfs_i2->i_sem);
+		down(&hpfs_i1->i_sem);
+	} else down(&hpfs_i1->i_sem);
 }
 
 void hpfs_unlock_2inodes(struct inode *i1, struct inode *i2)
 {
-	if (!i1) { if (i2) up(&i2->i_hpfs_sem); return; }
-	if (!i2) { if (i1) up(&i1->i_hpfs_sem); return; }
+	struct hpfs_inode_info *hpfs_i1 = NULL, *hpfs_i2 = NULL;
+
+	if (!i1) {
+		if (i2) {
+			hpfs_i2 = hpfs_i(i2);
+			up(&hpfs_i2->i_sem);
+		}
+		return;
+	}
+	if (!i2) {
+		if (i1) {
+			hpfs_i1 = hpfs_i(i1);
+			up(&hpfs_i1->i_sem);
+		}
+		return;
+	}
 	if (i1->i_ino < i2->i_ino) {
-		up(&i2->i_hpfs_sem);
-		up(&i1->i_hpfs_sem);
+		up(&hpfs_i2->i_sem);
+		up(&hpfs_i1->i_sem);
 	} else if (i1->i_ino > i2->i_ino) {
-		up(&i1->i_hpfs_sem);
-		up(&i2->i_hpfs_sem);
-	} else up(&i1->i_hpfs_sem);
+		up(&hpfs_i1->i_sem);
+		up(&hpfs_i2->i_sem);
+	} else up(&hpfs_i1->i_sem);
 }
 
 void hpfs_lock_3inodes(struct inode *i1, struct inode *i2, struct inode *i3)
@@ -87,13 +121,16 @@ void hpfs_lock_3inodes(struct inode *i1, struct inode *i2, struct inode *i3)
 	if (!i2) { hpfs_lock_2inodes(i1, i3); return; }
 	if (!i3) { hpfs_lock_2inodes(i1, i2); return; }
 	if (i1->i_ino < i2->i_ino && i1->i_ino < i3->i_ino) {
-		down(&i1->i_hpfs_sem);
+		struct hpfs_inode_info *hpfs_i1 = hpfs_i(i1);
+		down(&hpfs_i1->i_sem);
 		hpfs_lock_2inodes(i2, i3);
 	} else if (i2->i_ino < i1->i_ino && i2->i_ino < i3->i_ino) {
-		down(&i2->i_hpfs_sem);
+		struct hpfs_inode_info *hpfs_i2 = hpfs_i(i2);
+		down(&hpfs_i2->i_sem);
 		hpfs_lock_2inodes(i1, i3);
 	} else if (i3->i_ino < i1->i_ino && i3->i_ino < i2->i_ino) {
-		down(&i3->i_hpfs_sem);
+		struct hpfs_inode_info *hpfs_i3 = hpfs_i(i3);
+		down(&hpfs_i3->i_sem);
 		hpfs_lock_2inodes(i1, i2);
 	} else if (i1->i_ino != i2->i_ino) hpfs_lock_2inodes(i1, i2);
 	else hpfs_lock_2inodes(i1, i3);
@@ -105,14 +142,17 @@ void hpfs_unlock_3inodes(struct inode *i1, struct inode *i2, struct inode *i3)
 	if (!i2) { hpfs_unlock_2inodes(i1, i3); return; }
 	if (!i3) { hpfs_unlock_2inodes(i1, i2); return; }
 	if (i1->i_ino < i2->i_ino && i1->i_ino < i3->i_ino) {
+		struct hpfs_inode_info *hpfs_i1 = hpfs_i(i1);
 		hpfs_unlock_2inodes(i2, i3);
-		up(&i1->i_hpfs_sem);
+		up(&hpfs_i1->i_sem);
 	} else if (i2->i_ino < i1->i_ino && i2->i_ino < i3->i_ino) {
+		struct hpfs_inode_info *hpfs_i2 = hpfs_i(i2);
 		hpfs_unlock_2inodes(i1, i3);
-		up(&i2->i_hpfs_sem);
+		up(&hpfs_i2->i_sem);
 	} else if (i3->i_ino < i1->i_ino && i3->i_ino < i2->i_ino) {
+		struct hpfs_inode_info *hpfs_i3 = hpfs_i(i3);
 		hpfs_unlock_2inodes(i1, i2);
-		up(&i3->i_hpfs_sem);
+		up(&hpfs_i3->i_sem);
 	} else if (i1->i_ino != i2->i_ino) hpfs_unlock_2inodes(i1, i2);
 	else hpfs_unlock_2inodes(i1, i3);
 }

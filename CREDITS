@@ -1281,6 +1281,13 @@ W: http://www.carumba.com/
 D: bug toaster (A1 sauce makes all the difference)
 D: Random linux hacker
 
+N: Tim Hockin
+E: thockin@hockin.org
+W: http://www.hockin.org/~thockin
+D: Natsemi ethernet
+D: Cobalt Networks (x86) support
+D: This-and-That
+
 N: Dirk Hohndel
 E: hohndel@suse.de
 D: The XFree86[tm] Project
@@ -1451,11 +1458,10 @@ S: USA
 
 N: Dave Jones
 E: davej@suse.de
-W: http://www.suse.de/~davej
-D: Moved PCI bridge tuning to userspace (Powertweak).
-D: Various x86 (& clones) setup code hacking.
-D: AFFS fixes for 2.3.x
-D: Various Janitorial hacks. (kernel-janitor.sourceforge.net)
+W: http://www.codemonkey.org.uk
+D: x86 errata/setup maintenance.
+D: Backport/Forwardport merge monkey.
+D: Various Janitor work.
 S: c/o SuSE Linux UK Ltd
 S: The Kinetic Centre
 S: Theobald Street
@@ -1660,6 +1666,13 @@ S: ul. Matemblewska 1B/10
 S: 80-283 Gdansk
 S: Poland
 
+N: Jakob Kemi
+E: jakob.kemi@telia.com
+D: V4L W9966 Webcam driver
+S: Forsbyvägen 33
+S: 74143 Knivsta
+S: Sweden
+
 N: Gero Kuhlmann
 E: gero@gkminix.han.de
 D: mounting root via NFS
@@ -1831,6 +1844,11 @@ D: Console-mouse-tracking patches
 S: Puistokaari 1 E 18
 S: 00200 Helsinki
 S: Finland
+
+N: Daniel J. Maas
+E: dmaas@dcine.com
+W: http://www.maasdigital.com
+D: dv1394
 
 N: Hamish Macdonald
 E: hamishm@lucent.com
@@ -2526,7 +2544,7 @@ S: Wanniassa ACT 2903
 S: Australia
 
 N: Gerard Roudier
-E: groudier@iplus.fr
+E: groudier@free.fr
 D: Contributed to asynchronous read-ahead improvement
 S: 21 Rue Carnot
 S: 95170 Deuil La Barre

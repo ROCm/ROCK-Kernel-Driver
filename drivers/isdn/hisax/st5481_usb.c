@@ -235,7 +235,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	struct usb_interface_descriptor *altsetting;
 	struct usb_endpoint_descriptor *endpoint;
 	int status;
-	urb_t *urb;
+	struct urb *urb;
 	u_char *buf;
 	
 	DBG(1,"");
@@ -560,7 +560,7 @@ void st5481_release_in(struct st5481_in *in)
  */
 int st5481_isoc_flatten(struct urb *urb)
 {
-	iso_packet_descriptor_t *pipd,*pend;
+	struct usb_iso_packet_descriptor *pipd,*pend;
 	unsigned char *src,*dst;
 	unsigned int len;
 	

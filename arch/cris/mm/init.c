@@ -7,6 +7,15 @@
  *  Authors:  Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: init.c,v $
+ *  Revision 1.2  2001/12/18 13:35:22  bjornw
+ *  Applied the 2.4.13->2.4.16 CRIS patch to 2.5.1 (is a copy of 2.4.15).
+ *
+ *  Revision 1.31  2001/11/13 16:22:00  bjornw
+ *  Skip calculating totalram and sharedram in si_meminfo
+ *
+ *  Revision 1.30  2001/11/12 19:02:10  pkj
+ *  Fixed compiler warnings.
+ *
  *  Revision 1.29  2001/07/25 16:09:50  bjornw
  *  val->sharedram will stay 0
  *
@@ -459,29 +468,18 @@ free_initmem(void)
                 free_page(addr);
                 totalram_pages++;
         }
-        printk ("Freeing unused kernel memory: %dk freed\n", 
+        printk ("Freeing unused kernel memory: %luk freed\n", 
 		(&__init_end - &__init_begin) >> 10);
 }
 
 void 
 si_meminfo(struct sysinfo *val)
 {
-	int i;
-
-	i = max_mapnr;
-	val->totalram = 0;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	while (i-- > 0)  {
-		if (PageReserved(mem_map+i))
-			continue;
-		val->totalram++;
-		if (!atomic_read(&mem_map[i].count))
-			continue;
-		val->sharedram += atomic_read(&mem_map[i].count) - 1;
-	}
-	val->mem_unit = PAGE_SIZE;
-	val->totalhigh = 0;
-	val->freehigh = 0;
+        val->totalram = totalram_pages;
+        val->sharedram = 0;
+        val->freeram = nr_free_pages();
+        val->bufferram = atomic_read(&buffermem_pages);
+        val->totalhigh = 0;
+        val->freehigh = 0;
+        val->mem_unit = PAGE_SIZE;
 }

@@ -478,7 +478,7 @@ extern int st5481_debug;
   if (level & __debug_variable) dump_iso_packet(__FUNCTION__,urb)
 
 static void __attribute__((unused))
-dump_iso_packet(const char *name,urb_t *urb)
+dump_iso_packet(const char *name, struct urb *urb)
 {
 	int i,j;
 	int len,ofs;

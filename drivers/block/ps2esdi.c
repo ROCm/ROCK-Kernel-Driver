@@ -422,7 +422,7 @@ static void __init ps2esdi_geninit(void)
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
 	for (i = 0; i < ps2esdi_drives; i++) {
-		register_disk(&ps2esdi_gendisk,MKDEV(MAJOR_NR,i<<6),1<<6,
+		register_disk(&ps2esdi_gendisk,mk_kdev(MAJOR_NR,i<<6),1<<6,
 				&ps2esdi_fops,
 				ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
@@ -466,7 +466,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 #if 0
 	printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld, buffer: %p\n",
 	       DEVICE_NAME,
-	       CURRENT_DEV, MINOR(CURRENT->rq_dev),
+	       CURRENT_DEV, minor(CURRENT->rq_dev),
 	       CURRENT->cmd, CURRENT->sector,
 	       CURRENT->current_nr_sectors, CURRENT->buffer);
 #endif
@@ -481,12 +481,12 @@ static void do_ps2esdi_request(request_queue_t * q)
 	}			/* check for above 16Mb dmas */
 	else if ((CURRENT_DEV < ps2esdi_drives) &&
 	    (CURRENT->sector + CURRENT->current_nr_sectors <=
-	     ps2esdi[MINOR(CURRENT->rq_dev)].nr_sects) &&
+	     ps2esdi[minor(CURRENT->rq_dev)].nr_sects) &&
 	    	CURRENT->flags & REQ_CMD) {
 #if 0
 		printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld\n",
 		       DEVICE_NAME,
-		       CURRENT_DEV, MINOR(CURRENT->rq_dev),
+		       CURRENT_DEV, minor(CURRENT->rq_dev),
 		       CURRENT->cmd, CURRENT->sector,
 		       CURRENT->current_nr_sectors);
 #endif
@@ -510,7 +510,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 	/* is request is valid */ 
 	else {
 		printk("Grrr. error. ps2esdi_drives: %d, %lu %lu\n", ps2esdi_drives,
-		       CURRENT->sector, ps2esdi[MINOR(CURRENT->rq_dev)].nr_sects);
+		       CURRENT->sector, ps2esdi[minor(CURRENT->rq_dev)].nr_sects);
 		end_request(FAIL);
 	}
 
@@ -849,7 +849,7 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 	switch (int_ret_code & 0x0f) {
 	case INT_TRANSFER_REQ:
 		ps2esdi_prep_dma(CURRENT->buffer, CURRENT->current_nr_sectors,
-		    (CURRENT->cmd == READ)
+		    (rq_data_dir(CURRENT) == READ)
 		    ? MCA_DMA_MODE_16 | MCA_DMA_MODE_WRITE | MCA_DMA_MODE_XFER
 		    : MCA_DMA_MODE_16 | MCA_DMA_MODE_READ);
 		outb(CTRL_ENABLE_DMA | CTRL_ENABLE_INTR, ESDI_CONTROL);

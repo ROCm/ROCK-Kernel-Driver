@@ -124,7 +124,7 @@ static struct buffer_head * ext3_find_entry (struct dentry *dentry,
 	sb = dir->i_sb;
 
 	nblocks = dir->i_size >> EXT3_BLOCK_SIZE_BITS(sb);
-	start = dir->u.ext3_i.i_dir_start_lookup;
+	start = EXT3_I(dir)->i_dir_start_lookup;
 	if (start >= nblocks)
 		start = 0;
 	block = start;
@@ -165,7 +165,7 @@ restart:
 		i = search_dirblock(bh, dir, dentry,
 			    block << EXT3_BLOCK_SIZE_BITS(sb), res_dir);
 		if (i == 1) {
-			dir->u.ext3_i.i_dir_start_lookup = block;
+			EXT3_I(dir)->i_dir_start_lookup = block;
 			ret = bh;
 			goto cleanup_and_exit;
 		} else {
@@ -295,9 +295,9 @@ static int ext3_add_entry (handle_t *handle, struct dentry *dentry,
 				de = (struct ext3_dir_entry_2 *) bh->b_data;
 				de->inode = 0;
 				de->rec_len = le16_to_cpu(sb->s_blocksize);
-				dir->u.ext3_i.i_disksize =
+				EXT3_I(dir)->i_disksize =
 					dir->i_size = offset + sb->s_blocksize;
-				dir->u.ext3_i.i_flags &= ~EXT3_INDEX_FL;
+				EXT3_I(dir)->i_flags &= ~EXT3_INDEX_FL;
 				ext3_mark_inode_dirty(handle, dir);
 			} else {
 
@@ -353,7 +353,7 @@ static int ext3_add_entry (handle_t *handle, struct dentry *dentry,
 			 * and/or different from the directory change time.
 			 */
 			dir->i_mtime = dir->i_ctime = CURRENT_TIME;
-			dir->u.ext3_i.i_flags &= ~EXT3_INDEX_FL;
+			EXT3_I(dir)->i_flags &= ~EXT3_INDEX_FL;
 			ext3_mark_inode_dirty(handle, dir);
 			dir->i_version = ++event;
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
@@ -521,7 +521,7 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 
 	inode->i_op = &ext3_dir_inode_operations;
 	inode->i_fop = &ext3_dir_operations;
-	inode->i_size = inode->u.ext3_i.i_disksize = inode->i_sb->s_blocksize;
+	inode->i_size = EXT3_I(inode)->i_disksize = inode->i_sb->s_blocksize;
 	inode->i_blocks = 0;	
 	dir_block = ext3_bread (handle, inode, 0, 1, &err);
 	if (!dir_block) {
@@ -557,7 +557,7 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	if (err)
 		goto out_no_entry;
 	dir->i_nlink++;
-	dir->u.ext3_i.i_flags &= ~EXT3_INDEX_FL;
+	EXT3_I(dir)->i_flags &= ~EXT3_INDEX_FL;
 	ext3_mark_inode_dirty(handle, dir);
 	d_instantiate(dentry, inode);
 out_stop:
@@ -655,7 +655,7 @@ int ext3_orphan_add(handle_t *handle, struct inode *inode)
 	int err = 0, rc;
 	
 	lock_super(sb);
-	if (!list_empty(&inode->u.ext3_i.i_orphan))
+	if (!list_empty(&EXT3_I(inode)->i_orphan))
 		goto out_unlock;
 
 	/* Orphan handling is only valid for files with data blocks
@@ -696,7 +696,7 @@ int ext3_orphan_add(handle_t *handle, struct inode *inode)
 	 * This is safe: on error we're going to ignore the orphan list
 	 * anyway on the next recovery. */
 	if (!err)
-		list_add(&inode->u.ext3_i.i_orphan, &EXT3_SB(sb)->s_orphan);
+		list_add(&EXT3_I(inode)->i_orphan, &EXT3_SB(sb)->s_orphan);
 
 	jbd_debug(4, "superblock will point to %ld\n", inode->i_ino);
 	jbd_debug(4, "orphan inode %ld will point to %d\n",
@@ -714,25 +714,25 @@ out_unlock:
 int ext3_orphan_del(handle_t *handle, struct inode *inode)
 {
 	struct list_head *prev;
+	struct ext3_inode_info *ei = EXT3_I(inode);
 	struct ext3_sb_info *sbi;
 	ino_t ino_next; 
 	struct ext3_iloc iloc;
 	int err = 0;
 	
 	lock_super(inode->i_sb);
-	if (list_empty(&inode->u.ext3_i.i_orphan)) {
+	if (list_empty(&ei->i_orphan)) {
 		unlock_super(inode->i_sb);
 		return 0;
 	}
 
 	ino_next = NEXT_ORPHAN(inode);
-	prev = inode->u.ext3_i.i_orphan.prev;
+	prev = ei->i_orphan.prev;
 	sbi = EXT3_SB(inode->i_sb);
 
 	jbd_debug(4, "remove inode %ld from orphan list\n", inode->i_ino);
 
-	list_del(&inode->u.ext3_i.i_orphan);
-	INIT_LIST_HEAD(&inode->u.ext3_i.i_orphan);
+	list_del_init(&ei->i_orphan);
 
 	/* If we're on an error path, we may not have a valid
 	 * transaction handle with which to update the orphan list on
@@ -756,7 +756,7 @@ int ext3_orphan_del(handle_t *handle, struct inode *inode)
 	} else {
 		struct ext3_iloc iloc2;
 		struct inode *i_prev =
-			list_entry(prev, struct inode, u.ext3_i.i_orphan);
+			&list_entry(prev, struct ext3_inode_info, i_orphan)->vfs_inode;
 		
 		jbd_debug(4, "orphan inode %ld will point to %ld\n",
 			  i_prev->i_ino, ino_next);
@@ -832,7 +832,7 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 	ext3_mark_inode_dirty(handle, inode);
 	dir->i_nlink--;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	dir->u.ext3_i.i_flags &= ~EXT3_INDEX_FL;
+	EXT3_I(dir)->i_flags &= ~EXT3_INDEX_FL;
 	ext3_mark_inode_dirty(handle, dir);
 
 end_rmdir:
@@ -878,7 +878,7 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 	if (retval)
 		goto end_unlink;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	dir->u.ext3_i.i_flags &= ~EXT3_INDEX_FL;
+	EXT3_I(dir)->i_flags &= ~EXT3_INDEX_FL;
 	ext3_mark_inode_dirty(handle, dir);
 	inode->i_nlink--;
 	if (!inode->i_nlink)
@@ -916,7 +916,7 @@ static int ext3_symlink (struct inode * dir,
 	if (IS_ERR(inode))
 		goto out_stop;
 
-	if (l > sizeof (inode->u.ext3_i.i_data)) {
+	if (l > sizeof (EXT3_I(inode)->i_data)) {
 		inode->i_op = &page_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ext3_aops;
 		/*
@@ -929,10 +929,10 @@ static int ext3_symlink (struct inode * dir,
 			goto out_no_entry;
 	} else {
 		inode->i_op = &ext3_fast_symlink_inode_operations;
-		memcpy((char*)&inode->u.ext3_i.i_data,symname,l);
+		memcpy((char*)&EXT3_I(inode)->i_data,symname,l);
 		inode->i_size = l-1;
 	}
-	inode->u.ext3_i.i_disksize = inode->i_size;
+	EXT3_I(inode)->i_disksize = inode->i_size;
 	ext3_mark_inode_dirty(handle, inode);
 	err = ext3_add_nondir(handle, dentry, inode);
 out_stop:
@@ -1077,7 +1077,7 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 		new_inode->i_ctime = CURRENT_TIME;
 	}
 	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
-	old_dir->u.ext3_i.i_flags &= ~EXT3_INDEX_FL;
+	EXT3_I(old_dir)->i_flags &= ~EXT3_INDEX_FL;
 	if (dir_bh) {
 		BUFFER_TRACE(dir_bh, "get_write_access");
 		ext3_journal_get_write_access(handle, dir_bh);
@@ -1089,7 +1089,7 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 			new_inode->i_nlink--;
 		} else {
 			new_dir->i_nlink++;
-			new_dir->u.ext3_i.i_flags &= ~EXT3_INDEX_FL;
+			EXT3_I(new_dir)->i_flags &= ~EXT3_INDEX_FL;
 			ext3_mark_inode_dirty(handle, new_dir);
 		}
 	}

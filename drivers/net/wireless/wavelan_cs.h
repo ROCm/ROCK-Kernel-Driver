@@ -52,8 +52,8 @@
  *       Robert Morris' BSDI driver for the PCMCIA WaveLAN adapter
  */
 
-#ifndef _WAVELAN_H
-#define	_WAVELAN_H
+#ifndef _WAVELAN_CS_H
+#define	_WAVELAN_CS_H
 
 /************************** MAGIC NUMBERS ***************************/
 
@@ -383,4 +383,4 @@ typedef union mm_t
   struct mmr_t	r;	/* Read from the mmc */
 } mm_t;
 
-#endif /* _WAVELAN_H */
+#endif /* _WAVELAN_CS_H */

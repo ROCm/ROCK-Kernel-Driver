@@ -561,7 +561,7 @@ hdlc_l2l1(struct PStack *st, int pr, void *arg)
 		case (PH_PULL | REQUEST):
 			if (!st->l1.bcs->tx_skb) {
 				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+				L1L2(st, PH_PULL | CONFIRM, NULL);
 			} else
 				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
@@ -577,7 +577,7 @@ hdlc_l2l1(struct PStack *st, int pr, void *arg)
 			test_and_clear_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
 			test_and_clear_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 			modehdlc(st->l1.bcs, 0, st->l1.bc);
-			st->l1.l1l2(st, PH_DEACTIVATE | CONFIRM, NULL);
+			L1L2(st, PH_DEACTIVATE | CONFIRM, NULL);
 			break;
 	}
 }
@@ -640,7 +640,7 @@ setstack_hdlc(struct PStack *st, struct BCState *bcs)
 	if (open_hdlcstate(st->l1.hardware, bcs))
 		return (-1);
 	st->l1.bcs = bcs;
-	st->l2.l2l1 = hdlc_l2l1;
+	st->l1.l2l1 = hdlc_l2l1;
 	setstack_manager(st);
 	bcs->st = st;
 	setstack_l1_B(st);

@@ -1084,12 +1084,13 @@ void usb_inc_dev_use(struct usb_device *dev)
  *
  *	The driver should call usb_free_urb() when it is finished with the urb.
  */
-urb_t *usb_alloc_urb(int iso_packets)
+struct urb *usb_alloc_urb(int iso_packets)
 {
-	urb_t *urb;
+	struct urb *urb;
 
-	urb = (urb_t *)kmalloc(sizeof(urb_t) + iso_packets * sizeof(iso_packet_descriptor_t),
-	      in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+	urb = (struct urb *)kmalloc(sizeof(struct urb) + 
+		iso_packets * sizeof(struct usb_iso_packet_descriptor),
+		in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 	if (!urb) {
 		err("alloc_urb: kmalloc failed");
 		return NULL;
@@ -1110,7 +1111,7 @@ urb_t *usb_alloc_urb(int iso_packets)
  *	cleaned up with a call to usb_free_urb() when the driver is finished
  *	with it.
  */
-void usb_free_urb(urb_t* urb)
+void usb_free_urb(struct urb *urb)
 {
 	if (urb)
 		kfree(urb);
@@ -1171,7 +1172,7 @@ void usb_free_urb(urb_t* urb)
  * the periodic request, and bandwidth reservation is being done for
  * this controller, submitting such a periodic request will fail. 
  */
-int usb_submit_urb(urb_t *urb)
+int usb_submit_urb(struct urb *urb)
 {
 	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
 		return urb->dev->bus->op->submit_urb(urb);
@@ -1205,7 +1206,7 @@ int usb_submit_urb(urb_t *urb)
  * and the completion function will see status -ECONNRESET.  Failure is
  * indicated by any other return value.
  */
-int usb_unlink_urb(urb_t *urb)
+int usb_unlink_urb(struct urb *urb)
 {
 	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
 		return urb->dev->bus->op->unlink_urb(urb);
@@ -1221,7 +1222,7 @@ struct usb_api_data {
 	int done;
 };
 
-static void usb_api_blocking_completion(urb_t *urb)
+static void usb_api_blocking_completion(struct urb *urb)
 {
 	struct usb_api_data *awd = (struct usb_api_data *)urb->context;
 
@@ -1231,7 +1232,7 @@ static void usb_api_blocking_completion(urb_t *urb)
 }
 
 // Starts urb and waits for completion or timeout
-static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
+static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 { 
 	DECLARE_WAITQUEUE(wait, current);
 	struct usb_api_data awd;
@@ -1289,7 +1290,7 @@ static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
 int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe, 
 			    struct usb_ctrlrequest *cmd,  void *data, int len, int timeout)
 {
-	urb_t *urb;
+	struct urb *urb;
 	int retv;
 	int length;
 
@@ -1376,7 +1377,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u
 int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe, 
 			void *data, int len, int *actual_length, int timeout)
 {
-	urb_t *urb;
+	struct urb *urb;
 
 	if (len < 0)
 		return -EINVAL;

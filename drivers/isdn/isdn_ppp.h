@@ -12,12 +12,7 @@
 #include <linux/ppp_defs.h>     /* for PPP_PROTOCOL */
 #include <linux/isdn_ppp.h>	/* for isdn_ppp info */
 
-extern int isdn_ppp_open(struct inode *, struct file *);
-extern int isdn_ppp_release(struct inode *, struct file *);
-extern int isdn_ppp_read(struct file *, char *, int, loff_t *off);
-extern int isdn_ppp_write(struct file *, const char *, int, loff_t *off);
-extern int isdn_ppp_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
-extern unsigned int isdn_ppp_poll(struct file *, struct poll_table_struct *);
+extern struct file_operations isdn_ppp_fops;
 
 extern int isdn_ppp_init(void);
 extern void isdn_ppp_cleanup(void);

@@ -192,15 +192,15 @@ static USB_EP_Desc_t TxBulkEPList[NBR_OF_EP_DESC] __attribute__ ((aligned (4)));
 static USB_EP_Desc_t TxIntrEPList[MAX_INTR_INTERVAL] __attribute__ ((aligned (4)));
 static USB_SB_Desc_t TxIntrSB_zout __attribute__ ((aligned (4)));
 
-static urb_t *URB_List[NBR_OF_EP_DESC];
+static struct urb *URB_List[NBR_OF_EP_DESC];
 static kmem_cache_t *usb_desc_cache;
 static struct usb_bus *etrax_usb_bus;
 
 static void dump_urb (struct urb *urb);
 static void init_rx_buffers(void);
-static int etrax_rh_unlink_urb (urb_t *urb);
-static void etrax_rh_send_irq(urb_t *urb);
-static void etrax_rh_init_int_timer(urb_t *urb);
+static int etrax_rh_unlink_urb (struct urb *urb);
+static void etrax_rh_send_irq(struct urb *urb);
+static void etrax_rh_init_int_timer(struct urb *urb);
 static void etrax_rh_int_timer_do(unsigned long ptr);
 
 static void etrax_usb_setup_epid(char epid, char devnum, char endpoint,
@@ -210,13 +210,13 @@ static int etrax_usb_allocate_epid(void);
 static void etrax_usb_free_epid(char epid);
 static void cleanup_sb(USB_SB_Desc_t *sb);
 
-static int etrax_usb_do_ctrl_hw_add(urb_t *urb, char epid, char maxlen);
-static int etrax_usb_do_bulk_hw_add(urb_t *urb, char epid, char maxlen);
+static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen);
+static int etrax_usb_do_bulk_hw_add(struct urb *urb, char epid, char maxlen);
 
-static int etrax_usb_submit_ctrl_urb(urb_t *urb);
+static int etrax_usb_submit_ctrl_urb(struct urb *urb);
 
-static int etrax_usb_submit_urb(urb_t *urb);
-static int etrax_usb_unlink_urb(urb_t *urb);
+static int etrax_usb_submit_urb(struct urb *urb);
+static int etrax_usb_unlink_urb(struct urb *urb);
 static int etrax_usb_get_frame_number(struct usb_device *usb_dev);
 static int etrax_usb_allocate_dev(struct usb_device *usb_dev);
 static int etrax_usb_deallocate_dev(struct usb_device *usb_dev);
@@ -225,7 +225,7 @@ static void etrax_usb_tx_interrupt(int irq, void *vhc, struct pt_regs *regs);
 static void etrax_usb_rx_interrupt(int irq, void *vhc, struct pt_regs *regs);
 static void etrax_usb_hc_intr_top_half(int irq, void *vhc, struct pt_regs *regs);
 
-static int etrax_rh_submit_urb (urb_t *urb);
+static int etrax_rh_submit_urb (struct urb *urb);
 
 static int etrax_usb_hc_init(void);
 static void etrax_usb_hc_cleanup(void);
@@ -421,7 +421,7 @@ static void init_tx_intr_ep(void)
 }
 
 
-static int etrax_usb_unlink_intr_urb(urb_t *urb)
+static int etrax_usb_unlink_intr_urb(struct urb *urb)
 {
 	struct usb_device *usb_dev = urb->dev;
 	etrax_hc_t *hc = usb_dev->bus->hcpriv;
@@ -512,7 +512,7 @@ void etrax_usb_do_intr_recover(int epid)
 	} while (tmp_ep != first_ep);
 }
 
-static int etrax_usb_submit_intr_urb(urb_t *urb)
+static int etrax_usb_submit_intr_urb(struct urb *urb)
 {
 	USB_EP_Desc_t *tmp_ep;
 	USB_EP_Desc_t *first_ep;
@@ -643,7 +643,7 @@ static int etrax_usb_submit_intr_urb(urb_t *urb)
 
 static int handle_intr_transfer_attn(char epid, int status)
 {
-	urb_t *old_urb;
+	struct urb *old_urb;
 
 	DBFENTER;
 
@@ -696,7 +696,7 @@ static int handle_intr_transfer_attn(char epid, int status)
 	DBFEXIT;
 }
 
-static int etrax_rh_unlink_urb (urb_t *urb)
+static int etrax_rh_unlink_urb (struct urb *urb)
 {
 	etrax_hc_t *hc;
 	
@@ -713,7 +713,7 @@ static int etrax_rh_unlink_urb (urb_t *urb)
 	return 0;
 }
 
-static void etrax_rh_send_irq(urb_t *urb)
+static void etrax_rh_send_irq(struct urb *urb)
 {
 	__u16 data = 0;
 	etrax_hc_t *hc = urb->dev->bus->hcpriv;
@@ -746,7 +746,7 @@ static void etrax_rh_send_irq(urb_t *urb)
 /*	DBFEXIT; */
 }
 
-static void etrax_rh_init_int_timer(urb_t *urb)
+static void etrax_rh_init_int_timer(struct urb *urb)
 {
 	etrax_hc_t *hc;
 	
@@ -765,12 +765,12 @@ static void etrax_rh_init_int_timer(urb_t *urb)
 
 static void etrax_rh_int_timer_do(unsigned long ptr)
 {
-	urb_t *urb;
+	struct urb *urb;
 	etrax_hc_t *hc;
 	
 /*	DBFENTER; */
 	
-	urb = (urb_t*)ptr;
+	urb = (struct urb *)ptr;
 	hc = urb->dev->bus->hcpriv;
 	
 	if (hc->rh.send) {
@@ -904,7 +904,7 @@ static int etrax_usb_allocate_epid(void)
 	return -1;
 }
 
-static int etrax_usb_submit_bulk_urb(urb_t *urb)
+static int etrax_usb_submit_bulk_urb(struct urb *urb)
 {
 	char epid;
 	char devnum;
@@ -912,7 +912,7 @@ static int etrax_usb_submit_bulk_urb(urb_t *urb)
 	char maxlen;
 	char slow;
 
-	urb_t *tmp_urb;
+	struct urb *tmp_urb;
 	
 	etrax_urb_priv_t *urb_priv;
 	unsigned long flags;
@@ -962,7 +962,7 @@ static int etrax_usb_submit_bulk_urb(urb_t *urb)
 	return 0;
 }
 
-static int etrax_usb_do_bulk_hw_add(urb_t *urb, char epid, char maxlen)
+static int etrax_usb_do_bulk_hw_add(struct urb *urb, char epid, char maxlen)
 {
 	USB_SB_Desc_t *sb_desc_1;
 
@@ -1080,7 +1080,7 @@ static int etrax_usb_do_bulk_hw_add(urb_t *urb, char epid, char maxlen)
 
 static int handle_bulk_transfer_attn(char epid, int status)
 {
-	urb_t *old_urb;
+	struct urb *old_urb;
 	etrax_urb_priv_t *hc_priv;
 	unsigned long flags;
 
@@ -1159,7 +1159,7 @@ static int handle_bulk_transfer_attn(char epid, int status)
 
 /* ---------------------------------------------------------------------------- */
 
-static int etrax_usb_submit_ctrl_urb(urb_t *urb)
+static int etrax_usb_submit_ctrl_urb(struct urb *urb)
 {
 	char epid;
 	char devnum;
@@ -1167,7 +1167,7 @@ static int etrax_usb_submit_ctrl_urb(urb_t *urb)
 	char maxlen;
 	char slow;
 
-	urb_t *tmp_urb;
+	struct urb *tmp_urb;
 	
 	etrax_urb_priv_t *urb_priv;
 	unsigned long flags;
@@ -1217,7 +1217,7 @@ static int etrax_usb_submit_ctrl_urb(urb_t *urb)
 	return 0;
 }
 
-static int etrax_usb_do_ctrl_hw_add(urb_t *urb, char epid, char maxlen)
+static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen)
 {
 	USB_SB_Desc_t *sb_desc_1;
 	USB_SB_Desc_t *sb_desc_2;
@@ -1358,7 +1358,7 @@ static int etrax_usb_do_ctrl_hw_add(urb_t *urb, char epid, char maxlen)
 	DBFEXIT;
 }
 
-static int etrax_usb_submit_urb(urb_t *urb)
+static int etrax_usb_submit_urb(struct urb *urb)
 {
 	etrax_hc_t *hc;
 	int rval = -EINVAL;
@@ -1403,7 +1403,7 @@ static int etrax_usb_submit_urb(urb_t *urb)
 	return rval;
 }
 
-static int etrax_usb_unlink_urb(urb_t *urb)
+static int etrax_usb_unlink_urb(struct urb *urb)
 {
 	etrax_hc_t *hc = urb->dev->bus->hcpriv;
 	int epid;
@@ -1448,7 +1448,7 @@ static int etrax_usb_unlink_urb(urb_t *urb)
 	cli();
 	
 	for (epid = 0; epid < 32; epid++) {
-		urb_t *u = URB_List[epid];
+		struct urb *u = URB_List[epid];
 		pos = 0;
 
 		for (; u; u = u->next) {
@@ -1474,7 +1474,7 @@ static int etrax_usb_unlink_urb(urb_t *urb)
 					URB_List[epid] = u->next;
 				
 				} else {
-					urb_t *up;
+					struct urb *up;
 					for (up = URB_List[epid]; up->next != u; up = up->next);
 					up->next = u->next;
 				}
@@ -1522,7 +1522,7 @@ static void etrax_usb_tx_interrupt(int irq, void *vhc, struct pt_regs *regs)
 	etrax_hc_t *hc = (etrax_hc_t *)vhc;
 	int epid;
 	char eol;
-	urb_t *urb;
+	struct urb *urb;
 	USB_EP_Desc_t *tmp_ep;
 	USB_SB_Desc_t *tmp_sb;
 	
@@ -1551,7 +1551,7 @@ static void etrax_usb_tx_interrupt(int irq, void *vhc, struct pt_regs *regs)
 static void etrax_usb_rx_interrupt(int irq, void *vhc, struct pt_regs *regs)
 {
 	int epid = 0;
-	urb_t *urb;
+	struct urb *urb;
 	etrax_urb_priv_t *urb_priv;
 		
 	*R_DMA_CH9_CLR_INTR = IO_STATE(R_DMA_CH9_CLR_INTR, clr_eop, do);
@@ -1649,7 +1649,7 @@ static void cleanup_sb(USB_SB_Desc_t *sb)
 
 static int handle_control_transfer_attn(char epid, int status)
 {
-	urb_t *old_urb;
+	struct urb *old_urb;
 	etrax_urb_priv_t *hc_priv;	
 
 	DBFENTER;
@@ -1710,7 +1710,7 @@ static int handle_control_transfer_attn(char epid, int status)
 static void etrax_usb_hc_intr_bottom_half(void *data)
 {
 	struct usb_reg_context *reg = (struct usb_reg_context *)data;
-	urb_t *old_urb;
+	struct urb *old_urb;
 	
 	int error_code;
 	int epid;
@@ -1976,7 +1976,7 @@ static void etrax_usb_hc_intr_top_half(int irq, void *vhc, struct pt_regs *regs)
 	DBFEXIT;
 }
 
-static int etrax_rh_submit_urb(urb_t *urb)
+static int etrax_rh_submit_urb(struct urb *urb)
 {
 	struct usb_device *usb_dev = urb->dev;
 	etrax_hc_t *hc = usb_dev->bus->hcpriv;

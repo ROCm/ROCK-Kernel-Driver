@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.41 2001/10/29 14:55:58 pkj Exp $
+/* $Id: head.S,v 1.2 2001/12/18 13:35:19 bjornw Exp $
  * 
  * Head of the kernel - alter with care
  *
@@ -7,6 +7,15 @@
  * Authors:	Bjorn Wesen (bjornw@axis.com)
  * 
  * $Log: head.S,v $
+ * Revision 1.2  2001/12/18 13:35:19  bjornw
+ * Applied the 2.4.13->2.4.16 CRIS patch to 2.5.1 (is a copy of 2.4.15).
+ *
+ * Revision 1.43  2001/11/08 15:09:43  starvik
+ * Only start MII clock if Ethernet is configured
+ *
+ * Revision 1.42  2001/11/08 14:37:34  starvik
+ * Start MII clock early to make sure that it is running at tranceiver reset
+ *
  * Revision 1.41  2001/10/29 14:55:58  pkj
  * Corrected pa$r0 to par0.
  *
@@ -156,7 +165,10 @@
 
 #define CRAMFS_MAGIC 0x28cd3d45
 #define RAM_INIT_MAGIC 0x56902387
-		
+
+#define START_ETHERNET_CLOCK IO_STATE(R_NETWORK_GEN_CONFIG, enable, on) |\
+                             IO_STATE(R_NETWORK_GEN_CONFIG, phy, mii_clk)
+				
 	;; exported symbols
 		
 	.globl	etrax_irv
@@ -301,6 +313,12 @@ _inflash0:
 	;; after init.
 	.section ".text.init"
 _inflash:
+#ifdef CONFIG_ETRAX_ETHERNET	
+	;; Start MII clock to make sure it is running when tranceiver is reset
+	move.d START_ETHERNET_CLOCK, $r0
+	move.d $r0, [R_NETWORK_GEN_CONFIG]
+#endif
+		
 	;; We need to initialze DRAM registers before we start using the DRAM
 
 	cmp.d	RAM_INIT_MAGIC, $r8	; Already initialized?

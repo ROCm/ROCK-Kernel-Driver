@@ -39,10 +39,10 @@
 #define ACK_TYPE_ERROR           0xe 
 
 /* Non-standard "ACK codes" for internal use */
-#define ACKX_NONE                -1
-#define ACKX_SEND_ERROR          -2
-#define ACKX_ABORTED             -3
-#define ACKX_TIMEOUT             -4
+#define ACKX_NONE                (-1)
+#define ACKX_SEND_ERROR          (-2)
+#define ACKX_ABORTED             (-3)
+#define ACKX_TIMEOUT             (-4)
 
 
 #define SPEED_100                0x0
@@ -116,7 +116,7 @@ struct ext_selfid {
 
 /*
  * Note: these mean to be bit fields of a big endian SelfID as seen on a little
- * endian machine.
+ * endian machine.  Without swapping.
  */
 
 struct selfid {

@@ -289,7 +289,7 @@ static inline int ext3_should_journal_data(struct inode *inode)
 		return 1;
 	if (test_opt(inode->i_sb, DATA_FLAGS) == EXT3_MOUNT_JOURNAL_DATA)
 		return 1;
-	if (inode->u.ext3_i.i_flags & EXT3_JOURNAL_DATA_FL)
+	if (EXT3_I(inode)->i_flags & EXT3_JOURNAL_DATA_FL)
 		return 1;
 	return 0;
 }

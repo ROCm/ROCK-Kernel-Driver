@@ -4,6 +4,8 @@
 
 #include <linux/tqueue.h>
 #include <linux/slab.h>
+#include <linux/devfs_fs_kernel.h>
+#include <linux/proc_fs.h>
 #include <asm/semaphore.h>
 #include "hosts.h"
 
@@ -96,7 +98,6 @@ static inline unsigned int get_hpsb_generation(struct hpsb_host *host)
         return atomic_read(&host->generation);
 }
 
-
 /*
  * Queue packet for transmitting, return 0 for failure.
  */
@@ -151,5 +152,66 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
  */
 void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
                           int write_acked);
+
+
+/*
+ * CHARACTER DEVICE DISPATCHING
+ *
+ * All ieee1394 character device drivers share the same major number
+ * (major 171).  The 256 minor numbers are allocated to the various
+ * task-specific interfaces (raw1394, video1394, dv1394, etc) in
+ * blocks of 16.
+ *
+ * The core ieee1394.o modules handles the initial open() for all
+ * character devices on major 171; it then dispatches to the
+ * appropriate task-specific driver.
+ *
+ * Minor device number block allocations:
+ *
+ * Block 0  (  0- 15)  raw1394
+ * Block 1  ( 16- 31)  video1394
+ * Block 2  ( 32- 47)  dv1394
+ *
+ * Blocks 3-14 free for future allocation
+ *
+ * Block 15 (240-255)  reserved for drivers under development, etc.
+ */
+
+#define IEEE1394_MAJOR               171
+
+#define IEEE1394_MINOR_BLOCK_RAW1394       0
+#define IEEE1394_MINOR_BLOCK_VIDEO1394     1
+#define IEEE1394_MINOR_BLOCK_DV1394        2
+#define IEEE1394_MINOR_BLOCK_EXPERIMENTAL 15
+
+/* return the index (within a minor number block) of a file */
+static inline unsigned char ieee1394_file_to_instance(struct file *file)
+{
+	unsigned char minor = minor(file->f_dentry->d_inode->i_rdev);
+	
+	/* return lower 4 bits */
+	return minor & 0xF;
+}
+
+/* 
+ * Task-specific drivers should call ieee1394_register_chardev() to
+ * request a block of 16 minor numbers.
+ *
+ * Returns 0 if the request was successful, -EBUSY if the block was
+ * already taken.
+ */
+
+int  ieee1394_register_chardev(int blocknum,           /* 0-15 */
+			       struct module *module,  /* THIS_MODULE */
+			       struct file_operations *file_ops);
+
+/* release a block of minor numbers */
+void ieee1394_unregister_chardev(int blocknum);
+
+/* the devfs handle for /dev/ieee1394; NULL if devfs is not in use */
+extern devfs_handle_t ieee1394_devfs_handle;
+
+/* the proc_fs entry for /proc/ieee1394 */
+extern struct proc_dir_entry *ieee1394_procfs_entry;
 
 #endif /* _IEEE1394_CORE_H */

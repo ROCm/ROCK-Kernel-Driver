@@ -288,25 +288,15 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 
 #include <linux/pipe_fs_i.h>
 #include <linux/minix_fs_i.h>
-#include <linux/ext2_fs_i.h>
-#include <linux/ext3_fs_i.h>
-#include <linux/hpfs_fs_i.h>
 #include <linux/ntfs_fs_i.h>
 #include <linux/msdos_fs_i.h>
 #include <linux/umsdos_fs_i.h>
 #include <linux/iso_fs_i.h>
-#include <linux/nfs_fs_i.h>
 #include <linux/sysv_fs_i.h>
-#include <linux/affs_fs_i.h>
-#include <linux/ufs_fs_i.h>
-#include <linux/efs_fs_i.h>
-#include <linux/coda_fs_i.h>
 #include <linux/romfs_fs_i.h>
-#include <linux/shmem_fs.h>
 #include <linux/smb_fs_i.h>
 #include <linux/hfs_fs_i.h>
 #include <linux/adfs_fs_i.h>
-#include <linux/qnx4_fs_i.h>
 #include <linux/reiserfs_fs_i.h>
 #include <linux/bfs_fs_i.h>
 #include <linux/udf_fs_i.h>
@@ -477,25 +467,15 @@ struct inode {
 	__u32			i_generation;
 	union {
 		struct minix_inode_info		minix_i;
-		struct ext2_inode_info		ext2_i;
-		struct ext3_inode_info		ext3_i;
-		struct hpfs_inode_info		hpfs_i;
 		struct ntfs_inode_info		ntfs_i;
 		struct msdos_inode_info		msdos_i;
 		struct umsdos_inode_info	umsdos_i;
 		struct iso_inode_info		isofs_i;
-		struct nfs_inode_info		nfs_i;
 		struct sysv_inode_info		sysv_i;
-		struct affs_inode_info		affs_i;
-		struct ufs_inode_info		ufs_i;
-		struct efs_inode_info		efs_i;
 		struct romfs_inode_info		romfs_i;
-		struct shmem_inode_info		shmem_i;
-		struct coda_inode_info		coda_i;
 		struct smb_inode_info		smbfs_i;
 		struct hfs_inode_info		hfs_i;
 		struct adfs_inode_info		adfs_i;
-		struct qnx4_inode_info		qnx4_i;
 		struct reiserfs_inode_info	reiserfs_i;
 		struct bfs_inode_info		bfs_i;
 		struct udf_inode_info		udf_i;
@@ -506,6 +486,12 @@ struct inode {
 		void				*generic_ip;
 	} u;
 };
+
+#include <linux/shmem_fs.h>
+/* will die */
+#include <linux/coda_fs_i.h>
+#include <linux/ext3_fs_i.h>
+#include <linux/efs_fs_i.h>
 
 struct fown_struct {
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
@@ -562,6 +548,9 @@ extern int init_private_file(struct file *, struct dentry *, int);
  * Lockd stuffs a "host" pointer into this.
  */
 typedef struct files_struct *fl_owner_t;
+
+/* that will die - we need it for nfs_lock_info */
+#include <linux/nfs_fs_i.h>
 
 struct file_lock {
 	struct file_lock *fl_next;	/* singly linked list for this inode  */

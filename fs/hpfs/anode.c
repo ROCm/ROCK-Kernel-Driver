@@ -42,9 +42,10 @@ secno hpfs_bplus_lookup(struct super_block *s, struct inode *inode,
 				return -1;
 			}
 			if (inode) {
-				inode->i_hpfs_file_sec = btree->u.external[i].file_secno;
-				inode->i_hpfs_disk_sec = btree->u.external[i].disk_secno;
-				inode->i_hpfs_n_secs = btree->u.external[i].length;
+				struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
+				hpfs_inode->i_file_sec = btree->u.external[i].file_secno;
+				hpfs_inode->i_disk_sec = btree->u.external[i].disk_secno;
+				hpfs_inode->i_n_secs = btree->u.external[i].length;
 			}
 			brelse(bh);
 			return a;

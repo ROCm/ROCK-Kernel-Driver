@@ -467,7 +467,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                                 hi = list_entry(lh, struct host_info, list);
 
                                 khl->nodes = hi->host->node_count;
-                                strcpy(khl->name, hi->host->template->name);
+                                strcpy(khl->name, hi->host->driver->name);
 
                                 khl++;
                         }
@@ -495,7 +495,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                                 lh = lh->next;
                         }
                         hi = list_entry(lh, struct host_info, list);
-                        hpsb_inc_host_usage(hi->host);
+                        hpsb_ref_host(hi->host);
                         list_add_tail(&fi->list, &hi->file_info_list);
                         fi->host = hi->host;
                         fi->state = connected;
@@ -915,7 +915,7 @@ static int raw1394_open(struct inode *inode, struct file *file)
 {
         struct file_info *fi;
 
-        if (minor(inode->i_rdev)) {
+        if (ieee1394_file_to_instance(file) > 0) {
                 return -ENXIO;
         }
 
@@ -983,7 +983,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 list_del(&fi->list);
                 spin_unlock_irq(&host_info_lock);
 
-                hpsb_dec_host_usage(fi->host);
+                hpsb_unref_host(fi->host);
         }
 
         kfree(fi);
@@ -1017,14 +1017,18 @@ static int __init init_raw1394(void)
                 return -ENOMEM;
         }
 
-	devfs_handle = devfs_register(NULL, RAW1394_DEVICE_NAME, DEVFS_FL_NONE,
-                                      RAW1394_DEVICE_MAJOR, 0,
+	devfs_handle = devfs_register(NULL,
+				      RAW1394_DEVICE_NAME, DEVFS_FL_NONE,
+                                      IEEE1394_MAJOR,
+				      IEEE1394_MINOR_BLOCK_RAW1394 * 16,
                                       S_IFCHR | S_IRUSR | S_IWUSR, &file_ops,
                                       NULL);
 
-        if (devfs_register_chrdev(RAW1394_DEVICE_MAJOR, RAW1394_DEVICE_NAME, 
-                                  &file_ops)) {
-                HPSB_ERR("raw1394 failed to register /dev/raw1394 device");
+        if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_RAW1394,
+				      THIS_MODULE, &file_ops)) {
+                HPSB_ERR("raw1394 failed to register minor device block");
+		devfs_unregister(devfs_handle);
+		hpsb_unregister_highlevel(hl_handle);
                 return -EBUSY;
         }
 	printk(KERN_INFO "raw1394: /dev/%s device initialized\n", RAW1394_DEVICE_NAME);
@@ -1033,7 +1037,7 @@ static int __init init_raw1394(void)
 
 static void __exit cleanup_raw1394(void)
 {
-        devfs_unregister_chrdev(RAW1394_DEVICE_MAJOR, RAW1394_DEVICE_NAME);
+        ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_RAW1394);
 	devfs_unregister(devfs_handle);
         hpsb_unregister_highlevel(hl_handle);
 }

@@ -8,7 +8,7 @@ to turn off all CPUs, and if an IRQ controller does not support IRQ
 affinity then the value will not change from the default 0xffffffff.
 
 Here is an example of restricting IRQ44 (eth1) to CPU0-3 then restricting
-the IRQ to CPU4-8 (this is an 8-CPU SMP box):
+the IRQ to CPU4-7 (this is an 8-CPU SMP box):
 
 [root@moon 44]# cat smp_affinity
 ffffffff

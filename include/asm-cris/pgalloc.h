@@ -21,7 +21,7 @@ extern struct pgtable_cache_struct {
  * Allocate and free page tables.
  */
 
-extern __inline__ pgd_t *get_pgd_slow(void)
+static inline pgd_t *get_pgd_slow(void)
 {
         pgd_t *ret = (pgd_t *)__get_free_page(GFP_KERNEL);
 
@@ -33,12 +33,12 @@ extern __inline__ pgd_t *get_pgd_slow(void)
         return ret;
 }
 
-extern __inline__ void free_pgd_slow(pgd_t *pgd)
+static inline void free_pgd_slow(pgd_t *pgd)
 {
         free_page((unsigned long)pgd);
 }
 
-extern __inline__ pgd_t *get_pgd_fast(void)
+static inline pgd_t *get_pgd_fast(void)
 {
         unsigned long *ret;
 
@@ -51,7 +51,7 @@ extern __inline__ pgd_t *get_pgd_fast(void)
         return (pgd_t *)ret;
 }
 
-extern __inline__ void free_pgd_fast(pgd_t *pgd)
+static inline void free_pgd_fast(pgd_t *pgd)
 {
         *(unsigned long *)pgd = (unsigned long) pgd_quicklist;
         pgd_quicklist = (unsigned long *) pgd;

@@ -147,7 +147,7 @@ struct usb_device;
 
 struct ibmcam_sbuf {
 	char *data;
-	urb_t *urb;
+	struct urb *urb;
 };
 
 struct ibmcam_frame {

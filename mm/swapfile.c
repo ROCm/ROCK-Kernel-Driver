@@ -344,7 +344,7 @@ void free_swap_and_cache(swp_entry_t entry)
 	if (page) {
 		page_cache_get(page);
 		/* Only cache user (+us), or swap space full? Free it! */
-		if (page_count(page) == 2 || vm_swap_full()) {
+		if (page_count(page) - !!page->buffers == 2 || vm_swap_full()) {
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}

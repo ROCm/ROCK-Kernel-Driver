@@ -111,7 +111,10 @@ do {                                                                      \
 
 /* inode to cnode access functions */
 
-#define ITOC(inode) (&((inode)->u.coda_i))
+static inline struct coda_inode_info *ITOC(struct inode *inode)
+{
+	return list_entry(inode, struct coda_inode_info, vfs_inode);
+}
 
 static __inline__ struct ViceFid *coda_i2f(struct inode *inode)
 {
