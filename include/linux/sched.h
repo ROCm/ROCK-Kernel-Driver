@@ -760,6 +760,12 @@ static inline int capable(int cap)
 }
 #endif
 
+extern int sysctl_disable_cap_mlock;
+static inline int can_do_mlock(void)
+{
+	return likely(sysctl_disable_cap_mlock || capable(CAP_IPC_LOCK));
+}
+
 /*
  * Routines for handling mm_structs
  */

@@ -157,6 +157,7 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 	BUG_ON(PageSwapCache(page));
 	BUG_ON(PageAnon(page));
 	BUG_ON(PageLRU(page));
+	BUG_ON(PageCompound(page));
 	ret = add_to_page_cache(page, &swapper_space, entry.val, GFP_KERNEL);
 	if (unlikely(ret)) {
 		unlock_page(page);

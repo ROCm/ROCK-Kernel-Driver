@@ -99,11 +99,6 @@ static void bad_page(const char *function, struct page *page)
 	page->mapcount = 0;
 }
 
-#if !defined(CONFIG_HUGETLB_PAGE) && !defined(CONFIG_CRASH_DUMP) \
-	&& !defined(CONFIG_CRASH_DUMP_MODULE)
-#define prep_compound_page(page, order) do { } while (0)
-#define destroy_compound_page(page, order) do { } while (0)
-#else
 /*
  * Higher-order pages are called "compound pages".  They are structured thusly:
  *
@@ -154,7 +149,6 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 		ClearPageCompound(p);
 	}
 }
-#endif		/* CONFIG_HUGETLB_PAGE */
 
 /*
  * Freeing function for a buddy system allocator.
@@ -185,7 +179,7 @@ static inline void __free_pages_bulk (struct page *page, struct page *base,
 {
 	unsigned long page_idx, index;
 
-	if (order)
+	if (PageCompound(page))
 		destroy_compound_page(page, order);
 	page_idx = page - base;
 	if (page_idx & ~mask)
@@ -315,47 +309,37 @@ expand(struct zone *zone, struct page *page,
 	return page;
 }
 
-static inline void set_page_refs(struct page *page, int order)
-{
-#ifdef CONFIG_MMU
-	set_page_count(page, 1);
-#else
-	int i;
-
-	/*
-	 * We need to reference all the pages for this order, otherwise if
-	 * anyone accesses one of the pages with (get/put) it will be freed.
-	 */
-	for (i = 0; i < (1 << order); i++)
-		set_page_count(page+i, 1);
-#endif /* CONFIG_MMU */
-}
-
 /*
  * This page is about to be returned from the page allocator
  */
-static void prep_new_page(struct page *page, int order)
+static void prep_new_page(struct page * _page, int order)
 {
-	if (page->mapping ||
-	    page->mapcount ||
-	    (page->flags & (
-			1 << PG_private	|
-			1 << PG_locked	|
-			1 << PG_lru	|
-			1 << PG_active	|
-			1 << PG_dirty	|
-			1 << PG_reclaim	|
-			1 << PG_anon	|
-			1 << PG_maplock	|
-			1 << PG_swapcache	|
-			1 << PG_writeback )))
-		bad_page(__FUNCTION__, page);
+	int i;
 
-	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
-			1 << PG_referenced | 1 << PG_arch_1 |
-			1 << PG_checked | 1 << PG_mappedtodisk);
-	page->private = 0;
-	set_page_refs(page, order);
+	for (i = 0; i < (1 << order); i++) {
+		struct page * page = _page + i;
+
+		if (page->mapping ||
+		    page->mapcount ||
+		    (page->flags & (
+				    1 << PG_private	|
+				    1 << PG_locked	|
+				    1 << PG_lru	|
+				    1 << PG_active	|
+				    1 << PG_dirty	|
+				    1 << PG_reclaim	|
+				    1 << PG_anon	|
+				    1 << PG_maplock	|
+				    1 << PG_swapcache	|
+				    1 << PG_writeback )))
+			bad_page(__FUNCTION__, page);
+
+		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
+				 1 << PG_referenced | 1 << PG_arch_1 |
+				 1 << PG_checked | 1 << PG_mappedtodisk);
+		page->private = 0;
+		set_page_count(page, 1);
+	}
 }
 
 /* 
@@ -534,10 +518,11 @@ void fastcall free_cold_page(struct page *page)
  * or two.
  */
 
-static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
+static struct page *buffered_rmqueue(struct zone *zone, int order, int cold_compound)
 {
 	unsigned long flags;
 	struct page *page = NULL;
+	int cold = !!(cold_compound & __GFP_COLD);
 
 	if (order == 0) {
 		struct per_cpu_pages *pcp;
@@ -566,7 +551,7 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 		BUG_ON(bad_range(zone, page));
 		mod_page_state_zone(zone, pgalloc, 1 << order);
 		prep_new_page(page, order);
-		if (order)
+		if (unlikely(order) && !(cold_compound & __GFP_NO_COMP))
 			prep_compound_page(page, order);
 	}
 	return page;
@@ -606,7 +591,9 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 
 	cold = 0;
 	if (gfp_mask & __GFP_COLD)
-		cold = 1;
+		cold = __GFP_COLD;
+	if (gfp_mask & __GFP_NO_COMP)
+		cold |= __GFP_NO_COMP;
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
 	if (zones[0] == NULL)     /* no zones in the zonelist */

@@ -744,7 +744,7 @@ struct file *hugetlb_zero_setup(size_t size)
 	struct qstr quick_string;
 	char buf[16];
 
-	if (!disable_cap_mlock && !capable(CAP_IPC_LOCK))
+	if (!can_do_mlock())
 		return ERR_PTR(-EPERM);
 
 	if (!is_hugepage_mem_enough(size))

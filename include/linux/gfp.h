@@ -34,6 +34,7 @@
 #define __GFP_NOFAIL	0x800	/* Retry for ever.  Cannot fail */
 #define __GFP_NORETRY	0x1000	/* Do not retry.  Might fail */
 #define __GFP_NO_GROW	0x2000	/* Slab internal usage */
+#define __GFP_NO_COMP	0x4000	/* Return non compound pages if order > 0 */
 
 #define __GFP_BITS_SHIFT 16	/* Room for 16 __GFP_FOO bits */
 #define __GFP_BITS_MASK ((1 << __GFP_BITS_SHIFT) - 1)

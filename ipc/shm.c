@@ -505,7 +505,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 /* Allow superuser to lock segment in memory */
 /* Should the pages be faulted in here or leave it to user? */
 /* need to determine interaction with current->swappable */
-		if (!disable_cap_mlock && !capable(CAP_IPC_LOCK)) {
+		if (!can_do_mlock()) {
 			err = -EPERM;
 			goto out;
 		}

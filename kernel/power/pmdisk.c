@@ -531,7 +531,7 @@ static void calc_order(void)
 static int alloc_pagedir(void)
 {
 	calc_order();
-	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, 
+	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD | __GFP_NO_COMP, 
 							     pagedir_order);
 	if(!pagedir_save)
 		return -ENOMEM;

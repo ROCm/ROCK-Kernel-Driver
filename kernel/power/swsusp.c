@@ -513,7 +513,7 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 
 	pagedir_order = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages));
 
-	p = pagedir = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, pagedir_order);
+	p = pagedir = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD | __GFP_NO_COMP, pagedir_order);
 	if(!pagedir)
 		return NULL;
 

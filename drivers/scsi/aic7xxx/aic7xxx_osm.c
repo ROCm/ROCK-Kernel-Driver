@@ -2286,17 +2286,8 @@ ahc_linux_dv_thread(void *data)
 	 * Complete thread creation.
 	 */
 	lock_kernel();
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	/*
-	 * Don't care about any signals.
-	 */
-	siginitsetinv(&current->blocked, 0);
-
-	daemonize();
-	sprintf(current->comm, "ahc_dv_%d", ahc->unit);
-#else
 	daemonize("ahc_dv_%d", ahc->unit);
-#endif
+	current->flags |= PF_IOTHREAD;
 	unlock_kernel();
 
 	while (1) {
