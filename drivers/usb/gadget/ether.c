@@ -1688,54 +1688,25 @@ static struct net_device_stats *eth_get_stats (struct net_device *net)
 	return &((struct eth_dev *)netdev_priv(net))->stats;
 }
 
-static int eth_ethtool_ioctl (struct net_device *net, void __user *useraddr)
+static void eth_get_drvinfo(struct net_device *net, struct ethtool_drvinfo *p)
 {
 	struct eth_dev	*dev = netdev_priv(net);
-	u32		cmd;
-
-	if (get_user (cmd, (u32 __user *)useraddr))
-		return -EFAULT;
-	switch (cmd) {
-
-	case ETHTOOL_GDRVINFO: {	/* get driver info */
-		struct ethtool_drvinfo		info;
-
-		memset (&info, 0, sizeof info);
-		info.cmd = ETHTOOL_GDRVINFO;
-		strlcpy (info.driver, shortname, sizeof info.driver);
-		strlcpy (info.version, DRIVER_VERSION, sizeof info.version);
-		strlcpy (info.fw_version, dev->gadget->name,
-			sizeof info.fw_version);
-		strlcpy (info.bus_info, dev->gadget->dev.bus_id,
-			sizeof info.bus_info);
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-		}
-
-	case ETHTOOL_GLINK: {		/* get link status */
-		struct ethtool_value	edata = { ETHTOOL_GLINK };
-
-		edata.data = (dev->gadget->speed != USB_SPEED_UNKNOWN);
-		if (copy_to_user (useraddr, &edata, sizeof (edata)))
-			return -EFAULT;
-		return 0;
-		}
-
-	}
-	/* Note that the ethtool user space code requires EOPNOTSUPP */
-	return -EOPNOTSUPP;
+	strlcpy(p->driver, shortname, sizeof p->driver);
+	strlcpy(p->version, DRIVER_VERSION, sizeof p->version);
+	strlcpy(p->fw_version, dev->gadget->name, sizeof p->fw_version);
+	strlcpy (p->bus_info, dev->gadget->dev.bus_id, sizeof p->bus_info);
 }
 
-static int eth_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
+static u32 eth_get_link(struct net_device *net)
 {
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return eth_ethtool_ioctl(net, rq->ifr_data);
-	default:
-		return -EOPNOTSUPP;
-	}
+	struct eth_dev	*dev = netdev_priv(net);
+	return dev->gadget->speed != USB_SPEED_UNKNOWN;
 }
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = eth_get_drvinfo,
+	.get_link = eth_get_link
+};
 
 static void defer_kevent (struct eth_dev *dev, int flag)
 {
@@ -2518,7 +2489,7 @@ autoconf_fail:
 	net->stop = eth_stop;
 	// watchdog_timeo, tx_timeout ...
 	// set_multicast_list
-	net->do_ioctl = eth_ioctl;
+	SET_ETHTOOL_OPS(net, &ops);
 
 	/* preallocate control response and buffer */
 	dev->req = usb_ep_alloc_request (gadget->ep0, GFP_KERNEL);
