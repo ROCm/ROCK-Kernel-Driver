@@ -147,6 +147,10 @@ SECTIONS
   . = ALIGN(4096);
   __openfirmware_end = .;
 
+  __start___kallsyms = .;     /* All kernel symbols */
+  __kallsyms : { *(__kallsyms) }
+  __stop___kallsyms = .;
+
   __bss_start = .;
   .bss       :
   {
@@ -155,6 +159,8 @@ SECTIONS
    *(.bss)
    *(COMMON)
   }
+  __bss_stop = .;
+
   _end = . ;
   PROVIDE (end = .);
 }
