@@ -230,11 +230,11 @@ static int detect_ejectable_slots (acpi_handle *bridge_handle)
  * TBD: _TRA, etc.
  */
 static void
-decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
+decode_acpi_resource (struct acpi_resource *resource, struct acpiphp_bridge *bridge)
 {
-	acpi_resource_address16 *address16_data;
-	acpi_resource_address32 *address32_data;
-	acpi_resource_address64 *address64_data;
+	struct acpi_resource_address16 *address16_data;
+	struct acpi_resource_address32 *address32_data;
+	struct acpi_resource_address64 *address64_data;
 	struct pci_resource *res;
 
 	u32 resource_type, producer_consumer, address_length;
@@ -252,7 +252,7 @@ decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
 
 		switch (resource->id) {
 		case ACPI_RSTYPE_ADDRESS16:
-			address16_data = (acpi_resource_address16 *)&resource->data;
+			address16_data = (struct acpi_resource_address16 *)&resource->data;
 			resource_type = address16_data->resource_type;
 			producer_consumer = address16_data->producer_consumer;
 			min_address_range = address16_data->min_address_range;
@@ -264,7 +264,7 @@ decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
 			break;
 
 		case ACPI_RSTYPE_ADDRESS32:
-			address32_data = (acpi_resource_address32 *)&resource->data;
+			address32_data = (struct acpi_resource_address32 *)&resource->data;
 			resource_type = address32_data->resource_type;
 			producer_consumer = address32_data->producer_consumer;
 			min_address_range = address32_data->min_address_range;
@@ -276,7 +276,7 @@ decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
 			break;
 
 		case ACPI_RSTYPE_ADDRESS64:
-			address64_data = (acpi_resource_address64 *)&resource->data;
+			address64_data = (struct acpi_resource_address64 *)&resource->data;
 			resource_type = address64_data->resource_type;
 			producer_consumer = address64_data->producer_consumer;
 			min_address_range = address64_data->min_address_range;
@@ -296,7 +296,7 @@ decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
 			break;
 		}
 
-		resource = (acpi_resource *)((char*)resource + resource->length);
+		resource = (struct acpi_resource *)((char*)resource + resource->length);
 
 		if (found && producer_consumer == ACPI_PRODUCER && address_length > 0) {
 			switch (resource_type) {
@@ -389,9 +389,9 @@ static struct pci_bus *find_pci_bus(const struct list_head *list, int bus)
 static void decode_hpp(struct acpiphp_bridge *bridge)
 {
 	acpi_status status;
-	acpi_buffer buffer = { .length = ACPI_ALLOCATE_BUFFER,
-			       .pointer = NULL};
-	acpi_object *package;
+	struct acpi_buffer buffer = { .length = ACPI_ALLOCATE_BUFFER,
+				      .pointer = NULL};
+	union acpi_object *package;
 	int i;
 
 	/* default numbers */
@@ -407,7 +407,7 @@ static void decode_hpp(struct acpiphp_bridge *bridge)
 		return;
 	}
 
-	package = (acpi_object *) buffer.pointer;
+	package = (union acpi_object *) buffer.pointer;
 
 	if (!package || package->type != ACPI_TYPE_PACKAGE ||
 	    package->package.count != 4 || !package->package.elements) {
@@ -476,8 +476,8 @@ static void init_bridge_misc (struct acpiphp_bridge *bridge)
 static void add_host_bridge (acpi_handle *handle, int seg, int bus)
 {
 	acpi_status status;
-	acpi_buffer buffer = { .length = ACPI_ALLOCATE_BUFFER,
-			       .pointer = NULL};
+	struct acpi_buffer buffer = { .length = ACPI_ALLOCATE_BUFFER,
+				      .pointer = NULL};
 
 	struct acpiphp_bridge *bridge;
 
@@ -772,10 +772,10 @@ static acpi_status
 find_host_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 {
 	acpi_status status;
-	acpi_device_info info;
+	struct acpi_device_info info;
 	char objname[5];
-	acpi_buffer buffer = { .length = sizeof(objname),
-			       .pointer = objname };
+	struct acpi_buffer buffer = { .length = sizeof(objname),
+				      .pointer = objname };
 
 	status = acpi_get_object_info(handle, &info);
 	if (ACPI_FAILURE(status)) {
@@ -837,8 +837,8 @@ static int power_off_slot (struct acpiphp_slot *slot)
 	acpi_status status;
 	struct acpiphp_func *func;
 	struct list_head *l;
-	acpi_object_list arg_list;
-	acpi_object arg;
+	struct acpi_object_list arg_list;
+	union acpi_object arg;
 
 	int retval = 0;
 
@@ -1069,8 +1069,8 @@ static void handle_hotplug_event_bridge (acpi_handle handle, u32 type, void *con
 {
 	struct acpiphp_bridge *bridge;
 	char objname[64];
-	acpi_buffer buffer = { .length = sizeof(objname),
-			       .pointer = objname };
+	struct acpi_buffer buffer = { .length = sizeof(objname),
+				      .pointer = objname };
 
 	bridge = (struct acpiphp_bridge *)context;
 
@@ -1120,8 +1120,8 @@ static void handle_hotplug_event_func (acpi_handle handle, u32 type, void *conte
 {
 	struct acpiphp_func *func;
 	char objname[64];
-	acpi_buffer buffer = { .length = sizeof(objname),
-			       .pointer = objname };
+	struct acpi_buffer buffer = { .length = sizeof(objname),
+				      .pointer = objname };
 
 	acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 

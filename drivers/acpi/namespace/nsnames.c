@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,12 +49,12 @@
 
 void
 acpi_ns_build_external_path (
-	acpi_namespace_node     *node,
-	acpi_size               size,
-	char                    *name_buffer)
+	struct acpi_namespace_node      *node,
+	acpi_size                       size,
+	char                            *name_buffer)
 {
-	acpi_size               index;
-	acpi_namespace_node     *parent_node;
+	acpi_size                       index;
+	struct acpi_namespace_node      *parent_node;
 
 
 	ACPI_FUNCTION_NAME ("ns_build_external_path");
@@ -119,10 +119,10 @@ acpi_ns_build_external_path (
 
 char *
 acpi_ns_get_external_pathname (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
-	char                    *name_buffer;
-	acpi_size               size;
+	char                            *name_buffer;
+	acpi_size                       size;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ns_get_external_pathname", node);
@@ -162,10 +162,10 @@ acpi_ns_get_external_pathname (
 
 acpi_size
 acpi_ns_get_pathname_length (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
-	acpi_size               size;
-	acpi_namespace_node     *next_node;
+	acpi_size                       size;
+	struct acpi_namespace_node      *next_node;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -203,12 +203,12 @@ acpi_ns_get_pathname_length (
 
 acpi_status
 acpi_ns_handle_to_pathname (
-	acpi_handle             target_handle,
-	acpi_buffer             *buffer)
+	acpi_handle                     target_handle,
+	struct acpi_buffer              *buffer)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	acpi_size               required_size;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	acpi_size                       required_size;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ns_handle_to_pathname", target_handle);

@@ -187,23 +187,23 @@ acpi_bus_match (
 	struct acpi_driver	*driver)
 {
 	int error = 0;
-	acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 
 	if (device->flags.hardware_id)
 		if (strstr(driver->ids, device->pnp.hardware_id))
 			goto Done;
 
 	if (device->flags.compatible_ids) {
-		acpi_status	status = AE_OK;
-		acpi_object	*object = NULL;
-		char		cid[256] = {};
+		acpi_status		status = AE_OK;
+		union acpi_object	*object = NULL;
+		char			cid[256] = {};
 
 		status = acpi_evaluate_object(device->handle, "_CID", NULL, 
 			&buffer);
 		if (ACPI_FAILURE(status) || !buffer.pointer)
 			return -ENOENT;
 
-		object = (acpi_object *) buffer.pointer;
+		object = (union acpi_object *) buffer.pointer;
 
 		switch (object->type) {
 		case ACPI_TYPE_INTEGER:
@@ -480,7 +480,7 @@ acpi_bus_get_flags (
 static void acpi_device_get_busid(struct acpi_device * device, acpi_handle handle, int type)
 {
 	char			bus_id[5] = {'?',0};
-	acpi_buffer		buffer = {sizeof(bus_id), bus_id};
+	struct acpi_buffer	buffer = {sizeof(bus_id), bus_id};
 	int			i = 0;
 
 	/*
@@ -516,7 +516,7 @@ static void acpi_device_get_busid(struct acpi_device * device, acpi_handle handl
 static void acpi_device_set_id(struct acpi_device * device, struct acpi_device * parent,
 			       acpi_handle handle, int type)
 {
-	acpi_device_info	info;
+	struct acpi_device_info	info;
 	char			*hid = NULL;
 	char			*uid = NULL;
 	acpi_status		status;

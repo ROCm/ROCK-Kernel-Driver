@@ -96,8 +96,8 @@ acpi_pci_link_get_possible (
 {
 	int                     result = 0;
 	acpi_status		status = AE_OK;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_resource		*resource = NULL;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_resource	*resource = NULL;
 	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_link_get_possible");
@@ -112,7 +112,7 @@ acpi_pci_link_get_possible (
 		goto end;
 	}
 
-	resource = (acpi_resource *) buffer.pointer;
+	resource = (struct acpi_resource *) buffer.pointer;
 
 	/* skip past dependent function resource (if present) */
 	if (resource->id == ACPI_RSTYPE_START_DPF)
@@ -121,7 +121,7 @@ acpi_pci_link_get_possible (
 	switch (resource->id) {
 	case ACPI_RSTYPE_IRQ:
 	{
-		acpi_resource_irq *p = &resource->data.irq;
+		struct acpi_resource_irq *p = &resource->data.irq;
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Blank IRQ resource\n"));
 			result = -ENODEV;
@@ -139,7 +139,7 @@ acpi_pci_link_get_possible (
 	}
 	case ACPI_RSTYPE_EXT_IRQ:
 	{
-		acpi_resource_ext_irq *p = &resource->data.extended_irq;
+		struct acpi_resource_ext_irq *p = &resource->data.extended_irq;
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
 				"Blank IRQ resource\n"));
@@ -180,8 +180,8 @@ acpi_pci_link_get_current (
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_resource		*resource = NULL;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_resource	*resource = NULL;
 	int			irq = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_link_get_current");
@@ -212,12 +212,12 @@ acpi_pci_link_get_current (
 		result = -ENODEV;
 		goto end;
 	}
-	resource = (acpi_resource *) buffer.pointer;
+	resource = (struct acpi_resource *) buffer.pointer;
 
 	switch (resource->id) {
 	case ACPI_RSTYPE_IRQ:
 	{
-		acpi_resource_irq *p = &resource->data.irq;
+		struct acpi_resource_irq *p = &resource->data.irq;
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
 				"Blank IRQ resource\n"));
@@ -229,7 +229,7 @@ acpi_pci_link_get_current (
 	}
 	case ACPI_RSTYPE_EXT_IRQ:
 	{
-		acpi_resource_ext_irq *p = &resource->data.extended_irq;
+		struct acpi_resource_ext_irq *p = &resource->data.extended_irq;
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
 				"Blank IRQ resource\n"));
@@ -277,10 +277,10 @@ acpi_pci_link_set (
 	int			result = 0;
 	acpi_status		status = AE_OK;
 	struct {
-		acpi_resource	res;
-		acpi_resource   end;
+		struct acpi_resource	res;
+		struct acpi_resource	end;
 	}                       resource;
-	acpi_buffer		buffer = {sizeof(resource)+1, &resource};
+	struct acpi_buffer	buffer = {sizeof(resource)+1, &resource};
 	int			i = 0;
 	int			valid = 0;
 
@@ -307,7 +307,7 @@ acpi_pci_link_set (
 
 	/* NOTE: PCI interrupts are always level / active_low / shared. */
 	resource.res.id = ACPI_RSTYPE_IRQ;
-	resource.res.length = sizeof(acpi_resource);
+	resource.res.length = sizeof(struct acpi_resource);
 	resource.res.data.irq.edge_level = ACPI_LEVEL_SENSITIVE;
 	resource.res.data.irq.active_high_low = ACPI_ACTIVE_LOW;
 	resource.res.data.irq.shared_exclusive = ACPI_SHARED;

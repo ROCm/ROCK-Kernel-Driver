@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -43,17 +43,17 @@
  *
  ******************************************************************************/
 
-acpi_namespace_node *
+struct acpi_namespace_node *
 acpi_ns_create_node (
-	u32                     name)
+	u32                             name)
 {
-	acpi_namespace_node     *node;
+	struct acpi_namespace_node      *node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_create_node");
 
 
-	node = ACPI_MEM_CALLOCATE (sizeof (acpi_namespace_node));
+	node = ACPI_MEM_CALLOCATE (sizeof (struct acpi_namespace_node));
 	if (!node) {
 		return_PTR (NULL);
 	}
@@ -82,11 +82,11 @@ acpi_ns_create_node (
 
 void
 acpi_ns_delete_node (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
-	acpi_namespace_node     *parent_node;
-	acpi_namespace_node     *prev_node;
-	acpi_namespace_node     *next_node;
+	struct acpi_namespace_node      *parent_node;
+	struct acpi_namespace_node      *prev_node;
+	struct acpi_namespace_node      *next_node;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ns_delete_node", node);
@@ -141,13 +141,13 @@ acpi_ns_delete_node (
 
 int
 acpi_ns_compare_names (
-	char                    *name1,
-	char                    *name2)
+	char                            *name1,
+	char                            *name2)
 {
-	char                    reversed_name1[ACPI_NAME_SIZE];
-	char                    reversed_name2[ACPI_NAME_SIZE];
-	u32                     i;
-	u32                     j;
+	char                            reversed_name1[ACPI_NAME_SIZE];
+	char                            reversed_name2[ACPI_NAME_SIZE];
+	u32                             i;
+	u32                             j;
 
 
 	/*
@@ -198,16 +198,16 @@ acpi_ns_compare_names (
 
 void
 acpi_ns_install_node (
-	acpi_walk_state         *walk_state,
-	acpi_namespace_node     *parent_node,   /* Parent */
-	acpi_namespace_node     *node,          /* New Child*/
-	acpi_object_type        type)
+	struct acpi_walk_state          *walk_state,
+	struct acpi_namespace_node      *parent_node,   /* Parent */
+	struct acpi_namespace_node      *node,          /* New Child*/
+	acpi_object_type                type)
 {
-	u16                     owner_id = TABLE_ID_DSDT;
-	acpi_namespace_node     *child_node;
+	u16                             owner_id = TABLE_ID_DSDT;
+	struct acpi_namespace_node      *child_node;
 #ifdef ACPI_ALPHABETIC_NAMESPACE
 
-	acpi_namespace_node     *previous_child_node;
+	struct acpi_namespace_node      *previous_child_node;
 #endif
 
 
@@ -332,11 +332,11 @@ acpi_ns_install_node (
 
 void
 acpi_ns_delete_children (
-	acpi_namespace_node     *parent_node)
+	struct acpi_namespace_node      *parent_node)
 {
-	acpi_namespace_node     *child_node;
-	acpi_namespace_node     *next_node;
-	u8                      flags;
+	struct acpi_namespace_node      *child_node;
+	struct acpi_namespace_node      *next_node;
+	u8                              flags;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ns_delete_children", parent_node);
@@ -412,10 +412,10 @@ acpi_ns_delete_children (
 
 void
 acpi_ns_delete_namespace_subtree (
-	acpi_namespace_node     *parent_node)
+	struct acpi_namespace_node      *parent_node)
 {
-	acpi_namespace_node     *child_node = NULL;
-	u32                     level = 1;
+	struct acpi_namespace_node      *child_node = NULL;
+	u32                             level = 1;
 
 
 	ACPI_FUNCTION_TRACE ("ns_delete_namespace_subtree");
@@ -495,10 +495,10 @@ acpi_ns_delete_namespace_subtree (
 
 static void
 acpi_ns_remove_reference (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
-	acpi_namespace_node     *parent_node;
-	acpi_namespace_node     *this_node;
+	struct acpi_namespace_node      *parent_node;
+	struct acpi_namespace_node      *this_node;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -548,12 +548,12 @@ acpi_ns_remove_reference (
 
 void
 acpi_ns_delete_namespace_by_owner (
-	u16                     owner_id)
+	u16                             owner_id)
 {
-	acpi_namespace_node     *child_node;
-	acpi_namespace_node     *deletion_node;
-	u32                     level;
-	acpi_namespace_node     *parent_node;
+	struct acpi_namespace_node      *child_node;
+	struct acpi_namespace_node      *deletion_node;
+	u32                             level;
+	struct acpi_namespace_node      *parent_node;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ns_delete_namespace_by_owner", owner_id);

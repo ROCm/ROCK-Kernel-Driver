@@ -42,7 +42,7 @@ ACPI_MODULE_NAME		("acpi_utils")
 #ifdef ACPI_DEBUG_OUTPUT
 #define acpi_util_eval_error(h,p,s) {\
 	char prefix[80] = {'\0'};\
-	acpi_buffer buffer = {sizeof(prefix), prefix};\
+	struct acpi_buffer buffer = {sizeof(prefix), prefix};\
 	acpi_get_name(h, ACPI_FULL_PATHNAME, &buffer);\
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Evaluate [%s.%s]: %s\n",\
 		(char *) prefix, p, acpi_format_exception(s))); }
@@ -53,9 +53,9 @@ ACPI_MODULE_NAME		("acpi_utils")
 
 acpi_status
 acpi_extract_package (
-	acpi_object		*package,
-	acpi_buffer		*format,
-	acpi_buffer		*buffer)
+	union acpi_object	*package,
+	struct acpi_buffer	*format,
+	struct acpi_buffer	*buffer)
 {
 	u32			size_required = 0;
 	u32			tail_offset = 0;
@@ -95,7 +95,7 @@ acpi_extract_package (
 	 */
 	for (i=0; i<format_count; i++) {
 
-		acpi_object *element = &(package->package.elements[i]);
+		union acpi_object *element = &(package->package.elements[i]);
 
 		if (!element) {
 			return_ACPI_STATUS(AE_BAD_DATA);
@@ -167,7 +167,7 @@ acpi_extract_package (
 	for (i=0; i<format_count; i++) {
 
 		u8 **pointer = NULL;
-		acpi_object *element = &(package->package.elements[i]);
+		union acpi_object *element = &(package->package.elements[i]);
 
 		if (!element) {
 			return_ACPI_STATUS(AE_BAD_DATA);
@@ -239,12 +239,12 @@ acpi_status
 acpi_evaluate_integer (
 	acpi_handle		handle,
 	acpi_string		pathname,
-	acpi_object_list	*arguments,
+	struct acpi_object_list	*arguments,
 	unsigned long		*data)
 {
 	acpi_status             status = AE_OK;
-	acpi_object             element;
-	acpi_buffer		buffer = {sizeof(acpi_object), &element};
+	union acpi_object	element;
+	struct acpi_buffer	buffer = {sizeof(union acpi_object), &element};
 
 	ACPI_FUNCTION_TRACE("acpi_evaluate_integer");
 
@@ -324,13 +324,13 @@ acpi_status
 acpi_evaluate_reference (
 	acpi_handle		handle,
 	acpi_string		pathname,
-	acpi_object_list	*arguments,
+	struct acpi_object_list	*arguments,
 	struct acpi_handle_list	*list)
 {
 	acpi_status		status = AE_OK;
-	acpi_object		*package = NULL;
-	acpi_object		*element = NULL;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object	*package = NULL;
+	union acpi_object	*element = NULL;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	u32			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_evaluate_reference");
@@ -345,7 +345,7 @@ acpi_evaluate_reference (
 	if (ACPI_FAILURE(status))
 		goto end;
 
-	package = (acpi_object *) buffer.pointer;
+	package = (union acpi_object *) buffer.pointer;
 
 	if ((buffer.length == 0) || !package) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 

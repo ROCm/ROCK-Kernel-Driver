@@ -73,20 +73,6 @@ struct acpi20_table_rsdp {
 	u8			reserved[3];
 } __attribute__ ((packed));
 
-/* Common table header */
-
-struct acpi_table_header {
-	char			signature[4];
-	u32			length;
-	u8			revision;
-	u8			checksum;
-	char			oem_id[6];
-	char			oem_table_id[8];
-	u32			oem_revision;
-	char			asl_compiler_id[4];
-	u32			asl_compiler_revision;
-} __attribute__ ((packed));
-
 typedef struct {
 	u8			type;
 	u8			length;
@@ -325,12 +311,12 @@ struct acpi_table_sbst {
 /* Embedded Controller Boot Resources Table (ECDT) */
 
 struct acpi_table_ecdt {
-	struct acpi_table_header header;
-	acpi_generic_address	ec_control;
-	acpi_generic_address	ec_data;
-	u32			uid;
-	u8			gpe_bit;
-	char			ec_id[0];
+	struct acpi_table_header 	header;
+	struct acpi_generic_address	ec_control;
+	struct acpi_generic_address	ec_data;
+	u32				uid;
+	u8				gpe_bit;
+	char				ec_id[0];
 } __attribute__ ((packed));
 
 /* Table Handlers */
@@ -396,7 +382,7 @@ extern int acpi_mp_config;
 
 struct acpi_prt_entry {
 	struct list_head	node;
-	acpi_pci_id		id;
+	struct acpi_pci_id	id;
 	u8			pin;
 	struct {
 		acpi_handle		handle;

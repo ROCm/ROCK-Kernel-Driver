@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,11 +46,11 @@
 
 void
 acpi_ut_delete_internal_obj (
-	acpi_operand_object     *object)
+	union acpi_operand_object       *object)
 {
-	void                    *obj_pointer = NULL;
-	acpi_operand_object     *handler_desc;
-	acpi_operand_object     *second_desc;
+	void                            *obj_pointer = NULL;
+	union acpi_operand_object       *handler_desc;
+	union acpi_operand_object       *second_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_delete_internal_obj", object);
@@ -217,9 +217,9 @@ acpi_ut_delete_internal_obj (
 
 void
 acpi_ut_delete_internal_object_list (
-	acpi_operand_object     **obj_list)
+	union acpi_operand_object       **obj_list)
 {
-	acpi_operand_object     **internal_obj;
+	union acpi_operand_object       **internal_obj;
 
 
 	ACPI_FUNCTION_TRACE ("ut_delete_internal_object_list");
@@ -253,11 +253,11 @@ acpi_ut_delete_internal_object_list (
 
 static void
 acpi_ut_update_ref_count (
-	acpi_operand_object     *object,
-	u32                     action)
+	union acpi_operand_object       *object,
+	u32                             action)
 {
-	u16                     count;
-	u16                     new_count;
+	u16                             count;
+	u16                             new_count;
 
 
 	ACPI_FUNCTION_NAME ("ut_update_ref_count");
@@ -369,15 +369,15 @@ acpi_ut_update_ref_count (
 
 acpi_status
 acpi_ut_update_object_reference (
-	acpi_operand_object     *object,
-	u16                     action)
+	union acpi_operand_object       *object,
+	u16                             action)
 {
-	acpi_status             status;
-	u32                     i;
-	acpi_operand_object     *next;
-	acpi_operand_object     *new;
-	acpi_generic_state       *state_list = NULL;
-	acpi_generic_state       *state;
+	acpi_status                     status;
+	u32                             i;
+	union acpi_operand_object       *next;
+	union acpi_operand_object       *new;
+	union acpi_generic_state         *state_list = NULL;
+	union acpi_generic_state         *state;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_update_object_reference", object);
@@ -556,7 +556,7 @@ error_exit:
 
 void
 acpi_ut_add_reference (
-	acpi_operand_object     *object)
+	union acpi_operand_object       *object)
 {
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_add_reference", object);
@@ -591,7 +591,7 @@ acpi_ut_add_reference (
 
 void
 acpi_ut_remove_reference (
-	acpi_operand_object     *object)
+	union acpi_operand_object       *object)
 {
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_remove_reference", object);

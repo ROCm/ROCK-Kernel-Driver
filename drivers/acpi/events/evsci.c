@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,11 +47,11 @@
 
 static u32 ACPI_SYSTEM_XFACE
 acpi_ev_sci_handler (
-	void                    *context)
+	void                            *context)
 {
-	u32                     interrupt_handled = ACPI_INTERRUPT_NOT_HANDLED;
-	u32                     value;
-	acpi_status             status;
+	u32                             interrupt_handled = ACPI_INTERRUPT_NOT_HANDLED;
+	u32                             value;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE("ev_sci_handler");
@@ -105,7 +105,7 @@ acpi_ev_sci_handler (
 u32
 acpi_ev_install_sci_handler (void)
 {
-	u32                     status = AE_OK;
+	u32                             status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ev_install_sci_handler");
@@ -139,7 +139,7 @@ acpi_ev_install_sci_handler (void)
 acpi_status
 acpi_ev_remove_sci_handler (void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_remove_sci_handler");

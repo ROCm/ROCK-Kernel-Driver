@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,11 +49,11 @@
 
 acpi_status
 acpi_ex_system_wait_semaphore (
-	acpi_handle             semaphore,
-	u16                     timeout)
+	acpi_handle                     semaphore,
+	u16                             timeout)
 {
-	acpi_status             status;
-	acpi_status             status2;
+	acpi_status                     status;
+	acpi_status                     status2;
 
 
 	ACPI_FUNCTION_TRACE ("ex_system_wait_semaphore");
@@ -102,9 +102,9 @@ acpi_ex_system_wait_semaphore (
 
 acpi_status
 acpi_ex_system_do_stall (
-	u32                     how_long)
+	u32                             how_long)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -144,9 +144,9 @@ acpi_ex_system_do_stall (
 
 acpi_status
 acpi_ex_system_do_suspend (
-	u32                     how_long)
+	u32                             how_long)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -183,10 +183,10 @@ acpi_ex_system_do_suspend (
 
 acpi_status
 acpi_ex_system_acquire_mutex (
-	acpi_operand_object     *time_desc,
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *time_desc,
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_system_acquire_mutex", obj_desc);
@@ -227,9 +227,9 @@ acpi_ex_system_acquire_mutex (
 
 acpi_status
 acpi_ex_system_release_mutex (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_system_release_mutex");
@@ -267,9 +267,9 @@ acpi_ex_system_release_mutex (
 
 acpi_status
 acpi_ex_system_signal_event (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_system_signal_event");
@@ -300,10 +300,10 @@ acpi_ex_system_signal_event (
 
 acpi_status
 acpi_ex_system_wait_event (
-	acpi_operand_object     *time_desc,
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *time_desc,
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_system_wait_event");
@@ -332,10 +332,10 @@ acpi_ex_system_wait_event (
 
 acpi_status
 acpi_ex_system_reset_event (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_status             status = AE_OK;
-	void                    *temp_semaphore;
+	acpi_status                     status = AE_OK;
+	void                            *temp_semaphore;
 
 
 	ACPI_FUNCTION_ENTRY ();

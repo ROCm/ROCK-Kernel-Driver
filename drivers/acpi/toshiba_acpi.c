@@ -174,8 +174,8 @@ snscanf(const char* str, int n, const char* format, ...)
 static int
 write_acpi_int(const char* methodName, int val)
 {
-	acpi_object_list params;
-	acpi_object in_objs[1];
+	struct acpi_object_list params;
+	union acpi_object in_objs[1];
 	acpi_status status;
 
 	params.count = sizeof(in_objs)/sizeof(in_objs[0]);
@@ -211,10 +211,10 @@ read_acpi_int(const char* methodName, int* pVal)
 static acpi_status
 hci_raw(const u32 in[HCI_WORDS], u32 out[HCI_WORDS])
 {
-	acpi_object_list params;
-	acpi_object in_objs[HCI_WORDS];
-	acpi_buffer results;
-	acpi_object out_objs[HCI_WORDS+1];
+	struct acpi_object_list params;
+	union acpi_object in_objs[HCI_WORDS];
+	struct acpi_buffer results;
+	union acpi_object out_objs[HCI_WORDS+1];
 	acpi_status status;
 	int i;
 

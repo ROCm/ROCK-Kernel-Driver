@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@
 #define DUAL_PIC                0
 #define MULTIPLE_APIC           1
 
-/* values of Type in APIC_HEADER */
+/* values of Type in struct apic_header */
 
 #define APIC_PROC               0
 #define APIC_IO                 1
@@ -61,10 +61,10 @@
  * Common table types.  The base code can remain
  * constant if the underlying tables are changed
  */
-#define RSDT_DESCRIPTOR         RSDT_DESCRIPTOR_REV2
-#define xsdt_descriptor         XSDT_DESCRIPTOR_REV2
-#define FACS_DESCRIPTOR         facs_descriptor_rev2
-#define FADT_DESCRIPTOR         fadt_descriptor_rev2
+#define RSDT_DESCRIPTOR         struct rsdt_descriptor_rev2
+#define XSDT_DESCRIPTOR         struct xsdt_descriptor_rev2
+#define FACS_DESCRIPTOR         struct facs_descriptor_rev2
+#define FADT_DESCRIPTOR         struct fadt_descriptor_rev2
 
 
 #pragma pack(1)
@@ -73,83 +73,77 @@
  * Architecture-independent tables
  * The architecture dependent tables are in separate files
  */
-typedef struct  /* Root System Descriptor Pointer */
+struct rsdp_descriptor         /* Root System Descriptor Pointer */
 {
-	char                    signature [8];          /* ACPI signature, contains "RSD PTR " */
-	u8                      checksum;               /* To make sum of struct == 0 */
-	char                    oem_id [6];             /* OEM identification */
-	u8                      revision;               /* Must be 0 for 1.0, 2 for 2.0 */
-	u32                     rsdt_physical_address;  /* 32-bit physical address of RSDT */
-	u32                     length;                 /* XSDT Length in bytes including hdr */
-	u64                     xsdt_physical_address;  /* 64-bit physical address of XSDT */
-	u8                      extended_checksum;      /* Checksum of entire table */
-	char                    reserved [3];           /* Reserved field must be 0 */
+	char                            signature [8];          /* ACPI signature, contains "RSD PTR " */
+	u8                              checksum;               /* To make sum of struct == 0 */
+	char                            oem_id [6];             /* OEM identification */
+	u8                              revision;               /* Must be 0 for 1.0, 2 for 2.0 */
+	u32                             rsdt_physical_address;  /* 32-bit physical address of RSDT */
+	u32                             length;                 /* XSDT Length in bytes including hdr */
+	u64                             xsdt_physical_address;  /* 64-bit physical address of XSDT */
+	u8                              extended_checksum;      /* Checksum of entire table */
+	char                            reserved [3];           /* Reserved field must be 0 */
+};
 
-} rsdp_descriptor;
 
-
-typedef struct  /* ACPI common table header */
+struct acpi_table_header         /* ACPI common table header */
 {
-	char                    signature [4];          /* ACPI signature (4 ASCII characters) */
-	u32                     length;                 /* Length of table, in bytes, including header */
-	u8                      revision;               /* ACPI Specification minor version # */
-	u8                      checksum;               /* To make sum of entire table == 0 */
-	char                    oem_id [6];             /* OEM identification */
-	char                    oem_table_id [8];       /* OEM table identification */
-	u32                     oem_revision;           /* OEM revision number */
-	char                    asl_compiler_id [4];    /* ASL compiler vendor ID */
-	u32                     asl_compiler_revision;  /* ASL compiler revision number */
+	char                            signature [4];          /* ACPI signature (4 ASCII characters) */
+	u32                             length;                 /* Length of table, in bytes, including header */
+	u8                              revision;               /* ACPI Specification minor version # */
+	u8                              checksum;               /* To make sum of entire table == 0 */
+	char                            oem_id [6];             /* OEM identification */
+	char                            oem_table_id [8];       /* OEM table identification */
+	u32                             oem_revision;           /* OEM revision number */
+	char                            asl_compiler_id [4];    /* ASL compiler vendor ID */
+	u32                             asl_compiler_revision;  /* ASL compiler revision number */
+};
 
-} acpi_table_header;
 
-
-typedef struct  /* Common FACS for internal use */
+struct acpi_common_facs          /* Common FACS for internal use */
 {
-	u32                     *global_lock;
-	u64                     *firmware_waking_vector;
-	u8                      vector_width;
+	u32                             *global_lock;
+	u64                             *firmware_waking_vector;
+	u8                              vector_width;
+};
 
-} acpi_common_facs;
 
-
-typedef struct  /* APIC Table */
+struct apic_table
 {
-	acpi_table_header       header;                 /* ACPI table header */
-	u32                     local_apic_address;     /* Physical address for accessing local APICs */
-	u32                     PCATcompat      : 1;    /* a one indicates system also has dual 8259s */
-	u32                     reserved1       : 31;
+	struct acpi_table_header        header;                 /* ACPI table header */
+	u32                             local_apic_address;     /* Physical address for accessing local APICs */
+	u32                             PCATcompat      : 1;    /* a one indicates system also has dual 8259s */
+	u32                             reserved1       : 31;
+};
 
-} APIC_TABLE;
 
-
-typedef struct  /* APIC Header */
+struct apic_header
 {
-	u8                      type;                   /* APIC type.  Either APIC_PROC or APIC_IO */
-	u8                      length;                 /* Length of APIC structure */
+	u8                              type;                   /* APIC type.  Either APIC_PROC or APIC_IO */
+	u8                              length;                 /* Length of APIC structure */
+};
 
-} APIC_HEADER;
 
-
-typedef struct  /* Processor APIC */
+struct processor_apic
 {
-	APIC_HEADER             header;
-	u8                      processor_apic_id;      /* ACPI processor id */
-	u8                      local_apic_id;          /* Processor's local APIC id */
-	u32                     processor_enabled: 1;   /* Processor is usable if set */
-	u32                     reserved1       : 31;
+	struct apic_header              header;
+	u8                              processor_apic_id;      /* ACPI processor id */
+	u8                              local_apic_id;          /* Processor's local APIC id */
+	u32                             processor_enabled: 1;   /* Processor is usable if set */
+	u32                             reserved1       : 31;
+};
 
-} PROCESSOR_APIC;
 
-
-typedef struct  /* IO APIC */
+struct io_apic
 {
-	APIC_HEADER             header;
-	u8                      io_apic_id;             /* I/O APIC ID */
-	u8                      reserved;               /* Reserved - must be zero */
-	u32                     io_apic_address;        /* APIC's physical address */
-	u32                     vector;                 /* Interrupt vector index where INTI
+	struct apic_header              header;
+	u8                              io_apic_id;             /* I/O APIC ID */
+	u8                              reserved;               /* Reserved - must be zero */
+	u32                             io_apic_address;        /* APIC's physical address */
+	u32                             vector;                 /* Interrupt vector index where INTI
 			  * lines start */
-} IO_APIC;
+};
 
 
 /*
@@ -160,14 +154,13 @@ typedef struct  /* IO APIC */
  *  IA64 TBD:   Modify Smart Battery Description to comply with ACPI IA64
  *              extensions.
  */
-typedef struct  /* Smart Battery Description Table */
+struct smart_battery_description_table
 {
-	acpi_table_header       header;
-	u32                     warning_level;
-	u32                     low_level;
-	u32                     critical_level;
-
-} SMART_BATTERY_DESCRIPTION_TABLE;
+	struct acpi_table_header        header;
+	u32                             warning_level;
+	u32                             low_level;
+	u32                             critical_level;
+};
 
 
 #pragma pack()
@@ -182,7 +175,7 @@ typedef struct  /* Smart Battery Description Table */
 #define ACPI_MEM_ALLOCATED      1
 #define ACPI_MEM_MAPPED         2
 
-/* Definitions for the Flags bitfield member of ACPI_TABLE_SUPPORT */
+/* Definitions for the Flags bitfield member of struct acpi_table_support */
 
 #define ACPI_TABLE_SINGLE       0x00
 #define ACPI_TABLE_MULTIPLE     0x01
@@ -196,15 +189,14 @@ typedef struct  /* Smart Battery Description Table */
 
 /* Data about each known table type */
 
-typedef struct _acpi_table_support
+struct acpi_table_support
 {
-	char                    *name;
-	char                    *signature;
-	void                    **global_ptr;
-	u8                      sig_length;
-	u8                      flags;
-
-} ACPI_TABLE_SUPPORT;
+	char                            *name;
+	char                            *signature;
+	void                            **global_ptr;
+	u8                              sig_length;
+	u8                              flags;
+};
 
 
 /*

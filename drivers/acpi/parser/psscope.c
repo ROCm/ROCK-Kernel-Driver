@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -42,9 +42,9 @@
  *
  ******************************************************************************/
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_parent_scope (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
 	return (parser_state->scope->parse_scope.op);
 }
@@ -66,7 +66,7 @@ acpi_ps_get_parent_scope (
 
 u8
 acpi_ps_has_completed_scope (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
 	return ((u8) ((parser_state->aml >= parser_state->scope->parse_scope.arg_end ||
 			   !parser_state->scope->parse_scope.arg_count)));
@@ -88,10 +88,10 @@ acpi_ps_has_completed_scope (
 
 acpi_status
 acpi_ps_init_scope (
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       *root_op)
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         *root_op)
 {
-	acpi_generic_state      *scope;
+	union acpi_generic_state        *scope;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_init_scope", root_op);
@@ -132,12 +132,12 @@ acpi_ps_init_scope (
 
 acpi_status
 acpi_ps_push_scope (
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       *op,
-	u32                     remaining_args,
-	u32                     arg_count)
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         *op,
+	u32                             remaining_args,
+	u32                             arg_count)
 {
-	acpi_generic_state      *scope;
+	union acpi_generic_state        *scope;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_push_scope", op);
@@ -194,12 +194,12 @@ acpi_ps_push_scope (
 
 void
 acpi_ps_pop_scope (
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       **op,
-	u32                     *arg_list,
-	u32                     *arg_count)
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         **op,
+	u32                             *arg_list,
+	u32                             *arg_count)
 {
-	acpi_generic_state      *scope = parser_state->scope;
+	union acpi_generic_state        *scope = parser_state->scope;
 
 
 	ACPI_FUNCTION_TRACE ("ps_pop_scope");
@@ -252,9 +252,9 @@ acpi_ps_pop_scope (
 
 void
 acpi_ps_cleanup_scope (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
-	acpi_generic_state      *scope;
+	union acpi_generic_state        *scope;
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_cleanup_scope", parser_state);
 

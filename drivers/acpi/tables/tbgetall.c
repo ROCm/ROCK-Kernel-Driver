@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,11 +46,11 @@
 
 acpi_status
 acpi_tb_get_primary_table (
-	acpi_pointer            *address,
-	acpi_table_desc         *table_info)
+	struct acpi_pointer             *address,
+	struct acpi_table_desc          *table_info)
 {
-	acpi_status             status;
-	acpi_table_header       header;
+	acpi_status                     status;
+	struct acpi_table_header        header;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_primary_table");
@@ -72,7 +72,7 @@ acpi_tb_get_primary_table (
 
 	/* Clear the table_info */
 
-	ACPI_MEMSET (table_info, 0, sizeof (acpi_table_desc));
+	ACPI_MEMSET (table_info, 0, sizeof (struct acpi_table_desc));
 
 	/*
 	 * Check the table signature and make sure it is recognized.
@@ -113,12 +113,12 @@ acpi_tb_get_primary_table (
 
 acpi_status
 acpi_tb_get_secondary_table (
-	acpi_pointer            *address,
-	acpi_string             signature,
-	acpi_table_desc         *table_info)
+	struct acpi_pointer             *address,
+	acpi_string                     signature,
+	struct acpi_table_desc          *table_info)
 {
-	acpi_status             status;
-	acpi_table_header       header;
+	acpi_status                     status;
+	struct acpi_table_header        header;
 
 
 	ACPI_FUNCTION_TRACE_STR ("tb_get_secondary_table", signature);
@@ -186,10 +186,10 @@ acpi_status
 acpi_tb_get_required_tables (
 	void)
 {
-	acpi_status             status = AE_OK;
-	u32                     i;
-	acpi_table_desc         table_info;
-	acpi_pointer            address;
+	acpi_status                     status = AE_OK;
+	u32                             i;
+	struct acpi_table_desc          table_info;
+	struct acpi_pointer             address;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_required_tables");

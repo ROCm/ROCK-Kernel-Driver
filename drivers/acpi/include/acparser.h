@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,14 +49,14 @@
 
 acpi_status
 acpi_psx_load_table (
-	u8                      *pcode_addr,
-	u32                     pcode_length);
+	u8                              *pcode_addr,
+	u32                             pcode_length);
 
 acpi_status
 acpi_psx_execute (
-	acpi_namespace_node     *method_node,
-	acpi_operand_object     **params,
-	acpi_operand_object     **return_obj_desc);
+	struct acpi_namespace_node      *method_node,
+	union acpi_operand_object       **params,
+	union acpi_operand_object       **return_obj_desc);
 
 
 /******************************************************************************
@@ -70,110 +70,110 @@ acpi_psx_execute (
 
 u8 *
 acpi_ps_get_next_package_end (
-	acpi_parse_state        *parser_state);
+	struct acpi_parse_state         *parser_state);
 
 u32
 acpi_ps_get_next_package_length (
-	acpi_parse_state        *parser_state);
+	struct acpi_parse_state         *parser_state);
 
 char *
 acpi_ps_get_next_namestring (
-	acpi_parse_state        *parser_state);
+	struct acpi_parse_state         *parser_state);
 
 void
 acpi_ps_get_next_simple_arg (
-	acpi_parse_state        *parser_state,
-	u32                     arg_type,
-	acpi_parse_object       *arg);
+	struct acpi_parse_state         *parser_state,
+	u32                             arg_type,
+	union acpi_parse_object         *arg);
 
 acpi_status
 acpi_ps_get_next_namepath (
-	acpi_walk_state         *walk_state,
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       *arg,
-	u8                      method_call);
+	struct acpi_walk_state          *walk_state,
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         *arg,
+	u8                              method_call);
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_next_field (
-	acpi_parse_state        *parser_state);
+	struct acpi_parse_state         *parser_state);
 
 acpi_status
 acpi_ps_get_next_arg (
-	acpi_walk_state         *walk_state,
-	acpi_parse_state        *parser_state,
-	u32                     arg_type,
-	acpi_parse_object       **return_arg);
+	struct acpi_walk_state          *walk_state,
+	struct acpi_parse_state         *parser_state,
+	u32                             arg_type,
+	union acpi_parse_object         **return_arg);
 
 
 /* psfind */
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_find_name (
-	acpi_parse_object       *scope,
-	u32                     name,
-	u32                     opcode);
+	union acpi_parse_object         *scope,
+	u32                             name,
+	u32                             opcode);
 
-acpi_parse_object*
+union acpi_parse_object*
 acpi_ps_get_parent (
-	acpi_parse_object       *op);
+	union acpi_parse_object         *op);
 
 
 /* psopcode - AML Opcode information */
 
-const acpi_opcode_info *
+const struct acpi_opcode_info *
 acpi_ps_get_opcode_info (
-	u16                     opcode);
+	u16                             opcode);
 
 char *
 acpi_ps_get_opcode_name (
-	u16                     opcode);
+	u16                             opcode);
 
 
 /* psparse - top level parsing routines */
 
 u32
 acpi_ps_get_opcode_size (
-	u32                     opcode);
+	u32                             opcode);
 
 void
 acpi_ps_complete_this_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op);
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op);
 
 acpi_status
 acpi_ps_next_parse_state (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	acpi_status             callback_status);
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	acpi_status                     callback_status);
 
 acpi_status
 acpi_ps_find_object (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       **out_op);
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         **out_op);
 
 void
 acpi_ps_delete_parse_tree (
-	acpi_parse_object       *root);
+	union acpi_parse_object         *root);
 
 acpi_status
 acpi_ps_parse_loop (
-	acpi_walk_state         *walk_state);
+	struct acpi_walk_state          *walk_state);
 
 acpi_status
 acpi_ps_parse_aml (
-	acpi_walk_state         *walk_state);
+	struct acpi_walk_state          *walk_state);
 
 acpi_status
 acpi_ps_parse_table (
-	u8                      *aml,
-	u32                     aml_size,
-	acpi_parse_downwards    descending_callback,
-	acpi_parse_upwards      ascending_callback,
-	acpi_parse_object       **root_object);
+	u8                              *aml,
+	u32                             aml_size,
+	acpi_parse_downwards            descending_callback,
+	acpi_parse_upwards              ascending_callback,
+	union acpi_parse_object         **root_object);
 
 u16
 acpi_ps_peek_opcode (
-	acpi_parse_state        *state);
+	struct acpi_parse_state         *state);
 
 
 /* psscope - Scope stack management routines */
@@ -181,108 +181,108 @@ acpi_ps_peek_opcode (
 
 acpi_status
 acpi_ps_init_scope (
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       *root);
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         *root);
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_parent_scope (
-	acpi_parse_state        *state);
+	struct acpi_parse_state         *state);
 
 u8
 acpi_ps_has_completed_scope (
-	acpi_parse_state        *parser_state);
+	struct acpi_parse_state         *parser_state);
 
 void
 acpi_ps_pop_scope (
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       **op,
-	u32                     *arg_list,
-	u32                     *arg_count);
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         **op,
+	u32                             *arg_list,
+	u32                             *arg_count);
 
 acpi_status
 acpi_ps_push_scope (
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       *op,
-	u32                     remaining_args,
-	u32                     arg_count);
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         *op,
+	u32                             remaining_args,
+	u32                             arg_count);
 
 void
 acpi_ps_cleanup_scope (
-	acpi_parse_state        *state);
+	struct acpi_parse_state         *state);
 
 
 /* pstree - parse tree manipulation routines */
 
 void
 acpi_ps_append_arg(
-	acpi_parse_object       *op,
-	acpi_parse_object       *arg);
+	union acpi_parse_object         *op,
+	union acpi_parse_object         *arg);
 
-acpi_parse_object*
+union acpi_parse_object*
 acpi_ps_find (
-	acpi_parse_object       *scope,
-	char                    *path,
-	u16                     opcode,
-	u32                     create);
+	union acpi_parse_object         *scope,
+	char                            *path,
+	u16                             opcode,
+	u32                             create);
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_arg(
-	acpi_parse_object       *op,
-	u32                      argn);
+	union acpi_parse_object         *op,
+	u32                              argn);
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_child (
-	acpi_parse_object       *op);
+	union acpi_parse_object         *op);
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_depth_next (
-	acpi_parse_object       *origin,
-	acpi_parse_object       *op);
+	union acpi_parse_object         *origin,
+	union acpi_parse_object         *op);
 
 
 /* pswalk - parse tree walk routines */
 
 acpi_status
 acpi_ps_walk_parsed_aml (
-	acpi_parse_object       *start_op,
-	acpi_parse_object       *end_op,
-	acpi_operand_object     *mth_desc,
-	acpi_namespace_node     *start_node,
-	acpi_operand_object     **params,
-	acpi_operand_object     **caller_return_desc,
-	acpi_owner_id           owner_id,
-	acpi_parse_downwards    descending_callback,
-	acpi_parse_upwards      ascending_callback);
+	union acpi_parse_object         *start_op,
+	union acpi_parse_object         *end_op,
+	union acpi_operand_object       *mth_desc,
+	struct acpi_namespace_node      *start_node,
+	union acpi_operand_object       **params,
+	union acpi_operand_object       **caller_return_desc,
+	acpi_owner_id                   owner_id,
+	acpi_parse_downwards            descending_callback,
+	acpi_parse_upwards              ascending_callback);
 
 acpi_status
 acpi_ps_get_next_walk_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	acpi_parse_upwards      ascending_callback);
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	acpi_parse_upwards              ascending_callback);
 
 acpi_status
 acpi_ps_delete_completed_op (
-	acpi_walk_state         *walk_state);
+	struct acpi_walk_state          *walk_state);
 
 
 /* psutils - parser utilities */
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_create_scope_op (
 	void);
 
 void
 acpi_ps_init_op (
-	acpi_parse_object       *op,
-	u16                     opcode);
+	union acpi_parse_object         *op,
+	u16                             opcode);
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_alloc_op (
-	u16                     opcode);
+	u16                             opcode);
 
 void
 acpi_ps_free_op (
-	acpi_parse_object       *op);
+	union acpi_parse_object         *op);
 
 void
 acpi_ps_delete_parse_cache (
@@ -290,39 +290,39 @@ acpi_ps_delete_parse_cache (
 
 u8
 acpi_ps_is_leading_char (
-	u32                     c);
+	u32                             c);
 
 u8
 acpi_ps_is_prefix_char (
-	u32                     c);
+	u32                             c);
 
 u32
 acpi_ps_get_name(
-	acpi_parse_object       *op);
+	union acpi_parse_object         *op);
 
 void
 acpi_ps_set_name(
-	acpi_parse_object       *op,
-	u32                     name);
+	union acpi_parse_object         *op,
+	u32                             name);
 
 
 /* psdump - display parser tree */
 
 u32
 acpi_ps_sprint_path (
-	char                    *buffer_start,
-	u32                     buffer_size,
-	acpi_parse_object       *op);
+	char                            *buffer_start,
+	u32                             buffer_size,
+	union acpi_parse_object         *op);
 
 u32
 acpi_ps_sprint_op (
-	char                    *buffer_start,
-	u32                     buffer_size,
-	acpi_parse_object       *op);
+	char                            *buffer_start,
+	u32                             buffer_size,
+	union acpi_parse_object         *op);
 
 void
 acpi_ps_show (
-	acpi_parse_object       *op);
+	union acpi_parse_object         *op);
 
 
 #endif /* __ACPARSER_H__ */

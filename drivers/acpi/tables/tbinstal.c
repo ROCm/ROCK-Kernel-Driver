@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,11 +47,11 @@
 
 acpi_status
 acpi_tb_match_signature (
-	char                    *signature,
-	acpi_table_desc         *table_info,
-	u8                      search_type)
+	char                            *signature,
+	struct acpi_table_desc          *table_info,
+	u8                              search_type)
 {
-	acpi_native_uint        i;
+	acpi_native_uint                i;
 
 
 	ACPI_FUNCTION_TRACE ("tb_match_signature");
@@ -105,9 +105,9 @@ acpi_tb_match_signature (
 
 acpi_status
 acpi_tb_install_table (
-	acpi_table_desc         *table_info)
+	struct acpi_table_desc          *table_info)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 	ACPI_FUNCTION_TRACE ("tb_install_table");
 
@@ -159,11 +159,11 @@ acpi_tb_install_table (
 
 acpi_status
 acpi_tb_recognize_table (
-	acpi_table_desc         *table_info,
-	u8                      search_type)
+	struct acpi_table_desc          *table_info,
+	u8                              search_type)
 {
-	acpi_table_header       *table_header;
-	acpi_status             status;
+	struct acpi_table_header        *table_header;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("tb_recognize_table");
@@ -171,7 +171,7 @@ acpi_tb_recognize_table (
 
 	/* Ensure that we have a valid table pointer */
 
-	table_header = (acpi_table_header *) table_info->pointer;
+	table_header = (struct acpi_table_header *) table_info->pointer;
 	if (!table_header) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
@@ -217,11 +217,11 @@ acpi_tb_recognize_table (
 
 acpi_status
 acpi_tb_init_table_descriptor (
-	acpi_table_type         table_type,
-	acpi_table_desc         *table_info)
+	acpi_table_type                 table_type,
+	struct acpi_table_desc          *table_info)
 {
-	acpi_table_desc         *list_head;
-	acpi_table_desc         *table_desc;
+	struct acpi_table_desc          *list_head;
+	struct acpi_table_desc          *table_desc;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("tb_init_table_descriptor", table_type);
@@ -256,7 +256,7 @@ acpi_tb_init_table_descriptor (
 		 * the new table in to the list of tables of this type.
 		 */
 		if (list_head->pointer) {
-			table_desc = ACPI_MEM_CALLOCATE (sizeof (acpi_table_desc));
+			table_desc = ACPI_MEM_CALLOCATE (sizeof (struct acpi_table_desc));
 			if (!table_desc) {
 				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
@@ -289,7 +289,7 @@ acpi_tb_init_table_descriptor (
 	table_desc->allocation          = table_info->allocation;
 	table_desc->aml_start           = (u8 *) (table_desc->pointer + 1),
 	table_desc->aml_length          = (u32) (table_desc->length -
-			 (u32) sizeof (acpi_table_header));
+			 (u32) sizeof (struct acpi_table_header));
 	table_desc->table_id            = acpi_ut_allocate_owner_id (ACPI_OWNER_TYPE_TABLE);
 	table_desc->loaded_into_namespace = FALSE;
 
@@ -325,7 +325,7 @@ acpi_tb_init_table_descriptor (
 void
 acpi_tb_delete_acpi_tables (void)
 {
-	acpi_table_type             type;
+	acpi_table_type                     type;
 
 
 	/*
@@ -353,7 +353,7 @@ acpi_tb_delete_acpi_tables (void)
 
 void
 acpi_tb_delete_acpi_table (
-	acpi_table_type             type)
+	acpi_table_type                     type)
 {
 
 	ACPI_FUNCTION_TRACE_U32 ("tb_delete_acpi_table", type);
@@ -420,11 +420,11 @@ acpi_tb_delete_acpi_table (
 
 void
 acpi_tb_free_acpi_tables_of_type (
-	acpi_table_desc         *list_head)
+	struct acpi_table_desc          *list_head)
 {
-	acpi_table_desc         *table_desc;
-	u32                     count;
-	u32                     i;
+	struct acpi_table_desc          *table_desc;
+	u32                             count;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("tb_free_acpi_tables_of_type", list_head);
@@ -462,7 +462,7 @@ acpi_tb_free_acpi_tables_of_type (
 
 void
 acpi_tb_delete_single_table (
-	acpi_table_desc         *table_desc)
+	struct acpi_table_desc          *table_desc)
 {
 
 	if (!table_desc) {
@@ -507,11 +507,11 @@ acpi_tb_delete_single_table (
  *
  ******************************************************************************/
 
-acpi_table_desc *
+struct acpi_table_desc *
 acpi_tb_uninstall_table (
-	acpi_table_desc         *table_desc)
+	struct acpi_table_desc          *table_desc)
 {
-	acpi_table_desc         *next_desc;
+	struct acpi_table_desc          *next_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("acpi_tb_uninstall_table", table_desc);
