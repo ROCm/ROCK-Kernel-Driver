@@ -18,6 +18,7 @@
  *****************************************************************************/
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
@@ -75,6 +76,7 @@ static char term_msg[]   = "***KERNEL:  Out of buffer space!***\n";
  */
 
 static struct file_operations vlan_fops = {
+	.owner = THIS_MODULE,
 	.read =	vlan_proc_read,
 	.ioctl = NULL, /* vlan_proc_ioctl */
 };
@@ -84,6 +86,7 @@ static struct file_operations vlan_fops = {
  */
 
 static struct file_operations vlandev_fops = {
+	.owner = THIS_MODULE,
 	.read =	vlan_proc_read,
 	.ioctl =NULL, /* vlan_proc_ioctl */
 };

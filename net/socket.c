@@ -121,6 +121,7 @@ static ssize_t sock_sendpage(struct file *file, struct page *page,
  */
 
 static struct file_operations socket_file_ops = {
+	.owner =	THIS_MODULE,
 	.llseek =	no_llseek,
 	.aio_read =	sock_aio_read,
 	.aio_write =	sock_aio_write,
@@ -490,6 +491,7 @@ static int sock_no_open(struct inode *irrelevant, struct file *dontcare)
 }
 
 struct file_operations bad_sock_fops = {
+	.owner = THIS_MODULE,
 	.open = sock_no_open,
 };
 

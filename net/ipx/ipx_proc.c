@@ -319,6 +319,7 @@ static int ipx_seq_socket_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations ipx_seq_interface_fops = {
+	.owner		= THIS_MODULE,
 	.open           = ipx_seq_interface_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
@@ -326,6 +327,7 @@ static struct file_operations ipx_seq_interface_fops = {
 };
 
 static struct file_operations ipx_seq_route_fops = {
+	.owner		= THIS_MODULE,
 	.open           = ipx_seq_route_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
@@ -333,6 +335,7 @@ static struct file_operations ipx_seq_route_fops = {
 };
 
 static struct file_operations ipx_seq_socket_fops = {
+	.owner		= THIS_MODULE,
 	.open           = ipx_seq_socket_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,

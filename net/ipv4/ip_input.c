@@ -215,6 +215,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
         /* Point into the IP datagram, just past the header. */
         skb->h.raw = skb->data;
 
+	rcu_read_lock();
 	{
 		/* Note: See raw.c and net/raw.h, RAWV4_HTABLE_SIZE==MAX_INET_PROTOS */
 		int protocol = skb->nh.iph->protocol;
@@ -235,10 +236,11 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		if ((ipprot = inet_protos[hash]) != NULL) {
 			int ret;
 
+			smp_read_barrier_depends();
 			if (!ipprot->no_policy &&
 			    !xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 				kfree_skb(skb);
-				return 0;
+				goto out;
 			}
 			ret = ipprot->handler(skb);
 			if (ret < 0) {
@@ -258,6 +260,8 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 			kfree_skb(skb);
 		}
 	}
+ out:
+	rcu_read_unlock();
 
 	return 0;
 }

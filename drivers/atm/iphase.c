@@ -2777,7 +2777,7 @@ static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 	     if (!capable(CAP_NET_ADMIN)) return -EPERM;
              tmps = (u16 *)ia_cmds.buf;
              for(i=0; i<0x80; i+=2, tmps++)
-                if(put_user(*(u16*)(iadev->seg_reg+i), tmps)) return -EFAULT;
+                if(put_user((u16)(readl(iadev->seg_reg+i) & 0xffff), tmps)) return -EFAULT;
              ia_cmds.status = 0;
              ia_cmds.len = 0x80;
              break;
@@ -2785,7 +2785,7 @@ static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 	     if (!capable(CAP_NET_ADMIN)) return -EPERM;
              tmps = (u16 *)ia_cmds.buf;
              for(i=0; i<0x80; i+=2, tmps++)
-                if(put_user(*(u16*)(iadev->reass_reg+i), tmps)) return -EFAULT;
+                if(put_user((u16)(readl(iadev->reass_reg+i) & 0xffff), tmps)) return -EFAULT;
              ia_cmds.status = 0;
              ia_cmds.len = 0x80;
              break;
@@ -2802,10 +2802,10 @@ static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 	     rfL = &regs_local->rfredn;
              /* Copy real rfred registers into the local copy */
  	     for (i=0; i<(sizeof (rfredn_t))/4; i++)
-                ((u_int *)rfL)[i] = ((u_int *)iadev->reass_reg)[i] & 0xffff;
+                ((u_int *)rfL)[i] = readl(iadev->reass_reg + i) & 0xffff;
              	/* Copy real ffred registers into the local copy */
 	     for (i=0; i<(sizeof (ffredn_t))/4; i++)
-                ((u_int *)ffL)[i] = ((u_int *)iadev->seg_reg)[i] & 0xffff;
+                ((u_int *)ffL)[i] = readl(iadev->seg_reg + i) & 0xffff;
 
              if (copy_to_user(ia_cmds.buf, regs_local,sizeof(ia_regs_t))) {
                 kfree(regs_local);
