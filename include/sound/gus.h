@@ -561,7 +561,7 @@ struct _SND_IW_LFO_PROGRAM {
 };
 
 #if 0
-extern void snd_gf1_lfo_effect_interrupt(snd_gus_card_t * gus, snd_gf1_voice_t * voice);
+extern irqreturn_t snd_gf1_lfo_effect_interrupt(snd_gus_card_t * gus, snd_gf1_voice_t * voice);
 #endif
 extern void snd_gf1_lfo_init(snd_gus_card_t * gus);
 extern void snd_gf1_lfo_done(snd_gus_card_t * gus);
@@ -666,7 +666,7 @@ int snd_gus_initialize(snd_gus_card_t * gus);
 
 /* gus_irq.c */
 
-void snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef CONFIG_SND_DEBUG
 void snd_gus_irq_profile_init(snd_gus_card_t *gus);
 #endif

@@ -542,7 +542,7 @@ static inline int rme96xx_spdif_sample_rate (rme96xx_info *s, int *spdifrate)
 
 inline int rme96xx_gethwptr(rme96xx_info* s,int exact)
 {
-	long flags;
+	unsigned long flags;
 	if (exact) {
 		unsigned int hwp;
 /* the hwptr seems to be rather unreliable :(, so we don't use it */
@@ -587,7 +587,7 @@ static void rme96xx_clearbufs(struct dmabuf* dma)
 static int rme96xx_startcard(rme96xx_info *s,int stop)
 {
 	int i;
-	long flags;
+	unsigned long flags;
 
 	COMM       ("startcard");
 	if(s->control_register & RME96xx_IE){
@@ -760,7 +760,7 @@ inline int rme96xx_copytouser(struct dmabuf* dma,const char* buffer,int count,in
 }
 
 
-static void rme96xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t rme96xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int i;
 	rme96xx_info *s = (rme96xx_info *)dev_id;
@@ -770,7 +770,7 @@ static void rme96xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	status = readl(s->iobase + RME96xx_status_register);
 	if (!(status & RME96xx_IRQ)) {
-		return;
+		return IRQ_NONE;
 	}
 
 	spin_lock_irqsave(&s->lock,flags);
@@ -785,6 +785,7 @@ static void rme96xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			wake_up(&(db->wait));		
 	}  
 	spin_unlock_irqrestore(&s->lock,flags);
+	return IRQ_HANDLED;
 }
 
 

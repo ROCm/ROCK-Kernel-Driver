@@ -813,7 +813,7 @@ static inline void vrc5477_ac97_dac_interrupt(struct vrc5477_ac97_state *s)
 		wake_up_interruptible(&dac->wait);
 }
 
-static void vrc5477_ac97_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t vrc5477_ac97_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct vrc5477_ac97_state *s = (struct vrc5477_ac97_state *)dev_id;
 	u32 irqStatus;
@@ -851,6 +851,7 @@ static void vrc5477_ac97_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 /* --------------------------------------------------------------------- */

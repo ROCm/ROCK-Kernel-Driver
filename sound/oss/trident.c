@@ -1728,7 +1728,7 @@ static void cyber_address_interrupt(struct trident_card *card)
 	}
 }
 
-static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct trident_card *card = (struct trident_card *)dev_id;
 	u32 event;
@@ -1755,13 +1755,14 @@ static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		event = inl(TRID_REG(card, T4D_MISCINT));
 		outl(event | (ST_TARGET_REACHED | MIXER_OVERFLOW | MIXER_UNDERFLOW), TRID_REG(card, T4D_MISCINT));
 		spin_unlock(&card->lock);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* manually clear interrupt status, bad hardware design, blame T^2 */
 	outl((ST_TARGET_REACHED | MIXER_OVERFLOW | MIXER_UNDERFLOW),
 	     TRID_REG(card, T4D_MISCINT));
 	spin_unlock(&card->lock);
+	return IRQ_HANDLED;
 }
 
 /* in this loop, dmabuf.count signifies the amount of data that is waiting to be copied to

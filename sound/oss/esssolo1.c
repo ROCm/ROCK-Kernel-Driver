@@ -1694,7 +1694,7 @@ static void solo1_handle_midi(struct solo1_state *s)
 		wake_up(&s->midi.owait);
 }
 
-static void solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct solo1_state *s = (struct solo1_state *)dev_id;
 	unsigned int intsrc;
@@ -1702,7 +1702,7 @@ static void solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inb(s->iobase+7); /* get interrupt source(s) */
 	if (!intsrc)
-		return;
+		return IRQ_NONE;
 	(void)inb(s->sbbase+0xe);  /* clear interrupt */
 	spin_lock(&s->lock);
 	/* clear audio interrupts first */
@@ -1711,6 +1711,7 @@ static void solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	solo1_update_ptr(s);
 	solo1_handle_midi(s);
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 static void solo1_midi_timer(unsigned long data)

@@ -1549,7 +1549,7 @@ static void snd_m3_update_ptr(m3_t *chip, m3_dma_t *s)
 	}
 }
 
-static void 
+static irqreturn_t
 snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	m3_t *chip = snd_magic_cast(m3_t, dev_id, );
@@ -1559,7 +1559,7 @@ snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	status = inb(chip->iobase + 0x1A);
 
 	if (status == 0xff)
-		return;
+		return IRQ_NONE;
    
 	/* presumably acking the ints? */
 	outw(status, chip->iobase + 0x1A);
@@ -1592,6 +1592,7 @@ snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* XXX is this needed? */
 	if (status & 0x40) 
 		outb(0x40, chip->iobase+0x1A);
+	return IRQ_HANDLED;
 }
 
 

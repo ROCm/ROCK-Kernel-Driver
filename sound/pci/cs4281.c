@@ -511,7 +511,7 @@ struct snd_cs4281 {
 
 };
 
-static void snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static struct pci_device_id snd_cs4281_ids[] __devinitdata = {
 	{ 0x1013, 0x6005, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* CS4281 */
@@ -1883,18 +1883,18 @@ static int __devinit snd_cs4281_midi(cs4281_t * chip, int device, snd_rawmidi_t 
  *  Interrupt handler
  */
 
-static void snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	cs4281_t *chip = snd_magic_cast(cs4281_t, dev_id, return);
 	unsigned int status, dma, val;
 	cs4281_dma_t *cdma;
 
 	if (chip == NULL)
-		return;
+		return IRQ_NONE;
 	status = snd_cs4281_peekBA0(chip, BA0_HISR);
 	if ((status & 0x7fffffff) == 0) {
 		snd_cs4281_pokeBA0(chip, BA0_HICR, BA0_HICR_EOI);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	if (status & (BA0_HISR_DMA(0)|BA0_HISR_DMA(1)|BA0_HISR_DMA(2)|BA0_HISR_DMA(3))) {
@@ -1949,6 +1949,7 @@ static void snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* EOI to the PCI part... reenables interrupts */
 	snd_cs4281_pokeBA0(chip, BA0_HICR, BA0_HICR_EOI);
+	return IRQ_HANDLED;
 }
 
 

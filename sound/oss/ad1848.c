@@ -2212,7 +2212,7 @@ void ad1848_unload(int io_base, int irq, int dma_playback, int dma_capture, int 
 		printk(KERN_ERR "ad1848: Can't find device to be unloaded. Base=%x\n", io_base);
 }
 
-void adintr(int irq, void *dev_id, struct pt_regs *dummy)
+irqreturn_t adintr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	unsigned char status;
 	ad1848_info *devc;
@@ -2287,6 +2287,7 @@ interrupt_again:		/* Jump back here if int status doesn't reset */
 	{
 		  goto interrupt_again;
 	}
+	return IRQ_HANDLED;
 }
 
 /*

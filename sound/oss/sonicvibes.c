@@ -899,7 +899,7 @@ static void sv_handle_midi(struct sv_state *s)
 		wake_up(&s->midi.owait);
 }
 
-static void sv_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sv_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct sv_state *s = (struct sv_state *)dev_id;
 	unsigned int intsrc;
@@ -907,11 +907,12 @@ static void sv_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inb(s->ioenh + SV_CODEC_STATUS);
 	if (!(intsrc & (SV_CSTAT_DMAA | SV_CSTAT_DMAC | SV_CSTAT_MIDI)))
-		return;
+		return IRQ_NONE;
 	spin_lock(&s->lock);
 	sv_update_ptr(s);
 	sv_handle_midi(s);
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 static void sv_midi_timer(unsigned long data)

@@ -785,11 +785,14 @@ static void tumbler_update_automute(pmac_t *chip, int do_notify)
 
 
 /* interrupt - headphone plug changed */
-static void headphone_intr(int irq, void *devid, struct pt_regs *regs)
+static irqreturn_t headphone_intr(int irq, void *devid, struct pt_regs *regs)
 {
 	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
-	if (chip->update_automute && chip->initialized)
+	if (chip->update_automute && chip->initialized) {
 		chip->update_automute(chip, 1);
+		return IRQ_HANDLED;
+	}
+	return IRQ_NONE;
 }
 
 /* look for audio-gpio device */

@@ -600,7 +600,7 @@ struct snd_es1968 {
 #endif
 };
 
-static void snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static struct pci_device_id snd_es1968_ids[] __devinitdata = {
 	/* Maestro 1 */
@@ -2009,13 +2009,13 @@ static void es1968_update_hw_volume(unsigned long private_data)
 /*
  * interrupt handler
  */
-static void snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	es1968_t *chip = snd_magic_cast(es1968_t, dev_id, return);
 	u32 event;
 
 	if (!(event = inb(chip->io_port + 0x1A)))
-		return;
+		return IRQ_NONE;
 
 	outw(inw(chip->io_port + 4) & 1, chip->io_port + 4);
 
@@ -2041,6 +2041,7 @@ static void snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		spin_unlock(&chip->substream_lock);
 	}
+	return IRQ_HANDLED;
 }
 
 /*

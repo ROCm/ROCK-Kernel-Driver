@@ -1125,7 +1125,7 @@ static void snd_opti93x_overrange(opti93x_t *chip)
 	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
-void snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	opti93x_t *codec = snd_magic_cast(opti93x_t, dev_id, return);
 	unsigned char status;
@@ -1138,6 +1138,7 @@ void snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		snd_pcm_period_elapsed(codec->capture_substream);
 	}
 	outb(0x00, OPTi93X_PORT(codec, STATUS));
+	return IRQ_HANDLED;
 }
 
 

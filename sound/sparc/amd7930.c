@@ -497,7 +497,7 @@ static void __amd7930_update_map(amd7930_t *amd)
 	__amd7930_write_map(amd);
 }
 
-static void snd_amd7930_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_amd7930_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	amd7930_t *amd = dev_id;
 	unsigned int elapsed;
@@ -536,6 +536,7 @@ static void snd_amd7930_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		snd_pcm_period_elapsed(amd->playback_substream);
 	else
 		snd_pcm_period_elapsed(amd->capture_substream);
+	return IRQ_HANDLED;
 }
 
 static int snd_amd7930_trigger(amd7930_t *amd, unsigned int flag, int cmd)

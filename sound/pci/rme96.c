@@ -1153,7 +1153,7 @@ snd_rme96_capture_stop(rme96_t *rme96)
 	writel(rme96->wcreg, rme96->iobase + RME96_IO_CONTROL_REGISTER);
 }
 
-static void
+static irqreturn_t
 snd_rme96_interrupt(int irq,
 		    void *dev_id,
 		    struct pt_regs *regs)
@@ -1165,7 +1165,7 @@ snd_rme96_interrupt(int irq,
 	if (!((rme96->rcreg & RME96_RCR_IRQ) ||
 	      (rme96->rcreg & RME96_RCR_IRQ_2)))
 	{
-		return;
+		return IRQ_NONE;
 	}
 	
 	if (rme96->rcreg & RME96_RCR_IRQ) {
@@ -1178,6 +1178,7 @@ snd_rme96_interrupt(int irq,
 		snd_pcm_period_elapsed(rme96->capture_substream);		
 		writel(0, rme96->iobase + RME96_IO_CONFIRM_REC_IRQ);
 	}
+	return IRQ_HANDLED;
 }
 
 static unsigned int period_bytes[] = { RME96_SMALL_BLOCK_SIZE, RME96_LARGE_BLOCK_SIZE };

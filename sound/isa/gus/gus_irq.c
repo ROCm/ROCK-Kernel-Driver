@@ -30,16 +30,18 @@
 #define STAT_ADD(x)	while (0) { ; }
 #endif
 
-void snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	snd_gus_card_t * gus = snd_magic_cast(snd_gus_card_t, dev_id, return);
 	unsigned char status;
 	int loop = 100;
-	
-      __again:
+	int handled = 0;
+
+__again:
 	status = inb(gus->gf1.reg_irqstat);
 	if (status == 0)
-		return;
+		return IRQ_RETVAL(handled);
+	handled = 1;
 	// snd_printk("IRQ: status = 0x%x\n", status);
 	if (status & 0x02) {
 		STAT_ADD(gus->gf1.interrupt_stat_midi_in);
@@ -101,6 +103,7 @@ void snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	if (--loop > 0)
 		goto __again;
+	return IRQ_NONE;
 }
 
 #ifdef CONFIG_SND_DEBUG

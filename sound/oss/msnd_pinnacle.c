@@ -45,6 +45,7 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -1061,7 +1062,7 @@ static __inline__ void eval_dsp_msg(register WORD wMessage)
 	}
 }
 
-static void intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/* Send ack to DSP */
 	inb(dev.io + HP_RXL);
@@ -1077,6 +1078,7 @@ static void intr(int irq, void *dev_id, struct pt_regs *regs)
 		else
 			isa_writew(wTmp, dev.DSPQ + JQS_wHead);
 	}
+	return IRQ_HANDLED;
 }
 
 static struct file_operations dev_fileops = {

@@ -3,7 +3,7 @@
 
 /*	From gus_card.c */
 int gus_set_midi_irq(int num);
-void gusintr(int irq, void *dev_id, struct pt_regs * dummy);
+irqreturn_t gusintr(int irq, void *dev_id, struct pt_regs * dummy);
 
 /*	From gus_wave.c */
 int gus_wave_detect(int baseaddr);

@@ -1232,7 +1232,7 @@ static void m3_update_ptr(struct m3_state *s)
     }
 }
 
-static void m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct m3_card *c = (struct m3_card *)dev_id;
     struct m3_state *s = &c->channels[0];
@@ -1240,13 +1240,14 @@ static void m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
     status = inb(c->iobase+0x1A);
 
-    if(status == 0xff) return;
+    if(status == 0xff)
+	return IRQ_NONE;
    
     /* presumably acking the ints? */
     outw(status, c->iobase+0x1A); 
 
     if(c->in_suspend)
-        return;
+        return IRQ_HANDLED;
 
     /*
      * ack an assp int if its running
@@ -1269,6 +1270,7 @@ static void m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     /* XXX is this needed? */
     if(status & 0x40) 
         outb(0x40, c->iobase+0x1A);
+    return IRQ_HANDLED;
 }
 
 

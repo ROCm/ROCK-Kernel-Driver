@@ -693,23 +693,25 @@ static void snd_pmac_dbdma_reset(pmac_t *chip)
 /*
  * interrupt handlers
  */
-static void
+static irqreturn_t
 snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 {
 	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
 	snd_pmac_pcm_update(chip, &chip->playback);
+	return IRQ_HANDLED;
 }
 
 
-static void
+static irqreturn_t
 snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 {
 	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
 	snd_pmac_pcm_update(chip, &chip->capture);
+	return IRQ_HANDLED;
 }
 
 
-static void
+static irqreturn_t
 snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 {
 	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
@@ -728,6 +730,7 @@ snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 	}
 	/* Writing 1s to the CNTLERR and PORTCHG bits clears them... */
 	out_le32(&chip->awacs->control, ctrl);
+	return IRQ_HANDLED;
 }
 
 
