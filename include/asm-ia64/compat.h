@@ -27,6 +27,11 @@ typedef s32		compat_daddr_t;
 typedef u32		compat_caddr_t;
 typedef __kernel_fsid_t	compat_fsid_t;
 
+typedef s32		compat_int_t;
+typedef s32		compat_long_t;
+typedef u32		compat_uint_t;
+typedef u32		compat_ulong_t;
+
 struct compat_timespec {
 	compat_time_t	tv_sec;
 	s32		tv_nsec;
@@ -108,16 +113,16 @@ typedef u32		compat_sigset_word;
 #define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
 
 /*
- * A pointer passed in from user mode. This should not
- * be used for syscall parameters, just declare them
- * as pointers because the syscall entry code will have
- * appropriately comverted them already.
+ * A pointer passed in from user mode. This should not be used for syscall parameters,
+ * just declare them as pointers because the syscall entry code will have appropriately
+ * comverted them already.
  */
 typedef	u32		compat_uptr_t;
 
-static inline void *compat_ptr(compat_ptr_t uptr)
+static inline void *
+compat_ptr (compat_uptr_t uptr)
 {
-	return (void *)uptr;
+	return (void *) (unsigned long) uptr;
 }
 
 #endif /* _ASM_IA64_COMPAT_H */

@@ -2261,7 +2261,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 
 	}
   out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
   out:
 	unlock_kernel();
 	return ret;
