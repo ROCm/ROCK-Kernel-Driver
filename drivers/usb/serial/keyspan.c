@@ -175,13 +175,9 @@ struct keyspan_port_private {
 static int __init keyspan_init (void)
 {
 	usb_serial_register (&keyspan_pre_device);
-	usb_serial_register (&keyspan_usa18x_device);
-	usb_serial_register (&keyspan_usa19_device);
-	usb_serial_register (&keyspan_usa28_device);
-	usb_serial_register (&keyspan_usa28x_device);
-	usb_serial_register (&keyspan_usa28xa_device);
-	/* We don't need a separate entry for the usa28xb as it appears as a 28x anyway */
-	usb_serial_register (&keyspan_usa49w_device);
+	usb_serial_register (&keyspan_1port_device);
+	usb_serial_register (&keyspan_2port_device);
+	usb_serial_register (&keyspan_4port_device);
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
@@ -191,13 +187,9 @@ static int __init keyspan_init (void)
 static void __exit keyspan_exit (void)
 {
 	usb_serial_deregister (&keyspan_pre_device);
-	usb_serial_deregister (&keyspan_usa18x_device);
-	usb_serial_deregister (&keyspan_usa19_device);
-	usb_serial_deregister (&keyspan_usa28_device);
-	usb_serial_deregister (&keyspan_usa28x_device);
-	usb_serial_deregister (&keyspan_usa28xa_device);
-	/* We don't need a separate entry for the usa28xb as it appears as a 28x anyway */
-	usb_serial_deregister (&keyspan_usa49w_device);
+	usb_serial_deregister (&keyspan_1port_device);
+	usb_serial_deregister (&keyspan_2port_device);
+	usb_serial_deregister (&keyspan_4port_device);
 }
 
 module_init(keyspan_init);
