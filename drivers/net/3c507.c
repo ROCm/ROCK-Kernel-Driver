@@ -294,6 +294,7 @@ static void el16_tx_timeout (struct net_device *dev);
 static void hardware_send_packet(struct net_device *dev, void *buf, short length, short pad);
 static void init_82586_mem(struct net_device *dev);
 static struct ethtool_ops netdev_ethtool_ops;
+static void init_rx_bufs(struct net_device *);
 
 static int io = 0x300;
 static int irq;
@@ -612,7 +613,6 @@ static irqreturn_t el16_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	if ((status & 0x0070) != 0x0040 && netif_running(dev)) {
-		static void init_rx_bufs(struct net_device *);
 		/* The Rx unit is not ready, it must be hung.  Restart the receiver by
 		   initializing the rx buffers, and issuing an Rx start command. */
 		if (net_debug)
