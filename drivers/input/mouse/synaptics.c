@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/serio.h>
+#include <linux/libps2.h>
 #include "psmouse.h"
 #include "synaptics.h"
 
@@ -50,7 +51,7 @@ static int synaptics_send_cmd(struct psmouse *psmouse, unsigned char c, unsigned
 {
 	if (psmouse_sliced_command(psmouse, c))
 		return -1;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO))
+	if (ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_GETINFO))
 		return -1;
 	return 0;
 }
@@ -65,7 +66,7 @@ static int synaptics_mode_cmd(struct psmouse *psmouse, unsigned char mode)
 	if (psmouse_sliced_command(psmouse, mode))
 		return -1;
 	param[0] = SYN_PS_SET_MODE2;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE))
+	if (ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_SETRATE))
 		return -1;
 	return 0;
 }
@@ -219,7 +220,7 @@ static int synaptics_pt_write(struct serio *serio, unsigned char c)
 
 	if (psmouse_sliced_command(parent, c))
 		return -1;
-	if (psmouse_command(parent, &rate_param, PSMOUSE_CMD_SETRATE))
+	if (ps2_command(&parent->ps2dev, &rate_param, PSMOUSE_CMD_SETRATE))
 		return -1;
 	return 0;
 }
@@ -245,7 +246,7 @@ static void synaptics_pass_pt_packet(struct serio *ptport, unsigned char *packet
 
 static void synaptics_pt_activate(struct psmouse *psmouse)
 {
-	struct psmouse *child = psmouse->serio->child->private;
+	struct psmouse *child = psmouse->ps2dev.serio->child->private;
 
 	/* adjust the touchpad to child's choice of protocol */
 	if (child && child->type >= PSMOUSE_GENPS) {
@@ -270,11 +271,11 @@ static void synaptics_pt_create(struct psmouse *psmouse)
 	strlcpy(serio->name, "Synaptics pass-through", sizeof(serio->name));
 	strlcpy(serio->phys, "synaptics-pt/serio0", sizeof(serio->name));
 	serio->write = synaptics_pt_write;
-	serio->parent = psmouse->serio;
+	serio->parent = psmouse->ps2dev.serio;
 
 	psmouse->pt_activate = synaptics_pt_activate;
 
-	psmouse->serio->child = serio;
+	psmouse->ps2dev.serio->child = serio;
 }
 
 /*****************************************************************************
@@ -470,8 +471,8 @@ static psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_r
 			priv->pkt_type = synaptics_detect_pkt_type(psmouse);
 
 		if (SYN_CAP_PASS_THROUGH(priv->capabilities) && synaptics_is_pt_packet(psmouse->packet)) {
-			if (psmouse->serio->child)
-				synaptics_pass_pt_packet(psmouse->serio->child, psmouse->packet);
+			if (psmouse->ps2dev.serio->child)
+				synaptics_pass_pt_packet(psmouse->ps2dev.serio->child, psmouse->packet);
 		} else
 			synaptics_process_packet(psmouse);
 
@@ -561,15 +562,16 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 
 int synaptics_detect(struct psmouse *psmouse)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
 
 	param[0] = 0;
 
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO);
 
 	return param[1] == 0x47;
 }

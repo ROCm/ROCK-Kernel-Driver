@@ -20,11 +20,6 @@
 #define PSMOUSE_RET_ACK		0xfa
 #define PSMOUSE_RET_NAK		0xfe
 
-#define PSMOUSE_FLAG_ACK	0	/* Waiting for ACK/NAK */
-#define PSMOUSE_FLAG_CMD	1	/* Waiting for command to finish */
-#define PSMOUSE_FLAG_CMD1	2	/* Waiting for the first byte of command response */
-#define PSMOUSE_FLAG_WAITID	3	/* Command execiting is GET ID */
-
 enum psmouse_state {
 	PSMOUSE_IGNORE,
 	PSMOUSE_INITIALIZING,
@@ -42,26 +37,18 @@ typedef enum {
 struct psmouse {
 	void *private;
 	struct input_dev dev;
-	struct serio *serio;
+	struct ps2dev ps2dev;
 	char *vendor;
 	char *name;
-	unsigned char cmdbuf[8];
 	unsigned char packet[8];
-	unsigned char cmdcnt;
 	unsigned char pktcnt;
 	unsigned char type;
 	unsigned char model;
 	unsigned long last;
 	unsigned long out_of_sync;
 	enum psmouse_state state;
-	unsigned char nak;
-	char error;
 	char devname[64];
 	char phys[32];
-	unsigned long flags;
-
-	/* Used to signal completion from interrupt handler */
-	wait_queue_head_t wait;
 
 	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs);
 	int (*reconnect)(struct psmouse *psmouse);
@@ -84,7 +71,6 @@ enum psmouse_type {
 	PSMOUSE_ALPS,
 };
 
-int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command);
 int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command);
 int psmouse_reset(struct psmouse *psmouse);
 

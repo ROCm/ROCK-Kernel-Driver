@@ -11,6 +11,7 @@
 
 #include <linux/input.h>
 #include <linux/serio.h>
+#include <linux/libps2.h>
 #include "psmouse.h"
 #include "logips2pp.h"
 
@@ -97,7 +98,7 @@ static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned cha
 	if (psmouse_sliced_command(psmouse, command))
 		return -1;
 
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_POLL))
+	if (ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_POLL))
 		return -1;
 
 	return 0;
@@ -113,19 +114,20 @@ static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned cha
 
 static void ps2pp_set_smartscroll(struct psmouse *psmouse)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
 
 	ps2pp_cmd(psmouse, param, 0x32);
 
 	param[0] = 0;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
 
 	if (psmouse_smartscroll < 2) {
 		/* 0 - disabled, 1 - enabled */
 		param[0] = psmouse_smartscroll;
-		psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+		ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
 	}
 }
 
@@ -137,11 +139,13 @@ static void ps2pp_set_smartscroll(struct psmouse *psmouse)
 
 void ps2pp_set_800dpi(struct psmouse *psmouse)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param = 3;
-	psmouse_command(psmouse, NULL, PSMOUSE_CMD_SETSCALE11);
-	psmouse_command(psmouse, NULL, PSMOUSE_CMD_SETSCALE11);
-	psmouse_command(psmouse, NULL, PSMOUSE_CMD_SETSCALE11);
-	psmouse_command(psmouse, &param, PSMOUSE_CMD_SETRES);
+
+	ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
+	ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
+	ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
+	ps2_command(ps2dev, &param, PSMOUSE_CMD_SETRES);
 }
 
 static struct ps2pp_info *get_model_info(unsigned char model)
@@ -238,18 +242,19 @@ static void ps2pp_set_model_properties(struct psmouse *psmouse, struct ps2pp_inf
 
 int ps2pp_init(struct psmouse *psmouse, int set_properties)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
 	unsigned char protocol = PSMOUSE_PS2;
 	unsigned char model, buttons;
 	struct ps2pp_info *model_info;
 
 	param[0] = 0;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
-	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
-	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE11);
+	ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE11);
+	ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE11);
 	param[1] = 0;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO);
 
 	if (param[1] != 0) {
 		model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
@@ -263,16 +268,16 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 
 			/* Unprotect RAM */
 			param[0] = 0x11; param[1] = 0x04; param[2] = 0x68;
-			psmouse_command(psmouse, param, 0x30d1);
+			ps2_command(ps2dev, param, 0x30d1);
 			/* Enable features */
 			param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b;
-			psmouse_command(psmouse, param, 0x30d1);
+			ps2_command(ps2dev, param, 0x30d1);
 			/* Enable PS2++ */
 			param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3;
-			psmouse_command(psmouse, param, 0x30d1);
+			ps2_command(ps2dev, param, 0x30d1);
 
 			param[0] = 0;
-			if (!psmouse_command(psmouse, param, 0x13d1) &&
+			if (!ps2_command(ps2dev, param, 0x13d1) &&
 			    param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14) {
 				protocol = PSMOUSE_PS2TPP;
 			}

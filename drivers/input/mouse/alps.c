@@ -15,6 +15,7 @@
 
 #include <linux/input.h>
 #include <linux/serio.h>
+#include <linux/libps2.h>
 
 #include "psmouse.h"
 #include "alps.h"
@@ -187,6 +188,7 @@ static psmouse_ret_t alps_process_byte(struct psmouse *psmouse, struct pt_regs *
 
 int alps_get_model(struct psmouse *psmouse)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
 	int i;
 
@@ -195,14 +197,14 @@ int alps_get_model(struct psmouse *psmouse)
 	 * ALPS should return 0x00,0x00,0x0a or 0x00,0x00,0x64
 	 */
 	param[0] = 0;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES) ||
-	    psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11) ||
-	    psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11) ||
-	    psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11))
+	if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES) ||
+	    ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE11) ||
+	    ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE11) ||
+	    ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE11))
 		return -1;
 
 	param[0] = param[1] = param[2] = 0xff;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO))
+	if (ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO))
 		return -1;
 
 	dbg("E6 report: %2.2x %2.2x %2.2x", param[0], param[1], param[2]);
@@ -212,14 +214,14 @@ int alps_get_model(struct psmouse *psmouse)
 
 	/* Now try "E7 report". ALPS should return 0x33 in byte 1 */
 	param[0] = 0;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES) ||
-	    psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE21) ||
-	    psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE21) ||
-	    psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE21))
+	if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES) ||
+	    ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE21) ||
+	    ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE21) ||
+	    ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE21))
 		return -1;
 
 	param[0] = param[1] = param[2] = 0xff;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO))
+	if (ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO))
 		return -1;
 
 	dbg("E7 report: %2.2x %2.2x %2.2x", param[0], param[1], param[2]);
@@ -238,36 +240,39 @@ int alps_get_model(struct psmouse *psmouse)
  */
 static int alps_passthrough_mode(struct psmouse *psmouse, int enable)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[3];
 	int cmd = enable ? PSMOUSE_CMD_SETSCALE21 : PSMOUSE_CMD_SETSCALE11;
 
-	if (psmouse_command(psmouse, NULL, cmd) ||
-	    psmouse_command(psmouse, NULL, cmd) ||
-	    psmouse_command(psmouse, NULL, cmd) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE))
+	if (ps2_command(ps2dev, NULL, cmd) ||
+	    ps2_command(ps2dev, NULL, cmd) ||
+	    ps2_command(ps2dev, NULL, cmd) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE))
 		return -1;
 
 	/* we may get 3 more bytes, just ignore them */
-	psmouse_command(psmouse, param, 0x0300);
+	ps2_command(ps2dev, param, 0x0300);
 
 	return 0;
 }
 
 static int alps_magic_knock(struct psmouse *psmouse)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
+
 	/* Try ALPS magic knock - 4 disable before enable */
-	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_ENABLE))
+	if (ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_ENABLE))
 		return -1;
 	return 0;
 }
 
 static int alps_absolute_mode(struct psmouse *psmouse)
 {
-	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS))
+	if (ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS))
 		return -1;
 
 	if (alps_passthrough_mode(psmouse, 1))
@@ -286,16 +291,18 @@ static int alps_absolute_mode(struct psmouse *psmouse)
 	 * Switch mouse to poll (remote) mode so motion data will not
 	 * get in our way
 	 */
-	return psmouse_command(psmouse, NULL, PSMOUSE_CMD_SETPOLL);
+	return ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_SETPOLL);
 }
 
 static int alps_get_status(struct psmouse *psmouse, char *param)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
+
 	/* Get status: 0xF5 0xF5 0xF5 0xE9 */
-	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO))
+	if (ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO))
 		return -1;
 
 	dbg("Status: %2.2x %2.2x %2.2x", param[0], param[1], param[2]);
@@ -315,6 +322,7 @@ static int alps_get_status(struct psmouse *psmouse, char *param)
 static int alps_tap_mode(struct psmouse *psmouse, int model, int enable)
 {
 	int rc = 0;
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	int cmd = enable ? PSMOUSE_CMD_SETRATE : PSMOUSE_CMD_SETRES;
 	unsigned char tap_arg = enable ? 0x0A : 0x00;
 	unsigned char param[4];
@@ -322,10 +330,10 @@ static int alps_tap_mode(struct psmouse *psmouse, int model, int enable)
 	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 1))
 		return -1;
 
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE) ||
-	    psmouse_command(psmouse, &tap_arg, cmd))
+	if (ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
+	    ps2_command(ps2dev, &tap_arg, cmd))
 		rc = -1;
 
 	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 0))

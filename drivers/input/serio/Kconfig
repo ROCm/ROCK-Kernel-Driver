@@ -131,6 +131,16 @@ config SERIO_MACEPS2
 	  To compile this driver as a module, choose M here: the
 	  module will be called maceps2.
 
+config SERIO_LIBPS2
+	tristate "PS/2 driver library"
+	depends on SERIO
+	help
+	  Say Y here if you are using a driver for device connected
+	  to a PS/2 port, such as PS/2 mouse or standard AT keyboard.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called libps2.
+
 config SERIO_RAW
 	tristate "Raw access to serio ports"
 	depends on SERIO
