@@ -4150,7 +4150,7 @@ ips_map_status(ips_ha_t *ha, ips_scb_t *scb, ips_stat_t *sp) {
                 (scb->cmd.dcdb.op_code == IPS_CMD_EXTENDED_DCDB_SG)) {
                tapeDCDB = (IPS_DCDB_TABLE_TAPE *) &scb->dcdb;
                memcpy(scb->scsi_cmd->sense_buffer, tapeDCDB->sense_info,
-                      sizeof(tapeDCDB->sense_info));
+                      sizeof(scb->scsi_cmd->sense_buffer));
             } else {
                memcpy(scb->scsi_cmd->sense_buffer, scb->dcdb.sense_info,
                       sizeof(scb->scsi_cmd->sense_buffer));
@@ -4292,8 +4292,10 @@ ips_send_cmd(ips_ha_t *ha, ips_scb_t *scb) {
             scb->cmd.logical_info.reserved = 0;
             scb->cmd.logical_info.reserved2 = 0;
             scb->data_len = sizeof(ha->adapt->logical_drive_info);
-            scb->data_busaddr = ha->adapt->hw_status_start + sizeof(IPS_ADAPTER)
-                                - sizeof(IPS_LD_INFO);
+            scb->data_busaddr = pci_map_single(ha->pcidev,
+                                               &ha->adapt->logical_drive_info,
+                                               scb->data_len, IPS_DMA_DIR(scb));
+            scb->flags |= IPS_SCB_MAP_SINGLE;
             scb->cmd.logical_info.buffer_addr = scb->data_busaddr;
             ret = IPS_SUCCESS;
          }
@@ -4400,8 +4402,10 @@ ips_send_cmd(ips_ha_t *ha, ips_scb_t *scb) {
          scb->cmd.logical_info.reserved2 = 0;
          scb->cmd.logical_info.reserved3 = 0;
          scb->data_len = sizeof(ha->adapt->logical_drive_info);
-         scb->data_busaddr = ha->adapt->hw_status_start + sizeof(IPS_ADAPTER)
-                             - sizeof(IPS_LD_INFO);
+         scb->data_busaddr = pci_map_single(ha->pcidev,
+                                            &ha->adapt->logical_drive_info,
+                                            scb->data_len, IPS_DMA_DIR(scb));
+         scb->flags |= IPS_SCB_MAP_SINGLE;
          scb->cmd.logical_info.buffer_addr = scb->data_busaddr;
          ret = IPS_SUCCESS;
          break;
