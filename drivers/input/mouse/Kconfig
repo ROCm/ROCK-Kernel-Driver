@@ -30,8 +30,6 @@ config MOUSE_PS2
 	  and a new verion of GPM at:
 		http://www.geocities.com/dt_or/gpm/gpm.html
 	  to take advantage of the advanced features of the touchpad.
-	  If you do not want install specialized drivers but want tapping
-	  working please use option psmouse.proto=imps.
 
 	  If unsure, say Y.
 
