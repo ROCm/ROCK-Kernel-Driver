@@ -72,17 +72,12 @@ static char version[] __devinitdata =
 	DRV_MODULE_NAME ".c:v" DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")\n";
 
 MODULE_AUTHOR("David S. Miller (davem@redhat.com)");
-MODULE_DESCRIPTION("Broadcom 4400 ethernet driver");
+MODULE_DESCRIPTION("Broadcom 4400 10/100 PCI ethernet driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(b44_debug, "i");
 MODULE_PARM_DESC(b44_debug, "B44 bitmapped debugging message enable value");
 
 static int b44_debug = -1;	/* -1 == use B44_DEF_MSG_ENABLE as value */
-
-/* XXX put this to pci_ids.h and pci.ids */
-#ifndef PCI_DEVICE_ID_BCM4401
-#define PCI_DEVICE_ID_BCM4401 0x4401
-#endif
 
 static struct pci_device_id b44_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_BCM4401,
@@ -349,12 +344,6 @@ static int b44_phy_reset(struct b44 *bp)
 
 	return 0;
 }
-
-#if 0
-static int b44_set_power_state(struct b44 *bp, int state)
-{
-}
-#endif
 
 static void __b44_set_flow_ctrl(struct b44 *bp, u32 pause_flags)
 {
@@ -1211,45 +1200,38 @@ static int b44_open(struct net_device *dev)
 	if (err)
 		return err;
 
-	err = request_irq(dev->irq, b44_interrupt,
-			  SA_SHIRQ, dev->name, dev);
-	if (err) {
-		b44_free_consistent(bp);
-		return err;
-	}
+	err = request_irq(dev->irq, b44_interrupt, SA_SHIRQ, dev->name, dev);
+	if (err)
+		goto err_out_free;
 
 	spin_lock_irq(&bp->lock);
 
 	b44_init_rings(bp);
 	err = b44_init_hw(bp);
-	if (err) {
-		b44_halt(bp);
-		b44_free_rings(bp);
-	} else {
-		bp->flags |= B44_FLAG_INIT_COMPLETE;
-	}
+	if (err)
+		goto err_out_noinit;
+	bp->flags |= B44_FLAG_INIT_COMPLETE;
 
 	spin_unlock_irq(&bp->lock);
 
-	if (err) {
-		free_irq(dev->irq, dev);
-		b44_free_consistent(bp);
-		return err;
-	} else {
-		init_timer(&bp->timer);
-		bp->timer.expires = jiffies + HZ;
-		bp->timer.data = (unsigned long) bp;
-		bp->timer.function = b44_timer;
-		add_timer(&bp->timer);
-	}
-
-	spin_lock_irq(&bp->lock);
+	init_timer(&bp->timer);
+	bp->timer.expires = jiffies + HZ;
+	bp->timer.data = (unsigned long) bp;
+	bp->timer.function = b44_timer;
+	add_timer(&bp->timer);
 
 	b44_enable_ints(bp);
 
-	spin_unlock_irq(&bp->lock);
-
 	return 0;
+
+err_out_noinit:
+	b44_halt(bp);
+	b44_free_rings(bp);
+	spin_unlock_irq(&bp->lock);
+	free_irq(dev->irq, dev);
+err_out_free:
+	b44_free_consistent(bp);
+	return err;
 }
 
 #if 0
@@ -1760,8 +1742,8 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 	bp = dev->priv;
 	bp->pdev = pdev;
 	bp->dev = dev;
-	if (b44_debug > 0)
-		bp->msg_enable = b44_debug;
+	if (b44_debug >= 0)
+		bp->msg_enable = (1 << b44_debug) - 1;
 	else
 		bp->msg_enable = B44_DEF_MSG_ENABLE;
 
