@@ -109,13 +109,13 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		quad = translation_table[mpc_record]->trans_quad;
 		logical_apicid = (quad << 4) + 
 			(m->mpc_apicid ? m->mpc_apicid << 1 : 1);
-		printk("Processor #%d %d:%d APIC version %d (quad %d, apic %d)\n",
+		printk("Processor #%d %ld:%ld APIC version %d (quad %d, apic %d)\n",
 			m->mpc_apicid,
 		        (m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
 			(m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
 			m->mpc_apicver, quad, logical_apicid);
 	} else {
-		printk("Processor #%d %d:%d APIC version %d\n",
+		printk("Processor #%d %ld:%ld APIC version %d\n",
 			m->mpc_apicid,
 			(m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
 			(m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
