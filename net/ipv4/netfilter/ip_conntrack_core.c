@@ -1035,16 +1035,12 @@ int ip_conntrack_change_expect(struct ip_conntrack_expect *expect,
 	return ret;
 }
 
-/* Alter reply tuple (maybe alter helper).  If it's already taken,
-   return 0 and don't do alteration. */
-int ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
-			     const struct ip_conntrack_tuple *newreply)
+/* Alter reply tuple (maybe alter helper).  This is for NAT, and is
+   implicitly racy: see __ip_conntrack_confirm */
+void ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
+			      const struct ip_conntrack_tuple *newreply)
 {
 	WRITE_LOCK(&ip_conntrack_lock);
-	if (__ip_conntrack_find(newreply, conntrack)) {
-		WRITE_UNLOCK(&ip_conntrack_lock);
-		return 0;
-	}
 	/* Should be unconfirmed, so not in hash table yet */
 	IP_NF_ASSERT(!is_confirmed(conntrack));
 
@@ -1055,8 +1051,6 @@ int ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
 	if (!conntrack->master && list_empty(&conntrack->sibling_list))
 		conntrack->helper = ip_ct_find_helper(newreply);
 	WRITE_UNLOCK(&ip_conntrack_lock);
-
-	return 1;
 }
 
 int ip_conntrack_helper_register(struct ip_conntrack_helper *me)

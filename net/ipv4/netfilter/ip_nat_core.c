@@ -467,38 +467,25 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 	}
 #endif
 
-	do {
-		if (!get_unique_tuple(&new_tuple, &orig_tp, range, conntrack,
-				      hooknum)) {
-			DEBUGP("ip_nat_setup_info: Can't get unique for %p.\n",
-			       conntrack);
-			return NF_DROP;
-		}
-
-#if 0
-		DEBUGP("Hook %u (%s) %p\n", hooknum,
-		       HOOK2MANIP(hooknum)==IP_NAT_MANIP_SRC ? "SRC" : "DST",
+	if (!get_unique_tuple(&new_tuple, &orig_tp, range,conntrack,hooknum)) {
+		DEBUGP("ip_nat_setup_info: Can't get unique for %p.\n",
 		       conntrack);
-		DEBUGP("Original: ");
-		DUMP_TUPLE(&orig_tp);
-		DEBUGP("New: ");
-		DUMP_TUPLE(&new_tuple);
-#endif
+		return NF_DROP;
+	}
 
-		/* We now have two tuples (SRCIP/SRCPT/DSTIP/DSTPT):
-		   the original (A/B/C/D') and the mangled one (E/F/G/H').
+	/* We now have two tuples (SRCIP/SRCPT/DSTIP/DSTPT):
+	   the original (A/B/C/D') and the mangled one (E/F/G/H').
 
-		   We're only allowed to work with the SRC per-proto
-		   part, so we create inverses of both to start, then
-		   derive the other fields we need.  */
+	   We're only allowed to work with the SRC per-proto
+	   part, so we create inverses of both to start, then
+	   derive the other fields we need.  */
 
-		/* Reply connection: simply invert the new tuple
-                   (G/H/E/F') */
-		invert_tuplepr(&reply, &new_tuple);
+	/* Reply connection: simply invert the new tuple
+	   (G/H/E/F') */
+	invert_tuplepr(&reply, &new_tuple);
 
-		/* Alter conntrack table so it recognizes replies.
-                   If fail this race (reply tuple now used), repeat. */
-	} while (!ip_conntrack_alter_reply(conntrack, &reply));
+	/* Alter conntrack table so will recognize replies. */
+	ip_conntrack_alter_reply(conntrack, &reply);
 
 	/* FIXME: We can simply used existing conntrack reply tuple
            here --RR */
