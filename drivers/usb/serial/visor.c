@@ -2,7 +2,7 @@
  * USB HandSpring Visor, Palm m50x, and Sony Clie driver
  * (supports all of the Palm OS USB devices)
  *
- *	Copyright (C) 1999 - 2003
+ *	Copyright (C) 1999 - 2004
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -151,6 +151,7 @@
 #include <linux/tty_driver.h>
 #include <linux/tty_flip.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
@@ -194,8 +195,8 @@ static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_i
 static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_id *id);
 
 /* Parameters that may be passed into the module. */
-static int vendor = -1;
-static int product = -1;
+static __u16 vendor;
+static __u16 product;
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID),
@@ -1079,10 +1080,10 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM(vendor, "i");
+module_param(vendor, ushort, 0);
 MODULE_PARM_DESC(vendor, "User specified vendor ID");
-MODULE_PARM(product, "i");
+module_param(product, ushort, 0);
 MODULE_PARM_DESC(product, "User specified product ID");
