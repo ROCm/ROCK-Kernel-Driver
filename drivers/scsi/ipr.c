@@ -3535,6 +3535,11 @@ static void ipr_erp_cancel_all(struct ipr_cmnd *ipr_cmd)
 
 	ipr_reinit_ipr_cmnd_for_erp(ipr_cmd);
 
+	if (!res->tcq_active) {
+		ipr_erp_request_sense(ipr_cmd);
+		return;
+	}
+
 	cmd_pkt = &ipr_cmd->ioarcb.cmd_pkt;
 	cmd_pkt->request_type = IPR_RQTYPE_IOACMD;
 	cmd_pkt->cdb[0] = IPR_CANCEL_ALL_REQUESTS;
