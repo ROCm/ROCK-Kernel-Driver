@@ -1408,7 +1408,7 @@ static void unix_copy_addr(struct msghdr *msg, struct sock *sk)
 {
 	struct unix_sock *u = unix_sk(sk);
 
-	msg->msg_namelen = sizeof(short);
+	msg->msg_namelen = 0;
 	if (u->addr) {
 		msg->msg_namelen = u->addr->len;
 		memcpy(msg->msg_name, u->addr->name, u->addr->len);
@@ -1917,8 +1917,4 @@ static void __exit af_unix_exit(void)
 module_init(af_unix_init);
 module_exit(af_unix_exit);
 
-/*
- * Local variables:
- *  compile-command: "gcc -g -D__KERNEL__ -Wall -O6 -I/usr/src/linux/include -c af_unix.c"
- * End:
- */
+MODULE_LICENSE("GPL");
