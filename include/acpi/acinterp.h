@@ -83,21 +83,27 @@ acpi_status
 acpi_ex_convert_to_integer (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	struct acpi_walk_state          *walk_state);
+	u16                             opcode);
 
 acpi_status
 acpi_ex_convert_to_buffer (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	struct acpi_walk_state          *walk_state);
+	u16                             opcode);
 
 acpi_status
 acpi_ex_convert_to_string (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	u32                             base,
-	u32                             max_length,
-	struct acpi_walk_state          *walk_state);
+	u32                             type,
+	u16                             opcode);
+
+/* Types for String conversion */
+
+#define ACPI_EXPLICIT_BYTE_COPY         0x00000000
+#define ACPI_EXPLICIT_CONVERT_HEX       0x00000001
+#define ACPI_IMPLICIT_CONVERT_HEX       0x00000002
+#define ACPI_EXPLICIT_CONVERT_DECIMAL   0x00000003
 
 acpi_status
 acpi_ex_convert_to_target_type (
@@ -109,7 +115,7 @@ acpi_ex_convert_to_target_type (
 u32
 acpi_ex_convert_to_ascii (
 	acpi_integer                    integer,
-	u32                             base,
+	u16                             base,
 	u8                              *string,
 	u8                              max_length);
 
@@ -243,11 +249,19 @@ acpi_ex_do_concatenate (
 	union acpi_operand_object       **actual_return_desc,
 	struct acpi_walk_state          *walk_state);
 
-u8
+acpi_status
+acpi_ex_do_logical_numeric_op (
+	u16                             opcode,
+	acpi_integer                    integer0,
+	acpi_integer                    integer1,
+	u8                              *logical_result);
+
+acpi_status
 acpi_ex_do_logical_op (
 	u16                             opcode,
-	union acpi_operand_object       *obj_desc,
-	union acpi_operand_object       *obj_desc2);
+	union acpi_operand_object       *operand0,
+	union acpi_operand_object       *operand1,
+	u8                              *logical_result);
 
 acpi_integer
 acpi_ex_do_math_op (

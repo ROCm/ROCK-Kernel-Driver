@@ -639,7 +639,8 @@ acpi_ds_exec_end_op (
 	 * conditional predicate
 	 */
 
-	if ((walk_state->control_state) &&
+	if ((ACPI_SUCCESS (status)) &&
+		(walk_state->control_state) &&
 		(walk_state->control_state->common.state ==
 			ACPI_CONTROL_PREDICATE_EXECUTING) &&
 		(walk_state->control_state->control.predicate_op == op)) {

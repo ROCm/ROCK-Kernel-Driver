@@ -135,7 +135,10 @@ struct acpi_object_integer
 	acpi_integer                            value;
 };
 
-
+/*
+ * Note: The String and Buffer object must be identical through the Pointer
+ * element.  There is code that depends on this.
+ */
 struct acpi_object_string           /* Null terminated, ASCII characters only */
 {
 	ACPI_OBJECT_COMMON_HEADER

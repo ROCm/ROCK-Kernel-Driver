@@ -577,6 +577,10 @@ union acpi_operand_object *
 acpi_ut_create_buffer_object (
 	acpi_size                       buffer_size);
 
+union acpi_operand_object *
+acpi_ut_create_string_object (
+	acpi_size                       string_size);
+
 
 /*
  * ut_ref_cnt - Object reference count management

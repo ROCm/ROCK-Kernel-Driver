@@ -472,7 +472,7 @@ acpi_ut_allocate_and_track (
 	acpi_status                     status;
 
 
-	allocation = acpi_ut_allocate (size + sizeof (struct acpi_debug_mem_block), component,
+	allocation = acpi_ut_allocate (size + sizeof (struct acpi_debug_mem_header), component,
 			  module, line);
 	if (!allocation) {
 		return (NULL);
@@ -518,7 +518,7 @@ acpi_ut_callocate_and_track (
 	acpi_status                     status;
 
 
-	allocation = acpi_ut_callocate (size + sizeof (struct acpi_debug_mem_block), component,
+	allocation = acpi_ut_callocate (size + sizeof (struct acpi_debug_mem_header), component,
 			  module, line);
 	if (!allocation) {
 		/* Report allocation error */
@@ -712,6 +712,7 @@ acpi_ut_track_allocation (
 	allocation->line      = line;
 
 	ACPI_STRNCPY (allocation->module, module, ACPI_MAX_MODULE_NAME);
+	allocation->module[ACPI_MAX_MODULE_NAME-1] = 0;
 
 	/* Insert at list head */
 

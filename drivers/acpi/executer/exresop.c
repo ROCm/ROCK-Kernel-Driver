@@ -398,7 +398,8 @@ acpi_ex_resolve_operands (
 			 * But we can implicitly convert from a STRING or BUFFER
 			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_integer (obj_desc, stack_ptr, walk_state);
+			status = acpi_ex_convert_to_integer (obj_desc, stack_ptr,
+					 walk_state->opcode);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -420,7 +421,8 @@ acpi_ex_resolve_operands (
 			 * But we can implicitly convert from a STRING or INTEGER
 			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr, walk_state);
+			status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr,
+					 walk_state->opcode);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -442,7 +444,8 @@ acpi_ex_resolve_operands (
 			 * But we can implicitly convert from a BUFFER or INTEGER
 			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_string (obj_desc, stack_ptr, 16, ACPI_UINT32_MAX, walk_state);
+			status = acpi_ex_convert_to_string (obj_desc, stack_ptr,
+					 ACPI_IMPLICIT_CONVERT_HEX, walk_state->opcode);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -494,7 +497,8 @@ acpi_ex_resolve_operands (
 
 				/* Highest priority conversion is to type Buffer */
 
-				status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr, walk_state);
+				status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr,
+						 walk_state->opcode);
 				if (ACPI_FAILURE (status)) {
 					return_ACPI_STATUS (status);
 				}

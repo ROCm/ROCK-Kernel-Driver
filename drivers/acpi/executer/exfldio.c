@@ -139,7 +139,7 @@ acpi_ex_setup_region (
 			if (ACPI_ROUND_UP (rgn_desc->region.length,
 					   obj_desc->common_field.access_byte_width) >=
 				(obj_desc->common_field.base_byte_offset +
-				 obj_desc->common_field.access_byte_width +
+				 (acpi_native_uint) obj_desc->common_field.access_byte_width +
 				 field_datum_byte_offset)) {
 				return_ACPI_STATUS (AE_OK);
 			}

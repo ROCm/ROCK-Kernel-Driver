@@ -344,7 +344,7 @@ acpi_ex_opcode_1A_1T_1R (
 
 				/* Insert the BCD digit that resides in the remainder from above */
 
-				return_desc->integer.value |= (((acpi_integer) temp32) << (i * 4));
+				return_desc->integer.value |= (((acpi_integer) temp32) << ACPI_MUL_4 (i));
 			}
 
 			/* Overflow if there is any data left in Digit */
@@ -429,31 +429,36 @@ acpi_ex_opcode_1A_1T_1R (
 	 */
 	case AML_COPY_OP:               /* Copy (Source, Target) */
 
-		status = acpi_ut_copy_iobject_to_iobject (operand[0], &return_desc, walk_state);
+		status = acpi_ut_copy_iobject_to_iobject (operand[0], &return_desc,
+				 walk_state);
 		break;
 
 
 	case AML_TO_DECSTRING_OP:       /* to_decimal_string (Data, Result) */
 
-		status = acpi_ex_convert_to_string (operand[0], &return_desc, 10, ACPI_UINT32_MAX, walk_state);
+		status = acpi_ex_convert_to_string (operand[0], &return_desc,
+				 ACPI_EXPLICIT_CONVERT_DECIMAL, walk_state->opcode);
 		break;
 
 
 	case AML_TO_HEXSTRING_OP:       /* to_hex_string (Data, Result) */
 
-		status = acpi_ex_convert_to_string (operand[0], &return_desc, 16, ACPI_UINT32_MAX, walk_state);
+		status = acpi_ex_convert_to_string (operand[0], &return_desc,
+				 ACPI_EXPLICIT_CONVERT_HEX, walk_state->opcode);
 		break;
 
 
 	case AML_TO_BUFFER_OP:          /* to_buffer (Data, Result) */
 
-		status = acpi_ex_convert_to_buffer (operand[0], &return_desc, walk_state);
+		status = acpi_ex_convert_to_buffer (operand[0], &return_desc,
+				 walk_state->opcode);
 		break;
 
 
 	case AML_TO_INTEGER_OP:         /* to_integer (Data, Result) */
 
-		status = acpi_ex_convert_to_integer (operand[0], &return_desc, walk_state);
+		status = acpi_ex_convert_to_integer (operand[0], &return_desc,
+				 walk_state->opcode);
 		break;
 
 
@@ -463,8 +468,9 @@ acpi_ex_opcode_1A_1T_1R (
 		/*
 		 * These are two obsolete opcodes
 		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s is obsolete and not implemented\n",
-				  acpi_ps_get_opcode_name (walk_state->opcode)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"%s is obsolete and not implemented\n",
+			acpi_ps_get_opcode_name (walk_state->opcode)));
 		status = AE_SUPPORT;
 		goto cleanup;
 

@@ -292,7 +292,6 @@ acpi_ex_opcode_2A_1T_1R (
 {
 	union acpi_operand_object       **operand = &walk_state->operands[0];
 	union acpi_operand_object       *return_desc = NULL;
-	union acpi_operand_object       *temp_desc = NULL;
 	u32                             index;
 	acpi_status                     status = AE_OK;
 	acpi_size                       length;
@@ -331,52 +330,15 @@ acpi_ex_opcode_2A_1T_1R (
 
 		/* return_desc will contain the remainder */
 
-		status = acpi_ut_divide (&operand[0]->integer.value, &operand[1]->integer.value,
+		status = acpi_ut_divide (&operand[0]->integer.value,
+				  &operand[1]->integer.value,
 				  NULL, &return_desc->integer.value);
 		break;
 
 
 	case AML_CONCAT_OP:             /* Concatenate (Data1, Data2, Result) */
 
-		/*
-		 * Convert the second operand if necessary.  The first operand
-		 * determines the type of the second operand, (See the Data Types
-		 * section of the ACPI specification.)  Both object types are
-		 * guaranteed to be either Integer/String/Buffer by the operand
-		 * resolution mechanism above.
-		 */
-		switch (ACPI_GET_OBJECT_TYPE (operand[0])) {
-		case ACPI_TYPE_INTEGER:
-			status = acpi_ex_convert_to_integer (operand[1], &temp_desc, walk_state);
-			break;
-
-		case ACPI_TYPE_STRING:
-			status = acpi_ex_convert_to_string (operand[1], &temp_desc, 16, ACPI_UINT32_MAX, walk_state);
-			break;
-
-		case ACPI_TYPE_BUFFER:
-			status = acpi_ex_convert_to_buffer (operand[1], &temp_desc, walk_state);
-			break;
-
-		default:
-			ACPI_REPORT_ERROR (("Concat - invalid obj type: %X\n",
-					ACPI_GET_OBJECT_TYPE (operand[0])));
-			status = AE_AML_INTERNAL;
-		}
-
-		if (ACPI_FAILURE (status)) {
-			goto cleanup;
-		}
-
-		/*
-		 * Both operands are now known to be the same object type
-		 * (Both are Integer, String, or Buffer), and we can now perform the
-		 * concatenation.
-		 */
-		status = acpi_ex_do_concatenate (operand[0], temp_desc, &return_desc, walk_state);
-		if (temp_desc != operand[1]) {
-			acpi_ut_remove_reference (temp_desc);
-		}
+		status = acpi_ex_do_concatenate (operand[0], operand[1], &return_desc, walk_state);
 		break;
 
 
@@ -407,35 +369,25 @@ acpi_ex_opcode_2A_1T_1R (
 			goto cleanup;
 		}
 
-		/* Create the internal return object */
+		/* Allocate a new string (Length + 1 for null terminator) */
 
-		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_STRING);
+		return_desc = acpi_ut_create_string_object (length + 1);
 		if (!return_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
 
-		/* Allocate a new string buffer (Length + 1 for null terminator) */
+		/* Copy the raw buffer data with no transform. NULL terminated already. */
 
-		return_desc->string.pointer = ACPI_MEM_CALLOCATE (length + 1);
-		if (!return_desc->string.pointer) {
-			status = AE_NO_MEMORY;
-			goto cleanup;
-		}
-
-		/* Copy the raw buffer data with no transform */
-
-		ACPI_MEMCPY (return_desc->string.pointer, operand[0]->buffer.pointer, length);
-
-		/* Set the string length */
-
-		return_desc->string.length = (u32) length;
+		ACPI_MEMCPY (return_desc->string.pointer,
+			operand[0]->buffer.pointer, length);
 		break;
 
 
 	case AML_CONCAT_RES_OP:         /* concatenate_res_template (Buffer, Buffer, Result) (ACPI 2.0) */
 
-		status = acpi_ex_concat_template (operand[0], operand[1], &return_desc, walk_state);
+		status = acpi_ex_concat_template (operand[0], operand[1],
+				 &return_desc, walk_state);
 		break;
 
 
@@ -458,7 +410,8 @@ acpi_ex_opcode_2A_1T_1R (
 			/* Object to be indexed is a Package */
 
 			if (index >= operand[0]->package.count) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Index value (%X) beyond package end (%X)\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Index value (%X) beyond package end (%X)\n",
 					index, operand[0]->package.count));
 				status = AE_AML_PACKAGE_LIMIT;
 				goto cleanup;
@@ -472,7 +425,8 @@ acpi_ex_opcode_2A_1T_1R (
 			/* Object to be indexed is a Buffer */
 
 			if (index >= operand[0]->buffer.length) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Index value (%X) beyond end of buffer (%X)\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Index value (%X) beyond end of buffer (%X)\n",
 					index, operand[0]->buffer.length));
 				status = AE_AML_BUFFER_LIMIT;
 				goto cleanup;
@@ -572,18 +526,15 @@ acpi_ex_opcode_2A_0T_1R (
 	/*
 	 * Execute the Opcode
 	 */
-	if (walk_state->op_info->flags & AML_LOGICAL) /* logical_op (Operand0, Operand1) */ {
-		/* Both operands must be of the same type */
-
-		if (ACPI_GET_OBJECT_TYPE (operand[0]) !=
-			ACPI_GET_OBJECT_TYPE (operand[1])) {
-			status = AE_AML_OPERAND_TYPE;
-			goto cleanup;
-		}
-
-		logical_result = acpi_ex_do_logical_op (walk_state->opcode,
-				 operand[0],
-				 operand[1]);
+	if (walk_state->op_info->flags & AML_LOGICAL_NUMERIC) /* logical_op (Operand0, Operand1) */ {
+		status = acpi_ex_do_logical_numeric_op (walk_state->opcode,
+				  operand[0]->integer.value, operand[1]->integer.value,
+				  &logical_result);
+		goto store_logical_result;
+	}
+	else if (walk_state->op_info->flags & AML_LOGICAL)  /* logical_op (Operand0, Operand1) */ {
+		status = acpi_ex_do_logical_op (walk_state->opcode, operand[0],
+				 operand[1], &logical_result);
 		goto store_logical_result;
 	}
 

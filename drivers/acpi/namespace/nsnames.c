@@ -202,7 +202,11 @@ acpi_ns_get_pathname_length (
 		next_node = acpi_ns_get_parent_node (next_node);
 	}
 
-	return (size + 1);
+	if (!size) {
+		size = 1;       /* Root node case */
+	}
+
+	return (size + 1);  /* +1 for null string terminator */
 }
 
 
