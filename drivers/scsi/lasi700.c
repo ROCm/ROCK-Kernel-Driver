@@ -76,6 +76,7 @@ static struct parisc_driver lasi700_driver = {
 	.name =		"Lasi SCSI",
 	.id_table =	lasi700_scsi_tbl,
 	.probe =	lasi700_driver_callback,
+	.remove =	__devexit_p(lasi700_driver_remove),
 };
 
 static int __init
@@ -97,12 +98,6 @@ lasi700_driver_callback(struct parisc_device *dev)
 	}
 	memset(hostdata, 0, sizeof(struct NCR_700_Host_Parameters));
 
-	if (!request_mem_region(base, 64, dev->dev.name)) {
-		printk(KERN_ERR "%s: Failed to claim memory region\n",
-		       dev->dev.name);
-		goto out_kfree;
-	}
-
 	hostdata->dev = &dev->dev;
 	dma_set_mask(&dev->dev, 0xffffffffUL);
 	hostdata->base = base;
@@ -122,7 +117,7 @@ lasi700_driver_callback(struct parisc_device *dev)
 
 	host = NCR_700_detect(&lasi700_template, hostdata);
 	if (!host)
-		goto out_release_mem_region;
+		goto out_kfree;
 
 	host->irq = dev->irq;
 	if (request_irq(dev->irq, NCR_700_intr, SA_SHIRQ,
@@ -132,33 +127,33 @@ lasi700_driver_callback(struct parisc_device *dev)
 		goto out_put_host;
 	}
 
+	dev_set_drvdata(&dev->dev, host);
 	scsi_add_host(host, &dev->dev);
+
 	return 0;
 
  out_put_host:
 	scsi_host_put(host);
- out_release_mem_region:
-	release_mem_region(base, 64);
+
  out_kfree:
 	kfree(hostdata);
-	return 1;
+	return -ENODEV;
 }
 
-#if 0
-static int
-lasi700_release(struct Scsi_Host *host)
+static int __exit
+lasi700_driver_remove(struct parisc_device *dev)
 {
-	struct D700_Host_Parameters *hostdata = 
-		(struct D700_Host_Parameters *)host->hostdata[0];
+	struct Scsi_Host *host = dev_get_drvdata(&dev->dev);
+	struct NCR_700_Host_Parameters *hostdata = 
+		(struct NCR_700_Host_Parameters *)host->hostdata[0];
 
+	scsi_remove_host(host);
 	NCR_700_release(host);
-	kfree(hostdata);
 	free_irq(host->irq, host);
-	release_mem_region(host->base, 64);
-	unregister_parisc_driver(&lasi700_driver);
-	return 1;
+	kfree(hostdata);
+
+	return 0;
 }
-#endif
 
 static int __init
 lasi700_init(void)
@@ -166,4 +161,12 @@ lasi700_init(void)
 	return register_parisc_driver(&lasi700_driver);
 }
 
+static void __exit
+lasi700_exit(void)
+{
+	unregister_parisc_driver(&lasi700_driver);
+	scsi_sysfs_release_attributes(&lasi700_template);
+}
+
 module_init(lasi700_init);
+module_exit(lasi700_exit);

@@ -2379,7 +2379,6 @@ static int ibmmca_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start,
 {
 	int len = 0;
 	int i, id, lun, host_index;
-	struct Scsi_Host *shpnt;
 	unsigned long flags;
 	int max_pun;
 
@@ -2450,11 +2449,6 @@ static int ibmmca_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start,
 		len = length;
 	spin_unlock_irqrestore(shpnt->host_lock, flags);
 	return len;
-}
-
-static void ibmmca_scsi_setup(char *str, int *ints)
-{
-	internal_ibmmca_scsi_setup(str, ints);
 }
 
 static int option_setup(char *str)

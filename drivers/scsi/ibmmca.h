@@ -13,7 +13,6 @@
 /* Interfaces to the midlevel Linux SCSI driver */
 static int ibmmca_detect (Scsi_Host_Template *);
 static int ibmmca_release (struct Scsi_Host *);
-static int ibmmca_command (Scsi_Cmnd *);
 static int ibmmca_queuecommand (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int ibmmca_abort (Scsi_Cmnd *);
 static int ibmmca_host_reset (Scsi_Cmnd *);

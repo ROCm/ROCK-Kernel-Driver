@@ -32,7 +32,7 @@ struct scsi_request {
 	unsigned sr_bufflen;	/* Size of data buffer */
 	void *sr_buffer;		/* Data buffer */
 	int sr_allowed;
-	unsigned char sr_data_direction;
+	enum dma_data_direction sr_data_direction;
 	unsigned char sr_cmd_len;
 	unsigned char sr_cmnd[MAX_COMMAND_SIZE];
 	void (*sr_done) (struct scsi_cmnd *);	/* Mid-level done function */
@@ -54,5 +54,20 @@ extern void scsi_do_req(struct scsi_request *, const void *cmnd,
 			void *buffer, unsigned bufflen,
 			void (*done) (struct scsi_cmnd *),
 			int timeout, int retries);
+
+struct scsi_mode_data {
+	__u16	length;
+	__u16	block_descriptor_length;
+	__u8	medium_type;
+	__u8	device_specific;
+	__u8	header_length;
+	__u8	longlba:1;
+};
+
+extern int __scsi_mode_sense(struct scsi_request *SRpnt, int dbd,
+			     int modepage, unsigned char *buffer, int len,
+			     int timeout, int retries,
+			     struct scsi_mode_data *data);
+
 
 #endif /* _SCSI_SCSI_REQUEST_H */
