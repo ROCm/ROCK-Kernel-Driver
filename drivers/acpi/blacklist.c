@@ -69,6 +69,27 @@ static struct acpi_blacklist_item acpi_blacklist[] __initdata =
 	{""}
 };
 
+#define	ACPI_BLACKLIST_CUTOFF_YEAR	2001
+
+/*
+ * Notice: this is called from dmi_scan.c, which contains second (!) blacklist
+ */
+void __init
+acpi_bios_year(char *s)
+{
+	int year, disable = 0;
+
+	year = simple_strtoul(s,NULL,0); 
+	if (year >= 1000) 
+		disable = year < ACPI_BLACKLIST_CUTOFF_YEAR; 
+	else if (year < 1 || (year > 90 && year <= 99))
+		disable = 1; 
+	if (disable) { 
+		printk(KERN_NOTICE "ACPI disabled because your bios is from %s and too old\n", s);
+		printk(KERN_NOTICE "You can enable it with acpi=force\n");
+		acpi_disabled = 1; 
+	}
+}
 
 int __init
 acpi_blacklisted(void)

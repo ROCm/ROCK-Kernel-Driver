@@ -4,7 +4,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <asm/acpi.h>
+#include <linux/acpi.h>
 #include <asm/io.h>
 #include <linux/pm.h>
 #include <asm/system.h>
@@ -454,24 +454,10 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 static __init void dmi_check_blacklist(void)
 {
 #ifdef	CONFIG_ACPI_BOOT
-#define	ACPI_BLACKLIST_CUTOFF_YEAR	2001
-
 	if (dmi_ident[DMI_BIOS_DATE]) { 
 		char *s = strrchr(dmi_ident[DMI_BIOS_DATE], '/'); 
-		if (s) { 
-			int year, disable = 0;
-			s++; 
-			year = simple_strtoul(s,NULL,0); 
-			if (year >= 1000) 
-				disable = year < ACPI_BLACKLIST_CUTOFF_YEAR; 
-			else if (year < 1 || (year > 90 && year <= 99))
-				disable = 1; 
-			if (disable && !acpi_force) { 
-				printk(KERN_NOTICE "ACPI disabled because your bios is from %s and too old\n", s);
-				printk(KERN_NOTICE "You can enable it with acpi=force\n");
-				disable_acpi();
-			} 
-		}
+ 		if (s && !acpi_force)
+ 			acpi_bios_year(s+1);
 	}
 #endif
  	dmi_check_system(dmi_blacklist);
