@@ -116,28 +116,6 @@ static int ramfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	return ramfs_mknod(dir, dentry, mode | S_IFREG, 0);
 }
 
-static int ramfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
-			 struct kstat *stat)
-{
-	struct inode *inode = dentry->d_inode;
-
-	stat->dev = inode->i_sb->s_dev;
-	stat->ino = inode->i_ino;
-	stat->mode = inode->i_mode;
-	stat->nlink = inode->i_nlink;
-	stat->uid = inode->i_uid;
-	stat->gid = inode->i_gid;
-	stat->rdev = kdev_t_to_nr(inode->i_rdev);
-	stat->atime = inode->i_atime;
-	stat->mtime = inode->i_mtime;
-	stat->ctime = inode->i_ctime;
-	stat->size = inode->i_size;
-	stat->blocks = inode->i_mapping->nrpages << (PAGE_CACHE_SHIFT - 9);
-	stat->blksize = inode->i_blksize;
-
-	return 0;
-}
-
 static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
 {
 	struct inode *inode;
@@ -171,7 +149,7 @@ static struct file_operations ramfs_file_operations = {
 };
 
 static struct inode_operations ramfs_file_inode_operations = {
-	.getattr	= ramfs_getattr,
+	.getattr	= simple_getattr,
 };
 
 static struct inode_operations ramfs_dir_inode_operations = {

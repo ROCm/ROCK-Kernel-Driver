@@ -299,6 +299,7 @@ EXPORT_SYMBOL(dcache_dir_open);
 EXPORT_SYMBOL(dcache_dir_close);
 EXPORT_SYMBOL(dcache_dir_lseek);
 EXPORT_SYMBOL(dcache_readdir);
+EXPORT_SYMBOL(simple_getattr);
 EXPORT_SYMBOL(simple_statfs);
 EXPORT_SYMBOL(simple_lookup);
 EXPORT_SYMBOL(simple_dir_operations);
