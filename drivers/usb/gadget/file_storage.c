@@ -239,12 +239,14 @@
 #include <linux/usb_ch9.h>
 #include <linux/usb_gadget.h>
 
+#include "gadget_chips.h"
+
 
 /*-------------------------------------------------------------------------*/
 
 #define DRIVER_DESC		"File-backed Storage Gadget"
 #define DRIVER_NAME		"g_file_storage"
-#define DRIVER_VERSION		"26 January 2004"
+#define DRIVER_VERSION		"21 March 2004"
 
 static const char longname[] = DRIVER_DESC;
 static const char shortname[] = DRIVER_NAME;
@@ -261,147 +263,11 @@ MODULE_LICENSE("Dual BSD/GPL");
 #define DRIVER_PRODUCT_ID	0xa4a5	// Linux-USB File-backed Storage Gadget
 
 
-/*-------------------------------------------------------------------------*/
-
 /*
  * This driver assumes self-powered hardware and has no way for users to
- * trigger remote wakeup.
+ * trigger remote wakeup.  It uses autoconfiguration to select endpoints
+ * and endpoint addresses.
  */
-
-
-/*
- * Hardware-specific configuration, controlled by which device
- * controller driver was configured.
- *
- * CHIP ... hardware identifier
- * DRIVER_VERSION_NUM ... alerts the host side driver to differences
- * EP_*_NAME ... which endpoints do we use for which purpose?
- * EP_*_NUM ... numbers for them (often limited by hardware)
- * FS_BULK_IN_MAXPACKET ... maxpacket value for full-speed bulk-in ep
- * FS_BULK_OUT_MAXPACKET ... maxpacket value for full-speed bulk-out ep
- * NO_BULK_STALL ... bulk endpoint halts don't work well so avoid them
- */
-
-
-/*
- * NetChip 2280, PCI based.
- *
- * This has half a dozen configurable endpoints, four with dedicated
- * DMA channels to manage their FIFOs.  It supports high speed.
- * Those endpoints can be arranged in any desired configuration.
- */
-#ifdef	CONFIG_USB_GADGET_NET2280
-#define CHIP			"net2280"
-#define DRIVER_VERSION_NUM	0x0201
-static const char EP_BULK_IN_NAME[] = "ep-a";
-#define EP_BULK_IN_NUM		1
-#define FS_BULK_IN_MAXPACKET	64
-static const char EP_BULK_OUT_NAME[] = "ep-b";
-#define EP_BULK_OUT_NUM		2
-#define FS_BULK_OUT_MAXPACKET	64
-static const char EP_INTR_IN_NAME[] = "ep-e";
-#define EP_INTR_IN_NUM		5
-#endif
-
-
-/*
- * Dummy_hcd, software-based loopback controller.
- *
- * This imitates the abilities of the NetChip 2280, so we will use
- * the same configuration.
- */
-#ifdef	CONFIG_USB_GADGET_DUMMY_HCD
-#define CHIP			"dummy"
-#define DRIVER_VERSION_NUM	0x0202
-static const char EP_BULK_IN_NAME[] = "ep-a";
-#define EP_BULK_IN_NUM		1
-#define FS_BULK_IN_MAXPACKET	64
-static const char EP_BULK_OUT_NAME[] = "ep-b";
-#define EP_BULK_OUT_NUM		2
-#define FS_BULK_OUT_MAXPACKET	64
-static const char EP_INTR_IN_NAME[] = "ep-e";
-#define EP_INTR_IN_NUM		5
-#endif
-
-
-/*
- * PXA-2xx UDC:  widely used in second gen Linux-capable PDAs.
- *
- * This has fifteen fixed-function full speed endpoints, and it
- * can support all USB transfer types.
- *
- * These supports three or four configurations, with fixed numbers.
- * The hardware interprets SET_INTERFACE, net effect is that you
- * can't use altsettings or reset the interfaces independently.
- * So stick to a single interface.
- */
-#ifdef	CONFIG_USB_GADGET_PXA2XX
-#define CHIP			"pxa2xx"
-#define DRIVER_VERSION_NUM	0x0203
-static const char EP_BULK_IN_NAME[] = "ep1in-bulk";
-#define EP_BULK_IN_NUM		1
-#define FS_BULK_IN_MAXPACKET	64
-static const char EP_BULK_OUT_NAME[] = "ep2out-bulk";
-#define EP_BULK_OUT_NUM		2
-#define FS_BULK_OUT_MAXPACKET	64
-static const char EP_INTR_IN_NAME[] = "ep6in-bulk";
-#define EP_INTR_IN_NUM		6
-#endif
-
-
-/*
- * SuperH UDC:  UDC built-in to some Renesas SH processors.
- *
- * This has three fixed-function full speed bulk/interrupt endpoints.
- *
- * Only one configuration and interface is supported (SET_CONFIGURATION
- * and SET_INTERFACE are handled completely by the hardware).
- */
-#ifdef	CONFIG_USB_GADGET_SUPERH
-#define CHIP			"superh"
-#define DRIVER_VERSION_NUM	0x0205
-static const char EP_BULK_IN_NAME[] = "ep2in-bulk";
-#define EP_BULK_IN_NUM		2
-#define FS_BULK_IN_MAXPACKET	64
-static const char EP_BULK_OUT_NAME[] = "ep1out-bulk";
-#define EP_BULK_OUT_NUM		1
-#define FS_BULK_OUT_MAXPACKET	64
-static const char EP_INTR_IN_NAME[] = "ep3in-bulk";
-#define EP_INTR_IN_NUM		3
-#define NO_BULK_STALL
-#endif
-
-
-/*
- * Toshiba TC86C001 ("Goku-S") UDC
- *
- * This has three semi-configurable full speed bulk/interrupt endpoints.
- */
-#ifdef	CONFIG_USB_GADGET_GOKU
-#define CHIP			"goku"
-#define DRIVER_VERSION_NUM	0x0206
-static const char EP_BULK_OUT_NAME [] = "ep1-bulk";
-#define EP_BULK_OUT_NUM		1
-#define FS_BULK_IN_MAXPACKET	64
-static const char EP_BULK_IN_NAME [] = "ep2-bulk";
-#define EP_BULK_IN_NUM		2
-#define FS_BULK_OUT_MAXPACKET	64
-static const char EP_INTR_IN_NAME [] = "ep3-bulk";
-#define EP_INTR_IN_NUM		3
-#endif
-
-
-/*-------------------------------------------------------------------------*/
-
-#ifndef CHIP
-#	error Configure some USB peripheral controller driver!
-#endif
-
-#ifdef NO_BULK_STALL
-#define CAN_STALL	0
-#else
-#define CAN_STALL	1
-#endif
 
 
 /*-------------------------------------------------------------------------*/
@@ -493,9 +359,9 @@ static struct {
 	.removable		= 0,
 	.vendor			= DRIVER_VENDOR_ID,
 	.product		= DRIVER_PRODUCT_ID,
-	.release		= DRIVER_VERSION_NUM,
+	.release		= 0xffff,	// Use controller chip type
 	.buflen			= 16384,
-	.can_stall		= CAN_STALL,
+	.can_stall		= 1,
 	};
 
 
@@ -984,7 +850,7 @@ device_desc = {
 	/* The next three values can be overridden by module parameters */
 	.idVendor =		__constant_cpu_to_le16(DRIVER_VENDOR_ID),
 	.idProduct =		__constant_cpu_to_le16(DRIVER_PRODUCT_ID),
-	.bcdDevice =		__constant_cpu_to_le16(DRIVER_VERSION_NUM),
+	.bcdDevice =		__constant_cpu_to_le16(0xffff),
 
 	.iManufacturer =	STRING_MANUFACTURER,
 	.iProduct =		STRING_PRODUCT,
@@ -1011,41 +877,41 @@ intf_desc = {
 	.bLength =		sizeof intf_desc,
 	.bDescriptorType =	USB_DT_INTERFACE,
 
-	.bNumEndpoints =	2,		// Adjusted during bind()
+	.bNumEndpoints =	2,		// Adjusted during fsg_bind()
 	.bInterfaceClass =	USB_CLASS_MASS_STORAGE,
-	.bInterfaceSubClass =	USB_SC_SCSI,	// Adjusted during bind()
-	.bInterfaceProtocol =	USB_PR_BULK,	// Adjusted during bind()
+	.bInterfaceSubClass =	USB_SC_SCSI,	// Adjusted during fsg_bind()
+	.bInterfaceProtocol =	USB_PR_BULK,	// Adjusted during fsg_bind()
 };
 
 /* Three full-speed endpoint descriptors: bulk-in, bulk-out,
  * and interrupt-in. */
 
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 fs_bulk_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_BULK_IN_NUM | USB_DIR_IN,
+	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16(FS_BULK_IN_MAXPACKET),
+	/* wMaxPacketSize set by autoconfiguration */
 };
 
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 fs_bulk_out_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_BULK_OUT_NUM,
+	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16(FS_BULK_OUT_MAXPACKET),
+	/* wMaxPacketSize set by autoconfiguration */
 };
 
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 fs_intr_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_INTR_IN_NUM | USB_DIR_IN,
+	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	__constant_cpu_to_le16(2),
 	.bInterval =		32,	// frames -> 32 ms
@@ -1086,6 +952,7 @@ hs_bulk_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
+	/* bEndpointAddress copied from fs_bulk_in_desc during fsg_bind() */
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
 };
@@ -1095,6 +962,7 @@ hs_bulk_out_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
+	/* bEndpointAddress copied from fs_bulk_out_desc during fsg_bind() */
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
 	.bInterval =		1,	// NAK every 1 uframe
@@ -1105,6 +973,7 @@ hs_intr_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
+	/* bEndpointAddress copied from fs_intr_in_desc during fsg_bind() */
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	__constant_cpu_to_le16(2),
 	.bInterval =		9,	// 2**(9-1) = 256 uframes -> 32 ms
@@ -2137,7 +2006,7 @@ static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 	buf[4] = 31;		// Additional length
 				// No special options
 	sprintf(buf + 8, "%-8s%-16s%04x", vendor_id, product_id,
-			DRIVER_VERSION_NUM);
+			mod_data.release);
 	return 36;
 }
 
@@ -3816,6 +3685,34 @@ static int __init check_parameters(struct fsg_dev *fsg)
 	mod_data.protocol_type = USB_SC_SCSI;
 	mod_data.protocol_name = "Transparent SCSI";
 
+	if (gadget_is_sh(fsg->gadget))
+		mod_data.can_stall = 0;
+
+	if (mod_data.release == 0xffff) {	// Parameter wasn't set
+		if (gadget_is_net2280(fsg->gadget))
+			mod_data.release = __constant_cpu_to_le16(0x0301);
+		else if (gadget_is_dummy(fsg->gadget))
+			mod_data.release = __constant_cpu_to_le16(0x0302);
+		else if (gadget_is_pxa(fsg->gadget))
+			mod_data.release = __constant_cpu_to_le16(0x0303);
+		else if (gadget_is_sh(fsg->gadget))
+			mod_data.release = __constant_cpu_to_le16(0x0304);
+
+		/* The sa1100 controller is not supported */
+
+		else if (gadget_is_goku(fsg->gadget))
+			mod_data.release = __constant_cpu_to_le16(0x0306);
+		else if (gadget_is_mq11xx(fsg->gadget))
+			mod_data.release = __constant_cpu_to_le16(0x0307);
+		else if (gadget_is_omap(fsg->gadget))
+			mod_data.release = __constant_cpu_to_le16(0x0308);
+		else {
+			WARN(fsg, "controller '%s' not recognized\n",
+				fsg->gadget->name);
+			mod_data.release = __constant_cpu_to_le16(0x0399);
+		}
+	}
+
 	prot = simple_strtol(mod_data.protocol_parm, NULL, 0);
 
 #ifdef CONFIG_USB_FILE_STORAGE_TEST
@@ -3828,7 +3725,7 @@ static int __init check_parameters(struct fsg_dev *fsg)
 		mod_data.transport_type = USB_PR_CBI;
 		mod_data.transport_name = "Control-Bulk-Interrupt";
 	} else {
-		INFO(fsg, "invalid transport: %s\n", mod_data.transport_parm);
+		ERROR(fsg, "invalid transport: %s\n", mod_data.transport_parm);
 		return -EINVAL;
 	}
 
@@ -3857,13 +3754,13 @@ static int __init check_parameters(struct fsg_dev *fsg)
 		mod_data.protocol_type = USB_SC_8070;
 		mod_data.protocol_name = "8070i";
 	} else {
-		INFO(fsg, "invalid protocol: %s\n", mod_data.protocol_parm);
+		ERROR(fsg, "invalid protocol: %s\n", mod_data.protocol_parm);
 		return -EINVAL;
 	}
 
 	mod_data.buflen &= PAGE_CACHE_MASK;
 	if (mod_data.buflen <= 0) {
-		INFO(fsg, "invalid buflen\n");
+		ERROR(fsg, "invalid buflen\n");
 		return -ETOOSMALL;
 	}
 #endif /* CONFIG_USB_FILE_STORAGE_TEST */
@@ -3901,7 +3798,7 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	if (i == 0)
 		i = max(mod_data.num_filenames, 1);
 	if (i > MAX_LUNS) {
-		INFO(fsg, "invalid number of LUNs: %d\n", i);
+		ERROR(fsg, "invalid number of LUNs: %d\n", i);
 		rc = -EINVAL;
 		goto out;
 	}
@@ -3930,10 +3827,31 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 			if ((rc = open_backing_file(curlun, file[i])) != 0)
 				goto out;
 		} else if (!mod_data.removable) {
-			INFO(fsg, "no file given for LUN%d\n", i);
+			ERROR(fsg, "no file given for LUN%d\n", i);
 			rc = -EINVAL;
 			goto out;
 		}
+	}
+
+	/* Find all the endpoints we will use */
+	ep = usb_ep_autoconfig(gadget, &fs_bulk_in_desc);
+	if (!ep)
+		goto autoconf_fail;
+	ep->driver_data = fsg;		// claim the endpoint
+	fsg->bulk_in = ep;
+
+	ep = usb_ep_autoconfig(gadget, &fs_bulk_out_desc);
+	if (!ep)
+		goto autoconf_fail;
+	ep->driver_data = fsg;		// claim the endpoint
+	fsg->bulk_out = ep;
+
+	if (transport_is_cbi()) {
+		ep = usb_ep_autoconfig(gadget, &fs_intr_in_desc);
+		if (!ep)
+			goto autoconf_fail;
+		ep->driver_data = fsg;		// claim the endpoint
+		fsg->intr_in = ep;
 	}
 
 	/* Fix up the descriptors */
@@ -3959,22 +3877,6 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	hs_bulk_out_desc.bEndpointAddress = fs_bulk_out_desc.bEndpointAddress;
 	hs_intr_in_desc.bEndpointAddress = fs_intr_in_desc.bEndpointAddress;
 #endif
-
-	/* Find all the endpoints we will use */
-	gadget_for_each_ep(ep, gadget) {
-		if (strcmp(ep->name, EP_BULK_IN_NAME) == 0)
-			fsg->bulk_in = ep;
-		else if (strcmp(ep->name, EP_BULK_OUT_NAME) == 0)
-			fsg->bulk_out = ep;
-		else if (strcmp(ep->name, EP_INTR_IN_NAME) == 0)
-			fsg->intr_in = ep;
-	}
-	if (!fsg->bulk_in || !fsg->bulk_out ||
-			(transport_is_cbi() && !fsg->intr_in)) {
-		DBG(fsg, "unable to find all endpoints\n");
-		rc = -ENOTSUPP;
-		goto out;
-	}
 
 	rc = -ENOMEM;
 
@@ -4054,6 +3956,10 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 			mod_data.buflen);
 	DBG(fsg, "I/O thread pid: %d\n", fsg->thread_pid);
 	return 0;
+
+autoconf_fail:
+	ERROR(fsg, "unable to autoconfigure all endpoints\n");
+	rc = -ENOTSUPP;
 
 out:
 	fsg->state = FSG_STATE_TERMINATED;	// The thread is dead
