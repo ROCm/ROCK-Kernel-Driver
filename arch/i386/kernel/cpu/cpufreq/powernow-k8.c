@@ -949,7 +949,7 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 		if ((num_online_cpus() != 1) || (num_possible_cpus() != 1)) {
 			printk(KERN_INFO PFX "MP systems not supported by PSB BIOS structure\n");
 			kfree(data);
-			return 0;
+			return -ENODEV;
 		}
 		rc = find_psb_table(data);
 		if (rc) {
