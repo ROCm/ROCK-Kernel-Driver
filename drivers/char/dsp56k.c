@@ -293,10 +293,10 @@ static ssize_t dsp56k_write(struct file *file, const char *buf, size_t count,
 		}
 		case 2:  /* 16 bit */
 		{
-			short *data;
+			const short *data;
 
 			count /= 2;
-			data = (short*) buf;
+			data = (const short *)buf;
 			handshake(count, dsp56k.maxio, dsp56k.timeout, DSP56K_TRANSMIT,
 				  get_user(dsp56k_host_interface.data.w[1], data+n++));
 			return 2*n;
@@ -312,10 +312,10 @@ static ssize_t dsp56k_write(struct file *file, const char *buf, size_t count,
 		}
 		case 4:  /* 32 bit */
 		{
-			long *data;
+			const long *data;
 
 			count /= 4;
-			data = (long*) buf;
+			data = (const long *)buf;
 			handshake(count, dsp56k.maxio, dsp56k.timeout, DSP56K_TRANSMIT,
 				  get_user(dsp56k_host_interface.data.l, data+n++));
 			return 4*n;
