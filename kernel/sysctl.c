@@ -166,6 +166,7 @@ static void register_proc_table(ctl_table *, struct proc_dir_entry *);
 static void unregister_proc_table(ctl_table *, struct proc_dir_entry *);
 #endif
 
+static unsigned int __HZ = HZ;
 /* The default sysctl tables: */
 
 static ctl_table root_table[] = {
@@ -625,6 +626,30 @@ static ctl_table kern_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &min_ngroups,
 		.extra2		= &max_ngroups,
+	},
+	{
+		.ctl_name	= KERN_MAXTIMESLICE, 
+		.procname	= "max-timeslice",
+		.data		=  &max_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_MINTIMESLICE, 
+		.procname	= "min-timeslice",
+		.data		= &min_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_HZ, 
+		.procname	= "HZ",
+		.data		= &__HZ,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
 	},
 	{ .ctl_name = 0 }
 };

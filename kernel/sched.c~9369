@@ -3816,7 +3816,7 @@ static void __init arch_init_sched_domains(void)
 #endif /* CONFIG_NUMA */
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
-#undef SCHED_DOMAIN_DEBUG
+#define SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
 void sched_domain_debug(void)
 {
@@ -4006,13 +4006,6 @@ void __might_sleep(char *file, int line)
 EXPORT_SYMBOL(__might_sleep);
 #endif
 
-static int __init init_desktop(char *str)
-{
-	min_timeslice = __MIN_TIMESLICE_DESKTOP;
-	max_timeslice = __MAX_TIMESLICE_DESKTOP;
-	return 1;
-}
-__setup("desktop", init_desktop);
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
 /*

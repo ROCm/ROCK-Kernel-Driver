@@ -133,6 +133,9 @@ enum
 	KERN_NGROUPS_MAX=63,	/* int: NGROUPS_MAX */
 	KERN_SPARC_SCONS_PWROFF=64, /* int: serial console power-off halt */
 	KERN_HZ_TIMER=65,	/* int: hz timer on or off */
+	KERN_MAXTIMESLICE=66,	/* int: nice -20 max timeslice */
+	KERN_MINTIMESLICE=67,	/* int: nice +19 min timeslice */
+	KERN_HZ=68,		/* unsigned long: internal kernel HZ */
 };
 
 
