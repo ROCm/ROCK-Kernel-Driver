@@ -354,6 +354,7 @@ nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read 
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	nfsd4_lock_state();
 	status = nfs_ok;
 	/* For stateid -1, we don't check share reservations.  */
 	if (ONE_STATEID(&read->rd_stateid)) {
@@ -386,6 +387,7 @@ nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read 
 	}
 	status = nfs_ok;
 out:
+	nfsd4_unlock_state();
 	read->rd_rqstp = rqstp;
 	read->rd_fhp = current_fh;
 	return status;
@@ -454,12 +456,14 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_se
 	int status = nfs_ok;
 
 	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
+
 		status = nfserr_bad_stateid;
 		if (ZERO_STATEID(&setattr->sa_stateid) || ONE_STATEID(&setattr->sa_stateid)) {
-		dprintk("NFSD: nfsd4_setattr: magic stateid!\n");
-		goto out;
+			dprintk("NFSD: nfsd4_setattr: magic stateid!\n");
+			return status;
 		}
 
+		nfsd4_lock_state();
 		if ((status = nfs4_preprocess_stateid_op(current_fh, 
 						&setattr->sa_stateid, 
 						CHECK_FH, &stp))) {
@@ -471,9 +475,11 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_se
 			dprintk("NFSD: nfsd4_setattr: not opened for write!\n");
 			goto out;
 		}
+		nfsd4_unlock_state();
 	}
-	status = nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr, 0, (time_t)0);
+	return (nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr, 0, (time_t)0));
 out:
+	nfsd4_unlock_state();
 	return status;
 }
 
@@ -490,6 +496,7 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	if (write->wr_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	nfsd4_lock_state();
 	if (ZERO_STATEID(stateid) || ONE_STATEID(stateid)) {
 		dprintk("NFSD: nfsd4_write: zero stateid...\n");
 		if ((status = nfs4_share_conflict(current_fh, NFS4_SHARE_DENY_WRITE))) {
@@ -511,17 +518,18 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	}
 
 zero_stateid:
-
+	nfsd4_unlock_state();
 	write->wr_bytes_written = write->wr_buflen;
 	write->wr_how_written = write->wr_stable_how;
 	p = (u32 *)write->wr_verifier;
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 
-	status = nfsd_write(rqstp, current_fh, write->wr_offset,
+	return (nfsd_write(rqstp, current_fh, write->wr_offset,
 			  write->wr_vec, write->wr_vlen, write->wr_buflen,
-			  &write->wr_how_written);
+			  &write->wr_how_written));
 out:
+	nfsd4_unlock_state();
 	return status;
 }
 

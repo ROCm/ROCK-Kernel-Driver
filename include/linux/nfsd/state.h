@@ -167,4 +167,6 @@ extern int nfs4_preprocess_stateid_op(struct svc_fh *current_fh,
 		stateid_t *stateid, int flags, struct nfs4_stateid **stpp);
 extern int nfs4_share_conflict(struct svc_fh *current_fh, 
 		unsigned int deny_type);
+extern void nfsd4_lock_state(void);
+extern void nfsd4_unlock_state(void);
 #endif   /* NFSD4_STATE_H */

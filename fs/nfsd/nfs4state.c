@@ -79,6 +79,18 @@ u32 vfsclose = 0;
  */
 static struct semaphore client_sema;
 
+void
+nfsd4_lock_state(void)
+{
+	down(&client_sema);
+}
+
+void
+nfsd4_unlock_state(void)
+{
+	up(&client_sema);
+}
+
 static inline u32
 opaque_hashval(const void *ptr, int nbytes)
 {
