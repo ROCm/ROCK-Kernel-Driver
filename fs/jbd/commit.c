@@ -337,6 +337,9 @@ write_out_data:
 	}
 	spin_unlock(&journal->j_list_lock);
 
+	if (err)
+		__journal_abort_hard(journal);
+
 	journal_write_revoke_records(journal, commit_transaction);
 
 	jbd_debug(3, "JBD: commit phase 2\n");
