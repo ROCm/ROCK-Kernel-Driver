@@ -398,5 +398,5 @@ endif
 if_changed = $(if $(strip $? \
 		          $(filter-out $($(1)),$(cmd_$(@F)))\
 			  $(filter-out $(cmd_$(@F)),$($(1)))),\
-	       @echo $($(1)) && $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
+	       @echo '$($(1))' && $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
 
