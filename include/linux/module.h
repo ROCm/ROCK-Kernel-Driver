@@ -445,6 +445,11 @@ int register_module_notifier(struct notifier_block * nb);
 int unregister_module_notifier(struct notifier_block * nb);
 
 extern void print_modules(void);
+
+struct device_driver;
+void module_add_driver(struct module *, struct device_driver *);
+void module_remove_driver(struct device_driver *);
+
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -534,6 +539,15 @@ static inline int unregister_module_notifier(struct notifier_block * nb)
 static inline void print_modules(void)
 {
 }
+
+static inline void module_add_driver(struct module *, struct device_driver *)
+{
+}
+
+static inline void module_remove_driver(struct device_driver *)
+{
+}
+
 #endif /* CONFIG_MODULES */
 
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
