@@ -167,108 +167,6 @@ static void us_transfer_freecom(Scsi_Cmnd *srb, struct us_data* us, int transfer
 	srb->result = result;
 }
 
-#if 0
-/* Write a value to an ide register. */
-static int
-freecom_ide_write (struct us_data *us, int reg, int value)
-{
-        freecom_udata_t extra = (freecom_udata_t) us->extra;
-        struct freecom_ide_out *ideout =
-                (struct freecom_ide_out *) extra->buffer;
-        int opipe;
-        int result, partial;
-
-        US_DEBUGP("IDE out 0x%02x <- 0x%02x\n", reg, value);
-
-        /* Get handles for both transports. */
-        opipe = usb_sndbulkpipe (us->pusb_dev, us->ep_out);
-
-        if (reg < 0 || reg > 8)
-                return USB_STOR_TRANSPORT_ERROR;
-        if (reg < 8)
-                reg |= 0x20;
-        else
-                reg = 0x0e;
-
-        ideout->Type = FCM_PACKET_IDE_WRITE | reg;
-        ideout->Pad = 0;
-        ideout->Value = cpu_to_le16 (value);
-        memset (ideout->Pad2, 0, sizeof (ideout->Pad2));
-
-        result = usb_stor_bulk_msg (us, ideout, opipe,
-                        FCM_PACKET_LENGTH, &partial);
-        if (result != 0) {
-                if (result == -ENOENT)
-                        return US_BULK_TRANSFER_ABORTED;
-                else
-                        return USB_STOR_TRANSPORT_ERROR;
-        }
-
-        return USB_STOR_TRANSPORT_GOOD;
-}
-
-/* Read a value from an ide register. */
-static int
-freecom_ide_read (struct us_data *us, int reg, int *value)
-{
-        freecom_udata_t extra = (freecom_udata_t) us->extra;
-        struct freecom_ide_in *idein =
-                (struct freecom_ide_in *) extra->buffer;
-        __u8 *buffer = extra->buffer;
-        int ipipe, opipe;
-        int result, partial;
-        int desired_length;
-
-        /* Get handles for both transports. */
-        opipe = usb_sndbulkpipe (us->pusb_dev, us->ep_out);
-        ipipe = usb_rcvbulkpipe (us->pusb_dev, us->ep_in);
-
-        if (reg < 0 || reg > 8)
-                return USB_STOR_TRANSPORT_ERROR;
-        if (reg < 8)
-                reg |= 0x10;
-        else
-                reg = 0x0e;
-
-        US_DEBUGP("IDE in request for register 0x%02x\n", reg);
-
-        idein->Type = FCM_PACKET_IDE_READ | reg;
-        memset (idein->Pad, 0, sizeof (idein->Pad));
-
-        result = usb_stor_bulk_msg (us, idein, opipe,
-                        FCM_PACKET_LENGTH, &partial);
-        if (result != 0) {
-                if (result == -ENOENT)
-                        return US_BULK_TRANSFER_ABORTED;
-                else
-                        return USB_STOR_TRANSPORT_ERROR;
-        }
-
-        desired_length = 1;
-        if (reg == 0x10)
-                desired_length = 2;
-
-        result = usb_stor_bulk_msg (us, buffer, ipipe,
-                        desired_length, &partial);
-        if (result != 0) {
-                if (result == -ENOENT)
-                        return US_BULK_TRANSFER_ABORTED;
-                else
-                        return USB_STOR_TRANSPORT_ERROR;
-        }
-        US_DEBUGP("IDE in partial is %d\n", partial);
-
-        if (desired_length == 1)
-                *value = buffer[0];
-        else
-                *value = le16_to_cpu (*(__u16 *) buffer);
-
-        US_DEBUGP("IDE in 0x%02x -> 0x%02x\n", reg, *value);
-
-        return USB_STOR_TRANSPORT_GOOD;
-}
-#endif
-
 static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
                 int ipipe, int opipe, int count)
@@ -292,8 +190,8 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
                 US_DEBUGP ("Freecom readdata xpot failure: r=%d, p=%d\n",
                                 result, partial);
 
-		/* -ENOENT -- we canceled this transfer */
-		if (result == -ENOENT) {
+		/* has the current command been aborted? */
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_readdata(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
@@ -333,8 +231,8 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
                 US_DEBUGP ("Freecom writedata xpot failure: r=%d, p=%d\n",
                                 result, partial);
 
-		/* -ENOENT -- we canceled this transfer */
-		if (result == -ENOENT) {
+		/* has the current command been aborted? */
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_writedata(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
@@ -396,8 +294,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                 US_DEBUGP ("freecom xport failure: r=%d, p=%d\n",
                                 result, partial);
 
-		/* -ENOENT -- we canceled this transfer */
-		if (result == -ENOENT) {
+		/* we canceled this transfer */
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_transport(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
@@ -410,8 +308,9 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         result = usb_stor_bulk_msg (us, fst, ipipe,
                         FCM_PACKET_LENGTH, &partial);
         US_DEBUGP("foo Status result %d %d\n", result, partial);
-	/* -ENOENT -- we canceled this transfer */
-	if (result == -ENOENT) {
+
+	/* we canceled this transfer */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("freecom_transport(): transfer aborted\n");
 		return US_BULK_TRANSFER_ABORTED;
 	}
@@ -448,8 +347,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP ("freecom xport failure: r=%d, p=%d\n",
 					result, partial);
 
-			/* -ENOENT -- we canceled this transfer */
-			if (result == -ENOENT) {
+			/* we canceled this transfer */
+			if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 				US_DEBUGP("freecom_transport(): transfer aborted\n");
 				return US_BULK_TRANSFER_ABORTED;
 			}
@@ -463,8 +362,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		US_DEBUGP("bar Status result %d %d\n", result, partial);
 
-		/* -ENOENT -- we canceled this transfer */
-		if (result == -ENOENT) {
+		/* we canceled this transfer */
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_transport(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
@@ -524,7 +423,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                 result = usb_stor_bulk_msg (us, fst, ipipe,
                                 FCM_PACKET_LENGTH, &partial);
 		US_DEBUG(pdump ((void *) fst, partial));
-                if (result == -ENOENT) {
+
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
                         US_DEBUGP ("freecom_transport: transfer aborted\n");
                         return US_BULK_TRANSFER_ABORTED;
                 }
@@ -552,7 +452,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                 US_DEBUGP("FCM: Waiting for status\n");
                 result = usb_stor_bulk_msg (us, fst, ipipe,
                                 FCM_PACKET_LENGTH, &partial);
-                if (result == -ENOENT) {
+
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
                         US_DEBUGP ("freecom_transport: transfer aborted\n");
                         return US_BULK_TRANSFER_ABORTED;
                 }
