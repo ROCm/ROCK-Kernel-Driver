@@ -26,6 +26,7 @@
 extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
 extern int do_remount_sb(struct super_block *sb, int flags, void * data);
 extern int __init init_rootfs(void);
+extern int __init sysfs_init(void);
 
 static struct list_head *mount_hashtable;
 static int hash_mask, hash_bits;
@@ -1132,6 +1133,7 @@ void __init mnt_init(unsigned long mempages)
 		d++;
 		i--;
 	} while (i);
+	sysfs_init();
 	init_rootfs();
 	init_mount_tree();
 }
