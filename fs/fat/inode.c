@@ -191,9 +191,9 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 	int isvfat = opts->isvfat;
 
 	if (opts->fs_uid != 0)
-		seq_printf(m, ",uid=%d", opts->fs_uid);
+		seq_printf(m, ",uid=%u", opts->fs_uid);
 	if (opts->fs_gid != 0)
-		seq_printf(m, ",gid=%d", opts->fs_gid);
+		seq_printf(m, ",gid=%u", opts->fs_gid);
 	seq_printf(m, ",fmask=%04o", opts->fs_fmask);
 	seq_printf(m, ",dmask=%04o", opts->fs_dmask);
 	if (sbi->nls_disk)
