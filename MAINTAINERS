@@ -1568,7 +1568,6 @@ P:	Wensong Zhang
 M:	wensong@linux-vs.org
 P:	Julian Anastasov
 M:	ja@ssi.bg
-L:	lvs-users@linuxvirtualserver.org
 S:	Maintained
 
 NFS CLIENT
