@@ -2194,6 +2194,12 @@ void uart_unregister_driver(struct uart_driver *drv)
 	kfree(drv->tty_driver);
 }
 
+kdev_t uart_console_device(struct console *co)
+{
+	struct uart_driver *p = co->data;
+	return mk_kdev(p->major, p->minor + co->index);
+}
+
 /**
  *	uart_add_one_port - attach a driver-defined port structure
  *	@drv: pointer to the uart low level driver structure for this port

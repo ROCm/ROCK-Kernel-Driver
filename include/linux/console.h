@@ -103,6 +103,7 @@ struct console
 	short	flags;
 	short	index;
 	int	cflag;
+	void	*data;
 	struct	 console *next;
 };
 

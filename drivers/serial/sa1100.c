@@ -760,11 +760,6 @@ sa1100_console_write(struct console *co, const char *s, unsigned int count)
 	UART_PUT_UTCR3(sport, old_utcr3);
 }
 
-static kdev_t sa1100_console_device(struct console *co)
-{
-	return mk_kdev(SERIAL_SA1100_MAJOR, MINOR_START + co->index);
-}
-
 /*
  * If the port was already initialised (eg, by a boot loader),
  * try to determine the current setup.
@@ -827,13 +822,15 @@ sa1100_console_setup(struct console *co, char *options)
 	return uart_set_options(&sport->port, co, baud, parity, bits, flow);
 }
 
+extern struct uart_driver sa1100_reg;
 static struct console sa1100_console = {
 	.name		= "ttySA",
 	.write		= sa1100_console_write,
-	.device		= sa1100_console_device,
+	.device		= uart_console_device,
 	.setup		= sa1100_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= sa1100_reg,
 };
 
 static int __init sa1100_rs_console_init(void)
