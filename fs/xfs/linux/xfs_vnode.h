@@ -600,7 +600,8 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 	(!list_empty(&(LINVFS_GET_IP(vp)->i_mapping->i_mmap)) || \
 	(!list_empty(&(LINVFS_GET_IP(vp)->i_mapping->i_mmap_shared))))
 #define VN_CACHED(vp)	(LINVFS_GET_IP(vp)->i_mapping->nrpages)
-#define VN_DIRTY(vp)	(!list_empty(&(LINVFS_GET_IP(vp)->i_mapping->dirty_pages)))
+#define VN_DIRTY(vp)	mapping_tagged(LINVFS_GET_IP(vp)->i_mapping, \
+					PAGECACHE_TAG_DIRTY)
 #define VMODIFY(vp)	VN_FLAGSET(vp, VMODIFIED)
 #define VUNMODIFY(vp)	VN_FLAGCLR(vp, VMODIFIED)
 

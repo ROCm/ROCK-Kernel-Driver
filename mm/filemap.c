@@ -100,9 +100,7 @@ void __remove_from_page_cache(struct page *page)
 	struct address_space *mapping = page->mapping;
 
 	radix_tree_delete(&mapping->page_tree, page->index);
-	list_del(&page->list);
 	page->mapping = NULL;
-
 	mapping->nrpages--;
 	pagecache_acct(-1);
 }
@@ -148,9 +146,6 @@ static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
 	if (mapping->backing_dev_info->memory_backed)
 		return 0;
 
-	spin_lock_irq(&mapping->tree_lock);
-	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
-	spin_unlock_irq(&mapping->tree_lock);
 	ret = do_writepages(mapping, &wbc);
 	return ret;
 }
@@ -190,11 +185,7 @@ restart:
 		struct page *page;
 
 		page = list_entry(mapping->locked_pages.next,struct page,list);
-		list_del(&page->list);
-		if (PageDirty(page))
-			list_add(&page->list, &mapping->dirty_pages);
-		else
-			list_add(&page->list, &mapping->clean_pages);
+		list_del_init(&page->list);
 
 		if (!PageWriteback(page)) {
 			if (++progress > 32) {
@@ -228,7 +219,6 @@ restart:
 
 	return ret;
 }
-
 EXPORT_SYMBOL(filemap_fdatawait);
 
 int filemap_write_and_wait(struct address_space *mapping)
@@ -539,7 +529,7 @@ EXPORT_SYMBOL(find_or_create_page);
  *
  * find_get_pages() returns the number of pages which were found.
  */
-unsigned int find_get_pages(struct address_space *mapping, pgoff_t start,
+unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 			    unsigned int nr_pages, struct page **pages)
 {
 	unsigned int i;
@@ -550,6 +540,27 @@ unsigned int find_get_pages(struct address_space *mapping, pgoff_t start,
 				(void **)pages, start, nr_pages);
 	for (i = 0; i < ret; i++)
 		page_cache_get(pages[i]);
+	spin_unlock_irq(&mapping->tree_lock);
+	return ret;
+}
+
+/*
+ * Like find_get_pages, except we only return pages which are tagged with
+ * `tag'.   We update *start to index the next page for the traversal.
+ */
+unsigned find_get_pages_tag(struct address_space *mapping, pgoff_t *index,
+			int tag, unsigned int nr_pages, struct page **pages)
+{
+	unsigned int i;
+	unsigned int ret;
+
+	spin_lock_irq(&mapping->tree_lock);
+	ret = radix_tree_gang_lookup_tag(&mapping->page_tree,
+				(void **)pages, *index, nr_pages, tag);
+	for (i = 0; i < ret; i++)
+		page_cache_get(pages[i]);
+	if (ret)
+		*index = pages[ret - 1]->index + 1;
 	spin_unlock_irq(&mapping->tree_lock);
 	return ret;
 }

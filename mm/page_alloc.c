@@ -682,6 +682,8 @@ nopage:
 	return NULL;
 got_pg:
 	kernel_map_pages(page, 1 << order, 1);
+	INIT_LIST_HEAD(&page->list);
+	INIT_LIST_HEAD(&page->lru);
 	return page;
 }
 

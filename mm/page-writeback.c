@@ -472,12 +472,8 @@ int write_one_page(struct page *page, int wait)
 	if (wait)
 		wait_on_page_writeback(page);
 
-	spin_lock_irq(&mapping->tree_lock);
-	list_del(&page->list);
 	if (test_clear_page_dirty(page)) {
-		list_add(&page->list, &mapping->locked_pages);
 		page_cache_get(page);
-		spin_unlock_irq(&mapping->tree_lock);
 		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
@@ -486,8 +482,6 @@ int write_one_page(struct page *page, int wait)
 		}
 		page_cache_release(page);
 	} else {
-		list_add(&page->list, &mapping->clean_pages);
-		spin_unlock_irq(&mapping->tree_lock);
 		unlock_page(page);
 	}
 	return ret;
@@ -495,9 +489,8 @@ int write_one_page(struct page *page, int wait)
 EXPORT_SYMBOL(write_one_page);
 
 /*
- * For address_spaces which do not use buffers.  Just set the page's dirty bit
- * and move it to the dirty_pages list.  Also perform space reservation if
- * required.
+ * For address_spaces which do not use buffers.  Just tag the page as dirty in
+ * its radix tree.
  *
  * __set_page_dirty_nobuffers() may return -ENOSPC.  But if it does, the page
  * is still safe, as long as it actually manages to find some blocks at
@@ -520,8 +513,6 @@ int __set_page_dirty_nobuffers(struct page *page)
 				BUG_ON(page->mapping != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
 					inc_page_state(nr_dirty);
-				list_del(&page->list);
-				list_add(&page->list, &mapping->dirty_pages);
 				radix_tree_tag_set(&mapping->page_tree,
 					page->index, PAGECACHE_TAG_DIRTY);
 			}
@@ -646,3 +637,19 @@ int test_set_page_writeback(struct page *page)
 
 }
 EXPORT_SYMBOL(test_set_page_writeback);
+
+/*
+ * Return true if any of the pages in the mapping are marged with the
+ * passed tag.
+ */
+int mapping_tagged(struct address_space *mapping, int tag)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&mapping->tree_lock, flags);
+	ret = radix_tree_tagged(&mapping->page_tree, tag);
+	spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL(mapping_tagged);

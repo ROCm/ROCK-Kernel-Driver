@@ -27,7 +27,6 @@ struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
 	.tree_lock	= SPIN_LOCK_UNLOCKED,
 	.clean_pages	= LIST_HEAD_INIT(swapper_space.clean_pages),
-	.dirty_pages	= LIST_HEAD_INIT(swapper_space.dirty_pages),
 	.io_pages	= LIST_HEAD_INIT(swapper_space.io_pages),
 	.locked_pages	= LIST_HEAD_INIT(swapper_space.locked_pages),
 	.a_ops		= &swap_aops,
@@ -210,7 +209,6 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 	if (!err) {
 		if (!swap_duplicate(entry))
 			BUG();
-		/* shift page from clean_pages to dirty_pages list */
 		BUG_ON(PageDirty(page));
 		set_page_dirty(page);
 		INC_CACHE_INFO(add_total);
@@ -245,7 +243,6 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 
 	if (!err) {
 		swap_free(entry);
-		/* shift page from clean_pages to dirty_pages list */
 		__clear_page_dirty(page);
 		set_page_dirty(page);
 	}

@@ -129,12 +129,6 @@ static void write_inode(struct inode *inode, int sync)
  * starvation of particular inodes when others are being redirtied, prevent
  * livelocks, etc.
  *
- * So what we do is to move all pages which are to be written from dirty_pages
- * onto io_pages.  And keep on writing io_pages until it's empty.  Refusing to
- * move more pages onto io_pages until io_pages is empty.  Once that point has
- * been reached, we are ready to take another pass across the inode's dirty
- * pages.
- *
  * Called under inode_lock.
  */
 static int
@@ -159,10 +153,6 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	 * read speculatively by this cpu before &= ~I_DIRTY  -- mikulas
 	 */
 
-	spin_lock_irq(&mapping->tree_lock);
-	if (wait || !wbc->for_kupdate || list_empty(&mapping->io_pages))
-		list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
-	spin_unlock_irq(&mapping->tree_lock);
 	spin_unlock(&inode_lock);
 
 	ret = do_writepages(mapping, wbc);
@@ -180,10 +170,7 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	spin_lock(&inode_lock);
 	inode->i_state &= ~I_LOCK;
 	if (!(inode->i_state & I_FREEING)) {
-		if (!list_empty(&mapping->io_pages)) {
-		 	/* Needs more writeback */
-			inode->i_state |= I_DIRTY_PAGES;
-		} else if (!list_empty(&mapping->dirty_pages)) {
+		if (mapping_tagged(mapping, PAGECACHE_TAG_DIRTY)) {
 			/* Redirtied */
 			inode->i_state |= I_DIRTY_PAGES;
 			inode->dirtied_when = jiffies;
