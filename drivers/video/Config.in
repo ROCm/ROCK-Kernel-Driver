@@ -91,10 +91,10 @@ if [ "$CONFIG_FB" = "y" ]; then
    if [ "$CONFIG_HP300" = "y" ]; then
       define_bool CONFIG_FB_HP300 y
    fi
-   if [ "$ARCH" = "alpha" ]; then
+   if [ "$CONFIG_ALPHA" = "y" ]; then
       tristate '  TGA framebuffer support' CONFIG_FB_TGA
    fi
-   if [ "$ARCH" = "i386" ]; then
+   if [ "$CONFIG_X86" = "y" ]; then
       bool '  VESA VGA graphics console' CONFIG_FB_VESA
       tristate '  VGA 16-color graphics console' CONFIG_FB_VGA16
       tristate '  Hercules mono graphics console (EXPERIMENTAL)' CONFIG_FB_HGA
