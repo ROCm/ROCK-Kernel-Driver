@@ -2070,48 +2070,6 @@ config HPDCA
 	  If you want to use the internal "DCA" serial ports on an HP300
 	  machine, say Y here.
 
-config SUN3X_ZS
-	bool "Sun3/3x builtin serial support"
-	depends on SUN3 || SUN3X
-	help
-	  ZS refers to a type of asynchronous serial port built in to the Sun3
-	  and Sun3x workstations; if you have a Sun 3, you probably have
-	  these.  Say 'Y' to support ZS ports directly.  This option must be
-	  enabled in order to support the
-	  keyboard and mouse ports.
-
-config SUN_KEYBOARD
-	bool
-	depends on SUN3X_ZS
-	default y
-	help
-	  Say Y here to support the keyboard found on Sun 3 and 3x
-	  workstations.  It can also be used support Sun Type-5 keyboards
-	  through an adaptor.  See
-	  <http://www.suse.cz/development/input/adapters.html> and
-	  <http://sourceforge.net/projects/linuxconsole/> for details on the
-	  latter.
-
-config SUN_MOUSE
-	bool
-	depends on SUN3X_ZS
-	default y
-
-config SBUS
-	bool
-	depends on SUN3X_ZS
-	default y
-
-config SBUSCHAR
-	bool
-	depends on SUN3X_ZS
-	default y
-
-config SUN_SERIAL
-	bool
-	depends on SUN3X_ZS
-	default y
-
 config MVME147_SCC
 	bool "SCC support for MVME147 serial ports"
 	depends on MVME147
@@ -2148,7 +2106,7 @@ config DN_SERIAL
 
 config SERIAL_CONSOLE
 	bool "Support for serial port console"
-	depends on (AMIGA || ATARI || MAC || HP300 || SUN3 || SUN3X || VME || APOLLO) && (ATARI_MFPSER=y || ATARI_SCC=y || ATARI_MIDI=y || MAC_SCC=y || AMIGA_BUILTIN_SERIAL=y || GVPIOEXT=y || MULTIFACE_III_TTY=y || HPDCA=y || SUN3X_ZS || SERIAL=y || MVME147_SCC || SERIAL167 || MVME162_SCC || BVME6000_SCC || DN_SERIAL)
+	depends on (AMIGA || ATARI || MAC || HP300 || SUN3 || SUN3X || VME || APOLLO) && (ATARI_MFPSER=y || ATARI_SCC=y || ATARI_MIDI=y || MAC_SCC=y || AMIGA_BUILTIN_SERIAL=y || GVPIOEXT=y || MULTIFACE_III_TTY=y || HPDCA=y || SERIAL=y || MVME147_SCC || SERIAL167 || MVME162_SCC || BVME6000_SCC || DN_SERIAL)
 	---help---
 	  If you say Y here, it will be possible to use a serial port as the
 	  system console (the system console is the device which receives all
