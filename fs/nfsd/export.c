@@ -838,7 +838,6 @@ exp_freeclient(svc_client *clp)
 {
 	exp_unhashclient(clp);
 
-	/* umap_free(&(clp->cl_umap)); */
 	exp_unexport_all(clp);
 	kfree (clp);
 }

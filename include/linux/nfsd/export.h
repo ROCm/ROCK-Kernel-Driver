@@ -54,7 +54,6 @@ struct svc_client {
 	int			cl_idlen;
 	int			cl_naddr;
 	struct in_addr		cl_addr[NFSCLNT_ADDRMAX];
-	struct svc_uidmap *	cl_umap;
 	struct list_head	cl_export[NFSCLNT_EXPMAX];
 	struct list_head	cl_expfsid[NFSCLNT_EXPMAX];
 	struct list_head	cl_list;
