@@ -195,13 +195,12 @@ extern unsigned long pfn_base;
 extern struct page *mem_map_zero;
 #define ZERO_PAGE(vaddr)	(mem_map_zero)
 
-/* Warning: These take pointers to page structs now... */
-#define mk_pte(page, pgprot)		\
-	__pte((((page - mem_map) << PAGE_SHIFT)+phys_base) | pgprot_val(pgprot) | _PAGE_SZBITS)
+#define pfn_pte(pfn, prot)	\
+	__pte((((pfn)+(pfn_base)) << PAGE_SHIFT) | pgprot_val(prot) | _PAGE_SZBITS)
+#define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
+
 #define page_pte_prot(page, prot)	mk_pte(page, prot)
 #define page_pte(page)			page_pte_prot(page, __pgprot(0))
-
-#define mk_pte_phys(physpage, pgprot)	(__pte((physpage) | pgprot_val(pgprot) | _PAGE_SZBITS))
 
 extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 {
