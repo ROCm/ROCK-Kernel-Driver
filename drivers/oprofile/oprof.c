@@ -155,13 +155,11 @@ static int __init oprofile_init(void)
 {
 	int err = 0;
 
-	/* this is our fallback case */
-	oprofile_timer_init(&oprofile_ops);
+	oprofile_arch_init(&oprofile_ops);
 
 	if (timer) {
 		printk(KERN_INFO "oprofile: using timer interrupt.\n");
-	} else {
-		oprofile_arch_init(&oprofile_ops);
+		oprofile_timer_init(&oprofile_ops);
 	}
 
 	err = oprofilefs_register();

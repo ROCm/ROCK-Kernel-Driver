@@ -37,6 +37,9 @@ static void timer_stop(void)
 
 void __init oprofile_timer_init(struct oprofile_operations * ops)
 {
+	ops->create_files = NULL;
+	ops->setup = NULL;
+	ops->shutdown = NULL;
 	ops->start = timer_start;
 	ops->stop = timer_stop;
 	ops->cpu_type = "timer";
