@@ -6,7 +6,7 @@
    SMB authentication protocol
 
    Copyright (C) Andrew Tridgell 1998
-   Modified by Steve French (sfrench@us.ibm.com) 2002
+   Modified by Steve French (sfrench@us.ibm.com) 2002,2003
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -375,42 +375,4 @@ cred_hash3(unsigned char *out, unsigned char *in, unsigned char *key, int forw)
 	smbhash(out, in, key, forw);
 	key2[0] = key[7];
 	smbhash(out + 8, in + 8, key2, forw);
-}
-
-void
-SamOEMhash(unsigned char *data, unsigned char *key, int val)
-{
-	unsigned char s_box[256];
-	unsigned char index_i = 0;
-	unsigned char index_j = 0;
-	unsigned char j = 0;
-	int ind;
-
-	for (ind = 0; ind < 256; ind++) {
-		s_box[ind] = (unsigned char) ind;
-	}
-
-	for (ind = 0; ind < 256; ind++) {
-		unsigned char tc;
-
-		j += (s_box[ind] + key[ind % 16]);
-
-		tc = s_box[ind];
-		s_box[ind] = s_box[j];
-		s_box[j] = tc;
-	}
-	for (ind = 0; ind < val; ind++) {
-		unsigned char tc;
-		unsigned char t;
-
-		index_i++;
-		index_j += s_box[index_i];
-
-		tc = s_box[index_i];
-		s_box[index_i] = s_box[index_j];
-		s_box[index_j] = tc;
-
-		t = s_box[index_i] + s_box[index_j];
-		data[ind] = data[ind] ^ s_box[t];
-	}
 }

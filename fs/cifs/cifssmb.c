@@ -62,6 +62,7 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 				if(!rc)
 					reopen_files(tcon,nls_codepage);
 			}
+			unload_nls(nls_codepage);
 		}
 	}
 	if(rc)
