@@ -173,33 +173,7 @@ int __init umc8672_init(void)
 }
 
 #ifdef MODULE
-static void __exit umc8672_release_hwif(ide_hwif_t *hwif)
-{
-	if (hwif->chipset != ide_umc8672)
-		return;
-
-	hwif->chipset = ide_unknown;
-	hwif->tuneproc = NULL;
-	hwif->mate = NULL;
-	hwif->channel = 0;
-}
-
-static void __exit umc8672_exit(void)
-{
-	unsigned long flags;
-
-	umc8672_release_hwif(&ide_hwifs[0]);
-	umc8672_release_hwif(&ide_hwifs[1]);
-
-	local_irq_save(flags);
-	outb_p(0xa5, 0x108);	/* disable umc */
-	local_irq_restore(flags);
-
-	release_region(0x108, 2);
-}
-
 module_init(umc8672_init);
-module_exit(umc8672_exit);
 #endif
 
 MODULE_AUTHOR("Wolfram Podien");
