@@ -24,14 +24,16 @@ static inline int cpu_to_node(int cpu)
 
 #define parent_node(node)	(node)
 
-static inline unsigned long node_to_cpumask(int node)
+static inline cpumask_t node_to_cpumask(int node)
 {
 	return numa_cpumask_lookup_table[node];
 }
 
 static inline int node_to_first_cpu(int node)
 {
-	return __ffs(node_to_cpumask(node));
+	cpumask_t tmp;
+	tmp = node_to_cpumask(node);
+	return first_cpu(tmp);
 }
 
 #define node_to_memblk(node)	(node)
