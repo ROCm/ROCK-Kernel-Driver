@@ -1560,11 +1560,8 @@ M:	greg@kroah.com
 S:	Maintained
 
 PCMCIA SUBSYSTEM
-P:	David Hinds
-M:	dahinds@users.sourceforge.net
-L:	linux-kernel@vger.kernel.org
-W:	http://pcmcia-cs.sourceforge.net
-S:	Maintained
+L:	http://lists.infradead.org/mailman/listinfo/linux-pcmcia
+S:	Unmaintained
 
 PCNET32 NETWORK DRIVER
 P:	Thomas Bogendörfer
