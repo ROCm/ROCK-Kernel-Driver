@@ -557,12 +557,11 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 			retval = serial->type->open(port, filp);
 		else
 			retval = generic_open(port, filp);
-	}
-
-	if (retval) {
-		port->open_count = 0;
-		if (serial->type->owner)
-			__MOD_DEC_USE_COUNT(serial->type->owner);
+		if (retval) {
+			port->open_count = 0;
+			if (serial->type->owner)
+				__MOD_DEC_USE_COUNT(serial->type->owner);
+		}
 	}
 
 	up (&port->sem);
