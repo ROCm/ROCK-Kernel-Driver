@@ -98,10 +98,9 @@ static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t
 
 	if (!dentry->d_inode) {
 		inode = sysfs_get_inode(dir->i_sb, mode, dev);
-		if (inode) {
+		if (inode)
 			d_instantiate(dentry, inode);
-			dget(dentry);
-		} else
+		else
 			error = -ENOSPC;
 	} else
 		error = -EEXIST;
@@ -703,10 +702,6 @@ static void hash_and_remove(struct dentry * dir, const char * name)
 
 			pr_debug("sysfs: Removing %s (%d)\n", victim->d_name.name,
 				 atomic_read(&victim->d_count));
-			/**
-			 * Drop reference from initial get_dentry().
-			 */
-			dput(victim);
 		}
 		
 		/**
@@ -795,7 +790,7 @@ void sysfs_remove_link(struct kobject * kobj, char * name)
 
 void sysfs_remove_dir(struct kobject * kobj)
 {
-	struct list_head * node, * next;
+	struct list_head * node;
 	struct dentry * dentry = dget(kobj->dentry);
 	struct dentry * parent;
 
@@ -807,32 +802,31 @@ void sysfs_remove_dir(struct kobject * kobj)
 	down(&parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
-	list_for_each_safe(node,next,&dentry->d_subdirs) {
-		struct dentry * d = dget(list_entry(node,struct dentry,d_child));
-		/** 
-		 * Make sure dentry is still there 
-		 */
-		pr_debug(" o %s: ",d->d_name.name);
-		if (d->d_inode) {
+	spin_lock(&dcache_lock);
+	node = dentry->d_subdirs.next;
+	while (node != &dentry->d_subdirs) {
+		struct dentry * d = list_entry(node,struct dentry,d_child);
+		list_del_init(node);
 
+		pr_debug(" o %s (%d): ",d->d_name.name,atomic_read(&d->d_count));
+		if (d->d_inode) {
+			d = dget_locked(d);
 			pr_debug("removing");
+
 			/**
 			 * Unlink and unhash.
 			 */
-			simple_unlink(dentry->d_inode,d);
+			spin_unlock(&dcache_lock);
 			d_delete(d);
-
-			/**
-			 * Drop reference from initial get_dentry().
-			 */
+			simple_unlink(dentry->d_inode,d);
 			dput(d);
+			spin_lock(&dcache_lock);
 		}
-		pr_debug(" done (%d)\n",atomic_read(&d->d_count));
-		/**
-		 * drop reference from dget() above.
-		 */
-		dput(d);
+		pr_debug(" done\n");
+
+		node = dentry->d_subdirs.next;
 	}
+	spin_unlock(&dcache_lock);
 
 	up(&dentry->d_inode->i_sem);
 	d_invalidate(dentry);
