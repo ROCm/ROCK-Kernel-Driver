@@ -1582,7 +1582,7 @@ void fixup_rootmenu(struct menu *menu)
 int main(int ac, char *av[])
 {
 	const char *name;
-	gchar *cur_dir, *exe_path;
+	char *env;
 	gchar *glade_file;
 
 #ifndef LKC_DIRECT_LINK
@@ -1598,12 +1598,13 @@ int main(int ac, char *av[])
 	//add_pixmap_directory (PACKAGE_SOURCE_DIR "/pixmaps");
 
 	/* Determine GUI path */
-	cur_dir = g_get_current_dir();
-	exe_path = g_strdup(av[0]);
-	exe_path[0] = '/';
-	glade_file = g_strconcat(cur_dir, exe_path, ".glade", NULL);
-	g_free(cur_dir);
-	g_free(exe_path);
+	env = getenv(SRCTREE);
+	if (env)
+		glade_file = g_strconcat(env, "/scripts/kconfig/gconf.glade", NULL);
+	else if (av[0][0] == '/')
+		glade_file = g_strconcat(av[0], ".glade", NULL);
+	else
+		glade_file = g_strconcat(g_get_current_dir(), "/", av[0], ".glade", NULL);
 
 	/* Load the interface and connect signals */
 	init_main_window(glade_file);
