@@ -59,7 +59,7 @@ struct v2_disk_dqinfo {
 
 /*
  *  Structure of header of block with quota structures. It is padded to 16 bytes so
- *  there will be space for exactly 18 quota-entries in a block
+ *  there will be space for exactly 21 quota-entries in a block
  */
 struct v2_disk_dqdbheader {
 	__u32 dqdh_next_free;	/* Number of next block with free entry */

@@ -133,7 +133,7 @@ static void mem2diskdqb(struct v2_disk_dqblk *d, struct mem_dqblk *m, qid_t id)
 
 static dqbuf_t getdqbuf(void)
 {
-	dqbuf_t buf = kmalloc(V2_DQBLKSIZE, GFP_KERNEL);
+	dqbuf_t buf = kmalloc(V2_DQBLKSIZE, GFP_NOFS);
 	if (!buf)
 		printk(KERN_WARNING "VFS: Not enough memory for quota buffers.\n");
 	return buf;
@@ -415,7 +415,7 @@ static int v2_write_dquot(struct dquot *dquot)
 	mm_segment_t fs;
 	loff_t offset;
 	ssize_t ret;
-	struct v2_disk_dqblk ddquot;
+	struct v2_disk_dqblk ddquot, empty;
 
 	if (!dquot->dq_off)
 		if ((ret = dq_insert_tree(dquot)) < 0) {
@@ -425,6 +425,12 @@ static int v2_write_dquot(struct dquot *dquot)
 	filp = sb_dqopt(dquot->dq_sb)->files[type];
 	offset = dquot->dq_off;
 	mem2diskdqb(&ddquot, &dquot->dq_dqb, dquot->dq_id);
+	/* Argh... We may need to write structure full of zeroes but that would be
+	 * treated as an empty place by the rest of the code. Format change would
+	 * be definitely cleaner but the problems probably are not worth it */
+	memset(&empty, 0, sizeof(struct v2_disk_dqblk));
+	if (!memcmp(&empty, &ddquot, sizeof(struct v2_disk_dqblk)))
+		ddquot.dqb_itime = cpu_to_le64(1);
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = filp->f_op->write(filp, (char *)&ddquot, sizeof(struct v2_disk_dqblk), &offset);
@@ -616,7 +622,7 @@ static int v2_read_dquot(struct dquot *dquot)
 	struct file *filp;
 	mm_segment_t fs;
 	loff_t offset;
-	struct v2_disk_dqblk ddquot;
+	struct v2_disk_dqblk ddquot, empty;
 	int ret = 0;
 
 	filp = sb_dqopt(dquot->dq_sb)->files[type];
@@ -646,8 +652,14 @@ static int v2_read_dquot(struct dquot *dquot)
 			printk(KERN_ERR "VFS: Error while reading quota structure for id %u.\n", dquot->dq_id);
 			memset(&ddquot, 0, sizeof(struct v2_disk_dqblk));
 		}
-		else
+		else {
 			ret = 0;
+			/* We need to escape back all-zero structure */
+			memset(&empty, 0, sizeof(struct v2_disk_dqblk));
+			empty.dqb_itime = cpu_to_le64(1);
+			if (!memcmp(&empty, &ddquot, sizeof(struct v2_disk_dqblk)))
+				ddquot.dqb_itime = 0;
+		}
 		set_fs(fs);
 		disk2memdqb(&dquot->dq_dqb, &ddquot);
 	}
