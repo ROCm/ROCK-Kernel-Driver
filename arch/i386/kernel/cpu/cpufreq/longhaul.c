@@ -30,6 +30,8 @@
 #include <asm/timex.h>
 #include <asm/io.h>
 
+#include "longhaul.h"
+
 #define DEBUG
 
 #ifdef DEBUG
@@ -248,7 +250,7 @@ static int clock_ratio[32];
 static int eblcr_table[32];
 static int voltage_table[32];
 static unsigned int highest_speed, lowest_speed; /* kHz */
-static int longhaul; /* version. */
+static int longhaul_version;
 static struct cpufreq_frequency_table *longhaul_table;
 
 
@@ -273,7 +275,7 @@ static int longhaul_get_cpu_mult (void)
 
 	rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 	invalue = (lo & (1<<22|1<<23|1<<24|1<<25)) >>22;
-	if (longhaul==3) {
+	if (longhaul_version==3) {
 		if (lo & (1<<27))
 			invalue+=16;
 	}
@@ -290,11 +292,10 @@ static int longhaul_get_cpu_mult (void)
 
 static void longhaul_setstate (unsigned int clock_ratio_index)
 {
-	unsigned long lo, hi;
-	unsigned int bits;
 	int vidindex, i;
 	struct cpufreq_freqs freqs;
-	
+	union msr_longhaul longhaul;
+
 	if (clock_ratio[clock_ratio_index] == -1)
 		return;
 
@@ -311,36 +312,35 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	dprintk (KERN_INFO PFX "FSB:%d Mult(x10):%d\n",
 				fsb * 100, clock_ratio[clock_ratio_index]);
 
-	bits = clock_ratio_index;
 	/* "bits" contains the bitpattern of the new multiplier.
 	   we now need to transform it to the desired format. */
 
-	switch (longhaul) {
+	switch (longhaul_version) {
 	case 1:
-		rdmsr (MSR_VIA_BCR2, lo, hi);
+//		rdmsr (MSR_VIA_BCR2, lo, hi);
 		/* Enable software clock multiplier */
-		lo |= (1<<19);
+//		lo |= (1<<19);
 		/* desired multiplier */
-		lo &= ~(1<<23|1<<24|1<<25|1<<26);
-		lo |= (bits<<23);
-		wrmsr (MSR_VIA_BCR2, lo, hi);
+//		lo &= ~(1<<23|1<<24|1<<25|1<<26);
+//		lo |= (bits<<23);
+//		wrmsr (MSR_VIA_BCR2, lo, hi);
 
 		__hlt();
 
 		/* Disable software clock multiplier */
-		rdmsr (MSR_VIA_BCR2, lo, hi);
-		lo &= ~(1<<19);
-		wrmsr (MSR_VIA_BCR2, lo, hi);
+//		rdmsr (MSR_VIA_BCR2, lo, hi);
+//		lo &= ~(1<<19);
+//		wrmsr (MSR_VIA_BCR2, lo, hi);
 		break;
 
 	case 2:
-		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
-		lo &= 0xfff0bf0f;	/* reset [19:16,14](bus ratio) and [7:4](rev key) to 0 */
-		lo |= (bits<<16);
-		lo |= (1<<8);	/* EnableSoftBusRatio */
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
+		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
+		longhaul.bits.EnableSoftBusRatio = 1;
 		/* We must program the revision key only with values we
 		 * know about, not blindly copy it from 0:3 */
-		lo |= 1;
+		longhaul.bits.RevisionKey = 1;
 
 		if (can_scale_voltage) {
 			/* PB: TODO fix this up */
@@ -357,40 +357,39 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 
 			dprintk (KERN_INFO PFX "Desired vid index=%d\n", i);
 #if 0
-			lo &= 0xfe0fffff;/* reset [24:20](voltage) to 0 */
-			lo |= (i<<20);   /* set voltage */
-			lo |= (1<<9);    /* EnableSoftVID */
+			longhaul.bits.SoftVID = i;
+			longhaul.bits.EnableSoftVID = 1;
 #endif
 		}
-
+/* FIXME: Do voltage and freq seperatly like we do in powernow-k7 */
 bad_voltage:
-		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
+		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		__hlt();
 
-		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
-		lo &= ~(1<<8);
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		longhaul.bits.EnableSoftBusRatio = 0;
 		if (can_scale_voltage)
-			lo &= ~(1<<9);
-		lo |= 1;	/* Revision Key */
-		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
+			longhaul.bits.EnableSoftVID = 0;
+		longhaul.bits.RevisionKey = 1;
+		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
 
 	case 3:
-		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
-		lo &= 0xfff0bf0f;	/* reset longhaul[19:16,14] to 0 */
-		lo |= (bits<<16);
-		lo |= (1<<8);	/* EnableSoftBusRatio */
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
+		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
+		longhaul.bits.EnableSoftBusRatio = 1;
 		/* We must program the revision key only with values we
 		 * know about, not blindly copy it from 0:3 */
-		lo |= 3;	/* SoftVID & SoftBSEL */
+		longhaul.bits.RevisionKey = 3;	/* SoftVID & SoftBSEL */
 
-		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
+		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
 		__hlt();
 
-		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
-		lo &= ~(1<<8);
-		lo |= 3;
-		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		longhaul.bits.EnableSoftBusRatio = 0;
+		longhaul.bits.RevisionKey = 3;
+		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
 	}
 
@@ -400,14 +399,15 @@ bad_voltage:
 
 static int __init longhaul_get_ranges (void)
 {
-	unsigned long lo, hi, invalue;
+	unsigned long invalue;
 	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
 	unsigned int j, k = 0;
+	union msr_longhaul longhaul;
 
-	switch (longhaul) {
+	switch (longhaul_version) {
 	case 1:
 		/* Ugh, Longhaul v1 didn't have the min/max MSRs.
 		   Assume min=3.0x & max = whatever we booted at. */
@@ -416,17 +416,17 @@ static int __init longhaul_get_ranges (void)
 		break;
 
 	case 2 ... 3:
-		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
+		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
-		invalue = (hi & (1<<0|1<<1|1<<2|1<<3));
-		if (hi & (1<<11))
+		invalue = longhaul.bits.MaxMHzBR;
+		if (longhaul.bits.MaxMHzBR4)
 			invalue += 16;
 		maxmult=multipliers[invalue];
 
-#if 0	/* This is MaxMhz @ Min Voltage. Ignore for now */
-		invalue = (hi & (1<<16|1<<17|1<<18|1<<19)) >> 16;
-		if (hi & (1<<27))
-		invalue += 16;
+#if 0
+		invalue = longhaul.bits.MinMHzBR;
+		if (longhaul.bits.MinMHzBR4);
+			invalue += 16;
 		minmult = multipliers[invalue];
 #else
 		minmult = 30; /* as per spec */
@@ -460,18 +460,23 @@ static int __init longhaul_get_ranges (void)
 		kfree (longhaul_table);
 		return -EINVAL;
 	}
-	
+
 	return 0;
 }
 
 
-static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned long hi)
+static void __init longhaul_setup_voltagescaling(void)
 {
-	int revkey;
+	union msr_longhaul longhaul;
 
-	minvid = (hi & (1<<20|1<<21|1<<22|1<<23|1<<24)) >> 20; /* 56:52 */
-	maxvid = (hi & (1<<4|1<<5|1<<6|1<<7|1<<8)) >> 4;       /* 40:36 */
-	vrmrev = (lo & (1<<15))>>15;
+	rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+
+	if (!(longhaul.bits.RevisionID & 1))
+		return;
+
+	minvid = longhaul.bits.MinimumVID;
+	maxvid = longhaul.bits.MaximumVID;
+	vrmrev = longhaul.bits.VRMRev;
 
 	if (minvid == 0 || maxvid == 0) {
 		printk (KERN_INFO PFX "Bogus values Min:%d.%03d Max:%d.%03d. "
@@ -499,14 +504,14 @@ static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned lon
 
 	/* Current voltage isn't readable at first, so we need to
 	   set it to a known value. The spec says to use maxvid */
-	revkey = (lo & 0xf)<<4;	/* Rev key. */
-	lo |= revkey;		/* Reinsert key FIXME: This is bad. */
-	lo &= 0xfe0fff0f;	/* Mask unneeded bits */
-	lo |= (1<<9);		/* EnableSoftVID */
-	lo |= maxvid << 20;
-	wrmsr (MSR_VIA_LONGHAUL, lo, hi);
+	longhaul.bits.RevisionKey = longhaul.bits.RevisionID;	/* FIXME: This is bad. */
+	longhaul.bits.EnableSoftVID = 1;
+	longhaul.bits.SoftVID = maxvid;
+	wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+
 	minvid = voltage_table[minvid];
 	maxvid = voltage_table[maxvid];
+
 	dprintk ("Min VID=%d.%03d Max VID=%d.%03d, %d possible voltage scales\n",
 		maxvid/1000, maxvid%1000, minvid/1000, minvid%1000, numvscales);
 
@@ -524,8 +529,8 @@ static int longhaul_target (struct cpufreq_policy *policy,
 			    unsigned int target_freq,
 			    unsigned int relation)
 {
-	unsigned int    table_index = 0;
- 	unsigned int    new_clock_ratio = 0;
+	unsigned int table_index = 0;
+ 	unsigned int new_clock_ratio = 0;
 
 	if (cpufreq_frequency_table_target(policy, longhaul_table, target_freq, relation, &table_index))
 		return -EINVAL;
@@ -544,7 +549,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 
 	switch (c->x86_model) {
 	case 6:		/* VIA C3 Samuel C5A */
-		longhaul=1;
+		longhaul_version=1;
 		memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
 		memcpy (eblcr_table, samuel1_eblcr, sizeof(samuel1_eblcr));
 		break;
@@ -552,12 +557,12 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 	case 7:		/* C5B / C5C */
 		switch (c->x86_mask) {
 		case 0:
-			longhaul=1;
+			longhaul_version=1;
 			memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
 			break;
 		case 1 ... 15:
-			longhaul=2;
+			longhaul_version=2;
 			memcpy (clock_ratio, longhaul2_clock_ratio, sizeof(longhaul2_clock_ratio));
 			memcpy (eblcr_table, ezra_eblcr, sizeof(ezra_eblcr));
 			break;
@@ -566,21 +571,18 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 
 	case 8:		/* C5M/C5N */
 		return -ENODEV; // Waiting on updated docs from VIA before this is usable
-		longhaul=3;
+		longhaul_version=3;
 		numscales=32;
 		memcpy (clock_ratio, longhaul3_clock_ratio, sizeof(longhaul3_clock_ratio));
 		memcpy (eblcr_table, c5m_eblcr, sizeof(c5m_eblcr));
 		break;
 	}
 
-	printk (KERN_INFO PFX "VIA CPU detected. Longhaul version %d supported\n", longhaul);
+	printk (KERN_INFO PFX "VIA CPU detected. Longhaul version %d supported\n",
+					longhaul_version);
 
-	if (longhaul==2 || longhaul==3) {
-		unsigned long lo, hi;
-		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
-		if ((lo & (1<<0)) && (dont_scale_voltage==0))
-			longhaul_setup_voltagescaling (lo, hi);
-	}
+	if ((longhaul_version==2 || longhaul_version==3) && (dont_scale_voltage==0))
+		longhaul_setup_voltagescaling();
 
 	ret = longhaul_get_ranges();
 	if (ret != 0)
