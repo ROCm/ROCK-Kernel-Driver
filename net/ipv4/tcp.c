@@ -1540,6 +1540,17 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		if (copied && tp->urg_data && tp->urg_seq == *seq)
 			break;
 
+		/* We need to check signals first, to get correct SIGURG
+		 * handling. FIXME: Need to check this doesn't impact 1003.1g
+		 * and move it down to the bottom of the loop
+		 */
+		if (signal_pending(current)) {
+			if (copied)
+				break;
+			copied = timeo ? sock_intr_errno(timeo) : -EAGAIN;
+			break;
+		}
+
 		/* Next get a buffer. */
 
 		skb = skb_peek(&sk->sk_receive_queue);
@@ -1576,7 +1587,6 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			    sk->sk_state == TCP_CLOSE ||
 			    (sk->sk_shutdown & RCV_SHUTDOWN) ||
 			    !timeo ||
-			    signal_pending(current) ||
 			    (flags & MSG_PEEK))
 				break;
 		} else {
@@ -1604,11 +1614,6 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 			if (!timeo) {
 				copied = -EAGAIN;
-				break;
-			}
-
-			if (signal_pending(current)) {
-				copied = sock_intr_errno(timeo);
 				break;
 			}
 		}
