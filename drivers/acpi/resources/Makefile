@@ -2,7 +2,8 @@
 # Makefile for all Linux ACPI interpreter subdirectories
 #
 
-obj-$(CONFIG_ACPI_INTERPRETER) := $(patsubst %.c,%.o,$(wildcard *.c))
+obj-y := rsaddr.o  rscreate.o  rsio.o   rslist.o    rsmisc.o   rsxface.o \
+	 rscalc.o  rsdump.o    rsirq.o  rsmemory.o  rsutils.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
 

@@ -5,7 +5,7 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-EXTRA_CFLAGS	:= -I../../scsi/
+EXTRA_CFLAGS	:= -Idrivers/scsi
 
 obj-$(CONFIG_USB_STORAGE)	+= usb-storage.o
 

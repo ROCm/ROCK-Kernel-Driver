@@ -2,7 +2,8 @@
 # Makefile for all Linux ACPI interpreter subdirectories
 #
 
-obj-$(CONFIG_ACPI_INTERPRETER) := $(patsubst %.c,%.o,$(wildcard *.c))
+obj-y := evevent.o  evregion.o  evsci.o    evxfevnt.o \
+	 evmisc.o   evrgnini.o  evxface.o  evxfregn.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
 
