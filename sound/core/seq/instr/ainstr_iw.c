@@ -30,8 +30,6 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture IWFFFF support.");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 
 char *snd_seq_iwffff_id = SNDRV_SEQ_INSTR_ID_INTERWAVE;
 

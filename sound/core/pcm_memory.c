@@ -32,12 +32,10 @@
 static int preallocate_dma = 1;
 module_param(preallocate_dma, int, 0444);
 MODULE_PARM_DESC(preallocate_dma, "Preallocate DMA memory when the PCM devices are initialized.");
-MODULE_PARM_SYNTAX(preallocate_dma, SNDRV_BOOLEAN_TRUE_DESC);
 
 static int maximum_substreams = 4;
 module_param(maximum_substreams, int, 0444);
 MODULE_PARM_DESC(maximum_substreams, "Maximum substreams with preallocated DMA memory.");
-MODULE_PARM_SYNTAX(maximum_substreams, SNDRV_BOOLEAN_TRUE_DESC);
 
 const static size_t snd_minimum_buffer = 16384;
 

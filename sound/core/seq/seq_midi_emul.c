@@ -42,8 +42,6 @@
 MODULE_AUTHOR("Takashi Iwai / Steve Ratcliffe");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture sequencer MIDI emulation.");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 
 /* Prototypes for static functions */
 static void note_off(snd_midi_op_t *ops, void *drv, snd_midi_channel_t *chan, int note, int vel);

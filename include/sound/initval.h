@@ -21,20 +21,6 @@
  *
  */
 
-#ifndef MODULE_GENERIC_STRING
-#ifdef MODULE
-#define MODULE_GENERIC_STRING(name, string) \
-static const char __module_generic_string_##name [] \
-  __attribute__ ((unused, __section__(".modstring"))) = #name "=" string;
-#else
-#define MODULE_GENERIC_STRING(name, string)
-#endif
-#endif
-
-#define MODULE_CLASSES(val) MODULE_GENERIC_STRING(info_classes, val)
-#define MODULE_DEVICES(val) MODULE_GENERIC_STRING(info_devices, val)
-#define MODULE_PARM_SYNTAX(id, val) MODULE_GENERIC_STRING(info_parm_##id, val)
-
 #define SNDRV_AUTO_PORT		1
 #define SNDRV_AUTO_IRQ		0xffff
 #define SNDRV_AUTO_DMA		0xffff
@@ -63,25 +49,6 @@ static const char __module_generic_string_##name [] \
 #define SNDRV_DEFAULT_DMA	{ [0 ... (SNDRV_CARDS-1)] = SNDRV_AUTO_DMA }
 #define SNDRV_DEFAULT_DMA_SIZE	{ [0 ... (SNDRV_CARDS-1)] = SNDRV_AUTO_DMA_SIZE }
 #define SNDRV_DEFAULT_PTR	SNDRV_DEFAULT_STR
-
-#define SNDRV_BOOLEAN_TRUE_DESC	"allows:{{0,Disabled},{1,Enabled}},default:1,dialog:check"
-#define SNDRV_BOOLEAN_FALSE_DESC "allows:{{0,Disabled},{1,Enabled}},default:0,dialog:check"
-
-#define SNDRV_ENABLED		"enable:(enable)"
-
-#define SNDRV_INDEX_DESC	SNDRV_ENABLED ",allows:{{0,7}},unique,skill:required,dialog:list"
-#define SNDRV_ID_DESC		SNDRV_ENABLED ",unique"
-#define SNDRV_ENABLE_DESC	SNDRV_BOOLEAN_FALSE_DESC
-#define SNDRV_ISAPNP_DESC	SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC
-#define SNDRV_DMA8_DESC		SNDRV_ENABLED ",allows:{{0,1},{3}},dialog:list"
-#define SNDRV_DMA16_DESC	SNDRV_ENABLED ",allows:{{5,7}},dialog:list"
-#define SNDRV_DMA_DESC		SNDRV_ENABLED ",allows:{{0,1},{3},{5,7}},dialog:list"
-#define SNDRV_IRQ_DESC		SNDRV_ENABLED ",allows:{{5},{7},{9},{10,12},{14,15}},dialog:list"
-#define SNDRV_DMA_SIZE_DESC	SNDRV_ENABLED ",allows:{{4,128}},default:64,skill:advanced"
-#define SNDRV_DMA8_SIZE_DESC	SNDRV_ENABLED ",allows:{{4, 64}},default:64,skill:advanced"
-#define SNDRV_DMA16_SIZE_DESC	SNDRV_ENABLED ",allows:{{4,128}},default:64,skill:advanced"
-#define SNDRV_PORT12_DESC	SNDRV_ENABLED ",allows:{{0,0x3fff}},base:16"
-#define SNDRV_PORT_DESC		SNDRV_ENABLED ",allows:{{0,0xffff}},base:16"
 
 #ifdef SNDRV_LEGACY_AUTO_PROBE
 static int snd_legacy_auto_probe(unsigned long *ports, int (*probe)(unsigned long port))

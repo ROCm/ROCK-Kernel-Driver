@@ -53,13 +53,10 @@ MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
 module_param_array(dsp_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(dsp_map, "PCM device number assigned to 1st OSS device.");
-MODULE_PARM_SYNTAX(dsp_map, "default:0,skill:advanced");
 module_param_array(adsp_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(adsp_map, "PCM device number assigned to 2nd OSS device.");
-MODULE_PARM_SYNTAX(adsp_map, "default:1,skill:advanced");
 module_param(nonblock_open, bool, 0644);
 MODULE_PARM_DESC(nonblock_open, "Don't block opening busy PCM devices.");
-MODULE_PARM_SYNTAX(nonblock_open, "default:0,skill:advanced");
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_PCM);
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_PCM1);
 

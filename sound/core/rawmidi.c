@@ -44,10 +44,8 @@ static int amidi_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 static int boot_devs;
 module_param_array(midi_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(midi_map, "Raw MIDI device number assigned to 1st OSS device.");
-MODULE_PARM_SYNTAX(midi_map, "default:0,skill:advanced");
 module_param_array(amidi_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(amidi_map, "Raw MIDI device number assigned to 2nd OSS device.");
-MODULE_PARM_SYNTAX(amidi_map, "default:1,skill:advanced");
 #endif /* CONFIG_SND_OSSEMUL */
 
 static int snd_rawmidi_free(snd_rawmidi_t *rawmidi);
