@@ -1833,7 +1833,6 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	int err = 0;
 	unsigned blocksize, bbits;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh=wait;
-	char *kaddr = kmap(page);
 
 	BUG_ON(!PageLocked(page));
 	BUG_ON(from > PAGE_CACHE_SIZE);
@@ -1874,13 +1873,19 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 					set_buffer_uptodate(bh);
 					continue;
 				}
-				if (block_end > to)
-					memset(kaddr+to, 0, block_end-to);
-				if (block_start < from)
-					memset(kaddr+block_start,
-						0, from-block_start);
-				if (block_end > to || block_start < from)
+				if (block_end > to || block_start < from) {
+					void *kaddr;
+
+					kaddr = kmap_atomic(page, KM_USER0);
+					if (block_end > to)
+						memset(kaddr+to, 0,
+							block_end-to);
+					if (block_start < from)
+						memset(kaddr+block_start,
+							0, from-block_start);
 					flush_dcache_page(page);
+					kunmap_atomic(kaddr, KM_USER0);
+				}
 				continue;
 			}
 		}
@@ -1919,10 +1924,14 @@ out:
 		if (block_start >= to)
 			break;
 		if (buffer_new(bh)) {
+			void *kaddr;
+
 			clear_buffer_new(bh);
 			if (buffer_uptodate(bh))
 				buffer_error();
+			kaddr = kmap_atomic(page, KM_USER0);
 			memset(kaddr+block_start, 0, bh->b_size);
+			kunmap_atomic(kaddr, KM_USER0);
 			set_buffer_uptodate(bh);
 			mark_buffer_dirty(bh);
 		}
@@ -2008,9 +2017,10 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 					SetPageError(page);
 			}
 			if (!buffer_mapped(bh)) {
-				memset(kmap(page) + i*blocksize, 0, blocksize);
+				void *kaddr = kmap_atomic(page, KM_USER0);
+				memset(kaddr + i * blocksize, 0, blocksize);
 				flush_dcache_page(page);
-				kunmap(page);
+				kunmap_atomic(kaddr, KM_USER0);
 				set_buffer_uptodate(bh);
 				continue;
 			}
@@ -2118,7 +2128,7 @@ int cont_prepare_write(struct page *page, unsigned offset,
 	long status;
 	unsigned zerofrom;
 	unsigned blocksize = 1 << inode->i_blkbits;
-	char *kaddr;
+	void *kaddr;
 
 	while(page->index > (pgpos = *bytes>>PAGE_CACHE_SHIFT)) {
 		status = -ENOMEM;
@@ -2140,12 +2150,12 @@ int cont_prepare_write(struct page *page, unsigned offset,
 						PAGE_CACHE_SIZE, get_block);
 		if (status)
 			goto out_unmap;
-		kaddr = page_address(new_page);
+		kaddr = kmap_atomic(new_page, KM_USER0);
 		memset(kaddr+zerofrom, 0, PAGE_CACHE_SIZE-zerofrom);
 		flush_dcache_page(new_page);
+		kunmap_atomic(kaddr, KM_USER0);
 		__block_commit_write(inode, new_page,
 				zerofrom, PAGE_CACHE_SIZE);
-		kunmap(new_page);
 		unlock_page(new_page);
 		page_cache_release(new_page);
 	}
@@ -2170,21 +2180,20 @@ int cont_prepare_write(struct page *page, unsigned offset,
 	status = __block_prepare_write(inode, page, zerofrom, to, get_block);
 	if (status)
 		goto out1;
-	kaddr = page_address(page);
 	if (zerofrom < offset) {
+		kaddr = kmap_atomic(page, KM_USER0);
 		memset(kaddr+zerofrom, 0, offset-zerofrom);
 		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		__block_commit_write(inode, page, zerofrom, offset);
 	}
 	return 0;
 out1:
 	ClearPageUptodate(page);
-	kunmap(page);
 	return status;
 
 out_unmap:
 	ClearPageUptodate(new_page);
-	kunmap(new_page);
 	unlock_page(new_page);
 	page_cache_release(new_page);
 out:
@@ -2196,10 +2205,8 @@ int block_prepare_write(struct page *page, unsigned from, unsigned to,
 {
 	struct inode *inode = page->mapping->host;
 	int err = __block_prepare_write(inode, page, from, to, get_block);
-	if (err) {
+	if (err)
 		ClearPageUptodate(page);
-		kunmap(page);
-	}
 	return err;
 }
 
@@ -2207,7 +2214,6 @@ int block_commit_write(struct page *page, unsigned from, unsigned to)
 {
 	struct inode *inode = page->mapping->host;
 	__block_commit_write(inode,page,from,to);
-	kunmap(page);
 	return 0;
 }
 
@@ -2217,7 +2223,6 @@ int generic_commit_write(struct file *file, struct page *page,
 	struct inode *inode = page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 	__block_commit_write(inode,page,from,to);
-	kunmap(page);
 	if (pos > inode->i_size) {
 		inode->i_size = pos;
 		mark_inode_dirty(inode);
@@ -2234,6 +2239,7 @@ int block_truncate_page(struct address_space *mapping,
 	struct inode *inode = mapping->host;
 	struct page *page;
 	struct buffer_head *bh;
+	void *kaddr;
 	int err;
 
 	blocksize = 1 << inode->i_blkbits;
@@ -2286,9 +2292,10 @@ int block_truncate_page(struct address_space *mapping,
 			goto unlock;
 	}
 
-	memset(kmap(page) + offset, 0, length);
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr + offset, 0, length);
 	flush_dcache_page(page);
-	kunmap(page);
+	kunmap_atomic(kaddr, KM_USER0);
 
 	mark_buffer_dirty(bh);
 	err = 0;
@@ -2308,7 +2315,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 	struct inode * const inode = page->mapping->host;
 	const unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 	unsigned offset;
-	char *kaddr;
+	void *kaddr;
 
 	/* Is the page fully inside i_size? */
 	if (page->index < end_index)
@@ -2328,10 +2335,10 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 	 * the  page size, the remaining memory is zeroed when mapped, and
 	 * writes to that region are not written out to the file."
 	 */
-	kaddr = kmap(page);
+	kaddr = kmap_atomic(page, KM_USER0);
 	memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
 	flush_dcache_page(page);
-	kunmap(page);
+	kunmap_atomic(kaddr, KM_USER0);
 	return __block_write_full_page(inode, page, get_block);
 }
 

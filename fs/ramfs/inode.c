@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
+#include <linux/highmem.h>
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
@@ -47,8 +48,10 @@ static struct inode_operations ramfs_dir_inode_operations;
 static int ramfs_readpage(struct file *file, struct page * page)
 {
 	if (!PageUptodate(page)) {
-		memset(kmap(page), 0, PAGE_CACHE_SIZE);
-		kunmap(page);
+		char *kaddr = kmap_atomic(page, KM_USER0);
+
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
+		kunmap_atomic(kaddr, KM_USER0);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
 	}
@@ -58,10 +61,12 @@ static int ramfs_readpage(struct file *file, struct page * page)
 
 static int ramfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
-	void *addr = kmap(page);
 	if (!PageUptodate(page)) {
-		memset(addr, 0, PAGE_CACHE_SIZE);
+		char *kaddr = kmap_atomic(page, KM_USER0);
+
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		SetPageUptodate(page);
 	}
 	SetPageDirty(page);
@@ -73,7 +78,6 @@ static int ramfs_commit_write(struct file *file, struct page *page, unsigned off
 	struct inode *inode = page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 
-	kunmap(page);
 	if (pos > inode->i_size)
 		inode->i_size = pos;
 	return 0;

@@ -1065,6 +1065,21 @@ static inline int fault_in_pages_writeable(char *uaddr, int size)
 	return ret;
 }
 
+static inline void fault_in_pages_readable(const char *uaddr, int size)
+{
+	volatile char c;
+	int ret;
+
+	ret = __get_user(c, (char *)uaddr);
+	if (ret == 0) {
+		const char *end = uaddr + size - 1;
+
+		if (((unsigned long)uaddr & PAGE_MASK) !=
+				((unsigned long)end & PAGE_MASK))
+		 	__get_user(c, (char *)end);
+	}
+}
+
 int file_read_actor(read_descriptor_t *desc, struct page *page,
 			unsigned long offset, unsigned long size)
 {
@@ -1882,6 +1897,26 @@ inline void remove_suid(struct dentry *dentry)
 	}
 }
 
+static inline int
+filemap_copy_from_user(struct page *page, unsigned long offset,
+			const char *buf, unsigned bytes)
+{
+	char *kaddr;
+	int left;
+
+	kaddr = kmap_atomic(page, KM_USER0);
+	left = __copy_from_user(kaddr + offset, buf, bytes);
+	kunmap_atomic(kaddr, KM_USER0);
+
+	if (left != 0) {
+		/* Do it the slow way */
+		kaddr = kmap(page);
+		left = __copy_from_user(kaddr + offset, buf, bytes);
+		kunmap(page);
+	}
+	return left;
+}
+
 /*
  * Write to a file through the page cache. 
  *
@@ -2034,7 +2069,6 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		unsigned long index;
 		unsigned long offset;
 		long page_fault;
-		char *kaddr;
 
 		offset = (pos & (PAGE_CACHE_SIZE -1)); /* Within page */
 		index = pos >> PAGE_CACHE_SHIFT;
@@ -2048,10 +2082,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		 * same page as we're writing to, without it being marked
 		 * up-to-date.
 		 */
-		{ volatile unsigned char dummy;
-			__get_user(dummy, buf);
-			__get_user(dummy, buf+bytes-1);
-		}
+		fault_in_pages_readable(buf, bytes);
 
 		page = __grab_cache_page(mapping, index, &cached_page, &lru_pvec);
 		if (!page) {
@@ -2059,22 +2090,19 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 			break;
 		}
 
-		kaddr = kmap(page);
 		status = a_ops->prepare_write(file, page, offset, offset+bytes);
 		if (unlikely(status)) {
 			/*
 			 * prepare_write() may have instantiated a few blocks
 			 * outside i_size.  Trim these off again.
 			 */
-			kunmap(page);
 			unlock_page(page);
 			page_cache_release(page);
 			if (pos + bytes > inode->i_size)
 				vmtruncate(inode, inode->i_size);
 			break;
 		}
-		page_fault = __copy_from_user(kaddr + offset, buf, bytes);
-		flush_dcache_page(page);
+		page_fault = filemap_copy_from_user(page, offset, buf, bytes);
 		status = a_ops->commit_write(file, page, offset, offset+bytes);
 		if (unlikely(page_fault)) {
 			status = -EFAULT;
@@ -2089,7 +2117,6 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 				buf += status;
 			}
 		}
-		kunmap(page);
 		if (!PageReferenced(page))
 			SetPageReferenced(page);
 		unlock_page(page);
