@@ -378,7 +378,7 @@ irqreturn_t q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 				  /*printk("reenabling irq %d\n",irq); */
 #endif
 			  }
-// used to do 'goto repeat;' her, this delayed bh processing too long
+// used to do 'goto repeat;' here, this delayed bh processing too long
 			  return IRQ_HANDLED;
 		  }
 	  }
@@ -387,6 +387,7 @@ irqreturn_t q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
   } 
  iirq:
   mir=master_inb(IIRQ_REG);
+  /* should test whether keyboard irq is really enabled, doing it in defhand */
   if (mir&Q40_IRQ_KEYB_MASK) {
 	  irq_tab[Q40_IRQ_KEYBOARD].count++;
 	  irq_tab[Q40_IRQ_KEYBOARD].handler(Q40_IRQ_KEYBOARD,irq_tab[Q40_IRQ_KEYBOARD].dev_id,fp);
@@ -413,7 +414,9 @@ int show_q40_interrupts (struct seq_file *p, void *v)
 
 static irqreturn_t q40_defhand (int irq, void *dev_id, struct pt_regs *fp)
 {
-	printk ("Unknown q40 interrupt 0x%02x\n", irq);
+        if (irq!=Q40_IRQ_KEYBOARD)
+	     printk ("Unknown q40 interrupt %d\n", irq);
+	else master_outb(-1,KEYBOARD_UNLOCK_REG);
 	return IRQ_NONE;
 }
 static irqreturn_t sys_default_handler(int lev, void *dev_id, struct pt_regs *regs)
