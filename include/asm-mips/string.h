@@ -137,9 +137,6 @@ extern void *memcpy(void *__to, __const__ void *__from, size_t __n);
 #define __HAVE_ARCH_MEMMOVE
 extern void *memmove(void *__dest, __const__ void *__src, size_t __n);
 
-/* Don't build bcopy at all ...  */
-#define __HAVE_ARCH_BCOPY
-
 #ifdef CONFIG_MIPS32
 #define __HAVE_ARCH_MEMSCAN
 static __inline__ void *memscan(void *__addr, int __c, size_t __size)

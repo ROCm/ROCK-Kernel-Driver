@@ -17,15 +17,6 @@
 
 #define EK(y...) EX(y)
 
-GLOBAL_ENTRY(bcopy)
-	.regstk 3,0,0,0
-	mov r8=in0
-	mov in0=in1
-	;;
-	mov in1=r8
-	;;
-END(bcopy)
-
 /* McKinley specific optimization */
 
 #define retval		r8

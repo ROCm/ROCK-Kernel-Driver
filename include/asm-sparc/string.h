@@ -22,7 +22,6 @@ extern __kernel_size_t __memset(void *,int,__kernel_size_t);
 #ifndef EXPORT_SYMTAB_STROPS
 
 /* First the mem*() things. */
-#define __HAVE_ARCH_BCOPY
 #define __HAVE_ARCH_MEMMOVE
 #undef memmove
 #define memmove(_to, _from, _n) \

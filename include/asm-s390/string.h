@@ -15,7 +15,6 @@
 #include <linux/types.h>
 #endif
 
-#define __HAVE_ARCH_BCOPY	/* arch function */
 #define __HAVE_ARCH_MEMCHR	/* inline & arch function */
 #define __HAVE_ARCH_MEMCMP	/* arch function */
 #define __HAVE_ARCH_MEMCPY	/* gcc builtin & arch function */

@@ -13,7 +13,6 @@
 #define __HAVE_ARCH_MEMCPY
 extern void * memcpy(void *, const void *, size_t);
 #define __HAVE_ARCH_MEMMOVE
-#define __HAVE_ARCH_BCOPY
 extern void * memmove(void *, const void *, size_t);
 
 /* For backward compatibility with modules.  Unused otherwise.  */

@@ -515,16 +515,8 @@ void * memcpy(void * dst,const void *src, size_t count)
 	return dst;
 }
 
-void bcopy(const void * srcp, void * destp, size_t count)
-{
-	mtsp(get_kernel_space(), 1);
-	mtsp(get_kernel_space(), 2);
-	pa_memcpy(destp, srcp, count);
-}
-
 EXPORT_SYMBOL(copy_to_user);
 EXPORT_SYMBOL(copy_from_user);
 EXPORT_SYMBOL(copy_in_user);
 EXPORT_SYMBOL(memcpy);
-EXPORT_SYMBOL(bcopy);
 #endif
