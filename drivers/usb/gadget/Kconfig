@@ -10,7 +10,7 @@ menuconfig USB_GADGET
 	tristate "Support for USB Gadgets"
 	depends on EXPERIMENTAL
 	help
-	   USB is a master/slave protocol, organized with with one master
+	   USB is a master/slave protocol, organized with one master
 	   host (such as a PC) controlling up to 127 peripheral devices.
 	   The USB hardware is asymmetric, which makes it easier to set up:
 	   you can't connect two "to-the-host" connectors to each other.
