@@ -11,7 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/string.h>
-#include <linux/version.h>
+#include <linux/device.h>
 
 #include <linux/usb_ch9.h>
 #include <linux/usb_gadget.h>

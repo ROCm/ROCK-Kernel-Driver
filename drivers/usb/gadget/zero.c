@@ -77,6 +77,8 @@
 #include <linux/interrupt.h>
 #include <linux/uts.h>
 #include <linux/version.h>
+#include <linux/device.h>
+#include <linux/moduleparam.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -259,14 +261,8 @@ struct zero_dev {
 	struct usb_ep		*in_ep, *out_ep;
 };
 
-#ifdef HAVE_DRIVER_MODEL
-#define xprintk(dev,level,fmt,args...) \
-	dev_printk(level , &dev->gadget->dev , fmt , ## args)
-#else
-#define xprintk(dev,level,fmt,args...) \
-	printk(level "%s %s: " fmt , shortname, dev->gadget->dev.bus_id, \
-		## args)
-#endif	/* HAVE_DRIVER_MODEL */
+#define xprintk(d,level,fmt,args...) \
+	dev_printk(level , &(d)->gadget->dev , fmt , ## args)
 
 #ifdef DEBUG
 #undef DEBUG
@@ -296,6 +292,9 @@ struct zero_dev {
 static unsigned buflen = 4096;
 static unsigned qlen = 32;
 
+module_param (buflen, uint, S_IRUGO|S_IWUSR);
+module_param (qlen, uint, S_IRUGO|S_IWUSR);
+
 /*
  * Normally the "loopback" configuration is second (index 1) so
  * it's not the default.  Here's where to change that order, to
@@ -304,25 +303,7 @@ static unsigned qlen = 32;
  */
 static int loopdefault = 0;
 
-#ifdef HAVE_DRIVER_MODEL
-#include <linux/moduleparam.h>
-
-module_param (buflen, uint, 0);
-module_param (qlen, uint, 0);
-module_param (loopdefault, bool, 0);
-
-#else
-
-MODULE_PARM (buflen, "i");
-MODULE_PARM_DESC (buflen, "size of i/o buffers");
-
-MODULE_PARM (qlen, "i");
-MODULE_PARM_DESC (qlen, "depth of loopback buffering");
-
-MODULE_PARM (loopdefault, "b");
-MODULE_PARM_DESC (loopdefault, "true to have default config be loopback");
-
-#endif	/* HAVE_DRIVER_MODEL */
+module_param (loopdefault, bool, S_IRUGO|S_IWUSR);
 
 /*-------------------------------------------------------------------------*/
 
@@ -984,12 +965,10 @@ zero_set_config (struct zero_dev *dev, unsigned number, int gfp_flags)
 
 static void zero_setup_complete (struct usb_ep *ep, struct usb_request *req)
 {
-	if (req->status || req->actual != req->length) {
-		struct zero_dev		*dev = ep->driver_data;
-
-		DEBUG (dev, "setup complete --> %d, %d/%d\n",
+	if (req->status || req->actual != req->length)
+		DEBUG ((struct zero_dev *) ep->driver_data,
+				"setup complete --> %d, %d/%d\n",
 				req->status, req->actual, req->length);
-	}
 }
 
 /*

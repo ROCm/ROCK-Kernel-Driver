@@ -60,8 +60,8 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-#include <linux/version.h>
-
+#include <linux/moduleparam.h>
+#include <linux/device.h>
 #include <linux/usb_ch9.h>
 #include <linux/usb_gadget.h>
 
@@ -79,6 +79,7 @@
 #define	EP_DONTUSE		13	/* nonzero */
 
 #define USE_RDK_LEDS		/* GPIO pins control three LEDs */
+#define USE_SYSFS_DEBUG_FILES
 
 
 static const char driver_name [] = "net2280";
@@ -93,26 +94,12 @@ static const char *ep_name [] = {
 
 static int use_dma = 1;
 
-#ifdef HAVE_DRIVER_MODEL
-#include <linux/moduleparam.h>
-
 /* "modprobe net2280 use_dma=n" etc */
 module_param (use_dma, bool, S_IRUGO|S_IWUSR);
-#else
-/* use zero/nonzero for older versions */
-MODULE_PARM (use_dma, "i");
-MODULE_PARM_DESC (use_dma, "true to use dma controllers");
-#endif
-
-#include "net2280.h"
-
-#define valid_bit	cpu_to_le32 (1 << VALID_BIT)
-#define dma_done_ie	cpu_to_le32 (1 << DMA_DONE_INTERRUPT_ENABLE)
-
-/*-------------------------------------------------------------------------*/
 
 #define	DIR_STRING(bAddress) (((bAddress) & USB_DIR_IN) ? "in" : "out")
 
+#if defined(USE_SYSFS_DEBUG_FILES) || defined (DEBUG)
 static char *type_string (u8 bmAttributes)
 {
 	switch ((bmAttributes) & USB_ENDPOINT_XFERTYPE_MASK) {
@@ -122,6 +109,14 @@ static char *type_string (u8 bmAttributes)
 	};
 	return "control";
 }
+#endif
+
+#include "net2280.h"
+
+#define valid_bit	cpu_to_le32 (1 << VALID_BIT)
+#define dma_done_ie	cpu_to_le32 (1 << DMA_DONE_INTERRUPT_ENABLE)
+
+/*-------------------------------------------------------------------------*/
 
 static int
 net2280_enable (struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
@@ -1280,7 +1275,7 @@ static const struct usb_gadget_ops net2280_ops = {
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef	HAVE_DRIVER_MODEL
+#ifdef	USE_SYSFS_DEBUG_FILES
 
 /* "function" sysfs attribute */
 static ssize_t
@@ -1771,25 +1766,19 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 
 	/* hook up the driver ... */
 	dev->driver = driver;
-#ifdef HAVE_DRIVER_MODEL
 	dev->gadget.dev.driver = &driver->driver;
-#endif
 	retval = driver->bind (&dev->gadget);
 	if (retval) {
 		DEBUG (dev, "bind to driver %s --> %d\n",
 				driver->driver.name, retval);
 		dev->driver = 0;
-#ifdef HAVE_DRIVER_MODEL
 		dev->gadget.dev.driver = 0;
-#endif
 		return retval;
 	}
 
-#ifdef HAVE_DRIVER_MODEL
 	// FIXME
 	// driver_register (&driver->driver);
 	// device_register (&dev->gadget.dev);
-#endif
 
 	device_create_file (&dev->pdev->dev, &dev_attr_function);
 	device_create_file (&dev->pdev->dev, &dev_attr_queues);
@@ -2501,14 +2490,10 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->pdev = pdev;
 	dev->gadget.ops = &net2280_ops;
 
-#ifdef HAVE_DRIVER_MODEL
 	strcpy (dev->gadget.dev.bus_id, pdev->slot_name);
 	strcpy (dev->gadget.dev.name, pdev->dev.name);
 	dev->gadget.dev.parent = &pdev->dev;
 	dev->gadget.dev.dma_mask = pdev->dev.dma_mask;
-#else
-	dev->gadget.dev.bus_id = pdev->slot_name;
-#endif
 	dev->gadget.name = driver_name;
 
 	/* now all the pci goodies ... */
@@ -2601,9 +2586,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 			, &dev->pci->pcimstctl);
 	/* erratum 0115 shouldn't appear: Linux inits PCI_LATENCY_TIMER */
 	pci_set_master (pdev);
-#ifdef	HAVE_PCI_SET_MWI
 	pci_set_mwi (pdev);
-#endif
 
 	/* ... also flushes any posted pci writes */
 	dev->chiprev = get_idx_reg (dev->regs, REG_CHIPREV) & 0xffff;

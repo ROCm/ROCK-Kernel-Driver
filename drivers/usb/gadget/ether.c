@@ -37,6 +37,8 @@
 #include <linux/interrupt.h>
 #include <linux/uts.h>
 #include <linux/version.h>
+#include <linux/device.h>
+#include <linux/moduleparam.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -118,17 +120,8 @@ static unsigned qmult = 4;
 #define TX_DELAY	8
 
 
-#ifdef HAVE_DRIVER_MODEL
-#include <linux/moduleparam.h>
+module_param (qmult, uint, S_IRUGO|S_IWUSR);
 
-module_param (qmult, uint, 0);
-
-#else
-
-MODULE_PARM (qmult, "i");
-MODULE_PARM_DESC (qmult, "rx/tx buffering factor");
-
-#endif	/* HAVE_DRIVER_MODEL */
 
 /*-------------------------------------------------------------------------*/
 
@@ -279,14 +272,8 @@ static const char EP_IN_NAME [] = "ep2in-bulk";
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef HAVE_DRIVER_MODEL
-#define xprintk(dev,level,fmt,args...) \
-	dev_printk(level , &dev->gadget->dev , fmt , ## args)
-#else
-#define xprintk(dev,level,fmt,args...) \
-	printk(level "%s %s: " fmt , shortname, dev->gadget->dev.bus_id, \
-		## args)
-#endif	/* HAVE_DRIVER_MODEL */
+#define xprintk(d,level,fmt,args...) \
+	dev_printk(level , &(d)->gadget->dev , fmt , ## args)
 
 #ifdef DEBUG
 #undef DEBUG
@@ -954,12 +941,10 @@ free_req:
 
 static void eth_setup_complete (struct usb_ep *ep, struct usb_request *req)
 {
-	if (req->status || req->actual != req->length) {
-		struct eth_dev		*dev = ep->driver_data;
-
-		DEBUG (dev, "setup complete --> %d, %d/%d\n",
+	if (req->status || req->actual != req->length)
+		DEBUG ((struct eth_dev *) ep->driver_data,
+				"setup complete --> %d, %d/%d\n",
 				req->status, req->actual, req->length);
-	}
 }
 
 /* see section 3.8.2 table 10 of the CDC spec for more ethernet

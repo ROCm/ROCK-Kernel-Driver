@@ -435,11 +435,6 @@ struct usb_gadget_ops {
 				unsigned code, unsigned long param);
 };
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,50)
-#define	HAVE_DRIVER_MODEL
-#include <linux/device.h>
-#endif
-
 /**
  * struct usb_gadget - represents a usb slave device
  * @ep0: Endpoint zero, used when reading or writing responses to
@@ -469,46 +464,20 @@ struct usb_gadget {
 	enum usb_device_speed		speed;
 	const char			*name;
 
-#ifdef	HAVE_DRIVER_MODEL
-	/* with 2.5 "generic dma" api, use this to allocate dma-coherent
-	 * buffers or set up dma mappings.  or print diagnostics, etc.
+	/* use this to allocate dma-coherent buffers or set up
+	 * dma mappings.  or print diagnostics, etc.
 	 */
 	struct device			dev;
-#else
-	struct __gadget_device {
-		char			*bus_id;
-		void			*driver_data;
-	} dev;
-#endif
 };
 
-#ifdef	HAVE_DRIVER_MODEL
 static inline void set_gadget_data (struct usb_gadget *gadget, void *data)
 	{ dev_set_drvdata (&gadget->dev, data); }
 static inline void *get_gadget_data (struct usb_gadget *gadget)
 	{ return dev_get_drvdata (&gadget->dev); }
 
-#else
-static inline void set_gadget_data (struct usb_gadget *gadget, void *data)
-	{ gadget->dev.driver_data = data; }
-static inline void *get_gadget_data (struct usb_gadget *gadget)
-	{ return gadget->dev.driver_data; }
-
-#endif
-
 /* iterates the non-control endpoints; 'tmp' is a struct usb_ep pointer */
 #define gadget_for_each_ep(tmp,gadget) \
 	list_for_each_entry(tmp, &(gadget)->ep_list, ep_list)
-
-#ifndef list_for_each_entry
-/* not available in 2.4.18 */
-#define list_for_each_entry(pos, head, member)				\
-	for (pos = list_entry((head)->next, typeof(*pos), member),	\
-		     prefetch(pos->member.next);			\
-	     &pos->member != (head); 					\
-	     pos = list_entry(pos->member.next, typeof(*pos), member),	\
-		     prefetch(pos->member.next))
-#endif
 
 
 /**
@@ -649,14 +618,7 @@ struct usb_gadget_driver {
 	void			(*resume)(struct usb_gadget *);
 
 	// FIXME support safe rmmod
-#ifdef	HAVE_DRIVER_MODEL
 	struct device_driver	driver;
-#else
-	struct __gadget_driver {
-		char		*name;
-		void		*driver_data;
-	} driver;
-#endif
 };
 
 

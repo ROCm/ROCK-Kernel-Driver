@@ -118,7 +118,7 @@ config USB_ETH
 	  This driver implements the "Communication Device Class" (CDC)
 	  Ethernet Control Model.  That protocol is often avoided with pure
 	  Ethernet adapters, in favor of simpler vendor-specific hardware,
-	  but is widely suppored by firmware for smart network devices.
+	  but is widely supported by firmware for smart network devices.
 
 	  Within the USB device, this gadget driver exposes a network device
 	  "usbX", where X depends on what other networking devices you have.
