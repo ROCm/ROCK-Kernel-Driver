@@ -55,7 +55,6 @@ CONFIG_PPC_STD_MMU=y
 # CONFIG_POWERPMC250 is not set
 # CONFIG_EV64260 is not set
 CONFIG_SPRUCE=y
-# CONFIG_MENF1 is not set
 # CONFIG_LOPEC is not set
 # CONFIG_MCPN765 is not set
 # CONFIG_MVME5100 is not set

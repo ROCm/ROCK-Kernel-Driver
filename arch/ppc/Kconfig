@@ -450,9 +450,6 @@ config EV64260
 config SPRUCE
 	bool "IBM-Spruce"
 
-config MENF1
-	bool "MEN-F1"
-
 config LOPEC
 	bool "Motorola-LoPEC"
 
@@ -533,7 +530,7 @@ config WILLOW
 
 config MPC10X_STORE_GATHERING
 	bool "Enable MPC10x store gathering"
-	depends on FORCE || MENF1 || SANDPOINT
+	depends on FORCE || SANDPOINT
 
 config GT64260
 	bool
