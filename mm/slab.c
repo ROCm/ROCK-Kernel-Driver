@@ -1984,26 +1984,18 @@ void * kmalloc (size_t size, int flags)
 
 #ifdef CONFIG_SMP
 /**
- * kmalloc_percpu - allocate one copy of the object for every present
- * cpu in the system.
+ * __alloc_percpu - allocate one copy of the object for every present
+ * cpu in the system, zeroing them.
  * Objects should be dereferenced using per_cpu_ptr/get_cpu_ptr
  * macros only.
  *
  * @size: how many bytes of memory are required.
- * @flags: the type of memory to allocate.
- * The @flags argument may be one of:
- *
- * %GFP_USER - Allocate memory on behalf of user.  May sleep.
- *
- * %GFP_KERNEL - Allocate normal kernel ram.  May sleep.
- *
- * %GFP_ATOMIC - Allocation will not sleep.  Use inside interrupt handlers.
+ * @align: the alignment, which can't be greater than SMP_CACHE_BYTES.
  */
-void *
-kmalloc_percpu(size_t size, int flags)
+void *__alloc_percpu(size_t size, size_t align)
 {
 	int i;
-	struct percpu_data *pdata = kmalloc(sizeof (*pdata), flags);
+	struct percpu_data *pdata = kmalloc(sizeof (*pdata), GFP_KERNEL);
 
 	if (!pdata)
 		return NULL;
@@ -2011,9 +2003,10 @@ kmalloc_percpu(size_t size, int flags)
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_possible(i))
 			continue;
-		pdata->ptrs[i] = kmalloc(size, flags);
+		pdata->ptrs[i] = kmalloc(size, GFP_KERNEL);
 		if (!pdata->ptrs[i])
 			goto unwind_oom;
+		memset(pdata->ptrs[i], 0, size);
 	}
 
 	/* Catch derefs w/o wrappers */
@@ -2070,14 +2063,14 @@ void kfree (const void *objp)
 
 #ifdef CONFIG_SMP
 /**
- * kfree_percpu - free previously allocated percpu memory
- * @objp: pointer returned by kmalloc_percpu.
+ * free_percpu - free previously allocated percpu memory
+ * @objp: pointer returned by alloc_percpu.
  *
- * Don't free memory not originally allocated by kmalloc_percpu()
+ * Don't free memory not originally allocated by alloc_percpu()
  * The complemented objp is to check for that.
  */
 void
-kfree_percpu(const void *objp)
+free_percpu(const void *objp)
 {
 	int i;
 	struct percpu_data *p = (struct percpu_data *) (~(unsigned long) objp);

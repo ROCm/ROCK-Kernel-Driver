@@ -1,7 +1,8 @@
 #ifndef __LINUX_PERCPU_H
 #define __LINUX_PERCPU_H
 #include <linux/spinlock.h> /* For preempt_disable() */
-#include <linux/slab.h> /* For kmalloc_percpu() */
+#include <linux/slab.h> /* For kmalloc() */
+#include <linux/string.h> /* For memset() */
 #include <asm/percpu.h>
 
 /* Must be an lvalue. */
@@ -17,7 +18,7 @@ struct percpu_data {
 
 /* 
  * Use this to get to a cpu's version of the per-cpu object allocated using
- * kmalloc_percpu.  If you want to get "this cpu's version", maybe you want
+ * alloc_percpu.  If you want to get "this cpu's version", maybe you want
  * to use get_cpu_ptr... 
  */ 
 #define per_cpu_ptr(ptr, cpu)                   \
@@ -26,19 +27,22 @@ struct percpu_data {
         (__typeof__(ptr))__p->ptrs[(cpu)];	\
 })
 
-extern void *kmalloc_percpu(size_t size, int flags);
-extern void kfree_percpu(const void *);
+extern void *__alloc_percpu(size_t size, size_t align);
+extern void free_percpu(const void *);
 extern void kmalloc_percpu_init(void);
 
 #else /* CONFIG_SMP */
 
 #define per_cpu_ptr(ptr, cpu) (ptr)
 
-static inline void *kmalloc_percpu(size_t size, int flags)
+static inline void *__alloc_percpu(size_t size, size_t align)
 {
-	return(kmalloc(size, flags));
+	void *ret = kmalloc(size, GFP_KERNEL);
+	if (ret)
+		memset(ret, 0, size);
+	return ret;
 }
-static inline void kfree_percpu(const void *ptr)
+static inline void free_percpu(const void *ptr)
 {	
 	kfree(ptr);
 }
@@ -46,9 +50,13 @@ static inline void kmalloc_percpu_init(void) { }
 
 #endif /* CONFIG_SMP */
 
+/* Simple wrapper for the common case: zeros memory. */
+#define alloc_percpu(type) \
+	((type *)(__alloc_percpu(sizeof(type), __alignof__(type))))
+
 /* 
- * Use these with kmalloc_percpu. If
- * 1. You want to operate on memory allocated by kmalloc_percpu (dereference
+ * Use these with alloc_percpu. If
+ * 1. You want to operate on memory allocated by alloc_percpu (dereference
  *    and read/modify/write)  AND 
  * 2. You want "this cpu's version" of the object AND 
  * 3. You want to do this safely since:

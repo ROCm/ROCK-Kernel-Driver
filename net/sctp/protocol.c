@@ -880,25 +880,13 @@ static int __init init_sctp_mibs(void)
 {
 	int i;
 
-	sctp_statistics[0] = kmalloc_percpu(sizeof (struct sctp_mib),
-					    GFP_KERNEL);
+	sctp_statistics[0] = alloc_percpu(struct sctp_mib);
 	if (!sctp_statistics[0])
 		return -ENOMEM;
-	sctp_statistics[1] = kmalloc_percpu(sizeof (struct sctp_mib),
-					    GFP_KERNEL);
+	sctp_statistics[1] = alloc_percpu(struct sctp_mib);
 	if (!sctp_statistics[1]) {
-		kfree_percpu(sctp_statistics[0]);
+		free_percpu(sctp_statistics[0]);
 		return -ENOMEM;
-	}
-
-	/* Zero all percpu versions of the mibs */
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i)) {
-			memset(per_cpu_ptr(sctp_statistics[0], i), 0,
-					sizeof (struct sctp_mib));
-			memset(per_cpu_ptr(sctp_statistics[1], i), 0,
-					sizeof (struct sctp_mib));
-		}
 	}
 	return 0;
 
@@ -906,8 +894,8 @@ static int __init init_sctp_mibs(void)
 
 static void cleanup_sctp_mibs(void)
 {
-	kfree_percpu(sctp_statistics[0]);
-	kfree_percpu(sctp_statistics[1]);
+	free_percpu(sctp_statistics[0]);
+	free_percpu(sctp_statistics[1]);
 }
 
 /* Initialize the universe into something sensible.  */
