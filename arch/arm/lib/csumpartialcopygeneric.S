@@ -36,16 +36,16 @@ sum	.req	r3
 
 		load1b	ip
 		sub	len, len, #1
-		adcs	sum, sum, ip, lsl #byte(1)	@ update checksum
+		adcs	sum, sum, ip, put_byte_1	@ update checksum
 		strb	ip, [dst], #1
 		tst	dst, #2
 		moveq	pc, lr			@ dst is now 32bit aligned
 
 .dst_16bit:	load2b	r8, ip
 		sub	len, len, #2
-		adcs	sum, sum, r8, lsl #byte(0)
+		adcs	sum, sum, r8, put_byte_0
 		strb	r8, [dst], #1
-		adcs	sum, sum, ip, lsl #byte(1)
+		adcs	sum, sum, ip, put_byte_1
 		strb	ip, [dst], #1
 		mov	pc, lr			@ dst is now 32bit aligned
 
@@ -63,16 +63,16 @@ sum	.req	r3
 		/* Align dst */
 		load1b	ip
 		sub	len, len, #1
-		adcs	sum, sum, ip, lsl #byte(1)	@ update checksum
+		adcs	sum, sum, ip, put_byte_1	@ update checksum
 		strb	ip, [dst], #1
 		tst	len, #6
 		beq	.less8_byteonly
 
 1:		load2b	r8, ip
 		sub	len, len, #2
-		adcs	sum, sum, r8, lsl #byte(0)
+		adcs	sum, sum, r8, put_byte_0
 		strb	r8, [dst], #1
-		adcs	sum, sum, ip, lsl #byte(1)
+		adcs	sum, sum, ip, put_byte_1
 		strb	ip, [dst], #1
 .less8_aligned:	tst	len, #6
 		bne	1b
@@ -80,7 +80,7 @@ sum	.req	r3
 		tst	len, #1
 		beq	.done
 		load1b	r8
-		adcs	sum, sum, r8, lsl #byte(0)	@ update checksum
+		adcs	sum, sum, r8, put_byte_0	@ update checksum
 		strb	r8, [dst], #1
 		b	.done
 
@@ -139,17 +139,17 @@ FN_ENTRY
 		beq	.done
 		load1l	r4
 		tst	len, #2
-		mov	r5, r4, lsr #byte(0)
+		mov	r5, r4, get_byte_0
 		beq	.exit
 		adcs	sum, sum, r4, push #16
 		strb	r5, [dst], #1
-		mov	r5, r4, lsr #byte(1)
+		mov	r5, r4, get_byte_1
 		strb	r5, [dst], #1
-		mov	r5, r4, lsr #byte(2)
+		mov	r5, r4, get_byte_2
 .exit:		tst	len, #1
 		strneb	r5, [dst], #1
 		andne	r5, r5, #255
-		adcnes	sum, sum, r5, lsl #byte(0)
+		adcnes	sum, sum, r5, put_byte_0
 
 		/*
 		 * If the dst pointer was not 16-bit aligned, we
@@ -213,14 +213,14 @@ FN_ENTRY
 		mov	r4, r5, pull #8
 4:		ands	len, len, #3
 		beq	.done
-		mov	r5, r4, lsr #byte(0)
+		mov	r5, r4, get_byte_0
 		tst	len, #2
 		beq	.exit
 		adcs	sum, sum, r4, push #16
 		strb	r5, [dst], #1
-		mov	r5, r4, lsr #byte(1)
+		mov	r5, r4, get_byte_1
 		strb	r5, [dst], #1
-		mov	r5, r4, lsr #byte(2)
+		mov	r5, r4, get_byte_2
 		b	.exit
 
 .src2_aligned:	mov	r4, r5, pull #16
@@ -265,12 +265,12 @@ FN_ENTRY
 		mov	r4, r5, pull #16
 4:		ands	len, len, #3
 		beq	.done
-		mov	r5, r4, lsr #byte(0)
+		mov	r5, r4, get_byte_0
 		tst	len, #2
 		beq	.exit
 		adcs	sum, sum, r4
 		strb	r5, [dst], #1
-		mov	r5, r4, lsr #byte(1)
+		mov	r5, r4, get_byte_1
 		strb	r5, [dst], #1
 		tst	len, #1
 		beq	.done
@@ -319,14 +319,14 @@ FN_ENTRY
 		mov	r4, r5, pull #24
 4:		ands	len, len, #3
 		beq	.done
-		mov	r5, r4, lsr #byte(0)
+		mov	r5, r4, get_byte_0
 		tst	len, #2
 		beq	.exit
 		strb	r5, [dst], #1
 		adcs	sum, sum, r4
 		load1l	r4
-		mov	r5, r4, lsr #byte(0)
+		mov	r5, r4, get_byte_0
 		strb	r5, [dst], #1
 		adcs	sum, sum, r4, push #24
-		mov	r5, r4, lsr #byte(1)
+		mov	r5, r4, get_byte_1
 		b	.exit
