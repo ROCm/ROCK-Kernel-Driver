@@ -578,7 +578,9 @@ static int proc_control(struct dev_state *ps, void *arg)
 	}
 	free_page((unsigned long)tbuf);
 	if (i<0) {
-		printk(KERN_DEBUG "usbfs: USBDEVFS_CONTROL failed dev %d rqt %u rq %u len %u ret %d\n", 
+		printk(KERN_DEBUG "usbfs: USBDEVFS_CONTROL failed "
+			"cmd %s dev %d rqt %u rq %u len %u ret %d\n", 
+			current->comm,
 		       dev->devnum, ctrl.bRequestType, ctrl.bRequest, ctrl.wLength, i);
 	}
 	return i;
