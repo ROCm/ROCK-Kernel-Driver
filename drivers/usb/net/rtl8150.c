@@ -22,7 +22,7 @@
 #include <asm/uaccess.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v0.5.3 (2002/04/08)"
+#define DRIVER_VERSION "v0.5.4 (2002/04/11)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "rtl8150 based usb-ethernet driver"
 
@@ -65,6 +65,7 @@
 #define	RTL8150_HW_CRC		0
 #define	RX_REG_SET		1
 #define	RTL8150_UNPLUG		2
+#define	RX_URB_FAIL		3
 
 /* Define these values to match your device */
 #define VENDOR_ID_REALTEK		0x0bda
@@ -296,20 +297,19 @@ static void read_bulk_callback(struct urb *urb)
 	u16 rx_stat;
 
 	dev = urb->context;
-	if (!dev) {
-		warn("!dev");
+	if (!dev)
 		return;
-	}
+	if (test_bit(RTL8150_UNPLUG, &dev->flags))
+		return;
 	netdev = dev->netdev;
-	if (!netif_device_present(netdev)) {
-		warn("the network device is not present");
+	if (!netif_device_present(netdev))
 		return;
-	}
+
 	switch (urb->status) {
 	case 0:
 		break;
 	case -ENOENT:
-		return;
+		return;	/* urb's in unlink state */
 	case -ETIMEDOUT:
 		warn("reset needed may be?..");
 		goto goon;
@@ -317,6 +317,8 @@ static void read_bulk_callback(struct urb *urb)
 		warn("Rx status %d", urb->status);
 		goto goon;
 	}
+
+	tasklet_schedule(&dev->tl);
 
 	if (!dev->rx_skb) {
 		/* lost packets++ */
@@ -333,8 +335,6 @@ static void read_bulk_callback(struct urb *urb)
 	dev->stats.rx_packets++;
 	dev->stats.rx_bytes += pkt_len;
 	
-	tasklet_schedule(&dev->tl);
-
 	skb = pull_skb(dev);
 	if (!skb) {
 		dev->rx_skb = NULL;
@@ -347,8 +347,10 @@ static void read_bulk_callback(struct urb *urb)
 goon:
 	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
-	if ((res = usb_submit_urb(dev->rx_urb, GFP_ATOMIC)))
-		warn("%s: Rx urb submission failed %d", netdev->name, res);
+	if (usb_submit_urb(dev->rx_urb, GFP_ATOMIC))
+		set_bit(RX_URB_FAIL, &dev->flags);
+	else
+		clear_bit(RX_URB_FAIL, &dev->flags);
 }
 
 static void rx_fixup(unsigned long data)
@@ -357,18 +359,25 @@ static void rx_fixup(unsigned long data)
 	struct sk_buff *skb;
 
 	dev = (rtl8150_t *)data;
+
 	fill_skb_pool(dev);
-	skb = pull_skb(dev);
-	if (!skb) {
+	if (test_bit(RX_URB_FAIL, &dev->flags))
+		goto try_again;
+	if (dev->rx_skb)
+		return;
+	if (!(skb = pull_skb(dev))) {
 		tasklet_schedule(&dev->tl);
 		return;
 	}
-	if (dev->rx_skb)
-		return;
 	dev->rx_skb = skb;
 	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
-	usb_submit_urb(dev->rx_urb, GFP_ATOMIC);
+try_again:
+	if (usb_submit_urb(dev->rx_urb, GFP_ATOMIC)) {
+		set_bit(RX_URB_FAIL, &dev->flags);
+		tasklet_schedule(&dev->tl);
+	 } else
+		clear_bit(RX_URB_FAIL, &dev->flags);
 }
 
 static void write_bulk_callback(struct urb *urb)
@@ -544,7 +553,7 @@ static int rtl8150_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	dev->tx_skb = skb;
 	FILL_BULK_URB(dev->tx_urb, dev->udev, usb_sndbulkpipe(dev->udev, 2),
 		      skb->data, count, write_bulk_callback, dev);
-	if ((res = usb_submit_urb(dev->tx_urb, GFP_KERNEL))) {
+	if ((res = usb_submit_urb(dev->tx_urb, GFP_ATOMIC))) {
 		warn("failed tx_urb %d\n", res);
 		dev->stats.tx_errors++;
 		netif_start_queue(netdev);
@@ -598,10 +607,10 @@ static int rtl8150_close(struct net_device *netdev)
 		return -ENODEV;
 
 	down(&dev->sem);
+	netif_stop_queue(netdev);
 	if (!test_bit(RTL8150_UNPLUG, &dev->flags))
 		disable_net_traffic(dev);
 	unlink_all_urbs(dev);
-	netif_stop_queue(netdev);
 	up(&dev->sem);
 
 	return res;
