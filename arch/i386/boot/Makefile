@@ -30,6 +30,10 @@ EXTRA_TARGETS	:= vmlinux.bin bvmlinux.bin bootsect bootsect.o \
 
 host-progs	:= tools/build
 
+# 	Default
+
+boot: bzImage
+
 include $(TOPDIR)/Rules.make
 
 # ---------------------------------------------------------------------------
@@ -79,3 +83,11 @@ clean:
 	@rm -f setup bootsect zImage compressed/vmlinux.out
 	@rm -f bsetup bbootsect bzImage compressed/bvmlinux.out
 	@$(MAKE) -C compressed clean
+
+archhelp:
+	@echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
+	@echo  '  install	- Install kernel using'
+	@echo  '                  (your) ~/bin/installkernel or'
+	@echo  '                  (distribution) /sbin/installkernel or'
+	@echo  '        	  install to $$(INSTALL_PATH) and run lilo'
+
