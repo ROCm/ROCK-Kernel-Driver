@@ -59,6 +59,7 @@ unsigned long cache_decay_ticks;
 
 cpumask_t cpu_possible_map = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
+cpumask_t cpu_sibling_map[NR_CPUS] = { [0 ... NR_CPUS-1] = CPU_MASK_NONE };
 
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(cpu_possible_map);
@@ -858,6 +859,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	for_each_cpu(cpu)
 		if (cpu != boot_cpuid)
 			smp_create_idle(cpu);
+
+	for_each_cpu(cpu) {
+		cpu_set(cpu, cpu_sibling_map[cpu]);
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+			cpu_set(cpu ^ 0x1, cpu_sibling_map[cpu]);
+	}
 }
 
 void __devinit smp_prepare_boot_cpu(void)
