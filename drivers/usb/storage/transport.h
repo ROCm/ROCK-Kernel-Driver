@@ -58,6 +58,9 @@
 #define US_PR_EUSB_SDDR09	0x81	/* SCM-SCSI bridge for
 						SDDR-09 */
 #endif
+#ifdef CONFIG_USB_STORAGE_SDDR55
+#define US_PR_SDDR55	0x82		/* SDDR-55 (made up) */
+#endif
 #define US_PR_DPCM_USB  0xf0		/* Combination CB/SDDR09 */
 
 #ifdef CONFIG_USB_STORAGE_FREECOM

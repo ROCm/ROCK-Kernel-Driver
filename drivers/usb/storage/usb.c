@@ -60,6 +60,9 @@
 #ifdef CONFIG_USB_STORAGE_SDDR09
 #include "sddr09.h"
 #endif
+#ifdef CONFIG_USB_STORAGE_SDDR55
+#include "sddr55.h"
+#endif
 #ifdef CONFIG_USB_STORAGE_DPCM
 #include "dpcm.h"
 #endif
@@ -860,6 +863,15 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			ss->transport_name = "EUSB/SDDR09";
 			ss->transport = sddr09_transport;
 			ss->transport_reset = usb_stor_CB_reset;
+			ss->max_lun = 0;
+			break;
+#endif
+
+#ifdef CONFIG_USB_STORAGE_SDDR55
+		case US_PR_SDDR55:
+			ss->transport_name = "SDDR55";
+			ss->transport = sddr55_transport;
+			ss->transport_reset = sddr55_reset;
 			ss->max_lun = 0;
 			break;
 #endif
