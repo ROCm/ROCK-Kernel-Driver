@@ -61,6 +61,7 @@
  *		Panu Kuhlberg:		Experimental audit of TCP (re)transmission
  *					engine. Lots of bugs are found.
  *		Pasi Sarolahti:		F-RTO for dealing with spurious RTOs
+ *		Angelo Dell'Aera:	TCP Westwood+ support
  */
 
 #include <linux/config.h>
@@ -89,6 +90,7 @@ int sysctl_tcp_stdurg;
 int sysctl_tcp_rfc1337;
 int sysctl_tcp_max_orphans = NR_FILE;
 int sysctl_tcp_frto;
+int sysctl_tcp_westwood;
 
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
@@ -474,6 +476,8 @@ static void tcp_rtt_estimator(struct tcp_opt *tp, __u32 mrtt)
 		tp->mdev_max = tp->rttvar = max(tp->mdev, TCP_RTO_MIN);
 		tp->rtt_seq = tp->snd_nxt;
 	}
+
+	tcp_westwood_update_rtt(tp, tp->srtt >> 3);
 }
 
 /* Calculate rto without backoff.  This is the second half of Van Jacobson's
@@ -981,7 +985,8 @@ void tcp_enter_frto(struct sock *sk)
             tp->snd_una == tp->high_seq ||
             (tp->ca_state == TCP_CA_Loss && !tp->retransmits)) {
 		tp->prior_ssthresh = tcp_current_ssthresh(tp);
-		tp->snd_ssthresh = tcp_recalc_ssthresh(tp);
+		if (!tcp_westwood_ssthresh(tp))
+			tp->snd_ssthresh = tcp_recalc_ssthresh(tp);
 	}
 
 	/* Have to clear retransmission markers here to keep the bookkeeping
@@ -1390,11 +1395,24 @@ static __inline__ void tcp_moderate_cwnd(struct tcp_opt *tp)
 static void tcp_cwnd_down(struct tcp_opt *tp)
 {
 	int decr = tp->snd_cwnd_cnt + 1;
+	__u32 limit;
+
+	/*
+	 * TCP Westwood
+         * Here limit is evaluated as BWestimation*RTTmin (for obtaining it
+	 * in packets we use mss_cache). If CONFIG_TCP_WESTWOOD is not defined
+	 * westwood_bw_rttmin() returns 0. In such case snd_ssthresh is still
+	 * used as usual. It prevents other strange cases in which BWE*RTTmin
+	 * could assume value 0. It should not happen but...
+	 */
+
+	if (!(limit = tcp_westwood_bw_rttmin(tp)))
+		limit = tp->snd_ssthresh/2;
 
 	tp->snd_cwnd_cnt = decr&1;
 	decr >>= 1;
 
-	if (decr && tp->snd_cwnd > tp->snd_ssthresh/2)
+	if (decr && tp->snd_cwnd > limit)
 		tp->snd_cwnd -= decr;
 
 	tp->snd_cwnd = min(tp->snd_cwnd, tcp_packets_in_flight(tp)+1);
@@ -1539,7 +1557,10 @@ static int tcp_try_undo_loss(struct sock *sk, struct tcp_opt *tp)
 
 static __inline__ void tcp_complete_cwr(struct tcp_opt *tp)
 {
-	tp->snd_cwnd = min(tp->snd_cwnd, tp->snd_ssthresh);
+	if (tcp_westwood_cwnd(tp)) 
+		tp->snd_ssthresh = tp->snd_cwnd;
+	else
+		tp->snd_cwnd = min(tp->snd_cwnd, tp->snd_ssthresh);
 	tp->snd_cwnd_stamp = tcp_time_stamp;
 }
 
@@ -2030,6 +2051,240 @@ static void tcp_process_frto(struct sock *sk, u32 prior_snd_una)
 	 */
 	tp->frto_counter = (tp->frto_counter + 1) % 3;
 }
+/*
+ * TCP Westwood
+ * Functions needed for estimating bandwidth.
+ */
+
+/*
+ * This function initializes fields used in TCP Westwood.
+ * We can't get no information about RTT at this time so
+ * we are forced to set it to 0.
+ */
+static void init_westwood(struct sock *sk)
+{
+        struct tcp_opt *tp = tcp_sk(sk);
+
+        tp->westwood.bw_sample = 0;
+        tp->westwood.bw_ns_est = 0;
+        tp->westwood.bw_est = 0;
+        tp->westwood.accounted = 0;
+        tp->westwood.cumul_ack = 0;
+        tp->westwood.rtt_win_sx = tcp_time_stamp;
+        tp->westwood.rtt = TCP_WESTWOOD_INIT_RTT;
+        tp->westwood.rtt_min = TCP_WESTWOOD_INIT_RTT;
+        tp->westwood.snd_una = tp->snd_una;
+}
+
+/*
+ * @westwood_do_filter
+ * Low-pass filter. Implemented using constant coeffients.
+ */
+static inline __u32 westwood_do_filter(__u32 a, __u32 b)
+{
+	return (((7 * a) + b) >> 3);
+}
+
+static void westwood_filter(struct sock *sk, __u32 delta)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	__u32 sample = tp->westwood.bk / delta;
+
+	tp->westwood.bw_ns_est =
+		westwood_do_filter(tp->westwood.bw_ns_est, sample);
+	tp->westwood.bw_est =
+		westwood_do_filter(tp->westwood.bw_est,
+				   tp->westwood.bw_ns_est);
+	tp->westwood.bw_sample = sample;
+}
+
+/* @westwood_update_rttmin
+ * It is used to update RTTmin. In this case we MUST NOT use
+ * WESTWOOD_RTT_MIN minimum bound since we could be on a LAN!
+ */
+static inline __u32 westwood_update_rttmin(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	__u32 rttmin = tp->westwood.rtt_min;
+
+	if (tp->westwood.rtt == 0)
+		return(rttmin);
+
+	if (tp->westwood.rtt < tp->westwood.rtt_min || !rttmin)
+		rttmin = tp->westwood.rtt;
+
+	return(rttmin);
+}
+
+/*
+ * @westwood_acked
+ * Evaluate increases for dk. It requires no lock since when it is
+ * called lock should already be held. Be careful about it!
+ */
+static inline __u32 westwood_acked(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+
+	return ((tp->snd_una) - (tp->westwood.snd_una));
+}
+
+/*
+ * @westwood_new_window
+ * It evaluates if we are receiving data inside the same RTT window as
+ * when we started.
+ * Return value:
+ * It returns 0 if we are still evaluating samples in the same RTT
+ * window, 1 if the sample has to be considered in the next window.
+ */
+static int westwood_new_window(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	__u32 left_bound;
+	__u32 rtt;
+	int ret = 0;
+
+	left_bound = tp->westwood.rtt_win_sx;
+	rtt = max(tp->westwood.rtt, (u32) TCP_WESTWOOD_RTT_MIN);
+
+	/*
+	 * A RTT-window has passed. Be careful since if RTT is less than
+	 * 50ms we don't filter but we continue 'building the sample'.
+	 * This minimum limit was choosen since an estimation on small
+	 * time intervals is better to avoid...
+	 * Obvioulsy on a LAN we reasonably will always have
+	 * right_bound = left_bound + WESTWOOD_RTT_MIN
+         */
+
+	if ((left_bound + rtt) < tcp_time_stamp)
+		ret = 1;
+
+	return ret;
+}
+
+/*
+ * @westwood_update_window
+ * It updates RTT evaluation window if it is the right moment to do
+ * it. If so it calls filter for evaluating bandwidth. Be careful
+ * about __westwood_update_window() since it is called without
+ * any form of lock. It should be used only for internal purposes.
+ * Call westwood_update_window() instead.
+ */
+static void __westwood_update_window(struct sock *sk, __u32 now)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	__u32 delta = now - tp->westwood.rtt_win_sx;
+
+        if (!delta)
+                return;
+
+	if (tp->westwood.rtt)
+                westwood_filter(sk, delta);
+
+        tp->westwood.bk = 0;
+        tp->westwood.rtt_win_sx = tcp_time_stamp;
+}
+
+
+static void westwood_update_window(struct sock *sk, __u32 now)
+{
+	if (westwood_new_window(sk)) 
+		__westwood_update_window(sk, now);
+}
+
+/*
+ * @__westwood_fast_bw
+ * It is called when we are in fast path. In particular it is called when
+ * header prediction is successfull. In such case infact update is
+ * straight forward and doesn't need any particular care.
+ */
+void __tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+
+	westwood_update_window(sk, tcp_time_stamp);
+
+	tp->westwood.bk += westwood_acked(sk);
+	tp->westwood.snd_una = tp->snd_una;
+	tp->westwood.rtt_min = westwood_update_rttmin(sk);
+}
+
+
+/*
+ * @tcp_westwood_dupack_update
+ * It updates accounted and cumul_ack when receiving a dupack.
+ */
+
+static void westwood_dupack_update(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+
+	tp->westwood.accounted += tp->mss_cache;
+	tp->westwood.cumul_ack = tp->mss_cache;
+}
+
+static inline int westwood_may_change_cumul(struct tcp_opt *tp)
+{
+	return ((tp->westwood.cumul_ack) > tp->mss_cache);
+}
+
+static inline void westwood_partial_update(struct tcp_opt *tp)
+{
+	tp->westwood.accounted -= tp->westwood.cumul_ack;
+	tp->westwood.cumul_ack = tp->mss_cache;
+}
+
+static inline void westwood_complete_update(struct tcp_opt *tp)
+{
+	tp->westwood.cumul_ack -= tp->westwood.accounted;
+	tp->westwood.accounted = 0;
+}
+
+/*
+ * @westwood_acked_count
+ * This function evaluates cumul_ack for evaluating dk in case of
+ * delayed or partial acks.
+ */
+static __u32 westwood_acked_count(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+
+	tp->westwood.cumul_ack = westwood_acked(sk);
+
+        /* If cumul_ack is 0 this is a dupack since it's not moving
+         * tp->snd_una.
+         */
+        if (!(tp->westwood.cumul_ack))
+                westwood_dupack_update(sk);
+
+        if (westwood_may_change_cumul(tp)) {
+		/* Partial or delayed ack */
+		if ((tp->westwood.accounted) >= (tp->westwood.cumul_ack))
+			westwood_partial_update(tp);
+		else
+			westwood_complete_update(tp);
+	}
+
+	tp->westwood.snd_una = tp->snd_una;
+
+	return tp->westwood.cumul_ack;
+}
+
+
+/*
+ * @__westwood_slow_bw
+ * It is called when something is going wrong..even if there could
+ * be no problems! Infact a simple delayed packet may trigger a
+ * dupack. But we need to be careful in such case.
+ */
+void __tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+
+	westwood_update_window(sk, tcp_time_stamp);
+
+	tp->westwood.bk += westwood_acked_count(sk);
+	tp->westwood.rtt_min = westwood_update_rttmin(sk);
+}
 
 /* This routine deals with incoming acks, but not outgoing ones. */
 static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
@@ -2057,6 +2312,7 @@ static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 		 */
 		tcp_update_wl(tp, ack, ack_seq);
 		tp->snd_una = ack;
+		tcp_westwood_fast_bw(sk, skb);
 		flag |= FLAG_WIN_UPDATE;
 
 		NET_INC_STATS_BH(TCPHPAcks);
@@ -2073,6 +2329,8 @@ static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 
 		if (TCP_ECN_rcv_ecn_echo(tp, skb->h.th))
 			flag |= FLAG_ECE;
+
+		tcp_westwood_slow_bw(sk,skb);
 	}
 
 	/* We passed data and got it acked, remove any soft error
@@ -3866,6 +4124,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 			if(tp->af_specific->conn_request(sk, skb) < 0)
 				return 1;
 
+			init_westwood(sk);
+
 			/* Now we have several options: In theory there is 
 			 * nothing else in the frame. KA9Q has an option to 
 			 * send data with the syn, BSD accepts data with the
@@ -3887,6 +4147,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 		goto discard;
 
 	case TCP_SYN_SENT:
+		init_westwood(sk);
+
 		queued = tcp_rcv_synsent_state_process(sk, skb, th, len);
 		if (queued >= 0)
 			return queued;
