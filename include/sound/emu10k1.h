@@ -30,6 +30,7 @@
 #include <sound/hwdep.h>
 #include <sound/ac97_codec.h>
 #include <sound/util_mem.h>
+#include <sound/pcm-indirect.h>
 #include <linux/interrupt.h>
 #include <asm/io.h>
 
@@ -887,10 +888,7 @@ typedef struct {
 	unsigned char gpr_trigger;	/* GPR containing trigger (activate) information (host) */
 	unsigned char gpr_running;	/* GPR containing info if PCM is running (FX8010) */
 	unsigned char etram[32];	/* external TRAM address & data */
-	unsigned int sw_data, hw_data;
-	unsigned int sw_io, hw_io;
-	unsigned int sw_ready, hw_ready;
-	unsigned int appl_ptr;
+	snd_pcm_indirect_t pcm_rec;
 	unsigned int tram_pos;
 	unsigned int tram_shift;
 	snd_emu10k1_fx8010_irq_t *irq;
@@ -935,11 +933,11 @@ struct _snd_emu10k1 {
 	int irq;
 
 	unsigned long port;			/* I/O port number */
-	struct resource *res_port;
 	int APS: 1,				/* APS flag */
 	    no_ac97: 1,				/* no AC'97 */
 	    tos_link: 1,			/* tos link detected */
-	    rear_ac97: 1;			/* rear channels are on AC'97 */
+	    rear_ac97: 1,			/* rear channels are on AC'97 */
+	    spk71:1;				/* 7.1 configuration (Audigy 2 ZS) */
 	unsigned int audigy;			/* is Audigy? */
 	unsigned int revision;			/* chip revision */
 	unsigned int serial;			/* serial number */
@@ -947,7 +945,6 @@ struct _snd_emu10k1 {
 	unsigned int card_type;			/* EMU10K1_CARD_* */
 	unsigned int ecard_ctrl;		/* ecard control bits */
 	unsigned long dma_mask;			/* PCI DMA mask */
-	struct snd_dma_device dma_dev;		/* DMA device description */
 	int max_cache_pages;			/* max memory size / PAGE_SIZE */
 	struct snd_dma_buffer silent_page;	/* silent page */
 	struct snd_dma_buffer ptb_pages;	/* page table pages */
@@ -972,7 +969,6 @@ struct _snd_emu10k1 {
 	snd_pcm_t *pcm;
 	snd_pcm_t *pcm_mic;
 	snd_pcm_t *pcm_efx;
-	snd_pcm_t *pcm_fx8010;
 
 	spinlock_t synth_lock;
 	void *synth;
@@ -1069,6 +1065,15 @@ int snd_emu10k1_audigy_midi(emu10k1_t * emu);
 /* proc interface */
 int snd_emu10k1_proc_init(emu10k1_t * emu);
 
+/* fx8010 irq handler */
+int snd_emu10k1_fx8010_register_irq_handler(emu10k1_t *emu,
+					    snd_fx8010_irq_handler_t *handler,
+					    unsigned char gpr_running,
+					    void *private_data,
+					    snd_emu10k1_fx8010_irq_t **r_irq);
+int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
+					      snd_emu10k1_fx8010_irq_t *irq);
+
 #endif /* __KERNEL__ */
 
 /*
@@ -1162,6 +1167,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define FXBUS_PCM_RIGHT_FRONT	0x09
 #define FXBUS_MIDI_REVERB	0x0c
 #define FXBUS_MIDI_CHORUS	0x0d
+#define FXBUS_PCM_LEFT_SIDE	0x0e
+#define FXBUS_PCM_RIGHT_SIDE	0x0f
 #define FXBUS_PT_LEFT		0x14
 #define FXBUS_PT_RIGHT		0x15
 
@@ -1227,8 +1234,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define A_EXTOUT_AFRONT_R	0x09	/*              right */
 #define A_EXTOUT_ACENTER	0x0a	/* analog center */
 #define A_EXTOUT_ALFE		0x0b	/* analog LFE */
-/* 0x0c ?? */
-/* 0x0d ?? */
+#define A_EXTOUT_ASIDE_L	0x0c	/* analog side left  - Audigy 2 ZS */
+#define A_EXTOUT_ASIDE_R	0x0d	/*             right - Audigy 2 ZS */
 #define A_EXTOUT_AREAR_L	0x0e	/* analog rear left */
 #define A_EXTOUT_AREAR_R	0x0f	/*             right */
 #define A_EXTOUT_AC97_L		0x10	/* AC97 left (front) */

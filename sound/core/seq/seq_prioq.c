@@ -59,7 +59,7 @@ prioq_t *snd_seq_prioq_new(void)
 {
 	prioq_t *f;
 
-	f = snd_kcalloc(sizeof(prioq_t), GFP_KERNEL);
+	f = kcalloc(1, sizeof(*f), GFP_KERNEL);
 	if (f == NULL) {
 		snd_printd("oops: malloc failed for snd_seq_prioq_new()\n");
 		return NULL;

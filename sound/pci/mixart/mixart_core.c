@@ -403,7 +403,7 @@ void snd_mixart_msg_tasklet( unsigned long arg)
 
 irqreturn_t snd_mixart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, dev_id, return IRQ_NONE);
+	mixart_mgr_t *mgr = dev_id;
 	int err;
 	mixart_msg_t resp;
 

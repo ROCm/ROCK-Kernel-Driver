@@ -28,16 +28,54 @@
 #include "seq_oss_midi.h"
 #include "seq_oss_event.h"
 
+static int snd_seq_oss_synth_info_user(seq_oss_devinfo_t *dp, void __user *arg)
+{
+	struct synth_info info;
+
+	if (copy_from_user(&info, arg, sizeof(info)))
+		return -EFAULT;
+	if (snd_seq_oss_synth_make_info(dp, info.device, &info) < 0)
+		return -EINVAL;
+	if (copy_to_user(arg, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}
+
+static int snd_seq_oss_midi_info_user(seq_oss_devinfo_t *dp, void __user *arg)
+{
+	struct midi_info info;
+
+	if (copy_from_user(&info, arg, sizeof(info)))
+		return -EFAULT;
+	if (snd_seq_oss_midi_make_info(dp, info.device, &info) < 0)
+		return -EINVAL;
+	if (copy_to_user(arg, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}
+
+static int snd_seq_oss_oob_user(seq_oss_devinfo_t *dp, void __user *arg)
+{
+	unsigned char ev[8];
+	snd_seq_event_t tmpev;
+
+	if (copy_from_user(ev, arg, 8))
+		return -EFAULT;
+	memset(&tmpev, 0, sizeof(tmpev));
+	snd_seq_oss_fill_addr(dp, &tmpev, dp->addr.port, dp->addr.client);
+	tmpev.time.tick = 0;
+	if (! snd_seq_oss_process_event(dp, (evrec_t*)ev, &tmpev)) {
+		snd_seq_oss_dispatch(dp, &tmpev, 0, 0);
+	}
+	return 0;
+}
+
 int
 snd_seq_oss_ioctl(seq_oss_devinfo_t *dp, unsigned int cmd, unsigned long carg)
 {
 	int dev, val;
-	struct synth_info inf;
-	struct midi_info minf;
-	unsigned char ev[8];
 	void __user *arg = (void __user *)carg;
 	int __user *p = arg;
-	snd_seq_event_t tmpev;
 
 	switch (cmd) {
 	case SNDCTL_TMR_TIMEBASE:
@@ -124,35 +162,15 @@ snd_seq_oss_ioctl(seq_oss_devinfo_t *dp, unsigned int cmd, unsigned long carg)
 	case SNDCTL_SYNTH_INFO:
 	case SNDCTL_SYNTH_ID:
 		debug_printk(("synth info\n"));
-		if (copy_from_user(&inf, arg, sizeof(inf)))
-			return -EFAULT;
-		if (snd_seq_oss_synth_make_info(dp, inf.device, &inf) < 0)
-			return -EINVAL;
-		if (copy_to_user(arg, &inf, sizeof(inf)))
-			return -EFAULT;
-		return 0;
+		return snd_seq_oss_synth_info_user(dp, arg);
 
 	case SNDCTL_SEQ_OUTOFBAND:
-		debug_printk(("out of bound\n"));
-		if (copy_from_user(ev, arg, 8))
-			return -EFAULT;
-		memset(&tmpev, 0, sizeof(tmpev));
-		snd_seq_oss_fill_addr(dp, &tmpev, dp->addr.port, dp->addr.client);
-		tmpev.time.tick = 0;
-		if (! snd_seq_oss_process_event(dp, (evrec_t*)ev, &tmpev)) {
-			snd_seq_oss_dispatch(dp, &tmpev, 0, 0);
-		}
-		return 0;
+		debug_printk(("out of band\n"));
+		return snd_seq_oss_oob_user(dp, arg);
 
 	case SNDCTL_MIDI_INFO:
 		debug_printk(("midi info\n"));
-		if (copy_from_user(&minf, arg, sizeof(minf)))
-			return -EFAULT;
-		if (snd_seq_oss_midi_make_info(dp, minf.device, &minf) < 0)
-			return -EINVAL;
-		if (copy_to_user(arg, &minf, sizeof(minf)))
-			return -EFAULT;
-		return 0;
+		return snd_seq_oss_midi_info_user(dp, arg);
 
 	case SNDCTL_SEQ_THRESHOLD:
 		debug_printk(("threshold\n"));

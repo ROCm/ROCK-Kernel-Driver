@@ -38,8 +38,7 @@
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_DESCRIPTION("Brooktree Bt87x audio driver");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Brooktree,Bt878},"
+MODULE_SUPPORTED_DEVICE("{{Brooktree,Bt878},"
 		"{Brooktree,Bt879}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
@@ -50,16 +49,12 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Bt87x soundcard");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Bt87x soundcard");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Bt87x soundcard");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(digital_rate, int, boot_devs, 0444);
 MODULE_PARM_DESC(digital_rate, "Digital input rate for Bt87x soundcard");
-MODULE_PARM_SYNTAX(digital_rate, SNDRV_ENABLED);
 
 
 #ifndef PCI_VENDOR_ID_BROOKTREE
@@ -152,14 +147,12 @@ MODULE_PARM_SYNTAX(digital_rate, SNDRV_ENABLED);
 /* SYNC, one WRITE per line, one extra WRITE per page boundary, SYNC, JUMP */
 #define MAX_RISC_SIZE ((1 + 255 + (PAGE_ALIGN(255 * 4092) / PAGE_SIZE - 1) + 1 + 1) * 8)
 
-#define chip_t bt87x_t
 typedef struct snd_bt87x bt87x_t;
 struct snd_bt87x {
 	snd_card_t *card;
 	struct pci_dev *pci;
 
 	void *mmio;
-	struct resource *res_mmio;
 	int irq;
 
 	int dig_rate;
@@ -168,7 +161,6 @@ struct snd_bt87x {
 	long opened;
 	snd_pcm_substream_t *substream;
 
-	struct snd_dma_device dma_dev;
 	struct snd_dma_buffer dma_risc;
 	unsigned int line_bytes;
 	unsigned int lines;
@@ -197,10 +189,8 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 	u32 *risc;
 
 	if (chip->dma_risc.area == NULL) {
-		memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-		chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-		chip->dma_dev.dev = snd_dma_pci_data(chip->pci);
-		if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+					PAGE_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
 			return -ENOMEM;
 	}
 	risc = (u32 *)chip->dma_risc.area;
@@ -244,14 +234,14 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 static void snd_bt87x_free_risc(bt87x_t *chip)
 {
 	if (chip->dma_risc.area) {
-		snd_dma_free_pages(&chip->dma_dev, &chip->dma_risc);
+		snd_dma_free_pages(&chip->dma_risc);
 		chip->dma_risc.area = NULL;
 	}
 }
 
 static irqreturn_t snd_bt87x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	bt87x_t *chip = snd_magic_cast(bt87x_t, dev_id, return IRQ_NONE);
+	bt87x_t *chip = dev_id;
 	unsigned int status;
 
 	status = snd_bt87x_readl(chip, REG_INT_STAT);
@@ -314,7 +304,7 @@ static snd_pcm_hardware_t snd_bt87x_analog_hw = {
 		SNDRV_PCM_INFO_MMAP_VALID,
 	.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8,
 	.rates = SNDRV_PCM_RATE_KNOT,
-	.rate_min = 119467,
+	.rate_min = 119466,
 	.rate_max = 448000,
 	.channels_min = 1,
 	.channels_max = 1,
@@ -356,20 +346,21 @@ static int snd_bt87x_set_digital_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 
 static int snd_bt87x_set_analog_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 {
-	static unsigned int rates[] = {
-		119467, 128000, 137846, 149333, 162909, 179200,
-		199111, 224000, 256000, 298667, 358400, 448000
+	static ratnum_t analog_clock = {
+		.num = 1792000,
+		.den_min = 4,
+		.den_max = 15,
+		.den_step = 1
 	};
-	static snd_pcm_hw_constraint_list_t constraint_rates = {
-		.count = ARRAY_SIZE(rates),
-		.list = rates,
-		.mask = 0,
+	static snd_pcm_hw_constraint_ratnums_t constraint_rates = {
+		.nrats = 1,
+		.rats = &analog_clock
 	};
 
 	chip->reg_control &= ~CTL_DA_IOM_DA;
 	runtime->hw = snd_bt87x_analog_hw;
-	return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-					  &constraint_rates);
+	return snd_pcm_hw_constraint_ratnums(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+					     &constraint_rates);
 }
 
 static int snd_bt87x_pcm_open(snd_pcm_substream_t *substream)
@@ -439,25 +430,22 @@ static int snd_bt87x_prepare(snd_pcm_substream_t *substream)
 {
 	bt87x_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	unsigned long flags;
 	int decimation;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->reg_control &= ~(CTL_DA_SDR_MASK | CTL_DA_SBR);
-	decimation = (1792000 + 5) / runtime->rate;
+	decimation = (1792000 + runtime->rate / 4) / runtime->rate;
 	chip->reg_control |= decimation << CTL_DA_SDR_SHIFT;
 	if (runtime->format == SNDRV_PCM_FORMAT_S8)
 		chip->reg_control |= CTL_DA_SBR;
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
 static int snd_bt87x_start(bt87x_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	chip->current_line = 0;
 	chip->reg_control |= CTL_FIFO_ENABLE | CTL_RISC_ENABLE | CTL_ACAP_EN;
 	snd_bt87x_writel(chip, REG_RISC_STRT_ADD, chip->dma_risc.addr);
@@ -465,20 +453,18 @@ static int snd_bt87x_start(bt87x_t *chip)
 			 chip->line_bytes | (chip->lines << 16));
 	snd_bt87x_writel(chip, REG_INT_MASK, MY_INTERRUPTS);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return 0;
 }
 
 static int snd_bt87x_stop(bt87x_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	chip->reg_control &= ~(CTL_FIFO_ENABLE | CTL_RISC_ENABLE | CTL_ACAP_EN);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	snd_bt87x_writel(chip, REG_INT_MASK, 0);
 	snd_bt87x_writel(chip, REG_INT_STAT, MY_INTERRUPTS);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return 0;
 }
 
@@ -536,17 +522,16 @@ static int snd_bt87x_capture_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 static int snd_bt87x_capture_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
 {
 	bt87x_t *chip = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	u32 old_control;
 	int changed;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	old_control = chip->reg_control;
 	chip->reg_control = (chip->reg_control & ~CTL_A_GAIN_MASK)
 		| (value->value.integer.value[0] << CTL_A_GAIN_SHIFT);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	changed = old_control != chip->reg_control;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return changed;
 }
 
@@ -578,17 +563,16 @@ static int snd_bt87x_capture_boost_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_va
 static int snd_bt87x_capture_boost_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
 {
 	bt87x_t *chip = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	u32 old_control;
 	int changed;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	old_control = chip->reg_control;
 	chip->reg_control = (chip->reg_control & ~CTL_A_G2X)
 		| (value->value.integer.value[0] ? CTL_A_G2X : 0);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	changed = chip->reg_control != old_control;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return changed;
 }
 
@@ -624,17 +608,16 @@ static int snd_bt87x_capture_source_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 static int snd_bt87x_capture_source_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
 {
 	bt87x_t *chip = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	u32 old_control;
 	int changed;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	old_control = chip->reg_control;
 	chip->reg_control = (chip->reg_control & ~CTL_A_SEL_MASK)
 		| (value->value.enumerated.item[0] << CTL_A_SEL_SHIFT);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	changed = chip->reg_control != old_control;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return changed;
 }
 
@@ -655,19 +638,16 @@ static int snd_bt87x_free(bt87x_t *chip)
 
 		iounmap(chip->mmio);
 	}
-	if (chip->res_mmio) {
-		release_resource(chip->res_mmio);
-		kfree_nocheck(chip->res_mmio);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, chip);
-	snd_magic_kfree(chip);
+	pci_release_regions(chip->pci);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_bt87x_dev_free(snd_device_t *device)
 {
-	bt87x_t *chip = snd_magic_cast(bt87x_t, device->device_data, return -ENXIO);
+	bt87x_t *chip = device->device_data;
 	return snd_bt87x_free(chip);
 }
 
@@ -705,7 +685,7 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 	if (err < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(bt87x_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
 	chip->card = card;
@@ -713,13 +693,9 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 	chip->irq = -1;
 	spin_lock_init(&chip->reg_lock);
 
-	chip->res_mmio = request_mem_region(pci_resource_start(pci, 0),
-					    pci_resource_len(pci, 0),
-					    "Bt87x audio");
-	if (!chip->res_mmio) {
-		snd_bt87x_free(chip);
-		snd_printk(KERN_ERR "cannot allocate io memory\n");
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "Bt87x audio")) < 0) {
+		kfree(chip);
+		return err;
 	}
 	chip->mmio = ioremap_nocache(pci_resource_start(pci, 0),
 				     pci_resource_len(pci, 0));

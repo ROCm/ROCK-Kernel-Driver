@@ -51,8 +51,7 @@
 MODULE_AUTHOR("Zach Brown <zab@zabbo.net>, Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ESS Maestro3 PCI");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ESS,Maestro3 PCI},"
+MODULE_SUPPORTED_DEVICE("{{ESS,Maestro3 PCI},"
 		"{ESS,ES1988},"
 		"{ESS,Allegro PCI},"
 		"{ESS,Allegro-1 PCI},"
@@ -67,19 +66,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(external_amp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(external_amp, "Enable external amp for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 module_param_array(amp_gpio, int, boot_devs, 0444);
 MODULE_PARM_DESC(amp_gpio, "GPIO pin number for external amp. (default = -1)");
-MODULE_PARM_SYNTAX(amp_gpio, SNDRV_ENABLED);
 
 #define MAX_PLAYBACKS	2
 #define MAX_CAPTURES	1
@@ -776,8 +770,6 @@ MODULE_PARM_SYNTAX(amp_gpio, SNDRV_ENABLED);
 
 typedef struct snd_m3_dma m3_dma_t;
 typedef struct snd_m3 m3_t;
-#define chip_t m3_t
-
 
 /* quirk lists */
 struct m3_quirk {
@@ -827,7 +819,6 @@ struct snd_m3 {
 	snd_card_t *card;
 
 	unsigned long iobase;
-	struct resource *iobase_res;
 
 	int irq;
 	int allegro_flag : 1;
@@ -1165,12 +1156,11 @@ snd_m3_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 {
 	m3_t *chip = snd_pcm_substream_chip(subs);
 	m3_dma_t *s = (m3_dma_t*)subs->runtime->private_data;
-	unsigned long flags;
 	int err = -EINVAL;
 
 	snd_assert(s != NULL, return -ENXIO);
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -1191,7 +1181,7 @@ snd_m3_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 		}
 		break;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return err;
 }
 
@@ -1477,7 +1467,6 @@ snd_m3_pcm_prepare(snd_pcm_substream_t *subs)
 	m3_t *chip = snd_pcm_substream_chip(subs);
 	snd_pcm_runtime_t *runtime = subs->runtime;
 	m3_dma_t *s = (m3_dma_t*)runtime->private_data;
-	unsigned long flags;
 
 	snd_assert(s != NULL, return -ENXIO);
 
@@ -1488,7 +1477,7 @@ snd_m3_pcm_prepare(snd_pcm_substream_t *subs)
 	    runtime->rate < 8000)
 		return -EINVAL;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 
 	snd_m3_pcm_setup1(chip, s, subs);
 
@@ -1499,7 +1488,7 @@ snd_m3_pcm_prepare(snd_pcm_substream_t *subs)
 
 	snd_m3_pcm_setup2(chip, s, runtime);
 
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	return 0;
 }
@@ -1573,7 +1562,7 @@ static void snd_m3_update_ptr(m3_t *chip, m3_dma_t *s)
 static irqreturn_t
 snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	m3_t *chip = snd_magic_cast(m3_t, dev_id, );
+	m3_t *chip = dev_id;
 	u8 status;
 	int i;
 
@@ -1670,20 +1659,19 @@ snd_m3_substream_open(m3_t *chip, snd_pcm_substream_t *subs)
 {
 	int i;
 	m3_dma_t *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	for (i = 0; i < chip->num_substreams; i++) {
 		s = &chip->substreams[i];
 		if (! s->opened)
 			goto __found;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return -ENOMEM;
 __found:
 	s->opened = 1;
 	s->running = 0;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	subs->runtime->private_data = s;
 	s->substream = subs;
@@ -1703,12 +1691,11 @@ static void
 snd_m3_substream_close(m3_t *chip, snd_pcm_substream_t *subs)
 {
 	m3_dma_t *s = (m3_dma_t*) subs->runtime->private_data;
-	unsigned long flags;
 
 	if (s == NULL)
 		return; /* not opened properly */
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	if (s->substream && s->running)
 		snd_m3_pcm_stop(chip, s, s->substream); /* does this happen? */
 	if (s->in_lists) {
@@ -1719,7 +1706,7 @@ snd_m3_substream_close(m3_t *chip, snd_pcm_substream_t *subs)
 	}
 	s->running = 0;
 	s->opened = 0;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 }
 
 static int
@@ -1848,7 +1835,7 @@ static int snd_m3_ac97_wait(m3_t *chip)
 static unsigned short
 snd_m3_ac97_read(ac97_t *ac97, unsigned short reg)
 {
-	m3_t *chip = snd_magic_cast(m3_t, ac97->private_data, return -ENXIO);
+	m3_t *chip = ac97->private_data;
 	unsigned short ret = 0;
 	unsigned long flags;
 
@@ -1867,7 +1854,7 @@ __error:
 static void
 snd_m3_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
-	m3_t *chip = snd_magic_cast(m3_t, ac97->private_data, return);
+	m3_t *chip = ac97->private_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -1983,14 +1970,15 @@ static void snd_m3_ac97_reset(m3_t *chip)
 
 static int __devinit snd_m3_mixer(m3_t *chip)
 {
-	ac97_bus_t bus, *pbus;
-	ac97_t ac97;
+	ac97_bus_t *pbus;
+	ac97_template_t ac97;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_m3_ac97_write,
+		.read = snd_m3_ac97_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_m3_ac97_write;
-	bus.read = snd_m3_ac97_read;
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &pbus)) < 0)
 		return err;
 	
 	memset(&ac97, 0, sizeof(ac97));
@@ -2167,7 +2155,7 @@ static void __devinit snd_m3_assp_init(m3_t *chip)
 			  KDATA_DMA_XFER0);
 
 	/* write kernel into code memory.. */
-	for (i = 0 ; i < sizeof(assp_kernel_image) / 2; i++) {
+	for (i = 0 ; i < ARRAY_SIZE(assp_kernel_image); i++) {
 		snd_m3_assp_write(chip, MEMTYPE_INTERNAL_CODE, 
 				  REV_B_CODE_MEMORY_BEGIN + i, 
 				  assp_kernel_image[i]);
@@ -2179,7 +2167,7 @@ static void __devinit snd_m3_assp_init(m3_t *chip)
 	 * drop it there.  It seems that the minisrc doesn't
 	 * need vectors, so we won't bother with them..
 	 */
-	for (i = 0; i < sizeof(assp_minisrc_image) / 2; i++) {
+	for (i = 0; i < ARRAY_SIZE(assp_minisrc_image); i++) {
 		snd_m3_assp_write(chip, MEMTYPE_INTERNAL_CODE, 
 				  0x400 + i, 
 				  assp_minisrc_image[i]);
@@ -2368,22 +2356,21 @@ snd_m3_enable_ints(m3_t *chip)
 
 static int snd_m3_free(m3_t *chip)
 {
-	unsigned long flags;
 	m3_dma_t *s;
 	int i;
 
 	if (chip->substreams) {
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock_irq(&chip->reg_lock);
 		for (i = 0; i < chip->num_substreams; i++) {
 			s = &chip->substreams[i];
 			/* check surviving pcms; this should not happen though.. */
 			if (s->substream && s->running)
 				snd_m3_pcm_stop(chip, s, s->substream);
 		}
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock_irq(&chip->reg_lock);
 		kfree(chip->substreams);
 	}
-	if (chip->iobase_res) {
+	if (chip->iobase) {
 		snd_m3_outw(chip, HOST_INT_CTRL, 0); /* disable ints */
 	}
 
@@ -2392,17 +2379,15 @@ static int snd_m3_free(m3_t *chip)
 		vfree(chip->suspend_mem);
 #endif
 
-	if (chip->irq >= 0)
+	if (chip->irq >= 0) {
 		synchronize_irq(chip->irq);
-
-	if (chip->iobase_res) {
-		release_resource(chip->iobase_res);
-		kfree_nocheck(chip->iobase_res);
-	}
-	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	}
 
-	snd_magic_kfree(chip);
+	if (chip->iobase)
+		pci_release_regions(chip->pci);
+
+	kfree(chip);
 	return 0;
 }
 
@@ -2413,7 +2398,7 @@ static int snd_m3_free(m3_t *chip)
 #ifdef CONFIG_PM
 static int m3_suspend(snd_card_t *card, unsigned int state)
 {
-	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
+	m3_t *chip = card->pm_private_data;
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
@@ -2444,7 +2429,7 @@ static int m3_suspend(snd_card_t *card, unsigned int state)
 
 static int m3_resume(snd_card_t *card, unsigned int state)
 {
-	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
+	m3_t *chip = card->pm_private_data;
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
@@ -2489,7 +2474,7 @@ static int m3_resume(snd_card_t *card, unsigned int state)
 
 static int snd_m3_dev_free(snd_device_t *device)
 {
-	m3_t *chip = snd_magic_cast(m3_t, device->device_data, return -ENXIO);
+	m3_t *chip = device->device_data;
 	return snd_m3_free(chip);
 }
 
@@ -2519,7 +2504,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 		return -ENXIO;
 	}
 
-	chip = snd_magic_kcalloc(m3_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 
@@ -2562,18 +2547,16 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	chip->num_substreams = NR_DSPS;
 	chip->substreams = kmalloc(sizeof(m3_dma_t) * chip->num_substreams, GFP_KERNEL);
 	if (chip->substreams == NULL) {
-		snd_magic_kfree(chip);
+		kfree(chip);
 		return -ENOMEM;
 	}
 	memset(chip->substreams, 0, sizeof(m3_dma_t) * chip->num_substreams);
 
-	chip->iobase = pci_resource_start(pci, 0);
-	if ((chip->iobase_res = request_region(chip->iobase, 256,
-					       card->driver)) == NULL) {
-		snd_printk("unable to grab i/o ports %ld\n", chip->iobase);
+	if ((err = pci_request_regions(pci, card->driver)) < 0) {
 		snd_m3_free(chip);
-		return -EBUSY;
+		return err;
 	}
+	chip->iobase = pci_resource_start(pci, 0);
 	
 	/* just to be sure */
 	pci_set_master(pci);

@@ -25,6 +25,7 @@
 
 #include <sound/driver.h>
 #include <asm/io.h>
+#include <linux/pci.h>
 #include <linux/time.h>
 #include <sound/core.h>
 #include <sound/trident.h>
@@ -189,7 +190,7 @@ snd_trident_alloc_sg_pages(trident_t *trident, snd_pcm_substream_t *substream)
 	snd_util_memblk_t *blk;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int idx, page;
-	struct snd_sg_buf *sgbuf = runtime->dma_private;
+	struct snd_sg_buf *sgbuf = snd_pcm_substream_sgbuf(substream);
 
 	snd_assert(runtime->dma_bytes > 0 && runtime->dma_bytes <= SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
 	hdr = trident->tlb.memhdr;
@@ -274,7 +275,7 @@ snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream)
 {
 	snd_assert(trident != NULL, return NULL);
 	snd_assert(substream != NULL, return NULL);
-	if (substream->dma_device.type == SNDRV_DMA_TYPE_DEV_SG)
+	if (substream->dma_buffer.dev.type == SNDRV_DMA_TYPE_DEV_SG)
 		return snd_trident_alloc_sg_pages(trident, substream);
 	else
 		return snd_trident_alloc_cont_pages(trident, substream);
@@ -367,10 +368,12 @@ static void clear_tlb(trident_t *trident, int page)
 	set_silent_tlb(trident, page);
 	if (ptr) {
 		struct snd_dma_buffer dmab;
+		dmab.dev.type = SNDRV_DMA_TYPE_DEV;
+		dmab.dev.dev = snd_dma_pci_data(trident->pci);
 		dmab.area = ptr;
 		dmab.addr = addr;
 		dmab.bytes = ALIGN_PAGE_SIZE;
-		snd_dma_free_pages(&trident->dma_dev, &dmab);
+		snd_dma_free_pages(&dmab);
 	}
 }
 
@@ -412,10 +415,11 @@ static int synth_alloc_pages(trident_t *hw, snd_util_memblk_t *blk)
 	 * fortunately Trident page size and kernel PAGE_SIZE is identical!
 	 */
 	for (page = first_page; page <= last_page; page++) {
-		if (snd_dma_alloc_pages(&hw->dma_dev, ALIGN_PAGE_SIZE, &dmab) < 0)
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(hw->pci),
+					ALIGN_PAGE_SIZE, &dmab) < 0)
 			goto __fail;
 		if (! is_valid_page(dmab.addr)) {
-			snd_dma_free_pages(&hw->dma_dev, &dmab);
+			snd_dma_free_pages(&dmab);
 			goto __fail;
 		}
 		set_tlb_bus(hw, page, (unsigned long)dmab.area, dmab.addr);

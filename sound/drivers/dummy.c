@@ -34,8 +34,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Dummy soundcard (/dev/null)");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ALSA,Dummy soundcard}}");
+MODULE_SUPPORTED_DEVICE("{{ALSA,Dummy soundcard}}");
 
 #define MAX_PCM_DEVICES		4
 #define MAX_PCM_SUBSTREAMS	16
@@ -133,22 +132,16 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for dummy soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for dummy soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this dummy soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(pcm_devs, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_devs, "PCM devices # (0-4) for dummy driver.");
-MODULE_PARM_SYNTAX(pcm_devs, SNDRV_ENABLED ",allows:{{0,4}},default:1,dialog:list");
 module_param_array(pcm_substreams, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_substreams, "PCM substreams # (1-16) for dummy driver.");
-MODULE_PARM_SYNTAX(pcm_substreams, SNDRV_ENABLED ",allows:{{1,16}},default:8,dialog:list");
 //module_param_array(midi_devs, int, boot_devs, 0444);
 //MODULE_PARM_DESC(midi_devs, "MIDI devices # (0-2) for dummy driver.");
-//MODULE_PARM_SYNTAX(midi_devs, SNDRV_ENABLED ",allows:{{0,2}},default:8,dialog:list");
 
 #define MIXER_ADDR_MASTER	0
 #define MIXER_ADDR_LINE		1
@@ -180,24 +173,10 @@ typedef struct snd_card_dummy_pcm {
 static snd_card_t *snd_dummy_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
 
-static int snd_card_dummy_playback_ioctl(snd_pcm_substream_t * substream,
-				         unsigned int cmd,
-				         void *arg)
-{
-	return snd_pcm_lib_ioctl(substream, cmd, arg);
-}
-
-static int snd_card_dummy_capture_ioctl(snd_pcm_substream_t * substream,
-					unsigned int cmd,
-					void *arg)
-{
-	return snd_pcm_lib_ioctl(substream, cmd, arg);
-}
-
 static void snd_card_dummy_pcm_timer_start(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_card_dummy_pcm_t *dpcm = snd_magic_cast(snd_card_dummy_pcm_t, runtime->private_data, return);
+	snd_card_dummy_pcm_t *dpcm = runtime->private_data;
 
 	dpcm->timer.expires = 1 + jiffies;
 	add_timer(&dpcm->timer);
@@ -206,7 +185,7 @@ static void snd_card_dummy_pcm_timer_start(snd_pcm_substream_t * substream)
 static void snd_card_dummy_pcm_timer_stop(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_card_dummy_pcm_t *dpcm = snd_magic_cast(snd_card_dummy_pcm_t, runtime->private_data, return);
+	snd_card_dummy_pcm_t *dpcm = runtime->private_data;
 
 	del_timer(&dpcm->timer);
 }
@@ -240,7 +219,7 @@ static int snd_card_dummy_capture_trigger(snd_pcm_substream_t * substream,
 static int snd_card_dummy_pcm_prepare(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_card_dummy_pcm_t *dpcm = snd_magic_cast(snd_card_dummy_pcm_t, runtime->private_data, return -ENXIO);
+	snd_card_dummy_pcm_t *dpcm = runtime->private_data;
 	unsigned int bps;
 
 	bps = runtime->rate * runtime->channels;
@@ -269,7 +248,7 @@ static int snd_card_dummy_capture_prepare(snd_pcm_substream_t * substream)
 
 static void snd_card_dummy_pcm_timer_function(unsigned long data)
 {
-	snd_card_dummy_pcm_t *dpcm = snd_magic_cast(snd_card_dummy_pcm_t, (void *)data, return);
+	snd_card_dummy_pcm_t *dpcm = (snd_card_dummy_pcm_t *)data;
 	
 	dpcm->timer.expires = 1 + jiffies;
 	add_timer(&dpcm->timer);
@@ -287,7 +266,7 @@ static void snd_card_dummy_pcm_timer_function(unsigned long data)
 static snd_pcm_uframes_t snd_card_dummy_playback_pointer(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_card_dummy_pcm_t *dpcm = snd_magic_cast(snd_card_dummy_pcm_t, runtime->private_data, return -ENXIO);
+	snd_card_dummy_pcm_t *dpcm = runtime->private_data;
 
 	return bytes_to_frames(runtime, dpcm->pcm_buf_pos);
 }
@@ -295,7 +274,7 @@ static snd_pcm_uframes_t snd_card_dummy_playback_pointer(snd_pcm_substream_t * s
 static snd_pcm_uframes_t snd_card_dummy_capture_pointer(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_card_dummy_pcm_t *dpcm = snd_magic_cast(snd_card_dummy_pcm_t, runtime->private_data, return -ENXIO);
+	snd_card_dummy_pcm_t *dpcm = runtime->private_data;
 
 	return bytes_to_frames(runtime, dpcm->pcm_buf_pos);
 }
@@ -338,8 +317,19 @@ static snd_pcm_hardware_t snd_card_dummy_capture =
 
 static void snd_card_dummy_runtime_free(snd_pcm_runtime_t *runtime)
 {
-	snd_card_dummy_pcm_t *dpcm = snd_magic_cast(snd_card_dummy_pcm_t, runtime->private_data, return);
-	snd_magic_kfree(dpcm);
+	snd_card_dummy_pcm_t *dpcm = runtime->private_data;
+	kfree(dpcm);
+}
+
+static int snd_card_dummy_hw_params(snd_pcm_substream_t * substream,
+				    snd_pcm_hw_params_t * hw_params)
+{
+	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+}
+
+static int snd_card_dummy_hw_free(snd_pcm_substream_t * substream)
+{
+	return snd_pcm_lib_free_pages(substream);
 }
 
 static int snd_card_dummy_playback_open(snd_pcm_substream_t * substream)
@@ -348,13 +338,9 @@ static int snd_card_dummy_playback_open(snd_pcm_substream_t * substream)
 	snd_card_dummy_pcm_t *dpcm;
 	int err;
 
-	dpcm = snd_magic_kcalloc(snd_card_dummy_pcm_t, 0, GFP_KERNEL);
+	dpcm = kcalloc(1, sizeof(*dpcm), GFP_KERNEL);
 	if (dpcm == NULL)
 		return -ENOMEM;
-	if ((runtime->dma_area = snd_malloc_pages_fallback(MAX_BUFFER_SIZE, GFP_KERNEL, &runtime->dma_bytes)) == NULL) {
-		snd_magic_kfree(dpcm);
-		return -ENOMEM;
-	}
 	init_timer(&dpcm->timer);
 	dpcm->timer.data = (unsigned long) dpcm;
 	dpcm->timer.function = snd_card_dummy_pcm_timer_function;
@@ -370,7 +356,7 @@ static int snd_card_dummy_playback_open(snd_pcm_substream_t * substream)
 	if (substream->pcm->device & 2)
 		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID);
 	if ((err = add_playback_constraints(runtime)) < 0) {
-		snd_magic_kfree(dpcm);
+		kfree(dpcm);
 		return err;
 	}
 
@@ -383,14 +369,9 @@ static int snd_card_dummy_capture_open(snd_pcm_substream_t * substream)
 	snd_card_dummy_pcm_t *dpcm;
 	int err;
 
-	dpcm = snd_magic_kcalloc(snd_card_dummy_pcm_t, 0, GFP_KERNEL);
+	dpcm = kcalloc(1, sizeof(*dpcm), GFP_KERNEL);
 	if (dpcm == NULL)
 		return -ENOMEM;
-	if ((runtime->dma_area = snd_malloc_pages_fallback(MAX_BUFFER_SIZE, GFP_KERNEL, &runtime->dma_bytes)) == NULL) {
-		snd_magic_kfree(dpcm);
-		return -ENOMEM;
-	}
-	memset(runtime->dma_area, 0, runtime->dma_bytes);
 	init_timer(&dpcm->timer);
 	dpcm->timer.data = (unsigned long) dpcm;
 	dpcm->timer.function = snd_card_dummy_pcm_timer_function;
@@ -406,7 +387,7 @@ static int snd_card_dummy_capture_open(snd_pcm_substream_t * substream)
 	if (substream->pcm->device & 2)
 		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID);
 	if ((err = add_capture_constraints(runtime)) < 0) {
-		snd_magic_kfree(dpcm);
+		kfree(dpcm);
 		return err;
 	}
 
@@ -415,24 +396,20 @@ static int snd_card_dummy_capture_open(snd_pcm_substream_t * substream)
 
 static int snd_card_dummy_playback_close(snd_pcm_substream_t * substream)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
-
-	snd_free_pages(runtime->dma_area, runtime->dma_bytes);
 	return 0;
 }
 
 static int snd_card_dummy_capture_close(snd_pcm_substream_t * substream)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
-
-	snd_free_pages(runtime->dma_area, runtime->dma_bytes);
 	return 0;
 }
 
 static snd_pcm_ops_t snd_card_dummy_playback_ops = {
 	.open =			snd_card_dummy_playback_open,
 	.close =		snd_card_dummy_playback_close,
-	.ioctl =		snd_card_dummy_playback_ioctl,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_card_dummy_hw_params,
+	.hw_free =		snd_card_dummy_hw_free,
 	.prepare =		snd_card_dummy_playback_prepare,
 	.trigger =		snd_card_dummy_playback_trigger,
 	.pointer =		snd_card_dummy_playback_pointer,
@@ -441,7 +418,9 @@ static snd_pcm_ops_t snd_card_dummy_playback_ops = {
 static snd_pcm_ops_t snd_card_dummy_capture_ops = {
 	.open =			snd_card_dummy_capture_open,
 	.close =		snd_card_dummy_capture_close,
-	.ioctl =		snd_card_dummy_capture_ioctl,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_card_dummy_hw_params,
+	.hw_free =		snd_card_dummy_hw_free,
 	.prepare =		snd_card_dummy_capture_prepare,
 	.trigger =		snd_card_dummy_capture_trigger,
 	.pointer =		snd_card_dummy_capture_pointer,
@@ -459,6 +438,9 @@ static int __init snd_card_dummy_pcm(snd_card_dummy_t *dummy, int device, int su
 	pcm->private_data = dummy;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "Dummy PCM");
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
+					      snd_dma_continuous_data(GFP_KERNEL),
+					      0, 64*1024);
 	return 0;
 }
 
@@ -479,7 +461,7 @@ static int snd_dummy_volume_info(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t 
  
 static int snd_dummy_volume_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	snd_card_dummy_t *dummy = _snd_kcontrol_chip(kcontrol);
+	snd_card_dummy_t *dummy = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int addr = kcontrol->private_value;
 
@@ -488,11 +470,11 @@ static int snd_dummy_volume_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	ucontrol->value.integer.value[1] = dummy->mixer_volume[addr][1];
 	spin_unlock_irqrestore(&dummy->mixer_lock, flags);
 	return 0;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	snd_card_dummy_t *dummy = _snd_kcontrol_chip(kcontrol);
+	snd_card_dummy_t *dummy = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change, addr = kcontrol->private_value;
 	int left, right;
@@ -514,7 +496,7 @@ static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	dummy->mixer_volume[addr][1] = right;
 	spin_unlock_irqrestore(&dummy->mixer_lock, flags);
 	return change;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 #define DUMMY_CAPSRC(xname, xindex, addr) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
@@ -533,7 +515,7 @@ static int snd_dummy_capsrc_info(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t 
  
 static int snd_dummy_capsrc_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	snd_card_dummy_t *dummy = _snd_kcontrol_chip(kcontrol);
+	snd_card_dummy_t *dummy = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int addr = kcontrol->private_value;
 
@@ -546,7 +528,7 @@ static int snd_dummy_capsrc_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 
 static int snd_dummy_capsrc_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	snd_card_dummy_t *dummy = _snd_kcontrol_chip(kcontrol);
+	snd_card_dummy_t *dummy = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change, addr = kcontrol->private_value;
 	int left, right;
@@ -560,9 +542,7 @@ static int snd_dummy_capsrc_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	dummy->capture_source[addr][1] = right;
 	spin_unlock_irqrestore(&dummy->mixer_lock, flags);
 	return change;
-}                                                                                                                                                                                                                                                                                                            
-
-#define DUMMY_CONTROLS (sizeof(snd_dummy_controls)/sizeof(snd_kcontrol_new_t))
+}
 
 static snd_kcontrol_new_t snd_dummy_controls[] = {
 DUMMY_VOLUME("Master Volume", 0, MIXER_ADDR_MASTER),
@@ -587,7 +567,7 @@ int __init snd_card_dummy_new_mixer(snd_card_dummy_t * dummy)
 	spin_lock_init(&dummy->mixer_lock);
 	strcpy(card->mixername, "Dummy Mixer");
 
-	for (idx = 0; idx < DUMMY_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_dummy_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_dummy_controls[idx], dummy))) < 0)
 			return err;
 	}

@@ -540,6 +540,12 @@ vortex_XtalkHw_SetGains(vortex_t * vortex, xtalk_gains_t const gains)
 	}
 }
 
+static void
+vortex_XtalkHw_SetGainsAllChan(vortex_t * vortex)
+{
+	vortex_XtalkHw_SetGains(vortex, asXtalkGainsAllChan);
+}
+
 #if 0
 static void vortex_XtalkHw_GetGains(vortex_t * vortex, xtalk_gains_t gains)
 {

@@ -63,8 +63,7 @@
 MODULE_AUTHOR("George Talusan <gstalusan@uwaterloo.ca>");
 MODULE_DESCRIPTION("C-Media CMI8330");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{C-Media,CMI8330,isapnp:{CMI0001,@@@0001,@X@0001}}}");
+MODULE_SUPPORTED_DEVICE("{{C-Media,CMI8330,isapnp:{CMI0001,@@@0001,@X@0001}}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;
@@ -83,41 +82,30 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for CMI8330 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string  for CMI8330 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable CMI8330 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef CONFIG_PNP
 module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
 
 module_param_array(sbport, long, boot_devs, 0444);
 MODULE_PARM_DESC(sbport, "Port # for CMI8330 SB driver.");
-MODULE_PARM_SYNTAX(sbport, SNDRV_ENABLED ",allows:{{0x220,0x280,0x20}},prefers:{0x220},base:16,dialog:list");
 module_param_array(sbirq, int, boot_devs, 0444);
 MODULE_PARM_DESC(sbirq, "IRQ # for CMI8330 SB driver.");
-MODULE_PARM_SYNTAX(sbirq, SNDRV_ENABLED ",allows:{{5},{7},{9},{10},{11},{12}},prefers:{5},dialog:list");
 module_param_array(sbdma8, int, boot_devs, 0444);
 MODULE_PARM_DESC(sbdma8, "DMA8 for CMI8330 SB driver.");
-MODULE_PARM_SYNTAX(sbdma8, SNDRV_DMA8_DESC ",prefers:{1}");
 module_param_array(sbdma16, int, boot_devs, 0444);
 MODULE_PARM_DESC(sbdma16, "DMA16 for CMI8330 SB driver.");
-MODULE_PARM_SYNTAX(sbdma16, SNDRV_ENABLED ",allows:{{5},{7}},prefers:{5},dialog:list");
 
 module_param_array(wssport, long, boot_devs, 0444);
 MODULE_PARM_DESC(wssport, "Port # for CMI8330 WSS driver.");
-MODULE_PARM_SYNTAX(wssport, SNDRV_ENABLED ",allows:{{0x530},{0xe80,0xf40,0xc0}},prefers:{0x530},base:16,dialog:list");
 module_param_array(wssirq, int, boot_devs, 0444);
 MODULE_PARM_DESC(wssirq, "IRQ # for CMI8330 WSS driver.");
-MODULE_PARM_SYNTAX(wssirq, SNDRV_ENABLED ",allows:{{5},{7},{9},{10},{11},{12}},prefers:{11},dialog:list");
 module_param_array(wssdma, int, boot_devs, 0444);
 MODULE_PARM_DESC(wssdma, "DMA for CMI8330 WSS driver.");
-MODULE_PARM_SYNTAX(wssdma, SNDRV_DMA8_DESC ",prefers:{0}");
 
 #define CMI8330_RMUX3D    16
 #define CMI8330_MUTEMUX   17
@@ -385,7 +373,7 @@ static int __devinit snd_cmi8330_pnp(int dev, struct snd_cmi8330 *acard,
 
 static int snd_cmi8330_playback_open(snd_pcm_substream_t * substream)
 {
-	struct snd_cmi8330 *chip = (struct snd_cmi8330 *)_snd_pcm_substream_chip(substream);
+	struct snd_cmi8330 *chip = snd_pcm_substream_chip(substream);
 
 	/* replace the private_data and call the original open callback */
 	substream->private_data = chip->streams[SNDRV_PCM_STREAM_PLAYBACK].private_data;
@@ -394,7 +382,7 @@ static int snd_cmi8330_playback_open(snd_pcm_substream_t * substream)
 
 static int snd_cmi8330_capture_open(snd_pcm_substream_t * substream)
 {
-	struct snd_cmi8330 *chip = (struct snd_cmi8330 *)_snd_pcm_substream_chip(substream);
+	struct snd_cmi8330 *chip = snd_pcm_substream_chip(substream);
 
 	/* replace the private_data and call the original open callback */
 	substream->private_data = chip->streams[SNDRV_PCM_STREAM_CAPTURE].private_data;
