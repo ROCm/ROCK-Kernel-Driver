@@ -3,7 +3,7 @@
  *
  *	Procfs interface for the Zorro bus.
  *
- *	Copyright (C) 1998-2000 Geert Uytterhoeven
+ *	Copyright (C) 1998-2003 Geert Uytterhoeven
  *
  *	Heavily based on the procfs interface for the PCI bus, which is
  *
@@ -49,7 +49,7 @@ proc_bus_zorro_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 {
 	struct inode *ino = file->f_dentry->d_inode;
 	struct proc_dir_entry *dp = PDE(ino);
-	struct zorro_dev *dev = dp->data;
+	struct zorro_dev *z = dp->data;
 	struct ConfigDev cd;
 	loff_t pos = *ppos;
 
@@ -62,11 +62,11 @@ proc_bus_zorro_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 
 	/* Construct a ConfigDev */
 	memset(&cd, 0, sizeof(cd));
-	cd.cd_Rom = dev->rom;
-	cd.cd_SlotAddr = dev->slotaddr;
-	cd.cd_SlotSize = dev->slotsize;
-	cd.cd_BoardAddr = (void *)dev->resource.start;
-	cd.cd_BoardSize = dev->resource.end-dev->resource.start+1;
+	cd.cd_Rom = z->rom;
+	cd.cd_SlotAddr = z->slotaddr;
+	cd.cd_SlotSize = z->slotsize;
+	cd.cd_BoardAddr = (void *)zorro_resource_start(z);
+	cd.cd_BoardSize = zorro_resource_len(z);
 
 	if (copy_to_user(buf, &cd, nbytes))
 		return -EFAULT;
@@ -88,11 +88,10 @@ get_zorro_dev_info(char *buf, char **start, off_t pos, int count)
 	int len, cnt;
 
 	for (slot = cnt = 0; slot < zorro_num_autocon && count > cnt; slot++) {
-		struct zorro_dev *dev = &zorro_autocon[slot];
+		struct zorro_dev *z = &zorro_autocon[slot];
 		len = sprintf(buf, "%02x\t%08x\t%08lx\t%08lx\t%02x\n", slot,
-			      dev->id, dev->resource.start,
-			      dev->resource.end-dev->resource.start+1,
-			      dev->rom.er_Type);
+			      z->id, zorro_resource_start(z),
+			      zorro_resource_len(z), z->rom.er_Type);
 		at += len;
 		if (at >= pos) {
 			if (!*start) {
