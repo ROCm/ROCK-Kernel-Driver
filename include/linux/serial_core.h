@@ -212,10 +212,6 @@ struct uart_state {
 	struct uart_port	*port;
 
 	struct semaphore	sem;
-
-#ifdef CONFIG_PM
-	struct pm_dev		*pm;
-#endif
 };
 
 #define UART_XMIT_SIZE 1024

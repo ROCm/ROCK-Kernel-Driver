@@ -28,7 +28,6 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/console.h>
-#include <linux/pm.h>
 #include <linux/serial_core.h>
 #include <linux/smp_lock.h>
 #include <linux/serial.h> /* for serial_state and serial_icounter_struct */
@@ -41,11 +40,6 @@
 #define DPRINTK(x...)	printk(x)
 #else
 #define DPRINTK(x...)	do { } while (0)
-#endif
-
-#ifndef CONFIG_PM
-#define pm_access(pm)		do { } while (0)
-#define pm_unregister(pm)	do { } while (0)
 #endif
 
 /*
@@ -96,8 +90,6 @@ static void uart_start(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->port;
 	unsigned long flags;
-
-	pm_access(state->pm);
 
 	spin_lock_irqsave(&port->lock, flags);
 	__uart_start(tty);
@@ -1878,116 +1870,6 @@ uart_set_options(struct uart_port *port, struct console *co,
 }
 #endif /* CONFIG_SERIAL_CORE_CONSOLE */
 
-#ifdef CONFIG_PM
-/*
- *  Serial port power management.
- *
- * This is pretty coarse at the moment - either all on or all off.  We
- * should probably some day do finer power management here some day.
- *
- * We don't actually save any state; the serial driver already has the
- * state held internally to re-setup the port when we come out of D3.
- */
-static int uart_pm_set_state(struct uart_state *state, int pm_state, int oldstate)
-{
-	struct uart_port *port;
-	struct uart_ops *ops;
-	int running = state->info &&
-		      state->info->flags & UIF_INITIALIZED;
-
-	down(&port_sem);
-
-	if (!state->port || state->port->type == PORT_UNKNOWN) {
-		up(&port_sem);
-		return 0;
-	}
-
-	port = state->port;
-	ops = port->ops;
-
-	DPRINTK("pm: %08x: %ld -> %d, %srunning\n",
-		port->iobase, state->pm->state, pm_state, running ? "" : "not ");
-
-	if (pm_state == 0) {
-		if (ops->pm)
-			ops->pm(port, pm_state, oldstate);
-		if (running) {
-			/*
-			 * The port lock isn't taken here -
-			 * the port isn't initialised.
-			 */
-			ops->set_mctrl(port, 0);
-			ops->startup(port);
-			uart_change_speed(state, NULL);
-			spin_lock_irq(&port->lock);
-			ops->set_mctrl(port, port->mctrl);
-			ops->start_tx(port, 0);
-			spin_unlock_irq(&port->lock);
-		}
-
-		/*
-		 * Re-enable the console device after suspending.
-		 */
-		if (port->cons && port->cons->index == port->line)
-			port->cons->flags |= CON_ENABLED;
-	} else if (pm_state == 1) {
-		if (ops->pm)
-			ops->pm(port, pm_state, oldstate);
-	} else {
-		/*
-		 * Disable the console device before suspending.
-		 */
-		if (port->cons && port->cons->index == port->line)
-			port->cons->flags &= ~CON_ENABLED;
-
-		if (running) {
-			spin_lock_irq(&port->lock);
-			ops->stop_tx(port, 0);
-			ops->set_mctrl(port, 0);
-			ops->stop_rx(port);
-			spin_unlock_irq(&port->lock);
-			ops->shutdown(port);
-		}
-		if (ops->pm)
-			ops->pm(port, pm_state, oldstate);
-	}
-	up(&port_sem);
-
-	return 0;
-}
-
-/*
- *  Wakeup support.
- */
-static int uart_pm_set_wakeup(struct uart_state *state, int data)
-{
-	int err = 0;
-
-	if (state->port->ops->set_wake)
-		err = state->port->ops->set_wake(state->port, data);
-
-	return err;
-}
-
-static int uart_pm(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	struct uart_state *state = dev->data;
-	int err = 0;
-
-	switch (rqst) {
-	case PM_SUSPEND:
-	case PM_RESUME:
-		err = uart_pm_set_state(state, (int)(long)data, dev->state);
-		break;
-
-	case PM_SET_WAKEUP:
-		err = uart_pm_set_wakeup(state, (int)(long)data);
-		break;
-	}
-	return err;
-}
-#endif
-
 static inline void
 uart_report_port(struct uart_driver *drv, struct uart_port *port)
 {
@@ -2055,17 +1937,6 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 		spin_lock_irqsave(&port->lock, flags);
 		port->ops->set_mctrl(port, 0);
 		spin_unlock_irqrestore(&port->lock, flags);
-
-#if 0 //def CONFIG_PM
-		/*
-		 * Power down all ports by default, except the
-		 * console if we have one.  We need to drop the
-		 * port semaphore here.
-		 */
-		if (state->pm && (!drv->cons || port->line != drv->cons->index)) {
-			pm_send(state->pm, PM_SUSPEND, (void *)3);
-		}
-#endif
 	}
 }
 
@@ -2214,21 +2085,11 @@ int uart_register_driver(struct uart_driver *drv)
 		state->closing_wait    = 30 * HZ;
 
 		init_MUTEX(&state->sem);
-
-#ifdef CONFIG_PM
-		state->pm = pm_register(PM_SYS_DEV, PM_SYS_COM, uart_pm);
-		if (state->pm)
-			state->pm->data = state;
-#endif
 	}
 
 	retval = tty_register_driver(normal);
  out:
 	if (retval < 0) {
-#ifdef CONFIG_PM
-		for (i = 0; i < drv->nr; i++)
-			pm_unregister(drv->state[i].pm);
-#endif
 		kfree(normal);
 		kfree(drv->state);
 		kfree(termios);
@@ -2247,11 +2108,6 @@ int uart_register_driver(struct uart_driver *drv)
  */
 void uart_unregister_driver(struct uart_driver *drv)
 {
-	int i;
-
-	for (i = 0; i < drv->nr; i++)
-		pm_unregister(drv->state[i].pm);
-
 	tty_unregister_driver(drv->tty_driver);
 
 	kfree(drv->state);
