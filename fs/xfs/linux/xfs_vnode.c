@@ -200,7 +200,7 @@ vn_revalidate(
 	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
 	ASSERT(vp->v_fbhv != NULL);
 
-	va.va_mask = XFS_AT_STAT|XFS_AT_GENCOUNT;
+	va.va_mask = XFS_AT_STAT;
 	VOP_GETATTR(vp, &va, 0, NULL, error);
 	if (!error) {
 		inode = LINVFS_GET_IP(vp);
@@ -210,12 +210,9 @@ vn_revalidate(
 		inode->i_gid	    = va.va_gid;
 		inode->i_size	    = va.va_size;
 		inode->i_blocks	    = va.va_nblocks;
-		inode->i_mtime.tv_sec	    = va.va_mtime.tv_sec;
-		inode->i_mtime.tv_nsec	    = va.va_mtime.tv_nsec;
-		inode->i_ctime.tv_sec	    = va.va_ctime.tv_sec;
-		inode->i_ctime.tv_nsec	    = va.va_ctime.tv_nsec;
-		inode->i_atime.tv_sec	    = va.va_atime.tv_sec;
-		inode->i_atime.tv_nsec	    = va.va_atime.tv_nsec;
+		inode->i_mtime	    = va.va_mtime;
+		inode->i_ctime	    = va.va_ctime;
+		inode->i_atime	    = va.va_atime;
 		VUNMODIFY(vp);
 	}
 	return -error;
