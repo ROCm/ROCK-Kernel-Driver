@@ -500,7 +500,6 @@ static int snd_ac97_stac9758_output_jack_put(snd_kcontrol_t *kcontrol, snd_ctl_e
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	int shift = kcontrol->private_value;
 	unsigned short val;
-	int ret;
 
 	if (ucontrol->value.enumerated.item[0] > 4)
 		return -EINVAL;
@@ -508,10 +507,8 @@ static int snd_ac97_stac9758_output_jack_put(snd_kcontrol_t *kcontrol, snd_ctl_e
 		val = 0;
 	else
 		val = 4 | (ucontrol->value.enumerated.item[0] - 1);
-	ret = snd_ac97_update_bits(ac97, AC97_SIGMATEL_OUTSEL,
-				   7 << shift, val << shift);
-	up(&ac97->mutex);
-	return ret;
+	return ac97_update_bits_page(ac97, AC97_SIGMATEL_OUTSEL,
+				     7 << shift, val << shift, 0);
 }
 
 static int snd_ac97_stac9758_input_jack_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
