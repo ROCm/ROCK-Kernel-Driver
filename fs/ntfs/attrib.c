@@ -1113,15 +1113,11 @@ lock_retry_remap:
 			}
 			rl++;
 		}
-		switch (rl->lcn) {
-		case (LCN)LCN_RL_NOT_MAPPED:
-			break;
-		case (LCN)LCN_ENOENT:
-			err = -ENOENT;
-			break;
-		default:
-			err = -EIO;
-			break;
+		if (likely(rl->lcn != (LCN)LCN_RL_NOT_MAPPED)) {
+			if (likely(rl->lcn == (LCN)LCN_ENOENT))
+				err = -ENOENT;
+			else
+				err = -EIO;
 		}
 	}
 	if (!need_write)
