@@ -71,12 +71,12 @@ void mf_proc_init(struct proc_dir_entry *iSeries_proc)
 	ent->read_proc = proc_mf_dump_cmdline;
 	ent->write_proc = proc_mf_change_cmdline;
 
-	ent = create_proc_entry("vmlinux", S_IFREG|S_IRUSR|S_IWUSR, mf_a);
+	ent = create_proc_entry("vmlinux", S_IFREG|S_IWUSR, mf_a);
 	if (!ent) return;
 	ent->nlink = 1;
 	ent->data = (void *)0;
-	ent->read_proc = proc_mf_dump_vmlinux;
 	ent->write_proc = proc_mf_change_vmlinux;
+	ent->read_proc = NULL;
 
 	mf_b = proc_mkdir("B", mf_proc_root);
 	if (!mf_b) return;
@@ -88,12 +88,12 @@ void mf_proc_init(struct proc_dir_entry *iSeries_proc)
 	ent->read_proc = proc_mf_dump_cmdline;
 	ent->write_proc = proc_mf_change_cmdline;
 
-	ent = create_proc_entry("vmlinux", S_IFREG|S_IRUSR|S_IWUSR, mf_b);
+	ent = create_proc_entry("vmlinux", S_IFREG|S_IWUSR, mf_b);
 	if (!ent) return;
 	ent->nlink = 1;
 	ent->data = (void *)1;
-	ent->read_proc = proc_mf_dump_vmlinux;
 	ent->write_proc = proc_mf_change_vmlinux;
+	ent->read_proc = NULL;
 
 	mf_c = proc_mkdir("C", mf_proc_root);
 	if (!mf_c) return;
@@ -105,12 +105,12 @@ void mf_proc_init(struct proc_dir_entry *iSeries_proc)
 	ent->read_proc = proc_mf_dump_cmdline;
 	ent->write_proc = proc_mf_change_cmdline;
 
-	ent = create_proc_entry("vmlinux", S_IFREG|S_IRUSR|S_IWUSR, mf_c);
+	ent = create_proc_entry("vmlinux", S_IFREG|S_IWUSR, mf_c);
 	if (!ent) return;
 	ent->nlink = 1;
 	ent->data = (void *)2;
-	ent->read_proc = proc_mf_dump_vmlinux;
 	ent->write_proc = proc_mf_change_vmlinux;
+	ent->read_proc = NULL;
 
 	mf_d = proc_mkdir("D", mf_proc_root);
 	if (!mf_d) return;
@@ -122,14 +122,14 @@ void mf_proc_init(struct proc_dir_entry *iSeries_proc)
 	ent->data = (void *)3;
 	ent->read_proc = proc_mf_dump_cmdline;
 	ent->write_proc = proc_mf_change_cmdline;
-
+#if 0
 	ent = create_proc_entry("vmlinux", S_IFREG|S_IRUSR, mf_d);
 	if (!ent) return;
 	ent->nlink = 1;
 	ent->data = (void *)3;
 	ent->read_proc = proc_mf_dump_vmlinux;
 	ent->write_proc = NULL;
-
+#endif
 	ent = create_proc_entry("side", S_IFREG|S_IRUSR|S_IWUSR, mf_proc_root);
 	if (!ent) return;
 	ent->nlink = 1;
@@ -191,20 +191,16 @@ int proc_mf_dump_vmlinux
 		if (sizeToGet != 0)
 		{
 			*start = page + off;
-			printk("mf_proc.c: got count %d off %d\n", sizeToGet, (int)off);
 			return sizeToGet;
 		} else {
-			printk("mf_proc.c: eof\n");
 			*eof = 1;
 			return 0;
 		}
 	} else {
-		printk("mf_proc.c: eof\n");
 		*eof = 1;
 		return 0;
 	}
 }
-
 
 int proc_mf_dump_side
 (char *page, char **start, off_t off, int count, int *eof, void *data)
