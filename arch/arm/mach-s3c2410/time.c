@@ -232,7 +232,7 @@ static void __init s3c2410_timer_init (void)
 	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
 }
 
-struct sys_timer s3c2410_timer = {
+struct sys_timer s3c24xx_timer = {
 	.init		= s3c2410_timer_init,
 	.offset		= s3c2410_gettimeoffset,
 	.resume		= s3c2410_timer_setup
