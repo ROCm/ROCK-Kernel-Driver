@@ -124,10 +124,15 @@ static const char	hcd_name [] = "ehci_hcd";
 #define EHCI_ASYNC_JIFFIES	(HZ/20)		/* async idle timeout */
 #define EHCI_SHRINK_JIFFIES	(HZ/200)	/* async qh unlink delay */
 
-/* Initial IRQ latency:  lower than default */
+/* Initial IRQ latency:  faster than hw default */
 static int log2_irq_thresh = 0;		// 0 to 6
 module_param (log2_irq_thresh, int, S_IRUGO);
 MODULE_PARM_DESC (log2_irq_thresh, "log2 IRQ latency, 1-64 microframes");
+
+/* initial park setting:  slower than hw default */
+static unsigned park = 0;
+module_param (park, uint, S_IRUGO);
+MODULE_PARM_DESC (park, "park setting; 1-3 back-to-back async packets");
 
 #define	INTR_MASK (STS_IAA | STS_FATAL | STS_PCD | STS_ERR | STS_INT)
 
@@ -506,11 +511,24 @@ static int ehci_start (struct usb_hcd *hcd)
 	}
 
 	/* clear interrupt enables, set irq latency */
-	temp = readl (&ehci->regs->command) & 0x0fff;
 	if (log2_irq_thresh < 0 || log2_irq_thresh > 6)
 		log2_irq_thresh = 0;
-	temp |= 1 << (16 + log2_irq_thresh);
-	// if hc can park (ehci >= 0.96), default is 3 packets per async QH 
+	temp = 1 << (16 + log2_irq_thresh);
+	if (HCC_CANPARK(hcc_params)) {
+		/* HW default park == 3, on hardware that supports it (like
+		 * NVidia and ALI silicon), maximizes throughput on the async
+		 * schedule by avoiding QH fetches between transfers.
+		 *
+		 * With fast usb storage devices and NForce2, "park" seems to
+		 * make problems:  throughput reduction (!), data errors...
+		 */
+		if (park) {
+			park = min (park, (unsigned) 3);
+			temp |= CMD_PARK;
+			temp |= park << 8;
+		}
+		ehci_info (ehci, "park %d\n", park);
+	}
 	if (HCC_PGM_FRAMELISTLEN (hcc_params)) {
 		/* periodic schedule size can be smaller than default */
 		temp &= ~(3 << 2);
@@ -522,7 +540,6 @@ static int ehci_start (struct usb_hcd *hcd)
 		default:	BUG ();
 		}
 	}
-	temp &= ~(CMD_IAAD | CMD_ASE | CMD_PSE),
 	// Philips, Intel, and maybe others need CMD_RUN before the
 	// root hub will detect new devices (why?); NEC doesn't
 	temp |= CMD_RUN;
