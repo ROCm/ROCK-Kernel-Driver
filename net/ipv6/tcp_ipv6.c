@@ -686,13 +686,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
                         dst_release(dst);
                         goto failure;
                 }
-                ip6_dst_store(sk, dst, NULL, NULL);
-                sk->sk_route_caps = dst->dev->features&~NETIF_F_IP_CSUM;
 #endif
-// KK : Do we need a dst_store in case of not-SUBTREE ?
-	} else {
-		ip6_dst_store(sk, dst, NULL, NULL);
-		sk->sk_route_caps = dst->dev->features&~NETIF_F_IP_CSUM;
 	}
 
 	/* set the source address */
