@@ -51,4 +51,11 @@ fi
 #   U - undefined global symbols
 #   w - local weak symbols
 
-nm $1 | grep -v ' [aUw] ' > $2
+# readprofile starts reading symbols when _stext is found, and
+# continue until it finds a symbol which is not either of 'T', 't',
+# 'W' or 'w'. __crc_ are 'A' and placed in the middle
+# so we just ignore them to let readprofile continue to work.
+# (At least sparc64 has __crc_ in the middle).
+
+$NM -n $1 | grep -v '\( [aUw] \)\|\(__crc_\)' > $2
+

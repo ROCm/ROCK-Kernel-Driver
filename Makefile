@@ -608,12 +608,12 @@ endif
 
 define rule_vmlinux
 	$(rule_vmlinux__);
-	$(Q)$(if $($(quiet)cmd_sysmap),          \
-	  echo '  $($(quiet)cmd_sysmap) $@' &&)  \
-	$(cmd_sysmap) $@ System.map;             \
-	if [ $$? -ne 0 ]; then                   \
-		rm -f $@;                        \
-		/bin/false;                      \
+	$(Q)$(if $($(quiet)cmd_sysmap),                  \
+	  echo '  $($(quiet)cmd_sysmap) System.map' &&)  \
+	$(cmd_sysmap) $@ System.map;                     \
+	if [ $$? -ne 0 ]; then                           \
+		rm -f $@;                                \
+		/bin/false;                              \
 	fi;
 	$(rule_verify_kallsyms)
 endef
