@@ -43,7 +43,7 @@ extern struct processor {
 	/*
 	 * Idle the processor
 	 */
-	int (*_do_idle)(int mode);
+	int (*_do_idle)(void);
 	/*
 	 * Processor architecture specific
 	 */
@@ -113,7 +113,7 @@ extern const struct processor sa110_processor_functions;
 #define cpu_proc_init()				processor._proc_init()
 #define cpu_proc_fin()				processor._proc_fin()
 #define cpu_reset(addr)				processor.reset(addr)
-#define cpu_do_idle(mode)			processor._do_idle(mode)
+#define cpu_do_idle()				processor._do_idle()
 
 #define cpu_cache_clean_invalidate_all()	processor.cache.clean_invalidate_all()
 #define cpu_cache_clean_invalidate_range(s,e,f)	processor.cache.clean_invalidate_range(s,e,f)

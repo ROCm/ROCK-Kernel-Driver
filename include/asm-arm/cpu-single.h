@@ -52,7 +52,7 @@ extern void cpu_data_abort(unsigned long pc);
 extern void cpu_check_bugs(void);
 extern void cpu_proc_init(void);
 extern void cpu_proc_fin(void);
-extern int cpu_do_idle(int mode);
+extern int cpu_do_idle(void);
 
 extern void cpu_cache_clean_invalidate_all(void);
 extern void cpu_cache_clean_invalidate_range(unsigned long address, unsigned long end, int flags);
