@@ -185,8 +185,8 @@ static void ti1250_zoom_video(struct pcmcia_socket *sock, int onoff)
 
 	ti_zoom_video(sock, onoff);
 
-	reg = config_readb(socket, 0x84);
-	reg |= (1<<7);	/* ZV bus enable */
+	reg = config_readb(socket, TI1250_MULTIMEDIA_CTL);
+	reg |= TI1250_MMC_ZVOUTEN;	/* ZV bus enable */
 
 	if(PCI_FUNC(socket->dev->devfn)==1)
 		shift = 1;
@@ -204,7 +204,7 @@ static void ti1250_zoom_video(struct pcmcia_socket *sock, int onoff)
 		reg &= ~(1<<shift);	/* Socket zoon video off */
 	}
 
-	config_writeb(socket, 0x84, reg);
+	config_writeb(socket, TI1250_MULTIMEDIA_CTL, reg);
 }
 
 static void ti_set_zv(struct pcmcia_socket *sock)
