@@ -52,7 +52,7 @@
 #include <asm/uaccess.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
@@ -763,11 +763,11 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 				good_bytes = 0;
 			break;
 
-		case RECOVERED_ERROR:
+		case RECOVERED_ERROR: /* an error occurred, but it recovered */
+		case NO_SENSE: /* LLDD got sense data */
 			/*
-			 * An error occurred, but it recovered.  Inform the
-			 * user, but make sure that it's not treated as a
-			 * hard error.
+			 * Inform the user, but make sure that it's not treated
+			 * as a hard error.
 			 */
 			print_sense("sd", SCpnt);
 			SCpnt->result = 0;

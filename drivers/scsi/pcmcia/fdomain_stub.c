@@ -44,7 +44,7 @@
 #include <scsi/scsi_ioctl.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>

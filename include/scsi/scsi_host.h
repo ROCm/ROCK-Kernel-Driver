@@ -151,7 +151,7 @@ struct scsi_host_template {
 	 * here then you will get a call to slave_configure(), then the
 	 * device will be used for however long it is kept around, then when
 	 * the device is removed from the system (or * possibly at reboot
-	 * time), you will then get a call to slave_detach().  This is
+	 * time), you will then get a call to slave_destroy().  This is
 	 * assuming you implement slave_configure and slave_destroy.
 	 * However, if you allocate memory and hang it off the device struct,
 	 * then you must implement the slave_destroy() routine at a minimum
@@ -185,7 +185,7 @@ struct scsi_host_template {
 	 *     specific setup basis...
 	 * 6.  Return 0 on success, non-0 on error.  The device will be marked
 	 *     as offline on error so that no access will occur.  If you return
-	 *     non-0, your slave_detach routine will never get called for this
+	 *     non-0, your slave_destroy routine will never get called for this
 	 *     device, so don't leave any loose memory hanging around, clean
 	 *     up after yourself before returning non-0
 	 *
@@ -312,6 +312,11 @@ struct scsi_host_template {
 	 * True for emulated SCSI host adapters (e.g. ATAPI)
 	 */
 	unsigned emulated:1;
+
+	/*
+	 * True if the low-level driver performs its own reset-settle delays.
+	 */
+	unsigned skip_settle_delay:1;
 
 	/*
 	 * Countdown for host blocking with no commands outstanding

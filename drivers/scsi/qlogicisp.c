@@ -36,7 +36,7 @@
 #include <asm/irq.h>
 #include <asm/byteorder.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "qlogicisp.h"
 
 /* Configuration section *****************************************************/

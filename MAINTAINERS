@@ -90,6 +90,20 @@ M:	dave@thedillows.org
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+3W-XXXX ATA-RAID CONTROLLER DRIVER
+P:	Adam Radford
+M:	linuxraid@amcc.com
+L:	linux-scsi@vger.kernel.org
+W:	http://www.amcc.com
+S:	Supported
+
+3W-9XXX SATA-RAID CONTROLLER DRIVER
+P:	Adam Radford
+M:	linuxraid@amcc.com
+L:	linux-scsi@vger.kernel.org
+W:	http://www.amcc.com
+S:	Supported
+
 53C700 AND 53C700-66 SCSI DRIVER
 P:	James E.J. Bottomley
 M:	James.Bottomley@HansenPartnership.com

@@ -11,7 +11,7 @@
 #include <asm/uaccess.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
 
 #include "sr.h"
@@ -330,6 +330,9 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 	struct packet_command cgc;
 	int result;
 	unsigned char *buffer = kmalloc(32, GFP_KERNEL | SR_GFP_DMA(cd));
+
+	if (!buffer)
+		return -ENOMEM;
 
 	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.timeout = IOCTL_TIMEOUT;

@@ -5,7 +5,7 @@
 static int scsi_debug_slave_alloc(struct scsi_device *);
 static int scsi_debug_slave_configure(struct scsi_device *);
 static void scsi_debug_slave_destroy(struct scsi_device *);
-static int scsi_debug_queuecommand(struct scsi_cmnd *, 
+static int scsi_debug_queuecommand(struct scsi_cmnd *,
 				   void (*done) (struct scsi_cmnd *));
 static int scsi_debug_ioctl(struct scsi_device *, int, void *);
 static int scsi_debug_biosparam(struct scsi_device *, struct block_device *,
@@ -17,9 +17,6 @@ static int scsi_debug_host_reset(struct scsi_cmnd *);
 static int scsi_debug_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 static const char * scsi_debug_info(struct Scsi_Host *);
 
-/*
- * This driver is written for the lk 2.5 series
- */
 #define SCSI_DEBUG_CANQUEUE  255 	/* needs to be >= 1 */
 
 #define SCSI_DEBUG_MAX_CMD_LEN 16

@@ -36,7 +36,7 @@
 #include <linux/init.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "NCR53C9x.h"
 
 #include <asm/system.h>
@@ -3645,5 +3645,16 @@ void esp_release(void)
 	esps_running = esps_in_use;
 }
 #endif
+
+EXPORT_SYMBOL(esp_abort);
+EXPORT_SYMBOL(esp_allocate);
+EXPORT_SYMBOL(esp_deallocate);
+EXPORT_SYMBOL(esp_initialize);
+EXPORT_SYMBOL(esp_intr);
+EXPORT_SYMBOL(esp_queue);
+EXPORT_SYMBOL(esp_reset);
+EXPORT_SYMBOL(esp_slave_alloc);
+EXPORT_SYMBOL(esp_slave_destroy);
+EXPORT_SYMBOL(esps_in_use);
 
 MODULE_LICENSE("GPL");

@@ -51,7 +51,7 @@
 #include <asm/uaccess.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/sg.h>
 
 #define IDESCSI_DEBUG_LOG		0

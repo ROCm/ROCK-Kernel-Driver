@@ -51,7 +51,7 @@
 #include <asm/irq.h>
 #include <linux/spinlock.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"
@@ -1266,7 +1266,7 @@ static void QueLinkDownCmnd( CPQFCHBA *cpqfcHBAdata, Scsi_Cmnd *Cmnd)
 
 
 
-// The file "hosts.h" says not to call scsi_done from
+// The file <scsi/scsi_host.h> says not to call scsi_done from
 // inside _queuecommand, so we'll do it from the heartbeat timer
 // (clarification: Turns out it's ok to call scsi_done from queuecommand 
 // for cases that don't go to the hardware like scsi cmds destined

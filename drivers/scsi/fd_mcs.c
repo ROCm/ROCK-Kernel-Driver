@@ -93,7 +93,7 @@
 #include <asm/system.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "fd_mcs.h"
 
 #define DRIVER_VERSION "v0.2 by ZP Gu<zpg@castle.net>"

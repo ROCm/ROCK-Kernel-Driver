@@ -47,7 +47,7 @@
 #include <asm/uaccess.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>	/* For the door lock/unlock commands */

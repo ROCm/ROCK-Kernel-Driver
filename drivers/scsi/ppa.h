@@ -86,7 +86,7 @@
 #include  <linux/interrupt.h>
 
 #include  <asm/io.h>
-#include  "hosts.h"
+#include  <scsi/scsi_host.h>
 /* batteries not included :-) */
 
 /*

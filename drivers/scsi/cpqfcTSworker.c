@@ -39,7 +39,7 @@
 #include <asm/dma.h>
 
 #include "scsi.h"
-#include "hosts.h"   // struct Scsi_Host definition for T handler
+#include <scsi/scsi_host.h>   // struct Scsi_Host definition for T handler
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"
 #include "cpqfcTStrigger.h"

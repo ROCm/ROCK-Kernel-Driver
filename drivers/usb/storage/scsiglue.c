@@ -409,6 +409,9 @@ struct scsi_host_template usb_stor_host_template = {
 	/* emulated HBA */
 	.emulated =			TRUE,
 
+	/* we do our own delay after a device or bus reset */
+	.skip_settle_delay =		1,
+
 	/* sysfs device attributes */
 	.sdev_attrs =			sysfs_device_attr_list,
 

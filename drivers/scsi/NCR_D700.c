@@ -98,9 +98,7 @@
 #include <linux/module.h>
 #include <linux/mca.h>
 #include <asm/io.h>
-
-#include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "53c700.h"
 #include "NCR_D700.h"
@@ -156,7 +154,7 @@ param_setup(char *string)
 
 /* Host template.  The 53c700 routine NCR_700_detect will
  * fill in all of the missing routines */
-static Scsi_Host_Template NCR_D700_driver_template = {
+static struct scsi_host_template NCR_D700_driver_template = {
 	.module			= THIS_MODULE,
 	.name			= "NCR Dual 700 MCA",
 	.proc_name		= "NCR_D700",

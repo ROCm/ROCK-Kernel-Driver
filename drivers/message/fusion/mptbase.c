@@ -1311,14 +1311,14 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem_phys = msize = 0;
 	port = psize = 0;
 	for (ii=0; ii < DEVICE_COUNT_RESOURCE; ii++) {
-		if (pdev->PCI_BASEADDR_FLAGS(ii) & PCI_BASE_ADDRESS_SPACE_IO) {
+		if (pci_resource_flags(pdev, ii) & PCI_BASE_ADDRESS_SPACE_IO) {
 			/* Get I/O space! */
-			port = pdev->PCI_BASEADDR_START(ii);
-			psize = PCI_BASEADDR_SIZE(pdev,ii);
+			port = pci_resource_start(pdev, ii);
+			psize = pci_resource_len(pdev,ii);
 		} else {
 			/* Get memmap */
-			mem_phys = pdev->PCI_BASEADDR_START(ii);
-			msize = PCI_BASEADDR_SIZE(pdev,ii);
+			mem_phys = pci_resource_start(pdev, ii);
+			msize = pci_resource_len(pdev,ii);
 			break;
 		}
 	}
@@ -1524,7 +1524,7 @@ mptbase_remove(struct pci_dev *pdev)
 	CHIPREG_WRITE32(&ioc->chip->IntMask, 0xFFFFFFFF);
 
 	ioc->active = 0;
-	mpt_sync_irq(pdev->irq);
+	synchronize_irq(pdev->irq);
 
 	/* Clear any lingering interrupt */
 	CHIPREG_WRITE32(&ioc->chip->IntStatus, 0);
@@ -3799,7 +3799,8 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 
 		/*  Prime reply FIFO...  */
 		dprintk((KERN_INFO MYNAM ": %s.reply_alloc  @ %p[%p], sz=%d bytes\n",
-			 	ioc->name, mem, (void *)(ulong)ioc->reply_alloc_dma, reply_buffer_sz));
+			ioc->name, ioc->reply_alloc, 
+			(void *)(ulong)ioc->reply_alloc_dma, reply_buffer_sz));
 
 		b = (unsigned long) ioc->reply_alloc;
 		b = (b + (0x80UL - 1UL)) & ~(0x80UL - 1UL); /* round up to 128-byte boundary */
@@ -3812,7 +3813,8 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 	
 		/*  Request FIFO - WE manage this!  */
 		dprintk((KERN_INFO MYNAM ": %s.req_alloc    @ %p[%p], sz=%d bytes\n",
-			 	ioc->name, mem, (void *)(ulong)ioc->req_alloc_dma, request_buffer_sz));
+			ioc->name, ioc->req_alloc,
+			(void *)(ulong)ioc->req_alloc_dma, request_buffer_sz));
 
 		b = (unsigned long) ioc->req_alloc;
 		b = (b + (0x80UL - 1UL)) & ~(0x80UL - 1UL); /* round up to 128-byte boundary */
