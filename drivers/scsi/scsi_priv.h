@@ -153,4 +153,13 @@ extern struct scsi_transport_template blank_transport_template;
 extern struct class sdev_class;
 extern struct bus_type scsi_bus_type;
 
+/* 
+ * internal scsi timeout functions: for use by mid-layer and transport
+ * classes.
+ */
+
+#define SCSI_DEVICE_BLOCK_MAX_TIMEOUT	(HZ*60)
+extern int scsi_internal_device_block(struct scsi_device *sdev);
+extern int scsi_internal_device_unblock(struct scsi_device *sdev);
+
 #endif /* _SCSI_PRIV_H */

@@ -4453,61 +4453,64 @@ qla2x00_down_timeout(struct semaphore *sema, unsigned long timeout)
 }
 
 static void
-qla2xxx_get_port_id(struct scsi_device *sdev)
+qla2xxx_get_port_id(struct scsi_target *starget)
 {
-	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	scsi_qla_host_t *ha = to_qla_host(shost);
 	struct fc_port *fc;
 
 	list_for_each_entry(fc, &ha->fcports, list) {
-		if (fc->os_target_id == sdev->id) {
-			fc_port_id(sdev) = fc->d_id.b.domain << 16 |
+		if (fc->os_target_id == starget->id) {
+			fc_starget_port_id(starget) = fc->d_id.b.domain << 16 |
 				fc->d_id.b.area << 8 | 
 				fc->d_id.b.al_pa;
 			return;
 		}
 	}
-	fc_port_id(sdev) = -1;
+	fc_starget_port_id(starget) = -1;
 }
 
 static void
-qla2xxx_get_port_name(struct scsi_device *sdev)
+qla2xxx_get_port_name(struct scsi_target *starget)
 {
-	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	scsi_qla_host_t *ha = to_qla_host(shost);
 	struct fc_port *fc;
 
 	list_for_each_entry(fc, &ha->fcports, list) {
-		if (fc->os_target_id == sdev->id) {
-			fc_port_name(sdev) =
+		if (fc->os_target_id == starget->id) {
+			fc_starget_port_name(starget) =
 				__be64_to_cpu(*(uint64_t *)fc->port_name);
 			return;
 		}
 	}
-	fc_port_name(sdev) = -1;
+	fc_starget_port_name(starget) = -1;
 }
 
 static void
-qla2xxx_get_node_name(struct scsi_device *sdev)
+qla2xxx_get_node_name(struct scsi_target *starget)
 {
-	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	scsi_qla_host_t *ha = to_qla_host(shost);
 	struct fc_port *fc;
 
 	list_for_each_entry(fc, &ha->fcports, list) {
-		if (fc->os_target_id == sdev->id) {
-			fc_node_name(sdev) =
+		if (fc->os_target_id == starget->id) {
+			fc_starget_node_name(starget) =
 				__be64_to_cpu(*(uint64_t *)fc->node_name);
 			return;
 		}
 	}
-	fc_node_name(sdev) = -1;
+	fc_starget_node_name(starget) = -1;
 }
 
 static struct fc_function_template qla2xxx_transport_functions = {
-	.get_port_id = qla2xxx_get_port_id,
-	.show_port_id = 1,
-	.get_port_name = qla2xxx_get_port_name,
-	.show_port_name = 1,
-	.get_node_name = qla2xxx_get_node_name,
-	.show_node_name = 1,
+	.get_starget_port_id = qla2xxx_get_port_id,
+	.show_starget_port_id = 1,
+	.get_starget_port_name = qla2xxx_get_port_name,
+	.show_starget_port_name = 1,
+	.get_starget_node_name = qla2xxx_get_node_name,
+	.show_starget_node_name = 1,
 };
 
 /**

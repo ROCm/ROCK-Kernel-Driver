@@ -48,6 +48,8 @@ static int zfcp_task_management_function(struct zfcp_unit *, u8);
 
 static struct zfcp_unit *zfcp_unit_lookup(struct zfcp_adapter *, int, scsi_id_t,
 					  scsi_lun_t);
+static struct zfcp_port * zfcp_port_lookup(struct zfcp_adapter *, int,
+					 scsi_id_t);
 
 static struct device_attribute *zfcp_sysfs_sdev_attrs[];
 
@@ -397,6 +399,26 @@ zfcp_unit_lookup(struct zfcp_adapter *adapter, int channel, scsi_id_t id,
 	}
  out:
 	return retval;
+}
+/*
+ * function:    zfcp_unit_tgt_lookup
+ *
+ * purpose:
+ *
+ * returns:
+ *
+ * context:	
+ */
+static struct zfcp_port *
+zfcp_port_lookup(struct zfcp_adapter *adapter, int channel, scsi_id_t id)
+{
+	struct zfcp_port *port;
+
+	list_for_each_entry(port, &adapter->port_list_head, list) {
+		if (id == port->scsi_id)
+			return port;
+	}
+	return (zfcp_port *)NULL;
 }
 
 /*
@@ -839,39 +861,63 @@ zfcp_fsf_start_scsi_er_timer(struct zfcp_adapter *adapter)
  * Support functions for FC transport class
  */
 static void
-zfcp_get_port_id(struct scsi_device *sdev)
+zfcp_get_port_id(struct scsi_target *starget)
 {
-	struct zfcp_unit *unit;
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct zfcp_adapter *adapter = (struct zfcp_adapter *)shost->hostdata[0];
+	struct zfcp_port *port;
+	unsigned long flags;
 
-	unit = (struct zfcp_unit *) sdev->hostdata;
-	fc_port_id(sdev) = unit->port->d_id;
+	read_lock_irqsave(&zfcp_data.config_lock, flags);
+	port = zfcp_port_lookup(adapter, starget->channel, starget->id);
+	if (port)
+		fc_starget_port_id(starget) = port->d_id;
+	else
+		fc_starget_port_id(starget) = -1;
+	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
 }
 
 static void
-zfcp_get_port_name(struct scsi_device *sdev)
+zfcp_get_port_name(struct scsi_target *starget)
 {
-	struct zfcp_unit *unit;
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct zfcp_adapter *adapter = (struct zfcp_adapter *)shost->hostdata[0];
+	struct zfcp_port *port;
+	unsigned long flags;
 
-	unit = (struct zfcp_unit *) sdev->hostdata;
-	fc_port_name(sdev) = unit->port->wwpn;
+	read_lock_irqsave(&zfcp_data.config_lock, flags);
+	port = zfcp_port_lookup(adapter, starget->channel, starget->id);
+	if (port)
+		fc_starget_port_name(starget) = port->wwpn;
+	else
+		fc_starget_port_name(starget) = -1;
+	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
 }
 
 static void
-zfcp_get_node_name(struct scsi_device *sdev)
+zfcp_get_node_name(struct scsi_target *starget)
 {
-	struct zfcp_unit *unit;
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct zfcp_adapter *adapter = (struct zfcp_adapter *)shost->hostdata[0];
+	struct zfcp_port *port;
+	unsigned long flags;
 
-	unit = (struct zfcp_unit *) sdev->hostdata;
-	fc_node_name(sdev) = unit->port->wwnn;
+	read_lock_irqsave(&zfcp_data.config_lock, flags);
+	port = zfcp_port_lookup(adapter, starget->channel, starget->id);
+	if (port)
+		fc_starget_node_name(starget) = port->wwnn;
+	else
+		fc_starget_node_name(starget) = -1;
+	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
 }
 
 struct fc_function_template zfcp_transport_functions = {
-	.get_port_id = zfcp_get_port_id,
-	.get_port_name = zfcp_get_port_name,
-	.get_node_name = zfcp_get_node_name,
-	.show_port_id = 1,
-	.show_port_name = 1,
-	.show_node_name = 1,
+	.get_starget_port_id = zfcp_get_port_id,
+	.get_starget_port_name = zfcp_get_port_name,
+	.get_starget_node_name = zfcp_get_node_name,
+	.show_starget_port_id = 1,
+	.show_starget_port_name = 1,
+	.show_starget_node_name = 1,
 };
 
 /**
