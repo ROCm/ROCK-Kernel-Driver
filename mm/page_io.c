@@ -17,6 +17,7 @@
 #include <linux/bio.h>
 #include <linux/swapops.h>
 #include <linux/buffer_head.h>	/* for block_sync_page() */
+#include <linux/mpage.h>
 #include <asm/pgtable.h>
 
 static struct bio *

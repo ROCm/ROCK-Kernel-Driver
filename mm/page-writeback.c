@@ -316,12 +316,6 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 }
 EXPORT_SYMBOL(generic_vm_writeback);
 
-int generic_writepages(struct address_space *mapping, int *nr_to_write)
-{
-	return mpage_writepages(mapping, nr_to_write, NULL);
-}
-EXPORT_SYMBOL(generic_writepages);
-
 int do_writepages(struct address_space *mapping, int *nr_to_write)
 {
 	if (mapping->a_ops->writepages)

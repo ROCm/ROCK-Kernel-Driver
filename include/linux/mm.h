@@ -461,7 +461,6 @@ extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
 /* mm/page-writeback.c */
-int generic_writepages(struct address_space *mapping, int *nr_to_write);
 int write_one_page(struct page *page, int wait);
 
 /* readahead.c */
