@@ -154,6 +154,9 @@ static void __init reassign_cpu_only_nodes(void)
 
 	memcpy(numa_slit, numa_slit_fix, sizeof (numa_slit));
 
+	for (i = nnode; i < numnodes; i++)
+		node_set_offline(i);
+
 	numnodes = nnode;
 
 	return;
