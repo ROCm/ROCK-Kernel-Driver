@@ -1983,7 +1983,8 @@ static int fbcon_blank(struct vc_data *vc, int blank)
 						 height,
 						 vc->vc_cols);
 			vc->vc_video_erase_char = oldc;
-		}
+		} else
+			update_screen(vc->vc_num);
 		return 0;
 	} else {
 		/* Tell console.c that it has to restore the screen itself */
