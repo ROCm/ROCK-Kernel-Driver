@@ -563,6 +563,7 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	struct sadb_address *addr;
 	struct sadb_key *key;
 	struct sadb_x_sa2 *sa2;
+	struct sockaddr_in *sin;
 	int size;
 	int auth_key_size = 0;
 	int encrypt_key_size = 0;
@@ -675,9 +676,11 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	addr->sadb_address_proto = 0; 
 	addr->sadb_address_prefixlen = 32; /* XXX */ 
 	addr->sadb_address_reserved = 0;
-	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
-	((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr = 
-		x->props.saddr.xfrm4_addr;
+	sin = (struct sockaddr_in *) (addr + 1);
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = x->props.saddr.xfrm4_addr;
+	sin->sin_port = 0;
+	memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 	/* dst address */
 	addr = (struct sadb_address*) skb_put(skb, 
 					      sizeof(struct sadb_address)+sizeof(struct sockaddr_in));
@@ -688,9 +691,11 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	addr->sadb_address_proto = 0; 
 	addr->sadb_address_prefixlen = 32; /* XXX */ 
 	addr->sadb_address_reserved = 0;
-	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
-	((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr = 
-		x->id.daddr.xfrm4_addr;
+	sin = (struct sockaddr_in *) (addr + 1);
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = x->id.daddr.xfrm4_addr;
+	sin->sin_port = 0;
+	memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 
 	if (x->sel.saddr.xfrm4_addr != x->props.saddr.xfrm4_addr) {
 		addr = (struct sadb_address*) skb_put(skb, 
@@ -702,11 +707,11 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		addr->sadb_address_proto = pfkey_proto_from_xfrm(x->sel.proto);
 		addr->sadb_address_prefixlen = x->sel.prefixlen_s;
 		addr->sadb_address_reserved = 0;
-		((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
-		((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr = 
-			x->sel.saddr.xfrm4_addr;
-		((struct sockaddr_in*)(addr + 1))->sin_port = 
-			x->sel.sport;
+		sin = (struct sockaddr_in*)(addr + 1);
+		sin->sin_family = AF_INET;
+		sin->sin_addr.s_addr = x->sel.saddr.xfrm4_addr;
+		sin->sin_port = x->sel.sport;
+		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 	}
 
 	/* auth key */
@@ -2060,10 +2065,11 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	addr->sadb_address_proto = 0;
 	addr->sadb_address_prefixlen = 32;
 	addr->sadb_address_reserved = 0;
-	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
-	((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr = 
-		x->props.saddr.xfrm4_addr;
-	((struct sockaddr_in*)(addr + 1))->sin_port = 0;
+	sin = (struct sockaddr_in*)(addr + 1);
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = x->props.saddr.xfrm4_addr;
+	sin->sin_port = 0;
+	memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 	
 	/* dst address */
 	addr = (struct sadb_address*) skb_put(skb, 
@@ -2075,10 +2081,11 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	addr->sadb_address_proto = 0;
 	addr->sadb_address_prefixlen = 32; 
 	addr->sadb_address_reserved = 0;
-	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
-	((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr = 
-		x->id.daddr.xfrm4_addr;
-	((struct sockaddr_in*)(addr + 1))->sin_port = 0;
+	sin = (struct sockaddr_in*)(addr + 1);
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = x->id.daddr.xfrm4_addr;
+	sin->sin_port = 0;
+	memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 
 	pol = (struct sadb_x_policy *)  skb_put(skb, sizeof(struct sadb_x_policy));
 	pol->sadb_x_policy_len = sizeof(struct sadb_x_policy)/sizeof(uint64_t);
