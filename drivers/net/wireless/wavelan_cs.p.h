@@ -645,6 +645,7 @@ struct net_local
   int			cell_search;		/* Searching for new cell? */
   struct timer_list	cell_timer;		/* Garbage collection */
 #endif	/* WAVELAN_ROAMING */
+  void __iomem *mem;
 };
 
 /**************************** PROTOTYPES ****************************/
