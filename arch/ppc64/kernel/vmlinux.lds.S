@@ -117,8 +117,11 @@ SECTIONS
 
   .data : {
 	*(.data .data.rel* .toc1)
-	*(.opd)
 	*(.branch_lt)
+	}
+
+  .opd : {
+	*(.opd)
 	}
 
   .got : {
