@@ -343,19 +343,28 @@ static int __init sbc60xxwdt_init(void)
 	int rc = -EBUSY;
 
 	if (!request_region(wdt_start, 1, "SBC 60XX WDT"))
+	{
+		printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
+			wdt_start);
+		rc = -EIO;
 		goto err_out;
+	}
 
 	/* We cannot reserve 0x45 - the kernel already has! */
 	if ((wdt_stop != 0x45) && (wdt_stop != wdt_start))
 	{
 		if (!request_region(wdt_stop, 1, "SBC 60XX WDT"))
+		{
+			printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
+				wdt_stop);
 			goto err_out_region1;
+		}
 	}
 
 	if(timeout < 1 || timeout > 3600) /* arbitrary upper limit */
 	{
 		timeout = WATCHDOG_TIMEOUT;
-		printk (KERN_INFO PFX "timeout value must be 1<=x<=3600, using %d\n",
+		printk(KERN_INFO PFX "timeout value must be 1<=x<=3600, using %d\n",
 			timeout);
  	}
 
@@ -365,11 +374,19 @@ static int __init sbc60xxwdt_init(void)
 
 	rc = misc_register(&wdt_miscdev);
 	if (rc)
+	{
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			wdt_miscdev.minor, rc);
 		goto err_out_region2;
+	}
 
 	rc = register_reboot_notifier(&wdt_notifier);
 	if (rc)
+	{
+		printk(KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+			rc);
 		goto err_out_miscdev;
+	}
 
 	printk(KERN_INFO PFX "WDT driver for 60XX single board computer initialised.\n");
 
