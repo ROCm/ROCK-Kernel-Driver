@@ -374,9 +374,9 @@ static void module_unload_init(struct module *mod)
 
 	INIT_LIST_HEAD(&mod->modules_which_use_me);
 	for (i = 0; i < NR_CPUS; i++)
-		atomic_set(&mod->ref[i].count, 0);
+		local_set(&mod->ref[i].count, 0);
 	/* Hold reference count during initialization. */
-	atomic_set(&mod->ref[smp_processor_id()].count, 1);
+	local_set(&mod->ref[smp_processor_id()].count, 1);
 	/* Backwards compatibility macros put refcount during init. */
 	mod->waiter = current;
 }
@@ -599,7 +599,7 @@ unsigned int module_refcount(struct module *mod)
 	unsigned int i, total = 0;
 
 	for (i = 0; i < NR_CPUS; i++)
-		total += atomic_read(&mod->ref[i].count);
+		total += local_read(&mod->ref[i].count);
 	return total;
 }
 EXPORT_SYMBOL(module_refcount);
