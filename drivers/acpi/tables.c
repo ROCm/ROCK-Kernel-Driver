@@ -56,7 +56,7 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_SRAT]		= "SRAT",
 	[ACPI_SSDT]		= "SSDT",
 	[ACPI_SPMI]		= "SPMI",
-	[ACPI_HPET]		= "HPET"
+	[ACPI_HPET]		= "HPET",
 };
 
 /* System Description Table (RSDT/XSDT) */
