@@ -93,6 +93,10 @@ nfs4_free_client(struct nfs4_client *clp)
 		kfree(sp);
 	}
 	BUG_ON(!list_empty(&clp->cl_state_owners));
+	if (clp->cl_cred)
+		put_rpccred(clp->cl_cred);
+	if (clp->cl_rpcclient)
+		rpc_shutdown_client(clp->cl_rpcclient);
 	kfree(clp);
 }
 

@@ -762,9 +762,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	struct qstr		q;
 	int			status;
 
-	clp = server->nfs4_state = nfs4_get_client(&server->addr.sin_addr);
-	if (!clp)
-		return -ENOMEM;
+	clp = server->nfs4_state;
 
 	down_write(&clp->cl_sem);
 	/* Has the clientid already been initialized? */
@@ -850,8 +848,6 @@ no_setclientid:
 	return status;
 out_unlock:
 	up_write(&clp->cl_sem);
-	nfs4_put_client(clp);
-	server->nfs4_state = NULL;
 	return status;
 }
 

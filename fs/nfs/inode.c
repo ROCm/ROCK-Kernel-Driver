@@ -493,10 +493,17 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 	server->client = nfs_create_client(server, data);
 	if (server->client == NULL)
 		goto out_fail;
-	data->pseudoflavor = RPC_AUTH_UNIX;	/* RFC 2623, sec 2.3.2 */
-	server->client_sys = nfs_create_client(server, data);
-	if (server->client_sys == NULL)
-		goto out_shutdown;
+	/* RFC 2623, sec 2.3.2 */
+	if (authflavor != RPC_AUTH_UNIX) {
+		server->client_sys = rpc_clone_client(server->client);
+		if (server->client_sys == NULL)
+			goto out_shutdown;
+		if (!rpcauth_create(RPC_AUTH_UNIX, server->client_sys))
+			goto out_shutdown;
+	} else {
+		atomic_inc(&server->client->cl_count);
+		server->client_sys = server->client;
+	}
 
 	/* Fire up rpciod if not yet running */
 	if (rpciod_up() != 0) {
@@ -1349,6 +1356,7 @@ static struct file_system_type nfs_fs_type = {
 static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data, int silent)
 {
 	struct nfs_server *server;
+	struct nfs4_client *clp = NULL;
 	struct rpc_xprt *xprt = NULL;
 	struct rpc_clnt *clnt = NULL;
 	struct rpc_timeout timeparms;
@@ -1398,13 +1406,13 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		return -EINVAL;
 	}
 
-	/* Now create transport and client */
-	xprt = xprt_create_proto(proto, &server->addr, &timeparms);
-	if (xprt == NULL) {
-		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
+	clp = nfs4_get_client(&server->addr.sin_addr);
+	if (!clp) {
+		printk(KERN_WARNING "NFS: failed to create NFS4 client.\n");
 		goto out_fail;
 	}
 
+	/* Now create transport and client */
 	authflavour = RPC_AUTH_UNIX;
 	if (data->auth_flavourlen != 0) {
 		if (data->auth_flavourlen > 1)
@@ -1414,18 +1422,47 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 			goto out_fail;
 		}
 	}
-	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
-				 server->rpc_ops->version, authflavour);
+
+	down_write(&clp->cl_sem);
+	if (clp->cl_rpcclient == NULL) {
+		xprt = xprt_create_proto(proto, &server->addr, &timeparms);
+		if (xprt == NULL) {
+			up_write(&clp->cl_sem);
+			printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
+			goto out_fail;
+		}
+		clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
+				server->rpc_ops->version, authflavour);
+		if (clnt == NULL) {
+			up_write(&clp->cl_sem);
+			printk(KERN_WARNING "NFS: cannot create RPC client.\n");
+			xprt_destroy(xprt);
+			goto out_fail;
+		}
+		clnt->cl_chatty   = 1;
+		clp->cl_rpcclient = clnt;
+		clp->cl_cred = rpcauth_lookupcred(clnt->cl_auth, 0);
+		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
+	}
+	clnt = rpc_clone_client(clp->cl_rpcclient);
+	server->nfs4_state = clp;
+	up_write(&clp->cl_sem);
+
 	if (clnt == NULL) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
-		xprt_destroy(xprt);
 		goto out_fail;
 	}
 
 	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
 	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
-	clnt->cl_chatty   = 1;
 	server->client    = clnt;
+
+	if (clnt->cl_auth->au_flavor != authflavour) {
+		if (rpcauth_create(authflavour, clnt) == NULL) {
+			printk(KERN_WARNING "NFS: couldn't create credcache!\n");
+			goto out_shutdown;
+		}
+	}
 
 	/* Fire up rpciod if not yet running */
 	if (rpciod_up() != 0) {
@@ -1433,15 +1470,13 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		goto out_shutdown;
 	}
 
-	if (create_nfsv4_state(server, data))
-		goto out_shutdown;
-
 	if ((server->idmap = nfs_idmap_new(server)) == NULL)
 		printk(KERN_WARNING "NFS: couldn't start IDmap\n");
 
 	err = nfs_sb_init(sb, authflavour);
 	if (err == 0)
 		return 0;
+	clp = NULL;
 	rpciod_down();
 	destroy_nfsv4_state(server);
 	if (server->idmap != NULL)
@@ -1449,6 +1484,8 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 out_shutdown:
 	rpc_shutdown_client(server->client);
 out_fail:
+	if (clp)
+		nfs4_put_client(clp);
 	return err;
 }
 

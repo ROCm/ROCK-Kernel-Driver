@@ -489,6 +489,14 @@ struct nfs4_client {
 	int			cl_nunused;
 	spinlock_t		cl_lock;
 	atomic_t		cl_count;
+
+	struct rpc_clnt *	cl_rpcclient;
+	struct rpc_cred *	cl_cred;
+
+	/* Our own IP address, as a null-terminated string.
+	 * This is used to generate the clientid, and the callback address.
+	 */
+	char			cl_ipaddr[16];
 };
 
 /*
@@ -558,13 +566,6 @@ extern void nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp);
 
 
 struct nfs4_mount_data;
-static inline int
-create_nfsv4_state(struct nfs_server *server, struct nfs4_mount_data *data)
-{
-	server->nfs4_state = NULL;
-	return 0;
-}
-
 static inline void
 destroy_nfsv4_state(struct nfs_server *server)
 {
