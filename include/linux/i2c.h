@@ -66,7 +66,6 @@ struct i2c_driver;
 struct i2c_client_address_data;
 union i2c_smbus_data;
 
-
 /*
  * The master routines are the ones normally used to transmit data to devices
  * on a bus (or read from them). Apart from two basic transfer functions to 
