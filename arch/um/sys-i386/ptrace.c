@@ -28,8 +28,8 @@ int is_syscall(unsigned long addr)
 		       addr);
 		return(0);
 	}
-	return( (instr == 0x80cd || instr == 0x340f) &&
-	        PT_REGS_EAX(&current->thread.regs) < NR_syscalls);
+	/* int 0x80 or sysenter */
+	return((instr == 0x80cd) || (instr == 0x340f));
 }
 
 /* determines which flags the user has access to. */
