@@ -312,9 +312,6 @@ static int full_duplex[MAX_UNITS] = {0, };
 
 #include <linux/if_vlan.h>
 
-#define COMPAT_MOD_INC_USE_COUNT
-#define COMPAT_MOD_DEC_USE_COUNT
-
 #define init_tx_timer(dev, func, timeout) \
 	dev->tx_timeout = func; \
 	dev->watchdog_timeo = timeout;
@@ -1110,14 +1107,9 @@ static int netdev_open(struct net_device *dev)
 	size_t tx_done_q_size, rx_done_q_size, tx_ring_size, rx_ring_size;
 
 	/* Do we ever need to reset the chip??? */
-
-	COMPAT_MOD_INC_USE_COUNT;
-
 	retval = request_irq(dev->irq, &intr_handler, SA_SHIRQ, dev->name, dev);
-	if (retval) {
-		COMPAT_MOD_DEC_USE_COUNT;
+	if (retval)
 		return retval;
-	}
 
 	/* Disable the Rx and Tx, and reset the chip. */
 	writel(0, ioaddr + GenCtrl);
@@ -1134,10 +1126,8 @@ static int netdev_open(struct net_device *dev)
 		rx_ring_size = sizeof(struct starfire_rx_desc) * RX_RING_SIZE;
 		np->queue_mem_size = tx_done_q_size + rx_done_q_size + tx_ring_size + rx_ring_size;
 		np->queue_mem = pci_alloc_consistent(np->pci_dev, np->queue_mem_size, &np->queue_mem_dma);
-		if (np->queue_mem == 0) {
-			COMPAT_MOD_DEC_USE_COUNT;
+		if (np->queue_mem == 0)
 			return -ENOMEM;
-		}
 
 		np->tx_done_q     = np->queue_mem;
 		np->tx_done_q_dma = np->queue_mem_dma;
@@ -2149,8 +2139,6 @@ static int netdev_close(struct net_device *dev)
 		dev_kfree_skb(skb);
 		np->tx_info[i].skb = NULL;
 	}
-
-	COMPAT_MOD_DEC_USE_COUNT;
 
 	return 0;
 }

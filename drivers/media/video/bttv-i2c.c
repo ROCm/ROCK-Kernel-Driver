@@ -306,21 +306,6 @@ static struct i2c_adapter bttv_i2c_adap_hw_template = {
 	.client_unregister = detach_inform,
 };
 
-/* ----------------------------------------------------------------------- */
-/* I2C functions - common stuff                                            */
-
-#ifndef I2C_PEC
-static void bttv_inc_use(struct i2c_adapter *adap)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void bttv_dec_use(struct i2c_adapter *adap)
-{
-	MOD_DEC_USE_COUNT;
-}
-#endif
-
 static int attach_inform(struct i2c_client *client)
 {
         struct bttv *btv = i2c_get_adapdata(client->adapter);
