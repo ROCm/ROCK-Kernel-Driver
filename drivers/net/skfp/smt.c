@@ -1701,7 +1701,7 @@ void *sm_to_para(struct s_smc *smc, struct smt_header *sm, int para)
 	char	*p ;
 	int	len ;
 	int	plen ;
-	void	*found = 0 ;
+	void	*found = NULL;
 
 	SK_UNUSED(smc) ;
 
@@ -1715,16 +1715,16 @@ void *sm_to_para(struct s_smc *smc, struct smt_header *sm, int para)
 		len -= plen ;
 		if (len < 0) {
 			DB_SMT("SMT : sm_to_para - length error %d\n",plen,0) ;
-			return(0) ;
+			return NULL;
 		}
 		if ((plen & 3) && (para != SMT_P_ECHODATA)) {
 			DB_SMT("SMT : sm_to_para - odd length %d\n",plen,0) ;
-			return(0) ;
+			return NULL;
 		}
 		if (found)
 			return(found) ;
 	}
-	return(0) ;
+	return NULL;
 }
 
 #if	0
