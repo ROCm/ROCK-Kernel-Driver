@@ -1044,11 +1044,11 @@ static void __ethdev_init(struct net_device *dev)
  *
  * Allocate 8390-specific net_device.
  */
-struct net_device *alloc_ei_netdev(void)
+struct net_device *__alloc_ei_netdev(int size)
 {
 	struct net_device *dev;
 	
-	dev = alloc_netdev(sizeof(struct ei_device), "eth%d", __ethdev_init);
+	dev = alloc_netdev(sizeof(struct ei_device) + size, "eth%d", __ethdev_init);
 	if (dev)
 		ei_device_init(dev->priv);
 
@@ -1158,7 +1158,7 @@ EXPORT_SYMBOL(ei_interrupt);
 EXPORT_SYMBOL(ei_tx_timeout);
 EXPORT_SYMBOL(ethdev_init);
 EXPORT_SYMBOL(NS8390_init);
-EXPORT_SYMBOL(alloc_ei_netdev);
+EXPORT_SYMBOL(__alloc_ei_netdev);
 
 #if defined(MODULE)
 
