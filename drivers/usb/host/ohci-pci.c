@@ -30,6 +30,15 @@
 
 /*-------------------------------------------------------------------------*/
 
+static int
+ohci_pci_reset (struct usb_hcd *hcd)
+{
+	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
+
+	ohci->regs = hcd->regs;
+	return hc_reset (ohci);
+}
+
 static int __devinit
 ohci_pci_start (struct usb_hcd *hcd)
 {
@@ -88,12 +97,6 @@ ohci_pci_start (struct usb_hcd *hcd)
 	if ((ret = ohci_mem_init (ohci)) < 0) {
 		ohci_stop (hcd);
 		return ret;
-	}
-	ohci->regs = hcd->regs;
-
-	if (hc_reset (ohci) < 0) {
-		ohci_stop (hcd);
-		return -ENODEV;
 	}
 
 	if (hc_start (ohci) < 0) {
@@ -315,6 +318,7 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	/*
 	 * basic lifecycle operations
 	 */
+	.reset =		ohci_pci_reset,
 	.start =		ohci_pci_start,
 #ifdef	CONFIG_PM
 	.suspend =		ohci_pci_suspend,
