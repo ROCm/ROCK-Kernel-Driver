@@ -1,3 +1,9 @@
+Version 1.10
+------------
+Fix reconnection (and certain failed mounts) to properly wake up the
+blocked users thread so it does not seem hung (in some cases was blocked
+until the cifs receive timeout expired).
+
 Version 1.09
 ------------
 Fix /proc/fs module unload warning message (that could be logged
