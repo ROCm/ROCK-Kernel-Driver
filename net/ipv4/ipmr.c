@@ -1124,7 +1124,7 @@ static inline int ipmr_forward_finish(struct sk_buff *skb)
  *	Processing handlers for ipmr_forward
  */
 
-static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c, int vifi);
+static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c, int vifi)
 {
 	struct iphdr *iph = skb->nh.iph;
 	struct vif_device *vif = &vif_table[vifi];
