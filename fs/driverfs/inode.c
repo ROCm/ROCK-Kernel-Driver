@@ -585,29 +585,6 @@ driverfs_create_file(struct driver_file_entry * entry,
 }
 
 /**
- * __remove_file - remove a regular file in the filesystem
- * @dentry:	dentry of file to remove
- *
- * Call unlink to remove the file, and dput on the dentry to drop
- * the refcount.
- */
-static void __remove_file(struct dentry * dentry)
-{
-	dget(dentry);
-	down(&dentry->d_inode->i_sem);
-
-	vfs_unlink(dentry->d_parent->d_inode,dentry);
-
-	up(&dentry->d_inode->i_sem);
-	dput(dentry);
-
-	/* remove reference count from when file was created */
-	dput(dentry);
-
-	put_mount();
-}
-
-/**
  * driverfs_remove_file - exported file removal
  * @dir:	directory the file supposedly resides in
  * @name:	name of the file
@@ -617,14 +594,12 @@ static void __remove_file(struct dentry * dentry)
  */
 void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 {
-	struct dentry * dentry;
 	struct list_head * node;
 
 	if (!dir->dentry)
 		return;
 
-	dentry = dget(dir->dentry);
-	down(&dentry->d_inode->i_sem);
+	down(&dir->dentry->d_inode->i_sem);
 
 	node = dir->files.next;
 	while (node != &dir->files) {
@@ -633,14 +608,13 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 		entry = list_entry(node,struct driver_file_entry,node);
 		if (!strcmp(entry->name,name)) {
 			list_del_init(node);
-
-			__remove_file(entry->dentry);
+			vfs_unlink(entry->dentry->d_parent->d_inode,entry->dentry);
+			put_mount();
 			break;
 		}
 		node = node->next;
 	}
-	up(&dentry->d_inode->i_sem);
-	dput(dentry);
+	up(&dir->dentry->d_inode->i_sem);
 }
 
 /**
@@ -669,15 +643,14 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 		entry = list_entry(node,struct driver_file_entry,node);
 
 		list_del_init(node);
-
-		__remove_file(entry->dentry);
-
+		vfs_unlink(dentry->d_inode,entry->dentry);
+		put_mount();
 		node = dir->files.next;
 	}
+	up(&dentry->d_inode->i_sem);
 
 	vfs_rmdir(dentry->d_parent->d_inode,dentry);
 	up(&dentry->d_parent->d_inode->i_sem);
-	up(&dentry->d_inode->i_sem);
 	dput(dentry);
  done:
 	put_mount();
