@@ -1066,7 +1066,9 @@ mraid_mm_init(void)
 
 	slots_inuse = 0;
 
+#ifdef CONFIG_COMPAT
 	register_ioctl32_conversion(MEGAIOCCMD, mraid_mm_compat_ioctl);
+#endif
 
 	return 0;
 }
