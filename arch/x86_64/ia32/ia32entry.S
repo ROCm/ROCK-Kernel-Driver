@@ -258,7 +258,7 @@ ia32_sys_call_table:
 	.quad sys_acct
 	.quad sys_umount			/* new_umount */
 	.quad ni_syscall			/* old lock syscall holder */
-	.quad sys32_ioctl
+	.quad compat_sys_ioctl
 	.quad compat_sys_fcntl64		/* 55 */
 	.quad ni_syscall			/* old mpx syscall holder */
 	.quad sys_setpgid

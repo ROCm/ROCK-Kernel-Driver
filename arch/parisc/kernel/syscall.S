@@ -407,8 +407,7 @@ sys_call_table:
 	ENTRY_SAME(umount)
 	/* struct sockaddr... */
 	ENTRY_SAME(getpeername)
-	/* This one's a huge ugly mess */
-	ENTRY_DIFF(ioctl)
+	ENTRY_COMP(ioctl)
 	ENTRY_COMP(fcntl)		/* 55 */
 	ENTRY_SAME(socketpair)
 	ENTRY_SAME(setpgid)

@@ -77,10 +77,10 @@ static int host_count;
 static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
 static atomic_t internal_generation = ATOMIC_INIT(0);
 
-static struct hpsb_highlevel *hl_handle;
-
 static atomic_t iso_buffer_size;
 static const int iso_buffer_max = 4 * 1024 * 1024; /* 4 MB */
+
+static struct hpsb_highlevel raw1394_highlevel;
 
 static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
              u64 addr, unsigned int length, u16 flags);
@@ -188,7 +188,7 @@ static void queue_complete_cb(struct pending_request *req)
 }
 
 
-static void add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
+static void add_host(struct hpsb_host *host)
 {
         struct host_info *hi;
         unsigned long flags;
@@ -601,7 +601,7 @@ static void handle_iso_listen(struct file_info *fi, struct pending_request *req)
                 if (fi->listen_channels & (1ULL << channel)) {
                         req->req.error = RAW1394_ERROR_ALREADY;
                 } else {
-                        if(hpsb_listen_channel(hl_handle, fi->host, channel)) {
+                        if(hpsb_listen_channel(&raw1394_highlevel, fi->host, channel)) {
 				req->req.error = RAW1394_ERROR_ALREADY;
 			} else {
 				fi->listen_channels |= 1ULL << channel;
@@ -614,7 +614,7 @@ static void handle_iso_listen(struct file_info *fi, struct pending_request *req)
                 channel = ~channel;
 
                 if (fi->listen_channels & (1ULL << channel)) {
-                        hpsb_unlisten_channel(hl_handle, fi->host, channel);
+                        hpsb_unlisten_channel(&raw1394_highlevel, fi->host, channel);
                         fi->listen_channels &= ~(1ULL << channel);
                 } else {
                         req->req.error = RAW1394_ERROR_INVALID_ARG;
@@ -1679,7 +1679,7 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
                 spin_unlock_irqrestore(&host_info_lock, flags);
                 return sizeof(struct raw1394_request);
         }
-        retval = hpsb_register_addrspace(hl_handle, &arm_ops, req->req.address,
+        retval = hpsb_register_addrspace(&raw1394_highlevel, &arm_ops, req->req.address,
                 req->req.address + req->req.length);
         if (retval) {
                /* INSERT ENTRY */
@@ -1766,7 +1766,7 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
                 spin_unlock_irqrestore(&host_info_lock, flags);
                 return sizeof(struct raw1394_request);
         } 
-        retval = hpsb_unregister_addrspace(hl_handle, addr->start);
+        retval = hpsb_unregister_addrspace(&raw1394_highlevel, addr->start);
         if (!retval) {
                 printk(KERN_ERR "raw1394: arm_Unregister failed -> EINVAL\n");
                 spin_unlock_irqrestore(&host_info_lock, flags);
@@ -2379,7 +2379,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
 
         for (i = 0; i < 64; i++) {
                 if (fi->listen_channels & (1ULL << i)) {
-                        hpsb_unlisten_channel(hl_handle, fi->host, i);
+                        hpsb_unlisten_channel(&raw1394_highlevel, fi->host, i);
                 }
         }
 
@@ -2424,7 +2424,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 }
                 if (!another_host) {
                         DBGMSG("raw1394_release: call hpsb_arm_unregister");
-                        retval = hpsb_unregister_addrspace(hl_handle, addr->start);
+                        retval = hpsb_unregister_addrspace(&raw1394_highlevel, addr->start);
                         if (!retval) {
                                 ++fail;
                                 printk(KERN_ERR "raw1394_release arm_Unregister failed\n");
@@ -2507,7 +2507,8 @@ static struct hpsb_protocol_driver raw1394_driver = {
 /******************************************************************************/
 
 
-static struct hpsb_highlevel_ops hl_ops = {
+static struct hpsb_highlevel raw1394_highlevel = {
+	.name =		RAW1394_DEVICE_NAME,
         .add_host =    add_host,
         .remove_host = remove_host,
         .host_reset =  host_reset,
@@ -2528,11 +2529,7 @@ static struct file_operations file_ops = {
 
 static int __init init_raw1394(void)
 {
-        hl_handle = hpsb_register_highlevel(RAW1394_DEVICE_NAME, &hl_ops);
-        if (hl_handle == NULL) {
-                HPSB_ERR("raw1394 failed to register with ieee1394 highlevel");
-                return -ENOMEM;
-        }
+	hpsb_register_highlevel(&raw1394_highlevel);
 
         devfs_register(NULL, RAW1394_DEVICE_NAME, 0,
 			IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16,
@@ -2542,7 +2539,7 @@ static int __init init_raw1394(void)
                                       THIS_MODULE, &file_ops)) {
                 HPSB_ERR("raw1394 failed to register minor device block");
                 devfs_remove(RAW1394_DEVICE_NAME);
-                hpsb_unregister_highlevel(hl_handle);
+                hpsb_unregister_highlevel(&raw1394_highlevel);
                 return -EBUSY;
         }
 
@@ -2558,7 +2555,7 @@ static void __exit cleanup_raw1394(void)
 	hpsb_unregister_protocol(&raw1394_driver);
         ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_RAW1394);
         devfs_remove(RAW1394_DEVICE_NAME);
-        hpsb_unregister_highlevel(hl_handle);
+        hpsb_unregister_highlevel(&raw1394_highlevel);
 }
 
 module_init(init_raw1394);

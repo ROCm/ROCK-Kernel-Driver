@@ -13,7 +13,6 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
-#include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include "miropcm20-rds-core.h"
 
@@ -114,28 +113,17 @@ static struct file_operations rds_fops = {
 static struct miscdevice rds_miscdev = {
 	.minor		= MISC_DYNAMIC_MINOR,
 	.name		= "radiotext",
+	.devfs_name	= "v4l/rds/radiotext",
 	.fops		= &rds_fops,
 };
 
 static int __init miropcm20_rds_init(void)
 {
-	int error;
-
-	error = misc_register(&rds_miscdev);
-	if (error)
-		return error;
-
-	error = devfs_mk_symlink("v4l/rds/radiotext",
-				 "../misc/radiotext");
-	if (error)
-		misc_deregister(&rds_miscdev);
-
-	return error;
+	return misc_register(&rds_miscdev);
 }
 
 static void __exit miropcm20_rds_cleanup(void)
 {
-	devfs_remove("v4l/rds/radiotext");
 	misc_deregister(&rds_miscdev);
 }
 

@@ -79,11 +79,6 @@ struct bus_options {
 	u16	max_rec;	/* Maximum packet size node can receive */
 };
 
-enum {
-	DEV_CLASS_NODE,
-	DEV_CLASS_UNIT_DIRECTORY,
-	DEV_CLASS_HOST,
-};
 
 #define UNIT_DIRECTORY_VENDOR_ID	0x01
 #define UNIT_DIRECTORY_MODEL_ID		0x02

@@ -72,14 +72,6 @@
 
 #include "legacy/pdc4030.h"
 
-static inline u32 idedisk_read_24 (ide_drive_t *drive)
-{
-	u8 hcyl = HWIF(drive)->INB(IDE_HCYL_REG);
-	u8 lcyl = HWIF(drive)->INB(IDE_LCYL_REG);
-	u8 sect = HWIF(drive)->INB(IDE_SECTOR_REG);
-	return (hcyl<<16)|(lcyl<<8)|sect;
-}
-
 /*
  * lba_capacity_is_ok() performs a sanity check on the claimed "lba_capacity"
  * value for this drive (from its reported identification information).
@@ -812,9 +804,9 @@ static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 			if (drive->addressing == 1) {
 				__u64 sectors = 0;
 				u32 low = 0, high = 0;
-				low = idedisk_read_24(drive);
+				low = ide_read_24(drive);
 				hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
-				high = idedisk_read_24(drive);
+				high = ide_read_24(drive);
 				sectors = ((__u64)high << 24) | low;
 				printk(", LBAsect=%llu, high=%d, low=%d",
 				       (unsigned long long) sectors,
