@@ -583,23 +583,30 @@ static int idescsi_reinit(ide_drive_t *drive)
 	int id;
 
 	MOD_INC_USE_COUNT;
-
+	if (!strstr("ide-scsi", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	/* we accept everything except ide-disk */
+	if (drive->media == ide_disk)
+		goto failed;
 	if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
 		printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	if (ide_register_subdriver (drive, &idescsi_driver, IDE_SUBDRIVER_VERSION)) {
 		printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (scsi);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++)
 		;
 	idescsi_setup (drive, scsi, id);
 	MOD_DEC_USE_COUNT;
 	return 0;
+failed:
+	MOD_DEC_USE_COUNT;
+	return 1;
 }
 
 /*
@@ -608,7 +615,6 @@ static int idescsi_reinit(ide_drive_t *drive)
 int idescsi_init (void)
 {
 	ide_drive_t *drive;
-	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
 	int i, failed;
 
 	if (idescsi_initialized)
@@ -617,13 +623,11 @@ int idescsi_init (void)
 	for (i = 0; i < MAX_HWIFS * MAX_DRIVES; i++)
 		idescsi_drives[i] = NULL;
 	MOD_INC_USE_COUNT;
-	for (i = 0; media[i] != 255; i++) {
-		failed = 0;
-		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, NULL, failed++)) != NULL) {
-			if (idescsi_reinit(drive))
-				continue;
-			failed--;
-		}
+	failed = 0;
+	while ((drive = ide_scan_devices(NULL, failed++)) != NULL) {
+		if (idescsi_reinit(drive))
+			continue;
+		failed--;
 	}
 	ide_register_module(&idescsi_module);
 	MOD_DEC_USE_COUNT;
@@ -883,18 +887,15 @@ static int __init init_idescsi_module(void)
 static void __exit exit_idescsi_module(void)
 {
 	ide_drive_t *drive;
-	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
-	int i, failed;
+	int failed;
 
 	scsi_unregister_host(&idescsi_template);
-	for (i = 0; media[i] != 255; i++) {
-		failed = 0;
-		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, &idescsi_driver, failed)) != NULL)
-			if (idescsi_cleanup (drive)) {
-				printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
-				failed++;
-			}
-	}
+	failed = 0;
+	while ((drive = ide_scan_devices(&idescsi_driver, failed)) != NULL)
+		if (idescsi_cleanup (drive)) {
+			printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
+			failed++;
+		}
 	ide_unregister_module(&idescsi_module);
 }
 

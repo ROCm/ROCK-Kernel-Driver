@@ -3104,17 +3104,32 @@ int ide_cdrom_reinit (ide_drive_t *drive)
 	struct cdrom_info *info;
 
 	MOD_INC_USE_COUNT;
+	if (!strstr("ide-cdrom", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	if (drive->media != ide_cdrom)
+		goto failed;
+	/* skip drives that we were told to ignore */
+	if (ignore != NULL) {
+		if (strstr(ignore, drive->name)) {
+			printk("ide-cd: ignoring drive %s\n", drive->name);
+			goto failed;
+		}
+	}
+	if (drive->scsi) {
+		printk("ide-cd: passing drive %s to ide-scsi emulation.\n", drive->name);
+		goto failed;
+	}
 	info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
 	if (info == NULL) {
 		printk ("%s: Can't allocate a cdrom structure\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
 		printk ("%s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (info);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	memset (info, 0, sizeof (struct cdrom_info));
 	drive->driver_data = info;
@@ -3123,12 +3138,14 @@ int ide_cdrom_reinit (ide_drive_t *drive)
 		DRIVER(drive)->busy--;
 		if (ide_cdrom_cleanup (drive))
 			printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	DRIVER(drive)->busy--;
 	MOD_DEC_USE_COUNT;
 	return 0;
+failed:
+	MOD_DEC_USE_COUNT;
+	return 1;
 }
 
 static void __exit ide_cdrom_exit(void)
@@ -3136,7 +3153,7 @@ static void __exit ide_cdrom_exit(void)
 	ide_drive_t *drive;
 	int failed = 0;
 
-	while ((drive = ide_scan_devices (ide_cdrom, ide_cdrom_driver.name, &ide_cdrom_driver, failed)) != NULL)
+	while ((drive = ide_scan_devices (&ide_cdrom_driver, failed)) != NULL)
 		if (ide_cdrom_cleanup (drive)) {
 			printk ("%s: cleanup_module() called while still busy\n", drive->name);
 			failed++;
@@ -3150,18 +3167,7 @@ int ide_cdrom_init(void)
 	int failed = 0;
 
 	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ide_cdrom, ide_cdrom_driver.name, NULL, failed++)) != NULL) {
-		/* skip drives that we were told to ignore */
-		if (ignore != NULL) {
-			if (strstr(ignore, drive->name)) {
-				printk("ide-cd: ignoring drive %s\n", drive->name);
-				continue;
-			}
-		}
-		if (drive->scsi) {
-			printk("ide-cd: passing drive %s to ide-scsi emulation.\n", drive->name);
-			continue;
-		}
+	while ((drive = ide_scan_devices (NULL, failed++)) != NULL) {
 		if (ide_cdrom_reinit(drive))
 			continue;
 		failed--;

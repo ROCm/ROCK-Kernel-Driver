@@ -1686,11 +1686,17 @@ MODULE_DESCRIPTION("ATA DISK Driver");
 int idedisk_reinit(ide_drive_t *drive)
 {
 	MOD_INC_USE_COUNT;
+	/* strstr("foo", "") is non-NULL */
+	if (!strstr("ide-disk", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	if (drive->media != ide_disk)
+		goto failed;
 
 	if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
 		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	DRIVER(drive)->busy++;
 	idedisk_setup(drive);
@@ -1699,12 +1705,14 @@ int idedisk_reinit(ide_drive_t *drive)
 			drive->name, drive->head);
 		(void) idedisk_cleanup(drive);
 		DRIVER(drive)->busy--;
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	DRIVER(drive)->busy--;
 	MOD_DEC_USE_COUNT;
 	return 0;
+failed:
+	MOD_DEC_USE_COUNT;
+	return 1;
 }
 
 static void __exit idedisk_exit (void)
@@ -1712,7 +1720,7 @@ static void __exit idedisk_exit (void)
 	ide_drive_t *drive;
 	int failed = 0;
 
-	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, &idedisk_driver, failed)) != NULL) {
+	while ((drive = ide_scan_devices(&idedisk_driver, failed)) != NULL) {
 		if (idedisk_cleanup (drive)) {
 			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
 			failed++;
@@ -1733,7 +1741,7 @@ int idedisk_init (void)
 	int failed = 0;
 	
 	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, NULL, failed++)) != NULL) {
+	while ((drive = ide_scan_devices(NULL, failed++)) != NULL) {
 		if (idedisk_reinit(drive))
 			continue;
 		failed--;

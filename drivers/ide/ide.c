@@ -3535,7 +3535,7 @@ static void setup_driver_defaults (ide_drive_t *drive)
 	if (d->reinit == NULL)		d->reinit = default_reinit;
 }
 
-ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n)
+ide_drive_t *ide_scan_devices(ide_driver_t *driver, int n)
 {
 	unsigned int unit, index, i;
 
@@ -3545,10 +3545,7 @@ ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *drive
 			continue;
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
 			ide_drive_t *drive = &hwif->drives[unit];
-			char *req = drive->driver_req;
-			if (*req && !strstr(name, req))
-				continue;
-			if (drive->present && drive->media == media && drive->driver == driver && ++i > n)
+			if (drive->driver == driver && ++i > n)
 				return drive;
 		}
 	}

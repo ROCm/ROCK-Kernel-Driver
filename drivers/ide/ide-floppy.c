@@ -2196,32 +2196,37 @@ int idefloppy_reinit (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy;
 	MOD_INC_USE_COUNT;
+	if (!strstr("ide-floppy", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	if (drive->media != ide_floppy)
+		goto failed;
 	if (!idefloppy_identify_device (drive, drive->id)) {
 		printk (KERN_ERR "ide-floppy: %s: not supported by this version of ide-floppy\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	if (drive->scsi) {
 		printk("ide-floppy: passing drive %s to ide-scsi emulation.\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	if ((floppy = (idefloppy_floppy_t *) kmalloc (sizeof (idefloppy_floppy_t), GFP_KERNEL)) == NULL) {
 		printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
 		printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (floppy);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	DRIVER(drive)->busy++;
 	idefloppy_setup (drive, floppy);
 	DRIVER(drive)->busy--;
 	MOD_DEC_USE_COUNT;
 	return 0;
+failed:
+	MOD_DEC_USE_COUNT;
+	return 1;
 }
 
 MODULE_DESCRIPTION("ATAPI FLOPPY Driver");
@@ -2231,7 +2236,7 @@ static void __exit idefloppy_exit (void)
 	ide_drive_t *drive;
 	int failed = 0;
 
-	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, &idefloppy_driver, failed)) != NULL) {
+	while ((drive = ide_scan_devices(&idefloppy_driver, failed)) != NULL) {
 		if (idefloppy_cleanup (drive)) {
 			printk ("%s: cleanup_module() called while still busy\n", drive->name);
 			failed++;
@@ -2256,7 +2261,7 @@ int idefloppy_init (void)
 
 	printk("ide-floppy driver " IDEFLOPPY_VERSION "\n");
 	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, NULL, failed++)) != NULL) {
+	while ((drive = ide_scan_devices(NULL, failed++)) != NULL) {
 		if (idefloppy_reinit(drive))
 			continue;
 		failed--;

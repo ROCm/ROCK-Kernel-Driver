@@ -6372,31 +6372,33 @@ int idetape_reinit (ide_drive_t *drive)
 	int minor;
 
 	MOD_INC_USE_COUNT;
+	if (!strstr("ide-tape", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	if (drive->media != ide_tape)
+		goto failed;
 	if (!idetape_identify_device (drive, drive->id)) {
 		printk(KERN_ERR "ide-tape: %s: not supported by this version of ide-tape\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	if (drive->scsi) {
 		if (strstr(drive->id->model, "OnStream DI-")) {
 			printk("ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
 		} else {
 			printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
-			MOD_DEC_USE_COUNT;
-			return 1;
+			goto failed;
 		}
 	}
 	tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
 	if (tape == NULL) {
 		printk(KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	if (ide_register_subdriver (drive, &idetape_driver, IDE_SUBDRIVER_VERSION)) {
 		printk(KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
 		kfree(tape);
-		MOD_DEC_USE_COUNT;
-		return 1;
+		goto failed;
 	}
 	for (minor = 0; idetape_chrdevs[minor].drive != NULL; minor++)
 		;
@@ -6415,6 +6417,9 @@ int idetape_reinit (ide_drive_t *drive)
 	devfs_register_tape(tape->de_r);
 	MOD_DEC_USE_COUNT;
 	return 0;
+failed:
+	MOD_DEC_USE_COUNT;
+	return 1;
 }
 
 MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");
@@ -6452,7 +6457,7 @@ int idetape_init (void)
 			idetape_chrdevs[minor].drive = NULL;
 	}
 
-	while ((drive = ide_scan_devices(ide_tape, idetape_driver.name, NULL, failed++))) {
+	while ((drive = ide_scan_devices(NULL, failed++))) {
 		if (idetape_reinit(drive))
 			continue;
 		supported++;
