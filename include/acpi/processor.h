@@ -77,7 +77,6 @@ struct acpi_processor_performance {
 	int			state_count;
 	struct acpi_processor_px states[ACPI_PROCESSOR_MAX_PERFORMANCE];
 	struct cpufreq_frequency_table freq_table[ACPI_PROCESSOR_MAX_PERFORMANCE];
-	struct acpi_processor   *pr;
 };
 
 
