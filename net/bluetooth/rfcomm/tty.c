@@ -501,12 +501,6 @@ static void rfcomm_tty_wakeup(unsigned long arg)
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 5, 0)
-#define __minor MINOR
-#else
-#define __minor minor
-#endif
-
 static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 {
 	DECLARE_WAITQUEUE(wait, current);
@@ -514,7 +508,7 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 	struct rfcomm_dlc *dlc;
 	int err, id;
 
-        id = __minor(tty->device) - tty->driver.minor_start;
+        id = minor(tty->device) - tty->driver.minor_start;
 
 	BT_DBG("tty %p id %d", tty, id);
 
