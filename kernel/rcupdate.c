@@ -210,19 +210,15 @@ static void rcu_check_quiescent_state(void)
  * locking requirements, the list it's pulling from has to belong to a cpu
  * which is dead and hence not processing interrupts.
  */
-static void rcu_move_batch(struct rcu_head *list)
+static void rcu_move_batch(struct rcu_head *list, struct rcu_head **tail)
 {
 	int cpu;
 
 	local_irq_disable();
-
 	cpu = smp_processor_id();
-
-	while (list != NULL) {
-		*RCU_nxttail(cpu) = list;
-		RCU_nxttail(cpu) = &list->next;
-		list = list->next;
-	}
+	*RCU_nxttail(cpu) = list;
+	if (list)
+		RCU_nxttail(cpu) = tail;
 	local_irq_enable();
 }
 
@@ -237,8 +233,8 @@ static void rcu_offline_cpu(int cpu)
 		cpu_quiet(cpu);
 	spin_unlock_bh(&rcu_state.mutex);
 
-	rcu_move_batch(RCU_curlist(cpu));
-	rcu_move_batch(RCU_nxtlist(cpu));
+	rcu_move_batch(RCU_curlist(cpu), RCU_curtail(cpu));
+	rcu_move_batch(RCU_nxtlist(cpu), RCU_nxttail(cpu));
 
 	tasklet_kill_immediate(&RCU_tasklet(cpu), cpu);
 }
@@ -271,6 +267,7 @@ static void rcu_process_callbacks(unsigned long unused)
 	    !rcu_batch_before(rcu_ctrlblk.completed, RCU_batch(cpu))) {
 		rcu_list = RCU_curlist(cpu);
 		RCU_curlist(cpu) = NULL;
+		RCU_curtail(cpu) = &RCU_curlist(cpu);
 	}
 
 	local_irq_disable();
@@ -278,6 +275,7 @@ static void rcu_process_callbacks(unsigned long unused)
 		int next_pending, seq;
 
 		RCU_curlist(cpu) = RCU_nxtlist(cpu);
+		RCU_curtail(cpu) = RCU_nxttail(cpu);
 		RCU_nxtlist(cpu) = NULL;
 		RCU_nxttail(cpu) = &RCU_nxtlist(cpu);
 		local_irq_enable();
@@ -319,6 +317,7 @@ static void __devinit rcu_online_cpu(int cpu)
 {
 	memset(&per_cpu(rcu_data, cpu), 0, sizeof(struct rcu_data));
 	tasklet_init(&RCU_tasklet(cpu), rcu_process_callbacks, 0UL);
+	RCU_curtail(cpu) = &RCU_curlist(cpu);
 	RCU_nxttail(cpu) = &RCU_nxtlist(cpu);
 	RCU_quiescbatch(cpu) = rcu_ctrlblk.completed;
 	RCU_qs_pending(cpu) = 0;

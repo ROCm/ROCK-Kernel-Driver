@@ -98,6 +98,7 @@ struct rcu_data {
         struct rcu_head *nxtlist;
 	struct rcu_head **nxttail;
         struct rcu_head *curlist;
+        struct rcu_head **curtail;
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
@@ -111,6 +112,7 @@ extern struct rcu_ctrlblk rcu_ctrlblk;
 #define RCU_nxtlist(cpu) 	(per_cpu(rcu_data, (cpu)).nxtlist)
 #define RCU_curlist(cpu) 	(per_cpu(rcu_data, (cpu)).curlist)
 #define RCU_nxttail(cpu) 	(per_cpu(rcu_data, (cpu)).nxttail)
+#define RCU_curtail(cpu) 	(per_cpu(rcu_data, (cpu)).curtail)
 
 static inline int rcu_pending(int cpu) 
 {
