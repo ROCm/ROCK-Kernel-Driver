@@ -2600,6 +2600,10 @@ static int ata_thread (void *data)
 
                 if (signal_pending (current))
                         flush_signals(current);
+                        
+                if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
+                                                        
 
                 if ((timeout < 0) || (ap->time_to_die))
                         break;
