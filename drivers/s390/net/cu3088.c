@@ -1,5 +1,5 @@
 /*
- * $Id: cu3088.c,v 1.33 2003/10/14 12:10:19 cohuck Exp $
+ * $Id: cu3088.c,v 1.34 2004/06/15 13:16:27 pavlic Exp $
  *
  * CTC / LCS ccw_device driver
  *
@@ -38,7 +38,7 @@ const char *cu3088_type[] = {
 	"ESCON channel",
 	"FICON channel",
 	"P390 LCS card",
-	"OSA2 card",
+	"OSA LCS card",
 	"unknown channel type",
 	"unsupported channel type",
 };
