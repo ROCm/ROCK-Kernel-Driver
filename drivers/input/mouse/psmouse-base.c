@@ -337,13 +337,12 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		psmouse->vendor = "Synaptics";
 		psmouse->name = "TouchPad";
 
-#if CONFIG_MOUSE_PS2_SYNAPTICS
-		if (psmouse_max_proto > PSMOUSE_IMEX && synaptics_init(psmouse) == 0)
+		if (psmouse_max_proto > PSMOUSE_IMEX &&
+					synaptics_init(psmouse) == 0)
 			return PSMOUSE_SYNAPTICS;
-#endif
 		/*
-		 * Synaptics hardware (according to Peter Berg Larsen) can get confused
-		 * by protocol probes below so we have to stop here
+		 * Synaptics hardware (according to Peter Berg Larsen) can get
+		 * confused by protocol probes below so we have to stop here
 		 */
 		return PSMOUSE_PS2;
 	}
@@ -367,7 +366,8 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	if (psmouse_max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse)) {
 		set_bit(REL_WHEEL, psmouse->dev.relbit);
 
-		if (psmouse_max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse)) {
+		if (psmouse_max_proto >= PSMOUSE_IMEX &&
+					im_explorer_detect(psmouse)) {
 			set_bit(BTN_SIDE, psmouse->dev.keybit);
 			set_bit(BTN_EXTRA, psmouse->dev.keybit);
 
