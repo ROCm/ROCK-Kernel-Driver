@@ -1909,7 +1909,8 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 
 		if ( status & EV_MIC ) {
 			OUT4500( apriv, EVACK, EV_MIC );
-			airo_read_mic( apriv );
+			if (apriv->flags & FLAG_MIC_CAPABLE)
+				airo_read_mic( apriv );
 		}
 		if ( status & EV_LINK ) {
 #if WIRELESS_EXT > 13
