@@ -161,7 +161,7 @@ tiglusb_read (struct file *filp, char __user *buf, size_t count, loff_t * f_pos)
 	int bytes_to_read = 0;
 	int bytes_read = 0;
 	int result = 0;
-	char buffer[BULK_RCV_MAX];
+	char *buffer;
 	unsigned int pipe;
 
 	if (*f_pos)
@@ -172,6 +172,10 @@ tiglusb_read (struct file *filp, char __user *buf, size_t count, loff_t * f_pos)
 
 	if (!s->dev)
 		return -EIO;
+
+	buffer = kmalloc(BULK_RCV_MAX, GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
 
 	bytes_to_read = (count >= BULK_RCV_MAX) ? BULK_RCV_MAX : count;
 
@@ -203,6 +207,7 @@ tiglusb_read (struct file *filp, char __user *buf, size_t count, loff_t * f_pos)
 	}
 
       out:
+	kfree(buffer);
 	return ret ? ret : bytes_read;
 }
 
@@ -214,7 +219,7 @@ tiglusb_write (struct file *filp, const char __user *buf, size_t count, loff_t *
 	int bytes_to_write = 0;
 	int bytes_written = 0;
 	int result = 0;
-	char buffer[BULK_SND_MAX];
+	char *buffer;
 	unsigned int pipe;
 
 	if (*f_pos)
@@ -225,6 +230,10 @@ tiglusb_write (struct file *filp, const char __user *buf, size_t count, loff_t *
 
 	if (!s->dev)
 		return -EIO;
+
+	buffer = kmalloc(BULK_SND_MAX, GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
 
 	bytes_to_write = (count >= BULK_SND_MAX) ? BULK_SND_MAX : count;
 	if (copy_from_user (buffer, buf, bytes_to_write)) {
@@ -258,6 +267,7 @@ tiglusb_write (struct file *filp, const char __user *buf, size_t count, loff_t *
 	}
 
       out:
+	kfree(buffer);
 	return ret ? ret : bytes_written;
 }
 
