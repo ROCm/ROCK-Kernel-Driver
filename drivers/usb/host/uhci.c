@@ -2799,6 +2799,7 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 
 	uhci->bus = bus;
 	bus->hcpriv = uhci;
+	bus->bus_name = dev->slot_name;
 
 	usb_register_bus(uhci->bus);
 

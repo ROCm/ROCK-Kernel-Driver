@@ -765,23 +765,23 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		 * devices by location for diagnostics, tools, etc.  The
 		 * string is a path along hub ports, from the root.  Each
 		 * device's id will be stable until USB is re-cabled, and
-		 * hubs are often labled with these port numbers.
+		 * hubs are often labeled with these port numbers.
 		 *
-		 * Initial size: "/NN" times five hubs + NUL = 16 bytes max
+		 * Initial size: ".NN" times five hubs + NUL = 16 bytes max
 		 * (quite rare, since most hubs have 4-6 ports).
 		 */
 		pdev = dev->parent;
-		if (pdev->devpath [1] != '\0')	/* parent not root */
+		if (pdev->devpath [0] != '/')	/* parent not root */
 			len = snprintf (dev->devpath, sizeof dev->devpath,
-				"%s/%d", pdev->devpath, port + 1);
-		else	/* root == "/", root port 2 == "/2" */
+				"%s.%d", pdev->devpath, port + 1);
+		else	/* root == "/", root port 2 == "2", port 3 that hub "/2.3" */
 			len = snprintf (dev->devpath, sizeof dev->devpath,
-				"/%d", port + 1);
+				"%d", port + 1);
 		if (len == sizeof dev->devpath)
 			warn ("devpath size! usb/%03d/%03d path %s",
 				dev->bus->busnum, dev->devnum, dev->devpath);
-		info("new USB device on bus %d path %s, assigned address %d",
-			dev->bus->busnum, dev->devpath, dev->devnum);
+		info("new USB device %s-%s, assigned address %d",
+			dev->bus->bus_name, dev->devpath, dev->devnum);
 
 		/* put the device in the global device tree */
 		dev->dev.parent = &dev->parent->dev;

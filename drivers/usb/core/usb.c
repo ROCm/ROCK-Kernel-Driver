@@ -2407,56 +2407,6 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	return err;
 }
 
-/**
- * usb_make_path - returns device path in the hub tree
- * @dev: the device whose path is being constructed
- * @buf: where to put the string
- * @size: how big is "buf"?
- * Context: !in_interrupt ()
- *
- * Returns length of the string (>= 0) or out of memory status (< 0).
- *
- * NOTE:  prefer to use use dev->devpath directly.
- */
-int usb_make_path(struct usb_device *dev, char *buf, size_t size)
-{
-	struct usb_device *pdev = dev->parent;
-	char *tmp;
-	char *port;
-	int i;
-
-	if (!(port = kmalloc(size, GFP_KERNEL)))
-		return -ENOMEM;
-	if (!(tmp = kmalloc(size, GFP_KERNEL))) {
-		kfree(port);
-		return -ENOMEM;
-	}
-
-	*port = 0;
-	while (pdev) {
-		for (i = 0; i < pdev->maxchild; i++)
-			if (pdev->children[i] == dev)
-				break;
-
-		if (pdev->children[i] != dev) {
-			kfree(port);
-			kfree(tmp);
-			return -ENODEV;
-		}
-
-		strcpy(tmp, port);
-		snprintf(port, size, strlen(port) ? "%d.%s" : "%d", i + 1, tmp);
-
-		dev = pdev;
-		pdev = dev->parent;
-	}
-
-	snprintf(buf, size, "usb%d:%s", dev->bus->busnum, port);
-	kfree(port);
-	kfree(tmp);
-	return strlen(buf);
-}
-
 /*
  * By the time we get here, the device has gotten a new device ID
  * and is in the default state. We need to identify the thing and
