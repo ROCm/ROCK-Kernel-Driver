@@ -1119,6 +1119,7 @@ void ide_pci_create_host_proc(const char *, get_info_t *);
 	return len;			\
 }
 #else
+static inline void create_proc_ide_interfaces(void) { ; }
 #define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
 #endif
 
