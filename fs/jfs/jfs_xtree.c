@@ -3574,6 +3574,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 				    min(index, (int)xtlck->lwm.offset) : index;
 				xtlck->lwm.length = index + 1 -
 				    xtlck->lwm.offset;
+				xtlck->twm.offset = index;
 				pxdlock = (pxdlock_t *) & xtlck->pxdlock;
 				pxdlock->flag = mlckFREEPXD;
 				PXDaddress(&pxdlock->pxd, xaddr);
@@ -3705,7 +3706,6 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 				 */
 				tlck = txLock(tid, ip, mp, tlckXTREE);
 				xtlck = (xtlock_t *) & tlck->lock;
-				xtlck->twm.offset = index;
 				if (!(tlck->type & tlckTRUNCATE)) {
 					xtlck->hwm.offset =
 					    le16_to_cpu(p->header.
@@ -3782,7 +3782,6 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 			 */
 			tlck = txLock(tid, ip, mp, tlckXTREE);
 			xtlck = (xtlock_t *) & tlck->lock;
-			xtlck->twm.offset = index;
 			xtlck->hwm.offset =
 			    le16_to_cpu(p->header.nextindex) - 1;
 			tlck->type = tlckXTREE | tlckFREE;
@@ -3989,11 +3988,10 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 		return  (xoff + xlen) << JFS_SBI(ip->i_sb)->l2bsize;
 	}
 	tlck = txLock(tid, ip, mp, tlckXTREE);
-	tlck->type = tlckXTREE | tlckTRUNCATE;
+	tlck->type = tlckXTREE | tlckFREE;
 	xtlck = (xtlock_t *) & tlck->lock;
 	xtlck->hwm.offset = index;
 
-	tlck->type = tlckXTREE | tlckFREE;
 
 	XT_PUTPAGE(mp);
 
@@ -4024,7 +4022,6 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 		 */
 		tlck = txLock(tid, ip, mp, tlckXTREE);
 		xtlck = (xtlock_t *) & tlck->lock;
-		xtlck->twm.offset = index;
 		xtlck->hwm.offset =
 		    le16_to_cpu(p->header.nextindex) - 1;
 		tlck->type = tlckXTREE | tlckFREE;
