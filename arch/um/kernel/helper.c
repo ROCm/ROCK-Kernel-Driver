@@ -22,6 +22,7 @@ struct helper_data {
 	int fd;
 };
 
+/* Debugging aid, changed only from gdb */
 int helper_pause = 0;
 
 static void helper_hup(int sig)

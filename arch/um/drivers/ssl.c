@@ -61,7 +61,10 @@ static struct line_driver driver = {
 	symlink_to :		"tts",
 };
 
-static struct line serial_lines[NR_PORTS] = 
+/* The array is initialized by line_init, which is an initcall.  The 
+ * individual elements are protected by individual semaphores.
+ */
+static struct line serial_lines[NR_PORTS] =
 	{ [0 ... NR_PORTS - 1] = LINE_INIT(CONFIG_SSL_CHAN, &driver) };
 
 static struct lines lines = LINES_INIT(NR_PORTS);

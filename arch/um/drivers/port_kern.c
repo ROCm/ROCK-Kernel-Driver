@@ -62,8 +62,6 @@ static void pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	up(&conn->port->sem);
 }
 
-struct list_head ports = LIST_HEAD_INIT(ports);
-
 static void port_interrupt(int irq, void *data, struct pt_regs *regs)
 {
 	struct port_list *port = data;
@@ -107,6 +105,9 @@ static void port_interrupt(int irq, void *data, struct pt_regs *regs)
 	reactivate_fd(port->fd, ACCEPT_IRQ);
 } 
 
+DECLARE_MUTEX(ports_sem);
+struct list_head ports = LIST_HEAD_INIT(ports);
+
 void *port_data(int port_num)
 {
 	struct list_head *ele;
@@ -114,6 +115,7 @@ void *port_data(int port_num)
 	struct port_dev *dev;
 	int fd;
 
+	down(&ports_sem);
 	list_for_each(ele, &ports){
 		port = list_entry(ele, struct port_list, list);
 		if(port->port == port_num) goto found;
@@ -121,7 +123,7 @@ void *port_data(int port_num)
 	port = kmalloc(sizeof(struct port_list), GFP_KERNEL);
 	if(port == NULL){
 		printk(KERN_ERR "Allocation of port list failed\n");
-		return(NULL);
+		goto out;
 	}
 
 	fd = port_listen_fd(port_num);
@@ -151,18 +153,21 @@ void *port_data(int port_num)
 	dev = kmalloc(sizeof(struct port_dev), GFP_KERNEL);
 	if(dev == NULL){
 		printk(KERN_ERR "Allocation of port device entry failed\n");
-		return(NULL);
+		goto out;
 	}
 
  	*dev = ((struct port_dev) { port : 		port,
  				    fd :		-1,
  				    helper_pid : 	-1 });
+	up(&ports_sem);
 	return(dev);
 
  out_free:
 	kfree(port);
  out_close:
 	os_close_file(fd);
+ out:
+	up(&ports_sem);
 	return(NULL);
 }
 

@@ -40,6 +40,11 @@ static struct notifier_block reboot_notifier = {
 	priority:		0,
 };
 
+/* Safe without explicit locking for now.  Tasklets provide their own 
+ * locking, and the interrupt handler is safe because it can't interrupt
+ * itself and it can only happen on CPU 0.
+ */
+
 LIST_HEAD(mc_requests);
 
 void mc_work_proc(void *unused)
@@ -49,12 +54,12 @@ void mc_work_proc(void *unused)
 	int done;
 
 	do {
-		save_flags(flags);
+		local_save_flags(flags);
 		req = list_entry(mc_requests.next, struct mconsole_entry, 
 				 list);
 		list_del(&req->list);
 		done = list_empty(&mc_requests);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		req->request.cmd->handler(&req->request);
 		kfree(req);
 	} while(!done);
@@ -152,6 +157,8 @@ void mconsole_stop(struct mc_request *req)
 	mconsole_reply(req, "", 0, 0);
 }
 
+/* This list is populated by __initcall routines. */
+
 LIST_HEAD(mconsole_devices);
 
 void mconsole_register_dev(struct mc_device *new)
@@ -224,7 +231,10 @@ void mconsole_sysrq(struct mc_request *req)
 }
 #endif
 
-static char *notify_socket = NULL;
+/* Changed by mconsole_setup, which is __setup, and called before SMP is
+ * active.
+ */
+static char *notify_socket = NULL; 
 
 int mconsole_init(void)
 {
@@ -299,6 +309,18 @@ static int create_proc_mconsole(void)
 	ent->read_proc = NULL;
 	ent->write_proc = write_proc_mconsole;
 	return(0);
+}
+
+static spinlock_t notify_spinlock = SPIN_LOCK_UNLOCKED;
+
+void lock_notify(void)
+{
+	spin_lock(&notify_spinlock);
+}
+
+void unlock_notify(void)
+{
+	spin_unlock(&notify_spinlock);
 }
 
 __initcall(create_proc_mconsole);

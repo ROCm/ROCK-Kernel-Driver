@@ -15,6 +15,7 @@
 #include "init.h"
 #include "hostaudio.h"
 
+/* Only changed from linux_main at boot time */
 char *dsp = HOSTAUDIO_DEV_DSP;
 char *mixer = HOSTAUDIO_DEV_MIXER;
 

@@ -99,19 +99,27 @@ int line_write(struct line *lines, struct tty_struct *tty, const char *buf,
 	i = minor(tty->device) - tty->driver.minor_start;
 	line = &lines[i];
 
+	down(&line->sem);
 	if(line->head != line->tail){
 		local_irq_save(flags);
 		buffer_data(line, buf, len);
 		err = flush_buffer(line);
 		local_irq_restore(flags);
-		if(err <= 0) return(len);
+		if(err <= 0)
+			goto out;
 	}
 	else {
 		n = write_chan(&line->chan_list, buf, len, 
 			       line->driver->write_irq);
-		if(n < 0) return(n);
-		if(n < len) buffer_data(line, buf + n, len - n);
+		if(n < 0){
+			len = n;
+			goto out;
+		}
+		if(n < len)
+			buffer_data(line, buf + n, len - n);
 	}
+ out:
+	up(&line->sem);
 	return(len);
 }
 
@@ -249,6 +257,7 @@ void line_close(struct line *lines, struct tty_struct *tty)
 	else n = minor(tty->device) - tty->driver.minor_start;
 	line = &lines[n];
 
+	down(&line->sem);
 	line->count--;
 
 	/* I don't like this, but I can't think of anything better.  What's
@@ -261,6 +270,7 @@ void line_close(struct line *lines, struct tty_struct *tty)
 		line->tty = NULL;
 	if(line->count == 0)
 		line_disable(line, -1);
+	up(&line->sem);
 }
 
 void close_lines(struct line *lines, int nlines)
@@ -406,16 +416,18 @@ void winch_interrupt(int irq, void *data, struct pt_regs *unused)
 	reactivate_fd(winch->fd, WINCH_IRQ);
 }
 
+DECLARE_MUTEX(winch_handler_sem);
 LIST_HEAD(winch_handlers);
 
 void register_winch_irq(int fd, int tty_fd, int pid, void *line)
 {
 	struct winch *winch;
 
+	down(&winch_handler_sem);
 	winch = kmalloc(sizeof(*winch), GFP_KERNEL);
 	if(winch == NULL){
 		printk("register_winch_irq - kmalloc failed\n");
-		return;
+		goto out;
 	}
 	*winch = ((struct winch) { list : 	LIST_HEAD_INIT(winch->list),
 				   fd : 	fd,
@@ -427,6 +439,8 @@ void register_winch_irq(int fd, int tty_fd, int pid, void *line)
 			  SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
 			  "winch", winch) < 0)
 		printk("register_winch_irq - failed to register IRQ\n");
+ out:
+	up(&winch_handler_sem);
 }
 
 static void winch_cleanup(void)

@@ -18,7 +18,9 @@ extern void forward_interrupts(int pid);
 extern void init_irq_signals(int on_sigstack);
 extern void forward_ipi(int fd, int pid);
 extern void free_irq_later(int irq, void *dev_id);
-
+extern int activate_ipi(int fd, int pid);
+extern unsigned long irq_lock(void);
+extern void irq_unlock(unsigned long flags);
 #endif
 
 /*

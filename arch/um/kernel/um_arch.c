@@ -37,6 +37,11 @@
 
 #define DEFAULT_COMMAND_LINE "root=6200"
 
+struct cpuinfo_um boot_cpu_data = { 
+	.loops_per_jiffy = 	0,
+	.ipi_pipe = 		{ -1, -1 }
+};
+
 unsigned long thread_saved_pc(struct task_struct *task)
 {
 	return(os_process_pc(task->thread.extern_pid));
@@ -119,6 +124,7 @@ static int start_kernel_proc(void *unused)
 #define SIZE ((CONFIG_NEST_LEVEL + CONFIG_KERNEL_HALF_GIGS) * 0x20000000)
 #define START (TOP - SIZE)
 
+/* Set in main */
 unsigned long host_task_size;
 unsigned long task_size;
 
@@ -129,17 +135,21 @@ void set_task_sizes(int arg)
 	task_size = START;
 }
 
+/* Set in early boot */
 unsigned long uml_physmem;
 unsigned long uml_reserved;
-
 unsigned long start_vm;
 unsigned long end_vm;
-
 int ncpus = 1;
 
+/* Pointer set in linux_main, the array itself is private to each thread,
+ * and changed at address space creation time so this poses no concurrency
+ * problems.
+ */
 static char *argv1_begin = NULL;
 static char *argv1_end = NULL;
 
+/* Set in early boot */
 static int have_root __initdata = 0;
 long physmem_size = 32 * 1024 * 1024;
 
@@ -258,8 +268,9 @@ static void __init uml_postsetup(void)
 }
 
 extern int debug_trace;
-unsigned long brk_start;
 
+/* Set during early boot */
+unsigned long brk_start;
 static struct vm_reserved kernel_vm_reserved;
 
 #define MIN_VMALLOC (32 * 1024 * 1024)
@@ -364,18 +375,6 @@ void __init check_bugs(void)
 	arch_check_bugs();
 	check_ptrace();
 	check_sigio();
-}
-
-spinlock_t pid_lock = SPIN_LOCK_UNLOCKED;
-
-void lock_pid(void)
-{
-	spin_lock(&pid_lock);
-}
-
-void unlock_pid(void)
-{
-	spin_unlock(&pid_lock);
 }
 
 /*
