@@ -1508,7 +1508,7 @@ xfs_qm_dqpurge(
 	 */
 	ASSERT(XFS_DQ_IS_ON_FREELIST(dqp));
 
-	dqp->q_mount = NULL;;
+	dqp->q_mount = NULL;
 	dqp->q_hash = NULL;
 	dqp->dq_flags = XFS_DQ_INACTIVE;
 	memset(&dqp->q_core, 0, sizeof(dqp->q_core));

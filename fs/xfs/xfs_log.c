@@ -1056,7 +1056,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			if (xfs_physmem <= btoc(128*1024*1024)) { 
 				log->l_iclog_bufs = XLOG_MIN_ICLOGS; 
 			} else if (xfs_physmem <= btoc(400*1024*1024)) { 
-				log->l_iclog_bufs = XLOG_MED_ICLOGS;; 
+				log->l_iclog_bufs = XLOG_MED_ICLOGS; 
 			} else {
 				/* 256K with 32K bufs */
 				log->l_iclog_bufs = XLOG_MAX_ICLOGS;

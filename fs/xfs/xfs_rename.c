@@ -485,7 +485,7 @@ xfs_rename(
 		error = xfs_droplink(tp, target_ip);
 		if (error) {
 			rename_which_error_return = __LINE__;
-			goto abort_return;;
+			goto abort_return;
 		}
 		target_ip_dropped = 1;
 
