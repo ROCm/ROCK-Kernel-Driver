@@ -397,23 +397,43 @@ static struct {
 	unsigned long size;
 } supp;
 
-int
+const char *
 supported(struct module *mod)
 {
 	unsigned long pos = 0;
-	char *line, *basename;
+	char *line;
 
 	/* In a first shot, do a simple linear scan. */
 	while ((line = get_next_line(&pos, supp.file, supp.size))) {
-		basename = strrchr(mod->name, '/');
-		if (!basename)
-			basename = line;
-		else
+		const char *basename, *how = "yes";
+		char *l = line;
+
+		/* optional type-of-support flag */
+		for (l = line; *l != '\0'; l++) {
+			if (*l == ' ' || *l == '\t') {
+				*l = '\0';
+				how = l + 1;
+				break;
+			}
+		}
+
+		/* skip directory components */
+		if ((l = strrchr(line, '/')))
+			line = l + 1;
+		/* strip .ko extension */
+		l = line + strlen(line);
+		if (l - line > 3 && !strcmp(l-3, ".ko"))
+			*(l-3) = '\0';
+
+		/* skip directory components */
+		if ((basename = strrchr(mod->name, '/')))
 			basename++;
+		else
+			basename = mod->name;
 		if (!strcmp(basename, line))
-			return 1;
+			return how;
 	}
-	return 0;
+	return NULL;
 }
 
 void
@@ -523,8 +543,9 @@ add_header(struct buffer *b)
 void
 add_supported_flag(struct buffer *b, struct module *mod)
 {
-	if (supported(mod))
-		buf_printf(b, "\nMODULE_INFO(supported, \"yes\");\n");
+	const char *how = supported(mod);
+	if (how)
+		buf_printf(b, "\nMODULE_INFO(supported, \"%s\");\n", how);
 }
 
 /* Record CRCs for unresolved symbols */

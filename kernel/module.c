@@ -1440,7 +1440,13 @@ static struct module *load_module(void __user *umod,
 	}
 
 	supported = get_modinfo(sechdrs, infoindex, "supported");
-	if (!supported || strcmp(supported, "yes")) {
+	if (supported) {
+		if (!strcmp(supported, "external"))
+			tainted |= TAINT_EXTERNAL_SUPPORT;
+		else if (strcmp(supported, "yes"))
+			supported = NULL;
+	}
+	if (!supported) {
 		if (unsupported == 0) {
 			printk(KERN_WARNING "%s: unsupported module, refusing "
 			       "to load. To override, echo "
@@ -1449,7 +1455,7 @@ static struct module *load_module(void __user *umod,
 			err = -ENOEXEC;
 			goto free_hdr;
 		}
-		tainted |= TAINT_UNSUPPORTED;
+		tainted |= TAINT_NO_SUPPORT;
 		if (unsupported == 1) {
 			printk(KERN_WARNING "%s: unsupported module, tainting "
 			       "kernel.\n", mod->name);
