@@ -44,12 +44,12 @@
 #include <linux/genhd.h>
 
 #define CCISS_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
-#define DRIVER_NAME "Compaq CISS Driver (v 2.4.5)"
-#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,4,5)
+#define DRIVER_NAME "Compaq CISS Driver (v 2.5.0)"
+#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,5,0)
 
 /* Embedded module documentation macros - see modules.h */
 MODULE_AUTHOR("Charles M. White III - Compaq Computer Corporation");
-MODULE_DESCRIPTION("Driver for Compaq Smart Array Controller 5300");
+MODULE_DESCRIPTION("Driver for Compaq Smart Array Controller 5xxx v. 2.5.0");
 MODULE_LICENSE("GPL");
 
 #include "cciss_cmd.h"
