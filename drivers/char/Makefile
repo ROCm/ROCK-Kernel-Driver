@@ -150,13 +150,7 @@ obj-$(CONFIG_SPECIALIX) += specialix.o
 obj-$(CONFIG_AMIGA_BUILTIN_SERIAL) += amiserial.o
 obj-$(CONFIG_A2232) += ser_a2232.o generic_serial.o
 obj-$(CONFIG_SX) += sx.o generic_serial.o
-
-obj-$(CONFIG_RIO) += generic_serial.o
-subdir-$(CONFIG_RIO) += rio
-ifeq ($(CONFIG_RIO),y)
-  obj-y += rio/rio.o
-endif
-
+obj-$(CONFIG_RIO) += rio/ generic_serial.o
 obj-$(CONFIG_SH_SCI) += sh-sci.o generic_serial.o
 obj-$(CONFIG_SERIAL167) += serial167.o
 obj-$(CONFIG_MVME147_SCC) += generic_serial.o vme_scc.o
@@ -223,10 +217,7 @@ obj-$(CONFIG_SH_WDT) += shwdt.o
 obj-$(CONFIG_EUROTECH_WDT) += eurotechwdt.o
 obj-$(CONFIG_SOFT_WATCHDOG) += softdog.o
 
-subdir-$(CONFIG_MWAVE) += mwave
-ifeq ($(CONFIG_MWAVE),y)
-  obj-y += mwave/mwave.o
-endif
+obj-$(CONFIG_MWAVE) += mwave/
 
 subdir-$(CONFIG_AGP) += agp
 ifeq ($(CONFIG_AGP),y)
