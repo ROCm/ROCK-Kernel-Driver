@@ -78,10 +78,6 @@ static int sbusfb_open(struct fb_info *info, int user);
 static int sbusfb_release(struct fb_info *info, int user);
 static int sbusfb_mmap(struct fb_info *info, struct file *file, 
 			struct vm_area_struct *vma);
-static int sbusfb_get_fix(struct fb_fix_screeninfo *fix, int con,
-			struct fb_info *info);
-static int sbusfb_get_var(struct fb_var_screeninfo *var, int con,
-			struct fb_info *info);
 static int sbusfb_set_var(struct fb_var_screeninfo *var, int con,
 			struct fb_info *info);
 static int sbusfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -115,8 +111,6 @@ static struct fb_ops sbusfb_ops = {
 	.owner =	THIS_MODULE,
 	.fb_open =	sbusfb_open,
 	.fb_release =	sbusfb_release,
-	.fb_get_fix =	sbusfb_get_fix,
-	.fb_get_var =	sbusfb_get_var,
 	.fb_set_var =	sbusfb_set_var,
 	.fb_get_cmap =	sbusfb_get_cmap,
 	.fb_set_cmap =	sbusfb_set_cmap,
@@ -303,31 +297,6 @@ static void sbusfb_disp_setup(struct display *p)
 	sbusfb_clear_margin(p, 0);
 }
 
-    /*
-     *  Get the Fixed Part of the Display
-     */
-
-static int sbusfb_get_fix(struct fb_fix_screeninfo *fix, int con,
-			  struct fb_info *info)
-{
-	struct fb_info_sbusfb *fb = sbusfbinfo(info);
-
-	memcpy(fix, &fb->fix, sizeof(struct fb_fix_screeninfo));
-	return 0;
-}
-
-    /*
-     *  Get the User Defined Part of the Display
-     */
-
-static int sbusfb_get_var(struct fb_var_screeninfo *var, int con,
-			  struct fb_info *info)
-{
-	struct fb_info_sbusfb *fb = sbusfbinfo(info);
-
-	memcpy(var, &fb->var, sizeof(struct fb_var_screeninfo));
-	return 0;
-}
 
     /*
      *  Set the User Defined Part of the Display
@@ -1084,10 +1053,6 @@ sizechange:
 	fb->dispsw.clear_margins = NULL;
 
 	disp->var = *var;
-	disp->visual = fix->visual;
-	disp->type = fix->type;
-	disp->type_aux = fix->type_aux;
-	disp->line_length = fix->line_length;
 	
 	if (fb->blank)
 		disp->can_soft_blank = 1;

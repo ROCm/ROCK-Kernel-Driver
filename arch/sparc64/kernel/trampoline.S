@@ -34,11 +34,20 @@ sparc64_cpu_startup:
 	flushw
 
 	rdpr		%ver, %g1
-	sethi		%hi(0x003e0014), %g5
+	sethi		%hi(CHEETAH_ID), %g5
 	srlx		%g1, 32, %g1
-	or		%g5, %lo(0x003e0014), %g5
+	or		%g5, %lo(CHEETAH_ID), %g5
+	cmp		%g1, %g5
+	be,pn		%icc, cheetah_startup
+	 sethi		%hi(CHEETAH_PLUS_ID), %g5
+	or		%g5, %lo(CHEETAH_PLUS_ID), %g5
 	cmp		%g1, %g5
 	bne,pt		%icc, spitfire_startup
+	 nop
+
+cheetah_plus_startup:
+	/* Preserve OBP choosen DCU and DCR register settings.  */
+	ba,pt	%xcc, cheetah_generic_startup
 	 nop
 
 cheetah_startup:
@@ -52,6 +61,7 @@ cheetah_startup:
 	stxa		%g5, [%g0] ASI_DCU_CONTROL_REG
 	membar		#Sync
 
+cheetah_generic_startup:
 	mov	TSB_EXTENSION_P, %g3
 	stxa	%g0, [%g3] ASI_DMMU
 	stxa	%g0, [%g3] ASI_IMMU
@@ -118,9 +128,14 @@ startup_continue:
 	stx		%g2, [%sp + 2047 + 128 + 0x30]
 
 	rdpr		%ver, %g1
-	sethi		%hi(0x003e0014), %g5
+	sethi		%hi(CHEETAH_ID), %g5
 	srlx		%g1, 32, %g1
-	or		%g5, %lo(0x003e0014), %g5
+	or		%g5, %lo(CHEETAH_ID), %g5
+	cmp		%g1, %g5
+	be,a,pn		%icc, 1f
+	 mov		15, %g2
+	sethi		%hi(CHEETAH_PLUS_ID), %g5
+	or		%g5, %lo(CHEETAH_PLUS_ID), %g5
 	cmp		%g1, %g5
 	bne,a,pt	%icc, 1f
 	 mov		63, %g2
@@ -153,9 +168,14 @@ startup_continue:
 	stx		%g2, [%sp + 2047 + 128 + 0x30]
 
 	rdpr		%ver, %g1
-	sethi		%hi(0x003e0014), %g5
+	sethi		%hi(CHEETAH_ID), %g5
 	srlx		%g1, 32, %g1
-	or		%g5, %lo(0x003e0014), %g5
+	or		%g5, %lo(CHEETAH_ID), %g5
+	cmp		%g1, %g5
+	be,a,pn		%icc, 1f
+	 mov		15, %g2
+	sethi		%hi(CHEETAH_PLUS_ID), %g5
+	or		%g5, %lo(CHEETAH_PLUS_ID), %g5
 	cmp		%g1, %g5
 	bne,a,pt	%icc, 1f
 	 mov		63, %g2
@@ -225,13 +245,18 @@ startup_continue:
 	or		%g2, KERN_LOWBITS, %g2
 
 	rdpr		%ver, %g3
-	sethi		%hi(0x003e0014), %g7
+	sethi		%hi(CHEETAH_ID), %g7
 	srlx		%g3, 32, %g3
-	or		%g7, %lo(0x003e0014), %g7
+	or		%g7, %lo(CHEETAH_ID), %g7
+	cmp		%g3, %g7
+	be,pn		%icc, 9f
+	 sethi		%hi(CHEETAH_PLUS_ID), %g7
+	or		%g7, %lo(CHEETAH_PLUS_ID), %g7
 	cmp		%g3, %g7
 	bne,pt		%icc, 1f
 	 nop
 
+9:
 	sethi		%uhi(VPTE_BASE_CHEETAH), %g3
 	or		%g3, %ulo(VPTE_BASE_CHEETAH), %g3
 	ba,pt		%xcc, 2f

@@ -2388,9 +2388,9 @@ static int __init fbcon_show_logo( void )
 #if defined(CONFIG_FBCON_MFB) || defined(CONFIG_FBCON_AFB) || \
     defined(CONFIG_FBCON_ILBM) || defined(CONFIG_FBCON_HGA)
 
-	if (depth == 1 && (p->fix.type == FB_TYPE_PACKED_PIXELS ||
-			   p->fix.type == FB_TYPE_PLANES ||
-			   p->fix.type == FB_TYPE_INTERLEAVED_PLANES)) {
+	if (depth == 1 && (info->fix.type == FB_TYPE_PACKED_PIXELS ||
+			   info->fix.type == FB_TYPE_PLANES ||
+			   info->fix.type == FB_TYPE_INTERLEAVED_PLANES)) {
 
 	    /* monochrome */
 	    unsigned char inverse = p->inverse || p->visual == FB_VISUAL_MONO01

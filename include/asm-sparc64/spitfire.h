@@ -22,6 +22,7 @@
 #define TSB_EXTENSION_P		0x0000000000000048 /* Ultra-III and later		*/
 #define TSB_EXTENSION_S		0x0000000000000050 /* Ultra-III and later, D-TLB only	*/
 #define TSB_EXTENSION_N		0x0000000000000058 /* Ultra-III and later		*/
+#define TLB_TAG_ACCESS_EXT	0x0000000000000060 /* Ultra-III+ and later		*/
 
 /* These registers only exist as one entity, and are accessed
  * via ASI_DMMU only.
@@ -38,12 +39,13 @@
 
 enum ultra_tlb_layout {
 	spitfire = 0,
-	cheetah = 1
+	cheetah = 1,
+	cheetah_plus = 2,
 };
 
 extern enum ultra_tlb_layout tlb_type;
 
-#define SPARC64_USE_STICK	(tlb_type == cheetah)
+#define SPARC64_USE_STICK	(tlb_type != spitfire)
 
 #define CHEETAH_HIGHEST_LOCKED_TLBENT	(16 - 1)
 
@@ -433,35 +435,35 @@ extern __inline__ void cheetah_put_litlb_data(int entry, unsigned long data)
 			       "i" (ASI_ITLB_DATA_ACCESS));
 }
 
-extern __inline__ unsigned long cheetah_get_dtlb_data(int entry)
+extern __inline__ unsigned long cheetah_get_dtlb_data(int entry, int tlb)
 {
 	unsigned long data;
 
 	__asm__ __volatile__("ldxa	[%1] %2, %%g0\n\t"
 			     "ldxa	[%1] %2, %0"
 			     : "=r" (data)
-			     : "r" ((2 << 16) | (entry << 3)), "i" (ASI_DTLB_DATA_ACCESS));
+			     : "r" ((tlb << 16) | (entry << 3)), "i" (ASI_DTLB_DATA_ACCESS));
 
 	return data;
 }
 
-extern __inline__ unsigned long cheetah_get_dtlb_tag(int entry)
+extern __inline__ unsigned long cheetah_get_dtlb_tag(int entry, int tlb)
 {
 	unsigned long tag;
 
 	__asm__ __volatile__("ldxa	[%1] %2, %0"
 			     : "=r" (tag)
-			     : "r" ((2 << 16) | (entry << 3)), "i" (ASI_DTLB_TAG_READ));
+			     : "r" ((tlb << 16) | (entry << 3)), "i" (ASI_DTLB_TAG_READ));
 	return tag;
 }
 
-extern __inline__ void cheetah_put_dtlb_data(int entry, unsigned long data)
+extern __inline__ void cheetah_put_dtlb_data(int entry, unsigned long data, int tlb)
 {
 	__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 			     "membar	#Sync"
 			     : /* No outputs */
 			     : "r" (data),
-			       "r" ((2 << 16) | (entry << 3)),
+			       "r" ((tlb << 16) | (entry << 3)),
 			       "i" (ASI_DTLB_DATA_ACCESS));
 }
 

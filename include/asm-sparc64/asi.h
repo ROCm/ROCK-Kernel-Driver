@@ -40,6 +40,7 @@
 #define ASI_WCACHE_DATA		0x39 /* (III) WCache data RAM diag		*/
 #define ASI_WCACHE_TAG		0x3a /* (III) WCache tag RAM diag		*/
 #define ASI_WCACHE_SNOOP_TAG	0x3b /* (III) WCache snoop tag RAM diag		*/
+#define ASI_SRAM_FAST_INIT	0x40 /* (III+) Fast SRAM init			*/
 #define ASI_DCACHE_INVALIDATE	0x42 /* (III) DCache Invalidate diag		*/
 #define ASI_DCACHE_UTAG		0x43 /* (III) DCache uTag diag			*/
 #define ASI_DCACHE_SNOOP_TAG	0x44 /* (III) DCache snoop tag RAM diag		*/

@@ -63,7 +63,8 @@ void __init device_scan(void)
 				if (tlb_type == spitfire) {
 					prom_getproperty(scan, "upa-portid",
 							 (char *) &thismid, sizeof(thismid));
-				} else if (tlb_type == cheetah) {
+				} else if (tlb_type == cheetah ||
+					   tlb_type == cheetah_plus) {
 					prom_getproperty(scan, "portid",
 							 (char *) &thismid, sizeof(thismid));
 				}

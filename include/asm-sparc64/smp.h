@@ -91,7 +91,7 @@ static inline int any_online_cpu(unsigned long mask)
 
 extern __inline__ int hard_smp_processor_id(void)
 {
-	if (tlb_type == cheetah) {
+	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		unsigned long safari_config;
 		__asm__ __volatile__("ldxa [%%g0] %1, %0"
 				     : "=r" (safari_config)
