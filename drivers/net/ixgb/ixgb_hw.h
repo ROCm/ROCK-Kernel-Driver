@@ -616,9 +616,9 @@ struct ixgb_context_desc {
 #define IXGB_CONTEXT_DESC_STATUS_DD 0x01
 
 /* Filters */
-#define IXGB_RAR_ENTRIES          16	/* Number of entries in Rx Address array */
 #define IXGB_MC_TBL_SIZE          128	/* Multicast Filter Table (4096 bits) */
 #define IXGB_VLAN_FILTER_TBL_SIZE 128	/* VLAN Filter Table (4096 bits) */
+#define IXGB_RAR_ENTRIES		  3	/* Number of entries in Rx Address array */
 
 #define IXGB_MEMORY_REGISTER_BASE_ADDRESS   0
 #define ENET_HEADER_SIZE            14
