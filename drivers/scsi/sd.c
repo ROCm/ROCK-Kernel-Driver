@@ -1353,9 +1353,13 @@ static int sd_remove(struct device *dev)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_device *sdp = to_scsi_device(dev);
-	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+       struct scsi_disk *sdkp;
 	struct scsi_request *sreq;
 	int retries, res;
+
+       sdkp = dev_get_drvdata(dev);
+       if (!sdkp)
+               return;         /* this can happen */
 
 	if (!sdp->online || !sdkp->WCE)
 		return;
