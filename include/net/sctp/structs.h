@@ -42,7 +42,7 @@
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Dajiang Zhang         <dajiang.zhang@nokia.com>
- *    Ardelle Fan           <ardelle.fan@intel.com> 
+ *    Ardelle Fan           <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -104,27 +104,26 @@ union sctp_addr {
 
 
 /* Forward declarations for data structures. */
-struct SCTP_protocol;
+struct sctp_protocol;
 struct SCTP_endpoint;
 struct SCTP_association;
-struct SCTP_transport;
+struct sctp_transport;
 struct SCTP_packet;
 struct SCTP_chunk;
 struct SCTP_inqueue;
-struct SCTP_outqueue;
+struct sctp_outq;
 struct SCTP_bind_addr;
+struct sctp_ulpq;
 struct sctp_opt;
 struct sctp_endpoint_common;
+struct sctp_ssnmap;
 
-
-typedef struct SCTP_protocol sctp_protocol_t;
+typedef struct sctp_protocol sctp_protocol_t;
 typedef struct SCTP_endpoint sctp_endpoint_t;
 typedef struct SCTP_association sctp_association_t;
-typedef struct SCTP_transport sctp_transport_t;
 typedef struct SCTP_packet sctp_packet_t;
 typedef struct SCTP_chunk sctp_chunk_t;
 typedef struct SCTP_inqueue sctp_inqueue_t;
-typedef struct SCTP_outqueue sctp_outqueue_t;
 typedef struct SCTP_bind_addr sctp_bind_addr_t;
 typedef struct sctp_opt sctp_opt_t;
 typedef struct sctp_endpoint_common sctp_endpoint_common_t;
@@ -132,7 +131,6 @@ typedef struct sctp_endpoint_common sctp_endpoint_common_t;
 #include <net/sctp/tsnmap.h>
 #include <net/sctp/ulpevent.h>
 #include <net/sctp/ulpqueue.h>
-
 
 /* Structures useful for managing bind/connect. */
 
@@ -157,7 +155,7 @@ typedef struct sctp_hashbucket {
 
 
 /* The SCTP protocol structure. */
-struct SCTP_protocol {
+struct sctp_protocol {
 	/* RFC2960 Section 14. Suggested SCTP Protocol Parameter Values
 	 *
 	 * The following protocol parameters are RECOMMENDED:
@@ -183,8 +181,8 @@ struct SCTP_protocol {
 
 	/* Valid.Cookie.Life        - 60  seconds  */
 	int valid_cookie_life;
-	
-	/* Whether Cookie Preservative is enabled(1) or not(0) */ 
+
+	/* Whether Cookie Preservative is enabled(1) or not(0) */
 	int cookie_preserve_enable;
 
 	/* Association.Max.Retrans  - 10 attempts
@@ -239,7 +237,9 @@ struct SCTP_protocol {
  * (i.e. things that depend on the address family.)
  */
 struct sctp_af {
-	int		(*queue_xmit)	(struct sk_buff *skb);
+	int		(*sctp_xmit)	(struct sk_buff *skb,
+					 struct sctp_transport *,
+					 int ipfragok);
 	int 		(*setsockopt)	(struct sock *sk,
 					 int level,
 					 int optname,
@@ -250,12 +250,18 @@ struct sctp_af {
 					 int optname,
 					 char *optval,
 					 int *optlen);
-	struct dst_entry *(*get_dst)	(union sctp_addr *daddr,
+	struct dst_entry *(*get_dst)	(sctp_association_t *asoc,
+					 union sctp_addr *daddr,
 					 union sctp_addr *saddr);
+	void 		(*get_saddr)	(sctp_association_t *asoc,
+					 struct dst_entry *dst,
+					 union sctp_addr *daddr,
+				 	 union sctp_addr *saddr);	 
 	void            (*copy_addrlist) (struct list_head *,
 					  struct net_device *);
 	void            (*dst_saddr)    (union sctp_addr *saddr,
-					 struct dst_entry *dst);
+					 struct dst_entry *dst,
+					 unsigned short port);
 	int             (*cmp_addr)     (const union sctp_addr *addr1,
 					 const union sctp_addr *addr2);
 	void            (*addr_copy)    (union sctp_addr *dst,
@@ -282,7 +288,7 @@ struct sctp_af *sctp_get_af_specific(sa_family_t);
 int sctp_register_af(struct sctp_af *);
 
 /* Protocol family functions. */
-typedef struct sctp_pf {
+struct sctp_pf {
 	void (*event_msgname)(sctp_ulpevent_t *, char *, int *);
 	void (*skb_msgname)  (struct sk_buff *, char *, int *);
 	int  (*af_supported) (sa_family_t);
@@ -291,7 +297,7 @@ typedef struct sctp_pf {
 			  struct sctp_opt *);
 	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
 	struct sctp_af *af;
-} sctp_pf_t;
+};
 
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
@@ -318,7 +324,7 @@ struct sctp_opt {
 	__u32 autoclose;
 	__u8 nodelay;
 	__u8 disable_fragments;
-	sctp_pf_t *pf;
+	struct sctp_pf *pf;
 };
 
 
@@ -360,7 +366,8 @@ typedef struct sctp_cookie {
         struct timeval expiration;
 
 	/* Number of inbound/outbound streams which are set
-	 * and negotiated during the INIT process. */
+	 * and negotiated during the INIT process.
+	 */
 	__u16 sinit_num_ostreams;
 	__u16 sinit_max_instreams;
 
@@ -425,6 +432,49 @@ typedef struct sctp_sender_hb_info {
 	union sctp_addr daddr;
 	unsigned long sent_at;
 } sctp_sender_hb_info_t __attribute__((packed));
+
+/*
+ *  RFC 2960 1.3.2 Sequenced Delivery within Streams
+ *
+ *  The term "stream" is used in SCTP to refer to a sequence of user
+ *  messages that are to be delivered to the upper-layer protocol in
+ *  order with respect to other messages within the same stream.  This is
+ *  in contrast to its usage in TCP, where it refers to a sequence of
+ *  bytes (in this document a byte is assumed to be eight bits).
+ *  ...
+ *
+ *  This is the structure we use to track both our outbound and inbound
+ *  SSN, or Stream Sequence Numbers.
+ */
+
+struct sctp_stream {
+	__u16 *ssn;
+	unsigned int len;
+};
+
+struct sctp_ssnmap {
+	struct sctp_stream in;
+	struct sctp_stream out;
+	int malloced;
+};
+
+struct sctp_ssnmap *sctp_ssnmap_init(struct sctp_ssnmap *, __u16, __u16);
+struct sctp_ssnmap *sctp_ssnmap_new(__u16 in, __u16 out, int priority);
+void sctp_ssnmap_free(struct sctp_ssnmap *map);
+void sctp_ssnmap_clear(struct sctp_ssnmap *map);
+
+/* What is the current SSN number for this stream? */
+static inline __u16 sctp_ssn_peek(struct sctp_stream *stream, __u16 id)
+{
+	return stream->ssn[id];
+}
+
+/* Return the next SSN number for this stream.  */
+static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
+{
+	return stream->ssn[id]++;
+}
+
 
 /* RFC2960 1.4 Key Terms
  *
@@ -499,6 +549,7 @@ struct SCTP_chunk {
 	__u8 rtt_in_progress;  /* Is this chunk used for RTT calculation? */
 	__u8 num_times_sent;   /* How man times did we send this? */
 	__u8 has_tsn;          /* Does this chunk have a TSN yet? */
+	__u8 has_ssn;          /* Does this chunk have a SSN yet? */
 	__u8 singleton;        /* Was this the only chunk in the packet? */
 	__u8 end_of_packet;    /* Was this the last chunk in the packet? */
 	__u8 ecn_ce_done;      /* Have we processed the ECN CE bit? */
@@ -516,15 +567,13 @@ struct SCTP_chunk {
 	 * For an outbound chunk, it tells us where we'd like it to
 	 * go.  It is NULL if we have no preference.
 	 */
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 };
 
 sctp_chunk_t *sctp_make_chunk(const sctp_association_t *, __u8 type,
 			      __u8 flags, int size);
 void sctp_free_chunk(sctp_chunk_t *);
-sctp_chunk_t *sctp_copy_chunk(sctp_chunk_t *, int flags);
 void  *sctp_addto_chunk(sctp_chunk_t *chunk, int len, const void *data);
-int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data);
 sctp_chunk_t *sctp_chunkify(struct sk_buff *, const sctp_association_t *,
 			    struct sock *);
 void sctp_init_addrs(sctp_chunk_t *, union sctp_addr *, union sctp_addr *);
@@ -560,7 +609,7 @@ struct SCTP_packet {
 	 * The function we finally use to pass down to the next lower
 	 * layer lives in the transport structure.
 	 */
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 
 	/* Allow a callback for getting a high priority chunk
 	 * bundled early into the packet (This is used for ECNE).
@@ -575,30 +624,33 @@ struct SCTP_packet {
 	/* This packet contains a COOKIE-ECHO chunk. */
 	int has_cookie_echo;
 
+	/* SCTP cannot fragment this packet. So let ip fragment it. */
+	int ipfragok;
+
 	int malloced;
 };
 
-typedef int (sctp_outqueue_thandler_t)(sctp_outqueue_t *, void *);
-typedef int (sctp_outqueue_ehandler_t)(sctp_outqueue_t *);
-typedef sctp_packet_t *(sctp_outqueue_ohandler_init_t)
+typedef int (sctp_outq_thandler_t)(struct sctp_outq *, void *);
+typedef int (sctp_outq_ehandler_t)(struct sctp_outq *);
+typedef sctp_packet_t *(sctp_outq_ohandler_init_t)
 	(sctp_packet_t *,
-         sctp_transport_t *,
+         struct sctp_transport *,
          __u16 sport,
          __u16 dport);
-typedef sctp_packet_t *(sctp_outqueue_ohandler_config_t)
+typedef sctp_packet_t *(sctp_outq_ohandler_config_t)
         (sctp_packet_t *,
 	 __u32 vtag,
 	 int ecn_capable,
 	 sctp_packet_phandler_t *get_prepend_chunk);
-typedef sctp_xmit_t (sctp_outqueue_ohandler_t)(sctp_packet_t *,
+typedef sctp_xmit_t (sctp_outq_ohandler_t)(sctp_packet_t *,
                                                sctp_chunk_t *);
-typedef int (sctp_outqueue_ohandler_force_t)(sctp_packet_t *);
+typedef int (sctp_outq_ohandler_force_t)(sctp_packet_t *);
 
-sctp_outqueue_ohandler_init_t    sctp_packet_init;
-sctp_outqueue_ohandler_config_t  sctp_packet_config;
-sctp_outqueue_ohandler_t         sctp_packet_append_chunk;
-sctp_outqueue_ohandler_t         sctp_packet_transmit_chunk;
-sctp_outqueue_ohandler_force_t   sctp_packet_transmit;
+sctp_outq_ohandler_init_t    sctp_packet_init;
+sctp_outq_ohandler_config_t  sctp_packet_config;
+sctp_outq_ohandler_t         sctp_packet_append_chunk;
+sctp_outq_ohandler_t         sctp_packet_transmit_chunk;
+sctp_outq_ohandler_force_t   sctp_packet_transmit;
 void sctp_packet_free(sctp_packet_t *);
 
 
@@ -622,7 +674,7 @@ void sctp_packet_free(sctp_packet_t *);
  *      period.
  *
  */
-struct SCTP_transport {
+struct sctp_transport {
 	/* A list of transports. */
 	struct list_head transports;
 
@@ -692,6 +744,8 @@ struct SCTP_transport {
 
 	/* Destination */
 	struct dst_entry *dst;
+	/* Source address. */
+	union sctp_addr saddr;
 
 	/* When was the last time(in jiffies) that a data packet was sent on
 	 * this transport?  This is used to adjust the cwnd when the transport
@@ -771,24 +825,26 @@ struct SCTP_transport {
 	int malloced; /* Is this structure kfree()able? */
 };
 
-extern sctp_transport_t *sctp_transport_new(const union sctp_addr *, int);
-extern sctp_transport_t *sctp_transport_init(sctp_transport_t *,
-					     const union sctp_addr *, int);
-extern void sctp_transport_set_owner(sctp_transport_t *, sctp_association_t *);
-extern void sctp_transport_route(sctp_transport_t *, union sctp_addr *,
-				 struct sctp_opt *);
-extern void sctp_transport_free(sctp_transport_t *);
-extern void sctp_transport_destroy(sctp_transport_t *);
-extern void sctp_transport_reset_timers(sctp_transport_t *);
-extern void sctp_transport_hold(sctp_transport_t *);
-extern void sctp_transport_put(sctp_transport_t *);
-extern void sctp_transport_update_rto(sctp_transport_t *, __u32);
-extern void sctp_transport_raise_cwnd(sctp_transport_t *, __u32, __u32);
-extern void sctp_transport_lower_cwnd(sctp_transport_t *, sctp_lower_cwnd_t);
+struct sctp_transport *sctp_transport_new(const union sctp_addr *, int);
+struct sctp_transport *sctp_transport_init(struct sctp_transport *,
+					   const union sctp_addr *, int);
+void sctp_transport_set_owner(struct sctp_transport *, sctp_association_t *);
+void sctp_transport_route(struct sctp_transport *, union sctp_addr *,
+			  struct sctp_opt *);
+void sctp_transport_pmtu(struct sctp_transport *);
+void sctp_transport_free(struct sctp_transport *);
+void sctp_transport_destroy(struct sctp_transport *);
+void sctp_transport_reset_timers(struct sctp_transport *);
+void sctp_transport_hold(struct sctp_transport *);
+void sctp_transport_put(struct sctp_transport *);
+void sctp_transport_update_rto(struct sctp_transport *, __u32);
+void sctp_transport_raise_cwnd(struct sctp_transport *, __u32, __u32);
+void sctp_transport_lower_cwnd(struct sctp_transport *, sctp_lower_cwnd_t);
+unsigned long sctp_transport_timeout(struct sctp_transport *);
+
 
 /* This is the structure we use to queue packets as they come into
- * SCTP.  We write packets to it and read chunks from it.  It handles
- * fragment reassembly and chunk unbundling.
+ * SCTP.  We write packets to it and read chunks from it.
  */
 struct SCTP_inqueue {
 	/* This is actually a queue of sctp_chunk_t each
@@ -835,7 +891,7 @@ void sctp_inqueue_set_th_handler(sctp_inqueue_t *,
  *
  * When free()'d, it empties itself out via output_handler().
  */
-struct SCTP_outqueue {
+struct sctp_outq {
 	sctp_association_t *asoc;
 
 	/* BUG: This really should be an array of streams.
@@ -861,11 +917,11 @@ struct SCTP_outqueue {
 	 * layer.  This is always SCTP_packet, but we separate the two
 	 * structures to make testing simpler.
 	 */
-	sctp_outqueue_ohandler_init_t	*init_output;
-	sctp_outqueue_ohandler_config_t	*config_output;
-	sctp_outqueue_ohandler_t	*append_output;
-	sctp_outqueue_ohandler_t	*build_output;
-	sctp_outqueue_ohandler_force_t	*force_output;
+	sctp_outq_ohandler_init_t	*init_output;
+	sctp_outq_ohandler_config_t	*config_output;
+	sctp_outq_ohandler_t	*append_output;
+	sctp_outq_ohandler_t	*build_output;
+	sctp_outq_ohandler_force_t	*force_output;
 
 	/* How many unackd bytes do we have in-flight?  */
 	__u32 outstanding_bytes;
@@ -877,24 +933,24 @@ struct SCTP_outqueue {
 	int malloced;
 };
 
-sctp_outqueue_t *sctp_outqueue_new(sctp_association_t *);
-void sctp_outqueue_init(sctp_association_t *, sctp_outqueue_t *);
-void sctp_outqueue_teardown(sctp_outqueue_t *);
-void sctp_outqueue_free(sctp_outqueue_t*);
-void sctp_force_outqueue(sctp_outqueue_t *);
-int sctp_push_outqueue(sctp_outqueue_t *, sctp_chunk_t *chunk);
-int sctp_flush_outqueue(sctp_outqueue_t *, int);
-int sctp_sack_outqueue(sctp_outqueue_t *, sctp_sackhdr_t *);
-int sctp_outqueue_is_empty(const sctp_outqueue_t *);
-int sctp_outqueue_set_output_handlers(sctp_outqueue_t *,
-                                      sctp_outqueue_ohandler_init_t init,
-                                      sctp_outqueue_ohandler_config_t config,
-                                      sctp_outqueue_ohandler_t append,
-                                      sctp_outqueue_ohandler_t build,
-                                      sctp_outqueue_ohandler_force_t force);
-void sctp_outqueue_restart(sctp_outqueue_t *);
-void sctp_retransmit(sctp_outqueue_t *, sctp_transport_t *, __u8);
-void sctp_retransmit_mark(sctp_outqueue_t *, sctp_transport_t *, __u8);
+struct sctp_outq *sctp_outq_new(sctp_association_t *);
+void sctp_outq_init(sctp_association_t *, struct sctp_outq *);
+void sctp_outq_teardown(struct sctp_outq *);
+void sctp_outq_free(struct sctp_outq*);
+int sctp_outq_tail(struct sctp_outq *, sctp_chunk_t *chunk);
+int sctp_outq_flush(struct sctp_outq *, int);
+int sctp_outq_sack(struct sctp_outq *, sctp_sackhdr_t *);
+int sctp_outq_is_empty(const struct sctp_outq *);
+int sctp_outq_set_output_handlers(struct sctp_outq *,
+				  sctp_outq_ohandler_init_t init,
+				  sctp_outq_ohandler_config_t config,
+				  sctp_outq_ohandler_t append,
+				  sctp_outq_ohandler_t build,
+				  sctp_outq_ohandler_force_t force);
+void sctp_outq_restart(struct sctp_outq *);
+void sctp_retransmit(struct sctp_outq *, struct sctp_transport *,
+		     sctp_retransmit_reason_t);
+void sctp_retransmit_mark(struct sctp_outq *, struct sctp_transport *, __u8);
 
 
 /* These bind address data fields common between endpoints and associations */
@@ -1027,7 +1083,7 @@ struct SCTP_endpoint {
 	/* These are the system-wide defaults and other stuff which is
 	 * endpoint-independent.
 	 */
-	sctp_protocol_t *proto;
+	struct sctp_protocol *proto;
 
 	/* Associations: A list of current associations and mappings
 	 *            to the data consumers for each association. This
@@ -1066,10 +1122,7 @@ static inline sctp_endpoint_t *sctp_ep(sctp_endpoint_common_t *base)
 {
 	sctp_endpoint_t *ep;
 
-	/* We are not really a list, but the list_entry() macro is
-	 * really quite generic to find the address of an outter struct.
-	 */
-	ep = list_entry(base, sctp_endpoint_t, base);
+	ep = container_of(base, sctp_endpoint_t, base);
 	return ep;
 }
 
@@ -1083,7 +1136,7 @@ void sctp_endpoint_hold(sctp_endpoint_t *);
 void sctp_endpoint_add_asoc(sctp_endpoint_t *, sctp_association_t *asoc);
 sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 					       const union sctp_addr *paddr,
-					       sctp_transport_t **);
+					       struct sctp_transport **);
 int sctp_endpoint_is_peeled_off(sctp_endpoint_t *, const union sctp_addr *);
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
 					const union sctp_addr *);
@@ -1184,7 +1237,7 @@ struct SCTP_association {
 		 * designate the connection we are currently using to
 		 * transmit new data and most control chunks.
 		 */
-		sctp_transport_t *primary_path;
+		struct sctp_transport *primary_path;
 
 		/* Cache the primary path address here, when we
 		 * need a an address for msg_name.
@@ -1195,7 +1248,7 @@ struct SCTP_association {
 		 *   The path that we are currently using to
 		 *   transmit new data and most control chunks.
 		 */
-		sctp_transport_t *active_path;
+		struct sctp_transport *active_path;
 
 		/* retran_path
 		 *
@@ -1207,13 +1260,13 @@ struct SCTP_association {
 		 * different from the last destination address to
 		 * which the DATA chunk was sent.
 		 */
-		sctp_transport_t *retran_path;
+		struct sctp_transport *retran_path;
 
 		/* Pointer to last transport I have sent on.  */
-		sctp_transport_t *last_sent_to;
+		struct sctp_transport *last_sent_to;
 
 		/* This is the last transport I have recieved DATA on.  */
-		sctp_transport_t *last_data_from;
+		struct sctp_transport *last_data_from;
 
 		/*
 		 * Mapping  An array of bits or bytes indicating which out of
@@ -1325,7 +1378,7 @@ struct SCTP_association {
 	struct timer_list timers[SCTP_NUM_TIMEOUT_TYPES];
 
 	/* Transport to which SHUTDOWN chunk was last sent.  */
-	sctp_transport_t *shutdown_last_sent_to;
+	struct sctp_transport *shutdown_last_sent_to;
 
 	/* Next TSN    : The next TSN number to be assigned to a new
 	 *             : DATA chunk.  This is sent in the INIT or INIT
@@ -1408,18 +1461,15 @@ struct SCTP_association {
 	} defaults;
 
 	/* This tracks outbound ssn for a given stream.  */
-	__u16 ssn[SCTP_MAX_STREAM];
+	struct sctp_ssnmap *ssnmap;
 
 	/* All outbound chunks go through this structure.  */
-	sctp_outqueue_t outqueue;
+	struct sctp_outq outqueue;
 
 	/* A smart pipe that will handle reordering and fragmentation,
 	 * as well as handle passing events up to the ULP.
-	 * In the future, we should make this at least dynamic, if
-	 * not also some sparse structure.
 	 */
-	sctp_ulpqueue_t ulpq;
-	__u8 _ssnmap[sctp_ulpqueue_storage_size(SCTP_MAX_STREAM)];
+	struct sctp_ulpq ulpq;
 
 	/* Need to send an ECNE Chunk? */
 	int need_ecne;
@@ -1505,7 +1555,7 @@ struct SCTP_association {
 	 *
 	 *
 	 * [I really think this is EXACTLY the sort of intelligence
-	 *  which already resides in SCTP_outqueue.  Please move this
+	 *  which already resides in sctp_outq.  Please move this
 	 *  queue and its supporting logic down there.  --piggy]
 	 */
 	struct sk_buff_head addip_chunks;
@@ -1546,10 +1596,7 @@ static inline sctp_association_t *sctp_assoc(sctp_endpoint_common_t *base)
 {
 	sctp_association_t *asoc;
 
-	/* We are not really a list, but the list_entry() macro is
-	 * really quite generic find the address of an outter struct.
-	 */
-	asoc = list_entry(base, sctp_association_t, base);
+	asoc = container_of(base, sctp_association_t, base);
 	return asoc;
 }
 
@@ -1567,24 +1614,33 @@ void sctp_association_free(sctp_association_t *);
 void sctp_association_put(sctp_association_t *);
 void sctp_association_hold(sctp_association_t *);
 
-sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *);
-sctp_transport_t *sctp_assoc_lookup_paddr(const sctp_association_t *,
+struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *);
+struct sctp_transport *sctp_assoc_lookup_paddr(const sctp_association_t *,
 					  const union sctp_addr *);
-sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *,
+struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *,
 				     const union sctp_addr *address,
 				     const int priority);
-void sctp_assoc_control_transport(sctp_association_t *, sctp_transport_t *,
+void sctp_assoc_control_transport(sctp_association_t *,
+				  struct sctp_transport *,
 				  sctp_transport_cmd_t, sctp_sn_error_t);
-sctp_transport_t *sctp_assoc_lookup_tsn(sctp_association_t *, __u32);
-sctp_transport_t *sctp_assoc_is_match(sctp_association_t *,
-				      const union sctp_addr *,
-				      const union sctp_addr *);
+struct sctp_transport *sctp_assoc_lookup_tsn(sctp_association_t *, __u32);
+struct sctp_transport *sctp_assoc_is_match(sctp_association_t *,
+					   const union sctp_addr *,
+					   const union sctp_addr *);
 void sctp_assoc_migrate(sctp_association_t *, struct sock *);
 void sctp_assoc_update(sctp_association_t *dst, sctp_association_t *src);
 
 __u32 __sctp_association_get_next_tsn(sctp_association_t *);
 __u32 __sctp_association_get_tsn_block(sctp_association_t *, int);
 __u16 __sctp_association_get_next_ssn(sctp_association_t *, __u16 sid);
+
+void sctp_assoc_sync_pmtu(sctp_association_t *);
+void sctp_assoc_rwnd_increase(sctp_association_t *, int);
+void sctp_assoc_rwnd_decrease(sctp_association_t *, int);
+
+int sctp_assoc_set_bind_addr_from_ep(sctp_association_t *, int);
+int sctp_assoc_set_bind_addr_from_cookie(sctp_association_t *,
+					 sctp_cookie_t *, int);
 
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 		        const union sctp_addr *ss2);

@@ -98,43 +98,22 @@ static inline void sctp_v6_err(struct sk_buff *skb,
 }
 
 /* Based on tcp_v6_xmit() in tcp_ipv6.c. */
-static inline int sctp_v6_xmit(struct sk_buff *skb)
+static inline int sctp_v6_xmit(struct sk_buff *skb,
+			       struct sctp_transport *transport, int ipfragok)
 {
 	struct sock *sk = skb->sk;
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct flowi fl;
 	struct dst_entry *dst = skb->dst;
 	struct rt6_info *rt6 = (struct rt6_info *)dst;
-	struct in6_addr saddr;
-	int err;
 
 	fl.proto = sk->protocol;
-	fl.fl6_dst = &rt6->rt6i_dst.addr;
 
-	/* FIXME: Currently, ip6_route_output() doesn't fill in the source
-	 * address in the returned route entry. So we call ipv6_get_saddr()
-	 * to get an appropriate source address. It is possible that this address
-	 * may not be part of the bind address list of the association.
-	 * Once ip6_route_ouput() is fixed so that it returns a route entry
-	 * with an appropriate source address, the following if condition can
-	 * be removed. With ip6_route_output() returning a source address filled
-	 * route entry, sctp_transport_route() can do real source address 
-	 * selection for v6.
+	/* Fill in the dest address from the route entry passed with the skb
+	 * and the source address from the transport.
 	 */ 
-	if (ipv6_addr_any(&rt6->rt6i_src.addr)) {
-		err = ipv6_get_saddr(dst, fl.fl6_dst, &saddr);
-
-		if (err) {
-			printk(KERN_ERR "%s: No saddr available for "
-			       "DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
-			       __FUNCTION__, NIP6(fl.fl6_src));
-			return err;
-		}
-
-		fl.fl6_src = &saddr;
-	} else {
-		fl.fl6_src = &rt6->rt6i_src.addr;
-	}
+	fl.fl6_dst = &rt6->rt6i_dst.addr;
+	fl.fl6_src = &transport->saddr.v6.sin6_addr; 
 
 	fl.fl6_flowlabel = np->flow_label;
 	IP6_ECN_flow_xmit(sk, fl.fl6_flowlabel);
@@ -147,19 +126,25 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 		fl.nl_u.ip6_u.daddr = rt0->addr;
 	}
 
+	SCTP_DEBUG_PRINTK("%s: skb:%p, len:%d, "
+			  "src:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x "
+			  "dst:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
+			  __FUNCTION__, skb, skb->len, NIP6(fl.fl6_src),
+			  NIP6(fl.fl6_dst));
+
 	return ip6_xmit(sk, skb, &fl, np->opt);
 }
 
 /* Returns the dst cache entry for the given source and destination ip
  * addresses.
  */
-struct dst_entry *sctp_v6_get_dst(union sctp_addr *daddr,
+struct dst_entry *sctp_v6_get_dst(sctp_association_t *asoc,
+				  union sctp_addr *daddr,
 				  union sctp_addr *saddr)
 {
 	struct dst_entry *dst;
 	struct flowi fl = {
 		.nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr, } } };
-
 
 	SCTP_DEBUG_PRINTK("%s: DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
 			  __FUNCTION__, NIP6(fl.fl6_dst));
@@ -181,10 +166,94 @@ struct dst_entry *sctp_v6_get_dst(union sctp_addr *daddr,
 			NIP6(&rt->rt6i_dst.addr), NIP6(&rt->rt6i_src.addr));
 	} else {
 		SCTP_DEBUG_PRINTK("NO ROUTE\n");
-		return NULL;
 	}
 
 	return dst;
+}
+
+/* Returns the number of consecutive initial bits that match in the 2 ipv6
+ * addresses.
+ */ 
+static inline int sctp_v6_addr_match_len(union sctp_addr *s1,
+					 union sctp_addr *s2)
+{
+	struct in6_addr *a1 = &s1->v6.sin6_addr;
+	struct in6_addr *a2 = &s2->v6.sin6_addr;
+	int i, j;
+
+	for (i = 0; i < 4 ; i++) {
+		__u32 a1xora2;
+
+		a1xora2 = a1->s6_addr32[i] ^ a2->s6_addr32[i];
+		
+		if ((j = fls(ntohl(a1xora2))))
+			return (i * 32 + 32 - j);
+	}
+
+	return (i*32);
+}
+
+/* Fills in the source address(saddr) based on the destination address(daddr)
+ * and asoc's bind address list.
+ */   
+void sctp_v6_get_saddr(sctp_association_t *asoc, struct dst_entry *dst,
+		       union sctp_addr *daddr, union sctp_addr *saddr)
+{
+	sctp_bind_addr_t *bp;
+	rwlock_t *addr_lock;
+	struct sockaddr_storage_list *laddr;
+	struct list_head *pos;
+	sctp_scope_t scope;
+	union sctp_addr *baddr = NULL;
+	__u8 matchlen = 0;
+	__u8 bmatchlen;
+
+	SCTP_DEBUG_PRINTK("%s: asoc:%p dst:%p "
+			  "daddr:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
+			  __FUNCTION__, asoc, dst, NIP6(&daddr->v6.sin6_addr));
+
+	if (!asoc) {
+		ipv6_get_saddr(dst, &daddr->v6.sin6_addr, &saddr->v6.sin6_addr);
+		SCTP_DEBUG_PRINTK("saddr from ipv6_get_saddr: "
+				  "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
+				  NIP6(&saddr->v6.sin6_addr));
+		return;
+	}
+
+	scope = sctp_scope(daddr);
+
+	bp = &asoc->base.bind_addr;
+	addr_lock = &asoc->base.addr_lock;
+
+	/* Go through the bind address list and find the best source address
+	 * that matches the scope of the destination address.
+	 */
+	sctp_read_lock(addr_lock);
+	list_for_each(pos, &bp->address_list) {
+		laddr = list_entry(pos, struct sockaddr_storage_list, list);
+		if ((laddr->a.sa.sa_family == AF_INET6) &&
+		    (scope <= sctp_scope(&laddr->a))) {
+			bmatchlen = sctp_v6_addr_match_len(daddr, &laddr->a);
+			if (!baddr || (matchlen < bmatchlen)) {
+				baddr = &laddr->a;
+				matchlen = bmatchlen;
+			}
+		}
+	}
+
+	if (baddr) {
+		memcpy(saddr, baddr, sizeof(union sctp_addr));
+		SCTP_DEBUG_PRINTK("saddr: "
+				  "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
+				  NIP6(&saddr->v6.sin6_addr));
+	} else {
+		printk(KERN_ERR "%s: asoc:%p Could not find a valid source "
+		       "address for the "
+		       "dest:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
+		       __FUNCTION__, asoc, NIP6(&daddr->v6.sin6_addr));
+	}
+
+	sctp_read_unlock(addr_lock);
 }
 
 /* Make a copy of all potential local addresses. */
@@ -257,10 +326,12 @@ static void sctp_v6_to_sk(union sctp_addr *addr, struct sock *sk)
 }
 
 /* Initialize a sctp_addr from a dst_entry. */
-static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst)
+static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst,
+			      unsigned short port)
 {
 	struct rt6_info *rt = (struct rt6_info *)dst;
 	addr->sa.sa_family = AF_INET6;
+	addr->v6.sin6_port = port;
 	ipv6_addr_copy(&addr->v6.sin6_addr, &rt->rt6i_src.addr);
 }
 
@@ -527,10 +598,11 @@ static struct inet6_protocol sctpv6_protocol = {
 };
 
 static struct sctp_af sctp_ipv6_specific = {
-	.queue_xmit      = sctp_v6_xmit,
-	.setsockopt    = ipv6_setsockopt,
+	.sctp_xmit       = sctp_v6_xmit,
+	.setsockopt      = ipv6_setsockopt,
 	.getsockopt      = ipv6_getsockopt,
 	.get_dst	 = sctp_v6_get_dst,
+	.get_saddr	 = sctp_v6_get_saddr,
 	.copy_addrlist   = sctp_v6_copy_addrlist,
 	.from_skb        = sctp_v6_from_skb,
 	.from_sk         = sctp_v6_from_sk,
@@ -572,7 +644,7 @@ int sctp_v6_init(void)
 	/* Register the SCTP specfic AF_INET6 functions. */
 	sctp_register_af(&sctp_ipv6_specific);
 
-	/* Register notifier for inet6 address additions/deletions. */ 
+	/* Register notifier for inet6 address additions/deletions. */
 	register_inet6addr_notifier(&sctp_inetaddr_notifier);
 
 	return 0;

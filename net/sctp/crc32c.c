@@ -1,6 +1,6 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
@@ -33,6 +33,7 @@
  * Written or modified by: 
  *    Dinakaran Joseph 
  *    Jon Grimm <jgrimm@us.ibm.com>
+ *    Sridhar Samudrala <sri@us.ibm.com>
  * 
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -135,11 +136,10 @@ __u32 crc_c[256] = {
 	0xBE2DA0A5, 0x4C4623A6, 0x5F16D052, 0xAD7D5351,
 };
      
-__u32 count_crc(__u8 *buffer, __u16 length)
+__u32 sctp_start_cksum(__u8 *buffer, __u16 length)
 {
     	__u32 crc32 = ~(__u32) 0;
-	__u32 i, result;
-	__u8 byte0, byte1, byte2, byte3;
+	__u32 i;
 
 	/* Optimize this routine to be SCTP specific, knowing how
 	 * to skip the checksum field of the SCTP header.
@@ -156,6 +156,24 @@ __u32 count_crc(__u8 *buffer, __u16 length)
 	/* Calculate the rest of the CRC. */
 	for (i = sizeof(struct sctphdr); i < length ; i++)
 		CRC32C(crc32, buffer[i]);
+
+	return crc32;
+}
+
+__u32 sctp_update_cksum(__u8 *buffer, __u16 length, __u32 crc32)
+{
+	__u32 i;
+
+	for (i = 0; i < length ; i++)
+		CRC32C(crc32, buffer[i]);
+
+	return crc32;
+}
+
+__u32 sctp_end_cksum(__u32 crc32)
+{
+	__u32 result;
+	__u8 byte0, byte1, byte2, byte3;
 
 	result = ~crc32;
 
@@ -183,5 +201,3 @@ __u32 count_crc(__u8 *buffer, __u16 length)
 		 byte3);
 	return crc32;
 }
-
-

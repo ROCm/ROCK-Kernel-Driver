@@ -256,7 +256,7 @@ sctp_chunk_t *sctp_make_abort_user(const sctp_association_t *,
 				   const sctp_chunk_t *,
 				   const struct msghdr *);
 sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *,
-				  const sctp_transport_t *,
+				  const struct sctp_transport *,
 				  const void *payload,
 				  const size_t paylen);
 sctp_chunk_t *sctp_make_heartbeat_ack(const sctp_association_t *,
@@ -269,6 +269,11 @@ sctp_chunk_t *sctp_make_op_error(const sctp_association_t *,
 				 const void *payload,
 				 size_t paylen);
 void sctp_chunk_assign_tsn(sctp_chunk_t *);
+void sctp_chunk_assign_ssn(sctp_chunk_t *);
+int sctp_datachunks_from_user(sctp_association_t *,
+			      const struct sctp_sndrcvinfo *,
+			      struct msghdr *, int len,
+			      struct sk_buff_head *);
 
 
 /* Prototypes for statetable processing. */
