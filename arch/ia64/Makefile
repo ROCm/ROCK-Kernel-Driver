@@ -19,7 +19,7 @@ AFLAGS_KERNEL	:= -mconstant-gp
 EXTRA		:=
 
 cflags-y	:= -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
-		   -falign-functions=32
+		   -falign-functions=32 -frename-registers
 CFLAGS_KERNEL	:= -mconstant-gp
 
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
@@ -37,14 +37,12 @@ endif
 
 ifeq ($(GCC_VERSION),2)
 $(error Sorry, your compiler is too old.  GCC v2.96 is known to generate bad code.)
-else
-cflags-$(CONFIG_ITANIUM)	+= -frename-registers
 endif
 
 ifeq ($(GCC_VERSION),3)
  ifeq ($(GCC_MINOR_VERSION),4)
-	cflags-$(CONFIG_ITANIUM) += -mtune=merced
-	cflags-$(CONFIG_MCKINLEY) += -mtune=mckinley
+	cflags-$(CONFIG_ITANIUM)	+= -mtune=merced
+	cflags-$(CONFIG_MCKINLEY)	+= -mtune=mckinley
  endif
 endif
 
