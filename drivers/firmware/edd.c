@@ -43,12 +43,9 @@
 #include <linux/device.h>
 #include <linux/blkdev.h>
 #include <linux/edd.h>
-/* FIXME - this really belongs in include/scsi/scsi.h */
-#include <../drivers/scsi/scsi.h>
-#include <../drivers/scsi/hosts.h>
 
-#define EDD_VERSION "0.14"
-#define EDD_DATE    "2004-Apr-28"
+#define EDD_VERSION "0.15"
+#define EDD_DATE    "2004-May-17"
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
