@@ -439,6 +439,7 @@ extern struct acpi_prt_list	acpi_prt;
 struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
+void acpi_penalize_isa_irq(int irq);
 
 struct acpi_pci_driver {
 	struct acpi_pci_driver *next;

@@ -126,7 +126,7 @@ struct acpi_video_bus {
 	struct acpi_video_bus_flags flags;
 	struct semaphore	sem;
 	struct list_head	video_device_list;
-	struct proc_dir_entry	*dir;
+	struct proc_dir_entry 	*dir;
 };
 
 struct acpi_video_device_flags {
@@ -932,6 +932,7 @@ acpi_video_device_add_fs (
 				vid_dev->video->dir);
 		if (!acpi_device_dir(device))
 			return_VALUE(-ENODEV);
+		acpi_device_dir(device)->owner = THIS_MODULE;
 	}
 
 	/* 'info' [R] */
@@ -942,6 +943,7 @@ acpi_video_device_add_fs (
 	else {
 		entry->proc_fops = &acpi_video_device_info_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'state' [R/W] */
@@ -953,6 +955,7 @@ acpi_video_device_add_fs (
 		entry->proc_fops = &acpi_video_device_state_fops;
 		entry->proc_fops->write = acpi_video_device_write_state;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'brightness' [R/W] */
@@ -964,6 +967,7 @@ acpi_video_device_add_fs (
 		entry->proc_fops = &acpi_video_device_brightness_fops;
 		entry->proc_fops->write = acpi_video_device_write_brightness;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'EDID' [R] */
@@ -974,6 +978,7 @@ acpi_video_device_add_fs (
 	else {
 		entry->proc_fops = &acpi_video_device_EDID_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	return_VALUE(0);
@@ -991,7 +996,12 @@ acpi_video_device_remove_fs (
 		return_VALUE(-ENODEV);
 
 	if (acpi_device_dir(device)) {
-		remove_proc_entry(acpi_device_bid(device), vid_dev->video->dir);
+		remove_proc_entry("info", acpi_device_dir(device));
+		remove_proc_entry("state", acpi_device_dir(device));
+		remove_proc_entry("brightness", acpi_device_dir(device));
+		remove_proc_entry("EDID", acpi_device_dir(device));
+		remove_proc_entry(acpi_device_bid(device),
+				 vid_dev->video->dir);
 		acpi_device_dir(device) = NULL;
 	}
 
@@ -1256,9 +1266,9 @@ acpi_video_bus_add_fs (
 				acpi_video_dir);
 		if (!acpi_device_dir(device))
 			return_VALUE(-ENODEV);
+		video->dir = acpi_device_dir(device);
+		acpi_device_dir(device)->owner = THIS_MODULE;
 	}
-
-	video->dir = acpi_device_dir(device);
 
 	/* 'info' [R] */
 	entry = create_proc_entry("info", S_IRUGO, acpi_device_dir(device));
@@ -1267,6 +1277,7 @@ acpi_video_bus_add_fs (
 	else {
 		entry->proc_fops = &acpi_video_bus_info_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'ROM' [R] */
@@ -1276,6 +1287,7 @@ acpi_video_bus_add_fs (
 	else {
 		entry->proc_fops = &acpi_video_bus_ROM_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'POST_info' [R] */
@@ -1285,6 +1297,7 @@ acpi_video_bus_add_fs (
 	else {
 		entry->proc_fops = &acpi_video_bus_POST_info_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'POST' [R/W] */
@@ -1295,6 +1308,7 @@ acpi_video_bus_add_fs (
 		entry->proc_fops = &acpi_video_bus_POST_fops;
 		entry->proc_fops->write = acpi_video_bus_write_POST;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'DOS' [R/W] */
@@ -1305,6 +1319,7 @@ acpi_video_bus_add_fs (
 		entry->proc_fops = &acpi_video_bus_DOS_fops;
 		entry->proc_fops->write = acpi_video_bus_write_DOS;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	return_VALUE(0);
@@ -1314,10 +1329,20 @@ static int
 acpi_video_bus_remove_fs (
 	struct acpi_device	*device)
 {
+	struct acpi_video_bus	*video;
+
 	ACPI_FUNCTION_TRACE("acpi_video_bus_remove_fs");
 
+	video = (struct acpi_video_bus *) acpi_driver_data(device);
+
 	if (acpi_device_dir(device)) {
-		remove_proc_entry(acpi_device_bid(device), acpi_video_dir);
+		remove_proc_entry("info", acpi_device_dir(device));
+		remove_proc_entry("ROM", acpi_device_dir(device));
+		remove_proc_entry("POST_info", acpi_device_dir(device));
+		remove_proc_entry("POST", acpi_device_dir(device));
+		remove_proc_entry("DOS", acpi_device_dir(device));
+		remove_proc_entry(acpi_device_bid(device),
+				acpi_video_dir); 
 		acpi_device_dir(device) = NULL;
 	}
 
@@ -1936,6 +1961,7 @@ acpi_video_init (void)
 	acpi_video_dir = proc_mkdir(ACPI_VIDEO_CLASS, acpi_root_dir);
 	if (!acpi_video_dir)
 		return_VALUE(-ENODEV);
+	acpi_video_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_video_bus);
 	if (result < 0) {
