@@ -69,7 +69,7 @@ static struct packet_type vlan_packet_type = {
 	.func = vlan_skb_recv, /* VLAN receive method */
 };
 
-/* Bits of netdev state that are propogated from real device to virtual */
+/* Bits of netdev state that are propagated from real device to virtual */
 #define VLAN_LINK_STATE_MASK \
 	((1<<__LINK_STATE_PRESENT)|(1<<__LINK_STATE_NOCARRIER))
 
@@ -569,7 +569,7 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 
 	switch (event) {
 	case NETDEV_CHANGE:
-		/* Propogate real device state to vlan devices */
+		/* Propagate real device state to vlan devices */
 		flgs = dev->state & VLAN_LINK_STATE_MASK;
 		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
 			vlandev = grp->vlan_devices[i];
