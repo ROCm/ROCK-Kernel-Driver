@@ -84,7 +84,7 @@ kmem_flags_convert(int flags)
 {
 	int lflags;
 
-#if DEBUG
+#ifdef DEBUG
 	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS|KM_MAYFAIL))) {
 		printk(KERN_WARNING
 		    "XFS: memory allocation with wrong flags (%x)\n", flags);
