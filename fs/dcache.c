@@ -1635,7 +1635,7 @@ void __init vfs_caches_init(unsigned long mempages)
 	/* Base hash sizes on available memory, with a reserve equal to
            150% of current kernel size */
 
-	reserve = (mempages - nr_free_pages()) * 3/2;
+	reserve = min((mempages - nr_free_pages()) * 3/2, mempages - 1);
 	mempages -= reserve;
 
 	names_cachep = kmem_cache_create("names_cache",
