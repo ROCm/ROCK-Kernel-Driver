@@ -472,7 +472,7 @@ static int suspend_prepare_image(void)
 /**
  *	suspend_save_image - Prepare and write saved image to swap.
  *
- *	IRQs are re-enabled here so we can resume devices and safely write 
+ *	IRQs are re-enabled here so we can resume devices and safely write
  *	to the swap devices. We disable them again before we leave.
  *
  *	The second lock_swapdevices() will unlock ignored swap devices since
@@ -509,7 +509,7 @@ int swsusp_resume(void)
 	return 0;
 }
 
-/* swsusp_arch_suspend() is implemented in arch/?/power/swsusp.S, 
+/* swsusp_arch_suspend() is implemented in arch/?/power/swsusp.S,
    and basically does:
 
 	if (!resume) {
@@ -535,7 +535,7 @@ int swsusp_suspend(void)
 	if (!error)
 		error = suspend_save_image();
 	if (error) {
-		printk(KERN_EMERG "%sSuspend failed, trying to recover...\n", 
+		printk(KERN_EMERG "%sSuspend failed, trying to recover...\n",
 		       name_suspend);
 		barrier();
 		mb();
@@ -677,10 +677,10 @@ static struct block_device * resume_bdev;
 
 
 /**
- *	Using bio to read from swap. 
+ *	Using bio to read from swap.
  *	This code requires a bit more work than just using buffer heads
- *	but, it is the recommended way for 2.5/2.6. 
- *	The following are to signal the beginning and end of I/O. Bios 
+ *	but, it is the recommended way for 2.5/2.6.
+ *	The following are to signal the beginning and end of I/O. Bios
  *	finish asynchronously, while we want them to happen synchronously.
  *	A simple atomic_t, and a wait loop take care of this problem.
  */
@@ -713,8 +713,8 @@ static void wait_io(void)
  *	@page:	page we're reading or writing.
  *
  *	Straight from the textbook - allocate and initialize the bio.
- *	If we're writing, make sure the page is marked as dirty. 
- *	Then submit it and wait. 
+ *	If we're writing, make sure the page is marked as dirty.
+ *	Then submit it and wait.
  */
 
 static int submit(int rw, pgoff_t page_off, void * page)
@@ -778,8 +778,8 @@ static int __init read_suspend_image(void)
 	if ((error = read_page(0, cur)))
 		goto Done;
 
-	/* 
-	 * We have to read next position before we overwrite it 
+	/*
+	 * We have to read next position before we overwrite it
 	 */
 	next = next_entry(cur);
 
@@ -883,7 +883,7 @@ int swsusp_save(void)
  *
  *	swsusp_arch_suspend(0) returns after system is resumed.
  *
- *	swsusp_arch_suspend() copies all "used" memory to "free" memory, 
+ *	swsusp_arch_suspend() copies all "used" memory to "free" memory,
  *	then unsuspends all device drivers, and writes memory to disk
  *	using normal kernel mechanism.
  */

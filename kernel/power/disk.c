@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
- * 
+ *
  * This file is release under the GPLv2
  *
  */
@@ -36,7 +36,7 @@ extern long sys_sync(void);
  *	@mode:		Suspend-to-disk mode
  *
  *	Use the platform driver, if configured so, and return gracefully if it
- *	fails. 
+ *	fails.
  *	Otherwise, try to power off and reboot. If they fail, halt the machine,
  *	there ain't no turning back.
  */
@@ -75,7 +75,7 @@ static int in_suspend __nosavedata = 0;
  *
  *	... but do not OOM-kill anyone
  *
- *	Notice: all userland should be stopped at this point, or 
+ *	Notice: all userland should be stopped at this point, or
  *	livelock is possible.
  */
 
@@ -143,7 +143,7 @@ static int prepare(void)
 
 /**
  *	pm_suspend_disk - The granpappy of power management.
- *	
+ *
  *	If we're going through the firmware, then get it over with quickly.
  *
  *	If not, then call swsusp to do it's thing, then figure out how
@@ -169,8 +169,8 @@ int pm_suspend_disk(void)
 
 	pr_debug("PM: writing image.\n");
 
-	/* 
-	 * FIXME: Leftover from swsusp. Are they necessary? 
+	/*
+	 * FIXME: Leftover from swsusp. Are they necessary?
 	 */
 	mb();
 	barrier();
@@ -192,11 +192,11 @@ int pm_suspend_disk(void)
 /**
  *	pm_resume - Resume from a saved image.
  *
- *	Called as a late_initcall (so all devices are discovered and 
+ *	Called as a late_initcall (so all devices are discovered and
  *	initialized), we call swsusp to see if we have a saved image or not.
- *	If so, we quiesce devices, the restore the saved image. We will 
- *	return above (in pm_suspend_disk() ) if everything goes well. 
- *	Otherwise, we fail gracefully and return to the normally 
+ *	If so, we quiesce devices, the restore the saved image. We will
+ *	return above (in pm_suspend_disk() ) if everything goes well.
+ *	Otherwise, we fail gracefully and return to the normally
  *	scheduled program.
  *
  */
@@ -219,8 +219,8 @@ static int pm_resume(void)
 	mb();
 	local_irq_disable();
 
-	/* FIXME: The following (comment and mdelay()) are from swsusp. 
-	 * Are they really necessary? 
+	/* FIXME: The following (comment and mdelay()) are from swsusp.
+	 * Are they really necessary?
 	 *
 	 * We do not want some readahead with DMA to corrupt our memory, right?
 	 * Do it with disabled interrupts for best effect. That way, if some
@@ -254,19 +254,19 @@ static char * pm_disk_modes[] = {
 /**
  *	disk - Control suspend-to-disk mode
  *
- *	Suspend-to-disk can be handled in several ways. The greatest 
+ *	Suspend-to-disk can be handled in several ways. The greatest
  *	distinction is who writes memory to disk - the firmware or the OS.
- *	If the firmware does it, we assume that it also handles suspending 
+ *	If the firmware does it, we assume that it also handles suspending
  *	the system.
  *	If the OS does it, then we have three options for putting the system
  *	to sleep - using the platform driver (e.g. ACPI or other PM registers),
- *	powering off the system or rebooting the system (for testing). 
+ *	powering off the system or rebooting the system (for testing).
  *
  *	The system will support either 'firmware' or 'platform', and that is
  *	known a priori (and encoded in pm_ops). But, the user may choose
  *	'shutdown' or 'reboot' as alternatives.
  *
- *	show() will display what the mode is currently set to. 
+ *	show() will display what the mode is currently set to.
  *	store() will accept one of
  *
  *	'firmware'
@@ -301,7 +301,7 @@ static ssize_t disk_store(struct subsystem * s, const char * buf, size_t n)
 		if (mode == PM_DISK_SHUTDOWN || mode == PM_DISK_REBOOT)
 			pm_disk_mode = mode;
 		else {
-			if (pm_ops && pm_ops->enter && 
+			if (pm_ops && pm_ops->enter &&
 			    (mode == pm_ops->pm_disk_mode))
 				pm_disk_mode = mode;
 			else
