@@ -365,6 +365,11 @@ void __init time_init(void)
 #define	STARTOFTIME		1970
 #define SECDAY			86400L
 #define SECYR			(SECDAY * 365)
+
+/*
+ * Note: this is wrong for 2100, but our signed 32-bit time_t will
+ * have overflowed long before that, so who cares.  -- paulus
+ */
 #define	leapyear(year)		((year) % 4 == 0)
 #define	days_in_year(a) 	(leapyear(a) ? 366 : 365)
 #define	days_in_month(a) 	(month_days[(a) - 1])
