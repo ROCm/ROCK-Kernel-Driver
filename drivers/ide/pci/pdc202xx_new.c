@@ -237,11 +237,11 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 static int pdcnew_new_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
-	u32 indexreg		= hwif->dma_vendor1;
-	u32 datareg		= hwif->dma_vendor3;
+	unsigned long indexreg	= hwif->dma_vendor1;
+	unsigned long datareg	= hwif->dma_vendor3;
 	u8 thold		= 0x10;
 	u8 adj			= (drive->dn%2) ? 0x08 : 0x00;
-	u8 speed	= ide_rate_filter(pdcnew_ratemask(drive), xferspeed);
+	u8 speed		= ide_rate_filter(pdcnew_ratemask(drive), xferspeed);
 
 	if (speed == XFER_UDMA_2) {
 		hwif->OUTB((thold + adj), indexreg);
