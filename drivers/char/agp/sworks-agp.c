@@ -229,8 +229,6 @@ static int serverworks_configure(void)
 	struct aper_size_info_lvl2 *current_size;
 	u32 temp;
 	u8 enable_reg;
-	u8 cap_ptr;
-	u32 cap_id;
 	u16 cap_reg;
 
 	current_size = A_SIZE_LVL2(agp_bridge.current_size);
@@ -257,22 +255,11 @@ static int serverworks_configure(void)
 			      SVWRKS_AGP_ENABLE, enable_reg);
 	agp_bridge.tlb_flush(NULL);
 
-	pci_read_config_byte(serverworks_private.svrwrks_dev, 0x34, &cap_ptr);
-	if (cap_ptr != 0) {
-		do {
-			pci_read_config_dword(serverworks_private.svrwrks_dev,
-					      cap_ptr, &cap_id);
-
-			if ((cap_id & 0xff) != 0x02)
-				cap_ptr = (cap_id >> 8) & 0xff;
-		}
-		while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0));
-	}
-	agp_bridge.capndx = cap_ptr;
+	agp_bridge.capndx = pci_find_capability(serverworks_private.svrwrks_dev, PCI_CAP_ID_AGP);
 
 	/* Fill in the mode register */
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
-			      agp_bridge.capndx+4, &agp_bridge.mode);
+			      agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
 
 	pci_read_config_byte(agp_bridge.dev, SVWRKS_CACHING, &enable_reg);
 	enable_reg &= ~0x3;
@@ -413,104 +400,24 @@ static struct aper_size_info_lvl2 serverworks_sizes[7] =
 
 static void serverworks_agp_enable(u32 mode)
 {
-	struct pci_dev *device = NULL;
-	u32 command, scratch, cap_id;
-	u8 cap_ptr;
+	u32 command;
 
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
-			      agp_bridge.capndx + 4,
+			      agp_bridge.capndx + PCI_AGP_STATUS,
 			      &command);
 
-	/*
-	 * PASS1: go throu all devices that claim to be
-	 *        AGP devices and collect their data.
-	 */
+	command = agp_collect_device_status(mode, command);
 
+	command &= ~0x10;	/* disable FW */
+	command &= ~0x08;
 
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			do {
-				pci_read_config_dword(device,
-						      cap_ptr, &cap_id);
-
-				if ((cap_id & 0xff) != 0x02)
-					cap_ptr = (cap_id >> 8) & 0xff;
-			}
-			while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0x00));
-		}
-		if (cap_ptr != 0x00) {
-			/*
-			 * Ok, here we have a AGP device. Disable impossible 
-			 * settings, and adjust the readqueue to the minimum.
-			 */
-
-			pci_read_config_dword(device, cap_ptr + 4, &scratch);
-
-			/* adjust RQ depth */
-			command =
-			    ((command & ~0xff000000) |
-			     min_t(u32, (mode & 0xff000000),
-				 min_t(u32, (command & 0xff000000),
-				     (scratch & 0xff000000))));
-
-			/* disable SBA if it's not supported */
-			if (!((command & 0x00000200) &&
-			      (scratch & 0x00000200) &&
-			      (mode & 0x00000200)))
-				command &= ~0x00000200;
-
-			/* disable FW */
-			command &= ~0x00000010;
-
-			command &= ~0x00000008;
-
-			if (!((command & 4) &&
-			      (scratch & 4) &&
-			      (mode & 4)))
-				command &= ~0x00000004;
-
-			if (!((command & 2) &&
-			      (scratch & 2) &&
-			      (mode & 2)))
-				command &= ~0x00000002;
-
-			if (!((command & 1) &&
-			      (scratch & 1) &&
-			      (mode & 1)))
-				command &= ~0x00000001;
-		}
-	}
-	/*
-	 * PASS2: Figure out the 4X/2X/1X setting and enable the
-	 *        target (our motherboard chipset).
-	 */
-
-	if (command & 4) {
-		command &= ~3;	/* 4X */
-	}
-	if (command & 2) {
-		command &= ~5;	/* 2X */
-	}
-	if (command & 1) {
-		command &= ~6;	/* 1X */
-	}
-	command |= 0x00000100;
+	command |= 0x100;
 
 	pci_write_config_dword(serverworks_private.svrwrks_dev,
-			       agp_bridge.capndx + 8,
+			       agp_bridge.capndx + PCI_AGP_COMMAND,
 			       command);
 
-	/*
-	 * PASS3: Go throu all AGP devices and update the
-	 *        command registers.
-	 */
-
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00)
-			pci_write_config_dword(device, cap_ptr + 8, command);
-	}
+	agp_device_command(command, 0);
 }
 
 static int __init serverworks_setup (struct pci_dev *pdev)
@@ -618,11 +525,15 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 	return -ENODEV;
 }
 
+static struct agp_driver serverworks_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
-		agp_register_driver(dev);
+		serverworks_agp_driver.dev = dev;
+		agp_register_driver(&serverworks_agp_driver);
 		return 0;
 	}
 	return -ENODEV;	
@@ -661,7 +572,7 @@ static int __init agp_serverworks_init(void)
 
 static void __exit agp_serverworks_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&serverworks_agp_driver);
 	pci_unregister_driver(&agp_serverworks_pci_driver);
 }
 

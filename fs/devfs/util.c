@@ -60,14 +60,18 @@
                Copied and used macro for error messages from fs/devfs/base.c 
     20021013   Richard Gooch <rgooch@atnf.csiro.au>
                Documentation fix.
+    20030101   Adam J. Richter <adam@yggdrasil.com>
+               Eliminate DEVFS_SPECIAL_{CHR,BLK}.  Use mode_t instead.
+    20030106   Christoph Hellwig <hch@infradead.org>
+               Rewrite devfs_{,de}alloc_devnum to look like C code.
 */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-
 #include <asm/bitops.h>
+#include "internal.h"
 
 #define PRINTK(format, args...) \
    {printk (KERN_ERR "%s" format, __FUNCTION__ , ## args);}
@@ -145,48 +149,10 @@ static struct major_list char_major_list =
 
 /**
  *	devfs_alloc_major - Allocate a major number.
- *	@type: The type of the major (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK)
-
+ *	@mode: The file mode (must be block device or character device).
  *	Returns the allocated major, else -1 if none are available.
  *	This routine is thread safe and does not block.
  */
-
-int devfs_alloc_major (char type)
-{
-    int major;
-    struct major_list *list;
-
-    list = (type == DEVFS_SPECIAL_CHR) ? &char_major_list : &block_major_list;
-    spin_lock (&list->lock);
-    major = find_first_zero_bit (list->bits, 256);
-    if (major < 256) __set_bit (major, list->bits);
-    else major = -1;
-    spin_unlock (&list->lock);
-    return major;
-}   /*  End Function devfs_alloc_major  */
-EXPORT_SYMBOL(devfs_alloc_major);
-
-
-/**
- *	devfs_dealloc_major - Deallocate a major number.
- *	@type: The type of the major (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK)
- *	@major: The major number.
- *	This routine is thread safe and does not block.
- */
-
-void devfs_dealloc_major (char type, int major)
-{
-    int was_set;
-    struct major_list *list;
-
-    if (major < 0) return;
-    list = (type == DEVFS_SPECIAL_CHR) ? &char_major_list : &block_major_list;
-    spin_lock (&list->lock);
-    was_set = __test_and_clear_bit (major, list->bits);
-    spin_unlock (&list->lock);
-    if (!was_set) PRINTK ("(): major %d was already free\n", major);
-}   /*  End Function devfs_dealloc_major  */
-EXPORT_SYMBOL(devfs_dealloc_major);
 
 
 struct minor_list
@@ -196,130 +162,110 @@ struct minor_list
     struct minor_list *next;
 };
 
-struct device_list
-{
-    struct minor_list *first, *last;
-    int none_free;
-};
+static struct device_list {
+	struct minor_list	*first;
+	struct minor_list	*last;
+	int			none_free;
+} block_list, char_list;
 
-static DECLARE_MUTEX (block_semaphore);
-static struct device_list block_list;
-
-static DECLARE_MUTEX (char_semaphore);
-static struct device_list char_list;
+static DECLARE_MUTEX(device_list_mutex);
 
 
 /**
  *	devfs_alloc_devnum - Allocate a device number.
- *	@type: The type (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK).
+ *	@mode: The file mode (must be block device or character device).
  *
  *	Returns the allocated device number, else NODEV if none are available.
  *	This routine is thread safe and may block.
  */
 
-dev_t devfs_alloc_devnum (char type)
+dev_t devfs_alloc_devnum(umode_t mode)
 {
-    int minor;
-    struct semaphore *semaphore;
-    struct device_list *list;
-    struct minor_list *entry;
+	struct device_list *list;
+	struct major_list *major_list;
+	struct minor_list *entry;
+	int minor;
 
-    if (type == DEVFS_SPECIAL_CHR)
-    {
-	semaphore = &char_semaphore;
-	list = &char_list;
-    }
-    else
-    {
-	semaphore = &block_semaphore;
-	list = &block_list;
-    }
-    if (list->none_free) return 0;  /*  Fast test  */
-    down (semaphore);
-    if (list->none_free)
-    {
-	up (semaphore);
-	return 0;
-    }
-    for (entry = list->first; entry != NULL; entry = entry->next)
-    {
-	minor = find_first_zero_bit (entry->bits, 256);
-	if (minor >= 256) continue;
-	__set_bit (minor, entry->bits);
-	up (semaphore);
+	if (S_ISCHR(mode)) {
+		major_list = &char_major_list;
+		list = &char_list;
+	} else {
+		major_list = &block_major_list;
+		list = &block_list;
+	}
+
+	down(&device_list_mutex);
+	if (list->none_free)
+		goto out_unlock;
+
+	for (entry = list->first; entry; entry = entry->next) {
+		minor = find_first_zero_bit (entry->bits, 256);
+		if (minor >= 256)
+			continue;
+		goto out_done;
+	}
+	
+	/*  Need to allocate a new major  */
+	entry = kmalloc (sizeof *entry, GFP_KERNEL);
+	if (!entry)
+		goto out_full;
+	memset(entry, 0, sizeof *entry);
+
+	spin_lock(&major_list->lock);
+	entry->major = find_first_zero_bit(major_list->bits, 256);
+	if (entry->major >= 256) {
+		spin_unlock(&major_list->lock);
+		kfree(entry);
+		goto out_full;
+	}
+	__set_bit(entry->major, major_list->bits);
+	spin_unlock(&major_list->lock);
+
+	if (!list->first)
+		list->first = entry;
+	else
+		list->last->next = entry;
+	list->last = entry;
+
+	minor = 0;
+ out_done:
+	__set_bit(minor, entry->bits);
+	up(&device_list_mutex);
 	return MKDEV(entry->major, minor);
-    }
-    /*  Need to allocate a new major  */
-    if ( ( entry = kmalloc (sizeof *entry, GFP_KERNEL) ) == NULL )
-    {
+ out_full:
 	list->none_free = 1;
-	up (semaphore);
+ out_unlock:
+	up(&device_list_mutex);
 	return 0;
-    }
-    memset (entry, 0, sizeof *entry);
-    if ( ( entry->major = devfs_alloc_major (type) ) < 0 )
-    {
-	list->none_free = 1;
-	up (semaphore);
-	kfree (entry);
-	return 0;
-    }
-    __set_bit (0, entry->bits);
-    if (list->first == NULL) list->first = entry;
-    else list->last->next = entry;
-    list->last = entry;
-    up (semaphore);
-    return MKDEV(entry->major, 0);
-}   /*  End Function devfs_alloc_devnum  */
-EXPORT_SYMBOL(devfs_alloc_devnum);
+}
 
 
 /**
  *	devfs_dealloc_devnum - Dellocate a device number.
- *	@type: The type (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK).
+ *	@mode: The file mode (must be block device or character device).
  *	@devnum: The device number.
  *
  *	This routine is thread safe and may block.
  */
 
-void devfs_dealloc_devnum (char type, dev_t devnum)
+void devfs_dealloc_devnum(umode_t mode, dev_t devnum)
 {
-    int major, minor;
-    struct semaphore *semaphore;
-    struct device_list *list;
-    struct minor_list *entry;
+	struct device_list *list = S_ISCHR(mode) ? &char_list : &block_list;
+	struct minor_list *entry;
 
-    if (!devnum) return;
-    if (type == DEVFS_SPECIAL_CHR)
-    {
-	semaphore = &char_semaphore;
-	list = &char_list;
-    }
-    else
-    {
-	semaphore = &block_semaphore;
-	list = &block_list;
-    }
-    major = MAJOR (devnum);
-    minor = MINOR (devnum);
-    down (semaphore);
-    for (entry = list->first; entry != NULL; entry = entry->next)
-    {
-	int was_set;
+	if (!devnum)
+		return;
 
-	if (entry->major != major) continue;
-	was_set = __test_and_clear_bit (minor, entry->bits);
-	if (was_set) list->none_free = 0;
-	up (semaphore);
-	if (!was_set)
-	    PRINTK ( "(): device %s was already free\n", kdevname (to_kdev_t(devnum)) );
-	return;
-    }
-    up (semaphore);
-    PRINTK ( "(): major for %s not previously allocated\n",
-	     kdevname (to_kdev_t(devnum)) );
-}   /*  End Function devfs_dealloc_devnum  */
-EXPORT_SYMBOL(devfs_dealloc_devnum);
+	down(&device_list_mutex);
+	for (entry = list->first; entry; entry = entry->next) {
+		if (entry->major == MAJOR(devnum)) {
+			if (__test_and_clear_bit(MINOR(devnum), entry->bits))
+				list->none_free = 0;
+			break;
+		}
+	}
+	up(&device_list_mutex);
+}
 
 
 /**

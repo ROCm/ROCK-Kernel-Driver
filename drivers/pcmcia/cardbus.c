@@ -285,25 +285,29 @@ int cb_alloc(socket_info_t * s)
 		dev->dev.dma_mask = &dev->dma_mask;
 
 		pci_setup_device(dev);
-		if (pci_enable_device(dev))
-			continue;
 
 		strcpy(dev->dev.bus_id, dev->slot_name);
 
-		/* FIXME: Do we need to enable the expansion ROM? */
+		/* We need to assign resources for expansion ROM. */
 		for (r = 0; r < 7; r++) {
 			struct resource *res = dev->resource + r;
-			if (res->flags)
+			if (!res->start && res->end)
 				pci_assign_resource(dev, r);
 		}
 
 		/* Does this function have an interrupt at all? */
 		pci_readb(dev, PCI_INTERRUPT_PIN, &irq_pin);
-		if (irq_pin) {
+		if (irq_pin)
 			dev->irq = irq;
-			pci_writeb(dev, PCI_INTERRUPT_LINE, irq);
-		}
+		
+		/* pci_enable_device needs to be called after pci_assign_resource */
+		/* because it returns an error if (!res->start && res->end).      */
+		if (pci_enable_device(dev))
+			continue;
 
+		if (irq_pin)
+			pci_writeb(dev, PCI_INTERRUPT_LINE, irq);
+		
 		device_register(&dev->dev);
 		pci_insert_device(dev, bus);
 	}

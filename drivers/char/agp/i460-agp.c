@@ -559,6 +559,10 @@ static int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused))
 	return 0;
 }
 
+static struct agp_driver i460_agp_driver = {
+	.owner = THIS_MODULE;
+};
+
 static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	u8 cap_ptr = 0;
@@ -570,7 +574,8 @@ static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_de
 	agp_bridge.dev = dev;
 	agp_bridge.capndx = cap_ptr;
 	intel_i460_setup(dev);
-	agp_register_driver(dev);
+	i460_agp_driver.dev = dev;
+	agp_register_driver(&i460_agp_driver);
 	return 0;
 }
 
@@ -607,7 +612,7 @@ static int __init agp_intel_i460_init(void)
 
 static void __exit agp_intel_i460_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&i460_agp_driver);
 	pci_unregister_driver(&agp_intel_i460_pci_driver);
 }
 

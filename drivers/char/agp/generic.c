@@ -116,7 +116,6 @@ void agp_free_memory(agp_memory * curr)
 	agp_free_key(curr->key);
 	vfree(curr->memory);
 	kfree(curr);
-	MOD_DEC_USE_COUNT;
 }
 
 #define ENTRIES_PER_PAGE		(PAGE_SIZE / sizeof(unsigned long))
@@ -138,17 +137,12 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 		return new;
 	}
 
-	/* We always increase the module count, since free auto-decrements it */
-	MOD_INC_USE_COUNT;
-
 	scratch_pages = (page_count + ENTRIES_PER_PAGE - 1) / ENTRIES_PER_PAGE;
 
 	new = agp_create_memory(scratch_pages);
 
-	if (new == NULL) {
-		MOD_DEC_USE_COUNT;
+	if (new == NULL)
 		return NULL;
-	}
 
 	for (i = 0; i < page_count; i++) {
 		void *addr = agp_bridge.agp_alloc_page();
@@ -313,93 +307,106 @@ int agp_unbind_memory(agp_memory * curr)
 
 
 /* Generic Agp routines - Start */
-void agp_generic_agp_enable(u32 mode)
+
+u32 agp_collect_device_status(u32 mode, u32 command)
 {
-	struct pci_dev *device = NULL;
-	u32 command, scratch; 
-	u8 cap_ptr;
-
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx + 4, &command);
-
-	/*
-	 * PASS1: go through all devices that claim to be
-	 *        AGP devices and collect their data.
-	 */
+	struct pci_dev *device;
+	u8 agp;
+	u32 scratch; 
 
 	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			/*
-			 * Ok, here we have a AGP device. Disable impossible 
-			 * settings, and adjust the readqueue to the minimum.
-			 */
+		agp = pci_find_capability(device, PCI_CAP_ID_AGP);
+		if (!agp)
+			continue;
 
-			pci_read_config_dword(device, cap_ptr + 4, &scratch);
+		/*
+		 * Ok, here we have a AGP device. Disable impossible 
+		 * settings, and adjust the readqueue to the minimum.
+		 */
+		pci_read_config_dword(device, agp + PCI_AGP_STATUS, &scratch);
 
-			/* adjust RQ depth */
-			command = ((command & ~0xff000000) |
-			     min_t(u32, (mode & 0xff000000),
-				 min_t(u32, (command & 0xff000000),
-				     (scratch & 0xff000000))));
+		/* adjust RQ depth */
+		command = ((command & ~0xff000000) |
+		     min_t(u32, (mode & 0xff000000),
+			 min_t(u32, (command & 0xff000000),
+			     (scratch & 0xff000000))));
 
-			/* disable SBA if it's not supported */
-			if (!((command & 0x00000200) &&
-			      (scratch & 0x00000200) &&
-			      (mode & 0x00000200)))
-				command &= ~0x00000200;
+		/* disable SBA if it's not supported */
+		if (!((command & 0x00000200) &&
+		      (scratch & 0x00000200) &&
+		      (mode & 0x00000200)))
+			command &= ~0x00000200;
 
-			/* disable FW if it's not supported */
-			if (!((command & 0x00000010) &&
-			      (scratch & 0x00000010) &&
-			      (mode & 0x00000010)))
-				command &= ~0x00000010;
+		/* disable FW if it's not supported */
+		if (!((command & 0x00000010) &&
+		      (scratch & 0x00000010) &&
+		      (mode & 0x00000010)))
+			command &= ~0x00000010;
 
-			if (!((command & 4) &&
-			      (scratch & 4) &&
-			      (mode & 4)))
-				command &= ~0x00000004;
+		if (!((command & 4) &&
+		      (scratch & 4) &&
+		      (mode & 4)))
+			command &= ~0x00000004;
 
-			if (!((command & 2) &&
-			      (scratch & 2) &&
-			      (mode & 2)))
-				command &= ~0x00000002;
+		if (!((command & 2) &&
+		      (scratch & 2) &&
+		      (mode & 2)))
+			command &= ~0x00000002;
 
-			if (!((command & 1) &&
-			      (scratch & 1) &&
-			      (mode & 1)))
-				command &= ~0x00000001;
-		}
+		if (!((command & 1) &&
+		      (scratch & 1) &&
+		      (mode & 1)))
+			command &= ~0x00000001;
 	}
-	/*
-	 * PASS2: Figure out the 4X/2X/1X setting and enable the
-	 *        target (our motherboard chipset).
-	 */
 
 	if (command & 4)
 		command &= ~3;	/* 4X */
 
 	if (command & 2)
-		command &= ~5;	/* 2X */
+		command &= ~5;	/* 2X (8X for AGP3.0) */
 
 	if (command & 1)
-		command &= ~6;	/* 1X */
+		command &= ~6;	/* 1X (4X for AGP3.0) */
 
-	command |= 0x00000100;
+	return command;
+}
 
-	pci_write_config_dword(agp_bridge.dev,
-			       agp_bridge.capndx + 8,
-			       command);
+void agp_device_command(u32 command, int agp_v3)
+{
+	struct pci_dev *device;
+	int mode;
 
-	/*
-	 * PASS3: Go throu all AGP devices and update the
-	 *        command registers.
-	 */
+	mode = command & 0x7;
+	if (agp_v3)
+		mode *= 4;
 
 	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00)
-			pci_write_config_dword(device, cap_ptr + 8, command);
+		u8 agp = pci_find_capability(device, PCI_CAP_ID_AGP);
+		if (!agp)
+			continue;
+
+		printk(KERN_INFO PFX "Putting AGP V%d device at %s into %dx mode\n",
+				agp_v3 ? 3 : 2, device->slot_name, mode);
+		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 	}
+}
+
+void agp_generic_agp_enable(u32 mode)
+{
+	u32 command;
+
+	pci_read_config_dword(agp_bridge.dev,
+			      agp_bridge.capndx + PCI_AGP_STATUS,
+			      &command);
+
+	command = agp_collect_device_status(mode, command);
+	command |= 0x100;
+
+	pci_write_config_dword(agp_bridge.dev,
+			       agp_bridge.capndx + PCI_AGP_COMMAND,
+			       command);
+
+	agp_device_command(command, 0);
 }
 
 int agp_generic_create_gatt_table(void)

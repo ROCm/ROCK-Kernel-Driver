@@ -244,6 +244,9 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 	return -ENODEV;
 }
 
+static struct agp_driver via_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
@@ -258,8 +261,9 @@ static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id
 		agp_bridge.dev = dev;
 		agp_bridge.capndx = cap_ptr;
 		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
-		agp_register_driver(dev);
+		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
+		via_agp_driver.dev = dev;
+		agp_register_driver(&via_agp_driver);
 		return 0;
 	}
 	return -ENODEV;	
@@ -298,7 +302,7 @@ static int __init agp_via_init(void)
 
 static void __exit agp_via_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&via_agp_driver);
 	pci_unregister_driver(&agp_via_pci_driver);
 }
 

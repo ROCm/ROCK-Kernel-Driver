@@ -10,6 +10,8 @@
 #define CCB_SET_TERM_INT	0x04
 #define CCB_SET_TERM_CTL	0x05
 #define CCB_PROCESS_KEYCODE	0x06
+#define CCB_OPEN_CONSOLE	0x07
+#define CCB_CLOSE_CONSOLE	0x08
 
 #define CCB_OPEN		0x10
 #define CCB_CLOSE		0x11
@@ -47,6 +49,9 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 extern long callback_puts(long unit, const char *s, long length);
+extern long callback_getc(long unit);
+extern long callback_open_console(void);
+extern long callback_close_console(void);
 extern long callback_open(const char *device, long length);
 extern long callback_close(long unit);
 extern long callback_read(long channel, long count, const char *buf, long lbn);

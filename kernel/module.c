@@ -963,6 +963,9 @@ static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
 	}
 }
 
+/* From init/vermagic.o */
+extern char vermagic[];
+
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
 static struct module *load_module(void *umod,
@@ -973,7 +976,7 @@ static struct module *load_module(void *umod,
 	Elf_Shdr *sechdrs;
 	char *secstrings, *args;
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
-		modindex, obsparmindex, licenseindex, gplindex;
+		modindex, obsparmindex, licenseindex, gplindex, vmagindex;
 	long arglen;
 	struct module *mod;
 	long err = 0;
@@ -1012,7 +1015,7 @@ static struct module *load_module(void *umod,
 	exportindex = setupindex = obsparmindex = gplindex = licenseindex = 0;
 
 	/* And these should exist, but gcc whinges if we don't init them */
-	symindex = strindex = exindex = modindex = 0;
+	symindex = strindex = exindex = modindex = vmagindex = 0;
 
 	/* Find where important sections are */
 	for (i = 1; i < hdr->e_shnum; i++) {
@@ -1062,6 +1065,11 @@ static struct module *load_module(void *umod,
 			/* EXPORT_SYMBOL_GPL() */
 			DEBUGP("GPL symbols found in section %u\n", i);
 			gplindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,
+				  "__vermagic") == 0) {
+			/* Version magic. */
+			DEBUGP("Version magic found in section %u\n", i);
+			vmagindex = i;
 		}
 #ifdef CONFIG_KALLSYMS
 		/* symbol and string tables for decoding later. */
@@ -1081,6 +1089,18 @@ static struct module *load_module(void *umod,
 		goto free_hdr;
 	}
 	mod = (void *)sechdrs[modindex].sh_addr;
+
+	/* This is allowed: modprobe --force will strip it. */
+	if (!vmagindex) {
+		tainted |= TAINT_FORCED_MODULE;
+		printk(KERN_WARNING "%s: no version magic, tainting kernel.\n",
+		       mod->name);
+	} else if (strcmp((char *)sechdrs[vmagindex].sh_addr, vermagic) != 0) {
+		printk(KERN_ERR "%s: version magic '%s' should be '%s'\n",
+		       mod->name, (char*)sechdrs[vmagindex].sh_addr, vermagic);
+		err = -ENOEXEC;
+		goto free_hdr;
+	}
 
 	/* Now copy in args */
 	arglen = strlen_user(uargs);

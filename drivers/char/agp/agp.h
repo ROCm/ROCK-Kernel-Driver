@@ -1,5 +1,5 @@
 /*
- * AGPGART module
+ * AGPGART
  * Copyright (C) 2002 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
@@ -32,27 +32,7 @@
 
 extern struct agp_bridge_data agp_bridge;
 
-/* Generic routines. */
-void agp_generic_agp_enable(u32 mode);
-int agp_generic_agp_3_0_enable(u32 mode);
-int agp_generic_create_gatt_table(void);
-int agp_generic_free_gatt_table(void);
-agp_memory *agp_create_memory(int scratch_pages);
-int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type);
-int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type);
-agp_memory *agp_generic_alloc_by_type(size_t page_count, int type);
-void agp_generic_free_by_type(agp_memory * curr);
-void *agp_generic_alloc_page(void);
-void agp_generic_destroy_page(void *addr);
-int agp_generic_suspend(void);
-void agp_generic_resume(void);
-void agp_free_key(int key);
-int agp_num_entries(void);
-
 #define PFX "agpgart: "
-
-int agp_register_driver (struct pci_dev *dev);
-int agp_unregister_driver(void);
 
 #ifdef CONFIG_SMP
 static void ipi_handler(void *null)
@@ -378,19 +358,31 @@ struct agp_device_ids {
 	int (*chipset_setup) (struct pci_dev *pdev);	/* used to override generic */
 };
 
-struct agp_bridge_info {
-	unsigned short vendor_id;
-	const char *vendor_name;
-	int (*chipset_setup) (struct pci_dev *pdev);
-	struct agp_device_ids *ids;
+struct agp_driver {
+	struct module *owner;
+	struct pci_dev *dev;
 };
 
-extern struct agp_bridge_info ali_agp_bridge_info;
-extern struct agp_bridge_info amd_k8_agp_bridge_info;
-extern struct agp_bridge_info amd_agp_bridge_info;
-extern struct agp_bridge_info intel_agp_bridge_info;
-extern struct agp_bridge_info sis_agp_bridge_info;
-extern struct agp_bridge_info via_agp_bridge_info;
-extern struct agp_bridge_info hp_agp_bridge_info;
+
+/* Generic routines. */
+void agp_generic_agp_enable(u32 mode);
+int agp_generic_agp_3_0_enable(u32 mode);
+int agp_generic_create_gatt_table(void);
+int agp_generic_free_gatt_table(void);
+agp_memory *agp_create_memory(int scratch_pages);
+int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type);
+int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type);
+agp_memory *agp_generic_alloc_by_type(size_t page_count, int type);
+void agp_generic_free_by_type(agp_memory * curr);
+void *agp_generic_alloc_page(void);
+void agp_generic_destroy_page(void *addr);
+int agp_generic_suspend(void);
+void agp_generic_resume(void);
+void agp_free_key(int key);
+int agp_num_entries(void);
+int agp_register_driver (struct agp_driver *drv);
+int agp_unregister_driver(struct agp_driver *drv);
+u32 agp_collect_device_status(u32 mode, u32 command);
+void agp_device_command(u32 command, int agp_v3);
 
 #endif				/* _AGP_BACKEND_PRIV_H */

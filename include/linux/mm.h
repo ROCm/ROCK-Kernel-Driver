@@ -296,9 +296,10 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 	page->flags |= zone_num << ZONE_SHIFT;
 }
 
-#define lowmem_page_address(page)					\
-	__va( ( ((page) - page_zone(page)->zone_mem_map)		\
-			+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
+static inline void * lowmem_page_address(struct page *page)
+{
+	return __va( ( (page - page_zone(page)->zone_mem_map)	+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT);
+}
 
 #if defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL)
 #define HASHED_PAGE_VIRTUAL

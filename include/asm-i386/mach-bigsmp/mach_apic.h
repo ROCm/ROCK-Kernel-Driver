@@ -21,8 +21,12 @@ static inline int apic_id_registered(void)
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 #define TARGET_CPUS	((cpu_online_map < 0xf)?cpu_online_map:0xf)
 
+#define INT_DELIVERY_MODE dest_LowestPrio
+#define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
+
 #define APIC_BROADCAST_ID     (0x0f)
 #define check_apicid_used(bitmap, apicid) (0)
+#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
 
 static inline unsigned long calculate_ldr(unsigned long old)
 {
@@ -64,17 +68,24 @@ static inline int apicid_to_node(int logical_apicid)
 	return 0;
 }
 
-extern u8 raw_phys_apicid[];
+extern u8 bios_cpu_apicid[];
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return (int) raw_phys_apicid[mps_cpu];
+	return (int) bios_cpu_apicid[mps_cpu];
 }
 
 static inline unsigned long apicid_to_cpu_present(int phys_apicid)
 {
 	return (1ul << phys_apicid);
 }
+
+extern volatile u8 cpu_2_logical_apicid[];
+/* Mapping from cpu number to logical apicid */
+static inline int cpu_to_logical_apicid(int cpu)
+{
+       return (int)cpu_2_logical_apicid[cpu];
+ }
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
 {

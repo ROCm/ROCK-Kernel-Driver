@@ -72,8 +72,11 @@ $(obj)/tools/bootph: $(obj)/bootpheader $(OBJSTRIP) FORCE
 LDFLAGS_bootloader  := -static -uvsprintf -T  #-N -relax
 LDFLAGS_bootpheader := -static -uvsprintf -T  #-N -relax
 
-$(obj)/bootloader: $(obj)/bootloader.lds $(obj)/head.o $(obj)/main.o FORCE
+OBJ_bootlx   := $(obj)/head.o $(obj)/main.o
+OBJ_bootph   := $(obj)/head.o $(obj)/bootp.o
+
+$(obj)/bootloader: $(obj)/bootloader.lds $(OBJ_bootlx) FORCE
 	$(call if_changed,ld)
 
-$(obj)/bootpheader: $(obj)/bootloader.lds $(obj)/head.o $(obj)/bootp.o FORCE
+$(obj)/bootpheader: $(obj)/bootloader.lds $(OBJ_bootph) $(LIBS_Y) FORCE
 	$(call if_changed,ld)

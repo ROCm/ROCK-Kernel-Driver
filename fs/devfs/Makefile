@@ -8,27 +8,3 @@ obj-$(CONFIG_DEVFS_FS) += devfs.o
 
 devfs-objs := base.o util.o
 
-# Special case to support building documentation
-ifndef TOPDIR
-TOPDIR = ../..
-endif
-
-# Rule to build documentation
-doc:	base.c util.c
-	@echo '$$PACKAGE devfs' > devfs.doc
-	@echo '$$NAME Linux Kernel' >> devfs.doc
-	@echo '$$SUMMARY devfs (Device FileSystem) functions' >> devfs.doc
-	@echo '$$SYNOPSIS "#include <linux/devfs_fs.h>"' >> devfs.doc
-	@echo '$$END' >> devfs.doc
-	c2doc base.c util.c >> devfs.doc
-	karma_doc2man -section 9 devfs.doc .
-	rm devfs.doc
-	gzip --best *.9
-	mv *.9.gz /usr/man/man9
-
-
-# Rule for test compiling
-test:
-	gcc -o /tmp/base.o -D__KERNEL__ -I../../include -Wall \
-	-Wstrict-prototypes -O2 -fomit-frame-pointer -pipe \
-	-fno-strength-reduce   -DEXPORT_SYMTAB -c base.c

@@ -180,7 +180,7 @@ static int __init init_devpts_fs(void)
 static void __exit exit_devpts_fs(void)
 {
 	unregister_filesystem(&devpts_fs_type);
-	kern_umount(devpts_mnt);
+	mntput(devpts_mnt);
 }
 
 module_init(init_devpts_fs)
