@@ -2241,22 +2241,18 @@ int devfs_should_register_chrdev (void)
 
 
 /**
- *	devfs_register_blkdev - Optionally register a conventional block driver.
- *	@major: The major number for the driver.
- *	@name: The name of the driver (as seen in /proc/devices).
- *	@bdops: The &block_device_operations structure pointer.
+ *	devfs_should_register_blkdev - should we register a conventional block driver.
  *
- *	This function will register a block driver provided the "devfs=only"
- *	option was not provided at boot time.
- *	Returns 0 on success, else a negative error code on failure.
+ *	If the "devfs=only" option was provided at boot time, this function will
+ *	return -1, otherwise 0 is returned.
  */
 
-int devfs_register_blkdev (unsigned int major, const char *name,
-			   struct block_device_operations *bdops)
+int devfs_should_register_blkdev (void)
 {
-    if (boot_options & OPTION_ONLY) return 0;
-    return register_blkdev (major, name, bdops);
-}   /*  End Function devfs_register_blkdev  */
+    if (boot_options & OPTION_ONLY)
+	    return -1;
+    return 0;
+}
 
 
 /**
@@ -2273,20 +2269,18 @@ int devfs_should_unregister_chrdev (void)
 
 
 /**
- *	devfs_unregister_blkdev - Optionally unregister a conventional block driver.
- *	@major: The major number for the driver.
- *	@name: The name of the driver (as seen in /proc/devices).
+ *	devfs_should_unregister_blkdev - should we unregister a conventional block driver.
  *
- *	This function will unregister a block driver provided the "devfs=only"
- *	option was not provided at boot time.
- *	Returns 0 on success, else a negative error code on failure.
+ *	If the "devfs=only" option was provided at boot time, this function will
+ *	return -1, otherwise 0 is returned.
  */
 
-int devfs_unregister_blkdev (unsigned int major, const char *name)
+int devfs_should_unregister_blkdev (void)
 {
-    if (boot_options & OPTION_ONLY) return 0;
-    return unregister_blkdev (major, name);
-}   /*  End Function devfs_unregister_blkdev  */
+    if (boot_options & OPTION_ONLY)
+	    return -1;
+    return 0;
+}
 
 /**
  *	devfs_setup - Process kernel boot options.
@@ -2375,8 +2369,6 @@ EXPORT_SYMBOL(devfs_get_next_sibling);
 EXPORT_SYMBOL(devfs_auto_unregister);
 EXPORT_SYMBOL(devfs_get_unregister_slave);
 EXPORT_SYMBOL(devfs_get_name);
-EXPORT_SYMBOL(devfs_register_blkdev);
-EXPORT_SYMBOL(devfs_unregister_blkdev);
 
 
 /**

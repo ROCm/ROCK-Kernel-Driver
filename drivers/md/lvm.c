@@ -213,7 +213,6 @@
 #include <linux/proc_fs.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 #include <asm/ioctl.h>
 #include <asm/uaccess.h>
@@ -395,9 +394,8 @@ int lvm_init(void)
 		return -EIO;
 	}
 
-	if (devfs_register_blkdev(MAJOR_NR, lvm_name, &lvm_blk_dops) < 0)
-	{
-		printk("%s -- devfs_register_blkdev failed\n", lvm_name);
+	if (register_blkdev(MAJOR_NR, lvm_name, &lvm_blk_dops) < 0) {
+		printk("%s -- register_blkdev failed\n", lvm_name);
 		if (unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0)
 			printk(KERN_ERR
 			       "%s -- unregister_chrdev failed\n",
@@ -445,8 +443,8 @@ static void lvm_cleanup(void)
 	if (unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0)
 		printk(KERN_ERR "%s -- unregister_chrdev failed\n",
 		       lvm_name);
-	if (devfs_unregister_blkdev(MAJOR_NR, lvm_name) < 0)
-		printk(KERN_ERR "%s -- devfs_unregister_blkdev failed\n",
+	if (unregister_blkdev(MAJOR_NR, lvm_name) < 0)
+		printk(KERN_ERR "%s -- unregister_blkdev failed\n",
 		       lvm_name);
 
 	del_gendisk(&lvm_gendisk);

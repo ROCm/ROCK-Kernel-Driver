@@ -35,7 +35,6 @@
 #include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/fs.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/kernel.h>
 #include <linux/hdreg.h>
 #include <linux/genhd.h>
@@ -818,7 +817,7 @@ static void __init hd_geninit(void)
 
 int __init hd_init(void)
 {
-	if (devfs_register_blkdev(MAJOR_NR,"hd",&hd_fops)) {
+	if (register_blkdev(MAJOR_NR,"hd",&hd_fops)) {
 		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);
 		return -1;
 	}

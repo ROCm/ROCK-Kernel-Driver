@@ -1089,7 +1089,7 @@ static void channel_init(struct ata_channel *ch)
 	}
 #endif
 
-	if (devfs_register_blkdev(ch->major, ch->name, ide_fops)) {
+	if (register_blkdev(ch->major, ch->name, ide_fops)) {
 		printk("%s: UNABLE TO GET MAJOR NUMBER %d\n", ch->name, ch->major);
 
 		return;

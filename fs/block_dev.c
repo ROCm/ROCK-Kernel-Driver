@@ -453,6 +453,8 @@ struct block_device_operations * get_blkfops(unsigned int major)
 
 int register_blkdev(unsigned int major, const char * name, struct block_device_operations *bdops)
 {
+	if (devfs_should_register_blkdev())
+		return 0;
 	if (major == 0) {
 		for (major = MAX_BLKDEV-1; major > 0; major--) {
 			if (blkdevs[major].bdops == NULL) {
@@ -474,6 +476,8 @@ int register_blkdev(unsigned int major, const char * name, struct block_device_o
 
 int unregister_blkdev(unsigned int major, const char * name)
 {
+	if (devfs_should_unregister_blkdev())
+		return 0;
 	if (major >= MAX_BLKDEV)
 		return -EINVAL;
 	if (!blkdevs[major].bdops)
