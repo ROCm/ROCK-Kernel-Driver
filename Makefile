@@ -477,7 +477,7 @@ include/linux/version.h: Makefile
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi;
-	@echo -n '  Generating $@'
+	@echo -n '  GEN     $@'
 	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
@@ -784,7 +784,6 @@ help:
 	@echo  ''
 	@echo  'Other generic targets:'
 	@echo  '  all		- Build all targets marked with [*]'
-	@echo  '  dep           - Create module version information'
 	@echo  '* vmlinux	- Build the bare kernel'
 	@echo  '* modules	- Build all modules'
 	@echo  '  dir/file.[ois]- Build specified target only'
