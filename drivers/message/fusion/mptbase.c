@@ -3395,7 +3395,7 @@ SendIocReset(MPT_ADAPTER *ioc, u8 reset_type, int sleepFlag)
  *	@hd: Pointer to MPT_SCSI_HOST structure
  *	@init: If set, initialize the spin lock.
  */
-int
+static int
 initChainBuffers(MPT_ADAPTER *ioc)
 {
 	u8		*mem;

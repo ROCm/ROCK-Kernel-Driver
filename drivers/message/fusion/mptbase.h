@@ -83,8 +83,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.15"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.15"
+#define MPT_LINUX_VERSION_COMMON	"3.01.16"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.16"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -317,17 +317,6 @@ typedef struct _Q_TRACKER {
 	struct _Q_ITEM	*head;
 	struct _Q_ITEM	*tail;
 } Q_TRACKER;
-
-typedef struct _MPT_DONE_Q {
-	struct _MPT_DONE_Q	*forw;
-	struct _MPT_DONE_Q	*back;
-	void			*argp;
-} MPT_DONE_Q;
-
-typedef struct _DONE_Q_TRACKER {
-	MPT_DONE_Q	*head;
-	MPT_DONE_Q	*tail;
-} DONE_Q_TRACKER;
 
 /*
  *  Chip-specific stuff... FC929 delineates break between
@@ -859,7 +848,7 @@ typedef struct _mpt_sge {
 #define dtmprintk(x) printk x
 #define DBG_DUMP_TM_REQUEST_FRAME(mfp) \
 	{	u32 *m = (u32 *)(mfp);					\
-		int  i, n = 12;						\
+		int  i, n = 13;						\
 		printk("TM_REQUEST:\n");				\
 		for (i=0; i<n; i++) {					\
 			if (i && ((i%8)==0))				\
@@ -1028,12 +1017,7 @@ typedef struct _MPT_SCSI_HOST {
 		/* Pool of memory for holding SCpnts before doing
 		 * OS callbacks. freeQ is the free pool.
 		 */
-	u8			 *memQ;
-	DONE_Q_TRACKER		  freeQ;
-	DONE_Q_TRACKER		  doneQ;		/* Holds Linux formmatted requests */
-	DONE_Q_TRACKER		  pendingQ;		/* Holds MPI formmatted requests */
 	MPT_Q_TRACKER		  taskQ;		/* TM request Q */
-	spinlock_t		  freedoneQlock;
 	int			  taskQcnt;
 	u8			  tmPending;
 	u8			  resetPending;

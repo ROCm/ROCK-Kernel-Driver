@@ -484,7 +484,7 @@ mptctl_free_tm_flags(MPT_ADAPTER *ioc)
 
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
 
-	hd->tmState = TM_STATE_ERROR;
+	hd->tmState = TM_STATE_NONE;
 	hd->tmPending = 0;
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
@@ -2195,6 +2195,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 	add_timer(&ioc->ioctl->timer);
 
 	if (hdr->Function == MPI_FUNCTION_SCSI_TASK_MGMT) {
+		DBG_DUMP_TM_REQUEST_FRAME((u32 *)mf);
 		rc = mpt_send_handshake_request(mptctl_id, ioc,
 				sizeof(SCSITaskMgmt_t), (u32*)mf, CAN_SLEEP);
 		if (rc == 0) {
@@ -2865,7 +2866,7 @@ static struct mpt_pci_driver mptctl_driver = {
 };
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-int __init mptctl_init(void)
+static int __init mptctl_init(void)
 {
 	int err;
 	int where = 1;
@@ -2963,7 +2964,7 @@ out_fail:
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-void mptctl_exit(void)
+static void mptctl_exit(void)
 {
 	misc_deregister(&mptctl_miscdev);
 	printk(KERN_INFO MYNAM ": Deregistered /dev/%s @ (major,minor=%d,%d)\n",
