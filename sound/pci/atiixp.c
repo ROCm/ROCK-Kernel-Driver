@@ -1,5 +1,5 @@
 /*
- *   ALSA driver for ATI IXP 150/200/250 AC97 controllers
+ *   ALSA driver for ATI IXP 150/200/250/300 AC97 controllers
  *
  *	Copyright (c) 2004 Takashi Iwai <tiwai@suse.de>
  *
@@ -1387,17 +1387,9 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 		ac97.num = i;
 		ac97.scaps = AC97_SCAP_SKIP_MODEM;
 		if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97[i])) < 0) {
-			if (chip->codec_not_ready_bits)
-				/* codec(s) was detected but not available.
-				 * return the error
-				 */
-				return err;
-			else {
-				/* codec(s) was NOT detected, so just ignore here */
-				chip->ac97[i] = NULL; /* to be sure */
-				snd_printd("atiixp: codec %d not found\n", i);
-				continue;
-			}
+			chip->ac97[i] = NULL; /* to be sure */
+			snd_printdd("atiixp: codec %d not available for audio\n", i);
+			continue;
 		}
 		codec_count++;
 	}

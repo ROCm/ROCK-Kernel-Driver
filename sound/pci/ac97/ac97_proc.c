@@ -292,9 +292,9 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 {
 	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
 	
+	down(&ac97->mutex);
 	if ((ac97->id & 0xffffff40) == AC97_ID_AD1881) {	// Analog Devices AD1881/85/86
 		int idx;
-		down(&ac97->spec.ad18xx.mutex);
 		for (idx = 0; idx < 3; idx++)
 			if (ac97->spec.ad18xx.id[idx]) {
 				/* select single codec */
@@ -305,7 +305,6 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 			}
 		/* select all codecs */
 		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
-		up(&ac97->spec.ad18xx.mutex);
 		
 		snd_iprintf(buffer, "\nAD18XX configuration\n");
 		snd_iprintf(buffer, "Unchained        : 0x%04x,0x%04x,0x%04x\n",
@@ -319,6 +318,7 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 	} else {
 		snd_ac97_proc_read_main(ac97, buffer, 0);
 	}
+	up(&ac97->mutex);
 }
 
 #ifdef CONFIG_SND_DEBUG
@@ -328,6 +328,7 @@ static void snd_ac97_proc_regs_write(snd_info_entry_t *entry, snd_info_buffer_t 
 	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
 	char line[64];
 	unsigned int reg, val;
+	down(&ac97->mutex);
 	while (!snd_info_get_line(buffer, line, sizeof(line))) {
 		if (sscanf(line, "%x %x", &reg, &val) != 2)
 			continue;
@@ -335,6 +336,7 @@ static void snd_ac97_proc_regs_write(snd_info_entry_t *entry, snd_info_buffer_t 
 		if (reg < 0x80 && (reg & 1) == 0 && val <= 0xffff)
 			snd_ac97_write_cache(ac97, reg, val);
 	}
+	up(&ac97->mutex);
 }
 #endif
 
@@ -353,10 +355,10 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 {
 	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
 
+	down(&ac97->mutex);
 	if ((ac97->id & 0xffffff40) == AC97_ID_AD1881) {	// Analog Devices AD1881/85/86
 
 		int idx;
-		down(&ac97->spec.ad18xx.mutex);
 		for (idx = 0; idx < 3; idx++)
 			if (ac97->spec.ad18xx.id[idx]) {
 				/* select single codec */
@@ -366,10 +368,10 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 			}
 		/* select all codecs */
 		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
-		up(&ac97->spec.ad18xx.mutex);
 	} else {
 		snd_ac97_proc_regs_read_main(ac97, buffer, 0);
 	}	
+	up(&ac97->mutex);
 }
 
 void snd_ac97_proc_init(ac97_t * ac97)

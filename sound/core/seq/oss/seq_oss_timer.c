@@ -168,7 +168,7 @@ snd_seq_oss_timer_start(seq_oss_timer_t *timer)
 	tmprec.queue = dp->queue;
 	tmprec.ppq = timer->ppq;
 	tmprec.tempo = timer->tempo;
-	snd_seq_kernel_client_ctl(dp->cseq, SNDRV_SEQ_IOCTL_SET_QUEUE_TEMPO, &tmprec);
+	snd_seq_set_queue_tempo(dp->cseq, &tmprec);
 
 	send_timer_event(dp, SNDRV_SEQ_EVENT_START, 0);
 	timer->running = 1;

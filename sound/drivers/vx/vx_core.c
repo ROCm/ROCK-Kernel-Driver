@@ -572,6 +572,7 @@ static void vx_reset_board(vx_core_t *chip, int cold_reset)
 	if (cold_reset) {
 		chip->audio_source_target = chip->audio_source;
 		chip->clock_source = INTERNAL_QUARTZ;
+		chip->clock_mode = VX_CLOCK_MODE_AUTO;
 		chip->freq = 48000;
 		chip->uer_detected = VX_UER_MODE_NOT_PRESENT;
 		chip->uer_bits = SNDRV_PCM_DEFAULT_CON_SPDIF;
@@ -606,6 +607,7 @@ static void vx_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 	vx_core_t *chip = snd_magic_cast(vx_core_t, entry->private_data, return);
 	static char *audio_src_vxp[] = { "Line", "Mic", "Digital" };
 	static char *audio_src_vx2[] = { "Analog", "Analog", "Digital" };
+	static char *clock_mode[] = { "Auto", "Internal", "External" };
 	static char *clock_src[] = { "Internal", "External" };
 	static char *uer_type[] = { "Consumer", "Professional", "Not Present" };
 	
@@ -629,6 +631,7 @@ static void vx_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 	snd_iprintf(buffer, "Input Source: %s\n", vx_is_pcmcia(chip) ?
 		    audio_src_vxp[chip->audio_source] :
 		    audio_src_vx2[chip->audio_source]);
+	snd_iprintf(buffer, "Clock Mode: %s\n", clock_mode[chip->clock_mode]);
 	snd_iprintf(buffer, "Clock Source: %s\n", clock_src[chip->clock_source]);
 	snd_iprintf(buffer, "Frequency: %d\n", chip->freq);
 	snd_iprintf(buffer, "Detected Frequency: %d\n", chip->freq_detected);

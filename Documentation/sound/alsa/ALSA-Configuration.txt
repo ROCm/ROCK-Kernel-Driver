@@ -613,7 +613,7 @@ Module parameters
     model       - Use the given board model, one of the following:
 		  delta1010, dio2496, delta66, delta44, audiophile, delta410,
 		  delta1010lt, vx442, ewx2496, ews88mt, ews88mt_new, ews88d,
-		  dmx6fire, dsp24, dsp24_71, ez8
+		  dmx6fire, dsp24, dsp24_value, dsp24_71, ez8
     omni	- Omni I/O support for MidiMan M-Audio Delta44/66
     cs8427_timeout - reset timeout for the CS8427 chip (S/PDIF transciever)
                      in msec resolution, default value is 500 (0.5 sec)
@@ -631,7 +631,8 @@ Module parameters
 			* TerraTec Aureon Sky-5.1, Space-7.1
 
     model       - Use the given board model, one of the following:
-		  revo71, amp2000, prodigy71, aureon51, aureon71
+		  revo71, amp2000, prodigy71, aureon51, aureon71,
+		  k8x800
 
     Module supports up to 8 cards and autoprobe.
 
