@@ -2142,7 +2142,7 @@ static void get_pci_addrs (const struct pci_dev *pdev,
 }
 
 
-static void __devexit cirrusfb_pci_unmap (struct cirrusfb_info *cinfo)
+static void cirrusfb_pci_unmap (struct cirrusfb_info *cinfo)
 {
 	struct pci_dev *pdev = cinfo->pdev;
 
