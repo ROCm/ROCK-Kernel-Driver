@@ -33,6 +33,12 @@ extern pte_t *kmap_pte;
 extern pgprot_t kmap_prot;
 extern pte_t *pkmap_page_table;
 
+/* This gets set in {srmmu,sun4c}_paging_init() */
+extern unsigned long fix_kmap_begin;
+
+/* Only used and set with srmmu? */
+extern unsigned long pkmap_base;
+
 extern void kmap_init(void) __init;
 
 /*
@@ -42,9 +48,9 @@ extern void kmap_init(void) __init;
  */
 #define LAST_PKMAP 1024
 
-#define LAST_PKMAP_MASK (LAST_PKMAP-1)
-#define PKMAP_NR(virt)  ((virt-PKMAP_BASE) >> PAGE_SHIFT)
-#define PKMAP_ADDR(nr)  (PKMAP_BASE + ((nr) << PAGE_SHIFT))
+#define LAST_PKMAP_MASK (LAST_PKMAP - 1)
+#define PKMAP_NR(virt)  ((virt - pkmap_base) >> PAGE_SHIFT)
+#define PKMAP_ADDR(nr)  (pkmap_base + ((nr) << PAGE_SHIFT))
 
 extern void *kmap_high(struct page *page);
 extern void kunmap_high(struct page *page);
@@ -75,10 +81,10 @@ static inline struct page *kmap_atomic_to_page(void *ptr)
 	unsigned long idx, vaddr = (unsigned long)ptr;
 	pte_t *pte;
 
-	if (vaddr < FIX_KMAP_BEGIN)
+	if (vaddr < fix_kmap_begin)
 		return virt_to_page(ptr);
 
-	idx = ((vaddr - FIX_KMAP_BEGIN) >> PAGE_SHIFT);
+	idx = ((vaddr - fix_kmap_begin) >> PAGE_SHIFT);
 	pte = kmap_pte + idx;
 	return pte_page(*pte);
 }

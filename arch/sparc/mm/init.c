@@ -59,13 +59,17 @@ unsigned long highstart_pfn, highend_pfn;
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
+/* These are set in {srmmu,sun4c}_paging_init() */
+unsigned long fix_kmap_begin;
+unsigned long fix_kmap_end;
+
 #define kmap_get_fixed_pte(vaddr) \
 	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {
 	/* cache the first kmap pte */
-	kmap_pte = kmap_get_fixed_pte(FIX_KMAP_BEGIN);
+	kmap_pte = kmap_get_fixed_pte(fix_kmap_begin);
 	kmap_prot = __pgprot(SRMMU_ET_PTE | SRMMU_PRIV | SRMMU_CACHE);
 }
 
