@@ -702,16 +702,6 @@ typedef enum {
 } idetape_chrdev_direction_t;
 
 /*
- *	Packet command flag bits.
- */
-#define	PC_ABORT			0	/* Set when an error is considered normal - We won't retry */
-#define PC_WAIT_FOR_DSC			1	/* 1 When polling for DSC on a media access command */
-#define PC_DMA_RECOMMENDED		2	/* 1 when we prefer to use DMA if possible */
-#define	PC_DMA_IN_PROGRESS		3	/* 1 while DMA in progress */
-#define	PC_DMA_ERROR			4	/* 1 when encountered problem during DMA */
-#define	PC_WRITING			5	/* Data direction */
-
-/*
  *	Capabilities and Mechanical Status Page
  */
 typedef struct {

@@ -451,42 +451,45 @@ reserve_regions(struct IsdnCard *card, struct IsdnCardState *cs)
 		case R647:
 			base = cs->hw.gazel.hscx[0];
 			for (i = 0x0000; i < 0xC000; i += 0x1000) {
-				if (check_region(adr = (i + base), len = 16))
-					goto error;
-			}
-			if (check_region(adr = (0xC000 + base), len = 1))
-				goto error;
+				if (!request_region(adr = (i + base), len = 16, "gazel")) {
+					int j;
 
-			for (i = 0x0000; i < 0xC000; i += 0x1000)
-				request_region(i + base, 16, "gazel");
-			request_region(0xC000 + base, 1, "gazel");
+					for (j = 0x0000; j < i; j += 0x1000)
+						release_region ((j + base), len);					
+					goto error;
+				}
+			}
+			if (!request_region(adr = (0xC000 + base), len = 1, "gazel")) {
+				for (i = 0x0000; i < 0xC000; i += 0x1000) 
+					release_region ((i + base), 16);
+				goto error;
+			}
 
 			break;
 
 		case R685:
-			if (check_region(adr = cs->hw.gazel.hscx[0], len = 0x100))
+			if (!request_region(adr = cs->hw.gazel.hscx[0], len = 0x100, "gazel"))
 				goto error;
-			if (check_region(adr = cs->hw.gazel.cfg_reg, len = 0x80))
+			if (!request_region(adr = cs->hw.gazel.cfg_reg, len = 0x80, "gazel")) {
+				release_region (cs->hw.gazel.hscx[0], 0x100);
 				goto error;
+			}
 
-			request_region(cs->hw.gazel.hscx[0], 0x100, "gazel");
-			request_region(cs->hw.gazel.cfg_reg, 0x80, "gazel");
 			break;
 
 		case R753:
-			if (check_region(adr = cs->hw.gazel.ipac, len = 0x8))
+			if (!request_region(adr = cs->hw.gazel.ipac, len = 0x8, "gazel"))
 				goto error;
-			if (check_region(adr = cs->hw.gazel.cfg_reg, len = 0x80))
+			if (!request_region(adr = cs->hw.gazel.cfg_reg, len = 0x80, "gazel")) {
+				release_region (cs->hw.gazel.ipac, 0x8);
 				goto error;
+			}
 
-			request_region(cs->hw.gazel.ipac, 0x8, "gazel");
-			request_region(cs->hw.gazel.cfg_reg, 0x80, "gazel");
 			break;
 
 		case R742:
-			if (check_region(adr = cs->hw.gazel.ipac, len = 0x8))
+			if (!request_region(adr = cs->hw.gazel.ipac, len = 0x8, "gazel"))
 				goto error;
-			request_region(cs->hw.gazel.ipac, 0x8, "gazel");
 			break;
 	}
 

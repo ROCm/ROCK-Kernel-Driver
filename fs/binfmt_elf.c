@@ -607,7 +607,12 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
 	current->mm->rss = 0;
-	setup_arg_pages(bprm); /* XXX: check error */
+	retval = setup_arg_pages(bprm);
+	if (retval < 0) {
+		send_sig(SIGKILL, current, 0);
+		return retval;
+	}
+	
 	current->mm->start_stack = bprm->p;
 
 	/* Now we do a little grungy work by mmaping the ELF image into
@@ -1279,3 +1284,4 @@ static void __exit exit_elf_binfmt(void)
 
 module_init(init_elf_binfmt)
 module_exit(exit_elf_binfmt)
+MODULE_LICENSE("GPL");

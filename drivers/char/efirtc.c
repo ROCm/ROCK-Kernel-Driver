@@ -375,9 +375,14 @@ efi_rtc_read_proc(char *page, char **start, off_t off,
 static int __init 
 efi_rtc_init(void)
 {
+	int ret =0;
 	printk(KERN_INFO "EFI Time Services Driver v%s\n", EFI_RTC_VERSION);
 
-	misc_register(&efi_rtc_dev);
+	ret = misc_register(&efi_rtc_dev);
+	if (ret) {
+		printk(KERN_ERR "driver/efirtc: can't misc_register on minor=%d\n", EFI_RTC_MINOR);
+		return ret;
+	}
 
 	create_proc_read_entry ("driver/efirtc", 0, NULL, efi_rtc_read_proc, NULL);
 

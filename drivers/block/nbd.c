@@ -24,6 +24,8 @@
  * 01-3-11 Make nbd work with new Linux block layer code. It now supports
  *   plugging like all the other block devices. Also added in MSG_MORE to
  *   reduce number of partial TCP segments sent. <steve@chygwyn.com>
+ * 01-12-6 Fix deadlock condition by making queue locks independant of
+ *   the transmit lock. <steve@chygwyn.com>
  *
  * possible FIXME: make set_sock / set_blksize / set_size / do_it one syscall
  * why not: would need verify_area and friends, would share yet another 
@@ -148,27 +150,28 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 
 #define FAIL( s ) { printk( KERN_ERR "NBD: " s "(result %d)\n", result ); goto error_out; }
 
-void nbd_send_req(struct socket *sock, struct request *req)
+void nbd_send_req(struct nbd_device *lo, struct request *req)
 {
-	int result, rw, i, flags;
+	int result, i, flags;
 	struct nbd_request request;
 	unsigned long size = req->nr_sectors << 9;
+	struct socket *sock = lo->sock;
 
 	DEBUG("NBD: sending control, ");
 	
-	rw = rq_data_dir(req);
-	
 	request.magic = htonl(NBD_REQUEST_MAGIC);
-	request.type = htonl((rw & WRITE) ? 1 : 0);
+	request.type = htonl(nbd_cmd(req));
 	request.from = cpu_to_be64( (u64) req->sector << 9);
 	request.len = htonl(size);
 	memcpy(request.handle, &req, sizeof(req));
 
-	result = nbd_xmit(1, sock, (char *) &request, sizeof(request), rw & WRITE ? MSG_MORE : 0);
+	down(&lo->tx_lock);
+
+	result = nbd_xmit(1, sock, (char *) &request, sizeof(request), nbd_cmd(req) == NBD_CMD_WRITE ? MSG_MORE : 0);
 	if (result <= 0)
 		FAIL("Sendmsg failed for control.");
 
-	if (rw & WRITE) {
+	if (nbd_cmd(req) == NBD_CMD_WRITE) {
 		struct bio *bio;
 		/*
 		 * we are really probing at internals to determine
@@ -187,10 +190,33 @@ void nbd_send_req(struct socket *sock, struct request *req)
 			}
 		}
 	}
+	up(&lo->tx_lock);
 	return;
 
       error_out:
+	up(&lo->tx_lock);
 	req->errors++;
+}
+
+static struct request *nbd_find_request(struct nbd_device *lo, char *handle)
+{
+	struct request *req;
+	struct list_head *tmp;
+	struct request *xreq;
+
+	memcpy(&xreq, handle, sizeof(xreq));
+
+	spin_lock(&lo->queue_lock);
+	list_for_each(tmp, &lo->queue_head) {
+		req = list_entry(tmp, struct request, queuelist);
+		if (req != xreq)
+			continue;
+		list_del(&req->queuelist);
+		spin_unlock(&lo->queue_lock);
+		return req;
+	}
+	spin_unlock(&lo->queue_lock);
+	return NULL;
 }
 
 #define HARDFAIL( s ) { printk( KERN_ERR "NBD: " s "(result %d)\n", result ); lo->harderror = result; return NULL; }
@@ -199,25 +225,24 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 {
 	int result;
 	struct nbd_reply reply;
-	struct request *xreq, *req;
+	struct request *req;
 
 	DEBUG("reading control, ");
 	reply.magic = 0;
 	result = nbd_xmit(0, lo->sock, (char *) &reply, sizeof(reply), MSG_WAITALL);
 	if (result <= 0)
 		HARDFAIL("Recv control failed.");
-	memcpy(&xreq, reply.handle, sizeof(xreq));
-	req = blkdev_entry_to_request(lo->queue_head.prev);
-
-	if (xreq != req)
-		FAIL("Unexpected handle received.\n");
+	req = nbd_find_request(lo, reply.handle);
+	if (req == NULL)
+		HARDFAIL("Unexpected reply");
 
 	DEBUG("ok, ");
 	if (ntohl(reply.magic) != NBD_REPLY_MAGIC)
 		HARDFAIL("Not enough magic.");
 	if (ntohl(reply.error))
 		FAIL("Other side returned error.");
-	if (rq_data_dir(req) == READ) {
+
+	if (nbd_cmd(req) == NBD_CMD_READ) {
 		struct bio *bio = req->bio;
 		DEBUG("data, ");
 		do {
@@ -240,20 +265,14 @@ void nbd_do_it(struct nbd_device *lo)
 {
 	struct request *req;
 
-	down (&lo->tx_lock);
 	while (1) {
-		up (&lo->tx_lock);
 		req = nbd_read_stat(lo);
-		down (&lo->tx_lock);
 
 		if (!req) {
 			printk(KERN_ALERT "req should never be null\n" );
 			goto out;
 		}
 #ifdef PARANOIA
-		if (req != blkdev_entry_to_request(lo->queue_head.prev)) {
-			printk(KERN_ALERT "NBD: I have problem...\n");
-		}
 		if (lo != &nbd_dev[minor(req->rq_dev)]) {
 			printk(KERN_ALERT "NBD: request corrupted!\n");
 			continue;
@@ -263,15 +282,10 @@ void nbd_do_it(struct nbd_device *lo)
 			goto out;
 		}
 #endif
-		blkdev_dequeue_request(req);
-		up (&lo->tx_lock);
-		
 		nbd_end_request(req);
 
-		down (&lo->tx_lock);
 	}
  out:
-	up (&lo->tx_lock);
 }
 
 void nbd_clear_que(struct nbd_device *lo)
@@ -285,26 +299,19 @@ void nbd_clear_que(struct nbd_device *lo)
 	}
 #endif
 
-	while (!list_empty(&lo->queue_head)) {
-		req = blkdev_entry_to_request(lo->queue_head.prev);
-#ifdef PARANOIA
-		if (!req) {
-			printk( KERN_ALERT "NBD: panic, panic, panic\n" );
-			break;
+	do {
+		req = NULL;
+		spin_lock(&lo->queue_lock);
+		if (!list_empty(&lo->queue_head)) {
+			req = list_entry(lo->queue_head.next, struct request, queuelist);
+			list_del(&req->queuelist);
 		}
-		if (lo != &nbd_dev[minor(req->rq_dev)]) {
-			printk(KERN_ALERT "NBD: request corrupted when clearing!\n");
-			continue;
+		spin_unlock(&lo->queue_lock);
+		if (req) {
+			req->errors++;
+			nbd_end_request(req);
 		}
-#endif
-		req->errors++;
-		blkdev_dequeue_request(req);
-		up(&lo->tx_lock);
-
-		nbd_end_request(req);
-
-		down(&lo->tx_lock);
-	}
+	} while(req);
 }
 
 /*
@@ -340,8 +347,12 @@ static void do_nbd_request(request_queue_t * q)
 		lo = &nbd_dev[dev];
 		if (!lo->file)
 			FAIL("Request when not-ready.");
-		if ((rq_data_dir(req) == WRITE) && (lo->flags & NBD_READ_ONLY))
-			FAIL("Write on read-only");
+		nbd_cmd(req) = NBD_CMD_READ;
+		if (rq_data_dir(req) == WRITE) {
+			nbd_cmd(req) = NBD_CMD_WRITE;
+			if (lo->flags & NBD_READ_ONLY)
+				FAIL("Write on read-only");
+		}
 #ifdef PARANOIA
 		if (lo->magic != LO_MAGIC)
 			FAIL("nbd[] is not magical!");
@@ -351,10 +362,11 @@ static void do_nbd_request(request_queue_t * q)
 		blkdev_dequeue_request(req);
 		spin_unlock_irq(q->queue_lock);
 
-		down (&lo->tx_lock);
+		spin_lock(&lo->queue_lock);
 		list_add(&req->queuelist, &lo->queue_head);
-		nbd_send_req(lo->sock, req);	/* Why does this block?         */
-		up (&lo->tx_lock);
+		spin_unlock(&lo->queue_lock);
+
+		nbd_send_req(lo, req);
 
 		spin_lock_irq(q->queue_lock);
 		continue;
@@ -389,21 +401,23 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 	lo = &nbd_dev[dev];
 	switch (cmd) {
 	case NBD_DISCONNECT:
-	        printk("NBD_DISCONNECT\n") ;
-		sreq.flags = REQ_SPECIAL; /* FIXME: interpet as shutdown cmd */
-                if (!lo->sock) return -EINVAL ;
-                nbd_send_req(lo->sock,&sreq) ;
+	        printk(KERN_INFO "NBD_DISCONNECT\n");
+		sreq.flags = REQ_SPECIAL;
+		nbd_cmd(&sreq) = NBD_CMD_DISC;
+                if (!lo->sock)
+			return -EINVAL;
+                nbd_send_req(lo, &sreq);
                 return 0 ;
  
 	case NBD_CLEAR_SOCK:
-		down(&lo->tx_lock);
 		nbd_clear_que(lo);
+		spin_lock(&lo->queue_lock);
 		if (!list_empty(&lo->queue_head)) {
-			up(&lo->tx_lock);
+			spin_unlock(&lo->queue_lock);
 			printk(KERN_ERR "nbd: Some requests are in progress -> can not turn off.\n");
 			return -EBUSY;
 		}
-		up(&lo->tx_lock);
+		spin_unlock(&lo->queue_lock);
 		file = lo->file;
 		if (!file)
 			return -EINVAL;
@@ -525,6 +539,7 @@ static int __init nbd_init(void)
 		nbd_dev[i].file = NULL;
 		nbd_dev[i].magic = LO_MAGIC;
 		nbd_dev[i].flags = 0;
+		spin_lock_init(&nbd_dev[i].queue_lock);
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
 		init_MUTEX(&nbd_dev[i].tx_lock);
 		nbd_blksizes[i] = 1024;

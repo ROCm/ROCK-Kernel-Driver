@@ -34,7 +34,6 @@
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
 
-#include <asm/system.h>
 #include <asm/io.h>
 
 #include <linux/blk.h>

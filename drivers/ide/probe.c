@@ -37,9 +37,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-
 extern struct ata_device * get_info_ptr(kdev_t);
-
 
 /*
  * This is called from the partition-table code in pt/msdos.c.
@@ -532,7 +530,7 @@ static inline void do_identify(struct ata_device *drive, u8 cmd)
 		}
 	}
 	drive->type = ATA_DISK;
-	printk("ATA DISK drive\n");
+	printk("DISK drive\n");
 
 	/* Initialize our quirk list. */
 	if (drive->channel->quirkproc)
@@ -614,7 +612,7 @@ static int identify(struct ata_device *drive, u8 cmd)
 			goto out;
 	} else
 #endif
-		OUT_BYTE(cmd,IDE_COMMAND_REG);		/* ask drive for ID */
+		OUT_BYTE(cmd, IDE_COMMAND_REG);		/* ask drive for ID */
 	timeout = ((cmd == WIN_IDENTIFY) ? WAIT_WORSTCASE : WAIT_PIDENTIFY) / 2;
 	timeout += jiffies;
 	do {
@@ -673,29 +671,31 @@ out:
 static int do_probe(struct ata_device *drive, u8 cmd)
 {
 	int rc;
-	struct ata_channel *hwif = drive->channel;
+	struct ata_channel *ch = drive->channel;
+	u8 select;
 
 	if (drive->present) {	/* avoid waiting for inappropriate probes */
 		if ((drive->type != ATA_DISK) && (cmd == WIN_IDENTIFY))
 			return 4;
 	}
 #ifdef DEBUG
-	printk("probing for %s: present=%d, type=%d, probetype=%s\n",
+	printk("probing for %s: present=%d, type=%02x, probetype=%s\n",
 		drive->name, drive->present, drive->type,
 		(cmd == WIN_IDENTIFY) ? "ATA" : "ATAPI");
 #endif
 	mdelay(50);	/* needed for some systems (e.g. crw9624 as drive0 with disk as slave) */
-	SELECT_DRIVE(hwif,drive);
+	SELECT_DRIVE(ch, drive);
 	mdelay(50);
-	if (IN_BYTE(IDE_SELECT_REG) != drive->select.all && !drive->present) {
+	select = IN_BYTE(IDE_SELECT_REG);
+	if (select != drive->select.all && !drive->present) {
 		if (drive->select.b.unit != 0) {
-			SELECT_DRIVE(hwif,&hwif->drives[0]);	/* exit with drive0 selected */
+			SELECT_DRIVE(ch, &ch->drives[0]);	/* exit with drive0 selected */
 			mdelay(50);		/* allow BUSY_STAT to assert & clear */
 		}
 		return 3;    /* no i/f present: mmm.. this should be a 4 -ml */
 	}
 
-	if (OK_STAT(GET_STAT(),READY_STAT,BUSY_STAT) || drive->present || cmd == WIN_PIDENTIFY)
+	if (OK_STAT(GET_STAT(), READY_STAT, BUSY_STAT) || drive->present || cmd == WIN_PIDENTIFY)
 	{
 		if ((rc = identify(drive,cmd)))   /* send cmd and wait */
 			rc = identify(drive,cmd); /* failed: try again */
@@ -713,12 +713,12 @@ static int do_probe(struct ata_device *drive, u8 cmd)
 		}
 		if (rc == 1)
 			printk("%s: no response (status = 0x%02x)\n", drive->name, GET_STAT());
-		(void) GET_STAT();		/* ensure drive irq is clear */
+		GET_STAT();		/* ensure drive irq is clear */
 	} else
 		rc = 3;				/* not present or maybe ATAPI */
 
 	if (drive->select.b.unit != 0) {
-		SELECT_DRIVE(hwif,&hwif->drives[0]);	/* exit with drive0 selected */
+		SELECT_DRIVE(ch, &ch->drives[0]);	/* exit with drive0 selected */
 		mdelay(50);
 		GET_STAT();		/* ensure drive irq is clear */
 	}

@@ -48,11 +48,6 @@ enum {
 	RESUME_ENABLE,
 };
 
-enum {
-	REMOVE_NOTIFY,
-	REMOVE_FREE_RESOURCES,
-};
-
 struct device;
 struct device_driver;
 
@@ -103,7 +98,7 @@ struct device_driver {
 	struct driver_dir_entry	dir;
 
 	int	(*probe)	(struct device * dev);
-	int 	(*remove)	(struct device * dev, u32 flags);
+	int 	(*remove)	(struct device * dev);
 
 	int	(*suspend)	(struct device * dev, u32 state, u32 level);
 	int	(*resume)	(struct device * dev, u32 level);

@@ -11,6 +11,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/bitops.h>
 
 /*
  * UID task count cache, to get fast user lookup in "alloc_uid"
@@ -23,7 +24,9 @@
 #define uidhashentry(uid)	(uidhash_table + __uidhashfn(uid))
 
 static kmem_cache_t *uid_cachep;
-static struct user_struct *uidhash_table[UIDHASH_SZ];
+static struct list_head *uidhash_table;
+static unsigned uidhash_size;
+static unsigned uidhash_bits;
 static spinlock_t uidhash_lock = SPIN_LOCK_UNLOCKED;
 
 struct user_struct root_user = {
@@ -35,42 +38,32 @@ struct user_struct root_user = {
 /*
  * These routines must be called with the uidhash spinlock held!
  */
-static inline void uid_hash_insert(struct user_struct *up, struct user_struct **hashent)
+static inline void uid_hash_insert(struct user_struct *up, struct list_head *hashent)
 {
-	struct user_struct *next = *hashent;
-
-	up->next = next;
-	if (next)
-		next->pprev = &up->next;
-	up->pprev = hashent;
-	*hashent = up;
+	list_add(&up->uidhash_list, hashent);
 }
 
 static inline void uid_hash_remove(struct user_struct *up)
 {
-	struct user_struct *next = up->next;
-	struct user_struct **pprev = up->pprev;
-
-	if (next)
-		next->pprev = pprev;
-	*pprev = next;
+	list_del(&up->uidhash_list);
 }
 
-static inline struct user_struct *uid_hash_find(uid_t uid, struct user_struct **hashent)
+static inline struct user_struct *uid_hash_find(uid_t uid, struct list_head *hashent)
 {
-	struct user_struct *next;
+	struct list_head *up;
 
-	next = *hashent;
-	for (;;) {
-		struct user_struct *up = next;
-		if (next) {
-			next = up->next;
-			if (up->uid != uid)
-				continue;
-			atomic_inc(&up->__count);
+	list_for_each(up, hashent) {
+		struct user_struct *user;
+
+		user = list_entry(up, struct user_struct, uidhash_list);
+
+		if(user->uid == uid) {
+			atomic_inc(&user->__count);
+			return user;
 		}
-		return up;
 	}
+
+	return NULL;
 }
 
 void free_uid(struct user_struct *up)
@@ -84,7 +77,7 @@ void free_uid(struct user_struct *up)
 
 struct user_struct * alloc_uid(uid_t uid)
 {
-	struct user_struct **hashent = uidhashentry(uid);
+	struct list_head *hashent = uidhashentry(uid);
 	struct user_struct *up;
 
 	spin_lock(&uidhash_lock);
@@ -123,11 +116,30 @@ struct user_struct * alloc_uid(uid_t uid)
 
 static int __init uid_cache_init(void)
 {
+	int size, n;
+
 	uid_cachep = kmem_cache_create("uid_cache", sizeof(struct user_struct),
 				       0,
 				       SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if(!uid_cachep)
 		panic("Cannot create uid taskcount SLAB cache\n");
+
+	size = UIDHASH_SZ * sizeof(struct list_head);
+	do {
+		uidhash_table = (struct list_head *)
+					kmalloc(size, GFP_ATOMIC);
+		if(!uidhash_table)
+			size >>= 1;
+	} while(!uidhash_table && size >= sizeof(struct list_head));
+
+	if(!uidhash_table)
+		panic("Failed to allocate uid hash table!\n");
+
+	uidhash_size = size/sizeof(struct list_head);
+	uidhash_bits = ffz(uidhash_size);
+
+	for(n = 0; n < uidhash_size; ++n)
+		INIT_LIST_HEAD(uidhash_table + n);
 
 	/* Insert the root user immediately - init already runs with this */
 	uid_hash_insert(&root_user, uidhashentry(0));

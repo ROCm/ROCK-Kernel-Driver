@@ -2022,7 +2022,8 @@ static void post_fep_init(unsigned int crd)
 	    (*(ushort *)((ulong)memaddr + XEPORTS) < 3))
 		shrinkmem = 1;
 	if (bd->type < PCIXEM)
-		request_region((int)bd->port, 4, board_desc[bd->type]);
+		if (!request_region((int)bd->port, 4, board_desc[bd->type]))
+			return;		
 
 	memwinon(bd, 0);
 
@@ -2186,9 +2187,13 @@ static void post_fep_init(unsigned int crd)
 		if (!(ch->tmp_buf))
 		{
 			printk(KERN_ERR "POST FEP INIT : kmalloc failed for port 0x%x\n",i);
-
+			release_region((int)bd->port, 4);
+			while(i-- > 0)
+				kfree((ch--)->tmp_buf);
+			return;
 		}
-		memset((void *)ch->tmp_buf,0,ch->txbufsize);
+		else 
+			memset((void *)ch->tmp_buf,0,ch->txbufsize);
 	} /* End for each port */
 
 	printk(KERN_INFO 

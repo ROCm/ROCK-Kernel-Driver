@@ -47,7 +47,7 @@ static int pci_device_probe(struct device * dev)
 	return error > 0 ? 0 : -ENODEV;
 }
 
-static int pci_device_remove(struct device * dev, u32 flags)
+static int pci_device_remove(struct device * dev)
 {
 	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
 

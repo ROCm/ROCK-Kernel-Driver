@@ -524,3 +524,5 @@ struct export_operations export_op_default = {
 
 EXPORT_SYMBOL(export_op_default);
 EXPORT_SYMBOL(find_exported_dentry);
+
+MODULE_LICENSE("GPL");
