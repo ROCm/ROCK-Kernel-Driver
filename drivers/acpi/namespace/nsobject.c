@@ -34,7 +34,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_attach_object
+ * FUNCTION:    acpi_ns_attach_object
  *
  * PARAMETERS:  Node                - Parent Node
  *              Object              - Object to be attached
@@ -62,7 +62,7 @@ acpi_ns_attach_object (
 	acpi_object_type        object_type = ACPI_TYPE_ANY;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_attach_object");
+	ACPI_FUNCTION_TRACE ("ns_attach_object");
 
 
 	/*
@@ -71,28 +71,28 @@ acpi_ns_attach_object (
 	if (!node) {
 		/* Invalid handle */
 
-		ACPI_REPORT_ERROR (("Ns_attach_object: Null Named_obj handle\n"));
+		ACPI_REPORT_ERROR (("ns_attach_object: Null named_obj handle\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	if (!object && (ACPI_TYPE_ANY != type)) {
 		/* Null object */
 
-		ACPI_REPORT_ERROR (("Ns_attach_object: Null object, but type not ACPI_TYPE_ANY\n"));
+		ACPI_REPORT_ERROR (("ns_attach_object: Null object, but type not ACPI_TYPE_ANY\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (node) != ACPI_DESC_TYPE_NAMED) {
 		/* Not a name handle */
 
-		ACPI_REPORT_ERROR (("Ns_attach_object: Invalid handle\n"));
+		ACPI_REPORT_ERROR (("ns_attach_object: Invalid handle\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/* Check if this object is already attached */
 
 	if (node->object == object) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj %p already installed in Name_obj %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj %p already installed in name_obj %p\n",
 			object, node));
 
 		return_ACPI_STATUS (AE_OK);
@@ -170,7 +170,7 @@ acpi_ns_attach_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_detach_object
+ * FUNCTION:    acpi_ns_detach_object
  *
  * PARAMETERS:  Node           - An node whose object will be detached
  *
@@ -189,7 +189,7 @@ acpi_ns_detach_object (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_detach_object");
+	ACPI_FUNCTION_TRACE ("ns_detach_object");
 
 
 	obj_desc = node->object;
@@ -226,7 +226,7 @@ acpi_ns_detach_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_attached_object
+ * FUNCTION:    acpi_ns_get_attached_object
  *
  * PARAMETERS:  Node             - Parent Node to be examined
  *
@@ -241,7 +241,7 @@ acpi_operand_object *
 acpi_ns_get_attached_object (
 	acpi_namespace_node     *node)
 {
-	ACPI_FUNCTION_TRACE_PTR ("Ns_get_attached_object", node);
+	ACPI_FUNCTION_TRACE_PTR ("ns_get_attached_object", node);
 
 
 	if (!node) {
@@ -262,7 +262,7 @@ acpi_ns_get_attached_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_secondary_object
+ * FUNCTION:    acpi_ns_get_secondary_object
  *
  * PARAMETERS:  Node             - Parent Node to be examined
  *
@@ -277,7 +277,7 @@ acpi_operand_object *
 acpi_ns_get_secondary_object (
 	acpi_operand_object     *obj_desc)
 {
-	ACPI_FUNCTION_TRACE_PTR ("Ns_get_secondary_object", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ns_get_secondary_object", obj_desc);
 
 
 	if ((!obj_desc)                                               ||
@@ -293,7 +293,7 @@ acpi_ns_get_secondary_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_attach_data
+ * FUNCTION:    acpi_ns_attach_data
  *
  * PARAMETERS:  Node            - Namespace node
  *              Handler         - Handler to be associated with the data
@@ -355,7 +355,7 @@ acpi_ns_attach_data (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_detach_data
+ * FUNCTION:    acpi_ns_detach_data
  *
  * PARAMETERS:  Node            - Namespace node
  *              Handler         - Handler associated with the data
@@ -402,7 +402,7 @@ acpi_ns_detach_data (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_attached_data
+ * FUNCTION:    acpi_ns_get_attached_data
  *
  * PARAMETERS:  Node            - Namespace node
  *              Handler         - Handler associated with the data

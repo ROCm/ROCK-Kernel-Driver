@@ -43,7 +43,7 @@
 /*
  * Common area for all objects.
  *
- * Data_type is used to differentiate between internal descriptors, and MUST
+ * data_type is used to differentiate between internal descriptors, and MUST
  * be the first byte in this structure.
  */
 #define ACPI_OBJECT_COMMON_HEADER           /* SIZE/ALIGNMENT: 32 bits, one ptr plus trailing 8-bit flag */\
@@ -70,7 +70,7 @@
  */
 #define ACPI_COMMON_FIELD_INFO              /* SIZE/ALIGNMENT: 24 bits + three 32-bit values */\
 	u8                          field_flags;        /* Access, update, and lock bits */\
-	u8                          attribute;          /* From Access_as keyword */\
+	u8                          attribute;          /* From access_as keyword */\
 	u8                          access_byte_width;  /* Read/Write size in bytes */\
 	u32                         bit_length;         /* Length of field in bits */\
 	u32                         base_byte_offset;   /* Byte offset within containing object */\
@@ -149,7 +149,7 @@ typedef struct acpi_object_package
 	u32                         aml_length;
 	u8                          *aml_start;
 	acpi_namespace_node         *node;              /* Link back to parent node */
-	union acpi_operand_obj      **elements;         /* Array of pointers to Acpi_objects */
+	union acpi_operand_obj      **elements;         /* Array of pointers to acpi_objects */
 
 } acpi_object_package;
 
@@ -220,7 +220,7 @@ typedef struct acpi_object_region
 
 /******************************************************************************
  *
- * Objects that can be notified.  All share a common Notify_info area.
+ * Objects that can be notified.  All share a common notify_info area.
  *
  *****************************************************************************/
 
@@ -291,7 +291,7 @@ typedef struct acpi_object_region_field
 {
 	ACPI_OBJECT_COMMON_HEADER
 	ACPI_COMMON_FIELD_INFO
-	union acpi_operand_obj      *region_obj;        /* Containing Op_region object */
+	union acpi_operand_obj      *region_obj;        /* Containing op_region object */
 
 } acpi_object_region_field;
 
@@ -301,8 +301,8 @@ typedef struct acpi_object_bank_field
 	ACPI_OBJECT_COMMON_HEADER
 	ACPI_COMMON_FIELD_INFO
 
-	union acpi_operand_obj      *region_obj;        /* Containing Op_region object */
-	union acpi_operand_obj      *bank_obj;          /* Bank_select Register object */
+	union acpi_operand_obj      *region_obj;        /* Containing op_region object */
+	union acpi_operand_obj      *bank_obj;          /* bank_select Register object */
 
 } acpi_object_bank_field;
 
@@ -313,7 +313,7 @@ typedef struct acpi_object_index_field
 	ACPI_COMMON_FIELD_INFO
 
 	/*
-	 * No "Region_obj" pointer needed since the Index and Data registers
+	 * No "region_obj" pointer needed since the Index and Data registers
 	 * are each field definitions unto themselves.
 	 */
 	union acpi_operand_obj      *index_obj;         /* Index register */
@@ -323,7 +323,7 @@ typedef struct acpi_object_index_field
 } acpi_object_index_field;
 
 
-/* The Buffer_field is different in that it is part of a Buffer, not an Op_region */
+/* The buffer_field is different in that it is part of a Buffer, not an op_region */
 
 typedef struct acpi_object_buffer_field
 {
@@ -382,17 +382,17 @@ typedef struct acpi_object_addr_handler
 
 /*
  * The Reference object type is used for these opcodes:
- * Arg[0-6], Local[0-7], Index_op, Name_op, Zero_op, One_op, Ones_op, Debug_op
+ * Arg[0-6], Local[0-7], index_op, name_op, zero_op, one_op, ones_op, debug_op
  */
 typedef struct acpi_object_reference
 {
 	ACPI_OBJECT_COMMON_HEADER
 
-	u8                          target_type;        /* Used for Index_op */
+	u8                          target_type;        /* Used for index_op */
 	u16                         opcode;
-	u32                         offset;             /* Used for Arg_op, Local_op, and Index_op */
+	u32                         offset;             /* Used for arg_op, local_op, and index_op */
 
-	void                        *object;            /* Name_op=>HANDLE to obj, Index_op=>acpi_operand_object */
+	void                        *object;            /* name_op=>HANDLE to obj, index_op=>acpi_operand_object */
 	acpi_namespace_node         *node;
 	union acpi_operand_obj      **where;
 
@@ -401,10 +401,10 @@ typedef struct acpi_object_reference
 
 /*
  * Extra object is used as additional storage for types that
- * have AML code in their declarations (Term_args) that must be
+ * have AML code in their declarations (term_args) that must be
  * evaluated at run time.
  *
- * Currently: Region and Field_unit types
+ * Currently: Region and field_unit types
  */
 typedef struct acpi_object_extra
 {

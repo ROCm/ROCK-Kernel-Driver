@@ -34,7 +34,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_install_fixed_event_handler
+ * FUNCTION:    acpi_install_fixed_event_handler
  *
  * PARAMETERS:  Event           - Event type to enable.
  *              Handler         - Pointer to the handler function for the
@@ -57,7 +57,7 @@ acpi_install_fixed_event_handler (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_install_fixed_event_handler");
+	ACPI_FUNCTION_TRACE ("acpi_install_fixed_event_handler");
 
 
 	/* Parameter validation */
@@ -106,7 +106,7 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_remove_fixed_event_handler
+ * FUNCTION:    acpi_remove_fixed_event_handler
  *
  * PARAMETERS:  Event           - Event type to disable.
  *              Handler         - Address of the handler
@@ -125,7 +125,7 @@ acpi_remove_fixed_event_handler (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_remove_fixed_event_handler");
+	ACPI_FUNCTION_TRACE ("acpi_remove_fixed_event_handler");
 
 
 	/* Parameter validation */
@@ -163,12 +163,12 @@ acpi_remove_fixed_event_handler (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_install_notify_handler
+ * FUNCTION:    acpi_install_notify_handler
  *
  * PARAMETERS:  Device          - The device for which notifies will be handled
- *              Handler_type    - The type of handler:
- *                                  ACPI_SYSTEM_NOTIFY: System_handler (00-7f)
- *                                  ACPI_DEVICE_NOTIFY: Driver_handler (80-ff)
+ *              handler_type    - The type of handler:
+ *                                  ACPI_SYSTEM_NOTIFY: system_handler (00-7f)
+ *                                  ACPI_DEVICE_NOTIFY: driver_handler (80-ff)
  *              Handler         - Address of the handler
  *              Context         - Value passed to the handler on each GPE
  *
@@ -191,7 +191,7 @@ acpi_install_notify_handler (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_install_notify_handler");
+	ACPI_FUNCTION_TRACE ("acpi_install_notify_handler");
 
 
 	/* Parameter validation */
@@ -320,12 +320,12 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_remove_notify_handler
+ * FUNCTION:    acpi_remove_notify_handler
  *
  * PARAMETERS:  Device          - The device for which notifies will be handled
- *              Handler_type    - The type of handler:
- *                                  ACPI_SYSTEM_NOTIFY: System_handler (00-7f)
- *                                  ACPI_DEVICE_NOTIFY: Driver_handler (80-ff)
+ *              handler_type    - The type of handler:
+ *                                  ACPI_SYSTEM_NOTIFY: system_handler (00-7f)
+ *                                  ACPI_DEVICE_NOTIFY: driver_handler (80-ff)
  *              Handler         - Address of the handler
  * RETURN:      Status
  *
@@ -345,7 +345,7 @@ acpi_remove_notify_handler (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_remove_notify_handler");
+	ACPI_FUNCTION_TRACE ("acpi_remove_notify_handler");
 
 
 	/* Parameter validation */
@@ -450,9 +450,9 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_install_gpe_handler
+ * FUNCTION:    acpi_install_gpe_handler
  *
- * PARAMETERS:  Gpe_number      - The GPE number.  The numbering scheme is
+ * PARAMETERS:  gpe_number      - The GPE number.  The numbering scheme is
  *                                bank 0 first, then bank 1.
  *              Type            - Whether this GPE should be treated as an
  *                                edge- or level-triggered interrupt.
@@ -476,7 +476,7 @@ acpi_install_gpe_handler (
 	u32                     gpe_number_index;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_install_gpe_handler");
+	ACPI_FUNCTION_TRACE ("acpi_install_gpe_handler");
 
 
 	/* Parameter validation */
@@ -528,14 +528,14 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_remove_gpe_handler
+ * FUNCTION:    acpi_remove_gpe_handler
  *
- * PARAMETERS:  Gpe_number      - The event to remove a handler
+ * PARAMETERS:  gpe_number      - The event to remove a handler
  *              Handler         - Address of the handler
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Remove a handler for a General Purpose Acpi_event.
+ * DESCRIPTION: Remove a handler for a General Purpose acpi_event.
  *
  ******************************************************************************/
 
@@ -548,7 +548,7 @@ acpi_remove_gpe_handler (
 	u32                     gpe_number_index;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_remove_gpe_handler");
+	ACPI_FUNCTION_TRACE ("acpi_remove_gpe_handler");
 
 
 	/* Parameter validation */
@@ -598,10 +598,10 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_acquire_global_lock
+ * FUNCTION:    acpi_acquire_global_lock
  *
  * PARAMETERS:  Timeout         - How long the caller is willing to wait
- *              Out_handle      - A handle to the lock if acquired
+ *              out_handle      - A handle to the lock if acquired
  *
  * RETURN:      Status
  *
@@ -640,9 +640,9 @@ acpi_acquire_global_lock (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_release_global_lock
+ * FUNCTION:    acpi_release_global_lock
  *
- * PARAMETERS:  Handle      - Returned from Acpi_acquire_global_lock
+ * PARAMETERS:  Handle      - Returned from acpi_acquire_global_lock
  *
  * RETURN:      Status
  *

@@ -31,7 +31,7 @@
  * component basis and a per-exception-type basis.
  */
 
-/* Component IDs are used in the global "Debug_layer" */
+/* Component IDs are used in the global "debug_layer" */
 
 #define ACPI_UTILITIES              0x00000001
 #define ACPI_HARDWARE               0x00000002
@@ -104,7 +104,7 @@
 #define ACPI_LV_INTERRUPTS          0x08000000
 #define ACPI_LV_VERBOSITY3          0x0F000000 | ACPI_LV_VERBOSITY2
 
-/* Exceptionally verbose output -- also used in the global "Debug_level" */
+/* Exceptionally verbose output -- also used in the global "debug_level" */
 
 #define ACPI_LV_AML_DISASSEMBLE     0x10000000
 #define ACPI_LV_VERBOSE_INFO        0x20000000
@@ -119,7 +119,7 @@
  */
 #define ACPI_DEBUG_LEVEL(dl)        (u32) dl,__LINE__,&_dbg
 
-/* Exception level -- used in the global "Debug_level" */
+/* Exception level -- used in the global "debug_level" */
 
 #define ACPI_DB_ERROR               ACPI_DEBUG_LEVEL (ACPI_LV_ERROR)
 #define ACPI_DB_WARN                ACPI_DEBUG_LEVEL (ACPI_LV_WARN)
@@ -129,7 +129,7 @@
 #define ACPI_DB_ALL_EXCEPTIONS      ACPI_DEBUG_LEVEL (ACPI_LV_ALL_EXCEPTIONS)
 
 
-/* Trace level -- also used in the global "Debug_level" */
+/* Trace level -- also used in the global "debug_level" */
 
 #define ACPI_DB_INIT_NAMES          ACPI_DEBUG_LEVEL (ACPI_LV_INIT_NAMES)
 #define ACPI_DB_THREADS             ACPI_DEBUG_LEVEL (ACPI_LV_THREADS)
@@ -156,7 +156,7 @@
 #define ACPI_DB_ALL                 ACPI_DEBUG_LEVEL (ACPI_LV_ALL)
 
 
-/* Defaults for Debug_level, debug and normal */
+/* Defaults for debug_level, debug and normal */
 
 #define ACPI_DEBUG_DEFAULT          (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)
 #define ACPI_NORMAL_DEFAULT         (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)

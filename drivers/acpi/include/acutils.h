@@ -54,7 +54,7 @@ typedef struct acpi_pkg_info
 #define REF_DECREMENT       (u16) 1
 #define REF_FORCE_DELETE    (u16) 2
 
-/* Acpi_ut_dump_buffer */
+/* acpi_ut_dump_buffer */
 
 #define DB_BYTE_DISPLAY     1
 #define DB_WORD_DISPLAY     2
@@ -74,7 +74,7 @@ acpi_ut_terminate (
 
 
 /*
- * Ut_init - miscellaneous initialization and shutdown
+ * ut_init - miscellaneous initialization and shutdown
  */
 
 acpi_status
@@ -90,7 +90,7 @@ acpi_ut_validate_fadt (
 	void);
 
 /*
- * Ut_global - Global data structures and procedures
+ * ut_global - Global data structures and procedures
  */
 
 #if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
@@ -132,7 +132,7 @@ acpi_ut_allocate_owner_id (
 
 
 /*
- * Ut_clib - Local implementations of C library functions
+ * ut_clib - Local implementations of C library functions
  */
 
 #ifndef ACPI_USE_SYSTEM_CLIBRARY
@@ -230,7 +230,7 @@ extern const u8 _acpi_ctype[];
 #endif /* ACPI_USE_SYSTEM_CLIBRARY */
 
 /*
- * Ut_copy - Object construction and conversion interfaces
+ * ut_copy - Object construction and conversion interfaces
  */
 
 acpi_status
@@ -299,7 +299,7 @@ acpi_ut_copy_iobject_to_iobject (
 
 
 /*
- * Ut_create - Object creation
+ * ut_create - Object creation
  */
 
 acpi_status
@@ -309,7 +309,7 @@ acpi_ut_update_object_reference (
 
 
 /*
- * Ut_debug - Debug interfaces
+ * ut_debug - Debug interfaces
  */
 
 void
@@ -409,7 +409,7 @@ acpi_ut_debug_print_raw (
 
 
 /*
- * Ut_delete - Object deletion
+ * ut_delete - Object deletion
  */
 
 void
@@ -430,7 +430,7 @@ acpi_ut_delete_internal_object_list (
 
 
 /*
- * Ut_eval - object evaluation
+ * ut_eval - object evaluation
  */
 
 /* Method name strings */
@@ -481,7 +481,7 @@ acpi_ut_execute_UID (
 
 
 /*
- * Ut_mutex - mutual exclusion interfaces
+ * ut_mutex - mutual exclusion interfaces
  */
 
 acpi_status
@@ -510,7 +510,7 @@ acpi_ut_release_mutex (
 
 
 /*
- * Ut_object - internal object create/delete/cache routines
+ * ut_object - internal object create/delete/cache routines
  */
 
 acpi_operand_object  *
@@ -543,7 +543,7 @@ acpi_ut_create_buffer_object (
 
 
 /*
- * Ut_ref_cnt - Object reference count management
+ * ut_ref_cnt - Object reference count management
  */
 
 void
@@ -555,7 +555,7 @@ acpi_ut_remove_reference (
 	acpi_operand_object     *object);
 
 /*
- * Ut_size - Object size routines
+ * ut_size - Object size routines
  */
 
 acpi_status
@@ -582,7 +582,7 @@ acpi_ut_get_element_length (
 
 
 /*
- * Ut_state - Generic state creation/cache routines
+ * ut_state - Generic state creation/cache routines
  */
 
 void

@@ -59,9 +59,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_3A_0T_0R
+ * FUNCTION:    acpi_ex_opcode_3A_0T_0R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -78,15 +78,15 @@ acpi_ex_opcode_3A_0T_0R (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_3A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_3A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
 
-	case AML_FATAL_OP:          /* Fatal (Fatal_type Fatal_code Fatal_arg)   */
+	case AML_FATAL_OP:          /* Fatal (fatal_type fatal_code fatal_arg)   */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"Fatal_op: Type %X Code %X Arg %X <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n",
+			"fatal_op: Type %X Code %X Arg %X <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n",
 			(u32) operand[0]->integer.value, (u32) operand[1]->integer.value,
 			(u32) operand[2]->integer.value));
 
@@ -111,7 +111,7 @@ acpi_ex_opcode_3A_0T_0R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
@@ -126,9 +126,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_3A_1T_1R
+ * FUNCTION:    acpi_ex_opcode_3A_1T_1R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -148,7 +148,7 @@ acpi_ex_opcode_3A_1T_1R (
 	acpi_size               length;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
@@ -205,7 +205,7 @@ acpi_ex_opcode_3A_1T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;

@@ -32,21 +32,21 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_address16_resource
+ * FUNCTION:    acpi_rs_address16_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -67,7 +67,7 @@ acpi_rs_address16_resource (
 	u8                      temp8;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_address16_resource");
+	ACPI_FUNCTION_TRACE ("rs_address16_resource");
 
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
@@ -132,7 +132,7 @@ acpi_rs_address16_resource (
 				(u16) (temp8 & 0x03);
 		}
 		else {
-			/* BUS_NUMBER_RANGE == Address16.Data->Resource_type */
+			/* BUS_NUMBER_RANGE == Address16.Data->resource_type */
 			/* Nothing needs to be filled in */
 		}
 	}
@@ -145,28 +145,28 @@ acpi_rs_address16_resource (
 			 buffer);
 
 	/*
-	 * Get Min_address_range (Bytes 8-9)
+	 * Get min_address_range (Bytes 8-9)
 	 */
 	buffer += 2;
 	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.min_address_range,
 			 buffer);
 
 	/*
-	 * Get Max_address_range (Bytes 10-11)
+	 * Get max_address_range (Bytes 10-11)
 	 */
 	buffer += 2;
 	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.max_address_range,
 			 buffer);
 
 	/*
-	 * Get Address_translation_offset (Bytes 12-13)
+	 * Get address_translation_offset (Bytes 12-13)
 	 */
 	buffer += 2;
 	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.address_translation_offset,
 			 buffer);
 
 	/*
-	 * Get Address_length (Bytes 14-15)
+	 * Get address_length (Bytes 14-15)
 	 */
 	buffer += 2;
 	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.address_length,
@@ -221,12 +221,12 @@ acpi_rs_address16_resource (
 		output_struct->data.address16.resource_source.string_length = index + 1;
 
 		/*
-		 * In order for the Struct_size to fall on a 32-bit boundary,
+		 * In order for the struct_size to fall on a 32-bit boundary,
 		 * calculate the length of the string and expand the
-		 * Struct_size to the next 32-bit boundary.
+		 * struct_size to the next 32-bit boundary.
 		 */
 		temp8 = (u8) (index + 1);
-		struct_size += ACPI_ROUND_UP_TO_32_bITS (temp8);
+		struct_size += ACPI_ROUND_UP_to_32_bITS (temp8);
 	}
 	else {
 		output_struct->data.address16.resource_source.index = 0x00;
@@ -249,12 +249,12 @@ acpi_rs_address16_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_address16_stream
+ * FUNCTION:    acpi_rs_address16_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -276,7 +276,7 @@ acpi_rs_address16_stream (
 	acpi_size               actual_bytes;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_address16_stream");
+	ACPI_FUNCTION_TRACE ("rs_address16_stream");
 
 
 	/*
@@ -292,7 +292,7 @@ acpi_rs_address16_stream (
 	buffer += 2;
 
 	/*
-	 * Set the Resource Type (Memory, Io, Bus_number)
+	 * Set the Resource Type (Memory, Io, bus_number)
 	 */
 	temp8 = (u8) (linked_list->data.address16.resource_type & 0x03);
 	*buffer = temp8;
@@ -410,21 +410,21 @@ acpi_rs_address16_stream (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_address32_resource
+ * FUNCTION:    acpi_rs_address32_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -445,7 +445,7 @@ acpi_rs_address32_resource (
 	u32                     index;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_address32_resource");
+	ACPI_FUNCTION_TRACE ("rs_address32_resource");
 
 
 	buffer = byte_stream_buffer;
@@ -518,7 +518,7 @@ acpi_rs_address32_resource (
 				(u16) (temp8 & 0x03);
 		}
 		else {
-			/* BUS_NUMBER_RANGE == Output_struct->Data.Address32.Resource_type */
+			/* BUS_NUMBER_RANGE == output_struct->Data.Address32.resource_type */
 			/* Nothing needs to be filled in */
 		}
 	}
@@ -531,28 +531,28 @@ acpi_rs_address32_resource (
 			 buffer);
 
 	/*
-	 * Get Min_address_range (Bytes 10-13)
+	 * Get min_address_range (Bytes 10-13)
 	 */
 	buffer += 4;
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.min_address_range,
 			 buffer);
 
 	/*
-	 * Get Max_address_range (Bytes 14-17)
+	 * Get max_address_range (Bytes 14-17)
 	 */
 	buffer += 4;
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.max_address_range,
 			 buffer);
 
 	/*
-	 * Get Address_translation_offset (Bytes 18-21)
+	 * Get address_translation_offset (Bytes 18-21)
 	 */
 	buffer += 4;
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.address_translation_offset,
 			 buffer);
 
 	/*
-	 * Get Address_length (Bytes 22-25)
+	 * Get address_length (Bytes 22-25)
 	 */
 	buffer += 4;
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.address_length,
@@ -604,12 +604,12 @@ acpi_rs_address32_resource (
 		output_struct->data.address32.resource_source.string_length = index + 1;
 
 		/*
-		 * In order for the Struct_size to fall on a 32-bit boundary,
+		 * In order for the struct_size to fall on a 32-bit boundary,
 		 *  calculate the length of the string and expand the
-		 *  Struct_size to the next 32-bit boundary.
+		 *  struct_size to the next 32-bit boundary.
 		 */
 		temp8 = (u8) (index + 1);
-		struct_size += ACPI_ROUND_UP_TO_32_bITS (temp8);
+		struct_size += ACPI_ROUND_UP_to_32_bITS (temp8);
 	}
 	else {
 		output_struct->data.address32.resource_source.index = 0x00;
@@ -632,12 +632,12 @@ acpi_rs_address32_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_address32_stream
+ * FUNCTION:    acpi_rs_address32_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -658,7 +658,7 @@ acpi_rs_address32_stream (
 	char                    *temp_pointer;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_address32_stream");
+	ACPI_FUNCTION_TRACE ("rs_address32_stream");
 
 
 	buffer = *output_buffer;
@@ -676,7 +676,7 @@ acpi_rs_address32_stream (
 	buffer += 2;
 
 	/*
-	 * Set the Resource Type (Memory, Io, Bus_number)
+	 * Set the Resource Type (Memory, Io, bus_number)
 	 */
 	temp8 = (u8) (linked_list->data.address32.resource_type & 0x03);
 
@@ -792,21 +792,21 @@ acpi_rs_address32_stream (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_address64_resource
+ * FUNCTION:    acpi_rs_address64_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -827,7 +827,7 @@ acpi_rs_address64_resource (
 	u32                     index;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_address64_resource");
+	ACPI_FUNCTION_TRACE ("rs_address64_resource");
 
 
 	buffer = byte_stream_buffer;
@@ -901,7 +901,7 @@ acpi_rs_address64_resource (
 				(u16) (temp8 & 0x03);
 		}
 		else {
-			/* BUS_NUMBER_RANGE == Output_struct->Data.Address64.Resource_type */
+			/* BUS_NUMBER_RANGE == output_struct->Data.Address64.resource_type */
 			/* Nothing needs to be filled in */
 		}
 	}
@@ -914,28 +914,28 @@ acpi_rs_address64_resource (
 			 buffer);
 
 	/*
-	 * Get Min_address_range (Bytes 14-21)
+	 * Get min_address_range (Bytes 14-21)
 	 */
 	buffer += 8;
 	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.min_address_range,
 			 buffer);
 
 	/*
-	 * Get Max_address_range (Bytes 22-29)
+	 * Get max_address_range (Bytes 22-29)
 	 */
 	buffer += 8;
 	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.max_address_range,
 			 buffer);
 
 	/*
-	 * Get Address_translation_offset (Bytes 30-37)
+	 * Get address_translation_offset (Bytes 30-37)
 	 */
 	buffer += 8;
 	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.address_translation_offset,
 			 buffer);
 
 	/*
-	 * Get Address_length (Bytes 38-45)
+	 * Get address_length (Bytes 38-45)
 	 */
 	buffer += 8;
 	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.address_length,
@@ -990,12 +990,12 @@ acpi_rs_address64_resource (
 		output_struct->data.address64.resource_source.string_length = index + 1;
 
 		/*
-		 * In order for the Struct_size to fall on a 32-bit boundary,
+		 * In order for the struct_size to fall on a 32-bit boundary,
 		 * calculate the length of the string and expand the
-		 * Struct_size to the next 32-bit boundary.
+		 * struct_size to the next 32-bit boundary.
 		 */
 		temp8 = (u8) (index + 1);
-		struct_size += ACPI_ROUND_UP_TO_32_bITS (temp8);
+		struct_size += ACPI_ROUND_UP_to_32_bITS (temp8);
 	}
 	else {
 		output_struct->data.address64.resource_source.index = 0x00;
@@ -1018,12 +1018,12 @@ acpi_rs_address64_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_address64_stream
+ * FUNCTION:    acpi_rs_address64_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -1044,7 +1044,7 @@ acpi_rs_address64_stream (
 	char                    *temp_pointer;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_address64_stream");
+	ACPI_FUNCTION_TRACE ("rs_address64_stream");
 
 
 	buffer = *output_buffer;
@@ -1063,7 +1063,7 @@ acpi_rs_address64_stream (
 	buffer += 2;
 
 	/*
-	 * Set the Resource Type (Memory, Io, Bus_number)
+	 * Set the Resource Type (Memory, Io, bus_number)
 	 */
 	temp8 = (u8) (linked_list->data.address64.resource_type & 0x03);
 

@@ -35,16 +35,16 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_get_object_reference
+ * FUNCTION:    acpi_ex_get_object_reference
  *
- * PARAMETERS:  Obj_desc            - Create a reference to this object
- *              Return_desc         - Where to store the reference
- *              Walk_state          - Current state
+ * PARAMETERS:  obj_desc            - Create a reference to this object
+ *              return_desc         - Where to store the reference
+ *              walk_state          - Current state
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Obtain and return a "reference" to the target object
- *              Common code for the Ref_of_op and the Cond_ref_of_op.
+ *              Common code for the ref_of_op and the cond_ref_of_op.
  *
  ******************************************************************************/
 
@@ -58,7 +58,7 @@ acpi_ex_get_object_reference (
 	acpi_operand_object     *referenced_obj;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_get_object_reference", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_get_object_reference", obj_desc);
 
 
 	*return_desc = NULL;
@@ -128,11 +128,11 @@ acpi_ex_get_object_reference (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_concat_template
+ * FUNCTION:    acpi_ex_concat_template
  *
- * PARAMETERS:  *Obj_desc           - Object to be converted.  Must be an
+ * PARAMETERS:  *obj_desc           - Object to be converted.  Must be an
  *                                    Integer, Buffer, or String
- *              Walk_state          - Current walk state
+ *              walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -155,10 +155,10 @@ acpi_ex_concat_template (
 	acpi_size               length2;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_concat_template");
+	ACPI_FUNCTION_TRACE ("ex_concat_template");
 
 
-	/* Find the End_tags in each resource template */
+	/* Find the end_tags in each resource template */
 
 	end_tag1 = acpi_ut_get_resource_end_tag (obj_desc1);
 	end_tag2 = acpi_ut_get_resource_end_tag (obj_desc2);
@@ -200,12 +200,12 @@ acpi_ex_concat_template (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_do_concatenate
+ * FUNCTION:    acpi_ex_do_concatenate
  *
- * PARAMETERS:  Obj_desc1           - First source object
- *              Obj_desc2           - Second source object
- *              Actual_return_desc  - Where to place the return object
- *              Walk_state          - Current walk state
+ * PARAMETERS:  obj_desc1           - First source object
+ *              obj_desc2           - Second source object
+ *              actual_return_desc  - Where to place the return object
+ *              walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -284,7 +284,7 @@ acpi_ex_do_concatenate (
 				   (acpi_size) obj_desc2->string.length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
-				(("Ex_do_concatenate: String allocation failure\n"));
+				(("ex_do_concatenate: String allocation failure\n"));
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
@@ -347,7 +347,7 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_do_math_op
+ * FUNCTION:    acpi_ex_do_math_op
  *
  * PARAMETERS:  Opcode              - AML opcode
  *              Operand0            - Integer operand #0
@@ -405,12 +405,12 @@ acpi_ex_do_math_op (
 		return (operand0 * operand1);
 
 
-	case AML_SHIFT_LEFT_OP:         /* Shift_left (Operand, Shift_count, Result) */
+	case AML_SHIFT_LEFT_OP:         /* shift_left (Operand, shift_count, Result) */
 
 		return (operand0 << operand1);
 
 
-	case AML_SHIFT_RIGHT_OP:        /* Shift_right (Operand, Shift_count, Result) */
+	case AML_SHIFT_RIGHT_OP:        /* shift_right (Operand, shift_count, Result) */
 
 		return (operand0 >> operand1);
 
@@ -428,7 +428,7 @@ acpi_ex_do_math_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_do_logical_op
+ * FUNCTION:    acpi_ex_do_logical_op
  *
  * PARAMETERS:  Opcode              - AML opcode
  *              Operand0            - Integer operand #0

@@ -35,11 +35,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_report_error
+ * FUNCTION:    acpi_ns_report_error
  *
- * PARAMETERS:  Module_name         - Caller's module name (for error output)
- *              Line_number         - Caller's line number (for error output)
- *              Component_id        - Caller's component ID (for error output)
+ * PARAMETERS:  module_name         - Caller's module name (for error output)
+ *              line_number         - Caller's line number (for error output)
+ *              component_id        - Caller's component ID (for error output)
  *              Message             - Error message to use on failure
  *
  * RETURN:      None
@@ -87,11 +87,11 @@ acpi_ns_report_error (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_report_method_error
+ * FUNCTION:    acpi_ns_report_method_error
  *
- * PARAMETERS:  Module_name         - Caller's module name (for error output)
- *              Line_number         - Caller's line number (for error output)
- *              Component_id        - Caller's component ID (for error output)
+ * PARAMETERS:  module_name         - Caller's module name (for error output)
+ *              line_number         - Caller's line number (for error output)
+ *              component_id        - Caller's component ID (for error output)
  *              Message             - Error message to use on failure
  *
  * RETURN:      None
@@ -117,7 +117,7 @@ acpi_ns_report_method_error (
 	if (path) {
 		status = acpi_ns_get_node_by_path (path, prefix_node, ACPI_NS_NO_UPSEARCH, &node);
 		if (ACPI_FAILURE (status)) {
-			acpi_os_printf ("Report_method_error: Could not get node\n");
+			acpi_os_printf ("report_method_error: Could not get node\n");
 			return;
 		}
 	}
@@ -130,7 +130,7 @@ acpi_ns_report_method_error (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_print_node_pathname
+ * FUNCTION:    acpi_ns_print_node_pathname
  *
  * PARAMETERS:  Node                - Object
  *              Msg                 - Prefix message
@@ -163,7 +163,7 @@ acpi_ns_print_node_pathname (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_valid_root_prefix
+ * FUNCTION:    acpi_ns_valid_root_prefix
  *
  * PARAMETERS:  Prefix          - Character to be checked
  *
@@ -184,7 +184,7 @@ acpi_ns_valid_root_prefix (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_valid_path_separator
+ * FUNCTION:    acpi_ns_valid_path_separator
  *
  * PARAMETERS:  Sep              - Character to be checked
  *
@@ -205,7 +205,7 @@ acpi_ns_valid_path_separator (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_type
+ * FUNCTION:    acpi_ns_get_type
  *
  * PARAMETERS:  Handle              - Parent Node to be examined
  *
@@ -217,11 +217,11 @@ acpi_object_type
 acpi_ns_get_type (
 	acpi_namespace_node     *node)
 {
-	ACPI_FUNCTION_TRACE ("Ns_get_type");
+	ACPI_FUNCTION_TRACE ("ns_get_type");
 
 
 	if (!node) {
-		ACPI_REPORT_WARNING (("Ns_get_type: Null Node ptr"));
+		ACPI_REPORT_WARNING (("ns_get_type: Null Node ptr"));
 		return_VALUE (ACPI_TYPE_ANY);
 	}
 
@@ -231,7 +231,7 @@ acpi_ns_get_type (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_local
+ * FUNCTION:    acpi_ns_local
  *
  * PARAMETERS:  Type            - A namespace object type
  *
@@ -244,13 +244,13 @@ u32
 acpi_ns_local (
 	acpi_object_type        type)
 {
-	ACPI_FUNCTION_TRACE ("Ns_local");
+	ACPI_FUNCTION_TRACE ("ns_local");
 
 
 	if (!acpi_ut_valid_object_type (type)) {
 		/* Type code out of range  */
 
-		ACPI_REPORT_WARNING (("Ns_local: Invalid Object Type\n"));
+		ACPI_REPORT_WARNING (("ns_local: Invalid Object Type\n"));
 		return_VALUE (ACPI_NS_NORMAL);
 	}
 
@@ -260,7 +260,7 @@ acpi_ns_local (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_internal_name_length
+ * FUNCTION:    acpi_ns_get_internal_name_length
  *
  * PARAMETERS:  Info            - Info struct initialized with the
  *                                external name pointer.
@@ -290,11 +290,11 @@ acpi_ns_get_internal_name_length (
 
 	/*
 	 * For the internal name, the required length is 4 bytes
-	 * per segment, plus 1 each for Root_prefix, Multi_name_prefix_op,
+	 * per segment, plus 1 each for root_prefix, multi_name_prefix_op,
 	 * segment count, trailing null (which is not really needed,
 	 * but no there's harm in putting it there)
 	 *
-	 * strlen() + 1 covers the first Name_seg, which has no
+	 * strlen() + 1 covers the first name_seg, which has no
 	 * path separator
 	 */
 	if (acpi_ns_valid_root_prefix (next_external_char[0])) {
@@ -335,7 +335,7 @@ acpi_ns_get_internal_name_length (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_build_internal_name
+ * FUNCTION:    acpi_ns_build_internal_name
  *
  * PARAMETERS:  Info            - Info struct fully initialized
  *
@@ -357,7 +357,7 @@ acpi_ns_build_internal_name (
 	acpi_native_uint        i;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_build_internal_name");
+	ACPI_FUNCTION_TRACE ("ns_build_internal_name");
 
 
 	/* Setup the correct prefixes, counts, and pointers */
@@ -454,9 +454,9 @@ acpi_ns_build_internal_name (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_internalize_name
+ * FUNCTION:    acpi_ns_internalize_name
  *
- * PARAMETERS:  *External_name          - External representation of name
+ * PARAMETERS:  *external_name          - External representation of name
  *              **Converted Name        - Where to return the resulting
  *                                        internal represention of the name
  *
@@ -477,7 +477,7 @@ acpi_ns_internalize_name (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_internalize_name");
+	ACPI_FUNCTION_TRACE ("ns_internalize_name");
 
 
 	if ((!external_name)     ||
@@ -514,10 +514,10 @@ acpi_ns_internalize_name (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_externalize_name
+ * FUNCTION:    acpi_ns_externalize_name
  *
- * PARAMETERS:  *Internal_name         - Internal representation of name
- *              **Converted_name       - Where to return the resulting
+ * PARAMETERS:  *internal_name         - Internal representation of name
+ *              **converted_name       - Where to return the resulting
  *                                       external representation of name
  *
  * RETURN:      Status
@@ -542,7 +542,7 @@ acpi_ns_externalize_name (
 	acpi_native_uint        j = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_externalize_name");
+	ACPI_FUNCTION_TRACE ("ns_externalize_name");
 
 
 	if (!internal_name_length   ||
@@ -603,7 +603,7 @@ acpi_ns_externalize_name (
 
 		case 0:
 
-			/* Null_name */
+			/* null_name */
 
 			names_index = 0;
 			num_segments = 0;
@@ -620,7 +620,7 @@ acpi_ns_externalize_name (
 	}
 
 	/*
-	 * Calculate the length of Converted_name, which equals the length
+	 * Calculate the length of converted_name, which equals the length
 	 * of the prefix, length of all object names, length of any required
 	 * punctuation ('.') between object names, plus the NULL terminator.
 	 */
@@ -629,15 +629,15 @@ acpi_ns_externalize_name (
 
 	/*
 	 * Check to see if we're still in bounds.  If not, there's a problem
-	 * with Internal_name (invalid format).
+	 * with internal_name (invalid format).
 	 */
 	if (required_length > internal_name_length) {
-		ACPI_REPORT_ERROR (("Ns_externalize_name: Invalid internal name\n"));
+		ACPI_REPORT_ERROR (("ns_externalize_name: Invalid internal name\n"));
 		return_ACPI_STATUS (AE_BAD_PATHNAME);
 	}
 
 	/*
-	 * Build Converted_name...
+	 * Build converted_name...
 	 */
 	*converted_name = ACPI_MEM_CALLOCATE (required_length);
 	if (!(*converted_name)) {
@@ -673,7 +673,7 @@ acpi_ns_externalize_name (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_map_handle_to_node
+ * FUNCTION:    acpi_ns_map_handle_to_node
  *
  * PARAMETERS:  Handle          - Handle to be converted to an Node
  *
@@ -717,7 +717,7 @@ acpi_ns_map_handle_to_node (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_convert_entry_to_handle
+ * FUNCTION:    acpi_ns_convert_entry_to_handle
  *
  * PARAMETERS:  Node          - Node to be converted to a Handle
  *
@@ -746,7 +746,7 @@ acpi_ns_convert_entry_to_handle (
 		return (NULL);
 	}
 
-	if (Node == Acpi_gbl_Root_node)
+	if (Node == acpi_gbl_root_node)
 	{
 		return (ACPI_ROOT_OBJECT);
 	}
@@ -759,7 +759,7 @@ acpi_ns_convert_entry_to_handle (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_terminate
+ * FUNCTION:    acpi_ns_terminate
  *
  * PARAMETERS:  none
  *
@@ -776,7 +776,7 @@ acpi_ns_terminate (void)
 	acpi_namespace_node     *this_node;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_terminate");
+	ACPI_FUNCTION_TRACE ("ns_terminate");
 
 
 	this_node = acpi_gbl_root_node;
@@ -813,7 +813,7 @@ acpi_ns_terminate (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_opens_scope
+ * FUNCTION:    acpi_ns_opens_scope
  *
  * PARAMETERS:  Type        - A valid namespace type
  *
@@ -826,13 +826,13 @@ u32
 acpi_ns_opens_scope (
 	acpi_object_type        type)
 {
-	ACPI_FUNCTION_TRACE_STR ("Ns_opens_scope", acpi_ut_get_type_name (type));
+	ACPI_FUNCTION_TRACE_STR ("ns_opens_scope", acpi_ut_get_type_name (type));
 
 
 	if (!acpi_ut_valid_object_type (type)) {
 		/* type code out of range  */
 
-		ACPI_REPORT_WARNING (("Ns_opens_scope: Invalid Object Type %X\n", type));
+		ACPI_REPORT_WARNING (("ns_opens_scope: Invalid Object Type %X\n", type));
 		return_VALUE (ACPI_NS_NORMAL);
 	}
 
@@ -842,18 +842,18 @@ acpi_ns_opens_scope (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_node_by_path
+ * FUNCTION:    acpi_ns_get_node_by_path
  *
  * PARAMETERS:  *Pathname   - Name to be found, in external (ASL) format. The
  *                            \ (backslash) and ^ (carat) prefixes, and the
  *                            . (period) to separate segments are supported.
- *              Start_node  - Root of subtree to be searched, or NS_ALL for the
+ *              start_node  - Root of subtree to be searched, or NS_ALL for the
  *                            root of the name space.  If Name is fully
  *                            qualified (first s8 is '\'), the passed value
  *                            of Scope will not be accessed.
  *              Flags       - Used to indicate whether to perform upsearch or
  *                            not.
- *              Return_node - Where the Node is returned
+ *              return_node - Where the Node is returned
  *
  * DESCRIPTION: Look up a name relative to a given scope and return the
  *              corresponding Node.  NOTE: Scope can be null.
@@ -874,7 +874,7 @@ acpi_ns_get_node_by_path (
 	char                    *internal_path = NULL;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ns_get_node_by_path", pathname);
+	ACPI_FUNCTION_TRACE_PTR ("ns_get_node_by_path", pathname);
 
 
 	if (pathname) {
@@ -921,9 +921,9 @@ acpi_ns_get_node_by_path (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_find_parent_name
+ * FUNCTION:    acpi_ns_find_parent_name
  *
- * PARAMETERS:  *Child_node            - Named Obj whose name is to be found
+ * PARAMETERS:  *child_node            - Named Obj whose name is to be found
  *
  * RETURN:      The ACPI name
  *
@@ -940,7 +940,7 @@ acpi_ns_find_parent_name (
 	acpi_namespace_node     *parent_node;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_find_parent_name");
+	ACPI_FUNCTION_TRACE ("ns_find_parent_name");
 
 
 	if (child_node) {
@@ -967,7 +967,7 @@ acpi_ns_find_parent_name (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_parent_node
+ * FUNCTION:    acpi_ns_get_parent_node
  *
  * PARAMETERS:  Node       - Current table entry
  *
@@ -1007,7 +1007,7 @@ acpi_ns_get_parent_node (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_next_valid_node
+ * FUNCTION:    acpi_ns_get_next_valid_node
  *
  * PARAMETERS:  Node       - Current table entry
  *

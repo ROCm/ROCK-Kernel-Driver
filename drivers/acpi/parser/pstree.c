@@ -33,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_arg
+ * FUNCTION:    acpi_ps_get_arg
  *
  * PARAMETERS:  Op              - Get an argument for this op
  *              Argn            - Nth argument to get
@@ -87,7 +87,7 @@ acpi_ps_get_arg (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_append_arg
+ * FUNCTION:    acpi_ps_append_arg
  *
  * PARAMETERS:  Op              - Append an argument to this Op.
  *              Arg             - Argument Op to append
@@ -120,7 +120,7 @@ acpi_ps_append_arg (
 	if (op_info->class == AML_CLASS_UNKNOWN) {
 		/* Invalid opcode */
 
-		ACPI_REPORT_ERROR (("Ps_append_arg: Invalid AML Opcode: 0x%2.2X\n",
+		ACPI_REPORT_ERROR (("ps_append_arg: Invalid AML Opcode: 0x%2.2X\n",
 			op->common.aml_opcode));
 		return;
 	}
@@ -164,7 +164,7 @@ acpi_ps_append_arg (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_child
+ * FUNCTION:    acpi_ps_get_child
  *
  * PARAMETERS:  Op              - Get the child of this Op
  *
@@ -231,7 +231,7 @@ acpi_ps_get_child (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_depth_next
+ * FUNCTION:    acpi_ps_get_depth_next
  *
  * PARAMETERS:  Origin          - Root of subtree to search
  *              Op              - Last (previous) Op that was found

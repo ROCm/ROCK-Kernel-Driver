@@ -34,11 +34,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_create_scope_op
+ * FUNCTION:    acpi_ps_create_scope_op
  *
  * PARAMETERS:  None
  *
- * RETURN:      Scope_op
+ * RETURN:      scope_op
  *
  * DESCRIPTION: Create a Scope and associated namepath op with the root name
  *
@@ -64,7 +64,7 @@ acpi_ps_create_scope_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_init_op
+ * FUNCTION:    acpi_ps_init_op
  *
  * PARAMETERS:  Op              - A newly allocated Op object
  *              Opcode          - Opcode to store in the Op
@@ -94,7 +94,7 @@ acpi_ps_init_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_alloc_op
+ * FUNCTION:    acpi_ps_alloc_op
  *
  * PARAMETERS:  Opcode          - Opcode that will be stored in the new Op
  *
@@ -163,7 +163,7 @@ acpi_ps_alloc_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_free_op
+ * FUNCTION:    acpi_ps_free_op
  *
  * PARAMETERS:  Op              - Op to be freed
  *
@@ -178,7 +178,7 @@ void
 acpi_ps_free_op (
 	acpi_parse_object       *op)
 {
-	ACPI_FUNCTION_NAME ("Ps_free_op");
+	ACPI_FUNCTION_NAME ("ps_free_op");
 
 
 	if (op->common.aml_opcode == AML_INT_RETURN_VALUE_OP) {
@@ -196,7 +196,7 @@ acpi_ps_free_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_delete_parse_cache
+ * FUNCTION:    acpi_ps_delete_parse_cache
  *
  * PARAMETERS:  None
  *
@@ -210,7 +210,7 @@ void
 acpi_ps_delete_parse_cache (
 	void)
 {
-	ACPI_FUNCTION_TRACE ("Ps_delete_parse_cache");
+	ACPI_FUNCTION_TRACE ("ps_delete_parse_cache");
 
 
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_PSNODE);

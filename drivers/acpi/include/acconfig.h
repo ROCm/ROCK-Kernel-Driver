@@ -53,7 +53,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20021212
+#define ACPI_CA_VERSION                 0x20021217
 
 /* Version of ACPI supported */
 
@@ -148,7 +148,7 @@
 #define ACPI_NUM_PREDEFINED_REGIONS     8
 #define ACPI_USER_REGION_BEGIN          0x80
 
-/* Maximum Space_ids for Operation Regions */
+/* Maximum space_ids for Operation Regions */
 
 #define ACPI_MAX_ADDRESS_SPACE          255
 

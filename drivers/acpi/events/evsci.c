@@ -33,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_sci_handler
+ * FUNCTION:    acpi_ev_sci_handler
  *
  * PARAMETERS:  Context   - Calling Context
  *
@@ -54,7 +54,7 @@ acpi_ev_sci_handler (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE("Ev_sci_handler");
+	ACPI_FUNCTION_TRACE("ev_sci_handler");
 
 
 	/*
@@ -73,9 +73,9 @@ acpi_ev_sci_handler (
 	}
 
 	/*
-	 * Fixed Acpi_events:
+	 * Fixed acpi_events:
 	 * -------------
-	 * Check for and dispatch any Fixed Acpi_events that have occurred
+	 * Check for and dispatch any Fixed acpi_events that have occurred
 	 */
 	interrupt_handled |= acpi_ev_fixed_event_detect ();
 
@@ -92,7 +92,7 @@ acpi_ev_sci_handler (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_ev_install_sci_handler
+ * FUNCTION:    acpi_ev_install_sci_handler
  *
  * PARAMETERS:  none
  *
@@ -108,7 +108,7 @@ acpi_ev_install_sci_handler (void)
 	u32                     status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_install_sci_handler");
+	ACPI_FUNCTION_TRACE ("ev_install_sci_handler");
 
 
 	status = acpi_os_install_interrupt_handler ((u32) acpi_gbl_FADT->sci_int,
@@ -119,7 +119,7 @@ acpi_ev_install_sci_handler (void)
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_ev_remove_sci_handler
+ * FUNCTION:    acpi_ev_remove_sci_handler
  *
  * PARAMETERS:  none
  *
@@ -142,7 +142,7 @@ acpi_ev_remove_sci_handler (void)
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_remove_sci_handler");
+	ACPI_FUNCTION_TRACE ("ev_remove_sci_handler");
 
 
 	/* Just let the OS remove the handler and disable the level */

@@ -33,11 +33,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_find_table
+ * FUNCTION:    acpi_tb_find_table
  *
  * PARAMETERS:  Signature           - String with ACPI table signature
- *              Oem_id              - String with the table OEM ID
- *              Oem_table_id        - String with the OEM Table ID.
+ *              oem_id              - String with the table OEM ID
+ *              oem_table_id        - String with the OEM Table ID.
  *
  * RETURN:      Status
  *
@@ -57,7 +57,7 @@ acpi_tb_find_table (
 	acpi_table_header       *table;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_find_table");
+	ACPI_FUNCTION_TRACE ("tb_find_table");
 
 
 	/* Validate string lengths */
@@ -76,7 +76,7 @@ acpi_tb_find_table (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Check Oem_id and Oem_table_id */
+	/* Check oem_id and oem_table_id */
 
 	if ((oem_id[0]     && ACPI_STRCMP (oem_id, table->oem_id)) ||
 		(oem_table_id[0] && ACPI_STRCMP (oem_table_id, table->oem_table_id))) {
@@ -90,22 +90,22 @@ acpi_tb_find_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_firmware_table
+ * FUNCTION:    acpi_get_firmware_table
  *
  * PARAMETERS:  Signature       - Any ACPI table signature
  *              Instance        - the non zero instance of the table, allows
  *                                support for multiple tables of the same type
  *              Flags           - Physical/Virtual support
- *              Ret_buffer      - pointer to a structure containing a buffer to
+ *              ret_buffer      - pointer to a structure containing a buffer to
  *                                receive the table
  *
  * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get an ACPI table.  The caller
- *              supplies an Out_buffer large enough to contain the entire ACPI
+ *              supplies an out_buffer large enough to contain the entire ACPI
  *              table.  Upon completion
- *              the Out_buffer->Length field will indicate the number of bytes
- *              copied into the Out_buffer->Buf_ptr buffer. This table will be
+ *              the out_buffer->Length field will indicate the number of bytes
+ *              copied into the out_buffer->buf_ptr buffer. This table will be
  *              a complete table including the header.
  *
  ******************************************************************************/
@@ -128,7 +128,7 @@ acpi_get_firmware_table (
 	u32                     j;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_firmware_table");
+	ACPI_FUNCTION_TRACE ("acpi_get_firmware_table");
 
 
 	/*
@@ -195,7 +195,7 @@ acpi_get_firmware_table (
 		ACPI_HIDWORD (address.pointer.value),
 		ACPI_LODWORD (address.pointer.value)));
 
-	/* Insert Processor_mode flags */
+	/* Insert processor_mode flags */
 
 	address.pointer_type |= flags;
 
@@ -274,9 +274,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_find_root_pointer
+ * FUNCTION:    acpi_find_root_pointer
  *
- * PARAMETERS:  **Rsdp_address          - Where to place the RSDP address
+ * PARAMETERS:  **rsdp_address          - Where to place the RSDP address
  *              Flags                   - Logical/Physical addressing
  *
  * RETURN:      Status, Physical address of the RSDP
@@ -294,7 +294,7 @@ acpi_find_root_pointer (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_find_root_pointer");
+	ACPI_FUNCTION_TRACE ("acpi_find_root_pointer");
 
 
 	/* Get the RSDP */
@@ -314,9 +314,9 @@ acpi_find_root_pointer (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_scan_memory_for_rsdp
+ * FUNCTION:    acpi_tb_scan_memory_for_rsdp
  *
- * PARAMETERS:  Start_address       - Starting pointer for search
+ * PARAMETERS:  start_address       - Starting pointer for search
  *              Length              - Maximum length to search
  *
  * RETURN:      Pointer to the RSDP if found, otherwise NULL.
@@ -334,7 +334,7 @@ acpi_tb_scan_memory_for_rsdp (
 	u8                      *mem_rover;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_scan_memory_for_rsdp");
+	ACPI_FUNCTION_TRACE ("tb_scan_memory_for_rsdp");
 
 
 	/* Search from given start addr for the requested length  */
@@ -365,18 +365,18 @@ acpi_tb_scan_memory_for_rsdp (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_find_rsdp
+ * FUNCTION:    acpi_tb_find_rsdp
  *
- * PARAMETERS:  *Table_info             - Where the table info is returned
+ * PARAMETERS:  *table_info             - Where the table info is returned
  *              Flags                   - Current memory mode (logical vs.
  *                                        physical addressing)
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Search lower 1_mbyte of memory for the root system descriptor
+ * DESCRIPTION: search lower 1_mbyte of memory for the root system descriptor
  *              pointer structure.  If it is found, set *RSDP to point to it.
  *
- *              NOTE: The RSDP must be either in the first 1_k of the Extended
+ *              NOTE: The RSDp must be either in the first 1_k of the Extended
  *              BIOS Data Area or between E0000 and FFFFF (ACPI 1.0 section
  *              5.2.2; assertion #421).
  *
@@ -393,7 +393,7 @@ acpi_tb_find_rsdp (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_find_rsdp");
+	ACPI_FUNCTION_TRACE ("tb_find_rsdp");
 
 
 	/*

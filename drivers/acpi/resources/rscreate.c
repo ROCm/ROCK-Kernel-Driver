@@ -34,15 +34,15 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_create_resource_list
+ * FUNCTION:    acpi_rs_create_resource_list
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource byte stream
- *              Output_buffer           - Pointer to the user's buffer
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource byte stream
+ *              output_buffer           - Pointer to the user's buffer
  *
  * RETURN:      Status  - AE_OK if okay, else a valid acpi_status code
- *              If Output_buffer is not large enough, Output_buffer_length
- *              indicates how large Output_buffer should be, else it
- *              indicates how may u8 elements of Output_buffer are valid.
+ *              If output_buffer is not large enough, output_buffer_length
+ *              indicates how large output_buffer should be, else it
+ *              indicates how may u8 elements of output_buffer are valid.
  *
  * DESCRIPTION: Takes the byte stream returned from a _CRS, _PRS control method
  *              execution and parses the stream to create a linked list
@@ -62,10 +62,10 @@ acpi_rs_create_resource_list (
 	u32                     byte_stream_buffer_length;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_create_resource_list");
+	ACPI_FUNCTION_TRACE ("rs_create_resource_list");
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Byte_stream_buffer = %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "byte_stream_buffer = %p\n",
 		byte_stream_buffer));
 
 	/*
@@ -75,13 +75,13 @@ acpi_rs_create_resource_list (
 	byte_stream_start = byte_stream_buffer->buffer.pointer;
 
 	/*
-	 * Pass the Byte_stream_buffer into a module that can calculate
+	 * Pass the byte_stream_buffer into a module that can calculate
 	 * the buffer size needed for the linked list
 	 */
 	status = acpi_rs_get_list_length (byte_stream_start, byte_stream_buffer_length,
 			 &list_size_needed);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Status=%X List_size_needed=%X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Status=%X list_size_needed=%X\n",
 		status, (u32) list_size_needed));
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
@@ -102,7 +102,7 @@ acpi_rs_create_resource_list (
 		return_ACPI_STATUS (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Output_buffer %p Length %X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "output_buffer %p Length %X\n",
 			output_buffer->pointer, (u32) output_buffer->length));
 	return_ACPI_STATUS (AE_OK);
 }
@@ -110,15 +110,15 @@ acpi_rs_create_resource_list (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_create_pci_routing_table
+ * FUNCTION:    acpi_rs_create_pci_routing_table
  *
- * PARAMETERS:  Package_object          - Pointer to an acpi_operand_object
+ * PARAMETERS:  package_object          - Pointer to an acpi_operand_object
  *                                        package
- *              Output_buffer           - Pointer to the user's buffer
+ *              output_buffer           - Pointer to the user's buffer
  *
  * RETURN:      Status  AE_OK if okay, else a valid acpi_status code.
- *              If the Output_buffer is too small, the error will be
- *              AE_BUFFER_OVERFLOW and Output_buffer->Length will point
+ *              If the output_buffer is too small, the error will be
+ *              AE_BUFFER_OVERFLOW and output_buffer->Length will point
  *              to the size buffer needed.
  *
  * DESCRIPTION: Takes the acpi_operand_object  package and creates a
@@ -147,7 +147,7 @@ acpi_rs_create_pci_routing_table (
 	acpi_buffer             path_buffer;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_create_pci_routing_table");
+	ACPI_FUNCTION_TRACE ("rs_create_pci_routing_table");
 
 
 	/* Params already validated, so we don't re-validate here */
@@ -161,7 +161,7 @@ acpi_rs_create_pci_routing_table (
 		return_ACPI_STATUS (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Buffer_size_needed = %X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "buffer_size_needed = %X\n",
 		(u32) buffer_size_needed));
 
 	/* Validate/Allocate/Clear caller buffer */
@@ -174,7 +174,7 @@ acpi_rs_create_pci_routing_table (
 	/*
 	 * Loop through the ACPI_INTERNAL_OBJECTS - Each object
 	 * should be a package that in turn contains an
-	 * acpi_integer Address, a u8 Pin, a Name and a u8 Source_index.
+	 * acpi_integer Address, a u8 Pin, a Name and a u8 source_index.
 	 */
 	top_object_list  = package_object->package.elements;
 	number_of_elements = package_object->package.count;
@@ -183,9 +183,9 @@ acpi_rs_create_pci_routing_table (
 
 	for (index = 0; index < number_of_elements; index++) {
 		/*
-		 * Point User_prt past this current structure
+		 * Point user_prt past this current structure
 		 *
-		 * NOTE: On the first iteration, User_prt->Length will
+		 * NOTE: On the first iteration, user_prt->Length will
 		 * be zero because we cleared the return buffer earlier
 		 */
 		buffer += user_prt->length;
@@ -219,8 +219,8 @@ acpi_rs_create_pci_routing_table (
 
 		/*
 		 * Dereference the sub-package.
-		 * The Sub_object_list will now point to an array of the four IRQ
-		 * elements: [Address, Pin, Source, Source_index]
+		 * The sub_object_list will now point to an array of the four IRQ
+		 * elements: [Address, Pin, Source, source_index]
 		 */
 		sub_object_list = (*top_object_list)->package.elements;
 
@@ -253,7 +253,7 @@ acpi_rs_create_pci_routing_table (
 		}
 
 		/*
-		 * 3) Third subobject: Dereference the PRT.Source_name
+		 * 3) Third subobject: Dereference the PRT.source_name
 		 */
 		obj_desc = sub_object_list[2];
 		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
@@ -312,10 +312,10 @@ acpi_rs_create_pci_routing_table (
 
 		/* Now align the current length */
 
-		user_prt->length = ACPI_ROUND_UP_TO_64_bITS (user_prt->length);
+		user_prt->length = ACPI_ROUND_UP_to_64_bITS (user_prt->length);
 
 		/*
-		 * 4) Fourth subobject: Dereference the PRT.Source_index
+		 * 4) Fourth subobject: Dereference the PRT.source_index
 		 */
 		obj_desc = sub_object_list[3];
 		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
@@ -323,7 +323,7 @@ acpi_rs_create_pci_routing_table (
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"(PRT[%X].Source_index) Need Integer, found %s\n",
+				"(PRT[%X].source_index) Need Integer, found %s\n",
 				index, acpi_ut_get_object_type_name (obj_desc)));
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
@@ -333,7 +333,7 @@ acpi_rs_create_pci_routing_table (
 		top_object_list++;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Output_buffer %p Length %X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "output_buffer %p Length %X\n",
 			output_buffer->pointer, (u32) output_buffer->length));
 	return_ACPI_STATUS (AE_OK);
 }
@@ -341,14 +341,14 @@ acpi_rs_create_pci_routing_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_create_byte_stream
+ * FUNCTION:    acpi_rs_create_byte_stream
  *
- * PARAMETERS:  Linked_list_buffer      - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's buffer
+ * PARAMETERS:  linked_list_buffer      - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's buffer
  *
  * RETURN:      Status  AE_OK if okay, else a valid acpi_status code.
- *              If the Output_buffer is too small, the error will be
- *              AE_BUFFER_OVERFLOW and Output_buffer->Length will point
+ *              If the output_buffer is too small, the error will be
+ *              AE_BUFFER_OVERFLOW and output_buffer->Length will point
  *              to the size buffer needed.
  *
  * DESCRIPTION: Takes the linked list of device resources and
@@ -366,22 +366,22 @@ acpi_rs_create_byte_stream (
 	acpi_size               byte_stream_size_needed = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_create_byte_stream");
+	ACPI_FUNCTION_TRACE ("rs_create_byte_stream");
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Linked_list_buffer = %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "linked_list_buffer = %p\n",
 		linked_list_buffer));
 
 	/*
 	 * Params already validated, so we don't re-validate here
 	 *
-	 * Pass the Linked_list_buffer into a module that calculates
+	 * Pass the linked_list_buffer into a module that calculates
 	 * the buffer size needed for the byte stream.
 	 */
 	status = acpi_rs_get_byte_stream_length (linked_list_buffer,
 			 &byte_stream_size_needed);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Byte_stream_size_needed=%X, %s\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "byte_stream_size_needed=%X, %s\n",
 		(u32) byte_stream_size_needed, acpi_format_exception (status)));
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
@@ -402,7 +402,7 @@ acpi_rs_create_byte_stream (
 		return_ACPI_STATUS (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Output_buffer %p Length %X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "output_buffer %p Length %X\n",
 			output_buffer->pointer, (u32) output_buffer->length));
 	return_ACPI_STATUS (AE_OK);
 }

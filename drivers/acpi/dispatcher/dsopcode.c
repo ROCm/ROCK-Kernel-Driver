@@ -38,11 +38,11 @@
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_execute_arguments
+ * FUNCTION:    acpi_ds_execute_arguments
  *
  * PARAMETERS:  Node                - Parent NS node
- *              Aml_length          - Length of executable AML
- *              Aml_start           - Pointer to the AML
+ *              aml_length          - Length of executable AML
+ *              aml_start           - Pointer to the AML
  *
  * RETURN:      Status.
  *
@@ -63,7 +63,7 @@ acpi_ds_execute_arguments (
 	acpi_parse_object       *arg;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_ds_execute_arguments");
+	ACPI_FUNCTION_TRACE ("acpi_ds_execute_arguments");
 
 
 	/*
@@ -74,7 +74,7 @@ acpi_ds_execute_arguments (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-	/* Save the Node for use in Acpi_ps_parse_aml */
+	/* Save the Node for use in acpi_ps_parse_aml */
 
 	op->common.node = scope_node;
 
@@ -140,13 +140,13 @@ acpi_ds_execute_arguments (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_get_buffer_field_arguments
+ * FUNCTION:    acpi_ds_get_buffer_field_arguments
  *
- * PARAMETERS:  Obj_desc        - A valid Buffer_field object
+ * PARAMETERS:  obj_desc        - A valid buffer_field object
  *
  * RETURN:      Status.
  *
- * DESCRIPTION: Get Buffer_field Buffer and Index. This implements the late
+ * DESCRIPTION: Get buffer_field Buffer and Index. This implements the late
  *              evaluation of these field attributes.
  *
  ****************************************************************************/
@@ -160,23 +160,23 @@ acpi_ds_get_buffer_field_arguments (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_get_buffer_field_arguments", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ds_get_buffer_field_arguments", obj_desc);
 
 
 	if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	/* Get the AML pointer (method object) and Buffer_field node */
+	/* Get the AML pointer (method object) and buffer_field node */
 
 	extra_desc = acpi_ns_get_secondary_object (obj_desc);
 	node = obj_desc->buffer_field.node;
 
 	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_BUFFER_FIELD, node, NULL));
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] Buffer_field JIT Init\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] buffer_field JIT Init\n",
 		node->name.ascii));
 
-	/* Execute the AML code for the Term_arg arguments */
+	/* Execute the AML code for the term_arg arguments */
 
 	status = acpi_ds_execute_arguments (node, acpi_ns_get_parent_node (node),
 			 extra_desc->extra.aml_length, extra_desc->extra.aml_start);
@@ -186,9 +186,9 @@ acpi_ds_get_buffer_field_arguments (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_get_buffer_arguments
+ * FUNCTION:    acpi_ds_get_buffer_arguments
  *
- * PARAMETERS:  Obj_desc        - A valid Bufferobject
+ * PARAMETERS:  obj_desc        - A valid Bufferobject
  *
  * RETURN:      Status.
  *
@@ -205,7 +205,7 @@ acpi_ds_get_buffer_arguments (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_get_buffer_arguments", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ds_get_buffer_arguments", obj_desc);
 
 
 	if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
@@ -223,7 +223,7 @@ acpi_ds_get_buffer_arguments (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Buffer JIT Init\n"));
 
-	/* Execute the AML code for the Term_arg arguments */
+	/* Execute the AML code for the term_arg arguments */
 
 	status = acpi_ds_execute_arguments (node, node,
 			 obj_desc->buffer.aml_length, obj_desc->buffer.aml_start);
@@ -233,9 +233,9 @@ acpi_ds_get_buffer_arguments (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_get_package_arguments
+ * FUNCTION:    acpi_ds_get_package_arguments
  *
- * PARAMETERS:  Obj_desc        - A valid Packageobject
+ * PARAMETERS:  obj_desc        - A valid Packageobject
  *
  * RETURN:      Status.
  *
@@ -252,7 +252,7 @@ acpi_ds_get_package_arguments (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_get_package_arguments", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ds_get_package_arguments", obj_desc);
 
 
 	if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
@@ -270,7 +270,7 @@ acpi_ds_get_package_arguments (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Package JIT Init\n"));
 
-	/* Execute the AML code for the Term_arg arguments */
+	/* Execute the AML code for the term_arg arguments */
 
 	status = acpi_ds_execute_arguments (node, node,
 			 obj_desc->package.aml_length, obj_desc->package.aml_start);
@@ -280,9 +280,9 @@ acpi_ds_get_package_arguments (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_get_region_arguments
+ * FUNCTION:    acpi_ds_get_region_arguments
  *
- * PARAMETERS:  Obj_desc        - A valid region object
+ * PARAMETERS:  obj_desc        - A valid region object
  *
  * RETURN:      Status.
  *
@@ -300,7 +300,7 @@ acpi_ds_get_region_arguments (
 	acpi_operand_object     *extra_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_get_region_arguments", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ds_get_region_arguments", obj_desc);
 
 
 	if (obj_desc->region.flags & AOPOBJ_DATA_VALID) {
@@ -318,7 +318,7 @@ acpi_ds_get_region_arguments (
 
 	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_REGION, node, NULL));
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] Op_region Init at AML %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] op_region Init at AML %p\n",
 		node->name.ascii, extra_desc->extra.aml_start));
 
 
@@ -330,13 +330,13 @@ acpi_ds_get_region_arguments (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_initialize_region
+ * FUNCTION:    acpi_ds_initialize_region
  *
  * PARAMETERS:  Op              - A valid region Op object
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Front end to Ev_initialize_region
+ * DESCRIPTION: Front end to ev_initialize_region
  *
  ****************************************************************************/
 
@@ -359,12 +359,12 @@ acpi_ds_initialize_region (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_init_buffer_field
+ * FUNCTION:    acpi_ds_init_buffer_field
  *
- * PARAMETERS:  Aml_opcode      - Create_xxx_field
- *              Obj_desc        - Buffer_field object
- *              Buffer_desc     - Host Buffer
- *              Offset_desc     - Offset into buffer
+ * PARAMETERS:  aml_opcode      - create_xxx_field
+ *              obj_desc        - buffer_field object
+ *              buffer_desc     - Host Buffer
+ *              offset_desc     - Offset into buffer
  *              Length          - Length of field (CREATE_FIELD_OP only)
  *              Result          - Where to store the result
  *
@@ -390,7 +390,7 @@ acpi_ds_init_buffer_field (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_init_buffer_field", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ds_init_buffer_field", obj_desc);
 
 
 	/* Host object must be a Buffer */
@@ -405,9 +405,9 @@ acpi_ds_init_buffer_field (
 	}
 
 	/*
-	 * The last parameter to all of these opcodes (Result_desc) started
-	 * out as a Name_string, and should therefore now be a NS node
-	 * after resolution in Acpi_ex_resolve_operands().
+	 * The last parameter to all of these opcodes (result_desc) started
+	 * out as a name_string, and should therefore now be a NS node
+	 * after resolution in acpi_ex_resolve_operands().
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (result_desc) != ACPI_DESC_TYPE_NAMED) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "(%s) destination must be a NS Node\n",
@@ -500,7 +500,7 @@ acpi_ds_init_buffer_field (
 
 	/*
 	 * Initialize areas of the field object that are common to all fields
-	 * For Field_flags, use LOCK_RULE = 0 (NO_LOCK), UPDATE_RULE = 0 (UPDATE_PRESERVE)
+	 * For field_flags, use LOCK_RULE = 0 (NO_LOCK), UPDATE_RULE = 0 (UPDATE_PRESERVE)
 	 */
 	status = acpi_ex_prep_common_field_object (obj_desc, field_flags, 0,
 			  bit_offset, bit_count);
@@ -510,7 +510,7 @@ acpi_ds_init_buffer_field (
 
 	obj_desc->buffer_field.buffer_obj = buffer_desc;
 
-	/* Reference count for Buffer_desc inherits Obj_desc count */
+	/* Reference count for buffer_desc inherits obj_desc count */
 
 	buffer_desc->common.reference_count = (u16) (buffer_desc->common.reference_count +
 			  obj_desc->common.reference_count);
@@ -533,7 +533,7 @@ cleanup:
 		acpi_ut_remove_reference (result_desc); /* Result descriptor */
 	}
 	else {
-		/* Now the address and length are valid for this Buffer_field */
+		/* Now the address and length are valid for this buffer_field */
 
 		obj_desc->buffer_field.flags |= AOPOBJ_DATA_VALID;
 	}
@@ -544,15 +544,15 @@ cleanup:
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_eval_buffer_field_operands
+ * FUNCTION:    acpi_ds_eval_buffer_field_operands
  *
- * PARAMETERS:  Walk_state      - Current walk
- *              Op              - A valid Buffer_field Op object
+ * PARAMETERS:  walk_state      - Current walk
+ *              Op              - A valid buffer_field Op object
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Get Buffer_field Buffer and Index
- *              Called from Acpi_ds_exec_end_op during Buffer_field parse tree walk
+ * DESCRIPTION: Get buffer_field Buffer and Index
+ *              Called from acpi_ds_exec_end_op during buffer_field parse tree walk
  *
  ****************************************************************************/
 
@@ -567,16 +567,16 @@ acpi_ds_eval_buffer_field_operands (
 	acpi_parse_object       *next_op;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_eval_buffer_field_operands", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_eval_buffer_field_operands", op);
 
 
 	/*
 	 * This is where we evaluate the address and length fields of the
-	 * Create_xxx_field declaration
+	 * create_xxx_field declaration
 	 */
 	node =  op->common.node;
 
-	/* Next_op points to the op that holds the Buffer */
+	/* next_op points to the op that holds the Buffer */
 
 	next_op = op->common.value.arg;
 
@@ -599,7 +599,7 @@ acpi_ds_eval_buffer_field_operands (
 
 	ACPI_DUMP_OPERANDS (ACPI_WALK_OPERANDS, ACPI_IMODE_EXECUTE,
 			  acpi_ps_get_opcode_name (op->common.aml_opcode),
-			  walk_state->num_operands, "after Acpi_ex_resolve_operands");
+			  walk_state->num_operands, "after acpi_ex_resolve_operands");
 
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "(%s) bad operand(s) (%X)\n",
@@ -618,7 +618,7 @@ acpi_ds_eval_buffer_field_operands (
 				 walk_state->operands[2], walk_state->operands[3]);
 	}
 	else {
-		/* All other, Create_xxx_field opcodes */
+		/* All other, create_xxx_field opcodes */
 
 		status = acpi_ds_init_buffer_field (op->common.aml_opcode, obj_desc,
 				 walk_state->operands[0], walk_state->operands[1],
@@ -631,15 +631,15 @@ acpi_ds_eval_buffer_field_operands (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_eval_region_operands
+ * FUNCTION:    acpi_ds_eval_region_operands
  *
- * PARAMETERS:  Walk_state      - Current walk
+ * PARAMETERS:  walk_state      - Current walk
  *              Op              - A valid region Op object
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Get region address and length
- *              Called from Acpi_ds_exec_end_op during Op_region parse tree walk
+ *              Called from acpi_ds_exec_end_op during op_region parse tree walk
  *
  ****************************************************************************/
 
@@ -655,19 +655,19 @@ acpi_ds_eval_region_operands (
 	acpi_parse_object       *next_op;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_eval_region_operands", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_eval_region_operands", op);
 
 
 	/*
-	 * This is where we evaluate the address and length fields of the Op_region declaration
+	 * This is where we evaluate the address and length fields of the op_region declaration
 	 */
 	node =  op->common.node;
 
-	/* Next_op points to the op that holds the Space_iD */
+	/* next_op points to the op that holds the space_iD */
 
 	next_op = op->common.value.arg;
 
-	/* Next_op points to address op */
+	/* next_op points to address op */
 
 	next_op = next_op->common.next;
 
@@ -687,7 +687,7 @@ acpi_ds_eval_region_operands (
 
 	ACPI_DUMP_OPERANDS (ACPI_WALK_OPERANDS, ACPI_IMODE_EXECUTE,
 			  acpi_ps_get_opcode_name (op->common.aml_opcode),
-			  1, "after Acpi_ex_resolve_operands");
+			  1, "after acpi_ex_resolve_operands");
 
 	obj_desc = acpi_ns_get_attached_object (node);
 	if (!obj_desc) {
@@ -712,7 +712,7 @@ acpi_ds_eval_region_operands (
 	obj_desc->region.address = (acpi_physical_address) operand_desc->integer.value;
 	acpi_ut_remove_reference (operand_desc);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Rgn_obj %p Addr %8.8X%8.8X Len %X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "rgn_obj %p Addr %8.8X%8.8X Len %X\n",
 		obj_desc,
 		ACPI_HIDWORD (obj_desc->region.address), ACPI_LODWORD (obj_desc->region.address),
 		obj_desc->region.length));
@@ -727,11 +727,11 @@ acpi_ds_eval_region_operands (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_eval_data_object_operands
+ * FUNCTION:    acpi_ds_eval_data_object_operands
  *
- * PARAMETERS:  Walk_state      - Current walk
- *              Op              - A valid Data_object Op object
- *              Obj_desc        - Data_object
+ * PARAMETERS:  walk_state      - Current walk
+ *              Op              - A valid data_object Op object
+ *              obj_desc        - data_object
  *
  * RETURN:      Status
  *
@@ -752,7 +752,7 @@ acpi_ds_eval_data_object_operands (
 	u32                     length;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_eval_data_object_operands");
+	ACPI_FUNCTION_TRACE ("ds_eval_data_object_operands");
 
 
 	/* The first operand (for all of these data objects) is the length */
@@ -804,7 +804,7 @@ acpi_ds_eval_data_object_operands (
 
 	if (ACPI_SUCCESS (status)) {
 		/*
-		 * Return the object in the Walk_state, unless the parent is a package --
+		 * Return the object in the walk_state, unless the parent is a package --
 		 * in this case, the return object will be stored in the parse tree
 		 * for the package.
 		 */
@@ -822,9 +822,9 @@ acpi_ds_eval_data_object_operands (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_exec_begin_control_op
+ * FUNCTION:    acpi_ds_exec_begin_control_op
  *
- * PARAMETERS:  Walk_list       - The list that owns the walk stack
+ * PARAMETERS:  walk_list       - The list that owns the walk stack
  *              Op              - The control Op
  *
  * RETURN:      Status
@@ -843,7 +843,7 @@ acpi_ds_exec_begin_control_op (
 	acpi_generic_state      *control_state;
 
 
-	ACPI_FUNCTION_NAME ("Ds_exec_begin_control_op");
+	ACPI_FUNCTION_NAME ("ds_exec_begin_control_op");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p Opcode=%2.2X State=%p\n", op,
@@ -902,9 +902,9 @@ acpi_ds_exec_begin_control_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_exec_end_control_op
+ * FUNCTION:    acpi_ds_exec_end_control_op
  *
- * PARAMETERS:  Walk_list       - The list that owns the walk stack
+ * PARAMETERS:  walk_list       - The list that owns the walk stack
  *              Op              - The control Op
  *
  * RETURN:      Status
@@ -923,7 +923,7 @@ acpi_ds_exec_end_control_op (
 	acpi_generic_state      *control_state;
 
 
-	ACPI_FUNCTION_NAME ("Ds_exec_end_control_op");
+	ACPI_FUNCTION_NAME ("ds_exec_end_control_op");
 
 
 	switch (op->common.aml_opcode) {
@@ -1003,7 +1003,7 @@ acpi_ds_exec_end_control_op (
 
 			/*
 			 * Get the return value and save as the last result
-			 * value.  This is the only place where Walk_state->Return_desc
+			 * value.  This is the only place where walk_state->return_desc
 			 * is set to anything other than zero!
 			 */
 			walk_state->return_desc = walk_state->operands[0];
@@ -1044,7 +1044,7 @@ acpi_ds_exec_end_control_op (
 
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-			"Completed RETURN_OP State=%p, Ret_val=%p\n",
+			"Completed RETURN_OP State=%p, ret_val=%p\n",
 			walk_state, walk_state->return_desc));
 
 		/* End the control method execution right now */
@@ -1088,7 +1088,7 @@ acpi_ds_exec_end_control_op (
 			return (AE_AML_NO_WHILE);
 		}
 
-		/* Was: Walk_state->Aml_last_while = Walk_state->Control_state->Control.Aml_predicate_start; */
+		/* Was: walk_state->aml_last_while = walk_state->control_state->Control.aml_predicate_start; */
 
 		walk_state->aml_last_while = walk_state->control_state->control.package_end;
 

@@ -37,18 +37,18 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_store
+ * FUNCTION:    acpi_ex_store
  *
- * PARAMETERS:  *Source_desc        - Value to be stored
- *              *Dest_desc          - Where to store it.  Must be an NS node
+ * PARAMETERS:  *source_desc        - Value to be stored
+ *              *dest_desc          - Where to store it.  Must be an NS node
  *                                    or an acpi_operand_object of type
  *                                    Reference;
- *              Walk_state          - Current walk state
+ *              walk_state          - Current walk state
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Store the value described by Source_desc into the location
- *              described by Dest_desc. Called by various interpreter
+ * DESCRIPTION: Store the value described by source_desc into the location
+ *              described by dest_desc. Called by various interpreter
  *              functions to store the result of an operation into
  *              the destination operand -- not just simply the actual "Store"
  *              ASL operator.
@@ -65,7 +65,7 @@ acpi_ex_store (
 	acpi_operand_object     *ref_desc = dest_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_store", dest_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_store", dest_desc);
 
 
 	/* Validate parameters */
@@ -75,7 +75,7 @@ acpi_ex_store (
 		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
-	/* Dest_desc can be either a namespace node or an ACPI object */
+	/* dest_desc can be either a namespace node or an ACPI object */
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (dest_desc) == ACPI_DESC_TYPE_NAMED) {
 		/*
@@ -113,7 +113,7 @@ acpi_ex_store (
 
 		ACPI_DUMP_STACK_ENTRY (source_desc);
 		ACPI_DUMP_STACK_ENTRY (dest_desc);
-		ACPI_DUMP_OPERANDS (&dest_desc, ACPI_IMODE_EXECUTE, "Ex_store",
+		ACPI_DUMP_OPERANDS (&dest_desc, ACPI_IMODE_EXECUTE, "ex_store",
 				  2, "Target is not a Reference or Constant object");
 
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -223,11 +223,11 @@ acpi_ex_store (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_store_object_to_index
+ * FUNCTION:    acpi_ex_store_object_to_index
  *
- * PARAMETERS:  *Source_desc            - Value to be stored
- *              *Dest_desc              - Named object to receive the value
- *              Walk_state              - Current walk state
+ * PARAMETERS:  *source_desc            - Value to be stored
+ *              *dest_desc              - Named object to receive the value
+ *              walk_state              - Current walk state
  *
  * RETURN:      Status
  *
@@ -247,7 +247,7 @@ acpi_ex_store_object_to_index (
 	u8                      value = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_store_object_to_index");
+	ACPI_FUNCTION_TRACE ("ex_store_object_to_index");
 
 
 	/*
@@ -263,7 +263,7 @@ acpi_ex_store_object_to_index (
 		 * source object.
 		 */
 		/*
-		 * The object at *(Index_desc->Reference.Where) is the
+		 * The object at *(index_desc->Reference.Where) is the
 		 * element within the package that is to be modified.
 		 */
 		obj_desc = *(index_desc->reference.where);
@@ -298,7 +298,7 @@ acpi_ex_store_object_to_index (
 	case ACPI_TYPE_BUFFER_FIELD:
 
 		/*
-		 * Store into a Buffer (not actually a real Buffer_field) at a
+		 * Store into a Buffer (not actually a real buffer_field) at a
 		 * location defined by an Index.
 		 *
 		 * The first 8-bit element of the source object is written to the
@@ -354,7 +354,7 @@ acpi_ex_store_object_to_index (
 
 	default:
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Target is not a Package or Buffer_field\n"));
+			"Target is not a Package or buffer_field\n"));
 		status = AE_AML_OPERAND_TYPE;
 		break;
 	}
@@ -365,11 +365,11 @@ acpi_ex_store_object_to_index (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_store_object_to_node
+ * FUNCTION:    acpi_ex_store_object_to_node
  *
- * PARAMETERS:  Source_desc             - Value to be stored
+ * PARAMETERS:  source_desc             - Value to be stored
  *              Node                    - Named object to receive the value
- *              Walk_state              - Current walk state
+ *              walk_state              - Current walk state
  *
  * RETURN:      Status
  *
@@ -400,7 +400,7 @@ acpi_ex_store_object_to_node (
 	acpi_object_type        target_type;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_store_object_to_node", source_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_store_object_to_node", source_desc);
 
 
 	/*
@@ -455,9 +455,9 @@ acpi_ex_store_object_to_node (
 
 		if (new_desc != target_desc) {
 			/*
-			 * Store the new New_desc as the new value of the Name, and set
+			 * Store the new new_desc as the new value of the Name, and set
 			 * the Name's type to that of the value being stored in it.
-			 * Source_desc reference count is incremented by Attach_object.
+			 * source_desc reference count is incremented by attach_object.
 			 *
 			 * Note: This may change the type of the node if an explicit store
 			 * has been performed such that the node/object type has been

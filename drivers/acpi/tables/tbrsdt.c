@@ -33,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_verify_rsdp
+ * FUNCTION:    acpi_tb_verify_rsdp
  *
  * PARAMETERS:  Address         - RSDP (Pointer to RSDT)
  *
@@ -52,7 +52,7 @@ acpi_tb_verify_rsdp (
 	rsdp_descriptor         *rsdp;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_verify_rsdp");
+	ACPI_FUNCTION_TRACE ("tb_verify_rsdp");
 
 
 	switch (address->pointer_type) {
@@ -133,7 +133,7 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_rsdt_address
+ * FUNCTION:    acpi_tb_get_rsdt_address
  *
  * PARAMETERS:  None
  *
@@ -169,9 +169,9 @@ acpi_tb_get_rsdt_address (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_validate_rsdt
+ * FUNCTION:    acpi_tb_validate_rsdt
  *
- * PARAMETERS:  Table_ptr       - Addressable pointer to the RSDT.
+ * PARAMETERS:  table_ptr       - Addressable pointer to the RSDT.
  *
  * RETURN:      Status
  *
@@ -186,7 +186,7 @@ acpi_tb_validate_rsdt (
 	int                     no_match;
 
 
-	ACPI_FUNCTION_NAME ("Tb_validate_rsdt");
+	ACPI_FUNCTION_NAME ("tb_validate_rsdt");
 
 
 	/*
@@ -223,7 +223,7 @@ acpi_tb_validate_rsdt (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_table_rsdt
+ * FUNCTION:    acpi_tb_get_table_rsdt
  *
  * PARAMETERS:  None
  *
@@ -242,7 +242,7 @@ acpi_tb_get_table_rsdt (
 	acpi_pointer            address;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_table_rsdt");
+	ACPI_FUNCTION_TRACE ("tb_get_table_rsdt");
 
 
 	/* Get the RSDT/XSDT via the RSDP */

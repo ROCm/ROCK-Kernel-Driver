@@ -26,12 +26,12 @@
 #define __ACNAMESP_H__
 
 
-/* To search the entire name space, pass this as Search_base */
+/* To search the entire name space, pass this as search_base */
 
 #define ACPI_NS_ALL                 ((acpi_handle)0)
 
 /*
- * Elements of Acpi_ns_properties are bit significant
+ * Elements of acpi_ns_properties are bit significant
  * and should be one-to-one with values of acpi_object_type
  */
 #define ACPI_NS_NORMAL              0
@@ -49,7 +49,7 @@
 #define ACPI_NS_SYSTEM_BUS          "_SB_"
 
 
-/* Flags for Acpi_ns_lookup, Acpi_ns_search_and_enter */
+/* Flags for acpi_ns_lookup, acpi_ns_search_and_enter */
 
 #define ACPI_NS_NO_UPSEARCH         0
 #define ACPI_NS_SEARCH_PARENT       0x01

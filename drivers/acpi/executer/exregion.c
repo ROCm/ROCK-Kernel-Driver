@@ -1,7 +1,7 @@
 
 /******************************************************************************
  *
- * Module Name: exregion - ACPI default Op_region (address space) handlers
+ * Module Name: exregion - ACPI default op_region (address space) handlers
  *
  *****************************************************************************/
 
@@ -34,14 +34,14 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_memory_space_handler
+ * FUNCTION:    acpi_ex_system_memory_space_handler
  *
  * PARAMETERS:  Function            - Read or Write operation
  *              Address             - Where in the space to read or write
- *              Bit_width           - Field width in bits (8, 16, or 32)
+ *              bit_width           - Field width in bits (8, 16, or 32)
  *              Value               - Pointer to in or out value
- *              Handler_context     - Pointer to Handler's context
- *              Region_context      - Pointer to context specific to the
+ *              handler_context     - Pointer to Handler's context
+ *              region_context      - Pointer to context specific to the
  *                                    accessed region
  *
  * RETURN:      Status
@@ -68,7 +68,7 @@ acpi_ex_system_memory_space_handler (
 	u32                     remainder;
 #endif
 
-	ACPI_FUNCTION_TRACE ("Ex_system_memory_space_handler");
+	ACPI_FUNCTION_TRACE ("ex_system_memory_space_handler");
 
 
 	/* Validate and translate the bit width */
@@ -91,7 +91,7 @@ acpi_ex_system_memory_space_handler (
 		break;
 
 	default:
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid System_memory width %d\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid system_memory width %d\n",
 			bit_width));
 		return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 	}
@@ -161,7 +161,7 @@ acpi_ex_system_memory_space_handler (
 			  ((acpi_integer) address - (acpi_integer) mem_info->mapped_physical_address);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"System_memory %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
+		"system_memory %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
 		ACPI_HIDWORD (address), ACPI_LODWORD (address)));
 
    /*
@@ -195,7 +195,7 @@ acpi_ex_system_memory_space_handler (
 			break;
 #endif
 		default:
-			/* Bit_width was already validated */
+			/* bit_width was already validated */
 			break;
 		}
 		break;
@@ -222,7 +222,7 @@ acpi_ex_system_memory_space_handler (
 #endif
 
 		default:
-			/* Bit_width was already validated */
+			/* bit_width was already validated */
 			break;
 		}
 		break;
@@ -238,14 +238,14 @@ acpi_ex_system_memory_space_handler (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_io_space_handler
+ * FUNCTION:    acpi_ex_system_io_space_handler
  *
  * PARAMETERS:  Function            - Read or Write operation
  *              Address             - Where in the space to read or write
- *              Bit_width           - Field width in bits (8, 16, or 32)
+ *              bit_width           - Field width in bits (8, 16, or 32)
  *              Value               - Pointer to in or out value
- *              Handler_context     - Pointer to Handler's context
- *              Region_context      - Pointer to context specific to the
+ *              handler_context     - Pointer to Handler's context
+ *              region_context      - Pointer to context specific to the
  *                                    accessed region
  *
  * RETURN:      Status
@@ -266,11 +266,11 @@ acpi_ex_system_io_space_handler (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_system_io_space_handler");
+	ACPI_FUNCTION_TRACE ("ex_system_io_space_handler");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"System_iO %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
+		"system_iO %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
 		ACPI_HIDWORD (address), ACPI_LODWORD (address)));
 
 	/* Decode the function parameter */
@@ -298,14 +298,14 @@ acpi_ex_system_io_space_handler (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_pci_config_space_handler
+ * FUNCTION:    acpi_ex_pci_config_space_handler
  *
  * PARAMETERS:  Function            - Read or Write operation
  *              Address             - Where in the space to read or write
- *              Bit_width           - Field width in bits (8, 16, or 32)
+ *              bit_width           - Field width in bits (8, 16, or 32)
  *              Value               - Pointer to in or out value
- *              Handler_context     - Pointer to Handler's context
- *              Region_context      - Pointer to context specific to the
+ *              handler_context     - Pointer to Handler's context
+ *              region_context      - Pointer to context specific to the
  *                                    accessed region
  *
  * RETURN:      Status
@@ -328,17 +328,17 @@ acpi_ex_pci_config_space_handler (
 	u16                     pci_register;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_pci_config_space_handler");
+	ACPI_FUNCTION_TRACE ("ex_pci_config_space_handler");
 
 
 	/*
-	 *  The arguments to Acpi_os(Read|Write)Pci_configuration are:
+	 *  The arguments to acpi_os(Read|Write)pci_configuration are:
 	 *
-	 *  Pci_segment is the PCI bus segment range 0-31
-	 *  Pci_bus     is the PCI bus number range 0-255
-	 *  Pci_device  is the PCI device number range 0-31
-	 *  Pci_function is the PCI device function number
-	 *  Pci_register is the Config space register range 0-255 bytes
+	 *  pci_segment is the PCI bus segment range 0-31
+	 *  pci_bus     is the PCI bus number range 0-255
+	 *  pci_device  is the PCI device number range 0-31
+	 *  pci_function is the PCI device function number
+	 *  pci_register is the Config space register range 0-255 bytes
 	 *
 	 *  Value - input value for write, output address for read
 	 *
@@ -347,7 +347,7 @@ acpi_ex_pci_config_space_handler (
 	pci_register = (u16) (u32) address;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"Pci_config %d (%d) Seg(%04x) Bus(%04x) Dev(%04x) Func(%04x) Reg(%04x)\n",
+		"pci_config %d (%d) Seg(%04x) Bus(%04x) Dev(%04x) Func(%04x) Reg(%04x)\n",
 		function, bit_width, pci_id->segment, pci_id->bus, pci_id->device,
 		pci_id->function, pci_register));
 
@@ -375,14 +375,14 @@ acpi_ex_pci_config_space_handler (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_cmos_space_handler
+ * FUNCTION:    acpi_ex_cmos_space_handler
  *
  * PARAMETERS:  Function            - Read or Write operation
  *              Address             - Where in the space to read or write
- *              Bit_width           - Field width in bits (8, 16, or 32)
+ *              bit_width           - Field width in bits (8, 16, or 32)
  *              Value               - Pointer to in or out value
- *              Handler_context     - Pointer to Handler's context
- *              Region_context      - Pointer to context specific to the
+ *              handler_context     - Pointer to Handler's context
+ *              region_context      - Pointer to context specific to the
  *                                    accessed region
  *
  * RETURN:      Status
@@ -403,7 +403,7 @@ acpi_ex_cmos_space_handler (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_cmos_space_handler");
+	ACPI_FUNCTION_TRACE ("ex_cmos_space_handler");
 
 
 	return_ACPI_STATUS (status);
@@ -412,19 +412,19 @@ acpi_ex_cmos_space_handler (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_pci_bar_space_handler
+ * FUNCTION:    acpi_ex_pci_bar_space_handler
  *
  * PARAMETERS:  Function            - Read or Write operation
  *              Address             - Where in the space to read or write
- *              Bit_width           - Field width in bits (8, 16, or 32)
+ *              bit_width           - Field width in bits (8, 16, or 32)
  *              Value               - Pointer to in or out value
- *              Handler_context     - Pointer to Handler's context
- *              Region_context      - Pointer to context specific to the
+ *              handler_context     - Pointer to Handler's context
+ *              region_context      - Pointer to context specific to the
  *                                    accessed region
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Handler for the PCI Bar_target address space (Op Region)
+ * DESCRIPTION: Handler for the PCI bar_target address space (Op Region)
  *
  ******************************************************************************/
 
@@ -440,7 +440,7 @@ acpi_ex_pci_bar_space_handler (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_pci_bar_space_handler");
+	ACPI_FUNCTION_TRACE ("ex_pci_bar_space_handler");
 
 
 	return_ACPI_STATUS (status);
@@ -449,14 +449,14 @@ acpi_ex_pci_bar_space_handler (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_data_table_space_handler
+ * FUNCTION:    acpi_ex_data_table_space_handler
  *
  * PARAMETERS:  Function            - Read or Write operation
  *              Address             - Where in the space to read or write
- *              Bit_width           - Field width in bits (8, 16, or 32)
+ *              bit_width           - Field width in bits (8, 16, or 32)
  *              Value               - Pointer to in or out value
- *              Handler_context     - Pointer to Handler's context
- *              Region_context      - Pointer to context specific to the
+ *              handler_context     - Pointer to Handler's context
+ *              region_context      - Pointer to context specific to the
  *                                    accessed region
  *
  * RETURN:      Status
@@ -480,7 +480,7 @@ acpi_ex_data_table_space_handler (
 	char                    *logical_addr_ptr;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_data_table_space_handler");
+	ACPI_FUNCTION_TRACE ("ex_data_table_space_handler");
 
 
 	logical_addr_ptr = ACPI_PHYSADDR_TO_PTR (address);

@@ -38,11 +38,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_is_result_used
+ * FUNCTION:    acpi_ds_is_result_used
  *
  * PARAMETERS:  Op
- *              Result_obj
- *              Walk_state
+ *              result_obj
+ *              walk_state
  *
  * RETURN:      Status
  *
@@ -58,7 +58,7 @@ acpi_ds_is_result_used (
 	const acpi_opcode_info  *parent_info;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_is_result_used", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_is_result_used", op);
 
 
 	/* Must have both an Op and a Result Object */
@@ -129,7 +129,7 @@ acpi_ds_is_result_used (
 	case AML_CLASS_CREATE:
 
 		/*
-		 * These opcodes allow Term_arg(s) as operands and therefore
+		 * These opcodes allow term_arg(s) as operands and therefore
 		 * the operands can be method calls.  The result is used.
 		 */
 		goto result_used;
@@ -144,7 +144,7 @@ acpi_ds_is_result_used (
 			(op->common.parent->common.aml_opcode == AML_BUFFER_OP)      ||
 			(op->common.parent->common.aml_opcode == AML_INT_EVAL_SUBTREE_OP)) {
 			/*
-			 * These opcodes allow Term_arg(s) as operands and therefore
+			 * These opcodes allow term_arg(s) as operands and therefore
 			 * the operands can be method calls.  The result is used.
 			 */
 			goto result_used;
@@ -183,11 +183,11 @@ result_not_used:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_delete_result_if_not_used
+ * FUNCTION:    acpi_ds_delete_result_if_not_used
  *
  * PARAMETERS:  Op
- *              Result_obj
- *              Walk_state
+ *              result_obj
+ *              walk_state
  *
  * RETURN:      Status
  *
@@ -208,7 +208,7 @@ acpi_ds_delete_result_if_not_used (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_delete_result_if_not_used", result_obj);
+	ACPI_FUNCTION_TRACE_PTR ("ds_delete_result_if_not_used", result_obj);
 
 
 	if (!op) {
@@ -223,7 +223,7 @@ acpi_ds_delete_result_if_not_used (
 
 	if (!acpi_ds_is_result_used (op, walk_state)) {
 		/*
-		 * Must pop the result stack (Obj_desc should be equal to Result_obj)
+		 * Must pop the result stack (obj_desc should be equal to result_obj)
 		 */
 		status = acpi_ds_result_pop (&obj_desc, walk_state);
 		if (ACPI_SUCCESS (status)) {
@@ -237,9 +237,9 @@ acpi_ds_delete_result_if_not_used (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_resolve_operands
+ * FUNCTION:    acpi_ds_resolve_operands
  *
- * PARAMETERS:  Walk_state          - Current walk state with operands on stack
+ * PARAMETERS:  walk_state          - Current walk state with operands on stack
  *
  * RETURN:      Status
  *
@@ -257,7 +257,7 @@ acpi_ds_resolve_operands (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_resolve_operands", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ds_resolve_operands", walk_state);
 
 
 	/*
@@ -277,9 +277,9 @@ acpi_ds_resolve_operands (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_clear_operands
+ * FUNCTION:    acpi_ds_clear_operands
  *
- * PARAMETERS:  Walk_state          - Current walk state with operands on stack
+ * PARAMETERS:  walk_state          - Current walk state with operands on stack
  *
  * RETURN:      None
  *
@@ -294,7 +294,7 @@ acpi_ds_clear_operands (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Acpi_ds_clear_operands", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("acpi_ds_clear_operands", walk_state);
 
 
 	/*
@@ -317,9 +317,9 @@ acpi_ds_clear_operands (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_create_operand
+ * FUNCTION:    acpi_ds_create_operand
  *
- * PARAMETERS:  Walk_state
+ * PARAMETERS:  walk_state
  *              Arg
  *
  * RETURN:      Status
@@ -347,7 +347,7 @@ acpi_ds_create_operand (
 	const acpi_opcode_info  *op_info;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_create_operand", arg);
+	ACPI_FUNCTION_TRACE_PTR ("ds_create_operand", arg);
 
 
 	/* A valid name must be looked up in the namespace */
@@ -367,7 +367,7 @@ acpi_ds_create_operand (
 
 		/*
 		 * All prefixes have been handled, and the name is
-		 * in Name_string
+		 * in name_string
 		 */
 
 		/*
@@ -400,7 +400,7 @@ acpi_ds_create_operand (
 				 ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, &obj_desc));
 		/*
 		 * The only case where we pass through (ignore) a NOT_FOUND
-		 * error is for the Cond_ref_of opcode.
+		 * error is for the cond_ref_of opcode.
 		 */
 		if (status == AE_NOT_FOUND) {
 			if (parent_op->common.aml_opcode == AML_COND_REF_OF_OP) {
@@ -529,9 +529,9 @@ acpi_ds_create_operand (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_create_operands
+ * FUNCTION:    acpi_ds_create_operands
  *
- * PARAMETERS:  First_arg           - First argument of a parser argument tree
+ * PARAMETERS:  first_arg           - First argument of a parser argument tree
  *
  * RETURN:      Status
  *
@@ -551,7 +551,7 @@ acpi_ds_create_operands (
 	u32                     arg_count = 0;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_create_operands", first_arg);
+	ACPI_FUNCTION_TRACE_PTR ("ds_create_operands", first_arg);
 
 
 	/* For all arguments in the list... */

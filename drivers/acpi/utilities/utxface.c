@@ -36,7 +36,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_initialize_subsystem
+ * FUNCTION:    acpi_initialize_subsystem
  *
  * PARAMETERS:  None
  *
@@ -53,7 +53,7 @@ acpi_initialize_subsystem (
 {
 	acpi_status             status;
 
-	ACPI_FUNCTION_TRACE ("Acpi_initialize_subsystem");
+	ACPI_FUNCTION_TRACE ("acpi_initialize_subsystem");
 
 
 	ACPI_DEBUG_EXEC (acpi_ut_init_stack_ptr_trace ());
@@ -104,7 +104,7 @@ acpi_initialize_subsystem (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_enable_subsystem
+ * FUNCTION:    acpi_enable_subsystem
  *
  * PARAMETERS:  Flags           - Init/enable Options
  *
@@ -122,13 +122,13 @@ acpi_enable_subsystem (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_enable_subsystem");
+	ACPI_FUNCTION_TRACE ("acpi_enable_subsystem");
 
 
 	/*
-	 * Install the default Op_region handlers. These are installed unless
+	 * Install the default op_region handlers. These are installed unless
 	 * other handlers have already been installed via the
-	 * Install_address_space_handler interface
+	 * install_address_space_handler interface
 	 */
 	if (!(flags & ACPI_NO_ADDRESS_SPACE_INIT)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing default address space handlers\n"));
@@ -162,7 +162,7 @@ acpi_enable_subsystem (
 
 		status = acpi_enable ();
 		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Acpi_enable failed.\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "acpi_enable failed.\n"));
 			return_ACPI_STATUS (status);
 		}
 	}
@@ -198,7 +198,7 @@ acpi_enable_subsystem (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_initialize_objects
+ * FUNCTION:    acpi_initialize_objects
  *
  * PARAMETERS:  Flags           - Init/enable Options
  *
@@ -216,7 +216,7 @@ acpi_initialize_objects (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_initialize_objects");
+	ACPI_FUNCTION_TRACE ("acpi_initialize_objects");
 
 	/*
 	 * Initialize all device objects in the namespace
@@ -233,7 +233,7 @@ acpi_initialize_objects (
 
 	/*
 	 * Initialize the objects that remain uninitialized.  This
-	 * runs the executable AML that is part of the declaration of Op_regions
+	 * runs the executable AML that is part of the declaration of op_regions
 	 * and Fields.
 	 */
 	if (!(flags & ACPI_NO_OBJECT_INIT)) {
@@ -259,7 +259,7 @@ acpi_initialize_objects (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_terminate
+ * FUNCTION:    acpi_terminate
  *
  * PARAMETERS:  None
  *
@@ -275,7 +275,7 @@ acpi_terminate (void)
 	acpi_status         status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_terminate");
+	ACPI_FUNCTION_TRACE ("acpi_terminate");
 
 
 	/* Terminate the AML Debugger if present */
@@ -308,7 +308,7 @@ acpi_terminate (void)
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_subsystem_status
+ * FUNCTION:    acpi_subsystem_status
  *
  * PARAMETERS:  None
  *
@@ -334,20 +334,20 @@ acpi_subsystem_status (void)
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_get_system_info
+ * FUNCTION:    acpi_get_system_info
  *
- * PARAMETERS:  Out_buffer      - a pointer to a buffer to receive the
+ * PARAMETERS:  out_buffer      - a pointer to a buffer to receive the
  *                                resources for the device
- *              Buffer_length   - the number of bytes available in the buffer
+ *              buffer_length   - the number of bytes available in the buffer
  *
  * RETURN:      Status          - the status of the call
  *
  * DESCRIPTION: This function is called to get information about the current
  *              state of the ACPI subsystem.  It will return system information
- *              in the Out_buffer.
+ *              in the out_buffer.
  *
  *              If the function fails an appropriate status will be returned
- *              and the value of Out_buffer is undefined.
+ *              and the value of out_buffer is undefined.
  *
  ******************************************************************************/
 
@@ -360,7 +360,7 @@ acpi_get_system_info (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_system_info");
+	ACPI_FUNCTION_TRACE ("acpi_get_system_info");
 
 
 	/* Parameter validation */
@@ -423,7 +423,7 @@ acpi_get_system_info (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_install_initialization_handler
+ * FUNCTION:    acpi_install_initialization_handler
  *
  * PARAMETERS:  Handler             - Callback procedure
  *
@@ -456,7 +456,7 @@ acpi_install_initialization_handler (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_purge_cached_objects
+ * FUNCTION:    acpi_purge_cached_objects
  *
  * PARAMETERS:  None
  *
@@ -469,7 +469,7 @@ acpi_install_initialization_handler (
 acpi_status
 acpi_purge_cached_objects (void)
 {
-	ACPI_FUNCTION_TRACE ("Acpi_purge_cached_objects");
+	ACPI_FUNCTION_TRACE ("acpi_purge_cached_objects");
 
 
 	acpi_ut_delete_generic_state_cache ();

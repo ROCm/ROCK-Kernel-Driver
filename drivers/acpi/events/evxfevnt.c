@@ -32,7 +32,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_enable
+ * FUNCTION:    acpi_enable
  *
  * PARAMETERS:  None
  *
@@ -48,7 +48,7 @@ acpi_enable (void)
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_enable");
+	ACPI_FUNCTION_TRACE ("acpi_enable");
 
 
 	/* Make sure we have the FADT*/
@@ -79,7 +79,7 @@ acpi_enable (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_disable
+ * FUNCTION:    acpi_disable
  *
  * PARAMETERS:  None
  *
@@ -95,7 +95,7 @@ acpi_disable (void)
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_disable");
+	ACPI_FUNCTION_TRACE ("acpi_disable");
 
 	if (!acpi_gbl_FADT) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No FADT information present!\n"));
@@ -124,7 +124,7 @@ acpi_disable (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_enable_event
+ * FUNCTION:    acpi_enable_event
  *
  * PARAMETERS:  Event           - The fixed event or GPE to be enabled
  *              Type            - The type of event
@@ -146,7 +146,7 @@ acpi_enable_event (
 	u32                     value;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_enable_event");
+	ACPI_FUNCTION_TRACE ("acpi_enable_event");
 
 
 	/* The Type must be either Fixed Event or GPE */
@@ -218,7 +218,7 @@ acpi_enable_event (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_disable_event
+ * FUNCTION:    acpi_disable_event
  *
  * PARAMETERS:  Event           - The fixed event or GPE to be enabled
  *              Type            - The type of event, fixed or general purpose
@@ -240,7 +240,7 @@ acpi_disable_event (
 	u32                     value;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_disable_event");
+	ACPI_FUNCTION_TRACE ("acpi_disable_event");
 
 
 	/* The Type must be either Fixed Event or GPE */
@@ -310,7 +310,7 @@ acpi_disable_event (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_clear_event
+ * FUNCTION:    acpi_clear_event
  *
  * PARAMETERS:  Event           - The fixed event or GPE to be cleared
  *              Type            - The type of event
@@ -329,7 +329,7 @@ acpi_clear_event (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_clear_event");
+	ACPI_FUNCTION_TRACE ("acpi_clear_event");
 
 
 	/* The Type must be either Fixed Event or GPE */
@@ -375,7 +375,7 @@ acpi_clear_event (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_event_status
+ * FUNCTION:    acpi_get_event_status
  *
  * PARAMETERS:  Event           - The fixed event or GPE
  *              Type            - The type of event
@@ -398,7 +398,7 @@ acpi_get_event_status (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_event_status");
+	ACPI_FUNCTION_TRACE ("acpi_get_event_status");
 
 
 	if (!event_status) {

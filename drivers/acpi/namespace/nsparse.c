@@ -35,10 +35,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Ns_one_complete_parse
+ * FUNCTION:    ns_one_complete_parse
  *
- * PARAMETERS:  Pass_number             - 1 or 2
- *              Table_desc              - The table to be parsed.
+ * PARAMETERS:  pass_number             - 1 or 2
+ *              table_desc              - The table to be parsed.
  *
  * RETURN:      Status
  *
@@ -56,7 +56,7 @@ acpi_ns_one_complete_parse (
 	acpi_walk_state         *walk_state;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_one_complete_parse");
+	ACPI_FUNCTION_TRACE ("ns_one_complete_parse");
 
 
 	/* Create and init a Root Node */
@@ -95,10 +95,10 @@ acpi_ns_one_complete_parse (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_parse_table
+ * FUNCTION:    acpi_ns_parse_table
  *
- * PARAMETERS:  Table_desc      - An ACPI table descriptor for table to parse
- *              Start_node      - Where to enter the table into the namespace
+ * PARAMETERS:  table_desc      - An ACPI table descriptor for table to parse
+ *              start_node      - Where to enter the table into the namespace
  *
  * RETURN:      Status
  *
@@ -114,7 +114,7 @@ acpi_ns_parse_table (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_parse_table");
+	ACPI_FUNCTION_TRACE ("ns_parse_table");
 
 
 	/*

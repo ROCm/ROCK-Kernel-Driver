@@ -35,7 +35,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_load_tables
+ * FUNCTION:    acpi_load_tables
  *
  * PARAMETERS:  None
  *
@@ -53,7 +53,7 @@ acpi_load_tables (void)
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_load_tables");
+	ACPI_FUNCTION_TRACE ("acpi_load_tables");
 
 
 	/* Get the RSDP */
@@ -61,7 +61,7 @@ acpi_load_tables (void)
 	status = acpi_os_get_root_pointer (ACPI_LOGICAL_ADDRESSING,
 			  &rsdp_address);
 	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_ERROR (("Acpi_load_tables: Could not get RSDP, %s\n",
+		ACPI_REPORT_ERROR (("acpi_load_tables: Could not get RSDP, %s\n",
 				  acpi_format_exception (status)));
 		goto error_exit;
 	}
@@ -72,7 +72,7 @@ acpi_load_tables (void)
 
 	status = acpi_tb_verify_rsdp (&rsdp_address);
 	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_ERROR (("Acpi_load_tables: RSDP Failed validation: %s\n",
+		ACPI_REPORT_ERROR (("acpi_load_tables: RSDP Failed validation: %s\n",
 				  acpi_format_exception (status)));
 		goto error_exit;
 	}
@@ -81,7 +81,7 @@ acpi_load_tables (void)
 
 	status = acpi_tb_get_table_rsdt ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_ERROR (("Acpi_load_tables: Could not load RSDT: %s\n",
+		ACPI_REPORT_ERROR (("acpi_load_tables: Could not load RSDT: %s\n",
 				  acpi_format_exception (status)));
 		goto error_exit;
 	}
@@ -90,7 +90,7 @@ acpi_load_tables (void)
 
 	status = acpi_tb_get_required_tables ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_ERROR (("Acpi_load_tables: Error getting required tables (DSDT/FADT/FACS): %s\n",
+		ACPI_REPORT_ERROR (("acpi_load_tables: Error getting required tables (DSDT/FADT/FACS): %s\n",
 				  acpi_format_exception (status)));
 		goto error_exit;
 	}
@@ -102,7 +102,7 @@ acpi_load_tables (void)
 
 	status = acpi_ns_load_namespace ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_ERROR (("Acpi_load_tables: Could not load namespace: %s\n",
+		ACPI_REPORT_ERROR (("acpi_load_tables: Could not load namespace: %s\n",
 				  acpi_format_exception (status)));
 		goto error_exit;
 	}
@@ -111,7 +111,7 @@ acpi_load_tables (void)
 
 
 error_exit:
-	ACPI_REPORT_ERROR (("Acpi_load_tables: Could not load tables: %s\n",
+	ACPI_REPORT_ERROR (("acpi_load_tables: Could not load tables: %s\n",
 			  acpi_format_exception (status)));
 
 	return_ACPI_STATUS (status);
@@ -120,9 +120,9 @@ error_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_load_table
+ * FUNCTION:    acpi_load_table
  *
- * PARAMETERS:  Table_ptr       - pointer to a buffer containing the entire
+ * PARAMETERS:  table_ptr       - pointer to a buffer containing the entire
  *                                table to be loaded
  *
  * RETURN:      Status
@@ -143,7 +143,7 @@ acpi_load_table (
 	acpi_pointer            address;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_load_table");
+	ACPI_FUNCTION_TRACE ("acpi_load_table");
 
 
 	if (!table_ptr) {
@@ -164,7 +164,7 @@ acpi_load_table (
 
 	status = acpi_tb_install_table (&table_info);
 	if (ACPI_FAILURE (status)) {
-		/* Free table allocated by Acpi_tb_get_table_body */
+		/* Free table allocated by acpi_tb_get_table_body */
 
 		acpi_tb_delete_single_table (&table_info);
 		return_ACPI_STATUS (status);
@@ -202,9 +202,9 @@ acpi_load_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_unload_table
+ * FUNCTION:    acpi_unload_table
  *
- * PARAMETERS:  Table_type    - Type of table to be unloaded
+ * PARAMETERS:  table_type    - Type of table to be unloaded
  *
  * RETURN:      Status
  *
@@ -219,7 +219,7 @@ acpi_unload_table (
 	acpi_table_desc         *list_head;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_unload_table");
+	ACPI_FUNCTION_TRACE ("acpi_unload_table");
 
 
 	/* Parameter validation */
@@ -253,13 +253,13 @@ acpi_unload_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_table_header
+ * FUNCTION:    acpi_get_table_header
  *
- * PARAMETERS:  Table_type      - one of the defined table types
+ * PARAMETERS:  table_type      - one of the defined table types
  *              Instance        - the non zero instance of the table, allows
  *                                support for multiple tables of the same type
- *                                see Acpi_gbl_Acpi_table_flag
- *              Out_table_header - pointer to the acpi_table_header if successful
+ *                                see acpi_gbl_acpi_table_flag
+ *              out_table_header - pointer to the acpi_table_header if successful
  *
  * DESCRIPTION: This function is called to get an ACPI table header.  The caller
  *              supplies an pointer to a data area sufficient to contain an ACPI
@@ -282,7 +282,7 @@ acpi_get_table_header (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_table_header");
+	ACPI_FUNCTION_TRACE ("acpi_get_table_header");
 
 
 	if ((instance == 0)                 ||
@@ -326,23 +326,23 @@ acpi_get_table_header (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_table
+ * FUNCTION:    acpi_get_table
  *
- * PARAMETERS:  Table_type      - one of the defined table types
+ * PARAMETERS:  table_type      - one of the defined table types
  *              Instance        - the non zero instance of the table, allows
  *                                support for multiple tables of the same type
- *                                see Acpi_gbl_Acpi_table_flag
- *              Ret_buffer      - pointer to a structure containing a buffer to
+ *                                see acpi_gbl_acpi_table_flag
+ *              ret_buffer      - pointer to a structure containing a buffer to
  *                                receive the table
  *
  * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get an ACPI table.  The caller
- *              supplies an Out_buffer large enough to contain the entire ACPI
- *              table.  The caller should call the Acpi_get_table_header function
+ *              supplies an out_buffer large enough to contain the entire ACPI
+ *              table.  The caller should call the acpi_get_table_header function
  *              first to determine the buffer size needed.  Upon completion
- *              the Out_buffer->Length field will indicate the number of bytes
- *              copied into the Out_buffer->Buf_ptr buffer. This table will be
+ *              the out_buffer->Length field will indicate the number of bytes
+ *              copied into the out_buffer->buf_ptr buffer. This table will be
  *              a complete table including the header.
  *
  ******************************************************************************/
@@ -358,7 +358,7 @@ acpi_get_table (
 	acpi_size               table_length;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_table");
+	ACPI_FUNCTION_TRACE ("acpi_get_table");
 
 
 	/* Parameter validation */
@@ -389,7 +389,7 @@ acpi_get_table (
 	}
 
 	/*
-	 * Acpi_tb_get_table_ptr will return a NULL pointer if the
+	 * acpi_tb_get_table_ptr will return a NULL pointer if the
 	 * table is not loaded.
 	 */
 	if (tbl_ptr == NULL) {

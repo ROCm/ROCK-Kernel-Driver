@@ -638,7 +638,7 @@ acpi_ex_unsigned_integer_to_string (
 
 
 /*
- * exregion - default Op_region handlers
+ * exregion - default op_region handlers
  */
 
 acpi_status

@@ -34,7 +34,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_initialize_objects
+ * FUNCTION:    acpi_ns_initialize_objects
  *
  * PARAMETERS:  None
  *
@@ -53,7 +53,7 @@ acpi_ns_initialize_objects (
 	acpi_init_walk_info     info;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_initialize_objects");
+	ACPI_FUNCTION_TRACE ("ns_initialize_objects");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
@@ -70,7 +70,7 @@ acpi_ns_initialize_objects (
 			  ACPI_UINT32_MAX, acpi_ns_init_one_object,
 			  &info, NULL);
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %s\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "walk_namespace failed! %s\n",
 			acpi_format_exception (status)));
 	}
 
@@ -92,7 +92,7 @@ acpi_ns_initialize_objects (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_initialize_devices
+ * FUNCTION:    acpi_ns_initialize_devices
  *
  * PARAMETERS:  None
  *
@@ -114,7 +114,7 @@ acpi_ns_initialize_devices (
 	acpi_device_walk_info   info;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_initialize_devices");
+	ACPI_FUNCTION_TRACE ("ns_initialize_devices");
 
 
 	/* Init counters */
@@ -131,7 +131,7 @@ acpi_ns_initialize_devices (
 			  ACPI_UINT32_MAX, FALSE, acpi_ns_init_one_device, &info, NULL);
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %s\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "walk_namespace failed! %s\n",
 			acpi_format_exception (status)));
 	}
 
@@ -145,16 +145,16 @@ acpi_ns_initialize_devices (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_init_one_object
+ * FUNCTION:    acpi_ns_init_one_object
  *
- * PARAMETERS:  Obj_handle      - Node
+ * PARAMETERS:  obj_handle      - Node
  *              Level           - Current nesting level
  *              Context         - Points to a init info struct
- *              Return_value    - Not used
+ *              return_value    - Not used
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Callback from Acpi_walk_namespace. Invoked for every object
+ * DESCRIPTION: Callback from acpi_walk_namespace. Invoked for every object
  *              within the  namespace.
  *
  *              Currently, the only objects that require initialization are:
@@ -177,7 +177,7 @@ acpi_ns_init_one_object (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_NAME ("Ns_init_one_object");
+	ACPI_FUNCTION_NAME ("ns_init_one_object");
 
 
 	info->object_count++;
@@ -291,7 +291,7 @@ acpi_ns_init_one_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_init_one_device
+ * FUNCTION:    acpi_ns_init_one_device
  *
  * PARAMETERS:  acpi_walk_callback
  *
@@ -316,7 +316,7 @@ acpi_ns_init_one_device (
 	acpi_device_walk_info  *info = (acpi_device_walk_info *) context;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_init_one_device");
+	ACPI_FUNCTION_TRACE ("ns_init_one_device");
 
 
 	if ((acpi_dbg_level <= ACPI_LV_ALL_EXCEPTIONS) && (!(acpi_dbg_level & ACPI_LV_INFO))) {

@@ -33,7 +33,7 @@
 #include "actypes.h"
 
 
-/* Priorities for Acpi_os_queue_for_execution */
+/* Priorities for acpi_os_queue_for_execution */
 
 #define OSD_PRIORITY_GPE            1
 #define OSD_PRIORITY_HIGH           2
@@ -44,7 +44,7 @@
 #define ACPI_MUTEX_SEM              1
 
 
-/* Functions for Acpi_os_signal */
+/* Functions for acpi_os_signal */
 
 #define ACPI_SIGNAL_FATAL           0
 #define ACPI_SIGNAL_BREAKPOINT      1

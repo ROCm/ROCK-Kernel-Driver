@@ -36,10 +36,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_check_object_type
+ * FUNCTION:    acpi_ex_check_object_type
  *
- * PARAMETERS:  Type_needed         Object type needed
- *              This_type           Actual object type
+ * PARAMETERS:  type_needed         Object type needed
+ *              this_type           Actual object type
  *              Object              Object pointer
  *
  * RETURN:      Status
@@ -54,7 +54,7 @@ acpi_ex_check_object_type (
 	acpi_object_type        this_type,
 	void                    *object)
 {
-	ACPI_FUNCTION_NAME ("Ex_check_object_type");
+	ACPI_FUNCTION_NAME ("ex_check_object_type");
 
 
 	if (type_needed == ACPI_TYPE_ANY) {
@@ -90,19 +90,19 @@ acpi_ex_check_object_type (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_resolve_operands
+ * FUNCTION:    acpi_ex_resolve_operands
  *
  * PARAMETERS:  Opcode              - Opcode being interpreted
- *              Stack_ptr           - Pointer to the operand stack to be
+ *              stack_ptr           - Pointer to the operand stack to be
  *                                    resolved
- *              Walk_state          - Current state
+ *              walk_state          - Current state
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Convert multiple input operands to the types required by the
  *              target operator.
  *
- *      Each 5-bit group in Arg_types represents one required
+ *      Each 5-bit group in arg_types represents one required
  *      operand and indicates the required Type. The corresponding operand
  *      will be converted to the required type if possible, otherwise we
  *      abort with an exception.
@@ -125,7 +125,7 @@ acpi_ex_resolve_operands (
 	acpi_object_type        type_needed;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ex_resolve_operands", opcode);
+	ACPI_FUNCTION_TRACE_U32 ("ex_resolve_operands", opcode);
 
 
 	op_info = acpi_ps_get_opcode_info (opcode);
@@ -141,11 +141,11 @@ acpi_ex_resolve_operands (
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode %X [%s] Operand_types=%X \n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode %X [%s] operand_types=%X \n",
 		opcode, op_info->name, arg_types));
 
 	/*
-	 * Normal exit is with (Arg_types == 0) at end of argument list.
+	 * Normal exit is with (arg_types == 0) at end of argument list.
 	 * Function will return an exception from within the loop upon
 	 * finding an entry which is not (or cannot be converted
 	 * to) the required type; if stack underflows; or upon
@@ -293,8 +293,8 @@ acpi_ex_resolve_operands (
 		case ARGI_ANYTYPE:
 
 			/*
-			 * We don't want to resolve Index_op reference objects during
-			 * a store because this would be an implicit De_ref_of operation.
+			 * We don't want to resolve index_op reference objects during
+			 * a store because this would be an implicit de_ref_of operation.
 			 * Instead, we just want to store the reference object.
 			 * -- All others must be resolved below.
 			 */
@@ -460,8 +460,8 @@ acpi_ex_resolve_operands (
 
 		case ARGI_DATAOBJECT:
 			/*
-			 * ARGI_DATAOBJECT is only used by the Size_of operator.
-			 * Need a buffer, string, package, or Ref_of reference.
+			 * ARGI_DATAOBJECT is only used by the size_of operator.
+			 * Need a buffer, string, package, or ref_of reference.
 			 *
 			 * The only reference allowed here is a direct reference to
 			 * a namespace node.
@@ -530,7 +530,7 @@ acpi_ex_resolve_operands (
 
 next_operand:
 		/*
-		 * If more operands needed, decrement Stack_ptr to point
+		 * If more operands needed, decrement stack_ptr to point
 		 * to next operand on stack
 		 */
 		if (GET_CURRENT_ARG_TYPE (arg_types)) {

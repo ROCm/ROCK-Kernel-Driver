@@ -26,7 +26,7 @@
 #define __ACTABLES_H__
 
 
-/* Used in Acpi_tb_map_acpi_table for size parameter if table header is to be used */
+/* Used in acpi_tb_map_acpi_table for size parameter if table header is to be used */
 
 #define SIZE_IN_HEADER          0
 

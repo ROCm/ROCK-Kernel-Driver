@@ -32,9 +32,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_get_resource_type
+ * FUNCTION:    acpi_rs_get_resource_type
  *
- * PARAMETERS:  Resource_start_byte     - Byte 0 of a resource descriptor
+ * PARAMETERS:  resource_start_byte     - Byte 0 of a resource descriptor
  *
  * RETURN:      The Resource Type (Name) with no extraneous bits
  *
@@ -82,11 +82,11 @@ acpi_rs_get_resource_type (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_byte_stream_to_list
+ * FUNCTION:    acpi_rs_byte_stream_to_list
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource byte stream
- *              Byte_stream_buffer_length - Length of Byte_stream_buffer
- *              Output_buffer           - Pointer to the buffer that will
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource byte stream
+ *              byte_stream_buffer_length - Length of byte_stream_buffer
+ *              output_buffer           - Pointer to the buffer that will
  *                                        contain the output structures
  *
  * RETURN:      Status
@@ -111,7 +111,7 @@ acpi_rs_byte_stream_to_list (
 	u8                      end_tag_processed = FALSE;
 	acpi_resource           *resource;
 
-	ACPI_FUNCTION_TRACE ("Rs_byte_stream_to_list");
+	ACPI_FUNCTION_TRACE ("rs_byte_stream_to_list");
 
 
 	while (bytes_parsed < byte_stream_buffer_length &&
@@ -311,16 +311,16 @@ acpi_rs_byte_stream_to_list (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_list_to_byte_stream
+ * FUNCTION:    acpi_rs_list_to_byte_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Byte_steam_size_needed  - Calculated size of the byte stream
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              byte_steam_size_needed  - Calculated size of the byte stream
  *                                        needed from calling
- *                                        Acpi_rs_get_byte_stream_length()
- *                                        The size of the Output_buffer is
+ *                                        acpi_rs_get_byte_stream_length()
+ *                                        The size of the output_buffer is
  *                                        guaranteed to be >=
- *                                        Byte_stream_size_needed
- *              Output_buffer           - Pointer to the buffer that will
+ *                                        byte_stream_size_needed
+ *              output_buffer           - Pointer to the buffer that will
  *                                        contain the byte stream
  *
  * RETURN:      Status
@@ -342,7 +342,7 @@ acpi_rs_list_to_byte_stream (
 	u8                      done = FALSE;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_list_to_byte_stream");
+	ACPI_FUNCTION_TRACE ("rs_list_to_byte_stream");
 
 
 	while (!done) {
@@ -475,7 +475,7 @@ acpi_rs_list_to_byte_stream (
 			status = AE_BAD_DATA;
 			break;
 
-		} /* switch (Linked_list->Id) */
+		} /* switch (linked_list->Id) */
 
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);

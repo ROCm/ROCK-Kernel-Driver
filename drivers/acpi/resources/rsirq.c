@@ -32,21 +32,21 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_irq_resource
+ * FUNCTION:    acpi_rs_irq_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -67,7 +67,7 @@ acpi_rs_irq_resource (
 	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_irq);
 
 
-	ACPI_FUNCTION_TRACE ("Rs_irq_resource");
+	ACPI_FUNCTION_TRACE ("rs_irq_resource");
 
 
 	/*
@@ -165,12 +165,12 @@ acpi_rs_irq_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_irq_stream
+ * FUNCTION:    acpi_rs_irq_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -189,10 +189,10 @@ acpi_rs_irq_stream (
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
-	u8                      IRQinfo_byte_needed;
+	u8                      IRqinfo_byte_needed;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_irq_stream");
+	ACPI_FUNCTION_TRACE ("rs_irq_stream");
 
 
 	/*
@@ -203,11 +203,11 @@ acpi_rs_irq_stream (
 		ACPI_ACTIVE_HIGH == linked_list->data.irq.active_high_low &&
 		ACPI_EXCLUSIVE == linked_list->data.irq.shared_exclusive) {
 		*buffer = 0x22;
-		IRQinfo_byte_needed = FALSE;
+		IRqinfo_byte_needed = FALSE;
 	}
 	else {
 		*buffer = 0x23;
-		IRQinfo_byte_needed = TRUE;
+		IRqinfo_byte_needed = TRUE;
 	}
 
 	buffer += 1;
@@ -229,7 +229,7 @@ acpi_rs_irq_stream (
 	/*
 	 * Set the IRQ Info byte if needed.
 	 */
-	if (IRQinfo_byte_needed) {
+	if (IRqinfo_byte_needed) {
 		temp8 = 0;
 		temp8 = (u8) ((linked_list->data.irq.shared_exclusive &
 				 0x01) << 4);
@@ -256,21 +256,21 @@ acpi_rs_irq_stream (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_extended_irq_resource
+ * FUNCTION:    acpi_rs_extended_irq_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -291,7 +291,7 @@ acpi_rs_extended_irq_resource (
 	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_ext_irq);
 
 
-	ACPI_FUNCTION_TRACE ("Rs_extended_irq_resource");
+	ACPI_FUNCTION_TRACE ("rs_extended_irq_resource");
 
 
 	/*
@@ -407,12 +407,12 @@ acpi_rs_extended_irq_resource (
 		output_struct->data.extended_irq.resource_source.string_length = index + 1;
 
 		/*
-		 * In order for the Struct_size to fall on a 32-bit boundary,
+		 * In order for the struct_size to fall on a 32-bit boundary,
 		 * calculate the length of the string and expand the
-		 * Struct_size to the next 32-bit boundary.
+		 * struct_size to the next 32-bit boundary.
 		 */
 		temp8 = (u8) (index + 1);
-		struct_size += ACPI_ROUND_UP_TO_32_bITS (temp8);
+		struct_size += ACPI_ROUND_UP_to_32_bITS (temp8);
 	}
 	else {
 		output_struct->data.extended_irq.resource_source.index = 0x00;
@@ -435,12 +435,12 @@ acpi_rs_extended_irq_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_extended_irq_stream
+ * FUNCTION:    acpi_rs_extended_irq_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -462,7 +462,7 @@ acpi_rs_extended_irq_stream (
 	char                    *temp_pointer = NULL;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_extended_irq_stream");
+	ACPI_FUNCTION_TRACE ("rs_extended_irq_stream");
 
 
 	/*

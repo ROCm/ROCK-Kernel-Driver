@@ -63,7 +63,7 @@ extern      u32                         acpi_gbl_nesting_level;
 
 /*
  * Table pointers.
- * Although these pointers are somewhat redundant with the global Acpi_table,
+ * Although these pointers are somewhat redundant with the global acpi_table,
  * they are convenient because they are typed pointers.
  *
  * These tables are single-table only; meaning that there can be at most one

@@ -33,12 +33,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_next_node
+ * FUNCTION:    acpi_ns_get_next_node
  *
  * PARAMETERS:  Type                - Type of node to be searched for
- *              Parent_node         - Parent node whose children we are
+ *              parent_node         - Parent node whose children we are
  *                                     getting
- *              Child_node          - Previous child that was found.
+ *              child_node          - Previous child that was found.
  *                                    The NEXT child will be returned
  *
  * RETURN:      acpi_namespace_node - Pointer to the NEXT child or NULL if
@@ -79,7 +79,7 @@ acpi_ns_get_next_node (
 	/* If any type is OK, we are done */
 
 	if (type == ACPI_TYPE_ANY) {
-		/* Next_node is NULL if we are at the end-of-list */
+		/* next_node is NULL if we are at the end-of-list */
 
 		return (next_node);
 	}
@@ -106,22 +106,22 @@ acpi_ns_get_next_node (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_walk_namespace
+ * FUNCTION:    acpi_ns_walk_namespace
  *
  * PARAMETERS:  Type                - acpi_object_type to search for
- *              Start_node          - Handle in namespace where search begins
- *              Max_depth           - Depth to which search is to reach
- *              Unlock_before_callback- Whether to unlock the NS before invoking
+ *              start_node          - Handle in namespace where search begins
+ *              max_depth           - Depth to which search is to reach
+ *              unlock_before_callback- Whether to unlock the NS before invoking
  *                                    the callback routine
- *              User_function       - Called when an object of "Type" is found
+ *              user_function       - Called when an object of "Type" is found
  *              Context             - Passed to user function
- *              Return_value        - from the User_function if terminated early.
+ *              return_value        - from the user_function if terminated early.
  *                                    Otherwise, returns NULL.
  * RETURNS:     Status
  *
  * DESCRIPTION: Performs a modified depth-first walk of the namespace tree,
- *              starting (and ending) at the node specified by Start_handle.
- *              The User_function is called whenever a node that matches
+ *              starting (and ending) at the node specified by start_handle.
+ *              The user_function is called whenever a node that matches
  *              the type parameter is found.  If the user function returns
  *              a non-zero value, the search is terminated immediately and this
  *              value is returned to the caller.
@@ -151,7 +151,7 @@ acpi_ns_walk_namespace (
 	u32                     level;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_walk_namespace");
+	ACPI_FUNCTION_TRACE ("ns_walk_namespace");
 
 
 	/* Special case for the namespace Root Node */
@@ -170,7 +170,7 @@ acpi_ns_walk_namespace (
 	/*
 	 * Traverse the tree of nodes until we bubble back up to where we
 	 * started. When Level is zero, the loop is done because we have
-	 * bubbled up to (and passed) the original parent handle (Start_entry)
+	 * bubbled up to (and passed) the original parent handle (start_entry)
 	 */
 	while (level > 0) {
 		/* Get the next node in this scope.  Null if not found */
@@ -251,7 +251,7 @@ acpi_ns_walk_namespace (
 		}
 		else {
 			/*
-			 * No more children of this node (Acpi_ns_get_next_node
+			 * No more children of this node (acpi_ns_get_next_node
 			 * failed), go back upwards in the namespace tree to
 			 * the node's parent.
 			 */

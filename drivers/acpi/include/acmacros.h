@@ -184,8 +184,8 @@
 #define ACPI_ROUND_DOWN_TO_64_BITS(a)        ACPI_ROUND_DOWN(a,8)
 #define ACPI_ROUND_DOWN_TO_NATIVE_WORD(a)    ACPI_ROUND_DOWN(a,ALIGNED_ADDRESS_BOUNDARY)
 
-#define ACPI_ROUND_UP_TO_32_bITS(a)          ACPI_ROUND_UP(a,4)
-#define ACPI_ROUND_UP_TO_64_bITS(a)          ACPI_ROUND_UP(a,8)
+#define ACPI_ROUND_UP_to_32_bITS(a)          ACPI_ROUND_UP(a,4)
+#define ACPI_ROUND_UP_to_64_bITS(a)          ACPI_ROUND_UP(a,8)
 #define ACPI_ROUND_UP_TO_NATIVE_WORD(a)      ACPI_ROUND_UP(a,ALIGNED_ADDRESS_BOUNDARY)
 
 
@@ -386,7 +386,7 @@
 /*
  * Function entry tracing.
  * The first parameter should be the procedure name as a quoted string.  This is declared
- * as a local string ("_Proc_name) so that it can be also used by the function exit macros below.
+ * as a local string ("_proc_name) so that it can be also used by the function exit macros below.
  */
 
 #define ACPI_FUNCTION_NAME(a)           acpi_debug_print_info _dbg;     \
@@ -410,7 +410,7 @@
  * WARNING: These macros include a return statement.  This is usually considered
  * bad form, but having a separate exit macro is very ugly and difficult to maintain.
  * One of the FUNCTION_TRACE macros above must be used in conjunction with these macros
- * so that "_Proc_name" is defined.
+ * so that "_proc_name" is defined.
  */
 #ifdef ACPI_USE_DO_WHILE_0
 #define ACPI_DO_WHILE0(a)               do a while(0)

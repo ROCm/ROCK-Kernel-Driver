@@ -34,16 +34,16 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_evaluate_object_typed
+ * FUNCTION:    acpi_evaluate_object_typed
  *
  * PARAMETERS:  Handle              - Object handle (optional)
  *              *Pathname           - Object pathname (optional)
- *              **External_params   - List of parameters to pass to method,
+ *              **external_params   - List of parameters to pass to method,
  *                                    terminated by NULL.  May be NULL
  *                                    if no parameters are being passed.
- *              *Return_buffer      - Where to put method's return value (if
+ *              *return_buffer      - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
- *              Return_type         - Expected type of return object
+ *              return_type         - Expected type of return object
  *
  * RETURN:      Status
  *
@@ -65,7 +65,7 @@ acpi_evaluate_object_typed (
 	u8                      must_free = FALSE;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_evaluate_object_typed");
+	ACPI_FUNCTION_TRACE ("acpi_evaluate_object_typed");
 
 
 	/* Return buffer must be valid */
@@ -100,7 +100,7 @@ acpi_evaluate_object_typed (
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
-	/* Examine the object type returned from Evaluate_object */
+	/* Examine the object type returned from evaluate_object */
 
 	if (((acpi_object *) return_buffer->pointer)->type == return_type) {
 		return_ACPI_STATUS (AE_OK);
@@ -127,14 +127,14 @@ acpi_evaluate_object_typed (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_evaluate_object
+ * FUNCTION:    acpi_evaluate_object
  *
  * PARAMETERS:  Handle              - Object handle (optional)
  *              *Pathname           - Object pathname (optional)
- *              **External_params   - List of parameters to pass to method,
+ *              **external_params   - List of parameters to pass to method,
  *                                    terminated by NULL.  May be NULL
  *                                    if no parameters are being passed.
- *              *Return_buffer      - Where to put method's return value (if
+ *              *return_buffer      - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *
  * RETURN:      Status
@@ -159,7 +159,7 @@ acpi_evaluate_object (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_evaluate_object");
+	ACPI_FUNCTION_TRACE ("acpi_evaluate_object");
 
 
 	/*
@@ -327,22 +327,22 @@ acpi_evaluate_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_walk_namespace
+ * FUNCTION:    acpi_walk_namespace
  *
  * PARAMETERS:  Type                - acpi_object_type to search for
- *              Start_object        - Handle in namespace where search begins
- *              Max_depth           - Depth to which search is to reach
- *              User_function       - Called when an object of "Type" is found
+ *              start_object        - Handle in namespace where search begins
+ *              max_depth           - Depth to which search is to reach
+ *              user_function       - Called when an object of "Type" is found
  *              Context             - Passed to user function
- *              Return_value        - Location where return value of
- *                                    User_function is put if terminated early
+ *              return_value        - Location where return value of
+ *                                    user_function is put if terminated early
  *
- * RETURNS      Return value from the User_function if terminated early.
+ * RETURNS      Return value from the user_function if terminated early.
  *              Otherwise, returns NULL.
  *
  * DESCRIPTION: Performs a modified depth-first walk of the namespace tree,
- *              starting (and ending) at the object specified by Start_handle.
- *              The User_function is called whenever an object that matches
+ *              starting (and ending) at the object specified by start_handle.
+ *              The user_function is called whenever an object that matches
  *              the type parameter is found.  If the user function returns
  *              a non-zero value, the search is terminated immediately and this
  *              value is returned to the caller.
@@ -367,7 +367,7 @@ acpi_walk_namespace (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_walk_namespace");
+	ACPI_FUNCTION_TRACE ("acpi_walk_namespace");
 
 
 	/* Parameter validation */
@@ -399,13 +399,13 @@ acpi_walk_namespace (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_device_callback
+ * FUNCTION:    acpi_ns_get_device_callback
  *
- * PARAMETERS:  Callback from Acpi_get_device
+ * PARAMETERS:  Callback from acpi_get_device
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Takes callbacks from Walk_namespace and filters out all non-
+ * DESCRIPTION: Takes callbacks from walk_namespace and filters out all non-
  *              present devices, or if they specified a HID, it filters based
  *              on that.
  *
@@ -492,26 +492,26 @@ acpi_ns_get_device_callback (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_devices
+ * FUNCTION:    acpi_get_devices
  *
  * PARAMETERS:  HID                 - HID to search for. Can be NULL.
- *              User_function       - Called when a matching object is found
+ *              user_function       - Called when a matching object is found
  *              Context             - Passed to user function
- *              Return_value        - Location where return value of
- *                                    User_function is put if terminated early
+ *              return_value        - Location where return value of
+ *                                    user_function is put if terminated early
  *
- * RETURNS      Return value from the User_function if terminated early.
+ * RETURNS      Return value from the user_function if terminated early.
  *              Otherwise, returns NULL.
  *
  * DESCRIPTION: Performs a modified depth-first walk of the namespace tree,
- *              starting (and ending) at the object specified by Start_handle.
- *              The User_function is called whenever an object that matches
+ *              starting (and ending) at the object specified by start_handle.
+ *              The user_function is called whenever an object that matches
  *              the type parameter is found.  If the user function returns
  *              a non-zero value, the search is terminated immediately and this
  *              value is returned to the caller.
  *
- *              This is a wrapper for Walk_namespace, but the callback performs
- *              additional filtering. Please see Acpi_get_device_callback.
+ *              This is a wrapper for walk_namespace, but the callback performs
+ *              additional filtering. Please see acpi_get_device_callback.
  *
  ******************************************************************************/
 
@@ -526,7 +526,7 @@ acpi_get_devices (
 	acpi_get_devices_info   info;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_devices");
+	ACPI_FUNCTION_TRACE ("acpi_get_devices");
 
 
 	/* Parameter validation */
@@ -567,9 +567,9 @@ acpi_get_devices (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_attach_data
+ * FUNCTION:    acpi_attach_data
  *
- * PARAMETERS:  Obj_handle          - Namespace node
+ * PARAMETERS:  obj_handle          - Namespace node
  *              Handler             - Handler for this attachment
  *              Data                - Pointer to data to be attached
  *
@@ -620,10 +620,10 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_detach_data
+ * FUNCTION:    acpi_detach_data
  *
- * PARAMETERS:  Obj_handle          - Namespace node handle
- *              Handler             - Handler used in call to Acpi_attach_data
+ * PARAMETERS:  obj_handle          - Namespace node handle
+ *              Handler             - Handler used in call to acpi_attach_data
  *
  * RETURN:      Status
  *
@@ -670,10 +670,10 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_data
+ * FUNCTION:    acpi_get_data
  *
- * PARAMETERS:  Obj_handle          - Namespace node
- *              Handler             - Handler used in call to Attach_data
+ * PARAMETERS:  obj_handle          - Namespace node
+ *              Handler             - Handler used in call to attach_data
  *              Data                - Where the data is returned
  *
  * RETURN:      Status

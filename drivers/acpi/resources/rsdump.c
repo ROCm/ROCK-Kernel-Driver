@@ -34,7 +34,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_irq
+ * FUNCTION:    acpi_rs_dump_irq
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -79,7 +79,7 @@ acpi_rs_dump_irq (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_dma
+ * FUNCTION:    acpi_rs_dump_dma
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -159,7 +159,7 @@ acpi_rs_dump_dma (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_start_depend_fns
+ * FUNCTION:    acpi_rs_dump_start_depend_fns
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -224,7 +224,7 @@ acpi_rs_dump_start_depend_fns (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_io
+ * FUNCTION:    acpi_rs_dump_io
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -267,7 +267,7 @@ acpi_rs_dump_io (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_fixed_io
+ * FUNCTION:    acpi_rs_dump_fixed_io
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -300,7 +300,7 @@ acpi_rs_dump_fixed_io (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_vendor_specific
+ * FUNCTION:    acpi_rs_dump_vendor_specific
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -336,7 +336,7 @@ acpi_rs_dump_vendor_specific (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_memory24
+ * FUNCTION:    acpi_rs_dump_memory24
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -381,7 +381,7 @@ acpi_rs_dump_memory24 (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_memory32
+ * FUNCTION:    acpi_rs_dump_memory32
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -426,7 +426,7 @@ acpi_rs_dump_memory32 (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_fixed_memory32
+ * FUNCTION:    acpi_rs_dump_fixed_memory32
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -465,7 +465,7 @@ acpi_rs_dump_fixed_memory32 (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_address16
+ * FUNCTION:    acpi_rs_dump_address16
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -608,7 +608,7 @@ acpi_rs_dump_address16 (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_address32
+ * FUNCTION:    acpi_rs_dump_address32
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -750,7 +750,7 @@ acpi_rs_dump_address32 (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_address64
+ * FUNCTION:    acpi_rs_dump_address64
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -897,7 +897,7 @@ acpi_rs_dump_address64 (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_extended_irq
+ * FUNCTION:    acpi_rs_dump_extended_irq
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -958,7 +958,7 @@ acpi_rs_dump_extended_irq (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_resource_list
+ * FUNCTION:    acpi_rs_dump_resource_list
  *
  * PARAMETERS:  Data            - pointer to the resource structure to dump.
  *
@@ -997,8 +997,8 @@ acpi_rs_dump_resource_list (
 				break;
 
 			case ACPI_RSTYPE_END_DPF:
-				acpi_os_printf ("End_dependent_functions Resource\n");
-				/* Acpi_rs_dump_end_dependent_functions (Resource->Data);*/
+				acpi_os_printf ("end_dependent_functions Resource\n");
+				/* acpi_rs_dump_end_dependent_functions (Resource->Data);*/
 				break;
 
 			case ACPI_RSTYPE_IO:
@@ -1014,8 +1014,8 @@ acpi_rs_dump_resource_list (
 				break;
 
 			case ACPI_RSTYPE_END_TAG:
-				/*Rs_dump_end_tag (Resource->Data);*/
-				acpi_os_printf ("End_tag Resource\n");
+				/*rs_dump_end_tag (Resource->Data);*/
+				acpi_os_printf ("end_tag Resource\n");
 				done = TRUE;
 				break;
 
@@ -1062,7 +1062,7 @@ acpi_rs_dump_resource_list (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_dump_irq_list
+ * FUNCTION:    acpi_rs_dump_irq_list
  *
  * PARAMETERS:  Data            - pointer to the routing table to dump.
  *
@@ -1099,7 +1099,7 @@ acpi_rs_dump_irq_list (
 
 			acpi_os_printf ("  Source: %s\n", prt_element->source);
 
-			acpi_os_printf ("  Source_index: %X\n",
+			acpi_os_printf ("  source_index: %X\n",
 					 prt_element->source_index);
 
 			buffer += prt_element->length;

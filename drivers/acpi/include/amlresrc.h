@@ -38,12 +38,12 @@
 #define ASL_RESNAME_DMATYPE                     "_TYP"  /* Compatible(0), A(1), B(2), F(3) */
 #define ASL_RESNAME_GRANULARITY                 "_GRA"
 #define ASL_RESNAME_INTERRUPT                   "_INT"
-#define ASL_RESNAME_INTERRUPTLEVEL              "_LL_"  /* Active_lo(1), Active_hi(0) */
-#define ASL_RESNAME_INTERRUPTSHARE              "_SHR"  /* Shareable(1), No_share(0) */
+#define ASL_RESNAME_INTERRUPTLEVEL              "_LL_"  /* active_lo(1), active_hi(0) */
+#define ASL_RESNAME_INTERRUPTSHARE              "_SHR"  /* Shareable(1), no_share(0) */
 #define ASL_RESNAME_INTERRUPTTYPE               "_HE_"  /* Edge(1), Level(0) */
 #define ASL_RESNAME_LENGTH                      "_LEN"
 #define ASL_RESNAME_MEMATTRIBUTES               "_MTP"  /* Memory(0), Reserved(1), ACPI(2), NVS(3) */
-#define ASL_RESNAME_MEMTYPE                     "_MEM"  /* Non_cache(0), Cacheable(1) Cache+combine(2), Cache+prefetch(3) */
+#define ASL_RESNAME_MEMTYPE                     "_MEM"  /* non_cache(0), Cacheable(1) Cache+combine(2), Cache+prefetch(3) */
 #define ASL_RESNAME_MAXADDR                     "_MAX"
 #define ASL_RESNAME_MINADDR                     "_MIN"
 #define ASL_RESNAME_MAXTYPE                     "_MAF"
@@ -51,11 +51,11 @@
 #define ASL_RESNAME_REGISTERBITOFFSET           "_RBO"
 #define ASL_RESNAME_REGISTERBITWIDTH            "_RBW"
 #define ASL_RESNAME_RANGETYPE                   "_RNG"
-#define ASL_RESNAME_READWRITETYPE               "_RW_"  /* Read_only(0), Writeable (1) */
+#define ASL_RESNAME_READWRITETYPE               "_RW_"  /* read_only(0), Writeable (1) */
 #define ASL_RESNAME_TRANSLATION                 "_TRA"
 #define ASL_RESNAME_TRANSTYPE                   "_TRS"  /* Sparse(1), Dense(0) */
 #define ASL_RESNAME_TYPE                        "_TTP"  /* Translation(1), Static (0) */
-#define ASL_RESNAME_XFERTYPE                    "_SIZ"  /* 8(0), 8_and16(1), 16(2) */
+#define ASL_RESNAME_XFERTYPE                    "_SIz"  /* 8(0), 8_and16(1), 16(2) */
 
 
 /* Default sizes for "small" resource descriptors */
@@ -277,7 +277,7 @@ typedef struct asl_extended_xrupt_desc
 	u8                          flags;
 	u8                          table_length;
 	u32                         interrupt_number[1];
-	/* Res_source_index, Res_source optional fields follow */
+	/* res_source_index, res_source optional fields follow */
 
 } asl_extended_xrupt_desc;
 
@@ -320,8 +320,8 @@ typedef union asl_resource_desc
 	asl_word_address_desc       was;
 	asl_extended_xrupt_desc     exx;
 	asl_general_register_desc   grg;
-	u32                         U32_item;
-	u16                         U16_item;
+	u32                         u32_item;
+	u16                         u16_item;
 	u8                          U8item;
 
 } asl_resource_desc;

@@ -68,7 +68,7 @@ acpi_rs_create_pci_routing_table (
 
 
 /*
- * Function prototypes called from Acpi_rs_create*
+ * Function prototypes called from acpi_rs_create*
  */
 void
 acpi_rs_dump_irq (

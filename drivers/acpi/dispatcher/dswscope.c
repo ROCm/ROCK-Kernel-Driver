@@ -36,7 +36,7 @@
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_ds_scope_stack_clear
+ * FUNCTION:    acpi_ds_scope_stack_clear
  *
  * PARAMETERS:  None
  *
@@ -51,7 +51,7 @@ acpi_ds_scope_stack_clear (
 {
 	acpi_generic_state      *scope_info;
 
-	ACPI_FUNCTION_NAME ("Ds_scope_stack_clear");
+	ACPI_FUNCTION_NAME ("ds_scope_stack_clear");
 
 
 	while (walk_state->scope_info) {
@@ -69,7 +69,7 @@ acpi_ds_scope_stack_clear (
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_ds_scope_stack_push
+ * FUNCTION:    acpi_ds_scope_stack_push
  *
  * PARAMETERS:  *Node,              - Name to be made current
  *              Type,               - Type of frame being pushed
@@ -89,20 +89,20 @@ acpi_ds_scope_stack_push (
 	acpi_generic_state      *old_scope_info;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_scope_stack_push");
+	ACPI_FUNCTION_TRACE ("ds_scope_stack_push");
 
 
 	if (!node) {
 		/* Invalid scope   */
 
-		ACPI_REPORT_ERROR (("Ds_scope_stack_push: null scope passed\n"));
+		ACPI_REPORT_ERROR (("ds_scope_stack_push: null scope passed\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/* Make sure object type is valid */
 
 	if (!acpi_ut_valid_object_type (type)) {
-		ACPI_REPORT_WARNING (("Ds_scope_stack_push: type code out of range\n"));
+		ACPI_REPORT_WARNING (("ds_scope_stack_push: type code out of range\n"));
 	}
 
 
@@ -151,7 +151,7 @@ acpi_ds_scope_stack_push (
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_ds_scope_stack_pop
+ * FUNCTION:    acpi_ds_scope_stack_pop
  *
  * PARAMETERS:  Type                - The type of frame to be found
  *
@@ -174,7 +174,7 @@ acpi_ds_scope_stack_pop (
 	acpi_generic_state      *new_scope_info;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_scope_stack_pop");
+	ACPI_FUNCTION_TRACE ("ds_scope_stack_pop");
 
 
 	/*

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
+ * Module Name: evregion - ACPI address_space (op_region) handler dispatch
  *
  *****************************************************************************/
 
@@ -34,7 +34,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_init_address_spaces
+ * FUNCTION:    acpi_ev_init_address_spaces
  *
  * PARAMETERS:
  *
@@ -51,7 +51,7 @@ acpi_ev_init_address_spaces (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_init_address_spaces");
+	ACPI_FUNCTION_TRACE ("ev_init_address_spaces");
 
 
 	/*
@@ -67,7 +67,7 @@ acpi_ev_init_address_spaces (
 	 * near ready to find the PCI root buses at this point.
 	 *
 	 * NOTE: We ignore AE_ALREADY_EXISTS because this means that a handler
-	 * has already been installed (via Acpi_install_address_space_handler)
+	 * has already been installed (via acpi_install_address_space_handler)
 	 */
 
 	status = acpi_install_address_space_handler ((acpi_handle) acpi_gbl_root_node,
@@ -108,9 +108,9 @@ acpi_ev_init_address_spaces (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_execute_reg_method
+ * FUNCTION:    acpi_ev_execute_reg_method
  *
- * PARAMETERS:  Region_obj          - Object structure
+ * PARAMETERS:  region_obj          - Object structure
  *              Function            - On (1) or Off (0)
  *
  * RETURN:      Status
@@ -129,7 +129,7 @@ acpi_ev_execute_reg_method (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_execute_reg_method");
+	ACPI_FUNCTION_TRACE ("ev_execute_reg_method");
 
 
 	region_obj2 = acpi_ns_get_secondary_object (region_obj);
@@ -144,7 +144,7 @@ acpi_ev_execute_reg_method (
 	/*
 	 *  _REG method has two arguments
 	 *  Arg0:   Integer: Operation region space ID
-	 *          Same value as Region_obj->Region.Space_id
+	 *          Same value as region_obj->Region.space_id
 	 *  Arg1:   Integer: connection status
 	 *          1 for connecting the handler,
 	 *          0 for disconnecting the handler
@@ -185,13 +185,13 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_address_space_dispatch
+ * FUNCTION:    acpi_ev_address_space_dispatch
  *
- * PARAMETERS:  Region_obj          - internal region object
- *              Space_id            - ID of the address space (0-255)
+ * PARAMETERS:  region_obj          - internal region object
+ *              space_id            - ID of the address space (0-255)
  *              Function            - Read or Write operation
  *              Address             - Where in the space to read or write
- *              Bit_width           - Field width in bits (8, 16, 32, or 64)
+ *              bit_width           - Field width in bits (8, 16, 32, or 64)
  *              Value               - Pointer to in or out value
  *
  * RETURN:      Status
@@ -218,7 +218,7 @@ acpi_ev_address_space_dispatch (
 	void                    *region_context = NULL;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_address_space_dispatch");
+	ACPI_FUNCTION_TRACE ("ev_address_space_dispatch");
 
 
 	region_obj2 = acpi_ns_get_secondary_object (region_obj);
@@ -338,10 +338,10 @@ acpi_ev_address_space_dispatch (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_detach_region
+ * FUNCTION:    acpi_ev_detach_region
  *
- * PARAMETERS:  Region_obj      - Region Object
- *              Acpi_ns_is_locked - Namespace Region Already Locked?
+ * PARAMETERS:  region_obj      - Region Object
+ *              acpi_ns_is_locked - Namespace Region Already Locked?
  *
  * RETURN:      None
  *
@@ -364,7 +364,7 @@ acpi_ev_detach_region(
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_detach_region");
+	ACPI_FUNCTION_TRACE ("ev_detach_region");
 
 
 	region_obj2 = acpi_ns_get_secondary_object (region_obj);
@@ -483,11 +483,11 @@ acpi_ev_detach_region(
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_attach_region
+ * FUNCTION:    acpi_ev_attach_region
  *
- * PARAMETERS:  Handler_obj     - Handler Object
- *              Region_obj      - Region Object
- *              Acpi_ns_is_locked - Namespace Region Already Locked?
+ * PARAMETERS:  handler_obj     - Handler Object
+ *              region_obj      - Region Object
+ *              acpi_ns_is_locked - Namespace Region Already Locked?
  *
  * RETURN:      None
  *
@@ -506,7 +506,7 @@ acpi_ev_attach_region (
 	acpi_status             status2;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_attach_region");
+	ACPI_FUNCTION_TRACE ("ev_attach_region");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
@@ -551,11 +551,11 @@ acpi_ev_attach_region (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_addr_handler_helper
+ * FUNCTION:    acpi_ev_addr_handler_helper
  *
  * PARAMETERS:  Handle              - Node to be dumped
  *              Level               - Nesting level of the handle
- *              Context             - Passed into Acpi_ns_walk_namespace
+ *              Context             - Passed into acpi_ns_walk_namespace
  *
  * DESCRIPTION: This routine installs an address handler into objects that are
  *              of type Region.
@@ -582,7 +582,7 @@ acpi_ev_addr_handler_helper (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_NAME ("Ev_addr_handler_helper");
+	ACPI_FUNCTION_NAME ("ev_addr_handler_helper");
 
 
 	handler_obj = (acpi_operand_object *) context;

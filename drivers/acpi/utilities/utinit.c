@@ -33,12 +33,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_fadt_register_error
+ * FUNCTION:    acpi_ut_fadt_register_error
  *
- * PARAMETERS:  *Register_name          - Pointer to string identifying register
+ * PARAMETERS:  *register_name          - Pointer to string identifying register
  *              Value                   - Actual register contents value
- *              Acpi_test_spec_section  - TDS section containing assertion
- *              Acpi_assertion          - Assertion number being tested
+ *              acpi_test_spec_section  - TDS section containing assertion
+ *              acpi_assertion          - Assertion number being tested
  *
  * RETURN:      AE_BAD_VALUE
  *
@@ -61,7 +61,7 @@ acpi_ut_fadt_register_error (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_ut_validate_fadt
+ * FUNCTION:    acpi_ut_validate_fadt
  *
  * PARAMETERS:  None
  *
@@ -91,22 +91,22 @@ acpi_ut_validate_fadt (
 				  ACPI_FADT_OFFSET (pm1_cnt_len));
 	}
 
-	if (!acpi_gbl_FADT->Xpm1a_evt_blk.address) {
+	if (!acpi_gbl_FADT->xpm1a_evt_blk.address) {
 		acpi_ut_fadt_register_error ("X_PM1a_EVT_BLK", 0,
-				  ACPI_FADT_OFFSET (Xpm1a_evt_blk.address));
+				  ACPI_FADT_OFFSET (xpm1a_evt_blk.address));
 	}
 
-	if (!acpi_gbl_FADT->Xpm1a_cnt_blk.address) {
+	if (!acpi_gbl_FADT->xpm1a_cnt_blk.address) {
 		acpi_ut_fadt_register_error ("X_PM1a_CNT_BLK", 0,
-				  ACPI_FADT_OFFSET (Xpm1a_cnt_blk.address));
+				  ACPI_FADT_OFFSET (xpm1a_cnt_blk.address));
 	}
 
-	if (!acpi_gbl_FADT->Xpm_tmr_blk.address) {
+	if (!acpi_gbl_FADT->xpm_tmr_blk.address) {
 		acpi_ut_fadt_register_error ("X_PM_TMR_BLK", 0,
-				  ACPI_FADT_OFFSET (Xpm_tmr_blk.address));
+				  ACPI_FADT_OFFSET (xpm_tmr_blk.address));
 	}
 
-	if ((acpi_gbl_FADT->Xpm2_cnt_blk.address &&
+	if ((acpi_gbl_FADT->xpm2_cnt_blk.address &&
 		!acpi_gbl_FADT->pm2_cnt_len)) {
 		acpi_ut_fadt_register_error ("PM2_CNT_LEN",
 				  (u32) acpi_gbl_FADT->pm2_cnt_len,
@@ -121,14 +121,14 @@ acpi_ut_validate_fadt (
 
 	/* Length of GPE blocks must be a multiple of 2 */
 
-	if (acpi_gbl_FADT->Xgpe0_blk.address &&
+	if (acpi_gbl_FADT->xgpe0_blk.address &&
 		(acpi_gbl_FADT->gpe0_blk_len & 1)) {
 		acpi_ut_fadt_register_error ("(x)GPE0_BLK_LEN",
 				  (u32) acpi_gbl_FADT->gpe0_blk_len,
 				  ACPI_FADT_OFFSET (gpe0_blk_len));
 	}
 
-	if (acpi_gbl_FADT->Xgpe1_blk.address &&
+	if (acpi_gbl_FADT->xgpe1_blk.address &&
 		(acpi_gbl_FADT->gpe1_blk_len & 1)) {
 		acpi_ut_fadt_register_error ("(x)GPE1_BLK_LEN",
 				  (u32) acpi_gbl_FADT->gpe1_blk_len,
@@ -141,7 +141,7 @@ acpi_ut_validate_fadt (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_ut_terminate
+ * FUNCTION:    acpi_ut_terminate
  *
  * PARAMETERS:  none
  *
@@ -155,7 +155,7 @@ void
 acpi_ut_terminate (void)
 {
 
-	ACPI_FUNCTION_TRACE ("Ut_terminate");
+	ACPI_FUNCTION_TRACE ("ut_terminate");
 
 
 	/* Free global tables, etc. */
@@ -168,7 +168,7 @@ acpi_ut_terminate (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_subsystem_shutdown
+ * FUNCTION:    acpi_ut_subsystem_shutdown
  *
  * PARAMETERS:  none
  *
@@ -183,7 +183,7 @@ void
 acpi_ut_subsystem_shutdown (void)
 {
 
-	ACPI_FUNCTION_TRACE ("Ut_subsystem_shutdown");
+	ACPI_FUNCTION_TRACE ("ut_subsystem_shutdown");
 
 	/* Just exit if subsystem is already shutdown */
 
@@ -197,7 +197,7 @@ acpi_ut_subsystem_shutdown (void)
 	acpi_gbl_shutdown = TRUE;
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Shutting down ACPI Subsystem...\n"));
 
-	/* Close the Acpi_event Handling */
+	/* Close the acpi_event Handling */
 
 	acpi_ev_terminate ();
 

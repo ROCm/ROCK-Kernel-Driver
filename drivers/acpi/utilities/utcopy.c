@@ -33,11 +33,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_isimple_to_esimple
+ * FUNCTION:    acpi_ut_copy_isimple_to_esimple
  *
- * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
+ * PARAMETERS:  *internal_object    - Pointer to the object we are examining
  *              *Buffer             - Where the object is returned
- *              *Space_used         - Where the data length is returned
+ *              *space_used         - Where the data length is returned
  *
  * RETURN:      Status
  *
@@ -58,7 +58,7 @@ acpi_ut_copy_isimple_to_esimple (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_isimple_to_esimple");
+	ACPI_FUNCTION_TRACE ("ut_copy_isimple_to_esimple");
 
 
 	*buffer_space_used = 0;
@@ -165,7 +165,7 @@ acpi_ut_copy_isimple_to_esimple (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_ielement_to_eelement
+ * FUNCTION:    acpi_ut_copy_ielement_to_eelement
  *
  * PARAMETERS:  acpi_pkg_callback
  *
@@ -245,11 +245,11 @@ acpi_ut_copy_ielement_to_eelement (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_ipackage_to_epackage
+ * FUNCTION:    acpi_ut_copy_ipackage_to_epackage
  *
- * PARAMETERS:  *Internal_object    - Pointer to the object we are returning
+ * PARAMETERS:  *internal_object    - Pointer to the object we are returning
  *              *Buffer             - Where the object is returned
- *              *Space_used         - Where the object length is returned
+ *              *space_used         - Where the object length is returned
  *
  * RETURN:      Status
  *
@@ -258,7 +258,7 @@ acpi_ut_copy_ielement_to_eelement (
  *
  *              The buffer is assumed to have sufficient space for the object.
  *              The caller must have verified the buffer length needed using the
- *              Acpi_ut_get_object_size function before calling this function.
+ *              acpi_ut_get_object_size function before calling this function.
  *
  ******************************************************************************/
 
@@ -273,7 +273,7 @@ acpi_ut_copy_ipackage_to_epackage (
 	acpi_pkg_info           info;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_ipackage_to_epackage");
+	ACPI_FUNCTION_TRACE ("ut_copy_ipackage_to_epackage");
 
 
 	/*
@@ -312,10 +312,10 @@ acpi_ut_copy_ipackage_to_epackage (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_iobject_to_eobject
+ * FUNCTION:    acpi_ut_copy_iobject_to_eobject
  *
- * PARAMETERS:  *Internal_object    - The internal object to be converted
- *              *Buffer_ptr         - Where the object is returned
+ * PARAMETERS:  *internal_object    - The internal object to be converted
+ *              *buffer_ptr         - Where the object is returned
  *
  * RETURN:      Status
  *
@@ -332,7 +332,7 @@ acpi_ut_copy_iobject_to_eobject (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_iobject_to_eobject");
+	ACPI_FUNCTION_TRACE ("ut_copy_iobject_to_eobject");
 
 
 	if (ACPI_GET_OBJECT_TYPE (internal_object) == ACPI_TYPE_PACKAGE) {
@@ -365,10 +365,10 @@ acpi_ut_copy_iobject_to_eobject (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_esimple_to_isimple
+ * FUNCTION:    acpi_ut_copy_esimple_to_isimple
  *
- * PARAMETERS:  *External_object   - The external object to be converted
- *              *Internal_object   - Where the internal object is returned
+ * PARAMETERS:  *external_object   - The external object to be converted
+ *              *internal_object   - Where the internal object is returned
  *
  * RETURN:      Status
  *
@@ -387,7 +387,7 @@ acpi_ut_copy_esimple_to_isimple (
 	acpi_operand_object     *internal_object;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_esimple_to_isimple");
+	ACPI_FUNCTION_TRACE ("ut_copy_esimple_to_isimple");
 
 
 	/*
@@ -469,11 +469,11 @@ acpi_ut_copy_esimple_to_isimple (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_epackage_to_ipackage
+ * FUNCTION:    acpi_ut_copy_epackage_to_ipackage
  *
- * PARAMETERS:  *Internal_object   - Pointer to the object we are returning
+ * PARAMETERS:  *internal_object   - Pointer to the object we are returning
  *              *Buffer            - Where the object is returned
- *              *Space_used        - Where the length of the object is returned
+ *              *space_used        - Where the length of the object is returned
  *
  * RETURN:      Status
  *
@@ -482,7 +482,7 @@ acpi_ut_copy_esimple_to_isimple (
  *
  *              The buffer is assumed to have sufficient space for the object.
  *              The caller must have verified the buffer length needed using the
- *              Acpi_ut_get_object_size function before calling this function.
+ *              acpi_ut_get_object_size function before calling this function.
  *
  ******************************************************************************/
 
@@ -501,7 +501,7 @@ acpi_ut_copy_epackage_to_ipackage (
 	acpi_object             *this_external_obj;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_epackage_to_ipackage");
+	ACPI_FUNCTION_TRACE ("ut_copy_epackage_to_ipackage");
 
 
 	/*
@@ -526,7 +526,7 @@ acpi_ut_copy_epackage_to_ipackage (
 	free_space += external_object->package.count * sizeof(acpi_object);
 
 
-	/* Call Walk_package */
+	/* Call walk_package */
 
 }
 
@@ -535,10 +535,10 @@ acpi_ut_copy_epackage_to_ipackage (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_eobject_to_iobject
+ * FUNCTION:    acpi_ut_copy_eobject_to_iobject
  *
- * PARAMETERS:  *Internal_object   - The external object to be converted
- *              *Buffer_ptr     - Where the internal object is returned
+ * PARAMETERS:  *internal_object   - The external object to be converted
+ *              *buffer_ptr     - Where the internal object is returned
  *
  * RETURN:      Status          - the status of the call
  *
@@ -554,7 +554,7 @@ acpi_ut_copy_eobject_to_iobject (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_eobject_to_iobject");
+	ACPI_FUNCTION_TRACE ("ut_copy_eobject_to_iobject");
 
 
 	if (external_object->type == ACPI_TYPE_PACKAGE) {
@@ -580,10 +580,10 @@ acpi_ut_copy_eobject_to_iobject (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_simple_object
+ * FUNCTION:    acpi_ut_copy_simple_object
  *
- * PARAMETERS:  Source_desc         - The internal object to be copied
- *              Dest_desc           - New target object
+ * PARAMETERS:  source_desc         - The internal object to be copied
+ *              dest_desc           - New target object
  *
  * RETURN:      Status
  *
@@ -673,7 +673,7 @@ acpi_ut_copy_simple_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_ielement_to_ielement
+ * FUNCTION:    acpi_ut_copy_ielement_to_ielement
  *
  * PARAMETERS:  acpi_pkg_callback
  *
@@ -780,10 +780,10 @@ acpi_ut_copy_ielement_to_ielement (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_ipackage_to_ipackage
+ * FUNCTION:    acpi_ut_copy_ipackage_to_ipackage
  *
- * PARAMETERS:  *Source_obj     - Pointer to the source package object
- *              *Dest_obj       - Where the internal object is returned
+ * PARAMETERS:  *source_obj     - Pointer to the source package object
+ *              *dest_obj       - Where the internal object is returned
  *
  * RETURN:      Status          - the status of the call
  *
@@ -801,7 +801,7 @@ acpi_ut_copy_ipackage_to_ipackage (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_ipackage_to_ipackage");
+	ACPI_FUNCTION_TRACE ("ut_copy_ipackage_to_ipackage");
 
 
 	dest_obj->common.type   = ACPI_GET_OBJECT_TYPE (source_obj);
@@ -816,7 +816,7 @@ acpi_ut_copy_ipackage_to_ipackage (
 			   sizeof (void *));
 	if (!dest_obj->package.elements) {
 		ACPI_REPORT_ERROR (
-			("Aml_build_copy_internal_package_object: Package allocation failure\n"));
+			("aml_build_copy_internal_package_object: Package allocation failure\n"));
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
@@ -838,11 +838,11 @@ acpi_ut_copy_ipackage_to_ipackage (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_copy_iobject_to_iobject
+ * FUNCTION:    acpi_ut_copy_iobject_to_iobject
  *
- * PARAMETERS:  Walk_state          - Current walk state
- *              Source_desc         - The internal object to be copied
- *              Dest_desc           - Where the copied object is returned
+ * PARAMETERS:  walk_state          - Current walk state
+ *              source_desc         - The internal object to be copied
+ *              dest_desc           - Where the copied object is returned
  *
  * RETURN:      Status
  *
@@ -859,7 +859,7 @@ acpi_ut_copy_iobject_to_iobject (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_copy_iobject_to_iobject");
+	ACPI_FUNCTION_TRACE ("ut_copy_iobject_to_iobject");
 
 
 	/* Create the top level object */

@@ -31,14 +31,14 @@
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_set_firmware_waking_vector
+ * FUNCTION:    acpi_set_firmware_waking_vector
  *
- * PARAMETERS:  Physical_address    - Physical address of ACPI real mode
+ * PARAMETERS:  physical_address    - Physical address of ACPI real mode
  *                                    entry point.
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Access function for d_firmware_waking_vector field in FACS
+ * DESCRIPTION: access function for d_firmware_waking_vector field in FACS
  *
  ******************************************************************************/
 
@@ -47,7 +47,7 @@ acpi_set_firmware_waking_vector (
 	acpi_physical_address physical_address)
 {
 
-	ACPI_FUNCTION_TRACE ("Acpi_set_firmware_waking_vector");
+	ACPI_FUNCTION_TRACE ("acpi_set_firmware_waking_vector");
 
 
 	/* Set the vector */
@@ -67,15 +67,15 @@ acpi_set_firmware_waking_vector (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_get_firmware_waking_vector
+ * FUNCTION:    acpi_get_firmware_waking_vector
  *
- * PARAMETERS:  *Physical_address   - Output buffer where contents of
- *                                    the Firmware_waking_vector field of
+ * PARAMETERS:  *physical_address   - Output buffer where contents of
+ *                                    the firmware_waking_vector field of
  *                                    the FACS will be stored.
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Access function for Firmware_waking_vector field in FACS
+ * DESCRIPTION: Access function for firmware_waking_vector field in FACS
  *
  ******************************************************************************/
 
@@ -84,7 +84,7 @@ acpi_get_firmware_waking_vector (
 	acpi_physical_address *physical_address)
 {
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_firmware_waking_vector");
+	ACPI_FUNCTION_TRACE ("acpi_get_firmware_waking_vector");
 
 
 	if (!physical_address) {
@@ -108,9 +108,9 @@ acpi_get_firmware_waking_vector (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_enter_sleep_state_prep
+ * FUNCTION:    acpi_enter_sleep_state_prep
  *
- * PARAMETERS:  Sleep_state         - Which sleep state to enter
+ * PARAMETERS:  sleep_state         - Which sleep state to enter
  *
  * RETURN:      Status
  *
@@ -130,7 +130,7 @@ acpi_enter_sleep_state_prep (
 	acpi_object         arg;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_enter_sleep_state_prep");
+	ACPI_FUNCTION_TRACE ("acpi_enter_sleep_state_prep");
 
 
 	/*
@@ -168,9 +168,9 @@ acpi_enter_sleep_state_prep (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_enter_sleep_state
+ * FUNCTION:    acpi_enter_sleep_state
  *
- * PARAMETERS:  Sleep_state         - Which sleep state to enter
+ * PARAMETERS:  sleep_state         - Which sleep state to enter
  *
  * RETURN:      Status
  *
@@ -191,7 +191,7 @@ acpi_enter_sleep_state (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_enter_sleep_state");
+	ACPI_FUNCTION_TRACE ("acpi_enter_sleep_state");
 
 
 	if ((acpi_gbl_sleep_type_a > ACPI_SLEEP_TYPE_MAX) ||
@@ -318,9 +318,9 @@ acpi_enter_sleep_state (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_leave_sleep_state
+ * FUNCTION:    acpi_leave_sleep_state
  *
- * PARAMETERS:  Sleep_state         - Which sleep state we just exited
+ * PARAMETERS:  sleep_state         - Which sleep state we just exited
  *
  * RETURN:      Status
  *
@@ -337,10 +337,10 @@ acpi_leave_sleep_state (
 	acpi_status         status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_leave_sleep_state");
+	ACPI_FUNCTION_TRACE ("acpi_leave_sleep_state");
 
 
-	/* Ensure Enter_sleep_state_prep -> Enter_sleep_state ordering */
+	/* Ensure enter_sleep_state_prep -> enter_sleep_state ordering */
 
 	acpi_gbl_sleep_type_a = ACPI_SLEEP_TYPE_INVALID;
 

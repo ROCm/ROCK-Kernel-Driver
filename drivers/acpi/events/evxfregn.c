@@ -35,17 +35,17 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_install_address_space_handler
+ * FUNCTION:    acpi_install_address_space_handler
  *
  * PARAMETERS:  Device          - Handle for the device
- *              Space_id        - The address space ID
+ *              space_id        - The address space ID
  *              Handler         - Address of the handler
  *              Setup           - Address of the setup function
  *              Context         - Value passed to the handler on each access
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Install a handler for all Op_regions of a given Space_id.
+ * DESCRIPTION: Install a handler for all op_regions of a given space_id.
  *
  ******************************************************************************/
 
@@ -65,7 +65,7 @@ acpi_install_address_space_handler (
 	u16                     flags = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_install_address_space_handler");
+	ACPI_FUNCTION_TRACE ("acpi_install_address_space_handler");
 
 
 	/* Parameter validation */
@@ -180,7 +180,7 @@ acpi_install_address_space_handler (
 		ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 			"Creating object on Device %p while installing handler\n", node));
 
-		/* Obj_desc does not exist, create one */
+		/* obj_desc does not exist, create one */
 
 		if (node->type == ACPI_TYPE_ANY) {
 			type = ACPI_TYPE_DEVICE;
@@ -268,9 +268,9 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_remove_address_space_handler
+ * FUNCTION:    acpi_remove_address_space_handler
  *
- * PARAMETERS:  Space_id        - The address space ID
+ * PARAMETERS:  space_id        - The address space ID
  *              Handler         - Address of the handler
  *
  * RETURN:      Status
@@ -293,7 +293,7 @@ acpi_remove_address_space_handler (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_remove_address_space_handler");
+	ACPI_FUNCTION_TRACE ("acpi_remove_address_space_handler");
 
 
 	/* Parameter validation */
@@ -390,7 +390,7 @@ acpi_remove_address_space_handler (
 	 * The handler does not exist
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
-		"Unable to remove address handler %p for %s(%X), Dev_node %p, obj %p\n",
+		"Unable to remove address handler %p for %s(%X), dev_node %p, obj %p\n",
 		handler, acpi_ut_get_region_name (space_id), space_id, node, obj_desc));
 
 	status = AE_NOT_EXIST;

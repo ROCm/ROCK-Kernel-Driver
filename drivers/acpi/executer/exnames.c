@@ -42,11 +42,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_allocate_name_string
+ * FUNCTION:    acpi_ex_allocate_name_string
  *
- * PARAMETERS:  Prefix_count        - Count of parent levels. Special cases:
+ * PARAMETERS:  prefix_count        - Count of parent levels. Special cases:
  *                                    (-1) = root,  0 = none
- *              Num_name_segs       - count of 4-character name segments
+ *              num_name_segs       - count of 4-character name segments
  *
  * RETURN:      A pointer to the allocated string segment.  This segment must
  *              be deleted by the caller.
@@ -65,11 +65,11 @@ acpi_ex_allocate_name_string (
 	char                    *name_string;
 	u32                      size_needed;
 
-	ACPI_FUNCTION_TRACE ("Ex_allocate_name_string");
+	ACPI_FUNCTION_TRACE ("ex_allocate_name_string");
 
 
 	/*
-	 * Allow room for all \ and ^ prefixes, all segments, and a Multi_name_prefix.
+	 * Allow room for all \ and ^ prefixes, all segments, and a multi_name_prefix.
 	 * Also, one byte for the null terminator.
 	 * This may actually be somewhat longer than needed.
 	 */
@@ -88,7 +88,7 @@ acpi_ex_allocate_name_string (
 	 */
 	name_string = ACPI_MEM_ALLOCATE (size_needed);
 	if (!name_string) {
-		ACPI_REPORT_ERROR (("Ex_allocate_name_string: Could not allocate size %d\n", size_needed));
+		ACPI_REPORT_ERROR (("ex_allocate_name_string: Could not allocate size %d\n", size_needed));
 		return_PTR (NULL);
 	}
 
@@ -121,7 +121,7 @@ acpi_ex_allocate_name_string (
 	}
 
 	/*
-	 * Terminate string following prefixes. Acpi_ex_name_segment() will
+	 * Terminate string following prefixes. acpi_ex_name_segment() will
 	 * append the segment(s)
 	 */
 	*temp_ptr = 0;
@@ -131,9 +131,9 @@ acpi_ex_allocate_name_string (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_name_segment
+ * FUNCTION:    acpi_ex_name_segment
  *
- * PARAMETERS:  Interpreter_mode    - Current running mode (load1/Load2/Exec)
+ * PARAMETERS:  interpreter_mode    - Current running mode (load1/Load2/Exec)
  *
  * RETURN:      Status
  *
@@ -152,7 +152,7 @@ acpi_ex_name_segment (
 	char                    char_buf[5];
 
 
-	ACPI_FUNCTION_TRACE ("Ex_name_segment");
+	ACPI_FUNCTION_TRACE ("ex_name_segment");
 
 
 	/*
@@ -218,9 +218,9 @@ acpi_ex_name_segment (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_get_name_string
+ * FUNCTION:    acpi_ex_get_name_string
  *
- * PARAMETERS:  Data_type           - Data type to be associated with this name
+ * PARAMETERS:  data_type           - Data type to be associated with this name
  *
  * RETURN:      Status
  *
@@ -243,13 +243,13 @@ acpi_ex_get_name_string (
 	u8                      has_prefix = FALSE;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_get_name_string", aml_address);
+	ACPI_FUNCTION_TRACE_PTR ("ex_get_name_string", aml_address);
 
 
 	if (ACPI_TYPE_LOCAL_REGION_FIELD == data_type  ||
 		ACPI_TYPE_LOCAL_BANK_FIELD == data_type    ||
 		ACPI_TYPE_LOCAL_INDEX_FIELD == data_type) {
-		/* Disallow prefixes for types associated with Field_unit names */
+		/* Disallow prefixes for types associated with field_unit names */
 
 		name_string = acpi_ex_allocate_name_string (0, 1);
 		if (!name_string) {
@@ -261,17 +261,17 @@ acpi_ex_get_name_string (
 	}
 	else {
 		/*
-		 * Data_type is not a field name.
+		 * data_type is not a field name.
 		 * Examine first character of name for root or parent prefix operators
 		 */
 		switch (*aml_address) {
 		case AML_ROOT_PREFIX:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Root_prefix(\\) at %p\n", aml_address));
+			ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "root_prefix(\\) at %p\n", aml_address));
 
 			/*
-			 * Remember that we have a Root_prefix --
-			 * see comment in Acpi_ex_allocate_name_string()
+			 * Remember that we have a root_prefix --
+			 * see comment in acpi_ex_allocate_name_string()
 			 */
 			aml_address++;
 			prefix_count = ACPI_UINT32_MAX;
@@ -284,7 +284,7 @@ acpi_ex_get_name_string (
 			/* Increment past possibly multiple parent prefixes */
 
 			do {
-				ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Parent_prefix (^) at %p\n", aml_address));
+				ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "parent_prefix (^) at %p\n", aml_address));
 
 				aml_address++;
 				prefix_count++;
@@ -308,7 +308,7 @@ acpi_ex_get_name_string (
 		switch (*aml_address) {
 		case AML_DUAL_NAME_PREFIX:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Dual_name_prefix at %p\n", aml_address));
+			ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "dual_name_prefix at %p\n", aml_address));
 
 			aml_address++;
 			name_string = acpi_ex_allocate_name_string (prefix_count, 2);
@@ -330,7 +330,7 @@ acpi_ex_get_name_string (
 
 		case AML_MULTI_NAME_PREFIX_OP:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Multi_name_prefix at %p\n", aml_address));
+			ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "multi_name_prefix at %p\n", aml_address));
 
 			/* Fetch count of segments remaining in name path */
 
@@ -358,10 +358,10 @@ acpi_ex_get_name_string (
 
 		case 0:
 
-			/* Null_name valid as of 8-12-98 ASL/AML Grammar Update */
+			/* null_name valid as of 8-12-98 ASL/AML Grammar Update */
 
 			if (prefix_count == ACPI_UINT32_MAX) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Name_seg is \"\\\" followed by NULL\n"));
+				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "name_seg is \"\\\" followed by NULL\n"));
 			}
 
 			/* Consume the NULL byte */
@@ -395,7 +395,7 @@ acpi_ex_get_name_string (
 		/* Ran out of segments after processing a prefix */
 
 		ACPI_REPORT_ERROR (
-			("Ex_do_name: Malformed Name at %p\n", name_string));
+			("ex_do_name: Malformed Name at %p\n", name_string));
 		status = AE_AML_BAD_NAME;
 	}
 

@@ -32,9 +32,9 @@
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_get_gpe_bit_mask
+ * FUNCTION:    acpi_hw_get_gpe_bit_mask
  *
- * PARAMETERS:  Gpe_number      - The GPE
+ * PARAMETERS:  gpe_number      - The GPE
  *
  * RETURN:      Gpe register bitmask for this gpe level
  *
@@ -52,9 +52,9 @@ acpi_hw_get_gpe_bit_mask (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_enable_gpe
+ * FUNCTION:    acpi_hw_enable_gpe
  *
- * PARAMETERS:  Gpe_number      - The GPE
+ * PARAMETERS:  gpe_number      - The GPE
  *
  * RETURN:      None
  *
@@ -102,9 +102,9 @@ acpi_hw_enable_gpe (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_enable_gpe_for_wakeup
+ * FUNCTION:    acpi_hw_enable_gpe_for_wakeup
  *
- * PARAMETERS:  Gpe_number      - The GPE
+ * PARAMETERS:  gpe_number      - The GPE
  *
  * RETURN:      None
  *
@@ -141,9 +141,9 @@ acpi_hw_enable_gpe_for_wakeup (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_disable_gpe
+ * FUNCTION:    acpi_hw_disable_gpe
  *
- * PARAMETERS:  Gpe_number      - The GPE
+ * PARAMETERS:  gpe_number      - The GPE
  *
  * RETURN:      None
  *
@@ -195,9 +195,9 @@ acpi_hw_disable_gpe (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_disable_gpe_for_wakeup
+ * FUNCTION:    acpi_hw_disable_gpe_for_wakeup
  *
- * PARAMETERS:  Gpe_number      - The GPE
+ * PARAMETERS:  gpe_number      - The GPE
  *
  * RETURN:      None
  *
@@ -234,9 +234,9 @@ acpi_hw_disable_gpe_for_wakeup (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_clear_gpe
+ * FUNCTION:    acpi_hw_clear_gpe
  *
- * PARAMETERS:  Gpe_number      - The GPE
+ * PARAMETERS:  gpe_number      - The GPE
  *
  * RETURN:      None
  *
@@ -277,9 +277,9 @@ acpi_hw_clear_gpe (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_get_gpe_status
+ * FUNCTION:    acpi_hw_get_gpe_status
  *
- * PARAMETERS:  Gpe_number      - The GPE
+ * PARAMETERS:  gpe_number      - The GPE
  *
  * RETURN:      None
  *
@@ -350,7 +350,7 @@ acpi_hw_get_gpe_status (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_disable_non_wakeup_gpes
+ * FUNCTION:    acpi_hw_disable_non_wakeup_gpes
  *
  * PARAMETERS:  None
  *
@@ -358,7 +358,7 @@ acpi_hw_get_gpe_status (
  *
  * DESCRIPTION: Disable all non-wakeup GPEs
  *              Call with interrupts disabled. The interrupt handler also
- *              modifies Acpi_gbl_Gpe_register_info[i].Enable, so it should not be
+ *              modifies acpi_gbl_gpe_register_info[i].Enable, so it should not be
  *              given the chance to run until after non-wake GPEs are
  *              re-enabled.
  *
@@ -407,7 +407,7 @@ acpi_hw_disable_non_wakeup_gpes (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_enable_non_wakeup_gpes
+ * FUNCTION:    acpi_hw_enable_non_wakeup_gpes
  *
  * PARAMETERS:  None
  *

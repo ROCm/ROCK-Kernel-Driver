@@ -33,10 +33,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_type
+ * FUNCTION:    acpi_get_type
  *
  * PARAMETERS:  Handle          - Handle of object whose type is desired
- *              *Ret_type       - Where the type will be placed
+ *              *ret_type       - Where the type will be placed
  *
  * RETURN:      Status
  *
@@ -91,10 +91,10 @@ acpi_get_type (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_parent
+ * FUNCTION:    acpi_get_parent
  *
  * PARAMETERS:  Handle          - Handle of object whose parent is desired
- *              Ret_handle      - Where the parent handle will be placed
+ *              ret_handle      - Where the parent handle will be placed
  *
  * RETURN:      Status
  *
@@ -156,13 +156,13 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_next_object
+ * FUNCTION:    acpi_get_next_object
  *
  * PARAMETERS:  Type            - Type of object to be searched for
  *              Parent          - Parent object whose children we are getting
- *              Last_child      - Previous child that was found.
+ *              last_child      - Previous child that was found.
  *                                The NEXT child will be returned
- *              Ret_handle      - Where handle to the next object is placed
+ *              ret_handle      - Where handle to the next object is placed
  *
  * RETURN:      Status
  *

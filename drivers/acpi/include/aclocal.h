@@ -46,12 +46,12 @@ typedef u32                             acpi_mutex_handle;
 
 /*
  * Predefined handles for the mutex objects used within the subsystem
- * All mutex objects are automatically created by Acpi_ut_mutex_initialize.
+ * All mutex objects are automatically created by acpi_ut_mutex_initialize.
  *
  * The acquire/release ordering protocol is implied via this list.  Mutexes
  * with a lower value must be acquired before mutexes with a higher value.
  *
- * NOTE: any changes here must be reflected in the Acpi_gbl_Mutex_names table also!
+ * NOTE: any changes here must be reflected in the acpi_gbl_mutex_names table also!
  */
 
 #define ACPI_MTX_EXECUTE                0
@@ -84,14 +84,14 @@ static char                 *acpi_gbl_mutex_names[] =
 	"ACPI_MTX_Parser",
 	"ACPI_MTX_Dispatcher",
 	"ACPI_MTX_Tables",
-	"ACPI_MTX_Op_regions",
+	"ACPI_MTX_op_regions",
 	"ACPI_MTX_Namespace",
 	"ACPI_MTX_Events",
 	"ACPI_MTX_Hardware",
 	"ACPI_MTX_Caches",
 	"ACPI_MTX_Memory",
-	"ACPI_MTX_Debug_cmd_complete",
-	"ACPI_MTX_Debug_cmd_ready",
+	"ACPI_MTX_debug_cmd_complete",
+	"ACPI_MTX_debug_cmd_ready",
 };
 
 #endif
@@ -157,9 +157,9 @@ typedef enum
 
 /*
  * The Node describes a named object that appears in the AML
- * An Acpi_node is used to store Nodes.
+ * An acpi_node is used to store Nodes.
  *
- * Data_type is used to differentiate between internal descriptors, and MUST
+ * data_type is used to differentiate between internal descriptors, and MUST
  * be the first byte in this structure.
  */
 
@@ -480,7 +480,7 @@ typedef struct acpi_pscope_state
 typedef struct acpi_thread_state
 {
 	ACPI_STATE_COMMON
-	struct acpi_walk_state  *walk_state_list;       /* Head of list of Walk_states for this thread */
+	struct acpi_walk_state  *walk_state_list;       /* Head of list of walk_states for this thread */
 	union acpi_operand_obj  *acquired_mutex_list;   /* List of all currently acquired mutexes */
 	u32                     thread_id;              /* Running thread ID */
 	u16                     current_sync_level;     /* Mutex Sync (nested acquire) level */
@@ -625,7 +625,7 @@ typedef struct acpi_parseobj_common
 
 
 /*
- * Extended Op for named ops (Scope, Method, etc.), deferred ops (Methods and Op_regions),
+ * Extended Op for named ops (Scope, Method, etc.), deferred ops (Methods and op_regions),
  * and bytelists.
  */
 typedef struct acpi_parseobj_named
@@ -712,7 +712,7 @@ typedef struct acpi_parse_state
 #define ACPI_PARSEOP_BYTELIST                   0x08
 #define ACPI_PARSEOP_IN_CACHE                   0x80
 
-/* Parse object Disasm_flags */
+/* Parse object disasm_flags */
 
 #define ACPI_PARSEOP_IGNORE                     0x01
 #define ACPI_PARSEOP_PARAMLIST                  0x02
@@ -752,7 +752,7 @@ typedef struct
 #define ACPI_REGISTER_SMI_COMMAND_BLOCK         0x09
 
 
-/* Masks used to access the Bit_registers */
+/* Masks used to access the bit_registers */
 
 #define ACPI_BITMASK_TIMER_STATUS               0x0001
 #define ACPI_BITMASK_BUS_MASTER_STATUS          0x0010
@@ -785,7 +785,7 @@ typedef struct
 #define ACPI_BITMASK_ARB_DISABLE                0x0001
 
 
-/* Raw bit position of each Bit_register */
+/* Raw bit position of each bit_register */
 
 #define ACPI_BITPOSITION_TIMER_STATUS           0x00
 #define ACPI_BITPOSITION_BUS_MASTER_STATUS      0x04
@@ -817,7 +817,7 @@ typedef struct
  ****************************************************************************/
 
 
-/* Resource_type values */
+/* resource_type values */
 
 #define ACPI_RESOURCE_TYPE_MEMORY_RANGE         0
 #define ACPI_RESOURCE_TYPE_IO_RANGE             1

@@ -53,7 +53,7 @@ typedef struct acpi_walk_state
 	acpi_owner_id           owner_id;                           /* Owner of objects created during the walk */
 	u8                      last_predicate;                     /* Result of last predicate */
 	u8                      current_result;                     /* */
-	u8                      next_op_info;                       /* Info about Next_op */
+	u8                      next_op_info;                       /* Info about next_op */
 	u8                      num_operands;                       /* Stack pointer for Operands[] array */
 	u8                      return_used;
 	u8                      walk_type;
@@ -75,7 +75,7 @@ typedef struct acpi_walk_state
 	acpi_generic_state      *control_state;                     /* List of control states (nested IFs) */
 	struct acpi_node        local_variables[ACPI_METHOD_NUM_LOCALS];    /* Control method locals */
 	struct acpi_node        *method_call_node;                  /* Called method Node*/
-	acpi_parse_object       *method_call_op;                    /* Method_call Op if running a method */
+	acpi_parse_object       *method_call_op;                    /* method_call Op if running a method */
 	union acpi_operand_obj  *method_desc;                       /* Method descriptor if running a method */
 	struct acpi_node        *method_node;                       /* Method Node if running a method */
 	acpi_parse_object       *op;                                /* Current parser op */
@@ -94,13 +94,13 @@ typedef struct acpi_walk_state
 	acpi_parse_downwards    descending_callback;
 	acpi_parse_upwards      ascending_callback;
 	acpi_thread_state       *thread;
-	struct acpi_walk_state  *next;                              /* Next Walk_state in list */
+	struct acpi_walk_state  *next;                              /* Next walk_state in list */
 
 
 } acpi_walk_state;
 
 
-/* Info used by Acpi_ps_init_objects */
+/* Info used by acpi_ps_init_objects */
 
 typedef struct acpi_init_walk_info
 {
@@ -120,7 +120,7 @@ typedef struct acpi_init_walk_info
 } acpi_init_walk_info;
 
 
-/* Info used by Acpi_ns_initialize_devices */
+/* Info used by acpi_ns_initialize_devices */
 
 typedef struct acpi_device_walk_info
 {

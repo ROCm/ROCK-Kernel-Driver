@@ -36,9 +36,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_print_pathname
+ * FUNCTION:    acpi_ns_print_pathname
  *
- * PARAMETERS:  Num_segment         - Number of ACPI name segments
+ * PARAMETERS:  num_segment         - Number of ACPI name segments
  *              Pathname            - The compressed (internal) path
  *
  * DESCRIPTION: Print an object's full namespace pathname
@@ -50,7 +50,7 @@ acpi_ns_print_pathname (
 	u32                     num_segments,
 	char                    *pathname)
 {
-	ACPI_FUNCTION_NAME ("Ns_print_pathname");
+	ACPI_FUNCTION_NAME ("ns_print_pathname");
 
 
 	if (!(acpi_dbg_level & ACPI_LV_NAMES) || !(acpi_dbg_layer & ACPI_NAMESPACE)) {
@@ -77,7 +77,7 @@ acpi_ns_print_pathname (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_dump_pathname
+ * FUNCTION:    acpi_ns_dump_pathname
  *
  * PARAMETERS:  Handle              - Object
  *              Msg                 - Prefix message
@@ -97,7 +97,7 @@ acpi_ns_dump_pathname (
 	u32                     component)
 {
 
-	ACPI_FUNCTION_TRACE ("Ns_dump_pathname");
+	ACPI_FUNCTION_TRACE ("ns_dump_pathname");
 
 
 	/* Do this only if the requested debug level and component are enabled */
@@ -116,14 +116,14 @@ acpi_ns_dump_pathname (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_dump_one_object
+ * FUNCTION:    acpi_ns_dump_one_object
  *
  * PARAMETERS:  Handle              - Node to be dumped
  *              Level               - Nesting level of the handle
- *              Context             - Passed into Walk_namespace
+ *              Context             - Passed into walk_namespace
  *
  * DESCRIPTION: Dump a single Node
- *              This procedure is a User_function called by Acpi_ns_walk_namespace.
+ *              This procedure is a user_function called by acpi_ns_walk_namespace.
  *
  ******************************************************************************/
 
@@ -144,7 +144,7 @@ acpi_ns_dump_one_object (
 	u32                     i;
 
 
-	ACPI_FUNCTION_NAME ("Ns_dump_one_object");
+	ACPI_FUNCTION_NAME ("ns_dump_one_object");
 
 
 	/* Is output enabled? */
@@ -530,17 +530,17 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_dump_objects
+ * FUNCTION:    acpi_ns_dump_objects
  *
  * PARAMETERS:  Type                - Object type to be dumped
- *              Max_depth           - Maximum depth of dump.  Use ACPI_UINT32_MAX
+ *              max_depth           - Maximum depth of dump.  Use ACPI_UINT32_MAX
  *                                    for an effectively unlimited depth.
- *              Owner_id            - Dump only objects owned by this ID.  Use
+ *              owner_id            - Dump only objects owned by this ID.  Use
  *                                    ACPI_UINT32_MAX to match all owners.
- *              Start_handle        - Where in namespace to start/end search
+ *              start_handle        - Where in namespace to start/end search
  *
  * DESCRIPTION: Dump typed objects within the loaded namespace.
- *              Uses Acpi_ns_walk_namespace in conjunction with Acpi_ns_dump_one_object.
+ *              Uses acpi_ns_walk_namespace in conjunction with acpi_ns_dump_one_object.
  *
  ******************************************************************************/
 
@@ -571,11 +571,11 @@ acpi_ns_dump_objects (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_dump_tables
+ * FUNCTION:    acpi_ns_dump_tables
  *
- * PARAMETERS:  Search_base         - Root of subtree to be dumped, or
+ * PARAMETERS:  search_base         - Root of subtree to be dumped, or
  *                                    NS_ALL to dump the entire namespace
- *              Max_depth           - Maximum depth of dump.  Use INT_MAX
+ *              max_depth           - Maximum depth of dump.  Use INT_MAX
  *                                    for an effectively unlimited depth.
  *
  * DESCRIPTION: Dump the name space, or a portion of it.
@@ -590,7 +590,7 @@ acpi_ns_dump_tables (
 	acpi_handle             search_handle = search_base;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_dump_tables");
+	ACPI_FUNCTION_TRACE ("ns_dump_tables");
 
 
 	if (!acpi_gbl_root_node) {
@@ -618,10 +618,10 @@ acpi_ns_dump_tables (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_dump_entry
+ * FUNCTION:    acpi_ns_dump_entry
  *
  * PARAMETERS:  Handle              - Node to be dumped
- *              Debug_level         - Output level
+ *              debug_level         - Output level
  *
  * DESCRIPTION: Dump a single Node
  *
