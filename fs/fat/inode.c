@@ -591,8 +591,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi;
-	int logical_sector_size, fat_clusters, debug, cp;
+	int logical_sector_size, fat_clusters, debug, cp, first;
 	unsigned int total_sectors, rootdir_sectors;
+	unsigned char media;
 	long error = -EIO;
 	char buf[50];
 	int i;
@@ -652,6 +653,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!b->heads) {
 		if (!silent)
 			printk("FAT: bogus number-of-heads value\n");
+		brelse(bh);
+		goto out_invalid;
+	}
+	media = b->media;
+	if (!FAT_VALID_MEDIA(media)) {
+		if (!silent)
+			printk("FAT: invalid media value (0x%02x)\n", media);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -776,6 +784,21 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		sbi->clusters = fat_clusters - 2;
 
 	brelse(bh);
+
+	/* validity check of FAT */
+	first = __fat_access(sb, 0, -1);
+	if (first < 0) {
+		error = first;
+		goto out_fail;
+	}
+	if (FAT_FIRST_ENT(sb, media) != first) {
+		if (!silent) {
+			printk("FAT: invalid first entry of FAT "
+			       "(0x%x != 0x%x)\n",
+			       FAT_FIRST_ENT(sb, media), first);
+		}
+		goto out_invalid;
+	}
 
 	if (!strcmp(cvf_format, "none"))
 		i = -1;

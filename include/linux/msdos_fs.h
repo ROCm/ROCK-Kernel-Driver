@@ -54,6 +54,11 @@
 
 #define MSDOS_FAT12 4084 /* maximum number of clusters in a 12 bit FAT */
 
+/* media of boot sector */
+#define FAT_VALID_MEDIA(x)	((0xF8 <= (x) && (x) <= 0xFF) || (x) == 0xF0)
+#define FAT_FIRST_ENT(s, x)	((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
+	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
+
 /* bad cluster mark */
 #define BAD_FAT12 0xFF7
 #define BAD_FAT16 0xFFF7
@@ -114,7 +119,7 @@ struct fat_boot_sector {
 	__u8	fats;		/* number of FATs */
 	__u8	dir_entries[2];	/* root directory entries */
 	__u8	sectors[2];	/* number of sectors */
-	__u8	media;		/* media code (unused) */
+	__u8	media;		/* media code */
 	__u16	fat_length;	/* sectors/FAT */
 	__u16	secs_track;	/* sectors per track */
 	__u16	heads;		/* number of heads */
@@ -242,6 +247,7 @@ extern void fat_ll_rw_block(struct super_block *sb, int opr, int nbreq,
 
 /* fat/cache.c */
 extern int fat_access(struct super_block *sb, int nr, int new_value);
+extern int __fat_access(struct super_block *sb, int nr, int new_value);
 extern int fat_bmap(struct inode *inode, int sector);
 extern void fat_cache_init(void);
 extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,

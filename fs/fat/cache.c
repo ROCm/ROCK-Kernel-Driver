@@ -34,16 +34,12 @@ int fat_bmap(struct inode *inode,int sector)
 	return MSDOS_SB(inode->i_sb)->cvf_format->cvf_bmap(inode,sector);
 }
 
-int default_fat_access(struct super_block *sb,int nr,int new_value)
+int __fat_access(struct super_block *sb, int nr, int new_value)
 {
 	struct buffer_head *bh, *bh2, *c_bh, *c_bh2;
 	unsigned char *p_first, *p_last;
 	int copy, first, last, next, b;
 
-	if (nr < 2 || MSDOS_SB(sb)->clusters + 2 <= nr) {
-		fat_fs_panic(sb, "invalid access to FAT (entry 0x%08x)", nr);
-		return -EIO;
-	}
 	if (MSDOS_SB(sb)->fat_bits == 32) {
 		first = last = nr*4;
 	} else if (MSDOS_SB(sb)->fat_bits == 16) {
@@ -73,25 +69,17 @@ int default_fat_access(struct super_block *sb,int nr,int new_value)
 		    (sb->s_blocksize - 1)) >> 2]);
 		/* Fscking Microsoft marketing department. Their "32" is 28. */
 		next &= 0x0fffffff;
-		if (next >= BAD_FAT32) next = FAT_ENT_EOF;
-		PRINTK(("fat_bread: 0x%x, nr=0x%x, first=0x%x, next=0x%x\n", b, nr, first, next));
-
 	} else if (MSDOS_SB(sb)->fat_bits == 16) {
 		p_first = p_last = NULL; /* GCC needs that stuff */
 		next = CF_LE_W(((__u16 *) bh->b_data)[(first &
 		    (sb->s_blocksize - 1)) >> 1]);
-		if (next >= BAD_FAT16) next = FAT_ENT_EOF;
 	} else {
 		p_first = &((__u8 *)bh->b_data)[first & (sb->s_blocksize - 1)];
 		p_last = &((__u8 *)bh2->b_data)[(first + 1) & (sb->s_blocksize - 1)];
 		if (nr & 1) next = ((*p_first >> 4) | (*p_last << 4)) & 0xfff;
 		else next = (*p_first+(*p_last << 8)) & 0xfff;
-		if (next >= BAD_FAT12) next = FAT_ENT_EOF;
 	}
 	if (new_value != -1) {
-		if (next == FAT_ENT_EOF)
-			next = EOF_FAT(sb);
-		
 		if (MSDOS_SB(sb)->fat_bits == 32) {
 			((__u32 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 2]
 				= CT_LE_L(new_value);
@@ -132,6 +120,27 @@ int default_fat_access(struct super_block *sb,int nr,int new_value)
 	fat_brelse(sb, bh);
 	if (bh != bh2)
 		fat_brelse(sb, bh2);
+	return next;
+}
+
+int default_fat_access(struct super_block *sb, int nr, int new_value)
+{
+	int next;
+
+	next = -EIO;
+	if (nr < 2 || MSDOS_SB(sb)->clusters + 2 <= nr) {
+		fat_fs_panic(sb, "invalid access to FAT (entry 0x%08x)", nr);
+		goto out;
+	}
+	if (new_value == FAT_ENT_EOF)
+		new_value = EOF_FAT(sb);
+
+	next = __fat_access(sb, nr, new_value);
+	if (next < 0)
+		goto out;
+	if (next >= BAD_FAT(sb))
+		next = FAT_ENT_EOF;
+out:
 	return next;
 }
 
