@@ -1279,7 +1279,7 @@ static int __init __read_suspend_image(int noresume)
 
 #define PREPARENEXT \
 	{	next = cur->link.next; \
-		next.val = swp_offset(next) * PAGE_SIZE; \
+		next.val = swp_offset(next); \
         }
 
 	if (bio_read_page(0, cur)) return -EIO;
