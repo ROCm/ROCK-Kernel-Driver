@@ -59,7 +59,7 @@ drivers-$(CONFIG_OCP)		+= arch/ppc/ocp/
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
 
-.PHONY: $(BOOT_TARGETS) clean archclean archmrproper
+.PHONY: $(BOOT_TARGETS)
 
 all: zImage
 
@@ -77,8 +77,6 @@ $(BOOT_TARGETS): vmlinux
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/ppc/boot
-
-archmrproper:
 
 prepare: include/asm-$(ARCH)/offsets.h checkbin
 

@@ -96,9 +96,6 @@ include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
 	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
 
-archclean:
-archmrproper:
-
 CLEAN_FILES	+= palo.conf lifimage include/asm-parisc/offsets.h \
 		include/asm-parisc/offsets.h.tmp
 

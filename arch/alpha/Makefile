@@ -125,8 +125,6 @@ include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$(boot)
 
-archmrproper:
-
 CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h.tmp \
 	       include/asm-$(ARCH)/asm_offsets.h
 

@@ -81,5 +81,3 @@ archclean:
 	$(MAKE) -C arch/$(ARCH)/stboards clean
 #	$(MAKE) -C arch/$(ARCH)/tools clean
 
-archmrproper:
-

@@ -74,10 +74,6 @@ drivers-$(CONFIG_OPROFILE)	+= arch/sparc64/oprofile/
 tftpboot.img vmlinux.aout:
 	$(Q)$(MAKE) $(build)=arch/sparc64/boot arch/sparc64/boot/$@
 
-archclean:
-
-archmrproper:
-
 define archhelp
   echo  '* vmlinux       - Standard sparc64 kernel'
   echo  '  vmlinux.aout  - a.out kernel for sparc64'

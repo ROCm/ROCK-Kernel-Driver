@@ -61,8 +61,6 @@ image tftpboot.img: vmlinux
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
 
-archmrproper:
-
 prepare: include/asm-$(ARCH)/asm_offsets.h
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \

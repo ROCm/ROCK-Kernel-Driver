@@ -181,7 +181,6 @@ MRPROPER_FILES	+= \
 	include/asm-arm/mach-types.h
 
 # We use MRPROPER_FILES and CLEAN_FILES now
-archmrproper:
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 

@@ -38,7 +38,6 @@ listing image: vmlinux
 install: vmlinux
 	$(call makeboot, $@)
 
-archmrproper:
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
 

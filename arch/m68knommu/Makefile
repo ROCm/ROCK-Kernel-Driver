@@ -98,8 +98,6 @@ libs-y	+= arch/m68knommu/lib/
 
 prepare: include/asm-$(ARCH)/asm-offsets.h
 
-archmrproper:
-
 archclean:
 	$(call descend arch/$(ARCH)/boot, subdirclean)
 
