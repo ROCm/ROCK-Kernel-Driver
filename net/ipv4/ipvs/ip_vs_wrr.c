@@ -138,7 +138,7 @@ static int ip_vs_wrr_update_svc(struct ip_vs_service *svc)
  *    Weighted Round-Robin Scheduling
  */
 static struct ip_vs_dest *
-ip_vs_wrr_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_wrr_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
 	struct ip_vs_dest *dest;
 	struct ip_vs_wrr_mark *mark = svc->sched_data;

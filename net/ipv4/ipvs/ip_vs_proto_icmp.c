@@ -28,8 +28,11 @@ static int icmp_timeouts[1] =		{ 1*60*HZ };
 static char * icmp_state_name_table[1] = { "ICMP" };
 
 struct ip_vs_conn *
-icmp_conn_in_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		 struct iphdr *iph, union ip_vs_tphdr h, int inverse)
+icmp_conn_in_get(const struct sk_buff *skb,
+		 struct ip_vs_protocol *pp,
+		 const struct iphdr *iph,
+		 unsigned int proto_off,
+		 int inverse)
 {
 #if 0
 	struct ip_vs_conn *cp;
@@ -52,8 +55,11 @@ icmp_conn_in_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 }
 
 struct ip_vs_conn *
-icmp_conn_out_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		  struct iphdr *iph, union ip_vs_tphdr h, int inverse)
+icmp_conn_out_get(const struct sk_buff *skb,
+		  struct ip_vs_protocol *pp,
+		  const struct iphdr *iph,
+		  unsigned int proto_off,
+		  int inverse)
 {
 #if 0
 	struct ip_vs_conn *cp;
@@ -76,7 +82,6 @@ icmp_conn_out_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 
 static int
 icmp_conn_schedule(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		   struct iphdr *iph, union ip_vs_tphdr h,
 		   int *verdict, struct ip_vs_conn **cpp)
 {
 	*verdict = NF_ACCEPT;
@@ -84,41 +89,51 @@ icmp_conn_schedule(struct sk_buff *skb, struct ip_vs_protocol *pp,
 }
 
 static int
-icmp_csum_check(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		struct iphdr *iph, union ip_vs_tphdr h, int size)
+icmp_csum_check(struct sk_buff *skb, struct ip_vs_protocol *pp)
 {
-	if (!(iph->frag_off & __constant_htons(IP_OFFSET))) {
-		if (ip_compute_csum(h.raw, size)) {
-			IP_VS_DBG_RL_PKT(0, pp, iph, "Failed checksum for");
-			return 0;
+	if (!(skb->nh.iph->frag_off & __constant_htons(IP_OFFSET))) {
+		if (skb->ip_summed != CHECKSUM_UNNECESSARY) {
+			if (ip_vs_checksum_complete(skb, skb->nh.iph->ihl * 4)) {
+				IP_VS_DBG_RL_PKT(0, pp, skb, 0, "Failed checksum for");
+				return 0;
+			}
 		}
 	}
 	return 1;
-
 }
 
 static void
-icmp_debug_packet(struct ip_vs_protocol *pp, struct iphdr *iph, char *msg)
+icmp_debug_packet(struct ip_vs_protocol *pp,
+		  const struct sk_buff *skb,
+		  int offset,
+		  const char *msg)
 {
 	char buf[256];
-	union ip_vs_tphdr h;
+	struct iphdr iph;
+	struct icmphdr icmph;
 
-	h.raw = (char *) iph + iph->ihl * 4;
-	if (iph->frag_off & __constant_htons(IP_OFFSET))
+	if (skb_copy_bits(skb, offset, &iph, sizeof(iph)) < 0)
+		sprintf(buf, "%s TRUNCATED", pp->name);
+	else if (iph.frag_off & __constant_htons(IP_OFFSET))
 		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u frag",
-			pp->name, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr));
+			pp->name, NIPQUAD(iph.saddr),
+			NIPQUAD(iph.daddr));
+	else if (skb_copy_bits(skb, offset + iph.ihl*4, &icmph, sizeof(icmph)) < 0)
+		sprintf(buf, "%s TRUNCATED to %u bytes\n",
+			pp->name, skb->len - offset);
 	else
 		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u T:%d C:%d",
-			pp->name, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr),
-			h.icmph->type, h.icmph->code);
+			pp->name, NIPQUAD(iph.saddr),
+			NIPQUAD(iph.daddr),
+			icmph.type, icmph.code);
 
 	printk(KERN_DEBUG "IPVS: %s: %s\n", msg, buf);
 }
 
 static int
-icmp_state_transition(struct ip_vs_conn *cp,
-		      int direction, struct iphdr *iph,
-		      union ip_vs_tphdr h, struct ip_vs_protocol *pp)
+icmp_state_transition(struct ip_vs_conn *cp, int direction,
+		      const struct sk_buff *skb,
+		      struct ip_vs_protocol *pp)
 {
 	cp->timeout = pp->timeout_table[IP_VS_ICMP_S_NORMAL];
 	return 1;

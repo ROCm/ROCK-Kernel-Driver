@@ -63,7 +63,7 @@ ip_vs_lc_dest_overhead(struct ip_vs_dest *dest)
  *	Least Connection scheduling
  */
 static struct ip_vs_dest *
-ip_vs_lc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
+ip_vs_lc_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 {
 	struct ip_vs_dest *dest, *least = NULL;
 	unsigned int loh = 0, doh;
