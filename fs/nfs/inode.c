@@ -660,7 +660,7 @@ nfs_inode_is_stale(struct inode *inode, struct nfs_fh *fh, struct nfs_fattr *fat
 	if ((fattr->mode & S_IFMT) != (inode->i_mode & S_IFMT))
 		return 1;
 
-	if (is_bad_inode(inode))
+	if (is_bad_inode(inode) || NFS_STALE(inode))
 		return 1;
 
 	/* Has the filehandle changed? If so is the old one stale? */
@@ -862,24 +862,22 @@ int nfs_release(struct inode *inode, struct file *filp)
 int
 __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 {
-	int		 status = 0;
+	int		 status = -ESTALE;
 	struct nfs_fattr fattr;
 
 	dfprintk(PAGECACHE, "NFS: revalidating (%x/%Ld)\n",
 		inode->i_dev, (long long)NFS_FILEID(inode));
 
 	lock_kernel();
-	if (!inode || is_bad_inode(inode) || NFS_STALE(inode)) {
-		unlock_kernel();
-		return -ESTALE;
-	}
+	if (!inode || is_bad_inode(inode))
+ 		goto out_nowait;
+	if (NFS_STALE(inode) && inode != inode->i_sb->s_root->d_inode)
+ 		goto out_nowait;
 
 	while (NFS_REVALIDATING(inode)) {
 		status = nfs_wait_on_inode(inode, NFS_INO_REVALIDATING);
-		if (status < 0) {
-			unlock_kernel();
-			return status;
-		}
+		if (status < 0)
+			goto out_nowait;
 		if (time_before(jiffies,NFS_READTIME(inode)+NFS_ATTRTIMEO(inode))) {
 			status = NFS_STALE(inode) ? -ESTALE : 0;
 			goto out_nowait;
@@ -893,7 +891,8 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 			 inode->i_dev, (long long)NFS_FILEID(inode), status);
 		if (status == -ESTALE) {
 			NFS_FLAGS(inode) |= NFS_INO_STALE;
-			remove_inode_hash(inode);
+			if (inode != inode->i_sb->s_root->d_inode)
+				remove_inode_hash(inode);
 		}
 		goto out;
 	}
@@ -906,6 +905,8 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	}
 	dfprintk(PAGECACHE, "NFS: (%x/%Ld) revalidation complete\n",
 		inode->i_dev, (long long)NFS_FILEID(inode));
+
+	NFS_FLAGS(inode) &= ~NFS_INO_STALE;
 out:
 	NFS_FLAGS(inode) &= ~NFS_INO_REVALIDATING;
 	wake_up(&inode->i_wait);

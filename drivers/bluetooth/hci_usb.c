@@ -28,8 +28,9 @@
  *    Copyright (c) 2000 Greg Kroah-Hartman        <greg@kroah.com>
  *    Copyright (c) 2000 Mark Douglas Corner       <mcorner@umich.edu>
  *
- * $Id: hci_usb.c,v 1.1 2001/06/01 08:12:10 davem Exp $    
+ * $Id: hci_usb.c,v 1.5 2001/07/05 18:42:44 maxk Exp $    
  */
+#define VERSION "1.0"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -106,7 +107,7 @@ static void hci_usb_free_bufs(struct hci_usb *husb)
 		usb_free_urb(husb->write_urb);
 
 	if (husb->intr_skb)
-		bluez_skb_free(husb->intr_skb);
+		kfree_skb(husb->intr_skb);
 }
 
 /* ------- Interface to HCI layer ------ */
@@ -139,8 +140,8 @@ int hci_usb_flush(struct hci_dev *hdev)
 	DBG("%s", hdev->name);
 
 	/* Drop TX queues */
-	bluez_skb_queue_purge(&husb->tx_ctrl_q);
-	bluez_skb_queue_purge(&husb->tx_write_q);
+	skb_queue_purge(&husb->tx_ctrl_q);
+	skb_queue_purge(&husb->tx_write_q);
 
 	return 0;
 }
@@ -173,7 +174,7 @@ void hci_usb_ctrl_wakeup(struct hci_usb *husb)
 		goto done;
 
 	if (hci_usb_ctrl_msg(husb, skb)){
-		bluez_skb_free(skb);
+		kfree_skb(skb);
 		goto done;
 	}
 
@@ -271,7 +272,7 @@ static void hci_usb_ctrl(struct urb *urb)
 		DBG("%s ctrl status: %d", hdev->name, urb->status);
 
 	clear_bit(HCI_TX_CTRL, &husb->tx_state);
-	bluez_skb_free(skb);
+	kfree_skb(skb);
 
 	/* Wake up device */
 	hci_usb_ctrl_wakeup(husb);
@@ -294,7 +295,7 @@ static void hci_usb_bulk_write(struct urb *urb)
 		DBG("%s bulk write status: %d", hdev->name, urb->status);
 
 	clear_bit(HCI_TX_WRITE, &husb->tx_state);
-	bluez_skb_free(skb);
+	kfree_skb(skb);
 
 	/* Wake up device */
 	hci_usb_write_wakeup(husb);
@@ -352,7 +353,7 @@ static void hci_usb_intr(struct urb *urb)
 		if (count > husb->intr_count) {
 			ERR("%s bad frame len %d (expected %d)", husb->hdev.name, count, husb->intr_count);
 
-			bluez_skb_free(skb);
+			kfree_skb(skb);
 			husb->intr_skb = NULL;
 			husb->intr_count = 0;
 			return;
@@ -563,7 +564,7 @@ static void * hci_usb_probe(struct usb_device *udev, unsigned int ifnum, const s
 
 	ep = bulk_in_ep;
 	pipe = usb_rcvbulkpipe(udev, ep->bEndpointAddress);
-	size = HCI_USB_MAX_READ;
+	size = HCI_MAX_FRAME_SIZE;
 
 	if (!(buf = kmalloc(size, GFP_KERNEL))) {
 		ERR("Can't allocate: read buffer");
@@ -652,7 +653,7 @@ int hci_usb_init(void)
 	int err;
 
 	INF("BlueZ HCI USB driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
-		BLUEZ_VER);
+		VERSION);
 	INF("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 
 	if ((err = usb_register(&hci_usb_driver)) < 0)
@@ -668,3 +669,7 @@ void hci_usb_cleanup(void)
 
 module_init(hci_usb_init);
 module_exit(hci_usb_cleanup);
+
+MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
+MODULE_DESCRIPTION("BlueZ HCI USB driver ver " VERSION);
+MODULE_LICENSE("GPL");

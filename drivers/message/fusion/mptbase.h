@@ -12,7 +12,7 @@
  *  Originally By: Steven J. Ralston
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: mptbase.h,v 1.38 2001/03/22 10:54:30 sralston Exp $
+ *  $Id: mptbase.h,v 1.46.2.2.2.1 2001/08/24 20:07:05 sralston Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -63,8 +63,8 @@
 #include "lsi/mpi_init.h"	/* SCSI Host (initiator) protocol support */
 #include "lsi/mpi_lan.h"	/* LAN over FC protocol support */
 
-//#include "lsi/mpi_fc.h"	/* Fibre Channel (lowlevel) support */
-//#include "lsi/mpi_targ.h"	/* SCSI/FCP Target protcol support */
+#include "lsi/mpi_fc.h"		/* Fibre Channel (lowlevel) support */
+#include "lsi/mpi_targ.h"	/* SCSI/FCP Target protcol support */
 #include "lsi/fc_log.h"
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -77,9 +77,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2001 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"1.00.11"
-#define MPT_LINUX_VERSION_EXP		"0.09.66-EXP"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-1.00.11"
+#define MPT_LINUX_VERSION_COMMON	"1.02.01"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-1.02.01"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -91,6 +90,7 @@
  */
 #define MPT_MAX_ADAPTERS		16
 #define MPT_MAX_PROTOCOL_DRIVERS	8
+#define MPT_MAX_FC_DEVICES		255
 
 #define MPT_MISCDEV_BASENAME		"mptctl"
 #define MPT_MISCDEV_PATHNAME		"/dev/" MPT_MISCDEV_BASENAME
@@ -262,8 +262,6 @@ typedef struct _MPT_ADAPTER
 	struct _MPT_ADAPTER	*back;
 	int			 id;		/* Unique adapter id {0,1,2,...} */
 	int			 pci_irq;
-	IOCFactsReply_t		 facts0;
-	IOCFactsReply_t		 factsN;
 	char			 name[32];	/* "iocN"             */
 	char			*prod_name;	/* "LSIFC9x9"         */
 	u32			 mem_phys;	/* == f4020000 (mmap) */
@@ -275,10 +273,6 @@ typedef struct _MPT_ADAPTER
 	int			 active;
 	int			 sod_reset;
 	unsigned long		 last_kickstart;
-	PortFactsReply_t	 pfacts0;
-	PortFactsReply_t	 pfactsN;
-	LANPage0_t		 lan_cnfg_page0;
-	LANPage1_t		 lan_cnfg_page1;
 	u8			*reply_alloc;		/* Reply frames alloc ptr */
 	dma_addr_t		 reply_alloc_dma;
 	MPT_FRAME_HDR		*reply_frames;		/* Reply frames - rounded up! */
@@ -292,24 +286,30 @@ typedef struct _MPT_ADAPTER
 	dma_addr_t		 req_frames_dma;
 	int			 req_depth;
 	int			 req_sz;
-	spinlock_t		 FreeQlock;
 	MPT_Q_TRACKER		 FreeQ;
+	spinlock_t		 FreeQlock;
 		/* Pool of SCSI sense buffers for commands coming from
 		 * the SCSI mid-layer.  We have one 256 byte sense buffer
 		 * for each REQ entry.
 		 */
 	u8			*sense_buf_pool;
 	dma_addr_t		 sense_buf_pool_dma;
-	int			 hs_reply_idx;
-	u32			 hs_req[MPT_MAX_FRAME_SIZE/sizeof(u32)];
-	u16			 hs_reply[MPT_MAX_FRAME_SIZE/sizeof(u16)];
 	struct pci_dev		*pcidev;
-	struct _MPT_ADAPTER	*alt_ioc;
 /*	atomic_t		 userCnt;	*/
 	u8			*memmap;
 	int			 mtrr_reg;
 	struct Scsi_Host	*sh;
 	struct proc_dir_entry	*ioc_dentry;
+	struct _MPT_ADAPTER	*alt_ioc;
+	int			 hs_reply_idx;
+	u32			 hs_req[MPT_MAX_FRAME_SIZE/sizeof(u32)];
+	u16			 hs_reply[MPT_MAX_FRAME_SIZE/sizeof(u16)];
+	IOCFactsReply_t		 facts;
+	PortFactsReply_t	 pfacts[2];
+	LANPage0_t		 lan_cnfg_page0;
+	LANPage1_t		 lan_cnfg_page1;
+	u8			 FirstWhoInit;
+	u8			 pad1[3];
 } MPT_ADAPTER;
 
 
@@ -324,26 +324,25 @@ typedef struct _MPT_ADAPTER_TRACKER {
  *    0 = not Ok ...
  */
 typedef int (*MPT_CALLBACK)(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply);
+
 typedef int (*MPT_EVHANDLER)(MPT_ADAPTER *ioc, EventNotificationReply_t *evReply);
+typedef int (*MPT_RESETHANDLER)(MPT_ADAPTER *ioc, int reset_phase);
+/* reset_phase defs */
+#define MPT_IOC_PRE_RESET		0
+#define MPT_IOC_POST_RESET		1
 
 /*
- *  Fibre Channel (SCSI) target device...
+ * Invent MPT host event (super-set of MPI Events)
+ * Fitted to 1030's 64-byte [max] request frame size
  */
-typedef struct _FC_TARGET {
-	struct _FC_TARGET	*forw;
-	struct _FC_TARGET	*back;
-	int			 bus_id;
-	int			 target_id;
-	int			 lun_exists[32];
-	u8			 inquiry_data[36];
-	u8			 last_sense[256];
-} FC_TARGET;
+typedef struct _MPT_HOST_EVENT {
+	EventNotificationReply_t	 MpiEvent;	/* 8 32-bit words! */
+	u32				 pad[6];
+	void				*next;
+} MPT_HOST_EVENT;
 
-typedef struct _FCDEV_TRACKER {
-	FC_TARGET	*head;
-	FC_TARGET	*tail;
-} FCDEV_TRACKER;
-
+#define MPT_HOSTEVENT_IOC_BRINGUP	0x91
+#define MPT_HOSTEVENT_IOC_RECOVER	0x92
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -523,6 +522,8 @@ extern int	 mpt_register(MPT_CALLBACK cbfunc, MPT_DRIVER_CLASS dclass);
 extern void	 mpt_deregister(int cb_idx);
 extern int	 mpt_event_register(int cb_idx, MPT_EVHANDLER ev_cbfunc);
 extern void	 mpt_event_deregister(int cb_idx);
+extern int	 mpt_reset_register(int cb_idx, MPT_RESETHANDLER reset_func);
+extern void	 mpt_reset_deregister(int cb_idx);
 extern int	 mpt_register_ascqops_strings(/*ASCQ_Table_t*/void *ascqTable, int ascqtbl_sz, const char **opsTable);
 extern void	 mpt_deregister_ascqops_strings(void);
 extern MPT_FRAME_HDR	*mpt_get_msg_frame(int handle, int iocid);
@@ -532,7 +533,7 @@ extern int	 mpt_send_handshake_request(int handle, int iocid, int reqBytes, u32 
 extern int	 mpt_verify_adapter(int iocid, MPT_ADAPTER **iocpp);
 extern MPT_ADAPTER	*mpt_adapter_find_first(void);
 extern MPT_ADAPTER	*mpt_adapter_find_next(MPT_ADAPTER *prev);
-extern void	 mpt_print_ioc_summary(MPT_ADAPTER *ioc, char *buf, int *size, int len);
+extern void	 mpt_print_ioc_summary(MPT_ADAPTER *ioc, char *buf, int *size, int len, int showlan);
 extern void	 mpt_print_ioc_facts(MPT_ADAPTER *ioc, char *buf, int *size, int len);
 
 /*

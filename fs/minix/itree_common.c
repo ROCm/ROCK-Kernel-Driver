@@ -87,7 +87,7 @@ static int alloc_branch(struct inode *inode,
 		*branch[n].p = branch[n].key;
 		mark_buffer_uptodate(bh, 1);
 		unlock_buffer(bh);
-		mark_buffer_dirty(bh);
+		mark_buffer_dirty_inode(bh, inode);
 		parent = nr;
 	}
 	if (n == num)
@@ -127,7 +127,7 @@ static inline int splice_branch(struct inode *inode,
 
 	/* had we spliced it onto indirect block? */
 	if (where->bh)
-		mark_buffer_dirty(where->bh);
+		mark_buffer_dirty_inode(where->bh, inode);
 
 	mark_inode_dirty(inode);
 	return 0;
@@ -320,14 +320,14 @@ static inline void truncate (struct inode * inode)
 		if (partial == chain)
 			mark_inode_dirty(inode);
 		else
-			mark_buffer_dirty(partial->bh);
+			mark_buffer_dirty_inode(partial->bh, inode);
 		free_branches(inode, &nr, &nr+1, (chain+n-1) - partial);
 	}
 	/* Clear the ends of indirect blocks on the shared branch */
 	while (partial > chain) {
 		free_branches(inode, partial->p + 1, block_end(partial->bh),
 				(chain+n-1) - partial);
-		mark_buffer_dirty(partial->bh);
+		mark_buffer_dirty_inode(partial->bh, inode);
 		brelse (partial->bh);
 		partial--;
 	}
@@ -344,74 +344,4 @@ do_indirects:
 	}
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
-}
-
-static int sync_block (struct inode * inode, block_t block, int wait)
-{
-	struct buffer_head * bh;
-	
-	if (!block)
-		return 0;
-	bh = get_hash_table(inode->i_dev, block_to_cpu(block), BLOCK_SIZE);
-	if (!bh)
-		return 0;
-	if (wait && buffer_req(bh) && !buffer_uptodate(bh)) {
-		brelse(bh);
-		return -1;
-	}
-	if (wait || !buffer_uptodate(bh) || !buffer_dirty(bh))
-	{
-		brelse(bh);
-		return 0;
-	}
-	ll_rw_block(WRITE, 1, &bh);
-	atomic_dec(&bh->b_count);
-	return 0;
-}
-
-static int sync_indirect(struct inode *inode, block_t iblock, int depth,
-			 int wait)
-{
-	struct buffer_head * ind_bh = NULL;
-	int rc, err = 0;
-
-	if (!iblock)
-		return 0;
-
-	rc = sync_block (inode, iblock, wait);
-	if (rc)
-		return rc;
-
-	ind_bh = bread(inode->i_dev, block_to_cpu(iblock), BLOCK_SIZE);
-	if (!ind_bh)
-		return -1;
-
-	if (--depth) {
-		block_t *p = (block_t*)ind_bh->b_data;
-		block_t *end = block_end(ind_bh);
-		while (p < end) {
-			rc = sync_indirect (inode, *p++, depth, wait);
-			if (rc > 0)
-				break;
-			if (rc)
-				err = rc;
-		}
-	}
-	brelse(ind_bh);
-	return err;
-}
-
-static inline int sync_file(struct inode * inode)
-{
-	int wait, err = 0, i;
-	block_t *idata = i_data(inode);
-	
-	lock_kernel();
-	err = generic_buffer_fdatasync(inode, 0, ~0UL);
-	for (wait=0; wait<=1; wait++)
-		for (i=1; i<DEPTH; i++)
-			err |= sync_indirect(inode, idata[DIRECT+i-1], i, wait);
-	err |= minix_sync_inode (inode);
-	unlock_kernel();
-	return (err < 0) ? -EIO : 0;
 }

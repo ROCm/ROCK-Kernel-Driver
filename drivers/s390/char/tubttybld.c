@@ -34,6 +34,8 @@ tty3270_clear_log_area(tub_t *tubp, char **cpp)
 	TUB_BUFADR(GEOM_INPUT, cpp);
 	*(*cpp)++ = '\0';
 	tubp->tty_oucol = tubp->tty_nextlogx = 0;
+	*(*cpp)++ = TO_SBA;
+	TUB_BUFADR(tubp->tty_nextlogx, cpp);
 }
 
 static void
@@ -376,12 +378,16 @@ tty3270_build(tub_t *tubp)
 		printk(KERN_WARNING "tty3270_build unknown command %d\n", tubp->cmd);
 		return 0;
 	case TBC_OPEN:
+tbc_open:
+		tubp->flags &= ~TUB_INPUT_HACK;
 		chancmd = TC_EWRITEA;
 		tty3270_clear_input_area(tubp, &cp);
 		tty3270_set_status_area(tubp, &cp);
 		tty3270_clear_log_area(tubp, &cp);
 		break;
 	case TBC_UPDLOG:
+		if (tubp->flags & TUB_INPUT_HACK)
+			goto tbc_open;
 		chancmd = TC_WRITE;
 		writecc = TW_NONE;
 		tty3270_update_log_area(tubp, &cp);

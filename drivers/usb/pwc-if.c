@@ -312,13 +312,13 @@ static int pwc_allocate_buffers(struct pwc_device *pdev)
 	/* create frame buffers, and make circular ring */
 	for (i = 0; i < default_fbufs; i++) {
 		if (pdev->fbuf[i].data == NULL) {
-			kbuf = vmalloc(FRAME_SIZE); /* need vmalloc since frame buffer > 128K */
+			kbuf = vmalloc(PWC_FRAME_SIZE); /* need vmalloc since frame buffer > 128K */
 			if (kbuf == NULL) {
 				Err("Failed to allocate frame buffer %d.\n", i);
 				return -ENOMEM;
 			}
 			pdev->fbuf[i].data = kbuf;
-			memset(kbuf, 0, FRAME_SIZE);
+			memset(kbuf, 0, PWC_FRAME_SIZE);
 		}
 	}
 	
@@ -1807,6 +1807,7 @@ MODULE_PARM_DESC(compression, "Preferred compression quality. Range 0 (uncompres
 
 MODULE_DESCRIPTION("Philips USB webcam driver");
 MODULE_AUTHOR("Nemosoft Unv. <nemosoft@smcc.demon.nl>");
+MODULE_LICENSE("GPL");
 
 static int __init usb_pwc_init(void)
 {

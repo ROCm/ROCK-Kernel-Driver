@@ -442,8 +442,6 @@ void do_tty_hangup(void *data)
 	file_list_lock();
 	for (l = tty->tty_files.next; l != &tty->tty_files; l = l->next) {
 		struct file * filp = list_entry(l, struct file, f_list);
-		if (!filp->f_dentry)
-			continue;
 		if (filp->f_dentry->d_inode->i_rdev == CONSOLE_DEV ||
 		    filp->f_dentry->d_inode->i_rdev == SYSCONS_DEV) {
 			cons_filp = filp;

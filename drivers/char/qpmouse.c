@@ -338,8 +338,8 @@ static int __init probe_qp(void)
 	return 1;
 }
 
-static const char msg_banner[] __initdata = KERN_INFO "82C710 type pointing device detected -- driver installed.\n";
-static const char msg_nomem[]  __initdata = KERN_ERR "qpmouse: no queue memory.\n";
+static char msg_banner[] __initdata = KERN_INFO "82C710 type pointing device detected -- driver installed.\n";
+static char msg_nomem[]  __initdata = KERN_ERR "qpmouse: no queue memory.\n";
 
 static int __init qpmouse_init_driver(void)
 {
@@ -371,3 +371,6 @@ static void __exit qpmouse_exit_driver(void)
 module_init(qpmouse_init_driver);
 module_exit(qpmouse_exit_driver);
 
+
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

@@ -589,11 +589,23 @@ struct usb_bus {
 	atomic_t refcnt;
 };
 
-#define USB_MAXCHILDREN		(16)	/* This is arbitrary */
+/* This is arbitrary.
+ * From USB 2.0 spec Table 11-13, offset 7, a hub can
+ * have up to 255 ports. The most yet reported is 10.
+ */
+#define USB_MAXCHILDREN		(16)
 
 struct usb_device {
 	int devnum;			/* Device number on USB bus */
-	int slow;			/* Slow device? */
+
+	enum {
+		USB_SPEED_UNKNOWN = 0,			/* enumerating */
+		USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
+		USB_SPEED_HIGH				/* usb 2.0 */
+	} speed;
+
+	struct usb_device *tt;		/* usb1.1 device on usb2.0 bus */
+	int ttport;			/* device/hub port on that tt */
 
 	atomic_t refcnt;		/* Reference count */
 	struct semaphore serialize;
@@ -704,6 +716,9 @@ int usb_get_current_frame_number (struct usb_device *usb_dev);
  * up to us. This one happens to share a lot of bit positions with the UHCI
  * specification, so that much of the uhci driver can just mask the bits
  * appropriately.
+ *
+ * NOTE:  there's no encoding (yet?) for a "high speed" endpoint; treat them
+ * like full speed devices.
  */
 
 #define PIPE_ISOCHRONOUS		0
@@ -744,12 +759,13 @@ int usb_get_current_frame_number (struct usb_device *usb_dev);
 
 static inline unsigned int __create_pipe(struct usb_device *dev, unsigned int endpoint)
 {
-	return (dev->devnum << 8) | (endpoint << 15) | (dev->slow << 26);
+	return (dev->devnum << 8) | (endpoint << 15) |
+		((dev->speed == USB_SPEED_LOW) << 26);
 }
 
 static inline unsigned int __default_pipe(struct usb_device *dev)
 {
-	return (dev->slow << 26);
+	return ((dev->speed == USB_SPEED_LOW) << 26);
 }
 
 /* Create various pipes... */

@@ -9,7 +9,7 @@
     Ver.0.1   Initial version
 
     This software may be used and distributed according to the terms of
-    the GNU Public License.
+    the GNU General Public License.
 
 ======================================================================*/
 

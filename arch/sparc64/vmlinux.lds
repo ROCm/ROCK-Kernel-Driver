@@ -5,7 +5,6 @@ ENTRY(_start)
 
 SECTIONS
 {
-  empty_zero_page = 0x0000000000400000;
   swapper_pmd_dir = 0x0000000000402000;
   empty_pg_dir = 0x0000000000403000;
   . = 0x4000;

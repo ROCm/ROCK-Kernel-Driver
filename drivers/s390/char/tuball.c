@@ -449,7 +449,7 @@ tubmakemin(int irq, s390_dev_info_t *dp)
 			
 			tub3270_con_devno = dp->devno;
 			tubp->cmd = TBC_CONOPEN;
-			tubp->flags |= TUB_OPEN_STET;
+			tubp->flags |= TUB_OPEN_STET | TUB_INPUT_HACK;
 			tty3270_size(tubp, &flags);
 			tty3270_aid_init(tubp);
 			tty3270_scl_init(tubp);

@@ -121,8 +121,6 @@ struct frame_buf {
         struct frame_buf * next;
 };
 
-#define MIN(a,b) ((a<b)?a:b)
-
 extern int pcbit_l2_write(struct pcbit_dev * dev, ulong msg, ushort refnum, 
                           struct sk_buff *skb, unsigned short hdr_len);
 

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>
  *
- *	$Id: icmp.c,v 1.35 2001/08/13 18:56:13 davem Exp $
+ *	$Id: icmp.c,v 1.36 2001/09/01 00:31:50 davem Exp $
  *
  *	Based on net/ipv4/icmp.c
  *
@@ -322,7 +322,8 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	 *	for now we don't know that.
 	 */
 	if ((addr_type == IPV6_ADDR_ANY) || (addr_type & IPV6_ADDR_MULTICAST)) {
-		printk(KERN_DEBUG "icmpv6_send: addr_any/mcast source\n");
+		if (net_ratelimit())
+			printk(KERN_DEBUG "icmpv6_send: addr_any/mcast source\n");
 		return;
 	}
 
@@ -368,7 +369,8 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	len = min(unsigned int, len, IPV6_MIN_MTU - sizeof(struct ipv6hdr));
 
 	if (len < 0) {
-		printk(KERN_DEBUG "icmp: len problem\n");
+		if (net_ratelimit())
+			printk(KERN_DEBUG "icmp: len problem\n");
 		goto out;
 	}
 
@@ -507,30 +509,32 @@ int icmpv6_rcv(struct sk_buff *skb)
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 		if (csum_ipv6_magic(saddr, daddr, skb->len, IPPROTO_ICMPV6,
 				    skb->csum)) {
-			printk(KERN_DEBUG "ICMPv6 hw checksum failed\n");
+			if (net_ratelimit())
+				printk(KERN_DEBUG "ICMPv6 hw checksum failed\n");
 			skb->ip_summed = CHECKSUM_NONE;
 		}
 	}
 	if (skb->ip_summed == CHECKSUM_NONE) {
 		if (csum_ipv6_magic(saddr, daddr, skb->len, IPPROTO_ICMPV6,
 				    skb_checksum(skb, 0, skb->len, 0))) {
-			printk(KERN_DEBUG "ICMPv6 checksum failed [%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x > %04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x]\n",
-				ntohs(saddr->in6_u.u6_addr16[0]),
-				ntohs(saddr->in6_u.u6_addr16[1]),
-				ntohs(saddr->in6_u.u6_addr16[2]),
-				ntohs(saddr->in6_u.u6_addr16[3]),
-				ntohs(saddr->in6_u.u6_addr16[4]),
-				ntohs(saddr->in6_u.u6_addr16[5]),
-				ntohs(saddr->in6_u.u6_addr16[6]),
-				ntohs(saddr->in6_u.u6_addr16[7]),
-				ntohs(daddr->in6_u.u6_addr16[0]),
-				ntohs(daddr->in6_u.u6_addr16[1]),
-				ntohs(daddr->in6_u.u6_addr16[2]),
-				ntohs(daddr->in6_u.u6_addr16[3]),
-				ntohs(daddr->in6_u.u6_addr16[4]),
-				ntohs(daddr->in6_u.u6_addr16[5]),
-				ntohs(daddr->in6_u.u6_addr16[6]),
-				ntohs(daddr->in6_u.u6_addr16[7]));
+			if (net_ratelimit())
+				printk(KERN_DEBUG "ICMPv6 checksum failed [%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x > %04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x]\n",
+				       ntohs(saddr->in6_u.u6_addr16[0]),
+				       ntohs(saddr->in6_u.u6_addr16[1]),
+				       ntohs(saddr->in6_u.u6_addr16[2]),
+				       ntohs(saddr->in6_u.u6_addr16[3]),
+				       ntohs(saddr->in6_u.u6_addr16[4]),
+				       ntohs(saddr->in6_u.u6_addr16[5]),
+				       ntohs(saddr->in6_u.u6_addr16[6]),
+				       ntohs(saddr->in6_u.u6_addr16[7]),
+				       ntohs(daddr->in6_u.u6_addr16[0]),
+				       ntohs(daddr->in6_u.u6_addr16[1]),
+				       ntohs(daddr->in6_u.u6_addr16[2]),
+				       ntohs(daddr->in6_u.u6_addr16[3]),
+				       ntohs(daddr->in6_u.u6_addr16[4]),
+				       ntohs(daddr->in6_u.u6_addr16[5]),
+				       ntohs(daddr->in6_u.u6_addr16[6]),
+				       ntohs(daddr->in6_u.u6_addr16[7]));
 			goto discard_it;
 		}
 	}

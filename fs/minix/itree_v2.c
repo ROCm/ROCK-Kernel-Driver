@@ -1,6 +1,6 @@
-#include <linux/sched.h>
-#include <linux/locks.h>
+#include <linux/fs.h>
 #include <linux/minix_fs.h>
+#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 enum {DIRECT = 7, DEPTH = 4};	/* Have triple indirect */
@@ -60,9 +60,4 @@ int V2_minix_get_block(struct inode * inode, long block,
 void V2_minix_truncate(struct inode * inode)
 {
 	truncate(inode);
-}
-
-int V2_minix_sync_file(struct inode * inode)
-{
-	return sync_file(inode);
 }

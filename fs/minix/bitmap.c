@@ -11,13 +11,9 @@
 
 /* bitmap.c contains the code that handles the inode and block bitmaps */
 
-#include <linux/sched.h>
+#include <linux/fs.h>
 #include <linux/minix_fs.h>
-#include <linux/stat.h>
-#include <linux/kernel.h>
-#include <linux/string.h>
 #include <linux/locks.h>
-#include <linux/quotaops.h>
 
 #include <asm/bitops.h>
 
@@ -68,10 +64,6 @@ void minix_free_block(struct inode * inode, int block)
 		printk("trying to free block not in datazone\n");
 		return;
 	}
-	bh = get_hash_table(sb->s_dev,block,BLOCK_SIZE);
-	if (bh)
-		clear_bit(BH_Dirty, &bh->b_state);
-	brelse(bh);
 	zone = block - sb->u.minix_sb.s_firstdatazone + 1;
 	bit = zone & 8191;
 	zone >>= 13;
@@ -126,60 +118,53 @@ unsigned long minix_count_free_blocks(struct super_block *sb)
 		<< sb->u.minix_sb.s_log_zone_size);
 }
 
-static struct buffer_head *V1_minix_clear_inode(struct inode *inode)
+struct minix_inode *
+minix_V1_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 {
-	struct buffer_head *bh;
-	struct minix_inode *raw_inode;
-	int ino, block;
+	int block;
+	struct minix_sb_info *sbi = &sb->u.minix_sb;
+	struct minix_inode *p;
 
-	ino = inode->i_ino;
-	if (!ino || ino > inode->i_sb->u.minix_sb.s_ninodes) {
-		printk("Bad inode number on dev %s: %d is out of range\n",
-		       kdevname(inode->i_dev), ino);
+	if (!ino || ino > sbi->s_ninodes) {
+		printk("Bad inode number on dev %s: %ld is out of range\n",
+		       bdevname(sb->s_dev), ino);
 		return NULL;
 	}
-	block = (2 + inode->i_sb->u.minix_sb.s_imap_blocks +
-		 inode->i_sb->u.minix_sb.s_zmap_blocks +
-		 (ino - 1) / MINIX_INODES_PER_BLOCK);
-	bh = bread(inode->i_dev, block, BLOCK_SIZE);
-	if (!bh) {
+	ino--;
+	block = 2 + sbi->s_imap_blocks + sbi->s_zmap_blocks +
+		 ino / MINIX_INODES_PER_BLOCK;
+	*bh = bread(sb->s_dev, block, BLOCK_SIZE);
+	if (!*bh) {
 		printk("unable to read i-node block\n");
 		return NULL;
 	}
-	raw_inode = ((struct minix_inode *)bh->b_data +
-		     (ino - 1) % MINIX_INODES_PER_BLOCK);
-	raw_inode->i_nlinks = 0;
-	raw_inode->i_mode = 0;
-	mark_buffer_dirty(bh);
-	return bh;
+	p = (void *)(*bh)->b_data;
+	return p + ino % MINIX_INODES_PER_BLOCK;
 }
 
-static struct buffer_head *V2_minix_clear_inode(struct inode *inode)
+struct minix2_inode *
+minix_V2_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 {
-	struct buffer_head *bh;
-	struct minix2_inode *raw_inode;
-	int ino, block;
+	int block;
+	struct minix_sb_info *sbi = &sb->u.minix_sb;
+	struct minix2_inode *p;
 
-	ino = inode->i_ino;
-	if (!ino || ino > inode->i_sb->u.minix_sb.s_ninodes) {
-		printk("Bad inode number on dev %s: %d is out of range\n",
-		       kdevname(inode->i_dev), ino);
+	*bh = NULL;
+	if (!ino || ino > sbi->s_ninodes) {
+		printk("Bad inode number on dev %s: %ld is out of range\n",
+		       bdevname(sb->s_dev), ino);
 		return NULL;
 	}
-	block = (2 + inode->i_sb->u.minix_sb.s_imap_blocks +
-		 inode->i_sb->u.minix_sb.s_zmap_blocks +
-		 (ino - 1) / MINIX2_INODES_PER_BLOCK);
-	bh = bread(inode->i_dev, block, BLOCK_SIZE);
-	if (!bh) {
+	ino--;
+	block = 2 + sbi->s_imap_blocks + sbi->s_zmap_blocks +
+		 ino / MINIX2_INODES_PER_BLOCK;
+	*bh = bread(sb->s_dev, block, BLOCK_SIZE);
+	if (!*bh) {
 		printk("unable to read i-node block\n");
 		return NULL;
 	}
-	raw_inode = ((struct minix2_inode *) bh->b_data +
-		     (ino - 1) % MINIX2_INODES_PER_BLOCK);
-	raw_inode->i_nlinks = 0;
-	raw_inode->i_mode = 0;
-	mark_buffer_dirty(bh);
-	return bh;
+	p = (void *)(*bh)->b_data;
+	return p + ino % MINIX2_INODES_PER_BLOCK;
 }
 
 /* Clear the link count and mode of a deleted inode on disk. */
@@ -187,11 +172,25 @@ static struct buffer_head *V2_minix_clear_inode(struct inode *inode)
 static void minix_clear_inode(struct inode *inode)
 {
 	struct buffer_head *bh;
-	if (INODE_VERSION(inode) == MINIX_V1)
-		bh = V1_minix_clear_inode(inode);
-	else
-		bh = V2_minix_clear_inode(inode);
-	brelse (bh);
+	if (INODE_VERSION(inode) == MINIX_V1) {
+		struct minix_inode *raw_inode;
+		raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
+		if (raw_inode) {
+			raw_inode->i_nlinks = 0;
+			raw_inode->i_mode = 0;
+		}
+	} else {
+		struct minix2_inode *raw_inode;
+		raw_inode = minix_V2_raw_inode(inode->i_sb, inode->i_ino, &bh);
+		if (raw_inode) {
+			raw_inode->i_nlinks = 0;
+			raw_inode->i_mode = 0;
+		}
+	}
+	if (bh) {
+		mark_buffer_dirty(bh);
+		brelse (bh);
+	}
 }
 
 void minix_free_inode(struct inode * inode)

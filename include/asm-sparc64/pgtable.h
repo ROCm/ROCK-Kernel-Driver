@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.143 2001/08/22 22:16:56 kanoj Exp $
+/* $Id: pgtable.h,v 1.145 2001/08/30 03:22:00 kanoj Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -112,6 +112,18 @@
 #define _PAGE_WRITE	0x0000000000000100	/* Writable SW Bit                    */
 #define _PAGE_PRESENT	0x0000000000000080	/* Present Page (ie. not swapped out) */
 
+#if PAGE_SHIFT == 13
+#define _PAGE_SZBITS	_PAGE_SZ8K
+#elif PAGE_SHIFT == 16
+#define _PAGE_SZBITS	_PAGE_SZ64K
+#elif PAGE_SHIFT == 19
+#define _PAGE_SZBITS	_PAGE_SZ512K
+#elif PAGE_SHIFT == 22
+#define _PAGE_SZBITS	_PAGE_SZ4M
+#else
+#error Wrong PAGE_SHIFT specified
+#endif
+
 #define _PAGE_CACHE	(_PAGE_CP | _PAGE_CV)
 
 #define __DIRTY_BITS	(_PAGE_MODIFIED | _PAGE_WRITE | _PAGE_W)
@@ -137,7 +149,7 @@
 
 #define _PFN_MASK	_PAGE_PADDR
 
-#define _PAGE_CHG_MASK	(_PFN_MASK | _PAGE_MODIFIED | _PAGE_ACCESSED | _PAGE_PRESENT)
+#define _PAGE_CHG_MASK	(_PFN_MASK | _PAGE_MODIFIED | _PAGE_ACCESSED | _PAGE_PRESENT | _PAGE_SZBITS)
 
 #define pg_iobits (_PAGE_VALID | _PAGE_PRESENT | __DIRTY_BITS | __ACCESS_BITS | _PAGE_E)
 
@@ -161,21 +173,18 @@
 
 #ifndef __ASSEMBLY__
 
-extern pte_t __bad_page(void);
-
-#define BAD_PAGE	__bad_page()
-
 extern unsigned long phys_base;
 
-#define ZERO_PAGE(vaddr)	(mem_map)
+extern struct page *mem_map_zero;
+#define ZERO_PAGE(vaddr)	(mem_map_zero)
 
 /* Warning: These take pointers to page structs now... */
 #define mk_pte(page, pgprot)		\
-	__pte((((page - mem_map) << PAGE_SHIFT)+phys_base) | pgprot_val(pgprot))
+	__pte((((page - mem_map) << PAGE_SHIFT)+phys_base) | pgprot_val(pgprot) | _PAGE_SZBITS)
 #define page_pte_prot(page, prot)	mk_pte(page, prot)
 #define page_pte(page)			page_pte_prot(page, __pgprot(0))
 
-#define mk_pte_phys(physpage, pgprot)	(__pte((physpage) | pgprot_val(pgprot)))
+#define mk_pte_phys(physpage, pgprot)	(__pte((physpage) | pgprot_val(pgprot) | _PAGE_SZBITS))
 
 extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 {

@@ -108,28 +108,11 @@ static void ppc6_wr_data_byte(PPC *ppc, u8 data);
 static u8 ppc6_rd_data_byte(PPC *ppc);
 static u8 ppc6_rd_port(PPC *ppc, u8 port);
 static void ppc6_wr_port(PPC *ppc, u8 port, u8 data);
-static u8 ppc6_rd_reg(PPC *ppc, u8 reg);
-static void ppc6_wr_reg(PPC *ppc, u8 reg, u8 data);
-static u8 ppc6_version(PPC *ppc);
 static void ppc6_rd_data_blk(PPC *ppc, u8 *data, long count);
 static void ppc6_wait_for_fifo(PPC *ppc);
 static void ppc6_wr_data_blk(PPC *ppc, u8 *data, long count);
 static void ppc6_rd_port16_blk(PPC *ppc, u8 port, u8 *data, long length);
-static u16 ppc6_rd_port16(PPC *ppc, u8 port);
-static void ppc6_wr_port16(PPC *ppc, u8 port, u16 data);
 static void ppc6_wr_port16_blk(PPC *ppc, u8 port, u8 *data, long length);
-static u8 ppc6_rd_eeprom_reg(PPC *ppc);
-static void ppc6_wr_eeprom_reg(PPC *ppc, u8 data);
-static void ppc6_eeprom_start(PPC *ppc);
-static void ppc6_eeprom_end(PPC *ppc);
-static void ppc6_set_cs(PPC *ppc);
-static void ppc6_reset_cs(PPC *ppc);
-static u8 ppc6_rd_eeprom_bit(PPC *ppc);
-static void ppc6_eeprom_ready_wait(PPC *ppc);
-static void ppc6_wr_eeprom_bit(PPC *ppc, u8 bit);
-static u16 ppc6_eeprom_read(PPC *ppc, u8 addr);
-static u8 ppc6_irq_test(PPC *ppc);
-static u8 ppc6_rd_extout(PPC *ppc);
 static void ppc6_wr_extout(PPC *ppc, u8 regdata);
 static int ppc6_open(PPC *ppc);
 static void ppc6_close(PPC *ppc);
@@ -304,7 +287,7 @@ static void ppc6_wr_data_byte(PPC *ppc, u8 data)
 
 static u8 ppc6_rd_data_byte(PPC *ppc)
 {
-	u8 data;
+	u8 data = 0;
 
 	switch(ppc->mode)
 	{
@@ -389,33 +372,6 @@ static void ppc6_wr_port(PPC *ppc, u8 port, u8 data)
 	ppc6_send_cmd(ppc,(u8)(port | ACCESS_PORT | ACCESS_WRITE));
 
 	ppc6_wr_data_byte(ppc, data);
-}
-
-//***************************************************************************
-
-static u8 ppc6_rd_reg(PPC *ppc, u8 reg)
-{
-	ppc6_send_cmd(ppc,(u8)(reg | ACCESS_REG | ACCESS_READ));
-
-	return(ppc6_rd_data_byte(ppc));
-}
-
-//***************************************************************************
-
-static void ppc6_wr_reg(PPC *ppc, u8 reg, u8 data)
-{
-	ppc6_send_cmd(ppc,(u8)(reg | ACCESS_REG | ACCESS_WRITE));
-
-	ppc6_wr_data_byte(ppc, data);
-}
-
-//***************************************************************************
-
-static u8 ppc6_version(PPC *ppc)
-{
-	ppc6_send_cmd(ppc,(REG_VERSION | ACCESS_REG | ACCESS_READ));
-
-	return(ppc6_rd_data_byte(ppc) & 0x3F);
 }
 
 //***************************************************************************
@@ -708,44 +664,6 @@ static void ppc6_rd_port16_blk(PPC *ppc, u8 port, u8 *data, long length)
 
 //***************************************************************************
 
-static u16 ppc6_rd_port16(PPC *ppc, u8 port)
-{
-	u16 data;
-
-	ppc6_send_cmd(ppc, (CMD_PREFIX_SET | PREFIX_IO16));
-
-	ppc6_send_cmd(ppc, (u8)(port | ACCESS_PORT | ACCESS_READ));
-
-	data = ppc6_rd_data_byte(ppc);
-
-	ppc6_send_cmd(ppc, (u8)(port | ACCESS_PORT | ACCESS_READ));
-
-	data += (u16)ppc6_rd_data_byte(ppc) << 8;
-
-	ppc6_send_cmd(ppc, (CMD_PREFIX_RESET | PREFIX_IO16));
-
-	return(data);
-}
-
-//***************************************************************************
-
-static void ppc6_wr_port16(PPC *ppc, u8 port, u16 data)
-{
-	ppc6_send_cmd(ppc, (CMD_PREFIX_SET | PREFIX_IO16));
-
-	ppc6_send_cmd(ppc, (u8)(port | ACCESS_PORT | ACCESS_WRITE));
-
-	ppc6_wr_data_byte(ppc, (u8)data);
-
-	ppc6_send_cmd(ppc, (u8)(port | ACCESS_PORT | ACCESS_WRITE));
-
-	ppc6_wr_data_byte(ppc, (u8)(data >> 8));
-
-	ppc6_send_cmd(ppc, (CMD_PREFIX_RESET | PREFIX_IO16));
-}
-
-//***************************************************************************
-
 static void ppc6_wr_port16_blk(PPC *ppc, u8 port, u8 *data, long length)
 {
 	length = length << 1;
@@ -762,148 +680,6 @@ static void ppc6_wr_port16_blk(PPC *ppc, u8 port, u8 *data, long length)
 	ppc6_wr_data_blk(ppc, data, length);
 
 	ppc6_send_cmd(ppc, (CMD_PREFIX_RESET | PREFIX_IO16 | PREFIX_BLK));
-}
-
-//***************************************************************************
-
-static u8 ppc6_rd_eeprom_reg(PPC *ppc)
-{
-	ppc6_send_cmd(ppc, (REG_EEPROM | ACCESS_REG | ACCESS_READ));
-
-	return(ppc6_rd_data_byte(ppc));
-}
-
-//***************************************************************************
-
-static void ppc6_wr_eeprom_reg(PPC *ppc, u8 data)
-{
-	ppc6_send_cmd(ppc, (REG_EEPROM | ACCESS_REG | ACCESS_WRITE));
-
-	ppc6_wr_data_byte(ppc, data);
-}
-
-//***************************************************************************
-
-static void ppc6_eeprom_start(PPC *ppc)
-{
-	ppc6_wr_eeprom_reg(ppc, EEPROM_EN);
-}
-
-//***************************************************************************
-
-static void ppc6_eeprom_end(PPC *ppc)
-{
-	ppc6_wr_eeprom_reg(ppc, 0);
-}
-
-//***************************************************************************
-
-static void ppc6_set_cs(PPC *ppc)
-{
-	ppc6_wr_eeprom_reg(ppc, (u8)(ppc6_rd_eeprom_reg(ppc) | EEPROM_CS));
-}
-
-//***************************************************************************
-
-static void ppc6_reset_cs(PPC *ppc)
-{
-	ppc6_wr_eeprom_reg(ppc, (u8)(ppc6_rd_eeprom_reg(ppc) & ~EEPROM_CS));
-}
-
-//***************************************************************************
-
-static u8 ppc6_rd_eeprom_bit(PPC *ppc)
-{
-	ppc6_send_cmd(ppc, (REG_STATUS | ACCESS_REG | ACCESS_READ));
-
-	if (ppc6_rd_data_byte(ppc) & STATUS_EEPROM_DO)
-		return(1);
-	else
-		return(0);
-}
-
-//***************************************************************************
-
-static void ppc6_eeprom_ready_wait(PPC *ppc)
-{
-	ppc6_set_cs(ppc);
-
-	while(ppc6_rd_eeprom_bit(ppc));
-
-	ppc6_reset_cs(ppc);
-}
-
-//***************************************************************************
-
-static void ppc6_wr_eeprom_bit(PPC *ppc, u8 bit)
-{
-	u8 eereg;
-
-	eereg = ppc6_rd_eeprom_reg(ppc);
-
-	eereg &= ~(EEPROM_SK | EEPROM_DI);
-
-	if (bit & 1)
-		eereg |= EEPROM_DI;
-
-	ppc6_wr_eeprom_reg(ppc, eereg);
-
-	eereg |= EEPROM_SK;
-
-	ppc6_wr_eeprom_reg(ppc, eereg);
-
-	eereg &= ~EEPROM_SK;
-
-	ppc6_wr_eeprom_reg(ppc, eereg);
-}
-
-//***************************************************************************
-
-static u16 ppc6_eeprom_read(PPC *ppc, u8 addr)
-{
-	int i;
-	u16 data;
-
-	ppc6_set_cs(ppc);
-
-	ppc6_wr_eeprom_bit(ppc, 1); // Start bit
-
-	ppc6_wr_eeprom_bit(ppc, 1); // opcode 10 (read)
-	ppc6_wr_eeprom_bit(ppc, 0);
-
-	for(i=0; i<6; i++)
-		ppc6_wr_eeprom_bit(ppc, (u8)((addr >> (5 - i)) & 1));
-
-	data = 0;
-
-	for(i=0; i<16; i++)
-	{
-		ppc6_wr_eeprom_bit(ppc,0);
-
-		data = (data << 1) | ppc6_rd_eeprom_bit(ppc);
-	}
-
-	ppc6_reset_cs(ppc);
-
-	return(data);
-}
-
-//***************************************************************************
-
-static u8 ppc6_irq_test(PPC *ppc)
-{
-	ppc6_send_cmd(ppc,(REG_STATUS | ACCESS_REG | ACCESS_READ));
-
-	return(ppc6_rd_data_byte(ppc) & STATUS_IRQA);
-}
-
-//***************************************************************************
-
-static u8 ppc6_rd_extout(PPC *ppc)
-{
-	ppc6_send_cmd(ppc,(REG_VERSION | ACCESS_REG | ACCESS_READ));
-
-	return((ppc6_rd_data_byte(ppc) & 0xC0) >> 6);
 }
 
 //***************************************************************************

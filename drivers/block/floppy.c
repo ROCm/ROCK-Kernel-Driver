@@ -124,6 +124,11 @@
  * - s/suser/capable/
  */
 
+/*
+ * 2001/08/26 -- Paul Gortmaker - fix insmod oops on machines with no
+ * floppy controller (lingering task on list after module is gone... boom.)
+ */
+
 #define FLOPPY_SANITY_CHECK
 #undef  FLOPPY_SILENT_DCL_CLEAR
 
@@ -4144,7 +4149,7 @@ static int __init floppy_setup(char *str)
 	return 0;
 }
 
-static int have_no_fdc= -EIO;
+static int have_no_fdc= -ENODEV;
 
 
 int __init floppy_init(void)
@@ -4200,7 +4205,6 @@ int __init floppy_init(void)
 		del_timer(&fd_timeout);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		devfs_unregister_blkdev(MAJOR_NR,"fd");
-		del_timer(&fd_timeout);
 		return -EBUSY;
 	}
 
@@ -4259,9 +4263,7 @@ int __init floppy_init(void)
 	if (have_no_fdc) 
 	{
 		DPRINT("no floppy controllers found\n");
-		floppy_tq.routine = (void *)(void *) empty;
-		mark_bh(IMMEDIATE_BH);
-		schedule();
+		run_task_queue(&tq_immediate);
 		if (usage_count)
 			floppy_release_irq_and_dma();
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
@@ -4472,6 +4474,7 @@ MODULE_PARM(FLOPPY_IRQ,"i");
 MODULE_PARM(FLOPPY_DMA,"i");
 MODULE_AUTHOR("Alain L. Knaff");
 MODULE_SUPPORTED_DEVICE("fd");
+MODULE_LICENSE("GPL");
 
 #else
 

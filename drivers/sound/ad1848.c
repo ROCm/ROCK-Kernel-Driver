@@ -29,6 +29,7 @@
  * Christoph Hellwig	: adapted to module_init/module_exit
  * Aki Laukkanen	: added power management support
  * Arnaldo C. de Melo	: added missing restore_flags in ad1848_resume
+ * Miguel Freitas       : added ISA PnP support
  *
  * Status:
  *		Tested. Believed fully functional.
@@ -39,6 +40,7 @@
 #include <linux/module.h>
 #include <linux/stddef.h>
 #include <linux/pm.h>
+#include <linux/isapnp.h>
 
 #define DEB(x)
 #define DEB1(x)
@@ -159,6 +161,18 @@ static struct {
     ,{0}           /* MD_4235  */
     ,{CAP_F_TIMER} /* MD_1845_SSCAPE */
 };
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+static int isapnp	= 1;
+static int isapnpjump	= 0;
+static int reverse	= 0;
+
+static int audio_activated = 0;
+#else
+static int isapnp	= 0;
+#endif
+
+
 
 static int      ad1848_open(int dev, int mode);
 static void     ad1848_close(int dev);
@@ -2812,34 +2826,207 @@ MODULE_PARM(irq, "i");                  /* IRQ to use */
 MODULE_PARM(dma, "i");                  /* First DMA channel */
 MODULE_PARM(dma2, "i");                 /* Second DMA channel */
 MODULE_PARM(type, "i");                 /* Card type */
-MODULE_PARM(deskpro_xl, "i");           /* Special magic for Deskpro XL boxen
-*/
+MODULE_PARM(deskpro_xl, "i");           /* Special magic for Deskpro XL boxen */
 MODULE_PARM(deskpro_m, "i");            /* Special magic for Deskpro M box */
-MODULE_PARM(soundpro, "i");             /* More special magic for SoundPro
-chips */
+MODULE_PARM(soundpro, "i");             /* More special magic for SoundPro chips */
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+MODULE_PARM(isapnp,	"i");
+MODULE_PARM(isapnpjump,	"i");
+MODULE_PARM(reverse,	"i");
+MODULE_PARM_DESC(isapnp,	"When set to 0, Plug & Play support will be disabled");
+MODULE_PARM_DESC(isapnpjump,	"Jumps to a specific slot in the driver's PnP table. Use the source, Luke.");
+MODULE_PARM_DESC(reverse,	"When set to 1, will reverse ISAPnP search order");
+
+struct pci_dev	*ad1848_dev  = NULL;
+
+/* Please add new entries at the end of the table */
+static struct {
+	char *name;
+	unsigned short	card_vendor, card_device,
+			vendor, function;
+	short mss_io, irq, dma, dma2;   /* index into isapnp table */
+        int type;
+} ad1848_isapnp_list[] __initdata = {
+	{"CMI 8330 SoundPRO",
+		ISAPNP_VENDOR('C','M','I'), ISAPNP_DEVICE(0x0001),
+		ISAPNP_VENDOR('@','@','@'), ISAPNP_FUNCTION(0x0001),
+		0, 0, 0,-1, 0},
+        {"CS4232 based card",
+                ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('C','S','C'), ISAPNP_FUNCTION(0x0000),
+		0, 0, 0, 1, 0},
+        {"CS4232 based card",
+                ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('C','S','C'), ISAPNP_FUNCTION(0x0100),
+		0, 0, 0, 1, 0},
+        {"OPL3-SA2 WSS mode",
+        	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021),
+                1, 0, 0, 1, 1},
+	{0}
+};
+
+static struct isapnp_device_id id_table[] __devinitdata = {
+	{	ISAPNP_VENDOR('C','M','I'), ISAPNP_DEVICE(0x0001),
+		ISAPNP_VENDOR('@','@','@'), ISAPNP_FUNCTION(0x0001), 0 },
+        {       ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('C','S','C'), ISAPNP_FUNCTION(0x0000), 0 },
+        {       ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('C','S','C'), ISAPNP_FUNCTION(0x0100), 0 },
+        {       ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021), 0 },
+	{0}
+};
+
+MODULE_DEVICE_TABLE(isapnp, id_table);
+
+static struct pci_dev *activate_dev(char *devname, char *resname, struct pci_dev *dev)
+{
+	int err;
+
+	/* Device already active? Let's use it */
+	if(dev->active)
+		return(dev);
+
+	if((err = dev->activate(dev)) < 0) {
+		printk(KERN_ERR "ad1848: %s %s config failed (out of resources?)[%d]\n", devname, resname, err);
+
+		dev->deactivate(dev);
+
+		return(NULL);
+	}
+	return(dev);
+}
+
+static struct pci_dev *ad1848_init_generic(struct pci_bus *bus, struct address_info *hw_config, int slot)
+{
+
+	/* Configure Audio device */
+	if((ad1848_dev = isapnp_find_dev(bus, ad1848_isapnp_list[slot].vendor, ad1848_isapnp_list[slot].function, NULL)))
+	{
+		int ret;
+		ret = ad1848_dev->prepare(ad1848_dev);
+		/* If device is active, assume configured with /proc/isapnp
+		 * and use anyway. Some other way to check this? */
+		if(ret && ret != -EBUSY) {
+			printk(KERN_ERR "ad1848: ISAPnP found device that could not be autoconfigured.\n");
+			return(NULL);
+		}
+		if(ret == -EBUSY)
+			audio_activated = 1;
+
+		if((ad1848_dev = activate_dev(ad1848_isapnp_list[slot].name, "ad1848", ad1848_dev)))
+		{
+			hw_config->io_base 	= ad1848_dev->resource[ad1848_isapnp_list[slot].mss_io].start;
+			hw_config->irq 		= ad1848_dev->irq_resource[ad1848_isapnp_list[slot].irq].start;
+			hw_config->dma 		= ad1848_dev->dma_resource[ad1848_isapnp_list[slot].dma].start;
+			if(ad1848_isapnp_list[slot].dma2 != -1)
+				hw_config->dma2 = ad1848_dev->dma_resource[ad1848_isapnp_list[slot].dma2].start;
+			else
+				hw_config->dma2 = -1;
+                        hw_config->card_subtype = ad1848_isapnp_list[slot].type;
+		} else
+			return(NULL);
+	} else
+		return(NULL);
+
+	return(ad1848_dev);
+}
+
+static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pci_bus *bus, int slot)
+{
+	char *busname = bus->name[0] ? bus->name : ad1848_isapnp_list[slot].name;
+
+	printk(KERN_INFO "ad1848: %s detected\n", busname);
+
+	/* Initialize this baby. */
+
+	if(ad1848_init_generic(bus, hw_config, slot)) {
+		/* We got it. */
+
+		printk(KERN_NOTICE "ad1848: ISAPnP reports '%s' at i/o %#x, irq %d, dma %d, %d\n",
+		       busname,
+		       hw_config->io_base, hw_config->irq, hw_config->dma,
+		       hw_config->dma2);
+		return 1;
+	}
+	else
+		printk(KERN_INFO "ad1848: Failed to initialize %s\n", busname);
+
+	return 0;
+}
+
+static int __init ad1848_isapnp_probe(struct address_info *hw_config)
+{
+	static int first = 1;
+	int i;
+
+	/* Count entries in sb_isapnp_list */
+	for (i = 0; ad1848_isapnp_list[i].card_vendor != 0; i++);
+	i--;
+
+	/* Check and adjust isapnpjump */
+	if( isapnpjump < 0 || isapnpjump > i) {
+		isapnpjump = reverse ? i : 0;
+		printk(KERN_ERR "ad1848: Valid range for isapnpjump is 0-%d. Adjusted to %d.\n", i, isapnpjump);
+	}
+
+	if(!first || !reverse)
+		i = isapnpjump;
+	first = 0;
+	while(ad1848_isapnp_list[i].card_vendor != 0) {
+		static struct pci_bus *bus = NULL;
+
+		while ((bus = isapnp_find_card(
+				ad1848_isapnp_list[i].card_vendor,
+				ad1848_isapnp_list[i].card_device,
+				bus))) {
+
+			if(ad1848_isapnp_init(hw_config, bus, i)) {
+				isapnpjump = i; /* start next search from here */
+				return 0;
+			}
+		}
+		i += reverse ? -1 : 1;
+	}
+
+	return -ENODEV;
+}
+#endif
+
 
 static int __init init_ad1848(void)
 {
 	printk(KERN_INFO "ad1848/cs4248 codec driver Copyright (C) by Hannu Savolainen 1993-1996\n");
 
-	if(io != -1) {
-		if(irq == -1 || dma == -1) {
-			printk(KERN_WARNING "ad1848: must give I/O , IRQ and DMA.\n");
-			return -EINVAL;
-		}
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+	if(isapnp && (ad1848_isapnp_probe(&cfg) < 0) ) {
+		printk(KERN_NOTICE "ad1848: No ISAPnP cards found, trying standard ones...\n");
+		isapnp = 0;
+	}
+#endif
 
-		cfg.irq = irq;
-		cfg.io_base = io;
-		cfg.dma = dma;
-		cfg.dma2 = dma2;
-		cfg.card_subtype = type;
+	if(io != -1) {
+	        if( isapnp == 0 )
+	        {
+			if(irq == -1 || dma == -1) {
+				printk(KERN_WARNING "ad1848: must give I/O , IRQ and DMA.\n");
+				return -EINVAL;
+			}
+
+			cfg.irq = irq;
+			cfg.io_base = io;
+			cfg.dma = dma;
+			cfg.dma2 = dma2;
+			cfg.card_subtype = type;
+	        }
 
 		if(!probe_ms_sound(&cfg))
 			return -ENODEV;
 		attach_ms_sound(&cfg, THIS_MODULE);
 		loaded = 1;
 	}
-	
 	return 0;
 }
 
@@ -2847,6 +3034,12 @@ static void __exit cleanup_ad1848(void)
 {
 	if(loaded)
 		unload_ms_sound(&cfg);
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+	if(audio_activated)
+		if(ad1848_dev)
+			ad1848_dev->deactivate(ad1848_dev);
+#endif
 }
 
 module_init(init_ad1848);

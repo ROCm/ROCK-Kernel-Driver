@@ -123,7 +123,7 @@
 #define FAST
 #endif
 
-#undef LINKED		/* Linked commands are currently broken! */
+#undef LINKED			/* Linked commands are currently broken! */
 
 #if defined(OVERRIDE) && !defined(CONTROLLER)
 #error Please use -DCONTROLLER=SEAGATE or -DCONTROLLER=FD to override controller type
@@ -152,11 +152,11 @@
 	STATUS
 */
 #ifdef SWAPSTAT
-	#define STAT_MSG		0x08
-	#define STAT_CD			0x02
+#define STAT_MSG		0x08
+#define STAT_CD			0x02
 #else
-	#define STAT_MSG		0x02
-	#define STAT_CD			0x08
+#define STAT_MSG		0x02
+#define STAT_CD			0x08
 #endif
 
 #define STAT_BSY		0x01
@@ -181,9 +181,9 @@
 extern volatile int seagate_st0x_timeout;
 
 #ifdef PARITY
-	#define BASE_CMD CMD_EN_PARITY
+#define BASE_CMD CMD_EN_PARITY
 #else
-	#define BASE_CMD  0
+#define BASE_CMD  0
 #endif
 
 /*
@@ -193,7 +193,7 @@ extern volatile int seagate_st0x_timeout;
 #define PHASE_BUS_FREE 1
 #define PHASE_ARBITRATION 2
 #define PHASE_SELECTION 4
-#define PHASE_DATAIN 8 
+#define PHASE_DATAIN 8
 #define PHASE_DATAOUT 0x10
 #define PHASE_CMDOUT 0x20
 #define PHASE_MSGIN 0x40
@@ -216,44 +216,43 @@ extern volatile int seagate_st0x_timeout;
 #define ST0X_BUS_FREE_DELAY 25
 #define ST0X_SELECTION_DELAY 25
 
-#define SEAGATE 1	/* these determine the type of the controller */
+#define SEAGATE 1		/* these determine the type of the controller */
 #define FD	2
 
 #define ST0X_ID_STR	"Seagate ST-01/ST-02"
 #define FD_ID_STR	"TMC-8XX/TMC-950"
 
-
 static int internal_command (unsigned char target, unsigned char lun,
-                             const void *cmnd,
-                             void *buff, int bufflen, int reselect);
+			     const void *cmnd,
+			     void *buff, int bufflen, int reselect);
 
-static int incommand;                   /* set if arbitration has finished
-                                           and we are in some command phase. */
+static int incommand;		/* set if arbitration has finished
+				   and we are in some command phase. */
 
-static unsigned int base_address = 0;   /* Where the card ROM starts, used to 
-                                           calculate memory mapped register
-                                           location.  */
+static unsigned int base_address = 0;	/* Where the card ROM starts, used to 
+					   calculate memory mapped register
+					   location.  */
 
-static unsigned long st0x_cr_sr;        /* control register write, status
-                                           register read.  256 bytes in
-                                           length.
-                                           Read is status of SCSI BUS, as per 
-                                           STAT masks.  */
+static unsigned long st0x_cr_sr;	/* control register write, status
+					   register read.  256 bytes in
+					   length.
+					   Read is status of SCSI BUS, as per 
+					   STAT masks.  */
 
-static unsigned long st0x_dr;           /* data register, read write 256
-                                           bytes in length.  */
+static unsigned long st0x_dr;	/* data register, read write 256
+				   bytes in length.  */
 
-static volatile int st0x_aborted = 0;   /* set when we are aborted, ie by a
-                                           time out, etc.  */
+static volatile int st0x_aborted = 0;	/* set when we are aborted, ie by a
+					   time out, etc.  */
 
-static unsigned char controller_type = 0;       /* set to SEAGATE for ST0x
-                                                   boards or FD for TMC-8xx
-                                                   boards */
+static unsigned char controller_type = 0;	/* set to SEAGATE for ST0x
+						   boards or FD for TMC-8xx
+						   boards */
 static int irq = IRQ;
 
-MODULE_PARM(base_address, "i");
-MODULE_PARM(controller_type, "b");
-MODULE_PARM(irq, "i");
+MODULE_PARM (base_address, "i");
+MODULE_PARM (controller_type, "b");
+MODULE_PARM (irq, "i");
 
 #define retcode(result) (((result) << 16) | (message << 8) | status)
 #define STATUS ((u8) isa_readb(st0x_cr_sr))
@@ -261,40 +260,38 @@ MODULE_PARM(irq, "i");
 #define WRITE_CONTROL(d) { isa_writeb((d), st0x_cr_sr); }
 #define WRITE_DATA(d) { isa_writeb((d), st0x_dr); }
 
-void st0x_setup (char *str, int *ints)
+void
+st0x_setup (char *str, int *ints)
 {
-  controller_type = SEAGATE;
-  base_address = ints[1];
-  irq = ints[2];
+	controller_type = SEAGATE;
+	base_address = ints[1];
+	irq = ints[2];
 }
 
-void tmc8xx_setup (char *str, int *ints)
+void
+tmc8xx_setup (char *str, int *ints)
 {
-  controller_type = FD;
-  base_address = ints[1];
-  irq = ints[2];
+	controller_type = FD;
+	base_address = ints[1];
+	irq = ints[2];
 }
 
 #ifndef OVERRIDE
-static unsigned int seagate_bases[] =
-{
-  0xc8000, 0xca000, 0xcc000,
-  0xce000, 0xdc000, 0xde000
+static unsigned int seagate_bases[] = {
+	0xc8000, 0xca000, 0xcc000,
+	0xce000, 0xdc000, 0xde000
 };
 
-typedef struct
-{
-  const unsigned char *signature;
-  unsigned offset;
-  unsigned length;
-  unsigned char type;
-}
-Signature;
+typedef struct {
+	const unsigned char *signature;
+	unsigned offset;
+	unsigned length;
+	unsigned char type;
+} Signature;
 
-static const Signature __initdata signatures[] =
-{
-  {"ST01 v1.7  (C) Copyright 1987 Seagate", 15, 37, SEAGATE},
-  {"SCSI BIOS 2.00  (C) Copyright 1987 Seagate", 15, 40, SEAGATE},
+static Signature __initdata signatures[] = {
+	{"ST01 v1.7  (C) Copyright 1987 Seagate", 15, 37, SEAGATE},
+	{"SCSI BIOS 2.00  (C) Copyright 1987 Seagate", 15, 40, SEAGATE},
 
 /*
  * The following two lines are NOT mistakes.  One detects ROM revision
@@ -303,28 +300,28 @@ static const Signature __initdata signatures[] =
  * are probably "good enough"
  */
 
-  {"SEAGATE SCSI BIOS ", 16, 17, SEAGATE},
-  {"SEAGATE SCSI BIOS ", 17, 17, SEAGATE},
+	{"SEAGATE SCSI BIOS ", 16, 17, SEAGATE},
+	{"SEAGATE SCSI BIOS ", 17, 17, SEAGATE},
 
 /*
  * However, future domain makes several incompatible SCSI boards, so specific
  * signatures must be used.
  */
 
-  {"FUTURE DOMAIN CORP. (C) 1986-1989 V5.0C2/14/89", 5, 46, FD},
-  {"FUTURE DOMAIN CORP. (C) 1986-1989 V6.0A7/28/89", 5, 46, FD},
-  {"FUTURE DOMAIN CORP. (C) 1986-1990 V6.0105/31/90", 5, 47, FD},
-  {"FUTURE DOMAIN CORP. (C) 1986-1990 V6.0209/18/90", 5, 47, FD},
-  {"FUTURE DOMAIN CORP. (C) 1986-1990 V7.009/18/90", 5, 46, FD},
-  {"FUTURE DOMAIN CORP. (C) 1992 V8.00.004/02/92", 5, 44, FD},
-  {"IBM F1 BIOS V1.1004/30/92", 5, 25, FD},
-  {"FUTURE DOMAIN TMC-950", 5, 21, FD},
-  /* Added for 2.2.16 by Matthias_Heidbrink@b.maus.de */
-  {"IBM F1 V1.2009/22/93", 5, 25, FD},
+	{"FUTURE DOMAIN CORP. (C) 1986-1989 V5.0C2/14/89", 5, 46, FD},
+	{"FUTURE DOMAIN CORP. (C) 1986-1989 V6.0A7/28/89", 5, 46, FD},
+	{"FUTURE DOMAIN CORP. (C) 1986-1990 V6.0105/31/90", 5, 47, FD},
+	{"FUTURE DOMAIN CORP. (C) 1986-1990 V6.0209/18/90", 5, 47, FD},
+	{"FUTURE DOMAIN CORP. (C) 1986-1990 V7.009/18/90", 5, 46, FD},
+	{"FUTURE DOMAIN CORP. (C) 1992 V8.00.004/02/92", 5, 44, FD},
+	{"IBM F1 BIOS V1.1004/30/92", 5, 25, FD},
+	{"FUTURE DOMAIN TMC-950", 5, 21, FD},
+	/* Added for 2.2.16 by Matthias_Heidbrink@b.maus.de */
+	{"IBM F1 V1.2009/22/93", 5, 25, FD},
 };
 
 #define NUM_SIGNATURES (sizeof(signatures) / sizeof(Signature))
-#endif /* n OVERRIDE */
+#endif				/* n OVERRIDE */
 
 /*
  * hostno stores the hostnumber, as told to us by the init routine.
@@ -382,35 +379,37 @@ static int fast = 1;
  */
 
 static int borken_calibration = 0;
+
 static void __init borken_init (void)
 {
-  register int count = 0, start = jiffies + 1, stop = start + 25;
+	register int count = 0, start = jiffies + 1, stop = start + 25;
 
-  while (time_before(jiffies, start)) ;
-  for (; time_before(jiffies, stop); ++count) ;
+	while (time_before (jiffies, start)) ;
+	for (; time_before (jiffies, stop); ++count) ;
 
 /*
  * Ok, we now have a count for .25 seconds.  Convert to a
  * count per second and divide by transfer rate in K.  */
 
-  borken_calibration = (count * 4) / (SLOW_RATE * 1024);
+	borken_calibration = (count * 4) / (SLOW_RATE * 1024);
 
-  if (borken_calibration < 1)
-    borken_calibration = 1;
+	if (borken_calibration < 1)
+		borken_calibration = 1;
 }
 
 static inline void borken_wait (void)
 {
-  register int count;
+	register int count;
 
-  for (count = borken_calibration; count && (STATUS & STAT_REQ); --count) ;
+	for (count = borken_calibration; count && (STATUS & STAT_REQ);
+	     --count) ;
 #if (DEBUG & DEBUG_BORKEN)
-  if (count)
-    printk ("scsi%d : borken timeout\n", hostno);
+	if (count)
+		printk ("scsi%d : borken timeout\n", hostno);
 #endif
 }
 
-#endif /* def SLOW_RATE */
+#endif				/* def SLOW_RATE */
 
 /* These beasts only live on ISA, and ISA means 8MHz. Each ULOOP()
  * contains at least one ISA access, which takes more than 0.125
@@ -422,33 +421,34 @@ static inline void borken_wait (void)
 
 int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
 {
-  struct Scsi_Host *instance;
-  int i, j;
+	struct Scsi_Host *instance;
+	int i, j;
 
-  tpnt->proc_name = "seagate";
+	tpnt->proc_name = "seagate";
 /*
- *    First, we try for the manual override.  */
-  DANY ("Autodetecting ST0x / TMC-8xx\n");
+ *    First, we try for the manual override.
+ */
+	DANY ("Autodetecting ST0x / TMC-8xx\n");
 
-  if (hostno != -1) {
-    printk (KERN_ERR "seagate_st0x_detect() called twice?!\n");
-    return 0;
-  }
+	if (hostno != -1) {
+		printk (KERN_ERR "seagate_st0x_detect() called twice?!\n");
+		return 0;
+	}
 
 /* If the user specified the controller type from the command line,
    controller_type will be non-zero, so don't try to detect one */
 
-  if (!controller_type)
-  {
+	if (!controller_type) {
 #ifdef OVERRIDE
-    base_address = OVERRIDE;
-    controller_type = CONTROLLER;
+		base_address = OVERRIDE;
+		controller_type = CONTROLLER;
 
-    DANY("Base address overridden to %x, controller type is %s\n",
-            base_address, controller_type == SEAGATE ? "SEAGATE" : "FD");
-#else /* OVERRIDE */
+		DANY ("Base address overridden to %x, controller type is %s\n",
+		      base_address,
+		      controller_type == SEAGATE ? "SEAGATE" : "FD");
+#else				/* OVERRIDE */
 /*
- *    To detect this card, we simply look for the signature
+ * 	To detect this card, we simply look for the signature
  *      from the BIOS version notice in all the possible locations
  *      of the ROM's.  This has a nice side effect of not trashing
  *      any register locations that might be used by something else.
@@ -457,106 +457,112 @@ int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
  * space for the on-board RAM instead.
  */
 
-    for (i = 0; i < (sizeof (seagate_bases) / sizeof (unsigned int)); ++i)
+		for (i = 0;
+		     i < (sizeof (seagate_bases) / sizeof (unsigned int)); ++i)
 
-      for (j = 0; !base_address && j < NUM_SIGNATURES; ++j)
-        if (isa_check_signature (seagate_bases[i] + signatures[j].offset,
-                             signatures[j].signature, signatures[j].length))
-        {
-          base_address = seagate_bases[i];
-          controller_type = signatures[j].type;
-        }
-#endif /* OVERRIDE */
-  }    /* (! controller_type) */
+			for (j = 0; !base_address && j < NUM_SIGNATURES; ++j)
+				if (isa_check_signature
+				    (seagate_bases[i] + signatures[j].offset,
+				     signatures[j].signature,
+				     signatures[j].length)) {
+					base_address = seagate_bases[i];
+					controller_type = signatures[j].type;
+				}
+#endif				/* OVERRIDE */
+	}
+	/* (! controller_type) */
+	tpnt->this_id = (controller_type == SEAGATE) ? 7 : 6;
+	tpnt->name = (controller_type == SEAGATE) ? ST0X_ID_STR : FD_ID_STR;
 
-  tpnt->this_id = (controller_type == SEAGATE) ? 7 : 6;
-  tpnt->name = (controller_type == SEAGATE) ? ST0X_ID_STR : FD_ID_STR;
+	if (!base_address) {
+		DANY ("ST0x / TMC-8xx not detected.\n");
+		return 0;
+	}
 
-  if (!base_address) {
-    DANY ("ST0x / TMC-8xx not detected.\n");
-    return 0;
-  }
+	st0x_cr_sr =
+	    base_address + (controller_type == SEAGATE ? 0x1a00 : 0x1c00);
+	st0x_dr = st0x_cr_sr + 0x200;
 
-  st0x_cr_sr = base_address + (controller_type == SEAGATE ? 0x1a00 : 0x1c00);
-  st0x_dr = st0x_cr_sr + 0x200;
-
-  DANY ("%s detected. Base address = %x, cr = %x, dr = %x\n",
-	tpnt->name, base_address, st0x_cr_sr, st0x_dr);
+	DANY ("%s detected. Base address = %x, cr = %x, dr = %x\n",
+	      tpnt->name, base_address, st0x_cr_sr, st0x_dr);
 
 /*
- *    At all times, we will use IRQ 5.  Should also check for IRQ3 if we
+ *	At all times, we will use IRQ 5.  Should also check for IRQ3 if we
  *      loose our first interrupt.
  */
-  instance = scsi_register (tpnt, 0);
-  if(instance == NULL)
-  	return 0;
-  	
-  hostno = instance->host_no;
-  if (request_irq (irq, do_seagate_reconnect_intr, SA_INTERRUPT,
-		   (controller_type == SEAGATE) ? "seagate" : "tmc-8xx", NULL)) {
-    printk ("scsi%d : unable to allocate IRQ%d\n", hostno, irq);
-    return 0;
-  }
-  instance->irq = irq;
-  instance->io_port = base_address;
+	instance = scsi_register (tpnt, 0);
+	if (instance == NULL)
+		return 0;
+
+	hostno = instance->host_no;
+	if (request_irq (irq, do_seagate_reconnect_intr, SA_INTERRUPT,
+			 (controller_type == SEAGATE) ? "seagate" : "tmc-8xx",
+			 NULL)) {
+		printk ("scsi%d : unable to allocate IRQ%d\n", hostno, irq);
+		return 0;
+	}
+	instance->irq = irq;
+	instance->io_port = base_address;
 #ifdef SLOW_RATE
-  printk( "Calibrating borken timer... " );
-  borken_init ();
-  printk( " %d cycles per transfer\n", borken_calibration );
+	printk (KERN_INFO "Calibrating borken timer... ");
+	borken_init ();
+	printk (" %d cycles per transfer\n", borken_calibration);
 #endif
 
-  printk( "This is one second... " );
-  {
-    int clock;
-    ULOOP( 1*1000*1000 ) {
-      STATUS;
-      if (TIMEOUT) break;
-    }
-  }
+	printk (KERN_INFO "This is one second... ");
+	{
+		int clock;
+		ULOOP (1 * 1000 * 1000) {
+			STATUS;
+			if (TIMEOUT)
+				break;
+		}
+	}
 
-  printk ("done, %s options:"
+	printk ("done, %s options:"
 #ifdef ARBITRATE
-            " ARBITRATE"
+		" ARBITRATE"
 #endif
 #ifdef DEBUG
-            " DEBUG"
+		" DEBUG"
 #endif
 #ifdef FAST
-            " FAST"
+		" FAST"
 #ifdef FAST32
-            "32"
+		"32"
 #endif
 #endif
 #ifdef LINKED
-            " LINKED"
+		" LINKED"
 #endif
 #ifdef PARITY
-            " PARITY"
+		" PARITY"
 #endif
 #ifdef SEAGATE_USE_ASM
-            " SEAGATE_USE_ASM"
+		" SEAGATE_USE_ASM"
 #endif
 #ifdef SLOW_RATE
-            " SLOW_RATE"
+		" SLOW_RATE"
 #endif
 #ifdef SWAPSTAT
-            " SWAPSTAT"
+		" SWAPSTAT"
 #endif
 #ifdef SWAPCNTDATA
-            " SWAPCNTDATA"
+		" SWAPCNTDATA"
 #endif
-	  "\n", tpnt->name);
-  return 1;
+		"\n", tpnt->name);
+	return 1;
 }
 
-const char *seagate_st0x_info (struct Scsi_Host *shpnt)
+const char *
+seagate_st0x_info (struct Scsi_Host *shpnt)
 {
-  static char buffer[64];
+	static char buffer[64];
 
-  sprintf (buffer, "%s at irq %d, address 0x%05X",
-           (controller_type == SEAGATE) ? ST0X_ID_STR : FD_ID_STR,
-           irq, base_address);
-  return buffer;
+	sprintf (buffer, "%s at irq %d, address 0x%05X",
+		 (controller_type == SEAGATE) ? ST0X_ID_STR : FD_ID_STR,
+		 irq, base_address);
+	return buffer;
 }
 
 /*
@@ -616,50 +622,50 @@ static int should_reconnect = 0;
 
 static void do_seagate_reconnect_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
-  unsigned long flags;
+	unsigned long flags;
 
-  spin_lock_irqsave(&io_request_lock, flags);
-  seagate_reconnect_intr(irq, dev_id, regs);
-  spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_lock_irqsave (&io_request_lock, flags);
+	seagate_reconnect_intr (irq, dev_id, regs);
+	spin_unlock_irqrestore (&io_request_lock, flags);
 }
 
 static void seagate_reconnect_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
-  int temp;
-  Scsi_Cmnd *SCtmp;
+	int temp;
+	Scsi_Cmnd *SCtmp;
 
-  DPRINTK (PHASE_RESELECT, "scsi%d : seagate_reconnect_intr() called\n", hostno);
+	DPRINTK (PHASE_RESELECT, "scsi%d : seagate_reconnect_intr() called\n",
+		 hostno);
 
-  if (!should_reconnect)
-    printk ("scsi%d: unexpected interrupt.\n", hostno);
-  else
-  {
-    should_reconnect = 0;
+	if (!should_reconnect)
+		printk ("scsi%d: unexpected interrupt.\n", hostno);
+	else {
+		should_reconnect = 0;
 
-    DPRINTK (PHASE_RESELECT, "scsi%d : internal_command("
-            "%d, %08x, %08x, RECONNECT_NOW\n", hostno,
-            current_target, current_data, current_bufflen);
+		DPRINTK (PHASE_RESELECT, "scsi%d : internal_command("
+			 "%d, %08x, %08x, RECONNECT_NOW\n", hostno,
+			 current_target, current_data, current_bufflen);
 
-    temp = internal_command (current_target, current_lun, current_cmnd,
-                             current_data, current_bufflen, RECONNECT_NOW);
+		temp =
+		    internal_command (current_target, current_lun, current_cmnd,
+				      current_data, current_bufflen,
+				      RECONNECT_NOW);
 
-    if (msg_byte (temp) != DISCONNECT)
-    {
-      if (done_fn)
-      {
-        DPRINTK (PHASE_RESELECT, "scsi%d : done_fn(%d,%08x)", hostno,
-                hostno, temp);
-        if (!SCint)
-          panic ("SCint == NULL in seagate");
-        SCtmp = SCint;
-        SCint = NULL;
-        SCtmp->result = temp;
-        done_fn (SCtmp);
-      }
-      else
-        printk ("done_fn() not defined.\n");
-    }
-  }
+		if (msg_byte (temp) != DISCONNECT) {
+			if (done_fn) {
+				DPRINTK (PHASE_RESELECT,
+					 "scsi%d : done_fn(%d,%08x)", hostno,
+					 hostno, temp);
+				if (!SCint)
+					panic ("SCint == NULL in seagate");
+				SCtmp = SCint;
+				SCint = NULL;
+				SCtmp->result = temp;
+				done_fn (SCtmp);
+			} else
+				printk ("done_fn() not defined.\n");
+		}
+	}
 }
 
 /*
@@ -677,212 +683,215 @@ static int recursion_depth = 0;
 
 int seagate_st0x_queue_command (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {
-  int result, reconnect;
-  Scsi_Cmnd *SCtmp;
+	int result, reconnect;
+	Scsi_Cmnd *SCtmp;
 
-  DANY( "seagate: que_command" );
-  done_fn = done;
-  current_target = SCpnt->target;
-  current_lun = SCpnt->lun;
-  (const void *) current_cmnd = SCpnt->cmnd;
-  current_data = (unsigned char *) SCpnt->request_buffer;
-  current_bufflen = SCpnt->request_bufflen;
-  SCint = SCpnt;
-  if (recursion_depth) return 0;
-  recursion_depth++;
-  do
-  {
+	DANY ("seagate: que_command");
+	done_fn = done;
+	current_target = SCpnt->target;
+	current_lun = SCpnt->lun;
+	(const void *) current_cmnd = SCpnt->cmnd;
+	current_data = (unsigned char *) SCpnt->request_buffer;
+	current_bufflen = SCpnt->request_bufflen;
+	SCint = SCpnt;
+	if (recursion_depth)
+		return 0;
+	recursion_depth++;
+	do {
 #ifdef LINKED
 /*
  * Set linked command bit in control field of SCSI command.
  */
 
-    current_cmnd[SCpnt->cmd_len] |= 0x01;
-    if (linked_connected)
-    {
-      DPRINTK (DEBUG_LINKED, 
-	       "scsi%d : using linked commands, current I_T_L nexus is ", hostno);
-      if ((linked_target == current_target) && (linked_lun == current_lun))
-      {
-        DPRINTK (DEBUG_LINKED, "correct\n");
-        reconnect = LINKED_RIGHT;
-      }
-      else
-      {
-        DPRINTK (DEBUG_LINKED, "incorrect\n");
-        reconnect = LINKED_WRONG;
-      }
-    }
-    else
-#endif /* LINKED */
-      reconnect = CAN_RECONNECT;
+		current_cmnd[SCpnt->cmd_len] |= 0x01;
+		if (linked_connected) {
+			DPRINTK (DEBUG_LINKED,
+				 "scsi%d : using linked commands, current I_T_L nexus is ",
+				 hostno);
+			if ((linked_target == current_target)
+			    && (linked_lun == current_lun)) {
+				DPRINTK (DEBUG_LINKED, "correct\n");
+				reconnect = LINKED_RIGHT;
+			} else {
+				DPRINTK (DEBUG_LINKED, "incorrect\n");
+				reconnect = LINKED_WRONG;
+			}
+		} else
+#endif				/* LINKED */
+			reconnect = CAN_RECONNECT;
 
-    result = internal_command (SCint->target, SCint->lun, SCint->cmnd,
-                               SCint->request_buffer, SCint->request_bufflen, reconnect);
-    if (msg_byte (result) == DISCONNECT) break;
-    SCtmp = SCint;
-    SCint = NULL;
-    SCtmp->result = result;
-    done_fn (SCtmp);
-  }
-  while (SCint);
-  recursion_depth--;
-  return 0;
+		result =
+		    internal_command (SCint->target, SCint->lun, SCint->cmnd,
+				      SCint->request_buffer,
+				      SCint->request_bufflen, reconnect);
+		if (msg_byte (result) == DISCONNECT)
+			break;
+		SCtmp = SCint;
+		SCint = NULL;
+		SCtmp->result = result;
+		done_fn (SCtmp);
+	}
+	while (SCint);
+	recursion_depth--;
+	return 0;
 }
 
 int seagate_st0x_command (Scsi_Cmnd * SCpnt)
 {
-  return internal_command (SCpnt->target, SCpnt->lun, SCpnt->cmnd,
-                           SCpnt->request_buffer, SCpnt->request_bufflen,
-                           (int) NO_RECONNECT);
+	return internal_command (SCpnt->target, SCpnt->lun, SCpnt->cmnd,
+				 SCpnt->request_buffer, SCpnt->request_bufflen,
+				 (int) NO_RECONNECT);
 }
 
-static int internal_command (unsigned char target, unsigned char lun, 
-                             const void *cmnd, void *buff, int bufflen, int reselect)
+static int internal_command (unsigned char target, unsigned char lun,
+		  const void *cmnd, void *buff, int bufflen, int reselect)
 {
-  unsigned char *data = NULL;
-  struct scatterlist *buffer = NULL;
-  int clock, temp, nobuffs = 0, done = 0, len = 0;
-  unsigned long flags;
+	unsigned char *data = NULL;
+	struct scatterlist *buffer = NULL;
+	int clock, temp, nobuffs = 0, done = 0, len = 0;
+	unsigned long flags;
 
 #ifdef DEBUG
-  int transfered = 0, phase = 0, newphase;
+	int transfered = 0, phase = 0, newphase;
 #endif
 
-  register unsigned char status_read;
-  unsigned char tmp_data, tmp_control, status = 0, message = 0;
+	register unsigned char status_read;
+	unsigned char tmp_data, tmp_control, status = 0, message = 0;
 
-  unsigned transfersize = 0, underflow = 0;
+	unsigned transfersize = 0, underflow = 0;
 
 #ifdef SLOW_RATE
-  int borken = (int) SCint->device->borken; /* Does the current target require
-					       Very Slow I/O ?  */
+	int borken = (int) SCint->device->borken;	/* Does the current target require
+							   Very Slow I/O ?  */
 #endif
 
-  incommand = 0;
-  st0x_aborted = 0;
+	incommand = 0;
+	st0x_aborted = 0;
 
 #if (DEBUG & PRINT_COMMAND)
-  printk ("scsi%d : target = %d, command = ", hostno, target);
-  print_command ((unsigned char *) cmnd);
+	printk ("scsi%d : target = %d, command = ", hostno, target);
+	print_command ((unsigned char *) cmnd);
 #endif
 
 #if (DEBUG & PHASE_RESELECT)
-  switch (reselect)
-  {
-    case RECONNECT_NOW:
-      printk ("scsi%d : reconnecting\n", hostno);
-      break;
+	switch (reselect) {
+	case RECONNECT_NOW:
+		printk ("scsi%d : reconnecting\n", hostno);
+		break;
 #ifdef LINKED
-    case LINKED_RIGHT:
-      printk ("scsi%d : connected, can reconnect\n", hostno);
-      break;
-    case LINKED_WRONG:
-      printk ("scsi%d : connected to wrong target, can reconnect\n", hostno);
-      break;
+	case LINKED_RIGHT:
+		printk ("scsi%d : connected, can reconnect\n", hostno);
+		break;
+	case LINKED_WRONG:
+		printk ("scsi%d : connected to wrong target, can reconnect\n",
+			hostno);
+		break;
 #endif
-    case CAN_RECONNECT:
-      printk ("scsi%d : allowed to reconnect\n", hostno);
-      break;
-    default:
-      printk ("scsi%d : not allowed to reconnect\n", hostno);
-  }
+	case CAN_RECONNECT:
+		printk ("scsi%d : allowed to reconnect\n", hostno);
+		break;
+	default:
+		printk ("scsi%d : not allowed to reconnect\n", hostno);
+	}
 #endif
 
-  if (target == (controller_type == SEAGATE ? 7 : 6))
-    return DID_BAD_TARGET;
+	if (target == (controller_type == SEAGATE ? 7 : 6))
+		return DID_BAD_TARGET;
 
 /*
- *    We work it differently depending on if this is is "the first time,"
+ *	We work it differently depending on if this is is "the first time,"
  *      or a reconnect.  If this is a reselect phase, then SEL will
  *      be asserted, and we must skip selection / arbitration phases.
  */
 
-  switch (reselect)
-  {
-    case RECONNECT_NOW:
-      DPRINTK ( PHASE_RESELECT, "scsi%d : phase RESELECT \n", hostno);
+	switch (reselect) {
+	case RECONNECT_NOW:
+		DPRINTK (PHASE_RESELECT, "scsi%d : phase RESELECT \n", hostno);
 
 /*
- *    At this point, we should find the logical or of our ID and the original
+ *	At this point, we should find the logical or of our ID and the original
  *      target's ID on the BUS, with BSY, SEL, and I/O signals asserted.
  *
  *      After ARBITRATION phase is completed, only SEL, BSY, and the
  *      target ID are asserted.  A valid initiator ID is not on the bus
  *      until IO is asserted, so we must wait for that.
  */
-      ULOOP( 100*1000 ) {
-        temp = STATUS;
-        if ((temp & STAT_IO) && !(temp & STAT_BSY))
-          break;
+		ULOOP (100 * 1000) {
+			temp = STATUS;
+			if ((temp & STAT_IO) && !(temp & STAT_BSY))
+				break;
 
-        if (TIMEOUT) {
-          DPRINTK (PHASE_RESELECT, 
-		   "scsi%d : RESELECT timed out while waiting for IO .\n", hostno);
-          return (DID_BAD_INTR << 16);
-        }
-      }
+			if (TIMEOUT) {
+				DPRINTK (PHASE_RESELECT,
+					 "scsi%d : RESELECT timed out while waiting for IO .\n",
+					 hostno);
+				return (DID_BAD_INTR << 16);
+			}
+		}
 
 /*
- *    After I/O is asserted by the target, we can read our ID and its
+ *	After I/O is asserted by the target, we can read our ID and its
  *      ID off of the BUS.
  */
 
-      if (!((temp = DATA) & (controller_type == SEAGATE ? 0x80 : 0x40)))
-      {
-        DPRINTK (PHASE_RESELECT,
-		 "scsi%d : detected reconnect request to different target.\n"
-		 "\tData bus = %d\n", hostno, temp);
-        return (DID_BAD_INTR << 16);
-      }
+		if (!
+		    ((temp =
+		      DATA) & (controller_type == SEAGATE ? 0x80 : 0x40))) {
+			DPRINTK (PHASE_RESELECT,
+				 "scsi%d : detected reconnect request to different target.\n"
+				 "\tData bus = %d\n", hostno, temp);
+			return (DID_BAD_INTR << 16);
+		}
 
-      if (!(temp & (1 << current_target)))
-      {
-        printk ("scsi%d : Unexpected reselect interrupt.  Data bus = %d\n",
-                hostno, temp);
-        return (DID_BAD_INTR << 16);
-      }
+		if (!(temp & (1 << current_target))) {
+			printk
+			    ("scsi%d : Unexpected reselect interrupt.  Data bus = %d\n",
+			     hostno, temp);
+			return (DID_BAD_INTR << 16);
+		}
 
-      buffer = current_buffer;
-      cmnd = current_cmnd;              /* WDE add */
-      data = current_data;              /* WDE add */
-      len = current_bufflen;            /* WDE add */
-      nobuffs = current_nobuffs;
+		buffer = current_buffer;
+		cmnd = current_cmnd;	/* WDE add */
+		data = current_data;	/* WDE add */
+		len = current_bufflen;	/* WDE add */
+		nobuffs = current_nobuffs;
 
 /*
- *    We have determined that we have been selected.  At this point,
+ *	We have determined that we have been selected.  At this point,
  *      we must respond to the reselection by asserting BSY ourselves
  */
 
 #if 1
-      WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE | CMD_BSY);
+		WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE | CMD_BSY);
 #else
-      WRITE_CONTROL (BASE_CMD | CMD_BSY);
+		WRITE_CONTROL (BASE_CMD | CMD_BSY);
 #endif
 
 /*
- *    The target will drop SEL, and raise BSY, at which time we must drop
+ *	The target will drop SEL, and raise BSY, at which time we must drop
  *      BSY.
  */
 
-      ULOOP( 100*1000 ) {
-	if (!(STATUS & STAT_SEL)) break;
-	if (TIMEOUT) {
-	  WRITE_CONTROL (BASE_CMD | CMD_INTR);
-	  DPRINTK (PHASE_RESELECT,
-		   "scsi%d : RESELECT timed out while waiting for SEL.\n", hostno);
-	  return (DID_BAD_INTR << 16);
-	}
-      }
+		ULOOP (100 * 1000) {
+			if (!(STATUS & STAT_SEL))
+				break;
+			if (TIMEOUT) {
+				WRITE_CONTROL (BASE_CMD | CMD_INTR);
+				DPRINTK (PHASE_RESELECT,
+					 "scsi%d : RESELECT timed out while waiting for SEL.\n",
+					 hostno);
+				return (DID_BAD_INTR << 16);
+			}
+		}
 
-      WRITE_CONTROL (BASE_CMD);
+		WRITE_CONTROL (BASE_CMD);
 
 /*
- *    At this point, we have connected with the target and can get
+ *	At this point, we have connected with the target and can get
  *      on with our lives.
  */
-      break;
-    case CAN_RECONNECT:
+		break;
+	case CAN_RECONNECT:
 
 #ifdef LINKED
 /*
@@ -892,11 +901,12 @@ static int internal_command (unsigned char target, unsigned char lun,
  * message on MESSAGE OUT phase, and then loop back to here.
  */
 
-    connect_loop:
+	      connect_loop:
 
 #endif
 
-      DPRINTK (PHASE_BUS_FREE, "scsi%d : phase = BUS FREE \n", hostno);
+		DPRINTK (PHASE_BUS_FREE, "scsi%d : phase = BUS FREE \n",
+			 hostno);
 
 /*
  *    BUS FREE PHASE
@@ -909,21 +919,22 @@ static int internal_command (unsigned char target, unsigned char lun,
 
 #ifndef ARBITRATE
 #error FIXME: this is broken: we may not use jiffies here - we are under cli(). It will hardlock.
-      clock = jiffies + ST0X_BUS_FREE_DELAY;
+		clock = jiffies + ST0X_BUS_FREE_DELAY;
 
-      while (((STATUS | STATUS | STATUS) &
-              (STAT_BSY | STAT_SEL)) &&
-             (!st0x_aborted) && time_before(jiffies, clock));
+		while (((STATUS | STATUS | STATUS) &
+			(STAT_BSY | STAT_SEL)) &&
+		       (!st0x_aborted) && time_before (jiffies, clock)) ;
 
-      if (time_after(jiffies, clock))
-        return retcode (DID_BUS_BUSY);
-      else if (st0x_aborted)
-        return retcode (st0x_aborted);
+		if (time_after (jiffies, clock))
+			return retcode (DID_BUS_BUSY);
+		else if (st0x_aborted)
+			return retcode (st0x_aborted);
 #endif
 
-      DPRINTK (PHASE_SELECTION, "scsi%d : phase = SELECTION\n", hostno);
+		DPRINTK (PHASE_SELECTION, "scsi%d : phase = SELECTION\n",
+			 hostno);
 
-      clock = jiffies + ST0X_SELECTION_DELAY;
+		clock = jiffies + ST0X_SELECTION_DELAY;
 
 /*
  * Arbitration/selection procedure :
@@ -937,26 +948,30 @@ static int internal_command (unsigned char target, unsigned char lun,
  */
 
 #ifdef ARBITRATE
-      save_flags (flags);
-      cli ();
-      WRITE_CONTROL (0);
-      WRITE_DATA ((controller_type == SEAGATE) ? 0x80 : 0x40);
-      WRITE_CONTROL (CMD_START_ARB);
-      restore_flags (flags);
+		save_flags (flags);
+		cli ();
+		WRITE_CONTROL (0);
+		WRITE_DATA ((controller_type == SEAGATE) ? 0x80 : 0x40);
+		WRITE_CONTROL (CMD_START_ARB);
+		restore_flags (flags);
 
-      ULOOP( ST0X_SELECTION_DELAY * 10000 ) {
-	status_read = STATUS;
-	if (status_read & STAT_ARB_CMPL) break;
-	if (st0x_aborted)	/* FIXME: What? We are going to do something even after abort? */
-	   break;
-	if (TIMEOUT || (status_read & STAT_SEL)) {
-	  printk( "scsi%d : arbitration lost or timeout.\n", hostno );
-	  WRITE_CONTROL (BASE_CMD);
-	  return retcode (DID_NO_CONNECT);
-	}
-      }
+		ULOOP (ST0X_SELECTION_DELAY * 10000) {
+			status_read = STATUS;
+			if (status_read & STAT_ARB_CMPL)
+				break;
+			if (st0x_aborted)	/* FIXME: What? We are going to do something even after abort? */
+				break;
+			if (TIMEOUT || (status_read & STAT_SEL)) {
+				printk
+				    ("scsi%d : arbitration lost or timeout.\n",
+				     hostno);
+				WRITE_CONTROL (BASE_CMD);
+				return retcode (DID_NO_CONNECT);
+			}
+		}
 
-      DPRINTK (PHASE_SELECTION, "scsi%d : arbitration complete\n", hostno);
+		DPRINTK (PHASE_SELECTION, "scsi%d : arbitration complete\n",
+			 hostno);
 #endif
 
 /*
@@ -971,92 +986,103 @@ static int internal_command (unsigned char target, unsigned char lun,
  *    try this with a SCSI protocol or logic analyzer to see what is
  *    going on.
  */
-       tmp_data = (unsigned char) ((1 << target) | (controller_type == SEAGATE ? 0x80 : 0x40));
-       tmp_control = BASE_CMD | CMD_DRVR_ENABLE | CMD_SEL | (reselect ? CMD_ATTN : 0);
+		tmp_data =
+		    (unsigned char) ((1 << target) |
+				     (controller_type ==
+				      SEAGATE ? 0x80 : 0x40));
+		tmp_control =
+		    BASE_CMD | CMD_DRVR_ENABLE | CMD_SEL | (reselect ? CMD_ATTN
+							    : 0);
 
-       save_flags(flags);
-       cli();
+		save_flags (flags);
+		cli ();
 #ifdef OLDCNTDATASCEME
 #ifdef SWAPCNTDATA
-       WRITE_CONTROL (tmp_control);
-       WRITE_DATA (tmp_data);
+		WRITE_CONTROL (tmp_control);
+		WRITE_DATA (tmp_data);
 #else
-       WRITE_DATA (tmp_data);
-       WRITE_CONTROL (tmp_control);
+		WRITE_DATA (tmp_data);
+		WRITE_CONTROL (tmp_control);
 #endif
 #else
-       tmp_control ^= CMD_BSY;		/* This is guesswork. What used to be in driver	   */
-       WRITE_CONTROL (tmp_control);	/* could never work: it sent data into control	   */
-       WRITE_DATA (tmp_data);		/* register and control info into data. Hopefully  */
-       tmp_control ^= CMD_BSY;		/* fixed, but order of first two may be wrong.     */
-       WRITE_CONTROL (tmp_control);	                              /* -- pavel@ucw.cz   */
-#endif       
+		tmp_control ^= CMD_BSY;	/* This is guesswork. What used to be in driver    */
+		WRITE_CONTROL (tmp_control);	/* could never work: it sent data into control     */
+		WRITE_DATA (tmp_data);	/* register and control info into data. Hopefully  */
+		tmp_control ^= CMD_BSY;	/* fixed, but order of first two may be wrong.     */
+		WRITE_CONTROL (tmp_control);	/* -- pavel@ucw.cz   */
+#endif
 
+		restore_flags (flags);
 
-       restore_flags (flags);
-
-       ULOOP( 250*1000 ) {
-	 if (st0x_aborted) {
+		ULOOP (250 * 1000) {
+			if (st0x_aborted) {
 /*
- *    If we have been aborted, and we have a command in progress, IE the
+ *	If we have been aborted, and we have a command in progress, IE the
  *      target still has BSY asserted, then we will reset the bus, and
  *      notify the midlevel driver to expect sense.
  */
 
-	   WRITE_CONTROL (BASE_CMD);
-	   if (STATUS & STAT_BSY) {
-	     printk ("scsi%d : BST asserted after we've been aborted.\n", hostno);
-	     seagate_st0x_reset (NULL, 0);
-	     return retcode (DID_RESET);
-	   }
-	   return retcode (st0x_aborted);
-	 }
-	 if (STATUS & STAT_BSY) break;
-	 if (TIMEOUT) {
-	   DPRINTK (PHASE_SELECTION, "scsi%d : NO CONNECT with target %d, stat = %x \n",
-		    hostno, target, STATUS);
-	   return retcode (DID_NO_CONNECT);
-	 }
-       }
+				WRITE_CONTROL (BASE_CMD);
+				if (STATUS & STAT_BSY) {
+					printk
+					    ("scsi%d : BST asserted after we've been aborted.\n",
+					     hostno);
+					seagate_st0x_reset (NULL, 0);
+					return retcode (DID_RESET);
+				}
+				return retcode (st0x_aborted);
+			}
+			if (STATUS & STAT_BSY)
+				break;
+			if (TIMEOUT) {
+				DPRINTK (PHASE_SELECTION,
+					 "scsi%d : NO CONNECT with target %d, stat = %x \n",
+					 hostno, target, STATUS);
+				return retcode (DID_NO_CONNECT);
+			}
+		}
 
 /* Establish current pointers.  Take into account scatter / gather */
 
-      if ((nobuffs = SCint->use_sg))
-      {
+		if ((nobuffs = SCint->use_sg)) {
 #if (DEBUG & DEBUG_SG)
-        {
-          int i;
+			{
+				int i;
 
-          printk ("scsi%d : scatter gather requested, using %d buffers.\n",
-                  hostno, nobuffs);
-          for (i = 0; i < nobuffs; ++i)
-            printk ("scsi%d : buffer %d address = %08x length = %d\n",
-                    hostno, i, buffer[i].address, buffer[i].length);
-        }
+				printk
+				    ("scsi%d : scatter gather requested, using %d buffers.\n",
+				     hostno, nobuffs);
+				for (i = 0; i < nobuffs; ++i)
+					printk
+					    ("scsi%d : buffer %d address = %08x length = %d\n",
+					     hostno, i, buffer[i].address,
+					     buffer[i].length);
+			}
 #endif
 
-        buffer = (struct scatterlist *) SCint->buffer;
-        len = buffer->length;
-        data = (unsigned char *) buffer->address;
-      }
-      else
-      {
-        DPRINTK (DEBUG_SG, "scsi%d : scatter gather not requested.\n", hostno);
-        buffer = NULL;
-        len = SCint->request_bufflen;
-        data = (unsigned char *) SCint->request_buffer;
-      }
+			buffer = (struct scatterlist *) SCint->buffer;
+			len = buffer->length;
+			data = (unsigned char *) buffer->address;
+		} else {
+			DPRINTK (DEBUG_SG,
+				 "scsi%d : scatter gather not requested.\n",
+				 hostno);
+			buffer = NULL;
+			len = SCint->request_bufflen;
+			data = (unsigned char *) SCint->request_buffer;
+		}
 
-      DPRINTK (PHASE_DATAIN | PHASE_DATAOUT, "scsi%d : len = %d\n", hostno, len);
+		DPRINTK (PHASE_DATAIN | PHASE_DATAOUT, "scsi%d : len = %d\n",
+			 hostno, len);
 
-      break;
+		break;
 #ifdef LINKED
-    case LINKED_RIGHT:
-      break;
-    case LINKED_WRONG:
-      break;
+	case LINKED_RIGHT:
+		break;
+	case LINKED_WRONG:
+		break;
 #endif
-  }                                     /* end of switch(reselect) */
+	}			/* end of switch(reselect) */
 
 /*
  *    There are several conditions under which we wish to send a message :
@@ -1069,14 +1095,14 @@ static int internal_command (unsigned char target, unsigned char lun,
 
 /* GCC does not like an ifdef inside a macro, so do it the hard way. */
 #ifdef LINKED
-  WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE |
-                 (((reselect == CAN_RECONNECT)
-                   || (reselect == LINKED_WRONG)
-                  )? CMD_ATTN : 0));
+	WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE |
+		       (((reselect == CAN_RECONNECT)
+			 || (reselect == LINKED_WRONG)
+			)? CMD_ATTN : 0));
 #else
-  WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE |
-                 (((reselect == CAN_RECONNECT)
-                  )? CMD_ATTN : 0));
+	WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE |
+		       (((reselect == CAN_RECONNECT)
+			)? CMD_ATTN : 0));
 #endif
 
 /*
@@ -1091,134 +1117,145 @@ static int internal_command (unsigned char target, unsigned char lun,
  *
  */
 
-  DPRINTK (PHASE_ETC, "scsi%d : phase = INFORMATION TRANSFER\n", hostno);
+	DPRINTK (PHASE_ETC, "scsi%d : phase = INFORMATION TRANSFER\n", hostno);
 
-  incommand = 1;
-  transfersize = SCint->transfersize;
-  underflow = SCint->underflow;
+	incommand = 1;
+	transfersize = SCint->transfersize;
+	underflow = SCint->underflow;
 
 /*
- *    Now, we poll the device for status information,
+ *	Now, we poll the device for status information,
  *      and handle any requests it makes.  Note that since we are unsure of
  *      how much data will be flowing across the system, etc and cannot
  *      make reasonable timeouts, that we will instead have the midlevel
  *      driver handle any timeouts that occur in this phase.
  */
 
-  while (((status_read = STATUS) & STAT_BSY) && !st0x_aborted && !done)
-  {
+	while (((status_read = STATUS) & STAT_BSY) && !st0x_aborted && !done) {
 #ifdef PARITY
-    if (status_read & STAT_PARITY)
-    {
-      printk ("scsi%d : got parity error\n", hostno);
-      st0x_aborted = DID_PARITY;
-    }
+		if (status_read & STAT_PARITY) {
+			printk ("scsi%d : got parity error\n", hostno);
+			st0x_aborted = DID_PARITY;
+		}
 #endif
 
-    if (status_read & STAT_REQ)
-    {
+		if (status_read & STAT_REQ) {
 #if ((DEBUG & PHASE_ETC) == PHASE_ETC)
-      if ((newphase = (status_read & REQ_MASK)) != phase)
-      {
-        phase = newphase;
-        switch (phase)
-        {
-          case REQ_DATAOUT:
-            printk ("scsi%d : phase = DATA OUT\n", hostno);
-            break;
-          case REQ_DATAIN:
-            printk ("scsi%d : phase = DATA IN\n", hostno);
-            break;
-          case REQ_CMDOUT:
-            printk ("scsi%d : phase = COMMAND OUT\n", hostno);
-            break;
-          case REQ_STATIN:
-            printk ("scsi%d : phase = STATUS IN\n", hostno);
-            break;
-          case REQ_MSGOUT:
-            printk ("scsi%d : phase = MESSAGE OUT\n", hostno);
-            break;
-          case REQ_MSGIN:
-            printk ("scsi%d : phase = MESSAGE IN\n", hostno);
-            break;
-          default:
-            printk ("scsi%d : phase = UNKNOWN\n", hostno);
-            st0x_aborted = DID_ERROR;
-        }
-      }
+			if ((newphase = (status_read & REQ_MASK)) != phase) {
+				phase = newphase;
+				switch (phase) {
+				case REQ_DATAOUT:
+					printk ("scsi%d : phase = DATA OUT\n",
+						hostno);
+					break;
+				case REQ_DATAIN:
+					printk ("scsi%d : phase = DATA IN\n",
+						hostno);
+					break;
+				case REQ_CMDOUT:
+					printk
+					    ("scsi%d : phase = COMMAND OUT\n",
+					     hostno);
+					break;
+				case REQ_STATIN:
+					printk ("scsi%d : phase = STATUS IN\n",
+						hostno);
+					break;
+				case REQ_MSGOUT:
+					printk
+					    ("scsi%d : phase = MESSAGE OUT\n",
+					     hostno);
+					break;
+				case REQ_MSGIN:
+					printk ("scsi%d : phase = MESSAGE IN\n",
+						hostno);
+					break;
+				default:
+					printk ("scsi%d : phase = UNKNOWN\n",
+						hostno);
+					st0x_aborted = DID_ERROR;
+				}
+			}
 #endif
-      switch (status_read & REQ_MASK)
-      {
-        case REQ_DATAOUT:
+			switch (status_read & REQ_MASK) {
+			case REQ_DATAOUT:
 /*
  * If we are in fast mode, then we simply splat the data out
  * in word-sized chunks as fast as we can.
  */
 
-          if (!len)
-          {
+				if (!len) {
 #if 0
-            printk ("scsi%d: underflow to target %d lun %d \n", hostno, target, lun);
-            st0x_aborted = DID_ERROR;
-            fast = 0;
+					printk
+					    ("scsi%d: underflow to target %d lun %d \n",
+					     hostno, target, lun);
+					st0x_aborted = DID_ERROR;
+					fast = 0;
 #endif
-            break;
-          }
+					break;
+				}
 
-          if (fast && transfersize && !(len % transfersize)
-              && (len >= transfersize)
+				if (fast && transfersize
+				    && !(len % transfersize)
+				    && (len >= transfersize)
 #ifdef FAST32
-              && !(transfersize % 4)
+				    && !(transfersize % 4)
 #endif
-            )
-          {
-            DPRINTK (DEBUG_FAST,
-		     "scsi%d : FAST transfer, underflow = %d, transfersize = %d\n"
-                    "         len = %d, data = %08x\n",
-                  hostno, SCint->underflow, SCint->transfersize, len, data);
+				    ) {
+					DPRINTK (DEBUG_FAST,
+						 "scsi%d : FAST transfer, underflow = %d, transfersize = %d\n"
+						 "         len = %d, data = %08x\n",
+						 hostno, SCint->underflow,
+						 SCint->transfersize, len,
+						 data);
 
 /* SJT: Start. Fast Write */
 #ifdef SEAGATE_USE_ASM
-            __asm__(
-                "cld\n\t"
+					__asm__ ("cld\n\t"
 #ifdef FAST32
-                "shr $2, %%ecx\n\t"
-                "1:\t"
-                "lodsl\n\t"
-                "movl %%eax, (%%edi)\n\t"
+						 "shr $2, %%ecx\n\t"
+						 "1:\t"
+						 "lodsl\n\t"
+						 "movl %%eax, (%%edi)\n\t"
 #else
-                "1:\t"
-                "lodsb\n\t"
-                "movb %%al, (%%edi)\n\t"
+						 "1:\t"
+						 "lodsb\n\t"
+						 "movb %%al, (%%edi)\n\t"
 #endif
-                "loop 1b;"
-/* output */    :
-/* input */     : "D" (phys_to_virt(st0x_dr)), "S" (data), "c" (SCint->transfersize) 
-/* clobbered */ : "eax", "ecx", "esi" );
-#else /* SEAGATE_USE_ASM */
-            {
+						 "loop 1b;"
+				      /* output */ :
+				      /* input */ :"D" (phys_to_virt (st0x_dr)),
+						 "S"
+						 (data),
+						 "c" (SCint->transfersize)
+/* clobbered */
+				      :	 "eax", "ecx",
+						 "esi");
+#else				/* SEAGATE_USE_ASM */
+					{
 #ifdef FAST32
-              unsigned int *iop = phys_to_virt (st0x_dr);
-              const unsigned int *dp = (unsigned int *) data;
-              int xferlen = transfersize >> 2;
+						unsigned int *iop =
+						    phys_to_virt (st0x_dr);
+						const unsigned int *dp =
+						    (unsigned int *) data;
+						int xferlen = transfersize >> 2;
 #else
-              unsigned char *iop = phys_to_virt (st0x_dr);
-              const unsigned char *dp = data;
-              int xferlen = transfersize;
+						unsigned char *iop =
+						    phys_to_virt (st0x_dr);
+						const unsigned char *dp = data;
+						int xferlen = transfersize;
 #endif
-              for (; xferlen; --xferlen)
-                *iop = *dp++;
-            }
-#endif /* SEAGATE_USE_ASM */
+						for (; xferlen; --xferlen)
+							*iop = *dp++;
+					}
+#endif				/* SEAGATE_USE_ASM */
 /* SJT: End */
-            len -= transfersize;
-            data += transfersize;
-            DPRINTK (DEBUG_FAST,
-		     "scsi%d : FAST transfer complete len = %d data = %08x\n",
-                    hostno, len, data);
-          }
-          else
-          {
+					len -= transfersize;
+					data += transfersize;
+					DPRINTK (DEBUG_FAST,
+						 "scsi%d : FAST transfer complete len = %d data = %08x\n",
+						 hostno, len, data);
+				} else {
 /*
  *    We loop as long as we are in a data out phase, there is data to send,
  *      and BSY is still active.
@@ -1227,7 +1264,7 @@ static int internal_command (unsigned char target, unsigned char lun,
 /* SJT: Start. Slow Write. */
 #ifdef SEAGATE_USE_ASM
 
-int __dummy_1,__dummy_2;
+					int __dummy_1, __dummy_2;
 
 /*
  *      We loop as long as we are in a data out phase, there is data to send, 
@@ -1236,159 +1273,173 @@ int __dummy_1,__dummy_2;
 /* Local variables : len = ecx , data = esi, 
                      st0x_cr_sr = ebx, st0x_dr =  edi
 */
-            __asm__ (
-            /* Test for any data here at all. */
-                    "orl %%ecx, %%ecx\n\t"
-                    "jz 2f\n\t"
-                    "cld\n\t"
+					__asm__ (
+							/* Test for any data here at all. */
+							"orl %%ecx, %%ecx\n\t"
+							"jz 2f\n\t" "cld\n\t"
 /*                    "movl " SYMBOL_NAME_STR(st0x_cr_sr) ", %%ebx\n\t"  */
 /*                    "movl " SYMBOL_NAME_STR(st0x_dr) ", %%edi\n\t"  */
-                "1:\t"
-                    "movb (%%ebx), %%al\n\t"
-            /* Test for BSY */
-                    "test $1, %%al\n\t"
-                    "jz 2f\n\t"
-            /* Test for data out phase - STATUS & REQ_MASK should be 
-               REQ_DATAOUT, which is 0. */
-                    "test $0xe, %%al\n\t"
-                    "jnz 2f\n\t"
-            /* Test for REQ */      
-                    "test $0x10, %%al\n\t"
-                    "jz 1b\n\t"
-                    "lodsb\n\t"
-                    "movb %%al, (%%edi)\n\t"
-                    "loop 1b\n\t"
-                "2:\n"
-/* output */    : "=S" (data), "=c" (len)  ,"=b" (__dummy_1) ,"=D" (__dummy_2)
-/* input */     : "0" (data), "1" (len), "2" (phys_to_virt(st0x_cr_sr)), "3" (phys_to_virt(st0x_dr)) 
-/* clobbered */ : "eax"); 
-#else /* SEAGATE_USE_ASM */
-            while (len)
-            {
-              unsigned char stat;
+							"1:\t"
+							"movb (%%ebx), %%al\n\t"
+							/* Test for BSY */
+							"test $1, %%al\n\t"
+							"jz 2f\n\t"
+							/* Test for data out phase - STATUS & REQ_MASK should be 
+							   REQ_DATAOUT, which is 0. */
+							"test $0xe, %%al\n\t"
+							"jnz 2f\n\t"
+							/* Test for REQ */
+							"test $0x10, %%al\n\t"
+							"jz 1b\n\t"
+							"lodsb\n\t"
+							"movb %%al, (%%edi)\n\t"
+							"loop 1b\n\t" "2:\n"
+				      /* output */ :"=S" (data), "=c" (len),
+							"=b"
+							(__dummy_1),
+							"=D" (__dummy_2)
+/* input */
+				      :		"0" (data), "1" (len),
+							"2" (phys_to_virt
+							     (st0x_cr_sr)),
+							"3" (phys_to_virt
+							     (st0x_dr))
+/* clobbered */
+				      :		"eax");
+#else				/* SEAGATE_USE_ASM */
+					while (len) {
+						unsigned char stat;
 
-              stat = STATUS;
-              if (!(stat & STAT_BSY) || ((stat & REQ_MASK) != REQ_DATAOUT))
-                break;
-              if (stat & STAT_REQ)
-              {
-                WRITE_DATA (*data++);
-                --len;
-              }
-            }
-#endif /* SEAGATE_USE_ASM */
+						stat = STATUS;
+						if (!(stat & STAT_BSY)
+						    || ((stat & REQ_MASK) !=
+							REQ_DATAOUT))
+							break;
+						if (stat & STAT_REQ) {
+							WRITE_DATA (*data++);
+							--len;
+						}
+					}
+#endif				/* SEAGATE_USE_ASM */
 /* SJT: End. */
-          }
+				}
 
-          if (!len && nobuffs)
-          {
-            --nobuffs;
-            ++buffer;
-            len = buffer->length;
-            data = (unsigned char *) buffer->address;
-            DPRINTK (DEBUG_SG,
-		    "scsi%d : next scatter-gather buffer len = %d address = %08x\n",
-                    hostno, len, data);
-          }
-          break;
+				if (!len && nobuffs) {
+					--nobuffs;
+					++buffer;
+					len = buffer->length;
+					data =
+					    (unsigned char *) buffer->address;
+					DPRINTK (DEBUG_SG,
+						 "scsi%d : next scatter-gather buffer len = %d address = %08x\n",
+						 hostno, len, data);
+				}
+				break;
 
-        case REQ_DATAIN:
+			case REQ_DATAIN:
 #ifdef SLOW_RATE
-          if (borken)
-          {
+				if (borken) {
 #if (DEBUG & (PHASE_DATAIN))
-            transfered += len;
+					transfered += len;
 #endif
-            for (;
-                 len && (STATUS & (REQ_MASK | STAT_REQ)) == (REQ_DATAIN |
-                                                             STAT_REQ)
-                 ; --len)
-            {
-              *data++ = DATA;
-              borken_wait ();
-            }
+					for (;
+					     len
+					     && (STATUS & (REQ_MASK | STAT_REQ))
+					     == (REQ_DATAIN | STAT_REQ);
+					     --len) {
+						*data++ = DATA;
+						borken_wait ();
+					}
 #if (DEBUG & (PHASE_DATAIN))
-            transfered -= len;
+					transfered -= len;
 #endif
-          }
-          else
+				} else
 #endif
 
-            if (fast && transfersize && !(len % transfersize) &&
-                (len >= transfersize)
+					if (fast && transfersize
+					    && !(len % transfersize)
+					    && (len >= transfersize)
 #ifdef FAST32
-                && !(transfersize % 4)
+					    && !(transfersize % 4)
 #endif
-            )
-          {
-            DPRINTK (DEBUG_FAST,
-		     "scsi%d : FAST transfer, underflow = %d, transfersize = %d\n"
-                    "         len = %d, data = %08x\n",
-                  hostno, SCint->underflow, SCint->transfersize, len, data);
+				    ) {
+					DPRINTK (DEBUG_FAST,
+						 "scsi%d : FAST transfer, underflow = %d, transfersize = %d\n"
+						 "         len = %d, data = %08x\n",
+						 hostno, SCint->underflow,
+						 SCint->transfersize, len,
+						 data);
 
 /* SJT: Start. Fast Read */
 #ifdef SEAGATE_USE_ASM
-            __asm__(
-                    "cld\n\t"
+					__asm__ ("cld\n\t"
 #ifdef FAST32
-                    "shr $2, %%ecx\n\t"
-                "1:\t"
-                    "movl (%%esi), %%eax\n\t"
-                    "stosl\n\t"
+						 "shr $2, %%ecx\n\t"
+						 "1:\t"
+						 "movl (%%esi), %%eax\n\t"
+						 "stosl\n\t"
 #else
-                "1:\t"
-                    "movb (%%esi), %%al\n\t"
-                    "stosb\n\t"
+						 "1:\t"
+						 "movb (%%esi), %%al\n\t"
+						 "stosb\n\t"
 #endif
-                    "loop 1b\n\t"
-/* output */        : 
-/* input */         : "S" (phys_to_virt(st0x_dr)), "D" (data), "c" (SCint->transfersize) 
-/* clobbered */     : "eax", "ecx", "edi");
-#else /* SEAGATE_USE_ASM */
-            {
+						 "loop 1b\n\t"
+				      /* output */ :
+				      /* input */ :"S" (phys_to_virt (st0x_dr)),
+						 "D"
+						 (data),
+						 "c" (SCint->transfersize)
+/* clobbered */
+				      :	 "eax", "ecx",
+						 "edi");
+#else				/* SEAGATE_USE_ASM */
+					{
 #ifdef FAST32
-              const unsigned int *iop = phys_to_virt (st0x_dr);
-              unsigned int *dp = (unsigned int *) data;
-              int xferlen = len >> 2;
+						const unsigned int *iop =
+						    phys_to_virt (st0x_dr);
+						unsigned int *dp =
+						    (unsigned int *) data;
+						int xferlen = len >> 2;
 #else
-              const unsigned char *iop = phys_to_virt (st0x_dr);
-              unsigned char *dp = data;
-              int xferlen = len;
+						const unsigned char *iop =
+						    phys_to_virt (st0x_dr);
+						unsigned char *dp = data;
+						int xferlen = len;
 #endif
-              for (; xferlen; --xferlen)
-                *dp++ = *iop;
-            }
-#endif /* SEAGATE_USE_ASM */
+						for (; xferlen; --xferlen)
+							*dp++ = *iop;
+					}
+#endif				/* SEAGATE_USE_ASM */
 /* SJT: End */
-            len -= transfersize;
-            data += transfersize;
+					len -= transfersize;
+					data += transfersize;
 #if (DEBUG & PHASE_DATAIN)
-            printk ("scsi%d: transfered += %d\n", hostno, transfersize);
-            transfered += transfersize;
+					printk ("scsi%d: transfered += %d\n",
+						hostno, transfersize);
+					transfered += transfersize;
 #endif
 
-            DPRINTK (DEBUG_FAST,
-		     "scsi%d : FAST transfer complete len = %d data = %08x\n",
-                    hostno, len, data);
-          }
-          else
-          {
+					DPRINTK (DEBUG_FAST,
+						 "scsi%d : FAST transfer complete len = %d data = %08x\n",
+						 hostno, len, data);
+				} else {
 
 #if (DEBUG & PHASE_DATAIN)
-            printk ("scsi%d: transfered += %d\n", hostno, len);
-            transfered += len;          /* Assume we'll transfer it all, then
-                                           subtract what we *didn't* transfer */
+					printk ("scsi%d: transfered += %d\n",
+						hostno, len);
+					transfered += len;	/* Assume we'll transfer it all, then
+								   subtract what we *didn't* transfer */
 #endif
 
 /*
- *    We loop as long as we are in a data in phase, there is room to read,
+ *	We loop as long as we are in a data in phase, there is room to read,
  *      and BSY is still active
  */
 
 /* SJT: Start. */
 #ifdef SEAGATE_USE_ASM
 
-int __dummy_3,__dummy_4;
+					int __dummy_3, __dummy_4;
 
 /* Dummy clobbering variables for the new gcc-2.95 */
 
@@ -1396,175 +1447,200 @@ int __dummy_3,__dummy_4;
  *      We loop as long as we are in a data in phase, there is room to read, 
  *      and BSY is still active
  */
-            /* Local variables : ecx = len, edi = data
-                                 esi = st0x_cr_sr, ebx = st0x_dr */
-            __asm__ (
-            /* Test for room to read */
-                "orl %%ecx, %%ecx\n\t"
-                "jz 2f\n\t"
-                "cld\n\t"
+					/* Local variables : ecx = len, edi = data
+					   esi = st0x_cr_sr, ebx = st0x_dr */
+					__asm__ (
+							/* Test for room to read */
+							"orl %%ecx, %%ecx\n\t"
+							"jz 2f\n\t" "cld\n\t"
 /*                "movl " SYMBOL_NAME_STR(st0x_cr_sr) ", %%esi\n\t"  */
 /*                "movl " SYMBOL_NAME_STR(st0x_dr) ", %%ebx\n\t"  */
-            "1:\t"
-                "movb (%%esi), %%al\n\t"
-            /* Test for BSY */
-                "test $1, %%al\n\t"
-                "jz 2f\n\t"
-            /* Test for data in phase - STATUS & REQ_MASK should be REQ_DATAIN, 
-               = STAT_IO, which is 4. */
-                "movb $0xe, %%ah\n\t"      
-                "andb %%al, %%ah\n\t"
-                "cmpb $0x04, %%ah\n\t"
-                "jne 2f\n\t"
-            /* Test for REQ */      
-                "test $0x10, %%al\n\t"
-                "jz 1b\n\t"
-                "movb (%%ebx), %%al\n\t"      
-                "stosb\n\t"   
-                "loop 1b\n\t"
-            "2:\n"
-/* output */    : "=D" (data), "=c" (len) ,"=S" (__dummy_3) ,"=b" (__dummy_4)
-/* input */     : "0" (data), "1" (len), "2" (phys_to_virt(st0x_cr_sr)), "3" (phys_to_virt(st0x_dr)) 
-/* clobbered */ : "eax" ); 
-#else /* SEAGATE_USE_ASM */
-            while (len)
-            {
-              unsigned char stat;
+							"1:\t"
+							"movb (%%esi), %%al\n\t"
+							/* Test for BSY */
+							"test $1, %%al\n\t"
+							"jz 2f\n\t"
+							/* Test for data in phase - STATUS & REQ_MASK should be REQ_DATAIN, 
+							   = STAT_IO, which is 4. */
+							"movb $0xe, %%ah\n\t"
+							"andb %%al, %%ah\n\t"
+							"cmpb $0x04, %%ah\n\t"
+							"jne 2f\n\t"
+							/* Test for REQ */
+							"test $0x10, %%al\n\t"
+							"jz 1b\n\t"
+							"movb (%%ebx), %%al\n\t"
+							"stosb\n\t"
+							"loop 1b\n\t" "2:\n"
+				      /* output */ :"=D" (data), "=c" (len),
+							"=S"
+							(__dummy_3),
+							"=b" (__dummy_4)
+/* input */
+				      :		"0" (data), "1" (len),
+							"2" (phys_to_virt
+							     (st0x_cr_sr)),
+							"3" (phys_to_virt
+							     (st0x_dr))
+/* clobbered */
+				      :		"eax");
+#else				/* SEAGATE_USE_ASM */
+					while (len) {
+						unsigned char stat;
 
-              stat = STATUS;
-              if (!(stat & STAT_BSY) || ((stat & REQ_MASK) != REQ_DATAIN))
-                break;
-              if (stat & STAT_REQ)
-              {
-                *data++ = DATA;
-                --len;
-              }
-            }
-#endif /* SEAGATE_USE_ASM */
+						stat = STATUS;
+						if (!(stat & STAT_BSY)
+						    || ((stat & REQ_MASK) !=
+							REQ_DATAIN))
+							break;
+						if (stat & STAT_REQ) {
+							*data++ = DATA;
+							--len;
+						}
+					}
+#endif				/* SEAGATE_USE_ASM */
 /* SJT: End. */
 #if (DEBUG & PHASE_DATAIN)
-            printk ("scsi%d: transfered -= %d\n", hostno, len);
-            transfered -= len;          /* Since we assumed all of Len got  *
-                                           transfered, correct our mistake */
+					printk ("scsi%d: transfered -= %d\n",
+						hostno, len);
+					transfered -= len;	/* Since we assumed all of Len got  *
+								   transfered, correct our mistake */
 #endif
-          }
+				}
 
-          if (!len && nobuffs)
-          {
-            --nobuffs;
-            ++buffer;
-            len = buffer->length;
-            data = (unsigned char *) buffer->address;
-            DPRINTK (DEBUG_SG, 
-		     "scsi%d : next scatter-gather buffer len = %d address = %08x\n",
-                    hostno, len, data);
-          }
+				if (!len && nobuffs) {
+					--nobuffs;
+					++buffer;
+					len = buffer->length;
+					data =
+					    (unsigned char *) buffer->address;
+					DPRINTK (DEBUG_SG,
+						 "scsi%d : next scatter-gather buffer len = %d address = %08x\n",
+						 hostno, len, data);
+				}
 
-          break;
+				break;
 
-        case REQ_CMDOUT:
-          while (((status_read = STATUS) & STAT_BSY) &&
-                 ((status_read & REQ_MASK) == REQ_CMDOUT))
-            if (status_read & STAT_REQ)
-            {
-              WRITE_DATA (*(const unsigned char *) cmnd);
-              cmnd = 1 + (const unsigned char *) cmnd;
+			case REQ_CMDOUT:
+				while (((status_read = STATUS) & STAT_BSY) &&
+				       ((status_read & REQ_MASK) == REQ_CMDOUT))
+					if (status_read & STAT_REQ) {
+						WRITE_DATA (*
+							    (const unsigned char
+							     *) cmnd);
+						cmnd =
+						    1 +
+						    (const unsigned char *)
+						    cmnd;
 #ifdef SLOW_RATE
-              if (borken)
-                borken_wait ();
+						if (borken)
+							borken_wait ();
 #endif
-            }
-          break;
+					}
+				break;
 
-        case REQ_STATIN:
-          status = DATA;
-          break;
+			case REQ_STATIN:
+				status = DATA;
+				break;
 
-        case REQ_MSGOUT:
+			case REQ_MSGOUT:
 /*
- *    We can only have sent a MSG OUT if we requested to do this
+ *	We can only have sent a MSG OUT if we requested to do this
  *      by raising ATTN.  So, we must drop ATTN.
  */
 
-          WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE);
+				WRITE_CONTROL (BASE_CMD | CMD_DRVR_ENABLE);
 /*
- *    If we are reconnecting, then we must send an IDENTIFY message in
- *       response  to MSGOUT.
+ *	If we are reconnecting, then we must send an IDENTIFY message in
+ *      response  to MSGOUT.
  */
-          switch (reselect)
-          {
-            case CAN_RECONNECT:
-              WRITE_DATA (IDENTIFY (1, lun));
+				switch (reselect) {
+				case CAN_RECONNECT:
+					WRITE_DATA (IDENTIFY (1, lun));
 
-              DPRINTK (PHASE_RESELECT | PHASE_MSGOUT, "scsi%d : sent IDENTIFY message.\n", hostno);
-              break;
+					DPRINTK (PHASE_RESELECT | PHASE_MSGOUT,
+						 "scsi%d : sent IDENTIFY message.\n",
+						 hostno);
+					break;
 #ifdef LINKED
-            case LINKED_WRONG:
-              WRITE_DATA (ABORT);
-              linked_connected = 0;
-              reselect = CAN_RECONNECT;
-              goto connect_loop;
-              DPRINTK (PHASE_MSGOUT | DEBUG_LINKED, 
-		       "scsi%d : sent ABORT message to cancel incorrect I_T_L nexus.\n", hostno);
-#endif /* LINKED */
-              DPRINTK (DEBUG_LINKED, "correct\n");
-            default:
-              WRITE_DATA (NOP);
-              printk ("scsi%d : target %d requested MSGOUT, sent NOP message.\n", hostno, target);
-          }
-          break;
+				case LINKED_WRONG:
+					WRITE_DATA (ABORT);
+					linked_connected = 0;
+					reselect = CAN_RECONNECT;
+					goto connect_loop;
+					DPRINTK (PHASE_MSGOUT | DEBUG_LINKED,
+						 "scsi%d : sent ABORT message to cancel incorrect I_T_L nexus.\n",
+						 hostno);
+#endif				/* LINKED */
+					DPRINTK (DEBUG_LINKED, "correct\n");
+				default:
+					WRITE_DATA (NOP);
+					printk
+					    ("scsi%d : target %d requested MSGOUT, sent NOP message.\n",
+					     hostno, target);
+				}
+				break;
 
-        case REQ_MSGIN:
-          switch (message = DATA)
-          {
-            case DISCONNECT:
-	      DANY ("seagate: deciding to disconnect\n");
-              should_reconnect = 1;
-              current_data = data;      /* WDE add */
-              current_buffer = buffer;
-              current_bufflen = len;    /* WDE add */
-              current_nobuffs = nobuffs;
+			case REQ_MSGIN:
+				switch (message = DATA) {
+				case DISCONNECT:
+					DANY ("seagate: deciding to disconnect\n");
+					should_reconnect = 1;
+					current_data = data;	/* WDE add */
+					current_buffer = buffer;
+					current_bufflen = len;	/* WDE add */
+					current_nobuffs = nobuffs;
 #ifdef LINKED
-              linked_connected = 0;
+					linked_connected = 0;
 #endif
-              done = 1;
-              DPRINTK ((PHASE_RESELECT | PHASE_MSGIN), "scsi%d : disconnected.\n", hostno);
-              break;
+					done = 1;
+					DPRINTK ((PHASE_RESELECT | PHASE_MSGIN),
+						 "scsi%d : disconnected.\n",
+						 hostno);
+					break;
 
 #ifdef LINKED
-            case LINKED_CMD_COMPLETE:
-            case LINKED_FLG_CMD_COMPLETE:
+				case LINKED_CMD_COMPLETE:
+				case LINKED_FLG_CMD_COMPLETE:
 #endif
-            case COMMAND_COMPLETE:
+				case COMMAND_COMPLETE:
 /*
  * Note : we should check for underflow here.
  */
-              DPRINTK (PHASE_MSGIN, "scsi%d : command complete.\n", hostno);
-              done = 1;
-              break;
-            case ABORT:
-              DPRINTK (PHASE_MSGIN, "scsi%d : abort message.\n", hostno);
-              done = 1;
-              break;
-            case SAVE_POINTERS:
-              current_buffer = buffer;
-              current_bufflen = len;    /* WDE add */
-              current_data = data;      /* WDE mod */
-              current_nobuffs = nobuffs;
-              DPRINTK (PHASE_MSGIN, "scsi%d : pointers saved.\n", hostno);
-              break;
-            case RESTORE_POINTERS:
-              buffer = current_buffer;
-              cmnd = current_cmnd;
-              data = current_data;      /* WDE mod */
-              len = current_bufflen;
-              nobuffs = current_nobuffs;
-              DPRINTK (PHASE_MSGIN, "scsi%d : pointers restored.\n", hostno);
-              break;
-            default:
+					DPRINTK (PHASE_MSGIN,
+						 "scsi%d : command complete.\n",
+						 hostno);
+					done = 1;
+					break;
+				case ABORT:
+					DPRINTK (PHASE_MSGIN,
+						 "scsi%d : abort message.\n",
+						 hostno);
+					done = 1;
+					break;
+				case SAVE_POINTERS:
+					current_buffer = buffer;
+					current_bufflen = len;	/* WDE add */
+					current_data = data;	/* WDE mod */
+					current_nobuffs = nobuffs;
+					DPRINTK (PHASE_MSGIN,
+						 "scsi%d : pointers saved.\n",
+						 hostno);
+					break;
+				case RESTORE_POINTERS:
+					buffer = current_buffer;
+					cmnd = current_cmnd;
+					data = current_data;	/* WDE mod */
+					len = current_bufflen;
+					nobuffs = current_nobuffs;
+					DPRINTK (PHASE_MSGIN,
+						 "scsi%d : pointers restored.\n",
+						 hostno);
+					break;
+				default:
 
 /*
- *    IDENTIFY distinguishes itself from the other messages by setting the
+ *	IDENTIFY distinguishes itself from the other messages by setting the
  *      high byte. [FIXME: should not this read "the high bit"? - pavel@ucw.cz]
  *
  *      Note : we need to handle at least one outstanding command per LUN,
@@ -1572,13 +1648,12 @@ int __dummy_3,__dummy_4;
  *      known ID (at this point) and LUN.
  */
 
-              if (message & 0x80)
-              {
-                DPRINTK (PHASE_MSGIN, "scsi%d : IDENTIFY message received from id %d, lun %d.\n",
-                        hostno, target, message & 7);
-              }
-              else
-              {
+					if (message & 0x80) {
+						DPRINTK (PHASE_MSGIN,
+							 "scsi%d : IDENTIFY message received from id %d, lun %d.\n",
+							 hostno, target,
+							 message & 7);
+					} else {
 
 /*
  *      We should go into a MESSAGE OUT phase, and send  a MESSAGE_REJECT
@@ -1586,17 +1661,19 @@ int __dummy_3,__dummy_4;
  *      needs some serious restructuring first though.
  */
 
-                DPRINTK (PHASE_MSGIN, 
-			 "scsi%d : unknown message %d from target %d.\n", hostno, message, target);
-              }
-          }
-          break;
+						DPRINTK (PHASE_MSGIN,
+							 "scsi%d : unknown message %d from target %d.\n",
+							 hostno, message,
+							 target);
+					}
+				}
+				break;
 
-        default:
-          printk ("scsi%d : unknown phase.\n", hostno);
-          st0x_aborted = DID_ERROR;
-      }                                 /* end of switch (status_read &
-                                           REQ_MASK) */
+			default:
+				printk ("scsi%d : unknown phase.\n", hostno);
+				st0x_aborted = DID_ERROR;
+			}	/* end of switch (status_read &
+				   REQ_MASK) */
 
 #ifdef SLOW_RATE
 /*
@@ -1604,34 +1681,34 @@ int __dummy_3,__dummy_4;
  * byte transfer case (ie, message in, message out, status), so
  * I'll do the wait here if necessary.
  */
-      if (borken)
-        borken_wait ();
+			if (borken)
+				borken_wait ();
 #endif
 
-    }                                   /* if(status_read & STAT_REQ) ends */
-  }                                     /* while(((status_read = STATUS)...)
-                                           ends */
+		}		/* if(status_read & STAT_REQ) ends */
+	}			/* while(((status_read = STATUS)...)
+				   ends */
 
-  DPRINTK (PHASE_DATAIN | PHASE_DATAOUT | PHASE_EXIT, 
-	   "scsi%d : Transfered %d bytes\n", hostno, transfered);
+	DPRINTK (PHASE_DATAIN | PHASE_DATAOUT | PHASE_EXIT,
+		 "scsi%d : Transfered %d bytes\n", hostno, transfered);
 
 #if (DEBUG & PHASE_EXIT)
-#if 0                                   /* Doesn't work for scatter/gather */
-  printk ("Buffer : \n");
-  for (i = 0; i < 20; ++i)
-    printk ("%02x  ", ((unsigned char *) data)[i]);     /* WDE mod */
-  printk ("\n");
+#if 0				/* Doesn't work for scatter/gather */
+	printk ("Buffer : \n");
+	for (i = 0; i < 20; ++i)
+		printk ("%02x  ", ((unsigned char *) data)[i]);	/* WDE mod */
+	printk ("\n");
 #endif
-  printk ("scsi%d : status = ", hostno);
-  print_status (status);
-  printk ("message = %02x\n", message);
+	printk ("scsi%d : status = ", hostno);
+	print_status (status);
+	printk ("message = %02x\n", message);
 #endif
 
 /* We shouldn't reach this until *after* BSY has been deasserted */
 
 #ifdef LINKED
-  else
-  {
+	else
+	{
 /*
  * Fix the message byte so that unsuspecting high level drivers don't
  * puke when they see a LINKED COMMAND message in place of the COMMAND
@@ -1642,52 +1719,53 @@ int __dummy_3,__dummy_4;
  * and we are now disconnected.
  */
 
-    switch (message)
-    {
-      case LINKED_CMD_COMPLETE:
-      case LINKED_FLG_CMD_COMPLETE:
-        message = COMMAND_COMPLETE;
-        linked_target = current_target;
-        linked_lun = current_lun;
-        linked_connected = 1;
-	DPRINTK (DEBUG_LINKED, "scsi%d : keeping I_T_L nexus established"
-		 "for linked command.\n", hostno);
-    /* We also will need to adjust status to accommodate intermediate
-       conditions. */
-        if ((status == INTERMEDIATE_GOOD) ||
-            (status == INTERMEDIATE_C_GOOD))
-          status = GOOD;
+		switch (message) {
+		case LINKED_CMD_COMPLETE:
+		case LINKED_FLG_CMD_COMPLETE:
+			message = COMMAND_COMPLETE;
+			linked_target = current_target;
+			linked_lun = current_lun;
+			linked_connected = 1;
+			DPRINTK (DEBUG_LINKED,
+				 "scsi%d : keeping I_T_L nexus established"
+				 "for linked command.\n", hostno);
+			/* We also will need to adjust status to accommodate intermediate
+			   conditions. */
+			if ((status == INTERMEDIATE_GOOD) ||
+			    (status == INTERMEDIATE_C_GOOD))
+				status = GOOD;
 
-        break;
+			break;
 /*
  * We should also handle what are "normal" termination messages
  * here (ABORT, BUS_DEVICE_RESET?, and COMMAND_COMPLETE individually,
  * and flake if things aren't right.
  */
-      default:
-        DPRINTK (DEBUG_LINKED, "scsi%d : closing I_T_L nexus.\n", hostno);
-        linked_connected = 0;
-    }
-  }
-#endif /* LINKED */
+		default:
+			DPRINTK (DEBUG_LINKED,
+				 "scsi%d : closing I_T_L nexus.\n", hostno);
+			linked_connected = 0;
+		}
+	}
+#endif				/* LINKED */
 
-  if (should_reconnect)
-  {
-    DPRINTK (PHASE_RESELECT, "scsi%d : exiting seagate_st0x_queue_command()"
-	     "with reconnect enabled.\n", hostno);
-    WRITE_CONTROL (BASE_CMD | CMD_INTR);
-  }
-  else
-    WRITE_CONTROL (BASE_CMD);
+	if (should_reconnect) {
+		DPRINTK (PHASE_RESELECT,
+			 "scsi%d : exiting seagate_st0x_queue_command()"
+			 "with reconnect enabled.\n", hostno);
+		WRITE_CONTROL (BASE_CMD | CMD_INTR);
+	} else
+		WRITE_CONTROL (BASE_CMD);
 
-  return retcode (st0x_aborted);
-}                                       /* end of internal_command */
+	return retcode (st0x_aborted);
+}				/* end of internal_command */
 
-int seagate_st0x_abort (Scsi_Cmnd * SCpnt)
+static int seagate_st0x_abort (Scsi_Cmnd * SCpnt)
 {
-  st0x_aborted = DID_ABORT;
-  return SCSI_ABORT_PENDING;
+	st0x_aborted = DID_ABORT;
+	return SCSI_ABORT_PENDING;
 }
+
 #undef ULOOP
 #undef TIMEOUT
 
@@ -1695,23 +1773,22 @@ int seagate_st0x_abort (Scsi_Cmnd * SCpnt)
  * the seagate_st0x_reset function resets the SCSI bus 
  */
 
-int seagate_st0x_reset (Scsi_Cmnd * SCpnt, unsigned int reset_flags)
+static int seagate_st0x_reset (Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 {
 /* No timeouts - this command is going to fail because it was reset. */
-  DANY ("scsi%d: Reseting bus... ", hostno );
+	DANY ("scsi%d: Reseting bus... ", hostno);
 
 /* assert  RESET signal on SCSI bus.  */
-  WRITE_CONTROL (BASE_CMD | CMD_RST);
+	WRITE_CONTROL (BASE_CMD | CMD_RST);
 
-  udelay( 20*1000 );
+	udelay (20 * 1000);
 
-  WRITE_CONTROL (BASE_CMD);
-  st0x_aborted = DID_RESET;
+	WRITE_CONTROL (BASE_CMD);
+	st0x_aborted = DID_RESET;
 
-  DANY ("done.\n");
-  return SCSI_RESET_WAKEUP;
+	DANY ("done.\n");
+	return SCSI_RESET_WAKEUP;
 }
-
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = SEAGATE_ST0X;

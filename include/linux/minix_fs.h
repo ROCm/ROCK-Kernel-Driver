@@ -89,6 +89,14 @@ struct minix_dir_entry {
 
 #ifdef __KERNEL__
 
+/*
+ * change the define below to 0 if you want names > info->s_namelen chars to be
+ * truncated. Else they will be disallowed (ENAMETOOLONG).
+ */
+#define NO_TRUNCATE 1
+
+extern struct minix_inode * minix_V1_raw_inode(struct super_block *, ino_t, struct buffer_head **);
+extern struct minix2_inode * minix_V2_raw_inode(struct super_block *, ino_t, struct buffer_head **);
 extern struct inode * minix_new_inode(const struct inode * dir, int * error);
 extern void minix_free_inode(struct inode * inode);
 extern unsigned long minix_count_free_inodes(struct super_block *sb);
@@ -96,19 +104,25 @@ extern int minix_new_block(struct inode * inode);
 extern void minix_free_block(struct inode * inode, int block);
 extern unsigned long minix_count_free_blocks(struct super_block *sb);
 
-extern struct buffer_head * minix_getblk(struct inode *, int, int);
-extern struct buffer_head * minix_bread(struct inode *, int, int);
-
 extern void V1_minix_truncate(struct inode *);
 extern void V2_minix_truncate(struct inode *);
 extern void minix_truncate(struct inode *);
 extern int minix_sync_inode(struct inode *);
-extern int V1_minix_sync_file(struct inode *);
-extern int V2_minix_sync_file(struct inode *);
+extern void minix_set_inode(struct inode *, dev_t);
 extern int V1_minix_get_block(struct inode *, long, struct buffer_head *, int);
 extern int V2_minix_get_block(struct inode *, long, struct buffer_head *, int);
 
-extern struct address_space_operations minix_aops;
+extern struct minix_dir_entry *minix_find_entry(struct dentry*, struct page**);
+extern int minix_add_link(struct dentry*, struct inode*);
+extern int minix_delete_entry(struct minix_dir_entry*, struct page*);
+extern int minix_make_empty(struct inode*, struct inode*);
+extern int minix_empty_dir(struct inode*);
+extern void minix_set_link(struct minix_dir_entry*, struct page*, struct inode*);
+extern struct minix_dir_entry *minix_dotdot(struct inode*, struct page**);
+extern ino_t minix_inode_by_name(struct dentry*);
+
+extern int minix_sync_file(struct file *, struct dentry *, int);
+
 extern struct inode_operations minix_file_inode_operations;
 extern struct inode_operations minix_dir_inode_operations;
 extern struct file_operations minix_file_operations;

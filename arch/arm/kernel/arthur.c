@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/arthur.c
  *
- *  Copyright (C) 1998, 1999, 2000 Philip Blundell
+ *  Copyright (C) 1998, 1999, 2000, 2001 Philip Blundell
  *
  * Arthur personality
  */
@@ -58,7 +58,7 @@ static void arthur_lcall7(int nr, struct pt_regs *regs)
 {
 	struct siginfo info;
 	info.si_signo = SIGSWI;
-	info.si_code = nr;
+	info.si_errno = nr;
 	/* Bounce it to the emulator */
 	send_sig_info(SIGSWI, &info, current);
 }

@@ -626,3 +626,9 @@ static int __init wdtpci_init(void)
 
 module_init(wdtpci_init);
 module_exit(wdtpci_cleanup);
+
+MODULE_AUTHOR("JP Nollmann, Alan Cox");
+MODULE_DESCRIPTION("Driver for the ICS PCI watchdog cards");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

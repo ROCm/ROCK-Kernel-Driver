@@ -199,3 +199,5 @@ EXPORT_NO_SYMBOLS;
 
 module_init(nwwatchdog_init);
 module_exit(nwwatchdog_exit);
+
+MODULE_LICENSE("GPL");

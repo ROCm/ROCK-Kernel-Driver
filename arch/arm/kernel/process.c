@@ -124,7 +124,7 @@ void machine_power_off(void)
 		pm_power_off();
 }
 
-void machine_restart(void * __unused)
+void machine_restart(char * __unused)
 {
 	/*
 	 * Clean and disable cache, and turn off interrupts

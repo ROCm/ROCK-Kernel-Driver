@@ -384,7 +384,7 @@ static ssize_t usb_device_dump(char **buffer, size_t *nbytes, loff_t *skip_bytes
 	int chix;
 	int ret, cnt = 0;
 	int parent_devnum = 0;
-	char *pages_start, *data_end;
+	char *pages_start, *data_end, *speed;
 	unsigned int length;
 	ssize_t total_written = 0;
 	
@@ -404,8 +404,21 @@ static ssize_t usb_device_dump(char **buffer, size_t *nbytes, loff_t *skip_bytes
 	 * So the root hub's parent is 0 and any device that is
 	 * plugged into the root hub has a parent of 0.
 	 */
-	data_end = pages_start + sprintf(pages_start, format_topo, bus->busnum, level, parent_devnum, index, count,
-					usbdev->devnum, usbdev->slow ? "1.5" : "12 ", usbdev->maxchild);
+	switch (usbdev->speed) {
+	case USB_SPEED_LOW:
+		speed = "1.5"; break;
+	case USB_SPEED_UNKNOWN:		/* usb 1.1 root hub code */
+	case USB_SPEED_FULL:
+		speed = "12 "; break;
+	case USB_SPEED_HIGH:
+		speed = "480"; break;
+	default:
+		speed = "?? ";
+	}
+	data_end = pages_start + sprintf(pages_start, format_topo,
+			bus->busnum, level, parent_devnum,
+			index, count, usbdev->devnum,
+			speed, usbdev->maxchild);
 	/*
 	 * level = topology-tier level;
 	 * parent_devnum = parent device number;

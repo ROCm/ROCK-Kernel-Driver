@@ -51,6 +51,9 @@ MODULE_DESCRIPTION(LANAME);
 #define MPT_LAN_MAX_MTU		65280		/* RFC2625 */
 #define MPT_LAN_MTU             16128		/* be nice to slab allocator */
 
+#define MPT_LAN_NAA_RFC2625     0x1
+#define MPT_LAN_NAA_QLOGIC      0x2
+
 /* MPT LAN Reset and Suspend Resource Flags Defines */
 
 #define MPT_LAN_RESOURCE_FLAG_RETURN_POSTED_BUCKETS    0x01

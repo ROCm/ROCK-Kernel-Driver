@@ -10,7 +10,7 @@
  *  (yes I wrote some of the orig. code back in 1991!)
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: isense.c,v 1.28 2001/01/14 23:11:09 sralston Exp $
+ *  $Id: isense.c,v 1.28.14.1 2001/08/24 20:07:04 sralston Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -61,7 +61,7 @@
 #endif
 
 #define MODULEAUTHOR "Steven J. Ralston"
-#define COPYRIGHT "Copyright (c) 2000 " MODULEAUTHOR
+#define COPYRIGHT "Copyright (c) 2001 " MODULEAUTHOR
 #include "mptbase.h"
 
 #include "isense.h"

@@ -282,6 +282,7 @@ typedef struct tub_s {
 #define	TUB_UNSOL_DE	0x0200
 #define	TUB_OPEN_STET	0x0400		/* No screen clear on open */
 #define	TUB_UE_BUSY	0x0800
+#define	TUB_INPUT_HACK	0x1000		/* Early init of command line */
 
 #ifdef CONFIG_TN3270_CONSOLE
 /*
@@ -372,7 +373,7 @@ extern inline tub_t *INODE2TUB(struct inode *ip)
 		if (MAJOR(current->tty->device) == IBM_TTY3270_MAJOR)
 			minor = MINOR(current->tty->device);
 	}
-	if (minor >= tubnummins && minor > 0)
+	if (minor <= tubnummins && minor > 0)
 		tubp = (*tubminors)[minor];
 	return tubp;
 }

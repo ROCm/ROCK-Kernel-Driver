@@ -79,7 +79,6 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 #ifdef RPC_DEBUG
 	rpc_register_sysctl();
 #endif
-	xdr_init();
 
 	if (!xprt)
 		goto out;

@@ -660,7 +660,6 @@ static int dqinit_needed(struct inode *inode, short type)
 static void add_dquot_ref(struct super_block *sb, short type)
 {
 	struct list_head *p;
-	struct inode *inode;
 
 	if (!sb->dq_op)
 		return;	/* nothing to do */
@@ -669,13 +668,15 @@ restart:
 	file_list_lock();
 	for (p = sb->s_files.next; p != &sb->s_files; p = p->next) {
 		struct file *filp = list_entry(p, struct file, f_list);
-		if (!filp->f_dentry)
-			continue;
-		inode = filp->f_dentry->d_inode;
+		struct inode *inode = filp->f_dentry->d_inode;
 		if (filp->f_mode & FMODE_WRITE && dqinit_needed(inode, type)) {
+			struct vfsmount *mnt = mntget(file->f_vfsmnt);
+			struct dentry *dentry = dget(file->f_dentry);
 			file_list_unlock();
 			sb->dq_op->initialize(inode, type);
 			inode->i_flags |= S_QUOTA;
+			dput(dentry);
+			mntput(mnt);
 			/* As we may have blocked we had better restart... */
 			goto restart;
 		}

@@ -1,6 +1,6 @@
-#include <linux/sched.h>
-#include <linux/locks.h>
+#include <linux/fs.h>
 #include <linux/minix_fs.h>
+#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 enum {DEPTH = 3, DIRECT = 7};	/* Only double indirect */
@@ -55,9 +55,4 @@ int V1_minix_get_block(struct inode * inode, long block,
 void V1_minix_truncate(struct inode * inode)
 {
 	truncate(inode);
-}
-
-int V1_minix_sync_file(struct inode * inode)
-{
-	return sync_file(inode);
 }

@@ -82,7 +82,6 @@ struct nlm_reboot {
  */
 #define NLMSVC_XDRSIZE		sizeof(struct nlm_args)
 
-void	nlmxdr_init(void);
 int	nlmsvc_decode_testargs(struct svc_rqst *, u32 *, struct nlm_args *);
 int	nlmsvc_encode_testres(struct svc_rqst *, u32 *, struct nlm_res *);
 int	nlmsvc_decode_lockargs(struct svc_rqst *, u32 *, struct nlm_args *);

@@ -164,6 +164,11 @@ reclaimer(void *ptr)
 	struct nlm_wait	  *block;
 	struct list_head *tmp;
 
+	reparent_to_init();
+	snprintf(current->comm, sizeof(current->comm),
+		 "%s-reclaim",
+		 host->h_name);
+	
 	/* This one ensures that our parent doesn't terminate while the
 	 * reclaim is in progress */
 	lock_kernel();

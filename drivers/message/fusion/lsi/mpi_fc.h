@@ -6,7 +6,7 @@
  *          Title:  MPI Fibre Channel messages and structures
  *  Creation Date:  June 12, 2000
  *
- *    MPI Version:  01.01.05
+ *    MPI Version:  01.01.07
  *
  *  Version History
  *  ---------------
@@ -27,6 +27,11 @@
  *                      FC_ABORT_TYPE_EXLINKSEND_REQUEST for FcAbort request.
  *                      Added MPI_FC_PRIM_SEND_FLAGS_STOP_SEND.
  *  02-20-01  01.01.05  Started using MPI_POINTER.
+ *  03-27-01  01.01.06  Added Flags field to MSG_LINK_SERVICE_BUFFER_POST_REPLY
+ *                      and defined MPI_LS_BUF_POST_REPLY_FLAG_NO_RSP_NEEDED.
+ *                      Added MPI_FC_PRIM_SEND_FLAGS_RESET_LINK define.
+ *                      Added structure offset comments.
+ *  04-09-01  01.01.07  Added RspLength field to MSG_LINK_SERVICE_RSP_REQUEST.
  *  --------------------------------------------------------------------------
  */
 
@@ -136,7 +141,7 @@ typedef struct _MSG_LINK_SERVICE_BUFFER_POST_REPLY
 typedef struct _MSG_LINK_SERVICE_RSP_REQUEST
 {
     U8                      RspFlags;           /* 00h */
-    U8                      Reserved;           /* 01h */
+    U8                      RspLength;          /* 01h */
     U8                      ChainOffset;        /* 02h */
     U8                      Function;           /* 03h */
     U16                     Reserved1;          /* 04h */
@@ -224,14 +229,14 @@ typedef struct _MSG_EXLINK_SERVICE_SEND_REPLY
 
 typedef struct _MSG_FC_ABORT_REQUEST
 {
-    U8                      AbortFlags;         /* 00h */
-    U8                      AbortType;          /* 01h */
-    U8                      ChainOffset;        /* 02h */
-    U8                      Function;           /* 03h */
-    U16                     Reserved1;          /* 04h */
-    U8                      Reserved2;          /* 06h */
-    U8                      MsgFlags;           /* 07h */
-    U32                     MsgContext;         /* 08h */
+    U8                      AbortFlags;                 /* 00h */
+    U8                      AbortType;                  /* 01h */
+    U8                      ChainOffset;                /* 02h */
+    U8                      Function;                   /* 03h */
+    U16                     Reserved1;                  /* 04h */
+    U8                      Reserved2;                  /* 06h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
     U32                     TransactionContextToAbort;  /* 0Ch */
 } MSG_FC_ABORT_REQUEST, MPI_POINTER PTR_MSG_FC_ABORT_REQUEST,
   FcAbortRequest_t, MPI_POINTER pFcAbortRequest_t;
@@ -323,6 +328,7 @@ typedef struct _MSG_FC_PRIMITIVE_SEND_REQUEST
   FcPrimitiveSendRequest_t, MPI_POINTER pFcPrimitiveSendRequest_t;
 
 #define MPI_FC_PRIM_SEND_FLAGS_PORT_MASK       (0x01)
+#define MPI_FC_PRIM_SEND_FLAGS_RESET_LINK      (0x04)
 #define MPI_FC_PRIM_SEND_FLAGS_STOP_SEND       (0x08)
 #define MPI_FC_PRIM_SEND_FLAGS_SEND_ONCE       (0x10)
 #define MPI_FC_PRIM_SEND_FLAGS_SEND_AROUND     (0x20)

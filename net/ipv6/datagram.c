@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: datagram.c,v 1.22 2000/12/13 18:31:50 davem Exp $
+ *	$Id: datagram.c,v 1.23 2001/09/01 00:31:50 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -427,7 +427,8 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 			break;
 
 		default:
-			printk(KERN_DEBUG "invalid cmsg type: %d\n", cmsg->cmsg_type);
+			if (net_ratelimit())
+				printk(KERN_DEBUG "invalid cmsg type: %d\n", cmsg->cmsg_type);
 			err = -EINVAL;
 			break;
 		};

@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) output module.
  *
- * Version:	$Id: ip_output.c,v 1.97 2001/08/09 17:53:40 davem Exp $
+ * Version:	$Id: ip_output.c,v 1.98 2001/09/01 00:31:50 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -174,7 +174,8 @@ static inline int ip_finish_output2(struct sk_buff *skb)
 	} else if (dst->neighbour)
 		return dst->neighbour->output(skb);
 
-	printk(KERN_DEBUG "khm\n");
+	if (net_ratelimit())
+		printk(KERN_DEBUG "ip_finish_output2: No header cache and no neighbour!\n");
 	kfree_skb(skb);
 	return -EINVAL;
 }

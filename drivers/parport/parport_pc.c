@@ -2756,17 +2756,20 @@ static int __init parport_pc_init_superio (int autoirq, int autodma)
 {
 	const struct pci_device_id *id;
 	struct pci_dev *pdev;
+	int ret = 0;
 
 	pci_for_each_dev(pdev) {
 		id = pci_match_device (parport_pc_pci_tbl, pdev);
 		if (id == NULL || id->driver_data >= last_sio)
 			continue;
 
-		return parport_pc_superio_info[id->driver_data].probe
-			(pdev, autoirq, autodma);
+		if (parport_pc_superio_info[id->driver_data].probe
+			(pdev, autoirq, autodma)) {
+			ret++;
+		}
 	}
 
-	return 0; /* zero devices found */
+	return ret; /* number of devices found */
 }
 #else
 static struct pci_driver parport_pc_pci_driver;

@@ -167,5 +167,7 @@ static void __exit telephony_exit(void)
 module_init(telephony_init);
 module_exit(telephony_exit);
 
+MODULE_LICENSE("GPL");
+
 EXPORT_SYMBOL(phone_register_device);
 EXPORT_SYMBOL(phone_unregister_device);

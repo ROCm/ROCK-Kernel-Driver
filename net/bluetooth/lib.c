@@ -25,7 +25,7 @@
 /*
  * BlueZ kernel library.
  *
- * $Id: lib.c,v 1.1 2001/06/01 08:12:11 davem Exp $
+ * $Id: lib.c,v 1.3 2001/06/22 23:14:23 maxk Exp $
  */
 
 #include <linux/kernel.h>
@@ -76,7 +76,8 @@ char *batostr(bdaddr_t *ba)
 
 	i ^= 1;
 	sprintf(str[i], "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
-	        ba->b0, ba->b1, ba->b2, ba->b3, ba->b4, ba->b5);
+	        ba->b[0], ba->b[1], ba->b[2],
+		ba->b[3], ba->b[4], ba->b[5]);
 
 	return str[i];
 }

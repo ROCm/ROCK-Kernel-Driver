@@ -109,6 +109,7 @@
 #define I2C_ALGO_ISA 	0x050000	/* lm_sensors ISA pseudo-adapter */
 #define I2C_ALGO_SAA7146 0x060000	/* SAA 7146 video decoder bus	*/
 #define I2C_ALGO_ACB 	0x070000	/* ACCESS.bus algorithm         */
+#define I2C_ALGO_IIC    0x080000 	/* ITE IIC bus */
 
 #define I2C_ALGO_EC     0x100000        /* ACPI embedded controller     */
 
@@ -152,6 +153,9 @@
 
 /* --- MPC8xx PowerPC adapters						*/
 #define I2C_HW_MPC8XX_EPON 0x00	/* Eponymous MPC8xx I2C adapter 	*/
+
+/* --- ITE based algorithms						*/
+#define I2C_HW_I_IIC	0x00	/* controller on the ITE */
 
 /* --- SMBus only adapters						*/
 #define I2C_HW_SMBUS_PIIX4	0x00

@@ -502,7 +502,7 @@ static struct file_operations dsp56k_fops = {
 
 static devfs_handle_t devfs_handle;
 
-static const char banner[] __initdata = KERN_INFO "DSP56k driver installed\n";
+static char banner[] __initdata = KERN_INFO "DSP56k driver installed\n";
 
 static int __init dsp56k_init_driver(void)
 {
@@ -531,3 +531,5 @@ static void __exit dsp56k_cleanup_driver(void)
 	devfs_unregister(devfs_handle);
 }
 module_exit(dsp56k_cleanup_driver);
+
+MODULE_LICENSE("GPL");

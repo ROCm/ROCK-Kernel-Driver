@@ -175,6 +175,7 @@ CONFIG_IP_MULTICAST=y
 #
 # CONFIG_PHONE is not set
 # CONFIG_PHONE_IXJ is not set
+# CONFIG_PHONE_IXJ_PCMCIA is not set
 
 #
 # ATA/IDE/MFM/RLL support

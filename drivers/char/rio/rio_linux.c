@@ -248,6 +248,7 @@ long rio_irqmask = -1;
 #ifndef TWO_ZERO
 MODULE_AUTHOR("Rogier Wolff <R.E.Wolff@bitwizard.nl>, Patrick van de Lageweg <patrick@bitwizard.nl>");
 MODULE_DESCRIPTION("RIO driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(rio_poll, "i");
 MODULE_PARM(rio_debug, "i");
 MODULE_PARM(rio_irqmask, "i");

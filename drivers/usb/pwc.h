@@ -77,7 +77,7 @@
 /* Frame buffers: contains compressed or uncompressed video data. */
 #define MAX_FRAMES		5
 /* Maximum size after decompression is 640x480 YUV data, 1.5 * 640 * 480 */
-#define FRAME_SIZE 		(460800 + TOUCAM_HEADER_SIZE + TOUCAM_TRAILER_SIZE)
+#define PWC_FRAME_SIZE 		(460800 + TOUCAM_HEADER_SIZE + TOUCAM_TRAILER_SIZE)
 
 /* Absolute maximum number of buffers available for mmap() */
 #define MAX_IMAGES 		4

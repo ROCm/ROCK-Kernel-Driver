@@ -25,8 +25,9 @@
 /*
  * BlueZ HCI UART driver.
  *
- * $Id: hci_uart.c,v 1.1 2001/06/01 08:12:10 davem Exp $    
+ * $Id: hci_uart.c,v 1.5 2001/07/05 18:42:44 maxk Exp $    
  */
+#define VERSION "1.0"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -84,7 +85,7 @@ int n_hci_flush(struct hci_dev *hdev)
 	DBG("hdev %p tty %p", hdev, tty);
 
 	/* Drop TX queue */
-	bluez_skb_queue_purge(&n_hci->txq);
+	skb_queue_purge(&n_hci->txq);
 
 	/* Flush any pending characters in the driver and discipline. */
 	if (tty->ldisc.flush_buffer)
@@ -139,7 +140,7 @@ int n_hci_tx_wakeup(struct n_hci *n_hci)
 
 		if (len == skb->len) {
 			/* Full frame was sent */
-			bluez_skb_free(skb);
+			kfree_skb(skb);
 		} else {
 			/* Subtract sent part and requeue  */
 			skb_pull(skb, len);
@@ -334,7 +335,7 @@ static inline int n_hci_check_data_len(struct n_hci *n_hci, int len)
 		hci_recv_frame(n_hci->rx_skb);
 	} else if (len > room) {
 		ERR("Data length is to large");
-		bluez_skb_free(n_hci->rx_skb);
+		kfree_skb(n_hci->rx_skb);
 		n_hci->hdev.stat.err_rx++;
 	} else {
 		n_hci->rx_state = WAIT_DATA;
@@ -356,7 +357,7 @@ static inline void n_hci_rx(struct n_hci *n_hci, const __u8 * data, char *flags,
 	hci_sco_hdr   *sh;
 	register int len, type, dlen;
 
-	DBG("count %d state %d rx_count %d", count, n_hci->rx_state, n_hci->rx_count);
+	DBG("count %d state %ld rx_count %ld", count, n_hci->rx_state, n_hci->rx_count);
 
 	n_hci->hdev.stat.byte_rx += count;
 
@@ -441,7 +442,7 @@ static inline void n_hci_rx(struct n_hci *n_hci, const __u8 * data, char *flags,
 		ptr++; count--;
 
 		/* Allocate packet */
-		if (!(n_hci->rx_skb = bluez_skb_alloc(HCI_MAX_READ, GFP_ATOMIC))) {
+		if (!(n_hci->rx_skb = bluez_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
 			ERR("Can't allocate mem for new packet");
 
 			n_hci->rx_state = WAIT_PACKET_TYPE;
@@ -536,7 +537,7 @@ int __init n_hci_init(void)
 	int err;
 
 	INF("BlueZ HCI UART driver ver %s Copyright (C) 2000,2001 Qualcomm Inc", 
-		BLUEZ_VER);
+		VERSION);
 	INF("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 
 	/* Register the tty discipline */
@@ -573,3 +574,7 @@ void n_hci_cleanup(void)
 
 module_init(n_hci_init);
 module_exit(n_hci_cleanup);
+
+MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
+MODULE_DESCRIPTION("BlueZ HCI UART driver ver " VERSION);
+MODULE_LICENSE("GPL");

@@ -1,5 +1,5 @@
 /*
- * $Id: via82cxxx.c,v 3.26 2001/08/17 12:03:00 vojtech Exp $
+ * $Id: via82cxxx.c,v 3.28 2001/09/01 21:10:00 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
@@ -14,17 +14,20 @@
 /*
  * VIA IDE driver for Linux. Supports
  *
- *   vt82c586, vt82c586a, vt82c586b, vt82c596a, vt82c596b,
+ *   vt82c576, vt82c586, vt82c586a, vt82c586b, vt82c596a, vt82c596b,
  *   vt82c686, vt82c686a, vt82c686b, vt8231, vt8233
  *
  * southbridges, which can be found in
  *
- *  VIA Apollo VP, VPX, VPX/97, VP2, VP2/97, VP3, MVP3, MVP4, P6, Pro,
- *  Pro Plus, Pro 133, Pro 133A, ProMedia PM601, ProSavage PM133, PLE133,
- *  Pro 266, KX133, KT133, ProSavage KM133, KT133A, KT266
- *  PC-Chips VXPro, VXPro+, TXPro-III, TXPro-AGP, ViaGra, BXToo, BXTel
- *  AMD 640, 640 AGP, 750 IronGate
- *  ETEQ 6618, 6628, 6638
+ *  VIA Apollo Master, VP, VP2, VP2/97, VP3, VPX, VPX/97, MVP3, MVP4, P6, Pro,
+ *    ProII, ProPlus, Pro133, Pro133+, Pro133A, Pro133A Dual, Pro133T, Pro133Z,
+ *    PLE133, PLE133T, Pro266, Pro266T, ProP4X266, PM601, PM133, PN133, PL133T,
+ *    PX266, PM266, KX133, KT133, KT133A, KLE133, KT266, KX266, KM133, KM133A,
+ *    KL133, KN133, KM266
+ *  PC-Chips VXPro, VXPro+, VXTwo, TXPro-III, TXPro-AGP, AGPPro, ViaGra, BXToo,
+ *    BXTel, BXpert
+ *  AMD 640, 640 AGP, 750 IronGate, 760, 760MP
+ *  ETEQ 6618, 6628, 6629, 6638
  *  Micron Samurai
  *
  * chipsets. Supports
@@ -100,6 +103,11 @@ static struct via_isa_bridge {
 	unsigned char rev_max;
 	unsigned short flags;
 } via_isa_bridges[] = {
+#ifdef FUTURE_BRIDGES
+	{ "vt8237",	PCI_DEVICE_ID_VIA_8237,     0x00, 0x2f, VIA_UDMA_100 },
+	{ "vt8235",	PCI_DEVICE_ID_VIA_8235,     0x00, 0x2f, VIA_UDMA_100 },
+	{ "vt8233c",	PCI_DEVICE_ID_VIA_8233C,    0x30, 0x4f, VIA_UDMA_100 },
+#endif
 	{ "vt8233",	PCI_DEVICE_ID_VIA_8233_0,   0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8231",	PCI_DEVICE_ID_VIA_8231,     0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt82c686b",	PCI_DEVICE_ID_VIA_82C686,   0x40, 0x4f, VIA_UDMA_100 },
@@ -107,10 +115,12 @@ static struct via_isa_bridge {
 	{ "vt82c686",	PCI_DEVICE_ID_VIA_82C686,   0x00, 0x0f, VIA_UDMA_33 | VIA_BAD_CLK66 },
 	{ "vt82c596b",	PCI_DEVICE_ID_VIA_82C596,   0x10, 0x2f, VIA_UDMA_66 },
 	{ "vt82c596a",	PCI_DEVICE_ID_VIA_82C596,   0x00, 0x0f, VIA_UDMA_33 | VIA_BAD_CLK66 },
-	{ "vt82c586b",	PCI_DEVICE_ID_VIA_82C586_0, 0x40, 0x4f, VIA_UDMA_33 | VIA_SET_FIFO | VIA_BAD_PREQ },
+	{ "vt82c586b",	PCI_DEVICE_ID_VIA_82C586_0, 0x47, 0x4f, VIA_UDMA_33 | VIA_SET_FIFO },
+	{ "vt82c586b",	PCI_DEVICE_ID_VIA_82C586_0, 0x40, 0x46, VIA_UDMA_33 | VIA_SET_FIFO | VIA_BAD_PREQ },
 	{ "vt82c586b",	PCI_DEVICE_ID_VIA_82C586_0, 0x30, 0x3f, VIA_UDMA_33 | VIA_SET_FIFO },
 	{ "vt82c586a",	PCI_DEVICE_ID_VIA_82C586_0, 0x20, 0x2f, VIA_UDMA_33 | VIA_SET_FIFO },
 	{ "vt82c586",	PCI_DEVICE_ID_VIA_82C586_0, 0x00, 0x0f, VIA_UDMA_NONE | VIA_SET_FIFO },
+	{ "vt82c576",	PCI_DEVICE_ID_VIA_82C576,   0x00, 0x2f, VIA_UDMA_NONE | VIA_SET_FIFO },
 	{ NULL }
 };
 
@@ -151,7 +161,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	via_print("----------VIA BusMastering IDE Configuration----------------");
 
-	via_print("Driver Version:                     3.26");
+	via_print("Driver Version:                     3.27");
 	via_print("South Bridge:                       VIA %s", via_config->name);
 
 	pci_read_config_byte(isa_dev, PCI_REVISION_ID, &t);

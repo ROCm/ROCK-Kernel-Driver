@@ -23,10 +23,12 @@
 */
 
 /*
- * $Id: hci_uart.h,v 1.1 2001/06/01 08:12:11 davem Exp $
+ * $Id: hci_uart.h,v 1.2 2001/06/02 01:40:08 maxk Exp $
  */
 
-#define HCI_MAX_READ 2048
+#ifndef N_HCI
+#define N_HCI	15
+#endif
 
 #ifdef __KERNEL__
 

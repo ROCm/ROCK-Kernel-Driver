@@ -6,22 +6,22 @@
  Copyright (c) 2000-2001 LSI Logic Corporation.
 
  ---------------------------------------
- Header Set Release Version:    01.01.08
- Header Set Release Date:       02-27-01
+ Header Set Release Version:    01.01.10
+ Header Set Release Date:       04-09-01
  ---------------------------------------
 
  Filename               Current version     Prior version
  ----------             ---------------     -------------
- mpi.h                  01.01.06            01.01.05
- mpi_ioc.h              01.01.05            01.01.04
- mpi_cnfg.h             01.01.09            01.01.08
- mpi_init.h             01.01.03            01.01.03
- mpi_targ.h             01.01.03            01.01.03
- mpi_fc.h               01.01.05            01.01.05
- mpi_lan.h              01.01.02            01.01.02
- mpi_raid.h             01.01.01            none
+ mpi.h                  01.01.07            01.01.06
+ mpi_ioc.h              01.01.07            01.01.06
+ mpi_cnfg.h             01.01.11            01.01.10
+ mpi_init.h             01.01.05            01.01.04
+ mpi_targ.h             01.01.04            01.01.04
+ mpi_fc.h               01.01.07            01.01.06
+ mpi_lan.h              01.01.03            01.01.03
+ mpi_raid.h             01.01.02            01.01.02
  mpi_type.h             01.01.02            01.01.02
- mpi_history.txt        01.01.08            01.01.07
+ mpi_history.txt        01.01.09            01.01.09
 
 
  *  Date      Version   Description
@@ -51,6 +51,8 @@ mpi.h
  *                      Obsoleted MPI_IOCSTATUS_TARGET_FC_ defines.
  *  02-27-01  01.01.06  Removed MPI_HOST_INDEX_REGISTER define.
  *                      Added function codes for RAID.
+ *  04-09-01  01.01.07  Added alternate define for MPI_DOORBELL_ACTIVE,
+ *                      MPI_DOORBELL_USED, to better match the spec.
  *  --------------------------------------------------------------------------
 
 mpi_ioc.h
@@ -76,6 +78,9 @@ mpi_ioc.h
  *  02-20-01  01.01.04  Started using MPI_POINTER.
  *  02-27-01  01.01.05  Added event for RAID status change and its event data.
  *                      Added IocNumber field to MSG_IOC_FACTS_REPLY.
+ *  03-27-01  01.01.06  Added defines for ProductId field of MPI_FW_HEADER.
+ *                      Added structure offset comments.
+ *  04-09-01  01.01.07  Added structure EVENT_DATA_EVENT_CHANGE.
  *  --------------------------------------------------------------------------
 
 mpi_cnfg.h
@@ -125,6 +130,18 @@ mpi_cnfg.h
  *                      MPI_CONFIG_PAGETYPE_RAID_VOLUME.
  *                      Added definitions and structures for IOC Page 2 and
  *                      RAID Volume Page 2.
+ *  03-27-01  01.01.10  Added CONFIG_PAGE_FC_PORT_8 and CONFIG_PAGE_FC_PORT_9.
+ *                      CONFIG_PAGE_FC_PORT_3 now supports persistent by DID.
+ *                      Added VendorId and ProductRevLevel fields to
+ *                      RAIDVOL2_IM_PHYS_ID struct.
+ *                      Modified values for MPI_FCPORTPAGE0_FLAGS_ATTACH_
+ *                      defines to make them compatible to MPI version 1.0.
+ *                      Added structure offset comments.
+ *  04-09-01  01.01.11  Added some new defines for the PageAddress field and
+ *                      removed some obsolete ones.
+ *                      Added IO Unit Page 3.
+ *                      Modified defines for Scsi Port Page 2.
+ *                      Modified RAID Volume Pages.
  *  --------------------------------------------------------------------------
 
 mpi_init.h
@@ -135,6 +152,8 @@ mpi_init.h
  *  11-02-00  01.01.01  Original release for post 1.0 work
  *  12-04-00  01.01.02  Added MPI_SCSIIO_CONTROL_NO_DISCONNECT.
  *  02-20-01  01.01.03  Started using MPI_POINTER.
+ *  03-27-01  01.01.04  Added structure offset comments.
+ *  04-10-01  01.01.05  Added new MsgFlag for MSG_SCSI_TASK_MGMT.
  *  --------------------------------------------------------------------------
 
 mpi_targ.h
@@ -150,6 +169,7 @@ mpi_targ.h
  *  02-20-01  01.01.03  Started using MPI_POINTER.
  *                      Added structures for MPI_TARGET_SCSI_SPI_CMD_BUFFER and
  *                      MPI_TARGET_FCP_CMD_BUFFER.
+ *  03-27-01  01.01.04  Added structure offset comments.
  *  --------------------------------------------------------------------------
 
 mpi_fc.h
@@ -167,6 +187,11 @@ mpi_fc.h
  *                      FC_ABORT_TYPE_EXLINKSEND_REQUEST for FcAbort request.
  *                      Added MPI_FC_PRIM_SEND_FLAGS_STOP_SEND.
  *  02-20-01  01.01.05  Started using MPI_POINTER.
+ *  03-27-01  01.01.06  Added Flags field to MSG_LINK_SERVICE_BUFFER_POST_REPLY
+ *                      and defined MPI_LS_BUF_POST_REPLY_FLAG_NO_RSP_NEEDED.
+ *                      Added MPI_FC_PRIM_SEND_FLAGS_RESET_LINK define.
+ *                      Added structure offset comments.
+ *  04-09-01  01.01.07  Added RspLength field to MSG_LINK_SERVICE_RSP_REQUEST.
  *  --------------------------------------------------------------------------
 
 mpi_lan.h
@@ -183,10 +208,12 @@ mpi_lan.h
  *                      to lan private header file
  *  11-02-00  01.01.01  Original release for post 1.0 work
  *  02-20-01  01.01.02  Started using MPI_POINTER.
+ *  03-27-01  01.01.03  Added structure offset comments.
  *  --------------------------------------------------------------------------
 
 mpi_raid.h
  *  02-27-01  01.01.01  Original release for this file.
+ *  03-27-01  01.01.02  Added structure offset comments.
  *  --------------------------------------------------------------------------
 
 mpi_type.h
@@ -198,17 +225,29 @@ mpi_type.h
 
 mpi_history.txt         Parts list history
 
-Filename    01.01.08   01.01.07   01.01.06   01.01.05   01.01.04
-----------  --------   --------   --------   --------   --------
-mpi.h       01.01.06   01.01.05   01.01.04   01.01.04   01.01.03
-mpi_ioc.h   01.01.05   01.01.04   01.01.03   01.01.03   01.01.03
-mpi_cnfg.h  01.01.09   01.01.08   01.01.07   01.01.06   01.01.05
-mpi_init.h  01.01.03   01.01.03   01.01.02   01.01.02   01.01.02
-mpi_targ.h  01.01.03   01.01.03   01.01.02   01.01.02   01.01.02
-mpi_fc.h    01.01.05   01.01.05   01.01.04   01.01.04   01.01.03
-mpi_lan.h   01.01.02   01.01.02   01.01.01   01.01.01   01.01.01
-mpi_raid.h  01.01.01
-mpi_type.h  01.01.02   01.01.02   01.01.01   01.01.01   01.01.01
+Filename    01.01.10
+----------  --------
+mpi.h       01.01.07
+mpi_ioc.h   01.01.07
+mpi_cnfg.h  01.01.11
+mpi_init.h  01.01.05
+mpi_targ.h  01.01.04
+mpi_fc.h    01.01.07
+mpi_lan.h   01.01.03
+mpi_raid.h  01.01.02
+mpi_type.h  01.01.02
+
+Filename    01.01.09   01.01.08   01.01.07   01.01.06   01.01.05   01.01.04
+----------  --------   --------   --------   --------   --------   --------
+mpi.h       01.01.06   01.01.06   01.01.05   01.01.04   01.01.04   01.01.03
+mpi_ioc.h   01.01.06   01.01.05   01.01.04   01.01.03   01.01.03   01.01.03
+mpi_cnfg.h  01.01.10   01.01.09   01.01.08   01.01.07   01.01.06   01.01.05
+mpi_init.h  01.01.04   01.01.03   01.01.03   01.01.02   01.01.02   01.01.02
+mpi_targ.h  01.01.04   01.01.03   01.01.03   01.01.02   01.01.02   01.01.02
+mpi_fc.h    01.01.06   01.01.05   01.01.05   01.01.04   01.01.04   01.01.03
+mpi_lan.h   01.01.03   01.01.02   01.01.02   01.01.01   01.01.01   01.01.01
+mpi_raid.h  01.01.02   01.01.01
+mpi_type.h  01.01.02   01.01.02   01.01.02   01.01.01   01.01.01   01.01.01
 
 Filename    01.01.03   01.01.02   01.01.01   01.00.07   01.00.06   01.00.05
 ----------  --------   --------   --------   --------   --------   --------

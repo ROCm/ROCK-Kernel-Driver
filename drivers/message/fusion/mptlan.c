@@ -26,7 +26,7 @@
  *  Copyright (c) 2000-2001 LSI Logic Corporation
  *  Originally By: Noah Romer
  *
- *  $Id: mptlan.c,v 1.25 2001/03/02 22:12:04 sralston Exp $
+ *  $Id: mptlan.c,v 1.32.2.2 2001/07/12 19:43:33 nromer Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -93,6 +93,12 @@
  *  Fusion MPT LAN private structures
  */
 
+struct NAA_Hosed {
+	u16 NAA;
+	u8 ieee[FC_ALEN];
+	struct NAA_Hosed *next;
+};
+
 struct BufferControl {
 	struct sk_buff	*skb;
 	dma_addr_t	dma;
@@ -153,6 +159,7 @@ static int  mpt_lan_receive_post_reply(struct net_device *dev,
 static int  mpt_lan_send_turbo(struct net_device *dev, u32 tmsg);
 static int  mpt_lan_send_reply(struct net_device *dev,
 			       LANSendReply_t *pSendRep);
+static int  mpt_lan_ioc_reset(MPT_ADAPTER *ioc, int reset_phase);
 static int  mpt_lan_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply);
 static unsigned short mpt_lan_type_trans(struct sk_buff *skb,
 					 struct net_device *dev);
@@ -167,6 +174,9 @@ static u32 max_buckets_out = 127;
 static u32 tx_max_out_p = 127 - 16;
 
 static struct net_device *mpt_landev[MPT_MAX_ADAPTERS+1];
+
+static struct NAA_Hosed *mpt_bad_naa = NULL;
+rwlock_t bad_naa_lock;
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -318,6 +328,41 @@ lan_reply (MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static int
+mpt_lan_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
+{
+	struct net_device *dev = mpt_landev[ioc->id];
+	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+
+	dprintk((KERN_INFO MYNAM ": IOC %s_reset routed to LAN driver!\n",
+			reset_phase==MPT_IOC_PRE_RESET ? "pre" : "post"));
+
+	if (priv->mpt_rxfidx == NULL)
+		return (1);
+
+	if (reset_phase == MPT_IOC_PRE_RESET) {
+		int i;
+		unsigned long flags;
+		
+		netif_stop_queue(dev);
+
+		atomic_set(&priv->buckets_out, 0);
+
+		/* Reset Rx Free Tail index and re-populate the queue. */
+		spin_lock_irqsave(&priv->rxfidx_lock, flags);
+		priv->mpt_rxfidx_tail = -1;
+		for (i = 0; i < priv->max_buckets_out; i++)
+			priv->mpt_rxfidx[++priv->mpt_rxfidx_tail] = i;
+		spin_unlock_irqrestore(&priv->rxfidx_lock, flags);
+	} else {
+		mpt_lan_post_receive_buckets(dev);
+		netif_wake_queue(dev);
+	}
+
+	return 1;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+static int
 mpt_lan_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 {
 	dprintk((KERN_INFO MYNAM ": MPT event routed to LAN driver!\n"));
@@ -356,7 +401,19 @@ mpt_lan_open(struct net_device *dev)
 	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
 	int i;
 
-	mpt_lan_reset(dev);
+	if (mpt_lan_reset(dev) != 0) {
+		MPT_ADAPTER *mpt_dev = priv->mpt_dev;
+		
+		printk (KERN_WARNING MYNAM "/lan_open: lan_reset failed.");
+		
+		if (mpt_dev->active)
+			printk ("The ioc is active. Perhaps it needs to be"
+				" reset?\n");
+		else
+			printk ("The ioc in inactive, most likely in the "
+				"process of being reset. Please try again in "
+				"a moment.\n");
+	}
 
 	priv->mpt_txfidx = kmalloc(priv->tx_max_out * sizeof(int), GFP_KERNEL);
 	if (priv->mpt_txfidx == NULL)
@@ -402,7 +459,10 @@ mpt_lan_open(struct net_device *dev)
 			IOC_AND_NETDEV_NAMES_s_s(dev));
 
 	if (mpt_event_register(LanCtx, mpt_lan_event_process) != 0) {
-		/* FIXME! */
+		printk (KERN_WARNING MYNAM "/lo: Unable to register for Event"
+			" Notifications. This is a bad thing! We're not going "
+			"to go ahead, but I'd be leery of system stability at "
+			"this point.\n");
 	}
 
 	netif_start_queue(dev);
@@ -422,6 +482,8 @@ out:	return -ENOMEM;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/* Send a LanReset message to the FW. This should result in the FW returning
+   any buckets it still has. */
 static int
 mpt_lan_reset(struct net_device *dev)
 {
@@ -660,6 +722,8 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 	dma_addr_t dma;
 	unsigned long flags;
 	int ctx;
+	struct NAA_Hosed *nh;
+	u16 cur_naa = 0x1000;
 
 	dioprintk((KERN_INFO MYNAM ": %s called, skb_addr = %p\n",
 			__FUNCTION__, skb));
@@ -707,8 +771,10 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 	priv->SendCtl[ctx].len = skb->len;
 
 	/* Message Header */
+	pSendReq->Reserved    = 0;
 	pSendReq->Function    = MPI_FUNCTION_LAN_SEND;
 	pSendReq->ChainOffset = 0;
+	pSendReq->Reserved2   = 0;
 	pSendReq->MsgFlags    = 0;
 	pSendReq->PortNumber  = priv->pnum;
 
@@ -725,7 +791,26 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 //			IOC_AND_NETDEV_NAMES_s_s(dev),
 //			ctx, skb, skb->data));
 
-	pTrans->TransactionDetails[0] = cpu_to_le32((0x1000          << 16) |
+	/* Munge the NAA for Tx packets to QLogic boards, which don't follow
+	   RFC 2625. The longer I look at this, the more my opinion of Qlogic
+	   drops. */
+	read_lock_irq(&bad_naa_lock);
+	for (nh = mpt_bad_naa; nh != NULL; nh=nh->next) {
+		if ((nh->ieee[0] == skb->mac.raw[0]) &&
+		    (nh->ieee[1] == skb->mac.raw[1]) &&
+		    (nh->ieee[2] == skb->mac.raw[2]) &&
+		    (nh->ieee[3] == skb->mac.raw[3]) &&
+		    (nh->ieee[4] == skb->mac.raw[4]) &&
+		    (nh->ieee[5] == skb->mac.raw[5])) {
+			cur_naa = nh->NAA;
+			dprintk ((KERN_INFO "mptlan/sdu_send: using NAA value "
+				  "= %04x.\n", cur_naa));
+			break;
+		}
+	}
+	read_unlock_irq(&bad_naa_lock);
+
+	pTrans->TransactionDetails[0] = cpu_to_le32((cur_naa         << 16) |
 						    (skb->mac.raw[0] <<  8) |
 						    (skb->mac.raw[1] <<  0));
 	pTrans->TransactionDetails[1] = cpu_to_le32((skb->mac.raw[2] << 24) |
@@ -735,9 +820,15 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 
 	pSimple = (SGESimple64_t *) &pTrans->TransactionDetails[2];
 
+	/* If we ever decide to send more than one Simple SGE per LANSend, then
+	   we will need to make sure that LAST_ELEMENT only gets set on the 
+	   last one. Otherwise, bad voodoo and evil funkiness will commence. */
 	pSimple->FlagsLength = cpu_to_le32(
-			((MPI_SGE_FLAGS_END_OF_BUFFER |
+			((MPI_SGE_FLAGS_LAST_ELEMENT | 
+			  MPI_SGE_FLAGS_END_OF_BUFFER |
 			  MPI_SGE_FLAGS_SIMPLE_ELEMENT |
+			  MPI_SGE_FLAGS_SYSTEM_ADDRESS |
+			  MPI_SGE_FLAGS_HOST_TO_IOC |
 			  MPI_SGE_FLAGS_64_BIT_ADDRESSING |
 			  MPI_SGE_FLAGS_END_OF_LIST) << MPI_SGE_FLAGS_SHIFT) |
 			skb->len);
@@ -1252,12 +1343,12 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 	priv->total_posted = 0;
 	priv->total_received = 0;
 	priv->max_buckets_out = max_buckets_out;
-	if (mpt_dev->pfacts0.MaxLanBuckets < max_buckets_out)
-		priv->max_buckets_out = mpt_dev->pfacts0.MaxLanBuckets;
+	if (mpt_dev->pfacts[0].MaxLanBuckets < max_buckets_out)
+		priv->max_buckets_out = mpt_dev->pfacts[0].MaxLanBuckets;
 
 	dprintk((KERN_INFO MYNAM "@%d: MaxLanBuckets=%d, max_buckets_out/priv=%d/%d\n",
 			__LINE__,
-			mpt_dev->pfacts0.MaxLanBuckets,
+			mpt_dev->pfacts[0].MaxLanBuckets,
 			max_buckets_out,
 			priv->max_buckets_out));
 
@@ -1316,7 +1407,11 @@ mpt_lan_init (void)
 
 	show_mptmod_ver(LANAME, LANVER);
 
-	if ((LanCtx = mpt_register(lan_reply, MPTLAN_DRIVER)) < 0) {
+	/* Init the global r/w lock for the bad_naa list. We want to do this 
+	   before any boards are initialized and may be used. */
+	rwlock_init(&bad_naa_lock);
+
+	if ((LanCtx = mpt_register(lan_reply, MPTLAN_DRIVER)) <= 0) {
 		printk (KERN_ERR MYNAM ": Failed to register with MPT base driver\n");
 		return -EBUSY;
 	}
@@ -1326,6 +1421,15 @@ mpt_lan_init (void)
 
 	dprintk((KERN_INFO MYNAM ": assigned context of %d\n", LanCtx));
 
+	if (mpt_reset_register(LanCtx, mpt_lan_ioc_reset) == 0) {
+		dprintk((KERN_INFO MYNAM ": Registered for IOC reset notifications\n"));
+	} else {
+		printk(KERN_ERR MYNAM ": Eieee! unable to register a reset "
+		       "handler with mptbase! The world is at an end! "
+		       "Everything is fading to black! Goodbye.\n");
+		return -EBUSY;
+	}
+
 	for (j = 0; j < MPT_MAX_ADAPTERS; j++) {
 		mpt_landev[j] = NULL;
 	}
@@ -1333,14 +1437,14 @@ mpt_lan_init (void)
 
 	curadapter = mpt_adapter_find_first();
 	while (curadapter != NULL) {
-		for (i = 0; i < curadapter->facts0.NumberOfPorts; i++) {
+		for (i = 0; i < curadapter->facts.NumberOfPorts; i++) {
 			printk (KERN_INFO MYNAM ": %s: PortNum=%x, ProtocolFlags=%02Xh (%c%c%c%c)\n",
 					curadapter->name,
-					curadapter->pfacts0.PortNumber,
-					curadapter->pfacts0.ProtocolFlags,
-					MPT_PROTOCOL_FLAGS_c_c_c_c(curadapter->pfacts0.ProtocolFlags));
+					curadapter->pfacts[i].PortNumber,
+					curadapter->pfacts[i].ProtocolFlags,
+					MPT_PROTOCOL_FLAGS_c_c_c_c(curadapter->pfacts[i].ProtocolFlags));
 
-			if (curadapter->pfacts0.ProtocolFlags & MPI_PORTFACTS_PROTOCOL_LAN) {
+			if (curadapter->pfacts[i].ProtocolFlags & MPI_PORTFACTS_PROTOCOL_LAN) {
 				dev = mpt_register_lan_device (curadapter, i);
 				if (dev != NULL) {
 					printk (KERN_INFO MYNAM ": %s: Fusion MPT LAN device registered as '%s'\n",
@@ -1361,7 +1465,7 @@ mpt_lan_init (void)
 				} else {
 					printk (KERN_ERR MYNAM ": %s: Unable to register port%d as a LAN device\n",
 							curadapter->name,
-							curadapter->pfacts0.PortNumber);
+							curadapter->pfacts[i].PortNumber);
 				}
 			} else {
 				printk (KERN_INFO MYNAM ": %s: Hmmm... LAN protocol seems to be disabled on this adapter port!\n",
@@ -1378,6 +1482,8 @@ mpt_lan_init (void)
 void __init mpt_lan_exit(void)
 {
 	int i;
+
+	mpt_reset_deregister(LanCtx);
 
 	for (i = 0; mpt_landev[i] != NULL; i++) {
 		struct net_device *dev = mpt_landev[i];
@@ -1411,6 +1517,7 @@ mpt_lan_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
 	struct mpt_lan_ohdr *fch = (struct mpt_lan_ohdr *)skb->data;
 	struct fcllc *fcllc;
+	u16 source_naa = fch->stype, found = 0;
 
 	skb->mac.raw = skb->data;
 	skb_pull(skb, sizeof(struct mpt_lan_ohdr));
@@ -1444,11 +1551,80 @@ mpt_lan_type_trans(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 
+	fcllc = (struct fcllc *)skb->data;
+
+	/* Workaround for QLogic not following RFC 2625 in regards to the NAA
+	   value. */
+
+	if ((source_naa & 0xF000) == 0)
+		source_naa = swab16(source_naa);
+
+	if (fcllc->ethertype == htons(ETH_P_ARP))
+	    dprintk ((KERN_INFO "mptlan/type_trans: got arp req/rep w/ naa of "
+		      "%04x.\n", source_naa));
+
+	if ((fcllc->ethertype == htons(ETH_P_ARP)) && 
+	   ((source_naa >> 12) !=  MPT_LAN_NAA_RFC2625)){
+		struct NAA_Hosed *nh, *prevnh;
+		int i;
+
+		dprintk ((KERN_INFO "mptlan/type_trans: ARP Req/Rep from "
+			  "system with non-RFC 2625 NAA value (%04x).\n",
+			  source_naa));
+
+		write_lock_irq(&bad_naa_lock);
+		for (prevnh = nh = mpt_bad_naa; nh != NULL;
+		     prevnh=nh, nh=nh->next) {
+			if ((nh->ieee[0] == fch->saddr[0]) &&
+			    (nh->ieee[1] == fch->saddr[1]) &&
+			    (nh->ieee[2] == fch->saddr[2]) &&
+			    (nh->ieee[3] == fch->saddr[3]) &&
+			    (nh->ieee[4] == fch->saddr[4]) &&
+			    (nh->ieee[5] == fch->saddr[5])) {
+				found = 1;
+				dprintk ((KERN_INFO "mptlan/type_trans: ARP Re"
+					 "q/Rep w/ bad NAA from system already"
+					 " in DB.\n"));
+				break;
+			}
+		}
+		
+		if ((!found) && (nh == NULL)) {
+
+			nh = kmalloc(sizeof(struct NAA_Hosed), GFP_KERNEL);
+			dprintk ((KERN_INFO "mptlan/type_trans: ARP Req/Rep w/"
+				 " bad NAA from system not yet in DB.\n"));
+
+			if (nh != NULL) {
+				nh->next = NULL;
+				if (!mpt_bad_naa)
+					mpt_bad_naa = nh;
+				if (prevnh)
+					prevnh->next = nh;
+				
+				nh->NAA = source_naa; /* Set the S_NAA value. */
+				for (i = 0; i < FC_ALEN; i++)
+					nh->ieee[i] = fch->saddr[i];
+				dprintk ((KERN_INFO "Got ARP from %02x:%02x:%02x:%02x:"
+					  "%02x:%02x with non-compliant S_NAA value.\n",
+					  fch->saddr[0], fch->saddr[1], fch->saddr[2],
+					  fch->saddr[3], fch->saddr[4],fch->saddr[5]));
+			} else {
+				printk (KERN_ERR "mptlan/type_trans: Unable to"
+					" kmalloc a NAA_Hosed struct.\n");
+			}
+		} else if (!found) {
+			printk (KERN_ERR "mptlan/type_trans: found not"
+				" set, but nh isn't null. Evil "
+				"funkiness abounds.\n");
+		}
+		write_unlock_irq(&bad_naa_lock);
+	}
+		
+
 	/* Strip the SNAP header from ARP packets since we don't 
 	 * pass them through to the 802.2/SNAP layers.
 	 */
-	fcllc = (struct fcllc *)skb->data;
-
 	if (fcllc->dsap == EXTENDED_SAP &&
 		(fcllc->ethertype == htons(ETH_P_IP) ||
 		 fcllc->ethertype == htons(ETH_P_ARP))) {

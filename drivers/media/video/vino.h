@@ -1,10 +1,9 @@
-/* $Id: vino.h,v 1.2 1999/02/09 23:03:53 ulfc Exp $
- * drivers/sgi/vino.h
- *
+/*
  * Copyright (C) 1999 Ulf Carlsson (ulfc@bun.falkenberg.se)
+ * Copyright (C) 2001 Ralf Baechle (ralf@gnu.org)
  */
 
-#define VINO_BASE		0x0008000
+#define VINO_BASE		0x00080000	/* In EISA address space */
 
 #define VINO_REVID		0x0000
 #define VINO_CTRL		0x0008

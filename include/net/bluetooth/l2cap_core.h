@@ -23,7 +23,7 @@
 */
 
 /*
- *  $Id: l2cap_core.h,v 1.1 2001/06/01 08:12:11 davem Exp $
+ *  $Id: l2cap_core.h,v 1.6 2001/08/03 04:19:49 maxk Exp $
  */
 
 #ifndef __L2CAP_CORE_H
@@ -41,12 +41,12 @@ struct l2cap_iff {
 	struct list_head conn_list;
 };
 
-static __inline__ void l2cap_iff_lock(struct l2cap_iff *iff)
+static inline void l2cap_iff_lock(struct l2cap_iff *iff)
 {
 	spin_lock(&iff->lock);
 }
 
-static __inline__ void l2cap_iff_unlock(struct l2cap_iff *iff)
+static inline void l2cap_iff_unlock(struct l2cap_iff *iff)
 {
 	spin_unlock(&iff->lock);
 }
@@ -78,14 +78,16 @@ struct l2cap_conn {
 	__u8		tx_ident;
 
 	struct l2cap_chan_list chan_list;
+
+	struct timer_list timer;
 };
 
-static __inline__ void __l2cap_conn_link(struct l2cap_iff *iff, struct l2cap_conn *c)
+static inline void __l2cap_conn_link(struct l2cap_iff *iff, struct l2cap_conn *c)
 {
 	list_add(&c->list, &iff->conn_list);
 }
 
-static __inline__ void __l2cap_conn_unlink(struct l2cap_iff *iff, struct l2cap_conn *c)
+static inline void __l2cap_conn_unlink(struct l2cap_iff *iff, struct l2cap_conn *c)
 {
 	list_del(&c->list);
 }
@@ -126,9 +128,9 @@ struct l2cap_pinfo {
 	struct l2cap_accept_q accept_q;
 };
 
-#define CONF_INPUT  0x01
-#define CONF_OUTPUT 0x02
-#define CONF_DONE	(CONF_INPUT | CONF_OUTPUT)
+#define CONF_REQ_SENT    0x01
+#define CONF_INPUT_DONE  0x02
+#define CONF_OUTPUT_DONE 0x04
 
 extern struct bluez_sock_list l2cap_sk_list;
 extern struct list_head  l2cap_iff_list;

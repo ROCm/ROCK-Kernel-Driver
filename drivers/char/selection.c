@@ -96,11 +96,7 @@ static inline int inword(const unsigned char c) {
 /* set inwordLut contents. Invoked by ioctl(). */
 int sel_loadlut(const unsigned long arg)
 {
-	int err = -EFAULT;
-
-	if (!copy_from_user(inwordLut, (u32 *)(arg+4), 32))
-		err = 0;
-	return err;
+	return copy_from_user(inwordLut, (u32 *)(arg+4), 32) ? -EFAULT : 0;
 }
 
 /* does screen address p correspond to character at LH/RH edge of screen? */
@@ -130,15 +126,13 @@ int set_selection(const unsigned long arg, struct tty_struct *tty, int user)
 
 	  args = (unsigned short *)(arg + 1);
 	  if (user) {
-	  	  int err;
-		  err = verify_area(VERIFY_READ, args, sizeof(short) * 5);
-		  if (err)
-		  	return err;
-		  get_user(xs, args++);
-		  get_user(ys, args++);
-		  get_user(xe, args++);
-		  get_user(ye, args++);
-		  get_user(sel_mode, args);
+		  if (verify_area(VERIFY_READ, args, sizeof(short) * 5))
+		  	return -EFAULT;
+		  __get_user(xs, args++);
+		  __get_user(ys, args++);
+		  __get_user(xe, args++);
+		  __get_user(ye, args++);
+		  __get_user(sel_mode, args);
 	  } else {
 		  xs = *(args++); /* set selection from kernel */
 		  ys = *(args++);

@@ -25,8 +25,9 @@
 /*
  * BlueZ Bluetooth address family and sockets.
  *
- * $Id: af_bluetooth.c,v 1.1 2001/06/01 08:12:11 davem Exp $
+ * $Id: af_bluetooth.c,v 1.4 2001/07/05 18:42:44 maxk Exp $
  */
+#define VERSION "1.1"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -36,7 +37,7 @@
 #include <linux/kernel.h>
 #include <linux/major.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
@@ -129,7 +130,7 @@ struct net_proto_family bluez_sock_family_ops =
 int bluez_init(void)
 {
 	INF("BlueZ HCI Core ver %s Copyright (C) 2000,2001 Qualcomm Inc",
-		 BLUEZ_VER);
+		 VERSION);
 	INF("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 
 	proc_mkdir("bluetooth", NULL);
@@ -161,4 +162,7 @@ void bluez_cleanup(void)
 #ifdef MODULE
 module_init(bluez_init);
 module_exit(bluez_cleanup);
+
+MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
+MODULE_DESCRIPTION("BlueZ HCI Core ver " VERSION);
 #endif

@@ -99,6 +99,7 @@ void gs_set_termios (struct tty_struct * tty,
 int  gs_init_port(struct gs_port *port);
 int  gs_setserial(struct gs_port *port, struct serial_struct *sp);
 void gs_getserial(struct gs_port *port, struct serial_struct *sp);
+void gs_got_break(struct gs_port *port);
 
 extern int gs_debug;
 

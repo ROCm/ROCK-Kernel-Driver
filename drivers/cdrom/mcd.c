@@ -102,14 +102,14 @@
 #define MAJOR_NR MITSUMI_CDROM_MAJOR
 #include <linux/blk.h>
 
-#define mcd_port mcd    /* for compatible parameter passing with "insmod" */
+#define mcd_port mcd		/* for compatible parameter passing with "insmod" */
 #include "mcd.h"
 
 static int mcd_blocksizes[1];
 
 
 /* I added A flag to drop to 1x speed if too many errors 0 = 1X ; 1 = 2X */
-static int mcdDouble; 
+static int mcdDouble;
 
 /* How many sectors to hold at 1x speed counter */
 static int mcd1xhold;
@@ -118,19 +118,19 @@ static int mcd1xhold;
 static int mcdPresent;
 
 #if 0
-#define TEST1 /* <int-..> */
-#define TEST2 /* do_mcd_req */
-#define TEST3 */ /* MCD_S_state */
-#define TEST4 /* QUICK_LOOP-counter */
-#define TEST5 */ /* port(1) state */
+#define TEST1			/* <int-..> */
+#define TEST2			/* do_mcd_req */
+#define TEST3 */		/* MCD_S_state */
+#define TEST4			/* QUICK_LOOP-counter */
+#define TEST5 */		/* port(1) state */
 #endif
 
 #if 1
-#define QUICK_LOOP_DELAY udelay(45)  /* use udelay */
+#define QUICK_LOOP_DELAY udelay(45)	/* use udelay */
 #define QUICK_LOOP_COUNT 20
 #else
 #define QUICK_LOOP_DELAY
-#define QUICK_LOOP_COUNT 140 /* better wait constant time */
+#define QUICK_LOOP_COUNT 140	/* better wait constant time */
 #endif
 /* #define DOUBLE_QUICK_ONLY */
 
@@ -141,32 +141,32 @@ static int mcdPresent;
 #define MFL_STATUSorDATA (MFL_STATUS | MFL_DATA)
 #define MCD_BUF_SIZ 16
 static volatile int mcd_transfer_is_active;
-static char mcd_buf[2048*MCD_BUF_SIZ];	/* buffer for block size conversion */
+static char mcd_buf[2048 * MCD_BUF_SIZ];	/* buffer for block size conversion */
 static volatile int mcd_buf_bn[MCD_BUF_SIZ], mcd_next_bn;
 static volatile int mcd_buf_in, mcd_buf_out = -1;
 static volatile int mcd_error;
 static int mcd_open_count;
 enum mcd_state_e {
-  MCD_S_IDLE,   /* 0 */
-  MCD_S_START,  /* 1 */
-  MCD_S_MODE, /* 2 */
-  MCD_S_READ,   /* 3 */
-  MCD_S_DATA,   /* 4 */
-  MCD_S_STOP,   /* 5 */
-  MCD_S_STOPPING /* 6 */
+	MCD_S_IDLE,		/* 0 */
+	MCD_S_START,		/* 1 */
+	MCD_S_MODE,		/* 2 */
+	MCD_S_READ,		/* 3 */
+	MCD_S_DATA,		/* 4 */
+	MCD_S_STOP,		/* 5 */
+	MCD_S_STOPPING		/* 6 */
 };
 static volatile enum mcd_state_e mcd_state = MCD_S_IDLE;
 static int mcd_mode = -1;
-static int MCMD_DATA_READ= MCMD_PLAY_READ;
+static int MCMD_DATA_READ = MCMD_PLAY_READ;
 #define READ_TIMEOUT 3000
 #define WORK_AROUND_MITSUMI_BUG_92
 #define WORK_AROUND_MITSUMI_BUG_93
 #ifdef WORK_AROUND_MITSUMI_BUG_93
 int mitsumi_bug_93_wait;
-#endif /* WORK_AROUND_MITSUMI_BUG_93 */
+#endif				/* WORK_AROUND_MITSUMI_BUG_93 */
 
-static short mcd_port = CONFIG_MCD_BASE; /* used as "mcd" by "insmod" */
-static int   mcd_irq  = CONFIG_MCD_IRQ; /* must directly follow mcd_port */
+static short mcd_port = CONFIG_MCD_BASE;	/* used as "mcd" by "insmod" */
+static int mcd_irq = CONFIG_MCD_IRQ;	/* must directly follow mcd_port */
 MODULE_PARM(mcd, "1-2i");
 
 static int McdTimeout, McdTries;
@@ -195,75 +195,76 @@ static int updateToc(void);
 static int GetDiskInfo(void);
 static int GetToc(void);
 static int getValue(unsigned char *result);
-static int mcd_open(struct cdrom_device_info * cdi, int purpose);
-static void mcd_release(struct cdrom_device_info * cdi);
-static int mcd_media_changed(struct cdrom_device_info * cdi, int disc_nr);
-static int mcd_tray_move(struct cdrom_device_info * cdi, int position);
-int mcd_audio_ioctl(struct cdrom_device_info * cdi, unsigned int cmd,
-                      void * arg);
-int mcd_drive_status(struct cdrom_device_info * cdi, int slot_nr);
+static int mcd_open(struct cdrom_device_info *cdi, int purpose);
+static void mcd_release(struct cdrom_device_info *cdi);
+static int mcd_media_changed(struct cdrom_device_info *cdi, int disc_nr);
+static int mcd_tray_move(struct cdrom_device_info *cdi, int position);
+int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
+		    void *arg);
+int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
 
 static struct timer_list mcd_timer;
 
 static struct cdrom_device_ops mcd_dops = {
-	open:			mcd_open,
-	release:		mcd_release,
-	drive_status:		mcd_drive_status,
-	media_changed:		mcd_media_changed,
-	tray_move:		mcd_tray_move,
-	audio_ioctl:		mcd_audio_ioctl,
-	capability:		CDC_OPEN_TRAY | CDC_MEDIA_CHANGED |
-				CDC_PLAY_AUDIO | CDC_DRIVE_STATUS,
+	open:mcd_open,
+	release:mcd_release,
+	drive_status:mcd_drive_status,
+	media_changed:mcd_media_changed,
+	tray_move:mcd_tray_move,
+	audio_ioctl:mcd_audio_ioctl,
+	capability:CDC_OPEN_TRAY | CDC_MEDIA_CHANGED |
+	    CDC_PLAY_AUDIO | CDC_DRIVE_STATUS,
 };
 
 static struct cdrom_device_info mcd_info = {
-	ops:			&mcd_dops,
-	speed:			2,
-	capacity:		1,
-	name:			"mcd",
+	ops:&mcd_dops,
+	speed:2,
+	capacity:1,
+	name:"mcd",
 };
 
 #ifndef MODULE
 static int __init mcd_setup(char *str)
 {
-   int ints[9];
-   
-   (void)get_options(str, ARRAY_SIZE(ints), ints);
-   
-   if (ints[0] > 0)
-      mcd_port = ints[1];
-   if (ints[0] > 1)      
-      mcd_irq  = ints[2];
-#ifdef WORK_AROUND_MITSUMI_BUG_93
-   if (ints[0] > 2)
-      mitsumi_bug_93_wait = ints[3];
-#endif /* WORK_AROUND_MITSUMI_BUG_93 */
+	int ints[9];
 
- return 1;
+	(void) get_options(str, ARRAY_SIZE(ints), ints);
+
+	if (ints[0] > 0)
+		mcd_port = ints[1];
+	if (ints[0] > 1)
+		mcd_irq = ints[2];
+#ifdef WORK_AROUND_MITSUMI_BUG_93
+	if (ints[0] > 2)
+		mitsumi_bug_93_wait = ints[3];
+#endif				/* WORK_AROUND_MITSUMI_BUG_93 */
+
+	return 1;
 }
 
 __setup("mcd=", mcd_setup);
 
-#endif /* MODULE */ 
+#endif				/* MODULE */
 
-static int mcd_media_changed(struct cdrom_device_info * cdi, int disc_nr)
+static int mcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 {
-   int retval;
+	int retval;
 
 
-#if 1	 /* the below is not reliable */
-   return 0;
-#endif  
+#if 1				/* the below is not reliable */
+	return 0;
+#endif
 
-   if (cdi->dev) {
-      printk("mcd: Mitsumi CD-ROM request error: invalid device.\n");
-      return 0;
-   }
+	if (cdi->dev) {
+		printk
+		    ("mcd: Mitsumi CD-ROM request error: invalid device.\n");
+		return 0;
+	}
 
-   retval = mcdDiskChanged;
-   mcdDiskChanged = 0;
+	retval = mcdDiskChanged;
+	mcdDiskChanged = 0;
 
-   return retval;
+	return retval;
 }
 
 
@@ -272,18 +273,16 @@ static int mcd_media_changed(struct cdrom_device_info * cdi, int disc_nr)
  * because it calls 'getMcdStatus' which sleeps.
  */
 
-static int
-statusCmd(void)
+static int statusCmd(void)
 {
 	int st = -1, retry;
 
-	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++)
-	{
-		outb(MCMD_GET_STATUS, MCDPORT(0));    /* send get-status cmd */
+	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++) {
+		outb(MCMD_GET_STATUS, MCDPORT(0));	/* send get-status cmd */
 
 		st = getMcdStatus(MCD_STATUS_DELAY);
-		if (st != -1) 
-        		break;
+		if (st != -1)
+			break;
 	}
 
 	return st;
@@ -294,13 +293,11 @@ statusCmd(void)
  * Send a 'Play' command and get the status.  Use only from the top half.
  */
 
-static int
-mcdPlay(struct mcd_Play_msf *arg)
+static int mcdPlay(struct mcd_Play_msf *arg)
 {
 	int retry, st = -1;
 
-	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++)
-	{
+	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++) {
 		sendMcdCmd(MCMD_PLAY_READ, arg);
 		st = getMcdStatus(2 * MCD_STATUS_DELAY);
 		if (st != -1)
@@ -311,45 +308,40 @@ mcdPlay(struct mcd_Play_msf *arg)
 }
 
 
-static int 
-mcd_tray_move(struct cdrom_device_info * cdi, int position)
+static int mcd_tray_move(struct cdrom_device_info *cdi, int position)
 {
 	int i;
 	if (position) {
-	/*  Eject */
-       		/* all drives can at least stop! */
+		/*  Eject */
+		/* all drives can at least stop! */
 		if (audioStatus == CDROM_AUDIO_PLAY) {
-	  	outb(MCMD_STOP, MCDPORT(0));
-	  	i = getMcdStatus(MCD_STATUS_DELAY);
+			outb(MCMD_STOP, MCDPORT(0));
+			i = getMcdStatus(MCD_STATUS_DELAY);
 		}
 
-                audioStatus = CDROM_AUDIO_NO_STATUS;
+		audioStatus = CDROM_AUDIO_NO_STATUS;
 
-                outb(MCMD_EJECT, MCDPORT(0));
-                /*
-                 * the status (i) shows failure on all but the FX drives.
-                 * But nothing we can do about that in software!
-                 * So just read the status and forget it. - Jon.
-                 */
-                i = getMcdStatus(MCD_STATUS_DELAY);
-                return 0;
-	}
-	else 
+		outb(MCMD_EJECT, MCDPORT(0));
+		/*
+		 * the status (i) shows failure on all but the FX drives.
+		 * But nothing we can do about that in software!
+		 * So just read the status and forget it. - Jon.
+		 */
+		i = getMcdStatus(MCD_STATUS_DELAY);
+		return 0;
+	} else
 		return -EINVAL;
 }
 
-long
-msf2hsg(struct msf *mp)
+long msf2hsg(struct msf *mp)
 {
-	return bcd2bin(mp -> frame)
-		+ bcd2bin(mp -> sec) * 75
-		+ bcd2bin(mp -> min) * 4500
-		- 150;
+	return bcd2bin(mp->frame)
+	    + bcd2bin(mp->sec) * 75 + bcd2bin(mp->min) * 4500 - 150;
 }
 
 
-int mcd_audio_ioctl(struct cdrom_device_info * cdi, unsigned int cmd,
-                      void * arg)
+int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
+		    void *arg)
 {
 	int i, st;
 	struct mcd_Toc qInfo;
@@ -365,24 +357,22 @@ int mcd_audio_ioctl(struct cdrom_device_info * cdi, unsigned int cmd,
 	if (st < 0)
 		return -EIO;
 
-	if (!tocUpToDate)
-	{
+	if (!tocUpToDate) {
 		i = updateToc();
-		if (i < 0) 
+		if (i < 0)
 			return i;	/* error reading TOC */
 	}
 
-	switch (cmd)
-	{
-	case CDROMSTART:     /* Spin up the drive */
+	switch (cmd) {
+	case CDROMSTART:	/* Spin up the drive */
 		/* Don't think we can do this.  Even if we could,
- 		 * I think the drive times out and stops after a while
+		 * I think the drive times out and stops after a while
 		 * anyway.  For now, ignore it.
 		 */
 
 		return 0;
 
-	case CDROMSTOP:      /* Spin down the drive */
+	case CDROMSTOP:	/* Spin down the drive */
 		outb(MCMD_STOP, MCDPORT(0));
 		i = getMcdStatus(MCD_STATUS_DELAY);
 
@@ -391,15 +381,14 @@ int mcd_audio_ioctl(struct cdrom_device_info * cdi, unsigned int cmd,
 		audioStatus = CDROM_AUDIO_NO_STATUS;
 		return 0;
 
-	case CDROMPAUSE:     /* Pause the drive */
+	case CDROMPAUSE:	/* Pause the drive */
 		if (audioStatus != CDROM_AUDIO_PLAY)
 			return -EINVAL;
 
 		outb(MCMD_STOP, MCDPORT(0));
 		i = getMcdStatus(MCD_STATUS_DELAY);
 
-		if (GetQChannelInfo(&qInfo) < 0)
-		{
+		if (GetQChannelInfo(&qInfo) < 0) {
 			/* didn't get q channel info */
 
 			audioStatus = CDROM_AUDIO_NO_STATUS;
@@ -411,15 +400,14 @@ int mcd_audio_ioctl(struct cdrom_device_info * cdi, unsigned int cmd,
 		audioStatus = CDROM_AUDIO_PAUSED;
 		return 0;
 
-	case CDROMRESUME:    /* Play it again, Sam */
+	case CDROMRESUME:	/* Play it again, Sam */
 		if (audioStatus != CDROM_AUDIO_PAUSED)
 			return -EINVAL;
 
 		/* restart the drive at the saved position. */
 
 		i = mcdPlay(&mcd_Play);
-		if (i < 0)
-		{
+		if (i < 0) {
 			audioStatus = CDROM_AUDIO_ERROR;
 			return -EIO;
 		}
@@ -427,14 +415,13 @@ int mcd_audio_ioctl(struct cdrom_device_info * cdi, unsigned int cmd,
 		audioStatus = CDROM_AUDIO_PLAY;
 		return 0;
 
-	case CDROMPLAYTRKIND:     /* Play a track.  This currently ignores index. */
+	case CDROMPLAYTRKIND:	/* Play a track.  This currently ignores index. */
 
-		ti=(struct cdrom_ti *) arg;
+		ti = (struct cdrom_ti *) arg;
 
 		if (ti->cdti_trk0 < DiskInfo.first
-			|| ti->cdti_trk0 > DiskInfo.last
-			|| ti->cdti_trk1 < ti->cdti_trk0)
-		{
+		    || ti->cdti_trk0 > DiskInfo.last
+		    || ti->cdti_trk1 < ti->cdti_trk0) {
 			return -EINVAL;
 		}
 
@@ -445,14 +432,14 @@ int mcd_audio_ioctl(struct cdrom_device_info * cdi, unsigned int cmd,
 		mcd_Play.end = Toc[ti->cdti_trk1 + 1].diskTime;
 
 #ifdef MCD_DEBUG
-printk("play: %02x:%02x.%02x to %02x:%02x.%02x\n",
-	mcd_Play.start.min, mcd_Play.start.sec, mcd_Play.start.frame,
-	mcd_Play.end.min, mcd_Play.end.sec, mcd_Play.end.frame);
+		printk("play: %02x:%02x.%02x to %02x:%02x.%02x\n",
+		       mcd_Play.start.min, mcd_Play.start.sec,
+		       mcd_Play.start.frame, mcd_Play.end.min,
+		       mcd_Play.end.sec, mcd_Play.end.frame);
 #endif
 
 		i = mcdPlay(&mcd_Play);
-		if (i < 0)
-		{
+		if (i < 0) {
 			audioStatus = CDROM_AUDIO_ERROR;
 			return -EIO;
 		}
@@ -460,15 +447,15 @@ printk("play: %02x:%02x.%02x to %02x:%02x.%02x\n",
 		audioStatus = CDROM_AUDIO_PLAY;
 		return 0;
 
-	case CDROMPLAYMSF:   /* Play starting at the given MSF address. */
+	case CDROMPLAYMSF:	/* Play starting at the given MSF address. */
 
 		if (audioStatus == CDROM_AUDIO_PLAY) {
-		  outb(MCMD_STOP, MCDPORT(0));
-		  i = getMcdStatus(MCD_STATUS_DELAY);
-		  audioStatus = CDROM_AUDIO_NO_STATUS;
+			outb(MCMD_STOP, MCDPORT(0));
+			i = getMcdStatus(MCD_STATUS_DELAY);
+			audioStatus = CDROM_AUDIO_NO_STATUS;
 		}
 
-		msf=(struct cdrom_msf *) arg;
+		msf = (struct cdrom_msf *) arg;
 
 		/* convert to bcd */
 
@@ -487,14 +474,14 @@ printk("play: %02x:%02x.%02x to %02x:%02x.%02x\n",
 		mcd_Play.end.frame = msf->cdmsf_frame1;
 
 #ifdef MCD_DEBUG
-printk("play: %02x:%02x.%02x to %02x:%02x.%02x\n",
-mcd_Play.start.min, mcd_Play.start.sec, mcd_Play.start.frame,
-mcd_Play.end.min, mcd_Play.end.sec, mcd_Play.end.frame);
+		printk("play: %02x:%02x.%02x to %02x:%02x.%02x\n",
+		       mcd_Play.start.min, mcd_Play.start.sec,
+		       mcd_Play.start.frame, mcd_Play.end.min,
+		       mcd_Play.end.sec, mcd_Play.end.frame);
 #endif
 
 		i = mcdPlay(&mcd_Play);
-		if (i < 0)
-		{
+		if (i < 0) {
 			audioStatus = CDROM_AUDIO_ERROR;
 			return -EIO;
 		}
@@ -502,35 +489,37 @@ mcd_Play.end.min, mcd_Play.end.sec, mcd_Play.end.frame);
 		audioStatus = CDROM_AUDIO_PLAY;
 		return 0;
 
-	case CDROMREADTOCHDR:        /* Read the table of contents header */
-	        tocHdr=(struct cdrom_tochdr *) arg; 
+	case CDROMREADTOCHDR:	/* Read the table of contents header */
+		tocHdr = (struct cdrom_tochdr *) arg;
 		tocHdr->cdth_trk0 = DiskInfo.first;
 		tocHdr->cdth_trk1 = DiskInfo.last;
 		return 0;
 
-	case CDROMREADTOCENTRY:      /* Read an entry in the table of contents */
-		entry=(struct cdrom_tocentry *) arg;
+	case CDROMREADTOCENTRY:	/* Read an entry in the table of contents */
+		entry = (struct cdrom_tocentry *) arg;
 		if (entry->cdte_track == CDROM_LEADOUT)
 			tocPtr = &Toc[DiskInfo.last - DiskInfo.first + 1];
 
 		else if (entry->cdte_track > DiskInfo.last
-				|| entry->cdte_track < DiskInfo.first)
+			 || entry->cdte_track < DiskInfo.first)
 			return -EINVAL;
 
 		else
 			tocPtr = &Toc[entry->cdte_track];
 
-		entry->cdte_adr = tocPtr -> ctrl_addr;
-		entry->cdte_ctrl = tocPtr -> ctrl_addr >> 4;
+		entry->cdte_adr = tocPtr->ctrl_addr;
+		entry->cdte_ctrl = tocPtr->ctrl_addr >> 4;
 
 		if (entry->cdte_format == CDROM_LBA)
-			entry->cdte_addr.lba = msf2hsg(&tocPtr -> diskTime);
+			entry->cdte_addr.lba = msf2hsg(&tocPtr->diskTime);
 
-		else if (entry->cdte_format == CDROM_MSF)
-		{
-			entry->cdte_addr.msf.minute = bcd2bin(tocPtr -> diskTime.min);
-			entry->cdte_addr.msf.second = bcd2bin(tocPtr -> diskTime.sec);
-			entry->cdte_addr.msf.frame = bcd2bin(tocPtr -> diskTime.frame);
+		else if (entry->cdte_format == CDROM_MSF) {
+			entry->cdte_addr.msf.minute =
+			    bcd2bin(tocPtr->diskTime.min);
+			entry->cdte_addr.msf.second =
+			    bcd2bin(tocPtr->diskTime.sec);
+			entry->cdte_addr.msf.frame =
+			    bcd2bin(tocPtr->diskTime.frame);
 		}
 
 		else
@@ -538,9 +527,9 @@ mcd_Play.end.min, mcd_Play.end.sec, mcd_Play.end.frame);
 
 		return 0;
 
-	case CDROMSUBCHNL:   /* Get subchannel info */
+	case CDROMSUBCHNL:	/* Get subchannel info */
 
-                subchnl=(struct cdrom_subchnl *) arg;
+		subchnl = (struct cdrom_subchnl *) arg;
 		if (GetQChannelInfo(&qInfo) < 0)
 			return -EIO;
 
@@ -549,16 +538,22 @@ mcd_Play.end.min, mcd_Play.end.sec, mcd_Play.end.frame);
 		subchnl->cdsc_ctrl = qInfo.ctrl_addr >> 4;
 		subchnl->cdsc_trk = bcd2bin(qInfo.track);
 		subchnl->cdsc_ind = bcd2bin(qInfo.pointIndex);
-		subchnl->cdsc_absaddr.msf.minute = bcd2bin(qInfo.diskTime.min);
-		subchnl->cdsc_absaddr.msf.second = bcd2bin(qInfo.diskTime.sec);
-		subchnl->cdsc_absaddr.msf.frame = bcd2bin(qInfo.diskTime.frame);
-		subchnl->cdsc_reladdr.msf.minute = bcd2bin(qInfo.trackTime.min);
-		subchnl->cdsc_reladdr.msf.second = bcd2bin(qInfo.trackTime.sec);
-		subchnl->cdsc_reladdr.msf.frame = bcd2bin(qInfo.trackTime.frame);
-		return(0);
+		subchnl->cdsc_absaddr.msf.minute =
+		    bcd2bin(qInfo.diskTime.min);
+		subchnl->cdsc_absaddr.msf.second =
+		    bcd2bin(qInfo.diskTime.sec);
+		subchnl->cdsc_absaddr.msf.frame =
+		    bcd2bin(qInfo.diskTime.frame);
+		subchnl->cdsc_reladdr.msf.minute =
+		    bcd2bin(qInfo.trackTime.min);
+		subchnl->cdsc_reladdr.msf.second =
+		    bcd2bin(qInfo.trackTime.sec);
+		subchnl->cdsc_reladdr.msf.frame =
+		    bcd2bin(qInfo.trackTime.frame);
+		return (0);
 
-	case CDROMVOLCTRL:   /* Volume control */
-		volctrl=(struct cdrom_volctrl *) arg;
+	case CDROMVOLCTRL:	/* Volume control */
+		volctrl = (struct cdrom_volctrl *) arg;
 		outb(MCMD_SET_VOLUME, MCDPORT(0));
 		outb(volctrl->channel0, MCDPORT(0));
 		outb(255, MCDPORT(0));
@@ -590,37 +585,38 @@ mcd_Play.end.min, mcd_Play.end.sec, mcd_Play.end.frame);
  * When Linux gets variable block sizes this will probably go away.
  */
 
-static void
-mcd_transfer(void)
+static void mcd_transfer(void)
 {
-  if (CURRENT_VALID) {
-    while (CURRENT -> nr_sectors) {
-      int bn = CURRENT -> sector / 4;
-      int i;
-      for (i = 0; i < MCD_BUF_SIZ && mcd_buf_bn[i] != bn; ++i)
-	;
-      if (i < MCD_BUF_SIZ) {
-	int offs = (i * 4 + (CURRENT -> sector & 3)) * 512;
-	int nr_sectors = 4 - (CURRENT -> sector & 3);
-	if (mcd_buf_out != i) {
-	  mcd_buf_out = i;
-	  if (mcd_buf_bn[i] != bn) {
-	    mcd_buf_out = -1;
-	    continue;
-	  }
+	if (CURRENT_VALID) {
+		while (CURRENT->nr_sectors) {
+			int bn = CURRENT->sector / 4;
+			int i;
+			for (i = 0; i < MCD_BUF_SIZ && mcd_buf_bn[i] != bn;
+			     ++i);
+			if (i < MCD_BUF_SIZ) {
+				int offs =
+				    (i * 4 + (CURRENT->sector & 3)) * 512;
+				int nr_sectors = 4 - (CURRENT->sector & 3);
+				if (mcd_buf_out != i) {
+					mcd_buf_out = i;
+					if (mcd_buf_bn[i] != bn) {
+						mcd_buf_out = -1;
+						continue;
+					}
+				}
+				if (nr_sectors > CURRENT->nr_sectors)
+					nr_sectors = CURRENT->nr_sectors;
+				memcpy(CURRENT->buffer, mcd_buf + offs,
+				       nr_sectors * 512);
+				CURRENT->nr_sectors -= nr_sectors;
+				CURRENT->sector += nr_sectors;
+				CURRENT->buffer += nr_sectors * 512;
+			} else {
+				mcd_buf_out = -1;
+				break;
+			}
+		}
 	}
-	if (nr_sectors > CURRENT -> nr_sectors)
-	  nr_sectors = CURRENT -> nr_sectors;
-	memcpy(CURRENT -> buffer, mcd_buf + offs, nr_sectors * 512);
-	CURRENT -> nr_sectors -= nr_sectors;
-	CURRENT -> sector += nr_sectors;
-	CURRENT -> buffer += nr_sectors * 512;
-      } else {
-	mcd_buf_out = -1;
-	break;
-      }
-    }
-  }
 }
 
 
@@ -629,500 +625,512 @@ mcd_transfer(void)
  * Just take the interrupt and clear out the status reg.
  */
 
-static void
-mcd_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static void mcd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int st;
 
 	st = inb(MCDPORT(1)) & 0xFF;
 #ifdef TEST1
-		printk("<int1-%02X>", st);
+	printk("<int1-%02X>", st);
 #endif
-	if (!(st & MFL_STATUS))
-	{
+	if (!(st & MFL_STATUS)) {
 		st = inb(MCDPORT(0)) & 0xFF;
 #ifdef TEST1
 		printk("<int0-%02X>", st);
 #endif
 		if ((st & 0xFF) != 0xFF)
-		  mcd_error = st ? st & 0xFF : -1;
+			mcd_error = st ? st & 0xFF : -1;
 	}
 }
 
 
-static void
-do_mcd_request(request_queue_t * q)
+static void do_mcd_request(request_queue_t * q)
 {
 #ifdef TEST2
-  printk(" do_mcd_request(%ld+%ld)\n", CURRENT -> sector, CURRENT -> nr_sectors);
+	printk(" do_mcd_request(%ld+%ld)\n", CURRENT->sector,
+	       CURRENT->nr_sectors);
 #endif
-  mcd_transfer_is_active = 1;
-  while (CURRENT_VALID) {
-    if (CURRENT->bh) {
-      if (!buffer_locked(CURRENT->bh))
-	panic(DEVICE_NAME ": block not locked");
-    }
-    mcd_transfer();
-    if (CURRENT -> nr_sectors == 0) {
-      end_request(1);
-    } else {
-      mcd_buf_out = -1;		/* Want to read a block not in buffer */
-      if (mcd_state == MCD_S_IDLE) {
-	if (!tocUpToDate) {
-	  if (updateToc() < 0) {
-	    while (CURRENT_VALID)
-	      end_request(0);
-	    break;
-	  }
-	}
-	mcd_state = MCD_S_START;
-	McdTries = 5;
-	SET_TIMER(mcd_poll, 1);
-      }
-      break;
-    }
-  }
-  mcd_transfer_is_active = 0;
-#ifdef TEST2
-  printk(" do_mcd_request ends\n");
-#endif
-}
-
-
-
-static void
-mcd_poll(unsigned long dummy)
-{
-  int st;
-
-
-  if (mcd_error) 
-  {
-    if (mcd_error & 0xA5) 
-    {
-      printk("mcd: I/O error 0x%02x", mcd_error);
-      if (mcd_error & 0x80)
-	printk(" (Door open)");
-      if (mcd_error & 0x20)
-	printk(" (Disk changed)");
-      if (mcd_error & 0x04)
-	{
-	printk(" (Read error)"); /* Bitch about the problem. */
-	
-	/* Time to get fancy! If at 2x speed and 1 error, drop to 1x speed! */
-	/* Interesting how it STAYS at MCD_RETRY_ATTEMPTS on first error! */
-	/* But I find that rather HANDY!!! */
-	/* Neat! it REALLY WORKS on those LOW QUALITY CD's!!! Smile! :) */
-	/* AJK [06/17/95] */
-	
-	/* Slap the CD down to single speed! */
-	if (mcdDouble == 1 && McdTries == MCD_RETRY_ATTEMPTS && MCMD_DATA_READ == MCMD_2X_READ) 
-		{
-		MCMD_DATA_READ = MCMD_PLAY_READ; /* Uhhh, Ummmm, muhuh-huh! */
-		mcd1xhold = SINGLE_HOLD_SECTORS; /* Hey Beavis! */
-		printk(" Speed now 1x");	 /* Pull my finger! */
-		}
-	}
-      printk("\n");
-      mcd_invalidate_buffers();
-#ifdef WARN_IF_READ_FAILURE
-      if (McdTries == MCD_RETRY_ATTEMPTS)
-	printk("mcd: read of block %d failed\n", mcd_next_bn);
-#endif
-      if (!McdTries--) 
-        {
-	/* Nuts! This cd is ready for recycling! */
-	/* When WAS the last time YOU cleaned it CORRECTLY?! */
-	printk("mcd: read of block %d failed, giving up\n", mcd_next_bn);
-	if (mcd_transfer_is_active) 
-	{
-	  McdTries = 0;
-	  goto ret;
-	}
-	if (CURRENT_VALID)
-	  end_request(0);
-	McdTries = MCD_RETRY_ATTEMPTS;
-      }
-    }
-    mcd_error = 0;
-    mcd_state = MCD_S_STOP;
-  }
-	/* Switch back to Double speed if enough GOOD sectors were read! */
-	
-	/* Are we a double speed with a crappy CD?! */
-    if (mcdDouble == 1 && McdTries == MCD_RETRY_ATTEMPTS && MCMD_DATA_READ == MCMD_PLAY_READ)
-    	{
-	/* We ARE a double speed and we ARE bitching! */
-	if (mcd1xhold == 0) /* Okay, Like are we STILL at single speed? */
-		{ /* We need to switch back to double speed now... */
-		MCMD_DATA_READ = MCMD_2X_READ; /* Uhhh... BACK You GO! */
-		printk("mcd: Switching back to 2X speed!\n"); /* Tell 'em! */
-		}
-	else mcd1xhold--; /* No?! Count down the good reads some more... */
-				/* and try, try again! */
-    	}
-
-
-
- immediately:
-  switch (mcd_state) {
-
-
-
-  case MCD_S_IDLE:
-#ifdef TEST3
-    printk("MCD_S_IDLE\n");
-#endif
-    goto out;
-
-
-
-  case MCD_S_START:
-#ifdef TEST3
-    printk("MCD_S_START\n");
-#endif
-
-    outb(MCMD_GET_STATUS, MCDPORT(0));
-    mcd_state = mcd_mode == 1 ? MCD_S_READ : MCD_S_MODE;
-    McdTimeout = 3000;
-    break;
-
-
-
-  case MCD_S_MODE:
-#ifdef TEST3
-    printk("MCD_S_MODE\n");
-#endif
-
-    if ((st = mcdStatus()) != -1) {
-
-      if (st & MST_DSK_CHG) {
-	mcdDiskChanged = 1;
-	tocUpToDate = 0;
-	mcd_invalidate_buffers();
-      }
-
-    set_mode_immediately:
-
-      if ((st & MST_DOOR_OPEN) || !(st & MST_READY)) {
-	mcdDiskChanged = 1;
-	tocUpToDate = 0;
-	if (mcd_transfer_is_active) {
-	  mcd_state = MCD_S_START;
-	  goto immediately;
-	}
-	printk((st & MST_DOOR_OPEN) ? "mcd: door open\n" : "mcd: disk removed\n");
-	mcd_state = MCD_S_IDLE;
-	while (CURRENT_VALID)
-	  end_request(0);
-	goto out;
-      }
-
-      outb(MCMD_SET_MODE, MCDPORT(0));
-      outb(1, MCDPORT(0));
-      mcd_mode = 1;
-      mcd_state = MCD_S_READ;
-      McdTimeout = 3000;
-
-    }
-    break;
-
-
-
-  case MCD_S_READ:
-#ifdef TEST3
-    printk("MCD_S_READ\n");
-#endif
-
-    if ((st = mcdStatus()) != -1) {
-
-      if (st & MST_DSK_CHG) {
-	mcdDiskChanged = 1;
-	tocUpToDate = 0;
-	mcd_invalidate_buffers();
-      }
-
-    read_immediately:
-
-      if ((st & MST_DOOR_OPEN) || !(st & MST_READY)) {
-	mcdDiskChanged = 1;
-	tocUpToDate = 0;
-	if (mcd_transfer_is_active) {
-	  mcd_state = MCD_S_START;
-	  goto immediately;
-	}
-	printk((st & MST_DOOR_OPEN) ? "mcd: door open\n" : "mcd: disk removed\n");
-	mcd_state = MCD_S_IDLE;
-	while (CURRENT_VALID)
-	  end_request(0);
-	goto out;
-      }
-
-      if (CURRENT_VALID) {
-	struct mcd_Play_msf msf;
-	mcd_next_bn = CURRENT -> sector / 4;
-	hsg2msf(mcd_next_bn, &msf.start);
-	msf.end.min = ~0;
-	msf.end.sec = ~0;
-	msf.end.frame = ~0;
-	sendMcdCmd(MCMD_DATA_READ, &msf);
-	mcd_state = MCD_S_DATA;
-	McdTimeout = READ_TIMEOUT;
-      } else {
-	mcd_state = MCD_S_STOP;
-	goto immediately;
-      }
-
-    }
-    break;
-
-
-  case MCD_S_DATA:
-#ifdef TEST3
-    printk("MCD_S_DATA\n");
-#endif
-
-    st = inb(MCDPORT(1)) & (MFL_STATUSorDATA);
-  data_immediately:
-#ifdef TEST5
-    printk("Status %02x\n",st);
-#endif
-    switch (st) {
-
-    case MFL_DATA:
-#ifdef WARN_IF_READ_FAILURE
-      if (McdTries == 5)
-	printk("mcd: read of block %d failed\n", mcd_next_bn);
-#endif
-      if (!McdTries--) {
-	printk("mcd: read of block %d failed, giving up\n", mcd_next_bn);
-	if (mcd_transfer_is_active) {
-	  McdTries = 0;
-	  break;
-	}
-	if (CURRENT_VALID)
-	  end_request(0);
-	McdTries = 5;
-      }
-      mcd_state = MCD_S_START;
-      McdTimeout = READ_TIMEOUT;
-      goto immediately;
-
-    case MFL_STATUSorDATA:
-      break;
-
-    default:
-      McdTries = 5;
-      if (!CURRENT_VALID && mcd_buf_in == mcd_buf_out) {
-	mcd_state = MCD_S_STOP;
-	goto immediately;
-      }
-      mcd_buf_bn[mcd_buf_in] = -1;
-      READ_DATA(MCDPORT(0), mcd_buf + 2048 * mcd_buf_in, 2048);
-      mcd_buf_bn[mcd_buf_in] = mcd_next_bn++;
-      if (mcd_buf_out == -1)
-	mcd_buf_out = mcd_buf_in;
-      mcd_buf_in = mcd_buf_in + 1 == MCD_BUF_SIZ ? 0 : mcd_buf_in + 1;
-      if (!mcd_transfer_is_active) {
+	mcd_transfer_is_active = 1;
 	while (CURRENT_VALID) {
-	  mcd_transfer();
-	  if (CURRENT -> nr_sectors == 0)
-	    end_request(1);
-	  else
-	    break;
+		if (CURRENT->bh) {
+			if (!buffer_locked(CURRENT->bh))
+				panic(DEVICE_NAME ": block not locked");
+		}
+		mcd_transfer();
+		if (CURRENT->nr_sectors == 0) {
+			end_request(1);
+		} else {
+			mcd_buf_out = -1;	/* Want to read a block not in buffer */
+			if (mcd_state == MCD_S_IDLE) {
+				if (!tocUpToDate) {
+					if (updateToc() < 0) {
+						while (CURRENT_VALID)
+							end_request(0);
+						break;
+					}
+				}
+				mcd_state = MCD_S_START;
+				McdTries = 5;
+				SET_TIMER(mcd_poll, 1);
+			}
+			break;
+		}
 	}
-      }
-
-      if (CURRENT_VALID
-	  && (CURRENT -> sector / 4 < mcd_next_bn || 
-	      CURRENT -> sector / 4 > mcd_next_bn + 16)) {
-	mcd_state = MCD_S_STOP;
-	goto immediately;
-      }
-      McdTimeout = READ_TIMEOUT;
-#ifdef DOUBLE_QUICK_ONLY
-      if (MCMD_DATA_READ != MCMD_PLAY_READ)
+	mcd_transfer_is_active = 0;
+#ifdef TEST2
+	printk(" do_mcd_request ends\n");
 #endif
-      {
-	int count= QUICK_LOOP_COUNT;
-	while (count--) {
-          QUICK_LOOP_DELAY;
-	  if ((st = (inb(MCDPORT(1))) & (MFL_STATUSorDATA)) != (MFL_STATUSorDATA)) {
+}
+
+
+
+static void mcd_poll(unsigned long dummy)
+{
+	int st;
+
+
+	if (mcd_error) {
+		if (mcd_error & 0xA5) {
+			printk("mcd: I/O error 0x%02x", mcd_error);
+			if (mcd_error & 0x80)
+				printk(" (Door open)");
+			if (mcd_error & 0x20)
+				printk(" (Disk changed)");
+			if (mcd_error & 0x04) {
+				printk(" (Read error)");	/* Bitch about the problem. */
+
+				/* Time to get fancy! If at 2x speed and 1 error, drop to 1x speed! */
+				/* Interesting how it STAYS at MCD_RETRY_ATTEMPTS on first error! */
+				/* But I find that rather HANDY!!! */
+				/* Neat! it REALLY WORKS on those LOW QUALITY CD's!!! Smile! :) */
+				/* AJK [06/17/95] */
+
+				/* Slap the CD down to single speed! */
+				if (mcdDouble == 1
+				    && McdTries == MCD_RETRY_ATTEMPTS
+				    && MCMD_DATA_READ == MCMD_2X_READ) {
+					MCMD_DATA_READ = MCMD_PLAY_READ;	/* Uhhh, Ummmm, muhuh-huh! */
+					mcd1xhold = SINGLE_HOLD_SECTORS;	/* Hey Beavis! */
+					printk(" Speed now 1x");	/* Pull my finger! */
+				}
+			}
+			printk("\n");
+			mcd_invalidate_buffers();
+#ifdef WARN_IF_READ_FAILURE
+			if (McdTries == MCD_RETRY_ATTEMPTS)
+				printk("mcd: read of block %d failed\n",
+				       mcd_next_bn);
+#endif
+			if (!McdTries--) {
+				/* Nuts! This cd is ready for recycling! */
+				/* When WAS the last time YOU cleaned it CORRECTLY?! */
+				printk
+				    ("mcd: read of block %d failed, giving up\n",
+				     mcd_next_bn);
+				if (mcd_transfer_is_active) {
+					McdTries = 0;
+					goto ret;
+				}
+				if (CURRENT_VALID)
+					end_request(0);
+				McdTries = MCD_RETRY_ATTEMPTS;
+			}
+		}
+		mcd_error = 0;
+		mcd_state = MCD_S_STOP;
+	}
+	/* Switch back to Double speed if enough GOOD sectors were read! */
+
+	/* Are we a double speed with a crappy CD?! */
+	if (mcdDouble == 1 && McdTries == MCD_RETRY_ATTEMPTS
+	    && MCMD_DATA_READ == MCMD_PLAY_READ) {
+		/* We ARE a double speed and we ARE bitching! */
+		if (mcd1xhold == 0) {	/* Okay, Like are we STILL at single speed? *//* We need to switch back to double speed now... */
+			MCMD_DATA_READ = MCMD_2X_READ;	/* Uhhh... BACK You GO! */
+			printk("mcd: Switching back to 2X speed!\n");	/* Tell 'em! */
+		} else
+			mcd1xhold--;	/* No?! Count down the good reads some more... */
+		/* and try, try again! */
+	}
+
+
+
+      immediately:
+	switch (mcd_state) {
+
+
+
+	case MCD_S_IDLE:
+#ifdef TEST3
+		printk("MCD_S_IDLE\n");
+#endif
+		goto out;
+
+
+
+	case MCD_S_START:
+#ifdef TEST3
+		printk("MCD_S_START\n");
+#endif
+
+		outb(MCMD_GET_STATUS, MCDPORT(0));
+		mcd_state = mcd_mode == 1 ? MCD_S_READ : MCD_S_MODE;
+		McdTimeout = 3000;
+		break;
+
+
+
+	case MCD_S_MODE:
+#ifdef TEST3
+		printk("MCD_S_MODE\n");
+#endif
+
+		if ((st = mcdStatus()) != -1) {
+
+			if (st & MST_DSK_CHG) {
+				mcdDiskChanged = 1;
+				tocUpToDate = 0;
+				mcd_invalidate_buffers();
+			}
+
+		      set_mode_immediately:
+
+			if ((st & MST_DOOR_OPEN) || !(st & MST_READY)) {
+				mcdDiskChanged = 1;
+				tocUpToDate = 0;
+				if (mcd_transfer_is_active) {
+					mcd_state = MCD_S_START;
+					goto immediately;
+				}
+				printk((st & MST_DOOR_OPEN) ?
+				       "mcd: door open\n" :
+				       "mcd: disk removed\n");
+				mcd_state = MCD_S_IDLE;
+				while (CURRENT_VALID)
+					end_request(0);
+				goto out;
+			}
+
+			outb(MCMD_SET_MODE, MCDPORT(0));
+			outb(1, MCDPORT(0));
+			mcd_mode = 1;
+			mcd_state = MCD_S_READ;
+			McdTimeout = 3000;
+
+		}
+		break;
+
+
+
+	case MCD_S_READ:
+#ifdef TEST3
+		printk("MCD_S_READ\n");
+#endif
+
+		if ((st = mcdStatus()) != -1) {
+
+			if (st & MST_DSK_CHG) {
+				mcdDiskChanged = 1;
+				tocUpToDate = 0;
+				mcd_invalidate_buffers();
+			}
+
+		      read_immediately:
+
+			if ((st & MST_DOOR_OPEN) || !(st & MST_READY)) {
+				mcdDiskChanged = 1;
+				tocUpToDate = 0;
+				if (mcd_transfer_is_active) {
+					mcd_state = MCD_S_START;
+					goto immediately;
+				}
+				printk((st & MST_DOOR_OPEN) ?
+				       "mcd: door open\n" :
+				       "mcd: disk removed\n");
+				mcd_state = MCD_S_IDLE;
+				while (CURRENT_VALID)
+					end_request(0);
+				goto out;
+			}
+
+			if (CURRENT_VALID) {
+				struct mcd_Play_msf msf;
+				mcd_next_bn = CURRENT->sector / 4;
+				hsg2msf(mcd_next_bn, &msf.start);
+				msf.end.min = ~0;
+				msf.end.sec = ~0;
+				msf.end.frame = ~0;
+				sendMcdCmd(MCMD_DATA_READ, &msf);
+				mcd_state = MCD_S_DATA;
+				McdTimeout = READ_TIMEOUT;
+			} else {
+				mcd_state = MCD_S_STOP;
+				goto immediately;
+			}
+
+		}
+		break;
+
+
+	case MCD_S_DATA:
+#ifdef TEST3
+		printk("MCD_S_DATA\n");
+#endif
+
+		st = inb(MCDPORT(1)) & (MFL_STATUSorDATA);
+	      data_immediately:
+#ifdef TEST5
+		printk("Status %02x\n", st);
+#endif
+		switch (st) {
+
+		case MFL_DATA:
+#ifdef WARN_IF_READ_FAILURE
+			if (McdTries == 5)
+				printk("mcd: read of block %d failed\n",
+				       mcd_next_bn);
+#endif
+			if (!McdTries--) {
+				printk
+				    ("mcd: read of block %d failed, giving up\n",
+				     mcd_next_bn);
+				if (mcd_transfer_is_active) {
+					McdTries = 0;
+					break;
+				}
+				if (CURRENT_VALID)
+					end_request(0);
+				McdTries = 5;
+			}
+			mcd_state = MCD_S_START;
+			McdTimeout = READ_TIMEOUT;
+			goto immediately;
+
+		case MFL_STATUSorDATA:
+			break;
+
+		default:
+			McdTries = 5;
+			if (!CURRENT_VALID && mcd_buf_in == mcd_buf_out) {
+				mcd_state = MCD_S_STOP;
+				goto immediately;
+			}
+			mcd_buf_bn[mcd_buf_in] = -1;
+			READ_DATA(MCDPORT(0), mcd_buf + 2048 * mcd_buf_in,
+				  2048);
+			mcd_buf_bn[mcd_buf_in] = mcd_next_bn++;
+			if (mcd_buf_out == -1)
+				mcd_buf_out = mcd_buf_in;
+			mcd_buf_in =
+			    mcd_buf_in + 1 ==
+			    MCD_BUF_SIZ ? 0 : mcd_buf_in + 1;
+			if (!mcd_transfer_is_active) {
+				while (CURRENT_VALID) {
+					mcd_transfer();
+					if (CURRENT->nr_sectors == 0)
+						end_request(1);
+					else
+						break;
+				}
+			}
+
+			if (CURRENT_VALID
+			    && (CURRENT->sector / 4 < mcd_next_bn ||
+				CURRENT->sector / 4 > mcd_next_bn + 16)) {
+				mcd_state = MCD_S_STOP;
+				goto immediately;
+			}
+			McdTimeout = READ_TIMEOUT;
+#ifdef DOUBLE_QUICK_ONLY
+			if (MCMD_DATA_READ != MCMD_PLAY_READ)
+#endif
+			{
+				int count = QUICK_LOOP_COUNT;
+				while (count--) {
+					QUICK_LOOP_DELAY;
+					if ((st =
+					     (inb(MCDPORT(1))) &
+					     (MFL_STATUSorDATA)) !=
+					    (MFL_STATUSorDATA)) {
 #   ifdef TEST4
 /*	    printk("Quickloop success at %d\n",QUICK_LOOP_COUNT-count); */
-	    printk(" %d ",QUICK_LOOP_COUNT-count);
+						printk(" %d ",
+						       QUICK_LOOP_COUNT -
+						       count);
 #   endif
-	    goto data_immediately;
-	  }
-	}
+						goto data_immediately;
+					}
+				}
 #   ifdef TEST4
 /*      printk("Quickloop ended at %d\n",QUICK_LOOP_COUNT); */
-	printk("ended ");
+				printk("ended ");
 #   endif
-      }
-      break;
-    }
-    break;
+			}
+			break;
+		}
+		break;
 
 
 
-  case MCD_S_STOP:
+	case MCD_S_STOP:
 #ifdef TEST3
-    printk("MCD_S_STOP\n");
+		printk("MCD_S_STOP\n");
 #endif
 
 #ifdef WORK_AROUND_MITSUMI_BUG_93
-    if (!mitsumi_bug_93_wait)
-      goto do_not_work_around_mitsumi_bug_93_1;
+		if (!mitsumi_bug_93_wait)
+			goto do_not_work_around_mitsumi_bug_93_1;
 
-    McdTimeout = mitsumi_bug_93_wait;
-    mcd_state = 9+3+1;
-    break;
+		McdTimeout = mitsumi_bug_93_wait;
+		mcd_state = 9 + 3 + 1;
+		break;
 
-  case 9+3+1:
-    if (McdTimeout)
-      break;
+	case 9 + 3 + 1:
+		if (McdTimeout)
+			break;
 
-  do_not_work_around_mitsumi_bug_93_1:
-#endif /* WORK_AROUND_MITSUMI_BUG_93 */
+	      do_not_work_around_mitsumi_bug_93_1:
+#endif				/* WORK_AROUND_MITSUMI_BUG_93 */
 
-    outb(MCMD_STOP, MCDPORT(0));
+		outb(MCMD_STOP, MCDPORT(0));
 
 #ifdef WORK_AROUND_MITSUMI_BUG_92
-    if ((inb(MCDPORT(1)) & MFL_STATUSorDATA) == MFL_STATUS) {
-      int i = 4096;
-      do {
-	inb(MCDPORT(0));
-      } while ((inb(MCDPORT(1)) & MFL_STATUSorDATA) == MFL_STATUS && --i);
-      outb(MCMD_STOP, MCDPORT(0));
-      if ((inb(MCDPORT(1)) & MFL_STATUSorDATA) == MFL_STATUS) {
-	i = 4096;
-	do {
-	  inb(MCDPORT(0));
-	} while ((inb(MCDPORT(1)) & MFL_STATUSorDATA) == MFL_STATUS && --i);
-	outb(MCMD_STOP, MCDPORT(0));
-      }
-    }
-#endif /* WORK_AROUND_MITSUMI_BUG_92 */
+		if ((inb(MCDPORT(1)) & MFL_STATUSorDATA) == MFL_STATUS) {
+			int i = 4096;
+			do {
+				inb(MCDPORT(0));
+			} while ((inb(MCDPORT(1)) & MFL_STATUSorDATA) ==
+				 MFL_STATUS && --i);
+			outb(MCMD_STOP, MCDPORT(0));
+			if ((inb(MCDPORT(1)) & MFL_STATUSorDATA) ==
+			    MFL_STATUS) {
+				i = 4096;
+				do {
+					inb(MCDPORT(0));
+				} while ((inb(MCDPORT(1)) &
+					  MFL_STATUSorDATA) == MFL_STATUS
+					 && --i);
+				outb(MCMD_STOP, MCDPORT(0));
+			}
+		}
+#endif				/* WORK_AROUND_MITSUMI_BUG_92 */
 
-    mcd_state = MCD_S_STOPPING;
-    McdTimeout = 1000;
-    break;
+		mcd_state = MCD_S_STOPPING;
+		McdTimeout = 1000;
+		break;
 
-  case MCD_S_STOPPING:
+	case MCD_S_STOPPING:
 #ifdef TEST3
-    printk("MCD_S_STOPPING\n");
+		printk("MCD_S_STOPPING\n");
 #endif
 
-    if ((st = mcdStatus()) == -1 && McdTimeout)
-      break;
+		if ((st = mcdStatus()) == -1 && McdTimeout)
+			break;
 
-    if ((st != -1) && (st & MST_DSK_CHG)) {
-      mcdDiskChanged = 1;
-      tocUpToDate = 0;
-      mcd_invalidate_buffers();
-    }
-
+		if ((st != -1) && (st & MST_DSK_CHG)) {
+			mcdDiskChanged = 1;
+			tocUpToDate = 0;
+			mcd_invalidate_buffers();
+		}
 #ifdef WORK_AROUND_MITSUMI_BUG_93
-    if (!mitsumi_bug_93_wait)
-      goto do_not_work_around_mitsumi_bug_93_2;
+		if (!mitsumi_bug_93_wait)
+			goto do_not_work_around_mitsumi_bug_93_2;
 
-    McdTimeout = mitsumi_bug_93_wait;
-    mcd_state = 9+3+2;
-    break;
+		McdTimeout = mitsumi_bug_93_wait;
+		mcd_state = 9 + 3 + 2;
+		break;
 
-  case 9+3+2:
-    if (McdTimeout)
-      break;
+	case 9 + 3 + 2:
+		if (McdTimeout)
+			break;
 
-    st = -1;
+		st = -1;
 
-  do_not_work_around_mitsumi_bug_93_2:
-#endif /* WORK_AROUND_MITSUMI_BUG_93 */
+	      do_not_work_around_mitsumi_bug_93_2:
+#endif				/* WORK_AROUND_MITSUMI_BUG_93 */
 
 #ifdef TEST3
-    printk("CURRENT_VALID %d mcd_mode %d\n",
-	   CURRENT_VALID, mcd_mode);
+		printk("CURRENT_VALID %d mcd_mode %d\n",
+		       CURRENT_VALID, mcd_mode);
 #endif
 
-    if (CURRENT_VALID) {
-      if (st != -1) {
-	if (mcd_mode == 1)
-	  goto read_immediately;
-	else
-	  goto set_mode_immediately;
-      } else {
-	mcd_state = MCD_S_START;
-	McdTimeout = 1;
-      }
-    } else {
-      mcd_state = MCD_S_IDLE;
-      goto out;
-    }
-    break;
+		if (CURRENT_VALID) {
+			if (st != -1) {
+				if (mcd_mode == 1)
+					goto read_immediately;
+				else
+					goto set_mode_immediately;
+			} else {
+				mcd_state = MCD_S_START;
+				McdTimeout = 1;
+			}
+		} else {
+			mcd_state = MCD_S_IDLE;
+			goto out;
+		}
+		break;
 
-  default:
-    printk("mcd: invalid state %d\n", mcd_state);
-    goto out;
-  }
+	default:
+		printk("mcd: invalid state %d\n", mcd_state);
+		goto out;
+	}
 
- ret:
-  if (!McdTimeout--) {
-    printk("mcd: timeout in state %d\n", mcd_state);
-    mcd_state = MCD_S_STOP;
-  }
+      ret:
+	if (!McdTimeout--) {
+		printk("mcd: timeout in state %d\n", mcd_state);
+		mcd_state = MCD_S_STOP;
+	}
 
-  SET_TIMER(mcd_poll, 1);
-out:
-  return;
+	SET_TIMER(mcd_poll, 1);
+      out:
+	return;
 }
 
 
 
-static void
-mcd_invalidate_buffers(void)
+static void mcd_invalidate_buffers(void)
 {
-  int i;
-  for (i = 0; i < MCD_BUF_SIZ; ++i)
-    mcd_buf_bn[i] = -1;
-  mcd_buf_out = -1;
+	int i;
+	for (i = 0; i < MCD_BUF_SIZ; ++i)
+		mcd_buf_bn[i] = -1;
+	mcd_buf_out = -1;
 }
 
 
 /*
  * Open the device special file.  Check that a disk is in.
  */
-static int mcd_open(struct cdrom_device_info * cdi, int purpose)
+static int mcd_open(struct cdrom_device_info *cdi, int purpose)
 {
-	int st, count=0;
+	int st, count = 0;
 	if (mcdPresent == 0)
-		return -ENXIO;			/* no hardware */
+		return -ENXIO;	/* no hardware */
 
-        MOD_INC_USE_COUNT;
+	MOD_INC_USE_COUNT;
 
-        if (mcd_open_count || mcd_state != MCD_S_IDLE)
+	if (mcd_open_count || mcd_state != MCD_S_IDLE)
 		goto bump_count;
 
-        mcd_invalidate_buffers();
-        do {
-                st = statusCmd();               /* check drive status */
-                if (st == -1)
-                        goto err_out;            /* drive doesn't respond */
-                if ((st & MST_READY) == 0) {    /* no disk? wait a sec... */
-                        current->state = TASK_INTERRUPTIBLE;
-                        schedule_timeout(HZ);
-                }
-        } while (((st & MST_READY) == 0) && count++ < MCD_RETRY_ATTEMPTS);
+	mcd_invalidate_buffers();
+	do {
+		st = statusCmd();	/* check drive status */
+		if (st == -1)
+			goto err_out;	/* drive doesn't respond */
+		if ((st & MST_READY) == 0) {	/* no disk? wait a sec... */
+			current->state = TASK_INTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (((st & MST_READY) == 0) && count++ < MCD_RETRY_ATTEMPTS);
 
-        if (updateToc() < 0)
-                       goto err_out;
+	if (updateToc() < 0)
+		goto err_out;
 
-bump_count:
+      bump_count:
 	++mcd_open_count;
 	return 0;
 
-err_out:
-        MOD_DEC_USE_COUNT;
+      err_out:
+	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1130,11 +1138,12 @@ err_out:
 /*
  * On close, we flush all mcd blocks from the buffer cache.
  */
-static void mcd_release(struct cdrom_device_info * cdi)
-{ MOD_DEC_USE_COUNT;
-  if (!--mcd_open_count) {
-	mcd_invalidate_buffers();
-  }
+static void mcd_release(struct cdrom_device_info *cdi)
+{
+	MOD_DEC_USE_COUNT;
+	if (!--mcd_open_count) {
+		mcd_invalidate_buffers();
+	}
 }
 
 
@@ -1143,23 +1152,25 @@ static void mcd_release(struct cdrom_device_info * cdi)
  * and is used in mcd_exit as well. */
 static void cleanup(int level)
 {
-  switch (level) {
-  case 3:
-    if (unregister_cdrom(&mcd_info)) {
-      printk(KERN_WARNING "Can't unregister cdrom mcd\n");
-      return;
-    }
-    free_irq(mcd_irq, NULL);
-  case 2:
-    release_region(mcd_port,4);
-  case 1:
-    if (devfs_unregister_blkdev(MAJOR_NR, "mcd")) {
-      printk(KERN_WARNING "Can't unregister major mcd\n");
-      return;
-    }
-    blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-  default:;
-  }
+	switch (level) {
+	case 3:
+		if (unregister_cdrom(&mcd_info)) {
+			printk(KERN_WARNING
+			       "Can't unregister cdrom mcd\n");
+			return;
+		}
+		free_irq(mcd_irq, NULL);
+	case 2:
+		release_region(mcd_port, 4);
+	case 1:
+		if (devfs_unregister_blkdev(MAJOR_NR, "mcd")) {
+			printk(KERN_WARNING
+			       "Can't unregister major mcd\n");
+			return;
+		}
+		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	default:;
+	}
 }
 
 
@@ -1175,21 +1186,20 @@ int __init mcd_init(void)
 	char msg[80];
 
 	if (mcd_port <= 0 || mcd_irq <= 0) {
-	  printk("skip mcd_init\n");
-          return -EIO;
+		printk("skip mcd_init\n");
+		return -EIO;
 	}
 
-	if (devfs_register_blkdev(MAJOR_NR, "mcd", &cdrom_fops) != 0)
-	{
+	if (devfs_register_blkdev(MAJOR_NR, "mcd", &cdrom_fops) != 0) {
 		printk("Unable to get major %d for Mitsumi CD-ROM\n",
 		       MAJOR_NR);
-                return -EIO;
+		return -EIO;
 	}
-        if (check_region(mcd_port, 4)) {
-	  cleanup(1);
-	  printk("Init failed, I/O port (%X) already in use\n",
-		 mcd_port);
-          return -EIO;
+	if (check_region(mcd_port, 4)) {
+		cleanup(1);
+		printk("Init failed, I/O port (%X) already in use\n",
+		       mcd_port);
+		return -EIO;
 	}
 
 	blksize_size[MAJOR_NR] = mcd_blocksizes;
@@ -1198,106 +1208,105 @@ int __init mcd_init(void)
 
 	/* check for card */
 
-	outb(0, MCDPORT(1));			/* send reset */
+	outb(0, MCDPORT(1));	/* send reset */
 	for (count = 0; count < 2000000; count++)
-		(void) inb(MCDPORT(1));		/* delay a bit */
+		(void) inb(MCDPORT(1));	/* delay a bit */
 
-	outb(0x40, MCDPORT(0));	                /* send get-stat cmd */
+	outb(0x40, MCDPORT(0));	/* send get-stat cmd */
 	for (count = 0; count < 2000000; count++)
 		if (!(inb(MCDPORT(1)) & MFL_STATUS))
 			break;
 
 	if (count >= 2000000) {
 		printk("Init failed. No mcd device at 0x%x irq %d\n",
-		     mcd_port, mcd_irq);
+		       mcd_port, mcd_irq);
 		cleanup(1);
-                return -EIO;
+		return -EIO;
 	}
-	count = inb(MCDPORT(0));		/* pick up the status */
-	
-	outb(MCMD_GET_VERSION,MCDPORT(0));
-	for(count=0;count<3;count++)
-		if(getValue(result+count)) {
+	count = inb(MCDPORT(0));	/* pick up the status */
+
+	outb(MCMD_GET_VERSION, MCDPORT(0));
+	for (count = 0; count < 3; count++)
+		if (getValue(result + count)) {
 			printk("mitsumi get version failed at 0x%x\n",
 			       mcd_port);
-                        cleanup(1);
-                        return -EIO;
-		}	
+			cleanup(1);
+			return -EIO;
+		}
 
 	if (result[0] == result[1] && result[1] == result[2]) {
 		cleanup(1);
-                return -EIO;
+		return -EIO;
 	}
 
-	mcdVersion=result[2];
+	mcdVersion = result[2];
 
-	if (mcdVersion >=4)
-		outb(4,MCDPORT(2)); 	/* magic happens */
+	if (mcdVersion >= 4)
+		outb(4, MCDPORT(2));	/* magic happens */
 
 	/* don't get the IRQ until we know for sure the drive is there */
 
-	if (request_irq(mcd_irq, mcd_interrupt, SA_INTERRUPT, "Mitsumi CD", NULL))
-	{
-		printk("Unable to get IRQ%d for Mitsumi CD-ROM\n", mcd_irq);
+	if (request_irq
+	    (mcd_irq, mcd_interrupt, SA_INTERRUPT, "Mitsumi CD", NULL)) {
+		printk("Unable to get IRQ%d for Mitsumi CD-ROM\n",
+		       mcd_irq);
 		cleanup(1);
-                return -EIO;
+		return -EIO;
 	}
 
-        if (result[1] == 'D') 
-	{
+	if (result[1] == 'D') {
 		MCMD_DATA_READ = MCMD_2X_READ;
 		/* Added flag to drop to 1x speed if too many errors */
 		mcdDouble = 1;
-        } else 
+	} else
 		mcd_info.speed = 1;
 	sprintf(msg, " mcd: Mitsumi %s Speed CD-ROM at port=0x%x,"
-		     " irq=%d\n", mcd_info.speed == 1 ?  "Single" : "Double", mcd_port, mcd_irq);
+		" irq=%d\n", mcd_info.speed == 1 ? "Single" : "Double",
+		mcd_port, mcd_irq);
 
 	request_region(mcd_port, 4, "mcd");
 
 	outb(MCMD_CONFIG_DRIVE, MCDPORT(0));
-	outb(0x02,MCDPORT(0));
-	outb(0x00,MCDPORT(0));
+	outb(0x02, MCDPORT(0));
+	outb(0x00, MCDPORT(0));
 	getValue(result);
 
 	outb(MCMD_CONFIG_DRIVE, MCDPORT(0));
-	outb(0x10,MCDPORT(0));
-	outb(0x04,MCDPORT(0));
+	outb(0x10, MCDPORT(0));
+	outb(0x04, MCDPORT(0));
 	getValue(result);
 
 	mcd_invalidate_buffers();
 	mcdPresent = 1;
 
-	mcd_info.dev = MKDEV(MAJOR_NR,0);
+	mcd_info.dev = MKDEV(MAJOR_NR, 0);
 
-        if (register_cdrom(&mcd_info) != 0) {
-              printk("Cannot register Mitsumi CD-ROM!\n");
-              cleanup(3);
-              return -EIO;
-        }
-        printk(msg);
+	if (register_cdrom(&mcd_info) != 0) {
+		printk("Cannot register Mitsumi CD-ROM!\n");
+		cleanup(3);
+		return -EIO;
+	}
+	printk(msg);
 
 	return 0;
 }
 
 
-static void
-hsg2msf(long hsg, struct msf *msf)
+static void hsg2msf(long hsg, struct msf *msf)
 {
 	hsg += 150;
-	msf -> min = hsg / 4500;
+	msf->min = hsg / 4500;
 	hsg %= 4500;
-	msf -> sec = hsg / 75;
-	msf -> frame = hsg % 75;
+	msf->sec = hsg / 75;
+	msf->frame = hsg % 75;
 
-	bin2bcd(&msf -> min);		/* convert to BCD */
-	bin2bcd(&msf -> sec);
-	bin2bcd(&msf -> frame);
+	bin2bcd(&msf->min);	/* convert to BCD */
+	bin2bcd(&msf->sec);
+	bin2bcd(&msf->frame);
 }
 
 
-static void
-bin2bcd(unsigned char *p)
+static void bin2bcd(unsigned char *p)
 {
 	int u, t;
 
@@ -1306,8 +1315,7 @@ bin2bcd(unsigned char *p)
 	*p = u | (t << 4);
 }
 
-static int
-bcd2bin(unsigned char bcd)
+static int bcd2bin(unsigned char bcd)
 {
 	return (bcd >> 4) * 10 + (bcd & 0xF);
 }
@@ -1318,19 +1326,16 @@ bcd2bin(unsigned char bcd)
  * if it is ready.
  */
 
-static int
-mcdStatus(void)
+static int mcdStatus(void)
 {
 	int i;
 	int st;
 
 	st = inb(MCDPORT(1)) & MFL_STATUS;
-	if (!st)
-	{
+	if (!st) {
 		i = inb(MCDPORT(0)) & 0xFF;
 		return i;
-	}
-	else
+	} else
 		return -1;
 }
 
@@ -1339,16 +1344,15 @@ mcdStatus(void)
  * Send a play or read command to the drive
  */
 
-static void
-sendMcdCmd(int cmd, struct mcd_Play_msf *params)
+static void sendMcdCmd(int cmd, struct mcd_Play_msf *params)
 {
 	outb(cmd, MCDPORT(0));
-	outb(params -> start.min, MCDPORT(0));
-	outb(params -> start.sec, MCDPORT(0));
-	outb(params -> start.frame, MCDPORT(0));
-	outb(params -> end.min, MCDPORT(0));
-	outb(params -> end.sec, MCDPORT(0));
-	outb(params -> end.frame, MCDPORT(0));
+	outb(params->start.min, MCDPORT(0));
+	outb(params->start.sec, MCDPORT(0));
+	outb(params->start.frame, MCDPORT(0));
+	outb(params->end.min, MCDPORT(0));
+	outb(params->end.sec, MCDPORT(0));
+	outb(params->end.frame, MCDPORT(0));
 }
 
 
@@ -1357,18 +1361,15 @@ sendMcdCmd(int cmd, struct mcd_Play_msf *params)
  * (see the next routine)
  */
 
-static void
-mcdStatTimer(unsigned long dummy)
+static void mcdStatTimer(unsigned long dummy)
 {
-	if (!(inb(MCDPORT(1)) & MFL_STATUS))
-	{
+	if (!(inb(MCDPORT(1)) & MFL_STATUS)) {
 		wake_up(&mcd_waitq);
 		return;
 	}
 
 	McdTimeout--;
-	if (McdTimeout <= 0)
-	{
+	if (McdTimeout <= 0) {
 		wake_up(&mcd_waitq);
 		return;
 	}
@@ -1383,8 +1384,7 @@ mcdStatTimer(unsigned long dummy)
  * excessive rescheduling.
  */
 
-static int
-getMcdStatus(int timeout)
+static int getMcdStatus(int timeout)
 {
 	int st;
 
@@ -1402,8 +1402,7 @@ getMcdStatus(int timeout)
 		/* XXX might be an error? look at q-channel? */
 		audioStatus = CDROM_AUDIO_COMPLETED;
 
-	if (st & MST_DSK_CHG)
-	{
+	if (st & MST_DSK_CHG) {
 		mcdDiskChanged = 1;
 		tocUpToDate = 0;
 		audioStatus = CDROM_AUDIO_NO_STATUS;
@@ -1415,18 +1414,22 @@ getMcdStatus(int timeout)
 
 /* gives current state of the drive This function is quite unreliable, 
    and should probably be rewritten by someone, eventually... */
-int mcd_drive_status(struct cdrom_device_info * cdi, int slot_nr)
+int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr)
 {
-  int st;
+	int st;
 
-  st = statusCmd();               /* check drive status */
-  if (st == -1)
-      return -EIO;            /* drive doesn't respond */
-  if ((st & MST_READY)) return CDS_DISC_OK;
-  if ((st & MST_DOOR_OPEN)) return CDS_TRAY_OPEN;
-  if ((st & MST_DSK_CHG)) return CDS_NO_DISC;
-  if ((st & MST_BUSY)) return CDS_DRIVE_NOT_READY;
-  return -EIO;
+	st = statusCmd();	/* check drive status */
+	if (st == -1)
+		return -EIO;	/* drive doesn't respond */
+	if ((st & MST_READY))
+		return CDS_DISC_OK;
+	if ((st & MST_DOOR_OPEN))
+		return CDS_TRAY_OPEN;
+	if ((st & MST_DSK_CHG))
+		return CDS_NO_DISC;
+	if ((st & MST_BUSY))
+		return CDS_DRIVE_NOT_READY;
+	return -EIO;
 }
 
 
@@ -1434,18 +1437,16 @@ int mcd_drive_status(struct cdrom_device_info * cdi, int slot_nr)
  * Read a value from the drive.
  */
 
-static int
-getValue(unsigned char *result)
+static int getValue(unsigned char *result)
 {
-        int count;
+	int count;
 	int s;
 
 	for (count = 0; count < 2000; count++)
 		if (!(inb(MCDPORT(1)) & MFL_STATUS))
 			break;
 
-	if (count >= 2000)
-	{
+	if (count >= 2000) {
 		printk("mcd: getValue timeout\n");
 		return -1;
 	}
@@ -1461,14 +1462,12 @@ getValue(unsigned char *result)
  * table of contents.
  */
 
-int
-GetQChannelInfo(struct mcd_Toc *qp)
+int GetQChannelInfo(struct mcd_Toc *qp)
 {
 	unsigned char notUsed;
 	int retry;
 
-	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++)
-	{
+	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++) {
 		outb(MCMD_GET_Q_CHANNEL, MCDPORT(0));
 		if (getMcdStatus(MCD_STATUS_DELAY) != -1)
 			break;
@@ -1477,16 +1476,26 @@ GetQChannelInfo(struct mcd_Toc *qp)
 	if (retry >= MCD_RETRY_ATTEMPTS)
 		return -1;
 
-	if (getValue(&qp -> ctrl_addr) < 0) return -1;
-	if (getValue(&qp -> track) < 0) return -1;
-	if (getValue(&qp -> pointIndex) < 0) return -1;
-	if (getValue(&qp -> trackTime.min) < 0) return -1;
-	if (getValue(&qp -> trackTime.sec) < 0) return -1;
-	if (getValue(&qp -> trackTime.frame) < 0) return -1;
-	if (getValue(&notUsed) < 0) return -1;
-	if (getValue(&qp -> diskTime.min) < 0) return -1;
-	if (getValue(&qp -> diskTime.sec) < 0) return -1;
-	if (getValue(&qp -> diskTime.frame) < 0) return -1;
+	if (getValue(&qp->ctrl_addr) < 0)
+		return -1;
+	if (getValue(&qp->track) < 0)
+		return -1;
+	if (getValue(&qp->pointIndex) < 0)
+		return -1;
+	if (getValue(&qp->trackTime.min) < 0)
+		return -1;
+	if (getValue(&qp->trackTime.sec) < 0)
+		return -1;
+	if (getValue(&qp->trackTime.frame) < 0)
+		return -1;
+	if (getValue(&notUsed) < 0)
+		return -1;
+	if (getValue(&qp->diskTime.min) < 0)
+		return -1;
+	if (getValue(&qp->diskTime.sec) < 0)
+		return -1;
+	if (getValue(&qp->diskTime.frame) < 0)
+		return -1;
 
 	return 0;
 }
@@ -1496,8 +1505,7 @@ GetQChannelInfo(struct mcd_Toc *qp)
  * Read the table of contents (TOC) and TOC header if necessary
  */
 
-static int
-updateToc()
+static int updateToc()
 {
 	if (tocUpToDate)
 		return 0;
@@ -1517,13 +1525,11 @@ updateToc()
  * Read the table of contents header
  */
 
-static int
-GetDiskInfo()
+static int GetDiskInfo()
 {
 	int retry;
 
-	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++)
-	{
+	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++) {
 		outb(MCMD_GET_DISK_INFO, MCDPORT(0));
 		if (getMcdStatus(MCD_STATUS_DELAY) != -1)
 			break;
@@ -1532,30 +1538,35 @@ GetDiskInfo()
 	if (retry >= MCD_RETRY_ATTEMPTS)
 		return -1;
 
-	if (getValue(&DiskInfo.first) < 0) return -1;
-	if (getValue(&DiskInfo.last) < 0) return -1;
+	if (getValue(&DiskInfo.first) < 0)
+		return -1;
+	if (getValue(&DiskInfo.last) < 0)
+		return -1;
 
 	DiskInfo.first = bcd2bin(DiskInfo.first);
 	DiskInfo.last = bcd2bin(DiskInfo.last);
 
 #ifdef MCD_DEBUG
-printk("Disk Info: first %d last %d length %02x:%02x.%02x first %02x:%02x.%02x\n",
-	DiskInfo.first,
-	DiskInfo.last,
-	DiskInfo.diskLength.min,
-	DiskInfo.diskLength.sec,
-	DiskInfo.diskLength.frame,
-	DiskInfo.firstTrack.min,
-	DiskInfo.firstTrack.sec,
-	DiskInfo.firstTrack.frame);
+	printk
+	    ("Disk Info: first %d last %d length %02x:%02x.%02x first %02x:%02x.%02x\n",
+	     DiskInfo.first, DiskInfo.last, DiskInfo.diskLength.min,
+	     DiskInfo.diskLength.sec, DiskInfo.diskLength.frame,
+	     DiskInfo.firstTrack.min, DiskInfo.firstTrack.sec,
+	     DiskInfo.firstTrack.frame);
 #endif
 
-	if (getValue(&DiskInfo.diskLength.min) < 0) return -1;
-	if (getValue(&DiskInfo.diskLength.sec) < 0) return -1;
-	if (getValue(&DiskInfo.diskLength.frame) < 0) return -1;
-	if (getValue(&DiskInfo.firstTrack.min) < 0) return -1;
-	if (getValue(&DiskInfo.firstTrack.sec) < 0) return -1;
-	if (getValue(&DiskInfo.firstTrack.frame) < 0) return -1;
+	if (getValue(&DiskInfo.diskLength.min) < 0)
+		return -1;
+	if (getValue(&DiskInfo.diskLength.sec) < 0)
+		return -1;
+	if (getValue(&DiskInfo.diskLength.frame) < 0)
+		return -1;
+	if (getValue(&DiskInfo.firstTrack.min) < 0)
+		return -1;
+	if (getValue(&DiskInfo.firstTrack.sec) < 0)
+		return -1;
+	if (getValue(&DiskInfo.firstTrack.frame) < 0)
+		return -1;
 
 	return 0;
 }
@@ -1565,8 +1576,7 @@ printk("Disk Info: first %d last %d length %02x:%02x.%02x first %02x:%02x.%02x\n
  * Read the table of contents (TOC)
  */
 
-static int
-GetToc()
+static int GetToc()
 {
 	int i, px;
 	int limit;
@@ -1578,8 +1588,7 @@ GetToc()
 
 	i = DiskInfo.last + 3;
 
-	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++)
-	{
+	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++) {
 		outb(MCMD_STOP, MCDPORT(0));
 		if (getMcdStatus(MCD_STATUS_DELAY) != -1)
 			break;
@@ -1588,10 +1597,9 @@ GetToc()
 	if (retry >= MCD_RETRY_ATTEMPTS)
 		return -1;
 
-	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++)
-	{
+	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++) {
 		outb(MCMD_SET_MODE, MCDPORT(0));
-		outb(0x05, MCDPORT(0));			/* mode: toc */
+		outb(0x05, MCDPORT(0));	/* mode: toc */
 		mcd_mode = 0x05;
 		if (getMcdStatus(MCD_STATUS_DELAY) != -1)
 			break;
@@ -1600,15 +1608,13 @@ GetToc()
 	if (retry >= MCD_RETRY_ATTEMPTS)
 		return -1;
 
-	for (limit = 300; limit > 0; limit--)
-	{
+	for (limit = 300; limit > 0; limit--) {
 		if (GetQChannelInfo(&qInfo) < 0)
 			break;
 
 		px = bcd2bin(qInfo.pointIndex);
 		if (px > 0 && px < MAX_TRACKS && qInfo.track == 0)
-			if (Toc[px].pointIndex == 0)
-			{
+			if (Toc[px].pointIndex == 0) {
 				Toc[px] = qInfo;
 				i--;
 			}
@@ -1619,26 +1625,29 @@ GetToc()
 
 	Toc[DiskInfo.last + 1].diskTime = DiskInfo.diskLength;
 
-	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++)
-	{
-                outb(MCMD_SET_MODE, MCDPORT(0));
-                outb(0x01, MCDPORT(0));
+	for (retry = 0; retry < MCD_RETRY_ATTEMPTS; retry++) {
+		outb(MCMD_SET_MODE, MCDPORT(0));
+		outb(0x01, MCDPORT(0));
 		mcd_mode = 1;
-                if (getMcdStatus(MCD_STATUS_DELAY) != -1)
-                        break;
+		if (getMcdStatus(MCD_STATUS_DELAY) != -1)
+			break;
 	}
 
 #ifdef MCD_DEBUG
-for (i = 1; i <= DiskInfo.last; i++)
-printk("i = %2d ctl-adr = %02X track %2d px %02X %02X:%02X.%02X    %02X:%02X.%02X\n",
-i, Toc[i].ctrl_addr, Toc[i].track, Toc[i].pointIndex,
-Toc[i].trackTime.min, Toc[i].trackTime.sec, Toc[i].trackTime.frame,
-Toc[i].diskTime.min, Toc[i].diskTime.sec, Toc[i].diskTime.frame);
-for (i = 100; i < 103; i++)
-printk("i = %2d ctl-adr = %02X track %2d px %02X %02X:%02X.%02X    %02X:%02X.%02X\n",
-i, Toc[i].ctrl_addr, Toc[i].track, Toc[i].pointIndex,
-Toc[i].trackTime.min, Toc[i].trackTime.sec, Toc[i].trackTime.frame,
-Toc[i].diskTime.min, Toc[i].diskTime.sec, Toc[i].diskTime.frame);
+	for (i = 1; i <= DiskInfo.last; i++)
+		printk
+		    ("i = %2d ctl-adr = %02X track %2d px %02X %02X:%02X.%02X    %02X:%02X.%02X\n",
+		     i, Toc[i].ctrl_addr, Toc[i].track, Toc[i].pointIndex,
+		     Toc[i].trackTime.min, Toc[i].trackTime.sec,
+		     Toc[i].trackTime.frame, Toc[i].diskTime.min,
+		     Toc[i].diskTime.sec, Toc[i].diskTime.frame);
+	for (i = 100; i < 103; i++)
+		printk
+		    ("i = %2d ctl-adr = %02X track %2d px %02X %02X:%02X.%02X    %02X:%02X.%02X\n",
+		     i, Toc[i].ctrl_addr, Toc[i].track, Toc[i].pointIndex,
+		     Toc[i].trackTime.min, Toc[i].trackTime.sec,
+		     Toc[i].trackTime.frame, Toc[i].diskTime.min,
+		     Toc[i].diskTime.sec, Toc[i].diskTime.frame);
 #endif
 
 	return limit > 0 ? 0 : -1;
@@ -1647,13 +1656,14 @@ Toc[i].diskTime.min, Toc[i].diskTime.sec, Toc[i].diskTime.frame);
 
 void __exit mcd_exit(void)
 {
-  cleanup(3);
-  del_timer_sync(&mcd_timer);
+	cleanup(3);
+	del_timer_sync(&mcd_timer);
 }
 
 #ifdef MODULE
 module_init(mcd_init);
-#endif 
+#endif
 module_exit(mcd_exit);
 
-
+MODULE_AUTHOR("Martin Harriss");
+MODULE_LICENSE("GPL");

@@ -397,19 +397,18 @@ static void proc_kill_inodes(struct proc_dir_entry *de)
 	file_list_lock();
 	for (p = sb->s_files.next; p != &sb->s_files; p = p->next) {
 		struct file * filp = list_entry(p, struct file, f_list);
-		struct dentry * dentry;
+		struct dentry * dentry = filp->f_dentry;
 		struct inode * inode;
+		struct file_operations *fops;
 
-		dentry = filp->f_dentry;
-		if (!dentry)
-			continue;
 		if (dentry->d_op != &proc_dentry_operations)
 			continue;
 		inode = dentry->d_inode;
 		if (inode->u.generic_ip != de)
 			continue;
-		fops_put(filp->f_op);
+		fops = filp->f_op;
 		filp->f_op = NULL;
+		fops_put(fops);
 	}
 	file_list_unlock();
 }

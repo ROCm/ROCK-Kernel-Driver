@@ -1,6 +1,10 @@
 /*
+ *	OSS driver for Linux 2.4.x for
  *
- *	Trident 4D-Wave/SiS 7018/ALi 5451 OSS driver for Linux 2.2.x
+ *	Trident 4D-Wave
+ *	SiS 7018
+ *	ALi 5451
+ *	Tvia/IGST CyberPro 5050
  *
  *	Driver: Alan Cox <alan@redhat.com>
  *
@@ -14,6 +18,7 @@
  *	Ollie Lho <ollie@sis.com.tw> SiS 7018 Audio Core Support
  *	Ching-Ling Lee <cling-li@ali.com.tw> ALi 5451 Audio Core Support 
  *	Matt Wu <mattwu@acersoftech.com.cn> ALi 5451 Audio Core Support
+ *	Peter Wächtler <pwaechtler@loewe-komp.de> CyberPro5050 support
  *
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -31,6 +36,10 @@
  *	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  History
+ *  v0.14.9c
+ *	August 10 2001 Peter Wächtler <pwaechtler@loewe-komp.de>
+ *	added support for Tvia (formerly Integraphics/IGST) CyberPro5050
+ *	this chip is often found in settop boxes (combined video+audio)
  *  v0.14.9b
  *	Switch to static inline not extern inline (gcc 3)
  *  v0.14.9a
@@ -61,7 +70,7 @@
  *	Implement multi-channels and S/PDIF in support for ALi 1535+
  *  v0.14.6 
  *	Nov 1 2000 Ching-Ling Lee
- *	Fix the bug of memory leak when swithing 5.1-channels to 2 channels.
+ *	Fix the bug of memory leak when switching 5.1-channels to 2 channels.
  *	Add lock protection into dynamic changing format of data.
  *	Oct 18 2000 Ching-Ling Lee
  *	5.1-channels support for ALi
@@ -167,7 +176,7 @@
 
 #include <linux/pm.h>
 
-#define DRIVER_VERSION "0.14.9b"
+#define DRIVER_VERSION "0.14.9c"
 
 /* magic numbers to protect our data structures */
 #define TRIDENT_CARD_MAGIC	0x5072696E /* "Prin" */
@@ -195,14 +204,16 @@ enum {
 	TRIDENT_4D_DX = 0,
 	TRIDENT_4D_NX,
 	SIS_7018,
-	ALI_5451
+	ALI_5451,
+	CYBER5050
 };
 
 static char * card_names[] = {
 	"Trident 4DWave DX",
 	"Trident 4DWave NX",
 	"SiS 7018 PCI Audio",
-	"ALi Audio Accelerator"
+	"ALi Audio Accelerator",
+	"Tvia/IGST CyberPro 5050"
 };
 
 static struct pci_device_id trident_pci_tbl [] __devinitdata = {
@@ -214,6 +225,8 @@ static struct pci_device_id trident_pci_tbl [] __devinitdata = {
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, SIS_7018},
 	{PCI_VENDOR_ID_ALI, PCI_DEVICE_ID_ALI_5451,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, ALI_5451},
+	{ PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_5050, 
+	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, CYBER5050},
 	{0,}
 };
 
@@ -456,6 +469,7 @@ static int trident_enable_loop_interrupts(struct trident_card * card)
 	case PCI_DEVICE_ID_ALI_5451:
 	case PCI_DEVICE_ID_TRIDENT_4DWAVE_DX:
 	case PCI_DEVICE_ID_TRIDENT_4DWAVE_NX:
+	case PCI_DEVICE_ID_INTERG_5050:
 		global_control |= (ENDLP_IE | MIDLP_IE);
 		break;
 	default:
@@ -466,7 +480,7 @@ static int trident_enable_loop_interrupts(struct trident_card * card)
 
 #ifdef DEBUG
 	printk("trident: Enable Loop Interrupts, globctl = 0x%08X\n",
-	       global_control);
+			inl(TRID_REG(card, T4D_LFO_GC_CIR)));
 #endif
 	return (TRUE);
 }
@@ -497,9 +511,9 @@ static void trident_enable_voice_irq(struct trident_card * card, unsigned int ch
 	outl(reg, TRID_REG(card, addr));
 
 #ifdef DEBUG
-	reg = inl(TRID_REG(card, T4D_AINTEN_B));
-	printk("trident: enabled IRQ on channel %d, AINTEN_B = 0x%08x\n",
-	       channel, reg);
+	reg = inl(TRID_REG(card, addr));
+	printk("trident: enabled IRQ on channel %d, %s = 0x%08x(addr:%X)\n",
+		channel, addr==T4D_AINTEN_B? "AINTEN_B":"AINTEN_A",reg,addr);
 #endif
 }
 
@@ -517,9 +531,9 @@ static void trident_disable_voice_irq(struct trident_card * card, unsigned int c
 	outl(mask, TRID_REG(card, bank->addresses->aint));
 
 #ifdef DEBUG
-	reg = inl(TRID_REG(card, T4D_AINTEN_B));
-	printk("trident: disabled IRQ on channel %d, AINTEN_B = 0x%08x\n",
-	       channel, reg);
+	reg = inl(TRID_REG(card, addr));
+	printk("trident: disabled IRQ on channel %d, %s = 0x%08x(addr:%X)\n",
+		channel, addr==T4D_AINTEN_B? "AINTEN_B":"AINTEN_A",reg,addr);
 #endif
 }
 
@@ -536,9 +550,9 @@ static void trident_start_voice(struct trident_card * card, unsigned int channel
 	outl(mask, TRID_REG(card, addr));
 
 #ifdef DEBUG
-	reg = inl(TRID_REG(card, T4D_START_B));
-	printk("trident: start voice on channel %d, START_B  = 0x%08x\n",
-	       channel, reg);
+	reg = inl(TRID_REG(card, addr));
+	printk("trident: start voice on channel %d, %s = 0x%08x(addr:%X)\n",
+		channel, addr==T4D_START_B? "START_B":"START_A",reg,addr);
 #endif
 }
 
@@ -555,9 +569,9 @@ static void trident_stop_voice(struct trident_card * card, unsigned int channel)
 	outl(mask, TRID_REG(card, addr));
 
 #ifdef DEBUG
-	reg = inl(TRID_REG(card, T4D_STOP_B));
-	printk("trident: stop voice on channel %d,  STOP_B  = 0x%08x\n",
-	       channel, reg);
+	reg = inl(TRID_REG(card, addr));
+	printk("trident: stop voice on channel %d, %s = 0x%08x(addr:%X)\n",
+		channel, addr==T4D_STOP_B? "STOP_B":"STOP_A",reg,addr);
 #endif
 }
 
@@ -575,8 +589,8 @@ static int trident_check_channel_interrupt(struct trident_card * card, unsigned 
 
 #ifdef DEBUG
 	if (reg & mask)
-		printk("trident: channel %d has interrupt, AINT_B = 0x%08x\n",
-		       channel, reg);
+		printk("trident: channel %d has interrupt, %s = 0x%08x\n",
+			channel,reg==T4D_AINT_B? "AINT_B":"AINT_A", reg);
 #endif
 	return (reg & mask) ? TRUE : FALSE;
 }
@@ -614,7 +628,7 @@ static struct trident_channel * trident_alloc_pcm_channel(struct trident_card *c
 		}
 	}
 
-	/* no more free channels avaliable */
+	/* no more free channels available */
 	printk(KERN_ERR "trident: no more channels available on Bank B.\n");
 	return NULL;
 }
@@ -632,7 +646,94 @@ static void trident_free_pcm_channel(struct trident_card *card, unsigned int cha
 	card->banks[bank].bitmap &= ~(1 << (channel));
 }
 
-/* called with spin lock held */
+static struct trident_channel * cyber_alloc_pcm_channel(struct trident_card *card)
+{
+	struct trident_pcm_bank *bank;
+	int idx;
+
+	/* The cyberpro 5050 has only 32 voices and one bank */
+	/* .. at least they are not documented (if you want to call that 
+	 * crap documentation), perhaps broken ? */
+
+	bank = &card->banks[BANK_A];
+
+	for (idx = 31; idx >= 0; idx--) {
+		if (!(bank->bitmap & (1 << idx))) {
+			struct trident_channel *channel = &bank->channels[idx];
+			bank->bitmap |= 1 << idx;
+			channel->num = idx;
+			return channel;
+		}
+	}
+
+	/* no more free channels available */
+	printk(KERN_ERR "cyberpro5050: no more channels available on Bank A.\n");
+	return NULL;
+}
+
+static void cyber_free_pcm_channel(struct trident_card *card, unsigned int channel)
+{
+	if (channel > 31)
+		return;
+	card->banks[BANK_A].bitmap &= ~(1 << (channel));
+}
+
+static inline void cyber_outidx(int port,int idx,int data)
+{
+	outb(idx,port);
+	outb(data,port+1);
+}
+
+static inline int cyber_inidx(int port,int idx)
+{
+	outb(idx,port);
+	return inb(port+1);
+}
+
+static int cyber_init_ritual(struct trident_card *card)
+{
+	/* some black magic, taken from SDK samples */
+	/* remove this and nothing will work */
+	int portDat;
+	int ret = 0;
+	unsigned long flags;
+
+	/*
+ 	 *	Keep interrupts off for the configure - we don't want to
+ 	 *	clash with another cyberpro config event
+ 	 */
+ 
+	save_flags(flags);
+	cli();
+	portDat = cyber_inidx(CYBER_PORT_AUDIO, CYBER_IDX_AUDIO_ENABLE);
+	/* enable, if it was disabled */
+	if( (portDat & CYBER_BMSK_AUENZ) != CYBER_BMSK_AUENZ_ENABLE ) {
+		printk(KERN_INFO "cyberpro5050: enabling audio controller\n" );
+		cyber_outidx( CYBER_PORT_AUDIO, CYBER_IDX_AUDIO_ENABLE,
+			portDat | CYBER_BMSK_AUENZ_ENABLE );
+		/* check again if hardware is enabled now */
+		portDat = cyber_inidx(CYBER_PORT_AUDIO, CYBER_IDX_AUDIO_ENABLE);
+	}
+	if( (portDat & CYBER_BMSK_AUENZ) != CYBER_BMSK_AUENZ_ENABLE )
+	{
+		printk(KERN_ERR "cyberpro5050: initAudioAccess: no success\n" );
+		ret = -1;
+	}
+	else
+	{
+		cyber_outidx( CYBER_PORT_AUDIO, CYBER_IDX_IRQ_ENABLE, CYBER_BMSK_AUDIO_INT_ENABLE );
+		cyber_outidx( CYBER_PORT_AUDIO, 0xbf, 0x01 );
+		cyber_outidx( CYBER_PORT_AUDIO, 0xba, 0x20 );
+		cyber_outidx( CYBER_PORT_AUDIO, 0xbb, 0x08 );
+		cyber_outidx( CYBER_PORT_AUDIO, 0xbf, 0x02 );
+		cyber_outidx( CYBER_PORT_AUDIO, 0xb3, 0x06 );
+		cyber_outidx( CYBER_PORT_AUDIO, 0xbf, 0x00 );
+	}
+	restore_flags(flags);
+	return ret;
+}
+
+/*  called with spin lock held */
 
 static int trident_load_channel_registers(struct trident_card *card, u32 *data, unsigned int channel)
 {
@@ -651,7 +752,8 @@ static int trident_load_channel_registers(struct trident_card *card, u32 *data, 
 			continue;
 		outl(data[i], TRID_REG(card, CHANNEL_START + 4*i));
 	}
-	if (card->pci_id == PCI_DEVICE_ID_ALI_5451) {
+	if (card->pci_id == PCI_DEVICE_ID_ALI_5451 ||
+		card->pci_id == PCI_DEVICE_ID_INTERG_5050) {
 		outl(ALI_EMOD_Still, TRID_REG(card, ALI_EBUF1));
 		outl(ALI_EMOD_Still, TRID_REG(card, ALI_EBUF2));
 	}
@@ -677,6 +779,7 @@ static int trident_write_voice_regs(struct trident_state *state)
 		data[3] = 0;
 		break;	
 	case PCI_DEVICE_ID_SI_7018:
+	case PCI_DEVICE_ID_INTERG_5050:
 		data[0] = 0; /* Current Sample Offset */
 		data[2] = (channel->eso << 16) | (channel->delta & 0xffff);
 		data[3] = (channel->attribute << 16) | (channel->fm_vol & 0xffff);
@@ -814,7 +917,7 @@ static void trident_play_setup(struct trident_state *state)
 		channel->control |= CHANNEL_STEREO;
 #ifdef DEBUG
 	printk("trident: trident_play_setup, LBA = 0x%08x, "
-	       "Delat = 0x%08x, ESO = 0x%08x, Control = 0x%08x\n",
+	       "Delta = 0x%08x, ESO = 0x%08x, Control = 0x%08x\n",
 	       channel->lba, channel->delta, channel->eso, channel->control);
 #endif
 	trident_write_voice_regs(state);
@@ -851,6 +954,9 @@ static void trident_rec_setup(struct trident_state *state)
 		outw(w | 0x1000, TRID_REG(card, T4D_MISCINT));
 		/* enable and set record channel */
 		outb(0x80 | channel->num, TRID_REG(card, T4D_REC_CH));
+		break;
+	case PCI_DEVICE_ID_INTERG_5050:
+		/* don't know yet, using special channel 22 in GC1(0xd4)? */
 		break;
 	default:
 		return;
@@ -920,6 +1026,7 @@ static inline unsigned trident_get_dma_addr(struct trident_state *state)
 	case PCI_DEVICE_ID_ALI_5451:
 	case PCI_DEVICE_ID_SI_7018:
 	case PCI_DEVICE_ID_TRIDENT_4DWAVE_DX:
+	case PCI_DEVICE_ID_INTERG_5050:
 		/* 16 bits ESO, CSO for 7018 and DX */
 		cso = inw(TRID_REG(state->card, CH_DX_CSO_ALPHA_FMS + 2));
 		break;
@@ -1271,7 +1378,8 @@ static int drain_dac(struct trident_state *state, int nonblock)
 
 		/* No matter how much data is left in the buffer, we have to wait until
 		   CSO == ESO/2 or CSO == ESO when address engine interrupts */
-	 	if (state->card->pci_id == PCI_DEVICE_ID_ALI_5451)
+	 	if (state->card->pci_id == PCI_DEVICE_ID_ALI_5451 ||
+		    state->card->pci_id == PCI_DEVICE_ID_INTERG_5050)
 		{	
 			diff = dmabuf->swptr - trident_get_dma_addr(state) + dmabuf->dmasize ;
 			diff = diff % (dmabuf->dmasize);
@@ -1526,6 +1634,38 @@ static void ali_queue_task(struct trident_card *card, int opt)
 	
 	/* Set the timer for 1/10th sec */
 	ali_set_timer(card);
+}
+
+static void cyber_address_interrupt(struct trident_card *card)
+{
+	int i,irq_status;
+	struct trident_state *state;
+
+	/* Update the pointers for all channels we are running. */
+	/* FIXED: read interrupt status only once */
+	irq_status=inl(TRID_REG(card, T4D_AINT_A) );
+#ifdef DEBUG	
+	printk("cyber_address_interrupt: irq_status 0x%X\n",irq_status);
+#endif
+	for (i = 0; i < NR_HW_CH; i++) {
+		if (irq_status & ( 1 << (31 - i)) ) {
+
+			/* clear bit by writing a 1, zeroes are ignored */ 		
+			outl( (1 <<(31-i)), TRID_REG(card, T4D_AINT_A));
+		
+#ifdef DEBUG	
+	printk("cyber_interrupt: channel %d\n", 31-i);
+#endif
+			if ((state = card->states[i]) != NULL) {
+				trident_update_ptr(state);
+			} else {
+				printk("cyber5050: spurious channel irq %d.\n",
+				       31 - i);
+				trident_stop_voice(card, 31 - i);
+				trident_disable_voice_irq(card, 31 - i);
+			}
+		}
+	}
 }
 
 static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -2537,6 +2677,11 @@ static int trident_release(struct inode *inode, struct file *file)
 		drain_dac(state, file->f_flags & O_NONBLOCK);
 	}
 
+#ifdef DEBUG
+	printk(KERN_ERR "trident: closing virtual channel %d, hard channel %d\n", 
+		state->virt, dmabuf->channel->num);
+#endif
+
 	/* stop DMA state machine and free DMA buffers/channels */
 	down(&card->open_sem);
 
@@ -2626,6 +2771,12 @@ static void trident_ac97_set(struct ac97_codec *codec, u8 reg, u16 val)
 			mask |= NX_AC97_WRITE_SECONDARY;
 		busy = NX_AC97_BUSY_WRITE;
 		break;
+	case PCI_DEVICE_ID_INTERG_5050:
+		address = SI_AC97_WRITE;
+		mask = busy = SI_AC97_BUSY_WRITE;
+		if (codec->id)
+			mask |= SI_AC97_SECONDARY;
+		break;
 	}
 
 	spin_lock_irqsave(&card->lock, flags);
@@ -2677,6 +2828,12 @@ static u16 trident_ac97_get(struct ac97_codec *codec, u8 reg)
 			address = NX_ACR2_AC97_R_PRIMARY;
 		mask = NX_AC97_BUSY_READ;
 		busy = NX_AC97_BUSY_READ | NX_AC97_BUSY_DATA;
+		break;
+	case PCI_DEVICE_ID_INTERG_5050:
+		address = SI_AC97_READ;
+		mask = busy = SI_AC97_BUSY_READ;
+		if (codec->id)
+			mask |= SI_AC97_SECONDARY;
 		break;
 	}
 
@@ -3707,6 +3864,18 @@ static int __init trident_ac97_init(struct trident_card *card)
 		ready_2nd = inl(TRID_REG(card, NX_ACR0_AC97_COM_STAT));
 		ready_2nd &= NX_AC97_SECONDARY_READY;
 		break;
+	case PCI_DEVICE_ID_INTERG_5050:
+		/* disable AC97 GPIO interrupt */
+		outl(0x00, TRID_REG(card, SI_AC97_GPIO));
+		/* when power up, the AC link is in cold reset mode, so stop it */
+		outl(PCMOUT|SURROUT|CENTEROUT|LFEOUT,
+		     TRID_REG(card, SI_SERIAL_INTF_CTRL));
+		/* it take a long time to recover from a cold reset (especially when you have
+		   more than one codec) */
+		udelay(2000);
+		ready_2nd = inl(TRID_REG(card, SI_SERIAL_INTF_CTRL));
+		ready_2nd &= SI_AC97_SECONDARY_READY;
+		break;
 	}
 
 	for (num_ac97 = 0; num_ac97 < NR_AC97; num_ac97++) {
@@ -3769,7 +3938,7 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	struct pci_dev *pci_dev_m1533 = NULL;
 
 	if (pci_enable_device(pci_dev))
-	    return -ENODEV;
+		return -ENODEV;
 
 	if (pci_set_dma_mask(pci_dev, TRIDENT_DMA_MASK)) {
 		printk(KERN_ERR "trident: architecture does not support"
@@ -3778,7 +3947,11 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	}
 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);
 
-	iobase = pci_resource_start(pci_dev, 0);
+	if (pci_id->device == PCI_DEVICE_ID_INTERG_5050)
+		iobase = pci_resource_start(pci_dev, 1);
+	else
+		iobase = pci_resource_start(pci_dev, 0);
+
 	if (check_region(iobase, 256)) {
 		printk(KERN_ERR "trident: can't allocate I/O space at 0x%4.4lx\n",
 		       iobase);
@@ -3855,7 +4028,16 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 			pci_write_config_byte(pci_dev_m1533, 0x7b, bits);
 		}
 	}
-	else {
+	else if(card->pci_id == PCI_DEVICE_ID_INTERG_5050)
+	{
+		card->alloc_pcm_channel = cyber_alloc_pcm_channel;
+		card->alloc_rec_pcm_channel = cyber_alloc_pcm_channel;
+		card->free_pcm_channel = cyber_free_pcm_channel;
+		card->address_interrupt = cyber_address_interrupt;
+		cyber_init_ritual(card);
+	}
+	else
+	{
 		card->alloc_pcm_channel = trident_alloc_pcm_channel;
 		card->alloc_rec_pcm_channel = trident_alloc_pcm_channel;
 		card->free_pcm_channel = trident_free_pcm_channel;
@@ -3982,7 +4164,7 @@ static void __exit trident_remove(struct pci_dev *pci_dev)
 }
 
 MODULE_AUTHOR("Alan Cox, Aaron Holtzman, Ollie Lho, Ching Ling Lee");
-MODULE_DESCRIPTION("Trident 4DWave/SiS 7018/ALi 5451 PCI Audio Driver");
+MODULE_DESCRIPTION("Trident 4DWave/SiS 7018/ALi 5451 and Tvia/IGST CyberPro5050 PCI Audio Driver");
 
 #define TRIDENT_MODULE_NAME "trident"
 
@@ -4000,7 +4182,7 @@ static int __init trident_init_module (void)
 	if (!pci_present())   /* No PCI bus in this machine! */
 		return -ENODEV;
 
-	printk(KERN_INFO "Trident 4DWave/SiS 7018/ALi 5451 PCI Audio, version "
+	printk(KERN_INFO "Trident 4DWave/SiS 7018/ALi 5451,Tvia CyberPro 5050 PCI Audio, version "
 	       DRIVER_VERSION ", " __TIME__ " " __DATE__ "\n");
 
 	if (!pci_register_driver(&trident_pci_driver)) {

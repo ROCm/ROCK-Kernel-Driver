@@ -12,7 +12,11 @@
  * Free memory management - zoned buddy allocator.
  */
 
+#ifndef CONFIG_FORCE_MAX_ZONEORDER
 #define MAX_ORDER 10
+#else
+#define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
+#endif
 
 typedef struct free_area_struct {
 	struct list_head	free_list;

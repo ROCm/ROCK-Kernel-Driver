@@ -5,7 +5,7 @@
  *
  *		The IP fragmentation functionality.
  *		
- * Version:	$Id: ip_fragment.c,v 1.57 2001/03/07 22:00:57 davem Exp $
+ * Version:	$Id: ip_fragment.c,v 1.58 2001/09/01 00:31:50 davem Exp $
  *
  * Authors:	Fred N. van Kempen <waltje@uWalt.NL.Mugnet.ORG>
  *		Alan Cox <Alan.Cox@linux.org>
@@ -335,7 +335,7 @@ static struct ipq *ip_frag_create(unsigned hash, struct iphdr *iph)
 	return ip_frag_intern(hash, qp);
 
 out_nomem:
-	NETDEBUG(printk(KERN_ERR "ip_frag_create: no memory left !\n"));
+	NETDEBUG(if (net_ratelimit()) printk(KERN_ERR "ip_frag_create: no memory left !\n"));
 	return NULL;
 }
 
@@ -578,7 +578,8 @@ static struct sk_buff *ip_frag_reasm(struct ipq *qp, struct net_device *dev)
 	return head;
 
 out_nomem:
- 	NETDEBUG(printk(KERN_ERR 
+ 	NETDEBUG(if (net_ratelimit())
+	         printk(KERN_ERR 
 			"IP: queue_glue: no memory for gluing queue %p\n",
 			qp));
 	goto out_fail;

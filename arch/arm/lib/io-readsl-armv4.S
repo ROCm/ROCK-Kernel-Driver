@@ -63,8 +63,8 @@ ENTRY(__raw_readsl)
 		strne	ip, [r1], #4
 		movne	ip, r3, lsr #8
 		bne	7b
-		strb	ip, [r1], #1
-		mov	ip, ip, lsr #8
 		strh	ip, [r1], #2
+		mov	ip, ip, lsr #16
+		strb	ip, [r1]
 		mov	pc, lr
 

@@ -25,7 +25,7 @@
 /*
  * BlueZ HCI socket layer.
  *
- * $Id: hci_sock.c,v 1.1 2001/06/01 08:12:11 davem Exp $
+ * $Id: hci_sock.c,v 1.9 2001/08/05 06:02:16 maxk Exp $
  */
 
 #include <linux/config.h>
@@ -36,7 +36,7 @@
 #include <linux/kernel.h>
 #include <linux/major.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/fcntl.h>
 #include <linux/init.h>
@@ -81,13 +81,15 @@ static struct sock *hci_sock_lookup(struct hci_dev *hdev)
 /* Send frame to RAW socket */
 void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct sk_buff *nskb;
 	struct sock * sk;
 
 	DBG("hdev %p len %d", hdev, skb->len);
 
 	read_lock(&hci_sk_list.lock);
 	for (sk = hci_sk_list.head; sk; sk = sk->next) {
+		struct hci_filter *flt;	
+		struct sk_buff *nskb;
+
 		if (sk->state != BT_BOUND || hci_pi(sk)->hdev != hdev)
 			continue;
 
@@ -95,7 +97,20 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 		if (skb->sk == sk)
 			continue;
 
-		if (!(nskb = bluez_skb_clone(skb, GFP_ATOMIC)))
+		/* Apply filter */
+		flt = &hci_pi(sk)->filter;
+
+		if (!test_bit(skb->pkt_type, &flt->type_mask))
+			continue;
+
+		if (skb->pkt_type == HCI_EVENT_PKT) {
+			register int evt = (*(__u8 *)skb->data & 63);
+
+			if (!test_bit(evt, &flt->event_mask))
+				continue;
+		}
+
+		if (!(nskb = skb_clone(skb, GFP_ATOMIC)))
 			continue;
 
 		/* Put type byte before the data */
@@ -128,8 +143,8 @@ static int hci_sock_release(struct socket *sock)
 
 	sock_orphan(sk);
 
-	bluez_skb_queue_purge(&sk->receive_queue);
-	bluez_skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->write_queue);
 
 	sock_put(sk);
 
@@ -144,7 +159,7 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long a
 	struct hci_dev *hdev = hci_pi(sk)->hdev;
 	__u32 mode;
 
-	DBG("cmd %x", cmd);
+	DBG("cmd %x arg %lx", cmd, arg);
 
 	switch (cmd) {
 	case HCIGETINFO:
@@ -156,37 +171,31 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long a
 	case HCIDEVUP:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-
 		return hci_dev_open(arg);
 
 	case HCIDEVDOWN:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-
 		return hci_dev_close(arg);
 
 	case HCIDEVRESET:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-
 		return hci_dev_reset(arg);
 
 	case HCIRESETSTAT:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-
 		return hci_dev_reset_stat(arg);
 
 	case HCISETSCAN:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-
 		return hci_dev_setscan(arg);
 
 	case HCISETAUTH:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-
 		return hci_dev_setauth(arg);
 
 	case HCISETRAW:
@@ -203,8 +212,16 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long a
 
 		return hci_dev_setmode(hdev, mode);
 
+	case HCISETPTYPE:
+		if (!capable(CAP_NET_ADMIN))
+			return -EACCES;
+		return hci_dev_setptype(arg);
+
 	case HCIINQUIRY:
 		return hci_inquiry(arg);
+
+	case HCIGETCONNLIST:
+		return hci_conn_list(arg);
 
 	default:
 		return -EINVAL;
@@ -291,11 +308,11 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	return len;
 }
 
-static __inline__ void hci_sock_cmsg(struct sock *sk, struct msghdr *msg, struct sk_buff *skb)
+static inline void hci_sock_cmsg(struct sock *sk, struct msghdr *msg, struct sk_buff *skb)
 {
-	__u32 flags = hci_pi(sk)->cmsg_flags;
+	__u32 mask = hci_pi(sk)->cmsg_mask;
 
-	if (flags & HCI_CMSG_DIR)
+	if (mask & HCI_CMSG_DIR)
         	put_cmsg(msg, SOL_HCI, HCI_CMSG_DIR, sizeof(int), &bluez_cb(skb)->incomming);
 }
  
@@ -326,7 +343,7 @@ static int hci_sock_recvmsg(struct socket *sock, struct msghdr *msg, int len,
 	skb->h.raw = skb->data;
 	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 
-	if (hci_pi(sk)->cmsg_flags)
+	if (hci_pi(sk)->cmsg_mask)
 		hci_sock_cmsg(sk, msg, skb);
 
 	skb_free_datagram(sk, skb);
@@ -334,24 +351,34 @@ static int hci_sock_recvmsg(struct socket *sock, struct msghdr *msg, int len,
 	return err ? : copied;
 }
 
-int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
+int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int len)
 {
 	struct sock *sk = sock->sk;
-	int err = 0, opt;
+	struct hci_filter flt;
+	int err = 0, opt = 0;
 
-	if (get_user(opt, (int *)optval))
-		return -EFAULT;
-
-	DBG("sk %p, opt %d", sk, opt);
+	DBG("sk %p, opt %d", sk, optname);
 
 	lock_sock(sk);
 
 	switch (optname) {
 	case HCI_DATA_DIR:
+		if (get_user(opt, (int *)optval))
+			return -EFAULT;
+
 		if (opt)
-			hci_pi(sk)->cmsg_flags |= HCI_CMSG_DIR;
+			hci_pi(sk)->cmsg_mask |= HCI_CMSG_DIR;
 		else
-			hci_pi(sk)->cmsg_flags &= ~HCI_CMSG_DIR;
+			hci_pi(sk)->cmsg_mask &= ~HCI_CMSG_DIR;
+		break;
+
+	case HCI_FILTER:
+		len = MIN(len, sizeof(struct hci_filter));
+		if (copy_from_user(&flt, optval, len)) {
+			err = -EFAULT;
+			break;
+		}
+		memcpy(&hci_pi(sk)->filter, &flt, len);
 		break;
 
 	default:
@@ -373,12 +400,18 @@ int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 
 	switch (optname) {
 	case HCI_DATA_DIR:
-		if (hci_pi(sk)->cmsg_flags & HCI_CMSG_DIR)
+		if (hci_pi(sk)->cmsg_mask & HCI_CMSG_DIR)
 			opt = 1;
 		else 
 			opt = 0;
 
 		if (put_user(opt, optval))
+			return -EFAULT;
+		break;
+
+	case HCI_FILTER:
+		len = MIN(len, sizeof(struct hci_filter));
+		if (copy_to_user(optval, &hci_pi(sk)->filter, len))
 			return -EFAULT;
 		break;
 
@@ -431,6 +464,11 @@ static int hci_sock_create(struct socket *sock, int protocol)
 	sk->protocol = protocol;
 	sk->state    = BT_OPEN;
 
+	/* Initialize filter */
+	hci_pi(sk)->filter.type_mask  = (1<<HCI_EVENT_PKT);
+	hci_pi(sk)->filter.event_mask[0] = ~0L;
+	hci_pi(sk)->filter.event_mask[1] = ~0L;
+
 	bluez_sock_link(&hci_sk_list, sk);
 
 	MOD_INC_USE_COUNT;
@@ -455,7 +493,7 @@ static int hci_sock_dev_event(struct notifier_block *this, unsigned long event, 
 		memcpy(skb_put(skb, EVT_HCI_DEV_EVENT_SIZE), &he, EVT_HCI_DEV_EVENT_SIZE);
 
 		hci_send_to_sock(NULL, skb);
-		bluez_skb_free(skb);
+		kfree_skb(skb);
 	}
 
 	if (event == HCI_DEV_UNREG) {

@@ -69,6 +69,10 @@
 	- Manfred Spraul: use "singlecopy" for unaligned buffers
 	                  don't allocate bounce buffers for !ReqTxAlign cards
 
+	LK1.1.11:
+	- David Woodhouse: Set dev->base_addr before the first time we call
+					   wait_for_reset(). It's a lot happier that way.
+					   Free np->tx_bufs only if we actually allocated it.
 */
 
 
@@ -151,7 +155,7 @@ static const int multicast_filter_limit = 32;
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO "via-rhine.c:v1.10-LK1.1.10  07/12/2001  Written by Donald Becker\n"
+KERN_INFO "via-rhine.c:v1.10-LK1.1.11  20/08/2001  Written by Donald Becker\n"
 KERN_INFO "  http://www.scyld.com/network/via-rhine.html\n";
 
 static char shortname[] __devinitdata = "via-rhine";
@@ -584,6 +588,8 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 
 	/* Reset the chip to erase previous misconfiguration. */
 	writew(CmdReset, ioaddr + ChipCmd);
+
+	dev->base_addr = ioaddr;
 	wait_for_reset(dev, shortname);
 
 	/* Reload the station address from the EEPROM. */
@@ -609,7 +615,6 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 		writeb(readb(ioaddr + ConfigA) & 0xFE, ioaddr + ConfigA);
 	}
 
-	dev->base_addr = ioaddr;
 	dev->irq = pdev->irq;
 
 	np = dev->priv;
@@ -758,8 +763,11 @@ void free_ring(struct net_device* dev)
 			    TX_RING_SIZE * sizeof(struct tx_desc),
 			    np->rx_ring, np->rx_ring_dma);
 
-	pci_free_consistent(np->pdev, PKT_BUF_SZ * TX_RING_SIZE,
-						np->tx_bufs, np->tx_bufs_dma);
+	if (np->tx_bufs)
+		pci_free_consistent(np->pdev, PKT_BUF_SZ * TX_RING_SIZE,
+							np->tx_bufs, np->tx_bufs_dma);
+
+	np->tx_bufs = NULL;
 
 }
 

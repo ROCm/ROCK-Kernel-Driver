@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.56 2001/08/27 18:42:07 kanoj Exp $
+/* $Id: fault.c,v 1.58 2001/09/01 00:11:16 kanoj Exp $
  * arch/sparc64/mm/fault.c: Page fault handlers for the 64-bit Sparc.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -22,19 +22,56 @@
 #include <asm/openprom.h>
 #include <asm/oplib.h>
 #include <asm/uaccess.h>
+#include <asm/asi.h>
+#include <asm/lsu.h>
 
 #define ELEMENTS(arr) (sizeof (arr)/sizeof (arr[0]))
 
 extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
 
+/*
+ * To debug kernel during syscall entry.
+ */
 void syscall_trace_entry(struct pt_regs *regs)
 {
 	printk("scall entry: %s[%d]/cpu%d: %d\n", current->comm, current->pid, smp_processor_id(), (int) regs->u_regs[UREG_G1]);
 }
 
+/*
+ * To debug kernel during syscall exit.
+ */
 void syscall_trace_exit(struct pt_regs *regs)
 {
 	printk("scall exit: %s[%d]/cpu%d: %d\n", current->comm, current->pid, smp_processor_id(), (int) regs->u_regs[UREG_G1]);
+}
+
+/*
+ * To debug kernel to catch accesses to certain virtual/physical addresses.
+ * Mode = 0 selects physical watchpoints, mode = 1 selects virtual watchpoints.
+ * flags = VM_READ watches memread accesses, flags = VM_WRITE watches memwrite accesses.
+ * Caller passes in a 64bit aligned addr, with mask set to the bytes that need to be
+ * watched. This is only useful on a single cpu machine for now. After the watchpoint
+ * is detected, the process causing it will be killed, thus preventing an infinite loop.
+ */
+void set_brkpt(unsigned long addr, unsigned char mask, int flags, int mode)
+{
+	unsigned long lsubits = LSU_CONTROL_IC|LSU_CONTROL_DC|LSU_CONTROL_IM|LSU_CONTROL_DM;
+
+	__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
+			     "membar	#Sync"
+			     : /* no outputs */
+			     : "r" (addr), "r" (mode ? VIRT_WATCHPOINT : PHYS_WATCHPOINT),
+			       "i" (ASI_DMMU));
+	lsubits |= ((unsigned long)mask << (mode ? 25 : 33));
+	if (flags & VM_READ)
+		lsubits |= (mode ? LSU_CONTROL_VR : LSU_CONTROL_PR);
+	if (flags & VM_WRITE)
+		lsubits |= (mode ? LSU_CONTROL_VW : LSU_CONTROL_PW);
+	__asm__ __volatile__("stxa %0, [%%g0] %1\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (lsubits), "i" (ASI_LSU_CONTROL)
+			     : "memory");
 }
 
 /* Nice, simple, prom library does all the sweating for us. ;) */
@@ -180,7 +217,7 @@ static void do_kernel_fault(struct pt_regs *regs, int si_code, int fault_code,
 	unsigned long g2;
 	unsigned char asi = ASI_P;
  
-	if (!insn)
+	if ((!insn) && (regs->tstate & TSTATE_PRIV))
 		goto cannot_handle;
 
 	/* If user insn could be read (thus insn is zero), that

@@ -878,7 +878,7 @@ static struct inet_protocol ipip_protocol = {
 	name:		"IPIP"
 };
 
-static const char banner[] __initdata =
+static char banner[] __initdata =
 	KERN_INFO "IPv4 over IPv4 tunneling driver\n";
 
 int __init ipip_init(void)

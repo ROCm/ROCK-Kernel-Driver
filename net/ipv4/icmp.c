@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.80 2001/08/22 20:38:41 davem Exp $
+ *	Version: $Id: icmp.c,v 1.81 2001/09/01 00:31:50 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -885,7 +885,7 @@ int icmp_rcv(struct sk_buff *skb)
 	case CHECKSUM_HW:
 		if ((u16)csum_fold(skb->csum) == 0)
 			break;
-		NETDEBUG(printk(KERN_DEBUG "icmp v4 hw csum failure\n"));
+		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "icmp v4 hw csum failure\n"));
 	case CHECKSUM_NONE:
 		if ((u16)csum_fold(skb_checksum(skb, 0, skb->len, 0)))
 			goto error;

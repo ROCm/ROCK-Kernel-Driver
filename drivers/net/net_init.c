@@ -165,9 +165,16 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
 	setup(dev);
 	
 	if (new_device) {
+		int err;
+
 		rtnl_lock();
-		register_netdevice(dev);
+		err = register_netdevice(dev);
 		rtnl_unlock();
+
+		if (err < 0) {
+			kfree(dev);
+			dev = NULL;
+		}
 	}
 	return dev;
 }

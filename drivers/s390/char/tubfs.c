@@ -42,11 +42,11 @@ void fs3270_devfs_register(tub_t *tubp)
 {
 	char name[16];
 
-	sprintf(name, "tub%x", tubp->devno);
+	sprintf(name, "tub%.3x", tubp->devno);
 	devfs_register(fs3270_devfs_dir, name, DEVFS_FL_DEFAULT,
 		       IBM_FS3270_MAJOR, tubp->minor,
 		       S_IFCHR | S_IRUSR | S_IWUSR, &fs3270_fops, NULL);
-	sprintf(name, "tty%x", tubp->devno);
+	sprintf(name, "tty%.3x", tubp->devno);
 	tty_register_devfs_name(&tty3270_driver, 0, tubp->minor,
 				fs3270_devfs_dir, name);
 }
@@ -56,12 +56,12 @@ void fs3270_devfs_unregister(tub_t *tubp)
 	char name[16];
 	devfs_handle_t handle;
 
-	sprintf(name, "tub%x", tubp->devno);
+	sprintf(name, "tub%.3x", tubp->devno);
 	handle = devfs_find_handle (fs3270_devfs_dir, name,
 				    IBM_FS3270_MAJOR, tubp->minor,
 				    DEVFS_SPECIAL_CHR, 0);
 	devfs_unregister (handle);
-	sprintf(name, "tty%x", tubp->devno);
+	sprintf(name, "tty%.3x", tubp->devno);
 	handle = devfs_find_handle (fs3270_devfs_dir, name,
 				    IBM_TTY3270_MAJOR, tubp->minor,
 				    DEVFS_SPECIAL_CHR, 0);
@@ -88,7 +88,7 @@ fs3270_init(void)
 	fs3270_devfs_tub = 
 		devfs_register(fs3270_devfs_dir, "tub", DEVFS_FL_DEFAULT,
 			       IBM_FS3270_MAJOR, 0,
-			       S_IFCHR | S_IRUSR | S_IWUSR, 
+			       S_IFCHR | S_IRUGO | S_IWUGO, 
 			       &fs3270_fops, NULL);
 #else
 	rc = register_chrdev(IBM_FS3270_MAJOR, "fs3270", &fs3270_fops);

@@ -1,4 +1,4 @@
-/* $Id: elf.h,v 1.29 2001/03/30 07:10:48 davem Exp $ */
+/* $Id: elf.h,v 1.30 2001/08/30 23:35:38 kanoj Exp $ */
 #ifndef __ASM_SPARC64_ELF_H
 #define __ASM_SPARC64_ELF_H
 
@@ -40,7 +40,7 @@ typedef struct {
 #endif
 
 #define USE_ELF_CORE_DUMP
-#define ELF_EXEC_PAGESIZE	8192
+#define ELF_EXEC_PAGESIZE	PAGE_SIZE
 
 /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
    use of this is to invoke "./ld.so someprog" to test out a new version of

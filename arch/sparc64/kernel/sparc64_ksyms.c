@@ -1,4 +1,4 @@
-/* $Id: sparc64_ksyms.c,v 1.110 2001/08/18 08:08:13 davem Exp $
+/* $Id: sparc64_ksyms.c,v 1.111 2001/08/30 03:22:00 kanoj Exp $
  * arch/sparc64/kernel/sparc64_ksyms.c: Sparc64 specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -208,7 +208,6 @@ EXPORT_SYMBOL(sbus_dma_sync_sg);
 EXPORT_SYMBOL(ebus_chain);
 EXPORT_SYMBOL(isa_chain);
 EXPORT_SYMBOL(pci_memspace_mask);
-EXPORT_SYMBOL(empty_zero_page);
 EXPORT_SYMBOL(outsb);
 EXPORT_SYMBOL(outsw);
 EXPORT_SYMBOL(outsl);

@@ -133,6 +133,7 @@ static char * pdc202xx_info (char *buf, struct pci_dev *dev)
 
 	switch(dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20268:
+		case PCI_DEVICE_ID_PROMISE_20268R:
 			p += sprintf(p, "\n                                PDC20268 TX2 Chipset.\n");
 			invalid_data_set = 1;
 			break;

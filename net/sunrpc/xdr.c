@@ -14,41 +14,6 @@
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/msg_prot.h>
 
-u32	rpc_success, rpc_prog_unavail, rpc_prog_mismatch, rpc_proc_unavail,
-	rpc_garbage_args, rpc_system_err;
-u32	rpc_auth_ok, rpc_autherr_badcred, rpc_autherr_rejectedcred,
-	rpc_autherr_badverf, rpc_autherr_rejectedverf, rpc_autherr_tooweak;
-u32	xdr_zero, xdr_one, xdr_two;
-
-void
-xdr_init(void)
-{
-	static int	inited = 0;
-
-	if (inited)
-		return;
-
-	xdr_zero = htonl(0);
-	xdr_one = htonl(1);
-	xdr_two = htonl(2);
-
-	rpc_success = htonl(RPC_SUCCESS);
-	rpc_prog_unavail = htonl(RPC_PROG_UNAVAIL);
-	rpc_prog_mismatch = htonl(RPC_PROG_MISMATCH);
-	rpc_proc_unavail = htonl(RPC_PROC_UNAVAIL);
-	rpc_garbage_args = htonl(RPC_GARBAGE_ARGS);
-	rpc_system_err = htonl(RPC_SYSTEM_ERR);
-
-	rpc_auth_ok = htonl(RPC_AUTH_OK);
-	rpc_autherr_badcred = htonl(RPC_AUTH_BADCRED);
-	rpc_autherr_rejectedcred = htonl(RPC_AUTH_REJECTEDCRED);
-	rpc_autherr_badverf = htonl(RPC_AUTH_BADVERF);
-	rpc_autherr_rejectedverf = htonl(RPC_AUTH_REJECTEDVERF);
-	rpc_autherr_tooweak = htonl(RPC_AUTH_TOOWEAK);
-
-	inited = 1;
-}
-
 /*
  * XDR functions for basic NFS types
  */

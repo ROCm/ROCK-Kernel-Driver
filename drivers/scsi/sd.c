@@ -1022,7 +1022,7 @@ static int sd_init_onedisk(int i)
 		cmd[1] = (rscsi_disks[i].device->scsi_level <= SCSI_2) ?
 			 ((rscsi_disks[i].device->lun << 5) & 0xe0) : 0;
 		cmd[2] = 0x3f;	/* Get all pages */
-		cmd[4] = 8;     /* But we only want the 8 byte header */
+		cmd[4] = 255;     /* But we only want the 8 byte header */
 		SRpnt->sr_cmd_len = 0;
 		SRpnt->sr_sense_buffer[0] = 0;
 		SRpnt->sr_sense_buffer[2] = 0;

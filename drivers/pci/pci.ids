@@ -749,6 +749,7 @@
 	0620  620 Host
 	0630  630 Host
 	0730  730 Host
+	0735  735 Host
 	0900  SiS900 10/100 Ethernet
 		1039 0900  SiS900 10/100 Ethernet Adapter
 	3602  83C602
@@ -781,6 +782,7 @@
 		1569 6326  SiS6326 GUI Accelerator
 	7001  7001
 	7007  OHCI Compliant FireWire Controller
+	7012  SiS7012 PCI Audio Accelerator
 	7016  SiS7016 10/100 Ethernet Adapter
 		1039 7016  SiS7016 10/100 Ethernet Adapter
 	7018  SiS PCI Audio Accelerator
@@ -809,6 +811,7 @@
 103a  Seiko Epson Corporation
 103b  Tatung Co. of America
 103c  Hewlett-Packard Company
+	1005  A4977A Visualize EG
 	1030  J2585A
 	1031  J2585B
 		103c 1040  J2973A DeskDirect 10BaseT NIC
@@ -1952,7 +1955,7 @@
 	0505  VT82C505
 	0561  VT82C561
 	0571  Bus Master IDE
-	0576  VT82C576 3V [Apollo Master]
+	0576  VT82C576 [Apollo Master]
 	0585  VT82C585VP [Apollo VP1/VPX]
 	0586  VT82C586/A/B PCI-to-ISA [Apollo VP]
 		1106 0000  MVP3 ISA Bridge
@@ -1975,7 +1978,7 @@
 	0926  VT82C926 [Amazon]
 	1000  VT82C570MV
 	1106  VT82C570MV
-	1571  VT82C416MV
+	1571  VT82C576 IDE [Apollo Master]
 	1595  VT82C595/97 [Apollo VP2/97]
 	3038  UHCI USB
 		1234 0925  MVP3 USB Controller
@@ -1996,6 +1999,7 @@
 	3074  VT8233 PCI to ISA Bridge
 	3091  VT8633 [Apollo Pro266]
 	3099  VT8367 [KT266]
+	3109  VT8233C PCI to ISA Bridge
 	5030  VT82C596 ACPI [Apollo PRO]
 	6100  VT85C100A [Rhine II]
 	8231  VT8231 [PCI-to-ISA Bridge]
@@ -2636,6 +2640,7 @@
 11d2  Intercom Inc.
 11d3  Trancell Systems Inc
 11d4  Analog Devices
+	1889  AD1889 sound chip
 11d5  Ikon Corporation
 	0115  10115
 	0117  10117

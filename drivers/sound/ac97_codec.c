@@ -104,6 +104,7 @@ static const struct {
 	{0x41445303, "Analog Devices AD1819",	&null_ops},
 	{0x41445340, "Analog Devices AD1881",	&null_ops},
 	{0x41445348, "Analog Devices AD1881A",	&null_ops},
+	{0x41445360, "Analog Devices AD1885",	&default_ops},
 	{0x41445460, "Analog Devices AD1885",	&default_ops},
 	{0x414B4D00, "Asahi Kasei AK4540",	&null_ops},
 	{0x414B4D01, "Asahi Kasei AK4542",	&null_ops},
@@ -937,3 +938,85 @@ static int pt101_init(struct ac97_codec * codec)
 
 EXPORT_SYMBOL(ac97_read_proc);
 EXPORT_SYMBOL(ac97_probe_codec);
+
+/*
+ *	AC97 library support routines
+ */	
+ 
+/**
+ *	ac97_set_dac_rate	-	set codec rate adaption
+ *	@codec: ac97 code
+ *	@rate: rate in hertz
+ *
+ *	Set the DAC rate. Assumes the codec supports VRA. The caller is
+ *	expected to have checked this little detail.
+ */
+ 
+unsigned int ac97_set_dac_rate(struct ac97_codec *codec, unsigned int rate)
+{
+	unsigned int new_rate = rate;
+	u32 dacp;
+	u32 mast_vol, phone_vol, mono_vol, pcm_vol;
+	u32 mute_vol = 0x8000;	/* The mute volume? */
+
+	if(rate != codec->codec_read(codec, AC97_PCM_FRONT_DAC_RATE))
+	{
+		/* Mute several registers */
+		mast_vol = codec->codec_read(codec, AC97_MASTER_VOL_STEREO);
+		mono_vol = codec->codec_read(codec, AC97_MASTER_VOL_MONO);
+		phone_vol = codec->codec_read(codec, AC97_HEADPHONE_VOL);
+		pcm_vol = codec->codec_read(codec, AC97_PCMOUT_VOL);
+		codec->codec_write(codec, AC97_MASTER_VOL_STEREO, mute_vol);
+		codec->codec_write(codec, AC97_MASTER_VOL_MONO, mute_vol);
+		codec->codec_write(codec, AC97_HEADPHONE_VOL, mute_vol);
+		codec->codec_write(codec, AC97_PCMOUT_VOL, mute_vol);
+		
+		/* Power down the DAC */
+		dacp=codec->codec_read(codec, AC97_POWER_CONTROL);
+		codec->codec_write(codec, AC97_POWER_CONTROL, dacp|0x0200);
+		/* Load the rate and read the effective rate */
+		codec->codec_write(codec, AC97_PCM_FRONT_DAC_RATE, rate);
+		new_rate=codec->codec_read(codec, AC97_PCM_FRONT_DAC_RATE);
+		/* Power it back up */
+		codec->codec_write(codec, AC97_POWER_CONTROL, dacp);
+
+		/* Restore volumes */
+		codec->codec_write(codec, AC97_MASTER_VOL_STEREO, mast_vol);
+		codec->codec_write(codec, AC97_MASTER_VOL_MONO, mono_vol);
+		codec->codec_write(codec, AC97_HEADPHONE_VOL, phone_vol);
+		codec->codec_write(codec, AC97_PCMOUT_VOL, pcm_vol);
+	}
+	return new_rate;
+}
+
+EXPORT_SYMBOL(ac97_set_dac_rate);
+
+/**
+ *	ac97_set_adc_rate	-	set codec rate adaption
+ *	@codec: ac97 code
+ *	@rate: rate in hertz
+ *
+ *	Set the ADC rate. Assumes the codec supports VRA. The caller is
+ *	expected to have checked this little detail.
+ */
+
+unsigned int ac97_set_adc_rate(struct ac97_codec *codec, unsigned int rate)
+{
+	unsigned int new_rate = rate;
+	u32 dacp;
+
+	if(rate != codec->codec_read(codec, AC97_PCM_LR_ADC_RATE))
+	{
+		/* Power down the ADC */
+		dacp=codec->codec_read(codec, AC97_POWER_CONTROL);
+		codec->codec_write(codec, AC97_POWER_CONTROL, dacp|0x0100);
+		/* Load the rate and read the effective rate */
+		codec->codec_write(codec, AC97_PCM_LR_ADC_RATE, rate);
+		new_rate=codec->codec_read(codec, AC97_PCM_LR_ADC_RATE);
+		/* Power it back up */
+		codec->codec_write(codec, AC97_POWER_CONTROL, dacp);
+	}
+	return new_rate;
+}
+
+EXPORT_SYMBOL(ac97_set_adc_rate);

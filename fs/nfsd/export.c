@@ -582,6 +582,38 @@ exp_flags(char *buffer, int flag)
     return len;
 }
 
+
+
+/* mangling borrowed from fs/super.c */
+/* Use octal escapes, like mount does, for embedded spaces etc. */
+static unsigned char need_escaping[] = { ' ', '\t', '\n', '\\' };
+
+static int
+mangle(const unsigned char *s, char *buf, int len) {
+        char *sp;
+        int n;
+
+        sp = buf;
+        while(*s && sp-buf < len-3) {
+                for (n = 0; n < sizeof(need_escaping); n++) {
+                        if (*s == need_escaping[n]) {
+                                *sp++ = '\\';
+                                *sp++ = '0' + ((*s & 0300) >> 6);
+                                *sp++ = '0' + ((*s & 070) >> 3);
+                                *sp++ = '0' + (*s & 07);
+                                goto next;
+                        }
+                }
+                *sp++ = *s;
+        next:
+                s++;
+        }
+        return sp - buf;	/* no trailing NUL */
+}
+
+#define FREEROOM	((int)PAGE_SIZE-200-len)
+#define MANGLE(s)	len += mangle((s), buffer+len, FREEROOM);
+
 int
 exp_procfs_exports(char *buffer, char **start, off_t offset,
                              int length, int *eof, void *data)
@@ -594,7 +626,7 @@ exp_procfs_exports(char *buffer, char **start, off_t offset,
         int	len = 0;
 	int	i,j;
 
-        len += sprintf(buffer, "# Version 1.0\n");
+        len += sprintf(buffer, "# Version 1.1\n");
         len += sprintf(buffer+len, "# Path Client(Flags) # IPs\n");
 
 	for (clp = clients; clp; clp = clp->cl_next) {
@@ -602,9 +634,10 @@ exp_procfs_exports(char *buffer, char **start, off_t offset,
 			exp = clp->cl_export[i];
 			while (exp) {
 				int first = 0;
-				len += sprintf(buffer+len, "%s\t", exp->ex_path);
-				len += sprintf(buffer+len, "%s", clp->cl_ident);
-				len += sprintf(buffer+len, "(");
+				MANGLE(exp->ex_path);
+				buffer[len++]='\t';
+				MANGLE(clp->cl_ident);
+				buffer[len++]='(';
 
 				len += exp_flags(buffer+len, exp->ex_flags);
 				len += sprintf(buffer+len, ") # ");

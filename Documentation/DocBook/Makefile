@@ -24,10 +24,10 @@ pdf:	$(PDF)
 html:	$(HTML)
 
 %.eps: %.fig
-	-fig2dev -Leps $< $@
+	fig2dev -Leps $< $@
 
 %.jpeg: %.fig
-	-fig2dev -Ljpeg $< $@
+	fig2dev -Ljpeg $< $@
 
 %.sgml: %.c
 	echo "<programlisting>" > $@
@@ -129,7 +129,7 @@ kernel-api-man: $(APISOURCES)
 		$(PERL) $(TOPDIR)/scripts/split-man $(TOPDIR)/Documentation/man
 
 parportbook: $(JPG-parportbook)
-parportbook.ps: $(EPS-parportbook)
+parportbook.ps parportbook.pdf: $(EPS-parportbook)
 parportbook.sgml: parportbook.tmpl $(TOPDIR)/drivers/parport/init.c
 	$(TOPDIR)/scripts/docgen $(TOPDIR)/drivers/parport/init.c <$< >$@
 

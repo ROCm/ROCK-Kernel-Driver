@@ -37,10 +37,14 @@ ls $P > /dev/null 2>&1 || exit 1
 echo "#!/bin/sh" > $SCR || exit 1
 echo " " >> $SCR
 echo "# Script built by /sbin/config3270" >> $SCR
-echo rm -rf "$D/$SUBD/*" >> $SCR
+if [ ! -d /dev/dasd ]; then
+	echo rm -rf "$D/$SUBD/*" >> $SCR
+fi
 echo "grep -v $TTY $INITTAB > $NINITTAB" > $SCRTMP || exit 1
 echo "echo $ADDNOTE >> $NINITTAB" >> $SCRTMP
-echo mkdir -p $D/$SUBD >> $SCR
+if [ ! -d /dev/dasd ]; then
+	echo mkdir -p $D/$SUBD >> $SCR
+fi
 
 # Now query the tub3270 driver for 3270 device information
 # and add appropriate mknod and mingetty lines to our files
@@ -48,13 +52,19 @@ echo what=config > $P
 while read devno maj min;do
 	if [ $min = 0 ]; then
 		fsmaj=$maj
-		echo mknod $D/$TUB c $fsmaj 0 >> $SCR
-		echo chmod 666 $D/$TUB >> $SCR
+		if [ ! -d /dev/dasd ]; then
+			echo mknod $D/$TUB c $fsmaj 0 >> $SCR
+			echo chmod 666 $D/$TUB >> $SCR
+		fi
 	elif [ $maj = CONSOLE ]; then
-		echo mknod $D/$TUB$devno c $fsmaj $min >> $SCR
+		if [ ! -d /dev/dasd ]; then
+			echo mknod $D/$TUB$devno c $fsmaj $min >> $SCR
+		fi
 	else
-		echo mknod $D/$TTY$devno c $maj $min >>$SCR
-		echo mknod $D/$TUB$devno c $fsmaj $min >> $SCR
+		if [ ! -d /dev/dasd ]; then
+			echo mknod $D/$TTY$devno c $maj $min >>$SCR
+			echo mknod $D/$TUB$devno c $fsmaj $min >> $SCR
+		fi
 		echo "echo t$min$GETTYLINE $TTY$devno >> $NINITTAB" >> $SCRTMP
 	fi
 done < $P

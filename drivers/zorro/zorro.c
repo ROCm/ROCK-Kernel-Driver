@@ -173,3 +173,5 @@ void __init zorro_init(void)
 
 EXPORT_SYMBOL(zorro_find_device);
 EXPORT_SYMBOL(zorro_unused_z2ram);
+
+MODULE_LICENSE("GPL");

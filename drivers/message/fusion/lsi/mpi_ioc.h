@@ -3,10 +3,10 @@
  *
  *
  *           Name:  MPI_IOC.H
- *          Title:  MPI IOC, Port, Event, FW Load, and ToolBox messages
+ *          Title:  MPI IOC, Port, Event, FW Download, and FW Upload messages
  *  Creation Date:  August 11, 2000
  *
- *    MPI Version:  01.01.05
+ *    MPI Version:  01.01.07
  *
  *  Version History
  *  ---------------
@@ -35,6 +35,9 @@
  *  02-20-01  01.01.04  Started using MPI_POINTER.
  *  02-27-01  01.01.05  Added event for RAID status change and its event data.
  *                      Added IocNumber field to MSG_IOC_FACTS_REPLY.
+ *  03-27-01  01.01.06  Added defines for ProductId field of MPI_FW_HEADER.
+ *                      Added structure offset comments.
+ *  04-09-01  01.01.07  Added structure EVENT_DATA_EVENT_CHANGE.
  *  --------------------------------------------------------------------------
  */
 
@@ -54,36 +57,36 @@
 
 typedef struct _MSG_IOC_INIT
 {
-    U8                      WhoInit;
-    U8                      Reserved;
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Flags;
-    U8                      MaxDevices;
-    U8                      MaxBuses;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U16                     ReplyFrameSize;
-    U8                      Reserved1[2];
-    U32                     HostMfaHighAddr;
-    U32                     SenseBufferHighAddr;
+    U8                      WhoInit;                    /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U8                      ChainOffset;                /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Flags;                      /* 04h */
+    U8                      MaxDevices;                 /* 05h */
+    U8                      MaxBuses;                   /* 06h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U16                     ReplyFrameSize;             /* 0Ch */
+    U8                      Reserved1[2];               /* 0Eh */
+    U32                     HostMfaHighAddr;            /* 10h */
+    U32                     SenseBufferHighAddr;        /* 14h */
 } MSG_IOC_INIT, MPI_POINTER PTR_MSG_IOC_INIT,
   IOCInit_t, MPI_POINTER pIOCInit_t;
 
 typedef struct _MSG_IOC_INIT_REPLY
 {
-    U8                      WhoInit;
-    U8                      Reserved;
-    U8                      MsgLength;
-    U8                      Function;
-    U8                      Flags;
-    U8                      MaxDevices;
-    U8                      MaxBuses;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U16                     Reserved2;
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
+    U8                      WhoInit;                    /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U8                      MsgLength;                  /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Flags;                      /* 04h */
+    U8                      MaxDevices;                 /* 05h */
+    U8                      MaxBuses;                   /* 06h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U16                     Reserved2;                  /* 0Ch */
+    U16                     IOCStatus;                  /* 0Eh */
+    U32                     IOCLogInfo;                 /* 10h */
 } MSG_IOC_INIT_REPLY, MPI_POINTER PTR_MSG_IOC_INIT_REPLY,
   IOCInitReply_t, MPI_POINTER pIOCInitReply_t;
 
@@ -103,12 +106,12 @@ typedef struct _MSG_IOC_INIT_REPLY
 
 typedef struct _MSG_IOC_FACTS
 {
-    U8                      Reserved[2];
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
+    U8                      Reserved[2];                /* 00h */
+    U8                      ChainOffset;                /* 01h */
+    U8                      Function;                   /* 02h */
+    U8                      Reserved1[3];               /* 03h */
+    U8                      MsgFlags;                   /* 04h */
+    U32                     MsgContext;                 /* 08h */
 } MSG_IOC_FACTS, MPI_POINTER PTR_IOC_FACTS,
   IOCFacts_t, MPI_POINTER pIOCFacts_t;
 
@@ -116,34 +119,34 @@ typedef struct _MSG_IOC_FACTS
 
 typedef struct _MSG_IOC_FACTS_REPLY
 {
-    U16                     MsgVersion;
-    U8                      MsgLength;
-    U8                      Function;
-    U16                     Reserved;
-    U8                      IOCNumber;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U16                     Reserved2;
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
-    U8                      MaxChainDepth;
-    U8                      WhoInit;
-    U8                      BlockSize;
-    U8                      Flags;
-    U16                     ReplyQueueDepth;
-    U16                     RequestFrameSize;
-    U16                     FWVersion;
-    U16                     ProductID;
-    U32                     CurrentHostMfaHighAddr;
-    U16                     GlobalCredits;
-    U8                      NumberOfPorts;
-    U8                      EventState;
-    U32                     CurrentSenseBufferHighAddr;
-    U16                     CurReplyFrameSize;
-    U8                      MaxDevices;
-    U8                      MaxBuses;
-    U32                     FWImageSize;
-    U32                     DataImageSize;
+    U16                     MsgVersion;                 /* 00h */
+    U8                      MsgLength;                  /* 02h */
+    U8                      Function;                   /* 03h */
+    U16                     Reserved;                   /* 04h */
+    U8                      IOCNumber;                  /* 06h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U16                     Reserved2;                  /* 0Ch */
+    U16                     IOCStatus;                  /* 0Eh */
+    U32                     IOCLogInfo;                 /* 10h */
+    U8                      MaxChainDepth;              /* 14h */
+    U8                      WhoInit;                    /* 15h */
+    U8                      BlockSize;                  /* 16h */
+    U8                      Flags;                      /* 17h */
+    U16                     ReplyQueueDepth;            /* 18h */
+    U16                     RequestFrameSize;           /* 1Ah */
+    U16                     FWVersion;                  /* 1Ch */
+    U16                     ProductID;                  /* 1Eh */
+    U32                     CurrentHostMfaHighAddr;     /* 20h */
+    U16                     GlobalCredits;              /* 24h */
+    U8                      NumberOfPorts;              /* 26h */
+    U8                      EventState;                 /* 27h */
+    U32                     CurrentSenseBufferHighAddr; /* 28h */
+    U16                     CurReplyFrameSize;          /* 2Ch */
+    U8                      MaxDevices;                 /* 2Eh */
+    U8                      MaxBuses;                   /* 2Fh */
+    U32                     FWImageSize;                /* 30h */
+    U32                     DataImageSize;              /* 34h */
 } MSG_IOC_FACTS_REPLY, MPI_POINTER PTR_MSG_IOC_FACTS_REPLY,
   IOCFactsReply_t, MPI_POINTER pIOCFactsReply_t;
 
@@ -170,38 +173,38 @@ typedef struct _MSG_IOC_FACTS_REPLY
 
 typedef struct _MSG_PORT_FACTS
 {
-     U8                     Reserved[2];
-     U8                     ChainOffset;
-     U8                     Function;
-     U8                     Reserved1[2];
-     U8                     PortNumber;
-     U8                     MsgFlags;
-     U32                    MsgContext;
+     U8                     Reserved[2];                /* 00h */
+     U8                     ChainOffset;                /* 02h */
+     U8                     Function;                   /* 03h */
+     U8                     Reserved1[2];               /* 04h */
+     U8                     PortNumber;                 /* 06h */
+     U8                     MsgFlags;                   /* 07h */
+     U32                    MsgContext;                 /* 08h */
 } MSG_PORT_FACTS, MPI_POINTER PTR_MSG_PORT_FACTS,
   PortFacts_t, MPI_POINTER pPortFacts_t;
 
 typedef struct _MSG_PORT_FACTS_REPLY
 {
-     U16                    Reserved;
-     U8                     MsgLength;
-     U8                     Function;
-     U16                    Reserved1;
-     U8                     PortNumber;
-     U8                     MsgFlags;
-     U32                    MsgContext;
-     U16                    Reserved2;
-     U16                    IOCStatus;
-     U32                    IOCLogInfo;
-     U8                     Reserved3;
-     U8                     PortType;
-     U16                    MaxDevices;
-     U16                    PortSCSIID;
-     U16                    ProtocolFlags;
-     U16                    MaxPostedCmdBuffers;
-     U16                    MaxPersistentIDs;
-     U16                    MaxLanBuckets;
-     U16                    Reserved4;
-     U32                    Reserved5;
+     U16                    Reserved;                   /* 00h */
+     U8                     MsgLength;                  /* 02h */
+     U8                     Function;                   /* 03h */
+     U16                    Reserved1;                  /* 04h */
+     U8                     PortNumber;                 /* 06h */
+     U8                     MsgFlags;                   /* 07h */
+     U32                    MsgContext;                 /* 08h */
+     U16                    Reserved2;                  /* 0Ch */
+     U16                    IOCStatus;                  /* 0Eh */
+     U32                    IOCLogInfo;                 /* 10h */
+     U8                     Reserved3;                  /* 14h */
+     U8                     PortType;                   /* 15h */
+     U16                    MaxDevices;                 /* 16h */
+     U16                    PortSCSIID;                 /* 18h */
+     U16                    ProtocolFlags;              /* 1Ah */
+     U16                    MaxPostedCmdBuffers;        /* 1Ch */
+     U16                    MaxPersistentIDs;           /* 1Eh */
+     U16                    MaxLanBuckets;              /* 20h */
+     U16                    Reserved4;                  /* 22h */
+     U32                    Reserved5;                  /* 24h */
 } MSG_PORT_FACTS_REPLY, MPI_POINTER PTR_MSG_PORT_FACTS_REPLY,
   PortFactsReply_t, MPI_POINTER pPortFactsReply_t;
 
@@ -226,28 +229,28 @@ typedef struct _MSG_PORT_FACTS_REPLY
 
 typedef struct _MSG_PORT_ENABLE
 {
-    U8                      Reserved[2];
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Reserved1[2];
-    U8                      PortNumber;
-    U8                      MsgFlags;
-    U32                     MsgContext;
+    U8                      Reserved[2];                /* 00h */
+    U8                      ChainOffset;                /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[2];               /* 04h */
+    U8                      PortNumber;                 /* 06h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
 } MSG_PORT_ENABLE, MPI_POINTER PTR_MSG_PORT_ENABLE,
   PortEnable_t, MPI_POINTER pPortEnable_t;
 
 typedef struct _MSG_PORT_ENABLE_REPLY
 {
-    U8                      Reserved[2];
-    U8                      MsgLength;
-    U8                      Function;
-    U8                      Reserved1[2];
-    U8                      PortNumber;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U16                     Reserved2;
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
+    U8                      Reserved[2];                /* 00h */
+    U8                      MsgLength;                  /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[2];               /* 04h */
+    U8                      PortNumber;                 /* 05h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U16                     Reserved2;                  /* 0Ch */
+    U16                     IOCStatus;                  /* 0Eh */
+    U32                     IOCLogInfo;                 /* 10h */
 } MSG_PORT_ENABLE_REPLY, MPI_POINTER PTR_MSG_PORT_ENABLE_REPLY,
   PortEnableReply_t, MPI_POINTER pPortEnableReply_t;
 
@@ -264,13 +267,13 @@ typedef struct _MSG_PORT_ENABLE_REPLY
 
 typedef struct _MSG_EVENT_NOTIFY
 {
-    U8                      Switch;
-    U8                      Reserved;
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
+    U8                      Switch;                     /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U8                      ChainOffset;                /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[3];               /* 04h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
 } MSG_EVENT_NOTIFY, MPI_POINTER PTR_MSG_EVENT_NOTIFY,
   EventNotification_t, MPI_POINTER pEventNotification_t;
 
@@ -278,19 +281,19 @@ typedef struct _MSG_EVENT_NOTIFY
 
 typedef struct _MSG_EVENT_NOTIFY_REPLY
 {
-     U16                    EventDataLength;
-     U8                     MsgLength;
-     U8                     Function;
-     U8                     Reserved1[2];
-     U8                     AckRequired;
-     U8                     MsgFlags;
-     U32                    MsgContext;
-     U8                     Reserved2[2];
-     U16                    IOCStatus;
-     U32                    IOCLogInfo;
-     U32                    Event;
-     U32                    EventContext;
-     U32                    Data[1];
+     U16                    EventDataLength;            /* 00h */
+     U8                     MsgLength;                  /* 02h */
+     U8                     Function;                   /* 03h */
+     U8                     Reserved1[2];               /* 04h */
+     U8                     AckRequired;                /* 06h */
+     U8                     MsgFlags;                   /* 07h */
+     U32                    MsgContext;                 /* 08h */
+     U8                     Reserved2[2];               /* 0Ch */
+     U16                    IOCStatus;                  /* 0Eh */
+     U32                    IOCLogInfo;                 /* 10h */
+     U32                    Event;                      /* 14h */
+     U32                    EventContext;               /* 18h */
+     U32                    Data[1];                    /* 1Ch */
 } MSG_EVENT_NOTIFY_REPLY, MPI_POINTER PTR_MSG_EVENT_NOTIFY_REPLY,
   EventNotificationReply_t, MPI_POINTER pEventNotificationReply_t;
 
@@ -298,28 +301,28 @@ typedef struct _MSG_EVENT_NOTIFY_REPLY
 
 typedef struct _MSG_EVENT_ACK
 {
-    U8                      Reserved[2];
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U32                     Event;
-    U32                     EventContext;
+    U8                      Reserved[2];                /* 00h */
+    U8                      ChainOffset;                /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[3];               /* 04h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U32                     Event;                      /* 0Ch */
+    U32                     EventContext;               /* 10h */
 } MSG_EVENT_ACK, MPI_POINTER PTR_MSG_EVENT_ACK,
   EventAck_t, MPI_POINTER pEventAck_t;
 
 typedef struct _MSG_EVENT_ACK_REPLY
 {
-    U8                      Reserved[2];
-    U8                      MsgLength;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U16                     Reserved2;
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
+    U8                      Reserved[2];                /* 00h */
+    U8                      MsgLength;                  /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[3];               /* 04h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U16                     Reserved2;                  /* 0Ch */
+    U16                     IOCStatus;                  /* 0Eh */
+    U32                     IOCLogInfo;                 /* 10h */
 } MSG_EVENT_ACK_REPLY, MPI_POINTER PTR_MSG_EVENT_ACK_REPLY,
   EventAckReply_t, MPI_POINTER pEventAckReply_t;
 
@@ -349,13 +352,23 @@ typedef struct _MSG_EVENT_ACK_REPLY
 #define MPI_EVENT_NOTIFICATION_ACK_NOT_REQUIRED (0x00)
 #define MPI_EVENT_NOTIFICATION_ACK_REQUIRED     (0x01)
 
-/* SCSI Event data for Port, Bus and Device forms) */
+/* EventChange Event data */
+
+typedef struct _EVENT_DATA_EVENT_CHANGE
+{
+    U8                      EventState;                 /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U16                     Reserved1;                  /* 02h */
+} EVENT_DATA_EVENT_CHANGE, MPI_POINTER PTR_EVENT_DATA_EVENT_CHANGE,
+  EventDataEventChange_t, MPI_POINTER pEventDataEventChange_t;
+
+/* SCSI Event data for Port, Bus and Device forms */
 
 typedef struct _EVENT_DATA_SCSI
 {
-    U8                      TargetID;
-    U8                      BusPort;
-    U16                     Reserved;
+    U8                      TargetID;                   /* 00h */
+    U8                      BusPort;                    /* 01h */
+    U16                     Reserved;                   /* 02h */
 } EVENT_DATA_SCSI, MPI_POINTER PTR_EVENT_DATA_SCSI,
   EventDataScsi_t, MPI_POINTER pEventDataScsi_t;
 
@@ -363,12 +376,12 @@ typedef struct _EVENT_DATA_SCSI
 
 typedef struct _EVENT_DATA_LINK_STATUS
 {
-    U8                      State;
-    U8                      Reserved;
-    U16                     Reserved1;
-    U8                      Reserved2;
-    U8                      Port;
-    U16                     Reserved3;
+    U8                      State;                      /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U16                     Reserved1;                  /* 02h */
+    U8                      Reserved2;                  /* 04h */
+    U8                      Port;                       /* 05h */
+    U16                     Reserved3;                  /* 06h */
 } EVENT_DATA_LINK_STATUS, MPI_POINTER PTR_EVENT_DATA_LINK_STATUS,
   EventDataLinkStatus_t, MPI_POINTER pEventDataLinkStatus_t;
 
@@ -379,13 +392,13 @@ typedef struct _EVENT_DATA_LINK_STATUS
 
 typedef struct _EVENT_DATA_LOOP_STATE
 {
-    U8                      Character4;
-    U8                      Character3;
-    U8                      Type;
-    U8                      Reserved;
-    U8                      Reserved1;
-    U8                      Port;
-    U16                     Reserved2;
+    U8                      Character4;                 /* 00h */
+    U8                      Character3;                 /* 01h */
+    U8                      Type;                       /* 02h */
+    U8                      Reserved;                   /* 03h */
+    U8                      Reserved1;                  /* 04h */
+    U8                      Port;                       /* 05h */
+    U16                     Reserved2;                  /* 06h */
 } EVENT_DATA_LOOP_STATE, MPI_POINTER PTR_EVENT_DATA_LOOP_STATE,
   EventDataLoopState_t, MPI_POINTER pEventDataLoopState_t;
 
@@ -397,10 +410,10 @@ typedef struct _EVENT_DATA_LOOP_STATE
 
 typedef struct _EVENT_DATA_LOGOUT
 {
-    U32                     NPortID;
-    U8                      Reserved;
-    U8                      Port;
-    U16                     Reserved1;
+    U32                     NPortID;                    /* 00h */
+    U8                      Reserved;                   /* 04h */
+    U8                      Port;                       /* 05h */
+    U16                     Reserved1;                  /* 06h */
 } EVENT_DATA_LOGOUT, MPI_POINTER PTR_EVENT_DATA_LOGOUT,
   EventDataLogout_t, MPI_POINTER pEventDataLogout_t;
 
@@ -408,13 +421,13 @@ typedef struct _EVENT_DATA_LOGOUT
 
 typedef struct _EVENT_DATA_RAID_STATUS_CHANGE
 {
-    U8                      VolumeTargetID;
-    U8                      VolumeBus;
-    U8                      ReasonCode;
-    U8                      PhysDiskNum;
-    U8                      ASC;
-    U8                      ASCQ;
-    U16                     Reserved;
+    U8                      VolumeTargetID;             /* 00h */
+    U8                      VolumeBus;                  /* 01h */
+    U8                      ReasonCode;                 /* 02h */
+    U8                      PhysDiskNum;                /* 03h */
+    U8                      ASC;                        /* 04h */
+    U8                      ASCQ;                       /* 05h */
+    U16                     Reserved;                   /* 06h */
 } EVENT_DATA_RAID_STATUS_CHANGE, MPI_POINTER PTR_EVENT_DATA_RAID_STATUS_CHANGE,
   MpiEventDataRaidStatusChange_t, MPI_POINTER pMpiEventDataRaidStatusChange_t;
 
@@ -441,14 +454,14 @@ typedef struct _EVENT_DATA_RAID_STATUS_CHANGE
 
 typedef struct _MSG_FW_DOWNLOAD
 {
-    U8                      ImageType;
-    U8                      Reserved;
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    SGE_MPI_UNION           SGL;
+    U8                      ImageType;                  /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U8                      ChainOffset;                /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[3];               /* 04h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    SGE_MPI_UNION           SGL;                        /* 0Ch */
 } MSG_FW_DOWNLOAD, MPI_POINTER PTR_MSG_FW_DOWNLOAD,
   FWDownload_t, MPI_POINTER pFWDownload_t;
 
@@ -459,29 +472,29 @@ typedef struct _MSG_FW_DOWNLOAD
 
 typedef struct _FWDownloadTCSGE
 {
-    U8                      Reserved;
-    U8                      ContextSize;
-    U8                      DetailsLength;
-    U8                      Flags;
-    U32                     Reserved1;
-    U32                     ImageOffset;
-    U32                     ImageSize;
+    U8                      Reserved;                   /* 00h */
+    U8                      ContextSize;                /* 01h */
+    U8                      DetailsLength;              /* 02h */
+    U8                      Flags;                      /* 03h */
+    U32                     Reserved1;                  /* 04h */
+    U32                     ImageOffset;                /* 08h */
+    U32                     ImageSize;                  /* 0Ch */
 } FW_DOWNLOAD_TCSGE, MPI_POINTER PTR_FW_DOWNLOAD_TCSGE,
   FWDownloadTCSGE_t, MPI_POINTER pFWDownloadTCSGE_t;
 
 /* Firmware Download reply */
 typedef struct _MSG_FW_DOWNLOAD_REPLY
 {
-    U8                      ImageType;
-    U8                      Reserved;
-    U8                      MsgLength;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U16                     Reserved2;
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
+    U8                      ImageType;                  /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U8                      MsgLength;                  /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[3];               /* 04h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U16                     Reserved2;                  /* 0Ch */
+    U16                     IOCStatus;                  /* 0Eh */
+    U32                     IOCLogInfo;                 /* 10h */
 } MSG_FW_DOWNLOAD_REPLY, MPI_POINTER PTR_MSG_FW_DOWNLOAD_REPLY,
   FWDownloadReply_t, MPI_POINTER pFWDownloadReply_t;
 
@@ -492,14 +505,14 @@ typedef struct _MSG_FW_DOWNLOAD_REPLY
 
 typedef struct _MSG_FW_UPLOAD
 {
-    U8                      ImageType;
-    U8                      Reserved;
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    SGE_MPI_UNION           SGL;
+    U8                      ImageType;                  /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U8                      ChainOffset;                /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[3];               /* 04h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    SGE_MPI_UNION           SGL;                        /* 0Ch */
 } MSG_FW_UPLOAD, MPI_POINTER PTR_MSG_FW_UPLOAD,
   FWUpload_t, MPI_POINTER pFWUpload_t;
 
@@ -510,74 +523,88 @@ typedef struct _MSG_FW_UPLOAD
 
 typedef struct _FWUploadTCSGE
 {
-    U8                      Reserved;
-    U8                      ContextSize;
-    U8                      DetailsLength;
-    U8                      Flags;
-    U32                     Reserved1;
-    U32                     ImageOffset;
-    U32                     ImageSize;
+    U8                      Reserved;                   /* 00h */
+    U8                      ContextSize;                /* 01h */
+    U8                      DetailsLength;              /* 02h */
+    U8                      Flags;                      /* 03h */
+    U32                     Reserved1;                  /* 04h */
+    U32                     ImageOffset;                /* 08h */
+    U32                     ImageSize;                  /* 0Ch */
 } FW_UPLOAD_TCSGE, MPI_POINTER PTR_FW_UPLOAD_TCSGE,
   FWUploadTCSGE_t, MPI_POINTER pFWUploadTCSGE_t;
 
 /* Firmware Upload reply */
 typedef struct _MSG_FW_UPLOAD_REPLY
 {
-    U8                      ImageType;
-    U8                      Reserved;
-    U8                      MsgLength;
-    U8                      Function;
-    U8                      Reserved1[3];
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U16                     Reserved2;
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
-    U32                     ActualImageSize;
+    U8                      ImageType;                  /* 00h */
+    U8                      Reserved;                   /* 01h */
+    U8                      MsgLength;                  /* 02h */
+    U8                      Function;                   /* 03h */
+    U8                      Reserved1[3];               /* 04h */
+    U8                      MsgFlags;                   /* 07h */
+    U32                     MsgContext;                 /* 08h */
+    U16                     Reserved2;                  /* 0Ch */
+    U16                     IOCStatus;                  /* 0Eh */
+    U32                     IOCLogInfo;                 /* 10h */
+    U32                     ActualImageSize;            /* 14h */
 } MSG_FW_UPLOAD_REPLY, MPI_POINTER PTR_MSG_FW_UPLOAD_REPLY,
   FWUploadReply_t, MPI_POINTER pFWUploadReply_t;
 
 
 typedef struct _MPI_FW_HEADER
 {
-    U32                     ArmBranchInstruction0;
-    U32                     Signature0;
-    U32                     Signature1;
-    U32                     Signature2;
-    U32                     ArmBranchInstruction1;
-    U32                     ArmBranchInstruction2;
-    U32                     Reserved;
-    U32                     Checksum;
-    U16                     VendorId;
-    U16                     ProductId;
-    U16                     FwVersion;
-    U16                     Reserved1;
-    U32                     SeqCodeVersion;
-    U32                     ImageSize;
-    U32                     Reserved2;
-    U32                     LoadStartAddress;
-    U32                     IopResetVectorValue;
-    U32                     IopResetRegAddr;
-    U32                     VersionNameWhat;
-    U8                      VersionName[32];
-    U32                     VendorNameWhat;
-    U8                      VendorName[32];
+    U32                     ArmBranchInstruction0;      /* 00h */
+    U32                     Signature0;                 /* 04h */
+    U32                     Signature1;                 /* 08h */
+    U32                     Signature2;                 /* 0Ch */
+    U32                     ArmBranchInstruction1;      /* 10h */
+    U32                     ArmBranchInstruction2;      /* 14h */
+    U32                     Reserved;                   /* 18h */
+    U32                     Checksum;                   /* 1Ch */
+    U16                     VendorId;                   /* 20h */
+    U16                     ProductId;                  /* 22h */
+    U16                     FwVersion;                  /* 24h */
+    U16                     Reserved1;                  /* 26h */
+    U32                     SeqCodeVersion;             /* 28h */
+    U32                     ImageSize;                  /* 2Ch */
+    U32                     Reserved2;                  /* 30h */
+    U32                     LoadStartAddress;           /* 34h */
+    U32                     IopResetVectorValue;        /* 38h */
+    U32                     IopResetRegAddr;            /* 3Ch */
+    U32                     VersionNameWhat;            /* 40h */
+    U8                      VersionName[32];            /* 44h */
+    U32                     VendorNameWhat;             /* 64h */
+    U8                      VendorName[32];             /* 68h */
 } MPI_FW_HEADER, MPI_POINTER PTR_MPI_FW_HEADER,
   MpiFwHeader_t, MPI_POINTER pMpiFwHeader_t;
 
-#define MPI_FW_HEADER_WHAT_SIGNATURE    (0x29232840)
+#define MPI_FW_HEADER_WHAT_SIGNATURE        (0x29232840)
+
+/* defines for using the ProductId field */
+#define MPI_FW_HEADER_PID_TYPE_MASK         (0xF000)
+#define MPI_FW_HEADER_PID_TYPE_SCSI         (0x0000)
+#define MPI_FW_HEADER_PID_TYPE_FC           (0x1000)
+
+#define MPI_FW_HEADER_PID_FW_VENDOR_MASK    (0x0F00)
+#define MPI_FW_HEADER_PID_FW_VENDOR_LSI     (0x0000)
+
+#define MPI_FW_HEADER_PID_FAMILY_MASK       (0x000F)
+#define MPI_FW_HEADER_PID_FAMILY_1030_SCSI  (0x0000)
+#define MPI_FW_HEADER_PID_FAMILY_909_FC     (0x0000)
+#define MPI_FW_HEADER_PID_FAMILY_919_FC     (0x0001)
+#define MPI_FW_HEADER_PID_FAMILY_919X_FC    (0x0002)
 
 
 typedef struct _MPI_DATA_HEADER
 {
-    U32                     Signature;
-    U16                     FunctionNumber;
-    U16                     Length;
-    U32                     Checksum;
-    U32                     LoadStartAddress;
+    U32                     Signature;                  /* 00h */
+    U16                     FunctionNumber;             /* 04h */
+    U16                     Length;                     /* 06h */
+    U32                     Checksum;                   /* 08h */
+    U32                     LoadStartAddress;           /* 0Ch */
 } MPI_DATA_HEADER, MPI_POINTER PTR_MPI_DATA_HEADER,
   MpiDataHeader_t, MPI_POINTER pMpiDataHeader_t;
 
-#define MPI_DATA_HEADER_SIGNATURE       (0x43504147)
+#define MPI_DATA_HEADER_SIGNATURE           (0x43504147)
 
 #endif

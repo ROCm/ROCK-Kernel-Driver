@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.54 2001/03/22 07:26:04 davem Exp $
+/* $Id: ultra.S,v 1.56 2001/08/30 10:10:32 davem Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -302,7 +302,7 @@ __flush_dcache_page:	/* %o0=kaddr, %o1=flush_icache */
 	 nop
 
 flush_dcpage_cheetah:
-	sethi		%hi(8192), %o4
+	sethi		%hi(PAGE_SIZE), %o4
 1:	subcc		%o4, (1 << 5), %o4
 	stxa		%g0, [%o0 + %o4] ASI_DCACHE_INVALIDATE
 	membar		#Sync
@@ -440,13 +440,13 @@ xcall_flush_tlb_mm:
 	retry
 
 xcall_flush_tlb_range:
-	sethi		%hi(8192 - 1), %g2
-	or		%g2, %lo(8192 - 1), %g2
+	sethi		%hi(PAGE_SIZE - 1), %g2
+	or		%g2, %lo(PAGE_SIZE - 1), %g2
 	andn		%g1, %g2, %g1
 	andn		%g7, %g2, %g7
 	sub		%g7, %g1, %g3
 	add		%g2, 1, %g2
-	srlx		%g3, 13, %g4
+	srlx		%g3, PAGE_SHIFT, %g4
 	cmp		%g4, 96
 
 	bgu,pn		%icc, xcall_flush_tlb_mm

@@ -23,26 +23,25 @@
 */
 
 /*
- *  $Id: bluetooth.h,v 1.1 2001/06/01 08:12:11 davem Exp $
+ *  $Id: bluetooth.h,v 1.6 2001/08/03 04:19:49 maxk Exp $
  */
 
-#ifndef __IF_BLUETOOTH_H
-#define __IF_BLUETOOTH_H
+#ifndef __BLUETOOTH_H
+#define __BLUETOOTH_H
 
 #include <asm/types.h>
 #include <asm/byteorder.h>
+
+#ifndef AF_BLUETOOTH
+#define AF_BLUETOOTH	31
+#define PF_BLUETOOTH	AF_BLUETOOTH
+#endif
 
 #define BTPROTO_L2CAP   0
 #define BTPROTO_HCI     1
 
 #define SOL_HCI     0
 #define SOL_L2CAP   6
-
-typedef struct {
-	__u8 b0, b1, b2, b3, b4, b5;
-} bdaddr_t;
-
-#define BDADDR_ANY ((bdaddr_t *)"\000\000\000\000\000")
 
 /* Connection and socket states */
 enum {
@@ -56,27 +55,33 @@ enum {
 	BT_CLOSED
 };
 
-/* Copy, swap, convert BD Address */
-static __inline__ int bacmp(bdaddr_t *ba1, bdaddr_t *ba2)
-{
-	return memcmp(ba1, ba2, sizeof(bdaddr_t));
-}
-static __inline__ void bacpy(bdaddr_t *dst, bdaddr_t *src)
-{
-	memcpy(dst, src, sizeof(bdaddr_t));
-}
-
-extern void baswap(bdaddr_t *dst, bdaddr_t *src);
-
-extern char *batostr(bdaddr_t *ba);
-extern bdaddr_t *strtoba(char *str);
-
 /* Endianness conversions */
 #define htobs(a)	__cpu_to_le16(a)
 #define htobl(a)	__cpu_to_le32(a)
 #define btohs(a)	__le16_to_cpu(a)
 #define btohl(a)	__le32_to_cpu(a)
 
+/* BD Address */
+typedef struct {
+	__u8 b[6];
+} __attribute__((packed)) bdaddr_t;
+
+#define BDADDR_ANY ((bdaddr_t *)"\000\000\000\000\000")
+
+/* Copy, swap, convert BD Address */
+static inline int bacmp(bdaddr_t *ba1, bdaddr_t *ba2)
+{
+	return memcmp(ba1, ba2, sizeof(bdaddr_t));
+}
+static inline void bacpy(bdaddr_t *dst, bdaddr_t *src)
+{
+	memcpy(dst, src, sizeof(bdaddr_t));
+}
+
+void baswap(bdaddr_t *dst, bdaddr_t *src);
+char *batostr(bdaddr_t *ba);
+bdaddr_t *strtoba(char *str);
+
 int bterr(__u16 code);
 
-#endif /* __IF_BLUETOOTH_H */
+#endif /* __BLUETOOTH_H */

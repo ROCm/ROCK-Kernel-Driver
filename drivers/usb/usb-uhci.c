@@ -16,7 +16,7 @@
  * (C) Copyright 1999 Randy Dunlap
  * (C) Copyright 1999 Gregory P. Smith
  *
- * $Id: usb-uhci.c,v 1.267 2001/08/28 16:45:00 acher Exp $
+ * $Id: usb-uhci.c,v 1.268 2001/08/29 14:08:43 acher Exp $
  */
 
 #include <linux/config.h>
@@ -52,7 +52,7 @@
 /* This enables an extra UHCI slab for memory debugging */
 #define DEBUG_SLAB
 
-#define VERSTR "$Revision: 1.267 $ time " __TIME__ " " __DATE__
+#define VERSTR "$Revision: 1.268 $ time " __TIME__ " " __DATE__
 
 #include <linux/usb.h>
 #include "usb-uhci.h"
@@ -61,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.267"
+#define DRIVER_VERSION "v1.268"
 #define DRIVER_AUTHOR "Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
 #define DRIVER_DESC "USB Universal Host Controller Interface driver"
 
@@ -1173,19 +1173,15 @@ _static int uhci_unlink_urb_sync (uhci_t *s, urb_t *urb)
 
 	spin_lock_irqsave (&s->urb_list_lock, flags);
 
-	if (!in_interrupt())		// shouldn't be called from interrupt at all...
-		spin_lock(&urb->lock); 
-	
 	if (urb->status == -EINPROGRESS) {
 
 		// move descriptors out the the running chains, dequeue urb
 		uhci_unlink_urb_async(s, urb, UNLINK_ASYNC_DONT_STORE);
 
-		if (!in_interrupt())	
-			spin_unlock(&urb->lock); 
-		
 		urb_priv = urb->hcpriv;
-
+		urb->status = -ENOENT;	// prevent from double deletion after unlock		
+		spin_unlock_irqrestore (&s->urb_list_lock, flags);
+		
 		// cleanup the rest
 		switch (usb_pipetype (urb->pipe)) {
 
@@ -1200,12 +1196,9 @@ _static int uhci_unlink_urb_sync (uhci_t *s, urb_t *urb)
 			uhci_clean_transfer(s, urb, qh, CLEAN_TRANSFER_DELETION_MARK);
 			uhci_wait_ms(1);
 		}
-
-		spin_unlock_irqrestore (&s->urb_list_lock, flags);
-				
-		uhci_urb_dma_unmap(s, urb, urb->hcpriv);
-
 		urb->status = -ENOENT;	// mark urb as killed		
+					
+		uhci_urb_dma_unmap(s, urb, urb->hcpriv);
 
 #ifdef DEBUG_SLAB
 		kmem_cache_free (urb_priv_kmem, urb->hcpriv);
@@ -1220,11 +1213,8 @@ _static int uhci_unlink_urb_sync (uhci_t *s, urb_t *urb)
 		}
 		usb_dec_dev_use (usb_dev);
 	}
-	else {
-		if (!in_interrupt())	
-			spin_unlock(&urb->lock); 
+	else
 		spin_unlock_irqrestore (&s->urb_list_lock, flags);
-	}
 
 	return 0;
 }
@@ -1334,22 +1324,12 @@ _static int uhci_unlink_urb (urb_t *urb)
 
 	if (urb->transfer_flags & USB_ASYNC_UNLINK) {
 		int ret;
-
        		spin_lock_irqsave (&s->urb_list_lock, flags);
-
-		// The URB needs to be locked if called outside completion context
-
-		if (!in_interrupt())
-			spin_lock(&urb->lock);
-
+       		
 		uhci_release_bandwidth(urb);
 		ret = uhci_unlink_urb_async(s, urb, UNLINK_ASYNC_STORE_URB);
 
-		if (!in_interrupt())
-			spin_unlock(&urb->lock);
-
 		spin_unlock_irqrestore (&s->urb_list_lock, flags);	
-
 		return ret;
 	}
 	else
@@ -1455,7 +1435,7 @@ _static int uhci_submit_int_urb (urb_t *urb)
 {
 	uhci_t *s = (uhci_t*) urb->dev->bus->hcpriv;
 	urb_priv_t *urb_priv = urb->hcpriv;
-	int nint, n, ret;
+	int nint, n;
 	uhci_desc_t *td;
 	int status, destination;
 	int info;
@@ -2683,9 +2663,7 @@ _static int process_urb (uhci_t *s, struct list_head *p)
 
 				if (next_urb == urb)
 					is_ring=1;
-			}
-			
-			spin_lock(&urb->lock);
+			}			
 
 			// Submit idle/non-killed URBs linked with urb->next
 			// Stop before the current URB				
@@ -2729,9 +2707,7 @@ _static int process_urb (uhci_t *s, struct list_head *p)
 				if (is_ring && !was_unlinked && !contains_killed) {
 					urb->dev=usb_dev;
 					uhci_submit_urb (urb);
-
 				}
-				spin_unlock(&urb->lock);		
 				spin_lock(&s->urb_list_lock);
 			}
 			

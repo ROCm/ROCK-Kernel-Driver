@@ -684,7 +684,7 @@ static int proc_connectinfo(struct dev_state *ps, void *arg)
 	struct usbdevfs_connectinfo ci;
 
 	ci.devnum = ps->dev->devnum;
-	ci.slow = ps->dev->slow;
+	ci.slow = ps->dev->speed == USB_SPEED_LOW;
 	if (copy_to_user(arg, &ci, sizeof(ci)))
 		return -EFAULT;
 	return 0;

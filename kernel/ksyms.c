@@ -307,7 +307,6 @@ EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(refile_buffer);
 EXPORT_SYMBOL(max_sectors);
 EXPORT_SYMBOL(max_readahead);
-EXPORT_SYMBOL(file_moveto);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_hangup);

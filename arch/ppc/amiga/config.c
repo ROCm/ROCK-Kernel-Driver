@@ -51,22 +51,22 @@ unsigned char amiga_vblank;
 unsigned char amiga_psfreq;
 struct amiga_hw_present amiga_hw_present;
 
-static const char s_a500[] __initdata = "A500";
-static const char s_a500p[] __initdata = "A500+";
-static const char s_a600[] __initdata = "A600";
-static const char s_a1000[] __initdata = "A1000";
-static const char s_a1200[] __initdata = "A1200";
-static const char s_a2000[] __initdata = "A2000";
-static const char s_a2500[] __initdata = "A2500";
-static const char s_a3000[] __initdata = "A3000";
-static const char s_a3000t[] __initdata = "A3000T";
-static const char s_a3000p[] __initdata = "A3000+";
-static const char s_a4000[] __initdata = "A4000";
-static const char s_a4000t[] __initdata = "A4000T";
-static const char s_cdtv[] __initdata = "CDTV";
-static const char s_cd32[] __initdata = "CD32";
-static const char s_draco[] __initdata = "Draco";
-static const char *amiga_models[] __initdata = {
+static char s_a500[] __initdata = "A500";
+static char s_a500p[] __initdata = "A500+";
+static char s_a600[] __initdata = "A600";
+static char s_a1000[] __initdata = "A1000";
+static char s_a1200[] __initdata = "A1200";
+static char s_a2000[] __initdata = "A2000";
+static char s_a2500[] __initdata = "A2500";
+static char s_a3000[] __initdata = "A3000";
+static char s_a3000t[] __initdata = "A3000T";
+static char s_a3000p[] __initdata = "A3000+";
+static char s_a4000[] __initdata = "A4000";
+static char s_a4000t[] __initdata = "A4000T";
+static char s_cdtv[] __initdata = "CDTV";
+static char s_cd32[] __initdata = "CD32";
+static char s_draco[] __initdata = "Draco";
+static char *amiga_models[] __initdata = {
     s_a500, s_a500p, s_a600, s_a1000, s_a1200, s_a2000, s_a2500, s_a3000,
     s_a3000t, s_a3000p, s_a4000, s_a4000t, s_cdtv, s_cd32, s_draco,
 };

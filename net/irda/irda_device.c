@@ -457,15 +457,17 @@ int irda_device_txqueue_empty(struct net_device *dev)
 dongle_t *irda_device_dongle_init(struct net_device *dev, int type)
 {
 	struct dongle_reg *reg;
-	char modname[32];
 	dongle_t *dongle;
 
 	ASSERT(dev != NULL, return NULL;);
 
 #ifdef CONFIG_KMOD
+	{
+	char modname[32];
 	/* Try to load the module needed */
 	sprintf(modname, "irda-dongle-%d", type);
 	request_module(modname);
+	}
 #endif /* CONFIG_KMOD */
 
 	if (!(reg = hashbin_find(dongles, type, NULL))) {

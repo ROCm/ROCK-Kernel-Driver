@@ -29,7 +29,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * $Id: msnd_pinnacle.c,v 1.75 1999/03/21 16:50:09 andrewtv Exp $
+ * $Id: msnd_pinnacle.c,v 1.8 2000/12/30 00:33:21 sycamore Exp $
+ *
+ * 12-3-2000  Modified IO port validation  Steve Sycamore
+ *
+ *
+ * $$$: msnd_pinnacle.c,v 1.75 1999/03/21 16:50:09 andrewtv $$$ $
  *
  ********************************************************************/
 
@@ -1703,6 +1708,7 @@ static int __init msnd_init(void)
 	if (io == -1 || irq == -1 || mem == -1)
 		printk(KERN_WARNING LOGNAME ": io, irq and mem must be set\n");
 
+#ifdef MSND_CLASSIC
 	if (io == -1 ||
 	    !(io == 0x290 ||
 	      io == 0x260 ||
@@ -1715,6 +1721,15 @@ static int __init msnd_init(void)
 		printk(KERN_ERR LOGNAME ": \"io\" - DSP I/O base must be set to 0x210, 0x220, 0x230, 0x240, 0x250, 0x260, 0x290, or 0x3E0\n");
 		return -EINVAL;
 	}
+#else
+	if (io == -1 ||
+		io < 0x100 ||
+		io > 0x3e0 ||
+		(io % 0x10) != 0) {
+			printk(KERN_ERR LOGNAME ": \"io\" - DSP I/O base must within the range 0x100 to 0x3E0 and must be evenly divisible by 0x10\n");
+			return -EINVAL;
+	}
+#endif /* MSND_CLASSIC */
 
 	if (irq == -1 ||
 	    !(irq == 5 ||

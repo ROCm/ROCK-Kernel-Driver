@@ -69,8 +69,8 @@ DRIVER PARAMETER
   Some functions for the cm8738 can be configured in Kernel Configuration
   or modules parameters. Set these parameters to 1 to enable.
 
-  mpu_io:	I/O ports base for MPU-401, 0 if disabled.
-  fm_io:	I/O ports base for OPL-3, 0 if disabled.
+  mpuio:	I/O ports base for MPU-401, 0 if disabled.
+  fmio:		I/O ports base for OPL-3, 0 if disabled.
   spdif_inverse:Inverse the S/PDIF-in signal, this depends on your
 		CD-ROM or DVD-ROM.
   spdif_loop:   Enable S/PDIF loop, this route S/PDIF-in to S/PDIF-out
@@ -80,8 +80,6 @@ DRIVER PARAMETER
                 rear-out.
   use_line_as_bass:Enable this if you want to use line-in as
                 bass-out.
-  modem:	You will need to set this parameter if you want to use
-		the HSP modem. You need install the pctel.o, the modem
-		driver itself.
   joystick:	Enable joystick. You will need to install Linux joystick
 		driver.
+

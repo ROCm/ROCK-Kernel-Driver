@@ -89,13 +89,29 @@
 	- Initialize the TxMode register properly
 	- Don't dereference dev->priv after freeing it
 
+	LK1.3.4 (Ion Badulescu)
+	- Fixed initialization timing problems
+	- Fixed interrupt mask definitions
+
 TODO:
 	- implement tx_timeout() properly
 */
 
 #define DRV_NAME	"starfire"
-#define DRV_VERSION	"1.03+LK1.3.3"
-#define DRV_RELDATE	"July 05, 2001"
+#define DRV_VERSION	"1.03+LK1.3.4"
+#define DRV_RELDATE	"August 14, 2001"
+
+#include <linux/version.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/pci.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/init.h>
+#include <linux/delay.h>
+#include <asm/processor.h>		/* Processor type for cache alignment. */
+#include <asm/uaccess.h>
+#include <asm/io.h>
 
 /*
  * Adaptec's license for their Novell drivers (which is where I got the
@@ -123,6 +139,10 @@ TODO:
 #if defined(HAS_FIRMWARE) && defined(MAX_SKB_FRAGS)
 #define ZEROCOPY
 #endif
+
+#ifdef HAS_FIRMWARE
+#include "starfire_firmware.h"
+#endif /* HAS_FIRMWARE */
 
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
@@ -196,22 +216,6 @@ static int full_duplex[MAX_UNITS] = {0, };
 #define skb_first_frag_len(skb)	(skb->len)
 #endif /* not ZEROCOPY */
 
-#include <linux/version.h>
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/pci.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/init.h>
-#include <linux/delay.h>
-#include <asm/processor.h>		/* Processor type for cache alignment. */
-#include <asm/uaccess.h>
-#include <asm/io.h>
-
-#ifdef HAS_FIRMWARE
-#include "starfire_firmware.h"
-#endif /* HAS_FIRMWARE */
-
 /* 2.2.x compatibility code */
 #if LINUX_VERSION_CODE < 0x20300
 
@@ -242,7 +246,6 @@ static int full_duplex[MAX_UNITS] = {0, };
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
 KERN_INFO "starfire.c:v1.03 7/26/2000  Written by Donald Becker <becker@scyld.com>\n"
-KERN_INFO " Updates and info at http://www.scyld.com/network/starfire.html\n"
 KERN_INFO " (unofficial 2.2/2.4 kernel port, version " DRV_VERSION ", " DRV_RELDATE ")\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
@@ -417,7 +420,7 @@ enum intr_status_bits {
 	/* not quite bits */
 	IntrRxDone=IntrRxQ2Done | IntrRxQ1Done,
 	IntrRxEmpty=IntrRxDescQ1Low | IntrRxDescQ2Low,
-	IntrNormalMask=0xf0, IntrAbnormalMask=0x3f0e,
+	IntrNormalMask=0xff00, IntrAbnormalMask=0x3ff00fe,
 };
 
 /* Bits in the RxFilterMode register. */
@@ -656,10 +659,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 
 #ifdef ZEROCOPY
 	/* Starfire can do SG and TCP/UDP checksumming */
-	dev->features |= NETIF_F_SG;
-#ifdef HAS_FIRMWARE
-	dev->features |= NETIF_F_IP_CSUM;
-#endif /* HAS_FIRMWARE */
+	dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 #endif /* ZEROCOPY */
 
 	/* Serial EEPROM reads are hidden by the hardware. */
@@ -745,7 +745,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 		int mii_status;
 		for (phy = 0; phy < 32 && phy_idx < PHY_CNT; phy++) {
 			mdio_write(dev, phy, MII_BMCR, BMCR_RESET);
-			udelay(500);
+			mdelay(100);
 			boguscnt = 1000;
 			while (--boguscnt > 0)
 				if ((mdio_read(dev, phy, MII_BMCR) & BMCR_RESET) == 0)
@@ -767,6 +767,14 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 		}
 		np->phy_cnt = phy_idx;
 	}
+
+#ifdef ZEROCOPY
+	printk(KERN_INFO "%s: scatter-gather and hardware TCP cksumming enabled.\n",
+	       dev->name,
+#else  /* not ZEROCOPY */
+	printk(KERN_INFO "%s: scatter-gather and hardware TCP cksumming disabled.\n",
+	       dev->name);
+#endif /* not ZEROCOPY */
 
 	return 0;
 
@@ -931,6 +939,7 @@ static int netdev_open(struct net_device *dev)
 	/* Configure the PCI bus bursts and FIFO thresholds. */
 	np->tx_mode = 0x0C04;		/* modified when link is up. */
 	writel(0x8000 | np->tx_mode, ioaddr + TxMode);
+	udelay(1000);
 	writel(np->tx_mode, ioaddr + TxMode);
 	np->tx_threshold = 4;
 	writel(np->tx_threshold, ioaddr + TxThreshold);
@@ -1546,6 +1555,7 @@ static void netdev_media_change(struct net_device *dev)
 		if (np->tx_mode != new_tx_mode) {
 			np->tx_mode = new_tx_mode;
 			writel(np->tx_mode | 0x8000, ioaddr + TxMode);
+			udelay(1000);
 			writel(np->tx_mode, ioaddr + TxMode);
 		}
 	} else {

@@ -1887,7 +1887,7 @@ static int cs_midi_open(struct inode *inode, struct file *file)
         spin_unlock_irqrestore(&card->midi.lock, flags);
         card->midi.open_mode |= (file->f_mode & (FMODE_READ | FMODE_WRITE));
         up(&card->midi.open_sem);
-        MOD_INC_USE_COUNT;
+        MOD_INC_USE_COUNT; /* for 2.2 */
         return 0;
 }
 
@@ -1926,7 +1926,7 @@ static int cs_midi_release(struct inode *inode, struct file *file)
         card->midi.open_mode &= (~(file->f_mode & (FMODE_READ | FMODE_WRITE)));
         up(&card->midi.open_sem);
         wake_up(&card->midi.open_wait);
-        MOD_DEC_USE_COUNT;
+        MOD_DEC_USE_COUNT; /* for 2.2 */
         return 0;
 }
 
@@ -3294,7 +3294,6 @@ static int cs_open(struct inode *inode, struct file *file)
 
 		state->open_mode |= FMODE_READ;
 		up(&state->open_sem);
-		MOD_INC_USE_COUNT;
 	}
 	if(file->f_mode & FMODE_WRITE)
 	{
@@ -3366,10 +3365,10 @@ static int cs_open(struct inode *inode, struct file *file)
 
 		state->open_mode |= FMODE_WRITE;
 		up(&state->open_sem);
-		MOD_INC_USE_COUNT;
 		if((ret = prog_dmabuf(state)))
 			return ret;
 	}
+	MOD_INC_USE_COUNT;	/* for 2.2 */
 	CS_DBGOUT(CS_OPEN | CS_FUNCTION, 2, printk("cs46xx: cs_open()- 0\n") );
 	return 0;
 }
@@ -3421,7 +3420,6 @@ static int cs_release(struct inode *inode, struct file *file)
 
 			kfree(state);
 		}
-		MOD_DEC_USE_COUNT;
 	}
 
 	state = card->states[0];
@@ -3454,10 +3452,10 @@ static int cs_release(struct inode *inode, struct file *file)
 
 			kfree(state);
 		}
-		MOD_DEC_USE_COUNT;
 	}
 
 	CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 2, printk("cs46xx: cs_release()- 0\n") );
+	MOD_DEC_USE_COUNT;	/* For 2.2 */
 	return 0;
 }
 
@@ -4088,7 +4086,7 @@ static int cs_open_mixdev(struct inode *inode, struct file *file)
 	}
 	card->amplifier_ctrl(card, 1);
 	CS_INC_USE_COUNT(&card->mixer_use_cnt);
-	MOD_INC_USE_COUNT;
+	MOD_INC_USE_COUNT; /* for 2.2 */
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 4,
 		  printk(KERN_INFO "cs46xx: cs_open_mixdev()- 0\n"));
 	return 0;
@@ -4119,7 +4117,7 @@ static int cs_release_mixdev(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 match:
-	MOD_DEC_USE_COUNT;
+	MOD_DEC_USE_COUNT; /* for 2.2 */
 	if(!CS_DEC_AND_TEST(&card->mixer_use_cnt))
 	{
 		CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 4,

@@ -5,7 +5,7 @@
  *
  *		The options processing module for ip.c
  *
- * Version:	$Id: ip_options.c,v 1.20 2000/08/09 09:17:00 davem Exp $
+ * Version:	$Id: ip_options.c,v 1.21 2001/09/01 00:31:50 davem Exp $
  *
  * Authors:	A.N.Kuznetsov
  *		
@@ -549,7 +549,7 @@ void ip_forward_options(struct sk_buff *skb)
 			ip_rt_get_source(&optptr[srrptr-1], rt);
 			skb->nh.iph->daddr = rt->rt_dst;
 			optptr[2] = srrptr+4;
-		} else
+		} else if (net_ratelimit())
 			printk(KERN_CRIT "ip_forward(): Argh! Destination lost!\n");
 		if (opt->ts_needaddr) {
 			optptr = raw + opt->ts;

@@ -6,7 +6,7 @@
  *          Title:  MPI Message independent structures and definitions
  *  Creation Date:  July 27, 2000
  *
- *    MPI Version:  01.01.06
+ *    MPI Version:  01.01.07
  *
  *  Version History
  *  ---------------
@@ -37,6 +37,8 @@
  *                      Obsoleted MPI_IOCSTATUS_TARGET_FC_ defines.
  *  02-27-01  01.01.06  Removed MPI_HOST_INDEX_REGISTER define.
  *                      Added function codes for RAID.
+ *  04-09-01  01.01.07  Added alternate define for MPI_DOORBELL_ACTIVE,
+ *                      MPI_DOORBELL_USED, to better match the spec.
  *  --------------------------------------------------------------------------
  */
 
@@ -90,7 +92,8 @@
 
 /* S y s t e m    D o o r b e l l */
 #define MPI_DOORBELL_OFFSET                 (0x00000000)
-#define MPI_DOORBELL_ACTIVE                 (0x08000000)
+#define MPI_DOORBELL_ACTIVE                 (0x08000000) /* DoorbellUsed */
+#define MPI_DOORBELL_USED                   (MPI_DOORBELL_ACTIVE)
 #define MPI_DOORBELL_ACTIVE_SHIFT           (27)
 #define MPI_DOORBELL_WHO_INIT_MASK          (0x07000000)
 #define MPI_DOORBELL_WHO_INIT_SHIFT         (24)
@@ -634,9 +637,9 @@ typedef struct _MSG_DEFAULT_REPLY
 /****************************************************************************/
 
 #define MPI_IOCLOGINFO_TYPE_MASK                (0xF0000000)
-#define MPI_IOCLOGINFO_TYPE_NONE                (0x00)
-#define MPI_IOCLOGINFO_TYPE_SCSI                (0x01)
-#define MPI_IOCLOGINFO_TYPE_FC                  (0x02)
+#define MPI_IOCLOGINFO_TYPE_NONE                (0x0)
+#define MPI_IOCLOGINFO_TYPE_SCSI                (0x1)
+#define MPI_IOCLOGINFO_TYPE_FC                  (0x2)
 #define MPI_IOCLOGINFO_LOG_DATA_MASK            (0x0FFFFFFF)
 
 

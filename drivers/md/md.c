@@ -2769,7 +2769,6 @@ static struct block_device_operations md_fops=
 int md_thread(void * arg)
 {
 	mdk_thread_t *thread = arg;
-	struct completion *event;
 
 	md_lock_kernel();
 
@@ -2910,7 +2909,7 @@ int md_error (mddev_t *mddev, kdev_t rdev)
 		return 0;
 	}
 	rrdev = find_rdev(mddev, rdev);
-	if (rrdev->faulty)
+	if (!rrdev || rrdev->faulty)
 		return 0;
 	if (mddev->pers->error_handler == NULL
 	    || mddev->pers->error_handler(mddev,rdev) <= 0) {
@@ -3213,7 +3212,7 @@ recheck:
 		if (mddev2 == mddev)
 			continue;
 		if (mddev2->curr_resync && match_mddev_units(mddev,mddev2)) {
-			printk(KERN_INFO "md: serializing resync, md%d shares one or more physical units with md%d!\n", mdidx(mddev), mdidx(mddev2));
+			printk(KERN_INFO "md: delaying resync of md%d until md%d has finished resync (they share one or more physical units)\n", mdidx(mddev), mdidx(mddev2));
 			serialize = 1;
 			break;
 		}
@@ -3275,9 +3274,12 @@ recheck:
 
 		if (last_check + window > j)
 			continue;
-		
-		run_task_queue(&tq_disk); //??
 
+		last_check = j;
+		
+		run_task_queue(&tq_disk);
+
+	repeat:
 		if (jiffies >= mark[last_mark] + SYNC_MARK_STEP ) {
 			/* step marks */
 			int next = (last_mark+1) % SYNC_MARKS;
@@ -3309,7 +3311,6 @@ recheck:
 		 * about not overloading the IO subsystem. (things like an
 		 * e2fsck being done on the RAID array should execute fast)
 		 */
-repeat:
 		if (md_need_resched(current))
 			schedule();
 
@@ -3322,8 +3323,7 @@ repeat:
 					!is_mddev_idle(mddev)) {
 				current->state = TASK_INTERRUPTIBLE;
 				md_schedule_timeout(HZ/4);
-				if (!md_signal_pending(current))
-					goto repeat;
+				goto repeat;
 			}
 		} else
 			current->nice = -20;
@@ -3748,7 +3748,7 @@ void md__init md_setup_drive(void)
 			ainfo.md_minor =minor;
 			ainfo.not_persistent = 1;
 
-			ainfo.state = MD_SB_CLEAN;
+			ainfo.state = (1 << MD_SB_CLEAN);
 			ainfo.active_disks = 0;
 			ainfo.working_disks = 0;
 			ainfo.failed_disks = 0;

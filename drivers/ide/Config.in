@@ -135,7 +135,7 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
 	 if [ "$CONFIG_BLK_DEV_IDEDISK" = "y" -a "$CONFIG_EXPERIMENTAL" = "y" ]; then
 	    bool '    PROMISE DC4030 support (EXPERIMENTAL)' CONFIG_BLK_DEV_PDC4030
 	 fi
-	 bool '    QDI QD6580 support' CONFIG_BLK_DEV_QD6580
+	 bool '    QDI QD65xx support' CONFIG_BLK_DEV_QD65XX
 	 bool '    UMC-8672 support' CONFIG_BLK_DEV_UMC8672
       fi
    fi

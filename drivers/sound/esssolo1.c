@@ -2262,7 +2262,7 @@ static int
 solo1_suspend(struct pci_dev *pci_dev, u32 state) {
 	struct solo1_state *s = (struct solo1_state*)pci_get_drvdata(pci_dev);
 	if (!s)
-		return;
+		return 1;
 	outb(0, s->iobase+6);
 	/* DMA master clear */
 	outb(0, s->ddmabase+0xd); 

@@ -27,7 +27,7 @@
  *  Originally By: Steven J. Ralston, Noah Romer
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: mptctl.c,v 1.23 2001/03/21 19:42:31 sralston Exp $
+ *  $Id: mptctl.c,v 1.25.4.1 2001/08/24 20:07:06 sralston Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -205,6 +205,22 @@ mptctl_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *  struct file_operations functionality. 
+ *  Members:
+ *	llseek, write, read, ioctl, open, release
+ */
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,9)
+static loff_t
+mptctl_llseek(struct file *file, loff_t offset, int origin)
+{
+	return -ESPIPE;
+}
+#define no_llseek mptctl_llseek
+#endif
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static ssize_t
 mptctl_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
@@ -335,8 +351,8 @@ mpt_ioctl_do_fw_download(int ioc, char *ufwbuf, size_t fwlen)
 	SGESimple32_t	*sgl;
 	SGESimple32_t	*sgOut, *sgIn;
 	dma_addr_t	 sgl_dma;
-	struct buflist	*buflist;
-	struct buflist	*bl;
+	struct buflist	*buflist = NULL;
+	struct buflist	*bl = NULL;
 	int		 numfrags = 0;
 	int		 maxfrags;
 	int		 n = 0;
@@ -421,7 +437,7 @@ mpt_ioctl_do_fw_download(int ioc, char *ufwbuf, size_t fwlen)
 	sgIn = sgl;
 	bl = buflist;
 	for (i=0; i < numfrags; i++) {
-		nib = (sgIn->FlagsLength & 0xF0000000) >> 28;
+		nib = (le32_to_cpu(sgIn->FlagsLength) & 0xF0000000) >> 28;
 		/* skip ignore/chain. */
 		if (nib == 0 || nib == 3) {
 			;
@@ -654,7 +670,7 @@ free_and_fail:
 			u8 *kptr;
 			int len;
 
-			if ((sglbuf[i].FlagsLength >> 24) == 0x30)
+			if ((le32_to_cpu(sglbuf[i].FlagsLength) >> 24) == 0x30)
 				continue;
 
 			dma_addr = le32_to_cpu(sglbuf[i].Address);
@@ -679,12 +695,12 @@ kfree_sgl(SGESimple32_t *sgl, dma_addr_t sgl_dma, struct buflist *buflist, MPT_A
 	int		 dir;
 	int		 n = 0;
 
-	if (sg->FlagsLength & 0x04000000)
+	if (le32_to_cpu(sg->FlagsLength) & 0x04000000)
 		dir = PCI_DMA_TODEVICE;
 	else
 		dir = PCI_DMA_FROMDEVICE;
 
-	nib = (sg->FlagsLength & 0xF0000000) >> 28;
+	nib = (le32_to_cpu(sg->FlagsLength) & 0xF0000000) >> 28;
 	while (! (nib & 0x4)) { /* eob */
 		/* skip ignore/chain. */
 		if (nib == 0 || nib == 3) {
@@ -703,7 +719,7 @@ kfree_sgl(SGESimple32_t *sgl, dma_addr_t sgl_dma, struct buflist *buflist, MPT_A
 		}
 		sg++;
 		bl++;
-		nib = (sg->FlagsLength & 0xF0000000) >> 28;
+		nib = (le32_to_cpu(sg->FlagsLength) & 0xF0000000) >> 28;
 	}
 
 	/* we're at eob! */
@@ -1081,10 +1097,14 @@ mpt_ioctl_scsi_cmd(unsigned long arg)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-static struct file_operations mptctl_fops = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,51)
-	owner:		THIS_MODULE,
+#define	owner_THIS_MODULE  owner:		THIS_MODULE,
+#else
+#define	owner_THIS_MODULE
 #endif
+
+static struct file_operations mptctl_fops = {
+	owner_THIS_MODULE
 	llseek:		no_llseek,
 	read:		mptctl_read,
 	write:		mptctl_write,
@@ -1162,48 +1182,6 @@ sparc32_mptfwxfer_ioctl(unsigned int fd, unsigned int cmd,
 	return ret;
 }
 
-#if 0		/* { */
-static int
-sparc32_mptfwxfer_ioctl(unsigned int fd, unsigned int cmd,
-			unsigned long arg, struct file *filp)
-{
-	struct mpt_fw_xfer32 kfw32;
-	struct mpt_fw_xfer kfw;
-	mm_segment_t old_fs;
-	int ret;
-
-	dprintk((KERN_INFO MYNAM "::sparc32_mptfwxfer_ioctl() called\n"));
-
-	if (copy_from_user(&kfw32, (char *)arg, sizeof(kfw32)))
-		return -EFAULT;
-
-	/* Verify intended MPT adapter */
-	iocnumX = kfw32.iocnum & 0xFF;
-	if (((iocnum = mpt_verify_adapter(iocnumX, &iocp)) < 0) ||
-	    (iocp == NULL)) {
-		printk(KERN_ERR MYNAM "::sparc32_mptfwxfer_ioctl @%d - ioc%d not found!\n",
-				__LINE__, iocnumX);
-		return -ENODEV;
-	}
-
-	if ((ret = mptctl_syscall_down(iocp, nonblock)) != 0)
-		return ret;
-
-	kfw.iocnum = iocnum;
-	kfw.fwlen = kfw32.fwlen;
-	kfw.bufp = (void *)(unsigned long)kfw32.bufp;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_ioctl(fd, MPTFWDOWNLOAD, (unsigned long)&kfw);
-	set_fs(old_fs);
-
-	up(&mptctl_syscall_sem_ioc[iocp->id]);
-
-	return ret;
-}
-#endif		/* #if 0 } */
-
 #endif		/*} linux >= 2.3.x */
 #endif		/*} sparc */
 
@@ -1228,8 +1206,7 @@ int __init mptctl_init(void)
 	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(MPTRWPERF_RESET, NULL);
 	if (++where && err) goto out_fail;
-	err = register_ioctl32_conversion(MPTFWDOWNLOAD32,
-					  sparc32_mptfwxfer_ioctl);
+	err = register_ioctl32_conversion(MPTFWDOWNLOAD32, sparc32_mptfwxfer_ioctl);
 	if (++where && err) goto out_fail;
 #endif		/*} linux >= 2.3.x */
 #endif		/*} sparc */
@@ -1247,7 +1224,7 @@ int __init mptctl_init(void)
 	 *  Install our handler
 	 */
 	++where;
-	if ((mptctl_id = mpt_register(mptctl_reply, MPTCTL_DRIVER)) < 0) {
+	if ((mptctl_id = mpt_register(mptctl_reply, MPTCTL_DRIVER)) <= 0) {
 		printk(KERN_ERR MYNAM ": ERROR: Failed to register with Fusion MPT base driver\n");
 		misc_deregister(&mptctl_miscdev);
 		err = -EBUSY;
@@ -1275,6 +1252,16 @@ out_fail:
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 void mptctl_exit(void)
 {
+
+#if defined(__sparc__) && defined(__sparc_v9__)		/*{*/
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)		/*{*/
+	unregister_ioctl32_conversion(MPTRWPERF);
+	unregister_ioctl32_conversion(MPTRWPERF_CHK);
+	unregister_ioctl32_conversion(MPTRWPERF_RESET);
+	unregister_ioctl32_conversion(MPTFWDOWNLOAD32);
+#endif		/*} linux >= 2.3.x */
+#endif		/*} sparc */
+
 	misc_deregister(&mptctl_miscdev);
 	printk(KERN_INFO MYNAM ": /dev/%s @ (major,minor=%d,%d)\n",
 			 mptctl_miscdev.name, MISC_MAJOR, mptctl_miscdev.minor);

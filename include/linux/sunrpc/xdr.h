@@ -34,27 +34,27 @@ struct xdr_netobj {
 typedef int	(*kxdrproc_t)(void *rqstp, u32 *data, void *obj);
 
 /*
- * These variables contain pre-xdr'ed values for faster operation.
- * FIXME: should be replaced by macros for big-endian machines.
+ * pre-xdr'ed macros.
  */
-extern u32	xdr_zero, xdr_one, xdr_two;
 
-extern u32	rpc_success,
-		rpc_prog_unavail,
-		rpc_prog_mismatch,
-		rpc_proc_unavail,
-		rpc_garbage_args,
-		rpc_system_err;
+#define	xdr_zero	__constant_htonl(0)
+#define	xdr_one		__constant_htonl(1)
+#define	xdr_two		__constant_htonl(2)
 
-extern u32	rpc_auth_ok,
-		rpc_autherr_badcred,
-		rpc_autherr_rejectedcred,
-		rpc_autherr_badverf,
-		rpc_autherr_rejectedverf,
-		rpc_autherr_tooweak,
-		rpc_autherr_dropit;
+#define	rpc_success		__constant_htonl(RPC_SUCCESS)
+#define	rpc_prog_unavail	__constant_htonl(RPC_PROG_UNAVAIL)
+#define	rpc_prog_mismatch	__constant_htonl(RPC_PROG_MISMATCH)
+#define	rpc_proc_unavail	__constant_htonl(RPC_PROC_UNAVAIL)
+#define	rpc_garbage_args	__constant_htonl(RPC_GARBAGE_ARGS)
+#define	rpc_system_err		__constant_htonl(RPC_SYSTEM_ERR)
 
-void		xdr_init(void);
+#define	rpc_auth_ok		__constant_htonl(RPC_AUTH_OK)
+#define	rpc_autherr_badcred	__constant_htonl(RPC_AUTH_BADCRED)
+#define	rpc_autherr_rejectedcred __constant_htonl(RPC_AUTH_REJECTEDCRED)
+#define	rpc_autherr_badverf	__constant_htonl(RPC_AUTH_BADVERF)
+#define	rpc_autherr_rejectedverf __constant_htonl(RPC_AUTH_REJECTEDVERF)
+#define	rpc_autherr_tooweak	__constant_htonl(RPC_AUTH_TOOWEAK)
+
 
 /*
  * Miscellaneous XDR helper functions

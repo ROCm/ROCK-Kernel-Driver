@@ -418,6 +418,9 @@ out:
 
 static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 {
+	if (mnt->mnt_sb->s_flags & MS_NOUSER)
+		return -EINVAL;
+
 	if (S_ISDIR(nd->dentry->d_inode->i_mode) !=
 	      S_ISDIR(mnt->mnt_root->d_inode->i_mode))
 		return -ENOTDIR;
@@ -920,7 +923,6 @@ static struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	bdops = devfs_get_ops ( devfs_get_handle_from_inode (inode) );
 	if (bdops) bdev->bd_op = bdops;
 	/* Done with lookups, semaphore down */
-	down(&mount_sem);
 	dev = to_kdev_t(bdev->bd_dev);
 	if (!(flags & MS_RDONLY))
 		mode |= FMODE_WRITE;
@@ -995,7 +997,6 @@ out1:
 	blkdev_put(bdev, BDEV_FS);
 out:
 	path_release(&nd);
-	up(&mount_sem);
 	return ERR_PTR(error);
 }
 
@@ -1004,7 +1005,6 @@ static struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 {
 	kdev_t dev;
 	int error = -EMFILE;
-	down(&mount_sem);
 	dev = get_unnamed_dev();
 	if (dev) {
 		struct super_block * sb;
@@ -1016,7 +1016,6 @@ static struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 		}
 		put_unnamed_dev(dev);
 	}
-	up(&mount_sem);
 	return ERR_PTR(error);
 }
 
@@ -1031,7 +1030,6 @@ static struct super_block *get_sb_single(struct file_system_type *fs_type,
 	 * Get the superblock of kernel-wide instance, but
 	 * keep the reference to fs_type.
 	 */
-	down(&mount_sem);
 retry:
 	spin_lock(&sb_lock);
 	if (!list_empty(&fs_type->fs_supers)) {
@@ -1047,7 +1045,6 @@ retry:
 		kdev_t dev = get_unnamed_dev();
 		if (!dev) {
 			put_super(s);
-			up(&mount_sem);
 			return ERR_PTR(-EMFILE);
 		}
 		s->s_dev = dev;
@@ -1076,7 +1073,6 @@ retry:
 		spin_unlock(&sb_lock);
 		put_super(s);
 		put_unnamed_dev(dev);
-		up(&mount_sem);
 		return ERR_PTR(-EINVAL);
 	}
 }
@@ -1175,31 +1171,6 @@ static int do_remount_sb(struct super_block *sb, int flags, char *data)
 	 */
 
 	return 0;
-}
-
-struct vfsmount *kern_mount(struct file_system_type *type)
-{
-	struct super_block *sb;
-	struct vfsmount *mnt = alloc_vfsmnt();
-
-	if (!mnt)
-		return ERR_PTR(-ENOMEM);
-
-	if (type->fs_flags & FS_SINGLE)
-		sb = get_sb_single(type, 0, NULL);
-	else
-		sb = get_sb_nodev(type, 0, NULL);
-	if (IS_ERR(sb)) {
-		kmem_cache_free(mnt_cache, mnt);
-		return (struct vfsmount *)sb;
-	}
-	mnt->mnt_sb = sb;
-	mnt->mnt_root = dget(sb->s_root);
-	mnt->mnt_mountpoint = mnt->mnt_root;
-	mnt->mnt_parent = mnt;
-	up_write(&sb->s_umount);
-	up(&mount_sem);
-	return mnt;
 }
 
 /*
@@ -1428,74 +1399,91 @@ static int do_remount(struct nameidata *nd, int flags, char *data)
 	return err;
 }
 
-static int do_add_mount(struct nameidata *nd, char *type, int flags,
-			char *name, void *data)
+struct vfsmount *do_kern_mount(char *type, int flags, char *name, void *data)
 {
 	struct file_system_type * fstype;
 	struct vfsmount *mnt = NULL;
 	struct super_block *sb;
-	int retval = 0;
 
 	if (!type || !memchr(type, 0, PAGE_SIZE))
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
 
 	/* we need capabilities... */
 	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
+		return ERR_PTR(-EPERM);
 
 	/* ... filesystem driver... */
 	fstype = get_fs_type(type);
 	if (!fstype)		
-		return -ENODEV;
+		return ERR_PTR(-ENODEV);
 
 	/* ... allocated vfsmount... */
-	retval = -ENOMEM;
 	mnt = alloc_vfsmnt();
-	if (!mnt)
+	if (!mnt) {
+		mnt = ERR_PTR(-ENOMEM);
 		goto fs_out;
+	}
 	if (name) {
 		mnt->mnt_devname = kmalloc(strlen(name)+1, GFP_KERNEL);
 		if (mnt->mnt_devname)
 			strcpy(mnt->mnt_devname, name);
 	}
 
-	/* get superblock, locks mount_sem on success */
-	if (fstype->fs_flags & FS_NOMOUNT)
-		sb = ERR_PTR(-EINVAL);
-	else if (fstype->fs_flags & FS_REQUIRES_DEV)
+	/* get locked superblock */
+	if (fstype->fs_flags & FS_REQUIRES_DEV)
 		sb = get_sb_bdev(fstype, name, flags, data);
 	else if (fstype->fs_flags & FS_SINGLE)
 		sb = get_sb_single(fstype, flags, data);
 	else
 		sb = get_sb_nodev(fstype, flags, data);
 
-	retval = PTR_ERR(sb);
 	if (IS_ERR(sb)) {
 		if (mnt->mnt_devname)
 			kfree(mnt->mnt_devname);
 		kmem_cache_free(mnt_cache, mnt);
+		mnt = (struct vfsmount *)sb;
 		goto fs_out;
 	}
+	if (fstype->fs_flags & FS_NOMOUNT)
+		sb->s_flags |= MS_NOUSER;
 
 	mnt->mnt_sb = sb;
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	mnt->mnt_parent = mnt;
 	up_write(&sb->s_umount);
+fs_out:
+	put_filesystem(fstype);
+	return mnt;
+}
 
+struct vfsmount *kern_mount(struct file_system_type *type)
+{
+	return do_kern_mount((char *)type->name, 0, (char *)type->name, NULL);
+}
+
+static int do_add_mount(struct nameidata *nd, char *type, int flags,
+			char *name, void *data)
+{
+	struct vfsmount *mnt = do_kern_mount(type, flags, name, data);
+	int retval = PTR_ERR(mnt);
+
+	if (IS_ERR(mnt))
+		goto out;
+
+	down(&mount_sem);
 	/* Something was mounted here while we slept */
 	while(d_mountpoint(nd->dentry) && follow_down(&nd->mnt, &nd->dentry))
 		;
 
 	/* Refuse the same filesystem on the same mount point */
-	if (nd->mnt->mnt_sb == sb && nd->mnt->mnt_root == nd->dentry)
+	if (nd->mnt->mnt_sb == mnt->mnt_sb && nd->mnt->mnt_root == nd->dentry)
 		retval = -EBUSY;
 	else
 		retval = graft_tree(mnt, nd);
-	mntput(mnt);
 	up(&mount_sem);
-fs_out:
-	put_filesystem(fstype);
+	mntput(mnt);
+out:
 	return retval;
 }
 

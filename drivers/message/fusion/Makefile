@@ -27,18 +27,22 @@ EXTRA_CFLAGS += -I. ${MPT_CFLAGS}
 #EXTRA_CFLAGS += -DDEBUG
 #EXTRA_CFLAGS += -DMPT_DEBUG
 #EXTRA_CFLAGS += -DMPT_DEBUG_MSG_FRAME
-#EXTRA_CFLAGS += -DMPT_DEBUG_SPINLOCK
+#
 # driver/module specifics...
+#
 #  For mptbase:
 #CFLAGS_mptbase.o += -DMPT_DEBUG_HANDSHAKE
 #CFLAGS_mptbase.o += -DMPT_DEBUG_IRQ
+#
 #  For {mptscsih, mptctl}:
 #CFLAGS_mptscsih.o += -DMPT_SCSI_USE_NEW_EH
-#CFLAGS_mptscsih.o += -DMPT_SCSI_CACHE_AUTOSENSE
+#CFLAGS_mptscsih.o += -DMPT_DEBUG_SCANDV
 #CFLAGS_mptscsih.o += -DMPT_DEBUG_SG
 #CFLAGS_mptctl.o += -DMPT_DEBUG_SG
+#
 #  For mptlan:
 #CFLAGS_mptlan.o += -DMPT_LAN_IO_DEBUG
+#
 #  For isense:
 
 #  EXP...

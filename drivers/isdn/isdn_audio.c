@@ -1,4 +1,4 @@
-/* $Id: isdn_audio.c,v 1.21 2000/06/20 18:01:55 keil Exp $
+/* $Id: isdn_audio.c,v 1.21.6.1 2001/08/17 12:34:25 kai Exp $
 
  * Linux ISDN subsystem, audio conversion and compression (linklevel).
  *
@@ -28,7 +28,7 @@
 #include "isdn_audio.h"
 #include "isdn_common.h"
 
-char *isdn_audio_revision = "$Revision: 1.21 $";
+char *isdn_audio_revision = "$Revision: 1.21.6.1 $";
 
 /*
  * Misc. lookup-tables.
@@ -607,7 +607,9 @@ isdn_audio_calc_dtmf(modem_info * info, unsigned char *buf, int len, int fmt)
 	int c;
 
 	while (len) {
-		c = MIN(len, (DTMF_NPOINTS - s->idx));
+		c = DTMF_NPOINTS - s->idx;
+		if (c > len)
+			c = len;
 		if (c <= 0)
 			break;
 		for (i = 0; i < c; i++) {

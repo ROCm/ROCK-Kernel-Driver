@@ -575,7 +575,6 @@ static int process_xmt_interrupt(struct net_device *dev)
 	outb(0xff, EDLC_XCLR);	/* Clear all pending xmit IRQ's */
 	
 	if (xmit_stat & XS_COLL){
-                printk("ether collision\n"); /* FIXME: remove */
 		PRINTK((KERN_DEBUG "%s: collision detected, retransmitting\n", 
 			dev->name));
 		outw(NI5010_BUFSIZE - lp->o_pkt_size, IE_GP);

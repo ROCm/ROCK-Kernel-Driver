@@ -10,7 +10,7 @@
  *
  * <achim@vortex.de>
  *
- * $Id: gdth.h,v 1.38 2001/03/15 15:06:23 achim Exp $
+ * $Id: gdth.h,v 1.44 2001/08/21 11:19:05 achim Exp $
  */
 
 #include <linux/version.h>
@@ -29,12 +29,16 @@
 /* defines, macros */
 
 /* driver version */
-#define GDTH_VERSION_STR        "1.28"
-#define GDTH_VERSION            1
-#define GDTH_SUBVERSION         28
+#define GDTH_VERSION_STR        "2.03"
+#define GDTH_VERSION            2
+#define GDTH_SUBVERSION         3
 
 /* protocol version */
 #define PROTOCOL_VERSION        1
+
+/* OEM IDs */
+#define OEM_ID_ICP	0x941c
+#define OEM_ID_INTEL	0x8000
 
 /* controller classes */
 #define GDT_ISA         0x01                    /* ISA controller */
@@ -53,6 +57,9 @@
 /* these defines should already exist in <linux/pci.h> */
 #ifndef PCI_VENDOR_ID_VORTEX
 #define PCI_VENDOR_ID_VORTEX            0x1119  /* PCI controller vendor ID */
+#endif
+#ifndef PCI_VENDOR_ID_INTEL
+#define PCI_VENDOR_ID_INTEL             0x8086  
 #endif
 
 #ifndef PCI_DEVICE_ID_VORTEX_GDT60x0
@@ -123,6 +130,16 @@
 #ifndef PCI_DEVICE_ID_VORTEX_GDTMAXRP
 /* GDT_MPR, last device ID */
 #define PCI_DEVICE_ID_VORTEX_GDTMAXRP   0x2ff   
+#endif
+
+#ifndef PCI_DEVICE_ID_VORTEX_GDTNEWRX
+/* new GDT Rx Controller */
+#define PCI_DEVICE_ID_VORTEX_GDTNEWRX	0x300
+#endif
+	
+#ifndef PCI_DEVICE_ID_INTEL_SRC
+/* Intel Storage RAID Controller */
+#define PCI_DEVICE_ID_INTEL_SRC		0x600
 #endif
 
 /* limits */
@@ -202,6 +219,8 @@
 #define GDT_CLUST_INFO  22                      /* cluster info */
 #define GDT_RW_ATTRIBS  23                      /* R/W attribs (write thru,..)*/
 #define GDT_CLUST_RESET 24                      /* releases the cluster drives*/
+#define GDT_FREEZE_IO   25                      /* freezes all IOs */
+#define GDT_UNFREEZE_IO 26                      /* unfreezes all IOs */
 
 /* raw service commands */
 #define GDT_RESERVE     14                      /* reserve dev. to raw serv. */
@@ -843,7 +862,9 @@ typedef struct {
 #if LINUX_VERSION_CODE >= 0x02015C
     struct pci_dev      *pdev;
 #endif
+    ushort              vendor_id;              /* vendor (ICP, Intel, ..) */
     ushort              device_id;              /* device ID (0,..,9) */
+    ushort              subdevice_id;           /* sub device ID */
     unchar              bus;                    /* PCI bus */
     unchar              device_fn;              /* PCI device/function no. */
     ulong               dpmem;                  /* DPRAM address */
@@ -855,9 +876,11 @@ typedef struct {
 
 /* controller information structure */
 typedef struct {
+    ushort              oem_id;                 /* OEM */
     ushort              type;                   /* controller class */
     ushort              raw_feat;               /* feat. raw service (s/g,..) */
-    ulong32             stype;                  /* controller subtype */
+    ulong32             stype;                  /* subtype (PCI: device ID) */
+    ushort              subdevice_id;           /* sub device ID (PCI) */
     ushort              fw_vers;                /* firmware version */
     ushort              cache_feat;             /* feat. cache serv. (s/g,..) */
     ushort              bmic;                   /* BMIC address (EISA) */

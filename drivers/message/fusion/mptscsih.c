@@ -19,7 +19,7 @@
  *  Original author: Steven J. Ralston
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: mptscsih.c,v 1.24 2001/03/22 08:45:08 sralston Exp $
+ *  $Id: mptscsih.c,v 1.29 2001/06/18 18:59:05 sralston Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -95,7 +95,6 @@ typedef struct _MPT_SCSI_HOST {
 	u8			 *SgHunks;
 	dma_addr_t		  SgHunksDMA;
 	u32			  qtag_tick;
-	FCDEV_TRACKER		  TargetsQ;
 } MPT_SCSI_HOST;
 
 typedef struct _MPT_SCSI_DEV {
@@ -119,6 +118,7 @@ static int	mptscsih_io_direction(Scsi_Cmnd *cmd);
 static void	copy_sense_data(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSIIOReply_t *pScsiReply);
 static u32	SCPNT_TO_MSGCTX(Scsi_Cmnd *sc);
 
+static int	mptscsih_ioc_reset(MPT_ADAPTER *ioc, int post_reset);
 static int	mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply);
 
 
@@ -205,7 +205,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *r)
 			dprintk((KERN_INFO MYNAM ": *NEW* SCSI device (%d:%d:%d)!\n",
 					   sc->device->id, sc->device->lun, sc->device->channel));
 			if ((sc->device->hostdata = kmalloc(sizeof(MPT_SCSI_DEV), GFP_ATOMIC)) == NULL) {
-				printk(KERN_ERR MYNAM ": ERROR: kmalloc(%d) FAILED!\n", (int)sizeof(MPT_SCSI_DEV));
+				printk(KERN_ERR MYNAM ": ERROR - kmalloc(%d) FAILED!\n", (int)sizeof(MPT_SCSI_DEV));
 			} else {
 				memset(sc->device->hostdata, 0, sizeof(MPT_SCSI_DEV));
 				mpt_sdev = (MPT_SCSI_DEV *) sc->device->hostdata;
@@ -555,8 +555,14 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 	if (! BeenHereDoneThat++) {
 		show_mptmod_ver(my_NAME, my_VERSION);
 
-		ScsiDoneCtx = mpt_register(mptscsih_io_done, MPTSCSIH_DRIVER);
-		ScsiTaskCtx = mpt_register(mptscsih_taskmgmt_complete, MPTSCSIH_DRIVER);
+		if ((ScsiDoneCtx = mpt_register(mptscsih_io_done, MPTSCSIH_DRIVER)) <= 0) {
+			printk(KERN_ERR MYNAM ": Failed to register callback1 with MPT base driver\n");
+			return mpt_scsi_hosts;
+		}
+		if ((ScsiTaskCtx = mpt_register(mptscsih_taskmgmt_complete, MPTSCSIH_DRIVER)) <= 0) {
+			printk(KERN_ERR MYNAM ": Failed to register callback2 with MPT base driver\n");
+			return mpt_scsi_hosts;
+		}
 
 #ifndef MPT_SCSI_USE_NEW_EH
 		Q_INIT(&mpt_scsih_taskQ, MPT_FRAME_HDR);
@@ -565,6 +571,12 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 
 		if (mpt_event_register(ScsiDoneCtx, mptscsih_event_process) == 0) {
 			dprintk((KERN_INFO MYNAM ": Registered for IOC event notifications\n"));
+		} else {
+			/* FIXME! */
+		}
+
+		if (mpt_reset_register(ScsiDoneCtx, mptscsih_ioc_reset) == 0) {
+			dprintk((KERN_INFO MYNAM ": Registered for IOC reset notifications\n"));
 		} else {
 			/* FIXME! */
 		}
@@ -582,7 +594,7 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 		 *  Added sanity check on SCSI Initiator-mode enabled
 		 *  for this MPT adapter.
 		 */
-		if (!(this->pfacts0.ProtocolFlags & MPI_PORTFACTS_PROTOCOL_INITIATOR)) {
+		if (!(this->pfacts[0].ProtocolFlags & MPI_PORTFACTS_PROTOCOL_INITIATOR)) {
 			printk(KERN_ERR MYNAM ": Skipping %s because SCSI Initiator mode is NOT enabled!\n",
 					this->name);
 			this = mpt_adapter_find_next(this);
@@ -612,10 +624,18 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 
 			/* Yikes!  This is important!
 			 * Otherwise, by default, linux only scans target IDs 0-7!
+			 *
+			 * BUG FIX!  20010618 -sralston & pdelaney
+			 * FC919 testing was encountering "duplicate" FC devices,
+			 * as it turns out because the 919 was returning 512
+			 * for PortFacts.MaxDevices, causing a wraparound effect
+			 * in SCSI IO requests.  So instead of using:
+			 *     sh->max_id = this->pfacts[0].MaxDevices - 1
+			 * we'll use a definitive max here.
 			 */
-			sh->max_id = this->pfacts0.MaxDevices - 1;
+			sh->max_id = MPT_MAX_FC_DEVICES;
 
-			sh->this_id = this->pfacts0.PortSCSIID;
+			sh->this_id = this->pfacts[0].PortSCSIID;
 
 			restore_flags(flags);
 
@@ -730,6 +750,9 @@ mptscsih_release(struct Scsi_Host *host)
 #if 0
 			mptscsih_flush_pending();
 #endif
+			mpt_reset_deregister(ScsiDoneCtx);
+			dprintk((KERN_INFO MYNAM ": Deregistered for IOC reset notifications\n"));
+
 			mpt_event_deregister(ScsiDoneCtx);
 			dprintk((KERN_INFO MYNAM ": Deregistered for IOC event notifications\n"));
 
@@ -765,7 +788,7 @@ mptscsih_info(struct Scsi_Host *SChost)
 
 	h = (MPT_SCSI_HOST *)SChost->hostdata;
 	info_kbuf[0] = '\0';
-	mpt_print_ioc_summary(h->ioc, info_kbuf, &size, 0);
+	mpt_print_ioc_summary(h->ioc, info_kbuf, &size, 0, 0);
 	info_kbuf[size-1] = '\0';
 
 	return info_kbuf;
@@ -1235,7 +1258,6 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		dprintk((KERN_INFO MYNAM ": Queue depth now %d.\n", max_qd));
 	}
 
-	mb();
 	dmfprintk((KERN_INFO MYNAM ": Issued SCSI cmd (%p)\n", SCpnt));
 
 	return 0;
@@ -1265,6 +1287,7 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	u32		*msg;
 	u32		 ctx2abort;
 	int		 i;
+	unsigned long	 flags;
 
 	printk(KERN_WARNING MYNAM ": Attempting _ABORT SCSI IO (=%p)\n", SCpnt);
 	printk(KERN_WARNING MYNAM ": IOs outstanding = %d\n", atomic_read(&queue_depth));
@@ -1309,85 +1332,37 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	 *	 the controller, so it does not matter. -DaveM
 	 */
 	ctx2abort = SCPNT_TO_MSGCTX(SCpnt);
-	dprintk((KERN_INFO MYNAM ":DbG: ctx2abort = %08x\n", ctx2abort));
-	pScsiTm->TaskMsgContext = ctx2abort;
-
-	wmb();
-
-/* MPI v0.10 requires SCSITaskMgmt requests be sent via Doorbell/handshake
-	mpt_put_msg_frame(hd->ioc->id, mf);
-*/
-/* FIXME!  Check return status! */
-	(void) mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id, sizeof(SCSITaskMgmt_t), msg);
-
-	wmb();
-
-	return SUCCESS;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/**
- *	mptscsih_bus_reset - Perform a SCSI BUS_RESET!	new_eh variant
- *	@SCpnt: Pointer to Scsi_Cmnd structure, IO which reset is due to
- *
- *	(linux Scsi_Host_Template.eh_bus_reset_handler routine)
- *
- *	Returns SUCCESS or FAILED.
- */
-int
-mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
-{
-	MPT_FRAME_HDR	*mf;
-	SCSITaskMgmt_t	*pScsiTm;
-	MPT_SCSI_HOST	*hd;
-	u32		*msg;
-	int		 i;
-
-	printk(KERN_WARNING MYNAM ": Attempting _BUS_RESET (%p)\n", SCpnt);
-	printk(KERN_WARNING MYNAM ": IOs outstanding = %d\n", atomic_read(&queue_depth));
-
-	hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata;
-
-	if ((mf = mpt_get_msg_frame(ScsiTaskCtx, hd->ioc->id)) == NULL) {
-/*		SCpnt->result = DID_SOFT_ERROR << 16;	*/
-		SCpnt->result = STS_BUSY;
+	if (ctx2abort == -1) {
+		printk(KERN_ERR MYNAM ": ERROR - ScsiLookup fail(#2) for SCpnt=%p\n", SCpnt);
+		SCpnt->result = DID_SOFT_ERROR << 16;
+		spin_lock_irqsave(&io_request_lock, flags);
 		SCpnt->scsi_done(SCpnt);
-		return FAILED;
+		spin_unlock_irqrestore(&io_request_lock, flags);
+		mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
+	} else {
+		dprintk((KERN_INFO MYNAM ":DbG: ctx2abort = %08x\n", ctx2abort));
+		pScsiTm->TaskMsgContext = ctx2abort;
+
+
+		/* MPI v0.10 requires SCSITaskMgmt requests be sent via Doorbell/handshake
+			mpt_put_msg_frame(hd->ioc->id, mf);
+		*/
+		if ((i = mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id,
+					sizeof(SCSITaskMgmt_t), msg))
+		    != 0) {
+			printk(KERN_WARNING MYNAM
+					": WARNING[2] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n",
+					i, mf, SCpnt);
+			SCpnt->result = DID_SOFT_ERROR << 16;
+			spin_lock_irqsave(&io_request_lock, flags);
+			SCpnt->scsi_done(SCpnt);
+			spin_unlock_irqrestore(&io_request_lock, flags);
+			mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
+		}
 	}
 
-	pScsiTm = (SCSITaskMgmt_t *) mf;
-	msg = (u32 *) mf;
-
-	pScsiTm->TargetID = SCpnt->target;
-	pScsiTm->Bus = hd->port;
-	pScsiTm->ChainOffset = 0;
-	pScsiTm->Function = MPI_FUNCTION_SCSI_TASK_MGMT;
-
-	pScsiTm->Reserved = 0;
-	pScsiTm->TaskType = MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS;
-	pScsiTm->Reserved1 = 0;
-	pScsiTm->MsgFlags = 0;
-
-	for (i = 0; i < 8; i++)
-		pScsiTm->LUN[i] = 0;
-
-	/* Control: No data direction, set task mgmt bit? */
-	for (i = 0; i < 7; i++)
-		pScsiTm->Reserved2[i] = 0;
-
-	pScsiTm->TaskMsgContext = cpu_to_le32(0);
-
-	wmb();
-
-/* MPI v0.10 requires SCSITaskMgmt requests be sent via Doorbell/handshake
-	mpt_put_msg_frame(hd->ioc->id, mf);
-*/
-/* FIXME!  Check return status! */
-	(void) mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id, sizeof(SCSITaskMgmt_t), msg);
-
-	wmb();
-
-	return SUCCESS;
+	//return SUCCESS;
+	return FAILED;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1407,6 +1382,7 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 	MPT_SCSI_HOST	*hd;
 	u32		*msg;
 	int		 i;
+	unsigned long	 flags;
 
 	printk(KERN_WARNING MYNAM ": Attempting _TARGET_RESET (%p)\n", SCpnt);
 	printk(KERN_WARNING MYNAM ": IOs outstanding = %d\n", atomic_read(&queue_depth));
@@ -1443,15 +1419,96 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 
 	pScsiTm->TaskMsgContext = cpu_to_le32(0);
 
-	wmb();
+/* MPI v0.10 requires SCSITaskMgmt requests be sent via Doorbell/handshake
+	mpt_put_msg_frame(hd->ioc->id, mf);
+*/
+/* FIXME!  Check return status! */
+	if ((i = mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id,
+				sizeof(SCSITaskMgmt_t), msg))
+	    != 0) {
+		printk(KERN_WARNING MYNAM
+				": WARNING[3] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n",
+				i, mf, SCpnt);
+		SCpnt->result = DID_SOFT_ERROR << 16;
+		spin_lock_irqsave(&io_request_lock, flags);
+		SCpnt->scsi_done(SCpnt);
+		spin_unlock_irqrestore(&io_request_lock, flags);
+		mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
+	}
+
+	//return SUCCESS;
+	return FAILED;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/**
+ *	mptscsih_bus_reset - Perform a SCSI BUS_RESET!	new_eh variant
+ *	@SCpnt: Pointer to Scsi_Cmnd structure, IO which reset is due to
+ *
+ *	(linux Scsi_Host_Template.eh_bus_reset_handler routine)
+ *
+ *	Returns SUCCESS or FAILED.
+ */
+int
+mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
+{
+	MPT_FRAME_HDR	*mf;
+	SCSITaskMgmt_t	*pScsiTm;
+	MPT_SCSI_HOST	*hd;
+	u32		*msg;
+	int		 i;
+	unsigned long	 flags;
+
+	printk(KERN_WARNING MYNAM ": Attempting _BUS_RESET (%p)\n", SCpnt);
+	printk(KERN_WARNING MYNAM ": IOs outstanding = %d\n", atomic_read(&queue_depth));
+
+	hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata;
+
+	if ((mf = mpt_get_msg_frame(ScsiTaskCtx, hd->ioc->id)) == NULL) {
+/*		SCpnt->result = DID_SOFT_ERROR << 16;	*/
+		SCpnt->result = STS_BUSY;
+		SCpnt->scsi_done(SCpnt);
+		return FAILED;
+	}
+
+	pScsiTm = (SCSITaskMgmt_t *) mf;
+	msg = (u32 *) mf;
+
+	pScsiTm->TargetID = SCpnt->target;
+	pScsiTm->Bus = hd->port;
+	pScsiTm->ChainOffset = 0;
+	pScsiTm->Function = MPI_FUNCTION_SCSI_TASK_MGMT;
+
+	pScsiTm->Reserved = 0;
+	pScsiTm->TaskType = MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS;
+	pScsiTm->Reserved1 = 0;
+	pScsiTm->MsgFlags = 0;
+
+	for (i = 0; i < 8; i++)
+		pScsiTm->LUN[i] = 0;
+
+	/* Control: No data direction, set task mgmt bit? */
+	for (i = 0; i < 7; i++)
+		pScsiTm->Reserved2[i] = 0;
+
+	pScsiTm->TaskMsgContext = cpu_to_le32(0);
 
 /* MPI v0.10 requires SCSITaskMgmt requests be sent via Doorbell/handshake
 	mpt_put_msg_frame(hd->ioc->id, mf);
 */
 /* FIXME!  Check return status! */
-	(void) mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id, sizeof(SCSITaskMgmt_t), msg);
-
-	wmb();
+	if ((i = mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id,
+				sizeof(SCSITaskMgmt_t), msg))
+	    != 0) {
+		printk(KERN_WARNING MYNAM
+				": WARNING[4] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n",
+				i, mf, SCpnt);
+		SCpnt->result = DID_SOFT_ERROR << 16;
+		spin_lock_irqsave(&io_request_lock, flags);
+		SCpnt->scsi_done(SCpnt);
+		spin_unlock_irqrestore(&io_request_lock, flags);
+		mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
+	}
 
 	return SUCCESS;
 }
@@ -1646,6 +1703,9 @@ mptscsih_taskmgmt_bh(void *sc)
 	spin_unlock_irqrestore(&mpt_scsih_taskQ_lock, flags);
 
 	while (1) {
+		current->state = TASK_INTERRUPTIBLE;
+		schedule_timeout(HZ/4);
+
 		/*
 		 *  We MUST remove item from taskQ *before* we format the
 		 *  frame as a SCSITaskMgmt request and send it down to the IOC.
@@ -1664,9 +1724,10 @@ mptscsih_taskmgmt_bh(void *sc)
 
 		SCpnt = (Scsi_Cmnd*)mf->u.frame.linkage.argp1;
 		if (SCpnt == NULL) {
-			printk(KERN_ERR MYNAM ": ERROR: TaskMgmt has NULL SCpnt! (%p:%p)\n", mf, SCpnt);
+			printk(KERN_ERR MYNAM ": ERROR - TaskMgmt has NULL SCpnt! (%p:%p)\n", mf, SCpnt);
 			continue;
 		}
+		hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata;
 		pScsiTm = (SCSITaskMgmt_t *) mf;
 
 		for (i = 0; i < 8; i++) {
@@ -1674,9 +1735,9 @@ mptscsih_taskmgmt_bh(void *sc)
 		}
 
 		task_type = mf->u.frame.linkage.arg1;
-		if (task_type == MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK)
-		{
-			printk(KERN_WARNING MYNAM ": Attempting _ABORT SCSI IO! (mf:sc=%p:%p)\n", mf, SCpnt);
+		if (task_type == MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK) {
+			printk(KERN_WARNING MYNAM ": Attempting _ABORT SCSI IO! (mf=%p:sc=%p)\n",
+					mf, SCpnt);
 
 			/* Most important!  Set TaskMsgContext to SCpnt's MsgContext!
 			 * (the IO to be ABORT'd)
@@ -1686,11 +1747,20 @@ mptscsih_taskmgmt_bh(void *sc)
 			 *	 the controller, so it does not matter. -DaveM
 			 */
 			ctx2abort = SCPNT_TO_MSGCTX(SCpnt);
+			if (ctx2abort == -1) {
+				printk(KERN_ERR MYNAM ": ERROR - ScsiLookup fail(#1) for SCpnt=%p\n", SCpnt);
+				SCpnt->result = DID_SOFT_ERROR << 16;
+				spin_lock_irqsave(&io_request_lock, flags);
+				SCpnt->scsi_done(SCpnt);
+				spin_unlock_irqrestore(&io_request_lock, flags);
+				mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
+				continue;
+			}
 			pScsiTm->LUN[1] = SCpnt->lun;
 		}
 		else if (task_type == MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS)
 		{
-			printk(KERN_WARNING MYNAM ": Attempting _BUS_RESET! (against SCSI IO mf:sc=%p:%p)\n", mf, SCpnt);
+			printk(KERN_WARNING MYNAM ": Attempting _BUS_RESET! (against SCSI IO mf=%p:sc=%p)\n", mf, SCpnt);
 		}
 #if 0
 		else if (task_type == MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET) {}
@@ -1698,8 +1768,6 @@ mptscsih_taskmgmt_bh(void *sc)
 #endif
 
 		printk(KERN_WARNING MYNAM ": IOs outstanding = %d\n", atomic_read(&queue_depth));
-
-		hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata;
 
 		pScsiTm->TargetID = SCpnt->target;
 		pScsiTm->Bus = hd->port;
@@ -1725,15 +1793,22 @@ mptscsih_taskmgmt_bh(void *sc)
 		 *		mpt_put_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
 		 *  SCSITaskMgmt requests MUST be sent ONLY via
 		 *  Doorbell/handshake now.   :-(
-		 *
-		 *  FIXME!  Check return status!
 		 */
-		(void) mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id, sizeof(SCSITaskMgmt_t), (u32*)mf);
-
-		/* Spin-Wait for TaskMgmt complete!!! */
-		while (mpt_scsih_active_taskmgmt_mf != NULL) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ/2);
+		if ((i = mpt_send_handshake_request(ScsiTaskCtx, hd->ioc->id,
+					sizeof(SCSITaskMgmt_t), (u32*) mf))
+		    != 0) {
+			printk(KERN_WARNING MYNAM ": WARNING[1] - IOC error (%d) processing TaskMgmt request (mf=%p:sc=%p)\n", i, mf, SCpnt);
+			SCpnt->result = DID_SOFT_ERROR << 16;
+			spin_lock_irqsave(&io_request_lock, flags);
+			SCpnt->scsi_done(SCpnt);
+			spin_unlock_irqrestore(&io_request_lock, flags);
+			mpt_free_msg_frame(ScsiTaskCtx, hd->ioc->id, mf);
+		} else {
+			/* Spin-Wait for TaskMgmt complete!!! */
+			while (mpt_scsih_active_taskmgmt_mf != NULL) {
+				current->state = TASK_INTERRUPTIBLE;
+				schedule_timeout(HZ/4);
+			}
 		}
 	}
 
@@ -2002,6 +2077,22 @@ SCPNT_TO_MSGCTX(Scsi_Cmnd *sc)
 #	include "../../scsi/scsi_module.c"
 #endif
 
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+static int
+mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
+{
+	dprintk((KERN_INFO MYNAM ": IOC %s_reset routed to SCSI host driver!\n",
+			reset_phase==MPT_IOC_PRE_RESET ? "pre" : "post"));
+
+	if (reset_phase == MPT_IOC_PRE_RESET) {
+		/* FIXME! Do pre-reset cleanup */
+	} else {
+		/* FIXME! Do post-reset cleanup */
+	}
+
+	return 1;		/* currently means nothing really */
+}
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static int

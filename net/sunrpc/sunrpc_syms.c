@@ -94,16 +94,8 @@ EXPORT_SYMBOL(xdr_encode_string);
 EXPORT_SYMBOL(xdr_decode_string);
 EXPORT_SYMBOL(xdr_decode_netobj);
 EXPORT_SYMBOL(xdr_encode_netobj);
-EXPORT_SYMBOL(xdr_zero);
-EXPORT_SYMBOL(xdr_one);
-EXPORT_SYMBOL(xdr_two);
 EXPORT_SYMBOL(xdr_shift_iovec);
 EXPORT_SYMBOL(xdr_zero_iovec);
-
-/* RPC errors */
-EXPORT_SYMBOL(rpc_success);
-EXPORT_SYMBOL(rpc_garbage_args);
-EXPORT_SYMBOL(rpc_system_err);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: tcp_ipv6.c,v 1.137 2001/06/13 16:25:03 davem Exp $
+ *	$Id: tcp_ipv6.c,v 1.138 2001/09/01 00:31:50 davem Exp $
  *
  *	Based on: 
  *	linux/net/ipv4/tcp.c
@@ -1380,7 +1380,7 @@ static int tcp_v6_checksum_init(struct sk_buff *skb)
 		if (!tcp_v6_check(skb->h.th,skb->len,&skb->nh.ipv6h->saddr,
 				  &skb->nh.ipv6h->daddr,skb->csum))
 			return 0;
-		NETDEBUG(printk(KERN_DEBUG "hw tcp v6 csum failed\n"));
+		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "hw tcp v6 csum failed\n"));
 	}
 	if (skb->len <= 76) {
 		if (tcp_v6_check(skb->h.th,skb->len,&skb->nh.ipv6h->saddr,

@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.67 2001/08/03 09:32:17 davem Exp $
+ *	$Id: addrconf.c,v 1.68 2001/09/01 00:31:50 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -628,7 +628,8 @@ struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *
 
 void addrconf_dad_failure(struct inet6_ifaddr *ifp)
 {
-	printk(KERN_INFO "%s: duplicate address detected!\n", ifp->idev->dev->name);
+	if (net_ratelimit())
+		printk(KERN_INFO "%s: duplicate address detected!\n", ifp->idev->dev->name);
 	if (ifp->flags&IFA_F_PERMANENT) {
 		spin_lock_bh(&ifp->lock);
 		addrconf_del_timer(ifp);
@@ -818,14 +819,16 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	prefered_lft = ntohl(pinfo->prefered);
 
 	if (prefered_lft > valid_lft) {
-		printk(KERN_WARNING "addrconf: prefix option has invalid lifetime\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING "addrconf: prefix option has invalid lifetime\n");
 		return;
 	}
 
 	in6_dev = in6_dev_get(dev);
 
 	if (in6_dev == NULL) {
-		printk(KERN_DEBUG "addrconf: device %s not configured\n", dev->name);
+		if (net_ratelimit())
+			printk(KERN_DEBUG "addrconf: device %s not configured\n", dev->name);
 		return;
 	}
 
@@ -881,7 +884,9 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 			}
 			goto ok;
 		}
-		printk(KERN_DEBUG "IPv6 addrconf: prefix with wrong length %d\n", pinfo->prefix_len);
+		if (net_ratelimit())
+			printk(KERN_DEBUG "IPv6 addrconf: prefix with wrong length %d\n",
+			       pinfo->prefix_len);
 		in6_dev_put(in6_dev);
 		return;
 

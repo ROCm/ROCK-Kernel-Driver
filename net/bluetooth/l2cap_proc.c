@@ -25,7 +25,7 @@
 /*
  * BlueZ L2CAP proc fs support.
  *
- * $Id: l2cap_proc.c,v 1.1 2001/06/01 08:12:11 davem Exp $
+ * $Id: l2cap_proc.c,v 1.2 2001/06/02 01:40:09 maxk Exp $
  */
 
 #include <linux/config.h>
@@ -36,7 +36,7 @@
 #include <linux/kernel.h>
 #include <linux/major.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/fcntl.h>
 #include <linux/init.h>

@@ -315,12 +315,19 @@ enum miscint_bits {
 
 #define TRID_REG( trident, x ) ( (trident) -> iobase + (x) )
 
+#define		CYBER_PORT_AUDIO		0x3CE
+#define		CYBER_IDX_AUDIO_ENABLE          0x7B
+#define		CYBER_BMSK_AUDIO_INT_ENABLE	0x09
+#define		CYBER_BMSK_AUENZ		0x01
+#define		CYBER_BMSK_AUENZ_ENABLE		0x00
+#define		CYBER_IDX_IRQ_ENABLE		0x12
+      
 #define VALIDATE_MAGIC(FOO,MAG)				\
-({						  \
-	if (!(FOO) || (FOO)->magic != MAG) { \
-		printk(invalid_magic,__FUNCTION__);	       \
-		return -ENXIO;			  \
-	}					  \
+({						  	\
+	if (!(FOO) || (FOO)->magic != MAG) { 		\
+		printk(invalid_magic,__FUNCTION__);	\
+		return -ENXIO;			  	\
+	}					  	\
 })
 
 #define VALIDATE_STATE(a) VALIDATE_MAGIC(a,TRIDENT_STATE_MAGIC)

@@ -1,4 +1,4 @@
-/* $Id: system.h,v 1.63 2001/04/24 01:09:12 davem Exp $ */
+/* $Id: system.h,v 1.64 2001/08/30 03:22:00 kanoj Exp $ */
 #ifndef __SPARC64_SYSTEM_H
 #define __SPARC64_SYSTEM_H
 
@@ -29,8 +29,6 @@ enum sparc_cpu {
 #define ARCH_SUN4C_SUN4 0
 #define ARCH_SUN4 0
 
-extern unsigned long empty_bad_page;
-extern unsigned long empty_zero_page;
 #endif
 
 #define setipl(__new_ipl) \

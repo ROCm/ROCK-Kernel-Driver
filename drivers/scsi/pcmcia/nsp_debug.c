@@ -3,7 +3,7 @@
       By: YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>
 
     This software may be used and distributed according to the terms of
-    the GNU Public License.
+    the GNU General Public License.
 =========================================================================*/
 
 /* $Id: nsp_debug.c,v 1.6 2001/07/04 14:43:53 elca Exp $ */

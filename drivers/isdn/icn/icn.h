@@ -1,4 +1,4 @@
-/* $Id: icn.h,v 1.30.6.3 2001/04/20 02:42:01 keil Exp $
+/* $Id: icn.h,v 1.30.6.4 2001/08/17 12:34:27 kai Exp $
 
  * ISDN lowlevel-module for the ICN active ISDN-Card.
  *
@@ -284,9 +284,6 @@ MODULE_PARM_DESC(icn_id2, "ID-String of first card, second S0 (4B only)");
 		   readb(&msg_i)-readb(&msg_o))
 
 #define CID (card->interface.id)
-
-#define MIN(a,b) ((a<b)?a:b)
-#define MAX(a,b) ((a>b)?a:b)
 
 #endif                          /* defined(__KERNEL__) || defined(__DEBUGVAR__) */
 #endif                          /* icn_h */

@@ -1163,6 +1163,24 @@ struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
     struct list_head *lp;
     struct dentry *result;
 
+    /* fhtype happens to reflect the number of u32s encoded.
+     * due to a bug in earlier code, fhtype might indicate there
+     * are more u32s then actually fitted.
+     * so if fhtype seems to be more than len, reduce fhtype.
+     * Valid types are:
+     *   2 - objectid + dir_id - legacy support
+     *   3 - objectid + dir_id + generation
+     *   4 - objectid + dir_id + objectid and dirid of parent - legacy
+     *   5 - objectid + dir_id + generation + objectid and dirid of parent
+     *   6 - as above plus generation of directory
+     * 6 does not fit in NFSv2 handles
+     */
+    if (fhtype > len) {
+	    if (fhtype != 6 || len != 5)
+		    printk(KERN_WARNING "nfsd/reiserfs, fhtype=%d, len=%d - odd\n",
+			   fhtype, len);
+	    fhtype = 5;
+    }
     if (fhtype < 2 || (parent && fhtype < 4)) 
 	goto out ;
 
@@ -1173,14 +1191,14 @@ struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
 	    key.on_disk_key.k_objectid = data[0] ;
 	    key.on_disk_key.k_dir_id = data[1] ;
 	    inode = reiserfs_iget(sb, &key) ;
-	    if (inode && (fhtype == 3 || fhtype == 6) &&
+	    if (inode && (fhtype == 3 || fhtype >= 5) &&
 		data[2] != inode->i_generation) {
 		    iput(inode) ;
 		    inode = NULL ;
 	    }
     } else {
-	    key.on_disk_key.k_objectid = data[fhtype==6?3:2] ;
-	    key.on_disk_key.k_dir_id = data[fhtype==6?4:3] ;
+	    key.on_disk_key.k_objectid = data[fhtype>=5?3:2] ;
+	    key.on_disk_key.k_dir_id = data[fhtype>=5?4:3] ;
 	    inode = reiserfs_iget(sb, &key) ;
 	    if (inode && fhtype == 6 &&
 		data[5] != inode->i_generation) {
@@ -1227,17 +1245,20 @@ int reiserfs_dentry_to_fh(struct dentry *dentry, __u32 *data, int *lenp, int nee
     data[0] = inode->i_ino ;
     data[1] = le32_to_cpu(INODE_PKEY (inode)->k_dir_id) ;
     data[2] = inode->i_generation ;
-    *lenp = 3;
+    *lenp = 3 ;
     /* no room for directory info? return what we've stored so far */
-    if (maxlen < 6 || ! need_parent)
-        return 3;
+    if (maxlen < 5 || ! need_parent)
+        return 3 ;
 
     inode = dentry->d_parent->d_inode ;
     data[3] = inode->i_ino ;
     data[4] = le32_to_cpu(INODE_PKEY (inode)->k_dir_id) ;
+    *lenp = 5 ;
+    if (maxlen < 6)
+	    return 5 ;
     data[5] = inode->i_generation ;
-    *lenp = 6;
-    return 6; 
+    *lenp = 6 ;
+    return 6 ;
 }
 
 

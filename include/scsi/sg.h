@@ -11,9 +11,13 @@ Original driver (sg.h):
 Version 2 and 3 extensions to driver:
 *       Copyright (C) 1998 - 2001 Douglas Gilbert
 
-    Version: 3.1.19 (20010623)
+    Version: 3.1.20 (20010814)
     This version is for 2.4 series kernels.
 
+    Changes since 3.1.19 (20010623)
+	- add SG_GET_ACCESS_COUNT ioctl 
+	- make open() increment and close() decrement access_count
+	- only register first 256 devices, reject subsequent devices
     Changes since 3.1.18 (20010505)
 	- fix bug that caused long wait when large buffer requested
 	- fix leak in error case of sg_new_read() [report: Eric Barton]
@@ -220,6 +224,9 @@ typedef struct sg_req_info { /* used by SG_GET_REQUEST_TABLE ioctl() */
 /* How to treat EINTR during SG_IO ioctl(), only in SG 3.x series */
 #define SG_SET_KEEP_ORPHAN 0x2287 /* 1 -> hold for read(), 0 -> drop (def) */
 #define SG_GET_KEEP_ORPHAN 0x2288
+
+/* yields scsi midlevel's access_count for this SCSI device */
+#define SG_GET_ACCESS_COUNT 0x2289  
 
 
 #define SG_SCATTER_SZ (8 * 4096)  /* PAGE_SIZE not available to user */

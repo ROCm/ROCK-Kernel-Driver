@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_ipv4.c,v 1.229 2001/04/20 20:46:19 davem Exp $
+ * Version:	$Id: tcp_ipv4.c,v 1.230 2001/09/01 00:31:50 davem Exp $
  *
  *		IPv4 specific functions
  *
@@ -1505,7 +1505,7 @@ static int tcp_v4_checksum_init(struct sk_buff *skb)
 				  skb->nh.iph->daddr,skb->csum))
 			return 0;
 
-		NETDEBUG(printk(KERN_DEBUG "hw tcp v4 csum failed\n"));
+		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "hw tcp v4 csum failed\n"));
 		skb->ip_summed = CHECKSUM_NONE;
 	}
 	if (skb->len <= 76) {

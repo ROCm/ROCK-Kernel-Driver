@@ -1654,6 +1654,16 @@ struct parport_operations {
 
       </listitem></varlistentry>
 
+     <varlistentry><term><constant>PPGETMODE</constant></term>
+      <listitem>
+
+       <para>
+	Retrieves the current IEEE 1284 mode to use for
+	<function>read</function> and <function>write</function>.
+       </para>
+
+      </listitem></varlistentry>
+
      <varlistentry><term><constant>PPGETTIME</constant></term>
       <listitem>
 
@@ -1681,6 +1691,36 @@ struct parport_operations {
 	should be a pointer to a <structname>struct
 	timeval</structname>.
        </para>
+
+      </listitem></varlistentry>
+
+     <varlistentry><term><constant>PPGETMODES</constant></term>
+      <listitem>
+
+       <para>
+	Retrieves the capabilities of the hardware (i.e. the
+	<structfield>modes</structfield> field of the
+	<structname>parport</structname> structure).
+       </para>
+
+      </listitem></varlistentry>
+
+     <varlistentry><term><constant>PPSETFLAGS</constant></term>
+      <listitem>
+
+       <para>
+	Sets flags on the <literal>ppdev</literal> device which can
+	affect future I/O operations.  Available flags are:
+       </para>
+
+       <itemizedlist spacing=compact>
+	<listitem><para>
+	  <constant>PP_FASTWRITE</constant></para></listitem>
+	<listitem><para>
+	  <constant>PP_FASTREAD</constant></para></listitem>
+	<listitem><para>
+	  <constant>PP_W91284PIC</constant></para></listitem>
+       </itemizedlist>
 
       </listitem></varlistentry>
 

@@ -396,7 +396,6 @@ static struct super_block *qnx4_read_super(struct super_block *s,
  		goto outi;
 
 	brelse(bh);
-	s->s_dirt = 1;
 
 	return s;
 

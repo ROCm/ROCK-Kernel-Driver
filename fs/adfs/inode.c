@@ -220,7 +220,7 @@ adfs_unix2adfs_time(struct inode *inode, unsigned int secs)
 	if (inode->u.adfs_i.stamped) {
 		/* convert 32-bit seconds to 40-bit centi-seconds */
 		low  = (secs & 255) * 100;
-		high = (secs / 256) * 100 + (low << 8) + 0x336e996a;
+		high = (secs / 256) * 100 + (low >> 8) + 0x336e996a;
 
 		inode->u.adfs_i.loadaddr = (high >> 24) |
 				(inode->u.adfs_i.loadaddr & ~0xff);

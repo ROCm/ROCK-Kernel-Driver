@@ -34,17 +34,6 @@ This paper covers installation of the driver and operation of a
 dialed-in x3270.
 
 
-HELP !!!
-
-The device name of e.g. /dev/3270/tty620 noted below is at variance
-with "standard" Linux device names.  What should it be?  The portion
-"/dev/3270" was recommended by H. Peter Anvin, maintainer of the
-official Linux major-numbers list; the portion "tty620" was recommended
-by me.  Please send your thoughts on this issue at least to me at
-rbh00@utsglobal.com.  Even if you think it's okay as is, please let me
-know.  Thanks.
-
-
 INSTALLATION.
 
 You install the driver by installing a patch, doing a kernel build, and
@@ -60,9 +49,14 @@ script and the resulting /tmp/mkdev3270.
 
 If you have chosen to make tub3270 a module, you add a line to
 /etc/modules.conf.  If you are working on a VM virtual machine, you
-can use DEF GRAF to define virtual 3270 devices.  If you generate 3270
-console support, the driver automatically converts your console at boot
-time to a 3270 if it is a 3215.
+can use DEF GRAF to define virtual 3270 devices.
+
+You may generate both 3270 and 3215 console support, or one or the
+other, or neither.  If you generate both, the console type under VM is
+not changed.  Use #CP Q TERM to see what the current console type is.
+Use #CP TERM CONMODE 3270 to change it to 3270.  If you generate only
+3270 console support, then the driver automatically converts your console
+at boot time to a 3270 if it is a 3215.
 
 In brief, these are the steps:
 	1. Install the tub3270 patch
@@ -78,21 +72,17 @@ To test that everything works, assuming VM and x3270,
 
 Here are the installation steps in detail:
 
-	0.  Retrieve the patch file via anonymous ftp from
-	ftp://ftp.utsglobal.com/pub/tub3270.  The patch is designed
-	to apply smoothly to an IBM 2.4.0 system with no other
-	UTS-Global patches applied.  We know of some easily resolvable
-	conflicts between this and other of our patches.
-
-	1. Apply the patch.  Then do
+	1.  The 3270 driver is a part of the official Linux kernel
+	source.  Build a tree with the kernel source and any necessary
+	patches.  Then do
 		make oldconfig
-			(Reply "y" or "m" for CONFIG_3270; if "y",
-			reply "y" or "n" for CONFIG_3270_CONSOLE)
+		(If you wish to disable 3215 console support, edit
+		.config; change CONFIG_TN3215's value to "n";
+		and rerun "make oldconfig".)
 		make dep
 		make image
 		make modules
 		make modules_install
-		<run silo in the usual way>
 
 	2. (Perform this step only if you have configured tub3270 as a
 	module.)  Add a line to /etc/modules.conf to automatically
@@ -122,12 +112,17 @@ Here are the installation steps in detail:
 	config3270.sh.	Inspect the output script it produces,
 	/tmp/mkdev3270, and then run that script.  This will create the
 	necessary character special device files and make the necessary
-	changes to /etc/inittab.  Then notify /sbin/init that /etc/inittab
-	has changed, by issuing the telinit command with the q operand:
+	changes to /etc/inittab.  If you have selected DEVFS, the driver
+	itself creates the device files, and /tmp/mkdev3270 only changes
+	/etc/inittab.
+
+	Then notify /sbin/init that /etc/inittab has changed, by issuing
+	the telinit command with the q operand:
 		cd /usr/src/linux/Documentation/s390
 		sh config3270.sh
 		sh /tmp/mkdev3270
 		telinit q
+
 	This should be sufficient for your first time.	If your 3270
 	configuration has changed and you're reusing config3270, you
 	should follow these steps:

@@ -23,13 +23,13 @@
 */
 
 /* 
- * $Id: hci_core.h,v 1.1 2001/06/01 08:12:11 davem Exp $ 
+ * $Id: hci_core.h,v 1.11 2001/08/05 06:02:15 maxk Exp $ 
  */
 
-#ifndef __IF_HCI_CORE_H
-#define __IF_HCI_CORE_H
+#ifndef __HCI_CORE_H
+#define __HCI_CORE_H
 
-#include "hci.h"
+#include <net/bluetooth/hci.h>
 
 /* HCI upper protocols */
 #define HCI_MAX_PROTO 	1
@@ -53,154 +53,131 @@ struct inquiry_cache {
 	struct inquiry_entry 	*list;
 };
 
-static __inline__ void inquiry_cache_init(struct inquiry_cache *cache)
+static inline void inquiry_cache_init(struct inquiry_cache *cache)
 {
 	spin_lock_init(&cache->lock);
 	cache->list = NULL;
 }
 
-static __inline__ void inquiry_cache_lock(struct inquiry_cache *cache)
+static inline void inquiry_cache_lock(struct inquiry_cache *cache)
 {
 	spin_lock(&cache->lock);
 }
 
-static __inline__ void inquiry_cache_unlock(struct inquiry_cache *cache)
+static inline void inquiry_cache_unlock(struct inquiry_cache *cache)
 {
 	spin_unlock(&cache->lock);
 }
 
-static __inline__ void inquiry_cache_lock_bh(struct inquiry_cache *cache)
+static inline void inquiry_cache_lock_bh(struct inquiry_cache *cache)
 {
 	spin_lock_bh(&cache->lock);
 }
 
-static __inline__ void inquiry_cache_unlock_bh(struct inquiry_cache *cache)
+static inline void inquiry_cache_unlock_bh(struct inquiry_cache *cache)
 {
 	spin_unlock_bh(&cache->lock);
 }
 
-static __inline__ long inquiry_cache_age(struct inquiry_cache *cache)
+static inline long inquiry_cache_age(struct inquiry_cache *cache)
 {
 	return jiffies - cache->timestamp;
 }
 
-static __inline__ long inquiry_entry_age(struct inquiry_entry *e)
+static inline long inquiry_entry_age(struct inquiry_entry *e)
 {
 	return jiffies - e->timestamp;
 }
 extern void inquiry_cache_flush(struct inquiry_cache *cache);
 
-/* ----- Connection hash ----- */
-#define HCI_MAX_CONN 	10
-
-/* FIXME:
- * We assume that handle is a number - 0 ... HCI_MAX_CONN.
- */
-struct conn_hash {
-	spinlock_t 	lock;
-	unsigned int	num;
-	void 		*conn[HCI_MAX_CONN];
-};
-
-static __inline__ void conn_hash_init(struct conn_hash *h)
-{
-	memset(h, 0, sizeof(struct conn_hash));
-	spin_lock_init(&h->lock);
-}
-
-static __inline__ void conn_hash_lock(struct conn_hash *h)
-{
-	spin_lock(&h->lock);
-}
-
-static __inline__ void conn_hash_unlock(struct conn_hash *h)
-{
-	spin_unlock(&h->lock);
-}
-
-static __inline__ void *__conn_hash_add(struct conn_hash *h, __u16 handle, void *conn)
-{
-	if (!h->conn[handle]) {
-		h->conn[handle] = conn;
-		h->num++;
-		return conn;
-	} else
-		return NULL;
-}
-
-static __inline__ void *conn_hash_add(struct conn_hash *h, __u16 handle, void *conn)
-{
-	if (handle >= HCI_MAX_CONN)
-		return NULL;
-
-	conn_hash_lock(h);
-	conn = __conn_hash_add(h, handle, conn);
-	conn_hash_unlock(h);
-
-	return conn;
-}
-
-static __inline__ void *__conn_hash_del(struct conn_hash *h, __u16 handle)
-{
-	void *conn = h->conn[handle];
-
-	if (conn) {
-		h->conn[handle] = NULL;
-		h->num--;
-		return conn;
-	} else
-		return NULL;
-}
-
-static __inline__ void *conn_hash_del(struct conn_hash *h, __u16 handle)
-{
-	void *conn;
-
-	if (handle >= HCI_MAX_CONN)
-		return NULL;
-	conn_hash_lock(h);
-	conn = __conn_hash_del(h, handle); 
-	conn_hash_unlock(h);
-
-	return conn;
-}
-
-static __inline__ void *__conn_hash_lookup(struct conn_hash *h, __u16 handle)
-{
-	return h->conn[handle];
-}
-
-static __inline__ void *conn_hash_lookup(struct conn_hash *h, __u16 handle)
-{
-	void *conn;
-
-	if (handle >= HCI_MAX_CONN)
-		return NULL;
-
-	conn_hash_lock(h);
-	conn = __conn_hash_lookup(h, handle);
-	conn_hash_unlock(h);
-
-	return conn;
-}
-
 struct hci_dev;
 
 /* ----- HCI Connections ----- */
 struct hci_conn {
-	bdaddr_t	dst;
-	__u16		handle;
-
-	unsigned int 	acl_sent;
-	unsigned int 	sco_sent;
+	struct list_head list;
+	bdaddr_t         dst;
+	__u16            handle;
+	__u8		 type;
+	unsigned int     sent;
 
 	struct hci_dev 	*hdev;
 	void		*l2cap_data;
 	void		*priv;
 
-	struct sk_buff_head	acl_q;
-	struct sk_buff_head	sco_q;
+	struct sk_buff_head data_q;
 };
+
+struct conn_hash {
+	struct list_head list;
+	spinlock_t       lock;
+	unsigned int     num;
+};
+
+static inline void conn_hash_init(struct conn_hash *h)
+{
+	INIT_LIST_HEAD(&h->list);
+	spin_lock_init(&h->lock);
+	h->num = 0;	
+}
+
+static inline void conn_hash_lock(struct conn_hash *h)
+{
+	spin_lock(&h->lock);
+}
+
+static inline void conn_hash_unlock(struct conn_hash *h)
+{
+	spin_unlock(&h->lock);
+}
+
+static inline void __conn_hash_add(struct conn_hash *h, __u16 handle, struct hci_conn *c)
+{
+	list_add(&c->list, &h->list);
+	h->num++;
+}
+
+static inline void conn_hash_add(struct conn_hash *h, __u16 handle, struct hci_conn *c)
+{
+	conn_hash_lock(h);
+	__conn_hash_add(h, handle, c);
+	conn_hash_unlock(h);
+}
+
+static inline void __conn_hash_del(struct conn_hash *h, struct hci_conn *c)
+{
+	list_del(&c->list);
+	h->num--;
+}
+
+static inline void conn_hash_del(struct conn_hash *h, struct hci_conn *c)
+{
+	conn_hash_lock(h);
+	__conn_hash_del(h, c);
+	conn_hash_unlock(h);
+}
+
+static inline  struct hci_conn *__conn_hash_lookup(struct conn_hash *h, __u16 handle)
+{
+	register struct list_head *p;
+	register struct hci_conn  *c;
+
+	list_for_each(p, &h->list) {
+		c = list_entry(p, struct hci_conn, list);
+		if (c->handle == handle)
+			return c;
+	}
+        return NULL;
+}
+
+static inline struct hci_conn *conn_hash_lookup(struct conn_hash *h, __u16 handle)
+{
+	struct hci_conn *conn;
+
+	conn_hash_lock(h);
+	conn = __conn_hash_lookup(h, handle);
+	conn_hash_unlock(h);
+	return conn;
+}
 
 /* ----- HCI Devices ----- */
 struct hci_dev {
@@ -211,6 +188,9 @@ struct hci_dev {
 	__u16		id;
 	__u8	 	type;
 	bdaddr_t	bdaddr;
+	__u8		features[8];
+
+	__u16		pkt_type;
 
 	atomic_t 	cmd_cnt;
 	unsigned int 	acl_cnt;
@@ -232,7 +212,8 @@ struct hci_dev {
 	struct sk_buff_head	rx_q;
 	struct sk_buff_head 	raw_q;
 	struct sk_buff_head 	cmd_q;
-	struct sk_buff     	*cmd_sent;
+
+	struct sk_buff     	*sent_cmd;
 
 	struct semaphore	req_lock;
 	wait_queue_head_t	req_wait_q;
@@ -251,20 +232,17 @@ struct hci_dev {
 	int (*send)(struct sk_buff *skb);
 };
 
-static __inline__ void hci_dev_hold(struct hci_dev *hdev)
+static inline void hci_dev_hold(struct hci_dev *hdev)
 {
 	atomic_inc(&hdev->refcnt);
 }
 
-static __inline__ void hci_dev_put(struct hci_dev *hdev)
+static inline void hci_dev_put(struct hci_dev *hdev)
 {
 	atomic_dec(&hdev->refcnt);
 }
 
 extern struct hci_dev *hci_dev_get(int index);
-
-#define SENT_CMD_PARAM(X)	(((X->cmd_sent->data) + HCI_COMMAND_HDR_SIZE))
-
 extern int hci_register_dev(struct hci_dev *hdev);
 extern int hci_unregister_dev(struct hci_dev *hdev);
 extern int hci_dev_open(__u16 dev);
@@ -275,6 +253,8 @@ extern int hci_dev_info(unsigned long arg);
 extern int hci_dev_list(unsigned long arg);
 extern int hci_dev_setscan(unsigned long arg);
 extern int hci_dev_setauth(unsigned long arg);
+extern int hci_dev_setptype(unsigned long arg);
+extern int hci_conn_list(unsigned long arg);
 extern int hci_inquiry(unsigned long arg);
 
 extern __u32 hci_dev_setmode(struct hci_dev *hdev, __u32 mode);
@@ -282,18 +262,21 @@ extern __u32 hci_dev_getmode(struct hci_dev *hdev);
 
 extern int hci_recv_frame(struct sk_buff *skb);
 
+/* ----- LMP capabilities ----- */
+#define lmp_rswitch_capable(dev) (dev->features[0] & LMP_RSWITCH)
+
 /* ----- HCI tasks ----- */
-static __inline__ void hci_sched_cmd(struct hci_dev *hdev)
+static inline void hci_sched_cmd(struct hci_dev *hdev)
 {
 	tasklet_schedule(&hdev->cmd_task);
 }
 
-static __inline__ void hci_sched_rx(struct hci_dev *hdev)
+static inline void hci_sched_rx(struct hci_dev *hdev)
 {
 	tasklet_schedule(&hdev->rx_task);
 }
 
-static __inline__ void hci_sched_tx(struct hci_dev *hdev)
+static inline void hci_sched_tx(struct hci_dev *hdev)
 {
 	tasklet_schedule(&hdev->tx_task);
 }
@@ -330,9 +313,9 @@ extern void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb);
 /* HCI info for socket */
 #define hci_pi(sk)	((struct hci_pinfo *) &sk->protinfo)
 struct hci_pinfo {
-	struct hci_dev 	*hdev;
-	__u32 	   	cmsg_flags;
-	__u32 	   	mask;
+	struct hci_dev 	  *hdev;
+	struct hci_filter filter;
+	__u32             cmsg_mask;
 };
 
 /* ----- HCI requests ----- */
@@ -340,4 +323,4 @@ struct hci_pinfo {
 #define HCI_REQ_PEND	  1
 #define HCI_REQ_CANCELED  2
 
-#endif /* __IF_HCI_CORE_H */
+#endif /* __HCI_CORE_H */

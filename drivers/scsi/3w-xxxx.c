@@ -90,6 +90,16 @@
    1.02.00.007 - Fix possible null pointer dereferences in tw_ioctl().
                  Remove check for invalid done function pointer from
                  tw_scsi_queue().
+   1.02.00.008 - Set max sectors per io to TW_MAX_SECTORS in tw_findcards().
+                 Add tw_decode_error() for printing readable error messages.
+                 Print some useful information on certain aen codes.
+                 Add tw_decode_bits() for interpreting status register output.
+                 Make scsi_set_pci_device() for kernels >= 2.4.4
+                 Fix bug where aen's could be lost before a reset.
+                 Re-add spinlocks in tw_scsi_detect().
+                 Fix possible null pointer dereference in tw_aen_drain_queue()
+                 during initialization.
+                 Clear pci parity errors during initialization and during io.
 */
 
 #include <linux/module.h>
@@ -135,7 +145,7 @@ static struct notifier_block tw_notifier = {
 };
 
 /* Globals */
-char *tw_driver_version="1.02.00.007";
+char *tw_driver_version="1.02.00.008";
 TW_Device_Extension *tw_device_extension_list[TW_MAX_SLOT];
 int tw_device_extension_count = 0;
 
@@ -147,6 +157,7 @@ int tw_aen_complete(TW_Device_Extension *tw_dev, int request_id)
 	TW_Param *param;
 	unsigned short aen;
 
+	dprintk(KERN_WARNING "3w-xxxx: tw_aen_complete()\n");
 	if (tw_dev->alignment_virtual_address[request_id] == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_aen_complete(): Bad alignment virtual address.\n");
 		return 1;
@@ -154,6 +165,27 @@ int tw_aen_complete(TW_Device_Extension *tw_dev, int request_id)
 	param = (TW_Param *)tw_dev->alignment_virtual_address[request_id];
 	aen = *(unsigned short *)(param->data);
 	dprintk(KERN_NOTICE "3w-xxxx: tw_aen_complete(): Queue'd code 0x%x\n", aen);
+
+	/* Print some useful info when certain aen codes come out */
+	switch (aen & 0x0ff) {
+		case TW_AEN_APORT_TIMEOUT:
+			printk(KERN_WARNING "3w-xxxx: scsi%d: Received drive timeout AEN on port %d, check drive and drive cables.\n", tw_dev->host->host_no,  aen >> 8);
+			break;
+		case TW_AEN_DRIVE_ERROR:
+			printk(KERN_WARNING "3w-xxxx: scsi%d: Received drive error AEN on port %d, check/replace cabling, or possible bad drive.\n", tw_dev->host->host_no, aen >> 8);
+			break;
+		case TW_AEN_SMART_FAIL:
+			printk(KERN_WARNING "3w-xxxx: scsi%d: Received S.M.A.R.T. threshold AEN on port %d, check drive/cooling, or possible bad drive.\n", tw_dev->host->host_no, aen >> 8);
+			break;
+		case TW_AEN_SBUF_FAIL:
+			printk(KERN_WARNING "3w-xxxx: scsi%d: Received SBUF integrity check failure AEN, reseat card or bad card.\n", tw_dev->host->host_no);
+			break;
+		default:
+			printk(KERN_WARNING "3w-xxxx: Received AEN 0x%x\n", aen);
+	}
+
+	tw_dev->aen_count++;
+
 	/* Now queue the code */
 	tw_dev->aen_queue[tw_dev->aen_tail] = aen;
 	if (tw_dev->aen_tail == TW_Q_LENGTH - 1) {
@@ -201,7 +233,7 @@ int tw_aen_drain_queue(TW_Device_Extension *tw_dev)
 	response_que_addr = tw_dev->registers.response_que_addr;
 
 	if (tw_poll_status(tw_dev, TW_STATUS_ATTENTION_INTERRUPT, 15)) {
-		printk(KERN_WARNING "3w-xxxx: tw_aen_drain_queue(): No attention interrupt for card %d\n", tw_dev->host->host_no);
+		printk(KERN_WARNING "3w-xxxx: tw_aen_drain_queue(): No attention interrupt for card %d.\n", tw_device_extension_count);
 		return 1;
 	}
 
@@ -258,6 +290,7 @@ int tw_aen_drain_queue(TW_Device_Extension *tw_dev)
 			status_reg_value = inl(status_reg_addr);
 			if (tw_check_bits(status_reg_value)) {
 				printk(KERN_WARNING "3w-xxxx: tw_aen_drain_queue(): Unexpected bits.\n");
+				tw_decode_bits(tw_dev, status_reg_value);
 				return 1;
 			}
 			if ((status_reg_value & TW_STATUS_RESPONSE_QUEUE_EMPTY) == 0) {
@@ -322,6 +355,22 @@ int tw_aen_drain_queue(TW_Device_Extension *tw_dev)
 						dprintk(KERN_NOTICE "3w-xxxx: tw_aen_drain_queue(): Found TW_AEN_QUEUE_FULL.\n");
 						queue = 1;
 						break;
+					case TW_AEN_APORT_TIMEOUT:
+						printk(KERN_WARNING "3w-xxxx: Received drive timeout AEN on port %d, check drive and drive cables.\n", aen >> 8);
+						queue = 1;
+						break;
+					case TW_AEN_DRIVE_ERROR:
+						printk(KERN_WARNING "3w-xxxx: Received drive error AEN on port %d, check/replace cabling, or possible bad drive.\n", aen >> 8);
+						queue = 1;
+						break;
+					case TW_AEN_SMART_FAIL:
+						printk(KERN_WARNING "3w-xxxx: Received S.M.A.R.T. threshold AEN on port %d, check drive/cooling, or possible bad drive.\n", aen >> 8);
+						queue = 1;
+						break;
+					case TW_AEN_SBUF_FAIL:
+						printk(KERN_WARNING "3w-xxxx: Received SBUF integrity check failure AEN, reseat card or bad card.\n");
+						queue = 1;
+						break;
 					default:
 						dprintk(KERN_WARNING "3w-xxxx: tw_aen_drain_queue(): Unknown AEN code 0x%x.\n", aen_code);
 						queue = 1;
@@ -378,6 +427,7 @@ int tw_aen_read_queue(TW_Device_Extension *tw_dev, int request_id)
 	status_reg_value = inl(status_reg_addr);
 	if (tw_check_bits(status_reg_value)) {
 		printk(KERN_WARNING "3w-xxxx: tw_aen_read_queue(): Unexpected bits.\n");
+		tw_decode_bits(tw_dev, status_reg_value);
 		return 1;
 	}
 	if (tw_dev->command_packet_virtual_address[request_id] == NULL) {
@@ -552,6 +602,40 @@ static void tw_copy_mem_info(TW_Info *info, char *data, int len)
 	}
 } /* End tw_copy_mem_info() */
 
+/* This function will print readable messages from statsu register errors */
+void tw_decode_bits(TW_Device_Extension *tw_dev, u32 status_reg_value)
+{
+	dprintk(KERN_WARNING "3w-xxxx: tw_decode_bits()\n");
+	switch (status_reg_value & TW_STATUS_UNEXPECTED_BITS) {
+	case TW_STATUS_PCI_PARITY_ERROR:
+		printk(KERN_WARNING "3w-xxxx: PCI Parity Error: Reseat card, move card, or buggy device on the bus.\n");
+		outl(TW_CONTROL_CLEAR_PARITY_ERROR, tw_dev->registers.control_reg_addr);
+		pci_write_config_word(tw_dev->tw_pci_dev, PCI_STATUS, TW_PCI_CLEAR_PARITY_ERRORS);
+		break;
+	case TW_STATUS_MICROCONTROLLER_ERROR:
+		printk(KERN_WARNING "3w-xxxx: Microcontroller Error.\n");
+		break;
+  }
+} /* End tw_decode_bits() */
+
+/* This function will print readable messages from flags and status values */
+void tw_decode_error(TW_Device_Extension *tw_dev, unsigned char status, unsigned char flags, unsigned char unit)
+{
+	dprintk(KERN_WARNING "3w-xxxx: tw_decode_error()\n");
+	switch (status) {
+	case 0xc7:
+		switch (flags) {
+		case 0x1b: 
+			printk(KERN_WARNING "3w-xxxx: scsi%d: Drive timeout on unit %d, check drive and drive cables.\n", tw_dev->host->host_no, unit);
+			break;
+		case 0x51:
+			printk(KERN_WARNING "3w-xxxx: scsi%d: Unrecoverable drive error on unit %d, check/replace cabling, or possible bad drive.\n", tw_dev->host->host_no, unit);
+			break;
+		}
+		break;
+	}
+} /* End tw_decode_error() */
+
 /* This function will disable interrupts on the controller */  
 void tw_disable_interrupts(TW_Device_Extension *tw_dev) 
 {
@@ -575,6 +659,7 @@ int tw_empty_response_que(TW_Device_Extension *tw_dev)
 
 	if (tw_check_bits(status_reg_value)) {
 		printk(KERN_WARNING "3w-xxxx: tw_empty_response_queue(): Unexpected bits 1.\n");
+		tw_decode_bits(tw_dev, status_reg_value);
 		return 1;
 	}
   
@@ -583,6 +668,7 @@ int tw_empty_response_que(TW_Device_Extension *tw_dev)
 		status_reg_value = inl(status_reg_addr);
 		if (tw_check_bits(status_reg_value)) {
 			printk(KERN_WARNING "3w-xxxx: tw_empty_response_queue(): Unexpected bits 2.\n");
+			tw_decode_bits(tw_dev, status_reg_value);
 			return 1;
 		}
 	}
@@ -645,6 +731,11 @@ int tw_findcards(Scsi_Host_Template *tw_host)
 			/* Save pci_dev struct to device extension */
 			tw_dev->tw_pci_dev = tw_pci_dev;
 
+			/* Check for errors and clear them */
+			status_reg_value = inl(tw_dev->registers.status_reg_addr);
+			if (TW_STATUS_ERRORS(status_reg_value)) 
+			  tw_decode_bits(tw_dev, status_reg_value);
+			
 			/* Poll status register for 60 secs for 'Controller Ready' flag */
 			if (tw_poll_status(tw_dev, TW_STATUS_MICROCONTROLLER_READY, 60)) {
 				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Microcontroller not ready for card %d.\n", numcards);
@@ -738,10 +829,18 @@ int tw_findcards(Scsi_Host_Template *tw_host)
 				continue;
 			}
 
+			/* Set max sectors per io */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
+			host->max_sectors = TW_MAX_SECTORS;
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
 			scsi_set_pci_device(host, tw_pci_dev);
+#endif
+
 			status_reg_value = inl(tw_dev->registers.status_reg_addr);
 
-			dprintk(KERN_NOTICE "scsi%d : Found a 3ware Storage Controller at 0x%x, IRQ: %d P-chip: %d.%d\n", host->host_no,
+			printk(KERN_NOTICE "scsi%d : Found a 3ware Storage Controller at 0x%x, IRQ: %d, P-chip: %d.%d\n", host->host_no,
 				(u32)(tw_pci_dev->resource[0].start), tw_pci_dev->irq, 
 				(status_reg_value & TW_STATUS_MAJOR_VERSION_MASK) >> 28, 
 				(status_reg_value & TW_STATUS_MINOR_VERSION_MASK) >> 24);
@@ -881,6 +980,7 @@ int tw_initconnection(TW_Device_Extension *tw_dev, int message_credits)
 		status_reg_value = inl(status_reg_addr);
 		if (tw_check_bits(status_reg_value)) {
 			printk(KERN_WARNING "3w-xxxx: tw_initconnection(): Unexpected bits.\n");
+			tw_decode_bits(tw_dev, status_reg_value);
 			return 1;
 		}
 		if ((status_reg_value & TW_STATUS_RESPONSE_QUEUE_EMPTY) == 0) {
@@ -1034,6 +1134,7 @@ int tw_initialize_units(TW_Device_Extension *tw_dev)
 		status_reg_value = inl(status_reg_addr);
 		if (tw_check_bits(status_reg_value)) {
 			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Unexpected bits.\n");
+			tw_decode_bits(tw_dev, status_reg_value);
 			return 1;
 		}
 		if ((status_reg_value & TW_STATUS_RESPONSE_QUEUE_EMPTY) == 0) {
@@ -1136,6 +1237,7 @@ int tw_initialize_units(TW_Device_Extension *tw_dev)
 			status_reg_value = inl(status_reg_addr);
 			if (tw_check_bits(status_reg_value)) {
 				printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Unexpected bits.\n");
+				tw_decode_bits(tw_dev, status_reg_value);
 				return 1;
 			}
 			if ((status_reg_value & TW_STATUS_RESPONSE_QUEUE_EMPTY) == 0) {
@@ -1143,14 +1245,12 @@ int tw_initialize_units(TW_Device_Extension *tw_dev)
 				request_id = (unsigned char)response_queue.u.response_id;
 				if (request_id != 0) {
 					/* unexpected request id */
-					printk(KERN_WARNING "3w-xxxx: tw_initia
-lize_units(): Unexpected request id.\n");
+					printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Unexpected request id.\n");
 					return 1;
 				}
 				if (command_packet->status != 0) {
 					/* bad response */
-					printk(KERN_WARNING "3w-xxxx: tw_initia
-lize_units(): Bad response, status = 0x%x, flags = 0x%x.\n", command_packet->status, command_packet->flags);
+					printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Bad response, status = 0x%x, flags = 0x%x.\n", command_packet->status, command_packet->flags);
 					return 1;
 				}
 				found = 1;
@@ -1159,8 +1259,7 @@ lize_units(): Bad response, status = 0x%x, flags = 0x%x.\n", command_packet->sta
 		}
 		if (found == 0) {
 			/* response never received */
-			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): No
- response.\n");
+			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): No response.\n");
 			return 1;
 		}
 
@@ -1177,12 +1276,12 @@ lize_units(): Bad response, status = 0x%x, flags = 0x%x.\n", command_packet->sta
 	/* Now allocate raid5 bounce buffers */
 	if ((num_raid_five != 0) && (tw_dev->tw_pci_dev->device == TW_DEVICE_ID)) {
 		for (i=0;i<TW_Q_LENGTH;i++) {
-			tw_allocate_memory(tw_dev, i, sizeof(TW_Sector)*256, 2);
+			tw_allocate_memory(tw_dev, i, sizeof(TW_Sector)*TW_MAX_SECTORS, 2);
 			if (tw_dev->bounce_buffer[i] == NULL) {
 				printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Bounce buffer allocation failed.\n");
 				return 1;
 			}
-			memset(tw_dev->bounce_buffer[i], 0, sizeof(TW_Sector)*256);
+			memset(tw_dev->bounce_buffer[i], 0, sizeof(TW_Sector)*TW_MAX_SECTORS);
 		}
 	}
   
@@ -1282,11 +1381,16 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				error = 0;
 				if (command_packet->status != 0) {
 					printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Bad response, status = 0x%x, flags = 0x%x, unit = 0x%x.\n", command_packet->status, command_packet->flags, command_packet->byte3.unit);
+					tw_decode_error(tw_dev, command_packet->status, command_packet->flags, command_packet->byte3.unit);
 					error = 1;
 				}
 				if (tw_dev->state[request_id] != TW_S_POSTED) {
 					printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Received a request id (%d) (opcode = 0x%x) that wasn't posted.\n", request_id, command_packet->byte0.opcode);
 					error = 1;
+				}
+				if (TW_STATUS_ERRORS(status_reg_value)) {
+				  tw_decode_bits(tw_dev, status_reg_value);
+				  error = 1;
 				}
 				dprintk(KERN_NOTICE "3w-xxxx: tw_interrupt(): Response queue request id: %d.\n", request_id);
 				/* Check for internal command */
@@ -1299,6 +1403,7 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					status_reg_value = inl(status_reg_addr);
 					if (tw_check_bits(status_reg_value)) {
 						printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Unexpected bits.\n");
+						tw_decode_bits(tw_dev, status_reg_value);
 					}
 		} else {
 				switch (tw_dev->srb[request_id]->cmnd[0]) {
@@ -1344,6 +1449,7 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					status_reg_value = inl(status_reg_addr);
 					if (tw_check_bits(status_reg_value)) {
 						printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Unexpected bits.\n");
+						tw_decode_bits(tw_dev, status_reg_value);
 					}
 				}
 			}
@@ -1400,7 +1506,7 @@ int tw_ioctl(TW_Device_Extension *tw_dev, int request_id)
 	param = (TW_Param *)tw_dev->alignment_virtual_address[request_id];
 	memset(param, 0, sizeof(TW_Sector));
 
-	dprintk(KERN_NOTICE "opcode = %d table_id = %d parameter_id = %d parameter_size_bytes = %d\n", ioctl->opcode, ioctl->table_id, ioctl->parameter_id,, ioctl->parameter_size_bytes);
+	dprintk(KERN_NOTICE "opcode = %d table_id = %d parameter_id = %d parameter_size_bytes = %d\n", ioctl->opcode, ioctl->table_id, ioctl->parameter_id, ioctl->parameter_size_bytes);
 	opcode = ioctl->opcode;
 
 	switch (opcode) {
@@ -1571,8 +1677,10 @@ int tw_post_command_packet(TW_Device_Extension *tw_dev, int request_id)
 	status_reg_addr = tw_dev->registers.status_reg_addr;
 	status_reg_value = inl(status_reg_addr);
 
-	if (tw_check_bits(status_reg_value)) 
+	if (tw_check_bits(status_reg_value)) {
 		printk(KERN_WARNING "3w-xxxx: tw_post_command_packet(): Unexpected bits.\n");
+		tw_decode_bits(tw_dev, status_reg_value);
+	}
 
 	if ((status_reg_value & TW_STATUS_COMMAND_QUEUE_FULL) == 0) {
 		/* We successfully posted the command packet */
@@ -1737,13 +1845,17 @@ int tw_scsi_detect(Scsi_Host_Template *tw_host)
 	
 	dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_detect()\n");
 
+	printk(KERN_WARNING "3ware Storage Controller device driver for Linux v%s.\n", tw_driver_version);
+
 	/* Check if the kernel has PCI interface compiled in */
 	if (!pci_present()) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_detect(): No pci interface present.\n");
 		return 0;
 	}
 
+	spin_unlock_irq(&io_request_lock);
 	ret = tw_findcards(tw_host);
+	spin_lock_irq(&io_request_lock);
 
 	return ret;
 } /* End tw_scsi_detect() */
@@ -1766,6 +1878,11 @@ int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt)
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_eh_abort(): Invalid device extension.\n");
 		return (FAILED);
 	}
+
+	/* We have to let AEN requests through before the reset */
+	spin_unlock_irq(&io_request_lock);
+	mdelay(TW_AEN_WAIT_TIME);
+	spin_lock_irq(&io_request_lock);
 
 	spin_lock(&tw_dev->tw_lock);
 	tw_dev->num_aborts++;
@@ -1826,6 +1943,11 @@ int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt)
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_eh_reset(): Invalid device extension.\n");
 		return (FAILED);
 	}
+
+	/* We have to let AEN requests through before the reset */
+	spin_unlock_irq(&io_request_lock);
+	mdelay(TW_AEN_WAIT_TIME);
+	spin_lock_irq(&io_request_lock);
 
 	spin_lock(&tw_dev->tw_lock);
 	tw_dev->num_resets++;
@@ -2446,6 +2568,7 @@ int tw_setfeature(TW_Device_Extension *tw_dev, int parm, int param_size,
 		status_reg_value = inl(status_reg_addr);
 		if (tw_check_bits(status_reg_value)) {
 			printk(KERN_WARNING "3w-xxxx: tw_setfeature(): Unexpected bits.\n");
+			tw_decode_bits(tw_dev, status_reg_value);
 			return 1;
 		}
 		if ((status_reg_value & TW_STATUS_RESPONSE_QUEUE_EMPTY) == 0) {

@@ -2279,6 +2279,32 @@ int dev_ioctl(unsigned int cmd, void *arg)
 		 *	These ioctl calls:
 		 *	- require superuser power.
 		 *	- require strict serialization.
+		 *	- return a value
+		 */
+		 
+		case SIOCETHTOOL:
+		case SIOCGMIIPHY:
+		case SIOCGMIIREG:
+			if (!capable(CAP_NET_ADMIN))
+				return -EPERM;
+			dev_load(ifr.ifr_name);
+			dev_probe_lock();
+			rtnl_lock();
+			ret = dev_ifsioc(&ifr, cmd);
+			rtnl_unlock();
+			dev_probe_unlock();
+			if (!ret) {
+				if (colon)
+					*colon = ':';
+				if (copy_to_user(arg, &ifr, sizeof(struct ifreq)))
+					return -EFAULT;
+			}
+			return ret;
+
+		/*
+		 *	These ioctl calls:
+		 *	- require superuser power.
+		 *	- require strict serialization.
 		 *	- do not return a value
 		 */
 		 
@@ -2293,9 +2319,6 @@ int dev_ioctl(unsigned int cmd, void *arg)
 		case SIOCSIFHWBROADCAST:
 		case SIOCSIFTXQLEN:
 		case SIOCSIFNAME:
-		case SIOCETHTOOL:
-		case SIOCGMIIPHY:
-		case SIOCGMIIREG:
 		case SIOCSMIIREG:
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;

@@ -8,7 +8,7 @@
  *  Written By: Steven J. Ralston (19960517)
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: scsi3.h,v 1.4 2001/01/06 15:54:25 sralston Exp $
+ *  $Id: scsi3.h,v 1.5 2001/04/06 14:31:32 sralston Exp $
  */
 
 #ifndef SCSI3_H_INCLUDED
@@ -64,12 +64,15 @@
 #define CMD_WriteVerify        0x2E
 #define CMD_Verify             0x2F
 #define CMD_ReadDefectData     0x37
+#define CMD_ReadLong           0x3E
 #define CMD_LogSelect          0x4C
 #define CMD_LogSense           0x4D
 #define CMD_ModeSelect10       0x55
 #define CMD_Reserve10          0x56
 #define CMD_Release10          0x57
 #define CMD_ModeSense10        0x5A
+#define CMD_PersistReserveIn   0x5E
+#define CMD_PersistReserveOut  0x5F
 #define CMD_ReportLuns         0xA0
 
 /*

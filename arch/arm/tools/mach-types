@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Thu Aug 9 22:46:02 2001
+# Last update: Thu Aug 23 12:38:13 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -31,7 +31,7 @@ itsy			SA1100_ITSY		ITSY			18
 l7200			ARCH_L7200		L7200			19
 pleb			SA1100_PLEB		PLEB			20
 integrator		ARCH_INTEGRATOR		INTEGRATOR		21
-bitsy			SA1100_BITSY		BITSY			22
+h3600			SA1100_H3600		H3600			22
 ixp1200			ARCH_IXP1200		IXP1200			23
 p720t			ARCH_P720T		P720T			24
 assabet			SA1100_ASSABET		ASSABET			25
@@ -89,7 +89,7 @@ venus			ARCH_VENUS		VENUS			76
 tardis			ARCH_TARDIS		TARDIS			77
 mercury			ARCH_MERCURY		MERCURY			78
 empeg			SA1100_EMPEG		EMPEG			79
-adi_eb			ARCH_I80200FCC		I80200FCC		80
+adi_evb			ARCH_I80200FCC		I80200FCC		80
 itt_cpb			SA1100_ITT_CPB		ITT_CPB			81
 svc			SA1100_SVC		SVC			82
 alpha2			SA1100_ALPHA2		ALPHA2			84
@@ -115,3 +115,10 @@ gator			SA1100_GATOR		GATOR			103
 granite			ARCH_GRANITE		GRANITE			104
 consus			SA1100_CONSUS		CONSUS			105
 aaec2000_aaed20		ARCH_AAEC2000_AAED2000	AAEC2000_AAED2000	106
+cdb89712		ARCH_CDB89712		CDB89712		107
+graphicsmaster		SA1100_GRAPHICSMASTER	GRAPHICSMASTER		108
+adsbitsy		SA1100_ADSBITSY		ADSBITSY		109
+cotulla_idp		ARCH_COTULLA_IDP	COTULLA_IDP		110
+plce			ARCH_PLCE		PLCE			111
+pt_system3		SA1100_PT_SYSTEM3	PT_SYSTEM3		112
+medalb			ARCH_MEDALB		MEDALB			113

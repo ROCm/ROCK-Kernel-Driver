@@ -45,6 +45,9 @@ dep_tristate '  S3 SonicVibes' CONFIG_SOUND_SONICVIBES $CONFIG_SOUND
 if [ "$CONFIG_VISWS" = "y" ]; then
     dep_tristate '  SGI Visual Workstation Sound' CONFIG_SOUND_VWSND $CONFIG_SOUND
 fi
+if [ "$CONFIG_DDB5477" = "y" ]; then
+    dep_tristate '  NEC Vrc5477 AC97 sound' CONFIG_SOUND_VRC5477 $CONFIG_SOUND
+fi
 dep_tristate '  Trident 4DWave DX/NX, SiS 7018 or ALi 5451 PCI Audio Core' CONFIG_SOUND_TRIDENT $CONFIG_SOUND
 
 dep_tristate '  Support for Turtle Beach MultiSound Classic, Tahiti, Monterey' CONFIG_SOUND_MSNDCLAS $CONFIG_SOUND

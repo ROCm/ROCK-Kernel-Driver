@@ -993,7 +993,7 @@ tty3270_show_tube(int minor, char *buf, int count)
 	if (tty)
 		len += sprintf(buf+len,
 				"    write_wait=%.8x read_wait=%.8x\n",
-				tty->write_wait, tty->read_wait);
+				(int)&tty->write_wait, (int)&tty->read_wait);
 
 	if (tty && ((mp = tty->termios)))
 		len += sprintf(buf+len,"    iflag=%.8x oflag=%.8x "

@@ -37,9 +37,9 @@ struct zorro_manuf_info {
  * real memory.. Parse the same file multiple times
  * to get all the info.
  */
-#define MANUF( manuf, name )		static const char __manufstr_##manuf[] __initdata = name;
+#define MANUF( manuf, name )		static char __manufstr_##manuf[] __initdata = name;
 #define ENDMANUF()
-#define PRODUCT( manuf, prod, name ) 	static const char __prodstr_##manuf##prod[] __initdata = name;
+#define PRODUCT( manuf, prod, name ) 	static char __prodstr_##manuf##prod[] __initdata = name;
 #include "devlist.h"
 
 
@@ -48,7 +48,7 @@ struct zorro_manuf_info {
 #define PRODUCT( manuf, prod, name )	{ 0x##prod, 0, __prodstr_##manuf##prod },
 #include "devlist.h"
 
-static const struct zorro_manuf_info __initdata zorro_manuf_list[] = {
+static struct zorro_manuf_info __initdata zorro_manuf_list[] = {
 #define MANUF( manuf, name )		{ 0x##manuf, sizeof(__prods_##manuf) / sizeof(struct zorro_prod_info), __manufstr_##manuf, __prods_##manuf },
 #define ENDMANUF()
 #define PRODUCT( manuf, prod, name )

@@ -7,7 +7,7 @@
  *
  *	Based on linux/ipv4/udp.c
  *
- *	$Id: udp.c,v 1.63 2001/06/13 16:25:03 davem Exp $
+ *	$Id: udp.c,v 1.64 2001/09/01 00:31:50 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -635,7 +635,7 @@ int udpv6_rcv(struct sk_buff *skb)
 	if (skb->ip_summed==CHECKSUM_HW) {
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 		if (csum_ipv6_magic(saddr, daddr, ulen, IPPROTO_UDP, skb->csum)) {
-			NETDEBUG(printk(KERN_DEBUG "udp v6 hw csum failure.\n"));
+			NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp v6 hw csum failure.\n"));
 			skb->ip_summed = CHECKSUM_NONE;
 		}
 	}

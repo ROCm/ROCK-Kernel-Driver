@@ -108,6 +108,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_NOATIME	1024	/* Do not update access times. */
 #define MS_NODIRATIME	2048	/* Do not update directory access times */
 #define MS_BIND		4096
+#define MS_NOUSER	(1<<31)
 
 /*
  * Flags that can be altered by MS_REMOUNT
@@ -1297,7 +1298,6 @@ extern void insert_inode_hash(struct inode *);
 extern void remove_inode_hash(struct inode *);
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
-extern void file_moveto(struct file *new, struct file *old);
 extern struct buffer_head * get_hash_table(kdev_t, int, int);
 extern struct buffer_head * getblk(kdev_t, int, int);
 extern void ll_rw_block(int, int, struct buffer_head * bh[]);

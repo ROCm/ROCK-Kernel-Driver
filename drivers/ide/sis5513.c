@@ -96,7 +96,7 @@ static struct _udma_mode_mapping {
 	{ 4, "Mode 2" }, 
 	{ 3, "Mode 3" },
 	{ 2, "Mode 4" },
-	{ 0, "Undefined" }
+	{ 0, "Mode 5" }
 };
 
 static __inline__ char * find_udma_mode (byte cycle_time)
@@ -135,7 +135,7 @@ static char *recovery_time [] ={
 };
 
 static char * cycle_time [] = {
-	"Undefined", "2 CLCK",
+	"2 CLK", "2 CLK",
 	"3 CLK", "4 CLK",
 	"5 CLK", "6 CLK",
 	"7 CLK", "8 CLK"
@@ -495,7 +495,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	printk("%s: %s drive%d\n", drive->name, ide_xfer_verbose(speed), drive->dn);
 #endif /* SIS5513_DEBUG_DRIVE_INFO */
 
-	return ((int)	((id->dma_ultra >> 11) & 3) ? ide_dma_on :
+	return ((int)	((id->dma_ultra >> 11) & 7) ? ide_dma_on :
 			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
 			((id->dma_mword >> 8) & 7) ? ide_dma_on :
 			((id->dma_1word >> 8) & 7) ? ide_dma_on :
@@ -515,7 +515,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 		}
 		dma_func = ide_dma_off_quietly;
 		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x001F) {
+			if (id->dma_ultra & 0x003F) {
 				/* Force if Capable UltraDMA */
 				dma_func = config_chipset_for_dma(drive, 1);
 				if ((id->field_valid & 2) &&

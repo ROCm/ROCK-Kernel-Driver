@@ -19,9 +19,9 @@
  */
 #include <linux/config.h>
 #ifdef CONFIG_PROC_FS
- static char sg_version_str[] = "Version: 3.1.19 (20010623)";
+ static char sg_version_str[] = "Version: 3.1.20 (20010814)";
 #endif
- static int sg_version_num = 30119; /* 2 digits for each component */
+ static int sg_version_num = 30120; /* 2 digits for each component */
 /*
  *  D. P. Gilbert (dgilbert@interlog.com, dougg@triode.net.au), notes:
  *      - scsi logging is available via SCSI_LOG_TIMEOUT macros. First
@@ -271,6 +271,7 @@ static int sg_open(struct inode * inode, struct file * filp)
      /* Prevent the device driver from vanishing while we sleep */
      if (sdp->device->host->hostt->module)
         __MOD_INC_USE_COUNT(sdp->device->host->hostt->module);
+    sdp->device->access_count++;
 
     if (! ((flags & O_NONBLOCK) ||
 	   scsi_block_when_processing_errors(sdp->device))) {
@@ -323,6 +324,7 @@ static int sg_open(struct inode * inode, struct file * filp)
     return 0;
 
 error_out:
+    sdp->device->access_count--;
     if ((! sdp->detached) && sdp->device->host->hostt->module)
         __MOD_DEC_USE_COUNT(sdp->device->host->hostt->module);
     return retval;
@@ -342,8 +344,11 @@ static int sg_release(struct inode * inode, struct file * filp)
     SCSI_LOG_TIMEOUT(3, printk("sg_release: dev=%d\n", MINOR(sdp->i_rdev)));
     sg_fasync(-1, filp, 0);   /* remove filp from async notification list */
     if (0 == sg_remove_sfp(sdp, sfp)) { /* Returns 1 when sdp gone */
-	if ((! sdp->detached) && sdp->device->host->hostt->module)
-	    __MOD_DEC_USE_COUNT(sdp->device->host->hostt->module);
+        if (! sdp->detached) {
+            sdp->device->access_count--;
+            if (sdp->device->host->hostt->module)
+                __MOD_DEC_USE_COUNT(sdp->device->host->hostt->module);
+        }
 	sdp->exclude = 0;
 	wake_up_interruptible(&sdp->o_excl_wait);
     }
@@ -874,6 +879,9 @@ static int sg_ioctl(struct inode * inode, struct file * filp,
         return 0;
     case SG_GET_VERSION_NUM:
         return put_user(sg_version_num, (int *)arg);
+    case SG_GET_ACCESS_COUNT:
+    	val = (sdp->device ? sdp->device->access_count : 0);
+	return put_user(val, (int *)arg);
     case SG_GET_REQUEST_TABLE:
 	result = verify_area(VERIFY_WRITE, (void *) arg,
 			     SZ_SG_REQ_INFO * SG_MAX_QUEUE);
@@ -1116,6 +1124,7 @@ static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
             sg_remove_sfp(sdp, sfp);
 	    sfp = NULL;
         }
+	sdp->device->access_count--;
 	if (sg_template.module)
 		__MOD_DEC_USE_COUNT(sg_template.module);
 	if (sdp->device->host->hostt->module)
@@ -1241,6 +1250,15 @@ static int sg_attach(Scsi_Device * scsidp)
 
     for(k = 0; k < sg_template.dev_max; k++)
         if(! sg_dev_arr[k]) break;
+    if (k > MINORMASK) {
+	scsidp->attached--;
+	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
+	printk("Unable to attach sg device <%d, %d, %d, %d>"
+	       " type=%d, minor number exceed %d\n", scsidp->host->host_no, 
+	       scsidp->channel, scsidp->id, scsidp->lun, scsidp->type,
+	       MINORMASK);
+	return 1;
+    }
     if(k < sg_template.dev_max)
     	sdp = (Sg_device *)kmalloc(sizeof(Sg_device), GFP_ATOMIC);
     else
@@ -1264,7 +1282,7 @@ static int sg_attach(Scsi_Device * scsidp)
     sdp->de = devfs_register (scsidp->de, "generic", DEVFS_FL_DEFAULT,
                              SCSI_GENERIC_MAJOR, k,
                              S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-                             &sg_fops, NULL);
+                             &sg_fops, sdp);
     sg_template.nr_dev++;
     sg_dev_arr[k] = sdp;
     write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
@@ -1314,6 +1332,7 @@ static void sg_detach(Scsi_Device * scsidp)
 			sg_finish_rem_req(srp);
 		}
 		if (sfp->closed) {
+		    sdp->device->access_count--;
 		    if (sg_template.module)
 			__MOD_DEC_USE_COUNT(sg_template.module);
 		    if (sdp->device->host->hostt->module)
@@ -2210,6 +2229,7 @@ static int sg_remove_sfp(Sg_device * sdp, Sg_fd * sfp)
     }
     else {
         sfp->closed = 1; /* flag dirty state on this fd */
+	sdp->device->access_count++;
 	/* MOD_INC's to inhibit unloading sg and associated adapter driver */
 	if (sg_template.module)
 	    __MOD_INC_USE_COUNT(sg_template.module);
@@ -2753,7 +2773,7 @@ static int sg_proc_devhdr_read(char * buffer, char ** start, off_t offset,
 static int sg_proc_devhdr_info(char * buffer, int * len, off_t * begin,
 			       off_t offset, int size)
 {
-    PRINT_PROC("host\tchan\tid\tlun\ttype\tbopens\tqdepth\tbusy\tonline\n");
+    PRINT_PROC("host\tchan\tid\tlun\ttype\topens\tqdepth\tbusy\tonline\n");
     return 1;
 }
 

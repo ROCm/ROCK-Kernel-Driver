@@ -23,7 +23,7 @@
 */
 
 /*
- *  $Id: l2cap.h,v 1.1 2001/06/01 08:12:11 davem Exp $
+ *  $Id: l2cap.h,v 1.5 2001/06/14 21:28:26 maxk Exp $
  */
 
 #ifndef __L2CAP_H
@@ -31,6 +31,14 @@
 
 #include <asm/types.h>
 #include <asm/byteorder.h>
+
+/* L2CAP defaults */
+#define L2CAP_DEFAULT_MTU 	672
+#define L2CAP_DEFAULT_FLUSH_TO	0xFFFF
+
+#define L2CAP_CONN_TIMEOUT 	(HZ * 40)
+#define L2CAP_DISCONN_TIMEOUT 	(HZ * 2)
+#define L2CAP_CONN_IDLE_TIMEOUT	(HZ * 60)
 
 /* L2CAP socket address */
 struct sockaddr_l2 {
@@ -52,11 +60,10 @@ struct l2cap_options {
 	__u32 delay_var;
 };
 
-/* L2CAP defaults */
-#define L2CAP_DEFAULT_MTU 	672
-#define L2CAP_DEFAULT_FLUSH_TO	0xFFFF
-
-#define L2CAP_CONN_TIMEOUT 	(HZ * 40)
+#define L2CAP_CONNINFO  0x02
+struct l2cap_conninfo {
+	__u16 hci_handle;
+};
 
 /* L2CAP command codes */
 #define L2CAP_COMMAND_REJ 0x01

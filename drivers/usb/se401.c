@@ -25,7 +25,7 @@
  * 	- Jeroen Vreeken
  */
 
-static const char version[] = "0.22";
+static const char version[] = "0.23";
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -1034,8 +1034,8 @@ static int se401_newframe(struct usb_se401 *se401, int framenr)
 			}
 		}
 	}
-	
-	if (se401->frame[framenr].grabstate==FRAME_DONE) 
+
+	if (se401->frame[framenr].grabstate==FRAME_DONE)
 		if (se401->enhance)
 			enhance_picture(se401->frame[framenr].data, se401->cheight*se401->cwidth*3);
 	return 0;
@@ -1054,31 +1054,26 @@ static int se401_open(struct video_device *dev, int flags)
 	struct usb_se401 *se401 = (struct usb_se401 *)dev;
 	int err = 0;
 
+	/* we are called with the BKL held */
 	MOD_INC_USE_COUNT;
-	down(&se401->lock);
 
+	se401->user=1;
 	se401->fbuf=rvmalloc(se401->maxframesize * SE401_NUMFRAMES);
 	if(!se401->fbuf) err=-ENOMEM;
 
         if (err) {
 		MOD_DEC_USE_COUNT;
-		up(&se401->lock);
-	        return err;
+		se401->user = 0;
 	}
-	
-	se401->user=1;
 
-	up(&se401->lock);
-	
-	return 0;
+	return err;
 }
 
 static void se401_close(struct video_device *dev)
 {
+	/* called with BKL held */
         struct usb_se401 *se401 = (struct usb_se401 *)dev;
 	int i;
-
-	down(&se401->lock);
 
 	for (i=0; i<SE401_NUMFRAMES; i++)
 		se401->frame[i].grabstate=FRAME_UNUSED;
@@ -1087,9 +1082,8 @@ static void se401_close(struct video_device *dev)
 
 	rvfree(se401->fbuf, se401->maxframesize * SE401_NUMFRAMES);
 	se401->user=0;
-	up(&se401->lock);
 
-        if (!se401->dev) {
+        if (se401->removed) {
                 video_unregister_device(&se401->vdev);
 		kfree(se401->width);
 		kfree(se401->height);
@@ -1205,7 +1199,7 @@ static int se401_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 			return -EINVAL;
 		if (se401_set_size(se401, vw.width, vw.height))
 			return -EINVAL;
-		
+
 		return 0;
         }
 	case VIDIOCGWIN:
@@ -1280,7 +1274,7 @@ static int se401_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 
 		if(frame <0 || frame >= SE401_NUMFRAMES)
 			return -EINVAL;
-			
+
 		ret=se401_newframe(se401, frame);
 		se401->frame[frame].grabstate=FRAME_UNUSED;
 		return ret;
@@ -1350,12 +1344,12 @@ static long se401_read(struct video_device *dev, char *buf, unsigned long count,
 
 	ret=se401_newframe(se401, 0);
 
-	if (!ret) {
-		copy_to_user(buf, se401->frame[0].data, realcount);
-	} else {
-		realcount=ret;
-	}
 	se401->frame[0].grabstate=FRAME_UNUSED;
+	if (ret)
+		return ret;	
+	if (copy_to_user(buf, se401->frame[0].data, realcount))
+		return -EFAULT;
+	return realcount;
 
 	return realcount;
 }
@@ -1368,7 +1362,7 @@ static int se401_mmap(struct video_device *dev, const char *adr,
 	unsigned long page, pos;
 
 	down(&se401->lock);
-	
+
 	if (se401->dev == NULL) {
 		up(&se401->lock);
 		return -EIO;
@@ -1487,7 +1481,7 @@ static int se401_init(struct usb_se401 *se401)
 		info("int urb burned down");
 		return 1;
 	}
-	
+
         /* Flash the led */
         se401_sndctrl(1, se401, SE401_REQ_CAMERA_POWER, 1, NULL, 0);
         se401_sndctrl(1, se401, SE401_REQ_LED_CONTROL, 1, NULL, 0);
@@ -1555,33 +1549,45 @@ static void* __devinit se401_probe(struct usb_device *dev, unsigned int ifnum,
 
 	info("firmware version: %02x", dev->descriptor.bcdDevice & 255);
 
-        if (se401_init(se401))
+        if (se401_init(se401)) {
+		kfree(se401);
 		return NULL;
+	}
+
 	memcpy(&se401->vdev, &se401_template, sizeof(se401_template));
 	memcpy(se401->vdev.name, se401->camera_name, strlen(se401->camera_name));
+	init_waitqueue_head(&se401->wq);
+	init_MUTEX(&se401->lock);
+	wmb();
+
 	if (video_register_device(&se401->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
+		kfree(se401);
 		err("video_register_device failed");
 		return NULL;
 	}
 	info("registered new video device: video%d", se401->vdev.minor);
-
-	init_waitqueue_head(&se401->wq);
-	init_MUTEX(&se401->lock);
 
         return se401;
 }
 
 static void se401_disconnect(struct usb_device *dev, void *ptr)
 {
-	int i;
 	struct usb_se401 *se401 = (struct usb_se401 *) ptr;
 
+	lock_kernel();
 	/* We don't want people trying to open up the device */
-	if (!se401->user)
-              video_unregister_device(&se401->vdev);
+	if (!se401->user){
+		video_unregister_device(&se401->vdev);
+		usb_se401_remove_disconnected(se401);
+	} else {
+		se401->removed = 1;
+	}
+	unlock_kernel();
+}
 
-        usb_driver_release_interface(&se401_driver,
-                &se401->dev->actconfig->interface[se401->iface]);
+static inline void usb_se401_remove_disconnected (struct usb_se401 *se401)
+{
+	int i;
 
         se401->dev = NULL;
         se401->frame[0].grabstate = FRAME_ERROR;
@@ -1589,8 +1595,7 @@ static void se401_disconnect(struct usb_device *dev, void *ptr)
 
 	se401->streaming = 0;
 
-	if (waitqueue_active(&se401->wq))
-                wake_up_interruptible(&se401->wq);
+	wake_up_interruptible(&se401->wq);
 
 	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
 		se401->urb[i]->next = NULL;
@@ -1613,14 +1618,10 @@ static void se401_disconnect(struct usb_device *dev, void *ptr)
 #endif
 
         /* Free the memory */
-        if (!se401->user) {
-		kfree(se401->width);
-		kfree(se401->height);
-                kfree(se401);
-                se401 = NULL;
-        }
+	kfree(se401->width);
+	kfree(se401->height);
+	kfree(se401);
 }
-
 
 static struct usb_driver se401_driver = {
         name:		"se401",

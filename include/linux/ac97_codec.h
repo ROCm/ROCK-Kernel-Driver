@@ -32,7 +32,7 @@
 #define AC97_PCM_FRONT_DAC_RATE   0x002C       /* PCM Front DAC Rate */
 #define AC97_PCM_SURR_DAC_RATE    0x002E       /* PCM Surround DAC Rate */
 #define AC97_PCM_LFE_DAC_RATE     0x0030       /* PCM LFE DAC Rate */
-#define AC97_PCM_LR_DAC_RATE      0x0032       /* PCM LR DAC Rate */
+#define AC97_PCM_LR_ADC_RATE      0x0032       /* PCM LR DAC Rate */
 #define AC97_PCM_MIC_ADC_RATE     0x0034       /* PCM MIC ADC Rate */
 #define AC97_CENTER_LFE_MASTER    0x0036       /* Center + LFE Master Volume */
 #define AC97_SURROUND_MASTER      0x0038       /* Surround (Rear) Master Volume */
@@ -200,5 +200,8 @@ struct ac97_ops
 extern int ac97_read_proc (char *page_out, char **start, off_t off,
 			   int count, int *eof, void *data);
 extern int ac97_probe_codec(struct ac97_codec *);
+extern unsigned int ac97_set_adc_rate(struct ac97_codec *codec, unsigned int rate);
+extern unsigned int ac97_set_dac_rate(struct ac97_codec *codec, unsigned int rate);
+
 
 #endif /* _AC97_CODEC_H_ */

@@ -26,7 +26,8 @@ $(TOPDIR)/include/asm-arm/constants.h: constants-hdr getconstants.c
 # directories
 
 dep:
-	$(TOPDIR)/scripts/mkdep getconstants.c | sed s,getconstants.o,$(TOPDIR)/include/asm-arm/constants.h, > .depend
+	$(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- getconstants.c |\
+	 sed s,getconstants.o,$(TOPDIR)/include/asm-arm/constants.h, > .depend
 	$(MAKE) all
 
 .PHONY:	all dep

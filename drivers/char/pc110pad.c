@@ -798,7 +798,7 @@ static struct miscdevice pc110_pad = {
  *	asked to open it by an application.
  */
 
-static const char banner[] __initdata = KERN_INFO "PC110 digitizer pad at 0x%X, irq %d.\n";
+static char banner[] __initdata = KERN_INFO "PC110 digitizer pad at 0x%X, irq %d.\n";
 
 static int __init pc110pad_init_driver(void)
 {
@@ -840,3 +840,9 @@ static void __exit pc110pad_exit_driver(void)
 
 module_init(pc110pad_init_driver);
 module_exit(pc110pad_exit_driver);
+
+MODULE_AUTHOR("Alan Cox, Robin O'Leary");
+MODULE_DESCRIPTION("Driver for the touchpad on the IBM PC110 palmtop");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

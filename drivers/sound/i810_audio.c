@@ -191,7 +191,7 @@ enum {
 #define INT_MASK (INT_SEC|INT_PRI|INT_MC|INT_PO|INT_PI|INT_MO|INT_NI|INT_GPI)
 
 
-#define DRIVER_VERSION "0.03"
+#define DRIVER_VERSION "0.04"
 
 /* magic numbers to protect our data structures */
 #define I810_CARD_MAGIC		0x5072696E /* "Prin" */
@@ -429,20 +429,11 @@ static unsigned int i810_set_dac_rate(struct i810_state * state, unsigned int ra
 		dmabuf->rate = (rate * 48000)/clocking;
 	}
 	
-	if(rate != i810_ac97_get(codec, AC97_PCM_FRONT_DAC_RATE))
-	{
-		/* Power down the DAC */
-		dacp=i810_ac97_get(codec, AC97_POWER_CONTROL);
-		i810_ac97_set(codec, AC97_POWER_CONTROL, dacp|0x0200);
-		/* Load the rate and read the effective rate */
-		i810_ac97_set(codec, AC97_PCM_FRONT_DAC_RATE, rate);
-		new_rate=i810_ac97_get(codec, AC97_PCM_FRONT_DAC_RATE);
-		/* Power it back up */
-		i810_ac97_set(codec, AC97_POWER_CONTROL, dacp);
-		if(new_rate != rate) {
-			dmabuf->rate = (new_rate * 48000)/clocking;
-			rate = new_rate;
-		}
+	new_rate = ac97_set_dac_rate(codec, rate);
+
+	if(new_rate != rate) {
+		dmabuf->rate = (new_rate * 48000)/clocking;
+		rate = new_rate;
 	}
 #ifdef DEBUG
 	printk("i810_audio: called i810_set_dac_rate : rate = %d/%d\n", dmabuf->rate, rate);
@@ -478,21 +469,12 @@ static unsigned int i810_set_adc_rate(struct i810_state * state, unsigned int ra
 		rate = 8000;
 		dmabuf->rate = (rate * 48000)/clocking;
 	}
+
+	new_rate = ac97_set_adc_rate(codec, rate);
 	
-	if(rate != i810_ac97_get(codec, AC97_PCM_LR_DAC_RATE))
-	{
-		/* Power down the ADC */
-		dacp=i810_ac97_get(codec, AC97_POWER_CONTROL);
-		i810_ac97_set(codec, AC97_POWER_CONTROL, dacp|0x0100);
-		/* Load the rate and read the effective rate */
-		i810_ac97_set(codec, AC97_PCM_LR_DAC_RATE, rate);
-		new_rate=i810_ac97_get(codec, AC97_PCM_LR_DAC_RATE);
-		/* Power it back up */
-		i810_ac97_set(codec, AC97_POWER_CONTROL, dacp);
-		if(new_rate != rate) {
-			dmabuf->rate = (new_rate * 48000)/clocking;
-			rate = new_rate;
-		}
+	if(new_rate != rate) {
+		dmabuf->rate = (new_rate * 48000)/clocking;
+		rate = new_rate;
 	}
 #ifdef DEBUG
 	printk("i810_audio: called i810_set_adc_rate : rate = %d/%d\n", dmabuf->rate, rate);
@@ -985,8 +967,10 @@ static void i810_channel_interrupt(struct i810_card *card)
 		dmabuf = &state->dmabuf;
 		if(dmabuf->enable & DAC_RUNNING)
 			c=dmabuf->write_channel;
-		else
+		else if(dmabuf->enable & ADC_RUNNING)
 			c=dmabuf->read_channel;
+		else	/* This can occur going from R/W to close */
+			continue;
 		
 		port+=c->port;
 		
@@ -1450,18 +1434,14 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #endif
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
-		if(val==0) {
-			return -EINVAL;
-		} else {
-			ret = 1;
-		}
+
 		if (dmabuf->enable & DAC_RUNNING) {
 			stop_dac(state);
 		}
 		if (dmabuf->enable & ADC_RUNNING) {
 			stop_adc(state);
 		}
-		return put_user(ret, (int *)arg);
+		return put_user(1, (int *)arg);
 
 	case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {
@@ -1493,6 +1473,17 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #ifdef DEBUG
 		printk("SNDCTL_DSP_CHANNELS\n");
 #endif
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+
+		if (val > 0) {
+	    		if (dmabuf->enable & DAC_RUNNING) {
+				stop_dac(state);
+			}
+			if (dmabuf->enable & ADC_RUNNING) {
+				stop_adc(state);
+			}
+		}
 		return put_user(2, (int *)arg);
 
 	case SNDCTL_DSP_POST: /* the user has sent all data and is notifying us */
@@ -2038,129 +2029,6 @@ static int __init i810_ac97_init(struct i810_card *card)
 	return num_ac97;
 }
 
-/* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
-   until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
-   
-static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
-{
-	struct i810_card *card;
-
-	if (pci_enable_device(pci_dev))
-		return -EIO;
-
-	if (pci_set_dma_mask(pci_dev, I810_DMA_MASK)) {
-		printk(KERN_ERR "intel810: architecture does not support"
-		       " 32bit PCI busmaster DMA\n");
-		return -ENODEV;
-	}
-
-	if ((card = kmalloc(sizeof(struct i810_card), GFP_KERNEL)) == NULL) {
-		printk(KERN_ERR "i810_audio: out of memory\n");
-		return -ENOMEM;
-	}
-	memset(card, 0, sizeof(*card));
-
-	card->iobase = pci_resource_start (pci_dev, 1);
-	card->ac97base = pci_resource_start (pci_dev, 0);
-	card->pci_dev = pci_dev;
-	card->pci_id = pci_id->device;
-	card->irq = pci_dev->irq;
-	card->next = devs;
-	card->magic = I810_CARD_MAGIC;
-	spin_lock_init(&card->lock);
-	devs = card;
-
-	pci_set_master(pci_dev);
-
-	printk(KERN_INFO "i810: %s found at IO 0x%04lx and 0x%04lx, IRQ %d\n",
-	       card_names[pci_id->driver_data], card->iobase, card->ac97base, 
-	       card->irq);
-
-	card->alloc_pcm_channel = i810_alloc_pcm_channel;
-	card->alloc_rec_pcm_channel = i810_alloc_rec_pcm_channel;
-	card->alloc_rec_mic_channel = i810_alloc_rec_mic_channel;
-	card->free_pcm_channel = i810_free_pcm_channel;
-	card->channel[0].offset = 0;
-	card->channel[0].port = 0x00;
-	card->channel[0].num=0;
-	card->channel[1].offset = 0;
-	card->channel[1].port = 0x10;
-	card->channel[1].num=1;
-	card->channel[2].offset = 0;
-	card->channel[2].port = 0x20;
-	card->channel[2].num=2;
-
-	/* claim our iospace and irq */
-	request_region(card->iobase, 64, card_names[pci_id->driver_data]);
-	request_region(card->ac97base, 256, card_names[pci_id->driver_data]);
-
-	if (request_irq(card->irq, &i810_interrupt, SA_SHIRQ,
-			card_names[pci_id->driver_data], card)) {
-		printk(KERN_ERR "i810_audio: unable to allocate irq %d\n", card->irq);
-		release_region(card->iobase, 64);
-		release_region(card->ac97base, 256);
-		kfree(card);
-		return -ENODEV;
-	}
-	/* register /dev/dsp */
-	if ((card->dev_audio = register_sound_dsp(&i810_audio_fops, -1)) < 0) {
-		printk(KERN_ERR "i810_audio: couldn't register DSP device!\n");
-		release_region(card->iobase, 64);
-		release_region(card->ac97base, 256);
-		free_irq(card->irq, card);
-		kfree(card);
-		return -ENODEV;
-	}
-
-
-	/* initialize AC97 codec and register /dev/mixer */
-	if (i810_ac97_init(card) <= 0) {
-		unregister_sound_dsp(card->dev_audio);
-		release_region(card->iobase, 64);
-		release_region(card->ac97base, 256);
-		free_irq(card->irq, card);
-		kfree(card);
-		return -ENODEV;
-	}
-	pci_dev->driver_data = card;
-	return 0;
-}
-
-static void __exit i810_remove(struct pci_dev *pci_dev)
-{
-	int i;
-	struct i810_card *card = pci_dev->driver_data;
-	/* free hardware resources */
-	free_irq(card->irq, devs);
-	release_region(card->iobase, 64);
-	release_region(card->ac97base, 256);
-
-	/* unregister audio devices */
-	for (i = 0; i < NR_AC97; i++)
-		if (devs->ac97_codec[i] != NULL) {
-			unregister_sound_mixer(card->ac97_codec[i]->dev_mixer);
-			kfree (card->ac97_codec[i]);
-		}
-	unregister_sound_dsp(card->dev_audio);
-	kfree(card);
-}
-
-
-MODULE_AUTHOR("");
-MODULE_DESCRIPTION("Intel 810 audio support");
-MODULE_PARM(ftsodell, "i");
-MODULE_PARM(clocking, "i");
-MODULE_PARM(strict_clocking, "i");
-
-#define I810_MODULE_NAME "intel810_audio"
-
-static struct pci_driver i810_pci_driver = {
-	name:		I810_MODULE_NAME,
-	id_table:	i810_pci_tbl,
-	probe:		i810_probe,
-	remove:		i810_remove,
-};
-
 static void __init i810_configure_clocking (void)
 {
 	struct i810_card *card;
@@ -2229,6 +2097,140 @@ config_out_nodmabuf:
 		card->states[0] = NULL;
 	}
 }
+
+/* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
+   until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
+   
+static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
+{
+	struct i810_card *card;
+
+	if (pci_enable_device(pci_dev))
+		return -EIO;
+
+	if (pci_set_dma_mask(pci_dev, I810_DMA_MASK)) {
+		printk(KERN_ERR "intel810: architecture does not support"
+		       " 32bit PCI busmaster DMA\n");
+		return -ENODEV;
+	}
+
+	if ((card = kmalloc(sizeof(struct i810_card), GFP_KERNEL)) == NULL) {
+		printk(KERN_ERR "i810_audio: out of memory\n");
+		return -ENOMEM;
+	}
+	memset(card, 0, sizeof(*card));
+
+	card->iobase = pci_resource_start (pci_dev, 1);
+	card->ac97base = pci_resource_start (pci_dev, 0);
+	card->pci_dev = pci_dev;
+	card->pci_id = pci_id->device;
+	card->irq = pci_dev->irq;
+	card->next = devs;
+	card->magic = I810_CARD_MAGIC;
+	spin_lock_init(&card->lock);
+	devs = card;
+
+	pci_set_master(pci_dev);
+
+	printk(KERN_INFO "i810: %s found at IO 0x%04lx and 0x%04lx, IRQ %d\n",
+	       card_names[pci_id->driver_data], card->iobase, card->ac97base, 
+	       card->irq);
+
+	card->alloc_pcm_channel = i810_alloc_pcm_channel;
+	card->alloc_rec_pcm_channel = i810_alloc_rec_pcm_channel;
+	card->alloc_rec_mic_channel = i810_alloc_rec_mic_channel;
+	card->free_pcm_channel = i810_free_pcm_channel;
+	card->channel[0].offset = 0;
+	card->channel[0].port = 0x00;
+	card->channel[0].num=0;
+	card->channel[1].offset = 0;
+	card->channel[1].port = 0x10;
+	card->channel[1].num=1;
+	card->channel[2].offset = 0;
+	card->channel[2].port = 0x20;
+	card->channel[2].num=2;
+
+	/* claim our iospace and irq */
+	request_region(card->iobase, 64, card_names[pci_id->driver_data]);
+	request_region(card->ac97base, 256, card_names[pci_id->driver_data]);
+
+	if (request_irq(card->irq, &i810_interrupt, SA_SHIRQ,
+			card_names[pci_id->driver_data], card)) {
+		printk(KERN_ERR "i810_audio: unable to allocate irq %d\n", card->irq);
+		release_region(card->iobase, 64);
+		release_region(card->ac97base, 256);
+		kfree(card);
+		return -ENODEV;
+	}
+
+	/* initialize AC97 codec and register /dev/mixer */
+	if (i810_ac97_init(card) <= 0) {
+		release_region(card->iobase, 64);
+		release_region(card->ac97base, 256);
+		free_irq(card->irq, card);
+		kfree(card);
+		return -ENODEV;
+	}
+	pci_dev->driver_data = card;
+
+	if(clocking == 48000) {
+		i810_configure_clocking();
+	}
+
+	/* register /dev/dsp */
+	if ((card->dev_audio = register_sound_dsp(&i810_audio_fops, -1)) < 0) {
+		int i;
+		printk(KERN_ERR "i810_audio: couldn't register DSP device!\n");
+		release_region(card->iobase, 64);
+		release_region(card->ac97base, 256);
+		free_irq(card->irq, card);
+		for (i = 0; i < NR_AC97; i++)
+		if (card->ac97_codec[i] != NULL) {
+			unregister_sound_mixer(card->ac97_codec[i]->dev_mixer);
+			kfree (card->ac97_codec[i]);
+		}
+		kfree(card);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static void __exit i810_remove(struct pci_dev *pci_dev)
+{
+	int i;
+	struct i810_card *card = pci_dev->driver_data;
+	/* free hardware resources */
+	free_irq(card->irq, devs);
+	release_region(card->iobase, 64);
+	release_region(card->ac97base, 256);
+
+	/* unregister audio devices */
+	for (i = 0; i < NR_AC97; i++)
+		if (card->ac97_codec[i] != NULL) {
+			unregister_sound_mixer(card->ac97_codec[i]->dev_mixer);
+			kfree (card->ac97_codec[i]);
+		}
+	unregister_sound_dsp(card->dev_audio);
+	kfree(card);
+}
+
+
+MODULE_AUTHOR("");
+MODULE_DESCRIPTION("Intel 810 audio support");
+MODULE_PARM(ftsodell, "i");
+MODULE_PARM(clocking, "i");
+MODULE_PARM(strict_clocking, "i");
+
+#define I810_MODULE_NAME "intel810_audio"
+
+static struct pci_driver i810_pci_driver = {
+	name:		I810_MODULE_NAME,
+	id_table:	i810_pci_tbl,
+	probe:		i810_probe,
+	remove:		i810_remove,
+};
+
 
 static int __init i810_init_module (void)
 {

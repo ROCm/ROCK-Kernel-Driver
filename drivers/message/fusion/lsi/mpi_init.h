@@ -6,7 +6,7 @@
  *          Title:  MPI initiator mode messages and structures
  *  Creation Date:  June 8, 2000
  *
- *    MPI Version:  01.01.03
+ *    MPI Version:  01.01.05
  *
  *  Version History
  *  ---------------
@@ -20,6 +20,8 @@
  *  11-02-00  01.01.01  Original release for post 1.0 work.
  *  12-04-00  01.01.02  Added MPI_SCSIIO_CONTROL_NO_DISCONNECT.
  *  02-20-01  01.01.03  Started using MPI_POINTER.
+ *  03-27-01  01.01.04  Added structure offset comments.
+ *  04-10-01  01.01.05  Added new MsgFlag for MSG_SCSI_TASK_MGMT.
  *  --------------------------------------------------------------------------
  */
 
@@ -39,21 +41,21 @@
 
 typedef struct _MSG_SCSI_IO_REQUEST
 {
-    U8                      TargetID;
-    U8                      Bus;
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      CDBLength;
-    U8                      SenseBufferLength;
-    U8                      Reserved;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U8                      LUN[8];
-    U32                     Control;
-    U8                      CDB[16];
-    U32                     DataLength;
-    U32                     SenseBufferLowAddr;
-    SGE_IO_UNION            SGL;
+    U8                      TargetID;           /* 00h */
+    U8                      Bus;                /* 01h */
+    U8                      ChainOffset;        /* 02h */
+    U8                      Function;           /* 03h */
+    U8                      CDBLength;          /* 04h */
+    U8                      SenseBufferLength;  /* 05h */
+    U8                      Reserved;           /* 06h */
+    U8                      MsgFlags;           /* 07h */
+    U32                     MsgContext;         /* 08h */
+    U8                      LUN[8];             /* 0Ch */
+    U32                     Control;            /* 14h */
+    U8                      CDB[16];            /* 18h */
+    U32                     DataLength;         /* 28h */
+    U32                     SenseBufferLowAddr; /* 2Ch */
+    SGE_IO_UNION            SGL;                /* 30h */
 } MSG_SCSI_IO_REQUEST, MPI_POINTER PTR_MSG_SCSI_IO_REQUEST,
   SCSIIORequest_t, MPI_POINTER pSCSIIORequest_t;
 
@@ -108,22 +110,22 @@ typedef struct _MSG_SCSI_IO_REQUEST
 /* SCSIIO reply structure */
 typedef struct _MSG_SCSI_IO_REPLY
 {
-    U8                      TargetID;
-    U8                      Bus;
-    U8                      MsgLength;
-    U8                      Function;
-    U8                      CDBLength;
-    U8                      SenseBufferLength;
-    U8                      Reserved;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U8                      SCSIStatus;
-    U8                      SCSIState;
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
-    U32                     TransferCount;
-    U32                     SenseCount;
-    U32                     ResponseInfo;
+    U8                      TargetID;           /* 00h */
+    U8                      Bus;                /* 01h */
+    U8                      MsgLength;          /* 02h */
+    U8                      Function;           /* 03h */
+    U8                      CDBLength;          /* 04h */
+    U8                      SenseBufferLength;  /* 05h */
+    U8                      Reserved;           /* 06h */
+    U8                      MsgFlags;           /* 07h */
+    U32                     MsgContext;         /* 08h */
+    U8                      SCSIStatus;         /* 0Ch */
+    U8                      SCSIState;          /* 0Dh */
+    U16                     IOCStatus;          /* 0Eh */
+    U32                     IOCLogInfo;         /* 10h */
+    U32                     TransferCount;      /* 14h */
+    U32                     SenseCount;         /* 18h */
+    U32                     ResponseInfo;       /* 1Ch */
 } MSG_SCSI_IO_REPLY, MPI_POINTER PTR_MSG_SCSI_IO_REPLY,
   SCSIIOReply_t, MPI_POINTER pSCSIIOReply_t;
 
@@ -168,47 +170,49 @@ typedef struct _MSG_SCSI_IO_REPLY
 
 typedef struct _MSG_SCSI_TASK_MGMT
 {
-    U8                      TargetID;
-    U8                      Bus;
-    U8                      ChainOffset;
-    U8                      Function;
-    U8                      Reserved;
-    U8                      TaskType;
-    U8                      Reserved1;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U8                      LUN[8];
-    U32                     Reserved2[7];
-    U32                     TaskMsgContext;
+    U8                      TargetID;           /* 00h */
+    U8                      Bus;                /* 01h */
+    U8                      ChainOffset;        /* 02h */
+    U8                      Function;           /* 03h */
+    U8                      Reserved;           /* 04h */
+    U8                      TaskType;           /* 05h */
+    U8                      Reserved1;          /* 06h */
+    U8                      MsgFlags;           /* 07h */
+    U32                     MsgContext;         /* 08h */
+    U8                      LUN[8];             /* 0Ch */
+    U32                     Reserved2[7];       /* 14h */
+    U32                     TaskMsgContext;     /* 30h */
 } MSG_SCSI_TASK_MGMT, MPI_POINTER PTR_SCSI_TASK_MGMT,
   SCSITaskMgmt_t, MPI_POINTER pSCSITaskMgmt_t;
 
 /* TaskType values */
 
-#define MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK        (0x00000001)
-#define MPI_SCSITASKMGMT_TASKTYPE_ABRT_TASK_SET     (0x00000002)
-#define MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET      (0x00000003)
-#define MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS         (0x00000004)
+#define MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK            (0x01)
+#define MPI_SCSITASKMGMT_TASKTYPE_ABRT_TASK_SET         (0x02)
+#define MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET          (0x03)
+#define MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS             (0x04)
 
 /* MsgFlags bits */
-#define MPI_SCSITASKMGMT_MSGFLAGS_LIP_RESET_OPTION  (0x00000002)
+#define MPI_SCSITASKMGMT_MSGFLAGS_TARGET_RESET_OPTION   (0x00)
+#define MPI_SCSITASKMGMT_MSGFLAGS_LIP_RESET_OPTION      (0x02)
+#define MPI_SCSITASKMGMT_MSGFLAGS_LIPRESET_RESET_OPTION (0x04)
 
 /* SCSI Task Management Reply */
 typedef struct _MSG_SCSI_TASK_MGMT_REPLY
 {
-    U8                      TargetID;
-    U8                      Bus;
-    U8                      MsgLength;
-    U8                      Function;
-    U8                      Reserved;
-    U8                      TaskType;
-    U8                      Reserved1;
-    U8                      MsgFlags;
-    U32                     MsgContext;
-    U8                      Reserved2[2];
-    U16                     IOCStatus;
-    U32                     IOCLogInfo;
-    U32                     TerminationCount;
+    U8                      TargetID;           /* 00h */
+    U8                      Bus;                /* 01h */
+    U8                      MsgLength;          /* 02h */
+    U8                      Function;           /* 03h */
+    U8                      Reserved;           /* 04h */
+    U8                      TaskType;           /* 05h */
+    U8                      Reserved1;          /* 06h */
+    U8                      MsgFlags;           /* 07h */
+    U32                     MsgContext;         /* 08h */
+    U8                      Reserved2[2];       /* 0Ch */
+    U16                     IOCStatus;          /* 0Eh */
+    U32                     IOCLogInfo;         /* 10h */
+    U32                     TerminationCount;   /* 14h */
 } MSG_SCSI_TASK_MGMT_REPLY, MPI_POINTER PTR_MSG_SCSI_TASK_MGMT_REPLY,
   SCSITaskMgmtReply_t, MPI_POINTER pSCSITaskMgmtReply_t;
 

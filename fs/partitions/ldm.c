@@ -23,7 +23,7 @@
  * in the file COPYING); if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <asm/types.h>
+#include <linux/types.h>
 #include <asm/unaligned.h>
 #include <asm/byteorder.h>
 #include <linux/genhd.h>
@@ -141,7 +141,8 @@ static int parse_vblk(const u8 *buffer, const int buf_size, struct vblk *vb)
 		printk(LDM_CRIT "Cannot find VBLK, database may be corrupt.\n");
 		return -1;
 	}
-	if (BE16(buffer + 0x0E) == 0)	/* Record is not in use. */
+	if ((BE16(buffer + 0x0E) == 0) ||       /* Record is not in use. */
+	    (BE16(buffer + 0x0C) != 0))         /* Part 2 of an ext. record */
 		return 0;
 	/* FIXME: What about extended VBLKs? */
 	switch (buffer[0x13]) {

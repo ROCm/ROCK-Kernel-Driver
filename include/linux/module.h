@@ -250,6 +250,33 @@ static const struct gtype##_id * __module_##gtype##_table \
 #define MODULE_DEVICE_TABLE(type,name)		\
   MODULE_GENERIC_TABLE(type##_device,name)
 
+/*
+ * The following license idents are currently accepted as indicating free
+ * software modules
+ *
+ *	"GPL"				[GNU Public License v2 or later]
+ *	"GPL and additional rights"	[GNU Public License v2 rights and more]
+ *	"Dual BSD/GPL"			[GNU Public License v2 or BSD license choice]
+ *
+ * The following other idents are available
+ *
+ *	"Proprietary"			[Non free products]
+ *
+ * There are dual licensed components, but when running with Linux it is the
+ * GPL that is relevant so this is a non issue. Similarly LGPL linked with GPL
+ * is a GPL combined work.
+ *
+ * This exists for several reasons
+ * 1.	So modinfo can show license info for users wanting to vet their setup 
+ *	is free
+ * 2.	So the community can ignore bug reports including proprietary modules
+ * 3.	So vendors can do likewise based on their own policies
+ */
+ 
+#define MODULE_LICENSE(license) 	\
+static const char __module_license[] __attribute__((section(".modinfo"))) =   \
+"license=" license
+
 /* Define the module variable, and usage macros.  */
 extern struct module __this_module;
 
@@ -269,6 +296,7 @@ static const char __module_using_checksums[] __attribute__((section(".modinfo"))
 #else /* MODULE */
 
 #define MODULE_AUTHOR(name)
+#define MODULE_LICENSE(license)
 #define MODULE_DESCRIPTION(desc)
 #define MODULE_SUPPORTED_DEVICE(name)
 #define MODULE_PARM(var,type)

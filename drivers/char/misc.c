@@ -273,9 +273,6 @@ int __init misc_init(void)
 #ifdef CONFIG_SGI_NEWPORT_GFX
 	gfx_register ();
 #endif
-#ifdef CONFIG_SGI
-	streamable_init ();
-#endif
 #ifdef CONFIG_TOSHIBA
 	tosh_init();
 #endif

@@ -23,15 +23,15 @@
 */
 
 /*
- * $Id: hci_emu.h,v 1.1 2001/06/01 08:12:11 davem Exp $
+ * $Id: hci_vhci.h,v 1.2 2001/08/01 01:02:20 maxk Exp $
  */
 
-#ifndef __IF_HCI_EMU_H
-#define __IF_HCI_EMU_H
+#ifndef __HCI_VHCI_H
+#define __HCI_VHCI_H
 
 #ifdef __KERNEL__
 
-struct hci_emu_struct {
+struct hci_vhci_struct {
 	struct hci_dev       hdev;
 	__u32                flags;
 	wait_queue_head_t    read_wait;
@@ -39,14 +39,12 @@ struct hci_emu_struct {
 	struct fasync_struct *fasync;
 };
 
+/* VHCI device flags */
+#define VHCI_FASYNC		0x0010
+
 #endif /* __KERNEL__ */
 
-#define HCI_EMU_MINOR		250
+#define VHCI_DEV	"/dev/vhci"
+#define VHCI_MINOR	250
 
-/* Max frame size */
-#define HCI_EMU_MAX_FRAME	4096
-
-/* HCI_EMU device flags */
-#define HCI_EMU_FASYNC		0x0010
-
-#endif /* __IF_HCI_EMU_H */
+#endif /* __HCI_VHCI_H */

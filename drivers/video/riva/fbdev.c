@@ -260,7 +260,7 @@ static char nomtrr __initdata = 0;
 #endif
 
 #ifndef MODULE
-static const char *mode_option __initdata = NULL;
+static char *mode_option __initdata = NULL;
 #else
 static char *font = NULL;
 #endif
@@ -1109,6 +1109,8 @@ static int riva_get_cmap_len(const struct fb_var_screeninfo *var)
 		break;
 #endif
 #ifdef FBCON_HAS_CFB16
+	case 15:
+		rc = 15;	/* fix for 15 bpp depths on Riva 128 based cards */
 	case 16:
 		rc = 16;	/* directcolor... 16 entries SW palette */
 		break;		/* Mystique: truecolor, 16 entries SW palette, HW palette hardwired into 1:1 mapping */
@@ -1119,7 +1121,6 @@ static int riva_get_cmap_len(const struct fb_var_screeninfo *var)
 		break;		/* Mystique: truecolor, 16 entries SW palette, HW palette hardwired into 1:1 mapping */
 #endif
 	default:
-		assert(0);
 		/* should not occur */
 		break;
 	}

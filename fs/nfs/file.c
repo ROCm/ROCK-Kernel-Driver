@@ -155,16 +155,15 @@ nfs_fsync(struct file *file, struct dentry *dentry, int datasync)
  */
 static int nfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
-	kmap(page);
 	return nfs_flush_incompatible(file, page);
 }
+
 static int nfs_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
 	long status;
 	loff_t pos = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + to;
 	struct inode *inode = page->mapping->host;
 
-	kunmap(page);
 	lock_kernel();
 	status = nfs_updatepage(file, page, offset, to-offset);
 	unlock_kernel();

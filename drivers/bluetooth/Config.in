@@ -3,6 +3,6 @@ comment 'Bluetooth device drivers'
 
 dep_tristate 'HCI USB driver' CONFIG_BLUEZ_HCIUSB $CONFIG_BLUEZ $CONFIG_USB
 dep_tristate 'HCI UART driver' CONFIG_BLUEZ_HCIUART $CONFIG_BLUEZ
-dep_tristate 'HCI EMU (virtual device) driver' CONFIG_BLUEZ_HCIEMU $CONFIG_BLUEZ
+dep_tristate 'HCI VHCI virtual HCI device driver' CONFIG_BLUEZ_HCIVHCI $CONFIG_BLUEZ
 
 endmenu

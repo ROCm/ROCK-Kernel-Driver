@@ -1475,6 +1475,14 @@ L:     linux-usb-devel@lists.sourceforge.net
 W:     http://alpha.dyndns.org/ov511/
 S:     Maintained
 
+USB SE401 DRIVER
+P:	Jeroen Vreeken
+M:	pe1rxq@amsat.org
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://www.chello.nl/~j.vreeken/se401/
+S:	Maintained
+
 USB PEGASUS DRIVER
 P:	Petko Manolov
 M:	petkan@dce.bg

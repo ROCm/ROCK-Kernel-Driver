@@ -1,6 +1,6 @@
 /* linux/net/inet/arp.c
  *
- * Version:	$Id: arp.c,v 1.98 2001/05/16 16:45:35 davem Exp $
+ * Version:	$Id: arp.c,v 1.99 2001/08/30 22:55:42 davem Exp $
  *
  * Copyright (C) 1994 by Florian  La Roche
  *
@@ -560,7 +560,6 @@ void arp_send(int type, int ptype, u32 dest_ip,
 		memset(arp_ptr, 0, dev->addr_len);
 	arp_ptr+=dev->addr_len;
 	memcpy(arp_ptr, &dest_ip, 4);
-	skb->dev = dev;
 
 	dev_queue_xmit(skb);
 	return;

@@ -23,12 +23,10 @@
 */
 
 /*
- * $Id: hci_usb.h,v 1.1 2001/06/01 08:12:11 davem Exp $
+ * $Id: hci_usb.h,v 1.3 2001/06/02 01:40:08 maxk Exp $
  */
 
 #ifdef __KERNEL__
-
-#define HCI_USB_MAX_READ     2048
 
 /* Class, SubClass, and Protocol codes that describe a Bluetooth device */
 #define HCI_DEV_CLASS        0xe0	/* Wireless class */

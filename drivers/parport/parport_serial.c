@@ -296,7 +296,16 @@ static int __devinit parport_serial_pci_probe (struct pci_dev *dev,
 		return err;
 	}
 
-	if (serial_register (dev, id) + parport_register (dev, id)) {
+	if (parport_register (dev, id)) {
+		pci_set_drvdata (dev, NULL);
+		kfree (priv);
+		return -ENODEV;
+	}
+
+	if (serial_register (dev, id)) {
+		int i;
+		for (i = 0; i < priv->num_par; i++)
+			parport_pc_unregister_port (priv->port[i]);
 		pci_set_drvdata (dev, NULL);
 		kfree (priv);
 		return -ENODEV;

@@ -365,6 +365,8 @@ MODULE_PARM(sx_maxints, "i");
 MODULE_PARM(sx_debug, "i");
 MODULE_PARM(sx_irqmask, "i");
 
+MODULE_LICENSE("GPL");
+
 static struct real_driver sx_real_driver = {
 	sx_disable_tx_interrupts,
 	sx_enable_tx_interrupts,
@@ -1139,7 +1141,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 		sx_dprintk (SX_DEBUG_MODEMSIGNALS, "got a break.\n");
 
 		sx_write_channel_byte (port, hi_state, hi_state);
-		gs_got_break (port);
+		gs_got_break (&port->gs);
 	}
 	if (hi_state & ST_DCD) {
 		hi_state &= ~ST_DCD;
@@ -1614,6 +1616,7 @@ static int do_memtest (struct sx_board *board, int min, int max)
 #define R0         if (read_sx_word (board, i) != 0x55aa) return 1
 #define R1         if (read_sx_word (board, i) != 0xaa55) return 1
 
+#if 0
 /* This memtest takes a human-noticable time. You normally only do it
    once a boot, so I guess that it is worth it. */
 static int do_memtest_w (struct sx_board *board, int min, int max)
@@ -1628,6 +1631,7 @@ static int do_memtest_w (struct sx_board *board, int min, int max)
 
 	return 0;
 }
+#endif
 
 
 static int sx_fw_ioctl (struct inode *inode, struct file *filp,

@@ -2,7 +2,7 @@
 #define _GDTH_IOCTL_H
 
 /* gdth_ioctl.h
- * $Id: gdth_ioctl.h,v 1.9 2001/01/10 14:39:37 achim Exp $
+ * $Id: gdth_ioctl.h,v 1.10 2001/05/22 06:28:59 achim Exp $
  */
 
 /* IOCTLs */
@@ -83,6 +83,8 @@ typedef struct {
             ushort          bios_ver;           /* not used */
             ushort          access;             /* not used */
             ushort          ext_type;           /* extended type */
+            ushort          device_id;          /* device ID */
+            ushort          sub_device_id;      /* sub device ID */
         } ctrtype;
         struct {
             unchar          version;            /* OS version */

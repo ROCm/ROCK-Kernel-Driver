@@ -20,6 +20,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/proc_fs.h>
+#include <linux/bitops.h>
 #include <linux/init.h>
 
 #include <asm/system.h>
@@ -366,8 +367,7 @@ do_alignment_ldmstm(unsigned long addr, unsigned long instr, struct pt_regs *reg
 	ai_multi += 1;
 
 	/* count the number of registers in the mask to be transferred */
-	for (regbits = REGMASK_BITS(instr), nr_regs = 0; regbits; regbits >>= 1)
-		nr_regs += 4;
+	nr_regs = hweight16(REGMASK_BITS(instr)) * 4;
 
 	rn = RN_BITS(instr);
 	newaddr = eaddr = regs->uregs[rn];
@@ -385,10 +385,12 @@ do_alignment_ldmstm(unsigned long addr, unsigned long instr, struct pt_regs *reg
 	 * This is a "hint" - we already have eaddr worked out by the
 	 * processor for us.
 	 */
-	if (addr != eaddr)
+	if (addr != eaddr) {
 		printk(KERN_ERR "LDMSTM: PC = %08lx, instr = %08lx, "
 			"addr = %08lx, eaddr = %08lx\n",
 			 instruction_pointer(regs), instr, addr, eaddr);
+		show_regs(regs);
+	}
 
 	for (regbits = REGMASK_BITS(instr), rd = 0; regbits; regbits >>= 1, rd += 1)
 		if (regbits & 1) {

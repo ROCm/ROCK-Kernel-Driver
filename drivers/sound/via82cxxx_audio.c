@@ -90,10 +90,6 @@
 
 #define VIA_MIN_FRAG_NUMBER		2	
 
-#ifndef AC97_PCM_LR_ADC_RATE
-#  define AC97_PCM_LR_ADC_RATE AC97_PCM_LR_DAC_RATE
-#endif
-
 /* 82C686 function 5 (audio codec) PCI configuration registers */
 #define VIA_ACLINK_CTRL		0x41
 #define VIA_FUNC_ENABLE		0x42

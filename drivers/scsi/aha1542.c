@@ -433,7 +433,7 @@ static void aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	void (*my_done) (Scsi_Cmnd *) = NULL;
 	int errstatus, mbi, mbo, mbistatus;
 	int number_serviced;
-	unsigned int flags;
+	unsigned long flags;
 	struct Scsi_Host *shost;
 	Scsi_Cmnd *SCtmp;
 	int flag;

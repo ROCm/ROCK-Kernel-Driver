@@ -5,7 +5,7 @@
  *
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *              stevel@mvista.com or support@mvista.com
+ *              stevel@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -57,50 +57,41 @@ unsigned int __init pci_init_it8172 (struct pci_dev *dev, const char *name);
 void __init ide_init_it8172 (ide_hwif_t *hwif);
 
 
-/*
- *  Based on settings done by AMI BIOS
- *  (might be usefull if drive is not registered in CMOS for any reason).
- */
 static void it8172_tune_drive (ide_drive_t *drive, byte pio)
 {
     unsigned long flags;
     u16 master_data;
-    byte slave_data;
+    u32 slave_data;
     int is_slave	= (&HWIF(drive)->drives[1] == drive);
-    int master_port	= HWIF(drive)->index ? 0x42 : 0x40;
-    int slave_port	= 0x44;
-    /* ISP  RTC */
-    byte timings[][2]	= { { 0, 0 },
-			    { 0, 0 },
-			    { 1, 0 },
-			    { 2, 1 },
-			    { 2, 3 }, };
-
+    int master_port	= 0x40;
+    int slave_port      = 0x44;
+    
     pio = ide_get_best_pio_mode(drive, pio, 5, NULL);
     pci_read_config_word(HWIF(drive)->pci_dev, master_port, &master_data);
+    pci_read_config_dword(HWIF(drive)->pci_dev, slave_port, &slave_data);
+
+    /*
+     * FIX! The DIOR/DIOW pulse width and recovery times in port 0x44
+     * are being left at the default values of 8 PCI clocks (242 nsec
+     * for a 33 MHz clock). These can be safely shortened at higher
+     * PIO modes.
+     */
+    
     if (is_slave) {
-	master_data = master_data | 0x4000;
+	master_data |= 0x4000;
 	if (pio > 1)
-	    /* enable PPE, IE and TIME */
-	    master_data = master_data | 0x0070;
-	pci_read_config_byte(HWIF(drive)->pci_dev, slave_port, &slave_data);
-	slave_data = slave_data & (HWIF(drive)->index ? 0x0f : 0xf0);
-	slave_data = slave_data |
-	    ((timings[pio][0] << 2) | (timings[pio][1]
-				       << (HWIF(drive)->index ? 4 : 0)));
+	    /* enable PPE and IE */
+	    master_data |= 0x0060;
     } else {
-	master_data = master_data & 0xccf8;
+	master_data &= 0xc060;
 	if (pio > 1)
-	    /* enable PPE, IE and TIME */
-	    master_data = master_data | 0x0007;
-	master_data = master_data | (timings[pio][0] << 12) |
-	    (timings[pio][1] << 8);
+	    /* enable PPE and IE */
+	    master_data |= 0x0006;
     }
+
     save_flags(flags);
     cli();
     pci_write_config_word(HWIF(drive)->pci_dev, master_port, master_data);
-    if (is_slave)
-	pci_write_config_byte(HWIF(drive)->pci_dev, slave_port, slave_data);
     restore_flags(flags);
 }
 
@@ -150,12 +141,22 @@ static int it8172_tune_chipset (ide_drive_t *drive, byte speed)
     pci_read_config_byte(dev, 0x48, &reg48);
     pci_read_config_byte(dev, 0x4a, &reg4a);
 
+    /*
+     * Setting the DMA cycle time to 2 or 3 PCI clocks (60 and 91 nsec
+     * at 33 MHz PCI clock) seems to cause BadCRC errors during DMA
+     * transfers on some drives, even though both numbers meet the minimum
+     * ATAPI-4 spec of 73 and 54 nsec for UDMA 1 and 2 respectively.
+     * So the faster times are just commented out here. The good news is
+     * that the slower cycle time has very little affect on transfer
+     * performance.
+     */
+    
     switch(speed) {
     case XFER_UDMA_4:
-    case XFER_UDMA_2:	u_speed = 2 << (drive->dn * 4); break;
+    case XFER_UDMA_2:	//u_speed = 2 << (drive->dn * 4); break;
     case XFER_UDMA_5:
     case XFER_UDMA_3:
-    case XFER_UDMA_1:	u_speed = 1 << (drive->dn * 4); break;
+    case XFER_UDMA_1:	//u_speed = 1 << (drive->dn * 4); break;
     case XFER_UDMA_0:	u_speed = 0 << (drive->dn * 4); break;
     case XFER_MW_DMA_2:
     case XFER_MW_DMA_1:
@@ -164,25 +165,16 @@ static int it8172_tune_chipset (ide_drive_t *drive, byte speed)
     }
 
     if (speed >= XFER_UDMA_0) {
-	if (!(reg48 & u_flag))
-	    pci_write_config_byte(dev, 0x48, reg48|u_flag);
-	if (!(reg4a & u_speed)) {
-	    pci_write_config_byte(dev, 0x4a, reg4a & ~a_speed);
-	    pci_write_config_byte(dev, 0x4a, reg4a|u_speed);
-	}
-    }
-    if (speed < XFER_UDMA_0) {
-	if (reg48 & u_flag)
-	    pci_write_config_byte(dev, 0x48, reg48 & ~u_flag);
-	if (reg4a & a_speed)
-	    pci_write_config_byte(dev, 0x4a, reg4a & ~a_speed);
+	pci_write_config_byte(dev, 0x48, reg48 | u_flag);
+	reg4a &= ~a_speed;
+	pci_write_config_byte(dev, 0x4a, reg4a | u_speed);
+    } else {
+	pci_write_config_byte(dev, 0x48, reg48 & ~u_flag);
+	pci_write_config_byte(dev, 0x4a, reg4a & ~a_speed);
     }
 
     it8172_tune_drive(drive, it8172_dma_2_pio(speed));
 
-#if IT8172_DEBUG
-    printk("%s: %s drive%d\n", drive->name, ide_xfer_verbose(speed), drive->dn);
-#endif
     if (!drive->init_speed)
 	drive->init_speed = speed;
     err = ide_config_drive_speed(drive, speed);
@@ -236,7 +228,9 @@ static int it8172_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
     /* Other cases are done by generic IDE-DMA code. */
     return ide_dmaproc(func, drive);
 }
+
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_IT8172_TUNING) */
+
 
 unsigned int __init pci_init_it8172 (struct pci_dev *dev, const char *name)
 {

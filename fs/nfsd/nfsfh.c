@@ -275,7 +275,6 @@ struct dentry *nfsd_findparent(struct dentry *child)
 	d_drop(tdentry); /* we never want ".." hashed */
 	if (!pdentry && tdentry->d_inode == NULL) {
 		/* File system cannot find ".." ... sad but possible */
-		dput(tdentry);
 		pdentry = ERR_PTR(-EINVAL);
 	}
 	if (!pdentry) {
@@ -714,9 +713,8 @@ out:
  * before the fh goes out on the wire ...
  */
 inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
-		      __u32 **datapp, int maxsize)
+		      __u32 *datap, int *maxsize)
 {
-	__u32 *datap= *datapp;
 	struct super_block *sb = dentry->d_inode->i_sb;
 	
 	if (dentry == exp->ex_dentry)
@@ -726,20 +724,22 @@ inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 		int need_parent = !S_ISDIR(dentry->d_inode->i_mode) &&
 			!(exp->ex_flags & NFSEXP_NOSUBTREECHECK);
 		
-		int type = sb->s_op->dentry_to_fh(dentry, datap, &maxsize, need_parent);
-		datap += maxsize;
-		*datapp = datap;
+		int type = sb->s_op->dentry_to_fh(dentry, datap, maxsize, need_parent);
 		return type;
 	}
-	
+
+	if (*maxsize < 2)
+		return 255;
 	*datap++ = ino_t_to_u32(dentry->d_inode->i_ino);
 	*datap++ = dentry->d_inode->i_generation;
-	if (S_ISDIR(dentry->d_inode->i_mode) || (exp->ex_flags & NFSEXP_NOSUBTREECHECK)){
-		*datapp = datap;
+	if (*maxsize ==2 ||
+	    S_ISDIR(dentry->d_inode->i_mode) ||
+	    (exp->ex_flags & NFSEXP_NOSUBTREECHECK)) {
+		*maxsize = 2;
 		return 1;
 	}
 	*datap++ = ino_t_to_u32(dentry->d_parent->d_inode->i_ino);
-	*datapp = datap;
+	*maxsize = 3;
 	return 2;
 }
 
@@ -809,10 +809,13 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
 		*datap++ = htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
 		*datap++ = ino_t_to_u32(exp->ex_ino);
-		if (inode)
+		fhp->fh_handle.fh_size = 3*4;
+		if (inode) {
+			int size = fhp->fh_maxsize/4 - 3;
 			fhp->fh_handle.fh_fileid_type =
-				_fh_update(dentry, exp, &datap, fhp->fh_maxsize-3);
-		fhp->fh_handle.fh_size = (datap-fhp->fh_handle.fh_auth+1)*4;
+				_fh_update(dentry, exp, datap, &size);
+			fhp->fh_handle.fh_size += size*4;
+		}
 	}
 
 	nfsd_nr_verified++;
@@ -840,13 +843,15 @@ fh_update(struct svc_fh *fhp)
 	if (fhp->fh_handle.fh_version != 1) {
 		_fh_update_old(dentry, fhp->fh_export, &fhp->fh_handle);
 	} else {
+		int size;
 		if (fhp->fh_handle.fh_fileid_type != 0)
 			goto out_uptodate;
 		datap = fhp->fh_handle.fh_auth+
 			fhp->fh_handle.fh_size/4 -1;
+		size = (fhp->fh_maxsize - fhp->fh_handle.fh_size)/4;
 		fhp->fh_handle.fh_fileid_type =
-			_fh_update(dentry, fhp->fh_export, &datap, fhp->fh_maxsize-fhp->fh_handle.fh_size);
-		fhp->fh_handle.fh_size = (datap-fhp->fh_handle.fh_auth+1)*4;
+			_fh_update(dentry, fhp->fh_export, datap, &size);
+		fhp->fh_handle.fh_size += size*4;
 	}
 out:
 	return 0;

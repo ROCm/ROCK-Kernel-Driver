@@ -481,7 +481,7 @@ PKT *PacketP;
 	   			not freed. */
 			/* Call tmgr HANGUP HERE */
 			/* Fix this later when every thing works !!!! RAMRAJ */
-			gs_got_break (PortP);
+			gs_got_break (&PortP->gs);
 			break;
 
 		case COMPLETE:

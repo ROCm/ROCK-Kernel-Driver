@@ -45,6 +45,8 @@
 #include <linux/kmod.h>
 #endif
 
+int core_uses_pid;
+
 static struct linux_binfmt *formats;
 static rwlock_t binfmt_lock = RW_LOCK_UNLOCKED;
 
@@ -159,11 +161,9 @@ static int count(char ** argv, int max)
 	if (argv != NULL) {
 		for (;;) {
 			char * p;
-			int error;
 
-			error = get_user(p,argv);
-			if (error)
-				return error;
+			if (get_user(p, argv))
+				return -EFAULT;
 			if (!p)
 				break;
 			argv++;
@@ -262,7 +262,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	pte_t * pte;
 
 	if (page_count(page) != 1)
-		printk("mem_map disagrees with %p at %08lx\n", page, address);
+		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n", page, address);
 	pgd = pgd_offset(tsk->mm, address);
 
 	spin_lock(&tsk->mm->page_table_lock);
@@ -580,9 +580,10 @@ int flush_old_exec(struct linux_binprm * bprm)
 mmap_failed:
 flush_failed:
 	spin_lock_irq(&current->sigmask_lock);
-	if (current->sig != oldsig)
+	if (current->sig != oldsig) {
 		kfree(current->sig);
-	current->sig = oldsig;
+		current->sig = oldsig;
+	}
 	spin_unlock_irq(&current->sigmask_lock);
 	return retval;
 }
@@ -924,7 +925,7 @@ void set_binfmt(struct linux_binfmt *new)
 int do_coredump(long signr, struct pt_regs * regs)
 {
 	struct linux_binfmt * binfmt;
-	char corename[6+sizeof(current->comm)];
+	char corename[6+sizeof(current->comm)+10];
 	struct file * file;
 	struct inode * inode;
 	int retval = 0;
@@ -940,11 +941,9 @@ int do_coredump(long signr, struct pt_regs * regs)
 		goto fail;
 
 	memcpy(corename,"core.", 5);
-#if 0
-	memcpy(corename+5,current->comm,sizeof(current->comm));
-#else
 	corename[4] = '\0';
-#endif
+ 	if (core_uses_pid || atomic_read(&current->mm->mm_users) != 1)
+ 		sprintf(&corename[4], ".%d", current->pid);
 	file = filp_open(corename, O_CREAT | 2 | O_NOFOLLOW, 0600);
 	if (IS_ERR(file))
 		goto fail;

@@ -35,9 +35,9 @@ are:
 
 - Makefile
 
-  The targets 'sgmldocs', 'psdocs', and 'pdfdocs' are used to build
-  DocBook files, PostScript files, and PDF files in
-  Documentation/DocBook.
+  The targets 'sgmldocs', 'psdocs', 'pdfdocs', and 'htmldocs' are used
+  to build DocBook files, PostScript files, PDF files, and html files
+  in Documentation/DocBook.
 
 - Documentation/DocBook/Makefile
 
@@ -49,10 +49,11 @@ How to extract the documentation
 
 If you just want to read the ready-made books on the various
 subsystems (see Documentation/DocBook/*.tmpl), just type 'make
-psdocs', or 'make pdfdocs', depending on your preference.  If you
-would rather read a different format, you can type 'make sgmldocs' and
-then use DocBook tools to convert Documentation/DocBook/*.sgml to a
-format of your choice (for example, 'db2html ...').
+psdocs', or 'make pdfdocs', or 'make htmldocs', depending on your 
+preference.  If you would rather read a different format, you can type 
+'make sgmldocs' and then use DocBook tools to convert 
+Documentation/DocBook/*.sgml to a format of your choice (for example, 
+'db2html ...' if 'make htmldocs' was not defined).
 
 If you want to see man pages instead, you can do this:
 
@@ -111,7 +112,9 @@ The format of the block comment is like this:
 (*)?*/
 
 The short function description cannot be multiline, but the other
-descriptions can be.
+descriptions can be (and they can contain blank lines). Avoid putting a
+spurious blank line after the function name, or else the description will
+be repeated!
 
 All descriptive text is further processed, scanning for the following special
 patterns, which are highlighted appropriately.

@@ -2989,7 +2989,7 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
  * "ide0=ht6560b"	: probe/support HT6560B interface
  * "ide0=cmd640_vlb"	: *REQUIRED* for VLB cards with the CMD640 chip
  *			  (not for PCI -- automatically detected)
- * "ide0=qd6580"	: probe/support qd6580 interface
+ * "ide0=qd65xx"	: probe/support qd65xx interface
  * "ide0=ali14xx"	: probe/support ali14xx chipsets (ALI M1439, M1443, M1445)
  * "ide0=umc8672"	: probe/support umc8672 chipsets
  * "idex=dc4030"	: probe/support Promise DC4030VL interface
@@ -3157,7 +3157,7 @@ int __init ide_setup (char *s)
 		const char *ide_words[] = {
 			"noprobe", "serialize", "autotune", "noautotune", "reset", "dma", "ata66",
 			"minus8", "minus9", "minus10",
-			"four", "qd6580", "ht6560b", "cmd640_vlb", "dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
+			"four", "qd65xx", "ht6560b", "cmd640_vlb", "dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
 		hw = s[3] - '0';
 		hwif = &ide_hwifs[hw];
 		i = match_parm(&s[4], ide_words, vals, 3);
@@ -3224,14 +3224,14 @@ int __init ide_setup (char *s)
 				goto done;
 			}
 #endif /* CONFIG_BLK_DEV_HT6560B */
-#if CONFIG_BLK_DEV_QD6580
-			case -12: /* "qd6580" */
+#if CONFIG_BLK_DEV_QD65XX
+			case -12: /* "qd65xx" */
 			{
-				extern void init_qd6580 (void);
-				init_qd6580();
+				extern void init_qd65xx (void);
+				init_qd65xx();
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_QD6580 */
+#endif /* CONFIG_BLK_DEV_QD65XX */
 #ifdef CONFIG_BLK_DEV_4DRIVES
 			case -11: /* "four" drives on one set of ports */
 			{

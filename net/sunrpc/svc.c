@@ -31,7 +31,6 @@ svc_create(struct svc_program *prog, unsigned int bufsize, unsigned int xdrsize)
 {
 	struct svc_serv	*serv;
 
-	xdr_init();
 #ifdef RPC_DEBUG
 	rpc_register_sysctl();
 #endif
