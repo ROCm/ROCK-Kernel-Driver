@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -30,7 +30,22 @@
 
 /* Change Log
  *
- * 4.4.19       11/27/02
+ * 5.0.43	3/5/03
+ *   o Feature: Added support for 82541 and 82547 hardware.
+ *   o Feature: Added support for Intel Gigabit PHY (IGP) and a variety of
+ *   eeproms.
+ *   o Feature: Added support for TCP Segmentation Offload (TSO).
+ *   o Feature: Added MII ioctl.
+ *   o Feature: Added support for statistics reporting through ethtool.
+ *   o Cleanup: Removed proprietary hooks for ANS.
+ *   o Cleanup: Miscellaneous code changes to improve CPU utilization.
+ *   	- Replaced "%" with conditionals and "+-" operators.
+ *   	- Implemented dynamic Interrupt Throttle Rate (ITR).
+ *   	- Reduced expensive PCI reads of ICR in interrupt.
+ *   o Bug fix: Request IRQ after descriptor ring setup to avoid panic in
+ *   shared interrupt instances.
+ *
+ * 4.4.18       11/27/02
  *   o Feature: Added user-settable knob for interrupt throttle rate (ITR).
  *   o Cleanup: removed large static array allocations.
  *   o Cleanup: C99 struct initializer format.
@@ -42,25 +57,12 @@
  *   o Bug fix: Make ethtool EEPROM acceses work on older versions of ethtool.
  * 
  * 4.4.12       10/15/02
- *   o Clean up: use members of pci_device rather than direct calls to
- *     pci_read_config_word.
- *   o Bug fix: changed default flow control settings.
- *   o Clean up: ethtool file now has an inclusive list for adapters in the
- *     Wake-On-LAN capabilities instead of an exclusive list.
- *   o Bug fix: miscellaneous WoL bug fixes.
- *   o Added software interrupt for clearing rx ring
- *   o Bug fix: easier to undo "forcing" of 1000/fd using ethtool.
- *   o Now setting netdev->mem_end in e1000_probe.
- *   o Clean up: Moved tx_timeout from interrupt context to process context
- *     using schedule_task.
- * 
- * 4.3.15       8/9/02
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.4.19-k3";
-char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
+char e1000_driver_version[] = "5.0.43-k1";
+char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
  *
