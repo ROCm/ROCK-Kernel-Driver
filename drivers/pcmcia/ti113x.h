@@ -175,6 +175,27 @@ static int ti_override(struct yenta_socket *socket)
 	new = reg & ~I365_INTR_ENA;
 	if (new != reg)
 		exca_writeb(socket, I365_INTCTL, new);
+
+	/*
+	 * If ISA interrupts don't work, then fall back to routing card
+	 * interrupts to the PCI interrupt of the socket.
+	 */
+	if (!socket->socket.irq_mask) {
+		int irqmux, devctl;
+
+		printk (KERN_INFO "ti113x: Routing card interrupts to PCI\n");
+
+		devctl = config_readb(socket, TI113X_DEVICE_CONTROL);
+		devctl &= ~TI113X_DCR_IMODE_MASK;
+
+		irqmux = config_readl(socket, TI122X_IRQMUX);
+		irqmux = (irqmux & ~0x0f) | 0x02; /* route INTA */
+		irqmux = (irqmux & ~0xf0) | 0x20; /* route INTB */
+
+		config_writel(socket, TI122X_IRQMUX, irqmux);
+		config_writeb(socket, TI113X_DEVICE_CONTROL, devctl);
+	}
+
 	socket->socket.ss_entry->init = ti_init;
 	return 0;
 }
