@@ -366,6 +366,8 @@ static int
 can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
 	struct file *file, unsigned long vm_pgoff, unsigned long size)
 {
+	if ((vma->vm_flags & VM_DONTEXPAND) || (vm_flags & VM_DONTEXPAND))
+		return 0;
 	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
 		if (!file)
 			return 1;	/* anon mapping */
@@ -383,6 +385,8 @@ static int
 can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
 	struct file *file, unsigned long vm_pgoff)
 {
+	if ((vma->vm_flags & VM_DONTEXPAND) || (vm_flags & VM_DONTEXPAND))
+		return 0;
 	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
 		unsigned long vma_size;
 
