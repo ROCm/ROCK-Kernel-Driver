@@ -75,6 +75,9 @@ static struct sctp_af *sctp_af_v6_specific;
 
 extern struct net_proto_family inet_family_ops;
 
+extern int sctp_snmp_proc_init(void);
+extern int sctp_snmp_proc_exit(void);
+
 /* Return the address of the control sock. */
 struct sock *sctp_get_ctl_sock(void)
 {
@@ -82,21 +85,32 @@ struct sock *sctp_get_ctl_sock(void)
 }
 
 /* Set up the proc fs entry for the SCTP protocol. */
-__init void sctp_proc_init(void)
+__init int sctp_proc_init(void)
 {
+	int rc = 0;
+
 	if (!proc_net_sctp) {
 		struct proc_dir_entry *ent;
 		ent = proc_mkdir("net/sctp", 0);
 		if (ent) {
 			ent->owner = THIS_MODULE;
 			proc_net_sctp = ent;
-		}
+		} else
+			rc = -ENOMEM;
 	}
+
+	if (sctp_snmp_proc_init())
+		rc = -ENOMEM;
+
+	return rc;
 }
 
 /* Clean up the proc fs entry for the SCTP protocol. */
 void sctp_proc_exit(void)
 {
+
+	sctp_snmp_proc_exit();
+
 	if (proc_net_sctp) {
 		proc_net_sctp = NULL;
 		remove_proc_entry("net/sctp", 0);
@@ -628,6 +642,7 @@ static inline int sctp_v4_xmit(struct sk_buff *skb,
 			  NIPQUAD(((struct rtable *)skb->dst)->rt_src),
 			  NIPQUAD(((struct rtable *)skb->dst)->rt_dst));
 
+	SCTP_INC_STATS(SctpOutSCTPPacks);
 	return ip_queue_xmit(skb, ipfragok);
 }
 

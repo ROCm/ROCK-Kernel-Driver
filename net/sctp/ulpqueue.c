@@ -266,6 +266,8 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 
 	event = (sctp_ulpevent_t *) f_frag->cb;
 
+	SCTP_INC_STATS(SctpReasmUsrMsgs);
+
 	return event;
 }
 
