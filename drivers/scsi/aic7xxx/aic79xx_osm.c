@@ -670,7 +670,6 @@ ahd_linux_run_complete_queue(struct ahd_softc *ahd)
 		TAILQ_REMOVE(&ahd->platform_data->completeq,
 			     acmd, acmd_links.tqe);
 		cmd = &acmd_scsi_cmd(acmd);
-		acmd = TAILQ_NEXT(acmd, acmd_links.tqe);
 		cmd->host_scribble = NULL;
 		if (ahd_cmd_get_transaction_status(cmd) != DID_OK
 		 || (cmd->result & 0xFF) != SCSI_STATUS_OK)
@@ -1756,9 +1755,11 @@ ahd_runq_tasklet(unsigned long data)
 		TAILQ_REMOVE(&ahd->platform_data->device_runq, dev, links);
 		dev->flags &= ~AHD_DEV_ON_RUN_LIST;
 		ahd_linux_check_device_queue(ahd, dev);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		/* Yeild to our interrupt handler */
 		ahd_unlock(ahd, &flags);
 		ahd_lock(ahd, &flags);
+#endif
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	ahd_unlock(ahd, &flags);
