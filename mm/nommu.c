@@ -793,10 +793,21 @@ unsigned long do_mremap(unsigned long addr,
 	return vml->vma->vm_start;
 }
 
-struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
+/*
+ * Look up the first VMA which satisfies  addr < vm_end,  NULL if none
+ */
+struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
 {
+	struct vm_list_struct *vml;
+
+	for (vml = mm->context.vmlist; vml; vml = vml->next)
+		if (addr >= vml->vma->vm_start && addr < vml->vma->vm_end)
+			return vml->vma;
+
 	return NULL;
 }
+
+EXPORT_SYMBOL(find_vma);
 
 struct page * follow_page(struct mm_struct *mm, unsigned long addr, int write)
 {
