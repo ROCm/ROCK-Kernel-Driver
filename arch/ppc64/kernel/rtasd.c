@@ -481,9 +481,10 @@ static int __init surveillance_setup(char *str)
 
 static int __init rtasmsg_setup(char *str)
 {
-	int i;
-	if (get_option(&str, &i)) 
-		print_rtasmsgs = i;
+	if (!strcmp(str, "on"))
+		print_rtasmsgs = 1;
+	if (!strcmp(str, "off"))
+		print_rtasmsgs = 0;
 
 	return 1;
 }
