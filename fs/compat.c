@@ -406,9 +406,11 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 	while (t && t->cmd != cmd)
 		t = (struct ioctl_trans *)t->next;
 	if (t) {
-		if (t->handler)
+		if (t->handler) { 
+			lock_kernel();
 			error = t->handler(fd, cmd, arg, filp);
-		else
+			unlock_kernel();
+		} else
 			error = sys_ioctl(fd, cmd, arg);
 	} else if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
 		error = siocdevprivate_ioctl(fd, cmd, arg);
