@@ -1690,7 +1690,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 * to simply update the task's cpu field.
 	 */
 	if (!p->array) {
-		p->cpu = __ffs(p->cpus_allowed);
+		p->thread_info->cpu = __ffs(p->cpus_allowed);
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}
