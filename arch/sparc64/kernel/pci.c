@@ -798,6 +798,12 @@ int pci_domain_nr(struct pci_bus *pbus)
 	return ret;
 }
 
+int pci_name_bus(char *name, struct pci_bus *bus)
+{
+	sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
+	return 0;
+}
+
 int pcibios_prep_mwi(struct pci_dev *dev)
 {
 	/* We set correct PCI_CACHE_LINE_SIZE register values for every
