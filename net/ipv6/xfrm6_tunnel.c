@@ -215,6 +215,8 @@ u32 xfrm6_tunnel_spi_lookup(xfrm_address_t *saddr)
 	return spi;
 }
 
+EXPORT_SYMBOL(xfrm6_tunnel_spi_lookup);
+
 static u32 __xfrm6_tunnel_alloc_spi(xfrm_address_t *saddr)
 {
 	u32 spi;
@@ -305,6 +307,8 @@ u32 xfrm6_tunnel_alloc_spi(xfrm_address_t *saddr)
 	return spi;
 }
 
+EXPORT_SYMBOL(xfrm6_tunnel_alloc_spi);
+
 void xfrm6_tunnel_free_spi(xfrm_address_t *saddr)
 {
 	struct xfrm6_tunnel_spi *x6spi;
@@ -337,6 +341,7 @@ void xfrm6_tunnel_free_spi(xfrm_address_t *saddr)
 	write_unlock_bh(&xfrm6_tunnel_spi_lock);
 }
 
+EXPORT_SYMBOL(xfrm6_tunnel_free_spi);
 
 int xfrm6_tunnel_check_size(struct sk_buff *skb)
 {
@@ -354,6 +359,8 @@ int xfrm6_tunnel_check_size(struct sk_buff *skb)
 
 	return ret;
 }
+
+EXPORT_SYMBOL(xfrm6_tunnel_check_size);
 
 static int xfrm6_tunnel_output(struct sk_buff **pskb)
 {
@@ -434,6 +441,8 @@ int xfrm6_tunnel_register(struct xfrm6_tunnel *handler)
 	return ret;
 }
 
+EXPORT_SYMBOL(xfrm6_tunnel_register);
+
 int xfrm6_tunnel_deregister(struct xfrm6_tunnel *handler)
 {
 	int ret;
@@ -450,6 +459,8 @@ int xfrm6_tunnel_deregister(struct xfrm6_tunnel *handler)
 
 	return ret;
 }
+
+EXPORT_SYMBOL(xfrm6_tunnel_deregister);
 
 static int xfrm6_tunnel_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
