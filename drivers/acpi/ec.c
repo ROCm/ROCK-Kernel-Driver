@@ -442,6 +442,8 @@ acpi_ec_space_handler (
 	int			result = 0;
 	struct acpi_ec		*ec = NULL;
 	u32			temp = 0;
+	acpi_integer		f_v = 0;
+	int 			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_space_handler");
 
@@ -456,6 +458,7 @@ acpi_ec_space_handler (
 
 	ec = (struct acpi_ec *) handler_context;
 
+next_byte:
 	switch (function) {
 	case ACPI_READ:
 		result = acpi_ec_read(ec, (u8) address, &temp);
@@ -466,9 +469,29 @@ acpi_ec_space_handler (
 		break;
 	default:
 		result = -EINVAL;
+		goto out;
 		break;
 	}
 
+	bit_width -= 8;
+	if(bit_width){
+
+		if(function == ACPI_READ)
+			f_v |= (acpi_integer) (*value) << 8*i;
+		if(function == ACPI_WRITE)
+			(*value) >>=8; 
+		i++;
+		goto next_byte;
+	}
+
+
+	if(function == ACPI_READ){
+		f_v |= (acpi_integer) (*value) << 8*i;
+		*value = f_v;
+	}
+
+		
+out:
 	switch (result) {
 	case -EINVAL:
 		return_VALUE(AE_BAD_PARAMETER);
@@ -482,6 +505,7 @@ acpi_ec_space_handler (
 	default:
 		return_VALUE(AE_OK);
 	}
+	
 
 }
 
