@@ -578,21 +578,12 @@ static void set_size(struct saa7134_dev *dev, int task,
 	saa_writeb(SAA7134_VIDEO_LINES2(task),      height/div >> 8);
 
 	/* deinterlace y offsets */
-	if (interlace) {
-		y_odd  = dev->ctl_y_odd;
-		y_even = dev->ctl_y_even;
-		saa_writeb(SAA7134_V_PHASE_OFFSET0(task), y_odd);
-		saa_writeb(SAA7134_V_PHASE_OFFSET1(task), y_even);
-		saa_writeb(SAA7134_V_PHASE_OFFSET2(task), y_odd);
-		saa_writeb(SAA7134_V_PHASE_OFFSET3(task), y_even);
-	} else {
-		y_odd  = dev->ctl_y_odd;
-		y_even = dev->ctl_y_even;
-		saa_writeb(SAA7134_V_PHASE_OFFSET0(task), y_odd);
-		saa_writeb(SAA7134_V_PHASE_OFFSET1(task), y_even);
-		saa_writeb(SAA7134_V_PHASE_OFFSET2(task), y_odd);
-		saa_writeb(SAA7134_V_PHASE_OFFSET3(task), y_even);
-	}
+	y_odd  = dev->ctl_y_odd;
+	y_even = dev->ctl_y_even;
+	saa_writeb(SAA7134_V_PHASE_OFFSET0(task), y_odd);
+	saa_writeb(SAA7134_V_PHASE_OFFSET1(task), y_even);
+	saa_writeb(SAA7134_V_PHASE_OFFSET2(task), y_odd);
+	saa_writeb(SAA7134_V_PHASE_OFFSET3(task), y_even);
 }
 
 /* ------------------------------------------------------------------ */
@@ -912,7 +903,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 		buf->fmt       = fh->fmt;
 		buf->pt        = &fh->pt_cap;
 
-		err = videobuf_iolock(dev->pci,&buf->vb);
+		err = videobuf_iolock(dev->pci,&buf->vb,&dev->ovbuf);
 		if (err)
 			goto oops;
 		err = saa7134_pgtable_build(dev->pci,buf->pt,
@@ -1084,7 +1075,7 @@ static int set_control(struct saa7134_dev *dev, struct saa7134_fh *fh,
 	default:
 		return -EINVAL;
 	}
-	if (restart_overlay && res_check(fh, RESOURCE_OVERLAY)) {
+	if (restart_overlay && fh && res_check(fh, RESOURCE_OVERLAY)) {
 		spin_lock_irqsave(&dev->slock,flags);
 		stop_preview(dev,fh);
 		start_preview(dev,fh);
@@ -1140,13 +1131,13 @@ static int video_open(struct inode *inode, struct file *file)
 	
 	list_for_each(list,&saa7134_devlist) {
 		h = list_entry(list, struct saa7134_dev, devlist);
-		if (h->video_dev.minor == minor)
+		if (h->video_dev && (h->video_dev->minor == minor))
 			dev = h;
-		if (h->radio_dev.minor == minor) {
+		if (h->radio_dev && (h->radio_dev->minor == minor)) {
 			radio = 1;
 			dev = h;
 		}
-		if (h->vbi_dev.minor == minor) {
+		if (h->vbi_dev && (h->vbi_dev->minor == minor)) {
 			type = V4L2_BUF_TYPE_VBI_CAPTURE;
 			dev = h;
 		}
@@ -1188,13 +1179,10 @@ static int video_open(struct inode *inode, struct file *file)
 
 	if (fh->radio) {
 		/* switch to radio mode */
-		u32 v = 400*16;
 		saa7134_tvaudio_setinput(dev,&card(dev).radio);
-		saa7134_i2c_call_clients(dev,VIDIOCSFREQ,&v);
 		saa7134_i2c_call_clients(dev,AUDC_SET_RADIO,NULL);
 	} else {
 		/* switch to video/vbi mode */
-		set_tvnorm(dev,dev->tvnorm);
 		video_mux(dev,dev->ctl_input);
 	}
         return 0;
@@ -1327,7 +1315,7 @@ void saa7134_vbi_fmt(struct saa7134_dev *dev, struct v4l2_format *f)
 	f->fmt.vbi.count[0] = norm->vbi_v_stop - norm->vbi_v_start +1;
 	f->fmt.vbi.start[1] = norm->video_v_stop + norm->vbi_v_start +1;
 	f->fmt.vbi.count[1] = f->fmt.vbi.count[0];
-	f->fmt.vbi.flags = 0; /* VBI_UNSYNC VBI_INTERLACED */;
+	f->fmt.vbi.flags = 0; /* VBI_UNSYNC VBI_INTERLACED */
 
 #if 0
 	if (V4L2_STD_PAL == norm->id) {
@@ -1479,6 +1467,92 @@ int saa7134_s_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
 	}
 }
 
+int saa7134_common_ioctl(struct saa7134_dev *dev,
+			 unsigned int cmd, void *arg)
+{
+	int err;
+	
+	switch (cmd) {
+	case VIDIOC_QUERYCTRL:
+	{
+		const struct v4l2_queryctrl *ctrl;
+		struct v4l2_queryctrl *c = arg;
+
+		if ((c->id <  V4L2_CID_BASE ||
+		     c->id >= V4L2_CID_LASTP1) &&
+		    (c->id <  V4L2_CID_PRIVATE_BASE ||
+		     c->id >= V4L2_CID_PRIVATE_LASTP1))
+			return -EINVAL;
+		ctrl = ctrl_by_id(c->id);
+		*c = (NULL != ctrl) ? *ctrl : no_ctrl;
+		return 0;
+	}
+	case VIDIOC_G_CTRL:
+		return get_control(dev,arg);
+	case VIDIOC_S_CTRL:
+	{
+		down(&dev->lock);
+		err = set_control(dev,NULL,arg);
+		up(&dev->lock);
+		return err;
+	}
+	/* --- input switching --------------------------------------- */
+	case VIDIOC_ENUMINPUT:
+	{
+		struct v4l2_input *i = arg;
+		unsigned int n;
+
+		n = i->index;
+		if (n >= SAA7134_INPUT_MAX)
+			return -EINVAL;
+		if (NULL == card_in(dev,i->index).name)
+			return -EINVAL;
+		memset(i,0,sizeof(*i));
+		i->index = n;
+		i->type  = V4L2_INPUT_TYPE_CAMERA;
+		strcpy(i->name,card_in(dev,n).name);
+		if (card_in(dev,n).tv)
+			i->type = V4L2_INPUT_TYPE_TUNER;
+		i->audioset = 1;
+		if (n == dev->ctl_input) {
+			int v1 = saa_readb(SAA7134_STATUS_VIDEO1);
+			int v2 = saa_readb(SAA7134_STATUS_VIDEO2);
+
+			if (0 != (v1 & 0x40))
+				i->status |= V4L2_IN_ST_NO_H_LOCK;
+			if (0 != (v2 & 0x40))
+				i->status |= V4L2_IN_ST_NO_SYNC;
+			if (0 != (v2 & 0x0e))
+				i->status |= V4L2_IN_ST_MACROVISION;
+		}
+		for (n = 0; n < TVNORMS; n++)
+			i->std |= tvnorms[n].id;
+		return 0;
+	}
+	case VIDIOC_G_INPUT:
+	{
+		int *i = arg;
+		*i = dev->ctl_input;
+		return 0;
+	}
+	case VIDIOC_S_INPUT:
+	{
+		int *i = arg;
+		
+		if (*i < 0  ||  *i >= SAA7134_INPUT_MAX)
+			return -EINVAL;
+		if (NULL == card_in(dev,*i).name)
+			return -EINVAL;
+		down(&dev->lock);
+		video_mux(dev,*i);
+		up(&dev->lock);
+		return 0;
+	}
+
+	}
+	return 0;
+}
+
 /*
  * This function is _not_ called directly, but from
  * video_generic_ioctl (and maybe others).  userspace
@@ -1562,59 +1636,6 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		return 0;
 	}
 
-	/* --- input switching --------------------------------------- */
-	case VIDIOC_ENUMINPUT:
-	{
-		struct v4l2_input *i = arg;
-		unsigned int n;
-
-		n = i->index;
-		if (n >= SAA7134_INPUT_MAX)
-			return -EINVAL;
-		if (NULL == card_in(dev,i->index).name)
-			return -EINVAL;
-		memset(i,0,sizeof(*i));
-		i->index = n;
-		i->type  = V4L2_INPUT_TYPE_CAMERA;
-		strcpy(i->name,card_in(dev,n).name);
-		if (card_in(dev,n).tv)
-			i->type = V4L2_INPUT_TYPE_TUNER;
-		i->audioset = 1;
-		if (n == dev->ctl_input) {
-			int v1 = saa_readb(SAA7134_STATUS_VIDEO1);
-			int v2 = saa_readb(SAA7134_STATUS_VIDEO2);
-
-			if (0 != (v1 & 0x40))
-				i->status |= V4L2_IN_ST_NO_H_LOCK;
-			if (0 != (v2 & 0x40))
-				i->status |= V4L2_IN_ST_NO_SYNC;
-			if (0 != (v2 & 0x0e))
-				i->status |= V4L2_IN_ST_MACROVISION;
-		}
-		for (n = 0; n < TVNORMS; n++)
-			i->std |= tvnorms[n].id;
-		return 0;
-	}
-	case VIDIOC_G_INPUT:
-	{
-		int *i = arg;
-		*i = dev->ctl_input;
-		return 0;
-	}
-	case VIDIOC_S_INPUT:
-	{
-		int *i = arg;
-		
-		if (*i < 0  ||  *i >= SAA7134_INPUT_MAX)
-			return -EINVAL;
-		if (NULL == card_in(dev,*i).name)
-			return -EINVAL;
-		down(&dev->lock);
-		video_mux(dev,*i);
-		up(&dev->lock);
-		return 0;
-	}
-
 	/* --- tuner ioctls ------------------------------------------ */
 	case VIDIOC_G_TUNER:
 	{
@@ -1643,9 +1664,17 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 	}
 	case VIDIOC_S_TUNER:
 	{
-#if 0
 		struct v4l2_tuner *t = arg;
-#endif
+		int rx,mode;
+
+		mode = dev->thread.mode;
+		if (UNSET == mode) {
+			rx   = saa7134_tvaudio_getstereo(dev);
+			mode = saa7134_tvaudio_rx2mode(t->rxsubchans);
+		}
+		if (mode != t->audmode) {
+			dev->thread.mode = t->audmode;
+		}
 		return 0;
 	}
 	case VIDIOC_G_FREQUENCY:
@@ -1673,29 +1702,14 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 	}
 		
 	/* --- control ioctls ---------------------------------------- */
+	case VIDIOC_ENUMINPUT:
+	case VIDIOC_G_INPUT:
+	case VIDIOC_S_INPUT:
 	case VIDIOC_QUERYCTRL:
-	{
-		const struct v4l2_queryctrl *ctrl;
-		struct v4l2_queryctrl *c = arg;
-
-		if ((c->id <  V4L2_CID_BASE ||
-		     c->id >= V4L2_CID_LASTP1) &&
-		    (c->id <  V4L2_CID_PRIVATE_BASE ||
-		     c->id >= V4L2_CID_PRIVATE_LASTP1))
-			return -EINVAL;
-		ctrl = ctrl_by_id(c->id);
-		*c = (NULL != ctrl) ? *ctrl : no_ctrl;
-		return 0;
-	}
 	case VIDIOC_G_CTRL:
-		return get_control(dev,arg);
 	case VIDIOC_S_CTRL:
-	{
-		down(&dev->lock);
-		err = set_control(dev,fh,arg);
-		up(&dev->lock);
-		return err;
-	}
+		return saa7134_common_ioctl(dev, cmd, arg);
+
 	case VIDIOC_G_AUDIO:
 	{
 		struct v4l2_audio *a = arg;
@@ -1828,8 +1842,9 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 
 		q = saa7134_queue(fh);
 		memset(&req,0,sizeof(req));
-		req.type  = q->type;
-		req.count = gbuffers;
+		req.type   = q->type;
+		req.count  = gbuffers;
+		req.memory = V4L2_MEMORY_MMAP;
 		err = videobuf_reqbufs(file,q,&req);
 		if (err < 0)
 			return err;
@@ -1912,6 +1927,9 @@ static int radio_do_ioctl(struct inode *inode, struct file *file,
 	{
 		struct v4l2_tuner *t = arg;
 		struct video_tuner vt;
+
+		if (0 != t->index)
+			return -EINVAL;
 
 		memset(t,0,sizeof(*t));
 		strcpy(t->name, "Radio");
@@ -2046,7 +2064,7 @@ struct video_device saa7134_radio_template =
 	.minor         = -1,
 };
 
-int saa7134_video_init(struct saa7134_dev *dev)
+int saa7134_video_init1(struct saa7134_dev *dev)
 {
 	/* sanitycheck insmod options */
 	if (gbuffers < 2 || gbuffers > VIDEO_MAX_FRAME)
@@ -2072,12 +2090,6 @@ int saa7134_video_init(struct saa7134_dev *dev)
 	dev->video_q.timeout.data     = (unsigned long)(&dev->video_q);
 	dev->video_q.dev              = dev;
 
-	/* init video hw */
-	set_tvnorm(dev,&tvnorms[0]);
-	video_mux(dev,0);
-	saa7134_tvaudio_setmute(dev);
-	saa7134_tvaudio_setvolume(dev,dev->ctl_volume);
-
 	if (saa7134_boards[dev->board].video_out) {
 		/* enable video output */
 		int vo = saa7134_boards[dev->board].video_out;
@@ -2092,6 +2104,16 @@ int saa7134_video_init(struct saa7134_dev *dev)
 		saa_writeb(SAA7134_VIDEO_PORT_CTRL8, video_out[vo][8]);
 	}
  
+	return 0;
+}
+
+int saa7134_video_init2(struct saa7134_dev *dev)
+{
+	/* init video hw */
+	set_tvnorm(dev,&tvnorms[0]);
+	video_mux(dev,0);
+	saa7134_tvaudio_setmute(dev);
+	saa7134_tvaudio_setvolume(dev,dev->ctl_volume);
 	return 0;
 }
 

@@ -669,7 +669,6 @@ static void sync_master_loop(void)
 
 		__set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ);
-		__set_current_state(TASK_RUNNING);
 	}
 
 	/* clean up the sync_buff queue */
@@ -728,7 +727,6 @@ static void sync_backup_loop(void)
 
 		__set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ);
-		__set_current_state(TASK_RUNNING);
 	}
 
 	/* release the sending multicast socket */

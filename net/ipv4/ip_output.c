@@ -1295,12 +1295,9 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
  *	IP protocol layer initialiser
  */
 
-static struct packet_type ip_packet_type =
-{
+static struct packet_type ip_packet_type = {
 	.type = __constant_htons(ETH_P_IP),
-	.dev  = NULL,	/* All devices */
 	.func = ip_rcv,
-	.data = PKT_CAN_SHARE_SKB,
 };
 
 /*

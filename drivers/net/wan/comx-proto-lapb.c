@@ -372,6 +372,10 @@ static int comxlapb_data_indication(void *token, struct sk_buff *skb)
 
 	if (ch->dev->type == ARPHRD_X25) {
 		skb_push(skb, 1);
+
+		if (skb_cow(skb, 1))
+			return NET_RX_DROP;
+
 		skb->data[0] = 0;	// indicate data for X25
 		skb->protocol = htons(ETH_P_X25);
 	} else {

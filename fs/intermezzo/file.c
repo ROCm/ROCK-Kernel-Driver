@@ -41,7 +41,6 @@
 #include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/smp_lock.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/module.h>

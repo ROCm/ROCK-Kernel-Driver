@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -54,6 +55,8 @@ unsigned long ds1287_regs = 0UL;
 extern unsigned long wall_jiffies;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 static unsigned long mstk48t08_regs = 0UL;
 static unsigned long mstk48t59_regs = 0UL;
@@ -1126,6 +1129,8 @@ int do_settimeofday(struct timespec *tv)
 	return 0;
 }
 
+EXPORT_SYMBOL(do_settimeofday);
+
 /* Ok, my cute asm atomicity trick doesn't work anymore.
  * There are just too many variables that need to be protected
  * now (both members of xtime, wall_jiffies, et al.)
@@ -1156,6 +1161,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_sec = sec;
 	tv->tv_usec = usec;
 }
+
+EXPORT_SYMBOL(do_gettimeofday);
 
 static int set_rtc_mmss(unsigned long nowtime)
 {

@@ -104,6 +104,8 @@ void mark_page_accessed(struct page *page)
 	}
 }
 
+EXPORT_SYMBOL(mark_page_accessed);
+
 /**
  * lru_cache_add: add a page to the page lists
  * @page: the page to add
@@ -161,6 +163,8 @@ void __page_cache_release(struct page *page)
 	if (page)
 		free_hot_page(page);
 }
+
+EXPORT_SYMBOL(__page_cache_release);
 
 /*
  * Batched page_cache_release().  Decrement the reference count on all the
@@ -280,6 +284,8 @@ void __pagevec_lru_add(struct pagevec *pvec)
 	release_pages(pvec->pages, pvec->nr, pvec->cold);
 	pagevec_reinit(pvec);
 }
+
+EXPORT_SYMBOL(__pagevec_lru_add);
 
 void __pagevec_lru_add_active(struct pagevec *pvec)
 {

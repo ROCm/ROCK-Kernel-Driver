@@ -6,6 +6,7 @@
 
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -87,6 +88,8 @@ void do_gettimeofday(struct timeval *tv)
 	} while (read_seqretry(&xtime_lock, seq));
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 void do_settimeofday(struct timeval *tv)
 {
 	write_seqlock_irq(&xtime_lock);
@@ -98,3 +101,5 @@ void do_settimeofday(struct timeval *tv)
 	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irq(&xtime_lock);
 }
+
+EXPORT_SYMBOL(do_settimeofday);

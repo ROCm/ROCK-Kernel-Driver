@@ -13,6 +13,7 @@
 #include <linux/config.h> /* CONFIG_HEARTBEAT */
 #include <linux/errno.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/mm.h>
@@ -26,6 +27,8 @@
 #include "mach.h"
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 #define TICK_SIZE	(tick_nsec / 1000)
 
@@ -149,6 +152,8 @@ void do_gettimeofday (struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
@@ -182,6 +187,8 @@ int do_settimeofday(struct timespec *tv)
 	write_sequnlock_irq (&xtime_lock);
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 static int timer_dev_id;
 static struct irqaction timer_irqaction = {

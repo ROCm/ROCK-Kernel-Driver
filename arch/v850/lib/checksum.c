@@ -17,6 +17,7 @@
  * $Id: checksum.c,v 1.1 2002/09/28 14:58:40 gerg Exp $
  */
 #include <net/checksum.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <asm/byteorder.h>
 #include <asm/string.h>
@@ -114,6 +115,8 @@ unsigned int csum_partial(const unsigned char *buff, int len, unsigned int sum)
 		result += 1;
 	return result;
 }
+
+EXPORT_SYMBOL(csum_partial);
 
 /*
  * copy while checksumming, otherwise like csum_partial

@@ -146,7 +146,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 		buf->vb.size   = size;
 		buf->pt        = &fh->pt_vbi;
 
-		err = videobuf_iolock(dev->pci,&buf->vb);
+		err = videobuf_iolock(dev->pci,&buf->vb,NULL);
 		if (err)
 			goto oops;
 		err = saa7134_pgtable_build(dev->pci,buf->pt,
@@ -215,7 +215,7 @@ struct videobuf_queue_ops saa7134_vbi_qops = {
 
 /* ------------------------------------------------------------------ */
 
-int saa7134_vbi_init(struct saa7134_dev *dev)
+int saa7134_vbi_init1(struct saa7134_dev *dev)
 {
 	INIT_LIST_HEAD(&dev->vbi_q.queue);
 	init_timer(&dev->vbi_q.timeout);

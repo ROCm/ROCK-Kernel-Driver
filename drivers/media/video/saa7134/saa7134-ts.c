@@ -24,9 +24,12 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 
 #include "saa7134-reg.h"
 #include "saa7134.h"
+
+#include <media/saa6752hs.h>
 
 /* ------------------------------------------------------------------ */
 
@@ -109,7 +112,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 		buf->vb.size   = size;
 		buf->pt        = &dev->ts.pt_ts;
 
-		err = videobuf_iolock(dev->pci,&buf->vb);
+		err = videobuf_iolock(dev->pci,&buf->vb,NULL);
 		if (err)
 			goto oops;
 		err = saa7134_pgtable_build(dev->pci,buf->pt,
@@ -162,6 +165,26 @@ static struct videobuf_queue_ops ts_qops = {
 	.buf_release  = buffer_release,
 };
 
+
+/* ------------------------------------------------------------------ */
+
+static void ts_reset_encoder(struct saa7134_dev* dev) 
+{
+	saa_writeb(SAA7134_SPECIAL_MODE, 0x00);
+	mdelay(10);
+   	saa_writeb(SAA7134_SPECIAL_MODE, 0x01);
+   	current->state = TASK_INTERRUPTIBLE;
+	schedule_timeout(HZ/10);
+}
+
+static int ts_init_encoder(struct saa7134_dev* dev, void* arg) 
+{
+	ts_reset_encoder(dev);
+	saa7134_i2c_call_clients(dev, MPEG_SETPARAMS, arg);
+ 	return 0;
+}
+
+
 /* ------------------------------------------------------------------ */
 
 static int ts_open(struct inode *inode, struct file *file)
@@ -173,7 +196,7 @@ static int ts_open(struct inode *inode, struct file *file)
 	
 	list_for_each(list,&saa7134_devlist) {
 		h = list_entry(list, struct saa7134_dev, devlist);
-		if (h->ts_dev.minor == minor)
+		if (h->ts_dev->minor == minor)
 			dev = h;
 	}
 	if (NULL == dev)
@@ -185,9 +208,11 @@ static int ts_open(struct inode *inode, struct file *file)
 	if (dev->ts.users)
 		goto done;
 
+	dev->ts.started = 0;
 	dev->ts.users++;
 	file->private_data = dev;
 	err = 0;
+
  done:
 	up(&dev->ts.ts.lock);
 	return err;
@@ -203,6 +228,11 @@ static int ts_release(struct inode *inode, struct file *file)
 	if (dev->ts.ts.reading)
 		videobuf_read_stop(file,&dev->ts.ts);
 	dev->ts.users--;
+
+	/* stop the encoder */
+	if (dev->ts.started)
+	      	ts_reset_encoder(dev);
+  
 	up(&dev->ts.ts.lock);
 	return 0;
 }
@@ -212,6 +242,11 @@ ts_read(struct file *file, char *data, size_t count, loff_t *ppos)
 {
 	struct saa7134_dev *dev = file->private_data;
 
+	if (!dev->ts.started) {
+		ts_init_encoder(dev, NULL);
+		dev->ts.started = 1;
+	}
+  
 	return videobuf_read_stream(file, &dev->ts.ts, data, count, ppos, 0);
 }
 
@@ -345,6 +380,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 		f->fmt.pix.height       = 576;
 		f->fmt.pix.pixelformat  = V4L2_PIX_FMT_MPEG;
 		f->fmt.pix.sizeimage    = TS_PACKET_SIZE*TS_NR_PACKETS;
+		return 0;
 	}
 
 	case VIDIOC_REQBUFS:
@@ -365,6 +401,14 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOC_STREAMOFF:
 		return videobuf_streamoff(file,&dev->ts.ts);
 
+	case VIDIOC_QUERYCTRL:
+	case VIDIOC_G_CTRL:
+	case VIDIOC_S_CTRL:
+		return saa7134_common_ioctl(dev, cmd, arg);
+
+	case MPEG_SETPARAMS:
+		return ts_init_encoder(dev, arg);
+	  
 	default:
 		return -ENOIOCTLCMD;
 	}
@@ -404,7 +448,7 @@ struct video_device saa7134_ts_template =
 	.minor	       = -1,
 };
 
-int saa7134_ts_init(struct saa7134_dev *dev)
+int saa7134_ts_init1(struct saa7134_dev *dev)
 {
 	/* sanitycheck insmod options */
 	if (tsbufs < 2)

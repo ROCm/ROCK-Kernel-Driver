@@ -2029,6 +2029,9 @@ void ipv6_mc_destroy_dev(struct inet6_dev *idev)
 	struct ifmcaddr6 *i;
 	struct in6_addr maddr;
 
+	/* Deactivate timers */
+	ipv6_mc_down(idev);
+
 	/* Delete all-nodes address. */
 	ipv6_addr_all_nodes(&maddr);
 

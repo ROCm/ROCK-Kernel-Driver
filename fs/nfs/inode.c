@@ -42,7 +42,17 @@
 #define NFSDBG_FACILITY		NFSDBG_VFS
 #define NFS_PARANOIA 1
 
-static struct inode * __nfs_fhget(struct super_block *, struct nfs_fh *, struct nfs_fattr *);
+/* Maximum number of readahead requests
+ * FIXME: this should really be a sysctl so that users may tune it to suit
+ *        their needs. People that do NFS over a slow network, might for
+ *        instance want to reduce it to something closer to 1 for improved
+ *        interactive response.
+ *
+ *        For the moment, though, we instead set it to RPC_MAXREQS, which
+ *        is the maximum number of simultaneous RPC requests on the wire.
+ */
+#define NFS_MAX_READAHEAD	RPC_MAXREQS
+
 void nfs_zap_caches(struct inode *);
 static void nfs_invalidate_inode(struct inode *);
 
@@ -141,10 +151,6 @@ nfs_clear_inode(struct inode *inode)
 	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
-	/* Clean up the V4 state */
-	nfs4_put_shareowner(inode, nfsi->wo_owner);
-	nfs4_put_shareowner(inode, nfsi->ro_owner);
-	nfs4_put_shareowner(inode, nfsi->rw_owner);
 }
 
 void
@@ -262,7 +268,7 @@ nfs_get_root(struct inode **rooti, rpc_authflavor_t authflavor, struct super_blo
 		return error;
 	}
 
-	*rooti = __nfs_fhget(sb, rootfh, &fattr);
+	*rooti = nfs_fhget(sb, rootfh, &fattr);
 	if (error == -EACCES && authflavor > RPC_AUTH_MAXFLAVOR) {
 		if (*rooti) {
 			NFS_FLAGS(*rooti) |= NFS_INO_FAKE_ROOT;
@@ -356,7 +362,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->acdirmin = server->acdirmax = 0;
 		sb->s_flags |= MS_SYNCHRONOUS;
 	}
-	server->backing_dev_info.ra_pages = server->rpages << 2;
+	server->backing_dev_info.ra_pages = server->rpages * NFS_MAX_READAHEAD;
 
 	sb->s_maxbytes = fsinfo.maxfilesize;
 	if (sb->s_maxbytes > MAX_LFS_FILESIZE) 
@@ -681,33 +687,15 @@ nfs_init_locked(struct inode *inode, void *opaque)
 	return 0;
 }
 
-/*
- * This is our own version of iget that looks up inodes by file handle
- * instead of inode number.  We use this technique instead of using
- * the vfs read_inode function because there is no way to pass the
- * file handle or current attributes into the read_inode function.
- *
- */
-struct inode *
-nfs_fhget(struct dentry *dentry, struct nfs_fh *fhandle,
-				 struct nfs_fattr *fattr)
-{
-	struct super_block *sb = dentry->d_sb;
-
-	dprintk("NFS: nfs_fhget(%s/%s fileid=%Ld)\n",
-		dentry->d_parent->d_name.name, dentry->d_name.name,
-		(long long)fattr->fileid);
-	return __nfs_fhget(sb, fhandle, fattr);
-}
-
 /* Don't use READDIRPLUS on directories that we believe are too large */
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
 
 /*
- * Look up the inode by super block and fattr->fileid.
+ * This is our front-end to iget that looks up inodes by file handle
+ * instead of inode number.
  */
-static struct inode *
-__nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
+struct inode *
+nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 {
 	struct nfs_find_desc desc = {
 		.fh	= fh,
@@ -790,7 +778,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		unlock_new_inode(inode);
 	} else
 		nfs_refresh_inode(inode, fattr);
-	dprintk("NFS: __nfs_fhget(%s/%Ld ct=%d)\n",
+	dprintk("NFS: nfs_fhget(%s/%Ld ct=%d)\n",
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
 		atomic_read(&inode->i_count));
@@ -799,7 +787,7 @@ out:
 	return inode;
 
 out_no_inode:
-	printk("__nfs_fhget: iget failed\n");
+	printk("nfs_fhget: iget failed\n");
 	goto out;
 }
 
@@ -899,7 +887,7 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
  * Ensure that mmap has a recent RPC credential for use when writing out
  * shared pages
  */
-static inline void
+void
 nfs_set_mmcred(struct inode *inode, struct rpc_cred *cred)
 {
 	struct rpc_cred **p = &NFS_I(inode)->mm_cred,
@@ -1581,9 +1569,7 @@ static struct file_system_type nfs4_fs_type = {
 
 #define nfs4_zero_state(nfsi) \
 	do { \
-		(nfsi)->wo_owner = NULL; \
-		(nfsi)->ro_owner = NULL; \
-		(nfsi)->rw_owner = NULL; \
+		INIT_LIST_HEAD(&(nfsi)->open_states); \
 	} while(0)
 #define register_nfs4fs() register_filesystem(&nfs4_fs_type)
 #define unregister_nfs4fs() unregister_filesystem(&nfs4_fs_type)

@@ -1872,13 +1872,11 @@ static struct notifier_block ddp_notifier = {
 struct packet_type ltalk_packet_type = {
 	.type		= __constant_htons(ETH_P_LOCALTALK),
 	.func		= ltalk_rcv,
-	.data		= PKT_CAN_SHARE_SKB,
 };
 
 struct packet_type ppptalk_packet_type = {
 	.type		= __constant_htons(ETH_P_PPPTALK),
 	.func		= atalk_rcv,
-	.data		= PKT_CAN_SHARE_SKB,
 };
 
 static unsigned char ddp_snap_id[] = { 0x08, 0x00, 0x07, 0x80, 0x9B };

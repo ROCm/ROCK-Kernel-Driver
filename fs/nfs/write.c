@@ -132,66 +132,68 @@ static int
 nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 		   unsigned int offset, unsigned int count)
 {
-	struct rpc_cred	*cred = NULL;
-	loff_t		base;
 	unsigned int	wsize = NFS_SERVER(inode)->wsize;
-	int		result, refresh = 0, written = 0, flags;
-	u8		*buffer;
-	struct nfs_fattr fattr;
-	struct nfs_writeverf verf;
-
-
-	if (file)
-		cred = get_rpccred(nfs_file_cred(file));
-	if (!cred)
-		cred = get_rpccred(NFS_I(inode)->mm_cred);
+	int		result, written = 0;
+	int		swapfile = IS_SWAPFILE(inode);
+	struct nfs_write_data	wdata = {
+		.flags		= swapfile ? NFS_RPC_SWAPFLAGS : 0,
+		.cred		= NULL,
+		.inode		= inode,
+		.args		= {
+			.fh		= NFS_FH(inode),
+			.pages		= &page,
+			.stable		= NFS_FILE_SYNC,
+			.pgbase		= offset,
+			.count		= wsize,
+		},
+		.res		= {
+			.fattr		= &wdata.fattr,
+			.verf		= &wdata.verf,
+		},
+	};
 
 	dprintk("NFS:      nfs_writepage_sync(%s/%Ld %d@%Ld)\n",
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
 		count, (long long)(page_offset(page) + offset));
 
-	base = page_offset(page) + offset;
-
-	flags = ((IS_SWAPFILE(inode)) ? NFS_RW_SWAP : 0) | NFS_RW_SYNC;
-
 	do {
-		if (count < wsize && !IS_SWAPFILE(inode))
-			wsize = count;
+		if (count < wsize && !swapfile)
+			wdata.args.count = count;
+		wdata.args.offset = page_offset(page) + wdata.args.pgbase;
 
-		result = NFS_PROTO(inode)->write(inode, cred, &fattr, flags,
-						 offset, wsize, page, &verf);
+		result = NFS_PROTO(inode)->write(&wdata, file);
 
 		if (result < 0) {
 			/* Must mark the page invalid after I/O error */
 			ClearPageUptodate(page);
 			goto io_error;
 		}
-		if (result != wsize)
-			printk("NFS: short write, wsize=%u, result=%d\n",
-			wsize, result);
-		refresh = 1;
-		buffer  += wsize;
-		base    += wsize;
-	        offset  += wsize;
-		written += wsize;
-		count   -= wsize;
+		if (result < wdata.args.count)
+			printk(KERN_WARNING "NFS: short write, count=%u, result=%d\n",
+					wdata.args.count, result);
+
+		wdata.args.offset += result;
+	        wdata.args.pgbase += result;
+		written += result;
+		count -= result;
+
 		/*
 		 * If we've extended the file, update the inode
 		 * now so we don't invalidate the cache.
 		 */
-		if (base > i_size_read(inode))
-			i_size_write(inode, base);
+		if (wdata.args.offset > i_size_read(inode))
+			i_size_write(inode, wdata.args.offset);
 	} while (count);
 
 	if (PageError(page))
 		ClearPageError(page);
 
 io_error:
-	if (cred)
-		put_rpccred(cred);
+	if (wdata.cred)
+		put_rpccred(wdata.cred);
 
-	return written? written : result;
+	return written ? written : result;
 }
 
 static int
@@ -206,8 +208,6 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
 	status = (IS_ERR(req)) ? PTR_ERR(req) : 0;
 	if (status < 0)
 		goto out;
-	if (!req->wb_cred)
-		req->wb_cred = get_rpccred(NFS_I(inode)->mm_cred);
 	nfs_unlock_request(req);
 	nfs_strategy(inode);
 	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
@@ -549,7 +549,7 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		}
 		spin_unlock(&nfs_wreq_lock);
 
-		new = nfs_create_request(nfs_file_cred(file), inode, page, offset, bytes);
+		new = nfs_create_request(file, inode, page, offset, bytes);
 		if (IS_ERR(new))
 			return new;
 		if (file) {
@@ -630,7 +630,6 @@ int
 nfs_flush_incompatible(struct file *file, struct page *page)
 {
 	struct inode	*inode = page->mapping->host;
-	struct rpc_cred	*cred = nfs_file_cred(file);
 	struct nfs_page	*req;
 	int		status = 0;
 	/*
@@ -643,7 +642,7 @@ nfs_flush_incompatible(struct file *file, struct page *page)
 	 */
 	req = nfs_find_request(inode, page->index);
 	if (req) {
-		if (req->wb_file != file || req->wb_cred != cred || req->wb_page != page)
+		if (!NFS_PROTO(inode)->request_compatible(req, file, page))
 			status = nfs_wb_page(inode, page);
 		nfs_release_request(req);
 	}

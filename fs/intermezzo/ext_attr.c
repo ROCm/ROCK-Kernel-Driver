@@ -28,14 +28,12 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/smp_lock.h>
 #include <linux/unistd.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
 #include <linux/fs.h>
-#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <asm/segment.h>

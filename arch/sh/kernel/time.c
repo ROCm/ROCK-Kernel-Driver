@@ -13,6 +13,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -71,6 +72,8 @@ extern unsigned long wall_jiffies;
 spinlock_t tmu0_lock = SPIN_LOCK_UNLOCKED;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 /* XXX: Can we initialize this in a routine somewhere?  Dreamcast doesn't want
  * these routines anywhere... */
@@ -177,6 +180,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	time_t wtm_sec, sec = tv->tv_sec;
@@ -210,6 +215,8 @@ int do_settimeofday(struct timespec *tv)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 /* last time the RTC clock got updated */
 static long last_rtc_update;

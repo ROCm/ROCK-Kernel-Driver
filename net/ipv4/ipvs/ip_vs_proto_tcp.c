@@ -132,7 +132,7 @@ tcp_snat_handler(struct sk_buff **pskb,
 
 	if (unlikely(cp->app != NULL)) {
 		/* Some checks before mangling */
-		if (pp->csum_check && !pp->slave && !pp->csum_check(*pskb, pp))
+		if (pp->csum_check && !pp->csum_check(*pskb, pp))
 			return 0;
 
 		/* Call application helper if needed */
@@ -180,7 +180,7 @@ tcp_dnat_handler(struct sk_buff **pskb,
 
 	if (unlikely(cp->app != NULL)) {
 		/* Some checks before mangling */
-		if (pp->csum_check && !pp->slave && !pp->csum_check(*pskb, pp))
+		if (pp->csum_check && !pp->csum_check(*pskb, pp))
 			return 0;
 
 		/*
@@ -614,11 +614,7 @@ static void tcp_exit(struct ip_vs_protocol *pp)
 struct ip_vs_protocol ip_vs_protocol_tcp = {
 	.name =			"TCP",
 	.protocol =		IPPROTO_TCP,
-	.minhlen =		sizeof(struct tcphdr),
-	.minhlen_icmp =		8,
 	.dont_defrag =		0,
-	.skip_nonexisting =	0,
-	.slave =		0,
 	.appcnt =		ATOMIC_INIT(0),
 	.init =			tcp_init,
 	.exit =			tcp_exit,

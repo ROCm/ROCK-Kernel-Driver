@@ -953,6 +953,8 @@ void dump_stack(void)
 	show_trace(&stack);
 }
 
+EXPORT_SYMBOL(dump_stack);
+
 void bad_super_trap (struct frame *fp)
 {
 	console_verbose();

@@ -2633,7 +2633,6 @@ he_close(struct atm_vcc *vcc)
 		       (retry < MAX_RETRY)) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			(void) schedule_timeout(sleep);
-			set_current_state(TASK_RUNNING);
 			if (sleep < HZ)
 				sleep = sleep * 2;
 

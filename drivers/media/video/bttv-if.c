@@ -27,14 +27,22 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 
 #include "bttvp.h"
 
-static struct i2c_algo_bit_data bttv_i2c_algo_template;
-static struct i2c_adapter bttv_i2c_adap_template;
+static struct i2c_algo_bit_data bttv_i2c_algo_bit_template;
+static struct i2c_adapter bttv_i2c_adap_sw_template;
+static struct i2c_adapter bttv_i2c_adap_hw_template;
 static struct i2c_client bttv_i2c_client_template;
+
+#ifndef I2C_PEC
+static void bttv_inc_use(struct i2c_adapter *adap);
+static void bttv_dec_use(struct i2c_adapter *adap);
+#endif
+static int attach_inform(struct i2c_client *client);
 
 EXPORT_SYMBOL(bttv_get_cardinfo);
 EXPORT_SYMBOL(bttv_get_pcidev);
@@ -44,6 +52,11 @@ EXPORT_SYMBOL(bttv_read_gpio);
 EXPORT_SYMBOL(bttv_write_gpio);
 EXPORT_SYMBOL(bttv_get_gpio_queue);
 EXPORT_SYMBOL(bttv_i2c_call);
+
+static int i2c_debug = 0;
+static int i2c_hw = 0;
+MODULE_PARM(i2c_debug,"i");
+MODULE_PARM(i2c_hw,"i");
 
 /* ----------------------------------------------------------------------- */
 /* Exported functions - for other modules which want to access the         */
@@ -75,6 +88,7 @@ int bttv_get_id(unsigned int card)
 	}
 	return bttvs[card].type;
 }
+
 
 int bttv_gpio_enable(unsigned int card, unsigned long mask, unsigned long data)
 {
@@ -146,7 +160,7 @@ wait_queue_head_t* bttv_get_gpio_queue(unsigned int card)
 
 
 /* ----------------------------------------------------------------------- */
-/* I2C functions                                                           */
+/* I2C functions - bitbanging adapter (software i2c)                       */
 
 void bttv_bit_setscl(void *data, int state)
 {
@@ -190,6 +204,222 @@ static int bttv_bit_getsda(void *data)
 	return state;
 }
 
+static struct i2c_algo_bit_data bttv_i2c_algo_bit_template = {
+	.setsda  = bttv_bit_setsda,
+	.setscl  = bttv_bit_setscl,
+	.getsda  = bttv_bit_getsda,
+	.getscl  = bttv_bit_getscl,
+	.udelay  = 16,
+	.mdelay  = 10,
+	.timeout = 200,
+};
+
+static struct i2c_adapter bttv_i2c_adap_sw_template = {
+#ifdef I2C_PEC
+	.owner             = THIS_MODULE,
+#else
+	.inc_use           = bttv_inc_use,
+	.dec_use           = bttv_dec_use,
+#endif
+#ifdef I2C_ADAP_CLASS_TV_ANALOG
+	.class             = I2C_ADAP_CLASS_TV_ANALOG,
+#endif
+	I2C_DEVNAME("bt848"),
+	.id                = I2C_HW_B_BT848,
+	.client_register   = attach_inform,
+};
+
+/* ----------------------------------------------------------------------- */
+/* I2C functions - hardware i2c                                            */
+
+static int algo_control(struct i2c_adapter *adapter, 
+			unsigned int cmd, unsigned long arg)
+{
+	return 0;
+}
+
+static u32 functionality(struct i2c_adapter *adap)
+{
+	return I2C_FUNC_SMBUS_EMUL;
+}
+
+static int
+bttv_i2c_wait_done(struct bttv *btv)
+{
+	u32 stat;
+	int timeout;
+
+	timeout = jiffies + HZ/100 + 1; /* 10ms */
+	for (;;) {
+		stat = btread(BT848_INT_STAT);
+		if (stat & BT848_INT_I2CDONE)
+			break;
+		if (time_after(jiffies,timeout))
+			return -EIO;
+		udelay(10);
+	}
+	btwrite(BT848_INT_I2CDONE|BT848_INT_RACK, BT848_INT_STAT);
+	return ((stat & BT848_INT_RACK) ? 1 : 0);
+}
+
+#define I2C_HW (BT878_I2C_MODE  | BT848_I2C_SYNC |\
+		BT848_I2C_SCL | BT848_I2C_SDA)
+
+static int
+bttv_i2c_sendbytes(struct bttv *btv, const struct i2c_msg *msg, int last)
+{
+	u32 xmit;
+	int retval,cnt;
+
+	/* start, address + first byte */
+	xmit = (msg->addr << 25) | (msg->buf[0] << 16) | I2C_HW;
+	if (msg->len > 1 || !last)
+		xmit |= BT878_I2C_NOSTOP;
+	btwrite(xmit, BT848_I2C);
+	retval = bttv_i2c_wait_done(btv);
+	if (retval < 0)
+		goto err;
+	if (retval == 0)
+		goto eio;
+	if (i2c_debug) {
+		printk(" <W %02x %02x", msg->addr << 1, msg->buf[0]);
+		if (!(xmit & BT878_I2C_NOSTOP))
+			printk(" >\n");
+	}
+
+	for (cnt = 1; cnt < msg->len; cnt++ ) {
+		/* following bytes */
+		xmit = (msg->buf[cnt] << 24) | I2C_HW | BT878_I2C_NOSTART;
+		if (cnt < msg->len-1 || !last)
+			xmit |= BT878_I2C_NOSTOP;
+		btwrite(xmit, BT848_I2C);
+		retval = bttv_i2c_wait_done(btv);
+		if (retval < 0)
+			goto err;
+		if (retval == 0)
+			goto eio;
+		if (i2c_debug) {
+			printk(" %02x", msg->buf[cnt]);
+			if (!(xmit & BT878_I2C_NOSTOP))
+				printk(" >\n");
+		}
+	}
+	return msg->len;
+
+ eio:
+	retval = -EIO;
+ err:
+	if (i2c_debug)
+		printk(" ERR: %d\n",retval);
+	return retval;
+}
+
+static int
+bttv_i2c_readbytes(struct bttv *btv, const struct i2c_msg *msg, int last)
+{
+	u32 xmit;
+	u32 cnt;
+	int retval;
+
+	for(cnt = 0; cnt < msg->len; cnt++) {
+		xmit = (msg->addr << 25) | (1 << 24) | I2C_HW;
+		if (cnt < msg->len-1)
+			xmit |= BT848_I2C_W3B;
+		if (cnt < msg->len-1 || !last)
+			xmit |= BT878_I2C_NOSTOP;
+		if (cnt)
+			xmit |= BT878_I2C_NOSTART;
+		btwrite(xmit, BT848_I2C);
+		retval = bttv_i2c_wait_done(btv);
+		if (retval < 0)
+			goto err;
+		if (retval == 0)
+			goto eio;
+		msg->buf[cnt] = ((u32)btread(BT848_I2C) >> 8) & 0xff;
+		if (i2c_debug) {
+			if (!(xmit & BT878_I2C_NOSTART))
+				printk(" <R %02x", (msg->addr << 1) +1);
+			printk(" =%02x", msg->buf[cnt]);
+			if (!(xmit & BT878_I2C_NOSTOP))
+				printk(" >\n");
+		}
+	}
+	return msg->len;
+
+ eio:
+	retval = -EIO;
+ err:
+	if (i2c_debug)
+		printk(" ERR: %d\n",retval);
+       	return retval;
+}
+
+int bttv_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[], int num)
+{
+	struct bttv *btv = i2c_get_adapdata(i2c_adap);
+	int retval = 0;
+	int i;
+
+	if (i2c_debug)
+		printk("bt-i2c:");
+	btwrite(BT848_INT_I2CDONE|BT848_INT_RACK, BT848_INT_STAT);
+	for (i = 0 ; i < num; i++) {
+		if (msgs[i].flags & I2C_M_RD) {
+			/* read */
+			retval = bttv_i2c_readbytes(btv, &msgs[i], i+1 == num);
+			if (retval < 0)
+				goto err;
+		} else {
+			/* write */
+			retval = bttv_i2c_sendbytes(btv, &msgs[i], i+1 == num);
+			if (retval < 0)
+				goto err;
+		}
+	}
+	return num;
+
+ err:
+	return retval;
+}
+
+static struct i2c_algorithm bttv_algo = {
+	.name          = "bt878",
+	.id            = I2C_ALGO_BIT | I2C_HW_B_BT848 /* FIXME */,
+	.master_xfer   = bttv_i2c_xfer,
+	.algo_control  = algo_control,
+	.functionality = functionality,
+};
+
+static struct i2c_adapter bttv_i2c_adap_hw_template = {
+#ifdef I2C_PEC
+	.owner         = THIS_MODULE,
+#else
+	.inc_use       = bttv_inc_use,
+	.dec_use       = bttv_dec_use,
+#endif
+#ifdef I2C_ADAP_CLASS_TV_ANALOG
+	.class         = I2C_ADAP_CLASS_TV_ANALOG,
+#endif
+	I2C_DEVNAME("bt878"),
+	.id            = I2C_ALGO_BIT | I2C_HW_B_BT848 /* FIXME */,
+	.algo          = &bttv_algo,
+	.client_register = attach_inform,
+};
+
+/* ----------------------------------------------------------------------- */
+/* I2C functions - common stuff                                            */
+
+#ifndef I2C_PEC
+static void bttv_inc_use(struct i2c_adapter *adap)
+{
+	MOD_INC_USE_COUNT;
+}
+
+static void bttv_dec_use(struct i2c_adapter *adap)
+{
+	MOD_DEC_USE_COUNT;
+}
+#endif
 
 static int attach_inform(struct i2c_client *client)
 {
@@ -220,24 +450,6 @@ void bttv_i2c_call(unsigned int card, unsigned int cmd, void *arg)
 		return;
 	bttv_call_i2c_clients(&bttvs[card], cmd, arg);
 }
-
-static struct i2c_algo_bit_data bttv_i2c_algo_template = {
-	.setsda  = bttv_bit_setsda,
-	.setscl  = bttv_bit_setscl,
-	.getsda  = bttv_bit_getsda,
-	.getscl  = bttv_bit_getscl,
-	.udelay  = 16,
-	.mdelay  = 10,
-	.timeout = 200,
-};
-
-static struct i2c_adapter bttv_i2c_adap_template = {
-	.owner             = THIS_MODULE,
-	.class             = I2C_ADAP_CLASS_TV_ANALOG,
-	I2C_DEVNAME("bt848"),
-	.id                = I2C_HW_B_BT848,
-	.client_register   = attach_inform,
-};
 
 static struct i2c_client bttv_i2c_client_template = {
 	I2C_DEVNAME("bttv internal"),
@@ -308,26 +520,54 @@ void __devinit bttv_readee(struct bttv *btv, unsigned char *eedata, int addr)
 /* init + register i2c algo-bit adapter */
 int __devinit init_bttv_i2c(struct bttv *btv)
 {
-	memcpy(&btv->i2c_adap, &bttv_i2c_adap_template,
-	       sizeof(struct i2c_adapter));
-	memcpy(&btv->i2c_algo, &bttv_i2c_algo_template,
-	       sizeof(struct i2c_algo_bit_data));
+	int use_hw = (btv->id == 878) && i2c_hw;
+
 	memcpy(&btv->i2c_client, &bttv_i2c_client_template,
-	       sizeof(struct i2c_client));
+	       sizeof(bttv_i2c_client_template));
 
-	sprintf(btv->i2c_adap.name, "bt848 #%d", btv->nr);
+	if (use_hw) {
+		/* bt878 */
+		memcpy(&btv->i2c_adap, &bttv_i2c_adap_hw_template,
+		       sizeof(bttv_i2c_adap_hw_template));
+	} else {
+		/* bt848 */
+		memcpy(&btv->i2c_adap, &bttv_i2c_adap_sw_template,
+		       sizeof(bttv_i2c_adap_sw_template));
+		memcpy(&btv->i2c_algo, &bttv_i2c_algo_bit_template,
+		       sizeof(bttv_i2c_algo_bit_template));
+		btv->i2c_algo.data = btv;
+		btv->i2c_adap.algo_data = &btv->i2c_algo;
+	}
+
 	btv->i2c_adap.dev.parent = &btv->dev->dev;
+	snprintf(btv->i2c_adap.name, sizeof(btv->i2c_adap.name),
+		 "bt%d #%d [%s]", btv->id, btv->nr, use_hw ? "hw" : "sw");
 
-        btv->i2c_algo.data = btv;
         i2c_set_adapdata(&btv->i2c_adap, btv);
-        btv->i2c_adap.algo_data = &btv->i2c_algo;
         btv->i2c_client.adapter = &btv->i2c_adap;
 
-	bttv_bit_setscl(btv,1);
-	bttv_bit_setsda(btv,1);
-
-	btv->i2c_rc = i2c_bit_add_bus(&btv->i2c_adap);
+	if (use_hw) {
+		btv->i2c_rc = i2c_add_adapter(&btv->i2c_adap);
+	} else {
+		bttv_bit_setscl(btv,1);
+		bttv_bit_setsda(btv,1);
+		btv->i2c_rc = i2c_bit_add_bus(&btv->i2c_adap);
+	}
 	return btv->i2c_rc;
+}
+
+int __devexit fini_bttv_i2c(struct bttv *btv)
+{
+	int use_hw = (btv->id == 878) && i2c_hw;
+
+	if (0 != btv->i2c_rc)
+		return 0;
+
+	if (use_hw) {
+		return i2c_del_adapter(&btv->i2c_adap);
+	} else {
+		return i2c_bit_del_bus(&btv->i2c_adap);
+	}
 }
 
 /*

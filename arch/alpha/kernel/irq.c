@@ -12,6 +12,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel_stat.h>
 #include <linux/signal.h>
@@ -472,6 +473,8 @@ request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs
 	return retval;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void
 free_irq(unsigned int irq, void *dev_id)
 {
@@ -517,6 +520,8 @@ free_irq(unsigned int irq, void *dev_id)
 		return;
 	}
 }
+
+EXPORT_SYMBOL(free_irq);
 
 int
 show_interrupts(struct seq_file *p, void *v)
@@ -752,6 +757,8 @@ probe_irq_on(void)
 	return val;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 /*
  * Return a mask of triggered interrupts (this
  * can handle only legacy ISA interrupts).
@@ -822,6 +829,8 @@ probe_irq_off(unsigned long val)
 		irq_found = -irq_found;
 	return irq_found;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 #ifdef CONFIG_SMP
 void synchronize_irq(unsigned int irq)

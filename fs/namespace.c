@@ -94,6 +94,8 @@ struct vfsmount *lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
 	return found;
 }
 
+EXPORT_SYMBOL(lookup_mnt);
+
 static int check_mnt(struct vfsmount *mnt)
 {
 	spin_lock(&vfsmount_lock);
@@ -163,6 +165,8 @@ void __mntput(struct vfsmount *mnt)
 	free_vfsmnt(mnt);
 	deactivate_super(sb);
 }
+
+EXPORT_SYMBOL(__mntput);
 
 /* iterator */
 static void *m_start(struct seq_file *m, loff_t *pos)
@@ -258,6 +262,8 @@ int may_umount(struct vfsmount *mnt)
 		return -EBUSY;
 	return 0;
 }
+
+EXPORT_SYMBOL(may_umount);
 
 void umount_tree(struct vfsmount *mnt)
 {
@@ -925,6 +931,8 @@ void set_fs_root(struct fs_struct *fs, struct vfsmount *mnt,
 	}
 }
 
+EXPORT_SYMBOL(set_fs_root);
+
 /*
  * Replace the fs->{pwdmnt,pwd} with {mnt,dentry}. Put the old values.
  * It can block. Requires the big lock held.
@@ -947,6 +955,8 @@ void set_fs_pwd(struct fs_struct *fs, struct vfsmount *mnt,
 		mntput(old_pwdmnt);
 	}
 }
+
+EXPORT_SYMBOL(set_fs_pwd);
 
 static void chroot_fs_refs(struct nameidata *old_nd, struct nameidata *new_nd)
 {

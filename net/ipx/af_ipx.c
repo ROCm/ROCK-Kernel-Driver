@@ -1920,13 +1920,11 @@ SOCKOPS_WRAP(ipx_dgram, PF_IPX);
 static struct packet_type ipx_8023_packet_type = {
 	.type		= __constant_htons(ETH_P_802_3),
 	.func		= ipx_rcv,
-	.data		= PKT_CAN_SHARE_SKB,
 };
 
 static struct packet_type ipx_dix_packet_type = {
 	.type		= __constant_htons(ETH_P_IPX),
 	.func		= ipx_rcv,
-	.data		= PKT_CAN_SHARE_SKB,
 };
 
 static struct notifier_block ipx_dev_notifier = {

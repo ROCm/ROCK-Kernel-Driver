@@ -435,11 +435,7 @@ struct ip_vs_protocol {
 	struct ip_vs_protocol	*next;
 	char			*name;
 	__u16			protocol;
-	int			minhlen;
-	int			minhlen_icmp;
 	int			dont_defrag;
-	int			skip_nonexisting;
-	int			slave;		/* if controlled by others */
 	atomic_t		appcnt;		/* counter of proto app incs */
 	int			*timeout_table;	/* protocol timeout table */
 
@@ -528,7 +524,10 @@ struct ip_vs_conn {
 	struct ip_vs_dest       *dest;          /* real server */
 	atomic_t                in_pkts;        /* incoming packet counter */
 
-	/* packet transmitter for different forwarding methods */
+	/* packet transmitter for different forwarding methods.  If it
+	   mangles the packet, it must return NF_DROP or NF_STOLEN, otherwise
+	   this must be changed to a sk_buff **.
+	 */
 	int (*packet_xmit)(struct sk_buff *skb, struct ip_vs_conn *cp,
 			   struct ip_vs_protocol *pp);
 

@@ -960,6 +960,24 @@ call_verify(struct rpc_task *task)
 	switch ((n = ntohl(*p++))) {
 	case RPC_SUCCESS:
 		return p;
+	case RPC_PROG_UNAVAIL:
+		printk(KERN_WARNING "RPC: %4d call_verify: program %u is unsupported by server %s\n",
+				task->tk_pid, (unsigned int)task->tk_client->cl_prog,
+				task->tk_client->cl_server);
+		goto out_eio;
+	case RPC_PROG_MISMATCH:
+		printk(KERN_WARNING "RPC: %4d call_verify: program %u, version %u unsupported by server %s\n",
+				task->tk_pid, (unsigned int)task->tk_client->cl_prog,
+				(unsigned int)task->tk_client->cl_vers,
+				task->tk_client->cl_server);
+		goto out_eio;
+	case RPC_PROC_UNAVAIL:
+		printk(KERN_WARNING "RPC: %4d call_verify: proc %u unsupported by program %u, version %u on server %s\n",
+				task->tk_pid, (unsigned int)task->tk_msg.rpc_proc,
+				(unsigned int)task->tk_client->cl_prog,
+				(unsigned int)task->tk_client->cl_vers,
+				task->tk_client->cl_server);
+		goto out_eio;
 	case RPC_GARBAGE_ARGS:
 		break;			/* retry */
 	default:
@@ -977,6 +995,7 @@ garbage:
 		return NULL;
 	}
 	printk(KERN_WARNING "RPC: garbage, exit EIO\n");
+out_eio:
 	rpc_exit(task, -EIO);
 	return NULL;
 }

@@ -61,6 +61,7 @@
 #include <linux/compat.h>
 #include <linux/vfs.h>
 #include <linux/ptrace.h>
+#include <linux/highuid.h>
 #include <asm/mman.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -78,28 +79,23 @@
 #define ROUND_UP(x,a)	((__typeof__(x))(((unsigned long)(x) + ((a) - 1)) & ~((a) - 1)))
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 
-#undef high2lowuid
-#undef high2lowgid
-#undef low2highuid
-#undef low2highgid
-
-#define high2lowuid(uid) ((uid) > 65535) ? (u16)overflowuid : (u16)(uid)
-#define high2lowgid(gid) ((gid) > 65535) ? (u16)overflowgid : (u16)(gid)
-#define low2highuid(uid) ((uid) == (u16)-1) ? (uid_t)-1 : (uid_t)(uid)
-#define low2highgid(gid) ((gid) == (u16)-1) ? (gid_t)-1 : (gid_t)(gid)
-extern int overflowuid,overflowgid; 
-
 int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 {
+	typeof(ubuf->st_uid) uid = 0;
+	typeof(ubuf->st_gid) gid = 0;
+	SET_UID(uid, kbuf->uid);
+	SET_GID(gid, kbuf->gid);
 	if (!old_valid_dev(kbuf->dev) || !old_valid_dev(kbuf->rdev))
+		return -EOVERFLOW;
+	if (kbuf->size >= 0x7fffffff)
 		return -EOVERFLOW;
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct compat_stat)) ||
 	    __put_user (old_encode_dev(kbuf->dev), &ubuf->st_dev) ||
 	    __put_user (kbuf->ino, &ubuf->st_ino) ||
 	    __put_user (kbuf->mode, &ubuf->st_mode) ||
 	    __put_user (kbuf->nlink, &ubuf->st_nlink) ||
-	    __put_user (kbuf->uid, &ubuf->st_uid) ||
-	    __put_user (kbuf->gid, &ubuf->st_gid) ||
+	    __put_user (uid, &ubuf->st_uid) ||
+	    __put_user (gid, &ubuf->st_gid) ||
 	    __put_user (old_encode_dev(kbuf->rdev), &ubuf->st_rdev) ||
 	    __put_user (kbuf->size, &ubuf->st_size) ||
 	    __put_user (kbuf->atime.tv_sec, &ubuf->st_atime) ||
@@ -120,14 +116,18 @@ int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 static int
 cp_stat64(struct stat64 *ubuf, struct kstat *stat)
 {
+	typeof(ubuf->st_uid) uid = 0;
+	typeof(ubuf->st_gid) gid = 0;
+	SET_UID(uid, stat->uid);
+	SET_GID(gid, stat->gid);
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct stat64)) ||
 	    __put_user(huge_encode_dev(stat->dev), &ubuf->st_dev) ||
 	    __put_user (stat->ino, &ubuf->__st_ino) ||
 	    __put_user (stat->ino, &ubuf->st_ino) ||
 	    __put_user (stat->mode, &ubuf->st_mode) ||
 	    __put_user (stat->nlink, &ubuf->st_nlink) ||
-	    __put_user (stat->uid, &ubuf->st_uid) ||
-	    __put_user (stat->gid, &ubuf->st_gid) ||
+	    __put_user (uid, &ubuf->st_uid) ||
+	    __put_user (gid, &ubuf->st_gid) ||
 	    __put_user (huge_encode_dev(stat->rdev), &ubuf->st_rdev) ||
 	    __put_user (stat->size, &ubuf->st_size) ||
 	    __put_user (stat->atime.tv_sec, &ubuf->st_atime) ||
@@ -1701,8 +1701,8 @@ static int nfs_exp32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 		      &arg32->ca32_export.ex32_anon_uid);
 	err |= __get_user(karg->ca_export.ex_anon_gid,
 		      &arg32->ca32_export.ex32_anon_gid);
-	karg->ca_export.ex_anon_uid = high2lowuid(karg->ca_export.ex_anon_uid);
-	karg->ca_export.ex_anon_gid = high2lowgid(karg->ca_export.ex_anon_gid);
+	SET_UID(karg->ca_export.ex_anon_uid, karg->ca_export.ex_anon_uid);
+	SET_GID(karg->ca_export.ex_anon_gid, karg->ca_export.ex_anon_gid);
 	return err;
 }
 

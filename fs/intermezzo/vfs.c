@@ -55,7 +55,6 @@
 
 #include <linux/mm.h>
 #include <linux/proc_fs.h>
-#include <linux/smp_lock.h>
 #include <linux/quotaops.h>
 
 #include <asm/uaccess.h>

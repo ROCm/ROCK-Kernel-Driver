@@ -4,6 +4,7 @@
  */
 
 #include "linux/kernel.h"
+#include "linux/module.h"
 #include "linux/unistd.h"
 #include "linux/stddef.h"
 #include "linux/spinlock.h"
@@ -21,6 +22,8 @@
 #include "mode.h"
 
 u64 jiffies_64;
+
+EXPORT_SYMBOL(jiffies_64);
 
 int hz(void)
 {

@@ -46,8 +46,8 @@
 #define NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE   2
 #define NFS4_ACE_SYSTEM_ALARM_ACE_TYPE   3
 
-typedef char nfs4_verifier[NFS4_VERIFIER_SIZE];
-typedef char nfs4_stateid[16];
+typedef struct { char data[NFS4_VERIFIER_SIZE]; } nfs4_verifier;
+typedef struct { char data[16]; } nfs4_stateid;
 
 enum nfs_opnum4 {
 	OP_ACCESS = 3,

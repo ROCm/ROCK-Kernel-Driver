@@ -419,7 +419,6 @@ struct task_struct {
 	char comm[16];
 /* file system info */
 	int link_count, total_link_count;
-	unsigned int locks; /* How many file locks are being held */
 /* ipc stuff */
 	struct sysv_sem sysvsem;
 /* CPU-specific state of this task */

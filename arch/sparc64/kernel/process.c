@@ -14,6 +14,7 @@
 #include <stdarg.h>
 
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/kallsyms.h>
@@ -125,6 +126,8 @@ void machine_halt(void)
 	panic("Halt failed!");
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 void machine_alt_power_off(void)
 {
 	if (!serial_console && prom_palette)
@@ -152,6 +155,8 @@ void machine_restart(char * cmd)
 	prom_reboot("");
 	panic("Reboot failed!");
 }
+
+EXPORT_SYMBOL(machine_restart);
 
 static void show_regwindow32(struct pt_regs *regs)
 {

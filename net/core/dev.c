@@ -229,8 +229,7 @@ void dev_add_pack(struct packet_type *pt)
 
 	spin_lock_bh(&ptype_lock);
 #ifdef CONFIG_NET_FASTROUTE
-	/* Hack to detect packet socket */
-	if (pt->data && pt->data != PKT_CAN_SHARE_SKB) {
+	if (pt->af_packet_priv) {
 		netdev_fastroute_obstacles++;
 		dev_clear_fastroute(pt->dev);
 	}
@@ -278,7 +277,7 @@ void __dev_remove_pack(struct packet_type *pt)
 	list_for_each_entry(pt1, head, list) {
 		if (pt == pt1) {
 #ifdef CONFIG_NET_FASTROUTE
-			if (pt->data && pt->data != PKT_CAN_SHARE_SKB)
+			if (pt->af_packet_priv)
 				netdev_fastroute_obstacles--;
 #endif
 			list_del_rcu(&pt->list);
@@ -943,7 +942,7 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		 * they originated from - MvS (miquels@drinkel.ow.org)
 		 */
 		if ((ptype->dev == dev || !ptype->dev) &&
-		    (struct sock *)ptype->data != skb->sk) {
+		    (struct sock *)ptype->af_packet_priv != skb->sk) {
 			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC);
 			if (!skb2)
 				break;
@@ -1404,36 +1403,6 @@ drop:
 	return NET_RX_DROP;
 }
 
-/* Deliver skb to an old protocol, which is not threaded well
-   or which do not understand shared skbs.
- */
-static int deliver_to_old_ones(struct packet_type *pt,
-			       struct sk_buff *skb, int last)
-{
-	int ret = NET_RX_DROP;
-
-	if (!last) {
-		skb = skb_clone(skb, GFP_ATOMIC);
-		if (!skb)
-			goto out;
-	}
-	if (skb_is_nonlinear(skb) && __skb_linearize(skb, GFP_ATOMIC))
-		goto out_kfree;
-
-#ifdef CONFIG_SMP
-	/* Old protocols did not depened on BHs different of NET_BH and
-	   TIMER_BH - they need to be fixed for the new assumptions.
-	 */
-	print_symbol("fix old protocol handler %s!\n", (unsigned long)pt->func);
-#endif
-	ret = pt->func(skb, skb->dev, pt);
-out:
-	return ret;
-out_kfree:
-	kfree_skb(skb);
-	goto out;
-}
-
 static __inline__ void skb_bond(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
@@ -1493,12 +1462,8 @@ static void net_tx_action(struct softirq_action *h)
 static __inline__ int deliver_skb(struct sk_buff *skb,
 				  struct packet_type *pt_prev, int last)
 {
-	if (unlikely(!pt_prev->data))
-		return deliver_to_old_ones(pt_prev, skb, last);
-	else {
-		atomic_inc(&skb->users);
-		return pt_prev->func(skb, skb->dev, pt_prev);
-	}
+	atomic_inc(&skb->users);
+	return pt_prev->func(skb, skb->dev, pt_prev);
 }
 
 
@@ -1579,11 +1544,7 @@ int netif_receive_skb(struct sk_buff *skb)
 	}
 
 	if (pt_prev) {
-		if (!pt_prev->data) {
-			ret = deliver_to_old_ones(pt_prev, skb, 1);
-		} else {
-			ret = pt_prev->func(skb, skb->dev, pt_prev);
-		}
+		ret = pt_prev->func(skb, skb->dev, pt_prev);
 	} else {
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining

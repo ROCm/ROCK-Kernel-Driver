@@ -69,7 +69,6 @@ EXPORT_SYMBOL(flush_kernel_dcache_range_asm);
 EXPORT_SYMBOL(flush_kernel_dcache_page);
 EXPORT_SYMBOL(flush_data_cache_local);
 EXPORT_SYMBOL(flush_kernel_icache_range_asm);
-EXPORT_SYMBOL(__flush_dcache_page);
 EXPORT_SYMBOL(flush_all_caches);
 EXPORT_SYMBOL(dcache_stride);
 EXPORT_SYMBOL(flush_cache_all_local);
