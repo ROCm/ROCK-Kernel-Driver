@@ -503,6 +503,18 @@ UNUSUAL_DEV( 0x07c4, 0xa103, 0x0000, 0x9999,
 		US_FL_FIX_INQUIRY ),
 #endif
 
+/* Datafab KECF-USB / Sagatek DCS-CF / Simpletech Flashlink UCF-100
+ * Only revision 1.13 tested (same for all of the above devices,
+ * based on the Datafab DF-UG-07 chip).  Needed for US_FL_FIX_INQUIRY.
+ * Submitted by Marek Michalkiewicz <marekm@amelek.gda.pl>.
+ * See also http://martin.wilck.bei.t-online.de/#kecf .
+ */
+UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
+		"Datafab",
+		"KECF-USB",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY ),
+
 /* Casio QV 2x00/3x00/4000/8000 digital still cameras are not conformant
  * to the USB storage specification in two ways:
  * - They tell us they are using transport protocol CBI. In reality they
