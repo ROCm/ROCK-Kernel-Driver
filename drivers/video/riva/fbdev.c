@@ -1529,6 +1529,8 @@ static int rivafb_sync(struct fb_info *info)
 /* kernel interface */
 static struct fb_ops riva_fb_ops = {
 	.owner 		= THIS_MODULE,
+	.fb_open	= rivafb_open,
+	.fb_release	= rivafb_release,
 	.fb_check_var 	= rivafb_check_var,
 	.fb_set_par 	= rivafb_set_par,
 	.fb_setcolreg 	= rivafb_setcolreg,

@@ -14,7 +14,7 @@
 #include <asm/bootinfo.h>
 #include <asm/irq.h>
 #include <asm/amigahw.h>
-#include <video/font.h>
+#include <linux/font.h>
 
 #define DEFINE(sym, val) \
 	asm volatile("\n#define " #sym " %c0" : : "i" (val))
