@@ -329,7 +329,10 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 			
 			/* now scan */
 			for(ofs = 0; ofs != count; ofs++){
-				if(buf[ofs] == 'V'){
+				char c;
+				if (get_user(c, buf + ofs))
+					return -EFAULT;
+				if (c == 'V'){
 					zf_expect_close = 1;
 					dprintk("zf_expect_close 1\n");
 				}
