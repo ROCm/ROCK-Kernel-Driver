@@ -110,29 +110,6 @@ long plpar_put_term_char(unsigned long termno,
 			   lbuf[0], lbuf[1], &dummy, &dummy, &dummy);
 }
 
-long plpar_eoi(unsigned long xirr)
-{
-	return plpar_hcall_norets(H_EOI, xirr);
-}
-
-long plpar_cppr(unsigned long cppr)
-{
-	return plpar_hcall_norets(H_CPPR, cppr);
-}
-
-long plpar_ipi(unsigned long servernum,
-	       unsigned long mfrr)
-{
-	return plpar_hcall_norets(H_IPI, servernum, mfrr);
-}
-
-long plpar_xirr(unsigned long *xirr_ret)
-{
-	unsigned long dummy;
-	return plpar_hcall(H_XIRR, 0, 0, 0, 0,
-			   xirr_ret, &dummy, &dummy);
-}
-
 static void tce_build_pSeriesLP(struct TceTable *tbl, long tcenum, 
 				unsigned long uaddr, int direction )
 {
@@ -179,66 +156,6 @@ static void tce_free_one_pSeriesLP(struct TceTable *tbl, long tcenum)
 	}
 
 }
-
-/* PowerPC Interrupts for lpar. */
-/* NOTE: this typedef is duplicated (for now) from xics.c! */
-typedef struct {
-	int (*xirr_info_get)(int cpu);
-	void (*xirr_info_set)(int cpu, int val);
-	void (*cppr_info)(int cpu, u8 val);
-	void (*qirr_info)(int cpu, u8 val);
-} xics_ops;
-static int pSeriesLP_xirr_info_get(int n_cpu)
-{
-	unsigned long lpar_rc;
-	unsigned long return_value; 
-
-	lpar_rc = plpar_xirr(&return_value);
-	if (lpar_rc != H_Success) {
-		panic(" bad return code xirr - rc = %lx \n", lpar_rc); 
-	}
-	return ((int)(return_value));
-}
-
-static void pSeriesLP_xirr_info_set(int n_cpu, int value)
-{
-	unsigned long lpar_rc;
-	unsigned long val64 = value & 0xffffffff;
-
-	lpar_rc = plpar_eoi(val64);
-	if (lpar_rc != H_Success) {
-		panic(" bad return code EOI - rc = %ld, value=%lx \n", lpar_rc, val64); 
-	}
-}
-
-static void pSeriesLP_cppr_info(int n_cpu, u8 value)
-{
-	unsigned long lpar_rc;
-
-	lpar_rc = plpar_cppr(value);
-	if (lpar_rc != H_Success) {
-		panic(" bad return code cppr - rc = %lx \n", lpar_rc); 
-	}
-}
-
-static void pSeriesLP_qirr_info(int n_cpu , u8 value)
-{
-	unsigned long lpar_rc;
-
-	lpar_rc = plpar_ipi(n_cpu, value);
-	if (lpar_rc != H_Success) {
-		panic(" bad return code qirr -ipi  - rc = %lx \n", lpar_rc); 
-	}
-}
-
-xics_ops pSeriesLP_ops = {
-	pSeriesLP_xirr_info_get,
-	pSeriesLP_xirr_info_set,
-	pSeriesLP_cppr_info,
-	pSeriesLP_qirr_info
-};
-/* end TAI-LPAR */
-
 
 int vtermno;	/* virtual terminal# for udbg  */
 

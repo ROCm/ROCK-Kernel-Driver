@@ -111,7 +111,6 @@ unsigned int openpic_vec_spurious;
  * data has probably been corrupted and we're going to panic or deadlock later
  * anyway --Troy
  */
-extern unsigned long* _get_SP(void);
 #define check_arg_irq(irq) \
     if (irq < open_pic_irq_offset || irq >= (NumSources+open_pic_irq_offset)){ \
       printk(KERN_ERR "open_pic.c:%d: illegal irq %d\n", __LINE__, irq); \
