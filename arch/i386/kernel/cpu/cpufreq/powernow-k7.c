@@ -260,7 +260,7 @@ static void change_speed (unsigned int index)
 	/* Now do the magic poking into the MSRs.  */
 
 	if (have_a0 == 1)	/* A0 errata 5 */
-		__asm__("\tcli\n");
+		local_irq_disable();
 
 	if (freqs.old > freqs.new) {
 		/* Going down, so change FID first */
@@ -274,7 +274,7 @@ static void change_speed (unsigned int index)
 	
 
 	if (have_a0 == 1)
-		__asm__("\tsti\n");
+		local_irq_enable();
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 }
