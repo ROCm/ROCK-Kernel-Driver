@@ -48,6 +48,8 @@ struct pst_s *ppst;	/* array of p states, valid for this part */
 static u32 currvid;	/* keep track of the current fid / vid */
 static u32 currfid;
 
+static struct cpufreq_frequency_table *powernow_table;
+
 /*
 The PSB table supplied by BIOS allows for the definition of the number of
 p-states that can be used when running on a/c, and the number of p-states
@@ -641,6 +643,12 @@ find_psb_table(void)
 			return -ENODEV;
 		}
 
+		powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (numps + 1)), GFP_KERNEL);
+		if (!powernow_table) {
+			printk(KERN_ERR PFX "powernow_table memory alloc failure\n");
+			return -ENOMEM;
+		}
+
 		ppst = kmalloc(sizeof (struct pst_s) * numps, GFP_KERNEL);
 		if (!ppst) {
 			printk(KERN_ERR PFX "ppst memory alloc failure\n");
@@ -654,7 +662,13 @@ find_psb_table(void)
 			printk(KERN_INFO PFX
 			       "   %d : fid 0x%x, vid 0x%x\n", j,
 			       ppst[j].fid, ppst[j].vid);
+			powernow_table[j].index = pst[j].fid; /* lower 8 bits */
+			powernow_table[j].index |= (pst[j].vid << 8); /* upper 8 bits */
+			powernow_table[j].frequency = find_freq_from_fid(pst[j].fid);
 		}
+		powernow_table[numps].frequency = CPUFREQ_TABLE_END;
+		powernow_table[numps].index = 0;
+
 		sort_pst(ppst, numps);
 
 		lastfid = ppst[0].fid;
@@ -664,6 +678,7 @@ find_psb_table(void)
 		if ((lastfid > MAX_FID) || (lastfid & 1) || (ppst[0].vid > LEAST_VID)) {
 			printk(KERN_ERR BFX "first fid/vid bad (0x%x - 0x%x)\n",
 			       lastfid, ppst[0].vid);
+			kfree(powernow_table);
 			kfree(ppst);
 			return -ENODEV;
 		}
@@ -687,18 +702,21 @@ find_psb_table(void)
 			if (ppst[j].vid < rvo) {	/* vid+rvo >= 0 */
 				printk(KERN_ERR BFX
 				       "0 vid exceeded with pstate %d\n", j);
+				kfree(powernow_table);
 				kfree(ppst);
 				return -ENODEV;
 			}
 			if (ppst[j].vid < maxvid+rvo) { /* vid+rvo >= maxvid */
 				printk(KERN_ERR BFX
 				       "maxvid exceeded with pstate %d\n", j);
+				kfree(powernow_table);
 				kfree(ppst);
 				return -ENODEV;
 			}
 		}
 
 		if (query_current_values_with_pending_wait()) {
+			kfree(powernow_table);
 			kfree(ppst);
 			return -EIO;
 		}
@@ -913,36 +931,12 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 static int
 powernowk8_verify(struct cpufreq_policy *pol)
 {
-	u32 min = pol->min / 1000;
-	u32 max = pol->max / 1000;
-	u32 targ = min;
-	int res;
-
-	if (ppst == 0) {
-		printk(KERN_ERR PFX "verify - ppst 0\n");
-		return -ENODEV;
-	}
-
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "failing verify, change pending bit set\n");
 		return -EIO;
 	}
 
-	dprintk(KERN_DEBUG PFX
-		"ver: cpu%d, min %d, max %d, cur %d, pol %d\n", pol->cpu,
-		pol->min, pol->max, pol->cur, pol->policy);
-
-	if (pol->cpu != 0) {
-		printk(KERN_ERR PFX "verify - cpu not 0\n");
-		return -ENODEV;
-	}
-
-	res = find_match(&targ, &min, &max, SEARCH_DOWN, 0, 0);
-	if (!res) {
-		pol->min = min * 1000;
-		pol->max = max * 1000;
-	}
-	return res;
+	return cpufreq_frequency_table_verify(pol, powernow_table);
 }
 
 /* per CPU init entry point to the driver */
@@ -968,10 +962,14 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 	dprintk(KERN_DEBUG PFX "policy current frequency %d kHz\n", pol->cur);
 
 	/* min/max the cpu is capable of */
-	pol->cpuinfo.min_freq = 1000 * find_freq_from_fid(ppst[0].fid);
-	pol->cpuinfo.max_freq = 1000 * find_freq_from_fid(ppst[numps-1].fid);
-	pol->min = 1000 * find_freq_from_fid(ppst[0].fid);
-	pol->max = 1000 * find_freq_from_fid(ppst[batps - 1].fid);
+	if (cpufreq_frequency_table_cpuinfo(pol, powernow_table)) {
+		printk(KERN_ERR PFX "invalid powernow_table\n");
+		kfree(powernow_table);
+		return -EINVAL;
+	}
+
+	if (!ppst)
+		return -EINVAL;
 
 	printk(KERN_INFO PFX "cpu_init done, current fid 0x%x, vid 0x%x\n",
 	       currfid, currvid);
