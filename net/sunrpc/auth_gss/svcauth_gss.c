@@ -389,11 +389,13 @@ static int rsc_parse(struct cache_detail *cd,
 		/* number of additional gid's */
 		if (get_int(&mesg, &N))
 			goto out;
+		status = -ENOMEM;
 		rsci.cred.cr_group_info = groups_alloc(N);
 		if (rsci.cred.cr_group_info == NULL)
 			goto out;
 
 		/* gid's */
+		status = -EINVAL;
 		for (i=0; i<N; i++) {
 			gid_t gid;
 			if (get_int(&mesg, &gid))
