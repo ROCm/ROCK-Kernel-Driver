@@ -543,7 +543,6 @@ static ssize_t proc_info_read(struct file * file, char __user * buf,
 	struct inode * inode = file->f_dentry->d_inode;
 	unsigned long page;
 	ssize_t length;
-	ssize_t end;
 	struct task_struct *task = proc_task(inode);
 
 	if (count > PROC_BLOCK_SIZE)
@@ -553,24 +552,10 @@ static ssize_t proc_info_read(struct file * file, char __user * buf,
 
 	length = PROC_I(inode)->op.proc_read(task, (char*)page);
 
-	if (length < 0) {
-		free_page(page);
-		return length;
-	}
-	/* Static 4kB (or whatever) block capacity */
-	if (*ppos >= length) {
-		free_page(page);
-		return 0;
-	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count))
-		count = -EFAULT;
-	else
-		*ppos = end;
+	if (length >= 0)
+		length = simple_read_from_buffer(buf, count, ppos, (char *)page, length);
 	free_page(page);
-	return count;
+	return length;
 }
 
 static struct file_operations proc_info_file_operations = {
@@ -1194,7 +1179,6 @@ static ssize_t proc_pid_attr_read(struct file * file, char __user * buf,
 	struct inode * inode = file->f_dentry->d_inode;
 	unsigned long page;
 	ssize_t length;
-	ssize_t end;
 	struct task_struct *task = proc_task(inode);
 
 	if (count > PAGE_SIZE)
@@ -1205,24 +1189,10 @@ static ssize_t proc_pid_attr_read(struct file * file, char __user * buf,
 	length = security_getprocattr(task, 
 				      (char*)file->f_dentry->d_name.name, 
 				      (void*)page, count);
-	if (length < 0) {
-		free_page(page);
-		return length;
-	}
-	/* Static 4kB (or whatever) block capacity */
-	if (*ppos >= length) {
-		free_page(page);
-		return 0;
-	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count))
-		count = -EFAULT;
-	else
-		*ppos = end;
+	if (length >= 0)
+		length = simple_read_from_buffer(buf, count, ppos, (char *)page, length);
 	free_page(page);
-	return count;
+	return length;
 }
 
 static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
