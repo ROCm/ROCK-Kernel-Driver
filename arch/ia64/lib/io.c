@@ -108,7 +108,7 @@ ia64_readl (void *addr)
 unsigned long
 ia64_readq (void *addr)
 {
-	return __ia64_readq (addr)
+	return __ia64_readq (addr);
 }
 
 

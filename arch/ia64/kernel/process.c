@@ -135,7 +135,7 @@ show_regs (struct pt_regs *regs)
 			       ((i == sof - 1) || (i % 3) == 2) ? "\n" : " ");
 		}
 	} else
-		show_stack(0);
+		show_stack(NULL);
 }
 
 void

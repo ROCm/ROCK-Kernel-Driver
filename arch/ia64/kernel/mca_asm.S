@@ -766,8 +766,6 @@ GLOBAL_ENTRY(ia64_monarch_init_handler)
 	// stash the information the SAL passed to os
 	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
 	;;
-
-// now we want to save information so we can dump registers
 	SAVE_MIN_WITH_COVER
 	;;
 	mov r8=cr.ifa

@@ -581,9 +581,8 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity, trigger);
 
 	DBG("ISA: IRQ %u -> GSI 0x%x (%s,%s) -> CPU 0x%04x vector %d\n",
-	    isa_irq, gsi,
-	    polarity == IOSAPIC_POL_HIGH ? "high" : "low", trigger == IOSAPIC_EDGE ? "edge" : "level",
-	    dest, vector);
+	    isa_irq, gsi, polarity == IOSAPIC_POL_HIGH ? "high" : "low",
+	    trigger == IOSAPIC_EDGE ? "edge" : "level", dest, vector);
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
@@ -635,7 +634,6 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, gsi_base, gsi_base + num_rte - 1);
 
 	if ((gsi_base == 0) && pcat_compat) {
-
 		/*
 		 * Map the legacy ISA devices into the IOSAPIC data.  Some of these may
 		 * get reprogrammed later on with data from the ACPI Interrupt Source

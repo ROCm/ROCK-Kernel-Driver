@@ -279,15 +279,6 @@ smp_callin (void)
 
 	smp_setup_percpu_timer();
 
-	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
-		/*
-		 * Synchronize the ITC with the BP
-		 */
-		Dprintk("Going to syncup ITC with BP.\n");
-
-		ia64_sync_itc(0);
-	}
-
 	/*
 	 * Get our bogomips.
 	 */
@@ -310,6 +301,18 @@ smp_callin (void)
 	local_irq_enable();
 	calibrate_delay();
 	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
+
+	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
+		/*
+		 * Synchronize the ITC with the BP.  Need to do this after irqs are
+		 * enabled because ia64_sync_itc() calls smp_call_function_single(), which
+		 * calls spin_unlock_bh(), which calls spin_unlock_bh(), which calls
+		 * local_bh_enable(), which bugs out if irqs are not enabled...
+		 */
+		Dprintk("Going to syncup ITC with BP.\n");
+		ia64_sync_itc(0);
+	}
+
 	/*
 	 * Allow the master to continue.
 	 */

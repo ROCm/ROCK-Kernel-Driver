@@ -39,6 +39,7 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/kallsyms.h>
 #include <linux/smp_lock.h>
 #include <linux/bootmem.h>
 #include <linux/acpi.h>
@@ -47,6 +48,7 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 
+#include <asm/delay.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
@@ -139,7 +141,7 @@ ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
 
 	/* Get the MCA error record */
 	if (!ia64_log_get(sal_info_type, (prfunc_t)printk))
-		return platform_err;                 // no record retrieved
+		return platform_err;		/* no record retrieved */
 
 	/* TODO:
 	 * 1. analyze error logs to determine recoverability
@@ -176,18 +178,90 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE, 0);
 }
 
+static void
+show_min_state (pal_min_state_area_t *minstate)
+{
+	u64 iip = minstate->pmsa_iip + ((struct ia64_psr *)(&minstate->pmsa_ipsr))->ri;
+	u64 xip = minstate->pmsa_xip + ((struct ia64_psr *)(&minstate->pmsa_xpsr))->ri;
+
+	printk("NaT bits\t%016lx\n", minstate->pmsa_nat_bits);
+	printk("pr\t\t%016lx\n", minstate->pmsa_pr);
+	printk("b0\t\t%016lx ", minstate->pmsa_br0); print_symbol("%s\n", minstate->pmsa_br0);
+	printk("ar.rsc\t\t%016lx\n", minstate->pmsa_rsc);
+	printk("cr.iip\t\t%016lx ", iip); print_symbol("%s\n", iip);
+	printk("cr.ipsr\t\t%016lx\n", minstate->pmsa_ipsr);
+	printk("cr.ifs\t\t%016lx\n", minstate->pmsa_ifs);
+	printk("xip\t\t%016lx ", xip); print_symbol("%s\n", xip);
+	printk("xpsr\t\t%016lx\n", minstate->pmsa_xpsr);
+	printk("xfs\t\t%016lx\n", minstate->pmsa_xfs);
+	printk("b1\t\t%016lx ", minstate->pmsa_br1);
+	print_symbol("%s\n", minstate->pmsa_br1);
+
+	printk("\nstatic registers r0-r15:\n");
+	printk(" r0- 3 %016lx %016lx %016lx %016lx\n",
+	       0UL, minstate->pmsa_gr[0], minstate->pmsa_gr[1], minstate->pmsa_gr[2]);
+	printk(" r4- 7 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_gr[3], minstate->pmsa_gr[4],
+	       minstate->pmsa_gr[5], minstate->pmsa_gr[6]);
+	printk(" r8-11 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_gr[7], minstate->pmsa_gr[8],
+	       minstate->pmsa_gr[9], minstate->pmsa_gr[10]);
+	printk("r11-15 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_gr[11], minstate->pmsa_gr[12],
+	       minstate->pmsa_gr[13], minstate->pmsa_gr[14]);
+
+	printk("\nbank 0:\n");
+	printk("r16-19 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[0], minstate->pmsa_bank0_gr[1],
+	       minstate->pmsa_bank0_gr[2], minstate->pmsa_bank0_gr[3]);
+	printk("r20-23 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[4], minstate->pmsa_bank0_gr[5],
+	       minstate->pmsa_bank0_gr[6], minstate->pmsa_bank0_gr[7]);
+	printk("r24-27 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[8], minstate->pmsa_bank0_gr[9],
+	       minstate->pmsa_bank0_gr[10], minstate->pmsa_bank0_gr[11]);
+	printk("r28-31 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[12], minstate->pmsa_bank0_gr[13],
+	       minstate->pmsa_bank0_gr[14], minstate->pmsa_bank0_gr[15]);
+
+	printk("\nbank 1:\n");
+	printk("r16-19 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[0], minstate->pmsa_bank1_gr[1],
+	       minstate->pmsa_bank1_gr[2], minstate->pmsa_bank1_gr[3]);
+	printk("r20-23 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[4], minstate->pmsa_bank1_gr[5],
+	       minstate->pmsa_bank1_gr[6], minstate->pmsa_bank1_gr[7]);
+	printk("r24-27 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[8], minstate->pmsa_bank1_gr[9],
+	       minstate->pmsa_bank1_gr[10], minstate->pmsa_bank1_gr[11]);
+	printk("r28-31 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[12], minstate->pmsa_bank1_gr[13],
+	       minstate->pmsa_bank1_gr[14], minstate->pmsa_bank1_gr[15]);
+}
+
 /*
  * This routine will be used to deal with platform specific handling
  * of the init, i.e. drop into the kernel debugger on server machine,
  * or if the processor is part of some parallel machine without a
  * console, then we would call the appropriate debug hooks here.
  */
+unsigned long tr_val[32], tr_idx;
+
 void
-init_handler_platform (struct pt_regs *regs)
+init_handler_platform (sal_log_processor_info_t *proc_ptr, struct pt_regs *regs)
 {
 	/* if a kernel debugger is available call it here else just dump the registers */
 
-	show_regs(regs);		/* dump the state info */
+	/*
+	 * Wait for a bit.  On some machines (e.g., HP's zx2000 and zx6000, INIT can be
+	 * generated via the BMC's command-line interface, but since the console is on the
+	 * same serial line, the user will need some time to switch out of the BMC before
+	 * the dump begins.
+	 */
+	printk("Delaying for 5 seconds...\n");
+	udelay(5*1000000);
+	show_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
+
 	while (1);			/* hang city if no debugger */
 }
 
@@ -263,7 +337,6 @@ ia64_mca_register_cpev (int cpev)
 /*
  * routine to process and prepare to dump min_state_save
  * information for debugging purposes.
- *
  */
 void
 ia64_process_min_state_save (pal_min_state_area_t *pmss)
@@ -271,8 +344,6 @@ ia64_process_min_state_save (pal_min_state_area_t *pmss)
 	int i, max = MIN_STATE_AREA_SIZE;
 	u64 *tpmss_ptr = (u64 *)pmss;
 	u64 *return_min_state_ptr = ia64_mca_min_state_save_info;
-
-	/* dump out the min_state_area information */
 
 	for (i=0;i<max;i++) {
 
@@ -1089,7 +1160,7 @@ ia64_init_handler (struct pt_regs *regs)
 	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
 	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
 
-	init_handler_platform(regs);              /* call platform specific routines */
+	init_handler_platform(proc_ptr, regs);		/* call platform specific routines */
 }
 
 /*
