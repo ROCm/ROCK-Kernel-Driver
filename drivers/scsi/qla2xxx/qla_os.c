@@ -3590,7 +3590,7 @@ qla2x00_get_new_sp(scsi_qla_host_t *ha)
 {
 	srb_t *sp;
 
-	sp = mempool_alloc(ha->srb_mempool, GFP_KERNEL);
+	sp = mempool_alloc(ha->srb_mempool, GFP_ATOMIC);
 	if (sp)
 		atomic_set(&sp->ref_count, 1);
 	return (sp);
