@@ -40,8 +40,6 @@
  * interrupt-controller happy.
  */
 
-BUILD_COMMON_IRQ()
-
 #define BI(x,y) \
 	BUILD_IRQ(x##y)
 
@@ -57,7 +55,7 @@ BUILD_COMMON_IRQ()
  */
 BUILD_16_IRQS(0x0)
 
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 /*
  * The IO-APIC gives us many more interrupt sources. Most of these 
  * are unused but an SMP system is supposed to have enough memory ...
@@ -77,31 +75,6 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd)
 #undef BUILD_16_IRQS
 #undef BI
 
-
-/*
- * The following vectors are part of the Linux architecture, there
- * is no hardware IRQ pin equivalent for them, they are triggered
- * through the ICC by us (IPIs)
- */
-#ifdef CONFIG_SMP
-BUILD_SMP_INTERRUPT(task_migration_interrupt,TASK_MIGRATION_VECTOR);
-BUILD_SMP_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR);
-BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR);
-BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR); 
-#endif
-
-/*
- * every pentium local APIC has two 'local interrupts', with a
- * soft-definable vector attached to both interrupts, one of
- * which is a timer interrupt, the other one is error counter
- * overflow. Linux uses the local APIC timer interrupt to get
- * a much simpler SMP time architecture:
- */
-#ifdef CONFIG_X86_LOCAL_APIC
-BUILD_SMP_INTERRUPT(apic_timer_interrupt, LOCAL_TIMER_VECTOR);
-BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR);
-BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR);
-#endif
 
 #define IRQ(x,y) \
 	IRQ##x##y##_interrupt
@@ -139,6 +112,13 @@ spinlock_t i8259A_lock = SPIN_LOCK_UNLOCKED;
 
 static void end_8259A_irq (unsigned int irq)
 {
+	if (irq > 256) { 
+		char var;
+		printk("return %p stack %p ti %p\n", __builtin_return_address(0), &var, current->thread_info); 
+
+		BUG(); 
+	}
+
 	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
 		enable_8259A_irq(irq);
 }
@@ -386,10 +366,7 @@ void __init init_8259A(int auto_eoi)
  * IRQ2 is cascade interrupt to second interrupt controller
  */
 
-#ifndef CONFIG_VISWS
 static struct irqaction irq2 = { no_action, 0, 0, "cascade", NULL, NULL};
-#endif
-
 
 void __init init_ISA_irqs (void)
 {
@@ -419,15 +396,18 @@ void __init init_ISA_irqs (void)
 	}
 }
 
+void apic_timer_interrupt(void);
+void spurious_interrupt(void);
+void error_interrupt(void);
+void reschedule_interrupt(void);
+void call_function_interrupt(void);
+void invalidate_interrupt(void);
+
 void __init init_IRQ(void)
 {
 	int i;
 
-#ifndef CONFIG_X86_VISWS_APIC
 	init_ISA_irqs();
-#else
-	init_VISWS_APIC_irqs();
-#endif
 	/*
 	 * Cover the whole vector space, no vector can escape
 	 * us. (some of these will be overridden and become
@@ -435,8 +415,9 @@ void __init init_IRQ(void)
 	 */
 	for (i = 0; i < NR_IRQS; i++) {
 		int vector = FIRST_EXTERNAL_VECTOR + i;
-		if (vector != IA32_SYSCALL_VECTOR)
+		if (vector != IA32_SYSCALL_VECTOR && vector != KDB_VECTOR) { 
 			set_intr_gate(vector, interrupt[i]);
+	}
 	}
 
 #ifdef CONFIG_SMP
@@ -451,9 +432,6 @@ void __init init_IRQ(void)
 	 * IPI, driven by wakeup.
 	 */
 	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
-
-	/* IPI for task migration */
-	set_intr_gate(TASK_MIGRATION_VECTOR, task_migration_interrupt);
 
 	/* IPI for invalidation */
 	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
@@ -479,7 +457,5 @@ void __init init_IRQ(void)
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
 
-#ifndef CONFIG_VISWS
 	setup_irq(2, &irq2);
-#endif
 }

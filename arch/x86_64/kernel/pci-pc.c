@@ -406,6 +406,12 @@ char * __devinit pcibios_setup(char *str)
 		return NULL;
 	}
 #endif
+#ifdef CONFIG_ACPI_PCI
+	else if (!strcmp(str, "noacpi")) {
+		pci_probe |= PCI_NO_ACPI_ROUTING;
+		return NULL;
+	}
+#endif
 	else if (!strcmp(str, "rom")) {
 		pci_probe |= PCI_ASSIGN_ROMS;
 		return NULL;
@@ -417,6 +423,9 @@ char * __devinit pcibios_setup(char *str)
 		return NULL;
 	} else if (!strncmp(str, "lastbus=", 8)) {
 		pcibios_last_bus = simple_strtol(str+8, NULL, 0);
+		return NULL;
+	} else if (!strcmp(str, "usepirqmask")) { 
+		pci_probe |= PCI_USE_PIRQ_MASK;
 		return NULL;
 	}
 	return str;

@@ -5,7 +5,7 @@
  *  Copyright (C) 2000, 2001, 2002  Andi Kleen SuSE Labs
  *  Copyright (C) 2000  Pavel Machek <pavel@suse.cz>
  * 
- *  $Id: entry.S,v 1.66 2001/11/11 17:47:47 ak Exp $		
+ *  $Id$
  */
 
 /*
@@ -39,8 +39,7 @@
 #include <asm/msr.h>
 #include <asm/unistd.h>
 #include <asm/thread_info.h>
-	
-#define RIP_SYMBOL_NAME(x) x(%rip)
+#include <asm/hw_irq.h>
 
 	.code64
 
@@ -67,8 +66,7 @@
 	movq  	\tmp,RSP(%rsp)
 	movq    $__USER_DS,SS(%rsp)
 	movq    $__USER_CS,CS(%rsp)
-	movq	RCX(%rsp),\tmp  /* get return address */
-	movq	\tmp,RIP(%rsp)
+	movq 	$-1,RCX(%rsp)
 	movq	R11(%rsp),\tmp  /* get eflags */
 	movq	\tmp,EFLAGS(%rsp)
 	.endm
@@ -76,8 +74,6 @@
 	.macro RESTORE_TOP_OF_STACK tmp,offset=0
 	movq   RSP-\offset(%rsp),\tmp
 	movq   \tmp,PDAREF(pda_oldrsp)
-	movq   RIP-\offset(%rsp),\tmp
-	movq   \tmp,RCX-\offset(%rsp)
 	movq   EFLAGS-\offset(%rsp),\tmp
 	movq   \tmp,R11-\offset(%rsp)
 	.endm
@@ -97,17 +93,19 @@
 	addq $8*6, %rsp
 	.endm
 
-	
 /*
  * A newly forked process directly context switches into this.
  */ 	
 ENTRY(ret_from_fork)
+#if CONFIG_SMP || CONFIG_PREEMPT
+	call schedule_tail
+#endif		
 	GET_THREAD_INFO(%rcx)
 	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%rcx)
 	jc rff_trace
 rff_action:	
 	RESTORE_REST
-	cmpq $__KERNEL_CS,CS-ARGOFFSET(%rsp)	# from kernel_thread?
+	testl $3,CS-ARGOFFSET(%rsp)	# from kernel_thread?
 	je   int_ret_from_sys_call
 	testl $_TIF_IA32,threadinfo_flags(%rcx)
 	jnz  int_ret_from_sys_call
@@ -132,25 +130,27 @@ rff_trace:
  * rcx  return address for syscall/sysret, C arg3 
  * rsi  arg1
  * rdx  arg2	
- * r10  arg4 	(--> moved to rcx for C, serves as TOS flag afterwards) 
- * r8   arg5
- * r9   arg6
+ * r10  arg3 	(--> moved to rcx for C)
+ * r8   arg4
+ * r9   arg5
  * r11  eflags for syscall/sysret, temporary for C
  * r12-r15,rbp,rbx saved by C code, not touched. 		
  * 
  * Interrupts are off on entry.
  * Only called from user space.
  *
- * XXX need to add a flag for thread_saved_pc/KSTK_*. 			
+ * XXX	if we had a free scratch register we could save the RSP into the stack frame
+ *      and report it properly in ps. Unfortunately we haven't.
  */ 			 		
 
 ENTRY(system_call)
 	swapgs
 	movq	%rsp,PDAREF(pda_oldrsp) 
 	movq	PDAREF(pda_kernelstack),%rsp
-	pushq %rax
 	sti					
-	SAVE_ARGS
+	SAVE_ARGS 8,1
+	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp) 
+	movq  %rcx,RIP-ARGOFFSET(%rsp)  
 	GET_THREAD_INFO(%rcx)
 	bt    $TIF_SYSCALL_TRACE,threadinfo_flags(%rcx) 
 	jc    tracesys
@@ -163,33 +163,49 @@ ENTRY(system_call)
  * Syscall return path ending with SYSRET (fast path)
  * Has incomplete stack frame and undefined top of stack. 
  */		
-ENTRY(ret_from_sys_call)	
+	.globl ret_from_sys_call
+ret_from_sys_call:
+	movl $_TIF_WORK_MASK,%edi
+	/* edi:	flagmask */
+sysret_check:		
 	GET_THREAD_INFO(%rcx)
 	cli
 	movl threadinfo_flags(%rcx),%edx
-	andl $_TIF_WORK_MASK,%edx	# tracesys has been already checked.
+	andl %edi,%edx
 	jnz  sysret_careful 
-sysret_restore_args:
-	RESTORE_ARGS
+	movq RIP-ARGOFFSET(%rsp),%rcx
+	RESTORE_ARGS 0,-ARG_SKIP,1
 	movq	PDAREF(pda_oldrsp),%rsp
 	swapgs
-	SYSRET64
+	sysretq
 
+	/* Handle reschedules */
+	/* edx:	work, edi: workmask */	
 sysret_careful:
 	bt $TIF_NEED_RESCHED,%edx
-	jnc 1f
+	jnc sysret_signal
+	sti
+	pushq %rdi
 	call schedule
-	jmp ret_from_sys_call
-1:	sti
-	SAVE_REST
-	FIXUP_TOP_OF_STACK %rax
-	xorq %rsi,%rsi		# oldset
-	movq %rsp,%rdi		# &ptregs	
-	call do_notify_resume
-	RESTORE_TOP_OF_STACK %rax
-	RESTORE_REST
-	jmp ret_from_sys_call
+	popq  %rdi
+	jmp sysret_check
+
+	/* Handle a signal */ 
+sysret_signal:
+	sti
+	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME),%edx
+	jz    1f
+
+	/* Really a signal */
+	/* edx:	work flags (arg3) */
+	leaq do_notify_resume(%rip),%rax
+	leaq -ARGOFFSET(%rsp),%rdi # &pt_regs -> arg1
+	xorl %esi,%esi # oldset -> arg2
+	call ptregscall_common
+1:	movl $_TIF_NEED_RESCHED,%edi
+	jmp sysret_check
 	
+	/* Do syscall tracing */
 tracesys:			 
 	SAVE_REST
 	movq $-ENOSYS,RAX(%rsp)
@@ -201,7 +217,6 @@ tracesys:
 	cmpq $__NR_syscall_max,%rax
 	ja  1f
 	movq %r10,%rcx	/* fixup for C */
-	movl $1,%r10d	/* set TOS flag */ 
 	call *sys_call_table(,%rax,8)
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	SAVE_REST
@@ -220,40 +235,58 @@ badsys:
  * Has correct top of stack, but partial stack frame.
  */ 	
 ENTRY(int_ret_from_sys_call)	
-	cmpq $__KERNEL_CS,CS-ARGOFFSET(%rsp)	# in kernel syscall?
+	testl $3,CS-ARGOFFSET(%rsp)	# kernel syscall?
 	je int_restore_args
-	movl $_TIF_ALLWORK_MASK,%esi
-int_with_reschedule:
+	movl $_TIF_ALLWORK_MASK,%edi
+	/* edi:	mask to check */
+int_with_check:
 	GET_THREAD_INFO(%rcx)
 	cli
 	movl threadinfo_flags(%rcx),%edx
-	andl %esi,%edx
+	andl %edi,%edx
 	jnz   int_careful
+int_restore_swapgs:	
 	swapgs
 int_restore_args:		
-	RESTORE_ARGS	
-	addq $8,%rsp	# Remove oldrax
+	RESTORE_ARGS 0,8,0
 	iretq
 
+	/* Either reschedule or signal or syscall exit tracking needed. */
+	/* First do a reschedule test. */
+	/* edx:	work, edi: workmask */
 int_careful:
-	sti
 	bt $TIF_NEED_RESCHED,%edx
 	jnc  int_very_careful
+	sti
+	pushq %rdi
 	call schedule
-	movl $_TIF_ALLWORK_MASK,%esi
-	jmp int_with_reschedule
+	popq %rdi
+	jmp int_with_check
+
+	/* handle signals and tracing -- both require a full stack frame */
 int_very_careful:
+	sti
 	SAVE_REST
-	leaq syscall_trace(%rip),%rbp
-	leaq do_notify_resume(%rip),%rbx
+	/* Check for syscall exit trace */	
 	bt $TIF_SYSCALL_TRACE,%edx
-	cmovcq %rbp,%rbx
-	xorq %rsi,%rsi		# oldset -> arg2 
+	jnc int_signal
 	movq %rsp,%rdi		# &ptregs -> arg1
-	call *%rbx
+	pushq %rdi
+	call syscall_trace
+	popq %rdi
+	btr  $TIF_SYSCALL_TRACE,%edi
+	jmp int_restore_rest
+	
+int_signal:
+	testl $(_TIF_NOTIFY_RESUME|_TIF_SIGPENDING),%edx
+	jz 1f
+	movq %rsp,%rdi		# &ptregs -> arg1
+	xorl %esi,%esi		# oldset -> arg2
+	call do_notify_resume
+1:	movl $_TIF_NEED_RESCHED,%edi	
+int_restore_rest:
 	RESTORE_REST
-	movl $_TIF_WORK_MASK,%esi
-	jmp int_with_reschedule	
+	jmp int_with_check
 		
 /* 
  * Certain special system calls that need to save a complete full stack frame.
@@ -292,8 +325,8 @@ ENTRY(stub_execve)
 	FIXUP_TOP_OF_STACK %r11
 	call sys_execve
 	GET_THREAD_INFO(%rcx)
-	testl $_TIF_IA32,threadinfo_flags(%rcx)
-	jnz exec_32bit
+	bt $TIF_IA32,threadinfo_flags(%rcx)
+	jc exec_32bit
 	RESTORE_TOP_OF_STACK %r11
 	movq %r15, %r11
 	RESTORE_REST
@@ -327,24 +360,27 @@ ENTRY(stub_rt_sigreturn)
  */ 
 
 /* 0(%rsp): interrupt number */ 
-ENTRY(common_interrupt)
-	cmpq $__KERNEL_CS,16(%rsp)
-	je   1f
-	swapgs
-1:	cld
+	.macro interrupt func
+	cld
 	SAVE_ARGS
 #ifdef CONFIG_PREEMPT
 	GET_THREAD_INFO(%rdx)
 	incl threadinfo_preempt_count(%rdx)
 #endif		
 	leaq -ARGOFFSET(%rsp),%rdi	# arg1 for handler
-	addl $1,PDAREF(pda_irqcount)	# XXX: should be merged with irq.c irqcount
+	testl $3,CS(%rdi)
+	je 1f
+	swapgs	
+1:	addl $1,PDAREF(pda_irqcount)	# XXX: should be merged with irq.c irqcount
 	movq PDAREF(pda_irqstackptr),%rax
 	cmoveq %rax,%rsp							
 	pushq %rdi			# save old stack	
-	call do_IRQ
+	call \func
+	.endm
+
+ENTRY(common_interrupt)
+	interrupt do_IRQ
 	/* 0(%rsp): oldrsp-ARGOFFSET */
-	.globl ret_from_intr
 ret_from_intr:		
 	popq  %rdi
 	cli	
@@ -355,35 +391,38 @@ exit_intr:
 #ifdef CONFIG_PREEMPT	
 	decl threadinfo_preempt_count(%rcx)
 #endif
-	cmpq $__KERNEL_CS,CS-ARGOFFSET(%rsp)
+	testl $3,CS-ARGOFFSET(%rsp)
 	je retint_kernel
 	
 	/* Interrupt came from user space */
 	/*
-	 * Shared return path for exceptions and interrupts that came from user space.
 	 * Has a correct top of stack, but a partial stack frame
 	 * %rcx: thread info. Interrupts off.
 	 */		
 retint_with_reschedule:
-	testl $_TIF_WORK_MASK,threadinfo_flags(%rcx)
+	movl $_TIF_WORK_MASK,%edi
+retint_check:			
+	movl threadinfo_flags(%rcx),%edx
+	andl %edi,%edx
 	jnz  retint_careful
 retint_swapgs:	 	
 	swapgs 
 retint_restore_args:				
-	RESTORE_ARGS						
-	addq $8,%rsp
+	RESTORE_ARGS 0,8,0						
 	iretq
 
+	/* edi: workmask, edx: work */	
 retint_careful:
-	movl  threadinfo_flags(%rcx),%edx
 	bt    $TIF_NEED_RESCHED,%edx
 	jnc   retint_signal
 	sti
+	pushq %rdi
 	call  schedule
-retint_next_try:		
+	popq %rdi		
 	GET_THREAD_INFO(%rcx)
 	cli
-	jmp retint_with_reschedule
+	jmp retint_check
+	
 retint_signal:
 	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME),%edx
 	jz    retint_swapgs
@@ -394,7 +433,10 @@ retint_signal:
 	movq %rsp,%rdi		# &pt_regs
 	call do_notify_resume
 	RESTORE_REST
-	jmp retint_next_try
+	cli
+	movl $_TIF_NEED_RESCHED,%edi
+	GET_THREAD_INFO(%rcx)	
+	jmp retint_check
 
 #ifdef CONFIG_PREEMPT
 	/* Returning to kernel space. Check if we need preemption */
@@ -408,26 +450,59 @@ retint_kernel:
 	movl PDAREF(pda___local_bh_count),%eax
 	addl PDAREF(pda___local_irq_count),%eax
 	jnz  retint_restore_args
-	incl threadinfo_preempt_count(%rcx)
+	movl $PREEMPT_ACTIVE,threadinfo_preempt_count(%rcx)
 	sti
-	call preempt_schedule
+	call schedule
 	cli
+	GET_THREAD_INFO(%rcx)
+	movl $0,threadinfo_preempt_count(%rcx) 
 	jmp exit_intr
 #endif	
 	
+/*
+ * APIC interrupts.
+ */		
+	.macro apicinterrupt num,func
+	pushq $\num-256
+	interrupt \func
+	jmp ret_from_intr
+	.endm
+
+#ifdef CONFIG_SMP	
+ENTRY(reschedule_interrupt)
+	apicinterrupt RESCHEDULE_VECTOR,smp_reschedule_interrupt
+
+ENTRY(invalidate_interrupt)
+	apicinterrupt INVALIDATE_TLB_VECTOR,smp_invalidate_interrupt
+
+ENTRY(call_function_interrupt)
+	apicinterrupt CALL_FUNCTION_VECTOR,smp_call_function_interrupt
+#endif
+
+#ifdef CONFIG_X86_LOCAL_APIC	
+ENTRY(apic_timer_interrupt)
+	apicinterrupt LOCAL_TIMER_VECTOR,smp_apic_timer_interrupt
+
+ENTRY(error_interrupt)
+	apicinterrupt ERROR_APIC_VECTOR,smp_error_interrupt
+
+ENTRY(spurious_interrupt)
+	apicinterrupt SPURIOUS_APIC_VECTOR,smp_spurious_interrupt
+#endif
+				
 /*
  * Exception entry points.
  */ 		
 	.macro zeroentry sym
 	pushq $0	/* push error code/oldrax */ 
 	pushq %rax	/* push real oldrax to the rdi slot */ 
-	leaq  RIP_SYMBOL_NAME(\sym),%rax
+	leaq  \sym(%rip),%rax
 	jmp error_entry
 	.endm	
 
 	.macro errorentry sym
 	pushq %rax
-	leaq  RIP_SYMBOL_NAME(\sym),%rax
+	leaq  \sym(%rip),%rax
 	jmp error_entry
 	.endm
 
@@ -437,7 +512,7 @@ retint_kernel:
  */ 		  				
  	ALIGN
 error_entry:
-	cmpq $__KERNEL_CS,24(%rsp)	
+	testl $3,24(%rsp)	
 	je  error_kernelspace	
 	swapgs
 error_kernelspace:			
@@ -463,9 +538,15 @@ error_exit:
 	RESTORE_REST
 	cli
 	GET_THREAD_INFO(%rcx)	
-	cmpq $__KERNEL_CS,CS-ARGOFFSET(%rsp)
+	testl $3,CS-ARGOFFSET(%rsp)
 	je retint_kernel
-	jmp retint_with_reschedule
+	movl  threadinfo_flags(%rcx),%edx
+	movl  $_TIF_WORK_MASK,%edi
+	andl  %edi,%edx
+	jnz  retint_careful
+	swapgs 
+	RESTORE_ARGS 0,8,0						
+	iretq
 
 /*
  * Create a kernel thread.
@@ -544,6 +625,18 @@ ENTRY(execve)
 	ret
 
 ENTRY(page_fault)
+#ifdef CONFIG_KDB
+        pushq %rcx
+        pushq %rdx
+        pushq %rax
+        movl  $473,%ecx
+        rdmsr
+        andl  $0xfffffffe,%eax          /* Disable last branch recording */
+        wrmsr
+        popq  %rax
+        popq  %rdx
+        popq  %rcx
+#endif 
 	errorentry do_page_fault
 
 ENTRY(coprocessor_error)
@@ -552,12 +645,11 @@ ENTRY(coprocessor_error)
 ENTRY(simd_coprocessor_error)
 	zeroentry do_simd_coprocessor_error	
 
-
 ENTRY(device_not_available)
-	cmpq $0,(%rsp)
-	jl  1f
+	testl $3,8(%rsp)
+	je 1f
 	swapgs
-1:	pushq $-1	
+1:	pushq $-1	#error code
 	SAVE_ALL
 	movq  %cr0,%rax
 	leaq  math_state_restore(%rip),%rcx
@@ -571,21 +663,27 @@ ENTRY(device_not_available)
 ENTRY(debug)
 	zeroentry do_debug
 
-	/* XXX checkme */ 
 ENTRY(nmi)
-	cmpq $0,(%rsp)
-	jl 1f
-	swapgs
-1:	pushq $-1
+	pushq $-1
 	SAVE_ALL
-	movq %rsp,%rdi
-	call do_nmi
-	RESTORE_ALL
-	addq $8,%rsp
-	cmpq $0,(%rsp)
-	jl 2f
+        /* NMI could happen inside the critical section of a swapgs,
+           so it is needed to use this expensive way to check. */
+        movl  $MSR_GS_BASE,%ecx
+        rdmsr
+        xorl  %ebx,%ebx
+        testl %edx,%edx
+        js    1f
 	swapgs
-2:	iretq
+	movl $1,%ebx
+1:	movq %rsp,%rdi # regs -> arg1
+	call do_nmi
+	/* XXX: should do preemption checks here */
+	cli
+	testl %ebx,%ebx
+	jz 2f
+	swapgs
+2:	RESTORE_ALL 8
+	iretq
 	
 ENTRY(int3)
 	zeroentry do_int3	
@@ -624,15 +722,14 @@ ENTRY(alignment_check)
 	errorentry do_alignment_check
 
 ENTRY(divide_error)
-	errorentry do_divide_error
+	zeroentry do_divide_error
 
 ENTRY(spurious_interrupt_bug)
 	zeroentry do_spurious_interrupt_bug
 
-ENTRY(__bad_intr)
-	pushq $-1
-	SAVE_ALL
-	call  bad_intr
-	RESTORE_ALL
-	addq $8,%rsp
-	iretq
+ENTRY(machine_check)
+       zeroentry do_machine_check      
+
+ENTRY(call_debug)
+       zeroentry do_call_debug
+

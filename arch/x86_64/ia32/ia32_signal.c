@@ -7,7 +7,7 @@
  *  2000-06-20  Pentium III FXSR, SSE support by Gareth Hughes
  *  2000-12-*   x86-64 compatibility mode signal handling by Andi Kleen
  * 
- *  $Id: ia32_signal.c,v 1.15 2001/10/16 23:41:42 ak Exp $
+ *  $Id: ia32_signal.c,v 1.17 2002/03/21 14:16:32 ak Exp $
  */
 
 #include <linux/sched.h>
@@ -29,6 +29,8 @@
 #include <asm/ptrace.h>
 #include <asm/ia32_unistd.h>
 #include <asm/user32.h>
+#include <asm/sigcontext32.h>
+#include <asm/fpu32.h>
 
 #define ptr_to_u32(x) ((u32)(u64)(x))	/* avoid gcc warning */ 
 
@@ -147,7 +149,7 @@ struct rt_sigframe
 };
 
 static int
-restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsigned int *peax)
+ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsigned int *peax)
 {
 	unsigned int err = 0;
 	
@@ -171,7 +173,13 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsigned in
 	/* Reload fs and gs if they have changed in the signal handler.
 	   This does not handle long fs/gs base changes in the handler, but does not clobber 
 	   them at least in the normal case. */ 
-	RELOAD_SEG(gs);
+	
+	
+	{
+		unsigned short gs; 
+		err |= __get_user(gs, &sc->gs);
+		load_gs_index(gs); 
+	} 
 	RELOAD_SEG(fs);
 
 	COPY(di); COPY(si); COPY(bp); COPY(sp); COPY(bx);
@@ -187,13 +195,13 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsigned in
 
 	{
 		u32 tmp;
-		struct _fpstate * buf;
+		struct _fpstate_ia32 * buf;
 		err |= __get_user(tmp, &sc->fpstate);
-		buf = (struct _fpstate *) (u64)tmp;
+		buf = (struct _fpstate_ia32 *) (u64)tmp;
 		if (buf) {
 			if (verify_area(VERIFY_READ, buf, sizeof(*buf)))
 				goto badframe;
-			err |= restore_i387(buf);
+			err |= restore_i387_ia32(current, buf, 0);
 		}
 	}
 
@@ -228,7 +236,7 @@ asmlinkage int sys32_sigreturn(struct pt_regs regs)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	
-	if (restore_sigcontext(&regs, &frame->sc, &eax))
+	if (ia32_restore_sigcontext(&regs, &frame->sc, &eax))
 		goto badframe;
 	return eax;
 
@@ -255,7 +263,7 @@ asmlinkage int sys32_rt_sigreturn(struct pt_regs regs)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	
-	if (restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
+	if (ia32_restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
 	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
@@ -281,7 +289,7 @@ badframe:
  */
 
 static int
-setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
+ia32_setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
 		 struct pt_regs *regs, unsigned int mask)
 {
 	int tmp, err = 0;
@@ -306,7 +314,7 @@ setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
 	err |= __put_user((u32)regs->eflags, &sc->eflags);
 	err |= __put_user((u32)regs->rsp, &sc->esp_at_signal);
 
-	tmp = save_i387(fpstate);
+	tmp = save_i387_ia32(current, fpstate, regs, 0);
 	if (tmp < 0)
 	  err = -EFAULT;
 	else
@@ -351,23 +359,24 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 {
 	struct sigframe *frame;
 	int err = 0;
-	struct exec_domain *exec_domain = current_thread_info()->exec_domain; 
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user((exec_domain
-		           && exec_domain->signal_invmap
-		           && sig < 32
-		           ? exec_domain->signal_invmap[sig]
+	{
+		struct exec_domain *ed = current_thread_info()->exec_domain;
+		
+		err |= __put_user((ed && ed->signal_invmap && sig < 32
+		           ? ed->signal_invmap[sig]
 		           : sig),
 		          &frame->sig);
+	}
 	if (err)
 		goto give_sigsegv;
 
-	err |= setup_sigcontext(&frame->sc, &frame->fpstate, regs, set->sig[0]);
+	err |= ia32_setup_sigcontext(&frame->sc, &frame->fpstate, regs, set->sig[0]);
 	if (err)
 		goto give_sigsegv;
 
@@ -419,19 +428,19 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 {
 	struct rt_sigframe *frame;
 	int err = 0;
-	struct exec_domain *exec_domain = current_thread_info()->exec_domain; 
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user((exec_domain
-		    	   && exec_domain->signal_invmap
-		    	   && sig < 32
-		    	   ? exec_domain->signal_invmap[sig]
+	{
+		struct exec_domain *ed = current_thread_info()->exec_domain;
+		err |= __put_user((ed && ed->signal_invmap && sig < 32
+		    	   ? ed->signal_invmap[sig]
 			   : sig),
 			  &frame->sig);
+	}
 	err |= __put_user((u32)(u64)&frame->info, &frame->pinfo);
 	err |= __put_user((u32)(u64)&frame->uc, &frame->puc);
 	err |= ia32_copy_siginfo_to_user(&frame->info, info);
@@ -445,7 +454,7 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	err |= __put_user(sas_ss_flags(regs->rsp),
 			  &frame->uc.uc_stack.ss_flags);
 	err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
-	err |= setup_sigcontext(&frame->uc.uc_mcontext, &frame->fpstate,
+	err |= ia32_setup_sigcontext(&frame->uc.uc_mcontext, &frame->fpstate,
 			        regs, set->sig[0]);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
 	if (err)

@@ -1,16 +1,24 @@
 /* 
- * Written 2000 by Andi Kleen. 
+ * Written 2000,2002 by Andi Kleen. 
  * 
  * Losely based on the sparc64 and IA64 32bit emulation loaders.
+ * This tricks binfmt_elf.c into loading 32bit binaries using lots 
+ * of ugly preprocessor tricks. Talk about very very poor man's inheritance.
  */ 
 #include <linux/types.h>
 #include <linux/config.h> 
 #include <linux/stddef.h>
 #include <linux/module.h>
 #include <linux/rwsem.h>
+#include <linux/sched.h>
+#include <linux/string.h>
 #include <asm/segment.h> 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
+#include <asm/user32.h>
+#include <asm/sigcontext32.h>
+#include <asm/fpu32.h>
+#include <asm/i387.h>
 
 struct file;
 struct elf_phdr; 
@@ -28,19 +36,99 @@ struct elf_phdr;
 #define ELF_CLASS ELFCLASS32
 
 #define ELF_DATA	ELFDATA2LSB
-//#define USE_ELF_CORE_DUMP
+
+#define USE_ELF_CORE_DUMP 1
+
+/* Overwrite elfcore.h */ 
+#define _LINUX_ELFCORE_H 1
+typedef unsigned int elf_greg_t;
+
+#define ELF_NGREG (sizeof (struct user_regs_struct32) / sizeof(elf_greg_t))
+typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+
+struct elf_siginfo
+{
+	int	si_signo;			/* signal number */
+	int	si_code;			/* extra code */
+	int	si_errno;			/* errno */
+};
+
+struct timeval32
+{
+    int tv_sec, tv_usec;
+};
+
+struct elf_prstatus
+{
+	struct elf_siginfo pr_info;	/* Info associated with signal */
+	short	pr_cursig;		/* Current signal */
+	unsigned int pr_sigpend;	/* Set of pending signals */
+	unsigned int pr_sighold;	/* Set of held signals */
+	pid_t	pr_pid;
+	pid_t	pr_ppid;
+	pid_t	pr_pgrp;
+	pid_t	pr_sid;
+	struct timeval32 pr_utime;	/* User time */
+	struct timeval32 pr_stime;	/* System time */
+	struct timeval32 pr_cutime;	/* Cumulative user time */
+	struct timeval32 pr_cstime;	/* Cumulative system time */
+	elf_gregset_t pr_reg;	/* GP registers */
+	int pr_fpvalid;		/* True if math co-processor being used.  */
+};
+
+#define ELF_PRARGSZ	(80)	/* Number of chars for args */
+
+struct elf_prpsinfo
+{
+	char	pr_state;	/* numeric process state */
+	char	pr_sname;	/* char for pr_state */
+	char	pr_zomb;	/* zombie */
+	char	pr_nice;	/* nice val */
+	unsigned int pr_flag;	/* flags */
+	__u16	pr_uid;
+	__u16	pr_gid;
+	pid_t	pr_pid, pr_ppid, pr_pgrp, pr_sid;
+	/* Lots missing */
+	char	pr_fname[16];	/* filename of executable */
+	char	pr_psargs[ELF_PRARGSZ];	/* initial part of arg list */
+};
+
+#define __STR(x) #x
+#define STR(x) __STR(x)
+
+#define _GET_SEG(x) \
+	({ __u32 seg; asm("movl %%" STR(x) ",%0" : "=r"(seg)); seg; })
+
+/* Assumes current==process to be dumped */
+#define ELF_CORE_COPY_REGS(pr_reg, regs)       		\
+	pr_reg[0] = regs->rbx;				\
+	pr_reg[1] = regs->rcx;				\
+	pr_reg[2] = regs->rdx;				\
+	pr_reg[3] = regs->rsi;				\
+	pr_reg[4] = regs->rdi;				\
+	pr_reg[5] = regs->rbp;				\
+	pr_reg[6] = regs->rax;				\
+	pr_reg[7] = _GET_SEG(ds);   			\
+	pr_reg[8] = _GET_SEG(es);			\
+	pr_reg[9] = _GET_SEG(fs);			\
+	pr_reg[10] = _GET_SEG(gs);			\
+	pr_reg[11] = regs->orig_rax;			\
+	pr_reg[12] = regs->rip;				\
+	pr_reg[13] = regs->cs;				\
+	pr_reg[14] = regs->eflags;			\
+	pr_reg[15] = regs->rsp;				\
+	pr_reg[16] = regs->ss;
+
+#define user user32
+
+#define dump_fpu dump_fpu_ia32
 
 #define __ASM_X86_64_ELF_H 1
 #include <asm/ia32.h>
 #include <linux/elf.h>
 
-typedef __u32  elf_greg_t;
-
-typedef elf_greg_t elf_gregset_t[8];
-
-/* FIXME -- wrong */
 typedef struct user_i387_ia32_struct elf_fpregset_t;
-typedef struct user_i387_struct elf_fpxregset_t;
+typedef struct user32_fxsr_struct elf_fpxregset_t;
 
 #undef elf_check_arch
 #define elf_check_arch(x) \
@@ -177,11 +265,35 @@ elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	unsigned long map_addr;
 	struct task_struct *me = current; 
 
+	if (prot & PROT_READ) 
+		prot |= PROT_EXEC; 
+
 	down_write(&me->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),
-			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr), prot, type|MAP_32BIT,
+			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr), prot, 
+			   type|MAP_32BIT,
 			   eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr));
 	up_write(&me->mm->mmap_sem);
 	return(map_addr);
 }
 
+int dump_fpu_ia32(struct pt_regs *regs, elf_fpregset_t *fp)
+{
+	struct _fpstate_ia32 *fpu = (void*)fp; 
+	struct task_struct *tsk = current;
+	mm_segment_t oldfs = get_fs();
+	int ret;
+
+	if (!tsk->used_math) 
+		return 0;
+	if (!(test_thread_flag(TIF_IA32)))
+		BUG(); 
+	unlazy_fpu(tsk);
+	set_fs(KERNEL_DS); 
+	ret = save_i387_ia32(current, fpu, regs, 1);
+	/* Correct for i386 bug. It puts the fop into the upper 16bits of 
+	   the tag word (like FXSAVE), not into the fcs*/ 
+	fpu->cssel |= fpu->tag & 0xffff0000; 
+	set_fs(oldfs); 
+	return ret; 
+}

@@ -53,38 +53,7 @@ struct ia32_flock64 {
 #define F_SETLK64	13
 #define F_SETLKW64	14
 
-
-
-/* sigcontext.h */
-/* The x86-64 port uses FXSAVE without prefix; thus a 32bit compatible
-   FXSAVE layout. The additional XMM registers are added, but they're 
-   in currently unused space. Hopefully nobody else will use them*/ 
-#define _fpstate_ia32 _fpstate
-
-struct sigcontext_ia32 {
-       unsigned short gs, __gsh;
-       unsigned short fs, __fsh;
-       unsigned short es, __esh;
-       unsigned short ds, __dsh;
-       unsigned int edi;
-       unsigned int esi;
-       unsigned int ebp;
-       unsigned int esp;
-       unsigned int ebx;
-       unsigned int edx;
-       unsigned int ecx;
-       unsigned int eax;
-       unsigned int trapno;
-       unsigned int err;
-       unsigned int eip;
-       unsigned short cs, __csh;
-       unsigned int eflags;
-       unsigned int esp_at_signal;
-       unsigned short ss, __ssh;
-       unsigned int fpstate;		/* really (struct _fpstate_ia32 *) */
-       unsigned int oldmask;
-       unsigned int cr2;
-};
+#include <asm/sigcontext32.h>
 
 /* signal.h */
 #define _IA32_NSIG	       64
