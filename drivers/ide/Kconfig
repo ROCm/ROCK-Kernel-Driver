@@ -467,16 +467,24 @@ config BLK_DEV_CY82C693
 	  If you say Y here, you need to say Y to "Use DMA by default
 	  when available" as well.
 
+config BLK_DEV_CS5520
+	tristate "Cyrix CS5510/20 MediaGX chipset support (VERY EXPERIMENTAL)"
+	depends on BLK_DEV_IDEDMA_PCI && EXPERIMENTAL
+	help
+	  Include support for PIO tuning an virtual DMA on the Cyrix MediaGX 
+	  5510/5520 chipset. This will automatically be detected and
+	  configured if found.
+
+	  It is safe to say Y to this question.
+
 config BLK_DEV_CS5530
-	tristate "Cyrix CS5530 MediaGX chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
+	tristate "Cyrix/National Semiconductor CS5530 MediaGX chipset support"
+	depends on BLK_DEV_IDEDMA_PCIOA
 	help
 	  Include support for UDMA on the Cyrix MediaGX 5530 chipset. This
 	  will automatically be detected and configured if found.
 
 	  It is safe to say Y to this question.
-
-	  People with SCSI-only systems should say N here. If unsure, say Y.
 
 config BLK_DEV_HPT34X
 	tristate "HPT34X chipset support"
@@ -523,6 +531,13 @@ config BLK_DEV_HPT366
 	  This driver requires dynamic tuning of the chipset during the
 	  ide-probe at boot. It is reported to support DVD II drives, by the
 	  manufacturer.
+
+config BLK_DEV_SC1200
+	tristate "National SCx200 chipset support"
+	depends on BLK_DEV_IDEDMA_PCI
+	help
+	  This driver adds support for the built in IDE on the National
+	  SCx200 series of embedded x86 "Geode" systems
 
 config BLK_DEV_PIIX
 	tristate "Intel PIIXn chipsets support"
@@ -616,6 +631,9 @@ config BLK_DEV_SVWKS
 config BLK_DEV_SIIMAGE
 	tristate "Silicon Image chipset support"
 	depends on BLK_DEV_IDEDMA_PCI
+	help
+	  This driver adds PIO/(U)DMA support for the SI CMD680 and SII
+	  3112 (Serial ATA) chips.
 
 config BLK_DEV_SIS5513
 	tristate "SiS5513 chipset support"
