@@ -51,7 +51,7 @@
 #define SNDRV_SEQ_LFLG_OUTPUT	0x0002
 #define SNDRV_SEQ_LFLG_OPEN	(SNDRV_SEQ_LFLG_INPUT|SNDRV_SEQ_LFLG_OUTPUT)
 
-static spinlock_t clients_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(clients_lock);
 static DECLARE_MUTEX(register_mutex);
 
 /*
@@ -2131,21 +2131,20 @@ static int snd_seq_do_ioctl(client_t *client, unsigned int cmd, void __user *arg
 }
 
 
-static int snd_seq_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, unsigned long arg)
+static long snd_seq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	client_t *client = (client_t *) file->private_data;
-	int err;
 
 	snd_assert(client != NULL, return -ENXIO);
 		
-	/* FIXME: need to unlock BKL to allow preemption */
-	unlock_kernel();
-	err = snd_seq_do_ioctl(client, cmd, (void __user *) arg);
-	lock_kernel();
-	return err;
+	return snd_seq_do_ioctl(client, cmd, (void __user *) arg);
 }
 
+#ifdef CONFIG_COMPAT
+#include "seq_compat.c"
+#else
+#define snd_seq_ioctl_compat	NULL
+#endif
 
 /* -------------------------------------------------------- */
 
@@ -2462,7 +2461,8 @@ static struct file_operations snd_seq_f_ops =
 	.open =		snd_seq_open,
 	.release =	snd_seq_release,
 	.poll =		snd_seq_poll,
-	.ioctl =	snd_seq_ioctl,
+	.unlocked_ioctl =	snd_seq_ioctl,
+	.compat_ioctl =	snd_seq_ioctl_compat,
 };
 
 static snd_minor_t snd_seq_reg =

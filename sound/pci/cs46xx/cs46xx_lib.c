@@ -3704,7 +3704,7 @@ static struct cs_card_type __devinitdata cards[] = {
  * APM support
  */
 #ifdef CONFIG_PM
-static int snd_cs46xx_suspend(snd_card_t *card, unsigned int state)
+static int snd_cs46xx_suspend(snd_card_t *card, pm_message_t state)
 {
 	cs46xx_t *chip = card->pm_private_data;
 	int amp_saved;
@@ -3728,7 +3728,7 @@ static int snd_cs46xx_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_cs46xx_resume(snd_card_t *card, unsigned int state)
+static int snd_cs46xx_resume(snd_card_t *card)
 {
 	cs46xx_t *chip = card->pm_private_data;
 	int amp_saved;

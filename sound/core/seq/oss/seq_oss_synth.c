@@ -75,7 +75,7 @@ static seq_oss_synth_t midi_synth_dev = {
 	"MIDI", /* name */
 };
 
-static spinlock_t register_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(register_lock);
 
 /*
  * prototypes

@@ -29,6 +29,7 @@
 #include <linux/time.h>
 #include <linux/wait.h>
 #include <linux/moduleparam.h>
+#include <linux/delay.h>
 #include <sound/rawmidi.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -149,10 +150,8 @@ int snd_rawmidi_drain_output(snd_rawmidi_substream_t * substream)
 		/* we need wait a while to make sure that Tx FIFOs are empty */
 		if (substream->ops->drain)
 			substream->ops->drain(substream);
-		else {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ / 20);
-		}
+		else
+			msleep(50);
 		snd_rawmidi_drop_output(substream);
 	}
 	return err;
@@ -673,8 +672,7 @@ static int snd_rawmidi_input_status(snd_rawmidi_substream_t * substream,
 	return 0;
 }
 
-static inline int _snd_rawmidi_ioctl(struct inode *inode, struct file *file,
-				     unsigned int cmd, unsigned long arg)
+static long snd_rawmidi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	snd_rawmidi_file_t *rfile;
 	void __user *argp = (void __user *)arg;
@@ -782,17 +780,6 @@ static inline int _snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 #endif
 	}
 	return -ENOTTY;
-}
-
-/* FIXME: need to unlock BKL to allow preemption */
-static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
-			     unsigned int cmd, unsigned long arg)
-{
-	int err;
-	unlock_kernel();
-	err = _snd_rawmidi_ioctl(inode, file, cmd, arg);
-	lock_kernel();
-	return err;
 }
 
 static int snd_rawmidi_control_ioctl(snd_card_t * card,
@@ -1278,6 +1265,14 @@ static unsigned int snd_rawmidi_poll(struct file *file, poll_table * wait)
 }
 
 /*
+ */
+#ifdef CONFIG_COMPAT
+#include "rawmidi_compat.c"
+#else
+#define snd_rawmidi_ioctl_compat	NULL
+#endif
+
+/*
 
  */
 
@@ -1347,7 +1342,8 @@ static struct file_operations snd_rawmidi_f_ops =
 	.open =		snd_rawmidi_open,
 	.release =	snd_rawmidi_release,
 	.poll =		snd_rawmidi_poll,
-	.ioctl =	snd_rawmidi_ioctl,
+	.unlocked_ioctl =	snd_rawmidi_ioctl,
+	.compat_ioctl =	snd_rawmidi_ioctl_compat,
 };
 
 static snd_minor_t snd_rawmidi_reg =
@@ -1628,6 +1624,7 @@ static int __init alsa_rawmidi_init(void)
 {
 
 	snd_ctl_register_ioctl(snd_rawmidi_control_ioctl);
+	snd_ctl_register_ioctl_compat(snd_rawmidi_control_ioctl);
 #ifdef CONFIG_SND_OSSEMUL
 	{ int i;
 	/* check device map table */
@@ -1649,6 +1646,7 @@ static int __init alsa_rawmidi_init(void)
 static void __exit alsa_rawmidi_exit(void)
 {
 	snd_ctl_unregister_ioctl(snd_rawmidi_control_ioctl);
+	snd_ctl_unregister_ioctl_compat(snd_rawmidi_control_ioctl);
 }
 
 module_init(alsa_rawmidi_init)

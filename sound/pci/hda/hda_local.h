@@ -140,4 +140,20 @@ int snd_hda_resume_ctls(struct hda_codec *codec, snd_kcontrol_new_t *knew);
 int snd_hda_resume_spdif_out(struct hda_codec *codec);
 #endif
 
+/*
+ * unsolicited event handler
+ */
+
+#define HDA_UNSOL_QUEUE_SIZE	64
+
+struct hda_bus_unsolicited {
+	/* ring buffer */
+	u32 queue[HDA_UNSOL_QUEUE_SIZE * 2];
+	unsigned int rp, wp;
+
+	/* workqueue */
+	struct workqueue_struct *workq;
+	struct work_struct work;
+};
+
 #endif /* __SOUND_HDA_LOCAL_H */

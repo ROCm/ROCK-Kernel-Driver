@@ -1894,7 +1894,7 @@ static int __devinit snd_ali_mixer(ali_t * codec)
 }
 
 #ifdef CONFIG_PM
-static int ali_suspend(snd_card_t *card, unsigned int state)
+static int ali_suspend(snd_card_t *card, pm_message_t state)
 {
 	ali_t *chip = card->pm_private_data;
 	ali_image_t *im;
@@ -1936,7 +1936,7 @@ static int ali_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int ali_resume(snd_card_t *card, unsigned int state)
+static int ali_resume(snd_card_t *card)
 {
 	ali_t *chip = card->pm_private_data;
 	ali_image_t *im;

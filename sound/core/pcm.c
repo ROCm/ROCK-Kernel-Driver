@@ -1004,6 +1004,7 @@ static int __init alsa_pcm_init(void)
 	snd_info_entry_t *entry;
 
 	snd_ctl_register_ioctl(snd_pcm_control_ioctl);
+	snd_ctl_register_ioctl_compat(snd_pcm_control_ioctl);
 	if ((entry = snd_info_create_module_entry(THIS_MODULE, "pcm", NULL)) != NULL) {
 		snd_info_set_text_ops(entry, NULL, SNDRV_CARDS * SNDRV_PCM_DEVICES * 128, snd_pcm_proc_read);
 		if (snd_info_register(entry) < 0) {
@@ -1018,6 +1019,7 @@ static int __init alsa_pcm_init(void)
 static void __exit alsa_pcm_exit(void)
 {
 	snd_ctl_unregister_ioctl(snd_pcm_control_ioctl);
+	snd_ctl_unregister_ioctl_compat(snd_pcm_control_ioctl);
 	if (snd_pcm_proc_entry) {
 		snd_info_unregister(snd_pcm_proc_entry);
 		snd_pcm_proc_entry = NULL;

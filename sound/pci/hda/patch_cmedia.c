@@ -357,7 +357,7 @@ static int cmi9880_init(struct hda_codec *codec)
 /*
  * resume
  */
-static int cmi9880_resume(struct hda_codec *codec, unsigned int state)
+static int cmi9880_resume(struct hda_codec *codec)
 {
 	struct cmi_spec *spec = codec->spec;
 

@@ -1394,7 +1394,7 @@ static void snd_cs4231_resume(cs4231_t *chip)
 #endif
 }
 
-static int snd_cs4231_pm_suspend(snd_card_t *card, unsigned int state)
+static int snd_cs4231_pm_suspend(snd_card_t *card, pm_message_t state)
 {
 	cs4231_t *chip = card->pm_private_data;
 	if (chip->suspend)
@@ -1402,7 +1402,7 @@ static int snd_cs4231_pm_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_cs4231_pm_resume(snd_card_t *card, unsigned int state)
+static int snd_cs4231_pm_resume(snd_card_t *card)
 {
 	cs4231_t *chip = card->pm_private_data;
 	if (chip->resume)

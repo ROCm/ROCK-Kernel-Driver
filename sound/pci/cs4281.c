@@ -1376,8 +1376,8 @@ static int snd_cs4281_dev_free(snd_device_t *device)
 
 static int snd_cs4281_chip_init(cs4281_t *chip); /* defined below */
 #ifdef CONFIG_PM
-static int cs4281_suspend(snd_card_t *card, unsigned int state);
-static int cs4281_resume(snd_card_t *card, unsigned int state);
+static int cs4281_suspend(snd_card_t *card, pm_message_t state);
+static int cs4281_resume(snd_card_t *card);
 #endif
 
 static int __devinit snd_cs4281_create(snd_card_t * card,
@@ -2037,7 +2037,7 @@ static int saved_regs[SUSPEND_REGISTERS] = {
 
 #define CLKCR1_CKRA                             0x00010000L
 
-static int cs4281_suspend(snd_card_t *card, unsigned int state)
+static int cs4281_suspend(snd_card_t *card, pm_message_t state)
 {
 	cs4281_t *chip = card->pm_private_data;
 	u32 ulCLK;
@@ -2082,7 +2082,7 @@ static int cs4281_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int cs4281_resume(snd_card_t *card, unsigned int state)
+static int cs4281_resume(snd_card_t *card)
 {
 	cs4281_t *chip = card->pm_private_data;
 	unsigned int i;

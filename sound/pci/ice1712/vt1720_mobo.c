@@ -101,6 +101,15 @@ struct snd_ice1712_card_info snd_vt1720_mobo_cards[] __devinitdata = {
 		.eeprom_size = sizeof(k8x800_eeprom),
 		.eeprom_data = k8x800_eeprom,
 	},
+	{
+		.subvendor = VT1720_SUBDEVICE_9CJS,
+		.name = "Chaintech 9CJS",
+		/* identical with k8x800 */
+		.chip_init = k8x800_init,
+		.build_controls = k8x800_add_controls,
+		.eeprom_size = sizeof(k8x800_eeprom),
+		.eeprom_data = k8x800_eeprom,
+	},
 	{ } /* terminator */
 };
 

@@ -207,7 +207,6 @@ void snd_gf1_stop_voices(snd_gus_card_t * gus, unsigned short v_min, unsigned sh
 	unsigned long flags;
 	short i, ramp_ok;
 	unsigned short ramp_end;
-	long time;
 
 	if (!in_interrupt()) {	/* this can't be done in interrupt */
 		for (i = v_min, ramp_ok = 0; i <= v_max; i++) {
@@ -227,11 +226,7 @@ void snd_gf1_stop_voices(snd_gus_card_t * gus, unsigned short v_min, unsigned sh
 			}
 			spin_unlock_irqrestore(&gus->reg_lock, flags);
 		}
-		time = HZ / 20;
-		while (time > 0 && !signal_pending(current)) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			time = schedule_timeout(time);
-		}
+		msleep_interruptible(50);
 	}
 	snd_gf1_clear_voices(gus, v_min, v_max);
 }

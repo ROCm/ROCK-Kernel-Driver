@@ -1065,10 +1065,10 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "Wave Playback Volume", gpr, 100);
 	gpr += 2;
 
-	/* Music Playback */
+	/* Synth Playback */
 	A_OP(icode, &ptr, iMAC0, A_GPR(stereo_mix+0), A_GPR(stereo_mix+0), A_GPR(gpr), A_FXBUS(FXBUS_MIDI_LEFT));
 	A_OP(icode, &ptr, iMAC0, A_GPR(stereo_mix+1), A_GPR(stereo_mix+1), A_GPR(gpr+1), A_FXBUS(FXBUS_MIDI_RIGHT));
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Music Playback Volume", gpr, 100);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Synth Playback Volume", gpr, 100);
 	gpr += 2;
 
 	/* Wave (PCM) Capture */
@@ -1077,10 +1077,10 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "PCM Capture Volume", gpr, 0);
 	gpr += 2;
 
-	/* Music Capture */
+	/* Synth Capture */
 	A_OP(icode, &ptr, iMAC0, A_GPR(capture+0), A_GPR(capture+0), A_GPR(gpr), A_FXBUS(FXBUS_MIDI_LEFT));
 	A_OP(icode, &ptr, iMAC0, A_GPR(capture+1), A_GPR(capture+1), A_GPR(gpr+1), A_FXBUS(FXBUS_MIDI_RIGHT));
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Music Capture Volume", gpr, 0);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Synth Capture Volume", gpr, 0);
 	gpr += 2;
 
 	/*
@@ -1608,19 +1608,19 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	snd_emu10k1_init_stereo_onoff_control(controls + i++, "Wave Capture Switch", gpr + 2, 0);
 	gpr += 4;
 
-	/* Music Playback Volume */
+	/* Synth Playback Volume */
 	for (z = 0; z < 2; z++)
 		VOLUME_ADD(icode, &ptr, playback + z, 2 + z, gpr + z);
-	snd_emu10k1_init_stereo_control(controls + i++, "Music Playback Volume", gpr, 100);
+	snd_emu10k1_init_stereo_control(controls + i++, "Synth Playback Volume", gpr, 100);
 	gpr += 2;
 
-	/* Music Capture Volume + Switch */
+	/* Synth Capture Volume + Switch */
 	for (z = 0; z < 2; z++) {
 		SWITCH(icode, &ptr, tmp + 0, 2 + z, gpr + 2 + z);
 		VOLUME_ADD(icode, &ptr, capture + z, tmp + 0, gpr + z);
 	}
-	snd_emu10k1_init_stereo_control(controls + i++, "Music Capture Volume", gpr, 0);
-	snd_emu10k1_init_stereo_onoff_control(controls + i++, "Music Capture Switch", gpr + 2, 0);
+	snd_emu10k1_init_stereo_control(controls + i++, "Synth Capture Volume", gpr, 0);
+	snd_emu10k1_init_stereo_onoff_control(controls + i++, "Synth Capture Switch", gpr + 2, 0);
 	gpr += 4;
 
 	/* Surround Digital Playback Volume (renamed later without Digital) */

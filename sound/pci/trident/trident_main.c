@@ -48,8 +48,8 @@ static int snd_trident_pcm_mixer_build(trident_t *trident, snd_trident_voice_t *
 static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t * voice, snd_pcm_substream_t *substream);
 static irqreturn_t snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef CONFIG_PM
-static int snd_trident_suspend(snd_card_t *card, unsigned int state);
-static int snd_trident_resume(snd_card_t *card, unsigned int state);
+static int snd_trident_suspend(snd_card_t *card, pm_message_t state);
+static int snd_trident_resume(snd_card_t *card);
 #endif
 static int snd_trident_sis_reset(trident_t *trident);
 
@@ -3921,7 +3921,7 @@ static void snd_trident_clear_voices(trident_t * trident, unsigned short v_min, 
 }
 
 #ifdef CONFIG_PM
-static int snd_trident_suspend(snd_card_t *card, unsigned int state)
+static int snd_trident_suspend(snd_card_t *card, pm_message_t state)
 {
 	trident_t *trident = card->pm_private_data;
 
@@ -3947,7 +3947,7 @@ static int snd_trident_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_trident_resume(snd_card_t *card, unsigned int state)
+static int snd_trident_resume(snd_card_t *card)
 {
 	trident_t *trident = card->pm_private_data;
 

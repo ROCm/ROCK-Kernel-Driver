@@ -672,7 +672,7 @@ static int alc_init(struct hda_codec *codec)
 /*
  * resume
  */
-static int alc_resume(struct hda_codec *codec, unsigned int state)
+static int alc_resume(struct hda_codec *codec)
 {
 	struct alc_spec *spec = codec->spec;
 	int i;

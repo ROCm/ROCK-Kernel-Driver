@@ -1332,6 +1332,12 @@ static irqreturn_t snd_atiixp_interrupt(int irq, void *dev_id, struct pt_regs *r
  */
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
+	{
+		.vendor = 0x103c,
+		.device = 0x006b,
+		.name = "HP Pavilion ZV5030US",
+		.type = AC97_TUNE_MUTE_LED
+	},
 	{ } /* terminator */
 };
 
@@ -1392,7 +1398,7 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock, const char 
 /*
  * power management
  */
-static int snd_atiixp_suspend(snd_card_t *card, unsigned int state)
+static int snd_atiixp_suspend(snd_card_t *card, pm_message_t state)
 {
 	atiixp_t *chip = card->pm_private_data;
 	int i;
@@ -1411,7 +1417,7 @@ static int snd_atiixp_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
+static int snd_atiixp_resume(snd_card_t *card)
 {
 	atiixp_t *chip = card->pm_private_data;
 	int i;

@@ -1895,7 +1895,7 @@ static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
 /*
  * power management
  */
-static int snd_via82xx_suspend(snd_card_t *card, unsigned int state)
+static int snd_via82xx_suspend(snd_card_t *card, pm_message_t state)
 {
 	via82xx_t *chip = card->pm_private_data;
 	int i;
@@ -1920,7 +1920,7 @@ static int snd_via82xx_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_via82xx_resume(snd_card_t *card, unsigned int state)
+static int snd_via82xx_resume(snd_card_t *card)
 {
 	via82xx_t *chip = card->pm_private_data;
 	int idx, i;

@@ -222,6 +222,85 @@ int snd_hda_get_connections(struct hda_codec *codec, hda_nid_t nid,
 }
 
 
+/**
+ * snd_hda_queue_unsol_event - add an unsolicited event to queue
+ * @bus: the BUS
+ * @res: unsolicited event (lower 32bit of RIRB entry)
+ * @res_ex: codec addr and flags (upper 32bit or RIRB entry)
+ *
+ * Adds the given event to the queue.  The events are processed in
+ * the workqueue asynchronously.  Call this function in the interrupt
+ * hanlder when RIRB receives an unsolicited event.
+ *
+ * Returns 0 if successful, or a negative error code.
+ */
+int snd_hda_queue_unsol_event(struct hda_bus *bus, u32 res, u32 res_ex)
+{
+	struct hda_bus_unsolicited *unsol;
+	unsigned int wp;
+
+	if ((unsol = bus->unsol) == NULL)
+		return 0;
+
+	wp = (unsol->wp + 1) % HDA_UNSOL_QUEUE_SIZE;
+	unsol->wp = wp;
+
+	wp <<= 1;
+	unsol->queue[wp] = res;
+	unsol->queue[wp + 1] = res_ex;
+
+	queue_work(unsol->workq, &unsol->work);
+
+	return 0;
+}
+
+/*
+ * process queueud unsolicited events
+ */
+static void process_unsol_events(void *data)
+{
+	struct hda_bus *bus = data;
+	struct hda_bus_unsolicited *unsol = bus->unsol;
+	struct hda_codec *codec;
+	unsigned int rp, caddr, res;
+
+	while (unsol->rp != unsol->wp) {
+		rp = (unsol->rp + 1) % HDA_UNSOL_QUEUE_SIZE;
+		unsol->rp = rp;
+		rp <<= 1;
+		res = unsol->queue[rp];
+		caddr = unsol->queue[rp + 1];
+		if (! (caddr & (1 << 4))) /* no unsolicited event? */
+			continue;
+		codec = bus->caddr_tbl[caddr & 0x0f];
+		if (codec && codec->patch_ops.unsol_event)
+			codec->patch_ops.unsol_event(codec, res);
+	}
+}
+
+/*
+ * initialize unsolicited queue
+ */
+static int init_unsol_queue(struct hda_bus *bus)
+{
+	struct hda_bus_unsolicited *unsol;
+
+	unsol = kcalloc(1, sizeof(*unsol), GFP_KERNEL);
+	if (! unsol) {
+		snd_printk(KERN_ERR "hda_codec: can't allocate unsolicited queue\n");
+		return -ENOMEM;
+	}
+	unsol->workq = create_workqueue("hda_codec");
+	if (! unsol->workq) {
+		snd_printk(KERN_ERR "hda_codec: can't create workqueue\n");
+		kfree(unsol);
+		return -ENOMEM;
+	}
+	INIT_WORK(&unsol->work, process_unsol_events, bus);
+	bus->unsol = unsol;
+	return 0;
+}
+
 /*
  * destructor
  */
@@ -233,6 +312,10 @@ static int snd_hda_bus_free(struct hda_bus *bus)
 
 	if (! bus)
 		return 0;
+	if (bus->unsol) {
+		destroy_workqueue(bus->unsol->workq);
+		kfree(bus->unsol);
+	}
 	list_for_each_safe(p, n, &bus->codec_list) {
 		struct hda_codec *codec = list_entry(p, struct hda_codec, list);
 		snd_hda_codec_free(codec);
@@ -286,6 +369,8 @@ int snd_hda_bus_new(snd_card_t *card, const struct hda_bus_template *temp,
 
 	init_MUTEX(&bus->cmd_mutex);
 	INIT_LIST_HEAD(&bus->codec_list);
+
+	init_unsol_queue(bus);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_BUS, bus, &dev_ops)) < 0) {
 		snd_hda_bus_free(bus);
@@ -369,6 +454,7 @@ static void snd_hda_codec_free(struct hda_codec *codec)
 	if (! codec)
 		return;
 	list_del(&codec->list);
+	codec->bus->caddr_tbl[codec->addr] = NULL;
 	if (codec->patch_ops.free)
 		codec->patch_ops.free(codec);
 	kfree(codec);
@@ -392,6 +478,12 @@ int snd_hda_codec_new(struct hda_bus *bus, unsigned int codec_addr,
 	int err;
 
 	snd_assert(bus, return -EINVAL);
+	snd_assert(codec_addr <= HDA_MAX_CODEC_ADDRESS, return -EINVAL);
+
+	if (bus->caddr_tbl[codec_addr]) {
+		snd_printk(KERN_ERR "hda_codec: address 0x%x is already occupied\n", codec_addr);
+		return -EBUSY;
+	}
 
 	codec = kcalloc(1, sizeof(*codec), GFP_KERNEL);
 	if (codec == NULL) {
@@ -405,6 +497,7 @@ int snd_hda_codec_new(struct hda_bus *bus, unsigned int codec_addr,
 	init_amp_hash(codec);
 
 	list_add_tail(&codec->list, &bus->codec_list);
+	bus->caddr_tbl[codec_addr] = codec;
 
 	codec->vendor_id = snd_hda_param_read(codec, AC_NODE_ROOT, AC_PAR_VENDOR_ID);
 	codec->subsystem_id = snd_hda_param_read(codec, AC_NODE_ROOT, AC_PAR_SUBSYSTEM_ID);
@@ -1520,9 +1613,16 @@ int snd_hda_multi_out_analog_cleanup(struct hda_codec *codec, struct hda_multi_o
  *
  * Returns 0 if successful.
  */
-int snd_hda_suspend(struct hda_bus *bus, unsigned int state)
+int snd_hda_suspend(struct hda_bus *bus, pm_message_t state)
 {
+	struct list_head *p;
+
 	/* FIXME: should handle power widget capabilities */
+	list_for_each(p, &bus->codec_list) {
+		struct hda_codec *codec = list_entry(p, struct hda_codec, list);
+		if (codec->patch_ops.suspend)
+			codec->patch_ops.suspend(codec, state);
+	}
 	return 0;
 }
 
@@ -1533,14 +1633,14 @@ int snd_hda_suspend(struct hda_bus *bus, unsigned int state)
  *
  * Returns 0 if successful.
  */
-int snd_hda_resume(struct hda_bus *bus, unsigned int state)
+int snd_hda_resume(struct hda_bus *bus)
 {
 	struct list_head *p;
 
 	list_for_each(p, &bus->codec_list) {
 		struct hda_codec *codec = list_entry(p, struct hda_codec, list);
 		if (codec->patch_ops.resume)
-			codec->patch_ops.resume(codec, state);
+			codec->patch_ops.resume(codec);
 	}
 	return 0;
 }
@@ -1602,6 +1702,7 @@ EXPORT_SYMBOL(snd_hda_codec_read);
 EXPORT_SYMBOL(snd_hda_codec_write);
 EXPORT_SYMBOL(snd_hda_sequence_write);
 EXPORT_SYMBOL(snd_hda_get_sub_nodes);
+EXPORT_SYMBOL(snd_hda_queue_unsol_event);
 EXPORT_SYMBOL(snd_hda_bus_new);
 EXPORT_SYMBOL(snd_hda_codec_new);
 EXPORT_SYMBOL(snd_hda_codec_setup_stream);

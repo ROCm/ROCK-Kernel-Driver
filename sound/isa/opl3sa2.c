@@ -529,7 +529,7 @@ static int __init snd_opl3sa2_mixer(opl3sa2_t *chip)
 
 /* Power Management support functions */
 #ifdef CONFIG_PM
-static int snd_opl3sa2_suspend(snd_card_t *card, unsigned int state)
+static int snd_opl3sa2_suspend(snd_card_t *card, pm_message_t state)
 {
 	opl3sa2_t *chip = card->pm_private_data;
 
@@ -542,7 +542,7 @@ static int snd_opl3sa2_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_opl3sa2_resume(snd_card_t *card, unsigned int state)
+static int snd_opl3sa2_resume(snd_card_t *card)
 {
 	opl3sa2_t *chip = card->pm_private_data;
 	int i;

@@ -420,7 +420,9 @@ EXPORT_SYMBOL(snd_card_file_remove);
 #ifdef CONFIG_PM
 EXPORT_SYMBOL(snd_power_wait);
 EXPORT_SYMBOL(snd_card_set_pm_callback);
-EXPORT_SYMBOL(snd_card_set_dev_pm_callback);
+#if defined(CONFIG_PM) && defined(CONFIG_SND_GENERIC_PM)
+EXPORT_SYMBOL(snd_card_set_generic_pm_callback);
+#endif
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(snd_card_pci_suspend);
 EXPORT_SYMBOL(snd_card_pci_resume);
@@ -467,6 +469,10 @@ EXPORT_SYMBOL(snd_ctl_find_id);
 EXPORT_SYMBOL(snd_ctl_notify);
 EXPORT_SYMBOL(snd_ctl_register_ioctl);
 EXPORT_SYMBOL(snd_ctl_unregister_ioctl);
+#ifdef CONFIG_COMPAT
+EXPORT_SYMBOL(snd_ctl_register_ioctl_compat);
+EXPORT_SYMBOL(snd_ctl_unregister_ioctl_compat);
+#endif
 EXPORT_SYMBOL(snd_ctl_elem_read);
 EXPORT_SYMBOL(snd_ctl_elem_write);
   /* misc.c */

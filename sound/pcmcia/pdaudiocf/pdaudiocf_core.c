@@ -255,7 +255,7 @@ void snd_pdacf_powerdown(pdacf_t *chip)
 
 #ifdef CONFIG_PM
 
-int snd_pdacf_suspend(snd_card_t *card, unsigned int state)
+int snd_pdacf_suspend(snd_card_t *card, pm_message_t state)
 {
 	pdacf_t *chip = card->pm_private_data;
 	u16 val;
@@ -275,7 +275,7 @@ static inline int check_signal(pdacf_t *chip)
 	return (chip->ak4117->rcs0 & AK4117_UNLCK) == 0;
 }
 
-int snd_pdacf_resume(snd_card_t *card, unsigned int state)
+int snd_pdacf_resume(snd_card_t *card)
 {
 	pdacf_t *chip = card->pm_private_data;
 	int timeout = 40;

@@ -1785,15 +1785,21 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x103c,
-		.device = 0x129d,
-		.name = "HP xw8000",
-		.type = AC97_TUNE_HP_ONLY
+		.device = 0x088c,
+		.name = "HP nc8000",
+		.type = AC97_TUNE_MUTE_LED
 	},
 	{
 		.vendor = 0x103c,
 		.device = 0x0890,
-		.name = "HP NC6000",
+		.name = "HP nc6000",
 		.type = AC97_TUNE_MUTE_LED
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x129d,
+		.name = "HP xw8000",
+		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x103c,
@@ -2314,7 +2320,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 /*
  * power management
  */
-static int intel8x0_suspend(snd_card_t *card, unsigned int state)
+static int intel8x0_suspend(snd_card_t *card, pm_message_t state)
 {
 	intel8x0_t *chip = card->pm_private_data;
 	int i;
@@ -2339,7 +2345,7 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int intel8x0_resume(snd_card_t *card, unsigned int state)
+static int intel8x0_resume(snd_card_t *card)
 {
 	intel8x0_t *chip = card->pm_private_data;
 	int i;

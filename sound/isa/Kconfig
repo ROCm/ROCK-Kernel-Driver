@@ -20,6 +20,7 @@ config SND_AD1848
 	tristate "Generic AD1848/CS4248 driver"
 	depends on SND
 	select SND_PCM
+	select SND_GENERIC_PM
 	help
 	  Say Y here to include support for AD1848 (Analog Devices) or
 	  CS4248 (Cirrus Logic - Crystal Semiconductors) chips.
@@ -35,6 +36,7 @@ config SND_CS4231
 	depends on SND
 	select SND_MPU401_UART
 	select SND_PCM
+	select SND_GENERIC_PM
 	help
 	  Say Y here to include support for CS4231 chips from Cirrus
 	  Logic - Crystal Semiconductors.
@@ -48,6 +50,7 @@ config SND_CS4232
 	select SND_OPL3_LIB
 	select SND_MPU401_UART
 	select SND_PCM
+	select SND_GENERIC_PM
 	help
 	  Say Y here to include support for CS4232 chips from Cirrus
 	  Logic - Crystal Semiconductors.
@@ -61,6 +64,7 @@ config SND_CS4236
 	select SND_OPL3_LIB
 	select SND_MPU401_UART
 	select SND_PCM
+	select SND_GENERIC_PM
 	help
 	  Say Y to include support for CS4235,CS4236,CS4237B,CS4238B,
 	  CS4239 chips from Cirrus Logic - Crystal Semiconductors.
@@ -98,6 +102,7 @@ config SND_ES18XX
 	select SND_OPL3_LIB
 	select SND_MPU401_UART
 	select SND_PCM
+	select SND_GENERIC_PM
 	help
 	  Say Y here to include support for ESS AudioDrive ES18xx chips.
 
@@ -332,6 +337,7 @@ config SND_OPL3SA2
 	select SND_OPL3_LIB
 	select SND_MPU401_UART
 	select SND_PCM
+	select SND_GENERIC_PM
 	help
 	  Say Y here to include support for Yamaha OPL3-SA2 and OPL3-SA3
 	  chips.

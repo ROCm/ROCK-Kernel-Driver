@@ -72,6 +72,8 @@ YAMAHA_DEVICE(0x1007, "MOTIF8"),
 YAMAHA_DEVICE(0x1008, "UX96"),
 YAMAHA_DEVICE(0x1009, "UX16"),
 YAMAHA_INTERFACE(0x100a, 3, "EOS BX"),
+YAMAHA_DEVICE(0x100c, "UC-MX"),
+YAMAHA_DEVICE(0x100d, "UC-KX"),
 YAMAHA_DEVICE(0x100e, "S08"),
 YAMAHA_DEVICE(0x100f, "CLP-150"),
 YAMAHA_DEVICE(0x1010, "CLP-170"),
@@ -86,6 +88,7 @@ YAMAHA_DEVICE(0x1019, "CVP-208"),
 YAMAHA_DEVICE(0x101a, "CVP-210"),
 YAMAHA_DEVICE(0x101b, "PSR-1100"),
 YAMAHA_DEVICE(0x101c, "PSR-2100"),
+YAMAHA_DEVICE(0x101d, "CLP-175"),
 YAMAHA_DEVICE(0x101e, "PSR-K1"),
 YAMAHA_DEVICE(0x1020, "EZ-250i"),
 YAMAHA_DEVICE(0x1021, "MOTIF ES 6"),
@@ -125,9 +128,12 @@ YAMAHA_DEVICE(0x5005, "ACU16-C"),
 YAMAHA_DEVICE(0x5006, "NHB32-C"),
 YAMAHA_DEVICE(0x5007, "DM1000"),
 YAMAHA_DEVICE(0x5008, "01V96"),
+YAMAHA_DEVICE(0x5009, "SPX2000"),
 YAMAHA_DEVICE(0x500a, "PM5D"),
 YAMAHA_DEVICE(0x500b, "DME64N"),
 YAMAHA_DEVICE(0x500c, "DME24N"),
+YAMAHA_DEVICE(0x500d, NULL),
+YAMAHA_DEVICE(0x500e, NULL),
 YAMAHA_DEVICE(0x7000, "DTX"),
 YAMAHA_DEVICE(0x7010, "UB99"),
 #undef YAMAHA_DEVICE
@@ -876,12 +882,32 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 			 * but captured samples are big-endian (see usbaudio.c).
 			 */
 			{
+				.ifnum = 0,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 1,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 3,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
 				.ifnum = 4,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE
 			},
 			{
 				.ifnum = 5,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 6,
+				.type = QUIRK_IGNORE_INTERFACE
 			},
 			{
 				.ifnum = 7,
@@ -936,11 +962,56 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "M-Audio",
 		.product_name = "OmniStudio",
-		.ifnum = 9,
-		.type = QUIRK_MIDI_MIDIMAN,
-		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.out_cables = 0x0001,
-			.in_cables  = 0x0001
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = & (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 0,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 1,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 3,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 4,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 5,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 6,
+				.type = QUIRK_IGNORE_INTERFACE
+			},
+			{
+				.ifnum = 7,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 8,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 9,
+				.type = QUIRK_MIDI_MIDIMAN,
+				.data = & (const snd_usb_midi_endpoint_info_t) {
+					.out_cables = 0x0001,
+					.in_cables  = 0x0001
+				}
+			},
+			{
+				.ifnum = -1
+			}
 		}
 	}
 },

@@ -2330,33 +2330,6 @@ int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *
 	return -ENOENT;
 }
 
-static int bind_hp_volsw_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	int err = snd_ac97_put_volsw(kcontrol, ucontrol);
-	if (err > 0) {
-		unsigned long priv_saved = kcontrol->private_value;
-		kcontrol->private_value = (kcontrol->private_value & ~0xff) | AC97_HEADPHONE;
-		snd_ac97_put_volsw(kcontrol, ucontrol);
-		kcontrol->private_value = priv_saved;
-	}
-	return err;
-}
-
-/* ac97 tune: bind Master and Headphone controls */
-static int tune_hp_only(ac97_t *ac97)
-{
-	snd_kcontrol_t *msw = ctl_find(ac97, "Master Playback Switch", NULL);
-	snd_kcontrol_t *mvol = ctl_find(ac97, "Master Playback Volume", NULL);
-	if (! msw || ! mvol)
-		return -ENOENT;
-	msw->put = bind_hp_volsw_put;
-	mvol->put = bind_hp_volsw_put;
-	snd_ac97_remove_ctl(ac97, "Headphone Playback", "Switch");
-	snd_ac97_remove_ctl(ac97, "Headphone Playback", "Volume");
-	return 0;
-}
-
-#if 0
 /* ac97 tune: use Headphone control as master */
 static int tune_hp_only(ac97_t *ac97)
 {
@@ -2367,7 +2340,6 @@ static int tune_hp_only(ac97_t *ac97)
 	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Master Playback");
 	return 0;
 }
-#endif
 
 /* ac97 tune: swap Headphone and Master controls */
 static int tune_swap_hp(ac97_t *ac97)

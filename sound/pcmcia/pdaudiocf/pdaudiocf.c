@@ -342,7 +342,7 @@ static int pdacf_event(event_t event, int priority, event_callback_args_t *args)
 		link->state |= DEV_SUSPEND;
 		if (chip) {
 			snd_printdd(KERN_DEBUG "snd_pdacf_suspend calling\n");
-			snd_pdacf_suspend(chip->card, 0);
+			snd_pdacf_suspend(chip->card, PMSG_SUSPEND);
 		}
 		/* Fall through... */
 	case CS_EVENT_RESET_PHYSICAL:
@@ -361,7 +361,7 @@ static int pdacf_event(event_t event, int priority, event_callback_args_t *args)
 			pcmcia_request_configuration(link->handle, &link->conf);
 			if (chip) {
 				snd_printdd(KERN_DEBUG "calling snd_pdacf_resume\n");
-				snd_pdacf_resume(chip->card, 0);
+				snd_pdacf_resume(chip->card);
 			}
 		}
 		snd_printdd(KERN_DEBUG "resume done!\n");

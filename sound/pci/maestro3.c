@@ -2385,7 +2385,7 @@ static int snd_m3_free(m3_t *chip)
  * APM support
  */
 #ifdef CONFIG_PM
-static int m3_suspend(snd_card_t *card, unsigned int state)
+static int m3_suspend(snd_card_t *card, pm_message_t state)
 {
 	m3_t *chip = card->pm_private_data;
 	int i, index;
@@ -2417,7 +2417,7 @@ static int m3_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int m3_resume(snd_card_t *card, unsigned int state)
+static int m3_resume(snd_card_t *card)
 {
 	m3_t *chip = card->pm_private_data;
 	int i, index;

@@ -1612,7 +1612,7 @@ static int __devinit snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpc
 
 /* Power Management support functions */
 #ifdef CONFIG_PM
-static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
+static int snd_es18xx_suspend(snd_card_t *card, pm_message_t state)
 {
 	es18xx_t *chip = card->pm_private_data;
 
@@ -1627,7 +1627,7 @@ static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_es18xx_resume(snd_card_t *card, unsigned int state)
+static int snd_es18xx_resume(snd_card_t *card)
 {
 	es18xx_t *chip = card->pm_private_data;
 

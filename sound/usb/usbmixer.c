@@ -1519,7 +1519,7 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif)
 
 	/* check the mapping table */
 	for (map = usbmix_ctl_maps; map->vendor; map++) {
-		if (map->vendor == le16_to_cpu(dev->idVendor) && map->product == le16_to_cpu(dev->idProduct)) {
+		if (map->vendor == state.vendor && map->product == state.product) {
 			state.map = map->map;
 			chip->ignore_ctl_error = map->ignore_ctl_error;
 			break;

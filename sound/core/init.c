@@ -39,7 +39,7 @@ struct snd_shutdown_f_ops {
 
 unsigned int snd_cards_lock = 0;	/* locked for registering/using */
 snd_card_t *snd_cards[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = NULL};
-rwlock_t snd_card_rwlock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(snd_card_rwlock);
 
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 int (*snd_mixer_oss_notify_callback)(snd_card_t *card, int free_flag);
@@ -84,16 +84,13 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	write_lock(&snd_card_rwlock);
 	if (idx < 0) {
 		int idx2;
-		for (idx2 = 0; idx2 < snd_ecards_limit; idx2++)
-			if (!(snd_cards_lock & (1 << idx2))) {
+		for (idx2 = 0; idx2 < SNDRV_CARDS; idx2++)
+			if (~snd_cards_lock & idx & 1<<idx2) {
 				idx = idx2;
+				if (idx >= snd_ecards_limit)
+					snd_ecards_limit = idx + 1;
 				break;
 			}
-		if (idx < 0 && snd_ecards_limit < SNDRV_CARDS)
-			/* for dynamically additional devices like hotplug:
-			 * increment the limit if still free slot exists.
-			 */
-			idx = snd_ecards_limit++;
 	} else if (idx < snd_ecards_limit) {
 		if (snd_cards_lock & (1 << idx))
 			err = -ENODEV;	/* invalid */
@@ -229,6 +226,10 @@ int snd_card_disconnect(snd_card_t * card)
 	return 0;	
 }
 
+#if defined(CONFIG_PM) && defined(CONFIG_SND_GENERIC_PM)
+static void snd_generic_device_unregister(struct snd_generic_device *dev);
+#endif
+
 /**
  *  snd_card_free - frees given soundcard structure
  *  @card: soundcard structure
@@ -252,9 +253,9 @@ int snd_card_free(snd_card_t * card)
 
 #ifdef CONFIG_PM
 	wake_up(&card->power_sleep);
-#ifdef CONFIG_ISA
+#ifdef CONFIG_SND_GENERIC_PM
 	if (card->pm_dev) {
-		pm_unregister(card->pm_dev);
+		snd_generic_device_unregister(card->pm_dev);
 		card->pm_dev = NULL;
 	}
 #endif
@@ -374,7 +375,7 @@ static void choose_default_id(snd_card_t * card)
 
 	while (1) {
 	      	if (loops-- == 0) {
-      			snd_printk(KERN_ERR "unable to choose default card id (%s)", id);
+      			snd_printk(KERN_ERR "unable to choose default card id (%s)\n", id);
       			strcpy(card->id, card->proc_root->name);
       			return;
       		}
@@ -719,8 +720,8 @@ int snd_power_wait(snd_card_t *card, unsigned int power_state, struct file *file
  * handler and from the control API.
  */
 int snd_card_set_pm_callback(snd_card_t *card,
-			     int (*suspend)(snd_card_t *, unsigned int),
-			     int (*resume)(snd_card_t *, unsigned int),
+			     int (*suspend)(snd_card_t *, pm_message_t),
+			     int (*resume)(snd_card_t *),
 			     void *private_data)
 {
 	card->pm_suspend = suspend;
@@ -729,56 +730,132 @@ int snd_card_set_pm_callback(snd_card_t *card,
 	return 0;
 }
 
-static int snd_generic_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	snd_card_t *card = dev->data;
+#ifdef CONFIG_SND_GENERIC_PM
+/*
+ * use platform_device for generic power-management without a proper bus
+ * (e.g. ISA)
+ */
+struct snd_generic_device {
+	struct platform_device pdev;
+	snd_card_t *card;
+};
 
-	switch (rqst) {
-	case PM_SUSPEND:
-		if (card->power_state == SNDRV_CTL_POWER_D3hot)
-			break;
-		/* FIXME: the correct state value? */
-		card->pm_suspend(card, 0);
-		snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-		break;
-	case PM_RESUME:
-		if (card->power_state == SNDRV_CTL_POWER_D0)
-			break;
-		/* FIXME: the correct state value? */
-		card->pm_resume(card, 0);
-		snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-		break;
+#define get_snd_generic_card(dev)	container_of(to_platform_device(dev), struct snd_generic_device, pdev)->card
+
+#define SND_GENERIC_NAME	"snd_generic_pm"
+
+static int snd_generic_suspend(struct device *dev, u32 state, u32 level);
+static int snd_generic_resume(struct device *dev, u32 level);
+
+static struct device_driver snd_generic_driver = {
+	.name		= SND_GENERIC_NAME,
+	.bus		= &platform_bus_type,
+	.suspend	= snd_generic_suspend,
+	.resume		= snd_generic_resume,
+};
+
+static int generic_driver_registered;
+
+static void generic_driver_unregister(void)
+{
+	if (generic_driver_registered) {
+		generic_driver_registered--;
+		if (! generic_driver_registered)
+			driver_unregister(&snd_generic_driver);
 	}
+}
+
+static struct snd_generic_device *snd_generic_device_register(snd_card_t *card)
+{
+	struct snd_generic_device *dev;
+
+	if (! generic_driver_registered) {
+		if (driver_register(&snd_generic_driver) < 0)
+			return NULL;
+	}
+	generic_driver_registered++;
+
+	dev = kcalloc(1, sizeof(*dev), GFP_KERNEL);
+	if (! dev) {
+		generic_driver_unregister();
+		return NULL;
+	}
+
+	dev->pdev.name = SND_GENERIC_NAME;
+	dev->pdev.id = card->number;
+	dev->card = card;
+	if (platform_device_register(&dev->pdev) < 0) {
+		kfree(dev);
+		generic_driver_unregister();
+		return NULL;
+	}
+	return dev;
+}
+
+static void snd_generic_device_unregister(struct snd_generic_device *dev)
+{
+	platform_device_unregister(&dev->pdev);
+	kfree(dev);
+	generic_driver_unregister();
+}
+
+/* suspend/resume callbacks for snd_generic platform device */
+static int snd_generic_suspend(struct device *dev, u32 state, u32 level)
+{
+	snd_card_t *card;
+
+	if (level != SUSPEND_DISABLE)
+		return 0;
+
+	card = get_snd_generic_card(dev);
+	if (card->power_state == SNDRV_CTL_POWER_D3hot)
+		return 0;
+	card->pm_suspend(card, PMSG_SUSPEND);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
+}
+
+static int snd_generic_resume(struct device *dev, u32 level)
+{
+	snd_card_t *card;
+
+	if (level != RESUME_ENABLE)
+		return 0;
+
+	card = get_snd_generic_card(dev);
+	if (card->power_state == SNDRV_CTL_POWER_D0)
+		return 0;
+	card->pm_resume(card);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 
 /**
- * snd_card_set_dev_pm_callback - set the generic power-management callbacks
+ * snd_card_set_generic_pm_callback - set the generic power-management callbacks
  * @card: soundcard structure
- * @type: PM device type (PM_XXX)
  * @suspend: suspend callback function
  * @resume: resume callback function
  * @private_data: private data to pass to the callback functions
  *
  * Registers the power-management and sets the lowlevel callbacks for
- * the given card with the given PM type.  These callbacks are called
- * from the ALSA's common PM handler and from the control API.
+ * the given card.  These callbacks are called from the ALSA's common
+ * PM handler and from the control API.
  */
-int snd_card_set_dev_pm_callback(snd_card_t *card, int type,
-				 int (*suspend)(snd_card_t *, unsigned int),
-				 int (*resume)(snd_card_t *, unsigned int),
+int snd_card_set_generic_pm_callback(snd_card_t *card,
+				 int (*suspend)(snd_card_t *, pm_message_t),
+				 int (*resume)(snd_card_t *),
 				 void *private_data)
 {
-	card->pm_dev = pm_register(type, 0, snd_generic_pm_callback);
+	card->pm_dev = snd_generic_device_register(card);
 	if (! card->pm_dev)
 		return -ENOMEM;
-	card->pm_dev->data = card;
 	snd_card_set_pm_callback(card, suspend, resume, private_data);
 	return 0;
 }
+#endif /* CONFIG_SND_GENERIC_PM */
 
 #ifdef CONFIG_PCI
-int snd_card_pci_suspend(struct pci_dev *dev, u32 state)
+int snd_card_pci_suspend(struct pci_dev *dev, pm_message_t state)
 {
 	snd_card_t *card = pci_get_drvdata(dev);
 	int err;
@@ -786,8 +863,7 @@ int snd_card_pci_suspend(struct pci_dev *dev, u32 state)
 		return 0;
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		return 0;
-	/* FIXME: correct state value? */
-	err = card->pm_suspend(card, 0);
+	err = card->pm_suspend(card, PMSG_SUSPEND);
 	pci_save_state(dev);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return err;
@@ -802,8 +878,7 @@ int snd_card_pci_resume(struct pci_dev *dev)
 		return 0;
 	/* restore the PCI config space */
 	pci_restore_state(dev);
-	/* FIXME: correct state value? */
-	card->pm_resume(card, 0);
+	card->pm_resume(card);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }

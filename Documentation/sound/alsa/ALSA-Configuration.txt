@@ -7,75 +7,75 @@
 Kernel Configuration
 ====================
 
-To enable the ALSA support, at least you need to build the kernel with
-the primary sound card support (CONFIG_SOUND).  Since ALSA can emulate
-the OSS, you don't have to choose any of the OSS/Free modules.  Please
-enable "OSS API emulation" (CONFIG_SND_OSSEMUL) and both OSS mixer and
-PCM supports if you want to run the OSS application with the ALSA.
+To enable ALSA support you need at least to build the kernel with
+primary sound card support (CONFIG_SOUND).  Since ALSA can emulate OSS,
+you don't have to choose any of the OSS modules.
 
-When you want to support the WaveTable functionality on some cards
-such like SB Live!, you need to enable "Sequencer support"
+Enable "OSS API emulation" (CONFIG_SND_OSSEMUL) and both OSS mixer and
+PCM supports if you want to run OSS applications with ALSA.
+
+If you want to support the WaveTable functionality on cards such as
+SB Live! then you need to enable "Sequencer support"
 (CONFIG_SND_SEQUENCER).
 
-For getting more verbose debug messages, turn on "Verbose printk" and
-"Debug" options.  For checking the memory leaks, you can turn on
-"Debug memory" option, too.  "Debug detection" will put more
-additional checks for the detection of cards.
+To make ALSA debug messages more verbose, enable the "Verbose printk"
+and "Debug" options.  To check for memory leaks, turn on "Debug memory"
+too.  "Debug detection" will add checks for the detection of cards.
 
-Please note that all the ALSA ISA drivers support Linux isapnp API (if
-the card supports).  You don't need to configure the PnP via
-isapnptools.
+Please note that all the ALSA ISA drivers support the Linux isapnp API
+(if the card supports ISA PnP).  You don't need to configure the cards
+using isapnptools.
 
 
 Creating ALSA devices
 =====================
 
-Use the /dev/MAKEDEV script to create the nessecary device nodes.
+This depends on your distribution, but normally you use the /dev/MAKEDEV
+script to create the necessary device nodes.  On some systems you use a
+script named 'snddevices'.
 
 
 Module parameters
 =================
 
-  A user can modify or set parameters at the load time of the module. If
-  the module supports more cards and you have got more than one card
-  of the same type, you may simply specify more values for the parameter,
-  delimited by commas.
-  
-  Note that module option names were changed in 0.9.0rc4. The 'snd_'
-  prefix was removed.
+The user can load modules with options. If the module supports more than
+one card and you have more than one card of the same type then you can
+specify multiple values for the option separated by commas.
+
+Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
 
   Module snd
   ----------
 
-    The module snd is the ALSA core module, which is used by all ALSA
-    card drivers.  This takes the global options for creating devices,
-    etc.
+    The core ALSA module.  It is used by all ALSA card drivers.
+    It takes the following options which have global effects.
 
-    major	- major # for sound driver
-		- default is 116
+    major	- major number for sound driver
+		- Default: 116
     cards_limit
-		- specifies card limit # for auto-loading (1-8)
-		- default is 1
-		- for auto-loading more than 1 card, specify this option
-		  together with snd-card-X aliases.
+		- limiting card index for auto-loading (1-8)
+		- Default: 1
+		- For auto-loading more than one card, specify this
+		  option together with snd-card-X aliases.
     device_mode
-		- specifies permission mask for dynamic sound device filesystem
-		  (available only when DEVFS is enabled)
-		- default value = 0666
-		- for example 'device_mode=0660'
+		- permission mask for dynamic sound device filesystem
+		- This is available only when DEVFS is enabled
+		- Default: 0666
+		- E.g.: device_mode=0660
 
   
   Module snd-pcm-oss
   ------------------
 
     The PCM OSS emulation module.
-    This module takes the options to change the mapping of devices.
+    This module takes options which change the mapping of devices.
 
     dsp_map	- PCM device number maps assigned to the 1st OSS device.
-		  (default: 0)
+		- Default: 0
     adsp_map	- PCM device number maps assigned to the 2st OSS device.
-		  (default: 1)
-    nonblock_open - Don't block opening busy PCM devices.
+		- Default: 1
+    nonblock_open
+		- Don't block opening busy PCM devices.
 
     For example, when dsp_map=2, /dev/dsp will be mapped to PCM #2 of
     the card #0.  Similarly, when adsp_map=0, /dev/adsp will be mapped
@@ -91,33 +91,39 @@ Module parameters
   Module snd-rawmidi
   ------------------
 
-    This module takes the options to change the mapping of OSS
-    devices like snd-pcm-oss module.
+    This module takes options which change the mapping of devices.
+    similar to those of the snd-pcm-oss module.
 
     midi_map	- MIDI device number maps assigned to the 1st OSS device.
-		  (default: 0)
+		- Default: 0
     amidi_map	- MIDI device number maps assigned to the 2st OSS device.
-		  (default: 1)
+		- Default: 1
 
-  Common parameters for top soundcard modules
-  -------------------------------------------
+  Common parameters for top sound card modules
+  --------------------------------------------
 
-    Each of top-level soundcard module takes some general options,
+    Each of top level sound card module takes the following options.
 
-    index	- 0-7 - index (slot #) for soundcard
-                - if not set or -1, first free index (slot #) is assigned
-    id		- user identification for card (up to 15 chars)
-		- default expression is 'card<index>' (for example card1)
-		- value is used for /proc/asound filesystem
-		- this value can be used by applications for identification
-		  of card if user does not want identify card with index number
-    enable  	- enable card.  (all cards enabled for PCI and ISA PnP cards
-		  as default.)
+    index	- index (slot #) of sound card
+		- Values: 0 through 7 or negative
+		- If nonnegative, assign that index number
+                - if negative, interpret as a bitmask of permissible
+		  indices; the first free permitted index is assigned
+		- Default: -1
+    id		- card ID (identifier or name)
+		- Can be up to 15 characters long
+		- Default: the card type
+		- A directory by this name is created under /proc/asound/
+		  containing information about the card
+		- This ID can be used instead of the index number in
+		  identifying the card
+    enable  	- enable card
+		- Default: enabled, for PCI and ISA PnP cards
 
   Module snd-ad1816a
   ------------------
 
-    Module for soundcards based on Analog Devices AD1816A/AD1815 ISA chips.
+    Module for sound cards based on Analog Devices AD1816A/AD1815 ISA chips.
 
     port	- port # for AD1816A chip (PnP setup)
     mpu_port	- port # for MPU-401 UART (PnP setup)
@@ -132,7 +138,7 @@ Module parameters
   Module snd-ad1848
   -----------------
 
-    Module for soundcards based on AD1848/AD1847/CS4248 ISA chips.
+    Module for sound cards based on AD1848/AD1847/CS4248 ISA chips.
 
     port	- port # for AD1848 chip
     irq		- IRQ # for AD1848  chip
@@ -147,7 +153,8 @@ Module parameters
     Module for ALi M5451 PCI chip.
 
     pcm_channels    - Number of hardware channels assigned for PCM
-    spdif           - Support SPDIF I/O (disabled by default)
+    spdif           - Support SPDIF I/O
+    		    - Default: disabled
 
     Module supports autoprobe and multiple chips (max 8).
 
@@ -156,7 +163,7 @@ Module parameters
   Module snd-als100
   -----------------
 
-    Module for soundcards based on Avance Logic ALS100/ALS120 ISA chips.
+    Module for sound cards based on Avance Logic ALS100/ALS120 ISA chips.
 
     port	- port # for ALS100 (SB16) chip (PnP setup)
     irq		- IRQ # for ALS100 (SB16) chip (PnP setup)
@@ -171,7 +178,7 @@ Module parameters
   Module snd-als4000
   ------------------
 
-    Module for soundcards based on Avance Logic ALS4000 PCI chip.
+    Module for sound cards based on Avance Logic ALS4000 PCI chip.
 
     joystick_port - port # for legacy joystick support.
                     0 = disabled (default), 1 = auto-detect
@@ -196,6 +203,9 @@ Module parameters
     Module for ATI IXP 150/200/250 AC97 modem controllers.
 
     Module supports up to 8 cards.
+
+    Note: The default index value of this module is -2, i.e. the first
+          slot is excluded.
 
   Module snd-au8810, snd-au8820, snd-au8830
   -----------------------------------------
@@ -226,7 +236,7 @@ Module parameters
   Module snd-azt2320
   ------------------
 
-    Module for soundcards based on Aztech System AZT2320 ISA chip (PnP only).
+    Module for sound cards based on Aztech System AZT2320 ISA chip (PnP only).
 
     port	- port # for AZT2320 chip (PnP setup)
     wss_port	- port # for WSS (PnP setup)
@@ -242,7 +252,7 @@ Module parameters
   Module snd-azt3328
   ------------------
 
-    Module for soundcards based on Aztech AZF3328 PCI chip.
+    Module for sound cards based on Aztech AZF3328 PCI chip.
 
     joystick	- Enable joystick (default off)
 
@@ -258,6 +268,9 @@ Module parameters
 
     Module supports up to 8 cards.
 
+    Note: The default index value of this module is -2, i.e. the first
+          slot is excluded.
+
   Module snd-ca0106
   -----------------
 
@@ -269,7 +282,7 @@ Module parameters
   Module snd-cmi8330
   ------------------
 
-    Module for soundcards based on C-Media CMI8330 ISA chips.
+    Module for sound cards based on C-Media CMI8330 ISA chips.
 
     wssport	- port # for CMI8330 chip (WSS)
     wssirq	- IRQ # for CMI8330 chip (WSS)
@@ -284,7 +297,7 @@ Module parameters
   Module snd-cmipci
   -----------------
 
-    Module for C-Media CMI8338 and 8738 PCI soundcards.
+    Module for C-Media CMI8338 and 8738 PCI sound cards.
 
     mpu_port	- 0x300,0x310,0x320,0x330, 0 = disable (default)
     fm_port     - 0x388 (default), 0 = disable (default)
@@ -297,7 +310,7 @@ Module parameters
   Module snd-cs4231
   -----------------
 
-    Module for soundcards based on CS4231 ISA chips.
+    Module for sound cards based on CS4231 ISA chips.
 
     port	- port # for CS4231 chip
     mpu_port	- port # for MPU-401 UART (optional), -1 = disable
@@ -314,7 +327,7 @@ Module parameters
   Module snd-cs4232
   -----------------
 
-    Module for soundcards based on CS4232/CS4232A ISA chips.
+    Module for sound cards based on CS4232/CS4232A ISA chips.
 
     port	- port # for CS4232 chip (PnP setup - 0x534)
     cport	- control port # for CS4232 chip (PnP setup - 0x120,0x210,0xf00)
@@ -334,7 +347,7 @@ Module parameters
   Module snd-cs4236
   -----------------
 
-    Module for soundcards based on CS4235/CS4236/CS4236B/CS4237B/
+    Module for sound cards based on CS4235/CS4236/CS4236B/CS4237B/
                                    CS4238B/CS4239 ISA chips.
 
     port	- port # for CS4236 chip (PnP setup - 0x534)
@@ -367,7 +380,7 @@ Module parameters
   Module snd-cs46xx
   -----------------
 
-    Module for PCI soundcards based on CS4610/CS4612/CS4614/CS4615/CS4622/
+    Module for PCI sound cards based on CS4610/CS4612/CS4614/CS4615/CS4622/
 				       CS4624/CS4630/CS4280 PCI chips.
 
     external_amp     - Force to enable external amplifer.
@@ -400,14 +413,14 @@ Module parameters
   Module snd-dummy
   ----------------
 
-    Module for the dummy soundcard. This soundcard doesn't do any output
+    Module for the dummy sound card. This "card" doesn't do any output
     or input, but you may use this module for any application which
-    requires a soundcard (like RealPlayer).
+    requires a sound card (like RealPlayer).
 
   Module snd-emu10k1
   ------------------
 
-    Module for EMU10K1/EMU10k2 based PCI soundcards.
+    Module for EMU10K1/EMU10k2 based PCI sound cards.
 			* Sound Blaster Live!
 			* Sound Blaster PCI 512
 			* Emu APS (partially supported)
@@ -447,7 +460,7 @@ Module parameters
   Module snd-ens1370
   ------------------
 
-    Module for Ensoniq AudioPCI ES1370 PCI soundcards.
+    Module for Ensoniq AudioPCI ES1370 PCI sound cards.
 			* SoundBlaster PCI 64
 			* SoundBlaster PCI 128
 
@@ -458,7 +471,7 @@ Module parameters
   Module snd-ens1371
   ------------------
 
-    Module for Ensoniq AudioPCI ES1371 PCI soundcards.
+    Module for Ensoniq AudioPCI ES1371 PCI sound cards.
 			* SoundBlaster PCI 64
 			* SoundBlaster PCI 128
 			* SoundBlaster Vibra PCI
@@ -471,7 +484,7 @@ Module parameters
   Module snd-es968
   ----------------
 
-    Module for soundcards based on ESS ES968 chip (PnP only).
+    Module for sound cards based on ESS ES968 chip (PnP only).
 
     port	- port # for ES968 (SB8) chip (PnP setup)
     irq		- IRQ # for ES968 (SB8) chip (PnP setup)
@@ -482,7 +495,7 @@ Module parameters
   Module snd-es1688
   -----------------
 
-    Module for ESS AudioDrive ES-1688 and ES-688 soundcards.
+    Module for ESS AudioDrive ES-1688 and ES-688 sound cards.
 
     port	- port # for ES-1688 chip (0x220,0x240,0x260)
     mpu_port	- port # for MPU-401 port (0x300,0x310,0x320,0x330), -1 = disable (default)
@@ -495,7 +508,7 @@ Module parameters
   Module snd-es18xx
   -----------------
 
-    Module for ESS AudioDrive ES-18xx soundcards.
+    Module for ESS AudioDrive ES-18xx sound cards.
 
     port	- port # for ES-18xx chip (0x220,0x240,0x260)
     mpu_port	- port # for MPU-401 port (0x300,0x310,0x320,0x330), -1 = disable (default)
@@ -514,14 +527,14 @@ Module parameters
   Module snd-es1938
   -----------------
 
-    Module for soundcards based on ESS Solo-1 (ES1938,ES1946) chips.
+    Module for sound cards based on ESS Solo-1 (ES1938,ES1946) chips.
 
     Module supports up to 8 cards and autoprobe.
 
   Module snd-es1968
   -----------------
 
-    Module for soundcards based on ESS Maestro-1/2/2E (ES1968/ES1978) chips.
+    Module for sound cards based on ESS Maestro-1/2/2E (ES1968/ES1978) chips.
 
     total_bufsize	- total buffer size in kB (1-4096kB)
     pcm_substreams_p	- playback channels (1-8, default=2)
@@ -539,7 +552,7 @@ Module parameters
   Module snd-fm801
   ----------------
 
-    Module for ForteMedia FM801 based PCI soundcards.
+    Module for ForteMedia FM801 based PCI sound cards.
 
     tea575x_tuner       - Enable TEA575x tuner
                           - 1 = MediaForte 256-PCS
@@ -553,7 +566,7 @@ Module parameters
   Module snd-gusclassic
   ---------------------
 
-    Module for Gravis UltraSound Classic soundcard.
+    Module for Gravis UltraSound Classic sound card.
 
     port	- port # for GF1 chip (0x220,0x230,0x240,0x250,0x260)
     irq		- IRQ # for GF1 chip (3,5,9,11,12,15)
@@ -568,7 +581,7 @@ Module parameters
   Module snd-gusextreme
   ---------------------
 
-    Module for Gravis UltraSound Extreme (Synergy ViperMax) soundcard.
+    Module for Gravis UltraSound Extreme (Synergy ViperMax) sound card.
 
     port	- port # for ES-1688 chip (0x220,0x230,0x240,0x250,0x260)
     gf1_port	- port # for GF1 chip (0x210,0x220,0x230,0x240,0x250,0x260,0x270)
@@ -587,7 +600,7 @@ Module parameters
   Module snd-gusmax
   -----------------
 
-    Module for Gravis UltraSound MAX soundcard.
+    Module for Gravis UltraSound MAX sound card.
 
     port	- port # for GF1 chip (0x220,0x230,0x240,0x250,0x260)
     irq		- IRQ # for GF1 chip (3,5,9,11,12,15)
@@ -599,17 +612,41 @@ Module parameters
 
     Module supports up to 8 cards and autoprobe.
     
+  Module snd-hda-intel
+  --------------------
+
+    Module for Intel HD Audio (ICH6, ICH6M, ICH7)
+
+    model	- force the model name
+
+    Module supports up to 8 cards.
+
+    Each codec may have a model table for different configurations.
+    If your machine isn't listed there, the default (usually minimal)
+    configuration is set up.  You can pass "model=<name>" option to
+    specify a certain model in such a case.  There are different
+    models depending on the codec chip.
+
+	  Model name	Description
+	  ----------    -----------
+	ALC880
+	  3stack	3-jack in back and a headphone out
+	  3stack-digout	3-jack in back, a HP out and a SPDIF out
+	  5stack	5-jack in back, 2-jack in front
+	  5stack-digout	5-jack in back, 2-jack in front, a SPDIF out
+	  w810		3-jack
+
+	CMI9880
+	  minimal	3-jack in back
+	  min_fp	3-jack in back, 2-jack in front
+	  full		6-jack in back, 2-jack in front
+	  full_dig	6-jack in back, 2-jack in front, SPDIF I/O
+	  allout	5-jack in back, 2-jack in front, SPDIF out
+
   Module snd-hdsp
   ---------------
 
     Module for RME Hammerfall DSP audio interface(s)
-
-    precise_ptr	      - Enable precise pointer (doesn't work reliably).
-			(default = 0)
-    line_outs_monitor - Send all input and playback streams to line outs
-			by default. (default = 0)
-    force_firmware    - Force a reload of the I/O box firmware
-			(default = 0)
 
     Module supports up to 8 cards.
 
@@ -628,7 +665,7 @@ Module parameters
   Module snd-ice1712
   ------------------
 
-    Module for Envy24 (ICE1712) based PCI soundcards.
+    Module for Envy24 (ICE1712) based PCI sound cards.
 			* MidiMan M Audio Delta 1010
 			* MidiMan M Audio Delta 1010LT
 			* MidiMan M Audio Delta DiO 2496
@@ -660,7 +697,7 @@ Module parameters
   Module snd-ice1724
   ------------------
 
-    Module for Envy24HT (VT/ICE1724) based PCI soundcards.
+    Module for Envy24HT (VT/ICE1724) based PCI sound cards.
 			* MidiMan M Audio Revolution 7.1
 			* AMP Ltd AUDIO2000
 			* TerraTec Aureon Sky-5.1, Space-7.1
@@ -689,7 +726,7 @@ Module parameters
                       hp_only = use headphone control as master
                       swap_hp = swap headphone and master controls
                       swap_surround = swap master and surround controls
-                      ad_shring = for AD1985, turn on OMS bit and use headphone
+                      ad_sharing = for AD1985, turn on OMS bit and use headphone
                       alc_jack = for ALC65x, turn on the jack sense mode
                       inv_eapd = inverted EAPD implementation
                       mute_led = bind EAPD bit for turning on/off mute LED
@@ -726,11 +763,14 @@ Module parameters
 
     This module supports up to 8 cards and autoprobe.
 
+    Note: The default index value of this module is -2, i.e. the first
+          slot is excluded.
+
   Module snd-interwave
   --------------------
 
     Module for Gravis UltraSound PnP, Dynasonic 3-D/Pro, STB Sound Rage 32
-    and other soundcards based on AMD InterWave (tm) chip.
+    and other sound cards based on AMD InterWave (tm) chip.
   
     port	- port # for InterWave chip (0x210,0x220,0x230,0x240,0x250,0x260)
     irq		- IRQ # for InterWave chip (3,5,9,11,12,15)
@@ -747,8 +787,8 @@ Module parameters
   Module snd-interwave-stb
   ------------------------
 
-    Module for UltraSound 32-Pro (soundcard from STB used by Compaq)
-    and other soundcards based on AMD InterWave (tm) chip with TEA6330T
+    Module for UltraSound 32-Pro (sound card from STB used by Compaq)
+    and other sound cards based on AMD InterWave (tm) chip with TEA6330T
     circuit for extended control of bass, treble and master volume.
   
     port	- port # for InterWave chip (0x210,0x220,0x230,0x240,0x250,0x260)
@@ -794,7 +834,7 @@ Module parameters
   Module snd-mixart
   -----------------
 
-    Module for Digigram miXart8 soundcards.
+    Module for Digigram miXart8 sound cards.
 
     Module supports multiple cards.
     Note: One miXart8 board will be represented as 4 alsa cards.
@@ -883,7 +923,7 @@ Module parameters
   Module snd-opl3sa2
   ------------------
 
-    Module for Yamaha OPL3-SA2/SA3 soundcards.
+    Module for Yamaha OPL3-SA2/SA3 sound cards.
 
     port	- control port # for OPL3-SA chip (0x370)
     sb_port	- SB port # for OPL3-SA chip (0x220,0x240)
@@ -903,7 +943,7 @@ Module parameters
   Module snd-opti92x-ad1848
   -------------------------
 
-    Module for soundcards based on OPTi 82c92x and Analog Devices AD1848 chips.
+    Module for sound cards based on OPTi 82c92x and Analog Devices AD1848 chips.
     Module works with OAK Mozart cards as well.
     
     port      - port # for WSS chip (0x530,0xe80,0xf40,0x604)
@@ -918,7 +958,7 @@ Module parameters
   Module snd-opti92x-cs4231
   -------------------------
 
-    Module for soundcards based on OPTi 82c92x and Crystal CS4231 chips.
+    Module for sound cards based on OPTi 82c92x and Crystal CS4231 chips.
     
     port      - port # for WSS chip (0x530,0xe80,0xf40,0x604)
     mpu_port  - port # for MPU-401 UART (0x300,0x310,0x320,0x330)
@@ -933,7 +973,7 @@ Module parameters
   Module snd-opti93x
   ------------------
 
-    Module for soundcards based on OPTi 82c93x chips.
+    Module for sound cards based on OPTi 82c93x chips.
     
     port      - port # for WSS chip (0x530,0xe80,0xf40,0x604)
     mpu_port  - port # for MPU-401 UART (0x300,0x310,0x320,0x330)
@@ -962,21 +1002,21 @@ Module parameters
   ----------------
 
     Module for RME Digi32, Digi32 Pro and Digi32/8 (Sek'd Prodif32, 
-    Prodif96 and Prodif Gold) soundcards.
+    Prodif96 and Prodif Gold) sound cards.
 
     Module supports up to 8 cards.
 
   Module snd-rme96
   ----------------
 
-    Module for RME Digi96, Digi96/8 and Digi96/8 PRO/PAD/PST soundcards.
+    Module for RME Digi96, Digi96/8 and Digi96/8 PRO/PAD/PST sound cards.
 
     Module supports up to 8 cards.
 
   Module snd-rme9652
   ------------------
 
-    Module for RME Digi9652 (Hammerfall, Hammerfall-Light) soundcards.
+    Module for RME Digi9652 (Hammerfall, Hammerfall-Light) sound cards.
 
     precise_ptr	- Enable precise pointer (doesn't work reliably).
 		  (default = 0)
@@ -992,7 +1032,7 @@ Module parameters
   Module snd-sa11xx-uda1341 (on arm only)
   ---------------------------------------
 
-    Module for Philips UDA1341TS on Compaq iPAQ H3600 soundcard.
+    Module for Philips UDA1341TS on Compaq iPAQ H3600 sound card.
 
     Module supports only one card.
     Module has no enable and index options.
@@ -1039,7 +1079,7 @@ Module parameters
   Module snd-sgalaxy
   ------------------
 
-    Module for Aztech Sound Galaxy soundcard.
+    Module for Aztech Sound Galaxy sound card.
 
     sbport	- Port # for SB16 interface (0x220,0x240)
     wssport	- Port # for WSS interface (0x530,0xe80,0xf40,0x604)
@@ -1079,7 +1119,7 @@ Module parameters
   Module snd-wavefront
   --------------------
 
-    Module for Turtle Beach Maui, Tropez and Tropez+ soundcards.
+    Module for Turtle Beach Maui, Tropez and Tropez+ sound cards.
 
     cs4232_pcm_port - Port # for CS4232 PCM interface.
     cs4232_pcm_irq  - IRQ # for CS4232 PCM interface (5,7,9,11,12,15).
@@ -1099,7 +1139,7 @@ Module parameters
   Module snd-sonicvibes
   ---------------------
 
-    Module for S3 SonicVibes PCI soundcards.
+    Module for S3 SonicVibes PCI sound cards.
 			* PINE Schubert 32 PCI
 
     reverb    - Reverb Enable - 1 = enable, 0 = disable (default)
@@ -1131,7 +1171,7 @@ Module parameters
   Module snd-trident
   ------------------
 
-    Module for Trident 4DWave DX/NX soundcards.
+    Module for Trident 4DWave DX/NX sound cards.
 			* Best Union  Miss Melody 4DWave PCI
 			* HIS  4DWave PCI
 			* Warpspeed  ONSpeed 4DWave PCI
@@ -1223,6 +1263,9 @@ Module parameters
 
     Module supports up to 8 cards.
 
+    Note: The default index value of this module is -2, i.e. the first
+          slot is excluded.
+
   Module snd-virmidi
   ------------------
 
@@ -1266,10 +1309,6 @@ Module parameters
 
     Module for Digigram VX-Pocket VX2 PCMCIA card.
 
-    irq_mask - IRQ bitmask, specifies the available IRQs as bits
-               (default = 0xffff, all available)
-    irq_list - List of available interrupts (default = -1, not specified)
-               4 numbers must be given (if specified).
     ibl      - Capture IBL size. (default = 0, minimum size)
 
     Module supports up to 8 cards.  The module is compiled only when
@@ -1284,9 +1323,6 @@ Module parameters
     When no hotplug fw loader is available, you need to load the
     firmware via vxloader utility in alsa-tools package.
 
-    The irq_mask and irq_list are provided to avoid allocation of
-    specific IRQs.  Usually you don't need to specify them.
-
     About capture IBL, see the description of snd-vx222 module.
 
     Note: the driver is build only when CONFIG_ISA is set.
@@ -1296,9 +1332,6 @@ Module parameters
 
     Module for Digigram VX-Pocket 440 PCMCIA card.
 
-    irq_mask - IRQ bitmask, specifies the available IRQs as bits
-    irq_list - List of available interrupts (default = -1, not specified)
-               4 numbers must be given (if specified).
     ibl      - Capture IBL size. (default = 0, minimum size)
 
     Module supports up to 8 cards.  The module is compiled only when
@@ -1312,9 +1345,6 @@ Module parameters
     Install the necessary firmware files in alsa-firmware package.
     When no hotplug fw loader is available, you need to load the
     firmware via vxloader utility in alsa-tools package.
-
-    The irq_mask and irq_list are provided to avoid allocation of
-    specific IRQs.  Usually you don't need to specify them.
 
     About capture IBL, see the description of snd-vx222 module.
 
@@ -1340,10 +1370,7 @@ Module parameters
   Module snd-pdaudiocf
   --------------------
 
-    Module for Sound Core PDAudioCF soundcard.
-
-    irq_mask	  - IRQ mask (PCMCIA type)
-    irq_list	  - List of available interrupts for this soundcard
+    Module for Sound Core PDAudioCF sound card.
 
     Note: the driver is build only when CONFIG_ISA is set.
 
@@ -1366,7 +1393,7 @@ Module Autoloading Support
 
 The ALSA drivers can be loaded automatically on demand by defining
 module aliases.  The string 'snd-card-%1' is requested for ALSA native
-devices where %i is soundcard number from zero to seven.
+devices where %i is sound card number from zero to seven.
 
 To auto-load an ALSA driver for OSS services, define the string
 'sound-slot-%i' where %i means the slot number for OSS, which
@@ -1379,16 +1406,16 @@ alias snd-card-0 snd-emu10k1
 alias sound-slot-0 snd-emu10k1
 ----- /etc/modprobe.conf
 
-The available number of auto-loaded soundcards depends on the module
+The available number of auto-loaded sound cards depends on the module
 option "cards_limit" of snd module.  As default it's set to 1.
 To enable the auto-loading of multiple cards, specify the number of
-soundcards in that option.
+sound cards in that option.
 
 When multiple cards are available, it'd better to specify the index
 number for each card via module option, too, so that the order of
 cards is kept consistent.
 
-An example configuration for two soundcards is like below:
+An example configuration for two sound cards is like below:
 
 ----- /etc/modprobe.conf
 # ALSA portion
@@ -1420,7 +1447,7 @@ ALSA PCM devices to OSS devices mapping
 /dev/snd/pcmC2D1[c|p]  -> /dev/adsp2               -> minor 12+32 = 44
 
 The first number from /dev/snd/pcmC{X}D{Y}[c|p] expression means
-soundcard number and second means device number.  The ALSA devices
+sound card number and second means device number.  The ALSA devices
 have either 'c' or 'p' suffix indicating the direction, capture and
 playback, respectively.
 

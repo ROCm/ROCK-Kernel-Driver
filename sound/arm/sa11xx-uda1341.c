@@ -862,7 +862,7 @@ static int __init snd_card_sa11xx_uda1341_pcm(sa11xx_uda1341_t *sa11xx_uda1341, 
 
 #ifdef CONFIG_PM
 
-static int snd_sa11xx_uda1341_suspend(snd_card_t *card, unsigned int state)
+static int snd_sa11xx_uda1341_suspend(snd_card_t *card, pm_message_t state)
 {
 	sa11xx_uda1341_t *chip = card->pm_private_data;
 
@@ -878,7 +878,7 @@ static int snd_sa11xx_uda1341_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_sa11xx_uda1341_resume(snd_card_t *card, unsigned int state)
+static int snd_sa11xx_uda1341_resume(snd_card_t *card)
 {
 	sa11xx_uda1341_t *chip = card->pm_private_data;
 
@@ -938,7 +938,7 @@ static int __init sa11xx_uda1341_init(void)
 	if ((err = snd_card_sa11xx_uda1341_pcm(sa11xx_uda1341, 0)) < 0)
 		goto nodev;
         
-	snd_card_set_dev_pm_callback(card, PM_SYS_DEV,
+	snd_card_set_generic_pm_callback(card,
 				     snd_sa11xx_uda1341_suspend, snd_sa11_uda1341_resume,
 				     sa11xx_uda1341);
 

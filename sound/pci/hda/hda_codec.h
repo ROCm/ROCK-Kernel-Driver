@@ -361,6 +361,9 @@ enum {
 /* max. connections to a widget */
 #define HDA_MAX_CONNECTIONS	16
 
+/* max. codec address */
+#define HDA_MAX_CODEC_ADDRESS	0x0f
+
 /*
  * Structures
  */
@@ -369,6 +372,7 @@ struct hda_bus;
 struct hda_codec;
 struct hda_pcm;
 struct hda_pcm_stream;
+struct hda_bus_unsolicited;
 
 /* NID type */
 typedef u16 hda_nid_t;
@@ -409,8 +413,12 @@ struct hda_bus {
 
 	/* codec linked list */
 	struct list_head codec_list;
+	struct hda_codec *caddr_tbl[HDA_MAX_CODEC_ADDRESS]; /* caddr -> codec */
 
 	struct semaphore cmd_mutex;
+
+	/* unsolicited event queue */
+	struct hda_bus_unsolicited *unsol;
 
 	snd_info_entry_t *proc;
 };
@@ -437,8 +445,10 @@ struct hda_codec_ops {
 	int (*build_pcms)(struct hda_codec *codec);
 	int (*init)(struct hda_codec *codec);
 	void (*free)(struct hda_codec *codec);
+	void (*unsol_event)(struct hda_codec *codec, unsigned int res);
 #ifdef CONFIG_PM
-	int (*resume)(struct hda_codec *codec, unsigned int state);
+	int (*suspend)(struct hda_codec *codec, pm_message_t state);
+	int (*resume)(struct hda_codec *codec);
 #endif
 };
 
@@ -555,6 +565,9 @@ struct hda_verb {
 
 void snd_hda_sequence_write(struct hda_codec *codec, const struct hda_verb *seq);
 
+/* unsolicited event */
+int snd_hda_queue_unsol_event(struct hda_bus *bus, u32 res, u32 res_ex);
+
 /*
  * Mixer
  */
@@ -582,8 +595,8 @@ void snd_hda_get_codec_name(struct hda_codec *codec, char *name, int namelen);
  * power management
  */
 #ifdef CONFIG_PM
-int snd_hda_suspend(struct hda_bus *bus, unsigned int state);
-int snd_hda_resume(struct hda_bus *bus, unsigned int state);
+int snd_hda_suspend(struct hda_bus *bus, pm_message_t state);
+int snd_hda_resume(struct hda_bus *bus);
 #endif
 
 #endif /* __SOUND_HDA_CODEC_H */

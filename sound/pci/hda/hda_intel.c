@@ -358,11 +358,11 @@ static void azx_init_cmd_io(azx_t *chip)
 	/* set N=1, get RIRB response interrupt for new entry */
 	azx_writew(chip, RINTCNT, 1);
 	/* enable rirb dma and response irq */
-	azx_writeb(chip, RIRBCTL, ICH6_RBCTL_DMA_EN
 #ifdef USE_CORB_RIRB
-		   | ICH6_RBCTL_IRQ_EN
+	azx_writeb(chip, RIRBCTL, ICH6_RBCTL_DMA_EN | ICH6_RBCTL_IRQ_EN);
+#else
+	azx_writeb(chip, RIRBCTL, ICH6_RBCTL_DMA_EN);
 #endif
-		   );
 	chip->rirb.rp = chip->rirb.cmds = 0;
 }
 
@@ -421,10 +421,9 @@ static void azx_update_rirb(azx_t *chip)
 		rp = chip->rirb.rp << 1; /* an RIRB entry is 8-bytes */
 		res_ex = le32_to_cpu(chip->rirb.buf[rp + 1]);
 		res = le32_to_cpu(chip->rirb.buf[rp]);
-		if (res_ex & ICH6_RIRB_EX_UNSOL_EV) {
-			//azx_push_unsol_event(chip, res);
-			printk(KERN_DEBUG "RIRB: unsolicited event 0x%x\n", res);
-		} else if (chip->rirb.cmds) {
+		if (res_ex & ICH6_RIRB_EX_UNSOL_EV)
+			snd_hda_queue_unsol_event(chip->bus, res, res_ex);
+		else if (chip->rirb.cmds) {
 			chip->rirb.cmds--;
 			chip->rirb.res = res;
 		}
@@ -1175,7 +1174,7 @@ static int __devinit azx_init_stream(azx_t *chip)
 /*
  * power management
  */
-static int azx_suspend(snd_card_t *card, unsigned int state)
+static int azx_suspend(snd_card_t *card, pm_message_t state)
 {
 	azx_t *chip = card->pm_private_data;
 	int i;
@@ -1189,14 +1188,14 @@ static int azx_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int azx_resume(snd_card_t *card, unsigned int state)
+static int azx_resume(snd_card_t *card)
 {
 	azx_t *chip = card->pm_private_data;
 
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
 	azx_init_chip(chip);
-	snd_hda_resume(chip->bus, state);
+	snd_hda_resume(chip->bus);
 	return 0;
 }
 #endif /* CONFIG_PM */

@@ -1267,7 +1267,7 @@ snd_nm256_peek_for_sig(nm256_t *chip)
  * APM event handler, so the card is properly reinitialized after a power
  * event.
  */
-static int nm256_suspend(snd_card_t *card, unsigned int state)
+static int nm256_suspend(snd_card_t *card, pm_message_t state)
 {
 	nm256_t *chip = card->pm_private_data;
 
@@ -1278,7 +1278,7 @@ static int nm256_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int nm256_resume(snd_card_t *card, unsigned int state)
+static int nm256_resume(snd_card_t *card)
 {
 	nm256_t *chip = card->pm_private_data;
 

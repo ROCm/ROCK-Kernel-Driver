@@ -2980,6 +2980,8 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 		return create_ua700_ua25_quirk(chip, iface);
 	case QUIRK_AUDIO_EDIROL_UA1000:
 		return create_ua1000_quirk(chip, iface);
+	case QUIRK_IGNORE_INTERFACE:
+		return 0;
 	default:
 		snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);
 		return -ENXIO;

@@ -26,11 +26,13 @@
 
 #define VT1720_MOBO_DEVICE_DESC        "{Albatron,K8X800 Pro II},"\
 				       "{Chaintech,ZNF3-150},"\
-				       "{Chaintech,ZNF3-250},"
+				       "{Chaintech,ZNF3-250},"\
+				       "{Chaintech,9CJS},"
 
 #define VT1720_SUBDEVICE_K8X800		0xf217052c
 #define VT1720_SUBDEVICE_ZNF3_150	0x0f2741f6
 #define VT1720_SUBDEVICE_ZNF3_250	0x0f2745f6
+#define VT1720_SUBDEVICE_9CJS		0x0f272327
 
 extern struct snd_ice1712_card_info  snd_vt1720_mobo_cards[];
 

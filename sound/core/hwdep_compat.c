@@ -18,13 +18,9 @@
  *
  */
 
-#include <sound/driver.h>
-#include <linux/time.h>
-#include <linux/fs.h>
-#include <sound/core.h>
-#include <sound/hwdep.h>
-#include <asm/uaccess.h>
-#include "ioctl32.h"
+/* This file is included from hwdep.c */
+
+#include <linux/compat.h>
 
 struct sndrv_hwdep_dsp_image32 {
 	u32 index;
@@ -34,40 +30,48 @@ struct sndrv_hwdep_dsp_image32 {
 	u32 driver_data;
 } /* don't set packed attribute here */;
 
-static inline int _snd_ioctl32_hwdep_dsp_image(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+static int snd_hwdep_dsp_load_compat(snd_hwdep_t *hw,
+				     struct sndrv_hwdep_dsp_image32 __user *src)
 {
-	struct sndrv_hwdep_dsp_image __user *data, *dst;
-	struct sndrv_hwdep_dsp_image32 __user *data32, *src;
+	struct sndrv_hwdep_dsp_image *dst;
 	compat_caddr_t ptr;
+	u32 val;
 
-	data32 = compat_ptr(arg);
-	data = compat_alloc_user_space(sizeof(*data));
+	dst = compat_alloc_user_space(sizeof(*dst));
 
 	/* index and name */
-	if (copy_in_user(data, data32, 4 + 64))
+	if (copy_in_user(dst, src, 4 + 64))
 		return -EFAULT;
-	if (__get_user(ptr, &data32->image) ||
-	    __put_user(compat_ptr(ptr), &data->image))
+	if (get_user(ptr, &src->image) ||
+	    put_user(compat_ptr(ptr), &dst->image))
 		return -EFAULT;
-	src = data32;
-	dst = data;
-	COPY_CVT(length);
-	COPY_CVT(driver_data);
-	return file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);
+	if (get_user(val, &src->length) ||
+	    put_user(val, &dst->length))
+		return -EFAULT;
+	if (get_user(val, &src->driver_data) ||
+	    put_user(val, &dst->driver_data))
+		return -EFAULT;
+
+	return snd_hwdep_dsp_load(hw, dst);
 }
-
-DEFINE_ALSA_IOCTL_ENTRY(hwdep_dsp_image, hwdep_dsp_image, SNDRV_HWDEP_IOCTL_DSP_LOAD);
-
-#define AP(x) snd_ioctl32_##x
 
 enum {
 	SNDRV_HWDEP_IOCTL_DSP_LOAD32   = _IOW('H', 0x03, struct sndrv_hwdep_dsp_image32)
 };
 
-struct ioctl32_mapper hwdep_mappers[] = {
-	MAP_COMPAT(SNDRV_HWDEP_IOCTL_PVERSION),
-	MAP_COMPAT(SNDRV_HWDEP_IOCTL_INFO),
-	MAP_COMPAT(SNDRV_HWDEP_IOCTL_DSP_STATUS),
-	{ SNDRV_HWDEP_IOCTL_DSP_LOAD32, AP(hwdep_dsp_image) },
-	{ 0 },
-};
+static long snd_hwdep_ioctl_compat(struct file * file, unsigned int cmd, unsigned long arg)
+{
+	snd_hwdep_t *hw = file->private_data;
+	void __user *argp = compat_ptr(arg);
+	switch (cmd) {
+	case SNDRV_HWDEP_IOCTL_PVERSION:
+	case SNDRV_HWDEP_IOCTL_INFO:
+	case SNDRV_HWDEP_IOCTL_DSP_STATUS:
+		return snd_hwdep_ioctl(file, cmd, (unsigned long)argp);
+	case SNDRV_HWDEP_IOCTL_DSP_LOAD32:
+		return snd_hwdep_dsp_load_compat(hw, argp);
+	}
+	if (hw->ops.ioctl_compat)
+		return hw->ops.ioctl_compat(hw, file, cmd, arg);
+	return -ENOIOCTLCMD;
+}

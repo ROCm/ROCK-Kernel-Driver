@@ -76,7 +76,7 @@ static LIST_HEAD(snd_timer_list);
 static LIST_HEAD(snd_timer_slave_list);
 
 /* lock for slave active lists */
-static spinlock_t slave_active_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(slave_active_lock);
 
 static DECLARE_MUTEX(register_mutex);
 
@@ -1653,8 +1653,7 @@ static int snd_timer_user_continue(struct file *file)
 	return (err = snd_timer_continue(tu->timeri)) < 0 ? err : 0;
 }
 
-static inline int _snd_timer_user_ioctl(struct inode *inode, struct file *file,
-					unsigned int cmd, unsigned long arg)
+static long snd_timer_user_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	snd_timer_user_t *tu;
 	void __user *argp = (void __user *)arg;
@@ -1699,17 +1698,6 @@ static inline int _snd_timer_user_ioctl(struct inode *inode, struct file *file,
 		return snd_timer_user_continue(file);
 	}
 	return -ENOTTY;
-}
-
-/* FIXME: need to unlock BKL to allow preemption */
-static int snd_timer_user_ioctl(struct inode *inode, struct file * file,
-				unsigned int cmd, unsigned long arg)
-{
-	int err;
-	unlock_kernel();
-	err = _snd_timer_user_ioctl(inode, file, cmd, arg);
-	lock_kernel();
-	return err;
 }
 
 static int snd_timer_user_fasync(int fd, struct file * file, int on)
@@ -1803,6 +1791,12 @@ static unsigned int snd_timer_user_poll(struct file *file, poll_table * wait)
 	return mask;
 }
 
+#ifdef CONFIG_COMPAT
+#include "timer_compat.c"
+#else
+#define snd_timer_user_ioctl_compat	NULL
+#endif
+
 static struct file_operations snd_timer_f_ops =
 {
 	.owner =	THIS_MODULE,
@@ -1810,7 +1804,8 @@ static struct file_operations snd_timer_f_ops =
 	.open =		snd_timer_user_open,
 	.release =	snd_timer_user_release,
 	.poll =		snd_timer_user_poll,
-	.ioctl =	snd_timer_user_ioctl,
+	.unlocked_ioctl =	snd_timer_user_ioctl,
+	.compat_ioctl =	snd_timer_user_ioctl_compat,
 	.fasync = 	snd_timer_user_fasync,
 };
 

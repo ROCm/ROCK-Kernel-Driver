@@ -644,7 +644,7 @@ static void snd_ad1848_thinkpad_twiddle(ad1848_t *chip, int on) {
 }
 
 #ifdef CONFIG_PM
-static int snd_ad1848_suspend(snd_card_t *card, unsigned int state)
+static int snd_ad1848_suspend(snd_card_t *card, pm_message_t state)
 {
 	ad1848_t *chip = card->pm_private_data;
 
@@ -657,7 +657,7 @@ static int snd_ad1848_suspend(snd_card_t *card, unsigned int state)
 	return 0;
 }
 
-static int snd_ad1848_resume(snd_card_t *card, unsigned int state)
+static int snd_ad1848_resume(snd_card_t *card)
 {
 	ad1848_t *chip = card->pm_private_data;
 

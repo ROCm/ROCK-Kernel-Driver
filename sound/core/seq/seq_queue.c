@@ -49,7 +49,7 @@
 
 /* list of allocated queues */
 static queue_t *queue_list[SNDRV_SEQ_MAX_QUEUES];
-static spinlock_t queue_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(queue_list_lock);
 /* number of queues allocated */
 static int num_queues;
 

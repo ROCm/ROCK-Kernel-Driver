@@ -50,8 +50,8 @@ static long snd_alloc_kmalloc;
 static long snd_alloc_vmalloc;
 static LIST_HEAD(snd_alloc_kmalloc_list);
 static LIST_HEAD(snd_alloc_vmalloc_list);
-static spinlock_t snd_alloc_kmalloc_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t snd_alloc_vmalloc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(snd_alloc_kmalloc_lock);
+static DEFINE_SPINLOCK(snd_alloc_vmalloc_lock);
 #define KMALLOC_MAGIC 0x87654321
 #define VMALLOC_MAGIC 0x87654320
 static snd_info_entry_t *snd_memory_info_entry;

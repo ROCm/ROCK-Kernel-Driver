@@ -1913,8 +1913,7 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static inline int _snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
-				     unsigned int cmd, unsigned long arg)
+static long snd_pcm_oss_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	snd_pcm_oss_file_t *pcm_oss_file;
 	int __user *p = (int __user *)arg;
@@ -2073,16 +2072,12 @@ static inline int _snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 	return -EINVAL;
 }
 
-/* FIXME: need to unlock BKL to allow preemption */
-static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
-			     unsigned int cmd, unsigned long arg)
-{
-	int err;
-	unlock_kernel();
-	err = _snd_pcm_oss_ioctl(inode, file, cmd, arg);
-	lock_kernel();
-	return err;
-}
+#ifdef CONFIG_COMPAT
+/* all compatible */
+#define snd_pcm_oss_ioctl_compat	snd_pcm_oss_ioctl
+#else
+#define snd_pcm_oss_ioctl_compat	NULL
+#endif
 
 static ssize_t snd_pcm_oss_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
@@ -2410,7 +2405,8 @@ static struct file_operations snd_pcm_oss_f_reg =
 	.open =		snd_pcm_oss_open,
 	.release =	snd_pcm_oss_release,
 	.poll =		snd_pcm_oss_poll,
-	.ioctl =	snd_pcm_oss_ioctl,
+	.unlocked_ioctl =	snd_pcm_oss_ioctl,
+	.compat_ioctl =	snd_pcm_oss_ioctl_compat,
 	.mmap =		snd_pcm_oss_mmap,
 };
 

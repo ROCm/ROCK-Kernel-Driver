@@ -38,6 +38,7 @@ typedef struct _snd_hwdep_ops {
 	int (*release) (snd_hwdep_t * hw, struct file * file);
 	unsigned int (*poll) (snd_hwdep_t * hw, struct file * file, poll_table * wait);
 	int (*ioctl) (snd_hwdep_t * hw, struct file * file, unsigned int cmd, unsigned long arg);
+	int (*ioctl_compat) (snd_hwdep_t * hw, struct file * file, unsigned int cmd, unsigned long arg);
 	int (*mmap) (snd_hwdep_t * hw, struct file * file, struct vm_area_struct * vma);
 	int (*dsp_status) (snd_hwdep_t * hw, snd_hwdep_dsp_status_t * status);
 	int (*dsp_load) (snd_hwdep_t * hw, snd_hwdep_dsp_image_t * image);
