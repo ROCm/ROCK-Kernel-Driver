@@ -24,7 +24,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.124 $"
+#define VERSION_QETH_H 		"$Revision: 1.129 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -669,7 +669,6 @@ struct qeth_reply {
 #define QETH_BROADCAST_WITHOUT_ECHO 2
 
 struct qeth_card_info {
-	char if_name[IF_NAME_LEN];
 	unsigned short unit_addr2;
 	unsigned short cula;
 	unsigned short chpid;
@@ -774,6 +773,8 @@ extern spinlock_t qeth_notify_lock;
 extern struct list_head qeth_notify_list;
 
 /*some helper functions*/
+
+#define QETH_CARD_IFNAME(card) (((card)->dev)? (card)->dev->name : "")
 
 inline static __u8
 qeth_get_ipa_adp_type(enum qeth_link_types link_type)
@@ -1069,4 +1070,9 @@ qeth_schedule_recovery(struct qeth_card *);
 
 extern int
 qeth_realloc_buffer_pool(struct qeth_card *, int);
+
+extern int
+qeth_fake_header(struct sk_buff *skb, struct net_device *dev,
+                 unsigned short type, void *daddr, void *saddr,
+		 unsigned len);
 #endif /* __QETH_H__ */
