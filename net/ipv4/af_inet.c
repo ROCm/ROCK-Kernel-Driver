@@ -5,7 +5,7 @@
  *
  *		PF_INET protocol family socket handler.
  *
- * Version:	$Id: af_inet.c,v 1.136 2001/11/06 22:21:08 davem Exp $
+ * Version:	$Id: af_inet.c,v 1.137 2002/02/01 22:01:03 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -147,6 +147,11 @@ int (*br_ioctl_hook)(unsigned long);
 int (*vlan_ioctl_hook)(unsigned long arg);
 #endif
 
+/* Per protocol sock slabcache */
+kmem_cache_t *tcp_sk_cachep;
+static kmem_cache_t *udp_sk_cachep;
+static kmem_cache_t *raw4_sk_cachep;
+
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
  */
@@ -156,6 +161,8 @@ struct list_head inetsw[SOCK_MAX];
 
 void inet_sock_destruct(struct sock *sk)
 {
+	struct inet_opt *inet = inet_sk(sk);
+
 	__skb_queue_purge(&sk->receive_queue);
 	__skb_queue_purge(&sk->error_queue);
 
@@ -175,8 +182,8 @@ void inet_sock_destruct(struct sock *sk)
 	BUG_TRAP(sk->wmem_queued == 0);
 	BUG_TRAP(sk->forward_alloc == 0);
 
-	if (sk->protinfo.af_inet.opt)
-		kfree(sk->protinfo.af_inet.opt);
+	if (inet->opt)
+		kfree(inet->opt);
 	dst_release(sk->dst_cache);
 #ifdef INET_REFCNT_DEBUG
 	atomic_dec(&inet_sock_nr);
@@ -312,6 +319,28 @@ out:
 	return err;
 }
 
+static __inline__ kmem_cache_t *inet_sk_slab(int protocol)
+{
+	kmem_cache_t* rc = tcp_sk_cachep;
+
+	if (protocol == IPPROTO_UDP)
+		rc = udp_sk_cachep;
+	else if (protocol == IPPROTO_RAW)
+		rc = raw4_sk_cachep;
+	return rc;
+}
+
+static __inline__ int inet_sk_size(int protocol)
+{
+	int rc = sizeof(struct tcp_sock);
+
+	if (protocol == IPPROTO_UDP)
+		rc = sizeof(struct udp_sock);
+	else if (protocol == IPPROTO_RAW)
+		rc = sizeof(struct raw_sock);
+	return rc;
+}
+
 /*
  *	Create an inet socket.
  */
@@ -321,9 +350,11 @@ static int inet_create(struct socket *sock, int protocol)
 	struct sock *sk;
         struct list_head *p;
         struct inet_protosw *answer;
+	struct inet_opt *inet;
 
 	sock->state = SS_UNCONNECTED;
-	sk = sk_alloc(PF_INET, GFP_KERNEL, 1);
+	sk = sk_alloc(PF_INET, GFP_KERNEL, inet_sk_size(protocol),
+		      inet_sk_slab(protocol));
 	if (sk == NULL) 
 		goto do_oom;
   
@@ -363,18 +394,20 @@ static int inet_create(struct socket *sock, int protocol)
 	if (INET_PROTOSW_REUSE & answer->flags)
 		sk->reuse = 1;
 
+	inet = inet_sk(sk);
+
 	if (SOCK_RAW == sock->type) {
 		sk->num = protocol;
 		if (IPPROTO_RAW == protocol)
-			sk->protinfo.af_inet.hdrincl = 1;
+			inet->hdrincl = 1;
 	}
 
 	if (ipv4_config.no_pmtu_disc)
-		sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_DONT;
+		inet->pmtudisc = IP_PMTUDISC_DONT;
 	else
-		sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_WANT;
+		inet->pmtudisc = IP_PMTUDISC_WANT;
 
-	sk->protinfo.af_inet.id = 0;
+	inet->id = 0;
 
 	sock_init_data(sock,sk);
 
@@ -386,12 +419,12 @@ static int inet_create(struct socket *sock, int protocol)
 
 	sk->backlog_rcv = sk->prot->backlog_rcv;
 
-	sk->protinfo.af_inet.ttl	= sysctl_ip_default_ttl;
+	inet->ttl	= sysctl_ip_default_ttl;
 
-	sk->protinfo.af_inet.mc_loop	= 1;
-	sk->protinfo.af_inet.mc_ttl	= 1;
-	sk->protinfo.af_inet.mc_index	= 0;
-	sk->protinfo.af_inet.mc_list	= NULL;
+	inet->mc_loop	= 1;
+	inet->mc_ttl	= 1;
+	inet->mc_index	= 0;
+	inet->mc_list	= NULL;
 
 #ifdef INET_REFCNT_DEBUG
 	atomic_inc(&inet_sock_nr);
@@ -474,6 +507,7 @@ static int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in *addr=(struct sockaddr_in *)uaddr;
 	struct sock *sk=sock->sk;
+	struct inet_opt *inet = inet_sk(sk);
 	unsigned short snum;
 	int chk_addr_ret;
 	int err;
@@ -495,7 +529,7 @@ static int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	 *  is temporarily down)
 	 */
 	if (sysctl_ip_nonlocal_bind == 0 && 
-	    sk->protinfo.af_inet.freebind == 0 &&
+	    inet->freebind == 0 &&
 	    addr->sin_addr.s_addr != INADDR_ANY &&
 	    chk_addr_ret != RTN_LOCAL &&
 	    chk_addr_ret != RTN_MULTICAST &&
@@ -992,8 +1026,8 @@ struct proto_ops inet_dgram_ops = {
 };
 
 struct net_proto_family inet_family_ops = {
-	family:	PF_INET,
-	create:	inet_create
+	family:	 PF_INET,
+	create:	 inet_create,
 };
 
 
@@ -1120,6 +1154,18 @@ static int __init inet_init(void)
 		return -EINVAL;
 	}
 
+	tcp_sk_cachep = kmem_cache_create("tcp_sock",
+					  sizeof(struct tcp_sock), 0,
+					  SLAB_HWCACHE_ALIGN, 0, 0);
+	udp_sk_cachep = kmem_cache_create("udp_sock",
+					  sizeof(struct udp_sock), 0,
+					  SLAB_HWCACHE_ALIGN, 0, 0);
+	raw4_sk_cachep = kmem_cache_create("raw4_sock",
+					   sizeof(struct raw_sock), 0,
+					   SLAB_HWCACHE_ALIGN, 0, 0);
+        if (!tcp_sk_cachep || !udp_sk_cachep || !raw4_sk_cachep)
+		printk(KERN_CRIT __FUNCTION__
+			": Can't create protocol sock SLAB caches!\n");
 	/*
 	 *	Tell SOCKET that we are alive... 
 	 */

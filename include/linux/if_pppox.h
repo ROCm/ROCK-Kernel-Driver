@@ -113,6 +113,26 @@ struct pppoe_hdr {
 } __attribute__ ((packed));
 
 #ifdef __KERNEL__
+struct pppoe_opt {
+	struct net_device      *dev;	  /* device associated with socket*/
+	struct pppoe_addr	pa;	  /* what this socket is bound to*/
+	struct sockaddr_pppox	relay;	  /* what socket data will be
+					     relayed to (PPPoE relaying) */
+};
+
+struct pppox_opt {
+	struct ppp_channel	chan;
+	struct sock		*sk;
+	struct pppox_opt	*next;	  /* for hash table */
+	union {
+		struct pppoe_opt pppoe;
+	} proto;
+};
+#define pppoe_dev	proto.pppoe.dev
+#define pppoe_pa	proto.pppoe.pa
+#define pppoe_relay	proto.pppoe.relay
+
+#define pppox_sk(__sk) ((struct pppox_opt *)(__sk)->protinfo)
 
 struct pppox_proto {
 	int (*create)(struct socket *sock);

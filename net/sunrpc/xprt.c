@@ -56,6 +56,7 @@
 #include <linux/net.h>
 #include <linux/mm.h>
 #include <linux/udp.h>
+#include <linux/tcp.h>
 #include <linux/unistd.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/file.h>

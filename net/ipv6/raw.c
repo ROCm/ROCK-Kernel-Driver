@@ -7,7 +7,7 @@
  *
  *	Adapted from linux/net/ipv4/raw.c
  *
- *	$Id: raw.c,v 1.50 2001/09/18 22:29:10 davem Exp $
+ *	$Id: raw.c,v 1.51 2002/02/01 22:01:04 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -86,14 +86,14 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 
 	for(s = sk; s; s = s->next) {
 		if(s->num == num) {
-			struct ipv6_pinfo *np = &s->net_pinfo.af_inet6;
+			struct ipv6_pinfo *np = inet6_sk(s);
 
 			if (!ipv6_addr_any(&np->daddr) &&
 			    ipv6_addr_cmp(&np->daddr, rmt_addr))
 				continue;
 
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
-				if (ipv6_addr_cmp(&np->rcv_saddr, loc_addr) == 0)
+				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
 					break;
 				if ((addr_type & IPV6_ADDR_MULTICAST) &&
 				    inet6_mc_check(s, loc_addr))
@@ -113,9 +113,8 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 static __inline__ int icmpv6_filter(struct sock *sk, struct sk_buff *skb)
 {
 	struct icmp6hdr *icmph;
-	struct raw6_opt *opt;
+	struct raw6_opt *opt = raw6_sk(sk);
 
-	opt = &sk->tp_pinfo.tp_raw;
 	if (pskb_may_pull(skb, sizeof(struct icmp6hdr))) {
 		__u32 *data = &opt->filter.data[0];
 		int bit_nr;
@@ -187,6 +186,7 @@ out:
 /* This cleans up af_inet6 a bit. -DaveM */
 static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *) uaddr;
 	__u32 v4addr = 0;
 	int addr_type;
@@ -235,9 +235,9 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 	sk->rcv_saddr = v4addr;
 	sk->saddr = v4addr;
-	ipv6_addr_copy(&sk->net_pinfo.af_inet6.rcv_saddr, &addr->sin6_addr);
+	ipv6_addr_copy(&np->rcv_saddr, &addr->sin6_addr);
 	if (!(addr_type & IPV6_ADDR_MULTICAST))
-		ipv6_addr_copy(&sk->net_pinfo.af_inet6.saddr, &addr->sin6_addr);
+		ipv6_addr_copy(&np->saddr, &addr->sin6_addr);
 	err = 0;
 out:
 	release_sock(sk);
@@ -248,6 +248,8 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb,
 	       struct inet6_skb_parm *opt,
 	       int type, int code, int offset, u32 info)
 {
+	struct inet_opt *inet = inet_sk(sk);
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	int err;
 	int harderr;
 
@@ -256,21 +258,21 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb,
 	   2. Socket is connected (otherwise the error indication
 	      is useless without recverr and error is hard.
 	 */
-	if (!sk->net_pinfo.af_inet6.recverr && sk->state != TCP_ESTABLISHED)
+	if (!np->recverr && sk->state != TCP_ESTABLISHED)
 		return;
 
 	harderr = icmpv6_err_convert(type, code, &err);
 	if (type == ICMPV6_PKT_TOOBIG)
-		harderr = (sk->net_pinfo.af_inet6.pmtudisc == IPV6_PMTUDISC_DO);
+		harderr = (np->pmtudisc == IPV6_PMTUDISC_DO);
 
-	if (sk->net_pinfo.af_inet6.recverr) {
+	if (np->recverr) {
 		u8 *payload = skb->data;
-		if (!sk->protinfo.af_inet.hdrincl)
+		if (!inet->hdrincl)
 			payload += offset;
 		ipv6_icmp_error(sk, skb, err, 0, ntohl(info), payload);
 	}
 
-	if (sk->net_pinfo.af_inet6.recverr || harderr) {
+	if (np->recverr || harderr) {
 		sk->err = err;
 		sk->error_report(sk);
 	}
@@ -298,7 +300,9 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
  */
 int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	if (sk->protinfo.af_inet.hdrincl) {
+	struct inet_opt *inet = inet_sk(sk);
+
+	if (inet->hdrincl) {
 		__skb_push(skb, skb->nh.raw - skb->data);
 		skb->h.raw = skb->nh.raw;
 	}
@@ -316,6 +320,7 @@ int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
 int rawv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		  int noblock, int flags, int *addr_len)
 {
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)msg->msg_name;
 	struct sk_buff *skb;
 	int copied, err;
@@ -358,7 +363,7 @@ int rawv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 
 	sock_recv_timestamp(msg, sk, skb);
 
-	if (sk->net_pinfo.af_inet6.rxopt.all)
+	if (np->rxopt.all)
 		datagram_recv_ctl(sk, msg, skb);
 	err = copied;
 
@@ -405,7 +410,7 @@ static int rawv6_frag_cksum(const void *data, struct in6_addr *addr,
 		struct in6_addr *daddr;
 		
 		sk = hdr->sk;
-		opt = &sk->tp_pinfo.tp_raw;
+		opt = raw6_sk(sk);
 
 		if (hdr->daddr)
 			daddr = hdr->daddr;
@@ -434,7 +439,7 @@ static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
 	struct flowi fl;
@@ -491,8 +496,8 @@ static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 
 		/* Otherwise it will be difficult to maintain sk->dst_cache. */
 		if (sk->state == TCP_ESTABLISHED &&
-		    !ipv6_addr_cmp(daddr, &sk->net_pinfo.af_inet6.daddr))
-			daddr = &sk->net_pinfo.af_inet6.daddr;
+		    !ipv6_addr_cmp(daddr, &np->daddr))
+			daddr = &np->daddr;
 
 		if (addr_len >= sizeof(struct sockaddr_in6) &&
 		    sin6->sin6_scope_id &&
@@ -503,7 +508,7 @@ static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 			return(-EINVAL);
 		
 		proto = sk->num;
-		daddr = &(sk->net_pinfo.af_inet6.daddr);
+		daddr = &np->daddr;
 		fl.fl6_flowlabel = np->flow_label;
 	}
 
@@ -541,7 +546,7 @@ static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 	if (flowlabel)
 		opt = fl6_merge_options(&opt_space, flowlabel, opt);
 
-	raw_opt = &sk->tp_pinfo.tp_raw;
+	raw_opt = raw6_sk(sk);
 
 	fl.proto = proto;
 	fl.fl6_dst = daddr;
@@ -583,7 +588,7 @@ static int rawv6_seticmpfilter(struct sock *sk, int level, int optname,
 	case ICMPV6_FILTER:
 		if (optlen > sizeof(struct icmp6_filter))
 			optlen = sizeof(struct icmp6_filter);
-		if (copy_from_user(&sk->tp_pinfo.tp_raw.filter, optval, optlen))
+		if (copy_from_user(&raw6_sk(sk)->filter, optval, optlen))
 			return -EFAULT;
 		return 0;
 	default:
@@ -608,7 +613,7 @@ static int rawv6_geticmpfilter(struct sock *sk, int level, int optname,
 			len = sizeof(struct icmp6_filter);
 		if (put_user(len, optlen))
 			return -EFAULT;
-		if (copy_to_user(optval, &sk->tp_pinfo.tp_raw.filter, len))
+		if (copy_to_user(optval, &raw6_sk(sk)->filter, len))
 			return -EFAULT;
 		return 0;
 	default:
@@ -622,7 +627,7 @@ static int rawv6_geticmpfilter(struct sock *sk, int level, int optname,
 static int rawv6_setsockopt(struct sock *sk, int level, int optname, 
 			    char *optval, int optlen)
 {
-	struct raw6_opt *opt = &sk->tp_pinfo.tp_raw;
+	struct raw6_opt *opt = raw6_sk(sk);
 	int val;
 
 	switch(level) {
@@ -665,7 +670,7 @@ static int rawv6_setsockopt(struct sock *sk, int level, int optname,
 static int rawv6_getsockopt(struct sock *sk, int level, int optname, 
 			    char *optval, int *optlen)
 {
-	struct raw6_opt *opt = &sk->tp_pinfo.tp_raw;
+	struct raw6_opt *opt = raw6_sk(sk);
 	int val, len;
 
 	switch(level) {
@@ -752,11 +757,12 @@ static int rawv6_init_sk(struct sock *sk)
 
 static void get_raw6_sock(struct sock *sp, char *tmpbuf, int i)
 {
+	struct ipv6_pinfo *np = inet6_sk(sp);
 	struct in6_addr *dest, *src;
 	__u16 destp, srcp;
 
-	dest  = &sp->net_pinfo.af_inet6.daddr;
-	src   = &sp->net_pinfo.af_inet6.rcv_saddr;
+	dest  = &np->daddr;
+	src   = &np->rcv_saddr;
 	destp = 0;
 	srcp  = sp->num;
 	sprintf(tmpbuf,

@@ -33,7 +33,8 @@
 #define ATM_PDU_OVHD	0	/* number of bytes to charge against buffer
 				   quota per PDU */
 
-#define ATM_SD(s)	((s)->sk->protinfo.af_atm)
+#define atm_sk(__sk) ((struct atm_vcc *)(__sk)->protinfo)
+#define ATM_SD(s)	(atm_sk((s)->sk))
 
 
 #define __AAL_STAT_ITEMS \

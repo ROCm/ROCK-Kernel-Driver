@@ -156,17 +156,18 @@ int x25_create_facilities(unsigned char *buffer, struct x25_facilities *faciliti
  */
 int x25_negotiate_facilities(struct sk_buff *skb, struct sock *sk, struct x25_facilities *new)
 {
+	x25_cb *x25 = x25_sk(sk);
 	struct x25_facilities *ours;
 	struct x25_facilities theirs;
 	int len;
 
 	memset(&theirs, 0x00, sizeof(struct x25_facilities));
 
-	ours = &sk->protinfo.x25->facilities;
+	ours = &x25->facilities;
 
 	*new = *ours;
 
-	len = x25_parse_facilities(skb, &theirs, &sk->protinfo.x25->vc_facil_mask);
+	len = x25_parse_facilities(skb, &theirs, &x25->vc_facil_mask);
 
 	/*
 	 *	They want reverse charging, we won't accept it.

@@ -26,6 +26,7 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 #include <linux/ip.h>
+#include <linux/in.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/in_route.h>
@@ -181,8 +182,8 @@ int ip_decrease_ttl(struct iphdr *iph)
 static inline
 int ip_dont_fragment(struct sock *sk, struct dst_entry *dst)
 {
-	return (sk->protinfo.af_inet.pmtudisc == IP_PMTUDISC_DO ||
-		(sk->protinfo.af_inet.pmtudisc == IP_PMTUDISC_WANT &&
+	return (inet_sk(sk)->pmtudisc == IP_PMTUDISC_DO ||
+		(inet_sk(sk)->pmtudisc == IP_PMTUDISC_WANT &&
 		 !(dst->mxlock&(1<<RTAX_MTU))));
 }
 
@@ -196,7 +197,7 @@ static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, str
 		 * does not change, they drop every other packet in
 		 * a TCP stream using header compression.
 		 */
-		iph->id = ((sk && sk->daddr) ? htons(sk->protinfo.af_inet.id++) : 0);
+		iph->id = (sk && sk->daddr) ? htons(inet_sk(sk)->id++) : 0;
 	} else
 		__ip_select_ident(iph, dst);
 }

@@ -122,7 +122,7 @@ void unix_inflight(struct file *fp)
 {
 	unix_socket *s=unix_get_socket(fp);
 	if(s) {
-		atomic_inc(&s->protinfo.af_unix.inflight);
+		atomic_inc(&unix_sk(s)->inflight);
 		atomic_inc(&unix_tot_inflight);
 	}
 }
@@ -131,7 +131,7 @@ void unix_notinflight(struct file *fp)
 {
 	unix_socket *s=unix_get_socket(fp);
 	if(s) {
-		atomic_dec(&s->protinfo.af_unix.inflight);
+		atomic_dec(&unix_sk(s)->inflight);
 		atomic_dec(&unix_tot_inflight);
 	}
 }
@@ -144,7 +144,7 @@ void unix_notinflight(struct file *fp)
 extern inline unix_socket *pop_stack(void)
 {
 	unix_socket *p=gc_current;
-	gc_current = p->protinfo.af_unix.gc_tree;
+	gc_current = unix_sk(p)->gc_tree;
 	return p;
 }
 
@@ -155,10 +155,12 @@ extern inline int empty_stack(void)
 
 extern inline void maybe_unmark_and_push(unix_socket *x)
 {
-	if (x->protinfo.af_unix.gc_tree != GC_ORPHAN)
+	struct unix_sock *u = unix_sk(x);
+
+	if (u->gc_tree != GC_ORPHAN)
 		return;
 	sock_hold(x);
-	x->protinfo.af_unix.gc_tree = gc_current;
+	u->gc_tree = gc_current;
 	gc_current = x;
 }
 
@@ -184,7 +186,7 @@ void unix_gc(void)
 
 	forall_unix_sockets(i, s)
 	{
-		s->protinfo.af_unix.gc_tree=GC_ORPHAN;
+		unix_sk(s)->gc_tree = GC_ORPHAN;
 	}
 	/*
 	 *	Everything is now marked 
@@ -219,7 +221,7 @@ void unix_gc(void)
 		 */
 		if(s->socket && s->socket->file)
 			open_count = file_count(s->socket->file);
-		if (open_count > atomic_read(&s->protinfo.af_unix.inflight))
+		if (open_count > atomic_read(&unix_sk(s)->inflight))
 			maybe_unmark_and_push(s);
 	}
 
@@ -277,8 +279,9 @@ void unix_gc(void)
 
 	forall_unix_sockets(i, s)
 	{
-		if (s->protinfo.af_unix.gc_tree == GC_ORPHAN)
-		{
+		struct unix_sock *u = unix_sk(s);
+
+		if (u->gc_tree == GC_ORPHAN) {
 			struct sk_buff *nextsk;
 			spin_lock(&s->receive_queue.lock);
 			skb=skb_peek(&s->receive_queue);
@@ -297,7 +300,7 @@ void unix_gc(void)
 			}
 			spin_unlock(&s->receive_queue.lock);
 		}
-		s->protinfo.af_unix.gc_tree = GC_ORPHAN;
+		u->gc_tree = GC_ORPHAN;
 	}
 	read_unlock(&unix_table_lock);
 

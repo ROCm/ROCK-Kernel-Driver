@@ -113,7 +113,7 @@ static inline void dn_rt_finish_output(struct sk_buff *skb, char *dst)
 static inline void dn_nsp_send(struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	struct dst_entry *dst;
 
 	skb->h.raw = skb->data;

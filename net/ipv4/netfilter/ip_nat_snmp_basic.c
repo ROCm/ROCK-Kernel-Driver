@@ -52,10 +52,11 @@
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
 #include <linux/brlock.h>
 #include <linux/types.h>
+#include <linux/in.h>
 #include <linux/ip.h>
 #include <net/udp.h>
 #include <asm/uaccess.h>
-#include <asm/checksum.h>
+#include <net/checksum.h>
 
 
 

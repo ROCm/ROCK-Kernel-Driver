@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) output module.
  *
- * Version:	$Id: ip_output.c,v 1.99 2001/10/15 12:34:50 davem Exp $
+ * Version:	$Id: ip_output.c,v 1.100 2002/02/01 22:01:03 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -122,6 +122,7 @@ output_maybe_reroute(struct sk_buff *skb)
 int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 			  u32 saddr, u32 daddr, struct ip_options *opt)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct rtable *rt = (struct rtable *)skb->dst;
 	struct iphdr *iph;
 
@@ -133,11 +134,11 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 
 	iph->version  = 4;
 	iph->ihl      = 5;
-	iph->tos      = sk->protinfo.af_inet.tos;
+	iph->tos      = inet->tos;
 	iph->frag_off = 0;
 	if (ip_dont_fragment(sk, &rt->u.dst))
 		iph->frag_off |= htons(IP_DF);
-	iph->ttl      = sk->protinfo.af_inet.ttl;
+	iph->ttl      = inet->ttl;
 	iph->daddr    = rt->rt_dst;
 	iph->saddr    = rt->rt_src;
 	iph->protocol = sk->protocol;
@@ -214,7 +215,7 @@ int ip_mc_output(struct sk_buff *skb)
 	 */
 
 	if (rt->rt_flags&RTCF_MULTICAST) {
-		if ((!sk || sk->protinfo.af_inet.mc_loop)
+		if ((!sk || inet_sk(sk)->mc_loop)
 #ifdef CONFIG_IP_MROUTE
 		/* Small optimization: do not loopback not local frames,
 		   which returned after forwarding; they will be  dropped
@@ -341,7 +342,8 @@ fragment:
 int ip_queue_xmit(struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
-	struct ip_options *opt = sk->protinfo.af_inet.opt;
+	struct inet_opt *inet = inet_sk(sk);
+	struct ip_options *opt = inet->opt;
 	struct rtable *rt;
 	struct iphdr *iph;
 
@@ -381,10 +383,10 @@ packet_routed:
 
 	/* OK, we know where to send it, allocate and build IP header. */
 	iph = (struct iphdr *) skb_push(skb, sizeof(struct iphdr) + (opt ? opt->optlen : 0));
-	*((__u16 *)iph)	= htons((4 << 12) | (5 << 8) | (sk->protinfo.af_inet.tos & 0xff));
+	*((__u16 *)iph)	= htons((4 << 12) | (5 << 8) | (inet->tos & 0xff));
 	iph->tot_len = htons(skb->len);
 	iph->frag_off = 0;
-	iph->ttl      = sk->protinfo.af_inet.ttl;
+	iph->ttl      = inet->ttl;
 	iph->protocol = sk->protocol;
 	iph->saddr    = rt->rt_src;
 	iph->daddr    = rt->rt_dst;
@@ -436,6 +438,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 		  struct rtable *rt,
 		  int flags)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	unsigned int fraglen, maxfraglen, fragheaderlen;
 	int err;
 	int offset, mf;
@@ -499,7 +502,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 	 *	Don't fragment packets for path mtu discovery.
 	 */
 
-	if (offset > 0 && sk->protinfo.af_inet.pmtudisc==IP_PMTUDISC_DO) { 
+	if (offset > 0 && inet->pmtudisc == IP_PMTUDISC_DO) { 
 		ip_local_error(sk, EMSGSIZE, rt->rt_dst, sk->dport, mtu);
  		return -EMSGSIZE;
 	}
@@ -510,7 +513,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 	 *	Begin outputting the bytes.
 	 */
 
-	id = sk->protinfo.af_inet.id++;
+	id = inet->id++;
 
 	do {
 		char *data;
@@ -553,7 +556,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 				ip_options_build(skb, opt,
 						 ipc->addr, rt, offset);
 			}
-			iph->tos = sk->protinfo.af_inet.tos;
+			iph->tos = inet->tos;
 			iph->tot_len = htons(fraglen - fragheaderlen + iph->ihl*4);
 			iph->frag_off = htons(offset>>3)|mf|df;
 			iph->id = id;
@@ -573,9 +576,9 @@ static int ip_build_xmit_slow(struct sock *sk,
 				mf = htons(IP_MF);
 			}
 			if (rt->rt_type == RTN_MULTICAST)
-				iph->ttl = sk->protinfo.af_inet.mc_ttl;
+				iph->ttl = inet->mc_ttl;
 			else
-				iph->ttl = sk->protinfo.af_inet.ttl;
+				iph->ttl = inet->ttl;
 			iph->protocol = sk->protocol;
 			iph->check = 0;
 			iph->saddr = rt->rt_src;
@@ -603,7 +606,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 			      skb->dst->dev, output_maybe_reroute);
 		if (err) {
 			if (err > 0)
-				err = sk->protinfo.af_inet.recverr ? net_xmit_errno(err) : 0;
+				err = inet->recverr ? net_xmit_errno(err) : 0;
 			if (err)
 				goto error;
 		}
@@ -635,6 +638,7 @@ int ip_build_xmit(struct sock *sk,
 		  struct rtable *rt,
 		  int flags)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	int err;
 	struct sk_buff *skb;
 	int df;
@@ -645,7 +649,7 @@ int ip_build_xmit(struct sock *sk,
 	 *	choice RAW frames within 20 bytes of maximum size(rare) to the long path
 	 */
 
-	if (!sk->protinfo.af_inet.hdrincl) {
+	if (!inet->hdrincl) {
 		length += sizeof(struct iphdr);
 
 		/*
@@ -687,16 +691,16 @@ int ip_build_xmit(struct sock *sk,
 
 	skb->nh.iph = iph = (struct iphdr *)skb_put(skb, length);
 
-	if(!sk->protinfo.af_inet.hdrincl) {
+	if (!inet->hdrincl) {
 		iph->version=4;
 		iph->ihl=5;
-		iph->tos=sk->protinfo.af_inet.tos;
+		iph->tos = inet->tos;
 		iph->tot_len = htons(length);
 		iph->frag_off = df;
-		iph->ttl=sk->protinfo.af_inet.mc_ttl;
+		iph->ttl = inet->mc_ttl;
 		ip_select_ident(iph, &rt->u.dst, sk);
 		if (rt->rt_type != RTN_MULTICAST)
-			iph->ttl=sk->protinfo.af_inet.ttl;
+			iph->ttl = inet->ttl;
 		iph->protocol=sk->protocol;
 		iph->saddr=rt->rt_src;
 		iph->daddr=rt->rt_dst;
@@ -713,7 +717,7 @@ int ip_build_xmit(struct sock *sk,
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
 		      output_maybe_reroute);
 	if (err > 0)
-		err = sk->protinfo.af_inet.recverr ? net_xmit_errno(err) : 0;
+		err = inet->recverr ? net_xmit_errno(err) : 0;
 	if (err)
 		goto error;
 out:
@@ -943,6 +947,7 @@ static int ip_reply_glue_bits(const void *dptr, char *to, unsigned int offset,
 void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *arg,
 		   unsigned int len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct {
 		struct ip_options	opt;
 		char			data[40];
@@ -974,7 +979,7 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 	   with locally disabled BH and that sk cannot be already spinlocked.
 	 */
 	bh_lock_sock(sk);
-	sk->protinfo.af_inet.tos = skb->nh.iph->tos;
+	inet->tos = skb->nh.iph->tos;
 	sk->priority = skb->priority;
 	sk->protocol = skb->nh.iph->protocol;
 	ip_build_xmit(sk, ip_reply_glue_bits, arg, len, &ipc, rt, MSG_DONTWAIT);

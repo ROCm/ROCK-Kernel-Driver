@@ -57,6 +57,7 @@
 #include <linux/netfilter.h>
 #include <net/sock.h>
 #include <net/ip.h>			/* For ip_rcv */
+#include <net/tcp.h>
 #include <net/arp.h>			/* For arp_rcv */
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -388,7 +389,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev, ax25_address *d
 			return 0;
 		}
 
-		ax25 = make->protinfo.ax25;
+		ax25 = ax25_sk(make);
 		skb_set_owner_r(skb, make);
 		skb_queue_head(&sk->receive_queue, skb);
 

@@ -64,11 +64,12 @@ int x25_output(struct sock *sk, struct sk_buff *skb)
 {
 	struct sk_buff *skbn;
 	unsigned char header[X25_EXT_MIN_LEN];
-	int err, frontlen, len, header_len, max_len;
+	int err, frontlen, len;
 	int sent=0, noblock = X25_SKB_CB(skb)->flags & MSG_DONTWAIT;
-
-	header_len = (sk->protinfo.x25->neighbour->extended) ? X25_EXT_MIN_LEN : X25_STD_MIN_LEN;
-	max_len    = x25_pacsize_to_bytes(sk->protinfo.x25->facilities.pacsize_out);
+	x25_cb *x25 = x25_sk(sk);
+	int header_len = x25->neighbour->extended ? X25_EXT_MIN_LEN :
+						    X25_STD_MIN_LEN;
+	int max_len = x25_pacsize_to_bytes(x25->facilities.pacsize_out);
 
 	if (skb->len - header_len > max_len) {
 		/* Save a copy of the Header */
@@ -100,7 +101,7 @@ int x25_output(struct sock *sk, struct sk_buff *skb)
 			memcpy(skbn->data, header, header_len);
 
 			if (skb->len > 0) {
-				if (sk->protinfo.x25->neighbour->extended)
+				if (x25->neighbour->extended)
 					skbn->data[3] |= X25_EXT_M_BIT;
 				else
 					skbn->data[2] |= X25_STD_M_BIT;
@@ -124,20 +125,22 @@ int x25_output(struct sock *sk, struct sk_buff *skb)
  */
 static void x25_send_iframe(struct sock *sk, struct sk_buff *skb)
 {
+	x25_cb *x25 = x25_sk(sk);
+
 	if (skb == NULL)
 		return;
 
-	if (sk->protinfo.x25->neighbour->extended) {
-		skb->data[2]  = (sk->protinfo.x25->vs << 1) & 0xFE;
+	if (x25->neighbour->extended) {
+		skb->data[2]  = (x25->vs << 1) & 0xFE;
 		skb->data[3] &= X25_EXT_M_BIT;
-		skb->data[3] |= (sk->protinfo.x25->vr << 1) & 0xFE;
+		skb->data[3] |= (x25->vr << 1) & 0xFE;
 	} else {
 		skb->data[2] &= X25_STD_M_BIT;
-		skb->data[2] |= (sk->protinfo.x25->vs << 1) & 0x0E;
-		skb->data[2] |= (sk->protinfo.x25->vr << 5) & 0xE0;
+		skb->data[2] |= (x25->vs << 1) & 0x0E;
+		skb->data[2] |= (x25->vr << 5) & 0xE0;
 	}
 
-	x25_transmit_link(skb, sk->protinfo.x25->neighbour);	
+	x25_transmit_link(skb, x25->neighbour);	
 }
 
 void x25_kick(struct sock *sk)
@@ -145,34 +148,35 @@ void x25_kick(struct sock *sk)
 	struct sk_buff *skb, *skbn;
 	unsigned short start, end;
 	int modulus;
+	x25_cb *x25 = x25_sk(sk);
 
-	if (sk->protinfo.x25->state != X25_STATE_3)
+	if (x25->state != X25_STATE_3)
 		return;
 
 	/*
 	 *	Transmit interrupt data.
 	 */
-	if (!sk->protinfo.x25->intflag && skb_peek(&sk->protinfo.x25->interrupt_out_queue) != NULL) {
-		sk->protinfo.x25->intflag = 1;
-		skb = skb_dequeue(&sk->protinfo.x25->interrupt_out_queue);
-		x25_transmit_link(skb, sk->protinfo.x25->neighbour);
+	if (!x25->intflag && skb_peek(&x25->interrupt_out_queue) != NULL) {
+		x25->intflag = 1;
+		skb = skb_dequeue(&x25->interrupt_out_queue);
+		x25_transmit_link(skb, x25->neighbour);
 	}
 
-	if (sk->protinfo.x25->condition & X25_COND_PEER_RX_BUSY)
+	if (x25->condition & X25_COND_PEER_RX_BUSY)
 		return;
 
 	if (skb_peek(&sk->write_queue) == NULL)
 		return;
 
-	modulus = (sk->protinfo.x25->neighbour->extended) ? X25_EMODULUS : X25_SMODULUS;
+	modulus = (x25->neighbour->extended) ? X25_EMODULUS : X25_SMODULUS;
 
-	start   = (skb_peek(&sk->protinfo.x25->ack_queue) == NULL) ? sk->protinfo.x25->va : sk->protinfo.x25->vs;
-	end     = (sk->protinfo.x25->va + sk->protinfo.x25->facilities.winsize_out) % modulus;
+	start   = (skb_peek(&x25->ack_queue) == NULL) ? x25->va : x25->vs;
+	end     = (x25->va + x25->facilities.winsize_out) % modulus;
 
 	if (start == end)
 		return;
 
-	sk->protinfo.x25->vs = start;
+	x25->vs = start;
 
 	/*
 	 * Transmit data until either we're out of data to send or
@@ -194,17 +198,17 @@ void x25_kick(struct sock *sk)
 		 */
 		x25_send_iframe(sk, skbn);
 
-		sk->protinfo.x25->vs = (sk->protinfo.x25->vs + 1) % modulus;
+		x25->vs = (x25->vs + 1) % modulus;
 
 		/*
 		 * Requeue the original data frame.
 		 */
-		skb_queue_tail(&sk->protinfo.x25->ack_queue, skb);
+		skb_queue_tail(&x25->ack_queue, skb);
 
-	} while (sk->protinfo.x25->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
+	} while (x25->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
 
-	sk->protinfo.x25->vl         = sk->protinfo.x25->vr;
-	sk->protinfo.x25->condition &= ~X25_COND_ACK_PENDING;
+	x25->vl         = x25->vr;
+	x25->condition &= ~X25_COND_ACK_PENDING;
 
 	x25_stop_timer(sk);
 }
@@ -216,13 +220,15 @@ void x25_kick(struct sock *sk)
 
 void x25_enquiry_response(struct sock *sk)
 {
-	if (sk->protinfo.x25->condition & X25_COND_OWN_RX_BUSY)
+	x25_cb *x25 = x25_sk(sk);
+
+	if (x25->condition & X25_COND_OWN_RX_BUSY)
 		x25_write_internal(sk, X25_RNR);
 	else
 		x25_write_internal(sk, X25_RR);
 
-	sk->protinfo.x25->vl         = sk->protinfo.x25->vr;
-	sk->protinfo.x25->condition &= ~X25_COND_ACK_PENDING;
+	x25->vl         = x25->vr;
+	x25->condition &= ~X25_COND_ACK_PENDING;
 
 	x25_stop_timer(sk);
 }

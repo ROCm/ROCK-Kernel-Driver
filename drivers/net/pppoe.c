@@ -7,6 +7,7 @@
  *
  * Version:    0.6.9
  *
+ * 220102 :	Fix module use count on failure in pppoe_create, pppox_sk -acme
  * 030700 :     Fixed connect logic to allow for disconnect.
  * 270700 :	Fixed potential SMP problems; we must protect against
  *		simultaneous invocation of ppp_input
@@ -34,7 +35,7 @@
  *
  * Author:	Michal Ostrowski <mostrows@speakeasy.net>
  * Contributors:
- * 		Arnaldo Carvalho de Melo <acme@xconectiva.com.br>
+ * 		Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *		David S. Miller (davem@redhat.com)
  *
  * License:
@@ -127,7 +128,8 @@ static int hash_item(unsigned long sid, unsigned char *addr)
 	return hash & ( PPPOE_HASH_SIZE - 1 );
 }
 
-static struct pppox_opt *item_hash_table[PPPOE_HASH_SIZE] = { 0, };
+/* zeroed because its in .bss */
+static struct pppox_opt *item_hash_table[PPPOE_HASH_SIZE];
 
 /**********************************************************************
  *
@@ -340,7 +342,7 @@ static struct notifier_block pppoe_notifier = {
  ***********************************************************************/
 int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb)
 {
-	struct pppox_opt *po = sk->protinfo.pppox;
+	struct pppox_opt *po = pppox_sk(sk);
 	struct pppox_opt *relay_po = NULL;
 
 	if (sk->state & PPPOX_BOUND) {
@@ -468,8 +470,10 @@ struct packet_type pppoed_ptype = {
  **********************************************************************/
 void pppoe_sock_destruct(struct sock *sk)
 {
-	if (sk->protinfo.destruct_hook)
-		kfree(sk->protinfo.destruct_hook);
+	struct pppox_opt *po = pppox_sk(sk);
+
+	if (po)
+		kfree(po);
 	MOD_DEC_USE_COUNT;
 }
 
@@ -481,14 +485,15 @@ void pppoe_sock_destruct(struct sock *sk)
  **********************************************************************/
 static int pppoe_create(struct socket *sock)
 {
-	int error = 0;
+	int error = -ENOMEM;
 	struct sock *sk;
+	struct pppox_opt *po;
 
 	MOD_INC_USE_COUNT;
 
-	sk = sk_alloc(PF_PPPOX, GFP_KERNEL, 1);
+	sk = sk_alloc(PF_PPPOX, GFP_KERNEL, 1, NULL);
 	if (!sk)
-		return -ENOMEM;
+		goto decmod;
 
 	sock_init_data(sock, sk);
 
@@ -505,24 +510,17 @@ static int pppoe_create(struct socket *sock)
 	sk->type = SOCK_STREAM;
 	sk->destruct = pppoe_sock_destruct;
 
-	sk->protinfo.pppox = kmalloc(sizeof(struct pppox_opt), GFP_KERNEL);
-	if (!sk->protinfo.pppox) {
-		error = -ENOMEM;
-		goto free_sk;
-	}
-
-	memset((void *) sk->protinfo.pppox, 0, sizeof(struct pppox_opt));
-	sk->protinfo.pppox->sk = sk;
-
-	/* Delete the protinfo when it is time to do so. */
-	sk->protinfo.destruct_hook = sk->protinfo.pppox;
+	po = pppox_sk(sk) = kmalloc(sizeof(*po), GFP_KERNEL);
+	if (!po)
+		goto frees;
+	memset(po, 0, sizeof(*po));
+	po->sk = sk;
+	error = 0;
 	sock->sk = sk;
-
-	return 0;
-
-free_sk:
-	sk_free(sk);
-	return error;
+out:	return error;
+frees:	sk_free(sk);
+decmod:	MOD_DEC_USE_COUNT;
+	goto out;
 }
 
 int pppoe_release(struct socket *sock)
@@ -542,7 +540,7 @@ int pppoe_release(struct socket *sock)
 	/* Signal the death of the socket. */
 	sk->state = PPPOX_DEAD;
 
-	po = sk->protinfo.pppox;
+	po = pppox_sk(sk);
 	if (po->pppoe_pa.sid) {
 		delete_item(po->pppoe_pa.sid, po->pppoe_pa.remote);
 	}
@@ -568,7 +566,7 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	struct sock *sk = sock->sk;
 	struct net_device *dev = NULL;
 	struct sockaddr_pppox *sp = (struct sockaddr_pppox *) uservaddr;
-	struct pppox_opt *po = sk->protinfo.pppox;
+	struct pppox_opt *po = pppox_sk(sk);
 	int error;
 
 	lock_sock(sk);
@@ -657,7 +655,7 @@ int pppoe_getname(struct socket *sock, struct sockaddr *uaddr,
 
 	sp.sa_family	= AF_PPPOX;
 	sp.sa_protocol	= PX_PROTO_OE;
-	memcpy(&sp.sa_addr.pppoe, &sock->sk->protinfo.pppox->pppoe_pa,
+	memcpy(&sp.sa_addr.pppoe, &pppox_sk(sock->sk)->pppoe_pa,
 	       sizeof(struct pppoe_addr));
 
 	memcpy(uaddr, &sp, len);
@@ -672,11 +670,10 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		unsigned long arg)
 {
 	struct sock *sk = sock->sk;
-	struct pppox_opt *po;
+	struct pppox_opt *po = pppox_sk(sk);
 	int val = 0;
 	int err = 0;
 
-	po = sk->protinfo.pppox;
 	switch (cmd) {
 	case PPPIOCGMRU:
 		err = -ENXIO;
@@ -776,6 +773,7 @@ int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
 {
 	struct sk_buff *skb = NULL;
 	struct sock *sk = sock->sk;
+	struct pppox_opt *po = pppox_sk(sk);
 	int error = 0;
 	struct pppoe_hdr hdr;
 	struct pppoe_hdr *ph;
@@ -794,7 +792,7 @@ int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
 
 	lock_sock(sk);
 
-	dev = sk->protinfo.pppox->pppoe_dev;
+	dev = po->pppoe_dev;
 
 	error = -EMSGSIZE;
  	if (total_len > (dev->mtu + dev->hard_header_len))
@@ -829,8 +827,7 @@ int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
 
 	error = total_len;
 	dev->hard_header(skb, dev, ETH_P_PPP_SES,
-			 sk->protinfo.pppox->pppoe_pa.remote,
-			 NULL, total_len);
+			 po->pppoe_pa.remote, NULL, total_len);
 
 	memcpy(ph, &hdr, sizeof(struct pppoe_hdr));
 
@@ -851,7 +848,8 @@ end:
  ***********************************************************************/
 int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 {
-	struct net_device *dev = sk->protinfo.pppox->pppoe_dev;
+	struct pppox_opt *po = pppox_sk(sk);
+	struct net_device *dev = po->pppoe_dev;
 	struct pppoe_hdr hdr;
 	struct pppoe_hdr *ph;
 	int headroom = skb_headroom(skb);
@@ -897,8 +895,7 @@ int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	skb2->dev = dev;
 
 	dev->hard_header(skb2, dev, ETH_P_PPP_SES,
-			 sk->protinfo.pppox->pppoe_pa.remote,
-			 NULL, data_len);
+			 po->pppoe_pa.remote, NULL, data_len);
 
 	/* We're transmitting skb2, and assuming that dev_queue_xmit
 	 * will free it.  The generic ppp layer however, is expecting

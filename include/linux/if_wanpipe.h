@@ -123,6 +123,9 @@ struct wanpipe_opt
 	unsigned char force;	/* Used to force sock release */
 	atomic_t packet_sent;   
 };
+
+#define wp_sk(__sk) ((struct wanpipe_opt *)(__sk)->protinfo)
+
 #endif
 
 #endif

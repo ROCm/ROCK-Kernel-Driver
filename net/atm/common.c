@@ -105,7 +105,7 @@ int atm_create(struct socket *sock,int protocol,int family)
 	sock->sk = NULL;
 	if (sock->type == SOCK_STREAM) return -EINVAL;
 	if (!(sk = alloc_atm_vcc_sk(family))) return -ENOMEM;
-	vcc = sk->protinfo.af_atm;
+	vcc = atm_sk(sk);
 	memset(&vcc->flags,0,sizeof(vcc->flags));
 	vcc->dev = NULL;
 	vcc->family = sock->ops->family;
@@ -133,10 +133,9 @@ int atm_create(struct socket *sock,int protocol,int family)
 
 void atm_release_vcc_sk(struct sock *sk,int free_sk)
 {
-	struct atm_vcc *vcc;
+	struct atm_vcc *vcc = atm_sk(sk);
 	struct sk_buff *skb;
 
-	vcc = sk->protinfo.af_atm;
 	clear_bit(ATM_VF_READY,&vcc->flags);
 	if (vcc->dev) {
 		if (vcc->dev->ops->close) vcc->dev->ops->close(vcc);

@@ -59,6 +59,7 @@
 #include <linux/inet.h>
 #include <linux/route.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/system.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
@@ -71,6 +72,7 @@
 #include <linux/netfilter_decnet.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
+#include <net/dn.h>
 #include <net/dn_nsp.h>
 #include <net/dn_dev.h>
 #include <net/dn_route.h>
@@ -99,7 +101,7 @@ static void dn_ack(struct sock *sk, struct sk_buff *skb, unsigned short ack)
 
 	switch(type) {
 		case 0: /* ACK - Data */
-			if (after(ack, scp->ackrcv_dat)) {
+			if (dn_after(ack, scp->ackrcv_dat)) {
 				scp->ackrcv_dat = ack & 0x0fff;
 				wakeup |= dn_nsp_check_xmit_queue(sk, skb, &scp->data_xmit_queue, ack);
 			}
@@ -107,7 +109,7 @@ static void dn_ack(struct sock *sk, struct sk_buff *skb, unsigned short ack)
 		case 1: /* NAK - Data */
 			break;
 		case 2: /* ACK - OtherData */
-			if (after(ack, scp->ackrcv_oth)) {
+			if (dn_after(ack, scp->ackrcv_oth)) {
 				scp->ackrcv_oth = ack & 0x0fff;
 				wakeup |= dn_nsp_check_xmit_queue(sk, skb, &scp->other_xmit_queue, ack);
 			}

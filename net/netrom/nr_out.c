@@ -91,13 +91,15 @@ void nr_output(struct sock *sk, struct sk_buff *skb)
  */
 static void nr_send_iframe(struct sock *sk, struct sk_buff *skb)
 {
+	nr_cb *nr = nr_sk(sk);
+
 	if (skb == NULL)
 		return;
 
-	skb->data[2] = sk->protinfo.nr->vs;
-	skb->data[3] = sk->protinfo.nr->vr;
+	skb->data[2] = nr->vs;
+	skb->data[3] = nr->vr;
 
-	if (sk->protinfo.nr->condition & NR_COND_OWN_RX_BUSY)
+	if (nr->condition & NR_COND_OWN_RX_BUSY)
 		skb->data[4] |= NR_CHOKE_FLAG;
 
 	nr_start_idletimer(sk);
@@ -108,48 +110,50 @@ static void nr_send_iframe(struct sock *sk, struct sk_buff *skb)
 void nr_send_nak_frame(struct sock *sk)
 {
 	struct sk_buff *skb, *skbn;
+	nr_cb *nr = nr_sk(sk);
 
-	if ((skb = skb_peek(&sk->protinfo.nr->ack_queue)) == NULL)
+	if ((skb = skb_peek(&nr->ack_queue)) == NULL)
 		return;
 
 	if ((skbn = skb_clone(skb, GFP_ATOMIC)) == NULL)
 		return;
 
-	skbn->data[2] = sk->protinfo.nr->va;
-	skbn->data[3] = sk->protinfo.nr->vr;
+	skbn->data[2] = nr->va;
+	skbn->data[3] = nr->vr;
 
-	if (sk->protinfo.nr->condition & NR_COND_OWN_RX_BUSY)
+	if (nr->condition & NR_COND_OWN_RX_BUSY)
 		skbn->data[4] |= NR_CHOKE_FLAG;
 
 	nr_transmit_buffer(sk, skbn);
 
-	sk->protinfo.nr->condition &= ~NR_COND_ACK_PENDING;
-	sk->protinfo.nr->vl         = sk->protinfo.nr->vr;
+	nr->condition &= ~NR_COND_ACK_PENDING;
+	nr->vl         = nr->vr;
 
 	nr_stop_t1timer(sk);
 }
 
 void nr_kick(struct sock *sk)
 {
+	nr_cb *nr = nr_sk(sk);
 	struct sk_buff *skb, *skbn;
 	unsigned short start, end;
 
-	if (sk->protinfo.nr->state != NR_STATE_3)
+	if (nr->state != NR_STATE_3)
 		return;
 
-	if (sk->protinfo.nr->condition & NR_COND_PEER_RX_BUSY)
+	if (nr->condition & NR_COND_PEER_RX_BUSY)
 		return;
 
 	if (skb_peek(&sk->write_queue) == NULL)
 		return;
 
-	start = (skb_peek(&sk->protinfo.nr->ack_queue) == NULL) ? sk->protinfo.nr->va : sk->protinfo.nr->vs;
-	end   = (sk->protinfo.nr->va + sk->protinfo.nr->window) % NR_MODULUS;
+	start = (skb_peek(&nr->ack_queue) == NULL) ? nr->va : nr->vs;
+	end   = (nr->va + nr->window) % NR_MODULUS;
 
 	if (start == end)
 		return;
 
-	sk->protinfo.nr->vs = start;
+	nr->vs = start;
 
 	/*
 	 * Transmit data until either we're out of data to send or
@@ -174,17 +178,17 @@ void nr_kick(struct sock *sk)
 		 */
 		nr_send_iframe(sk, skbn);
 
-		sk->protinfo.nr->vs = (sk->protinfo.nr->vs + 1) % NR_MODULUS;
+		nr->vs = (nr->vs + 1) % NR_MODULUS;
 
 		/*
 		 * Requeue the original data frame.
 		 */
-		skb_queue_tail(&sk->protinfo.nr->ack_queue, skb);
+		skb_queue_tail(&nr->ack_queue, skb);
 
-	} while (sk->protinfo.nr->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
+	} while (nr->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
 
-	sk->protinfo.nr->vl         = sk->protinfo.nr->vr;
-	sk->protinfo.nr->condition &= ~NR_COND_ACK_PENDING;
+	nr->vl         = nr->vr;
+	nr->condition &= ~NR_COND_ACK_PENDING;
 
 	if (!nr_t1timer_running(sk))
 		nr_start_t1timer(sk);
@@ -192,6 +196,7 @@ void nr_kick(struct sock *sk)
 
 void nr_transmit_buffer(struct sock *sk, struct sk_buff *skb)
 {
+	nr_cb *nr = nr;
 	unsigned char *dptr;
 
 	/*
@@ -199,13 +204,13 @@ void nr_transmit_buffer(struct sock *sk, struct sk_buff *skb)
 	 */
 	dptr = skb_push(skb, NR_NETWORK_LEN);
 
-	memcpy(dptr, &sk->protinfo.nr->source_addr, AX25_ADDR_LEN);
+	memcpy(dptr, &nr->source_addr, AX25_ADDR_LEN);
 	dptr[6] &= ~AX25_CBIT;
 	dptr[6] &= ~AX25_EBIT;
 	dptr[6] |= AX25_SSSID_SPARE;
 	dptr += AX25_ADDR_LEN;
 
-	memcpy(dptr, &sk->protinfo.nr->dest_addr, AX25_ADDR_LEN);
+	memcpy(dptr, &nr->dest_addr, AX25_ADDR_LEN);
 	dptr[6] &= ~AX25_CBIT;
 	dptr[6] |= AX25_EBIT;
 	dptr[6] |= AX25_SSSID_SPARE;
@@ -226,8 +231,10 @@ void nr_transmit_buffer(struct sock *sk, struct sk_buff *skb)
 
 void nr_establish_data_link(struct sock *sk)
 {
-	sk->protinfo.nr->condition = 0x00;
-	sk->protinfo.nr->n2count   = 0;
+	nr_cb *nr = nr_sk(sk);
+
+	nr->condition = 0x00;
+	nr->n2count   = 0;
 
 	nr_write_internal(sk, NR_CONNREQ);
 
@@ -242,29 +249,32 @@ void nr_establish_data_link(struct sock *sk)
  */
 void nr_enquiry_response(struct sock *sk)
 {
+	nr_cb *nr = nr_sk(sk);
 	int frametype = NR_INFOACK;
 
-	if (sk->protinfo.nr->condition & NR_COND_OWN_RX_BUSY) {
+	if (nr->condition & NR_COND_OWN_RX_BUSY) {
 		frametype |= NR_CHOKE_FLAG;
 	} else {
-		if (skb_peek(&sk->protinfo.nr->reseq_queue) != NULL)
+		if (skb_peek(&nr->reseq_queue) != NULL)
 			frametype |= NR_NAK_FLAG;
 	}
 
 	nr_write_internal(sk, frametype);
 
-	sk->protinfo.nr->vl         = sk->protinfo.nr->vr;
-	sk->protinfo.nr->condition &= ~NR_COND_ACK_PENDING;
+	nr->vl         = nr->vr;
+	nr->condition &= ~NR_COND_ACK_PENDING;
 }
 
 void nr_check_iframes_acked(struct sock *sk, unsigned short nr)
 {
-	if (sk->protinfo.nr->vs == nr) {
+	nr_cb *nrom = nr_sk(sk);
+
+	if (nrom->vs == nr) {
 		nr_frames_acked(sk, nr);
 		nr_stop_t1timer(sk);
-		sk->protinfo.nr->n2count = 0;
+		nrom->n2count = 0;
 	} else {
-		if (sk->protinfo.nr->va != nr) {
+		if (nrom->va != nr) {
 			nr_frames_acked(sk, nr);
 			nr_start_t1timer(sk);
 		}

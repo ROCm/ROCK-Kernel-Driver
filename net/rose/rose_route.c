@@ -36,6 +36,7 @@
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <linux/fcntl.h>
@@ -809,20 +810,21 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	 */
 	if ((sk = rose_find_socket(lci, rose_neigh)) != NULL) {
 		if (frametype == ROSE_CALL_REQUEST) {
+			rose_cb *rose = rose_sk(sk);
 			/* Remove an existing unused socket */
 			rose_clear_queues(sk);
-			sk->protinfo.rose->cause      = ROSE_NETWORK_CONGESTION;
-			sk->protinfo.rose->diagnostic = 0;
-			sk->protinfo.rose->neighbour->use--;
-			sk->protinfo.rose->neighbour = NULL;
-			sk->protinfo.rose->lci   = 0;
-			sk->protinfo.rose->state = ROSE_STATE_0;
-			sk->state                = TCP_CLOSE;
-			sk->err                  = 0;
-			sk->shutdown            |= SEND_SHUTDOWN;
+			rose->cause	 = ROSE_NETWORK_CONGESTION;
+			rose->diagnostic = 0;
+			rose->neighbour->use--;
+			rose->neighbour	 = NULL;
+			rose->lci	 = 0;
+			rose->state	 = ROSE_STATE_0;
+			sk->state	 = TCP_CLOSE;
+			sk->err		 = 0;
+			sk->shutdown	 |= SEND_SHUTDOWN;
 			if (!sk->dead)
 				sk->state_change(sk);
-			sk->dead                 = 1;
+			sk->dead         = 1;
 		}
 		else {
 			skb->h.raw = skb->data;

@@ -168,6 +168,8 @@ struct irda_sock {
 	LOCAL_FLOW rx_flow;
 };
 
+#define irda_sk(__sk) ((struct irda_sock *)(__sk)->protinfo)
+
 /*
  *  This type is used by the protocols that transmit 16 bits words in 
  *  little endian format. A little endian machine stores MSB of word in

@@ -56,6 +56,7 @@
 #include <asm/uaccess.h>
 
 #include <net/sock.h>
+#include <net/tcp.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/iriap.h>
@@ -728,7 +729,7 @@ static int irda_getname(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct sockaddr_irda saddr;
 	struct sock *sk = sock->sk;
-	struct irda_sock *self = sk->protinfo.irda;
+	struct irda_sock *self = irda_sk(sk);
 
 	if (peer) {
 		if (sk->state != TCP_ESTABLISHED)
@@ -789,10 +790,9 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_irda *addr = (struct sockaddr_irda *) uaddr;
-	struct irda_sock *self;
+	struct irda_sock *self = irda_sk(sk);
 	int err;
 
-	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
 
 	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
@@ -845,15 +845,14 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
  */
 static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 {
-	struct irda_sock *self, *new;
 	struct sock *sk = sock->sk;
+	struct irda_sock *new, *self = irda_sk(sk);
 	struct sock *newsk;
 	struct sk_buff *skb;
 	int err;
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
 
-	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
 
 	err = irda_create(newsock, sk->protocol);
@@ -891,7 +890,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
  	newsk = newsock->sk;
 	newsk->state = TCP_ESTABLISHED;
 
-	new = newsk->protinfo.irda;
+	new = irda_sk(newsk);
 	ASSERT(new != NULL, return -1;);
 
 	/* Now attach up the new socket */
@@ -953,10 +952,8 @@ static int irda_connect(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_irda *addr = (struct sockaddr_irda *) uaddr;
-	struct irda_sock *self;
+	struct irda_sock *self = irda_sk(sk);
 	int err;
-
-	self = sk->protinfo.irda;
 	
 	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
@@ -1078,11 +1075,11 @@ static int irda_create(struct socket *sock, int protocol)
 	}
 
 	/* Allocate networking socket */
-	if ((sk = sk_alloc(PF_IRDA, GFP_ATOMIC, 1)) == NULL)
+	if ((sk = sk_alloc(PF_IRDA, GFP_ATOMIC, 1, NULL)) == NULL)
 		return -ENOMEM;
 
 	/* Allocate IrDA socket */
-	self = kmalloc(sizeof(struct irda_sock), GFP_ATOMIC);
+	self = irda_sk(sk) = kmalloc(sizeof(struct irda_sock), GFP_ATOMIC);
 	if (self == NULL) {
 		sk_free(sk);
 		return -ENOMEM;
@@ -1098,7 +1095,6 @@ static int irda_create(struct socket *sock, int protocol)
 	sk->family = PF_IRDA;
 	sk->protocol = protocol;
 	/* Link networking socket and IrDA socket structs together */
-	sk->protinfo.irda = self;
 	self->sk = sk;
 
 	switch (sock->type) {
@@ -1208,9 +1204,9 @@ static int irda_release(struct socket *sock)
 	sk->state_change(sk);
 
 	/* Destroy IrDA socket */
-	irda_destroy_socket(sk->protinfo.irda);
+	irda_destroy_socket(irda_sk(sk));
 	/* Prevent sock_def_destruct() to create havoc */
-	sk->protinfo.irda = NULL;
+	irda_sk(sk) = NULL;
 
 	sock_orphan(sk);
 	sock->sk   = NULL;      
@@ -1281,7 +1277,7 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if (sk->state != TCP_ESTABLISHED)
 		return -ENOTCONN;
 
-	self = sk->protinfo.irda;
+	self = irda_sk(sk);
 	ASSERT(self != NULL, return -1;);
 
 	/* Check if IrTTP is wants us to slow down */
@@ -1334,14 +1330,13 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 static int irda_recvmsg_dgram(struct socket *sock, struct msghdr *msg, 
 			      int size, int flags, struct scm_cookie *scm)
 {
-	struct irda_sock *self;
 	struct sock *sk = sock->sk;
+	struct irda_sock *self = irda_sk(sk);
 	struct sk_buff *skb;
 	int copied, err;
 
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
-	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
 
 	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT, 
@@ -1404,15 +1399,14 @@ static void irda_data_wait(struct sock *sk)
 static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg, 
 			       int size, int flags, struct scm_cookie *scm)
 {
-	struct irda_sock *self;
 	struct sock *sk = sock->sk;
+	struct irda_sock *self = irda_sk(sk);
 	int noblock = flags & MSG_DONTWAIT;
 	int copied = 0;
 	int target = 1;
 
 	IRDA_DEBUG(3, __FUNCTION__ "()\n");
 
-	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
 
 	if (sock->flags & __SO_ACCEPTCON) 
@@ -1531,7 +1525,7 @@ static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
 	if (sk->state != TCP_ESTABLISHED)
 		return -ENOTCONN;
 
-	self = sk->protinfo.irda;
+	self = irda_sk(sk);
 	ASSERT(self != NULL, return -1;);
 
 	/*  
@@ -1594,7 +1588,7 @@ static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
 		return -EPIPE;
 	}
 
-	self = sk->protinfo.irda;
+	self = irda_sk(sk);
 	ASSERT(self != NULL, return -1;);
 
 	/*  
@@ -1636,10 +1630,9 @@ static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
  */
 static int irda_shutdown(struct socket *sock, int how)
 {
-	struct irda_sock *self;
 	struct sock *sk = sock->sk;
+	struct irda_sock *self = irda_sk(sk);
 
-	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
 
 	IRDA_DEBUG(1, __FUNCTION__ "(%p)\n", self);
@@ -1677,12 +1670,11 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 			      poll_table *wait)
 {
 	struct sock *sk = sock->sk;
+	struct irda_sock *self = irda_sk(sk);
 	unsigned int mask;
-	struct irda_sock *self;
 
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
-	self = sk->protinfo.irda;
 	poll_wait(file, sk->sleep, wait);
 	mask = 0;
 
@@ -1808,13 +1800,12 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 			   char *optval, int optlen)
 {
  	struct sock *sk = sock->sk;
-	struct irda_sock *self;
+	struct irda_sock *self = irda_sk(sk);
 	struct irda_ias_set    *ias_opt;
 	struct ias_object      *ias_obj;
 	struct ias_attrib *	ias_attr;	/* Attribute in IAS object */
 	int opt;
 	
-	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
 
 	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
@@ -2107,7 +2098,7 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 			   char *optval, int *optlen)
 {
 	struct sock *sk = sock->sk;
-	struct irda_sock *self;
+	struct irda_sock *self = irda_sk(sk);
 	struct irda_device_list list;
 	struct irda_device_info *discoveries;
 	struct irda_ias_set *	ias_opt;	/* IAS get/query params */
@@ -2118,8 +2109,6 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	int len = 0;
 	int err;
 	int offset, total;
-
-	self = sk->protinfo.irda;
 
 	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
@@ -2408,10 +2397,9 @@ bed:
 	return 0;
 }
 
-static struct net_proto_family irda_family_ops =
-{
-	PF_IRDA,
-	irda_create
+static struct net_proto_family irda_family_ops = {
+	family:	PF_IRDA,
+	create:	irda_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_stream_ops) = {

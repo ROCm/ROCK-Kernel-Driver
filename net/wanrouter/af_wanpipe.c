@@ -326,7 +326,7 @@ static int wanpipe_rcv(struct sk_buff *skb, netdevice_t *dev,  struct sock *sk)
 
 static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 {
-
+	wanpipe_opt *wp = wp_sk(sk), *newwp;
 	struct wan_sockaddr_ll *sll = (struct wan_sockaddr_ll*)skb->cb;
 	struct sock *newsk;
 	netdevice_t *dev; 
@@ -337,7 +337,7 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 	/* Find a free device, if none found, all svc's are busy 
          */
 
-	card = (sdla_t*)sk->protinfo.af_wanpipe->card;
+	card = (sdla_t*)wp->card;
 	if (!card){
 		printk(KERN_INFO "wansock: LISTEN ERROR, No Card\n");
 		return -ENODEV;
@@ -364,7 +364,8 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 	/* Initialize the new sock structure 
 	 */
 	newsk->bound_dev_if = dev->ifindex;
-	newsk->protinfo.af_wanpipe->card = sk->protinfo.af_wanpipe->card;
+	newwp = wp_sk(newsk);
+	newwp->card = wp->card;
 
 	/* Insert the sock into the main wanpipe
          * sock list.
@@ -389,8 +390,8 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
          * whic lcn to clear 
 	 */ 
 
-	newsk->protinfo.af_wanpipe->lcn = mbox_ptr->cmd.lcn;
-	newsk->protinfo.af_wanpipe->mbox = (void *)mbox_ptr;
+	newwp->lcn = mbox_ptr->cmd.lcn;
+	newwp->mbox = (void *)mbox_ptr;
 
 	DBG_PRINTK(KERN_INFO "NEWSOCK : Device %s, bind to lcn %i\n",
 			dev->name,mbox_ptr->cmd.lcn);
@@ -497,7 +498,7 @@ static struct sock *wanpipe_alloc_socket(void)
 	struct sock *sk;
 	struct wanpipe_opt *wan_opt;
 
-	if ((sk = sk_alloc(PF_WANPIPE, GFP_ATOMIC, 1)) == NULL)
+	if ((sk = sk_alloc(PF_WANPIPE, GFP_ATOMIC, 1, NULL)) == NULL)
 		return NULL;
 
 	if ((wan_opt = kmalloc(sizeof(struct wanpipe_opt), GFP_ATOMIC)) == NULL) {
@@ -506,13 +507,12 @@ static struct sock *wanpipe_alloc_socket(void)
 	}
 	memset(wan_opt, 0x00, sizeof(struct wanpipe_opt));
 
-	sk->protinfo.af_wanpipe = wan_opt;
-	sk->protinfo.destruct_hook = wan_opt;
+	wp_sk(sk) = wan_opt;
 
 	/* Use timer to send data to the driver. This will act
          * as a BH handler for sendmsg functions */
-	sk->protinfo.af_wanpipe->tx_timer.data=(unsigned long)sk;
-	sk->protinfo.af_wanpipe->tx_timer.function=wanpipe_delayed_transmit;
+	wan_opt->tx_timer.data	   = (unsigned long)sk;
+	wan_opt->tx_timer.function = wanpipe_delayed_transmit;
 
 	MOD_INC_USE_COUNT;
 
@@ -542,6 +542,7 @@ static struct sock *wanpipe_alloc_socket(void)
 static int wanpipe_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 			  struct scm_cookie *scm)
 {
+	wanpipe_opt *wp;
 	struct sock *sk = sock->sk;
 	struct wan_sockaddr_ll *saddr=(struct wan_sockaddr_ll *)msg->msg_name;
 	struct sk_buff *skb;
@@ -647,12 +648,13 @@ static int wanpipe_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	}
 
 	skb_queue_tail(&sk->write_queue,skb);
-	atomic_inc(&sk->protinfo.af_wanpipe->packet_sent);
+	wp = wp_sk(sk);
+	atomic_inc(&wp->packet_sent);
 
-	if (!(test_and_set_bit(0,&sk->protinfo.af_wanpipe->timer))){
-		del_timer(&sk->protinfo.af_wanpipe->tx_timer);
-		sk->protinfo.af_wanpipe->tx_timer.expires=jiffies+1;
-		add_timer(&sk->protinfo.af_wanpipe->tx_timer);
+	if (!(test_and_set_bit(0, &wp->timer))){
+		del_timer(&wp->tx_timer);
+		wp->tx_timer.expires = jiffies + 1;
+		add_timer(&wp->tx_timer);
 	}	
 	
 	return(len);
@@ -683,17 +685,18 @@ static void wanpipe_delayed_transmit (unsigned long data)
 {
 	struct sock *sk=(struct sock *)data;
 	struct sk_buff *skb;
-	netdevice_t *dev = sk->protinfo.af_wanpipe->dev;
-	sdla_t *card = (sdla_t*)sk->protinfo.af_wanpipe->card;
+	wanpipe_opt *wp = wp_sk(sk);
+	netdevice_t *dev = wp->dev;
+	sdla_t *card = (sdla_t*)wp->card;
 
 	if (!card || !dev){
-		clear_bit (0,&sk->protinfo.af_wanpipe->timer);
+		clear_bit(0, &wp->timer);
 		DBG_PRINTK(KERN_INFO "wansock: Transmit delay, no dev or card\n");
 		return;
 	}
 	
 	if (sk->state != WANSOCK_CONNECTED || !sk->zapped){	
-		clear_bit (0,&sk->protinfo.af_wanpipe->timer);
+		clear_bit(0, &wp->timer);
 		DBG_PRINTK(KERN_INFO "wansock: Tx Timer, State not CONNECTED\n");
 		return;
 	}
@@ -703,8 +706,8 @@ static void wanpipe_delayed_transmit (unsigned long data)
          * pending command will never get a free buffer
          * to execute */ 	
 	if (atomic_read(&card->u.x.command_busy)){
-		sk->protinfo.af_wanpipe->tx_timer.expires=jiffies+SLOW_BACKOFF;
-		add_timer(&sk->protinfo.af_wanpipe->tx_timer);
+		wp->tx_timer.expires = jiffies + SLOW_BACKOFF;
+		add_timer(&wp->tx_timer);
 		DBG_PRINTK(KERN_INFO "wansock: Tx Timer, command bys BACKOFF\n");
 		return;
 	}
@@ -712,8 +715,8 @@ static void wanpipe_delayed_transmit (unsigned long data)
 	
 	if (test_and_set_bit(0,&wanpipe_tx_critical)){
 		printk(KERN_INFO "WanSock: Tx timer critical %s\n",dev->name);
-		sk->protinfo.af_wanpipe->tx_timer.expires=jiffies+SLOW_BACKOFF;
-		add_timer(&sk->protinfo.af_wanpipe->tx_timer);
+		wp->tx_timer.expires = jiffies + SLOW_BACKOFF;
+		add_timer(&wp->tx_timer);
 		return;
 	}	
 	
@@ -733,18 +736,18 @@ static void wanpipe_delayed_transmit (unsigned long data)
                          * if more packets, re-trigger the transmit routine 
                          * other wise exit
                          */
-			atomic_dec(&sk->protinfo.af_wanpipe->packet_sent);
+			atomic_dec(&wp->packet_sent);
 
 			if (skb_peek(&sk->write_queue) == NULL){
 				/* If there is nothing to send, kick
 				 * the poll routine, which will trigger
 				 * the application to send more data */
 				sk->data_ready(sk,0);
-				clear_bit (0,&sk->protinfo.af_wanpipe->timer);
+				clear_bit(0, &wp->timer);
 			}else{
 				/* Reschedule as fast as possible */
-				sk->protinfo.af_wanpipe->tx_timer.expires=jiffies+1;
-				add_timer(&sk->protinfo.af_wanpipe->tx_timer);
+				wp->tx_timer.expires = jiffies + 1;
+				add_timer(&wp->tx_timer);
 			}
 		}
 	}
@@ -758,7 +761,7 @@ static void wanpipe_delayed_transmit (unsigned long data)
  *      chan->command is used to indicate to the driver that
  *      command is pending for exection.  The acutal command
  *      structure is placed into a sock mbox structure 
- *      (sk->protinfo.af_wanpipe->mbox).
+ *      (wp_sk(sk)->mbox).
  *
  *      The sock private structure, mbox is
  *      used as shared memory between sock and the driver.
@@ -774,6 +777,7 @@ static void wanpipe_delayed_transmit (unsigned long data)
 
 static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int flags)
 {
+	wanpipe_opt *wp = wp_sk(sk);
 	netdevice_t *dev;
 	wanpipe_common_t *chan=NULL;
 	int err=0;
@@ -798,15 +802,14 @@ static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int fla
 		return -EINVAL;
 	}
 
-	if (!sk->protinfo.af_wanpipe->mbox){
+	if (!wp->mbox) {
 		printk(KERN_INFO "wansock: In execute without MBOX\n");
 		return -EINVAL;
 	}
 
-	((mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox)->cmd.command=cmd;	
-	((mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox)->cmd.lcn = 
-					sk->protinfo.af_wanpipe->lcn;
-	((mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox)->cmd.result=0x7F;
+	((mbox_cmd_t*)wp->mbox)->cmd.command = cmd;	
+	((mbox_cmd_t*)wp->mbox)->cmd.lcn     = wp->lcn;
+	((mbox_cmd_t*)wp->mbox)->cmd.result  = 0x7F;
 
 
 	if (flags & O_NONBLOCK){
@@ -819,7 +822,7 @@ static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int fla
 	add_wait_queue(sk->sleep,&wait);
 	current->state = TASK_INTERRUPTIBLE;
 	for (;;){
-		if (((mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox)->cmd.result != 0x7F) {
+		if (((mbox_cmd_t*)wp->mbox)->cmd.result != 0x7F) {
 			err = 0;
 			break;
 		}
@@ -845,17 +848,16 @@ static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int fla
 static void wanpipe_destroy_timer(unsigned long data)
 {
 	struct sock *sk=(struct sock *)data;
+	wanpipe_opt *wp = wp_sk(sk);
 
 	if ((!atomic_read(&sk->wmem_alloc) && !atomic_read(&sk->rmem_alloc)) ||
-	    (++sk->protinfo.af_wanpipe->force == 5)) {
+	    (++wp->force == 5)) {
 
 		if (atomic_read(&sk->wmem_alloc) || atomic_read(&sk->rmem_alloc))
 			printk(KERN_INFO "wansock: Warning, Packet Discarded due to sock shutdown!\n");
 
-		if (sk->protinfo.af_wanpipe){
-			kfree(sk->protinfo.af_wanpipe);
-			sk->protinfo.af_wanpipe=NULL;
-		}
+		kfree(wp);
+		wp_sk(sk) = NULL;
 		
               #ifdef LINUX_2_4
 		if (atomic_read(&sk->refcnt) != 1){
@@ -891,7 +893,7 @@ static void wanpipe_unlink_driver (struct sock *sk)
 
 	sk->zapped=0;
 	sk->state = WANSOCK_DISCONNECTED;
-	sk->protinfo.af_wanpipe->dev = NULL;
+	wp_sk(sk)->dev = NULL;
 
 	dev = dev_get_by_index(sk->bound_dev_if);
 	if (!dev){
@@ -928,15 +930,16 @@ static void wanpipe_unlink_driver (struct sock *sk)
 
 static void wanpipe_link_driver (netdevice_t *dev, struct sock *sk)
 {
+	wanpipe_opt *wp = wp_sk(sk);
 	wanpipe_common_t *chan = dev->priv;
 	if (!chan)
 		return;
 	set_bit(0,&chan->common_critical);
 	chan->sk=sk;
 	chan->func=wanpipe_rcv;
-	chan->mbox=sk->protinfo.af_wanpipe->mbox;
-	chan->tx_timer = &sk->protinfo.af_wanpipe->tx_timer;
-	sk->protinfo.af_wanpipe->dev=dev;
+	chan->mbox = wp->mbox;
+	chan->tx_timer = &wp->tx_timer;
+	wp->dev = dev;
 	sk->zapped = 1;
 	clear_bit(0,&chan->common_critical);
 }
@@ -974,12 +977,14 @@ static int wanpipe_release(struct socket *sock, struct socket *peersock)
 #ifndef LINUX_2_4
 	struct sk_buff	*skb;
 #endif
+	wanpipe_opt *wp;
 	struct sock *sk = sock->sk;
 	struct sock **skp;
 	
 	if (!sk)
 		return 0;
 
+	wp = wp_sk(sk);
 	check_write_queue(sk);
 
 	/* Kill the tx timer, if we don't kill it now, the timer
@@ -987,7 +992,7 @@ static int wanpipe_release(struct socket *sock, struct socket *peersock)
          * try to access the sock which has been killed and cause
          * kernel panic */
 
-	del_timer(&sk->protinfo.af_wanpipe->tx_timer);
+	del_timer(&wp->tx_timer);
 
 	/*
 	 *	Unhook packet receive handler.
@@ -1060,10 +1065,8 @@ static int wanpipe_release(struct socket *sock, struct socket *peersock)
 		return 0;
 	}
 
-	if (sk->protinfo.af_wanpipe){
-		kfree(sk->protinfo.af_wanpipe);
-		sk->protinfo.af_wanpipe=NULL;
-	}
+	kfree(wp);
+	wp_sk(sk) = NULL;
 
       #ifdef LINUX_2_4
 	if (atomic_read(&sk->refcnt) != 1){
@@ -1113,6 +1116,7 @@ static void check_write_queue(struct sock *sk)
 
 static void release_driver(struct sock *sk)
 {
+	wanpipe_opt *wp;
 	struct sk_buff *skb=NULL;
 	struct sock *deadsk=NULL;
 
@@ -1134,12 +1138,11 @@ static void release_driver(struct sock *sk)
 	sk->state = WANSOCK_DISCONNECTED;
 	sk->bound_dev_if = 0;
 	sk->zapped=0;
+	wp = wp_sk(sk);
 
-	if (sk->protinfo.af_wanpipe){
-		if (sk->protinfo.af_wanpipe->mbox){
-			kfree(sk->protinfo.af_wanpipe->mbox);
-			sk->protinfo.af_wanpipe->mbox=NULL;
-		}
+	if (wp && wp->mbox) {
+		kfree(wp->mbox);
+		wp->mbox = NULL;
 	}
 }
 
@@ -1244,9 +1247,9 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 		return;
 	}
 
-	if (sk->protinfo.af_wanpipe){
-		kfree(sk->protinfo.af_wanpipe);
-		sk->protinfo.af_wanpipe=NULL;
+	if (wp_sk(sk)) {
+		kfree(wp_sk(sk));
+		wp_sk(sk) = NULL;
 	}
 
       #ifdef LINUX_2_4
@@ -1288,9 +1291,9 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 	sk->socket = NULL;
 
 
-	if (sk->protinfo.af_wanpipe){
-		kfree(sk->protinfo.af_wanpipe);
-		sk->protinfo.af_wanpipe=NULL;
+	if (wp_sk(sk)) {
+		kfree(wp_sk(sk));
+		wp_sk(sk) = NULL;
 	}
 
       #ifdef LINUX_2_4
@@ -1317,9 +1320,9 @@ static void wanpipe_kill_sock_irq (struct sock *sk)
 
 	sk->socket = NULL;
 
-	if (sk->protinfo.af_wanpipe){
-		kfree(sk->protinfo.af_wanpipe);
-		sk->protinfo.af_wanpipe=NULL;
+	if (wp_sk(sk)) {
+		kfree(wp_sk(sk));
+		wp_sk(sk) = NULL;
 	}
 
       #ifdef LINUX_2_4
@@ -1386,7 +1389,7 @@ static int wanpipe_do_bind(struct sock *sk, netdevice_t *dev, int protocol)
 
 			/* X25 Specific option */
 			if (sk->num == htons(X25_PROT))
-				sk->protinfo.af_wanpipe->svc = chan->svc;
+				wp_sk(sk)->svc = chan->svc;
 
 		} else {
 			sk->err = ENETDOWN;
@@ -1440,7 +1443,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 		printk(KERN_INFO "wansock: Wanpipe card not found: %s\n",sll->sll_card);
 		return -ENODEV;
 	}else{
-		sk->protinfo.af_wanpipe->card = (void *)card;
+		wp_sk(sk)->card = (void *)card;
 	}
 
 	if (!strcmp(sll->sll_device,"svc_listen")){
@@ -1808,7 +1811,7 @@ static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void
 
 	for (sk = wanpipe_sklist; sk; sk = sk->next) {
 
-		if ((po = sk->protinfo.af_wanpipe)==NULL)
+		if ((po = wp_sk(sk)) == NULL)
 			continue;
 		if (dev == NULL)
 			continue;
@@ -2005,6 +2008,7 @@ static int wanpipe_debug (struct sock *origsk, void *arg)
 	wan_debug_t *dbg_data = (wan_debug_t *)arg;
 
 	for (sk = wanpipe_sklist; sk; sk = sk->next){
+		wanpipe_opt *wp = wp_sk(sk);
 
 		if (sk == origsk){
 			continue;
@@ -2024,8 +2028,7 @@ static int wanpipe_debug (struct sock *origsk, void *arg)
 			return err;
 		if ((err=put_user(sk_count, &dbg_data->debug[cnt].sk_count)))
 			return err;
-		if ((err=put_user(sk->protinfo.af_wanpipe->poll_cnt, 
-						&dbg_data->debug[cnt].poll_cnt)))
+		if ((err=put_user(wp->poll_cnt, &dbg_data->debug[cnt].poll_cnt)))
 			return err;
 		if ((err=put_user(sk->bound_dev_if, &dbg_data->debug[cnt].bound)))
 			return err;
@@ -2048,8 +2051,8 @@ static int wanpipe_debug (struct sock *origsk, void *arg)
 				return err;
 
 
-			if (sk->protinfo.af_wanpipe){
-				sdla_t *card = (sdla_t*)sk->protinfo.af_wanpipe->card;			
+			if (wp){
+				sdla_t *card = (sdla_t*)wp->card;			
 	
 				if (card){
 					if ((err=put_user(atomic_read(&card->u.x.command_busy), 
@@ -2057,11 +2060,11 @@ static int wanpipe_debug (struct sock *origsk, void *arg)
 						return err;
 				}
 
-				if ((err=put_user(sk->protinfo.af_wanpipe->lcn, 
-								&dbg_data->debug[cnt].lcn)))
+				if ((err=put_user(wp->lcn, 
+						  &dbg_data->debug[cnt].lcn)))
 					return err;
 				
-				if (sk->protinfo.af_wanpipe->mbox){
+				if (wp->mbox) {
 					if ((err=put_user(1, &dbg_data->debug[cnt].mbox)))
 						return err;
 				}
@@ -2096,11 +2099,11 @@ static int get_ioctl_cmd (struct sock *sk, void *arg)
 	if (usr_data == NULL)
 		return -EINVAL;
 
-	if (!sk->protinfo.af_wanpipe->mbox){
+	if (!wp_sk(sk)->mbox) {
 		return -EINVAL;
 	}
 
-	mbox_ptr = (mbox_cmd_t *)sk->protinfo.af_wanpipe->mbox;
+	mbox_ptr = (mbox_cmd_t *)wp_sk(sk)->mbox;
 
 	if ((err=put_user(mbox_ptr->cmd.qdm, &usr_data->hdr.qdm)))
 		return err;
@@ -2140,7 +2143,7 @@ static int set_ioctl_cmd (struct sock *sk, void *arg)
 	mbox_cmd_t *mbox_ptr;
 	int err;
 
-	if (!sk->protinfo.af_wanpipe->mbox){
+	if (!wp_sk(sk)->mbox) {
 		void *mbox_ptr;
 		netdevice_t *dev = dev_get_by_index(sk->bound_dev_if);
 		if (!dev)
@@ -2152,12 +2155,12 @@ static int set_ioctl_cmd (struct sock *sk, void *arg)
 			return -ENOMEM;
 
 		memset(mbox_ptr, 0, sizeof(mbox_cmd_t));
-		sk->protinfo.af_wanpipe->mbox = mbox_ptr;
+		wp_sk(sk)->mbox = mbox_ptr;
 
 		wanpipe_link_driver(dev,sk);
 	}
 
-	mbox_ptr = (mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox;
+	mbox_ptr = (mbox_cmd_t*)wp_sk(sk)->mbox;
 	memset(mbox_ptr, 0, sizeof(mbox_cmd_t));
 
 	if (usr_data == NULL){
@@ -2204,7 +2207,7 @@ unsigned int wanpipe_poll(struct file * file, struct socket *sock, poll_table *w
 	struct sock *sk = sock->sk;
 	unsigned int mask;
 
-	++sk->protinfo.af_wanpipe->poll_cnt;
+	++wp_sk(sk)->poll_cnt;
 
 	poll_wait(file, sk->sleep, wait);
 	mask = 0;
@@ -2240,7 +2243,7 @@ unsigned int wanpipe_poll(struct file * file, struct socket *sock, poll_table *w
          * transmit queue */
 
 	if (sk->num == htons(X25_PROT)){
-		if (atomic_read(&sk->protinfo.af_wanpipe->packet_sent))
+		if (atomic_read(&wp_sk(sk)->packet_sent))
 			return mask;
 	}
 
@@ -2294,9 +2297,8 @@ static int wanpipe_listen(struct socket *sock, int backlog)
 
 static int wanpipe_link_card (struct sock *sk)
 {
-	sdla_t *card;
+	sdla_t *card = (sdla_t*)wp_sk(sk)->card;
 
-	card = (sdla_t*)sk->protinfo.af_wanpipe->card;
 	if (!card)
 		return -ENOMEM;
 
@@ -2321,9 +2323,7 @@ static int wanpipe_link_card (struct sock *sk)
 
 static void wanpipe_unlink_card (struct sock *sk)
 {
-	sdla_t *card; 
-
-	card = (sdla_t*)sk->protinfo.af_wanpipe->card; 
+	sdla_t *card = (sdla_t*)wp_sk(sk)->card; 
 
 	if (card){
 		card->sk=NULL;
@@ -2342,7 +2342,8 @@ static void wanpipe_unlink_card (struct sock *sk)
 static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 {
 	int err = -EINVAL;
-	mbox_cmd_t *mbox_ptr = (mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox;
+	wanpipe_opt *wp = wp_sk(sk);
+	mbox_cmd_t *mbox_ptr = (mbox_cmd_t*)wp->mbox;
 
 	if (!mbox_ptr){
 		printk(KERN_INFO "NO MBOX PTR !!!!!\n");
@@ -2373,16 +2374,15 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
                          * it is done in wanpipe_listen_rcv(). 
                          */ 
 		 	if (sk->state == WANSOCK_CONNECTED){
-				sk->protinfo.af_wanpipe->lcn =
-				((mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox)->cmd.lcn;	
+				wp->lcn = ((mbox_cmd_t*)wp->mbox)->cmd.lcn;	
 				DBG_PRINTK(KERN_INFO "\nwansock: Accept OK %i\n",
-					sk->protinfo.af_wanpipe->lcn );
+					wp->lcn);
 				err = 0;
 
 			}else{
 				DBG_PRINTK (KERN_INFO "\nwansock: Accept Failed %i\n",
-					sk->protinfo.af_wanpipe->lcn);
-				sk->protinfo.af_wanpipe->lcn = 0;
+					wp->lcn);
+				wp->lcn = 0;
 				err = -ECONNREFUSED;
 			}
 			break;
@@ -2400,7 +2400,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
                          * is transmitted, or clear a call and drop packets */
                           
 			if (atomic_read(&sk->wmem_alloc) || check_driver_busy(sk)){
-			  	mbox_cmd_t *mbox = sk->protinfo.af_wanpipe->mbox;
+			  	mbox_cmd_t *mbox = wp->mbox;
 				if (mbox->cmd.qdm & 0x80){
 					mbox->cmd.result = 0x35;
 					err = -EAGAIN;	
@@ -2417,8 +2417,8 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 			err = -ECONNREFUSED;
 			if (sk->state == WANSOCK_DISCONNECTED){
 				DBG_PRINTK(KERN_INFO "\nwansock: CLEAR OK %i\n",
-					sk->protinfo.af_wanpipe->lcn);
-				sk->protinfo.af_wanpipe->lcn=0;
+					   wp->lcn);
+				wp->lcn = 0;
 				err = 0;
 			}
 			break;
@@ -2436,7 +2436,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
                          * is transmitted, or reset a call and drop packets */
                           
 			if (atomic_read(&sk->wmem_alloc) || check_driver_busy(sk)){
-			  	mbox_cmd_t *mbox = sk->protinfo.af_wanpipe->mbox;
+			  	mbox_cmd_t *mbox = wp->mbox;
 				if (mbox->cmd.qdm & 0x80){
 					mbox->cmd.result = 0x35;
 					err = -EAGAIN;	
@@ -2461,18 +2461,16 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 			if (sk->state == WANSOCK_CONNECTED){
 
-				sk->protinfo.af_wanpipe->lcn =
-				((mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox)->cmd.lcn;	
+				wp->lcn = ((mbox_cmd_t*)wp->mbox)->cmd.lcn;	
 
 				DBG_PRINTK(KERN_INFO "\nwansock: PLACE CALL OK %i\n",
-					sk->protinfo.af_wanpipe->lcn);
+					wp->lcn);
 				err = 0;
 
 			}else if (sk->state == WANSOCK_CONNECTING && (flags & O_NONBLOCK)){
-				sk->protinfo.af_wanpipe->lcn = 
-				((mbox_cmd_t*)sk->protinfo.af_wanpipe->mbox)->cmd.lcn;
+				wp->lcn = ((mbox_cmd_t*)wp->mbox)->cmd.lcn;
 				DBG_PRINTK(KERN_INFO "\nwansock: Place Call OK: Waiting %i\n",
-					sk->protinfo.af_wanpipe->lcn);
+					wp->lcn);
 
 				err = 0;
 
@@ -2583,7 +2581,8 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 	
 	kfree_skb(skb);
 
-	DBG_PRINTK(KERN_INFO "\nwansock: ACCEPT Got LCN %i\n",newsk->protinfo.af_wanpipe->lcn);
+	DBG_PRINTK(KERN_INFO "\nwansock: ACCEPT Got LCN %i\n",
+		   wp_sk(newsk)->lcn);
 	return 0;
 }
 
@@ -2660,10 +2659,10 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 	sock->state   = SS_CONNECTING;
 	sk->state     = WANSOCK_CONNECTING;
 
-	if (!sk->protinfo.af_wanpipe->mbox){
-		if (sk->protinfo.af_wanpipe->svc){
+	if (!wp_sk(sk)->mbox) {
+		if (wp_sk (sk)->svc)
 			return -EINVAL;
-		}else{
+		else {
 			int err;
 			if ((err=set_ioctl_cmd(sk,NULL)) < 0)
 				return err;
@@ -2733,14 +2732,12 @@ struct proto_ops wanpipe_ops = {
 
 
 static struct net_proto_family wanpipe_family_ops = {
-	PF_WANPIPE,
-	wanpipe_create
+	family:	PF_WANPIPE,
+	create:	wanpipe_create,
 };
 
-struct notifier_block wanpipe_netdev_notifier={
-	wanpipe_notifier,
-	NULL,
-	0
+struct notifier_block wanpipe_netdev_notifier = {
+	notifier_call:	wanpipe_notifier,
 };
 
 

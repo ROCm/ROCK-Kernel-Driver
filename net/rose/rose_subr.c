@@ -30,6 +30,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/system.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
@@ -42,7 +43,7 @@
 void rose_clear_queues(struct sock *sk)
 {
 	skb_queue_purge(&sk->write_queue);
-	skb_queue_purge(&sk->protinfo.rose->ack_queue);
+	skb_queue_purge(&rose_sk(sk)->ack_queue);
 }
 
 /*
@@ -53,15 +54,16 @@ void rose_clear_queues(struct sock *sk)
 void rose_frames_acked(struct sock *sk, unsigned short nr)
 {
 	struct sk_buff *skb;
+	rose_cb *rose = rose_sk(sk);
 
 	/*
 	 * Remove all the ack-ed frames from the ack queue.
 	 */
-	if (sk->protinfo.rose->va != nr) {
-		while (skb_peek(&sk->protinfo.rose->ack_queue) != NULL && sk->protinfo.rose->va != nr) {
-			skb = skb_dequeue(&sk->protinfo.rose->ack_queue);
+	if (rose->va != nr) {
+		while (skb_peek(&rose->ack_queue) != NULL && rose->va != nr) {
+			skb = skb_dequeue(&rose->ack_queue);
 			kfree_skb(skb);
-			sk->protinfo.rose->va = (sk->protinfo.rose->va + 1) % ROSE_MODULUS;
+			rose->va = (rose->va + 1) % ROSE_MODULUS;
 		}
 	}
 }
@@ -75,7 +77,7 @@ void rose_requeue_frames(struct sock *sk)
 	 * up by rose_kick. This arrangement handles the possibility of an
 	 * empty output queue.
 	 */
-	while ((skb = skb_dequeue(&sk->protinfo.rose->ack_queue)) != NULL) {
+	while ((skb = skb_dequeue(&rose_sk(sk)->ack_queue)) != NULL) {
 		if (skb_prev == NULL)
 			skb_queue_head(&sk->write_queue, skb);
 		else
@@ -90,16 +92,15 @@ void rose_requeue_frames(struct sock *sk)
  */
 int rose_validate_nr(struct sock *sk, unsigned short nr)
 {
-	unsigned short vc = sk->protinfo.rose->va;
+	rose_cb *rose = rose_sk(sk);
+	unsigned short vc = rose->va;
 
-	while (vc != sk->protinfo.rose->vs) {
+	while (vc != rose->vs) {
 		if (nr == vc) return 1;
 		vc = (vc + 1) % ROSE_MODULUS;
 	}
 
-	if (nr == sk->protinfo.rose->vs) return 1;
-
-	return 0;
+	return nr == rose->vs;
 }
 
 /* 
@@ -108,6 +109,7 @@ int rose_validate_nr(struct sock *sk, unsigned short nr)
  */
 void rose_write_internal(struct sock *sk, int frametype)
 {
+	rose_cb *rose = rose_sk(sk);
 	struct sk_buff *skb;
 	unsigned char  *dptr;
 	unsigned char  lci1, lci2;
@@ -119,7 +121,7 @@ void rose_write_internal(struct sock *sk, int frametype)
 	switch (frametype) {
 		case ROSE_CALL_REQUEST:
 			len   += 1 + ROSE_ADDR_LEN + ROSE_ADDR_LEN;
-			faclen = rose_create_facilities(buffer, sk->protinfo.rose);
+			faclen = rose_create_facilities(buffer, rose);
 			len   += faclen;
 			break;
 		case ROSE_CALL_ACCEPTED:
@@ -139,8 +141,8 @@ void rose_write_internal(struct sock *sk, int frametype)
 	
 	dptr = skb_put(skb, skb_tailroom(skb));
 
-	lci1 = (sk->protinfo.rose->lci >> 8) & 0x0F;
-	lci2 = (sk->protinfo.rose->lci >> 0) & 0xFF;
+	lci1 = (rose->lci >> 8) & 0x0F;
+	lci2 = (rose->lci >> 0) & 0xFF;
 
 	switch (frametype) {
 
@@ -149,9 +151,9 @@ void rose_write_internal(struct sock *sk, int frametype)
 			*dptr++ = lci2;
 			*dptr++ = frametype;
 			*dptr++ = 0xAA;
-			memcpy(dptr, &sk->protinfo.rose->dest_addr,  ROSE_ADDR_LEN);
+			memcpy(dptr, &rose->dest_addr,  ROSE_ADDR_LEN);
 			dptr   += ROSE_ADDR_LEN;
-			memcpy(dptr, &sk->protinfo.rose->source_addr, ROSE_ADDR_LEN);
+			memcpy(dptr, &rose->source_addr, ROSE_ADDR_LEN);
 			dptr   += ROSE_ADDR_LEN;
 			memcpy(dptr, buffer, faclen);
 			dptr   += faclen;
@@ -169,8 +171,8 @@ void rose_write_internal(struct sock *sk, int frametype)
 			*dptr++ = ROSE_GFI | lci1;
 			*dptr++ = lci2;
 			*dptr++ = frametype;
-			*dptr++ = sk->protinfo.rose->cause;
-			*dptr++ = sk->protinfo.rose->diagnostic;
+			*dptr++ = rose->cause;
+			*dptr++ = rose->diagnostic;
 			break;
 
 		case ROSE_RESET_REQUEST:
@@ -186,7 +188,7 @@ void rose_write_internal(struct sock *sk, int frametype)
 			*dptr++ = ROSE_GFI | lci1;
 			*dptr++ = lci2;
 			*dptr   = frametype;
-			*dptr++ |= (sk->protinfo.rose->vr << 5) & 0xE0;
+			*dptr++ |= (rose->vr << 5) & 0xE0;
 			break;
 
 		case ROSE_CLEAR_CONFIRMATION:
@@ -202,7 +204,7 @@ void rose_write_internal(struct sock *sk, int frametype)
 			return;
 	}
 
-	rose_transmit_link(skb, sk->protinfo.rose->neighbour);
+	rose_transmit_link(skb, rose->neighbour);
 }
 
 int rose_decode(struct sk_buff *skb, int *ns, int *nr, int *q, int *d, int *m)
@@ -497,19 +499,21 @@ int rose_create_facilities(unsigned char *buffer, rose_cb *rose)
 
 void rose_disconnect(struct sock *sk, int reason, int cause, int diagnostic)
 {
+	rose_cb *rose = rose_sk(sk);
+
 	rose_stop_timer(sk);
 	rose_stop_idletimer(sk);
 
 	rose_clear_queues(sk);
 
-	sk->protinfo.rose->lci   = 0;
-	sk->protinfo.rose->state = ROSE_STATE_0;
+	rose->lci   = 0;
+	rose->state = ROSE_STATE_0;
 
 	if (cause != -1)
-		sk->protinfo.rose->cause = cause;
+		rose->cause = cause;
 
 	if (diagnostic != -1)
-		sk->protinfo.rose->diagnostic = diagnostic;
+		rose->diagnostic = diagnostic;
 
 	sk->state     = TCP_CLOSE;
 	sk->err       = reason;

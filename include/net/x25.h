@@ -139,6 +139,8 @@ typedef struct {
 	unsigned long 		vc_facil_mask;	/* inc_call facilities mask */
 } x25_cb;
 
+#define x25_sk(__sk) ((x25_cb *)(__sk)->protinfo)
+
 /* af_x25.c */
 extern int  sysctl_x25_restart_request_timeout;
 extern int  sysctl_x25_call_request_timeout;

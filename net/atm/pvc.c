@@ -111,11 +111,8 @@ static int pvc_create(struct socket *sock,int protocol)
 
 
 static struct net_proto_family pvc_family_ops = {
-	PF_ATMPVC,
-	pvc_create,
-	0,			/* no authentication */
-	0,			/* no encryption */
-	0			/* no encrypt_net */
+	family:	PF_ATMPVC,
+	create:	pvc_create,
 };
 
 

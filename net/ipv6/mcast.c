@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: mcast.c,v 1.38 2001/08/15 07:36:31 davem Exp $
+ *	$Id: mcast.c,v 1.40 2002/02/08 03:57:19 davem Exp $
  *
  *	Based on linux/ipv4/igmp.c and linux/ipv4/ip_sockglue.c 
  *
@@ -77,7 +77,7 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 {
 	struct net_device *dev = NULL;
 	struct ipv6_mc_socklist *mc_lst;
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	int err;
 
 	if (!(ipv6_addr_type(addr) & IPV6_ADDR_MULTICAST))
@@ -136,7 +136,7 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, struct in6_addr *addr)
  */
 int ipv6_sock_mc_drop(struct sock *sk, int ifindex, struct in6_addr *addr)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_mc_socklist *mc_lst, **lnk;
 
 	write_lock_bh(&ipv6_sk_mc_lock);
@@ -163,7 +163,7 @@ int ipv6_sock_mc_drop(struct sock *sk, int ifindex, struct in6_addr *addr)
 
 void ipv6_sock_mc_close(struct sock *sk)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_mc_socklist *mc_lst;
 
 	write_lock_bh(&ipv6_sk_mc_lock);
@@ -188,10 +188,11 @@ void ipv6_sock_mc_close(struct sock *sk)
 
 int inet6_mc_check(struct sock *sk, struct in6_addr *addr)
 {
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_mc_socklist *mc;
 
 	read_lock(&ipv6_sk_mc_lock);
-	for (mc = sk->net_pinfo.af_inet6.ipv6_mc_list; mc; mc=mc->next) {
+	for (mc = np->ipv6_mc_list; mc; mc = mc->next) {
 		if (ipv6_addr_cmp(&mc->addr, addr) == 0) {
 			read_unlock(&ipv6_sk_mc_lock);
 			return 1;
@@ -748,6 +749,7 @@ done:
 
 int __init igmp6_init(struct net_proto_family *ops)
 {
+	struct ipv6_pinfo *np;
 	struct sock *sk;
 	int err;
 
@@ -764,7 +766,8 @@ int __init igmp6_init(struct net_proto_family *ops)
 	sk->allocation = GFP_ATOMIC;
 	sk->prot->unhash(sk);
 
-	sk->net_pinfo.af_inet6.hop_limit = 1;
+	np = inet6_sk(sk);
+	np->hop_limit = 1;
 #ifdef CONFIG_PROC_FS
 	create_proc_read_entry("net/igmp6", 0, 0, igmp6_read_proc, NULL);
 #endif

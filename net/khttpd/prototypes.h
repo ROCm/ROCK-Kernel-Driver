@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <linux/wait.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/uaccess.h>
 
 #include "structure.h"

@@ -640,7 +640,7 @@ static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 {
 	struct sock *sk;
 
-	if (!(sk = sk_alloc(PF_BLUETOOTH, prio, 1)))
+	if (!(sk = sk_alloc(PF_BLUETOOTH, prio, 1, NULL)))
 		return NULL;
 
 	sock_init_data(sock, sk);
@@ -2238,7 +2238,7 @@ struct proto_ops l2cap_sock_ops = {
 
 struct net_proto_family l2cap_sock_family_ops = {
 	family:		PF_BLUETOOTH,
-	create:		l2cap_sock_create
+	create:		l2cap_sock_create,
 };
 
 struct hci_proto l2cap_hci_proto = {

@@ -180,7 +180,7 @@ static int fl_intern(struct ip6_flowlabel *fl, __u32 label)
 struct ip6_flowlabel * fl6_sock_lookup(struct sock *sk, u32 label)
 {
 	struct ipv6_fl_socklist *sfl;
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 
 	label &= IPV6_FLOWLABEL_MASK;
 
@@ -197,7 +197,7 @@ struct ip6_flowlabel * fl6_sock_lookup(struct sock *sk, u32 label)
 
 void fl6_free_socklist(struct sock *sk)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_fl_socklist *sfl;
 
 	while ((sfl = np->ipv6_fl_list) != NULL) {
@@ -354,6 +354,7 @@ done:
 
 static int mem_check(struct sock *sk)
 {
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_fl_socklist *sfl;
 	int room = FL_MAX_SIZE - atomic_read(&fl_size);
 	int count = 0;
@@ -361,7 +362,7 @@ static int mem_check(struct sock *sk)
 	if (room > FL_MAX_SIZE - FL_MAX_PER_SOCK)
 		return 0;
 
-	for (sfl = sk->net_pinfo.af_inet6.ipv6_fl_list; sfl; sfl = sfl->next)
+	for (sfl = np->ipv6_fl_list; sfl; sfl = sfl->next)
 		count++;
 
 	if (room <= 0 ||
@@ -404,7 +405,7 @@ static int ipv6_opt_cmp(struct ipv6_txoptions *o1, struct ipv6_txoptions *o2)
 int ipv6_flowlabel_opt(struct sock *sk, char *optval, int optlen)
 {
 	int err;
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct in6_flowlabel_req freq;
 	struct ipv6_fl_socklist *sfl1=NULL;
 	struct ipv6_fl_socklist *sfl, **sflp;

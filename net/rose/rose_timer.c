@@ -30,6 +30,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/system.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
@@ -53,58 +54,68 @@ void rose_start_heartbeat(struct sock *sk)
 
 void rose_start_t1timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.rose->timer);
+	rose_cb *rose = rose_sk(sk);
 
-	sk->protinfo.rose->timer.data     = (unsigned long)sk;
-	sk->protinfo.rose->timer.function = &rose_timer_expiry;
-	sk->protinfo.rose->timer.expires  = jiffies + sk->protinfo.rose->t1;
+	del_timer(&rose->timer);
 
-	add_timer(&sk->protinfo.rose->timer);
+	rose->timer.data     = (unsigned long)sk;
+	rose->timer.function = &rose_timer_expiry;
+	rose->timer.expires  = jiffies + rose->t1;
+
+	add_timer(&rose->timer);
 }
 
 void rose_start_t2timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.rose->timer);
+	rose_cb *rose = rose_sk(sk);
 
-	sk->protinfo.rose->timer.data     = (unsigned long)sk;
-	sk->protinfo.rose->timer.function = &rose_timer_expiry;
-	sk->protinfo.rose->timer.expires  = jiffies + sk->protinfo.rose->t2;
+	del_timer(&rose->timer);
 
-	add_timer(&sk->protinfo.rose->timer);
+	rose->timer.data     = (unsigned long)sk;
+	rose->timer.function = &rose_timer_expiry;
+	rose->timer.expires  = jiffies + rose->t2;
+
+	add_timer(&rose->timer);
 }
 
 void rose_start_t3timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.rose->timer);
+	rose_cb *rose = rose_sk(sk);
 
-	sk->protinfo.rose->timer.data     = (unsigned long)sk;
-	sk->protinfo.rose->timer.function = &rose_timer_expiry;
-	sk->protinfo.rose->timer.expires  = jiffies + sk->protinfo.rose->t3;
+	del_timer(&rose->timer);
 
-	add_timer(&sk->protinfo.rose->timer);
+	rose->timer.data     = (unsigned long)sk;
+	rose->timer.function = &rose_timer_expiry;
+	rose->timer.expires  = jiffies + rose->t3;
+
+	add_timer(&rose->timer);
 }
 
 void rose_start_hbtimer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.rose->timer);
+	rose_cb *rose = rose_sk(sk);
 
-	sk->protinfo.rose->timer.data     = (unsigned long)sk;
-	sk->protinfo.rose->timer.function = &rose_timer_expiry;
-	sk->protinfo.rose->timer.expires  = jiffies + sk->protinfo.rose->hb;
+	del_timer(&rose->timer);
 
-	add_timer(&sk->protinfo.rose->timer);
+	rose->timer.data     = (unsigned long)sk;
+	rose->timer.function = &rose_timer_expiry;
+	rose->timer.expires  = jiffies + rose->hb;
+
+	add_timer(&rose->timer);
 }
 
 void rose_start_idletimer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.rose->idletimer);
+	rose_cb *rose = rose_sk(sk);
 
-	if (sk->protinfo.rose->idle > 0) {
-		sk->protinfo.rose->idletimer.data     = (unsigned long)sk;
-		sk->protinfo.rose->idletimer.function = &rose_idletimer_expiry;
-		sk->protinfo.rose->idletimer.expires  = jiffies + sk->protinfo.rose->idle;
+	del_timer(&rose->idletimer);
 
-		add_timer(&sk->protinfo.rose->idletimer);
+	if (rose->idle > 0) {
+		rose->idletimer.data     = (unsigned long)sk;
+		rose->idletimer.function = &rose_idletimer_expiry;
+		rose->idletimer.expires  = jiffies + rose->idle;
+
+		add_timer(&rose->idletimer);
 	}
 }
 
@@ -115,19 +126,20 @@ void rose_stop_heartbeat(struct sock *sk)
 
 void rose_stop_timer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.rose->timer);
+	del_timer(&rose_sk(sk)->timer);
 }
 
 void rose_stop_idletimer(struct sock *sk)
 {
-	del_timer(&sk->protinfo.rose->idletimer);
+	del_timer(&rose_sk(sk)->idletimer);
 }
 
 static void rose_heartbeat_expiry(unsigned long param)
 {
 	struct sock *sk = (struct sock *)param;
+	rose_cb *rose = rose_sk(sk);
 
-	switch (sk->protinfo.rose->state) {
+	switch (rose->state) {
 
 		case ROSE_STATE_0:
 			/* Magic here: If we listen() and a new link dies before it
@@ -143,10 +155,10 @@ static void rose_heartbeat_expiry(unsigned long param)
 			 * Check for the state of the receive buffer.
 			 */
 			if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
-			    (sk->protinfo.rose->condition & ROSE_COND_OWN_RX_BUSY)) {
-				sk->protinfo.rose->condition &= ~ROSE_COND_OWN_RX_BUSY;
-				sk->protinfo.rose->condition &= ~ROSE_COND_ACK_PENDING;
-				sk->protinfo.rose->vl         = sk->protinfo.rose->vr;
+			    (rose->condition & ROSE_COND_OWN_RX_BUSY)) {
+				rose->condition &= ~ROSE_COND_OWN_RX_BUSY;
+				rose->condition &= ~ROSE_COND_ACK_PENDING;
+				rose->vl         = rose->vr;
 				rose_write_internal(sk, ROSE_RR);
 				rose_stop_timer(sk);	/* HB */
 				break;
@@ -160,24 +172,25 @@ static void rose_heartbeat_expiry(unsigned long param)
 static void rose_timer_expiry(unsigned long param)
 {
 	struct sock *sk = (struct sock *)param;
+	rose_cb *rose = rose_sk(sk);
 
-	switch (sk->protinfo.rose->state) {
+	switch (rose->state) {
 
 		case ROSE_STATE_1:	/* T1 */
 		case ROSE_STATE_4:	/* T2 */
 			rose_write_internal(sk, ROSE_CLEAR_REQUEST);
-			sk->protinfo.rose->state = ROSE_STATE_2;
+			rose->state = ROSE_STATE_2;
 			rose_start_t3timer(sk);
 			break;
 
 		case ROSE_STATE_2:	/* T3 */
-			sk->protinfo.rose->neighbour->use--;
+			rose->neighbour->use--;
 			rose_disconnect(sk, ETIMEDOUT, -1, -1);
 			break;
 
 		case ROSE_STATE_3:	/* HB */
-			if (sk->protinfo.rose->condition & ROSE_COND_ACK_PENDING) {
-				sk->protinfo.rose->condition &= ~ROSE_COND_ACK_PENDING;
+			if (rose->condition & ROSE_COND_ACK_PENDING) {
+				rose->condition &= ~ROSE_COND_ACK_PENDING;
 				rose_enquiry_response(sk);
 			}
 			break;
@@ -191,7 +204,7 @@ static void rose_idletimer_expiry(unsigned long param)
 	rose_clear_queues(sk);
 
 	rose_write_internal(sk, ROSE_CLEAR_REQUEST);
-	sk->protinfo.rose->state = ROSE_STATE_2;
+	rose_sk(sk)->state = ROSE_STATE_2;
 
 	rose_start_t3timer(sk);
 

@@ -138,6 +138,8 @@ typedef struct {
 	struct sock		*sk;		/* Backlink to socket */
 } rose_cb;
 
+#define rose_sk(__sk) ((rose_cb *)(__sk)->protinfo)
+
 /* af_rose.c */
 extern ax25_address rose_callsign;
 extern int  sysctl_rose_restart_request_timeout;

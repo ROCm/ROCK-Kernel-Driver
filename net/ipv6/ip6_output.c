@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: ip6_output.c,v 1.33 2001/09/20 00:35:35 davem Exp $
+ *	$Id: ip6_output.c,v 1.34 2002/02/01 22:01:04 davem Exp $
  *
  *	Based on linux/net/ipv4/ip_output.c
  *
@@ -34,6 +34,7 @@
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/in6.h>
+#include <linux/tcp.h>
 #include <linux/route.h>
 
 #include <linux/netfilter.h>
@@ -105,8 +106,9 @@ int ip6_output(struct sk_buff *skb)
 	skb->dev = dev;
 
 	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr)) {
-		if (!(dev->flags&IFF_LOOPBACK) &&
-		    (skb->sk == NULL || skb->sk->net_pinfo.af_inet6.mc_loop) &&
+		struct ipv6_pinfo* np = skb->sk ? inet6_sk(skb->sk) : NULL;
+
+		if (!(dev->flags & IFF_LOOPBACK) && (!np || np->mc_loop) &&
 		    ipv6_chk_mcast_addr(dev, &skb->nh.ipv6h->daddr)) {
 			struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
 
@@ -182,7 +184,7 @@ static inline int ip6_maybe_reroute(struct sk_buff *skb)
 int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	     struct ipv6_txoptions *opt)
 {
-	struct ipv6_pinfo * np = sk ? &sk->net_pinfo.af_inet6 : NULL;
+	struct ipv6_pinfo *np = sk ? inet6_sk(sk) : NULL;
 	struct in6_addr *first_hop = fl->nl_u.ip6_u.daddr;
 	struct dst_entry *dst = skb->dst;
 	struct ipv6hdr *hdr;
@@ -258,7 +260,7 @@ int ip6_nd_hdr(struct sock *sk, struct sk_buff *skb, struct net_device *dev,
 	       struct in6_addr *saddr, struct in6_addr *daddr,
 	       int proto, int len)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6hdr *hdr;
 	int totlen;
 
@@ -500,7 +502,8 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		   struct flowi *fl, unsigned length,
 		   struct ipv6_txoptions *opt, int hlimit, int flags)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct inet_opt *inet = inet_sk(sk);
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct in6_addr *final_dst = NULL;
 	struct dst_entry *dst;
 	int err = 0;
@@ -582,7 +585,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 
 	jumbolen = 0;
 
-	if (!sk->protinfo.af_inet.hdrincl) {
+	if (!inet->hdrincl) {
 		pktlength += sizeof(struct ipv6hdr);
 		if (opt)
 			pktlength += opt->opt_flen + opt->opt_nflen;
@@ -642,7 +645,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		hdr = (struct ipv6hdr *) skb->tail;
 		skb->nh.ipv6h = hdr;
 
-		if (!sk->protinfo.af_inet.hdrincl) {
+		if (!inet->hdrincl) {
 			ip6_bld_1(sk, skb, fl, hlimit,
 				  jumbolen ? sizeof(struct ipv6hdr) : pktlength);
 
@@ -667,7 +670,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 			kfree_skb(skb);
 		}
 	} else {
-		if (sk->protinfo.af_inet.hdrincl || jumbolen ||
+		if (inet->hdrincl || jumbolen ||
 		    np->pmtudisc == IPV6_PMTUDISC_DO) {
 			ipv6_local_error(sk, EMSGSIZE, fl, mtu);
 			err = -EMSGSIZE;

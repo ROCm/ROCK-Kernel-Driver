@@ -62,6 +62,7 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/in.h>
+#include <linux/tcp.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/if_ether.h>
@@ -152,16 +153,18 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 
 	spin_lock_bh(&atalk_sockets_lock);
 	for (s = atalk_sockets; s; s = s->next) {
-		if (to->sat_port != s->protinfo.af_at.src_port)
+		struct atalk_sock *at = at_sk(s);
+
+		if (to->sat_port != at->src_port)
 			continue;
 
 	    	if (to->sat_addr.s_net == ATADDR_ANYNET &&
 		    to->sat_addr.s_node == ATADDR_BCAST &&
-		    s->protinfo.af_at.src_net == atif->address.s_net)
+		    at->src_net == atif->address.s_net)
 			break;
 
-	    	if (to->sat_addr.s_net == s->protinfo.af_at.src_net &&
-		    (to->sat_addr.s_node == s->protinfo.af_at.src_node ||
+	    	if (to->sat_addr.s_net == at->src_net &&
+		    (to->sat_addr.s_node == at->src_node ||
 		     to->sat_addr.s_node == ATADDR_BCAST ||
 		     to->sat_addr.s_node == ATADDR_ANYNODE))
 			break;
@@ -170,7 +173,7 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 		 * that the node is appropriately set. */
 		if (to->sat_addr.s_node == ATADDR_ANYNODE &&
 		    to->sat_addr.s_net != ATADDR_ANYNET &&
-		    atif->address.s_node == s->protinfo.af_at.src_node) {
+		    atif->address.s_node == at->src_node) {
 			to->sat_addr.s_node = atif->address.s_node;
 			break; 
 		}
@@ -192,11 +195,14 @@ static struct sock *atalk_find_or_insert_socket(struct sock *sk,
 	struct sock *s;
 
 	spin_lock_bh(&atalk_sockets_lock);
-	for (s = atalk_sockets; s; s = s->next)
-		if (s->protinfo.af_at.src_net == sat->sat_addr.s_net &&
-		    s->protinfo.af_at.src_node == sat->sat_addr.s_node &&
-		    s->protinfo.af_at.src_port == sat->sat_port)
+	for (s = atalk_sockets; s; s = s->next) {
+		struct atalk_sock *at = at_sk(s);
+
+		if (at->src_net == sat->sat_addr.s_net &&
+		    at->src_node == sat->sat_addr.s_node &&
+		    at->src_port == sat->sat_port)
 			break;
+	}
 
 	if (!s) {
 		/* Wheee, it's free, assign and insert. */
@@ -255,15 +261,14 @@ static int atalk_get_info(char *buffer, char **start, off_t offset, int length)
 
 	spin_lock_bh(&atalk_sockets_lock);
 	for (s = atalk_sockets; s; s = s->next) {
+		struct atalk_sock *at = at_sk(s);
+
 		len += sprintf(buffer + len,"%02X   ", s->type);
 		len += sprintf(buffer + len,"%04X:%02X:%02X  ",
-			       ntohs(s->protinfo.af_at.src_net),
-			       s->protinfo.af_at.src_node,
-			       s->protinfo.af_at.src_port);
+			       ntohs(at->src_net), at->src_node, at->src_port);
 		len += sprintf(buffer + len,"%04X:%02X:%02X  ",
-			       ntohs(s->protinfo.af_at.dest_net),
-			       s->protinfo.af_at.dest_node,
-			       s->protinfo.af_at.dest_port);
+			       ntohs(at->dest_net), at->dest_node,
+			       at->dest_port);
 		len += sprintf(buffer + len,"%08X:%08X ",
 			       atomic_read(&s->wmem_alloc),
 			       atomic_read(&s->rmem_alloc));
@@ -1112,42 +1117,33 @@ unsigned short atalk_checksum(struct ddpehdr *ddp, int len)
  */
 static int atalk_create(struct socket *sock, int protocol)
 {
-	struct sock *sk = sk_alloc(PF_APPLETALK, GFP_KERNEL, 1);
-
-	if (!sk)
-		return -ENOMEM;
-
-	switch (sock->type) {
-		/*
-		 * We permit SOCK_DGRAM and RAW is an extension. It is
-		 * trivial to do and gives you the full ELAP frame.
-		 * Should be handy for CAP 8) 
-		 */
-		case SOCK_RAW:
-		case SOCK_DGRAM:
-			sock->ops = &atalk_dgram_ops;
-			break;
-			
-		case SOCK_STREAM:
-			/*
-			 * TODO: if you want to implement ADSP, here's the
-			 * place to start
-			 */
-			/*
-			sock->ops = &atalk_stream_ops;
-			break;
-			*/
-		default:
-			sk_free(sk);
-			return -ESOCKTNOSUPPORT;
-	}
+	struct sock *sk;
+	struct atalk_sock *at;
+	int rc = -ESOCKTNOSUPPORT;
 
 	MOD_INC_USE_COUNT;
+	/*
+	 * We permit SOCK_DGRAM and RAW is an extension. It is trivial to do
+	 * and gives you the full ELAP frame. Should be handy for CAP 8) 
+	 */
+	if (sock->type != SOCK_RAW && sock->type != SOCK_DGRAM)
+		goto decmod;
+	rc = -ENOMEM;
+	sk = sk_alloc(PF_APPLETALK, GFP_KERNEL, 1, NULL);
+	if (!sk)
+		goto decmod;
+	at = at_sk(sk) = kmalloc(sizeof(*at), GFP_KERNEL);
+	if (!at)
+		goto outsk;
+	rc = 0;
+	sock->ops = &atalk_dgram_ops;
 	sock_init_data(sock, sk);
-	sk->destruct = NULL;
 	/* Checksums on by default */
 	sk->zapped = 1;
-	return 0;
+out:	return rc;
+outsk:	sk_free(sk);
+decmod:	MOD_DEC_USE_COUNT;
+	goto out;
 }
 
 /* Free a socket. No work needed */
@@ -1156,15 +1152,13 @@ static int atalk_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 
 	if (!sk)
-		return 0;
-
+		goto out;
 	if (!sk->dead)
 		sk->state_change(sk);
-
 	sk->dead = 1;
 	sock->sk = NULL;
 	atalk_destroy_socket(sk);
-	return 0;
+out:	return 0;
 }
 
 /*
@@ -1185,10 +1179,11 @@ static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 	     sat->sat_port < ATPORT_LAST;
 	     sat->sat_port++) {
 		for (s = atalk_sockets; s; s = s->next) {
-			if (s->protinfo.af_at.src_net == sat->sat_addr.s_net &&
-			    s->protinfo.af_at.src_node ==
-			    	sat->sat_addr.s_node &&
-			    s->protinfo.af_at.src_port == sat->sat_port)
+			struct atalk_sock *at = at_sk(s);
+
+			if (at->src_net == sat->sat_addr.s_net &&
+			    at->src_node == sat->sat_addr.s_node &&
+			    at->src_port == sat->sat_port)
 				goto try_next_port;
 		}
 
@@ -1198,7 +1193,7 @@ static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 			atalk_sockets->pprev = &sk->next;
 		atalk_sockets = sk;
 		sk->pprev = &atalk_sockets;
-		sk->protinfo.af_at.src_port = sat->sat_port;
+		at_sk(sk)->src_port = sat->sat_port;
 		retval = 0;
 		goto out;
 
@@ -1213,6 +1208,7 @@ out:	spin_unlock_bh(&atalk_sockets_lock);
 
 static int atalk_autobind(struct sock *sk)
 {
+	struct atalk_sock *at = at_sk(sk);
 	struct sockaddr_at sat;
 	int n;
 	struct at_addr *ap = atalk_find_primary();
@@ -1220,8 +1216,8 @@ static int atalk_autobind(struct sock *sk)
 	if (!ap || ap->s_net == htons(ATADDR_ANYNET))
 		return -EADDRNOTAVAIL;
 
-	sk->protinfo.af_at.src_net  = sat.sat_addr.s_net  = ap->s_net;
-	sk->protinfo.af_at.src_node = sat.sat_addr.s_node = ap->s_node;
+	at->src_net  = sat.sat_addr.s_net  = ap->s_net;
+	at->src_node = sat.sat_addr.s_node = ap->s_node;
 
 	n = atalk_pick_and_bind_port(sk, &sat);
 	if (n < 0)
@@ -1236,6 +1232,7 @@ static int atalk_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_at *addr = (struct sockaddr_at *)uaddr;
 	struct sock *sk = sock->sk;
+	struct atalk_sock *at = at_sk(sk);
 
 	if (!sk->zapped || addr_len != sizeof(struct sockaddr_at))
 		return -EINVAL;
@@ -1249,15 +1246,15 @@ static int atalk_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		if (!ap)
 			return -EADDRNOTAVAIL;
 
-		sk->protinfo.af_at.src_net  = addr->sat_addr.s_net = ap->s_net;
-		sk->protinfo.af_at.src_node = addr->sat_addr.s_node= ap->s_node;
+		at->src_net  = addr->sat_addr.s_net = ap->s_net;
+		at->src_node = addr->sat_addr.s_node= ap->s_node;
 	} else {
 		if (!atalk_find_interface(addr->sat_addr.s_net,
 					  addr->sat_addr.s_node))
 			return -EADDRNOTAVAIL;
 
-		sk->protinfo.af_at.src_net  = addr->sat_addr.s_net;
-		sk->protinfo.af_at.src_node = addr->sat_addr.s_node;
+		at->src_net  = addr->sat_addr.s_net;
+		at->src_node = addr->sat_addr.s_node;
 	}
 
 	if (addr->sat_port == ATADDR_ANYPORT) {
@@ -1266,7 +1263,7 @@ static int atalk_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		if (n < 0)
 			return n;
 	} else {
-		sk->protinfo.af_at.src_port = addr->sat_port;
+		at->src_port = addr->sat_port;
 
 		if (atalk_find_or_insert_socket(sk, addr))
 			return -EADDRINUSE;
@@ -1281,6 +1278,7 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 			 int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
+	struct atalk_sock *at = at_sk(sk);
 	struct sockaddr_at *addr;
 
 	sk->state   = TCP_CLOSE;
@@ -1312,9 +1310,9 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (!atrtr_get_dev(&addr->sat_addr))
 		return -ENETUNREACH;
 
-	sk->protinfo.af_at.dest_port = addr->sat_port;
-	sk->protinfo.af_at.dest_net  = addr->sat_addr.s_net;
-	sk->protinfo.af_at.dest_node = addr->sat_addr.s_node;
+	at->dest_port = addr->sat_port;
+	at->dest_net  = addr->sat_addr.s_net;
+	at->dest_node = addr->sat_addr.s_node;
 
 	sock->state = SS_CONNECTED;
 	sk->state   = TCP_ESTABLISHED;
@@ -1331,6 +1329,7 @@ static int atalk_getname(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct sockaddr_at sat;
 	struct sock *sk = sock->sk;
+	struct atalk_sock *at = at_sk(sk);
 
 	if (sk->zapped)
 		if (atalk_autobind(sk) < 0)
@@ -1342,13 +1341,13 @@ static int atalk_getname(struct socket *sock, struct sockaddr *uaddr,
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 
-		sat.sat_addr.s_net  = sk->protinfo.af_at.dest_net;
-		sat.sat_addr.s_node = sk->protinfo.af_at.dest_node;
-		sat.sat_port = sk->protinfo.af_at.dest_port;
+		sat.sat_addr.s_net  = at->dest_net;
+		sat.sat_addr.s_node = at->dest_node;
+		sat.sat_port	    = at->dest_port;
 	} else {
-		sat.sat_addr.s_net  = sk->protinfo.af_at.src_net;
-		sat.sat_addr.s_node = sk->protinfo.af_at.src_node;
-		sat.sat_port = sk->protinfo.af_at.src_port;
+		sat.sat_addr.s_net  = at->src_net;
+		sat.sat_addr.s_node = at->src_node;
+		sat.sat_port	    = at->src_port;
 	}
 
 	sat.sat_family = AF_APPLETALK;
@@ -1597,6 +1596,7 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 				struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
+	struct atalk_sock *at = at_sk(sk);
 	struct sockaddr_at *usat = (struct sockaddr_at *)msg->msg_name;
 	int flags = msg->msg_flags;
 	int loopback = 0;
@@ -1635,10 +1635,10 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 		usat = &local_satalk;
-		usat->sat_family = AF_APPLETALK;
-		usat->sat_port   = sk->protinfo.af_at.dest_port;
-		usat->sat_addr.s_node = sk->protinfo.af_at.dest_node;
-		usat->sat_addr.s_net  = sk->protinfo.af_at.dest_net;
+		usat->sat_family      = AF_APPLETALK;
+		usat->sat_port	      = at->dest_port;
+		usat->sat_addr.s_node = at->dest_node;
+		usat->sat_addr.s_net  = at->dest_net;
 	}
 
 	/* Build a packet */
@@ -1657,7 +1657,7 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		struct at_addr at_hint;
 
 		at_hint.s_node = 0;
-		at_hint.s_net  = sk->protinfo.af_at.src_net;
+		at_hint.s_net  = at->src_net;
 
 		rt = atrtr_find(&at_hint);
 		if (!rt)
@@ -1693,11 +1693,11 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	*((__u16 *)ddp) = ntohs(*((__u16 *)ddp));
 
 	ddp->deh_dnet  = usat->sat_addr.s_net;
-	ddp->deh_snet  = sk->protinfo.af_at.src_net;
+	ddp->deh_snet  = at->src_net;
 	ddp->deh_dnode = usat->sat_addr.s_node;
-	ddp->deh_snode = sk->protinfo.af_at.src_node;
+	ddp->deh_snode = at->src_node;
 	ddp->deh_dport = usat->sat_port;
-	ddp->deh_sport = sk->protinfo.af_at.src_port;
+	ddp->deh_sport = at->src_port;
 
 	SOCK_DEBUG(sk, "SK %p: Copy user data (%d bytes).\n", sk, len);
 
@@ -1894,10 +1894,9 @@ static int atalk_ioctl(struct socket *sock,unsigned int cmd, unsigned long arg)
 	return put_user(amount, (int *)arg);
 }
 
-static struct net_proto_family atalk_family_ops =
-{
-	PF_APPLETALK,
-	atalk_create
+static struct net_proto_family atalk_family_ops = {
+	family:	PF_APPLETALK,
+	create:	atalk_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(atalk_dgram_ops)=

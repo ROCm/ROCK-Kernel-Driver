@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_minisocks.c,v 1.14 2001/09/21 21:27:34 davem Exp $
+ * Version:	$Id: tcp_minisocks.c,v 1.15 2002/02/01 22:01:04 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -347,7 +347,7 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 void tcp_time_wait(struct sock *sk, int state, int timeo)
 {
 	struct tcp_tw_bucket *tw = NULL;
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	int recycle_ok = 0;
 
 	if (sysctl_tcp_tw_recycle && tp->ts_recent_stamp)
@@ -383,11 +383,11 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 		if(tw->family == PF_INET6) {
-			memcpy(&tw->v6_daddr,
-			       &sk->net_pinfo.af_inet6.daddr,
+			struct ipv6_pinfo *np = inet6_sk(sk);
+
+			memcpy(&tw->v6_daddr, &np->daddr,
 			       sizeof(struct in6_addr));
-			memcpy(&tw->v6_rcv_saddr,
-			       &sk->net_pinfo.af_inet6.rcv_saddr,
+			memcpy(&tw->v6_rcv_saddr, &np->rcv_saddr,
 			       sizeof(struct in6_addr));
 		}
 #endif
@@ -641,7 +641,10 @@ SMP_TIMER_DEFINE(tcp_twcal_tick, tcp_twcal_tasklet);
  */
 struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req, struct sk_buff *skb)
 {
-	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0);
+	/* allocate the newsk from the same slab of the master sock,
+	 * if not, at sk_free time we'll try to free it from the wrong
+	 * slabcache (i.e. is it TCPv4 or v6?) -acme */
+	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0, sk->slab);
 
 	if(newsk != NULL) {
 		struct tcp_opt *newtp;
@@ -649,7 +652,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		struct sk_filter *filter;
 #endif
 
-		memcpy(newsk, sk, sizeof(*newsk));
+		memcpy(newsk, sk, sizeof(struct tcp_sock));
 		newsk->state = TCP_SYN_RECV;
 
 		/* SANITY */
@@ -684,7 +687,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 #endif
 
 		/* Now setup tcp_opt */
-		newtp = &(newsk->tp_pinfo.af_tcp);
+		newtp = tcp_sk(newsk);
 		newtp->pred_flags = 0;
 		newtp->rcv_nxt = req->rcv_isn + 1;
 		newtp->snd_nxt = req->snt_isn + 1;
@@ -797,7 +800,7 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 			   struct open_request **prev)
 {
 	struct tcphdr *th = skb->h.th;
-	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct tcp_opt *tp = tcp_sk(sk);
 	u32 flg = tcp_flag_word(th) & (TCP_FLAG_RST|TCP_FLAG_SYN|TCP_FLAG_ACK);
 	int paws_reject = 0;
 	struct tcp_opt ttp;

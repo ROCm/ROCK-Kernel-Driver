@@ -7,7 +7,7 @@
  *
  *	Adapted from linux/net/ipv4/af_inet.c
  *
- *	$Id: af_inet6.c,v 1.65 2001/10/02 02:22:36 davem Exp $
+ *	$Id: af_inet6.c,v 1.66 2002/02/01 22:01:04 davem Exp $
  *
  * 	Fixes:
  *	piggy, Karl Knutson	:	Socket protocol table
@@ -92,6 +92,11 @@ extern void ipv6_sysctl_unregister(void);
 atomic_t inet6_sock_nr;
 #endif
 
+/* Per protocol sock slabcache */
+kmem_cache_t *tcp6_sk_cachep;
+kmem_cache_t *udp6_sk_cachep;
+kmem_cache_t *raw6_sk_cachep;
+
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
  */
@@ -107,13 +112,50 @@ static void inet6_sock_destruct(struct sock *sk)
 	MOD_DEC_USE_COUNT;
 }
 
+static __inline__ kmem_cache_t *inet6_sk_slab(int protocol)
+{
+        kmem_cache_t* rc = tcp6_sk_cachep;
+
+        if (protocol == IPPROTO_UDP)
+                rc = udp6_sk_cachep;
+        else if (protocol == IPPROTO_RAW)
+                rc = raw6_sk_cachep;
+        return rc;
+}
+
+static __inline__ int inet6_sk_size(int protocol)
+{
+        int rc = sizeof(struct tcp6_sock);
+
+        if (protocol == IPPROTO_UDP)
+                rc = sizeof(struct udp6_sock);
+        else if (protocol == IPPROTO_RAW)
+                rc = sizeof(struct raw6_sock);
+        return rc;
+}
+
+static __inline__ struct ipv6_pinfo *inet6_sk_generic(struct sock *sk)
+{
+	struct ipv6_pinfo *rc = (&((struct tcp6_sock *)sk)->inet6);
+
+        if (sk->protocol == IPPROTO_UDP)
+                rc = (&((struct udp6_sock *)sk)->inet6);
+        else if (sk->protocol == IPPROTO_RAW)
+                rc = (&((struct raw6_sock *)sk)->inet6);
+        return rc;
+}
+
 static int inet6_create(struct socket *sock, int protocol)
 {
+	struct inet_opt *inet;
+	struct ipv6_pinfo *np;
 	struct sock *sk;
+	struct tcp6_sock* tcp6sk;
 	struct list_head *p;
 	struct inet_protosw *answer;
 
-	sk = sk_alloc(PF_INET6, GFP_KERNEL, 1);
+	sk = sk_alloc(PF_INET6, GFP_KERNEL, inet6_sk_size(protocol),
+		      inet6_sk_slab(protocol));
 	if (sk == NULL) 
 		goto do_oom;
 
@@ -155,10 +197,12 @@ static int inet6_create(struct socket *sock, int protocol)
 	if (INET_PROTOSW_REUSE & answer->flags)
 		sk->reuse = 1;
 
+	inet = inet_sk(sk);
+
 	if (SOCK_RAW == sock->type) {
 		sk->num = protocol;
 		if (IPPROTO_RAW == protocol)
-			sk->protinfo.af_inet.hdrincl = 1;
+			inet->hdrincl = 1;
 	}
 
 	sk->destruct            = inet6_sock_destruct;
@@ -168,25 +212,27 @@ static int inet6_create(struct socket *sock, int protocol)
 
 	sk->backlog_rcv		= answer->prot->backlog_rcv;
 
-	sk->net_pinfo.af_inet6.hop_limit  = -1;
-	sk->net_pinfo.af_inet6.mcast_hops = -1;
-	sk->net_pinfo.af_inet6.mc_loop	  = 1;
-	sk->net_pinfo.af_inet6.pmtudisc	  = IPV6_PMTUDISC_WANT;
+	tcp6sk		= (struct tcp6_sock *)sk;
+	tcp6sk->pinet6 = np = inet6_sk_generic(sk);
+	np->hop_limit	= -1;
+	np->mcast_hops	= -1;
+	np->mc_loop	= 1;
+	np->pmtudisc	= IPV6_PMTUDISC_WANT;
 
 	/* Init the ipv4 part of the socket since we can have sockets
 	 * using v6 API for ipv4.
 	 */
-	sk->protinfo.af_inet.ttl	= 64;
+	inet->ttl	= 64;
 
-	sk->protinfo.af_inet.mc_loop	= 1;
-	sk->protinfo.af_inet.mc_ttl	= 1;
-	sk->protinfo.af_inet.mc_index	= 0;
-	sk->protinfo.af_inet.mc_list	= NULL;
+	inet->mc_loop	= 1;
+	inet->mc_ttl	= 1;
+	inet->mc_index	= 0;
+	inet->mc_list	= NULL;
 
 	if (ipv4_config.no_pmtu_disc)
-		sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_DONT;
+		inet->pmtudisc = IP_PMTUDISC_DONT;
 	else
-		sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_WANT;
+		inet->pmtudisc = IP_PMTUDISC_WANT;
 
 
 #ifdef INET_REFCNT_DEBUG
@@ -232,6 +278,7 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in6 *addr=(struct sockaddr_in6 *)uaddr;
 	struct sock *sk = sock->sk;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	__u32 v4addr = 0;
 	unsigned short snum;
 	int addr_type = 0;
@@ -296,17 +343,17 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	sk->rcv_saddr = v4addr;
 	sk->saddr = v4addr;
 
-	ipv6_addr_copy(&sk->net_pinfo.af_inet6.rcv_saddr, &addr->sin6_addr);
+	ipv6_addr_copy(&np->rcv_saddr, &addr->sin6_addr);
 		
 	if (!(addr_type & IPV6_ADDR_MULTICAST))
-		ipv6_addr_copy(&sk->net_pinfo.af_inet6.saddr, &addr->sin6_addr);
+		ipv6_addr_copy(&np->saddr, &addr->sin6_addr);
 
 	/* Make sure we are allowed to bind here. */
 	if (sk->prot->get_port(sk, snum) != 0) {
 		sk->rcv_saddr = 0;
 		sk->saddr = 0;
-		memset(&sk->net_pinfo.af_inet6.rcv_saddr, 0, sizeof(struct in6_addr));
-		memset(&sk->net_pinfo.af_inet6.saddr, 0, sizeof(struct in6_addr));
+		memset(&np->rcv_saddr, 0, sizeof(struct in6_addr));
+		memset(&np->saddr, 0, sizeof(struct in6_addr));
 
 		release_sock(sk);
 		return -EADDRINUSE;
@@ -339,6 +386,7 @@ static int inet6_release(struct socket *sock)
 
 int inet6_destroy_sock(struct sock *sk)
 {
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sk_buff *skb;
 	struct ipv6_txoptions *opt;
 
@@ -350,7 +398,7 @@ int inet6_destroy_sock(struct sock *sk)
 
 	/* Release rx options */
 
-	if ((skb = xchg(&sk->net_pinfo.af_inet6.pktoptions, NULL)) != NULL)
+	if ((skb = xchg(&np->pktoptions, NULL)) != NULL)
 		kfree_skb(skb);
 
 	/* Free flowlabels */
@@ -358,7 +406,7 @@ int inet6_destroy_sock(struct sock *sk)
 
 	/* Free tx options */
 
-	if ((opt = xchg(&sk->net_pinfo.af_inet6.opt, NULL)) != NULL)
+	if ((opt = xchg(&np->opt, NULL)) != NULL)
 		sock_kfree_s(sk, opt, opt->tot_len);
 
 	return 0;
@@ -373,6 +421,7 @@ static int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct sockaddr_in6 *sin=(struct sockaddr_in6 *)uaddr;
 	struct sock *sk = sock->sk;
+	struct ipv6_pinfo *np = inet6_sk(sk);
   
 	sin->sin6_family = AF_INET6;
 	sin->sin6_flowinfo = 0;
@@ -383,18 +432,15 @@ static int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 		if (((1<<sk->state)&(TCPF_CLOSE|TCPF_SYN_SENT)) && peer == 1)
 			return -ENOTCONN;
 		sin->sin6_port = sk->dport;
-		memcpy(&sin->sin6_addr, &sk->net_pinfo.af_inet6.daddr,
-		       sizeof(struct in6_addr));
-		if (sk->net_pinfo.af_inet6.sndflow)
-			sin->sin6_flowinfo = sk->net_pinfo.af_inet6.flow_label;
+		memcpy(&sin->sin6_addr, &np->daddr, sizeof(struct in6_addr));
+		if (np->sndflow)
+			sin->sin6_flowinfo = np->flow_label;
 	} else {
-		if (ipv6_addr_type(&sk->net_pinfo.af_inet6.rcv_saddr) == IPV6_ADDR_ANY)
-			memcpy(&sin->sin6_addr, 
-			       &sk->net_pinfo.af_inet6.saddr,
+		if (ipv6_addr_type(&np->rcv_saddr) == IPV6_ADDR_ANY)
+			memcpy(&sin->sin6_addr, &np->saddr,
 			       sizeof(struct in6_addr));
 		else
-			memcpy(&sin->sin6_addr, 
-			       &sk->net_pinfo.af_inet6.rcv_saddr,
+			memcpy(&sin->sin6_addr, &np->rcv_saddr,
 			       sizeof(struct in6_addr));
 
 		sin->sin6_port = sk->sport;
@@ -502,8 +548,8 @@ struct proto_ops inet6_dgram_ops = {
 };
 
 struct net_proto_family inet6_family_ops = {
-	PF_INET6,
-	inet6_create
+	family:	PF_INET6,
+	create:	inet6_create,
 };
 
 #ifdef MODULE
@@ -606,6 +652,19 @@ static int __init inet6_init(void)
 		printk(KERN_CRIT "inet6_proto_init: size fault\n");
 		return -EINVAL;
 	}
+	/* allocate our sock slab caches */
+        tcp6_sk_cachep = kmem_cache_create("tcp6_sock",
+					   sizeof(struct tcp6_sock), 0,
+                                           SLAB_HWCACHE_ALIGN, 0, 0);
+        udp6_sk_cachep = kmem_cache_create("udp6_sock",
+					   sizeof(struct udp6_sock), 0,
+                                           SLAB_HWCACHE_ALIGN, 0, 0);
+        raw6_sk_cachep = kmem_cache_create("raw6_sock",
+					   sizeof(struct raw6_sock), 0,
+                                           SLAB_HWCACHE_ALIGN, 0, 0);
+        if (!tcp6_sk_cachep || !udp6_sk_cachep || !raw6_sk_cachep)
+                printk(KERN_CRIT __FUNCTION__
+                        ": Can't create protocol sock SLAB caches!\n");
 
 	/* Register the socket-side information for inet6_create.  */
 	for(r = &inetsw6[0]; r < &inetsw6[SOCK_MAX]; ++r)

@@ -19,6 +19,7 @@
 #include <linux/mm.h>
 #include <linux/tty.h>
 #include <linux/smp_lock.h>
+#include <linux/binfmts.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>

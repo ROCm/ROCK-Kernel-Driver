@@ -9,6 +9,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/icmp.h>
 #include <linux/ip.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
@@ -188,7 +189,7 @@ ip_nat_local_fn(unsigned int hooknum,
 	if (ret != NF_DROP && ret != NF_STOLEN
 	    && ((*pskb)->nh.iph->saddr != saddr
 		|| (*pskb)->nh.iph->daddr != daddr))
-		return route_me_harder(pskb) == 0 ? ret : NF_DROP;
+		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 	return ret;
 }
 

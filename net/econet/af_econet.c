@@ -167,6 +167,7 @@ static int econet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len
 {
 	struct sockaddr_ec *sec = (struct sockaddr_ec *)uaddr;
 	struct sock *sk=sock->sk;
+	struct econet_opt *eo = ec_sk(sk);
 	
 	/*
 	 *	Check legality
@@ -176,10 +177,10 @@ static int econet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	    sec->sec_family != AF_ECONET)
 		return -EINVAL;
 	
-	sk->protinfo.af_econet->cb = sec->cb;
-	sk->protinfo.af_econet->port = sec->port;
-	sk->protinfo.af_econet->station = sec->addr.station;
-	sk->protinfo.af_econet->net = sec->addr.net;
+	eo->cb	    = sec->cb;
+	eo->port    = sec->port;
+	eo->station = sec->addr.station;
+	eo->net	    = sec->addr.net;
 
 	return 0;
 }
@@ -265,10 +266,12 @@ static int econet_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	 */
 	 
 	if (saddr == NULL) {
-		addr.station = sk->protinfo.af_econet->station;
-		addr.net = sk->protinfo.af_econet->net;
-		port = sk->protinfo.af_econet->port;
-		cb = sk->protinfo.af_econet->cb;
+		struct econet_opt *eo = ec_sk(sk);
+
+		addr.station = eo->station;
+		addr.net     = eo->net;
+		port	     = eo->port;
+		cb	     = eo->cb;
 	} else {
 		if (msg->msg_namelen < sizeof(struct sockaddr_ec)) 
 			return -EINVAL;
@@ -449,15 +452,16 @@ static int econet_getname(struct socket *sock, struct sockaddr *uaddr,
 			  int *uaddr_len, int peer)
 {
 	struct sock *sk = sock->sk;
+	struct econet_opt *eo = ec_sk(sk);
 	struct sockaddr_ec *sec = (struct sockaddr_ec *)uaddr;
 
 	if (peer)
 		return -EOPNOTSUPP;
 
-	sec->sec_family = AF_ECONET;
-	sec->port = sk->protinfo.af_econet->port;
-	sec->addr.station = sk->protinfo.af_econet->station;
-	sec->addr.net = sk->protinfo.af_econet->net;
+	sec->sec_family	  = AF_ECONET;
+	sec->port	  = eo->port;
+	sec->addr.station = eo->station;
+	sec->addr.net	  = eo->net;
 
 	*uaddr_len = sizeof(*sec);
 	return 0;
@@ -525,6 +529,7 @@ static int econet_release(struct socket *sock)
 static int econet_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
+	struct econet_opt *eo;
 	int err;
 
 	/* Econet only provides datagram services. */
@@ -535,7 +540,7 @@ static int econet_create(struct socket *sock, int protocol)
 	MOD_INC_USE_COUNT;
 
 	err = -ENOBUFS;
-	sk = sk_alloc(PF_ECONET, GFP_KERNEL, 1);
+	sk = sk_alloc(PF_ECONET, GFP_KERNEL, 1, NULL);
 	if (sk == NULL)
 		goto out;
 
@@ -543,10 +548,10 @@ static int econet_create(struct socket *sock, int protocol)
 	sock->ops = &econet_ops;
 	sock_init_data(sock,sk);
 
-	sk->protinfo.af_econet = kmalloc(sizeof(struct econet_opt), GFP_KERNEL);
-	if (sk->protinfo.af_econet == NULL)
+	eo = ec_sk(sk) = kmalloc(sizeof(*eo), GFP_KERNEL);
+	if (!eo)
 		goto out_free;
-	memset(sk->protinfo.af_econet, 0, sizeof(struct econet_opt));
+	memset(eo, 0, sizeof(*eo));
 	sk->zapped=0;
 	sk->family = PF_ECONET;
 	sk->num = protocol;
@@ -731,7 +736,7 @@ static struct sock *ec_listening_socket(unsigned char port, unsigned char
 
 	while (sk)
 	{
-		struct econet_opt *opt = sk->protinfo.af_econet;
+		struct econet_opt *opt = ec_sk(sk);
 		if ((opt->port == port || opt->port == 0) && 
 		    (opt->station == station || opt->station == 0) &&
 		    (opt->net == net || opt->net == 0))

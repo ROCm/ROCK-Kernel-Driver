@@ -76,6 +76,8 @@ struct igmphdr
  */
 
 #ifdef __KERNEL__
+#include <linux/skbuff.h>
+#include <linux/in.h>
 
 /* ip_mc_socklist is real list now. Speed is not argument;
    this list never used in fast path code

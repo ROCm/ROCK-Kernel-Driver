@@ -30,6 +30,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <linux/fcntl.h>
@@ -42,10 +43,12 @@
  */
 void nr_clear_queues(struct sock *sk)
 {
+	nr_cb *nr = nr_sk(sk);
+
 	skb_queue_purge(&sk->write_queue);
-	skb_queue_purge(&sk->protinfo.nr->ack_queue);
-	skb_queue_purge(&sk->protinfo.nr->reseq_queue);
-	skb_queue_purge(&sk->protinfo.nr->frag_queue);
+	skb_queue_purge(&nr->ack_queue);
+	skb_queue_purge(&nr->reseq_queue);
+	skb_queue_purge(&nr->frag_queue);
 }
 
 /*
@@ -55,16 +58,17 @@ void nr_clear_queues(struct sock *sk)
  */
 void nr_frames_acked(struct sock *sk, unsigned short nr)
 {
+	nr_cb *nrom = nr_sk(sk);
 	struct sk_buff *skb;
 
 	/*
 	 * Remove all the ack-ed frames from the ack queue.
 	 */
-	if (sk->protinfo.nr->va != nr) {
-		while (skb_peek(&sk->protinfo.nr->ack_queue) != NULL && sk->protinfo.nr->va != nr) {
-		        skb = skb_dequeue(&sk->protinfo.nr->ack_queue);
+	if (nrom->va != nr) {
+		while (skb_peek(&nrom->ack_queue) != NULL && nrom->va != nr) {
+		        skb = skb_dequeue(&nrom->ack_queue);
 			kfree_skb(skb);
-			sk->protinfo.nr->va = (sk->protinfo.nr->va + 1) % NR_MODULUS;
+			nrom->va = (nrom->va + 1) % NR_MODULUS;
 		}
 	}
 }
@@ -78,7 +82,7 @@ void nr_requeue_frames(struct sock *sk)
 {
 	struct sk_buff *skb, *skb_prev = NULL;
 
-	while ((skb = skb_dequeue(&sk->protinfo.nr->ack_queue)) != NULL) {
+	while ((skb = skb_dequeue(&nr_sk(sk)->ack_queue)) != NULL) {
 		if (skb_prev == NULL)
 			skb_queue_head(&sk->write_queue, skb);
 		else
@@ -93,16 +97,15 @@ void nr_requeue_frames(struct sock *sk)
  */
 int nr_validate_nr(struct sock *sk, unsigned short nr)
 {
-	unsigned short vc = sk->protinfo.nr->va;
+	nr_cb *nrom = nr_sk(sk);
+	unsigned short vc = nrom->va;
 
-	while (vc != sk->protinfo.nr->vs) {
+	while (vc != nrom->vs) {
 		if (nr == vc) return 1;
 		vc = (vc + 1) % NR_MODULUS;
 	}
 
-	if (nr == sk->protinfo.nr->vs) return 1;
-
-	return 0;
+	return nr == nrom->vs;
 }
 
 /*
@@ -110,8 +113,9 @@ int nr_validate_nr(struct sock *sk, unsigned short nr)
  */
 int nr_in_rx_window(struct sock *sk, unsigned short ns)
 {
-	unsigned short vc = sk->protinfo.nr->vr;
-	unsigned short vt = (sk->protinfo.nr->vl + sk->protinfo.nr->window) % NR_MODULUS;
+	nr_cb *nr = nr_sk(sk);
+	unsigned short vc = nr->vr;
+	unsigned short vt = (nr->vl + nr->window) % NR_MODULUS;
 
 	while (vc != vt) {
 		if (ns == vc) return 1;
@@ -127,6 +131,7 @@ int nr_in_rx_window(struct sock *sk, unsigned short ns)
  */
 void nr_write_internal(struct sock *sk, int frametype)
 {
+	nr_cb *nr = nr_sk(sk);
 	struct sk_buff *skb;
 	unsigned char  *dptr;
 	int len, timeout;
@@ -138,7 +143,7 @@ void nr_write_internal(struct sock *sk, int frametype)
 			len += 17;
 			break;
 		case NR_CONNACK:
-			len += (sk->protinfo.nr->bpqext) ? 2 : 1;
+			len += (nr->bpqext) ? 2 : 1;
 			break;
 		case NR_DISCREQ:
 		case NR_DISCACK:
@@ -162,19 +167,19 @@ void nr_write_internal(struct sock *sk, int frametype)
 	switch (frametype & 0x0F) {
 
 		case NR_CONNREQ:
-			timeout  = sk->protinfo.nr->t1 / HZ;
-			*dptr++  = sk->protinfo.nr->my_index;
-			*dptr++  = sk->protinfo.nr->my_id;
+			timeout  = nr->t1 / HZ;
+			*dptr++  = nr->my_index;
+			*dptr++  = nr->my_id;
 			*dptr++  = 0;
 			*dptr++  = 0;
 			*dptr++  = frametype;
-			*dptr++  = sk->protinfo.nr->window;
-			memcpy(dptr, &sk->protinfo.nr->user_addr, AX25_ADDR_LEN);
+			*dptr++  = nr->window;
+			memcpy(dptr, &nr->user_addr, AX25_ADDR_LEN);
 			dptr[6] &= ~AX25_CBIT;
 			dptr[6] &= ~AX25_EBIT;
 			dptr[6] |= AX25_SSSID_SPARE;
 			dptr    += AX25_ADDR_LEN;
-			memcpy(dptr, &sk->protinfo.nr->source_addr, AX25_ADDR_LEN);
+			memcpy(dptr, &nr->source_addr, AX25_ADDR_LEN);
 			dptr[6] &= ~AX25_CBIT;
 			dptr[6] &= ~AX25_EBIT;
 			dptr[6] |= AX25_SSSID_SPARE;
@@ -184,29 +189,29 @@ void nr_write_internal(struct sock *sk, int frametype)
 			break;
 
 		case NR_CONNACK:
-			*dptr++ = sk->protinfo.nr->your_index;
-			*dptr++ = sk->protinfo.nr->your_id;
-			*dptr++ = sk->protinfo.nr->my_index;
-			*dptr++ = sk->protinfo.nr->my_id;
+			*dptr++ = nr->your_index;
+			*dptr++ = nr->your_id;
+			*dptr++ = nr->my_index;
+			*dptr++ = nr->my_id;
 			*dptr++ = frametype;
-			*dptr++ = sk->protinfo.nr->window;
-			if (sk->protinfo.nr->bpqext) *dptr++ = sysctl_netrom_network_ttl_initialiser;
+			*dptr++ = nr->window;
+			if (nr->bpqext) *dptr++ = sysctl_netrom_network_ttl_initialiser;
 			break;
 
 		case NR_DISCREQ:
 		case NR_DISCACK:
-			*dptr++ = sk->protinfo.nr->your_index;
-			*dptr++ = sk->protinfo.nr->your_id;
+			*dptr++ = nr->your_index;
+			*dptr++ = nr->your_id;
 			*dptr++ = 0;
 			*dptr++ = 0;
 			*dptr++ = frametype;
 			break;
 
 		case NR_INFOACK:
-			*dptr++ = sk->protinfo.nr->your_index;
-			*dptr++ = sk->protinfo.nr->your_id;
+			*dptr++ = nr->your_index;
+			*dptr++ = nr->your_id;
 			*dptr++ = 0;
-			*dptr++ = sk->protinfo.nr->vr;
+			*dptr++ = nr->vr;
 			*dptr++ = frametype;
 			break;
 	}
@@ -275,7 +280,7 @@ void nr_disconnect(struct sock *sk, int reason)
 
 	nr_clear_queues(sk);
 
-	sk->protinfo.nr->state = NR_STATE_0;
+	nr_sk(sk)->state = NR_STATE_0;
 
 	sk->state     = TCP_CLOSE;
 	sk->err       = reason;

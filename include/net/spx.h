@@ -48,6 +48,8 @@ struct spx_opt
 	struct sk_buff_head     retransmit_queue;
 };
 
+#define spx_sk(__sk) ((struct spx_opt *)(((struct sock *)(__sk)) + 1))
+
 /* Packet connectino control defines */
 #define CCTL_SPXII_XHD  0x01    /* SPX2 extended header */
 #define CCTL_SPX_UNKNOWN 0x02   /* Unknown (unused ??) */

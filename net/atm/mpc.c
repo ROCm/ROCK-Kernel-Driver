@@ -13,7 +13,7 @@
 #include <linux/ip.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
-#include <asm/checksum.h>   /* for ip_fast_csum() */
+#include <net/checksum.h>   /* for ip_fast_csum() */
 #include <net/arp.h>
 #include <net/dst.h>
 #include <linux/proc_fs.h>

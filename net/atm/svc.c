@@ -430,11 +430,8 @@ static int svc_create(struct socket *sock,int protocol)
 
 
 static struct net_proto_family svc_family_ops = {
-	PF_ATMSVC,
-	svc_create,
-	0,			/* no authentication */
-	0,			/* no encryption */
-	0			/* no encrypt_net */
+	family:	PF_ATMSVC,
+	create:	svc_create,
 };
 
 

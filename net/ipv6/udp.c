@@ -7,7 +7,7 @@
  *
  *	Based on linux/ipv4/udp.c
  *
- *	$Id: udp.c,v 1.64 2001/09/01 00:31:50 davem Exp $
+ *	$Id: udp.c,v 1.65 2002/02/01 22:01:04 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -98,18 +98,20 @@ gotit:
 		udp_port_rover = snum = result;
 	} else {
 		struct sock *sk2;
-		int addr_type = ipv6_addr_type(&sk->net_pinfo.af_inet6.rcv_saddr);
+		struct ipv6_pinfo *np = inet6_sk(sk);
+		int addr_type = ipv6_addr_type(&np->rcv_saddr);
 
 		for (sk2 = udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
 		     sk2 != NULL;
 		     sk2 = sk2->next) {
+			struct ipv6_pinfo *np2 = inet6_sk(sk2);
+
 			if (sk2->num == snum &&
 			    sk2 != sk &&
 			    sk2->bound_dev_if == sk->bound_dev_if &&
 			    (!sk2->rcv_saddr ||
 			     addr_type == IPV6_ADDR_ANY ||
-			     !ipv6_addr_cmp(&sk->net_pinfo.af_inet6.rcv_saddr,
-					    &sk2->net_pinfo.af_inet6.rcv_saddr) ||
+			     !ipv6_addr_cmp(&np->rcv_saddr, &np2->rcv_saddr) ||
 			     (addr_type == IPV6_ADDR_MAPPED &&
 			      sk2->family == AF_INET &&
 			      sk->rcv_saddr == sk2->rcv_saddr)) &&
@@ -167,20 +169,20 @@ static struct sock *udp_v6_lookup(struct in6_addr *saddr, u16 sport,
 	for(sk = udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]; sk != NULL; sk = sk->next) {
 		if((sk->num == hnum)		&&
 		   (sk->family == PF_INET6)) {
-			struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+			struct ipv6_pinfo *np = inet6_sk(sk);
 			int score = 0;
 			if(sk->dport) {
 				if(sk->dport != sport)
 					continue;
 				score++;
 			}
-			if(!ipv6_addr_any(&np->rcv_saddr)) {
-				if(ipv6_addr_cmp(&np->rcv_saddr, daddr))
+			if (!ipv6_addr_any(&np->rcv_saddr)) {
+				if (ipv6_addr_cmp(&np->rcv_saddr, daddr))
 					continue;
 				score++;
 			}
-			if(!ipv6_addr_any(&np->daddr)) {
-				if(ipv6_addr_cmp(&np->daddr, saddr))
+			if (!ipv6_addr_any(&np->daddr)) {
+				if (ipv6_addr_cmp(&np->daddr, saddr))
 					continue;
 				score++;
 			}
@@ -211,7 +213,7 @@ static struct sock *udp_v6_lookup(struct in6_addr *saddr, u16 sport,
 int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in6	*usin = (struct sockaddr_in6 *) uaddr;
-	struct ipv6_pinfo      	*np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo      	*np = inet6_sk(sk);
 	struct in6_addr		*daddr;
 	struct in6_addr		saddr;
 	struct dst_entry	*dst;
@@ -266,19 +268,15 @@ ipv4_connected:
 		if (err < 0)
 			return err;
 		
-		ipv6_addr_set(&np->daddr, 0, 0, 
-			      __constant_htonl(0x0000ffff),
-			      sk->daddr);
+		ipv6_addr_set(&np->daddr, 0, 0, htonl(0x0000ffff), sk->daddr);
 
-		if(ipv6_addr_any(&np->saddr)) {
-			ipv6_addr_set(&np->saddr, 0, 0, 
-				      __constant_htonl(0x0000ffff),
+		if (ipv6_addr_any(&np->saddr)) {
+			ipv6_addr_set(&np->saddr, 0, 0, htonl(0x0000ffff),
 				      sk->saddr);
 		}
 
-		if(ipv6_addr_any(&np->rcv_saddr)) {
-			ipv6_addr_set(&np->rcv_saddr, 0, 0, 
-				      __constant_htonl(0x0000ffff),
+		if (ipv6_addr_any(&np->rcv_saddr)) {
+			ipv6_addr_set(&np->rcv_saddr, 0, 0, htonl(0x0000ffff),
 				      sk->rcv_saddr);
 		}
 		return 0;
@@ -322,7 +320,7 @@ ipv4_connected:
 			fl.fl6_dst = rt0->addr;
 		}
 	} else if (np->opt && np->opt->srcrt) {
-		struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
+		struct rt0_hdr *rt0 = (struct rt0_hdr *)np->opt->srcrt;
 		fl.fl6_dst = rt0->addr;
 	}
 
@@ -341,10 +339,10 @@ ipv4_connected:
 	err = ipv6_get_saddr(dst, daddr, &saddr);
 
 	if (err == 0) {
-		if(ipv6_addr_any(&np->saddr))
+		if (ipv6_addr_any(&np->saddr))
 			ipv6_addr_copy(&np->saddr, &saddr);
 
-		if(ipv6_addr_any(&np->rcv_saddr)) {
+		if (ipv6_addr_any(&np->rcv_saddr)) {
 			ipv6_addr_copy(&np->rcv_saddr, &saddr);
 			sk->rcv_saddr = LOOPBACK4_IPV6;
 		}
@@ -368,6 +366,7 @@ static void udpv6_close(struct sock *sk, long timeout)
 int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		  int noblock, int flags, int *addr_len)
 {
+	struct ipv6_pinfo *np = inet6_sk(sk);
   	struct sk_buff *skb;
   	int copied, err;
 
@@ -416,15 +415,17 @@ int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		sin6->sin6_scope_id = 0;
 
 		if (skb->protocol == __constant_htons(ETH_P_IP)) {
+			struct inet_opt *inet = inet_sk(sk);
+
 			ipv6_addr_set(&sin6->sin6_addr, 0, 0,
 				      __constant_htonl(0xffff), skb->nh.iph->saddr);
-			if (sk->protinfo.af_inet.cmsg_flags)
+			if (inet->cmsg_flags)
 				ip_cmsg_recv(msg, skb);
 		} else {
 			memcpy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr,
 			       sizeof(struct in6_addr));
 
-			if (sk->net_pinfo.af_inet6.rxopt.all)
+			if (np->rxopt.all)
 				datagram_recv_ctl(sk, msg, skb);
 			if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL) {
 				struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
@@ -464,6 +465,7 @@ csum_copy_err:
 void udpv6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	       int type, int code, int offset, __u32 info)
 {
+	struct ipv6_pinfo *np;
 	struct ipv6hdr *hdr = (struct ipv6hdr*)skb->data;
 	struct net_device *dev = skb->dev;
 	struct in6_addr *saddr = &hdr->saddr;
@@ -477,15 +479,15 @@ void udpv6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	if (sk == NULL)
 		return;
 
-	if (!icmpv6_err_convert(type, code, &err) &&
-	    !sk->net_pinfo.af_inet6.recverr)
+	np = inet6_sk(sk);
+
+	if (!icmpv6_err_convert(type, code, &err) && !np->recverr)
 		goto out;
 
-	if (sk->state!=TCP_ESTABLISHED &&
-	    !sk->net_pinfo.af_inet6.recverr)
+	if (sk->state != TCP_ESTABLISHED && !np->recverr)
 		goto out;
 
-	if (sk->net_pinfo.af_inet6.recverr)
+	if (np->recverr)
 		ipv6_icmp_error(sk, skb, err, uh->dest, ntohl(info), (u8 *)(uh+1));
 
 	sk->err = err;
@@ -527,20 +529,20 @@ static struct sock *udp_v6_mcast_next(struct sock *sk,
 	unsigned short num = ntohs(loc_port);
 	for(; s; s = s->next) {
 		if(s->num == num) {
-			struct ipv6_pinfo *np = &s->net_pinfo.af_inet6;
+			struct ipv6_pinfo *np = inet6_sk(s);
 			if(s->dport) {
 				if(s->dport != rmt_port)
 					continue;
 			}
-			if(!ipv6_addr_any(&np->daddr) &&
-			   ipv6_addr_cmp(&np->daddr, rmt_addr))
+			if (!ipv6_addr_any(&np->daddr) &&
+			    ipv6_addr_cmp(&np->daddr, rmt_addr))
 				continue;
 
 			if (s->bound_dev_if && s->bound_dev_if != dif)
 				continue;
 
-			if(!ipv6_addr_any(&np->rcv_saddr)) {
-				if(ipv6_addr_cmp(&np->rcv_saddr, loc_addr) == 0)
+			if (!ipv6_addr_any(&np->rcv_saddr)) {
+				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
 					return s;
 			}
 			if(!inet6_mc_check(s, loc_addr))
@@ -755,7 +757,7 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 {
 	struct ipv6_txoptions opt_space;
 	struct udpv6fakehdr udh;
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) msg->msg_name;
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
@@ -805,8 +807,8 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 
 		/* Otherwise it will be difficult to maintain sk->dst_cache. */
 		if (sk->state == TCP_ESTABLISHED &&
-		    !ipv6_addr_cmp(daddr, &sk->net_pinfo.af_inet6.daddr))
-			daddr = &sk->net_pinfo.af_inet6.daddr;
+		    !ipv6_addr_cmp(daddr, &np->daddr))
+			daddr = &np->daddr;
 
 		if (addr_len >= sizeof(struct sockaddr_in6) &&
 		    sin6->sin6_scope_id &&
@@ -817,7 +819,7 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 			return -ENOTCONN;
 
 		udh.uh.dest = sk->dport;
-		daddr = &sk->net_pinfo.af_inet6.daddr;
+		daddr = &np->daddr;
 		fl.fl6_flowlabel = np->flow_label;
 	}
 
@@ -891,15 +893,11 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 	return ulen;
 }
 
-static struct inet6_protocol udpv6_protocol = 
-{
-	udpv6_rcv,		/* UDP handler		*/
-	udpv6_err,		/* UDP error control	*/
-	NULL,			/* next			*/
-	IPPROTO_UDP,		/* protocol ID		*/
-	0,			/* copy			*/
-	NULL,			/* data			*/
-	"UDPv6"			/* name			*/
+static struct inet6_protocol udpv6_protocol = {
+	handler:	udpv6_rcv,
+	err_handler:	udpv6_err,
+	protocol:	IPPROTO_UDP,
+	name:		"UDPv6",
 };
 
 #define LINE_LEN 190
@@ -907,11 +905,12 @@ static struct inet6_protocol udpv6_protocol =
 
 static void get_udp6_sock(struct sock *sp, char *tmpbuf, int i)
 {
+	struct ipv6_pinfo *np = inet6_sk(sp);
 	struct in6_addr *dest, *src;
 	__u16 destp, srcp;
 
-	dest  = &sp->net_pinfo.af_inet6.daddr;
-	src   = &sp->net_pinfo.af_inet6.rcv_saddr;
+	dest  = &np->daddr;
+	src   = &np->rcv_saddr;
 	destp = ntohs(sp->dport);
 	srcp  = ntohs(sp->sport);
 	sprintf(tmpbuf,

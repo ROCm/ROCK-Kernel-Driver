@@ -7,7 +7,7 @@
  *
  *	Based on linux/net/ipv4/ip_sockglue.c
  *
- *	$Id: ipv6_sockglue.c,v 1.40 2001/09/18 22:29:10 davem Exp $
+ *	$Id: ipv6_sockglue.c,v 1.41 2002/02/01 22:01:04 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -122,7 +122,7 @@ int ip6_ra_control(struct sock *sk, int sel, void (*destructor)(struct sock *))
 int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval, 
 		    int optlen)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	int val, valbool;
 	int retv = -ENOPROTOOPT;
 
@@ -166,7 +166,7 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 			ipv6_sock_mc_close(sk);
 
 			if (sk->protocol == IPPROTO_TCP) {
-				struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+				struct tcp_opt *tp = tcp_sk(sk);
 
 				local_bh_disable();
 				sock_prot_dec_use(sk->prot);
@@ -281,7 +281,7 @@ update:
 		retv = 0;
 		if (sk->type == SOCK_STREAM) {
 			if (opt) {
-				struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
+				struct tcp_opt *tp = tcp_sk(sk);
 				if (!((1<<sk->state)&(TCPF_LISTEN|TCPF_CLOSE))
 				    && sk->daddr != LOOPBACK4_IPV6) {
 					tp->ext_header_len = opt->opt_flen + opt->opt_nflen;
@@ -401,7 +401,7 @@ e_inval:
 int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval, 
 		    int *optlen)
 {
-	struct ipv6_pinfo *np = &sk->net_pinfo.af_inet6;
+	struct ipv6_pinfo *np = inet6_sk(sk);
 	int len;
 	int val;
 

@@ -7,7 +7,7 @@
  *		handler for protocols to use and generic option handler.
  *
  *
- * Version:	$Id: sock.c,v 1.116 2001/11/08 04:20:06 davem Exp $
+ * Version:	$Id: sock.c,v 1.117 2002/02/01 22:01:03 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -574,19 +574,33 @@ lenout:
 
 static kmem_cache_t *sk_cachep;
 
-/*
- *	All socket objects are allocated here. This is for future
- *	usage.
+/**
+ *	sk_alloc - All socket objects are allocated here
+ *	@family - protocol family
+ *	@priority - for allocation (%GFP_KERNEL, %GFP_ATOMIC, etc)
+ *	@zero_it - zeroes the allocated sock
+ *	@slab - alternate slab
+ *
+ *	All socket objects are allocated here. If @zero_it is non-zero
+ *	it should have the size of the are to be zeroed, because the
+ *	private slabcaches have different sizes of the generic struct sock.
+ *	1 has been kept as a way to say sizeof(struct sock).
  */
- 
-struct sock *sk_alloc(int family, int priority, int zero_it)
+struct sock *sk_alloc(int family, int priority, int zero_it, kmem_cache_t *slab)
 {
-	struct sock *sk = kmem_cache_alloc(sk_cachep, priority);
-
-	if(sk && zero_it) {
-		memset(sk, 0, sizeof(struct sock));
-		sk->family = family;
-		sock_lock_init(sk);
+	struct sock *sk;
+       
+	if (!slab)
+		slab = sk_cachep;
+	sk = kmem_cache_alloc(slab, priority);
+	if (sk) {
+		if (zero_it) {
+			memset(sk, 0,
+			       zero_it == 1 ? sizeof(struct sock) : zero_it);
+			sk->family = family;
+			sock_lock_init(sk);
+		}
+		sk->slab = slab;
 	}
 
 	return sk;
@@ -612,7 +626,7 @@ void sk_free(struct sock *sk)
 	if (atomic_read(&sk->omem_alloc))
 		printk(KERN_DEBUG "sk_free: optmem leakage (%d bytes) detected.\n", atomic_read(&sk->omem_alloc));
 
-	kmem_cache_free(sk_cachep, sk);
+	kmem_cache_free(sk->slab, sk);
 }
 
 void __init sk_init(void)
@@ -1160,8 +1174,8 @@ void sock_def_write_space(struct sock *sk)
 
 void sock_def_destruct(struct sock *sk)
 {
-	if (sk->protinfo.destruct_hook)
-		kfree(sk->protinfo.destruct_hook);
+	if (sk->protinfo)
+		kfree(sk->protinfo);
 }
 
 void sock_init_data(struct socket *sock, struct sock *sk)

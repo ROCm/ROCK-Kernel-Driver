@@ -63,6 +63,7 @@
 #include <linux/if_packet.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
+#include <net/dn.h>
 #include <net/dn_nsp.h>
 #include <net/dn_dev.h>
 #include <net/dn_route.h>
@@ -401,7 +402,7 @@ int dn_nsp_check_xmit_queue(struct sock *sk, struct sk_buff *skb, struct sk_buff
 	while(list != skb2) {
 		struct dn_skb_cb *cb2 = DN_SKB_CB(skb2);
 
-		if (before_or_equal(cb2->segnum, acknum))
+		if (dn_before_or_equal(cb2->segnum, acknum))
 			ack = skb2;
 
 		/* printk(KERN_DEBUG "ack: %s %04x %04x\n", ack ? "ACK" : "SKIP", (int)cb2->segnum, (int)acknum); */
@@ -438,7 +439,7 @@ int dn_nsp_check_xmit_queue(struct sock *sk, struct sk_buff *skb, struct sk_buff
 		 * further.
 		 */
 		if (xmit_count == 1) {
-			if (equal(segnum, acknum)) 
+			if (dn_equal(segnum, acknum)) 
 				dn_nsp_rtt(sk, (long)(pkttime - reftime));
 
 			if (scp->snd_window < scp->max_window)

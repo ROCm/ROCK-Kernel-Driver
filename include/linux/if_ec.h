@@ -55,6 +55,8 @@ struct econet_opt
   unsigned char net;
 };
 
+#define ec_sk(__sk) ((struct econet_opt *)(__sk)->protinfo)
+
 struct ec_device
 {
   unsigned char station, net;		/* Econet protocol address */
