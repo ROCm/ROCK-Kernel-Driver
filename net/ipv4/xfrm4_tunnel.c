@@ -174,6 +174,8 @@ static void ipip_err(struct sk_buff *skb, u32 info)
 
 static int ipip_init_state(struct xfrm_state *x, void *args)
 {
+	if (!x->props.mode)
+		return -EINVAL;
 	x->props.header_len = sizeof(struct iphdr);
 
 	return 0;
