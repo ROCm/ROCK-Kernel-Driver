@@ -51,6 +51,7 @@ int sysfs_create(struct dentry * dentry, int mode, int (*init)(struct inode *))
 				goto Proceed;
 			else 
 				error = -ENOMEM;
+		} else
 			error = -EEXIST;
 	} else 
 		error = -ENOENT;
@@ -97,6 +98,7 @@ void sysfs_hash_and_remove(struct dentry * dir, const char * name)
 
 			pr_debug("sysfs: Removing %s (%d)\n", victim->d_name.name,
 				 atomic_read(&victim->d_count));
+			/*
 			 * Drop reference from initial sysfs_get_dentry().
 			 */
 			dput(victim);
