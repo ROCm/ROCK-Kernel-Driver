@@ -300,7 +300,8 @@ struct pcibr_intr_wrap_s {
  */
 #define PV854697 (~0)     /* PIC: write 64bit regs as 64bits. permanent */
 #define PV854827 (~0)     /* PIC: fake widget 0xf presence bit. permanent */
-#define PV855271 (1 << 1) /* PIC: PIC: use virt chan iff 64-bit device. */
+#define PV855271 (1 << 1) /* PIC: use virt chan iff 64-bit device. */
+#define PV878674 (~0)     /* PIC: Dont allow 64bit PIOs.  permanent */
 #define PV855272 (1 << 1) /* PIC: runaway interrupt WAR */
 #define PV856155 (1 << 1) /* PIC: arbitration WAR */
 #define PV856864 (1 << 1) /* PIC: lower timeout to free TNUMs quicker */
