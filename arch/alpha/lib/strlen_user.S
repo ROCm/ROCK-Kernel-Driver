@@ -19,7 +19,7 @@
 #define EX(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda v0, $exception-99b(zero);	\
 	.previous
 
@@ -42,8 +42,7 @@ __strlen_user:
 
 	.align 3
 __strnlen_user:
-	ldgp	$29,0($27)	# we do exceptions -- we need the gp.
-	.prologue 1
+	.prologue 0
 
 	EX( ldq_u t0, 0(a0) )	# load first quadword (a0 may be misaligned)
 	lda     t1, -1(zero)

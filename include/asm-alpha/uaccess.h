@@ -126,7 +126,7 @@ struct __large_struct { unsigned long buf[100]; };
 	__asm__("1: ldq %0,%2\n"			\
 	"2:\n"						\
 	".section __ex_table,\"a\"\n"			\
-	"	.gprel32 1b\n"				\
+	"	.long 1b - .\n"				\
 	"	lda %0, 2b-1b(%1)\n"			\
 	".previous"					\
 		: "=r"(__gu_val), "=r"(__gu_err)	\
@@ -136,7 +136,7 @@ struct __large_struct { unsigned long buf[100]; };
 	__asm__("1: ldl %0,%2\n"			\
 	"2:\n"						\
 	".section __ex_table,\"a\"\n"			\
-	"	.gprel32 1b\n"				\
+	"	.long 1b - .\n"				\
 	"	lda %0, 2b-1b(%1)\n"			\
 	".previous"					\
 		: "=r"(__gu_val), "=r"(__gu_err)	\
@@ -149,7 +149,7 @@ struct __large_struct { unsigned long buf[100]; };
 	__asm__("1: ldwu %0,%2\n"			\
 	"2:\n"						\
 	".section __ex_table,\"a\"\n"			\
-	"	.gprel32 1b\n"				\
+	"	.long 1b - .\n"				\
 	"	lda %0, 2b-1b(%1)\n"			\
 	".previous"					\
 		: "=r"(__gu_val), "=r"(__gu_err)	\
@@ -159,7 +159,7 @@ struct __large_struct { unsigned long buf[100]; };
 	__asm__("1: ldbu %0,%2\n"			\
 	"2:\n"						\
 	".section __ex_table,\"a\"\n"			\
-	"	.gprel32 1b\n"				\
+	"	.long 1b - .\n"				\
 	"	lda %0, 2b-1b(%1)\n"			\
 	".previous"					\
 		: "=r"(__gu_val), "=r"(__gu_err)	\
@@ -178,10 +178,10 @@ struct __large_struct { unsigned long buf[100]; };
 	"	or %0,%1,%0\n"						\
 	"3:\n"								\
 	".section __ex_table,\"a\"\n"					\
-	"	.gprel32 1b\n"						\
+	"	.long 1b - .\n"						\
 	"	lda %0, 3b-1b(%2)\n"					\
-	"	.gprel32 2b\n"						\
-	"	lda %0, 2b-1b(%2)\n"					\
+	"	.long 2b - .\n"						\
+	"	lda %0, 3b-2b(%2)\n"					\
 	".previous"							\
 		: "=&r"(__gu_val), "=&r"(__gu_tmp), "=r"(__gu_err)	\
 		: "r"(addr), "2"(__gu_err));				\
@@ -192,7 +192,7 @@ struct __large_struct { unsigned long buf[100]; };
 	"	extbl %0,%2,%0\n"					\
 	"2:\n"								\
 	".section __ex_table,\"a\"\n"					\
-	"	.gprel32 1b\n"						\
+	"	.long 1b - .\n"						\
 	"	lda %0, 2b-1b(%1)\n"					\
 	".previous"							\
 		: "=&r"(__gu_val), "=r"(__gu_err)			\
@@ -240,7 +240,7 @@ extern void __put_user_unknown(void);
 __asm__ __volatile__("1: stq %r2,%1\n"				\
 	"2:\n"							\
 	".section __ex_table,\"a\"\n"				\
-	"	.gprel32 1b\n"					\
+	"	.long 1b - .\n"					\
 	"	lda $31,2b-1b(%0)\n"				\
 	".previous"						\
 		: "=r"(__pu_err)				\
@@ -250,7 +250,7 @@ __asm__ __volatile__("1: stq %r2,%1\n"				\
 __asm__ __volatile__("1: stl %r2,%1\n"				\
 	"2:\n"							\
 	".section __ex_table,\"a\"\n"				\
-	"	.gprel32 1b\n"					\
+	"	.long 1b - .\n"					\
 	"	lda $31,2b-1b(%0)\n"				\
 	".previous"						\
 		: "=r"(__pu_err)				\
@@ -263,7 +263,7 @@ __asm__ __volatile__("1: stl %r2,%1\n"				\
 __asm__ __volatile__("1: stw %r2,%1\n"				\
 	"2:\n"							\
 	".section __ex_table,\"a\"\n"				\
-	"	.gprel32 1b\n"					\
+	"	.long 1b - .\n"					\
 	"	lda $31,2b-1b(%0)\n"				\
 	".previous"						\
 		: "=r"(__pu_err)				\
@@ -273,7 +273,7 @@ __asm__ __volatile__("1: stw %r2,%1\n"				\
 __asm__ __volatile__("1: stb %r2,%1\n"				\
 	"2:\n"							\
 	".section __ex_table,\"a\"\n"				\
-	"	.gprel32 1b\n"					\
+	"	.long 1b - .\n"					\
 	"	lda $31,2b-1b(%0)\n"				\
 	".previous"						\
 		: "=r"(__pu_err)				\
@@ -298,13 +298,13 @@ __asm__ __volatile__("1: stb %r2,%1\n"				\
 	"4:	stq_u %1,0(%5)\n"				\
 	"5:\n"							\
 	".section __ex_table,\"a\"\n"				\
-	"	.gprel32 1b\n"					\
+	"	.long 1b - .\n"					\
 	"	lda $31, 5b-1b(%0)\n"				\
-	"	.gprel32 2b\n"					\
+	"	.long 2b - .\n"					\
 	"	lda $31, 5b-2b(%0)\n"				\
-	"	.gprel32 3b\n"					\
+	"	.long 3b - .\n"					\
 	"	lda $31, 5b-3b(%0)\n"				\
-	"	.gprel32 4b\n"					\
+	"	.long 4b - .\n"					\
 	"	lda $31, 5b-4b(%0)\n"				\
 	".previous"						\
 		: "=r"(__pu_err), "=&r"(__pu_tmp1),		\
@@ -324,9 +324,9 @@ __asm__ __volatile__("1: stb %r2,%1\n"				\
 	"2:	stq_u %1,0(%4)\n"				\
 	"3:\n"							\
 	".section __ex_table,\"a\"\n"				\
-	"	.gprel32 1b\n"					\
+	"	.long 1b - .\n"					\
 	"	lda $31, 3b-1b(%0)\n"				\
-	"	.gprel32 2b\n"					\
+	"	.long 2b - .\n"					\
 	"	lda $31, 3b-2b(%0)\n"				\
 	".previous"						\
 		: "=r"(__pu_err),				\
@@ -356,7 +356,7 @@ __copy_tofrom_user_nocheck(void *to, const void *from, long len)
 	register long __cu_len __asm__("$0") = len;
 
 	__asm__ __volatile__(
-		"jsr $28,(%3),__copy_user\n\tldgp $29,0($28)"
+		"jsr $28,(%3),__copy_user"
 		: "=r" (__cu_len), "=r" (__cu_from), "=r" (__cu_to), "=r"(pv)
 		: "0" (__cu_len), "1" (__cu_from), "2" (__cu_to), "3"(pv)
 		: "$1","$2","$3","$4","$5","$28","memory");
@@ -373,7 +373,7 @@ __copy_tofrom_user(void *to, const void *from, long len, const void *validate)
 		register const void * __cu_from __asm__("$7") = from;
 		register long __cu_len __asm__("$0") = len;
 		__asm__ __volatile__(
-			"jsr $28,(%3),__copy_user\n\tldgp $29,0($28)"
+			"jsr $28,(%3),__copy_user"
 			: "=r"(__cu_len), "=r"(__cu_from), "=r"(__cu_to),
 			  "=r" (pv)
 			: "0" (__cu_len), "1" (__cu_from), "2" (__cu_to), 
@@ -413,7 +413,7 @@ __clear_user(void *to, long len)
 	register void * __cl_to __asm__("$6") = to;
 	register long __cl_len __asm__("$0") = len;
 	__asm__ __volatile__(
-		"jsr $28,(%2),__do_clear_user\n\tldgp $29,0($28)"
+		"jsr $28,(%2),__do_clear_user"
 		: "=r"(__cl_len), "=r"(__cl_to), "=r"(pv)
 		: "0"(__cl_len), "1"(__cl_to), "2"(pv)
 		: "$1","$2","$3","$4","$5","$28","memory");
@@ -428,7 +428,7 @@ clear_user(void *to, long len)
 		register void * __cl_to __asm__("$6") = to;
 		register long __cl_len __asm__("$0") = len;
 		__asm__ __volatile__(
-			"jsr $28,(%2),__do_clear_user\n\tldgp $29,0($28)"
+			"jsr $28,(%2),__do_clear_user"
 			: "=r"(__cl_len), "=r"(__cl_to), "=r"(pv)
 			: "0"(__cl_len), "1"(__cl_to), "2"(pv)
 			: "$1","$2","$3","$4","$5","$28","memory");
@@ -471,7 +471,7 @@ extern inline long strnlen_user(const char *str, long n)
 /*
  * About the exception table:
  *
- * - insn is a 32-bit offset off of the kernel's or module's gp.
+ * - insn is a 32-bit pc-relative offset from the faulting insn.
  * - nextinsn is a 16-bit offset off of the faulting instruction
  *   (not off of the *next* instruction as branches are).
  * - errreg is the register in which to place -EFAULT.
@@ -502,7 +502,7 @@ struct exception_table_entry
 };
 
 /* Returns 0 if exception not found and fixup.unit otherwise.  */
-extern unsigned search_exception_table(unsigned long, unsigned long);
+extern unsigned search_exception_table(unsigned long);
 
 /* Returns the new pc */
 #define fixup_exception(map_reg, fixup_unit, pc)		\
