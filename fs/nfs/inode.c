@@ -371,13 +371,13 @@ nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
 	/* create transport and client */
 	xprt = xprt_create_proto(tcp ? IPPROTO_TCP : IPPROTO_UDP,
 				 &server->addr, &timeparms);
-	if (xprt == NULL) {
+	if (IS_ERR(xprt)) {
 		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
-		goto out_fail;
+		return (struct rpc_clnt *)xprt;
 	}
 	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
 				 server->rpc_ops->version, data->pseudoflavor);
-	if (clnt == NULL) {
+	if (IS_ERR(clnt)) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
 		goto out_fail;
 	}
@@ -390,9 +390,8 @@ nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
 	return clnt;
 
 out_fail:
-	if (xprt)
-		xprt_destroy(xprt);
-	return NULL;
+	xprt_destroy(xprt);
+	return clnt;
 }
 
 /*
@@ -1492,17 +1491,19 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	down_write(&clp->cl_sem);
 	if (clp->cl_rpcclient == NULL) {
 		xprt = xprt_create_proto(proto, &server->addr, &timeparms);
-		if (xprt == NULL) {
+		if (IS_ERR(xprt)) {
 			up_write(&clp->cl_sem);
 			printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
+			err = PTR_ERR(xprt);
 			goto out_fail;
 		}
 		clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
 				server->rpc_ops->version, authflavour);
-		if (clnt == NULL) {
+		if (IS_ERR(clnt)) {
 			up_write(&clp->cl_sem);
 			printk(KERN_WARNING "NFS: cannot create RPC client.\n");
 			xprt_destroy(xprt);
+			err = PTR_ERR(clnt);
 			goto out_fail;
 		}
 		clnt->cl_chatty   = 1;
@@ -1515,14 +1516,17 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		clear_bit(NFS4CLNT_OK, &clp->cl_state);
 	list_add_tail(&server->nfs4_siblings, &clp->cl_superblocks);
 	clnt = rpc_clone_client(clp->cl_rpcclient);
-	server->nfs4_state = clp;
+	if (!IS_ERR(clnt))
+			server->nfs4_state = clp;
 	up_write(&clp->cl_sem);
 	clp = NULL;
 
-	if (clnt == NULL) {
+	if (IS_ERR(clnt)) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
+		err = PTR_ERR(clnt);
 		goto out_remove_list;
 	}
+	err = -ENOMEM;
 	if (server->nfs4_state->cl_idmap == NULL) {
 		printk(KERN_WARNING "NFS: failed to create idmapper.\n");
 		goto out_shutdown;

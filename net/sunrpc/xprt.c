@@ -1421,7 +1421,7 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 				proto == IPPROTO_UDP? "UDP" : "TCP");
 
 	if ((xprt = kmalloc(sizeof(struct rpc_xprt), GFP_KERNEL)) == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	memset(xprt, 0, sizeof(*xprt)); /* Nnnngh! */
 
 	xprt->addr = *ap;
@@ -1597,16 +1597,11 @@ xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
 	struct rpc_xprt	*xprt;
 
 	xprt = xprt_setup(proto, sap, to);
-	if (!xprt)
-		goto out_bad;
-
-	dprintk("RPC:      xprt_create_proto created xprt %p\n", xprt);
+	if (IS_ERR(xprt))
+		dprintk("RPC:      xprt_create_proto failed\n");
+	else
+		dprintk("RPC:      xprt_create_proto created xprt %p\n", xprt);
 	return xprt;
- out_bad:
-	dprintk("RPC:      xprt_create_proto failed\n");
-	if (xprt)
-		kfree(xprt);
-	return NULL;
 }
 
 /*

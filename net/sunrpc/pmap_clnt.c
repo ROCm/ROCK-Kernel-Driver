@@ -65,9 +65,11 @@ rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 	map->pm_binding = 1;
 	spin_unlock(&pmap_lock);
 
-	task->tk_status = -EACCES; /* why set this? returns -EIO below */
-	if (!(pmap_clnt = pmap_create(clnt->cl_server, sap, map->pm_prot)))
+	pmap_clnt = pmap_create(clnt->cl_server, sap, map->pm_prot);
+	if (IS_ERR(pmap_clnt)) {
+		task->tk_status = PTR_ERR(pmap_clnt);
 		goto bailout;
+	}
 	task->tk_status = 0;
 
 	/*
@@ -110,8 +112,9 @@ rpc_getport_external(struct sockaddr_in *sin, __u32 prog, __u32 vers, int prot)
 			NIPQUAD(sin->sin_addr.s_addr), prog, vers, prot);
 
 	sprintf(hostname, "%u.%u.%u.%u", NIPQUAD(sin->sin_addr.s_addr));
-	if (!(pmap_clnt = pmap_create(hostname, sin, prot)))
-		return -EACCES;
+	pmap_clnt = pmap_create(hostname, sin, prot);
+	if (IS_ERR(pmap_clnt))
+		return PTR_ERR(pmap_clnt);
 
 	/* Setup the call info struct */
 	status = rpc_call(pmap_clnt, PMAP_GETPORT, &map, &map.pm_port, 0);
@@ -161,16 +164,18 @@ rpc_register(u32 prog, u32 vers, int prot, unsigned short port, int *okay)
 	struct sockaddr_in	sin;
 	struct rpc_portmap	map;
 	struct rpc_clnt		*pmap_clnt;
-	unsigned int		error = 0;
+	int error = 0;
 
 	dprintk("RPC: registering (%d, %d, %d, %d) with portmapper.\n",
 			prog, vers, prot, port);
 
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	if (!(pmap_clnt = pmap_create("localhost", &sin, IPPROTO_UDP))) {
-		dprintk("RPC: couldn't create pmap client\n");
-		return -EACCES;
+	pmap_clnt = pmap_create("localhost", &sin, IPPROTO_UDP);
+	if (IS_ERR(pmap_clnt)) {
+		error = PTR_ERR(pmap_clnt);
+		dprintk("RPC: couldn't create pmap client. Error = %d\n", error);
+		return error;
 	}
 
 	map.pm_prog = prog;
@@ -199,15 +204,16 @@ pmap_create(char *hostname, struct sockaddr_in *srvaddr, int proto)
 	struct rpc_clnt	*clnt;
 
 	/* printk("pmap: create xprt\n"); */
-	if (!(xprt = xprt_create_proto(proto, srvaddr, NULL)))
-		return NULL;
+	xprt = xprt_create_proto(proto, srvaddr, NULL);
+	if (IS_ERR(xprt))
+		return (struct rpc_clnt *)xprt;
 	xprt->addr.sin_port = htons(RPC_PMAP_PORT);
 
 	/* printk("pmap: create clnt\n"); */
 	clnt = rpc_create_client(xprt, hostname,
 				&pmap_program, RPC_PMAP_VERSION,
 				RPC_AUTH_NULL);
-	if (!clnt) {
+	if (IS_ERR(clnt)) {
 		xprt_destroy(xprt);
 	} else {
 		clnt->cl_softrtry = 1;
