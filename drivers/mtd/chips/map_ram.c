@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple RAM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_ram.c,v 1.19 2004/07/12 21:58:44 dwmw2 Exp $
+ * $Id: map_ram.c,v 1.20 2004/08/09 13:19:43 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -114,8 +114,7 @@ static int mapram_erase (struct mtd_info *mtd, struct erase_info *instr)
 
 	instr->state = MTD_ERASE_DONE;
 
-	if (instr->callback)
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 
 	return 0;
 }

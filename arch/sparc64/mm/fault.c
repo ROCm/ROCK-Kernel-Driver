@@ -428,7 +428,8 @@ good_area:
 		if (tlb_type == spitfire &&
 		    (vma->vm_flags & VM_EXEC) != 0 &&
 		    vma->vm_file != NULL)
-			set_thread_flag(TIF_BLKCOMMIT);
+			set_thread_fault_code(fault_code |
+					      FAULT_CODE_BLKCOMMIT);
 	} else {
 		/* Allow reads even for write-only mappings */
 		if (!(vma->vm_flags & (VM_READ | VM_EXEC)))
@@ -497,6 +498,5 @@ do_sigbus:
 fault_done:
 	/* These values are no longer needed, clear them. */
 	set_thread_fault_code(0);
-	clear_thread_flag(TIF_BLKCOMMIT);
 	current_thread_info()->fault_address = 0;
 }

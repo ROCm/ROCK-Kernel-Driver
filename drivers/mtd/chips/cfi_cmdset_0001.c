@@ -4,7 +4,7 @@
  *
  * (C) 2000 Red Hat. GPL'd
  *
- * $Id: cfi_cmdset_0001.c,v 1.153 2004/07/12 21:52:20 dwmw2 Exp $
+ * $Id: cfi_cmdset_0001.c,v 1.154 2004/08/09 13:19:43 dwmw2 Exp $
  *
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
@@ -1554,8 +1554,7 @@ int cfi_intelext_erase_varsize(struct mtd_info *mtd, struct erase_info *instr)
 		return ret;
 
 	instr->state = MTD_ERASE_DONE;
-	if (instr->callback)
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 	
 	return 0;
 }

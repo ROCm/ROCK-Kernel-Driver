@@ -13,7 +13,7 @@
  *
  * This code is GPL
  *
- * $Id: cfi_cmdset_0002.c,v 1.103 2004/07/14 16:24:03 dwmw2 Exp $
+ * $Id: cfi_cmdset_0002.c,v 1.106 2004/08/09 14:02:32 dwmw2 Exp $
  *
  */
 
@@ -1420,8 +1420,7 @@ int cfi_amdstd_erase_varsize(struct mtd_info *mtd, struct erase_info *instr)
 		return ret;
 
 	instr->state = MTD_ERASE_DONE;
-	if (instr->callback)
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 	
 	return 0;
 }
@@ -1444,8 +1443,7 @@ static int cfi_amdstd_erase_chip(struct mtd_info *mtd, struct erase_info *instr)
 		return ret;
 
 	instr->state = MTD_ERASE_DONE;
-	if (instr->callback)
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 	
 	return 0;
 }

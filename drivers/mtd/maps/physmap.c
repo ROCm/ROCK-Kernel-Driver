@@ -1,5 +1,5 @@
 /*
- * $Id: physmap.c,v 1.33 2004/07/12 14:37:24 dwmw2 Exp $
+ * $Id: physmap.c,v 1.34 2004/07/21 00:16:14 jwboyer Exp $
  *
  * Normal mappings of chips in physical memory
  *
@@ -22,7 +22,12 @@
 
 static struct mtd_info *mymtd;
 
-struct map_info physmap_map = {.name = "phys_mapped_flash"};
+struct map_info physmap_map = {
+	.name = "phys_mapped_flash",
+	.phys = CONFIG_MTD_PHYSMAP_START,
+	.size = CONFIG_MTD_PHYSMAP_LEN,
+	.bankwidth = CONFIG_MTD_PHYSMAP_BANKWIDTH,
+};
 
 #ifdef CONFIG_MTD_PARTITIONS
 static struct mtd_partition *mtd_parts;

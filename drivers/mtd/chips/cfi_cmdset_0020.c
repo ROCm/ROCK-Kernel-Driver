@@ -4,7 +4,7 @@
  *
  * (C) 2000 Red Hat. GPL'd
  *
- * $Id: cfi_cmdset_0020.c,v 1.14 2004/07/20 02:44:25 dwmw2 Exp $
+ * $Id: cfi_cmdset_0020.c,v 1.15 2004/08/09 13:19:43 dwmw2 Exp $
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
  * 	- completely revamped method functions so they are aware and
@@ -966,8 +966,7 @@ int cfi_staa_erase_varsize(struct mtd_info *mtd, struct erase_info *instr)
 	}
 		
 	instr->state = MTD_ERASE_DONE;
-	if (instr->callback)
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 	
 	return 0;
 }

@@ -233,7 +233,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 	}
 
 	/* Set the wrap registers for string I/O reads.   */
-	outw((HP_START_PG + TX_2X_PAGES) | ((HP_STOP_PG - 1) << 8), ioaddr + 14);
+	outw((HP_START_PG + TX_PAGES/2) | ((HP_STOP_PG - 1) << 8), ioaddr + 14);
 
 	/* Set the base address to point to the NIC, not the "real" base! */
 	dev->base_addr = ioaddr + NIC_OFFSET;
@@ -247,7 +247,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 	ei_status.name = name;
 	ei_status.word16 = 0;		/* Agggghhhhh! Debug time: 2 days! */
 	ei_status.tx_start_page = HP_START_PG;
-	ei_status.rx_start_page = HP_START_PG + TX_2X_PAGES;
+	ei_status.rx_start_page = HP_START_PG + TX_PAGES/2;
 	ei_status.stop_page = HP_STOP_PG;
 
 	ei_status.reset_8390 = &hpp_reset_8390;
@@ -261,7 +261,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 		ei_status.block_output = &hpp_mem_block_output;
 		ei_status.get_8390_hdr = &hpp_mem_get_8390_hdr;
 		dev->mem_start = mem_start;
-		ei_status.rmem_start = dev->mem_start + TX_2X_PAGES*256;
+		ei_status.rmem_start = dev->mem_start + TX_PAGES/2*256;
 		dev->mem_end = ei_status.rmem_end
 			= dev->mem_start + (HP_STOP_PG - HP_START_PG)*256;
 	}
@@ -297,7 +297,7 @@ hpp_open(struct net_device *dev)
 
 	/* Set the wrap registers for programmed-I/O operation.   */
 	outw(HW_Page, ioaddr + HP_PAGING);
-	outw((HP_START_PG + TX_2X_PAGES) | ((HP_STOP_PG - 1) << 8), ioaddr + 14);
+	outw((HP_START_PG + TX_PAGES/2) | ((HP_STOP_PG - 1) << 8), ioaddr + 14);
 
 	/* Select the operational page. */
 	outw(Perf_Page, ioaddr + HP_PAGING);

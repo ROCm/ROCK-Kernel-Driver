@@ -6,7 +6,7 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- *	$Id: ms02-nv.c,v 1.6 2003/08/19 09:25:36 dwmw2 Exp $
+ *	$Id: ms02-nv.c,v 1.7 2004/07/29 14:16:45 macro Exp $
  */
 
 #include <linux/init.h>
@@ -31,7 +31,7 @@
 static char version[] __initdata =
 	"ms02-nv.c: v.1.0.0  13 Aug 2001  Maciej W. Rozycki.\n";
 
-MODULE_AUTHOR("Maciej W. Rozycki <macro@ds2.pg.gda.pl>");
+MODULE_AUTHOR("Maciej W. Rozycki <macro@linux-mips.org>");
 MODULE_DESCRIPTION("DEC MS02-NV NVRAM module driver");
 MODULE_LICENSE("GPL");
 

@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.27 2004/07/20 02:44:26 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.28 2004/08/09 13:19:44 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -169,9 +169,7 @@ out:
 	printk(KERN_DEBUG "pmc551_erase() done\n");
 #endif
 
-        if (instr->callback) {
-                (*(instr->callback))(instr);
-	}
+        mtd_erase_callback(instr);
         return 0;
 }
 

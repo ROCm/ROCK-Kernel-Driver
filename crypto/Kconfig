@@ -197,6 +197,19 @@ config CRYPTO_ARC4
 	  WEP, but it should not be for other purposes because of the
 	  weakness of the algorithm.
 
+config CRYPTO_KHAZAD
+	tristate "Khazad cipher algorithm"
+	depends on CRYPTO
+	help
+	  Khazad cipher algorithm.
+
+	  Khazad was a finalist in the initial NESSIE competition.  It is
+	  an algorithm optimized for 64-bit processors with good performance
+	  on 32-bit processors.  Khazad uses an 128 bit key size.
+
+	  See also:
+	  http://planeta.terra.com.br/informatica/paulobarreto/KhazadPage.html
+
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO

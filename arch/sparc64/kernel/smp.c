@@ -35,6 +35,7 @@
 #include <asm/uaccess.h>
 #include <asm/timer.h>
 #include <asm/starfire.h>
+#include <asm/tlb.h>
 
 extern int linux_num_cpus;
 extern void calibrate_delay(void);
@@ -635,9 +636,8 @@ void smp_call_function_client(int irq, struct pt_regs *regs)
 	}
 }
 
-extern unsigned long xcall_flush_tlb_page;
 extern unsigned long xcall_flush_tlb_mm;
-extern unsigned long xcall_flush_tlb_range;
+extern unsigned long xcall_flush_tlb_pending;
 extern unsigned long xcall_flush_tlb_kernel_range;
 extern unsigned long xcall_flush_tlb_all_spitfire;
 extern unsigned long xcall_flush_tlb_all_cheetah;
@@ -835,7 +835,6 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 		int cpu = get_cpu();
 
 		if (atomic_read(&mm->mm_users) == 1) {
-			/* See smp_flush_tlb_page for info about this. */
 			mm->cpu_vm_mask = cpumask_of_cpu(cpu);
 			goto local_flush_and_out;
 		}
@@ -851,27 +850,40 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 	}
 }
 
-void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
-			 unsigned long end)
+void smp_flush_tlb_pending(struct mm_struct *mm, unsigned long nr, unsigned long *vaddrs)
 {
 	u32 ctx = CTX_HWBITS(mm->context);
 	int cpu = get_cpu();
 
-	start &= PAGE_MASK;
-	end    = PAGE_ALIGN(end);
-
 	if (mm == current->active_mm && atomic_read(&mm->mm_users) == 1) {
 		mm->cpu_vm_mask = cpumask_of_cpu(cpu);
 		goto local_flush_and_out;
+	} else {
+		/* This optimization is not valid.  Normally
+		 * we will be holding the page_table_lock, but
+		 * there is an exception which is copy_page_range()
+		 * when forking.  The lock is held during the individual
+		 * page table updates in the parent, but not at the
+		 * top level, which is where we are invoked.
+		 */
+		if (0) {
+			cpumask_t this_cpu_mask = cpumask_of_cpu(cpu);
+
+			/* By virtue of running under the mm->page_table_lock,
+			 * and mmu_context.h:switch_mm doing the same, the
+			 * following operation is safe.
+			 */
+			if (cpus_equal(mm->cpu_vm_mask, this_cpu_mask))
+				goto local_flush_and_out;
+		}
 	}
 
-	smp_cross_call_masked(&xcall_flush_tlb_range,
-			      ctx, start, end,
+	smp_cross_call_masked(&xcall_flush_tlb_pending,
+			      ctx, nr, (unsigned long) vaddrs,
 			      mm->cpu_vm_mask);
 
- local_flush_and_out:
-	__flush_tlb_range(ctx, start, SECONDARY_CONTEXT,
-			  end, PAGE_SIZE, (end-start));
+local_flush_and_out:
+	__flush_tlb_pending(ctx, nr, vaddrs);
 
 	put_cpu();
 }
@@ -885,55 +897,6 @@ void smp_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 			       0, start, end);
 
 		__flush_tlb_kernel_range(start, end);
-	}
-}
-
-void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
-{
-	{
-		u32 ctx = CTX_HWBITS(mm->context);
-		int cpu = get_cpu();
-
-		page &= PAGE_MASK;
-		if (mm == current->active_mm &&
-		    atomic_read(&mm->mm_users) == 1) {
-			/* By virtue of being the current address space, and
-			 * having the only reference to it, the following
-			 * operation is safe.
-			 *
-			 * It would not be a win to perform the xcall tlb
-			 * flush in this case, because even if we switch back
-			 * to one of the other processors in cpu_vm_mask it
-			 * is almost certain that all TLB entries for this
-			 * context will be replaced by the time that happens.
-			 */
-			mm->cpu_vm_mask = cpumask_of_cpu(cpu);
-			goto local_flush_and_out;
-		} else {
-			cpumask_t this_cpu_mask = cpumask_of_cpu(cpu);
-
-			/* By virtue of running under the mm->page_table_lock,
-			 * and mmu_context.h:switch_mm doing the same, the
-			 * following operation is safe.
-			 */
-			if (cpus_equal(mm->cpu_vm_mask, this_cpu_mask))
-				goto local_flush_and_out;
-		}
-
-		/* OK, we have to actually perform the cross call.  Most
-		 * likely this is a cloned mm or kswapd is kicking out pages
-		 * for a task which has run recently on another cpu.
-		 */
-		smp_cross_call_masked(&xcall_flush_tlb_page,
-				      ctx, page, 0,
-				      mm->cpu_vm_mask);
-		if (!cpu_isset(cpu, mm->cpu_vm_mask))
-			return;
-
-	local_flush_and_out:
-		__flush_tlb_page(ctx, page, SECONDARY_CONTEXT);
-
-		put_cpu();
 	}
 }
 
