@@ -327,7 +327,7 @@ static int dn_phase3_output(struct sk_buff *skb)
 	}
 
 	data = skb_push(skb, sizeof(struct dn_short_packet) + 2);
-	data = (unsigned char *)dn_htons(skb->len - 2);
+	*((unsigned short *)data) = dn_htons(skb->len - 2);
 	sp = (struct dn_short_packet *)(data + 2);
 
 	sp->msgflg   = DN_RT_PKT_SHORT|(cb->rt_flags&(DN_RT_F_RQR|DN_RT_F_RTS));
