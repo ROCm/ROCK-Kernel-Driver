@@ -229,3 +229,14 @@ __udivdi3 (UDItype n, UDItype d)
 {
   return __udivmoddi4 (n, d, (UDItype *) 0);
 }
+
+UDItype
+__umoddi3 (UDItype u, UDItype v)
+{
+  UDItype w;
+
+  (void) __udivmoddi4 (u ,v, &w);
+
+  return w;
+}
+
