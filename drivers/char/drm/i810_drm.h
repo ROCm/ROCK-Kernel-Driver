@@ -88,6 +88,8 @@
 #define I810_TEXREG_MCS  7	/* GFX_OP_MAP_COORD_SETS ??? */
 #define I810_TEX_SETUP_SIZE 8
 
+/* Flags for clear ioctl
+ */
 #define I810_FRONT   0x1
 #define I810_BACK    0x2
 #define I810_DEPTH   0x4
@@ -112,6 +114,8 @@ typedef struct _drm_i810_init {
 	unsigned int front_offset;
 	unsigned int back_offset;
 	unsigned int depth_offset;
+	unsigned int overlay_offset;
+	unsigned int overlay_physical;
 	unsigned int w;
 	unsigned int h;
 	unsigned int pitch;
@@ -189,11 +193,36 @@ typedef struct _drm_i810_copy_t {
 	void *address;		/* Address to copy from */
 } drm_i810_copy_t;
 
+#define PR_TRIANGLES         (0x0<<18)
+#define PR_TRISTRIP_0        (0x1<<18)
+#define PR_TRISTRIP_1        (0x2<<18)
+#define PR_TRIFAN            (0x3<<18)
+#define PR_POLYGON           (0x4<<18)
+#define PR_LINES             (0x5<<18)
+#define PR_LINESTRIP         (0x6<<18)
+#define PR_RECTS             (0x7<<18)
+#define PR_MASK              (0x7<<18)
+
+
 typedef struct drm_i810_dma {
 	void *virtual;
 	int request_idx;
 	int request_size;
 	int granted;
 } drm_i810_dma_t;
+
+typedef struct _drm_i810_overlay_t {
+	unsigned int offset;    /* Address of the Overlay Regs */
+	unsigned int physical;
+} drm_i810_overlay_t;
+
+typedef struct _drm_i810_mc {
+	int idx;                /* buffer index */
+	int used;               /* nr bytes in use */
+	int num_blocks;         /* number of GFXBlocks */
+	int *length;            /* List of lengths for GFXBlocks (FUTURE)*/
+	unsigned int last_render; /* Last Render Request */
+} drm_i810_mc_t;
+
 
 #endif /* _I810_DRM_H_ */

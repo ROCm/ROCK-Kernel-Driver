@@ -113,7 +113,6 @@
 #define DRIVER_IOCTLS
 #endif
 #ifndef DRIVER_FOPS
-#if LINUX_VERSION_CODE >= 0x020400
 #define DRIVER_FOPS				\
 static struct file_operations	DRM(fops) = {	\
 	owner:   THIS_MODULE,			\
@@ -126,19 +125,6 @@ static struct file_operations	DRM(fops) = {	\
 	fasync:	 DRM(fasync),			\
 	poll:	 DRM(poll),			\
 }
-#else
-#define DRIVER_FOPS				\
-static struct file_operations	DRM(fops) = {	\
-	open:	 DRM(open),			\
-	flush:	 DRM(flush),			\
-	release: DRM(release),			\
-	ioctl:	 DRM(ioctl),			\
-	mmap:	 DRM(mmap),			\
-	read:	 DRM(read),			\
-	fasync:	 DRM(fasync),			\
-	poll:	 DRM(poll),			\
-}
-#endif
 #endif
 
 
@@ -201,9 +187,7 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 
 	/* The DRM_IOCTL_DMA ioctl should be defined by the driver.
 	 */
-#if __HAVE_DMA_IRQ
 	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { DRM(control),     1, 1 },
-#endif
 #endif
 
 #if __REALLY_HAVE_AGP
@@ -732,9 +716,6 @@ int DRM(open)( struct inode *inode, struct file *filp )
 
 	retcode = DRM(open_helper)( inode, filp, dev );
 	if ( !retcode ) {
-#if LINUX_VERSION_CODE < 0x020333
-		MOD_INC_USE_COUNT; /* Needed before Linux 2.3.51 */
-#endif
 		atomic_inc( &dev->counts[_DRM_STAT_OPENS] );
 		spin_lock( &dev->count_lock );
 		if ( !dev->open_count++ ) {
@@ -853,9 +834,6 @@ int DRM(release)( struct inode *inode, struct file *filp )
 	 * End inline drm_release
 	 */
 
-#if LINUX_VERSION_CODE < 0x020333
-	MOD_DEC_USE_COUNT; /* Needed before Linux 2.3.51 */
-#endif
 	atomic_inc( &dev->counts[_DRM_STAT_CLOSES] );
 	spin_lock( &dev->count_lock );
 	if ( !--dev->open_count ) {

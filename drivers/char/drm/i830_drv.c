@@ -1,5 +1,5 @@
-/* gamma.c -- 3dlabs GMX 2000 driver -*- linux-c -*-
- * Created: Mon Jan  4 08:58:31 1999 by faith@precisioninsight.com
+/* i830_drv.c -- I810 driver -*- linux-c -*-
+ * Created: Mon Dec 13 01:56:22 1999 by jhartmann@precisioninsight.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -19,49 +19,53 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  *
  * Authors:
  *    Rickard E. (Rik) Faith <faith@valinux.com>
+ *    Jeff Hartmann <jhartmann@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
+ *    Abraham vd Merwe <abraham@2d3d.co.za>
  */
 
 #include <linux/config.h>
-#include "gamma.h"
+#include "i830.h"
 #include "drmP.h"
-#include "gamma_drv.h"
+#include "i830_drv.h"
 
 #define DRIVER_AUTHOR		"VA Linux Systems Inc."
 
-#define DRIVER_NAME		"gamma"
-#define DRIVER_DESC		"3DLabs gamma"
-#define DRIVER_DATE		"20010624"
+#define DRIVER_NAME		"i830"
+#define DRIVER_DESC		"Intel 830M"
+#define DRIVER_DATE		"20011004"
 
-#define DRIVER_MAJOR		2
-#define DRIVER_MINOR		0
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		2
 #define DRIVER_PATCHLEVEL	0
 
-#define DRIVER_IOCTLS							  \
-	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	     = { gamma_dma,	  1, 0 }, \
-	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_INIT)] = { gamma_dma_init,  1, 1 }, \
-	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_COPY)] = { gamma_dma_copy,  1, 1 }
+#define DRIVER_IOCTLS							    \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_INIT)]   = { i830_dma_init,    1, 1 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_VERTEX)] = { i830_dma_vertex,  1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_CLEAR)]  = { i830_clear_bufs,  1, 0 }, \
+      	[DRM_IOCTL_NR(DRM_IOCTL_I830_FLUSH)]  = { i830_flush_ioctl, 1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETAGE)] = { i830_getage,      1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETBUF)] = { i830_getbuf,      1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_SWAP)]   = { i830_swap_bufs,   1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_COPY)]   = { i830_copybuf,     1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_DOCOPY)] = { i830_docopy,      1, 0 },
 
-#define IOCTL_TABLE_NAME	DRM(ioctls)
-#define IOCTL_FUNC_NAME 	DRM(ioctl)
-
-#define __HAVE_COUNTERS		5
-#define __HAVE_COUNTER6		_DRM_STAT_IRQ
-#define __HAVE_COUNTER7		_DRM_STAT_DMA
-#define __HAVE_COUNTER8		_DRM_STAT_PRIMARY
-#define __HAVE_COUNTER9		_DRM_STAT_SPECIAL
-#define __HAVE_COUNTER10	_DRM_STAT_MISSED
+#define __HAVE_COUNTERS         4
+#define __HAVE_COUNTER6         _DRM_STAT_IRQ
+#define __HAVE_COUNTER7         _DRM_STAT_PRIMARY
+#define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
+#define __HAVE_COUNTER9         _DRM_STAT_DMA
 
 
-#include "drm_auth.h"
 #include "drm_agpsupport.h"
+#include "drm_auth.h"
 #include "drm_bufs.h"
 #include "drm_context.h"
 #include "drm_dma.h"
@@ -78,20 +82,20 @@
  * anyone can think of a way that we can fit into the __setup macro without
  * changing it, then please send the solution my way.
  */
-static int __init gamma_options( char *str )
+static int __init i830_options( char *str )
 {
-	DRM(parse_options)( str );
-	return 1;
+   DRM(parse_options)( str );
+   return 1;
 }
 
-__setup( DRIVER_NAME "=", gamma_options );
+__setup( DRIVER_NAME "=", i830_options );
 #endif
 
 #include "drm_fops.h"
 #include "drm_init.h"
 #include "drm_ioctl.h"
-#include "drm_lists.h"
 #include "drm_lock.h"
+#include "drm_lists.h"
 #include "drm_memory.h"
 #include "drm_proc.h"
 #include "drm_vm.h"

@@ -94,6 +94,8 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 		return -ENOMEM;
 	}
 
+	memset(entry->pagelist, 0, pages * sizeof(*entry->pagelist));
+
 	entry->busaddr = DRM(alloc)( pages * sizeof(*entry->busaddr),
 				     DRM_MEM_PAGES );
 	if ( !entry->busaddr ) {

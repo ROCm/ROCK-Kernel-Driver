@@ -1,4 +1,4 @@
-/* i810.h -- Intel i810/i815 DRM template customization -*- linux-c -*-
+/* i830.h -- Intel I830 DRM template customization -*- linux-c -*-
  * Created: Thu Feb 15 00:01:12 2001 by gareth@valinux.com
  *
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -27,12 +27,12 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
-#ifndef __I810_H__
-#define __I810_H__
+#ifndef __I830_H__
+#define __I830_H__
 
 /* This remains constant for all DRM template files.
  */
-#define DRM(x) i810_##x
+#define DRM(x) i830_##x
 
 /* General customization:
  */
@@ -45,7 +45,7 @@
  */
 #define __HAVE_RELEASE		1
 #define DRIVER_RELEASE() do {						\
-	i810_reclaim_buffers( dev, priv->pid );				\
+	i830_reclaim_buffers( dev, priv->pid );				\
 } while (0)
 
 /* DMA customization:
@@ -57,20 +57,60 @@
 
 #define __HAVE_DMA_QUIESCENT	1
 #define DRIVER_DMA_QUIESCENT() do {					\
-	i810_dma_quiescent( dev );					\
+	i830_dma_quiescent( dev );					\
 } while (0)
 
-/* Don't need an irq any more.  The template code will make sure that
- * a noop stub is generated for compatibility.
- */
-#define __HAVE_DMA_IRQ		0
+#define __HAVE_DMA_IRQ		1
+#define __HAVE_DMA_IRQ_BH	1
+#define __HAVE_SHARED_IRQ       1
+#define DRIVER_PREINSTALL() do {					\
+	drm_i830_private_t *dev_priv =					\
+		(drm_i830_private_t *)dev->dev_private;			\
+	u16 tmp;							\
+   	tmp = I830_READ16( I830REG_HWSTAM );				\
+   	tmp = tmp & 0x6000;						\
+   	I830_WRITE16( I830REG_HWSTAM, tmp );				\
+									\
+      	tmp = I830_READ16( I830REG_INT_MASK_R );			\
+   	tmp = tmp & 0x6000;		/* Unmask interrupts */		\
+   	I830_WRITE16( I830REG_INT_MASK_R, tmp );			\
+   	tmp = I830_READ16( I830REG_INT_ENABLE_R );			\
+   	tmp = tmp & 0x6000;		/* Disable all interrupts */	\
+      	I830_WRITE16( I830REG_INT_ENABLE_R, tmp );			\
+} while (0)
+
+#define DRIVER_POSTINSTALL() do {					\
+	drm_i830_private_t *dev_priv =					\
+		(drm_i830_private_t *)dev->dev_private;	\
+	u16 tmp;							\
+   	tmp = I830_READ16( I830REG_INT_ENABLE_R );			\
+   	tmp = tmp & 0x6000;						\
+   	tmp = tmp | 0x0003;	/* Enable bp & user interrupts */	\
+   	I830_WRITE16( I830REG_INT_ENABLE_R, tmp );			\
+} while (0)
+
+#define DRIVER_UNINSTALL() do {						\
+	drm_i830_private_t *dev_priv =					\
+		(drm_i830_private_t *)dev->dev_private;			\
+	u16 tmp;							\
+	if ( dev_priv ) {						\
+		tmp = I830_READ16( I830REG_INT_IDENTITY_R );		\
+		tmp = tmp & ~(0x6000);	/* Clear all interrupts */	\
+		if ( tmp != 0 )						\
+			I830_WRITE16( I830REG_INT_IDENTITY_R, tmp );	\
+									\
+		tmp = I830_READ16( I830REG_INT_ENABLE_R );		\
+		tmp = tmp & 0x6000;	/* Disable all interrupts */	\
+		I830_WRITE16( I830REG_INT_ENABLE_R, tmp );		\
+	}								\
+} while (0)
 
 /* Buffer customization:
  */
 
-#define DRIVER_BUF_PRIV_T	drm_i810_buf_priv_t
+#define DRIVER_BUF_PRIV_T	drm_i830_buf_priv_t
 
 #define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_i810_private_t *)((dev)->dev_private))->buffer_map
+	((drm_i830_private_t *)((dev)->dev_private))->buffer_map
 
 #endif

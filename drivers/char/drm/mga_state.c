@@ -163,6 +163,9 @@ static inline void mga_g400_emit_tex0( drm_mga_private_t *dev_priv )
 	drm_mga_texture_regs_t *tex = &sarea_priv->tex_state[0];
 	DMA_LOCALS;
 
+/*  	printk("mga_g400_emit_tex0 %x %x %x\n", tex->texorg, */
+/*  	       tex->texctl, tex->texctl2); */
+
 	BEGIN_DMA( 6 );
 
 	DMA_BLOCK( MGA_TEXCTL2,		tex->texctl2 | MGA_G400_TC2_MAGIC,
@@ -203,6 +206,9 @@ static inline void mga_g400_emit_tex1( drm_mga_private_t *dev_priv )
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mga_texture_regs_t *tex = &sarea_priv->tex_state[1];
 	DMA_LOCALS;
+
+/*  	printk("mga_g400_emit_tex1 %x %x %x\n", tex->texorg,  */
+/*  	       tex->texctl, tex->texctl2); */
 
 	BEGIN_DMA( 5 );
 
@@ -271,6 +277,8 @@ static inline void mga_g400_emit_pipe( drm_mga_private_t *dev_priv )
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	unsigned int pipe = sarea_priv->warp_pipe;
 	DMA_LOCALS;
+
+/*  	printk("mga_g400_emit_pipe %x\n", pipe); */
 
 	BEGIN_DMA( 10 );
 

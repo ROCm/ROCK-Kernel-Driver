@@ -1,4 +1,4 @@
-/* i810_drv.h -- Private header for the Matrox g200/g400 driver -*- linux-c -*-
+/* i830_drv.h -- Private header for the I830 driver -*- linux-c -*-
  * Created: Mon Dec 13 01:50:01 1999 by jhartmann@precisioninsight.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -11,11 +11,11 @@
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
  * and/or sell copies of the Software, and to permit persons to whom the
  * Software is furnished to do so, subject to the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice (including the next
  * paragraph) shall be included in all copies or substantial portions of the
  * Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
@@ -29,10 +29,10 @@
  *
  */
 
-#ifndef _I810_DRV_H_
-#define _I810_DRV_H_
+#ifndef _I830_DRV_H_
+#define _I830_DRV_H_
 
-typedef struct drm_i810_buf_priv {
+typedef struct drm_i830_buf_priv {
    	u32 *in_use;
    	int my_use_idx;
 	int currently_mapped;
@@ -40,9 +40,9 @@ typedef struct drm_i810_buf_priv {
 	void *kernel_virtual;
 	int map_count;
    	struct vm_area_struct *vma;
-} drm_i810_buf_priv_t;
+} drm_i830_buf_priv_t;
 
-typedef struct _drm_i810_ring_buffer{
+typedef struct _drm_i830_ring_buffer{
 	int tail_mask;
 	unsigned long Start;
 	unsigned long End;
@@ -51,89 +51,73 @@ typedef struct _drm_i810_ring_buffer{
 	int head;
 	int tail;
 	int space;
-} drm_i810_ring_buffer_t;
+} drm_i830_ring_buffer_t;
 
-typedef struct drm_i810_private {
+typedef struct drm_i830_private {
 	drm_map_t *sarea_map;
 	drm_map_t *buffer_map;
 	drm_map_t *mmio_map;
 
-	drm_i810_sarea_t *sarea_priv;
-   	drm_i810_ring_buffer_t ring;
+	drm_i830_sarea_t *sarea_priv;
+   	drm_i830_ring_buffer_t ring;
 
       	unsigned long hw_status_page;
    	unsigned long counter;
 
+   	atomic_t flush_done;
+   	wait_queue_head_t flush_queue;	/* Processes waiting until flush    */
 	drm_buf_t *mmap_buffer;
-
-
+	
 	u32 front_di1, back_di1, zi1;
-
+	
 	int back_offset;
 	int depth_offset;
-	int overlay_offset;
-	int overlay_physical;
 	int w, h;
 	int pitch;
+	int back_pitch;
+	int depth_pitch;
+	unsigned int cpp;
+} drm_i830_private_t;
 
-} drm_i810_private_t;
-
-				/* i810_dma.c */
-extern int  i810_dma_schedule(drm_device_t *dev, int locked);
-extern int  i810_getbuf(struct inode *inode, struct file *filp,
+				/* i830_dma.c */
+extern int  i830_dma_schedule(drm_device_t *dev, int locked);
+extern int  i830_getbuf(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long arg);
-extern int  i810_dma_init(struct inode *inode, struct file *filp,
+extern int  i830_dma_init(struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg);
-extern int  i810_flush_ioctl(struct inode *inode, struct file *filp,
+extern int  i830_flush_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg);
-extern void i810_reclaim_buffers(drm_device_t *dev, pid_t pid);
-extern int  i810_getage(struct inode *inode, struct file *filp,
+extern void i830_reclaim_buffers(drm_device_t *dev, pid_t pid);
+extern int  i830_getage(struct inode *inode, struct file *filp, unsigned int cmd,
+			unsigned long arg);
+extern int i830_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
+extern int i830_copybuf(struct inode *inode, struct file *filp, 
 			unsigned int cmd, unsigned long arg);
-extern int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
-
-/* Obsolete:
- */
-extern int i810_copybuf(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-/* Obsolete:
- */
-extern int i810_docopy(struct inode *inode, struct file *filp,
+extern int i830_docopy(struct inode *inode, struct file *filp, 
 		       unsigned int cmd, unsigned long arg);
 
-extern int i810_rstatus(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_ov0_info(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_fstatus(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_ov0_flip(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_dma_mc(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
+extern void i830_dma_quiescent(drm_device_t *dev);
 
+extern int i830_dma_vertex(struct inode *inode, struct file *filp,
+			  unsigned int cmd, unsigned long arg);
 
-extern void i810_dma_quiescent(drm_device_t *dev);
+extern int i830_swap_bufs(struct inode *inode, struct file *filp,
+			 unsigned int cmd, unsigned long arg);
 
-int i810_dma_vertex(struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg);
+extern int i830_clear_bufs(struct inode *inode, struct file *filp,
+			  unsigned int cmd, unsigned long arg);
 
-int i810_swap_bufs(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg);
+#define I830_VERBOSE 0
 
-int i810_clear_bufs(struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg);
-
-
-#define I810_BASE(reg)		((unsigned long) \
+#define I830_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)
-#define I810_ADDR(reg)		(I810_BASE(reg) + reg)
-#define I810_DEREF(reg)		*(__volatile__ int *)I810_ADDR(reg)
-#define I810_READ(reg)		I810_DEREF(reg)
-#define I810_WRITE(reg,val) 	do { I810_DEREF(reg) = val; } while (0)
-#define I810_DEREF16(reg)	*(__volatile__ u16 *)I810_ADDR(reg)
-#define I810_READ16(reg)	I810_DEREF16(reg)
-#define I810_WRITE16(reg,val)	do { I810_DEREF16(reg) = val; } while (0)
-
+#define I830_ADDR(reg)		(I830_BASE(reg) + reg)
+#define I830_DEREF(reg)		*(__volatile__ int *)I830_ADDR(reg)
+#define I830_READ(reg)		I830_DEREF(reg)
+#define I830_WRITE(reg,val) 	do { I830_DEREF(reg) = val; } while (0)
+#define I830_DEREF16(reg)	*(__volatile__ u16 *)I830_ADDR(reg)
+#define I830_READ16(reg) 	I830_DEREF16(reg)
+#define I830_WRITE16(reg,val)	do { I830_DEREF16(reg) = val; } while (0)
 
 #define GFX_OP_USER_INTERRUPT 		((0<<29)|(2<<23))
 #define GFX_OP_BREAKPOINT_INTERRUPT	((0<<29)|(1<<23))
@@ -151,10 +135,10 @@ int i810_clear_bufs(struct inode *inode, struct file *filp,
 #define BB1_UNPROTECTED       (0<<0)
 #define BB2_END_ADDR_MASK     (~0x7)
 
-#define I810REG_HWSTAM		0x02098
-#define I810REG_INT_IDENTITY_R	0x020a4
-#define I810REG_INT_MASK_R 	0x020a8
-#define I810REG_INT_ENABLE_R	0x020a0
+#define I830REG_HWSTAM		0x02098
+#define I830REG_INT_IDENTITY_R	0x020a4
+#define I830REG_INT_MASK_R 	0x020a8
+#define I830REG_INT_ENABLE_R	0x020a0
 
 #define LP_RING     		0x2030
 #define HP_RING     		0x2040
@@ -167,7 +151,7 @@ int i810_clear_bufs(struct inode *inode, struct file *filp,
 #define RING_START     		0x08
 #define START_ADDR          	0x00FFFFF8
 #define RING_LEN       		0x0C
-#define RING_NR_PAGES       	0x000FF000
+#define RING_NR_PAGES       	0x000FF000 
 #define RING_REPORT_MASK    	0x00000006
 #define RING_REPORT_64K     	0x00000002
 #define RING_REPORT_128K    	0x00000004
@@ -187,21 +171,43 @@ int i810_clear_bufs(struct inode *inode, struct file *filp,
 #define SCI_YMAX_MASK      (0xffff<<16)
 #define SCI_XMAX_MASK      (0xffff<<0)
 
+#define GFX_OP_SCISSOR_ENABLE	 ((0x3<<29)|(0x1c<<24)|(0x10<<19))
+#define GFX_OP_SCISSOR_RECT	 ((0x3<<29)|(0x1d<<24)|(0x81<<16)|1)
 #define GFX_OP_COLOR_FACTOR      ((0x3<<29)|(0x1d<<24)|(0x1<<16)|0x0)
 #define GFX_OP_STIPPLE           ((0x3<<29)|(0x1d<<24)|(0x83<<16))
-#define GFX_OP_MAP_INFO          ((0x3<<29)|(0x1d<<24)|0x2)
+#define GFX_OP_MAP_INFO          ((0x3<<29)|(0x1d<<24)|0x4)
 #define GFX_OP_DESTBUFFER_VARS   ((0x3<<29)|(0x1d<<24)|(0x85<<16)|0x0)
 #define GFX_OP_DRAWRECT_INFO     ((0x3<<29)|(0x1d<<24)|(0x80<<16)|(0x3))
 #define GFX_OP_PRIMITIVE         ((0x3<<29)|(0x1f<<24))
 
-#define CMD_OP_Z_BUFFER_INFO     ((0x0<<29)|(0x16<<23))
-#define CMD_OP_DESTBUFFER_INFO   ((0x0<<29)|(0x15<<23))
+#define CMD_OP_DESTBUFFER_INFO	 ((0x3<<29)|(0x1d<<24)|(0x8e<<16)|1)
+
 
 #define BR00_BITBLT_CLIENT   0x40000000
 #define BR00_OP_COLOR_BLT    0x10000000
 #define BR00_OP_SRC_COPY_BLT 0x10C00000
 #define BR13_SOLID_PATTERN   0x80000000
 
+#define BUF_3D_ID_COLOR_BACK    (0x3<<24)
+#define BUF_3D_ID_DEPTH         (0x7<<24)
+#define BUF_3D_USE_FENCE        (1<<23)
+#define BUF_3D_PITCH(x)         (((x)/4)<<2)
+
+#define CMD_OP_MAP_PALETTE_LOAD	((3<<29)|(0x1d<<24)|(0x82<<16)|255)
+#define MAP_PALETTE_NUM(x)	((x<<8) & (1<<8))
+#define MAP_PALETTE_BOTH	(1<<11)
+
+#define XY_COLOR_BLT_CMD		((2<<29)|(0x50<<22)|0x4)
+#define XY_COLOR_BLT_WRITE_ALPHA	(1<<21)
+#define XY_COLOR_BLT_WRITE_RGB		(1<<20)
+
+#define XY_SRC_COPY_BLT_CMD             ((2<<29)|(0x53<<22)|6)
+#define XY_SRC_COPY_BLT_WRITE_ALPHA     (1<<21)
+#define XY_SRC_COPY_BLT_WRITE_RGB       (1<<20)
+
+#define MI_BATCH_BUFFER 	((0x30<<23)|1)
+#define MI_BATCH_NON_SECURE	(1)
 
 
 #endif
+

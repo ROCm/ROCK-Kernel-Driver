@@ -598,6 +598,25 @@ int DRM(control)( struct inode *inode, struct file *filp,
 	}
 }
 
+#else
+
+int DRM(control)( struct inode *inode, struct file *filp,
+		  unsigned int cmd, unsigned long arg )
+{
+	drm_control_t ctl;
+
+	if ( copy_from_user( &ctl, (drm_control_t *)arg, sizeof(ctl) ) )
+		return -EFAULT;
+
+	switch ( ctl.func ) {
+	case DRM_INST_HANDLER:
+	case DRM_UNINST_HANDLER:
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 #endif /* __HAVE_DMA_IRQ */
 
 #endif /* __HAVE_DMA */

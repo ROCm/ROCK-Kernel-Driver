@@ -37,28 +37,25 @@
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
 
-
 static inline void gamma_dma_dispatch(drm_device_t *dev, unsigned long address,
 				      unsigned long length)
 {
 	drm_gamma_private_t *dev_priv =
-		(drm_gamma_private_t *)dev->dev_private;
-
-	GAMMA_WRITE(GAMMA_DMAADDRESS, virt_to_phys((void *)address));
-	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4)
-		;
+				(drm_gamma_private_t *)dev->dev_private;
+	mb();
+	while ( GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
+	GAMMA_WRITE(GAMMA_DMAADDRESS, address);
+	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4);
 	GAMMA_WRITE(GAMMA_DMACOUNT, length / 4);
 }
 
 void gamma_dma_quiescent_single(drm_device_t *dev)
 {
 	drm_gamma_private_t *dev_priv =
-		(drm_gamma_private_t *)dev->dev_private;
+				(drm_gamma_private_t *)dev->dev_private;
+	while (GAMMA_READ(GAMMA_DMACOUNT));
 
-	while (GAMMA_READ(GAMMA_DMACOUNT))
-		;
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3)
-		;
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
 
 	GAMMA_WRITE(GAMMA_FILTERMODE, 1 << 10);
 	GAMMA_WRITE(GAMMA_SYNC, 0);
@@ -72,56 +69,50 @@ void gamma_dma_quiescent_single(drm_device_t *dev)
 void gamma_dma_quiescent_dual(drm_device_t *dev)
 {
 	drm_gamma_private_t *dev_priv =
-		(drm_gamma_private_t *)dev->dev_private;
+				(drm_gamma_private_t *)dev->dev_private;
+	while (GAMMA_READ(GAMMA_DMACOUNT));
 
-	while (GAMMA_READ(GAMMA_DMACOUNT))
-		;
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3)
-		;
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
 
 	GAMMA_WRITE(GAMMA_BROADCASTMASK, 3);
-
 	GAMMA_WRITE(GAMMA_FILTERMODE, 1 << 10);
 	GAMMA_WRITE(GAMMA_SYNC, 0);
 
-				/* Read from first MX */
+	/* Read from first MX */
 	do {
-		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS))
-			;
+		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS));
 	} while (GAMMA_READ(GAMMA_OUTPUTFIFO) != GAMMA_SYNC_TAG);
 
-				/* Read from second MX */
+	/* Read from second MX */
 	do {
-		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS + 0x10000))
-			;
+		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS + 0x10000));
 	} while (GAMMA_READ(GAMMA_OUTPUTFIFO + 0x10000) != GAMMA_SYNC_TAG);
 }
 
 void gamma_dma_ready(drm_device_t *dev)
 {
 	drm_gamma_private_t *dev_priv =
-		(drm_gamma_private_t *)dev->dev_private;
-
-	while (GAMMA_READ(GAMMA_DMACOUNT))
-		;
+				(drm_gamma_private_t *)dev->dev_private;
+	while (GAMMA_READ(GAMMA_DMACOUNT));
 }
 
 static inline int gamma_dma_is_ready(drm_device_t *dev)
 {
 	drm_gamma_private_t *dev_priv =
-		(drm_gamma_private_t *)dev->dev_private;
-
-	return !GAMMA_READ(GAMMA_DMACOUNT);
+				(drm_gamma_private_t *)dev->dev_private;
+	return(!GAMMA_READ(GAMMA_DMACOUNT));
 }
 
 void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 {
-	drm_device_t	    *dev      = (drm_device_t *)device;
-	drm_device_dma_t    *dma      = dev->dma;
+	drm_device_t	 *dev = (drm_device_t *)device;
+	drm_device_dma_t *dma = dev->dma;
 	drm_gamma_private_t *dev_priv =
-		(drm_gamma_private_t *)dev->dev_private;
+				(drm_gamma_private_t *)dev->dev_private;
 
 	atomic_inc(&dev->counts[6]); /* _DRM_STAT_IRQ */
+
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
 	GAMMA_WRITE(GAMMA_GDELAYTIMER, 0xc350/2); /* 0x05S */
 	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 8);
 	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2001);
@@ -165,7 +156,9 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	}
 
 	buf	= dma->next_buffer;
-	address = (unsigned long)buf->address;
+	/* WE NOW ARE ON LOGICAL PAGES!! - using page table setup in dma_init */
+	/* So we pass the buffer index value into the physical page offset */
+	address = buf->idx << 12;
 	length	= buf->used;
 
 	DRM_DEBUG("context %d, buffer %d (%ld bytes)\n",
@@ -231,6 +224,9 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 #if DRM_DMA_HISTOGRAM
 	buf->time_dispatched = get_cycles();
 #endif
+
+	/* WE NOW ARE ON LOGICAL PAGES!!! - overriding address */
+	address = buf->idx << 12;
 
 	gamma_dma_dispatch(dev, address, length);
 	gamma_free_buffer(dev, dma->this_buffer);
@@ -581,4 +577,256 @@ int gamma_dma(struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EFAULT;
 
 	return retcode;
+}
+
+/* =============================================================
+ * DMA initialization, cleanup
+ */
+
+static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
+{
+	drm_gamma_private_t *dev_priv;
+	drm_device_dma_t    *dma = dev->dma;
+	drm_buf_t	    *buf;
+	int i;
+	struct list_head    *list;
+	unsigned int	    *pgt;
+
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	dev_priv = DRM(alloc)( sizeof(drm_gamma_private_t),
+							DRM_MEM_DRIVER );
+	if ( !dev_priv )
+		return -ENOMEM;
+
+	dev->dev_private = (void *)dev_priv;
+
+	memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
+
+	list_for_each(list, &dev->maplist->head) {
+		drm_map_list_t *r_list = (drm_map_list_t *)list;
+		if( r_list->map &&
+		    r_list->map->type == _DRM_SHM &&
+		    r_list->map->flags & _DRM_CONTAINS_LOCK ) {
+			dev_priv->sarea = r_list->map;
+ 			break;
+ 		}
+ 	}
+
+	DRM_FIND_MAP( dev_priv->mmio0, init->mmio0 );
+	DRM_FIND_MAP( dev_priv->mmio1, init->mmio1 );
+	DRM_FIND_MAP( dev_priv->mmio2, init->mmio2 );
+	DRM_FIND_MAP( dev_priv->mmio3, init->mmio3 );
+
+	dev_priv->sarea_priv = (drm_gamma_sarea_t *)
+		((u8 *)dev_priv->sarea->handle +
+		 init->sarea_priv_offset);
+
+	if (init->pcimode) {
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+		pgt = buf->address;
+
+ 		for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
+			buf = dma->buflist[i];
+			*pgt = virt_to_phys((void*)buf->address) | 0x07;
+			pgt++;
+		}
+
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+	} else {
+		DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
+
+		DRM_IOREMAP( dev_priv->buffers );
+
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+		pgt = buf->address;
+
+ 		for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
+			buf = dma->buflist[i];
+			*pgt = (unsigned int)buf->address + 0x07;
+			pgt++;
+		}
+
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+
+		while (GAMMA_READ(GAMMA_INFIFOSPACE) < 1);
+		GAMMA_WRITE( GAMMA_GDMACONTROL, 0xe);
+	}
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
+	GAMMA_WRITE( GAMMA_PAGETABLEADDR, virt_to_phys((void*)buf->address) );
+	GAMMA_WRITE( GAMMA_PAGETABLELENGTH, 2 );
+
+	return 0;
+}
+
+int gamma_do_cleanup_dma( drm_device_t *dev )
+{
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	if ( dev->dev_private ) {
+		drm_gamma_private_t *dev_priv = dev->dev_private;
+
+		DRM_IOREMAPFREE( dev_priv->buffers );
+
+		DRM(free)( dev->dev_private, sizeof(drm_gamma_private_t),
+			   DRM_MEM_DRIVER );
+		dev->dev_private = NULL;
+	}
+
+	return 0;
+}
+
+int gamma_dma_init( struct inode *inode, struct file *filp,
+		  unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_gamma_init_t init;
+
+	if ( copy_from_user( &init, (drm_gamma_init_t *)arg, sizeof(init) ) )
+		return -EFAULT;
+
+	switch ( init.func ) {
+	case GAMMA_INIT_DMA:
+		return gamma_do_init_dma( dev, &init );
+	case GAMMA_CLEANUP_DMA:
+		return gamma_do_cleanup_dma( dev );
+	}
+
+	return -EINVAL;
+}
+
+static int gamma_do_copy_dma( drm_device_t *dev, drm_gamma_copy_t *copy )
+{
+	drm_device_dma_t    *dma = dev->dma;
+	unsigned int        *screenbuf;
+
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	/* We've DRM_RESTRICTED this DMA buffer */
+
+	screenbuf = dma->buflist[ GLINT_DRI_BUF_COUNT + 1 ]->address;
+
+#if 0
+	*buffer++ = 0x180;	/* Tag (FilterMode) */
+	*buffer++ = 0x200;	/* Allow FBColor through */
+	*buffer++ = 0x53B;	/* Tag */
+	*buffer++ = copy->Pitch;
+	*buffer++ = 0x53A;	/* Tag */
+	*buffer++ = copy->SrcAddress;
+	*buffer++ = 0x539;	/* Tag */
+	*buffer++ = copy->WidthHeight; /* Initiates transfer */
+	*buffer++ = 0x53C;	/* Tag - DMAOutputAddress */
+	*buffer++ = virt_to_phys((void*)screenbuf);
+	*buffer++ = 0x53D;	/* Tag - DMAOutputCount */
+	*buffer++ = copy->Count; /* Reads HostOutFifo BLOCKS until ..*/
+
+	/* Data now sitting in dma->buflist[ GLINT_DRI_BUF_COUNT + 1 ] */
+	/* Now put it back to the screen */
+
+	*buffer++ = 0x180;	/* Tag (FilterMode) */
+	*buffer++ = 0x400;	/* Allow Sync through */
+	*buffer++ = 0x538;	/* Tag - DMARectangleReadTarget */
+	*buffer++ = 0x155;	/* FBSourceData | count */
+	*buffer++ = 0x537;	/* Tag */
+	*buffer++ = copy->Pitch;
+	*buffer++ = 0x536;	/* Tag */
+	*buffer++ = copy->DstAddress;
+	*buffer++ = 0x535;	/* Tag */
+	*buffer++ = copy->WidthHeight; /* Initiates transfer */
+	*buffer++ = 0x530;	/* Tag - DMAAddr */
+	*buffer++ = virt_to_phys((void*)screenbuf);
+	*buffer++ = 0x531;
+	*buffer++ = copy->Count; /* initiates DMA transfer of color data */
+#endif
+
+	/* need to dispatch it now */
+
+	return 0;
+}
+
+int gamma_dma_copy( struct inode *inode, struct file *filp,
+		  unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_gamma_copy_t copy;
+
+	if ( copy_from_user( &copy, (drm_gamma_copy_t *)arg, sizeof(copy) ) )
+		return -EFAULT;
+
+	return gamma_do_copy_dma( dev, &copy );
+}
+
+/* =============================================================
+ * Per Context SAREA Support
+ */
+
+int gamma_getsareactx(struct inode *inode, struct file *filp,
+		     unsigned int cmd, unsigned long arg)
+{
+	drm_file_t	*priv	= filp->private_data;
+	drm_device_t	*dev	= priv->dev;
+	drm_ctx_priv_map_t request;
+	drm_map_t *map;
+
+	if (copy_from_user(&request,
+			   (drm_ctx_priv_map_t *)arg,
+			   sizeof(request)))
+		return -EFAULT;
+
+	down(&dev->struct_sem);
+	if ((int)request.ctx_id >= dev->max_context) {
+		up(&dev->struct_sem);
+		return -EINVAL;
+	}
+
+	map = dev->context_sareas[request.ctx_id];
+	up(&dev->struct_sem);
+
+	request.handle = map->handle;
+	if (copy_to_user((drm_ctx_priv_map_t *)arg, &request, sizeof(request)))
+		return -EFAULT;
+	return 0;
+}
+
+int gamma_setsareactx(struct inode *inode, struct file *filp,
+		     unsigned int cmd, unsigned long arg)
+{
+	drm_file_t	*priv	= filp->private_data;
+	drm_device_t	*dev	= priv->dev;
+	drm_ctx_priv_map_t request;
+	drm_map_t *map = NULL;
+	drm_map_list_t *r_list;
+	struct list_head *list;
+
+	if (copy_from_user(&request,
+			   (drm_ctx_priv_map_t *)arg,
+			   sizeof(request)))
+		return -EFAULT;
+
+	down(&dev->struct_sem);
+	r_list = NULL;
+	list_for_each(list, &dev->maplist->head) {
+		r_list = (drm_map_list_t *)list;
+		if(r_list->map &&
+		   r_list->map->handle == request.handle) break;
+	}
+	if (list == &(dev->maplist->head)) {
+		up(&dev->struct_sem);
+		return -EINVAL;
+	}
+	map = r_list->map;
+	up(&dev->struct_sem);
+
+	if (!map) return -EINVAL;
+
+	down(&dev->struct_sem);
+	if ((int)request.ctx_id >= dev->max_context) {
+		up(&dev->struct_sem);
+		return -EINVAL;
+	}
+	dev->context_sareas[request.ctx_id] = map;
+	up(&dev->struct_sem);
+	return 0;
 }
