@@ -731,7 +731,7 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 			 * The old block will be released after updating
 			 * the inode.
 			 */
-			ea_bdebug(old_bh, "reusing block %ld",
+			ea_bdebug(new_bh, "reusing block %ld",
 				new_bh->b_blocknr);
 			
 			error = -EDQUOT;

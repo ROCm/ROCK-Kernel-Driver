@@ -433,6 +433,7 @@ mb_cache_entry_insert(struct mb_cache_entry *ce, struct block_device *bdev,
 		list_add(&ce->e_indexes[n].o_list,
 			 &cache->c_indexes_hash[n][bucket]);
 	}
+	error = 0;
 out:
 	spin_unlock(&mb_cache_spinlock);
 	return error;
