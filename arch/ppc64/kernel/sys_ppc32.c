@@ -102,47 +102,57 @@ asmlinkage long sys32_utime(char * filename, struct utimbuf32 *times)
 	return ret;
 }
 
-
-
 struct iovec32 { u32 iov_base; __kernel_size_t32 iov_len; };
 
-typedef ssize_t (*IO_fn_t)(struct file *, char *, size_t, loff_t *);
+typedef ssize_t (*io_fn_t)(struct file *, char *, size_t, loff_t *);
+typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
 
 static long do_readv_writev32(int type, struct file *file,
 			      const struct iovec32 *vector, u32 count)
 {
-	unsigned long tot_len;
+	__kernel_ssize_t32 tot_len;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack, *ivp;
 	struct inode *inode;
 	long retval, i;
-	IO_fn_t fn;
+	io_fn_t fn;
+	iov_fn_t fnv;
 
 	/* First get the "struct iovec" from user memory and
 	 * verify all the pointers
 	 */
+	retval = 0;
 	if (!count)
-		return 0;
-	if(verify_area(VERIFY_READ, vector, sizeof(struct iovec32)*count))
-		return -EFAULT;
+		goto out_nofree;
+	retval = -EFAULT;
+	if (verify_area(VERIFY_READ, vector, sizeof(struct iovec32)*count))
+		goto out_nofree;
+	retval = -EINVAL;
 	if (count > UIO_MAXIOV)
-		return -EINVAL;
+		goto out_nofree;
 	if (count > UIO_FASTIOV) {
+		retval = -ENOMEM;
 		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
 		if (!iov)
-			return -ENOMEM;
+			goto out_nofree;
 	}
 
 	tot_len = 0;
 	i = count;
 	ivp = iov;
+	retval = -EINVAL;
 	while(i > 0) {
-		u32 len;
+		__kernel_ssize_t32 tmp = tot_len;
+		__kernel_ssize_t32 len;
 		u32 buf;
 
 		__get_user(len, &vector->iov_len);
 		__get_user(buf, &vector->iov_base);
+		if (len < 0)	/* size_t not fittina an ssize_t32 .. */
+			goto out;
 		tot_len += len;
+		if (tot_len < tmp) /* maths overflow on the ssize_t32 */
+			goto out;
 		ivp->iov_base = (void *)A(buf);
 		ivp->iov_len = (__kernel_size_t) len;
 		vector++;
@@ -155,33 +165,19 @@ static long do_readv_writev32(int type, struct file *file,
 	retval = locks_verify_area((type == VERIFY_WRITE
 				    ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
 				   inode, file, file->f_pos, tot_len);
-	if (retval) {
-		if (iov != iovstack)
-			kfree(iov);
-		return retval;
-	}
+	if (retval)
+		goto out;
 
-	/* Then do the actual IO.  Note that sockets need to be handled
-	 * specially as they have atomicity guarantees and can handle
-	 * iovec's natively
-	 */
-	if (inode->i_sock) {
-		int err;
-		err = sock_readv_writev(type, inode, file, iov, count, tot_len);
-		if (iov != iovstack)
-			kfree(iov);
-		return err;
-	}
-
-	if (!file->f_op) {
-		if (iov != iovstack)
-			kfree(iov);
-		return -EINVAL;
-	}
 	/* VERIFY_WRITE actually means a read, as we write to user space */
-	fn = file->f_op->read;
-	if (type == VERIFY_READ)
-		fn = (IO_fn_t) file->f_op->write;		
+	fnv = (type == VERIFY_WRITE ? file->f_op->readv : file->f_op->writev);
+	if (fnv) {
+		retval = fnv(file, iov, count, &file->f_pos);
+		goto out;
+	}
+
+	fn = (type == VERIFY_WRITE ? file->f_op->read :
+	      (io_fn_t) file->f_op->write);
+
 	ivp = iov;
 	while (count > 0) {
 		void * base;
@@ -193,21 +189,27 @@ static long do_readv_writev32(int type, struct file *file,
 		count--;
 		nr = fn(file, base, len, &file->f_pos);
 		if (nr < 0) {
-			if (retval)
-				break;
-			retval = nr;
+			if (!retval)
+				retval = nr;
 			break;
 		}
 		retval += nr;
 		if (nr != len)
 			break;
 	}
+out:
 	if (iov != iovstack)
 		kfree(iov);
+out_nofree:
+	/* VERIFY_WRITE actually means a read, as we write to user space */
+	if ((retval + (type == VERIFY_WRITE)) > 0)
+		dnotify_parent(file->f_dentry,
+			(type == VERIFY_WRITE) ? DN_MODIFY : DN_ACCESS);
+
 	return retval;
 }
 
-asmlinkage long sys32_readv(u32 fd, struct iovec32 *vector, u32 count)
+asmlinkage long sys32_readv(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
 	long ret = -EBADF;
@@ -225,7 +227,7 @@ bad_file:
 	return ret;
 }
 
-asmlinkage long sys32_writev(u32 fd, struct iovec32 *vector, u32 count)
+asmlinkage long sys32_writev(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
 	int ret = -EBADF;
