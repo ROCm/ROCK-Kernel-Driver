@@ -324,8 +324,12 @@ vmalloc_fault:
 
 		if (!pgd_present(*pgd_k))
 			goto no_context;
-		set_pgd(pgd, *pgd_k);
-		
+
+		/*
+		 * set_pgd(pgd, *pgd_k); here would be useless on PAE
+		 * and redundant with the set_pmd() on non-PAE.
+		 */
+
 		pmd = pmd_offset(pgd, address);
 		pmd_k = pmd_offset(pgd_k, address);
 		if (!pmd_present(*pmd_k))
