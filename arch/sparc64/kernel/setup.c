@@ -678,21 +678,24 @@ void sun_do_break(void)
 int serial_console;
 int stop_a_enabled = 1;
 
-static struct cpu *sparc64_cpus;
-
 static int __init topology_init(void)
 {
-	int i;
+	int i, err;
 
-	sparc64_cpus = kmalloc(NR_CPUS * sizeof(struct cpu), GFP_KERNEL);
-	if (!sparc64_cpus)
-		return -ENOMEM;
-	memset(sparc64_cpus, 0, NR_CPUS * sizeof(struct cpu));
+	err = -ENOMEM;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i))
-			register_cpu(&sparc64_cpus[i], i, NULL);
+		if (cpu_possible(i)) {
+			struct cpu *p = kmalloc(sizeof(*p), GFP_KERNEL);
+
+			if (p) {
+				memset(p, 0, sizeof(*p));
+				register_cpu(p, i, NULL);
+				err = 0;
+			}
+		}
 	}
-	return 0;
+
+	return err;
 }
 
 subsys_initcall(topology_init);
