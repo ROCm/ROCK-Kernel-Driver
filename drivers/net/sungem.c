@@ -942,6 +942,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct gem *gp = dev->priv;
 	int entry;
 	u64 ctrl;
+	unsigned long flags;
 
 	ctrl = 0;
 	if (skb->ip_summed == CHECKSUM_HW) {
@@ -955,12 +956,17 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			(csum_stuff_off << 21));
 	}
 
-	spin_lock_irq(&gp->tx_lock);
+	local_irq_save(flags);
+	if (!spin_trylock(&gp->tx_lock)) {
+		/* Tell upper layer to requeue */
+		local_irq_restore(flags);
+		return -1;
+	}
 
 	/* This is a hard error, log it. */
 	if (TX_BUFFS_AVAIL(gp) <= (skb_shinfo(skb)->nr_frags + 1)) {
 		netif_stop_queue(dev);
-		spin_unlock_irq(&gp->tx_lock);
+		spin_unlock_irqrestore(&gp->tx_lock, flags);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
 		return 1;
@@ -1047,7 +1053,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		       dev->name, entry, skb->len);
 	mb();
 	writel(gp->tx_new, gp->regs + TXDMA_KICK);
-	spin_unlock_irq(&gp->tx_lock);
+	spin_unlock_irqrestore(&gp->tx_lock, flags);
 
 	dev->trans_start = jiffies;
 
@@ -2960,7 +2966,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, dev);
 
 	/* GEM can do it all... */
-	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM;
+	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_LLTX;
 	if (pci_using_dac)
 		dev->features |= NETIF_F_HIGHDMA;
 
