@@ -2815,7 +2815,7 @@ restart:
 			txLazyCommit(tblk);
 
 			/*
-			 * We can be running indefinately if other processors
+			 * We can be running indefinitely if other processors
 			 * are adding transactions to this list
 			 */
 			cond_resched();

@@ -1134,7 +1134,7 @@ int		QuIoOffs)	/* Queue IO Address Offset */
  *	After calling this function the descriptor rings and rx and tx
  *	queues of this port may be reconfigured.
  *
- *	It is possible to stop the receive and transmit path seperate or
+ *	It is possible to stop the receive and transmit path separate or
  *	both together.
  *
  *	Dir =	SK_STOP_TX 	Stops the transmit path only and resets

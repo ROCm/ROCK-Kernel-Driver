@@ -1466,7 +1466,7 @@ static void do_status(void *p)
 		}
 #ifdef NEVER_HAPPENS_AS_SETUP_XXX
 	// and can't work because we don't know the_char
-	// as the_char is reported on a seperate path
+	// as the_char is reported on a separate path
 	// The intelligent board does this stuff as setup
 	{
 	char brkf = TTY_NORMAL;

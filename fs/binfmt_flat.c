@@ -403,7 +403,7 @@ static int load_flat_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	set_personality(PER_LINUX);
 
 	/*
-	 * there are a couple of cases here,  the seperate code/data
+	 * there are a couple of cases here,  the separate code/data
 	 * case,  and then the fully copied to RAM case which lumps
 	 * it all together.
 	 */

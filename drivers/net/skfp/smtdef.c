@@ -217,7 +217,7 @@ int level ;
 	mib->fddiSMTStatRptPolicy = TRUE ;
 	mib->fddiSMTTrace_MaxExpiration = SEC2MIB(7) ;
 	mib->fddiSMTMACIndexes = INDEX_MAC ;
-	mib->fddiSMTStationStatus = MIB_SMT_STASTA_SEPA ;	/* seperated */
+	mib->fddiSMTStationStatus = MIB_SMT_STASTA_SEPA ;	/* separated */
 
 	mib->m[MAC0].fddiMACIndex = INDEX_MAC ;
 	mib->m[MAC0].fddiMACFrameStatusFunctions = FSC_TYPE0 ;

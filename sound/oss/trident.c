@@ -1227,7 +1227,7 @@ static int alloc_dmabuf(struct dmabuf* dmabuf, struct pci_dev* pci_dev, int orde
 }
 
 /* allocate the main DMA buffer, playback and recording buffer should be */ 
-/* allocated seperately */
+/* allocated separately */
 static int alloc_main_dmabuf(struct trident_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;

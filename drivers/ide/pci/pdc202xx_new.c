@@ -339,7 +339,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	 * fall back to U33 mode. The BIOS INT 13 hooks turn
 	 * the clock on then off for each read/write issued. I don't
 	 * do that here because it would require modifying the
-	 * kernel, seperating the fop routines from the kernel or
+	 * kernel, separating the fop routines from the kernel or
 	 * somehow hooking the fops calls. It may also be possible to
 	 * leave the 66Mhz clock on and readjust the timing
 	 * parameters.

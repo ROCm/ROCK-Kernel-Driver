@@ -19,7 +19,7 @@
  *
  *----------------------------------------------------------------
  *
- * This device handler seperates the card driver module from sequencer
+ * This device handler separates the card driver module from sequencer
  * stuff (sequencer core, synth drivers, etc), so that user can avoid
  * to spend unnecessary resources e.g. if he needs only listening to
  * MP3s.

@@ -79,7 +79,7 @@ struct diskparm
 /*
  *	Host side memory scatter gather list
  *	Used by the adapter for read, write, and readdirplus operations
- *	We have seperate 32 and 64 bit version because even
+ *	We have separate 32 and 64 bit version because even
  *	on 64 bit systems not all cards support the 64 bit version
  */
 struct sgentry {
@@ -443,7 +443,7 @@ struct aac_driver_ident
 /*
  *	The adapter interface specs all queues to be located in the same
  *	physically contigous block. The host structure that defines the
- *	commuication queues will assume they are each a seperate physically
+ *	commuication queues will assume they are each a separate physically
  *	contigous memory region that will support them all being one big
  *	contigous block. 
  *	There is a command and response queue for each level and direction of

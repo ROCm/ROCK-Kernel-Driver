@@ -99,7 +99,7 @@ void sv_init(sv_t *sv, sv_mon_lock_t *monitor_lock, int flags);
  * Set SV_WAIT_SIG in sv_wait_flags to let the sv_wait be interrupted by signals.
  *
  * timeout is how long to wait before giving up, or 0 to wait
- * indefinately.  It is given in jiffies, and is relative.
+ * indefinitely.  It is given in jiffies, and is relative.
  *
  * The associated lock must be locked on entry.  It is unlocked on return.
  *

@@ -346,7 +346,7 @@
    This table is quite informative for interested users. It shows the load
    of commands on the subsystem and wether you are running the bypassed 
    (software) or integrated (hardware) SCSI-command set (see below). The
-   amount of accesses is shown. Read, write, modeselect is shown seperately
+   amount of accesses is shown. Read, write, modeselect is shown separately
    in order to help debugging problems with CD-ROMs or tapedrives.
    
    The following table shows the list of 15 logical device numbers, that are
@@ -943,7 +943,7 @@
 
    4 To do
    -------
-        - IBM SCSI-2 F/W external SCSI bus support in seperate mode!
+        - IBM SCSI-2 F/W external SCSI bus support in separate mode!
 	- It seems that the handling of bad disks is really bad -
 	  non-existent, in fact. However, a low-level driver cannot help
 	  much, if such things happen.

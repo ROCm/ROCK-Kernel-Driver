@@ -19,7 +19,7 @@
  *  struct vc_data to data in a device independent way in struct fb_info. Then
  *  various functions in struct fb_ops will be called to store the device 
  *  dependent state in the par field in struct fb_info and to change the 
- *  hardware to that state. This allows a very clean seperation of the fbdev
+ *  hardware to that state. This allows a very clean separation of the fbdev
  *  layer from the console layer. It also allows one to use fbdev on its own
  *  which is a bounus for embedded devices. The reason this approach works is  
  *  for each framebuffer device when used as a tty/console device is allocated
@@ -93,7 +93,7 @@ static struct fb_fix_screeninfo xxxfb_fix __initdata = {
      * 	Modern graphical hardware not only supports pipelines but some 
      *  also support multiple monitors where each display can have its  
      *  its own unique data. In this case each display could be  
-     *  represented by a seperate framebuffer device thus a seperate 
+     *  represented by a separate framebuffer device thus a separate 
      *  struct fb_info. Now the struct xxx_par represents the graphics
      *  hardware state thus only one exist per card. In this case the 
      *  struct xxx_par for each graphics card would be shared between 

@@ -108,7 +108,7 @@
 	  and scsi_set_pci_device()
 	- Call scsi_set_pci_device() for all devices
 	- Reduce size of kernel version dependant device probe code
-	- Move duplicate probe/init code to seperate function
+	- Move duplicate probe/init code to separate function
 	- Handle error if qla1280_mem_alloc() fails
 	- Kill OFFSET() macro and use Linux's PCI definitions instead
         - Kill private structure defining PCI config space (struct config_reg)
