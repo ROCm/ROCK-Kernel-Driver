@@ -1090,15 +1090,15 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->switch_con	= gen_switch;			 
 	info->updatevar		= gen_update_var;
 
-	size = (info->var.bits_per_pixel == 8) ? 256 : 16;
-	fb_alloc_cmap(&info->cmap, size, 0);  
-
 	if (!mode_option)
 		mode_option = "640x480@60";
 	 
 	err = fb_find_mode(&info->var, info, mode_option, NULL, 0, NULL, 8); 
 	if (!err || err == 4)
 		info->var = tdfx_var;
+
+	size = (info->var.bits_per_pixel == 8) ? 256 : 16;
+	fb_alloc_cmap(&info->cmap, size, 0);  
 
 	gen_set_var(&info->var, -1, info);
 

@@ -1194,6 +1194,48 @@ static int neofb_pan_display(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
+static int neofb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			   u_int transp, struct fb_info *fb)
+{
+	if (regno >= NR_PALETTE)
+		return -EINVAL;
+
+	switch (fb->var.bits_per_pixel) {
+	case 8:
+		outb(regno, 0x3c8);
+
+		outb(red >> 10, 0x3c9);
+		outb(green >> 10, 0x3c9);
+		outb(blue >> 10, 0x3c9);
+		break;
+	case 16:
+		if (regno < 16)
+			((u16 *) fb->pseudo_palette)[regno] =
+			    ((red & 0xf800)) | ((green & 0xfc00) >> 5) |
+			    ((blue & 0xf800) >> 11);
+		break;
+	case 24:
+		if (regno < 16)
+			((u32 *) fb->pseudo_palette)[regno] =
+			    ((red & 0xff00) << 8) | ((green & 0xff00)) |
+			    ((blue & 0xff00) >> 8);
+		break;
+#ifdef NO_32BIT_SUPPORT_YET
+	case 32:
+		if (regno < 16)
+			((u32 *) fb->pseudo_palette)[regno] =
+			    ((transp & 0xff00) << 16) | ((red & 0xff00) <<
+							 8) | ((green &
+								0xff00)) |
+			    ((blue & 0xff00) >> 8);
+		break;
+#endif
+	default:
+		return 1;
+	}
+	return 0;
+}
+
 /*
  *    (Un)Blank the display.
  */
@@ -1376,7 +1418,6 @@ static struct fb_var_screeninfo __devinitdata neofb_var640x480x8 = {
 	lower_margin:	10,
 	hsync_len:	96,
 	vsync_len:	2,
-	sync:		0,
 	vmode:		FB_VMODE_NONINTERLACED
 };
 
@@ -1948,10 +1989,10 @@ static struct pci_device_id neofb_devices[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, neofb_devices);
 
 static struct pci_driver neofb_driver = {
-	name:"neofb",
-	id_table:neofb_devices,
-	probe:neofb_probe,
-	remove:__devexit_p(neofb_remove)
+	name:		"neofb",
+	id_table:	neofb_devices,
+	probe:		neofb_probe,
+	remove:		__devexit_p(neofb_remove)
 };
 
 /* **************************** init-time only **************************** */
