@@ -1577,6 +1577,9 @@ static int run (mddev_t *mddev)
 	conf->algorithm = mddev->layout;
 	conf->max_nr_stripes = NR_STRIPES;
 
+	/* device size must be a multiple of chunk size */
+	mddev->size &= ~(mddev->chunk_size/1024 -1);
+
 	if (!conf->chunk_size || conf->chunk_size % 4) {
 		printk(KERN_ERR "raid5: invalid chunk size %d for %s\n",
 			conf->chunk_size, mdname(mddev));
