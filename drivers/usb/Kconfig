@@ -91,5 +91,7 @@ source "drivers/usb/serial/Kconfig"
 
 source "drivers/usb/misc/Kconfig"
 
+source "drivers/usb/gadget/Kconfig"
+
 endmenu
 
