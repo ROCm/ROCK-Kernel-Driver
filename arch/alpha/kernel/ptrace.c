@@ -186,7 +186,8 @@ ptrace_set_bpt(struct task_struct * child)
 		displ = ((s32)(insn << 11)) >> 9;
 		child->thread_info->bpt_addr[nsaved++] = pc + 4;
 		if (displ)		/* guard against unoptimized code */
-			child->thread.bpt_addr[nsaved++] = pc + 4 + displ;
+			child->thread_info->bpt_addr[nsaved++]
+			  = pc + 4 + displ;
 		DBG(DBG_BPT, ("execing branch\n"));
 	} else if (op_code == 0x1a) {
 		reg_b = (insn >> 16) & 0x1f;

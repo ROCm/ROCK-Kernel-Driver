@@ -269,7 +269,7 @@ callback_init(void * kernel_end)
 
 		/* Let vmalloc know that we've allocated some space.  */
 		console_remap_vm.flags = VM_ALLOC;
-		console_remap_vm.addr = VMALLOC_START;
+		console_remap_vm.addr = (void *) VMALLOC_START;
 		console_remap_vm.size = vaddr - VMALLOC_START;
 		vmlist = &console_remap_vm;
 	}

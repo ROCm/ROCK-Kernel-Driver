@@ -131,7 +131,7 @@ dik_show_trace(unsigned long *sp)
 
 void show_trace_task(struct task_struct * tsk)
 {
-	struct thread_info *ti = &tsk->thread_info;
+	struct thread_info *ti = tsk->thread_info;
 	unsigned long fp, sp = ti->pcb.ksp, base = (unsigned long) ti;
  
 	if (sp > base && sp+6*8 < base + 16*1024) {
@@ -330,7 +330,7 @@ do_entIF(unsigned long type, unsigned long a1,
 		   FP registers, PAL_clrfen is not useful except for DoS
 		   attacks.  So turn the bleeding FPU back on and be done
 		   with it.  */
-		current_thead_info()->pcb.flags |= 1;
+		current_thread_info()->pcb.flags |= 1;
 		__reload_thread(&current_thread_info()->pcb);
 		return;
 

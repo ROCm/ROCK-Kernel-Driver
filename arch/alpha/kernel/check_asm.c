@@ -14,9 +14,9 @@ void foo(void)
 	OUT("#define __ASM_OFFSETS_H__");
 	OUT("");
 
-	DEF("TI_TASK", offsetof(struct thread_struct, task));
-	DEF("TI_FLAGS", offsetof(struct thread_struct, flags));
-	DEF("TI_CPU", offsetof(struct thread_struct, cpu));
+	DEF("TI_TASK", offsetof(struct thread_info, task));
+	DEF("TI_FLAGS", offsetof(struct thread_info, flags));
+	DEF("TI_CPU", offsetof(struct thread_info, cpu));
 
 	DEF("PT_PTRACED", PT_PTRACED);
 	DEF("CLONE_VM", CLONE_VM);

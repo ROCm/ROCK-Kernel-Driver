@@ -205,11 +205,10 @@ kernel_thread:
 	stq	$1, SP_OFF+8($30)	/* pc */
 	stq	$29, SP_OFF+16($30)	/* gp */
 	stq	$16, 136($30)		/* $27; FN for child */
-	stq	$17, 160($30)		/* $16; ARG for child */
+	stq	$17, SP_OFF+24($30)	/* $16; ARG for child */
 	stq	$8, 64($30)		/* $8 */
 	stq	$26, 128($30)		/* $26 */
-	/* Avoid the HAE being gratuitously wrong, which would cause us
-	   to go off to restore it.  */
+	/* Avoid the HAE being gratuitously wrong, to avoid restoring it.  */
 	ldq	$2, alpha_mv+HAE_CACHE
 	stq	$2, 152($30)		/* HAE */
 

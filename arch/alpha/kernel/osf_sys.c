@@ -776,7 +776,7 @@ asmlinkage unsigned long osf_getsysinfo(unsigned long op, void *buffer,
 		/* Return current software fp control & status bits.  */
 		/* Note that DU doesn't verify available space here.  */
 
- 		w = current_thread_info->ieee_state & IEEE_SW_MASK;
+ 		w = current_thread_info()->ieee_state & IEEE_SW_MASK;
  		w = swcr_update_status(w, rdfpcr());
 		if (put_user(w, (unsigned long *) buffer))
 			return -EFAULT;
