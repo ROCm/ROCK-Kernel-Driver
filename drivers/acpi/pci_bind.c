@@ -214,6 +214,7 @@ acpi_pci_bind (
 			data->id.device, data->id.function));
 		data->bus = data->dev->subordinate;
 		device->ops.bind = acpi_pci_bind;
+		device->ops.unbind = acpi_pci_unbind;
 	}
 
 	/*
@@ -257,6 +258,49 @@ end:
 	return_VALUE(result);
 }
 
+int acpi_pci_unbind(
+	struct acpi_device      *device)
+{
+	int                     result = 0;
+	acpi_status             status = AE_OK;
+	struct acpi_pci_data    *data = NULL;
+	char                    pathname[ACPI_PATHNAME_MAX] = {0};
+	struct acpi_buffer      buffer = {ACPI_PATHNAME_MAX, pathname};
+
+	ACPI_FUNCTION_TRACE("acpi_pci_unbind");
+
+	if (!device || !device->parent)
+		return_VALUE(-EINVAL);
+
+	acpi_get_name(device->handle, ACPI_FULL_PATHNAME, &buffer);
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Unbinding PCI device [%s]...\n",
+		pathname));
+
+	status = acpi_get_data(device->handle, acpi_pci_data_handler, (void**)&data);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unable to get data from device %s\n",
+			acpi_device_bid(device)));
+		result = -ENODEV;
+		goto end;
+	}
+
+	status = acpi_detach_data(device->handle, acpi_pci_data_handler);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unable to detach data from device %s\n",
+			acpi_device_bid(device)));
+		result = -ENODEV;
+		goto end;
+	}
+	if (data->dev->subordinate) {
+		acpi_pci_irq_del_prt(data->id.segment, data->bus->number);
+	}
+	kfree(data);
+
+end:
+	return_VALUE(result);
+}
 
 int 
 acpi_pci_bind_root (
@@ -283,6 +327,7 @@ acpi_pci_bind_root (
 	data->id = *id;
 	data->bus = bus;
 	device->ops.bind = acpi_pci_bind;
+	device->ops.unbind = acpi_pci_unbind;
 
 	acpi_get_name(device->handle, ACPI_FULL_PATHNAME, &buffer);
 

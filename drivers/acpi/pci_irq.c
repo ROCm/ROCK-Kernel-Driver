@@ -43,7 +43,7 @@
 ACPI_MODULE_NAME		("pci_irq")
 
 struct acpi_prt_list		acpi_prt;
-
+spinlock_t acpi_prt_lock = SPIN_LOCK_UNLOCKED;
 
 /* --------------------------------------------------------------------------
                          PCI IRQ Routing Table (PRT) Support
@@ -68,18 +68,20 @@ acpi_pci_irq_find_prt_entry (
 	 * Parse through all PRT entries looking for a match on the specified
 	 * PCI device's segment, bus, device, and pin (don't care about func).
 	 *
-	 * TBD: Acquire/release lock
 	 */
+	spin_lock(&acpi_prt_lock);
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
 		if ((segment == entry->id.segment) 
 			&& (bus == entry->id.bus) 
 			&& (device == entry->id.device)
 			&& (pin == entry->pin)) {
+			spin_unlock(&acpi_prt_lock);
 			return_PTR(entry);
 		}
 	}
 
+	spin_unlock(&acpi_prt_lock);
 	return_PTR(NULL);
 }
 
@@ -141,11 +143,26 @@ acpi_pci_irq_add_entry (
 		entry->id.segment, entry->id.bus, entry->id.device, 
 		('A' + entry->pin), prt->source, entry->link.index));
 
-	/* TBD: Acquire/release lock */
+	spin_lock(&acpi_prt_lock);
 	list_add_tail(&entry->node, &acpi_prt.entries);
 	acpi_prt.count++;
+	spin_unlock(&acpi_prt_lock);
 
 	return_VALUE(0);
+}
+
+
+static void
+acpi_pci_irq_del_entry (
+	int				segment,
+	int				bus,
+	struct acpi_prt_entry		*entry)
+{
+	if (segment == entry->id.segment && bus == entry->id.bus){
+		acpi_prt.count--;
+		list_del(&entry->node);
+		kfree(entry);
+	}
 }
 
 
@@ -222,7 +239,26 @@ acpi_pci_irq_add_prt (
 	return_VALUE(0);
 }
 
+void
+acpi_pci_irq_del_prt (int segment, int bus)
+{
+	struct list_head        *node = NULL, *n = NULL;
+	struct acpi_prt_entry   *entry = NULL;
 
+	if (!acpi_prt.count)    {
+		return;
+	}
+
+	printk(KERN_DEBUG "ACPI: Delete PCI Interrupt Routing Table for %x:%x\n",
+		segment, bus);
+	spin_lock(&acpi_prt_lock);
+	list_for_each_safe(node, n, &acpi_prt.entries) {
+		entry = list_entry(node, struct acpi_prt_entry, node);
+
+		acpi_pci_irq_del_entry(segment, bus, entry);
+	}
+	spin_unlock(&acpi_prt_lock);
+}
 /* --------------------------------------------------------------------------
                           PCI Interrupt Routing Support
    -------------------------------------------------------------------------- */

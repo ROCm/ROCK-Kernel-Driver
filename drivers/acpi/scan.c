@@ -57,6 +57,7 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 	INIT_LIST_HEAD(&device->children);
 	INIT_LIST_HEAD(&device->node);
 	INIT_LIST_HEAD(&device->g_list);
+	INIT_LIST_HEAD(&device->wakeup_list);
 
 	spin_lock(&acpi_device_lock);
 	if (device->parent) {
@@ -64,6 +65,8 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 		list_add_tail(&device->g_list,&device->parent->g_list);
 	} else
 		list_add_tail(&device->g_list,&acpi_device_list);
+	if (device->wakeup.flags.valid)
+		list_add_tail(&device->wakeup_list,&acpi_wakeup_device_list);
 	spin_unlock(&acpi_device_lock);
 
 	kobject_init(&device->kobj);
@@ -80,6 +83,18 @@ acpi_device_unregister (
 	struct acpi_device	*device, 
 	int			type)
 {
+	spin_lock(&acpi_device_lock);
+	if (device->parent) {
+		list_del(&device->node);
+		list_del(&device->g_list);
+	} else
+		list_del(&device->g_list);
+
+	list_del(&device->wakeup_list);
+
+	spin_unlock(&acpi_device_lock);
+
+	acpi_detach_data(device->handle, acpi_bus_data_handler);
 	kobject_unregister(&device->kobj);
 	return 0;
 }
@@ -270,12 +285,6 @@ acpi_bus_get_wakeup_device_flags (
 	/* Power button, Lid switch always enable wakeup*/
 	if (!acpi_match_ids(device, "PNP0C0D,PNP0C0C,PNP0C0E"))
 		device->wakeup.flags.run_wake = 1;
-
-	/* TBD: lock */
-	INIT_LIST_HEAD(&device->wakeup_list);
-	spin_lock(&acpi_device_lock);
-	list_add_tail(&device->wakeup_list, &acpi_wakeup_device_list);
-	spin_unlock(&acpi_device_lock);
 
 end:
 	if (ACPI_FAILURE(status))
@@ -730,7 +739,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #ifdef CONFIG_ACPI_DEBUG_OUTPUT
 	char		*type_string = NULL;
 	char		name[80] = {'?','\0'};
-	acpi_buffer	buffer = {sizeof(name), name};
+	struct acpi_buffer	buffer = {sizeof(name), name};
 
 	switch (type) {
 	case ACPI_BUS_TYPE_DEVICE:
@@ -767,7 +776,55 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #endif /*CONFIG_ACPI_DEBUG_OUTPUT*/
 }
 
-static int 
+
+int
+acpi_bus_remove (
+	struct acpi_device *dev,
+	int rmdevice)
+{
+	int 			result = 0;
+	struct acpi_driver	*driver;
+	
+	ACPI_FUNCTION_TRACE("acpi_bus_remove");
+
+	if (!dev)
+		return_VALUE(-EINVAL);
+
+	driver = dev->driver;
+
+	if ((driver) && (driver->ops.remove)) {
+
+		if (driver->ops.stop) {
+			result = driver->ops.stop(dev, ACPI_BUS_REMOVAL_EJECT);
+			if (result)
+				return_VALUE(result);
+		}
+
+		result = dev->driver->ops.remove(dev, ACPI_BUS_REMOVAL_EJECT);
+		if (result) {
+			return_VALUE(result);
+		}
+
+		atomic_dec(&dev->driver->references);
+		dev->driver = NULL;
+		acpi_driver_data(dev) = NULL;
+	}
+
+	if (!rmdevice)
+		return_VALUE(0);
+
+	if (dev->flags.bus_address) {
+		if ((dev->parent) && (dev->parent->ops.unbind))
+			dev->parent->ops.unbind(dev);
+	}
+	
+	acpi_device_unregister(dev, ACPI_BUS_REMOVAL_EJECT);
+
+	return_VALUE(0);
+}
+
+
+int
 acpi_bus_add (
 	struct acpi_device	**child,
 	struct acpi_device	*parent,
@@ -914,7 +971,7 @@ end:
 
 
 
-static int acpi_bus_scan (struct acpi_device	*start)
+int acpi_bus_scan (struct acpi_device	*start)
 {
 	acpi_status		status = AE_OK;
 	struct acpi_device	*parent = NULL;
@@ -1016,6 +1073,62 @@ static int acpi_bus_scan (struct acpi_device	*start)
 	return_VALUE(0);
 }
 
+
+int
+acpi_bus_trim(struct acpi_device	*start,
+		int rmdevice)
+{
+	acpi_status		status;
+	struct acpi_device	*parent, *child;
+	acpi_handle		phandle, chandle;
+	acpi_object_type	type;
+	u32			level = 1;
+	int			err = 0;
+
+	parent  = start;
+	phandle = start->handle;
+	child = chandle = NULL;
+
+	while ((level > 0) && parent && (!err)) {
+		status = acpi_get_next_object(ACPI_TYPE_ANY, phandle,
+			chandle, &chandle);
+
+		/*
+		 * If this scope is exhausted then move our way back up.
+		 */
+		if (ACPI_FAILURE(status)) {
+			level--;
+			chandle = phandle;
+			acpi_get_parent(phandle, &phandle);
+			child = parent;
+			parent = parent->parent;
+
+			if (level == 0)
+				err = acpi_bus_remove(child, rmdevice);
+			else
+				err = acpi_bus_remove(child, 1);
+
+			continue;
+		}
+
+		status = acpi_get_type(chandle, &type);
+		if (ACPI_FAILURE(status)) {
+			continue;
+		}
+		/*
+		 * If there is a device corresponding to chandle then
+		 * parse it (depth-first).
+		 */
+		if (acpi_bus_get_device(chandle, &child) == 0) {
+			level++;
+			phandle = chandle;
+			chandle = NULL;
+			parent = child;
+		}
+		continue;
+	}
+	return err;
+}
 
 static int
 acpi_bus_scan_fixed (

@@ -138,6 +138,9 @@ EXPORT_SYMBOL(acpi_bus_generate_event);
 EXPORT_SYMBOL(acpi_bus_receive_event);
 EXPORT_SYMBOL(acpi_bus_register_driver);
 EXPORT_SYMBOL(acpi_bus_unregister_driver);
+EXPORT_SYMBOL(acpi_bus_scan);
+EXPORT_SYMBOL(acpi_bus_trim);
+EXPORT_SYMBOL(acpi_bus_add);
 
 #endif /*CONFIG_ACPI_BUS*/
 
