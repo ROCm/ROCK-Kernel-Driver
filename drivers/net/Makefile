@@ -184,6 +184,9 @@ obj-$(CONFIG_TUN) += tun.o
 obj-$(CONFIG_DL2K) += dl2k.o
 obj-$(CONFIG_R8169) += r8169.o
 
+# non-drivers/net drivers who want mii lib
+obj-$(CONFIG_PCMCIA_SMC91C92) += mii.o
+
 obj-$(CONFIG_ARCH_ACORN) += ../acorn/net/
 obj-$(CONFIG_NET_FC) += fc/
 obj-$(CONFIG_DEV_APPLETALK) += appletalk/
