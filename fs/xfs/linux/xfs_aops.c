@@ -76,10 +76,10 @@ linvfs_unwritten_done(
 
 /*
  * Issue transactions to convert a buffer range from unwritten
- * to written extents.
+ * to written extents (buffered IO).
  */
 STATIC void
-linvfs_unwritten_conv(
+linvfs_unwritten_convert(
 	xfs_buf_t	*bp)
 {
 	vnode_t		*vp = XFS_BUF_FSPRIVATE(bp, vnode_t *);
@@ -94,6 +94,30 @@ linvfs_unwritten_conv(
 	XFS_BUF_CLR_IODONE_FUNC(bp);
 	XFS_BUF_UNDATAIO(bp);
 	pagebuf_iodone(bp, 0, 0);
+}
+
+/*
+ * Issue transactions to convert a buffer range from unwritten
+ * to written extents (direct IO).
+ */
+STATIC void
+linvfs_unwritten_convert_direct(
+	struct inode	*inode,
+	loff_t		offset,
+	ssize_t		size,
+	void		*private)
+{
+	ASSERT(!private || inode == (struct inode *)private);
+
+	/* private indicates an unwritten extent lay beneath this IO,
+	 * see linvfs_get_block_core.
+	 */
+	if (private && size > 0) {
+		vnode_t	*vp = LINVFS_GET_VP(inode);
+		int	error;
+
+		VOP_BMAP(vp, offset, size, BMAP_UNWRITTEN, NULL, NULL, error);
+	}
 }
 
 STATIC int
@@ -456,7 +480,7 @@ map_unwritten(
 	XFS_BUF_SET_SIZE(pb, size);
 	XFS_BUF_SET_OFFSET(pb, offset);
 	XFS_BUF_SET_FSPRIVATE(pb, LINVFS_GET_VP(inode));
-	XFS_BUF_SET_IODONE_FUNC(pb, linvfs_unwritten_conv);
+	XFS_BUF_SET_IODONE_FUNC(pb, linvfs_unwritten_convert);
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pagebuf_iodone(pb, 1, 1);
@@ -804,7 +828,7 @@ STATIC int
 linvfs_get_block_core(
 	struct inode		*inode,
 	sector_t		iblock,
-	int			blocks,
+	unsigned long		blocks,
 	struct buffer_head	*bh_result,
 	int			create,
 	int			direct,
@@ -854,8 +878,11 @@ linvfs_get_block_core(
 			set_buffer_mapped(bh_result);
 		}
 		if (pbmap.pbm_flags & PBMF_UNWRITTEN) {
-			if (create)
+			if (create) {
+				if (direct)
+					bh_result->b_private = inode;
 				set_buffer_mapped(bh_result);
+			}
 			set_buffer_unwritten(bh_result);
 			set_buffer_delay(bh_result);
 		}
@@ -935,8 +962,8 @@ linvfs_direct_IO(
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
-        return blockdev_direct_IO(rw, iocb, inode, NULL,
-			iov, offset, nr_segs, linvfs_get_blocks_direct);
+        return blockdev_direct_IO(rw, iocb, inode, NULL, iov, offset, nr_segs,
+		linvfs_get_blocks_direct, linvfs_unwritten_convert_direct);
 }
 
 

@@ -1562,7 +1562,8 @@ static int ext3_direct_IO(int rw, struct kiocb *iocb,
 	}
 
 	ret = blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov, 
-				offset, nr_segs, ext3_direct_io_get_blocks);
+				 offset, nr_segs,
+				 ext3_direct_io_get_blocks, NULL);
 
 out_stop:
 	if (handle) {
