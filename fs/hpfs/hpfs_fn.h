@@ -249,6 +249,7 @@ ssize_t hpfs_file_write(struct file *file, const char __user *buf, size_t count,
 
 /* inode.c */
 
+void hpfs_init_inode(struct inode *);
 void hpfs_read_inode(struct inode *);
 void hpfs_write_inode_ea(struct inode *, struct fnode *);
 void hpfs_write_inode(struct inode *);

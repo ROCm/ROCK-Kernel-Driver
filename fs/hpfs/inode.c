@@ -57,14 +57,10 @@ struct address_space_operations hpfs_symlink_aops = {
 	.readpage	= hpfs_symlink_readpage
 };
 
-void hpfs_read_inode(struct inode *i)
+void hpfs_init_inode(struct inode *i)
 {
-	struct buffer_head *bh;
-	struct fnode *fnode;
 	struct super_block *sb = i->i_sb;
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
-	unsigned char *ea;
-	int ea_size;
 
 	i->i_uid = hpfs_sb(sb)->sb_uid;
 	i->i_gid = hpfs_sb(sb)->sb_gid;
@@ -91,6 +87,18 @@ void hpfs_read_inode(struct inode *i)
 	i->i_ctime.tv_sec = i->i_ctime.tv_nsec = 0;
 	i->i_mtime.tv_sec = i->i_mtime.tv_nsec = 0;
 	i->i_atime.tv_sec = i->i_atime.tv_nsec = 0;
+}
+
+void hpfs_read_inode(struct inode *i)
+{
+	struct buffer_head *bh;
+	struct fnode *fnode;
+	struct super_block *sb = i->i_sb;
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
+	unsigned char *ea;
+	int ea_size;
+
+	hpfs_init_inode(i);
 
 	if (!hpfs_sb(i->i_sb)->sb_rd_inode)
 		hpfs_error(i->i_sb, "read_inode: sb_rd_inode == 0");
@@ -240,14 +248,19 @@ void hpfs_write_inode(struct inode *i)
 		kfree(hpfs_inode->i_rddir_off);
 		hpfs_inode->i_rddir_off = NULL;
 	}
-	hpfs_inode->i_dirty = 0;
 	hpfs_lock_iget(i->i_sb, 1);
 	parent = iget(i->i_sb, hpfs_inode->i_parent_dir);
-	hpfs_unlock_iget(i->i_sb);
-	hpfs_lock_inode(parent);
-	hpfs_write_inode_nolock(i);
-	hpfs_unlock_inode(parent);
-	iput(parent);
+	if (parent) {
+		hpfs_unlock_iget(i->i_sb);
+		hpfs_inode->i_dirty = 0;
+		hpfs_lock_inode(parent);
+		hpfs_write_inode_nolock(i);
+		hpfs_unlock_inode(parent);
+		iput(parent);
+	} else {
+		hpfs_unlock_iget(i->i_sb);
+		mark_inode_dirty(i);
+	}
 }
 
 void hpfs_write_inode_nolock(struct inode *i)
