@@ -383,8 +383,8 @@ int generic_writepages(struct address_space *mapping, int *nr_to_write)
 		lock_page(page);
 
 		/* It may have been removed from swapcache: check ->mapping */
-		if (page->mapping && TestClearPageDirty(page) &&
-					!PageWriteback(page)) {
+		if (page->mapping && !PageWriteback(page) &&
+					TestClearPageDirty(page)) {
 			/* FIXME: batch this up */
 			if (!PageActive(page) && PageLRU(page)) {
 				spin_lock(&pagemap_lru_lock);
