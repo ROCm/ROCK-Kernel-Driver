@@ -385,10 +385,6 @@ void __init prepare_namespace(void)
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 
-	/* This has to be before mounting root, because even readonly mount of reiserfs would replay
-	   log corrupting stuff */
-	software_resume();
-
 	if (initrd_load())
 		goto out;
 
