@@ -42,9 +42,8 @@ MODULE_PARM_DESC(polarity, "Output's polarity: 0 = active high, 1 = active low")
 /* Many DS1621 constants specified below */
 /* Config register used for detection         */
 /*  7    6    5    4    3    2    1    0      */
-/* |Done|THF |TLF |NVB | 1  | 0  |POL |1SHOT| */
-#define DS1621_REG_CONFIG_MASK		0x0C
-#define DS1621_REG_CONFIG_VAL		0x08
+/* |Done|THF |TLF |NVB | X  | X  |POL |1SHOT| */
+#define DS1621_REG_CONFIG_NVB		0x10
 #define DS1621_REG_CONFIG_POLARITY	0x02
 #define DS1621_REG_CONFIG_1SHOT		0x01
 #define DS1621_REG_CONFIG_DONE		0x80
@@ -55,6 +54,7 @@ MODULE_PARM_DESC(polarity, "Output's polarity: 0 = active high, 1 = active low")
 #define DS1621_REG_TEMP_MAX		0xA2 /* word, RW */
 #define DS1621_REG_CONF			0xAC /* byte, RW */
 #define DS1621_COM_START		0xEE /* no data */
+#define DS1621_COM_STOP			0x22 /* no data */
 
 /* The DS1621 configuration register */
 #define DS1621_ALARM_TEMP_HIGH		0x40
@@ -212,9 +212,13 @@ int ds1621_detect(struct i2c_adapter *adapter, int address,
 
 	/* Now, we do the remaining detection. It is lousy. */
 	if (kind < 0) {
+		/* The NVB bit should be low if no EEPROM write has been 
+		   requested during the latest 10ms, which is highly 
+		   improbable in our case. */
 		conf = ds1621_read_value(new_client, DS1621_REG_CONF);
-		if ((conf & DS1621_REG_CONFIG_MASK) != DS1621_REG_CONFIG_VAL)
+		if (conf & DS1621_REG_CONFIG_NVB)
 			goto exit_free;
+		/* The 7 lowest bits of a temperature should always be 0. */
 		temp = ds1621_read_value(new_client, DS1621_REG_TEMP);
 		if (temp & 0x007f)
 			goto exit_free;
