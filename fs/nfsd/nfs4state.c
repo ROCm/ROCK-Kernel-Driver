@@ -1950,9 +1950,10 @@ static inline void
 nfs4_set_lock_denied(struct file_lock *fl, struct nfsd4_lock_denied *deny)
 {
 	struct nfs4_stateowner *sop = (struct nfs4_stateowner *) fl->fl_owner;
+	unsigned int hval = lockownerid_hashval(sop->so_id);
 
 	deny->ld_sop = NULL;
-	if (nfs4_verify_lock_stateowner(sop, fl->fl_pid))
+	if (nfs4_verify_lock_stateowner(sop, hval))
 		deny->ld_sop = sop;
 	deny->ld_start = fl->fl_start;
 	deny->ld_length = ~(u64)0;
@@ -2196,7 +2197,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 		goto out;
 	}
 	file_lock.fl_owner = (fl_owner_t) lock->lk_stateowner;
-	file_lock.fl_pid = lockownerid_hashval(lock->lk_stateowner->so_id);
+	file_lock.fl_pid = current->tgid;
 	file_lock.fl_file = filp;
 	file_lock.fl_flags = FL_POSIX;
 
@@ -2322,7 +2323,7 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	sop = lockt->lt_stateowner;
 	if (sop) {
 		file_lock.fl_owner = (fl_owner_t) sop;
-		file_lock.fl_pid = lockownerid_hashval(sop->so_id);
+		file_lock.fl_pid = current->tgid;
 	} else {
 		file_lock.fl_owner = NULL;
 		file_lock.fl_pid = 0;
@@ -2386,7 +2387,7 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	locks_init_lock(&file_lock);
 	file_lock.fl_type = F_UNLCK;
 	file_lock.fl_owner = (fl_owner_t) locku->lu_stateowner;
-	file_lock.fl_pid = lockownerid_hashval(locku->lu_stateowner->so_id);
+	file_lock.fl_pid = current->tgid;
 	file_lock.fl_file = filp;
 	file_lock.fl_flags = FL_POSIX; 
 	file_lock.fl_start = locku->lu_offset;
