@@ -107,7 +107,7 @@ static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdat
 #ifdef CONFIG_X86_NUMAQ
 static int MP_valid_apicid(int apicid, int version)
 {
-	return hweight_long(i & 0xf) == 1 && (i >> 4) != 0xf;
+	return hweight_long(apicid & 0xf) == 1 && (apicid >> 4) != 0xf;
 }
 #else
 static int MP_valid_apicid(int apicid, int version)
@@ -207,7 +207,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	num_processors++;
 	ver = m->mpc_apicver;
 
-	if (MP_valid_apicid(m->mpc_apicid, ver))
+	if (MP_valid_apicid(apicid, ver))
 		MP_mark_version_physids(ver);
 	else {
 		printk(KERN_WARNING "Processor #%d INVALID. (Max ID: %d).\n",
@@ -871,7 +871,7 @@ void __init mp_register_lapic (
 	MP_processor_info(&processor);
 }
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
+#if defined(CONFIG_X86_IO_APIC) && (defined(CONFIG_ACPI_INTERPRETER) || defined(CONFIG_ACPI_BOOT))
 
 #define MP_ISA_BUS		0
 #define MP_MAX_IOAPIC_PIN	127
@@ -1143,5 +1143,5 @@ void __init mp_parse_prt (void)
 }
 
 #endif /*CONFIG_ACPI_PCI*/
-#endif /*CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER*/
+#endif /*CONFIG_X86_IO_APIC && (CONFIG_ACPI_INTERPRETER || CONFIG_ACPI_BOOT)*/
 #endif /*CONFIG_ACPI_BOOT*/

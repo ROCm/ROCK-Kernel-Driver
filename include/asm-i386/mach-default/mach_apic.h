@@ -79,7 +79,10 @@ static inline int cpu_to_logical_apicid(int cpu)
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return  mps_cpu;
+	if (mps_cpu < get_physical_broadcast())
+		return  mps_cpu;
+	else
+		return BAD_APICID;
 }
 
 static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)

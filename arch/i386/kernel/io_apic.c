@@ -722,7 +722,7 @@ static int __init ioapic_pirq_setup(char *str)
 
 __setup("pirq=", ioapic_pirq_setup);
 
-static int get_physical_broadcast(void)
+int get_physical_broadcast(void)
 {
 	unsigned int lvr, version;
 	lvr = apic_read(APIC_LVR);

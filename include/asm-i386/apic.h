@@ -41,6 +41,8 @@ static __inline__ void apic_wait_icr_idle(void)
 	do { } while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY );
 }
 
+int get_physical_broadcast(void);
+
 #ifdef CONFIG_X86_GOOD_APIC
 # define FORCE_READ_AROUND_WRITE 0
 # define apic_read_around(x)
