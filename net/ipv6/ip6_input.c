@@ -263,3 +263,5 @@ int ip6_mc_input(struct sk_buff *skb)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(ip6_input);

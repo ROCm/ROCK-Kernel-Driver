@@ -84,6 +84,8 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
+#include <net/mipglue.h>
+
 /* Set to 3 to get tracing... */
 #define ACONF_DEBUG 2
 
@@ -135,7 +137,7 @@ static int addrconf_ifdown(struct net_device *dev, int how);
 
 static void addrconf_dad_start(struct inet6_ifaddr *ifp, int flags);
 static void addrconf_dad_timer(unsigned long data);
-static void addrconf_dad_completed(struct inet6_ifaddr *ifp);
+void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 static void addrconf_rs_timer(unsigned long data);
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
 
@@ -900,6 +902,7 @@ int ipv6_dev_get_saddr(struct net_device *daddr_dev,
 			}
 
 			/* XXX: Rule 4: Prefer home address */
+			/* Not implemented here */
 
 			/* Rule 5: Prefer outgoing interface */
 			if (daddr_dev == NULL || daddr_dev == dev)
@@ -961,6 +964,12 @@ int ipv6_dev_get_saddr(struct net_device *daddr_dev,
 
 	if (candidate.ifp) {
 		ipv6_addr_copy(saddr, &candidate.ifp->addr);
+
+		/* The home address is always used as source address in
+		 * MIPL mobile IPv6
+		 */
+		addrconf_get_mipv6_home_address(candidate.ifp, saddr);
+
 		in6_ifa_put(candidate.ifp);
 		err = 0;
 	} else {
@@ -1793,7 +1802,6 @@ static int inet6_addr_del(int ifindex, struct in6_addr *pfx, int plen)
 	return -EADDRNOTAVAIL;
 }
 
-
 int addrconf_add_ifaddr(void *arg)
 {
 	struct in6_ifreq ireq;
@@ -1824,6 +1832,28 @@ int addrconf_del_ifaddr(void *arg)
 
 	rtnl_lock();
 	err = inet6_addr_del(ireq.ifr6_ifindex, &ireq.ifr6_addr, ireq.ifr6_prefixlen);
+	rtnl_unlock();
+	return err;
+}
+
+int addrconf_add_ifaddr_kernel(struct in6_ifreq *ireq)
+{
+	int err;
+	
+	rtnl_lock();
+	err = inet6_addr_add(ireq->ifr6_ifindex, &ireq->ifr6_addr,
+			ireq->ifr6_prefixlen);
+	rtnl_unlock();
+	return err;
+}
+
+int addrconf_del_ifaddr_kernel(struct in6_ifreq *ireq)
+{
+	int err;
+	
+	rtnl_lock();
+	err = inet6_addr_del(ireq->ifr6_ifindex, &ireq->ifr6_addr,
+			ireq->ifr6_prefixlen);
 	rtnl_unlock();
 	return err;
 }
@@ -2347,7 +2377,7 @@ static void addrconf_dad_timer(unsigned long data)
 	in6_ifa_put(ifp);
 }
 
-static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
+void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 {
 	struct net_device *	dev = ifp->idev->dev;
 
@@ -2356,6 +2386,7 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	 */
 
 	ipv6_ifa_notify(RTM_NEWADDR, ifp);
+	notifier_call_chain(&inet6addr_chain,NETDEV_UP,ifp);
 
 	/* If added prefix is link local and forwarding is off,
 	   start sending router solicitations.
@@ -2666,7 +2697,19 @@ inet6_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	if (rta[IFA_LOCAL-1]) {
 		if (pfx && memcmp(pfx, RTA_DATA(rta[IFA_LOCAL-1]), sizeof(*pfx)))
 			return -EINVAL;
+		if (ifm->ifa_flags & IFA_F_HOMEADDR && !rta[IFA_HOMEAGENT-1])
+			return -EINVAL;
 		pfx = RTA_DATA(rta[IFA_LOCAL-1]);
+	}
+	if (rta[IFA_HOMEAGENT-1]) {
+		struct in6_addr *ha;
+		if (pfx == NULL || !(ifm->ifa_flags & IFA_F_HOMEADDR))
+			return -EINVAL;
+		if (RTA_PAYLOAD(rta[IFA_HOMEAGENT-1]) < sizeof(*ha))
+			return -EINVAL;
+		ha = RTA_DATA(rta[IFA_HOMEAGENT-1]);
+		addrconf_set_mipv6_mn_home(ifm->ifa_index, pfx, ifm->ifa_prefixlen,
+					   ha, ifm->ifa_prefixlen);
 	}
 
 	if (pfx == NULL)
@@ -3603,3 +3646,8 @@ void __exit addrconf_cleanup(void)
 	proc_net_remove("if_inet6");
 #endif
 }
+
+EXPORT_SYMBOL(ipv6_get_ifaddr);
+EXPORT_SYMBOL(ipv6_get_lladdr);
+EXPORT_SYMBOL(addrconf_add_ifaddr_kernel);
+EXPORT_SYMBOL(addrconf_del_ifaddr_kernel);

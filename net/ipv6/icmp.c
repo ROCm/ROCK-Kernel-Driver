@@ -64,6 +64,8 @@
 #include <net/addrconf.h>
 #include <net/icmp.h>
 
+#include <net/mipglue.h>
+
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -286,6 +288,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	int len;
 	int hlimit = -1;
 	int err = 0;
+	int plen;
 
 	if ((u8*)hdr < skb->head || (u8*)(hdr+1) > skb->tail)
 		return;
@@ -382,15 +385,22 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	msg.skb = skb;
 	msg.offset = skb->nh.raw - skb->data;
 
+	/* KK : Following two from MIPL */
+	plen = msg.offset;
+	__skb_pull(skb, plen);
+
 	len = skb->len - msg.offset;
 	len = min_t(unsigned int, len, IPV6_MIN_MTU - sizeof(struct ipv6hdr) -sizeof(struct icmp6hdr));
 	if (len < 0) {
 		if (net_ratelimit())
 			printk(KERN_DEBUG "icmp: len problem\n");
+		__skb_push(skb, plen);	/* KK: MIPL */
 		goto out_dst_release;
 	}
 
 	idev = in6_dev_get(skb->dev);
+
+	// icmpv6_handle_mipv6_homeaddr(skb);
 
 	err = ip6_append_data(sk, icmpv6_getfrag, &msg,
 			      len + sizeof(struct icmp6hdr),
@@ -402,6 +412,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 		goto out_put;
 	}
 	err = icmpv6_push_pending_frames(sk, &fl, &tmp_hdr, len + sizeof(struct icmp6hdr));
+	__skb_push(skb, plen);	/* KK : MIPL */
 
 	if (type >= ICMPV6_DEST_UNREACH && type <= ICMPV6_PARAMPROB)
 		ICMP6_INC_STATS_OFFSET_BH(idev, Icmp6OutDestUnreachs, type - ICMPV6_DEST_UNREACH);
@@ -619,13 +630,13 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		rt6_pmtu_discovery(&orig_hdr->daddr, &orig_hdr->saddr, dev,
 				   ntohl(hdr->icmp6_mtu));
 
-		/*
-		 *	Drop through to notify
-		 */
+		icmpv6_notify(skb, type, hdr->icmp6_code, hdr->icmp6_mtu);
+		break;
 
 	case ICMPV6_DEST_UNREACH:
-	case ICMPV6_TIME_EXCEED:
 	case ICMPV6_PARAMPROB:
+		mipv6_icmp_rcv(skb);
+	case ICMPV6_TIME_EXCEED:
 		icmpv6_notify(skb, type, hdr->icmp6_code, hdr->icmp6_mtu);
 		break;
 
@@ -646,6 +657,13 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		break;
 
 	case ICMPV6_MGM_REDUCTION:
+		break;
+
+	case MIPV6_DHAAD_REQUEST:
+	case MIPV6_DHAAD_REPLY:
+	case MIPV6_PREFIX_SOLICIT:
+	case MIPV6_PREFIX_ADV:
+		mipv6_icmp_rcv(skb);
 		break;
 
 	default:
@@ -806,3 +824,4 @@ ctl_table ipv6_icmp_table[] = {
 };
 #endif
 
+EXPORT_SYMBOL(icmpv6_push_pending_frames);

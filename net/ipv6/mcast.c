@@ -72,6 +72,19 @@
 #endif
 
 /*
+ * Should probably go to a public header file
+ */
+static inline int
+ipv6_addr_is_ll_solicited_node(struct in6_addr *addr)
+{
+	return (addr->s6_addr32[0] == htonl(0xff020000) &&
+		addr->s6_addr32[1] == 0 &&
+		addr->s6_addr32[2] == htonl(1) &&
+		addr->s6_addr[12]  == 0xFF);
+}
+
+
+/*
  *  These header formats should be in a separate include file, but icmpv6.h
  *  doesn't have in6_addr defined in all cases, there is no __u128, and no
  *  other files reference these.
@@ -846,6 +859,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 	mc->mca_sfcount[MCAST_EXCLUDE] = 1;
 
 	if (ipv6_addr_is_ll_all_nodes(&mc->mca_addr) ||
+	    ipv6_addr_is_ll_solicited_node(&mc->mca_addr) ||
 	    IPV6_ADDR_MC_SCOPE(&mc->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL)
 		mc->mca_flags |= MAF_NOREPORT;
 
@@ -2467,3 +2481,7 @@ void igmp6_cleanup(void)
 	proc_net_remove("igmp6");
 #endif
 }
+
+EXPORT_SYMBOL(ipv6_dev_mc_inc);
+EXPORT_SYMBOL(ipv6_dev_mc_dec);
+

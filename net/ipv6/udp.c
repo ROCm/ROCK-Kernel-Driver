@@ -50,6 +50,7 @@
 #include <net/ip.h>
 #include <net/udp.h>
 #include <net/inet_common.h>
+#include <net/mipglue.h>
 
 #include <net/checksum.h>
 #include <net/xfrm.h>
@@ -314,7 +315,7 @@ ipv4_connected:
 
 	fl.proto = IPPROTO_UDP;
 	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
-	ipv6_addr_copy(&fl.fl6_src, &np->saddr);
+	ipv6_addr_set(&fl.fl6_src, 0, 0, 0, 0);
 	fl.oif = sk->sk_bound_dev_if;
 	fl.fl_ip_dport = inet->dport;
 	fl.fl_ip_sport = inet->sport;
@@ -348,7 +349,9 @@ ipv4_connected:
 
 	ip6_dst_store(sk, dst,
 		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
-		      &np->daddr : NULL);
+			      &np->daddr : NULL,
+		      !ipv6_addr_cmp(&fl.fl6_src, &np->saddr) ?
+			      &fl.fl6_src : NULL);
 
 	sk->sk_state = TCP_ESTABLISHED;
 out:
@@ -990,7 +993,9 @@ do_append_data:
 	if (dst)
 		ip6_dst_store(sk, dst,
 			      !ipv6_addr_cmp(&fl->fl6_dst, &np->daddr) ?
-			      &np->daddr : NULL);
+			      &np->daddr : NULL,
+			      !ipv6_addr_cmp(&fl->fl6_src, &np->saddr) ?
+			      &np->saddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 	release_sock(sk);

@@ -40,14 +40,16 @@ struct icmp6hdr {
                 struct icmpv6_nd_ra {
 			__u8		hop_limit;
 #if defined(__LITTLE_ENDIAN_BITFIELD)
-			__u8		reserved:6,
+			__u8		reserved:5,
+				        home_agent:1,
 					other:1,
 					managed:1;
 
 #elif defined(__BIG_ENDIAN_BITFIELD)
 			__u8		managed:1,
 					other:1,
-					reserved:6;
+				        home_agent:1,
+					reserved:5;
 #else
 #error	"Please fix <asm/byteorder.h>"
 #endif
@@ -70,6 +72,7 @@ struct icmp6hdr {
 #define icmp6_addrconf_managed	icmp6_dataun.u_nd_ra.managed
 #define icmp6_addrconf_other	icmp6_dataun.u_nd_ra.other
 #define icmp6_rt_lifetime	icmp6_dataun.u_nd_ra.rt_lifetime
+#define icmp6_home_agent	icmp6_dataun.u_nd_ra.home_agent
 };
 
 

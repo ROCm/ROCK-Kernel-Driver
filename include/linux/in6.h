@@ -142,6 +142,11 @@ struct in6_flowlabel_req
 #define IPV6_TLV_JUMBO		194
 
 /*
+ *	Mobile IPv6 TLV options.
+ */
+#define MIPV6_TLV_HOMEADDR	201
+
+/*
  *	IPV6 socket options
  */
 
