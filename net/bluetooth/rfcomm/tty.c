@@ -669,12 +669,12 @@ static int rfcomm_tty_set_modem_status(uint cmd, struct rfcomm_dlc *dlc, uint st
 	else
 		rfcomm_dlc_get_modem_status(dlc, &v24_sig);
 
-	mask =  (status & TIOCM_DSR) ? RFCOMM_V24_RTC : 0 |
-		(status & TIOCM_DTR) ? RFCOMM_V24_RTC : 0 |
-		(status & TIOCM_RTS) ? RFCOMM_V24_RTR : 0 |
-		(status & TIOCM_CTS) ? RFCOMM_V24_RTR : 0 |
-		(status & TIOCM_RI)  ? RFCOMM_V24_IC  : 0 |
-		(status & TIOCM_CD)  ? RFCOMM_V24_DV  : 0;
+	mask =  ((status & TIOCM_DSR) ? RFCOMM_V24_RTC : 0) |
+		((status & TIOCM_DTR) ? RFCOMM_V24_RTC : 0) |
+		((status & TIOCM_RTS) ? RFCOMM_V24_RTR : 0) |
+		((status & TIOCM_CTS) ? RFCOMM_V24_RTR : 0) |
+		((status & TIOCM_RI)  ? RFCOMM_V24_IC  : 0) |
+		((status & TIOCM_CD)  ? RFCOMM_V24_DV  : 0);
 
 	if (cmd == TIOCMBIC)
 		v24_sig &= ~mask;
