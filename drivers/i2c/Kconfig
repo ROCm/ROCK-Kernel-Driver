@@ -15,9 +15,6 @@ config I2C
 
 	  Both I2C and SMBus are supported here. You will need this for
 	  hardware sensors support, and also for Video For Linux support.
-	  Specifically, if you want to use a BT848 based frame grabber/overlay
-	  boards under Linux, say Y here and also to "I2C bit-banging
-	  interfaces", below.
 
 	  If you want I2C support, you should say Y here and also to the
 	  specific driver for your bus adapter(s) below.
