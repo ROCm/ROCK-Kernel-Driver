@@ -104,11 +104,13 @@ acpi_ns_root_initialize (void)
 
 			status = acpi_os_predefined_override(init_val, &val);
 			if (ACPI_FAILURE (status)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"Could not override predefined %s\n", init_val->name));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not override predefined %s\n",
+					init_val->name));
 			}
-			if (val == NULL)
+
+			if (!val) {
 				val = init_val->val;
+			}
 
 			/*
 			 * Entry requests an initial value, allocate a

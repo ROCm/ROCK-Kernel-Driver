@@ -30,21 +30,21 @@
  * We put them here because we don't want to duplicate them
  * in the rest of the source code again and again.
  */
-#include <acpi/acconfig.h>           /* Configuration constants */
-#include <acpi/platform/acenv.h>     /* Target environment specific items */
-#include <acpi/actypes.h>            /* Fundamental common data types */
-#include <acpi/acexcep.h>            /* ACPI exception codes */
-#include <acpi/acmacros.h>           /* C macros */
-#include <acpi/actbl.h>              /* ACPI table definitions */
-#include <acpi/aclocal.h>            /* Internal data types */
-#include <acpi/acoutput.h>           /* Error output and Debug macros */
-#include <acpi/acpiosxf.h>           /* Interfaces to the ACPI-to-OS layer*/
-#include <acpi/acpixf.h>             /* ACPI core subsystem external interfaces */
-#include <acpi/acobject.h>           /* ACPI internal object */
-#include <acpi/acstruct.h>           /* Common structures */
-#include <acpi/acglobal.h>           /* All global variables */
-#include <acpi/achware.h>            /* Hardware defines and interfaces */
-#include <acpi/acutils.h>            /* Utility interfaces */
+#include "acconfig.h"           /* Configuration constants */
+#include "platform/acenv.h"     /* Target environment specific items */
+#include "actypes.h"            /* Fundamental common data types */
+#include "acexcep.h"            /* ACPI exception codes */
+#include "acmacros.h"           /* C macros */
+#include "actbl.h"              /* ACPI table definitions */
+#include "aclocal.h"            /* Internal data types */
+#include "acoutput.h"           /* Error output and Debug macros */
+#include "acpiosxf.h"           /* Interfaces to the ACPI-to-OS layer*/
+#include "acpixf.h"             /* ACPI core subsystem external interfaces */
+#include "acobject.h"           /* ACPI internal object */
+#include "acstruct.h"           /* Common structures */
+#include "acglobal.h"           /* All global variables */
+#include "achware.h"            /* Hardware defines and interfaces */
+#include "acutils.h"            /* Utility interfaces */
 
 
 #endif /* __ACPI_H__ */

@@ -95,7 +95,7 @@ acpi_os_get_root_pointer (
 acpi_status
 acpi_os_predefined_override (
 	const struct acpi_predefined_names *init_val,
-	acpi_string                     *new_val);
+	acpi_string                         *new_val);
 
 acpi_status
 acpi_os_table_override (

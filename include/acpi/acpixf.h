@@ -27,8 +27,8 @@
 #ifndef __ACXFACE_H__
 #define __ACXFACE_H__
 
-#include <acpi/actypes.h>
-#include <acpi/actbl.h>
+#include "actypes.h"
+#include "actbl.h"
 
 
  /*
