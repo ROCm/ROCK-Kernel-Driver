@@ -465,11 +465,11 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	int db_count;
 	int i, j;
 
-	sbi = kmalloc(sizeof(struct ext2_super_block), GFP_KERNEL);
+	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
 	sb->u.generic_sbp = sbi;
-	memset(sbi, 0, sizeof(struct ext2_super_block));
+	memset(sbi, 0, sizeof(*sbi));
 
 	/*
 	 * See what the current blocksize for the device is, and

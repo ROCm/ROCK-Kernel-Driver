@@ -123,9 +123,10 @@ static int devpts_fill_super(struct super_block *s, void *data, int silent)
 	struct inode * inode;
 	struct devpts_sb_info *sbi;
 
-	sbi = (struct devpts_sb_info *) kmalloc(sizeof(struct devpts_sb_info), GFP_KERNEL);
+	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if ( !sbi )
 		goto fail;
+	memset(sbi, 0, sizeof(*sbi));
 
 	sbi->magic  = DEVPTS_SBI_MAGIC;
 	sbi->max_ptys = unix98_max_ptys;
