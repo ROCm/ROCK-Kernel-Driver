@@ -377,7 +377,7 @@ UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
 UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff, 
 		"", 
 		"USB TO IDE",
-		US_SC_SCSI, US_PR_DEVICE, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ), 
 
 /* Reported by Peter Marks <peter.marks@turner.com>
