@@ -941,7 +941,7 @@ static void *aarp_seq_start(struct seq_file *seq, loff_t *pos)
 	iter->table     = resolved;
 	iter->bucket    = 0;
 
-	return *pos ? iter_next(iter, pos) : ((void *)1);
+	return *pos ? iter_next(iter, pos) : SEQ_START_TOKEN);
 }
 
 static void *aarp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -952,7 +952,7 @@ static void *aarp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	++*pos;
 
 	/* first line after header */
-	if (v == ((void *)1)) 
+	if (v == SEQ_START_TOKEN) 
 		entry = iter_next(iter, NULL);
 		
 	/* next entry in current bucket */
@@ -987,7 +987,7 @@ static int aarp_seq_show(struct seq_file *seq, void *v)
 	struct aarp_entry *entry = v;
 	unsigned long now = jiffies;
 
-	if (v == ((void *)1))
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, 
 			 "Address  Interface   Hardware Address"
 			 "   Expires LastSend  Retry Status\n");

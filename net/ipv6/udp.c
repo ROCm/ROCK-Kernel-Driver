@@ -1113,7 +1113,7 @@ static void udp6_sock_seq_show(struct seq_file *seq, struct sock *sp, int bucket
 
 static int udp6_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq,
 			   "  sl  "
 			   "local_address                         "

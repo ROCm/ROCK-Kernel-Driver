@@ -1076,7 +1076,7 @@ static void *rose_node_start(struct seq_file *seq, loff_t *pos)
 
 	spin_lock_bh(&rose_neigh_list_lock);
 	if (*pos == 0)
-		return ROSE_PROC_START;
+		return SEQ_START_TOKEN;
 
 	for (rose_node = rose_node_list; rose_node && i < *pos; 
 	     rose_node = rose_node->next, ++i);
@@ -1088,7 +1088,7 @@ static void *rose_node_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
 	
-	return (v == ROSE_PROC_START) ? rose_node_list 
+	return (v == SEQ_START_TOKEN) ? rose_node_list 
 		: ((struct rose_node *)v)->next;
 }
 
@@ -1101,7 +1101,7 @@ static int rose_node_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	if (v == ROSE_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "address    mask n neigh neigh neigh\n");
 	else {
 		const struct rose_node *rose_node = v;
@@ -1152,7 +1152,7 @@ static void *rose_neigh_start(struct seq_file *seq, loff_t *pos)
 
 	spin_lock_bh(&rose_neigh_list_lock);
 	if (*pos == 0)
-		return ROSE_PROC_START;
+		return SEQ_START_TOKEN;
 
 	for (rose_neigh = rose_neigh_list; rose_neigh && i < *pos; 
 	     rose_neigh = rose_neigh->next, ++i);
@@ -1164,7 +1164,7 @@ static void *rose_neigh_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
 	
-	return (v == ROSE_PROC_START) ? rose_neigh_list 
+	return (v == SEQ_START_TOKEN) ? rose_neigh_list 
 		: ((struct rose_neigh *)v)->next;
 }
 
@@ -1177,7 +1177,7 @@ static int rose_neigh_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	if (v == ROSE_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, 
 			 "addr  callsign  dev  count use mode restart  t0  tf digipeaters\n");
 	else {
@@ -1234,7 +1234,7 @@ static void *rose_route_start(struct seq_file *seq, loff_t *pos)
 
 	spin_lock_bh(&rose_route_list_lock);
 	if (*pos == 0)
-		return ROSE_PROC_START;
+		return SEQ_START_TOKEN;
 
 	for (rose_route = rose_route_list; rose_route && i < *pos; 
 	     rose_route = rose_route->next, ++i);
@@ -1246,7 +1246,7 @@ static void *rose_route_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
 	
-	return (v == ROSE_PROC_START) ? rose_route_list 
+	return (v == SEQ_START_TOKEN) ? rose_route_list 
 		: ((struct rose_route *)v)->next;
 }
 
@@ -1257,7 +1257,7 @@ static void rose_route_stop(struct seq_file *seq, void *v)
 
 static int rose_route_show(struct seq_file *seq, void *v)
 {
-	if (v == ROSE_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, 
 			 "lci  address     callsign   neigh  <-> lci  address     callsign   neigh\n");
 	else {

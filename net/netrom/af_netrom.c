@@ -1241,8 +1241,6 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 #ifdef CONFIG_PROC_FS
 
-/* Marker for header entry */
-#define NETROM_PROC_START	((void *)1)
 static void *nr_info_start(struct seq_file *seq, loff_t *pos)
 {
 	struct sock *s;
@@ -1251,7 +1249,7 @@ static void *nr_info_start(struct seq_file *seq, loff_t *pos)
 
 	spin_lock_bh(&nr_list_lock);
 	if (*pos == 0)
-		return NETROM_PROC_START;
+		return SEQ_START_TOKEN;
 
 	sk_for_each(s, node, &nr_list) {
 		if (i == *pos)
@@ -1265,7 +1263,7 @@ static void *nr_info_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
 
-	return (v == NETROM_PROC_START) ? sk_head(&nr_list) 
+	return (v == SEQ_START_TOKEN) ? sk_head(&nr_list) 
 		: sk_next((struct sock *)v);
 }
 	
@@ -1281,7 +1279,7 @@ static int nr_info_show(struct seq_file *seq, void *v)
 	nr_cb *nr;
 	const char *devname;
 
-	if (v == NETROM_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq,
 "user_addr dest_node src_node  dev    my  your  st  vs  vr  va    t1     t2     t4      idle   n2  wnd Snd-Q Rcv-Q inode\n");
 

@@ -1275,7 +1275,7 @@ static void *arp_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? arp_get_idx(seq, *pos - 1) : (void *)1;
+	return *pos ? arp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -1283,7 +1283,7 @@ static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	void *rc;
 	struct arp_iter_state* state;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		rc = arp_get_idx(seq, 0);
 		goto out;
 	}
@@ -1306,7 +1306,7 @@ static void arp_seq_stop(struct seq_file *seq, void *v)
 {
 	struct arp_iter_state* state = seq->private;
 
-	if (!state->is_pneigh && v != (void *)1)
+	if (!state->is_pneigh && v != SEQ_START_TOKEN)
 		read_unlock_bh(&arp_tbl.lock);
 }
 
@@ -1359,7 +1359,7 @@ static __inline__ void arp_format_pneigh_entry(struct seq_file *seq,
 
 static int arp_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "IP address       HW type     Flags       "
 			      "HW address            Mask     Device\n");
 	else {

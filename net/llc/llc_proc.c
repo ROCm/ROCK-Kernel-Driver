@@ -67,7 +67,7 @@ static void *llc_seq_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&llc_main_station.sap_list.lock);
-	return l ? llc_get_sk_idx(--l) : (void *)1;
+	return l ? llc_get_sk_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -77,7 +77,7 @@ static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct llc_sap *sap;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		sk = llc_get_sk_idx(0);
 		goto out;
 	}
@@ -123,7 +123,7 @@ static int llc_seq_socket_show(struct seq_file *seq, void *v)
 	struct sock* sk;
 	struct llc_opt *llc;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "SKt Mc local_mac_sap        remote_mac_sap   "
 			      "    tx_queue rx_queue st uid link\n");
 		goto out;
@@ -172,7 +172,7 @@ static int llc_seq_core_show(struct seq_file *seq, void *v)
 	struct sock* sk;
 	struct llc_opt *llc;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Connection list:\n"
 			      "dsap state      retr txw rxw pf ff sf df rs cs "
 			      "tack tpfc trs tbs blog busr\n");

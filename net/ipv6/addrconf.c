@@ -2170,7 +2170,7 @@ out:
 static void *if6_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock_bh(&addrconf_hash_lock);
-	return *pos ? if6_get_bucket(seq, pos) : (void *)1;
+	return *pos ? if6_get_bucket(seq, pos) : SEQ_START_TOKEN;
 }
 
 static void *if6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -2178,7 +2178,7 @@ static void *if6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct inet6_ifaddr *ifa;
 	struct if6_iter_state *state;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		ifa = if6_get_bucket(seq, pos);
 		goto out;
 	}
@@ -2214,7 +2214,7 @@ static inline void if6_iface_seq_show(struct seq_file *seq, struct inet6_ifaddr 
 
 static int if6_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		return 0;
 	else
 		if6_iface_seq_show(seq, v);

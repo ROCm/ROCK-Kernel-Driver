@@ -33,7 +33,7 @@ static void *atalk_seq_interface_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&atalk_interfaces_lock);
-	return l ? atalk_get_interface_idx(--l) : (void *)1;
+	return l ? atalk_get_interface_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *atalk_seq_interface_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -41,7 +41,7 @@ static void *atalk_seq_interface_next(struct seq_file *seq, void *v, loff_t *pos
 	struct atalk_iface *i;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		i = NULL;
 		if (atalk_interfaces)
 			i = atalk_interfaces;
@@ -62,7 +62,7 @@ static int atalk_seq_interface_show(struct seq_file *seq, void *v)
 {
 	struct atalk_iface *iface;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Interface        Address   Networks  "
 			      "Status\n");
 		goto out;
@@ -92,7 +92,7 @@ static void *atalk_seq_route_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&atalk_routes_lock);
-	return l ? atalk_get_route_idx(--l) : (void *)1;
+	return l ? atalk_get_route_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *atalk_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -100,7 +100,7 @@ static void *atalk_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct atalk_route *r;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		r = NULL;
 		if (atalk_routes)
 			r = atalk_routes;
@@ -121,7 +121,7 @@ static int atalk_seq_route_show(struct seq_file *seq, void *v)
 {
 	struct atalk_route *rt;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Target        Router  Flags Dev\n");
 		goto out;
 	}
@@ -160,7 +160,7 @@ static void *atalk_seq_socket_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&atalk_sockets_lock);
-	return l ? atalk_get_socket_idx(--l) : (void *)1;
+	return l ? atalk_get_socket_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *atalk_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -168,7 +168,7 @@ static void *atalk_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct sock *i;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		i = sk_head(&atalk_sockets);
 		goto out;
 	}
@@ -187,7 +187,7 @@ static int atalk_seq_socket_show(struct seq_file *seq, void *v)
 	struct sock *s;
 	struct atalk_sock *at;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq, "Type Local_addr  Remote_addr Tx_queue "
 				"Rx_queue St UID\n");
 		goto out;

@@ -259,14 +259,14 @@ static struct rtable *rt_cache_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *rt_cache_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? rt_cache_get_idx(seq, *pos) : (void *)1;
+	return *pos ? rt_cache_get_idx(seq, *pos) : SEQ_START_TOKEN;
 }
 
 static void *rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct rtable *r = NULL;
 
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		r = rt_cache_get_first(seq);
 	else
 		r = rt_cache_get_next(seq, v);
@@ -276,13 +276,13 @@ static void *rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void rt_cache_seq_stop(struct seq_file *seq, void *v)
 {
-	if (v && v != (void *)1)
+	if (v && v != SEQ_START_TOKEN)
 		rcu_read_unlock();
 }
 
 static int rt_cache_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, "%-127s\n",
 			   "Iface\tDestination\tGateway \tFlags\t\tRefCnt\tUse\t"
 			   "Metric\tSource\t\tMTU\tWindow\tIRTT\tTOS\tHHRef\t"

@@ -44,7 +44,7 @@ static void *x25_seq_route_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&x25_route_list_lock);
-	return l ? x25_get_route_idx(--l) : (void *)1;
+	return l ? x25_get_route_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *x25_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -52,7 +52,7 @@ static void *x25_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct x25_route *rt;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		rt = NULL;
 		if (!list_empty(&x25_route_list))
 			rt = list_entry(x25_route_list.next,
@@ -77,7 +77,7 @@ static int x25_seq_route_show(struct seq_file *seq, void *v)
 {
 	struct x25_route *rt;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Address          Digits  Device\n");
 		goto out;
 	}
@@ -108,7 +108,7 @@ static void *x25_seq_socket_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&x25_list_lock);
-	return l ? x25_get_socket_idx(--l) : (void *)1;
+	return l ? x25_get_socket_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *x25_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -116,7 +116,7 @@ static void *x25_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct sock *s;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		s = sk_head(&x25_list);
 		goto out;
 	}
@@ -137,7 +137,7 @@ static int x25_seq_socket_show(struct seq_file *seq, void *v)
 	struct net_device *dev;
 	const char *devname;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq, "dest_addr  src_addr   dev   lci st vs vr "
 				"va   t  t2 t21 t22 t23 Snd-Q Rcv-Q inode\n");
 		goto out;

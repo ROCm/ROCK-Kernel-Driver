@@ -1035,7 +1035,7 @@ static void *c_start(struct seq_file *m, loff_t *pos)
 
 	read_lock(&cd->hash_lock);
 	if (!n--)
-		return (void *)1;
+		return SEQ_START_TOKEN;
 	hash = n >> 32;
 	entry = n & ((1LL<<32) - 1);
 
@@ -1060,7 +1060,7 @@ static void *c_next(struct seq_file *m, void *p, loff_t *pos)
 	int hash = (*pos >> 32);
 	struct cache_detail *cd = ((struct handle*)m->private)->cd;
 
-	if (p == (void *)1)
+	if (p == SEQ_START_TOKEN)
 		hash = 0;
 	else if (ch->next == NULL) {
 		hash++;
@@ -1092,7 +1092,7 @@ static int c_show(struct seq_file *m, void *p)
 	struct cache_head *cp = p;
 	struct cache_detail *cd = ((struct handle*)m->private)->cd;
 
-	if (p == (void *)1)
+	if (p == SEQ_START_TOKEN)
 		return cd->cache_show(m, cd, NULL);
 
 	ifdebug(CACHE)

@@ -961,14 +961,14 @@ static struct sock *raw6_get_idx(struct seq_file *seq, loff_t pos)
 static void *raw6_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&raw_v6_lock);
-	return *pos ? raw6_get_idx(seq, *pos) : (void *)1;
+	return *pos ? raw6_get_idx(seq, *pos) : SEQ_START_TOKEN;
 }
 
 static void *raw6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct sock *sk;
 
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		sk = raw6_get_first(seq);
 	else
 		sk = raw6_get_next(seq, v);
@@ -1010,7 +1010,7 @@ static void raw6_sock_seq_show(struct seq_file *seq, struct sock *sp, int i)
 
 static int raw6_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq,
 			   "  sl  "
 			   "local_address                         "

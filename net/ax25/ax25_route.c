@@ -281,8 +281,6 @@ int ax25_rt_ioctl(unsigned int cmd, void *arg)
 
 #ifdef CONFIG_PROC_FS
 
-#define AX25_PROC_START	((void *)1)
-
 static void *ax25_rt_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct ax25_route *ax25_rt;
@@ -290,7 +288,7 @@ static void *ax25_rt_seq_start(struct seq_file *seq, loff_t *pos)
  
  	read_lock(&ax25_route_lock);
 	if (*pos == 0)
-		return AX25_PROC_START;
+		return SEQ_START_TOKEN;
 
 	for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
 		if (i == *pos)
@@ -304,7 +302,7 @@ static void *ax25_rt_seq_start(struct seq_file *seq, loff_t *pos)
 static void *ax25_rt_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
-	return (v == AX25_PROC_START) ? ax25_route_list : 
+	return (v == SEQ_START_TOKEN) ? ax25_route_list : 
 		((struct ax25_route *) v)->next;
 }
 
@@ -315,7 +313,7 @@ static void ax25_rt_seq_stop(struct seq_file *seq, void *v)
 
 static int ax25_rt_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == AX25_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "callsign  dev  mode digipeaters\n");
 	else {
 		struct ax25_route *ax25_rt = v;

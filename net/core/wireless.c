@@ -458,7 +458,7 @@ static __inline__ void wireless_seq_printf_stats(struct seq_file *seq,
  */
 static int wireless_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, "Inter-| sta-|   Quality        |   Discarded "
 				"packets               | Missed | WE\n"
 				" face | tus | link level noise |  nwid  "

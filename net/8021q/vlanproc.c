@@ -46,10 +46,6 @@ static void *vlan_seq_next(struct seq_file *seq, void *v, loff_t *pos);
 static void vlan_seq_stop(struct seq_file *seq, void *);
 static int vlandev_seq_show(struct seq_file *seq, void *v);
 
-/* Miscellaneous */
-#define SEQ_START_TOKEN		((void *) 1)
-
-
 /*
  *	Global Data
  */

@@ -86,7 +86,7 @@ static void *r_start(struct seq_file *m, loff_t *pos)
 
 	lock_kernel();
 	if (!l--)
-		return (void *)1;
+		return SEQ_START_TOKEN;
 	for (wandev = wanrouter_router_devlist; l-- && wandev;
 	     wandev = wandev->next)
 		;
@@ -97,7 +97,7 @@ static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct wan_device *wandev = v;
 	(*pos)++;
-	return (v == (void *)1) ? wanrouter_router_devlist : wandev->next;
+	return (v == SEQ_START_TOKEN) ? wanrouter_router_devlist : wandev->next;
 }
 
 static void r_stop(struct seq_file *m, void *v)
@@ -108,7 +108,7 @@ static void r_stop(struct seq_file *m, void *v)
 static int config_show(struct seq_file *m, void *v)
 {
 	struct wan_device *p = v;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(m, "Device name    | port |IRQ|DMA|  mem.addr  |"
 			    "mem.size|option1|option2|option3|option4\n");
 		return 0;
@@ -124,7 +124,7 @@ static int config_show(struct seq_file *m, void *v)
 static int status_show(struct seq_file *m, void *v)
 {
 	struct wan_device *p = v;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(m, "Device name    |protocol|station|interface|"
 			    "clocking|baud rate| MTU |ndev|link state\n");
 		return 0;

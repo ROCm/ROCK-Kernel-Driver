@@ -2162,13 +2162,13 @@ static struct ip_mc_list *igmp_mc_get_idx(struct seq_file *seq, loff_t pos)
 static void *igmp_mc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? igmp_mc_get_idx(seq, *pos) : (void *)1;
+	return *pos ? igmp_mc_get_idx(seq, *pos) : SEQ_START_TOKEN;
 }
 
 static void *igmp_mc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct ip_mc_list *im;
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		im = igmp_mc_get_first(seq);
 	else
 		im = igmp_mc_get_next(seq, v);
@@ -2190,7 +2190,7 @@ static void igmp_mc_seq_stop(struct seq_file *seq, void *v)
 
 static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, 
 			   "Idx\tDevice    : Count Querier\tGroup    Users Timer\tReporter\n");
 	else {
@@ -2337,13 +2337,13 @@ static struct ip_sf_list *igmp_mcf_get_idx(struct seq_file *seq, loff_t pos)
 static void *igmp_mcf_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? igmp_mcf_get_idx(seq, *pos) : (void *)1;
+	return *pos ? igmp_mcf_get_idx(seq, *pos) : SEQ_START_TOKEN;
 }
 
 static void *igmp_mcf_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct ip_sf_list *psf;
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		psf = igmp_mcf_get_first(seq);
 	else
 		psf = igmp_mcf_get_next(seq, v);
@@ -2372,7 +2372,7 @@ static int igmp_mcf_seq_show(struct seq_file *seq, void *v)
 	struct ip_sf_list *psf = (struct ip_sf_list *)v;
 	struct igmp_mcf_iter_state *state = igmp_mcf_seq_private(seq);
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq, 
 			   "%3s %6s "
 			   "%10s %10s %6s %6s\n", "Idx",

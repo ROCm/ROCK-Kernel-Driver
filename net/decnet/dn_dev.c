@@ -1365,7 +1365,7 @@ static void *dn_dev_seq_start(struct seq_file *seq, loff_t *pos)
 			read_unlock(&dev_base_lock);
 		return dev;
 	}
-	return (void*)1;
+	return SEQ_START_TOKEN;
 }
 
 static void *dn_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -1373,7 +1373,7 @@ static void *dn_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct net_device *dev = v;
 	loff_t one = 1;
 
-	if (v == (void*)1) {
+	if (v == SEQ_START_TOKEN) {
 		dev = dn_dev_seq_start(seq, &one);
 	} else {
 		dev = dn_dev_get_next(seq, dev);
@@ -1386,7 +1386,7 @@ static void *dn_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void dn_dev_seq_stop(struct seq_file *seq, void *v)
 {
-	if (v && v != (void*)1)
+	if (v && v != SEQ_START_TOKEN)
 		read_unlock(&dev_base_lock);
 }
 
@@ -1406,7 +1406,7 @@ static char *dn_type2asc(char type)
 
 static int dn_dev_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void*)1)
+	if (v == SEQ_START_TOKEN)
         	seq_puts(seq, "Name     Flags T1   Timer1 T3   Timer3 BlkSize Pri State DevType    Router Peer\n");
 	else {
 		struct net_device *dev = v;

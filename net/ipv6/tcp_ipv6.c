@@ -2027,7 +2027,7 @@ static int tcp6_seq_show(struct seq_file *seq, void *v)
 {
 	struct tcp_iter_state *st;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq,
 			   "  sl  "
 			   "local_address                         "

@@ -39,7 +39,7 @@ static void *ipx_seq_interface_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	spin_lock_bh(&ipx_interfaces_lock);
-	return l ? ipx_get_interface_idx(--l) : (void *)1;
+	return l ? ipx_get_interface_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *ipx_seq_interface_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -47,7 +47,7 @@ static void *ipx_seq_interface_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct ipx_interface *i;
 
 	++*pos;
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		i = ipx_interfaces_head();
 	else
 		i = ipx_interfaces_next(v);
@@ -63,7 +63,7 @@ static int ipx_seq_interface_show(struct seq_file *seq, void *v)
 {
 	struct ipx_interface *i;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Network    Node_Address   Primary  Device     "
 			      "Frame_Type");
 #ifdef IPX_REFCNT_DEBUG
@@ -123,7 +123,7 @@ static void *ipx_seq_route_start(struct seq_file *seq, loff_t *pos)
 {
 	loff_t l = *pos;
 	read_lock_bh(&ipx_routes_lock);
-	return l ? ipx_get_route_idx(--l) : (void *)1;
+	return l ? ipx_get_route_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *ipx_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -131,7 +131,7 @@ static void *ipx_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct ipx_route *r;
 
 	++*pos;
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		r = ipx_routes_head();
 	else
 		r = ipx_routes_next(v);
@@ -147,7 +147,7 @@ static int ipx_seq_route_show(struct seq_file *seq, void *v)
 {
 	struct ipx_route *rt;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Network    Router_Net   Router_Node\n");
 		goto out;
 	}
@@ -195,7 +195,7 @@ static void *ipx_seq_socket_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	spin_lock_bh(&ipx_interfaces_lock);
-	return l ? ipx_get_socket_idx(--l) : (void *)1;
+	return l ? ipx_get_socket_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -205,7 +205,7 @@ static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct ipx_opt *ipxs;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		sk = NULL;
 		i = ipx_interfaces_head();
 		if (!i)
@@ -245,7 +245,7 @@ static int ipx_seq_socket_show(struct seq_file *seq, void *v)
 	struct sock *s;
 	struct ipx_opt *ipxs;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 #ifdef CONFIG_IPX_INTERN
 		seq_puts(seq, "Local_Address               "
 			      "Remote_Address              Tx_Queue  "

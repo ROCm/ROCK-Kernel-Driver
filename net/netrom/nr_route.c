@@ -841,7 +841,6 @@ int nr_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 }
 
 #ifdef CONFIG_PROC_FS
-#define NETROM_PROC_START	((void *) 1)
 
 static void *nr_node_start(struct seq_file *seq, loff_t *pos)
 {
@@ -851,7 +850,7 @@ static void *nr_node_start(struct seq_file *seq, loff_t *pos)
  
  	spin_lock_bh(&nr_node_list_lock);
 	if (*pos == 0)
-		return NETROM_PROC_START;
+		return SEQ_START_TOKEN;
 
 	nr_node_for_each(nr_node, node, &nr_node_list) {
 		if (i == *pos)
@@ -867,7 +866,7 @@ static void *nr_node_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct hlist_node *node;
 	++*pos;
 	
-	node = (v == NETROM_PROC_START)  
+	node = (v == SEQ_START_TOKEN)  
 		? nr_node_list.first
 		: ((struct nr_node *)v)->node_node.next;
 
@@ -883,7 +882,7 @@ static int nr_node_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	if (v == NETROM_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq,
 			 "callsign  mnemonic w n qual obs neigh qual obs neigh qual obs neigh\n");
 	else {
@@ -936,7 +935,7 @@ static void *nr_neigh_start(struct seq_file *seq, loff_t *pos)
 
 	spin_lock_bh(&nr_neigh_list_lock);
 	if (*pos == 0)
-		return NETROM_PROC_START;
+		return SEQ_START_TOKEN;
 
 	nr_neigh_for_each(nr_neigh, node, &nr_neigh_list) {
 		if (i == *pos)
@@ -950,7 +949,7 @@ static void *nr_neigh_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct hlist_node *node;
 	++*pos;
 	
-	node = (v == NETROM_PROC_START)  
+	node = (v == SEQ_START_TOKEN)  
 		? nr_neigh_list.first
 		: ((struct nr_neigh *)v)->neigh_node.next;
 
@@ -966,7 +965,7 @@ static int nr_neigh_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	if (v == NETROM_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "addr  callsign  dev  qual lock count failed digipeaters\n");
 	else {
 		struct nr_neigh *nr_neigh = v;

@@ -144,8 +144,6 @@ int ax25_uid_ioctl(int cmd, struct sockaddr_ax25 *sax)
 
 #ifdef CONFIG_PROC_FS
 
-#define AX25_PROC_START	((void *)1)
-
 static void *ax25_uid_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct ax25_uid_assoc *pt;
@@ -153,7 +151,7 @@ static void *ax25_uid_seq_start(struct seq_file *seq, loff_t *pos)
 
 	read_lock(&ax25_uid_lock);
 	if (*pos == 0)
-		return AX25_PROC_START;
+		return SEQ_START_TOKEN;
 
 	for (pt = ax25_uid_list; pt != NULL; pt = pt->next) {
 		if (i == *pos)
@@ -166,7 +164,7 @@ static void *ax25_uid_seq_start(struct seq_file *seq, loff_t *pos)
 static void *ax25_uid_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
-	return (v == AX25_PROC_START) ? ax25_uid_list : 
+	return (v == SEQ_START_TOKEN) ? ax25_uid_list : 
 		((struct ax25_uid_assoc *) v)->next;
 }
 
@@ -177,7 +175,7 @@ static void ax25_uid_seq_stop(struct seq_file *seq, void *v)
 
 static int ax25_uid_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == AX25_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, "Policy: %d\n", ax25_uid_policy);
 	else {
 		struct ax25_uid_assoc *pt = v;

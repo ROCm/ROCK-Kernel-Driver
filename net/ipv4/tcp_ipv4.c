@@ -2351,7 +2351,7 @@ static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? tcp_get_idx(seq, *pos - 1) : (void *)1;
+	return *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -2359,7 +2359,7 @@ static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	void *rc = NULL;
 	struct tcp_iter_state* st;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		rc = tcp_get_idx(seq, 0);
 		goto out;
 	}
@@ -2397,7 +2397,7 @@ static void tcp_seq_stop(struct seq_file *seq, void *v)
 			read_unlock_bh(&tp->syn_wait_lock);
 		}
 	case TCP_SEQ_STATE_LISTENING:
-		if (v != (void *)1)
+		if (v != SEQ_START_TOKEN)
 			tcp_listen_unlock();
 		break;
 	case TCP_SEQ_STATE_TIME_WAIT:
@@ -2559,7 +2559,7 @@ static int tcp4_seq_show(struct seq_file *seq, void *v)
 	struct tcp_iter_state* st;
 	char tmpbuf[TMPSZ + 1];
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq, "%-*s\n", TMPSZ - 1,
 			   "  sl  local_address rem_address   st tx_queue "
 			   "rx_queue tr tm->when retrnsmt   uid  timeout "
