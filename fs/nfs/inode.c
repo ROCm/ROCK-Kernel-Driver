@@ -144,7 +144,7 @@ nfs_clear_inode(struct inode *inode)
 void
 nfs_put_super(struct super_block *sb)
 {
-	struct nfs_server *server = &sb->u.nfs_sb.s_server;
+	struct nfs_server *server = NFS_SB(sb);
 	struct rpc_clnt	*rpc;
 
 	/*
@@ -169,7 +169,7 @@ nfs_put_super(struct super_block *sb)
 void
 nfs_umount_begin(struct super_block *sb)
 {
-	struct nfs_server *server = &sb->u.nfs_sb.s_server;
+	struct nfs_server *server = NFS_SB(sb);
 	struct rpc_clnt	*rpc;
 
 	/* -EIO all pending I/O */
@@ -225,7 +225,7 @@ nfs_block_size(unsigned long bsize, unsigned char *nrbitsp)
 static struct inode *
 nfs_get_root(struct super_block *sb, struct nfs_fh *rootfh)
 {
-	struct nfs_server	*server = &sb->u.nfs_sb.s_server;
+	struct nfs_server	*server = NFS_SB(sb);
 	struct nfs_fattr	fattr;
 	struct inode		*inode;
 	int			error;
@@ -262,7 +262,7 @@ int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	/* We probably want something more informative here */
 	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", major(sb->s_dev), minor(sb->s_dev));
 
-	memset(&sb->u.nfs_sb, 0, sizeof(sb->u.nfs_sb));
+	memset(NFS_SB(sb), 0, sizeof(struct nfs_sb_info));
 	if (!data)
 		goto out_miss_args;
 
@@ -291,7 +291,7 @@ int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_op         = &nfs_sops;
 	sb->s_blocksize_bits = 0;
 	sb->s_blocksize  = nfs_block_size(data->bsize, &sb->s_blocksize_bits);
-	server           = &sb->u.nfs_sb.s_server;
+	server           = NFS_SB(sb);
 	server->rsize    = nfs_block_size(data->rsize, NULL);
 	server->wsize    = nfs_block_size(data->wsize, NULL);
 	server->flags    = data->flags & NFS_MOUNT_FLAGMASK;
@@ -513,7 +513,7 @@ out_fail:
 static int
 nfs_statfs(struct super_block *sb, struct statfs *buf)
 {
-	struct nfs_server *server = &sb->u.nfs_sb.s_server;
+	struct nfs_server *server = NFS_SB(sb);
 	unsigned char blockbits;
 	unsigned long blockres;
 	struct nfs_fsinfo res;
@@ -561,7 +561,7 @@ static int nfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 		{ 0, NULL, NULL }
 	};
 	struct proc_nfs_info *nfs_infop;
-	struct nfs_server *nfss = &mnt->mnt_sb->u.nfs_sb.s_server;
+	struct nfs_server *nfss = NFS_SB(mnt->mnt_sb);
 
 	seq_printf(m, ",v%d", nfss->rpc_ops->version);
 	seq_printf(m, ",rsize=%d", nfss->rsize);

@@ -174,9 +174,10 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
 	return list_entry(inode, struct nfs_inode, vfs_inode);
 }
+#define NFS_SB(s)		(&s->u.nfs_sb.s_server)
 
 #define NFS_FH(inode)			(&NFS_I(inode)->fh)
-#define NFS_SERVER(inode)		(&(inode)->i_sb->u.nfs_sb.s_server)
+#define NFS_SERVER(inode)		(NFS_SB(inode->i_sb))
 #define NFS_CLIENT(inode)		(NFS_SERVER(inode)->client)
 #define NFS_PROTO(inode)		(NFS_SERVER(inode)->rpc_ops)
 #define NFS_REQUESTLIST(inode)		(NFS_SERVER(inode)->rw_requests)
