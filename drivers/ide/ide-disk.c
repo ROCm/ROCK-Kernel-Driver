@@ -1790,6 +1790,12 @@ static int idedisk_ioctl(struct inode *inode, struct file *file,
 static int idedisk_media_changed(struct gendisk *disk)
 {
 	ide_drive_t *drive = disk->private_data;
+
+	/* do not scan partitions twice if this is a removable device */
+	if (drive->attach) {
+		drive->attach = 0;
+		return 0;
+	}
 	/* if removable, always assume it was changed */
 	return drive->removable;
 }
@@ -1848,6 +1854,7 @@ static int idedisk_attach(ide_drive_t *drive)
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	set_capacity(g, current_capacity(drive));
 	g->fops = &idedisk_ops;
+	drive->attach = 1;
 	add_disk(g);
 	return 0;
 failed:

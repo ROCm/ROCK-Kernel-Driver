@@ -711,6 +711,7 @@ typedef struct ide_drive_s {
 	unsigned id_read	: 1;	/* 1=id read from disk 0 = synthetic */
 	unsigned noprobe 	: 1;	/* from:  hdx=noprobe */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
+	unsigned attach		: 1;	/* needed for removable devices */
 	unsigned is_flash	: 1;	/* 1 if probed as flash */
 	unsigned forced_geom	: 1;	/* 1 if hdx=c,h,s was given at boot */
 	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
