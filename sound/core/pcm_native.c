@@ -1848,7 +1848,10 @@ int snd_pcm_release(struct inode *inode, struct file *file)
 	snd_assert(substream != NULL, return -ENXIO);
 	snd_assert(!atomic_read(&substream->runtime->mmap_count), );
 	pcm = substream->pcm;
-	snd_pcm_capture_drop(substream);
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		snd_pcm_playback_drop(substream);
+	else
+		snd_pcm_capture_drop(substream);
 	fasync_helper(-1, file, 0, &substream->runtime->fasync);
 	down(&pcm->open_mutex);
 	snd_pcm_release_file(pcm_file);
@@ -2110,7 +2113,7 @@ static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 	{
 		snd_xfern_t xfern, *_xfern = arg;
 		snd_pcm_runtime_t *runtime = substream->runtime;
-		void *bufs[128];
+		void *bufs;
 		snd_pcm_sframes_t result;
 		if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
 			return -EBADFD;
@@ -2120,9 +2123,15 @@ static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 			return -EFAULT;
 		if (copy_from_user(&xfern, _xfern, sizeof(xfern)))
 			return -EFAULT;
-		if (copy_from_user(bufs, xfern.bufs, sizeof(*bufs) * runtime->channels))
+		bufs = kmalloc(sizeof(void *) * runtime->channels, GFP_KERNEL);
+		if (bufs == NULL)
+			return -ENOMEM;
+		if (copy_from_user(bufs, xfern.bufs, sizeof(void *) * runtime->channels)) {
+			kfree(bufs);
 			return -EFAULT;
+		}
 		result = snd_pcm_lib_writev(substream, bufs, xfern.frames);
+		kfree(bufs);
 		__put_user(result, &_xfern->result);
 		return result < 0 ? result : 0;
 	}
@@ -2181,7 +2190,7 @@ static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
 	{
 		snd_xfern_t xfern, *_xfern = arg;
 		snd_pcm_runtime_t *runtime = substream->runtime;
-		void *bufs[128];
+		void *bufs;
 		snd_pcm_sframes_t result;
 		if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
 			return -EBADFD;
@@ -2191,9 +2200,15 @@ static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
 			return -EFAULT;
 		if (copy_from_user(&xfern, _xfern, sizeof(xfern)))
 			return -EFAULT;
-		if (copy_from_user(bufs, xfern.bufs, sizeof(*bufs) * runtime->channels))
+		bufs = kmalloc(sizeof(void *) * runtime->channels, GFP_KERNEL);
+		if (bufs == NULL)
+			return -ENOMEM;
+		if (copy_from_user(bufs, xfern.bufs, sizeof(void *) * runtime->channels)) {
+			kfree(bufs);
 			return -EFAULT;
+		}
 		result = snd_pcm_lib_readv(substream, bufs, xfern.frames);
+		kfree(bufs);
 		__put_user(result, &_xfern->result);
 		return result < 0 ? result : 0;
 	}
@@ -2343,7 +2358,7 @@ static ssize_t snd_pcm_readv(struct file *file, const struct iovec *_vector,
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 	unsigned long i;
-	void *bufs[128];
+	void *bufs;
 	snd_pcm_uframes_t frames;
 
 	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
@@ -2352,16 +2367,20 @@ static ssize_t snd_pcm_readv(struct file *file, const struct iovec *_vector,
 	runtime = substream->runtime;
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
 		return -EBADFD;
-	if (count > 128 || count != runtime->channels)
+	if (count > 1024 || count != runtime->channels)
 		return -EINVAL;
 	if (!frame_aligned(runtime, _vector->iov_len))
 		return -EINVAL;
 	frames = bytes_to_samples(runtime, _vector->iov_len);
+	bufs = kmalloc(sizeof(void *) * count, GFP_KERNEL);
+	if (bufs == NULL)
+		return -ENOMEM;
 	for (i = 0; i < count; ++i)
 		bufs[i] = _vector[i].iov_base;
 	result = snd_pcm_lib_readv(substream, bufs, frames);
 	if (result > 0)
 		result = frames_to_bytes(runtime, result);
+	kfree(bufs);
 	return result;
 }
 
@@ -2373,10 +2392,12 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 	unsigned long i;
-	void *bufs[128];
+	void *bufs;
 	snd_pcm_uframes_t frames;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
 	up(&file->f_dentry->d_inode->i_sem);
+#endif
 	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
@@ -2391,13 +2412,19 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 		goto end;
 	}
 	frames = bytes_to_samples(runtime, _vector->iov_len);
+	bufs = kcalloc(sizeof(void *) * count, GFP_KERNEL);
+	if (bufs == NULL)
+		return -ENOMEM;
 	for (i = 0; i < count; ++i)
 		bufs[i] = _vector[i].iov_base;
 	result = snd_pcm_lib_writev(substream, bufs, frames);
 	if (result > 0)
 		result = frames_to_bytes(runtime, result);
+	kfree(bufs);
  end:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
 	down(&file->f_dentry->d_inode->i_sem);
+#endif
 	return result;
 }
 #endif

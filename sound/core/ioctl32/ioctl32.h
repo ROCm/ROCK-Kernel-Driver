@@ -79,6 +79,44 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 	return 0;\
 }
 
+#define DEFINE_ALSA_IOCTL_BIG(type) \
+static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
+{\
+	struct sndrv_##type##32 *data32;\
+	struct sndrv_##type *data;\
+	mm_segment_t oldseg;\
+	int err;\
+	data32 = kcalloc(sizeof(*data32), GFP_KERNEL); \
+	data = kcalloc(sizeof(*data), GFP_KERNEL); \
+	if (data32 == NULL || data == NULL) { \
+		err = -ENOMEM; \
+		goto __end; \
+	}
+	if (copy_from_user(data32, (void*)arg, sizeof(*data32))) { \
+		err = -EFAULT; \
+		goto __end; \
+	}
+	memset(data, 0, sizeof(*data));\
+	convert_from_32(type, data, data32);\
+	oldseg = get_fs();\
+	set_fs(KERNEL_DS);\
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);\
+	if (err < 0) \
+		goto __end;\
+	err = 0;\
+	if (native_ctl & (_IOC_READ << _IOC_DIRSHIFT)) {\
+		convert_to_32(type, data32, data);\
+		if (copy_to_user((void*)arg, data32, sizeof(*data32)))\
+			err = -EFAULT;\
+	}\
+      __end:\
+      	if (data)\
+      		kfree(data);\
+      	if (data32)\
+      		kfree(data32);\
+	return err;\
+}
+
 #define DEFINE_ALSA_IOCTL_ENTRY(name,type,native_ctl) \
 static int snd_ioctl32_##name(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file) {\
 	return _snd_ioctl32_##type(fd, cmd, arg, file, native_ctl);\

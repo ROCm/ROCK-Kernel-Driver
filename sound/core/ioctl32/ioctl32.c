@@ -264,46 +264,56 @@ static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
 
 static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
-	// too big?
-	struct sndrv_ctl_elem_value data;
-	struct sndrv_ctl_elem_value32 data32;
+	struct sndrv_ctl_elem_value *data;
+	struct sndrv_ctl_elem_value32 *data32;
 	int err, i;
 	int type;
 	mm_segment_t oldseg;
 
 	/* FIXME: check the sane ioctl.. */
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
-		return -EFAULT;
-	memset(&data, 0, sizeof(data));
-	data.id = data32.id;
-	data.indirect = data32.indirect;
-	if (data.indirect) /* FIXME: this is not correct for long arrays */
-		data.value.integer.value_ptr = (void*)TO_PTR(data32.value.integer.value_ptr);
-	type = get_ctl_type(file, &data.id);
-	if (type < 0)
-		return type;
+	data = kmalloc(sizeof(*data), GFP_KERNEL);
+	data32 = kmalloc(sizeof(*data32), GFP_KERNEL);
+	if (data == NULL || data32 == NULL) {
+		err = -ENOMEM;
+		goto __end;
+	}
+
+	if (copy_from_user(data32, (void*)arg, sizeof(*data32))) {
+		err = -EFAULT;
+		goto __end;
+	}
+	memset(data, 0, sizeof(*data));
+	data->id = data32->id;
+	data->indirect = data32->indirect;
+	if (data->indirect) /* FIXME: this is not correct for long arrays */
+		data.value.integer.value_ptr = (void*)TO_PTR(data32->value.integer.value_ptr);
+	type = get_ctl_type(file, &data->id);
+	if (type < 0) {
+		err = type;
+		goto __end;
+	}
 	if (! data.indirect) {
 		switch (type) {
 		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
 		case SNDRV_CTL_ELEM_TYPE_INTEGER:
 			for (i = 0; i < 128; i++)
-				data.value.integer.value[i] = data32.value.integer.value[i];
+				data->value.integer.value[i] = data32->value.integer.value[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_INTEGER64:
 			for (i = 0; i < 64; i++)
-				data.value.integer64.value[i] = data32.value.integer64.value[i];
+				data->value.integer64.value[i] = data32->value.integer64.value[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
 			for (i = 0; i < 128; i++)
-				data.value.enumerated.item[i] = data32.value.enumerated.item[i];
+				data->value.enumerated.item[i] = data32->value.enumerated.item[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_BYTES:
-			memcpy(data.value.bytes.data, data32.value.bytes.data,
-			       sizeof(data.value.bytes.data));
+			memcpy(data->value.bytes.data, data32->value.bytes.data,
+			       sizeof(data->value.bytes.data));
 			break;
 		case SNDRV_CTL_ELEM_TYPE_IEC958:
-			data.value.iec958 = data32.value.iec958;
+			data->value.iec958 = data32->value.iec958;
 			break;
 		default:
 			printk("unknown type %d\n", type);
@@ -313,40 +323,46 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 
 	oldseg = get_fs();
 	set_fs(KERNEL_DS);
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);
 	set_fs(oldseg);
 	if (err < 0)
-		return err;
+		goto __end;
 	/* restore info to 32bit */
 	if (! data.indirect) {
 		switch (type) {
 		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
 		case SNDRV_CTL_ELEM_TYPE_INTEGER:
 			for (i = 0; i < 128; i++)
-				data32.value.integer.value[i] = data.value.integer.value[i];
+				data32->value.integer.value[i] = data->value.integer.value[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_INTEGER64:
 			for (i = 0; i < 64; i++)
-				data32.value.integer64.value[i] = data.value.integer64.value[i];
+				data32->value.integer64.value[i] = data->value.integer64.value[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
 			for (i = 0; i < 128; i++)
-				data32.value.enumerated.item[i] = data.value.enumerated.item[i];
+				data32->value.enumerated.item[i] = data->value.enumerated.item[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_BYTES:
-			memcpy(data32.value.bytes.data, data.value.bytes.data,
-			       sizeof(data.value.bytes.data));
+			memcpy(data32->value.bytes.data, data->value.bytes.data,
+			       sizeof(data->value.bytes.data));
 			break;
 		case SNDRV_CTL_ELEM_TYPE_IEC958:
-			data32.value.iec958 = data.value.iec958;
+			data32->value.iec958 = data->value.iec958;
 			break;
 		default:
 			break;
 		}
 	}
-	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
-		return -EFAULT;
-	return 0;
+	err = 0;
+	if (copy_to_user((void*)arg, data32, sizeof(*data32)))
+		err = -EFAULT;
+      __end:
+      	if (data32)
+      		kfree(data32);
+	if (data)
+		kfree(data);
+	return err;
 }
 
 DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_read, ctl_elem_value, SNDRV_CTL_IOCTL_ELEM_READ);

@@ -172,7 +172,7 @@ struct sndrv_pcm_status32 {
 
 DEFINE_ALSA_IOCTL(pcm_uframes_str);
 DEFINE_ALSA_IOCTL(pcm_sframes_str);
-DEFINE_ALSA_IOCTL(pcm_hw_params);
+DEFINE_ALSA_IOCTL_BIG(pcm_hw_params);
 DEFINE_ALSA_IOCTL(pcm_sw_params);
 DEFINE_ALSA_IOCTL(pcm_channel_info);
 DEFINE_ALSA_IOCTL(pcm_status);
@@ -230,7 +230,7 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 	snd_pcm_file_t *pcm_file;
 	snd_pcm_substream_t *substream;
 	struct sndrv_xfern32 data32, *srcptr = (struct sndrv_xfern32*)arg;
-	void *bufs[128];
+	void *bufs = NULL;
 	int err = 0, ch, i;
 	u32 *bufptr;
 	mm_segment_t oldseg;
@@ -260,6 +260,9 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 		return -EFAULT;
 	__get_user(data32.bufs, &srcptr->bufs);
 	bufptr = (u32*)TO_PTR(data32.bufs);
+	bufs = kmalloc(sizeof(void *) * 128, GFP_KERNEL)
+	if (bufs == NULL)
+		return -ENOMEM;
 	for (i = 0; i < ch; i++) {
 		u32 ptr;
 		if (get_user(ptr, bufptr))
@@ -278,10 +281,11 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 		break;
 	}
 	set_fs(oldseg);
-	if (err < 0)
-		return err;
-	if (put_user(err, &srcptr->result))
-		return -EFAULT;
+	if (err >= 0) {
+		if (put_user(err, &srcptr->result))
+			err = -EFAULT;
+	}
+	kfree(bufs);
 	return 0;
 }
 
@@ -343,24 +347,38 @@ static void snd_pcm_hw_convert_to_old_params(struct sndrv_pcm_hw_params_old32 *o
 
 static int _snd_ioctl32_pcm_hw_params_old(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
-	struct sndrv_pcm_hw_params_old32 data32;
-	struct sndrv_pcm_hw_params data;
+	struct sndrv_pcm_hw_params_old32 *data32;
+	struct sndrv_pcm_hw_params *data;
 	mm_segment_t oldseg;
 	int err;
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
-		return -EFAULT;
-	snd_pcm_hw_convert_from_old_params(&data, &data32);
+	data32 = kcalloc(sizeof(*data32), GFP_KERNEL);
+	data = kcalloc(sizeof(*data), GFP_KERNEL);
+	if (data32 == NULL || data == NULL) {
+		err = -ENOMEM;
+		goto __end;
+	}
+	if (copy_from_user(data32, (void*)arg, sizeof(*data32))) {
+		err = -EFAULT;
+		goto __end;
+	}
+	snd_pcm_hw_convert_from_old_params(data, data32);
 	oldseg = get_fs();
 	set_fs(KERNEL_DS);
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);
 	set_fs(oldseg);
 	if (err < 0)
-		return err;
-	snd_pcm_hw_convert_to_old_params(&data32, &data);
-	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
-		return  -EFAULT;
-	return 0;
+		goto __end;
+	snd_pcm_hw_convert_to_old_params(data32, data);
+	err = 0;
+	if (copy_to_user((void*)arg, data32, sizeof(*data32)))
+		err = -EFAULT;
+      __end:
+      	if (data)
+      		kfree(data);
+      	if (data32)
+      		kfree(data32);
+	return err;
 }
 
 
