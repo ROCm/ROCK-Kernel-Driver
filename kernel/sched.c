@@ -337,8 +337,15 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 		 * boost gets as well.
 		 */
 		p->sleep_avg += sleep_time;
-		if (p->sleep_avg > MAX_SLEEP_AVG)
+		if (p->sleep_avg > MAX_SLEEP_AVG) {
+			int ticks = p->sleep_avg - MAX_SLEEP_AVG + current->sleep_avg;
 			p->sleep_avg = MAX_SLEEP_AVG;
+			if (ticks > MAX_SLEEP_AVG)
+				ticks = MAX_SLEEP_AVG;
+			if (!in_interrupt())
+				current->sleep_avg = ticks;
+		}
+			
 		p->prio = effective_prio(p);
 	}
 	enqueue_task(p, array);
