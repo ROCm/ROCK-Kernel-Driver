@@ -2263,7 +2263,7 @@ static void uhci_call_completion(struct urb *urb)
 	killed = (urb->status == -ENOENT || urb->status == -ECONNABORTED ||
 			urb->status == -ECONNRESET);
 	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
-			urb->interval && !killed);
+			urb->interval);
 
 	nurb = urb->next;
 	if (nurb && !killed) {
@@ -2289,7 +2289,7 @@ static void uhci_call_completion(struct urb *urb)
 	}
 
 	status = urbp->status;
-	if (!resubmit_interrupt)
+	if (!resubmit_interrupt || killed)
 		/* We don't need urb_priv anymore */
 		uhci_destroy_urb_priv(urb);
 
@@ -2306,10 +2306,17 @@ static void uhci_call_completion(struct urb *urb)
 			sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
 
 	urb->dev = NULL;
-	if (urb->complete)
+	if (urb->complete) {
 		urb->complete(urb);
 
-	if (resubmit_interrupt) {
+		/* Recheck the status. The completion handler may have */
+		/*  unlinked the resubmitting interrupt URB */
+		killed = (urb->status == -ENOENT ||
+			  urb->status == -ECONNABORTED ||
+			  urb->status == -ECONNRESET);
+	}
+
+	if (resubmit_interrupt && !killed) {
 		urb->dev = dev;
 		uhci_reset_interrupt(urb);
 	} else {
