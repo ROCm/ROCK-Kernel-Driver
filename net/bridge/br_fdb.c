@@ -14,6 +14,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/if_bridge.h>
 #include <linux/times.h>
