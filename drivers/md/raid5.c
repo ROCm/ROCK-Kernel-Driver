@@ -1452,7 +1452,9 @@ static int run (mddev_t *mddev)
 		return -EIO;
 	}
 
-	mddev->private = kmalloc (sizeof (raid5_conf_t), GFP_KERNEL);
+	mddev->private = kmalloc (sizeof (raid5_conf_t)
+				  + mddev->raid_disks * sizeof(struct disk_info),
+				  GFP_KERNEL);
 	if ((conf = mddev->private) == NULL)
 		goto abort;
 	memset (conf, 0, sizeof (*conf));
