@@ -23,6 +23,7 @@
 #ifndef __SOUND_MIXART_H
 #define __SOUND_MIXART_H
 
+#include <linux/interrupt.h>
 #include <sound/pcm.h>
 
 #define MIXART_DRIVER_VERSION	0x000100	/* 0.1.0 */
