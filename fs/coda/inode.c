@@ -82,6 +82,12 @@ void coda_destroy_inodecache(void)
 		printk(KERN_INFO "coda_inode_cache: not all structures were freed\n");
 }
 
+static int coda_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 /* exported operations */
 struct super_operations coda_super_operations =
 {
@@ -90,6 +96,7 @@ struct super_operations coda_super_operations =
 	.clear_inode	= coda_clear_inode,
 	.put_super	= coda_put_super,
 	.statfs		= coda_statfs,
+	.remount_fs	= coda_remount,
 };
 
 static int get_device_index(struct coda_mount_data *data)

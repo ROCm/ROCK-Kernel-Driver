@@ -119,12 +119,20 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "iso_inode_cache: not all structures were freed\n");
 }
 
+static int isofs_remount(struct super_block *sb, int *flags, char *data)
+{
+	/* we probably want a lot more here */
+	*flags |= MS_RDONLY;
+	return 0;
+}
+
 static struct super_operations isofs_sops = {
 	.alloc_inode	= isofs_alloc_inode,
 	.destroy_inode	= isofs_destroy_inode,
 	.read_inode	= isofs_read_inode,
 	.put_super	= isofs_put_super,
 	.statfs		= isofs_statfs,
+	.remount_fs	= isofs_remount,
 };
 
 /* the export_operations structure for describing
