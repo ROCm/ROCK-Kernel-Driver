@@ -3550,8 +3550,8 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
       CCB->DataLength = Count * sizeof(BusLogic_ScatterGatherSegment_T);
       if (BusLogic_MultiMasterHostAdapterP(HostAdapter))
 	CCB->DataPointer = (unsigned int)CCB->DMA_Handle +
-			    ((unsigned int)&CCB->ScatterGatherList - 
-			     (unsigned int)CCB);
+			    ((unsigned long)&CCB->ScatterGatherList - 
+			     (unsigned long)CCB);
       else CCB->DataPointer = Virtual_to_32Bit_Virtual(CCB->ScatterGatherList);
       for (Segment = 0; Segment < Count; Segment++)
 	{
