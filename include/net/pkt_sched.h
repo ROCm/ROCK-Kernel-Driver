@@ -78,11 +78,11 @@ struct Qdisc
 #define TCQ_F_THROTTLED	2
 #define TCQ_F_INGRES	4
 	struct Qdisc_ops	*ops;
-	struct Qdisc		*next;
 	u32			handle;
 	atomic_t		refcnt;
 	struct sk_buff_head	q;
 	struct net_device	*dev;
+	struct list_head	list;
 
 	struct tc_stats		stats;
 	spinlock_t		*stats_lock;

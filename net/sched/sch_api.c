@@ -34,6 +34,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/kmod.h>
+#include <linux/list.h>
 
 #include <net/sock.h>
 #include <net/pkt_sched.h>
@@ -195,7 +196,7 @@ struct Qdisc *qdisc_lookup(struct net_device *dev, u32 handle)
 {
 	struct Qdisc *q;
 
-	for (q = dev->qdisc_list; q; q = q->next) {
+	list_for_each_entry(q, &dev->qdisc_list, list) {
 		if (q->handle == handle)
 			return q;
 	}
@@ -421,6 +422,7 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 
 	memset(sch, 0, size);
 
+	INIT_LIST_HEAD(&sch->list);
 	skb_queue_head_init(&sch->q);
 
 	if (handle == TC_H_INGRESS)
@@ -454,8 +456,7 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	smp_wmb();
 	if (!ops->init || (err = ops->init(sch, tca[TCA_OPTIONS-1])) == 0) {
 		qdisc_lock_tree(dev);
-		sch->next = dev->qdisc_list;
-		dev->qdisc_list = sch;
+		list_add_tail(&sch->list, &dev->qdisc_list);
 		qdisc_unlock_tree(dev);
 
 #ifdef CONFIG_NET_ESTIMATOR
@@ -814,9 +815,9 @@ static int tc_dump_qdisc(struct sk_buff *skb, struct netlink_callback *cb)
 		if (idx > s_idx)
 			s_q_idx = 0;
 		read_lock_bh(&qdisc_tree_lock);
-		for (q = dev->qdisc_list, q_idx = 0; q;
-		     q = q->next, q_idx++) {
-			if (q_idx < s_q_idx)
+		q_idx = 0;
+		list_for_each_entry(q, &dev->qdisc_list, list) {
+			if (q_idx++ < s_q_idx)
 				continue;
 			if (tc_fill_qdisc(skb, q, 0, NETLINK_CB(cb->skb).pid,
 					  cb->nlh->nlmsg_seq, NLM_F_MULTI, RTM_NEWQDISC) <= 0) {
@@ -831,7 +832,7 @@ done:
 	read_unlock(&dev_base_lock);
 
 	cb->args[0] = idx;
-	cb->args[1] = q_idx;
+	cb->args[1] = q_idx - 1;
 
 	return skb->len;
 }
@@ -1033,13 +1034,16 @@ static int tc_dump_tclass(struct sk_buff *skb, struct netlink_callback *cb)
 		return 0;
 
 	s_t = cb->args[0];
+	t = 0;
 
 	read_lock_bh(&qdisc_tree_lock);
-	for (q=dev->qdisc_list, t=0; q; q = q->next, t++) {
-		if (t < s_t) continue;
-		if (!q->ops->cl_ops) continue;
-		if (tcm->tcm_parent && TC_H_MAJ(tcm->tcm_parent) != q->handle)
+	list_for_each_entry(q, &dev->qdisc_list, list) {
+		if (t < s_t || !q->ops->cl_ops ||
+		    (tcm->tcm_parent &&
+		     TC_H_MAJ(tcm->tcm_parent) != q->handle)) {
+			t++;
 			continue;
+		}
 		if (t > s_t)
 			memset(&cb->args[1], 0, sizeof(cb->args)-sizeof(cb->args[0]));
 		arg.w.fn = qdisc_class_dump;
@@ -1052,6 +1056,7 @@ static int tc_dump_tclass(struct sk_buff *skb, struct netlink_callback *cb)
 		cb->args[1] = arg.w.count;
 		if (arg.w.stop)
 			break;
+		t++;
 	}
 	read_unlock_bh(&qdisc_tree_lock);
 
