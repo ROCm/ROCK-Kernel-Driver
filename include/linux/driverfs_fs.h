@@ -26,6 +26,8 @@
 #ifndef _DRIVER_FS_H_
 #define _DRIVER_FS_H_
 
+#include <linux/sysfs.h>
+
 struct driver_dir_entry;
 struct attribute;
 
@@ -41,11 +43,6 @@ struct driver_dir_entry {
 	struct dentry		* dentry;
 	mode_t			mode;
 	struct driverfs_ops	* ops;
-};
-
-struct attribute {
-	char			* name;
-	mode_t			mode;
 };
 
 extern int

@@ -88,8 +88,8 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 static DEVICE_ATTR(power,S_IWUSR | S_IRUGO,
 		   device_read_power,device_write_power);
 
-struct device_attribute * device_default_files[] = {
-	&dev_attr_name,
-	&dev_attr_power,
+struct attribute * dev_default_attrs[] = {
+	&dev_attr_name.attr,
+	&dev_attr_power.attr,
 	NULL,
 };

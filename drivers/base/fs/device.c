@@ -21,97 +21,6 @@ static struct driver_dir_entry device_root_dir = {
 	.mode	= (S_IRWXU | S_IRUGO | S_IXUGO),
 };
 
-extern struct device_attribute * device_default_files[];
-
-#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
-
-#define to_device(d) container_of(d, struct device, dir)
-
-
-/* driverfs ops for device attribute files */
-
-static int
-dev_attr_open(struct driver_dir_entry * dir)
-{
-	struct device * dev = to_device(dir);
-	get_device(dev);
-	return 0;
-}
-
-static int
-dev_attr_close(struct driver_dir_entry * dir)
-{
-	struct device * dev = to_device(dir);
-	put_device(dev);
-	return 0;
-}
-
-static ssize_t
-dev_attr_show(struct driver_dir_entry * dir, struct attribute * attr,
-	      char * buf, size_t count, loff_t off)
-{
-	struct device_attribute * dev_attr = to_dev_attr(attr);
-	struct device * dev = to_device(dir);
-	ssize_t ret = 0;
-
-	if (dev_attr->show)
-		ret = dev_attr->show(dev,buf,count,off);
-	return ret;
-}
-
-static ssize_t
-dev_attr_store(struct driver_dir_entry * dir, struct attribute * attr,
-	       const char * buf, size_t count, loff_t off)
-{
-	struct device_attribute * dev_attr = to_dev_attr(attr);
-	struct device * dev = to_device(dir);
-	ssize_t ret = 0;
-
-	if (dev_attr->store)
-		ret = dev_attr->store(dev,buf,count,off);
-	return ret;
-}
-
-static struct driverfs_ops dev_attr_ops = {
-	.open	= dev_attr_open,
-	.close	= dev_attr_close,
-	.show	= dev_attr_show,
-	.store	= dev_attr_store,
-};
-
-/**
- * device_create_file - create a driverfs file for a device
- * @dev:	device requesting file
- * @entry:	entry describing file
- *
- * Allocate space for file entry, copy descriptor, and create.
- */
-int device_create_file(struct device * dev, struct device_attribute * entry)
-{
-	int error = -EINVAL;
-
-	if (get_device(dev)) {
-		error = driverfs_create_file(&entry->attr,&dev->dir);
-		put_device(dev);
-	}
-	return error;
-}
-
-/**
- * device_remove_file - remove a device's file by name
- * @dev:	device requesting removal
- * @name:	name of the file
- *
- */
-void device_remove_file(struct device * dev, struct device_attribute * attr)
-{
-	if (dev) {
-		get_device(dev);
-		driverfs_remove_file(&dev->dir,attr->attr.name);
-		put_device(dev);
-	}
-}
-
 /**
  * device_remove_dir - remove a device's directory
  * @dev:	device in question
@@ -213,24 +122,12 @@ int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * p
 int device_make_dir(struct device * dev)
 {
 	struct driver_dir_entry * parent;
-	struct device_attribute * entry;
 	int error;
-	int i;
 
 	parent = dev->parent ? &dev->parent->dir : &device_root_dir;
 	dev->dir.name = dev->bus_id;
-	dev->dir.ops = &dev_attr_ops;
 
-	if ((error = device_create_dir(&dev->dir,parent)))
-		return error;
-
-	for (i = 0; (entry = *(device_default_files + i)); i++) {
-		if ((error = device_create_file(dev,entry))) {
-			device_remove_dir(dev);
-			break;
-		}
-	}
-	return error;
+	return device_create_dir(&dev->dir,parent);
 }
 
 static int device_driverfs_init(void)

@@ -29,6 +29,7 @@
 #include <linux/list.h>
 #include <linux/sched.h>
 #include <linux/driverfs_fs.h>
+#include <linux/kobject.h>
 
 #define DEVICE_NAME_SIZE	80
 #define DEVICE_ID_SIZE		32
@@ -65,6 +66,9 @@ struct bus_type {
 	atomic_t		refcount;
 	u32			present;
 
+	struct subsystem	subsys;
+	struct subsystem	drvsubsys;
+	struct subsystem	devsubsys;
 	struct list_head	node;
 	struct list_head	devices;
 	struct list_head	drivers;
@@ -119,6 +123,7 @@ struct device_driver {
 	atomic_t		refcount;
 	u32			present;
 
+	struct kobject		kobj;
 	struct list_head	bus_list;
 	struct list_head	class_list;
 	struct list_head	devices;
@@ -275,6 +280,7 @@ struct device {
 	struct list_head intf_list;
 	struct device 	* parent;
 
+	struct kobject kobj;
 	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
