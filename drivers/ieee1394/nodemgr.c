@@ -28,6 +28,11 @@
 #include "csr.h"
 #include "nodemgr.h"
 
+struct nodemgr_csr_info {
+	struct hpsb_host *host;
+	nodeid_t nodeid;
+	unsigned int generation;
+};
 
 
 static char *nodemgr_find_oui_name(int oui)
@@ -45,6 +50,37 @@ static char *nodemgr_find_oui_name(int oui)
 #endif
 	return NULL;
 }
+
+
+static int nodemgr_bus_read(struct csr1212_csr *csr, u64 addr, u16 length,
+                            void *buffer, void *__ci)
+{
+	struct nodemgr_csr_info *ci = (struct nodemgr_csr_info*)__ci;
+	int i, ret = 0;
+
+	for (i = 0; i < 3; i++) {
+		ret = hpsb_read(ci->host, ci->nodeid, ci->generation, addr,
+				buffer, length);
+		if (!ret)
+			break;
+
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (schedule_timeout (HZ/3))
+			return -EINTR;
+	}
+
+	return ret;
+}
+
+static int nodemgr_get_max_rom(quadlet_t *bus_info_data, void *__ci)
+{
+	return (bus_info_data[2] >> 8) & 0x3;
+}
+
+static struct csr1212_bus_ops nodemgr_csr_ops = {
+	.bus_read =	nodemgr_bus_read,
+	.get_max_rom =	nodemgr_get_max_rom
+};
 
 
 /* 
@@ -107,6 +143,26 @@ static struct device_attribute dev_attr_##class##_##field = {		\
 	.show   = fw_show_##class##_##field,				\
 };
 
+#define fw_attr_td(class, class_type, td_kv)				\
+static ssize_t fw_show_##class##_##td_kv (struct device *dev, char *buf)\
+{									\
+	int len;							\
+	class_type *class = container_of(dev, class_type, device);	\
+	len = (class->td_kv->value.leaf.len - 2) * sizeof(quadlet_t);	\
+	memcpy(buf,							\
+	       CSR1212_TEXTUAL_DESCRIPTOR_LEAF_DATA(class->td_kv),	\
+	       len);							\
+	while ((buf + len - 1) == '\0')					\
+		len--;							\
+	buf[len++] = '\n';						\
+	buf[len] = '\0';						\
+	return len;							\
+}									\
+static struct device_attribute dev_attr_##class##_##td_kv = {		\
+	.attr = {.name = __stringify(td_kv), .mode = S_IRUGO },		\
+	.show   = fw_show_##class##_##td_kv,				\
+};
+
 
 #define fw_drv_attr(field, type, format_string)			\
 static ssize_t fw_drv_show_##field (struct device_driver *drv, char *buf) \
@@ -126,10 +182,13 @@ static ssize_t fw_show_ne_bus_options(struct device *dev, char *buf)
 	struct node_entry *ne = container_of(dev, struct node_entry, device);
 
 	return sprintf(buf, "IRMC(%d) CMC(%d) ISC(%d) BMC(%d) PMC(%d) GEN(%d) "
-			"LSPD(%d) MAX_REC(%d) CYC_CLK_ACC(%d)\n", ne->busopt.irmc,
-			ne->busopt.cmc, ne->busopt.isc, ne->busopt.bmc,
-			ne->busopt.pmc, ne->busopt.generation, ne->busopt.lnkspd,
-			ne->busopt.max_rec, ne->busopt.cyc_clk_acc);
+		       "LSPD(%d) MAX_REC(%d) MAX_ROM(%d) CYC_CLK_ACC(%d)\n",
+		       ne->busopt.irmc,
+		       ne->busopt.cmc, ne->busopt.isc, ne->busopt.bmc,
+		       ne->busopt.pmc, ne->busopt.generation, ne->busopt.lnkspd,
+		       ne->busopt.max_rec, 
+		       ne->busopt.max_rom,
+		       ne->busopt.cyc_clk_acc);
 }
 static DEVICE_ATTR(bus_options,S_IRUGO,fw_show_ne_bus_options,NULL);
 
@@ -166,7 +225,7 @@ fw_attr(ne, struct node_entry, capabilities, unsigned int, "0x%06x\n")
 fw_attr(ne, struct node_entry, nodeid, unsigned int, "0x%04x\n")
 
 fw_attr(ne, struct node_entry, vendor_id, unsigned int, "0x%06x\n")
-fw_attr(ne, struct node_entry, vendor_name, const char *, "%s\n")
+fw_attr_td(ne, struct node_entry, vendor_name_kv)
 fw_attr(ne, struct node_entry, vendor_oui, const char *, "%s\n")
 
 fw_attr(ne, struct node_entry, guid, unsigned long long, "0x%016Lx\n")
@@ -194,9 +253,9 @@ fw_attr(ud, struct unit_directory, vendor_id, unsigned int, "0x%06x\n")
 fw_attr(ud, struct unit_directory, model_id, unsigned int, "0x%06x\n")
 fw_attr(ud, struct unit_directory, specifier_id, unsigned int, "0x%06x\n")
 fw_attr(ud, struct unit_directory, version, unsigned int, "0x%06x\n")
-fw_attr(ud, struct unit_directory, vendor_name, const char *, "%s\n")
+fw_attr_td(ud, struct unit_directory, vendor_name_kv)
 fw_attr(ud, struct unit_directory, vendor_oui, const char *, "%s\n")
-fw_attr(ud, struct unit_directory, model_name, const char *, "%s\n")
+fw_attr_td(ud, struct unit_directory, model_name_kv)
 
 static struct device_attribute *const fw_ud_attrs[] = {
 	&dev_attr_ud_address,
@@ -358,14 +417,14 @@ static void nodemgr_create_ud_dev_files(struct unit_directory *ud)
 
 	if (ud->flags & UNIT_DIRECTORY_VENDOR_ID) {
 		device_create_file(dev, &dev_attr_ud_vendor_id);
-		if (ud->flags & UNIT_DIRECTORY_VENDOR_TEXT)
-			device_create_file(dev, &dev_attr_ud_vendor_name);
+		if (ud->vendor_name_kv)
+			device_create_file(dev, &dev_attr_ud_vendor_name_kv);
 	}
 
 	if (ud->flags & UNIT_DIRECTORY_MODEL_ID) {
 		device_create_file(dev, &dev_attr_ud_model_id);
-		if (ud->flags & UNIT_DIRECTORY_MODEL_TEXT)
-			device_create_file(dev, &dev_attr_ud_model_name);
+		if (ud->model_name_kv)
+			device_create_file(dev, &dev_attr_ud_model_name_kv);
 	}
 }
 
@@ -410,18 +469,28 @@ static int nodemgr_bus_match(struct device * dev, struct device_driver * drv)
 
 static void nodemgr_release_ud(struct device *dev)
 {
+	struct unit_directory *ud = container_of(dev, struct unit_directory, device);
+	if (ud->vendor_name_kv)
+		csr1212_release_keyval(ud->vendor_name_kv);
+	if (ud->model_name_kv)
+		csr1212_release_keyval(ud->model_name_kv);
 	kfree(container_of(dev, struct unit_directory, device));
 }
 
 
 static void nodemgr_release_ne(struct device *dev)
 {
+	struct node_entry *ne = container_of(dev, struct node_entry, device);
+	if (ne->vendor_name_kv)
+		csr1212_release_keyval(ne->vendor_name_kv);
 	kfree(container_of(dev, struct node_entry, device));
 }
 
 
 static void nodemgr_release_host(struct device *dev)
 {
+	struct hpsb_host *host = container_of(dev, struct hpsb_host, device);
+	csr1212_destroy_csr(host->csr.rom);
 	kfree(container_of(dev, struct hpsb_host, device));
 }
 
@@ -444,10 +513,10 @@ static void nodemgr_remove_ud(struct unit_directory *ud)
 	device_remove_file(dev, &dev_attr_ud_specifier_id);
 	device_remove_file(dev, &dev_attr_ud_version);
 	device_remove_file(dev, &dev_attr_ud_vendor_id);
-	device_remove_file(dev, &dev_attr_ud_vendor_name);
+	device_remove_file(dev, &dev_attr_ud_vendor_name_kv);
 	device_remove_file(dev, &dev_attr_ud_vendor_oui);
 	device_remove_file(dev, &dev_attr_ud_model_id);
-	device_remove_file(dev, &dev_attr_ud_model_name);
+	device_remove_file(dev, &dev_attr_ud_model_name_kv);
 
 	device_unregister(dev);
 }
@@ -476,7 +545,7 @@ static void nodemgr_remove_ne(struct node_entry *ne)
 		device_remove_file(dev, fw_ne_attrs[i]);
 
 	device_remove_file(dev, &dev_attr_ne_guid_vendor_oui);
-	device_remove_file(dev, &dev_attr_ne_vendor_name);
+	device_remove_file(dev, &dev_attr_ne_vendor_name_kv);
 	device_remove_file(dev, &dev_attr_ne_vendor_oui);
 
 	device_unregister(dev);
@@ -535,156 +604,13 @@ struct bus_type ieee1394_bus_type = {
 };
 
 
-static int nodemgr_read_quadlet(struct hpsb_host *host,
-				nodeid_t nodeid, unsigned int generation,
-				octlet_t address, quadlet_t *quad)
+static void nodemgr_update_bus_options(struct node_entry *ne)
 {
-	int i;
-	int ret = 0;
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+	static const u16 mr[] = { 4, 64, 1024, 0};
+#endif
+	quadlet_t busoptions = be32_to_cpu(ne->csr->bus_info_data[2]);
 
-	for (i = 0; i < 3; i++) {
-		ret = hpsb_read(host, nodeid, generation, address, quad, 4);
-		if (!ret)
-			break;
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout (HZ/3))
-			return -1;
-	}
-	*quad = be32_to_cpu(*quad);
-
-	return ret;
-}
-
-static int nodemgr_size_text_leaf(struct hpsb_host *host,
-				  nodeid_t nodeid, unsigned int generation,
-				  octlet_t address)
-{
-	quadlet_t quad;
-	int size = 0;
-
-	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
-		return -1;
-
-	if (CONFIG_ROM_KEY(quad) == CONFIG_ROM_DESCRIPTOR_LEAF) {
-		/* This is the offset.  */
-		address += 4 * CONFIG_ROM_VALUE(quad); 
-		if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
-			return -1;
-		/* Now we got the size of the text descriptor leaf. */
-		size = CONFIG_ROM_LEAF_LENGTH(quad);
-	}
-
-	return size;
-}
-
-static int nodemgr_read_text_leaf(struct node_entry *ne,
-				  octlet_t address,
-				  quadlet_t *quadp)
-{
-	quadlet_t quad;
-	int i, size, ret;
-
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, &quad)
-	    || CONFIG_ROM_KEY(quad) != CONFIG_ROM_DESCRIPTOR_LEAF)
-		return -1;
-
-	/* This is the offset.  */
-	address += 4 * CONFIG_ROM_VALUE(quad);
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, &quad))
-		return -1;
-
-	/* Now we got the size of the text descriptor leaf. */
-	size = CONFIG_ROM_LEAF_LENGTH(quad) - 2;
-	if (size <= 0)
-		return -1;
-
-	address += 4;
-	for (i = 0; i < 2; i++, address += 4, quadp++) {
-		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, quadp))
-			return -1;
-	}
-
-	/* Now read the text string.  */
-	ret = -ENXIO;
-	for (; size > 0; size--, address += 4, quadp++) {
-		for (i = 0; i < 3; i++) {
-			ret = hpsb_node_read(ne, address, quadp, 4);
-			if (ret != -EAGAIN)
-				break;
-		}
-		if (ret)
-			break;
-	}
-
-	return ret;
-}
-
-static struct node_entry *nodemgr_scan_root_directory
-	(struct hpsb_host *host, nodeid_t nodeid, unsigned int generation)
-{
-	octlet_t address;
-	quadlet_t quad;
-	int length;
-	int code, size, total_size;
-	struct node_entry *ne;
-
-	address = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
-	
-	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
-		return NULL;
-
-	if (CONFIG_ROM_BUS_INFO_LENGTH(quad) == 1)  /* minimal config rom */
-		return NULL;
-
-	address += 4 + CONFIG_ROM_BUS_INFO_LENGTH(quad) * 4;
-
-	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
-		return NULL;
-	length = CONFIG_ROM_ROOT_LENGTH(quad);
-	address += 4;
-
-	size = 0;
-	total_size = sizeof(struct node_entry);
-	for (; length > 0; length--, address += 4) {
-		if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
-			return NULL;
-		code = CONFIG_ROM_KEY(quad);
-
-		if (code == CONFIG_ROM_VENDOR_ID && length > 0) {
-			/* Check if there is a text descriptor leaf
-			   immediately after this.  */
-			size = nodemgr_size_text_leaf(host, nodeid, generation,
-						      address + 4);
-			if (size > 0) {
-				address += 4;
-				length--;
-				total_size += (size + 1) * sizeof (quadlet_t);
-			} else if (size < 0)
-				return NULL;
-		}
-	}
-	ne = kmalloc(total_size, GFP_KERNEL);
-
-	if (!ne)
-		return NULL;
-
-	memset(ne, 0, total_size);
-
-	if (size != 0) {
-		ne->vendor_name = (const char *) &(ne->quadlets[2]);
-		ne->quadlets[size] = 0;
-	} else {
-		ne->vendor_name = NULL;
-	}
-
-	return ne; 
-}
-
-
-static void nodemgr_update_bus_options(struct node_entry *ne,
-                                       quadlet_t busoptions)
-{
 	ne->busopt.irmc         = (busoptions >> 31) & 1;
 	ne->busopt.cmc          = (busoptions >> 30) & 1;
 	ne->busopt.isc          = (busoptions >> 29) & 1;
@@ -692,27 +618,31 @@ static void nodemgr_update_bus_options(struct node_entry *ne,
 	ne->busopt.pmc          = (busoptions >> 27) & 1;
 	ne->busopt.cyc_clk_acc  = (busoptions >> 16) & 0xff;
 	ne->busopt.max_rec      = 1 << (((busoptions >> 12) & 0xf) + 1);
+	ne->busopt.max_rom	= (busoptions >> 8) & 0x3;
 	ne->busopt.generation   = (busoptions >> 4) & 0xf;
 	ne->busopt.lnkspd       = busoptions & 0x7;
 	
 	HPSB_VERBOSE("NodeMgr: raw=0x%08x irmc=%d cmc=%d isc=%d bmc=%d pmc=%d "
-		     "cyc_clk_acc=%d max_rec=%d gen=%d lspd=%d",
+		     "cyc_clk_acc=%d max_rec=%d max_rom=%d gen=%d lspd=%d",
 		     busoptions, ne->busopt.irmc, ne->busopt.cmc,
 		     ne->busopt.isc, ne->busopt.bmc, ne->busopt.pmc,
 		     ne->busopt.cyc_clk_acc, ne->busopt.max_rec,
+		     mr[ne->busopt.max_rom],
 		     ne->busopt.generation, ne->busopt.lnkspd);
 }
 
 
-static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoptions,
+static struct node_entry *nodemgr_create_node(octlet_t guid, struct csr1212_csr *csr,
 					      struct host_info *hi, nodeid_t nodeid,
 					      unsigned int generation)
 {
 	struct hpsb_host *host = hi->host;
         struct node_entry *ne;
 
-	ne = nodemgr_scan_root_directory (host, nodeid, generation);
+	ne = kmalloc(sizeof(struct node_entry), GFP_KERNEL);
         if (!ne) return NULL;
+
+	memset(ne, 0, sizeof(struct node_entry));
 
 	ne->tpool = &host->tpool[nodeid & NODE_MASK];
 
@@ -724,6 +654,7 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
         ne->guid = guid;
 	ne->guid_vendor_id = (guid >> 40) & 0xffffff;
 	ne->guid_vendor_oui = nodemgr_find_oui_name(ne->guid_vendor_id);
+	ne->csr = csr;
 
 	memcpy(&ne->device, &nodemgr_dev_template_ne,
 	       sizeof(ne->device));
@@ -737,7 +668,7 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 		device_create_file(&ne->device, &dev_attr_ne_guid_vendor_oui);
 	nodemgr_create_ne_dev_files(ne);
 
-	nodemgr_update_bus_options(ne, busoptions);
+	nodemgr_update_bus_options(ne);
 
 	HPSB_DEBUG("%s added: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
 		   (host->node_id == nodeid) ? "Host" : "Node",
@@ -821,245 +752,127 @@ static struct node_entry *find_entry_by_nodeid(struct hpsb_host *host, nodeid_t 
 	return search.ne;
 }
 
-static struct unit_directory *nodemgr_scan_unit_directory
-	(struct node_entry *ne, octlet_t address)
-{
-	struct unit_directory *ud;
-	quadlet_t quad;
-	u8 flags, todo;
-	int length, size, total_size, count;
-	int vendor_name_size, model_name_size;
 
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, &quad))
-		return NULL;
-
-	length = CONFIG_ROM_DIRECTORY_LENGTH(quad) ;
-	address += 4;
-
-	size = 0;
-	total_size = sizeof (struct unit_directory);
-	flags = 0;
-	count = 0;
-	vendor_name_size = 0;
-	model_name_size = 0;
-	for (; length > 0; length--, address += 4) {
-		int code;
-		quadlet_t value;
-
-		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
-					 address, &quad))
-			return NULL;
-		code = CONFIG_ROM_KEY(quad);
-		value = CONFIG_ROM_VALUE(quad);
-
-		todo = 0;
-		switch (code) {
-		case CONFIG_ROM_VENDOR_ID:
-			todo = UNIT_DIRECTORY_VENDOR_TEXT;
-			break;
-
-		case CONFIG_ROM_MODEL_ID:
-			todo = UNIT_DIRECTORY_MODEL_TEXT;
-			break;
-
-		case CONFIG_ROM_SPECIFIER_ID:
-		case CONFIG_ROM_UNIT_SW_VERSION:
-			break;
-
-		case CONFIG_ROM_DESCRIPTOR_LEAF:
-		case CONFIG_ROM_DESCRIPTOR_DIRECTORY:
-			/* TODO: read strings... icons? */
-			break;
-
-		default:
-			/* Which types of quadlets do we want to
-			   store?  Only count immediate values and
-			   CSR offsets for now.  */
-			code &= CONFIG_ROM_KEY_TYPE_MASK;
-			if ((code & CONFIG_ROM_KEY_TYPE_LEAF) == 0)
-				count++;
-			break;
-		}
-
-		if (todo && length > 0) {
-			/* Check if there is a text descriptor leaf
-			   immediately after this.  */
-			size = nodemgr_size_text_leaf(ne->host,
-						      ne->nodeid,
-						      ne->generation,
-						      address + 4);
-
-			if (todo == UNIT_DIRECTORY_VENDOR_TEXT)
-				vendor_name_size = size;
-			else
-				model_name_size = size;
-
-			if (size > 0) {
-				address += 4;
-				length--;
-				flags |= todo;
-				total_size += (size + 1) * sizeof (quadlet_t);
-			}
-			else if (size < 0)
-				return NULL;
-		}
-	}
-
-	total_size += count * sizeof (quadlet_t);
-	ud = kmalloc (total_size, GFP_KERNEL);
-
-	if (ud != NULL) {
-		memset (ud, 0, total_size);
-		ud->flags = flags;
-		ud->length = count;
-		ud->vendor_name_size = vendor_name_size;
-		ud->model_name_size = model_name_size;
-	}
-
-	return ud;
-}
 
 
 /* This implementation currently only scans the config rom and its
  * immediate unit directories looking for software_id and
  * software_version entries, in order to get driver autoloading working. */
 static struct unit_directory *nodemgr_process_unit_directory
-	(struct host_info *hi, struct node_entry *ne, octlet_t address, unsigned int *id,
-	 struct unit_directory *parent)
+	(struct host_info *hi, struct node_entry *ne, struct csr1212_keyval *ud_kv,
+	 unsigned int *id, struct unit_directory *parent)
 {
 	struct unit_directory *ud;
-	quadlet_t quad;
-	quadlet_t *infop;
-	int length;
 	struct unit_directory *ud_temp = NULL;
+	struct csr1212_dentry *dentry;
+	struct csr1212_keyval *kv;
+	u8 last_key_id = 0;
 
-	if (!(ud = nodemgr_scan_unit_directory(ne, address)))
+	ud = kmalloc(sizeof(struct unit_directory), GFP_KERNEL);
+	if (!ud)
 		goto unit_directory_error;
+
+	memset (ud, 0, sizeof(struct unit_directory));
 
 	ud->ne = ne;
-	ud->address = address;
+	ud->address = ud_kv->offset + CSR1212_CONFIG_ROM_SPACE_BASE;
+	ud->ud_kv = ud_kv;
 	ud->id = (*id)++;
 
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
-				 address, &quad))
-		goto unit_directory_error;
-	length = CONFIG_ROM_DIRECTORY_LENGTH(quad) ;
-	address += 4;
+	csr1212_for_each_dir_entry(ne->csr, kv, ud_kv, dentry) {
+		switch (kv->key.id) {
+		case CSR1212_KV_ID_VENDOR:
+			if (kv->key.type == CSR1212_KV_TYPE_IMMEDIATE) {
+				ud->vendor_id = kv->value.immediate;
+				ud->flags |= UNIT_DIRECTORY_VENDOR_ID;
 
-	infop = (quadlet_t *) ud->quadlets;
-	for (; length > 0; length--, address += 4) {
-		int code;
-		quadlet_t value;
-		quadlet_t *quadp;
-
-		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
-					 address, &quad))
-			goto unit_directory_error;
-		code = CONFIG_ROM_KEY(quad) ;
-		value = CONFIG_ROM_VALUE(quad);
-
-		switch (code) {
-		case CONFIG_ROM_VENDOR_ID:
-			ud->vendor_id = value;
-			ud->flags |= UNIT_DIRECTORY_VENDOR_ID;
-
-			if (ud->vendor_id)
-				ud->vendor_oui = nodemgr_find_oui_name(ud->vendor_id);
-
-			if ((ud->flags & UNIT_DIRECTORY_VENDOR_TEXT) != 0) {
-				length--;
-				address += 4;
-				quadp = &(ud->quadlets[ud->length]);
-				if (nodemgr_read_text_leaf(ne, address, quadp) == 0
-				    && quadp[0] == 0 && quadp[1] == 0) {
-				    	/* We only support minimal
-					   ASCII and English. */
-					quadp[ud->vendor_name_size] = 0;
-					ud->vendor_name
-						= (const char *) &(quadp[2]);
-				}
+				if (ud->vendor_id)
+					ud->vendor_oui = nodemgr_find_oui_name(ud->vendor_id);
 			}
 			break;
 
-		case CONFIG_ROM_MODEL_ID:
-			ud->model_id = value;
+		case CSR1212_KV_ID_MODEL:
+			ud->model_id = kv->value.immediate;
 			ud->flags |= UNIT_DIRECTORY_MODEL_ID;
-			if ((ud->flags & UNIT_DIRECTORY_MODEL_TEXT) != 0) {
-				length--;
-				address += 4;
-				quadp = &(ud->quadlets[ud->length + ud->vendor_name_size + 1]);
-				if (nodemgr_read_text_leaf(ne, address, quadp) == 0
-				    && quadp[0] == 0 && quadp[1] == 0) {
-				    	/* We only support minimal
-					   ASCII and English. */
-					quadp[ud->model_name_size] = 0;
-					ud->model_name
-						= (const char *) &(quadp[2]);
-				}
-			}
 			break;
 
-		case CONFIG_ROM_SPECIFIER_ID:
-			ud->specifier_id = value;
+		case CSR1212_KV_ID_SPECIFIER_ID:
+			ud->specifier_id = kv->value.immediate;
 			ud->flags |= UNIT_DIRECTORY_SPECIFIER_ID;
 			break;
 
-		case CONFIG_ROM_UNIT_SW_VERSION:
-			ud->version = value;
+		case CSR1212_KV_ID_VERSION:
+			ud->version = kv->value.immediate;
 			ud->flags |= UNIT_DIRECTORY_VERSION;
 			break;
 
-		case CONFIG_ROM_DESCRIPTOR_LEAF:
-		case CONFIG_ROM_DESCRIPTOR_DIRECTORY:
-			/* TODO: read strings... icons? */
+		case CSR1212_KV_ID_DESCRIPTOR:
+			if (kv->key.type == CSR1212_KV_TYPE_LEAF &&
+			    CSR1212_DESCRIPTOR_LEAF_TYPE(kv) == 0 &&
+			    CSR1212_DESCRIPTOR_LEAF_SPECIFIER_ID(kv) == 0 &&
+			    CSR1212_TEXTUAL_DESCRIPTOR_LEAF_WIDTH(kv) == 0 &&
+			    CSR1212_TEXTUAL_DESCRIPTOR_LEAF_CHAR_SET(kv) == 0 &&
+			    CSR1212_TEXTUAL_DESCRIPTOR_LEAF_LANGUAGE(kv) == 0) {
+				switch (last_key_id) {
+				case CSR1212_KV_ID_VENDOR:
+					ud->vendor_name_kv = kv;
+					csr1212_keep_keyval(kv);
+					break;
+
+				case CSR1212_KV_ID_MODEL:
+					ud->model_name_kv = kv;
+					csr1212_keep_keyval(kv);
+					break;
+
+				}
+			} /* else if (kv->key.type == CSR1212_KV_TYPE_DIRECTORY) ... */
 			break;
 
-		case CONFIG_ROM_LOGICAL_UNIT_DIRECTORY:
-			ud->flags |= UNIT_DIRECTORY_HAS_LUN_DIRECTORY;
-			ud_temp = nodemgr_process_unit_directory(hi, ne, address + value * 4, id,
-								 parent);
+		case CSR1212_KV_ID_DEPENDENT_INFO:
+			if (kv->key.type == CSR1212_KV_TYPE_DIRECTORY) {
+				/* This should really be done in SBP2 as this is
+				 * doing SBP2 specific parsing. */
+				ud->flags |= UNIT_DIRECTORY_HAS_LUN_DIRECTORY;
+				ud_temp = nodemgr_process_unit_directory(hi, ne, kv, id,
+									 parent);
 
-			if (ud_temp == NULL)
-				break;
+				if (ud_temp == NULL)
+					break;
 
-			/* inherit unspecified values */
-			if ((ud->flags & UNIT_DIRECTORY_VENDOR_ID) &&
-				!(ud_temp->flags & UNIT_DIRECTORY_VENDOR_ID))
-			{
-				ud_temp->flags |=  UNIT_DIRECTORY_VENDOR_ID;
-				ud_temp->vendor_id = ud->vendor_id;
-				ud_temp->vendor_oui = ud->vendor_oui;
-			}
-			if ((ud->flags & UNIT_DIRECTORY_MODEL_ID) &&
-				!(ud_temp->flags & UNIT_DIRECTORY_MODEL_ID))
-			{
-				ud_temp->flags |=  UNIT_DIRECTORY_MODEL_ID;
-				ud_temp->model_id = ud->model_id;
-			}
-			if ((ud->flags & UNIT_DIRECTORY_SPECIFIER_ID) &&
-				!(ud_temp->flags & UNIT_DIRECTORY_SPECIFIER_ID))
-			{
-				ud_temp->flags |=  UNIT_DIRECTORY_SPECIFIER_ID;
-				ud_temp->specifier_id = ud->specifier_id;
-			}
-			if ((ud->flags & UNIT_DIRECTORY_VERSION) &&
-				!(ud_temp->flags & UNIT_DIRECTORY_VERSION))
-			{
-				ud_temp->flags |=  UNIT_DIRECTORY_VERSION;
-				ud_temp->version = ud->version;
+				/* inherit unspecified values */
+				if ((ud->flags & UNIT_DIRECTORY_VENDOR_ID) &&
+				    !(ud_temp->flags & UNIT_DIRECTORY_VENDOR_ID))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_VENDOR_ID;
+					ud_temp->vendor_id = ud->vendor_id;
+					ud_temp->vendor_oui = ud->vendor_oui;
+				}
+				if ((ud->flags & UNIT_DIRECTORY_MODEL_ID) &&
+				    !(ud_temp->flags & UNIT_DIRECTORY_MODEL_ID))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_MODEL_ID;
+					ud_temp->model_id = ud->model_id;
+				}
+				if ((ud->flags & UNIT_DIRECTORY_SPECIFIER_ID) &&
+				    !(ud_temp->flags & UNIT_DIRECTORY_SPECIFIER_ID))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_SPECIFIER_ID;
+					ud_temp->specifier_id = ud->specifier_id;
+				}
+				if ((ud->flags & UNIT_DIRECTORY_VERSION) &&
+				    !(ud_temp->flags & UNIT_DIRECTORY_VERSION))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_VERSION;
+					ud_temp->version = ud->version;
+				}
 			}
 
 			break;
 
 		default:
-			/* Which types of quadlets do we want to
-			   store?  Only count immediate values and
-			   CSR offsets for now.  */
-			code &= CONFIG_ROM_KEY_TYPE_MASK;
-			if ((code & CONFIG_ROM_KEY_TYPE_LEAF) == 0)
-				*infop++ = quad;
 			break;
 		}
+		last_key_id = kv->key.id;
 	}
 
 	memcpy(&ud->device, &nodemgr_dev_template_ud,
@@ -1091,76 +904,49 @@ unit_directory_error:
 
 static void nodemgr_process_root_directory(struct host_info *hi, struct node_entry *ne)
 {
-	octlet_t address;
-	quadlet_t quad;
-	int length;
 	unsigned int ud_id = 0;
+	struct csr1212_dentry *dentry;
+	struct csr1212_keyval *kv;
+	u8 last_key_id = 0;
 
-	device_remove_file(&ne->device, &dev_attr_ne_vendor_oui);
-
-	address = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
-	
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
-				 address, &quad))
-		return;
-	address += 4 + CONFIG_ROM_BUS_INFO_LENGTH(quad) * 4;
-
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
-				 address, &quad))
-		return;
-	length = CONFIG_ROM_ROOT_LENGTH(quad);
-	address += 4;
-
-	for (; length > 0; length--, address += 4) {
-		int code, value;
-
-		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
-					 address, &quad))
-			return;
-		code = CONFIG_ROM_KEY(quad);
-		value = CONFIG_ROM_VALUE(quad);
-
-		switch (code) {
-		case CONFIG_ROM_VENDOR_ID:
-			ne->vendor_id = value;
+	csr1212_for_each_dir_entry(ne->csr, kv, ne->csr->root_kv, dentry) {
+		switch (kv->key.id) {
+		case CSR1212_KV_ID_VENDOR:
+			ne->vendor_id = kv->value.immediate;
 
 			if (ne->vendor_id)
 				ne->vendor_oui = nodemgr_find_oui_name(ne->vendor_id);
-
-			/* Now check if there is a vendor name text
-			   string.  */
-			if (ne->vendor_name != NULL) {
-				length--;
-				address += 4;
-				if (nodemgr_read_text_leaf(ne, address, ne->quadlets) != 0
-				    || ne->quadlets[0] != 0 || ne->quadlets[1] != 0)
-				    	/* We only support minimal
-					   ASCII and English. */
-					ne->vendor_name = NULL;
-				else
-					device_create_file(&ne->device,
-						&dev_attr_ne_vendor_name);
-			}
 			break;
 
-		case CONFIG_ROM_NODE_CAPABILITES:
-			ne->capabilities = value;
+		case CSR1212_KV_ID_NODE_CAPABILITIES:
+			ne->capabilities = kv->value.immediate;
 			break;
 
-		case CONFIG_ROM_UNIT_DIRECTORY:
-			nodemgr_process_unit_directory(hi, ne, address + value * 4, &ud_id,
-						       NULL);
+		case CSR1212_KV_ID_UNIT:
+			nodemgr_process_unit_directory(hi, ne, kv, &ud_id, NULL);
 			break;			
 
-		case CONFIG_ROM_DESCRIPTOR_LEAF:
-		case CONFIG_ROM_DESCRIPTOR_DIRECTORY:
-			/* TODO: read strings... icons? */
+		case CSR1212_KV_ID_DESCRIPTOR:
+			if (last_key_id == CSR1212_KV_ID_VENDOR) {
+				if (kv->key.type == CSR1212_KV_TYPE_LEAF &&
+				    CSR1212_DESCRIPTOR_LEAF_TYPE(kv) == 0 &&
+				    CSR1212_DESCRIPTOR_LEAF_SPECIFIER_ID(kv) == 0 &&
+				    CSR1212_TEXTUAL_DESCRIPTOR_LEAF_WIDTH(kv) == 0 &&
+				    CSR1212_TEXTUAL_DESCRIPTOR_LEAF_CHAR_SET(kv) == 0 &&
+				    CSR1212_TEXTUAL_DESCRIPTOR_LEAF_LANGUAGE(kv) == 0) {
+					ne->vendor_name_kv = kv;
+					csr1212_keep_keyval(kv);
+				}
+			}
 			break;
 		}
+		last_key_id = kv->key.id;
 	}
 
 	if (ne->vendor_oui)
 		device_create_file(&ne->device, &dev_attr_ne_vendor_oui);
+	if (ne->vendor_name_kv)
+		device_create_file(&ne->device, &dev_attr_ne_vendor_name_kv);
 }
 
 #ifdef CONFIG_HOTPLUG
@@ -1261,7 +1047,7 @@ void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver)
  * informed that this device just went through a bus reset, to allow
  * the to take whatever actions required.
  */
-static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
+static void nodemgr_update_node(struct node_entry *ne, struct csr1212_csr *csr,
 				struct host_info *hi, nodeid_t nodeid,
 				unsigned int generation)
 {
@@ -1272,12 +1058,16 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 		ne->nodeid = nodeid;
 	}
 
-	if (ne->busopt.generation != ((busoptions >> 4) & 0xf)) {
+	if (ne->busopt.generation != ((be32_to_cpu(csr->bus_info_data[2]) >> 4) & 0xf)) {
+		kfree(ne->csr->private);
+		csr1212_destroy_csr(ne->csr);
+		ne->csr = csr;
+
 		/* If the node's configrom generation has changed, we
 		 * unregister all the unit directories. */
 		nodemgr_remove_node_uds(ne);
 
-		nodemgr_update_bus_options(ne, busoptions);
+		nodemgr_update_bus_options(ne);
 
 		/* Mark the node as new, so it gets re-probed */
 		ne->needs_probe = 1;
@@ -1287,72 +1077,7 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 	ne->generation = generation;
 }
 
-static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned int generation,
-			      quadlet_t *buffer, int buffer_length)
-{
-	octlet_t addr = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
-	unsigned header_size;
-	int i;
-
-	/* IEEE P1212 says that devices should support 64byte block
-	 * reads, aligned on 64byte boundaries. That doesn't seem to
-	 * work though, and we are forced to doing quadlet sized
-	 * reads.  */
-
-	HPSB_VERBOSE("Initiating ConfigROM request for node " NODE_BUS_FMT,
-		     NODE_BUS_ARGS(host, nodeid));
-
-	/* 
-	 * Must retry a few times if config rom read returns zero (how long?). Will
-	 * not normally occur, but we should do the right thing. For example, with
-	 * some sbp2 devices, the bridge chipset cannot return valid config rom reads
-	 * immediately after power-on, since they need to detect the type of 
-	 * device attached (disk or CD-ROM).
-	 */
-	for (i = 0; i < 4; i++) {
-		if (nodemgr_read_quadlet(host, nodeid, generation,
-					 addr, &buffer[0]) < 0) {
-			HPSB_ERR("ConfigROM quadlet transaction error for node "
-				 NODE_BUS_FMT, NODE_BUS_ARGS(host, nodeid));
-			return -1;
-		}
-		if (buffer[0])
-			break;
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout (HZ/4))
-			return -1;
-	}
-
-	header_size = buffer[0] >> 24;
-	addr += 4;
-
-	if (header_size == 1) {
-		HPSB_INFO("Node " NODE_BUS_FMT " has a minimal ROM.  "
-			  "Vendor is %08x",
-			  NODE_BUS_ARGS(host, nodeid), buffer[0] & 0x00ffffff);
-		return -1;
-	}
-
-	if (header_size < 4) {
-		HPSB_INFO("Node " NODE_BUS_FMT " has non-standard ROM "
-			  "format (%d quads), cannot parse",
-			  NODE_BUS_ARGS(host, nodeid), header_size);
-		return -1;
-	}
-
-	for (i = 1; i < buffer_length; i++, addr += 4) {
-		if (nodemgr_read_quadlet(host, nodeid, generation,
-					 addr, &buffer[i]) < 0) {
-			HPSB_ERR("ConfigROM quadlet transaction "
-				 "error for node " NODE_BUS_FMT,
-				 NODE_BUS_ARGS(host, nodeid));
-			return -1;
-		}
-	}
-
-	return 0;
-}		
+		
 
 
 static void nodemgr_node_scan_one(struct host_info *hi,
@@ -1360,17 +1085,32 @@ static void nodemgr_node_scan_one(struct host_info *hi,
 {
 	struct hpsb_host *host = hi->host;
 	struct node_entry *ne;
-	quadlet_t buffer[5];
 	octlet_t guid;
+	struct csr1212_csr *csr;
+	struct nodemgr_csr_info *ci;
+
+	ci = kmalloc(sizeof(struct nodemgr_csr_info), GFP_KERNEL);
+	if (!ci)
+		return;
+
+	ci->host = host;
+	ci->nodeid = nodeid;
+	ci->generation = generation;
 
 	/* We need to detect when the ConfigROM's generation has changed,
 	 * so we only update the node's info when it needs to be.  */
 
-	if (read_businfo_block (host, nodeid, generation,
-				buffer, sizeof(buffer) >> 2))
+	csr = csr1212_create_csr(&nodemgr_csr_ops, 5 * sizeof(quadlet_t), ci);
+	if (!csr || csr1212_parse_csr(csr) != CSR1212_SUCCESS) {
+		HPSB_ERR("Error parsing configrom for node " NODE_BUS_FMT,
+			 NODE_BUS_ARGS(host, nodeid));
+		if (csr)
+			csr1212_destroy_csr(csr);
+		kfree(ci);
 		return;
+	}
 
-	if (buffer[1] != IEEE1394_BUSID_MAGIC) {
+	if (csr->bus_info_data[1] != IEEE1394_BUSID_MAGIC) {
 		/* This isn't a 1394 device, but we let it slide. There
 		 * was a report of a device with broken firmware which
 		 * reported '2394' instead of '1394', which is obviously a
@@ -1379,16 +1119,16 @@ static void nodemgr_node_scan_one(struct host_info *hi,
 		 * shouldn't be held responsible, so we'll allow it with a
 		 * warning.  */
 		HPSB_WARN("Node " NODE_BUS_FMT " has invalid busID magic [0x%08x]",
-			  NODE_BUS_ARGS(host, nodeid), buffer[1]);
+			  NODE_BUS_ARGS(host, nodeid), csr->bus_info_data[1]);
 	}
 
-	guid = ((u64)buffer[3] << 32) | buffer[4];
+	guid = ((u64)be32_to_cpu(csr->bus_info_data[3]) << 32) | be32_to_cpu(csr->bus_info_data[4]);
 	ne = find_entry_by_guid(guid);
 
 	if (!ne)
-		nodemgr_create_node(guid, buffer[2], hi, nodeid, generation);
+		nodemgr_create_node(guid, csr, hi, nodeid, generation);
 	else
-		nodemgr_update_node(ne, buffer[2], hi, nodeid, generation);
+		nodemgr_update_node(ne, csr, hi, nodeid, generation);
 
 	return;
 }

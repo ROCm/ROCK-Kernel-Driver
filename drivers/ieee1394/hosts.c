@@ -17,13 +17,46 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
+#include <linux/timer.h>
 
+#include "csr1212.h"
+#include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"
 #include "nodemgr.h"
+#include "csr.h"
 
+
+
+static void delayed_reset_bus(unsigned long __reset_info)
+{
+	struct hpsb_host *host = (struct hpsb_host*)__reset_info;
+	int generation = host->csr.generation + 1;
+
+	/* The generation field rolls over to 2 rather than 0 per IEEE
+	 * 1394a-2000. */
+	if (generation > 0xf || generation < 2)
+		generation = 2;
+
+	CSR_SET_BUS_INFO_GENERATION(host->csr.rom, generation);
+	if (csr1212_generate_csr_image(host->csr.rom) != CSR1212_SUCCESS) {
+		/* CSR image creation failed, reset generation field and do not
+		 * issue a bus reset. */
+		CSR_SET_BUS_INFO_GENERATION(host->csr.rom, host->csr.generation);
+		return;
+	}
+
+	host->csr.generation = generation;
+
+	host->update_config_rom = 0;
+	if (host->driver->set_hw_config_rom)
+		host->driver->set_hw_config_rom(host, host->csr.rom->bus_info_data);
+
+	host->csr.gen_timestamp[host->csr.generation] = jiffies;
+	hpsb_reset_bus(host, SHORT_RESET);
+}
 
 static int dummy_transmit_packet(struct hpsb_host *h, struct hpsb_packet *p)
 {
@@ -83,6 +116,12 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
         if (!h) return NULL;
         memset(h, 0, sizeof(struct hpsb_host) + extra);
 
+	h->csr.rom = csr1212_create_csr(&csr_bus_ops, CSR_BUS_INFO_SIZE, h);
+	if (!h->csr.rom) {
+		kfree(h);
+		return NULL;
+	}
+
 	h->hostdata = h + 1;
         h->driver = drv;
 
@@ -90,6 +129,12 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
         spin_lock_init(&h->pending_pkt_lock);
 
 	INIT_LIST_HEAD(&h->addr_space);
+
+	init_timer(&h->delayed_reset);
+	h->delayed_reset.function = delayed_reset_bus;
+	h->delayed_reset.data = (unsigned long)h;
+	for (i = 2; i < 16; i++)
+		h->csr.gen_timestamp[i] = jiffies - 60 * HZ;
 
 	for (i = 0; i < ARRAY_SIZE(h->tpool); i++)
 		HPSB_TPOOL_INIT(&h->tpool[i]);
@@ -124,7 +169,6 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 void hpsb_add_host(struct hpsb_host *host)
 {
         highlevel_add_host(host);
-        host->driver->devctl(host, RESET_BUS, LONG_RESET);
 }
 
 void hpsb_remove_host(struct hpsb_host *host)
@@ -135,4 +179,36 @@ void hpsb_remove_host(struct hpsb_host *host)
         highlevel_remove_host(host);
 
 	device_unregister(&host->device);
+}
+
+int hpsb_update_config_rom_image(struct hpsb_host *host)
+{
+	unsigned long reset_time;
+	int next_gen = host->csr.generation + 1;
+
+	if (!host->update_config_rom)
+		return -EINVAL;
+
+	if (next_gen > 0xf)
+		next_gen = 2;
+
+	/* Stop the delayed interrupt, we're about to change the config rom and
+	 * it would be a waste to do a bus reset twice. */
+	del_timer_sync(&host->delayed_reset);
+
+	/* IEEE 1394a-2000 prohibits using the same generation number
+	 * twice in a 60 second period. */
+	if (jiffies - host->csr.gen_timestamp[next_gen] < 60 * HZ)
+		/* Wait 60 seconds from the last time this generation number was
+		 * used. */
+		reset_time = (60 * HZ) + host->csr.gen_timestamp[next_gen];
+	else
+		/* Wait 1 second in case some other code wants to change the
+		 * Config ROM in the near future. */
+		reset_time = jiffies + HZ;
+
+	/* This will add the timer as well as modify it */
+	mod_timer(&host->delayed_reset, reset_time);
+
+	return 0;
 }

@@ -1009,7 +1009,8 @@ static int __init ieee1394_init(void)
 
 	bus_register(&ieee1394_bus_type);
 
-	init_csr();
+	if (init_csr())
+		return -ENOMEM;
 
 	if (!disable_nodemgr)
 		init_ieee1394_nodemgr();
@@ -1043,6 +1044,7 @@ module_exit(ieee1394_cleanup);
 EXPORT_SYMBOL(hpsb_alloc_host);
 EXPORT_SYMBOL(hpsb_add_host);
 EXPORT_SYMBOL(hpsb_remove_host);
+EXPORT_SYMBOL(hpsb_update_config_rom_image);
 
 /** ieee1394_core.c **/
 EXPORT_SYMBOL(hpsb_speedto_str);
@@ -1081,6 +1083,7 @@ EXPORT_SYMBOL(hpsb_register_highlevel);
 EXPORT_SYMBOL(hpsb_unregister_highlevel);
 EXPORT_SYMBOL(hpsb_register_addrspace);
 EXPORT_SYMBOL(hpsb_unregister_addrspace);
+EXPORT_SYMBOL(hpsb_allocate_and_register_addrspace);
 EXPORT_SYMBOL(hpsb_listen_channel);
 EXPORT_SYMBOL(hpsb_unlisten_channel);
 EXPORT_SYMBOL(hpsb_get_hostinfo);
@@ -1113,7 +1116,6 @@ EXPORT_SYMBOL(nodemgr_for_each_host);
 
 /** csr.c **/
 EXPORT_SYMBOL(hpsb_update_config_rom);
-EXPORT_SYMBOL(hpsb_get_config_rom);
 
 /** dma.c **/
 EXPORT_SYMBOL(dma_prog_region_init);
@@ -1144,3 +1146,34 @@ EXPORT_SYMBOL(hpsb_iso_packet_sent);
 EXPORT_SYMBOL(hpsb_iso_packet_received);
 EXPORT_SYMBOL(hpsb_iso_wake);
 EXPORT_SYMBOL(hpsb_iso_recv_flush);
+
+/** csr1212.c **/
+EXPORT_SYMBOL(csr1212_create_csr);
+EXPORT_SYMBOL(csr1212_init_local_csr);
+EXPORT_SYMBOL(csr1212_new_immediate);
+EXPORT_SYMBOL(csr1212_new_leaf);
+EXPORT_SYMBOL(csr1212_new_csr_offset);
+EXPORT_SYMBOL(csr1212_new_directory);
+EXPORT_SYMBOL(csr1212_associate_keyval);
+EXPORT_SYMBOL(csr1212_attach_keyval_to_directory);
+EXPORT_SYMBOL(csr1212_new_extended_immediate);
+EXPORT_SYMBOL(csr1212_new_extended_leaf);
+EXPORT_SYMBOL(csr1212_new_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_textual_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_string_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_icon_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_modifiable_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_keyword_leaf);
+EXPORT_SYMBOL(csr1212_detach_keyval_from_directory);
+EXPORT_SYMBOL(csr1212_disassociate_keyval);
+EXPORT_SYMBOL(csr1212_release_keyval);
+EXPORT_SYMBOL(csr1212_destroy_csr);
+EXPORT_SYMBOL(csr1212_read);
+EXPORT_SYMBOL(csr1212_generate_positions);
+EXPORT_SYMBOL(csr1212_generate_layout_order);
+EXPORT_SYMBOL(csr1212_fill_cache);
+EXPORT_SYMBOL(csr1212_generate_csr_image);
+EXPORT_SYMBOL(csr1212_parse_keyval);
+EXPORT_SYMBOL(csr1212_parse_csr);
+EXPORT_SYMBOL(_csr1212_read_keyval);
+EXPORT_SYMBOL(_csr1212_destroy_keyval);

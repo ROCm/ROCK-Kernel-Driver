@@ -21,50 +21,12 @@
 #define _IEEE1394_NODEMGR_H
 
 #include <linux/device.h>
+#include "csr1212.h"
 #include "ieee1394_core.h"
 #include "ieee1394_hotplug.h"
 
-#define CONFIG_ROM_BUS_INFO_LENGTH(q)		((q) >> 24)
-#define CONFIG_ROM_BUS_CRC_LENGTH(q)		(((q) >> 16) & 0xff)
-#define CONFIG_ROM_BUS_CRC(q)			((q) & 0xffff)
-
-#define CONFIG_ROM_ROOT_LENGTH(q)		((q) >> 16)
-#define CONFIG_ROM_ROOT_CRC(q)			((q) & 0xffff)
-
-#define CONFIG_ROM_DIRECTORY_LENGTH(q)		((q) >> 16)
-#define CONFIG_ROM_DIRECTORY_CRC(q)		((q) & 0xffff)
-
-#define CONFIG_ROM_LEAF_LENGTH(q)		((q) >> 16)
-#define CONFIG_ROM_LEAF_CRC(q)			((q) & 0xffff)
-
-#define CONFIG_ROM_DESCRIPTOR_TYPE(q)		((q) >> 24)
-#define CONFIG_ROM_DESCRIPTOR_SPECIFIER_ID(q)	((q) & 0xffffff)
-#define CONFIG_ROM_DESCRIPTOR_WIDTH(q)		((q) >> 28)
-#define CONFIG_ROM_DESCRIPTOR_CHAR_SET(q)	(((q) >> 16) & 0xfff)
-#define CONFIG_ROM_DESCRIPTOR_LANG(q)		((q) & 0xffff)
-
-#define CONFIG_ROM_KEY_ID_MASK			0x3f
-#define CONFIG_ROM_KEY_TYPE_MASK		0xc0
-#define CONFIG_ROM_KEY_TYPE_IMMEDIATE		0x00
-#define CONFIG_ROM_KEY_TYPE_OFFSET		0x40
-#define CONFIG_ROM_KEY_TYPE_LEAF		0x80
-#define CONFIG_ROM_KEY_TYPE_DIRECTORY		0xc0
-
-#define CONFIG_ROM_KEY(q)			((q) >> 24)
-#define CONFIG_ROM_VALUE(q)			((q) & 0xffffff)
-
-#define CONFIG_ROM_VENDOR_ID			0x03
-#define CONFIG_ROM_MODEL_ID			0x17
-#define CONFIG_ROM_NODE_CAPABILITES		0x0C
-#define CONFIG_ROM_UNIT_DIRECTORY		0xd1
-#define CONFIG_ROM_LOGICAL_UNIT_DIRECTORY	0xd4
-#define CONFIG_ROM_SPECIFIER_ID			0x12 
-#define CONFIG_ROM_UNIT_SW_VERSION		0x13
-#define CONFIG_ROM_DESCRIPTOR_LEAF		0x81
-#define CONFIG_ROM_DESCRIPTOR_DIRECTORY		0xc1
-
 /* '1' '3' '9' '4' in ASCII */
-#define IEEE1394_BUSID_MAGIC	0x31333934
+#define IEEE1394_BUSID_MAGIC	__constant_cpu_to_be32(0x31333934)
 
 /* This is the start of a Node entry structure. It should be a stable API
  * for which to gather info from the Node Manager about devices attached
@@ -76,6 +38,7 @@ struct bus_options {
 	u8	bmc;		/* Bus Master Capable */
 	u8	pmc;		/* Power Manager Capable (PNP spec) */
 	u8	cyc_clk_acc;	/* Cycle clock accuracy */
+	u8	max_rom;	/* Maximum block read supported in the CSR */
 	u8	generation;	/* Incremented when configrom changes */
 	u8	lnkspd;		/* Link speed */
 	u16	max_rec;	/* Maximum packet size node can receive */
@@ -86,10 +49,8 @@ struct bus_options {
 #define UNIT_DIRECTORY_MODEL_ID			0x02
 #define UNIT_DIRECTORY_SPECIFIER_ID		0x04
 #define UNIT_DIRECTORY_VERSION			0x08
-#define UNIT_DIRECTORY_VENDOR_TEXT		0x10
-#define UNIT_DIRECTORY_MODEL_TEXT		0x20
-#define UNIT_DIRECTORY_HAS_LUN_DIRECTORY	0x40
-#define UNIT_DIRECTORY_LUN_DIRECTORY		0x80
+#define UNIT_DIRECTORY_HAS_LUN_DIRECTORY	0x10
+#define UNIT_DIRECTORY_LUN_DIRECTORY		0x20
 
 /*
  * A unit directory corresponds to a protocol supported by the
@@ -98,17 +59,15 @@ struct bus_options {
  */
 struct unit_directory {
 	struct node_entry *ne;  /* The node which this directory belongs to */
-	octlet_t address;	/* Address of the unit directory on the node */
+	octlet_t address;       /* Address of the unit directory on the node */
 	u8 flags;		/* Indicates which entries were read */
 
 	quadlet_t vendor_id;
-	const char *vendor_name;
+	struct csr1212_keyval *vendor_name_kv;
 	const char *vendor_oui;
 
-	int vendor_name_size;
 	quadlet_t model_id;
-	const char *model_name;
-	int model_name_size;
+	struct csr1212_keyval *model_name_kv;
 	quadlet_t specifier_id;
 	quadlet_t version;
 
@@ -118,8 +77,7 @@ struct unit_directory {
 
 	struct device device;
 
-	/* XXX Must be last in the struct! */
-	quadlet_t quadlets[0];
+	struct csr1212_keyval *ud_kv;
 };
 
 struct node_entry {
@@ -135,7 +93,7 @@ struct node_entry {
 
 	/* The following is read from the config rom */
 	u32 vendor_id;
-	const char *vendor_name;
+	struct csr1212_keyval *vendor_name_kv;
 	const char *vendor_oui;
 
 	u32 capabilities;
@@ -143,8 +101,7 @@ struct node_entry {
 
 	struct device device;
 
-	/* XXX Must be last in the struct! */
-	quadlet_t quadlets[0];
+	struct csr1212_csr *csr;
 };
 
 struct hpsb_protocol_driver {
