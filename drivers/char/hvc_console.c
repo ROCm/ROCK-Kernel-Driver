@@ -227,7 +227,12 @@ static void hvc_poll(int index)
 	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
+#if defined (CONFIG_XMON)
 extern unsigned long cpus_in_xmon;
+#else
+unsigned long cpus_in_xmon=0;
+#endif
+
 
 int khvcd(void *unused)
 {
