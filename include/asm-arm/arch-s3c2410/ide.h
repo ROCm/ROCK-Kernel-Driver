@@ -23,10 +23,10 @@
  * This should follow whatever the default interface uses.
  */
 
-static __inline__ void
-ide_init_hwif_ports(hw_regs_t *hw, int data_port, int ctrl_port, int *irq)
+static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
+				       unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t reg = (ide_ioreg_t) data_port;
+	unsigned long reg = data_port;
 	int i;
 
 	memset(hw, 0, sizeof(*hw));
@@ -35,7 +35,7 @@ ide_init_hwif_ports(hw_regs_t *hw, int data_port, int ctrl_port, int *irq)
 		hw->io_ports[i] = reg;
 		reg += 1;
 	}
-	hw->io_ports[IDE_CONTROL_OFFSET] = (ide_ioreg_t) ctrl_port;
+	hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
 	if (irq)
 		*irq = 0;
 }
