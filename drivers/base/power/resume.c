@@ -39,17 +39,13 @@ static int resume_device(struct device * dev)
 
 int dpm_resume(void)
 {
-	spin_lock(&dpm_lock);
 	while(!list_empty(&dpm_suspended)) {
 		struct list_head * entry = dpm_suspended.next;
 		struct device * dev = to_device(entry);
 		list_del_init(entry);
-		spin_unlock(&dpm_lock);
 		resume_device(dev);
-		spin_lock(&dpm_lock);
 		list_add_tail(entry,&dpm_active);
 	}
-	spin_unlock(&dpm_lock);
 	return 0;
 }
 
@@ -95,14 +91,12 @@ static void power_up_device(struct device * dev)
 
 void dpm_power_up_irq(void)
 {
-	spin_lock_irq(&dpm_lock);
 	while(!list_empty(&dpm_off_irq)) {
 		struct list_head * entry = dpm_off_irq.next;
 		list_del_init(entry);
 		power_up_device(to_device(entry));
 		list_add_tail(entry,&dpm_suspended);
 	}
-	spin_unlock_irq(&dpm_lock);
 }
 
 
@@ -116,14 +110,12 @@ void dpm_power_up_irq(void)
 
 void dpm_power_up(void)
 {
-	spin_lock(&dpm_lock);
 	while (!list_empty(&dpm_off)) {
 		struct list_head * entry = dpm_off.next;
 		list_del_init(entry);
 		power_up_device(to_device(entry));
 		list_add_tail(entry,&dpm_suspended);
 	}
-	spin_unlock(&dpm_lock);
 }
 
 

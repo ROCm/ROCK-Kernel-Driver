@@ -4,11 +4,6 @@
  */
 extern struct semaphore dpm_sem;
 
-/*
- * Used to protect PM lists.
- */
-extern spinlock_t dpm_lock;
-
 /* 
  * The PM lists.
  */

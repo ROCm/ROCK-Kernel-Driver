@@ -71,15 +71,12 @@ int device_pm_suspend(u32 state)
 	int error = 0;
 
 	down(&dpm_sem);
-	spin_lock(&dpm_lock);
 	while(!list_empty(&dpm_active)) {
 		struct list_head * entry = dpm_active.prev;
 		struct device * dev = to_device(entry);
 		list_del_init(entry);
-		spin_unlock(&dpm_lock);
 		error = suspend_device(dev,state);
 
-		spin_lock(&dpm_lock);
 		if (!error)
 			list_add(entry,&dpm_suspended);
 		else {
@@ -87,7 +84,6 @@ int device_pm_suspend(u32 state)
 			goto Error;
 		}
 	}
-	spin_unlock(&dpm_lock);
 
 	if ((error = sysdev_save(state)))
 		goto Error;
@@ -129,15 +125,12 @@ static int power_down_device(struct device * dev, u32 state)
 
 static int dpm_power_down(u32 state)
 {
-	spin_lock(&dpm_lock);
 	while(!list_empty(&dpm_suspended)) {
 		struct list_head * entry = dpm_suspended.prev;
 		int error;
 
 		list_del_init(entry);
-		spin_unlock(&dpm_lock);
 		error = power_down_device(to_device(entry),state);
-		spin_lock(&dpm_lock);
 		if (!error)
 			list_add(entry,&dpm_off);
 		else if (error == -EAGAIN)
@@ -147,7 +140,6 @@ static int dpm_power_down(u32 state)
 			return error;
 		}
 	}
-	spin_unlock(&dpm_lock);
 	return 0;
 }
 
@@ -166,12 +158,10 @@ static int dpm_power_down_irq(u32 state)
 	struct device * dev;
 	int error = 0;
 
-	spin_lock_irq(&dpm_lock);
 	list_for_each_entry_reverse(dev,&dpm_off_irq,power.entry) {
 		if ((error = power_down_device(dev,state)))
 			break;
 	}
-	spin_unlock_irq(&dpm_lock);
 	return error;
 }
 
