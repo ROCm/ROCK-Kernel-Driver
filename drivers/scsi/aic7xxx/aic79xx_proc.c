@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#19 $
+ * $Id$
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
@@ -49,7 +49,7 @@ static void	ahd_dump_target_state(struct ahd_softc *ahd,
 				      u_int our_id, char channel,
 				      u_int target_id, u_int target_offset);
 static void	ahd_dump_device_state(struct info_str *info,
-				      struct ahd_linux_device *dev);
+				      struct aic_linux_device *dev);
 static int	ahd_proc_write_seeprom(struct ahd_softc *ahd,
 				       char *buffer, int length);
 
@@ -166,7 +166,7 @@ ahd_dump_target_state(struct ahd_softc *ahd, struct info_str *info,
 		      u_int our_id, char channel, u_int target_id,
 		      u_int target_offset)
 {
-	struct	ahd_linux_target *targ;
+	struct	aic_linux_target *targ;
 	struct	ahd_initiator_tinfo *tinfo;
 	struct	ahd_tmode_tstate *tstate;
 	int	lun;
@@ -187,7 +187,7 @@ ahd_dump_target_state(struct ahd_softc *ahd, struct info_str *info,
 	copy_info(info, "\tTransmission Errors %ld\n", targ->errors_detected);
 
 	for (lun = 0; lun < AHD_NUM_LUNS; lun++) {
-		struct ahd_linux_device *dev;
+		struct aic_linux_device *dev;
 
 		dev = targ->devices[lun];
 
@@ -199,7 +199,7 @@ ahd_dump_target_state(struct ahd_softc *ahd, struct info_str *info,
 }
 
 static void
-ahd_dump_device_state(struct info_str *info, struct ahd_linux_device *dev)
+ahd_dump_device_state(struct info_str *info, struct aic_linux_device *dev)
 {
 	copy_info(info, "\tChannel %c Target %d Lun %d Settings\n",
 		  dev->target->channel + 'A', dev->target->target, dev->lun);

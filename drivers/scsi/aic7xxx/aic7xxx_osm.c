@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#235 $
+ * $Id$
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -129,9 +129,7 @@
  */
 #include "aiclib.c"
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 #include <linux/init.h>		/* __setup */
-#endif
 
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
@@ -139,7 +137,22 @@
 #endif
 
 #include <linux/mm.h>		/* For fetching system memory size */
-#include <linux/blkdev.h>		/* For block_size() */
+
+/************************* Magic SysReq Support *******************************/
+static struct aic_sysrq_key_op ahc_sysrq_op =
+{
+	aic_sysrq_handler,
+	"aic7xxxstatedump",
+	"Dump aic7xxx controller information to Console"
+};
+
+static int ahc_sysrq_key;
+
+/***************************** Global Data ************************************/
+/*
+ * Driver Initialization Status.  Used by ahc_linux_exit().
+ */
+int ahc_init_status;
 
 /*
  * Lock protecting manipulation of the ahc softc list.
@@ -149,14 +162,6 @@ spinlock_t ahc_list_spinlock;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 /* For dynamic sglist size calculation. */
 u_int ahc_linux_nseg;
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-struct proc_dir_entry proc_scsi_aic7xxx = {
-	PROC_SCSI_AIC7XXX, 7, "aic7xxx",
-	S_IFDIR | S_IRUGO | S_IXUGO, 2,
-	0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-};
 #endif
 
 /*
@@ -472,7 +477,7 @@ MODULE_PARM_DESC(aic7xxx,
 "	seltime:<int>		Selection Timeout\n"
 "				(0/256ms,1/128ms,2/64ms,3/32ms)\n"
 "\n"
-"	Sample /etc/modprobe.conf line:\n"
+"	Sample module configuration line:\n"
 "		Toggle EISA/VLB probing\n"
 "		Set tag depth on Controller 1/Target 1 to 10 tags\n"
 "		Shorten the selection timeout to 128ms\n"
@@ -482,35 +487,35 @@ MODULE_PARM_DESC(aic7xxx,
 #endif
 
 static void ahc_linux_handle_scsi_status(struct ahc_softc *,
-					 struct ahc_linux_device *,
+					 struct aic_linux_device *,
 					 struct scb *);
 static void ahc_linux_queue_cmd_complete(struct ahc_softc *ahc,
 					 Scsi_Cmnd *cmd);
 static void ahc_linux_filter_inquiry(struct ahc_softc*, struct ahc_devinfo*);
 static void ahc_linux_sem_timeout(u_long arg);
-static void ahc_linux_freeze_simq(struct ahc_softc *ahc);
-static void ahc_linux_release_simq(u_long arg);
 static void ahc_linux_dev_timed_unfreeze(u_long arg);
+static void ahc_linux_targ_timed_unfreeze(u_long arg);
+static int __init ahc_linux_init(void);
+static void ahc_linux_exit(void);
 static int  ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
 static void ahc_linux_initialize_scsi_bus(struct ahc_softc *ahc);
 static void ahc_linux_size_nseg(void);
 static void ahc_linux_thread_run_complete_queue(struct ahc_softc *ahc);
 static void ahc_linux_start_dv(struct ahc_softc *ahc);
-static void ahc_linux_dv_timeout(struct scsi_cmnd *cmd);
 static int  ahc_linux_dv_thread(void *data);
 static void ahc_linux_kill_dv_thread(struct ahc_softc *ahc);
 static void ahc_linux_dv_target(struct ahc_softc *ahc, u_int target);
 static void ahc_linux_dv_transition(struct ahc_softc *ahc,
 				    struct scsi_cmnd *cmd,
 				    struct ahc_devinfo *devinfo,
-				    struct ahc_linux_target *targ);
+				    struct aic_linux_target *targ);
 static void ahc_linux_dv_fill_cmd(struct ahc_softc *ahc,
 				  struct scsi_cmnd *cmd,
 				  struct ahc_devinfo *devinfo);
 static void ahc_linux_dv_inq(struct ahc_softc *ahc,
 			     struct scsi_cmnd *cmd,
 			     struct ahc_devinfo *devinfo,
-			     struct ahc_linux_target *targ,
+			     struct aic_linux_target *targ,
 			     u_int request_length);
 static void ahc_linux_dv_tur(struct ahc_softc *ahc,
 			     struct scsi_cmnd *cmd,
@@ -518,58 +523,48 @@ static void ahc_linux_dv_tur(struct ahc_softc *ahc,
 static void ahc_linux_dv_rebd(struct ahc_softc *ahc,
 			      struct scsi_cmnd *cmd,
 			      struct ahc_devinfo *devinfo,
-			      struct ahc_linux_target *targ);
+			      struct aic_linux_target *targ);
 static void ahc_linux_dv_web(struct ahc_softc *ahc,
 			     struct scsi_cmnd *cmd,
 			     struct ahc_devinfo *devinfo,
-			     struct ahc_linux_target *targ);
+			     struct aic_linux_target *targ);
 static void ahc_linux_dv_reb(struct ahc_softc *ahc,
 			     struct scsi_cmnd *cmd,
 			     struct ahc_devinfo *devinfo,
-			     struct ahc_linux_target *targ);
+			     struct aic_linux_target *targ);
 static void ahc_linux_dv_su(struct ahc_softc *ahc,
 			    struct scsi_cmnd *cmd,
 			    struct ahc_devinfo *devinfo,
-			    struct ahc_linux_target *targ);
+			    struct aic_linux_target *targ);
 static int ahc_linux_fallback(struct ahc_softc *ahc,
 			      struct ahc_devinfo *devinfo);
-static void ahc_linux_dv_complete(Scsi_Cmnd *cmd);
-static void ahc_linux_generate_dv_pattern(struct ahc_linux_target *targ);
+static void ahc_linux_generate_dv_pattern(struct aic_linux_target *targ);
 static u_int ahc_linux_user_tagdepth(struct ahc_softc *ahc,
 				     struct ahc_devinfo *devinfo);
 static u_int ahc_linux_user_dv_setting(struct ahc_softc *ahc);
-static void ahc_linux_device_queue_depth(struct ahc_softc *ahc,
-					 struct ahc_linux_device *dev);
-static struct ahc_linux_target*	ahc_linux_alloc_target(struct ahc_softc*,
+static void aic_linux_device_queue_depth(struct ahc_softc *ahc,
+					 struct aic_linux_device *dev);
+static struct aic_linux_target*	ahc_linux_alloc_target(struct ahc_softc*,
 						       u_int, u_int);
 static void			ahc_linux_free_target(struct ahc_softc*,
-						      struct ahc_linux_target*);
-static struct ahc_linux_device*	ahc_linux_alloc_device(struct ahc_softc*,
-						       struct ahc_linux_target*,
+						      struct aic_linux_target*);
+static struct aic_linux_device*	ahc_linux_alloc_device(struct ahc_softc*,
+						       struct aic_linux_target*,
 						       u_int);
 static void			ahc_linux_free_device(struct ahc_softc*,
-						      struct ahc_linux_device*);
-static void ahc_linux_run_device_queue(struct ahc_softc*,
-				       struct ahc_linux_device*);
+						      struct aic_linux_device*);
 static void ahc_linux_setup_tag_info_global(char *p);
 static aic_option_callback_t ahc_linux_setup_tag_info;
 static aic_option_callback_t ahc_linux_setup_dv;
 static int  aic7xxx_setup(char *s);
 static int  ahc_linux_next_unit(void);
-static void ahc_runq_tasklet(unsigned long data);
-static struct ahc_cmd *ahc_linux_run_complete_queue(struct ahc_softc *ahc);
+static struct aic_cmd *ahc_linux_run_complete_queue(struct ahc_softc *ahc);
 
 /********************************* Inlines ************************************/
-static __inline void ahc_schedule_runq(struct ahc_softc *ahc);
-static __inline struct ahc_linux_device*
+static __inline struct aic_linux_device*
 		     ahc_linux_get_device(struct ahc_softc *ahc, u_int channel,
 					  u_int target, u_int lun, int alloc);
 static __inline void ahc_schedule_completeq(struct ahc_softc *ahc);
-static __inline void ahc_linux_check_device_queue(struct ahc_softc *ahc,
-						  struct ahc_linux_device *dev);
-static __inline struct ahc_linux_device *
-		     ahc_linux_next_device_to_run(struct ahc_softc *ahc);
-static __inline void ahc_linux_run_device_queues(struct ahc_softc *ahc);
 static __inline void ahc_linux_unmap_scb(struct ahc_softc*, struct scb*);
 
 static __inline int ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
@@ -579,35 +574,19 @@ static __inline int ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
 static __inline void
 ahc_schedule_completeq(struct ahc_softc *ahc)
 {
-	if ((ahc->platform_data->flags & AHC_RUN_CMPLT_Q_TIMER) == 0) {
-		ahc->platform_data->flags |= AHC_RUN_CMPLT_Q_TIMER;
+	if ((ahc->platform_data->flags & AIC_RUN_CMPLT_Q_TIMER) == 0) {
+		ahc->platform_data->flags |= AIC_RUN_CMPLT_Q_TIMER;
 		ahc->platform_data->completeq_timer.expires = jiffies;
 		add_timer(&ahc->platform_data->completeq_timer);
 	}
 }
 
-/*
- * Must be called with our lock held.
- */
-static __inline void
-ahc_schedule_runq(struct ahc_softc *ahc)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	tasklet_schedule(&ahc->platform_data->runq_tasklet);
-#else
-	/*
-	 * Tasklets are not available, so run inline.
-	 */
-	ahc_runq_tasklet((unsigned long)ahc);
-#endif
-}
-
-static __inline struct ahc_linux_device*
+static __inline struct aic_linux_device*
 ahc_linux_get_device(struct ahc_softc *ahc, u_int channel, u_int target,
 		     u_int lun, int alloc)
 {
-	struct ahc_linux_target *targ;
-	struct ahc_linux_device *dev;
+	struct aic_linux_target *targ;
+	struct aic_linux_device *dev;
 	u_int target_offset;
 
 	target_offset = target;
@@ -629,15 +608,13 @@ ahc_linux_get_device(struct ahc_softc *ahc, u_int channel, u_int target,
 }
 
 #define AHC_LINUX_MAX_RETURNED_ERRORS 4
-static struct ahc_cmd *
+static struct aic_cmd *
 ahc_linux_run_complete_queue(struct ahc_softc *ahc)
 {
-	struct	ahc_cmd *acmd;
-	u_long	done_flags;
+	struct	aic_cmd *acmd;
 	int	with_errors;
 
 	with_errors = 0;
-	ahc_done_lock(ahc, &done_flags);
 	while ((acmd = TAILQ_FIRST(&ahc->platform_data->completeq)) != NULL) {
 		Scsi_Cmnd *cmd;
 
@@ -657,56 +634,11 @@ ahc_linux_run_complete_queue(struct ahc_softc *ahc)
 			     acmd, acmd_links.tqe);
 		cmd = &acmd_scsi_cmd(acmd);
 		cmd->host_scribble = NULL;
-		if (ahc_cmd_get_transaction_status(cmd) != DID_OK
-		 || (cmd->result & 0xFF) != SCSI_STATUS_OK)
-			with_errors++;
-
 		cmd->scsi_done(cmd);
+		with_errors++;
 	}
-	ahc_done_unlock(ahc, &done_flags);
 	return (acmd);
 }
-
-static __inline void
-ahc_linux_check_device_queue(struct ahc_softc *ahc,
-			     struct ahc_linux_device *dev)
-{
-	if ((dev->flags & AHC_DEV_FREEZE_TIL_EMPTY) != 0
-	 && dev->active == 0) {
-		dev->flags &= ~AHC_DEV_FREEZE_TIL_EMPTY;
-		dev->qfrozen--;
-	}
-
-	if (TAILQ_FIRST(&dev->busyq) == NULL
-	 || dev->openings == 0 || dev->qfrozen != 0)
-		return;
-
-	ahc_linux_run_device_queue(ahc, dev);
-}
-
-static __inline struct ahc_linux_device *
-ahc_linux_next_device_to_run(struct ahc_softc *ahc)
-{
-	
-	if ((ahc->flags & AHC_RESOURCE_SHORTAGE) != 0
-	 || (ahc->platform_data->qfrozen != 0
-	  && AHC_DV_SIMQ_FROZEN(ahc) == 0))
-		return (NULL);
-	return (TAILQ_FIRST(&ahc->platform_data->device_runq));
-}
-
-static __inline void
-ahc_linux_run_device_queues(struct ahc_softc *ahc)
-{
-	struct ahc_linux_device *dev;
-
-	while ((dev = ahc_linux_next_device_to_run(ahc)) != NULL) {
-		TAILQ_REMOVE(&ahc->platform_data->device_runq, dev, links);
-		dev->flags &= ~AHC_DEV_ON_RUN_LIST;
-		ahc_linux_check_device_queue(ahc, dev);
-	}
-}
-
 static __inline void
 ahc_linux_unmap_scb(struct ahc_softc *ahc, struct scb *scb)
 {
@@ -718,10 +650,10 @@ ahc_linux_unmap_scb(struct ahc_softc *ahc, struct scb *scb)
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *)cmd->request_buffer;
-		pci_unmap_sg(ahc->dev_softc, sg, cmd->use_sg,
+		aic_unmap_sg(ahc, sg, cmd->use_sg,
 			     scsi_to_pci_dma_dir(cmd->sc_data_direction));
 	} else if (cmd->request_bufflen != 0) {
-		pci_unmap_single(ahc->dev_softc,
+		aic_unmap_single(ahc,
 				 scb->platform_data->buf_busaddr,
 				 cmd->request_bufflen,
 				 scsi_to_pci_dma_dir(cmd->sc_data_direction));
@@ -739,14 +671,14 @@ ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
 		      "Increase AHC_NSEG\n");
 
 	consumed = 1;
-	sg->addr = ahc_htole32(addr & 0xFFFFFFFF);
+	sg->addr = aic_htole32(addr & 0xFFFFFFFF);
 	scb->platform_data->xfer_len += len;
 
 	if (sizeof(bus_addr_t) > 4
 	 && (ahc->flags & AHC_39BIT_ADDRESSING) != 0)
 		len |= (addr >> 8) & AHC_SG_HIGH_ADDR_MASK;
 
-	sg->len = ahc_htole32(len);
+	sg->len = aic_htole32(len);
 	return (consumed);
 }
 
@@ -836,6 +768,164 @@ ahc_linux_size_nseg(void)
 #endif
 }
 
+/************************** Error Recovery ************************************/
+static int ahc_linux_recovery_thread(void *arg);
+
+static int
+ahc_linux_recovery_thread(void *arg)
+{
+	struct ahc_softc *ahc;
+	u_long s;
+
+	ahc = (struct ahc_softc *)arg;
+
+	/*
+	 * Complete thread creation.
+	 */
+	lock_kernel();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,60)
+	/*
+	 * Don't care about any signals.
+	 */
+	siginitsetinv(&current->blocked, 0);
+
+	daemonize();
+	sprintf(current->comm, "ahc_recovery_%d", ahc->unit);
+#else
+	daemonize("ahc_recovery_%d", ahc->unit);
+#endif
+	unlock_kernel();
+
+	while (1) {
+
+		/*
+		 * Use down_interruptible() rather than down() to
+		 * avoid inclusion in the load average.
+		 */
+		down_interruptible(&ahc->platform_data->recovery_sem);
+
+		ahc_lock(ahc, &s);
+		if ((ahc->flags & AHC_SHUTDOWN_RECOVERY) != 0) {
+			ahc_unlock(ahc, &s);
+			break;
+		}
+
+		/*
+		 * Don't bother the recovery handler if the
+		 * list has been cleared by a previous run
+		 * of the handler.  This can happen when
+		 * several SCBs timeout before our handler
+		 * can run causing our semaphore to be up'ed
+		 * repeatedly.  The extra calls need to be
+		 * avoided so that the recovery handler doesn't
+		 * confuse this case with timeouts occuring
+		 * due to interrupts failing to function.
+		 */
+		if (LIST_EMPTY(&ahc->timedout_scbs) != 0) {
+			ahc_unlock(ahc, &s);
+			continue;
+		}
+		ahc_unlock(ahc, &s);
+		ahc_recover_commands(ahc);
+
+		/*
+		 * Process any pent up completions.
+		 */
+		ahc_lock(ahc, &s);
+		aic_schedule_runq(ahc);
+		ahc_linux_run_complete_queue(ahc);
+		ahc_unlock(ahc, &s);
+	}
+	up(&ahc->platform_data->recovery_ending_sem);
+	return(0);
+}
+
+int
+ahc_spawn_recovery_thread(struct ahc_softc *ahc)
+{
+	ahc->platform_data->recovery_pid =
+	    kernel_thread(ahc_linux_recovery_thread, ahc, 0);
+
+	if (ahc->platform_data->recovery_pid < 0)
+		return (-ahc->platform_data->recovery_pid);
+
+	return (0);
+}
+
+void
+ahc_terminate_recovery_thread(struct ahc_softc *ahc)
+{
+	u_long s;
+
+	ahc_lock(ahc, &s);
+	if (ahc->platform_data->recovery_pid != 0) {
+		ahc->flags |= AHC_SHUTDOWN_RECOVERY;
+		ahc_unlock(ahc, &s);
+		up(&ahc->platform_data->recovery_sem);
+
+		/*
+		 * Use the recovery_ending_sem as an indicator that
+		 * the dv thread is exiting.  Note that the dv
+		 * thread must still return after performing
+		 * the up on our semaphore before it has
+		 * completely exited this module.  Unfortunately,
+		 * there seems to be no easy way to wait for the
+		 * exit of a thread for which you are not the
+		 * parent (dv threads are parented by init).
+		 * Cross your fingers...
+		 */
+		down(&ahc->platform_data->recovery_ending_sem);
+
+		/*
+		 * Mark the recovery thread as already dead.  This
+		 * avoids attempting to kill it a second time.
+		 * This is necessary because we must kill the
+		 * our threads before calling ahc_free() in the
+		 * module shutdown case to avoid bogus locking
+		 * in the SCSI mid-layer, but when ahc_free() is
+		 * called without killing the DV thread in the
+		 * instance detach case, so ahc_platform_free()
+		 * calls us again to verify that the DV thread
+		 * is dead.
+		 */
+		ahc->platform_data->recovery_pid = 0;
+	} else {
+		ahc_unlock(ahc, &s);
+	}
+}
+
+void
+ahc_set_recoveryscb(struct ahc_softc *ahc, struct scb *scb)
+{
+	if ((scb->flags & SCB_RECOVERY_SCB) == 0) {
+		struct scb *list_scb;
+
+		scb->flags |= SCB_RECOVERY_SCB;
+
+		/*
+		 * Take all queued, but not sent SCBs out of the equation.
+		 * Also ensure that no new commands are queued to us while we
+		 * try to fix this problem.
+		 */
+		if ((scb->platform_data->flags & AIC_RELEASE_SIMQ) == 0) {
+			aic_freeze_simq(ahc);
+			scb->platform_data->flags |= AIC_RELEASE_SIMQ;
+		}
+
+		/*
+		 * Go through all of our pending SCBs and remove
+		 * any scheduled timeouts for them.  We will reschedule
+		 * them after we've successfully fixed this problem.
+		 */
+		LIST_FOREACH(list_scb, &ahc->pending_scbs, pending_links) {
+
+			scsi_delete_timer(list_scb->io_ctx);
+			list_scb->platform_data->flags &= ~AIC_TIMEOUT_ACTIVE;
+		}
+	}
+}
+
+/************************ Linux Entry Points **********************************/
 /*
  * Try to detect an Adaptec 7XXX controller.
  */
@@ -852,17 +942,19 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	 */
 	spin_unlock_irq(&io_request_lock);
 #endif
+	found = 0;
 
 	/*
 	 * Sanity checking of Linux SCSI data structures so
 	 * that some of our hacks^H^H^H^H^Hassumptions aren't
 	 * violated.
 	 */
-	if (offsetof(struct ahc_cmd_internal, end)
+	if (offsetof(struct aic_cmd_internal, end)
 	  > offsetof(struct scsi_cmnd, host_scribble)) {
 		printf("ahc_linux_detect: SCSI data structures changed.\n");
 		printf("ahc_linux_detect: Unable to attach\n");
-		return (0);
+		ahc_init_status = -EINVAL;
+		goto done;
 	}
 	ahc_linux_size_nseg();
 #ifdef MODULE
@@ -879,11 +971,7 @@ ahc_linux_detect(Scsi_Host_Template *template)
 "aic7xxx: insmod or else it might trash certain memory areas.\n");
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
 	template->proc_name = "aic7xxx";
-#else
-	template->proc_dir = &proc_scsi_aic7xxx;
-#endif
 
 	/*
 	 * Initialize our softc list lock prior to
@@ -892,36 +980,32 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	ahc_list_lockinit();
 
 #ifdef CONFIG_PCI
-	found = ahc_linux_pci_init();
-	if (found)
-		goto out;
+	ahc_init_status = ahc_linux_pci_init();
+	if (ahc_init_status != 0)
+		goto done;
 #endif
 
 #ifdef CONFIG_EISA
-	found = ahc_linux_eisa_init();
-	if (found) {
-#ifdef CONFIG_PCI
-		ahc_linux_pci_exit();
-#endif
-		goto out;
-	}
+	ahc_init_status = ahc_linux_eisa_init();
+	if (ahc_init_status != 0)
+		goto done;
 #endif
 
 	/*
 	 * Register with the SCSI layer all
 	 * controllers we've found.
 	 */
+	found = 0;
 	TAILQ_FOREACH(ahc, &ahc_tailq, links) {
 
 		if (ahc_linux_register_host(ahc, template) == 0)
 			found++;
 	}
+done:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	spin_lock_irq(&io_request_lock);
 #endif
 	aic7xxx_detect_complete++;
-
-out:
 	return (found);
 }
 
@@ -936,7 +1020,6 @@ ahc_linux_release(struct Scsi_Host * host)
 	struct ahc_softc *ahc;
 	u_long l;
 
-	ahc_list_lock(&l);
 	if (host != NULL) {
 
 		/*
@@ -944,17 +1027,20 @@ ahc_linux_release(struct Scsi_Host * host)
 		 * the free directly, but check our
 		 * list for extra sanity.
 		 */
+		ahc_list_lock(&l);
 		ahc = ahc_find_softc(*(struct ahc_softc **)host->hostdata);
 		if (ahc != NULL) {
 			u_long s;
 
+			TAILQ_REMOVE(&ahc_tailq, ahc, links);
+			ahc_list_unlock(&l);
 			ahc_lock(ahc, &s);
 			ahc_intr_enable(ahc, FALSE);
 			ahc_unlock(ahc, &s);
 			ahc_free(ahc);
-		}
+		} else
+			ahc_list_unlock(&l);
 	}
-	ahc_list_unlock(&l);
 	return (0);
 }
 #endif
@@ -994,7 +1080,7 @@ static int
 ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 {
 	struct	 ahc_softc *ahc;
-	struct	 ahc_linux_device *dev;
+	struct	 aic_linux_device *dev;
 	u_long	 flags;
 
 	ahc = *(struct ahc_softc **)cmd->device->host->hostdata;
@@ -1004,7 +1090,7 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 	 */
 	cmd->scsi_done = scsi_done;
 
-	ahc_midlayer_entrypoint_lock(ahc, &flags);
+	ahc_entrypoint_lock(ahc, &flags);
 
 	/*
 	 * Close the race of a command that was in the process of
@@ -1013,33 +1099,63 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 	 * perform DV.
 	 */
 	if (ahc->platform_data->qfrozen != 0
-	 && AHC_DV_CMD(cmd) == 0) {
+	 && AIC_DV_CMD(cmd) == 0) {
 
-		ahc_cmd_set_transaction_status(cmd, CAM_REQUEUE_REQ);
+		aic_cmd_set_transaction_status(cmd, CAM_REQUEUE_REQ);
 		ahc_linux_queue_cmd_complete(ahc, cmd);
 		ahc_schedule_completeq(ahc);
-		ahc_midlayer_entrypoint_unlock(ahc, &flags);
+		ahc_entrypoint_unlock(ahc, &flags);
 		return (0);
 	}
 	dev = ahc_linux_get_device(ahc, cmd->device->channel, cmd->device->id,
 				   cmd->device->lun, /*alloc*/TRUE);
 	if (dev == NULL) {
-		ahc_cmd_set_transaction_status(cmd, CAM_RESRC_UNAVAIL);
+
+		aic_cmd_set_transaction_status(cmd, CAM_RESRC_UNAVAIL);
 		ahc_linux_queue_cmd_complete(ahc, cmd);
 		ahc_schedule_completeq(ahc);
-		ahc_midlayer_entrypoint_unlock(ahc, &flags);
+		ahc_entrypoint_unlock(ahc, &flags);
 		printf("%s: aic7xxx_linux_queue - Unable to allocate device!\n",
 		       ahc_name(ahc));
 		return (0);
+	} else if ((dev->flags & AIC_DEV_UNCONFIGURED) != 0
+		&& cmd->device->type != -1) {
+		/*
+		 * Configure devices that have already successfully
+		 * completed an inquiry. This  handles the case of
+		 * devices being destroyed due to transient selection
+		 * timeouts.
+		 */
+		dev->flags &= ~AIC_DEV_UNCONFIGURED;
+	 	dev->scsi_device = cmd->device;
+		aic_linux_device_queue_depth(ahc, dev);
 	}
+
+	if (cmd->cmd_len > MAX_CDB_LEN) {
+
+		aic_cmd_set_transaction_status(cmd, CAM_REQ_INVALID);
+		ahc_linux_queue_cmd_complete(ahc, cmd);
+		ahc_schedule_completeq(ahc);
+		ahc_entrypoint_unlock(ahc, &flags);
+		printf("%s: aic7xxx_linux_queue -"
+		       "CDB length of %d exceeds max!\n",
+		       ahc_name(ahc), cmd->cmd_len);
+		return (0);
+	}
+
+	/*
+	 * We perform our own timeout handling.
+	 */
+	scsi_delete_timer(cmd);
+
 	cmd->result = CAM_REQ_INPROG << 16;
-	TAILQ_INSERT_TAIL(&dev->busyq, (struct ahc_cmd *)cmd, acmd_links.tqe);
-	if ((dev->flags & AHC_DEV_ON_RUN_LIST) == 0) {
+	TAILQ_INSERT_TAIL(&dev->busyq, (struct aic_cmd *)cmd, acmd_links.tqe);
+	if ((dev->flags & AIC_DEV_ON_RUN_LIST) == 0) {
 		TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq, dev, links);
-		dev->flags |= AHC_DEV_ON_RUN_LIST;
-		ahc_linux_run_device_queues(ahc);
+		dev->flags |= AIC_DEV_ON_RUN_LIST;
+		aic_linux_run_device_queues(ahc);
 	}
-	ahc_midlayer_entrypoint_unlock(ahc, &flags);
+	ahc_entrypoint_unlock(ahc, &flags);
 	return (0);
 }
 
@@ -1059,13 +1175,13 @@ static int
 ahc_linux_slave_configure(Scsi_Device *device)
 {
 	struct	ahc_softc *ahc;
-	struct	ahc_linux_device *dev;
+	struct	aic_linux_device *dev;
 	u_long	flags;
 
 	ahc = *((struct ahc_softc **)device->host->hostdata);
 	if (bootverbose)
 		printf("%s: Slave Configure %d\n", ahc_name(ahc), device->id);
-	ahc_midlayer_entrypoint_lock(ahc, &flags);
+	ahc_entrypoint_lock(ahc, &flags);
 	/*
 	 * Since Linux has attached to the device, configure
 	 * it so we don't free and allocate the device
@@ -1075,11 +1191,11 @@ ahc_linux_slave_configure(Scsi_Device *device)
 				   device->id, device->lun,
 				   /*alloc*/TRUE);
 	if (dev != NULL) {
-		dev->flags &= ~AHC_DEV_UNCONFIGURED;
+		dev->flags &= ~AIC_DEV_UNCONFIGURED;
 		dev->scsi_device = device;
-		ahc_linux_device_queue_depth(ahc, dev);
+		aic_linux_device_queue_depth(ahc, dev);
 	}
-	ahc_midlayer_entrypoint_unlock(ahc, &flags);
+	ahc_entrypoint_unlock(ahc, &flags);
 	return (0);
 }
 
@@ -1087,13 +1203,13 @@ static void
 ahc_linux_slave_destroy(Scsi_Device *device)
 {
 	struct	ahc_softc *ahc;
-	struct	ahc_linux_device *dev;
+	struct	aic_linux_device *dev;
 	u_long	flags;
 
 	ahc = *((struct ahc_softc **)device->host->hostdata);
 	if (bootverbose)
 		printf("%s: Slave Destroy %d\n", ahc_name(ahc), device->id);
-	ahc_midlayer_entrypoint_lock(ahc, &flags);
+	ahc_entrypoint_lock(ahc, &flags);
 	dev = ahc_linux_get_device(ahc, device->channel,
 				   device->id, device->lun,
 					   /*alloc*/FALSE);
@@ -1105,14 +1221,13 @@ ahc_linux_slave_destroy(Scsi_Device *device)
 	 * the refcounting process.
 	 */
 	if (dev != NULL
-	 && (dev->flags & AHC_DEV_SLAVE_CONFIGURED) != 0) {
-		dev->flags |= AHC_DEV_UNCONFIGURED;
+	 && (dev->flags & AIC_DEV_SLAVE_CONFIGURED) != 0) {
+		dev->flags |= AIC_DEV_UNCONFIGURED;
 		if (TAILQ_EMPTY(&dev->busyq)
-		 && dev->active == 0
-	 	 && (dev->flags & AHC_DEV_TIMER_ACTIVE) == 0)
+		 && dev->active == 0)
 			ahc_linux_free_device(ahc, dev);
 	}
-	ahc_midlayer_entrypoint_unlock(ahc, &flags);
+	ahc_entrypoint_unlock(ahc, &flags);
 }
 #else
 /*
@@ -1148,7 +1263,7 @@ ahc_linux_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs)
 			continue;
 
 		if (device->host == host) {
-			struct	 ahc_linux_device *dev;
+			struct	 aic_linux_device *dev;
 
 			/*
 			 * Since Linux has attached to the device, configure
@@ -1159,13 +1274,13 @@ ahc_linux_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs)
 						   device->id, device->lun,
 						   /*alloc*/TRUE);
 			if (dev != NULL) {
-				dev->flags &= ~AHC_DEV_UNCONFIGURED;
+				dev->flags &= ~AIC_DEV_UNCONFIGURED;
 				dev->scsi_device = device;
-				ahc_linux_device_queue_depth(ahc, dev);
+				aic_linux_device_queue_depth(ahc, dev);
 				device->queue_depth = dev->openings
 						    + dev->active;
-				if ((dev->flags & (AHC_DEV_Q_BASIC
-						| AHC_DEV_Q_TAGGED)) == 0) {
+				if ((dev->flags & (AIC_DEV_Q_BASIC
+						| AIC_DEV_Q_TAGGED)) == 0) {
 					/*
 					 * We allow the OS to queue 2 untagged
 					 * transactions to us at any time even
@@ -1290,11 +1405,11 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
 	int    found;
 
 	ahc = *(struct ahc_softc **)cmd->device->host->hostdata;
-	ahc_midlayer_entrypoint_lock(ahc, &s);
+	ahc_entrypoint_lock(ahc, &s);
 	found = ahc_reset_channel(ahc, cmd->device->channel + 'A',
 				  /*initiate reset*/TRUE);
 	ahc_linux_run_complete_queue(ahc);
-	ahc_midlayer_entrypoint_unlock(ahc, &s);
+	ahc_entrypoint_unlock(ahc, &s);
 
 	if (bootverbose)
 		printf("%s: SCSI bus reset delivered. "
@@ -1303,201 +1418,14 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
 	return SUCCESS;
 }
 
-Scsi_Host_Template aic7xxx_driver_template = {
-	.module			= THIS_MODULE,
-	.name			= "aic7xxx",
-	.proc_info		= ahc_linux_proc_info,
-	.info			= ahc_linux_info,
-	.queuecommand		= ahc_linux_queue,
-	.eh_abort_handler	= ahc_linux_abort,
-	.eh_device_reset_handler = ahc_linux_dev_reset,
-	.eh_bus_reset_handler	= ahc_linux_bus_reset,
-#if defined(__i386__)
-	.bios_param		= ahc_linux_biosparam,
-#endif
-	.can_queue		= AHC_MAX_QUEUE,
-	.this_id		= -1,
-	.cmd_per_lun		= 2,
-	.use_clustering		= ENABLE_CLUSTERING,
-	.slave_alloc		= ahc_linux_slave_alloc,
-	.slave_configure	= ahc_linux_slave_configure,
-	.slave_destroy		= ahc_linux_slave_destroy,
-};
-
-/**************************** Tasklet Handler *********************************/
-
-/*
- * In 2.4.X and above, this routine is called from a tasklet,
- * so we must re-acquire our lock prior to executing this code.
- * In all prior kernels, ahc_schedule_runq() calls this routine
- * directly and ahc_schedule_runq() is called with our lock held.
- */
-static void
-ahc_runq_tasklet(unsigned long data)
-{
-	struct ahc_softc* ahc;
-	struct ahc_linux_device *dev;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	u_long flags;
-#endif
-
-	ahc = (struct ahc_softc *)data;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	ahc_lock(ahc, &flags);
-#endif
-	while ((dev = ahc_linux_next_device_to_run(ahc)) != NULL) {
-	
-		TAILQ_REMOVE(&ahc->platform_data->device_runq, dev, links);
-		dev->flags &= ~AHC_DEV_ON_RUN_LIST;
-		ahc_linux_check_device_queue(ahc, dev);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-		/* Yeild to our interrupt handler */
-		ahc_unlock(ahc, &flags);
-		ahc_lock(ahc, &flags);
-#endif
-	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	ahc_unlock(ahc, &flags);
-#endif
-}
+Scsi_Host_Template aic7xxx_driver_template =
+	AIC_TEMPLATE_INITIALIZER("aic7xxx", /* max_sectors*/8192);
 
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahc, cmd)						    \
 	((((cmd)->device->id << TID_SHIFT) & TID)			    \
 	| (((cmd)->device->channel == 0) ? (ahc)->our_id : (ahc)->our_id_b) \
 	| (((cmd)->device->channel == 0) ? 0 : TWIN_CHNLB))
-
-/******************************** Bus DMA *************************************/
-int
-ahc_dma_tag_create(struct ahc_softc *ahc, bus_dma_tag_t parent,
-		   bus_size_t alignment, bus_size_t boundary,
-		   bus_addr_t lowaddr, bus_addr_t highaddr,
-		   bus_dma_filter_t *filter, void *filterarg,
-		   bus_size_t maxsize, int nsegments,
-		   bus_size_t maxsegsz, int flags, bus_dma_tag_t *ret_tag)
-{
-	bus_dma_tag_t dmat;
-
-	dmat = malloc(sizeof(*dmat), M_DEVBUF, M_NOWAIT);
-	if (dmat == NULL)
-		return (ENOMEM);
-
-	/*
-	 * Linux is very simplistic about DMA memory.  For now don't
-	 * maintain all specification information.  Once Linux supplies
-	 * better facilities for doing these operations, or the
-	 * needs of this particular driver change, we might need to do
-	 * more here.
-	 */
-	dmat->alignment = alignment;
-	dmat->boundary = boundary;
-	dmat->maxsize = maxsize;
-	*ret_tag = dmat;
-	return (0);
-}
-
-void
-ahc_dma_tag_destroy(struct ahc_softc *ahc, bus_dma_tag_t dmat)
-{
-	free(dmat, M_DEVBUF);
-}
-
-int
-ahc_dmamem_alloc(struct ahc_softc *ahc, bus_dma_tag_t dmat, void** vaddr,
-		 int flags, bus_dmamap_t *mapp)
-{
-	bus_dmamap_t map;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-	map = malloc(sizeof(*map), M_DEVBUF, M_NOWAIT);
-	if (map == NULL)
-		return (ENOMEM);
-	/*
-	 * Although we can dma data above 4GB, our
-	 * "consistent" memory is below 4GB for
-	 * space efficiency reasons (only need a 4byte
-	 * address).  For this reason, we have to reset
-	 * our dma mask when doing allocations.
-	 */
-	if (ahc->dev_softc != NULL)
-		if (ahc_pci_set_dma_mask(ahc->dev_softc, 0xFFFFFFFF)) {
-			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
-			return (ENODEV);
-		}
-	*vaddr = pci_alloc_consistent(ahc->dev_softc,
-				      dmat->maxsize, &map->bus_addr);
-	if (ahc->dev_softc != NULL)
-		if (ahc_pci_set_dma_mask(ahc->dev_softc,
-				     ahc->platform_data->hw_dma_mask)) {
-			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
-			return (ENODEV);
-		}
-#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
-	/*
-	 * At least in 2.2.14, malloc is a slab allocator so all
-	 * allocations are aligned.  We assume for these kernel versions
-	 * that all allocations will be bellow 4Gig, physically contiguous,
-	 * and accessible via DMA by the controller.
-	 */
-	map = NULL; /* No additional information to store */
-	*vaddr = malloc(dmat->maxsize, M_DEVBUF, M_NOWAIT);
-#endif
-	if (*vaddr == NULL)
-		return (ENOMEM);
-	*mapp = map;
-	return(0);
-}
-
-void
-ahc_dmamem_free(struct ahc_softc *ahc, bus_dma_tag_t dmat,
-		void* vaddr, bus_dmamap_t map)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-	pci_free_consistent(ahc->dev_softc, dmat->maxsize,
-			    vaddr, map->bus_addr);
-#else
-	free(vaddr, M_DEVBUF);
-#endif
-}
-
-int
-ahc_dmamap_load(struct ahc_softc *ahc, bus_dma_tag_t dmat, bus_dmamap_t map,
-		void *buf, bus_size_t buflen, bus_dmamap_callback_t *cb,
-		void *cb_arg, int flags)
-{
-	/*
-	 * Assume for now that this will only be used during
-	 * initialization and not for per-transaction buffer mapping.
-	 */
-	bus_dma_segment_t stack_sg;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-	stack_sg.ds_addr = map->bus_addr;
-#else
-#define VIRT_TO_BUS(a) (uint32_t)virt_to_bus((void *)(a))
-	stack_sg.ds_addr = VIRT_TO_BUS(buf);
-#endif
-	stack_sg.ds_len = dmat->maxsize;
-	cb(cb_arg, &stack_sg, /*nseg*/1, /*error*/0);
-	return (0);
-}
-
-void
-ahc_dmamap_destroy(struct ahc_softc *ahc, bus_dma_tag_t dmat, bus_dmamap_t map)
-{
-	/*
-	 * The map may is NULL in our < 2.3.X implementation.
-	 */
-	if (map != NULL)
-		free(map, M_DEVBUF);
-}
-
-int
-ahc_dmamap_unload(struct ahc_softc *ahc, bus_dma_tag_t dmat, bus_dmamap_t map)
-{
-	/* Nothing to do */
-	return (0);
-}
 
 /********************* Platform Dependent Functions ***************************/
 /*
@@ -1543,24 +1471,25 @@ ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 
 	/* Still equal.  Sort by BIOS address, ioport, or bus/slot/func. */
 	switch (rvalue) {
+#ifdef CONFIG_PCI
 	case AHC_PCI:
 	{
 		char primary_channel;
 
 		if (aic7xxx_reverse_scan != 0)
-			value = ahc_get_pci_bus(lahc->dev_softc)
-			      - ahc_get_pci_bus(rahc->dev_softc);
+			value = aic_get_pci_bus(lahc->dev_softc)
+			      - aic_get_pci_bus(rahc->dev_softc);
 		else
-			value = ahc_get_pci_bus(rahc->dev_softc)
-			      - ahc_get_pci_bus(lahc->dev_softc);
+			value = aic_get_pci_bus(rahc->dev_softc)
+			      - aic_get_pci_bus(lahc->dev_softc);
 		if (value != 0)
 			break;
 		if (aic7xxx_reverse_scan != 0)
-			value = ahc_get_pci_slot(lahc->dev_softc)
-			      - ahc_get_pci_slot(rahc->dev_softc);
+			value = aic_get_pci_slot(lahc->dev_softc)
+			      - aic_get_pci_slot(rahc->dev_softc);
 		else
-			value = ahc_get_pci_slot(rahc->dev_softc)
-			      - ahc_get_pci_slot(lahc->dev_softc);
+			value = aic_get_pci_slot(rahc->dev_softc)
+			      - aic_get_pci_slot(lahc->dev_softc);
 		if (value != 0)
 			break;
 		/*
@@ -1575,6 +1504,8 @@ ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 			value = 1;
 		break;
 	}
+#endif
+#ifdef CONFIG_EISA
 	case AHC_EISA:
 		if ((rahc->flags & AHC_BIOS_ENABLED) != 0) {
 			value = rahc->platform_data->bios_address
@@ -1584,6 +1515,7 @@ ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 			      - lahc->bsh.ioport; 
 		}
 		break;
+#endif
 	default:
 		panic("ahc_softc_sort: invalid bus type");
 	}
@@ -1703,9 +1635,7 @@ aic7xxx_setup(char *s)
 	return 1;
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
 __setup("aic7xxx=", aic7xxx_setup);
-#endif
 
 uint32_t aic7xxx_verbose;
 
@@ -1717,20 +1647,23 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	char	*new_name;
 	u_long	 s;
 	u_int	 targ_offset;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	int	 error;
+#endif
 
 	template->name = ahc->description;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	host = scsi_host_alloc(template, sizeof(struct ahc_softc *));
+#else
+	host = scsi_register(template, sizeof(struct ahc_softc *));
+#endif
 	if (host == NULL)
 		return (ENOMEM);
 
 	*((struct ahc_softc **)host->hostdata) = ahc;
 	ahc_lock(ahc, &s);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	scsi_assign_lock(host, &ahc->platform_data->spin_lock);
-#elif AHC_SCSI_HAS_HOST_LOCK != 0
-	host->lock = &ahc->platform_data->spin_lock;
-#endif
 	ahc->platform_data->host = host;
+	aic_assign_host_lock(ahc);
 	host->can_queue = AHC_MAX_QUEUE;
 	host->cmd_per_lun = 2;
 	/* XXX No way to communicate the ID for multiple channels */
@@ -1754,13 +1687,19 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 #endif
 	ahc_linux_initialize_scsi_bus(ahc);
 	ahc_unlock(ahc, &s);
+	ahc_spawn_recovery_thread(ahc);
+	if (ahc->platform_data->recovery_pid < 0) {
+		printf("%s: Failed to create recovery thread, error= %d\n",
+		       ahc_name(ahc), ahc->platform_data->recovery_pid);
+		return (-ahc->platform_data->recovery_pid);
+	}
 	ahc->platform_data->dv_pid = kernel_thread(ahc_linux_dv_thread, ahc, 0);
-	ahc_lock(ahc, &s);
 	if (ahc->platform_data->dv_pid < 0) {
 		printf("%s: Failed to create DV thread, error= %d\n",
 		       ahc_name(ahc), ahc->platform_data->dv_pid);
 		return (-ahc->platform_data->dv_pid);
 	}
+	ahc_lock(ahc, &s);
 	/*
 	 * Initially allocate *all* of our linux target objects
 	 * so that the DV thread will scan them all in parallel
@@ -1805,7 +1744,9 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	ahc_unlock(ahc, &s);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	scsi_add_host(host, (ahc->dev_softc ? &ahc->dev_softc->dev : NULL)); /* XXX handle failure */
+	error = scsi_add_host(host, ahc->dev_softc);
+	if (error != 0)
+		return (-error);
 	scsi_scan_host(host);
 #endif
 	return (0);
@@ -1903,17 +1844,6 @@ ahc_linux_initialize_scsi_bus(struct ahc_softc *ahc)
 		ahc_update_neg_request(ahc, &devinfo, tstate,
 				       tinfo, AHC_NEG_ALWAYS);
 	}
-	/* Give the bus some time to recover */
-	if ((ahc->flags & (AHC_RESET_BUS_A|AHC_RESET_BUS_B)) != 0) {
-		ahc_linux_freeze_simq(ahc);
-		init_timer(&ahc->platform_data->reset_timer);
-		ahc->platform_data->reset_timer.data = (u_long)ahc;
-		ahc->platform_data->reset_timer.expires =
-		    jiffies + (AIC7XXX_RESET_DELAY * HZ)/1000;
-		ahc->platform_data->reset_timer.function =
-		    ahc_linux_release_simq;
-		add_timer(&ahc->platform_data->reset_timer);
-	}
 }
 
 int
@@ -1927,27 +1857,23 @@ ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg)
 	memset(ahc->platform_data, 0, sizeof(struct ahc_platform_data));
 	TAILQ_INIT(&ahc->platform_data->completeq);
 	TAILQ_INIT(&ahc->platform_data->device_runq);
-	ahc->platform_data->irq = AHC_LINUX_NOIRQ;
+	ahc->platform_data->irq = AIC_LINUX_NOIRQ;
 	ahc->platform_data->hw_dma_mask = 0xFFFFFFFF;
 	ahc_lockinit(ahc);
-	ahc_done_lockinit(ahc);
+	init_timer(&ahc->platform_data->bus_settle_timer);
+	ahc->platform_data->bus_settle_timer.data = (u_long)ahc;
+	ahc->platform_data->bus_settle_timer.function =
+	    (aic_linux_callback_t *)aic_bus_settle_complete;
 	init_timer(&ahc->platform_data->completeq_timer);
 	ahc->platform_data->completeq_timer.data = (u_long)ahc;
 	ahc->platform_data->completeq_timer.function =
-	    (ahc_linux_callback_t *)ahc_linux_thread_run_complete_queue;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
+	    (aic_linux_callback_t *)ahc_linux_thread_run_complete_queue;
 	init_MUTEX_LOCKED(&ahc->platform_data->eh_sem);
 	init_MUTEX_LOCKED(&ahc->platform_data->dv_sem);
 	init_MUTEX_LOCKED(&ahc->platform_data->dv_cmd_sem);
-#else
-	ahc->platform_data->eh_sem = MUTEX_LOCKED;
-	ahc->platform_data->dv_sem = MUTEX_LOCKED;
-	ahc->platform_data->dv_cmd_sem = MUTEX_LOCKED;
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	tasklet_init(&ahc->platform_data->runq_tasklet, ahc_runq_tasklet,
-		     (unsigned long)ahc);
-#endif
+	init_MUTEX_LOCKED(&ahc->platform_data->recovery_sem);
+	init_MUTEX_LOCKED(&ahc->platform_data->recovery_ending_sem);
+	aic_setup_tasklets(ahc);
 	ahc->seltime = (aic7xxx_seltime & 0x3) << 4;
 	ahc->seltime_b = (aic7xxx_seltime & 0x3) << 4;
 	if (aic7xxx_pci_parity == 0)
@@ -1959,34 +1885,47 @@ ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg)
 void
 ahc_platform_free(struct ahc_softc *ahc)
 {
-	struct ahc_linux_target *targ;
-	struct ahc_linux_device *dev;
+	struct aic_linux_target *targ;
+	struct aic_linux_device *dev;
 	int i, j;
 
 	if (ahc->platform_data != NULL) {
 		del_timer_sync(&ahc->platform_data->completeq_timer);
 		ahc_linux_kill_dv_thread(ahc);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-		tasklet_kill(&ahc->platform_data->runq_tasklet);
-#endif
+		aic_teardown_tasklets(ahc);
 		if (ahc->platform_data->host != NULL) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 			scsi_remove_host(ahc->platform_data->host);
-#endif
 			scsi_host_put(ahc->platform_data->host);
+#else
+			scsi_unregister(ahc->platform_data->host);
+#endif
 		}
 
 		/* destroy all of the device and target objects */
 		for (i = 0; i < AHC_NUM_TARGETS; i++) {
 			targ = ahc->platform_data->targets[i];
 			if (targ != NULL) {
-				/* Keep target around through the loop. */
+
+				/*
+				 * Stop any unfreeze timer from running.
+				 */
+				del_timer_sync(&targ->timer);
+
+				/*
+				 * Keep target around through the loop.
+				 * The timer above may also have held
+				 * a refcount, but since we forcibly
+				 * delete the target, we don't care
+				 * about the extra reference.
+				 */
 				targ->refcount++;
 				for (j = 0; j < AHC_NUM_LUNS; j++) {
 
 					if (targ->devices[j] == NULL)
 						continue;
 					dev = targ->devices[j];
+					del_timer_sync(&dev->timer);
 					ahc_linux_free_device(ahc, dev);
 				}
 				/*
@@ -1997,7 +1936,7 @@ ahc_platform_free(struct ahc_softc *ahc)
  			}
  		}
 
-		if (ahc->platform_data->irq != AHC_LINUX_NOIRQ)
+		if (ahc->platform_data->irq != AIC_LINUX_NOIRQ)
 			free_irq(ahc->platform_data->irq, ahc);
 		if (ahc->tag == BUS_SPACE_PIO
 		 && ahc->bsh.ioport != 0)
@@ -2009,10 +1948,8 @@ ahc_platform_free(struct ahc_softc *ahc)
 			base_addr = (u_long)ahc->bsh.maddr;
 			base_addr &= PAGE_MASK;
 			iounmap((void *)base_addr);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 			release_mem_region(ahc->platform_data->mem_busaddr,
 					   0x1000);
-#endif
 		}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) && \
     LINUX_VERSION_CODE  < KERNEL_VERSION(2,5,0)
@@ -2042,7 +1979,7 @@ void
 ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		      ahc_queue_alg alg)
 {
-	struct ahc_linux_device *dev;
+	struct aic_linux_device *dev;
 	int was_queuing;
 	int now_queuing;
 
@@ -2051,27 +1988,27 @@ ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 				   devinfo->lun, /*alloc*/FALSE);
 	if (dev == NULL)
 		return;
-	was_queuing = dev->flags & (AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED);
+	was_queuing = dev->flags & (AIC_DEV_Q_BASIC|AIC_DEV_Q_TAGGED);
 	switch (alg) {
 	default:
 	case AHC_QUEUE_NONE:
 		now_queuing = 0;
 		break; 
 	case AHC_QUEUE_BASIC:
-		now_queuing = AHC_DEV_Q_BASIC;
+		now_queuing = AIC_DEV_Q_BASIC;
 		break;
 	case AHC_QUEUE_TAGGED:
-		now_queuing = AHC_DEV_Q_TAGGED;
+		now_queuing = AIC_DEV_Q_TAGGED;
 		break;
 	}
-	if ((dev->flags & AHC_DEV_FREEZE_TIL_EMPTY) == 0
+	if ((dev->flags & AIC_DEV_FREEZE_TIL_EMPTY) == 0
 	 && (was_queuing != now_queuing)
 	 && (dev->active != 0)) {
-		dev->flags |= AHC_DEV_FREEZE_TIL_EMPTY;
+		dev->flags |= AIC_DEV_FREEZE_TIL_EMPTY;
 		dev->qfrozen++;
 	}
 
-	dev->flags &= ~(AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED|AHC_DEV_PERIODIC_OTAG);
+	dev->flags &= ~(AIC_DEV_Q_BASIC|AIC_DEV_Q_TAGGED|AIC_DEV_PERIODIC_OTAG);
 	if (now_queuing) {
 		u_int usertags;
 
@@ -2091,11 +2028,11 @@ ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 			 */
 			dev->openings = 1;
 		} else if (alg == AHC_QUEUE_TAGGED) {
-			dev->flags |= AHC_DEV_Q_TAGGED;
+			dev->flags |= AIC_DEV_Q_TAGGED;
 			if (aic7xxx_periodic_otag != 0)
-				dev->flags |= AHC_DEV_PERIODIC_OTAG;
+				dev->flags |= AIC_DEV_PERIODIC_OTAG;
 		} else
-			dev->flags |= AHC_DEV_Q_BASIC;
+			dev->flags |= AIC_DEV_Q_BASIC;
 	} else {
 		/* We can only have one opening. */
 		dev->maxtags = 0;
@@ -2103,13 +2040,13 @@ ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	if (dev->scsi_device != NULL) {
-		switch ((dev->flags & (AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED))) {
-		case AHC_DEV_Q_BASIC:
+		switch ((dev->flags & (AIC_DEV_Q_BASIC|AIC_DEV_Q_TAGGED))) {
+		case AIC_DEV_Q_BASIC:
 			scsi_adjust_queue_depth(dev->scsi_device,
 						MSG_SIMPLE_TASK,
 						dev->openings + dev->active);
 			break;
-		case AHC_DEV_Q_TAGGED:
+		case AIC_DEV_Q_TAGGED:
 			scsi_adjust_queue_depth(dev->scsi_device,
 						MSG_ORDERED_TASK,
 						dev->openings + dev->active);
@@ -2173,9 +2110,9 @@ ahc_platform_abort_scbs(struct ahc_softc *ahc, int target, char channel,
 		for (; targ < maxtarg; targ++) {
 
 			for (; clun < maxlun; clun++) {
-				struct ahc_linux_device *dev;
-				struct ahc_busyq *busyq;
-				struct ahc_cmd *acmd;
+				struct aic_linux_device *dev;
+				struct aic_busyq *busyq;
+				struct aic_cmd *acmd;
 
 				dev = ahc_linux_get_device(ahc, chan,
 							   targ, clun,
@@ -2192,6 +2129,20 @@ ahc_platform_abort_scbs(struct ahc_softc *ahc, int target, char channel,
 						     acmd_links.tqe);
 					count++;
 					cmd->result = status << 16;
+					/*
+					 * The completion handler believes that
+					 * commands without active timers
+					 * running have lost the race of
+					 * completing before their timer
+					 * expires.  Since commands in our
+					 * busy queues do not have timers
+					 * running, appease the mid-layer by
+					 * adding a timer now.  This timer will
+					 * be immediately canceled by the
+					 * midlayer.
+					 */
+					scsi_add_timer(cmd, 60*HZ,
+					    aic_linux_midlayer_timeout);
 					ahc_linux_queue_cmd_complete(ahc, cmd);
 				}
 			}
@@ -2208,7 +2159,7 @@ ahc_linux_thread_run_complete_queue(struct ahc_softc *ahc)
 
 	ahc_lock(ahc, &flags);
 	del_timer(&ahc->platform_data->completeq_timer);
-	ahc->platform_data->flags &= ~AHC_RUN_CMPLT_Q_TIMER;
+	ahc->platform_data->flags &= ~AIC_RUN_CMPLT_Q_TIMER;
 	ahc_linux_run_complete_queue(ahc);
 	ahc_unlock(ahc, &flags);
 }
@@ -2221,14 +2172,23 @@ ahc_linux_start_dv(struct ahc_softc *ahc)
 	 * Freeze the simq and signal ahc_linux_queue to not let any
 	 * more commands through.
 	 */
-	if ((ahc->platform_data->flags & AHC_DV_ACTIVE) == 0) {
+	if ((ahc->platform_data->flags & AIC_DV_ACTIVE) == 0) {
 #ifdef AHC_DEBUG
 		if (ahc_debug & AHC_SHOW_DV)
 			printf("%s: Waking DV thread\n", ahc_name(ahc));
 #endif
 
-		ahc->platform_data->flags |= AHC_DV_ACTIVE;
-		ahc_linux_freeze_simq(ahc);
+		ahc->platform_data->flags |= AIC_DV_ACTIVE;
+
+		/*
+		 * Prevent upper layer from sending any
+		 * commands to us.
+		 */
+		aic_freeze_simq(ahc);
+		scsi_block_requests(ahc->platform_data->host);
+		ahc_platform_abort_scbs(ahc, CAM_TARGET_WILDCARD, ALL_CHANNELS,
+					CAM_LUN_WILDCARD, SCB_LIST_NULL,
+					ROLE_INITIATOR, CAM_REQUEUE_REQ);
 
 		/* Wake up the DV kthread */
 		up(&ahc->platform_data->dv_sem);
@@ -2242,7 +2202,7 @@ ahc_linux_kill_dv_thread(struct ahc_softc *ahc)
 
 	ahc_lock(ahc, &s);
 	if (ahc->platform_data->dv_pid != 0) {
-		ahc->platform_data->flags |= AHC_DV_SHUTDOWN;
+		ahc->platform_data->flags |= AIC_DV_SHUTDOWN;
 		ahc_unlock(ahc, &s);
 		up(&ahc->platform_data->dv_sem);
 
@@ -2308,7 +2268,7 @@ ahc_linux_dv_thread(void *data)
 
 		/* Check to see if we've been signaled to exit */
 		ahc_lock(ahc, &s);
-		if ((ahc->platform_data->flags & AHC_DV_SHUTDOWN) != 0) {
+		if ((ahc->platform_data->flags & AIC_DV_SHUTDOWN) != 0) {
 			ahc_unlock(ahc, &s);
 			break;
 		}
@@ -2325,7 +2285,7 @@ ahc_linux_dv_thread(void *data)
 		 */
 		ahc_lock(ahc, &s);
 		while (LIST_FIRST(&ahc->pending_scbs) != NULL) {
-			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_EMPTY;
+			ahc->platform_data->flags |= AIC_DV_WAIT_SIMQ_EMPTY;
 			ahc_unlock(ahc, &s);
 			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
@@ -2335,8 +2295,8 @@ ahc_linux_dv_thread(void *data)
 		 * Wait for the SIMQ to be released so that DV is the
 		 * only reason the queue is frozen.
 		 */
-		while (AHC_DV_SIMQ_FROZEN(ahc) == 0) {
-			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_RELEASE;
+		while (AIC_DV_SIMQ_FROZEN(ahc) == 0) {
+			ahc->platform_data->flags |= AIC_DV_WAIT_SIMQ_RELEASE;
 			ahc_unlock(ahc, &s);
 			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
@@ -2347,14 +2307,16 @@ ahc_linux_dv_thread(void *data)
 			ahc_linux_dv_target(ahc, target);
 
 		ahc_lock(ahc, &s);
-		ahc->platform_data->flags &= ~AHC_DV_ACTIVE;
-		ahc_unlock(ahc, &s);
+		ahc->platform_data->flags &= ~AIC_DV_ACTIVE;
 
 		/*
 		 * Release the SIMQ so that normal commands are
 		 * allowed to continue on the bus.
 		 */
-		ahc_linux_release_simq((u_long)ahc);
+		aic_release_simq_locked(ahc);
+		ahc_unlock(ahc, &s);
+
+		scsi_unblock_requests(ahc->platform_data->host);
 	}
 	up(&ahc->platform_data->eh_sem);
 	return (0);
@@ -2368,10 +2330,10 @@ ahc_linux_dv_thread(void *data)
 	ahc_set_dv_state(ahc, targ, newstate, __LINE__)
 
 static __inline void
-ahc_set_dv_state(struct ahc_softc *ahc, struct ahc_linux_target *targ,
-		 ahc_dv_state newstate, u_int line)
+ahc_set_dv_state(struct ahc_softc *ahc, struct aic_linux_target *targ,
+		 aic_dv_state newstate, u_int line)
 {
-	ahc_dv_state oldstate;
+	aic_dv_state oldstate;
 
 	oldstate = targ->dv_state;
 #ifdef AHC_DEBUG
@@ -2391,7 +2353,7 @@ static void
 ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 {
 	struct	 ahc_devinfo devinfo;
-	struct	 ahc_linux_target *targ;
+	struct	 aic_linux_target *targ;
 	struct	 scsi_cmnd *cmd;
 	struct	 scsi_device *scsi_dev;
 	struct	 scsi_sense_data *sense;
@@ -2405,7 +2367,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 	echo_size = 0;
 	ahc_lock(ahc, &s);
 	targ = ahc->platform_data->targets[target_offset];
-	if (targ == NULL || (targ->flags & AHC_DV_REQUIRED) == 0) {
+	if (targ == NULL || (targ->flags & AIC_DV_REQUIRED) == 0) {
 		ahc_unlock(ahc, &s);
 		return;
 	}
@@ -2430,14 +2392,14 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 	scsi_dev->channel = devinfo.channel - 'A';
 	ahc->platform_data->dv_scsi_dev = scsi_dev;
 
-	AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_INQ_SHORT_ASYNC);
+	AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_INQ_SHORT_ASYNC);
 
-	while (targ->dv_state != AHC_DV_STATE_EXIT) {
+	while (targ->dv_state != AIC_DV_STATE_EXIT) {
 		timeout = AHC_LINUX_DV_TIMEOUT;
 		switch (targ->dv_state) {
-		case AHC_DV_STATE_INQ_SHORT_ASYNC:
-		case AHC_DV_STATE_INQ_ASYNC:
-		case AHC_DV_STATE_INQ_ASYNC_VERIFY:
+		case AIC_DV_STATE_INQ_SHORT_ASYNC:
+		case AIC_DV_STATE_INQ_ASYNC:
+		case AIC_DV_STATE_INQ_ASYNC_VERIFY:
 			/*
 			 * Set things to async narrow to reduce the
 			 * chance that the INQ will fail.
@@ -2449,36 +2411,36 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 				      AHC_TRANS_GOAL, /*paused*/FALSE);
 			ahc_unlock(ahc, &s);
 			timeout = 10 * HZ;
-			targ->flags &= ~AHC_INQ_VALID;
+			targ->flags &= ~AIC_INQ_VALID;
 			/* FALLTHROUGH */
-		case AHC_DV_STATE_INQ_VERIFY:
+		case AIC_DV_STATE_INQ_VERIFY:
 		{
 			u_int inq_len;
 
-			if (targ->dv_state == AHC_DV_STATE_INQ_SHORT_ASYNC)
+			if (targ->dv_state == AIC_DV_STATE_INQ_SHORT_ASYNC)
 				inq_len = AHC_LINUX_DV_INQ_SHORT_LEN;
 			else
 				inq_len = targ->inq_data->additional_length + 5;
 			ahc_linux_dv_inq(ahc, cmd, &devinfo, targ, inq_len);
 			break;
 		}
-		case AHC_DV_STATE_TUR:
-		case AHC_DV_STATE_BUSY:
+		case AIC_DV_STATE_TUR:
+		case AIC_DV_STATE_BUSY:
 			timeout = 5 * HZ;
 			ahc_linux_dv_tur(ahc, cmd, &devinfo);
 			break;
-		case AHC_DV_STATE_REBD:
+		case AIC_DV_STATE_REBD:
 			ahc_linux_dv_rebd(ahc, cmd, &devinfo, targ);
 			break;
-		case AHC_DV_STATE_WEB:
+		case AIC_DV_STATE_WEB:
 			ahc_linux_dv_web(ahc, cmd, &devinfo, targ);
 			break;
 
-		case AHC_DV_STATE_REB:
+		case AIC_DV_STATE_REB:
 			ahc_linux_dv_reb(ahc, cmd, &devinfo, targ);
 			break;
 
-		case AHC_DV_STATE_SU:
+		case AIC_DV_STATE_SU:
 			ahc_linux_dv_su(ahc, cmd, &devinfo, targ);
 			timeout = 50 * HZ;
 			break;
@@ -2490,8 +2452,6 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 		}
 
 		/* Queue the command and wait for it to complete */
-		/* Abuse eh_timeout in the scsi_cmnd struct for our purposes */
-		init_timer(&cmd->eh_timeout);
 #ifdef AHC_DEBUG
 		if ((ahc_debug & AHC_SHOW_MESSAGES) != 0)
 			/*
@@ -2501,20 +2461,22 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 			 */
 			timeout += HZ;
 #endif
-		scsi_add_timer(cmd, timeout, ahc_linux_dv_timeout);
+		init_timer(&cmd->eh_timeout);
+		cmd->timeout_per_command = timeout;
+
 		/*
 		 * In 2.5.X, it is assumed that all calls from the
 		 * "midlayer" (which we are emulating) will have the
 		 * ahc host lock held.  For other kernels, the
 		 * io_request_lock must be held.
 		 */
-#if AHC_SCSI_HAS_HOST_LOCK != 0
+#if AIC_SCSI_HAS_HOST_LOCK != 0
 		ahc_lock(ahc, &s);
 #else
 		spin_lock_irqsave(&io_request_lock, s);
 #endif
 		ahc_linux_queue(cmd, ahc_linux_dv_complete);
-#if AHC_SCSI_HAS_HOST_LOCK != 0
+#if AIC_SCSI_HAS_HOST_LOCK != 0
 		ahc_unlock(ahc, &s);
 #else
 		spin_unlock_irqrestore(&io_request_lock, s);
@@ -2525,8 +2487,8 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 		 * only reason the queue is frozen.
 		 */
 		ahc_lock(ahc, &s);
-		while (AHC_DV_SIMQ_FROZEN(ahc) == 0) {
-			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_RELEASE;
+		while (AIC_DV_SIMQ_FROZEN(ahc) == 0) {
+			ahc->platform_data->flags |= AIC_DV_WAIT_SIMQ_RELEASE;
 			ahc_unlock(ahc, &s);
 			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
@@ -2537,7 +2499,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 	}
 
 out:
-	if ((targ->flags & AHC_INQ_VALID) != 0
+	if ((targ->flags & AIC_INQ_VALID) != 0
 	 && ahc_linux_get_device(ahc, devinfo.channel - 'A',
 				 devinfo.target, devinfo.lun,
 				 /*alloc*/FALSE) == NULL) {
@@ -2548,7 +2510,7 @@ out:
 		 * parameters found in the inquiry string.
 		 */
 		ahc_linux_filter_inquiry(ahc, &devinfo);
-		if ((targ->flags & (AHC_BASIC_DV|AHC_ENHANCED_DV)) != 0) {
+		if ((targ->flags & (AIC_BASIC_DV|AIC_ENHANCED_DV)) != 0) {
 			ahc_print_devinfo(ahc, &devinfo);
 			printf("DV failed to configure device.  "
 			       "Please file a bug report against "
@@ -2573,7 +2535,7 @@ out:
 		free(targ->dv_buffer1, M_DEVBUF);
 		targ->dv_buffer1 = NULL;
 	}
-	targ->flags &= ~AHC_DV_REQUIRED;
+	targ->flags &= ~AIC_DV_REQUIRED;
 	if (targ->refcount == 0)
 		ahc_linux_free_target(ahc, targ);
 	ahc_unlock(ahc, &s);
@@ -2582,13 +2544,13 @@ out:
 static void
 ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			struct ahc_devinfo *devinfo,
-			struct ahc_linux_target *targ)
+			struct aic_linux_target *targ)
 {
 	u_int32_t status;
 
 	status = aic_error_action(cmd, targ->inq_data,
-				  ahc_cmd_get_transaction_status(cmd),
-				  ahc_cmd_get_scsi_status(cmd));
+				  aic_cmd_get_transaction_status(cmd),
+				  aic_cmd_get_scsi_status(cmd));
 	
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_DV) {
@@ -2600,8 +2562,8 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 #endif
 
 	switch (targ->dv_state) {
-	case AHC_DV_STATE_INQ_SHORT_ASYNC:
-	case AHC_DV_STATE_INQ_ASYNC:
+	case AIC_DV_STATE_INQ_SHORT_ASYNC:
+	case AIC_DV_STATE_INQ_ASYNC:
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		{
@@ -2610,21 +2572,21 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 		}
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		case SS_TUR:
 		case SS_RETRY:
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ)
 				targ->dv_state_retry--;
 			if ((status & SS_ERRMASK) == EBUSY)
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_BUSY);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_BUSY);
 			if (targ->dv_state_retry < 10)
 				break;
 			/* FALLTHROUGH */
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 #ifdef AHC_DEBUG
 			if (ahc_debug & AHC_SHOW_DV) {
 				ahc_print_devinfo(ahc, devinfo);
@@ -2634,7 +2596,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			break;
 		}
 		break;
-	case AHC_DV_STATE_INQ_ASYNC_VERIFY:
+	case AIC_DV_STATE_INQ_ASYNC_VERIFY:
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		{
@@ -2648,12 +2610,12 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 				 * Try from the top again.
 				 */
 				AHC_SET_DV_STATE(ahc, targ,
-						 AHC_DV_STATE_INQ_SHORT_ASYNC);
+						 AIC_DV_STATE_INQ_SHORT_ASYNC);
 				break;
 			}
 
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state+1);
-			targ->flags |= AHC_INQ_VALID;
+			targ->flags |= AIC_INQ_VALID;
 			if (ahc_linux_user_dv_setting(ahc) == 0)
 				break;
 
@@ -2666,33 +2628,33 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			default:
 			case SID_SPI_CLOCK_ST:
 				/* Assume only basic DV is supported. */
-				targ->flags |= AHC_BASIC_DV;
+				targ->flags |= AIC_BASIC_DV;
 				break;
 			case SID_SPI_CLOCK_DT:
 			case SID_SPI_CLOCK_DT_ST:
-				targ->flags |= AHC_ENHANCED_DV;
+				targ->flags |= AIC_ENHANCED_DV;
 				break;
 			}
 			break;
 		}
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		case SS_TUR:
 		case SS_RETRY:
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ)
 				targ->dv_state_retry--;
 
 			if ((status & SS_ERRMASK) == EBUSY)
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_BUSY);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_BUSY);
 			if (targ->dv_state_retry < 10)
 				break;
 			/* FALLTHROUGH */
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 #ifdef AHC_DEBUG
 			if (ahc_debug & AHC_SHOW_DV) {
 				ahc_print_devinfo(ahc, devinfo);
@@ -2702,14 +2664,14 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			break;
 		}
 		break;
-	case AHC_DV_STATE_INQ_VERIFY:
+	case AIC_DV_STATE_INQ_VERIFY:
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		{
 
 			if (memcmp(targ->inq_data, targ->dv_buffer,
 				   AHC_LINUX_DV_INQ_LEN) == 0) {
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 				break;
 			}
 #ifdef AHC_DEBUG
@@ -2730,7 +2692,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 #endif
 
 			if (ahc_linux_fallback(ahc, devinfo) != 0) {
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 				break;
 			}
 			/*
@@ -2743,18 +2705,18 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 		}
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		case SS_TUR:
 		case SS_RETRY:
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
 				if (ahc_linux_fallback(ahc, devinfo) != 0) {
 					AHC_SET_DV_STATE(ahc, targ,
-							 AHC_DV_STATE_EXIT);
+							 AIC_DV_STATE_EXIT);
 					break;
 				}
 				/*
@@ -2763,12 +2725,12 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 				 */
 				targ->dv_state_retry = 0;
 			} else if ((status & SS_ERRMASK) == EBUSY)
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_BUSY);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_BUSY);
 			if (targ->dv_state_retry < 10)
 				break;
 			/* FALLTHROUGH */
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 #ifdef AHC_DEBUG
 			if (ahc_debug & AHC_SHOW_DV) {
 				ahc_print_devinfo(ahc, devinfo);
@@ -2779,33 +2741,33 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 		}
 		break;
 
-	case AHC_DV_STATE_TUR:
+	case AIC_DV_STATE_TUR:
 		switch (status & SS_MASK) {
 		case SS_NOP:
-			if ((targ->flags & AHC_BASIC_DV) != 0) {
+			if ((targ->flags & AIC_BASIC_DV) != 0) {
 				ahc_linux_filter_inquiry(ahc, devinfo);
 				AHC_SET_DV_STATE(ahc, targ,
-						 AHC_DV_STATE_INQ_VERIFY);
-			} else if ((targ->flags & AHC_ENHANCED_DV) != 0) {
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_REBD);
+						 AIC_DV_STATE_INQ_VERIFY);
+			} else if ((targ->flags & AIC_ENHANCED_DV) != 0) {
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_REBD);
 			} else {
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			}
 			break;
 		case SS_RETRY:
 		case SS_TUR:
 			if ((status & SS_ERRMASK) == EBUSY) {
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_BUSY);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_BUSY);
 				break;
 			}
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
 				if (ahc_linux_fallback(ahc, devinfo) != 0) {
 					AHC_SET_DV_STATE(ahc, targ,
-							 AHC_DV_STATE_EXIT);
+							 AIC_DV_STATE_EXIT);
 					break;
 				}
 				/*
@@ -2821,7 +2783,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 					printf("DV TUR reties exhausted\n");
 				}
 #endif
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 				break;
 			}
 			if (status & SSQ_DELAY)
@@ -2829,25 +2791,25 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 
 			break;
 		case SS_START:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_SU);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_SU);
 			break;
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			break;
 		}
 		break;
 
-	case AHC_DV_STATE_REBD:
+	case AIC_DV_STATE_REBD:
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		{
 			uint32_t echo_size;
 
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_WEB);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_WEB);
 			echo_size = scsi_3btoul(&targ->dv_buffer[1]);
 			echo_size &= 0x1FFF;
 #ifdef AHC_DEBUG
@@ -2857,7 +2819,17 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			}
 #endif
 			if (echo_size == 0) {
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+				/*
+				 * Fall back to basic DV.
+				 */
+				if (bootverbose) {
+					ahc_print_devinfo(ahc, devinfo);
+					printf("Echo Buffer unavailable.  "
+					       "Performing basic DV.\n");
+				}
+				targ->flags &= ~AIC_ENHANCED_DV;
+				targ->flags |= AIC_BASIC_DV;
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_TUR);
 				break;
 			}
 
@@ -2872,11 +2844,11 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 		}
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		case SS_RETRY:
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ)
 				targ->dv_state_retry--;
 			if (targ->dv_state_retry <= 10)
@@ -2895,30 +2867,30 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			 * and try level 1 DV.
 			 */
 			ahc_linux_filter_inquiry(ahc, devinfo);
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_INQ_VERIFY);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_INQ_VERIFY);
 			targ->dv_echo_size = 0;
 			break;
 		}
 		break;
 
-	case AHC_DV_STATE_WEB:
+	case AIC_DV_STATE_WEB:
 		switch (status & SS_MASK) {
 		case SS_NOP:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_REB);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_REB);
 			break;
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		case SS_RETRY:
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
 				if (ahc_linux_fallback(ahc, devinfo) != 0) {
 					AHC_SET_DV_STATE(ahc, targ,
-							 AHC_DV_STATE_EXIT);
+							 AIC_DV_STATE_EXIT);
 					break;
 				}
 				/*
@@ -2937,22 +2909,22 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			}
 #endif
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			break;
 		}
 		break;
 
-	case AHC_DV_STATE_REB:
+	case AIC_DV_STATE_REB:
 		switch (status & SS_MASK) {
 		case SS_NOP:
 			if (memcmp(targ->dv_buffer, targ->dv_buffer1,
 				   targ->dv_echo_size) != 0) {
 				if (ahc_linux_fallback(ahc, devinfo) != 0)
 					AHC_SET_DV_STATE(ahc, targ,
-							 AHC_DV_STATE_EXIT);
+							 AIC_DV_STATE_EXIT);
 				else
 					AHC_SET_DV_STATE(ahc, targ,
-							 AHC_DV_STATE_WEB);
+							 AIC_DV_STATE_WEB);
 				break;
 			}
 			
@@ -2964,24 +2936,24 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 				free(targ->dv_buffer1, M_DEVBUF);
 				targ->dv_buffer1 = NULL;
 			}
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			break;
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		case SS_RETRY:
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
 				if (ahc_linux_fallback(ahc, devinfo) != 0) {
 					AHC_SET_DV_STATE(ahc, targ,
-							 AHC_DV_STATE_EXIT);
+							 AIC_DV_STATE_EXIT);
 					break;
 				}
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_WEB);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_WEB);
 			}
 			if (targ->dv_state_retry <= 10) {
 				if ((status & (SSQ_DELAY_RANDOM|SSQ_DELAY))!= 0)
@@ -2996,35 +2968,35 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 #endif
 			/* FALLTHROUGH */
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			break;
 		}
 		break;
 
-	case AHC_DV_STATE_SU:
+	case AIC_DV_STATE_SU:
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			break;
 		}
 		break;
 
-	case AHC_DV_STATE_BUSY:
+	case AIC_DV_STATE_BUSY:
 		switch (status & SS_MASK) {
 		case SS_NOP:
 		case SS_INQ_REFRESH:
 			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_SHORT_ASYNC);
+					 AIC_DV_STATE_INQ_SHORT_ASYNC);
 			break;
 		case SS_TUR:
 		case SS_RETRY:
 			AHC_SET_DV_STATE(ahc, targ, targ->dv_state);
-			if (ahc_cmd_get_transaction_status(cmd)
+			if (aic_cmd_get_transaction_status(cmd)
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if (targ->dv_state_retry < 60) {
@@ -3037,11 +3009,11 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 					printf("DV BUSY reties exhausted\n");
 				}
 #endif
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+				AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			}
 			break;
 		default:
-			AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 			break;
 		}
 		break;
@@ -3049,7 +3021,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 	default:
 		printf("%s: Invalid DV completion state %d\n", ahc_name(ahc),
 		       targ->dv_state);
-		AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+		AHC_SET_DV_STATE(ahc, targ, AIC_DV_STATE_EXIT);
 		break;
 	}
 }
@@ -3069,7 +3041,7 @@ ahc_linux_dv_fill_cmd(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
  */
 static void
 ahc_linux_dv_inq(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
-		 struct ahc_devinfo *devinfo, struct ahc_linux_target *targ,
+		 struct ahc_devinfo *devinfo, struct aic_linux_target *targ,
 		 u_int request_length)
 {
 
@@ -3082,7 +3054,7 @@ ahc_linux_dv_inq(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 	if (targ->inq_data == NULL)
 		targ->inq_data = malloc(AHC_LINUX_DV_INQ_LEN,
 					M_DEVBUF, M_WAITOK);
-	if (targ->dv_state > AHC_DV_STATE_INQ_ASYNC) {
+	if (targ->dv_state > AIC_DV_STATE_INQ_ASYNC) {
 		if (targ->dv_buffer != NULL)
 			free(targ->dv_buffer, M_DEVBUF);
 		targ->dv_buffer = malloc(AHC_LINUX_DV_INQ_LEN,
@@ -3095,7 +3067,7 @@ ahc_linux_dv_inq(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 	cmd->cmnd[0] = INQUIRY;
 	cmd->cmnd[4] = request_length;
 	cmd->request_bufflen = request_length;
-	if (targ->dv_state > AHC_DV_STATE_INQ_ASYNC)
+	if (targ->dv_state > AIC_DV_STATE_INQ_ASYNC)
 		cmd->request_buffer = targ->dv_buffer;
 	else
 		cmd->request_buffer = targ->inq_data;
@@ -3124,7 +3096,7 @@ ahc_linux_dv_tur(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 
 static void
 ahc_linux_dv_rebd(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
-		 struct ahc_devinfo *devinfo, struct ahc_linux_target *targ)
+		 struct ahc_devinfo *devinfo, struct aic_linux_target *targ)
 {
 
 #ifdef AHC_DEBUG
@@ -3149,7 +3121,7 @@ ahc_linux_dv_rebd(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 
 static void
 ahc_linux_dv_web(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
-		 struct ahc_devinfo *devinfo, struct ahc_linux_target *targ)
+		 struct ahc_devinfo *devinfo, struct aic_linux_target *targ)
 {
 
 #ifdef AHC_DEBUG
@@ -3171,7 +3143,7 @@ ahc_linux_dv_web(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 
 static void
 ahc_linux_dv_reb(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
-		 struct ahc_devinfo *devinfo, struct ahc_linux_target *targ)
+		 struct ahc_devinfo *devinfo, struct aic_linux_target *targ)
 {
 
 #ifdef AHC_DEBUG
@@ -3194,7 +3166,7 @@ ahc_linux_dv_reb(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 static void
 ahc_linux_dv_su(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 		struct ahc_devinfo *devinfo,
-		struct ahc_linux_target *targ)
+		struct aic_linux_target *targ)
 {
 	u_int le;
 
@@ -3216,7 +3188,7 @@ ahc_linux_dv_su(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 static int
 ahc_linux_fallback(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 {
-	struct	ahc_linux_target *targ;
+	struct	aic_linux_target *targ;
 	struct	ahc_initiator_tinfo *tinfo;
 	struct	ahc_transinfo *goal;
 	struct	ahc_tmode_tstate *tstate;
@@ -3395,7 +3367,7 @@ ahc_linux_fallback(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	return (0);
 }
 
-static void
+void
 ahc_linux_dv_timeout(struct scsi_cmnd *cmd)
 {
 	struct	ahc_softc *ahc;
@@ -3429,29 +3401,19 @@ ahc_linux_dv_timeout(struct scsi_cmnd *cmd)
 	 * error code.
 	 */
 	if ((scb->flags & SCB_SENSE) != 0)
-		ahc_set_transaction_status(scb, CAM_AUTOSENSE_FAIL);
+		aic_set_transaction_status(scb, CAM_AUTOSENSE_FAIL);
 	else
-		ahc_set_transaction_status(scb, CAM_CMD_TIMEOUT);
+		aic_set_transaction_status(scb, CAM_CMD_TIMEOUT);
 	ahc_reset_channel(ahc, cmd->device->channel + 'A', /*initiate*/TRUE);
 
-	/*
-	 * Add a minimal bus settle delay for devices that are slow to
-	 * respond after bus resets.
-	 */
-	ahc_linux_freeze_simq(ahc);
-	init_timer(&ahc->platform_data->reset_timer);
-	ahc->platform_data->reset_timer.data = (u_long)ahc;
-	ahc->platform_data->reset_timer.expires = jiffies + HZ / 2;
-	ahc->platform_data->reset_timer.function =
-	    (ahc_linux_callback_t *)ahc_linux_release_simq;
-	add_timer(&ahc->platform_data->reset_timer);
-	if (ahc_linux_next_device_to_run(ahc) != NULL)
-		ahc_schedule_runq(ahc);
+	if (aic_linux_next_device_to_run(ahc) != NULL)
+		aic_schedule_runq(ahc);
+
 	ahc_linux_run_complete_queue(ahc);
 	ahc_unlock(ahc, &flags);
 }
 
-static void
+void
 ahc_linux_dv_complete(struct scsi_cmnd *cmd)
 {
 	struct ahc_softc *ahc;
@@ -3473,7 +3435,7 @@ ahc_linux_dv_complete(struct scsi_cmnd *cmd)
 }
 
 static void
-ahc_linux_generate_dv_pattern(struct ahc_linux_target *targ)
+ahc_linux_generate_dv_pattern(struct aic_linux_target *targ)
 {
 	uint16_t b;
 	u_int	 i;
@@ -3605,8 +3567,8 @@ ahc_linux_user_dv_setting(struct ahc_softc *ahc)
  * Determines the queue depth for a given device.
  */
 static void
-ahc_linux_device_queue_depth(struct ahc_softc *ahc,
-			     struct ahc_linux_device *dev)
+aic_linux_device_queue_depth(struct ahc_softc *ahc,
+			     struct aic_linux_device *dev)
 {
 	struct	ahc_devinfo devinfo;
 	u_int	tags;
@@ -3630,10 +3592,10 @@ ahc_linux_device_queue_depth(struct ahc_softc *ahc,
 	}
 }
 
-static void
-ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
+void
+ahc_linux_run_device_queue(struct ahc_softc *ahc, struct aic_linux_device *dev)
 {
-	struct	 ahc_cmd *acmd;
+	struct	 aic_cmd *acmd;
 	struct	 scsi_cmnd *cmd;
 	struct	 scb *scb;
 	struct	 hardware_scb *hscb;
@@ -3641,21 +3603,22 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 	struct	 ahc_tmode_tstate *tstate;
 	uint16_t mask;
 
-	if ((dev->flags & AHC_DEV_ON_RUN_LIST) != 0)
+	if ((dev->flags & AIC_DEV_ON_RUN_LIST) != 0)
 		panic("running device on run list");
 
 	while ((acmd = TAILQ_FIRST(&dev->busyq)) != NULL
-	    && dev->openings > 0 && dev->qfrozen == 0) {
+	    && dev->openings > 0 && dev->qfrozen == 0
+	    && dev->target->qfrozen == 0) {
 
 		/*
 		 * Schedule us to run later.  The only reason we are not
 		 * running is because the whole controller Q is frozen.
 		 */
 		if (ahc->platform_data->qfrozen != 0
-	 	 && AHC_DV_SIMQ_FROZEN(ahc) == 0) {
+	 	 && AIC_DV_SIMQ_FROZEN(ahc) == 0) {
 			TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq,
 					  dev, links);
-			dev->flags |= AHC_DEV_ON_RUN_LIST;
+			dev->flags |= AIC_DEV_ON_RUN_LIST;
 			return;
 		}
 		/*
@@ -3664,14 +3627,16 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		if ((scb = ahc_get_scb(ahc)) == NULL) {
 			TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq,
 					 dev, links);
-			dev->flags |= AHC_DEV_ON_RUN_LIST;
-			ahc->flags |= AHC_RESOURCE_SHORTAGE;
+			dev->flags |= AIC_DEV_ON_RUN_LIST;
+			ahc->flags |= AIC_RESOURCE_SHORTAGE;
+			ahc->platform_data->qfrozen++;
 			return;
 		}
 		TAILQ_REMOVE(&dev->busyq, acmd, acmd_links.tqe);
 		cmd = &acmd_scsi_cmd(acmd);
 		scb->io_ctx = cmd;
 		scb->platform_data->dev = dev;
+		scb->platform_data->flags = 0;
 		hscb = scb->hscb;
 		cmd->host_scribble = (char *)scb;
 
@@ -3693,15 +3658,37 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		if ((ahc->user_discenable & mask) != 0)
 			hscb->control |= DISCENB;
 
-	 	if (AHC_DV_CMD(cmd) != 0)
+	 	if (AIC_DV_CMD(cmd) != 0)
 			scb->flags |= SCB_SILENT;
 
 		if ((tstate->auto_negotiate & mask) != 0) {
 			scb->flags |= SCB_AUTO_NEGOTIATE;
 			scb->hscb->control |= MK_MESSAGE;
+		} else if (cmd->cmnd[0] == INQUIRY
+			&& (tinfo->curr.offset != 0
+			 || tinfo->curr.width != MSG_EXT_WDTR_BUS_8_BIT)) {
+			/*
+			 * The SCSI spec requires inquiry
+			 * commands to complete without
+			 * reporting unit attention conditions.
+			 * Because of this, an inquiry command
+			 * that occurs just after a device is
+			 * reset will result in a data phase
+			 * with mismatched negotiated rates.
+			 * The core already forces a renegotiation
+			 * for reset events that are visible to
+			 * our controller or that we initiate,
+			 * but a third party device reset or a
+			 * hot-plug insertion can still cause this
+			 * issue.  Therefore, we force a re-negotiation
+			 * for every inquiry command unless we
+			 * are async.
+			 */
+			scb->flags |= SCB_NEGOTIATE;
+			scb->hscb->control |= MK_MESSAGE;
 		}
 
-		if ((dev->flags & (AHC_DEV_Q_TAGGED|AHC_DEV_Q_BASIC)) != 0) {
+		if ((dev->flags & (AIC_DEV_Q_TAGGED|AIC_DEV_Q_BASIC)) != 0) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 			int	msg_bytes;
 			uint8_t tag_msgs[2];
@@ -3713,8 +3700,8 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 					dev->commands_since_idle_or_otag = 0;
 			} else
 #endif
-			if (dev->commands_since_idle_or_otag == AHC_OTAG_THRESH
-			 && (dev->flags & AHC_DEV_Q_TAGGED) != 0) {
+			if (dev->commands_since_idle_or_otag == AIC_OTAG_THRESH
+			 && (dev->flags & AIC_DEV_Q_TAGGED) != 0) {
 				hscb->control |= MSG_ORDERED_TASK;
 				dev->commands_since_idle_or_otag = 0;
 			} else {
@@ -3731,8 +3718,8 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		}
 
 		scb->platform_data->xfer_len = 0;
-		ahc_set_residual(scb, 0);
-		ahc_set_sense_residual(scb, 0);
+		aic_set_residual(scb, 0);
+		aic_set_sense_residual(scb, 0);
 		scb->sg_count = 0;
 		if (cmd->use_sg != 0) {
 			struct	ahc_dma_seg *sg;
@@ -3741,7 +3728,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			int	nseg;
 
 			cur_seg = (struct scatterlist *)cmd->request_buffer;
-			nseg = pci_map_sg(ahc->dev_softc, cur_seg, cmd->use_sg,
+			nseg = aic_map_sg(ahc, cur_seg, cmd->use_sg,
 			    scsi_to_pci_dma_dir(cmd->sc_data_direction));
 			end_seg = cur_seg + nseg;
 			/* Copy the segments into the SG list. */
@@ -3764,13 +3751,13 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 				cur_seg++;
 			}
 			sg--;
-			sg->len |= ahc_htole32(AHC_DMA_LAST_SEG);
+			sg->len |= aic_htole32(AHC_DMA_LAST_SEG);
 
 			/*
 			 * Reset the sg list pointer.
 			 */
 			scb->hscb->sgptr =
-			    ahc_htole32(scb->sg_list_phys | SG_FULL_RESID);
+			    aic_htole32(scb->sg_list_phys | SG_FULL_RESID);
 
 			/*
 			 * Copy the first SG into the "current"
@@ -3783,7 +3770,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			bus_addr_t addr;
 
 			sg = scb->sg_list;
-			addr = pci_map_single(ahc->dev_softc,
+			addr = aic_map_single(ahc,
 			       cmd->request_buffer,
 			       cmd->request_bufflen,
 			       scsi_to_pci_dma_dir(cmd->sc_data_direction));
@@ -3791,13 +3778,13 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			scb->sg_count = ahc_linux_map_seg(ahc, scb,
 							  sg, addr,
 							  cmd->request_bufflen);
-			sg->len |= ahc_htole32(AHC_DMA_LAST_SEG);
+			sg->len |= aic_htole32(AHC_DMA_LAST_SEG);
 
 			/*
 			 * Reset the sg list pointer.
 			 */
 			scb->hscb->sgptr =
-			    ahc_htole32(scb->sg_list_phys | SG_FULL_RESID);
+			    aic_htole32(scb->sg_list_phys | SG_FULL_RESID);
 
 			/*
 			 * Copy the first SG into the "current"
@@ -3806,7 +3793,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			scb->hscb->dataptr = sg->addr;
 			scb->hscb->datacnt = sg->len;
 		} else {
-			scb->hscb->sgptr = ahc_htole32(SG_LIST_NULL);
+			scb->hscb->sgptr = aic_htole32(SG_LIST_NULL);
 			scb->hscb->dataptr = 0;
 			scb->hscb->datacnt = 0;
 			scb->sg_count = 0;
@@ -3817,7 +3804,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		dev->openings--;
 		dev->active++;
 		dev->commands_issued++;
-		if ((dev->flags & AHC_DEV_PERIODIC_OTAG) != 0)
+		if ((dev->flags & AIC_DEV_PERIODIC_OTAG) != 0)
 			dev->commands_since_idle_or_otag++;
 
 		/*
@@ -3839,6 +3826,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 				continue;
 		}
 		scb->flags |= SCB_ACTIVE;
+		aic_scb_timer_start(scb);
 		ahc_queue_scb(ahc, scb);
 	}
 }
@@ -3856,8 +3844,8 @@ ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 	ahc = (struct ahc_softc *) dev_id;
 	ahc_lock(ahc, &flags); 
 	ours = ahc_intr(ahc);
-	if (ahc_linux_next_device_to_run(ahc) != NULL)
-		ahc_schedule_runq(ahc);
+	if (aic_linux_next_device_to_run(ahc) != NULL)
+		aic_schedule_runq(ahc);
 	ahc_linux_run_complete_queue(ahc);
 	ahc_unlock(ahc, &flags);
 	return IRQ_RETVAL(ours);
@@ -3871,10 +3859,10 @@ ahc_platform_flushwork(struct ahc_softc *ahc)
 		;
 }
 
-static struct ahc_linux_target*
+static struct aic_linux_target*
 ahc_linux_alloc_target(struct ahc_softc *ahc, u_int channel, u_int target)
 {
-	struct ahc_linux_target *targ;
+	struct aic_linux_target *targ;
 	u_int target_offset;
 
 	target_offset = target;
@@ -3887,14 +3875,15 @@ ahc_linux_alloc_target(struct ahc_softc *ahc, u_int channel, u_int target)
 	memset(targ, 0, sizeof(*targ));
 	targ->channel = channel;
 	targ->target = target;
-	targ->ahc = ahc;
-	targ->flags = AHC_DV_REQUIRED;
+	targ->softc = ahc;
+	targ->flags = AIC_DV_REQUIRED;
+	init_timer(&targ->timer);
 	ahc->platform_data->targets[target_offset] = targ;
 	return (targ);
 }
 
 static void
-ahc_linux_free_target(struct ahc_softc *ahc, struct ahc_linux_target *targ)
+ahc_linux_free_target(struct ahc_softc *ahc, struct aic_linux_target *targ)
 {
 	struct ahc_devinfo devinfo;
 	struct ahc_initiator_tinfo *tinfo;
@@ -3934,11 +3923,11 @@ ahc_linux_free_target(struct ahc_softc *ahc, struct ahc_linux_target *targ)
 	free(targ, M_DEVBUF);
 }
 
-static struct ahc_linux_device*
+static struct aic_linux_device*
 ahc_linux_alloc_device(struct ahc_softc *ahc,
-		 struct ahc_linux_target *targ, u_int lun)
+		 struct aic_linux_target *targ, u_int lun)
 {
-	struct ahc_linux_device *dev;
+	struct aic_linux_device *dev;
 
 	dev = malloc(sizeof(*dev), M_DEVBUG, M_NOWAIT);
 	if (dev == NULL)
@@ -3946,7 +3935,7 @@ ahc_linux_alloc_device(struct ahc_softc *ahc,
 	memset(dev, 0, sizeof(*dev));
 	init_timer(&dev->timer);
 	TAILQ_INIT(&dev->busyq);
-	dev->flags = AHC_DEV_UNCONFIGURED;
+	dev->flags = AIC_DEV_UNCONFIGURED;
 	dev->lun = lun;
 	dev->target = targ;
 
@@ -3962,24 +3951,23 @@ ahc_linux_alloc_device(struct ahc_softc *ahc,
 	 * a tagged queuing capable device.
 	 */
 	dev->maxtags = 0;
-	
+
 	targ->refcount++;
 	targ->devices[lun] = dev;
 	return (dev);
 }
 
 static void
-ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
+ahc_linux_free_device(struct ahc_softc *ahc, struct aic_linux_device *dev)
 {
-	struct ahc_linux_target *targ;
+	struct aic_linux_target *targ;
 
-	del_timer_sync(&dev->timer);
 	targ = dev->target;
 	targ->devices[dev->lun] = NULL;
 	free(dev, M_DEVBUF);
 	targ->refcount--;
 	if (targ->refcount == 0
-	 && (targ->flags & AHC_DV_REQUIRED) == 0)
+	 && (targ->flags & AIC_DV_REQUIRED) == 0)
 		ahc_linux_free_target(ahc, targ);
 }
 
@@ -3991,7 +3979,7 @@ ahc_send_async(struct ahc_softc *ahc, char channel,
 	case AC_TRANSFER_NEG:
 	{
 		char	buf[80];
-		struct	ahc_linux_target *targ;
+		struct	aic_linux_target *targ;
 		struct	info_str info;
 		struct	ahc_initiator_tinfo *tinfo;
 		struct	ahc_tmode_tstate *tstate;
@@ -4054,11 +4042,14 @@ ahc_send_async(struct ahc_softc *ahc, char channel,
 	}
         case AC_SENT_BDR:
 	{
+		struct	aic_linux_target *targ;
+		int	target_offset;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+
 		WARN_ON(lun != CAM_LUN_WILDCARD);
 		scsi_report_device_reset(ahc->platform_data->host,
 					 channel - 'A', target);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		Scsi_Device *scsi_dev;
 
 		/*
@@ -4076,15 +4067,57 @@ ahc_send_async(struct ahc_softc *ahc, char channel,
 			}
 		}
 #endif
+		/*
+		 * Freeze the target for a 500ms to give the
+		 * target some time to recover from this BDR.
+		 */
+		target_offset = target;
+		if (channel == 'B')
+			target_offset += 8;
+		targ = ahc->platform_data->targets[target_offset];
+		if (targ == NULL)
+			break;
+		if ((targ->flags & AIC_TARG_TIMER_ACTIVE) != 0) {
+			printf("%s:%c:%d: Target Timer still active during "
+			       "BDR processing\n", ahc_name(ahc),
+				targ->channel, targ->target);
+			break;
+		}
+		/*
+		 * Keep the reference count non-zero during
+		 * the lifetime of the timer.  This
+		 * guarantees that the target will not
+		 * be freed before our timer executes.
+		 */
+		targ->refcount++;
+		targ->flags |= AIC_TARG_TIMER_ACTIVE;
+		targ->qfrozen++;
+		init_timer(&targ->timer);
+		targ->timer.data = (u_long)targ;
+		targ->timer.expires = jiffies + (HZ/2);
+		targ->timer.function = ahc_linux_targ_timed_unfreeze;
+		add_timer(&targ->timer);
 		break;
 	}
         case AC_BUS_RESET:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 		if (ahc->platform_data->host != NULL) {
 			scsi_report_bus_reset(ahc->platform_data->host,
 					      channel - 'A');
 		}
-#endif
+		/*
+		 * Add a minimal bus settle delay for devices that are slow to
+		 * respond after bus resets.
+		 */
+		if ((ahc->platform_data->flags & AIC_BUS_SETTLE_TIMER) == 0) {
+			aic_freeze_simq(ahc);
+			ahc->platform_data->flags |= AIC_BUS_SETTLE_TIMER;
+			ahc->platform_data->bus_settle_timer.expires =
+			    jiffies + (AIC7XXX_RESET_DELAY * HZ)/1000;
+			add_timer(&ahc->platform_data->bus_settle_timer);
+		} else {
+			mod_timer(&ahc->platform_data->bus_settle_timer,
+				  jiffies + (AIC7XXX_RESET_DELAY * HZ)/1000);
+		}
                 break;
         default:
                 panic("ahc_send_async: Unexpected async event");
@@ -4098,9 +4131,11 @@ void
 ahc_done(struct ahc_softc *ahc, struct scb *scb)
 {
 	Scsi_Cmnd *cmd;
-	struct	   ahc_linux_device *dev;
+	struct	   aic_linux_device *dev;
 
 	LIST_REMOVE(scb, pending_links);
+	if ((scb->flags & SCB_TIMEDOUT) != 0)
+		LIST_REMOVE(scb, timedout_links);
 	if ((scb->flags & SCB_UNTAGGEDQ) != 0) {
 		struct scb_tailq *untagged_q;
 		int target_offset;
@@ -4109,13 +4144,17 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 		untagged_q = &(ahc->untagged_queues[target_offset]);
 		TAILQ_REMOVE(untagged_q, scb, links.tqe);
 		ahc_run_untagged_queue(ahc, untagged_q);
-	}
-
-	if ((scb->flags & SCB_ACTIVE) == 0) {
+	} else if ((scb->flags & SCB_ACTIVE) == 0) {
+		/*
+		 * Transactions aborted from the untagged queue may
+		 * not have been dispatched to the controller, so
+		 * only check the SCB_ACTIVE flag for tagged transactions.
+		 */
 		printf("SCB %d done'd twice\n", scb->hscb->tag);
 		ahc_dump_card_state(ahc);
 		panic("Stopping for safety");
 	}
+
 	cmd = scb->io_ctx;
 	dev = scb->platform_data->dev;
 	dev->active--;
@@ -4133,11 +4172,11 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 	 * the sense buffer looks "sane".
 	 */
 	cmd->sense_buffer[0] = 0;
-	if (ahc_get_transaction_status(scb) == CAM_REQ_INPROG) {
+	if (aic_get_transaction_status(scb) == CAM_REQ_INPROG) {
 		uint32_t amount_xferred;
 
 		amount_xferred =
-		    ahc_get_transfer_length(scb) - ahc_get_residual(scb);
+		    aic_get_transfer_length(scb) - aic_get_residual(scb);
 		if ((scb->flags & SCB_TRANSMISSION_ERROR) != 0) {
 #ifdef AHC_DEBUG
 			if ((ahc_debug & AHC_SHOW_MISC) != 0) {
@@ -4145,7 +4184,7 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 				printf("Set CAM_UNCOR_PARITY\n");
 			}
 #endif
-			ahc_set_transaction_status(scb, CAM_UNCOR_PARITY);
+			aic_set_transaction_status(scb, CAM_UNCOR_PARITY);
 #ifdef AHC_REPORT_UNDERFLOWS
 		/*
 		 * This code is disabled by default as some
@@ -4167,31 +4206,57 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 			ahc_print_path(ahc, scb);
 			printf("Saw underflow (%ld of %ld bytes). "
 			       "Treated as error\n",
-				ahc_get_residual(scb),
-				ahc_get_transfer_length(scb));
-			ahc_set_transaction_status(scb, CAM_DATA_RUN_ERR);
+				aic_get_residual(scb),
+				aic_get_transfer_length(scb));
+			aic_set_transaction_status(scb, CAM_DATA_RUN_ERR);
 #endif
 		} else {
-			ahc_set_transaction_status(scb, CAM_REQ_CMP);
+			aic_set_transaction_status(scb, CAM_REQ_CMP);
 		}
-	} else if (ahc_get_transaction_status(scb) == CAM_SCSI_STATUS_ERROR) {
+	} else if (aic_get_transaction_status(scb) == CAM_SCSI_STATUS_ERROR) {
 		ahc_linux_handle_scsi_status(ahc, dev, scb);
-	} else if (ahc_get_transaction_status(scb) == CAM_SEL_TIMEOUT) {
-		dev->flags |= AHC_DEV_UNCONFIGURED;
-		if (AHC_DV_CMD(cmd) == FALSE)
-			dev->target->flags &= ~AHC_DV_REQUIRED;
+	} else if (aic_get_transaction_status(scb) == CAM_SEL_TIMEOUT) {
+		struct aic_linux_target *targ;
+		struct aic_linux_device *cur_dev;
+		int i;
+
+		/*
+		 * Mark all devices linked off this target
+		 * as unconfigured.
+		 */
+		targ = dev->target;
+		for (i = 0; i < AHC_NUM_LUNS; i++) {
+
+			if (targ->devices[i] == NULL)
+				continue;
+			cur_dev = targ->devices[i];
+			cur_dev->flags |= AIC_DEV_UNCONFIGURED;
+
+			/*
+			 * Don't free the dev for this
+			 * command prematurely.
+			 */
+			if (cur_dev == dev)
+				continue;
+
+			if (TAILQ_EMPTY(&cur_dev->busyq)
+			 && cur_dev->active == 0)
+				ahc_linux_free_device(ahc, cur_dev);
+		}
+		if (AIC_DV_CMD(cmd) == FALSE)
+			dev->target->flags &= ~AIC_DV_REQUIRED;
 	}
 	/*
 	 * Start DV for devices that require it assuming the first command
 	 * sent does not result in a selection timeout.
 	 */
-	if (ahc_get_transaction_status(scb) != CAM_SEL_TIMEOUT
-	 && (dev->target->flags & AHC_DV_REQUIRED) != 0)
+	if (aic_get_transaction_status(scb) != CAM_SEL_TIMEOUT
+	 && (dev->target->flags & AIC_DV_REQUIRED) != 0)
 		ahc_linux_start_dv(ahc);
 
 	if (dev->openings == 1
-	 && ahc_get_transaction_status(scb) == CAM_REQ_CMP
-	 && ahc_get_scsi_status(scb) != SCSI_STATUS_QUEUE_FULL)
+	 && aic_get_transaction_status(scb) == CAM_REQ_CMP
+	 && aic_get_scsi_status(scb) != SCSI_STATUS_QUEUE_FULL)
 		dev->tag_success_count++;
 	/*
 	 * Some devices deal with temporary internal resource
@@ -4200,7 +4265,7 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 	 * back to our previous queue depth.
 	 */
 	if ((dev->openings + dev->active) < dev->maxtags
-	 && dev->tag_success_count > AHC_TAG_SUCCESS_INTERVAL) {
+	 && dev->tag_success_count > AIC_TAG_SUCCESS_INTERVAL) {
 		dev->tag_success_count = 0;
 		dev->openings++;
 	}
@@ -4209,32 +4274,61 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 		dev->commands_since_idle_or_otag = 0;
 
 	if (TAILQ_EMPTY(&dev->busyq)) {
-		if ((dev->flags & AHC_DEV_UNCONFIGURED) != 0
-		 && dev->active == 0
-	 	 && (dev->flags & AHC_DEV_TIMER_ACTIVE) == 0)
+		if ((dev->flags & AIC_DEV_UNCONFIGURED) != 0
+		 && dev->active == 0)
 			ahc_linux_free_device(ahc, dev);
-	} else if ((dev->flags & AHC_DEV_ON_RUN_LIST) == 0) {
+	} else if ((dev->flags & AIC_DEV_ON_RUN_LIST) == 0) {
 		TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq, dev, links);
-		dev->flags |= AHC_DEV_ON_RUN_LIST;
+		dev->flags |= AIC_DEV_ON_RUN_LIST;
 	}
 
 	if ((scb->flags & SCB_RECOVERY_SCB) != 0) {
 		printf("Recovery SCB completes\n");
-		if (ahc_get_transaction_status(scb) == CAM_BDR_SENT
-		 || ahc_get_transaction_status(scb) == CAM_REQ_ABORTED)
-			ahc_set_transaction_status(scb, CAM_CMD_TIMEOUT);
-		if ((ahc->platform_data->flags & AHC_UP_EH_SEMAPHORE) != 0) {
-			ahc->platform_data->flags &= ~AHC_UP_EH_SEMAPHORE;
+		if (aic_get_transaction_status(scb) == CAM_BDR_SENT
+		 || aic_get_transaction_status(scb) == CAM_REQ_ABORTED)
+			aic_set_transaction_status(scb, CAM_CMD_TIMEOUT);
+		if ((scb->platform_data->flags & AIC_SCB_UP_EH_SEM) != 0) {
+			scb->platform_data->flags &= ~AIC_SCB_UP_EH_SEM;
 			up(&ahc->platform_data->eh_sem);
+		} else {
+			struct  scb *list_scb;
+
+			/*
+			 * We were able to complete the command successfully,
+			 * so reinstate the timeouts for all other pending
+			 * commands.
+			 */
+			LIST_FOREACH(list_scb,
+				     &ahc->pending_scbs, pending_links) {
+
+				aic_scb_timer_start(list_scb);
+                	}
 		}
 	}
+
+	if ((scb->platform_data->flags & AIC_TIMEOUT_ACTIVE) == 0) {
+		/*
+		 * The completion handler believes that
+		 * commands without active timers running
+		 * have lost the race of completing before
+		 * their timer expires.  Since commands in
+		 * our busy queues do not have timers running,
+		 * appease the mid-layer by adding a timer
+		 * now.  This timer will be immediately
+		 * canceled by the midlayer.
+		 */
+		scsi_add_timer(cmd, 60*HZ, aic_linux_midlayer_timeout);
+	}
+
+	if ((scb->platform_data->flags & AIC_RELEASE_SIMQ) != 0)
+		aic_release_simq_locked(ahc);
 
 	ahc_free_scb(ahc, scb);
 	ahc_linux_queue_cmd_complete(ahc, cmd);
 
-	if ((ahc->platform_data->flags & AHC_DV_WAIT_SIMQ_EMPTY) != 0
+	if ((ahc->platform_data->flags & AIC_DV_WAIT_SIMQ_EMPTY) != 0
 	 && LIST_FIRST(&ahc->pending_scbs) == NULL) {
-		ahc->platform_data->flags &= ~AHC_DV_WAIT_SIMQ_EMPTY;
+		ahc->platform_data->flags &= ~AIC_DV_WAIT_SIMQ_EMPTY;
 		up(&ahc->platform_data->dv_sem);
 	}
 		
@@ -4242,7 +4336,7 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 
 static void
 ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
-			     struct ahc_linux_device *dev, struct scb *scb)
+			     struct aic_linux_device *dev, struct scb *scb)
 {
 	struct	ahc_devinfo devinfo;
 
@@ -4262,7 +4356,7 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 	 * we don't clobber the device with too many
 	 * commands.
 	 */
-	switch (ahc_get_scsi_status(scb)) {
+	switch (aic_get_scsi_status(scb)) {
 	default:
 		break;
 	case SCSI_STATUS_CHECK_COND:
@@ -4276,13 +4370,15 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 		 */
 		cmd = scb->io_ctx;
 		if (scb->flags & SCB_SENSE) {
-			u_int sense_size;
+			struct	scsi_sense_data *sense;
+			u_int	sense_size;
+			int	error_code, sense_key, asc, ascq;
 
+			sense = ahc_get_sense_buf(ahc, scb);
 			sense_size = MIN(sizeof(struct scsi_sense_data)
-				       - ahc_get_sense_residual(scb),
+				       - aic_get_sense_residual(scb),
 					 sizeof(cmd->sense_buffer));
-			memcpy(cmd->sense_buffer,
-			       ahc_get_sense_buf(ahc, scb), sense_size);
+			memcpy(cmd->sense_buffer, sense, sense_size);
 			if (sense_size < sizeof(cmd->sense_buffer))
 				memset(&cmd->sense_buffer[sense_size], 0,
 				       sizeof(cmd->sense_buffer) - sense_size);
@@ -4301,6 +4397,23 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 				printf("\n");
 			}
 #endif
+			/*
+			 * If this is not a DV command and the target
+			 * provides some status that makes us believe
+			 * that the target has changed (power on reset,
+			 * etc.) kick off a DV scan to re-validate the
+			 * device.
+			 */
+	 		if (AIC_DV_CMD(cmd) != 0)
+				break;
+
+			scsi_extract_sense(sense, &error_code,
+					   &sense_key, &asc, &ascq);
+			if (error_code == SSD_CURRENT_ERROR
+			 && sense_key == SSD_KEY_UNIT_ATTENTION
+			 && asc == 0x29
+			 && (ascq == 0 || ascq == 1))
+				dev->target->flags |= AIC_DV_REQUIRED;
 		}
 		break;
 	}
@@ -4337,7 +4450,7 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 				 * this device.
 				 */
 				if (dev->last_queuefull_same_count
-				 == AHC_LOCK_TAGS_COUNT) {
+				 == AIC_LOCK_TAGS_COUNT) {
 					dev->maxtags = dev->active;
 					ahc_print_path(ahc, scb);
 					printf("Locking max tag count at %d\n",
@@ -4347,10 +4460,10 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 				dev->tags_on_last_queuefull = dev->active;
 				dev->last_queuefull_same_count = 0;
 			}
-			ahc_set_transaction_status(scb, CAM_REQUEUE_REQ);
-			ahc_set_scsi_status(scb, SCSI_STATUS_OK);
+			aic_set_transaction_status(scb, CAM_REQUEUE_REQ);
+			aic_set_scsi_status(scb, SCSI_STATUS_OK);
 			ahc_platform_set_tags(ahc, &devinfo,
-				     (dev->flags & AHC_DEV_Q_BASIC)
+				     (dev->flags & AIC_DEV_Q_BASIC)
 				   ? AHC_QUEUE_BASIC : AHC_QUEUE_TAGGED);
 			break;
 		}
@@ -4359,9 +4472,9 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 		 * as if the target returned BUSY SCSI status.
 		 */
 		dev->openings = 1;
-		ahc_set_scsi_status(scb, SCSI_STATUS_BUSY);
+		aic_set_scsi_status(scb, SCSI_STATUS_BUSY);
 		ahc_platform_set_tags(ahc, &devinfo,
-			     (dev->flags & AHC_DEV_Q_BASIC)
+			     (dev->flags & AIC_DEV_Q_BASIC)
 			   ? AHC_QUEUE_BASIC : AHC_QUEUE_TAGGED);
 		/* FALLTHROUGH */
 	}
@@ -4371,14 +4484,21 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 		 * Set a short timer to defer sending commands for
 		 * a bit since Linux will not delay in this case.
 		 */
-		if ((dev->flags & AHC_DEV_TIMER_ACTIVE) != 0) {
+		if ((dev->flags & AIC_DEV_TIMER_ACTIVE) != 0) {
 			printf("%s:%c:%d: Device Timer still active during "
 			       "busy processing\n", ahc_name(ahc),
 				dev->target->channel, dev->target->target);
 			break;
 		}
-		dev->flags |= AHC_DEV_TIMER_ACTIVE;
 		dev->qfrozen++;
+		/*
+		 * Keep the active count non-zero during
+		 * the lifetime of the timer.  This
+		 * guarantees that the device will not
+		 * be freed before our timer executes.
+		 */
+		dev->active++;
+		dev->flags |= AIC_DEV_TIMER_ACTIVE;
 		init_timer(&dev->timer);
 		dev->timer.data = (u_long)dev;
 		dev->timer.expires = jiffies + (HZ/2);
@@ -4404,9 +4524,9 @@ ahc_linux_queue_cmd_complete(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 	 * not guarantee the order that aborted commands will be
 	 * returned to us.
 	 */
-	struct ahc_completeq *completeq;
-	struct ahc_cmd *list_cmd;
-	struct ahc_cmd *acmd;
+	struct aic_completeq *completeq;
+	struct aic_cmd *list_cmd;
+	struct aic_cmd *acmd;
 
 	/*
 	 * Map CAM error codes into Linux Error codes.  We
@@ -4414,10 +4534,10 @@ ahc_linux_queue_cmd_complete(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 	 * full error information available when making
 	 * state change decisions.
 	 */
-	if (AHC_DV_CMD(cmd) == FALSE) {
+	if (AIC_DV_CMD(cmd) == FALSE) {
 		u_int new_status;
 
-		switch (ahc_cmd_get_transaction_status(cmd)) {
+		switch (aic_cmd_get_transaction_status(cmd)) {
 		case CAM_REQ_INPROG:
 		case CAM_REQ_CMP:
 		case CAM_SCSI_STATUS_ERROR:
@@ -4444,7 +4564,17 @@ ahc_linux_queue_cmd_complete(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 			new_status = DID_PARITY;
 			break;
 		case CAM_CMD_TIMEOUT:
-			new_status = DID_TIME_OUT;
+			/*
+			 *  Returning DID_TIME_OUT will 
+			 *  wake up the error recovery
+			 *  thread instead of doing the
+			 *  command retry we desire. Since
+			 *  we have already recovered the
+			 *  command, returning DID_ERROR
+			 *  will cause a retry up to the
+			 *  retry limit for this command.
+			 */
+			new_status = DID_ERROR;
 			break;
 		case CAM_UA_ABORT:
 		case CAM_REQ_CMP_ERR:
@@ -4474,7 +4604,7 @@ ahc_linux_queue_cmd_complete(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 			if (cmd->retries > 0)
 				cmd->retries--;
 			new_status = DID_OK;
-			ahc_cmd_set_scsi_status(cmd, SCSI_STATUS_CHECK_COND);
+			aic_cmd_set_scsi_status(cmd, SCSI_STATUS_CHECK_COND);
 			cmd->result |= (DRIVER_SENSE << 24);
 			memset(cmd->sense_buffer, 0,
 			       sizeof(cmd->sense_buffer));
@@ -4488,12 +4618,21 @@ ahc_linux_queue_cmd_complete(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 			break;
 		}
 
-		ahc_cmd_set_transaction_status(cmd, new_status);
+		aic_cmd_set_transaction_status(cmd, new_status);
+	}
+
+	/*
+	 * Commands that have completed successfully
+	 * can be completed to the OS immediately.
+	 */
+	if (cmd->result == (DID_OK << 16)) {
+		cmd->scsi_done(cmd);
+		return;
 	}
 
 	completeq = &ahc->platform_data->completeq;
 	list_cmd = TAILQ_FIRST(completeq);
-	acmd = (struct ahc_cmd *)cmd;
+	acmd = (struct aic_cmd *)cmd;
 	while (list_cmd != NULL
 	    && acmd_scsi_cmd(list_cmd).serial_number
 	     < acmd_scsi_cmd(acmd).serial_number)
@@ -4514,7 +4653,7 @@ ahc_linux_filter_inquiry(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	struct	ahc_transinfo *curr;
 	struct	ahc_tmode_tstate *tstate;
 	struct	ahc_syncrate *syncrate;
-	struct	ahc_linux_device *dev;
+	struct	aic_linux_device *dev;
 	u_int	maxsync;
 	u_int	width;
 	u_int	period;
@@ -4537,9 +4676,9 @@ ahc_linux_filter_inquiry(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	sid = (struct scsi_inquiry_data *)dev->target->inq_data;
 	if (SID_QUAL(sid) == SID_QUAL_LU_CONNECTED) {
 
-		dev->flags &= ~AHC_DEV_UNCONFIGURED;
+		dev->flags &= ~AIC_DEV_UNCONFIGURED;
 	} else {
-		dev->flags |= AHC_DEV_UNCONFIGURED;
+		dev->flags |= AIC_DEV_UNCONFIGURED;
 		return;
 	}
 
@@ -4616,84 +4755,84 @@ ahc_linux_filter_inquiry(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 static void
 ahc_linux_sem_timeout(u_long arg)
 {
+	struct	scb *scb;
 	struct	ahc_softc *ahc;
 	u_long	s;
 
-	ahc = (struct ahc_softc *)arg;
-
+	scb = (struct scb *)arg;
+	ahc = scb->ahc_softc;
 	ahc_lock(ahc, &s);
-	if ((ahc->platform_data->flags & AHC_UP_EH_SEMAPHORE) != 0) {
-		ahc->platform_data->flags &= ~AHC_UP_EH_SEMAPHORE;
+	if ((scb->platform_data->flags & AIC_SCB_UP_EH_SEM) != 0) {
+		scb->platform_data->flags &= ~AIC_SCB_UP_EH_SEM;
 		up(&ahc->platform_data->eh_sem);
 	}
 	ahc_unlock(ahc, &s);
 }
 
 static void
-ahc_linux_freeze_simq(struct ahc_softc *ahc)
-{
-	ahc->platform_data->qfrozen++;
-	if (ahc->platform_data->qfrozen == 1) {
-		scsi_block_requests(ahc->platform_data->host);
-
-		/* XXX What about Twin channels? */
-		ahc_platform_abort_scbs(ahc, CAM_TARGET_WILDCARD, ALL_CHANNELS,
-					CAM_LUN_WILDCARD, SCB_LIST_NULL,
-					ROLE_INITIATOR, CAM_REQUEUE_REQ);
-	}
-}
-
-static void
-ahc_linux_release_simq(u_long arg)
-{
-	struct ahc_softc *ahc;
-	u_long s;
-	int    unblock_reqs;
-
-	ahc = (struct ahc_softc *)arg;
-
-	unblock_reqs = 0;
-	ahc_lock(ahc, &s);
-	if (ahc->platform_data->qfrozen > 0)
-		ahc->platform_data->qfrozen--;
-	if (ahc->platform_data->qfrozen == 0)
-		unblock_reqs = 1;
-	if (AHC_DV_SIMQ_FROZEN(ahc)
-	 && ((ahc->platform_data->flags & AHC_DV_WAIT_SIMQ_RELEASE) != 0)) {
-		ahc->platform_data->flags &= ~AHC_DV_WAIT_SIMQ_RELEASE;
-		up(&ahc->platform_data->dv_sem);
-	}
-	ahc_schedule_runq(ahc);
-	ahc_unlock(ahc, &s);
-	/*
-	 * There is still a race here.  The mid-layer
-	 * should keep its own freeze count and use
-	 * a bottom half handler to run the queues
-	 * so we can unblock with our own lock held.
-	 */
-	if (unblock_reqs)
-		scsi_unblock_requests(ahc->platform_data->host);
-}
-
-static void
 ahc_linux_dev_timed_unfreeze(u_long arg)
 {
-	struct ahc_linux_device *dev;
+	struct aic_linux_device *dev;
 	struct ahc_softc *ahc;
 	u_long s;
 
-	dev = (struct ahc_linux_device *)arg;
-	ahc = dev->target->ahc;
+	dev = (struct aic_linux_device *)arg;
+	ahc = dev->target->softc;
 	ahc_lock(ahc, &s);
-	dev->flags &= ~AHC_DEV_TIMER_ACTIVE;
+
+	/*
+	 * Release our hold on the device.
+	 */
+	dev->flags &= ~AIC_DEV_TIMER_ACTIVE;
+	dev->active--;
+
 	if (dev->qfrozen > 0)
 		dev->qfrozen--;
 	if (dev->qfrozen == 0
-	 && (dev->flags & AHC_DEV_ON_RUN_LIST) == 0)
+	 && dev->target->qfrozen == 0
+	 && (dev->flags & AIC_DEV_ON_RUN_LIST) == 0)
 		ahc_linux_run_device_queue(ahc, dev);
-	if (TAILQ_EMPTY(&dev->busyq)
+	if ((dev->flags & AIC_DEV_UNCONFIGURED) != 0
+	 && TAILQ_EMPTY(&dev->busyq)
 	 && dev->active == 0)
 		ahc_linux_free_device(ahc, dev);
+	ahc_unlock(ahc, &s);
+}
+
+static void
+ahc_linux_targ_timed_unfreeze(u_long arg)
+{
+	struct aic_linux_target *targ;
+	struct ahc_softc *ahc;
+	u_long s;
+
+	targ = (struct aic_linux_target *)arg;
+	ahc = targ->softc;
+	ahc_lock(ahc, &s);
+
+	/*
+	 * Release our hold on the target.
+	 */
+	targ->flags &= ~AIC_TARG_TIMER_ACTIVE;
+	targ->refcount--;
+
+	targ->flags &= ~AIC_TARG_TIMER_ACTIVE;
+	if (targ->qfrozen > 0)
+		targ->qfrozen--;
+	if (targ->qfrozen == 0) {
+		u_int i;
+
+		for (i = 0; i < AHC_NUM_LUNS; i++) {
+			struct aic_linux_device *dev;
+		
+			dev = targ->devices[i];
+			if (dev == NULL
+	 		 || (dev->flags & AIC_DEV_ON_RUN_LIST) != 0)
+				continue;
+
+			aic_linux_check_device_queue(ahc, dev);
+		}
+	}
 	ahc_unlock(ahc, &s);
 }
 
@@ -4701,9 +4840,9 @@ static int
 ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 {
 	struct ahc_softc *ahc;
-	struct ahc_cmd *acmd;
-	struct ahc_cmd *list_acmd;
-	struct ahc_linux_device *dev;
+	struct aic_cmd *acmd;
+	struct aic_cmd *list_acmd;
+	struct aic_linux_device *dev;
 	struct scb *pending_scb;
 	u_long s;
 	u_int  saved_scbptr;
@@ -4721,7 +4860,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	paused = FALSE;
 	wait = FALSE;
 	ahc = *(struct ahc_softc **)cmd->device->host->hostdata;
-	acmd = (struct ahc_cmd *)cmd;
+	acmd = (struct aic_cmd *)cmd;
 
 	printf("%s:%d:%d:%d: Attempting to queue a%s message\n",
 	       ahc_name(ahc), cmd->device->channel,
@@ -4747,7 +4886,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	 * by acquiring either the io_request_lock or our own
 	 * lock, this *should* be safe.
 	 */
-	ahc_midlayer_entrypoint_lock(ahc, &s);
+	ahc_entrypoint_lock(ahc, &s);
 
 	/*
 	 * First determine if we currently own this command.
@@ -4783,13 +4922,24 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		if (flag == SCB_ABORT) {
 			TAILQ_REMOVE(&dev->busyq, list_acmd, acmd_links.tqe);
 			cmd->result = DID_ABORT << 16;
+			/*
+			 * The completion handler believes that
+			 * commands without active timers running
+			 * have lost the race of completing before
+			 * their timer expires.  Since commands in our
+			 * busy queues do not have timers running,
+			 * appease the mid-layer by adding a timer
+			 * now.  This timer will be immediately
+			 * canceled by the midlayer.
+			 */
+			scsi_add_timer(cmd, 60*HZ, aic_linux_midlayer_timeout);
 			ahc_linux_queue_cmd_complete(ahc, cmd);
 			retval = SUCCESS;
 			goto done;
 		}
 	}
 
-	if ((dev->flags & (AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED)) == 0
+	if ((dev->flags & (AIC_DEV_Q_BASIC|AIC_DEV_Q_TAGGED)) == 0
 	 && ahc_search_untagged_queues(ahc, cmd, cmd->device->id,
 				       cmd->device->channel + 'A',
 				       cmd->device->lun,
@@ -5005,10 +5155,10 @@ done:
 		struct timer_list timer;
 		int ret;
 
-		ahc->platform_data->flags |= AHC_UP_EH_SEMAPHORE;
+		pending_scb->platform_data->flags |= AIC_SCB_UP_EH_SEM;
 		spin_unlock_irq(&ahc->platform_data->spin_lock);
 		init_timer(&timer);
-		timer.data = (u_long)ahc;
+		timer.data = (u_long)pending_scb;
 		timer.expires = jiffies + (5 * HZ);
 		timer.function = ahc_linux_sem_timeout;
 		add_timer(&timer);
@@ -5022,16 +5172,17 @@ done:
 		}
 		spin_lock_irq(&ahc->platform_data->spin_lock);
 	}
-	ahc_schedule_runq(ahc);
+	aic_schedule_runq(ahc);
 	ahc_linux_run_complete_queue(ahc);
-	ahc_midlayer_entrypoint_unlock(ahc, &s);
+	ahc_entrypoint_unlock(ahc, &s);
 	return (retval);
 }
 
 void
 ahc_platform_dump_card_state(struct ahc_softc *ahc)
 {
-	struct ahc_linux_device *dev;
+	struct Scsi_Host *host;
+	struct aic_linux_device *dev;
 	int channel;
 	int maxchannel;
 	int target;
@@ -5039,6 +5190,14 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 	int lun;
 	int i;
 
+	host = ahc->platform_data->host;
+	printf("%s: Host Status: Failed(%d) %s%s%s\n",
+	       ahc_name(ahc),
+	       host->host_failed,
+	       host->eh_active ? "eh_active " : "",
+	       host->host_blocked ? "host_blocked " : "",
+	       host->host_self_blocked ? "host_self_blocked " : "");
+	       
 	maxchannel = (ahc->features & AHC_TWIN) ? 1 : 0;
 	maxtarget = (ahc->features & AHC_WIDE) ? 15 : 7;
 	for (channel = 0; channel <= maxchannel; channel++) {
@@ -5046,7 +5205,7 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 		for (target = 0; target <=maxtarget; target++) {
 
 			for (lun = 0; lun < AHC_NUM_LUNS; lun++) {
-				struct ahc_cmd *acmd;
+				struct aic_cmd *acmd;
 
 				dev = ahc_linux_get_device(ahc, channel, target,
 							   lun, /*alloc*/FALSE);
@@ -5067,47 +5226,51 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 	}
 }
 
-static void __exit ahc_linux_exit(void);
-
 static int __init
 ahc_linux_init(void)
 {
+	int found;
+
+	ahc_sysrq_key = aic_install_sysrq(&ahc_sysrq_op);
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	int rc = ahc_linux_detect(&aic7xxx_driver_template);
-	if (rc)
-		return rc;
-	ahc_linux_exit();
-	return -ENODEV;
+	found = ahc_linux_detect(&aic7xxx_driver_template);
 #else
 	scsi_register_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
-	if (aic7xxx_driver_template.present == 0) {
-		scsi_unregister_module(MODULE_SCSI_HA,
-				       &aic7xxx_driver_template);
-		return (-ENODEV);
-	}
-
-	return (0);
+	found = aic7xxx_driver_template.present;
 #endif
+#ifdef MODULE
+	if (found == 0)
+		ahc_init_status = -ENODEV;
+#endif
+	if (ahc_init_status != 0) {
+		/*
+		 * Linux will not call our exit
+		 * routine if we fail to load.
+		 * Force cleanup if initialization
+		 * is not successful.
+		 */
+		ahc_linux_exit();
+	}
+	return (ahc_init_status);
 }
 
-static void __exit
+static void
 ahc_linux_exit(void)
 {
 	struct ahc_softc *ahc;
-	u_long l;
 
 	/*
-	 * Shutdown DV threads before going into the SCSI mid-layer.
+	 * Shutdown our threads before going into the SCSI mid-layer.
 	 * This avoids situations where the mid-layer locks the entire
 	 * kernel so that waiting for our DV threads to exit leads
 	 * to deadlock.
 	 */
-	ahc_list_lock(&l);
 	TAILQ_FOREACH(ahc, &ahc_tailq, links) {
 
 		ahc_linux_kill_dv_thread(ahc);
+		ahc_terminate_recovery_thread(ahc);
 	}
-	ahc_list_unlock(&l);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	/*
@@ -5123,6 +5286,7 @@ ahc_linux_exit(void)
 #ifdef CONFIG_EISA
 	ahc_linux_eisa_exit();
 #endif
+	aic_remove_sysrq(ahc_sysrq_key, &ahc_sysrq_op);
 }
 
 module_init(ahc_linux_init);

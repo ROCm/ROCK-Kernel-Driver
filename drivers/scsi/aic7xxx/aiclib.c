@@ -30,16 +30,6 @@
  * $Id$
  */
 
-#include <linux/blkdev.h>
-#include <linux/delay.h>
-#include <linux/version.h>
-
-/* Core SCSI definitions */
-#include "scsi.h"
-#include "hosts.h"
-#include "aiclib.h"
-#include "cam.h"
-
 #ifndef FALSE
 #define FALSE   0
 #endif /* FALSE */
@@ -1409,4 +1399,326 @@ aic_parse_brace_option(char *opt_name, char *opt_arg, char *end, int depth,
 		}
 	}
 	return (opt_arg);
+}
+
+/************************* Magic SysReq Support *******************************/
+void
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+aic_sysrq_handler(int key, struct pt_regs *unused, struct kbd_struct *unused1,
+		  struct tty_struct *unused2)
+#else
+aic_sysrq_handler(int key, struct pt_regs *unused, struct tty_struct *unused2)
+#endif
+{
+#ifdef CONFIG_MAGIC_SYSRQ
+	struct aic_softc *aic;
+	u_long l;
+
+	aic_list_lock(&l);
+
+	TAILQ_FOREACH(aic, &aic_tailq, links) {
+		u_long s;
+
+		aic_lock(aic, &s);
+		aic_dump_card_state(aic);
+		aic_unlock(aic, &s);
+	}
+	aic_list_unlock(&l);
+#endif
+}
+
+int
+aic_install_sysrq(struct aic_sysrq_key_op *key_op)
+{
+#ifdef CONFIG_MAGIC_SYSRQ
+	char *str;
+	int len;
+	int i;
+
+	str = key_op->help_msg;
+	len = strlen(str);
+	for (i = 0; i < len; i++) {
+		int key;
+
+		key = str[i];
+		if (register_sysrq_key(key, key_op) == 0) {
+
+			if (key >= 'a' && key <= 'z')
+				str[i] = key + ('A' - 'a');
+			return (key);
+		}
+	}
+#endif
+	return (0);
+}
+
+void
+aic_remove_sysrq(int key, struct aic_sysrq_key_op *key_op)
+{
+#ifdef CONFIG_MAGIC_SYSRQ
+	unregister_sysrq_key(key, key_op);
+#endif
+}
+
+/******************************** Bus DMA *************************************/
+int
+aic_dma_tag_create(struct aic_softc *aic, bus_dma_tag_t parent,
+		   bus_size_t alignment, bus_size_t boundary,
+		   bus_addr_t lowaddr, bus_addr_t highaddr,
+		   bus_dma_filter_t *filter, void *filterarg,
+		   bus_size_t maxsize, int nsegments,
+		   bus_size_t maxsegsz, int flags, bus_dma_tag_t *ret_tag)
+{
+	bus_dma_tag_t dmat;
+
+	dmat = malloc(sizeof(*dmat), M_DEVBUF, M_NOWAIT);
+	if (dmat == NULL)
+		return (ENOMEM);
+
+	/*
+	 * Linux is very simplistic about DMA memory.  For now don't
+	 * maintain all specification information.  Once Linux supplies
+	 * better facilities for doing these operations, or the
+	 * needs of this particular driver change, we might need to do
+	 * more here.
+	 */
+	dmat->alignment = alignment;
+	dmat->boundary = boundary;
+	dmat->maxsize = maxsize;
+	*ret_tag = dmat;
+	return (0);
+}
+
+void
+aic_dma_tag_destroy(struct aic_softc *aic, bus_dma_tag_t dmat)
+{
+	free(dmat, M_DEVBUF);
+}
+
+int
+aic_dmamem_alloc(struct aic_softc *aic, bus_dma_tag_t dmat, void** vaddr,
+		 int flags, bus_dmamap_t *mapp)
+{
+	bus_dmamap_t map;
+
+	map = malloc(sizeof(*map), M_DEVBUF, M_NOWAIT);
+	if (map == NULL)
+		return (ENOMEM);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	/*
+	 * Although we can dma data above 4GB, our
+	 * coherent memory is below 4GB for
+	 * space efficiency reasons (only need a 4byte
+	 * address).  For this reason, we have to reset
+	 * our dma mask when doing allocations.
+	 */
+	aic_set_dma_mask(aic, 0xFFFFFFFF);
+#endif
+	*vaddr = aic_alloc_coherent(aic, dmat->maxsize, &map->bus_addr);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	aic_set_dma_mask(aic, aic->platform_data->hw_dma_mask);
+#endif
+	if (*vaddr == NULL)
+		return (ENOMEM);
+	*mapp = map;
+	return(0);
+}
+
+void
+aic_dmamem_free(struct aic_softc *aic, bus_dma_tag_t dmat,
+		void* vaddr, bus_dmamap_t map)
+{
+	aic_free_coherent(aic, dmat->maxsize, vaddr, map->bus_addr);
+}
+
+int
+aic_dmamap_load(struct aic_softc *aic, bus_dma_tag_t dmat, bus_dmamap_t map,
+		void *buf, bus_size_t buflen, bus_dmamap_callback_t *cb,
+		void *cb_arg, int flags)
+{
+	/*
+	 * Assume for now that this will only be used during
+	 * initialization and not for per-transaction buffer mapping.
+	 */
+	bus_dma_segment_t stack_sg;
+
+	stack_sg.ds_addr = map->bus_addr;
+	stack_sg.ds_len = dmat->maxsize;
+	cb(cb_arg, &stack_sg, /*nseg*/1, /*error*/0);
+	return (0);
+}
+
+void
+aic_dmamap_destroy(struct aic_softc *aic, bus_dma_tag_t dmat, bus_dmamap_t map)
+{
+	free(map, M_DEVBUF);
+}
+
+int
+aic_dmamap_unload(struct aic_softc *aic, bus_dma_tag_t dmat, bus_dmamap_t map)
+{
+	/* Nothing to do */
+	return (0);
+}
+
+/***************************** Queue Handling ********************************/
+/*
+ * In 2.4.X and above, this routine is called from a tasklet,
+ * so we must re-acquire our lock prior to executing this code.
+ * In all prior kernels, aic_schedule_runq() calls this routine
+ * directly and aic_schedule_runq() is called with our lock held.
+ */
+void
+aic_runq_tasklet(unsigned long data)
+{
+	struct aic_softc* aic;
+	struct aic_linux_device *dev;
+	u_long flags;
+
+	aic = (struct aic_softc *)data;
+	aic_lock(aic, &flags);
+	while ((dev = aic_linux_next_device_to_run(aic)) != NULL) {
+	
+		TAILQ_REMOVE(&aic->platform_data->device_runq, dev, links);
+		dev->flags &= ~AIC_DEV_ON_RUN_LIST;
+		aic_linux_check_device_queue(aic, dev);
+		/* Yeild to our interrupt handler */
+		aic_unlock(aic, &flags);
+		aic_lock(aic, &flags);
+	}
+	aic_unlock(aic, &flags);
+}
+
+void
+aic_unblock_tasklet(unsigned long data)
+{
+	struct aic_softc* aic;
+
+	aic = (struct aic_softc *)data;
+	scsi_unblock_requests(aic->platform_data->host);
+}
+
+void
+aic_bus_settle_complete(u_long data)
+{
+	struct aic_softc *aic;
+	u_long s;
+
+	aic = (struct aic_softc *)data;
+	/*
+	 * Guard against our bottom half scheduling another
+	 * bus settle delay just as our timer runs.  If this
+	 * occurs, do nothing.  The newly scheduled timer will
+	 * take care of things.
+	 */
+	aic_lock(aic, &s);
+	if (timer_pending(&aic->platform_data->bus_settle_timer) == 0) {
+		aic->platform_data->flags &= ~AIC_BUS_SETTLE_TIMER;
+		aic_release_simq_locked(aic);
+	}
+	aic_unlock(aic, &s);
+}
+
+void
+aic_freeze_simq(struct aic_softc *aic)
+{
+	aic->platform_data->qfrozen++;
+	if (aic->platform_data->qfrozen == 1)
+		scsi_block_requests(aic->platform_data->host);
+}
+
+void
+aic_release_simq(struct aic_softc *aic)
+{
+	u_long s;
+
+	aic_lock(aic, &s);
+	aic_release_simq_locked(aic);
+	aic_unlock(aic, &s);
+}
+
+void
+aic_release_simq_locked(struct aic_softc *aic)
+{
+
+	if (aic->platform_data->qfrozen > 0)
+		aic->platform_data->qfrozen--;
+	if (AIC_DV_SIMQ_FROZEN(aic)
+	 && ((aic->platform_data->flags & AIC_DV_WAIT_SIMQ_RELEASE) != 0)) {
+		aic->platform_data->flags &= ~AIC_DV_WAIT_SIMQ_RELEASE;
+		up(&aic->platform_data->dv_sem);
+	}
+	if (aic->platform_data->qfrozen == 0) {
+		aic_schedule_unblock(aic);
+		aic_schedule_runq(aic);
+	}
+}
+
+/***************************** Timer Facilities *******************************/
+void
+aic_platform_timeout(struct scsi_cmnd *cmd)
+{
+
+	if (AIC_DV_CMD(cmd) != 0) {
+
+		aic_linux_dv_timeout(cmd);
+	} else {
+		struct	scb *scb;
+		struct	aic_softc *aic;
+		u_long	s;
+
+		scb = (struct scb *)cmd->host_scribble;
+		aic = scb->aic_softc;
+		aic_lock(aic, &s);
+
+		if (scb == NULL
+		 || scb->flags == SCB_FLAG_NONE) {
+			int done_late;
+
+			/*
+			 * Handle timeout/completion races.
+			 * If the command is still sitting on
+			 * our completion queue, just re-instate
+			 * the timeout.  If we've already completed
+			 * the command, the function pointer in our
+			 * timer will be cleared and we will need to
+			 * additionally complete it again to the mid-layer.
+			 *
+			 * Since done_late is cleared by adding a
+			 * timer, we must save off its value first.
+			 */
+			done_late = cmd->eh_timeout.function == NULL;
+			scsi_add_timer(cmd, 60*HZ, aic_linux_midlayer_timeout);
+			if (done_late)
+				cmd->scsi_done(cmd);
+		} else if ((scb->platform_data->flags & AIC_TIMEOUT_ACTIVE)) {
+
+			/*
+			 * Handle the case of timeouts that expire just
+			 * as we delete timers during recovery by skipping
+			 * SCBs that don't have timers active.
+			 */
+			scb->platform_data->flags &= ~AIC_TIMEOUT_ACTIVE;
+
+			/*
+			 * We must clear out the function pointer so that
+			 * scsi_add_timer does not believe that a del_timer
+			 * is required before setting up a new timer for
+			 * this command.
+			 */
+			scb->io_ctx->eh_timeout.function = NULL;
+			aic_timeout(scb);
+		}
+		aic_unlock(aic, &s);
+	}
+}
+
+void
+aic_linux_midlayer_timeout(struct scsi_cmnd *cmd)
+{
+	struct aic_softc *aic;
+
+	aic = *(struct aic_softc **)cmd->device->host->hostdata;
+	printf("%s: midlayer_timeout\n", aic_name(aic));
 }
