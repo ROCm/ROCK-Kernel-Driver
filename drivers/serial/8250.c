@@ -530,10 +530,10 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 			status1 |= 0x10;  /* 1.625 divisor for baud_base --> 921600 */
 			serial_outp(up, 0x04, status1);
 			serial_outp(up, UART_LCR, 0);
+			up->port.uartclk = 921600*16;
 #endif
 
 			up->port.type = PORT_NS16550A;
-			up->port.uartclk = 921600*16;
 			return;
 		}
 	}
