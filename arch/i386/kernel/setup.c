@@ -147,7 +147,7 @@ extern char _text, _etext, _edata, _end;
 extern unsigned long cpu_khz;
 
 static int disable_x86_serial_nr __initdata = 1;
-int disable_x86_fxsr __initdata = 0;
+static int disable_x86_fxsr __initdata = 0;
 
 /*
  * This is set up by the setup-routine at boot-time
@@ -2012,6 +2012,12 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	if ( tsc_disable )
 		clear_bit(X86_FEATURE_TSC, &c->x86_capability);
 #endif
+
+	/* FXSR disabled? */
+	if (disable_x86_fxsr) {
+		clear_bit(X86_FEATURE_FXSR, &c->x86_capability);
+		clear_bit(X86_FEATURE_XMM, &c->x86_capability);
+	}
 
 	/* Disable the PN if appropriate */
 	squash_the_stupid_serial_number(c);

@@ -542,14 +542,8 @@ void __free_pages(struct page *page, unsigned long order)
 
 void free_pages(unsigned long addr, unsigned long order)
 {
-	struct page *fpage;
-
-#ifdef CONFIG_DISCONTIGMEM
-	if (addr == 0) return;
-#endif
-	fpage = virt_to_page(addr);
-	if (VALID_PAGE(fpage))
-		__free_pages(fpage, order);
+	if (addr != 0)
+		__free_pages(virt_to_page(addr), order);
 }
 
 /*

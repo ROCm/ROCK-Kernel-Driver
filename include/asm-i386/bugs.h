@@ -66,8 +66,6 @@ static double __initdata y = 3145727.0;
  */
 static void __init check_fpu(void)
 {
-	extern int disable_x86_fxsr;
-
 	if (!boot_cpu_data.hard_math) {
 #ifndef CONFIG_MATH_EMULATION
 		printk(KERN_EMERG "No coprocessor found and no math emulation present.\n");
@@ -85,19 +83,16 @@ static void __init check_fpu(void)
 		extern void __buggy_fxsr_alignment(void);
 		__buggy_fxsr_alignment();
 	}
-	if (!disable_x86_fxsr) {
-		if (cpu_has_fxsr) {
-			printk(KERN_INFO "Enabling fast FPU save and restore... ");
-			set_in_cr4(X86_CR4_OSFXSR);
-			printk("done.\n");
-		}
-		if (cpu_has_xmm) {
-			printk(KERN_INFO "Enabling unmasked SIMD FPU exception support... ");
-			set_in_cr4(X86_CR4_OSXMMEXCPT);
-			printk("done.\n");
-		}
-	} else
-		printk(KERN_INFO "Disabling fast FPU save and restore.\n");
+	if (cpu_has_fxsr) {
+		printk(KERN_INFO "Enabling fast FPU save and restore... ");
+		set_in_cr4(X86_CR4_OSFXSR);
+		printk("done.\n");
+	}
+	if (cpu_has_xmm) {
+		printk(KERN_INFO "Enabling unmasked SIMD FPU exception support... ");
+		set_in_cr4(X86_CR4_OSXMMEXCPT);
+		printk("done.\n");
+	}
 
 	/* Test for the divl bug.. */
 	__asm__("fninit\n\t"

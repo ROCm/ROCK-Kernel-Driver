@@ -2,6 +2,8 @@
 #include <linux/string.h>
 #include <linux/sched.h>
 
+#include <asm/i387.h>
+
 /*
  *	MMX 3DNow! library helper functions
  *
@@ -26,13 +28,7 @@ void *_mmx_memcpy(void *to, const void *from, size_t len)
 	void *p=to;
 	int i= len >> 6;	/* len/64 */
 
-	if (!(current->flags & PF_USEDFPU))
-		clts();
-	else
-	{
-		__asm__ __volatile__ ( " fnsave %0; fwait\n"::"m"(current->thread.i387));
-		current->flags &= ~PF_USEDFPU;
-	}
+	kernel_fpu_begin();
 
 	__asm__ __volatile__ (
 		"1: prefetch (%0)\n"		/* This set is 28 bytes */
@@ -88,20 +84,15 @@ void *_mmx_memcpy(void *to, const void *from, size_t len)
 	 *	Now do the tail of the block
 	 */
 	__memcpy(to, from, len&63);
-	stts();
+	kernel_fpu_end();
 	return p;
 }
 
 static void fast_clear_page(void *page)
 {
 	int i;
-	if (!(current->flags & PF_USEDFPU))
-		clts();
-	else
-	{
-		__asm__ __volatile__ ( " fnsave %0; fwait\n"::"m"(current->thread.i387));
-		current->flags &= ~PF_USEDFPU;
-	}
+
+	kernel_fpu_begin();
 	
 	__asm__ __volatile__ (
 		"  pxor %%mm0, %%mm0\n" : :
@@ -127,19 +118,14 @@ static void fast_clear_page(void *page)
 	__asm__ __volatile__ (
 		"  sfence \n" : :
 	);
-	stts();
+	kernel_fpu_end();
 }
 
 static void fast_copy_page(void *to, void *from)
 {
 	int i;
-	if (!(current->flags & PF_USEDFPU))
-		clts();
-	else
-	{
-		__asm__ __volatile__ ( " fnsave %0; fwait\n"::"m"(current->thread.i387));
-		current->flags &= ~PF_USEDFPU;
-	}
+
+	kernel_fpu_begin();
 
 	/* maybe the prefetch stuff can go before the expensive fnsave...
 	 * but that is for later. -AV
@@ -199,7 +185,7 @@ static void fast_copy_page(void *to, void *from)
 	__asm__ __volatile__ (
 		"  sfence \n" : :
 	);
-	stts();
+	kernel_fpu_end();
 }
 
 /*
