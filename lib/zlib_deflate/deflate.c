@@ -66,18 +66,18 @@ typedef enum {
 typedef block_state (*compress_func) (deflate_state *s, int flush);
 /* Compression function. Returns the block state after the call. */
 
-local void fill_window    (deflate_state *s);
-local block_state deflate_stored (deflate_state *s, int flush);
-local block_state deflate_fast   (deflate_state *s, int flush);
-local block_state deflate_slow   (deflate_state *s, int flush);
-local void lm_init        (deflate_state *s);
-local void putShortMSB    (deflate_state *s, uInt b);
-local void flush_pending  (z_streamp strm);
-local int read_buf        (z_streamp strm, Byte *buf, unsigned size);
-local uInt longest_match  (deflate_state *s, IPos cur_match);
+static void fill_window    (deflate_state *s);
+static block_state deflate_stored (deflate_state *s, int flush);
+static block_state deflate_fast   (deflate_state *s, int flush);
+static block_state deflate_slow   (deflate_state *s, int flush);
+static void lm_init        (deflate_state *s);
+static void putShortMSB    (deflate_state *s, uInt b);
+static void flush_pending  (z_streamp strm);
+static int read_buf        (z_streamp strm, Byte *buf, unsigned size);
+static uInt longest_match  (deflate_state *s, IPos cur_match);
 
 #ifdef DEBUG_ZLIB
-local  void check_match (deflate_state *s, IPos start, IPos match,
+static  void check_match (deflate_state *s, IPos start, IPos match,
                          int length);
 #endif
 
@@ -111,7 +111,7 @@ typedef struct config_s {
    compress_func func;
 } config;
 
-local const config configuration_table[10] = {
+static const config configuration_table[10] = {
 /*      good lazy nice chain */
 /* 0 */ {0,    0,  0,    0, deflate_stored},  /* store only */
 /* 1 */ {4,    4,  8,    4, deflate_fast}, /* maximum speed, no lazy matches */
@@ -371,7 +371,7 @@ int zlib_deflateParams(
  * IN assertion: the stream state is correct and there is enough room in
  * pending_buf.
  */
-local void putShortMSB(
+static void putShortMSB(
 	deflate_state *s,
 	uInt b
 )
@@ -386,7 +386,7 @@ local void putShortMSB(
  * to avoid allocating a large strm->next_out buffer and copying into it.
  * (See also read_buf()).
  */
-local void flush_pending(
+static void flush_pending(
 	z_streamp strm
 )
 {
@@ -632,7 +632,7 @@ int zlib_deflateCopy (
  * allocating a large strm->next_in buffer and copying from it.
  * (See also flush_pending()).
  */
-local int read_buf(
+static int read_buf(
 	z_streamp strm,
 	Byte *buf,
 	unsigned size
@@ -658,7 +658,7 @@ local int read_buf(
 /* ===========================================================================
  * Initialize the "longest match" routines for a new zlib stream
  */
-local void lm_init(
+static void lm_init(
 	deflate_state *s
 )
 {
@@ -693,7 +693,7 @@ local void lm_init(
 /* For 80x86 and 680x0, an optimized version will be provided in match.asm or
  * match.S. The code will be functionally equivalent.
  */
-local uInt longest_match(
+static uInt longest_match(
 	deflate_state *s,
 	IPos cur_match			/* current match */
 )
@@ -836,7 +836,7 @@ local uInt longest_match(
 /* ===========================================================================
  * Check that the match at match_start is indeed a match.
  */
-local void check_match(
+static void check_match(
 	deflate_state *s,
 	IPos start,
 	IPos match,
@@ -872,7 +872,7 @@ local void check_match(
  *    performed for at least two bytes (required for the zip translate_eol
  *    option -- not supported here).
  */
-local void fill_window(s)
+static void fill_window(s)
     deflate_state *s;
 {
     register unsigned n, m;
@@ -991,7 +991,7 @@ local void fill_window(s)
  * NOTE: this function should be optimized to avoid extra copying from
  * window to pending_buf.
  */
-local block_state deflate_stored(
+static block_state deflate_stored(
 	deflate_state *s,
 	int flush
 )
@@ -1050,7 +1050,7 @@ local block_state deflate_stored(
  * new strings in the dictionary only for unmatched strings or for short
  * matches. It is used only for the fast compression options.
  */
-local block_state deflate_fast(
+static block_state deflate_fast(
 	deflate_state *s,
 	int flush
 )
@@ -1144,7 +1144,7 @@ local block_state deflate_fast(
  * evaluation for matches: a match is finally adopted only if there is
  * no better match at the next window position.
  */
-local block_state deflate_slow(
+static block_state deflate_slow(
 	deflate_state *s,
 	int flush
 )

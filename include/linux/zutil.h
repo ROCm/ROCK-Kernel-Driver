@@ -18,11 +18,6 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 
-#ifndef local
-#  define local static
-#endif
-/* compile with -Dlocal if your debugger can't find static symbols */
-
 typedef unsigned char  uch;
 typedef unsigned short ush;
 typedef unsigned long  ulg;
