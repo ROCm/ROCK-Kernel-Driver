@@ -546,7 +546,7 @@ prom_initialize_lmb(unsigned long mem)
 			opt++;
 		if (!strncmp(opt, RELOC("off"), 3))
 			nodart = 1;
-		else if (!strncmp(opt, RELOC("on"), 2))
+		else if (!strncmp(opt, RELOC("force"), 5))
 			RELOC(dart_force_on) = 1;
 	}
 #else
