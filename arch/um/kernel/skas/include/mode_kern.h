@@ -21,6 +21,8 @@ extern void release_thread_skas(struct task_struct *task);
 extern void exit_thread_skas(void);
 extern void initial_thread_cb_skas(void (*proc)(void *), void *arg);
 extern void init_idle_skas(void);
+extern void flush_tlb_kernel_range_skas(unsigned long start, 
+					unsigned long end);
 extern void flush_tlb_kernel_vm_skas(void);
 extern void __flush_tlb_one_skas(unsigned long addr);
 extern void flush_tlb_range_skas(struct vm_area_struct *vma, 
@@ -32,11 +34,10 @@ extern void before_mem_skas(unsigned long unused);
 extern unsigned long set_task_sizes_skas(int arg, unsigned long *host_size_out,
 					 unsigned long *task_size_out);
 extern int start_uml_skas(void);
-extern struct page *arch_validate_skas(struct page *page, int mask, int order);
 extern int external_pid_skas(struct task_struct *task);
 extern int thread_pid_skas(struct task_struct *task);
 
-#define kmem_end_skas (host_task_size)
+#define kmem_end_skas (host_task_size - 1024 * 1024)
 
 #endif
 

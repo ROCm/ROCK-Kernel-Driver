@@ -20,29 +20,32 @@ static inline int check_area(void *ptr, int size)
 
 static int check_readlink(struct pt_regs *regs)
 {
-	return(check_area((void *) regs->regs.args[1], regs->regs.args[2]));
+	return(check_area((void *) UPT_SYSCALL_ARG1(&regs->regs),
+			  UPT_SYSCALL_ARG2(&regs->regs)));
 }
 
 static int check_utime(struct pt_regs *regs)
 {
-	return(check_area((void *) regs->regs.args[1],
+	return(check_area((void *) UPT_SYSCALL_ARG1(&regs->regs),
 			  sizeof(struct utimbuf)));
 }
 
 static int check_oldstat(struct pt_regs *regs)
 {
-	return(check_area((void *) regs->regs.args[1], 
+	return(check_area((void *) UPT_SYSCALL_ARG1(&regs->regs), 
 			  sizeof(struct __old_kernel_stat)));
 }
 
 static int check_stat(struct pt_regs *regs)
 {
-	return(check_area((void *) regs->regs.args[1], sizeof(struct stat)));
+	return(check_area((void *) UPT_SYSCALL_ARG1(&regs->regs), 
+			  sizeof(struct stat)));
 }
 
 static int check_stat64(struct pt_regs *regs)
 {
-	return(check_area((void *) regs->regs.args[1], sizeof(struct stat64)));
+	return(check_area((void *) UPT_SYSCALL_ARG1(&regs->regs), 
+			  sizeof(struct stat64)));
 }
 
 struct bogus {
@@ -90,7 +93,7 @@ struct bogus this_is_bogus[256] = {
 
 static int check_bogosity(struct pt_regs *regs)
 {
-	struct bogus *bogon = &this_is_bogus[regs->regs.syscall];
+	struct bogus *bogon = &this_is_bogus[UPT_SYSCALL_NR(&regs->regs)];
 
 	if(!bogon->kernel_ds) return(0);
 	if(bogon->check_params && (*bogon->check_params)(regs))
@@ -109,7 +112,7 @@ long execute_syscall_tt(void *r)
 
 	current->thread.nsyscalls++;
 	nsyscalls++;
-	syscall = regs->regs.syscall;
+	syscall = UPT_SYSCALL_NR(&regs->regs);
 
 	if((syscall >= NR_syscalls) || (syscall < 0))
 		res = -ENOSYS;

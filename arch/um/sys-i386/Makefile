@@ -7,6 +7,7 @@ USER_OBJS := bugs.o ptrace_user.o sigcontext.o fault.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 SYMLINKS = semaphore.c highmem.c module.c
+SYMLINKS := $(foreach f,$(SYMLINKS),$(src)/$f)
 
 semaphore.c-dir = kernel
 highmem.c-dir = mm
@@ -20,7 +21,7 @@ endef
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
 
-$(foreach f,$(SYMLINKS),$(src)/$f): 
+$(SYMLINKS): 
 	$(call make_link,$@)
 
 clean:

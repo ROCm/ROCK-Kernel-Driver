@@ -42,7 +42,7 @@ static int pollfds_size = 0;
 
 extern int io_count, intr_count;
 
-void sigio_handler(int sig, struct uml_pt_regs *regs)
+void sigio_handler(int sig, union uml_pt_regs *regs)
 {
 	struct irq_fd *irq_fd, *next;
 	int i, n;

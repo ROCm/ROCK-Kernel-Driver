@@ -12,6 +12,7 @@
 #include "asm/errno.h"
 #include "asm/current.h"
 #include "asm/a.out.h"
+#include "uml_uaccess.h"
 
 #define ABOVE_KMEM (16 * 1024 * 1024)
 
@@ -50,9 +51,6 @@ static inline int copy_from_user_tt(void *to, const void *from, int n)
 				   &current->thread.fault_addr,
 				   &current->thread.fault_catcher) : n);
 }
-
-extern int __do_copy_to_user(void *to, const void *from, int n,
-				  void **fault_addr, void **fault_catcher);
 
 static inline int copy_to_user_tt(void *to, const void *from, int n)
 {

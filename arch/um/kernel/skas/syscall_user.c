@@ -15,18 +15,17 @@
 #define ERESTARTNOINTR	513
 #define ERESTARTNOHAND	514
 
-void handle_syscall(struct uml_pt_regs *regs)
+void handle_syscall(union uml_pt_regs *regs)
 {
 	long result;
 	int index;
 
-	host_to_regs(regs);
 	index = record_syscall_start(UPT_SYSCALL_NR(regs));
 
 	syscall_trace();
 	result = execute_syscall(regs);
 
-	REGS_SET_SYSCALL_RETURN(regs->mode.skas.regs, result);
+	REGS_SET_SYSCALL_RETURN(regs->skas.regs, result);
 	if((result == -ERESTARTNOHAND) || (result == -ERESTARTSYS) || 
 	   (result == -ERESTARTNOINTR))
 		do_signal(result);

@@ -137,7 +137,7 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 	}
 	if(new < 0){
 		printk("xterm_open : os_rcv_fd failed, errno = %d\n", -new);
-		return(new);
+		goto out;
 	}
 
 	tcgetattr(new, &data->tt);
@@ -145,6 +145,8 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 
 	data->pid = pid;
 	*dev_out = NULL;
+ out:
+	unlink(file);
 	return(new);
 }
 
@@ -152,9 +154,11 @@ void xterm_close(int fd, void *d)
 {
 	struct xterm_chan *data = d;
 	
-	if(data->pid != -1) kill(data->pid, SIGKILL);
+	if(data->pid != -1) 
+		os_kill_process(data->pid, 1);
 	data->pid = -1;
-	if(data->helper_pid != -1) kill(data->helper_pid, SIGKILL);
+	if(data->helper_pid != -1) 
+		os_kill_process(data->helper_pid, 0);
 	data->helper_pid = -1;
 	close(fd);
 }

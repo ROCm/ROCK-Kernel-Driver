@@ -7,30 +7,35 @@
 #ifndef __MCONSOLE_H__
 #define __MCONSOLE_H__
 
+#ifndef __KERNEL__
+#include <stdint.h>
+#define u32 uint32_t
+#endif
+
 #define MCONSOLE_MAGIC (0xcafebabe)
 #define MCONSOLE_MAX_DATA (512)
 #define MCONSOLE_VERSION 2
 
 struct mconsole_request {
-	unsigned long magic;
-	int version;
-	int len;
+	u32 magic;
+	u32 version;
+	u32 len;
 	char data[MCONSOLE_MAX_DATA];
 };
 
 struct mconsole_reply {
-	int err;
-	int more;
-	int len;
+	u32 err;
+	u32 more;
+	u32 len;
 	char data[MCONSOLE_MAX_DATA];
 };
 
 struct mconsole_notify {
-	unsigned long magic;
-	int version;	
+	u32 magic;
+	u32 version;	
 	enum { MCONSOLE_SOCKET, MCONSOLE_PANIC, MCONSOLE_HANG,
 	       MCONSOLE_USER_NOTIFY } type;
-	int len;
+	u32 len;
 	char data[MCONSOLE_MAX_DATA];
 };
 

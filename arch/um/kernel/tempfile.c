@@ -23,20 +23,19 @@ static void __init find_tempdir(void)
 	if(tempdir != NULL) return;	/* We've already been called */
 	for(i = 0; dirs[i]; i++){
 		dir = getenv(dirs[i]);
-		if(dir != NULL) break;
+		if((dir != NULL) && (*dir != '\0'))
+			break;
 	}
-	if(dir == NULL) dir = "/tmp";
-	else if(*dir == '\0') dir = NULL;
-	if(dir != NULL) {
-		tempdir = malloc(strlen(dir) + 2);
-		if(tempdir == NULL){
-			fprintf(stderr, "Failed to malloc tempdir, "
-				"errno = %d\n", errno);
-			return;
-		}
-		strcpy(tempdir, dir);
-		strcat(tempdir, "/");
+	if((dir == NULL) || (*dir == '\0')) 
+		dir = "/tmp";
+	tempdir = malloc(strlen(dir) + 2);
+	if(tempdir == NULL){
+		fprintf(stderr, "Failed to malloc tempdir, "
+			"errno = %d\n", errno);
+		return;
 	}
+	strcpy(tempdir, dir);
+	strcat(tempdir, "/");
 }
 
 int make_tempfile(const char *template, char **out_tempname, int do_unlink)
