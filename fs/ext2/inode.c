@@ -584,6 +584,7 @@ out:
 	if (err == -EAGAIN)
 		goto changed;
 
+	goal = 0;
 	if (ext2_find_goal(inode, iblock, chain, partial, &goal) < 0)
 		goto changed;
 

@@ -811,6 +811,7 @@ out:
 	if (err == -EAGAIN)
 		goto changed;
 
+	goal = 0;
 	down(&ei->truncate_sem);
 	if (ext3_find_goal(inode, iblock, chain, partial, &goal) < 0) {
 		up(&ei->truncate_sem);
