@@ -73,6 +73,16 @@ struct w1_bus_master
 
 	u8			(*read_bit)(unsigned long);
 	void			(*write_bit)(unsigned long, u8);
+  	
+	u8			(*read_byte)(unsigned long);
+  	void			(*write_byte)(unsigned long, u8);
+  	
+	u8			(*read_block)(unsigned long, u8 *, int);
+	void			(*write_block)(unsigned long, u8 *, int);
+	
+  	u8			(*touch_bit)(unsigned long, u8);
+  
+  	u8			(*reset_bus)(unsigned long);
 };
 
 struct w1_master
