@@ -236,8 +236,8 @@ static int __init longhaul_get_ranges (void)
 		 minmult/10, minmult%10, maxmult/10, maxmult%10);
 	highest_speed = calc_speed (maxmult, fsb);
 	lowest_speed = calc_speed (minmult,fsb);
-	dprintk (KERN_INFO PFX "Lowestspeed=%dMHz Highestspeed=%dMHz\n",
-		 lowest_speed, highest_speed);
+	dprintk (KERN_INFO PFX "FSB: %dMHz Lowestspeed=%dMHz Highestspeed=%dMHz\n",
+		 fsb, lowest_speed, highest_speed);
 
 	longhaul_table = kmalloc((numscales + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
 	if(!longhaul_table)
