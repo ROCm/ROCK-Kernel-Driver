@@ -345,7 +345,7 @@ static void dscc4_timer(unsigned long);
 static void dscc4_tx_timeout(struct net_device *);
 static void dscc4_irq(int irq, void *dev_id, struct pt_regs *ptregs);
 static int dscc4_hdlc_attach(hdlc_device *, unsigned short, unsigned short);
-static int dscc4_set_iface(struct net_device *);
+static int dscc4_set_iface(struct dscc4_dev_priv *, struct net_device *);
 static inline int dscc4_set_quartz(struct dscc4_dev_priv *, int);
 #ifdef DSCC4_POLLING
 static int dscc4_tx_poll(struct dscc4_dev_priv *, struct net_device *);
@@ -1094,7 +1094,7 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 		if (copy_from_user(&dpriv->settings, &line->sync, size))
 			return -EFAULT;
-		ret = dscc4_set_iface(dev);
+		ret = dscc4_set_iface(dpriv, dev);
 		break;
 
 	default:
@@ -1223,7 +1223,7 @@ static int dscc4_crc_setting(struct net_device *dev)
 	return ret;
 }
 
-static int dscc4_set_iface(struct net_device *dev)
+static int dscc4_set_iface(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	struct {
 		int (*action)(struct net_device *);
