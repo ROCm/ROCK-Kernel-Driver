@@ -242,14 +242,6 @@ asmlinkage ssize_t parisc_readahead(int fd, unsigned int high, unsigned int low,
 	return sys_readahead(fd, (loff_t)high << 32 | low, count);
 }
 
-/*
- * This changes the io permissions bitmap in the current task.
- */
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
-{
-	return -ENOSYS;
-}
-
 asmlinkage unsigned long sys_alloc_hugepages(int key, unsigned long addr, unsigned long len, int prot, int flag)
 {
 	return -ENOMEM;

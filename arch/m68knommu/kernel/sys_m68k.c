@@ -193,12 +193,6 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 	return -EINVAL;
 }
 
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
-{
-  return -ENOSYS;
-}
-
-
 /* sys_cacheflush -- flush (part of) the processor cache.  */
 asmlinkage int
 sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
