@@ -1,0 +1,18 @@
+#
+# Cryptographic API Components
+#
+CONFIG_CRYPTO
+  This option provides the core Cryptographic API.
+  
+CONFIG_CRYPTO_MD5
+  MD5 message digest algorithm (RFC1321), including HMAC (RFC2104, RFC2403).
+
+CONFIG_CRYPTO_SHA1
+  SHA-1 secure hash standard (FIPS 180-1), including HMAC (RFC2104, RFC2404).
+
+CONFIG_CRYPTO_DES
+  DES cipher algorithm (FIPS 46-2), and 3DES_EDE.
+
+CONFIG_CRYPTO_TEST
+  Quick & dirty crypto test module.
+

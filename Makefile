@@ -209,7 +209,7 @@ endif
 
 include arch/$(ARCH)/Makefile
 
-core-y		+= kernel/ mm/ fs/ ipc/ security/
+core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
 
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
