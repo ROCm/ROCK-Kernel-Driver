@@ -30,8 +30,8 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _LINUX_XQM_H
-#define _LINUX_XQM_H
+#ifndef _LINUX_DQBLK_XFS_H
+#define _LINUX_DQBLK_XFS_H
 
 #include <linux/types.h>
 
@@ -156,4 +156,4 @@ typedef struct fs_quota_stat {
 	__u16		qs_iwarnlimit;	/* limit for num warnings */
 } fs_quota_stat_t;
 
-#endif	/* _LINUX_XQM_H */
+#endif	/* _LINUX_DQBLK_XFS_H */
