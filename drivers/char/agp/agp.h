@@ -33,6 +33,7 @@ extern struct agp_bridge_data agp_bridge;
 
 /* Generic routines. */
 void agp_generic_agp_enable(u32 mode);
+int agp_generic_agp_3_0_enable(u32 mode);
 int agp_generic_create_gatt_table(void);
 int agp_generic_free_gatt_table(void);
 agp_memory *agp_create_memory(int scratch_pages);
@@ -289,6 +290,9 @@ struct agp_bridge_data {
 #define VIA_GARTCTRL	0x80
 #define VIA_APSIZE	0x84
 #define VIA_ATTBASE	0x88
+
+/* VIA KT400 */
+#define VIA_AGPSEL	0xfd
 
 /* SiS registers */
 #define SIS_APBASE	0x10
