@@ -796,10 +796,6 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 			goto out_err_release;
 		}
 	}
-	if ((err = xfrm_lookup(dst, fl, sk, 0)) < 0) {
-		err = -ENETUNREACH;
-		goto out_err_release;
-        }
 
 	return 0;
 

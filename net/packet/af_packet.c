@@ -66,6 +66,7 @@
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 #include <asm/page.h>
+#include <asm/io.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/poll.h>
@@ -173,7 +174,7 @@ struct packet_opt
 {
 	struct tpacket_stats	stats;
 #ifdef CONFIG_PACKET_MMAP
-	unsigned long		*pg_vec;
+	char *			*pg_vec;
 	unsigned int		head;
 	unsigned int            frames_per_block;
 	unsigned int		frame_size;
@@ -198,15 +199,15 @@ struct packet_opt
 
 #ifdef CONFIG_PACKET_MMAP
 
-static inline unsigned long packet_lookup_frame(struct packet_opt *po, unsigned int position)
+static inline char *packet_lookup_frame(struct packet_opt *po, unsigned int position)
 {
 	unsigned int pg_vec_pos, frame_offset;
-	unsigned long frame;
+	char *frame;
 
 	pg_vec_pos = position / po->frames_per_block;
 	frame_offset = position % po->frames_per_block;
 
-	frame = (unsigned long) (po->pg_vec[pg_vec_pos] + (frame_offset * po->frame_size));
+	frame = po->pg_vec[pg_vec_pos] + (frame_offset * po->frame_size);
 	
 	return frame;
 }
@@ -1549,7 +1550,12 @@ static struct vm_operations_struct packet_mmap_ops = {
 	.close =packet_mm_close,
 };
 
-static void free_pg_vec(unsigned long *pg_vec, unsigned order, unsigned len)
+static inline struct page *pg_vec_endpage(char *one_pg_vec, unsigned int order)
+{
+	return virt_to_page(one_pg_vec + (PAGE_SIZE << order) - 1);
+}
+
+static void free_pg_vec(char **pg_vec, unsigned order, unsigned len)
 {
 	int i;
 
@@ -1557,10 +1563,10 @@ static void free_pg_vec(unsigned long *pg_vec, unsigned order, unsigned len)
 		if (pg_vec[i]) {
 			struct page *page, *pend;
 
-			pend = virt_to_page(pg_vec[i] + (PAGE_SIZE << order) - 1);
+			pend = pg_vec_endpage(pg_vec[i], order);
 			for (page = virt_to_page(pg_vec[i]); page <= pend; page++)
 				ClearPageReserved(page);
-			free_pages(pg_vec[i], order);
+			free_pages((unsigned long)pg_vec[i], order);
 		}
 	}
 	kfree(pg_vec);
@@ -1569,7 +1575,7 @@ static void free_pg_vec(unsigned long *pg_vec, unsigned order, unsigned len)
 
 static int packet_set_ring(struct sock *sk, struct tpacket_req *req, int closing)
 {
-	unsigned long *pg_vec = NULL;
+	char **pg_vec = NULL;
 	struct packet_opt *po = pkt_sk(sk);
 	int was_running, num, order = 0;
 	int err = 0;
@@ -1604,18 +1610,18 @@ static int packet_set_ring(struct sock *sk, struct tpacket_req *req, int closing
 
 		err = -ENOMEM;
 
-		pg_vec = kmalloc(req->tp_block_nr*sizeof(unsigned long*), GFP_KERNEL);
+		pg_vec = kmalloc(req->tp_block_nr*sizeof(char *), GFP_KERNEL);
 		if (pg_vec == NULL)
 			goto out;
-		memset(pg_vec, 0, req->tp_block_nr*sizeof(unsigned long*));
+		memset(pg_vec, 0, req->tp_block_nr*sizeof(char **));
 
 		for (i=0; i<req->tp_block_nr; i++) {
 			struct page *page, *pend;
-			pg_vec[i] = __get_free_pages(GFP_KERNEL, order);
+			pg_vec[i] = (char *)__get_free_pages(GFP_KERNEL, order);
 			if (!pg_vec[i])
 				goto out_free_pgvec;
 
-			pend = virt_to_page(pg_vec[i] + (PAGE_SIZE << order) - 1);
+			pend = pg_vec_endpage(pg_vec[i], order);
 			for (page = virt_to_page(pg_vec[i]); page <= pend; page++)
 				SetPageReserved(page);
 		}
@@ -1623,7 +1629,7 @@ static int packet_set_ring(struct sock *sk, struct tpacket_req *req, int closing
 
 		l = 0;
 		for (i=0; i<req->tp_block_nr; i++) {
-			unsigned long ptr = pg_vec[i];
+			char *ptr = pg_vec[i];
 			struct tpacket_hdr *header;
 			int k;
 
