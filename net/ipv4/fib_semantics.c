@@ -270,6 +270,74 @@ int ip_fib_check_default(u32 gw, struct net_device *dev)
 	return -1;
 }
 
+void rtmsg_fib(int event, u32 key, struct fib_alias *fa,
+	       int z, int tb_id,
+	       struct nlmsghdr *n, struct netlink_skb_parms *req)
+{
+	struct sk_buff *skb;
+	u32 pid = req ? req->pid : 0;
+	int size = NLMSG_SPACE(sizeof(struct rtmsg)+256);
+
+	skb = alloc_skb(size, GFP_KERNEL);
+	if (!skb)
+		return;
+
+	if (fib_dump_info(skb, pid, n->nlmsg_seq, event, tb_id,
+			  fa->fa_type, fa->fa_scope, &key, z,
+			  fa->fa_tos,
+			  fa->fa_info) < 0) {
+		kfree_skb(skb);
+		return;
+	}
+	NETLINK_CB(skb).dst_groups = RTMGRP_IPV4_ROUTE;
+	if (n->nlmsg_flags&NLM_F_ECHO)
+		atomic_inc(&skb->users);
+	netlink_broadcast(rtnl, skb, pid, RTMGRP_IPV4_ROUTE, GFP_KERNEL);
+	if (n->nlmsg_flags&NLM_F_ECHO)
+		netlink_unicast(rtnl, skb, pid, MSG_DONTWAIT);
+}
+
+/* Return the first fib alias matching TOS with
+ * priority less than or equal to PRIO.
+ */
+struct fib_alias *fib_find_alias(struct list_head *fah, u8 tos, u32 prio)
+{
+	if (fah) {
+		struct fib_alias *fa;
+		list_for_each_entry(fa, fah, fa_list) {
+			if (fa->fa_tos > tos)
+				continue;
+			if (fa->fa_info->fib_priority >= prio ||
+			    fa->fa_tos < tos)
+				return fa;
+		}
+	}
+	return NULL;
+}
+
+int fib_detect_death(struct fib_info *fi, int order,
+		     struct fib_info **last_resort, int *last_idx, int *dflt)
+{
+	struct neighbour *n;
+	int state = NUD_NONE;
+
+	n = neigh_lookup(&arp_tbl, &fi->fib_nh[0].nh_gw, fi->fib_dev);
+	if (n) {
+		state = n->nud_state;
+		neigh_release(n);
+	}
+	if (state==NUD_REACHABLE)
+		return 0;
+	if ((state&NUD_VALID) && order != *dflt)
+		return 0;
+	if ((state&NUD_VALID) ||
+	    (*last_idx<0 && order > *dflt)) {
+		*last_resort = fi;
+		*last_idx = order;
+	}
+	return 1;
+}
+
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 
 static u32 fib_get_attr32(struct rtattr *attr, int attrlen, int type)

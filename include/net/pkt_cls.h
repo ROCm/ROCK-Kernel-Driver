@@ -70,17 +70,10 @@ tcf_change_act_police(struct tcf_proto *tp, struct tc_action **action,
 	int ret;
 	struct tc_action *act;
 
-	act = kmalloc(sizeof(*act), GFP_KERNEL);
-	if (NULL == act)
-		return -ENOMEM;
-	memset(act, 0, sizeof(*act));
-	
-	ret = tcf_action_init_1(act_police_tlv, rate_tlv, act, "police",
-		TCA_ACT_NOREPLACE, TCA_ACT_BIND);
-	if (ret < 0) {
-		tcf_action_destroy(act, TCA_ACT_UNBIND);
+	act = tcf_action_init_1(act_police_tlv, rate_tlv, "police",
+	                        TCA_ACT_NOREPLACE, TCA_ACT_BIND, &ret);
+	if (act == NULL)
 		return ret;
-	}
 
 	act->type = TCA_OLD_COMPAT;
 
@@ -103,17 +96,10 @@ tcf_change_act(struct tcf_proto *tp, struct tc_action **action,
 	int ret;
 	struct tc_action *act;
 
-	act = kmalloc(sizeof(*act), GFP_KERNEL);
-	if (NULL == act)
-		return -ENOMEM;
-	memset(act, 0, sizeof(*act));
-
-	ret = tcf_action_init(act_tlv, rate_tlv, act, NULL,
-		TCA_ACT_NOREPLACE, TCA_ACT_BIND);
-	if (ret < 0) {
-		tcf_action_destroy(act, TCA_ACT_UNBIND);
+	act = tcf_action_init(act_tlv, rate_tlv, NULL,
+	                      TCA_ACT_NOREPLACE, TCA_ACT_BIND, &ret);
+	if (act == NULL)
 		return ret;
-	}
 
 	if (*action) {
 		tcf_tree_lock(tp);

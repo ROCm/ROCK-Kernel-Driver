@@ -47,9 +47,12 @@ struct ArcProto rfc1051_proto =
 {
 	.suffix		= 's',
 	.mtu		= XMTU - RFC1051_HDR_SIZE,
+	.is_ip          = 1,
 	.rx		= rx,
 	.build_header	= build_header,
 	.prepare_tx	= prepare_tx,
+	.continue_tx    = NULL,
+	.ack_tx         = NULL
 };
 
 

@@ -66,7 +66,7 @@ obj-$(CONFIG_MII) += mii.o
 
 obj-$(CONFIG_SUNDANCE) += sundance.o
 obj-$(CONFIG_HAMACHI) += hamachi.o
-obj-$(CONFIG_NET) += Space.o net_init.o loopback.o
+obj-$(CONFIG_NET) += Space.o loopback.o
 obj-$(CONFIG_SEEQ8005) += seeq8005.o
 obj-$(CONFIG_ETHERTAP) += ethertap.o
 obj-$(CONFIG_NET_SB1000) += sb1000.o
