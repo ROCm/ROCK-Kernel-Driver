@@ -160,32 +160,23 @@ static int pci_device_remove(struct device * dev)
 	return 0;
 }
 
-static int pci_device_suspend(struct device * dev, u32 state, u32 level)
+static int pci_device_suspend(struct device * dev, u32 state)
 {
 	struct pci_dev * pci_dev = to_pci_dev(dev);
-	int error = 0;
+	struct pci_driver * drv = pci_dev->driver;
 
-	if (pci_dev->driver) {
-		if (level == SUSPEND_SAVE_STATE && pci_dev->driver->save_state)
-			error = pci_dev->driver->save_state(pci_dev,state);
-		else if (level == SUSPEND_POWER_DOWN && pci_dev->driver->suspend)
-			error = pci_dev->driver->suspend(pci_dev,state);
-	}
-	return error;
+	if (drv && drv->suspend)
+		return drv->suspend(pci_dev,state);
+	return 0;
 }
 
-static int pci_device_resume(struct device * dev, u32 level)
+static int pci_device_resume(struct device * dev)
 {
 	struct pci_dev * pci_dev = to_pci_dev(dev);
+	struct pci_driver * drv = pci_dev->driver;
 
-	if (pci_dev->driver) {
-		/* We may not call PCI drivers resume at
-		   RESUME_POWER_ON because interrupts are not yet
-		   working at that point. Calling resume at
-		   RESUME_RESTORE_STATE seems like solution. */
-		if (level == RESUME_RESTORE_STATE && pci_dev->driver->resume)
-			pci_dev->driver->resume(pci_dev);
-	}
+	if (drv && drv->resume)
+		drv->resume(pci_dev);
 	return 0;
 }
 
@@ -351,8 +342,6 @@ pci_register_driver(struct pci_driver *drv)
 	drv->driver.name = drv->name;
 	drv->driver.bus = &pci_bus_type;
 	drv->driver.probe = pci_device_probe;
-	drv->driver.resume = pci_device_resume;
-	drv->driver.suspend = pci_device_suspend;
 	drv->driver.remove = pci_device_remove;
 	drv->driver.kobj.ktype = &pci_driver_kobj_type;
 	pci_init_dynids(&drv->dynids);
@@ -498,6 +487,8 @@ struct bus_type pci_bus_type = {
 	.name		= "pci",
 	.match		= pci_bus_match,
 	.hotplug	= pci_hotplug,
+	.suspend	= pci_device_suspend,
+	.resume		= pci_device_resume,
 };
 
 static int __init pci_driver_init(void)
