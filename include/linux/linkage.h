@@ -2,7 +2,6 @@
 #define _LINUX_LINKAGE_H
 
 #include <linux/config.h>
-#include <linux/stringify.h>
 #include <asm/linkage.h>
 
 #ifdef __cplusplus
@@ -16,10 +15,9 @@
 #endif
 
 #ifndef __ALIGN
-#define __ALIGN .align 4,0x90
+#define __ALIGN		.align 4,0x90
+#define __ALIGN_STR	".align 4,0x90"
 #endif
-
-#define __ALIGN_STR __stringify(__ALIGN)
 
 #ifdef __ASSEMBLY__
 

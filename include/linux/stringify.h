@@ -10,7 +10,7 @@
  * like two arguments, which breaks the standard non-vararg stringizer.
  */
 
-#define __stringify_1(...)	#__VA_ARGS__
-#define __stringify(...)	__stringify_1(__VA_ARGS__)
+#define __stringify_1(x)	#x
+#define __stringify(x)		__stringify_1(x)
 
 #endif	/* !__LINUX_STRINGIFY_H */
