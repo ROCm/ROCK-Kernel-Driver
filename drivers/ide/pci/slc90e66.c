@@ -381,7 +381,7 @@ static int __devinit slc90e66_init_one(struct pci_dev *dev, const struct pci_dev
 	return 0;
 }
 
-static struct pci_device_id slc90e66_pci_tbl[] __devinitdata = {
+static struct pci_device_id slc90e66_pci_tbl[] = {
 	{ PCI_VENDOR_ID_EFAR, PCI_DEVICE_ID_EFAR_SLC90E66_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };

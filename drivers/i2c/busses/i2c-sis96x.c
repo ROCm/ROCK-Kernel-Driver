@@ -276,7 +276,7 @@ static struct i2c_adapter sis96x_adapter = {
 	},
 };
 
-static struct pci_device_id sis96x_ids[] __devinitdata = {
+static struct pci_device_id sis96x_ids[] = {
 
 	{
 		.vendor	=	PCI_VENDOR_ID_SI,

@@ -914,7 +914,7 @@ static void via686a_update_client(struct i2c_client *client)
 	up(&data->update_lock);
 }
 
-static struct pci_device_id via686a_pci_ids[] __devinitdata = {
+static struct pci_device_id via686a_pci_ids[] = {
        {
 	       .vendor 		= PCI_VENDOR_ID_VIA, 
 	       .device 		= PCI_DEVICE_ID_VIA_82C686_4, 
