@@ -23,7 +23,6 @@ EXPORT_SYMBOL(strncpy);
 EXPORT_SYMBOL(strnlen);
 EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strstr);
-EXPORT_SYMBOL(strtok);
 EXPORT_SYMBOL(strpbrk);
 
 #include <linux/irq.h>

@@ -537,7 +537,6 @@ EXPORT_SYMBOL(sys_tz);
 EXPORT_SYMBOL(file_fsync);
 EXPORT_SYMBOL(fsync_buffers_list);
 EXPORT_SYMBOL(clear_inode);
-EXPORT_SYMBOL(___strtok);
 EXPORT_SYMBOL(init_special_inode);
 EXPORT_SYMBOL(__get_hash_table);
 EXPORT_SYMBOL(new_inode);

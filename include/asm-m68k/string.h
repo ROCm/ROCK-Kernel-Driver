@@ -117,29 +117,6 @@ static inline size_t strspn(const char *s, const char *accept)
 }
 #endif
 
-#if 0
-#define __HAVE_ARCH_STRTOK
-extern inline char * strtok(char * s,const char * ct)
-{
-  char *sbegin, *send;
-  
-  sbegin  = s ? s : ___strtok;
-  if (!sbegin) {
-	  return NULL;
-  }
-  sbegin += strspn(sbegin,ct);
-  if (*sbegin == '\0') {
-    ___strtok = NULL;
-    return( NULL );
-  }
-  send = strpbrk( sbegin, ct);
-  if (send && *send != '\0')
-    *send++ = '\0';
-  ___strtok = send;
-  return (sbegin);
-}
-#endif
-
 /* strstr !! */
 
 #define __HAVE_ARCH_STRLEN
