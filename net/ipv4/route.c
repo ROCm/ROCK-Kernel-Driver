@@ -53,6 +53,7 @@
  *	Vladimir V. Ivanov	:	IP rule info (flowid) is really useful.
  *		Marc Boucher	:	routing by fwmark
  *	Robert Olsson		:	Added rt_cache statistics
+ *	Arnaldo C. Melo		:	Convert proc stuff to seq_file
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -208,74 +209,107 @@ static __inline__ unsigned rt_hash_code(u32 daddr, u32 saddr, u8 tos)
 	return (hash ^ (hash >> 8)) & rt_hash_mask;
 }
 
-static int rt_cache_get_info(char *buffer, char **start, off_t offset,
-				int length)
+#ifdef CONFIG_PROC_FS
+struct rt_cache_iter_state {
+	int bucket;
+};
+
+static struct rtable *rt_cache_get_first(struct seq_file *seq)
 {
-	int len = 0;
-	off_t pos = 128;
-	char temp[256];
-	struct rtable *r;
-	int i;
+	struct rtable *r = NULL;
+	struct rt_cache_iter_state *st = seq->private;
 
-	if (offset < 128) {
-		sprintf(buffer, "%-127s\n",
-			"Iface\tDestination\tGateway \tFlags\t\tRefCnt\tUse\t"
-			"Metric\tSource\t\tMTU\tWindow\tIRTT\tTOS\tHHRef\t"
-			"HHUptod\tSpecDst");
-		len = 128;
-  	}
-	
-	for (i = rt_hash_mask; i >= 0; i--) {
-		read_lock_bh(&rt_hash_table[i].lock);
-		for (r = rt_hash_table[i].chain; r; r = r->u.rt_next) {
-			/*
-			 *	Spin through entries until we are ready
-			 */
-			pos += 128;
+	for (st->bucket = rt_hash_mask; st->bucket >= 0; --st->bucket) {
+		read_lock_bh(&rt_hash_table[st->bucket].lock);
+		r = rt_hash_table[st->bucket].chain;
+		if (r)
+			break;
+		read_unlock_bh(&rt_hash_table[st->bucket].lock);
+	}
+	return r;
+}
 
-			if (pos <= offset) {
-				len = 0;
-				continue;
-			}
-			sprintf(temp, "%s\t%08lX\t%08lX\t%8X\t%d\t%u\t%d\t"
-				"%08lX\t%d\t%u\t%u\t%02X\t%d\t%1d\t%08X",
-				r->u.dst.dev ? r->u.dst.dev->name : "*",
-				(unsigned long)r->rt_dst,
-				(unsigned long)r->rt_gateway,
-				r->rt_flags,
-				atomic_read(&r->u.dst.__refcnt),
-				r->u.dst.__use,
-				0,
-				(unsigned long)r->rt_src,
-				(dst_metric(&r->u.dst, RTAX_ADVMSS) ?
-				 (int) dst_metric(&r->u.dst, RTAX_ADVMSS) + 40 : 0),
-				dst_metric(&r->u.dst, RTAX_WINDOW),
-				(int)((dst_metric(&r->u.dst, RTAX_RTT) >> 3)
-				      + dst_metric(&r->u.dst, RTAX_RTTVAR)),
-				r->fl.fl4_tos,
-				r->u.dst.hh ?
-					atomic_read(&r->u.dst.hh->hh_refcnt) :
-					-1,
-				r->u.dst.hh ?
-			       		(r->u.dst.hh->hh_output ==
-					 dev_queue_xmit) : 0,
-				r->rt_spec_dst);
-			sprintf(buffer + len, "%-127s\n", temp);
-			len += 128;
-			if (pos >= offset+length) {
-				read_unlock_bh(&rt_hash_table[i].lock);
-				goto done;
-			}
-		}
-		read_unlock_bh(&rt_hash_table[i].lock);
+static struct rtable *rt_cache_get_next(struct seq_file *seq, struct rtable *r)
+{
+	struct rt_cache_iter_state *st = seq->private;
+
+	r = r->u.rt_next;
+	while (!r) {
+		read_unlock_bh(&rt_hash_table[st->bucket].lock);
+		if (--st->bucket < 0)
+			break;
+		read_lock_bh(&rt_hash_table[st->bucket].lock);
+		r = rt_hash_table[st->bucket].chain;
+	}
+	return r;
+}
+
+static struct rtable *rt_cache_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct rtable *r = rt_cache_get_first(seq);
+
+	if (r)
+		while (pos && (r = rt_cache_get_next(seq, r)))
+			--pos;
+	return pos ? NULL : r;
+}
+
+static void *rt_cache_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return *pos ? rt_cache_get_idx(seq, *pos) : (void *)1;
+}
+
+static void *rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct rtable *r = NULL;
+
+	if (v == (void *)1)
+		r = rt_cache_get_first(seq);
+	else
+		r = rt_cache_get_next(seq, v);
+	++*pos;
+	return r;
+}
+
+static void rt_cache_seq_stop(struct seq_file *seq, void *v)
+{
+	if (v && v != (void *)1) {
+		struct rt_cache_iter_state *st = seq->private;
+
+		read_unlock_bh(&rt_hash_table[st->bucket].lock);
+	}
+}
+
+static int rt_cache_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == (void *)1)
+		seq_printf(seq, "%-127s\n",
+			   "Iface\tDestination\tGateway \tFlags\t\tRefCnt\tUse\t"
+			   "Metric\tSource\t\tMTU\tWindow\tIRTT\tTOS\tHHRef\t"
+			   "HHUptod\tSpecDst");
+	else {
+		struct rtable *r = v;
+		char temp[256];
+
+		sprintf(temp, "%s\t%08lX\t%08lX\t%8X\t%d\t%u\t%d\t"
+			      "%08lX\t%d\t%u\t%u\t%02X\t%d\t%1d\t%08X",
+			r->u.dst.dev ? r->u.dst.dev->name : "*",
+			(unsigned long)r->rt_dst, (unsigned long)r->rt_gateway,
+			r->rt_flags, atomic_read(&r->u.dst.__refcnt),
+			r->u.dst.__use, 0, (unsigned long)r->rt_src,
+			(dst_metric(&r->u.dst, RTAX_ADVMSS) ?
+			     (int)dst_metric(&r->u.dst, RTAX_ADVMSS) + 40 : 0),
+			dst_metric(&r->u.dst, RTAX_WINDOW),
+			(int)((dst_metric(&r->u.dst, RTAX_RTT) >> 3) +
+			      dst_metric(&r->u.dst, RTAX_RTTVAR)),
+			r->fl.fl4_tos,
+			r->u.dst.hh ? atomic_read(&r->u.dst.hh->hh_refcnt) : -1,
+			r->u.dst.hh ? (r->u.dst.hh->hh_output ==
+				       dev_queue_xmit) : 0,
+			r->rt_spec_dst);
+		seq_printf(seq, "%-127s\n", temp);
         }
-
-done:
-  	*start = buffer + len - (pos - offset);
-  	len = pos - offset;
-  	if (len > length)
-  		len = length;
-  	return len;
+  	return 0;
 }
 
 static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int length)
@@ -316,6 +350,59 @@ static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int 
 	*start = buffer + offset;
   	return len;
 }
+
+static struct seq_operations rt_cache_seq_ops = {
+	.start  = rt_cache_seq_start,
+	.next   = rt_cache_seq_next,
+	.stop   = rt_cache_seq_stop,
+	.show   = rt_cache_seq_show,
+};
+
+static int rt_cache_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct rt_cache_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+	rc = seq_open(file, &rt_cache_seq_ops);
+	if (rc)
+		goto out_kfree;
+	seq          = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations rt_cache_seq_fops = {
+	.open	 = rt_cache_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = ip_seq_release,
+};
+
+int __init rt_cache_proc_init(void)
+{
+	int rc = 0;
+	struct proc_dir_entry *p = create_proc_entry("rt_cache", S_IRUGO,
+						     proc_net);
+	if (p)
+		p->proc_fops = &rt_cache_seq_fops;
+	else
+		rc = -ENOMEM;
+	return rc;
+}
+
+void __init rt_cache_proc_exit(void)
+{
+	remove_proc_entry("rt_cache", proc_net);
+}
+#endif /* CONFIG_PROC_FS */
   
 static __inline__ void rt_free(struct rtable *rt)
 {
@@ -2456,6 +2543,7 @@ struct ip_rt_acct *ip_rt_acct;
 /* IP route accounting ptr for this logical cpu number. */
 #define IP_RT_ACCT_CPU(i) (ip_rt_acct + i * 256)
 
+#ifdef CONFIG_PROC_FS
 static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 			   int length, int *eof, void *data)
 {
@@ -2488,11 +2576,12 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 	}
 	return length;
 }
-#endif
+#endif /* CONFIG_PROC_FS */
+#endif /* CONFIG_NET_CLS_ROUTE */
 
-void __init ip_rt_init(void)
+int __init ip_rt_init(void)
 {
-	int i, order, goal;
+	int i, order, goal, rc = 0;
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	for (order = 0;
@@ -2560,10 +2649,16 @@ void __init ip_rt_init(void)
 					ip_rt_gc_interval;
 	add_timer(&rt_periodic_timer);
 
-	proc_net_create ("rt_cache", 0, rt_cache_get_info);
+	if (rt_cache_proc_init())
+		goto out_enomem;
 	proc_net_create ("rt_cache_stat", 0, rt_cache_stat_get_info);
 #ifdef CONFIG_NET_CLS_ROUTE
 	create_proc_read_entry("net/rt_acct", 0, 0, ip_rt_acct_read, NULL);
 #endif
 	xfrm_init();
+out:
+	return rc;
+out_enomem:
+	rc = -ENOMEM;
+	goto out;
 }

@@ -185,6 +185,7 @@ Original developers of the crypto algorithms:
   Jean-Luc Cooke (SHA256)
   Kazunori Miyazawa / USAGI (HMAC)
   Matthew Skala (Twofish)
+  Dag Arne Osvik (Serpent)
   
 DES algorithm contributors:
   Raimar Falke
