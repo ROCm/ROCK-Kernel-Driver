@@ -644,6 +644,7 @@ extern void blk_queue_invalidate_tags(request_queue_t *);
 extern long blk_congestion_wait(int rw, long timeout);
 
 extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
+extern void blk_rq_data_prep(request_queue_t *, struct request *);
 extern void blk_rq_prep_restart(struct request *);
 extern int blkdev_issue_flush(struct block_device *, sector_t *);
 

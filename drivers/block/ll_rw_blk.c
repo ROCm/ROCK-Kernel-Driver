@@ -1840,11 +1840,14 @@ struct request *blk_rq_map_user(request_queue_t *q, int rw, void __user *ubuf,
 	}
 
 	rq->bio = rq->biotail = bio;
-	if (rq->bio)
-		blk_rq_bio_prep(q, rq, bio);
-
 	rq->buffer = rq->data = buf;
 	rq->data_len = len;
+
+	if (rq->bio)
+		blk_rq_bio_prep(q, rq, bio);
+	else if (rq->data)
+		blk_rq_data_prep(q, rq);
+
 	return rq;
 fault:
 	if (buf)
@@ -2909,6 +2912,48 @@ void end_request(struct request *req, int uptodate)
 }
 
 EXPORT_SYMBOL(end_request);
+
+void blk_rq_data_prep(request_queue_t *q, struct request *rq)
+{
+	int seg_size, total_len, offset, cluster;
+	unsigned long start, prev;
+
+	cluster = q->queue_flags & (1 << QUEUE_FLAG_CLUSTER);
+
+	rq->nr_hw_segments = rq->nr_phys_segments = 0;
+	total_len = rq->data_len;
+	seg_size = 0;
+	start = (unsigned long) rq->data & ~(PAGE_SIZE - 1);
+	offset = (unsigned long) rq->data - start;
+	prev = start;
+	do {
+		int len = total_len;
+
+		if (len > PAGE_SIZE)
+			len = PAGE_SIZE;
+
+		len -= offset;
+
+		if (prev != start && cluster) {
+			if (seg_size + len > q->max_segment_size)
+				goto new_segment;
+			if (!__BIO_SEG_BOUNDARY(prev, start, q->seg_boundary_mask))
+				goto new_segment;
+
+			seg_size += len;
+			goto no_new_seg;
+		}
+new_segment:
+		if (((prev + PAGE_SIZE) | start) & (BIO_VMERGE_BOUNDARY - 1))
+			rq->nr_hw_segments++;
+		rq->nr_phys_segments++;
+		seg_size = len;
+no_new_seg:
+		total_len -= len;
+		prev += PAGE_SIZE;
+		offset = 0;
+	} while (total_len > 0);
+}
 
 void blk_rq_bio_prep(request_queue_t *q, struct request *rq, struct bio *bio)
 {
