@@ -488,12 +488,19 @@ static int bt3c_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned long 
 /* ======================== Card services HCI interaction ======================== */
 
 
-static struct device bt3c_device = {
-	.bus_id = "pcmcia",
-	.kobj = {
-		.k_name = "bt3c"
-	}
-};
+static struct device *bt3c_device(void)
+{
+	static char *kobj_name = "bt3c";
+
+	static struct device dev = {
+		.bus_id = "pcmcia",
+	};
+	dev.kobj.k_name = kmalloc(strlen(kobj_name) + 1, GFP_KERNEL);
+	strcpy(dev.kobj.k_name, kobj_name);
+	kobject_init(&dev.kobj);
+
+	return &dev;
+}
 
 
 static int bt3c_load_firmware(bt3c_info_t *info, unsigned char *firmware, int count)
@@ -616,7 +623,7 @@ int bt3c_open(bt3c_info_t *info)
 	hdev->owner = THIS_MODULE;
 
 	/* Load firmware */
-	err = request_firmware(&firmware, "BT3CPCC.bin", &bt3c_device);
+	err = request_firmware(&firmware, "BT3CPCC.bin", bt3c_device());
 	if (err < 0) {
 		BT_ERR("Firmware request failed");
 		goto error;
