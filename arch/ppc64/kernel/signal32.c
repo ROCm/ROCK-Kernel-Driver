@@ -338,79 +338,44 @@ static void setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 {
 	struct sigcontext32_struct *sc =
 		(struct sigcontext32_struct *)(u64)newsp;
+	int i;
 
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	/***************************************************************/
-	/*                                                             */ 
-	/* Copy the register contents for the pt_regs structure on the */
-	/*   kernel stack to the elf_gregset_t32 structure on the user */
-	/*   stack. This is a copy of 64 bit register values to 32 bit */
-	/*   register values. The high order 32 bits of the 64 bit     */
-	/*   registers are not needed since a 32 bit application is    */
-	/*   running and the saved registers are the contents of the   */
-	/*   user registers at the time of a system call.              */
-	/*                                                             */
-	/* The values saved on the user stack will be restored into    */
-	/*  the registers during the signal return processing          */
-	/*                                                             */
-	/* Note the +1 is needed in order to get the lower 32 bits     */
-	/*  of 64 bit register                                         */
-	/***************************************************************/
-	if (__copy_to_user(&frame->gp_regs[0], (u32*)(&regs->gpr[0])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[1], (u32*)(&regs->gpr[1])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[2], (u32*)(&regs->gpr[2])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[3], (u32*)(&regs->gpr[3])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[4], (u32*)(&regs->gpr[4])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[5], (u32*)(&regs->gpr[5])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[6], (u32*)(&regs->gpr[6])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[7], (u32*)(&regs->gpr[7])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[8], (u32*)(&regs->gpr[8])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[9], (u32*)(&regs->gpr[9])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[10], (u32*)(&regs->gpr[10])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[11], (u32*)(&regs->gpr[11])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[12], (u32*)(&regs->gpr[12])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[13], (u32*)(&regs->gpr[13])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[14], (u32*)(&regs->gpr[14])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[15], (u32*)(&regs->gpr[15])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[16], (u32*)(&regs->gpr[16])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[17], (u32*)(&regs->gpr[17])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[18], (u32*)(&regs->gpr[18])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[19], (u32*)(&regs->gpr[19])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[20], (u32*)(&regs->gpr[20])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[21], (u32*)(&regs->gpr[21])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[22], (u32*)(&regs->gpr[22])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[23], (u32*)(&regs->gpr[23])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[24], (u32*)(&regs->gpr[24])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[25], (u32*)(&regs->gpr[25])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[26], (u32*)(&regs->gpr[26])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[27], (u32*)(&regs->gpr[27])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[28], (u32*)(&regs->gpr[28])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[29], (u32*)(&regs->gpr[29])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[30], (u32*)(&regs->gpr[30])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[31], (u32*)(&regs->gpr[31])+1, sizeof(u32))) 
-		goto badframe;
+	/*
+	 * Copy the register contents for the pt_regs structure on the
+	 *   kernel stack to the elf_gregset_t32 structure on the user
+	 *   stack. This is a copy of 64 bit register values to 32 bit
+	 *   register values. The high order 32 bits of the 64 bit
+	 *   registers are not needed since a 32 bit application is
+	 *   running and the saved registers are the contents of the
+	 *   user registers at the time of a system call.
+	 * 
+	 * The values saved on the user stack will be restored into
+	 *  the registers during the signal return processing
+	 */
+	for (i = 0; i < 32; i++) {
+		if (__put_user((u32)regs->gpr[i], &frame->gp_regs[i]))
+			goto badframe;
+	}
 
-  /*****************************************************************************/
-  /* Copy the non gpr registers to the user stack                              */
-  /*****************************************************************************/
-
-	if (__copy_to_user(&frame->gp_regs[PT_NIP], (u32*)(&regs->gpr[PT_NIP])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_MSR], (u32*)(&regs->gpr[PT_MSR])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_ORIG_R3], (u32*)(&regs->gpr[PT_ORIG_R3])+1,
-			      sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_CTR], (u32*)(&regs->gpr[PT_CTR])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_LNK], (u32*)(&regs->gpr[PT_LNK])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_XER], (u32*)(&regs->gpr[PT_XER])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_CCR], (u32*)(&regs->gpr[PT_CCR])+1, sizeof(u32))
-# if 0
-	    || __copy_to_user(&frame->gp_regs[PT_MQ], (u32*)(&regs->gpr[PT_MQ])+1, sizeof(u32))
+	/*
+	 * Copy the non gpr registers to the user stack
+	 */
+	if (__put_user((u32)regs->gpr[PT_NIP], &frame->gp_regs[PT_NIP])
+	    || __put_user((u32)regs->gpr[PT_MSR], &frame->gp_regs[PT_MSR])
+	    || __put_user((u32)regs->gpr[PT_ORIG_R3], &frame->gp_regs[PT_ORIG_R3])
+	    || __put_user((u32)regs->gpr[PT_CTR], &frame->gp_regs[PT_CTR])
+	    || __put_user((u32)regs->gpr[PT_LNK], &frame->gp_regs[PT_LNK])
+	    || __put_user((u32)regs->gpr[PT_XER], &frame->gp_regs[PT_XER])
+	    || __put_user((u32)regs->gpr[PT_CCR], &frame->gp_regs[PT_CCR])
+#if 0
+	    || __put_user((u32)regs->gpr[PT_MQ], &frame->gp_regs[PT_MQ])
 #endif
-	    || __copy_to_user(&frame->gp_regs[PT_RESULT], (u32*)(&regs->gpr[PT_RESULT])+1,
-			      sizeof(u32)))
+	    || __put_user((u32)regs->gpr[PT_RESULT], &frame->gp_regs[PT_RESULT]))
 		goto badframe;
 
 
@@ -915,76 +880,41 @@ static void setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 {
 	unsigned int copyreg4, copyreg5;
 	struct rt_sigframe_32 * rt_sf = (struct rt_sigframe_32 *) (u64)newsp;
-
+	int i;
   
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
-	/***************************************************************/
-	/*                                                             */ 
-	/* Copy the register contents for the pt_regs structure on the */
-	/*   kernel stack to the elf_gregset_t32 structure on the user */
-	/*   stack. This is a copy of 64 bit register values to 32 bit */
-	/*   register values. The high order 32 bits of the 64 bit     */
-	/*   registers are not needed since a 32 bit application is    */
-	/*   running and the saved registers are the contents of the   */
-	/*   user registers at the time of a system call.              */
-	/*                                                             */
-	/* The values saved on the user stack will be restored into    */
-	/*  the registers during the signal return processing          */
-	/*                                                             */
-	/* Note the +1 is needed in order to get the lower 32 bits     */
-	/*  of 64 bit register                                         */
-	/***************************************************************/
-	if (__copy_to_user(&frame->gp_regs[0], (u32*)(&regs->gpr[0])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[1], (u32*)(&regs->gpr[1])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[2], (u32*)(&regs->gpr[2])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[3], (u32*)(&regs->gpr[3])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[4], (u32*)(&regs->gpr[4])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[5], (u32*)(&regs->gpr[5])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[6], (u32*)(&regs->gpr[6])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[7], (u32*)(&regs->gpr[7])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[8], (u32*)(&regs->gpr[8])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[9], (u32*)(&regs->gpr[9])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[10], (u32*)(&regs->gpr[10])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[11], (u32*)(&regs->gpr[11])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[12], (u32*)(&regs->gpr[12])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[13], (u32*)(&regs->gpr[13])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[14], (u32*)(&regs->gpr[14])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[15], (u32*)(&regs->gpr[15])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[16], (u32*)(&regs->gpr[16])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[17], (u32*)(&regs->gpr[17])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[18], (u32*)(&regs->gpr[18])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[19], (u32*)(&regs->gpr[19])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[20], (u32*)(&regs->gpr[20])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[21], (u32*)(&regs->gpr[21])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[22], (u32*)(&regs->gpr[22])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[23], (u32*)(&regs->gpr[23])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[24], (u32*)(&regs->gpr[24])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[25], (u32*)(&regs->gpr[25])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[26], (u32*)(&regs->gpr[26])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[27], (u32*)(&regs->gpr[27])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[28], (u32*)(&regs->gpr[28])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[29], (u32*)(&regs->gpr[29])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[30], (u32*)(&regs->gpr[30])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[31], (u32*)(&regs->gpr[31])+1, sizeof(u32))) 
-		goto badframe;
 
-	/*****************************************************************************/
-	/* Copy the non gpr registers to the user stack                              */
-	/*****************************************************************************/
+	/*
+	 * Copy the register contents for the pt_regs structure on the
+	 *   kernel stack to the elf_gregset_t32 structure on the user
+	 *   stack. This is a copy of 64 bit register values to 32 bit
+	 *   register values. The high order 32 bits of the 64 bit
+	 *   registers are not needed since a 32 bit application is
+	 *   running and the saved registers are the contents of the
+	 *   user registers at the time of a system call.
+	 *
+	 * The values saved on the user stack will be restored into
+	 *  the registers during the signal return processing
+	 */
+	for (i = 0; i < 32; i++) {
+		if (__put_user((u32)regs->gpr[i], &frame->gp_regs[i]))
+			goto badframe;
+	}
 
-	if (__copy_to_user(&frame->gp_regs[PT_NIP], (u32*)(&regs->gpr[PT_NIP])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_MSR], (u32*)(&regs->gpr[PT_MSR])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_ORIG_R3], (u32*)(&regs->gpr[PT_ORIG_R3])+1,
-			      sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_CTR], (u32*)(&regs->gpr[PT_CTR])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_LNK], (u32*)(&regs->gpr[PT_LNK])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_XER], (u32*)(&regs->gpr[PT_XER])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_CCR], (u32*)(&regs->gpr[PT_CCR])+1, sizeof(u32))
-	    || __copy_to_user(&frame->gp_regs[PT_RESULT], (u32*)(&regs->gpr[PT_RESULT])+1,
-			      sizeof(u32)))
+	/*
+	 * Copy the non gpr registers to the user stack
+	 */
+	if (__put_user((u32)regs->gpr[PT_NIP], &frame->gp_regs[PT_NIP])
+	    || __put_user((u32)regs->gpr[PT_MSR], &frame->gp_regs[PT_MSR])
+	    || __put_user((u32)regs->gpr[PT_ORIG_R3], &frame->gp_regs[PT_ORIG_R3])
+	    || __put_user((u32)regs->gpr[PT_CTR], &frame->gp_regs[PT_CTR])
+	    || __put_user((u32)regs->gpr[PT_LNK], &frame->gp_regs[PT_LNK])
+	    || __put_user((u32)regs->gpr[PT_XER], &frame->gp_regs[PT_XER])
+	    || __put_user((u32)regs->gpr[PT_CCR], &frame->gp_regs[PT_CCR])
+	    || __put_user((u32)regs->gpr[PT_RESULT], &frame->gp_regs[PT_RESULT]))
 		goto badframe;
 
 
