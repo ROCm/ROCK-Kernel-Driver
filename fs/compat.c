@@ -150,6 +150,64 @@ out:
 	return error;
 }
 
+static int put_compat_statfs64(struct compat_statfs64 *ubuf, struct kstatfs *kbuf)
+{
+	
+	if (sizeof ubuf->f_blocks == 4) {
+		if ((kbuf->f_blocks | kbuf->f_bfree |
+		     kbuf->f_bavail | kbuf->f_files | kbuf->f_ffree) &
+		    0xffffffff00000000ULL)
+			return -EOVERFLOW;
+	}
+	if (verify_area(VERIFY_WRITE, ubuf, sizeof(*ubuf)) ||
+	    __put_user(kbuf->f_type, &ubuf->f_type) ||
+	    __put_user(kbuf->f_bsize, &ubuf->f_bsize) ||
+	    __put_user(kbuf->f_blocks, &ubuf->f_blocks) ||
+	    __put_user(kbuf->f_bfree, &ubuf->f_bfree) ||
+	    __put_user(kbuf->f_bavail, &ubuf->f_bavail) ||
+	    __put_user(kbuf->f_files, &ubuf->f_files) ||
+	    __put_user(kbuf->f_ffree, &ubuf->f_ffree) ||
+	    __put_user(kbuf->f_namelen, &ubuf->f_namelen) ||
+	    __put_user(kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]) ||
+	    __put_user(kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]) ||
+	    __put_user(kbuf->f_frsize, &ubuf->f_frsize))
+		return -EFAULT;
+	return 0;
+}
+
+asmlinkage long compat_statfs64(const char *path, struct compat_statfs64 *buf)
+{
+	struct nameidata nd;
+	int error;
+
+	error = user_path_walk(path, &nd);
+	if (!error) {
+		struct kstatfs tmp;
+		error = vfs_statfs(nd.dentry->d_inode->i_sb, &tmp);
+		if (!error && put_compat_statfs64(buf, &tmp))
+			error = -EFAULT;
+		path_release(&nd);
+	}
+	return error;
+}
+
+asmlinkage long compat_fstatfs64(unsigned int fd, struct compat_statfs64 *buf)
+{
+	struct file * file;
+	struct kstatfs tmp;
+	int error;
+
+	error = -EBADF;
+	file = fget(fd);
+	if (!file)
+		goto out;
+	error = vfs_statfs(file->f_dentry->d_inode->i_sb, &tmp);
+	if (!error && put_compat_statfs64(buf, &tmp))
+		error = -EFAULT;
+	fput(file);
+out:
+	return error;
+}
 
 /* ioctl32 stuff, used by sparc64, parisc, s390x, ppc64, x86_64 */
 
