@@ -389,7 +389,7 @@ sys_call_table:
 	.quad sys_getcwd
 	.quad sys_capget
 	.quad sys_capset
-	.quad sys_sendfile			/* 370 */
+	.quad sys_sendfile64			/* 370 */
 	.quad sys_setresgid
 	.quad sys_getresgid
 	.quad sys_ni_syscall			/* sys_dipc */
