@@ -3482,11 +3482,9 @@ static void md_geninit(void)
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));
 
-#ifdef CONFIG_PROC_FS
 	p = create_proc_entry("mdstat", S_IRUGO, NULL);
 	if (p)
 		p->proc_fops = &md_seq_fops;
-#endif
 }
 
 int __init md_init(void)
