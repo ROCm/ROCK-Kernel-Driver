@@ -210,6 +210,31 @@
 		bne	1001b
 		.endm
 
+#elif defined(CONFIG_ARCH_PXA)
+
+		.macro	addruart,rx
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #0x40000000	@ physical
+		movne	\rx, #0xfc000000	@ virtual
+		orr	\rx, \rx, #0x00100000
+		.endm
+
+		.macro	senduart,rd,rx
+		str	\rd, [\rx, #0]
+		.endm
+
+		.macro	busyuart,rd,rx
+1002:		ldr	\rd, [\rx, #0x14]
+		tst	\rd, #(1 << 6)
+		beq	1002b
+		.endm
+
+		.macro	waituart,rd,rx
+1001:		ldr	\rd, [\rx, #0x14]
+		tst	\rd, #(1 << 5)
+		beq	1001b
+		.endm
 #elif defined(CONFIG_ARCH_CLPS7500)
 		.macro	addruart,rx
 		mov	\rx, #0xe0000000
