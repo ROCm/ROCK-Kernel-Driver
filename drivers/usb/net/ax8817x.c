@@ -1,7 +1,7 @@
 /*
  * ASIX AX8817x USB 2.0 10/100/HomePNA Ethernet controller driver
  *
- * $Id: ax8817x.c,v 1.17 2003/07/23 20:46:13 dhollis Exp $
+ * $Id: ax8817x.c,v 1.18 2003/07/24 11:08:17 dhollis Exp $
  *
  * Copyright (c) 2002-2003 TiVo Inc.
  *
@@ -10,6 +10,9 @@
  *
  * History 
  *
+ *	2003-07-24 - Dave Hollis <dhollis@davehollis.com>  2.0.2
+ *		* Minor fix that greatly increases rx performance
+ 
  *	2003-07-22 - Dave Hollis <dhollis@davehollis.com>  2.0.1
  *		* Add Intellinet USB ids
  *		* Fix mii/ethtool support - link check works!
@@ -75,7 +78,7 @@
 #include <linux/version.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v2.0.1"
+#define DRIVER_VERSION "v2.0.2"
 #define DRIVER_AUTHOR "TiVo, Inc."
 #define DRIVER_DESC "ASIX AX8817x USB Ethernet driver"
 #define DRIVER_NAME "ax8817x"
@@ -758,7 +761,7 @@ static int ax8817x_open(struct net_device *net)
 				break;
 			}
 			if (n_rx_urbs > 1) {
-				urb->transfer_flags |= URB_NO_INTERRUPT;	/* FIXME: Was USB_QUEUE_BULK */
+				urb->transfer_flags |= URB_ZERO_PACKET;
 			}
 		}
 		ret = ax_refill_rx_urb(ax_info, urb);
