@@ -1737,6 +1737,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Compaq Evo D510C",
 		.type = AC97_TUNE_HP_ONLY
 	},
+        {
+		.vendor = 0x0e11,
+		.device = 0x0860,
+		.name = "HP/Compaq nx7010",
+		.type = AC97_TUNE_MUTE_LED
+        },
 	{
 		.vendor = 0x1014,
 		.device = 0x1f00,
@@ -1778,6 +1784,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.device = 0x00c3,
 		.name = "Hewlett-Packard onboard",
 		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x0890,
+		.name = "HP NC6000",
+		.type = AC97_TUNE_MUTE_LED
 	},
 	{
 		.vendor = 0x103c,

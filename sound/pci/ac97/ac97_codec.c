@@ -2430,6 +2430,43 @@ static int tune_inv_eapd(ac97_t *ac97)
 	return 0;
 }
 
+static int master_mute_sw_put_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	int err = snd_ac97_put_single(kcontrol, ucontrol);
+	if (err > 0) {
+		ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+		snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x8000,
+				     ac97->regs[AC97_MASTER] & 0x8000);
+	}
+	return err;
+}
+
+static int master_mute_sw_put_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	int err = snd_ac97_put_double(kcontrol, ucontrol);
+	if (err > 0) {
+		ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+		snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x8000,
+				     (ac97->regs[AC97_MASTER] & 0x8080) == 0x8080 ?
+				     0x8000 : 0);
+	}
+	return err;
+}
+
+static int tune_mute_led(ac97_t *ac97)
+{
+	snd_kcontrol_t *msw = ctl_find(ac97, "Master Playback Switch", NULL);
+	if (! msw)
+		return -ENOENT;
+	if (msw->put == snd_ac97_put_double)
+		msw->put = master_mute_sw_put_double;
+	else
+		msw->put = master_mute_sw_put_single;
+	snd_ac97_remove_ctl(ac97, "External Amplifier", NULL);
+	snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x8000, 0x8000); /* mute LED on */
+	return 0;
+}
+
 static int apply_quirk(ac97_t *ac97, int quirk)
 {
 	switch (quirk) {
@@ -2447,6 +2484,8 @@ static int apply_quirk(ac97_t *ac97, int quirk)
 		return tune_alc_jack(ac97);
 	case AC97_TUNE_INV_EAPD:
 		return tune_inv_eapd(ac97);
+	case AC97_TUNE_MUTE_LED:
+		return tune_mute_led(ac97);
 	}
 	return -EINVAL;
 }
