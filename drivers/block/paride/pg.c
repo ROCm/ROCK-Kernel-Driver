@@ -244,7 +244,7 @@ struct pg_unit {
 	int timeout;		  /* timeout requested */
 	int status;		  /* last sense key */
 	int drive;		  /* drive */
-	int access;               /* count of active opens ... */
+	unsigned long access;     /* count of active opens ... */
 	int present;		  /* device present ? */
 	char *bufptr;
 	char name[PG_NAMELEN];	  /* pg0, pg1, ... */
