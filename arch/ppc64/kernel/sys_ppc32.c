@@ -3877,19 +3877,36 @@ asmlinkage long sys32_nice(u32 increment)
 	return sys_nice((int)increment);
 }
 
-
-extern asmlinkage long sys_open(const char * filename, int flags, int mode);
-
-/* Note: it is necessary to treat flags and mode as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
+/*
+ * This is just a version for 32-bit applications which does
+ * not force O_LARGEFILE on.
  */
-asmlinkage long sys32_open(const char * filename, int flags, int mode)
+long sys32_open(const char * filename, int flags, int mode)
 {
-	return sys_open(filename, (int)flags, (int)mode);
-}
+	char * tmp;
+	int fd, error;
 
+	tmp = getname(filename);
+	fd = PTR_ERR(tmp);
+	if (!IS_ERR(tmp)) {
+		fd = get_unused_fd();
+		if (fd >= 0) {
+			struct file * f = filp_open(tmp, flags, mode);
+			error = PTR_ERR(f);
+			if (IS_ERR(f))
+				goto out_error;
+			fd_install(fd, f);
+		}
+out:
+		putname(tmp);
+	}
+	return fd;
+
+out_error:
+	put_unused_fd(fd);
+	fd = error;
+	goto out;
+}
 
 extern asmlinkage long sys_readlink(const char * path, char * buf, int bufsiz);
 
