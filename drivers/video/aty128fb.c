@@ -67,9 +67,6 @@
 #include <asm/backlight.h>
 #endif
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif
 #ifdef CONFIG_BOOTX_TEXT
 #include <asm/btext.h>
 #endif /* CONFIG_BOOTX_TEXT */
@@ -1231,27 +1228,6 @@ aty128_set_par(struct aty128fb_par *par,
     if (par->accel_flags & FB_ACCELF_TEXT)
         aty128_init_engine(par, info);
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-    if (!console_fb_info || console_fb_info == &info->fb_info) {
-        struct fb_var_screeninfo var;
-        int cmode, vmode;
-
-	display_info.height = ((par->crtc.v_total >> 16) & 0x7ff) + 1;
-	display_info.width = (((par->crtc.h_total >> 16) & 0xff) + 1) << 3;
-	display_info.depth = par->crtc.bpp;
-	display_info.pitch = (par->crtc.vxres * par->crtc.bpp) >> 3;
-        aty128_encode_var(&var, par, info);
-	if (mac_var_to_vmode(&var, &vmode, &cmode))
-	    display_info.mode = 0;
-	else
-	    display_info.mode = vmode;
-	strcpy(display_info.name, aty128fb_name);
-	display_info.fb_address = info->frame_buffer_phys;
-	display_info.cmap_adr_address = 0;
-	display_info.cmap_data_address = 0;
-	display_info.disp_reg_address = info->regbase_phys;
-    }
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 #if defined(CONFIG_BOOTX_TEXT)
 	btext_update_display(info->frame_buffer_phys,
 			(((par->crtc.h_total>>16) & 0xff)+1)*8,
@@ -1927,12 +1903,7 @@ aty128_pci_register(struct pci_dev *pdev,
 		printk(KERN_INFO "aty128fb: Rage128 MTRR set to ON\n");
 	}
 #endif /* CONFIG_MTRR */
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-    if (!console_fb_info)
-	console_fb_info = &info->fb_info;
-#endif
-
+	
 	return 0;
 
 err_out:

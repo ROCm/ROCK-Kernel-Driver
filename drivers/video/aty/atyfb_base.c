@@ -93,9 +93,6 @@
 #ifdef CONFIG_NVRAM
 #include <linux/nvram.h>
 #endif
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
@@ -798,26 +795,6 @@ static void atyfb_set_par(const struct atyfb_par *par,
     if (par->accel_flags & FB_ACCELF_TEXT)
 	aty_init_engine(par, info);
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-    if (!console_fb_info || console_fb_info == &info->fb_info) {
-	struct fb_var_screeninfo var;
-	int vmode, cmode;
-	display_info.height = ((par->crtc.v_tot_disp>>16) & 0x7ff)+1;
-	display_info.width = (((par->crtc.h_tot_disp>>16) & 0xff)+1)*8;
-	display_info.depth = par->crtc.bpp;
-	display_info.pitch = par->crtc.vxres*par->crtc.bpp/8;
-	atyfb_encode_var(&var, par, info);
-	if (mac_var_to_vmode(&var, &vmode, &cmode))
-	    display_info.mode = 0;
-	else
-	    display_info.mode = vmode;
-	strcpy(display_info.name, atyfb_name);
-	display_info.fb_address = info->frame_buffer_phys;
-	display_info.cmap_adr_address = info->ati_regbase_phys+0xc0;
-	display_info.cmap_data_address = info->ati_regbase_phys+0xc1;
-	display_info.disp_reg_address = info->ati_regbase_phys;
-    }
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 #ifdef CONFIG_BOOTX_TEXT
 	btext_update_display(info->frame_buffer_phys,
 			(((par->crtc.h_tot_disp>>16) & 0xff)+1)*8,
@@ -2454,11 +2431,6 @@ int __init atyfb_init(void)
 	    info->next = first_display;
 	    first_display = info;
 #endif
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	    if (!console_fb_info)
-		console_fb_info = &info->fb_info;
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 	}
     }
 

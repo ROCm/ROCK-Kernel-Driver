@@ -33,9 +33,6 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/nvram.h>
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/pgtable.h>
@@ -510,24 +507,6 @@ static void platinum_set_par(const struct fb_par_platinum *par, struct fb_info_p
 	set_platinum_clock(info);
 
 	out_be32(&platinum_regs->reg[24].r, 0);	/* turn display on */
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	if (console_fb_info == &info->fb_info) {
-		display_info.height = par->yres;
-		display_info.width = par->xres;
-		display_info.depth = ( (cmode == CMODE_32) ? 32 :
-				      ((cmode == CMODE_16) ? 16 : 8));
-		display_info.pitch = vmode_attrs[vmode-1].hres * (1<<cmode) + 0x20;
-		display_info.mode = vmode;
-		strncpy(display_info.name, "platinum",
-			sizeof(display_info.name));
-		display_info.fb_address = info->frame_buffer_phys + init->fb_offset + 0x20;
-		display_info.cmap_adr_address = info->cmap_regs_phys;
-		display_info.cmap_data_address = info->cmap_regs_phys + 0x30;
-		display_info.disp_reg_address = info->platinum_regs_phys;
-		
-	}
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 }
 
 
@@ -705,11 +684,6 @@ static void __init platinum_of_init(struct device_node *dp)
 		kfree(info);
 		return;
 	}
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	if (!console_fb_info)
-		console_fb_info = &info->fb_info;
-#endif
 }
 
 /*

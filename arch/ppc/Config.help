@@ -241,12 +241,6 @@ CONFIG_FB
   and strongly recommended if you are compiling a kernel for an Apple
   machine.
 
-CONFIG_FB_COMPAT_XPMAC
-  If you use the Xpmac X server (common with mklinux), you'll need to
-  say Y here to use X. You should consider changing to XFree86 which
-  includes a server that supports the frame buffer device directly
-  (XF68_FBDev).
-
 CONFIG_SCSI
   If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
   any other SCSI device under Linux, say Y and make sure that you know

@@ -27,9 +27,6 @@
 #include <linux/selection.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif
 #include <asm/io.h>
 #include <asm/prom.h>
 #ifdef CONFIG_BOOTX_TEXT
@@ -660,29 +657,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 
     printk(KERN_INFO "fb%d: Open Firmware frame buffer device on %s\n",
 	   GET_FB_IDX(info->info.node), full_name);
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-    if (!console_fb_info) {
-	display_info.height = var->yres;
-	display_info.width = var->xres;
-	display_info.depth = depth;
-	display_info.pitch = fix->line_length;
-	display_info.mode = 0;
-	strncpy(display_info.name, name, sizeof(display_info.name));
-	display_info.fb_address = address;
-	display_info.cmap_adr_address = 0;
-	display_info.cmap_data_address = 0;
-	display_info.disp_reg_address = 0;
-	/* XXX kludge for ati */
-	if (info->cmap_type == cmap_m64) {
-	    unsigned long base = address & 0xff000000UL;
-	    display_info.disp_reg_address = base + 0x7ffc00;
-	    display_info.cmap_adr_address = base + 0x7ffcc0;
-	    display_info.cmap_data_address = base + 0x7ffcc1;
-	}
-	console_fb_info = &info->info;
-    }
-#endif /* CONFIG_FB_COMPAT_XPMAC) */
 }
 
 static int offbcon_switch(int con, struct fb_info *info)

@@ -41,9 +41,6 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #include <linux/pci.h>
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif
 
 #include <video/fbcon.h>
 #include <video/fbcon-cfb8.h>
@@ -539,22 +536,6 @@ static void __init s3triofb_of_init(struct device_node *dp)
 #if 0
     fb_info.setcmap = &s3triofbcon_setcmap;
 #endif
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-    if (!console_fb_info) {
-	display_info.height = fb_var.yres;
-	display_info.width = fb_var.xres;
-	display_info.depth = 8;
-	display_info.pitch = fb_fix.line_length;
-	display_info.mode = 0;
-	strncpy(display_info.name, dp->name, sizeof(display_info.name));
-	display_info.fb_address = (unsigned long)fb_fix.smem_start;
-	display_info.disp_reg_address = address + 0x1008000;
-	display_info.cmap_adr_address = address + 0x1008000 + 0x3c8;
-	display_info.cmap_data_address = address + 0x1008000 + 0x3c9;
-	console_fb_info = &fb_info;
-    }
-#endif /* CONFIG_FB_COMPAT_XPMAC) */
 
     fb_info.flags = FBINFO_FLAG_DEFAULT;
     if (register_framebuffer(&fb_info) < 0)

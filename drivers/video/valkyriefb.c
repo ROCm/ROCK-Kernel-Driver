@@ -53,9 +53,6 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/nvram.h>
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <asm/io.h>
@@ -370,11 +367,6 @@ static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	return 0;
 }
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-extern struct vc_mode display_info;
-extern struct fb_info *console_fb_info;
-#endif /* CONFIG_FB_COMPAT_XPMAC */
-
 static int valkyrie_vram_reqd(int video_mode, int color_mode)
 {
 	int pitch;
@@ -492,24 +484,6 @@ static void valkyrie_set_par(const struct fb_par_valkyrie *par,
 
 	/* Turn on display */
 	out_8(&valkyrie_regs->mode.r, init->mode);
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	/* And let the world know the truth. */
-	if (!console_fb_info || console_fb_info == &p->info) {
-		display_info.height = p->var.yres;
-		display_info.width = p->var.xres;
-		display_info.depth = (cmode == CMODE_16) ? 16 : 8;
-		display_info.pitch = p->fix.line_length;
-		display_info.mode = vmode;
-		strncpy(display_info.name, "valkyrie",
-			sizeof(display_info.name));
-		display_info.fb_address = p->frame_buffer_phys + 0x1000;
-		display_info.cmap_adr_address = p->cmap_regs_phys;
-		display_info.cmap_data_address = p->cmap_regs_phys + 8;
-		display_info.disp_reg_address = p->valkyrie_regs_phys;
-		console_fb_info = &p->info;
-	}
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 }
 
 int __init valkyriefb_init(void)
