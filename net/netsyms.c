@@ -60,8 +60,6 @@
 #endif
 #endif
 
-#include <linux/rtnetlink.h>
-
 #ifdef CONFIG_IPX_MODULE
 extern struct datalink_proto   *make_EII_client(void);
 extern struct datalink_proto   *make_8023_client(void);
@@ -217,8 +215,6 @@ EXPORT_SYMBOL(ip_setsockopt);
 EXPORT_SYMBOL(ip_getsockopt);
 #endif /* CONFIG_IP_SCTP_MODULE */
 
-EXPORT_SYMBOL(rtattr_parse);
-EXPORT_SYMBOL(__rta_fill);
 
 
 /* Used by at least ipip.c.  */
@@ -262,13 +258,6 @@ EXPORT_SYMBOL(dev_mc_delete);
 EXPORT_SYMBOL(dev_mc_upload);
 EXPORT_SYMBOL(__kill_fasync);
 
-EXPORT_SYMBOL(rtnl);
-EXPORT_SYMBOL(rtnetlink_links);
-EXPORT_SYMBOL(rtnetlink_dump_ifinfo);
-EXPORT_SYMBOL(rtnetlink_put_metrics);
-EXPORT_SYMBOL(rtnl_sem);
-EXPORT_SYMBOL(rtnl_lock);
-EXPORT_SYMBOL(rtnl_unlock);
 
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);
