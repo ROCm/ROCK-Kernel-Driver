@@ -27,6 +27,7 @@ vertex_hdl_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 extern void register_pcibr_intr(int irq, pcibr_intr_t intr);
 
 void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot);
+extern int cbrick_type_get_nasid(nasid_t);
 
 #define IS_OPUS(nasid) (cbrick_type_get_nasid(nasid) == MODULE_OPUSBRICK)
 #define IS_ALTIX(nasid) (cbrick_type_get_nasid(nasid) == MODULE_CBRICK)
@@ -344,7 +345,6 @@ sn_pci_fixup(int arg)
 	struct sn_device_sysdata *device_sysdata;
 	pcibr_intr_t intr_handle;
 	pciio_provider_t *pci_provider;
-	int cpuid;
 	vertex_hdl_t device_vertex;
 	pciio_intr_line_t lines;
 	extern int numnodes;

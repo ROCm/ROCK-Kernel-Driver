@@ -645,3 +645,27 @@ parse_module_id(char *buffer)
 	/* avoid sign extending the moduleid_t */
 	return (int)(unsigned short)m;
 }
+
+int
+cbrick_type_get_nasid(nasid_t nasid)
+{
+	lboard_t *brd;
+	moduleid_t module;
+	uint type;
+	int t;
+
+	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
+	module = geo_module(brd->brd_geoid);
+	type = (module & MODULE_BTYPE_MASK) >> MODULE_BTYPE_SHFT;
+	/* convert brick_type to lower case */
+	if ((type >= 'A') && (type <= 'Z'))
+		type = type - 'A' + 'a';
+    
+	/* convert to a module.h brick type */
+	for( t = 0; t < MAX_BRICK_TYPES; t++ ) {
+		if( brick_types[t] == type ) {
+			return t;
+		}
+	} 
+	return -1;
+}
