@@ -1256,17 +1256,6 @@ smp_done:
 	zap_low_mappings();
 }
 
-extern void (*interrupt[NR_IRQS])(void);
-
-/*
- * The following vectors are part of the Linux architecture, there
- * is no hardware IRQ pin equivalent for them, they are triggered
- * through the ICC by us (IPIs)
- */
-BUILD_SMP_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR)
-BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
-BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
-
 void __init smp_intr_init()
 {
 	/*

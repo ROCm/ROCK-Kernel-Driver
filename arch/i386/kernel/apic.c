@@ -32,17 +32,6 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 
-/*
- * every pentium local APIC has two 'local interrupts', with a
- * soft-definable vector attached to both interrupts, one of
- * which is a timer interrupt, the other one is error counter
- * overflow. Linux uses the local APIC timer interrupt to get
- * a much simpler SMP time architecture:
- */
-BUILD_SMP_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
-BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
-
 void __init apic_intr_init(void)
 {
 #ifdef CONFIG_SMP

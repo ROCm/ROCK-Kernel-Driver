@@ -103,6 +103,7 @@ CORE_FILES := arch/i386/kernel/kernel.o arch/i386/mm/mm.o \
 LIBS := $(TOPDIR)/arch/i386/lib/lib.a $(LIBS) $(TOPDIR)/arch/i386/lib/lib.a
 
 CFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
+AFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
 
 ifdef CONFIG_MATH_EMULATION
 SUBDIRS += arch/i386/math-emu
