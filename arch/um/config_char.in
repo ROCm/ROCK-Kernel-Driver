@@ -1,0 +1,37 @@
+mainmenu_option next_comment
+comment 'Character Devices'
+
+define_bool CONFIG_STDIO_CONSOLE y
+
+bool 'Virtual serial line' CONFIG_SSL
+
+bool 'file descriptor channel support' CONFIG_FD_CHAN
+bool 'null channel support' CONFIG_NULL_CHAN
+bool 'port channel support' CONFIG_PORT_CHAN
+bool 'pty channel support' CONFIG_PTY_CHAN
+bool 'tty channel support' CONFIG_TTY_CHAN
+bool 'xterm channel support' CONFIG_XTERM_CHAN
+string 'Default main console channel initialization' CONFIG_CON_ZERO_CHAN \
+            "fd:0,fd:1"
+string 'Default console channel initialization' CONFIG_CON_CHAN "xterm"
+string 'Default serial line channel initialization' CONFIG_SSL_CHAN "pty"
+
+
+bool 'Unix98 PTY support' CONFIG_UNIX98_PTYS
+if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then
+   int 'Maximum number of Unix98 PTYs in use (0-2048)' CONFIG_UNIX98_PTY_COUNT 256
+fi
+
+bool 'Watchdog Timer Support' CONFIG_WATCHDOG
+dep_bool '  Disable watchdog shutdown on close' CONFIG_WATCHDOG_NOWAYOUT \
+	$CONFIG_WATCHDOG
+dep_tristate '  Software Watchdog' CONFIG_SOFT_WATCHDOG $CONFIG_WATCHDOG
+dep_tristate '  UML watchdog' CONFIG_UML_WATCHDOG $CONFIG_WATCHDOG
+
+tristate 'Sound support' CONFIG_UML_SOUND
+define_tristate CONFIG_SOUND $CONFIG_UML_SOUND
+define_tristate CONFIG_HOSTAUDIO $CONFIG_UML_SOUND
+
+bool 'Enable tty logging' CONFIG_TTY_LOG
+
+endmenu

@@ -27,6 +27,7 @@ extern unsigned long event;
 #include <linux/securebits.h>
 #include <linux/fs_struct.h>
 #include <linux/compiler.h>
+#include <linux/completion.h>
 
 struct exec_domain;
 
@@ -128,8 +129,6 @@ struct sched_param {
 	int sched_priority;
 };
 
-struct completion;
-
 #ifdef __KERNEL__
 
 #include <linux/spinlock.h>
@@ -216,6 +215,12 @@ struct signal_struct {
         task_t                  *curr_target;
 
 	struct sigpending	shared_pending;
+
+	/* thread group exit support */
+	int			group_exit;
+	int			group_exit_code;
+
+	struct completion	group_exit_done;
 };
 
 /*
@@ -555,6 +560,7 @@ extern void notify_parent(struct task_struct *, int);
 extern void do_notify_parent(struct task_struct *, int);
 extern void force_sig(int, struct task_struct *);
 extern int send_sig(int, struct task_struct *, int);
+extern int __broadcast_thread_group(struct task_struct *p, int sig);
 extern int kill_pg(pid_t, int, int);
 extern int kill_sl(pid_t, int, int);
 extern int kill_proc(pid_t, int, int);
@@ -661,6 +667,7 @@ extern void exit_thread(void);
 extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
+extern void __exit_sighand(struct task_struct *);
 extern void remove_thread_group(struct task_struct *tsk, struct signal_struct *sig);
 
 extern void reparent_to_init(void);

@@ -34,26 +34,12 @@
 #include "../zftape/zftape-buffers.h"
 #include "../zftape/zftape-ctl.h"
 
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
-# define FT_KSYM(sym) EXPORT_SYMBOL(sym);
-#else
-# define FT_KSYM(sym) X(sym),
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VER(2,1,18)
-struct symbol_table zft_symbol_table = {
-#include <linux/symtab_begin.h>
-#endif
 /* zftape-init.c */
-FT_KSYM(zft_cmpr_register)
-FT_KSYM(zft_cmpr_unregister)
+EXPORT_SYMBOL(zft_cmpr_register);
+EXPORT_SYMBOL(zft_cmpr_unregister);
 /* zftape-read.c */
-FT_KSYM(zft_fetch_segment_fraction)
+EXPORT_SYMBOL(zft_fetch_segment_fraction);
 /* zftape-buffers.c */
-FT_KSYM(zft_vmalloc_once)
-FT_KSYM(zft_vmalloc_always)
-FT_KSYM(zft_vfree)
-#if LINUX_VERSION_CODE < KERNEL_VER(2,1,18)
-#include <linux/symtab_end.h>
-};
-#endif
+EXPORT_SYMBOL(zft_vmalloc_once);
+EXPORT_SYMBOL(zft_vmalloc_always);
+EXPORT_SYMBOL(zft_vfree);

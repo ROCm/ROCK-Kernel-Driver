@@ -164,6 +164,9 @@ export srctree objtree
 
 SUBDIRS		:= init kernel mm fs ipc lib drivers sound net security
 
+# The temporary file to save gcc -MD generated dependencies must not
+# contain a comma
+depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
@@ -271,7 +274,7 @@ boot: vmlinux
 
 vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
 
-quiet_cmd_link_vmlinux = LD     $@
+quiet_cmd_link_vmlinux = LD      $@
 cmd_link_vmlinux = $(LD) $(LDFLAGS) $(LDFLAGS_$(@F)) $(HEAD) $(INIT) \
 		--start-group \
 		$(CORE_FILES) \
@@ -318,8 +321,12 @@ prepare: include/linux/version.h include/asm include/config/MARKER
 #	This can be used by arch/$ARCH/Makefile to preprocess
 #	their vmlinux.lds.S file
 
-arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S
-	$(CPP) $(CPPFLAGS) $(CPPFLAGS_$@) -P -C -U$(ARCH) $< -o $@
+AFLAGS_vmlinux.lds.o += -P -C -U$(ARCH)
+
+arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S FORCE
+	$(call if_changed_dep,as_s_S)
+
+targets += arch/$(ARCH)/vmlinux.lds.s
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -782,12 +789,33 @@ endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
 
+a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+
+quiet_cmd_as_s_S = CPP     $(echo_target)
+cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
+
 # read all saved command lines
 
-cmd_files := $(wildcard .*.cmd)
+targets := $(wildcard $(sort $(targets)))
+cmd_files := $(wildcard .*.cmd $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
+
 ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
+
+# execute the command and also postprocess generated .d dependencies
+# file
+
+if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
+		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
+			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
+	@set -e; \
+	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(cmd_$(1)); \
+	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	rm -f $(depfile); \
+	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
 # Usage: $(call if_changed_rule,foo)
 # will check if $(cmd_foo) changed, or any of the prequisites changed,

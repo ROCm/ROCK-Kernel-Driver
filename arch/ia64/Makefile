@@ -96,9 +96,6 @@ MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
-arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S
-	$(CPP) $(CPPFLAGS) $(CPPFLAGS_$@) -D__ASSEMBLY__ -P -C -U$(ARCH) $< -o $@
-
 compressed: vmlinux
 	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux-tmp
 	gzip vmlinux-tmp

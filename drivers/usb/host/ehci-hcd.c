@@ -111,6 +111,7 @@
 #define	EHCI_TUNE_MULT_TT	1
 
 #define EHCI_WATCHDOG_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
+#define EHCI_ASYNC_JIFFIES	(HZ/3)		/* async idle timeout */
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -190,7 +191,7 @@ static int ehci_reset (struct ehci_hcd *ehci)
 	dbg_cmd (ehci, "reset", command);
 	writel (command, &ehci->regs->command);
 	ehci->hcd.state = USB_STATE_HALT;
-	return handshake (&ehci->regs->command, CMD_RESET, 0, 050);
+	return handshake (&ehci->regs->command, CMD_RESET, 0, 250);
 }
 
 /* idle the controller (from running) */
@@ -247,9 +248,14 @@ static void ehci_watchdog (unsigned long param)
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
 	unsigned long		flags;
 
-	/* guard against lost IAA, which wedges everything */
 	spin_lock_irqsave (&ehci->lock, flags);
+	/* guard against lost IAA, which wedges everything */
 	ehci_irq (&ehci->hcd);
+ 	/* unlink the last qh after it's idled a while */
+ 	if (ehci->async_idle) {
+ 		start_unlink_async (ehci, ehci->async);
+ 		ehci->async_idle = 0;
+	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
@@ -368,6 +374,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	 *
 	 * NOTE:  layered drivers can't yet tell when we enable that,
 	 * so they can't pass this info along (like NETIF_F_HIGHDMA)
+	 * (or like Scsi_Host.highmem_io) ... usb_bus.flags?
 	 */
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
@@ -585,6 +592,10 @@ static void ehci_tasklet (unsigned long param)
 {
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
 	unsigned long		flags;
+
+	// FIXME don't pass flags; on sparc they aren't really flags.
+	// qh_completions can just leave irqs blocked,
+	// then have scan_async() allow IRQs if it's very busy 
 
 	spin_lock_irqsave (&ehci->lock, flags);
 

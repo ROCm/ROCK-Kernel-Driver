@@ -108,6 +108,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(BELKIN_OLD_VID, BELKIN_OLD_PID) },
 	{ USB_DEVICE(PERACOM_VID, PERACOM_PID) },
 	{ USB_DEVICE(GOHUBS_VID, GOHUBS_PID) },
+	{ USB_DEVICE(GOHUBS_VID, HANDYLINK_PID) },
 	{ USB_DEVICE(BELKIN_DOCKSTATION_VID, BELKIN_DOCKSTATION_PID) },
 	{ }							/* Terminating entry */
 };

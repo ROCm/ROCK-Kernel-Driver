@@ -14,7 +14,7 @@
 #ifndef __ASMPPC_HDREG_H
 #define __ASMPPC_HDREG_H
 
-typedef unsigned int ide_ioreg_t;
+typedef unsigned long ide_ioreg_t;
 
 #endif /* __ASMPPC_HDREG_H */
 
