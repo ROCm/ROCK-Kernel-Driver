@@ -418,13 +418,13 @@ struct _snd_intel8x0 {
 	snd_pcm_t *pcm[6];
 	ichdev_t ichd[6];
 
-	int multi4: 1,
-	    multi6: 1,
-	    smp20bit: 1;
-	int in_ac97_init: 1,
-	    in_sdin_init: 1;
-	int fix_nocache: 1; /* workaround for 440MX */
-	int buggy_irq: 1; /* workaround for buggy mobos */
+	unsigned multi4: 1,
+		 multi6: 1,
+		 smp20bit: 1;
+	unsigned in_ac97_init: 1,
+		 in_sdin_init: 1;
+	unsigned fix_nocache: 1; /* workaround for 440MX */
+	unsigned buggy_irq: 1; /* workaround for buggy mobos */
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
