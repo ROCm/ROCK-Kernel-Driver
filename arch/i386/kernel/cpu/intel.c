@@ -6,12 +6,18 @@
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 #include <asm/msr.h>
+#include <asm/uaccess.h>
 
 #include "cpu.h"
 
 static int disable_x86_serial_nr __initdata = 1;
 static int disable_P4_HT __initdata = 0;
 extern int trap_init_f00f_bug(void);
+
+#ifdef INTEL_MOVSL
+struct movsl_mask movsl_mask;	/* alignment at which movsl is preferred for
+			   	   bulk memory copies */
+#endif
 
 /*
  *	Early probe support logic for ppro memory erratum #50
@@ -348,6 +354,25 @@ too_many_siblings:
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);
+
+#ifdef INTEL_MOVSL
+	/*
+	 * Set up the preferred alignment for movsl bulk memory moves
+	 */
+	switch (c->x86) {
+	case 4:		/* 486: untested */
+		break;
+	case 5:		/* Old Pentia: untested */
+		break;
+	case 6:		/* PII/PIII only like movsl with 8-byte alignment */
+		movsl_mask.mask = 7;
+		break;
+	case 15:	/* P4 is OK down to 8-byte alignment */
+		movsl_mask.mask = 7;
+		break;
+	}
+#endif
+
 }
 
 

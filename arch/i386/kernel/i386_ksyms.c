@@ -119,6 +119,11 @@ EXPORT_SYMBOL(__clear_user);
 EXPORT_SYMBOL(__generic_copy_from_user);
 EXPORT_SYMBOL(__generic_copy_to_user);
 EXPORT_SYMBOL(strnlen_user);
+#ifdef INTEL_MOVSL
+EXPORT_SYMBOL(movsl_mask);
+EXPORT_SYMBOL(__copy_user_int);
+EXPORT_SYMBOL(__copy_user_zeroing_int);
+#endif
 
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);

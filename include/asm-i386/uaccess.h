@@ -33,7 +33,39 @@
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
-extern int __verify_write(const void *, unsigned long);
+/*
+ * movsl can be slow when source and dest are not both 8-byte aligned
+ */
+#if defined(CONFIG_M586MMX) || defined(CONFIG_M686) || \
+	defined(CONFIG_MPENTIUMIII) || defined(CONFIG_MPENTIUM4)
+#define INTEL_MOVSL
+#endif
+
+#ifdef INTEL_MOVSL
+extern struct movsl_mask {
+	int mask;
+} ____cacheline_aligned_in_smp movsl_mask;
+
+static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
+{
+	if (n < 64)
+		return 1;
+	if ((((const long)a1 ^ (const long)a2) & movsl_mask.mask) == 0)
+		return 1;
+	return 0;
+}
+#else
+static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
+{
+	return 1;
+}
+#endif
+
+/* These are undefined on !INTEL_MOVSL.  And they should be unreferenced. */
+unsigned long __copy_user_int(void *, const void *, unsigned long);
+unsigned long __copy_user_zeroing_int(void *, const void *, unsigned long);
+
+int __verify_write(const void *, unsigned long);
 
 #define __addr_ok(addr) ((unsigned long)(addr) < (current_thread_info()->addr_limit.seg))
 
@@ -255,37 +287,64 @@ do {									\
 /* Generic arbitrary sized copy.  */
 #define __copy_user(to,from,size)					\
 do {									\
-	int __d0, __d1;							\
+	int __d0, __d1, __d2;						\
 	__asm__ __volatile__(						\
+		"	cmp  $7,%0\n"					\
+		"	jbe  1f\n"					\
+		"	movl %1,%0\n"					\
+		"	negl %0\n"					\
+		"	andl $7,%0\n"					\
+		"	subl %0,%3\n"					\
+		"4:	rep; movsb\n"					\
+		"	movl %3,%0\n"					\
+		"	shrl $2,%0\n"					\
+		"	andl $3,%3\n"					\
+		"	.align 2,0x90\n"				\
 		"0:	rep; movsl\n"					\
 		"	movl %3,%0\n"					\
 		"1:	rep; movsb\n"					\
 		"2:\n"							\
 		".section .fixup,\"ax\"\n"				\
+		"5:	addl %3,%0\n"					\
+		"	jmp 2b\n"					\
 		"3:	lea 0(%3,%0,4),%0\n"				\
 		"	jmp 2b\n"					\
 		".previous\n"						\
 		".section __ex_table,\"a\"\n"				\
 		"	.align 4\n"					\
+		"	.long 4b,5b\n"					\
 		"	.long 0b,3b\n"					\
 		"	.long 1b,2b\n"					\
 		".previous"						\
-		: "=&c"(size), "=&D" (__d0), "=&S" (__d1)		\
-		: "r"(size & 3), "0"(size / 4), "1"(to), "2"(from)	\
+		: "=&c"(size), "=&D" (__d0), "=&S" (__d1), "=r"(__d2)	\
+		: "3"(size), "0"(size), "1"(to), "2"(from)		\
 		: "memory");						\
 } while (0)
 
 #define __copy_user_zeroing(to,from,size)				\
 do {									\
-	int __d0, __d1;							\
+	int __d0, __d1, __d2;						\
 	__asm__ __volatile__(						\
+		"	cmp  $7,%0\n"					\
+		"	jbe  1f\n"					\
+		"	movl %1,%0\n"					\
+		"	negl %0\n"					\
+		"	andl $7,%0\n"					\
+		"	subl %0,%3\n"					\
+		"4:	rep; movsb\n"					\
+		"	movl %3,%0\n"					\
+		"	shrl $2,%0\n"					\
+		"	andl $3,%3\n"					\
+		"	.align 2,0x90\n"				\
 		"0:	rep; movsl\n"					\
 		"	movl %3,%0\n"					\
 		"1:	rep; movsb\n"					\
 		"2:\n"							\
 		".section .fixup,\"ax\"\n"				\
+		"5:	addl %3,%0\n"					\
+		"	jmp 6f\n"					\
 		"3:	lea 0(%3,%0,4),%0\n"				\
-		"4:	pushl %0\n"					\
+		"6:	pushl %0\n"					\
 		"	pushl %%eax\n"					\
 		"	xorl %%eax,%%eax\n"				\
 		"	rep; stosb\n"					\
@@ -295,13 +354,16 @@ do {									\
 		".previous\n"						\
 		".section __ex_table,\"a\"\n"				\
 		"	.align 4\n"					\
+		"	.long 4b,5b\n"					\
 		"	.long 0b,3b\n"					\
-		"	.long 1b,4b\n"					\
+		"	.long 1b,6b\n"					\
 		".previous"						\
-		: "=&c"(size), "=&D" (__d0), "=&S" (__d1)		\
-		: "r"(size & 3), "0"(size / 4), "1"(to), "2"(from)	\
+		: "=&c"(size), "=&D" (__d0), "=&S" (__d1), "=r"(__d2)	\
+		: "3"(size), "0"(size), "1"(to), "2"(from)		\
 		: "memory");						\
 } while (0)
+
+
 
 /* We let the __ versions of copy_from/to_user inline, because they're often
  * used in fast paths and have only a small space overhead.
@@ -309,14 +371,20 @@ do {									\
 static inline unsigned long
 __generic_copy_from_user_nocheck(void *to, const void *from, unsigned long n)
 {
-	__copy_user_zeroing(to,from,n);
+	if (movsl_is_ok(to, from, n))
+		__copy_user_zeroing(to, from, n);
+	else
+		n = __copy_user_zeroing_int(to, from, n);
 	return n;
 }
 
 static inline unsigned long
 __generic_copy_to_user_nocheck(void *to, const void *from, unsigned long n)
 {
-	__copy_user(to,from,n);
+	if (movsl_is_ok(to, from, n))
+		__copy_user(to, from, n);
+	else
+		n = __copy_user_int(to, from, n);
 	return n;
 }
 
@@ -578,24 +646,16 @@ __constant_copy_from_user_nocheck(void *to, const void *from, unsigned long n)
 }
 
 #define copy_to_user(to,from,n)				\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_to_user((to),(from),(n)) :	\
-	 __generic_copy_to_user((to),(from),(n)))
+	 __generic_copy_to_user((to),(from),(n))
 
 #define copy_from_user(to,from,n)			\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_from_user((to),(from),(n)) :	\
-	 __generic_copy_from_user((to),(from),(n)))
+	 __generic_copy_from_user((to),(from),(n))
 
 #define __copy_to_user(to,from,n)			\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_to_user_nocheck((to),(from),(n)) :	\
-	 __generic_copy_to_user_nocheck((to),(from),(n)))
+	 __generic_copy_to_user_nocheck((to),(from),(n))
 
 #define __copy_from_user(to,from,n)			\
-	(__builtin_constant_p(n) ?			\
-	 __constant_copy_from_user_nocheck((to),(from),(n)) :	\
-	 __generic_copy_from_user_nocheck((to),(from),(n)))
+	 __generic_copy_from_user_nocheck((to),(from),(n))
 
 long strncpy_from_user(char *dst, const char *src, long count);
 long __strncpy_from_user(char *dst, const char *src, long count);
