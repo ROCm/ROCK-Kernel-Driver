@@ -12,7 +12,7 @@
 static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
 {
 #ifdef CONFIG_X86_INTEL_USERCOPY
-	if (n >= 64 || (((const long)a1 ^ (const long)a2) & movsl_mask.mask))
+	if (n >= 64 && (((const long)a1 ^ (const long)a2) & movsl_mask.mask))
 		return 0;
 #endif
 	return 1;
