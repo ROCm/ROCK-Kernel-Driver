@@ -1,7 +1,7 @@
 /*
  * Sun3 SCSI stuff by Erik Verbruggen (erik@bigmama.xtdnet.nl)
  *
- * Sun3 DMA routines added by Sam Creasey (sammy@oh.verio.com)
+ * Sun3 DMA routines added by Sam Creasey (sammy@sammy.net)
  *
  * Adapted from mac_scsinew.c:
  */
