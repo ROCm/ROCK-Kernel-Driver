@@ -27,6 +27,10 @@
 #include <pcmcia/cisreg.h>
 
 
+MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
+MODULE_DESCRIPTION("Common routines for Digigram PCMCIA VX drivers");
+MODULE_LICENSE("GPL");
+
 /*
  * prototypes
  */

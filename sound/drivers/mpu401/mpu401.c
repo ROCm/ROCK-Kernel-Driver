@@ -157,7 +157,7 @@ static int __init alsa_card_mpu401_setup(char *str)
 #ifdef CONFIG_X86_PC9800
 	       get_option(&str,&pc98ii[nr_dev]) == 2 &&
 #endif
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2);
 	nr_dev++;
 	return 1;

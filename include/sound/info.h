@@ -134,12 +134,13 @@ void snd_remove_proc_entry(struct proc_dir_entry *parent,
 /* for card drivers */
 int snd_card_proc_new(snd_card_t *card, const char *name, snd_info_entry_t **entryp);
 
-inline static void snd_info_set_text_ops(snd_info_entry_t *entry, 
+static inline void snd_info_set_text_ops(snd_info_entry_t *entry, 
 					 void *private_data,
+					 long read_size,
 					 void (*read)(snd_info_entry_t *, snd_info_buffer_t *))
 {
 	entry->private_data = private_data;
-	entry->c.text.read_size = 1024;
+	entry->c.text.read_size = read_size;
 	entry->c.text.read = read;
 }
 
