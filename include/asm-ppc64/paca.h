@@ -16,6 +16,7 @@
  * 2 of the License, or (at your option) any later version.
  */    
 
+#include	<linux/config.h>
 #include	<asm/types.h>
 #include	<asm/iSeries/ItLpPaca.h>
 #include	<asm/iSeries/ItLpRegSave.h>
@@ -104,7 +105,9 @@ struct paca_struct {
 	 * The lppaca is also used on POWER5 pSeries boxes.
 	 */
 	struct ItLpPaca lppaca __attribute__((aligned(0x80)));
+#ifdef CONFIG_PPC_ISERIES
 	struct ItLpRegSave reg_save;
+#endif
 };
 
 #endif /* _PPC64_PACA_H */
