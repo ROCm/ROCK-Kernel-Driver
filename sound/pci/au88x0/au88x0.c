@@ -216,7 +216,7 @@ snd_vortex_create(snd_card_t * card, struct pci_dev *pci, vortex_t ** rchip)
 	vortex_core_shutdown(chip);
       core_out:
 	//FIXME: the type of chip->mmio might need to be changed??
-	iounmap((void *)chip->mmio);
+	iounmap(chip->mmio);
       ioremap_out:
 	pci_release_regions(chip->pci_dev);
       regions_out:

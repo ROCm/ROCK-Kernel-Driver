@@ -236,10 +236,10 @@ struct _snd_intel8x0m {
 
 	unsigned int mmio;
 	unsigned long addr;
-	unsigned long remap_addr;
+	void __iomem *remap_addr;
 	unsigned int bm_mmio;
 	unsigned long bmaddr;
-	unsigned long remap_bmaddr;
+	void __iomem *remap_bmaddr;
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -1069,9 +1069,9 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	if (chip->bdbars.area)
 		snd_dma_free_pages(&chip->bdbars);
 	if (chip->remap_addr)
-		iounmap((void *) chip->remap_addr);
+		iounmap(chip->remap_addr);
 	if (chip->remap_bmaddr)
-		iounmap((void *) chip->remap_bmaddr);
+		iounmap(chip->remap_bmaddr);
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	pci_release_regions(chip->pci);
@@ -1196,9 +1196,9 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and Nforce */
 		chip->mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
-		chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr,
-								   pci_resource_len(pci, 2));
-		if (chip->remap_addr == 0) {
+		chip->remap_addr = ioremap_nocache(chip->addr,
+						   pci_resource_len(pci, 2));
+		if (chip->remap_addr == NULL) {
 			snd_printk("AC'97 space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;
@@ -1209,9 +1209,9 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 3) & IORESOURCE_MEM) {	/* ICH4 */
 		chip->bm_mmio = 1;
 		chip->bmaddr = pci_resource_start(pci, 3);
-		chip->remap_bmaddr = (unsigned long) ioremap_nocache(chip->bmaddr,
-								     pci_resource_len(pci, 3));
-		if (chip->remap_bmaddr == 0) {
+		chip->remap_bmaddr = ioremap_nocache(chip->bmaddr,
+						     pci_resource_len(pci, 3));
+		if (chip->remap_bmaddr == NULL) {
 			snd_printk("Controller space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;

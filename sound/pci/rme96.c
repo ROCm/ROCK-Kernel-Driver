@@ -225,7 +225,7 @@ typedef struct snd_rme96 {
 	spinlock_t    lock;
 	int irq;
 	unsigned long port;
-	unsigned long iobase;
+	void __iomem *iobase;
 	
 	u32 wcreg;    /* cached write control register value */
 	u32 wcreg_spdif;		/* S/PDIF setup */
@@ -1547,8 +1547,8 @@ snd_rme96_free(void *private_data)
 		rme96->irq = -1;
 	}
 	if (rme96->iobase) {
-		iounmap((void *)rme96->iobase);
-		rme96->iobase = 0;
+		iounmap(rme96->iobase);
+		rme96->iobase = NULL;
 	}
 	if (rme96->port) {
 		pci_release_regions(rme96->pci);
@@ -1592,7 +1592,7 @@ snd_rme96_create(rme96_t *rme96)
 	}
 	rme96->irq = pci->irq;
 
-	if ((rme96->iobase = (unsigned long) ioremap_nocache(rme96->port, RME96_IO_SIZE)) == 0) {
+	if ((rme96->iobase = ioremap_nocache(rme96->port, RME96_IO_SIZE)) == 0) {
 		snd_printk("unable to remap memory region 0x%lx-0x%lx\n", rme96->port, rme96->port + RME96_IO_SIZE - 1);
 		return -ENOMEM;
 	}
@@ -1859,7 +1859,8 @@ snd_rme96_put_loopback_control(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 	spin_lock_irq(&rme96->lock);
 	val = (rme96->wcreg & ~RME96_WCR_SEL) | val;
 	change = val != rme96->wcreg;
-	writel(rme96->wcreg = val, rme96->iobase + RME96_IO_CONTROL_REGISTER);
+	rme96->wcreg = val;
+	writel(val, rme96->iobase + RME96_IO_CONTROL_REGISTER);
 	spin_unlock_irq(&rme96->lock);
 	return change;
 }
@@ -2177,7 +2178,8 @@ static int snd_rme96_control_spdif_stream_put(snd_kcontrol_t * kcontrol, snd_ctl
 	change = val != rme96->wcreg_spdif_stream;
 	rme96->wcreg_spdif_stream = val;
 	rme96->wcreg &= ~(RME96_WCR_PRO | RME96_WCR_DOLBY | RME96_WCR_EMP);
-	writel(rme96->wcreg |= val, rme96->iobase + RME96_IO_CONTROL_REGISTER);
+	rme96->wcreg |= val;
+	writel(rme96->wcreg, rme96->iobase + RME96_IO_CONTROL_REGISTER);
 	spin_unlock_irq(&rme96->lock);
 	return change;
 }
