@@ -5,6 +5,7 @@
 if [ "$CONFIG_ISDN_CAPI" != "n" ]; then
   comment 'CAPI hardware drivers'
   source drivers/isdn/hardware/avm/Config.in
+  source drivers/isdn/hardware/eicon/Config.in
 fi
 
 if [ "$CONFIG_ISDN" != "n" ]; then
