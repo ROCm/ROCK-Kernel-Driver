@@ -68,11 +68,12 @@ unsigned long task_vsize(struct mm_struct *mm)
 	struct mm_tblock_struct *tbp;
 	unsigned long vsize = 0;
 
+	down_read(&mm->mmap_sem);
 	for (tbp = &mm->context.tblock; tbp; tbp = tbp->next) {
 		if (tbp->rblock)
 			vsize += kobjsize(tbp->rblock->kblock);
 	}
-
+	up_read(&mm->mmap_sem);
 	return vsize;
 }
 

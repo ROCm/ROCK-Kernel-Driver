@@ -299,7 +299,6 @@ int proc_pid_status(struct task_struct *task, char * buffer)
 	return buffer - orig;
 }
 
-extern unsigned long task_vsize(struct mm_struct *);
 int proc_pid_stat(struct task_struct *task, char * buffer)
 {
 	unsigned long vsize, eip, esp, wchan;
@@ -318,11 +317,9 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	vsize = eip = esp = 0;
 	mm = get_task_mm(task);
 	if (mm) {
-		down_read(&mm->mmap_sem);
 		vsize = task_vsize(mm);
 		eip = KSTK_EIP(task);
 		esp = KSTK_ESP(task);
-		up_read(&mm->mmap_sem);
 	}
 
 	get_task_comm(tcomm, task);
