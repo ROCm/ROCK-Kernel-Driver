@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#112 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#113 $
  *
  * $FreeBSD$
  */
@@ -1862,11 +1862,10 @@ ahd_dump_sglist(struct scb *scb)
 				len = ahd_le32toh(sg_list[i].len);
 				printf("sg[%d] - Addr 0x%x%x : Length %d%s\n",
 				       i,
-				       (sg_list[i].len >> 24)&SG_HIGH_ADDR_BITS,
+				       (len >> 24) & SG_HIGH_ADDR_BITS,
 				       ahd_le32toh(sg_list[i].addr),
-				       sg_list[i].len & AHD_SG_LEN_MASK,
-				       (sg_list[i].len & AHD_DMA_LAST_SEG)
-				     ? " Last" : "");
+				       len & AHD_SG_LEN_MASK,
+				       len & AHD_DMA_LAST_SEG ? " Last" : "");
 			}
 		}
 	}

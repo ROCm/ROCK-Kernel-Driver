@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#121 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#124 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -1802,6 +1802,17 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		}
 
 		if ((dev->flags & (AHC_DEV_Q_TAGGED|AHC_DEV_Q_BASIC)) != 0) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+			int	msg_bytes;
+			uint8_t tag_msgs[2];
+
+			msg_bytes = scsi_populate_tag_msg(cmd, tag_msgs);
+			if (msg_bytes && tag_msgs[0] != MSG_SIMPLE_TASK) {
+				hscb->control |= tag_msgs[0];
+				if (tag_msgs[0] == MSG_ORDERED_TASK)
+					dev->commands_since_idle_or_otag = 0;
+			} else
+#endif
 			if (dev->commands_since_idle_or_otag == AHC_OTAG_THRESH
 			 && (dev->flags & AHC_DEV_Q_TAGGED) != 0) {
 				hscb->control |= MSG_ORDERED_TASK;
@@ -2897,7 +2908,7 @@ done:
 		/*
 		 * In all versions of Linux, we have to work around
 		 * a major flaw in how the mid-layer is locked down
-		 * if we are to sleep succesffully in our error handler
+		 * if we are to sleep successfully in our error handler
 		 * while allowing our interrupt handler to run.  Since
 		 * the midlayer acquires either the io_request_lock or
 		 * our lock prior to calling us, we must use the

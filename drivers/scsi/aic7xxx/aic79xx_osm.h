@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#63 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#64 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -469,7 +469,7 @@ ahd_timer_reset(ahd_timer_t *timer, int usec, ahd_callback_t *func, void *arg)
 #include <linux/smp.h>
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.1.0"
+#define AIC79XX_DRIVER_VERSION "1.1.1"
 
 /**************************** Front End Queues ********************************/
 /*
