@@ -123,7 +123,7 @@ int xfrm6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir)
 	return nexthdr;
 }
 
-int xfrm6_rcv(struct sk_buff **pskb)
+int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *pskb;
 	int err;
@@ -233,6 +233,7 @@ int xfrm6_rcv(struct sk_buff **pskb)
 
 	memcpy(skb->sp->x+skb->sp->len, xfrm_vec, xfrm_nr*sizeof(struct sec_decap_state));
 	skb->sp->len += xfrm_nr;
+	skb->ip_summed = CHECKSUM_NONE;
 
 	if (decaps) {
 		if (!(skb->dev->flags&IFF_LOOPBACK)) {
@@ -240,9 +241,10 @@ int xfrm6_rcv(struct sk_buff **pskb)
 			skb->dst = NULL;
 		}
 		netif_rx(skb);
-		return 0;
+		return -1;
 	} else {
-		return -nexthdr;
+		*nhoffp = nh_offset;
+		return 1;
 	}
 
 drop_unlock:
@@ -253,7 +255,7 @@ drop:
 	while (--xfrm_nr >= 0)
 		xfrm_state_put(xfrm_vec[xfrm_nr].xvec);
 	kfree_skb(skb);
-	return 0;
+	return -1;
 }
 
 void __init xfrm6_input_init(void)

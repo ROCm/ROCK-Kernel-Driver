@@ -1591,7 +1591,7 @@ ipv6_pktoptions:
 	return 0;
 }
 
-static int tcp_v6_rcv(struct sk_buff **pskb)
+static int tcp_v6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *pskb;
 	struct tcphdr *th;	
@@ -1657,7 +1657,7 @@ process:
 	bh_unlock_sock(sk);
 
 	sock_put(sk);
-	return ret;
+	return ret ? -1 : 0;
 
 no_tcp_socket:
 	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
@@ -2193,7 +2193,7 @@ struct proto tcpv6_prot = {
 static struct inet6_protocol tcpv6_protocol = {
 	.handler	=	tcp_v6_rcv,
 	.err_handler	=	tcp_v6_err,
-	.no_policy	=	1,
+	.flags		=	INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
 };
 
 extern struct proto_ops inet6_stream_ops;

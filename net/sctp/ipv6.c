@@ -776,18 +776,18 @@ static struct inet_protosw sctpv6_stream_protosw = {
 	.ops           = &inet6_seqpacket_ops,
 	.capability    = -1,
 	.no_check      = 0,
-	.flags         = SCTP_PROTOSW_FLAG
+	.flags         = SCTP_PROTOSW_FLAG,
 };
 
-static int sctp6_rcv(struct sk_buff **pskb)
+static int sctp6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
-	return sctp_rcv(*pskb);
+	return sctp_rcv(*pskb) ? -1 : 0;
 }
 
 static struct inet6_protocol sctpv6_protocol = {
 	.handler      = sctp6_rcv,
 	.err_handler  = sctp_v6_err,
-	.no_policy    = 1,
+	.flags        = INET6_PROTO_NOPOLICY | INET6_PROTO_FINAL,
 };
 
 static struct sctp_af sctp_ipv6_specific = {

@@ -18,9 +18,9 @@
 /* Changes:
  *	yoshfuji		: ensure not to overrun while parsing 
  *				  tlv options.
- *	Mitsuru KANDA @USAGI	: Remove ipv6_parse_exthdrs().
- *				: Register inbound extention header
- *				: handlers as inet6_protocol{}.
+ *	Mitsuru KANDA @USAGI and: Remove ipv6_parse_exthdrs().
+ *	YOSHIFUJI Hideaki @USAGI  Register inbound extention header
+ *				  handlers as inet6_protocol{}.
  */
 
 #include <linux/errno.h>
@@ -153,38 +153,37 @@ static struct tlvtype_proc tlvprocdestopt_lst[] = {
 	{-1,			NULL}
 };
 
-static int ipv6_destopt_rcv(struct sk_buff **skbp) 
+static int ipv6_destopt_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *skbp;
 	struct inet6_skb_parm *opt = (struct inet6_skb_parm *)skb->cb;
-	u8 nexthdr = 0;
 
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8) ||
 	    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
 		kfree_skb(skb);
-		return 0;
+		return -1;
 	}
 
-	nexthdr = ((struct ipv6_destopt_hdr *)skb->h.raw)->nexthdr;
-	
 	opt->dst1 = skb->h.raw - skb->nh.raw;
 
 	if (ip6_parse_tlv(tlvprocdestopt_lst, skb)) {
 		skb->h.raw += ((skb->h.raw[1]+1)<<3);
-		return -nexthdr;
+		*nhoffp = opt->dst1;
+		return 1;
 	}
-						
-	return 0;
+
+	return -1;
 }
 
 static struct inet6_protocol destopt_protocol =
 {
-	.handler 	= 	ipv6_destopt_rcv,
+	.handler	=	ipv6_destopt_rcv,
+	.flags		=	INET6_PROTO_NOPOLICY,
 };
 
 void __init ipv6_destopt_init(void)
 {
-	if (inet6_add_protocol(&destopt_protocol, IPPROTO_DSTOPTS) < 0) 
+	if (inet6_add_protocol(&destopt_protocol, IPPROTO_DSTOPTS) < 0)
 		printk(KERN_ERR "ipv6_destopt_init: Could not register protocol\n");
 }
 
@@ -192,7 +191,7 @@ void __init ipv6_destopt_init(void)
   NONE header. No data in packet.
  ********************************/
 
-static int ipv6_nodata_rcv(struct sk_buff **skbp)
+static int ipv6_nodata_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *skbp;
 
@@ -203,6 +202,7 @@ static int ipv6_nodata_rcv(struct sk_buff **skbp)
 static struct inet6_protocol nodata_protocol =
 {
 	.handler	=	ipv6_nodata_rcv,
+	.flags		=	INET6_PROTO_NOPOLICY,
 };
 
 void __init ipv6_nodata_init(void)
@@ -215,7 +215,7 @@ void __init ipv6_nodata_init(void)
   Routing header.
  ********************************/
 
-static int ipv6_rthdr_rcv(struct sk_buff **skbp)
+static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *skbp;
 	struct inet6_skb_parm *opt = (struct inet6_skb_parm *)skb->cb;
@@ -223,7 +223,6 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp)
 	struct in6_addr daddr;
 	int addr_type;
 	int n, i;
-	u8 nexthdr = 0;
 
 	struct ipv6_rt_hdr *hdr;
 	struct rt0_hdr *rthdr;
@@ -232,16 +231,15 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp)
 	    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
 		kfree_skb(skb);
-		return 0;
+		return -1;
 	}
 
 	hdr = (struct ipv6_rt_hdr *) skb->h.raw;
-	nexthdr = hdr->nexthdr;
 
 	if ((ipv6_addr_type(&skb->nh.ipv6h->daddr)&IPV6_ADDR_MULTICAST) ||
 	    skb->pkt_type != PACKET_HOST) {
 		kfree_skb(skb);
-		return 0;
+		return -1;
 	}
 
 looped_back:
@@ -250,12 +248,13 @@ looped_back:
 		skb->h.raw += (hdr->hdrlen + 1) << 3;
 		opt->dst0 = opt->dst1;
 		opt->dst1 = 0;
-		return -nexthdr;
+		*nhoffp = (&hdr->nexthdr) - skb->nh.raw;
+		return 1;
 	}
 
 	if (hdr->type != IPV6_SRCRT_TYPE_0 || (hdr->hdrlen & 0x01)) {
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, hdr->type != IPV6_SRCRT_TYPE_0 ? 2 : 1);
-		return 0;
+		return -1;
 	}
 
 	/*
@@ -267,7 +266,7 @@ looped_back:
 
 	if (hdr->segments_left > n) {
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, (&hdr->segments_left) - skb->nh.raw);
-		return 0;
+		return -1;
 	}
 
 	/* We are about to mangle packet header. Be careful!
@@ -277,7 +276,7 @@ looped_back:
 		struct sk_buff *skb2 = skb_copy(skb, GFP_ATOMIC);
 		kfree_skb(skb);
 		if (skb2 == NULL)
-			return 0;
+			return -1;
 		*skbp = skb = skb2;
 		opt = (struct inet6_skb_parm *)skb2->cb;
 		hdr = (struct ipv6_rt_hdr *) skb2->h.raw;
@@ -296,7 +295,7 @@ looped_back:
 
 	if (addr_type&IPV6_ADDR_MULTICAST) {
 		kfree_skb(skb);
-		return 0;
+		return -1;
 	}
 
 	ipv6_addr_copy(&daddr, addr);
@@ -307,26 +306,27 @@ looped_back:
 	ip6_route_input(skb);
 	if (skb->dst->error) {
 		dst_input(skb);
-		return 0;
+		return -1;
 	}
 	if (skb->dst->dev->flags&IFF_LOOPBACK) {
 		if (skb->nh.ipv6h->hop_limit <= 1) {
 			icmpv6_send(skb, ICMPV6_TIME_EXCEED, ICMPV6_EXC_HOPLIMIT,
 				    0, skb->dev);
 			kfree_skb(skb);
-			return 0;
+			return -1;
 		}
 		skb->nh.ipv6h->hop_limit--;
 		goto looped_back;
 	}
 
 	dst_input(skb);
-	return 0;
+	return -1;
 }
 
 static struct inet6_protocol rthdr_protocol =
 {
 	.handler	=	ipv6_rthdr_rcv,
+	.flags		=	INET6_PROTO_NOPOLICY,
 };
 
 void __init ipv6_rthdr_init(void)
@@ -468,34 +468,6 @@ int ipv6_parse_hopopts(struct sk_buff *skb, int nhoff)
 	if (ip6_parse_tlv(tlvprochopopt_lst, skb))
 		return sizeof(struct ipv6hdr);
 	return -1;
-}
-
-/* This is fake. We have already parsed hopopts in ipv6_rcv(). -mk */
-static int ipv6_hopopts_rcv(struct sk_buff **skbp)
-{
-	struct sk_buff *skb = *skbp;
-	u8 nexthdr = 0;
-
-	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8) ||
-	    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
-		kfree_skb(skb);
-		return 0;
-	}
-	nexthdr = ((struct ipv6_hopopt_hdr *)skb->h.raw)->nexthdr;
-	skb->h.raw += (skb->h.raw[1]+1)<<3;
-
-       return -nexthdr;
-}
-
-static struct inet6_protocol hopopts_protocol =
-{
-	.handler	=	ipv6_hopopts_rcv,
-};
-
-void __init ipv6_hopopts_init(void)
-{
-	if (inet6_add_protocol(&hopopts_protocol, IPPROTO_HOPOPTS) < 0)
-		printk(KERN_ERR "ipv6_hopopts_init: Could not register protocol\n");
 }
 
 /*
