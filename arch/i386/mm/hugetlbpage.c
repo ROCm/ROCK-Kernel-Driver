@@ -210,19 +210,18 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
-	pte_t *pte;
+	pte_t pte;
 	struct page *page;
 
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
 	for (address = start; address < end; address += HPAGE_SIZE) {
-		pte = huge_pte_offset(mm, address);
-		if (pte_none(*pte))
+		pte = ptep_get_and_clear(huge_pte_offset(mm, address));
+		if (pte_none(pte))
 			continue;
-		page = pte_page(*pte);
+		page = pte_page(pte);
 		huge_page_release(page);
-		pte_clear(pte);
 	}
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 	flush_tlb_range(vma, start, end);
