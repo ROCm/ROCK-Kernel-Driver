@@ -50,9 +50,10 @@ found_middle:
  * on Linus's ALPHA routines, which are pretty portable BTW.
  */
 
-unsigned long find_next_zero_bit(unsigned long *addr, unsigned long size, unsigned long offset)
+unsigned long find_next_zero_bit(const unsigned long *addr,
+			unsigned long size, unsigned long offset)
 {
-	unsigned long *p = addr + (offset >> 6);
+	const unsigned long *p = addr + (offset >> 6);
 	unsigned long result = offset & ~63UL;
 	unsigned long tmp;
 
