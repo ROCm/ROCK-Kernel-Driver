@@ -851,6 +851,7 @@ no_setclientid:
 out_unlock:
 	up_write(&clp->cl_sem);
 	nfs4_put_client(clp);
+	server->nfs4_state = NULL;
 	return status;
 }
 
