@@ -234,6 +234,10 @@ const u8 sbp2_speedto_max_payload[] = { 0x7, 0x8, 0x9, 0xA, 0xB, 0xC };
 static void sbp2_remove_host(struct hpsb_host *host);
 static void sbp2_host_reset(struct hpsb_host *host);
 
+static int sbp2_probe(struct device *dev);
+static int sbp2_remove(struct device *dev);
+static int sbp2_update(struct unit_directory *ud);
+
 static struct hpsb_highlevel sbp2_highlevel = {
 	.name =		SBP2_DEVICE_NAME,
 	.remove_host =	sbp2_remove_host,
@@ -638,28 +642,26 @@ static int sbp2_remove(struct device *dev)
 	return 0;
 }
 
-static void sbp2_update(struct unit_directory *ud)
+static int sbp2_update(struct unit_directory *ud)
 {
 	struct scsi_id_instance_data *scsi_id = ud->device.driver_data;
-	struct sbp2scsi_host_info *hi = scsi_id->hi;
 
 	SBP2_DEBUG("sbp2_update");
-
-	hi = scsi_id->hi;
 
 	if (sbp2_reconnect_device(scsi_id)) {
 		
 		/* 
 		 * Ok, reconnect has failed. Perhaps we didn't
-		 * reconnect fast enough. Try doing a regular login.
+		 * reconnect fast enough. Try doing a regular login, but
+		 * first do a logout just in case of any weirdness.
 		 */
 		sbp2_logout_device(scsi_id);
 
 		if (sbp2_login_device(scsi_id)) {
-			/* Login failed too, just remove the device. */
-			SBP2_ERR("sbp2_reconnect_device failed!");
-			sbp2_remove_device(scsi_id);
-			return;
+			/* Login failed too, just fail, and the backend
+			 * will call our sbp2_remove for us */
+			SBP2_INFO("sbp2_reconnect_device failed!");
+			return -EBUSY;
 		}
 	}
 
@@ -676,6 +678,8 @@ static void sbp2_update(struct unit_directory *ud)
 	 * retried) and remove them from our queue
 	 */
 	sbp2scsi_complete_all_commands(scsi_id, DID_BUS_BUSY);
+
+	return 0;
 }
 
 /* This functions is called by the sbp2_probe, for each new device. We now
@@ -727,7 +731,7 @@ static struct scsi_id_instance_data *sbp2_alloc_device(struct unit_directory *ud
 #ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
 		/* Handle data movement if physical dma is not
 		 * enabled/supportedon host controller */
-		hpsb_register_addrspace(&sbp2_highlevel, host, &sbp2_physdma_ops,
+		hpsb_register_addrspace(&sbp2_highlevel, ud->ne->host, &sbp2_physdma_ops,
 					0x0ULL, 0xfffffffcULL);
 #endif
 	}
@@ -1145,12 +1149,12 @@ static int sbp2_query_logins(struct scsi_id_instance_data *scsi_id)
 	SBP2_DEBUG("sbp2_query_logins: written");
 
 	if (sbp2util_down_timeout(&scsi_id->sbp2_login_complete, 2*HZ)) {
-		SBP2_ERR("Error querying logins to SBP-2 device - timed out");
+		SBP2_INFO("Error querying logins to SBP-2 device - timed out");
 		return(-EIO);
 	}
 
 	if (scsi_id->status_block.ORB_offset_lo != scsi_id->query_logins_orb_dma) {
-		SBP2_ERR("Error querying logins to SBP-2 device - timed out");
+		SBP2_INFO("Error querying logins to SBP-2 device - timed out");
 		return(-EIO);
 	}
 
@@ -1158,7 +1162,7 @@ static int sbp2_query_logins(struct scsi_id_instance_data *scsi_id)
 	    STATUS_GET_DEAD_BIT(scsi_id->status_block.ORB_offset_hi_misc) ||
 	    STATUS_GET_SBP_STATUS(scsi_id->status_block.ORB_offset_hi_misc)) {
 
-		SBP2_ERR("Error querying logins to SBP-2 device - timed out");
+		SBP2_INFO("Error querying logins to SBP-2 device - timed out");
 		return(-EIO);
 	}
 
@@ -1167,13 +1171,13 @@ static int sbp2_query_logins(struct scsi_id_instance_data *scsi_id)
 	SBP2_DEBUG("length_max_logins = %x",
 		   (unsigned int)scsi_id->query_logins_response->length_max_logins);
 
-	SBP2_INFO("Query logins to SBP-2 device successful");
+	SBP2_DEBUG("Query logins to SBP-2 device successful");
 
 	max_logins = RESPONSE_GET_MAX_LOGINS(scsi_id->query_logins_response->length_max_logins);
-	SBP2_INFO("Maximum concurrent logins supported: %d", max_logins);
+	SBP2_DEBUG("Maximum concurrent logins supported: %d", max_logins);
                                                                                 
 	active_logins = RESPONSE_GET_ACTIVE_LOGINS(scsi_id->query_logins_response->length_max_logins);
-	SBP2_INFO("Number of active logins: %d", active_logins);
+	SBP2_DEBUG("Number of active logins: %d", active_logins);
                                                                                 
 	if (active_logins >= max_logins) {
 		return(-EIO);
@@ -1200,7 +1204,7 @@ static int sbp2_login_device(struct scsi_id_instance_data *scsi_id)
 
 	if (!exclusive_login) {
 		if (sbp2_query_logins(scsi_id)) {
-			SBP2_ERR("Device does not support any more concurrent logins");
+			SBP2_INFO("Device does not support any more concurrent logins");
 			return(-EIO);
 		}
 	}
@@ -2683,6 +2687,15 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 	return;
 }
 
+
+static int sbp2scsi_slave_configure (struct scsi_device *sdev)
+{
+	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
+
+	return 0;
+}
+
+
 /*
  * Called by scsi stack when something has really gone wrong.  Usually
  * called when a command has timed-out for some reason.
@@ -2798,6 +2811,7 @@ static Scsi_Host_Template scsi_driver_template = {
 	.eh_device_reset_handler =	sbp2scsi_reset,
 	.eh_bus_reset_handler =		sbp2scsi_reset,
 	.eh_host_reset_handler =	sbp2scsi_reset,
+	.slave_configure =		sbp2scsi_slave_configure,
 	.this_id =			-1,
 	.sg_tablesize =			SG_ALL,
 	.use_clustering =		ENABLE_CLUSTERING,

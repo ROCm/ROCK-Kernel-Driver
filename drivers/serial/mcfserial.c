@@ -985,13 +985,51 @@ static void send_break(	struct mcf_serial * info, int duration)
 	local_irq_restore(flags);
 }
 
+static int mcfrs_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct mcf_serial * info = (struct mcf_serial *)tty->driver_data;
+
+	if (serial_paranoia_check(info, tty->name, "mcfrs_ioctl"))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
+
+	return mcfrs_getsignals(info);
+}
+
+static int mcfrs_tiocmset(struct tty_struct *tty, struct file *file,
+			  unsigned int set, unsigned int clear)
+{
+	struct mcf_serial * info = (struct mcf_serial *)tty->driver_data;
+	int rts = -1, dtr = -1;
+
+	if (serial_paranoia_check(info, tty->name, "mcfrs_ioctl"))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
+
+	if (set & TIOCM_RTS)
+		rts = 1;
+	if (set & TIOCM_DTR)
+		dtr = 1;
+	if (clear & TIOCM_RTS)
+		rts = 0;
+	if (clear & TIOCM_DTR)
+		dtr = 0;
+
+	mcfrs_setsignals(info, dtr, rts);
+
+	return 0;
+}
+
 static int mcfrs_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg)
 {
 	struct mcf_serial * info = (struct mcf_serial *)tty->driver_data;
+#ifdef TIOCSET422
 	unsigned int val;
+#endif
 	int retval, error;
-	int dtr, rts;
 
 	if (serial_paranoia_check(info, tty->name, "mcfrs_ioctl"))
 		return -ENODEV;
@@ -1059,45 +1097,6 @@ static int mcfrs_ioctl(struct tty_struct *tty, struct file * file,
 				    info, sizeof(struct mcf_serial));
 			return 0;
 			
-		case TIOCMGET:
-			if ((error = verify_area(VERIFY_WRITE, (void *) arg,
-                            sizeof(unsigned int))))
-                                return(error);
-			val = mcfrs_getsignals(info);
-			put_user(val, (unsigned int *) arg);
-			break;
-
-                case TIOCMBIS:
-			if ((error = verify_area(VERIFY_WRITE, (void *) arg,
-                            sizeof(unsigned int))))
-				return(error);
-
-			get_user(val, (unsigned int *) arg);
-			rts = (val & TIOCM_RTS) ? 1 : -1;
-			dtr = (val & TIOCM_DTR) ? 1 : -1;
-			mcfrs_setsignals(info, dtr, rts);
-			break;
-
-                case TIOCMBIC:
-			if ((error = verify_area(VERIFY_WRITE, (void *) arg,
-                            sizeof(unsigned int))))
-				return(error);
-			get_user(val, (unsigned int *) arg);
-			rts = (val & TIOCM_RTS) ? 0 : -1;
-			dtr = (val & TIOCM_DTR) ? 0 : -1;
-			mcfrs_setsignals(info, dtr, rts);
-			break;
-
-                case TIOCMSET:
-			if ((error = verify_area(VERIFY_WRITE, (void *) arg,
-                            sizeof(unsigned int))))
-				return(error);
-			get_user(val, (unsigned int *) arg);
-			rts = (val & TIOCM_RTS) ? 1 : 0;
-			dtr = (val & TIOCM_DTR) ? 1 : 0;
-			mcfrs_setsignals(info, dtr, rts);
-			break;
-
 #ifdef TIOCSET422
 		case TIOCSET422:
 			get_user(val, (unsigned int *) arg);
@@ -1563,6 +1562,8 @@ static struct tty_operations mcfrs_ops = {
 	.start = mcfrs_start,
 	.hangup = mcfrs_hangup,
 	.read_proc = mcfrs_readproc,
+	.tiocmget = mcfrs_tiocmget,
+	.tiocmset = mcfrs_tiocmset,
 };
 
 /* mcfrs_init inits the driver */

@@ -232,6 +232,9 @@ static void moxa_set_termios(struct tty_struct *, struct termios *);
 static void moxa_stop(struct tty_struct *);
 static void moxa_start(struct tty_struct *);
 static void moxa_hangup(struct tty_struct *);
+static int moxa_tiocmget(struct tty_struct *tty, struct file *file);
+static int moxa_tiocmset(struct tty_struct *tty, struct file *file,
+			 unsigned int set, unsigned int clear);
 static void moxa_poll(unsigned long);
 static void set_tty_param(struct tty_struct *);
 static int block_till_ready(struct tty_struct *, struct file *,
@@ -289,6 +292,8 @@ static struct tty_operations moxa_ops = {
 	.stop = moxa_stop,
 	.start = moxa_start,
 	.hangup = moxa_hangup,
+	.tiocmget = moxa_tiocmget,
+	.tiocmset = moxa_tiocmset,
 };
 
 static int __init moxa_init(void)
@@ -742,6 +747,55 @@ static void moxa_put_char(struct tty_struct *tty, unsigned char c)
 	ch->statusflags |= LOWWAIT;
 }
 
+static int moxa_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct moxa_str *ch = (struct moxa_str *) tty->driver_data;
+	int port;
+	int flag = 0, dtr, rts;
+
+	port = PORTNO(tty);
+	if ((port != MAX_PORTS) && (!ch))
+		return (-EINVAL);
+
+	MoxaPortGetLineOut(ch->port, &dtr, &rts);
+	if (dtr)
+		flag |= TIOCM_DTR;
+	if (rts)
+		flag |= TIOCM_RTS;
+	dtr = MoxaPortLineStatus(ch->port);
+	if (dtr & 1)
+		flag |= TIOCM_CTS;
+	if (dtr & 2)
+		flag |= TIOCM_DSR;
+	if (dtr & 4)
+		flag |= TIOCM_CD;
+	return flag;
+}
+
+static int moxa_tiocmset(struct tty_struct *tty, struct file *file,
+			 unsigned int set, unsigned int clear)
+{
+	struct moxa_str *ch = (struct moxa_str *) tty->driver_data;
+	int port;
+	int flag = 0, dtr, rts;
+
+	port = PORTNO(tty);
+	if ((port != MAX_PORTS) && (!ch))
+		return (-EINVAL);
+
+	MoxaPortGetLineOut(ch->port, &dtr, &rts);
+	if (set & TIOCM_RTS)
+		rts = 1;
+	if (set & TIOCM_DTR)
+		dtr = 1;
+	if (clear & TIOCM_RTS)
+		rts = 0;
+	if (clear & TIOCM_DTR)
+		dtr = 0;
+	MoxaPortLineCtrl(ch->port, dtr, rts);
+	return 0;
+}
+
 static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 		      unsigned int cmd, unsigned long arg)
 {
@@ -784,51 +838,6 @@ static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 			ch->asyncflags &= ~ASYNC_CHECK_CD;
 		else
 			ch->asyncflags |= ASYNC_CHECK_CD;
-		return (0);
-	case TIOCMGET:
-		flag = 0;
-		MoxaPortGetLineOut(ch->port, &dtr, &rts);
-		if (dtr)
-			flag |= TIOCM_DTR;
-		if (rts)
-			flag |= TIOCM_RTS;
-		dtr = MoxaPortLineStatus(ch->port);
-		if (dtr & 1)
-			flag |= TIOCM_CTS;
-		if (dtr & 2)
-			flag |= TIOCM_DSR;
-		if (dtr & 4)
-			flag |= TIOCM_CD;
-		return put_user(flag, (unsigned int *) arg);
-	case TIOCMBIS:
-		if(get_user(retval, (unsigned int *) arg))
-			return -EFAULT;
-		MoxaPortGetLineOut(ch->port, &dtr, &rts);
-		if (retval & TIOCM_RTS)
-			rts = 1;
-		if (retval & TIOCM_DTR)
-			dtr = 1;
-		MoxaPortLineCtrl(ch->port, dtr, rts);
-		return (0);
-	case TIOCMBIC:
-		if(get_user(retval, (unsigned int *) arg))
-			return -EFAULT;
-		MoxaPortGetLineOut(ch->port, &dtr, &rts);
-		if (retval & TIOCM_RTS)
-			rts = 0;
-		if (retval & TIOCM_DTR)
-			dtr = 0;
-		MoxaPortLineCtrl(ch->port, dtr, rts);
-		return (0);
-	case TIOCMSET:
-		if(get_user(retval, (unsigned long *) arg))
-			return -EFAULT;
-		dtr = rts = 0;
-		if (retval & TIOCM_RTS)
-			rts = 1;
-		if (retval & TIOCM_DTR)
-			dtr = 1;
-		MoxaPortLineCtrl(ch->port, dtr, rts);
 		return (0);
 	case TIOCGSERIAL:
 		return (moxa_get_serial_info(ch, (struct serial_struct *) arg));

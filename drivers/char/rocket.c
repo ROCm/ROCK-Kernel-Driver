@@ -1216,59 +1216,6 @@ static int sGetChanRI(CHANNEL_T * ChP)
 /********************************************************************************************/
 /*  Here are the routines used by rp_ioctl.  These are all called from exception handlers.  */
 
-static int get_modem_info(struct r_port *info, unsigned int *value)
-{
-	unsigned int control, result, ChanStatus;
-
-	ChanStatus = sGetChanStatusLo(&info->channel);
-
-	control = info->channel.TxControl[3];
-	result = ((control & SET_RTS) ? TIOCM_RTS : 0) | 
-		((control & SET_DTR) ?  TIOCM_DTR : 0) |
-		((ChanStatus & CD_ACT) ? TIOCM_CAR : 0) |
-		(sGetChanRI(&info->channel) ? TIOCM_RNG : 0) |
-		((ChanStatus & DSR_ACT) ? TIOCM_DSR : 0) |
-		((ChanStatus & CTS_ACT) ? TIOCM_CTS : 0);
-
-	if (copy_to_user(value, &result, sizeof (int)))
-		return -EFAULT;
-	return 0;
-}
-
-static int set_modem_info(struct r_port *info, unsigned int cmd,
-			  unsigned int *value)
-{
-	unsigned int arg;
-
-	if (copy_from_user(&arg, value, sizeof (int)))
-		return -EFAULT;
-
-	switch (cmd) {
-	case TIOCMBIS:
-		if (arg & TIOCM_RTS)
-			info->channel.TxControl[3] |= SET_RTS;
-		if (arg & TIOCM_DTR)
-			info->channel.TxControl[3] |= SET_DTR;
-		break;
-	case TIOCMBIC:
-		if (arg & TIOCM_RTS)
-			info->channel.TxControl[3] &= ~SET_RTS;
-		if (arg & TIOCM_DTR)
-			info->channel.TxControl[3] &= ~SET_DTR;
-		break;
-	case TIOCMSET:
-		info->channel.TxControl[3] = ((info->channel.TxControl[3] & ~(SET_RTS | SET_DTR)) | 
-					      ((arg & TIOCM_RTS) ? SET_RTS : 0) | 
-					      ((arg & TIOCM_DTR) ? SET_DTR : 0));
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	sOutDW(info->channel.IndexAddr, *(DWord_t *) & (info->channel.TxControl[0]));
-	return 0;
-}
-
 /*
  *  Returns the state of the serial modem control lines.  These next 2 functions 
  *  are the way kernel versions > 2.5 handle modem control lines rather than IOCTLs.
@@ -1432,12 +1379,6 @@ static int rp_ioctl(struct tty_struct *tty, struct file *file,
 		return -ENXIO;
 
 	switch (cmd) {
-	case TIOCMGET:
-		return get_modem_info(info, (unsigned int *) arg);
-	case TIOCMBIS:
-	case TIOCMBIC:
-	case TIOCMSET:
-		return set_modem_info(info, cmd, (unsigned int *) arg);
 	case RCKP_GET_STRUCT:
 		if (copy_to_user((void *) arg, info, sizeof (struct r_port)))
 			return -EFAULT;

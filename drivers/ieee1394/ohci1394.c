@@ -523,7 +523,8 @@ static void ohci_initialize(struct ti_ohci *ohci)
   
 	/* Enable cycle timer and cycle master and set the IRM
 	 * contender bit in our self ID packets. */
-	reg_write(ohci, OHCI1394_LinkControlSet, 0x00300000);
+	reg_write(ohci, OHCI1394_LinkControlSet, OHCI1394_LinkControl_CycleTimerEnable |
+		  OHCI1394_LinkControl_CycleMaster);
 	set_phy_reg_mask(ohci, 4, 0xc0);
 
 	/* Clear interrupt registers */
@@ -533,8 +534,9 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	/* Set up self-id dma buffer */
 	reg_write(ohci, OHCI1394_SelfIDBuffer, ohci->selfid_buf_bus);
 
-	/* enable self-id dma */
-	reg_write(ohci, OHCI1394_LinkControlSet, 0x00000200);
+	/* enable self-id and phys */
+	reg_write(ohci, OHCI1394_LinkControlSet, OHCI1394_LinkControl_RcvSelfID |
+		  OHCI1394_LinkControl_RcvPhyPkt);
 
 	/* Set the Config ROM mapping register */
 	reg_write(ohci, OHCI1394_ConfigROMmap, ohci->csr_config_rom_bus);
@@ -970,11 +972,15 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 				 */
 				DBGMSG(ohci->id, "Cycle master enabled");
 				reg_write(ohci, OHCI1394_LinkControlSet, 
-					  0x00300000);
+					  OHCI1394_LinkControl_CycleTimerEnable |
+					  OHCI1394_LinkControl_CycleMaster);
 			}
 		} else {
 			/* disable cycleTimer, cycleMaster, cycleSource */
-			reg_write(ohci, OHCI1394_LinkControlClear, 0x00700000);
+			reg_write(ohci, OHCI1394_LinkControlClear,
+				  OHCI1394_LinkControl_CycleTimerEnable |
+				  OHCI1394_LinkControl_CycleMaster |
+				  OHCI1394_LinkControl_CycleSource);
 		}
 		break;
 
@@ -3283,6 +3289,11 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	 * will lock up the machine.  Wait 50msec to make sure we have
 	 * full link enabled.  */
 	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_LPS);
+
+	/* Disable and clear interrupts */
+	reg_write(ohci, OHCI1394_IntEventClear, 0xffffffff);
+	reg_write(ohci, OHCI1394_IntMaskClear, 0xffffffff);
+
 	mdelay(50);
 
 	/* Determine the number of available IR and IT contexts. */
@@ -3474,9 +3485,38 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 }
 
 
-static int ohci1394_pci_resume (struct pci_dev *dev)
+static int ohci1394_pci_resume (struct pci_dev *pdev)
 {
-	pci_enable_device(dev);
+#ifdef CONFIG_PMAC_PBOOK
+	{
+		struct device_node *of_node;
+
+		/* Re-enable 1394 */
+		of_node = pci_device_to_OF_node (pdev);
+		if (of_node)
+			pmac_call_feature (PMAC_FTR_1394_ENABLE, of_node, 0, 1);
+	}
+#endif
+
+	pci_enable_device(pdev);
+
+	return 0;
+}
+
+
+static int ohci1394_pci_suspend (struct pci_dev *pdev, u32 state)
+{
+#ifdef CONFIG_PMAC_PBOOK
+	{
+		struct device_node *of_node;
+
+		/* Disable 1394 */
+		of_node = pci_device_to_OF_node (pdev);
+		if (of_node)
+			pmac_call_feature(PMAC_FTR_1394_ENABLE, of_node, 0, 0);
+	}
+#endif
+
 	return 0;
 }
 
@@ -3503,6 +3543,7 @@ static struct pci_driver ohci1394_pci_driver = {
 	.probe =	ohci1394_pci_probe,
 	.remove =	ohci1394_pci_remove,
 	.resume =	ohci1394_pci_resume,
+	.suspend =	ohci1394_pci_suspend,
 };
 
 

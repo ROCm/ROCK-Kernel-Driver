@@ -91,16 +91,6 @@
 #include "check.h"
 #include "efi.h"
 
-/* Handle printing of 64-bit values */
-/* Borrowed from /usr/include/inttypes.h */
-# if BITS_PER_LONG == 64 
-#  define __PRI64_PREFIX	"l"
-# else
-#  define __PRI64_PREFIX	"ll"
-# endif
-# define PRIx64		__PRI64_PREFIX "x"
-
-
 #undef EFI_DEBUG
 #ifdef EFI_DEBUG
 #define Dprintk(x...) printk(KERN_DEBUG x)
@@ -307,9 +297,10 @@ is_gpt_valid(struct block_device *bdev, u64 lba,
 
 	/* Check the GUID Partition Table signature */
 	if (le64_to_cpu((*gpt)->signature) != GPT_HEADER_SIGNATURE) {
-		Dprintk("GUID Partition Table Header signature is wrong: %"
-			PRIx64 " != %" PRIx64 "\n", le64_to_cpu((*gpt)->signature),
-			GPT_HEADER_SIGNATURE);
+		Dprintk("GUID Partition Table Header signature is wrong:"
+			"%lld != %lld\n",
+			(unsigned long long)le64_to_cpu((*gpt)->signature),
+			(unsigned long long)GPT_HEADER_SIGNATURE);
 		kfree(*gpt);
 		*gpt = NULL;
 		return 0;
@@ -333,8 +324,9 @@ is_gpt_valid(struct block_device *bdev, u64 lba,
 	/* Check that the my_lba entry points to the LBA that contains
 	 * the GUID Partition Table */
 	if (le64_to_cpu((*gpt)->my_lba) != lba) {
-		Dprintk("GPT my_lba incorrect: %" PRIx64 " != %" PRIx64 "\n",
-			le64_to_cpu((*gpt)->my_lba), lba);
+		Dprintk("GPT my_lba incorrect: %lld != %lld\n",
+			(unsigned long long)le64_to_cpu((*gpt)->my_lba),
+			(unsigned long long)lba);
 		kfree(*gpt);
 		*gpt = NULL;
 		return 0;
@@ -382,33 +374,33 @@ compare_gpts(gpt_header *pgpt, gpt_header *agpt, u64 lastlba)
 	if (le64_to_cpu(pgpt->my_lba) != le64_to_cpu(agpt->alternate_lba)) {
 		printk(KERN_WARNING
 		       "GPT:Primary header LBA != Alt. header alternate_lba\n");
-		printk(KERN_WARNING "GPT:%" PRIx64 " != %" PRIx64 "\n",
-		       le64_to_cpu(pgpt->my_lba),
-                       le64_to_cpu(agpt->alternate_lba));
+		printk(KERN_WARNING "GPT:%lld != %lld\n",
+		       (unsigned long long)le64_to_cpu(pgpt->my_lba),
+                       (unsigned long long)le64_to_cpu(agpt->alternate_lba));
 		error_found++;
 	}
 	if (le64_to_cpu(pgpt->alternate_lba) != le64_to_cpu(agpt->my_lba)) {
 		printk(KERN_WARNING
 		       "GPT:Primary header alternate_lba != Alt. header my_lba\n");
-		printk(KERN_WARNING "GPT:%" PRIx64 " != %" PRIx64 "\n",
-		       le64_to_cpu(pgpt->alternate_lba),
-                       le64_to_cpu(agpt->my_lba));
+		printk(KERN_WARNING "GPT:%lld != %lld\n",
+		       (unsigned long long)le64_to_cpu(pgpt->alternate_lba),
+                       (unsigned long long)le64_to_cpu(agpt->my_lba));
 		error_found++;
 	}
 	if (le64_to_cpu(pgpt->first_usable_lba) !=
             le64_to_cpu(agpt->first_usable_lba)) {
 		printk(KERN_WARNING "GPT:first_usable_lbas don't match.\n");
-		printk(KERN_WARNING "GPT:%" PRIx64 " != %" PRIx64 "\n",
-		       le64_to_cpu(pgpt->first_usable_lba),
-                       le64_to_cpu(agpt->first_usable_lba));
+		printk(KERN_WARNING "GPT:%lld != %lld\n",
+		       (unsigned long long)le64_to_cpu(pgpt->first_usable_lba),
+                       (unsigned long long)le64_to_cpu(agpt->first_usable_lba));
 		error_found++;
 	}
 	if (le64_to_cpu(pgpt->last_usable_lba) !=
             le64_to_cpu(agpt->last_usable_lba)) {
 		printk(KERN_WARNING "GPT:last_usable_lbas don't match.\n");
-		printk(KERN_WARNING "GPT:%" PRIx64 " != %" PRIx64 "\n",
-		       le64_to_cpu(pgpt->last_usable_lba),
-                       le64_to_cpu(agpt->last_usable_lba));
+		printk(KERN_WARNING "GPT:%lld != %lld\n",
+		       (unsigned long long)le64_to_cpu(pgpt->last_usable_lba),
+                       (unsigned long long)le64_to_cpu(agpt->last_usable_lba));
 		error_found++;
 	}
 	if (efi_guidcmp(pgpt->disk_guid, agpt->disk_guid)) {
@@ -444,16 +436,18 @@ compare_gpts(gpt_header *pgpt, gpt_header *agpt, u64 lastlba)
 	if (le64_to_cpu(pgpt->alternate_lba) != lastlba) {
 		printk(KERN_WARNING
 		       "GPT:Primary header thinks Alt. header is not at the end of the disk.\n");
-		printk(KERN_WARNING "GPT:%" PRIx64 " != %" PRIx64 "\n",
-		       le64_to_cpu(pgpt->alternate_lba), lastlba);
+		printk(KERN_WARNING "GPT:%lld != %lld\n",
+			(unsigned long long)le64_to_cpu(pgpt->alternate_lba),
+			(unsigned long long)lastlba);
 		error_found++;
 	}
 
 	if (le64_to_cpu(agpt->my_lba) != lastlba) {
 		printk(KERN_WARNING
 		       "GPT:Alternate GPT header not at the end of the disk.\n");
-		printk(KERN_WARNING "GPT:%" PRIx64 " != %" PRIx64 "\n",
-		       le64_to_cpu(agpt->my_lba), lastlba);
+		printk(KERN_WARNING "GPT:%lld != %lld\n",
+			(unsigned long long)le64_to_cpu(agpt->my_lba),
+			(unsigned long long)lastlba);
 		error_found++;
 	}
 

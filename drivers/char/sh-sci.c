@@ -1109,6 +1109,31 @@ static void sci_close(void *ptr)
         return;
 }
 
+static int sci_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct sci_port *port = tty->driver_data;
+	return sci_getsignals(port);
+}
+
+static int sci_tiocmset(struct tty_struct *tty, struct file *file,
+			unsigned int set, unsigned int clear)
+{
+	struct sci_port *port = tty->driver_data;
+	int rts = -1, dtr = -1;
+
+	if (set & TIOCM_RTS)
+		rts = 1;
+	if (set & TIOCM_DTR)
+		dtr = 1;
+	if (clear & TIOCM_RTS)
+		rts = 0;
+	if (clear & TIOCM_DTR)
+		dtr = 0;
+
+	sci_setsignals(port, dtr, rts);
+	return 0;
+}
+
 static int sci_ioctl(struct tty_struct * tty, struct file * filp, 
                      unsigned int cmd, unsigned long arg)
 {
@@ -1139,26 +1164,6 @@ static int sci_ioctl(struct tty_struct * tty, struct file * filp,
 			rc = gs_setserial(&port->gs,
 					  (struct serial_struct *) arg);
 		break;
-	case TIOCMGET:
-		ival = sci_getsignals(port);
-		rc = put_user(ival, (unsigned int __user *) arg);
-		break;
-	case TIOCMBIS:
-		if ((rc = get_user(ival, (unsigned int __user *) arg)) == 0)
-			sci_setsignals(port, ((ival & TIOCM_DTR) ? 1 : -1),
-			                     ((ival & TIOCM_RTS) ? 1 : -1));
-		break;
-	case TIOCMBIC:
-		if ((rc = get_user(ival, (unsigned int __user *) arg)) == 0)
-			sci_setsignals(port, ((ival & TIOCM_DTR) ? 0 : -1),
-			                     ((ival & TIOCM_RTS) ? 0 : -1));
-		break;
-	case TIOCMSET:
-		if ((rc = get_user(ival, (unsigned int __user *)arg)) == 0)
-			sci_setsignals(port, ((ival & TIOCM_DTR) ? 1 : 0),
-			                     ((ival & TIOCM_RTS) ? 1 : 0));
-		break;
-
 	default:
 		rc = -ENOIOCTLCMD;
 		break;
@@ -1272,6 +1277,8 @@ static struct tty_operations sci_ops = {
 #ifdef CONFIG_PROC_FS
 	.read_proc = sci_read_proc,
 #endif
+	.tiocmget = sci_tiocmget,
+	.tiocmset = sci_tiocmset,
 };
 
 /* ********************************************************************** *

@@ -55,11 +55,6 @@ static inline void wrusp(unsigned long usp)
 #endif
 #define TASK_UNMAPPED_ALIGN(addr, off)	PAGE_ALIGN(addr)
 
-/*
- * Bus types
- */
-#define MCA_bus 0
-
 struct task_work {
 	unsigned char sigpending;
 	unsigned char notify_resume;	/* request for notification on

@@ -832,7 +832,7 @@ static struct fb_videomode ami_modedb[] __initdata = {
 	FB_SYNC_BROADCAST, FB_VMODE_NONINTERLACED | FB_VMODE_YWRAP
     }, {
 	/* 640x400, 15 kHz, 60 Hz interlaced (NTSC) */
-	"ntsc-lace", 60, 640, TAG_HIRES, 106, 86, 88, 33, 76, 4,
+	"ntsc-lace", 60, 640, 400, TAG_HIRES, 106, 86, 88, 33, 76, 4,
 	FB_SYNC_BROADCAST, FB_VMODE_INTERLACED | FB_VMODE_YWRAP
     }, {
 	/* 640x256, 15 kHz, 50 Hz (PAL) */
@@ -927,7 +927,7 @@ static struct fb_videomode ami_modedb[] __initdata = {
 	0, FB_VMODE_NONINTERLACED | FB_VMODE_YWRAP
     }, {
 	/* 1024x800, 15 Hz */
-	"a2024-15", 10, 1024, 800, TAG_HIRES, 0, 0, 0, 0, 0, 0,
+	"a2024-15", 15, 1024, 800, TAG_HIRES, 0, 0, 0, 0, 0, 0,
 	0, FB_VMODE_NONINTERLACED | FB_VMODE_YWRAP
     }
 #endif

@@ -73,6 +73,7 @@ struct sa1100_pcmcia_socket {
 	unsigned int		irq_state;
 
 	struct timer_list	poll_timer;
+	struct list_head	node;
 };
 
 struct pcmcia_low_level {

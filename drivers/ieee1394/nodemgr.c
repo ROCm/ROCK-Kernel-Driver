@@ -1364,8 +1364,11 @@ static void nodemgr_ud_update_pdrv(struct unit_directory *ud)
 	if (ud->device.driver) {
 		pdrv = container_of(ud->device.driver, struct hpsb_protocol_driver, driver);
 
-		if (pdrv->update)
-			pdrv->update(ud);
+		if (pdrv->update && pdrv->update(ud)) {
+			down_write(&ud->device.bus->subsys.rwsem);
+			device_release_driver(&ud->device);
+			up_write(&ud->device.bus->subsys.rwsem);
+		}
 	}
 
 	put_device(&ud->device);

@@ -439,12 +439,6 @@ static struct sbp2_command_info *sbp2util_allocate_command_orb(struct scsi_id_in
 static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_id,
 		struct sbp2_command_info *command);
 
-/*
- * IEEE-1394 core driver related prototypes
- */
-static int sbp2_probe(struct device *dev);
-static int sbp2_remove(struct device *dev);
-static void sbp2_update(struct unit_directory *ud);
 
 static int sbp2_start_device(struct scsi_id_instance_data *scsi_id);
 static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id);

@@ -36,7 +36,7 @@
 
 #include <linux/linkage.h>
 #include <asm/entry.h>
-#include "../kernel/m68k_defs.h"
+#include <asm/offsets.h>
 
 
 |################################

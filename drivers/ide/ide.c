@@ -995,9 +995,7 @@ found:
 
 	if (!initializing) {
 		probe_hwif_init(hwif);
-#ifdef CONFIG_PROC_FS
 		create_proc_ide_interfaces();
-#endif
 	}
 
 	if (hwifp)

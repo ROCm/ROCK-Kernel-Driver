@@ -538,7 +538,6 @@ void check_bugs(void)
 				"WHICH IS REQUIRED BY LINUX/M68K ***\n" );
 		printk( KERN_EMERG "Upgrade your hardware or join the FPU "
 				"emulation project\n" );
-		printk( KERN_EMERG "(see http://no-fpu.linux-m68k.org)\n" );
 		panic( "no FPU" );
 	}
 

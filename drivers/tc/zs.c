@@ -1176,10 +1176,20 @@ static int get_lsr_info(struct dec_serial * info, unsigned int *value)
 	return 0;
 }
 
-static int get_modem_info(struct dec_serial *info, unsigned int *value)
+static int rs_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct dec_serial * info = (struct dec_serial *)tty->driver_data;
 	unsigned char control, status_a, status_b;
 	unsigned int result;
+
+	if (info->hook)
+		return -ENODEV;
+
+	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+		return -ENODEV;
+
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	if (info->zs_channel == info->zs_chan_a)
 		result = 0;
@@ -1196,41 +1206,37 @@ static int get_modem_info(struct dec_serial *info, unsigned int *value)
 			| ((status_a & SYNC_HUNT) ? TIOCM_DSR: 0)
 			| ((status_b & CTS) ? TIOCM_CTS: 0);
 	}
-	put_user(result, value);
-	return 0;
+	return result;
 }
 
-static int set_modem_info(struct dec_serial *info, unsigned int cmd,
-			  unsigned int *value)
+static int rs_tiocmset(struct tty_struct *tty, struct file *file,
+		       unsigned int set, unsigned int clear)
 {
+	struct dec_serial * info = (struct dec_serial *)tty->driver_data;
 	int error;
 	unsigned int arg, bits;
 
-	error = verify_area(VERIFY_READ, value, sizeof(int));
-	if (error)
-		return error;
+	if (info->hook)
+		return -ENODEV;
+
+	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+		return -ENODEV;
+
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	if (info->zs_channel == info->zs_chan_a)
 		return 0;
 
-	get_user(arg, value);
-	bits = (arg & TIOCM_RTS? RTS: 0) + (arg & TIOCM_DTR? DTR: 0);
 	cli();
-	switch (cmd) {
-	case TIOCMBIS:
-		info->zs_chan_a->curregs[5] |= bits;
-		break;
-	case TIOCMBIC:
-		info->zs_chan_a->curregs[5] &= ~bits;
-		break;
-	case TIOCMSET:
-		info->zs_chan_a->curregs[5] = 
-			(info->zs_chan_a->curregs[5] & ~(DTR | RTS)) | bits;
-		break;
-	default:
-		sti();
-		return -EINVAL;
-	}
+	if (set & TIOCM_RTS)
+		info->zs_chan_a->curregs[5] |= RTS;
+	if (set & TIOCM_DTR)
+		info->zs_chan_a->curregs[5] |= DTR;
+	if (clear & TIOCM_RTS)
+		info->zs_chan_a->curregs[5] &= ~RTS;
+	if (clear & TIOCM_DTR)
+		info->zs_chan_a->curregs[5] &= ~DTR;
 	write_zsreg(info->zs_chan_a, 5, info->zs_chan_a->curregs[5]);
 	sti();
 	return 0;
@@ -1278,16 +1284,6 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 	}
 	
 	switch (cmd) {
-		case TIOCMGET:
-			error = verify_area(VERIFY_WRITE, (void *) arg,
-				sizeof(unsigned int));
-			if (error)
-				return error;
-			return get_modem_info(info, (unsigned int *) arg);
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			return set_modem_info(info, cmd, (unsigned int *) arg);
 		case TIOCGSERIAL:
 			error = verify_area(VERIFY_WRITE, (void *) arg,
 						sizeof(struct serial_struct));
@@ -1816,6 +1812,8 @@ static struct tty_operations serial_ops = {
 	.hangup = rs_hangup,
 	.break_ctl = rs_break,
 	.wait_until_sent = rs_wait_until_sent,
+	.tiocmget = rs_tiocmget,
+	.tiocmset = rs_tiocmset,
 };
 
 /* zs_init inits the driver */

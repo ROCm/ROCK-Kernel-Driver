@@ -749,6 +749,8 @@ void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d)
 		probe_hwif_init(&ide_hwifs[index_list.b.low]);
 	if ((index_list.b.high & 0xf0) != 0xf0)
 		probe_hwif_init(&ide_hwifs[index_list.b.high]);
+
+	create_proc_ide_interfaces();
 }
 
 EXPORT_SYMBOL_GPL(ide_setup_pci_device);
@@ -766,6 +768,8 @@ void ide_setup_pci_devices (struct pci_dev *dev, struct pci_dev *dev2, ide_pci_d
 		probe_hwif_init(&ide_hwifs[index_list2.b.low]);
 	if ((index_list2.b.high & 0xf0) != 0xf0)
 		probe_hwif_init(&ide_hwifs[index_list2.b.high]);
+
+	create_proc_ide_interfaces();
 }
 
 EXPORT_SYMBOL_GPL(ide_setup_pci_devices);

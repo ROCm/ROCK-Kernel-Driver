@@ -128,9 +128,11 @@ struct hpsb_protocol_driver {
 	 * The update function is called when the node has just
 	 * survived a bus reset, i.e. it is still present on the bus.
 	 * However, it may be necessary to reestablish the connection
-	 * or login into the node again, depending on the protocol.
+	 * or login into the node again, depending on the protocol. If the
+	 * probe fails (returns non-zero), we unbind the driver from this
+	 * device.
 	 */
-	void (*update)(struct unit_directory *ud);
+	int (*update)(struct unit_directory *ud);
 
 	/* Our LDM structure */
 	struct device_driver driver;

@@ -235,10 +235,13 @@ config BLK_DEV_LOOP
 	  bits of, say, a sound file). This is also safe if the file resides
 	  on a remote file server.
 
-	  There are several ways of doing this. Some of these require kernel
-	  patches. The vanilla kernel offers the cryptoloop option. If you
-	  want to use that, say Y to both LOOP and CRYPTOLOOP, and make sure
-	  you have a recent (version 2.12 or later) version of util-linux.
+	  There are several ways of encrypting disks. Some of these require
+	  kernel patches. The vanilla kernel offers the cryptoloop option
+	  and a Device Mapper target (which is superior, as it supports all
+	  file systems). If you want to use the cryptoloop, say Y to both
+	  LOOP and CRYPTOLOOP, and make sure you have a recent (version 2.12
+	  or later) version of util-linux. Additionally, be aware that
+	  the cryptoloop is not safe for storing journaled filesystems.
 
 	  Note that this loop device has nothing to do with the loopback
 	  device used for network connections from the machine to itself.
@@ -256,6 +259,11 @@ config BLK_DEV_CRYPTOLOOP
 	  Say Y here if you want to be able to use the ciphers that are 
 	  provided by the CryptoAPI as loop transformation. This might be
 	  used as hard disk encryption.
+
+	  WARNING: This device is not safe for journaled file systems like
+	  ext3 or Reiserfs. Please use the Device Mapper crypto module
+	  instead, which can be configured to be on-disk compatible with the
+	  cryptoloop device.
 
 config BLK_DEV_NBD
 	tristate "Network block device support"

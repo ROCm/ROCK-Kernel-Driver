@@ -111,7 +111,7 @@ void __init set_num_var_ranges(void)
 	num_var_ranges = config & 0xff;
 }
 
-static void init_table(void)
+static void __init init_table(void)
 {
 	int i, max;
 
@@ -541,7 +541,7 @@ static void __init init_ifs(void)
 	centaur_init_mtrr();
 }
 
-static void init_other_cpus(void)
+static void __init init_other_cpus(void)
 {
 	if (use_intel())
 		get_mtrr_state();
@@ -608,7 +608,7 @@ static struct sysdev_driver mtrr_sysdev_driver = {
 
 
 /**
- * mtrr_init - initialie mtrrs on the boot CPU
+ * mtrr_init - initialize mtrrs on the boot CPU
  *
  * This needs to be called early; before any of the other CPUs are 
  * initialized (i.e. before smp_init()).
@@ -618,7 +618,7 @@ static int __init mtrr_init(void)
 {
 	init_ifs();
 
-	if ( cpu_has_mtrr ) {
+	if (cpu_has_mtrr) {
 		mtrr_if = &generic_mtrr_ops;
 		size_or_mask = 0xff000000;	/* 36 bits */
 		size_and_mask = 0x00f00000;
@@ -660,7 +660,7 @@ static int __init mtrr_init(void)
 	} else {
 		switch (boot_cpu_data.x86_vendor) {
 		case X86_VENDOR_AMD:
-			if ( cpu_has_k6_mtrr ) {
+			if (cpu_has_k6_mtrr) {
 				/* Pre-Athlon (K6) AMD CPU MTRRs */
 				mtrr_if = mtrr_ops[X86_VENDOR_AMD];
 				size_or_mask = 0xfff00000;	/* 32 bits */
@@ -668,14 +668,14 @@ static int __init mtrr_init(void)
 			}
 			break;
 		case X86_VENDOR_CENTAUR:
-			if ( cpu_has_centaur_mcr ) {
+			if (cpu_has_centaur_mcr) {
 				mtrr_if = mtrr_ops[X86_VENDOR_CENTAUR];
 				size_or_mask = 0xfff00000;	/* 32 bits */
 				size_and_mask = 0;
 			}
 			break;
 		case X86_VENDOR_CYRIX:
-			if ( cpu_has_cyrix_arr ) {
+			if (cpu_has_cyrix_arr) {
 				mtrr_if = mtrr_ops[X86_VENDOR_CYRIX];
 				size_or_mask = 0xfff00000;	/* 32 bits */
 				size_and_mask = 0;

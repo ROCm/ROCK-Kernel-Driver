@@ -344,7 +344,7 @@ void __init config_atari(void)
 	ATARIHW_SET(PCM_8BIT);
         printk( "PCM " );
     }
-    if (!MACH_IS_HADES && hwreg_present( &codec.unused5 )) {
+    if (!MACH_IS_HADES && hwreg_present( &falcon_codec.unused5 )) {
 	ATARIHW_SET(CODEC);
         printk( "CODEC " );
     }
