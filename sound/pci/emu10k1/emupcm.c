@@ -740,22 +740,25 @@ static snd_pcm_hardware_t snd_emu10k1_capture =
  *
  */
 
-static void snd_emu10k1_pcm_mixer_notify1(snd_card_t *card, snd_kcontrol_t *kctl, int activate)
+static void snd_emu10k1_pcm_mixer_notify1(emu10k1_t *emu, snd_kcontrol_t *kctl, int idx, int activate)
 {
+	snd_ctl_elem_id_t id;
+
 	snd_runtime_check(kctl != NULL, return);
 	if (activate)
-		kctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+		kctl->vd[idx].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	else
-		kctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
-	snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE |
-		       SNDRV_CTL_EVENT_MASK_INFO, &kctl->id);
+		kctl->vd[idx].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	snd_ctl_notify(emu->card, SNDRV_CTL_EVENT_MASK_VALUE |
+		       SNDRV_CTL_EVENT_MASK_INFO,
+		       snd_ctl_build_ioff(&id, kctl, idx));
 }
 
-static void snd_emu10k1_pcm_mixer_notify(snd_card_t *card, emu10k1_pcm_mixer_t *mix, int activate)
+static void snd_emu10k1_pcm_mixer_notify(emu10k1_t *emu, int idx, int activate)
 {
-	snd_emu10k1_pcm_mixer_notify1(card, mix->ctl_send_routing, activate);
-	snd_emu10k1_pcm_mixer_notify1(card, mix->ctl_send_volume, activate);
-	snd_emu10k1_pcm_mixer_notify1(card, mix->ctl_attn, activate);
+	snd_emu10k1_pcm_mixer_notify1(emu, emu->ctl_send_routing, idx, activate);
+	snd_emu10k1_pcm_mixer_notify1(emu, emu->ctl_send_volume, idx, activate);
+	snd_emu10k1_pcm_mixer_notify1(emu, emu->ctl_attn, idx, activate);
 }
 
 static void snd_emu10k1_pcm_free_substream(snd_pcm_runtime_t *runtime)
@@ -799,7 +802,7 @@ static int snd_emu10k1_playback_open(snd_pcm_substream_t * substream)
 	mix->send_volume[1][0] = mix->send_volume[2][1] = 255;
 	mix->attn[0] = mix->attn[1] = mix->attn[2] = 0xffff;
 	mix->epcm = epcm;
-	snd_emu10k1_pcm_mixer_notify(emu->card, mix, 1);
+	snd_emu10k1_pcm_mixer_notify(emu, substream->number, 1);
 	return 0;
 }
 
@@ -809,7 +812,7 @@ static int snd_emu10k1_playback_close(snd_pcm_substream_t * substream)
 	emu10k1_pcm_mixer_t *mix = &emu->pcm_mixer[substream->number];
 
 	mix->epcm = NULL;
-	snd_emu10k1_pcm_mixer_notify(emu->card, mix, 0);
+	snd_emu10k1_pcm_mixer_notify(emu, substream->number, 0);
 	return 0;
 }
 

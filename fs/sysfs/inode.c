@@ -97,7 +97,7 @@ void sysfs_hash_and_remove(struct dentry * dir, const char * name)
 				 atomic_read(&victim->d_count));
 
 			simple_unlink(dir->d_inode,victim);
-
+			d_delete(victim);
 		}
 		/*
 		 * Drop reference from sysfs_get_dentry() above.

@@ -137,4 +137,7 @@ extern inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 
 #endif /* __KERNEL__ */
 
+/* generic pci stuff */
+#include <asm-generic/pci.h>
+
 #endif /* __SPARC_PCI_H */

@@ -253,6 +253,10 @@ unsigned int arpt_do_table(struct sk_buff **pskb,
 	const char *indev, *outdev;
 	void *table_base;
 
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	indev = in ? in->name : nulldevname;
 	outdev = out ? out->name : nulldevname;
 

@@ -24,7 +24,6 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
-#include <linux/brlock.h>
 #include <net/checksum.h>
 #include <linux/stddef.h>
 #include <linux/sysctl.h>
@@ -274,6 +273,8 @@ static void remove_expectations(struct ip_conntrack *ct)
 		 * the un-established ones only */
 		if (exp->sibling) {
 			DEBUGP("remove_expectations: skipping established %p of %p\n", exp->sibling, ct);
+			/* Indicate that this expectations parent is dead */
+			exp->expectant = NULL;
 			continue;
 		}
 
@@ -325,6 +326,9 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		ip_conntrack_destroyed(ct);
 
 	WRITE_LOCK(&ip_conntrack_lock);
+	/* Delete us from our own list to prevent corruption later */
+	list_del(&ct->sibling_list);
+
 	/* Delete our master expectation */
 	if (ct->master) {
 		/* can't call __unexpect_related here,
@@ -819,6 +823,10 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	if ((*pskb)->nfct)
 		return NF_ACCEPT;
 
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* Gather fragments. */
 	if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
 		*pskb = ip_ct_gather_frags(*pskb);
@@ -1160,8 +1168,7 @@ void ip_conntrack_helper_unregister(struct ip_conntrack_helper *me)
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
 	/* Someone could be still looking at the helper in a bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 }
 
 /* Refresh conntrack for this many jiffies. */
@@ -1401,8 +1408,7 @@ void ip_conntrack_cleanup(void)
 	/* This makes sure all current packets have passed through
            netfilter framework.  Roll on, two-stage module
            delete... */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
  
  i_see_dead_people:
 	ip_ct_selective_cleanup(kill_all, NULL);

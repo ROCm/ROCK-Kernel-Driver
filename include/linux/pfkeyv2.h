@@ -194,6 +194,26 @@ struct sadb_x_ipsecrequest {
 } __attribute__((packed));
 /* sizeof(struct sadb_x_ipsecrequest) == 16 */
 
+/* This defines the TYPE of Nat Traversal in use.  Currently only one
+ * type of NAT-T is supported, draft-ietf-ipsec-udp-encaps-06
+ */
+struct sadb_x_nat_t_type {
+	uint16_t	sadb_x_nat_t_type_len;
+	uint16_t	sadb_x_nat_t_type_exttype;
+	uint8_t		sadb_x_nat_t_type_type;
+	uint8_t		sadb_x_nat_t_type_reserved[3];
+} __attribute__((packed));
+/* sizeof(struct sadb_x_nat_t_type) == 8 */
+
+/* Pass a NAT Traversal port (Source or Dest port) */
+struct sadb_x_nat_t_port {
+	uint16_t	sadb_x_nat_t_port_len;
+	uint16_t	sadb_x_nat_t_port_exttype;
+	uint16_t	sadb_x_nat_t_port_port;
+	uint16_t	sadb_x_nat_t_port_reserved;
+} __attribute__((packed));
+/* sizeof(struct sadb_x_nat_t_port) == 8 */
+
 /* Message types */
 #define SADB_RESERVED		0
 #define SADB_GETSPI		1
@@ -218,7 +238,8 @@ struct sadb_x_ipsecrequest {
 #define SADB_X_SPDSETIDX	20
 #define SADB_X_SPDEXPIRE	21
 #define SADB_X_SPDDELETE2	22
-#define SADB_MAX		22
+#define SADB_X_NAT_T_NEW_MAPPING	23
+#define SADB_MAX		23
 
 /* Security Association flags */
 #define SADB_SAFLAGS_PFS	1
@@ -291,7 +312,12 @@ struct sadb_x_ipsecrequest {
 #define SADB_X_EXT_KMPRIVATE		17
 #define SADB_X_EXT_POLICY		18
 #define SADB_X_EXT_SA2			19
-#define SADB_EXT_MAX			19
+/* The next four entries are for setting up NAT Traversal */
+#define SADB_X_EXT_NAT_T_TYPE		20
+#define SADB_X_EXT_NAT_T_SPORT		21
+#define SADB_X_EXT_NAT_T_DPORT		22
+#define SADB_X_EXT_NAT_T_OA		23
+#define SADB_EXT_MAX			23
 
 /* Identity Extension values */
 #define SADB_IDENTTYPE_RESERVED	0

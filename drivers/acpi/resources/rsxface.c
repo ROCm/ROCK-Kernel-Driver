@@ -240,12 +240,13 @@ acpi_walk_resources (
 	struct acpi_buffer                  buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	struct acpi_resource                *resource;
 
+
 	ACPI_FUNCTION_TRACE ("acpi_walk_resources");
 
 
 	if (!device_handle ||
 		(ACPI_STRNCMP (path, METHOD_NAME__CRS, sizeof (METHOD_NAME__CRS)) &&
-		ACPI_STRNCMP (path, METHOD_NAME__PRS, sizeof (METHOD_NAME__PRS)))) {
+		 ACPI_STRNCMP (path, METHOD_NAME__PRS, sizeof (METHOD_NAME__PRS)))) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
@@ -290,9 +291,9 @@ acpi_walk_resources (
 cleanup:
 
 	acpi_os_free (buffer.pointer);
-
 	return_ACPI_STATUS (status);
 }
+
 
 /*******************************************************************************
  *
@@ -337,6 +338,7 @@ acpi_set_current_resources (
 	return_ACPI_STATUS (status);
 }
 
+
 #define COPY_FIELD(out, in, field)  out->field = in->field
 #define COPY_ADDRESS(out, in)                      \
 	COPY_FIELD(out, in, resource_type);             \
@@ -352,48 +354,53 @@ acpi_set_current_resources (
 	COPY_FIELD(out, in, address_length);            \
 	COPY_FIELD(out, in, resource_source);
 
-/*******************************************************************************
-*
-* FUNCTION:    acpi_resource_to_address64
-*
-* PARAMETERS:  resource                - Pointer to a resource
-*              out                     - Pointer to the users's return
-*                                        buffer (a struct
-*                                        struct acpi_resource_address64)
-*
-* RETURN:      Status
-*
-* DESCRIPTION: If the resource is an address16, address32, or address64,
-*              copy it to the address64 return buffer.  This saves the
-*              caller from having to duplicate code for different-sized
-*              addresses.
-*
-******************************************************************************/
+/******************************************************************************
+ *
+ * FUNCTION:    acpi_resource_to_address64
+ *
+ * PARAMETERS:  resource                - Pointer to a resource
+ *              out                     - Pointer to the users's return
+ *                                        buffer (a struct
+ *                                        struct acpi_resource_address64)
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: If the resource is an address16, address32, or address64,
+ *              copy it to the address64 return buffer.  This saves the
+ *              caller from having to duplicate code for different-sized
+ *              addresses.
+ *
+ ******************************************************************************/
 
 acpi_status
 acpi_resource_to_address64 (
-	struct acpi_resource            *resource,
-	struct acpi_resource_address64 *out)
+	struct acpi_resource                *resource,
+	struct acpi_resource_address64      *out)
 {
-	struct acpi_resource_address16   *address16;
-	struct acpi_resource_address32   *address32;
-	struct acpi_resource_address64   *address64;
+	struct acpi_resource_address16      *address16;
+	struct acpi_resource_address32      *address32;
+	struct acpi_resource_address64      *address64;
+
 
 	switch (resource->id) {
 	case ACPI_RSTYPE_ADDRESS16:
 		address16 = (struct acpi_resource_address16 *) &resource->data;
 		COPY_ADDRESS(out, address16);
 		break;
+
 	case ACPI_RSTYPE_ADDRESS32:
 		address32 = (struct acpi_resource_address32 *) &resource->data;
 		COPY_ADDRESS(out, address32);
 		break;
+
 	case ACPI_RSTYPE_ADDRESS64:
 		address64 = (struct acpi_resource_address64 *) &resource->data;
 		COPY_ADDRESS(out, address64);
 		break;
+
 	default:
 		return (AE_BAD_PARAMETER);
 	}
+
 	return (AE_OK);
 }

@@ -69,7 +69,7 @@ __tapeblock_end_request(struct tape_request *ccw_req, void *data)
 		device->blk_data.block_position = -1;
 	device->discipline->free_bread(ccw_req);
 	if (!list_empty(&device->req_queue) ||
-	    !blk_queue_empty(&device->blk_data.request_queue))
+	    elv_next_request(&device->blk_data.request_queue))
 		tasklet_schedule(&device->blk_data.tasklet);
 }
 
@@ -95,7 +95,7 @@ __tape_process_blk_queue(struct tape_device *device, struct list_head *new_req)
 	list_for_each(l, &device->req_queue)
 		nr_queued++;
 	while (!blk_queue_plugged(queue) &&
-	       !blk_queue_empty(queue) &&
+	       elv_next_request(queue) &&
 	       nr_queued < TAPEBLOCK_MIN_REQUEUE) {
 		req = elv_next_request(queue);
 		if (rq_data_dir(req) == WRITE) {
@@ -162,7 +162,7 @@ tapeblock_request_fn(request_queue_t *queue)
 	struct tape_device *device;
 
 	device = (struct tape_device *) queue->queuedata;
-	while (!blk_queue_empty(queue)) {
+	while (elv_next_request(queue)) {
 		INIT_LIST_HEAD(&new_req);
 		spin_lock(get_ccwdev_lock(device->cdev));
 		__tape_process_blk_queue(device, &new_req);
@@ -187,7 +187,7 @@ tapeblock_tasklet(unsigned long data)
 	struct tape_device *device;
 
 	device = (struct tape_device *) data;
-	while (!blk_queue_empty(&device->blk_data.request_queue)) {
+	while (elv_next_request(&device->blk_data.request_queue)) {
 		INIT_LIST_HEAD(&new_req);
 		spin_lock_irq(get_ccwdev_lock(device->cdev));
 		__tape_process_blk_queue(device, &new_req);

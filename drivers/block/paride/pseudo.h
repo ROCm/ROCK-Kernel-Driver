@@ -39,7 +39,7 @@ static void ps_tq_int( void *data);
 
 static void (* ps_continuation)(void);
 static int (* ps_ready)(void);
-static int ps_timeout;
+static unsigned long ps_timeout;
 static int ps_tq_active = 0;
 static int ps_nice = 0;
 
@@ -70,7 +70,7 @@ static void ps_set_intr(void (*continuation)(void),
 	spin_unlock_irqrestore(&ps_spinlock,flags);
 }
 
-static void ps_tq_int( void *data )
+static void ps_tq_int(void *data)
 {
 	void (*con)(void);
 	unsigned long flags;

@@ -223,25 +223,24 @@ int sirdev_receive(struct sir_dev *dev, const unsigned char *cp, size_t count)
 	}
 
 	/* Read the characters into the buffer */
- 	while (count--) {
-		if (likely(atomic_read(&dev->enable_rx))) {
+	if (likely(atomic_read(&dev->enable_rx))) {
+		while (count--)
 			/* Unwrap and destuff one byte */
 			async_unwrap_char(dev->netdev, &dev->stats, 
-				  &dev->rx_buff, *cp++);
-		}
-		else {
+					  &dev->rx_buff, *cp++);
+	} else {
+		while (count--) {
 			/* rx not enabled: save the raw bytes and never
 			 * trigger any netif_rx. The received bytes are flushed
 			 * later when we re-enable rx but might be read meanwhile
 			 * by the dongle driver.
 			 */
 			dev->rx_buff.data[dev->rx_buff.len++] = *cp++;
-		}
 
-		/* What should we do when the buffer is full? */
-		if (unlikely(dev->rx_buff.len == dev->rx_buff.truesize))
-			dev->rx_buff.len = 0;
-			
+			/* What should we do when the buffer is full? */
+			if (unlikely(dev->rx_buff.len == dev->rx_buff.truesize))
+				dev->rx_buff.len = 0;
+		}
 	}
 
 	return 0;
@@ -423,19 +422,24 @@ static int sirdev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 
 static int sirdev_alloc_buffers(struct sir_dev *dev)
 {
-	dev->rx_buff.truesize = SIRBUF_ALLOCSIZE; 
 	dev->tx_buff.truesize = SIRBUF_ALLOCSIZE;
+	dev->rx_buff.truesize = IRDA_SKB_MAX_MTU; 
 
-	dev->rx_buff.head = kmalloc(dev->rx_buff.truesize, GFP_KERNEL);
-	if (dev->rx_buff.head == NULL)
+	/* Bootstrap ZeroCopy Rx */
+	dev->rx_buff.skb = __dev_alloc_skb(dev->rx_buff.truesize, GFP_KERNEL);
+	if (dev->rx_buff.skb == NULL)
 		return -ENOMEM;
-	memset(dev->rx_buff.head, 0, dev->rx_buff.truesize);
+	skb_reserve(dev->rx_buff.skb, 1);
+	dev->rx_buff.head = dev->rx_buff.skb->data;
+	/* No need to memset the buffer, unless you are really pedantic */
 
 	dev->tx_buff.head = kmalloc(dev->tx_buff.truesize, GFP_KERNEL);
 	if (dev->tx_buff.head == NULL) {
-		kfree(dev->rx_buff.head);
+		kfree_skb(dev->rx_buff.skb);
+		dev->rx_buff.skb = NULL;
 		dev->rx_buff.head = NULL;
 		return -ENOMEM;
+		/* Hu ??? This should not be here, Martin ? */
 		memset(dev->tx_buff.head, 0, dev->tx_buff.truesize);
 	}
 
@@ -451,11 +455,12 @@ static int sirdev_alloc_buffers(struct sir_dev *dev)
 
 static void sirdev_free_buffers(struct sir_dev *dev)
 {
-	if (dev->rx_buff.head)
-		kfree(dev->rx_buff.head);
+	if (dev->rx_buff.skb)
+		kfree_skb(dev->rx_buff.skb);
 	if (dev->tx_buff.head)
 		kfree(dev->tx_buff.head);
 	dev->rx_buff.head = dev->tx_buff.head = NULL;
+	dev->rx_buff.skb = NULL;
 }
 
 static int sirdev_open(struct net_device *ndev)

@@ -62,14 +62,15 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#ifdef MODULE
+#if 0 /*def MODULE*/
 static int unloadable = 0; /* XX: Turn to one when all is ok within the
 			      module for allowing unload */
+MODULE_PARM(unloadable, "i");
 #endif
 
 MODULE_AUTHOR("Cast of dozens");
 MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
-MODULE_PARM(unloadable, "i");
+MODULE_LICENSE("GPL");
 
 /* IPv6 procfs goodies... */
 
@@ -110,7 +111,7 @@ static void inet6_sock_destruct(struct sock *sk)
 #ifdef INET_REFCNT_DEBUG
 	atomic_dec(&inet6_sock_nr);
 #endif
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 }
 
 static __inline__ kmem_cache_t *inet6_sk_slab(int protocol)
@@ -241,7 +242,10 @@ static int inet6_create(struct socket *sock, int protocol)
 	atomic_inc(&inet6_sock_nr);
 	atomic_inc(&inet_sock_nr);
 #endif
-	MOD_INC_USE_COUNT;
+	if (!try_module_get(THIS_MODULE)) {
+		inet_sock_release(sk);
+		return -EBUSY;
+	}
 
 	if (inet->num) {
 		/* It assumes that any protocol which allows
@@ -254,7 +258,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	if (sk->prot->init) {
 		int err = sk->prot->init(sk);
 		if (err != 0) {
-			MOD_DEC_USE_COUNT;
+			module_put(THIS_MODULE);
 			inet_sock_release(sk);
 			return err;
 		}
@@ -535,8 +539,8 @@ struct proto_ops inet6_dgram_ops = {
 };
 
 struct net_proto_family inet6_family_ops = {
-	.family =PF_INET6,
-	.create =inet6_create,
+	.family = PF_INET6,
+	.create = inet6_create,
 };
 
 #ifdef MODULE
@@ -556,13 +560,13 @@ extern void ipv6_sysctl_unregister(void);
 #endif
 
 static struct inet_protosw rawv6_protosw = {
-	.type =      SOCK_RAW,
-	.protocol =  IPPROTO_IP,	/* wild card */
-	.prot =      &rawv6_prot,
-	.ops =       &inet6_dgram_ops,
-	.capability =CAP_NET_RAW,
-	.no_check =  UDP_CSUM_DEFAULT,
-	.flags =     INET_PROTOSW_REUSE,
+	.type		= SOCK_RAW,
+	.protocol	= IPPROTO_IP,	/* wild card */
+	.prot		= &rawv6_prot,
+	.ops		= &inet6_dgram_ops,
+	.capability	= CAP_NET_RAW,
+	.no_check	= UDP_CSUM_DEFAULT,
+	.flags		= INET_PROTOSW_REUSE,
 };
 
 #define INETSW6_ARRAY_LEN (sizeof(inetsw6_array) / sizeof(struct inet_protosw))
@@ -701,7 +705,9 @@ static void cleanup_ipv6_mibs(void)
 	kfree_percpu(udp_stats_in6[0]);
 	kfree_percpu(udp_stats_in6[1]);
 }
-	
+
+extern int ipv6_misc_proc_init(void);
+
 static int __init inet6_init(void)
 {
 	struct sk_buff *dummy_skb;
@@ -785,10 +791,9 @@ static int __init inet6_init(void)
 		goto proc_tcp6_fail;
 	if (!proc_net_create("udp6", 0, udp6_get_info))
 		goto proc_udp6_fail;
-	if (!proc_net_create("sockstat6", 0, afinet6_get_info))
-		goto proc_sockstat6_fail;
-	if (!proc_net_create("snmp6", 0, afinet6_get_snmp))
-		goto proc_snmp6_fail;
+	if (ipv6_misc_proc_init())
+		goto proc_misc6_fail;
+
 	if (!proc_net_create("anycast6", 0, anycast6_get_info))
 		goto proc_anycast6_fail;
 #endif
@@ -799,7 +804,7 @@ static int __init inet6_init(void)
 	addrconf_init();
 	sit_init();
 
-	/* Init v6 extention headers. */
+	/* Init v6 extension headers. */
 	ipv6_hopopts_init();
 	ipv6_rthdr_init();
 	ipv6_frag_init();
@@ -814,10 +819,9 @@ static int __init inet6_init(void)
 
 #ifdef CONFIG_PROC_FS
 proc_anycast6_fail:
-	proc_net_remove("anycast6");
-proc_snmp6_fail:
+	proc_net_remove("snmp6");
 	proc_net_remove("sockstat6");
-proc_sockstat6_fail:
+proc_misc6_fail:
 	proc_net_remove("udp6");
 proc_udp6_fail:
 	proc_net_remove("tcp6");
@@ -871,4 +875,3 @@ static void inet6_exit(void)
 }
 module_exit(inet6_exit);
 #endif /* MODULE */
-MODULE_LICENSE("GPL");

@@ -221,6 +221,7 @@ static unsigned short patch_ad1881_unchained(ac97_t * ac97, int idx, unsigned sh
 		return 0;
 	ac97->spec.ad18xx.unchained[idx] = mask;
 	ac97->spec.ad18xx.id[idx] = val;
+	ac97->spec.ad18xx.codec_cfg[idx] = 0x0000;
 	return mask;
 }
 
@@ -238,6 +239,7 @@ static int patch_ad1881_chained1(ac97_t * ac97, int idx, unsigned short codec_bi
 		snd_ac97_write_cache(ac97, AC97_AD_CODEC_CFG, codec_bits);
 	ac97->spec.ad18xx.chained[idx] = cfg_bits[idx];
 	ac97->spec.ad18xx.id[idx] = val;
+	ac97->spec.ad18xx.codec_cfg[idx] = codec_bits ? codec_bits : 0x0004;
 	return 1;
 }
 
@@ -253,6 +255,7 @@ static void patch_ad1881_chained(ac97_t * ac97, int unchained_idx, int cidx1, in
 	// test for chained codecs
 	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[unchained_idx]);
 	snd_ac97_write_cache(ac97, AC97_AD_CODEC_CFG, 0x0002);		// ID1C
+	ac97->spec.ad18xx.codec_cfg[unchained_idx] = 0x0002;
 	if (cidx1 >= 0) {
 		if (patch_ad1881_chained1(ac97, cidx1, 0x0006))		// SDIE | ID1C
 			patch_ad1881_chained1(ac97, cidx2, 0);
@@ -306,6 +309,9 @@ int patch_ad1881(ac97_t * ac97)
 	if (num == 1) {
 		/* ok, deselect all ID bits */
 		snd_ac97_write_cache(ac97, AC97_AD_CODEC_CFG, 0x0000);
+		ac97->spec.ad18xx.codec_cfg[0] = 
+			ac97->spec.ad18xx.codec_cfg[1] = 
+			ac97->spec.ad18xx.codec_cfg[2] = 0x0000;
 	}
 	/* required for AD1886/AD1885 combination */
 	ac97->ext_id = snd_ac97_read(ac97, AC97_EXTENDED_ID);
@@ -373,3 +379,31 @@ int patch_alc650(ac97_t * ac97)
 	snd_ac97_write_cache(ac97, AC97_ALC650_LFE_DAC_VOL, 0x0808);
 	return 0;
 }
+
+int patch_cm9739(ac97_t * ac97)
+{
+	unsigned short val;
+
+	/* check spdif */
+	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+	if (val & AC97_EA_SPCV) {
+		/* enable spdif in */
+		snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
+				     snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) | 0x01);
+	} else {
+		ac97->ext_id &= ~AC97_EI_SPDIF; /* disable extended-id */
+	}
+
+	/* set-up multi channel */
+	/* bit 13: enable internal vref output for mic */
+	/* bit 12: enable center/lfe */
+	/* bit 14: 0 = SPDIF, 1 = EAPD */
+	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, 0x3000);
+
+	/* FIXME: set up GPIO */
+	snd_ac97_write_cache(ac97, 0x70, 0x0100);
+	snd_ac97_write_cache(ac97, 0x72, 0x0020);
+
+	return 0;
+}
+

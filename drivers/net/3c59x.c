@@ -464,6 +464,8 @@ enum vortex_chips {
 	CH_3CCFEM656_1,
 	CH_3C450,
 	CH_3C920,
+	CH_3C982A,
+	CH_3C982B,
 };
 
 
@@ -477,11 +479,12 @@ static struct vortex_chip_info {
 	int drv_flags;
 	int io_size;
 } vortex_info_tbl[] __devinitdata = {
-#define EISA_TBL_OFFSET	0		/* Offset of this entry for vortex_eisa_init */
 	{"3c590 Vortex 10Mbps",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
+#define EISA_3C592_OFFSET 1		/* Offset of this entry for vortex_eisa_init */
 	{"3c592 EISA 10Mbps Demon/Vortex",					/* AKPM: from Don's 3c59x_cb.c 0.49H */
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
+#define EISA_3C597_OFFSET 2		/* Offset of this entry for vortex_eisa_init */
 	{"3c597 EISA Fast Demon/Vortex",					/* AKPM: from Don's 3c59x_cb.c 0.49H */
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
 	{"3c595 Vortex 100baseTx",
@@ -557,6 +560,11 @@ static struct vortex_chip_info {
 	 PCI_USES_IO|PCI_USES_MASTER, IS_TORNADO|HAS_NWAY|HAS_HWCKSM, 128, },
 	{"3c920 Tornado",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_TORNADO|HAS_NWAY|HAS_HWCKSM, 128, },
+	{"3c982 Hydra Dual Port A",
+	 PCI_USES_IO|PCI_USES_MASTER, IS_TORNADO|HAS_HWCKSM|HAS_NWAY, 128, },
+	{"3c982 Hydra Dual Port B",
+	 PCI_USES_IO|PCI_USES_MASTER, IS_TORNADO|HAS_HWCKSM|HAS_NWAY, 128, },
+
 	{0,}, /* 0 terminated list. */
 };
 
@@ -601,6 +609,8 @@ static struct pci_device_id vortex_pci_tbl[] __devinitdata = {
 	{ 0x10B7, 0x6564, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3CCFEM656_1 },
 	{ 0x10B7, 0x4500, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3C450 },
 	{ 0x10B7, 0x9201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3C920 },
+	{ 0x10B7, 0x1201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3C982A },
+	{ 0x10B7, 0x1202, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_3C982B },
 	{0,}						/* 0 terminated list. */
 };
 MODULE_DEVICE_TABLE(pci, vortex_pci_tbl);
@@ -938,8 +948,8 @@ static int vortex_resume (struct pci_dev *pdev)
 
 #ifdef CONFIG_EISA
 static struct eisa_device_id vortex_eisa_ids[] = {
-	{ "TCM5920" },
-	{ "TCM5970" },
+	{ "TCM5920", EISA_3C592_OFFSET },
+	{ "TCM5970", EISA_3C597_OFFSET },
 	{ "" }
 };
 
@@ -967,7 +977,7 @@ static int vortex_eisa_probe (struct device *device)
 		return -EBUSY;
 
 	if (vortex_probe1(device, ioaddr, inw(ioaddr + 0xC88) >> 12,
-					  EISA_TBL_OFFSET, vortex_cards_found)) {
+					  edev->id.driver_data, vortex_cards_found)) {
 		release_region (ioaddr, VORTEX_TOTAL_SIZE);
 		return -ENODEV;
 	}
@@ -1009,10 +1019,6 @@ static int __init vortex_eisa_init (void)
 {
 	int eisa_found = 0;
 	int orig_cards_found = vortex_cards_found;
-
-	/* Now check all slots of the EISA bus. */
-	if (!EISA_bus)
-		return 0;
 
 #ifdef CONFIG_EISA
 	if (eisa_driver_register (&vortex_eisa_driver) >= 0) {

@@ -36,13 +36,13 @@
 #include <linux/pci.h>
 #include <linux/pm.h>
 #include <linux/cpufreq.h>
-#include <linux/compatmac.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/delay.h>
+#include <asm/uaccess.h>
 
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -639,7 +639,7 @@ acpi_processor_get_power_info (
 		/*
 		 * C2 latency must be less than or equal to 100 microseconds.
 		 */
-		if (acpi_fadt.plvl2_lat >= ACPI_PROCESSOR_MAX_C2_LATENCY)
+		if (acpi_fadt.plvl2_lat > ACPI_PROCESSOR_MAX_C2_LATENCY)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C2 latency too large [%d]\n",
 				acpi_fadt.plvl2_lat));
@@ -673,7 +673,7 @@ acpi_processor_get_power_info (
 		/*
 		 * C3 latency must be less than or equal to 1000 microseconds.
 		 */
-		if (acpi_fadt.plvl3_lat >= ACPI_PROCESSOR_MAX_C3_LATENCY)
+		if (acpi_fadt.plvl3_lat > ACPI_PROCESSOR_MAX_C3_LATENCY)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C3 latency too large [%d]\n", 
 				acpi_fadt.plvl3_lat));

@@ -58,7 +58,7 @@
 #define LM_IDLE_TIMEOUT     2*HZ /* 2 seconds for now */
 
 typedef enum {
-	S_PNP,
+	S_PNP = 0,
 	S_PDA,
 	S_COMPUTER,
 	S_PRINTER,
@@ -72,22 +72,24 @@ typedef enum {
 	S_END,
 } SERVICE;
 
-typedef void (*DISCOVERY_CALLBACK1) (discovery_t *, DISCOVERY_MODE, void *);
-typedef void (*DISCOVERY_CALLBACK2) (hashbin_t *, void *);
+/* For selective discovery */
+typedef void (*DISCOVERY_CALLBACK1) (discinfo_t *, DISCOVERY_MODE, void *);
+/* For expiry (the same) */
+typedef void (*DISCOVERY_CALLBACK2) (discinfo_t *, DISCOVERY_MODE, void *);
 
 typedef struct {
 	irda_queue_t queue; /* Must be first */
 
-	__u16 hints; /* Hint bits */
+	__u16_host_order hints; /* Hint bits */
 } irlmp_service_t;
 
 typedef struct {
 	irda_queue_t queue; /* Must be first */
 
-	__u16 hint_mask;
+	__u16_host_order hint_mask;
 
 	DISCOVERY_CALLBACK1 disco_callback;	/* Selective discovery */
-	DISCOVERY_CALLBACK1 expir_callback;	/* Selective expiration */
+	DISCOVERY_CALLBACK2 expir_callback;	/* Selective expiration */
 	void *priv;                /* Used to identify client */
 } irlmp_client_t;
 
@@ -199,11 +201,11 @@ __u16 irlmp_service_to_hint(int service);
 void *irlmp_register_service(__u16 hints);
 int irlmp_unregister_service(void *handle);
 void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
-			    DISCOVERY_CALLBACK1 expir_clb, void *priv);
+			    DISCOVERY_CALLBACK2 expir_clb, void *priv);
 int irlmp_unregister_client(void *handle);
 int irlmp_update_client(void *handle, __u16 hint_mask, 
 			DISCOVERY_CALLBACK1 disco_clb,
-			DISCOVERY_CALLBACK1 expir_clb, void *priv);
+			DISCOVERY_CALLBACK2 expir_clb, void *priv);
 
 void irlmp_register_link(struct irlap_cb *, __u32 saddr, notify_t *);
 void irlmp_unregister_link(__u32 saddr);
@@ -222,11 +224,11 @@ int  irlmp_disconnect_request(struct lsap_cb *, struct sk_buff *userdata);
 
 void irlmp_discovery_confirm(hashbin_t *discovery_log, DISCOVERY_MODE mode);
 void irlmp_discovery_request(int nslots);
-struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots);
+discinfo_t *irlmp_get_discoveries(int *pn, __u16 mask, int nslots);
 void irlmp_do_expiry(void);
 void irlmp_do_discovery(int nslots);
 discovery_t *irlmp_get_discovery_response(void);
-void irlmp_discovery_expiry(discovery_t *expiry);
+void irlmp_discovery_expiry(discinfo_t *expiry, int number);
 
 int  irlmp_data_request(struct lsap_cb *, struct sk_buff *);
 void irlmp_data_indication(struct lsap_cb *, struct sk_buff *);

@@ -188,7 +188,7 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 
 	buf->waiting  = 0;
 	buf->pending  = 0;
-	buf->pid      = 0;
+	buf->filp     = 0;
 	buf->used     = 0;
 #if __HAVE_DMA_HISTOGRAM
 	buf->time_completed = get_cycles();
@@ -210,14 +210,16 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 }
 
 #if !__HAVE_DMA_RECLAIM
-void DRM(reclaim_buffers)(drm_device_t *dev, pid_t pid)
+void DRM(reclaim_buffers)( struct file *filp )
 {
+	drm_file_t    *priv   = filp->private_data;
+	drm_device_t  *dev    = priv->dev;
 	drm_device_dma_t *dma = dev->dma;
 	int		 i;
 
 	if (!dma) return;
 	for (i = 0; i < dma->buf_count; i++) {
-		if (dma->buflist[i]->pid == pid) {
+		if (dma->buflist[i]->filp == filp) {
 			switch (dma->buflist[i]->list) {
 			case DRM_LIST_NONE:
 				DRM(free_buffer)(dev, dma->buflist[i]);
@@ -318,8 +320,10 @@ int DRM(select_queue)(drm_device_t *dev, void (*wrapper)(unsigned long))
 }
 
 
-int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
+int DRM(dma_enqueue)(struct file *filp, drm_dma_t *d)
 {
+	drm_file_t    *priv   = filp->private_data;
+	drm_device_t  *dev    = priv->dev;
 	int		  i;
 	drm_queue_t	  *q;
 	drm_buf_t	  *buf;
@@ -381,10 +385,10 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 			return -EINVAL;
 		}
 		buf = dma->buflist[ idx ];
-		if (buf->pid != current->pid) {
+		if (buf->filp != filp) {
 			atomic_dec(&q->use_count);
-			DRM_ERROR("Process %d using buffer owned by %d\n",
-				  current->pid, buf->pid);
+			DRM_ERROR("Process %d using buffer not owned\n",
+				  current->pid);
 			return -EINVAL;
 		}
 		if (buf->list != DRM_LIST_NONE) {
@@ -426,9 +430,11 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 	return 0;
 }
 
-static int DRM(dma_get_buffers_of_order)(drm_device_t *dev, drm_dma_t *d,
+static int DRM(dma_get_buffers_of_order)(struct file *filp, drm_dma_t *d,
 					 int order)
 {
+	drm_file_t    *priv   = filp->private_data;
+	drm_device_t  *dev    = priv->dev;
 	int		  i;
 	drm_buf_t	  *buf;
 	drm_device_dma_t  *dma = dev->dma;
@@ -438,13 +444,13 @@ static int DRM(dma_get_buffers_of_order)(drm_device_t *dev, drm_dma_t *d,
 					d->flags & _DRM_DMA_WAIT);
 		if (!buf) break;
 		if (buf->pending || buf->waiting) {
-			DRM_ERROR("Free buffer %d in use by %d (w%d, p%d)\n",
+			DRM_ERROR("Free buffer %d in use: filp %p (w%d, p%d)\n",
 				  buf->idx,
-				  buf->pid,
+				  buf->filp,
 				  buf->waiting,
 				  buf->pending);
 		}
-		buf->pid     = current->pid;
+		buf->filp     = filp;
 		if (copy_to_user(&d->request_indices[i],
 				 &buf->idx,
 				 sizeof(buf->idx)))
@@ -461,7 +467,7 @@ static int DRM(dma_get_buffers_of_order)(drm_device_t *dev, drm_dma_t *d,
 }
 
 
-int DRM(dma_get_buffers)(drm_device_t *dev, drm_dma_t *dma)
+int DRM(dma_get_buffers)(struct file *filp, drm_dma_t *dma)
 {
 	int		  order;
 	int		  retcode = 0;
@@ -470,7 +476,7 @@ int DRM(dma_get_buffers)(drm_device_t *dev, drm_dma_t *dma)
 	order = DRM(order)(dma->request_size);
 
 	dma->granted_count = 0;
-	retcode		   = DRM(dma_get_buffers_of_order)(dev, dma, order);
+	retcode		   = DRM(dma_get_buffers_of_order)(filp, dma, order);
 
 	if (dma->granted_count < dma->request_count
 	    && (dma->flags & _DRM_DMA_SMALLER_OK)) {
@@ -480,7 +486,7 @@ int DRM(dma_get_buffers)(drm_device_t *dev, drm_dma_t *dma)
 			     && tmp_order >= DRM_MIN_ORDER;
 		     --tmp_order) {
 
-			retcode = DRM(dma_get_buffers_of_order)(dev, dma,
+			retcode = DRM(dma_get_buffers_of_order)(filp, dma,
 								tmp_order);
 		}
 	}
@@ -493,7 +499,7 @@ int DRM(dma_get_buffers)(drm_device_t *dev, drm_dma_t *dma)
 			     && tmp_order <= DRM_MAX_ORDER;
 		     ++tmp_order) {
 
-			retcode = DRM(dma_get_buffers_of_order)(dev, dma,
+			retcode = DRM(dma_get_buffers_of_order)(filp, dma,
 								tmp_order);
 		}
 	}
@@ -540,6 +546,8 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	spin_lock_init( &dev->vbl_lock );
 
 	INIT_LIST_HEAD( &dev->vbl_sigs.head );
+
+	dev->vbl_pending = 0;
 #endif
 
 				/* Before installing handler */
@@ -622,6 +630,7 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 	switch ( vblwait.request.type & ~_DRM_VBLANK_FLAGS_MASK ) {
 	case _DRM_VBLANK_RELATIVE:
 		vblwait.request.sequence += atomic_read( &dev->vbl_received );
+		vblwait.request.type &= ~_DRM_VBLANK_RELATIVE;
 	case _DRM_VBLANK_ABSOLUTE:
 		break;
 	default:
@@ -632,10 +641,38 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 	
 	if ( flags & _DRM_VBLANK_SIGNAL ) {
 		unsigned long irqflags;
-		drm_vbl_sig_t *vbl_sig = DRM_MALLOC( sizeof( drm_vbl_sig_t ) );
+		drm_vbl_sig_t *vbl_sig;
+		
+		vblwait.reply.sequence = atomic_read( &dev->vbl_received );
 
-		if ( !vbl_sig )
+		spin_lock_irqsave( &dev->vbl_lock, irqflags );
+
+		/* Check if this task has already scheduled the same signal
+		 * for the same vblank sequence number; nothing to be done in
+		 * that case
+		 */
+		list_for_each_entry( vbl_sig, &dev->vbl_sigs.head, head ) {
+			if (vbl_sig->sequence == vblwait.request.sequence
+			    && vbl_sig->info.si_signo == vblwait.request.signal
+			    && vbl_sig->task == current)
+			{
+				spin_unlock_irqrestore( &dev->vbl_lock, irqflags );
+				goto done;
+			}
+		}
+
+		if ( dev->vbl_pending >= 100 ) {
+			spin_unlock_irqrestore( &dev->vbl_lock, irqflags );
+			return -EBUSY;
+		}
+
+		dev->vbl_pending++;
+
+		spin_unlock_irqrestore( &dev->vbl_lock, irqflags );
+
+		if ( !( vbl_sig = DRM_MALLOC( sizeof( drm_vbl_sig_t ) ) ) ) {
 			return -ENOMEM;
+		}
 
 		memset( (void *)vbl_sig, 0, sizeof(*vbl_sig) );
 
@@ -643,9 +680,6 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 		vbl_sig->info.si_signo = vblwait.request.signal;
 		vbl_sig->task = current;
 
-		vblwait.reply.sequence = atomic_read( &dev->vbl_received );
-
-		/* Hook signal entry into list */
 		spin_lock_irqsave( &dev->vbl_lock, irqflags );
 
 		list_add_tail( (struct list_head *) vbl_sig, &dev->vbl_sigs.head );
@@ -659,6 +693,7 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 		vblwait.reply.tval_usec = now.tv_usec;
 	}
 
+done:
 	DRM_COPY_TO_USER_IOCTL( (drm_wait_vblank_t *)data, vblwait,
 				sizeof(vblwait) );
 
@@ -667,25 +702,24 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 
 void DRM(vbl_send_signals)( drm_device_t *dev )
 {
-	struct list_head *entry, *tmp;
+	struct list_head *list, *tmp;
 	drm_vbl_sig_t *vbl_sig;
 	unsigned int vbl_seq = atomic_read( &dev->vbl_received );
 	unsigned long flags;
 
 	spin_lock_irqsave( &dev->vbl_lock, flags );
 
-	list_for_each_safe( entry, tmp, &dev->vbl_sigs.head ) {
-
-		vbl_sig = (drm_vbl_sig_t *) entry;
-
+	list_for_each_safe( list, tmp, &dev->vbl_sigs.head ) {
+		vbl_sig = list_entry( list, drm_vbl_sig_t, head );
 		if ( ( vbl_seq - vbl_sig->sequence ) <= (1<<23) ) {
-
-			vbl_sig->info.si_code = atomic_read( &dev->vbl_received );
+			vbl_sig->info.si_code = vbl_seq;
 			send_sig_info( vbl_sig->info.si_signo, &vbl_sig->info, vbl_sig->task );
 
-			list_del( entry );
+			list_del( list );
 
-			DRM_FREE( entry );
+			DRM_FREE( vbl_sig, sizeof(*vbl_sig) );
+
+			dev->vbl_pending--;
 		}
 	}
 

@@ -339,7 +339,7 @@ static int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
 	agp_bridge->cleanup = hp_zx1_cleanup;
 	agp_bridge->tlb_flush = hp_zx1_tlbflush;
 	agp_bridge->mask_memory = hp_zx1_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = hp_zx1_create_gatt_table;
 	agp_bridge->free_gatt_table = hp_zx1_free_gatt_table;
@@ -369,7 +369,7 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 }
 
 static struct agp_driver hp_agp_driver = {
-	.owner = THIS_MODULE;
+	.owner = THIS_MODULE,
 };
 
 static int __init agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
@@ -394,7 +394,7 @@ static struct pci_device_id agp_hp_pci_table[] __initdata = {
 	{ }
 };
 
-MODULE_DEVICE_TABLE(pci, agp_pci_table);
+MODULE_DEVICE_TABLE(pci, agp_hp_pci_table);
 
 static struct __initdata pci_driver agp_hp_pci_driver = {
 	.name		= "agpgart-hp",

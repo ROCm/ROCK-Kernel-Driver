@@ -565,10 +565,10 @@ out:
 }
 
 static int do_proc_readlink(struct dentry *dentry, struct vfsmount *mnt,
-			    char * buffer, int buflen)
+			    char *buffer, int buflen)
 {
 	struct inode * inode;
-	char * tmp = (char*)__get_free_page(GFP_KERNEL), *path;
+	char *tmp = (char*)__get_free_page(GFP_KERNEL), *path;
 	int len;
 
 	if (!tmp)
@@ -576,13 +576,18 @@ static int do_proc_readlink(struct dentry *dentry, struct vfsmount *mnt,
 		
 	inode = dentry->d_inode;
 	path = d_path(dentry, mnt, tmp, PAGE_SIZE);
+	len = PTR_ERR(path);
+	if (IS_ERR(path))
+		goto out;
 	len = tmp + PAGE_SIZE - 1 - path;
 
-	if (len < buflen)
-		buflen = len;
-	copy_to_user(buffer, path, buflen);
+	if (len > buflen)
+		len = buflen;
+	if (copy_to_user(buffer, path, len))
+		len = -EFAULT;
+ out:
 	free_page((unsigned long)tmp);
-	return buflen;
+	return len;
 }
 
 static int proc_pid_readlink(struct dentry * dentry, char * buffer, int buflen)

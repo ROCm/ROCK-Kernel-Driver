@@ -758,19 +758,6 @@ gt96100_probe1(int port_num)
 		goto free_region;
 	}
 
-	/* Initialize our private structure. */
-	if (dev->priv == NULL) {
-
-		gp = (struct gt96100_private *)kmalloc(sizeof(*gp),
-						       GFP_KERNEL);
-		if (gp == NULL) {
-			retval = -ENOMEM;
-			goto free_region;
-		}
-	
-		dev->priv = gp;
-	}
-
 	gp = dev->priv;
 
 	memset(gp, 0, sizeof(*gp)); // clear it
@@ -854,8 +841,6 @@ gt96100_probe1(int port_num)
  free_region:
 	release_region(gtif->iobase, GT96100_ETH_IO_SIZE);
 	unregister_netdev(dev);
-	if (dev->priv != NULL)
-		kfree (dev->priv);
 	kfree (dev);
 	err("%s failed.  Returns %d\n", __FUNCTION__, retval);
 	return retval;
@@ -1601,8 +1586,6 @@ static void gt96100_cleanup_module(void)
 				(struct gt96100_private *)gtif->dev->priv;
 			release_region(gtif->iobase, gp->io_size);
 			unregister_netdev(gtif->dev);
-			if (gtif->dev->priv != NULL)
-				kfree (gtif->dev->priv);
 			kfree (gtif->dev);
 		}
 	}

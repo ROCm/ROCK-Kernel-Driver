@@ -17,7 +17,7 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 	return x;
 }
 
-/* Do not define swab16.  Gcc is smart enought to recognize "C" version and
+/* Do not define swab16.  Gcc is smart enough to recognize "C" version and
    convert it into rotation or exhange.  */
 
 #define __arch__swab32(x) ___arch__swab32(x)

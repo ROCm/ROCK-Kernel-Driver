@@ -53,7 +53,7 @@
 
 /* Forward declarations for internal helpers. */
 static int sctp_copy_one_addr(sctp_bind_addr_t *, union sctp_addr *,
-			      sctp_scope_t scope, int priority, int flags);
+			      sctp_scope_t scope, int gfp, int flags);
 static void sctp_bind_addr_clean(sctp_bind_addr_t *);
 
 /* First Level Abstractions. */
@@ -62,7 +62,7 @@ static void sctp_bind_addr_clean(sctp_bind_addr_t *);
  * in 'src' which have a broader scope than 'scope'.
  */
 int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
-			sctp_scope_t scope, int priority, int flags)
+			sctp_scope_t scope, int gfp, int flags)
 {
 	struct sockaddr_storage_list *addr;
 	struct list_head *pos;
@@ -75,7 +75,7 @@ int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
 	list_for_each(pos, &src->address_list) {
 		addr = list_entry(pos, struct sockaddr_storage_list, list);
 		error = sctp_copy_one_addr(dest, &addr->a, scope,
-					   priority, flags);
+					   gfp, flags);
 		if (error < 0)
 			goto out;
 	}
@@ -88,11 +88,11 @@ out:
 }
 
 /* Create a new SCTP_bind_addr from nothing.  */
-sctp_bind_addr_t *sctp_bind_addr_new(int priority)
+sctp_bind_addr_t *sctp_bind_addr_new(int gfp)
 {
 	sctp_bind_addr_t *retval;
 
-	retval = t_new(sctp_bind_addr_t, priority);
+	retval = t_new(sctp_bind_addr_t, gfp);
 	if (!retval)
 		goto nomem;
 
@@ -144,12 +144,12 @@ void sctp_bind_addr_free(sctp_bind_addr_t *bp)
 
 /* Add an address to the bind address list in the SCTP_bind_addr structure. */
 int sctp_add_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *new,
-		       int priority)
+		       int gfp)
 {
 	struct sockaddr_storage_list *addr;
 
 	/* Add the address to the bind address list.  */
-	addr = t_new(struct sockaddr_storage_list, priority);
+	addr = t_new(struct sockaddr_storage_list, gfp);
 	if (!addr)
 		return -ENOMEM;
 
@@ -197,7 +197,7 @@ int sctp_del_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *del_addr)
  * The second argument is the return value for the length.
  */
 union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
-					 int *addrs_len, int priority)
+					 int *addrs_len, int gfp)
 {
 	union sctp_params addrparms;
 	union sctp_params retval;
@@ -214,7 +214,7 @@ union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
 		len += sizeof(sctp_addr_param_t);
 	}
 
-	retval.v = kmalloc(len, priority);
+	retval.v = kmalloc(len, gfp);
 	if (!retval.v)
 		goto end_raw;
 
@@ -238,7 +238,7 @@ end_raw:
  * address parameters).
  */
 int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
-			   int addrs_len, __u16 port, int priority)
+			   int addrs_len, __u16 port, int gfp)
 {
 	sctp_addr_param_t *rawaddr;
 	sctp_paramhdr_t *param;
@@ -254,8 +254,8 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
 		switch (param->type) {
 		case SCTP_PARAM_IPV4_ADDRESS:
 		case SCTP_PARAM_IPV6_ADDRESS:
-			sctp_param2sockaddr(&addr, rawaddr, port);
-			retval = sctp_add_bind_addr(bp, &addr, priority);
+			sctp_param2sockaddr(&addr, rawaddr, port, 0);
+			retval = sctp_add_bind_addr(bp, &addr, gfp);
 			if (retval) {
 				/* Can't finish building the list, clean up. */
 				sctp_bind_addr_clean(bp);
@@ -300,14 +300,14 @@ int sctp_bind_addr_match(sctp_bind_addr_t *bp, const union sctp_addr *addr,
 
 /* Copy out addresses from the global local address list. */
 static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
-			      sctp_scope_t scope, int priority, int flags)
+			      sctp_scope_t scope, int gfp, int flags)
 {
 	struct sctp_protocol *proto = sctp_get_protocol();
 	int error = 0;
 
 	if (sctp_is_any(addr)) {
 		error = sctp_copy_local_addr_list(proto, dest, scope,
-						  priority, flags);
+						  gfp, flags);
 	} else if (sctp_in_scope(addr, scope)) {
 		/* Now that the address is in scope, check to see if
 		 * the address type is supported by local sock as
@@ -318,7 +318,7 @@ static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
 		    (((AF_INET6 == addr->sa.sa_family) &&
 		      (flags & SCTP_ADDR6_ALLOWED) &&
 		      (flags & SCTP_ADDR6_PEERSUPP))))
-			error = sctp_add_bind_addr(dest, addr, priority);
+			error = sctp_add_bind_addr(dest, addr, gfp);
 	}
 
 	return error;

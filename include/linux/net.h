@@ -19,14 +19,12 @@
 #define _LINUX_NET_H
 
 #include <linux/config.h>
-#include <linux/socket.h>
 #include <linux/wait.h>
 
 struct poll_table_struct;
 struct inode;
 
 #define NPROTO		32		/* should be enough for now..	*/
-
 
 #define SYS_SOCKET	1		/* sys_socket(2)		*/
 #define SYS_BIND	2		/* sys_bind(2)			*/
@@ -46,16 +44,15 @@ struct inode;
 #define SYS_SENDMSG	16		/* sys_sendmsg(2)		*/
 #define SYS_RECVMSG	17		/* sys_recvmsg(2)		*/
 
-
 typedef enum {
-  SS_FREE = 0,				/* not allocated		*/
-  SS_UNCONNECTED,			/* unconnected to any socket	*/
-  SS_CONNECTING,			/* in process of connecting	*/
-  SS_CONNECTED,				/* connected to socket		*/
-  SS_DISCONNECTING			/* in process of disconnecting	*/
+	SS_FREE = 0,			/* not allocated		*/
+	SS_UNCONNECTED,			/* unconnected to any socket	*/
+	SS_CONNECTING,			/* in process of connecting	*/
+	SS_CONNECTED,			/* connected to socket		*/
+	SS_DISCONNECTING		/* in process of disconnecting	*/
 } socket_state;
 
-#define __SO_ACCEPTCON	(1<<16)		/* performed a listen		*/
+#define __SO_ACCEPTCON	(1 << 16)	/* performed a listen		*/
 
 #ifdef __KERNEL__
 
@@ -63,17 +60,26 @@ typedef enum {
 #define SOCK_ASYNC_WAITDATA	1
 #define SOCK_NOSPACE		2
 
-struct socket
-{
+/**
+ *  struct socket - general BSD socket
+ *  @state - socket state (%SS_CONNECTED, etc)
+ *  @flags - socket flags (%SOCK_ASYNC_NOSPACE, etc)
+ *  @ops - protocol specific socket operations
+ *  @fasync_list - Asynchronous wake up list
+ *  @file - File back pointer for gc
+ *  @sk - internal networking protocol agnostic socket representation
+ *  @wait - wait queue for several uses
+ *  @type - socket type (%SOCK_STREAM, etc)
+ *  @passcred - credentials (used only in Unix Sockets (aka PF_LOCAL))
+ */
+struct socket {
 	socket_state		state;
-
 	unsigned long		flags;
 	struct proto_ops	*ops;
-	struct fasync_struct	*fasync_list;	/* Asynchronous wake up list	*/
-	struct file		*file;		/* File back pointer for gc	*/
+	struct fasync_struct	*fasync_list;
+	struct file		*file;
 	struct sock		*sk;
 	wait_queue_head_t	wait;
-
 	short			type;
 	unsigned char		passcred;
 };
@@ -81,39 +87,47 @@ struct socket
 struct vm_area_struct;
 struct page;
 struct kiocb;
+struct sockaddr;
+struct msghdr;
 
 struct proto_ops {
-  int	family;
-
-  int	(*release)	(struct socket *sock);
-  int	(*bind)		(struct socket *sock, struct sockaddr *umyaddr,
-			 int sockaddr_len);
-  int	(*connect)	(struct socket *sock, struct sockaddr *uservaddr,
-			 int sockaddr_len, int flags);
-  int	(*socketpair)	(struct socket *sock1, struct socket *sock2);
-  int	(*accept)	(struct socket *sock, struct socket *newsock,
-			 int flags);
-  int	(*getname)	(struct socket *sock, struct sockaddr *uaddr,
-			 int *usockaddr_len, int peer);
-  unsigned int (*poll)	(struct file *file, struct socket *sock, struct poll_table_struct *wait);
-  int	(*ioctl)	(struct socket *sock, unsigned int cmd,
-			 unsigned long arg);
-  int	(*listen)	(struct socket *sock, int len);
-  int	(*shutdown)	(struct socket *sock, int flags);
-  int	(*setsockopt)	(struct socket *sock, int level, int optname,
-			 char *optval, int optlen);
-  int	(*getsockopt)	(struct socket *sock, int level, int optname,
-			 char *optval, int *optlen);
-  int   (*sendmsg)	(struct kiocb *iocb, struct socket *sock,
-			 struct msghdr *m, int total_len);
-  int   (*recvmsg)	(struct kiocb *iocb, struct socket *sock,
-			 struct msghdr *m, int total_len, int flags);
-  int	(*mmap)		(struct file *file, struct socket *sock, struct vm_area_struct * vma);
-  ssize_t (*sendpage)	(struct socket *sock, struct page *page, int offset, size_t size, int flags);
+	int		family;
+	int		(*release)   (struct socket *sock);
+	int		(*bind)	     (struct socket *sock,
+				      struct sockaddr *umyaddr,
+				      int sockaddr_len);
+	int		(*connect)   (struct socket *sock,
+				      struct sockaddr *uservaddr,
+				      int sockaddr_len, int flags);
+	int		(*socketpair)(struct socket *sock1,
+				      struct socket *sock2);
+	int		(*accept)    (struct socket *sock,
+				      struct socket *newsock, int flags);
+	int		(*getname)   (struct socket *sock,
+				      struct sockaddr *uaddr,
+				      int *usockaddr_len, int peer);
+	unsigned int	(*poll)	     (struct file *file, struct socket *sock,
+				      struct poll_table_struct *wait);
+	int		(*ioctl)     (struct socket *sock, unsigned int cmd,
+				      unsigned long arg);
+	int		(*listen)    (struct socket *sock, int len);
+	int		(*shutdown)  (struct socket *sock, int flags);
+	int		(*setsockopt)(struct socket *sock, int level,
+				      int optname, char *optval, int optlen);
+	int		(*getsockopt)(struct socket *sock, int level,
+				      int optname, char *optval, int *optlen);
+	int		(*sendmsg)   (struct kiocb *iocb, struct socket *sock,
+				      struct msghdr *m, int total_len);
+	int		(*recvmsg)   (struct kiocb *iocb, struct socket *sock,
+				      struct msghdr *m, int total_len,
+				      int flags);
+	int		(*mmap)	     (struct file *file, struct socket *sock,
+				      struct vm_area_struct * vma);
+	ssize_t		(*sendpage)  (struct socket *sock, struct page *page,
+				      int offset, size_t size, int flags);
 };
 
-struct net_proto_family 
-{
+struct net_proto_family {
 	int	family;
 	int	(*create)(struct socket *sock, int protocol);
 	/* These are counters for the number of different methods of
@@ -123,30 +137,29 @@ struct net_proto_family
 	short	encrypt_net;
 };
 
-struct net_proto 
-{
-	const char *name;		/* Protocol name */
-	void (*init_func)(struct net_proto *);	/* Bootstrap */
-};
+struct iovec;
 
-extern int	sock_wake_async(struct socket *sk, int how, int band);
-extern int	sock_register(struct net_proto_family *fam);
-extern int	sock_unregister(int family);
+extern int	     sock_wake_async(struct socket *sk, int how, int band);
+extern int	     sock_register(struct net_proto_family *fam);
+extern int	     sock_unregister(int family);
 extern struct socket *sock_alloc(void);
-extern int	sock_create(int family, int type, int proto, struct socket **);
-extern void	sock_release(struct socket *);
-extern int   	sock_sendmsg(struct socket *, struct msghdr *m, int len);
-extern int	sock_recvmsg(struct socket *, struct msghdr *m, int len, int flags);
-extern int	sock_readv_writev(int type, struct inode * inode, struct file * file,
-				  const struct iovec * iov, long count, long size);
-extern int 	sock_map_fd(struct socket *sock);
-
+extern int	     sock_create(int family, int type, int proto,
+				 struct socket **res);
+extern void	     sock_release(struct socket *sock);
+extern int   	     sock_sendmsg(struct socket *sock, struct msghdr *msg,
+				  int len);
+extern int	     sock_recvmsg(struct socket *sock, struct msghdr *msg,
+				  int size, int flags);
+extern int	     sock_readv_writev(int type, struct inode *inode,
+				       struct file *file,
+				       const struct iovec *iov, long count,
+				       long size);
+extern int 	     sock_map_fd(struct socket *sock);
 extern struct socket *sockfd_lookup(int fd, int *err);
-#define         sockfd_put(sock) fput(sock->file)
-
-extern int	net_ratelimit(void);
+#define		     sockfd_put(sock) fput(sock->file)
+extern int	     net_ratelimit(void);
 extern unsigned long net_random(void);
-extern void net_srandom(unsigned long);
+extern void	     net_srandom(unsigned long);
 
 #ifndef CONFIG_SMP
 #define SOCKOPS_WRAPPED(name) name

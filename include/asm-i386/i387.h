@@ -81,8 +81,8 @@ extern void set_fpu_mxcsr( struct task_struct *tsk, unsigned short mxcsr );
 /*
  * Signal frame handlers...
  */
-extern int save_i387( struct _fpstate *buf );
-extern int restore_i387( struct _fpstate *buf );
+extern int save_i387( struct _fpstate __user *buf );
+extern int restore_i387( struct _fpstate __user *buf );
 
 /*
  * ptrace request handers...

@@ -1,6 +1,7 @@
+#include <linux/init.h>
 #include <asm/timer.h>
 
-static int init_none(void)
+static int __init init_none(char* override)
 {
 	return 0;
 }
@@ -11,6 +12,11 @@ static void mark_offset_none(void)
 }
 
 static unsigned long get_offset_none(void)
+{
+	return 0;
+}
+
+static unsigned long long monotonic_clock_none(void)
 {
 	return 0;
 }
@@ -33,5 +39,6 @@ struct timer_opts timer_none = {
 	.init =		init_none, 
 	.mark_offset =	mark_offset_none, 
 	.get_offset =	get_offset_none,
+	.monotonic_clock =	monotonic_clock_none,
 	.delay = delay_none,
 };

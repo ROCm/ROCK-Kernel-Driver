@@ -24,6 +24,7 @@
 #include <linux/notifier.h>
 #include <linux/dcookies.h>
 #include <linux/profile.h>
+#include <linux/module.h>
 #include <linux/fs.h>
  
 #include "oprofile_stats.h"
@@ -67,6 +68,25 @@ static int mm_notify(struct notifier_block * self, unsigned long val, void * dat
 }
 
  
+/* We need to be told about new modules so we don't attribute to a previously
+ * loaded module, or drop the samples on the floor.
+ */
+static int module_load_notify(struct notifier_block * self, unsigned long val, void * data)
+{
+#ifdef CONFIG_MODULES
+	if (val != MODULE_STATE_COMING)
+		return 0;
+
+	sync_cpu_buffers();
+	down(&buffer_sem);
+	add_event_entry(ESCAPE_CODE);
+	add_event_entry(MODULE_LOADED_CODE);
+	up(&buffer_sem);
+#endif
+	return 0;
+}
+
+ 
 static struct notifier_block exit_task_nb = {
 	.notifier_call	= exit_task_notify,
 };
@@ -78,7 +98,11 @@ static struct notifier_block exec_unmap_nb = {
 static struct notifier_block exit_mmap_nb = {
 	.notifier_call	= mm_notify,
 };
- 
+
+static struct notifier_block module_load_nb = {
+	.notifier_call = module_load_notify,
+};
+
  
 int sync_start(void)
 {
@@ -98,9 +122,14 @@ int sync_start(void)
 	err = profile_event_register(EXEC_UNMAP, &exec_unmap_nb);
 	if (err)
 		goto out3;
+	err = register_module_notifier(&module_load_nb);
+	if (err)
+		goto out4;
 
 out:
 	return err;
+out4:
+	profile_event_unregister(EXEC_UNMAP, &exec_unmap_nb);
 out3:
 	profile_event_unregister(EXIT_MMAP, &exit_mmap_nb);
 out2:
@@ -113,6 +142,7 @@ out1:
 
 void sync_stop(void)
 {
+	unregister_module_notifier(&module_load_nb);
 	profile_event_unregister(EXIT_TASK, &exit_task_nb);
 	profile_event_unregister(EXIT_MMAP, &exit_mmap_nb);
 	profile_event_unregister(EXEC_UNMAP, &exec_unmap_nb);

@@ -44,6 +44,8 @@
 struct mmu_gather mmu_gathers[NR_CPUS];
 unsigned long highstart_pfn, highend_pfn;
 
+static int do_test_wp_bit(void);
+
 /*
  * Creates a middle page table and puts a pointer to it in the
  * given global directory entry. This only returns the gd entry
@@ -377,15 +379,10 @@ void __init paging_init(void)
 
 /*
  * Test if the WP bit works in supervisor mode. It isn't supported on 386's
- * and also on some strange 486's (NexGen etc.). All 586+'s are OK. The jumps
- * before and after the test are here to work-around some nasty CPU bugs.
+ * and also on some strange 486's (NexGen etc.). All 586+'s are OK. This
+ * used to involve black magic jumps to work around some nasty CPU bugs,
+ * but fortunately the switch to using exceptions got rid of all that.
  */
-
-/*
- * This function cannot be __init, since exceptions don't work in that
- * section.
- */
-static int do_test_wp_bit(void);
 
 void __init test_wp_bit(void)
 {
@@ -539,7 +536,10 @@ void __init pgtable_cache_init(void)
                 panic("pgtable_cache_init(): Cannot create pgd cache");
 }
 
-/* Put this after the callers, so that it cannot be inlined */
+/*
+ * This function cannot be __init, since exceptions don't work in that
+ * section.  Put this after the callers, so that it cannot be inlined.
+ */
 static int do_test_wp_bit(void)
 {
 	char tmp_reg;

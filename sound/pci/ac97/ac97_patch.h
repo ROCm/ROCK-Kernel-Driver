@@ -40,3 +40,4 @@ int patch_ad1885(ac97_t * ac97);
 int patch_ad1886(ac97_t * ac97);
 int patch_ad1980(ac97_t * ac97);
 int patch_alc650(ac97_t * ac97);
+int patch_cm9739(ac97_t * ac97);

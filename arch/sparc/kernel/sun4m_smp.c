@@ -26,7 +26,6 @@
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>

@@ -55,6 +55,13 @@ ia64_atomic_sub (int i, atomic_t *v)
 	return new;
 }
 
+#define atomic_add_return(i,v)						\
+	((__builtin_constant_p(i) &&					\
+	  (   (i ==  1) || (i ==  4) || (i ==  8) || (i ==  16)		\
+	   || (i == -1) || (i == -4) || (i == -8) || (i == -16)))	\
+	 ? ia64_fetch_and_add(i, &(v)->counter)				\
+	 : ia64_atomic_add(i, v))
+
 /*
  * Atomically add I to V and return TRUE if the resulting value is
  * negative.
@@ -62,15 +69,9 @@ ia64_atomic_sub (int i, atomic_t *v)
 static __inline__ int
 atomic_add_negative (int i, atomic_t *v)
 {
-	return ia64_atomic_add(i, v) < 0;
+	return atomic_add_return(i, v) < 0;
 }
 
-#define atomic_add_return(i,v)						\
-	((__builtin_constant_p(i) &&					\
-	  (   (i ==  1) || (i ==  4) || (i ==  8) || (i ==  16)		\
-	   || (i == -1) || (i == -4) || (i == -8) || (i == -16)))	\
-	 ? ia64_fetch_and_add(i, &(v)->counter)				\
-	 : ia64_atomic_add(i, v))
 
 #define atomic_sub_return(i,v)						\
 	((__builtin_constant_p(i) &&					\

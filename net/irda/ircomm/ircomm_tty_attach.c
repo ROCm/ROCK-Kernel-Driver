@@ -46,7 +46,7 @@
 #include <net/irda/ircomm_tty_attach.h>
 
 static void ircomm_tty_ias_register(struct ircomm_tty_cb *self);
-static void ircomm_tty_discovery_indication(discovery_t *discovery,
+static void ircomm_tty_discovery_indication(discinfo_t *discovery,
 					    DISCOVERY_MODE mode,
 					    void *priv);
 static void ircomm_tty_getvalue_confirm(int result, __u16 obj_id, 
@@ -305,7 +305,7 @@ int ircomm_tty_send_initial_parameters(struct ircomm_tty_cb *self)
  *    device it is, and which services it has.
  *
  */
-static void ircomm_tty_discovery_indication(discovery_t *discovery,
+static void ircomm_tty_discovery_indication(discinfo_t *discovery,
 					    DISCOVERY_MODE mode,
 					    void *priv)
 {

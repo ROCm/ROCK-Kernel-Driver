@@ -364,19 +364,8 @@ static inline int activate_task(task_t *p, runqueue_t *rq)
 		 * boosting tasks that are related to maximum-interactive
 		 * tasks.
 		 */
-		if (sleep_avg > MAX_SLEEP_AVG) {
-			if (!in_interrupt()) {
-				sleep_avg += current->sleep_avg - MAX_SLEEP_AVG;
-				if (sleep_avg > MAX_SLEEP_AVG)
-					sleep_avg = MAX_SLEEP_AVG;
-
-				if (current->sleep_avg != sleep_avg) {
-					current->sleep_avg = sleep_avg;
-					requeue_waker = 1;
-				}
-			}
+		if (sleep_avg > MAX_SLEEP_AVG)
 			sleep_avg = MAX_SLEEP_AVG;
-		}
 		if (p->sleep_avg != sleep_avg) {
 			p->sleep_avg = sleep_avg;
 			p->prio = effective_prio(p);
@@ -1722,7 +1711,7 @@ static inline task_t *find_process_by_pid(pid_t pid)
 /*
  * setscheduler - change the scheduling policy and/or RT priority of a thread.
  */
-static int setscheduler(pid_t pid, int policy, struct sched_param *param)
+static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 {
 	struct sched_param lp;
 	int retval = -EINVAL;
@@ -1815,7 +1804,7 @@ out_nounlock:
  * @param: structure containing the new RT priority.
  */
 asmlinkage long sys_sched_setscheduler(pid_t pid, int policy,
-				      struct sched_param *param)
+				      struct sched_param __user *param)
 {
 	return setscheduler(pid, policy, param);
 }
@@ -1825,7 +1814,7 @@ asmlinkage long sys_sched_setscheduler(pid_t pid, int policy,
  * @pid: the pid in question.
  * @param: structure containing the new RT priority.
  */
-asmlinkage long sys_sched_setparam(pid_t pid, struct sched_param *param)
+asmlinkage long sys_sched_setparam(pid_t pid, struct sched_param __user *param)
 {
 	return setscheduler(pid, -1, param);
 }
@@ -1861,7 +1850,7 @@ out_nounlock:
  * @pid: the pid in question.
  * @param: structure containing the RT priority.
  */
-asmlinkage long sys_sched_getparam(pid_t pid, struct sched_param *param)
+asmlinkage long sys_sched_getparam(pid_t pid, struct sched_param __user *param)
 {
 	struct sched_param lp;
 	int retval = -EINVAL;
@@ -1903,7 +1892,7 @@ out_unlock:
  * @user_mask_ptr: user-space pointer to the new cpu mask
  */
 asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
-				      unsigned long *user_mask_ptr)
+				      unsigned long __user *user_mask_ptr)
 {
 	unsigned long new_mask;
 	int retval;
@@ -1955,7 +1944,7 @@ out_unlock:
  * @user_mask_ptr: user-space pointer to hold the current cpu mask
  */
 asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
-				      unsigned long *user_mask_ptr)
+				      unsigned long __user *user_mask_ptr)
 {
 	unsigned int real_len;
 	unsigned long mask;
@@ -2121,7 +2110,7 @@ asmlinkage long sys_sched_get_priority_min(int policy)
  * this syscall writes the default timeslice value of a given process
  * into the user-space timespec buffer. A value of '0' means infinity.
  */
-asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
+asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec __user *interval)
 {
 	int retval = -EINVAL;
 	struct timespec t;
@@ -2354,7 +2343,8 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
  */
 static int migration_thread(void * data)
 {
-	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+	/* Marking "param" __user is ok, since we do a set_fs(KERNEL_DS); */
+	struct sched_param __user param = { .sched_priority = MAX_RT_PRIO-1 };
 	int cpu = (long) data;
 	runqueue_t *rq;
 	int ret;
@@ -2554,7 +2544,7 @@ void __might_sleep(char *file, int line)
 #if defined(in_atomic)
 	static unsigned long prev_jiffy;	/* ratelimiting */
 
-	if (in_atomic()) {
+	if (in_atomic() || irqs_disabled()) {
 		if (time_before(jiffies, prev_jiffy + HZ))
 			return;
 		prev_jiffy = jiffies;

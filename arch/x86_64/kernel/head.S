@@ -25,7 +25,7 @@
 
 	.text
 	.code32
-/* %bx:	 1 if comming from smp trampoline on secondary cpu */ 
+/* %bx:	 1 if coming from smp trampoline on secondary cpu */ 
 startup_32:
 	
 	/*
@@ -194,7 +194,8 @@ ENTRY(no_long_mode)
 	jmp	1b
 
 .org 0xf00
-ENTRY(pGDT32):
+	.globl pGDT32
+pGDT32:
 	.word	gdt32_end-gdt_table32
 	.long	gdt_table32-__START_KERNEL_map
 

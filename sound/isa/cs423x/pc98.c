@@ -3,6 +3,7 @@
  *  Copyright (c) by Jaroslav Kysela <perex@suse.cz>
  *                   Osamu Tomita <tomita@cinet.co.jp>
  *                   Takashi Iwai <tiwai@suse.de>
+ *                   Hideaki Okubo <okubo@msh.biglobe.ne.jp>
  *
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -290,8 +291,13 @@ static int __init pc98_cs4231_chip_init(int dev)
 		snd_printk(KERN_ERR IDENT ": Bad DMA %d\n", dma2[dev]);
 		return -EINVAL;
 	}
-	if (dma1[dev] != dma2[dev] && dma2[dev] >= 0)
+
+	outb(dma1[dev], 0x29);		/* dma1 boundary 64KB */
+	if (dma1[dev] != dma2[dev] && dma2[dev] >= 0) {
+		outb(0, 0x5f);		/* wait */
+		outb(dma2[dev], 0x29);	/* dma2 boundary 64KB */
 		intr_bits |= 0x04;
+	}
 
 	if (PC9800_SOUND_ID() == PC9800_SOUND_ID_118) {
 		/* Set up CanBe control registers. */

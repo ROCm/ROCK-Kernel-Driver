@@ -131,6 +131,16 @@ config CRYPTO_AES
 
 	  See http://csrc.nist.gov/encryption/aes/ for more information.
 
+config CRYPTO_DEFLATE
+	tristate "Deflate compression algorithm"
+	depends on CRYPTO
+	default y if INET_IPCOMP=y || INET_IPCOMP=m
+	help
+	  This is the Deflate algorithm (RFC1951), specified for use in
+	  IPSec with the IPCOMP protocol (RFC3173, RFC2394).
+	  
+	  You will most probably want this if using IPSec.
+
 config CRYPTO_TEST
 	tristate "Testing module"
 	depends on CRYPTO

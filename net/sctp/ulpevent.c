@@ -628,6 +628,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 	if (!event)
 		goto fail_init;
 
+	event->iif = sctp_chunk_iif(chunk);
 	/* Note:  Not clearing the entire event struct as
 	 * this is just a fragment of the real event.  However,
 	 * we still need to do rwnd accounting. 

@@ -1178,6 +1178,7 @@ tty3215_init(void)
 
 	memset(&tty3215_driver, 0, sizeof(struct tty_driver));
 	tty3215_driver.magic = TTY_DRIVER_MAGIC;
+	tty3215_driver.owner = THIS_MODULE;
 	tty3215_driver.driver_name = "tty3215";
 	tty3215_driver.name = "ttyS";
 	tty3215_driver.name_base = 0;

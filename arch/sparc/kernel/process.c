@@ -523,9 +523,16 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	new_stack = (((struct reg_window *) childregs) - 1);
 	copy_regwin(new_stack, (((struct reg_window *) regs) - 1));
 
+	/*
+	 * A new process must start with interrupts closed in 2.5,
+	 * because this is how Mingo's scheduler works (see schedule_tail
+	 * and finish_arch_switch). If we do not do it, a timer interrupt hits
+	 * before we unlock, attempts to re-take the rq->lock, and then we die.
+	 * Thus, kpsr|=PSR_PIL.
+	 */
 	ti->ksp = (unsigned long) new_stack;
 	ti->kpc = (((unsigned long) ret_from_fork) - 0x8);
-	ti->kpsr = current->thread.fork_kpsr;
+	ti->kpsr = current->thread.fork_kpsr | PSR_PIL;
 	ti->kwim = current->thread.fork_kwim;
 
 	/* This is used for sun4c only */

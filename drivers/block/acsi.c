@@ -763,7 +763,7 @@ static void unexpected_acsi_interrupt( void )
 static void bad_rw_intr( void )
 
 {
-	if (blk_queue_empty(QUEUE))
+	if (!CURRENT)
 		return;
 
 	if (++CURRENT->errors >= MAX_ERRORS)
@@ -837,7 +837,7 @@ static void acsi_times_out( unsigned long dummy )
 
 	do_acsi = NULL;
 	printk( KERN_ERR "ACSI timeout\n" );
-	if (blk_queue_empty(QUEUE))
+	if (!CURRENT)
 	    return;
 	if (++CURRENT->errors >= MAX_ERRORS) {
 #ifdef DEBUG
@@ -956,7 +956,7 @@ static void redo_acsi_request( void )
 	if (do_acsi)
 		return;
 
-	if (blk_queue_empty(QUEUE)) {
+	if (!CURRENT) {
 		do_acsi = NULL;
 		ENABLE_IRQ();
 		stdma_release();

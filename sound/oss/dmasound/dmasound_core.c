@@ -367,11 +367,11 @@ static int mixer_ioctl(struct inode *inode, struct file *file, u_int cmd,
 
 static struct file_operations mixer_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		mixer_ioctl,
-	open:		mixer_open,
-	release:	mixer_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= mixer_ioctl,
+	.open		= mixer_open,
+	.release	= mixer_release,
 };
 
 static void __init mixer_init(void)
@@ -1325,15 +1325,15 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 
 static struct file_operations sq_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	write:		sq_write,
-	poll:		sq_poll,
-	ioctl:		sq_ioctl,
-	open:		sq_open,
-	release:	sq_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.write		= sq_write,
+	.poll		= sq_poll,
+	.ioctl		= sq_ioctl,
+	.open		= sq_open,
+	.release	= sq_release,
 #ifdef HAS_RECORD
-	read:		NULL	/* default to no read for compat mode */
+	.read		= NULL	/* default to no read for compat mode */
 #endif
 };
 
@@ -1548,11 +1548,11 @@ static ssize_t state_read(struct file *file, char *buf, size_t count,
 }
 
 static struct file_operations state_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		state_read,
-	open:		state_open,
-	release:	state_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= state_read,
+	.open		= state_open,
+	.release	= state_release,
 };
 
 static int __init state_init(void)

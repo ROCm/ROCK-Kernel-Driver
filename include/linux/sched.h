@@ -541,6 +541,7 @@ extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 extern void unblock_all_signals(void);
 extern void release_task(struct task_struct * p);
 extern int send_sig_info(int, struct siginfo *, struct task_struct *);
+extern int send_group_sig_info(int, struct siginfo *, struct task_struct *);
 extern int force_sig_info(int, struct siginfo *, struct task_struct *);
 extern int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp);
 extern int kill_pg_info(int, struct siginfo *, pid_t);
@@ -557,6 +558,11 @@ extern int kill_sl(pid_t, int, int);
 extern int kill_proc(pid_t, int, int);
 extern int do_sigaction(int, const struct k_sigaction *, struct k_sigaction *);
 extern int do_sigaltstack(const stack_t *, stack_t *, unsigned long);
+
+/* These can be the second arg to send_sig_info/send_group_sig_info.  */
+#define SEND_SIG_NOINFO ((struct siginfo *) 0)
+#define SEND_SIG_PRIV	((struct siginfo *) 1)
+#define SEND_SIG_FORCED	((struct siginfo *) 2)
 
 /* True if we are on the alternate signal stack.  */
 
@@ -680,7 +686,11 @@ static inline int thread_group_empty(task_t *p)
 
 extern void unhash_process(struct task_struct *p);
 
-/* Protects ->fs, ->files, ->mm, and synchronises with wait4().  Nests inside tasklist_lock */
+/* Protects ->fs, ->files, ->mm, and synchronises with wait4().
+ * Nests both inside and outside of read_lock(&tasklist_lock).
+ * It must not be nested with write_lock_irq(&tasklist_lock),
+ * neither inside nor outside.
+ */
 static inline void task_lock(struct task_struct *p)
 {
 	spin_lock(&p->alloc_lock);

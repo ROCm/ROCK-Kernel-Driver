@@ -257,10 +257,10 @@ static void __do_gscd_request(unsigned long dummy)
 	unsigned int nsect;
 
 repeat:
-	if (blk_queue_empty(&gscd_queue))
+	req = elv_next_request(&gscd_queue);
+	if (!req)
 		return;
 
-	req = elv_next_request(&gscd_queue);
 	block = req->sector;
 	nsect = req->nr_sectors;
 

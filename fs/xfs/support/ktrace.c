@@ -37,7 +37,6 @@
 #include "kmem.h"
 #include "spin.h"
 #include "debug.h"
-#include "atomic.h"
 #include "ktrace.h"
 
 #if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
@@ -181,6 +180,7 @@ ktrace_enter(
 	void		*val14,
 	void		*val15)
 {
+	static lock_t   wrap_lock = SPIN_LOCK_UNLOCKED;
 	int		index;
 	ktrace_entry_t	*ktep;
 
@@ -189,7 +189,11 @@ ktrace_enter(
 	/*
 	 * Grab an entry by pushing the index up to the next one.
 	 */
-	index = atomicIncWithWrap(&ktp->kt_index, ktp->kt_nentries);
+	spin_lock(&wrap_lock);
+	index = ktp->kt_index;
+	if (++ktp->kt_index == ktp->kt_nentries)
+		ktp->kt_index = 0;
+	spin_unlock(&wrap_lock);
 
 	if (!ktp->kt_rollover && index == ktp->kt_nentries - 1)
 		ktp->kt_rollover = 1;

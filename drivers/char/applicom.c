@@ -29,22 +29,12 @@
 #include <linux/pci.h>
 #include <linux/wait.h>
 #include <linux/init.h>
-#include <linux/compatmac.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
 #include "applicom.h"
 
-#if LINUX_VERSION_CODE < 0x20300 
-/* These probably want adding to <linux/compatmac.h> */
-#define init_waitqueue_head(x) do { *(x) = NULL; } while (0)
-#define PCI_BASE_ADDRESS(dev) (dev->base_address[0])
-#define DECLARE_WAIT_QUEUE_HEAD(x) struct wait_queue *x
-#define __setup(x,y) /* */
-#else
-#define PCI_BASE_ADDRESS(dev) (dev->resource[0].start)
-#endif
 
 /* NOTE: We use for loops with {write,read}b() instead of 
    memcpy_{from,to}io throughout this driver. This is because
@@ -220,18 +210,18 @@ int __init applicom_init(void)
 		if (pci_enable_device(dev))
 			return -EIO;
 
-		RamIO = ioremap(PCI_BASE_ADDRESS(dev), LEN_RAM_IO);
+		RamIO = ioremap(dev->resource[0].start, LEN_RAM_IO);
 
 		if (!RamIO) {
-			printk(KERN_INFO "ac.o: Failed to ioremap PCI memory space at 0x%lx\n", PCI_BASE_ADDRESS(dev));
+			printk(KERN_INFO "ac.o: Failed to ioremap PCI memory space at 0x%lx\n", dev->resource[0].start);
 			return -EIO;
 		}
 
 		printk(KERN_INFO "Applicom %s found at mem 0x%lx, irq %d\n",
-		       applicom_pci_devnames[dev->device-1], PCI_BASE_ADDRESS(dev), 
+		       applicom_pci_devnames[dev->device-1], dev->resource[0].start, 
 		       dev->irq);
 
-		if (!(boardno = ac_register_board(PCI_BASE_ADDRESS(dev),
+		if (!(boardno = ac_register_board(dev->resource[0].start,
 						  (unsigned long)RamIO,0))) {
 			printk(KERN_INFO "ac.o: PCI Applicom device doesn't have correct signature.\n");
 			iounmap(RamIO);

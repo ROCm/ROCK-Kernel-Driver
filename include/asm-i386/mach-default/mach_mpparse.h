@@ -4,7 +4,7 @@
 static inline void mpc_oem_bus_info(struct mpc_config_bus *m, char *name, 
 				struct mpc_config_translation *translation)
 {
-	Dprintk("Bus #%d is %s\n", m->mpc_busid, name);
+//	Dprintk("Bus #%d is %s\n", m->mpc_busid, name);
 }
 
 static inline void mpc_oem_pci_bus(struct mpc_config_bus *m, 

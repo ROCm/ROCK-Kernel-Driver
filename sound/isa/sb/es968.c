@@ -69,7 +69,7 @@ struct snd_card_es968 {
 	struct pnp_dev *dev;
 };
 
-static struct pnp_card_id snd_es968_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_es968_pnpids[] __devinitdata = {
 	{ .id = "ESS0968", .devs = { { "@@@0968" }, } },
 	{ .id = "", } /* end */
 };
@@ -90,12 +90,12 @@ static void snd_card_es968_interrupt(int irq, void *dev_id,
 	}
 }
 
-static int __devinit snd_card_es968_isapnp(int dev, struct snd_card_es968 *acard,
+static int __devinit snd_card_es968_pnp(int dev, struct snd_card_es968 *acard,
 					struct pnp_card_link *card,
-					const struct pnp_card_id *id)
+					const struct pnp_card_device_id *id)
 {
 	struct pnp_dev *pdev;
-	struct pnp_resource_table * cfg = kmalloc(GFP_ATOMIC, sizeof(struct pnp_resource_table));
+	struct pnp_resource_table *cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
 	int err;
 	if (!cfg)
 		return -ENOMEM;
@@ -117,10 +117,10 @@ static int __devinit snd_card_es968_isapnp(int dev, struct snd_card_es968 *acard
 	if (irq[dev] != SNDRV_AUTO_IRQ)
 		pnp_resource_change(&cfg->irq_resource[0], irq[dev], 1);
 	if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
-		printk(KERN_ERR PFX "AUDIO the requested resources are invalid, using auto config\n");
+		snd_printk(KERN_ERR PFX "AUDIO the requested resources are invalid, using auto config\n");
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
-		printk(KERN_ERR PFX "AUDIO pnp configure failure\n");
+		snd_printk(KERN_ERR PFX "AUDIO pnp configure failure\n");
 		return err;
 	}
 	port[dev] = pnp_port_start(pdev, 0);
@@ -133,7 +133,7 @@ static int __devinit snd_card_es968_isapnp(int dev, struct snd_card_es968 *acard
 
 static int __init snd_card_es968_probe(int dev,
 					struct pnp_card_link *pcard,
-					const struct pnp_card_id *pid)
+					const struct pnp_card_device_id *pid)
 {
 	int error;
 	sb_t *chip;
@@ -144,7 +144,7 @@ static int __init snd_card_es968_probe(int dev,
 				 sizeof(struct snd_card_es968))) == NULL)
 		return -ENOMEM;
 	acard = (struct snd_card_es968 *)card->private_data;
-	if ((error = snd_card_es968_isapnp(dev, acard, pcard, pid))) {
+	if ((error = snd_card_es968_pnp(dev, acard, pcard, pid))) {
 		snd_card_free(card);
 		return error;
 	}
@@ -188,7 +188,7 @@ static int __init snd_card_es968_probe(int dev,
 }
 
 static int __devinit snd_es968_pnp_detect(struct pnp_card_link *card,
-                                          const struct pnp_card_id *id)
+                                          const struct pnp_card_device_id *id)
 {
 	static int dev;
 	int res;
@@ -223,7 +223,12 @@ static struct pnp_card_driver es968_pnpc_driver = {
 
 static int __init alsa_card_es968_init(void)
 {
-	return (pnp_register_card_driver(&es968_pnpc_driver) ? 0 : -ENODEV);
+	int res = pnp_register_card_driver(&es968_pnpc_driver);
+#ifdef MODULE
+	if (res == 0)
+		snd_printk(KERN_ERR "no ES968 based soundcards found\n");
+#endif
+	return res < 0 ? res : 0;
 }
 
 static void __exit alsa_card_es968_exit(void)

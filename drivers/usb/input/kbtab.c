@@ -91,7 +91,7 @@ static void kbtab_irq(struct urb *urb, struct pt_regs *regs)
 }
 
 struct usb_device_id kbtab_ids[] = {
-	{ USB_DEVICE(USB_VENDOR_ID_KBGEAR, 0x1001), driver_info : 0 },
+	{ USB_DEVICE(USB_VENDOR_ID_KBGEAR, 0x1001), .driver_info = 0 },
 	{ }
 };
 

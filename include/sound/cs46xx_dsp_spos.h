@@ -52,17 +52,18 @@
 #define DSP_MAX_TASK_DESC   50
 
 #define DSP_MAX_PCM_CHANNELS 32
-#define DSP_MAX_SRC_NR       6
+#define DSP_MAX_SRC_NR       14
 
-#define DSP_PCM_MAIN_CHANNEL    1
-#define DSP_PCM_REAR_CHANNEL    2
-#define DSP_PCM_CENTER_CHANNEL  3
-#define DSP_PCM_LFE_CHANNEL     4
-#define DSP_IEC958_CHANNEL      5
+#define DSP_PCM_MAIN_CHANNEL        1
+#define DSP_PCM_REAR_CHANNEL        2
+#define DSP_PCM_CENTER_LFE_CHANNEL  3
+#define DSP_PCM_S71_CHANNEL         4 /* surround 7.1 */
+#define DSP_IEC958_CHANNEL          5
 
-#define DSP_SPDIF_STATUS_OUTPUT_ENABLED 1
-#define DSP_SPDIF_STATUS_PLAYBACK_OPEN  2
-#define DSP_SPDIF_STATUS_HW_ENABLED     4
+#define DSP_SPDIF_STATUS_OUTPUT_ENABLED       1
+#define DSP_SPDIF_STATUS_PLAYBACK_OPEN        2
+#define DSP_SPDIF_STATUS_HW_ENABLED           4
+#define DSP_SPDIF_STATUS_INPUT_CTRL_ENABLED   8
 
 struct _dsp_module_desc_t;
 
@@ -157,8 +158,11 @@ typedef struct _dsp_spos_instance_t {
 	u16 dac_volume_right;
 	u16 dac_volume_left;
 
-	/* Rear PCM playback mixer */
+	/* Rear/surround PCM playback mixer */
 	dsp_scb_descriptor_t * rear_mix_scb;
+
+	/* Center/LFE mixer */
+	dsp_scb_descriptor_t * center_lfe_mix_scb;
 
 	int npcm_channels;
 	int nsrc_scb;

@@ -17,14 +17,23 @@ extern spinlock_t i8259A_lock;
 extern spinlock_t i8253_lock;
 #include "do_timer.h"
 
-static int init_pit(void)
+static int __init init_pit(char* override)
 {
+	/* check clock override */
+	if (override[0] && strncmp(override,"pit",3))
+		printk(KERN_ERR "Warning: clock= override failed. Defaulting to PIT\n");
+
 	return 0;
 }
 
 static void mark_offset_pit(void)
 {
 	/* nothing needed */
+}
+
+static unsigned long long monotonic_clock_pit(void)
+{
+	return 0;
 }
 
 static void delay_pit(unsigned long loops)
@@ -141,5 +150,6 @@ struct timer_opts timer_pit = {
 	.init =		init_pit, 
 	.mark_offset =	mark_offset_pit, 
 	.get_offset =	get_offset_pit,
+	.monotonic_clock = monotonic_clock_pit,
 	.delay = delay_pit,
 };

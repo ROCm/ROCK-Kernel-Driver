@@ -49,10 +49,10 @@
 #include <asm/tlbflush.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
-#include "smpboot_hooks.h"
 
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
+#include <smpboot_hooks.h>
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -422,7 +422,7 @@ void __init smp_callin(void)
 	/*
 	 *      Synchronize the TSC with the BP
 	 */
-	if (cpu_has_tsc)
+	if (cpu_has_tsc && cpu_khz)
 		synchronize_tsc_ap();
 }
 
@@ -823,13 +823,7 @@ static int __init do_boot_cpu(int apicid)
 
 	store_NMI_vector(&nmi_high, &nmi_low);
 
-	CMOS_WRITE(0xa, 0xf);
-	local_flush_tlb();
-	Dprintk("1.\n");
-	*((volatile unsigned short *) TRAMPOLINE_HIGH) = start_eip >> 4;
-	Dprintk("2.\n");
-	*((volatile unsigned short *) TRAMPOLINE_LOW) = start_eip & 0xf;
-	Dprintk("3.\n");
+	smpboot_setup_warm_reset_vector(start_eip);
 
 	/*
 	 * Starting actual IPI sequence...
@@ -1045,7 +1039,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * Cleanup possible dangling ends...
 	 */
-	smpboot_setup_warm_reset_vector();
+	smpboot_restore_warm_reset_vector();
 
 	/*
 	 * Allow the user to impress friends.
@@ -1114,7 +1108,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * Synchronize the TSC with the AP
 	 */
-	if (cpu_has_tsc && cpucount)
+	if (cpu_has_tsc && cpucount && cpu_khz)
 		synchronize_tsc_bp();
 }
 

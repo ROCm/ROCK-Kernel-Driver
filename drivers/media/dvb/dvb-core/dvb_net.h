@@ -32,23 +32,9 @@
 #include "dvbdev.h"
 
 #define DVB_NET_DEVICES_MAX 10
-#define DVB_NET_MULTICAST_MAX 10
 
-typedef struct dvb_net_priv_s {
-        struct net_device_stats stats;
-        char name[6];
-	u16 pid;
-        dmx_demux_t *demux;
-	dmx_section_feed_t *secfeed;
-	dmx_section_filter_t *secfilter;
-	int multi_num;
-	dmx_section_filter_t *multi_secfilter[DVB_NET_MULTICAST_MAX];
-	unsigned char multi_macs[DVB_NET_MULTICAST_MAX][6];
-} dvb_net_priv_t;
-
-typedef struct dvb_net_s {
+typedef struct dvb_net {
 	struct dvb_device *dvbdev;
-
 	int card_num;
 	int dev_num;
 	struct net_device device[DVB_NET_DEVICES_MAX];
@@ -57,7 +43,8 @@ typedef struct dvb_net_s {
 } dvb_net_t;
 
 
-void dvb_net_release(dvb_net_t *);
-int  dvb_net_init(struct dvb_adapter *, dvb_net_t *, dmx_demux_t *);
+void dvb_net_release(struct dvb_net *);
+int  dvb_net_init(struct dvb_adapter *, struct dvb_net *, dmx_demux_t *);
 
 #endif
+

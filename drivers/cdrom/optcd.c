@@ -977,7 +977,7 @@ static int update_toc(void)
 
 static int current_valid(void)
 {
-        return !blk_queue_empty(QUEUE) &&
+        return CURRENT &&
 		CURRENT->cmd == READ &&
 		CURRENT->sector != -1;
 }
@@ -1598,18 +1598,16 @@ static int cdromsubchnl(unsigned long arg)
 }
 
 
+static struct gendisk *optcd_disk;
+
+
 static int cdromread(unsigned long arg, int blocksize, int cmd)
 {
-	int status, ret = 0;
+	int status;
 	struct cdrom_msf msf;
-	char *buf;
 
 	if (copy_from_user(&msf, (void *) arg, sizeof msf))
 		return -EFAULT;
-
-	buf = kmalloc(CD_FRAMESIZE_RAWER, GFP_KERNEL);
-	if (!buf)
-		return -ENOMEM;
 
 	bin2bcd(&msf);
 	msf.cdmsf_min1 = 0;
@@ -1619,19 +1617,15 @@ static int cdromread(unsigned long arg, int blocksize, int cmd)
 
 	DEBUG((DEBUG_VFS, "read cmd status 0x%x", status));
 
-	if (!sleep_flag_low(FL_DTEN, SLEEP_TIMEOUT)) {
-		ret = -EIO;
-		goto cdr_free;
-	}
+	if (!sleep_flag_low(FL_DTEN, SLEEP_TIMEOUT))
+		return -EIO;
 
-	fetch_data(buf, blocksize);
+	fetch_data(optcd_disk->private_data, blocksize);
 
-	if (copy_to_user((void *)arg, &buf, blocksize))
-		ret = -EFAULT;
+	if (copy_to_user((void *)arg, optcd_disk->private_data, blocksize))
+		return -EFAULT;
 
-cdr_free:
-	kfree(buf);
-	return ret;
+	return 0;
 }
 
 
@@ -1857,6 +1851,14 @@ static int opt_open(struct inode *ip, struct file *fp)
 
 	if (!open_count && state == S_IDLE) {
 		int status;
+		char *buf;
+
+		buf = kmalloc(CD_FRAMESIZE_RAWER, GFP_KERNEL);
+		if (!buf) {
+			printk(KERN_INFO "optcd: cannot allocate read buffer\n");
+			return -ENOMEM;
+		}
+		optcd_disk->private_data = buf;		/* save read buffer */
 
 		toc_uptodate = 0;
 		opt_invalidate_buffers();
@@ -1922,6 +1924,7 @@ static int opt_release(struct inode *ip, struct file *fp)
 			status = exec_cmd(COMOPEN);
 			DEBUG((DEBUG_VFS, "exec_cmd COMOPEN: %02x", -status));
 		}
+		kfree(optcd_disk->private_data);
 		del_timer(&delay_timer);
 		del_timer(&req_timer);
 	}
@@ -2009,8 +2012,6 @@ static int optcd_setup(char *str)
 __setup("optcd=", optcd_setup);
 
 #endif /* MODULE */
-
-static struct gendisk *optcd_disk;
 
 /* Test for presence of drive and initialize it. Called at boot time
    or during module initialisation. */

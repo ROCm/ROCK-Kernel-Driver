@@ -217,6 +217,10 @@ void __init generic_identify(struct cpuinfo_x86 * c)
 			c->x86_capability[4] = excap;
 			c->x86 = (tfms >> 8) & 15;
 			c->x86_model = (tfms >> 4) & 15;
+			if (c->x86 == 0xf) {
+				c->x86 += (tfms >> 20) & 0xff;
+				c->x86_model += ((tfms >> 16) & 0xF) << 4;
+			} 
 			c->x86_mask = tfms & 15;
 		} else {
 			/* Have CPUID level 0 only - unheard of */

@@ -6,6 +6,7 @@
  * Rewritten. Old one was good in 2.2, but in 2.3 it was immoral. --ANK (990903)
  */
 
+#include <linux/module.h>
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
@@ -50,20 +51,18 @@ static inline void wakeup_softirqd(unsigned cpu)
 		wake_up_process(tsk);
 }
 
-asmlinkage void do_softirq()
+asmlinkage void do_softirq(void)
 {
 	__u32 pending;
 	unsigned long flags;
 	__u32 mask;
-	int cpu;
 
 	if (in_interrupt())
 		return;
 
 	local_irq_save(flags);
-	cpu = smp_processor_id();
 
-	pending = softirq_pending(cpu);
+	pending = local_softirq_pending();
 
 	if (pending) {
 		struct softirq_action *h;
@@ -72,7 +71,7 @@ asmlinkage void do_softirq()
 		local_bh_disable();
 restart:
 		/* Reset the pending bitmask before enabling irqs */
-		softirq_pending(cpu) = 0;
+		local_softirq_pending() = 0;
 
 		local_irq_enable();
 
@@ -87,18 +86,29 @@ restart:
 
 		local_irq_disable();
 
-		pending = softirq_pending(cpu);
+		pending = local_softirq_pending();
 		if (pending & mask) {
 			mask &= ~pending;
 			goto restart;
 		}
 		if (pending)
-			wakeup_softirqd(cpu);
+			wakeup_softirqd(smp_processor_id());
 		__local_bh_enable();
 	}
 
 	local_irq_restore(flags);
 }
+
+void local_bh_enable(void)
+{
+	__local_bh_enable();
+	BUG_ON(irqs_disabled());
+	if (unlikely(!in_interrupt() &&
+		     local_softirq_pending()))
+		do_softirq();
+	preempt_check_resched();
+}
+EXPORT_SYMBOL(local_bh_enable);
 
 /*
  * This function must run with irqs disabled!
@@ -286,7 +296,7 @@ static struct notifier_block tasklet_nb = {
 	.next		= NULL,
 };
 
-void __init softirq_init()
+void __init softirq_init(void)
 {
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
@@ -314,12 +324,12 @@ static int ksoftirqd(void * __bind_cpu)
 	ksoftirqd_task(cpu) = current;
 
 	for (;;) {
-		if (!softirq_pending(cpu))
+		if (!local_softirq_pending())
 			schedule();
 
 		__set_current_state(TASK_RUNNING);
 
-		while (softirq_pending(cpu)) {
+		while (local_softirq_pending()) {
 			do_softirq();
 			cond_resched();
 		}

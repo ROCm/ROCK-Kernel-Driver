@@ -522,7 +522,8 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	spin_lock(&call_lock);
 	call_data = &data;
-	wmb();
+	mb();
+	
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_VECTOR);
 

@@ -1876,10 +1876,10 @@ static void do_cciss_request(request_queue_t *q)
 		goto startio;
 
 queue:
-	if (blk_queue_empty(q))
+	creq = elv_next_request(q);
+	if (!creq)
 		goto startio;
 
-	creq = elv_next_request(q);
 	if (creq->nr_phys_segments > MAXSGENTRIES)
                 BUG();
 

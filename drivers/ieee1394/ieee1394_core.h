@@ -231,4 +231,7 @@ extern devfs_handle_t ieee1394_devfs_handle;
 /* the proc_fs entry for /proc/ieee1394 */
 extern struct proc_dir_entry *ieee1394_procfs_entry;
 
+/* Our sysfs bus entry */
+extern struct bus_type ieee1394_bus_type;
+
 #endif /* _IEEE1394_CORE_H */

@@ -2,16 +2,17 @@
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
 
+#define DRMFILE                         struct file *
 #define DRM_IOCTL_ARGS			struct inode *inode, struct file *filp, unsigned int cmd, unsigned long data
 #define DRM_ERR(d)			-(d)
 #define DRM_CURRENTPID			current->pid
 #define DRM_UDELAY(d)			udelay(d)
-#define DRM_READ8(addr)			readb(addr)
-#define DRM_READ32(addr)		readl(addr)
-#define DRM_WRITE8(addr, val)		writeb(val, addr)
-#define DRM_WRITE32(addr, val)		writel(val, addr)
-#define DRM_READMEMORYBARRIER()		mb()
-#define DRM_WRITEMEMORYBARRIER()	wmb()
+#define DRM_READ8(map, offset)		readb(((unsigned long)(map)->handle) + (offset))
+#define DRM_READ32(map, offset)		readl(((unsigned long)(map)->handle) + (offset))
+#define DRM_WRITE8(map, offset, val)	writeb(val, ((unsigned long)(map)->handle) + (offset))
+#define DRM_WRITE32(map, offset, val)	writel(val, ((unsigned long)(map)->handle) + (offset))
+#define DRM_READMEMORYBARRIER(map)	mb()
+#define DRM_WRITEMEMORYBARRIER(map)	wmb()
 #define DRM_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
 
@@ -41,13 +42,12 @@
 
 /* malloc/free without the overhead of DRM(alloc) */
 #define DRM_MALLOC(x) kmalloc(x, GFP_KERNEL)
-#define DRM_FREE(x) kfree(x)
+#define DRM_FREE(x,size) kfree(x)
 
 #define DRM_GETSAREA()							 \
 do { 									 \
-	struct list_head *list;						 \
-	list_for_each( list, &dev->maplist->head ) {			 \
-		drm_map_list_t *entry = (drm_map_list_t *)list;		 \
+	drm_map_list_t *entry;						 \
+	list_for_each_entry( entry, &dev->maplist->head, head ) {	 \
 		if ( entry->map &&					 \
 		     entry->map->type == _DRM_SHM &&			 \
 		     (entry->map->flags & _DRM_CONTAINS_LOCK) ) {	 \
@@ -59,28 +59,28 @@ do { 									 \
 
 #define DRM_HZ HZ
 
-#define DRM_WAIT_ON( ret, queue, timeout, condition )	\
-do {							\
-	DECLARE_WAITQUEUE(entry, current);		\
-	unsigned long end = jiffies + (timeout);	\
-	add_wait_queue(&(queue), &entry);		\
-							\
-	for (;;) {					\
-		current->state = TASK_INTERRUPTIBLE;	\
-		if (condition) 				\
-			break;				\
-		if((signed)(end - jiffies) <= 0) {	\
-			ret = -EBUSY;			\
-			break;				\
-		}					\
+#define DRM_WAIT_ON( ret, queue, timeout, condition )		\
+do {								\
+	DECLARE_WAITQUEUE(entry, current);			\
+	unsigned long end = jiffies + (timeout);		\
+	add_wait_queue(&(queue), &entry);			\
+								\
+	for (;;) {						\
+		current->state = TASK_INTERRUPTIBLE;		\
+		if (condition)					\
+			break;					\
+		if (time_after_eq(jiffies, end)) {		\
+			ret = -EBUSY;				\
+			break;					\
+		}						\
 		schedule_timeout((HZ/100 > 1) ? HZ/100 : 1);	\
-		if (signal_pending(current)) {		\
-			ret = -EINTR;			\
-			break;				\
-		}					\
-	}						\
-	current->state = TASK_RUNNING;			\
-	remove_wait_queue(&(queue), &entry);		\
+		if (signal_pending(current)) {			\
+			ret = -EINTR;				\
+			break;					\
+		}						\
+	}							\
+	current->state = TASK_RUNNING;				\
+	remove_wait_queue(&(queue), &entry);			\
 } while (0)
 
 

@@ -670,6 +670,7 @@ int fb_prepare_logo(struct fb_info *info)
 	case FB_VISUAL_MONO10:
 		fb_logo.needs_logo = 1;
 		break;
+	case FB_VISUAL_PSEUDOCOLOR:
 	case FB_VISUAL_STATIC_PSEUDOCOLOR:
 		if (fb_logo.depth >= 8) {
 			fb_logo.needs_logo = 8;

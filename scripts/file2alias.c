@@ -81,10 +81,14 @@ static int do_usb_entry(const char *filename,
 	return 1;
 }
 
-/* Looks like: pci:vNdNsvNsdNcN. */
+/* Looks like: pci:vNdNsvNsdNbcNscNiN. */
 static int do_pci_entry(const char *filename,
 			struct pci_device_id *id, char *alias)
 {
+	/* Class field can be divided into these three. */
+	unsigned char baseclass, subclass, interface,
+		baseclass_mask, subclass_mask, interface_mask;
+
 	id->vendor = TO_NATIVE(id->vendor);
 	id->device = TO_NATIVE(id->device);
 	id->subvendor = TO_NATIVE(id->subvendor);
@@ -97,13 +101,26 @@ static int do_pci_entry(const char *filename,
 	ADD(alias, "d", id->device != PCI_ANY_ID, id->device);
 	ADD(alias, "sv", id->subvendor != PCI_ANY_ID, id->subvendor);
 	ADD(alias, "sd", id->subdevice != PCI_ANY_ID, id->subdevice);
-	if (id->class_mask != 0 && id->class_mask != ~0) {
+
+	baseclass = (id->class) >> 16;
+	baseclass_mask = (id->class_mask) >> 16;
+	subclass = (id->class) >> 8;
+	subclass_mask = (id->class_mask) >> 8;
+	interface = id->class;
+	interface_mask = id->class_mask;
+
+	if ((baseclass_mask != 0 && baseclass_mask != 0xFF)
+	    || (subclass_mask != 0 && subclass_mask != 0xFF)
+	    || (interface_mask != 0 && interface_mask != 0xFF)) {
 		fprintf(stderr,
-			"*** Warning: Can't handle class_mask in %s:%04X\n",
+			"*** Warning: Can't handle masks in %s:%04X\n",
 			filename, id->class_mask);
 		return 0;
 	}
-	ADD(alias, "c", id->class_mask == ~0, id->class);
+
+	ADD(alias, "bc", baseclass_mask == 0xFF, baseclass);
+	ADD(alias, "sc", subclass_mask == 0xFF, subclass);
+	ADD(alias, "i", interface_mask == 0xFF, interface);
 	return 1;
 }
 

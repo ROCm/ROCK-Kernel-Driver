@@ -60,7 +60,7 @@
  * To avoid associated bogus bug reports, we flatly refuse to compile
  * with a gcc that is known to be too old from the very beginning.
  */
-#if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 91)
+#if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 95)
 #error Sorry, your GCC is too old. It builds incorrect kernels.
 #endif
 
@@ -463,6 +463,15 @@ asmlinkage void __init start_kernel(void)
 	rest_init();
 }
 
+int __initdata initcall_debug;
+
+static int __init initcall_debug_setup(char *str)
+{
+	initcall_debug = 1;
+	return 1;
+}
+__setup("initcall_debug", initcall_debug_setup);
+
 struct task_struct *child_reaper = &init_task;
 
 extern initcall_t __initcall_start, __initcall_end;
@@ -470,12 +479,30 @@ extern initcall_t __initcall_start, __initcall_end;
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
+	int count = preempt_count();
 
-	call = &__initcall_start;
-	do {
+	for (call = &__initcall_start; call < &__initcall_end; call++) {
+		char *msg;
+
+		if (initcall_debug)
+			printk("calling initcall 0x%p\n", *call);
+
 		(*call)();
-		call++;
-	} while (call < &__initcall_end);
+
+		msg = NULL;
+		if (preempt_count() != count) {
+			msg = "preemption imbalance";
+			preempt_count() = count;
+		}
+		if (irqs_disabled()) {
+			msg = "disabled interrupts";
+			local_irq_enable();
+		}
+		if (msg) {
+			printk("error in initcall at 0x%p: "
+				"returned with %s\n", *call, msg);
+		}
+	}
 
 	/* Make sure there is no pending stuff from the initcall sequence */
 	flush_scheduled_work();

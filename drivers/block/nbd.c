@@ -337,9 +337,9 @@ void nbd_clear_que(struct nbd_device *lo)
 
 static void do_nbd_request(request_queue_t * q)
 {
-
-	while (!blk_queue_empty(q)) {
-		struct request *req = elv_next_request(q);
+	struct request *req;
+	
+	while ((req = elv_next_request(q)) != NULL) {
 		struct nbd_device *lo;
 
 		if (!(req->flags & REQ_CMD))

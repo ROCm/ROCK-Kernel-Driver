@@ -277,6 +277,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			pte_chain_lock(page);
 			mapping = page->mapping;
 		}
+#endif /* CONFIG_SWAP */
 
 		/*
 		 * The page is mapped into the page tables of one or more
@@ -284,7 +285,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 */
 		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
-			case SWAP_ERROR:
 			case SWAP_FAIL:
 				pte_chain_unlock(page);
 				goto activate_locked;
@@ -295,7 +295,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				; /* try to free the page below */
 			}
 		}
-#endif /* CONFIG_SWAP */
 		pte_chain_unlock(page);
 
 		/*
@@ -326,7 +325,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto keep_locked;
 			if (!may_write_to_queue(mapping->backing_dev_info))
 				goto keep_locked;
-			write_lock(&mapping->page_lock);
+			spin_lock(&mapping->page_lock);
 			if (test_clear_page_dirty(page)) {
 				int res;
 				struct writeback_control wbc = {
@@ -337,7 +336,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				};
 
 				list_move(&page->list, &mapping->locked_pages);
-				write_unlock(&mapping->page_lock);
+				spin_unlock(&mapping->page_lock);
 
 				SetPageReclaim(page);
 				res = mapping->a_ops->writepage(page, &wbc);
@@ -352,7 +351,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				}
 				goto keep;
 			}
-			write_unlock(&mapping->page_lock);
+			spin_unlock(&mapping->page_lock);
 		}
 
 		/*
@@ -386,7 +385,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		if (!mapping)
 			goto keep_locked;	/* truncate got there first */
 
-		write_lock(&mapping->page_lock);
+		spin_lock(&mapping->page_lock);
 
 		/*
 		 * The non-racy check for busy page.  It is critical to check
@@ -394,7 +393,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * not in use by anybody. 	(pagecache + us == 2)
 		 */
 		if (page_count(page) != 2 || PageDirty(page)) {
-			write_unlock(&mapping->page_lock);
+			spin_unlock(&mapping->page_lock);
 			goto keep_locked;
 		}
 
@@ -402,7 +401,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		if (PageSwapCache(page)) {
 			swp_entry_t swap = { .val = page->index };
 			__delete_from_swap_cache(page);
-			write_unlock(&mapping->page_lock);
+			spin_unlock(&mapping->page_lock);
 			swap_free(swap);
 			__put_page(page);	/* The pagecache ref */
 			goto free_it;
@@ -410,7 +409,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 #endif /* CONFIG_SWAP */
 
 		__remove_from_page_cache(page);
-		write_unlock(&mapping->page_lock);
+		spin_unlock(&mapping->page_lock);
 		__put_page(page);
 
 free_it:

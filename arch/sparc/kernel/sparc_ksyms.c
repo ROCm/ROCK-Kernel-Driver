@@ -40,7 +40,6 @@
 #include <asm/smp.h>
 #include <asm/mostek.h>
 #include <asm/ptrace.h>
-#include <asm/softirq.h>
 #include <asm/hardirq.h>
 #include <asm/user.h>
 #include <asm/uaccess.h>
@@ -128,6 +127,7 @@ EXPORT_SYMBOL(__down_trylock);
 EXPORT_SYMBOL(__down_interruptible);
 
 EXPORT_SYMBOL(sparc_valid_addr_bitmap);
+EXPORT_SYMBOL(phys_base);
 
 /* Atomic operations. */
 EXPORT_SYMBOL_PRIVATE(_atomic_add);

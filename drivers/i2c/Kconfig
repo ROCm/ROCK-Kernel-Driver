@@ -142,6 +142,17 @@ config I2C_ELEKTOR
 	  <file:Documentation/modules.txt>.
 	  The module will be called i2c-elektor.
 
+config I2C_KEYWEST
+	tristate "Powermac Keywest I2C interface"
+	depends on I2C && ALL_PPC
+	help
+	  This supports the use of the I2C interface in the combo-I/O
+	  chip on recent Apple machines.  Say Y if you have such a machine.
+
+	  This driver is also available as a module.  If you want to compile
+	  it as a module, say M here and read Documentation/modules.txt.
+	  The module will be called i2c-keywest.
+
 config ITE_I2C_ALGO
 	tristate "ITE I2C Algorithm"
 	depends on MIPS_ITE8172 && I2C
@@ -195,17 +206,6 @@ config I2C_CHARDEV
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 	  The module will be called i2c-dev.
-
-config I2C_PROC
-	tristate "I2C /proc interface (required for hardware sensors)"
-	depends on I2C && SYSCTL
-	help
-	  This provides support for i2c device entries in the /proc filesystem.
-	  The entries will be found in /proc/sys/dev/sensors.
-
-	  This code is also available as a module. If you want to compile
-	  it as a module, say M here and read <file:Documentation/modules.txt>.
-	  The module will be called i2c-proc.
 
 	source drivers/i2c/busses/Kconfig
 	source drivers/i2c/chips/Kconfig

@@ -17,14 +17,14 @@
 #include <asm/posix_types.h>
 
 struct stat {
-	__kernel_dev_t	st_dev;
-	__kernel_ino_t	st_ino;
-	__kernel_mode_t	st_mode;
-	__kernel_nlink_t st_nlink;
-	__kernel_uid_t 	st_uid;
-	__kernel_gid_t 	st_gid;
-	__kernel_dev_t	st_rdev;
-	__kernel_off_t	st_size;
+	unsigned int	st_dev;
+	unsigned long	st_ino;
+	unsigned int	st_mode;
+	unsigned int	st_nlink;
+	unsigned int 	st_uid;
+	unsigned int 	st_gid;
+	unsigned int	st_rdev;
+	long		st_size;
 	unsigned long	st_blksize;
 	unsigned long	st_blocks;
 	unsigned long	st_atime;
@@ -38,23 +38,21 @@ struct stat {
 };
 
 struct stat64 {
-	__kernel_dev_t	st_dev;
-	unsigned long	__unused0;
+	unsigned long long	st_dev;
 	unsigned long	__unused1;
 
-	__kernel_ino64_t st_ino;
+	unsigned long long	st_ino;
 
-	__kernel_mode_t	st_mode;
-	__kernel_nlink_t st_nlink;
+	unsigned int	st_mode;
+	unsigned int	st_nlink;
 
-	__kernel_uid_t	st_uid;
-	__kernel_gid_t	st_gid;
+	unsigned int	st_uid;
+	unsigned int	st_gid;
 
-	__kernel_dev_t	st_rdev;
-	unsigned long	__unused2;
+	unsigned long long	st_rdev;
 	unsigned long	__unused3;
 
-	__kernel_loff_t	st_size;
+	long long	st_size;
 	unsigned long	st_blksize;
 
 	unsigned long	st_blocks; /* No. of 512-byte blocks allocated */

@@ -592,15 +592,8 @@ static void __init init_setup_pdc20270 (struct pci_dev *dev, ide_pci_device_t *d
 			if ((findev->vendor == dev->vendor) &&
 			    (findev->device == dev->device) &&
 			    (PCI_SLOT(findev->devfn) & 2)) {
-				u8 irq = 0, irq2 = 0;
-				pci_read_config_byte(dev,
-					PCI_INTERRUPT_LINE, &irq);
-				pci_read_config_byte(findev,
-					PCI_INTERRUPT_LINE, &irq2);
-				if (irq != irq2) {
+				if (findev->irq != dev->irq) {
 					findev->irq = dev->irq;
-					pci_write_config_byte(findev,
-						PCI_INTERRUPT_LINE, irq);
 				}
 				ide_setup_pci_devices(dev, findev, d);
 				return;

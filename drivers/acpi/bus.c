@@ -676,7 +676,7 @@ error0:
 	return_VALUE(-ENODEV);
 }
 
-decl_subsys(acpi,NULL);
+decl_subsys(acpi,NULL,NULL);
 
 static int __init acpi_init (void)
 {

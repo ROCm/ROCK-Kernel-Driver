@@ -1135,9 +1135,9 @@ static void do_ftl_request(struct request_queue *q)
 
 	do {
 		//	    sti();
-		if (blk_queue_empty(q))
-			return;
 		req = elv_next_request(q);
+		if (!req)
+			return;
 		part = req->rq_disk->private_data;
 		if (part) {
 			ret = 0;

@@ -2976,7 +2976,7 @@ static int ia_pkt_tx (struct atm_vcc *vcc, struct sk_buff *skb) {
            make it  aligned on a 48 byte boundary.  */
 	total_len = skb->len + sizeof(struct cpcs_trailer);  
 	total_len = ((total_len + 47) / 48) * 48;
-	IF_TX(printk("ia packet len:%d padding:%d\n", total_len, pad);)  
+	IF_TX(printk("ia packet len:%d padding:%d\n", total_len, total_len - skb->len);)  
  
 	/* Put the packet in a tx buffer */   
 	trailer = iadev->tx_buf[desc-1].cpcs;
@@ -3281,7 +3281,7 @@ static struct pci_driver ia_driver = {
 	.name =         DEV_LABEL,
 	.id_table =     ia_pci_tbl,
 	.probe =        ia_init_one,
-	.remove =       ia_remove_one,
+	.remove =       __devexit_p(ia_remove_one),
 };
 
 static int __init ia_module_init(void)

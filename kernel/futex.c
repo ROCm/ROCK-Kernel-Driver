@@ -448,7 +448,7 @@ long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout)
 	return ret;
 }
 
-asmlinkage long sys_futex(u32 *uaddr, int op, int val, struct timespec *utime)
+asmlinkage long sys_futex(u32 __user *uaddr, int op, int val, struct timespec __user *utime)
 {
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;

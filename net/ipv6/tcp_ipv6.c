@@ -1639,10 +1639,10 @@ process:
 	if(sk->state == TCP_TIME_WAIT)
 		goto do_time_wait;
 
-	if (sk_filter(sk, skb, 0))
+	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_and_relse;
 
-	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb))
+	if (sk_filter(sk, skb, 0))
 		goto discard_and_relse;
 
 	skb->dev = NULL;
@@ -2193,6 +2193,7 @@ struct proto tcpv6_prot = {
 static struct inet6_protocol tcpv6_protocol = {
 	.handler	=	tcp_v6_rcv,
 	.err_handler	=	tcp_v6_err,
+	.no_policy	=	1,
 };
 
 extern struct proto_ops inet6_stream_ops;

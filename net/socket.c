@@ -55,6 +55,7 @@
  *	This module is effectively the top level interface to the BSD socket
  *	paradigm. 
  *
+ *	Based upon Swansea University Computer Society NET3.039
  */
 
 #include <linux/config.h>
@@ -70,6 +71,7 @@
 #include <linux/wanrouter.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include <linux/if_bridge.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/cache.h>
@@ -711,7 +713,18 @@ static ssize_t sock_writev(struct file *file, const struct iovec *vector,
 				 file, vector, count, tot_len);
 }
 
-int (*br_ioctl_hook)(unsigned long arg);
+
+static DECLARE_MUTEX(br_ioctl_mutex);
+static int (*br_ioctl_hook)(unsigned long arg) = NULL;
+
+void brioctl_set(int (*hook)(unsigned long))
+{
+	down(&br_ioctl_mutex);
+	br_ioctl_hook = hook;
+	up(&br_ioctl_mutex);
+}
+
+
 int (*vlan_ioctl_hook)(unsigned long arg);
 
 #ifdef CONFIG_DLCI
@@ -758,12 +771,16 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCGIFBR:
 		case SIOCSIFBR:
 			err = -ENOPKG;
+			
 #ifdef CONFIG_KMOD
 			if (!br_ioctl_hook)
 				request_module("bridge");
 #endif
-			if (br_ioctl_hook)
+
+			down(&br_ioctl_mutex);
+			if (br_ioctl_hook) 
 				err = br_ioctl_hook(arg);
+			up(&br_ioctl_mutex);
 			break;
 		case SIOCGIFVLAN:
 		case SIOCSIFVLAN:
@@ -1692,6 +1709,8 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 
 	cmsg_ptr = (unsigned long)msg_sys.msg_control;
 	msg_sys.msg_flags = 0;
+	if (MSG_CMSG_COMPAT & flags)
+		msg_sys.msg_flags = MSG_CMSG_COMPAT;
 	
 	if (sock->file->f_flags & O_NONBLOCK)
 		flags |= MSG_DONTWAIT;
@@ -1709,7 +1728,8 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	if (err)
 		goto out_freeiov;
 	if (MSG_CMSG_COMPAT & flags)
-		err = put_compat_msg_controllen(&msg_sys, msg_compat, cmsg_ptr);
+		err = __put_user((unsigned long)msg_sys.msg_control-cmsg_ptr, 
+				 &msg_compat->msg_controllen);
 	else
 		err = __put_user((unsigned long)msg_sys.msg_control-cmsg_ptr, 
 				 &msg->msg_controllen);
@@ -1870,9 +1890,6 @@ extern void wanrouter_init(void);
 void __init sock_init(void)
 {
 	int i;
-
-	printk(KERN_INFO "Linux NET4.0 for Linux 2.4\n");
-	printk(KERN_INFO "Based upon Swansea University Computer Society NET3.039\n");
 
 	/*
 	 *	Initialize all address (protocol) families. 

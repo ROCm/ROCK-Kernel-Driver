@@ -24,7 +24,6 @@
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/semaphore.h>
-#include <asm/softirq.h>
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
 

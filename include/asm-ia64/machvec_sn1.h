@@ -44,7 +44,6 @@ extern ia64_mv_inl_t sn1_inl;
 extern ia64_mv_outb_t sn1_outb;
 extern ia64_mv_outw_t sn1_outw;
 extern ia64_mv_outl_t sn1_outl;
-extern ia64_mv_mmiob_t sn_mmiob;
 extern ia64_mv_pci_alloc_consistent	sn1_pci_alloc_consistent;
 extern ia64_mv_pci_free_consistent	sn1_pci_free_consistent;
 extern ia64_mv_pci_map_single		sn1_pci_map_single;
@@ -53,7 +52,6 @@ extern ia64_mv_pci_map_sg		sn1_pci_map_sg;
 extern ia64_mv_pci_unmap_sg		sn1_pci_unmap_sg;
 extern ia64_mv_pci_dma_sync_single	sn1_pci_dma_sync_single;
 extern ia64_mv_pci_dma_sync_sg		sn1_pci_dma_sync_sg;
-extern ia64_mv_pci_dma_address		sn1_dma_address;
 
 /*
  * This stuff has dual use!
@@ -74,7 +72,6 @@ extern ia64_mv_pci_dma_address		sn1_dma_address;
 #define platform_outb		sn1_outb
 #define platform_outw		sn1_outw
 #define platform_outl		sn1_outl
-#define platform_mmiob          sn_mmiob
 #define platform_pci_dma_init	machvec_noop
 #define platform_pci_alloc_consistent	sn1_pci_alloc_consistent
 #define platform_pci_free_consistent	sn1_pci_free_consistent
@@ -84,6 +81,5 @@ extern ia64_mv_pci_dma_address		sn1_dma_address;
 #define platform_pci_unmap_sg		sn1_pci_unmap_sg
 #define platform_pci_dma_sync_single	sn1_pci_dma_sync_single
 #define platform_pci_dma_sync_sg	sn1_pci_dma_sync_sg
-#define platform_pci_dma_address	sn1_dma_address
 
 #endif /* _ASM_IA64_MACHVEC_SN1_h */

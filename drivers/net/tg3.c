@@ -1751,7 +1751,7 @@ static void tg3_tx(struct tg3 *tp)
 
 		pci_unmap_single(tp->pdev,
 				 pci_unmap_addr(ri, mapping),
-				 (skb->len - skb->data_len),
+				 skb_headlen(skb),
 				 PCI_DMA_TODEVICE);
 
 		ri->skb = NULL;
@@ -2316,7 +2316,7 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 		int len;
 
 		if (i == 0)
-			len = skb->len - skb->data_len;
+			len = skb_headlen(skb);
 		else
 			len = skb_shinfo(skb)->frags[i-1].size;
 		pci_unmap_single(tp->pdev,
@@ -2401,7 +2401,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	int would_hit_hwbug;
 	unsigned long flags;
 
-	len = (skb->len - skb->data_len);
+	len = skb_headlen(skb);
 
 	/* No BH disabling for tx_lock here.  We are running in BH disabled
 	 * context and TX reclaim runs via tp->poll inside of a software
@@ -2520,7 +2520,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 		i = 0;
 		while (entry != last_plus_one) {
 			if (i == 0)
-				len = skb->len - skb->data_len;
+				len = skb_headlen(skb);
 			else
 				len = skb_shinfo(skb)->frags[i-1].size;
 
@@ -2593,7 +2593,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	u32 len, entry, base_flags, mss;
 	unsigned long flags;
 
-	len = (skb->len - skb->data_len);
+	len = skb_headlen(skb);
 
 	/* No BH disabling for tx_lock here.  We are running in BH disabled
 	 * context and TX reclaim runs via tp->poll inside of a software
@@ -2829,7 +2829,7 @@ static void tg3_free_rings(struct tg3 *tp)
 
 		pci_unmap_single(tp->pdev,
 				 pci_unmap_addr(txp, mapping),
-				 (skb->len - skb->data_len),
+				 skb_headlen(skb),
 				 PCI_DMA_TODEVICE);
 		txp->skb = NULL;
 

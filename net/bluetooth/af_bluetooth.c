@@ -320,9 +320,9 @@ int bt_sock_w4_connect(struct sock *sk, int flags)
 	return err;
 }
 
-struct net_proto_family bt_sock_family_ops =
-{
-	PF_BLUETOOTH, bt_sock_create
+struct net_proto_family bt_sock_family_ops = {
+	.family	= PF_BLUETOOTH,
+	.create	= bt_sock_create,
 };
 
 extern int hci_sock_init(void);

@@ -16,7 +16,6 @@
 #include <linux/poll.h>
 #include <linux/delay.h>
 #include <linux/sysrq.h>
-#include <linux/compatmac.h>
 #include <linux/proc_fs.h>
 #include <linux/irq.h>
 #include <linux/pm.h>
@@ -121,7 +120,11 @@ void fix_processor_context(void)
 	int cpu = smp_processor_id();
 	struct tss_struct * t = init_tss + cpu;
 
-	printk("Should fix processor context!\n");
+	set_tss_desc(cpu,t);	/* This just modifies memory; should not be neccessary. But... This is neccessary, because 386 hardware has concept of busy TSS or some similar stupidity. */
+        ((struct n_desc_struct *) &cpu_gdt_table[cpu][GDT_ENTRY_TSS])->b &= 0xfffffdff;
+
+	syscall_init();                         /* This sets MSR_*STAR and related */
+	load_TR_desc();				/* This does ltr */
 	load_LDT(&current->mm->context);	/* This does lldt */
 
 	/*

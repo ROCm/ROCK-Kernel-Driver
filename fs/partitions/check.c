@@ -248,7 +248,7 @@ static struct attribute * default_attrs[] = {
 
 extern struct subsystem block_subsys;
 
-static struct kobj_type ktype_part = {
+struct kobj_type ktype_part = {
 	.default_attrs	= default_attrs,
 	.sysfs_ops	= &part_sysfs_ops,
 };
@@ -262,6 +262,7 @@ void delete_partition(struct gendisk *disk, int part)
 	p->nr_sects = 0;
 	p->reads = p->writes = p->read_sectors = p->write_sectors = 0;
 	devfs_unregister(p->de);
+	p->de = NULL;
 	kobject_unregister(&p->kobj);
 }
 

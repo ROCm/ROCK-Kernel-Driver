@@ -1433,9 +1433,8 @@ static void net_tx_action(struct softirq_action *h)
 	}
 }
 
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
 int (*br_handle_frame_hook)(struct sk_buff *skb) = NULL;
-#endif
 
 static __inline__ int handle_bridge(struct sk_buff *skb,
 				     struct packet_type *pt_prev)
@@ -1454,6 +1453,7 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 	return ret;
 }
 
+#endif
 
 #ifdef CONFIG_NET_DIVERT
 static inline int handle_diverter(struct sk_buff *skb)
@@ -1510,12 +1510,13 @@ int netif_receive_skb(struct sk_buff *skb)
 #endif /* CONFIG_NET_DIVERT */
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	if (skb->dev->br_port && br_handle_frame_hook) {
+	if (skb->dev->br_port) {
 		int ret;
 
 		ret = handle_bridge(skb, pt_prev);
-		if (br_handle_frame_hook(skb) == 0)
+		if (br_handle_frame_hook(skb) == 0) 
 			return ret;
+
 		pt_prev = NULL;
 	}
 #endif
@@ -2646,6 +2647,13 @@ int netdev_finish_unregister(struct net_device *dev)
 	return 0;
 }
 
+/* Synchronize with packet receive processing. */
+void synchronize_net(void) 
+{
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
+}
+
 /**
  *	unregister_netdevice - remove device from the kernel
  *	@dev: device
@@ -2688,10 +2696,7 @@ int unregister_netdevice(struct net_device *dev)
 		return -ENODEV;
 	}
 
-	/* Synchronize to net_rx_action. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
-
+	synchronize_net();
 
 #ifdef CONFIG_NET_FASTROUTE
 	dev_clear_fastroute(dev);
@@ -2811,7 +2816,7 @@ extern void ip_auto_config(void);
 extern void dv_init(void);
 #endif /* CONFIG_NET_DIVERT */
 
-static decl_subsys(net,NULL);
+static decl_subsys(net,NULL,NULL);
 
 
 /*

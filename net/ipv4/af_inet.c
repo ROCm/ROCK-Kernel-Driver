@@ -1108,6 +1108,8 @@ static int __init init_ipv4_mibs(void)
 		}
 	}
 
+	(void) tcp_mib_init();
+
 	return 0;
 }
 
@@ -1122,7 +1124,7 @@ static int __init inet_init(void)
 	printk(KERN_INFO "NET4: Linux TCP/IP 1.0 for NET4.0\n");
 
 	if (sizeof(struct inet_skb_parm) > sizeof(dummy_skb->cb)) {
-		printk(KERN_CRIT "inet_proto_init: panic\n");
+		printk(KERN_CRIT "%s: panic\n", __FUNCTION__);
 		return -EINVAL;
 	}
 

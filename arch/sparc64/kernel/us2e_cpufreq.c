@@ -256,7 +256,8 @@ static void us2e_set_cpu_divider_index(unsigned int cpu, unsigned int index)
 	freqs.cpu = cpu;
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	us2e_transition(estar, new_bits, clock_tick, old_divisor, divisor);
+	if (old_divisor != divisor)
+		us2e_transition(estar, new_bits, clock_tick, old_divisor, divisor);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
@@ -314,7 +315,7 @@ static int __init us2e_freq_cpu_init(struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_cpuinfo(policy, table);
 }
 
-static int __exit us2e_freq_cpu_exit(struct cpufreq_policy *policy)
+static int us2e_freq_cpu_exit(struct cpufreq_policy *policy)
 {
 	if (cpufreq_us2e_driver)
 		us2e_set_cpu_divider_index(policy->cpu, 0);

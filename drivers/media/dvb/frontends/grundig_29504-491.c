@@ -27,7 +27,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
 
-#include "compat.h"
 #include "dvb_frontend.h"
 
 static int debug = 0;
@@ -36,20 +35,22 @@ static int debug = 0;
 
 static
 struct dvb_frontend_info grundig_29504_491_info = {
-	.name			= "Grundig 29504-491, (TDA8083 based)",
-	.type			= FE_QPSK,
-	.frequency_min		= 950000,     /* FIXME: guessed! */
-	.frequency_max		= 1400000,    /* FIXME: guessed! */
-	.frequency_stepsize	= 125,   /* kHz for QPSK frontends */
-	.symbol_rate_min	= 1000000,   /* FIXME: guessed! */
-	.symbol_rate_max	= 45000000,  /* FIXME: guessed! */
-	.caps			= FE_CAN_INVERSION_AUTO |
-				  FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
-				  FE_CAN_FEC_3_4 | FE_CAN_FEC_4_5 |
-				  FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
-				  FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 |
-				  FE_CAN_FEC_AUTO | FE_CAN_QPSK |
-				  FE_CAN_MUTE_TS
+	name: "Grundig 29504-491, (TDA8083 based)",
+	type: FE_QPSK,
+	frequency_min: 950000,     /* FIXME: guessed! */
+	frequency_max: 1400000,    /* FIXME: guessed! */
+	frequency_stepsize: 125,   /* kHz for QPSK frontends */
+/*      frequency_tolerance: ???,*/
+	symbol_rate_min: 1000000,   /* FIXME: guessed! */
+	symbol_rate_max: 45000000,  /* FIXME: guessed! */
+/*      symbol_rate_tolerance: ???,*/
+	notifier_delay: 0,
+	caps:	FE_CAN_INVERSION_AUTO |
+		FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
+		FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
+		FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO |
+		FE_CAN_QPSK |
+		FE_CAN_MUTE_TS | FE_CAN_CLEAN_SETUP
 };
 
 
@@ -71,7 +72,7 @@ int tda8083_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
-	struct i2c_msg msg = { .addr = 0x68, .flags = 0, .buf = buf, .len = 2 };
+	struct i2c_msg msg = { addr: 0x68, flags: 0, buf: buf, len: 2 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -87,8 +88,8 @@ static
 int tda8083_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
 {
 	int ret;
-	struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = &reg1, .len = 1 },
-			   { .addr = 0x68, .flags = I2C_M_RD, .buf = b, .len = len } };
+	struct i2c_msg msg [] = { { addr: 0x68, flags: 0, buf: &reg1, len: 1 },
+			   { addr: 0x68, flags: I2C_M_RD, buf: b, len: len } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -115,7 +116,7 @@ static
 int tsa5522_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	int ret;
-	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
+	struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
 
 	ret = i2c->xfer (i2c, &msg, 1);
 

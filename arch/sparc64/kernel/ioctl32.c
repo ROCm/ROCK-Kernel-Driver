@@ -107,15 +107,9 @@
 #include <linux/filter.h>
 
 /* Use this to get at 32-bit user passed pointers. 
-   See sys_sparc32.c for description about these. */
-#define A(__x) ((unsigned long)(__x))
-#define AA(__x)				\
-({	unsigned long __ret;		\
-	__asm__ ("srl	%0, 0, %0"	\
-		 : "=r" (__ret)		\
-		 : "0" (__x));		\
-	__ret;				\
-})
+ * See sys_sparc32.c for description about it.
+ */
+#define A(__x) ((void __user *)(unsigned long)(__x))
 
 /* Aiee. Someone does not find a difference between int and long */
 #define EXT2_IOC32_GETFLAGS               _IOR('f', 1, int)
@@ -261,7 +255,7 @@ static void free_kvideo_clips(struct video_window *kp)
 
 static int get_video_window32(struct video_window *kp, struct video_window32 *up)
 {
-	struct video_clip32 *ucp;
+	struct video_clip32 __user *ucp;
 	struct video_clip *kcp;
 	int nclips, err, i;
 	u32 tmp;
@@ -275,7 +269,7 @@ static int get_video_window32(struct video_window *kp, struct video_window32 *up
 	__get_user(kp->flags, &up->flags);
 	__get_user(kp->clipcount, &up->clipcount);
 	__get_user(tmp, &up->clips);
-	ucp = (struct video_clip32 *)A(tmp);
+	ucp = A(tmp);
 	kp->clips = NULL;
 
 	nclips = kp->clipcount;
@@ -487,7 +481,7 @@ static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifconf32 ifc32;
 	struct ifconf ifc;
-	struct ifreq32 *ifr32;
+	struct ifreq32 __user *ifr32;
 	struct ifreq *ifr;
 	mm_segment_t old_fs;
 	unsigned int i, j;
@@ -508,7 +502,7 @@ static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 			return -ENOMEM;
 	}
 	ifr = ifc.ifc_req;
-	ifr32 = (struct ifreq32 *)A(ifc32.ifcbuf);
+	ifr32 = A(ifc32.ifcbuf);
 	for (i = 0; i < ifc32.ifc_len; i += sizeof (struct ifreq32)) {
 		if (copy_from_user(ifr++, ifr32++, sizeof (struct ifreq32))) {
 			kfree (ifc.ifc_buf);
@@ -520,7 +514,7 @@ static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 	set_fs (old_fs);
 	if (!err) {
 		ifr = ifc.ifc_req;
-		ifr32 = (struct ifreq32 *)A(ifc32.ifcbuf);
+		ifr32 = A(ifc32.ifcbuf);
 		for (i = 0, j = 0; i < ifc32.ifc_len && j < ifc.ifc_len;
 		     i += sizeof (struct ifreq32), j += sizeof (struct ifreq)) {
 			if (copy_to_user(ifr32++, ifr++, sizeof (struct ifreq32))) {
@@ -566,7 +560,7 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
 
-	if (get_user(ethcmd, (u32 *)A(data))) {
+	if (get_user(ethcmd, (u32 __user *) A(data))) {
 		err = -EFAULT;
 		goto out;
 	}
@@ -577,7 +571,7 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	case ETHTOOL_GLINK:
 	case ETHTOOL_NWAY_RST:	len = sizeof(struct ethtool_value); break;
 	case ETHTOOL_GREGS: {
-		struct ethtool_regs *regaddr = (struct ethtool_regs *)A(data);
+		struct ethtool_regs __user *regaddr = A(data);
 		/* darned variable size arguments */
 		if (get_user(len, (u32 *)&regaddr->len)) {
 			err = -EFAULT;
@@ -593,7 +587,7 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		goto out;
 	}
 
-	if (copy_from_user(ifr.ifr_data, (char *)A(data), len)) {
+	if (copy_from_user(ifr.ifr_data, A(data), len)) {
 		err = -EFAULT;
 		goto out;
 	}
@@ -606,7 +600,7 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		u32 data;
 
 		__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
-		len = copy_to_user((char *)A(data), ifr.ifr_data, len);
+		len = copy_to_user(A(data), ifr.ifr_data, len);
 		if (len)
 			err = -EFAULT;
 	}
@@ -648,7 +642,7 @@ static int bond_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
 	};
 
 	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
-	if (copy_from_user(ifr.ifr_data, (char *)A(data), len)) {
+	if (copy_from_user(ifr.ifr_data, A(data), len)) {
 		err = -EFAULT;
 		goto out;
 	}
@@ -658,7 +652,7 @@ static int bond_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
 	err = sys_ioctl (fd, cmd, (unsigned long)&ifr);
 	set_fs (old_fs);
 	if (!err) {
-		len = copy_to_user((char *)A(data), ifr.ifr_data, len);
+		len = copy_to_user(A(data), ifr.ifr_data, len);
 		if (len)
 			err = -EFAULT;
 	}
@@ -684,7 +678,7 @@ static int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long
 	struct ifreq *u_ifreq64;
 	struct ifreq32 *u_ifreq32 = (struct ifreq32 *) arg;
 	char tmp_buf[IFNAMSIZ];
-	void *data64;
+	void __user *data64;
 	u32 data32;
 
 	if (copy_from_user(&tmp_buf[0], &(u_ifreq32->ifr_ifrn.ifrn_name[0]),
@@ -692,7 +686,7 @@ static int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long
 		return -EFAULT;
 	if (__get_user(data32, &u_ifreq32->ifr_ifru.ifru_data))
 		return -EFAULT;
-	data64 = (void *) A(data32);
+	data64 = A(data32);
 
 	u_ifreq64 = alloc_user_space(sizeof(*u_ifreq64));
 
@@ -829,7 +823,7 @@ static int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		ret |= __get_user (r4.rt_irtt, &(((struct rtentry32 *)arg)->rt_irtt));
 		ret |= __get_user (rtdev, &(((struct rtentry32 *)arg)->rt_dev));
 		if (rtdev) {
-			ret |= copy_from_user (devname, (char *)A(rtdev), 15);
+			ret |= copy_from_user (devname, A(rtdev), 15);
 			r4.rt_dev = devname; devname[15] = 0;
 		} else
 			r4.rt_dev = 0;
@@ -932,9 +926,9 @@ static int fbiogetputcmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (f.index + f.count > 256)
 		f.count = 256 - f.index;
 	if (cmd == FBIOPUTCMAP32) {
-		ret = copy_from_user (red, (char *)A(r), f.count);
-		ret |= copy_from_user (green, (char *)A(g), f.count);
-		ret |= copy_from_user (blue, (char *)A(b), f.count);
+		ret = copy_from_user (red, A(r), f.count);
+		ret |= copy_from_user (green, A(g), f.count);
+		ret |= copy_from_user (blue, A(b), f.count);
 		if (ret)
 			return -EFAULT;
 	}
@@ -943,9 +937,9 @@ static int fbiogetputcmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 	ret = sys_ioctl (fd, (cmd == FBIOPUTCMAP32) ? FBIOPUTCMAP_SPARC : FBIOGETCMAP_SPARC, (long)&f);
 	set_fs (old_fs);
 	if (!ret && cmd == FBIOGETCMAP32) {
-		ret = copy_to_user ((char *)A(r), red, f.count);
-		ret |= copy_to_user ((char *)A(g), green, f.count);
-		ret |= copy_to_user ((char *)A(b), blue, f.count);
+		ret = copy_to_user (A(r), red, f.count);
+		ret |= copy_to_user (A(g), green, f.count);
+		ret |= copy_to_user (A(b), blue, f.count);
 	}
 	return ret ? -EFAULT : 0;
 }
@@ -989,16 +983,16 @@ static int fbiogscursor(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (f.set & FB_CUR_SETCMAP) {
 		if ((uint) f.size.y > 32)
 			return -EINVAL;
-		ret = copy_from_user (mask, (char *)A(m), f.size.y * 4);
-		ret |= copy_from_user (image, (char *)A(i), f.size.y * 4);
+		ret = copy_from_user (mask, A(m), f.size.y * 4);
+		ret |= copy_from_user (image, A(i), f.size.y * 4);
 		if (ret)
 			return -EFAULT;
 		f.image = image; f.mask = mask;
 	}
 	if (f.set & FB_CUR_SETCMAP) {
-		ret = copy_from_user (red, (char *)A(r), 2);
-		ret |= copy_from_user (green, (char *)A(g), 2);
-		ret |= copy_from_user (blue, (char *)A(b), 2);
+		ret = copy_from_user (red, A(r), 2);
+		ret |= copy_from_user (green, A(g), 2);
+		ret |= copy_from_user (blue, A(b), 2);
 		if (ret)
 			return -EFAULT;
 		f.cmap.red = red; f.cmap.green = green; f.cmap.blue = blue;
@@ -1081,10 +1075,10 @@ static int fb_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		if (cmd == FBIOGETCMAP)
 			break;
 
-		err = __copy_from_user(cmap.red, (char *)A(red), cmap.len * sizeof(__u16));
-		err |= __copy_from_user(cmap.green, (char *)A(green), cmap.len * sizeof(__u16));
-		err |= __copy_from_user(cmap.blue, (char *)A(blue), cmap.len * sizeof(__u16));
-		if (cmap.transp) err |= __copy_from_user(cmap.transp, (char *)A(transp), cmap.len * sizeof(__u16));
+		err = __copy_from_user(cmap.red, A(red), cmap.len * sizeof(__u16));
+		err |= __copy_from_user(cmap.green, A(green), cmap.len * sizeof(__u16));
+		err |= __copy_from_user(cmap.blue, A(blue), cmap.len * sizeof(__u16));
+		if (cmap.transp) err |= __copy_from_user(cmap.transp, A(transp), cmap.len * sizeof(__u16));
 		if (err) {
 			err = -EFAULT;
 			goto out;
@@ -1123,11 +1117,11 @@ static int fb_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		err |= __copy_to_user((char *)((struct fb_fix_screeninfo32 *)arg)->reserved, (char *)fix.reserved, sizeof(fix.reserved));
 		break;
 	case FBIOGETCMAP:
-		err = __copy_to_user((char *)A(red), cmap.red, cmap.len * sizeof(__u16));
-		err |= __copy_to_user((char *)A(green), cmap.blue, cmap.len * sizeof(__u16));
-		err |= __copy_to_user((char *)A(blue), cmap.blue, cmap.len * sizeof(__u16));
+		err = __copy_to_user(A(red), cmap.red, cmap.len * sizeof(__u16));
+		err |= __copy_to_user(A(green), cmap.blue, cmap.len * sizeof(__u16));
+		err |= __copy_to_user(A(blue), cmap.blue, cmap.len * sizeof(__u16));
 		if (cmap.transp)
-			err |= __copy_to_user((char *)A(transp), cmap.transp, cmap.len * sizeof(__u16));
+			err |= __copy_to_user(A(transp), cmap.transp, cmap.len * sizeof(__u16));
 		break;
 	case FBIOPUTCMAP:
 		break;
@@ -1504,7 +1498,7 @@ typedef struct sg_iovec32 {
 
 static int alloc_sg_iovec(sg_io_hdr_t *sgp, u32 uptr32)
 {
-	sg_iovec32_t *uiov = (sg_iovec32_t *) A(uptr32);
+	sg_iovec32_t __user *uiov = A(uptr32);
 	sg_iovec_t *kiov;
 	int i;
 
@@ -1526,7 +1520,7 @@ static int alloc_sg_iovec(sg_io_hdr_t *sgp, u32 uptr32)
 		if (!kiov->iov_base)
 			return -ENOMEM;
 		if (copy_from_user(kiov->iov_base,
-				   (void *) A(iov_base32),
+				   A(iov_base32),
 				   kiov->iov_len))
 			return -EFAULT;
 
@@ -1539,7 +1533,7 @@ static int alloc_sg_iovec(sg_io_hdr_t *sgp, u32 uptr32)
 
 static int copy_back_sg_iovec(sg_io_hdr_t *sgp, u32 uptr32)
 {
-	sg_iovec32_t *uiov = (sg_iovec32_t *) A(uptr32);
+	sg_iovec32_t __user *uiov = A(uptr32);
 	sg_iovec_t *kiov = (sg_iovec_t *) sgp->dxferp;
 	int i;
 
@@ -1549,7 +1543,7 @@ static int copy_back_sg_iovec(sg_io_hdr_t *sgp, u32 uptr32)
 		if (__get_user(iov_base32, &uiov->iov_base))
 			return -EFAULT;
 
-		if (copy_to_user((void *) A(iov_base32),
+		if (copy_to_user(A(iov_base32),
 				 kiov->iov_base,
 				 kiov->iov_len))
 			return -EFAULT;
@@ -1607,7 +1601,7 @@ static int sg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		goto out;
 	}
 	if (copy_from_user(sg_io64.cmdp,
-			   (void *) A(cmdp32),
+			   A(cmdp32),
 			   sg_io64.cmd_len)) {
 		err = -EFAULT;
 		goto out;
@@ -1620,7 +1614,7 @@ static int sg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		goto out;
 	}
 	if (copy_from_user(sg_io64.sbp,
-			   (void *) A(sbp32),
+			   A(sbp32),
 			   sg_io64.mx_sb_len)) {
 		err = -EFAULT;
 		goto out;
@@ -1641,7 +1635,7 @@ static int sg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 			goto out;
 		}
 		if (copy_from_user(sg_io64.dxferp,
-				   (void *) A(dxferp32),
+				   A(dxferp32),
 				   sg_io64.dxfer_len)) {
 			err = -EFAULT;
 			goto out;
@@ -1672,12 +1666,12 @@ static int sg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 	err |= __put_user(sg_io64.resid, &sg_io32->resid);
 	err |= __put_user(sg_io64.duration, &sg_io32->duration);
 	err |= __put_user(sg_io64.info, &sg_io32->info);
-	err |= copy_to_user((void *)A(sbp32), sg_io64.sbp, sg_io64.mx_sb_len);
+	err |= copy_to_user(A(sbp32), sg_io64.sbp, sg_io64.mx_sb_len);
 	if (sg_io64.dxferp) {
 		if (sg_io64.iovec_count)
 			err |= copy_back_sg_iovec(&sg_io64, dxferp32);
 		else
-			err |= copy_to_user((void *)A(dxferp32),
+			err |= copy_to_user(A(dxferp32),
 					    sg_io64.dxferp,
 					    sg_io64.dxfer_len);
 	}
@@ -1711,7 +1705,7 @@ static int ppp_sock_fprog_ioctl_trans(unsigned int fd, unsigned int cmd, unsigne
 {
 	struct sock_fprog32 *u_fprog32 = (struct sock_fprog32 *) arg;
 	struct sock_fprog *u_fprog64 = alloc_user_space(sizeof(struct sock_fprog));
-	void *fptr64;
+	void __user *fptr64;
 	u32 fptr32;
 	u16 flen;
 
@@ -1719,7 +1713,7 @@ static int ppp_sock_fprog_ioctl_trans(unsigned int fd, unsigned int cmd, unsigne
 	    get_user(fptr32, &u_fprog32->filter))
 		return -EFAULT;
 
-	fptr64 = (void *) A(fptr32);
+	fptr64 = A(fptr32);
 
 	if (put_user(flen, &u_fprog64->len) ||
 	    put_user(fptr64, &u_fprog64->filter))
@@ -1768,7 +1762,7 @@ static int ppp_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		data.ptr = kmalloc (data32.length, GFP_KERNEL);
 		if (!data.ptr)
 			return -ENOMEM;
-		if (copy_from_user(data.ptr, (__u8 *)A(data32.ptr), data32.length)) {
+		if (copy_from_user(data.ptr, A(data32.ptr), data32.length)) {
 			kfree(data.ptr);
 			return -EFAULT;
 		}
@@ -2025,13 +2019,13 @@ static int cdrom_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long ar
 	case CDROMREADMODE1:
 	case CDROMREADRAW:
 	case CDROMREADCOOKED:
-		err = copy_to_user((char *)A(addr), data, cdread.cdread_buflen);
+		err = copy_to_user(A(addr), data, cdread.cdread_buflen);
 		break;
 	case CDROMREADAUDIO:
-		err = copy_to_user((char *)A(addr), data, cdreadaudio.nframes * 2352);
+		err = copy_to_user(A(addr), data, cdreadaudio.nframes * 2352);
 		break;
 	case CDROM_SEND_PACKET:
-		err = copy_to_user((char *)A(addr), data, cgc.buflen);
+		err = copy_to_user(A(addr), data, cgc.buflen);
 		break;
 	default:
 		break;
@@ -2148,7 +2142,7 @@ static int do_fontx_ioctl(unsigned int fd, int cmd, struct consolefontdesc32 *us
 	if (copy_from_user(&cfdarg, user_cfd, sizeof(struct consolefontdesc32)))
 		return -EFAULT;
 	
-	cfdarg.chardata = (unsigned char *)A(((struct consolefontdesc32 *)&cfdarg)->chardata);
+	cfdarg.chardata = A(((struct consolefontdesc32 *)&cfdarg)->chardata);
  	
 	switch (cmd) {
 	case PIO_FONTX:
@@ -2203,7 +2197,7 @@ static int do_kdfontop_ioctl(unsigned int fd, unsigned int cmd, struct console_f
 		return -EFAULT;
 	if (!perm && op.op != KD_FONT_OP_GET)
 		return -EPERM;
-	op.data = (unsigned char *)A(((struct console_font_op32 *)&op)->data);
+	op.data = A(((struct console_font_op32 *)&op)->data);
 	op.flags |= KD_FONT_FLAG_OLD;
 	vt = (struct vt_struct *)((struct tty_struct *)file->private_data)->driver_data;
 	i = con_font_op(vt->vc_num, &op);
@@ -2230,9 +2224,9 @@ static int do_unimap_ioctl(unsigned int fd, unsigned int cmd, struct unimapdesc3
 	switch (cmd) {
 	case PIO_UNIMAP:
 		if (!perm) return -EPERM;
-		return con_set_unimap(fg_console, tmp.entry_ct, (struct unipair *)A(tmp.entries));
+		return con_set_unimap(fg_console, tmp.entry_ct, A(tmp.entries));
 	case GIO_UNIMAP:
-		return con_get_unimap(fg_console, tmp.entry_ct, &(user_ud->entry_ct), (struct unipair *)A(tmp.entries));
+		return con_get_unimap(fg_console, tmp.entry_ct, &(user_ud->entry_ct), A(tmp.entries));
 	}
 	return 0;
 }
@@ -2907,9 +2901,9 @@ static lv_t *get_lv_t(u32 p, int *errp)
 	int err, i;
 	u32 ptr1, ptr2;
 	size_t size;
-	lv_block_exception32_t *lbe32;
+	lv_block_exception32_t __user *lbe32;
 	lv_block_exception_t *lbe;
-	lv32_t *ul = (lv32_t *)A(p);
+	lv32_t __user *ul = A(p);
 	lv_t *l = (lv_t *) kmalloc(sizeof(lv_t), GFP_KERNEL);
 
 	if (!l) {
@@ -2933,13 +2927,13 @@ static lv_t *get_lv_t(u32 p, int *errp)
 		size = l->lv_allocated_le * sizeof(pe_t);
 		l->lv_current_pe = vmalloc(size);
 		if (l->lv_current_pe)
-			err = copy_from_user(l->lv_current_pe, (void *)A(ptr1), size);
+			err = copy_from_user(l->lv_current_pe, A(ptr1), size);
 	}
 	if (!err && ptr2) {
 		size = l->lv_remap_end * sizeof(lv_block_exception_t);
 		l->lv_block_exception = lbe = vmalloc(size);
 		if (l->lv_block_exception) {
-			lbe32 = (lv_block_exception32_t *)A(ptr2);
+			lbe32 = A(ptr2);
 			memset(lbe, 0, size);
 			for (i = 0; i < l->lv_remap_end; i++, lbe++, lbe32++) {
 				err |= get_user(lbe->rsector_org, &lbe32->rsector_org);
@@ -2963,7 +2957,7 @@ static lv_t *get_lv_t(u32 p, int *errp)
 static int copy_lv_t(u32 ptr, lv_t *l)
 {
 	int err;
-	lv32_t *ul = (lv32_t *)A(ptr);
+	lv32_t __user *ul = A(ptr);
 	u32 ptr1;
 	size_t size;
 
@@ -2977,7 +2971,7 @@ static int copy_lv_t(u32 ptr, lv_t *l)
 				((long)&ul->dummy[0]) - ((long)&ul->lv_remap_ptr));
 	size = l->lv_allocated_le * sizeof(pe_t);
 	if (ptr1)
-		err |= __copy_to_user((void *)A(ptr1), l->lv_current_pe, size);
+		err |= __copy_to_user(A(ptr1), l->lv_current_pe, size);
 	return err ? -EFAULT : 0;
 }
 
@@ -3036,14 +3030,14 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 					err = -ENOMEM;
 					break;
 				}
-				err = copy_from_user(v->pv[i], (void *)A(ptr),
+				err = copy_from_user(v->pv[i], A(ptr),
 						     sizeof(pv32_t) - 8 - UUID_LEN+1);
 				if (err) {
 					err = -EFAULT;
 					break;
 				}
-				err = copy_from_user(v->pv[i]->pv_uuid,
-						     ((pv32_t *)A(ptr))->pv_uuid,
+				err = copy_from_user(&v->pv[i]->pv_uuid[0],
+						     &((pv32_t __user *)A(ptr))->pv_uuid[0],
 						     UUID_LEN+1);
 				if (err) {
 				        err = -EFAULT;
@@ -3125,7 +3119,7 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			return err;
 		u.pv_status.pv = &p;
 		if (cmd == PV_CHANGE) {
-			err = copy_from_user(&p, (void *)A(ptr),
+			err = copy_from_user(&p, A(ptr),
 					     sizeof(pv32_t) - 8 - UUID_LEN+1);
 			if (err)
 				return -EFAULT;
@@ -3195,10 +3189,10 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 	case PV_STATUS:
 		if (!err) {
-			err = copy_to_user((void *)A(ptr), &p, sizeof(pv32_t) - 8 - UUID_LEN+1);
+			err = copy_to_user(A(ptr), &p, sizeof(pv32_t) - 8 - UUID_LEN+1);
 			if (err)
 				return -EFAULT;
-			err = copy_to_user(((pv_t *)A(ptr))->pv_uuid, p.pv_uuid, UUID_LEN + 1);
+			err = copy_to_user(&((pv_t __user *)A(ptr))->pv_uuid[0], &p.pv_uuid[0], UUID_LEN + 1);
 			if (err)
 				return -EFAULT;
 		}
@@ -3229,7 +3223,7 @@ typedef struct drm32_version {
 static int drm32_version(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	drm32_version_t *uversion = (drm32_version_t *)arg;
-	char *name_ptr, *date_ptr, *desc_ptr;
+	char __user *name_ptr, *date_ptr, *desc_ptr;
 	u32 tmp1, tmp2, tmp3;
 	drm_version_t kversion;
 	mm_segment_t old_fs;
@@ -3244,9 +3238,9 @@ static int drm32_version(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(tmp3, &uversion->desc))
 		return -EFAULT;
 
-	name_ptr = (char *) A(tmp1);
-	date_ptr = (char *) A(tmp2);
-	desc_ptr = (char *) A(tmp3);
+	name_ptr = A(tmp1);
+	date_ptr = A(tmp2);
+	desc_ptr = A(tmp3);
 
 	ret = -ENOMEM;
 	if (kversion.name_len && name_ptr) {
@@ -3309,7 +3303,7 @@ static int drm32_getsetunique(unsigned int fd, unsigned int cmd, unsigned long a
 	drm32_unique_t *uarg = (drm32_unique_t *)arg;
 	drm_unique_t karg;
 	mm_segment_t old_fs;
-	char *uptr;
+	char __user *uptr;
 	u32 tmp;
 	int ret;
 
@@ -3320,7 +3314,7 @@ static int drm32_getsetunique(unsigned int fd, unsigned int cmd, unsigned long a
 	if (get_user(tmp, &uarg->unique))
 		return -EFAULT;
 
-	uptr = (char *) A(tmp);
+	uptr = A(tmp);
 
 	if (uptr) {
 		karg.unique = kmalloc(karg.unique_len, GFP_KERNEL);
@@ -3385,7 +3379,7 @@ static int drm32_addmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (ret)
 		return -EFAULT;
 
-	karg.handle = (void *) A(tmp);
+	karg.handle = A(tmp);
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -3416,7 +3410,7 @@ typedef struct drm32_buf_info {
 static int drm32_info_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	drm32_buf_info_t *uarg = (drm32_buf_info_t *)arg;
-	drm_buf_desc_t *ulist;
+	drm_buf_desc_t __user *ulist;
 	drm_buf_info_t karg;
 	mm_segment_t old_fs;
 	int orig_count, ret;
@@ -3426,7 +3420,7 @@ static int drm32_info_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(tmp, &uarg->list))
 		return -EFAULT;
 
-	ulist = (drm_buf_desc_t *) A(tmp);
+	ulist = A(tmp);
 
 	orig_count = karg.count;
 
@@ -3464,7 +3458,7 @@ static int drm32_free_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 	drm32_buf_free_t *uarg = (drm32_buf_free_t *)arg;
 	drm_buf_free_t karg;
 	mm_segment_t old_fs;
-	int *ulist;
+	int __user *ulist;
 	int ret;
 	u32 tmp;
 
@@ -3472,7 +3466,7 @@ static int drm32_free_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(tmp, &uarg->list))
 		return -EFAULT;
 
-	ulist = (int *) A(tmp);
+	ulist = A(tmp);
 
 	karg.list = kmalloc(karg.count * sizeof(int), GFP_KERNEL);
 	if (!karg.list)
@@ -3510,7 +3504,7 @@ typedef struct drm32_buf_map {
 static int drm32_map_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	drm32_buf_map_t *uarg = (drm32_buf_map_t *)arg;
-	drm32_buf_pub_t *ulist;
+	drm32_buf_pub_t __user *ulist;
 	drm_buf_map_t karg;
 	mm_segment_t old_fs;
 	int orig_count, ret, i;
@@ -3521,8 +3515,8 @@ static int drm32_map_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(tmp2, &uarg->list))
 		return -EFAULT;
 
-	karg.virtual = (void *) A(tmp1);
-	ulist = (drm32_buf_pub_t *) A(tmp2);
+	karg.virtual = A(tmp1);
+	ulist = A(tmp2);
 
 	orig_count = karg.count;
 
@@ -3538,7 +3532,7 @@ static int drm32_map_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 		    get_user(tmp1, &ulist[i].address))
 			goto out;
 
-		karg.list[i].address = (void *) A(tmp1);
+		karg.list[i].address = A(tmp1);
 	}
 
 	old_fs = get_fs();
@@ -3589,7 +3583,7 @@ typedef struct drm32_dma {
 static int drm32_dma(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	drm32_dma_t *uarg = (drm32_dma_t *) arg;
-	int *u_si, *u_ss, *u_ri, *u_rs;
+	int __user *u_si, *u_ss, *u_ri, *u_rs;
 	drm_dma_t karg;
 	mm_segment_t old_fs;
 	int ret;
@@ -3610,10 +3604,10 @@ static int drm32_dma(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(karg.granted_count, &uarg->granted_count))
 		return -EFAULT;
 
-	u_si = (int *) A(tmp1);
-	u_ss = (int *) A(tmp2);
-	u_ri = (int *) A(tmp3);
-	u_rs = (int *) A(tmp4);
+	u_si = A(tmp1);
+	u_ss = A(tmp2);
+	u_ri = A(tmp3);
+	u_rs = A(tmp4);
 
 	if (karg.send_count) {
 		karg.send_indices = kmalloc(karg.send_count * sizeof(int), GFP_KERNEL);
@@ -3699,7 +3693,7 @@ typedef struct drm32_ctx_res {
 static int drm32_res_ctx(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	drm32_ctx_res_t *uarg = (drm32_ctx_res_t *) arg;
-	drm_ctx_t *ulist;
+	drm_ctx_t __user *ulist;
 	drm_ctx_res_t karg;
 	mm_segment_t old_fs;
 	int orig_count, ret;
@@ -3710,7 +3704,7 @@ static int drm32_res_ctx(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(tmp, &uarg->contexts))
 		return -EFAULT;
 
-	ulist = (drm_ctx_t *) A(tmp);
+	ulist = A(tmp);
 
 	orig_count = karg.count;
 	if (karg.count && ulist) {
@@ -3817,7 +3811,8 @@ static int do_usbdevfs_control(unsigned int fd, unsigned int cmd, unsigned long 
 	struct usbdevfs_ctrltransfer32 *uctrl;
 	mm_segment_t old_fs;
 	__u32 udata;
-	void *uptr, *kptr;
+	void __user *uptr;
+	void *kptr;
 	int err;
 
 	uctrl = (struct usbdevfs_ctrltransfer32 *) arg;
@@ -3829,7 +3824,7 @@ static int do_usbdevfs_control(unsigned int fd, unsigned int cmd, unsigned long 
 
 	if (get_user(udata, &uctrl->data))
 		return -EFAULT;
-	uptr = (void *) A(udata);
+	uptr = A(udata);
 
 	/* In usbdevice_fs, it limits the control buffer to a page,
 	 * for simplicity so do we.
@@ -3878,7 +3873,8 @@ static int do_usbdevfs_bulk(unsigned int fd, unsigned int cmd, unsigned long arg
 	struct usbdevfs_bulktransfer32 *ubulk;
 	mm_segment_t old_fs;
 	__u32 udata;
-	void *uptr, *kptr;
+	void __user *uptr;
+	void *kptr;
 	int err;
 
 	ubulk = (struct usbdevfs_bulktransfer32 *) arg;
@@ -3889,7 +3885,7 @@ static int do_usbdevfs_bulk(unsigned int fd, unsigned int cmd, unsigned long arg
 	    get_user(udata, &ubulk->data))
 		return -EFAULT;
 
-	uptr = (void *) A(udata);
+	uptr = A(udata);
 
 	/* In usbdevice_fs, it limits the control buffer to a page,
 	 * for simplicity so do we.
@@ -4072,7 +4068,8 @@ static int do_usbdevfs_urb(unsigned int fd, unsigned int cmd, unsigned long arg)
 	struct usbdevfs_urb32 *uurb;
 	mm_segment_t old_fs;
 	__u32 udata;
-	void *uptr, *kptr;
+	void __user *uptr;
+	void *kptr;
 	unsigned int buflen;
 	int err;
 
@@ -4096,7 +4093,7 @@ static int do_usbdevfs_urb(unsigned int fd, unsigned int cmd, unsigned long arg)
 	err = -EFAULT;
 	if (__get_user(udata, &uurb->buffer))
 		goto out;
-	uptr = (void *) A(udata);
+	uptr = A(udata);
 
 	err = -ENOMEM;
 	buflen = kurb->buffer_length;
@@ -4153,7 +4150,7 @@ static int do_usbdevfs_reapurb(unsigned int fd, unsigned int cmd, unsigned long 
 	set_fs(old_fs);
 
 	if (err >= 0 &&
-	    put_user(((u32)(long)kptr), (u32 *) A(arg)))
+	    put_user(((u32)(long)kptr), (u32 __user *) A(arg)))
 		err = -EFAULT;
 
 	return err;
@@ -4205,7 +4202,7 @@ static int mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
 	struct mtd_oob_buf32	*uarg 	= (struct mtd_oob_buf32 *)arg;
 	struct mtd_oob_buf		karg;
 	u32 tmp;
-	char *ptr;
+	char __user *ptr;
 	int ret;
 
 	if (get_user(karg.start, &uarg->start) 		||
@@ -4213,7 +4210,7 @@ static int mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(tmp, &uarg->ptr))
 		return -EFAULT;
 
-	ptr = (char *)A(tmp);
+	ptr = A(tmp);
 	if (0 >= karg.length) 
 		return -EINVAL;
 

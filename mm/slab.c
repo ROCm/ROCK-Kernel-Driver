@@ -375,91 +375,27 @@ static int slab_break_gfp_order = BREAK_GFP_ORDER_LO;
 #define	SET_PAGE_SLAB(pg,x)   ((pg)->list.prev = (struct list_head *)(x))
 #define	GET_PAGE_SLAB(pg)     ((struct slab *)(pg)->list.prev)
 
-/* Size description struct for general caches. */
-struct cache_sizes {
+/* These are the default caches for kmalloc. Custom caches can have other sizes. */
+static struct cache_sizes {
 	size_t		 cs_size;
 	kmem_cache_t	*cs_cachep;
 	kmem_cache_t	*cs_dmacachep;
+} malloc_sizes[] = {
+#define CACHE(x) { .cs_size = (x) },
+#include <linux/kmalloc_sizes.h>
+#undef CACHE
 };
 
-/* These are the default caches for kmalloc. Custom caches can have other sizes. */
-static struct cache_sizes malloc_sizes[] = {
-#if PAGE_SIZE == 4096
-	{    32,	NULL, NULL},
-#endif
-	{    64,	NULL, NULL},
-#if L1_CACHE_BYTES < 64
-	{    96,	NULL, NULL},
-#endif
-	{   128,	NULL, NULL},
-#if L1_CACHE_BYTES < 128
-	{   192,	NULL, NULL},
-#endif
-	{   256,	NULL, NULL},
-	{   512,	NULL, NULL},
-	{  1024,	NULL, NULL},
-	{  2048,	NULL, NULL},
-	{  4096,	NULL, NULL},
-	{  8192,	NULL, NULL},
-	{ 16384,	NULL, NULL},
-	{ 32768,	NULL, NULL},
-	{ 65536,	NULL, NULL},
-	{131072,	NULL, NULL},
-#ifndef CONFIG_MMU
-	{262144,	NULL, NULL},
-	{524288,	NULL, NULL},
-	{1048576,	NULL, NULL},
-#ifdef CONFIG_LARGE_ALLOCS
-	{2097152,	NULL, NULL},
-	{4194304,	NULL, NULL},
-	{8388608,	NULL, NULL},
-	{16777216,	NULL, NULL},
-	{33554432,	NULL, NULL},
-#endif /* CONFIG_LARGE_ALLOCS */
-#endif /* CONFIG_MMU */
-	{     0,	NULL, NULL}
-};
 /* Must match cache_sizes above. Out of line to keep cache footprint low. */
-#define CN(x) { x, x "(DMA)" }
-static struct { 
-	char *name; 
+static struct {
+	char *name;
 	char *name_dma;
-} cache_names[] = { 
-#if PAGE_SIZE == 4096
-	CN("size-32"),
-#endif
-	CN("size-64"),
-#if L1_CACHE_BYTES < 64
-	CN("size-96"),
-#endif
-	CN("size-128"),
-#if L1_CACHE_BYTES < 128
-	CN("size-192"),
-#endif
-	CN("size-256"),
-	CN("size-512"),
-	CN("size-1024"),
-	CN("size-2048"),
-	CN("size-4096"),
-	CN("size-8192"),
-	CN("size-16384"),
-	CN("size-32768"),
-	CN("size-65536"),
-	CN("size-131072"),
-#ifndef CONFIG_MMU
-	CN("size-262144"),
-	CN("size-524288"),
-	CN("size-1048576"),
-#ifdef CONFIG_LARGE_ALLOCS
-	CN("size-2097152"),
-	CN("size-4194304"),
-	CN("size-8388608"),
-	CN("size-16777216"),
-	CN("size-33554432"),
-#endif /* CONFIG_LARGE_ALLOCS */
-#endif /* CONFIG_MMU */
-}; 
-#undef CN
+} cache_names[] = {
+#define CACHE(x) { .name = "size-" #x, .name_dma = "size-" #x "(DMA)" },
+#include <linux/kmalloc_sizes.h>
+	{ 0, }
+#undef CACHE
+};
 
 struct arraycache_init initarray_cache __initdata = { { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
 struct arraycache_init initarray_generic __initdata = { { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
@@ -660,39 +596,39 @@ void __init kmem_cache_init(void)
  */
 void __init kmem_cache_sizes_init(void)
 {
-	struct cache_sizes *sizes = malloc_sizes;
+	int i;
 	/*
 	 * Fragmentation resistance on low memory - only use bigger
 	 * page orders on machines with more than 32MB of memory.
 	 */
 	if (num_physpages > (32 << 20) >> PAGE_SHIFT)
 		slab_break_gfp_order = BREAK_GFP_ORDER_HI;
-	do {
+
+	for (i = 0; i < ARRAY_SIZE(malloc_sizes); i++) {
+		struct cache_sizes *sizes = malloc_sizes + i;
 		/* For performance, all the general caches are L1 aligned.
 		 * This should be particularly beneficial on SMP boxes, as it
 		 * eliminates "false sharing".
 		 * Note for systems short on memory removing the alignment will
 		 * allow tighter packing of the smaller caches. */
-		if (!(sizes->cs_cachep =
-			kmem_cache_create(cache_names[sizes-malloc_sizes].name, 
-					  sizes->cs_size,
-					0, SLAB_HWCACHE_ALIGN, NULL, NULL))) {
+		sizes->cs_cachep = kmem_cache_create(
+			cache_names[i].name, sizes->cs_size,
+			0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+		if (!sizes->cs_cachep)
 			BUG();
-		}
 
 		/* Inc off-slab bufctl limit until the ceiling is hit. */
 		if (!(OFF_SLAB(sizes->cs_cachep))) {
 			offslab_limit = sizes->cs_size-sizeof(struct slab);
 			offslab_limit /= sizeof(kmem_bufctl_t);
 		}
+
 		sizes->cs_dmacachep = kmem_cache_create(
-		    cache_names[sizes-malloc_sizes].name_dma, 
-			sizes->cs_size, 0,
-			SLAB_CACHE_DMA|SLAB_HWCACHE_ALIGN, NULL, NULL);
+			cache_names[i].name_dma, sizes->cs_size,
+			0, SLAB_CACHE_DMA|SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!sizes->cs_dmacachep)
 			BUG();
-		sizes++;
-	} while (sizes->cs_size);
+	}
 	/*
 	 * The generic caches are running - time to kick out the
 	 * bootstrap cpucaches.
@@ -1035,7 +971,7 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	if (flags & SLAB_HWCACHE_ALIGN) {
 		/* Need to adjust size so that objs are cache aligned. */
 		/* Small obj size, can get at least two per cache line. */
-		while (size < align/2)
+		while (size <= align/2)
 			align /= 2;
 		size = (size+align-1)&(~(align-1));
 	}

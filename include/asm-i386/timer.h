@@ -4,16 +4,17 @@
 /**
  * struct timer_ops - used to define a timer source
  *
- * @init: Probes and initializes the timer.  Returns 0 on success, anything
- *	else on failure.
+ * @init: Probes and initializes the timer. Takes clock= override 
+ *  string as an argument. Returns 0 on success, anything else on failure.
  * @mark_offset: called by the timer interrupt
  * @get_offset: called by gettimeofday().  Returns the number of ms since the
  *	last timer intruupt.
  */
 struct timer_opts{
-	int (*init)(void);
+	int (*init)(char *override);
 	void (*mark_offset)(void);
 	unsigned long (*get_offset)(void);
+	unsigned long long (*monotonic_clock)(void);
 	void (*delay)(unsigned long);
 };
 

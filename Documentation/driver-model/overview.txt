@@ -90,7 +90,7 @@ none     	/sys	sysfs    defaults		0	0
 
 Or by hand on the command line:
 
-# mount -t sysfs sysfs /devices
+# mount -t sysfs sysfs /sys
 
 Whenever a device is inserted into the tree, a directory is created for it.
 This directory may be populated at each layer of discovery - the global layer,

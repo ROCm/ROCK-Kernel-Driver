@@ -27,12 +27,13 @@
 #include <linux/file.h>
 #include <asm/uaccess.h>
 #include <linux/security.h>
+#include <linux/seqlock.h>
 
 #define DCACHE_PARANOIA 1
 /* #define DCACHE_DEBUG 1 */
 
 spinlock_t dcache_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-rwlock_t dparent_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
+seqlock_t rename_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 
 static kmem_cache_t *dentry_cache; 
 
@@ -824,6 +825,7 @@ static inline struct hlist_head * d_hash(struct dentry * parent, unsigned long h
 
 struct dentry * d_alloc_anon(struct inode *inode)
 {
+	static const struct qstr anonstring = { "", 0, 0};
 	struct dentry *tmp;
 	struct dentry *res;
 
@@ -832,7 +834,7 @@ struct dentry * d_alloc_anon(struct inode *inode)
 		return res;
 	}
 
-	tmp = d_alloc(NULL, &(const struct qstr) {"",0,0});
+	tmp = d_alloc(NULL, &anonstring);
 	if (!tmp)
 		return NULL;
 
@@ -926,7 +928,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
  * is returned. The caller must use d_put to free the entry when it has
  * finished using it. %NULL is returned on failure.
  *
- * d_lookup is now, dcache_lock free. The hash list is protected using RCU.
+ * __d_lookup is dcache_lock free. The hash list is protected using RCU.
  * Memory barriers are used while updating and doing lockless traversal. 
  * To avoid races with d_move while rename is happening, d_move_count is 
  * used. 
@@ -939,9 +941,26 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
  *
  * d_lru list is not updated, which can leave non-zero d_count dentries
  * around in d_lru list.
+ *
+ * d_lookup() is protected against the concurrent renames in some unrelated
+ * directory using the seqlockt_t rename_lock.
  */
 
 struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
+{
+	struct dentry * dentry = NULL;
+	unsigned long seq;
+
+        do {
+                seq = read_seqbegin(&rename_lock);
+                dentry = __d_lookup(parent, name);
+                if (dentry)
+			break;
+	} while (read_seqretry(&rename_lock, seq));
+	return dentry;
+}
+
+struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 {
 	unsigned int len = name->len;
 	unsigned int hash = name->hash;
@@ -1185,7 +1204,17 @@ void d_move(struct dentry * dentry, struct dentry * target)
 		printk(KERN_WARNING "VFS: moving negative dcache entry\n");
 
 	spin_lock(&dcache_lock);
-	spin_lock(&dentry->d_lock);
+	write_seqlock(&rename_lock);
+	/*
+	 * XXXX: do we really need to take target->d_lock?
+	 */
+	if (target < dentry) {
+		spin_lock(&target->d_lock);
+		spin_lock(&dentry->d_lock);
+	} else {
+		spin_lock(&dentry->d_lock);
+		spin_lock(&target->d_lock);
+	}
 
 	/* Move the dentry to the target hash queue, if on different bucket */
 	if (dentry->d_bucket != target->d_bucket) {
@@ -1205,8 +1234,8 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	smp_wmb();
 	do_switch(dentry->d_name.len, target->d_name.len);
 	do_switch(dentry->d_name.hash, target->d_name.hash);
+
 	/* ... and switch the parents */
-	write_lock(&dparent_lock);
 	if (IS_ROOT(dentry)) {
 		dentry->d_parent = target->d_parent;
 		target->d_parent = target;
@@ -1217,11 +1246,12 @@ void d_move(struct dentry * dentry, struct dentry * target)
 		/* And add them back to the (new) parent lists */
 		list_add(&target->d_child, &target->d_parent->d_subdirs);
 	}
-	write_unlock(&dparent_lock);
 
 	list_add(&dentry->d_child, &dentry->d_parent->d_subdirs);
 	dentry->d_move_count++;
+	spin_unlock(&target->d_lock);
 	spin_unlock(&dentry->d_lock);
+	write_sequnlock(&rename_lock);
 	spin_unlock(&dcache_lock);
 }
 
@@ -1336,7 +1366,7 @@ char * d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
  *		return NULL;
  *	}
  */
-asmlinkage long sys_getcwd(char *buf, unsigned long size)
+asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 {
 	int error;
 	struct vfsmount *pwdmnt, *rootmnt;

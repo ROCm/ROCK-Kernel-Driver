@@ -313,7 +313,7 @@ struct backing_dev_info;
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
-	rwlock_t		page_lock;	/* and rwlock protecting it */
+	spinlock_t		page_lock;	/* and rwlock protecting it */
 	struct list_head	clean_pages;	/* list of clean pages */
 	struct list_head	dirty_pages;	/* list of dirty pages */
 	struct list_head	locked_pages;	/* list of locked pages */
@@ -321,8 +321,8 @@ struct address_space {
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
-	struct list_head	i_mmap_shared;	/* list of private mappings */
-	struct semaphore	i_shared_sem;	/* and sem protecting it */
+	struct list_head	i_mmap_shared;	/* list of shared mappings */
+	struct semaphore	i_shared_sem;	/* protect both above lists */
 	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
 	int			gfp_mask;	/* how to allocate the pages */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
@@ -705,10 +705,10 @@ typedef int (*read_actor_t)(read_descriptor_t *, struct page *, unsigned long, u
 struct file_operations {
 	struct module *owner;
 	loff_t (*llseek) (struct file *, loff_t, int);
-	ssize_t (*read) (struct file *, char *, size_t, loff_t *);
-	ssize_t (*aio_read) (struct kiocb *, char *, size_t, loff_t);
-	ssize_t (*write) (struct file *, const char *, size_t, loff_t *);
-	ssize_t (*aio_write) (struct kiocb *, const char *, size_t, loff_t);
+	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+	ssize_t (*aio_read) (struct kiocb *, char __user *, size_t, loff_t);
+	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+	ssize_t (*aio_write) (struct kiocb *, const char __user *, size_t, loff_t);
 	int (*readdir) (struct file *, void *, filldir_t);
 	unsigned int (*poll) (struct file *, struct poll_table_struct *);
 	int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
@@ -738,7 +738,7 @@ struct inode_operations {
 	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *);
-	int (*readlink) (struct dentry *, char *,int);
+	int (*readlink) (struct dentry *, char __user *,int);
 	int (*follow_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);
 	int (*permission) (struct inode *, int);
@@ -1024,7 +1024,7 @@ extern int do_truncate(struct dentry *, loff_t start);
 extern struct file *filp_open(const char *, int, int);
 extern struct file * dentry_open(struct dentry *, struct vfsmount *, int);
 extern int filp_close(struct file *, fl_owner_t id);
-extern char * getname(const char *);
+extern char * getname(const char __user *);
 
 /* fs/dcache.c */
 extern void vfs_caches_init(unsigned long);
@@ -1060,6 +1060,8 @@ extern int register_chrdev_region(unsigned int, unsigned int, int,
 extern int register_chrdev(unsigned int, const char *,
 			   struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
+extern int unregister_chrdev_region(unsigned int, unsigned int, int,
+				    const char *);
 extern int chrdev_open(struct inode *, struct file *);
 
 /* fs/block_dev.c */
@@ -1074,7 +1076,6 @@ extern struct block_device *open_bdev_excl(const char *, int, int, void *);
 extern void close_bdev_excl(struct block_device *, int);
 
 extern const char * cdevname(kdev_t);
-extern const char * kdevname(kdev_t);
 extern void init_special_inode(struct inode *, umode_t, dev_t);
 
 /* Invalid inode operations -- fs/bad_inode.c */
@@ -1111,6 +1112,7 @@ unsigned long invalidate_inode_pages(struct address_space *mapping);
 extern void invalidate_inode_pages2(struct address_space *mapping);
 extern void write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);
+extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
 extern void sync_filesystems(int wait);
@@ -1304,9 +1306,10 @@ extern void inode_update_time(struct inode *inode, int ctime_too);
 static inline ino_t parent_ino(struct dentry *dentry)
 {
 	ino_t res;
-	read_lock(&dparent_lock);
+
+	spin_lock(&dentry->d_lock);
 	res = dentry->d_parent->d_inode->i_ino;
-	read_unlock(&dparent_lock);
+	spin_unlock(&dentry->d_lock);
 	return res;
 }
 

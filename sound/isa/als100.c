@@ -98,17 +98,17 @@ struct snd_card_als100 {
 	struct pnp_dev *devopl;
 };
 
-static struct pnp_card_id snd_als100_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_als100_pnpids[] __devinitdata = {
 	/* ALS100 - PRO16PNP */
-	{ .id = "ALS0001", .devs = { { "@@@0001" }, { "@X@0001" }, { "@H@0001" }, } },
+	{ .id = "ALS0001", .devs = { { "@@@0001" }, { "@X@0001" }, { "@H@0001" } } },
 	/* ALS110 - MF1000 - Digimate 3D Sound */
-	{ .id = "ALS0110", .devs = { { "@@@1001" }, { "@X@1001" }, { "@H@1001" }, } },
+	{ .id = "ALS0110", .devs = { { "@@@1001" }, { "@X@1001" }, { "@H@1001" } } },
 	/* ALS120 */
-	{ .id = "ALS0120", .devs = { { "@@@2001" }, { "@X@2001" }, { "@H@2001" }, } },
+	{ .id = "ALS0120", .devs = { { "@@@2001" }, { "@X@2001" }, { "@H@2001" } } },
 	/* ALS200 */
-	{ .id = "ALS0200", .devs = { { "@@@0020" }, { "@X@0020" }, { "@H@0001" }, } },
+	{ .id = "ALS0200", .devs = { { "@@@0020" }, { "@X@0020" }, { "@H@0001" } } },
 	/* RTL3000 */
-	{ .id = "RTL3000", .devs = { { "@@@2001" }, { "@X@2001" }, { "@H@2001" }, } },
+	{ .id = "RTL3000", .devs = { { "@@@2001" }, { "@X@2001" }, { "@H@2001" } } },
 	{ .id = "", } /* end */
 };
 
@@ -116,13 +116,14 @@ MODULE_DEVICE_TABLE(pnp_card, snd_als100_pnpids);
 
 #define DRIVER_NAME	"snd-card-als100"
 
-static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *acard,
-					    struct pnp_card_link *card,
-					    const struct pnp_card_id *id)
+static int __devinit snd_card_als100_pnp(int dev, struct snd_card_als100 *acard,
+					 struct pnp_card_link *card,
+					 const struct pnp_card_device_id *id)
 {
 	struct pnp_dev *pdev;
-	struct pnp_resource_table * cfg = kmalloc(GFP_ATOMIC, sizeof(struct pnp_resource_table));
+	struct pnp_resource_table *cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
 	int err;
+
 	if (!cfg)
 		return -ENOMEM;
 	acard->dev = pnp_request_card_device(card, id->devs[0].id, NULL);
@@ -146,11 +147,12 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 		pnp_resource_change(&cfg->dma_resource[1], dma16[dev], 1);
 	if (irq[dev] != SNDRV_AUTO_IRQ)
 		pnp_resource_change(&cfg->irq_resource[0], irq[dev], 1);
-	if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
-		printk(KERN_ERR PFX "AUDIO the requested resources are invalid, using auto config\n");
+	if (pnp_manual_config_dev(pdev, cfg, 0) < 0)
+		snd_printk(KERN_ERR PFX "AUDIO the requested resources are invalid, using auto config\n");
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
-		printk(KERN_ERR PFX "AUDIO pnp configure failure\n");
+		snd_printk(KERN_ERR PFX "AUDIO pnp configure failure\n");
+		kfree(cfg);
 		return err;
 	}
 	port[dev] = pnp_port_start(pdev, 0);
@@ -166,7 +168,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 		if (mpu_irq[dev] != SNDRV_AUTO_IRQ)
 			pnp_resource_change(&cfg->irq_resource[0], mpu_irq[dev], 1);
 		if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
-			printk(KERN_ERR PFX "MPU401 the requested resources are invalid, using auto config\n");
+			snd_printk(KERN_ERR PFX "MPU401 the requested resources are invalid, using auto config\n");
 		err = pnp_activate_dev(pdev);
 		if (err < 0)
 			goto __mpu_error;
@@ -176,7 +178,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 	     __mpu_error:
 	     	if (pdev) {
 		     	pnp_release_card_device(pdev);
-	     		printk(KERN_ERR PFX "MPU401 pnp configure failure, skipping\n");
+	     		snd_printk(KERN_ERR PFX "MPU401 pnp configure failure, skipping\n");
 	     	}
 	     	acard->devmpu = NULL;
 	     	mpu_port[dev] = -1;
@@ -188,7 +190,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 		if (fm_port[dev] != SNDRV_AUTO_PORT)
 			pnp_resource_change(&cfg->port_resource[0], fm_port[dev], 4);
 		if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
-			printk(KERN_ERR PFX "OPL3 the requested resources are invalid, using auto config\n");
+			snd_printk(KERN_ERR PFX "OPL3 the requested resources are invalid, using auto config\n");
 		err = pnp_activate_dev(pdev);
 		if (err < 0)
 			goto __fm_error;
@@ -197,7 +199,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 	      __fm_error:
 	     	if (pdev) {
 		     	pnp_release_card_device(pdev);
-	     		printk(KERN_ERR PFX "OPL3 pnp configure failure, skipping\n");
+	     		snd_printk(KERN_ERR PFX "OPL3 pnp configure failure, skipping\n");
 	     	}
 	     	acard->devopl = NULL;
 	     	fm_port[dev] = -1;
@@ -209,7 +211,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 
 static int __init snd_card_als100_probe(int dev,
 					struct pnp_card_link *pcard,
-					const struct pnp_card_id *pid)
+					const struct pnp_card_device_id *pid)
 {
 	int error;
 	sb_t *chip;
@@ -222,7 +224,7 @@ static int __init snd_card_als100_probe(int dev,
 		return -ENOMEM;
 	acard = (struct snd_card_als100 *)card->private_data;
 
-	if ((error = snd_card_als100_isapnp(dev, acard, pcard, pid))) {
+	if ((error = snd_card_als100_pnp(dev, acard, pcard, pid))) {
 		snd_card_free(card);
 		return error;
 	}
@@ -252,15 +254,15 @@ static int __init snd_card_als100_probe(int dev,
 					mpu_port[dev], 0, 
 					mpu_irq[dev], SA_INTERRUPT,
 					NULL) < 0)
-			printk(KERN_ERR PFX "no MPU-401 device at 0x%lx\n", mpu_port[dev]);
+			snd_printk(KERN_ERR PFX "no MPU-401 device at 0x%lx\n", mpu_port[dev]);
 	}
 
 	if (fm_port[dev] > 0) {
 		if (snd_opl3_create(card,
 				    fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_AUTO, 0, &opl3) < 0) {
-			printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx\n",
-				fm_port[dev], fm_port[dev] + 2);
+			snd_printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx\n",
+				   fm_port[dev], fm_port[dev] + 2);
 		} else {
 			if ((error = snd_opl3_timer_new(opl3, 0, 1)) < 0) {
 				snd_card_free(card);
@@ -287,7 +289,7 @@ static int __init snd_card_als100_probe(int dev,
 }
 
 static int __devinit snd_als100_pnp_detect(struct pnp_card_link *card,
-					   const struct pnp_card_id *id)
+					   const struct pnp_card_device_id *id)
 {
 	static int dev;
 	int res;
@@ -327,7 +329,7 @@ static int __init alsa_card_als100_init(void)
 	cards += pnp_register_card_driver(&als100_pnpc_driver);
 #ifdef MODULE
 	if (!cards)
-		printk(KERN_ERR "no ALS100 based soundcards found\n");
+		snd_printk(KERN_ERR "no ALS100 based soundcards found\n");
 #endif
 	return cards ? 0 : -ENODEV;
 }

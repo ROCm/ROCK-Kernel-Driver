@@ -128,7 +128,7 @@ int xfrm6_rcv(struct sk_buff **pskb)
 	struct sk_buff *skb = *pskb;
 	int err;
 	u32 spi, seq;
-	struct xfrm_state *xfrm_vec[XFRM_MAX_DEPTH];
+	struct sec_decap_state xfrm_vec[XFRM_MAX_DEPTH];
 	struct xfrm_state *x;
 	int xfrm_nr = 0;
 	int decaps = 0;
@@ -172,7 +172,10 @@ int xfrm6_rcv(struct sk_buff **pskb)
 		if (x->props.replay_window && xfrm_replay_check(x, seq))
 			goto drop_unlock;
 
-		nexthdr = x->type->input(x, skb);
+		if (xfrm_state_check_expire(x))
+			goto drop_unlock;
+
+		nexthdr = x->type->input(x, &(xfrm_vec[xfrm_nr].decap), skb);
 		if (nexthdr <= 0)
 			goto drop_unlock;
 
@@ -184,7 +187,9 @@ int xfrm6_rcv(struct sk_buff **pskb)
 
 		spin_unlock(&x->lock);
 
-		xfrm_vec[xfrm_nr++] = x;
+		xfrm_vec[xfrm_nr++].xvec = x;
+
+		iph = skb->nh.ipv6h;
 
 		if (x->props.mode) { /* XXX */
 			if (iph->nexthdr != IPPROTO_IPV6)
@@ -199,9 +204,11 @@ int xfrm6_rcv(struct sk_buff **pskb)
 			goto drop;
 	} while (!err);
 
-	memcpy(skb->nh.raw, tmp_hdr, hdr_len);
-	skb->nh.raw[nh_offset] = nexthdr;
-	skb->nh.ipv6h->payload_len = htons(hdr_len + skb->len - sizeof(struct ipv6hdr));
+	if (!decaps) {
+		memcpy(skb->nh.raw, tmp_hdr, hdr_len);
+		skb->nh.raw[nh_offset] = nexthdr;
+		skb->nh.ipv6h->payload_len = htons(hdr_len + skb->len - sizeof(struct ipv6hdr));
+	}
 
 	/* Allocate new secpath or COW existing one. */
 	if (!skb->sp || atomic_read(&skb->sp->refcnt) != 1) {
@@ -224,7 +231,7 @@ int xfrm6_rcv(struct sk_buff **pskb)
 	if (xfrm_nr + skb->sp->len > XFRM_MAX_DEPTH)
 		goto drop;
 
-	memcpy(skb->sp->xvec+skb->sp->len, xfrm_vec, xfrm_nr*sizeof(void*));
+	memcpy(skb->sp->x+skb->sp->len, xfrm_vec, xfrm_nr*sizeof(struct sec_decap_state));
 	skb->sp->len += xfrm_nr;
 
 	if (decaps) {
@@ -244,7 +251,7 @@ drop_unlock:
 drop:
 	if (tmp_hdr) kfree(tmp_hdr);
 	while (--xfrm_nr >= 0)
-		xfrm_state_put(xfrm_vec[xfrm_nr]);
+		xfrm_state_put(xfrm_vec[xfrm_nr].xvec);
 	kfree_skb(skb);
 	return 0;
 }

@@ -17,6 +17,7 @@ typedef struct dvb_filter_pes2ts_s {
 
 void dvb_filter_pes2ts_init(dvb_filter_pes2ts_t *p2ts, unsigned short pid, 
 		 	    dvb_filter_pes2ts_cb_t *cb, void *priv);
+
 int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len);
 
 
@@ -223,12 +224,7 @@ typedef struct audio_i{
 	uint32_t off;
 } AudioInfo;
 
+int dvb_filter_get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr);
 
-void dvb_filter_ipack_reset(ipack *p);
-int dvb_filter_instant_repack(u8 *buf, int count, ipack *p);
-void dvb_filter_ipack_init(ipack *p, int size,
-		void (*func)(u8 *buf,  int size, void *priv));
-void dvb_filter_ipack_free(ipack * p);
-void dvb_filter_ipack_flush(ipack *p);
 
 #endif

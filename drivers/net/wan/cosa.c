@@ -1057,7 +1057,8 @@ static inline int cosa_download(struct cosa_data *cosa, struct cosa_download *d)
 		return -EPERM;
 	}
 
-	if (get_user(addr, &(d->addr)) ||
+	if (verify_area(VERIFY_READ, d, sizeof(*d)) ||
+	    __get_user(addr, &(d->addr)) ||
 	    __get_user(len, &(d->len)) ||
 	    __get_user(code, &(d->code)))
 		return -EFAULT;
@@ -1098,7 +1099,8 @@ static inline int cosa_readmem(struct cosa_data *cosa, struct cosa_download *d)
 		return -EPERM;
 	}
 
-	if (get_user(addr, &(d->addr)) ||
+	if (verify_area(VERIFY_READ, d, sizeof(*d)) ||
+	    __get_user(addr, &(d->addr)) ||
 	    __get_user(len, &(d->len)) ||
 	    __get_user(code, &(d->code)))
 		return -EFAULT;
@@ -1106,7 +1108,7 @@ static inline int cosa_readmem(struct cosa_data *cosa, struct cosa_download *d)
 	/* If something fails, force the user to reset the card */
 	cosa->firmware_status &= ~COSA_FW_RESET;
 
-	if ((i=readmem(cosa, d->code, len, addr)) < 0) {
+	if ((i=readmem(cosa, code, len, addr)) < 0) {
 		printk(KERN_NOTICE "cosa%d: reading memory failed: %d\n",
 			cosa->num, i);
 		return -EIO;

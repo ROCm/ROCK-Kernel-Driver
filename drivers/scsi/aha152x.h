@@ -5,53 +5,11 @@
  * $Id: aha152x.h,v 2.5 2002/04/14 11:24:12 fischer Exp $
  */
 
-#if defined(__KERNEL__)
-
-#include <linux/blk.h>
-#include "scsi.h"
-#include <asm/io.h>
-#include <linux/version.h>
-
-int aha152x_detect(Scsi_Host_Template *);
-int aha152x_command(Scsi_Cmnd *);
-int aha152x_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int aha152x_abort(Scsi_Cmnd *);
-int aha152x_release(struct Scsi_Host *shpnt);
-int aha152x_device_reset(Scsi_Cmnd *);
-int aha152x_bus_reset(Scsi_Cmnd *);
-int aha152x_host_reset(Scsi_Cmnd *);
-int aha152x_biosparam(struct scsi_device *, struct block_device *,
-		sector_t, int*);
-int aha152x_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout);
-
 /* number of queueable commands
    (unless we support more than 1 cmd_per_lun this should do) */
 #define AHA152X_MAXQUEUE 7
 
 #define AHA152X_REVID "Adaptec 152x SCSI driver; $Revision: 2.5 $"
-
-/* Initial value of Scsi_Host entry */
-#define AHA152X { .proc_name			= "aha152x",		\
-                  .proc_info			= aha152x_proc_info,	\
-                  .name				= AHA152X_REVID,		\
-                  .detect			= aha152x_detect,		\
-                  .command			= aha152x_command,	\
-                  .queuecommand			= aha152x_queue,		\
-		  .eh_abort_handler		= aha152x_abort,		\
-		  .eh_device_reset_handler	= aha152x_device_reset,	\
-		  .eh_bus_reset_handler		= aha152x_bus_reset,	\
-		  .eh_host_reset_handler	= aha152x_host_reset,	\
-                  .release			= aha152x_release,	\
-                  .bios_param			= aha152x_biosparam,	\
-                  .can_queue			= 1,			\
-                  .this_id			= 7,			\
-                  .sg_tablesize			= SG_ALL,			\
-                  .cmd_per_lun			= 1,			\
-                  .present			= 0,			\
-                  .unchecked_isa_dma		= 0,			\
-                  .use_clustering		= DISABLE_CLUSTERING }
-#endif
-
 
 /* port addresses */
 #define SCSISEQ      (HOSTIOPORT0+0x00)    /* SCSI sequence control */
@@ -354,5 +312,25 @@ enum {
   debug_phases    = 0x2000,
 };
 #endif
+
+/* for the pcmcia stub */
+struct aha152x_setup {
+	int io_port;
+	int irq;
+	int scsiid;
+	int reconnect;
+	int parity;
+	int synchronous;
+	int delay;
+	int ext_trans;
+	int tc1550;
+#if defined(AHA152X_DEBUG)
+	int debug;
+#endif
+	char *conf;
+};
+
+struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *);
+int aha152x_host_reset(struct scsi_cmnd *);
 
 #endif /* _AHA152X_H */

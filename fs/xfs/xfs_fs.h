@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2.1 of the GNU Lesser General Public License
@@ -44,21 +44,25 @@
  * d_miniosz is the min xfer size, xfer size multiple and file seek offset
  * alignment.
  */
+#ifndef HAVE_DIOATTR
 struct dioattr {
 	__u32		d_mem;		/* data buffer memory alignment */
 	__u32		d_miniosz;	/* min xfer size		*/
 	__u32		d_maxiosz;	/* max xfer size		*/
 };
+#endif
 
 /*
  * Structure for XFS_IOC_FSGETXATTR[A] and XFS_IOC_FSSETXATTR.
  */
+#ifndef HAVE_FSXATTR
 struct fsxattr {
 	__u32		fsx_xflags;	/* xflags field value (get/set) */
 	__u32		fsx_extsize;	/* extsize field value (get/set)*/
 	__u32		fsx_nextents;	/* nextents field value (get)	*/
 	unsigned char	fsx_pad[16];
 };
+#endif
 
 /*
  * Flags for the bs_xflags/fsx_xflags field
@@ -79,6 +83,7 @@ struct fsxattr {
  * number of array elements given.  The first structure is updated on
  * return to give the offset and length for the next call.
  */
+#ifndef HAVE_GETBMAP
 struct getbmap {
 	__s64		bmv_offset;	/* file offset of segment in blocks */
 	__s64		bmv_block;	/* starting block (64-bit daddr_t)  */
@@ -86,6 +91,7 @@ struct getbmap {
 	__s32		bmv_count;	/* # of entries in array incl. 1st  */
 	__s32		bmv_entries;	/* # of entries filled in (output)  */
 };
+#endif
 
 /*
  *	Structure for XFS_IOC_GETBMAPX.	 Fields bmv_offset through bmv_entries
@@ -96,6 +102,7 @@ struct getbmap {
  *	in by the XFS_IOC_GETBMAPX command for each returned structure after
  *	the first.
  */
+#ifndef HAVE_GETBMAPX
 struct getbmapx {
 	__s64		bmv_offset;	/* file offset of segment in blocks */
 	__s64		bmv_block;	/* starting block (64-bit daddr_t)  */
@@ -107,6 +114,7 @@ struct getbmapx {
 	__s32		bmv_unused1;	/* future use			    */
 	__s32		bmv_unused2;	/* future use			    */
 };
+#endif
 
 /*	bmv_iflags values - set by XFS_IOC_GETBMAPX caller.	*/
 #define BMV_IF_ATTRFORK		0x1	/* return attr fork rather than data */
@@ -136,11 +144,13 @@ struct getbmapx {
  * only values previously obtained via xfs_bulkstat!  (Specifically the
  * xfs_bstat_t fields bs_dmevmask and bs_dmstate.)
  */
+#ifndef HAVE_FSDMIDATA
 struct fsdmidata {
 	__u32		fsd_dmevmask;	/* corresponds to di_dmevmask */
 	__u16		fsd_padding;
 	__u16		fsd_dmstate;	/* corresponds to di_dmstate  */
 };
+#endif
 
 /*
  * File segment locking set data type for 64 bit access.
@@ -391,7 +401,7 @@ typedef struct {
  * This is typically called by a stateless file server in order to generate
  * "file handles".
  */
-#ifndef MAXFIDSZ
+#ifndef HAVE_FID
 #define MAXFIDSZ	46
 typedef struct fid {
 	__u16		fid_len;		/* length of data in bytes */
@@ -472,7 +482,7 @@ typedef struct xfs_handle {
 #define XFS_IOC_FSGROWFSLOG	     _IOW ('X', 111, struct xfs_growfs_log)
 #define XFS_IOC_FSGROWFSRT	     _IOW ('X', 112, struct xfs_growfs_rt)
 #define XFS_IOC_FSCOUNTS	     _IOR ('X', 113, struct xfs_fsop_counts)
-#define XFS_IOC_SET_RESBLKS	     _IOR ('X', 114, struct xfs_fsop_resblks)
+#define XFS_IOC_SET_RESBLKS	     _IOWR('X', 114, struct xfs_fsop_resblks)
 #define XFS_IOC_GET_RESBLKS	     _IOR ('X', 115, struct xfs_fsop_resblks)
 #define XFS_IOC_ERROR_INJECTION	     _IOW ('X', 116, struct xfs_error_injection)
 #define XFS_IOC_ERROR_CLEARALL	     _IOW ('X', 117, struct xfs_error_injection)
@@ -486,6 +496,7 @@ typedef struct xfs_handle {
 /*	XFS_IOC_GETFSUUID ---------- deprecated 140	 */
 
 
+#ifndef HAVE_BBMACROS
 /*
  * Block I/O parameterization.	A basic block (BB) is the lowest size of
  * filesystem allocation, and must equal 512.  Length units given to bio
@@ -497,5 +508,6 @@ typedef struct xfs_handle {
 #define BTOBB(bytes)	(((__u64)(bytes) + BBSIZE - 1) >> BBSHIFT)
 #define BTOBBT(bytes)	((__u64)(bytes) >> BBSHIFT)
 #define BBTOB(bbs)	((bbs) << BBSHIFT)
+#endif
 
 #endif	/* __XFS_FS_H__ */

@@ -59,7 +59,7 @@ __handle_user_windows:
 		clr			%o0
 		mov			%l5, %o2
 		mov			%l6, %o3
-		add			%sp, STACK_BIAS + REGWIN_SZ, %o1
+		add			%sp, PTREGS_OFF, %o1
 		mov			%l0, %o4
 
 		call			do_notify_resume
@@ -103,7 +103,7 @@ __handle_perfctrs:
 		clr			%o0
 		mov			%l5, %o2
 		mov			%l6, %o3
-		add			%sp, STACK_BIAS + REGWIN_SZ, %o1
+		add			%sp, PTREGS_OFF, %o1
 		mov			%l0, %o4
 		call			do_notify_resume
 
@@ -132,7 +132,7 @@ __handle_signal:
 		clr			%o0
 		mov			%l5, %o2
 		mov			%l6, %o3
-		add			%sp, STACK_BIAS + REGWIN_SZ, %o1
+		add			%sp, PTREGS_OFF, %o1
 		mov			%l0, %o4
 		call			do_notify_resume
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
@@ -185,6 +185,7 @@ rtrap_xcall:
 		 * sched+signal checks with IRQs disabled.
 		 */
 to_user:	wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
+		wrpr			0, %pil
 __handle_preemption_continue:
 		ldx			[%g6 + TI_FLAGS], %l0
 		sethi			%hi(_TIF_USER_WORK_MASK), %o0
@@ -271,6 +272,7 @@ to_kernel:
 		brnz			%l5, kern_fpucheck
 		 sethi			%hi(PREEMPT_ACTIVE), %l6
 		stw			%l6, [%g6 + TI_PRE_COUNT]
+		wrpr			0, %pil
 		call			schedule
 		 nop
 		ba,pt			%xcc, rtrap

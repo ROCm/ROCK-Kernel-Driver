@@ -767,39 +767,39 @@ static ssize_t ata_ctx_u16le(const u_char *userPtr, size_t userCount,
 
 
 static TRANS transTTNormal = {
-	ct_ulaw:	ata_ct_law,
-	ct_alaw:	ata_ct_law,
-	ct_s8:		ata_ct_s8,
-	ct_u8:		ata_ct_u8,
+	.ct_ulaw	= ata_ct_law,
+	.ct_alaw	= ata_ct_law,
+	.ct_s8		= ata_ct_s8,
+	.ct_u8		= ata_ct_u8,
 };
 
 static TRANS transTTExpanding = {
-	ct_ulaw:	ata_ctx_law,
-	ct_alaw:	ata_ctx_law,
-	ct_s8:		ata_ctx_s8,
-	ct_u8:		ata_ctx_u8,
+	.ct_ulaw	= ata_ctx_law,
+	.ct_alaw	= ata_ctx_law,
+	.ct_s8		= ata_ctx_s8,
+	.ct_u8		= ata_ctx_u8,
 };
 
 static TRANS transFalconNormal = {
-	ct_ulaw:	ata_ct_law,
-	ct_alaw:	ata_ct_law,
-	ct_s8:		ata_ct_s8,
-	ct_u8:		ata_ct_u8,
-	ct_s16be:	ata_ct_s16be,
-	ct_u16be:	ata_ct_u16be,
-	ct_s16le:	ata_ct_s16le,
-	ct_u16le:	ata_ct_u16le
+	.ct_ulaw	= ata_ct_law,
+	.ct_alaw	= ata_ct_law,
+	.ct_s8		= ata_ct_s8,
+	.ct_u8		= ata_ct_u8,
+	.ct_s16be	= ata_ct_s16be,
+	.ct_u16be	= ata_ct_u16be,
+	.ct_s16le	= ata_ct_s16le,
+	.ct_u16le	= ata_ct_u16le
 };
 
 static TRANS transFalconExpanding = {
-	ct_ulaw:	ata_ctx_law,
-	ct_alaw:	ata_ctx_law,
-	ct_s8:		ata_ctx_s8,
-	ct_u8:		ata_ctx_u8,
-	ct_s16be:	ata_ctx_s16be,
-	ct_u16be:	ata_ctx_u16be,
-	ct_s16le:	ata_ctx_s16le,
-	ct_u16le:	ata_ctx_u16le,
+	.ct_ulaw	= ata_ctx_law,
+	.ct_alaw	= ata_ctx_law,
+	.ct_s8		= ata_ctx_s8,
+	.ct_u8		= ata_ctx_u8,
+	.ct_s16be	= ata_ctx_s16be,
+	.ct_u16be	= ata_ctx_u16be,
+	.ct_s16le	= ata_ctx_s16le,
+	.ct_u16le	= ata_ctx_u16le,
 };
 
 
@@ -1495,81 +1495,81 @@ static int FalconStateInfo(char *buffer, size_t space)
 /*** Machine definitions *****************************************************/
 
 static SETTINGS def_hard_falcon = {
-	format: AFMT_S8,
-	stereo: 0,
-	size: 8,
-	speed: 8195
+	.format		= AFMT_S8,
+	.stereo		= 0,
+	.size		= 8,
+	.speed		= 8195
 } ;
 
 static SETTINGS def_hard_tt = {
-	format: AFMT_S8,
-	stereo: 0,
-	size: 8,
-	speed: 12517
+	.format	= AFMT_S8,
+	.stereo	= 0,
+	.size	= 8,
+	.speed	= 12517
 } ;
 
 static SETTINGS def_soft = {
-	format: AFMT_U8,
-	stereo: 0,
-	size: 8,
-	speed: 8000
+	.format	= AFMT_U8,
+	.stereo	= 0,
+	.size	= 8,
+	.speed	= 8000
 } ;
 
 static MACHINE machTT = {
-	name:		"Atari",
-	name2:		"TT",
-	open:		AtaOpen,
-	release:	AtaRelease,
-	dma_alloc:	AtaAlloc,
-	dma_free:	AtaFree,
-	irqinit:	AtaIrqInit,
+	.name		= "Atari",
+	.name2		= "TT",
+	.open		= AtaOpen,
+	.release	= AtaRelease,
+	.dma_alloc	= AtaAlloc,
+	.dma_free	= AtaFree,
+	.irqinit	= AtaIrqInit,
 #ifdef MODULE
-	irqcleanup:	AtaIrqCleanUp,
+	.irqcleanup	= AtaIrqCleanUp,
 #endif /* MODULE */
-	init:		TTInit,
-	silence:	TTSilence,
-	setFormat:	TTSetFormat,
-	setVolume:	TTSetVolume,
-	setBass:	AtaSetBass,
-	setTreble:	AtaSetTreble,
-	setGain:	TTSetGain,
-	play:		AtaPlay,
-	mixer_init:	TTMixerInit,
-	mixer_ioctl:	TTMixerIoctl,
-	write_sq_setup:	AtaWriteSqSetup,
-	sq_open:	AtaSqOpen,
-	state_info:	TTStateInfo,
-	min_dsp_speed:	6258,
-	version:	((DMASOUND_ATARI_REVISION<<8) | DMASOUND_ATARI_EDITION),
-	hardware_afmts:	AFMT_S8,  /* h'ware-supported formats *only* here */
-	capabilities:	 DSP_CAP_BATCH	/* As per SNDCTL_DSP_GETCAPS */
+	.init		= TTInit,
+	.silence	= TTSilence,
+	.setFormat	= TTSetFormat,
+	.setVolume	= TTSetVolume,
+	.setBass	= AtaSetBass,
+	.setTreble	= AtaSetTreble,
+	.setGain	= TTSetGain,
+	.play		= AtaPlay,
+	.mixer_init	= TTMixerInit,
+	.mixer_ioctl	= TTMixerIoctl,
+	.write_sq_setup	= AtaWriteSqSetup,
+	.sq_open	= AtaSqOpen,
+	.state_info	= TTStateInfo,
+	.min_dsp_speed	= 6258,
+	.version	= ((DMASOUND_ATARI_REVISION<<8) | DMASOUND_ATARI_EDITION),
+	.hardware_afmts	= AFMT_S8,  /* h'ware-supported formats *only* here */
+	.capabilities	=  DSP_CAP_BATCH	/* As per SNDCTL_DSP_GETCAPS */
 };
 
 static MACHINE machFalcon = {
-	name:		"Atari",
-	name2:		"FALCON",
-	dma_alloc:	AtaAlloc,
-	dma_free:	AtaFree,
-	irqinit:	AtaIrqInit,
+	.name		= "Atari",
+	.name2		= "FALCON",
+	.dma_alloc	= AtaAlloc,
+	.dma_free	= AtaFree,
+	.irqinit	= AtaIrqInit,
 #ifdef MODULE
-	irqcleanup:	AtaIrqCleanUp,
+	.irqcleanup	= AtaIrqCleanUp,
 #endif /* MODULE */
-	init:		FalconInit,
-	silence:	FalconSilence,
-	setFormat:	FalconSetFormat,
-	setVolume:	FalconSetVolume,
-	setBass:	AtaSetBass,
-	setTreble:	AtaSetTreble,
-	play:		AtaPlay,
-	mixer_init:	FalconMixerInit,
-	mixer_ioctl:	FalconMixerIoctl,
-	write_sq_setup:	AtaWriteSqSetup,
-	sq_open:	AtaSqOpen,
-	state_info:	FalconStateInfo,
-	min_dsp_speed:	8195,
-	version:	((DMASOUND_ATARI_REVISION<<8) | DMASOUND_ATARI_EDITION),
-	hardware_afmts:	(AFMT_S8 | AFMT_S16_BE), /* h'ware-supported formats *only* here */
-	capabilities:	 DSP_CAP_BATCH	/* As per SNDCTL_DSP_GETCAPS */
+	.init		= FalconInit,
+	.silence	= FalconSilence,
+	.setFormat	= FalconSetFormat,
+	.setVolume	= FalconSetVolume,
+	.setBass	= AtaSetBass,
+	.setTreble	= AtaSetTreble,
+	.play		= AtaPlay,
+	.mixer_init	= FalconMixerInit,
+	.mixer_ioctl	= FalconMixerIoctl,
+	.write_sq_setup	= AtaWriteSqSetup,
+	.sq_open	= AtaSqOpen,
+	.state_info	= FalconStateInfo,
+	.min_dsp_speed	= 8195,
+	.version	= ((DMASOUND_ATARI_REVISION<<8) | DMASOUND_ATARI_EDITION),
+	.hardware_afmts	= (AFMT_S8 | AFMT_S16_BE), /* h'ware-supported formats *only* here */
+	.capabilities	=  DSP_CAP_BATCH	/* As per SNDCTL_DSP_GETCAPS */
 };
 
 

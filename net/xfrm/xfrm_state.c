@@ -8,12 +8,16 @@
  * 		IPv6 support
  * 	YOSHIFUJI Hideaki @USAGI
  * 		Split up af-specific functions
+ *	Derek Atkins <derek@ihtfp.com>
+ *		Add UDP Encapsulation
  * 	
  */
 
+#include <linux/workqueue.h>
 #include <net/xfrm.h>
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
+#include <asm/uaccess.h>
 
 /* Each xfrm_state may be linked to two tables:
 
@@ -38,7 +42,47 @@ DECLARE_WAIT_QUEUE_HEAD(km_waitq);
 static rwlock_t xfrm_state_afinfo_lock = RW_LOCK_UNLOCKED;
 static struct xfrm_state_afinfo *xfrm_state_afinfo[NPROTO];
 
+static struct work_struct xfrm_state_gc_work;
+static struct list_head xfrm_state_gc_list = LIST_HEAD_INIT(xfrm_state_gc_list);
+static spinlock_t xfrm_state_gc_lock = SPIN_LOCK_UNLOCKED;
+
 static void __xfrm_state_delete(struct xfrm_state *x);
+
+static void xfrm_state_gc_destroy(struct xfrm_state *x)
+{
+	if (del_timer(&x->timer))
+		BUG();
+	if (x->aalg)
+		kfree(x->aalg);
+	if (x->ealg)
+		kfree(x->ealg);
+	if (x->calg)
+		kfree(x->calg);
+	if (x->encap)
+		kfree(x->encap);
+	if (x->type) {
+		x->type->destructor(x);
+		xfrm_put_type(x->type);
+	}
+	kfree(x);
+	wake_up(&km_waitq);
+}
+
+static void xfrm_state_gc_task(void *data)
+{
+	struct xfrm_state *x;
+	struct list_head *entry, *tmp;
+	struct list_head gc_list = LIST_HEAD_INIT(gc_list);
+
+	spin_lock_bh(&xfrm_state_gc_lock);
+	list_splice_init(&xfrm_state_gc_list, &gc_list);
+	spin_unlock_bh(&xfrm_state_gc_lock);
+
+	list_for_each_safe(entry, tmp, &gc_list) {
+		x = list_entry(entry, struct xfrm_state, bydst);
+		xfrm_state_gc_destroy(x);
+	}
+}
 
 static inline unsigned long make_jiffies(long secs)
 {
@@ -146,26 +190,17 @@ struct xfrm_state *xfrm_state_alloc(void)
 void __xfrm_state_destroy(struct xfrm_state *x)
 {
 	BUG_TRAP(x->km.state == XFRM_STATE_DEAD);
-	if (del_timer(&x->timer))
-		BUG();
-	if (x->aalg)
-		kfree(x->aalg);
-	if (x->ealg)
-		kfree(x->ealg);
-	if (x->calg)
-		kfree(x->calg);
-	if (x->type)
-		xfrm_put_type(x->type);
-	kfree(x);
+
+	spin_lock_bh(&xfrm_state_gc_lock);
+	list_add(&x->bydst, &xfrm_state_gc_list);
+	spin_unlock_bh(&xfrm_state_gc_lock);
+	schedule_work(&xfrm_state_gc_work);
 }
 
 static void __xfrm_state_delete(struct xfrm_state *x)
 {
-	int kill = 0;
-
 	if (x->km.state != XFRM_STATE_DEAD) {
 		x->km.state = XFRM_STATE_DEAD;
-		kill = 1;
 		spin_lock(&xfrm_state_lock);
 		list_del(&x->bydst);
 		atomic_dec(&x->refcnt);
@@ -176,13 +211,25 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		spin_unlock(&xfrm_state_lock);
 		if (del_timer(&x->timer))
 			atomic_dec(&x->refcnt);
-		if (atomic_read(&x->refcnt) != 1)
-			xfrm_flush_bundles(x);
-	}
 
-	if (kill && x->type)
-		x->type->destructor(x);
-	wake_up(&km_waitq);
+		/* The number two in this test is the reference
+		 * mentioned in the comment below plus the reference
+		 * our caller holds.  A larger value means that
+		 * there are DSTs attached to this xfrm_state.
+		 */
+		if (atomic_read(&x->refcnt) > 2)
+			xfrm_flush_bundles(x);
+
+		/* All xfrm_state objects are created by one of two possible
+		 * paths:
+		 *
+		 * 2) xfrm_state_lookup --> xfrm_state_insert
+		 *
+		 * The xfrm_state_lookup or xfrm_state_alloc call gives a
+		 * reference, and that is what we are dropping here.
+		 */
+		atomic_dec(&x->refcnt);
+	}
 }
 
 void xfrm_state_delete(struct xfrm_state *x)
@@ -614,6 +661,22 @@ int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
 	return err;
 }
 
+int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport)
+{
+	int err = -EINVAL;
+	struct xfrm_mgr *km;
+
+	read_lock(&xfrm_km_lock);
+	list_for_each_entry(km, &xfrm_km_list, list) {
+		if (km->new_mapping)
+			err = km->new_mapping(x, ipaddr, sport);
+		if (!err)
+			break;
+	}
+	read_unlock(&xfrm_km_lock);
+	return err;
+}
+
 int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
 {
 	int err;
@@ -735,5 +798,6 @@ void __init xfrm_state_init(void)
 		INIT_LIST_HEAD(&xfrm_state_bydst[i]);
 		INIT_LIST_HEAD(&xfrm_state_byspi[i]);
 	}
+	INIT_WORK(&xfrm_state_gc_work, xfrm_state_gc_task, NULL);
 }
 

@@ -143,9 +143,15 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 			"InSegs OutSegs RetransSegs InErrs OutRsts\nTcp:");
 
 	for (i = 0;
-	     i < offsetof(struct tcp_mib, __pad) / sizeof(unsigned long); i++)
-		seq_printf(seq, " %lu",
-			   fold_field((void **) tcp_statistics, i));
+	     i < offsetof(struct tcp_mib, __pad) / sizeof(unsigned long); i++) {
+		if (i == (offsetof(struct tcp_mib, TcpMaxConn) / sizeof(unsigned long)))
+			/* MaxConn field is negative, RFC 2012 */
+			seq_printf(seq, " %ld", 
+				   fold_field((void **) tcp_statistics, i));
+		else
+			seq_printf(seq, " %lu", 
+				   fold_field((void **) tcp_statistics, i));
+	}
 
 	seq_printf(seq, "\nUdp: InDatagrams NoPorts InErrors OutDatagrams\n"
 			"Udp:");

@@ -85,6 +85,8 @@ typedef struct dmxdev_filter_s {
         struct dmxdev_s *dev;
         dmxdev_buffer_t buffer;
 
+	struct semaphore mutex;
+
         // only for sections
         struct timer_list timer;
         int todo;

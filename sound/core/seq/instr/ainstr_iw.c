@@ -78,7 +78,7 @@ static int snd_seq_iwffff_copy_env_from_stream(__u32 req_stype,
 	while (1) {
 		if (*len < (long)sizeof(__u32))
 			return -EINVAL;
-		if (copy_from_user(&stype, data, sizeof(stype)))
+		if (copy_from_user(&stype, *data, sizeof(stype)))
 			return -EFAULT;
 		if (stype == IWFFFF_STRU_WAVE)
 			return 0;

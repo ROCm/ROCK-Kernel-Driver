@@ -354,7 +354,7 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 static void skb_split(struct sk_buff *skb, struct sk_buff *skb1, u32 len)
 {
 	int i;
-	int pos = skb->len - skb->data_len;
+	int pos = skb_headlen(skb);
 
 	if (len < pos) {
 		/* Split line is inside header. */

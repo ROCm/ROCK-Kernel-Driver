@@ -13,9 +13,9 @@
 #define _CRYPTO_INTERNAL_H
 #include <linux/mm.h>
 #include <linux/highmem.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/kmap_types.h>
 
 extern enum km_type crypto_km_types[];
@@ -39,11 +39,6 @@ static inline void crypto_yield(struct crypto_tfm *tfm)
 {
 	if (!in_softirq())
 		cond_resched();
-}
-
-static inline u32 crypto_cipher_flags(u32 flags)
-{
-	return flags & (CRYPTO_TFM_MODE_MASK|CRYPTO_TFM_REQ_WEAK_KEY);
 }
 
 static inline void *crypto_tfm_ctx(struct crypto_tfm *tfm)

@@ -308,19 +308,19 @@ struct acpi_create_field_info
  *
  ****************************************************************************/
 
-/* Information about each particular GPE level */
+/* Information about a GPE, one per each GPE in an array */
 
 struct acpi_gpe_event_info
 {
 	struct acpi_namespace_node              *method_node;   /* Method node for this GPE level */
 	acpi_gpe_handler                        handler;        /* Address of handler, if any */
 	void                                    *context;       /* Context to be passed to handler */
-	struct acpi_gpe_register_info           *register_info;
-	u8                                      type;           /* Level or Edge */
-	u8                                      bit_mask;
+	struct acpi_gpe_register_info           *register_info; /* Backpointer to register info */
+	u8                                      flags;          /* Level or Edge */
+	u8                                      bit_mask;       /* This GPE within the register */
 };
 
-/* Information about a particular GPE register pair */
+/* Information about a GPE register pair, one per each status/enable pair in an array */
 
 struct acpi_gpe_register_info
 {
@@ -332,24 +332,36 @@ struct acpi_gpe_register_info
 	u8                                      base_gpe_number; /* Base GPE number for this register */
 };
 
-
-#define ACPI_GPE_LEVEL_TRIGGERED        1
-#define ACPI_GPE_EDGE_TRIGGERED         2
-
-
-/* Information about each GPE register block */
-
+/*
+ * Information about a GPE register block, one per each installed block --
+ * GPE0, GPE1, and one per each installed GPE Block Device.
+ */
 struct acpi_gpe_block_info
 {
 	struct acpi_gpe_block_info              *previous;
 	struct acpi_gpe_block_info              *next;
-	struct acpi_gpe_block_info              *next_on_interrupt;
-	struct acpi_gpe_register_info           *register_info;
-	struct acpi_gpe_event_info              *event_info;
-	struct acpi_generic_address             block_address;
-	u32                                     register_count;
-	u8                                      block_base_number;
+	struct acpi_gpe_xrupt_info              *xrupt_block;   /* Backpointer to interrupt block */
+	struct acpi_gpe_register_info           *register_info; /* One per GPE register pair */
+	struct acpi_gpe_event_info              *event_info;    /* One for each GPE */
+	struct acpi_generic_address             block_address;  /* Base address of the block */
+	u32                                     register_count; /* Number of register pairs in block */
+	u8                                      block_base_number;/* Base GPE number for this block */
 };
+
+/* Information about GPE interrupt handlers, one per each interrupt level used for GPEs */
+
+struct acpi_gpe_xrupt_info
+{
+	struct acpi_gpe_xrupt_info              *previous;
+	struct acpi_gpe_xrupt_info              *next;
+	struct acpi_gpe_block_info              *gpe_block_list_head; /* List of GPE blocks for this xrupt */
+	u32                                     interrupt_level;    /* System interrupt level */
+};
+
+
+typedef acpi_status (*ACPI_GPE_CALLBACK) (
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
+	struct acpi_gpe_block_info      *gpe_block);
 
 
 /* Information about each particular fixed event */
@@ -359,7 +371,6 @@ struct acpi_fixed_event_handler
 	acpi_event_handler              handler;        /* Address of handler. */
 	void                            *context;       /* Context to be passed to handler */
 };
-
 
 struct acpi_fixed_event_info
 {

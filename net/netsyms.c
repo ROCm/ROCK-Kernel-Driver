@@ -171,10 +171,8 @@ EXPORT_SYMBOL(sock_kfree_s);
 EXPORT_SYMBOL(sock_map_fd);
 EXPORT_SYMBOL(sockfd_lookup);
 
-#ifdef CONFIG_FILTER
 EXPORT_SYMBOL(sk_run_filter);
 EXPORT_SYMBOL(sk_chk_filter);
-#endif
 
 EXPORT_SYMBOL(neigh_table_init);
 EXPORT_SYMBOL(neigh_table_clear);
@@ -236,8 +234,8 @@ EXPORT_SYMBOL(scm_detach_fds);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
+EXPORT_SYMBOL(brioctl_set);
 #endif
-EXPORT_SYMBOL(br_ioctl_hook);
 
 #ifdef CONFIG_NET_DIVERT
 EXPORT_SYMBOL(alloc_divert_blk);
@@ -294,6 +292,7 @@ EXPORT_SYMBOL(dlci_ioctl_hook);
 
 EXPORT_SYMBOL(xfrm_user_policy);
 EXPORT_SYMBOL(km_waitq);
+EXPORT_SYMBOL(km_new_mapping);
 EXPORT_SYMBOL(xfrm_cfg_sem);
 EXPORT_SYMBOL(xfrm_policy_alloc);
 EXPORT_SYMBOL(__xfrm_policy_destroy);
@@ -546,6 +545,7 @@ EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(loopback_dev);
 EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(unregister_netdevice);
+EXPORT_SYMBOL(synchronize_net);
 EXPORT_SYMBOL(netdev_state_change);
 EXPORT_SYMBOL(dev_new_index);
 EXPORT_SYMBOL(dev_get_by_flags);

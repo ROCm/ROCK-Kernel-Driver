@@ -112,9 +112,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 		if (len==1)
 			dentry = dget(dparent);
 		else if (dparent != exp->ex_dentry) {
-			read_lock(&dparent_lock);
-			dentry = dget(dparent->d_parent);
-			read_unlock(&dparent_lock);
+			dentry = dget_parent(dparent);
 		} else  if (!EX_NOHIDE(exp))
 			dentry = dget(dparent); /* .. == . just like at / */
 		else {
@@ -125,9 +123,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 			dentry = dget(dparent);
 			while(follow_up(&mnt, &dentry))
 				;
-			read_lock(&dparent_lock);
-			dp = dget(dentry->d_parent);
-			read_unlock(&dparent_lock);
+			dp = dget_parent(dentry);
 			dput(dentry);
 			dentry = dp;
 

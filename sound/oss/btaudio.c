@@ -19,7 +19,6 @@
 
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/pci.h>
@@ -426,11 +425,11 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations btaudio_mixer_fops = {
-	owner:   THIS_MODULE,
-	llseek:  no_llseek,
-	open:    btaudio_mixer_open,
-	release: btaudio_mixer_release,
-	ioctl:   btaudio_mixer_ioctl,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.open		= btaudio_mixer_open,
+	.release	= btaudio_mixer_release,
+	.ioctl		= btaudio_mixer_ioctl,
 };
 
 /* -------------------------------------------------------------- */
@@ -791,25 +790,25 @@ static unsigned int btaudio_dsp_poll(struct file *file, struct poll_table_struct
 }
 
 static struct file_operations btaudio_digital_dsp_fops = {
-	owner:   THIS_MODULE,
-	llseek:  no_llseek,
-	open:    btaudio_dsp_open_digital,
-	release: btaudio_dsp_release,
-	read:    btaudio_dsp_read,
-	write:   btaudio_dsp_write,
-	ioctl:   btaudio_dsp_ioctl,
-	poll:    btaudio_dsp_poll,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.open		= btaudio_dsp_open_digital,
+	.release	= btaudio_dsp_release,
+	.read		= btaudio_dsp_read,
+	.write		= btaudio_dsp_write,
+	.ioctl		= btaudio_dsp_ioctl,
+	.poll		= btaudio_dsp_poll,
 };
 
 static struct file_operations btaudio_analog_dsp_fops = {
-	owner:   THIS_MODULE,
-	llseek:  no_llseek,
-	open:    btaudio_dsp_open_analog,
-	release: btaudio_dsp_release,
-	read:    btaudio_dsp_read,
-	write:   btaudio_dsp_write,
-	ioctl:   btaudio_dsp_ioctl,
-	poll:    btaudio_dsp_poll,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.open		= btaudio_dsp_open_analog,
+	.release	= btaudio_dsp_release,
+	.read		= btaudio_dsp_read,
+	.write		= btaudio_dsp_write,
+	.ioctl		= btaudio_dsp_ioctl,
+	.poll		= btaudio_dsp_poll,
 };
 
 /* -------------------------------------------------------------- */
@@ -882,12 +881,12 @@ static int rate = 0;
 
 static struct cardinfo cards[] = {
 	[0] = {
-		name: "default",
-		rate: 32000,
+		.name	= "default",
+		.rate	= 32000,
 	},
 	[BTA_OSPREY200] = {
-		name: "Osprey 200",
-		rate: 44100,
+		.name	= "Osprey 200",
+		.rate	= 44100,
 	},
 };
 
@@ -1062,31 +1061,31 @@ static void __devexit btaudio_remove(struct pci_dev *pci_dev)
 
 static struct pci_device_id btaudio_pci_tbl[] __devinitdata = {
         {
-		vendor:       PCI_VENDOR_ID_BROOKTREE,
-		device:       0x0878,
-		subvendor:    0x0070,
-		subdevice:    0xff01,
-		driver_data:  BTA_OSPREY200,
+		.vendor		= PCI_VENDOR_ID_BROOKTREE,
+		.device		= 0x0878,
+		.subvendor	= 0x0070,
+		.subdevice	= 0xff01,
+		.driver_data	= BTA_OSPREY200,
 	},{
-		vendor:       PCI_VENDOR_ID_BROOKTREE,
-		device:       0x0878,
-		subvendor:    PCI_ANY_ID,
-		subdevice:    PCI_ANY_ID,
+		.vendor		= PCI_VENDOR_ID_BROOKTREE,
+		.device		= 0x0878,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
 	},{
-		vendor:       PCI_VENDOR_ID_BROOKTREE,
-		device:       0x0878,
-		subvendor:    PCI_ANY_ID,
-		subdevice:    PCI_ANY_ID,
+		.vendor		= PCI_VENDOR_ID_BROOKTREE,
+		.device		= 0x0878,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
         },{
 		/* --- end of list --- */
 	}
 };
 
 static struct pci_driver btaudio_pci_driver = {
-        name:     "btaudio",
-        id_table: btaudio_pci_tbl,
-        probe:    btaudio_probe,
-        remove:   __devexit_p(btaudio_remove),
+        .name		= "btaudio",
+        .id_table	= btaudio_pci_tbl,
+        .probe		= btaudio_probe,
+        .remove		=  __devexit_p(btaudio_remove),
 };
 
 static int btaudio_init_module(void)

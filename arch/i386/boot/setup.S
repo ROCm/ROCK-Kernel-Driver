@@ -162,7 +162,7 @@ cmd_line_ptr:	.long 0			# (Header version 0x0202 or later)
 					# can be located anywhere in
 					# low memory 0x10000 or higher.
 
-ramdisk_max:	.long __MAXMEM-1	# (Header version 0x0203 or later)
+ramdisk_max:	.long MAXMEM-1		# (Header version 0x0203 or later)
 					# The highest safe address for
 					# the contents of an initrd
 
@@ -213,7 +213,7 @@ prtspc:	movb	$0x20, %al	# Print single space (note: fall-thru)
 # Part of above routine, this one just prints ascii al
 prtchr:	pushw	%ax
 	pushw	%cx
-	xorb	%bh, %bh
+	movw	$7,%bx
 	movw	$0x01, %cx
 	movb	$0x0e, %ah
 	int	$0x10

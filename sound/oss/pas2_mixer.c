@@ -311,10 +311,10 @@ static int pas_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 
 static struct mixer_operations pas_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"PAS16",
-	name:	"Pro Audio Spectrum 16",
-	ioctl:	pas_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "PAS16",
+	.name	= "Pro Audio Spectrum 16",
+	.ioctl	= pas_mixer_ioctl
 };
 
 int __init

@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/ptrace.h -- Access to CPU registers
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -102,10 +102,19 @@ struct pt_regs
 #define PT_CTBP		((NUM_GPRS + 4) * _PT_REG_SIZE)
 #define PT_KERNEL_MODE	((NUM_GPRS + 5) * _PT_REG_SIZE)
 
-#define PT_SYSCALL	PT_GPR(0)
+/* Where the current syscall number is stashed; obviously only valid in
+   the kernel!  */
+#define PT_CUR_SYSCALL	PT_GPR(0)
 
 /* Size of struct pt_regs, including alignment.  */
 #define PT_SIZE		((NUM_GPRS + 6) * _PT_REG_SIZE)
+
+
+/* These are `magic' values for PTRACE_PEEKUSR that return info about where
+   a process is located in memory.  */
+#define PT_TEXT_ADDR	(PT_SIZE + 1)
+#define PT_TEXT_LEN	(PT_SIZE + 2)
+#define PT_DATA_ADDR	(PT_SIZE + 3)
 
 
 #endif /* __V850_PTRACE_H__ */

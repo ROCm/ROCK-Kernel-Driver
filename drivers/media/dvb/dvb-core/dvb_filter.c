@@ -1,5 +1,4 @@
 #include <linux/module.h>
-#include <linux/videodev.h>
 #include "dvb_filter.h"
 
 unsigned int bitrates[3][16] =
@@ -52,10 +51,10 @@ void ts_to_pes(ipack *p, u8 *buf) // don't need count (=188)
 	if (buf[1]&PAY_START) {
 		if (p->plength == MMAX_PLENGTH-6 && p->found>6){
 			p->plength = p->found-6;
-	p->found = 0;
+			p->found = 0;
 			send_ipack(p);
 			dvb_filter_ipack_reset(p);
-	}
+		}
 	}
 	if (buf[3] & ADAPT_FIELD) {  // adaptation field?
 		off = buf[4] + 1;
@@ -71,12 +70,12 @@ static
 int read_picture_header(uint8_t *headr, mpg_picture *pic, int field, int pr)
 {
 	uint8_t pct;
-			
+
 	if (pr) printk( "Pic header: ");
         pic->temporal_reference[field] = (( headr[0] << 2 ) | 
 					  (headr[1] & 0x03) )& 0x03ff;
 	if (pr) printk( " temp ref: 0x%04x", pic->temporal_reference[field]);
-					
+
 	pct = ( headr[1] >> 2 ) & 0x07;
         pic->picture_coding_type[field] = pct;
 	if (pr) {
@@ -90,26 +89,26 @@ int read_picture_header(uint8_t *headr, mpg_picture *pic, int field, int pr)
 			case P_FRAME:
 				printk( "  P-FRAME");
 				break;
-			}
-		} 
-	
+		}
+	}
+
 
         pic->vinfo.vbv_delay  = (( headr[1] >> 5 ) | ( headr[2] << 3) | 
 				 ( (headr[3] & 0x1F) << 11) ) & 0xffff;
-		
+
 	if (pr) printk( " vbv delay: 0x%04x", pic->vinfo.vbv_delay);
-	
+
         pic->picture_header_parameter = ( headr[3] & 0xe0 ) | 
 		((headr[4] & 0x80) >> 3);
 
         if ( pct == B_FRAME ){
                 pic->picture_header_parameter |= ( headr[4] >> 3 ) & 0x0f;
-	}
+        }
 	if (pr) printk( " pic head param: 0x%x", 
 			pic->picture_header_parameter);
 
 	return pct;
-}
+} 
 #endif
 
 #if 0
@@ -130,14 +129,14 @@ int read_gop_header(uint8_t *headr, mpg_picture *pic, int pr)
                 pic->closed_gop = 1;
         } else {
                 pic->closed_gop = 0;
-	}
+        }
 	if (pr) printk("closed: %d", pic->closed_gop); 
 
         if ( ( headr[3] & 0x20 ) != 0 ){
                 pic->broken_link = 1;
-	} else {
+        } else {
                 pic->broken_link = 0;
-	}
+        }
 	if (pr) printk(" broken: %d\n", pic->broken_link); 
 
 	return 0;
@@ -160,37 +159,37 @@ int read_sequence_header(uint8_t *headr, VideoInfo *vi, int pr)
         sw = (int)((headr[3]&0xF0) >> 4) ;
 
         switch( sw ){
-		case 1:
+	case 1:
 		if (pr)
 			printk("Videostream: ASPECT: 1:1");
 		vi->aspect_ratio = 100;        
-			break;
-		case 2:
+		break;
+	case 2:
 		if (pr)
 			printk("Videostream: ASPECT: 4:3");
                 vi->aspect_ratio = 133;        
-			break;
-		case 3:
+		break;
+	case 3:
 		if (pr)
 			printk("Videostream: ASPECT: 16:9");
                 vi->aspect_ratio = 177;        
-				break;
+		break;
 	case 4:
 		if (pr)
 			printk("Videostream: ASPECT: 2.21:1");
                 vi->aspect_ratio = 221;        
-				break;
+		break;
 
         case 5 ... 15:
 		if (pr)
 			printk("Videostream: ASPECT: reserved");
                 vi->aspect_ratio = 0;        
-			break;
-			
+		break;
+
         default:
                 vi->aspect_ratio = 0;        
                 return -1;
-			}
+	}
 
 	if (pr)
 		printk("  Size = %dx%d",vi->horizontal_size,vi->vertical_size);
@@ -221,29 +220,29 @@ int read_sequence_header(uint8_t *headr, VideoInfo *vi, int pr)
 			printk("  FRate: 29.97 fps");
                 vi->framerate = 29970;
 		form = VIDEO_MODE_NTSC;
-			break;
-		case 5:
+		break;
+	case 5:
 		if (pr)
 			printk("  FRate: 30 fps");
                 vi->framerate = 30000;
 		form = VIDEO_MODE_NTSC;
-			break;
-		case 6:
+		break;
+	case 6:
 		if (pr)
 			printk("  FRate: 50 fps");
                 vi->framerate = 50000;
 		form = VIDEO_MODE_PAL;
-			break;
-		case 7:
+		break;
+	case 7:
 		if (pr)
 			printk("  FRate: 60 fps");
                 vi->framerate = 60000;
 		form = VIDEO_MODE_NTSC;
-			break;
-			}
-			
-	vi->bit_rate = (headr[4] << 10) | (headr[5] << 2) | (headr[6] & 0x03);
+		break;
+	}
 
+	vi->bit_rate = (headr[4] << 10) | (headr[5] << 2) | (headr[6] & 0x03);
+	
         vi->vbv_buffer_size
                 = (( headr[6] & 0xF8) >> 3 ) | (( headr[7] & 0x1F )<< 5);
 
@@ -259,7 +258,7 @@ int read_sequence_header(uint8_t *headr, VideoInfo *vi, int pr)
 }
 #endif
 
-			
+
 #if 0
 static
 int get_vinfo(uint8_t *mbuf, int count, VideoInfo *vi, int pr)
@@ -267,7 +266,7 @@ int get_vinfo(uint8_t *mbuf, int count, VideoInfo *vi, int pr)
 	uint8_t *headr;
 	int found = 0;
 	int c = 0;
-			
+
 	while (found < 4 && c+4 < count){
 		uint8_t *b;
 
@@ -277,7 +276,7 @@ int get_vinfo(uint8_t *mbuf, int count, VideoInfo *vi, int pr)
 		else {
 			c++;
 		}
-			}
+	}
 
 	if (! found) return -1;
 	c += 4;
@@ -288,7 +287,7 @@ int get_vinfo(uint8_t *mbuf, int count, VideoInfo *vi, int pr)
 	return 0;
 }
 #endif
-			
+
 
 #if 0
 static
@@ -306,9 +305,9 @@ int get_ainfo(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
 		if ( b[0] == 0xff && (b[1] & 0xf8) == 0xf8)
 			found = 2;
 		else {
-					c++;
-				}
-			}
+			c++;
+		}
+	}	
 
 	if (!found) return -1;
 
@@ -330,7 +329,7 @@ int get_ainfo(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
 			printk("  BRate: reserved");
 		else
 			printk("  BRate: %d kb/s", ai->bit_rate/1000);
-				}
+	}
 
 	fr = (headr[2] & 0x0c ) >> 2;
 	ai->frequency = freq[fr]*100;
@@ -340,41 +339,41 @@ int get_ainfo(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
 		else
 			printk("  Freq: %d kHz\n",ai->frequency); 
 			       
-				}
+	}
 	ai->off = c;
 	return 0;
 }
 #endif
-				
-static
-int get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
+
+
+int dvb_filter_get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
 {
 	uint8_t *headr;
 	int found = 0;
 	int c = 0;
 	uint8_t frame = 0;
 	int fr = 0;
-				
+	
 	while ( !found  && c < count){
 		uint8_t *b = mbuf+c;
-					
+
 		if ( b[0] == 0x0b &&  b[1] == 0x77 )
 			found = 1;
 		else {
-					c++;
-				}
-				}
-				
+			c++;
+		}
+	}	
+
 	if (!found) return -1;
 	if (pr)
 		printk("Audiostream: AC3");
-				
+
 	ai->off = c;
 	if (c+5 >= count) return -1;
-			
+
 	ai->layer = 0;  // 0 for AC3
         headr = mbuf+c+2;
-			
+
 	frame = (headr[2]&0x3f);
 	ai->bit_rate = ac3_bitrates[frame >> 1]*1000;
 
@@ -420,8 +419,8 @@ uint8_t *skip_pes_header(uint8_t **bufp)
         } else {        /* mpeg1 */
                 for (buf = inbuf + 6; *buf == 0xff; buf++)
                         if (buf == inbuf + 6 + 16) {
-				break;
-		}
+                                break;
+                        }
                 if ((*buf & 0xc0) == 0x40)
                         buf += 2;
                 skip = mpeg1_skip_table [*buf >> 4];
@@ -433,7 +432,7 @@ uint8_t *skip_pes_header(uint8_t **bufp)
 
         *bufp = buf;
         return pts;
-} 
+}
 #endif
 
 #if 0
@@ -509,7 +508,7 @@ void mpg_set_picture_parameter( int32_t field_type, mpg_picture *pic )
                 pic->progressive_frame = 1;
                 pic->picture_coding_parameter = 0x000010;
         }
-    
+
         /* Reset flag */
         pic->picture_display_extension_flag[field_type] = 0;
 
@@ -527,7 +526,7 @@ void mpg_set_picture_parameter( int32_t field_type, mpg_picture *pic )
         } else {
                 pic->frame_centre_horizontal_offset[3] = last_h_offset;
                 pic->frame_centre_vertical_offset[3] = last_v_offset;
-	}
+        }
 }
 #endif
 
@@ -566,7 +565,7 @@ void dvb_filter_pes2ts_init(dvb_filter_pes2ts_t *p2ts, unsigned short pid,
 			    dvb_filter_pes2ts_cb_t *cb, void *priv)
 {
 	unsigned char *buf=p2ts->buf;
-	
+
 	buf[0]=0x47;
 	buf[1]=(pid>>8);
 	buf[2]=pid&0xff;
@@ -579,7 +578,7 @@ int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len)
 {
 	unsigned char *buf=p2ts->buf;
 	int ret=0, rest;
-
+	
 	//len=6+((pes[4]<<8)|pes[5]);
 
 	buf[1]|=0x40;
@@ -592,7 +591,7 @@ int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len)
 		buf[1]&=~0x40;
 	}
 	if (!len)
-	return 0;
+	        return 0;
 	buf[3]=0x30|((p2ts->cc++)&0x0f);
 	rest=183-len;
 	if (rest) {
@@ -603,399 +602,5 @@ int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len)
 	buf[4]=rest;
 	memcpy(buf+5+rest, pes, len);
 	return p2ts->cb(p2ts->priv, buf);
-}
-
-void dvb_filter_ipack_reset(ipack *p)
-{
-	p->found = 0;
-	p->cid = 0;
-	p->plength = 0;
-	p->flag1 = 0;
-	p->flag2 = 0;
-	p->hlength = 0;
-	p->mpeg = 0;
-	p->check = 0;
-	p->which = 0;
-	p->done = 0;
-	p->count = 0;
-}
-
-void dvb_filter_ipack_init(ipack *p, int size,
-		void (*func)(u8 *buf, int size, void *priv))
-{
-	if ( !(p->buf = vmalloc(size*sizeof(u8))) ){
-		printk ("Couldn't allocate memory for ipack\n");
-	}
-	p->size = size;
-	p->func = func;
-	p->repack_subids = 0;
-	dvb_filter_ipack_reset(p);
-}
-
-void dvb_filter_ipack_free(ipack * p)
-{
-	if (p->buf) vfree(p->buf);
-}
-
-static
-void send_ipack(ipack *p)
-{
-	int off;
-	AudioInfo ai;
-	int ac3_off = 0;
-	int streamid=0;
-	int nframes= 0;
-	int f=0;
-
-	switch ( p->mpeg ){
-	case 2:		
-		if (p->count < 10) return;
-		p->buf[3] = p->cid;
-
-		p->buf[4] = (u8)(((p->count-6) & 0xFF00) >> 8);
-		p->buf[5] = (u8)((p->count-6) & 0x00FF);
-		if (p->repack_subids && p->cid == PRIVATE_STREAM1){
-			
-			off = 9+p->buf[8];
-			streamid = p->buf[off];
-			if ((streamid & 0xF8) == 0x80){
-				ai.off = 0;
-				ac3_off = ((p->buf[off+2] << 8)| 
-					   p->buf[off+3]);
-				if (ac3_off < p->count)
-					f=get_ac3info(p->buf+off+3+ac3_off, 
-						      p->count-ac3_off, &ai,0);
-				if ( !f ){
-					nframes = (p->count-off-3-ac3_off)/ 
-						ai.framesize + 1;
-					p->buf[off+2] = (ac3_off >> 8)& 0xFF;
-					p->buf[off+3] = (ac3_off)& 0xFF;
-					p->buf[off+1] = nframes;
-					
-					ac3_off +=  nframes * ai.framesize - 
-						p->count;
-				}
-		}
-	}	
-		p->func(p->buf, p->count, p->data);
-
-		p->buf[6] = 0x80;
-		p->buf[7] = 0x00;
-		p->buf[8] = 0x00;
-		p->count = 9;
-		if (p->repack_subids && p->cid == PRIVATE_STREAM1 
-		    && (streamid & 0xF8)==0x80 ){
-			p->count += 4;
-			p->buf[9] = streamid;
-			p->buf[10] = (ac3_off >> 8)& 0xFF;
-			p->buf[11] = (ac3_off)& 0xFF;
-			p->buf[12] = 0;
-		}
-
-		break;
-	case 1:
-		if (p->count < 8) return;
-		p->buf[3] = p->cid;
-
-		p->buf[4] = (u8)(((p->count-6) & 0xFF00) >> 8);
-		p->buf[5] = (u8)((p->count-6) & 0x00FF);
-		p->func(p->buf, p->count, p->data);
-
-		p->buf[6] = 0x0F;
-		p->count = 7;
-		break;
-	}
-}
-
-void dvb_filter_ipack_flush(ipack *p)
-{
-	if (p->plength != MMAX_PLENGTH-6 || p->found<=6)
-		return;
-	p->plength = p->found-6;
-	p->found = 0;
-	send_ipack(p);
-	dvb_filter_ipack_reset(p);
-}
-
-static 
-void write_ipack(ipack *p, u8 *data, int count)
-{
-	u8 headr[3] = { 0x00, 0x00, 0x01} ;
-
-	if (p->count < 6){
-		memcpy(p->buf, headr, 3);
-		p->count = 6;
-	}
-
-	if (p->count + count < p->size){
-		memcpy(p->buf+p->count, data, count);
-		p->count += count;
-	} else {
-		int rest = p->size - p->count;
-		memcpy(p->buf+p->count, data, rest);
-		p->count += rest;
-		send_ipack(p);
-		if (count - rest > 0)
-			write_ipack(p, data+rest, count-rest);
-	}
-}
-
-
-int dvb_filter_instant_repack(u8 *buf, int count, ipack *p)
-{
-	int l;
-	int c=0;
-	
-	while (c < count && (p->mpeg == 0 ||
-			     (p->mpeg == 1 && p->found < 7) ||
-			     (p->mpeg == 2 && p->found < 9))
-	       &&  (p->found < 5 || !p->done)){
-		switch ( p->found ){
-		case 0:
-		case 1:
-			if (buf[c] == 0x00) p->found++;
-			else p->found = 0;
-			c++;
-			break;
-		case 2:
-			if (buf[c] == 0x01) p->found++;
-			else if (buf[c] == 0) {
-				p->found = 2;
-			} else p->found = 0;
-			c++;
-			break;
-		case 3:
-			p->cid = 0;
-			switch (buf[c]){
-			case PROG_STREAM_MAP:
-			case PRIVATE_STREAM2:
-			case PROG_STREAM_DIR:
-			case ECM_STREAM     :
-			case EMM_STREAM     :
-			case PADDING_STREAM :
-			case DSM_CC_STREAM  :
-			case ISO13522_STREAM:
-				p->done = 1;
-			case PRIVATE_STREAM1:
-			case VIDEO_STREAM_S ... VIDEO_STREAM_E:
-			case AUDIO_STREAM_S ... AUDIO_STREAM_E:
-				p->found++;
-				p->cid = buf[c];
-				c++;
-				break;
-			default:
-				p->found = 0;
-				break;
-			}
-			break;
-
-		case 4:
-			if (count-c > 1){
-				p->plen[0] = buf[c];
-			c++;
-				p->plen[1] = buf[c];
-				c++;
-				p->found+=2;
-				p->plength=(p->plen[0]<<8)|p->plen[1];
- 			} else {
-				p->plen[0] = buf[c];
-				p->found++;
-				return count;
-		}
-			break;
-		case 5:
-			p->plen[1] = buf[c];
-			c++;
-			p->found++;
-			p->plength=(p->plen[0]<<8)|p->plen[1];
-			break;
-		case 6:
-			if (!p->done){
-				p->flag1 = buf[c];
-				c++;
-				p->found++;
-				if ( (p->flag1 & 0xC0) == 0x80 ) p->mpeg = 2;
-				else {
-					p->hlength = 0;
-					p->which = 0;
-					p->mpeg = 1;
-					p->flag2 = 0;
-	}	
-			}
-			break;
-
-		case 7:
-			if ( !p->done && p->mpeg == 2) {
-				p->flag2 = buf[c];
-				c++;
-				p->found++;
-			}	
-			break;
-
-		case 8:
-			if ( !p->done && p->mpeg == 2) {
-				p->hlength = buf[c];
-				c++;
-				p->found++;
-			}
-			break;
-
-		default:
-
-			break;
-		}
-	}
-
-	if (c == count) return count;
-
-	if (!p->plength) p->plength = MMAX_PLENGTH-6;
-
-	if ( p->done || ((p->mpeg == 2 && p->found >= 9) || 
-	     (p->mpeg == 1 && p->found >= 7)) ){
-		switch (p->cid){
-
-		case AUDIO_STREAM_S ... AUDIO_STREAM_E:			
-		case VIDEO_STREAM_S ... VIDEO_STREAM_E:
-		case PRIVATE_STREAM1:
-
-			if (p->mpeg == 2 && p->found == 9) {
-				write_ipack(p, &p->flag1, 1);
-				write_ipack(p, &p->flag2, 1);
-				write_ipack(p, &p->hlength, 1);
-			}
-
-			if (p->mpeg == 1 && p->found == 7) 
-				write_ipack(p, &p->flag1, 1);
-
-			if (p->mpeg == 2 && (p->flag2 & PTS_ONLY) &&  
-			    p->found < 14) {
-				while (c < count && p->found < 14) {
-					p->pts[p->found-9] = buf[c];
-					write_ipack(p, buf+c, 1);
-					c++;
-					p->found++;
-                        }
-				if (c == count) return count;
-        }
-
-			if (p->mpeg == 1 && p->which < 2000) {
-
-				if (p->found == 7) {
-					p->check = p->flag1;
-					p->hlength = 1;
-				}
-
-				while (!p->which && c < count && 
-				       p->check == 0xFF){
-					p->check = buf[c];
-					write_ipack(p, buf+c, 1);
-					c++;
-					p->found++;
-					p->hlength++;
-				}
-
-				if ( c == count) return count;
-
-				if ( (p->check & 0xC0) == 0x40 && !p->which){
-					p->check = buf[c];
-					write_ipack(p, buf+c, 1);
-					c++;
-					p->found++;
-					p->hlength++;
-
-					p->which = 1;
-					if ( c == count) return count;
-					p->check = buf[c];
-					write_ipack(p, buf+c, 1);
-					c++;
-					p->found++;
-					p->hlength++;
-					p->which = 2;
-					if ( c == count) return count;
-				}
-
-				if (p->which == 1){
-					p->check = buf[c];
-					write_ipack(p, buf+c, 1);
-					c++;
-					p->found++;
-					p->hlength++;
-					p->which = 2;
-					if ( c == count) return count;
-        }
-
-				if ( (p->check & 0x30) && p->check != 0xFF){
-					p->flag2 = (p->check & 0xF0) << 2;
-					p->pts[0] = p->check;
-					p->which = 3;
-				} 
-
-				if ( c == count) return count;
-				if (p->which > 2){
-					if ((p->flag2 & PTS_DTS_FLAGS)
-					    == PTS_ONLY){
-						while (c < count && 
-						       p->which < 7){
-							p->pts[p->which-2] =
-								buf[c];
-							write_ipack(p,buf+c,1);
-							c++;
-							p->found++;
-							p->which++;
-							p->hlength++;
-						}
-						if ( c == count) return count;
-					} else if ((p->flag2 & PTS_DTS_FLAGS) 
-						   == PTS_DTS){
-						while (c < count && 
-						       p->which< 12){
-							if (p->which< 7)
-								p->pts[p->which
-								      -2] =
-									buf[c];
-							write_ipack(p,buf+c,1);
-							c++;
-							p->found++;
-							p->which++;
-							p->hlength++;
-						}
-						if ( c == count) return count;
-					}
-					p->which = 2000;
-				}
-
-			}
-
-			while (c < count && p->found < p->plength+6){
-				l = count -c;
-				if (l+p->found > p->plength+6)
-					l = p->plength+6-p->found;
-				write_ipack(p, buf+c, l);
-				p->found += l;
-				c += l;
-			}	
-
-			break;
-        }
-
-
-		if ( p->done ){
-			if( p->found + count - c < p->plength+6){
-				p->found += count-c;
-				c = count;
-        } else {
-				c += p->plength+6 - p->found;
-				p->found = p->plength+6;
-			}
-        }
-
-		if (p->plength && p->found == p->plength+6) {
-			send_ipack(p);
-			dvb_filter_ipack_reset(p);
-			if (c < count)
-				dvb_filter_instant_repack(buf+c, count-c, p);
-		}
-	}
-	return count;
 }
 

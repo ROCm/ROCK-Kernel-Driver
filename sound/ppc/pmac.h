@@ -22,6 +22,7 @@
 #ifndef __PMAC_H
 #define __PMAC_H
 
+#include <linux/version.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include "awacs.h"
@@ -95,24 +96,6 @@ struct snd_pmac_stream {
 
 
 /*
- * beep using pcm
- */
-struct snd_pmac_beep {
-	int running;	/* boolean */
-	int volume;	/* mixer volume: 0-100 */
-	int volume_play;	/* currently playing volume */
-	int hz;
-	int nsamples;
-	short *buf;		/* allocated wave buffer */
-	unsigned long addr;	/* physical address of buffer */
-	struct timer_list timer;	/* timer list for stopping beep */
-	void (*orig_mksound)(unsigned int, unsigned int);
-				/* pointer to restore */
-	snd_kcontrol_t *control;	/* mixer element */
-};
-
-
-/*
  */
 
 enum snd_pmac_model {
@@ -125,6 +108,7 @@ struct snd_pmac {
 	/* h/w info */
 	struct device_node *node;
 	unsigned int revision;
+	unsigned int manufacturer;
 	unsigned int subframe;
 	unsigned int device_id;
 	enum snd_pmac_model model;
@@ -222,5 +206,10 @@ int snd_pmac_boolean_stereo_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *
 int snd_pmac_boolean_mono_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo);
 
 int snd_pmac_add_automute(pmac_t *chip);
+
+#ifndef PMAC_SUPPORT_PCM_BEEP
+#define snd_pmac_attach_beep(chip) 0
+#define snd_pmac_beep_stop(chip)  /**/
+#endif
 
 #endif /* __PMAC_H */

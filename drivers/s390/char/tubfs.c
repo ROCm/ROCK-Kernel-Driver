@@ -118,7 +118,6 @@ fs3270_open(struct inode *ip, struct file *fp)
 		return -EBUSY;
 	}
 
-	tub_inc_use_count();
 	fp->private_data = ip;
 	tubp->mode = TBM_FS;
 	tubp->intv = fs3270_int;
@@ -144,7 +143,6 @@ fs3270_close(struct inode *ip, struct file *fp)
 	fs3270_wait(tubp, &flags);
 	tubp->fsopen = 0;
 	tubp->fs_pid = 0;
-	tub_dec_use_count();
 	tubp->intv = NULL;
 	tubp->mode = 0;
 	tty3270_refresh(tubp);
@@ -165,7 +163,6 @@ fs3270_release(tub_t *tubp)
 	fs3270_wait(tubp, &flags);
 	tubp->fsopen = 0;
 	tubp->fs_pid = 0;
-	tub_dec_use_count();
 	tubp->intv = NULL;
 	tubp->mode = 0;
 	/*tty3270_refresh(tubp);*/

@@ -627,7 +627,7 @@ mpage_writepages(struct address_space *mapping,
 		writepage = mapping->a_ops->writepage;
 
 	pagevec_init(&pvec, 0);
-	write_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 	while (!list_empty(&mapping->io_pages) && !done) {
 		struct page *page = list_entry(mapping->io_pages.prev,
 					struct page, list);
@@ -647,7 +647,7 @@ mpage_writepages(struct address_space *mapping,
 		list_add(&page->list, &mapping->locked_pages);
 
 		page_cache_get(page);
-		write_unlock(&mapping->page_lock);
+		spin_unlock(&mapping->page_lock);
 
 		/*
 		 * At this point we hold neither mapping->page_lock nor
@@ -679,12 +679,12 @@ mpage_writepages(struct address_space *mapping,
 			unlock_page(page);
 		}
 		page_cache_release(page);
-		write_lock(&mapping->page_lock);
+		spin_lock(&mapping->page_lock);
 	}
 	/*
 	 * Leave any remaining dirty pages on ->io_pages
 	 */
-	write_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;

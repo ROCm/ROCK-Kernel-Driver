@@ -108,7 +108,7 @@
  * POSIX.1 2.4: an empty pathname is invalid (ENOENT).
  * PATH_MAX includes the nul terminator --RR.
  */
-static inline int do_getname(const char *filename, char *page)
+static inline int do_getname(const char __user *filename, char *page)
 {
 	int retval;
 	unsigned long len = PATH_MAX;
@@ -129,7 +129,7 @@ static inline int do_getname(const char *filename, char *page)
 	return retval;
 }
 
-char * getname(const char * filename)
+char * getname(const char __user * filename)
 {
 	char *tmp, *result;
 
@@ -275,8 +275,14 @@ void path_release(struct nameidata *nd)
  */
 static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name, int flags)
 {
-	struct dentry * dentry = d_lookup(parent, name);
-	
+	struct dentry * dentry = __d_lookup(parent, name);
+
+	/* lockess __d_lookup may fail due to concurrent d_move() 
+	 * in some unrelated directory, so try with d_lookup
+	 */
+	if (!dentry)
+		dentry = d_lookup(parent, name);
+
 	if (dentry && dentry->d_op && dentry->d_op->d_revalidate) {
 		if (!dentry->d_op->d_revalidate(dentry, flags) && !d_invalidate(dentry)) {
 			dput(dentry);
@@ -348,12 +354,9 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 	 * negatives from the RCU list walk here, unlike the optimistic
 	 * fast walk).
 	 *
-	 * We really should do a sequence number thing to avoid this
-	 * all.
+	 * so doing d_lookup() (with seqlock), instead of lockfree __d_lookup
 	 */
-	spin_lock(&dcache_lock);
 	result = d_lookup(parent, name);
-	spin_unlock(&dcache_lock);
 	if (!result) {
 		struct dentry * dentry = d_alloc(parent, name);
 		result = ERR_PTR(-ENOMEM);
@@ -524,7 +527,7 @@ static int do_lookup(struct nameidata *nd, struct qstr *name,
 		     struct path *path, int flags)
 {
 	struct vfsmount *mnt = nd->mnt;
-	struct dentry *dentry = d_lookup(nd->dentry, name);
+	struct dentry *dentry = __d_lookup(nd->dentry, name);
 
 	if (!dentry)
 		goto need_lookup;
@@ -938,7 +941,7 @@ access:
  * that namei follows links, while lnamei does not.
  * SMP-safe
  */
-int __user_walk(const char *name, unsigned flags, struct nameidata *nd)
+int __user_walk(const char __user *name, unsigned flags, struct nameidata *nd)
 {
 	char *tmp = getname(name);
 	int err = PTR_ERR(tmp);
@@ -1399,7 +1402,7 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	return error;
 }
 
-asmlinkage long sys_mknod(const char * filename, int mode, dev_t dev)
+asmlinkage long sys_mknod(const char __user * filename, int mode, dev_t dev)
 {
 	int error = 0;
 	char * tmp;
@@ -1468,7 +1471,7 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	return error;
 }
 
-asmlinkage long sys_mkdir(const char * pathname, int mode)
+asmlinkage long sys_mkdir(const char __user * pathname, int mode)
 {
 	int error = 0;
 	char * tmp;
@@ -1565,7 +1568,7 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 	return error;
 }
 
-asmlinkage long sys_rmdir(const char * pathname)
+asmlinkage long sys_rmdir(const char __user * pathname)
 {
 	int error = 0;
 	char * name;
@@ -1640,7 +1643,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
  * writeout happening, and we don't want to prevent access to the directory
  * while waiting on the I/O.
  */
-asmlinkage long sys_unlink(const char * pathname)
+asmlinkage long sys_unlink(const char __user * pathname)
 {
 	int error = 0;
 	char * name;
@@ -1711,7 +1714,7 @@ int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 	return error;
 }
 
-asmlinkage long sys_symlink(const char * oldname, const char * newname)
+asmlinkage long sys_symlink(const char __user * oldname, const char __user * newname)
 {
 	int error = 0;
 	char * from;
@@ -1793,7 +1796,7 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
  * with linux 2.0, and to avoid hard-linking to directories
  * and other special files.  --ADM
  */
-asmlinkage long sys_link(const char * oldname, const char * newname)
+asmlinkage long sys_link(const char __user * oldname, const char __user * newname)
 {
 	struct dentry *new_dentry;
 	struct nameidata nd, old_nd;
@@ -2054,7 +2057,7 @@ exit:
 	return error;
 }
 
-asmlinkage long sys_rename(const char * oldname, const char * newname)
+asmlinkage long sys_rename(const char __user * oldname, const char __user * newname)
 {
 	int error;
 	char * from;
@@ -2073,7 +2076,7 @@ asmlinkage long sys_rename(const char * oldname, const char * newname)
 	return error;
 }
 
-int vfs_readlink(struct dentry *dentry, char *buffer, int buflen, const char *link)
+int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen, const char *link)
 {
 	int len;
 
@@ -2154,7 +2157,7 @@ sync_fail:
 	return (char*)page;
 }
 
-int page_readlink(struct dentry *dentry, char *buffer, int buflen)
+int page_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	struct page *page = NULL;
 	char *s = page_getlink(dentry, &page);

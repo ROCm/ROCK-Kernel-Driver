@@ -51,7 +51,7 @@
 #define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		7
+#define DRIVER_MINOR		8
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:
@@ -77,6 +77,7 @@
  *       and R200_PP_CUBIC_OFFSET_F1_[0..5].
  *       Added packets R200_EMIT_PP_CUBIC_FACES_[0..5] and
  *       R200_EMIT_PP_CUBIC_OFFSETS_[0..5].  (brian)
+ * 1.8 - Remove need to call cleanup ioctls on last client exit (keith)
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \
@@ -105,11 +106,6 @@
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_WAIT)]   = { radeon_irq_wait, 1, 0 },
 
 
-#define USE_IRQS 1
-#if USE_IRQS
-#define __HAVE_DMA_IRQ		1
-#define __HAVE_VBL_IRQ		1
-#define __HAVE_SHARED_IRQ       1
 
 /* When a client dies:
  *    - Check for and clean up flipped page state
@@ -117,35 +113,34 @@
  *
  * DRM infrastructure takes care of reclaiming dma buffers.
  */
-#define DRIVER_PRERELEASE() do {					\
+#define DRIVER_PRERELEASE() 						\
+do {									\
 	if ( dev->dev_private ) {					\
 		drm_radeon_private_t *dev_priv = dev->dev_private;	\
 		if ( dev_priv->page_flipping ) {			\
 			radeon_do_cleanup_pageflip( dev );		\
 		}							\
-		radeon_mem_release( dev_priv->agp_heap );		\
+                radeon_mem_release( filp, dev_priv->agp_heap );		\
+                radeon_mem_release( filp, dev_priv->fb_heap );		\
 	}								\
 } while (0)
 
-/* On unloading the module:
- *    - Free memory heap structure
- *    - Remove mappings made at startup and free dev_private.
+/* When the last client dies, shut down the CP and free dev->dev_priv.
  */
-#define DRIVER_PRETAKEDOWN() do {					\
-	if ( dev->dev_private ) {					\
-		drm_radeon_private_t *dev_priv = dev->dev_private;	\
-		radeon_mem_takedown( &(dev_priv->agp_heap) );		\
-		radeon_do_cleanup_cp( dev );				\
-	}								\
+/* #define __HAVE_RELEASE 1 */
+#define DRIVER_PRETAKEDOWN()			\
+do {						\
+    radeon_do_release( dev );			\
 } while (0)
 
-#else
-#define __HAVE_DMA_IRQ 0
-#endif
+
 
 /* DMA customization:
  */
 #define __HAVE_DMA		1
+#define __HAVE_DMA_IRQ		1
+#define __HAVE_VBL_IRQ		1
+#define __HAVE_SHARED_IRQ       1
 
 
 /* Buffer customization:

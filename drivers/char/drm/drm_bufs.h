@@ -106,7 +106,7 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 	switch ( map->type ) {
 	case _DRM_REGISTERS:
 	case _DRM_FRAME_BUFFER:
-#if !defined(__sparc__) && !defined(__alpha__)
+#if !defined(__sparc__) && !defined(__alpha__) && !defined(__ia64__)
 		if ( map->offset + map->size < map->offset ||
 		     map->offset < virt_to_phys(high_memory) ) {
 			DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
@@ -210,7 +210,7 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 	down(&dev->struct_sem);
 	list = &dev->maplist->head;
 	list_for_each(list, &dev->maplist->head) {
-		r_list = (drm_map_list_t *) list;
+		r_list = list_entry(list, drm_map_list_t, head);
 
 		if(r_list->map &&
 		   r_list->map->handle == request.handle &&
@@ -403,7 +403,7 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 		buf->waiting = 0;
 		buf->pending = 0;
 		init_waitqueue_head( &buf->dma_wait );
-		buf->pid     = 0;
+		buf->filp    = 0;
 
 		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
 		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
@@ -616,7 +616,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 			buf->waiting = 0;
 			buf->pending = 0;
 			init_waitqueue_head( &buf->dma_wait );
-			buf->pid     = 0;
+			buf->filp    = 0;
 #if __HAVE_DMA_HISTOGRAM
 			buf->time_queued     = 0;
 			buf->time_dispatched = 0;
@@ -773,7 +773,7 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 		buf->waiting = 0;
 		buf->pending = 0;
 		init_waitqueue_head( &buf->dma_wait );
-		buf->pid     = 0;
+		buf->filp    = 0;
 
 		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
 		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
@@ -1011,9 +1011,9 @@ int DRM(freebufs)( struct inode *inode, struct file *filp,
 			return -EINVAL;
 		}
 		buf = dma->buflist[idx];
-		if ( buf->pid != current->pid ) {
-			DRM_ERROR( "Process %d freeing buffer owned by %d\n",
-				   current->pid, buf->pid );
+		if ( buf->filp != filp ) {
+			DRM_ERROR( "Process %d freeing buffer not owned\n",
+				   current->pid );
 			return -EINVAL;
 		}
 		DRM(free_buffer)( dev, buf );

@@ -11,7 +11,6 @@
 
 #include <asm/segment.h>
 #include <asm/page.h>
-#include <asm/openprom.h>	/* romvec. XXX will be dealt later. Promise. */
 #include <asm/psr.h>
 #include <asm/ptrace.h>
 #include <asm/btfixup.h>
@@ -95,20 +94,12 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	} while(0)
 #endif
 
-// #define prepare_arch_schedule(prev)	task_lock(prev)
-// #define finish_arch_schedule(prev)	task_unlock(prev)
-#define prepare_arch_schedule(prev)	do{ }while(0)
-#define finish_arch_schedule(prev)	do{ }while(0)
-
 /*
  * Flush windows so that the VM switch which follows
  * would not pull the stack from under us.
  *
  * SWITCH_ENTER and SWITH_DO_LAZY_FPU do not work yet (e.g. SMP does not work)
  * XXX WTF is the above comment? Found in late teen 2.4.x.
- *
- * XXX prepare_arch_switch() is much smarter than this in sparc64, are we sure?
- * XXX Cosider if doing it the flush_user_windows way is faster (by uwinmask).
  */
 #define prepare_arch_switch(rq, next) do { \
 	__asm__ __volatile__( \
@@ -133,14 +124,13 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	 * - Anton & Pete
 	 */
 #define switch_to(prev, next, last) do {						\
-	__label__ here;									\
-	register unsigned long task_pc asm("o7");					\
 	SWITCH_ENTER(prev);								\
 	SWITCH_DO_LAZY_FPU(next);							\
 	next->active_mm->cpu_vm_mask |= (1 << smp_processor_id());			\
-	task_pc = ((unsigned long) &&here) - 0x8;					\
 	__asm__ __volatile__(								\
+	"sethi	%%hi(here - 0x8), %%o7\n\t"						\
 	"mov	%%g6, %%g3\n\t"								\
+	"or	%%o7, %%lo(here - 0x8), %%o7\n\t"					\
 	"rd	%%psr, %%g4\n\t"							\
 	"std	%%sp, [%%g6 + %4]\n\t"							\
 	"rd	%%wim, %%g5\n\t"							\
@@ -155,7 +145,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"wr	%%g4, 0x20, %%psr\n\t"							\
 	"nop\n\t"									\
 	"nop\n\t"									\
-	"nop\n\t"	/* LEON needs this: load to %sp depends on CWP. */		\
+	"nop\n\t"	/* LEON needs all 3 nops: load to %sp depends on CWP. */		\
 	"ldd	[%%g6 + %4], %%sp\n\t"							\
 	"wr	%%g5, 0x0, %%wim\n\t"							\
 	"ldd	[%%sp + 0x00], %%l0\n\t"						\
@@ -165,18 +155,18 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"nop\n\t"									\
 	"jmpl	%%o7 + 0x8, %%g0\n\t"							\
 	" ld	[%%g3 + %5], %0\n\t"							\
+	"here:\n"									\
         : "=&r" (last)									\
         : "r" (&(current_set[hard_smp_processor_id()])),	\
 	  "r" ((next)->thread_info),				\
 	  "i" (TI_KPSR),					\
 	  "i" (TI_KSP),						\
-	  "i" (TI_TASK),					\
-	  "r" (task_pc)									\
+	  "i" (TI_TASK)						\
 	:       "g1", "g2", "g3", "g4", "g5",       "g7",	\
 	  "l0", "l1",       "l3", "l4", "l5", "l6", "l7",	\
 	  "i0", "i1", "i2", "i3", "i4", "i5",			\
-	  "o0", "o1", "o2", "o3");				\
-here:;  } while(0)
+	  "o0", "o1", "o2", "o3",                   "o7");	\
+	} while(0)
 
 /*
  * Changing the IRQ level on the Sparc.

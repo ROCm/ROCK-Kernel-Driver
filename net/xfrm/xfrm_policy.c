@@ -9,6 +9,7 @@
  * 	Kazunori MIYAZAWA @USAGI
  * 	YOSHIFUJI Hideaki
  * 		Split up af-specific portion
+ *	Derek Atkins <derek@ihtfp.com>		Add the post_input processor
  * 	
  */
 
@@ -889,7 +890,7 @@ xfrm_policy_ok(struct xfrm_tmpl *tmpl, struct sec_path *sp, int idx,
 	       unsigned short family)
 {
 	for (; idx < sp->len; idx++) {
-		if (xfrm_state_ok(tmpl, sp->xvec[idx], family))
+		if (xfrm_state_ok(tmpl, sp->x[idx].xvec, family))
 			return ++idx;
 	}
 	return -1;
@@ -922,7 +923,15 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 		int i;
 
 		for (i=skb->sp->len-1; i>=0; i--) {
-			if (!xfrm_selector_match(&skb->sp->xvec[i]->sel, &fl, family))
+		  struct sec_decap_state *xvec = &(skb->sp->x[i]);
+			if (!xfrm_selector_match(&xvec->xvec->sel, &fl, family))
+				return 0;
+
+			/* If there is a post_input processor, try running it */
+			if (xvec->xvec->type->post_input &&
+			    (xvec->xvec->type->post_input)(xvec->xvec,
+							   &(xvec->decap),
+							   skb) != 0)
 				return 0;
 		}
 	}
@@ -954,6 +963,8 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 			 * are implied between each two transformations.
 			 */
 			for (i = pol->xfrm_nr-1, k = 0; i >= 0; i--) {
+				if (pol->xfrm_vec[i].optional)
+					continue;
 				k = xfrm_policy_ok(pol->xfrm_vec+i, sp, k, family);
 				if (k < 0)
 					goto reject;

@@ -274,12 +274,31 @@ struct pnp_fixup {
 #define pnp_can_configure(dev)	((!(dev)->active) && ((dev)->config_mode & PNP_CONFIG_AUTO) && \
 				 ((dev)->capabilities & PNP_CONFIGURABLE))
 
+#ifdef CONFIG_ISAPNP
+extern struct pnp_protocol isapnp_protocol;
+#define pnp_device_is_isapnp(dev) ((dev)->protocol == (&isapnp_protocol))
+#else
+#define pnp_device_is_isapnp(dev) 0
+#endif
+
+#ifdef CONFIG_PNPBIOS
+extern struct pnp_protocol pnpbios_protocol;
+#define pnp_device_is_pnpbios(dev) ((dev)->protocol == (&pnpbios_protocol))
+#else
+#define pnp_device_is_pnpbios(dev) 0
+#endif
+
+
 /* status */
 #define PNP_READY		0x0000
 #define PNP_ATTACHED		0x0001
 #define PNP_BUSY		0x0002
 #define PNP_FAULTY		0x0004
 
+/* isapnp specific macros */
+
+#define isapnp_card_number(dev)	((dev)->card ? (dev)->card->number : -1)
+#define isapnp_csn_number(dev)  ((dev)->number)
 
 /*
  * Driver Management
@@ -295,7 +314,7 @@ struct pnp_device_id {
 	unsigned long driver_data;	/* data private to the driver */
 };
 
-struct pnp_card_id {
+struct pnp_card_device_id {
 	char id[PNP_ID_LEN];
 	unsigned long driver_data;	/* data private to the driver */
 	struct {
@@ -315,10 +334,11 @@ struct pnp_driver {
 #define	to_pnp_driver(drv) container_of(drv, struct pnp_driver, driver)
 
 struct pnp_card_driver {
+	struct list_head global_list;
 	char * name;
-	const struct pnp_card_id *id_table;
+	const struct pnp_card_device_id *id_table;
 	unsigned int flags;
-	int  (*probe)  (struct pnp_card_link *card, const struct pnp_card_id *card_id);
+	int  (*probe)  (struct pnp_card_link *card, const struct pnp_card_device_id *card_id);
 	void (*remove) (struct pnp_card_link *card);
 	struct pnp_driver link;
 };

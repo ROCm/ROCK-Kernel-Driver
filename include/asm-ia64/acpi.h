@@ -100,7 +100,9 @@ const char *acpi_get_sysname (void);
 int acpi_request_vector (u32 int_type);
 int acpi_get_prt (struct pci_vector_struct **vectors, int *count);
 int acpi_get_interrupt_model (int *type);
+int acpi_register_irq (u32 gsi, u32 polarity, u32 trigger);
 int acpi_irq_to_vector (u32 irq);
+int acpi_get_addr_space (void *obj, u8 type, u64 *base, u64 *length,u64 *tra);
 
 #ifdef CONFIG_ACPI_NUMA
 #include <asm/numa.h>

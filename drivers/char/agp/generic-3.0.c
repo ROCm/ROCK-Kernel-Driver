@@ -319,10 +319,10 @@ static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsi
  * Fully configure and enable an AGP 3.0 host bridge and all the devices
  * lying behind it.
  */
-static int agp_3_0_node_enable(u32 mode, u32 minor)
+int agp_3_0_node_enable(u32 mode, u32 minor)
 {
 	struct pci_dev *td = agp_bridge->dev, *dev;
-	u8 bus_num, mcapndx;
+	u8 mcapndx;
 	u32 isoch, arqsz, cal_cycle, tmp, rate;
 	u32 tstatus, tcmd, mcmd, mstatus, ncapid;
 	u32 mmajor, mminor;
@@ -343,23 +343,30 @@ static int agp_3_0_node_enable(u32 mode, u32 minor)
 	head = &dev_list->list;
 	INIT_LIST_HEAD(head);
 
-	/* 
-	 * Find all the devices on this bridge's secondary bus and add them
-	 * to dev_list. 
-	 */
-	pci_read_config_byte(td, PCI_SECONDARY_BUS, &bus_num);
-	pci_for_each_dev(dev) {
-		if(dev->bus->number == bus_num) {
-			if((cur = kmalloc(sizeof(*cur), GFP_KERNEL)) == NULL) {
-				ret = -ENOMEM;
-				goto free_and_exit;
-			}
-			
-			cur->dev = dev;
+	/* Find all AGP devices, and add them to dev_list. */
+	pci_for_each_dev(dev) { 
+		switch ((dev->class >>8) & 0xff00) {
+			case 0x0001:    /* Unclassified device */
+			case 0x0300:    /* Display controller */
+			case 0x0400:    /* Multimedia controller */
+			case 0x0600:    /* Bridge */
+				mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
+				if (mcapndx == 0)
+					continue;
 
-			pos = &cur->list;
-			list_add(pos, head);
-			ndevs++;
+				if((cur = kmalloc(sizeof(*cur), GFP_KERNEL)) == NULL) {
+					ret = -ENOMEM;
+					goto free_and_exit;
+				}
+				cur->dev = dev;
+
+				pos = &cur->list;
+				list_add(pos, head);
+				ndevs++;
+				continue;
+
+			default:
+				continue;
 		}
 	}
 
@@ -518,33 +525,5 @@ get_out:
 	return ret;
 }
 
-/* 
- * Entry point to AGP 3.0 host bridge init.  Check to see if we 
- * have an AGP 3.0 device operating in 3.0 mode.  Call 
- * agp_3_0_node_enable or agp_generic_agp_enable if we don't 
- * (AGP 3.0 devices are required to operate as AGP 2.0 devices 
- * when not using 3.0 electricals.
- */
-void agp_generic_agp_3_0_enable(u32 mode)
-{
-	u32 ncapid, major, minor, agp_3_0;
-
-	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx, &ncapid);
-
-	major = (ncapid >> 20) & 0xf;
-	minor = (ncapid >> 16) & 0xf;
-
-	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",major, minor);
-
-	if(major >= 3) {
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x4, &agp_3_0);
-		/* 
-		 * Check to see if we are operating in 3.0 mode 
-		 */
-		if((agp_3_0 >> 3) & 0x1)
-			agp_3_0_node_enable(mode, minor);
-	}
-}
-
-EXPORT_SYMBOL(agp_generic_agp_3_0_enable);
+EXPORT_SYMBOL_GPL(agp_3_0_node_enable);
 

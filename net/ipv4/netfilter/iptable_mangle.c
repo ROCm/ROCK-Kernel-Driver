@@ -145,6 +145,10 @@ ipt_local_hook(unsigned int hook,
 	u_int32_t saddr, daddr;
 	unsigned long nfmark;
 
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr)) {
@@ -179,7 +183,7 @@ static struct nf_hook_ops ipt_ops[] = {
 		.priority	= NF_IP_PRI_MANGLE,
 	},
 	{
-		.hook		= ipt_local_hook,
+		.hook		= ipt_route_hook,
 		.pf		= PF_INET,
 		.hooknum	= NF_IP_LOCAL_IN,
 		.priority	= NF_IP_PRI_MANGLE,

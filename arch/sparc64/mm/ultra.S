@@ -594,7 +594,7 @@ xcall_report_regs:
 	b,pt		%xcc, etrap_irq
 109:	 or		%g7, %lo(109b), %g7
 	call		__show_regs
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 	clr		%l6
 	/* Has to be a non-v9 branch due to the large distance. */
 	b		rtrap_xcall

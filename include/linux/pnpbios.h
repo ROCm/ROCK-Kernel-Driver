@@ -29,7 +29,7 @@
 #include <linux/pci.h>
 
 /*
- * Status codes (warnings and errors)
+ * Return codes
  */
 #define PNP_SUCCESS                     0x00
 #define PNP_NOT_SET_STATICALLY          0x7f
@@ -75,6 +75,7 @@
 #define PNPMSG_POWER_OFF		0x41
 #define PNPMSG_PNP_OS_ACTIVE		0x42
 #define PNPMSG_PNP_OS_INACTIVE		0x43
+
 /*
  * Plug and Play BIOS flags
  */
@@ -87,6 +88,12 @@
 #define PNPBIOS_REMOVABLE		0x0040
 #define pnpbios_is_static(x) (((x)->flags & 0x0100) == 0x0000)
 #define pnpbios_is_dynamic(x) ((x)->flags & 0x0080)
+
+/*
+ * Function Parameters
+ */
+#define PNPMODE_STATIC 1
+#define PNPMODE_DYNAMIC 0
 
 /* 0x8000 through 0xffff are OEM defined */
 
@@ -125,8 +132,10 @@ struct pnp_bios_node {
 
 /* non-exported */
 extern int  pnpbios_dont_use_current_config;
+extern struct pnp_dev_node_info node_info;
 extern void *pnpbios_kmalloc(size_t size, int f);
 extern int pnpbios_init (void);
+extern int pnpbios_interface_attach_device(struct pnp_bios_node * node);
 extern int pnpbios_proc_init (void);
 extern void pnpbios_proc_exit (void);
 

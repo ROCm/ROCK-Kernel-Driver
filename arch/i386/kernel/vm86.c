@@ -30,6 +30,7 @@
  *
  */
 
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -113,10 +114,13 @@ struct pt_regs * save_v86_state(struct kernel_vm86_regs * regs)
 		printk("vm86: could not access userspace vm86_info\n");
 		do_exit(SIGSEGV);
 	}
-	tss = init_tss + smp_processor_id();
+
+	tss = init_tss + get_cpu();
 	current->thread.esp0 = current->thread.saved_esp0;
 	load_esp0(tss, current->thread.esp0);
 	current->thread.saved_esp0 = 0;
+	put_cpu();
+
 	loadsegment(fs, current->thread.saved_fs);
 	loadsegment(gs, current->thread.saved_gs);
 	ret = KVM86->regs32;
@@ -289,9 +293,10 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	asm volatile("movl %%fs,%0":"=m" (tsk->thread.saved_fs));
 	asm volatile("movl %%gs,%0":"=m" (tsk->thread.saved_gs));
 
-	tss = init_tss + smp_processor_id();
+	tss = init_tss + get_cpu();
 	tss->esp0 = tsk->thread.esp0 = (unsigned long) &info->VM86_TSS_ESP0;
 	disable_sysenter(tss);
+	put_cpu();
 
 	tsk->thread.screen_bitmap = info->screen_bitmap;
 	if (info->flags & VM86_SCREEN_BITMAP)
@@ -721,7 +726,7 @@ static inline void free_vm86_irq(int irqnumber)
 void release_x86_irqs(struct task_struct *task)
 {
 	int i;
-	for (i=3; i<16; i++)
+	for (i = FIRST_VM86_IRQ ; i <= LAST_VM86_IRQ; i++)
 	    if (vm86_irqs[i].tsk == task)
 		free_vm86_irq(i);
 }
@@ -731,7 +736,7 @@ static inline int get_and_reset_irq(int irqnumber)
 	int bit;
 	unsigned long flags;
 	
-	if ( (irqnumber<3) || (irqnumber>15) ) return 0;
+	if (invalid_vm86_irq(irqnumber)) return 0;
 	if (vm86_irqs[irqnumber].tsk != current) return 0;
 	spin_lock_irqsave(&irqbits_lock, flags);	
 	bit = irqbits & (1 << irqnumber);
@@ -756,7 +761,7 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 			int irq = irqnumber & 255;
 			if (!capable(CAP_SYS_ADMIN)) return -EPERM;
 			if (!((1 << sig) & ALLOWED_SIGS)) return -EPERM;
-			if ( (irq<3) || (irq>15) ) return -EPERM;
+			if (invalid_vm86_irq(irq)) return -EPERM;
 			if (vm86_irqs[irq].tsk) return -EPERM;
 			ret = request_irq(irq, &irq_handler, 0, VM86_IRQNAME, 0);
 			if (ret) return ret;
@@ -765,7 +770,7 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 			return irq;
 		}
 		case  VM86_FREE_IRQ: {
-			if ( (irqnumber<3) || (irqnumber>15) ) return -EPERM;
+			if (invalid_vm86_irq(irqnumber)) return -EPERM;
 			if (!vm86_irqs[irqnumber].tsk) return 0;
 			if (vm86_irqs[irqnumber].tsk != current) return -EPERM;
 			free_vm86_irq(irqnumber);

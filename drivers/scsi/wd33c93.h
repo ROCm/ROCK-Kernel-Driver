@@ -186,8 +186,13 @@
 
    /* This is what the 3393 chip looks like to us */
 typedef struct {
+#ifdef CONFIG_WD33C93_PIO
+   unsigned int   SASR;
+   unsigned int   SCMD;
+#else
    volatile unsigned char  *SASR;
    volatile unsigned char  *SCMD;
+#endif
 } wd33c93_regs;
 
 
@@ -334,7 +339,7 @@ int wd33c93_abort (Scsi_Cmnd *cmd);
 int wd33c93_queuecommand (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *));
 void wd33c93_intr (struct Scsi_Host *instance);
 int wd33c93_proc_info(char *, char **, off_t, int, int, int);
-int wd33c93_reset (Scsi_Cmnd *, unsigned int);
+int wd33c93_host_reset (Scsi_Cmnd *);
 void wd33c93_release(void);
 
 #endif /* WD33C93_H */

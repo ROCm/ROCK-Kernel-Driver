@@ -10,6 +10,10 @@
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
+MODULE_AUTHOR("Jan Kara");
+MODULE_DESCRIPTION("Old quota format support");
+MODULE_LICENSE("GPL");
+
 static void v1_disk2mem_dqblk(struct mem_dqblk *m, struct v1_disk_dqblk *d)
 {
 	m->dqb_ihardlimit = d->dqb_ihardlimit;

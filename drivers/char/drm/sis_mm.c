@@ -182,10 +182,10 @@ int sisp_agp_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
   if(block){
     /* TODO */
     agp.offset = block->ofs;
-    agp.free = (unsigned int)block;
+    agp.free = (unsigned long)block;
     if(!add_alloc_set(agp.context, AGP_TYPE, agp.free)){
       DRM_DEBUG("adding to allocation set fails\n");
-      mmFreeMem((PMemBlock)agp.free);
+      mmFreeMem((PMemBlock)(unsigned long)agp.free);
       retval = -1;
     }
   }
@@ -218,7 +218,7 @@ int sisp_agp_free(struct inode *inode, struct file *filp, unsigned int cmd,
     return -1;
   }
 
-  mmFreeMem((PMemBlock)agp.free);
+  mmFreeMem((PMemBlock)(unsigned long)agp.free);
   if(!del_alloc_set(agp.context, AGP_TYPE, agp.free))
     retval = -1;
 
@@ -288,7 +288,7 @@ int sis_final_context(int context)
 	  retval = setFirst(set, &item);
 	  while(retval){
    	    DRM_DEBUG("free agp memory 0x%x\n", item);
-	    mmFreeMem((PMemBlock)item);
+	    mmFreeMem((PMemBlock)(unsigned long)item);
 	    retval = setNext(set, &item);
 	  }
 	  setDestroy(set);

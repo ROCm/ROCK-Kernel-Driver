@@ -30,6 +30,8 @@
  *						address validation timer.
  *	YOSHIFUJI Hideaki @USAGI	:	Privacy Extensions (RFC3041)
  *						support.
+ *	Yuji SEKIYA @USAGI		:	Don't assign a same IPv6
+ *						address on a same interface.
  */
 
 #include <linux/config.h>
@@ -125,6 +127,8 @@ static void addrconf_dad_timer(unsigned long data);
 static void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 static void addrconf_rs_timer(unsigned long data);
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
+
+static int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *dev);
 
 static struct notifier_block *inet6addr_chain;
 
@@ -492,12 +496,23 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 {
 	struct inet6_ifaddr *ifa;
 	int hash;
+	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+
+	spin_lock_bh(&lock);
+
+	/* Ignore adding duplicate addresses on an interface */
+	if (ipv6_chk_same_addr(addr, idev->dev)) {
+		spin_unlock_bh(&lock);
+		ADBG(("ipv6_add_addr: already assigned\n"));
+		return ERR_PTR(-EEXIST);
+	}
 
 	ifa = kmalloc(sizeof(struct inet6_ifaddr), GFP_ATOMIC);
 
 	if (ifa == NULL) {
+		spin_unlock_bh(&lock);
 		ADBG(("ipv6_add_addr: malloc failed\n"));
-		return NULL;
+		return ERR_PTR(-ENOBUFS);
 	}
 
 	memset(ifa, 0, sizeof(struct inet6_ifaddr));
@@ -513,8 +528,9 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	read_lock(&addrconf_lock);
 	if (idev->dead) {
 		read_unlock(&addrconf_lock);
+		spin_unlock_bh(&lock);
 		kfree(ifa);
-		return NULL;
+		return ERR_PTR(-ENODEV);	/*XXX*/
 	}
 
 	inet6_ifa_count++;
@@ -551,6 +567,7 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	in6_ifa_hold(ifa);
 	write_unlock_bh(&idev->lock);
 	read_unlock(&addrconf_lock);
+	spin_unlock_bh(&lock);
 
 	notifier_call_chain(&inet6addr_chain,NETDEV_UP,ifa);
 
@@ -697,7 +714,7 @@ retry:
 	ift = ipv6_count_addresses(idev) < IPV6_MAX_ADDRESSES ?
 		ipv6_add_addr(idev, &addr, tmp_plen,
 			      ipv6_addr_type(&addr)&IPV6_ADDR_SCOPE_MASK, IFA_F_TEMPORARY) : 0;
-	if (!ift) {
+	if (IS_ERR(ift)) {
 		in6_dev_put(idev);
 		in6_ifa_put(ifp);
 		printk(KERN_INFO
@@ -921,6 +938,23 @@ int ipv6_chk_addr(struct in6_addr *addr, struct net_device *dev)
 		    !(ifp->flags&IFA_F_TENTATIVE)) {
 			if (dev == NULL || ifp->idev->dev == dev ||
 			    !(ifp->scope&(IFA_LINK|IFA_HOST)))
+				break;
+		}
+	}
+	read_unlock_bh(&addrconf_hash_lock);
+	return ifp != NULL;
+}
+
+static
+int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *dev)
+{
+	struct inet6_ifaddr * ifp;
+	u8 hash = ipv6_addr_hash(addr);
+
+	read_lock_bh(&addrconf_hash_lock);
+	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
+		if (ipv6_addr_cmp(&ifp->addr, addr) == 0) {
+			if (dev == NULL || ifp->idev->dev == dev)
 				break;
 		}
 	}
@@ -1168,7 +1202,7 @@ addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
 	if (dev->type == ARPHRD_SIT && (dev->flags&IFF_POINTOPOINT))
 		rtmsg.rtmsg_flags |= RTF_NONEXTHOP;
 
-	ip6_route_add(&rtmsg);
+	ip6_route_add(&rtmsg, NULL);
 }
 
 /* Create "default" multicast route to the interface */
@@ -1185,7 +1219,7 @@ static void addrconf_add_mroute(struct net_device *dev)
 	rtmsg.rtmsg_ifindex = dev->ifindex;
 	rtmsg.rtmsg_flags = RTF_UP|RTF_ADDRCONF;
 	rtmsg.rtmsg_type = RTMSG_NEWROUTE;
-	ip6_route_add(&rtmsg);
+	ip6_route_add(&rtmsg, NULL);
 }
 
 static void sit_route_add(struct net_device *dev)
@@ -1202,7 +1236,7 @@ static void sit_route_add(struct net_device *dev)
 	rtmsg.rtmsg_flags	= RTF_UP|RTF_NONEXTHOP;
 	rtmsg.rtmsg_ifindex	= dev->ifindex;
 
-	ip6_route_add(&rtmsg);
+	ip6_route_add(&rtmsg, NULL);
 }
 
 static void addrconf_add_lroute(struct net_device *dev)
@@ -1294,7 +1328,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	if (rt && ((rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0)) {
 		if (rt->rt6i_flags&RTF_EXPIRES) {
 			if (pinfo->onlink == 0 || valid_lft == 0) {
-				ip6_del_rt(rt);
+				ip6_del_rt(rt, NULL);
 				rt = NULL;
 			} else {
 				rt->rt6i_expires = rt_expires;
@@ -1344,7 +1378,7 @@ ok:
 				ifp = ipv6_add_addr(in6_dev, &addr, pinfo->prefix_len,
 						    addr_type&IPV6_ADDR_SCOPE_MASK, 0);
 
-			if (ifp == NULL) {
+			if (IS_ERR(ifp)) {
 				in6_dev_put(in6_dev);
 				return;
 			}
@@ -1499,13 +1533,14 @@ static int inet6_addr_add(int ifindex, struct in6_addr *pfx, int plen)
 
 	scope = ipv6_addr_scope(pfx);
 
-	if ((ifp = ipv6_add_addr(idev, pfx, plen, scope, IFA_F_PERMANENT)) != NULL) {
+	ifp = ipv6_add_addr(idev, pfx, plen, scope, IFA_F_PERMANENT);
+	if (!IS_ERR(ifp)) {
 		addrconf_dad_start(ifp);
 		in6_ifa_put(ifp);
 		return 0;
 	}
 
-	return -ENOBUFS;
+	return PTR_ERR(ifp);
 }
 
 static int inet6_addr_del(int ifindex, struct in6_addr *pfx, int plen)
@@ -1597,7 +1632,7 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 
 	if (addr.s6_addr32[3]) {
 		ifp = ipv6_add_addr(idev, &addr, 128, scope, IFA_F_PERMANENT);
-		if (ifp) {
+		if (!IS_ERR(ifp)) {
 			spin_lock_bh(&ifp->lock);
 			ifp->flags &= ~IFA_F_TENTATIVE;
 			spin_unlock_bh(&ifp->lock);
@@ -1633,7 +1668,7 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 
 				ifp = ipv6_add_addr(idev, &addr, plen, flag,
 						    IFA_F_PERMANENT);
-				if (ifp) {
+				if (!IS_ERR(ifp)) {
 					spin_lock_bh(&ifp->lock);
 					ifp->flags &= ~IFA_F_TENTATIVE;
 					spin_unlock_bh(&ifp->lock);
@@ -1660,7 +1695,7 @@ static void init_loopback(struct net_device *dev)
 	}
 
 	ifp = ipv6_add_addr(idev, &in6addr_loopback, 128, IFA_HOST, IFA_F_PERMANENT);
-	if (ifp) {
+	if (!IS_ERR(ifp)) {
 		spin_lock_bh(&ifp->lock);
 		ifp->flags &= ~IFA_F_TENTATIVE;
 		spin_unlock_bh(&ifp->lock);
@@ -1674,7 +1709,7 @@ static void addrconf_add_linklocal(struct inet6_dev *idev, struct in6_addr *addr
 	struct inet6_ifaddr * ifp;
 
 	ifp = ipv6_add_addr(idev, addr, 64, IFA_LINK, IFA_F_PERMANENT);
-	if (ifp) {
+	if (!IS_ERR(ifp)) {
 		addrconf_dad_start(ifp);
 		in6_ifa_put(ifp);
 	}
@@ -1917,7 +1952,7 @@ static void addrconf_rs_timer(unsigned long data)
 
 		rtmsg.rtmsg_ifindex = ifp->idev->dev->ifindex;
 
-		ip6_route_add(&rtmsg);
+		ip6_route_add(&rtmsg, NULL);
 	}
 
 out:

@@ -39,6 +39,7 @@
 #include <asm/pstate.h>
 #include <asm/elf.h>
 #include <asm/fpumacro.h>
+#include <asm/head.h>
 
 /* #define VERBOSE_SHOWREGS */
 
@@ -341,8 +342,8 @@ void show_regs(struct pt_regs *regs)
 	    regs->u_regs[14] >= (long)current - PAGE_SIZE &&
 	    regs->u_regs[14] < (long)current + 6 * PAGE_SIZE) {
 		printk ("*********parent**********\n");
-		__show_regs((struct pt_regs *)(regs->u_regs[14] + STACK_BIAS + REGWIN_SZ));
-		idump_from_user(((struct pt_regs *)(regs->u_regs[14] + STACK_BIAS + REGWIN_SZ))->tpc);
+		__show_regs((struct pt_regs *)(regs->u_regs[14] + PTREGS_OFF));
+		idump_from_user(((struct pt_regs *)(regs->u_regs[14] + PTREGS_OFF))->tpc);
 		printk ("*********endpar**********\n");
 	}
 #endif
@@ -472,7 +473,7 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 
 	distance = fp - psp;
 	rval = (csp - distance);
-	if (copy_in_user(rval, psp, distance))
+	if (copy_in_user((void __user *) rval, (void __user *) psp, distance))
 		rval = 0;
 	else if (test_thread_flag(TIF_32BIT)) {
 		if (put_user(((u32)csp), &(((struct reg_window32 *)rval)->ins[6])))
@@ -508,11 +509,11 @@ void synchronize_user_stack(void)
 
 	flush_user_windows();
 	if ((window = get_thread_wsaved()) != 0) {
-		int winsize = REGWIN_SZ;
+		int winsize = sizeof(struct reg_window);
 		int bias = 0;
 
 		if (test_thread_flag(TIF_32BIT))
-			winsize = REGWIN32_SZ;
+			winsize = sizeof(struct reg_window32);
 		else
 			bias = STACK_BIAS;
 
@@ -533,11 +534,11 @@ void fault_in_user_windows(void)
 {
 	struct thread_info *t = current_thread_info();
 	unsigned long window;
-	int winsize = REGWIN_SZ;
+	int winsize = sizeof(struct reg_window);
 	int bias = 0;
 
 	if (test_thread_flag(TIF_32BIT))
-		winsize = REGWIN32_SZ;
+		winsize = sizeof(struct reg_window32);
 	else
 		bias = STACK_BIAS;
 
@@ -610,14 +611,14 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	p->set_child_tid = p->clear_child_tid = NULL;
 
 	/* Calculate offset to stack_frame & pt_regs */
-	child_trap_frame = ((char *)t) + (THREAD_SIZE - (TRACEREG_SZ+REGWIN_SZ));
-	memcpy(child_trap_frame, (((struct reg_window *)regs)-1), (TRACEREG_SZ+REGWIN_SZ));
+	child_trap_frame = ((char *)t) + (THREAD_SIZE - (TRACEREG_SZ+STACKFRAME_SZ));
+	memcpy(child_trap_frame, (((struct sparc_stackf *)regs)-1), (TRACEREG_SZ+STACKFRAME_SZ));
 
 	t->flags = (t->flags & ~((0xffUL << TI_FLAG_CWP_SHIFT) | (0xffUL << TI_FLAG_CURRENT_DS_SHIFT))) |
 		_TIF_NEWCHILD |
 		(((regs->tstate + 1) & TSTATE_CWP) << TI_FLAG_CWP_SHIFT);
 	t->ksp = ((unsigned long) child_trap_frame) - STACK_BIAS;
-	t->kregs = (struct pt_regs *)(child_trap_frame+sizeof(struct reg_window));
+	t->kregs = (struct pt_regs *)(child_trap_frame+sizeof(struct sparc_stackf));
 	t->fpsaved[0] = 0;
 
 	if (regs->tstate & TSTATE_PRIV) {
@@ -636,7 +637,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		flush_register_windows();
 		memcpy((void *)(t->ksp + STACK_BIAS),
 		       (void *)(regs->u_regs[UREG_FP] + STACK_BIAS),
-		       sizeof(struct reg_window));
+		       sizeof(struct sparc_stackf));
 		t->kregs->u_regs[UREG_G6] = (unsigned long) t;
 		t->kregs->u_regs[UREG_G4] = (unsigned long) t->task;
 	} else {

@@ -54,10 +54,10 @@ static int c_show(struct seq_file *m, void *p)
 	
 	seq_printf(m, "name         : %s\n", alg->cra_name);
 	seq_printf(m, "module       : %s\n", module_name(alg->cra_module));
-	seq_printf(m, "blocksize    : %u\n", alg->cra_blocksize);
 	
 	switch (alg->cra_flags & CRYPTO_ALG_TYPE_MASK) {
 	case CRYPTO_ALG_TYPE_CIPHER:
+		seq_printf(m, "blocksize    : %u\n", alg->cra_blocksize);
 		seq_printf(m, "min keysize  : %u\n",
 					alg->cra_cipher.cia_min_keysize);
 		seq_printf(m, "max keysize  : %u\n",
@@ -67,6 +67,7 @@ static int c_show(struct seq_file *m, void *p)
 		break;
 		
 	case CRYPTO_ALG_TYPE_DIGEST:
+		seq_printf(m, "blocksize    : %u\n", alg->cra_blocksize);
 		seq_printf(m, "digestsize   : %u\n",
 		           alg->cra_digest.dia_digestsize);
 		break;

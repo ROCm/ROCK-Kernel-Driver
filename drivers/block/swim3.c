@@ -305,6 +305,7 @@ static void do_fd_request(request_queue_t * q)
 
 static void start_request(struct floppy_state *fs)
 {
+	struct request *req;
 	unsigned long x;
 
 	if (fs->state == idle && fs->wanted) {
@@ -312,8 +313,7 @@ static void start_request(struct floppy_state *fs)
 		wake_up(&fs->wait);
 		return;
 	}
-	while (!blk_queue_empty(&swim3_queue) && fs->state == idle) {
-		struct request *req = elv_next_request(&swim3_queue);
+	while (fs->state == idle && (req = elv_next_request(&swim3_queue))) {
 #if 0
 		printk("do_fd_req: dev=%s cmd=%d sec=%ld nr_sec=%ld buf=%p\n",
 		       req->rq_disk->disk_name, req->cmd,

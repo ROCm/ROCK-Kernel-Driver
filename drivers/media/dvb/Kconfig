@@ -3,7 +3,7 @@
 #
 
 menu "Digital Video Broadcasting Devices"
-	depends on VIDEO_DEV!=n
+	depends on NET && INET 
 
 config DVB
 	bool "DVB For Linux"
@@ -32,10 +32,10 @@ source "drivers/media/dvb/dvb-core/Kconfig"
 
 source "drivers/media/dvb/frontends/Kconfig"
 
-comment "Supported DVB Adapters"
+comment "Supported SAA7146 based PCI Adapters"
 	depends on DVB
 
-source "drivers/media/dvb/av7110/Kconfig"
+source "drivers/media/dvb/ttpci/Kconfig"
 
 endmenu
 

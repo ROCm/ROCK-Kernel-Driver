@@ -26,6 +26,7 @@
 #include <linux/security.h>
 #include <net/sock.h>
 #include <net/xfrm.h>
+#include <asm/uaccess.h>
 
 static struct sock *xfrm_nl;
 
@@ -63,6 +64,20 @@ static int verify_one_alg(struct rtattr **xfrma, enum xfrm_attr_type_t type)
 	};
 
 	algp->alg_name[CRYPTO_MAX_ALG_NAME - 1] = '\0';
+	return 0;
+}
+
+static int verify_encap_tmpl(struct rtattr **xfrma)
+{
+	struct rtattr *rt = xfrma[XFRMA_ENCAP - 1];
+	struct xfrm_encap_tmpl *encap;
+
+	if (!rt)
+		return 0;
+
+	if ((rt->rta_len - sizeof(*rt)) < sizeof(*encap))
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -121,6 +136,8 @@ static int verify_newsa_info(struct xfrm_usersa_info *p,
 		goto out;
 	if ((err = verify_one_alg(xfrma, XFRMA_ALG_COMP)))
 		goto out;
+	if ((err = verify_encap_tmpl(xfrma)))
+		goto out;
 
 	err = -EINVAL;
 	switch (p->mode) {
@@ -156,6 +173,24 @@ static int attach_one_algo(struct xfrm_algo **algpp, struct rtattr *u_arg)
 	return 0;
 }
 
+static int attach_encap_tmpl(struct xfrm_encap_tmpl **encapp, struct rtattr *u_arg)
+{
+	struct rtattr *rta = u_arg;
+	struct xfrm_encap_tmpl *p, *uencap;
+
+	if (!rta)
+		return 0;
+
+	uencap = RTA_DATA(rta);
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return -ENOMEM;
+
+	memcpy(p, uencap, sizeof(*p));
+	*encapp = p;
+	return 0;
+}
+
 static void copy_from_user_state(struct xfrm_state *x, struct xfrm_usersa_info *p)
 {
 	memcpy(&x->id, &p->id, sizeof(x->id));
@@ -185,6 +220,8 @@ static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
 	if ((err = attach_one_algo(&x->ealg, xfrma[XFRMA_ALG_CRYPT-1])))
 		goto error;
 	if ((err = attach_one_algo(&x->calg, xfrma[XFRMA_ALG_COMP-1])))
+		goto error;
+	if ((err = attach_encap_tmpl(&x->encap, xfrma[XFRMA_ENCAP-1])))
 		goto error;
 
 	err = -ENOENT;
@@ -300,6 +337,9 @@ static int dump_one_state(struct xfrm_state *x, int count, void *ptr)
 			sizeof(*(x->ealg))+(x->ealg->alg_key_len+7)/8, x->ealg);
 	if (x->calg)
 		RTA_PUT(skb, XFRMA_ALG_COMP, sizeof(*(x->calg)), x->calg);
+
+	if (x->encap)
+		RTA_PUT(skb, XFRMA_ENCAP, sizeof(*x->encap), x->encap);
 
 	nlh->nlmsg_len = skb->tail - b;
 out:

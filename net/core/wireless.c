@@ -54,6 +54,7 @@
 #include <linux/rtnetlink.h>		/* rtnetlink stuff */
 #include <linux/seq_file.h>
 #include <linux/wireless.h>		/* Pretty obvious */
+#include <linux/init.h>			/* for __init */
 
 #include <net/iw_handler.h>		/* New driver API */
 

@@ -32,6 +32,18 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+ 
+/* Change Log
+ *
+ * Adam Belay - <ambx1@neo.rr.com> - March 16, 2003
+ * rev 1.01	Only call pnp_bios_dev_node_info once
+ *		Added pnpbios_print_status
+ *		Added several new error messages and info messages
+ *		Added pnpbios_interface_attach_device
+ *		integrated core and proc init system
+ *		Introduced PNPMODE flags
+ *		Removed some useless includes
+ */
 
 #include <linux/types.h>
 #include <linux/module.h>
@@ -46,9 +58,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <asm/desc.h>
-#include <linux/ioport.h>
 #include <linux/slab.h>
-#include <linux/pci.h>
 #include <linux/kmod.h>
 #include <linux/completion.h>
 #include <linux/spinlock.h>
@@ -93,6 +103,7 @@ static struct {
 } pnp_bios_callpoint;
 
 static union pnp_bios_expansion_header * pnp_bios_hdr = NULL;
+struct pnp_dev_node_info node_info;
 
 /* The PnP BIOS entries in the GDT */
 #define PNP_GDT    (GDT_ENTRY_PNPBIOS_BASE * 8)
@@ -237,9 +248,46 @@ static inline u16 call_pnp_bios(u16 func, u16 arg1, u16 arg2, u16 arg3,
  *
  */
 
-static void pnpbios_warn_unexpected_status(const char * module, u16 status)
+static void pnpbios_print_status(const char * module, u16 status)
 {
-	printk(KERN_ERR "PnPBIOS: %s: Unexpected status 0x%x\n", module, status);
+	switch(status) {
+	case PNP_SUCCESS:
+	printk(KERN_ERR "PnPBIOS: %s: function successful\n", module);
+	case PNP_NOT_SET_STATICALLY:
+	printk(KERN_ERR "PnPBIOS: %s: unable to set static resources\n", module);
+	case PNP_UNKNOWN_FUNCTION:
+	printk(KERN_ERR "PnPBIOS: %s: invalid function number passed\n", module);
+	case PNP_FUNCTION_NOT_SUPPORTED:
+	printk(KERN_ERR "PnPBIOS: %s: function not supported on this system\n", module);
+	case PNP_INVALID_HANDLE:
+	printk(KERN_ERR "PnPBIOS: %s: invalid handle\n", module);
+	case PNP_BAD_PARAMETER:
+	printk(KERN_ERR "PnPBIOS: %s: invalid parameters were passed\n", module);
+	case PNP_SET_FAILED:
+	printk(KERN_ERR "PnPBIOS: %s: unable to set resources\n", module);
+	case PNP_EVENTS_NOT_PENDING:
+	printk(KERN_ERR "PnPBIOS: %s: no events are pending\n", module);
+	case PNP_SYSTEM_NOT_DOCKED:
+	printk(KERN_ERR "PnPBIOS: %s: the system is not docked\n", module);
+	case PNP_NO_ISA_PNP_CARDS:
+	printk(KERN_ERR "PnPBIOS: %s: no isapnp cards are installed on this system\n", module);
+	case PNP_UNABLE_TO_DETERMINE_DOCK_CAPABILITIES:
+	printk(KERN_ERR "PnPBIOS: %s: cannot determine the capabilities of the docking station\n", module);
+	case PNP_CONFIG_CHANGE_FAILED_NO_BATTERY:
+	printk(KERN_ERR "PnPBIOS: %s: unable to undock, the system does not have a battery\n", module);
+	case PNP_CONFIG_CHANGE_FAILED_RESOURCE_CONFLICT:
+	printk(KERN_ERR "PnPBIOS: %s: could not dock due to resource conflicts\n", module);
+	case PNP_BUFFER_TOO_SMALL:
+	printk(KERN_ERR "PnPBIOS: %s: the buffer passed is too small\n", module);
+	case PNP_USE_ESCD_SUPPORT:
+	printk(KERN_ERR "PnPBIOS: %s: use ESCD instead\n", module);
+	case PNP_MESSAGE_NOT_SUPPORTED:
+	printk(KERN_ERR "PnPBIOS: %s: the message is unsupported\n", module);
+	case PNP_HARDWARE_ERROR:
+	printk(KERN_ERR "PnPBIOS: %s: a hardware failure has occured\n", module);
+	default:
+	printk(KERN_ERR "PnPBIOS: %s: unexpected status 0x%x\n", module, status);
+	}
 }
 
 void *pnpbios_kmalloc(size_t size, int f)
@@ -299,7 +347,7 @@ int pnp_bios_dev_node_info(struct pnp_dev_node_info *data)
 {
 	int status = __pnp_bios_dev_node_info( data );
 	if ( status )
-		pnpbios_warn_unexpected_status( "dev_node_info", status );
+		pnpbios_print_status( "dev_node_info", status );
 	return status;
 }
 
@@ -334,7 +382,7 @@ int pnp_bios_get_dev_node(u8 *nodenum, char boot, struct pnp_bios_node *data)
 	int status;
 	status =  __pnp_bios_get_dev_node( nodenum, boot, data );
 	if ( status )
-		pnpbios_warn_unexpected_status( "get_dev_node", status );
+		pnpbios_print_status( "get_dev_node", status );
 	return status;
 }
 
@@ -362,7 +410,7 @@ int pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *data)
 	int status;
 	status =  __pnp_bios_set_dev_node( nodenum, boot, data );
 	if ( status ) {
-		pnpbios_warn_unexpected_status( "set_dev_node", status );
+		pnpbios_print_status( "set_dev_node", status );
 		return status;
 	}
 	if ( !boot ) { /* Update devlist */
@@ -452,7 +500,7 @@ int pnp_bios_get_stat_res(char *info)
 	int status;
 	status = __pnp_bios_get_stat_res( info );
 	if ( status )
-		pnpbios_warn_unexpected_status( "get_stat_res", status );
+		pnpbios_print_status( "get_stat_res", status );
 	return status;
 }
 
@@ -489,7 +537,7 @@ int pnp_bios_isapnp_config(struct pnp_isa_config_struc *data)
 	int status;
 	status = __pnp_bios_isapnp_config( data );
 	if ( status )
-		pnpbios_warn_unexpected_status( "isapnp_config", status );
+		pnpbios_print_status( "isapnp_config", status );
 	return status;
 }
 
@@ -511,7 +559,7 @@ int pnp_bios_escd_info(struct escd_info_struc *data)
 	int status;
 	status = __pnp_bios_escd_info( data );
 	if ( status )
-		pnpbios_warn_unexpected_status( "escd_info", status );
+		pnpbios_print_status( "escd_info", status );
 	return status;
 }
 
@@ -534,7 +582,7 @@ int pnp_bios_read_escd(char *data, u32 nvram_base)
 	int status;
 	status = __pnp_bios_read_escd( data, nvram_base );
 	if ( status )
-		pnpbios_warn_unexpected_status( "read_escd", status );
+		pnpbios_print_status( "read_escd", status );
 	return status;
 }
 
@@ -658,7 +706,7 @@ static int pnp_dock_thread(void * unused)
 				d = 1;
 				break;
 			default:
-				pnpbios_warn_unexpected_status( "pnp_dock_thread", status );
+				pnpbios_print_status( "pnp_dock_thread", status );
 				continue;
 		}
 		if(d != docked)
@@ -753,19 +801,17 @@ static void node_id_data_to_dev(unsigned char *p, struct pnp_bios_node *node, st
 
 static int pnpbios_get_resources(struct pnp_dev * dev, struct pnp_resource_table * res)
 {
-	struct pnp_dev_node_info node_info;
 	u8 nodenum = dev->number;
 	struct pnp_bios_node * node;
 
 	/* just in case */
 	if(!pnpbios_is_dynamic(dev))
 		return -EPERM;
-	if (pnp_bios_dev_node_info(&node_info) != 0)
-		return -ENODEV;
+
 	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
 	if (!node)
 		return -1;
-	if (pnp_bios_get_dev_node(&nodenum, (char )0, node)) {
+	if (pnp_bios_get_dev_node(&nodenum, (char )PNPMODE_DYNAMIC, node)) {
 		kfree(node);
 		return -ENODEV;
 	}
@@ -777,7 +823,6 @@ static int pnpbios_get_resources(struct pnp_dev * dev, struct pnp_resource_table
 
 static int pnpbios_set_resources(struct pnp_dev * dev, struct pnp_resource_table * res)
 {
-	struct pnp_dev_node_info node_info;
 	u8 nodenum = dev->number;
 	struct pnp_bios_node * node;
 	int ret;
@@ -785,18 +830,17 @@ static int pnpbios_set_resources(struct pnp_dev * dev, struct pnp_resource_table
 	/* just in case */
 	if (!pnpbios_is_dynamic(dev))
 		return -EPERM;
-	if (pnp_bios_dev_node_info(&node_info) != 0)
-		return -ENODEV;
+
 	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
 	if (!node)
 		return -1;
-	if (pnp_bios_get_dev_node(&nodenum, (char )1, node))
+	if (pnp_bios_get_dev_node(&nodenum, (char )PNPMODE_STATIC, node))
 		return -ENODEV;
 	if(!pnp_write_resources((char *)node->data,(char *)node->data + node->size,res)){
 		kfree(node);
 		return -1;
 	}
-	ret = pnp_bios_set_dev_node(node->handle, (char)0, node);
+	ret = pnp_bios_set_dev_node(node->handle, (char)PNPMODE_DYNAMIC, node);
 	kfree(node);
 	if (ret > 0)
 		ret = -1;
@@ -805,23 +849,18 @@ static int pnpbios_set_resources(struct pnp_dev * dev, struct pnp_resource_table
 
 static int pnpbios_disable_resources(struct pnp_dev *dev)
 {
-	struct pnp_dev_node_info node_info;
 	struct pnp_bios_node * node;
 	int ret;
 	
 	/* just in case */
 	if(dev->flags & PNPBIOS_NO_DISABLE || !pnpbios_is_dynamic(dev))
 		return -EPERM;
-	if (!dev || !dev->active)
-		return -EINVAL;
-	if (pnp_bios_dev_node_info(&node_info) != 0)
-		return -ENODEV;
+
 	/* the value of this will be zero */
 	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
 	if (!node)
 		return -ENOMEM;
-	ret = pnp_bios_set_dev_node(dev->number, (char)0, node);
-	dev->active = 0;
+	ret = pnp_bios_set_dev_node(dev->number, (char)PNPMODE_DYNAMIC, node);
 	kfree(node);
 	if (ret > 0)
 		ret = -1;
@@ -830,7 +869,7 @@ static int pnpbios_disable_resources(struct pnp_dev *dev)
 
 /* PnP Layer support */
 
-static struct pnp_protocol pnpbios_protocol = {
+struct pnp_protocol pnpbios_protocol = {
 	.name	= "Plug and Play BIOS",
 	.get	= pnpbios_get_resources,
 	.set	= pnpbios_set_resources,
@@ -879,6 +918,8 @@ static int insert_device(struct pnp_dev *dev, struct pnp_bios_node * node)
 	dev->protocol = &pnpbios_protocol;
 
 	pnp_add_device(dev);
+	pnpbios_interface_attach_device(node);
+
 	return 0;
 }
 
@@ -903,8 +944,16 @@ static void __init build_devlist(void)
 
 	for(nodenum=0; nodenum<0xff; ) {
 		u8 thisnodenum = nodenum;
-		if (pnp_bios_get_dev_node(&nodenum, (char )0, node))
-			break;
+		/* eventually we will want to use PNPMODE_STATIC here but for now
+		 * dynamic will help us catch buggy bioses to add to the blacklist.
+		 */
+		if (!pnpbios_dont_use_current_config) {
+			if (pnp_bios_get_dev_node(&nodenum, (char )PNPMODE_DYNAMIC, node))
+				break;
+		} else {
+			if (pnp_bios_get_dev_node(&nodenum, (char )PNPMODE_STATIC, node))
+				break;
+		}
 		nodes_got++;
 		dev =  pnpbios_kmalloc(sizeof (struct pnp_dev), GFP_KERNEL);
 		if (!dev)
@@ -972,7 +1021,8 @@ int __init pnpbios_init(void)
 	if(pnpbios_disabled || (dmi_broken & BROKEN_PNP_BIOS)) {
 		printk(KERN_INFO "PnPBIOS: Disabled\n");
 		return -ENODEV;
-	}
+	} else
+		printk(KERN_INFO "PnPBIOS: Scanning system for PnP BIOS support...\n");
 
 	/*
  	 * Search the defined area (0xf0000-0xffff0) for a valid PnP BIOS
@@ -1016,17 +1066,34 @@ int __init pnpbios_init(void)
 		}
 		break;
 	}
-	if (!pnp_bios_present())
+	if (!pnp_bios_present()) {
+		printk(KERN_INFO "PnPBIOS: A PnP BIOS was not detected.\n");
 		return -ENODEV;
+	}
+
+	/*
+	 * we found a pnpbios, now let's load the rest of the driver
+	 */
+
+	/* read the node info */
+	if (pnp_bios_dev_node_info(&node_info)) {
+		printk(KERN_ERR "PnPBIOS: Unable to get node info.  Aborting.\n");
+		return -EIO;
+	}
+
+	/* register with the pnp layer */
 	pnp_register_protocol(&pnpbios_protocol);
-	build_devlist();
-	/*if ( ! dont_reserve_resources )*/
-		/*reserve_resources();*/
+
 #ifdef CONFIG_PROC_FS
+	/* start the proc interface */
 	r = pnpbios_proc_init();
 	if (r)
 		return r;
 #endif
+
+	/* scan for pnpbios devices */
+	build_devlist();
+
 	return 0;
 }
 

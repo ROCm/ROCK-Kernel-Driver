@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/nb85e_intc.c -- NB85E cpu core interrupt controller (INTC)
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -26,6 +26,42 @@ static unsigned nb85e_intc_irq_startup (unsigned irq)
 	return 0;
 }
 
+static void nb85e_intc_end_irq (unsigned irq)
+{
+	unsigned long psw, temp;
+
+	/* Clear the highest-level bit in the In-service priority register
+	   (ISPR), to allow this interrupt (or another of the same or
+	   lesser priority) to happen again.
+
+	   The `reti' instruction normally does this automatically when the
+	   PSW bits EP and NP are zero, but we can't always rely on reti
+	   being used consistently to return after an interrupt (another
+	   process can be scheduled, for instance, which can delay the
+	   associated reti for a long time, or this process may be being
+	   single-stepped, which uses the `dbret' instruction to return
+	   from the kernel).
+
+	   We also set the PSW EP bit, which prevents reti from also
+	   trying to modify the ISPR itself.  */
+
+	/* Get PSW and disable interrupts.  */
+	asm volatile ("stsr psw, %0; di" : "=r" (psw));
+	/* We don't want to do anything for NMIs (they don't use the ISPR).  */
+	if (! (psw & 0xC0)) {
+		/* Transition to `trap' state, so that an eventual real
+		   reti instruction won't modify the ISPR.  */
+		psw |= 0x40;
+		/* Fake an interrupt return, which automatically clears the
+		   appropriate bit in the ISPR.  */
+		asm volatile ("mov hilo(1f), %0;"
+			      "ldsr %0, eipc; ldsr %1, eipsw;"
+			      "reti;"
+			      "1:"
+			      : "=&r" (temp) : "r" (psw));
+	}
+}
+
 /* Initialize HW_IRQ_TYPES for INTC-controlled irqs described in array
    INITS (which is terminated by an entry with the name field == 0).  */
 void __init nb85e_intc_init_irq_types (struct nb85e_intc_irq_init *inits,
@@ -43,7 +79,7 @@ void __init nb85e_intc_init_irq_types (struct nb85e_intc_irq_init *inits,
 		hwit->enable   = nb85e_intc_enable_irq;
 		hwit->disable  = nb85e_intc_disable_irq;
 		hwit->ack      = irq_nop;
-		hwit->end      = irq_nop;
+		hwit->end      = nb85e_intc_end_irq;
 		
 		/* Initialize kernel IRQ infrastructure for this interrupt.  */
 		init_irq_handlers(init->base, init->num, init->interval, hwit);

@@ -46,11 +46,19 @@
  *  little endian format. A little endian machine stores MSB of word in
  *  byte[1] and LSB in byte[0]. A big endian machine stores MSB in byte[0] 
  *  and LSB in byte[1].
+ *
+ * This structure is used in the code for things that are endian neutral
+ * but that fit in a word so that we can manipulate them efficiently.
+ * By endian neutral, I mean things that are really an array of bytes,
+ * and always used as such, for example the hint bits. Jean II
  */
 typedef union {
 	__u16 word;
 	__u8  byte[2];
 } __u16_host_order;
+
+/* Same purpose, different application */
+#define u16ho(array) (* ((__u16 *) array))
 
 /* Types of discovery */
 typedef enum {
@@ -62,30 +70,31 @@ typedef enum {
 
 #define NICKNAME_MAX_LEN 21
 
+/* Basic discovery information about a peer */
+typedef struct irda_device_info		discinfo_t;	/* linux/irda.h */
+
 /*
  * The DISCOVERY structure is used for both discovery requests and responses
  */
 typedef struct discovery_t {
-	irda_queue_t q;          /* Must be first! */
+	irda_queue_t	q;		/* Must be first! */
 
-	__u32      saddr;        /* Which link the device was discovered */
-	__u32      daddr;        /* Remote device address */
-	LAP_REASON condition;    /* More info about the discovery */
+	discinfo_t	data;		/* Basic discovery information */
+	int		name_len;	/* Lenght of nickname */
 
-	__u16_host_order hints;  /* Discovery hint bits */
-	__u8       charset;      /* Encoding of nickname */
-	char       nickname[22]; /* The name of the device (21 bytes + \0) */
-	int        name_len;     /* Lenght of nickname */
-
-	int        gen_addr_bit; /* Need to generate a new device address? */
-	int        nslots;       /* Number of slots to use when discovering */
-	unsigned long timestamp; /* Time discovered */
-	unsigned long first_timestamp; /* First time discovered */
+	LAP_REASON	condition;	/* More info about the discovery */
+	int		gen_addr_bit;	/* Need to generate a new device
+					 * address? */
+	int		nslots;		/* Number of slots to use when
+					 * discovering */
+	unsigned long	timestamp;	/* Last time discovered */
+	unsigned long	firststamp;	/* First time discovered */
 } discovery_t;
 
 void irlmp_add_discovery(hashbin_t *cachelog, discovery_t *discovery);
 void irlmp_add_discovery_log(hashbin_t *cachelog, hashbin_t *log);
 void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force);
-struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn, __u16 mask);
+struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn,
+						__u16 mask, int old_entries);
 
 #endif

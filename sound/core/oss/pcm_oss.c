@@ -24,6 +24,7 @@
 #endif
 
 #include <sound/driver.h>
+#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/time.h>
@@ -930,8 +931,8 @@ static int snd_pcm_oss_set_rate(snd_pcm_oss_file_t *pcm_oss_file, int rate)
 		runtime = substream->runtime;
 		if (rate < 1000)
 			rate = 1000;
-		else if (rate > 48000)
-			rate = 48000;
+		else if (rate > 192000)
+			rate = 192000;
 		if (runtime->oss.rate != rate) {
 			runtime->oss.params = 1;
 			runtime->oss.rate = rate;

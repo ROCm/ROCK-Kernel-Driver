@@ -226,7 +226,7 @@ unsigned long get_wchan (struct task_struct *p)
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
 
-	pc = thread_saved_pc (&p->thread);
+	pc = thread_saved_pc (p);
 
 	/* This quite disgusting function walks up the stack, following
 	   saved return address, until it something that's out of bounds

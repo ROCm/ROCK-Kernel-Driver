@@ -218,18 +218,6 @@ cleanup_module(void)
 }
 #endif /* Not a MODULE or a MODULE */
 
-void
-tub_inc_use_count(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-void
-tub_dec_use_count(void)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static int
 tub3270_is_ours(s390_dev_info_t *dp)
 {

@@ -48,7 +48,7 @@ int do_getitimer(int which, struct itimerval *value)
 }
 
 /* SMP: Only we modify our itimer values. */
-asmlinkage long sys_getitimer(int which, struct itimerval *value)
+asmlinkage long sys_getitimer(int which, struct itimerval __user *value)
 {
 	int error = -EFAULT;
 	struct itimerval get_buffer;
@@ -67,7 +67,7 @@ void it_real_fn(unsigned long __data)
 	struct task_struct * p = (struct task_struct *) __data;
 	unsigned long interval;
 
-	send_sig(SIGALRM, p, 1);
+	send_group_sig_info(SIGALRM, SEND_SIG_PRIV, p);
 	interval = p->it_real_incr;
 	if (interval) {
 		if (interval > (unsigned long) LONG_MAX)
@@ -120,8 +120,9 @@ int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue)
 /* SMP: Again, only we play with our itimers, and signals are SMP safe
  *      now so that is not an issue at all anymore.
  */
-asmlinkage long sys_setitimer(int which, struct itimerval *value,
-			      struct itimerval *ovalue)
+asmlinkage long sys_setitimer(int which,
+			      struct itimerval __user *value,
+			      struct itimerval __user *ovalue)
 {
 	struct itimerval set_buffer, get_buffer;
 	int error;

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/pcmcia/sa1100_sa1111.c
+ * linux/drivers/pcmcia/sa1111_generic.c
  *
  * We implement the generic parts of a SA1111 PCMCIA driver.  This
  * basically means we handle everything except controlling the
@@ -19,63 +19,34 @@
 #include <asm/hardware/sa1111.h>
 #include <asm/irq.h>
 
-#include "sa1100_generic.h"
 #include "sa1111_generic.h"
 
-static struct irqs {
-	int irq;
-	const char *str;
-} irqs[] = {
-	{ IRQ_S0_CD_VALID,    "SA1111 PCMCIA card detect" },
-	{ IRQ_S0_BVD1_STSCHG, "SA1111 PCMCIA BVD1"        },
-	{ IRQ_S1_CD_VALID,    "SA1111 CF card detect"     },
-	{ IRQ_S1_BVD1_STSCHG, "SA1111 CF BVD1"            },
+static struct pcmcia_irqs irqs[] = {
+	{ 0, IRQ_S0_CD_VALID,    "SA1111 PCMCIA card detect" },
+	{ 0, IRQ_S0_BVD1_STSCHG, "SA1111 PCMCIA BVD1"        },
+	{ 1, IRQ_S1_CD_VALID,    "SA1111 CF card detect"     },
+	{ 1, IRQ_S1_BVD1_STSCHG, "SA1111 CF BVD1"            },
 };
 
-static struct sa1111_dev *pcmcia;
-
-int sa1111_pcmcia_init(struct pcmcia_init *init)
+int sa1111_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 {
-	int i, ret;
+	if (skt->irq == NO_IRQ)
+		skt->irq = skt->nr ? IRQ_S1_READY_NINT : IRQ_S0_READY_NINT;
 
-	if (init->socket_irq[0] == NO_IRQ)
-		init->socket_irq[0] = IRQ_S0_READY_NINT;
-	if (init->socket_irq[1] == NO_IRQ)
-		init->socket_irq[1] = IRQ_S1_READY_NINT;
-
-	for (i = ret = 0; i < ARRAY_SIZE(irqs); i++) {
-		ret = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
-				  SA_INTERRUPT, irqs[i].str, NULL);
-		if (ret)
-			break;
-		set_irq_type(irqs[i].irq, IRQT_FALLING);
-	}
-
-	if (i < ARRAY_SIZE(irqs)) {
-		printk(KERN_ERR "sa1111_pcmcia: unable to grab IRQ%d (%d)\n",
-			irqs[i].irq, ret);
-		while (i--)
-			free_irq(irqs[i].irq, NULL);
-	}
-
-	return ret ? -1 : 2;
+	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-int sa1111_pcmcia_shutdown(void)
+void sa1111_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(irqs); i++)
-		free_irq(irqs[i].irq, NULL);
-
-	return 0;
+	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-void sa1111_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+void sa1111_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state *state)
 {
-	unsigned long status = sa1111_readl(pcmcia->mapbase + SA1111_PCSR);
+	struct sa1111_dev *sadev = SA1111_DEV(skt->dev);
+	unsigned long status = sa1111_readl(sadev->mapbase + SA1111_PCSR);
 
-	switch (sock) {
+	switch (skt->nr) {
 	case 0:
 		state->detect = status & PCSR_S0_DETECT ? 0 : 1;
 		state->ready  = status & PCSR_S0_READY  ? 1 : 0;
@@ -98,90 +69,60 @@ void sa1111_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 	}
 }
 
-int sa1111_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
+int sa1111_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
 {
-	unsigned int rst, flt, wait, pse, irq, pccr_mask, val;
+	struct sa1111_dev *sadev = SA1111_DEV(skt->dev);
+	unsigned int pccr_skt_mask, pccr_set_mask, val;
 	unsigned long flags;
 
-	switch (sock) {
+	switch (skt->nr) {
 	case 0:
-		rst = PCCR_S0_RST;
-		flt = PCCR_S0_FLT;
-		wait = PCCR_S0_PWAITEN;
-		pse = PCCR_S0_PSE;
-		irq = IRQ_S0_READY_NINT;
+		pccr_skt_mask = PCCR_S0_RST|PCCR_S0_FLT|PCCR_S0_PWAITEN|PCCR_S0_PSE;
 		break;
 
 	case 1:
-		rst = PCCR_S1_RST;
-		flt = PCCR_S1_FLT;
-		wait = PCCR_S1_PWAITEN;
-		pse = PCCR_S1_PSE;
-		irq = IRQ_S1_READY_NINT;
+		pccr_skt_mask = PCCR_S1_RST|PCCR_S1_FLT|PCCR_S1_PWAITEN|PCCR_S1_PSE;
 		break;
 
 	default:
 		return -1;
 	}
 
-	switch (conf->vcc) {
-	case 0:
-		pccr_mask = 0;
-		break;
+	pccr_set_mask = 0;
 
-	case 33:
-		pccr_mask = wait;
-		break;
-
-	case 50:
-		pccr_mask = pse | wait;
-		break;
-
-	default:
-		printk(KERN_ERR "sa1111_pcmcia: unrecognised VCC %u\n",
-			conf->vcc);
-		return -1;
-	}
-
-	if (conf->reset)
-		pccr_mask |= rst;
-
-	if (conf->output)
-		pccr_mask |= flt;
+	if (state->Vcc != 0)
+		pccr_set_mask |= PCCR_S0_PWAITEN|PCCR_S1_PWAITEN;
+	if (state->Vcc == 50)
+		pccr_set_mask |= PCCR_S0_PSE|PCCR_S1_PSE;
+	if (state->flags & SS_RESET)
+		pccr_set_mask |= PCCR_S0_RST|PCCR_S1_RST;
+	if (state->flags & SS_OUTPUT_ENA)
+		pccr_set_mask |= PCCR_S0_FLT|PCCR_S1_FLT;
 
 	local_irq_save(flags);
-	val = sa1111_readl(pcmcia->mapbase + SA1111_PCCR);
-	val = (val & ~(pse | flt | wait | rst)) | pccr_mask;
-	sa1111_writel(val, pcmcia->mapbase + SA1111_PCCR);
+	val = sa1111_readl(sadev->mapbase + SA1111_PCCR);
+	val &= ~pccr_skt_mask;
+	val |= pccr_set_mask & pccr_skt_mask;
+	sa1111_writel(val, sadev->mapbase + SA1111_PCCR);
 	local_irq_restore(flags);
 
 	return 0;
 }
 
-int sa1111_pcmcia_socket_init(int sock)
+void sa1111_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
 {
-	return 0;
+	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-int sa1111_pcmcia_socket_suspend(int sock)
+void sa1111_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
 {
-	return 0;
+	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 static int pcmcia_probe(struct device *dev)
 {
 	struct sa1111_dev *sadev = SA1111_DEV(dev);
-	unsigned long flags;
 	char *base;
-
-	local_irq_save(flags);
-	if (pcmcia) {
-		local_irq_restore(flags);
-		return -EBUSY;
-	}
-
-	pcmcia = sadev;
-	local_irq_restore(flags);
 
 	if (!request_mem_region(sadev->res.start, 512,
 				SA1111_DRIVER_NAME(sadev)))
@@ -226,44 +167,8 @@ static int __devexit pcmcia_remove(struct device *dev)
 {
 	struct sa1111_dev *sadev = SA1111_DEV(dev);
 
-#ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_exit(dev);
-#endif
-#ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_exit(dev);
-#endif
-#ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_exit(dev);
-#endif
-#ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_exit(dev);
-#endif
-#ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_exit(dev);
-#endif
-#ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_exit(dev);
-#endif
-#ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_exit(dev);
-#endif
-#ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_exit(dev);
-#endif
-
+	sa11xx_drv_pcmcia_remove(dev);
 	release_mem_region(sadev->res.start, 512);
-	pcmcia = NULL;
-
-	return 0;
-}
-
-static int pcmcia_suspend(struct device *dev, u32 state, u32 level)
-{
-	return 0;
-}
-
-static int pcmcia_resume(struct device *dev, u32 level)
-{
 	return 0;
 }
 
@@ -274,8 +179,8 @@ static struct sa1111_driver pcmcia_driver = {
 		.devclass	= &pcmcia_socket_class,
 		.probe		= pcmcia_probe,
 		.remove		= __devexit_p(pcmcia_remove),
-		.suspend	= pcmcia_suspend,
-		.resume		= pcmcia_resume,
+		.suspend 	= pcmcia_socket_dev_suspend,
+		.resume 	= pcmcia_socket_dev_resume,
 	},
 	.devid			= SA1111_DEVID_PCMCIA,
 };

@@ -24,7 +24,6 @@
 #include <net/checksum.h>
 #include <linux/spinlock.h>
 #include <linux/version.h>
-#include <linux/brlock.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
 #define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_nat_lock)
@@ -72,6 +71,10 @@ ip_nat_fn(unsigned int hooknum,
 	/* maniptype == SRC for postrouting. */
 	enum ip_nat_manip_type maniptype = HOOK2MANIP(hooknum);
 
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* We never see fragments: conntrack defrags on pre-routing
 	   and local-out, and ip_nat_out protects post-routing. */
 	IP_NF_ASSERT(!((*pskb)->nh.iph->frag_off
@@ -110,12 +113,6 @@ ip_nat_fn(unsigned int hooknum,
 		}
 		/* Fall thru... (Only ICMPs can be IP_CT_IS_REPLY) */
 	case IP_CT_NEW:
-#ifdef CONFIG_IP_NF_NAT_LOCAL
-		/* LOCAL_IN hook doesn't have a chain and thus doesn't care
-		 * about new packets -HW */
-		if (hooknum == NF_IP_LOCAL_IN)
-			return NF_ACCEPT;
-#endif
 		info = &ct->nat.info;
 
 		WRITE_LOCK(&ip_nat_lock);
@@ -131,6 +128,12 @@ ip_nat_fn(unsigned int hooknum,
 				ret = call_expect(master_ct(ct), pskb, 
 						  hooknum, ct, info);
 			} else {
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+				/* LOCAL_IN hook doesn't have a chain!  */
+				if (hooknum == NF_IP_LOCAL_IN) {
+					ret = NF_ACCEPT;
+				} else
+#endif
 				ret = ip_nat_rule_find(pskb, hooknum, in, out,
 						       ct, info);
 			}
@@ -171,6 +174,10 @@ ip_nat_out(unsigned int hooknum,
 	   const struct net_device *out,
 	   int (*okfn)(struct sk_buff *))
 {
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
@@ -205,6 +212,10 @@ ip_nat_local_fn(unsigned int hooknum,
 {
 	u_int32_t saddr, daddr;
 	unsigned int ret;
+
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
 
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
@@ -286,8 +297,7 @@ void ip_nat_protocol_unregister(struct ip_nat_protocol *proto)
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	/* Someone could be still looking at the proto in a bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 }
 
 static int init_or_cleanup(int init)

@@ -2,8 +2,8 @@
  * include/asm-v850/nb85e_cache_cache.h -- Cache control for NB85E_CACHE212 and
  * 	NB85E_CACHE213 cache memories
  *
- *  Copyright (C) 2001  NEC Corporation
- *  Copyright (C) 2001  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -15,92 +15,65 @@
 #ifndef __V850_NB85E_CACHE_H__
 #define __V850_NB85E_CACHE_H__
 
+#include <asm/types.h>
+
+
 /* Cache control registers.  */
-#define NB85E_CACHE_ICC_ADDR		0xFFFFF070
-#define NB85E_CACHE_DCC_ADDR		0xFFFFF078
+#define NB85E_CACHE_BHC_ADDR	0xFFFFF06A
+#define NB85E_CACHE_BHC		(*(volatile u16 *)NB85E_CACHE_BHC_ADDR)
+#define NB85E_CACHE_ICC_ADDR	0xFFFFF070
+#define NB85E_CACHE_ICC		(*(volatile u16 *)NB85E_CACHE_ICC_ADDR)
+#define NB85E_CACHE_ISI_ADDR	0xFFFFF072
+#define NB85E_CACHE_ISI		(*(volatile u16 *)NB85E_CACHE_ISI_ADDR)
+#define NB85E_CACHE_DCC_ADDR	0xFFFFF078
+#define NB85E_CACHE_DCC		(*(volatile u16 *)NB85E_CACHE_DCC_ADDR)
 
 /* Size of a cache line in bytes.  */
-#define NB85E_CACHE_LINE_SIZE		16
-
-
-#ifndef __ASSEMBLY__
-
-extern inline void nb85e_cache_flush_cache (unsigned long cache_control_addr)
-{
-	/*
-	   From the NB85E Instruction/Data Cache manual, how to flush
-	   the instruction cache (ICC is the `Instruction Cache Control
-	   Register'):
-
-		mov	0x3, r2
-	  LOP0:
-		ld.h	ICC[r0], r1
-		cmp	r0, r1
-		bnz	LOP0
-		st.h	r2, ICC[r0]
-	  LOP1:				- First TAG clear
-		ld.h	ICC[r0], r1
-		cmp	r0, r1
-		bnz	LOP1
-		st.h	r2, ICC[r0]
-	  LOP2:				- Second TAG clear
-		ld.h	ICC[r0], r1
-		cmp	r0, r1
-		bnz	LOP2
-	*/
-	int cache_flush_bits, ccr_contents;
-	__asm__ __volatile__ (
-		"	mov	0x3, %1;"
-		"1:	ld.h	0[%2], %0;"
-		"	cmp	r0, %0;"
-		"	bnz	1b;"
-		"	st.h	%1, 0[%2];"
-		"2:	ld.h	0[%2], %0;"
-		"	cmp	r0, %0;"
-		"	bnz	2b;"
-		"	st.h	%1, 0[%2];"
-		"3:	ld.h	0[%2], %0;"
-		"	cmp	r0, %0;"
-		"	bnz	3b"
-		: "=&r" (ccr_contents), "=&r" (cache_flush_bits)
-		: "r" (cache_control_addr)
-		: "memory");
-}
-
-extern inline void nb85e_cache_flush_icache (void)
-{
-	nb85e_cache_flush_cache (NB85E_CACHE_ICC_ADDR);
-}
-
-extern inline void nb85e_cache_flush_dcache (void)
-{
-	nb85e_cache_flush_cache (NB85E_CACHE_DCC_ADDR);
-}
-
-extern inline void nb85e_cache_flush (void)
-{
-	nb85e_cache_flush_icache ();
-	nb85e_cache_flush_dcache ();
-}
-
-#endif /* !__ASSEMBLY__ */
-
-
-/* Define standard definitions in terms of processor-specific ones.  */
+#define NB85E_CACHE_LINE_SIZE	16
 
 /* For <asm/cache.h> */
 #define L1_CACHE_BYTES				NB85E_CACHE_LINE_SIZE
 
-/* For <asm/pgalloc.h> */
-#define flush_cache_all()			nb85e_cache_flush ()
-#define flush_cache_mm(mm)			nb85e_cache_flush ()
-#define flush_cache_range(mm, start, end)	nb85e_cache_flush ()
-#define flush_cache_page(vma, vmaddr)		nb85e_cache_flush ()
-#define flush_page_to_ram(page)			nb85e_cache_flush ()
-#define flush_dcache_page(page)			nb85e_cache_flush_dcache ()
-#define flush_icache_range(start, end)		nb85e_cache_flush_icache ()
-#define flush_icache_page(vma,pg)		nb85e_cache_flush_icache ()
-#define flush_icache()				nb85e_cache_flush_icache ()
-#define flush_cache_sigtramp(vaddr)		nb85e_cache_flush_icache ()
+
+#ifndef __ASSEMBLY__
+
+/* Set caching params via the BHC and DCC registers.  */
+void nb85e_cache_enable (u16 bhc, u16 dcc);
+
+struct page;
+struct mm_struct;
+struct vm_area_struct;
+
+extern void nb85e_cache_flush_all (void);
+extern void nb85e_cache_flush_mm (struct mm_struct *mm);
+extern void nb85e_cache_flush_range (struct mm_struct *mm,
+				     unsigned long start,
+				     unsigned long end);
+extern void nb85e_cache_flush_page (struct vm_area_struct *vma,
+				    unsigned long page_addr);
+extern void nb85e_cache_flush_dcache_page (struct page *page);
+extern void nb85e_cache_flush_icache (void);
+extern void nb85e_cache_flush_icache_range (unsigned long start,
+					    unsigned long end);
+extern void nb85e_cache_flush_icache_page (struct vm_area_struct *vma,
+					   struct page *page);
+extern void nb85e_cache_flush_icache_user_range (struct vm_area_struct *vma,
+						 struct page *page,
+						 unsigned long adr, int len);
+extern void nb85e_cache_flush_sigtramp (unsigned long addr);
+
+#define flush_page_to_ram(x)	((void)0)
+#define flush_cache_all		nb85e_cache_flush_all
+#define flush_cache_mm		nb85e_cache_flush_mm
+#define flush_cache_range	nb85e_cache_flush_range
+#define flush_cache_page	nb85e_cache_flush_page
+#define flush_dcache_page	nb85e_cache_flush_dcache_page
+#define flush_icache		nb85e_cache_flush_icache
+#define flush_icache_range	nb85e_cache_flush_icache_range
+#define flush_icache_page	nb85e_cache_flush_icache_page
+#define flush_icache_user_range	nb85e_cache_flush_icache_user_range
+#define flush_cache_sigtramp	nb85e_cache_flush_sigtramp
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __V850_NB85E_CACHE_H__ */

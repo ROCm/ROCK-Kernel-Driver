@@ -46,30 +46,10 @@
 #define I810_BUF_UNMAPPED 0
 #define I810_BUF_MAPPED   1
 
-#define RING_LOCALS	unsigned int outring, ringmask; volatile char *virt;
-
-#define BEGIN_LP_RING(n) do {						\
-	if (0) DRM_DEBUG("BEGIN_LP_RING(%d) in %s\n", n, __FUNCTION__);	\
-	if (dev_priv->ring.space < n*4)					\
-		i810_wait_ring(dev, n*4);				\
-	dev_priv->ring.space -= n*4;					\
-	outring = dev_priv->ring.tail;					\
-	ringmask = dev_priv->ring.tail_mask;				\
-	virt = dev_priv->ring.virtual_start;				\
-} while (0)
-
-#define ADVANCE_LP_RING() do {				\
-	if (0) DRM_DEBUG("ADVANCE_LP_RING\n");			\
-	dev_priv->ring.tail = outring;			\
-	I810_WRITE(LP_RING + RING_TAIL, outring);	\
-} while(0)
-
-#define OUT_RING(n) do {				\
-	if (0) DRM_DEBUG("   OUT_RING %x\n", (int)(n));	\
-	*(volatile unsigned int *)(virt + outring) = n;	\
-	outring += 4;					\
-	outring &= ringmask;				\
-} while (0)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,2)
+#define down_write down
+#define up_write up
+#endif
 
 static inline void i810_print_status_page(drm_device_t *dev)
 {
@@ -178,11 +158,7 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 
 	if(buf_priv->currently_mapped == I810_BUF_MAPPED) return -EINVAL;
 
-#if LINUX_VERSION_CODE <= 0x020402
-	down( &current->mm->mmap_sem );
-#else
 	down_write( &current->mm->mmap_sem );
-#endif
 	old_fops = filp->f_op;
 	filp->f_op = &i810_buffer_fops;
 	dev_priv->mmap_buffer = buf;
@@ -194,15 +170,12 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 	filp->f_op = old_fops;
 	if ((unsigned long)buf_priv->virtual > -1024UL) {
 		/* Real error */
-		DRM_DEBUG("mmap error\n");
+		DRM_ERROR("mmap error\n");
 		retcode = (signed int)buf_priv->virtual;
 		buf_priv->virtual = 0;
 	}
-#if LINUX_VERSION_CODE <= 0x020402
-	up( &current->mm->mmap_sem );
-#else
 	up_write( &current->mm->mmap_sem );
-#endif
+
 	return retcode;
 }
 
@@ -213,19 +186,13 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 
 	if(buf_priv->currently_mapped != I810_BUF_MAPPED)
 		return -EINVAL;
-#if LINUX_VERSION_CODE <= 0x020402
-	down( &current->mm->mmap_sem );
-#else
-	down_write( &current->mm->mmap_sem );
-#endif
+
+	down_write(&current->mm->mmap_sem);
 	retcode = do_munmap(current->mm,
 			    (unsigned long)buf_priv->virtual,
 			    (size_t) buf->total);
-#if LINUX_VERSION_CODE <= 0x020402
-	up( &current->mm->mmap_sem );
-#else
-	up_write( &current->mm->mmap_sem );
-#endif
+	up_write(&current->mm->mmap_sem);
+
    	buf_priv->currently_mapped = I810_BUF_UNMAPPED;
    	buf_priv->virtual = 0;
 
@@ -235,7 +202,6 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
 			       struct file *filp)
 {
-	drm_file_t	  *priv	  = filp->private_data;
 	drm_buf_t	  *buf;
 	drm_i810_buf_priv_t *buf_priv;
 	int retcode = 0;
@@ -250,10 +216,10 @@ static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
 	retcode = i810_map_buffer(buf, filp);
 	if(retcode) {
 		i810_freelist_put(dev, buf);
-	   	DRM_DEBUG("mapbuf failed, retcode %d\n", retcode);
+	   	DRM_ERROR("mapbuf failed, retcode %d\n", retcode);
 		return retcode;
 	}
-	buf->pid     = priv->pid;
+	buf->filp = filp;
 	buf_priv = buf->dev_private;
 	d->granted = 1;
    	d->request_idx = buf->idx;
@@ -314,7 +280,7 @@ static int i810_wait_ring(drm_device_t *dev, int n)
 		   end = jiffies + (HZ*3);
 
 	   	iters++;
-		if((signed)(end - jiffies) <= 0) {
+		if(time_before(end, jiffies)) {
 		   	DRM_ERROR("space: %d wanted %d\n", ring->space, n);
 		   	DRM_ERROR("lockup\n");
 		   	goto out_wait_ring;
@@ -374,7 +340,7 @@ static int i810_dma_initialize(drm_device_t *dev,
    	memset(dev_priv, 0, sizeof(drm_i810_private_t));
 
 	list_for_each(list, &dev->maplist->head) {
-		drm_map_list_t *r_list = (drm_map_list_t *)list;
+		drm_map_list_t *r_list = list_entry(list, drm_map_list_t, head);
 		if( r_list->map &&
 		    r_list->map->type == _DRM_SHM &&
 		    r_list->map->flags & _DRM_CONTAINS_LOCK ) {
@@ -882,8 +848,10 @@ static int i810_flush_queue(drm_device_t *dev)
 }
 
 /* Must be called with the lock held */
-void i810_reclaim_buffers(drm_device_t *dev, pid_t pid)
+void i810_reclaim_buffers(struct file *filp)
 {
+	drm_file_t    *priv   = filp->private_data;
+	drm_device_t  *dev    = priv->dev;
 	drm_device_dma_t *dma = dev->dma;
 	int		 i;
 
@@ -897,7 +865,7 @@ void i810_reclaim_buffers(drm_device_t *dev, pid_t pid)
 	   	drm_buf_t *buf = dma->buflist[ i ];
 	   	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
 
-		if (buf->pid == pid && buf_priv) {
+		if (buf->filp == filp && buf_priv) {
 			int used = cmpxchg(buf_priv->in_use, I810_BUF_CLIENT,
 					   I810_BUF_FREE);
 

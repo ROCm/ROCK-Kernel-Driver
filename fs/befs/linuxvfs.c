@@ -345,7 +345,7 @@ befs_read_inode(struct inode *inode)
 	/*
 	 * set uid and gid.  But since current BeOS is single user OS, so
 	 * you can change by "uid" or "gid" options.
-	 */
+	 */   
 
 	inode->i_uid = befs_sb->mount_opts.use_uid ?
 	    befs_sb->mount_opts.uid : (uid_t) fs32_to_cpu(sb, raw_inode->uid);
@@ -358,11 +358,14 @@ befs_read_inode(struct inode *inode)
 	 * BEFS's time is 64 bits, but current VFS is 32 bits...
 	 * BEFS don't have access time. Nor inode change time. VFS
 	 * doesn't have creation time.
+	 * Also, the lower 16 bits of the last_modified_time and 
+	 * create_time are just a counter to help ensure uniqueness
+	 * for indexing purposes. (PFD, page 54)
 	 */
 
 	inode->i_mtime.tv_sec =
 	    fs64_to_cpu(sb, raw_inode->last_modified_time) >> 16;
-	inode->i_mtime.tv_nsec = 0;   /* use the lower bits ? */	
+	inode->i_mtime.tv_nsec = 0;   /* lower 16 bits are not a time */	
 	inode->i_ctime = inode->i_mtime;
 	inode->i_atime = inode->i_mtime;
 	inode->i_blksize = befs_sb->block_size;
@@ -527,6 +530,7 @@ befs_readlink(struct dentry *dentry, char *buffer, int buflen)
 
 /*
  * UTF-8 to NLS charset  convert routine
+ * 
  *
  * Changed 8/10/01 by Will Dyson. Now use uni2char() / char2uni() rather than
  * the nls tables directly
@@ -572,11 +576,11 @@ befs_utf2nls(struct super_block *sb, const char *in,
 		}
 	}
 	result[o] = '\0';
+	*out_len = o;
 
 	befs_debug(sb, "<--- utf2nls()");
 
 	return o;
-	*out_len = o;
 
       conv_err:
 	befs_error(sb, "Name using charecter set %s contains a charecter that "
@@ -602,8 +606,8 @@ befs_utf2nls(struct super_block *sb, const char *in,
  * 
  * On return, *@destlen is the length of @dest in bytes.
  *
- * On success, the return value is the number of utf8 charecters written to
- * the ouput buffer @dest.
+ * On success, the return value is the number of utf8 characters written to
+ * the output buffer @dest.
  *  
  * On Failure, a negative number coresponding to the error code is returned.
  */

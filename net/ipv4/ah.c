@@ -9,8 +9,6 @@
 #include <asm/scatterlist.h>
 
 
-#define AH_HLEN_NOICV	12
-
 /* Clear mutable options and find final destination to substitute
  * into IP header for icv calculation. Options are already checked
  * for validity, so paranoia is not required. */
@@ -18,7 +16,7 @@
 static int ip_clear_mutable_options(struct iphdr *iph, u32 *daddr)
 {
 	unsigned char * optptr = (unsigned char*)(iph+1);
-	int  l = iph->ihl*4 - 20;
+	int  l = iph->ihl*4 - sizeof(struct iphdr);
 	int  optlen;
 
 	while (l > 0) {
@@ -116,8 +114,8 @@ static int ah_output(struct sk_buff *skb)
 		ah->nexthdr = iph->protocol;
 	}
 	ahp = x->data;
-	ah->hdrlen  = (XFRM_ALIGN8(ahp->icv_trunc_len +
-			AH_HLEN_NOICV) >> 2) - 2;
+	ah->hdrlen  = (XFRM_ALIGN8(sizeof(struct ip_auth_hdr) + 
+				   ahp->icv_trunc_len) >> 2) - 2;
 
 	ah->reserved = 0;
 	ah->spi = x->id.spi;
@@ -132,7 +130,7 @@ static int ah_output(struct sk_buff *skb)
 		top_iph->frag_off = iph->frag_off;
 		top_iph->daddr = iph->daddr;
 		if (iph->ihl != 5)
-			memcpy(top_iph+1, iph+1, iph->ihl*5 - 20);
+			memcpy(top_iph+1, iph+1, iph->ihl*4 - sizeof(struct iphdr));
 	}
 	ip_send_check(top_iph);
 
@@ -154,7 +152,7 @@ error_nolock:
 	return err;
 }
 
-int ah_input(struct xfrm_state *x, struct sk_buff *skb)
+int ah_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	int ah_hlen;
 	struct iphdr *iph;
@@ -169,8 +167,8 @@ int ah_input(struct xfrm_state *x, struct sk_buff *skb)
 	ahp = x->data;
 	ah_hlen = (ah->hdrlen + 2) << 2;
 	
-	if (ah_hlen != XFRM_ALIGN8(ahp->icv_full_len + AH_HLEN_NOICV) &&
-	    ah_hlen != XFRM_ALIGN8(ahp->icv_trunc_len + AH_HLEN_NOICV)) 
+	if (ah_hlen != XFRM_ALIGN8(sizeof(struct ip_auth_hdr) + ahp->icv_full_len) &&
+	    ah_hlen != XFRM_ALIGN8(sizeof(struct ip_auth_hdr) + ahp->icv_trunc_len)) 
 		goto out;
 
 	if (!pskb_may_pull(skb, ah_hlen))
@@ -286,9 +284,9 @@ static int ah_init_state(struct xfrm_state *x, void *args)
 	if (!ahp->work_icv)
 		goto error;
 	
-	x->props.header_len = XFRM_ALIGN8(ahp->icv_trunc_len + AH_HLEN_NOICV);
+	x->props.header_len = XFRM_ALIGN8(sizeof(struct ip_auth_hdr) + ahp->icv_trunc_len);
 	if (x->props.mode)
-		x->props.header_len += 20;
+		x->props.header_len += sizeof(struct iphdr);
 	x->data = ahp;
 
 	return 0;
@@ -316,12 +314,14 @@ static void ah_destroy(struct xfrm_state *x)
 		crypto_free_tfm(ahp->tfm);
 		ahp->tfm = NULL;
 	}
+	kfree(ahp);
 }
 
 
 static struct xfrm_type ah_type =
 {
 	.description	= "AH4",
+	.owner		= THIS_MODULE,
 	.proto	     	= IPPROTO_AH,
 	.init_state	= ah_init_state,
 	.destructor	= ah_destroy,
@@ -337,7 +337,6 @@ static struct inet_protocol ah4_protocol = {
 
 static int __init ah4_init(void)
 {
-	SET_MODULE_OWNER(&ah_type);
 	if (xfrm_register_type(&ah_type, AF_INET) < 0) {
 		printk(KERN_INFO "ip ah init: can't add xfrm type\n");
 		return -EAGAIN;

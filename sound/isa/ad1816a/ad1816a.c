@@ -22,11 +22,7 @@
 #include <linux/init.h>
 #include <linux/time.h>
 #include <linux/wait.h>
-#ifndef LINUX_ISAPNP_H
-#include <linux/isapnp.h>
-#define isapnp_card pci_bus
-#define isapnp_dev pci_dev
-#endif
+#include <linux/pnp.h>
 #include <sound/core.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
@@ -93,152 +89,111 @@ MODULE_PARM_DESC(dma2, "2nd DMA # for ad1816a driver.");
 MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 
 struct snd_card_ad1816a {
-#ifdef __ISAPNP__
-	struct isapnp_dev *dev;
-	struct isapnp_dev *devmpu;
-#endif	/* __ISAPNP__ */
+	struct pnp_dev *dev;
+	struct pnp_dev *devmpu;
 };
 
-static snd_card_t *snd_ad1816a_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
-
-#ifdef __ISAPNP__
-
-static struct isapnp_card *snd_ad1816a_isapnp_cards[SNDRV_CARDS] __devinitdata = SNDRV_DEFAULT_PTR;
-static const struct isapnp_card_id *snd_ad1816a_isapnp_id[SNDRV_CARDS] __devinitdata = SNDRV_DEFAULT_PTR;
-
-#define ISAPNP_AD1816A(_va, _vb, _vc, _device, _fa, _fb, _fc, _audio, _mpu401) \
-	{ \
-		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		.devs = { ISAPNP_DEVICE_ID(_fa, _fb, _fc, _audio), \
-			  ISAPNP_DEVICE_ID(_fa, _fb, _fc, _mpu401), } \
-	}
-
-static struct isapnp_card_id snd_ad1816a_pnpids[] __devinitdata = {
-	/* Highscreen Sound-Boostar 16 3D */
-	ISAPNP_AD1816A('M','D','K',0x1605,'A','D','S',0x7180,0x7181),
-	/* Highscreen Sound-Boostar 16 3D - added by Stefan Behnel */
-	ISAPNP_AD1816A('L','W','C',0x1061,'A','D','S',0x7180,0x7181),
+static struct pnp_card_device_id snd_ad1816a_pnpids[] __devinitdata = {
 	/* Analog Devices AD1815 */
-	ISAPNP_AD1816A('A','D','S',0x7150,'A','D','S',0x7150,0x7151),
+	{ .id = "ADS7150", .devs = { { .id = "ADS7150" }, { .id = "ADS7151" } } },
 	/* Analog Devices AD1816A - added by Kenneth Platz <kxp@atl.hp.com> */
-	ISAPNP_AD1816A('A','D','S',0x7181,'A','D','S',0x7180,0x7181),
-	/* Analog Devices AD1816A - Terratec Base 64 */
-	ISAPNP_AD1816A('T','E','R',0x1411,'A','D','S',0x7180,0x7181),
-	/* Analog Devices AD1816A - Terratec AudioSystem EWS64S */
-	ISAPNP_AD1816A('T','E','R',0x1112,'A','D','S',0x7180,0x7181),
+	{ .id = "ADS7181", .devs = { { .id = "ADS7180" }, { .id = "ADS7181" } } },
 	/* Analog Devices AD1816A - Aztech/Newcom SC-16 3D */
-	ISAPNP_AD1816A('A','Z','T',0x1022,'A','Z','T',0x1018,0x2002),
+	{ .id = "AZT1022", .devs = { { .id = "AZT1018" }, { .id = "AZT2002" } } },
+	/* Highscreen Sound-Boostar 16 3D - added by Stefan Behnel */
+	{ .id = "LWC1061", .devs = { { .id = "ADS7180" }, { .id = "ADS7181" } } },
+	/* Highscreen Sound-Boostar 16 3D */
+	{ .id = "MDK1605", .devs = { { .id = "ADS7180" }, { .id = "ADS7181" } } },
 	/* Shark Predator ISA - added by Ken Arromdee */
-	ISAPNP_AD1816A('S','M','M',0x7180,'A','D','S',0x7180,0x7181),
-	{ ISAPNP_CARD_END, }
+	{ .id = "SMM7180", .devs = { { .id = "ADS7180" }, { .id = "ADS7181" } } },
+	/* Analog Devices AD1816A - Terratec AudioSystem EWS64S */
+	{ .id = "TER1112", .devs = { { .id = "ADS7180" }, { .id = "ADS7181" } } },
+	/* Analog Devices AD1816A - Terratec Base 64 */
+	{ .id = "TER1411", .devs = { { .id = "ADS7180" }, { .id = "ADS7181" } } },
+	/* end */
+	{ .id = "" }
 };
 
-ISAPNP_CARD_TABLE(snd_ad1816a_pnpids);
+MODULE_DEVICE_TABLE(pnp_card, snd_ad1816a_pnpids);
 
-#endif	/* __ISAPNP__ */
 
 #define	DRIVER_NAME	"snd-card-ad1816a"
 
 
-#ifdef __ISAPNP__
-static int __init snd_card_ad1816a_isapnp(int dev,
-					  struct snd_card_ad1816a *acard)
+static int __devinit snd_card_ad1816a_pnp(int dev, struct snd_card_ad1816a *acard,
+					  struct pnp_card_link *card,
+					  const struct pnp_card_device_id *id)
 {
-	const struct isapnp_card_id *id = snd_ad1816a_isapnp_id[dev];
-	struct isapnp_card *card = snd_ad1816a_isapnp_cards[dev];
-	struct isapnp_dev *pdev;
+	struct pnp_dev *pdev;
+	struct pnp_resource_table *cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
+	int err;
 
-	acard->dev = isapnp_find_dev(card, id->devs[0].vendor, id->devs[0].function, NULL);
-	if (acard->dev->active) {
-		acard->dev = NULL;
+	acard->dev = pnp_request_card_device(card, id->devs[0].id, NULL);
+	if (acard->dev == NULL) {
+		kfree(cfg);
 		return -EBUSY;
 	}
-	acard->devmpu = isapnp_find_dev(card, id->devs[1].vendor, id->devs[1].function, NULL);
-	if (acard->devmpu->active) {
-		acard->dev = acard->devmpu = NULL;
+	acard->devmpu = pnp_request_card_device(card, id->devs[1].id, NULL);
+	if (acard->devmpu == NULL) {
+		kfree(cfg);
 		return -EBUSY;
 	}
 
 	pdev = acard->dev;
-	if (pdev->prepare(pdev) < 0)
-		return -EAGAIN;
+	pnp_init_resource_table(cfg);
 
 	if (port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[2], port[dev], 16);
+		pnp_resource_change(&cfg->port_resource[2], port[dev], 16);
 	if (fm_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[1], fm_port[dev], 4);
+		pnp_resource_change(&cfg->port_resource[1], fm_port[dev], 4);
 	if (dma1[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], dma1[dev],
-			1);
+		pnp_resource_change(&cfg->dma_resource[0], dma1[dev], 1);
 	if (dma2[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[1], dma2[dev],
-			1);
+		pnp_resource_change(&cfg->dma_resource[1], dma2[dev], 1);
 	if (irq[dev] != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], irq[dev], 1);
+		pnp_resource_change(&cfg->irq_resource[0], irq[dev], 1);
 
-	if (pdev->activate(pdev) < 0) {
-		printk(KERN_ERR PFX "AUDIO isapnp configure failure\n");
+	if (pnp_manual_config_dev(pdev, cfg, 0) < 0)
+		snd_printk(KERN_ERR PFX "AUDIO the requested resources are invalid, using auto config\n");
+	err = pnp_activate_dev(pdev);
+	if (err < 0) {
+		printk(KERN_ERR PFX "AUDIO PnP configure failure\n");
+		kfree(cfg);
 		return -EBUSY;
 	}
 
-	port[dev] = pdev->resource[2].start;
-	fm_port[dev] = pdev->resource[1].start;
-	dma1[dev] = pdev->dma_resource[0].start;
-	dma2[dev] = pdev->dma_resource[1].start;
-	irq[dev] = pdev->irq_resource[0].start;
+	port[dev] = pnp_port_start(pdev, 2);
+	fm_port[dev] = pnp_port_start(pdev, 1);
+	dma1[dev] = pnp_dma(pdev, 0);
+	dma2[dev] = pnp_dma(pdev, 1);
+	irq[dev] = pnp_irq(pdev, 0);
 
 	pdev = acard->devmpu;
-	if (pdev == NULL || pdev->prepare(pdev) < 0) {
-		mpu_port[dev] = -1;
-		acard->devmpu = NULL;
-		return 0;
-	}
+	pnp_init_resource_table(cfg);
 
 	if (mpu_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], mpu_port[dev],
-			2);
+		pnp_resource_change(&cfg->port_resource[0], mpu_port[dev], 2);
 	if (mpu_irq[dev] != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], mpu_irq[dev],
-			1);
+		pnp_resource_change(&cfg->irq_resource[0], mpu_irq[dev], 1);
 
-	if (pdev->activate(pdev) < 0) {
-		/* not fatal error */
-		printk(KERN_ERR PFX "MPU-401 isapnp configure failure\n");
+	if (pnp_manual_config_dev(pdev, cfg, 0) < 0)
+		snd_printk(KERN_ERR PFX "AUDIO the requested resources are invalid, using auto config\n");
+	err = pnp_activate_dev(pdev);
+	if (err < 0) {
+		printk(KERN_ERR PFX "MPU401 PnP configure failure\n");
 		mpu_port[dev] = -1;
 		acard->devmpu = NULL;
 	} else {
-		mpu_port[dev] = pdev->resource[0].start;
-		mpu_irq[dev] = pdev->irq_resource[0].start;
+		mpu_port[dev] = pnp_port_start(pdev, 0);
+		mpu_irq[dev] = pnp_irq(pdev, 0);
 	}
 
+	kfree(cfg);
 	return 0;
 }
 
-static void snd_card_ad1816a_deactivate(struct snd_card_ad1816a *acard)
-{
-	if (acard->dev) {
-		acard->dev->deactivate(acard->dev);
-		acard->dev = NULL;
-	}
-	if (acard->devmpu) {
-		acard->devmpu->deactivate(acard->devmpu);
-		acard->devmpu = NULL;
-	}
-}
-#endif	/* __ISAPNP__ */
-
-static void snd_card_ad1816a_free(snd_card_t *card)
-{
-	struct snd_card_ad1816a *acard = (struct snd_card_ad1816a *)card->private_data;
-
-	if (acard) {
-#ifdef __ISAPNP__
-		snd_card_ad1816a_deactivate(acard);
-#endif	/* __ISAPNP__ */
-	}
-}
-
-static int __init snd_card_ad1816a_probe(int dev)
+static int __devinit snd_card_ad1816a_probe(int dev, struct pnp_card_link *pcard,
+					    const struct pnp_card_device_id *pid)
 {
 	int error;
 	snd_card_t *card;
@@ -250,17 +205,11 @@ static int __init snd_card_ad1816a_probe(int dev)
 				 sizeof(struct snd_card_ad1816a))) == NULL)
 		return -ENOMEM;
 	acard = (struct snd_card_ad1816a *)card->private_data;
-	card->private_free = snd_card_ad1816a_free;
 
-#ifdef __ISAPNP__
-	if ((error = snd_card_ad1816a_isapnp(dev, acard))) {
+	if ((error = snd_card_ad1816a_pnp(dev, acard, pcard, pid))) {
 		snd_card_free(card);
 		return error;
 	}
-#else
-	printk(KERN_ERR PFX "you have to enable ISA PnP support.\n");
-	return -ENOSYS;
-#endif	/* __ISAPNP__ */
 
 	if ((error = snd_ad1816a_create(card, port[dev],
 					irq[dev],
@@ -314,13 +263,12 @@ static int __init snd_card_ad1816a_probe(int dev)
 		snd_card_free(card);
 		return error;
 	}
-	snd_ad1816a_cards[dev] = card;
+	pnp_set_card_drvdata(pcard, card);
 	return 0;
 }
 
-#ifdef __ISAPNP__
-static int __init snd_ad1816a_isapnp_detect(struct isapnp_card *card,
-					    const struct isapnp_card_id *id)
+static int __devinit snd_ad1816a_pnp_detect(struct pnp_card_link *card,
+					    const struct pnp_card_device_id *id)
 {
 	static int dev;
 	int res;
@@ -328,9 +276,7 @@ static int __init snd_ad1816a_isapnp_detect(struct isapnp_card *card,
 	for ( ; dev < SNDRV_CARDS; dev++) {
 		if (!enable[dev])
 			continue;
-		snd_ad1816a_isapnp_cards[dev] = card;
-		snd_ad1816a_isapnp_id[dev] = id;
-		res = snd_card_ad1816a_probe(dev);
+		res = snd_card_ad1816a_probe(dev, card, id);
 		if (res < 0)
 			return res;
 		dev++;
@@ -338,17 +284,28 @@ static int __init snd_ad1816a_isapnp_detect(struct isapnp_card *card,
 	}
         return -ENODEV;
 }
-#endif
+
+static void __devexit snd_ad1816a_pnp_remove(struct pnp_card_link * pcard)
+{
+	snd_card_t *card = (snd_card_t *) pnp_get_card_drvdata(pcard);
+
+	snd_card_disconnect(card);
+	snd_card_free_in_thread(card);
+}
+
+static struct pnp_card_driver ad1816a_pnpc_driver = {
+	.flags		= PNP_DRIVER_RES_DISABLE,
+	.name		= "ad1816a",
+	.id_table	= snd_ad1816a_pnpids,
+	.probe		= snd_ad1816a_pnp_detect,
+	.remove		= __devexit_p(snd_ad1816a_pnp_remove),
+};
 
 static int __init alsa_card_ad1816a_init(void)
 {
 	int cards = 0;
 
-#ifdef __ISAPNP__
-	cards += isapnp_probe_cards(snd_ad1816a_pnpids, snd_ad1816a_isapnp_detect);
-#else
-	printk(KERN_ERR PFX "you have to enable ISA PnP support.\n");
-#endif
+	cards += pnp_register_card_driver(&ad1816a_pnpc_driver);
 #ifdef MODULE
 	if (!cards)
 		printk(KERN_ERR "no AD1816A based soundcards found.\n");
@@ -358,10 +315,7 @@ static int __init alsa_card_ad1816a_init(void)
 
 static void __exit alsa_card_ad1816a_exit(void)
 {
-	int dev;
-
-	for (dev = 0; dev < SNDRV_CARDS; dev++)
-		snd_card_free(snd_ad1816a_cards[dev]);
+	pnp_unregister_card_driver(&ad1816a_pnpc_driver);
 }
 
 module_init(alsa_card_ad1816a_init)

@@ -129,6 +129,7 @@ enum
 	KERN_CADPID=54,		/* int: PID of the process to notify on CAD */
 	KERN_PIDMAX=55,		/* int: PID # limit */
   	KERN_CORE_PATTERN=56,	/* string: pattern for core-file names */
+	KERN_PANIC_ON_OOPS=57,  /* int: whether we will panic on an oops */
 };
 
 
@@ -678,8 +679,8 @@ extern void sysctl_init(void);
 typedef struct ctl_table ctl_table;
 
 typedef int ctl_handler (ctl_table *table, int *name, int nlen,
-			 void *oldval, size_t *oldlenp,
-			 void *newval, size_t newlen, 
+			 void __user *oldval, size_t __user *oldlenp,
+			 void __user *newval, size_t newlen, 
 			 void **context);
 
 typedef int proc_handler (ctl_table *ctl, int write, struct file * filp,
@@ -706,8 +707,8 @@ extern int do_sysctl (int *name, int nlen,
 
 extern int do_sysctl_strategy (ctl_table *table, 
 			       int *name, int nlen,
-			       void *oldval, size_t *oldlenp,
-			       void *newval, size_t newlen, void ** context);
+			       void __user *oldval, size_t __user *oldlenp,
+			       void __user *newval, size_t newlen, void ** context);
 
 extern ctl_handler sysctl_string;
 extern ctl_handler sysctl_intvec;

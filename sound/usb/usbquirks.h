@@ -717,7 +717,7 @@
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "M-Audio",
 		.product_name = "AudioPhile",
-		.ifnum = 9,
+		.ifnum = 6,
 		.type = QUIRK_MIDI_MIDIMAN,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
 			.out_cables = 0x0001,

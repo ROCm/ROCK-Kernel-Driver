@@ -25,7 +25,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include "compat.h"
 #include "dvb_frontend.h"
 
 static int debug = 0;
@@ -34,14 +33,18 @@ static int debug = 0;
 
 
 struct dvb_frontend_info grundig_29504_401_info = {
-	.name			= "Grundig 29504-401",
-	.type			= FE_OFDM,
-	.frequency_stepsize	= 166666,
-	.caps 			= FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
-				  FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 |
-				  FE_CAN_FEC_7_8 | FE_CAN_QPSK |
-				  FE_CAN_QAM_16 | FE_CAN_QAM_64 |
-				  FE_CAN_MUTE_TS
+	name: "Grundig 29504-401",
+	type: FE_OFDM,
+/*	frequency_min: ???,*/
+/*	frequency_max: ???,*/
+	frequency_stepsize: 166666,
+/*      frequency_tolerance: ???,*/
+/*      symbol_rate_tolerance: ???,*/
+	notifier_delay: 0,
+	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
+	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
+	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
+	      FE_CAN_MUTE_TS /*| FE_CAN_CLEAN_SETUP*/
 };
 
 
@@ -50,7 +53,7 @@ int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
-	struct i2c_msg msg = { .addr = 0x55, .flags = 0, .buf = buf, .len = 2 };
+	struct i2c_msg msg = { addr: 0x55, flags: 0, buf: buf, len: 2 };
 
 	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error (reg == %02x) = %02x!\n",
@@ -66,8 +69,8 @@ u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	int ret;
 	u8 b0 [] = { reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
-			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
+	struct i2c_msg msg [] = { { addr: 0x55, flags: 0, buf: b0, len: 1 },
+			   { addr: 0x55, flags: I2C_M_RD, buf: b1, len: 1 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -82,7 +85,7 @@ static
 int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	int ret;
-	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
+	struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
 
 	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error == %02x!\n", __FUNCTION__, ret);
@@ -97,24 +100,19 @@ int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
  *   frequency offset is 36000000 Hz.
  */
 static
-int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
+int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
 	u32 div;
 	u8 buf [4];
 	u8 cfg;
 
-	if (freq < 700000000) {
-		div = (36000000 + freq) / 31250;
-		cfg = 0x86;
-	} else {
-		div = (36000000 + freq) / 166666;
-		cfg = 0x88;
-	}
+	div = (36000000 + freq) / 166666;
+	cfg = 0x88;
 
 	buf [0] = (div >> 8) & 0x7f;
 	buf [1] = div & 0xff;
 	buf [2] = ((div >> 10) & 0x60) | cfg;
-	buf [3] = pwr << 6;
+	buf [3] = 0xc0;
 
 	return tsa5060_write (i2c, buf);
 }
@@ -175,12 +173,13 @@ int apply_frontend_param (struct dvb_i2c_bus *i2c,
 	u8 val0x04;
 	u8 val0x05;
 	u8 val0x06;
+	int bw = p->bandwidth - BANDWIDTH_8_MHZ;
 
 	if (param->inversion != INVERSION_ON &&
 	    param->inversion != INVERSION_OFF)
 		return -EINVAL;
 
-	if (p->bandwidth < BANDWIDTH_8_MHZ || p->bandwidth > BANDWIDTH_6_MHZ)
+	if (bw < 0 || bw > 2)
 		return -EINVAL;
 	
 	if (p->code_rate_HP != FEC_1_2 && p->code_rate_HP != FEC_2_3 &&
@@ -230,6 +229,7 @@ int apply_frontend_param (struct dvb_i2c_bus *i2c,
 
 	val0x04 = (p->transmission_mode << 2) | p->guard_interval;
 	val0x05 = fec_tab[p->code_rate_HP];
+
 	if (p->hierarchy_information != HIERARCHY_NONE)
 		val0x05 |= (p->code_rate_LP - FEC_1_2) << 3;
 
@@ -269,7 +269,7 @@ static
 void reset_and_configure (struct dvb_i2c_bus *i2c)
 {
 	u8 buf [] = { 0x06 };
-	struct i2c_msg msg = { .addr = 0x00, .flags = 0, .buf = buf, .len = 1 };
+	struct i2c_msg msg = { addr: 0x00, flags: 0, buf: buf, len: 1 };
 
 	i2c->xfer (i2c, &msg, 1);
 }
@@ -307,7 +307,7 @@ int init (struct dvb_i2c_bus *i2c)
         /*l64781_writereg (i2c, 0x19, 0x92);*/
 
 	/* Everything is two's complement, soft bit and CSI_OUT too */
-	l64781_writereg (i2c, 0x1e, 0x49);
+	l64781_writereg (i2c, 0x1e, 0x09);
 
 	return 0;
 }
@@ -390,9 +390,8 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 	{
 		struct dvb_frontend_parameters *p = arg;
 
-		tsa5060_set_tv_freq (i2c, p->frequency, 3);
+		tsa5060_set_tv_freq (i2c, p->frequency);
 		apply_frontend_param (i2c, p);
-//		tsa5060_set_tv_freq (i2c, p->frequency, 0);
 	}
         case FE_GET_FRONTEND:
 		/*  we could correct the frequency here, but...
@@ -406,13 +405,6 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 
 	case FE_INIT:
 		return init (i2c);
-
-        case FE_RESET:
-		//reset_afc (i2c);
-		apply_tps (i2c);
-		l64781_readreg (i2c, 0x00);  /*  clear interrupt registers... */
-		l64781_readreg (i2c, 0x01);  /*  dto. */
-		break;
 
         default:
 		dprintk ("%s: unknown command !!!\n", __FUNCTION__);
@@ -428,8 +420,8 @@ int l64781_attach (struct dvb_i2c_bus *i2c)
 {
 	u8 b0 [] = { 0x1a };
 	u8 b1 [] = { 0x00 };
-	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
-			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
+	struct i2c_msg msg [] = { { addr: 0x55, flags: 0, buf: b0, len: 1 },
+			   { addr: 0x55, flags: I2C_M_RD, buf: b1, len: 1 } };
 
 	if (i2c->xfer (i2c, msg, 2) == 2)   /*  probably an EEPROM... */
 		return -ENODEV;

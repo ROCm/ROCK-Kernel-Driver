@@ -4396,11 +4396,9 @@ static int floppy_grab_irq_and_dma(void)
 		return 0;
 	}
 	spin_unlock_irqrestore(&floppy_usage_lock, flags);
-	MOD_INC_USE_COUNT;
 	if (fd_request_irq()) {
 		DPRINT("Unable to grab IRQ%d for the floppy driver\n",
 			FLOPPY_IRQ);
-		MOD_DEC_USE_COUNT;
 		spin_lock_irqsave(&floppy_usage_lock, flags);
 		usage_count--;
 		spin_unlock_irqrestore(&floppy_usage_lock, flags);
@@ -4410,7 +4408,6 @@ static int floppy_grab_irq_and_dma(void)
 		DPRINT("Unable to grab DMA%d for the floppy driver\n",
 			FLOPPY_DMA);
 		fd_free_irq();
-		MOD_DEC_USE_COUNT;
 		spin_lock_irqsave(&floppy_usage_lock, flags);
 		usage_count--;
 		spin_unlock_irqrestore(&floppy_usage_lock, flags);
@@ -4459,7 +4456,6 @@ cleanup1:
 		release_region(FDCS->address + 2, 4);
 		release_region(FDCS->address + 7, 1);
 	}
-	MOD_DEC_USE_COUNT;
 	spin_lock_irqsave(&floppy_usage_lock, flags);
 	usage_count--;
 	spin_unlock_irqrestore(&floppy_usage_lock, flags);
@@ -4527,7 +4523,6 @@ static void floppy_release_irq_and_dma(void)
 			release_region(FDCS->address+7, 1);
 		}
 	fdc = old_fdc;
-	MOD_DEC_USE_COUNT;
 }
 
 

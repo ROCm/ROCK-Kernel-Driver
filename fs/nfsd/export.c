@@ -271,6 +271,47 @@ void svc_export_request(struct cache_detail *cd,
 }
 
 static struct svc_export *svc_export_lookup(struct svc_export *, int);
+
+extern struct dentry *
+find_exported_dentry(struct super_block *sb, void *obj, void *parent,
+		     int (*acceptable)(void *context, struct dentry *de),
+		     void *context);
+
+static int check_export(struct inode *inode, int flags)
+{
+
+	/* We currently export only dirs and regular files.
+	 * This is what umountd does.
+	 */
+	if (!S_ISDIR(inode->i_mode) &&
+	    !S_ISREG(inode->i_mode))
+		return -ENOTDIR;
+
+	/* There are two requirements on a filesystem to be exportable.
+	 * 1:  We must be able to identify the filesystem from a number.
+	 *       either a device number (so FS_REQUIRES_DEV needed)
+	 *       or an FSID number (so NFSEXP_FSID needed).
+	 * 2:  We must be able to find an inode from a filehandle.
+	 *       This means that s_export_op must be set.
+	 */
+	if (!(inode->i_sb->s_type->fs_flags & FS_REQUIRES_DEV) &&
+	    !(flags & NFSEXP_FSID)) {
+		dprintk("exp_export: export of non-dev fs without fsid");
+		return -EINVAL;
+	}
+	if (!inode->i_sb->s_export_op) {
+		dprintk("exp_export: export of invalid fs type.\n");
+		return -EINVAL;
+	}
+
+	/* Ok, we can export it */;
+	if (!inode->i_sb->s_export_op->find_exported_dentry)
+		inode->i_sb->s_export_op->find_exported_dentry =
+			find_exported_dentry;
+	return 0;
+
+}
+
 int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 {
 	/* client path expiry [flags anonuid anongid fsid] */
@@ -342,6 +383,9 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 		err = get_int(&mesg, &an_int);
 		if (err) goto out;
 		exp.ex_fsid = an_int;
+
+		err = check_export(nd.dentry->d_inode, exp.ex_flags);
+		if (err) goto out;
 	}
 
 	expp = svc_export_lookup(&exp, 1);
@@ -499,13 +543,12 @@ exp_parent(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry,
 	dget(dentry);
 	exp = exp_get_by_name(clp, mnt, dentry, reqp);
 
-	while (exp == NULL && dentry != dentry->d_parent) {
+	while (exp == NULL && !IS_ROOT(dentry)) {
 		struct dentry *parent;
-		read_lock(&dparent_lock);
-		parent = dget(dentry->d_parent);
+
+		parent = dget_parent(dentry);
 		dput(dentry);
 		dentry = parent;
-		read_unlock(&dparent_lock);
 		exp = exp_get_by_name(clp, mnt, dentry, reqp);
 	}
 	dput(dentry);
@@ -594,10 +637,6 @@ static void exp_unhash(struct svc_export *exp)
 	svc_expkey_cache.nextcheck = get_seconds();
 }
 	
-extern struct dentry *
-find_exported_dentry(struct super_block *sb, void *obj, void *parent,
-		     int (*acceptable)(void *context, struct dentry *de),
-		     void *context);
 /*
  * Export a file system.
  */
@@ -661,36 +700,8 @@ exp_export(struct nfsctl_export *nxp)
 		goto finish;
 	}
 
-	/* We currently export only dirs and regular files.
-	 * This is what umountd does.
-	 */
-	err = -ENOTDIR;
-	if (!S_ISDIR(inode->i_mode) && !S_ISREG(inode->i_mode))
-		goto finish;
-
-	err = -EINVAL;
-	/* There are two requirements on a filesystem to be exportable.
-	 * 1:  We must be able to identify the filesystem from a number.
-	 *       either a device number (so FS_REQUIRES_DEV needed)
-	 *       or an FSID number (so NFSEXP_FSID needed).
-	 * 2:  We must be able to find an inode from a filehandle.
-	 *       This means that s_export_op must be set.
-	 */
-	if (!(inode->i_sb->s_type->fs_flags & FS_REQUIRES_DEV)) {
-		if (!(nxp->ex_flags & NFSEXP_FSID)) {
-			dprintk("exp_export: export of non-dev fs without fsid");
-			goto finish;
-		}
-	}
-	if (!inode->i_sb->s_export_op) {
-		dprintk("exp_export: export of invalid fs type.\n");
-		goto finish;
-	}
-
-	/* Ok, we can export it */;
-	if (!inode->i_sb->s_export_op->find_exported_dentry)
-		inode->i_sb->s_export_op->find_exported_dentry =
-			find_exported_dentry;
+	err = check_export(inode, nxp->ex_flags);
+	if (err) goto finish;
 
 	err = -ENOMEM;
 

@@ -1,4 +1,6 @@
+#include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/string.h>
 #include <asm/timer.h>
 
 /* list of externed timers */
@@ -17,6 +19,17 @@ static struct timer_opts* timers[] = {
 	NULL,
 };
 
+static char clock_override[10] __initdata;
+
+static int __init clock_setup(char* str)
+{
+	if (str) {
+		strncpy(clock_override, str,10);
+		clock_override[9] = '\0';
+	}
+	return 1;
+}
+__setup("clock=", clock_setup);
 
 /* iterates through the list of timers, returning the first 
  * one that initializes successfully.
@@ -28,7 +41,7 @@ struct timer_opts* select_timer(void)
 	/* find most preferred working timer */
 	while (timers[i]) {
 		if (timers[i]->init)
-			if (timers[i]->init() == 0)
+			if (timers[i]->init(clock_override) == 0)
 				return timers[i];
 		++i;
 	}

@@ -31,10 +31,6 @@
 #include "pci_socket.h"
 
 
-extern void pcmcia_suspend_socket (struct socket_info_t *socket);
-extern void pcmcia_resume_socket (struct socket_info_t *socket);
-
-
 /*
  * Arbitrary define. This is the array of active cardbus
  * entries.
@@ -157,7 +153,6 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 	socket->cls_d.nsock = 1; /* yenta is 1, no other low-level driver uses
 			     this yet */
 	socket->cls_d.ops = &pci_socket_operations;
-	socket->cls_d.use_bus_pm = 1;
 	dev->dev.class_data = &socket->cls_d;
 
 	/* prepare pci_socket_t */
@@ -204,18 +199,12 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 
 static int cardbus_suspend (struct pci_dev *dev, u32 state)
 {
-	pci_socket_t *socket = pci_get_drvdata(dev);
-	if (socket && socket->cls_d.s_info)
-		pcmcia_suspend_socket (socket->cls_d.s_info);
-	return 0;
+	return pcmcia_socket_dev_suspend(&dev->dev, state, 0);
 }
 
 static int cardbus_resume (struct pci_dev *dev)
 {
-	pci_socket_t *socket = pci_get_drvdata(dev);
-	if (socket && socket->cls_d.s_info)
-		pcmcia_resume_socket (socket->cls_d.s_info);
-	return 0;
+	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
 }
 
 

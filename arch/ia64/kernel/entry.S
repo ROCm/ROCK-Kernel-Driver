@@ -91,7 +91,7 @@ ENTRY(ia64_execve)
 END(ia64_execve)
 
 /*
- * sys_clone2(u64 flags, u64 ustack_base, u64 ustack_size, u64 child_tidptr, u64 parent_tidptr,
+ * sys_clone2(u64 flags, u64 ustack_base, u64 ustack_size, u64 parent_tidptr, u64 child_tidptr,
  *	      u64 tls)
  */
 GLOBAL_ENTRY(sys_clone2)
@@ -105,10 +105,10 @@ GLOBAL_ENTRY(sys_clone2)
 	mov out1=in1
 	mov out3=in2
 	tbit.nz p6,p0=in0,CLONE_SETTLS_BIT
-	mov out4=in3	// child_tidptr:  valid only w/CLONE_CHILD_SETTID or CLONE_CHILD_CLEARTID
+	mov out4=in3	// parent_tidptr: valid only w/CLONE_PARENT_SETTID
 	;;
 (p6)	st8 [r2]=in5				// store TLS in r16 for copy_thread()
-	mov out5=in4	// parent_tidptr: valid only w/CLONE_PARENT_SETTID
+	mov out5=in4	// child_tidptr:  valid only w/CLONE_CHILD_SETTID or CLONE_CHILD_CLEARTID
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
 	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
 	br.call.sptk.many rp=do_fork
@@ -126,12 +126,12 @@ GLOBAL_ENTRY(sys_clone2)
 END(sys_clone2)
 
 /*
- * sys_clone(u64 flags, u64 ustack_base, u64 user_tid, u64 tls)
+ * sys_clone(u64 flags, u64 ustack_base, u64 parent_tidptr, u64 child_tidptr, u64 tls)
  *	Deprecated.  Use sys_clone2() instead.
  */
 GLOBAL_ENTRY(sys_clone)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
-	alloc r16=ar.pfs,4,2,5,0
+	alloc r16=ar.pfs,5,2,6,0
 	DO_SAVE_SWITCH_STACK
 	adds r2=PT(R16)+IA64_SWITCH_STACK_SIZE+16,sp
 	mov loc0=rp
@@ -140,9 +140,10 @@ GLOBAL_ENTRY(sys_clone)
 	mov out1=in1
 	mov out3=16				// stacksize (compensates for 16-byte scratch area)
 	tbit.nz p6,p0=in0,CLONE_SETTLS_BIT
-	mov out4=in2				// out4 = user_tid (optional)
+	mov out4=in2	// parent_tidptr: valid only w/CLONE_PARENT_SETTID
 	;;
-(p6)	st8 [r2]=in3				// store TLS in r13 (tp)
+(p6)	st8 [r2]=in4				// store TLS in r13 (tp)
+	mov out5=in3	// child_tidptr:  valid only w/CLONE_CHILD_SETTID or CLONE_CHILD_CLEARTID
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
 	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
 	br.call.sptk.many rp=do_fork

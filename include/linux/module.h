@@ -18,7 +18,6 @@
 #include <linux/stringify.h>
 
 #include <asm/module.h>
-#include <asm/uaccess.h> /* For struct exception_table_entry */
 
 /* Not Yet Implemented */
 #define MODULE_AUTHOR(name)
@@ -51,6 +50,8 @@ extern int init_module(void);
 extern void cleanup_module(void);
 
 /* Archs provide a method of finding the correct exception table. */
+struct exception_table_entry;
+
 const struct exception_table_entry *
 search_extable(const struct exception_table_entry *first,
 	       const struct exception_table_entry *last,
@@ -111,33 +112,10 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 #define MODULE_DEVICE_TABLE(type,name)		\
   MODULE_GENERIC_TABLE(type##_device,name)
 
-struct kernel_symbol_group
-{
-	/* Links us into the global symbol list */
-	struct list_head list;
-
-	/* Module which owns it (if any) */
-	struct module *owner;
-
-	/* Are we internal use only? */
-	int gplonly;
-
-	unsigned int num_syms;
-	const struct kernel_symbol *syms;
-	const unsigned long *crcs;
-};
-
 /* Given an address, look for it in the exception tables */
 const struct exception_table_entry *search_exception_tables(unsigned long add);
 
-struct exception_table
-{
-	struct list_head list;
-
-	unsigned int num_entries;
-	const struct exception_table_entry *entry;
-};
-
+struct notifier_block;
 
 #ifdef CONFIG_MODULES
 
@@ -204,13 +182,18 @@ struct module
 	char name[MODULE_NAME_LEN];
 
 	/* Exported symbols */
-	struct kernel_symbol_group symbols;
+	const struct kernel_symbol *syms;
+	unsigned int num_syms;
+	const unsigned long *crcs;
 
 	/* GPL-only exported symbols. */
-	struct kernel_symbol_group gpl_symbols;
+	const struct kernel_symbol *gpl_syms;
+	unsigned int num_gpl_syms;
+	const unsigned long *gpl_crcs;
 
-	/* Exception tables */
-	struct exception_table extable;
+	/* Exception table */
+	unsigned int num_exentries;
+	const struct exception_table_entry *extable;
 
 	/* Startup function. */
 	int (*init)(void);
@@ -250,7 +233,7 @@ struct module
 #ifdef CONFIG_KALLSYMS
 	/* We keep the symbol and string tables for kallsyms. */
 	Elf_Sym *symtab;
-	unsigned long num_syms;
+	unsigned long num_symtab;
 	char *strtab;
 #endif
 
@@ -268,7 +251,7 @@ static inline int module_is_live(struct module *mod)
 }
 
 /* Is this address in a module? */
-int module_text_address(unsigned long addr);
+struct module *module_text_address(unsigned long addr);
 
 #ifdef CONFIG_MODULE_UNLOAD
 
@@ -348,6 +331,9 @@ const char *module_address_lookup(unsigned long addr,
 /* For extable.c to search modules' exception tables. */
 const struct exception_table_entry *search_module_extables(unsigned long addr);
 
+int register_module_notifier(struct notifier_block * nb);
+int unregister_module_notifier(struct notifier_block * nb);
+
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -361,9 +347,9 @@ search_module_extables(unsigned long addr)
 }
 
 /* Is this address in a module? */
-static inline int module_text_address(unsigned long addr)
+static inline struct module *module_text_address(unsigned long addr)
 {
-	return 0;
+	return NULL;
 }
 
 /* Get/put a kernel symbol (calls should be symmetric) */
@@ -392,6 +378,18 @@ static inline const char *module_address_lookup(unsigned long addr,
 {
 	return NULL;
 }
+
+static inline int register_module_notifier(struct notifier_block * nb)
+{
+	/* no events will happen anyway, so this can always succeed */
+	return 0;
+}
+
+static inline int unregister_module_notifier(struct notifier_block * nb)
+{
+	return 0;
+}
+
 #endif /* CONFIG_MODULES */
 
 #ifdef MODULE
@@ -401,8 +399,6 @@ extern struct module __this_module;
 struct module __this_module
 __attribute__((section(".gnu.linkonce.this_module"))) = {
 	.name = __stringify(KBUILD_MODNAME),
-	.symbols = { .owner = &__this_module },
-	.gpl_symbols = { .owner = &__this_module, .gplonly = 1 },
 	.init = init_module,
 #ifdef CONFIG_MODULE_UNLOAD
 	.exit = cleanup_module,
@@ -412,9 +408,9 @@ __attribute__((section(".gnu.linkonce.this_module"))) = {
 #endif /* MODULE */
 
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
+#define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
 
 /* BELOW HERE ALL THESE ARE OBSOLETE AND WILL VANISH */
-#define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
 
 struct obsolete_modparm {
 	char name[64];
@@ -453,14 +449,6 @@ static inline void __deprecated MOD_DEC_USE_COUNT(struct module *module)
 #endif
 
 #define __MODULE_STRING(x) __stringify(x)
-
-/*
- * The exception and symbol tables, and the lock
- * to protect them.
- */
-extern spinlock_t modlist_lock;
-extern struct list_head extables;
-extern struct list_head symbols;
 
 /* Use symbol_get and symbol_put instead.  You'll thank me. */
 #define HAVE_INTER_MODULE

@@ -1293,11 +1293,10 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 
 static struct packet_type ip_packet_type =
 {
-	__constant_htons(ETH_P_IP),
-	NULL,	/* All devices */
-	ip_rcv,
-	(void*)1,
-	NULL,
+	.type = __constant_htons(ETH_P_IP),
+	.dev  = NULL,	/* All devices */
+	.func = ip_rcv,
+	.data = (void*)1,
 };
 
 /*
@@ -1313,5 +1312,6 @@ void __init ip_init(void)
 
 #ifdef CONFIG_IP_MULTICAST
 	proc_net_create("igmp", 0, ip_mc_procinfo);
+	proc_net_create("mcfilter", 0, ip_mcf_procinfo);
 #endif
 }

@@ -17,6 +17,7 @@
 #define Elf_Shdr    Elf32_Shdr 
 #define Elf_Sym     Elf32_Sym
 #define ELF_ST_BIND ELF32_ST_BIND
+#define ELF_ST_TYPE ELF32_ST_TYPE
 
 #else
 
@@ -24,6 +25,7 @@
 #define Elf_Shdr    Elf64_Shdr 
 #define Elf_Sym     Elf64_Sym
 #define ELF_ST_BIND ELF64_ST_BIND
+#define ELF_ST_TYPE ELF64_ST_TYPE
 
 #endif
 

@@ -15,7 +15,6 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
-#include <linux/brlock.h>
 #include <net/checksum.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_conntrack_lock)
@@ -193,6 +192,10 @@ static unsigned int ip_refrag(unsigned int hooknum,
 {
 	struct rtable *rt = (struct rtable *)(*pskb)->dst;
 
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* We've seen it coming out the other side: confirm */
 	if (ip_confirm(hooknum, pskb, in, out, okfn) != NF_ACCEPT)
 		return NF_DROP;
@@ -214,6 +217,10 @@ static unsigned int ip_conntrack_local(unsigned int hooknum,
 				       const struct net_device *out,
 				       int (*okfn)(struct sk_buff *))
 {
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr)) {
@@ -342,8 +349,7 @@ void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto)
 	WRITE_UNLOCK(&ip_conntrack_lock);
 	
 	/* Somebody could be still looking at the proto in bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 
 	/* Remove all contrack entries for this protocol */
 	ip_ct_selective_cleanup(kill_proto, &proto->proto);

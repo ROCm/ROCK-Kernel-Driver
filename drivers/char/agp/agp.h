@@ -1,6 +1,6 @@
 /*
  * AGPGART
- * Copyright (C) 2002 Dave Jones
+ * Copyright (C) 2002-2003 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
  * Copyright (C) 1999 Xi Graphics, Inc.
@@ -46,7 +46,7 @@ static void __attribute__((unused)) global_cache_flush(void)
 		panic(PFX "timed out waiting for the other CPUs!\n");
 }
 #else
-static inline void global_cache_flush(void)
+static void global_cache_flush(void)
 {
 	flush_agp_cache();
 }
@@ -281,6 +281,7 @@ struct agp_bridge_data {
 #define INTEL_I7505_ATTBASE	0x78
 #define INTEL_I7505_ERRSTS	0x42
 #define INTEL_I7505_AGPCTRL	0x70
+#define INTEL_I7505_MCHCFG	0x50
 
 /* VIA register */
 #define VIA_APBASE	0x10
@@ -380,8 +381,7 @@ struct agp_driver {
 
 
 /* Generic routines. */
-void agp_generic_agp_enable(u32 mode);
-void agp_generic_agp_3_0_enable(u32 mode);
+void agp_generic_enable(u32 mode);
 int agp_generic_create_gatt_table(void);
 int agp_generic_free_gatt_table(void);
 agp_memory *agp_create_memory(int scratch_pages);
@@ -399,5 +399,6 @@ int agp_register_driver (struct agp_driver *drv);
 int agp_unregister_driver(struct agp_driver *drv);
 u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
+int agp_3_0_node_enable(u32 mode, u32 minor);
 
 #endif				/* _AGP_BACKEND_PRIV_H */

@@ -106,6 +106,7 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	snd_card_t *card;
 	snd_ctl_file_t *ctl;
 	snd_kcontrol_t *control;
+	unsigned int idx;
 
 	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
 	fasync_helper(-1, file, 0, &ctl->fasync);
@@ -117,8 +118,9 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	down_write(&card->controls_rwsem);
 	list_for_each(list, &card->controls) {
 		control = snd_kcontrol(list);
-		if (control->owner == ctl)
-			control->owner = NULL;
+		for (idx = 0; idx < control->count; idx++)
+			if (control->vd[idx].owner == ctl)
+				control->vd[idx].owner = NULL;
 	}
 	up_write(&card->controls_rwsem);
 	snd_ctl_empty_read_queue(ctl);
@@ -163,8 +165,8 @@ void snd_ctl_notify(snd_card_t *card, unsigned int mask, snd_ctl_elem_id_t *id)
 		}
 	_found:
 		wake_up(&ctl->change_sleep);
-		kill_fasync(&ctl->fasync, SIGIO, POLL_IN);
 		spin_unlock_irqrestore(&ctl->read_lock, flags);
+		kill_fasync(&ctl->fasync, SIGIO, POLL_IN);
 	}
 	read_unlock(&card->ctl_files_rwlock);
 }
@@ -172,21 +174,28 @@ void snd_ctl_notify(snd_card_t *card, unsigned int mask, snd_ctl_elem_id_t *id)
 /**
  * snd_ctl_new - create a control instance from the template
  * @control: the control template
+ * @access: the default control access
  *
  * Allocates a new snd_kcontrol_t instance and copies the given template 
- * to the new instance.
+ * to the new instance. It does not copy volatile data (access).
  *
  * Returns the pointer of the new instance, or NULL on failure.
  */
-snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * control)
+snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * control, unsigned int access)
 {
 	snd_kcontrol_t *kctl;
+	unsigned int idx;
 	
 	snd_runtime_check(control != NULL, return NULL);
-	kctl = (snd_kcontrol_t *)snd_magic_kmalloc(snd_kcontrol_t, 0, GFP_KERNEL);
+	snd_runtime_check(control->count > 0, return NULL);
+	kctl = (snd_kcontrol_t *)snd_magic_kcalloc(snd_kcontrol_t,
+						   sizeof(snd_kcontrol_volatile_t) * control->count,
+						   GFP_KERNEL);
 	if (kctl == NULL)
 		return NULL;
 	*kctl = *control;
+	for (idx = 0; idx < kctl->count; idx++)
+		kctl->vd[idx].access = access;
 	return kctl;
 }
 
@@ -197,13 +206,14 @@ snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * control)
  *
  * Allocates a new snd_kcontrol_t instance and initialize from the given 
  * template.  When the access field of ncontrol is 0, it's assumed as
- * READWRITE access.
+ * READWRITE access. When the count field is 0, it's assumes as one.
  *
  * Returns the pointer of the newly generated instance, or NULL on failure.
  */
 snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * ncontrol, void *private_data)
 {
 	snd_kcontrol_t kctl;
+	unsigned int access;
 	
 	snd_runtime_check(ncontrol != NULL, return NULL);
 	snd_assert(ncontrol->info != NULL, return NULL);
@@ -214,14 +224,16 @@ snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * ncontrol, void *private_data)
 	if (ncontrol->name)
 		strncpy(kctl.id.name, ncontrol->name, sizeof(kctl.id.name)-1);
 	kctl.id.index = ncontrol->index;
-	kctl.access = ncontrol->access == 0 ? SNDRV_CTL_ELEM_ACCESS_READWRITE :
-		      (ncontrol->access & (SNDRV_CTL_ELEM_ACCESS_READWRITE|SNDRV_CTL_ELEM_ACCESS_INACTIVE|SNDRV_CTL_ELEM_ACCESS_INDIRECT));
+	kctl.count = ncontrol->count ? ncontrol->count : 1;
+	access = ncontrol->access == 0 ? SNDRV_CTL_ELEM_ACCESS_READWRITE :
+		 (ncontrol->access & (SNDRV_CTL_ELEM_ACCESS_READWRITE|SNDRV_CTL_ELEM_ACCESS_INACTIVE|
+		 		      SNDRV_CTL_ELEM_ACCESS_DINDIRECT|SNDRV_CTL_ELEM_ACCESS_INDIRECT));
 	kctl.info = ncontrol->info;
 	kctl.get = ncontrol->get;
 	kctl.put = ncontrol->put;
 	kctl.private_value = ncontrol->private_value;
 	kctl.private_data = private_data;
-	return snd_ctl_new(&kctl);
+	return snd_ctl_new(&kctl, access);
 }
 
 /**
@@ -253,16 +265,20 @@ void snd_ctl_free_one(snd_kcontrol_t * kcontrol)
  */
 int snd_ctl_add(snd_card_t * card, snd_kcontrol_t * kcontrol)
 {
+	snd_ctl_elem_id_t id;
+	unsigned int idx;
+
 	snd_runtime_check(card != NULL && kcontrol != NULL, return -EINVAL);
 	snd_assert(kcontrol->info != NULL, return -EINVAL);
-	snd_assert(!(kcontrol->access & SNDRV_CTL_ELEM_ACCESS_READ) || kcontrol->get != NULL, return -EINVAL);
-	snd_assert(!(kcontrol->access & SNDRV_CTL_ELEM_ACCESS_WRITE) || kcontrol->put != NULL, return -EINVAL);
 	down_write(&card->controls_rwsem);
 	list_add_tail(&kcontrol->list, &card->controls);
-	card->controls_count++;
-	kcontrol->id.numid = ++card->last_numid;
+	card->controls_count += kcontrol->count;
+	kcontrol->id.numid = card->last_numid + 1;
+	card->last_numid += kcontrol->count;
 	up_write(&card->controls_rwsem);
-	snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_ADD, &kcontrol->id);
+	id = kcontrol->id;
+	for (idx = 0; idx < kcontrol->count; idx++, id.index++, id.numid++)
+		snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_ADD, &id);
 	return 0;
 }
 
@@ -278,12 +294,17 @@ int snd_ctl_add(snd_card_t * card, snd_kcontrol_t * kcontrol)
  */
 int snd_ctl_remove(snd_card_t * card, snd_kcontrol_t * kcontrol)
 {
+	snd_ctl_elem_id_t id;
+	unsigned int idx;
+
 	snd_runtime_check(card != NULL && kcontrol != NULL, return -EINVAL);
 	down_write(&card->controls_rwsem);
 	list_del(&kcontrol->list);
-	card->controls_count--;
+	card->controls_count -= kcontrol->count;
 	up_write(&card->controls_rwsem);
-	snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_REMOVE, &kcontrol->id);
+	id = kcontrol->id;
+	for (idx = 0; idx < kcontrol->count; idx++, id.index++, id.numid++)
+		snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_REMOVE, &id);
 	snd_ctl_free_one(kcontrol);
 	return 0;
 }
@@ -308,7 +329,8 @@ int snd_ctl_remove_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 	return snd_ctl_remove(card, kctl);
 }
 
-static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id); /* w/o lock */
+static snd_kcontrol_t *_ctl_find_id
+(snd_card_t * card, snd_ctl_elem_id_t *id); /* w/o lock */
 
 /**
  * snd_ctl_rename_id - replace the id of a control on the card
@@ -332,7 +354,8 @@ int snd_ctl_rename_id(snd_card_t * card, snd_ctl_elem_id_t *src_id, snd_ctl_elem
 		return -ENOENT;
 	}
 	kctl->id = *dst_id;
-	kctl->id.numid = ++card->last_numid;
+	kctl->id.numid = card->last_numid + 1;
+	card->last_numid += kctl->count;
 	up_write(&card->controls_rwsem);
 	return 0;
 }
@@ -345,7 +368,7 @@ static snd_kcontrol_t *_ctl_find_numid(snd_card_t * card, unsigned int numid)
 	snd_runtime_check(card != NULL && numid != 0, return NULL);
 	list_for_each(list, &card->controls) {
 		kctl = snd_kcontrol(list);
-		if (kctl->id.numid == numid)
+		if (kctl->id.numid <= numid && kctl->id.numid + kctl->count > numid)
 			return kctl;
 	}
 	return NULL;
@@ -369,8 +392,14 @@ static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 			continue;
 		if (strncmp(kctl->id.name, id->name, sizeof(kctl->id.name)))
 			continue;
-		if (kctl->id.index != id->index)
+		if (kctl->id.index > id->index)
 			continue;
+		if (kctl->id.index + kctl->count <= id->index)
+			continue;
+		if (kctl->id.index != id->index) {
+			printk("BOOOR: %i, %i, %i\n", kctl->id.index, kctl->count, id->index);
+			continue;
+		}
 		return kctl;
 	}
 	return NULL;
@@ -438,12 +467,13 @@ static int snd_ctl_elem_list(snd_card_t *card, snd_ctl_elem_list_t *_list)
 	snd_ctl_elem_list_t list;
 	snd_kcontrol_t *kctl;
 	snd_ctl_elem_id_t *dst, *id;
-	int offset, space;
+	unsigned int offset, space, first, jidx;
 	
 	if (copy_from_user(&list, _list, sizeof(list)))
 		return -EFAULT;
 	offset = list.offset;
 	space = list.space;
+	first = 0;
 	/* try limit maximum space */
 	if (space > 16384)
 		return -ENOMEM;
@@ -455,17 +485,27 @@ static int snd_ctl_elem_list(snd_card_t *card, snd_ctl_elem_list_t *_list)
 		down_read(&card->controls_rwsem);
 		list.count = card->controls_count;
 		plist = card->controls.next;
-		while (offset-- > 0 && plist != &card->controls)
+		while (plist != &card->controls) {
+			if (offset == 0)
+				break;
+			kctl = snd_kcontrol(plist);
+			if (offset < kctl->count)
+				break;
+			offset -= kctl->count;
 			plist = plist->next;
+		}
 		list.used = 0;
 		id = dst;
 		while (space > 0 && plist != &card->controls) {
 			kctl = snd_kcontrol(plist);
-			memcpy(id, &kctl->id, sizeof(snd_ctl_elem_id_t));
-			id++;
+			for (jidx = offset; space > 0 && jidx < kctl->count; jidx++) {
+				snd_ctl_build_ioff(id, kctl, jidx);
+				id++;
+				space--;
+				list.used++;
+			}
 			plist = plist->next;
-			space--;
-			list.used++;
+			offset = 0;
 		}
 		up_read(&card->controls_rwsem);
 		if (list.used > 0 && copy_to_user(list.pids, dst, list.used * sizeof(snd_ctl_elem_id_t)))
@@ -486,6 +526,8 @@ static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t *_info)
 	snd_card_t *card = ctl->card;
 	snd_ctl_elem_info_t info;
 	snd_kcontrol_t *kctl;
+	snd_kcontrol_volatile_t *vd;
+	unsigned int index_offset;
 	int result;
 	
 	if (copy_from_user(&info, _info, sizeof(info)))
@@ -502,13 +544,15 @@ static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t *_info)
 	result = kctl->info(kctl, &info);
 	if (result >= 0) {
 		snd_assert(info.access == 0, );
-		info.id = kctl->id;
-		info.access = kctl->access;
-		if (kctl->owner) {
+		index_offset = snd_ctl_get_ioff(kctl, &info.id);
+		vd = &kctl->vd[index_offset];
+		snd_ctl_build_ioff(&info.id, kctl, index_offset);
+		info.access = vd->access;
+		if (vd->owner) {
 			info.access |= SNDRV_CTL_ELEM_ACCESS_LOCK;
-			if (kctl->owner == ctl)
+			if (vd->owner == ctl)
 				info.access |= SNDRV_CTL_ELEM_ACCESS_OWNER;
-			info.owner = kctl->owner_pid;
+			info.owner = vd->owner_pid;
 		} else {
 			info.owner = -1;
 		}
@@ -522,8 +566,11 @@ static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t *_info)
 
 static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
 {
+
 	snd_ctl_elem_value_t *control;
 	snd_kcontrol_t *kctl;
+	snd_kcontrol_volatile_t *vd;
+	unsigned int index_offset;
 	int result, indirect;
 	
 	control = kmalloc(sizeof(*control), GFP_KERNEL);
@@ -536,16 +583,18 @@ static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
-		indirect = kctl->access & SNDRV_CTL_ELEM_ACCESS_INDIRECT ? 1 : 0;
+		index_offset = snd_ctl_get_ioff(kctl, &control->id);
+		vd = &kctl->vd[index_offset];
+		indirect = vd->access & SNDRV_CTL_ELEM_ACCESS_INDIRECT ? 1 : 0;
 		if (control->indirect != indirect) {
 			result = -EACCES;
 		} else {
-			if ((kctl->access & SNDRV_CTL_ELEM_ACCESS_READ) && kctl->get != NULL) {
+			if ((vd->access & SNDRV_CTL_ELEM_ACCESS_READ) && kctl->get != NULL) {
+				snd_ctl_build_ioff(&control->id, kctl, index_offset);
 				result = kctl->get(kctl, control);
-				if (result >= 0)
-					control->id = kctl->id;
-			} else
+			} else {
 				result = -EPERM;
+			}
 		}
 	}
 	up_read(&card->controls_rwsem);
@@ -561,6 +610,8 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 	snd_card_t *card = file->card;
 	snd_ctl_elem_value_t *control;
 	snd_kcontrol_t *kctl;
+	snd_kcontrol_volatile_t *vd;
+	unsigned int index_offset;
 	int result, indirect;
 
 	control = kmalloc(sizeof(*control), GFP_KERNEL);
@@ -573,22 +624,23 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
-		indirect = kctl->access & SNDRV_CTL_ELEM_ACCESS_INDIRECT ? 1 : 0;
+		index_offset = snd_ctl_get_ioff(kctl, &control->id);
+		vd = &kctl->vd[index_offset];
+		indirect = vd->access & SNDRV_CTL_ELEM_ACCESS_INDIRECT ? 1 : 0;
 		if (control->indirect != indirect) {
 			result = -EACCES;
 		} else {
-			if (!(kctl->access & SNDRV_CTL_ELEM_ACCESS_WRITE) ||
+			if (!(vd->access & SNDRV_CTL_ELEM_ACCESS_WRITE) ||
 			    kctl->put == NULL ||
-			    (kctl->owner != NULL && kctl->owner != file)) {
+			    (vd->owner != NULL && vd->owner != file)) {
 				result = -EPERM;
 			} else {
+				snd_ctl_build_ioff(&control->id, kctl, index_offset);
 				result = kctl->put(kctl, control);
-				if (result >= 0)
-					control->id = kctl->id;
 			}
 			if (result > 0) {
 				up_read(&card->controls_rwsem);
-				snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE, &kctl->id);
+				snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE, &control->id);
 				result = 0;
 				goto __unlocked;
 			}
@@ -608,6 +660,7 @@ static int snd_ctl_elem_lock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	snd_card_t *card = file->card;
 	snd_ctl_elem_id_t id;
 	snd_kcontrol_t *kctl;
+	snd_kcontrol_volatile_t *vd;
 	int result;
 	
 	if (copy_from_user(&id, _id, sizeof(id)))
@@ -617,11 +670,12 @@ static int snd_ctl_elem_lock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
-		if (kctl->owner != NULL)
+		vd = &kctl->vd[snd_ctl_get_ioff(kctl, &id)];
+		if (vd->owner != NULL)
 			result = -EBUSY;
 		else {
-			kctl->owner = file;
-			kctl->owner_pid = current->pid;
+			vd->owner = file;
+			vd->owner_pid = current->pid;
 			result = 0;
 		}
 	}
@@ -634,6 +688,7 @@ static int snd_ctl_elem_unlock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	snd_card_t *card = file->card;
 	snd_ctl_elem_id_t id;
 	snd_kcontrol_t *kctl;
+	snd_kcontrol_volatile_t *vd;
 	int result;
 	
 	if (copy_from_user(&id, _id, sizeof(id)))
@@ -643,13 +698,14 @@ static int snd_ctl_elem_unlock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
-		if (kctl->owner == NULL)
+		vd = &kctl->vd[snd_ctl_get_ioff(kctl, &id)];
+		if (vd->owner == NULL)
 			result = -EINVAL;
-		else if (kctl->owner != file)
+		else if (vd->owner != file)
 			result = -EPERM;
 		else {
-			kctl->owner = NULL;
-			kctl->owner_pid = 0;
+			vd->owner = NULL;
+			vd->owner_pid = 0;
 			result = 0;
 		}
 	}

@@ -118,22 +118,6 @@ config NETFILTER_DEBUG
 	  You can say Y here if you want to get additional messages useful in
 	  debugging the netfilter code.
 
-config FILTER
-	bool "Socket Filtering"
-	---help---
-	  The Linux Socket Filter is derived from the Berkeley Packet Filter.
-	  If you say Y here, user-space programs can attach a filter to any
-	  socket and thereby tell the kernel that it should allow or disallow
-	  certain types of data to get through the socket.  Linux Socket
-	  Filtering works on all socket types except TCP for now.  See the
-	  text file <file:Documentation/networking/filter.txt> for more
-	  information.
-
-	  You need to say Y here if you want to use PPP packet filtering
-	  (see the CONFIG_PPP_FILTER option below).
-
-	  If unsure, say N.
-
 config UNIX
 	tristate "Unix domain sockets"
 	---help---
@@ -636,7 +620,7 @@ config NET_SCHED
 	  Differentiated Services (diffserv) and Resource Reservation Protocol
 	  (RSVP) on your Linux router if you also say Y to "QoS support",
 	  "Packet classifier API" and to some classifiers below. Documentation
-	  and software is at <http://icawww1.epfl.ch/linux-diffserv/>.
+	  and software is at <http://diffserv.sourceforge.net/>.
 
 	  If you say Y here and to "/proc file system" below, you will be able
 	  to read status information about packet schedulers from the file

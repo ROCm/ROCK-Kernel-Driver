@@ -155,7 +155,7 @@ static struct miscdevice indydog_miscdev = {
 	.fops	= &indydog_fops,
 };
 
-static const char banner[] __initdata = KERN_INFO "Hardware Watchdog Timer for SGI IP22: 0.2\n";
+static char banner[] __initdata = KERN_INFO "Hardware Watchdog Timer for SGI IP22: 0.2\n";
 
 static int __init watchdog_init(void)
 {

@@ -26,7 +26,6 @@ static int      midi_busy = 0, input_opened = 0;
 static int      my_dev;
 static int      output_used = 0;
 static volatile unsigned char gus_midi_control;
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 static void     (*midi_input_intr) (int dev, unsigned char data);
 
 static unsigned char tmp_queue[256];
@@ -35,6 +34,7 @@ static volatile int qlen;
 static volatile unsigned char qhead, qtail;
 extern int      gus_base, gus_irq, gus_dma;
 extern int     *gus_osp;
+extern spinlock_t gus_lock;
 
 static int GUS_MIDI_STATUS(void)
 {
@@ -76,7 +76,7 @@ static int dump_to_midi(unsigned char midi_byte)
 
 	output_used = 1;
 
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&gus_lock, flags);
 
 	if (GUS_MIDI_STATUS() & MIDI_XMIT_EMPTY)
 	{
@@ -92,7 +92,7 @@ static int dump_to_midi(unsigned char midi_byte)
 		outb((gus_midi_control), u_MidiControl);
 	}
 
-	spin_unlock_irqrestore(&lock,flags);
+	spin_unlock_irqrestore(&gus_lock,flags);
 	return ok;
 }
 
@@ -113,14 +113,14 @@ static int gus_midi_out(int dev, unsigned char midi_byte)
 	/*
 	 * Drain the local queue first
 	 */
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&gus_lock, flags);
 
 	while (qlen && dump_to_midi(tmp_queue[qhead]))
 	{
 		qlen--;
 		qhead++;
 	}
-	spin_unlock_irqrestore(&lock,flags);
+	spin_unlock_irqrestore(&gus_lock,flags);
 
 	/*
 	 *	Output the byte if the local queue is empty.
@@ -140,13 +140,13 @@ static int gus_midi_out(int dev, unsigned char midi_byte)
 		return 0;	/*
 				 * Local queue full
 				 */
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&gus_lock, flags);
 
 	tmp_queue[qtail] = midi_byte;
 	qlen++;
 	qtail++;
 
-	spin_unlock_irqrestore(&lock,flags);
+	spin_unlock_irqrestore(&gus_lock,flags);
 	return 1;
 }
 
@@ -171,14 +171,14 @@ static int gus_midi_buffer_status(int dev)
 	if (!output_used)
 		return 0;
 
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&gus_lock, flags);
 
 	if (qlen && dump_to_midi(tmp_queue[qhead]))
 	{
 		qlen--;
 		qhead++;
 	}
-	spin_unlock_irqrestore(&lock,flags);
+	spin_unlock_irqrestore(&gus_lock,flags);
 	return (qlen > 0) || !(GUS_MIDI_STATUS() & MIDI_XMIT_EMPTY);
 }
 
@@ -188,17 +188,17 @@ static int gus_midi_buffer_status(int dev)
 
 static struct midi_operations gus_midi_operations =
 {
-	owner:		THIS_MODULE,
-	info:		{"Gravis UltraSound Midi", 0, 0, SNDCARD_GUS},
-	converter:	&std_midi_synth,
-	in_info:	{0},
-	open:		gus_midi_open,
-	close:		gus_midi_close,
-	outputc:	gus_midi_out,
-	start_read:	gus_midi_start_read,
-	end_read:	gus_midi_end_read,
-	kick:		gus_midi_kick,
-	buffer_status:	gus_midi_buffer_status,
+	.owner		= THIS_MODULE,
+	.info		= {"Gravis UltraSound Midi", 0, 0, SNDCARD_GUS},
+	.converter	= &std_midi_synth,
+	.in_info	= {0},
+	.open		= gus_midi_open,
+	.close		= gus_midi_close,
+	.outputc	= gus_midi_out,
+	.start_read	= gus_midi_start_read,
+	.end_read	= gus_midi_end_read,
+	.kick		= gus_midi_kick,
+	.buffer_status	= gus_midi_buffer_status,
 };
 
 void __init gus_midi_init(struct address_info *hw_config)
@@ -224,7 +224,7 @@ void gus_midi_interrupt(int dummy)
 	volatile unsigned char stat, data;
 	int timeout = 10;
 
-	spin_lock(&lock);
+	spin_lock(&gus_lock);
 
 	while (timeout-- > 0 && (stat = GUS_MIDI_STATUS()) & (MIDI_RCV_FULL | MIDI_XMIT_EMPTY))
 	{
@@ -252,5 +252,5 @@ void gus_midi_interrupt(int dummy)
 			}
 		}
 	}
-	spin_unlock(&lock);
+	spin_unlock(&gus_lock);
 }

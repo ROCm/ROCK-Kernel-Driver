@@ -33,8 +33,10 @@ long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 
 	inode = file->f_dentry->d_inode;
 	mapping = inode->i_mapping;
-	if (!mapping)
-		return -EINVAL;
+	if (!mapping) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	bdi = mapping->backing_dev_info;
 
@@ -61,12 +63,15 @@ long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 			ret = 0;
 		break;
 	case POSIX_FADV_DONTNEED:
+		if (!bdi_write_congested(mapping->backing_dev_info))
+			filemap_flush(mapping);
 		invalidate_mapping_pages(mapping, offset >> PAGE_CACHE_SHIFT,
 				(len >> PAGE_CACHE_SHIFT) + 1);
 		break;
 	default:
 		ret = -EINVAL;
 	}
+out:
 	fput(file);
 	return ret;
 }

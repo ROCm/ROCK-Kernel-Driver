@@ -275,7 +275,7 @@ __test_and_change_bit (int nr, void *addr)
 }
 
 static __inline__ int
-test_bit (int nr, volatile void *addr)
+test_bit (int nr, const volatile void *addr)
 {
 	return 1 & (((const volatile __u32 *) addr)[nr >> 5] >> (nr & 31));
 }

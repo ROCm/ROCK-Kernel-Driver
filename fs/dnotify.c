@@ -142,6 +142,29 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 	write_unlock(&dn_lock);
 }
 
+/*
+ * This is hopelessly wrong, but unfixable without API changes.  At
+ * least it doesn't oops the kernel...
+ *
+ * To safely access ->d_parent we need to keep d_move away from it.  Use the
+ * dentry's d_lock for this.
+ */
+void dnotify_parent(struct dentry *dentry, unsigned long event)
+{
+	struct dentry *parent;
+
+	spin_lock(&dentry->d_lock);
+	parent = dentry->d_parent;
+	if (parent->d_inode->i_dnotify_mask & event) {
+		dget(parent);
+		spin_unlock(&dentry->d_lock);
+		__inode_dir_notify(parent->d_inode, event);
+		dput(parent);
+	} else {
+		spin_unlock(&dentry->d_lock);
+	}
+}
+
 static int __init dnotify_init(void)
 {
 	dn_cache = kmem_cache_create("dnotify_cache",

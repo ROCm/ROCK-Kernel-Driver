@@ -459,6 +459,8 @@ int xfs_bmap_sanity_check(struct xfs_mount *mp, xfs_bmbt_block_t *bb,
 #endif
 
 
+#ifdef __KERNEL__
+
 /*
  * Prototypes for xfs_bmap.c to call.
  */
@@ -706,5 +708,6 @@ xfs_bmap_do_search_extents(
 	xfs_bmbt_irec_t *,
 	xfs_bmbt_irec_t *);
 
+#endif	/* __KERNEL__ */
 
 #endif	/* __XFS_BMAP_BTREE_H__ */

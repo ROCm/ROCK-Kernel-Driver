@@ -58,7 +58,7 @@ bad_to_user:
  * rdx count
  *
  * Output:		
- * eax uncopied bytes or 0 if successfull. 
+ * eax uncopied bytes or 0 if successful. 
  */
 	.globl copy_user_generic	
 copy_user_generic:	
