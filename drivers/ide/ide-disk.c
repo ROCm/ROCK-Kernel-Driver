@@ -509,9 +509,11 @@ static u8 get_command(ide_drive_t *drive, struct request *rq, ide_task_t *task)
 		if (dma)
 			return lba48 ? WIN_READDMA_EXT : WIN_READDMA;
 		if (drive->mult_count) {
+			task->data_phase = TASKFILE_MULTI_IN;
 			task->handler = &task_mulin_intr;
 			return lba48 ? WIN_MULTREAD_EXT : WIN_MULTREAD;
 		}
+		task->data_phase = TASKFILE_IN;
 		task->handler = &task_in_intr;
 		return lba48 ? WIN_READ_EXT : WIN_READ;
 	} else {
@@ -519,10 +521,12 @@ static u8 get_command(ide_drive_t *drive, struct request *rq, ide_task_t *task)
 		if (dma)
 			return lba48 ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 		if (drive->mult_count) {
+			task->data_phase = TASKFILE_MULTI_OUT;
 			task->prehandler = &pre_task_mulout_intr;
 			task->handler = &task_mulout_intr;
 			return lba48 ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
 		}
+		task->data_phase = TASKFILE_OUT;
 		task->prehandler = &pre_task_out_intr;
 		task->handler = &task_out_intr;
 		return lba48 ? WIN_WRITE_EXT : WIN_WRITE;
@@ -556,6 +560,7 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
 	args.rq					= (struct request *) rq;
 	rq->special				= (ide_task_t *)&args;
+	drive->hwif->data_phase = args.data_phase;
 	return do_rw_taskfile(drive, &args);
 }
 
@@ -580,6 +585,7 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
 	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
 	args.rq					= (struct request *) rq;
 	rq->special				= (ide_task_t *)&args;
+	drive->hwif->data_phase = args.data_phase;
 	return do_rw_taskfile(drive, &args);
 }
 
@@ -615,6 +621,7 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 	args.hobRegister[IDE_CONTROL_OFFSET_HOB]= (drive->ctl|0x80);
 	args.rq					= (struct request *) rq;
 	rq->special				= (ide_task_t *)&args;
+	drive->hwif->data_phase = args.data_phase;
 	return do_rw_taskfile(drive, &args);
 }
 
@@ -1156,6 +1163,7 @@ static int get_smart_values(ide_drive_t *drive, u8 *buf)
 	args.tfRegister[IDE_HCYL_OFFSET]	= SMART_HCYL_PASS;
 	args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_SMART;
 	args.command_type			= IDE_DRIVE_TASK_IN;
+	args.data_phase				= TASKFILE_IN;
 	args.handler				= &task_in_intr;
 	(void) smart_enable(drive);
 	return ide_raw_taskfile(drive, &args, buf);

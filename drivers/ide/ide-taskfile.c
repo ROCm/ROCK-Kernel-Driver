@@ -96,6 +96,7 @@ int taskfile_lib_get_identify (ide_drive_t *drive, u8 *buf)
 	else
 		args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_PIDENTIFY;
 	args.command_type = IDE_DRIVE_TASK_IN;
+	args.data_phase   = TASKFILE_IN;
 	args.handler	  = &task_in_intr;
 	return ide_raw_taskfile(drive, &args, buf);
 }
