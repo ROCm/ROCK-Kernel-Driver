@@ -123,10 +123,16 @@ if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ]; then
 	 SBS-K2			CONFIG_K2		\
 	 Synergy-Gemini		CONFIG_GEMINI		\
 	 Zynx-ZX4500		CONFIG_ZX4500"		CHRP/PowerMac/PReP
-fi
 
-if [ "$CONFIG_PCORE" = "y" -o "$CONFIG_POWERPMC250" = "y" ]; then
-   define_bool CONFIG_FORCE y
+   if [ "$CONFIG_SANDPOINT" = "y" ]; then
+      bool '  Sandpoint X3' CONFIG_SANDPOINT_X3
+   fi
+   if [ "$CONFIG_PCORE" = "y" -o "$CONFIG_POWERPMC250" = "y" ]; then
+      define_bool CONFIG_FORCE y
+   fi
+   if [ "$CONFIG_LOPEC" = "y" -o "$CONFIG_SANDPOINT_X3" = "y" ]; then
+      define_bool CONFIG_EPIC_SERIAL_MODE y
+   fi
 fi
 
 if [ "$CONFIG_FORCE" = "y" -o "$CONFIG_MENF1" = "y" \
@@ -145,13 +151,6 @@ fi
 
 if [ "$CONFIG_MVME5100" = "y" ]; then
    bool 'MVME5100 configured with an IPMC761' CONFIG_MVME5100_IPMC761_PRESENT
-fi
-
-if [ "$CONFIG_SANDPOINT" = "y" ]; then
-   bool 'Sandpoint X3' CONFIG_SANDPOINT_X3
-   if [ "$CONFIG_SANDPOINT_X3" = "y" ]; then
-      define_bool CONFIG_EPIC_SERIAL_MODE y
-   fi
 fi
 
 if [ "$CONFIG_SPRUCE" = "y" ]; then
@@ -620,9 +619,10 @@ fi
 if [ "$CONFIG_ALL_PPC" = "y" ]; then
    bool 'Support for early boot text console (BootX or OpenFirmware only)' CONFIG_BOOTX_TEXT
 fi
-if [ "$CONFIG_MCPN765" = "y" -o "$CONFIG_SANDPOINT" = "y" \
-     -o "$CONFIG_ZX4500" = "y" -o "$CONFIG_PRPMC800" = "y" \
-     -o "$CONFIG_4xx" = "y" -o "$CONFIG_GT64260" = "y" ]; then
+if [ "$CONFIG_4xx" = "y" -o "$CONFIG_GT64260" = "y"		\
+     -o "$CONFIG_LOPEC" = "y" -o "$CONFIG_MCPN765" = "y"	\
+     -o "$CONFIG_PRPMC800" = "y" -o "$CONFIG_SANDPOINT" = "y"	\
+     -o "$CONFIG_ZX4500" = "y" ]; then
    bool 'Support for early boot texts over serial port' CONFIG_SERIAL_TEXT_DEBUG
 fi
 endmenu

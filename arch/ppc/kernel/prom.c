@@ -773,7 +773,12 @@ prom_get_irq_senses(unsigned char *senses, int off, int max)
 		for (j = 0; j < np->n_intrs; j++) {
 			i = np->intrs[j].line;
 			if (i >= off && i < max)
-				senses[i-off] = np->intrs[j].sense;
+				if (np->intrs[j].sense == 1)
+					senses[i-off] = (IRQ_SENSE_LEVEL
+						| IRQ_POLARITY_NEGATIVE);
+				else
+					senses[i-off] = (IRQ_SENSE_EDGE 
+						| IRQ_POLARITY_POSITIVE);
 		}
 	}
 }

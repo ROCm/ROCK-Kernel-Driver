@@ -95,6 +95,7 @@ static unsigned long chrp_find_phys_io_base(void)
 }
 #endif /* CONFIG_ALL_PPC */
 
+#ifdef CONFIG_MAGIC_SYSRQ
 static void sysrq_handle_xmon(int key, struct pt_regs *regs,
 			      struct kbd_struct *kbd, struct tty_struct *tty)
 {
@@ -107,6 +108,7 @@ static struct sysrq_key_op sysrq_xmon_op =
 	help_msg:	"Xmon",
 	action_msg:	"Entering xmon\n",
 };
+#endif
 
 void
 xmon_map_scc(void)
@@ -218,7 +220,9 @@ xmon_map_scc(void)
 	DLAB = 0x80;
 #endif /* platform */
 
+#ifdef CONFIG_MAGIC_SYSRQ
 	__sysrq_put_key_op('x', &sysrq_xmon_op);
+#endif
 }
 
 static int scc_initialized = 0;

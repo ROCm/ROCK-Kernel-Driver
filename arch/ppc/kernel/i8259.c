@@ -11,7 +11,7 @@
 #include <asm/io.h>
 #include <asm/i8259.h>
 
-static volatile char *pci_intack; /* RO, gives us the irq vector */
+static volatile unsigned char *pci_intack; /* RO, gives us the irq vector */
 
 unsigned char cached_8259[2] = { 0xff, 0xff };
 #define cached_A1 (cached_8259[0])
@@ -24,13 +24,13 @@ int i8259_pic_irq_offset;
 /* Acknowledge the irq using the PCI host bridge's interrupt acknowledge
  * feature. (Polling is somehow broken on some IBM and Motorola PReP boxes.)
  */
-int i8259_irq(void)
+int i8259_irq(struct pt_regs *regs)
 {
 	int irq;
 
 	spin_lock/*_irqsave*/(&i8259_lock/*, flags*/);
 
-	irq = *pci_intack & 0xff;
+	irq = *pci_intack;
 	if (irq==7) {
 		/*
 		 * This may be a spurious interrupt.
@@ -171,6 +171,10 @@ static struct resource pic_edgectrl_iores = {
 	"8259 edge control", 0x4d0, 0x4d1, IORESOURCE_BUSY
 };
 
+/* i8259_init()
+ * intack_addr - PCI interrupt acknowledge (real) address which will return
+ *               the active irq from the 8259
+ */
 void __init i8259_init(long intack_addr)
 {
 	unsigned long flags;
@@ -205,6 +209,9 @@ void __init i8259_init(long intack_addr)
 	request_resource(&ioport_resource, &pic2_iores);
 	request_resource(&ioport_resource, &pic_edgectrl_iores);
 
-	if (intack_addr)
-		pci_intack = ioremap(intack_addr, 1);
+	/* XXX remove me after board maintainers fix their i8259_init calls */
+	if (intack_addr == 0)
+		panic("You must supply a PCI interrupt acknowledge address to i8259_init()\n");
+
+	pci_intack = ioremap(intack_addr, 1);
 }
