@@ -130,8 +130,6 @@ static inline unsigned short pdacf_reg_read(pdacf_t *chip, unsigned char reg)
 	return inw(chip->port + reg);
 }
 
-unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg);
-void pdacf_ak4117_write(void *private_data, unsigned char reg, unsigned char val);
 pdacf_t *snd_pdacf_create(snd_card_t *card);
 int snd_pdacf_ak4117_create(pdacf_t *pdacf);
 void snd_pdacf_powerdown(pdacf_t *chip);
