@@ -7552,13 +7552,16 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	if (pm_cap == 0) {
 		printk(KERN_ERR PFX "Cannot find PowerManagement capability, "
 		       "aborting.\n");
+		err = -EIO;
 		goto err_out_free_res;
 	}
 
 	/* Configure DMA attributes. */
-	if (!pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
+	err = pci_set_dma_mask(pdev, 0xffffffffffffffffULL);
+	if (!err) {
 		pci_using_dac = 1;
-		if (pci_set_consistent_dma_mask(pdev, 0xffffffffffffffffULL)) {
+		err = pci_set_consistent_dma_mask(pdev, 0xffffffffffffffffULL);
+		if (err < 0) {
 			printk(KERN_ERR PFX "Unable to obtain 64 bit DMA "
 			       "for consistent allocations\n");
 			goto err_out_free_res;
