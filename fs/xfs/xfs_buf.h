@@ -182,6 +182,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 #define XFS_BUF_SET_TARGET(bp, target)	\
 	(bp)->pb_target = (target)
 
+#define XFS_BUF_TARGET(bp)	((bp)->pb_target)
 #define XFS_BUF_TARGET_DEV(bp)	((bp)->pb_target->pbr_dev)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)

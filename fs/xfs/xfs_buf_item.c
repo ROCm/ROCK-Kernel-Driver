@@ -1005,7 +1005,7 @@ xfs_buf_iodone_callbacks(
 		 */
 		mp = lip->li_mountp;
 		if (XFS_FORCED_SHUTDOWN(mp)) {
-			ASSERT(XFS_BUF_TARGET_DEV(bp) == mp->m_dev);
+			ASSERT(XFS_BUF_TARGET(bp) == mp->m_ddev_targp);
 			XFS_BUF_SUPER_STALE(bp);
 			xfs_buftrace("BUF_IODONE_CB", bp);
 			xfs_buf_do_callbacks(bp, lip);
@@ -1102,7 +1102,7 @@ xfs_buf_error_relse(
 
 	lip = XFS_BUF_FSPRIVATE(bp, xfs_log_item_t *);
 	mp = (xfs_mount_t *)lip->li_mountp;
-	ASSERT(XFS_BUF_TARGET_DEV(bp) == mp->m_dev);
+	ASSERT(XFS_BUF_TARGET(bp) == mp->m_ddev_targp);
 
 	XFS_BUF_STALE(bp);
 	XFS_BUF_DONE(bp);

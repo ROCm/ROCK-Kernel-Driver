@@ -1199,7 +1199,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		XFS_BUF_UNDELAYWRITE(sbp);
 		XFS_BUF_WRITE(sbp);
 		XFS_BUF_UNASYNC(sbp);
-		ASSERT(XFS_BUF_TARGET_DEV(sbp) == mp->m_dev);
+		ASSERT(XFS_BUF_TARGET(sbp) == mp->m_ddev_targp);
 		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
 		error = xfs_iowait(sbp);
