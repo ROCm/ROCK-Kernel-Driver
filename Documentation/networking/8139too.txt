@@ -98,6 +98,7 @@ KTI KF-230TX/2
 Lantech FastNet TX
 Ovislink Fast Ethernet
 Planet ENW-9504 (V.4) 10/100
+SDT Jeoun Fast PCI-TX
 SMC EZNET 10/100
 UNEX NexNIC ND012C
 
