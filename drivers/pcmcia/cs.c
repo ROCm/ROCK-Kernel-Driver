@@ -32,6 +32,7 @@
 ======================================================================*/
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/config.h>
@@ -110,12 +111,17 @@ INT_MODULE_PARM(cis_speed,	300);		/* ns */
 /* Access speed for IO windows */
 INT_MODULE_PARM(io_speed,	0);		/* ns */
 
-#ifdef PCMCIA_DEBUG
-INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
-static const char *version =
-"cs.c 1.279 2001/10/13 00:08:28 (David Hinds)";
+#ifdef DEBUG
+static int pc_debug;
+
+module_param(pc_debug, int, 0644);
+
+int cs_debug_level(int level)
+{
+	return pc_debug > level;
+}
 #endif
- 
+
 /*====================================================================*/
 
 socket_state_t dead_socket = {
@@ -306,7 +312,7 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	if (!socket || !socket->ops || !socket->dev.dev)
 		return -EINVAL;
 
-	DEBUG(0, "cs: pcmcia_register_socket(0x%p)\n", socket->ops);
+	cs_dbg(socket, 0, "pcmcia_register_socket(0x%p)\n", socket->ops);
 
 	/* try to obtain a socket number [yes, it gets ugly if we
 	 * register more than 2^sizeof(unsigned int) pcmcia 
@@ -377,7 +383,7 @@ void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 	if (!socket)
 		return;
 
-	DEBUG(0, "cs: pcmcia_unregister_socket(0x%p)\n", socket->ops);
+	cs_dbg(socket, 0, "pcmcia_unregister_socket(0x%p)\n", socket->ops);
 
 	if (socket->thread) {
 		init_completion(&socket->thread_done);
@@ -443,7 +449,7 @@ static void shutdown_socket(struct pcmcia_socket *s)
 {
     client_t **c;
     
-    DEBUG(1, "cs: shutdown_socket(%p)\n", s);
+    cs_dbg(s, 1, "shutdown_socket\n");
 
     /* Blank out the socket state */
     s->state &= SOCKET_PRESENT|SOCKET_INUSE;
@@ -499,8 +505,8 @@ static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 {
     client_t *client = s->clients;
     int ret;
-    DEBUG(1, "cs: send_event(sock %d, event %d, pri %d)\n",
-	  s->sock, event, priority);
+    cs_dbg(s, 1, "send_event(event %d, pri %d)\n",
+	   event, priority);
     ret = 0;
     if (s->state & SOCKET_CARDBUS)
 	    return 0;
@@ -516,25 +522,13 @@ static int send_event(struct pcmcia_socket *s, event_t event, int priority)
     return ret;
 } /* send_event */
 
-static void pcmcia_error(struct pcmcia_socket *skt, const char *fmt, ...)
-{
-	static char buf[128];
-	va_list ap;
-	int len;
-
-	va_start(ap, fmt);
-	len = vsnprintf(buf, sizeof(buf), fmt, ap);
-	va_end(ap);
-	buf[len] = '\0';
-
-	printk(KERN_ERR "PCMCIA: socket %p: %s", skt, buf);
-}
-
 #define cs_to_timeout(cs) (((cs) * HZ + 99) / 100)
 
 static void socket_remove_drivers(struct pcmcia_socket *skt)
 {
 	client_t *client;
+
+	cs_dbg(skt, 4, "remove_drivers\n");
 
 	send_event(skt, CS_EVENT_CARD_REMOVAL, CS_EVENT_PRI_HIGH);
 
@@ -545,6 +539,8 @@ static void socket_remove_drivers(struct pcmcia_socket *skt)
 
 static void socket_shutdown(struct pcmcia_socket *skt)
 {
+	cs_dbg(skt, 4, "shutdown\n");
+
 	socket_remove_drivers(skt);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(cs_to_timeout(shutdown_delay));
@@ -555,6 +551,8 @@ static void socket_shutdown(struct pcmcia_socket *skt)
 static int socket_reset(struct pcmcia_socket *skt)
 {
 	int status, i;
+
+	cs_dbg(skt, 4, "reset\n");
 
 	skt->socket.flags |= SS_OUTPUT_ENA | SS_RESET;
 	skt->ops->set_socket(skt, &skt->socket);
@@ -578,13 +576,15 @@ static int socket_reset(struct pcmcia_socket *skt)
 		schedule_timeout(cs_to_timeout(unreset_check));
 	}
 
-	pcmcia_error(skt, "time out after reset.\n");
+	cs_err(skt, "time out after reset.\n");
 	return CS_GENERAL_FAILURE;
 }
 
 static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 {
 	int status, i;
+
+	cs_dbg(skt, 4, "setup\n");
 
 	skt->ops->get_status(skt, &status);
 	if (!(status & SS_DETECT))
@@ -606,14 +606,14 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	}
 
 	if (status & SS_PENDING) {
-		pcmcia_error(skt, "voltage interrogation timed out.\n");
+		cs_err(skt, "voltage interrogation timed out.\n");
 		return CS_GENERAL_FAILURE;
 	}
 
 	if (status & SS_CARDBUS) {
 		skt->state |= SOCKET_CARDBUS;
 #ifndef CONFIG_CARDBUS
-		pcmcia_error(skt, "cardbus cards are not supported.\n");
+		cs_err(skt, "cardbus cards are not supported.\n");
 		return CS_BAD_TYPE;
 #endif
 	}
@@ -626,7 +626,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	else if (!(status & SS_XVCARD))
 		skt->socket.Vcc = skt->socket.Vpp = 50;
 	else {
-		pcmcia_error(skt, "unsupported voltage key.\n");
+		cs_err(skt, "unsupported voltage key.\n");
 		return CS_BAD_TYPE;
 	}
 	skt->socket.flags = 0;
@@ -640,7 +640,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 
 	skt->ops->get_status(skt, &status);
 	if (!(status & SS_POWERON)) {
-		pcmcia_error(skt, "unable to apply power.\n");
+		cs_err(skt, "unable to apply power.\n");
 		return CS_BAD_TYPE;
 	}
 
@@ -655,6 +655,8 @@ static int socket_insert(struct pcmcia_socket *skt)
 {
 	int ret;
 
+	cs_dbg(skt, 4, "insert\n");
+
 	if (!cs_socket_get(skt))
 		return CS_NO_CARD;
 
@@ -667,6 +669,8 @@ static int socket_insert(struct pcmcia_socket *skt)
 			skt->state |= SOCKET_CARDBUS_CONFIG;
 		}
 #endif
+		cs_dbg(skt, 4, "insert done\n");
+
 		send_event(skt, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 	} else {
 		socket_shutdown(skt);
@@ -832,6 +836,7 @@ static int pccardd(void *__skt)
  */
 void pcmcia_parse_events(struct pcmcia_socket *s, u_int events)
 {
+	cs_dbg(s, 4, "parse_events: events %08x\n", events);
 	if (s->thread) {
 		spin_lock(&s->thread_lock);
 		s->thread_events |= events;
@@ -857,15 +862,15 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
     align = (*base) ? (lines ? 1<<lines : 0) : 1;
     if (align && (align < num)) {
 	if (*base) {
-	    DEBUG(0, "odd IO request: num %04x align %04x\n",
-		  num, align);
+	    cs_dbg(s, 0, "odd IO request: num %04x align %04x\n",
+		   num, align);
 	    align = 0;
 	} else
 	    while (align && (align < num)) align <<= 1;
     }
     if (*base & ~(align-1)) {
-	DEBUG(0, "odd IO request: base %04x align %04x\n",
-	      *base, align);
+	cs_dbg(s, 0, "odd IO request: base %04x align %04x\n",
+	       *base, align);
 	align = 0;
     }
     if ((s->features & SS_CAP_STATIC_MAP) && s->io_offset) {
@@ -1010,8 +1015,8 @@ int pcmcia_bind_device(bind_req_t *req)
     init_waitqueue_head(&client->mtd_req);
     client->next = s->clients;
     s->clients = client;
-    DEBUG(1, "cs: bind_device(): client 0x%p, sock %p, dev %s\n",
-	  client, client->Socket, client->dev_info);
+    cs_dbg(s, 1, "bind_device(): client 0x%p, dev %s\n",
+	   client, client->dev_info);
     return CS_SUCCESS;
 } /* bind_device */
 
@@ -1046,8 +1051,8 @@ int pcmcia_bind_mtd(mtd_bind_t *req)
 	return CS_BAD_OFFSET;
     strlcpy(region->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
     
-    DEBUG(1, "cs: bind_mtd(): attr 0x%x, offset 0x%x, dev %s\n",
-	  req->Attributes, req->CardOffset, (char *)req->dev_info);
+    cs_dbg(s, 1, "bind_mtd(): attr 0x%x, offset 0x%x, dev %s\n",
+	   req->Attributes, req->CardOffset, (char *)req->dev_info);
     return CS_SUCCESS;
 } /* bind_mtd */
 
@@ -1061,9 +1066,12 @@ int pcmcia_deregister_client(client_handle_t handle)
     u_long flags;
     int i;
     
-    DEBUG(1, "cs: deregister_client(%p)\n", handle);
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
+
+    s = SOCKET(handle);
+    cs_dbg(s, 1, "deregister_client(%p)\n", handle);
+
     if (handle->state &
 	(CLIENT_IRQ_REQ|CLIENT_IO_REQ|CLIENT_CONFIG_LOCKED))
 	return CS_IN_USE;
@@ -1072,7 +1080,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	    return CS_IN_USE;
 
     /* Disconnect all MTD links */
-    s = SOCKET(handle);
     if (handle->mtd_count) {
 	for (region = s->a_region; region; region = region->info.next)
 	    if (region->mtd == handle) region->mtd = NULL;
@@ -1543,8 +1550,8 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	memset(s->config, 0, sizeof(config_t) * s->functions);
     }
     
-    DEBUG(1, "cs: register_client(): client 0x%p, sock %p, dev %s\n",
-	  client, client->Socket, client->dev_info);
+    cs_dbg(s, 1, "register_client(): client 0x%p, dev %s\n",
+	   client, client->dev_info);
     if (client->EventMask & CS_EVENT_REGISTRATION_COMPLETE)
 	EVENT(client, CS_EVENT_REGISTRATION_COMPLETE, CS_EVENT_PRI_LOW);
 
@@ -2077,8 +2084,8 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: resetting socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
+	cs_dbg(skt, 1, "resetting socket\n");
 
 	down(&skt->skt_sem);
 	do {
@@ -2126,8 +2133,8 @@ int pcmcia_suspend_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: suspending socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
+	cs_dbg(skt, 1, "suspending socket\n");
 
 	down(&skt->skt_sem);
 	do {
@@ -2153,8 +2160,8 @@ int pcmcia_resume_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: waking up socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
+	cs_dbg(skt, 1, "waking up socket\n");
 
 	down(&skt->skt_sem);
 	do {
@@ -2186,8 +2193,8 @@ int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: user eject request on socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
+	cs_dbg(skt, 1, "user eject request\n");
 
 	down(&skt->skt_sem);
 	do {
@@ -2215,8 +2222,8 @@ int pcmcia_insert_card(client_handle_t handle, client_req_t *req)
 
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: user insert request on socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
+	cs_dbg(skt, 1, "user insert request\n");
 
 	down(&skt->skt_sem);
 	do {
@@ -2360,7 +2367,6 @@ static int __init init_pcmcia_cs(void)
 {
     printk(KERN_INFO "%s\n", release);
     printk(KERN_INFO "  %s\n", options);
-    DEBUG(0, "%s\n", version);
     class_register(&pcmcia_socket_class);
 
     return 0;

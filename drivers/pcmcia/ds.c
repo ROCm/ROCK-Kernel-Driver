@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
@@ -69,13 +70,17 @@ MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("PCMCIA Driver Services");
 MODULE_LICENSE("Dual MPL/GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#ifdef DEBUG
+static int pc_debug;
 
-#ifdef PCMCIA_DEBUG
-INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
-#define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
+module_param(pc_debug, int, 0644);
+
+#define ds_dbg(lvl, fmt, arg...) do {				\
+	if (pc_debug > (lvl))					\
+		printk(KERN_DEBUG "ds: " fmt , ## arg);		\
+} while (0)
 #else
-#define DEBUG(n, args...)
+#define ds_dbg(lvl, fmt, arg...) do { } while (0)
 #endif
 
 /*====================================================================*/
@@ -277,7 +282,7 @@ static int ds_event(event_t event, int priority,
 {
     struct pcmcia_bus_socket *s;
 
-    DEBUG(1, "ds: ds_event(0x%06x, %d, 0x%p)\n",
+    ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
 	  event, priority, args->client_handle);
     s = args->client_data;
     
@@ -353,7 +358,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!s)
 	    return -EINVAL;
 
-    DEBUG(2, "bind_request(%d, '%s')\n", s->parent->sock,
+    ds_dbg(2, "bind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     driver = get_pcmcia_driver(&bind_info->dev_info);
     if (!driver)
@@ -484,7 +489,7 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
     socket_bind_t **b, *c;
 
-    DEBUG(2, "unbind_request(%d, '%s')\n", s->parent->sock,
+    ds_dbg(2, "unbind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     for (b = &s->bind; *b; b = &(*b)->next)
 	if ((strcmp((char *)(*b)->driver->drv.name,
@@ -518,7 +523,7 @@ static int ds_open(struct inode *inode, struct file *file)
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(0, "ds_open(socket %d)\n", i);
+    ds_dbg(0, "ds_open(socket %d)\n", i);
 
     s = pcmcia_get_bus_socket(i);
     if (!s)
@@ -552,7 +557,7 @@ static int ds_release(struct inode *inode, struct file *file)
     struct pcmcia_bus_socket *s;
     user_info_t *user, **link;
 
-    DEBUG(0, "ds_release(socket %d)\n", iminor(inode));
+    ds_dbg(0, "ds_release(socket %d)\n", iminor(inode));
 
     user = file->private_data;
     if (CHECK_USER(user))
@@ -588,7 +593,7 @@ static ssize_t ds_read(struct file *file, char *buf,
     user_info_t *user;
     int ret;
 
-    DEBUG(2, "ds_read(socket %d)\n", iminor(inode));
+    ds_dbg(2, "ds_read(socket %d)\n", iminor(file->f_dentry->d_inode));
     
     if (count < 4)
 	return -EINVAL;
@@ -616,7 +621,7 @@ static ssize_t ds_write(struct file *file, const char *buf,
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_write(socket %d)\n", iminor(inode));
+    ds_dbg(2, "ds_write(socket %d)\n", iminor(file->f_dentry->d_inode));
     
     if (count != 4)
 	return -EINVAL;
@@ -650,7 +655,7 @@ static u_int ds_poll(struct file *file, poll_table *wait)
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_poll(socket %d)\n", iminor(inode));
+    ds_dbg(2, "ds_poll(socket %d)\n", iminor(file->f_dentry->d_inode));
     
     user = file->private_data;
     if (CHECK_USER(user))
@@ -677,7 +682,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     ds_ioctl_arg_t buf;
     user_info_t *user;
 
-    DEBUG(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
+    ds_dbg(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
     
     user = file->private_data;
     if (CHECK_USER(user))
@@ -697,14 +702,14 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     if (cmd & IOC_IN) {
 	err = verify_area(VERIFY_READ, (char *)arg, size);
 	if (err) {
-	    DEBUG(3, "ds_ioctl(): verify_read = %d\n", err);
+	    ds_dbg(3, "ds_ioctl(): verify_read = %d\n", err);
 	    return err;
 	}
     }
     if (cmd & IOC_OUT) {
 	err = verify_area(VERIFY_WRITE, (char *)arg, size);
 	if (err) {
-	    DEBUG(3, "ds_ioctl(): verify_write = %d\n", err);
+	    ds_dbg(3, "ds_ioctl(): verify_write = %d\n", err);
 	    return err;
 	}
     }
@@ -806,7 +811,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     }
     
     if ((err == 0) && (ret != CS_SUCCESS)) {
-	DEBUG(2, "ds_ioctl: ret = %d\n", ret);
+	ds_dbg(2, "ds_ioctl: ret = %d\n", ret);
 	switch (ret) {
 	case CS_BAD_SOCKET: case CS_NO_CARD:
 	    err = -ENODEV; break;

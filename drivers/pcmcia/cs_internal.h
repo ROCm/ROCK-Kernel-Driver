@@ -167,7 +167,6 @@ int replace_cis(client_handle_t handle, cisdump_t *cis);
 int read_tuple(client_handle_t handle, cisdata_t code, void *parse);
 
 /* In bulkmem.c */
-void retry_erase_list(struct erase_busy_t *list, u_int cause);
 int get_first_region(client_handle_t handle, region_info_t *rgn);
 int get_next_region(client_handle_t handle, region_info_t *rgn);
 int register_mtd(client_handle_t handle, mtd_reg_t *reg);
@@ -194,11 +193,22 @@ void release_resource_db(void);
 extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
 
-#ifdef PCMCIA_DEBUG
-extern int pc_debug;
-#define DEBUG(n, args...) do { if (pc_debug>(n)) printk(KERN_DEBUG args); } while (0)
+#define cs_socket_name(skt)	((skt)->dev.class_id)
+
+#ifdef DEBUG
+extern int cs_debug_level(int);
+
+#define cs_dbg(skt, lvl, fmt, arg...) do {		\
+	if (cs_debug_level(lvl))			\
+		printk(KERN_DEBUG "cs: %s: " fmt, 	\
+		       cs_socket_name(skt) , ## arg);	\
+} while (0)
+
 #else
-#define DEBUG(n, args...) do { } while (0)
+#define cs_dbg(skt, lvl, fmt, arg...) do { } while (0)
 #endif
+
+#define cs_err(skt, fmt, arg...) \
+	printk(KERN_ERR "cs: %s: " fmt, (skt)->dev.class_id , ## arg)
 
 #endif /* _LINUX_CS_INTERNAL_H */
