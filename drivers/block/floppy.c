@@ -4323,6 +4323,12 @@ int __init floppy_init(void)
 		floppy_track_buffer = NULL;
 		max_buffer_sectors = 0;
 	}
+	/*
+	 * Small 10 msec delay to let through any interrupt that
+	 * initialization might have triggered, to not
+	 * confuse detection:
+	 */
+	msleep(10);
 
 	for (i = 0; i < N_FDC; i++) {
 		fdc = i;
