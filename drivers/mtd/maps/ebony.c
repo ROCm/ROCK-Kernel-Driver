@@ -1,5 +1,5 @@
 /*
- * $Id: ebony.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
+ * $Id: ebony.c,v 1.15 2004/12/09 18:39:54 holindho Exp $
  * 
  * Mapping for Ebony user flash
  *
@@ -103,7 +103,7 @@ int __init init_ebony(void)
 
 	simple_map_init(&ebony_small_map);
 
-	flash = do_map_probe("map_rom", &ebony_small_map);
+	flash = do_map_probe("jedec_probe", &ebony_small_map);
 	if (flash) {
 		flash->owner = THIS_MODULE;
 		add_mtd_partitions(flash, ebony_small_partitions,
@@ -124,7 +124,7 @@ int __init init_ebony(void)
 
 	simple_map_init(&ebony_large_map);
 
-	flash = do_map_probe("cfi_probe", &ebony_large_map);
+	flash = do_map_probe("jedec_probe", &ebony_large_map);
 	if (flash) {
 		flash->owner = THIS_MODULE;
 		add_mtd_partitions(flash, ebony_large_partitions,

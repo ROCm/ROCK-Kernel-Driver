@@ -4,7 +4,7 @@
 /* (C) 1999 Machine Vision Holdings, Inc.			*/
 /* (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>		*/
 
-/* $Id: docprobe.c,v 1.43 2004/11/16 18:29:01 dwmw2 Exp $	*/
+/* $Id: docprobe.c,v 1.44 2005/01/05 12:40:36 dwmw2 Exp $	*/
 
 
 

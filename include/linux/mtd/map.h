@@ -1,6 +1,6 @@
 
 /* Overhauled routines for dealing with different mmap regions of flash */
-/* $Id: map.h,v 1.45 2004/09/21 14:31:17 bjd Exp $ */
+/* $Id: map.h,v 1.46 2005/01/05 17:09:44 dwmw2 Exp $ */
 
 #ifndef __LINUX_MTD_MAP_H__
 #define __LINUX_MTD_MAP_H__
@@ -322,7 +322,7 @@ static inline map_word map_word_load_partial(struct map_info *map, map_word orig
 			bitpos = (map_bankwidth(map)-1-i)*8;
 #endif
 			orig.x[0] &= ~(0xff << bitpos);
-			orig.x[0] |= buf[i] << bitpos;
+			orig.x[0] |= buf[i-start] << bitpos;
 		}
 	}
 	return orig;
