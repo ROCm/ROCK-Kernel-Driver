@@ -75,9 +75,18 @@ struct link {
 };
 
 union diskpage {
-	union swap_header swh;
 	struct link link;
 	struct suspend_header sh;
+};
+
+
+#define PMDISK_SIG	"pmdisk-swap1"
+
+struct pmdisk_header {
+	char reserved[PAGE_SIZE - 20 - sizeof(swp_entry_t)];
+	swp_entry_t pmdisk_info;
+	char	orig_sig[10];
+	char	sig[10];
 };
 
 /*
@@ -98,10 +107,9 @@ static void fill_suspend_header(struct suspend_header *sh)
 	sh->num_physpages = num_physpages;
 	strncpy(sh->machine, system_utsname.machine, 8);
 	strncpy(sh->version, system_utsname.version, 20);
-	/* FIXME: Is this bogus? --RR */
+
 	sh->num_cpus = num_online_cpus();
 	sh->page_size = PAGE_SIZE;
-	sh->suspend_pagedir = pm_pagedir_nosave;
 	BUG_ON (pagedir_save != pm_pagedir_nosave);
 	sh->num_pbes = pmdisk_pages;
 	/* TODO: needed? mounted fs' last mounted date comparison
@@ -122,7 +130,7 @@ static unsigned short root_swap;
 static int mark_swapfiles(swp_entry_t prev)
 {
 	swp_entry_t entry;
-	union diskpage *cur;
+	struct pmdisk_header * hdr;
 	int error;
 
 	printk( "S" );
@@ -130,31 +138,28 @@ static int mark_swapfiles(swp_entry_t prev)
 	if (root_swap == 0xFFFF)  /* ignored */
 		return -EINVAL;
 
-	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	if (!cur)
+	hdr = (struct pmdisk_header *)get_zeroed_page(GFP_ATOMIC);
+	if (!hdr)
 		return -ENOMEM;
 
 	/* XXX: this is dirty hack to get first page of swap file */
 	entry = swp_entry(root_swap, 0);
-	rw_swap_page_sync(READ, entry, virt_to_page((unsigned long)cur));
+	rw_swap_page_sync(READ, entry, virt_to_page((unsigned long)hdr));
 
-	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)))
-		memcpy(cur->swh.magic.magic,"P1DISK....",10);
-	else if ((!memcmp("SWAPSPACE2",cur->swh.magic.magic,10)))
-		memcpy(cur->swh.magic.magic,"P2DISK....",10);
-	else {
+
+	if (!memcmp("SWAP-SPACE",hdr->sig,10) ||
+	    !memcmp("SWAPSPACE2",hdr->sig,10)) {
+		memcpy(hdr->orig_sig,hdr->sig,10);
+		memcpy(hdr->sig,PMDISK_SIG,10);
+		hdr->pmdisk_info = prev;
+
+		error = rw_swap_page_sync(WRITE, entry,
+					  virt_to_page((unsigned long)hdr));
+	} else {
 		pr_debug("pmdisk: Partition is not swap space.\n");
-		return -ENODEV;
+		error = -ENODEV;
 	}
-
-	/* prev is the first/last swap page of the resume area */
-	cur->link.next = prev; 
-
-	/* link.next lies *no more* in last 4/8 bytes of magic */
-
-	error = rw_swap_page_sync(WRITE, entry, 
-				  virt_to_page((unsigned long)cur));
-	free_page((unsigned long)cur);
+	free_page((unsigned long)hdr);
 	return error;
 }
 
@@ -934,42 +939,31 @@ extern dev_t __init name_to_dev_t(const char *line);
 
 static int __init check_sig(swp_entry_t * next)
 {
-	union swap_header * hdr;
+	struct pmdisk_header * hdr;
 	int error;
 
-	hdr = (union swap_header *)get_zeroed_page(GFP_ATOMIC);
+	hdr = (struct pmdisk_header *)get_zeroed_page(GFP_ATOMIC);
 	if (!hdr)
 		return -ENOMEM;
 
 	if ((error = read_page(0,hdr)))
-		return error;
-	/*
-	 * We have to read next position before we overwrite it
-	 */
-	*next = next_entry((union diskpage *)hdr);
-
-	if (!memcmp("P1",hdr->magic.magic,2))
-		memcpy(hdr->magic.magic,"SWAP-SPACE",10);
-	else if (!memcmp("P2",hdr->magic.magic,2))
-		memcpy(hdr->magic.magic,"SWAPSPACE2",10);
-	else if ((!memcmp("SWAP-SPACE",hdr->magic.magic,10)) ||
-		 (!memcmp("SWAPSPACE2",hdr->magic.magic,10))) {
-		pr_debug(KERN_ERR "pmdisk: Partition is normal swap space\n");
-		error = -EINVAL;
 		goto Done;
-	} else {
+
+	if (!memcmp(PMDISK_SIG,hdr->sig,10)) {
+		memcpy(hdr->sig,hdr->orig_sig,10);
+		*next = hdr->pmdisk_info;
+
+		/*
+		 * Reset swap signature now.
+		 */
+		error = write_page(0,hdr);
+	} else { 
 		pr_debug(KERN_ERR "pmdisk: Invalid partition type.\n");
 		error = -EINVAL;
-		goto Done;
 	}
 
-	/*
-	 * Reset swap signature now.
-	 */
-	if ((error = write_page(0,hdr)))
-		goto Done;
-
-	pr_debug("pmdisk: Signature found, resuming\n");
+	if (!error)
+		pr_debug("pmdisk: Signature found, resuming\n");
  Done:
 	free_page((unsigned long)hdr);
 	return error;
@@ -1020,7 +1014,6 @@ static int __init check_header(swp_entry_t * next)
 	}
 
 	*next = next_entry((union diskpage *)sh);
-	pagedir_save = sh->suspend_pagedir;
 	pmdisk_pages = sh->num_pbes;
  Done:
 	free_page((unsigned long)sh);
