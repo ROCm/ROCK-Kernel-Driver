@@ -1674,7 +1674,6 @@ void cleanup_module(void)
 			unregister_netdev(dev);
 			kfree(dev->priv);
 			dev->priv = NULL;
-			release_region(dev->base_addr, EEXP_IO_EXTENT);
 		}
 	}
 }
