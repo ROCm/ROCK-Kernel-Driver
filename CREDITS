@@ -1657,6 +1657,13 @@ S: Post Office Box 691886
 S: San Antonio, Texas 78269-1886
 S: USA
 
+N: Denis O. Kropp
+E: dok@directfb.org
+D: NeoMagic framebuffer driver
+S: Badensche Str. 46
+S: 10715 Berlin
+S: Germany
+
 N: Andrzej M. Krzysztofowicz
 E: ankry@mif.pg.gda.pl
 D: Some 8-bit XT disk driver and devfs hacking 

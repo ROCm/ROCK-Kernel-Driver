@@ -12,6 +12,9 @@
  * archive for more details.
  *
  *
+ * 0.3.2
+ *  - got rid of all floating point (dok) 
+ *
  * 0.3.1
  *  - added module license (dok)
  *
@@ -71,7 +74,7 @@
 #include "neofb.h"
 
 
-#define NEOFB_VERSION "0.3.1"
+#define NEOFB_VERSION "0.3.2"
 
 /* --------------------------------------------------------------------- */
 
@@ -872,7 +875,7 @@ static int neofb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
  *
  * Determine the closest clock frequency to the one requested.
  */
-#define REF_FREQ 14.31818
+#define REF_FREQ 0xe517  /* 14.31818 in 20.12 fixed point */
 #define MAX_N 127
 #define MAX_D 31
 #define MAX_F 1
@@ -880,17 +883,18 @@ static int neofb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 static void neoCalcVCLK (const struct neofb_info *info, struct neofb_par *par, long freq)
 {
   int n, d, f;
-  double f_out;
-  double f_diff;
   int n_best = 0, d_best = 0, f_best = 0;
-  double f_best_diff = 999999.0;
-  double f_target = freq/1000.0;
+  long f_best_diff = (0x7ffff << 12); /* 20.12 */
+  long f_target = (freq << 12) / 1000; /* 20.12 */
 
   for (f = 0; f <= MAX_F; f++)
     for (n = 0; n <= MAX_N; n++)
       for (d = 0; d <= MAX_D; d++)
 	{
-	  f_out = (n+1.0)/((d+1.0)*(1<<f))*REF_FREQ;
+          long f_out;  /* 20.12 */
+          long f_diff; /* 20.12 */
+
+	  f_out = ((((n+1) << 12)  /  ((d+1)*(1<<f))) >> 12)  *  REF_FREQ;
 	  f_diff = abs(f_out-f_target);
 	  if (f_diff < f_best_diff)
 	    {
@@ -917,12 +921,12 @@ static void neoCalcVCLK (const struct neofb_info *info, struct neofb_par *par, l
   par->VCLK3Denominator = d_best;
 
 #ifdef NEOFB_DEBUG
-  printk ("neoVCLK: f:%f NumLow=%d NumHi=%d Den=%d Df=%f\n",
-	  f_target,
+  printk ("neoVCLK: f:%d NumLow=%d NumHi=%d Den=%d Df=%d\n",
+	  f_target >> 12,
 	  par->VCLK3NumeratorLow,
 	  par->VCLK3NumeratorHigh,
 	  par->VCLK3Denominator,
-	  f_best_diff);
+	  f_best_diff >> 12);
 #endif
 }
 
