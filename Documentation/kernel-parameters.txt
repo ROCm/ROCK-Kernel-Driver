@@ -844,6 +844,13 @@ running once the system is up.
 	panic=		[KNL] Kernel behaviour on panic
 			Format: <timeout>
 
+	parkbd.port=	[HW] Parallel port number the keyboard adapter is
+			connected to, default is 0.
+			Format: <parport#>
+	parkbd.mode=	[HW] Parallel port keyboard adapter mode of operation,
+			0 for XT, 1 for AT (default is AT).
+			Format: <mode> 
+
 	parport=0	[HW,PPT]	Specify parallel ports. 0 disables.
 	parport=auto			Use 'auto' to force the driver to use
 	parport=0xBBB[,IRQ[,DMA]]	any IRQ/DMA settings detected (the
