@@ -353,6 +353,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	struct e1000_hw *hw = &adapter->hw;
 	int first_word, last_word;
 	int ret_val = 0;
+	uint16_t i;
 
 	if(eeprom->len == 0) {
 		ret_val = -EINVAL;
@@ -377,12 +378,16 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 					    last_word - first_word + 1,
 					    eeprom_buff);
 	else {
-		uint16_t i;
 		for (i = 0; i < last_word - first_word + 1; i++)
 			if((ret_val = e1000_read_eeprom(hw, first_word + i, 1,
 							&eeprom_buff[i])))
 				break;
 	}
+
+	/* Device's eeprom is always little-endian, word addressable */
+	for (i = 0; i < last_word - first_word + 1; i++)
+		le16_to_cpus(&eeprom_buff[i]);
+
 geeprom_error:
 	return ret_val;
 }
@@ -395,6 +400,7 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	uint16_t *eeprom_buff;
 	void *ptr;
 	int max_len, first_word, last_word, ret_val = 0;
+	uint16_t i;
 
 	if(eeprom->len == 0)
 		return -EOPNOTSUPP;
@@ -428,10 +434,18 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 		ret_val = e1000_read_eeprom(hw, last_word, 1,
 		                  &eeprom_buff[last_word - first_word]);
 	}
+
+	/* Device's eeprom is always little-endian, word addressable */
+	for (i = 0; i < last_word - first_word + 1; i++)
+		le16_to_cpus(&eeprom_buff[i]);
+
 	if((ret_val != 0) || copy_from_user(ptr, user_data, eeprom->len)) {
 		ret_val = -EFAULT;
 		goto seeprom_error;
 	}
+
+	for (i = 0; i < last_word - first_word + 1; i++)
+		eeprom_buff[i] = cpu_to_le16(eeprom_buff[i]);
 
 	ret_val = e1000_write_eeprom(hw, first_word,
 				     last_word - first_word + 1, eeprom_buff);
