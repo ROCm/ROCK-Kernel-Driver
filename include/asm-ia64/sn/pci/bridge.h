@@ -1684,7 +1684,7 @@ typedef volatile struct bridge_s {
 /* RRB clear register */
 #define	BRIDGE_RRB_CLEAR(r)	(0x00000001<<(r))
 
-/* Defines for the virtual channels so we dont hardcode 0-3 within code */
+/* Defines for the virtual channels so we don't hardcode 0-3 within code */
 #define VCHAN0	0	/* virtual channel 0 (ie. the "normal" channel) */
 #define VCHAN1	1	/* virtual channel 1 */
 #define VCHAN2	2	/* virtual channel 2 - PIC only */

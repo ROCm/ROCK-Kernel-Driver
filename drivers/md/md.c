@@ -1427,7 +1427,7 @@ static int do_md_run(mddev_t * mddev)
 			/*
 			 * 'default chunksize' in the old md code used to
 			 * be PAGE_SIZE, baaad.
-			 * we abort here to be on the safe side. We dont
+			 * we abort here to be on the safe side. We don't
 			 * want to continue the bad practice.
 			 */
 			printk(BAD_CHUNKSIZE);

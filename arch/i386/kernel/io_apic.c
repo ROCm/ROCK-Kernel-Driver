@@ -46,7 +46,7 @@ static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  *	Is the SiS APIC rmw bug present ?
- *	-1 = dont know, 0 = no, 1 = yes
+ *	-1 = don't know, 0 = no, 1 = yes
  */
 int sis_apic_bug = -1;
 

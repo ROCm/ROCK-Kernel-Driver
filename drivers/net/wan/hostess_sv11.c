@@ -61,7 +61,7 @@ static void hostess_input(struct z8530_channel *c, struct sk_buff *skb)
 	skb->mac.raw=skb->data;
 	skb->dev=c->netdevice;
 	/*
-	 *	Send it to the PPP layer. We dont have time to process
+	 *	Send it to the PPP layer. We don't have time to process
 	 *	it right now.
 	 */
 	netif_rx(skb);

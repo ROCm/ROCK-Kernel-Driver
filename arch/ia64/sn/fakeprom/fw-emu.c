@@ -757,7 +757,7 @@ sys_fw_init (const char *args, int arglen, int bsp)
 	sal_systab->checksum = -checksum;
 
 	/* If the checksum is correct, the kernel tries to use the
-	 * table. We dont build enough table & the kernel aborts.
+	 * table. We don't build enough table & the kernel aborts.
 	 * Note that the PROM hasd thhhe same problem!!
 	 */
 

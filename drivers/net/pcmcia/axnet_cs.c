@@ -1226,7 +1226,7 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Mask interrupts from the ethercard. 
 	   SMP: We have to grab the lock here otherwise the IRQ handler
 	   on another CPU can flip window and race the IRQ mask set. We end
-	   up trashing the mcast filter not disabling irqs if we dont lock */
+	   up trashing the mcast filter not disabling irqs if we don't lock */
 	   
 	spin_lock_irqsave(&ei_local->page_lock, flags);
 	outb_p(0x00, e8390_base + EN0_IMR);

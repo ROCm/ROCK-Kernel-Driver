@@ -3507,7 +3507,7 @@ maestro_probe(struct pci_dev *pcidev,const struct pci_device_id *pdid)
 	 * 		or
 	 *		- we're not a 2e, lesser chipps seem to have problems.
 	 *		- we're not on our _very_ small whitelist.  some implemenetations
-	 *			really dont' like the pm code, others require it.
+	 *			really don't like the pm code, others require it.
 	 *			feel free to expand this as required.
 	 */
 #define SUBSYSTEM_VENDOR(x) (x&0xffff)

@@ -810,7 +810,7 @@ static void envctrl_init_fanstat(struct i2c_child_t *pchild)
 		pchild->fan_mask |= chnls_mask[(pchild->chnl_array[i]).chnl_no];
 
 	/* We only need to know if this child has fan status monitored.
-	 * We dont care which channels since we have the mask already.
+	 * We don't care which channels since we have the mask already.
 	 */
 	pchild->mon_type[0] = ENVCTRL_FANSTAT_MON;
 }
@@ -842,7 +842,7 @@ static void envctrl_init_globaladdr(struct i2c_child_t *pchild)
 	}
 
 	/* We only need to know if this child has global addressing 
-	 * line monitored.  We dont care which channels since we know 
+	 * line monitored.  We don't care which channels since we know 
 	 * the mask already (ENVCTRL_GLOBALADDR_ADDR_MASK).
 	 */
 	pchild->mon_type[0] = ENVCTRL_GLOBALADDR_MON;
@@ -858,7 +858,7 @@ static void envctrl_init_voltage_status(struct i2c_child_t *pchild)
 		pchild->voltage_mask |= chnls_mask[(pchild->chnl_array[i]).chnl_no];
 
 	/* We only need to know if this child has voltage status monitored.
-	 * We dont care which channels since we have the mask already.
+	 * We don't care which channels since we have the mask already.
 	 */
 	pchild->mon_type[0] = ENVCTRL_VOLTAGESTAT_MON;
 }

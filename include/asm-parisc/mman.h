@@ -32,7 +32,7 @@
 #define MADV_RANDOM     1               /* expect random page references */
 #define MADV_SEQUENTIAL 2               /* expect sequential page references */
 #define MADV_WILLNEED   3               /* will need these pages */
-#define MADV_DONTNEED   4               /* dont need these pages */
+#define MADV_DONTNEED   4               /* don't need these pages */
 #define MADV_SPACEAVAIL 5               /* insure that resources are reserved */
 #define MADV_VPS_PURGE  6               /* Purge pages from VM page cache */
 #define MADV_VPS_INHERIT 7              /* Inherit parents page size */

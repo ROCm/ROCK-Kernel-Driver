@@ -3303,7 +3303,7 @@ static u32 tg3FwRodata[(TG3_FW_RODATA_LEN / sizeof(u32)) + 1] = {
 	0x00000000
 };
 
-#if 0 /* All zeros, dont eat up space with it. */
+#if 0 /* All zeros, don't eat up space with it. */
 u32 tg3FwData[(TG3_FW_DATA_LEN / sizeof(u32)) + 1] = {
 	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 	0x00000000, 0x00000000, 0x00000000, 0x00000000
@@ -3736,7 +3736,7 @@ u32 tg3TsoFwRodata[] = {
 	0x00000000
 };
 
-#if 0 /* All zeros, dont eat up space with it. */
+#if 0 /* All zeros, don't eat up space with it. */
 u32 tg3TsoFwData[] = {
 	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 	0x00000000, 0x00000000, 0x00000000

@@ -161,7 +161,7 @@ static int tco_timer_settimer (unsigned char tmrval)
 }
 
 /*
- * Reload (trigger) the timer. Lock is needed so we dont reload it during
+ * Reload (trigger) the timer. Lock is needed so we don't reload it during
  * a reprogramming event
  */
  

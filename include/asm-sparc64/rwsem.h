@@ -8,7 +8,7 @@
 #define _SPARC64_RWSEM_H
 
 #ifndef _LINUX_RWSEM_H
-#error please dont include asm/rwsem.h directly, use linux/rwsem.h instead
+#error "please don't include asm/rwsem.h directly, use linux/rwsem.h instead"
 #endif
 
 #ifdef __KERNEL__

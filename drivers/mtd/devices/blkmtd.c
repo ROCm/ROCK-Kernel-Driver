@@ -16,7 +16,7 @@
  *       thread writes pages out to the device in the background. This
  *       ensures that writes are order even if a page is updated twice.
  *       Also, since pages in the page cache are never marked as dirty,
- *       we dont have to worry about writepage() being called on some 
+ *       we don't have to worry about writepage() being called on some 
  *       random page which may not be in the write order.
  * 
  *       Erases are handled like writes, so the callback is called after
@@ -33,7 +33,7 @@
  *       Page cache usage may still be a bit wrong. Check we are doing
  *       everything properly.
  * 
- *       Somehow allow writes to dirty the page cache so we dont use too
+ *       Somehow allow writes to dirty the page cache so we don't use too
  *       much memory making copies of outgoing pages. Need to handle case
  *       where page x is written to, then page y, then page x again before
  *       any of them have been committed to disk.
@@ -350,7 +350,7 @@ static int write_queue_task(void *data)
       int max_sectors = KIO_MAX_SECTORS >> (item->rawdevice->sector_bits - 9);
 
       /* If we are writing to the last page on the device and it doesn't end
-       * on a page boundary, subtract the number of sectors that dont exist.
+       * on a page boundary, subtract the number of sectors that don't exist.
        */
       if(item->rawdevice->partial_last_page && 
 	 (item->pagenr + item->pagecnt -1) == item->rawdevice->partial_last_page) {

@@ -228,7 +228,7 @@ struct stream {
 	/* The cycle_count and cycle_offset fields are used for the
 	 * synchronization timestamps (syt) in the cip header.  They
 	 * are incremented by at least a cycle every time we put a
-	 * time stamp in a packet.  As we dont time stamp all
+	 * time stamp in a packet.  As we don't time stamp all
 	 * packages, cycle_count isn't updated in every cycle, and
 	 * sometimes it's incremented by 2.  Thus, we have
 	 * cycle_count2, which is simply incremented by one with each
@@ -748,7 +748,7 @@ static void fill_packet(struct stream *s, struct packet *packet, int nevents)
 
 		/* This next addition should be modulo 8000 (0x1f40),
 		 * but we only use the lower 4 bits of cycle_count, so
-		 * we dont need the modulo. */
+		 * we don't need the modulo. */
 		atomic_add(s->cycle_offset.integer / 3072, &s->cycle_count);
 		s->cycle_offset.integer %= 3072;
 	}

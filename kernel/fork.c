@@ -446,7 +446,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 		tsk->clear_child_tid = NULL;
 
 		/*
-		 * We dont check the error code - if userspace has
+		 * We don't check the error code - if userspace has
 		 * not set up a proper pointer then tough luck.
 		 */
 		put_user(0, tidptr);

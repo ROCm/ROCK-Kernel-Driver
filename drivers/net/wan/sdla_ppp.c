@@ -3418,7 +3418,7 @@ static int config_ppp (sdla_t *card)
 					card->devname);
 		}else{ 
 			/* IP addresses are the same and the link is up, 
-                         * we dont have to do anything here. Therefore, exit */
+                         * we don't have to do anything here. Therefore, exit */
 			return 0;
 		}
 	}

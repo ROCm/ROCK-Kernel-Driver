@@ -395,7 +395,7 @@ sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	mycnode = local_nodeid;
 
 	/* 
-	 * For now, we dont want to spin uninterruptibly waiting
+	 * For now, we don't want to spin uninterruptibly waiting
 	 * for the lock. Makes hangs hard to debug.
 	 */
 	local_irq_save(flags);

@@ -532,7 +532,7 @@ static int irtty_open(struct tty_struct *tty)
 		tty->driver.flush_buffer(tty);
 	
 /* from old irtty - but what is it good for?
- * we _are_ the ldisc and we _dont_ implement flush_buffer!
+ * we _are_ the ldisc and we _don't_ implement flush_buffer!
  *
  *	if (tty->ldisc.flush_buffer)
  *		tty->ldisc.flush_buffer(tty);

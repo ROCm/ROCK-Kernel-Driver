@@ -1341,7 +1341,7 @@ xfs_dir_leaf_toosmall(xfs_da_state_t *state, int *action)
 		count * ((uint)sizeof(xfs_dir_leaf_name_t)-1) +
 		INT_GET(leaf->hdr.namebytes, ARCH_CONVERT);
 	if (bytes > (state->blocksize >> 1)) {
-		*action = 0;	/* blk over 50%, dont try to join */
+		*action = 0;	/* blk over 50%, don't try to join */
 		return(0);
 	}
 

@@ -803,7 +803,7 @@ pcibr_slot_info_init(devfs_handle_t 	pcibr_vhdl,
 	 * 'min_gnt' and attempt to calculate a latency time. 
 	 *
 	 * NOTE: For now if the device is on the 'real time' arbitration
-	 * ring we dont set the latency timer.  
+	 * ring we don't set the latency timer.  
 	 *
 	 * WAR: SGI's IOC3 and RAD devices target abort if you write a 
 	 * single byte into their config space.  So don't set the Latency

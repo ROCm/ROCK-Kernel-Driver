@@ -27,7 +27,7 @@
 #define IQDIO_DELAY_TARGET 0
 #define QDIO_BUSY_BIT_PATIENCE 2000 /* in microsecs */
 #define IQDIO_GLOBAL_LAPS 2 /* GLOBAL_LAPS are not used as we */
-#define IQDIO_GLOBAL_LAPS_INT 1 /* dont global summary */
+#define IQDIO_GLOBAL_LAPS_INT 1 /* don't global summary */
 #define IQDIO_LOCAL_LAPS 4
 #define IQDIO_LOCAL_LAPS_INT 1
 #define IQDIO_GLOBAL_SUMMARY_CC_MASK 2

@@ -77,7 +77,7 @@ static char cyrix_model_mult2[] __initdata = "12233445";
  * BIOSes for compatibility with DOS games.  This makes the udelay loop
  * work correctly, and improves performance.
  *
- * FIXME: our newer udelay uses the tsc. We dont need to frob with SLOP
+ * FIXME: our newer udelay uses the tsc. We don't need to frob with SLOP
  */
 
 extern void calibrate_delay(void) __init;

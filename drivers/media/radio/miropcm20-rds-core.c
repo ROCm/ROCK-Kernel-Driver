@@ -91,7 +91,7 @@ static int rds_waitread(void)
 	}
 }
 
-/* dont use any ..._nowait() function if you are not sure what you do... */
+/* don't use any ..._nowait() function if you are not sure what you do... */
 
 static inline void rds_rawwrite_nowait(unsigned char byte)
 {

@@ -39,7 +39,7 @@
 #define MADV_SEQUENTIAL	2		/* expect sequential page references */
 #define MADV_WILLNEED	3		/* will need these pages */
 #define	MADV_SPACEAVAIL	5		/* ensure resources are available */
-#define MADV_DONTNEED	6		/* dont need these pages */
+#define MADV_DONTNEED	6		/* don't need these pages */
 
 /* compatibility flags */
 #define MAP_ANON	MAP_ANONYMOUS

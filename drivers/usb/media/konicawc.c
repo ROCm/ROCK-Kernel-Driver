@@ -266,7 +266,7 @@ static int konicawc_compress_iso(struct uvd *uvd, struct urb *dataurb, struct ur
 			sts &= ~0x40;
 		}
 		
-		/* work out the button status, but dont do
+		/* work out the button status, but don't do
 		   anything with it for now */
 
 		if(button != cam->buttonsts) {

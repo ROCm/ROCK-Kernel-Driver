@@ -1527,7 +1527,7 @@ pcibr_attach2(devfs_handle_t xconn_vhdl, bridge_t *bridge,
 	/* enable parity checking on PICs internal RAM */
 	pic_ctrl_reg |= PIC_CTRL_PAR_EN_RESP;
 	pic_ctrl_reg |= PIC_CTRL_PAR_EN_ATE;
-	/* PIC BRINGUP WAR (PV# 862253): dont enable write request
+	/* PIC BRINGUP WAR (PV# 862253): don't enable write request
 	 * parity checking.
 	 */
 	if (!PCIBR_WAR_ENABLED(PV862253, pcibr_soft)) {

@@ -2213,7 +2213,7 @@ static void enable_interrupts( struct airo_info *ai ) {
 	/* Enable the interrupts */
 	OUT4500( ai, EVINTEN, STATUS_INTS );
 	/* Note there is a race condition between the last two lines that
-	   I dont know how to get rid of right now... */
+	   I don't know how to get rid of right now... */
 }
 
 static void disable_interrupts( struct airo_info *ai ) {
