@@ -158,33 +158,23 @@ static int vfat_cmp(struct dentry *dentry, struct qstr *a, struct qstr *b)
 
 /* Characters that are undesirable in an MS-DOS file name */
 
-static wchar_t bad_chars[] = {
-	/*  `*'     `?'     `<'    `>'      `|'     `"'     `:'     `/' */
-	0x002A, 0x003F, 0x003C, 0x003E, 0x007C, 0x0022, 0x003A, 0x002F,
-	/*  `\' */
-	0x005C, 0,
-};
-#define IS_BADCHAR(uni)	(vfat_unistrchr(bad_chars, (uni)) != NULL)
-
-static wchar_t replace_chars[] = {
-	/*  `['     `]'    `;'     `,'     `+'      `=' */
-	0x005B, 0x005D, 0x003B, 0x002C, 0x002B, 0x003D, 0,
-};
-#define IS_REPLACECHAR(uni)	(vfat_unistrchr(replace_chars, (uni)) != NULL)
-
-static wchar_t skip_chars[] = {
-	/*  `.'     ` ' */
-	0x002E, 0x0020, 0,
-};
-#define IS_SKIPCHAR(uni) \
-	((wchar_t)(uni) == skip_chars[0] || (wchar_t)(uni) == skip_chars[1])
-
-static inline wchar_t *vfat_unistrchr(const wchar_t *s, const wchar_t c)
+static inline wchar_t vfat_bad_char(wchar_t w)
 {
-	for(; *s != c; ++s)
-		if (*s == 0)
-			return NULL;
-	return (wchar_t *) s;
+	return (w < 0x0020)
+	    || (w == '*') || (w == '?') || (w == '<') || (w == '>')
+	    || (w == '|') || (w == '"') || (w == ':') || (w == '/')
+	    || (w == '\\');
+}
+
+static inline wchar_t vfat_replace_char(wchar_t w)
+{
+	return (w == '[') || (w == ']') || (w == ';') || (w == ',')
+	    || (w == '+') || (w == '=');
+}
+
+static wchar_t vfat_skip_char(wchar_t w)
+{
+	return (w == '.') || (w == ' ');
 }
 
 static inline int vfat_is_used_badchars(const wchar_t *s, int len)
@@ -192,7 +182,7 @@ static inline int vfat_is_used_badchars(const wchar_t *s, int len)
 	int i;
 	
 	for (i = 0; i < len; i++)
-		if (s[i] < 0x0020 || IS_BADCHAR(s[i]))
+		if (vfat_bad_char(s[i]))
 			return -EINVAL;
 	return 0;
 }
@@ -291,11 +281,11 @@ static inline int to_shortname_char(struct nls_table *nls,
 {
 	int len;
 
-	if (IS_SKIPCHAR(*src)) {
+	if (vfat_skip_char(*src)) {
 		info->valid = 0;
 		return 0;
 	}
-	if (IS_REPLACECHAR(*src)) {
+	if (vfat_replace_char(*src)) {
 		info->valid = 0;
 		buf[0] = '_';
 		return 1;
@@ -375,7 +365,7 @@ static int vfat_create_shortname(struct inode *dir, struct nls_table *nls,
 		 */
 		name_start = &uname[0];
 		while (name_start < ext_start) {
-			if (!IS_SKIPCHAR(*name_start))
+			if (!vfat_skip_char(*name_start))
 				break;
 			name_start++;
 		}
