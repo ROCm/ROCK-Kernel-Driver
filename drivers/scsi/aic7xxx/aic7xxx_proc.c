@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#25 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#26 $
  */
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
@@ -148,8 +148,9 @@ ahc_dump_target_state(struct ahc_softc *ahc, struct info_str *info,
 
 	tinfo = ahc_fetch_transinfo(ahc, channel, our_id,
 				    target_id, &tstate);
-	copy_info(info, "Channel %c Target %d Negotiation Settings\n",
-		  channel, target_id);
+	if ((ahc->features & AHC_TWIN) != 0)
+		copy_info(info, "Channel %c ", channel);
+	copy_info(info, "Target %d Negotiation Settings\n", target_id);
 	copy_info(info, "\tUser: ");
 	ahc_format_transinfo(info, &tinfo->user);
 	targ = ahc->platform_data->targets[target_offset];
