@@ -586,12 +586,9 @@ xfs_unmount(
 	ASSERT(vn_count(rvp) == 1);
 
 	/*
-	 * Drop the reference count, and then
-	 * run the vnode through vn_remove.
+	 * Drop the reference count
 	 */
 	VN_RELE(rvp);
-
-	vn_remove(rvp);
 
 	/*
 	 * If we're forcing a shutdown, typically because of a media error,
