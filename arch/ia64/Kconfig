@@ -1,8 +1,6 @@
-
 mainmenu "IA-64 Linux Kernel Configuration"
 
 source "init/Kconfig"
-
 
 menu "Processor type and features"
 
@@ -10,51 +8,14 @@ config IA64
 	bool
 	default y
 	help
-	  The Itanium is Intel's 64-bit successor to the 32-bit X86 line.  As
-	  of early 2001 it is not yet in widespread production use.  The Linux
-	  IA-64 project has a home page at <http://www.linuxia64.org/>.
-
-config ISA
-	bool
-	help
-	  Find out whether you have ISA slots on your motherboard.  ISA is the
-	  name of a bus system, i.e. the way the CPU talks to the other stuff
-	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
-	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
-	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
-
-config EISA
-	bool
-	---help---
-	  The Extended Industry Standard Architecture (EISA) bus was
-	  developed as an open alternative to the IBM MicroChannel bus.
-
-	  The EISA bus provided some of the features of the IBM MicroChannel
-	  bus while maintaining backward compatibility with cards made for
-	  the older ISA bus.  The EISA bus saw limited use between 1988 and
-	  1995 when it was made obsolete by the PCI bus.
-
-	  Say Y here if you are building a kernel for an EISA-based machine.
-
-	  Otherwise, say N.
-
-config MCA
-	bool
-	help
-	  MicroChannel Architecture is found in some IBM PS/2 machines and
-	  laptops.  It is a bus system similar to PCI or ISA. See
-	  <file:Documentation/mca.txt> (and especially the web page given
-	  there) before attempting to build an MCA bus kernel.
-
-config SBUS
-	bool
+	  The Itanium Processor Family is Intel's 64-bit successor to
+	  the 32-bit X86 line.  The IA-64 Linux project has a home
+	  page at <http://www.linuxia64.org/> and a mailing list at
+	  linux-ia64@linuxia64.org.
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y
-
-config RWSEM_XCHGADD_ALGORITHM
-	bool
 
 choice
 	prompt "IA-64 processor type"
@@ -63,10 +24,12 @@ choice
 config ITANIUM
 	bool "Itanium"
 	help
-	  Select your IA64 processor type.  The default is Intel Itanium.
+	  Select your IA-64 processor type.  The default is Intel Itanium.
+	  This choice is safe for all IA-64 systems, but may not perform
+	  optimally on systems with, say, Itanium 2 or newer processors.
 
 config MCKINLEY
-	bool "Itanium-2"
+	bool "Itanium 2"
 	help
 	  Select this to configure for an Itanium 2 (McKinley) processor.
 
@@ -90,7 +53,7 @@ config IA64_GENERIC
 
 	  HP-simulator   For the HP simulator
 	  (<http://software.hp.com/ia64linux/>).
-	  HP-zx1         For HP zx1 platforms.
+	  HP-zx1         For HP zx1-based systems.
 	  SN1-simulator  For the SGI SN1 simulator.
 	  DIG-compliant  For DIG ("Developer's Interface Guide") compliant
 	  systems.
@@ -107,8 +70,8 @@ config IA64_HP_ZX1
 	bool "HP-zx1"
 	help
 	  Build a kernel that runs on HP zx1-based systems.  This adds support
-	  for the zx1 IOMMU and makes root bus bridges appear in PCI config space
-	  (required for zx1 agpgart support).
+	  for the zx1 I/O MMU and makes root bus bridges appear in PCI config
+	  space (required for zx1 agpgart support).
 
 config IA64_SGI_SN1
 	bool "SGI-SN1"
@@ -129,15 +92,15 @@ config IA64_PAGE_SIZE_4KB
 	  performance, a page size of 8KB or 16KB is recommended.  For best
 	  IA-32 compatibility, a page size of 4KB should be selected (the vast
 	  majority of IA-32 binaries work perfectly fine with a larger page
-	  size).  For Itanium systems, do NOT chose a page size larger than
-	  16KB.
+	  size).  For Itanium 2 or newer systems, a page size of 64KB can also
+	  be selected.
 
 	  4KB                For best IA-32 compatibility
 	  8KB                For best IA-64 performance
 	  16KB               For best IA-64 performance
-	  64KB               Not for Itanium.
+	  64KB               Requires Itanium 2 or newer processor.
 
-	  If you don't know what to do, choose 8KB.
+	  If you don't know what to do, choose 16KB.
 
 config IA64_PAGE_SIZE_8KB
 	bool "8KB"
@@ -200,7 +163,7 @@ config ACPI_KERNEL_CONFIG
 	default y
 	help
 	  If you say `Y' here, Linux's ACPI support will use the
-	  hardware-level system descriptions found on IA64 machines.
+	  hardware-level system descriptions found on IA-64 systems.
 
 config IA64_BRL_EMU
 	bool
@@ -226,15 +189,15 @@ config MCKINLEY_ASTEP_SPECIFIC
 	bool "Enable McKinley A-step specific code"
 	depends on MCKINLEY
 	help
-	  Select this option to build a kernel for an IA64 McKinley system
-	  with any A-stepping CPU.
+	  Select this option to build a kernel for an IA-64 McKinley prototype
+	  system with any A-stepping CPU.
 
 config MCKINLEY_A0_SPECIFIC
 	bool "Enable McKinley A0/A1-step specific code"
 	depends on MCKINLEY_ASTEP_SPECIFIC
 	help
-	  Select this option to build a kernel for an IA64 McKinley system
-	  with an A0 or A1 stepping CPU.
+	  Select this option to build a kernel for an IA-64 McKinley prototype
+	  system with an A0 or A1 stepping CPU.
 
 config NUMA
 	bool "Enable NUMA support" if IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
@@ -242,14 +205,14 @@ config NUMA
 	help
 	  Say Y to compile the kernel to support NUMA (Non-Uniform Memory
 	  Access).  This option is for configuring high-end multiprocessor
-	  server machines.  If in doubt, say N.
+	  server systems.  If in doubt, say N.
 
 config DISCONTIGMEM
 	bool
 	depends on IA64_SGI_SN1 || IA64_SGI_SN2 || (IA64_GENERIC || IA64_DIG || IA64_HP_ZX1) && NUMA
 	default y
 	help
-	  Say Y to upport efficient handling of discontiguous physical memory,
+	  Say Y to support efficient handling of discontiguous physical memory,
 	  for architectures which are either NUMA (Non-Uniform Memory Access)
 	  or have huge holes in the physical address space for other reasons.
 	  See <file:Documentation/vm/numa> for more.
@@ -298,14 +261,14 @@ config IA64_SGI_SN_DEBUG
 	depends on IA64_SGI_SN1 || IA64_SGI_SN2
 	help
 	  Turns on extra debugging code in the SGI SN (Scalable NUMA) platform
-	  for IA64.  Unless you are debugging problems on an SGI SN IA64 box,
+	  for IA-64.  Unless you are debugging problems on an SGI SN IA-64 box,
 	  say N.
 
 config IA64_SGI_SN_SIM
 	bool "Enable SGI Medusa Simulator Support"
 	depends on IA64_SGI_SN1 || IA64_SGI_SN2
 	help
-	  If you are compiling a kernel that will run under SGI's IA64
+	  If you are compiling a kernel that will run under SGI's IA-64
 	  simulator (Medusa) then say Y, otherwise say N.
 
 config IA64_SGI_AUTOTEST
@@ -323,7 +286,7 @@ config SERIAL_SGI_L1_PROTOCOL
 	depends on IA64_SGI_SN1 || IA64_SGI_SN2
 	help
 	  Uses protocol mode instead of raw mode for the level 1 console on the
-	  SGI SN (Scalable NUMA) platform for IA64.  If you are compiling for
+	  SGI SN (Scalable NUMA) platform for IA-64.  If you are compiling for
 	  an SGI SN box then Y is the recommended value, otherwise say N.
 
 config PERCPU_IRQ
@@ -336,8 +299,8 @@ config PCIBA
 	depends on IA64_SGI_SN1 || IA64_SGI_SN2
 	help
 	  IRIX PCIBA-inspired user mode PCI interface for the SGI SN (Scalable
-	  NUMA) platform for IA64.  Unless you are compiling a kernel for an
-	  SGI SN IA64 box, say N.
+	  NUMA) platform for IA-64.  Unless you are compiling a kernel for an
+	  SGI SN IA-64 box, say N.
 
 # On IA-64, we always want an ELF /proc/kcore.
 config KCORE_ELF
@@ -402,27 +365,17 @@ config SMP
 	bool "SMP support"
 	---help---
 	  This enables support for systems with more than one CPU. If you have
-	  a system with only one CPU, like most personal computers, say N. If
-	  you have a system with more than one CPU, say Y.
+	  a system with only one CPU say N. If you have a system with more than
+	  one CPU, say Y.
 
 	  If you say N here, the kernel will run on single and multiprocessor
-	  machines, but will use only one CPU of a multiprocessor machine. If
+	  systems, but will use only one CPU of a multiprocessor system. If
 	  you say Y here, the kernel will run on many, but not all,
-	  singleprocessor machines. On a singleprocessor machine, the kernel
+	  singleprocessor system. On a singleprocessor system, the kernel
 	  will run faster if you say N here.
 
-	  Note that if you say Y here and choose architecture "586" or
-	  "Pentium" under "Processor family", the kernel will not work on 486
-	  architectures. Similarly, multiprocessor kernels for the "PPro"
-	  architecture may not work on all Pentium based boards.
-
-	  People using multiprocessor machines who say Y here should also say
-	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
-	  Management" code will be disabled if you say Y here.
-
 	  See also the <file:Documentation/smp.tex>,
-	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
-	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+	  <file:Documentation/smp.txt>, and the SMP-HOWTO available at
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
@@ -430,17 +383,19 @@ config SMP
 config IA32_SUPPORT
 	bool "Support running of Linux/x86 binaries"
 	help
-	  IA64 processors can run IA32 (that is, x86) binaries by emulating
-	  the IA32 instruction set.  Say Y here to build in kernel support for
-	  this.  If in doubt, say Y.
+	  IA-64 processors can execute IA-32 (X86) instructions.  By
+	  saying Y here, the kernel will include IA-32 system call
+	  emulation support which makes it possible to transparently
+	  run IA-32 Linux binaries on an IA-64 Linux system.
+	  If in doubt, say Y.
 
 config PERFMON
 	bool "Performance monitor support"
 	help
 	  Selects whether support for the IA-64 performance monitor hardware
 	  is included in the kernel.  This makes some kernel data-structures a
-	  little bigger and slows down execution a bit, but it is still
-	  usually a good idea to turn this on.  If you're unsure, say N.
+	  little bigger and slows down execution a bit, but it is generally
+	  a good idea to turn this on.  If you're unsure, say Y.
 
 config IA64_PALINFO
 	tristate "/proc/pal support"
@@ -450,7 +405,7 @@ config IA64_PALINFO
 	  about the processors in your systems, such as cache and TLB sizes
 	  and the PAL firmware version in use.
 
-	  To use this option, you have to check that the "/proc file system
+	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
 config EFI_VARS
@@ -473,29 +428,10 @@ config BINFMT_ELF
 	---help---
 	  ELF (Executable and Linkable Format) is a format for libraries and
 	  executables used across different architectures and operating
-	  systems. Saying Y here will enable your kernel to run ELF binaries
-	  and enlarge it by about 13 KB. ELF support under Linux has now all
-	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
-	  because it is portable (this does *not* mean that you will be able
-	  to run executables from different architectures or operating systems
-	  however) and makes building run-time libraries very easy. Many new
-	  executables are distributed solely in ELF format. You definitely
-	  want to say Y here.
+	  systems. Saying Y here will enable your kernel to run ELF binaries.
 
 	  Information about ELF is contained in the ELF HOWTO available from
 	  <http://www.linuxdoc.org/docs.html#howto>.
-
-	  If you find that after upgrading from Linux kernel 1.2 and saying Y
-	  here, you still can't run any ELF binaries (they just crash), then
-	  you'll have to install the newest ELF runtime libraries, including
-	  ld.so (check the file <file:Documentation/Changes> for location and
-	  latest version).
-
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
-	  some crucial programs on your system might be in ELF format.
 
 config BINFMT_MISC
 	tristate "Kernel support for MISC binaries"
@@ -503,12 +439,10 @@ config BINFMT_MISC
 	  If you say Y here, it will be possible to plug wrapper-driven binary
 	  formats into the kernel. You will like this especially when you use
 	  programs that need an interpreter to run like Java, Python or
-	  Emacs-Lisp. It's also useful if you often run DOS executables under
-	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
-	  registered such a binary class with the kernel, you can start one of
-	  those programs simply by typing in its name at a shell prompt; Linux
-	  will automatically feed it to the correct interpreter.
+	  Emacs-Lisp.  Once you have registered such a binary class with the
+	  kernel, you can start one of those programs simply by typing in its
+	  name at a shell prompt; Linux will automatically feed it to the
+	  correct interpreter.
 
 	  You can do other nice things, too. Read the file
 	  <file:Documentation/binfmt_misc.txt> to learn how to use this
@@ -698,7 +632,7 @@ config NETDEVICES
 	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
 	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
 	  Protocol is mainly used to create a mini network by connecting the
-	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  parallel ports of two local systems) or AX.25/KISS (protocol for
 	  sending Internet traffic over amateur radio links).
 
 	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
@@ -831,21 +765,6 @@ config SOUND
 	  <file:Documentation/sound/README.OSS> contains some slightly
 	  outdated but still useful information as well.
 
-	  If you have a PnP sound card and you want to configure it at boot
-	  time using the ISA PnP tools (read
-	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
-	  compile the sound card support as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want)
-	  and load that module after the PnP configuration is finished.  To do
-	  this, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.o.
-
-	  I'm told that even without a sound card, you can make your computer
-	  say more than an occasional beep, by programming the PC speaker.
-	  Kernel patches and supporting utilities to do that are in the pcsp
-	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
-
 source "sound/Kconfig"
 
 endmenu
@@ -870,7 +789,7 @@ choice
 config IA64_GRANULE_16MB
 	bool "16MB"
 	help
-	  IA64 identity-mapped regions use a large page size called "granules".
+	  IA-64 identity-mapped regions use a large page size called "granules".
 
 	  Select "16MB" for a small granule size.
 	  Select "64MB" for a large granule size.  This is the current default.
@@ -895,14 +814,14 @@ config KALLSYMS
 	  somewhat, as all symbols have to be loaded into the kernel image.
 
 config IA64_PRINT_HAZARDS
-	bool "Print possible IA64 hazards to console"
+	bool "Print possible IA-64 dependency violations to console"
 	depends on DEBUG_KERNEL
 	help
 	  Selecting this option prints more information for Illegal Dependency
-	  Faults, that is, for Read after Write, Write after Write or Write
-	  after Read violations.  This option is ignored if you are compiling
-	  for an Itanium A step processor (CONFIG_ITANIUM_ASTEP_SPECIFIC).  If
-	  you're unsure, select Y.
+	  Faults, that is, for Read-after-Write (RAW), Write-after-Write (WAW),
+	  or Write-after-Read (WAR) violations.  This option is ignored if you
+	  are compiling for an Itanium A step processor
+	  (CONFIG_ITANIUM_ASTEP_SPECIFIC).  If you're unsure, select Y.
 
 config DISABLE_VHPT
 	bool "Disable VHPT"
@@ -931,10 +850,11 @@ config IA64_EARLY_PRINTK
 	bool "Early printk support"
 	depends on DEBUG_KERNEL
 	help
-	  Selecting this option uses the VGA screen for printk() output before
-	  the consoles are initialised.  It is useful for debugging problems
-	  early in the boot process, but only if you have a VGA screen
-	  attached.  If you're unsure, select N.
+	  Selecting this option uses the VGA screen or serial console for
+	  printk() output before the consoles are initialised.  It is useful
+	  for debugging problems early in the boot process, but only if you
+	  have a suitable VGA/serial console attached.  If you're unsure,
+	  select N.
 
 config IA64_EARLY_PRINTK_UART
 	bool "Early printk on MMIO serial port"
@@ -970,7 +890,7 @@ config IA64_DEBUG_CMPXCHG
 	bool "Turn on compare-and-exchange bug checking (slow!)"
 	depends on DEBUG_KERNEL
 	help
-	  Selecting this option turns on bug checking for the IA64
+	  Selecting this option turns on bug checking for the IA-64
 	  compare-and-exchange instructions.  This is slow!  Itaniums
 	  from step B3 or later don't have this problem. If you're unsure,
 	  select N.
@@ -979,7 +899,7 @@ config IA64_DEBUG_IRQ
 	bool "Turn on irq debug checks (slow!)"
 	depends on DEBUG_KERNEL
 	help
-	  Selecting this option turns on bug checking for the IA64 irq_save
+	  Selecting this option turns on bug checking for the IA-64 irq_save
 	  and restore instructions.  It's useful for tracking down spinlock
 	  problems, but slow!  If you're unsure, select N.
 
@@ -988,4 +908,3 @@ endmenu
 source "security/Kconfig"
 
 source "crypto/Kconfig"
-

@@ -1245,15 +1245,15 @@ sys_call_table:
 	data8 sys_alloc_hugepages
 	data8 sys_free_hugepages		// 1235
 	data8 sys_exit_group
-	data8 ia64_ni_syscall
+	data8 sys_lookup_dcookie
 	data8 sys_io_setup
 	data8 sys_io_destroy
 	data8 sys_io_getevents			// 1240
 	data8 sys_io_submit
 	data8 sys_io_cancel
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1245
+	data8 sys_epoll_create
+	data8 sys_epoll_ctl
+	data8 sys_epoll_wait			// 1245
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall

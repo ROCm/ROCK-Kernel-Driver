@@ -131,20 +131,6 @@ simscsi_info (struct Scsi_Host *host)
 }
 
 int
-simscsi_abort (Scsi_Cmnd *cmd)
-{
-	printk ("simscsi_abort: unimplemented\n");
-	return SCSI_ABORT_SUCCESS;
-}
-
-int
-simscsi_reset (Scsi_Cmnd *cmd, unsigned int reset_flags)
-{
-	printk ("simscsi_reset: unimplemented\n");
-	return SCSI_RESET_SUCCESS;
-}
-
-int
 simscsi_biosparam (struct scsi_device *sdev, struct block_device *n,
 		sector_t capacity, int ip[])
 {

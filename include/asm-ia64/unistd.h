@@ -226,12 +226,15 @@
 #define __NR_alloc_hugepages		1234
 #define __NR_free_hugepages		1235
 #define __NR_exit_group			1236
-/* 1237 currently unused */
+#define __NR_lookup_dcookie		1237
 #define __NR_io_setup			1238
 #define __NR_io_destroy			1239
 #define __NR_io_getevents		1240
 #define __NR_io_submit			1241
 #define __NR_io_cancel			1242
+#define __NR_epoll_create		1243
+#define __NR_epoll_ctl			1244
+#define __NR_epoll_wait			1245
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

@@ -430,30 +430,39 @@ smp_build_cpu_map (void)
 
 #ifdef CONFIG_NUMA
 
-char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+/* on which node is each logical CPU (one cacheline even for 64 CPUs) */
+volatile char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+/* which logical CPUs are on which nodes */
+volatile unsigned long node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
 
 /*
- * Build cpu to node mapping.
+ * Build cpu to node mapping and initialize the per node cpu masks.
  */
 void __init
 build_cpu_to_node_map (void)
 {
-	int cpu, i;
+	int cpu, i, node;
 
+	for(node=0; node<MAX_NUMNODES; node++)
+		node_to_cpu_mask[node] = 0;
 	for(cpu = 0; cpu < NR_CPUS; ++cpu) {
 		/*
 		 * All Itanium NUMA platforms I know use ACPI, so maybe we
 		 * can drop this ifdef completely.                    [EF]
 		 */
 #ifdef CONFIG_ACPI_NUMA
+		node = -1;
 		for (i = 0; i < NR_CPUS; ++i)
 			if (cpu_physical_id(cpu) == node_cpuid[i].phys_id) {
-				cpu_to_node_map[cpu] = node_cpuid[i].nid;
+				node = node_cpuid[i].nid;
 				break;
 			}
 #else
 #		error Fixme: Dunno how to build CPU-to-node map.
 #endif
+		cpu_to_node_map[cpu] = node;
+		if (node >= 0)
+			node_to_cpu_mask[node] |= (1UL << cpu);
 	}
 }
 

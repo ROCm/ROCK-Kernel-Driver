@@ -625,21 +625,18 @@ cpu_init (void)
 	extern char __per_cpu_end[];
 	int cpu;
 
-	if (__per_cpu_end - __per_cpu_start > PAGE_SIZE)
-		panic("Per-cpu data area too big! (%Zu > %Zu)",
-		      __per_cpu_end - __per_cpu_start, PAGE_SIZE);
-
-
 	/*
 	 * get_free_pages() cannot be used before cpu_init() done.  BSP allocates
 	 * "NR_CPUS" pages for all CPUs to avoid that AP calls get_zeroed_page().
 	 */
 	if (smp_processor_id() == 0) {
-		cpu_data = (unsigned long)alloc_bootmem_pages(PAGE_SIZE * NR_CPUS);
+		cpu_data = (unsigned long) __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
+							   PERCPU_PAGE_SIZE,
+							   __pa(MAX_DMA_ADDRESS));
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
-			cpu_data += PAGE_SIZE;
+			cpu_data += PERCPU_PAGE_SIZE;
 		}
 	}
 	cpu_data = __per_cpu_start + __per_cpu_offset[smp_processor_id()];
@@ -650,7 +647,6 @@ cpu_init (void)
 	cpu_info = cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
 #ifdef CONFIG_NUMA
 	cpu_info->node_data = get_node_data_ptr();
-	cpu_info->nodeid = boot_get_local_nodeid();
 #endif
 
 	/*
