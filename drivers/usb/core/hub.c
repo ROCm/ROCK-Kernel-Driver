@@ -794,7 +794,7 @@ hub_ioctl(struct usb_interface *intf, unsigned int code, void *user_data)
 	}
 }
 
-/* caller has locked the hub */
+/* caller has locked the hub and must own the device lock */
 static int hub_reset(struct usb_hub *hub)
 {
 	struct usb_device *hdev = hub->hdev;
@@ -812,7 +812,7 @@ static int hub_reset(struct usb_hub *hub)
 	else
 		return -1;
 
-	if (usb_reset_device(hdev))
+	if (__usb_reset_device(hdev))
 		return -1;
 
 	hub->urb->dev = hdev;                                                    
