@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/fb.h>
+#include <linux/mm.h>
 
 #include <asm/oplib.h>
 #include <asm/fbio.h>
