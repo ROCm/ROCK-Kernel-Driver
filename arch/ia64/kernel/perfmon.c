@@ -2601,7 +2601,7 @@ pfm_task_incompatible(pfm_context_t *ctx, struct task_struct *task)
 	 */
 	if (task == current) return 0;
 
-	if (task->state != TASK_STOPPED) {
+	if ((task->state != TASK_STOPPED) && (task->state != TASK_TRACED)) {
 		DPRINT(("cannot attach to non-stopped task [%d] state=%ld\n", task->pid, task->state));
 		return -EBUSY;
 	}
@@ -4755,7 +4755,7 @@ recheck:
 	 * the task must be stopped.
 	 */
 	if (PFM_CMD_STOPPED(cmd)) {
-		if (task->state != TASK_STOPPED) {
+		if ((task->state != TASK_STOPPED) && (task->state != TASK_TRACED)) {
 			DPRINT(("[%d] task not in stopped state\n", task->pid));
 			return -EBUSY;
 		}
