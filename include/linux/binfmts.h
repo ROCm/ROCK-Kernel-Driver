@@ -31,7 +31,10 @@ struct linux_binprm{
 	kernel_cap_t cap_inheritable, cap_permitted, cap_effective;
 	void *security;
 	int argc, envc;
-	char * filename;	/* Name of binary */
+	char * filename;	/* Name of binary as seen by procps */
+	char * interp;		/* Name of the binary really executed. Most
+				   of the time same as filename, but could be
+				   different for binfmt_{misc,script} */
 	unsigned long loader, exec;
 };
 

@@ -1053,6 +1053,7 @@ int do_execve(char * filename,
 
 	bprm.file = file;
 	bprm.filename = filename;
+	bprm.interp = filename;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
