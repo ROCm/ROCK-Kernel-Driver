@@ -388,11 +388,14 @@ static int __init flow_cache_init(void)
 	add_timer(&flow_hash_rnd_timer);
 
 	register_cpu_notifier(&flow_cache_cpu_nb);
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i)) {
-			flow_cache_cpu_prepare(i);
-			flow_cache_cpu_online(i);
-		}
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+		if (flow_cache_cpu_prepare(i) == NOTIFY_OK &&
+		    flow_cache_cpu_online(i) == NOTIFY_OK)
+			continue;
+		panic("NET: failed to initialise flow cache hash table\n");
+	}
 
 	return 0;
 }
