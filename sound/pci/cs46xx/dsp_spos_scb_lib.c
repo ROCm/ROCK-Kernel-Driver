@@ -1410,7 +1410,6 @@ int cs46xx_src_link(cs46xx_t *chip,dsp_scb_descriptor_t * src)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	dsp_scb_descriptor_t * parent_scb;
-	unsigned int flags;
 
 	snd_assert (src->parent_scb_ptr == NULL,   return -EINVAL );
 	snd_assert(ins->master_mix_scb !=NULL,   return -EINVAL );

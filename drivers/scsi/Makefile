@@ -111,6 +111,7 @@ obj-$(CONFIG_SCSI_DEBUG)	+= scsi_debug.o
 obj-$(CONFIG_SCSI_FCAL)		+= fcal.o
 obj-$(CONFIG_SCSI_CPQFCTS)	+= cpqfc.o
 obj-$(CONFIG_SCSI_LASI700)	+= lasi700.o 53c700.o
+obj-$(CONFIG_SCSI_NSP32)	+= nsp32.o
 
 obj-$(CONFIG_ARCH_ACORN)	+= ../acorn/scsi/
 

@@ -960,7 +960,6 @@ void snd_info_free_device(snd_info_entry_t * entry)
 {
 #ifdef CONFIG_DEVFS_FS
 	char dname[32];
-	devfs_handle_t master;
 #endif
 
 	snd_runtime_check(entry, return);
@@ -970,12 +969,7 @@ void snd_info_free_device(snd_info_entry_t * entry)
 #ifdef CONFIG_DEVFS_FS
 	if (entry->p && strncmp(entry->name, "controlC", 8)) {
 		sprintf(dname, "snd/%s", entry->name);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-		master = devfs_find_handle(NULL, dname, strlen(dname), 0, 0, DEVFS_SPECIAL_CHR, 0);
-		devfs_unregister(master);
-#else
 		devfs_find_and_unregister(NULL, dname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-#endif
 	}
 #endif
 	snd_info_free_entry(entry);
