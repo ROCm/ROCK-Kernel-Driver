@@ -2251,8 +2251,6 @@ static void xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
 static void xfs_btbmap(xfs_bmbt_block_t *bt, int bsz);
 static void xfs_btino(xfs_inobt_block_t *bt, int bsz);
 static void xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary);
-static void xfs_convert_extent(xfs_bmbt_rec_64_t *rp, xfs_dfiloff_t *op,
-			xfs_dfsbno_t *sp, xfs_dfilblks_t *cp, int *fp);
 static void xfs_dastate_path(xfs_da_state_path_t *p);
 static void xfs_dir2data(void *addr, int size);
 static void xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size);
@@ -2360,18 +2358,17 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 	kdb_printf("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_CONVERT));
 	if (INT_ISZERO(bt->bb_level, ARCH_CONVERT)) {
 		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
-			xfs_bmbt_rec_64_t *r;
-			xfs_dfiloff_t o;
-			xfs_dfsbno_t s;
-			xfs_dfilblks_t c;
-			int fl;
+			xfs_bmbt_rec_t *r;
+			xfs_bmbt_irec_t	irec;
 
-			r = (xfs_bmbt_rec_64_t *)XFS_BTREE_REC_ADDR(bsz,
+			r = (xfs_bmbt_rec_t *)XFS_BTREE_REC_ADDR(bsz,
 				xfs_bmbt, bt, i, 0);
-			xfs_convert_extent(r, &o, &s, &c, &fl);
-			kdb_printf("rec %d startoff %Ld ", i, o);
-			kdb_printf("startblock %Lx ", s);
-			kdb_printf("blockcount %Ld flag %d\n", c, fl);
+
+			xfs_bmbt_get_all((xfs_bmbt_rec_t *)r, &irec);
+			kdb_printf("rec %d startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
+				i, irec.br_startoff,
+				(__uint64_t)irec.br_startblock, 
+				irec.br_blockcount, irec.br_state);
 		}
 	} else {
 		int mxr;
@@ -2472,31 +2469,6 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 #endif
 	kdb_printf("\n");
 }
-
-/*
- * Convert an external extent descriptor to internal form.
- */
-static void
-xfs_convert_extent(xfs_bmbt_rec_64_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
-		   xfs_dfilblks_t *cp, int *fp)
-{
-	xfs_dfiloff_t o;
-	xfs_dfsbno_t s;
-	xfs_dfilblks_t c;
-	int flag;
-
-	flag = (int)((INT_GET(rp->l0, ARCH_CONVERT)) >> (64 - 1 ));
-	o = ((xfs_fileoff_t)INT_GET(rp->l0, ARCH_CONVERT) &
-			   (((__uint64_t)1 << ( 64 - 1	)) - 1) ) >> 9;
-	s = (((xfs_fsblock_t)INT_GET(rp->l0, ARCH_CONVERT) & (((__uint64_t)1 << ( 9 )) - 1) ) << 43) |
-			   (((xfs_fsblock_t)INT_GET(rp->l1, ARCH_CONVERT)) >> 21);
-	c = (xfs_filblks_t)(INT_GET(rp->l1, ARCH_CONVERT) & (((__uint64_t)1 << ( 21 )) - 1) );
-	*op = o;
-	*sp = s;
-	*cp = c;
-	*fp = flag;
-}
-
 
 /*
  * Print an xfs_da_state_path structure.
@@ -2891,11 +2863,8 @@ static void
 xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 {
 	int nextents, i;
-	xfs_dfiloff_t o;
-	xfs_dfsbno_t s;
-	xfs_dfilblks_t c;
-	int flag;
 	xfs_ifork_t *ifp;
+	xfs_bmbt_irec_t irec;
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (ifp->if_flags & XFS_IFEXTENTS) {
@@ -2903,12 +2872,12 @@ xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 		kdb_printf("inode 0x%p %cf extents 0x%p nextents 0x%x\n",
 			ip, "da"[whichfork], ifp->if_u1.if_extents, nextents);
 		for (i = 0; i < nextents; i++) {
-			xfs_convert_extent(
-				(xfs_bmbt_rec_64_t *)&ifp->if_u1.if_extents[i],
-				&o, &s, &c, &flag);
+			xfs_bmbt_get_all(&ifp->if_u1.if_extents[i], &irec);
 			kdb_printf(
 		"%d: startoff %Ld startblock %s blockcount %Ld flag %d\n",
-				i, o, xfs_fmtfsblock(s, ip->i_mount), c, flag);
+			i, irec.br_startoff,
+			xfs_fmtfsblock(irec.br_startblock, ip->i_mount),
+			irec.br_blockcount, irec.br_state);
 		}
 	}
 }
@@ -3200,14 +3169,12 @@ xfsidbg_xbmalla(xfs_bmalloca_t *a)
 static void
 xfsidbg_xbrec(xfs_bmbt_rec_64_t *r)
 {
-	xfs_dfiloff_t o;
-	xfs_dfsbno_t s;
-	xfs_dfilblks_t c;
-	int flag;
+	xfs_bmbt_irec_t	irec;
 
-	xfs_convert_extent(r, &o, &s, &c, &flag);
+	xfs_bmbt_get_all((xfs_bmbt_rec_t *)r, &irec);
 	kdb_printf("startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
-		o, s, c, flag);
+		irec.br_startoff, (__uint64_t)irec.br_startblock, 
+		irec.br_blockcount, irec.br_state);
 }
 
 /*
