@@ -319,7 +319,7 @@ error_fault:
 	err = -EFAULT;
 	kfree_skb(skb);
 error:
-	IP_INC_STATS(OutDiscards);
+	IP_INC_STATS(IPSTATS_MIB_OUTDISCARDS);
 	return err; 
 }
 

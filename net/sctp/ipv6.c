@@ -107,7 +107,7 @@ void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	skb->nh.raw = saveip;
 	skb->h.raw = savesctp;
 	if (!sk) {
-		ICMP6_INC_STATS_BH(idev, Icmp6InErrors);
+		ICMP6_INC_STATS_BH(idev, ICMP6_MIB_INERRORS);
 		goto out;
 	}
 
@@ -177,7 +177,7 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 			  __FUNCTION__, skb, skb->len,
 			  NIP6(fl.fl6_src), NIP6(fl.fl6_dst));
 
-	SCTP_INC_STATS(SctpOutSCTPPacks);
+	SCTP_INC_STATS(SCTP_MIB_OUTSCTPPACKS);
 
 	return ip6_xmit(sk, skb, &fl, np->opt, ipfragok);
 }
