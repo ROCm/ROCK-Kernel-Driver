@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.57 2004/11/16 20:36:11 dwmw2 Exp $
+ * $Id: build.c,v 1.60 2004/11/17 17:13:13 dedekind Exp $
  *
  */
 
@@ -62,6 +62,7 @@ static inline void jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2
 		if (!child_ic) {
 			printk(KERN_NOTICE "Eep. Child \"%s\" (ino #%u) of dir ino #%u doesn't exist!\n",
 				  fd->name, fd->ino, ic->ino);
+			jffs2_mark_node_obsolete(c, fd->raw);
 			continue;
 		}
 
@@ -95,8 +96,6 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 
 	c->flags |= JFFS2_SB_FLAG_MOUNTING;
 	ret = jffs2_scan_medium(c);
-	c->flags &= ~JFFS2_SB_FLAG_MOUNTING;
-
 	if (ret)
 		return ret;
 
@@ -114,6 +113,8 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 			cond_resched();
 		}
 	}
+	c->flags &= ~JFFS2_SB_FLAG_MOUNTING;
+
 	D1(printk(KERN_DEBUG "Pass 1 complete\n"));
 
 	/* Next, scan for inodes with nlink == 0 and remove them. If
