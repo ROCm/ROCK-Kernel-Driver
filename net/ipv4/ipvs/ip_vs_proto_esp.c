@@ -128,14 +128,15 @@ esp_debug_packet(struct ip_vs_protocol *pp, const struct sk_buff *skb,
 		 int offset, const char *msg)
 {
 	char buf[256];
-	struct iphdr iph;
+	struct iphdr _iph, *ih;
 
-	if (skb_copy_bits(skb, offset, &iph, sizeof(iph)) < 0)
+	ih = skb_header_pointer(skb, offset, sizeof(_iph), &_iph);
+	if (ih == NULL)
 		sprintf(buf, "%s TRUNCATED", pp->name);
 	else
 		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u",
-			pp->name, NIPQUAD(iph.saddr),
-			NIPQUAD(iph.daddr));
+			pp->name, NIPQUAD(ih->saddr),
+			NIPQUAD(ih->daddr));
 
 	printk(KERN_DEBUG "IPVS: %s: %s\n", msg, buf);
 }

@@ -23,14 +23,15 @@ static int udp_pkt_to_tuple(const struct sk_buff *skb,
 			     unsigned int dataoff,
 			     struct ip_conntrack_tuple *tuple)
 {
-	struct udphdr hdr;
+	struct udphdr _hdr, *hp;
 
 	/* Actually only need first 8 bytes. */
-	if (skb_copy_bits(skb, dataoff, &hdr, 8) != 0)
+	hp = skb_header_pointer(skb, dataoff, sizeof(_hdr), &_hdr);
+	if (hp == NULL)
 		return 0;
 
-	tuple->src.u.udp.port = hdr.source;
-	tuple->dst.u.udp.port = hdr.dest;
+	tuple->src.u.udp.port = hp->source;
+	tuple->dst.u.udp.port = hp->dest;
 
 	return 1;
 }

@@ -103,7 +103,7 @@ static inline struct rtable *route_reverse(struct sk_buff *skb, int hook)
 static void send_reset(struct sk_buff *oldskb, int hook)
 {
 	struct sk_buff *nskb;
-	struct tcphdr otcph, *tcph;
+	struct tcphdr _otcph, *oth, *tcph;
 	struct rtable *rt;
 	u_int16_t tmp_port;
 	u_int32_t tmp_addr;
@@ -114,12 +114,13 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 	if (oldskb->nh.iph->frag_off & htons(IP_OFFSET))
 		return;
 
-	if (skb_copy_bits(oldskb, oldskb->nh.iph->ihl*4,
-			  &otcph, sizeof(otcph)) < 0)
+	oth = skb_header_pointer(oldskb, oldskb->nh.iph->ihl * 4,
+				 sizeof(_otcph), &_otcph);
+	if (oth == NULL)
  		return;
 
 	/* No RST for RST. */
-	if (otcph.rst)
+	if (oth->rst)
 		return;
 
 	/* FIXME: Check checksum --RR */
@@ -167,13 +168,13 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 
 	if (tcph->ack) {
 		needs_ack = 0;
-		tcph->seq = otcph.ack_seq;
+		tcph->seq = oth->ack_seq;
 		tcph->ack_seq = 0;
 	} else {
 		needs_ack = 1;
-		tcph->ack_seq = htonl(ntohl(otcph.seq) + otcph.syn + otcph.fin
+		tcph->ack_seq = htonl(ntohl(oth->seq) + oth->syn + oth->fin
 				      + oldskb->len - oldskb->nh.iph->ihl*4
-				      - (otcph.doff<<2));
+				      - (oth->doff<<2));
 		tcph->seq = 0;
 	}
 

@@ -104,24 +104,29 @@ icmp_debug_packet(struct ip_vs_protocol *pp,
 		  const char *msg)
 {
 	char buf[256];
-	struct iphdr iph;
-	struct icmphdr icmph;
+	struct iphdr _iph, *ih;
 
-	if (skb_copy_bits(skb, offset, &iph, sizeof(iph)) < 0)
+	ih = skb_header_pointer(skb, offset, sizeof(_iph), &_iph);
+	if (ih == NULL)
 		sprintf(buf, "%s TRUNCATED", pp->name);
-	else if (iph.frag_off & __constant_htons(IP_OFFSET))
+	else if (ih->frag_off & __constant_htons(IP_OFFSET))
 		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u frag",
-			pp->name, NIPQUAD(iph.saddr),
-			NIPQUAD(iph.daddr));
-	else if (skb_copy_bits(skb, offset + iph.ihl*4, &icmph, sizeof(icmph)) < 0)
-		sprintf(buf, "%s TRUNCATED to %u bytes\n",
-			pp->name, skb->len - offset);
-	else
-		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u T:%d C:%d",
-			pp->name, NIPQUAD(iph.saddr),
-			NIPQUAD(iph.daddr),
-			icmph.type, icmph.code);
+			pp->name, NIPQUAD(ih->saddr),
+			NIPQUAD(ih->daddr));
+	else {
+		struct icmphdr _icmph, *ic;
 
+		ic = skb_header_pointer(skb, offset + ih->ihl*4,
+					sizeof(_icmph), &_icmph);
+		if (ic == NULL)
+			sprintf(buf, "%s TRUNCATED to %u bytes\n",
+				pp->name, skb->len - offset);
+		else
+			sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u T:%d C:%d",
+				pp->name, NIPQUAD(ih->saddr),
+				NIPQUAD(ih->daddr),
+				ic->type, ic->code);
+	}
 	printk(KERN_DEBUG "IPVS: %s: %s\n", msg, buf);
 }
 

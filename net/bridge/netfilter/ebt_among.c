@@ -73,20 +73,27 @@ static int ebt_mac_wormhash_check_integrity(const struct ebt_mac_wormhash
 static int get_ip_dst(const struct sk_buff *skb, uint32_t *addr)
 {
 	if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_IP)) {
-		struct iphdr iph;
+		struct iphdr _iph, *ih;
 
-		if (skb_copy_bits(skb, 0, &iph, sizeof(iph)))
+		ih = skb_header_pointer(skb, 0, sizeof(_iph), &_iph);
+		if (ih == NULL)
 			return -1;
-		*addr = iph.daddr;
+		*addr = ih->daddr;
 	} else if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_ARP)) {
-		struct arphdr arph;
+		struct arphdr _arph, *ah;
+		uint32_t buf, *bp;
 
-		if (skb_copy_bits(skb, 0, &arph, sizeof(arph)) ||
-		    arph.ar_pln != sizeof(uint32_t) || arph.ar_hln != ETH_ALEN)
+		ah = skb_header_pointer(skb, 0, sizeof(_arph), &_arph);
+		if (ah == NULL ||
+		    ah->ar_pln != sizeof(uint32_t) ||
+		    ah->ar_hln != ETH_ALEN)
 			return -1;
-		if (skb_copy_bits(skb, sizeof(struct arphdr) +
-		    2 * ETH_ALEN + sizeof(uint32_t), addr, sizeof(uint32_t)))
+		bp = skb_header_pointer(skb, sizeof(struct arphdr) +
+					2 * ETH_ALEN + sizeof(uint32_t),
+					sizeof(uint32_t), &buf);
+		if (bp == NULL)
 			return -1;
+		*addr = *bp;
 	}
 	return 0;
 }
@@ -94,20 +101,26 @@ static int get_ip_dst(const struct sk_buff *skb, uint32_t *addr)
 static int get_ip_src(const struct sk_buff *skb, uint32_t *addr)
 {
 	if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_IP)) {
-		struct iphdr iph;
+		struct iphdr _iph, *ih;
 
-		if (skb_copy_bits(skb, 0, &iph, sizeof(iph)))
+		ih = skb_header_pointer(skb, 0, sizeof(_iph), &_iph);
+		if (ih == NULL)
 			return -1;
-		*addr = iph.saddr;
+		*addr = ih->saddr;
 	} else if (skb->mac.ethernet->h_proto == __constant_htons(ETH_P_ARP)) {
-		struct arphdr arph;
+		struct arphdr _arph, *ah;
+		uint32_t buf, *bp;
 
-		if (skb_copy_bits(skb, 0, &arph, sizeof(arph)) ||
-		    arph.ar_pln != sizeof(uint32_t) || arph.ar_hln != ETH_ALEN)
+		ah = skb_header_pointer(skb, 0, sizeof(_arph), &_arph);
+		if (ah == NULL ||
+		    ah->ar_pln != sizeof(uint32_t) ||
+		    ah->ar_hln != ETH_ALEN)
 			return -1;
-		if (skb_copy_bits(skb, sizeof(struct arphdr) +
-		    ETH_ALEN, addr, sizeof(uint32_t)))
+		bp = skb_header_pointer(skb, sizeof(struct arphdr) +
+					ETH_ALEN, sizeof(uint32_t), &buf);
+		if (bp == NULL)
 			return -1;
+		*addr = *bp;
 	}
 	return 0;
 }

@@ -293,14 +293,15 @@ static int tcp_pkt_to_tuple(const struct sk_buff *skb,
 			    unsigned int dataoff,
 			    struct ip_conntrack_tuple *tuple)
 {
-	struct tcphdr hdr;
+	struct tcphdr _hdr, *hp;
 
 	/* Actually only need first 8 bytes. */
-	if (skb_copy_bits(skb, dataoff, &hdr, 8) != 0)
+	hp = skb_header_pointer(skb, dataoff, 8, &_hdr);
+	if (hp == NULL)
 		return 0;
 
-	tuple->src.u.tcp.port = hdr.source;
-	tuple->dst.u.tcp.port = hdr.dest;
+	tuple->src.u.tcp.port = hp->source;
+	tuple->dst.u.tcp.port = hp->dest;
 
 	return 1;
 }
@@ -385,12 +386,23 @@ static inline __u32 segment_seq_plus_len(__u32 seq,
 /*
  * Simplified tcp_parse_options routine from tcp_input.c
  */
-static void tcp_options(struct tcphdr *tcph, 
+static void tcp_options(struct sk_buff *skb,
+			struct iphdr *iph,
+			struct tcphdr *tcph, 
 			struct ip_ct_tcp_state *state)
 {
-	unsigned char *ptr = (unsigned char *)(tcph + 1);
+	unsigned char buff[(15 * 4) - sizeof(struct tcphdr)];
+	unsigned char *ptr;
 	int length = (tcph->doff*4) - sizeof(struct tcphdr);
 	
+	if (!length)
+		return;
+
+	ptr = skb_header_pointer(skb,
+				 (iph->ihl * 4) + sizeof(struct tcphdr),
+				 length, buff);
+	BUG_ON(ptr == NULL);
+
 	state->td_scale = 
 	state->flags = 0;
 	
@@ -533,7 +545,7 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 			sender->td_maxend = end;
 			sender->td_maxwin = (win == 0 ? 1 : win);
 
-			tcp_options(tcph, sender);
+			tcp_options(skb, iph, tcph, sender);
 			/* 
 			 * RFC 1323:
 			 * Both sides must send the Window Scale option
@@ -565,7 +577,7 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 		sender->td_maxend = end;
 		sender->td_maxwin = (win == 0 ? 1 : win);
 
-		tcp_options(tcph, sender);
+		tcp_options(skb, iph, tcph, sender);
 	}
 	
 	if (!(tcph->ack)) {
@@ -760,12 +772,14 @@ static int tcp_error(struct sk_buff *skb,
 		     unsigned int hooknum)
 {
 	struct iphdr *iph = skb->nh.iph;
-	struct tcphdr tcph;
+	struct tcphdr _tcph, *th;
 	unsigned int tcplen = skb->len - iph->ihl * 4;
 	u_int8_t tcpflags;
 
 	/* Smaller that minimal TCP header? */
-	if (skb_copy_bits(skb, iph->ihl * 4, &tcph, sizeof(tcph)) != 0) {
+	th = skb_header_pointer(skb, iph->ihl * 4,
+				sizeof(_tcph), &_tcph);
+	if (th == NULL) {
 		if (LOG_INVALID(IPPROTO_TCP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
 				"ip_ct_tcp: short packet ");
@@ -773,7 +787,7 @@ static int tcp_error(struct sk_buff *skb,
   	}
   
 	/* Not whole TCP header or malformed packet */
-	if (tcph.doff*4 < sizeof(struct tcphdr) || tcplen < tcph.doff*4) {
+	if (th->doff*4 < sizeof(struct tcphdr) || tcplen < th->doff*4) {
 		if (LOG_INVALID(IPPROTO_TCP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
 				"ip_ct_tcp: truncated/malformed packet ");
@@ -797,7 +811,7 @@ static int tcp_error(struct sk_buff *skb,
 	}
 
 	/* Check TCP flags. */
-	tcpflags = (((u_int8_t *)&tcph)[13] & ~(TH_ECE|TH_CWR));
+	tcpflags = (((u_int8_t *)th)[13] & ~(TH_ECE|TH_CWR));
 	if (!tcp_valid_flags[tcpflags]) {
 		if (LOG_INVALID(IPPROTO_TCP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
@@ -808,19 +822,6 @@ static int tcp_error(struct sk_buff *skb,
 	return NF_ACCEPT;
 }
 
-static inline void copy_whole_tcp_header(const struct sk_buff *skb,
-					 unsigned char *buff)
-{
-	struct iphdr *iph = skb->nh.iph;
-	struct tcphdr *tcph = (struct tcphdr *)buff;
-
-	/* tcp_error guarantees for us that the packet is not malformed */
-	skb_copy_bits(skb, iph->ihl * 4, buff, sizeof(*tcph));
-	skb_copy_bits(skb, iph->ihl * 4 + sizeof(*tcph), 
-		      buff + sizeof(*tcph), 
-		      tcph->doff * 4 - sizeof(*tcph));
-}
-
 /* Returns verdict for packet, or -1 for invalid. */
 static int tcp_packet(struct ip_conntrack *conntrack,
 		      const struct sk_buff *skb,
@@ -829,17 +830,18 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 	enum tcp_conntrack new_state, old_state;
 	enum ip_conntrack_dir dir;
 	struct iphdr *iph = skb->nh.iph;
-	unsigned char buff[15 * 4];
-	struct tcphdr *tcph = (struct tcphdr *)buff;
+	struct tcphdr *th, _tcph;
 	unsigned long timeout;
 	unsigned int index;
 	
-	copy_whole_tcp_header(skb, buff);
+	th = skb_header_pointer(skb, iph->ihl * 4,
+				sizeof(_tcph), &_tcph);
+	BUG_ON(th == NULL);
 	
 	WRITE_LOCK(&tcp_lock);
 	old_state = conntrack->proto.tcp.state;
 	dir = CTINFO2DIR(ctinfo);
-	index = get_conntrack_index(tcph);
+	index = get_conntrack_index(th);
 	new_state = tcp_conntracks[dir][index][old_state];
 
 	switch (new_state) {
@@ -848,7 +850,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		if (index == TCP_SYNACK_SET
 		    && conntrack->proto.tcp.last_index == TCP_SYN_SET
 		    && conntrack->proto.tcp.last_dir != dir
-		    && after(ntohl(tcph->ack_seq),
+		    && after(ntohl(th->ack_seq),
 		    	     conntrack->proto.tcp.last_seq)) {
 			/* This SYN/ACK acknowledges a SYN that we earlier 
 			 * ignored as invalid. This means that the client and
@@ -868,7 +870,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		}
 		conntrack->proto.tcp.last_index = index;
 		conntrack->proto.tcp.last_dir = dir;
-		conntrack->proto.tcp.last_seq = ntohl(tcph->seq);
+		conntrack->proto.tcp.last_seq = ntohl(th->seq);
 		
 		WRITE_UNLOCK(&tcp_lock);
 		if (LOG_INVALID(IPPROTO_TCP))
@@ -878,7 +880,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 	case TCP_CONNTRACK_MAX:
 		/* Invalid packet */
 		DEBUGP("ip_ct_tcp: Invalid dir=%i index=%u ostate=%u\n",
-		       dir, get_conntrack_index(tcph),
+		       dir, get_conntrack_index(th),
 		       old_state);
 		WRITE_UNLOCK(&tcp_lock);
 		if (LOG_INVALID(IPPROTO_TCP))
@@ -900,7 +902,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		if (index == TCP_RST_SET
 		    && test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status)
 		    && conntrack->proto.tcp.last_index <= TCP_SYNACK_SET
-		    && after(ntohl(tcph->ack_seq),
+		    && after(ntohl(th->ack_seq),
 		    	     conntrack->proto.tcp.last_seq)) {
 			/* Ignore RST closing down invalid SYN 
 			   we had let trough. */ 
@@ -917,7 +919,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 	}
 
 	if (!tcp_in_window(&conntrack->proto.tcp, dir, &index, 
-			   skb, iph, tcph)) {
+			   skb, iph, th)) {
 		WRITE_UNLOCK(&tcp_lock);
 		return -NF_ACCEPT;
 	}
@@ -929,10 +931,10 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 
 	DEBUGP("tcp_conntracks: src=%u.%u.%u.%u:%hu dst=%u.%u.%u.%u:%hu "
 	       "syn=%i ack=%i fin=%i rst=%i old=%i new=%i\n",
-		NIPQUAD(iph->saddr), ntohs(tcph->source),
-		NIPQUAD(iph->daddr), ntohs(tcph->dest),
-		(tcph->syn ? 1 : 0), (tcph->ack ? 1 : 0),
-		(tcph->fin ? 1 : 0), (tcph->rst ? 1 : 0),
+		NIPQUAD(iph->saddr), ntohs(th->source),
+		NIPQUAD(iph->daddr), ntohs(th->dest),
+		(th->syn ? 1 : 0), (th->ack ? 1 : 0),
+		(th->fin ? 1 : 0), (th->rst ? 1 : 0),
 		old_state, new_state);
 
 	conntrack->proto.tcp.state = new_state;
@@ -946,7 +948,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		   have an established connection: this is a fairly common
 		   problem case, so we can delete the conntrack
 		   immediately.  --RR */
-		if (tcph->rst) {
+		if (th->rst) {
 			if (del_timer(&conntrack->timeout))
 				conntrack->timeout.function((unsigned long)
 							    conntrack);
@@ -972,18 +974,19 @@ static int tcp_new(struct ip_conntrack *conntrack,
 {
 	enum tcp_conntrack new_state;
 	struct iphdr *iph = skb->nh.iph;
-	unsigned char buff[15 * 4];
-	struct tcphdr *tcph = (struct tcphdr *)buff;
+	struct tcphdr *th, _tcph;
 #ifdef DEBUGP_VARS
 	struct ip_ct_tcp_state *sender = &conntrack->proto.tcp.seen[0];
 	struct ip_ct_tcp_state *receiver = &conntrack->proto.tcp.seen[1];
 #endif
 
-	copy_whole_tcp_header(skb, buff);
-  
+	th = skb_header_pointer(skb, iph->ihl * 4,
+				sizeof(_tcph), &_tcph);
+	BUG_ON(th == NULL);
+	
 	/* Don't need lock here: this conntrack not in circulation yet */
 	new_state
-		= tcp_conntracks[0][get_conntrack_index(tcph)]
+		= tcp_conntracks[0][get_conntrack_index(th)]
 		[TCP_CONNTRACK_NONE];
 
 	/* Invalid: delete conntrack */
@@ -995,15 +998,15 @@ static int tcp_new(struct ip_conntrack *conntrack,
 	if (new_state == TCP_CONNTRACK_SYN_SENT) {
 		/* SYN packet */
 		conntrack->proto.tcp.seen[0].td_end =
-			segment_seq_plus_len(ntohl(tcph->seq), skb->len,
-					     iph, tcph);
-		conntrack->proto.tcp.seen[0].td_maxwin = ntohs(tcph->window);
+			segment_seq_plus_len(ntohl(th->seq), skb->len,
+					     iph, th);
+		conntrack->proto.tcp.seen[0].td_maxwin = ntohs(th->window);
 		if (conntrack->proto.tcp.seen[0].td_maxwin == 0)
 			conntrack->proto.tcp.seen[0].td_maxwin = 1;
 		conntrack->proto.tcp.seen[0].td_maxend =
 			conntrack->proto.tcp.seen[0].td_end;
 
-		tcp_options(tcph, &conntrack->proto.tcp.seen[0]);
+		tcp_options(skb, iph, th, &conntrack->proto.tcp.seen[0]);
 		conntrack->proto.tcp.seen[1].flags = 0;
 		conntrack->proto.tcp.seen[0].loose = 
 		conntrack->proto.tcp.seen[1].loose = 0;
@@ -1017,9 +1020,9 @@ static int tcp_new(struct ip_conntrack *conntrack,
 		 * Let's try to use the data from the packet.
 		 */
 		conntrack->proto.tcp.seen[0].td_end =
-			segment_seq_plus_len(ntohl(tcph->seq), skb->len,
-					     iph, tcph);
-		conntrack->proto.tcp.seen[0].td_maxwin = ntohs(tcph->window);
+			segment_seq_plus_len(ntohl(th->seq), skb->len,
+					     iph, th);
+		conntrack->proto.tcp.seen[0].td_maxwin = ntohs(th->window);
 		if (conntrack->proto.tcp.seen[0].td_maxwin == 0)
 			conntrack->proto.tcp.seen[0].td_maxwin = 1;
 		conntrack->proto.tcp.seen[0].td_maxend =
@@ -1056,14 +1059,16 @@ static int tcp_exp_matches_pkt(struct ip_conntrack_expect *exp,
 			       const struct sk_buff *skb)
 {
 	const struct iphdr *iph = skb->nh.iph;
-	struct tcphdr tcph;
+	struct tcphdr *th, _tcph;
 	unsigned int datalen;
 
-	if (skb_copy_bits(skb, iph->ihl * 4, &tcph, sizeof(tcph)) != 0)
+	th = skb_header_pointer(skb, iph->ihl * 4,
+				sizeof(_tcph), &_tcph);
+	if (th == NULL)
 		return 0;
-	datalen = skb->len - iph->ihl*4 - tcph.doff*4;
+	datalen = skb->len - iph->ihl*4 - th->doff*4;
 
-	return between(exp->seq, ntohl(tcph.seq), ntohl(tcph.seq) + datalen);
+	return between(exp->seq, ntohl(th->seq), ntohl(th->seq) + datalen);
 }
 
 struct ip_conntrack_protocol ip_conntrack_protocol_tcp =

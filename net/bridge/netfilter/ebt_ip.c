@@ -28,41 +28,44 @@ static int ebt_filter_ip(const struct sk_buff *skb, const struct net_device *in,
    unsigned int datalen)
 {
 	struct ebt_ip_info *info = (struct ebt_ip_info *)data;
-	union {struct iphdr iph; struct tcpudphdr ports;} u;
+	struct iphdr _iph, *ih;
+	struct tcpudphdr _ports, *pptr;
 
-	if (skb_copy_bits(skb, 0, &u.iph, sizeof(u.iph)))
+	ih = skb_header_pointer(skb, 0, sizeof(_iph), &_iph);
+	if (ih == NULL)
 		return EBT_NOMATCH;
 	if (info->bitmask & EBT_IP_TOS &&
-	   FWINV(info->tos != u.iph.tos, EBT_IP_TOS))
+	   FWINV(info->tos != ih->tos, EBT_IP_TOS))
 		return EBT_NOMATCH;
 	if (info->bitmask & EBT_IP_SOURCE &&
-	   FWINV((u.iph.saddr & info->smsk) !=
+	   FWINV((ih->saddr & info->smsk) !=
 	   info->saddr, EBT_IP_SOURCE))
 		return EBT_NOMATCH;
 	if ((info->bitmask & EBT_IP_DEST) &&
-	   FWINV((u.iph.daddr & info->dmsk) !=
+	   FWINV((ih->daddr & info->dmsk) !=
 	   info->daddr, EBT_IP_DEST))
 		return EBT_NOMATCH;
 	if (info->bitmask & EBT_IP_PROTO) {
-		if (FWINV(info->protocol != u.iph.protocol, EBT_IP_PROTO))
+		if (FWINV(info->protocol != ih->protocol, EBT_IP_PROTO))
 			return EBT_NOMATCH;
 		if (!(info->bitmask & EBT_IP_DPORT) &&
 		    !(info->bitmask & EBT_IP_SPORT))
 			return EBT_MATCH;
-		if (skb_copy_bits(skb, u.iph.ihl*4, &u.ports,
-		    sizeof(u.ports)))
+		pptr = skb_header_pointer(skb, ih->ihl*4,
+					  sizeof(_ports), &_ports);
+		if (pptr == NULL)
 			return EBT_NOMATCH;
 		if (info->bitmask & EBT_IP_DPORT) {
-			u.ports.dst = ntohs(u.ports.dst);
-			if (FWINV(u.ports.dst < info->dport[0] ||
-			          u.ports.dst > info->dport[1],
+			u32 dst = ntohs(pptr->dst);
+			if (FWINV(dst < info->dport[0] ||
+			          dst > info->dport[1],
 			          EBT_IP_DPORT))
 			return EBT_NOMATCH;
 		}
 		if (info->bitmask & EBT_IP_SPORT) {
-			u.ports.src = ntohs(u.ports.src);
-			if (FWINV(u.ports.src < info->sport[0] ||
-			          u.ports.src > info->sport[1],
+			u32 src = ntohs(pptr->src);
+			if (FWINV(src < info->sport[0] ||
+			          src > info->sport[1],
 			          EBT_IP_SPORT))
 			return EBT_NOMATCH;
 		}

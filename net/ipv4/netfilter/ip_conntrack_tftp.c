@@ -42,14 +42,16 @@ static int tftp_help(struct sk_buff *skb,
 		     struct ip_conntrack *ct,
 		     enum ip_conntrack_info ctinfo)
 {
-	struct tftphdr tftph;
+	struct tftphdr _tftph, *tfh;
 	struct ip_conntrack_expect *exp;
 
-	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4 + sizeof(struct udphdr),
-			  &tftph, sizeof(tftph)) != 0)
+	tfh = skb_header_pointer(skb,
+				 skb->nh.iph->ihl * 4 + sizeof(struct udphdr),
+				 sizeof(_tftph), &_tftph);
+	if (tfh == NULL)
 		return NF_ACCEPT;
 
-	switch (ntohs(tftph.opcode)) {
+	switch (ntohs(tfh->opcode)) {
 	/* RRQ and WRQ works the same way */
 	case TFTP_OPCODE_READ:
 	case TFTP_OPCODE_WRITE:

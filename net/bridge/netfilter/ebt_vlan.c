@@ -48,7 +48,7 @@ ebt_filter_vlan(const struct sk_buff *skb,
 		const void *data, unsigned int datalen)
 {
 	struct ebt_vlan_info *info = (struct ebt_vlan_info *) data;
-	struct vlan_hdr frame;
+	struct vlan_hdr _frame, *fp;
 
 	unsigned short TCI;	/* Whole TCI, given from parsed frame */
 	unsigned short id;	/* VLAN ID, given from frame TCI */
@@ -56,7 +56,8 @@ ebt_filter_vlan(const struct sk_buff *skb,
 	/* VLAN encapsulated Type/Length field, given from orig frame */
 	unsigned short encap;
 
-	if (skb_copy_bits(skb, 0, &frame, sizeof(frame)))
+	fp = skb_header_pointer(skb, 0, sizeof(_frame), &_frame);
+	if (fp == NULL)
 		return EBT_NOMATCH;
 
 	/* Tag Control Information (TCI) consists of the following elements:
@@ -66,10 +67,10 @@ ebt_filter_vlan(const struct sk_buff *skb,
 	 * (CFI) is a single bit flag value. Currently ignored.
 	 * - VLAN Identifier (VID). The VID is encoded as
 	 * an unsigned binary number. */
-	TCI = ntohs(frame.h_vlan_TCI);
+	TCI = ntohs(fp->h_vlan_TCI);
 	id = TCI & VLAN_VID_MASK;
 	prio = (TCI >> 13) & 0x7;
-	encap = frame.h_vlan_encapsulated_proto;
+	encap = fp->h_vlan_encapsulated_proto;
 
 	/* Checking VLAN Identifier (VID) */
 	if (GET_BITMASK(EBT_VLAN_ID))

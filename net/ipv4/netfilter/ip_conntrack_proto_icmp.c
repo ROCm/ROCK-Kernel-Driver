@@ -31,14 +31,15 @@ static int icmp_pkt_to_tuple(const struct sk_buff *skb,
 			     unsigned int dataoff,
 			     struct ip_conntrack_tuple *tuple)
 {
-	struct icmphdr hdr;
+	struct icmphdr _hdr, *hp;
 
-	if (skb_copy_bits(skb, dataoff, &hdr, sizeof(hdr)) != 0)
+	hp = skb_header_pointer(skb, dataoff, sizeof(_hdr), &_hdr);
+	if (hp == NULL)
 		return 0;
 
-	tuple->dst.u.icmp.type = hdr.type;
-	tuple->src.u.icmp.id = hdr.un.echo.id;
-	tuple->dst.u.icmp.code = hdr.code;
+	tuple->dst.u.icmp.type = hp->type;
+	tuple->src.u.icmp.id = hp->un.echo.id;
+	tuple->dst.u.icmp.code = hp->code;
 
 	return 1;
 }

@@ -49,7 +49,7 @@ static int help(struct sk_buff *skb,
 {
 	struct ip_conntrack_expect *exp;
 	struct ip_ct_amanda_expect *exp_amanda_info;
-	char *data, *data_limit, *tmp;
+	char *amp, *data, *data_limit, *tmp;
 	unsigned int dataoff, i;
 	u_int16_t port, len;
 
@@ -70,9 +70,11 @@ static int help(struct sk_buff *skb,
 	}
 
 	LOCK_BH(&amanda_buffer_lock);
-	skb_copy_bits(skb, dataoff, amanda_buffer, skb->len - dataoff);
-	data = amanda_buffer;
-	data_limit = amanda_buffer + skb->len - dataoff;
+	amp = skb_header_pointer(skb, dataoff,
+				 skb->len - dataoff, amanda_buffer);
+	BUG_ON(amp == NULL);
+	data = amp;
+	data_limit = amp + skb->len - dataoff;
 	*data_limit = '\0';
 
 	/* Search for the CONNECT string */
@@ -108,7 +110,7 @@ static int help(struct sk_buff *skb,
 		exp->mask.dst.u.tcp.port = 0xFFFF;
 
 		exp_amanda_info = &exp->help.exp_amanda_info;
-		exp_amanda_info->offset = tmp - amanda_buffer;
+		exp_amanda_info->offset = tmp - amp;
 		exp_amanda_info->port   = port;
 		exp_amanda_info->len    = len;
 
