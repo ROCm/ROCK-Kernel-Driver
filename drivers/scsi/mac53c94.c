@@ -59,7 +59,7 @@ static struct fsc_state *all_53c94s;
 static void mac53c94_init(struct fsc_state *);
 static void mac53c94_start(struct fsc_state *);
 static void mac53c94_interrupt(int, void *, struct pt_regs *);
-static void do_mac53c94_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t do_mac53c94_interrupt(int, void *, struct pt_regs *);
 static void cmd_done(struct fsc_state *, int result);
 static void set_dma_cmds(struct fsc_state *, Scsi_Cmnd *);
 static int data_goes_out(Scsi_Cmnd *);
@@ -316,7 +316,7 @@ mac53c94_start(struct fsc_state *state)
 		set_dma_cmds(state, cmd);
 }
 
-static void
+static irqreturn_t
 do_mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	unsigned long flags;
@@ -325,6 +325,7 @@ do_mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	spin_lock_irqsave(dev->host_lock, flags);
 	mac53c94_interrupt(irq, dev_id, ptregs);
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 static void
