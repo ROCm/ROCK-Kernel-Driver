@@ -12,6 +12,7 @@ if [ "$CONFIG_SERIO_I8042" != "n" ]; then
 fi
 dep_tristate '  Serial port line discipline' CONFIG_SERIO_SERPORT $CONFIG_SERIO 
 dep_tristate '  ct82c710 Aux port controller' CONFIG_SERIO_CT82C710 $CONFIG_SERIO
+dep_tristate '  Q40 keyboard controller' CONFIG_SERIO_Q40KBD $CONFIG_SERIO
 dep_tristate '  Parallel port keyboard adapter' CONFIG_SERIO_PARKBD $CONFIG_SERIO $CONFIG_PARPORT
 
 if [ "$CONFIG_ARCH_ACORN" = "y" ]; then

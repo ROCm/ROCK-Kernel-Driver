@@ -1,7 +1,7 @@
 		       Linux Joystick driver v2.0.0
-	       (c) 1996-2000 Vojtech Pavlik <vojtech@suse.cz>
+	       (c) 1996-2000 Vojtech Pavlik <vojtech@ucw.cz>
 			     Sponsored by SuSE
-	   $Id: joystick.txt,v 1.6 2001/06/05 09:57:01 vojtech Exp $
+	   $Id: joystick.txt,v 1.12 2002/03/03 12:13:07 jdeneux Exp $
 ----------------------------------------------------------------------------
 
 0. Disclaimer
@@ -21,8 +21,8 @@ with this program; if not, write to the Free Software Foundation, Inc., 59
 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
   Should you need to contact me, the author, you can do so either by e-mail
-- mail your message to <vojtech@suse.cz>, or by paper mail: Vojtech Pavlik,
-Ucitelska 1576, Prague 8, 182 00 Czech Republic
+- mail your message to <vojtech@ucw.cz>, or by paper mail: Vojtech Pavlik,
+Simunkova 1594, Prague 8, 182 00 Czech Republic
 
   For your convenience, the GNU General Public License version 2 is included
 in the package: See the file COPYING.
@@ -111,7 +111,7 @@ your needs:
 	alias tty-ldisc-2 serport
 	alias char-major-13 input
 	above input joydev ns558 analog
-	options analog js=gameport
+	options analog js=gamepad
 
 2.5 Verifying that it works
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -503,15 +503,16 @@ and the /dev/input/jsX device should become usable.
 
 3.21 I-Force devices 
 ~~~~~~~~~~~~~~~~~~~~
-  All I-Force devices are supported by the iforce.c module. This includes:
+  All I-Force devices are supported by the iforce.o module. This includes:
 
 * AVB Mag Turbo Force
 * AVB Top Shot Pegasus
+* AVB Top Shot Force Feedback Racing Wheel
 * Logitech WingMan Force
-* Logitech WingMan Force 3D
 * Logitech WingMan Force Wheel 
-* Logitech WingMan Strike Force 3D
 * Guillemot Race Leader Force Feedback
+* Guillemot Force Feedback Racing Wheel
+* Thrustmaster Motor Sport GT
 
   To use it, you need to attach the serial port to the driver using the
 
@@ -524,6 +525,10 @@ command. After that the I-Force device will be detected, and the
 isn't needed.
 
   The I-Force driver now supports force feedback via the event interface.
+
+  Please note that Logitech WingMan *3D devices are _not_ supported by this
+module, rather by hid. Force feedback is not supported for those devices.
+Logitech gamepads are also hid devices.
 
 3.22 Gravis Stinger gamepad 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
