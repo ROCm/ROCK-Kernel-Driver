@@ -314,6 +314,7 @@ config MOMENCO_OCELOT
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
+	select MIPS_GT64120
 	select RM7000_CPU_SCACHE
 	select SWAP_IO_SPACE
 	help
@@ -348,6 +349,7 @@ config MOMENCO_OCELOT_C
 
 config MOMENCO_OCELOT_3
 	bool "Support for Momentum Ocelot-3 board"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select IRQ_CPU
@@ -362,6 +364,7 @@ config MOMENCO_OCELOT_3
 
 config MOMENCO_JAGUAR_ATX
 	bool "Support for Momentum Jaguar board"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select IRQ_CPU
