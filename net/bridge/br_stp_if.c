@@ -93,7 +93,7 @@ void br_stp_disable_port(struct net_bridge_port *p)
 
 	br = p->br;
 	printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
-	       br->dev.name, p->port_no, p->dev->name, "disabled");
+	       br->dev->name, p->port_no, p->dev->name, "disabled");
 
 	wasroot = br_is_root_bridge(br);
 	br_become_designated_port(p);
@@ -124,7 +124,7 @@ static void br_stp_change_bridge_id(struct net_bridge *br, unsigned char *addr)
 
 	memcpy(oldaddr, br->bridge_id.addr, ETH_ALEN);
 	memcpy(br->bridge_id.addr, addr, ETH_ALEN);
-	memcpy(br->dev.dev_addr, addr, ETH_ALEN);
+	memcpy(br->dev->dev_addr, addr, ETH_ALEN);
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (!memcmp(p->designated_bridge.addr, oldaddr, ETH_ALEN))

@@ -197,7 +197,9 @@ static void inetdev_destroy(struct in_device *in_dev)
 	/* in_dev_put following below will kill the in_device */
 	write_unlock_bh(&inetdev_lock);
 
-
+#ifdef CONFIG_SYSCTL
+	neigh_sysctl_unregister(in_dev->arp_parms);
+#endif
 	neigh_parms_release(&arp_tbl, in_dev->arp_parms);
 	in_dev_put(in_dev);
 }

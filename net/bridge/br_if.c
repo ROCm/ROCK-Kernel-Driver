@@ -78,17 +78,14 @@ static struct net_bridge *new_nb(const char *name)
 	struct net_bridge *br;
 	struct net_device *dev;
 
-	if ((br = kmalloc(sizeof(*br), GFP_KERNEL)) == NULL)
+	dev = alloc_netdev(sizeof(struct net_bridge), name,
+			   br_dev_setup);
+	
+	if (!dev)
 		return NULL;
 
-	memset(br, 0, sizeof(*br));
-	dev = &br->dev;
-
-	strlcpy(dev->name, name, sizeof(dev->name));
-	dev->priv = br;
-	dev->priv_flags = IFF_EBRIDGE;
-	ether_setup(dev);
-	br_dev_setup(dev);
+	br = dev->priv;
+	br->dev = dev;
 
 	br->lock = SPIN_LOCK_UNLOCKED;
 	INIT_LIST_HEAD(&br->port_list);
@@ -159,9 +156,9 @@ int br_add_bridge(const char *name)
 	if ((br = new_nb(name)) == NULL) 
 		return -ENOMEM;
 
-	ret = register_netdev(&br->dev);
+	ret = register_netdev(br->dev);
 	if (ret)
-		kfree(br);
+		kfree(br->dev);
 	return ret;
 }
 
@@ -219,7 +216,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 
 	br_stp_recalculate_bridge_id(br);
 	br_fdb_insert(br, p, dev->dev_addr, 1);
-	if ((br->dev.flags & IFF_UP) && (dev->flags & IFF_UP))
+	if ((br->dev->flags & IFF_UP) && (dev->flags & IFF_UP))
 		br_stp_enable_port(p);
 	spin_unlock_bh(&br->lock);
 

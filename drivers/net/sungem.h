@@ -805,14 +805,14 @@ struct gem_txd {
 	u64	buffer;
 };
 
-#define TXDCTRL_BUFSZ	0x0000000000007fff	/* Buffer Size		*/
-#define TXDCTRL_CSTART	0x00000000001f8000	/* CSUM Start Offset	*/
-#define TXDCTRL_COFF	0x000000001fe00000	/* CSUM Stuff Offset	*/
-#define TXDCTRL_CENAB	0x0000000020000000	/* CSUM Enable		*/
-#define TXDCTRL_EOF	0x0000000040000000	/* End of Frame		*/
-#define TXDCTRL_SOF	0x0000000080000000	/* Start of Frame	*/
-#define TXDCTRL_INTME	0x0000000100000000	/* "Interrupt Me"	*/
-#define TXDCTRL_NOCRC	0x0000000200000000	/* No CRC Present	*/
+#define TXDCTRL_BUFSZ	0x0000000000007fffULL	/* Buffer Size		*/
+#define TXDCTRL_CSTART	0x00000000001f8000ULL	/* CSUM Start Offset	*/
+#define TXDCTRL_COFF	0x000000001fe00000ULL	/* CSUM Stuff Offset	*/
+#define TXDCTRL_CENAB	0x0000000020000000ULL	/* CSUM Enable		*/
+#define TXDCTRL_EOF	0x0000000040000000ULL	/* End of Frame		*/
+#define TXDCTRL_SOF	0x0000000080000000ULL	/* Start of Frame	*/
+#define TXDCTRL_INTME	0x0000000100000000ULL	/* "Interrupt Me"	*/
+#define TXDCTRL_NOCRC	0x0000000200000000ULL	/* No CRC Present	*/
 
 /* GEM requires that RX descriptors are provided four at a time,
  * aligned.  Also, the RX ring may not wrap around.  This means that
@@ -840,13 +840,13 @@ struct gem_rxd {
 	u64	buffer;
 };
 
-#define RXDCTRL_TCPCSUM	0x000000000000ffff	/* TCP Pseudo-CSUM	*/
-#define RXDCTRL_BUFSZ	0x000000007fff0000	/* Buffer Size		*/
-#define RXDCTRL_OWN	0x0000000080000000	/* GEM owns this entry	*/
-#define RXDCTRL_HASHVAL	0x0ffff00000000000	/* Hash Value		*/
-#define RXDCTRL_HPASS	0x1000000000000000	/* Passed Hash Filter	*/
-#define RXDCTRL_ALTMAC	0x2000000000000000	/* Matched ALT MAC	*/
-#define RXDCTRL_BAD	0x4000000000000000	/* Frame has bad CRC	*/
+#define RXDCTRL_TCPCSUM	0x000000000000ffffULL	/* TCP Pseudo-CSUM	*/
+#define RXDCTRL_BUFSZ	0x000000007fff0000ULL	/* Buffer Size		*/
+#define RXDCTRL_OWN	0x0000000080000000ULL	/* GEM owns this entry	*/
+#define RXDCTRL_HASHVAL	0x0ffff00000000000ULL	/* Hash Value		*/
+#define RXDCTRL_HPASS	0x1000000000000000ULL	/* Passed Hash Filter	*/
+#define RXDCTRL_ALTMAC	0x2000000000000000ULL	/* Matched ALT MAC	*/
+#define RXDCTRL_BAD	0x4000000000000000ULL	/* Frame has bad CRC	*/
 
 #define RXDCTRL_FRESH(gp)	\
 	((((RX_BUF_ALLOC_SIZE(gp) - RX_OFFSET) << 16) & RXDCTRL_BUFSZ) | \

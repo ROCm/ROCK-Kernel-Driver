@@ -52,7 +52,7 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 		break;
 
 	case NETDEV_DOWN:
-		if (br->dev.flags & IFF_UP) {
+		if (br->dev->flags & IFF_UP) {
 			spin_lock_bh(&br->lock);
 			br_stp_disable_port(p);
 			spin_unlock_bh(&br->lock);
@@ -60,7 +60,7 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 		break;
 
 	case NETDEV_UP:
-		if (!(br->dev.flags & IFF_UP)) {
+		if (!(br->dev->flags & IFF_UP)) {
 			spin_lock_bh(&br->lock);
 			br_stp_enable_port(p);
 			spin_unlock_bh(&br->lock);
