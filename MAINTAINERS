@@ -1290,13 +1290,14 @@ S:	Maintained
 LINUX FOR POWERPC
 P:	Paul Mackerras
 M:	paulus@samba.org
-W:	http://www.fsmlabs.com/linuxppcbk.html
+W:	http://www.penguinppc.org/
+L:	linuxppc-dev@lists.linuxppc.org
 S:	Supported
 
 LINUX FOR POWER MACINTOSH
 P:	Benjamin Herrenschmidt
 M:	benh@kernel.crashing.org
-W:	http://www.linuxppc.org/
+W:	http://www.penguinppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
 S:	Maintained
 
@@ -1327,9 +1328,11 @@ M:	acme@conectiva.com.br
 S:	Maintained
 
 LINUX FOR 64BIT POWERPC
-P:	David Engebretsen (stable kernel)
-M:	engebret@us.ibm.com
-P:	Anton Blanchard (development kernel)
+P:	Paul Mackerras
+M:	paulus@samba.org
+M:	paulus@au.ibm.com
+P:	Anton Blanchard
+M:	anton@samba.org
 M:	anton@au.ibm.com
 W:	http://linuxppc64.org
 L:	linuxppc64-dev@lists.linuxppc.org
