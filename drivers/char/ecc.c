@@ -544,7 +544,7 @@ static struct pci_dev* find_function(int fn)
   int devfn;
 
   devfn = (bridge->devfn & ~7) + (fn & 7);
-  while ((pfn = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8, pfn))) {
+  while ((pfn = pci_get_class(PCI_CLASS_BRIDGE_HOST << 8, pfn))) {
     if (pfn->devfn == devfn && pfn->bus->number == bridge->bus->number)
       return pfn;
   }
@@ -1515,7 +1515,7 @@ static struct pci_probe_matrix probe_matrix[] = {
 
 int find_chipset(void) {
 
-	while ((bridge = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8, bridge)))
+	while ((bridge = pci_get_class(PCI_CLASS_BRIDGE_HOST << 8, bridge)))
 	{
 		int loop = 0;
 		cs.ecc_cap = ECC_NONE;
