@@ -633,6 +633,12 @@ typedef struct smb_com_open_req {	/* also handles create */
 	char fileName[1];
 } OPEN_REQ;
 
+/* open response: oplock levels */
+#define OPLOCK_NONE  	 0
+#define OPLOCK_EXCLUSIVE 1
+#define OPLOCK_BATCH	 2
+#define OPLOCK_READ	 3  /* level 2 oplock */
+
 typedef struct smb_com_open_rsp {
 	struct smb_hdr hdr;	/* wct = 34 BB */
 	__u8 AndXCommand;

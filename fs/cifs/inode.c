@@ -43,6 +43,9 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	char *tmp_path;
 
+/* BB add caching check so we do not go to server to overwrite inode info to cached file
+	where the local file sizes are correct and the server info is stale  BB */
+
 	xid = GetXid();
 
 	pTcon = cifs_sb->tcon;
@@ -123,9 +126,13 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		findData.NumOfBytes = le64_to_cpu(findData.NumOfBytes);
 		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
 		inode->i_size = findData.EndOfFile;
-		inode->i_blksize =
-		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
-		inode->i_blocks = do_div(findData.NumOfBytes, inode->i_blksize);
+/* blksize needs to be multiple of two. So safer to default to blksize
+	and blkbits set in superblock so 2**blkbits and blksize will match */
+/*		inode->i_blksize =
+		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;*/
+		inode->i_blocks = 
+	                (inode->i_blksize - 1 + findData.NumOfBytes) >> inode->i_blkbits;
+
 		if (findData.NumOfBytes < findData.EndOfFile)
 			cFYI(1, ("Server inconsistency Error: it says allocation size less than end of file "));
 		cFYI(1,
@@ -155,24 +162,38 @@ cifs_get_inode_info_unix(struct inode **pinode,
 }
 
 int
-cifs_get_inode_info(struct inode **pinode,
-		    const unsigned char *search_path, struct super_block *sb)
+cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path, 
+		FILE_ALL_INFO * pfindData, struct super_block *sb)
 {
 	int xid;
 	int rc = 0;
-	FILE_ALL_INFO findData;
 	struct cifsTconInfo *pTcon;
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	char *tmp_path;
+	char *buf = NULL;
 
 	xid = GetXid();
 
 	pTcon = cifs_sb->tcon;
-	cFYI(1, (" Getting info on %s ", search_path));
-	/* we could have done a find first instead but this returns more info */
-	rc = CIFSSMBQPathInfo(xid, pTcon, search_path, &findData,
+	cFYI(1,("Getting info on %s ", search_path));
+
+	if((pfindData == NULL) && (*pinode != NULL)) {
+		if(CIFS_I(*pinode)->clientCanCacheRead) {
+			cFYI(1,("No need to revalidate inode sizes on cached file "));
+			FreeXid(xid);
+			return rc;
+		}
+	}
+
+	/* if file info not passed in then get it from server */
+	if(pfindData == NULL) {
+		buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+		pfindData = (FILE_ALL_INFO *)buf;
+	/* could do find first instead but this returns more info */
+		rc = CIFSSMBQPathInfo(xid, pTcon, search_path, pfindData,
 			      cifs_sb->local_nls);
+	}
 	/* dump_mem("\nQPathInfo return data",&findData, sizeof(findData)); */
 	if (rc) {
 		if (rc == -EREMOTE) {
@@ -183,8 +204,10 @@ cifs_get_inode_info(struct inode **pinode,
 				    strnlen(search_path, MAX_PATHCONF) + 1,
 				    GFP_KERNEL);
 			if (tmp_path == NULL) {
-				FreeXid(xid);
-				return -ENOMEM;
+			    if(buf)
+				kfree(buf);
+			    FreeXid(xid);
+			    return -ENOMEM;
 			}
 
 			strncpy(tmp_path, pTcon->treeName, MAX_TREE_SIZE);
@@ -195,8 +218,10 @@ cifs_get_inode_info(struct inode **pinode,
 			kfree(tmp_path);
 			/* BB fix up inode etc. */
 		} else if (rc) {
-			FreeXid(xid);
-			return rc;
+		    if(buf)
+			kfree(buf);
+		    FreeXid(xid);
+		    return rc;
 		}
 	} else {
 		struct cifsInodeInfo *cifsInfo;
@@ -208,32 +233,35 @@ cifs_get_inode_info(struct inode **pinode,
 
 		inode = *pinode;
 		cifsInfo = CIFS_I(inode);
-		findData.Attributes = le32_to_cpu(findData.Attributes);
-		cifsInfo->cifsAttrs = findData.Attributes;
+		pfindData->Attributes = le32_to_cpu(pfindData->Attributes);
+		cifsInfo->cifsAttrs = pfindData->Attributes;
 		cFYI(1, (" Old time %ld ", cifsInfo->time));
 		cifsInfo->time = jiffies;
 		cFYI(1, (" New time %ld ", cifsInfo->time));
 		atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode */
 
-		inode->i_blksize =
-		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
+/* blksize needs to be multiple of two. So safer to default to blksize
+        and blkbits set in superblock so 2**blkbits and blksize will match */
+/*		inode->i_blksize =
+		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;*/
+
 		/* Linux can not store file creation time unfortunately so we ignore it */
 		inode->i_atime =
-		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastAccessTime));
+		    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastAccessTime));
 		inode->i_mtime =
-		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastWriteTime));
+		    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastWriteTime));
 		inode->i_ctime =
-		    cifs_NTtimeToUnix(le64_to_cpu(findData.ChangeTime));
+		    cifs_NTtimeToUnix(le64_to_cpu(pfindData->ChangeTime));
 		cFYI(0,
-		     (" Attributes came in as 0x%x ", findData.Attributes));
+		     (" Attributes came in as 0x%x ", pfindData->Attributes));
 
 		/* set default mode. will override for dirs below */
 		inode->i_mode = cifs_sb->mnt_file_mode;
 
-		if (findData.Attributes & ATTR_REPARSE) {
+		if (pfindData->Attributes & ATTR_REPARSE) {
 	/* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
 			inode->i_mode |= S_IFLNK;
-		} else if (findData.Attributes & ATTR_DIRECTORY) {
+		} else if (pfindData->Attributes & ATTR_DIRECTORY) {
 	/* override default perms since we do not do byte range locking on dirs */
 			inode->i_mode = cifs_sb->mnt_dir_mode;
 			inode->i_mode |= S_IFDIR;
@@ -244,14 +272,12 @@ cifs_get_inode_info(struct inode **pinode,
 				inode->i_mode &= ~(S_IWUGO);
    /* BB add code here - validate if device or weird share or device type? */
 		}
-		inode->i_size = le64_to_cpu(findData.EndOfFile);
-		findData.AllocationSize = le64_to_cpu(findData.AllocationSize);
+		inode->i_size = le64_to_cpu(pfindData->EndOfFile);
+		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
 		inode->i_blocks =
-		    do_div(findData.AllocationSize, inode->i_blksize);
-		cFYI(1,
-		     (" Size %ld and blocks %ld ",
-		      (unsigned long) inode->i_size, inode->i_blocks));
-		inode->i_nlink = le32_to_cpu(findData.NumberOfLinks);
+	                (inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
+
+		inode->i_nlink = le32_to_cpu(pfindData->NumberOfLinks);
 
 		/* BB fill in uid and gid here? with help from winbind? 
 			or retrieve from NTFS stream extended attribute */
@@ -275,6 +301,8 @@ cifs_get_inode_info(struct inode **pinode,
 					   kdev_t_to_nr(inode->i_rdev));
 		}
 	}
+	if(buf)
+	    kfree(buf);
 	FreeXid(xid);
 	return rc;
 }
@@ -290,7 +318,7 @@ cifs_read_inode(struct inode *inode)
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
 		cifs_get_inode_info_unix(&inode, "", inode->i_sb);
 	else
-		cifs_get_inode_info(&inode, "", inode->i_sb);
+		cifs_get_inode_info(&inode, "", NULL, inode->i_sb);
 }
 
 int
@@ -323,7 +351,7 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 
 		rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, DELETE, 
 				CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
-				&netfid, &oplock, cifs_sb->local_nls);
+				&netfid, &oplock, NULL, cifs_sb->local_nls);
 		if(rc==0) {
 			CIFSSMBClose(xid, pTcon, netfid);
 			/* BB In the future chain close with the NTCreateX to narrow window */
@@ -387,12 +415,13 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
 						      inode->i_sb);
 		else
-			rc = cifs_get_inode_info(&newinode, full_path,
+			rc = cifs_get_inode_info(&newinode, full_path,NULL,
 						 inode->i_sb);
 
 		direntry->d_op = &cifs_dentry_ops;
 		d_instantiate(direntry, newinode);
-		direntry->d_inode->i_nlink = 2;
+		if(direntry->d_inode)
+			direntry->d_inode->i_nlink = 2;
 		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
 			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
 				(__u64)-1,  
@@ -511,13 +540,13 @@ cifs_revalidate(struct dentry *direntry)
 	      direntry->d_inode->i_count.counter, direntry,
 	      direntry->d_time, jiffies));
 
+
 	cifsInode = CIFS_I(direntry->d_inode);
 	/* BB add check - do not need to revalidate oplocked files */
 
-	if (time_before(jiffies, cifsInode->time + HZ)) {
+	if (time_before(jiffies, cifsInode->time + HZ) && lookupCacheEnabled) {
 	    if((S_ISREG(direntry->d_inode->i_mode) == 0) || 
-			(direntry->d_inode->i_nlink == 1) || 
-			(lookupCacheEnabled == 0)) {
+			(direntry->d_inode->i_nlink == 1)) {  
 			if (full_path)
 				kfree(full_path);
 			FreeXid(xid);
@@ -531,7 +560,7 @@ cifs_revalidate(struct dentry *direntry)
 		cifs_get_inode_info_unix(&direntry->d_inode, full_path,
 					 direntry->d_sb);
 	else
-		cifs_get_inode_info(&direntry->d_inode, full_path,
+		cifs_get_inode_info(&direntry->d_inode, full_path, NULL,
 				    direntry->d_sb);
 
 	/* BB if not oplocked, invalidate inode pages if mtime has changed */
