@@ -19,7 +19,6 @@
 #include <linux/tty.h>
 #include <asm/uaccess.h>
 #include <linux/consolemap.h>
-#include <linux/console_struct.h>
 #include <linux/vt_kern.h>
 
 static unsigned short translations[][256] = {

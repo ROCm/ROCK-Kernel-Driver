@@ -127,10 +127,6 @@ struct fb_info_valkyrie {
 int valkyriefb_init(void);
 int valkyriefb_setup(char*);
 
-static int valkyrie_get_fix(struct fb_fix_screeninfo *fix, int con,
-			 struct fb_info *info);
-static int valkyrie_get_var(struct fb_var_screeninfo *var, int con,
-			 struct fb_info *info);
 static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -157,8 +153,6 @@ static void valkyrie_init_fix(struct fb_fix_screeninfo *fix, struct fb_info_valk
 
 static struct fb_ops valkyriefb_ops = {
 	.owner =	THIS_MODULE,
-	.fb_get_fix =	valkyrie_get_fix,
-	.fb_get_var =	valkyrie_get_var,
 	.fb_set_var =	valkyrie_set_var,
 	.fb_get_cmap =	valkyrie_get_cmap,
 	.fb_set_cmap =	gen_set_cmap,
@@ -168,24 +162,6 @@ static struct fb_ops valkyriefb_ops = {
 
 static int valkyriefb_getcolreg(u_int regno, u_int *red, u_int *green,
 			     u_int *blue, u_int *transp, struct fb_info *info);
-
-static int valkyrie_get_fix(struct fb_fix_screeninfo *fix, int con,
-			 struct fb_info *info)
-{
-	struct fb_info_valkyrie *cp = (struct fb_info_valkyrie *) info;
-
-	*fix = cp->fix;
-	return 0;
-}
-
-static int valkyrie_get_var(struct fb_var_screeninfo *var, int con,
-			 struct fb_info *info)
-{
-	struct fb_info_valkyrie *cp = (struct fb_info_valkyrie *) info;
-
-	*var = cp->var;
-	return 0;
-}
 
 /* Sets everything according to var */
 static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
@@ -705,7 +681,6 @@ static void valkyrie_par_to_fix(struct fb_par_valkyrie *par,
 static void valkyrie_init_display(struct display *disp)
 {
 	memset(disp, 0, sizeof(*disp));
-	disp->type = /* fix->type */ FB_TYPE_PACKED_PIXELS;
 	disp->can_soft_blank = can_soft_blank;
 	disp->scrollmode = SCROLL_YREDRAW;
 }
@@ -714,8 +689,6 @@ static void valkyrie_par_to_display(struct fb_par_valkyrie *par,
   struct display *disp, struct fb_fix_screeninfo *fix, struct fb_info_valkyrie *p)
 {
 	disp->var = p->var;
-	disp->visual = fix->visual;
-	disp->line_length = fix->line_length;
 
 	if(disp->scrollmode != SCROLL_YREDRAW) {
 		printk(KERN_ERR "Scroll mode not YREDRAW in valkyrie_par_to_display\n");

@@ -9,8 +9,6 @@
 
 #include <asm/io.h>
 
-#include <video/fbcon.h>
-
 #include <video/mach64.h>
 #include "atyfb.h"
 
