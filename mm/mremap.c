@@ -169,6 +169,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		unsigned long new_len, unsigned long new_addr)
 {
 	struct mm_struct *mm = vma->vm_mm;
+	struct address_space *mapping = NULL;
 	struct vm_area_struct *new_vma;
 	unsigned long vm_flags = vma->vm_flags;
 	unsigned long new_pgoff;
@@ -184,30 +185,35 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		return -ENOMEM;
 
 	new_pgoff = vma->vm_pgoff + ((old_addr - vma->vm_start) >> PAGE_SHIFT);
-	new_vma = copy_vma(vma, new_addr, new_len, new_pgoff);
+	new_vma = copy_vma(&vma, new_addr, new_len, new_pgoff);
 	if (!new_vma)
 		return -ENOMEM;
 
+	if (vma->vm_file) {
+		/*
+		 * Subtle point from Rajesh Venkatasubramanian: before
+		 * moving file-based ptes, we must lock vmtruncate out,
+		 * since it might clean the dst vma before the src vma,
+		 * and we propagate stale pages into the dst afterward.
+		 */
+		mapping = vma->vm_file->f_mapping;
+		down(&mapping->i_shared_sem);
+	}
 	moved_len = move_page_tables(vma, new_addr, old_addr, old_len);
 	if (moved_len < old_len) {
 		/*
 		 * On error, move entries back from new area to old,
 		 * which will succeed since page tables still there,
 		 * and then proceed to unmap new area instead of old.
-		 *
-		 * Subtle point from Rajesh Venkatasubramanian: before
-		 * moving file-based ptes, move new_vma before old vma
-		 * in the i_mmap or i_mmap_shared list, so when racing
-		 * against vmtruncate we cannot propagate pages to be
-		 * truncated back from new_vma into just cleaned old.
 		 */
-		vma_relink_file(vma, new_vma);
 		move_page_tables(new_vma, old_addr, new_addr, moved_len);
 		vma = new_vma;
 		old_len = new_len;
 		old_addr = new_addr;
 		new_addr = -ENOMEM;
 	}
+	if (mapping)
+		up(&mapping->i_shared_sem);
 
 	/* Conceal VM_ACCOUNT so old reservation is not undone */
 	if (vm_flags & VM_ACCOUNT) {

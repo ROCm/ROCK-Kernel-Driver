@@ -526,9 +526,8 @@ extern void si_meminfo_node(struct sysinfo *val, int nid);
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void __vma_link_rb(struct mm_struct *, struct vm_area_struct *,
 	struct rb_node **, struct rb_node *);
-extern struct vm_area_struct *copy_vma(struct vm_area_struct *,
+extern struct vm_area_struct *copy_vma(struct vm_area_struct **,
 	unsigned long addr, unsigned long len, unsigned long pgoff);
-extern void vma_relink_file(struct vm_area_struct *, struct vm_area_struct *);
 extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
