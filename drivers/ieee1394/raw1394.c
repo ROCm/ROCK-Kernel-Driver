@@ -56,11 +56,11 @@
 #include "raw1394-private.h"
 
 #if BITS_PER_LONG == 64
-#define int2ptr(x) ((void *)x)
-#define ptr2int(x) ((u64)x)
+#define int2ptr(x) ((void __user *)x)
+#define ptr2int(x) ((u64)(unsigned long)(void __user *)x)
 #else
-#define int2ptr(x) ((void *)(u32)x)
-#define ptr2int(x) ((u64)(u32)x)
+#define int2ptr(x) ((void __user *)(u32)x)
+#define ptr2int(x) ((u64)(unsigned long)(void __user *)x)
 #endif
 
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
@@ -410,7 +410,7 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
 }
 
 
-static ssize_t raw1394_read(struct file *file, char *buffer, size_t count,
+static ssize_t raw1394_read(struct file *file, char __user *buffer, size_t count,
                     loff_t *offset_is_ignored)
 {
         struct file_info *fi = (struct file_info *)file->private_data;
@@ -602,7 +602,7 @@ static void handle_fcp_listen(struct file_info *fi, struct pending_request *req)
                 if (fi->fcp_buffer) {
                         req->req.error = RAW1394_ERROR_ALREADY;
                 } else {
-                        fi->fcp_buffer = (u8 *)int2ptr(req->req.recvb);
+                        fi->fcp_buffer = int2ptr(req->req.recvb);
                 }
         } else {
                 if (!fi->fcp_buffer) {
@@ -826,7 +826,7 @@ static int handle_async_send(struct file_info *fi, struct pending_request *req)
                 return sizeof(struct raw1394_request);
         }
 
-        if (copy_from_user(packet->data, ((u8*) int2ptr(req->req.sendb)) + header_length,
+        if (copy_from_user(packet->data, int2ptr(req->req.sendb) + header_length,
                            packet->data_size)) {
                 req->req.error = RAW1394_ERROR_MEMFAULT;
                 req->req.length = 0;
@@ -964,9 +964,8 @@ static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
                 arm_req->buffer  = NULL;
                 arm_resp->buffer = NULL;
                 if (rcode == RCODE_COMPLETE) {
-                        arm_resp->buffer = ((byte_t *)(arm_resp) +
-                                (sizeof(struct arm_response)));
-                        memcpy (arm_resp->buffer,
+                        byte_t *buf = (byte_t *)arm_resp + sizeof(struct arm_response);
+                        memcpy (buf,
                                 (arm_addr->addr_space_buffer)+(addr-(arm_addr->start)),
                                 length);
                         arm_resp->buffer = int2ptr((arm_addr->recvb) +
@@ -1091,10 +1090,9 @@ static int arm_write (struct hpsb_host *host, int nodeid, int destid,
                         (sizeof (struct arm_request_response)));
                 arm_resp = (struct arm_response *) ((byte_t *)(arm_req) +
                         (sizeof(struct arm_request)));
-                arm_req->buffer = ((byte_t *)(arm_resp) +
-                        (sizeof(struct arm_response)));
                 arm_resp->buffer = NULL;
-                memcpy (arm_req->buffer, data, length);
+                memcpy ((byte_t *)arm_resp + sizeof(struct arm_response),
+			data, length);
                 arm_req->buffer = int2ptr((arm_addr->recvb) +
                         sizeof (struct arm_request_response) +
                         sizeof (struct arm_request) +
@@ -1233,6 +1231,7 @@ static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
                 }
         }
         if (arm_addr->notification_options & ARM_LOCK) {
+		byte_t *buf1, *buf2;
                 DBGMSG("arm_lock -> entering notification-section");
                 req = __alloc_pending_request(SLAB_ATOMIC);
                 if (!req) {
@@ -1258,26 +1257,22 @@ static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
                         (sizeof (struct arm_request_response)));
                 arm_resp = (struct arm_response *) ((byte_t *)(arm_req) +
                         (sizeof(struct arm_request)));
-                arm_req->buffer = ((byte_t *)(arm_resp) +
-                        (sizeof(struct arm_response)));
-                arm_resp->buffer = ((byte_t *)(arm_req->buffer) +
-                        (2* sizeof(*store)));
+                buf1 = (byte_t *)arm_resp + sizeof(struct arm_response);
+		buf2 = buf1 + 2 * sizeof(*store);
                 if ((ext_tcode == EXTCODE_FETCH_ADD) ||
                         (ext_tcode == EXTCODE_LITTLE_ADD)) {
                         arm_req->buffer_length = sizeof(*store);
-                        memcpy (arm_req->buffer, &data, sizeof(*store));
+                        memcpy (buf1, &data, sizeof(*store));
 
                 } else {
                         arm_req->buffer_length = 2 * sizeof(*store);
-                        memcpy (arm_req->buffer, &arg,  sizeof(*store));
-                        memcpy (((arm_req->buffer) + sizeof(*store)),
-                                &data, sizeof(*store));
+                        memcpy (buf1, &arg,  sizeof(*store));
+                        memcpy (buf1 + sizeof(*store), &data, sizeof(*store));
                 }
                 if (rcode == RCODE_COMPLETE) {
                         arm_resp->buffer_length = sizeof(*store);
-                        memcpy (arm_resp->buffer, &old, sizeof(*store));
+                        memcpy (buf2, &old, sizeof(*store));
                 } else {
-                        arm_resp->buffer = NULL;
                         arm_resp->buffer_length = 0;
                 }
                 req->file_info = fi;
@@ -1438,6 +1433,7 @@ static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
                 }
         }
         if (arm_addr->notification_options & ARM_LOCK) {
+		byte_t *buf1, *buf2;
                 DBGMSG("arm_lock64 -> entering notification-section");
                 req = __alloc_pending_request(SLAB_ATOMIC);
                 if (!req) {
@@ -1463,26 +1459,22 @@ static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
                         (sizeof (struct arm_request_response)));
                 arm_resp = (struct arm_response *) ((byte_t *)(arm_req) +
                         (sizeof(struct arm_request)));
-                arm_req->buffer = ((byte_t *)(arm_resp) +
-                        (sizeof(struct arm_response)));
-                arm_resp->buffer = ((byte_t *)(arm_req->buffer) +
-                        (2* sizeof(*store)));
+                buf1 = (byte_t *)arm_resp + sizeof(struct arm_response);
+                buf2 = buf1 + 2 * sizeof(*store);
                 if ((ext_tcode == EXTCODE_FETCH_ADD) ||
                         (ext_tcode == EXTCODE_LITTLE_ADD)) {
                         arm_req->buffer_length = sizeof(*store);
-                        memcpy (arm_req->buffer, &data, sizeof(*store));
+                        memcpy (buf1, &data, sizeof(*store));
 
                 } else {
                         arm_req->buffer_length = 2 * sizeof(*store);
-                        memcpy (arm_req->buffer, &arg,  sizeof(*store));
-                        memcpy (((arm_req->buffer) + sizeof(*store)),
-                                &data, sizeof(*store));
+                        memcpy (buf1, &arg,  sizeof(*store));
+                        memcpy (buf1 + sizeof(*store), &data, sizeof(*store));
                 }
                 if (rcode == RCODE_COMPLETE) {
                         arm_resp->buffer_length = sizeof(*store);
-                        memcpy (arm_resp->buffer, &old, sizeof(*store));
+                        memcpy (buf2, &old, sizeof(*store));
                 } else {
-                        arm_resp->buffer = NULL;
                         arm_resp->buffer_length = 0;
                 }
                 req->file_info = fi;
@@ -2146,7 +2138,7 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
 }
 
 
-static ssize_t raw1394_write(struct file *file, const char *buffer, size_t count,
+static ssize_t raw1394_write(struct file *file, const char __user *buffer, size_t count,
                      loff_t *offset_is_ignored)
 {
         struct file_info *fi = (struct file_info *)file->private_data;
@@ -2262,7 +2254,7 @@ static void raw1394_iso_fill_status(struct hpsb_iso *iso, struct raw1394_iso_sta
 	stat->xmit_cycle = iso->xmit_cycle;
 }
 
-static int raw1394_iso_xmit_init(struct file_info *fi, void *uaddr)
+static int raw1394_iso_xmit_init(struct file_info *fi, void __user *uaddr)
 {
 	struct raw1394_iso_status stat;
 
@@ -2294,7 +2286,7 @@ static int raw1394_iso_xmit_init(struct file_info *fi, void *uaddr)
 	return 0;
 }
 
-static int raw1394_iso_recv_init(struct file_info *fi, void *uaddr)
+static int raw1394_iso_recv_init(struct file_info *fi, void __user *uaddr)
 {
 	struct raw1394_iso_status stat;
 
@@ -2322,7 +2314,7 @@ static int raw1394_iso_recv_init(struct file_info *fi, void *uaddr)
 	return 0;
 }
 
-static int raw1394_iso_get_status(struct file_info *fi, void *uaddr)
+static int raw1394_iso_get_status(struct file_info *fi, void __user *uaddr)
 {
 	struct raw1394_iso_status stat;
 	struct hpsb_iso *iso = fi->iso_handle;
@@ -2338,7 +2330,7 @@ static int raw1394_iso_get_status(struct file_info *fi, void *uaddr)
 }
 
 /* copy N packet_infos out of the ringbuffer into user-supplied array */
-static int raw1394_iso_recv_packets(struct file_info *fi, void *uaddr)
+static int raw1394_iso_recv_packets(struct file_info *fi, void __user *uaddr)
 {
 	struct raw1394_iso_packets upackets;
 	unsigned int packet = fi->iso_handle->first_packet;
@@ -2369,7 +2361,7 @@ static int raw1394_iso_recv_packets(struct file_info *fi, void *uaddr)
 }
 
 /* copy N packet_infos from user to ringbuffer, and queue them for transmission */
-static int raw1394_iso_send_packets(struct file_info *fi, void *uaddr)
+static int raw1394_iso_send_packets(struct file_info *fi, void __user *uaddr)
 {
 	struct raw1394_iso_packets upackets;
 	int i, rv;
@@ -2426,14 +2418,15 @@ static int raw1394_mmap(struct file *file, struct vm_area_struct *vma)
 static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct file_info *fi = file->private_data;
+	void __user *argp = (void __user *)arg;
 
 	switch(fi->iso_state) {
 	case RAW1394_ISO_INACTIVE:
 		switch(cmd) {
 		case RAW1394_IOC_ISO_XMIT_INIT:
-			return raw1394_iso_xmit_init(fi, (void*) arg);
+			return raw1394_iso_xmit_init(fi, argp);
 		case RAW1394_IOC_ISO_RECV_INIT:
-			return raw1394_iso_recv_init(fi, (void*) arg);
+			return raw1394_iso_recv_init(fi, argp);
 		default:
 			break;
 		}
@@ -2443,7 +2436,7 @@ static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		case RAW1394_IOC_ISO_RECV_START: {
 			/* copy args from user-space */
 			int args[3];
-			if (copy_from_user(&args[0], (void*) arg, sizeof(args)))
+			if (copy_from_user(&args[0], argp, sizeof(args)))
 				return -EFAULT;
 			return hpsb_iso_recv_start(fi->iso_handle, args[0], args[1], args[2]);
 		}
@@ -2457,14 +2450,14 @@ static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		case RAW1394_IOC_ISO_RECV_SET_CHANNEL_MASK: {
 			/* copy the u64 from user-space */
 			u64 mask;
-			if (copy_from_user(&mask, (void*) arg, sizeof(mask)))
+			if (copy_from_user(&mask, argp, sizeof(mask)))
 				return -EFAULT;
 			return hpsb_iso_recv_set_channel_mask(fi->iso_handle, mask);
 		}
 		case RAW1394_IOC_ISO_GET_STATUS:
-			return raw1394_iso_get_status(fi, (void*) arg);
+			return raw1394_iso_get_status(fi, argp);
 		case RAW1394_IOC_ISO_RECV_PACKETS:
-			return raw1394_iso_recv_packets(fi, (void*) arg);
+			return raw1394_iso_recv_packets(fi, argp);
 		case RAW1394_IOC_ISO_RECV_RELEASE_PACKETS:
 			return hpsb_iso_recv_release_packets(fi->iso_handle, arg);
 		case RAW1394_IOC_ISO_RECV_FLUSH:
@@ -2482,7 +2475,7 @@ static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		case RAW1394_IOC_ISO_XMIT_START: {
 			/* copy two ints from user-space */
 			int args[2];
-			if (copy_from_user(&args[0], (void*) arg, sizeof(args)))
+			if (copy_from_user(&args[0], argp, sizeof(args)))
 				return -EFAULT;
 			return hpsb_iso_xmit_start(fi->iso_handle, args[0], args[1]);
 		}
@@ -2492,9 +2485,9 @@ static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			hpsb_iso_stop(fi->iso_handle);
 			return 0;
 		case RAW1394_IOC_ISO_GET_STATUS:
-			return raw1394_iso_get_status(fi, (void*) arg);
+			return raw1394_iso_get_status(fi, argp);
 		case RAW1394_IOC_ISO_XMIT_PACKETS:
-			return raw1394_iso_send_packets(fi, (void*) arg);
+			return raw1394_iso_send_packets(fi, argp);
 		case RAW1394_IOC_ISO_SHUTDOWN:
 			raw1394_iso_shutdown(fi);
 			return 0;

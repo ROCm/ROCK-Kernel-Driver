@@ -1137,7 +1137,7 @@ static void fr_destroy(hdlc_device *hdlc)
 
 int hdlc_fr_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
-	fr_proto *fr_s = ifr->ifr_settings.ifs_ifsu.fr;
+	fr_proto __user *fr_s = ifr->ifr_settings.ifs_ifsu.fr;
 	const size_t size = sizeof(fr_proto);
 	fr_proto new_settings;
 	hdlc_device *hdlc = dev_to_hdlc(dev);

@@ -705,6 +705,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 	struct file_ctx *ctx = (struct file_ctx *)file->private_data;
 	struct ti_ohci *ohci = ctx->ohci;
 	unsigned long flags;
+	void __user *argp = (void __user *)arg;
 
 	switch(cmd)
 	{
@@ -716,7 +717,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		struct dma_iso_ctx *d;
 		int i;
 
-		if (copy_from_user(&v, (void *)arg, sizeof(v)))
+		if (copy_from_user(&v, argp, sizeof(v)))
 			return -EFAULT;
 
 		/* if channel < 0, find lowest available one */
@@ -813,7 +814,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			      v.channel);
 		}
 
-		if (copy_to_user((void *)arg, &v, sizeof(v)))
+		if (copy_to_user(argp, &v, sizeof(v)))
 			return -EFAULT;
 
 		return 0;
@@ -825,7 +826,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		u64 mask;
 		struct dma_iso_ctx *d;
 
-		if (copy_from_user(&channel, (void *)arg, sizeof(int)))
+		if (copy_from_user(&channel, argp, sizeof(int)))
 			return -EFAULT;
 
 		if (channel<0 || channel>(ISO_CHANNELS-1)) {
@@ -860,7 +861,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		struct video1394_wait v;
 		struct dma_iso_ctx *d;
 
-		if (copy_from_user(&v, (void *)arg, sizeof(v)))
+		if (copy_from_user(&v, argp, sizeof(v)))
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_RECEIVE, v.channel);
@@ -923,7 +924,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		struct dma_iso_ctx *d;
 		int i;
 
-		if (copy_from_user(&v, (void *)arg, sizeof(v)))
+		if (copy_from_user(&v, argp, sizeof(v)))
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_RECEIVE, v.channel);
@@ -994,7 +995,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		spin_unlock_irqrestore(&d->lock, flags);
 
 		v.buffer=i;
-		if (copy_to_user((void *)arg, &v, sizeof(v)))
+		if (copy_to_user(argp, &v, sizeof(v)))
 			return -EFAULT;
 
 		return 0;
@@ -1007,7 +1008,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 
 		qv.packet_sizes = NULL;
 
-		if (copy_from_user(&v, (void *)arg, sizeof(v)))
+		if (copy_from_user(&v, argp, sizeof(v)))
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_TRANSMIT, v.channel);
@@ -1023,7 +1024,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			unsigned int *psizes;
 			int buf_size = d->nb_cmd * sizeof(unsigned int);
 
-			if (copy_from_user(&qv, (void *)arg, sizeof(qv)))
+			if (copy_from_user(&qv, argp, sizeof(qv)))
 				return -EFAULT;
 
 			psizes = kmalloc(buf_size, GFP_KERNEL);
@@ -1111,7 +1112,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		struct video1394_wait v;
 		struct dma_iso_ctx *d;
 
-		if (copy_from_user(&v, (void *)arg, sizeof(v)))
+		if (copy_from_user(&v, argp, sizeof(v)))
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_TRANSMIT, v.channel);

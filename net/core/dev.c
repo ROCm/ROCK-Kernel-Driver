@@ -1406,13 +1406,12 @@ int dev_queue_xmit(struct sk_buff *skb)
 	   Either shot noqueue qdisc, it is even simpler 8)
 	 */
 	if (dev->flags & IFF_UP) {
-		preempt_disable();
-		int cpu = smp_processor_id();
+		int cpu = get_cpu();
 
 		if (dev->xmit_lock_owner != cpu) {
 
 			HARD_TX_LOCK_BH(dev, cpu);
-			preempt_enable();
+			put_cpu();
 
 			if (!netif_queue_stopped(dev)) {
 				if (netdev_nit)
@@ -1430,7 +1429,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 				       "queue packet!\n", dev->name);
 			goto out_enetdown;
 		} else {
-			preempt_enable();
+			put_cpu();
 			/* Recursion is detected! It is possible,
 			 * unfortunately */
 			if (net_ratelimit())
