@@ -2102,6 +2102,18 @@ static inline task_t *find_process_by_pid(pid_t pid)
 	return pid ? find_task_by_pid(pid) : current;
 }
 
+/* Actually do priority change: must hold rq lock. */
+static void __setscheduler(struct task_struct *p, int policy, int prio)
+{
+	BUG_ON(p->array);
+	p->policy = policy;
+	p->rt_priority = prio;
+	if (policy != SCHED_NORMAL)
+		p->prio = MAX_USER_RT_PRIO-1 - p->rt_priority;
+	else
+		p->prio = p->static_prio;
+}
+
 /*
  * setscheduler - change the scheduling policy and/or RT priority of a thread.
  */
@@ -2174,13 +2186,8 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 	if (array)
 		deactivate_task(p, task_rq(p));
 	retval = 0;
-	p->policy = policy;
-	p->rt_priority = lp.sched_priority;
 	oldprio = p->prio;
-	if (policy != SCHED_NORMAL)
-		p->prio = MAX_USER_RT_PRIO-1 - p->rt_priority;
-	else
-		p->prio = p->static_prio;
+	__setscheduler(p, policy, lp.sched_priority);
 	if (array) {
 		__activate_task(p, task_rq(p));
 		/*
@@ -2760,15 +2767,10 @@ out:
  */
 static int migration_thread(void * data)
 {
-	/* Marking "param" __user is ok, since we do a set_fs(KERNEL_DS); */
-	struct sched_param __user param = { .sched_priority = MAX_RT_PRIO-1 };
 	runqueue_t *rq;
 	int cpu = (long)data;
-	int ret;
 
 	BUG_ON(smp_processor_id() != cpu);
-	ret = setscheduler(0, SCHED_FIFO, &param);
-
 	rq = this_rq();
 	BUG_ON(rq->migration_thread != current);
 
@@ -2865,6 +2867,8 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 {
 	int cpu = (long)hcpu;
 	struct task_struct *p;
+	struct runqueue *rq;
+	unsigned long flags;
 
 	switch (action) {
 	case CPU_UP_PREPARE:
@@ -2872,6 +2876,10 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		if (IS_ERR(p))
 			return NOTIFY_BAD;
 		kthread_bind(p, cpu);
+		/* Must be high prio: stop_machine expects to yield to it. */
+		rq = task_rq_lock(p, &flags);
+		__setscheduler(p, SCHED_FIFO, MAX_RT_PRIO-1);
+		task_rq_unlock(rq, &flags);
 		cpu_rq(cpu)->migration_thread = p;
 		break;
 	case CPU_ONLINE:
