@@ -78,7 +78,7 @@ sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fif
 		if (!ptr)
 			break;
 		if ((ret = verify_area (VERIFY_READ, ptr, sizeof(long)))
-		    || (ret = get_user(fourth.__pad, (void *__user *)ptr)))
+		    || (ret = get_user(fourth.__pad, (void __user *__user *)ptr)))
 			break;
 		ret = sys_semctl (first, second, third, fourth);
 		break;

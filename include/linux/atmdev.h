@@ -147,7 +147,7 @@ struct atm_dev_stats {
 
 struct atm_iobuf {
 	int length;
-	void *buffer;
+	void __user *buffer;
 };
 
 /* for ATM_GETCIRANGE / ATM_SETCIRANGE */
