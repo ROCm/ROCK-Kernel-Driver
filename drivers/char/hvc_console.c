@@ -98,6 +98,14 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
+static void hvc_hangup(struct tty_struct *tty, struct file * filp)
+{
+	struct hvc_struct *hp = tty->driver_data;
+
+	hp->count = 0;
+	hp->tty = NULL;
+}
+
 /* called with hp->lock held */
 static void hvc_push(struct hvc_struct *hp)
 {
@@ -246,6 +254,7 @@ int __init hvc_init(void)
 	hvc_driver.open = hvc_open;
 	hvc_driver.close = hvc_close;
 	hvc_driver.write = hvc_write;
+	hvc_driver.hangup = hvc_hangup;
 	hvc_driver.write_room = hvc_write_room;
 	hvc_driver.chars_in_buffer = hvc_chars_in_buffer;
 
