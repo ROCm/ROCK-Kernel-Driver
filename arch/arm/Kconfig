@@ -234,6 +234,11 @@ config SHARP_LOCOMO
 	depends on SA1100_COLLIE
 	default y
 
+config SHARP_SCOOP
+	bool
+	depends on PXA_SHARPSL
+	default y
+
 config FORCE_MAX_ZONEORDER
 	int
 	depends on SA1111
