@@ -284,13 +284,15 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
 	spin_unlock_irqrestore(&consistent_lock, flags);
 
 	if (c) {
+		unsigned long off = vma->vm_pgoff;
+
 		kern_size = (c->vm_end - c->vm_start) >> PAGE_SHIFT;
 
-		if (vma->vm_pgoff < kern_size &&
-		    user_size <= (kern_size - vma->vm_pgoff)) {
+		if (off < kern_size &&
+		    user_size <= (kern_size - off)) {
 			vma->vm_flags |= VM_RESERVED;
 			ret = remap_pfn_range(vma, vma->vm_start,
-					      page_to_pfn(c->vm_pages),
+					      page_to_pfn(c->vm_pages) + off,
 					      user_size, vma->vm_page_prot);
 		}
 	}
