@@ -1192,12 +1192,7 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	hd->ioc = ioc;
 
 	if ((int)ioc->chip_type > (int)FC929)
-	hd->is_spi = 1;
-
-	if (DmpService && (ioc->chip_type == FC919 ||
-	  ioc->chip_type == FC929)) {
-		hd->is_multipath = 1;
-	}
+		hd->is_spi = 1;
 
 	/* SCSI needs scsi_cmnd lookup table!
 	 * (with size equal to req_depth*PtrSz!)
@@ -2787,7 +2782,6 @@ mptscsih_slave_alloc(struct scsi_device *device)
 			return -ENOMEM;
 		} else {
 			memset(vdev, 0, sizeof(VirtDevice));
-			rwlock_init(&vdev->VdevLock);
 			vdev->tflags = MPT_TARGET_FLAGS_Q_YES;
 			vdev->ioc_id = hd->ioc->id;
 			vdev->target_id = device->id;
@@ -2983,8 +2977,6 @@ copy_sense_data(struct scsi_cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSI
 	pReq = (SCSIIORequest_t *) mf;
 	index = (int) pReq->TargetID;
 	target = hd->Targets[index];
-	if (hd->is_multipath && sc->device->hostdata)
-		target = (VirtDevice *) sc->device->hostdata;
 
 	if (sense_count) {
 		u8 *sense_data;

@@ -137,8 +137,6 @@ int mpt_stm_index = -1;
 
 struct proc_dir_entry *mpt_proc_root_dir;
 
-DmpServices_t *DmpService;
-
 #define WHOINIT_UNKNOWN		0xAA
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -169,7 +167,9 @@ static DECLARE_WAIT_QUEUE_HEAD(mpt_waitq);
  */
 static irqreturn_t mpt_interrupt(int irq, void *bus_id, struct pt_regs *r);
 static int	mpt_base_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply);
-
+static int	mpt_handshake_req_reply_wait(MPT_ADAPTER *ioc, int reqBytes,
+			u32 *req, int replyBytes, u16 *u16reply, int maxwait,
+			int sleepFlag);
 static int	mpt_do_ioc_recovery(MPT_ADAPTER *ioc, u32 reason, int sleepFlag);
 static void	mpt_detect_bound_ports(MPT_ADAPTER *ioc, struct pci_dev *pdev);
 static void	mpt_adapter_disable(MPT_ADAPTER *ioc);
@@ -953,41 +953,6 @@ mpt_add_sge(char *pAddr, u32 flagslength, dma_addr_t dma_addr)
 		SGESimple32_t *pSge = (SGESimple32_t *) pAddr;
 		pSge->FlagsLength = cpu_to_le32(flagslength);
 		pSge->Address = cpu_to_le32(dma_addr);
-	}
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/**
- *	mpt_add_chain - Place a chain SGE at address pAddr.
- *	@pAddr: virtual address for SGE
- *	@next: nextChainOffset value (u32's)
- *	@length: length of next SGL segment
- *	@dma_addr: Physical address
- *
- *	This routine places a MPT request frame back on the MPT adapter's
- *	FreeQ.
- */
-void
-mpt_add_chain(char *pAddr, u8 next, u16 length, dma_addr_t dma_addr)
-{
-	if (sizeof(dma_addr_t) == sizeof(u64)) {
-		SGEChain64_t *pChain = (SGEChain64_t *) pAddr;
-		u32 tmp = dma_addr & 0xFFFFFFFF;
-
-		pChain->Length = cpu_to_le16(length);
-		pChain->Flags = MPI_SGE_FLAGS_CHAIN_ELEMENT | mpt_addr_size();
-
-		pChain->NextChainOffset = next;
-
-		pChain->Address.Low = cpu_to_le32(tmp);
-		tmp = (u32) ((u64)dma_addr >> 32);
-		pChain->Address.High = cpu_to_le32(tmp);
-	} else {
-		SGEChain32_t *pChain = (SGEChain32_t *) pAddr;
-		pChain->Length = cpu_to_le16(length);
-		pChain->Flags = MPI_SGE_FLAGS_CHAIN_ELEMENT | mpt_addr_size();
-		pChain->NextChainOffset = next;
-		pChain->Address = cpu_to_le32(dma_addr);
 	}
 }
 
@@ -3690,7 +3655,7 @@ out_fail:
  *
  *	Returns 0 for success, non-zero for failure.
  */
-int
+static int
 mpt_handshake_req_reply_wait(MPT_ADAPTER *ioc, int reqBytes, u32 *req,
 				int replyBytes, u16 *u16reply, int maxwait, int sleepFlag)
 {
@@ -5237,9 +5202,6 @@ procmpt_version_read(char *buf, char **start, off_t offset, int request, int *eo
 			case MPTCTL_DRIVER:
 				if (!ctl++) drvname = "ioctl";
 				break;
-			case MPTDMP_DRIVER:
-				if (!dmp++) drvname = "DMP";
-				break;
 			}
 
 			if (drvname)
@@ -5920,7 +5882,6 @@ mpt_sp_ioc_info(MPT_ADAPTER *ioc, u32 ioc_status, MPT_FRAME_HDR *mf)
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 EXPORT_SYMBOL(ioc_list);
 EXPORT_SYMBOL(mpt_proc_root_dir);
-EXPORT_SYMBOL(DmpService);
 EXPORT_SYMBOL(mpt_register);
 EXPORT_SYMBOL(mpt_deregister);
 EXPORT_SYMBOL(mpt_event_register);
@@ -5933,9 +5894,7 @@ EXPORT_SYMBOL(mpt_get_msg_frame);
 EXPORT_SYMBOL(mpt_put_msg_frame);
 EXPORT_SYMBOL(mpt_free_msg_frame);
 EXPORT_SYMBOL(mpt_add_sge);
-EXPORT_SYMBOL(mpt_add_chain);
 EXPORT_SYMBOL(mpt_send_handshake_request);
-EXPORT_SYMBOL(mpt_handshake_req_reply_wait);
 EXPORT_SYMBOL(mpt_verify_adapter);
 EXPORT_SYMBOL(mpt_GetIocState);
 EXPORT_SYMBOL(mpt_print_ioc_summary);
@@ -5989,8 +5948,6 @@ fusion_init(void)
 		MptEvHandlers[i] = NULL;
 		MptResetHandlers[i] = NULL;
 	}
-
-	DmpService = NULL;
 
 	/* NEW!  20010120 -sralston
 	 *  Register ourselves (mptbase) in order to facilitate
