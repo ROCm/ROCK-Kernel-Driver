@@ -264,7 +264,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
 
 
   DEBUG(3, "bklmtd: readpage: starting brw_kiovec\n");
-  err = brw_kiovec(READ, 1, &iobuf, dev, blocks, rawdevice->sector_size);
+  err = brw_kiovec(READ, 1, &iobuf, rawdevice->binding, blocks, rawdevice->sector_size);
   DEBUG(3, "blkmtd: readpage: finished, err = %d\n", err);
   iobuf->locked = 0;
   free_kiovec(1, &iobuf);
@@ -401,7 +401,7 @@ static int write_queue_task(void *data)
 	iobuf->nr_pages = cpagecnt;
 	iobuf->length = cursectors << item->rawdevice->sector_bits;
 	DEBUG(3, "blkmtd: write_task: about to kiovec\n");
-	err = brw_kiovec(WRITE, 1, &iobuf, dev, blocks, item->rawdevice->sector_size);
+	err = brw_kiovec(WRITE, 1, &iobuf, item->rawdevice->binding, blocks, item->rawdevice->sector_size);
 	DEBUG(3, "bklmtd: write_task: done, err = %d\n", err);
 	if(err != (cursectors << item->rawdevice->sector_bits)) {
 	  /* if an error occured - set this to exit the loop */

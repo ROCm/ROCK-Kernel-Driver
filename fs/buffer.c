@@ -2122,7 +2122,7 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
 	}
 
 	/* This does not understand multi-device filesystems currently */
-	retval = brw_kiovec(rw, 1, &iobuf, inode->i_dev, blocks, blocksize);
+	retval = brw_kiovec(rw, 1, &iobuf, inode->i_sb->s_bdev, blocks, blocksize);
 
  out:
 	return retval;
@@ -2138,8 +2138,8 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
  * It is up to the caller to make sure that there are enough blocks
  * passed in to completely map the iobufs to disk.
  */
-int brw_kiovec(int rw, int nr, struct kiobuf *iovec[], kdev_t dev, sector_t b[],
-	       int size)
+int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
+	       struct block_device *bdev, sector_t b[], int size)
 {
 	int		transferred;
 	int		i;
@@ -2167,7 +2167,7 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[], kdev_t dev, sector_t b[],
 		iobuf = iovec[i];
 		iobuf->errno = 0;
 
-		ll_rw_kio(rw, iobuf, dev, b[i] * (size >> 9));
+		ll_rw_kio(rw, iobuf, bdev, b[i] * (size >> 9));
 	}
 
 	/*
