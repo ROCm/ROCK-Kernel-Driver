@@ -471,6 +471,44 @@ config FB_RIVA
 	  module will be called rivafb.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+config FB_I810
+	tristate "Intel 810/815 support (EXPERIMENTAL)"
+	depends on FB && AGP && AGP_INTEL && EXPERIMENTAL && PCI	
+	help
+	  This driver supports the on-board graphics built in to the Intel 810 
+          and 815 chipsets.  Say Y if you have and plan to use such a board.
+
+          The driver is also available as a module ( = code which can be
+          inserted and removed from the running kernel whenever you want). 
+          The module will be called i810fb.o. If you want to compile it as a
+          module, say M here and read <file:Documentation/modules.txt>.
+
+          For more information, please read 
+	  <file:Documentation/fb/intel810.txt>
+
+config FB_I810_GTF
+	bool "use VESA Generalized Timing Formula"
+	depends on FB_I810
+	help
+	  If you say Y, then the VESA standard, Generalized Timing Formula 
+          or GTF, will be used to calculate the required video timing values
+	  per video mode.  Since the GTF allows nondiscrete timings 
+          (nondiscrete being a range of values as opposed to discrete being a
+          set of values), you'll be able to use any combination of horizontal 
+	  and vertical resolutions, and vertical refresh rates without having
+	  to specify your own timing parameters.  This is especially useful
+	  to maximize the performance of an aging display, or if you just 
+          have a display with nonstandard dimensions. A VESA compliant 
+	  monitor is recommended, but can still work with non-compliant ones.
+	  If you need or want this, then select this option. The timings may 
+	  not be compliant with Intel's recommended values. Use at your own 
+	  risk.
+
+          If you say N, the driver will revert to discrete video timings 
+	  using a set recommended by Intel in their documentation.
+  
+          If unsure, say N.
+
 config FB_MATROX
 	tristate "Matrox acceleration"
 	depends on FB && PCI

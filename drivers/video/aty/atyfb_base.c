@@ -976,7 +976,7 @@ static int atyfb_release(struct fb_info *info, int user)
 						var.yres_virtual =
 						    var.yres;
 				}
-				gen_set_var(&var, -1, info);
+				fb_set_var(&var, -1, info);
 			}
 		}
 	} 

@@ -929,11 +929,11 @@ static void fbcon_set_display(int con, int init, int logo)
 		struct display *q = &fb_display[i];
 		struct vc_data *tmp = vc_cons[i].d;
 		
-		if (fontwidthvalid(p, vc->vc_font.width)) {
+		if (!fontwidthvalid(p, vc->vc_font.width)) {
 			/* If we are not the first console on this
 			   fb, copy the font from that console */
-			tmp->vc_font.width = vc->vc_font.width;
-			tmp->vc_font.height = vc->vc_font.height;
+			vc->vc_font.width = tmp->vc_font.width;
+			vc->vc_font.height = tmp->vc_font.height;
 			p->fontdata = q->fontdata;
 			p->userfont = q->userfont;
 			if (p->userfont) {

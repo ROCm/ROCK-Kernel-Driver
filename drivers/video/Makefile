@@ -12,8 +12,7 @@ export-objs    	:= fbmem.o fbcmap.o fbmon.o modedb.o softcursor.o cfbfillrect.o 
 
 obj-$(CONFIG_VT)		  += console/
 
-# Add fbmon.o back into obj-$(CONFIG_FB) in 2.5.x
-obj-$(CONFIG_FB)                  += fbmem.o fbcmap.o modedb.o softcursor.o
+obj-$(CONFIG_FB)                  += fbmem.o fbmon.o fbcmap.o modedb.o softcursor.o
 # Only include macmodes.o if we have FB support and are PPC
 ifeq ($(CONFIG_FB),y)
 obj-$(CONFIG_PPC)                 += macmodes.o
@@ -42,7 +41,7 @@ obj-$(CONFIG_FB_SGIVW)            += sgivwfb.o cfbfillrect.o cfbcopyarea.o cfbim
 obj-$(CONFIG_FB_3DFX)             += tdfxfb.o
 obj-$(CONFIG_FB_MAC)              += macfb.o macmodes.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
 obj-$(CONFIG_FB_HP300)            += hpfb.o cfbfillrect.o cfbimgblt.o
-obj-$(CONFIG_FB_OF)               += offb.o cfbfillrect.o cfbimgblit.o cfbcopyarea.o
+obj-$(CONFIG_FB_OF)               += offb.o cfbfillrect.o cfbimgblt.o cfbcopyarea.o
 obj-$(CONFIG_FB_IMSTT)            += imsttfb.o
 obj-$(CONFIG_FB_RETINAZ3)         += retz3fb.o
 obj-$(CONFIG_FB_CLGEN)            += clgenfb.o
@@ -74,6 +73,8 @@ obj-$(CONFIG_FB_RIVA)		  += riva/ cfbfillrect.o cfbcopyarea.o \
 	                             cfbimgblt.o vgastate.o
 obj-$(CONFIG_FB_SIS)		  += sis/
 obj-$(CONFIG_FB_ATY)		  += aty/ cfbimgblt.o
+obj-$(CONFIG_FB_I810)             += i810/ cfbfillrect.o cfbcopyarea.o \
+	                             cfbimgblt.o vgastate.o
 
 obj-$(CONFIG_FB_SUN3)             += sun3fb.o
 obj-$(CONFIG_FB_BWTWO)            += bwtwofb.o

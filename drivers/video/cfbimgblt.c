@@ -103,10 +103,10 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 {
 	/* Draw the penguin */
 	int i, n;
-	unsigned long bitmask = SHIFT_LOW(~0UL, BITS_PER_LONG - p->var.bits_per_pixel);
+	int bpp = p->var.bits_per_pixel;
 	unsigned long *palette = (unsigned long *) p->pseudo_palette;
 	unsigned long *dst, *dst2, color = 0, val, shift;
-	unsigned long null_bits = BITS_PER_LONG - p->var.bits_per_pixel; 
+	unsigned long null_bits = BITS_PER_LONG - bpp;
 	u8 *src = image->data;
 
 	dst2 = (unsigned long *) dst1;
@@ -125,9 +125,10 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 		while (n--) {
 			if (p->fix.visual == FB_VISUAL_TRUECOLOR ||
 			    p->fix.visual == FB_VISUAL_DIRECTCOLOR )
-				color = palette[*src] & bitmask;
+				color = palette[*src];
 			else
-				color = *src & bitmask;	
+				color = *src;
+			color <<= LEFT_POS(bpp);
 			val |= SHIFT_HIGH(color, shift);
 			if (shift >= null_bits) {
 				FB_WRITEL(val, dst++);
@@ -136,7 +137,7 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 				else
 					val = SHIFT_LOW(color, BITS_PER_LONG - shift);
 			}
-			shift += p->var.bits_per_pixel;
+			shift += bpp;
 			shift &= (BITS_PER_LONG - 1);
 			src++;
 		}

@@ -141,6 +141,8 @@ extern int pvr2fb_init(void);
 extern int pvr2fb_setup(char*);
 extern int sstfb_init(void);
 extern int sstfb_setup(char*);
+extern int i810fb_init(void);
+extern int i810fb_setup(char*);
 
 static struct {
 	const char *name;
@@ -235,6 +237,9 @@ static struct {
 #ifdef CONFIG_FB_TRIDENT
 	{ "trident", tridentfb_init, tridentfb_setup },
 #endif
+#ifdef CONFIG_FB_I810
+	{ "i810fb", i810fb_init, i810fb_setup },
+#endif	
 
 	/*
 	 * Generic drivers that are used as fallbacks
