@@ -147,15 +147,6 @@ struct pccard_operations {
  */
 struct pcmcia_socket;
 
-struct pcmcia_socket_class_data {
-	unsigned int nsock;			/* number of sockets */
-	unsigned int sock_offset;		/* socket # (which is
-	 * returned to driver) = sock_offset + (0, 1, .. , (nsock-1) */
-	struct pccard_operations *ops;		/* see above */
-	struct pcmcia_socket *s_info;
-	struct class_device class_dev;		/* generic class structure */
-};
-
 typedef struct erase_busy_t {
 	eraseq_entry_t		*erase;
 	client_handle_t		client;
