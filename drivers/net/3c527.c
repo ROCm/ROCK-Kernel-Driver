@@ -92,7 +92,7 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Richard Proctor (rnp@netlink.co.nz
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
 #include <linux/skbuff.h>

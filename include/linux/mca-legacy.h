@@ -7,6 +7,8 @@
 #ifndef _LINUX_MCA_LEGACY_H
 #define _LINUX_MCA_LEGACY_H
 
+#include <linux/mca.h>
+
 #warning "MCA legacy - please move your driver to the new sysfs api"
 
 /* MCA_NOTFOUND is an error condition.  The other two indicate
