@@ -790,8 +790,14 @@ static __u32 ftdi_232bm_baud_to_divisor(int baud)
 static int set_rts(struct usb_serial_port *port, int high_or_low)
 {
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
-	char buf[1];
+	char *buf;
 	unsigned ftdi_high_or_low;
+	int rv;
+	
+	buf = kmalloc(1, GFP_NOIO);
+	if (!buf)
+		return -ENOMEM;
+	
 	if (high_or_low) {
 		ftdi_high_or_low = FTDI_SIO_SET_RTS_HIGH;
 		priv->last_dtr_rts |= TIOCM_RTS;
@@ -799,20 +805,29 @@ static int set_rts(struct usb_serial_port *port, int high_or_low)
 		ftdi_high_or_low = FTDI_SIO_SET_RTS_LOW;
 		priv->last_dtr_rts &= ~TIOCM_RTS;
 	}
-	return(usb_control_msg(port->serial->dev,
+	rv = usb_control_msg(port->serial->dev,
 			       usb_sndctrlpipe(port->serial->dev, 0),
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST, 
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST_TYPE,
 			       ftdi_high_or_low, 0, 
-			       buf, 0, WDR_TIMEOUT));
+			       buf, 0, WDR_TIMEOUT);
+
+	kfree(buf);
+	return rv;
 }
 
 
 static int set_dtr(struct usb_serial_port *port, int high_or_low)
 {
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
-	char buf[1];
+	char *buf;
 	unsigned ftdi_high_or_low;
+	int rv;
+	
+	buf = kmalloc(1, GFP_NOIO);
+	if (!buf)
+		return -ENOMEM;
+
 	if (high_or_low) {
 		ftdi_high_or_low = FTDI_SIO_SET_DTR_HIGH;
 		priv->last_dtr_rts |= TIOCM_DTR;
@@ -820,12 +835,15 @@ static int set_dtr(struct usb_serial_port *port, int high_or_low)
 		ftdi_high_or_low = FTDI_SIO_SET_DTR_LOW;
 		priv->last_dtr_rts &= ~TIOCM_DTR;
 	}
-	return(usb_control_msg(port->serial->dev,
+	rv = usb_control_msg(port->serial->dev,
 			       usb_sndctrlpipe(port->serial->dev, 0),
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST, 
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST_TYPE,
 			       ftdi_high_or_low, 0, 
-			       buf, 0, WDR_TIMEOUT));
+			       buf, 0, WDR_TIMEOUT);
+
+	kfree(buf);
+	return rv;
 }
 
 
@@ -834,21 +852,29 @@ static __u32 get_ftdi_divisor(struct usb_serial_port * port);
 
 static int change_speed(struct usb_serial_port *port)
 {
-	char buf[1];
+	char *buf;
         __u16 urb_value;
 	__u16 urb_index;
 	__u32 urb_index_value;
+	int rv;
+
+	buf = kmalloc(1, GFP_NOIO);
+	if (!buf)
+		return -ENOMEM;
 
 	urb_index_value = get_ftdi_divisor(port);
 	urb_value = (__u16)urb_index_value;
 	urb_index = (__u16)(urb_index_value >> 16);
 	
-	return (usb_control_msg(port->serial->dev,
+	rv = usb_control_msg(port->serial->dev,
 			    usb_sndctrlpipe(port->serial->dev, 0),
 			    FTDI_SIO_SET_BAUDRATE_REQUEST,
 			    FTDI_SIO_SET_BAUDRATE_REQUEST_TYPE,
 			    urb_value, urb_index,
-			    buf, 0, 100) < 0);
+			    buf, 0, 100);
+
+	kfree(buf);
+	return rv;
 }
 
 
