@@ -3,7 +3,7 @@
  * tiglusb -- Texas Instruments' USB GraphLink (aka SilverLink) driver.
  * Target: Texas Instruments graphing calculators (http://lpg.ticalc.org).
  *
- * Copyright (C) 2001-2002:
+ * Copyright (C) 2001-2004:
  *   Romain Lievin <roms@lpg.ticalc.org>
  *   Julien BLACHE <jb@technologeek.org>
  * under the terms of the GNU General Public License.
@@ -20,6 +20,8 @@
  *   1.04, Julien: clean-up & fixes; Romain: 2.4 backport.
  *   1.05, Randy Dunlap: bug fix with the timeout parameter (divide-by-zero).
  *   1.06, Romain: synched with 2.5, version/firmware changed (confusing).
+ *   1.07, Romain: fixed bad use of usb_clear_halt (invalid argument);
+ *          timeout argument checked in ioctl + clean-up.
  */
 
 #include <linux/module.h>
@@ -38,8 +40,8 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "1.06"
-#define DRIVER_AUTHOR  "Romain Lievin <roms@lpg.ticalc.org> & Julien Blache <jb@jblache.org>"
+#define DRIVER_VERSION "1.07"
+#define DRIVER_AUTHOR  "Romain Lievin <roms@tilp.info> & Julien Blache <jb@jblache.org>"
 #define DRIVER_DESC    "TI-GRAPH LINK USB (aka SilverLink) driver"
 #define DRIVER_LICENSE "GPL"
 
@@ -72,15 +74,15 @@ clear_pipes (struct usb_device *dev)
 {
 	unsigned int pipe;
 
-	pipe = usb_sndbulkpipe (dev, 1);
-	if (usb_clear_halt (dev, usb_pipeendpoint (pipe))) {
-		err ("clear_pipe (r), request failed");
+	pipe = usb_sndbulkpipe (dev, 2);
+	if (usb_clear_halt (dev, pipe)) {
+		err ("clear_pipe (w), request failed");
 		return -1;
 	}
 
-	pipe = usb_sndbulkpipe (dev, 2);
-	if (usb_clear_halt (dev, usb_pipeendpoint (pipe))) {
-		err ("clear_pipe (w), request failed");
+	pipe = usb_rcvbulkpipe (dev, 1);
+	if (usb_clear_halt (dev, pipe)) {
+		err ("clear_pipe (r), request failed");
 		return -1;
 	}
 
@@ -181,17 +183,16 @@ tiglusb_read (struct file *filp, char __user *buf, size_t count, loff_t * f_pos)
 
 	pipe = usb_rcvbulkpipe (s->dev, 1);
 	result = usb_bulk_msg (s->dev, pipe, buffer, bytes_to_read,
-			       &bytes_read, HZ * 10 / timeout);
+			       &bytes_read, (HZ * timeout) / 10);
 	if (result == -ETIMEDOUT) {	/* NAK */
-		ret = result;
-		if (!bytes_read) {
+		if (!bytes_read)
 			dbg ("quirk !");
-		}
 		warn ("tiglusb_read, NAK received.");
+		ret = result;
 		goto out;
 	} else if (result == -EPIPE) {	/* STALL -- shouldn't happen */
 		warn ("clear_halt request to remove STALL condition.");
-		if (usb_clear_halt (s->dev, usb_pipeendpoint (pipe)))
+		if (usb_clear_halt (s->dev, pipe))
 			err ("clear_halt, request failed");
 		clear_device (s->dev);
 		ret = result;
@@ -243,7 +244,7 @@ tiglusb_write (struct file *filp, const char __user *buf, size_t count, loff_t *
 
 	pipe = usb_sndbulkpipe (s->dev, 2);
 	result = usb_bulk_msg (s->dev, pipe, buffer, bytes_to_write,
-			       &bytes_written, HZ * 10 / timeout);
+			       &bytes_written, (HZ * timeout) / 10);
 
 	if (result == -ETIMEDOUT) {	/* NAK */
 		warn ("tiglusb_write, NAK received.");
@@ -251,7 +252,7 @@ tiglusb_write (struct file *filp, const char __user *buf, size_t count, loff_t *
 		goto out;
 	} else if (result == -EPIPE) {	/* STALL -- shouldn't happen */
 		warn ("clear_halt request to remove STALL condition.");
-		if (usb_clear_halt (s->dev, usb_pipeendpoint (pipe)))
+		if (usb_clear_halt (s->dev, pipe))
 			err ("clear_halt, request failed");
 		clear_device (s->dev);
 		ret = result;
@@ -292,15 +293,16 @@ tiglusb_ioctl (struct inode *inode, struct file *filp,
 
 	switch (cmd) {
 	case IOCTL_TIUSB_TIMEOUT:
-		timeout = arg;	// timeout value in tenth of seconds
+		if (arg > 0)
+			timeout = arg;
+		else
+			ret = -EINVAL;
 		break;
 	case IOCTL_TIUSB_RESET_DEVICE:
-		dbg ("IOCTL_TIGLUSB_RESET_DEVICE");
 		if (clear_device (s->dev))
 			ret = -EIO;
 		break;
 	case IOCTL_TIUSB_RESET_PIPES:
-		dbg ("IOCTL_TIGLUSB_RESET_PIPES");
 		if (clear_pipes (s->dev))
 			ret = -EIO;
 		break;
@@ -447,7 +449,7 @@ static struct usb_driver tiglusb_driver = {
 
 #ifndef MODULE
 /*
- * You can use 'tiusb=timeout'
+ * You can use 'tiusb=timeout' to set timeout.
  */
 static int __init
 tiglusb_setup (char *str)
@@ -457,10 +459,11 @@ tiglusb_setup (char *str)
 	str = get_options (str, ARRAY_SIZE (ints), ints);
 
 	if (ints[0] > 0) {
-		timeout = ints[1];
+		if (ints[1] > 0)
+			timeout = ints[1];
+		else
+			info ("tiglusb: wrong timeout value (0), using default value.");
 	}
-	if (timeout <= 0)
-		timeout = TIMAXTIME;
 
 	return 1;
 }
@@ -501,9 +504,6 @@ tiglusb_init (void)
 	}
 
 	info (DRIVER_DESC ", version " DRIVER_VERSION);
-
-	if (timeout <= 0)
-		timeout = TIMAXTIME;
 
 	return 0;
 }
