@@ -1530,6 +1530,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	size_t count;		/* after file limit checks */
 	struct inode 	*inode = mapping->host;
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+	const int	isblk = S_ISBLK(inode->i_mode);
 	long		status = 0;
 	loff_t		pos;
 	struct page	*page;
@@ -1581,22 +1582,21 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 
 	written = 0;
 
-	/* FIXME: this is for backwards compatibility with 2.4 */
-	if (!S_ISBLK(inode->i_mode) && file->f_flags & O_APPEND)
-		pos = inode->i_size;
+	if (!isblk) {
+		/* FIXME: this is for backwards compatibility with 2.4 */
+		if (file->f_flags & O_APPEND)
+			pos = inode->i_size;
 
-	/*
-	 * Check whether we've reached the file size limit.
-	 */
-	if (unlikely(limit != RLIM_INFINITY)) {
-		if (pos >= limit) {
-			send_sig(SIGXFSZ, current, 0);
-			err = -EFBIG;
-			goto out;
-		}
-		if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			count = limit - (u32)pos;
+		if (limit != RLIM_INFINITY) {
+			if (pos >= limit) {
+				send_sig(SIGXFSZ, current, 0);
+				err = -EFBIG;
+				goto out;
+			}
+			if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
+				/* send_sig(SIGXFSZ, current, 0); */
+				count = limit - (u32)pos;
+			}
 		}
 	}
 
@@ -1623,7 +1623,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	 * exceeded without writing data we send a signal and return EFBIG.
 	 * Linus frestrict idea will clean these up nicely..
 	 */
-	if (likely(!S_ISBLK(inode->i_mode))) {
+	if (likely(!isblk)) {
 		if (unlikely(pos >= inode->i_sb->s_maxbytes)) {
 			if (count || pos > inode->i_sb->s_maxbytes) {
 				send_sig(SIGXFSZ, current, 0);
@@ -1667,7 +1667,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 					iov, pos, nr_segs);
 		if (written > 0) {
 			loff_t end = pos + written;
-			if (end > inode->i_size && !S_ISBLK(inode->i_mode)) {
+			if (end > inode->i_size && !isblk) {
 				inode->i_size = end;
 				mark_inode_dirty(inode);
 			}
