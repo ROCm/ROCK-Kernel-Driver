@@ -1475,6 +1475,10 @@ extern struct inode_operations page_symlink_inode_operations;
 extern int vfs_readdir(struct file *, filldir_t, void *);
 extern int dcache_readdir(struct file *, void *, filldir_t);
 
+extern int vfs_stat(char *, struct kstat *);
+extern int vfs_lstat(char *, struct kstat *);
+extern int vfs_fstat(unsigned int, struct kstat *);
+
 extern struct file_system_type *get_fs_type(const char *name);
 extern struct super_block *get_super(kdev_t);
 extern void drop_super(struct super_block *sb);
