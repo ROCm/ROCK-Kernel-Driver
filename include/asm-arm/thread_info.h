@@ -76,6 +76,8 @@ struct thread_info {
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
 
+#define THREAD_SIZE		8192
+
 /*
  * how to get the thread information struct from C
  */
@@ -84,10 +86,8 @@ static inline struct thread_info *current_thread_info(void) __attribute_const__;
 static inline struct thread_info *current_thread_info(void)
 {
 	register unsigned long sp asm ("sp");
-	return (struct thread_info *)(sp & ~0x1fff);
+	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
 }
-
-#define THREAD_SIZE		(8192)
 
 extern struct thread_info *alloc_thread_info(struct task_struct *task);
 extern void free_thread_info(struct thread_info *);
