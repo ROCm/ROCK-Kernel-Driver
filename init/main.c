@@ -409,6 +409,7 @@ asmlinkage void __init start_kernel(void)
 	parse_args("Booting kernel", command_line, __start___param,
 		   __stop___param - __start___param,
 		   &unknown_bootoption);
+	sort_main_extable();
 	trap_init();
 	rcu_init();
 	init_IRQ();
@@ -436,7 +437,6 @@ asmlinkage void __init start_kernel(void)
 	page_address_init();
 	mem_init();
 	kmem_cache_init();
-	sort_main_extable();
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();
