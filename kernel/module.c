@@ -725,11 +725,66 @@ static int obsolete_params(const char *name,
 }
 #endif /* CONFIG_OBSOLETE_MODPARM */
 
+#ifdef CONFIG_MODVERSIONING
+static int check_version(Elf_Shdr *sechdrs,
+			 unsigned int versindex,
+			 const char *symname,
+			 struct module *mod, 
+			 struct kernel_symbol_group *ksg,
+			 unsigned int symidx)
+{
+	unsigned long crc;
+	unsigned int i, num_versions;
+	struct modversion_info *versions;
+
+	if (!ksg->crcs) { 
+		printk("%s: no CRC for \"%s\" [%s] found: kernel tainted.\n",
+		       mod->name, symname, 
+		       ksg->owner ? ksg->owner->name : "kernel");
+		goto taint;
+	}
+
+	crc = ksg->crcs[symidx];
+
+	versions = (void *) sechdrs[versindex].sh_addr;
+	num_versions = sechdrs[versindex].sh_size
+		/ sizeof(struct modversion_info);
+
+	for (i = 0; i < num_versions; i++) {
+		if (strcmp(versions[i].name, symname) != 0)
+			continue;
+
+		if (versions[i].crc == crc)
+			return 1;
+		printk("%s: disagrees about version of symbol %s\n",
+		       mod->name, symname);
+		DEBUGP("Found checksum %lX vs module %lX\n",
+		       crc, versions[i].crc);
+		return 0;
+	}
+	/* Not in module's version table.  OK, but that taints the kernel. */
+	printk("%s: no version for \"%s\" found: kernel tainted.\n",
+	       mod->name, symname);
+ taint:
+	tainted |= TAINT_FORCED_MODULE;
+	return 1;
+}
+#else
+static inline int check_version(Elf_Shdr *sechdrs,
+				unsigned int versindex,
+				const char *symname,
+				struct module *mod, 
+				struct kernel_symbol_group *ksg,
+				unsigned int symidx)
+{
+	return 1;
+}
+#endif /* CONFIG_MODVERSIONING */
+
 /* Resolve a symbol for this module.  I.e. if we find one, record usage.
    Must be holding module_mutex. */
 static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
-				    unsigned int symindex,
-				    const char *strtab,
+				    unsigned int versindex,
 				    const char *name,
 				    struct module *mod)
 {
@@ -740,8 +795,10 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 	spin_lock_irq(&modlist_lock);
 	ret = __find_symbol(name, &ksg, &symidx, mod->license_gplok);
 	if (ret) {
-		/* This can fail due to OOM, or module unloading */
-		if (!use_module(mod, ksg->owner))
+		/* use_module can fail due to OOM, or module unloading */
+		if (!check_version(sechdrs, versindex, name, mod,
+				   ksg, symidx) ||
+		    !use_module(mod, ksg->owner))
 			ret = 0;
 	}
 	spin_unlock_irq(&modlist_lock);
@@ -828,6 +885,7 @@ static int handle_section(const char *name,
 static int simplify_symbols(Elf_Shdr *sechdrs,
 			    unsigned int symindex,
 			    unsigned int strindex,
+			    unsigned int versindex,
 			    struct module *mod)
 {
 	Elf_Sym *sym = (void *)sechdrs[symindex].sh_addr;
@@ -852,7 +910,7 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 
 		case SHN_UNDEF:
 			sym[i].st_value
-			  = resolve_symbol(sechdrs, symindex, strtab,
+			  = resolve_symbol(sechdrs, versindex,
 					   strtab + sym[i].st_name, mod);
 
 			/* Ok if resolved.  */
@@ -981,7 +1039,7 @@ static struct module *load_module(void *umod,
 	char *secstrings, *args;
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
 		modindex, obsparmindex, licenseindex, gplindex, vmagindex,
-		crcindex, gplcrcindex;
+		crcindex, gplcrcindex, versindex;
 	long arglen;
 	struct module *mod;
 	long err = 0;
@@ -1018,7 +1076,7 @@ static struct module *load_module(void *umod,
 	/* May not export symbols, or have setup params, so these may
            not exist */
 	exportindex = setupindex = obsparmindex = gplindex = licenseindex 
-		= crcindex = gplcrcindex = 0;
+		= crcindex = gplcrcindex = versindex = 0;
 
 	/* And these should exist, but gcc whinges if we don't init them */
 	symindex = strindex = exindex = modindex = vmagindex = 0;
@@ -1088,6 +1146,13 @@ static struct module *load_module(void *umod,
 			/* Version magic. */
 			DEBUGP("Version magic found in section %u\n", i);
 			vmagindex = i;
+			sechdrs[i].sh_flags &= ~(unsigned long)SHF_ALLOC;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,
+				  "__versions") == 0 &&
+			   (sechdrs[i].sh_flags & SHF_ALLOC)) {
+			/* Module version info (both exported and needed) */
+			DEBUGP("Versions found in section %u\n", i);
+			versindex = i;
 			sechdrs[i].sh_flags &= ~(unsigned long)SHF_ALLOC;
 		}
 #ifdef CONFIG_KALLSYMS
@@ -1200,7 +1265,7 @@ static struct module *load_module(void *umod,
 	set_license(mod, sechdrs, licenseindex);
 
 	/* Fix up syms, so that st_value is a pointer to location. */
-	err = simplify_symbols(sechdrs, symindex, strindex, mod);
+	err = simplify_symbols(sechdrs, symindex, strindex, versindex, mod);
 	if (err < 0)
 		goto cleanup;
 
