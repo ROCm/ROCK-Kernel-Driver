@@ -690,7 +690,7 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 	struct rsc	*rsci = NULL;
 	struct rsi	*rsip, rsikey;
 	u32		*rpcstart;
-	u32		*reject_stat = resv->iov_base;
+	u32		*reject_stat = resv->iov_base + resv->iov_len;
 	int		ret;
 
 	dprintk("RPC: svcauth_gss: argv->iov_len = %zd\n",argv->iov_len);
