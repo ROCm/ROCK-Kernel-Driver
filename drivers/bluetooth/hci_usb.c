@@ -763,7 +763,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		goto probe_error;
 	}
 
-	dev_set_drvdata(&intf->dev, husb);
+	usb_set_intfdata(intf, husb);
 	return 0;
 
 probe_error:
@@ -775,12 +775,12 @@ done:
 
 static void hci_usb_disconnect(struct usb_interface *intf)
 {
-	struct hci_usb *husb = dev_get_drvdata(&intf->dev);
+	struct hci_usb *husb = usb_get_intfdata(intf);
 	struct hci_dev *hdev;
 
 	if (!husb)
 		return;
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 
 	hdev = &husb->hdev;
 	BT_DBG("%s", hdev->name);
