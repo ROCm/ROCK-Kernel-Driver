@@ -1670,7 +1670,7 @@ static int get_tgid_list(int index, unsigned long version, unsigned int *tgids)
 	p = NULL;
 	if (version) {
 		p = find_task_by_pid(version);
-		if (!thread_group_leader(p))
+		if (p && !thread_group_leader(p))
 			p = NULL;
 	}
 
@@ -1733,6 +1733,7 @@ int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	char buf[PROC_NUMBUF];
 	unsigned int nr = filp->f_pos - FIRST_PROCESS_ENTRY;
 	unsigned int nr_tgids, i;
+	int next_tgid;
 
 	if (!nr) {
 		ino_t ino = fake_ino(0,PROC_TGID_INO);
@@ -1742,26 +1743,45 @@ int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir)
 		nr++;
 	}
 
-	/*
-	 * f_version caches the last tgid which was returned from readdir
+	/* f_version caches the tgid value that the last readdir call couldn't
+	 * return. lseek aka telldir automagically resets f_version to 0.
 	 */
-	nr_tgids = get_tgid_list(nr, filp->f_version, tgid_array);
-
-	for (i = 0; i < nr_tgids; i++) {
-		int tgid = tgid_array[i];
-		ino_t ino = fake_ino(tgid,PROC_TGID_INO);
-		unsigned long j = PROC_NUMBUF;
-
-		do
-			buf[--j] = '0' + (tgid % 10);
-		while ((tgid /= 10) != 0);
-
-		if (filldir(dirent, buf+j, PROC_NUMBUF-j, filp->f_pos, ino, DT_DIR) < 0) {
-			filp->f_version = tgid;
+	next_tgid = filp->f_version;
+	filp->f_version = 0;
+	for (;;) {
+		nr_tgids = get_tgid_list(nr, next_tgid, tgid_array);
+		if (!nr_tgids) {
+			/* no more entries ! */
 			break;
 		}
-		filp->f_pos++;
+		next_tgid = 0;
+
+		/* do not use the last found pid, reserve it for next_tgid */
+		if (nr_tgids == PROC_MAXPIDS) {
+			nr_tgids--;
+			next_tgid = tgid_array[nr_tgids];
+		}
+
+		for (i=0;i<nr_tgids;i++) {
+			int tgid = tgid_array[i];
+			ino_t ino = fake_ino(tgid,PROC_TGID_INO);
+			unsigned long j = PROC_NUMBUF;
+
+			do
+				buf[--j] = '0' + (tgid % 10);
+			while ((tgid /= 10) != 0);
+
+			if (filldir(dirent, buf+j, PROC_NUMBUF-j, filp->f_pos, ino, DT_DIR) < 0) {
+				/* returning this tgid failed, save it as the first
+				 * pid for the next readir call */
+				filp->f_version = tgid_array[i];
+				goto out;
+			}
+			filp->f_pos++;
+			nr++;
+		}
 	}
+out:
 	return 0;
 }
 
