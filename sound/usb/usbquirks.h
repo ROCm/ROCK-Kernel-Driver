@@ -688,4 +688,14 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 	
 },
 
+{
+	USB_DEVICE_VENDOR_SPEC(0x0ccd, 0x0013),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Terratec",
+		.product_name = "PHASE 26",
+		.ifnum = 3,
+		.type = QUIRK_MIDI_STANDARD_INTERFACE
+	}
+},
+
 #undef USB_DEVICE_VENDOR_SPEC
