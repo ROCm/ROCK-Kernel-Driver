@@ -462,11 +462,21 @@ ia32_sys_call_table:
 	.quad sys_epoll_wait
 	.quad sys_remap_file_pages
 	.quad sys_set_tid_address
-	
+	.quad sys32_timer_create
+	.quad compat_timer_settime
+	.quad compat_timer_gettime
+	.quad sys_timer_getoverrun
+	.quad sys_timer_delete
+	.quad compat_clock_settime
+	.quad compat_clock_gettime
+	.quad compat_clock_getres
+	.quad compat_clock_nanosleep
+	.quad compat_statfs64   /* statfs64 */
+	.quad compat_fstatfs64  /* fstatfs64 */
+	.quad sys_tgkill
+	.quad compat_sys_utimes
 	/* don't forget to change IA32_NR_syscalls */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
 		.quad ni_syscall
 	.endr
-
-	
