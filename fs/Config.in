@@ -106,7 +106,7 @@ if [ "$CONFIG_NET" = "y" ]; then
    comment 'Network File Systems'
 
    dep_tristate 'Coda file system support (advanced network fs)' CONFIG_CODA_FS $CONFIG_INET
-   dep_tristate 'InterMezzo file system support (experimental, replicating fs)' CONFIG_INTERMEZZO_FS $CONFIG_INET $CONFIG_EXPERIMENTAL
+   dep_tristate 'InterMezzo file system support (replicating fs) (EXPERIMENTAL)' CONFIG_INTERMEZZO_FS $CONFIG_INET $CONFIG_EXPERIMENTAL
    dep_tristate 'NFS file system support' CONFIG_NFS_FS $CONFIG_INET
    dep_mbool '  Provide NFSv3 client support' CONFIG_NFS_V3 $CONFIG_NFS_FS
    dep_bool '  Root file system on NFS' CONFIG_ROOT_NFS $CONFIG_NFS_FS $CONFIG_IP_PNP
