@@ -92,21 +92,9 @@ extern void destroy_8023_client(struct datalink_proto *);
 extern int sysctl_max_syn_backlog;
 #endif
 
-/* Socket layer registration */
-EXPORT_SYMBOL(sock_register);
-EXPORT_SYMBOL(sock_unregister);
-
-/* Socket locking */
-
 /* Socket layer support routines */
 EXPORT_SYMBOL(memcpy_fromiovec);
 EXPORT_SYMBOL(memcpy_tokerneliovec);
-EXPORT_SYMBOL(sock_create);
-EXPORT_SYMBOL(sock_alloc);
-EXPORT_SYMBOL(sock_release);
-EXPORT_SYMBOL(sock_sendmsg);
-EXPORT_SYMBOL(sock_recvmsg);
-EXPORT_SYMBOL(sock_wake_async);
 EXPORT_SYMBOL(skb_recv_datagram);
 EXPORT_SYMBOL(skb_free_datagram);
 EXPORT_SYMBOL(skb_copy_datagram);
@@ -114,8 +102,6 @@ EXPORT_SYMBOL(skb_copy_datagram_iovec);
 EXPORT_SYMBOL(skb_copy_and_csum_datagram_iovec);
 EXPORT_SYMBOL(datagram_poll);
 EXPORT_SYMBOL(put_cmsg);
-EXPORT_SYMBOL(sock_map_fd);
-EXPORT_SYMBOL(sockfd_lookup);
 
 EXPORT_SYMBOL(sk_run_filter);
 EXPORT_SYMBOL(sk_chk_filter);
@@ -287,10 +273,6 @@ EXPORT_SYMBOL(rtattr_parse);
 EXPORT_SYMBOL(__rta_fill);
 
 
-/* ABI emulation layers need this */
-EXPORT_SYMBOL(move_addr_to_kernel);
-EXPORT_SYMBOL(move_addr_to_user);
-                  
 /* Used by at least ipip.c.  */
 EXPORT_SYMBOL(ipv4_config);
 
