@@ -20,10 +20,6 @@
 /* Does not work. Warning may block system in capture mode */
 /* #define USE_VAR48KRATE */
 
-/* Define this if you want soft ac3 encoding */
-#define DO_SOFT_AC3
-#define USE_AES_IEC958
-
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -62,9 +58,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
 static long mpu_port[SNDRV_CARDS];
 static long fm_port[SNDRV_CARDS];
-#ifdef DO_SOFT_AC3
-static int soft_ac3[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)]=1};
-#endif
+static int soft_ac3[SNDRV_CARDS]; /* obsoleted */
 #ifdef SUPPORT_JOYSTICK
 static int joystick_port[SNDRV_CARDS];
 #endif
@@ -85,11 +79,8 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x320},{0x310}
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
-#ifdef DO_SOFT_AC3
 module_param_array(soft_ac3, bool, boot_devs, 0444);
-MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 only).");
-MODULE_PARM_SYNTAX(soft_ac3, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
-#endif
+MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets [obsoleted].");
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address.");
@@ -465,7 +456,6 @@ struct snd_stru_cmipci {
 	unsigned int can_ac3_sw: 1;
 	unsigned int can_ac3_hw: 1;
 	unsigned int can_multi_ch: 1;
-	unsigned int do_soft_ac3: 1;
 
 	unsigned int spdif_playback_avail: 1;	/* spdif ready? */
 	unsigned int spdif_playback_enabled: 1;	/* spdif switch enabled? */
@@ -473,10 +463,6 @@ struct snd_stru_cmipci {
 
 	unsigned int dig_status;
 	unsigned int dig_pcm_status;
-#ifdef USE_AES_IEC958
-	snd_ctl_elem_value_t *spdif_channel;
-#endif
-	snd_kcontrol_t *spdif_pcm_ctl;
 
 	snd_pcm_hardware_t *hw_info[3]; /* for playbacks */
 
@@ -785,8 +771,6 @@ static int snd_cmipci_pcm_prepare(cmipci_t *cm, cmipci_pcm_t *rec,
 	/* buffer and period sizes in frame */
 	rec->dma_size = runtime->buffer_size << rec->shift;
 	rec->period_size = runtime->period_size << rec->shift;
-	rec->dma_size <<= rec->ac3_shift;
-	rec->period_size <<= rec->ac3_shift;
 	if (runtime->channels > 2) {
 		/* multi-channels */
 		rec->dma_size = (rec->dma_size * runtime->channels) / 2;
@@ -912,7 +896,6 @@ static snd_pcm_uframes_t snd_cmipci_pcm_pointer(cmipci_t *cm, cmipci_pcm_t *rec,
 	ptr = snd_cmipci_read(cm, reg) - rec->offset;
 	ptr = bytes_to_frames(substream->runtime, ptr);
 #endif
-	ptr >>= rec->ac3_shift;
 	if (substream->runtime->channels > 2)
 		ptr = (ptr * 2) / substream->runtime->channels;
 	return ptr;
@@ -953,358 +936,6 @@ static snd_pcm_uframes_t snd_cmipci_capture_pointer(snd_pcm_substream_t *substre
 	cmipci_t *cm = snd_pcm_substream_chip(substream);
 	return snd_cmipci_pcm_pointer(cm, &cm->channel[CM_CH_CAPT], substream);
 }
-
-#ifdef DO_SOFT_AC3
-/*
- * special tricks for soft ac3 transfer:
- *
- * we compose an iec958 subframe from 16bit ac3 sample and
- * write the raw subframe via 32bit data mode.
- */
-
-# ifndef USE_AES_IEC958
-
-/* find parity for bit 4~30 */
-static unsigned int parity(unsigned int data)
-{
-	unsigned int parity = 0;
-	int counter = 4;
-
-	data >>= 4;	/* start from bit 4 */
-	while (counter <= 30) {
-		if (data & 1)
-			parity++;
-		data >>= 1;
-		counter++;
-	}
-	return parity & 1;
-}
-
-/*
- * compose 32bit iec958 subframe with non-audio data.
- * bit 0-3  = preamble
- *     4-7  = aux (=0)
- *     8-27 = data (12-27 for 16bit)
- *     28   = validity (=0)
- *     29   = user data (=0)
- *     30   = channel status
- *     31   = parity
- *
- * channel status is assumed as consumer, non-audio
- * thus all 0 except bit 1
- */
-inline static u32 convert_ac3_32bit(cmipci_t *cm, u32 val)
-{
-	u32 data = (u32)val << 12;
-
-	if (cm->spdif_counter == 2 || cm->spdif_counter == 3) /* bit 1 */
-		data |= 0x40000000;	/* indicate AC-3 raw data */
-	if (parity(data))		/* parity bit 4-30 */
-		data |= 0x80000000;
-	if (cm->spdif_counter == 0)
-		data |= 3;		/* preamble 'M' */
-	else if (cm->spdif_counter & 1)
-		data |= 5;		/* odd, 'W' */
-	else
-		data |= 9;		/* even, 'M' */
-
-	cm->spdif_counter++;
-	if (cm->spdif_counter == 384)
-		cm->spdif_counter = 0;
-
-	return data;
-}
-
-# else  /* if USE_AES_IEC958 */
-
-/*
- * The bitstream handling
- */
-typedef struct iec958_stru_bitstream {
-	u32 *data;		/* Holds the current position */
-	u32  left;		/* Bits left in current 32bit frame */
-	u32  word;		/* The 32bit frame of the current position */
-	u32  bits;		/* All bits together */
-	int   err;		/* Error condition */
-} iec958_bitstream_t ;
-
-static iec958_bitstream_t bs;
-
-/* Initialize ptr on the buffer */
-static void iec958_init_bitstream(u8 *buf, u32 size)
-{
-	bs.data = (u32 *)buf;		/* Set initial position */
-	bs.word = *bs.data;		/* The first 32bit frame */
-	bs.left = 32;			/* has exactly 32bits */
-	bs.bits = size;
-	bs.err = 0;
-}
-
-/* Remove ptr on the buffer */
-static void iec958_clear_bitstream(void)
-{
-	bs.data = NULL;
-	bs.left = 0;
-	bs.err = 0;
-}
-
-/* Get bits from bitstream (max 32) */
-static inline u32 iec958_getbits(u32 bits)
-{
-	u32 res;
-
-	if (bs.bits < bits) {
-		bits = bs.bits;
-		bs.err = 1;
-	}
-	if (bits > 32) {
-		bits = 32;
-		bs.err = 1;
-	}
-	bs.bits -= bits;
-
-#  ifdef WORDS_BIGENDIAN
-	if (bits < bs.left) {		/* Within 32bit frame */
-		res = (bs.word << (32 - bs.left)) >> (32 - bits);
-		bs.left -= bits;
-		goto out;
-	}				/* We may cross the frame boundary */
-	res   = (bs.word << (32 - bs.left)) >> (32 - bs.left);
-	bits -= bs.left;
-
-	bs.word = *(++bs.data);		/* Next 32bit frame */
-
-	if (bits)			/* Add remaining bits, if any */
-		res = (res << bits) | (bs.word >> (32 - bits));
-
-#  else  /* not WORDS_BIGENDIAN */
-
-	if (bits < bs.left) {		/* Within 32bit frame */
-		res = (bs.word << (32 - bits)) >> (32 - bits);
-		bs.word >>= bits;
-		bs.left -= bits;
-		goto out;
-	}				/* We may cross the frame boundary */
-	res   = bs.word;
-	bits -= bs.left;
-
-	bs.word = *(++bs.data);		/* Next 32bit frame */
-
-	if (bits) {			/* Add remaining bits, if any */
-		res = res | (((bs.word << (32 - bits)) >> (32 - bits)) << bits);
-		bs.word >>= bits;
-	}
-#  endif /* not WORDS_BIGENDIAN */
-
-	bs.left = (32 - bits);
-out:
-	return res;
-}
-
-static inline u32 iec958_bits_avail(void)
-{
-	return bs.bits;
-}
-
-static inline int iec958_error(void)
-{
-	return bs.err;
-}
-
-/*
- * Determine parity for time slots 4 upto 30
- * to be sure that bit 4 upt 31 will carry
- * an even number of ones and zeros.
- */
-static u32 iec958_parity(u32 data)
-{
-	u32 parity = 0;
-	int counter = 4;
-
-	data >>= 4;     /* start from bit 4 */
-	while (counter++ <= 30) {
-		if (data & 0x00000001)
-			parity++;
-		data >>= 1;
-	}
-	return (parity & 0x00000001);
-}
-
-/*
- * Compose 32bit iec958 subframe, two sub frames
- * build one frame with two channels.
- *
- * bit 0-3  = preamble
- *     4-7  = AUX (=0)
- *     8-27 = data (12-27 for 16bit, 8-27 for 20bit, and 24bit without AUX)
- *     28   = validity (0 for valid data, else 'in error')
- *     29   = user data (0)
- *     30   = channel status (24 bytes for 192 frames)
- *     31   = parity
- */
-
-static inline u32 iec958_subframe(cmipci_t *cm, snd_ctl_elem_value_t * ucontrol)
-{
-	u32 data;
-	u32 byte = cm->spdif_counter >> 4;
-	u32 mask = 1 << ((cm->spdif_counter >> 1) - (byte << 3));
-	u8 * status = ucontrol->value.iec958.status;
-
-	if (status[2] & IEC958_AES2_PRO_SBITS_24) {
-		/* Does this work for LE systems ??? */
-		if (status[2] & IEC958_AES2_PRO_WORDLEN_24_20) {
-			data = iec958_getbits(24);
-			data <<= 4;
-		} else {
-			data = iec958_getbits(20);
-			data <<= 8;
-		}
-	} else {
-		if (status[2] & IEC958_AES2_PRO_WORDLEN_24_20) {
-			/* Does this work for LE systems ??? */
-			data = iec958_getbits(20);
-			data <<= 8;
-		} else {
-			data = iec958_getbits(16);
-			data <<= 12;
-		}
-	}
-
-	/*
-	 * Set one of the 192 bits of the channel status (AES3 and higher)
-	 */
-	if (status[byte] & mask)
-		data |= 0x40000000;
-
-	if (iec958_parity(data))	/* parity bit 4-30 */
-		data |= 0x80000000;
-
-	/* Preamble */
-	if      (!cm->spdif_counter)
-		data |= 0x03;		/* Block start, 'Z' */
-	else if (cm->spdif_counter % 2)
-		data |= 0x05;		/* odd sub frame, 'Y' */
-	else
-		data |= 0x09;		/* even sub frame, 'X' */
-
-	/*
-	 * sub frame counter: 2 sub frame are one audio frame
-	 * and 192 frames are one block
-	 */
-	cm->spdif_counter = (++cm->spdif_counter) % 384;
-
-	return data;
-}
-# endif /* if USE_AES_IEC958 */
-
-static int snd_cmipci_ac3_copy(snd_pcm_substream_t *subs, int channel,
-			       snd_pcm_uframes_t pos, void *src,
-			       snd_pcm_uframes_t count)
-{
-	cmipci_t *cm = snd_pcm_substream_chip(subs);
-	u32 *dst;
-	snd_pcm_uframes_t offset;
-	snd_pcm_runtime_t *runtime = subs->runtime;
-#ifndef USE_AES_IEC958
-	u16 *srcp = src, val;
-#else
-	char buf[480];         /* bits can be divided by 20, 24, 16 */
-	size_t bytes = frames_to_bytes(runtime, count);
-#endif
-
-
-	if (!cm->channel[CM_CH_PLAY].ac3_shift) {
-		if (copy_from_user(runtime->dma_area +
-				   frames_to_bytes(runtime, pos), src,
-				   frames_to_bytes(runtime, count)))
-			return -EFAULT;
-		return 0;
-	}
-
-	if (! access_ok(VERIFY_READ, src, count))
-		return -EFAULT;
-
-	/* frame = 16bit stereo */
-	offset = (pos << 1) % (cm->channel[CM_CH_PLAY].dma_size << 2);
-	dst = (u32*)(runtime->dma_area + offset);
-# ifndef USE_AES_IEC958
-	count /= 2;
-	while (count-- > 0) {
-		get_user(val, srcp);
-		srcp++;
-		*dst++ = convert_ac3_32bit(cm, val);
-	}
-# else
-	while (bytes) {
-		size_t c = bytes;
-
-		if (c > sizeof(buf))
-			c = sizeof(buf);
-
-		if (copy_from_user(buf, src, c))
-			return -EFAULT;
-		bytes -= c;
-		src   += c;
-
-		iec958_init_bitstream(buf, c*8);
-		while (iec958_bits_avail()) {
-			*(dst++) = iec958_subframe(cm, cm->spdif_channel);
-			if (iec958_error())
-				return -EINVAL;
-		}
-		iec958_clear_bitstream();
-	}
-# endif
-	return 0;
-}
-
-static int snd_cmipci_ac3_silence(snd_pcm_substream_t *subs, int channel,
-				  snd_pcm_uframes_t pos,
-				  snd_pcm_uframes_t count)
-{
-	cmipci_t *cm = snd_pcm_substream_chip(subs);
-	u32 *dst;
-	snd_pcm_uframes_t offset;
-	snd_pcm_runtime_t *runtime = subs->runtime;
-# ifdef USE_AES_IEC958
-	char buf[480];		/* bits can be divided by 20, 24, 16 */
-	size_t bytes = frames_to_bytes(runtime, count);
-# endif
-	if (! cm->channel[CM_CH_PLAY].ac3_shift)
-		return snd_pcm_format_set_silence(runtime->format,
-						  runtime->dma_area + frames_to_bytes(runtime, pos), count);
-	
-	/* frame = 16bit stereo */
-	offset = (pos << 1) % (cm->channel[CM_CH_PLAY].dma_size << 2);
-	dst = (u32*)(subs->runtime->dma_area + offset);
-# ifndef USE_AES_IEC958
-	count /= 2;
-	while (count-- > 0) {
-		*dst++ = convert_ac3_32bit(cm, 0);
-	}
-# else
-	while (bytes) {
-		size_t c = bytes;
-
-		if (c > sizeof(buf))
-			c = sizeof(buf);
-
-		/* Q: Does this function know about 24bit silence? */
-		if (snd_pcm_format_set_silence(runtime->format, buf, bytes_to_frames(runtime, c)))
-			return -EINVAL;
-
-		iec958_init_bitstream(buf, c*8);
-		while (iec958_bits_avail()) {
-			*(dst++) = iec958_subframe(cm, cm->spdif_channel);
-			if (iec958_error())
-				return -EINVAL;
-		}
-		iec958_clear_bitstream();
-	}
-# endif
-	return 0;
-}
-#endif /* DO_SOFT_AC3 */
 
 
 /*
@@ -1405,9 +1036,6 @@ static int snd_cmipci_spdif_stream_get(snd_kcontrol_t *kcontrol,
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	for (i = 0; i < 4; i++)
 		ucontrol->value.iec958.status[i] = (chip->dig_pcm_status >> (i * 8)) & 0xff;
-#ifdef USE_AES_IEC958
-	ucontrol = chip->spdif_channel;
-#endif
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	return 0;
 }
@@ -1426,9 +1054,6 @@ static int snd_cmipci_spdif_stream_put(snd_kcontrol_t *kcontrol,
 		val |= (unsigned int)ucontrol->value.iec958.status[i] << (i * 8);
 	change = val != chip->dig_pcm_status;
 	chip->dig_pcm_status = val;
-#ifdef USE_AES_IEC958
-	chip->spdif_channel = ucontrol;
-#endif
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	return change;
 }
@@ -1505,9 +1130,6 @@ static void restore_mixer_state(cmipci_t *cm)
 /* spinlock held! */
 static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int rate)
 {
-	cm->channel[CM_CH_PLAY].ac3_shift = 0;
-	cm->spdif_counter = 0;
-
 	if (do_ac3) {
 		/* AC3EN for 037 */
 		snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_AC3EN1);
@@ -1520,9 +1142,6 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 			snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
 			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
 		} else { /* can_ac3_sw */
-#ifdef DO_SOFT_AC3
-			/* FIXME: ugly hack! */
-			subs->runtime->buffer_size /= 2;
 			/* SPD32SEL for 037 & 039, 0x20 */
 			snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
 			/* set 176K sample rate to fix 033 HW bug */
@@ -1533,8 +1152,6 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 					snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_PLAYBACK_SRATE_176K);
 				}
 			}
-			cm->channel[CM_CH_PLAY].ac3_shift = 1; /* use 32bit */
-#endif /* DO_SOFT_AC3 */
 		}
 
 	} else {
@@ -1551,11 +1168,9 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 				snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
 			}
 		} else {
-#ifdef DO_SOFT_AC3
 			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_PLAYBACK_SRATE_176K);
-#endif /* DO_SOFT_AC3 */
 		}
 	}
 }
@@ -1605,15 +1220,12 @@ static int snd_cmipci_playback_prepare(snd_pcm_substream_t *substream)
 {
 	cmipci_t *cm = snd_pcm_substream_chip(substream);
 	int rate = substream->runtime->rate;
-	int do_spdif, do_ac3;
+	int do_spdif, do_ac3 = 0;
 	do_spdif = ((rate == 44100 || rate == 48000) &&
 		    substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE &&
 		    substream->runtime->channels == 2);
-	do_ac3 = cm->dig_pcm_status & IEC958_AES0_NONAUDIO;
-#ifdef DO_SOFT_AC3
-	if (do_ac3 && cm->can_ac3_sw)
-		do_spdif = 0;
-#endif
+	if (do_spdif && cm->can_ac3_hw) 
+		do_ac3 = cm->dig_pcm_status & IEC958_AES0_NONAUDIO;
 	setup_spdif_playback(cm, substream, do_spdif, do_ac3);
 	return snd_cmipci_pcm_prepare(cm, &cm->channel[CM_CH_PLAY], substream);
 }
@@ -1622,7 +1234,12 @@ static int snd_cmipci_playback_prepare(snd_pcm_substream_t *substream)
 static int snd_cmipci_playback_spdif_prepare(snd_pcm_substream_t *substream)
 {
 	cmipci_t *cm = snd_pcm_substream_chip(substream);
-	setup_spdif_playback(cm, substream, 1, cm->dig_pcm_status & IEC958_AES0_NONAUDIO);
+	int do_ac3;
+	if (cm->can_ac3_hw) 
+		do_ac3 = cm->dig_pcm_status & IEC958_AES0_NONAUDIO;
+	else
+		do_ac3 = 1; /* doesn't matter */
+	setup_spdif_playback(cm, substream, 1, do_ac3);
 	return snd_cmipci_pcm_prepare(cm, &cm->channel[CM_CH_PLAY], substream);
 }
 
@@ -1769,9 +1386,30 @@ static snd_pcm_hardware_t snd_cmipci_playback2 =
 /* spdif playback on channel A */
 static snd_pcm_hardware_t snd_cmipci_playback_spdif =
 {
-	.info =			(SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE),
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE |
+				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
+	.rate_min =		44100,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
+};
+
+/* spdif playback on channel A (32bit, IEC958 subframes) */
+static snd_pcm_hardware_t snd_cmipci_playback_iec958_subframe =
+{
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE |
+				 SNDRV_PCM_INFO_MMAP_VALID),
+	.formats =		SNDRV_PCM_FMTBIT_IEC958_SUBFRAME_LE,
 	.rates =		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
 	.rate_min =		44100,
 	.rate_max =		48000,
@@ -1922,13 +1560,13 @@ static int snd_cmipci_playback_spdif_open(snd_pcm_substream_t *substream)
 
 	if ((err = open_device_check(cm, CM_OPEN_SPDIF_PLAYBACK, substream)) < 0) /* use channel A */
 		return err;
-	runtime->hw = snd_cmipci_playback_spdif;
-#ifdef DO_SOFT_AC3
-	if (cm->can_ac3_hw)
-#endif
-		runtime->hw.info |= SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID;
-	if (cm->chip_version >= 37)
-		runtime->hw.formats |= SNDRV_PCM_FMTBIT_S32_LE;
+	if (cm->can_ac3_hw) {
+		runtime->hw = snd_cmipci_playback_spdif;
+		if (cm->chip_version >= 37)
+			runtime->hw.formats |= SNDRV_PCM_FMTBIT_S32_LE;
+	} else {
+		runtime->hw = snd_cmipci_playback_iec958_subframe;
+	}
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x40000);
 	cm->dig_pcm_status = cm->dig_status;
 	return 0;
@@ -2035,21 +1673,6 @@ static snd_pcm_ops_t snd_cmipci_playback_spdif_ops = {
 	.pointer =	snd_cmipci_playback_pointer,
 };
 
-#ifdef DO_SOFT_AC3
-static snd_pcm_ops_t snd_cmipci_playback_spdif_soft_ops = {
-	.open =		snd_cmipci_playback_spdif_open,
-	.close =	snd_cmipci_playback_spdif_close,
-	.ioctl =	snd_pcm_lib_ioctl,
-	.hw_params =	snd_cmipci_hw_params,
-	.hw_free =	snd_cmipci_playback_hw_free,
-	.prepare =	snd_cmipci_playback_spdif_prepare,	/* set up rate */
-	.trigger =	snd_cmipci_playback_trigger,
-	.pointer =	snd_cmipci_playback_pointer,
-	.copy =		snd_cmipci_ac3_copy,
-	.silence =	snd_cmipci_ac3_silence,
-};
-#endif
-
 static snd_pcm_ops_t snd_cmipci_capture_spdif_ops = {
 	.open =		snd_cmipci_capture_spdif_open,
 	.close =	snd_cmipci_capture_spdif_close,
@@ -2126,14 +1749,7 @@ static int __devinit snd_cmipci_pcm_spdif_new(cmipci_t *cm, int device)
 	if (err < 0)
 		return err;
 
-#ifdef DO_SOFT_AC3
-	if (cm->can_ac3_hw)
-		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_cmipci_playback_spdif_ops);
-	else
-		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_cmipci_playback_spdif_soft_ops);
-#else
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_cmipci_playback_spdif_ops);
-#endif
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_cmipci_capture_spdif_ops);
 
 	pcm->private_data = cm;
@@ -2771,16 +2387,17 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 			if (err < 0)
 				return err;
 		}
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_cmipci_spdif_default, cm))) < 0)
-			return err;
-		kctl->id.device = pcm_spdif_device;
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_cmipci_spdif_mask, cm))) < 0)
-			return err;
-		kctl->id.device = pcm_spdif_device;
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_cmipci_spdif_stream, cm))) < 0)
-			return err;
-		kctl->id.device = pcm_spdif_device;
-		cm->spdif_pcm_ctl = kctl;
+		if (cm->can_ac3_hw) {
+			if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_cmipci_spdif_default, cm))) < 0)
+				return err;
+			kctl->id.device = pcm_spdif_device;
+			if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_cmipci_spdif_mask, cm))) < 0)
+				return err;
+			kctl->id.device = pcm_spdif_device;
+			if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_cmipci_spdif_stream, cm))) < 0)
+				return err;
+			kctl->id.device = pcm_spdif_device;
+		}
 		if (cm->chip_version <= 37) {
 			sw = snd_cmipci_old_mixer_switches;
 			for (idx = 0; idx < num_controls(snd_cmipci_old_mixer_switches); idx++, sw++) {
@@ -2883,10 +2500,7 @@ static void __devinit query_chip(cmipci_t *cm)
 		if (! detect) {
 			cm->chip_version = 33;
 			cm->max_channels = 2;
-			if (cm->do_soft_ac3)
-				cm->can_ac3_sw = 1;
-			else
-				cm->can_ac3_hw = 1;
+			cm->can_ac3_sw = 1;
 			cm->has_dual_dac = 1;
 		} else {
 			cm->chip_version = 37;
@@ -3014,9 +2628,6 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 
 	cm->chip_version = 0;
 	cm->max_channels = 2;
-#ifdef DO_SOFT_AC3
-	cm->do_soft_ac3 = soft_ac3[dev];
-#endif
 
 	query_chip(cm);
 
