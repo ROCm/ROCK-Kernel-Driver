@@ -8,11 +8,12 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
-USE_STANDARD_AS_RULE := true
-
-EXTRA_AFLAGS := -traditional
-
 LINKFLAGS = -static -T bootloader.lds #-N -relax
+
+.S.s:
+	$(CPP) $(AFLAGS) -traditional -o $*.o $<
+.S.o:
+	$(CC) $(AFLAGS) -traditional -c -o $*.o $<
 
 OBJECTS = head.o main.o
 BPOBJECTS = head.o bootp.o

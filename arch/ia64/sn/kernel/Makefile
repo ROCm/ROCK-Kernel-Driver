@@ -31,12 +31,9 @@
 # http://oss.sgi.com/projects/GenInfo/NoticeExplan
 #
 
-EXTRA_CFLAGS    := -DLITTLE_ENDIAN
+USE_STANDARD_AS_RULE := true
 
-.S.s:
-	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
+EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
 O_TARGET        = sn.o
 

@@ -5,11 +5,6 @@
 # Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) -c -o $*.o $<
-
 all: dig.a
 
 O_TARGET := dig.a

@@ -39,6 +39,7 @@ GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
 MODFLAGS	= -DMODULE
 CFLAGS_KERNEL	=
+AFLAGS_KERNEL	=
 PERL		= perl
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
@@ -245,7 +246,7 @@ Version: dummy
 	@rm -f include/linux/compile.h
 
 boot: vmlinux
-	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C arch/$(ARCH)/boot
+	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
 vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o init/do_mounts.o linuxsubdirs
 	$(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o init/do_mounts.o \
@@ -286,7 +287,7 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
 
 $(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
+	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
 
 $(TOPDIR)/include/linux/version.h: include/linux/version.h
 $(TOPDIR)/include/linux/compile.h: include/linux/compile.h
@@ -331,7 +332,7 @@ init/do_mounts.o: init/do_mounts.c include/config/MARKER
 	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o $*.o $<
 
 fs lib mm ipc kernel drivers net sound: dummy
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
+	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 TAGS: dummy
 	{ find include/asm-${ARCH} -name '*.h' -print ; \
