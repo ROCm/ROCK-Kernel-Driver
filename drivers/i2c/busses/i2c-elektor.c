@@ -30,7 +30,6 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
@@ -42,7 +41,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "i2c-pcf8584.h"
+#include "../i2c-pcf8584.h"
 
 #define DEFAULT_BASE 0x330
 

@@ -225,7 +225,6 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct adm1021_data *data;
 	int err = 0;
 	const char *type_name = "";
-	const char *client_name = "";
 
 	/* Make sure we aren't probing the ISA bus!! This is just a safety check
 	   at this moment; i2c_detect really won't call us. */
@@ -291,28 +290,20 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	if (kind == max1617) {
 		type_name = "max1617";
-		client_name = "MAX1617 chip";
 	} else if (kind == max1617a) {
 		type_name = "max1617a";
-		client_name = "MAX1617A chip";
 	} else if (kind == adm1021) {
 		type_name = "adm1021";
-		client_name = "ADM1021 chip";
 	} else if (kind == adm1023) {
 		type_name = "adm1023";
-		client_name = "ADM1023 chip";
 	} else if (kind == thmc10) {
 		type_name = "thmc10";
-		client_name = "THMC10 chip";
 	} else if (kind == lm84) {
 		type_name = "lm84";
-		client_name = "LM84 chip";
 	} else if (kind == gl523sm) {
 		type_name = "gl523sm";
-		client_name = "GL523SM chip";
 	} else if (kind == mc1066) {
 		type_name = "mc1066";
-		client_name = "MC1066 chip";
 	} else {
 		dev_err(&adapter->dev, "Internal error: unknown kind (%d)?!?",
 			kind);
@@ -320,7 +311,7 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
-	strlcpy(new_client->name, client_name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->name, type_name, I2C_NAME_SIZE);
 	data->type = kind;
 
 	new_client->id = adm1021_id++;

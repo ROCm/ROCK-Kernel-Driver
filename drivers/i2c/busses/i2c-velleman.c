@@ -114,7 +114,6 @@ static struct i2c_algo_bit_data bit_velle_data = {
 
 static struct i2c_adapter bit_velle_ops = {
 	.owner		= THIS_MODULE,
-	.id		= I2C_HW_B_VELLE,
 	.algo_data	= &bit_velle_data,
 	.name		= "Velleman K8000",
 };

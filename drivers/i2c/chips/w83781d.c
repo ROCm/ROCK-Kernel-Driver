@@ -378,8 +378,8 @@ static ssize_t store_in_##reg (struct device *dev, const char *buf, size_t count
 	struct w83781d_data *data = i2c_get_clientdata(client); \
 	u32 val; \
 	 \
-	val = simple_strtoul(buf, NULL, 10); \
-	data->in_##reg[nr] = (IN_TO_REG(val) / 10); \
+	val = simple_strtoul(buf, NULL, 10) / 10; \
+	data->in_##reg[nr] = IN_TO_REG(val); \
 	w83781d_write_value(client, W83781D_REG_IN_##REG(nr), data->in_##reg[nr]); \
 	 \
 	return count; \
@@ -1098,15 +1098,15 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 	}
 
 	if (kind == w83781d)
-		client_name = "W83781D subclient";
+		client_name = "w83781d subclient";
 	else if (kind == w83782d)
-		client_name = "W83782D subclient";
+		client_name = "w83782d subclient";
 	else if (kind == w83783s)
-		client_name = "W83783S subclient";
+		client_name = "w83783s subclient";
 	else if (kind == w83627hf)
-		client_name = "W83627HF subclient";
+		client_name = "w83627hf subclient";
 	else if (kind == as99127f)
-		client_name = "AS99127F subclient";
+		client_name = "as99127f subclient";
 	else
 		client_name = "unknown subclient?";
 
@@ -1117,7 +1117,7 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 		data->lm75[i]->driver = &w83781d_driver;
 		data->lm75[i]->flags = 0;
 		strlcpy(data->lm75[i]->name, client_name,
-			DEVICE_NAME_SIZE);
+			I2C_NAME_SIZE);
 		if ((err = i2c_attach_client(data->lm75[i]))) {
 			dev_err(&new_client->dev, "Subclient %d "
 				"registration at address 0x%x "
@@ -1304,20 +1304,20 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	if (kind == w83781d) {
-		client_name = "W83781D chip";
+		client_name = "w83781d";
 	} else if (kind == w83782d) {
-		client_name = "W83782D chip";
+		client_name = "w83782d";
 	} else if (kind == w83783s) {
-		client_name = "W83783S chip";
+		client_name = "w83783s";
 	} else if (kind == w83627hf) {
 		if (val1 == 0x90)
-			client_name = "W83627THF chip";
+			client_name = "w83627thf";
 		else
-			client_name = "W83627HF chip";
+			client_name = "w83627hf";
 	} else if (kind == as99127f) {
-		client_name = "AS99127F chip";
+		client_name = "as99127f";
 	} else if (kind == w83697hf) {
-		client_name = "W83697HF chip";
+		client_name = "w83697hf";
 	} else {
 		dev_err(&new_client->dev, "Internal error: unknown "
 						"kind (%d)?!?", kind);
@@ -1326,7 +1326,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put into the global list */
-	strlcpy(new_client->name, client_name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->name, client_name, I2C_NAME_SIZE);
 	data->type = kind;
 
 	data->valid = 0;
