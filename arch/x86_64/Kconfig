@@ -68,6 +68,9 @@ config HPET_TIMER
 
 	  If unsure, say Y.
 
+config HPET_EMULATE_RTC
+	def_bool HPET_TIMER && RTC=y
+
 config GENERIC_ISA_DMA
 	bool
 	default y
@@ -271,51 +274,7 @@ endmenu
 
 menu "Power management options"
 
-config PM
-	bool "Power Management support"
-	---help---
-	  "Power Management" means that parts of your computer are shut
-	  off or put into a power conserving "sleep" mode if they are not
-	  being used.  There are two competing standards for doing this: APM
-	  and ACPI.  If you want to use either one, say Y here and then also
-	  to the requisite support below.
-
-	  Power Management is most important for battery powered laptop
-	  computers.
-
-	  Note that, even if you say N here, Linux on the x86 architecture
-	  will issue the hlt instruction if nothing is to be done, thereby
-	  sending the processor to limited sleep and saving power. However
-	  using ACPI will likely save more power.
-
-config SOFTWARE_SUSPEND
-	bool "Software Suspend (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && PM && SWAP
-	---help---
-	  Enable the possibilty of suspending the machine. It doesn't need APM.
-	  You may suspend your machine by 'swsusp' or 'shutdown -z <time>' 
-	  (patch for sysvinit needed). 
-
-	  It creates an image which is saved in your active swaps. On the next
-	  boot, pass the 'resume=/path/to/your/swap/file' option and the kernel
-	  will detect the saved image, restore the memory from
-	  it, and then continue to run as before you suspended.
-	  If you don't want the previous state to continue, use the 'noresume'
-	  kernel option. However, note that your partitions will be fsck'd and
-	  you must re-mkswap your swap partitions/files.
-
-	  Right now you may boot without resuming and then later resume but
-	  in the meantime you cannot use those swap partitions/files which were
-	  involved in suspending. Also in this case there is a risk that buffers
-	  on disk won't match with saved ones.
-
-	  SMP is supported ``as-is''. There's code for it but doesn't work.
-	  There have been problems reported relating to SCSI.
-
-	  This option is close to getting stable. However there is still some
-	  absence of features.
-
-	  For more information take a look at Documentation/power/swsusp.txt.
+source kernel/power/Kconfig
 
 source "drivers/acpi/Kconfig"
 
@@ -336,8 +295,23 @@ config PCI_DIRECT
 
 # the drivers/pci/msi.c code needs to be fixed first before enabling
 config PCI_USE_VECTOR
-	bool
+	bool "Vector-based interrupt indexing"
+	depends on X86_LOCAL_APIC && NOTWORKING
 	default n
+	help
+	   This replaces the current existing IRQ-based index interrupt scheme
+	   with the vector-base index scheme. The advantages of vector base
+	   over IRQ base are listed below:
+	   1) Support MSI implementation.
+	   2) Support future IOxAPIC hotplug
+
+	   Note that this enables MSI, Message Signaled Interrupt, on all
+	   MSI capable device functions detected if users also install the
+	   MSI patch. Message Signal Interrupt enables an MSI-capable
+	   hardware device to send an inbound Memory Write on its PCI bus
+	   instead of asserting IRQ signal on device IRQ pin.
+
+	   If you don't know what to do here, say N.
 
 source "drivers/pci/Kconfig"
 
@@ -396,51 +370,9 @@ config UID16
 
 endmenu
 
-source "drivers/base/Kconfig"
+source drivers/Kconfig
 
-source "drivers/mtd/Kconfig"
-
-source "drivers/parport/Kconfig"
-
-source "drivers/block/Kconfig"
-
-source "drivers/ide/Kconfig"
-
-source "drivers/scsi/Kconfig"
-
-source "drivers/md/Kconfig"
-
-source "drivers/telephony/Kconfig"
-
-source "drivers/message/fusion/Kconfig"
-
-source "drivers/ieee1394/Kconfig"
-
-#Currently not 64-bit safe
-#source drivers/message/i2o/Config.in
-source "net/Kconfig"
-
-source "drivers/isdn/Kconfig"
-
-# no support for non IDE/SCSI cdroms as they were all ISA only
-#
-# input before char - char/joystick depends on it. As does USB.
-#
-source "drivers/input/Kconfig"
-
-source "drivers/char/Kconfig"
-
-source "drivers/misc/Kconfig"
-
-source "drivers/media/Kconfig"
-
-source "fs/Kconfig"
-
-source "drivers/video/Kconfig"
-
-source "sound/Kconfig"
-
-source "drivers/usb/Kconfig"
+source fs/Kconfig
 
 source "arch/x86_64/oprofile/Kconfig"
 
@@ -505,6 +437,7 @@ config DEBUG_INFO
           If you say Y here the resulting kernel image will include
 	  debugging info resulting in a larger kernel image.
 	  Say Y here only if you plan to use gdb to debug the kernel.
+	  Please note that this option requires new binutils.
 	  If you don't debug the kernel, you can say N.
 	  
 config FRAME_POINTER

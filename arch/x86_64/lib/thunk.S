@@ -8,6 +8,7 @@
 
 	#include <linux/config.h>
 	#include <linux/linkage.h>
+	#include <asm/dwarf2.h>
 	#include <asm/calling.h>			
 	#include <asm/rwlock.h>
 		
@@ -15,18 +16,22 @@
 	.macro thunk name,func
 	.globl \name
 \name:	
+	CFI_STARTPROC
 	SAVE_ARGS
 	call \func
 	jmp  restore
+	CFI_ENDPROC
 	.endm
 
 	/* rdi:	arg1 ... normal C conventions. rax is passed from C. */ 	
 	.macro thunk_retrax name,func
 	.globl \name
 \name:	
+	CFI_STARTPROC
 	SAVE_ARGS
 	call \func
 	jmp  restore_norax
+	CFI_ENDPROC
 	.endm
 	
 
@@ -43,13 +48,20 @@
 	thunk_retrax __down_failed_trylock,__down_trylock
 	thunk __up_wakeup,__up
 	
+	/* SAVE_ARGS below is used only for the .cfi directives it contains. */
+	CFI_STARTPROC
+	SAVE_ARGS
 restore:
 	RESTORE_ARGS
 	ret	
+	CFI_ENDPROC
 	
+	CFI_STARTPROC
+	SAVE_ARGS
 restore_norax:	
 	RESTORE_ARGS 1
 	ret
+	CFI_ENDPROC
 
 #ifdef CONFIG_SMP
 /* Support for read/write spinlocks. */

@@ -67,10 +67,10 @@ static void BAD_SG_DMA(Scsi_Cmnd * SCpnt,
 		       int nseg,
 		       int badseg)
 {
-	printk(KERN_CRIT "sgpnt[%d:%d] page %p/0x%x length %u\n",
+	printk(KERN_CRIT "sgpnt[%d:%d] page %p/0x%llx length %u\n",
 	       badseg, nseg,
 	       page_address(sgpnt[badseg].page) + sgpnt[badseg].offset,
-	       SCSI_SG_PA(&sgpnt[badseg]),
+	       (unsigned long long)SCSI_SG_PA(&sgpnt[badseg]),
 	       sgpnt[badseg].length);
 
 	/*

@@ -285,6 +285,30 @@ static __init int apm_is_horked(struct dmi_blacklist *d)
 	return 0;
 }
 
+static __init int apm_is_horked_d850md(struct dmi_blacklist *d)
+{
+	if (apm_info.disabled == 0) {
+		apm_info.disabled = 1;
+		printk(KERN_INFO "%s machine detected. Disabling APM.\n", d->ident);
+		printk(KERN_INFO "This bug is fixed in bios P15 which is available for \n");
+		printk(KERN_INFO "download from support.intel.com \n");
+	}
+	return 0;
+}
+
+/* 
+ * Some APM bioses hang on APM idle calls
+ */
+
+static __init int apm_likes_to_melt(struct dmi_blacklist *d)
+{
+	if (apm_info.forbid_idle == 0) {
+		apm_info.forbid_idle = 1;
+		printk(KERN_INFO "%s machine detected. Disabling APM idle calls.\n", d->ident);
+	}
+	return 0;
+}
+
 /*
  * Some machines, usually laptops, can't handle an enabled local APIC.
  * The symptoms include hangs or reboots when suspending or resuming,
@@ -557,6 +581,22 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "Latitude C600"),
 			NO_MATCH, NO_MATCH
 			} },
+	{ set_apm_ints, "Dell Latitude", {  /* Allow interrupts during suspend on Dell Latitude laptops*/
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "Latitude C510"),
+			NO_MATCH, NO_MATCH
+			} },
+	{ apm_is_horked, "Dell Inspiron 2500", { /* APM crashes */
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "Inspiron 2500"),
+			MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION,"A11")
+			} },
+	{ set_apm_ints, "Dell Inspiron", {	/* Allow interrupts during suspend on Dell Inspiron laptops*/
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "Inspiron 4000"),
+			NO_MATCH, NO_MATCH
+			} },
 	{ broken_apm_power, "Dell Inspiron 5000e", {	/* Handle problems with APM on Inspiron 5000e */
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "A04"),
@@ -566,6 +606,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "A12"),
 			MATCH(DMI_BIOS_DATE, "02/04/2002"), NO_MATCH
+			} },
+	{ apm_is_horked, "Dell Dimension 4100", { /* APM crashes */
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "XPS-Z"),
+			MATCH(DMI_BIOS_VENDOR,"Intel Corp."),
+			MATCH(DMI_BIOS_VERSION,"A11")
 			} },
 	{ set_realmode_power_off, "Award Software v4.60 PGMA", {	/* broken PM poweroff bios */
 			MATCH(DMI_BIOS_VENDOR, "Award Software International, Inc."),
@@ -577,19 +623,14 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/"),
 			NO_MATCH, NO_MATCH
 			} },
-	{ set_bios_reboot, "Dell PowerEdge 300", {	/* Handle problems with rebooting on Dell 1300's */
+	{ set_bios_reboot, "Dell PowerEdge 300", {	/* Handle problems with rebooting on Dell 300's */
 			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
 			MATCH(DMI_PRODUCT_NAME, "PowerEdge 300/"),
 			NO_MATCH, NO_MATCH
 			} },
-	{ set_bios_reboot, "Dell PowerEdge 2400", {  /* Handle problems with rebooting on Dell 300/800's */
+	{ set_bios_reboot, "Dell PowerEdge 2400", {  /* Handle problems with rebooting on Dell 2400's */
 			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
 			MATCH(DMI_PRODUCT_NAME, "PowerEdge 2400"),
-			NO_MATCH, NO_MATCH
-			} },
-	{ set_apm_ints, "Dell Inspiron", {	/* Allow interrupts during suspend on Dell Inspiron laptops*/
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "Inspiron 4000"),
 			NO_MATCH, NO_MATCH
 			} },
 	{ set_apm_ints, "Compaq 12XL125", {	/* Allow interrupts during suspend on Compaq Laptops*/
@@ -618,7 +659,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VERSION, "Version1.01"),
 			NO_MATCH, NO_MATCH,
 			} },
-	{ apm_is_horked, "Intel D850MD", { /* APM crashes */
+	{ apm_is_horked_d850md, "Intel D850MD", { /* APM crashes */
 			MATCH(DMI_BIOS_VENDOR, "Intel Corp."),
 			MATCH(DMI_BIOS_VERSION, "MV85010A.86A.0016.P07.0201251536"),
 			NO_MATCH, NO_MATCH,
@@ -645,6 +686,16 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "Inspiron 2500"),
 			MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION,"A11")
+			} },
+	{ apm_likes_to_melt, "Jabil AMD", { /* APM idle hangs */
+			MATCH(DMI_BIOS_VENDOR, "American Megatrends Inc."),
+			MATCH(DMI_BIOS_VERSION, "0AASNP06"),
+			NO_MATCH, NO_MATCH,
+			} },
+	{ apm_likes_to_melt, "AMI Bios", { /* APM idle hangs */
+			MATCH(DMI_BIOS_VENDOR, "American Megatrends Inc."),
+			MATCH(DMI_BIOS_VERSION, "0AASNP05"), 
+			NO_MATCH, NO_MATCH,
 			} },
 	{ sony_vaio_laptop, "Sony Vaio", { /* This is a Sony Vaio laptop */
 			MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
@@ -776,6 +827,11 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
                         } },
 	{ broken_pirq, "l44GX Bios", {        		/* Bad $PIR */
 			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
+			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0115.P12"),
+			NO_MATCH, NO_MATCH
+                        } },
+	{ broken_pirq, "l44GX Bios", {        		/* Bad $PIR */
+			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
 			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0120.P12"),
 			NO_MATCH, NO_MATCH
                         } },
@@ -787,6 +843,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ broken_pirq, "l44GX Bios", {		/* Bad $PIR */
 			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
 			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0066.P07.9906041405"),
+			NO_MATCH, NO_MATCH
+			} },
+
+	{ broken_pirq, "IBM xseries 370", {		/* Bad $PIR */
+			MATCH(DMI_BIOS_VENDOR, "IBM"),
+			MATCH(DMI_BIOS_VERSION,"MMKT33AUS"),
 			NO_MATCH, NO_MATCH
 			} },
                         

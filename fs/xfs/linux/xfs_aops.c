@@ -407,8 +407,10 @@ map_unwritten(
 	offset <<= PAGE_CACHE_SHIFT;
 	offset += p_offset;
 
-	pb = pagebuf_lookup(iomapp->iomap_target,
-			    iomapp->iomap_offset, iomapp->iomap_bsize, 0);
+	/* get an "empty" pagebuf to manage IO completion
+	 * Proper values will be set before returning */
+	pb = pagebuf_lookup(iomapp->iomap_target, 0, 0, 0);
+
 	if (!pb)
 		return -EAGAIN;
 
@@ -471,6 +473,11 @@ map_unwritten(
 			nblocks += bs;
 			atomic_add(bs, &pb->pb_io_remaining);
 			convert_page(inode, page, iomapp, pb, startio, all_bh);
+                        /* stop if converting the next page might add
+			 * enough blocks that the corresponding byte
+			 * count won't fit in our ulong page buf length */
+			if (nblocks >= ((ULONG_MAX - PAGE_SIZE) >> block_bits))
+				goto enough;
 		}
 
 		if (tindex == tlast &&
@@ -481,16 +488,20 @@ map_unwritten(
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
 				convert_page(inode, page, iomapp, pb, startio, all_bh);
+				if (nblocks >= ((ULONG_MAX - PAGE_SIZE) >> block_bits))
+					goto enough;
 			}
 		}
 	}
 
+enough:
 	size = nblocks;		/* NB: using 64bit number here */
 	size <<= block_bits;	/* convert fsb's to byte range */
 
 	XFS_BUF_DATAIO(pb);
 	XFS_BUF_ASYNC(pb);
 	XFS_BUF_SET_SIZE(pb, size);
+	XFS_BUF_SET_COUNT(pb, size);
 	XFS_BUF_SET_OFFSET(pb, offset);
 	XFS_BUF_SET_FSPRIVATE(pb, LINVFS_GET_VP(inode));
 	XFS_BUF_SET_IODONE_FUNC(pb, linvfs_unwritten_convert);
@@ -925,8 +936,10 @@ linvfs_get_block_core(
 	}
 
 	if (blocks) {
-		size = (iomap.iomap_bsize - iomap.iomap_delta); 
-		bh_result->b_size = min_t(ssize_t, size, blocks << inode->i_blkbits);
+		loff_t iosize;
+		iosize = (iomap.iomap_bsize - iomap.iomap_delta);
+		bh_result->b_size =
+		    (ssize_t)min(iosize, (loff_t)(blocks << inode->i_blkbits));
 	}
 
 	return 0;

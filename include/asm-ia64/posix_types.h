@@ -6,8 +6,10 @@
  * be a little careful about namespace pollution etc.  Also, we cannot
  * assume GCC is being used.
  *
- * Copyright (C) 1998-2000, 2003 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Based on <asm-alpha/posix_types.h>.
+ *
+ * Modified 1998-2000, 2003
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 typedef unsigned long	__kernel_ino_t;

@@ -74,6 +74,8 @@ extern void setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 
 extern void check_ioapic(void);
 
+extern int unhandled_signal(struct task_struct *tsk, int sig);
+
 extern unsigned long max_mapnr;
 extern unsigned long end_pfn; 
 extern unsigned long table_start, table_end;

@@ -875,6 +875,7 @@ static ssize_t w9966_v4l_read(struct file *file, char *buf,
 	unsigned char addr = 0xa0;	// ECP, read, CCD-transfer, 00000
 	unsigned char* dest = (unsigned char*)buf;
 	unsigned long dleft = count;
+	unsigned char *tbuf;
 	
 	// Why would anyone want more than this??
 	if (count > cam->width * cam->height * 2)
@@ -894,25 +895,33 @@ static ssize_t w9966_v4l_read(struct file *file, char *buf,
 		w9966_pdev_release(cam);
 		return -EFAULT;
 	}
-	
+
+	tbuf = kmalloc(W9966_RBUFFER, GFP_KERNEL);
+	if (tbuf == NULL) {
+		count = -ENOMEM;
+		goto out;
+	}
+
 	while(dleft > 0)
 	{
 		unsigned long tsize = (dleft > W9966_RBUFFER) ? W9966_RBUFFER : dleft;
-		unsigned char tbuf[W9966_RBUFFER];
 	
 		if (parport_read(cam->pport, tbuf, tsize) < tsize) {
-			w9966_pdev_release(cam);
-			return -EFAULT;
+			count = -EFAULT;
+			goto out;
 		}
 		if (copy_to_user(dest, tbuf, tsize) != 0) {
-			w9966_pdev_release(cam);
-			return -EFAULT;
+			count = -EFAULT;
+			goto out;
 		}
 		dest += tsize;
 		dleft -= tsize;
 	}
-	
+
 	w9966_wReg(cam, 0x01, 0x18);	// Disable capture
+
+out:
+	kfree(tbuf);
 	w9966_pdev_release(cam);
 
 	return count;

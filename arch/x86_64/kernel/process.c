@@ -152,20 +152,6 @@ static int __init idle_setup (char *str)
 
 __setup("idle=", idle_setup);
 
-void idle_warning(void) 
-{ 
-	static int warned;
-	if (warned)
-		return; 
-	warned = 1;
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) 
-		BUG();
-	printk(KERN_ERR "******* Your BIOS seems to not contain a fix for K8 errata #93\n"); 
-	printk(KERN_ERR "******* Working around it, but it will cost you a lot of power\n");
-	printk(KERN_ERR "******* Please consider a BIOS update.\n");
-	printk(KERN_ERR "******* Disabling USB legacy in the BIOS may also help.\n");
-} 
-
 /* Prints also some state that isn't saved in the pt_regs */ 
 void __show_regs(struct pt_regs * regs)
 {
@@ -234,6 +220,10 @@ void exit_thread(void)
 void flush_thread(void)
 {
 	struct task_struct *tsk = current;
+	struct thread_info *t = current_thread_info();
+
+	if (t->flags & _TIF_ABI_PENDING)
+		t->flags ^= (_TIF_ABI_PENDING | _TIF_IA32);
 
 	tsk->thread.debugreg0 = 0;
 	tsk->thread.debugreg1 = 0;
@@ -439,7 +429,6 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	write_pda(oldrsp, next->userrsp); 
 	write_pda(pcurrent, next_p); 
 	write_pda(kernelstack, (unsigned long)next_p->thread_info + THREAD_SIZE - PDA_STACKOFFSET);
-
 
 	/*
 	 * Now maybe reload the debug registers

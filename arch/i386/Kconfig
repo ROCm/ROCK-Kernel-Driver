@@ -399,7 +399,7 @@ config X86_USE_3DNOW
 
 config X86_OOSTORE
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6
+	depends on (MWINCHIP3D || MWINCHIP2 || MWINCHIPC6) && MTRR
 	default y
 
 config HPET_TIMER
@@ -1260,11 +1260,6 @@ config FRAME_POINTER
 	  and slower, but it will give very useful debugging information.
 	  If you don't debug the kernel, you can say N, but we may not be able
 	  to solve problems without frame pointers.
-
-config X86_EXTRA_IRQS
-	bool
-	depends on X86_LOCAL_APIC || X86_VOYAGER
-	default y
 
 config X86_FIND_SMP_CONFIG
 	bool

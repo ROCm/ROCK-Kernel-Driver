@@ -109,10 +109,6 @@ typedef void irqreturn_t;
 #define pci_get_drvdata(pci_dev)	(pci_dev)->driver_data
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
-#define pci_pool_create(a, b, c, d, e)	pci_pool_create(a, b, c, d, e, SLAB_KERNEL)
-#endif
-
 #include "he.h"
 
 #include "suni.h"
@@ -1986,8 +1982,7 @@ he_service_tbrq(struct he_dev *he_dev, int group)
 			TBRQ_MULTIPLE(he_dev->tbrq_head) ? " MULTIPLE" : "");
 #ifdef USE_TPD_POOL
 		tpd = NULL;
-		p = &he_dev->outstanding_tpds;
-		while ((p = p->next) != &he_dev->outstanding_tpds) {
+		list_for_each(p, &he_dev->outstanding_tpds) {
 			struct he_tpd *__tpd = list_entry(p, struct he_tpd, entry);
 			if (TPD_ADDR(__tpd->status) == TBRQ_TPD(he_dev->tbrq_head)) {
 				tpd = __tpd;

@@ -858,8 +858,13 @@ sys32_waitpid(compat_pid_t pid, unsigned int *stat_addr, int options)
 
 int sys32_ni_syscall(int call)
 { 
+	struct task_struct *me = current;
+	static char lastcomm[8];
+	if (strcmp(lastcomm, me->comm)) {
 	printk(KERN_INFO "IA32 syscall %d from %s not implemented\n", call,
 	       current->comm);
+		strcpy(lastcomm, me->comm); 
+	} 
 	return -ENOSYS;	       
 } 
 
@@ -1022,84 +1027,6 @@ sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 	return ret;
 }
 
-siginfo_t32 *
-siginfo64to32(siginfo_t32 *d, siginfo_t *s)
-{
-	memset (d, 0, sizeof(siginfo_t32));
-	d->si_signo = s->si_signo;
-	d->si_errno = s->si_errno;
-	d->si_code = s->si_code;
-	if (s->si_signo >= SIGRTMIN) {
-		d->si_pid = s->si_pid;
-		d->si_uid = s->si_uid;
-		memcpy(&d->si_int, &s->si_int, 
-                       sizeof(siginfo_t) - offsetof(siginfo_t,si_int));
-	} else switch (s->si_signo) {
-	/* XXX: What about POSIX1.b timers */
-	case SIGCHLD:
-		d->si_pid = s->si_pid;
-		d->si_status = s->si_status;
-		d->si_utime = s->si_utime;
-		d->si_stime = s->si_stime;
-		break;
-	case SIGSEGV:
-	case SIGBUS:
-	case SIGFPE:
-	case SIGILL:
-		d->si_addr = (long)(s->si_addr);
-//		d->si_trapno = s->si_trapno;
-		break;
-	case SIGPOLL:
-		d->si_band = s->si_band;
-		d->si_fd = s->si_fd;
-		break;
-	default:
-		d->si_pid = s->si_pid;
-		d->si_uid = s->si_uid;
-		break;
-	}
-	return d;
-}
-
-siginfo_t *
-siginfo32to64(siginfo_t *d, siginfo_t32 *s)
-{
-	d->si_signo = s->si_signo;
-	d->si_errno = s->si_errno;
-	d->si_code = s->si_code;
-	if (s->si_signo >= SIGRTMIN) {
-		d->si_pid = s->si_pid;
-		d->si_uid = s->si_uid;
-		memcpy(&d->si_int,
-                       &s->si_int,
-                       sizeof(siginfo_t) - offsetof(siginfo_t, si_int)); 
-	} else switch (s->si_signo) {
-	/* XXX: What about POSIX1.b timers */
-	case SIGCHLD:
-		d->si_pid = s->si_pid;
-		d->si_status = s->si_status;
-		d->si_utime = s->si_utime;
-		d->si_stime = s->si_stime;
-		break;
-	case SIGSEGV:
-	case SIGBUS:
-	case SIGFPE:
-	case SIGILL:
-		d->si_addr = (void *)A(s->si_addr);
-//		d->si_trapno = s->si_trapno;
-		break;
-	case SIGPOLL:
-		d->si_band = s->si_band;
-		d->si_fd = s->si_fd;
-		break;
-	default:
-		d->si_pid = s->si_pid;
-		d->si_uid = s->si_uid;
-		break;
-	}
-	return d;
-}
-
 extern asmlinkage long
 sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 		    const struct timespec *uts, size_t sigsetsize);
@@ -1114,7 +1041,6 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	siginfo_t info;
-	siginfo_t32 info32;
 		
 	if (copy_from_user (&s32, uthese, sizeof(compat_sigset_t)))
 		return -EFAULT;
@@ -1126,13 +1052,18 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 	}
 	if (uts && get_compat_timespec(&t, uts))
 		return -EFAULT;
+	if (uinfo) {
+		/* stop data leak to user space in case of structure fill mismatch
+		 * between sys_rt_sigtimedwait & ia32_copy_siginfo_to_user.
+		 */
+		memset(&info, 0, sizeof(info));
+	}
 	set_fs (KERNEL_DS);
 	ret = sys_rt_sigtimedwait(&s, uinfo ? &info : NULL, uts ? &t : NULL,
 			sigsetsize);
 	set_fs (old_fs);
 	if (ret >= 0 && uinfo) {
-		if (copy_to_user (uinfo, siginfo64to32(&info32, &info),
-				  sizeof(siginfo_t32)))
+		if (ia32_copy_siginfo_to_user(uinfo, &info))
 			return -EFAULT;
 	}
 	return ret;
@@ -1145,14 +1076,11 @@ asmlinkage long
 sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
 {
 	siginfo_t info;
-	siginfo_t32 info32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	if (copy_from_user (&info32, uinfo, sizeof(siginfo_t32)))
+	if (ia32_copy_siginfo_from_user(&info, uinfo))
 		return -EFAULT;
-	/* XXX: Is this correct? */
-	siginfo32to64(&info, &info32);
 	set_fs (KERNEL_DS);
 	ret = sys_rt_sigqueueinfo(pid, sig, &info);
 	set_fs (old_fs);
@@ -1286,31 +1214,6 @@ sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
 	if (!ret && offset && put_user(of, offset))
 		return -EFAULT;
 		
-	return ret;
-}
-
-extern asmlinkage long sys_modify_ldt(int func, void *ptr, 
-				      unsigned long bytecount);
-
-asmlinkage long sys32_modify_ldt(int func, void *ptr, unsigned long bytecount)
-{
-	long ret;
-	if (func == 0x1 || func == 0x11) { 
-		struct user_desc info;
-		mm_segment_t old_fs = get_fs();
-		if (bytecount != sizeof(struct user_desc))
-			return -EINVAL;
-		if (copy_from_user(&info, ptr, sizeof(struct user_desc)))
-			return -EFAULT;
-		/* lm bit was undefined in the 32bit ABI and programs
-		   give it random values. Force it to zero here. */
-		info.lm = 0; 
-		set_fs(KERNEL_DS);
-		ret = sys_modify_ldt(func, &info, bytecount);
-		set_fs(old_fs);
-	}  else { 
-		ret = sys_modify_ldt(func, ptr, bytecount); 
-	}
 	return ret;
 }
 
@@ -2001,6 +1904,18 @@ long sys32_vm86_warning(void)
 	static char lastcomm[8];
 	if (strcmp(lastcomm, me->comm)) {
 		printk(KERN_INFO "%s: vm86 mode not supported on 64 bit kernel\n",
+		       me->comm);
+		strcpy(lastcomm, me->comm); 
+	} 
+	return -ENOSYS;
+} 
+
+long sys32_quotactl(void)
+{ 
+	struct task_struct *me = current;
+	static char lastcomm[8];
+	if (strcmp(lastcomm, me->comm)) {
+		printk(KERN_INFO "%s: 32bit quotactl not supported on 64 bit kernel\n",
 		       me->comm);
 		strcpy(lastcomm, me->comm); 
 	} 

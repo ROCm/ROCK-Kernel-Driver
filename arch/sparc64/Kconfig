@@ -727,6 +727,10 @@ config STACK_DEBUG
 	depends on DEBUG_KERNEL
 	bool "Stack Overflow Detection Support"
 
+config DEBUG_BOOTMEM
+	depends on DEBUG_KERNEL
+	bool "Debug BOOTMEM initialization"
+
 # We have a custom atomic_dec_and_lock() implementation but it's not
 # compatible with spinlock debugging so we need to fall back on
 # the generic version in that case.

@@ -21,6 +21,7 @@
 #include <linux/profile.h>
 #include <linux/timex.h>
 
+#include <asm/machvec.h>
 #include <asm/delay.h>
 #include <asm/hw_irq.h>
 #include <asm/ptrace.h>
@@ -242,6 +243,8 @@ static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm;
+
+	platform_timer_interrupt(irq, dev_id, regs);
 
 	new_itm = local_cpu_data->itm_next;
 

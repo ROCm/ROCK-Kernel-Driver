@@ -259,7 +259,7 @@ static int __init pci_direct_init(void)
 	release_resource(region);
 
  type2:
-	if ((!pci_probe & PCI_PROBE_CONF2) == 0)
+	if ((pci_probe & PCI_PROBE_CONF2) == 0)
 		goto out;
 	region = request_region(0xCF8, 4, "PCI conf2");
 	if (!region)

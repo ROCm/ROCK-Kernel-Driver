@@ -529,8 +529,7 @@ static void uart_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	struct uart_state *state = tty->driver_data;
 
-	if (tty)
-		__uart_put_char(state->port, &state->info->xmit, ch);
+	__uart_put_char(state->port, &state->info->xmit, ch);
 }
 
 static void uart_flush_chars(struct tty_struct *tty)
@@ -545,7 +544,7 @@ uart_write(struct tty_struct *tty, int from_user, const unsigned char * buf,
 	struct uart_state *state = tty->driver_data;
 	int ret;
 
-	if (!tty || !state->info->xmit.buf)
+	if (!state->info->xmit.buf)
 		return 0;
 
 	if (from_user)
@@ -833,13 +832,17 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	if (state->info->flags & UIF_INITIALIZED) {
 		if (((old_flags ^ port->flags) & UPF_SPD_MASK) ||
 		    old_custom_divisor != port->custom_divisor) {
-			/* If they're setting up a custom divisor or speed,
+			/*
+			 * If they're setting up a custom divisor or speed,
 			 * instead of clearing it, then bitch about it. No
-			 * need to rate-limit; it's CAP_SYS_ADMIN only. */
+			 * need to rate-limit; it's CAP_SYS_ADMIN only.
+			 */
 			if (port->flags & UPF_SPD_MASK) {
-				printk(KERN_NOTICE "%s sets custom speed on %s%d. This is deprecated.\n",
-				       current->comm, state->info->tty->driver->name, 
-				       state->port->line);
+				char buf[64];
+				printk(KERN_NOTICE
+				       "%s sets custom speed on %s. This "
+				       "is deprecated.\n", current->comm,
+				       tty_name(state->info->tty, buf));
 			}
 			uart_change_speed(state, NULL);
 		}
@@ -1209,9 +1212,15 @@ static void uart_set_termios(struct tty_struct *tty, struct termios *old_termios
 static void uart_close(struct tty_struct *tty, struct file *filp)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port = state->port;
+	struct uart_port *port;
 
 	BUG_ON(!kernel_locked());
+
+	if (!state || !state->port)
+		return;
+
+	port = state->port;
+
 	DPRINTK("uart_close(%d) called\n", port->line);
 
 	down(&state->sem);

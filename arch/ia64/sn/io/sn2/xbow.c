@@ -153,7 +153,7 @@ xbow_attach(vertex_hdl_t conn)
 #if DEBUG && ATTACH_DEBUG
     char		    name[MAXDEVNAME];
 #endif
-    static void xbow_errintr_handler(int, void *, struct pt_regs *);
+    static irqreturn_t xbow_errintr_handler(int, void *, struct pt_regs *);
 
 	
 #if DEBUG && ATTACH_DEBUG
