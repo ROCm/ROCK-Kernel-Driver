@@ -138,8 +138,10 @@ static int br_ioctl_device(struct net_bridge *br,
 		struct net_bridge_port *pt;
 
 		read_lock(&br->lock);
-		if ((pt = br_get_port(br, arg1)) == NULL)
+		if ((pt = br_get_port(br, arg1)) == NULL) {
+			read_unlock(&br->lock);
 			return -EINVAL;
+		}
 
 		memset(&p, 0, sizeof(struct __port_info));
 		memcpy(&p.designated_root, &pt->designated_root, 8);
@@ -176,25 +178,29 @@ static int br_ioctl_device(struct net_bridge *br,
 	case BRCTL_SET_PORT_PRIORITY:
 	{
 		struct net_bridge_port *p;
+		int ret = 0;
 
 		write_lock(&br->lock);
-		if ((p = br_get_port(br, arg0)) == NULL)
-			return -EINVAL;
-		br_stp_set_port_priority(p, arg1);
+		if ((p = br_get_port(br, arg0)) == NULL) 
+			ret = -EINVAL;
+		else
+			br_stp_set_port_priority(p, arg1);
 		write_unlock(&br->lock);
-		return 0;
+		return ret;
 	}
 
 	case BRCTL_SET_PATH_COST:
 	{
 		struct net_bridge_port *p;
+		int ret = 0;
 
 		write_lock(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL)
-			return -EINVAL;
-		br_stp_set_path_cost(p, arg1);
+			ret = -EINVAL;
+		else
+			br_stp_set_path_cost(p, arg1);
 		write_unlock(&br->lock);
-		return 0;
+		return ret;
 	}
 
 	case BRCTL_GET_FDB_ENTRIES:
