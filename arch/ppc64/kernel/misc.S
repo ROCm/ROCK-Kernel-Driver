@@ -359,7 +359,7 @@ _GLOBAL(_outsl)
 	bdnz	00b
 	blr	
 
-_GLOBAL(ide_insw)
+/* _GLOBAL(ide_insw) now in drivers/ide/ide-iops.c */
 _GLOBAL(_insw_ns)
 	cmpwi	0,r5,0
 	mtctr	r5
@@ -371,7 +371,7 @@ _GLOBAL(_insw_ns)
 	bdnz	00b
 	blr
 
-_GLOBAL(ide_outsw)
+/* _GLOBAL(ide_outsw) now in drivers/ide/ide-iops.c */
 _GLOBAL(_outsw_ns)
 	cmpwi	0,r5,0
 	mtctr	r5
