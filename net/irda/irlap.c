@@ -110,7 +110,7 @@ void __exit irlap_cleanup(void)
  *
  */
 struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
-			    char *	hw_name)
+			    const char *hw_name)
 {
 	struct irlap_cb *self;
 
