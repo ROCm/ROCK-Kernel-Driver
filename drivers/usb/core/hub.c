@@ -1111,7 +1111,7 @@ static void show_string(struct usb_device *udev, char *id, char *string)
 }
 
 #else
-static inline void show_string(struct usb_device *udev, char *id, int index)
+static inline void show_string(struct usb_device *udev, char *id, char *string)
 {}
 #endif
 
