@@ -464,7 +464,7 @@ asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 			unsigned long *k, m;
 			compat_ulong_t um;
 
-			err = access_ok(VERIFY_WRITE, user_mask_ptr, ret);
+			err = ! access_ok(VERIFY_WRITE, user_mask_ptr, ret);
 
 			k = &cpus_coerce(kernel_mask);
 
