@@ -65,7 +65,6 @@ xfs_init(void)
 #ifdef XFS_DABUF_DEBUG
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
 #endif
-	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 
 	/*
 	 * Initialize all of the zone allocators we use.

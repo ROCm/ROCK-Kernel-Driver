@@ -36,10 +36,6 @@ STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC int	xfs_uuid_mount(xfs_mount_t *);
 STATIC void	xfs_uuid_unmount(xfs_mount_t *mp);
 
-mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
-STATIC int	xfs_uuidtab_size;
-STATIC uuid_t	*xfs_uuidtab;
-
 void xfs_xlatesb(void *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
 
 static struct {
@@ -1169,7 +1165,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 void
 xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 {
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	int		first;
 	int		last;
 	xfs_mount_t	*mp;
@@ -1217,7 +1213,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 {
 	int		scounter;	/* short counter for 32 bit fields */
 	long long	lcounter;	/* long counter for 64 bit fields */
-	long long res_used, rem;
+	long long	res_used, rem;
 
 	/*
 	 * With the in-core superblock spin lock held, switch
@@ -1400,7 +1396,7 @@ xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta, int rsvd)
 int
 xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
 {
-	unsigned long		s;
+	unsigned long	s;
 	int		status=0;
 	xfs_mod_sb_t	*msbp;
 
@@ -1457,10 +1453,12 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
  * If it can't then we'll return NULL.
  */
 xfs_buf_t *
-xfs_getsb(xfs_mount_t	*mp,
-	  int		flags)
+xfs_getsb(
+	xfs_mount_t	*mp,
+	int		flags)
 {
 	xfs_buf_t	*bp;
+
 	ASSERT(mp->m_sb_bp != NULL);
 	bp = mp->m_sb_bp;
 	if (flags & XFS_BUF_TRYLOCK) {
@@ -1495,67 +1493,36 @@ xfs_freesb(
 }
 
 /*
- * See if the uuid is unique among mounted xfs filesystems.
- * Mount fails if UUID is nil or a FS with the same UUID is already
- * mounted
+ * See if the UUID is unique among mounted XFS filesystems.
+ * Mount fails if UUID is nil or a FS with the same UUID is already mounted.
  */
 STATIC int
-xfs_uuid_mount(xfs_mount_t *mp)
+xfs_uuid_mount(
+	xfs_mount_t	*mp)
 {
-	int	hole;
-	int	i;
-
 	if (uuid_is_nil(&mp->m_sb.sb_uuid)) {
-		cmn_err(CE_WARN, "XFS: Filesystem %s has nil UUID - can't mount",
+		cmn_err(CE_WARN,
+			"XFS: Filesystem %s has nil UUID - can't mount",
 			mp->m_fsname);
 		return -1;
 	}
-
-	mutex_lock(&xfs_uuidtabmon, PVFS);
-	for (i = 0, hole = -1; i < xfs_uuidtab_size; i++) {
-		if (uuid_is_nil(&xfs_uuidtab[i])) {
-			hole = i;
-			continue;
-		}
-		if (uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i])) {
-			cmn_err(CE_WARN, "XFS: Filesystem %s has duplicate UUID - can't mount",
-				mp->m_fsname);
-			mutex_unlock(&xfs_uuidtabmon);
-			return -1;
-		}
+	if (!uuid_table_insert(&mp->m_sb.sb_uuid)) {
+		cmn_err(CE_WARN,
+			"XFS: Filesystem %s has duplicate UUID - can't mount",
+			mp->m_fsname);
+		return -1;
 	}
-	if (hole < 0) {
-		xfs_uuidtab = kmem_realloc(xfs_uuidtab,
-			(xfs_uuidtab_size + 1) * sizeof(*xfs_uuidtab),
-			xfs_uuidtab_size  * sizeof(*xfs_uuidtab),
-			KM_SLEEP);
-		hole = xfs_uuidtab_size++;
-	}
-	xfs_uuidtab[hole] = mp->m_sb.sb_uuid;
-	mutex_unlock(&xfs_uuidtabmon);
-
 	return 0;
 }
 
 /*
- * Remove filesystem from the uuid table.
+ * Remove filesystem from the UUID table.
  */
 STATIC void
-xfs_uuid_unmount(xfs_mount_t *mp)
+xfs_uuid_unmount(
+	xfs_mount_t	*mp)
 {
-	int	i;
-
-	mutex_lock(&xfs_uuidtabmon, PVFS);
-	for (i = 0; i < xfs_uuidtab_size; i++) {
-		if (uuid_is_nil(&xfs_uuidtab[i]))
-			continue;
-		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i]))
-			continue;
-		uuid_create_nil(&xfs_uuidtab[i]);
-		break;
-	}
-	ASSERT(i < xfs_uuidtab_size);
-	mutex_unlock(&xfs_uuidtabmon);
+	uuid_table_remove(&mp->m_sb.sb_uuid);
 }
 
 /*
@@ -1564,10 +1531,10 @@ xfs_uuid_unmount(xfs_mount_t *mp)
  */
 STATIC void
 xfs_mount_log_sbunit(
-	xfs_mount_t *mp,
-	__int64_t fields)
+	xfs_mount_t	*mp,
+	__int64_t	fields)
 {
-	xfs_trans_t *tp;
+	xfs_trans_t	*tp;
 
 	ASSERT(fields & (XFS_SB_UNIT|XFS_SB_WIDTH|XFS_SB_UUID));
 
@@ -1578,7 +1545,7 @@ xfs_mount_log_sbunit(
 		return;
 	}
 	xfs_mod_sb(tp, fields);
-	(void)xfs_trans_commit(tp, 0, NULL);
+	xfs_trans_commit(tp, 0, NULL);
 }
 
 /* Functions to lock access out of the filesystem for forced
@@ -1603,7 +1570,7 @@ xfs_start_freeze(
 
 void
 xfs_finish_freeze(
-	xfs_mount_t *mp)
+	xfs_mount_t	*mp)
 {
 	unsigned long	s = mutex_spinlock(&mp->m_freeze_lock);
 
@@ -1617,11 +1584,11 @@ xfs_finish_freeze(
 
 void
 xfs_check_frozen(
-	xfs_mount_t *mp,
-	bhv_desc_t *bdp,
-	int	level)
+	xfs_mount_t	*mp,
+	bhv_desc_t	*bdp,
+	int		level)
 {
-	SPLDECL(s);
+	unsigned long	s;
 
 	if (mp->m_frozen) {
 		s = mutex_spinlock(&mp->m_freeze_lock);
