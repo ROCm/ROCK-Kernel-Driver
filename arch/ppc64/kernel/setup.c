@@ -58,6 +58,7 @@ extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );
 extern void pSeriesLP_init_early(void);
 extern void mm_init_ppc64( void ); 
+extern void vpa_init(int cpu);
 
 unsigned long decr_overclock = 1;
 unsigned long decr_overclock_proc0 = 1;
@@ -210,6 +211,13 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	mm_init_ppc64();
+
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		vpa_init(boot_cpuid);
+	}
+
+	/* Select the correct idle loop for the platform. */
+	idle_setup();
 
 	switch (systemcfg->platform) {
 #ifdef CONFIG_PPC_ISERIES

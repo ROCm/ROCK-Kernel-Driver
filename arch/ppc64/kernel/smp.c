@@ -266,6 +266,16 @@ static void __init smp_space_timers(unsigned int max_cpus)
 }
 
 #ifdef CONFIG_PPC_PSERIES
+void vpa_init(int cpu) {
+	unsigned long flags;
+
+	/* Register the Virtual Processor Area (VPA) */
+	printk(KERN_INFO "register_vpa: cpu 0x%x\n", cpu);
+	flags = 1UL << (63 - 18);
+	paca[cpu].xLpPaca.xSLBCount = 64; /* SLB restore highwater mark */
+	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].xLpPaca))); 
+}
+
 static void __devinit pSeries_setup_cpu(int cpu)
 {
 	if (OpenPIC_Addr) {
@@ -669,6 +679,12 @@ int __devinit start_secondary(void *unused)
 	smp_ops->setup_cpu(cpu);
 	if (smp_ops->take_timebase)
 		smp_ops->take_timebase();
+
+	get_paca()->yielded = 0;
+
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		vpa_init(cpu); 
+	}
 
 	local_irq_enable();
 

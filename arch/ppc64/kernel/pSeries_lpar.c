@@ -37,6 +37,31 @@
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 
+long poll_pending(void)
+{
+	unsigned long dummy;
+	return plpar_hcall(H_POLL_PENDING, 0, 0, 0, 0,
+			   &dummy, &dummy, &dummy);
+}
+
+long prod_processor(void)
+{
+	plpar_hcall_norets(H_PROD);
+	return(0); 
+}
+
+long cede_processor(void)
+{
+	plpar_hcall_norets(H_CEDE);
+	return(0); 
+}
+
+long register_vpa(unsigned long flags, unsigned long proc, unsigned long vpa)
+{
+	plpar_hcall_norets(H_REGISTER_VPA, flags, proc, vpa);
+	return(0); 
+}
+
 long plpar_pte_remove(unsigned long flags,
 		      unsigned long ptex,
 		      unsigned long avpn,

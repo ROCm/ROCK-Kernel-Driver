@@ -273,7 +273,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.progress = chrp_progress;
 
-        /* build up the firmware_features bitmask field
+        /* Build up the firmware_features bitmask field
          * using contents of device-tree/ibm,hypertas-functions.
          * Ultimately this functionality may be moved into prom.c prom_init().
          */

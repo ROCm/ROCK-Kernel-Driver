@@ -378,6 +378,7 @@
 #define PLATFORM_PSERIES      0x0100
 #define PLATFORM_PSERIES_LPAR 0x0101
 #define PLATFORM_ISERIES_LPAR 0x0201
+#define PLATFORM_LPAR         0x0001
 	
 /*
  * List of interrupt controllers.
