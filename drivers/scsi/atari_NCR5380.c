@@ -315,7 +315,7 @@ static Scsi_Host_Template *the_template = NULL;
 #endif
 
 typedef struct {
-    char	allocated[MAX_TAGS/8];
+    long	allocated[MAX_TAGS/32];
     int		nr_allocated;
     int		queue_size;
 } TAG_ALLOC;
