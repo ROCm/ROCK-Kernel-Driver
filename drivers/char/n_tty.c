@@ -317,8 +317,6 @@ static ssize_t opost_block(struct tty_struct * tty,
 		return 0;
 	if (nr > space)
 		nr = space;
-	if (nr > sizeof(buf))
-	    nr = sizeof(buf);
 
 	for (i = 0, cp = buf; i < nr; i++, cp++) {
 		switch (*cp) {

@@ -175,8 +175,8 @@ static psmouse_ret_t alps_process_byte(struct psmouse *psmouse, struct pt_regs *
 		return PSMOUSE_BAD_DATA;
 
 	/* Bytes 2 - 6 should have 0 in the highest bit */
-	if (psmouse->pktcnt > 1 && psmouse->pktcnt <= 6 &&
-	    (psmouse->packet[psmouse->pktcnt] & 0x80))
+	if (psmouse->pktcnt >= 2 && psmouse->pktcnt <= 6 &&
+	    (psmouse->packet[psmouse->pktcnt-1] & 0x80))
 		return PSMOUSE_BAD_DATA;
 
 	if (psmouse->pktcnt == 6) {

@@ -89,7 +89,8 @@ struct dst_ops
 	int			(*gc)(void);
 	struct dst_entry *	(*check)(struct dst_entry *, __u32 cookie);
 	void			(*destroy)(struct dst_entry *);
-	void			(*ifdown)(struct dst_entry *, int how);
+	void			(*ifdown)(struct dst_entry *,
+					  struct net_device *dev, int how);
 	struct dst_entry *	(*negative_advice)(struct dst_entry *);
 	void			(*link_failure)(struct sk_buff *);
 	void			(*update_pmtu)(struct dst_entry *dst, u32 mtu);

@@ -138,7 +138,8 @@ static struct timer_list rt_secret_timer;
 
 static struct dst_entry *ipv4_dst_check(struct dst_entry *dst, u32 cookie);
 static void		 ipv4_dst_destroy(struct dst_entry *dst);
-static void		 ipv4_dst_ifdown(struct dst_entry *dst, int how);
+static void		 ipv4_dst_ifdown(struct dst_entry *dst,
+					 struct net_device *dev, int how);
 static struct dst_entry *ipv4_negative_advice(struct dst_entry *dst);
 static void		 ipv4_link_failure(struct sk_buff *skb);
 static void		 ip_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
@@ -1342,11 +1343,12 @@ static void ipv4_dst_destroy(struct dst_entry *dst)
 	}
 }
 
-static void ipv4_dst_ifdown(struct dst_entry *dst, int how)
+static void ipv4_dst_ifdown(struct dst_entry *dst, struct net_device *dev,
+			    int how)
 {
 	struct rtable *rt = (struct rtable *) dst;
 	struct in_device *idev = rt->idev;
-	if (idev && idev->dev != &loopback_dev) {
+	if (dev != &loopback_dev && idev && idev->dev == dev) {
 		struct in_device *loopback_idev = in_dev_get(&loopback_dev);
 		if (loopback_idev) {
 			rt->idev = loopback_idev;
