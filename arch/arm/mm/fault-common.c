@@ -83,10 +83,14 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 			break;
 		}
 
-		pte = pte_offset(pmd, addr);
+#ifndef CONFIG_HIGHMEM
+		/* We must not map this if we have highmem enabled */
+		pte = pte_offset_map(pmd, addr);
 		printk(", *pte = %08lx", pte_val(*pte));
 #ifdef CONFIG_CPU_32
 		printk(", *ppte = %08lx", pte_val(pte[-PTRS_PER_PTE]));
+#endif
+		pte_unmap(pte);
 #endif
 	} while(0);
 

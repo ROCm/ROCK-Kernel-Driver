@@ -14,10 +14,13 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
-#include <asm/arch/pcmcia.h>
+#include "sa1100_generic.h"
+
+#error This is broken!
 
 #define	S0_CD_IRQ		60				// Socket 0 Card Detect IRQ
 #define	S0_STS_IRQ		55				// Socket 0 PCMCIA IRQ
@@ -47,8 +50,9 @@ static int gcplus_pcmcia_init(struct pcmcia_init *init)
   irq = S0_CD_IRQ;
   res = request_irq(irq, init->handler, SA_INTERRUPT, "PCMCIA 0 CD", NULL);
   if (res < 0) {
-	  printk(KERN_ERR "%s: Request for IRQ %lu failed\n", __FUNCTION__, irq);
-	  return	-1;
+    printk(KERN_ERR "%s: request for IRQ%d failed (%d)\n",
+	   __FUNCTION__, irq, res);
+    return res;
   }
 
   return 1;			// 1 PCMCIA Slot
@@ -106,7 +110,7 @@ static int gcplus_pcmcia_configure_socket(const struct pcmcia_configure
 
   if(configure->sock>1) return -1;
 
-  save_flags_cli(flags);
+  local_irq_save(flags);
 
   switch (configure->vcc) {
   case 0:
@@ -126,7 +130,7 @@ static int gcplus_pcmcia_configure_socket(const struct pcmcia_configure
   default:
     printk(KERN_ERR "%s(): unrecognized Vcc %u\n", __FUNCTION__,
 	   configure->vcc);
-    restore_flags(flags);
+    local_irq_restore(flags);
     return -1;
   }
 
@@ -139,16 +143,44 @@ static int gcplus_pcmcia_configure_socket(const struct pcmcia_configure
   *PCMCIA_Power |= ADS_CS_PR_A_RESET;
   mdelay(30);
 
-  restore_flags(flags);
+  local_irq_restore(flags);
 
   return 0;
 }
 
-struct pcmcia_low_level gcplus_pcmcia_ops = { 
-  gcplus_pcmcia_init,
-  gcplus_pcmcia_shutdown,
-  gcplus_pcmcia_socket_state,
-  gcplus_pcmcia_get_irq_info,
-  gcplus_pcmcia_configure_socket
+static int gcplus_pcmcia_socket_init(int sock)
+{
+  return 0;
+}
+
+static int gcplus_pcmcia_socket_suspend(int sock)
+{
+  return 0;
+}
+
+static struct pcmcia_low_level gcplus_pcmcia_ops = { 
+  init:			gcplus_pcmcia_init,
+  shutdown:		gcplus_pcmcia_shutdown,
+  socket_state:		gcplus_pcmcia_socket_state,
+  get_irq_info:		gcplus_pcmcia_get_irq_info,
+  configure_socket:	gcplus_pcmcia_configure_socket,
+
+  socket_init:		gcplus_pcmcia_socket_init,
+  socket_suspend:	gcplus_pcmcia_socket_suspend,
 };
+
+int __init pcmcia_gcplus_init(void)
+{
+	int ret = -ENODEV;
+
+	if (machine_is_gcplus())
+		ret = sa1100_register_pcmcia(&gcplus_pcmcia_ops);
+
+	return ret;
+}
+
+void __exit pcmcia_gcplus_exit(void)
+{
+	sa1100_unregister_pcmcia(&gcplus_pcmcia_ops);
+}
 

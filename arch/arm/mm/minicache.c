@@ -58,7 +58,7 @@ static int __init minicache_init(void)
 	pmd = pmd_alloc(&init_mm, pgd, minicache_address);
 	if (!pmd)
 		BUG();
-	minicache_pte = pte_alloc(&init_mm, pmd, minicache_address);
+	minicache_pte = pte_alloc_kernel(&init_mm, pmd, minicache_address);
 	if (!minicache_pte)
 		BUG();
 
