@@ -1993,7 +1993,7 @@ int __init rp_init(void)
 			isa_boards_found++;
 	}
 #ifdef CONFIG_PCI
-	if (pcibios_present()) {
+	if (pci_present()) {
 		if(isa_boards_found < NUM_BOARDS)
 			pci_boards_found = init_PCI(isa_boards_found);
 	} else {
