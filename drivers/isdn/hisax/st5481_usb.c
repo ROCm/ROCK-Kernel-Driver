@@ -258,7 +258,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	}
 
 	
-	altsetting = &(dev->config->interface[0].altsetting[3]);	
+	altsetting = &(dev->config->interface[0]->altsetting[3]);	
 
 	// Check if the config is sane
 	if ( altsetting->desc.bNumEndpoints != 7 ) {
