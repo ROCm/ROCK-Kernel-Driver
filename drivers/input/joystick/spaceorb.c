@@ -162,7 +162,7 @@ static void spaceorb_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
+static void spaceorb_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct spaceorb *spaceorb;
 	int i, t;
@@ -201,7 +201,7 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = spaceorb;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(spaceorb);
 		return;
 	}
@@ -213,7 +213,7 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev spaceorb_dev = {
+static struct serio_driver spaceorb_drv = {
 	.interrupt =	spaceorb_interrupt,
 	.connect =	spaceorb_connect,
 	.disconnect =	spaceorb_disconnect,
@@ -225,13 +225,13 @@ static struct serio_dev spaceorb_dev = {
 
 int __init spaceorb_init(void)
 {
-	serio_register_device(&spaceorb_dev);
+	serio_register_driver(&spaceorb_drv);
 	return 0;
 }
 
 void __exit spaceorb_exit(void)
 {
-	serio_unregister_device(&spaceorb_dev);
+	serio_unregister_driver(&spaceorb_drv);
 }
 
 module_init(spaceorb_init);

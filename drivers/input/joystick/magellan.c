@@ -146,7 +146,7 @@ static void magellan_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void magellan_connect(struct serio *serio, struct serio_dev *dev)
+static void magellan_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct magellan *magellan;
 	int i, t;
@@ -184,7 +184,7 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = magellan;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(magellan);
 		return;
 	}
@@ -199,7 +199,7 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev magellan_dev = {
+static struct serio_driver magellan_drv = {
 	.interrupt =	magellan_interrupt,
 	.connect =	magellan_connect,
 	.disconnect =	magellan_disconnect,
@@ -211,13 +211,13 @@ static struct serio_dev magellan_dev = {
 
 int __init magellan_init(void)
 {
-	serio_register_device(&magellan_dev);
+	serio_register_driver(&magellan_drv);
 	return 0;
 }
 
 void __exit magellan_exit(void)
 {
-	serio_unregister_device(&magellan_dev);
+	serio_unregister_driver(&magellan_drv);
 }
 
 module_init(magellan_init);

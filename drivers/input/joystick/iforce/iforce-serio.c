@@ -124,7 +124,7 @@ out:
 	return IRQ_HANDLED;
 }
 
-static void iforce_serio_connect(struct serio *serio, struct serio_dev *dev)
+static void iforce_serio_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct iforce *iforce;
 	if (serio->type != (SERIO_RS232 | SERIO_IFORCE))
@@ -137,7 +137,7 @@ static void iforce_serio_connect(struct serio *serio, struct serio_dev *dev)
 	iforce->serio = serio;
 	serio->private = iforce;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(iforce);
 		return;
 	}
@@ -158,7 +158,7 @@ static void iforce_serio_disconnect(struct serio *serio)
 	kfree(iforce);
 }
 
-struct serio_dev iforce_serio_dev = {
+struct serio_driver iforce_serio_drv = {
 	.write_wakeup =	iforce_serio_write_wakeup,
 	.interrupt =	iforce_serio_irq,
 	.connect =	iforce_serio_connect,

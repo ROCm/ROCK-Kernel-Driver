@@ -482,7 +482,7 @@ vsxxxaa_disconnect (struct serio *serio)
 }
 
 static void
-vsxxxaa_connect (struct serio *serio, struct serio_dev *dev)
+vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 {
 	struct vsxxxaa *mouse;
 
@@ -524,7 +524,7 @@ vsxxxaa_connect (struct serio *serio, struct serio_dev *dev)
 	mouse->dev.id.bustype = BUS_RS232;
 	mouse->serio = serio;
 
-	if (serio_open (serio, dev)) {
+	if (serio_open (serio, drv)) {
 		kfree (mouse);
 		return;
 	}
@@ -540,7 +540,7 @@ vsxxxaa_connect (struct serio *serio, struct serio_dev *dev)
 	printk (KERN_INFO "input: %s on %s\n", mouse->name, mouse->phys);
 }
 
-static struct serio_dev vsxxxaa_dev = {
+static struct serio_driver vsxxxaa_drv = {
 	.connect = vsxxxaa_connect,
 	.interrupt = vsxxxaa_interrupt,
 	.disconnect = vsxxxaa_disconnect,
@@ -549,14 +549,14 @@ static struct serio_dev vsxxxaa_dev = {
 int __init
 vsxxxaa_init (void)
 {
-	serio_register_device (&vsxxxaa_dev);
+	serio_register_driver(&vsxxxaa_drv);
 	return 0;
 }
 
 void __exit
 vsxxxaa_exit (void)
 {
-	serio_unregister_device (&vsxxxaa_dev);
+	serio_unregister_driver(&vsxxxaa_drv);
 }
 
 module_init (vsxxxaa_init);

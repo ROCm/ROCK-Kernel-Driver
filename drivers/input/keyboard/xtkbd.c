@@ -86,7 +86,7 @@ irqreturn_t xtkbd_interrupt(struct serio *serio,
 	return IRQ_HANDLED;
 }
 
-void xtkbd_connect(struct serio *serio, struct serio_dev *dev)
+void xtkbd_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct xtkbd *xtkbd;
 	int i;
@@ -111,7 +111,7 @@ void xtkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = xtkbd;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(xtkbd);
 		return;
 	}
@@ -143,7 +143,7 @@ void xtkbd_disconnect(struct serio *serio)
 	kfree(xtkbd);
 }
 
-struct serio_dev xtkbd_dev = {
+struct serio_driver xtkbd_drv = {
 	.interrupt =	xtkbd_interrupt,
 	.connect =	xtkbd_connect,
 	.disconnect =	xtkbd_disconnect
@@ -151,13 +151,13 @@ struct serio_dev xtkbd_dev = {
 
 int __init xtkbd_init(void)
 {
-	serio_register_device(&xtkbd_dev);
+	serio_register_driver(&xtkbd_drv);
 	return 0;
 }
 
 void __exit xtkbd_exit(void)
 {
-	serio_unregister_device(&xtkbd_dev);
+	serio_unregister_driver(&xtkbd_drv);
 }
 
 module_init(xtkbd_init);

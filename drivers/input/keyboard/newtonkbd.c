@@ -82,7 +82,7 @@ irqreturn_t nkbd_interrupt(struct serio *serio,
 
 }
 
-void nkbd_connect(struct serio *serio, struct serio_dev *dev)
+void nkbd_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct nkbd *nkbd;
 	int i;
@@ -106,7 +106,7 @@ void nkbd_connect(struct serio *serio, struct serio_dev *dev)
 	nkbd->dev.private = nkbd;
 	serio->private = nkbd;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(nkbd);
 		return;
 	}
@@ -138,7 +138,7 @@ void nkbd_disconnect(struct serio *serio)
 	kfree(nkbd);
 }
 
-struct serio_dev nkbd_dev = {
+struct serio_driver nkbd_drv = {
 	.interrupt =	nkbd_interrupt,
 	.connect =	nkbd_connect,
 	.disconnect =	nkbd_disconnect
@@ -146,13 +146,13 @@ struct serio_dev nkbd_dev = {
 
 int __init nkbd_init(void)
 {
-	serio_register_device(&nkbd_dev);
+	serio_register_driver(&nkbd_drv);
 	return 0;
 }
 
 void __exit nkbd_exit(void)
 {
-	serio_unregister_device(&nkbd_dev);
+	serio_unregister_driver(&nkbd_drv);
 }
 
 module_init(nkbd_init);

@@ -187,7 +187,7 @@ static void twidjoy_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
+static void twidjoy_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct twidjoy_button_spec *bp;
 	struct twidjoy *twidjoy;
@@ -232,7 +232,7 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
 	twidjoy->dev.private = twidjoy;
 	serio->private = twidjoy;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(twidjoy);
 		return;
 	}
@@ -246,7 +246,7 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev twidjoy_dev = {
+static struct serio_driver twidjoy_drv = {
 	.interrupt =	twidjoy_interrupt,
 	.connect =	twidjoy_connect,
 	.disconnect =	twidjoy_disconnect,
@@ -258,13 +258,13 @@ static struct serio_dev twidjoy_dev = {
 
 int __init twidjoy_init(void)
 {
-	serio_register_device(&twidjoy_dev);
+	serio_register_driver(&twidjoy_drv);
 	return 0;
 }
 
 void __exit twidjoy_exit(void)
 {
-	serio_unregister_device(&twidjoy_dev);
+	serio_unregister_driver(&twidjoy_drv);
 }
 
 module_init(twidjoy_init);

@@ -139,7 +139,7 @@ static void warrior_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void warrior_connect(struct serio *serio, struct serio_dev *dev)
+static void warrior_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct warrior *warrior;
 	int i;
@@ -185,7 +185,7 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = warrior;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(warrior);
 		return;
 	}
@@ -199,7 +199,7 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev warrior_dev = {
+static struct serio_driver warrior_drv = {
 	.interrupt =	warrior_interrupt,
 	.connect =	warrior_connect,
 	.disconnect =	warrior_disconnect,
@@ -211,13 +211,13 @@ static struct serio_dev warrior_dev = {
 
 int __init warrior_init(void)
 {
-	serio_register_device(&warrior_dev);
+	serio_register_driver(&warrior_drv);
 	return 0;
 }
 
 void __exit warrior_exit(void)
 {
-	serio_unregister_device(&warrior_dev);
+	serio_unregister_driver(&warrior_drv);
 }
 
 module_init(warrior_init);

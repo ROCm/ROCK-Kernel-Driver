@@ -237,7 +237,7 @@ static void sermouse_disconnect(struct serio *serio)
  * an unhandled serio port is found.
  */
 
-static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
+static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct sermouse *sermouse;
 	unsigned char c;
@@ -279,7 +279,7 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 	sermouse->dev.id.product = c;
 	sermouse->dev.id.version = 0x0100;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(sermouse);
 		return;
 	}
@@ -289,7 +289,7 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 	printk(KERN_INFO "input: %s on %s\n", sermouse_protocols[sermouse->type], serio->phys);
 }
 
-static struct serio_dev sermouse_dev = {
+static struct serio_driver sermouse_drv = {
 	.interrupt =	sermouse_interrupt,
 	.connect =	sermouse_connect,
 	.disconnect =	sermouse_disconnect
@@ -297,13 +297,13 @@ static struct serio_dev sermouse_dev = {
 
 int __init sermouse_init(void)
 {
-	serio_register_device(&sermouse_dev);
+	serio_register_driver(&sermouse_drv);
 	return 0;
 }
 
 void __exit sermouse_exit(void)
 {
-	serio_unregister_device(&sermouse_dev);
+	serio_unregister_driver(&sermouse_drv);
 }
 
 module_init(sermouse_init);

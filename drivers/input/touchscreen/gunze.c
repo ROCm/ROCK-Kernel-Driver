@@ -111,7 +111,7 @@ static void gunze_disconnect(struct serio *serio)
  * and if yes, registers it as an input device.
  */
 
-static void gunze_connect(struct serio *serio, struct serio_dev *dev)
+static void gunze_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct gunze *gunze;
 
@@ -142,7 +142,7 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
 	gunze->dev.id.product = 0x0051;
 	gunze->dev.id.version = 0x0100;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(gunze);
 		return;
 	}
@@ -156,7 +156,7 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev gunze_dev = {
+static struct serio_driver gunze_drv = {
 	.interrupt =	gunze_interrupt,
 	.connect =	gunze_connect,
 	.disconnect =	gunze_disconnect,
@@ -168,13 +168,13 @@ static struct serio_dev gunze_dev = {
 
 int __init gunze_init(void)
 {
-	serio_register_device(&gunze_dev);
+	serio_register_driver(&gunze_drv);
 	return 0;
 }
 
 void __exit gunze_exit(void)
 {
-	serio_unregister_device(&gunze_dev);
+	serio_unregister_driver(&gunze_drv);
 }
 
 module_init(gunze_init);

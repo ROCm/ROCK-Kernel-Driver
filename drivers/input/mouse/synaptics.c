@@ -470,7 +470,7 @@ static psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_r
 		if (unlikely(priv->pkt_type == SYN_NEWABS))
 			priv->pkt_type = synaptics_detect_pkt_type(psmouse);
 
-		if (psmouse->ptport && psmouse->ptport->serio.dev && synaptics_is_pt_packet(psmouse->packet))
+		if (psmouse->ptport && psmouse->ptport->serio.drv && synaptics_is_pt_packet(psmouse->packet))
 			synaptics_pass_pt_packet(&psmouse->ptport->serio, psmouse->packet);
 		else
 			synaptics_process_packet(psmouse);

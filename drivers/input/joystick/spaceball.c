@@ -201,7 +201,7 @@ static void spaceball_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
+static void spaceball_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct spaceball *spaceball;
 	int i, t, id;
@@ -254,7 +254,7 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = spaceball;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(spaceball);
 		return;
 	}
@@ -269,7 +269,7 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev spaceball_dev = {
+static struct serio_driver spaceball_drv = {
 	.interrupt =	spaceball_interrupt,
 	.connect =	spaceball_connect,
 	.disconnect =	spaceball_disconnect,
@@ -281,13 +281,13 @@ static struct serio_dev spaceball_dev = {
 
 int __init spaceball_init(void)
 {
-	serio_register_device(&spaceball_dev);
+	serio_register_driver(&spaceball_drv);
 	return 0;
 }
 
 void __exit spaceball_exit(void)
 {
-	serio_unregister_device(&spaceball_dev);
+	serio_unregister_driver(&spaceball_drv);
 }
 
 module_init(spaceball_init);

@@ -678,7 +678,7 @@ static void psmouse_disconnect(struct serio *serio)
  * psmouse_connect() is a callback from the serio module when
  * an unhandled serio port is found.
  */
-static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
+static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct psmouse *psmouse;
 
@@ -700,7 +700,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.private = psmouse;
 
 	serio->private = psmouse;
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(psmouse);
 		serio->private = NULL;
 		return;
@@ -753,9 +753,9 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 static int psmouse_reconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
-	struct serio_dev *dev = serio->dev;
+	struct serio_driver *drv = serio->drv;
 
-	if (!dev || !psmouse) {
+	if (!drv || !psmouse) {
 		printk(KERN_DEBUG "psmouse: reconnect request, but serio is disconnected, ignoring...\n");
 		return -1;
 	}
@@ -793,7 +793,7 @@ static int psmouse_reconnect(struct serio *serio)
 }
 
 
-static struct serio_dev psmouse_dev = {
+static struct serio_driver psmouse_drv = {
 	.interrupt =	psmouse_interrupt,
 	.connect =	psmouse_connect,
 	.reconnect =	psmouse_reconnect,
@@ -818,13 +818,13 @@ static inline void psmouse_parse_proto(void)
 int __init psmouse_init(void)
 {
 	psmouse_parse_proto();
-	serio_register_device(&psmouse_dev);
+	serio_register_driver(&psmouse_drv);
 	return 0;
 }
 
 void __exit psmouse_exit(void)
 {
-	serio_unregister_device(&psmouse_dev);
+	serio_unregister_driver(&psmouse_drv);
 }
 
 module_init(psmouse_init);

@@ -170,7 +170,7 @@ static void serport_ldisc_write_wakeup(struct tty_struct * tty)
 {
 	struct serport *sp = (struct serport *) tty->disc_data;
 
-	serio_dev_write_wakeup(&sp->serio);
+	serio_drv_write_wakeup(&sp->serio);
 }
 
 /*

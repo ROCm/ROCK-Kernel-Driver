@@ -48,27 +48,27 @@ EXPORT_SYMBOL(__serio_register_port);
 EXPORT_SYMBOL(serio_unregister_port);
 EXPORT_SYMBOL(serio_unregister_port_delayed);
 EXPORT_SYMBOL(__serio_unregister_port);
-EXPORT_SYMBOL(serio_register_device);
-EXPORT_SYMBOL(serio_unregister_device);
+EXPORT_SYMBOL(serio_register_driver);
+EXPORT_SYMBOL(serio_unregister_driver);
 EXPORT_SYMBOL(serio_open);
 EXPORT_SYMBOL(serio_close);
 EXPORT_SYMBOL(serio_rescan);
 EXPORT_SYMBOL(serio_reconnect);
 
-static DECLARE_MUTEX(serio_sem);				/* protects serio_list and serio_dev_list */
+static DECLARE_MUTEX(serio_sem);	/* protects serio_list and serio_diriver_list */
 static LIST_HEAD(serio_list);
-static LIST_HEAD(serio_dev_list);
+static LIST_HEAD(serio_driver_list);
 
-/* serio_find_dev() must be called with serio_sem down.  */
+/* serio_find_driver() must be called with serio_sem down.  */
 
-static void serio_find_dev(struct serio *serio)
+static void serio_find_driver(struct serio *serio)
 {
-	struct serio_dev *dev;
+	struct serio_driver *drv;
 
-	list_for_each_entry(dev, &serio_dev_list, node) {
-		if (serio->dev)
+	list_for_each_entry(drv, &serio_driver_list, node) {
+		if (serio->drv)
 			break;
-		dev->connect(serio, dev);
+		drv->connect(serio, drv);
 	}
 }
 
@@ -153,15 +153,15 @@ static void serio_handle_events(void)
 				break;
 
 			case SERIO_RECONNECT :
-				if (event->serio->dev && event->serio->dev->reconnect)
-					if (event->serio->dev->reconnect(event->serio) == 0)
+				if (event->serio->drv && event->serio->drv->reconnect)
+					if (event->serio->drv->reconnect(event->serio) == 0)
 						break;
 				/* reconnect failed - fall through to rescan */
 
 			case SERIO_RESCAN :
-				if (event->serio->dev)
-					event->serio->dev->disconnect(event->serio);
-				serio_find_dev(event->serio);
+				if (event->serio->drv)
+					event->serio->drv->disconnect(event->serio);
+				serio_find_driver(event->serio);
 				break;
 			default:
 				break;
@@ -252,7 +252,7 @@ void __serio_register_port(struct serio *serio)
 {
 	spin_lock_init(&serio->lock);
 	list_add_tail(&serio->node, &serio_list);
-	serio_find_dev(serio);
+	serio_find_driver(serio);
 }
 
 void serio_unregister_port(struct serio *serio)
@@ -281,58 +281,58 @@ void __serio_unregister_port(struct serio *serio)
 {
 	serio_remove_pending_events(serio);
 	list_del_init(&serio->node);
-	if (serio->dev)
-		serio->dev->disconnect(serio);
+	if (serio->drv)
+		serio->drv->disconnect(serio);
 }
 
 /*
- * Serio device operations
+ * Serio driver operations
  */
 
-void serio_register_device(struct serio_dev *dev)
+void serio_register_driver(struct serio_driver *drv)
 {
 	struct serio *serio;
 	down(&serio_sem);
-	list_add_tail(&dev->node, &serio_dev_list);
+	list_add_tail(&drv->node, &serio_driver_list);
 	list_for_each_entry(serio, &serio_list, node)
-		if (!serio->dev)
-			dev->connect(serio, dev);
+		if (!serio->drv)
+			drv->connect(serio, drv);
 	up(&serio_sem);
 }
 
-void serio_unregister_device(struct serio_dev *dev)
+void serio_unregister_driver(struct serio_driver *drv)
 {
 	struct serio *serio;
 
 	down(&serio_sem);
-	list_del_init(&dev->node);
+	list_del_init(&drv->node);
 
 	list_for_each_entry(serio, &serio_list, node) {
-		if (serio->dev == dev)
-			dev->disconnect(serio);
-		serio_find_dev(serio);
+		if (serio->drv == drv)
+			drv->disconnect(serio);
+		serio_find_driver(serio);
 	}
 	up(&serio_sem);
 }
 
-/* called from serio_dev->connect/disconnect methods under serio_sem */
-int serio_open(struct serio *serio, struct serio_dev *dev)
+/* called from serio_driver->connect/disconnect methods under serio_sem */
+int serio_open(struct serio *serio, struct serio_driver *drv)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&serio->lock, flags);
-	serio->dev = dev;
+	serio->drv = drv;
 	spin_unlock_irqrestore(&serio->lock, flags);
 	if (serio->open && serio->open(serio)) {
 		spin_lock_irqsave(&serio->lock, flags);
-		serio->dev = NULL;
+		serio->drv = NULL;
 		spin_unlock_irqrestore(&serio->lock, flags);
 		return -1;
 	}
 	return 0;
 }
 
-/* called from serio_dev->connect/disconnect methods under serio_sem */
+/* called from serio_driver->connect/disconnect methods under serio_sem */
 void serio_close(struct serio *serio)
 {
 	unsigned long flags;
@@ -340,7 +340,7 @@ void serio_close(struct serio *serio)
 	if (serio->close)
 		serio->close(serio);
 	spin_lock_irqsave(&serio->lock, flags);
-	serio->dev = NULL;
+	serio->drv = NULL;
 	spin_unlock_irqrestore(&serio->lock, flags);
 }
 
@@ -352,8 +352,8 @@ irqreturn_t serio_interrupt(struct serio *serio,
 
 	spin_lock_irqsave(&serio->lock, flags);
 
-        if (likely(serio->dev)) {
-                ret = serio->dev->interrupt(serio, data, dfl, regs);
+        if (likely(serio->drv)) {
+                ret = serio->drv->interrupt(serio, data, dfl, regs);
 	} else {
 		if (!dfl) {
 			if ((serio->type != SERIO_8042 &&
