@@ -165,6 +165,13 @@ CONFIG_IP_NF_MATCH_OWNER
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+CONFIG_IP_NF_MATCH_PHYSDEV
+  Physdev packet matching matches against the physical bridge ports
+  the IP packet arrived on or will leave by.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 CONFIG_IP_NF_FILTER
   Packet filtering defines a table `filter', which has a series of
   rules for simple packet filtering at local input, forwarding and

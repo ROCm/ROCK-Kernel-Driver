@@ -41,6 +41,10 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
     dep_tristate '  Unclean match support (EXPERIMENTAL)' CONFIG_IP_NF_MATCH_UNCLEAN $CONFIG_IP_NF_IPTABLES
     dep_tristate '  Owner match support (EXPERIMENTAL)' CONFIG_IP_NF_MATCH_OWNER $CONFIG_IP_NF_IPTABLES
   fi
+  if [ "$CONFIG_BRIDGE" != "n" ]; then
+    dep_tristate '  Physdev match support' CONFIG_IP_NF_MATCH_PHYSDEV
+  fi
+
 # The targets
   dep_tristate '  Packet filtering' CONFIG_IP_NF_FILTER $CONFIG_IP_NF_IPTABLES 
   if [ "$CONFIG_IP_NF_FILTER" != "n" ]; then
