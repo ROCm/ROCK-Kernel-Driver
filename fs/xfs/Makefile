@@ -32,10 +32,10 @@
 # Makefile for XFS on Linux.
 #
 
-# This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
+# This needs -I because everything does #include <xfs.h> instead of "xfs.h".
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
 # but I am not going to change every file at the moment.
-EXTRA_CFLAGS +=	 -I. -funsigned-char
+EXTRA_CFLAGS +=	 -Ifs/xfs -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
@@ -154,6 +154,6 @@ ifneq ($(CONFIG_KDB_MODULES),)
   endif
 endif
 
-CFLAGS_xfsidbg.o += -I $(TOPDIR)/arch/$(ARCH)/kdb
+CFLAGS_xfsidbg.o += -Iarch/$(ARCH)/kdb
 
 include $(TOPDIR)/Rules.make

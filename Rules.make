@@ -25,22 +25,20 @@ ifdef list-multi
 $(warning kbuild: list-multi ($(list-multi)) is obsolete in 2.5. Please fix!)
 endif
 
-# Figure out paths
-# ---------------------------------------------------------------------------
-# Find the path relative to the toplevel dir, $(RELDIR), and express
-# the toplevel dir as a relative path from this dir, $(TOPDIR_REL)
-
-ifeq ($(findstring $(TOPDIR),$(CURDIR)),)
-  # Can only happen when something is built out of tree
-  RELDIR := $(CURDIR)
-  TOPDIR_REL := $(TOPDIR)
-else
-  RELDIR := $(subst $(TOPDIR)/,,$(CURDIR))
-  TOPDIR_REL := $(subst $(space),,$(foreach d,$(subst /, ,$(RELDIR)),../))
-endif
-
 # Some paths for the Makefiles to use
 # ---------------------------------------------------------------------------
+
+# FIXME. For now, we leave it possible to use make -C or make -f
+# to do work in subdirs.
+
+ifndef obj
+obj = .
+CFLAGS := $(patsubst -I%,-I$(TOPDIR)/%,$(patsubst -I$(TOPDIR)/%,-I%,$(CFLAGS)))
+AFLAGS := $(patsubst -I%,-I$(TOPDIR)/%,$(patsubst -I$(TOPDIR)/%,-I%,$(AFLAGS)))
+endif
+
+# For use in the quiet output
+echo_target = $@
 
 # Usage:
 #
@@ -58,12 +56,7 @@ endif
 # We don't support separate source / object yet, so these are just
 # placeholders for now
 
-obj := .
-src := .
-
-# For use in the quiet output
-
-echo_target = $(RELDIR)/$@
+src := $(obj)
 
 # Figure out what we need to build from the various variables
 # ===========================================================================
@@ -120,6 +113,21 @@ real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m
 # Only build module versions for files which are selected to be built
 export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
 
+# Add subdir path
+
+EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
+obj-y		:= $(addprefix $(obj)/,$(obj-y))
+obj-m		:= $(addprefix $(obj)/,$(obj-m))
+export-objs	:= $(addprefix $(obj)/,$(export-objs))
+subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))
+real-objs-y	:= $(addprefix $(obj)/,$(real-objs-y))
+real-objs-m	:= $(addprefix $(obj)/,$(real-objs-m))
+multi-used-y	:= $(addprefix $(obj)/,$(multi-used-y))
+multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
+multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
+multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
+subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
+
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
@@ -153,7 +161,7 @@ else
 # This sets version suffixes on exported symbols
 # ---------------------------------------------------------------------------
 
-MODVERDIR := $(TOPDIR)/include/linux/modules/$(RELDIR)
+MODVERDIR := include/linux/modules/$(obj)
 
 #
 # Added the SMP separator to stop module accidents between uniprocessor
@@ -183,7 +191,7 @@ c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 # files (fix-dep filters them), so touch modversions.h if any of the .ver
 # files changes
 
-quiet_cmd_cc_ver_c = MKVER   include/linux/modules/$(RELDIR)/$*.ver
+quiet_cmd_cc_ver_c = MKVER   include/linux/modules/$(obj)/$*.ver
 cmd_cc_ver_c = $(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
 		 -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
 
@@ -216,8 +224,8 @@ $(MODVERDIR)/%.ver: %.c FORCE
 targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
 
 fastdep: $(targets) $(subdir-ym)
-	@mkdir -p $(dir $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR),$(export-objs:.o=.ver)))
-	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
+	@mkdir -p $(dir $(addprefix .tmp_export-objs/modules/,$(export-objs:.o=.ver)))
+	@touch $(addprefix .tmp_export-objs/modules/,$(export-objs:.o=.ver))
 
 endif # export-objs 
 
@@ -228,13 +236,15 @@ ifeq ($(MAKECMDGOALS),modules_install)
 # Installing modules
 # ==========================================================================
 
+quiet_cmd_modules_install = INSTALL $(obj-m)
+cmd_modules_install = mkdir -p $(MODLIB)/kernel/$(obj); \
+		      cp $(obj-m) $(MODLIB)/kernel/$(obj)
+
 .PHONY: modules_install
 
 modules_install: $(subdir-ym)
 ifneq ($(obj-m),)
-	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
-	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
-	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
+	$(call cmd,modules_install)
 else
 	@/bin/true
 endif
@@ -250,8 +260,12 @@ else # ! modules_install
 
 ifndef O_TARGET
 ifndef L_TARGET
-O_TARGET := built-in.o
+O_TARGET := $(obj)/built-in.o
 endif
+endif
+
+ifdef L_TARGET
+L_TARGET := $(obj)/$(L_TARGET)
 endif
 
 first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
@@ -368,7 +382,7 @@ endif
 #
 
 quiet_cmd_link_multi = LD      $(echo_target)
-cmd_link_multi = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
+cmd_link_multi = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(addprefix $(obj)/,$($(subst $(obj)/,,$(@:.o=-objs)))),$^)
 
 # We would rather have a list of rules like
 # 	foo.o: $(foo-objs)
@@ -388,6 +402,9 @@ targets += $(multi-used-y) $(multi-used-m)
 host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
 host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
 host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
+host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
+host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))
+host-progs-multi-objs := $(addprefix $(obj)/,$(host-progs-multi-objs))
 
 quiet_cmd_host_cc__c  = HOSTCC  $(echo_target)
 cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,$(depfile) \
@@ -405,7 +422,7 @@ $(host-progs-multi-objs): %.o: %.c FORCE
 	$(call if_changed_dep,host_cc_o_c)
 
 quiet_cmd_host_cc__o  = HOSTLD  $(echo_target)
-cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $($@-objs) \
+cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $(addprefix $(obj)/,$($(subst $(obj)/,,$@)-objs)) \
 			$(HOST_LOADLIBES)
 
 $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
@@ -583,5 +600,7 @@ endef
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
 
-descend = $(MAKE) -C $(1) $(2)
-
+ifeq ($(KBUILD_VERBOSE),1)
+descend = echo '$(MAKE) -f $(1)/Makefile $(2)';
+endif
+descend += $(MAKE) -f $(1)/Makefile obj=$(1) $(2)
