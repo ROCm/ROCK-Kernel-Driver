@@ -42,7 +42,6 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/mach-types.h>
 #include <asm/uaccess.h>
 #include <asm/arch/bitfield.h>
 #include <asm/arch/pxafb.h>
