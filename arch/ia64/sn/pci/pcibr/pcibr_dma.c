@@ -226,10 +226,10 @@ void sn_dma_flush(uint64_t addr)
 		return;
 
 	nasid = NASID_GET(addr);
-	if (-1 == NASID_TO_COMPACT_NODEID(nasid))
+	if (-1 == nasid_to_cnodeid(nasid))
 		return;
 
-	hubinfo = (NODEPDA(NASID_TO_COMPACT_NODEID(nasid)))->pdinfo;
+	hubinfo = (NODEPDA(nasid_to_cnodeid(nasid)))->pdinfo;
 
 	if (!hubinfo) {
 		BUG();

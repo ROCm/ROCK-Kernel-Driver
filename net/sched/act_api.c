@@ -416,14 +416,37 @@ bad_ret:
 
 int tcf_action_copy_stats (struct sk_buff *skb,struct tc_action *a)
 {
+	struct gnet_dump d;
+	struct tcf_act_hdr *h = a->priv;
+	
 #ifdef CONFIG_KMOD
 	/* place holder */
 #endif
 
-	if (NULL == a->ops || NULL == a->ops->get_stats)
-		return 1;
+	if (NULL == h)
+		goto errout;
 
-	return a->ops->get_stats(skb,a);
+	if (gnet_stats_start_copy(skb, TCA_ACT_STATS, h->stats_lock, &d) < 0)
+		goto errout;
+
+	if (NULL != a->ops && NULL != a->ops->get_stats)
+		if (a->ops->get_stats(skb, a) < 0)
+			goto errout;
+
+	if (gnet_stats_copy_basic(&d, &h->bstats) < 0 ||
+#ifdef CONFIG_NET_ESTIMATOR
+	    gnet_stats_copy_rate_est(&d, &h->rate_est) < 0 ||
+#endif
+	    gnet_stats_copy_queue(&d, &h->qstats) < 0)
+		goto errout;
+
+	if (gnet_stats_finish_copy(&d) < 0)
+		goto errout;
+
+	return 0;
+
+errout:
+	return -1;
 }
 
 

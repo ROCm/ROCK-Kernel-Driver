@@ -62,7 +62,7 @@ gact_net_rand(struct tcf_gact *p) {
 
 int
 gact_determ(struct tcf_gact *p) {
-	if (p->stats.packets%p->pval)
+	if (p->bstats.packets%p->pval)
 		return p->action;
 	return p->paction;
 }
@@ -163,10 +163,10 @@ tcf_gact(struct sk_buff **pskb, struct tc_action *a)
 #else
 	action = p->action;
 #endif
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 	if (TC_ACT_SHOT == action)
-		p->stats.drops++;
+		p->qstats.drops++;
 	p->tm.lastuse = jiffies;
 	spin_unlock(&p->lock);
 
@@ -214,17 +214,6 @@ tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	return -1;
 }
 
-int
-tcf_gact_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_gact *p;
-	p = PRIV(a,gact);
-	if (NULL != p)
-		return qdisc_copy_stats(skb, &p->stats,p->stats_lock);
-
-	return 1;
-}
-
 struct tc_action_ops act_gact_ops = {
 	.next		=	NULL,
 	.kind		=	"gact",
@@ -232,7 +221,6 @@ struct tc_action_ops act_gact_ops = {
 	.capab		=	TCA_CAP_NONE,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_gact,
-	.get_stats	=	tcf_gact_stats,
 	.dump		=	tcf_gact_dump,
 	.cleanup	=	tcf_gact_cleanup,
 	.lookup		=	tcf_hash_search,

@@ -183,10 +183,10 @@ tcf_pedit(struct sk_buff **pskb, struct tc_action *a)
 	}
 
 bad:
-	p->stats.overlimits++;
+	p->qstats.overlimits++;
 done:
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 	spin_unlock(&p->lock);
 	return p->action;
 }
@@ -255,17 +255,6 @@ rtattr_failure:
 	return -1;
 }
 
-int
-tcf_pedit_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_pedit *p;
-	p = PRIV(a,pedit);
-	if (NULL != p)
-		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
-
-	return 1;
-}
-
 static
 struct tc_action_ops act_pedit_ops = {
 	.kind		=	"pedit",
@@ -273,7 +262,6 @@ struct tc_action_ops act_pedit_ops = {
 	.capab		=	TCA_CAP_NONE,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_pedit,
-	.get_stats	=	tcf_pedit_stats,
 	.dump		=	tcf_pedit_dump,
 	.cleanup	=	tcf_pedit_cleanup,
 	.lookup		=	tcf_hash_search,

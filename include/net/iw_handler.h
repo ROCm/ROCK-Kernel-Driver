@@ -198,6 +198,7 @@
 /***************************** INCLUDES *****************************/
 
 #include <linux/wireless.h>		/* IOCTL user space API */
+#include <linux/if_ether.h>
 
 /***************************** VERSION *****************************/
 /*
@@ -293,6 +294,8 @@ struct iw_request_info
 	__u16		cmd;		/* Wireless Extension command */
 	__u16		flags;		/* More to come ;-) */
 };
+
+struct net_device;
 
 /*
  * This is how a function handling a Wireless Extension should look
