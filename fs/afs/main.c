@@ -33,12 +33,23 @@ static void afs_exit(void);
 static int afs_adding_peer(struct rxrpc_peer *peer);
 static void afs_discarding_peer(struct rxrpc_peer *peer);
 
-module_init(afs_init);
+/* XXX late_initcall is kludgy, but the only alternative seems to create
+ * a transport upon the first mount, which is worse. Or is it?
+ */
+/* module_init(afs_init); */
+late_initcall(afs_init);	/* must be called after net/ to create socket */
+
 module_exit(afs_exit);
 
 MODULE_DESCRIPTION("AFS Client File System");
 MODULE_AUTHOR("Red Hat, Inc.");
 MODULE_LICENSE("GPL");
+
+static char *rootcell;
+
+MODULE_PARM(rootcell, "s");
+MODULE_PARM_DESC(rootcell, "root AFS cell name and VL server IP addr list");
+
 
 static struct rxrpc_peer_ops afs_peer_ops = {
 	.adding		= afs_adding_peer,
@@ -72,7 +83,7 @@ static int afs_init(void)
 
 	/* initialise the callback hash table */
 	spin_lock_init(&afs_cb_hash_lock);
-	for (loop=AFS_CB_HASH_COUNT-1; loop>=0; loop--)
+	for (loop = AFS_CB_HASH_COUNT - 1; loop >= 0; loop--)
 		INIT_LIST_HEAD(&afs_cb_hash_tbl[loop]);
 
 	/* register the /proc stuff */
@@ -82,20 +93,27 @@ static int afs_init(void)
 
 #ifdef AFS_CACHING_SUPPORT
 	/* we want to be able to cache */
-	ret = cachefs_register_netfs(&afs_cache_netfs,&afs_cache_cell_index_def);
+	ret = cachefs_register_netfs(&afs_cache_netfs,
+				     &afs_cache_cell_index_def);
 	if (ret < 0)
 		goto error;
 #endif
 
-	/* initialise the cell DB */
-	ret = afs_cell_init();
+#ifdef CONFIG_KEYS
+	ret = afs_key_register();
 	if (ret < 0)
 		goto error_cache;
+#endif
+
+	/* initialise the cell DB */
+	ret = afs_cell_init(rootcell);
+	if (ret < 0)
+		goto error_keys;
 
 	/* start the timeout daemon */
 	ret = afs_kafstimod_start();
 	if (ret < 0)
-		goto error_cache;
+		goto error_keys;
 
 	/* start the async operation daemon */
 	ret = afs_kafsasyncd_start();
@@ -103,7 +121,7 @@ static int afs_init(void)
 		goto error_kafstimod;
 
 	/* create the RxRPC transport */
-	ret = rxrpc_create_transport(7001,&afs_transport);
+	ret = rxrpc_create_transport(7001, &afs_transport);
 	if (ret < 0)
 		goto error_kafsasyncd;
 
@@ -122,14 +140,18 @@ static int afs_init(void)
 	afs_kafsasyncd_stop();
  error_kafstimod:
 	afs_kafstimod_stop();
+ error_keys:
+#ifdef CONFIG_KEYS
+	afs_key_unregister();
  error_cache:
+#endif
 #ifdef AFS_CACHING_SUPPORT
 	cachefs_unregister_netfs(&afs_cache_netfs);
  error:
 #endif
 	afs_cell_purge();
 	afs_proc_cleanup();
-	printk(KERN_ERR "kAFS: failed to register: %d\n",ret);
+	printk(KERN_ERR "kAFS: failed to register: %d\n", ret);
 	return ret;
 } /* end afs_init() */
 
@@ -146,6 +168,9 @@ static void __exit afs_exit(void)
 	afs_kafstimod_stop();
 	afs_kafsasyncd_stop();
 	afs_cell_purge();
+#ifdef CONFIG_KEYS
+	afs_key_unregister();
+#endif
 #ifdef AFS_CACHING_SUPPORT
 	cachefs_unregister_netfs(&afs_cache_netfs);
 #endif
@@ -162,19 +187,20 @@ static void __exit afs_exit(void)
  */
 static int afs_adding_peer(struct rxrpc_peer *peer)
 {
-	afs_server_t *server;
+	struct afs_server *server;
 	int ret;
 
-	_debug("kAFS: Adding new peer %08x\n",ntohl(peer->addr.s_addr));
+	_debug("kAFS: Adding new peer %08x\n", ntohl(peer->addr.s_addr));
 
 	/* determine which server the peer resides in (if any) */
-	ret = afs_server_find_by_peer(peer,&server);
+	ret = afs_server_find_by_peer(peer, &server);
 	if (ret < 0)
 		return ret; /* none that we recognise, so abort */
 
-	_debug("Server %p{u=%d}\n",server,atomic_read(&server->usage));
+	_debug("Server %p{u=%d}\n", server, atomic_read(&server->usage));
 
-	_debug("Cell %p{u=%d}\n",server->cell,atomic_read(&server->cell->usage));
+	_debug("Cell %p{u=%d}\n",
+	       server->cell, atomic_read(&server->cell->usage));
 
 	/* cross-point the structs under a global lock */
 	spin_lock(&afs_server_peer_lock);
@@ -194,14 +220,14 @@ static int afs_adding_peer(struct rxrpc_peer *peer)
  */
 static void afs_discarding_peer(struct rxrpc_peer *peer)
 {
-	afs_server_t *server;
+	struct afs_server *server;
 
 	_enter("%p",peer);
 
 	_debug("Discarding peer %08x (rtt=%lu.%lumS)\n",
 	       ntohl(peer->addr.s_addr),
-	       (long)(peer->rtt/1000),
-	       (long)(peer->rtt%1000));
+	       (long) (peer->rtt / 1000),
+	       (long) (peer->rtt % 1000));
 
 	/* uncross-point the structs under a global lock */
 	spin_lock(&afs_server_peer_lock);
@@ -209,9 +235,6 @@ static void afs_discarding_peer(struct rxrpc_peer *peer)
 	if (server) {
 		peer->user = NULL;
 		server->peer = NULL;
-
-		//_debug("Server %p{u=%d}\n",server,atomic_read(&server->usage));
-		//_debug("Cell %p{u=%d}\n",server->cell,atomic_read(&server->cell->usage));
 	}
 	spin_unlock(&afs_server_peer_lock);
 
@@ -239,7 +262,7 @@ void __cyg_profile_func_enter (void *this_fn, void *call_site)
                     "  movl    $0xedededed,%%eax     \n"
                     "  rep stosl               \n"
                     :
-                    : "i"(~(THREAD_SIZE-1)), "i"(sizeof(struct thread_info))
+                    : "i"(~(THREAD_SIZE - 1)), "i"(sizeof(struct thread_info))
                     : "eax", "ecx", "edi", "memory", "cc"
                     );
 }
@@ -258,7 +281,7 @@ void __cyg_profile_func_exit(void *this_fn, void *call_site)
                     "  movl    $0xdadadada,%%eax     \n"
                     "  rep stosl               \n"
                     :
-                    : "i"(~(THREAD_SIZE-1)), "i"(sizeof(struct thread_info))
+                    : "i"(~(THREAD_SIZE - 1)), "i"(sizeof(struct thread_info))
                     : "eax", "ecx", "edi", "memory", "cc"
                     );
 }
