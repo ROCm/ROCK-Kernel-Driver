@@ -82,7 +82,6 @@ static DECLARE_TASKLET(sn_sal_tasklet, sn_sal_tasklet_action, 0);
 static unsigned long sn_interrupt_timeout;
 
 extern u64 master_node_bedrock_address;
-
 static int sn_debug_printf(const char *fmt, ...);
 
 #undef DEBUG
@@ -105,7 +104,7 @@ struct sn_sal_ops {
 static struct sn_sal_ops *sn_func;
 
 /* Prototypes */
-static void __init sn_sal_serial_console_init(void);
+int __init sn_sal_serial_console_init(void);
 static int snt_hw_puts(const char *, int);
 static int snt_poll_getc(void);
 static int snt_poll_input_pending(void);
@@ -921,9 +920,6 @@ sn_sal_module_init(void)
 		printk(KERN_ERR "sn_serial: Unable to register tty driver\n");
 		return retval;
 	}
-#ifdef CONFIG_SGI_L1_SERIAL_CONSOLE
-	sn_sal_serial_console_init();
-#endif	/* CONFIG_SGI_L1_SERIAL_CONSOLE */
 	return 0;
 }
 
@@ -1015,7 +1011,7 @@ static struct console sal_console = {
 	.index = -1
 };
 
-static void __init
+int __init
 sn_sal_serial_console_init(void)
 {
 	if (ia64_platform_is("sn2")) {
@@ -1023,6 +1019,8 @@ sn_sal_serial_console_init(void)
 		sn_debug_printf("sn_sal_serial_console_init : register console\n");
 		register_console(&sal_console);
 	}
+	return 0;
 }
+console_initcall(sn_sal_serial_console_init);
 
 #endif /* CONFIG_SGI_L1_SERIAL_CONSOLE */
