@@ -149,11 +149,11 @@ struct ItExtVpdPanel xItExtVpdPanel = {};
 
 struct IoHriProcessorVpd xIoHriProcessorVpd[maxPhysicalProcessors] = {
 	{
-		xInstCacheOperandSize: 32,
-		xDataCacheOperandSize: 32,
-		xProcFreq:     50000000,
-		xTimeBaseFreq: 50000000,
-		xPVR: 0x3600
+		.xInstCacheOperandSize = 32,
+		.xDataCacheOperandSize = 32,
+		.xProcFreq     = 50000000,
+		.xTimeBaseFreq = 50000000,
+		.xPVR = 0x3600
 	}
 };
 	

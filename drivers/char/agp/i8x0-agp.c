@@ -427,7 +427,7 @@ static void intel_resume(void)
 /* Setup function */
 static struct gatt_mask intel_generic_masks[] =
 {
-	{mask: 0x00000017, type: 0}
+	{.mask = 0x00000017, .type = 0}
 };
 
 static struct aper_size_info_8 intel_815_sizes[2] =

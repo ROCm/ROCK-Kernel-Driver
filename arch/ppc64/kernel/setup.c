@@ -119,10 +119,10 @@ void ppcdbg_initialize(void) {
 }
 
 static struct console udbg_console = {
-	name:	"udbg",
-	write:	udbg_console_write,
-	flags:	CON_PRINTBUFFER,
-	index:	-1,
+	.name	= "udbg",
+	.write	= udbg_console_write,
+	.flags	= CON_PRINTBUFFER,
+	.index	= -1,
 };
 
 static int early_console_initialized;

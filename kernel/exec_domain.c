@@ -211,7 +211,12 @@ get_exec_domain_list(char *page)
 	for (ep = exec_domains; ep && len < PAGE_SIZE - 80; ep = ep->next)
 		len += sprintf(page + len, "%d-%d\t%-16s\t[%s]\n",
 			ep->pers_low, ep->pers_high, ep->name,
-			ep->module ? ep->module->name : "kernel");
+#ifdef CONFIG_MODULES
+			ep->module ? ep->module->name : "kernel"
+#else
+			"kernel"
+#endif
+			);
 	read_unlock(&exec_domains_lock);
 	return (len);
 }

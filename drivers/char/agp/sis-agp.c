@@ -106,7 +106,7 @@ static struct aper_size_info_8 sis_generic_sizes[7] =
 
 static struct gatt_mask sis_generic_masks[] =
 {
-	{mask: 0x00000000, type: 0}
+	{.mask = 0x00000000, .type = 0}
 };
 
 int __init sis_generic_setup (struct pci_dev *pdev)

@@ -149,11 +149,11 @@ static struct eeprom_type eeprom;
 /* This is the exported file-operations structure for this device. */
 struct file_operations eeprom_fops =
 {
-  llseek:  eeprom_lseek,
-  read:    eeprom_read,
-  write:   eeprom_write,
-  open:    eeprom_open,
-  release: eeprom_close
+  .llseek  = eeprom_lseek,
+  .read    = eeprom_read,
+  .write   = eeprom_write,
+  .open    = eeprom_open,
+  .release = eeprom_close
 };
 
 /* eeprom init call. Probes for different eeprom models. */

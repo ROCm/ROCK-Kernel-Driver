@@ -538,12 +538,15 @@ struct net_proto_family inet6_family_ops = {
 };
 
 #ifdef MODULE
+#if 0 /* FIXME --RR */
 int ipv6_unload(void)
 {
 	if (!unloadable) return 1;
 	/* We keep internally 3 raw sockets */
 	return atomic_read(&(__this_module.uc.usecount)) - 3;
 }
+#endif
+#endif
 #endif
 
 #if defined(MODULE) && defined(CONFIG_SYSCTL)
@@ -624,10 +627,12 @@ static int __init inet6_init(void)
 	int err;
 
 #ifdef MODULE
+#if 0 /* FIXME --RR */
 	if (!mod_member_present(&__this_module, can_unload))
 	  return -EINVAL;
 
 	__this_module.can_unload = &ipv6_unload;
+#endif
 #endif
 
 	printk(KERN_INFO "IPv6 v0.8 for NET4.0\n");

@@ -84,8 +84,8 @@ static int pci_conf1_mq_write(struct pci_bus *bus, unsigned int devfn, int where
 }
 
 static struct pci_ops pci_direct_conf1_mq = {
-	read:	pci_conf1_mq_read,
-	write:	pci_conf1_mq_write
+	.read	= pci_conf1_mq_read,
+	.write	= pci_conf1_mq_write
 };
 
 

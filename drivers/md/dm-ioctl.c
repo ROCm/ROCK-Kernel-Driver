@@ -176,10 +176,10 @@ static void free_cell(struct hash_cell *hc)
  */
 static int register_with_devfs(struct hash_cell *hc)
 {
-	kdev_t dev = dm_kdev(hc->md);
+	struct gendisk *disk = dm_disk(hc->md);
 	hc->devfs_entry =
 	    devfs_register(_dev_dir, hc->name, DEVFS_FL_CURRENT_OWNER,
-			   major(dev), minor(dev),
+			   disk->major, disk->first_minor,
 			   S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
 			   &dm_blk_dops, NULL);
 
@@ -448,17 +448,18 @@ static int __info(struct mapped_device *md, struct dm_ioctl *param)
 {
 	struct dm_table *table;
 	struct block_device *bdev;
+	struct gendisk *disk = dm_disk(md);
 
 	param->flags = DM_EXISTS_FLAG;
 	if (dm_suspended(md))
 		param->flags |= DM_SUSPEND_FLAG;
 
-	param->dev = kdev_t_to_nr(dm_kdev(md));
+	param->dev = MKDEV(disk->major, disk->first_minor);
 	bdev = bdget(param->dev);
 	if (!bdev)
 		return -ENXIO;
 
-	if (bdev_read_only(bdev))
+	if (disk->policy)
 		param->flags |= DM_READONLY_FLAG;
 
 	param->open_count = bdev->bd_openers;
@@ -585,7 +586,7 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	}
 	dm_table_put(t);	/* md will have grabbed its own reference */
 
-	set_device_ro(dm_kdev(md), (param->flags & DM_READONLY_FLAG));
+	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG));
 	r = dm_hash_insert(param->name, *param->uuid ? param->uuid : NULL, md);
 	dm_put(md);
 
@@ -871,7 +872,7 @@ static int reload(struct dm_ioctl *param, struct dm_ioctl *user)
 		return r;
 	}
 
-	set_device_ro(dm_kdev(md), (param->flags & DM_READONLY_FLAG));
+	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG));
 	dm_put(md);
 
 	r = info(param, user);

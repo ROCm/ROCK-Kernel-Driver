@@ -370,7 +370,7 @@ static struct aper_size_info_lvl2 amd_irongate_sizes[7] =
 
 static struct gatt_mask amd_irongate_masks[] =
 {
-	{mask: 0x00000001, type: 0}
+	{.mask = 0x00000001, .type = 0}
 };
 
 int __init amd_irongate_setup (struct pci_dev *pdev)

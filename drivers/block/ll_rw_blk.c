@@ -1386,7 +1386,6 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
 	int rw = rq_data_dir(rq);
-	unsigned int major, index;
 
 	if (!rq->rq_disk)
 		return;
@@ -1404,9 +1403,6 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 		disk_round_stats(rq->rq_disk);
 		rq->rq_disk->in_flight++;
 	}
-
-	major = rq->rq_disk->major;
-	index = rq->rq_disk->first_minor >> rq->rq_disk->minor_shift;
 }
 
 /*

@@ -38,17 +38,30 @@
  * Also note, that this data cannot be "const".
  */
 
-#ifndef MODULE
+/* These are for everybody (although not all archs will actually
+   discard it in modules) */
+#define __init		__attribute__ ((__section__ (".init.text")))
+#define __initdata	__attribute__ ((__section__ (".init.data")))
+#define __exit		__attribute__ ((__section__(".exit.text")))
+#define __exitdata	__attribute__ ((__section__(".exit.data")))
+#define __exit_call	__attribute__ ((unused,__section__ (".exitcall.exit")))
+
+/* For assembly routines */
+#define __INIT		.section	".init.text","ax"
+#define __FINIT		.previous
+#define __INITDATA	.section	".init.data","aw"
 
 #ifndef __ASSEMBLY__
-
 /*
  * Used for initialization calls..
  */
 typedef int (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
+#endif
 
-extern initcall_t __initcall_start, __initcall_end;
+#ifndef MODULE
+
+#ifndef __ASSEMBLY__
 
 /* initcalls are now grouped by functionality into separate 
  * subsections. Ordering inside the subsections is determined
@@ -70,7 +83,7 @@ extern initcall_t __initcall_start, __initcall_end;
 
 #define __initcall(fn) device_initcall(fn)
 
-#define __exitcall(fn)								\
+#define __exitcall(fn)							\
 	static exitcall_t __exitcall_##fn __exit_call = fn
 
 /*
@@ -83,39 +96,21 @@ struct kernel_param {
 
 extern struct kernel_param __setup_start, __setup_end;
 
-#define __setup(str, fn)								\
-	static char __setup_str_##fn[] __initdata = str;				\
-	static struct kernel_param __setup_##fn __attribute__((unused)) __initsetup = { __setup_str_##fn, fn }
+#define __setup(str, fn)						\
+	static char __setup_str_##fn[] __initdata = str;		\
+	static struct kernel_param __setup_##fn				\
+		 __attribute__((unused,__section__ (".init.setup")))	\
+		= { __setup_str_##fn, fn }
 
 #endif /* __ASSEMBLY__ */
-
-/*
- * Mark functions and data as being only used at initialization
- * or exit time.
- */
-#define __init		__attribute__ ((__section__ (".init.text")))
-#define __exit		__attribute__ ((unused, __section__(".exit.text")))
-#define __initdata	__attribute__ ((__section__ (".init.data")))
-#define __exitdata	__attribute__ ((unused, __section__ (".exit.data")))
-#define __initsetup	__attribute__ ((unused,__section__ (".init.setup")))
-#define __init_call(level)  __attribute__ ((unused,__section__ (".initcall" level ".init")))
-#define __exit_call	__attribute__ ((unused,__section__ (".exitcall.exit")))
-
-/* For assembly routines */
-#define __INIT		.section	".init.text","ax"
-#define __FINIT		.previous
-#define __INITDATA	.section	".init.data","aw"
 
 /**
  * module_init() - driver initialization entry point
  * @x: function to be run at kernel boot time or module insertion
  * 
- * module_init() will add the driver initialization routine in
- * the "__initcall.int" code segment if the driver is checked as
- * "y" or static, or else it will wrap the driver initialization
- * routine with init_module() which is used by insmod and
- * modprobe when the driver is used as a module.
- */
+ * module_init() will either be called during do_initcalls (if
+ * builtin) or at module insertion time (if a module).  There can only
+ * be one per module. */
 #define module_init(x)	__initcall(x);
 
 /**
@@ -126,39 +121,21 @@ extern struct kernel_param __setup_start, __setup_end;
  * with cleanup_module() when used with rmmod when
  * the driver is a module.  If the driver is statically
  * compiled into the kernel, module_exit() has no effect.
+ * There can only be one per module.
  */
 #define module_exit(x)	__exitcall(x);
 
-#else
+/**
+ * no_module_init - code needs no initialization.
+ *
+ * The equivalent of declaring an empty init function which returns 0.
+ * Every module must have exactly one module_init() or no_module_init
+ * invocation.  */
+#define no_module_init
 
-#define __init
-#define __exit
-#define __initdata
-#define __exitdata
-#define __initcall(fn)
-/* For assembly routines */
-#define __INIT
-#define __FINIT
-#define __INITDATA
+#else /* MODULE */
 
-/* These macros create a dummy inline: gcc 2.9x does not count alias
- as usage, hence the `unused function' warning when __init functions
- are declared static. We use the dummy __*_module_inline functions
- both to kill the warning and check the type of the init/cleanup
- function. */
-typedef int (*__init_module_func_t)(void);
-typedef void (*__cleanup_module_func_t)(void);
-#define module_init(x) \
-	int init_module(void) __attribute__((alias(#x))); \
-	static inline __init_module_func_t __init_module_inline(void) \
-	{ return x; }
-#define module_exit(x) \
-	void cleanup_module(void) __attribute__((alias(#x))); \
-	static inline __cleanup_module_func_t __cleanup_module_inline(void) \
-	{ return x; }
-
-#define __setup(str,func) /* nothing */
-
+/* Don't use these in modules, but some people do... */
 #define core_initcall(fn)		module_init(fn)
 #define postcore_initcall(fn)		module_init(fn)
 #define arch_initcall(fn)		module_init(fn)
@@ -167,6 +144,34 @@ typedef void (*__cleanup_module_func_t)(void);
 #define device_initcall(fn)		module_init(fn)
 #define late_initcall(fn)		module_init(fn)
 
+/* Each module knows its own name. */
+#define __DEFINE_MODULE_NAME						\
+	char __module_name[] __attribute__((section(".modulename"))) =	\
+	__stringify(KBUILD_MODNAME)
+
+/* These macros create a dummy inline: gcc 2.9x does not count alias
+ as usage, hence the `unused function' warning when __init functions
+ are declared static. We use the dummy __*_module_inline functions
+ both to kill the warning and check the type of the init/cleanup
+ function. */
+
+/* Each module must use one module_init(), or one no_module_init */
+#define module_init(initfn)					\
+	__DEFINE_MODULE_NAME;					\
+	static inline initcall_t __inittest(void)		\
+	{ return initfn; }					\
+	int __initfn(void) __attribute__((alias(#initfn)));
+
+#define no_module_init __DEFINE_MODULE_NAME
+
+/* This is only required if you want to be unloadable. */
+#define module_exit(exitfn)					\
+	static inline exitcall_t __exittest(void)		\
+	{ return exitfn; }					\
+	void __exitfn(void) __attribute__((alias(#exitfn)));
+
+
+#define __setup(str,func) /* nothing */
 #endif
 
 /* Data marked not to be saved by software_suspend() */

@@ -241,14 +241,13 @@ dasd_ioctl_format(struct block_device *bdev, int no, long args)
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 	format_data_t fdata;
-	int partn, rc;
+	int rc;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 	if (!args)
 		return -EINVAL;
 	/* fdata == NULL is no longer a valid arg to dasd_format ! */
-	partn = MINOR(bdev->bd_dev) & DASD_PARTN_MASK;
 	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
@@ -260,7 +259,7 @@ dasd_ioctl_format(struct block_device *bdev, int no, long args)
 		rc = -EROFS;
 	else if (copy_from_user(&fdata, (void *) args, sizeof (format_data_t)))
 		rc = -EFAULT;
-	else if (partn != 0) {
+	else if (bdev != bdev->bd_contains) {
 		DEV_MESSAGE(KERN_WARNING, device, "%s",
 			    "Cannot low-level format a partition");
 		rc = -EINVAL;
@@ -428,7 +427,7 @@ dasd_ioctl_set_ro(struct block_device *bdev, int no, long args)
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	if (MINOR(bdev->bd_dev) & DASD_PARTN_MASK)
+	if (bdev != bdev->bd_contains)
 		// ro setting is not allowed for partitions
 		return -EINVAL;
 	if (get_user(intval, (int *) args))

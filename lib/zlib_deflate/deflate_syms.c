@@ -19,3 +19,5 @@ EXPORT_SYMBOL(zlib_deflateReset);
 EXPORT_SYMBOL(zlib_deflateCopy);
 EXPORT_SYMBOL(zlib_deflateParams);
 MODULE_LICENSE("GPL");
+
+no_module_init;

@@ -114,7 +114,7 @@ static struct aper_size_info_8 via_generic_sizes[7] =
 
 static struct gatt_mask via_generic_masks[] =
 {
-	{mask: 0x00000000, type: 0}
+	{.mask = 0x00000000, .type = 0}
 };
 
 int __init via_generic_setup (struct pci_dev *pdev)

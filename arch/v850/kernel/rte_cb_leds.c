@@ -116,15 +116,15 @@ static loff_t leds_dev_lseek (struct file *file, loff_t offs, int whence)
 }
 
 static struct file_operations leds_fops = {
-	read:		leds_dev_read,
-	write:		leds_dev_write,
-	llseek:		leds_dev_lseek
+	.read		= leds_dev_read,
+	.write		= leds_dev_write,
+	.llseek		= leds_dev_lseek
 };
 
 static struct miscdevice leds_miscdev = {
-	name:		"leds",
-	minor:		LEDS_MINOR,
-	fops:		&leds_fops
+	.name		= "leds",
+	.minor		= LEDS_MINOR,
+	.fops		= &leds_fops
 };
 
 int __init leds_dev_init (void)

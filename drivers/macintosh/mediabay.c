@@ -706,30 +706,30 @@ mb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 /* Definitions of "ops" structures.
  */
 static struct mb_ops ohare_mb_ops __pmacdata = {
-	name:		"Ohare",
-	content:	ohare_mb_content,
-	power:		ohare_mb_power,
-	setup_bus:	ohare_mb_setup_bus,
-	un_reset:	ohare_mb_un_reset,
-	un_reset_ide:	ohare_mb_un_reset_ide,
+	.name		= "Ohare",
+	.content	= ohare_mb_content,
+	.power		= ohare_mb_power,
+	.setup_bus	= ohare_mb_setup_bus,
+	.un_reset	= ohare_mb_un_reset,
+	.un_reset_ide	= ohare_mb_un_reset_ide,
 };
 
 static struct mb_ops heathrow_mb_ops __pmacdata = {
-	name:		"Heathrow",
-	content:	heathrow_mb_content,
-	power:		heathrow_mb_power,
-	setup_bus:	heathrow_mb_setup_bus,
-	un_reset:	heathrow_mb_un_reset,
-	un_reset_ide:	heathrow_mb_un_reset_ide,
+	.name		= "Heathrow",
+	.content	= heathrow_mb_content,
+	.power		= heathrow_mb_power,
+	.setup_bus	= heathrow_mb_setup_bus,
+	.un_reset	= heathrow_mb_un_reset,
+	.un_reset_ide	= heathrow_mb_un_reset_ide,
 };
 
 static struct mb_ops keylargo_mb_ops __pmacdata = {
-	name:		"KeyLargo",
-	content:	keylargo_mb_content,
-	power:		keylargo_mb_power,
-	setup_bus:	keylargo_mb_setup_bus,
-	un_reset:	keylargo_mb_un_reset,
-	un_reset_ide:	keylargo_mb_un_reset_ide,
+	.name		= "KeyLargo",
+	.content	= keylargo_mb_content,
+	.power		= keylargo_mb_power,
+	.setup_bus	= keylargo_mb_setup_bus,
+	.un_reset	= keylargo_mb_un_reset,
+	.un_reset_ide	= keylargo_mb_un_reset_ide,
 };
 
 /*

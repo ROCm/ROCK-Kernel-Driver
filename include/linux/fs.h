@@ -1121,10 +1121,10 @@ extern void blk_run_queues(void);
 extern int register_chrdev(unsigned int, const char *, struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
-extern const char *__bdevname(kdev_t);
+extern const char *__bdevname(dev_t);
 extern inline const char *bdevname(struct block_device *bdev)
 {
-	return __bdevname(to_kdev_t(bdev->bd_dev));
+	return __bdevname(bdev->bd_dev);
 }
 extern const char * cdevname(kdev_t);
 extern const char * kdevname(kdev_t);

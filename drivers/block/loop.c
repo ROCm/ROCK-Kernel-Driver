@@ -304,21 +304,16 @@ do_lo_receive(struct loop_device *lo,
 {
 	struct lo_read_data cookie;
 	struct file *file;
-	int error;
+	int retval;
 
 	cookie.lo = lo;
 	cookie.data = kmap(bvec->bv_page) + bvec->bv_offset;
 	cookie.bsize = bsize;
-
-	/* umm, what does this lock actually try to protect? */
-	spin_lock_irq(&lo->lo_lock);
 	file = lo->lo_backing_file;
-	spin_unlock_irq(&lo->lo_lock);
-
-	error = file->f_op->sendfile(file, &pos, bvec->bv_len,
+	retval = file->f_op->sendfile(file, &pos, bvec->bv_len,
 			lo_read_actor, &cookie);
 	kunmap(bvec->bv_page);
-	return error;
+	return (retval < 0)? retval: 0;
 }
 
 static int

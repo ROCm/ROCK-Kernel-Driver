@@ -102,7 +102,7 @@ isa_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	desc->handle(isa_irq, desc, regs);
 }
 
-static struct irqaction irq_cascade = { handler: no_action, name: "cascade", };
+static struct irqaction irq_cascade = { .handler = no_action, .name = "cascade", };
 static struct resource pic1_resource = { "pic1", 0x20, 0x3f };
 static struct resource pic2_resource = { "pic2", 0xa0, 0xbf };
 

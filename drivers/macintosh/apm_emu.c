@@ -499,12 +499,12 @@ static int apm_emu_get_info(char *buf, char **start, off_t fpos, int length)
 }
 
 static struct file_operations apm_bios_fops = {
-	owner:		THIS_MODULE,
-	read:		do_read,
-	poll:		do_poll,
-	ioctl:		do_ioctl,
-	open:		do_open,
-	release:	do_release,
+	.owner		= THIS_MODULE,
+	.read		= do_read,
+	.poll		= do_poll,
+	.ioctl		= do_ioctl,
+	.open		= do_open,
+	.release	= do_release,
 };
 
 static struct miscdevice apm_device = {

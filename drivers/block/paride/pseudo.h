@@ -33,114 +33,69 @@
 #define PS_VERSION	"1.02"
 
 #include <linux/sched.h>
-#include <linux/timer.h>
 #include <linux/workqueue.h>
 
-static void ps_timer_int( unsigned long data);
 static void ps_tq_int( void *data);
 
 static void (* ps_continuation)(void);
 static int (* ps_ready)(void);
-static int ps_then;
 static int ps_timeout;
-static int ps_timer_active = 0;
 static int ps_tq_active = 0;
 static int ps_nice = 0;
 
 static spinlock_t ps_spinlock __attribute__((unused)) = SPIN_LOCK_UNLOCKED;
 
-static struct timer_list ps_timer = TIMER_INITIALIZER(ps_timer_int, 0, 0);
 static DECLARE_WORK(ps_tq, ps_tq_int, NULL);
 
-static void ps_set_intr( void (*continuation)(void), 
-			 int (*ready)(void),
-			 int timeout, int nice )
-
-{       unsigned long	flags;
+static void ps_set_intr(void (*continuation)(void), 
+			int (*ready)(void),
+			int timeout, int nice)
+{
+	unsigned long	flags;
 
 	spin_lock_irqsave(&ps_spinlock,flags);
 
 	ps_continuation = continuation;
 	ps_ready = ready;
-        ps_then = jiffies;
 	ps_timeout = jiffies + timeout;
 	ps_nice = nice;
 
-        if (!ps_nice && !ps_tq_active) {
-#ifdef HAVE_DISABLE_HLT
-                disable_hlt();
-#endif
+	if (!ps_tq_active) {
 		ps_tq_active = 1;
-                schedule_work(&ps_tq);
+		if (!ps_nice)
+			schedule_work(&ps_tq);
+		else
+			schedule_delayed_work(&ps_tq, ps_nice-1);
 	}
-
-        if (!ps_timer_active) {
-		ps_timer_active = 1;
-                ps_timer.expires = jiffies + ((ps_nice>0)?(ps_nice-1):0);
-                add_timer(&ps_timer);
-        }
-
 	spin_unlock_irqrestore(&ps_spinlock,flags);
 }
 
 static void ps_tq_int( void *data )
-
-{       void (*con)(void);
+{
+	void (*con)(void);
 	unsigned long flags;
 
 	spin_lock_irqsave(&ps_spinlock,flags);
 
-        con = ps_continuation;
+	con = ps_continuation;
+	ps_tq_active = 0;
 
-#ifdef HAVE_DISABLE_HLT
-        enable_hlt();
-#endif
-
-        ps_tq_active = 0;
-
-        if (!con) {
+	if (!con) {
 		spin_unlock_irqrestore(&ps_spinlock,flags);
 		return;
 	}
-        if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
-                ps_continuation = NULL;
-        	spin_unlock_irqrestore(&ps_spinlock,flags);
-                con();
-                return;
-                }
-
-#ifdef HAVE_DISABLE_HLT
-        disable_hlt();
-#endif
-
-        ps_tq_active = 1;
-	schedule_work(&ps_tq);
-        spin_unlock_irqrestore(&ps_spinlock,flags);
-}
-
-static void ps_timer_int( unsigned long data)
-
-{       void (*con)(void);
-	unsigned long	flags;
-
-	spin_lock_irqsave(&ps_spinlock,flags);
-
-	con = ps_continuation;
-	ps_timer_active = 0;
-	if (!con) {
-	        spin_unlock_irqrestore(&ps_spinlock,flags);
+	if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
+		ps_continuation = NULL;
+		spin_unlock_irqrestore(&ps_spinlock,flags);
+		con();
 		return;
 	}
-        if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
-                ps_continuation = NULL;
-	        spin_unlock_irqrestore(&ps_spinlock,flags);
-                con();
-		return;
-		}
-	ps_timer_active = 1;
-        ps_timer.expires = jiffies + ((ps_nice>0)?(ps_nice-1):0);
-        add_timer(&ps_timer);
-        spin_unlock_irqrestore(&ps_spinlock,flags);
+	ps_tq_active = 1;
+	if (!ps_nice)
+		schedule_work(&ps_tq);
+	else
+		schedule_delayed_work(&ps_tq, ps_nice-1);
+	spin_unlock_irqrestore(&ps_spinlock,flags);
 }
 
 /* end of pseudo.h */

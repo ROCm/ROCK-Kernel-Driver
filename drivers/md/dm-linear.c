@@ -87,7 +87,7 @@ static int linear_status(struct dm_target *ti, status_type_t type,
 
 	case STATUSTYPE_TABLE:
 		snprintf(result, maxlen, "%s " SECTOR_FORMAT,
-			 kdevname(to_kdev_t(lc->dev->bdev->bd_dev)), lc->start);
+			 bdevname(lc->dev->bdev), lc->start);
 		break;
 	}
 	return 0;

@@ -220,7 +220,7 @@ jensen_init_arch(void)
 {
 	struct pci_controller *hose;
 #ifdef CONFIG_PCI
-	static struct pci_dev fake_isa_bridge = { dma_mask: 0xffffffffUL, };
+	static struct pci_dev fake_isa_bridge = { .dma_mask = 0xffffffffUL, };
 
 	isa_bridge = &fake_isa_bridge;
 #endif

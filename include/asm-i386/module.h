@@ -1,12 +1,11 @@
 #ifndef _ASM_I386_MODULE_H
 #define _ASM_I386_MODULE_H
-/*
- * This file contains the i386 architecture specific module code.
- */
+/* x86 is simple */
+struct mod_arch_specific
+{
+};
 
-#define module_map(x)		vmalloc(x)
-#define module_unmap(x)		vfree(x)
-#define module_arch_init(x)	(0)
-#define arch_init_modules(x)	do { } while (0)
-
+#define Elf_Shdr Elf32_Shdr
+#define Elf_Sym Elf32_Sym
+#define Elf_Ehdr Elf32_Ehdr
 #endif /* _ASM_I386_MODULE_H */

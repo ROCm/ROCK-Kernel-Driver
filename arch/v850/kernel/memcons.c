@@ -65,11 +65,11 @@ static kdev_t memcons_device (struct console *co)
 
 static struct console memcons =
 {
-    name:	"memcons",
-    write:	memcons_write,
-    device:	memcons_device,
-    flags:	CON_PRINTBUFFER,
-    index:	-1,
+    .name	= "memcons",
+    .write	= memcons_write,
+    .device	= memcons_device,
+    .flags	= CON_PRINTBUFFER,
+    .index	= -1,
 };
 
 void memcons_setup (void)

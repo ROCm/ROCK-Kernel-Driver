@@ -464,7 +464,6 @@ void dasd_devmap_exit(void);
 dasd_devmap_t *dasd_devmap_from_devno(int);
 dasd_devmap_t *dasd_devmap_from_devindex(int);
 dasd_devmap_t *dasd_devmap_from_irq(int);
-dasd_devmap_t *dasd_devmap_from_kdev(kdev_t);
 dasd_devmap_t *dasd_devmap_from_bdev(struct block_device *bdev);
 dasd_device_t *dasd_get_device(dasd_devmap_t *);
 void dasd_put_device(dasd_devmap_t *);
