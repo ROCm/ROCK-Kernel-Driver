@@ -161,6 +161,8 @@ static int qlcfg8 = (SLOWCABLE << 7) | (QL_ENABLE_PARITY << 4);
 static int qlcfg9 = ((XTALFREQ + 4) / 5);
 static int qlcfgc = (FASTCLK << 3) | (FASTSCSI << 4);
 
+static char qlogicfas_name[] = "qlogicfas";
+
 int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *));
 
 /*----------------------------------------------------------------*/
@@ -609,7 +611,7 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 
 	if (!qbase) {
 		for (qbase = 0x230; qbase < 0x430; qbase += 0x100) {
-			if (!request_region(qbase, 0x10, "qlogicfas"))
+			if (!request_region(qbase, 0x10, qlogicfas_name))
 				continue;
 			REG1;
 			if (((inb(qbase + 0xe) ^ inb(qbase + 0xe)) == 7)
@@ -668,7 +670,7 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 	} else
 		printk(KERN_INFO "Ql: Using preset IRQ %d\n", qlirq);
 
-	if (qlirq >= 0 && !request_irq(qlirq, do_ql_ihandl, 0, "qlogicfas", NULL))
+	if (qlirq >= 0 && !request_irq(qlirq, do_ql_ihandl, 0, qlogicfas_name, NULL))
 		host->can_queue = 1;
 #endif
 	hreg = scsi_register(host, 0);	/* no host data */
@@ -796,8 +798,8 @@ MODULE_LICENSE("GPL");
  */
 Scsi_Host_Template qlogicfas_driver_template = {
 	.module			= THIS_MODULE,
-	.name			= "qlogicfas",
-	.proc_name		= "qlogicfas",
+	.name			= qlogicfas_name,
+	.proc_name		= qlogicfas_name,
 	.detect			= qlogicfas_detect,
 	.release		= qlogicfas_release,
 	.info			= qlogicfas_info,
