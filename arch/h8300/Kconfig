@@ -5,6 +5,10 @@
 
 mainmenu "uClinux/h8300 (w/o MMU) Kernel Configuration"
 
+config H8300
+	bool
+	default y
+
 config MMU
 	bool
 	default n

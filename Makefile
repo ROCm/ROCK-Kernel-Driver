@@ -275,7 +275,7 @@ NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 CPPFLAGS        := -D__KERNEL__ -Iinclude \
 		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
 
-CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
+CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__
 
@@ -430,6 +430,12 @@ libs-y		:= $(libs-y1) $(libs-y2)
 # Here goes the main Makefile
 # ---------------------------------------------------------------------------
 
+
+ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+CFLAGS		+= -Os
+else
+CFLAGS		+= -O2
+endif
 
 ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
