@@ -901,14 +901,11 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 /*
  * timeouts, in seconds, used for sending/receiving control messages
  * they typically complete within a few frames (msec) after they're issued
+ * USB identifies 5 second timeouts, maybe more in a few cases, and a few
+ * slow devices (like some MGE Ellipse UPSes) actually push that limit.
  */
-#ifdef CONFIG_USB_LONG_TIMEOUT
-#define USB_CTRL_GET_TIMEOUT	4
-#else
-#define USB_CTRL_GET_TIMEOUT	3
-#endif
-
-#define USB_CTRL_SET_TIMEOUT	3
+#define USB_CTRL_GET_TIMEOUT	5
+#define USB_CTRL_SET_TIMEOUT	5
 
 
 /**
