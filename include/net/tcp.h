@@ -594,9 +594,6 @@ extern int sysctl_tcp_fack;
 extern int sysctl_tcp_reordering;
 extern int sysctl_tcp_ecn;
 extern int sysctl_tcp_dsack;
-extern int sysctl_tcp_mem[3];
-extern int sysctl_tcp_wmem[3];
-extern int sysctl_tcp_rmem[3];
 extern int sysctl_tcp_app_win;
 extern int sysctl_tcp_adv_win_scale;
 extern int sysctl_tcp_tw_reuse;
@@ -613,10 +610,6 @@ extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
 extern int sysctl_tcp_default_win_scale;
 extern int sysctl_tcp_moderate_rcvbuf;
-
-extern atomic_t tcp_memory_allocated;
-extern atomic_t tcp_sockets_allocated;
-extern int tcp_memory_pressure;
 
 struct open_request;
 
@@ -1867,24 +1860,7 @@ static __inline__ void tcp_openreq_init(struct open_request *req,
 	req->rmt_port = skb->h.th->source;
 }
 
-#define TCP_MEM_QUANTUM	((int)PAGE_SIZE)
-
-extern void __tcp_mem_reclaim(struct sock *sk);
-extern int tcp_mem_schedule(struct sock *sk, int size, int kind);
-
-static inline void tcp_mem_reclaim(struct sock *sk)
-{
-	if (sk->sk_forward_alloc >= TCP_MEM_QUANTUM)
-		__tcp_mem_reclaim(sk);
-}
-
-static inline void tcp_enter_memory_pressure(void)
-{
-	if (!tcp_memory_pressure) {
-		NET_INC_STATS(TCPMemoryPressures);
-		tcp_memory_pressure = 1;
-	}
-}
+extern void tcp_enter_memory_pressure(void);
 
 static inline struct sk_buff *tcp_alloc_pskb(struct sock *sk, int size, int mem, int gfp)
 {
@@ -1893,7 +1869,7 @@ static inline struct sk_buff *tcp_alloc_pskb(struct sock *sk, int size, int mem,
 	if (skb) {
 		skb->truesize += mem;
 		if (sk->sk_forward_alloc >= (int)skb->truesize ||
-		    tcp_mem_schedule(sk, skb->truesize, 0)) {
+		    sk_stream_mem_schedule(sk, skb->truesize, 0)) {
 			skb_reserve(skb, MAX_TCP_HEADER);
 			return skb;
 		}
@@ -1913,7 +1889,7 @@ static inline struct sk_buff *tcp_alloc_skb(struct sock *sk, int size, int gfp)
 static inline struct page * tcp_alloc_page(struct sock *sk)
 {
 	if (sk->sk_forward_alloc >= (int)PAGE_SIZE ||
-	    tcp_mem_schedule(sk, PAGE_SIZE, 0)) {
+	    sk_stream_mem_schedule(sk, PAGE_SIZE, 0)) {
 		struct page *page = alloc_pages(sk->sk_allocation, 0);
 		if (page)
 			return page;
@@ -1929,7 +1905,7 @@ static inline void tcp_writequeue_purge(struct sock *sk)
 
 	while ((skb = __skb_dequeue(&sk->sk_write_queue)) != NULL)
 		sk_stream_free_skb(sk, skb);
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 }
 
 extern void tcp_listen_wlock(void);

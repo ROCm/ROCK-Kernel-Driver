@@ -491,10 +491,11 @@ extern int sk_stream_wait_connect(struct sock *sk, long *timeo_p);
 extern int sk_stream_wait_memory(struct sock *sk, long *timeo_p);
 extern void sk_stream_wait_close(struct sock *sk, long timeo_p);
 extern int sk_stream_error(struct sock *sk, int flags, int err);
+extern void sk_stream_kill_queues(struct sock *sk);
 
 extern int sk_wait_data(struct sock *sk, long *timeo);
 
-/* IP protocol blocks we attach to sockets.
+/* Networking protocol blocks we attach to sockets.
  * socket layer -> transport layer interface
  * transport -> network interface is defined by struct inet_proto
  */
@@ -537,6 +538,21 @@ struct proto {
 	void			(*hash)(struct sock *sk);
 	void			(*unhash)(struct sock *sk);
 	int			(*get_port)(struct sock *sk, unsigned short snum);
+
+	/* Memory pressure */
+	void			(*enter_memory_pressure)(void);
+	atomic_t		memory_allocated;	/* Current allocated memory. */
+	atomic_t		sockets_allocated;	/* Current number of sockets. */
+	/*
+	 * Pressure flag: try to collapse.
+	 * Technical note: it is used by multiple contexts non atomically.
+	 * All the sk_stream_mem_schedule() is of this nature: accounting
+	 * is strict, actions are advisory and have some latency.
+	 */
+	int			memory_pressure;
+	int			sysctl_mem[3];
+	int			sysctl_wmem[3];
+	int			sysctl_rmem[3];
 
 	char			name[32];
 
@@ -626,6 +642,22 @@ static inline struct socket *SOCKET_I(struct inode *inode)
 static inline struct inode *SOCK_INODE(struct socket *socket)
 {
 	return &container_of(socket, struct socket_alloc, socket)->vfs_inode;
+}
+
+extern void __sk_stream_mem_reclaim(struct sock *sk);
+extern int sk_stream_mem_schedule(struct sock *sk, int size, int kind);
+
+#define SK_STREAM_MEM_QUANTUM ((int)PAGE_SIZE)
+
+static inline int sk_stream_pages(int amt)
+{
+	return (amt + SK_STREAM_MEM_QUANTUM - 1) / SK_STREAM_MEM_QUANTUM;
+}
+
+static inline void sk_stream_mem_reclaim(struct sock *sk)
+{
+	if (sk->sk_forward_alloc >= SK_STREAM_MEM_QUANTUM)
+		__sk_stream_mem_reclaim(sk);
 }
 
 /* Used by processes to "lock" a socket state, so that

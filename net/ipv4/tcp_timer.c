@@ -113,7 +113,7 @@ static int tcp_out_of_resources(struct sock *sk, int do_reset)
 
 	if (orphans >= sysctl_tcp_max_orphans ||
 	    (sk->sk_wmem_queued > SOCK_MIN_SNDBUF &&
-	     atomic_read(&tcp_memory_allocated) > sysctl_tcp_mem[2])) {
+	     atomic_read(&tcp_prot.memory_allocated) > tcp_prot.sysctl_mem[2])) {
 		if (net_ratelimit())
 			printk(KERN_INFO "Out of socket memory\n");
 
@@ -217,7 +217,7 @@ static void tcp_delack_timer(unsigned long data)
 		goto out_unlock;
 	}
 
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 
 	if (sk->sk_state == TCP_CLOSE || !(tp->ack.pending & TCP_ACK_TIMER))
 		goto out;
@@ -257,8 +257,8 @@ static void tcp_delack_timer(unsigned long data)
 	TCP_CHECK_TIMER(sk);
 
 out:
-	if (tcp_memory_pressure)
-		tcp_mem_reclaim(sk);
+	if (tcp_prot.memory_pressure)
+		sk_stream_mem_reclaim(sk);
 out_unlock:
 	bh_unlock_sock(sk);
 	sock_put(sk);
@@ -448,7 +448,7 @@ static void tcp_write_timer(unsigned long data)
 	TCP_CHECK_TIMER(sk);
 
 out:
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 out_unlock:
 	bh_unlock_sock(sk);
 	sock_put(sk);
@@ -633,7 +633,7 @@ static void tcp_keepalive_timer (unsigned long data)
 	}
 
 	TCP_CHECK_TIMER(sk);
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 
 resched:
 	tcp_reset_keepalive_timer (sk, elapsed);
