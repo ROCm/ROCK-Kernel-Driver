@@ -79,6 +79,69 @@
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_ex_opcode_0A_0T_1R
+ *
+ * PARAMETERS:  walk_state          - Current state (contains AML opcode)
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Execute Type 1 monadic operator with numeric operand on
+ *              object stack
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ex_opcode_0A_0T_1R (
+	struct acpi_walk_state          *walk_state)
+{
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *return_desc = NULL;
+
+
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_0A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+
+	/* Examine the AML opcode */
+
+	switch (walk_state->opcode) {
+	case AML_TIMER_OP:      /*  Timer () */
+
+		/* Create a return object of type Integer */
+
+		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+		if (!return_desc) {
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		return_desc->integer.value = acpi_os_get_timer ();
+		break;
+
+	default:                /*  Unknown opcode  */
+
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_0A_0T_1R: Unknown opcode %X\n",
+			walk_state->opcode));
+		status = AE_AML_BAD_OPCODE;
+		break;
+	}
+
+cleanup:
+
+	if (!walk_state->result_obj) {
+		walk_state->result_obj = return_desc;
+	}
+
+	/* Delete return object on error */
+
+	if (ACPI_FAILURE (status)) {
+		acpi_ut_remove_reference (return_desc);
+	}
+
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_ex_opcode_1A_0T_0R
  *
  * PARAMETERS:  walk_state          - Current state (contains AML opcode)

@@ -307,7 +307,7 @@ acpi_os_writable (
 	void                            *pointer,
 	acpi_size                       length);
 
-u32
+u64
 acpi_os_get_timer (
 	void);
 

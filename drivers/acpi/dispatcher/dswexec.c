@@ -60,17 +60,18 @@
  * Dispatch table for opcode classes
  */
 static ACPI_EXECUTE_OP      acpi_gbl_op_type_dispatch [] = {
-			 acpi_ex_opcode_1A_0T_0R,
-			 acpi_ex_opcode_1A_0T_1R,
-			 acpi_ex_opcode_1A_1T_0R,
-			 acpi_ex_opcode_1A_1T_1R,
-			 acpi_ex_opcode_2A_0T_0R,
-			 acpi_ex_opcode_2A_0T_1R,
-			 acpi_ex_opcode_2A_1T_1R,
-			 acpi_ex_opcode_2A_2T_1R,
-			 acpi_ex_opcode_3A_0T_0R,
-			 acpi_ex_opcode_3A_1T_1R,
-			 acpi_ex_opcode_6A_0T_1R};
+			  acpi_ex_opcode_0A_0T_1R,
+			  acpi_ex_opcode_1A_0T_0R,
+			  acpi_ex_opcode_1A_0T_1R,
+			  acpi_ex_opcode_1A_1T_0R,
+			  acpi_ex_opcode_1A_1T_1R,
+			  acpi_ex_opcode_2A_0T_0R,
+			  acpi_ex_opcode_2A_0T_1R,
+			  acpi_ex_opcode_2A_1T_1R,
+			  acpi_ex_opcode_2A_2T_1R,
+			  acpi_ex_opcode_3A_0T_0R,
+			  acpi_ex_opcode_3A_1T_1R,
+			  acpi_ex_opcode_6A_0T_1R};
 
 /*****************************************************************************
  *
@@ -413,7 +414,7 @@ acpi_ds_exec_end_op (
 			 * routine.  There is one routine per opcode "type" based upon the
 			 * number of opcode arguments and return type.
 			 */
-			status = acpi_gbl_op_type_dispatch [op_type] (walk_state);
+			status = acpi_gbl_op_type_dispatch[op_type] (walk_state);
 		}
 		else {
 			/*
