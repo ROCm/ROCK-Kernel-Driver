@@ -25,7 +25,7 @@
 
 
 /*
- * macros used for accesing structures
+ * macros used for accessing structures
  */
 static inline s32
 ufs_get_fs_state(struct super_block *sb, struct ufs_super_block_first *usb1,

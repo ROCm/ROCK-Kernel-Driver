@@ -478,7 +478,7 @@ static void sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
-/* Seperate interrupt handling path for keyboard/mouse ports.  */
+/* Separate interrupt handling path for keyboard/mouse ports.  */
 
 static void
 sunsu_change_speed(struct uart_port *port, unsigned int cflag,

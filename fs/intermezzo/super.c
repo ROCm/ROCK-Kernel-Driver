@@ -318,7 +318,7 @@ struct super_block * presto_get_sb(struct file_system_type *izo_type,
 
         CDEBUG(D_MALLOC, "mount error exit: kmem %ld, vmem %ld\n",
                presto_kmemory, presto_vmemory);
-        return NULL;
+        return ERR_PTR(-EINVAL);
 }
 
 

@@ -6,6 +6,7 @@
 
 #include <linux/config.h>
 #include <linux/netfilter_ipv4/ip_conntrack_tuple.h>
+#include <linux/bitops.h>
 #include <asm/atomic.h>
 
 enum ip_conntrack_info
@@ -41,6 +42,10 @@ enum ip_conntrack_status {
 	/* Conntrack should never be early-expired. */
 	IPS_ASSURED_BIT = 2,
 	IPS_ASSURED = (1 << IPS_ASSURED_BIT),
+
+	/* Connection is confirmed: originating packet has left box */
+	IPS_CONFIRMED_BIT = 3,
+	IPS_CONFIRMED = (1 << IPS_CONFIRMED_BIT),
 };
 
 #include <linux/netfilter_ipv4/ip_conntrack_tcp.h>
@@ -159,7 +164,7 @@ struct ip_conntrack
 	struct ip_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
 
 	/* Have we seen traffic both ways yet? (bitset) */
-	volatile unsigned long status;
+	unsigned long status;
 
 	/* Timer function; drops refcnt when it goes off. */
 	struct timer_list timeout;
@@ -229,7 +234,8 @@ ip_conntrack_expect_find_get(const struct ip_conntrack_tuple *tuple);
 /* decrement reference count on an expectation */
 void ip_conntrack_expect_put(struct ip_conntrack_expect *exp);
 
-extern struct module *ip_conntrack_module;
+/* call to create an explicit dependency on ip_conntrack. */
+extern void need_ip_conntrack(void);
 
 extern int invert_tuplepr(struct ip_conntrack_tuple *inverse,
 			  const struct ip_conntrack_tuple *orig);
@@ -254,7 +260,7 @@ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
 /* It's confirmed if it is, or has been in the hash table. */
 static inline int is_confirmed(struct ip_conntrack *ct)
 {
-	return ct->tuplehash[IP_CT_DIR_ORIGINAL].list.next != NULL;
+	return test_bit(IPS_CONFIRMED_BIT, &ct->status);
 }
 
 extern unsigned int ip_conntrack_htable_size;

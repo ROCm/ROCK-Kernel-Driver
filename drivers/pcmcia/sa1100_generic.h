@@ -18,7 +18,7 @@
 #define SA1100_PCMCIA_MAX_SOCK   (2)
 
 struct pcmcia_init {
-  void (*handler)(int irq, void *dev, struct pt_regs *regs);
+	int	socket_irq[SA1100_PCMCIA_MAX_SOCK];
 };
 
 struct pcmcia_state {
@@ -31,14 +31,8 @@ struct pcmcia_state {
             vs_Xv: 1;
 };
 
-struct pcmcia_state_array {
-  unsigned int size;
-  struct pcmcia_state *state;
-};
-
 struct pcmcia_configure {
-  unsigned sock: 8,
-            vcc: 8,
+  unsigned  vcc: 8,
             vpp: 8,
          output: 1,
         speaker: 1,
@@ -46,17 +40,13 @@ struct pcmcia_configure {
             irq: 1;
 };
 
-struct pcmcia_irq_info {
-  unsigned int sock;
-  unsigned int irq;
-};
-
 struct pcmcia_low_level {
+  struct module *owner;
+
   int (*init)(struct pcmcia_init *);
   int (*shutdown)(void);
-  int (*socket_state)(struct pcmcia_state_array *);
-  int (*get_irq_info)(struct pcmcia_irq_info *);
-  int (*configure_socket)(const struct pcmcia_configure *);
+  void (*socket_state)(int sock, struct pcmcia_state *);
+  int (*configure_socket)(int sock, const struct pcmcia_configure *);
 
   /*
    * Enable card status IRQs on (re-)initialisation.  This can
@@ -77,7 +67,8 @@ struct pcmcia_low_level {
 		unsigned int cpu_speed, unsigned int cmd_time);
 };
 
-extern int sa1100_register_pcmcia(struct pcmcia_low_level *);
-extern void sa1100_unregister_pcmcia(struct pcmcia_low_level *);
+extern int sa1100_register_pcmcia(struct pcmcia_low_level *, struct device *);
+extern void sa1100_unregister_pcmcia(struct pcmcia_low_level *, struct device *);
+extern void sa1100_pcmcia_interrupt(int, void *, struct pt_regs *);
 
 #endif

@@ -61,20 +61,17 @@ static volatile unsigned long cpu_eiem = 0;
 
 static spinlock_t irq_lock = SPIN_LOCK_UNLOCKED;  /* protect IRQ regions */
 
-#ifdef CONFIG_SMP
 static void cpu_set_eiem(void *info)
 {
 	set_eiem((unsigned long) info);
 }
-#endif
 
 static inline void disable_cpu_irq(void *unused, int irq)
 {
 	unsigned long eirr_bit = EIEM_MASK(irq);
 
 	cpu_eiem &= ~eirr_bit;
-	set_eiem(cpu_eiem);
-        smp_call_function(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
+        on_each_cpu(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
 }
 
 static void enable_cpu_irq(void *unused, int irq)
@@ -83,8 +80,7 @@ static void enable_cpu_irq(void *unused, int irq)
 
 	mtctl(eirr_bit, 23);	/* clear EIRR bit before unmasking */
 	cpu_eiem |= eirr_bit;
-        smp_call_function(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
-	set_eiem(cpu_eiem);
+        on_each_cpu(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
 }
 
 /* mask and disable are the same at the CPU level
@@ -100,8 +96,7 @@ static inline void unmask_cpu_irq(void *unused, int irq)
 	** handle *any* unmasked pending interrupts.
 	** ie We don't need to check for pending interrupts here.
 	*/
-        smp_call_function(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
-	set_eiem(cpu_eiem);
+        on_each_cpu(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
 }
 
 /*

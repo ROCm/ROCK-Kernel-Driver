@@ -11,9 +11,11 @@
  *    Fix
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -49,12 +51,14 @@ static int gcplus_pcmcia_init(struct pcmcia_init *init)
 
   /* Register interrupts */
   irq = S0_CD_IRQ;
-  res = request_irq(irq, init->handler, SA_INTERRUPT, "PCMCIA 0 CD", NULL);
+  res = request_irq(irq, sa1100_pcmcia_interrupt, SA_INTERRUPT, "PCMCIA 0 CD", NULL);
   if (res < 0) {
     printk(KERN_ERR "%s: request for IRQ%d failed (%d)\n",
 	   __FUNCTION__, irq, res);
     return res;
   }
+
+  init->socket_irq[0] = S0_STS_IRQ;
 
   return 1;			// 1 PCMCIA Slot
 }
@@ -71,45 +75,27 @@ static int gcplus_pcmcia_shutdown(void)
   return 0;
 }
 
-static int gcplus_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-  unsigned long levels;
-
-  if(state_array->size<1) return -1;
-
-  memset(state_array->state, 0, 
-	 (state_array->size)*sizeof(struct pcmcia_state));
-
-  levels=*PCMCIA_Status;
-
-  state_array->state[0].detect=(levels & ADS_CS_ST_A_CD)?1:0;
-  state_array->state[0].ready=(levels & ADS_CS_ST_A_READY)?1:0;
-  state_array->state[0].bvd1= 0;
-  state_array->state[0].bvd2= 0;
-  state_array->state[0].wrprot=0;
-  state_array->state[0].vs_3v=0;
-  state_array->state[0].vs_Xv=0;
-
-  return 1;
-}
-
-static int gcplus_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
+static void gcplus_pcmcia_socket_state(int sock, struct pcmcia_state *state_array)
 {
-	if (info->sock > 1)
-		return -1;
+  unsigned long levels = *PCMCIA_Status;
 
-	if (info->sock == 0)
-		info->irq = S0_STS_IRQ;
-
-  	return 0;
+  if (sock == 0) {
+    state->detect=(levels & ADS_CS_ST_A_CD)?1:0;
+    state->ready=(levels & ADS_CS_ST_A_READY)?1:0;
+    state->bvd1= 0;
+    state->bvd2= 0;
+    state->wrprot=0;
+    state->vs_3v=0;
+    state->vs_Xv=0;
+  }
 }
 
-static int gcplus_pcmcia_configure_socket(const struct pcmcia_configure
+static int gcplus_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
   unsigned long flags;
 
-  if(configure->sock>1) return -1;
+  if(sock>1) return -1;
 
   local_irq_save(flags);
 
@@ -160,28 +146,28 @@ static int gcplus_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level gcplus_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= gcplus_pcmcia_init,
   .shutdown		= gcplus_pcmcia_shutdown,
   .socket_state		= gcplus_pcmcia_socket_state,
-  .get_irq_info		= gcplus_pcmcia_get_irq_info,
   .configure_socket	= gcplus_pcmcia_configure_socket,
 
   .socket_init		= gcplus_pcmcia_socket_init,
   .socket_suspend	= gcplus_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_gcplus_init(void)
+int __init pcmcia_gcplus_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_gcplus())
-		ret = sa1100_register_pcmcia(&gcplus_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&gcplus_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_gcplus_exit(void)
+void __exit pcmcia_gcplus_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&gcplus_pcmcia_ops);
+	sa1100_unregister_pcmcia(&gcplus_pcmcia_ops, dev);
 }
 

@@ -598,10 +598,7 @@ cleanup_match(struct ipt_entry_match *m, unsigned int *i)
 	if (m->u.kernel.match->destroy)
 		m->u.kernel.match->destroy(m->data,
 					   m->u.match_size - sizeof(*m));
-
-	if (m->u.kernel.match->me)
-		__MOD_DEC_USE_COUNT(m->u.kernel.match->me);
-
+	module_put(m->u.kernel.match->me);
 	return 0;
 }
 
@@ -650,8 +647,10 @@ check_match(struct ipt_entry_match *m,
 		duprintf("check_match: `%s' not found\n", m->u.user.name);
 		return ret;
 	}
-	if (match->me)
-		__MOD_INC_USE_COUNT(match->me);
+	if (!try_module_get(match->me)) {
+		up(&ipt_mutex);
+		return -ENOENT;
+	}
 	m->u.kernel.match = match;
 	up(&ipt_mutex);
 
@@ -659,8 +658,7 @@ check_match(struct ipt_entry_match *m,
 	    && !m->u.kernel.match->checkentry(name, ip, m->data,
 					      m->u.match_size - sizeof(*m),
 					      hookmask)) {
-		if (m->u.kernel.match->me)
-			__MOD_DEC_USE_COUNT(m->u.kernel.match->me);
+		module_put(m->u.kernel.match->me);
 		duprintf("ip_tables: check failed for `%s'.\n",
 			 m->u.kernel.match->name);
 		return -EINVAL;
@@ -697,8 +695,11 @@ check_entry(struct ipt_entry *e, const char *name, unsigned int size,
 		duprintf("check_entry: `%s' not found\n", t->u.user.name);
 		goto cleanup_matches;
 	}
-	if (target->me)
-		__MOD_INC_USE_COUNT(target->me);
+	if (!try_module_get(target->me)) {
+		up(&ipt_mutex);
+		ret = -ENOENT;
+		goto cleanup_matches;
+	}
 	t->u.kernel.target = target;
 	up(&ipt_mutex);
 
@@ -712,8 +713,7 @@ check_entry(struct ipt_entry *e, const char *name, unsigned int size,
 						      t->u.target_size
 						      - sizeof(*t),
 						      e->comefrom)) {
-		if (t->u.kernel.target->me)
-			__MOD_DEC_USE_COUNT(t->u.kernel.target->me);
+		module_put(t->u.kernel.target->me);
 		duprintf("ip_tables: check failed for `%s'.\n",
 			 t->u.kernel.target->name);
 		ret = -EINVAL;
@@ -785,9 +785,7 @@ cleanup_entry(struct ipt_entry *e, unsigned int *i)
 	if (t->u.kernel.target->destroy)
 		t->u.kernel.target->destroy(t->data,
 					    t->u.target_size - sizeof(*t));
-	if (t->u.kernel.target->me)
-		__MOD_DEC_USE_COUNT(t->u.kernel.target->me);
-
+	module_put(t->u.kernel.target->me);
 	return 0;
 }
 
@@ -1319,17 +1317,14 @@ ipt_register_target(struct ipt_target *target)
 {
 	int ret;
 
-	MOD_INC_USE_COUNT;
 	ret = down_interruptible(&ipt_mutex);
-	if (ret != 0) {
-		MOD_DEC_USE_COUNT;
+	if (ret != 0)
 		return ret;
-	}
+
 	if (!list_named_insert(&ipt_target, target)) {
 		duprintf("ipt_register_target: `%s' already in list!\n",
 			 target->name);
 		ret = -EINVAL;
-		MOD_DEC_USE_COUNT;
 	}
 	up(&ipt_mutex);
 	return ret;
@@ -1341,7 +1336,6 @@ ipt_unregister_target(struct ipt_target *target)
 	down(&ipt_mutex);
 	LIST_DELETE(&ipt_target, target);
 	up(&ipt_mutex);
-	MOD_DEC_USE_COUNT;
 }
 
 int
@@ -1349,16 +1343,13 @@ ipt_register_match(struct ipt_match *match)
 {
 	int ret;
 
-	MOD_INC_USE_COUNT;
 	ret = down_interruptible(&ipt_mutex);
-	if (ret != 0) {
-		MOD_DEC_USE_COUNT;
+	if (ret != 0)
 		return ret;
-	}
+
 	if (!list_named_insert(&ipt_match, match)) {
 		duprintf("ipt_register_match: `%s' already in list!\n",
 			 match->name);
-		MOD_DEC_USE_COUNT;
 		ret = -EINVAL;
 	}
 	up(&ipt_mutex);
@@ -1372,7 +1363,6 @@ ipt_unregister_match(struct ipt_match *match)
 	down(&ipt_mutex);
 	LIST_DELETE(&ipt_match, match);
 	up(&ipt_mutex);
-	MOD_DEC_USE_COUNT;
 }
 
 int ipt_register_table(struct ipt_table *table)
@@ -1382,14 +1372,11 @@ int ipt_register_table(struct ipt_table *table)
 	static struct ipt_table_info bootstrap
 		= { 0, 0, 0, { 0 }, { 0 }, { } };
 
-	MOD_INC_USE_COUNT;
 	newinfo = vmalloc(sizeof(struct ipt_table_info)
 			  + SMP_ALIGN(table->table->size) * NR_CPUS);
-	if (!newinfo) {
-		ret = -ENOMEM;
-		MOD_DEC_USE_COUNT;
-		return ret;
-	}
+	if (!newinfo)
+		return -ENOMEM;
+
 	memcpy(newinfo->entries, table->table->entries, table->table->size);
 
 	ret = translate_table(table->name, table->valid_hooks,
@@ -1399,14 +1386,12 @@ int ipt_register_table(struct ipt_table *table)
 			      table->table->underflow);
 	if (ret != 0) {
 		vfree(newinfo);
-		MOD_DEC_USE_COUNT;
 		return ret;
 	}
 
 	ret = down_interruptible(&ipt_mutex);
 	if (ret != 0) {
 		vfree(newinfo);
-		MOD_DEC_USE_COUNT;
 		return ret;
 	}
 
@@ -1436,7 +1421,6 @@ int ipt_register_table(struct ipt_table *table)
 
  free_unlock:
 	vfree(newinfo);
-	MOD_DEC_USE_COUNT;
 	goto unlock;
 }
 
@@ -1450,7 +1434,6 @@ void ipt_unregister_table(struct ipt_table *table)
 	IPT_ENTRY_ITERATE(table->private->entries, table->private->size,
 			  cleanup_entry, NULL);
 	vfree(table->private);
-	MOD_DEC_USE_COUNT;
 }
 
 /* Returns 1 if the port is matched by the range, 0 otherwise */
@@ -1628,7 +1611,7 @@ icmp_type_code_match(u_int8_t test_type, u_int8_t min_code, u_int8_t max_code,
 		     u_int8_t type, u_int8_t code,
 		     int invert)
 {
-	return (type == test_type && code >= min_code && code <= max_code)
+	return ((test_type == 0xFF) || (type == test_type && code >= min_code && code <= max_code))
 		^ invert;
 }
 

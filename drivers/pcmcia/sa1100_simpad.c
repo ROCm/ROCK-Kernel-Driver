@@ -4,8 +4,10 @@
  * PCMCIA implementation routines for simpad
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -27,14 +29,15 @@ static int simpad_pcmcia_init(struct pcmcia_init *init){
 
   clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
 
-  /* Set transition detect */
-  set_irq_type( IRQ_GPIO_CF_CD, IRQT_NOEDGE );
-  set_irq_type( IRQ_GPIO_CF_IRQ, IRQT_FALLING );
+  init->socket_irq[1] = IRQ_GPIO_CF_IRQ;
 
   /* Register interrupts */
   irq = IRQ_GPIO_CF_CD;
-  res = request_irq( irq, init->handler, SA_INTERRUPT, "CF_CD", NULL );
+  res = request_irq(irq, sa1100_pcmcia_interrupt, SA_INTERRUPT,
+		    "CF_CD", NULL );
   if( res < 0 ) goto irq_err;
+
+  set_irq_type( IRQ_GPIO_CF_CD, IRQT_NOEDGE );
 
   /* There's only one slot, but it's "Slot 1": */
   return 2;
@@ -58,59 +61,36 @@ static int simpad_pcmcia_shutdown(void)
   return 0;
 }
 
-static int simpad_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array)
+static void simpad_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-  unsigned long levels;
-  unsigned long *cs3reg = CS3_BASE;
+  if (sock == 1) {
+    unsigned long levels = GPLR;
+    unsigned long *cs3reg = CS3_BASE;
 
-  if(state_array->size<2) return -1;
-
-  memset(state_array->state, 0, 
-	 (state_array->size)*sizeof(struct pcmcia_state));
-
-  levels=GPLR;
-
-  state_array->state[1].detect=((levels & GPIO_CF_CD)==0)?1:0;
-
-  state_array->state[1].ready=(levels & GPIO_CF_IRQ)?1:0;
-
-  state_array->state[1].bvd1=1; /* Not available on Simpad. */
-
-  state_array->state[1].bvd2=1; /* Not available on Simpad. */
-
-  state_array->state[1].wrprot=0; /* Not available on Simpad. */
-
+    state->detect=((levels & GPIO_CF_CD)==0)?1:0;
+    state->ready=(levels & GPIO_CF_IRQ)?1:0;
+    state->bvd1=1; /* Not available on Simpad. */
+    state->bvd2=1; /* Not available on Simpad. */
+    state->wrprot=0; /* Not available on Simpad. */
   
-  if((*cs3reg & 0x0c) == 0x0c) {
-    state_array->state[1].vs_3v=0;
-    state_array->state[1].vs_Xv=0;
-  } else
-  {
-    state_array->state[1].vs_3v=1;
-    state_array->state[1].vs_Xv=0;
+    if((*cs3reg & 0x0c) == 0x0c) {
+      state->vs_3v=0;
+      state->vs_Xv=0;
+    } else {
+      state->vs_3v=1;
+      state->vs_Xv=0;
+    }
   }
-  return 1;
 }
 
-static int simpad_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  if(info->sock>1) return -1;
-
-  if(info->sock==1)
-    info->irq=IRQ_GPIO_CF_IRQ;
-
-  return 0;
-}
-
-static int simpad_pcmcia_configure_socket(const struct pcmcia_configure
+static int simpad_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
   unsigned long value, flags;
 
-  if(configure->sock>1) return -1;
+  if(sock>1) return -1;
 
-  if(configure->sock==0) return 0;
+  if(sock==0) return 0;
 
   local_irq_save(flags);
 
@@ -159,27 +139,27 @@ static int simpad_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level simpad_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= simpad_pcmcia_init,
   .shutdown		= simpad_pcmcia_shutdown,
   .socket_state		= simpad_pcmcia_socket_state,
-  .get_irq_info		= simpad_pcmcia_get_irq_info,
   .configure_socket	= simpad_pcmcia_configure_socket,
 
   .socket_init		= simpad_pcmcia_socket_init,
   .socket_suspend	= simpad_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_simpad_init(void)
+int __init pcmcia_simpad_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_simpad())
-		ret = sa1100_register_pcmcia(&simpad_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&simpad_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_simpad_exit(void)
+void __exit pcmcia_simpad_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&simpad_pcmcia_ops);
+	sa1100_unregister_pcmcia(&simpad_pcmcia_ops, dev);
 }

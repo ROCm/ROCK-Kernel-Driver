@@ -419,6 +419,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	dst = transport->dst;
 	/* The 'obsolete' field of dst is set to 2 when a dst is freed. */
 	if (!dst || (dst->obsolete > 1)) {
+		dst_release(dst);
 		sctp_transport_route(transport, NULL, sctp_sk(sk));
 		sctp_assoc_sync_pmtu(asoc);
 	}

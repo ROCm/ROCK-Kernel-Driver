@@ -123,12 +123,7 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot,
 
 static inline void flush_map(unsigned long address)
 {	
-	preempt_disable();
-#ifdef CONFIG_SMP 
-	smp_call_function(flush_kernel_map, (void *)address, 1, 1);
-#endif	
-	flush_kernel_map((void *)address);
-	preempt_enable();
+	on_each_cpu(flush_kernel_map, (void *)address, 1, 1);
 }
 
 struct deferred_page { 

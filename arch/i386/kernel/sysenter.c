@@ -95,8 +95,7 @@ static int __init sysenter_setup(void)
 		return 0;
 
 	memcpy((void *) page, sysent, sizeof(sysent));
-	enable_sep_cpu(NULL);
-	smp_call_function(enable_sep_cpu, NULL, 1, 1);
+	on_each_cpu(enable_sep_cpu, NULL, 1, 1);
 	return 0;
 }
 

@@ -155,10 +155,7 @@ common_shutdown(int mode, char *restart_cmd)
 	struct halt_info args;
 	args.mode = mode;
 	args.restart_cmd = restart_cmd;
-#ifdef CONFIG_SMP
-	smp_call_function(common_shutdown_1, &args, 1, 0);
-#endif
-	common_shutdown_1(&args);
+	on_each_cpu(common_shutdown_1, &args, 1, 0);
 }
 
 void

@@ -87,7 +87,11 @@ static struct board_type products[] = {
 };
 
 /* How long to wait (in millesconds) for board to go into simple mode */
-#define MAX_CONFIG_WAIT 1000 
+#define MAX_CONFIG_WAIT 30000 
+#define MAX_IOCTL_CONFIG_WAIT 1000
+
+/*define how many times we will try a command because of bus resets */
+#define MAX_CMD_RETRIES 3
 
 #define READ_AHEAD 	 128
 #define NR_CMDS		 384 /* #commands that can be outstanding */
@@ -116,7 +120,7 @@ static inline void addQ(CommandList_struct **Qptr, CommandList_struct *c);
 static void start_io( ctlr_info_t *h);
 static int sendcmd( __u8 cmd, int ctlr, void *buff, size_t size,
 	unsigned int use_unit_num, unsigned int log_unit, __u8 page_code,
-	unsigned char *scsi3addr);
+	unsigned char *scsi3addr, int cmd_type);
 
 #ifdef CONFIG_PROC_FS
 static int cciss_proc_get_info(char *buffer, char **start, off_t offset, 
@@ -467,8 +471,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                         &(c->cfgtable->HostWrite.CoalIntCount));
 		writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
 
-		for(i=0;i<MAX_CONFIG_WAIT;i++)
-		{
+		for(i=0;i<MAX_IOCTL_CONFIG_WAIT;i++) {
 			if (!(readl(c->vaddr + SA5_DOORBELL) 
 					& CFGTBL_ChangeReq))
 				break;
@@ -476,8 +479,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			udelay(1000);
 		}	
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
-		if (i >= MAX_CONFIG_WAIT)
-			return( -EFAULT);
+		if (i >= MAX_IOCTL_CONFIG_WAIT)
+			return -EAGAIN;
                 return(0);
         }
 	case CCISS_GETNODENAME:
@@ -514,8 +517,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			
 		writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
 
-		for(i=0;i<MAX_CONFIG_WAIT;i++)
-		{
+		for(i=0;i<MAX_IOCTL_CONFIG_WAIT;i++) {
 			if (!(readl(c->vaddr + SA5_DOORBELL) 
 					& CFGTBL_ChangeReq))
 				break;
@@ -523,8 +525,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			udelay(1000);
 		}	
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
-		if (i >= MAX_CONFIG_WAIT)
-			return( -EFAULT);
+		if (i >= MAX_IOCTL_CONFIG_WAIT)
+			return -EAGAIN;
                 return(0);
         }
 
@@ -575,6 +577,24 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_REVALIDVOLS:
                 return( revalidate_allvol(inode->i_rdev));
 
+ 	case CCISS_GETLUNINFO: {
+ 		LogvolInfo_struct luninfo;
+ 		struct gendisk *disk = hba[ctlr]->gendisk[dsk];
+ 		drive_info_struct *drv = &hba[ctlr]->drv[dsk];
+ 		int i;
+ 		
+ 		luninfo.LunID = drv->LunID;
+ 		luninfo.num_opens = drv->usage_count;
+ 		luninfo.num_parts = 0;
+ 		/* count partitions 1 to 15 with sizes > 0 */
+ 		for(i=1; i <MAX_PART; i++)
+ 			if (disk->part[i].nr_sects != 0)
+ 				luninfo.num_parts++;
+ 		if (copy_to_user((void *) arg, &luninfo,
+ 				sizeof(LogvolInfo_struct)))
+ 			return -EFAULT;
+ 		return(0);
+ 	}
 	case CCISS_DEREGDISK:
 		return( deregister_disk(ctlr,dsk));
 
@@ -696,7 +716,153 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		cmd_free(h, c, 0);
                 return(0);
 	} 
+	case CCISS_BIG_PASSTHRU: {
+		BIG_IOCTL_Command_struct *ioc;
+		ctlr_info_t *h = hba[ctlr];
+		CommandList_struct *c;
+		unsigned char **buff = NULL;
+		int	*buff_size = NULL;
+		u64bit	temp64;
+		unsigned long flags;
+		BYTE sg_used = 0;
+		int status = 0;
+		int i;
+		DECLARE_COMPLETION(wait);
+		__u32   left;
+		__u32	sz;
+		BYTE    *data_ptr;
 
+		if (!arg)
+			return -EINVAL;
+		if (!capable(CAP_SYS_RAWIO))
+			return -EPERM;
+		ioc = (BIG_IOCTL_Command_struct *) 
+			kmalloc(sizeof(*ioc), GFP_KERNEL);
+		if (!ioc) {
+			status = -ENOMEM;
+			goto cleanup1;
+		}
+		if (copy_from_user(ioc, (void *) arg, sizeof(*ioc)))
+			return -EFAULT;
+		if ((ioc->buf_size < 1) &&
+			(ioc->Request.Type.Direction != XFER_NONE))
+				return -EINVAL;
+		/* Check kmalloc limits  using all SGs */
+		if (ioc->malloc_size > MAX_KMALLOC_SIZE)
+			return -EINVAL;
+		if (ioc->buf_size > ioc->malloc_size * MAXSGENTRIES)
+			return -EINVAL;
+		buff = (unsigned char **) kmalloc(MAXSGENTRIES * 
+				sizeof(char *), GFP_KERNEL);
+		if (!buff) {
+			status = -ENOMEM;
+			goto cleanup1;
+		}
+		memset(buff, 0, MAXSGENTRIES);
+		buff_size = (int *) kmalloc(MAXSGENTRIES * sizeof(int), 
+					GFP_KERNEL);
+		if (!buff_size) {
+			status = -ENOMEM;
+			goto cleanup1;
+		}
+		left = ioc->buf_size;
+		data_ptr = (BYTE *) ioc->buf;
+		while (left) {
+			sz = (left > ioc->malloc_size) ? ioc->malloc_size : left;
+			buff_size[sg_used] = sz;
+			buff[sg_used] = kmalloc(sz, GFP_KERNEL);
+			if (buff[sg_used] == NULL) {
+				status = -ENOMEM;
+				goto cleanup1;
+			}
+			if (ioc->Request.Type.Direction == XFER_WRITE &&
+				copy_from_user(buff[sg_used], data_ptr, sz)) {
+					status = -ENOMEM;
+					goto cleanup1;			
+			}
+			left -= sz;
+			data_ptr += sz;
+			sg_used++;
+		}
+		if ((c = cmd_alloc(h , 0)) == NULL) {
+			status = -ENOMEM;
+			goto cleanup1;	
+		}
+		c->cmd_type = CMD_IOCTL_PEND;
+		c->Header.ReplyQueue = 0;
+		
+		if( ioc->buf_size > 0) {
+			c->Header.SGList = sg_used;
+			c->Header.SGTotal= sg_used;
+		} else { 
+			c->Header.SGList = 0;
+			c->Header.SGTotal= 0;
+		}
+		c->Header.LUN = ioc->LUN_info;
+		c->Header.Tag.lower = c->busaddr;
+		
+		c->Request = ioc->Request;
+		if (ioc->buf_size > 0 ) {
+			int i;
+			for(i=0; i<sg_used; i++) {
+				temp64.val = pci_map_single( h->pdev, buff[i],
+					buff_size[i],
+					PCI_DMA_BIDIRECTIONAL);
+				c->SG[i].Addr.lower = temp64.val32.lower;
+				c->SG[i].Addr.upper = temp64.val32.upper;
+				c->SG[i].Len = buff_size[i];
+				c->SG[i].Ext = 0;  /* we are not chaining */
+			}
+		}
+		c->waiting = &wait;
+		/* Put the request on the tail of the request queue */
+		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
+		addQ(&h->reqQ, c);
+		h->Qdepth++;
+		start_io(h);
+		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
+		wait_for_completion(&wait);
+		/* unlock the buffers from DMA */
+		for(i=0; i<sg_used; i++) {
+			temp64.val32.lower = c->SG[i].Addr.lower;
+			temp64.val32.upper = c->SG[i].Addr.upper;
+			pci_unmap_single( h->pdev, (dma_addr_t) temp64.val,
+				buff_size[i], PCI_DMA_BIDIRECTIONAL);
+		}
+		/* Copy the error information out */
+		ioc->error_info = *(c->err_info);
+		if (copy_to_user((void *) arg, ioc, sizeof(*ioc))) {
+			cmd_free(h, c, 0);
+			status = -EFAULT;
+			goto cleanup1;
+		}
+		if (ioc->Request.Type.Direction == XFER_READ) {
+			/* Copy the data out of the buffer we created */
+			BYTE *ptr = (BYTE  *) ioc->buf;
+	        	for(i=0; i< sg_used; i++) {
+				if (copy_to_user(ptr, buff[i], buff_size[i])) {
+					cmd_free(h, c, 0);
+					status = -EFAULT;
+					goto cleanup1;
+				}
+				ptr += buff_size[i];
+			}
+		}
+		cmd_free(h, c, 0);
+		status = 0;
+cleanup1:
+		if (buff) {
+			for(i=0; i<sg_used; i++)
+				if(buff[i] != NULL)
+					kfree(buff[i]);
+			kfree(buff);
+		}
+		if (buff_size)
+			kfree(buff_size);
+		if (ioc)
+			kfree(ioc);
+		return(status);
+	}
 	default:
 		return -EBADRQC;
 	}
@@ -816,113 +982,154 @@ static int deregister_disk(int ctlr, int logvol)
 	h->drv[logvol].LunID = 0;
 	return(0);
 }
+static int fill_cmd(CommandList_struct *c, __u8 cmd, int ctlr, void *buff,
+	size_t size,
+	unsigned int use_unit_num, /* 0: address the controller,
+				      1: address logical volume log_unit,
+				      2: periph device address is scsi3addr */
+	unsigned int log_unit, __u8 page_code, unsigned char *scsi3addr,
+	int cmd_type)
+{
+	ctlr_info_t *h= hba[ctlr];
+	u64bit buff_dma_handle;
+	int status = IO_OK;
+
+	c->cmd_type = CMD_IOCTL_PEND;
+	c->Header.ReplyQueue = 0;
+	if( buff != NULL) {
+		c->Header.SGList = 1;
+		c->Header.SGTotal= 1;
+	} else {
+		c->Header.SGList = 0;
+                c->Header.SGTotal= 0;
+	}
+	c->Header.Tag.lower = c->busaddr;
+
+	c->Request.Type.Type = cmd_type;
+	if (cmd_type == TYPE_CMD) {
+		switch(cmd) {
+		case  CISS_INQUIRY:
+			/* If the logical unit number is 0 then, this is going
+			to controller so It's a physical command
+			mode = 0 target = 0.  So we have nothing to write.
+			otherwise, if use_unit_num == 1,
+			mode = 1(volume set addressing) target = LUNID
+			otherwise, if use_unit_num == 2,
+			mode = 0(periph dev addr) target = scsi3addr */
+			if (use_unit_num == 1) {
+				c->Header.LUN.LogDev.VolId=
+					h->drv[log_unit].LunID;
+                        	c->Header.LUN.LogDev.Mode = 1;
+			} else if (use_unit_num == 2) {
+				memcpy(c->Header.LUN.LunAddrBytes,scsi3addr,8);
+				c->Header.LUN.LogDev.Mode = 0;
+			}
+			/* are we trying to read a vital product page */
+			if(page_code != 0) {
+				c->Request.CDB[1] = 0x01;
+				c->Request.CDB[2] = page_code;
+			}
+			c->Request.CDBLen = 6;
+			c->Request.Type.Attribute = ATTR_SIMPLE;  
+			c->Request.Type.Direction = XFER_READ;
+			c->Request.Timeout = 0;
+			c->Request.CDB[0] =  CISS_INQUIRY;
+			c->Request.CDB[4] = size  & 0xFF;  
+		break;
+		case CISS_REPORT_LOG:
+		case CISS_REPORT_PHYS:
+                        /* Talking to controller so It's a physical command
+			   mode = 00 target = 0.  Nothing to write.
+                        */
+			c->Request.CDBLen = 12;
+			c->Request.Type.Attribute = ATTR_SIMPLE;
+			c->Request.Type.Direction = XFER_READ;
+			c->Request.Timeout = 0;
+			c->Request.CDB[0] = cmd;
+			c->Request.CDB[6] = (size >> 24) & 0xFF;  //MSB
+			c->Request.CDB[7] = (size >> 16) & 0xFF;
+			c->Request.CDB[8] = (size >> 8) & 0xFF;
+			c->Request.CDB[9] = size & 0xFF;
+			break;
+
+		case CCISS_READ_CAPACITY:
+			c->Header.LUN.LogDev.VolId = h->drv[log_unit].LunID;
+			c->Header.LUN.LogDev.Mode = 1;
+			c->Request.CDBLen = 10;
+			c->Request.Type.Attribute = ATTR_SIMPLE;
+			c->Request.Type.Direction = XFER_READ;
+			c->Request.Timeout = 0;
+			c->Request.CDB[0] = cmd;
+		break;
+		case CCISS_CACHE_FLUSH:
+			c->Request.CDBLen = 12;
+			c->Request.Type.Attribute = ATTR_SIMPLE;
+			c->Request.Type.Direction = XFER_WRITE;
+			c->Request.Timeout = 0;
+			c->Request.CDB[0] = BMIC_WRITE;
+			c->Request.CDB[6] = BMIC_CACHE_FLUSH;
+		break;
+		default:
+			printk(KERN_WARNING
+				"cciss%d:  Unknown Command 0x%c\n", ctlr, cmd);
+			return(IO_ERROR);
+		}
+	} else if (cmd_type == TYPE_MSG) {
+		switch (cmd) {
+		case 3:	/* No-Op message */
+			c->Request.CDBLen = 1;
+			c->Request.Type.Attribute = ATTR_SIMPLE;
+			c->Request.Type.Direction = XFER_WRITE;
+			c->Request.Timeout = 0;
+			c->Request.CDB[0] = cmd;
+			break;
+		default:
+			printk(KERN_WARNING
+				"cciss%d: unknown message type %d\n",
+				ctlr, cmd);
+			return IO_ERROR;
+		}
+	} else {
+		printk(KERN_WARNING
+			"cciss%d: unknown command type %d\n", ctlr, cmd_type);
+		return IO_ERROR;
+	}
+	/* Fill in the scatter gather information */
+	if (size > 0) {
+		buff_dma_handle.val = (__u64) pci_map_single(h->pdev,
+			buff, size, PCI_DMA_BIDIRECTIONAL);
+		c->SG[0].Addr.lower = buff_dma_handle.val32.lower;
+		c->SG[0].Addr.upper = buff_dma_handle.val32.upper;
+		c->SG[0].Len = size;
+		c->SG[0].Ext = 0;  /* we are not chaining */
+	}
+	return status;
+}
 static int sendcmd_withirq(__u8	cmd,
 	int	ctlr,
 	void	*buff,
 	size_t	size,
 	unsigned int use_unit_num,
 	unsigned int log_unit,
-	__u8	page_code )
+	__u8	page_code,
+	int cmd_type)
 {
 	ctlr_info_t *h = hba[ctlr];
 	CommandList_struct *c;
 	u64bit	buff_dma_handle;
 	unsigned long flags;
-	int return_status = IO_OK;
+	int return_status;
 	DECLARE_COMPLETION(wait);
 	
 	if ((c = cmd_alloc(h , 0)) == NULL)
-	{
 		return -ENOMEM;
+	return_status = fill_cmd(c, cmd, ctlr, buff, size, use_unit_num,
+		log_unit, page_code, NULL, cmd_type);
+	if (return_status != IO_OK) {
+		cmd_free(h, c, 0);
+		return return_status;
 	}
-	// Fill in the command type 
-	c->cmd_type = CMD_IOCTL_PEND;
-	// Fill in Command Header 
-	c->Header.ReplyQueue = 0;  // unused in simple mode
-	if( buff != NULL) 	// buffer to fill 
-	{
-		c->Header.SGList = 1;
-		c->Header.SGTotal= 1;
-	} else	// no buffers to fill  
-	{
-		c->Header.SGList = 0;
-                c->Header.SGTotal= 0;
-	}
-	c->Header.Tag.lower = c->busaddr;  // use the kernel address the cmd block for tag
-	// Fill in Request block 	
-	switch(cmd)
-	{
-		case  CISS_INQUIRY:
-			/* If the logical unit number is 0 then, this is going
-				to controller so It's a physical command
-				mode = 0 target = 0.
-				So we have nothing to write. 
-				Otherwise 
-				mode = 1  target = LUNID
-			*/
-			if(use_unit_num != 0)
-			{
-				c->Header.LUN.LogDev.VolId=
-                                	hba[ctlr]->drv[log_unit].LunID;
-                        	c->Header.LUN.LogDev.Mode = 1;
-			}
-			if(page_code != 0)
-			{
-				c->Request.CDB[1] = 0x01;
-				c->Request.CDB[2] = page_code;
-			}
-			c->Request.CDBLen = 6;
-			c->Request.Type.Type =  TYPE_CMD; // It is a command. 
-			c->Request.Type.Attribute = ATTR_SIMPLE;  
-			c->Request.Type.Direction = XFER_READ; // Read 
-			c->Request.Timeout = 0; // Don't time out 
-			c->Request.CDB[0] =  CISS_INQUIRY;
-			c->Request.CDB[4] = size  & 0xFF;  
-		break;
-	case CISS_REPORT_LOG:
-                        /* Talking to controller so It's a physical command
-                                mode = 00 target = 0.
-                                So we have nothing to write.
-                        */
-                        c->Request.CDBLen = 12;
-                        c->Request.Type.Type =  TYPE_CMD; // It is a command.
-                        c->Request.Type.Attribute = ATTR_SIMPLE; 
-                        c->Request.Type.Direction = XFER_READ; // Read
-                        c->Request.Timeout = 0; // Don't time out
-                        c->Request.CDB[0] = CISS_REPORT_LOG;
-                        c->Request.CDB[6] = (size >> 24) & 0xFF;  //MSB
-                        c->Request.CDB[7] = (size >> 16) & 0xFF;
-                        c->Request.CDB[8] = (size >> 8) & 0xFF;
-                        c->Request.CDB[9] = size & 0xFF;
-                break;
-	case CCISS_READ_CAPACITY:
-			c->Header.LUN.LogDev.VolId= 
-				hba[ctlr]->drv[log_unit].LunID;
-			c->Header.LUN.LogDev.Mode = 1;
-			c->Request.CDBLen = 10;
-                        c->Request.Type.Type =  TYPE_CMD; // It is a command.
-                        c->Request.Type.Attribute = ATTR_SIMPLE; 
-                        c->Request.Type.Direction = XFER_READ; // Read
-                        c->Request.Timeout = 0; // Don't time out
-                        c->Request.CDB[0] = CCISS_READ_CAPACITY;
-		break;
-		default:
-			printk(KERN_WARNING
-				"cciss:  Unknown Command 0x%c sent attempted\n", cmd);
-			cmd_free(h, c, 1);
-			return(IO_ERROR);
-	};
-
-	// Fill in the scatter gather information
-	if (size > 0 ) 
-	{
-		buff_dma_handle.val = (__u64) pci_map_single( h->pdev, 
-			buff, size, PCI_DMA_BIDIRECTIONAL);
-		c->SG[0].Addr.lower = buff_dma_handle.val32.lower;
-		c->SG[0].Addr.upper = buff_dma_handle.val32.upper;
-		c->SG[0].Len = size;
-		c->SG[0].Ext = 0;  // we are not chaining
-	}
+resend_cmd2:
 	c->waiting = &wait;
 	
 	/* Put the request on the tail of the queue and send it */
@@ -933,10 +1140,6 @@ static int sendcmd_withirq(__u8	cmd,
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 	
 	wait_for_completion(&wait);
-
-	/* unlock the buffers from DMA */
-        pci_unmap_single( h->pdev, (dma_addr_t) buff_dma_handle.val,
-                	size, PCI_DMA_BIDIRECTIONAL);
 
 	if(c->err_info->CommandStatus != 0) 
 	{ /* an error has occurred */ 
@@ -989,11 +1192,22 @@ case CMD_HARDWARE_ERR:
 				return_status = IO_ERROR;
 			break;
 			case CMD_UNSOLICITED_ABORT:
-				printk(KERN_WARNING "cciss: cmd %p aborted "
-					"do to an unsolicited abort\n", c);
+				printk(KERN_WARNING 
+					"cciss%d: unsolicited abort %p\n",
+					ctlr, c);
+				if (c->retry_count < MAX_CMD_RETRIES) {
+					printk(KERN_WARNING 
+						"cciss%d: retrying %p\n", 
+						ctlr, c);
+					c->retry_count++;
+					/* erase the old error information */
+					memset(c->err_info, 0,
+						sizeof(ErrorInfo_struct));
+					return_status = IO_OK;
+					INIT_COMPLETION(wait);
+					goto resend_cmd2;
+				}
 				return_status = IO_ERROR;
-
-
 			break;
 			default:
 				printk(KERN_WARNING "cciss: cmd %p returned "
@@ -1002,6 +1216,9 @@ case CMD_HARDWARE_ERR:
 				return_status = IO_ERROR;
 		}
 	}	
+	/* unlock the buffers from DMA */
+	pci_unmap_single( h->pdev, (dma_addr_t) buff_dma_handle.val,
+			size, PCI_DMA_BIDIRECTIONAL);
 	cmd_free(h, c, 0);
         return(return_status);
 
@@ -1015,10 +1232,10 @@ static void cciss_geometry_inquiry(int ctlr, int logvol,
 	memset(inq_buff, 0, sizeof(InquiryData_struct));
 	if (withirq)
 		return_code = sendcmd_withirq(CISS_INQUIRY, ctlr,
-			inq_buff, sizeof(*inq_buff), 1, logvol ,0xC1);
+			inq_buff, sizeof(*inq_buff), 1, logvol ,0xC1, TYPE_CMD);
 	else
 		return_code = sendcmd(CISS_INQUIRY, ctlr, inq_buff,
-			sizeof(*inq_buff), 1, logvol ,0xC1, NULL);
+			sizeof(*inq_buff), 1, logvol ,0xC1, NULL, TYPE_CMD);
 	if (return_code == IO_OK) {
 		if(inq_buff->data_byte[8] == 0xFF) {
 			printk(KERN_WARNING
@@ -1057,10 +1274,10 @@ cciss_read_capacity(int ctlr, int logvol, ReadCapdata_struct *buf,
 	memset(buf, 0, sizeof(*buf));
 	if (withirq)
 		return_code = sendcmd_withirq(CCISS_READ_CAPACITY,
-			ctlr, buf, sizeof(*buf), 1, logvol, 0 );
+			ctlr, buf, sizeof(*buf), 1, logvol, 0, TYPE_CMD);
 	else
 		return_code = sendcmd(CCISS_READ_CAPACITY,
-			ctlr, buf, sizeof(*buf), 1, logvol, 0, NULL );
+			ctlr, buf, sizeof(*buf), 1, logvol, 0, NULL, TYPE_CMD);
 	if (return_code == IO_OK) {
 		*total_size = be32_to_cpu(*((__u32 *) &buf->total_size[0]))+1;
 		*block_size = be32_to_cpu(*((__u32 *) &buf->block_size[0]));
@@ -1111,7 +1328,7 @@ static int register_new_disk(int ctlr)
 		goto mem_msg;
 	
 	return_code = sendcmd_withirq(CISS_REPORT_LOG, ctlr, ld_buff, 
-			sizeof(ReportLunData_struct), 0, 0, 0 );
+			sizeof(ReportLunData_struct), 0, 0, 0, TYPE_CMD);
 
 	if( return_code == IO_OK)
 	{
@@ -1265,126 +1482,27 @@ static int sendcmd(
 				      2: periph device address is scsi3addr */
 	unsigned int log_unit,
 	__u8	page_code,
-	unsigned char *scsi3addr)
+	unsigned char *scsi3addr,
+	int cmd_type)
 {
 	CommandList_struct *c;
 	int i;
 	unsigned long complete;
 	ctlr_info_t *info_p= hba[ctlr];
 	u64bit buff_dma_handle;
+	int status;
 
-	c = cmd_alloc(info_p, 1);
-	if (c == NULL)
-	{
+	if ((c = cmd_alloc(info_p, 1)) == NULL) {
 		printk(KERN_WARNING "cciss: unable to get memory");
 		return(IO_ERROR);
 	}
-	// Fill in Command Header 
-	c->Header.ReplyQueue = 0;  // unused in simple mode
-	if( buff != NULL) 	// buffer to fill 
-	{
-		c->Header.SGList = 1;
-		c->Header.SGTotal= 1;
-	} else	// no buffers to fill  
-	{
-		c->Header.SGList = 0;
-                c->Header.SGTotal= 0;
+	status = fill_cmd(c, cmd, ctlr, buff, size, use_unit_num,
+		log_unit, page_code, scsi3addr, cmd_type);
+	if (status != IO_OK) {
+		cmd_free(info_p, c, 1);
+		return status;
 	}
-	c->Header.Tag.lower = c->busaddr;  // use the kernel address the cmd block for tag
-	// Fill in Request block 	
-	switch(cmd)
-	{
-		case  CISS_INQUIRY:
-			/* If the logical unit number is 0 then, this is going
-				to controller so It's a physical command
-				mode = 0 target = 0.
-				So we have nothing to write. 
-				otherwise, if use_unit_num == 1, 
-				mode = 1(volume set addressing) target = LUNID
-				otherwise, if use_unit_num == 2,
-				mode = 0(periph dev addr) target = scsi3addr 
-			*/
-			if(use_unit_num == 1)
-			{
-				c->Header.LUN.LogDev.VolId=
-                                	hba[ctlr]->drv[log_unit].LunID;
-                        	c->Header.LUN.LogDev.Mode = 1;
-			}
-			else if (use_unit_num == 2)
-			{
-				memcpy(c->Header.LUN.LunAddrBytes,scsi3addr,8);
-                        	c->Header.LUN.LogDev.Mode = 0; // phys dev addr 
-			}
-
-			/* are we trying to read a vital product page */
-			if(page_code != 0)
-			{
-				c->Request.CDB[1] = 0x01;
-				c->Request.CDB[2] = page_code;
-			}
-			c->Request.CDBLen = 6;
-			c->Request.Type.Type =  TYPE_CMD; // It is a command. 
-			c->Request.Type.Attribute = ATTR_SIMPLE;  
-			c->Request.Type.Direction = XFER_READ; // Read 
-			c->Request.Timeout = 0; // Don't time out 
-			c->Request.CDB[0] =  CISS_INQUIRY;
-			c->Request.CDB[4] = size  & 0xFF;  
-		break;
-		case CISS_REPORT_LOG:
-		case CISS_REPORT_PHYS:
-                        /* Talking to controller so It's a physical command
-                                mode = 00 target = 0.
-                                So we have nothing to write.
-                        */
-                        c->Request.CDBLen = 12;
-                        c->Request.Type.Type =  TYPE_CMD; // It is a command.
-                        c->Request.Type.Attribute = ATTR_SIMPLE; 
-                        c->Request.Type.Direction = XFER_READ; // Read
-                        c->Request.Timeout = 0; // Don't time out
-                        c->Request.CDB[0] = cmd;
-                        c->Request.CDB[6] = (size >> 24) & 0xFF;  //MSB
-                        c->Request.CDB[7] = (size >> 16) & 0xFF;
-                        c->Request.CDB[8] = (size >> 8) & 0xFF;
-                        c->Request.CDB[9] = size & 0xFF;
-                break;
-
-		case CCISS_READ_CAPACITY:
-			c->Header.LUN.LogDev.VolId= 
-				hba[ctlr]->drv[log_unit].LunID;
-			c->Header.LUN.LogDev.Mode = 1;
-			c->Request.CDBLen = 10;
-                        c->Request.Type.Type =  TYPE_CMD; // It is a command.
-                        c->Request.Type.Attribute = ATTR_SIMPLE; 
-                        c->Request.Type.Direction = XFER_READ; // Read
-                        c->Request.Timeout = 0; // Don't time out
-                        c->Request.CDB[0] = CCISS_READ_CAPACITY;
-		break;
-		case CCISS_CACHE_FLUSH:
-			c->Request.CDBLen = 12;
-                        c->Request.Type.Type =  TYPE_CMD; // It is a command.
-                        c->Request.Type.Attribute = ATTR_SIMPLE;
-                        c->Request.Type.Direction = XFER_WRITE; // No data
-                        c->Request.Timeout = 0; // Don't time out
-                        c->Request.CDB[0] = BMIC_WRITE;  // BMIC Passthru
-                        c->Request.CDB[6] = BMIC_CACHE_FLUSH;
-		break;
-		default:
-			printk(KERN_WARNING
-				"cciss:  Unknown Command 0x%c sent attempted\n",
-				  cmd);
-			cmd_free(info_p, c, 1);
-			return(IO_ERROR);
-	};
-	// Fill in the scatter gather information
-	if (size > 0 ) 
-	{
-		buff_dma_handle.val = (__u64) pci_map_single( info_p->pdev, 
-			buff, size, PCI_DMA_BIDIRECTIONAL);
-		c->SG[0].Addr.lower = buff_dma_handle.val32.lower;
-		c->SG[0].Addr.upper = buff_dma_handle.val32.upper;
-		c->SG[0].Len = size;
-		c->SG[0].Ext = 0;  // we are not chaining
-	}
+resend_cmd1:
 	/*
          * Disable interrupt
          */
@@ -1417,9 +1535,6 @@ static int sendcmd(
 	printk(KERN_DEBUG "cciss: command completed\n");
 #endif /* CCISS_DEBUG */
 
-	/* unlock the data buffer from DMA */
-	pci_unmap_single(info_p->pdev, (dma_addr_t) buff_dma_handle.val,
-                                size, PCI_DMA_BIDIRECTIONAL);
 	if (complete != 1) {
 		if ( (complete & CISS_ERROR_BIT)
 		     && (complete & ~CISS_ERROR_BIT) == c->busaddr)
@@ -1437,8 +1552,30 @@ static int sendcmd(
 			 	))
 			{
 				complete = c->busaddr;
-			} else
-			{
+			} else {
+				if (c->err_info->CommandStatus ==
+						CMD_UNSOLICITED_ABORT) {
+					printk(KERN_WARNING "cciss%d: "
+						"unsolicited abort %p\n",
+						ctlr, c);
+					if (c->retry_count < MAX_CMD_RETRIES) {
+						printk(KERN_WARNING
+						   "cciss%d: retrying %p\n",
+						   ctlr, c);
+						c->retry_count++;
+						/* erase the old error */
+						/* information */
+						memset(c->err_info, 0,
+						   sizeof(ErrorInfo_struct));
+						goto resend_cmd1;
+					} else {
+						printk(KERN_WARNING
+						   "cciss%d: retried %p too "
+						   "many times\n", ctlr, c);
+						status = IO_ERROR;
+						goto cleanup1;
+					}
+				}
 				printk(KERN_WARNING "ciss ciss%d: sendcmd"
 				" Error %x \n", ctlr, 
 					c->err_info->CommandStatus); 
@@ -1448,27 +1585,31 @@ static int sendcmd(
 				  c->err_info->MoreErrInfo.Invalid_Cmd.offense_size,
 				  c->err_info->MoreErrInfo.Invalid_Cmd.offense_num,
 				  c->err_info->MoreErrInfo.Invalid_Cmd.offense_value);
-				cmd_free(info_p,c, 1);
-				return(IO_ERROR);
+				status = IO_ERROR;
+				goto cleanup1;
 			}
 		}
                 if (complete != c->busaddr) {
                         printk( KERN_WARNING "cciss cciss%d: SendCmd "
                       "Invalid command list address returned! (%lx)\n",
                                 ctlr, complete);
-                        cmd_free(info_p, c, 1);
-                        return (IO_ERROR);
+			status = IO_ERROR;
+			goto cleanup1;
                 }
         } else {
                 printk( KERN_WARNING
                         "cciss cciss%d: SendCmd Timeout out, "
                         "No command list address returned!\n",
                         ctlr);
-                cmd_free(info_p, c, 1);
-                return (IO_ERROR);
+		status = IO_ERROR;
         }
+		
+cleanup1:	
+	/* unlock the data buffer from DMA */
+	pci_unmap_single(info_p->pdev, (dma_addr_t) buff_dma_handle.val,
+				size, PCI_DMA_BIDIRECTIONAL);
 	cmd_free(info_p, c, 1);
-        return (IO_OK);
+	return (status);
 } 
 /*
  * Map (physical) PCI mem into (virtual) kernel space
@@ -1552,27 +1693,35 @@ static inline void complete_buffers(struct bio *bio, int status)
 	}
 
 } 
+/* Assumes that CCISS_LOCK(h->ctlr) is held. */
+/* Zeros out the error record and then resends the command back */
+/* to the controller */
+static inline void resend_cciss_cmd( ctlr_info_t *h, CommandList_struct *c)
+{
+	/* erase the old error information */
+	memset(c->err_info, 0, sizeof(ErrorInfo_struct));
+
+	/* add it to software queue and then send it to the controller */
+	addQ(&(h->reqQ),c);
+	h->Qdepth++;
+	if(h->Qdepth > h->maxQsinceinit)
+		h->maxQsinceinit = h->Qdepth;
+
+	start_io(h);
+}
 /* checks the status of the job and calls complete buffers to mark all 
  * buffers for the completed job. 
  */ 
-static inline void complete_command( CommandList_struct *cmd, int timeout)
+static inline void complete_command( ctlr_info_t *h, CommandList_struct *cmd,
+		int timeout)
 {
 	int status = 1;
 	int i;
+	int retry_cmd = 0;
 	u64bit temp64;
 		
 	if (timeout)
 		status = 0; 
-	/* unmap the DMA mapping for all the scatter gather elements */
-	for(i=0; i<cmd->Header.SGList; i++)
-	{
-		temp64.val32.lower = cmd->SG[i].Addr.lower;
-		temp64.val32.upper = cmd->SG[i].Addr.upper;
-		pci_unmap_page(hba[cmd->ctlr]->pdev,
-			temp64.val, cmd->SG[i].Len, 
-			(cmd->Request.Type.Direction == XFER_READ) ? 
-				PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
-	}
 
 	if(cmd->err_info->CommandStatus != 0) 
 	{ /* an error has occurred */ 
@@ -1646,8 +1795,18 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 				status=0;
 			break;
 			case CMD_UNSOLICITED_ABORT:
-				printk(KERN_WARNING "cciss: cmd %p aborted "
-					"do to an unsolicited abort\n", cmd);
+				printk(KERN_WARNING "cciss%d: unsolicited "
+					"abort %p\n", h->ctlr, cmd);
+				if (cmd->retry_count < MAX_CMD_RETRIES) {
+					retry_cmd=1;
+					printk(KERN_WARNING
+						"cciss%d: retrying %p\n",
+						h->ctlr, cmd);
+					cmd->retry_count++;
+				} else
+					printk(KERN_WARNING
+						"cciss%d: %p retried too "
+						"many times\n", h->ctlr, cmd);
 				status=0;
 			break;
 			case CMD_TIMEOUT:
@@ -1662,7 +1821,21 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 				status=0;
 		}
 	}
-
+	/* We need to return this command */
+	if(retry_cmd) {
+		resend_cciss_cmd(h,cmd);
+		return;
+	}	
+	/* command did not need to be retried */
+	/* unmap the DMA mapping for all the scatter gather elements */
+	for(i=0; i<cmd->Header.SGList; i++) {
+		temp64.val32.lower = cmd->SG[i].Addr.lower;
+		temp64.val32.upper = cmd->SG[i].Addr.upper;
+		pci_unmap_page(hba[cmd->ctlr]->pdev,
+			temp64.val, cmd->SG[i].Len,
+			(cmd->Request.Type.Direction == XFER_READ) ?
+				PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
+	}
 	complete_buffers(cmd->rq->bio, status);
 
 #ifdef CCISS_DEBUG
@@ -1670,6 +1843,7 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 #endif /* CCISS_DEBUG */ 
 
 	end_that_request_last(cmd->rq);
+	cmd_free(h,cmd,1);
 }
 
 /* 
@@ -1816,8 +1990,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 if (c->busaddr == a) {
 				removeQ(&h->cmpQ, c);
 				if (c->cmd_type == CMD_RWREQ) {
-					complete_command(c, 0);
-					cmd_free(h, c, 1);
+					complete_command(h, c, 0);
 				} else if (c->cmd_type == CMD_IOCTL_PEND) {
 					complete(c->waiting);
 				}
@@ -2038,12 +2211,15 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 		&(c->cfgtable->HostWrite.TransportRequest));
 	writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
 
-	for(i=0;i<MAX_CONFIG_WAIT;i++)
-	{
+	/* under certain very rare conditions, this can take awhile.
+	 * (e.g.: hot replace a failed 144GB drive in a RAID 5 set right
+	 * as we enter this code.) */
+	for(i=0;i<MAX_CONFIG_WAIT;i++) {
 		if (!(readl(c->vaddr + SA5_DOORBELL) & CFGTBL_ChangeReq))
 			break;
 		/* delay and try again */
-		udelay(1000);
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(10);
 	}	
 
 #ifdef CCISS_DEBUG
@@ -2102,7 +2278,7 @@ static void cciss_getgeometry(int cntl_num)
         }
 	/* Get the firmware version */ 
 	return_code = sendcmd(CISS_INQUIRY, cntl_num, inq_buff, 
-		sizeof(InquiryData_struct), 0, 0 ,0, NULL );
+		sizeof(InquiryData_struct), 0, 0 ,0, NULL, TYPE_CMD);
 	if (return_code == IO_OK)
 	{
 		hba[cntl_num]->firm_ver[0] = inq_buff->data_byte[32];
@@ -2116,7 +2292,7 @@ static void cciss_getgeometry(int cntl_num)
 	}
 	/* Get the number of logical volumes */ 
 	return_code = sendcmd(CISS_REPORT_LOG, cntl_num, ld_buff, 
-			sizeof(ReportLunData_struct), 0, 0, 0, NULL );
+			sizeof(ReportLunData_struct), 0, 0, 0, NULL, TYPE_CMD);
 
 	if( return_code == IO_OK)
 	{
@@ -2390,7 +2566,8 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	/* sendcmd will turn off interrupt, and send the flush...
 	* To write all data in the battery backed cache to disks */
 	memset(flush_buf, 0, 4);
-	return_code = sendcmd(CCISS_CACHE_FLUSH, i, flush_buf, 4, 0, 0, 0, NULL);
+	return_code = sendcmd(CCISS_CACHE_FLUSH, i, flush_buf, 4, 0, 0, 0, NULL,
+				TYPE_CMD);
 	if(return_code != IO_OK)
 	{
 		printk(KERN_WARNING "Error Flushing cache on controller %d\n", 

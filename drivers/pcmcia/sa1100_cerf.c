@@ -6,8 +6,10 @@
  *
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -34,15 +36,15 @@ static int cerf_pcmcia_init(struct pcmcia_init *init)
 {
   int i, res;
 
-  set_irq_type(IRQ_GPIO_CF_IRQ, IRQT_FALLING);
-
   for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-    res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
+    res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt, SA_INTERRUPT,
 		      irqs[i].str, NULL);
     if (res)
       goto irq_err;
+    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
   }
+
+  init->socket_irq[CERF_SOCKET] = IRQ_GPIO_CF_IRQ;
 
   return 2;
 
@@ -66,43 +68,28 @@ static int cerf_pcmcia_shutdown(void)
   return 0;
 }
 
-static int cerf_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-  unsigned long levels;
-  int i = CERF_SOCKET;
+static void cerf_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+{
+  unsigned long levels=GPLR;
 
-  if(state_array->size<2) return -1;
-
-  levels=GPLR;
-
-  state_array->state[i].detect=((levels & GPIO_CF_CD)==0)?1:0;
-  state_array->state[i].ready=(levels & GPIO_CF_IRQ)?1:0;
-  state_array->state[i].bvd1=(levels & GPIO_CF_BVD1)?1:0;
-  state_array->state[i].bvd2=(levels & GPIO_CF_BVD2)?1:0;
-  state_array->state[i].wrprot=0;
-  state_array->state[i].vs_3v=1;
-  state_array->state[i].vs_Xv=0;
-
-  return 1;
+  if (sock == CERF_SOCKET) {
+    state->detect=((levels & GPIO_CF_CD)==0)?1:0;
+    state->ready=(levels & GPIO_CF_IRQ)?1:0;
+    state->bvd1=(levels & GPIO_CF_BVD1)?1:0;
+    state->bvd2=(levels & GPIO_CF_BVD2)?1:0;
+    state->wrprot=0;
+    state->vs_3v=1;
+    state->vs_Xv=0;
+  }
 }
 
-static int cerf_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  if(info->sock>1) return -1;
-
-  if (info->sock == CERF_SOCKET)
-    info->irq=IRQ_GPIO_CF_IRQ;
-
-  return 0;
-}
-
-static int cerf_pcmcia_configure_socket(const struct pcmcia_configure
+static int cerf_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
-  if(configure->sock>1)
+  if (sock>1)
     return -1;
 
-  if (configure->sock != CERF_SOCKET)
+  if (sock != CERF_SOCKET)
     return 0;
 
   switch(configure->vcc){
@@ -161,27 +148,27 @@ static int cerf_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level cerf_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= cerf_pcmcia_init,
   .shutdown		= cerf_pcmcia_shutdown,
   .socket_state		= cerf_pcmcia_socket_state,
-  .get_irq_info		= cerf_pcmcia_get_irq_info,
   .configure_socket	= cerf_pcmcia_configure_socket,
 
   .socket_init		= cerf_pcmcia_socket_init,
   .socket_suspend	= cerf_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_cerf_init(void)
+int __init pcmcia_cerf_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_cerf())
-		ret = sa1100_register_pcmcia(&cerf_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&cerf_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_cerf_exit(void)
+void __exit pcmcia_cerf_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&cerf_pcmcia_ops);
+	sa1100_unregister_pcmcia(&cerf_pcmcia_ops, dev);
 }

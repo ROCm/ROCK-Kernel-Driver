@@ -9,8 +9,10 @@
  * Guennadi Liakhovetski <gl@dsa-ac.de>
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -29,6 +31,8 @@ static int trizeps_pcmcia_init(struct pcmcia_init *init)
 {
 	int res;
 
+	init->socket_irq[0] = TRIZEPS_IRQ_PCMCIA_IRQ0;
+
 	/* Enable CF bus: */
 	TRIZEPS_BCR_clear(TRIZEPS_BCR1, TRIZEPS_nPCM_ENA_REG);
 
@@ -36,15 +40,12 @@ static int trizeps_pcmcia_init(struct pcmcia_init *init)
 	GPDR &= ~((GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_CD0))
 		    | (GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_IRQ0)));
 
-	/* Set transition detect */
-//	set_irq_type(SA1100_GPIO_TO_IRQ(GPIO_TRIZEPS_PCMCIA_CD0), IRQT_BOTHEDGE);
-	set_irq_type(TRIZEPS_IRQ_PCMCIA_IRQ0, IRQT_FALLING);
-
 	/* Register SOCKET interrupts */
 	/* WHY? */
-	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_NOEDGE);
-	res = request_irq( TRIZEPS_IRQ_PCMCIA_CD0, init->handler, SA_INTERRUPT, "PCMCIA_CD0", NULL );
+	res = request_irq(TRIZEPS_IRQ_PCMCIA_CD0, sa1100_pcmcia_interrupt,
+			  SA_INTERRUPT, "PCMCIA_CD0", NULL );
 	if( res < 0 ) goto irq_err;
+	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_NOEDGE);
 
 	//MECR = 0x00060006; // Initialised on trizeps init
 
@@ -79,55 +80,30 @@ static int trizeps_pcmcia_shutdown(void)
  *
 
  ******************************************************/
-static int trizeps_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-	unsigned long levels;
+static void trizeps_pcmcia_socket_state(int sock, struct pcmcia_state *state_array)
+{
+	unsigned long levels = GPLR;
 
-	if (state_array->size < NUMBER_OF_TRIZEPS_PCMCIA_SLOTS) return -1;
-
-	memset(state_array->state, 0,
-	       (state_array->size)*sizeof(struct pcmcia_state));
-
-	levels = GPLR;
-
-	state_array->state[0].detect = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_CD0)) == 0) ? 1 : 0;
-	state_array->state[0].ready  = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_IRQ0)) != 0) ? 1 : 0;
-	state_array->state[0].bvd1   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD1) !=0 ) ? 1 : 0;
-	state_array->state[0].bvd2   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD2) != 0) ? 1 : 0;
-	state_array->state[0].wrprot = 0; // not write protected
-	state_array->state[0].vs_3v  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS1) == 0) ? 1 : 0; //VS1=0 -> vs_3v=1
-	state_array->state[0].vs_Xv  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS2) == 0) ? 1 : 0; //VS2=0 -> vs_Xv=1
-
-	return 1;  // success
-}
-
-/**
- *
- *
- ******************************************************/
-static int trizeps_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-	switch (info->sock) {
-	case 0:
-		info->irq=TRIZEPS_IRQ_PCMCIA_IRQ0;
-		break;
-	case 1:
-		// MFTB2 use only one Slot
-	default:
-		return -1;
+	if (sock == 0) {
+		state->detect = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_CD0)) == 0) ? 1 : 0;
+		state->ready  = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_IRQ0)) != 0) ? 1 : 0;
+		state->bvd1   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD1) !=0 ) ? 1 : 0;
+		state->bvd2   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD2) != 0) ? 1 : 0;
+		state->wrprot = 0; // not write protected
+		state->vs_3v  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS1) == 0) ? 1 : 0; //VS1=0 -> vs_3v=1
+		state->vs_Xv  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS2) == 0) ? 1 : 0; //VS2=0 -> vs_Xv=1
 	}
-	return 0;
 }
 
 /**
  *
  *
  ******************************************************/
-static int trizeps_pcmcia_configure_socket(const struct pcmcia_configure *configure)
+static int trizeps_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
 	unsigned long flags;
 
-	if(configure->sock>1) return -1;
+	if(sock>1) return -1;
 
 	local_irq_save(flags);
 
@@ -167,24 +143,18 @@ static int trizeps_pcmcia_configure_socket(const struct pcmcia_configure *config
 	*/
 	local_irq_restore(flags);
 
-	if (configure->irq) {
-		enable_irq(TRIZEPS_IRQ_PCMCIA_CD0);
-		enable_irq(TRIZEPS_IRQ_PCMCIA_IRQ0);
-	} else {
-		disable_irq(TRIZEPS_IRQ_PCMCIA_IRQ0);
-		disable_irq(TRIZEPS_IRQ_PCMCIA_CD0);
-	}
-
 	return 0;
 }
 
 static int trizeps_pcmcia_socket_init(int sock)
 {
+	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_BOTHEDGE);
 	return 0;
 }
 
 static int trizeps_pcmcia_socket_suspend(int sock)
 {
+	set_irq_type(TRIZEPS_IRQ_PCMCIA_CD0, IRQT_NOEDGE);
 	return 0;
 }
 
@@ -193,24 +163,24 @@ static int trizeps_pcmcia_socket_suspend(int sock)
  *
  ******************************************************/
 struct pcmcia_low_level trizeps_pcmcia_ops = {
+	.owner			= THIS_MODULE,
 	.init			= trizeps_pcmcia_init,
 	.shutdown		= trizeps_pcmcia_shutdown,
 	.socket_state		= trizeps_pcmcia_socket_state,
-	.get_irq_info		= trizeps_pcmcia_get_irq_info,
 	.configure_socket	= trizeps_pcmcia_configure_socket,
 	.socket_init		= trizeps_pcmcia_socket_init,
 	.socket_suspend		= trizeps_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_trizeps_init(void)
+int __init pcmcia_trizeps_init(struct device *dev)
 {
 	if (machine_is_trizeps()) {
-		return sa1100_register_pcmcia(&trizeps_pcmcia_ops);
+		return sa1100_register_pcmcia(&trizeps_pcmcia_ops, dev);
 	}
 	return -ENODEV;
 }
 
-void __exit pcmcia_trizeps_exit(void)
+void __exit pcmcia_trizeps_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&trizeps_pcmcia_ops);
+	sa1100_unregister_pcmcia(&trizeps_pcmcia_ops, dev);
 }

@@ -539,8 +539,10 @@ static inline int check_entry(struct arpt_entry *e, const char *name, unsigned i
 		duprintf("check_entry: `%s' not found\n", t->u.user.name);
 		goto out;
 	}
-	if (target->me)
-		__MOD_INC_USE_COUNT(target->me);
+	if (!try_module_get((target->me))) {
+		ret = -ENOENT;
+		goto out_unlock;
+	}
 	t->u.kernel.target = target;
 	up(&arpt_mutex);
 
@@ -554,8 +556,7 @@ static inline int check_entry(struct arpt_entry *e, const char *name, unsigned i
 						      t->u.target_size
 						      - sizeof(*t),
 						      e->comefrom)) {
-		if (t->u.kernel.target->me)
-			__MOD_DEC_USE_COUNT(t->u.kernel.target->me);
+		module_put(t->u.kernel.target->me);
 		duprintf("arp_tables: check failed for `%s'.\n",
 			 t->u.kernel.target->name);
 		ret = -EINVAL;
@@ -565,6 +566,8 @@ static inline int check_entry(struct arpt_entry *e, const char *name, unsigned i
 	(*i)++;
 	return 0;
 
+out_unlock:
+	up(&arpt_mutex);
 out:
 	return ret;
 }
@@ -622,9 +625,7 @@ static inline int cleanup_entry(struct arpt_entry *e, unsigned int *i)
 	if (t->u.kernel.target->destroy)
 		t->u.kernel.target->destroy(t->data,
 					    t->u.target_size - sizeof(*t));
-	if (t->u.kernel.target->me)
-		__MOD_DEC_USE_COUNT(t->u.kernel.target->me);
-
+	module_put(t->u.kernel.target->me);
 	return 0;
 }
 
@@ -1110,17 +1111,14 @@ int arpt_register_target(struct arpt_target *target)
 {
 	int ret;
 
-	MOD_INC_USE_COUNT;
 	ret = down_interruptible(&arpt_mutex);
-	if (ret != 0) {
-		MOD_DEC_USE_COUNT;
+	if (ret != 0)
 		return ret;
-	}
+
 	if (!list_named_insert(&arpt_target, target)) {
 		duprintf("arpt_register_target: `%s' already in list!\n",
 			 target->name);
 		ret = -EINVAL;
-		MOD_DEC_USE_COUNT;
 	}
 	up(&arpt_mutex);
 	return ret;
@@ -1131,7 +1129,6 @@ void arpt_unregister_target(struct arpt_target *target)
 	down(&arpt_mutex);
 	LIST_DELETE(&arpt_target, target);
 	up(&arpt_mutex);
-	MOD_DEC_USE_COUNT;
 }
 
 int arpt_register_table(struct arpt_table *table)
@@ -1141,12 +1138,10 @@ int arpt_register_table(struct arpt_table *table)
 	static struct arpt_table_info bootstrap
 		= { 0, 0, 0, { 0 }, { 0 }, { } };
 
-	MOD_INC_USE_COUNT;
 	newinfo = vmalloc(sizeof(struct arpt_table_info)
 			  + SMP_ALIGN(table->table->size) * NR_CPUS);
 	if (!newinfo) {
 		ret = -ENOMEM;
-		MOD_DEC_USE_COUNT;
 		return ret;
 	}
 	memcpy(newinfo->entries, table->table->entries, table->table->size);
@@ -1159,14 +1154,12 @@ int arpt_register_table(struct arpt_table *table)
 	duprintf("arpt_register_table: translate table gives %d\n", ret);
 	if (ret != 0) {
 		vfree(newinfo);
-		MOD_DEC_USE_COUNT;
 		return ret;
 	}
 
 	ret = down_interruptible(&arpt_mutex);
 	if (ret != 0) {
 		vfree(newinfo);
-		MOD_DEC_USE_COUNT;
 		return ret;
 	}
 
@@ -1196,7 +1189,6 @@ int arpt_register_table(struct arpt_table *table)
 
  free_unlock:
 	vfree(newinfo);
-	MOD_DEC_USE_COUNT;
 	goto unlock;
 }
 
@@ -1210,7 +1202,6 @@ void arpt_unregister_table(struct arpt_table *table)
 	ARPT_ENTRY_ITERATE(table->private->entries, table->private->size,
 			   cleanup_entry, NULL);
 	vfree(table->private);
-	MOD_DEC_USE_COUNT;
 }
 
 /* The built-in targets: standard (NULL) and error. */

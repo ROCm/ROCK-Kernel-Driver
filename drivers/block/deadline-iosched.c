@@ -98,7 +98,7 @@ struct deadline_rq {
 	unsigned long expires;
 };
 
-static inline void deadline_move_to_dispatch(struct deadline_data *dd, struct deadline_rq *drq);
+static void deadline_move_request(struct deadline_data *dd, struct deadline_rq *drq);
 
 static kmem_cache_t *drq_pool;
 
@@ -205,7 +205,7 @@ retry:
 		return;
 	}
 
-	deadline_move_to_dispatch(dd, __alias);
+	deadline_move_request(dd, __alias);
 	goto retry;
 }
 

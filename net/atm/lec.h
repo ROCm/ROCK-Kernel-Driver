@@ -38,6 +38,9 @@ struct lecdatahdr_8025 {
   unsigned char h_source[ETH_ALEN];
 };
 
+#define LEC_MINIMUM_8023_SIZE   62
+#define LEC_MINIMUM_8025_SIZE   16
+
 /*
  * Operations that LANE2 capable device can do. Two first functions
  * are used to make the device do things. See spec 3.1.3 and 3.1.4.

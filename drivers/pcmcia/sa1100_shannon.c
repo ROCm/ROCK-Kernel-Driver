@@ -4,8 +4,10 @@
  * PCMCIA implementation routines for Shannon
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -32,17 +34,16 @@ static int shannon_pcmcia_init(struct pcmcia_init *init)
 	GAFR &= ~(SHANNON_GPIO_EJECT_0 | SHANNON_GPIO_EJECT_1 | 
 		  SHANNON_GPIO_RDY_0 | SHANNON_GPIO_RDY_1);
 
-	/* Set transition detect */
-	set_irq_type(SHANNON_IRQ_GPIO_RDY_0, IRQT_FALLING);
-	set_irq_type(SHANNON_IRQ_GPIO_RDY_1, IRQT_FALLING);
+	init->socket_irq[0] = SHANNON_IRQ_GPIO_RDY_0;
+	init->socket_irq[1] = SHANNON_IRQ_GPIO_RDY_1;
 
 	/* Register interrupts */
 	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
-				  irqs[i].str, NULL);
+		res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
+				  SA_INTERRUPT, irqs[i].str, NULL);
 		if (res)
 			goto irq_err;
+		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
 	}
 
 	return 2;
@@ -68,48 +69,35 @@ static int shannon_pcmcia_shutdown(void)
 	return 0;
 }
 
-static int shannon_pcmcia_socket_state(struct pcmcia_state_array *state_array)
+static void shannon_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-	unsigned long levels;
+	unsigned long levels = GPLR;
 
-	memset(state_array->state, 0,
-	       state_array->size * sizeof(struct pcmcia_state));
+	switch (sock) {
+	case 0:
+		state->detect = (levels & SHANNON_GPIO_EJECT_0) ? 0 : 1;
+		state->ready  = (levels & SHANNON_GPIO_RDY_0) ? 1 : 0;
+		state->wrprot = 0; /* Not available on Shannon. */
+		state->bvd1   = 1; 
+		state->bvd2   = 1; 
+		state->vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
+		state->vs_Xv  = 0;
+		break;
 
-	levels = GPLR;
-
-	state_array->state[0].detect = (levels & SHANNON_GPIO_EJECT_0) ? 0 : 1;
-	state_array->state[0].ready  = (levels & SHANNON_GPIO_RDY_0) ? 1 : 0;
-	state_array->state[0].wrprot = 0; /* Not available on Shannon. */
-	state_array->state[0].bvd1 = 1; 
-	state_array->state[0].bvd2 = 1; 
-	state_array->state[0].vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
-	state_array->state[0].vs_Xv  = 0;
-
-	state_array->state[1].detect = (levels & SHANNON_GPIO_EJECT_1) ? 0 : 1;
-	state_array->state[1].ready  = (levels & SHANNON_GPIO_RDY_1) ? 1 : 0;
-	state_array->state[1].wrprot = 0; /* Not available on Shannon. */
-	state_array->state[1].bvd1 = 1; 
-	state_array->state[1].bvd2 = 1; 
-	state_array->state[1].vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
-	state_array->state[1].vs_Xv  = 0;
-
-	return 1;
+	case 1:
+		state->detect = (levels & SHANNON_GPIO_EJECT_1) ? 0 : 1;
+		state->ready  = (levels & SHANNON_GPIO_RDY_1) ? 1 : 0;
+		state->wrprot = 0; /* Not available on Shannon. */
+		state->bvd1   = 1; 
+		state->bvd2   = 1; 
+		state->vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
+		state->vs_Xv  = 0;
+		break;
+	}
 }
 
-static int shannon_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
+static int shannon_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
 {
-	if (info->sock == 0)
-		info->irq = SHANNON_IRQ_GPIO_RDY_0;
-	else if (info->sock == 1)
-		info->irq = SHANNON_IRQ_GPIO_RDY_1;
-	else return -1;
-	
-	return 0;
-}
-
-static int shannon_pcmcia_configure_socket(const struct pcmcia_configure *configure)
-{
-
 	switch (configure->vcc) {
 	case 0:	/* power off */
 		printk(KERN_WARNING __FUNCTION__"(): CS asked for 0V, still applying 3.3V..\n");
@@ -152,27 +140,27 @@ static int shannon_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level shannon_pcmcia_ops = {
+	.owner			= THIS_MODULE,
 	.init			= shannon_pcmcia_init,
 	.shutdown		= shannon_pcmcia_shutdown,
 	.socket_state		= shannon_pcmcia_socket_state,
-	.get_irq_info		= shannon_pcmcia_get_irq_info,
 	.configure_socket	= shannon_pcmcia_configure_socket,
 
 	.socket_init		= shannon_pcmcia_socket_init,
 	.socket_suspend		= shannon_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_shannon_init(void)
+int __init pcmcia_shannon_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_shannon())
-		ret = sa1100_register_pcmcia(&shannon_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&shannon_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_shannon_exit(void)
+void __exit pcmcia_shannon_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&shannon_pcmcia_ops);
+	sa1100_unregister_pcmcia(&shannon_pcmcia_ops, dev);
 }

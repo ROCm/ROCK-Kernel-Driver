@@ -19,7 +19,7 @@
  * 10/04/00 changed RW-CCWS to R/W Key and Data
  * 10/10/00 reverted last change according to ESS exploitation
  * 10/10/00 now dequeuing init_cqr before freeing *ouch*
- * 26/10/00 fixed ITPM20144ASC (problems when accesing a device formatted by VIF)
+ * 26/10/00 fixed ITPM20144ASC (problems when accessing a device formatted by VIF)
  * 01/23/01 fixed kmalloc statement in dump_sense to be GFP_ATOMIC
  *	    fixed partition handling and HDIO_GETGEO
  * 2002/01/04 Created 2.4-2.5 compatibility mode

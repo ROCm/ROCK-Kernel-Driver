@@ -110,59 +110,74 @@ sa1100_pcmcia_default_mecr_timing(unsigned int sock, unsigned int cpu_speed,
  * Call board specific BS value calculation to allow boards
  * to tweak the BS values.
  */
-static int sa1100_pcmcia_set_mecr(int sock, unsigned int cpu_clock)
+static int
+sa1100_pcmcia_set_mecr(struct sa1100_pcmcia_socket *skt, unsigned int cpu_clock)
 {
-	struct sa1100_pcmcia_socket *skt;
 	u32 mecr;
 	unsigned long flags;
 	unsigned int bs;
 
-	if (sock < 0 || sock > SA1100_PCMCIA_MAX_SOCK)
-		return -1;
-
-	skt = PCMCIA_SOCKET(sock);
-
 	local_irq_save(flags);
 
-	bs = pcmcia_low_level->socket_get_timing(sock, cpu_clock, skt->speed_io);
+	bs = skt->ops->socket_get_timing(skt->nr, cpu_clock, skt->speed_io);
 
 	mecr = MECR;
-	MECR_FAST_SET(mecr, sock, 0);
-	MECR_BSIO_SET(mecr, sock, bs );
-	MECR_BSA_SET(mecr, sock, bs );
-	MECR_BSM_SET(mecr, sock, bs );
+	MECR_FAST_SET(mecr, skt->nr, 0);
+	MECR_BSIO_SET(mecr, skt->nr, bs );
+	MECR_BSA_SET(mecr, skt->nr, bs );
+	MECR_BSM_SET(mecr, skt->nr, bs );
 	MECR = mecr;
 
 	local_irq_restore(flags);
 
-	DEBUG(4, "%s(): FAST%u %X  BSM%u %X  BSA%u %X  BSIO%u %X\n",
-	      __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
-	      MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock),
-	      sock, MECR_BSIO_GET(mecr, sock));
+	DEBUG(4, "%s(): sock %u FAST %X  BSM %X  BSA %X  BSIO %X\n",
+	      __FUNCTION__, skt->nr, MECR_FAST_GET(mecr, skt->nr),
+	      MECR_BSM_GET(mecr, skt->nr), MECR_BSA_GET(mecr, skt->nr),
+	      MECR_BSIO_GET(mecr, skt->nr));
 
 	return 0;
 }
 
 /*
- * sa1100_pcmcia_state_to_config
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ * sa1100_pcmcia_config_skt
+ * ^^^^^^^^^^^^^^^^^^^^^^^^
  *
  * Convert PCMCIA socket state to our socket configure structure.
  */
-static struct pcmcia_configure
-sa1100_pcmcia_state_to_config(unsigned int sock, socket_state_t *state)
+static int
+sa1100_pcmcia_config_skt(struct sa1100_pcmcia_socket *skt, socket_state_t *state)
 {
-  struct pcmcia_configure conf;
+	struct pcmcia_configure conf;
+	int ret;
 
-  conf.sock    = sock;
-  conf.vcc     = state->Vcc;
-  conf.vpp     = state->Vpp;
-  conf.output  = state->flags & SS_OUTPUT_ENA ? 1 : 0;
-  conf.speaker = state->flags & SS_SPKR_ENA ? 1 : 0;
-  conf.reset   = state->flags & SS_RESET ? 1 : 0;
-  conf.irq     = state->io_irq != 0;
+	conf.vcc     = state->Vcc;
+	conf.vpp     = state->Vpp;
+	conf.output  = state->flags & SS_OUTPUT_ENA ? 1 : 0;
+	conf.speaker = state->flags & SS_SPKR_ENA ? 1 : 0;
+	conf.reset   = state->flags & SS_RESET ? 1 : 0;
 
-  return conf;
+	ret = skt->ops->configure_socket(skt->nr, &conf);
+	if (ret == 0) {
+		/*
+		 * This really needs a better solution.  The IRQ
+		 * may or may not be claimed by the driver.
+		 */
+		if (skt->irq_state != 1 && state->io_irq) {
+			skt->irq_state = 1;
+			set_irq_type(skt->irq, IRQT_FALLING);
+		} else if (skt->irq_state == 1 && state->io_irq == 0) {
+		  	skt->irq_state = 0;
+			set_irq_type(skt->irq, IRQT_NOEDGE);
+		}
+
+		skt->cs_state = *state;
+	}
+
+	if (ret < 0)
+		printk(KERN_ERR "sa1100_pcmcia: unable to configure "
+		       "socket %d\n", skt->nr);
+
+	return ret;
 }
 
 /* sa1100_pcmcia_sock_init()
@@ -177,17 +192,12 @@ sa1100_pcmcia_state_to_config(unsigned int sock, socket_state_t *state)
 static int sa1100_pcmcia_sock_init(unsigned int sock)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_configure conf;
 
   DEBUG(2, "%s(): initializing socket %u\n", __FUNCTION__, sock);
 
-  skt->cs_state = dead_socket;
+  sa1100_pcmcia_config_skt(skt, &dead_socket);
 
-  conf = sa1100_pcmcia_state_to_config(sock, &dead_socket);
-
-  pcmcia_low_level->configure_socket(&conf);
-
-  return pcmcia_low_level->socket_init(sock);
+  return skt->ops->socket_init(skt->nr);
 }
 
 
@@ -203,19 +213,14 @@ static int sa1100_pcmcia_sock_init(unsigned int sock)
 static int sa1100_pcmcia_suspend(unsigned int sock)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_configure conf;
   int ret;
 
-  DEBUG(2, "%s(): suspending socket %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s(): suspending socket %u\n", __FUNCTION__, skt->nr);
 
-  conf = sa1100_pcmcia_state_to_config(sock, &dead_socket);
+  ret = sa1100_pcmcia_config_skt(skt, &dead_socket);
 
-  ret = pcmcia_low_level->configure_socket(&conf);
-
-  if (ret == 0) {
-    skt->cs_state = dead_socket;
-    ret = pcmcia_low_level->socket_suspend(sock);
-  }
+  if (ret == 0)
+    ret = skt->ops->socket_suspend(skt->nr);
 
   return ret;
 }
@@ -286,40 +291,33 @@ sa1100_pcmcia_events(struct pcmcia_state *state,
  */
 static void sa1100_pcmcia_task_handler(void *data)
 {
-  struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
-  struct pcmcia_state_array state_array;
+  struct pcmcia_state state;
   unsigned int all_events;
 
   DEBUG(4, "%s(): entering PCMCIA monitoring thread\n", __FUNCTION__);
 
-  state_array.size = sa1100_pcmcia_socket_count;
-  state_array.state = state;
-
   do {
     unsigned int events;
-    int ret, i;
-
-    memset(state, 0, sizeof(state));
+    int i;
 
     DEBUG(4, "%s(): interrogating low-level PCMCIA service\n", __FUNCTION__);
 
-    ret = pcmcia_low_level->socket_state(&state_array);
-    if (ret < 0) {
-      printk(KERN_ERR "sa1100_pcmcia: unable to read socket status\n");
-      break;
-    }
-
     all_events = 0;
 
-    for (i = 0; i < state_array.size; i++, all_events |= events) {
+    for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
       struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
-      events = sa1100_pcmcia_events(&state[i], &skt->k_state,
+      memset(&state, 0, sizeof(state));
+
+      skt->ops->socket_state(skt->nr, &state);
+
+      events = sa1100_pcmcia_events(&state, &skt->k_state,
 				    skt->cs_state.csc_mask,
 				    skt->cs_state.flags);
 
-      if (events && sa1100_pcmcia_socket[i].handler != NULL)
+      if (events && skt->handler != NULL)
 	skt->handler(skt->handler_info, events);
+      all_events |= events;
     }
   } while(all_events);
 }  /* sa1100_pcmcia_task_handler() */
@@ -351,7 +349,7 @@ static void sa1100_pcmcia_poll_event(unsigned long dummy)
  * handling code performs scheduling operations which cannot be
  * executed from within an interrupt context.
  */
-static void sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
+void sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
   DEBUG(3, "%s(): servicing IRQ %d\n", __FUNCTION__, irq);
   schedule_work(&sa1100_pcmcia_task);
@@ -378,12 +376,16 @@ sa1100_pcmcia_register_callback(unsigned int sock,
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
 
+  if (handler && !try_module_get(skt->ops->owner))
+  	return -ENODEV;
   if (handler == NULL) {
     skt->handler = NULL;
   } else {
     skt->handler_info = info;
     skt->handler = handler;
   }
+  if (!handler)
+  	module_put(skt->ops->owner);
 
   return 0;
 }
@@ -427,7 +429,7 @@ sa1100_pcmcia_inquire_socket(unsigned int sock, socket_cap_t *cap)
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
   int ret = -1;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   if (sock < sa1100_pcmcia_socket_count) {
     cap->features  = SS_CAP_PAGE_REGS | SS_CAP_STATIC_MAP | SS_CAP_PCCARD;
@@ -463,28 +465,20 @@ static int
 sa1100_pcmcia_get_status(unsigned int sock, unsigned int *status)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
-  struct pcmcia_state_array state_array;
+  struct pcmcia_state state;
   unsigned int stat;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
-  state_array.size = sa1100_pcmcia_socket_count;
-  state_array.state = state;
+  memset(&state, 0, sizeof(state));
 
-  memset(state, 0, sizeof(state));
+  skt->ops->socket_state(skt->nr, &state);
+  skt->k_state = state;
 
-  if ((pcmcia_low_level->socket_state(&state_array)) < 0) {
-    printk(KERN_ERR "sa1100_pcmcia: unable to get socket status\n");
-    return -1;
-  }
-
-  skt->k_state = state[sock];
-
-  stat = state[sock].detect ? SS_DETECT : 0;
-  stat |= state[sock].ready ? SS_READY  : 0;
-  stat |= state[sock].vs_3v ? SS_3VCARD : 0;
-  stat |= state[sock].vs_Xv ? SS_XVCARD : 0;
+  stat = state.detect ? SS_DETECT : 0;
+  stat |= state.ready ? SS_READY  : 0;
+  stat |= state.vs_3v ? SS_3VCARD : 0;
+  stat |= state.vs_Xv ? SS_XVCARD : 0;
 
   /* The power status of individual sockets is not available
    * explicitly from the hardware, so we just remember the state
@@ -493,11 +487,11 @@ sa1100_pcmcia_get_status(unsigned int sock, unsigned int *status)
   stat |= skt->cs_state.Vcc ? SS_POWERON : 0;
 
   if (skt->cs_state.flags & SS_IOCARD)
-    stat |= state[sock].bvd1 ? SS_STSCHG : 0;
+    stat |= state.bvd1 ? SS_STSCHG : 0;
   else {
-    if (state[sock].bvd1 == 0)
+    if (state.bvd1 == 0)
       stat |= SS_BATDEAD;
-    else if (state[sock].bvd2 == 0)
+    else if (state.bvd2 == 0)
       stat |= SS_BATWARN;
   }
 
@@ -530,7 +524,7 @@ sa1100_pcmcia_get_socket(unsigned int sock, socket_state_t *state)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   *state = skt->cs_state;
 
@@ -551,9 +545,8 @@ static int
 sa1100_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_configure conf;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   DEBUG(3, "\tmask:  %s%s%s%s%s%s\n\tflags: %s%s%s%s%s%s\n",
 	(state->csc_mask==0)?"<NONE>":"",
@@ -571,16 +564,7 @@ sa1100_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
   DEBUG(3, "\tVcc %d  Vpp %d  irq %d\n",
 	state->Vcc, state->Vpp, state->io_irq);
 
-  conf = sa1100_pcmcia_state_to_config(sock, state);
-
-  if (pcmcia_low_level->configure_socket(&conf) < 0) {
-    printk(KERN_ERR "sa1100_pcmcia: unable to configure socket %d\n", sock);
-    return -1;
-  }
-
-  skt->cs_state = *state;
-  
-  return 0;
+  return sa1100_pcmcia_config_skt(skt, state);
 }  /* sa1100_pcmcia_set_socket() */
 
 
@@ -623,7 +607,7 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   DEBUG(3, "\tmap %u  speed %u\n\tstart 0x%08x  stop 0x%08x\n",
 	map->map, map->speed, map->start, map->stop);
@@ -647,7 +631,7 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
     if ( map->speed == 0)
        map->speed = SA1100_PCMCIA_IO_ACCESS;
 
-	sa1100_pcmcia_set_mecr(sock, cpufreq_get(0));
+	sa1100_pcmcia_set_mecr(skt, cpufreq_get(0));
   }
 
   if (map->stop == 1)
@@ -704,7 +688,7 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
   unsigned long start;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   DEBUG(3, "\tmap %u speed %u sys_start %08lx sys_stop %08lx card_start %08x\n",
 	map->map, map->speed, map->sys_start, map->sys_stop, map->card_start);
@@ -736,18 +720,17 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 			  map->speed = SA1100_PCMCIA_5V_MEM_ACCESS;
 	  }
 
-	  sa1100_pcmcia_set_mecr(sock, cpufreq_get(0));
+	  sa1100_pcmcia_set_mecr(skt, cpufreq_get(0));
 
   }
-
-  start = (map->flags & MAP_ATTRIB) ? skt->phys_attr : skt->phys_mem;
 
   if (map->sys_stop == 0)
     map->sys_stop = PAGE_SIZE-1;
 
+  start = (map->flags & MAP_ATTRIB) ? skt->phys_attr : skt->phys_mem;
   map->sys_stop -= map->sys_start;
-  map->sys_stop += start;
-  map->sys_start = start;
+  map->sys_stop += start + map->card_start;
+  map->sys_start = start + map->card_start;
 
   skt->pc_mem_map[map->map] = *map;
 
@@ -767,9 +750,8 @@ static int
 sa1100_pcmcia_proc_status(char *buf, char **start, off_t pos,
 			  int count, int *eof, void *data)
 {
-  unsigned int sock = (unsigned int)data;
+  struct sa1100_pcmcia_socket *skt = data;
   unsigned int clock = cpufreq_get(0);
-  struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
   unsigned long mecr = MECR;
   char *p = buf;
 
@@ -815,13 +797,13 @@ sa1100_pcmcia_proc_status(char *buf, char **start, off_t pos,
   p+=sprintf(p, "IRQ      : %d\n", skt->cs_state.io_irq);
 
   p+=sprintf(p, "I/O      : %u (%u)\n", skt->speed_io,
-	     sa1100_pcmcia_cmd_time(clock, MECR_BSIO_GET(mecr, sock)));
+	     sa1100_pcmcia_cmd_time(clock, MECR_BSIO_GET(mecr, skt->nr)));
 
   p+=sprintf(p, "attribute: %u (%u)\n", skt->speed_attr,
-	     sa1100_pcmcia_cmd_time(clock, MECR_BSA_GET(mecr, sock)));
+	     sa1100_pcmcia_cmd_time(clock, MECR_BSA_GET(mecr, skt->nr)));
 
   p+=sprintf(p, "common   : %u (%u)\n", skt->speed_mem,
-	     sa1100_pcmcia_cmd_time(clock, MECR_BSM_GET(mecr, sock)));
+	     sa1100_pcmcia_cmd_time(clock, MECR_BSM_GET(mecr, skt->nr)));
 
   return p-buf;
 }
@@ -846,7 +828,7 @@ sa1100_pcmcia_proc_setup(unsigned int sock, struct proc_dir_entry *base)
   }
 
   entry->read_proc = sa1100_pcmcia_proc_status;
-  entry->data = (void *)sock;
+  entry->data = PCMCIA_SOCKET(sock);
 }
 
 #endif  /* defined(CONFIG_PROC_FS) */
@@ -881,8 +863,10 @@ static void sa1100_pcmcia_update_mecr(unsigned int clock)
 {
 	unsigned int sock;
 
-	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock)
-		sa1100_pcmcia_set_mecr(sock, clock);
+	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
+		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+		sa1100_pcmcia_set_mecr(skt, clock);
+	}
 }
 
 /* sa1100_pcmcia_notifier()
@@ -936,11 +920,10 @@ static struct notifier_block sa1100_pcmcia_notifier_block = {
  *
  * Register an SA1100 PCMCIA low level driver with the SA1100 core.
  */
-int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
+int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 {
 	struct pcmcia_init pcmcia_init;
-	struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
-	struct pcmcia_state_array state_array;
+	struct pcmcia_socket_class_data *cls;
 	unsigned int i, cpu_clock;
 	int ret;
 
@@ -956,32 +939,25 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	 * set default MECR calculation if the board specific
 	 * code did not specify one...
 	 */
-	if (!pcmcia_low_level->socket_get_timing)
-		pcmcia_low_level->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
+	if (!ops->socket_get_timing)
+		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
-	pcmcia_init.handler = sa1100_pcmcia_interrupt;
+	pcmcia_init.socket_irq[0] = NO_IRQ;
+	pcmcia_init.socket_irq[1] = NO_IRQ;
 	ret = ops->init(&pcmcia_init);
 	if (ret < 0) {
 		printk(KERN_ERR "Unable to initialize kernel PCMCIA service (%d).\n", ret);
-		if (ret == -1)
-			ret = -EIO;
 		goto out;
 	}
 
 	sa1100_pcmcia_socket_count = ret;
 
-	state_array.size  = ret;
-	state_array.state = state;
-
-	memset(state, 0, sizeof(state));
-
-	if (ops->socket_state(&state_array) < 0) {
-		printk(KERN_ERR "Unable to get PCMCIA status driver.\n");
-		ret = -EIO;
-		goto shutdown;
-	}
-
 	cpu_clock = cpufreq_get(0);
+
+	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
+		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
+		memset(skt, 0, sizeof(*skt));
+	}
 
 	/*
 	 * We initialize the MECR to default values here, because we are
@@ -989,21 +965,20 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	 */
 	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
-		struct pcmcia_irq_info irq_info;
 
-		if (!request_mem_region(_PCMCIA(i), PCMCIASp, "PCMCIA")) {
-			ret = -EBUSY;
+		skt->res.start	= _PCMCIA(i);
+		skt->res.end	= _PCMCIA(i) + PCMCIASp - 1;
+		skt->res.name	= "PCMCIA";
+		skt->res.flags	= IORESOURCE_MEM;
+
+		ret = request_resource(&iomem_resource, &skt->res);
+		if (ret)
 			goto out_err;
-		}
 
-		irq_info.sock = i;
-		irq_info.irq  = -1;
-		ret = ops->get_irq_info(&irq_info);
-		if (ret < 0)
-			printk(KERN_ERR "Unable to get IRQ for socket %u (%d)\n", i, ret);
-
-		skt->irq        = irq_info.irq;
-		skt->k_state    = state[i];
+		skt->nr		= i;
+		skt->ops	= ops;
+		skt->irq	= pcmcia_init.socket_irq[i];
+		skt->irq_state	= 0;
 		skt->speed_io   = SA1100_PCMCIA_IO_ACCESS;
 		skt->speed_attr = SA1100_PCMCIA_5V_MEM_ACCESS;
 		skt->speed_mem  = SA1100_PCMCIA_5V_MEM_ACCESS;
@@ -1016,17 +991,21 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 			goto out_err;
 		}
 
-		sa1100_pcmcia_set_mecr(i, cpu_clock);
+		ops->socket_state(skt->nr, &skt->k_state);
+		sa1100_pcmcia_set_mecr(skt, cpu_clock);
 	}
 
-
-	/* Only advertise as many sockets as we can detect */
-	ret = register_ss_entry(sa1100_pcmcia_socket_count,
-				&sa1100_pcmcia_operations);
-	if (ret < 0) {
-		printk(KERN_ERR "Unable to register sockets\n");
+	cls = kmalloc(sizeof(struct pcmcia_socket_class_data), GFP_KERNEL);
+	if (!cls) {
+		ret = -ENOMEM;
 		goto out_err;
 	}
+
+	memset(cls, 0, sizeof(struct pcmcia_socket_class_data));
+
+	cls->ops	= &sa1100_pcmcia_operations;
+	cls->nsock	= sa1100_pcmcia_socket_count;
+	dev->class_data = cls;
 
 	/*
 	 * Start the event poll timer.  It will reschedule by itself afterwards.
@@ -1039,10 +1018,10 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 		iounmap(skt->virt_io);
 		skt->virt_io = NULL;
-		release_mem_region(_PCMCIA(i), PCMCIASp);
+		if (skt->res.start)
+			release_resource(&skt->res);
 	}
 
- shutdown:
 	ops->shutdown();
 
  out:
@@ -1056,7 +1035,7 @@ EXPORT_SYMBOL(sa1100_register_pcmcia);
  *
  * Unregister a previously registered pcmcia driver
  */
-void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops)
+void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 {
 	int i;
 
@@ -1072,24 +1051,83 @@ void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops)
 
 	del_timer_sync(&poll_timer);
 
-	unregister_ss_entry(&sa1100_pcmcia_operations);
-
 	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
 		iounmap(skt->virt_io);
 		skt->virt_io = NULL;
 		
-		release_mem_region(_PCMCIA(i), PCMCIASp);
+		release_resource(&skt->res);
 	}
 
 	ops->shutdown();
 
 	flush_scheduled_work();
 
+	kfree(dev->class_data);
+	dev->class_data = NULL;
+
 	pcmcia_low_level = NULL;
 }
 EXPORT_SYMBOL(sa1100_unregister_pcmcia);
+
+static struct device_driver sa1100_pcmcia_driver = {
+	.name		= "sa11x0-pcmcia",
+	.bus		= &platform_bus_type,
+	.devclass	= &pcmcia_socket_class,
+};
+
+static struct platform_device sa1100_pcmcia_device = {
+	.name		= "sa11x0-pcmcia",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA11x0 [PCMCIA]",
+	},
+};
+
+struct ll_fns {
+	int (*init)(struct device *dev);
+	void (*exit)(struct device *dev);
+};
+
+static struct ll_fns sa1100_ll_fns[] = {
+#ifdef CONFIG_SA1100_ASSABET
+	{ .init = pcmcia_assabet_init,	.exit = pcmcia_assabet_exit,	},
+#endif
+#ifdef CONFIG_SA1100_CERF
+	{ .init = pcmcia_cerf_init,	.exit = pcmcia_cerf_exit,	},
+#endif
+#ifdef CONFIG_SA1100_FLEXANET
+	{ .init = pcmcia_flexanet_init,	.exit = pcmcia_flexanet_exit,	},
+#endif
+#ifdef CONFIG_SA1100_FREEBIRD
+	{ .init = pcmcia_freebird_init,	.exit = pcmcia_freebird_exit,	},
+#endif
+#ifdef CONFIG_SA1100_GRAPHICSCLIENT
+	{ .init = pcmcia_gcplus_init,	.exit = pcmcia_gcplus_exit,	},
+#endif
+#ifdef CONFIG_SA1100_H3600
+	{ .init = pcmcia_h3600_init,	.exit = pcmcia_h3600_exit,	},
+#endif
+#ifdef CONFIG_SA1100_PANGOLIN
+	{ .init = pcmcia_pangolin_init,	.exit = pcmcia_pangolin_exit,	},
+#endif
+#ifdef CONFIG_SA1100_SHANNON
+	{ .init = pcmcia_shannon_init,	.exit = pcmcia_shannon_exit,	},
+#endif
+#ifdef CONFIG_SA1100_SIMPAD
+	{ .init = pcmcia_simpad_init,	.exit = pcmcia_simpad_exit,	},
+#endif
+#ifdef CONFIG_SA1100_STORK
+	{ .init = pcmcia_stork_init,	.exit = pcmcia_stork_exit,	},
+#endif
+#ifdef CONFIG_SA1100_TRIZEPS
+	{ .init = pcmcia_trizeps_init,	.exit = pcmcia_trizeps_exit,	},
+#endif
+#ifdef CONFIG_SA1100_YOPY
+	{ .init = pcmcia_yopy_init,	.exit = pcmcia_yopy_exit,	},
+#endif
+};
 
 /* sa1100_pcmcia_init()
  * ^^^^^^^^^^^^^^^^^^^^
@@ -1115,61 +1153,34 @@ static int __init sa1100_pcmcia_init(void)
 		return -EINVAL;
 	}
 
-	for (i = 0; i < SA1100_PCMCIA_MAX_SOCK; i++) {
-		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
-
-		skt->speed_io   = SA1100_PCMCIA_IO_ACCESS;
-		skt->speed_attr = SA1100_PCMCIA_5V_MEM_ACCESS;
-		skt->speed_mem  = SA1100_PCMCIA_5V_MEM_ACCESS;
-	}
-
 #ifdef CONFIG_CPU_FREQ
 	ret = cpufreq_register_notifier(&sa1100_pcmcia_notifier_block,
 					CPUFREQ_TRANSITION_NOTIFIER);
 	if (ret < 0) {
 		printk(KERN_ERR "Unable to register CPU frequency change "
 			"notifier (%d)\n", ret);
+		driver_unregister(&sa1100_pcmcia_driver);
 		return ret;
 	}
 #endif
 
-#ifdef CONFIG_SA1100_ASSABET
-	pcmcia_assabet_init();
-#endif
-#ifdef CONFIG_SA1100_CERF
-	pcmcia_cerf_init();
-#endif
-#ifdef CONFIG_SA1100_FLEXANET
-	pcmcia_flexanet_init();
-#endif
-#ifdef CONFIG_SA1100_FREEBIRD
-	pcmcia_freebird_init();
-#endif
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-	pcmcia_gcplus_init();
-#endif
-#ifdef CONFIG_SA1100_H3600
-	pcmcia_h3600_init();
-#endif
-#ifdef CONFIG_SA1100_PANGOLIN
-	pcmcia_pangolin_init();
-#endif
-#ifdef CONFIG_SA1100_SHANNON
-	pcmcia_shannon_init();
-#endif
-#ifdef CONFIG_SA1100_SIMPAD
-	pcmcia_simpad_init();
-#endif
-#ifdef CONFIG_SA1100_STORK
-	pcmcia_stork_init();
-#endif
-#ifdef CONFIG_SA1100_TRIZEPS
-	pcmcia_trizeps_init();
-#endif
-#ifdef CONFIG_SA1100_YOPY
-	pcmcia_yopy_init();
-#endif
+	driver_register(&sa1100_pcmcia_driver);
 
+	/*
+	 * Initialise any "on-board" PCMCIA sockets.
+	 */
+	for (i = 0; i < ARRAY_SIZE(sa1100_ll_fns); i++) {
+		ret = sa1100_ll_fns[i].init(&sa1100_pcmcia_device.dev);
+		if (ret == 0)
+			break;
+	}
+
+	if (ret == 0)
+		platform_device_register(&sa1100_pcmcia_device);
+
+	/*
+	 * Don't fail if we don't find any on-board sockets.
+	 */
 	return 0;
 }
 
@@ -1180,48 +1191,14 @@ static int __init sa1100_pcmcia_init(void)
  */
 static void __exit sa1100_pcmcia_exit(void)
 {
-#ifdef CONFIG_SA1100_ASSABET
-	pcmcia_assabet_exit();
-#endif
-#ifdef CONFIG_SA1100_CERF
-	pcmcia_cerf_exit();
-#endif
-#ifdef CONFIG_SA1100_FLEXANET
-	pcmcia_flexanet_exit();
-#endif
-#ifdef CONFIG_SA1100_FREEBIRD
-	pcmcia_freebird_exit();
-#endif
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-	pcmcia_gcplus_exit();
-#endif
-#ifdef CONFIG_SA1100_H3600
-	pcmcia_h3600_exit();
-#endif
-#ifdef CONFIG_SA1100_PANGOLIN
-	pcmcia_pangolin_exit();
-#endif
-#ifdef CONFIG_SA1100_SHANNON
-	pcmcia_shannon_exit();
-#endif
-#ifdef CONFIG_SA1100_SIMPAD
-	pcmcia_simpad_exit();
-#endif
-#ifdef CONFIG_SA1100_STORK
-	pcmcia_stork_exit();
-#endif
-#ifdef CONFIG_SA1100_YOPY
-	pcmcia_yopy_exit();
-#endif
+	platform_device_unregister(&sa1100_pcmcia_device);
 
-	if (pcmcia_low_level) {
-		printk(KERN_ERR "PCMCIA: low level driver still registered\n");
-		sa1100_unregister_pcmcia(pcmcia_low_level);
-	}
 
 #ifdef CONFIG_CPU_FREQ
 	cpufreq_unregister_notifier(&sa1100_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 #endif
+
+	driver_unregister(&sa1100_pcmcia_driver);
 }
 
 MODULE_AUTHOR("John Dorsey <john+@cs.cmu.edu>");

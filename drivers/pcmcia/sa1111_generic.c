@@ -12,6 +12,9 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 
+#include <linux/proc_fs.h>
+#include <pcmcia/ss.h>
+
 #include <asm/hardware.h>
 #include <asm/hardware/sa1111.h>
 #include <asm/irq.h>
@@ -35,9 +38,14 @@ int sa1111_pcmcia_init(struct pcmcia_init *init)
 {
 	int i, ret;
 
+	if (init->socket_irq[0] == NO_IRQ)
+		init->socket_irq[0] = IRQ_S0_READY_NINT;
+	if (init->socket_irq[1] == NO_IRQ)
+		init->socket_irq[1] = IRQ_S1_READY_NINT;
+
 	for (i = ret = 0; i < ARRAY_SIZE(irqs); i++) {
-		ret = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
-				  irqs[i].str, NULL);
+		ret = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
+				  SA_INTERRUPT, irqs[i].str, NULL);
 		if (ret)
 			break;
 		set_irq_type(irqs[i].irq, IRQT_FALLING);
@@ -63,53 +71,39 @@ int sa1111_pcmcia_shutdown(void)
 	return 0;
 }
 
-int sa1111_pcmcia_socket_state(struct pcmcia_state_array *state)
+void sa1111_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-	unsigned long status;
+	unsigned long status = sa1111_readl(pcmcia->mapbase + SA1111_PCSR);
 
-	if (state->size < 2)
-		return -1;
+	switch (sock) {
+	case 0:
+		state->detect = status & PCSR_S0_DETECT ? 0 : 1;
+		state->ready  = status & PCSR_S0_READY  ? 1 : 0;
+		state->bvd1   = status & PCSR_S0_BVD1   ? 1 : 0;
+		state->bvd2   = status & PCSR_S0_BVD2   ? 1 : 0;
+		state->wrprot = status & PCSR_S0_WP     ? 1 : 0;
+		state->vs_3v  = status & PCSR_S0_VS1    ? 0 : 1;
+		state->vs_Xv  = status & PCSR_S0_VS2    ? 0 : 1;
+		break;
 
-	status = sa1111_readl(pcmcia->mapbase + SA1111_PCSR);
-
-	state->state[0].detect = status & PCSR_S0_DETECT ? 0 : 1;
-	state->state[0].ready  = status & PCSR_S0_READY  ? 1 : 0;
-	state->state[0].bvd1   = status & PCSR_S0_BVD1   ? 1 : 0;
-	state->state[0].bvd2   = status & PCSR_S0_BVD2   ? 1 : 0;
-	state->state[0].wrprot = status & PCSR_S0_WP     ? 1 : 0;
-	state->state[0].vs_3v  = status & PCSR_S0_VS1    ? 0 : 1;
-	state->state[0].vs_Xv  = status & PCSR_S0_VS2    ? 0 : 1;
-
-	state->state[1].detect = status & PCSR_S1_DETECT ? 0 : 1;
-	state->state[1].ready  = status & PCSR_S1_READY  ? 1 : 0;
-	state->state[1].bvd1   = status & PCSR_S1_BVD1   ? 1 : 0;
-	state->state[1].bvd2   = status & PCSR_S1_BVD2   ? 1 : 0;
-	state->state[1].wrprot = status & PCSR_S1_WP     ? 1 : 0;
-	state->state[1].vs_3v  = status & PCSR_S1_VS1    ? 0 : 1;
-	state->state[1].vs_Xv  = status & PCSR_S1_VS2    ? 0 : 1;
-
-	return 1;
-}
-
-int sa1111_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
-{
-	int ret = 0;
-
-	switch (info->sock) {
-	case 0:	info->irq = IRQ_S0_READY_NINT;	break;
-	case 1: info->irq = IRQ_S1_READY_NINT;	break;
-	default: ret = 1;
+	case 1:
+		state->detect = status & PCSR_S1_DETECT ? 0 : 1;
+		state->ready  = status & PCSR_S1_READY  ? 1 : 0;
+		state->bvd1   = status & PCSR_S1_BVD1   ? 1 : 0;
+		state->bvd2   = status & PCSR_S1_BVD2   ? 1 : 0;
+		state->wrprot = status & PCSR_S1_WP     ? 1 : 0;
+		state->vs_3v  = status & PCSR_S1_VS1    ? 0 : 1;
+		state->vs_Xv  = status & PCSR_S1_VS2    ? 0 : 1;
+		break;
 	}
-
-	return ret;
 }
 
-int sa1111_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+int sa1111_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
 	unsigned int rst, flt, wait, pse, irq, pccr_mask, val;
 	unsigned long flags;
 
-	switch (conf->sock) {
+	switch (sock) {
 	case 0:
 		rst = PCCR_S0_RST;
 		flt = PCCR_S0_FLT;
@@ -161,11 +155,6 @@ int sa1111_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 	sa1111_writel(val, pcmcia->mapbase + SA1111_PCCR);
 	local_irq_restore(flags);
 
-	if (conf->irq)
-		enable_irq(irq);
-	else
-		disable_irq(irq);
-
 	return 0;
 }
 
@@ -207,28 +196,28 @@ static int pcmcia_probe(struct device *dev)
 	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + SA1111_PCCR);
 
 #ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_init();
+	pcmcia_adsbitsy_init(dev);
 #endif
 #ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_init();
+	pcmcia_badge4_init(dev);
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_init();
+	pcmcia_graphicsmaster_init(dev);
 #endif
 #ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_init();
+	pcmcia_jornada720_init(dev);
 #endif
 #ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_init();
+	pcmcia_neponset_init(dev);
 #endif
 #ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_init();
+	pcmcia_pfs_init(dev);
 #endif
 #ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_init();
+	pcmcia_system3_init(dev);
 #endif
 #ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_init();
+	pcmcia_xp860_init(dev);
 #endif
 	return 0;
 }
@@ -238,28 +227,28 @@ static int __devexit pcmcia_remove(struct device *dev)
 	struct sa1111_dev *sadev = SA1111_DEV(dev);
 
 #ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_exit();
+	pcmcia_adsbitsy_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_exit();
+	pcmcia_badge4_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_exit();
+	pcmcia_graphicsmaster_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_exit();
+	pcmcia_jornada720_exit(dev);
 #endif
 #ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_exit();
+	pcmcia_neponset_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_exit();
+	pcmcia_pfs_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_exit();
+	pcmcia_system3_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_exit();
+	pcmcia_xp860_exit(dev);
 #endif
 
 	release_mem_region(sadev->res.start, 512);
@@ -282,6 +271,7 @@ static struct sa1111_driver pcmcia_driver = {
 	.drv = {
 		.name		= "sa1111-pcmcia",
 		.bus		= &sa1111_bus_type,
+		.devclass	= &pcmcia_socket_class,
 		.probe		= pcmcia_probe,
 		.remove		= __devexit_p(pcmcia_remove),
 		.suspend	= pcmcia_suspend,

@@ -4,9 +4,11 @@
  * XP860 PCMCIA specific routines
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -40,7 +42,7 @@ static int xp860_pcmcia_init(struct pcmcia_init *init)
 }
 
 static int
-xp860_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+xp860_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
   unsigned int gpio_mask, pa_dwr_mask;
   unsigned int gpio_set, pa_dwr_set;
@@ -70,7 +72,7 @@ xp860_pcmcia_configure_socket(const struct pcmcia_configure *conf)
    * the corresponding truth table.
    */
 
-  switch (conf->sock) {
+  switch (sock) {
   case 0:
     pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
     gpio_mask = NCR_A0VPP | NCR_A1VPP;
@@ -117,7 +119,7 @@ xp860_pcmcia_configure_socket(const struct pcmcia_configure *conf)
     break;
   }
 
-  ret = sa1111_pcmcia_configure_socket(conf);
+  ret = sa1111_pcmcia_configure_socket(sock, conf);
   if (ret == 0) {
     unsigned long flags;
 
@@ -132,28 +134,28 @@ xp860_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level xp860_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= xp860_pcmcia_init,
   .shutdown		= sa1111_pcmcia_shutdown,
   .socket_state		= sa1111_pcmcia_socket_state,
-  .get_irq_info		= sa1111_pcmcia_get_irq_info,
   .configure_socket	= xp860_pcmcia_configure_socket,
 
   .socket_init		= sa1111_pcmcia_socket_init,
   .socket_suspend	= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_xp860_init(void)
+int __init pcmcia_xp860_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_xp860())
-		ret = sa1100_register_pcmcia(&xp860_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&xp860_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_xp860_exit(void)
+void __exit pcmcia_xp860_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&xp860_pcmcia_ops);
+	sa1100_unregister_pcmcia(&xp860_pcmcia_ops, dev);
 }
 

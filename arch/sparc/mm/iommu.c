@@ -112,7 +112,7 @@ iommu_init(int iommund, struct sbus_bus *sbus)
 	for (i = 6; i < 9; i++)
 		if ((1 << (i + PAGE_SHIFT)) == ptsize)
 			break;
-        tmp = __get_free_pages(GFP_DMA, i);
+        tmp = __get_free_pages(GFP_KERNEL, i);
 	if (!tmp) {
 		prom_printf("Could not allocate iopte of size 0x%08x\n", ptsize);
 		prom_halt();

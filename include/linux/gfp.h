@@ -49,24 +49,16 @@
 extern struct page * FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
 static inline struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int order)
 {
-	struct pglist_data *pgdat = NODE_DATA(nid);
-	unsigned int idx = (gfp_mask & GFP_ZONEMASK);
-
 	if (unlikely(order >= MAX_ORDER))
 		return NULL;
-	return __alloc_pages(gfp_mask, order, pgdat->node_zonelists + idx);
-}
-static inline struct page * alloc_pages(unsigned int gfp_mask, unsigned int order)
-{
-	struct pglist_data *pgdat = NODE_DATA(numa_node_id());
-	unsigned int idx = (gfp_mask & GFP_ZONEMASK);
 
-	if (unlikely(order >= MAX_ORDER))
-		return NULL;
-	return __alloc_pages(gfp_mask, order, pgdat->node_zonelists + idx);
+	return __alloc_pages(gfp_mask, order, NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
 }
 
-#define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
+#define alloc_pages(gfp_mask, order) \
+		alloc_pages_node(numa_node_id(), gfp_mask, order)
+#define alloc_page(gfp_mask) \
+		alloc_pages_node(numa_node_id(), gfp_mask, 0)
 
 extern unsigned long FASTCALL(__get_free_pages(unsigned int gfp_mask, unsigned int order));
 extern unsigned long FASTCALL(get_zeroed_page(unsigned int gfp_mask));

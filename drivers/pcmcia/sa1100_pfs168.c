@@ -5,9 +5,11 @@
  * PFS168 PCMCIA specific routines
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -29,7 +31,7 @@ static int pfs168_pcmcia_init(struct pcmcia_init *init)
 }
 
 static int
-pfs168_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+pfs168_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
   unsigned int pa_dwr_mask = 0, pa_dwr_set = 0;
   int ret;
@@ -46,7 +48,7 @@ pfs168_pcmcia_configure_socket(const struct pcmcia_configure *conf)
    *
    */
 
-  switch (conf->sock) {
+  switch (sock) {
   case 0:
     pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1 | GPIO_GPIO2 | GPIO_GPIO3;
 
@@ -106,7 +108,7 @@ pfs168_pcmcia_configure_socket(const struct pcmcia_configure *conf)
     break;
   }
 
-  ret = sa1111_pcmcia_configure_socket(conf);
+  ret = sa1111_pcmcia_configure_socket(sock, conf);
   if (ret == 0) {
     unsigned long flags;
 
@@ -119,27 +121,27 @@ pfs168_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level pfs168_pcmcia_ops = {
+  .owner		= THIS_MODULE,
   .init			= pfs168_pcmcia_init,
   .shutdown		= sa1111_pcmcia_shutdown,
   .socket_state		= sa1111_pcmcia_socket_state,
-  .get_irq_info		= sa1111_pcmcia_get_irq_info,
   .configure_socket	= pfs168_pcmcia_configure_socket,
 
   .socket_init		= sa1111_pcmcia_socket_init,
   .socket_suspend	= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_pfs168_init(void)
+int __init pcmcia_pfs168_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_pfs168())
-		ret = sa1100_register_pcmcia(&pfs168_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&pfs168_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_pfs168_exit(void)
+void __exit pcmcia_pfs168_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&pfs168_pcmcia_ops);
+	sa1100_unregister_pcmcia(&pfs168_pcmcia_ops, dev);
 }

@@ -15,16 +15,31 @@
 
 static struct ebt_entries initial_chains[] =
 {
-  {0, "PREROUTING", 0, EBT_ACCEPT, 0},
-  {0, "OUTPUT", 0, EBT_ACCEPT, 0},
-  {0, "POSTROUTING", 0, EBT_ACCEPT, 0}
+	{
+		.name	= "PREROUTING",
+		.policy	= EBT_ACCEPT,
+	},
+	{
+		.name	= "OUTPUT",
+		.policy	= EBT_ACCEPT,
+	},
+	{
+		.name	= "POSTROUTING",
+		.policy	= EBT_ACCEPT,
+	}
 };
 
 static struct ebt_replace initial_table =
 {
-  "nat", NAT_VALID_HOOKS, 0, 3 * sizeof(struct ebt_entries),
-  { [NF_BR_PRE_ROUTING]&initial_chains[0], [NF_BR_LOCAL_OUT]&initial_chains[1],
-    [NF_BR_POST_ROUTING]&initial_chains[2] }, 0, NULL, (char *)initial_chains
+	.name		= "nat",
+	.valid_hooks	= NAT_VALID_HOOKS,
+	.entries_size	= 3 * sizeof(struct ebt_entries),
+	.hook_entry	= {
+		[NF_BR_PRE_ROUTING]	= &initial_chains[0],
+		[NF_BR_LOCAL_OUT]	= &initial_chains[1],
+		[NF_BR_POST_ROUTING]	= &initial_chains[2],
+	},
+	.entries	= (char *)initial_chains
 };
 
 static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
@@ -36,8 +51,11 @@ static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
 
 static struct ebt_table frame_nat =
 {
-  {NULL, NULL}, "nat", &initial_table, NAT_VALID_HOOKS,
-  RW_LOCK_UNLOCKED, check, NULL
+	.name		= "nat",
+	.table		= &initial_table,
+	.valid_hooks	= NAT_VALID_HOOKS,
+	.lock		= RW_LOCK_UNLOCKED,
+	.check		= check,
 };
 
 static unsigned int
@@ -55,12 +73,24 @@ ebt_nat_src(unsigned int hook, struct sk_buff **pskb, const struct net_device *i
 }
 
 static struct nf_hook_ops ebt_ops_nat[] = {
-	{ { NULL, NULL }, ebt_nat_dst, PF_BRIDGE, NF_BR_LOCAL_OUT,
-	   NF_BR_PRI_NAT_DST_OTHER},
-	{ { NULL, NULL }, ebt_nat_src, PF_BRIDGE, NF_BR_POST_ROUTING,
-	   NF_BR_PRI_NAT_SRC},
-	{ { NULL, NULL }, ebt_nat_dst, PF_BRIDGE, NF_BR_PRE_ROUTING,
-	   NF_BR_PRI_NAT_DST_BRIDGED},
+	{
+		.hook		= ebt_nat_dst,
+		.pf		= PF_BRIDGE,
+		.hooknum	= NF_BR_LOCAL_OUT,
+		.priority	= NF_BR_PRI_NAT_DST_OTHER
+	},
+	{
+		.hook		= ebt_nat_src,
+		.pf		= PF_BRIDGE,
+		.hooknum	= NF_BR_POST_ROUTING,
+		.priority	= NF_BR_PRI_NAT_SRC
+	},
+	{
+		.hook		= ebt_nat_dst,
+		.pf		= PF_BRIDGE,
+		.hooknum	= NF_BR_PRE_ROUTING,
+		.priority	= NF_BR_PRI_NAT_DST_BRIDGED
+	},
 };
 
 static int __init init(void)

@@ -68,10 +68,11 @@ typedef struct {
 
 #ifdef __KERNEL__
 
-struct sysinfo;
 struct address_space;
-struct zone;
+struct pte_chain;
+struct sysinfo;
 struct writeback_control;
+struct zone;
 
 /*
  * A swap extent maps a range of a swapfile's PAGE_SIZE pages onto a range of
@@ -140,6 +141,9 @@ struct swap_list_t {
 /* Swap 50% full? Release swapcache more aggressively.. */
 #define vm_swap_full() (nr_swap_pages*2 < total_swap_pages)
 
+/* linux/mm/oom_kill.c */
+extern void out_of_memory(void);
+
 /* linux/mm/page_alloc.c */
 extern unsigned long totalram_pages;
 extern unsigned long totalhigh_pages;
@@ -149,13 +153,11 @@ extern unsigned int nr_free_pages_pgdat(pg_data_t *pgdat);
 extern unsigned int nr_free_buffer_pages(void);
 extern unsigned int nr_free_pagecache_pages(void);
 
-/* linux/mm/filemap.c */
-extern void FASTCALL(mark_page_accessed(struct page *));
-
 /* linux/mm/swap.c */
 extern void FASTCALL(lru_cache_add(struct page *));
 extern void FASTCALL(lru_cache_add_active(struct page *));
 extern void FASTCALL(activate_page(struct page *));
+extern void FASTCALL(mark_page_accessed(struct page *));
 extern void lru_add_drain(void);
 extern int rotate_reclaimable_page(struct page *page);
 extern void swap_setup(void);
@@ -165,11 +167,8 @@ extern int try_to_free_pages(struct zone *, unsigned int, unsigned int);
 extern int shrink_all_memory(int);
 extern int vm_swappiness;
 
-/* linux/mm/oom_kill.c */
-extern void out_of_memory(void);
-
 /* linux/mm/rmap.c */
-struct pte_chain;
+#ifdef CONFIG_MMU
 int FASTCALL(page_referenced(struct page *));
 struct pte_chain *FASTCALL(page_add_rmap(struct page *, pte_t *,
 					struct pte_chain *));
@@ -185,6 +184,11 @@ int FASTCALL(page_over_rsslimit(struct page *));
 
 /* linux/mm/shmem.c */
 extern int shmem_unuse(swp_entry_t entry, struct page *page);
+
+#else
+#define page_referenced(page) \
+	TestClearPageReferenced(page)
+#endif /* CONFIG_MMU */
 
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */
@@ -242,8 +246,6 @@ extern spinlock_t swaplock;
 	page_cache_release(page)
 #define free_pages_and_swap_cache(pages, nr) \
 	release_pages((pages), (nr), 0);
-#define page_referenced(page) \
-	TestClearPageReferenced(page)
 
 #define show_swap_cache_info()			/*NOTHING*/
 #define free_swap_and_cache(swp)		/*NOTHING*/

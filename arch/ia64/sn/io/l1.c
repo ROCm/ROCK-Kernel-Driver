@@ -2602,7 +2602,7 @@ subch_pull_msg( brl1_sch_t *subch, char *msg, int *len )
 {
     sc_cq_t *q;         /* receive queue */
     int before_wrap,    /* packet may be split into two different       */
-        after_wrap;     /*   pieces to acommodate queue wraparound      */
+        after_wrap;     /*   pieces to accommodate queue wraparound      */
 
     /* pull message off the receive queue */
     q = subch->iqp;

@@ -444,7 +444,7 @@ SK_IOC	IoC)	/* I/O Context */
 /*
  * Receive an ACK.
  *
- * returns	0 If acknoledged
+ * returns	0 If acknowledged
  *		1 in case of an error
  */
 int SkI2cRcvAck(

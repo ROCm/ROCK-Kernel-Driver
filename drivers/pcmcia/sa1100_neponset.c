@@ -3,6 +3,7 @@
  *
  * Neponset PCMCIA specific routines
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/device.h>
@@ -58,13 +59,13 @@ static int neponset_pcmcia_init(struct pcmcia_init *init)
 }
 
 static int
-neponset_pcmcia_configure_socket(const struct pcmcia_configure *conf)
+neponset_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 {
 	unsigned int ncr_mask, pa_dwr_mask;
 	unsigned int ncr_set, pa_dwr_set;
 	int ret;
 
-	switch (conf->sock) {
+	switch (sock) {
 	case 0:
 		pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
 		ncr_mask = NCR_A0VPP | NCR_A1VPP;
@@ -113,7 +114,7 @@ neponset_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 		return -1;
 	}
 
-	ret = sa1111_pcmcia_configure_socket(conf);
+	ret = sa1111_pcmcia_configure_socket(sock, conf);
 	if (ret == 0) {
 		unsigned long flags;
 
@@ -127,27 +128,27 @@ neponset_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level neponset_pcmcia_ops = {
+	.owner			= THIS_MODULE,
 	.init			= neponset_pcmcia_init,
 	.shutdown		= sa1111_pcmcia_shutdown,
 	.socket_state		= sa1111_pcmcia_socket_state,
-	.get_irq_info		= sa1111_pcmcia_get_irq_info,
 	.configure_socket	= neponset_pcmcia_configure_socket,
 
 	.socket_init		= sa1111_pcmcia_socket_init,
 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_neponset_init(void)
+int __init pcmcia_neponset_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_assabet())
-		ret = sa1100_register_pcmcia(&neponset_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&neponset_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __devexit pcmcia_neponset_exit(void)
+void __devexit pcmcia_neponset_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&neponset_pcmcia_ops);
+	sa1100_unregister_pcmcia(&neponset_pcmcia_ops, dev);
 }

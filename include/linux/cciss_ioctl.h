@@ -33,6 +33,18 @@ typedef __u32 BusTypes_type;
 typedef char FirmwareVer_type[4];
 typedef __u32 DriverVer_type;
 
+#define MAX_KMALLOC_SIZE 128000
+
+typedef struct _BIG_IOCTL_Command_struct {
+  LUNAddr_struct	   LUN_info;
+  RequestBlock_struct      Request;
+  ErrorInfo_struct  	   error_info; 
+  DWORD			   malloc_size; /* < MAX_KMALLOC_SIZE in cciss.c */
+  DWORD			   buf_size;    /* size in bytes of the buf */
+  				        /* < malloc_size * MAXSGENTRIES */
+  BYTE			   *buf;
+} BIG_IOCTL_Command_struct;
+
 
 #ifndef CCISS_CMD_H
 // This defines are duplicated in cciss_cmd.h in the driver directory 
@@ -169,6 +181,11 @@ typedef struct _IOCTL_Command_struct {
   BYTE			   *buf;
 } IOCTL_Command_struct;
 
+typedef struct _LogvolInfo_struct{
+	__u32	LunID;
+	int	num_opens;  /* number of opens on the logical volume */
+	int	num_parts;  /* number of partitions configured on logvol */
+} LogvolInfo_struct;
 
 #define CCISS_GETPCIINFO _IOR(CCISS_IOC_MAGIC, 1, cciss_pci_info_struct)
 
@@ -190,5 +207,7 @@ typedef struct _IOCTL_Command_struct {
 #define CCISS_REGNEWDISK  _IOW(CCISS_IOC_MAGIC, 13, int)
 
 #define CCISS_REGNEWD	   _IO(CCISS_IOC_MAGIC, 14)
+#define CCISS_GETLUNINFO   _IOR(CCISS_IOC_MAGIC, 17, LogvolInfo_struct)
+#define CCISS_BIG_PASSTHRU _IOWR(CCISS_IOC_MAGIC, 18, BIG_IOCTL_Command_struct)
 
 #endif  

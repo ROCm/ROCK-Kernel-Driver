@@ -3627,7 +3627,7 @@ SK_U32 Val)		/* pointer to store the read value */
  * Description:
  *	This routine writes a 16 bit value to the pci configuration
  *	space. The flag PciConfigUp indicates whether the config space
- *	is accesible or must be set up first.
+ *	is accessible or must be set up first.
  *
  * Returns:
  *	0 - indicate everything worked ok.
@@ -3650,7 +3650,7 @@ SK_U16 Val)		/* pointer to store the read value */
  * Description:
  *	This routine writes a 8 bit value to the pci configuration
  *	space. The flag PciConfigUp indicates whether the config space
- *	is accesible or must be set up first.
+ *	is accessible or must be set up first.
  *
  * Returns:
  *	0 - indicate everything worked ok.

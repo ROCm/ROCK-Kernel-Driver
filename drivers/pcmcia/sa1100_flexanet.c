@@ -5,9 +5,10 @@
  * by Jordi Colomer, 09/05/2001
  *
  */
-
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -40,18 +41,17 @@ static int flexanet_pcmcia_init(struct pcmcia_init *init)
   GPDR &= ~(GPIO_CF1_NCD | GPIO_CF1_BVD1 | GPIO_CF1_IRQ |
             GPIO_CF2_NCD | GPIO_CF2_BVD1 | GPIO_CF2_IRQ );
 
-  /* Set IRQ edge */
-  set_irq_type(IRQ_GPIO_CF1_IRQ, IRQT_FALLING);
-  set_irq_type(IRQ_GPIO_CF2_IRQ, IRQT_FALLING);
-
   /* Register the socket interrupts (not the card interrupts) */
   for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-    res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
+    res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt, SA_INTERRUPT,
 		      irqs[i].name, NULL);
     if (res < 0)
       break;
+    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
   }
+
+  init->socket_irq[0] = IRQ_GPIO_CF1_IRQ;
+  init->socket_irq[1] = IRQ_GPIO_CF2_IRQ;
 
   /* If we failed, then free all interrupts requested thus far. */
   if (res < 0) {
@@ -88,67 +88,43 @@ static int flexanet_pcmcia_shutdown(void)
  *  Sockets in Flexanet are 3.3V only, without BVD2.
  *
  */
-static int flexanet_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-  unsigned long levels;
+static void flexanet_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+{
+  unsigned long levels = GPLR; /* Sense the GPIOs, asynchronously */
 
-  if (state_array->size < 2)
-    return -1;
+  switch (sock) {
+  case 0: /* Socket 0 */
+    state->detect = ((levels & GPIO_CF1_NCD)==0)?1:0;
+    state->ready  = (levels & GPIO_CF1_IRQ)?1:0;
+    state->bvd1   = (levels & GPIO_CF1_BVD1)?1:0;
+    state->bvd2   = 1;
+    state->wrprot = 0;
+    state->vs_3v  = 1;
+    state->vs_Xv  = 0;
+    break;
 
-  /* Sense the GPIOs, asynchronously */
-  levels = GPLR;
-
-  /* Socket 0 */
-  state_array->state[0].detect = ((levels & GPIO_CF1_NCD)==0)?1:0;
-  state_array->state[0].ready  = (levels & GPIO_CF1_IRQ)?1:0;
-  state_array->state[0].bvd1   = (levels & GPIO_CF1_BVD1)?1:0;
-  state_array->state[0].bvd2   = 1;
-  state_array->state[0].wrprot = 0;
-  state_array->state[0].vs_3v  = 1;
-  state_array->state[0].vs_Xv  = 0;
-
-  /* Socket 1 */
-  state_array->state[1].detect = ((levels & GPIO_CF2_NCD)==0)?1:0;
-  state_array->state[1].ready  = (levels & GPIO_CF2_IRQ)?1:0;
-  state_array->state[1].bvd1   = (levels & GPIO_CF2_BVD1)?1:0;
-  state_array->state[1].bvd2   = 1;
-  state_array->state[1].wrprot = 0;
-  state_array->state[1].vs_3v  = 1;
-  state_array->state[1].vs_Xv  = 0;
-
-  return 1;
-}
-
-
-/*
- * Return the IRQ information for a given socket number (the IRQ number)
- *
- */
-static int flexanet_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
-
-  /* check the socket index */
-  if (info->sock > 1)
-    return -1;
-
-  if (info->sock == 0)
-    info->irq = IRQ_GPIO_CF1_IRQ;
-  else if (info->sock == 1)
-    info->irq = IRQ_GPIO_CF2_IRQ;
-
-  return 0;
+  case 1: /* Socket 1 */
+    state->detect = ((levels & GPIO_CF2_NCD)==0)?1:0;
+    state->ready  = (levels & GPIO_CF2_IRQ)?1:0;
+    state->bvd1   = (levels & GPIO_CF2_BVD1)?1:0;
+    state->bvd2   = 1;
+    state->wrprot = 0;
+    state->vs_3v  = 1;
+    state->vs_Xv  = 0;
+    break;
+  }
 }
 
 
 /*
  *
  */
-static int flexanet_pcmcia_configure_socket(const struct pcmcia_configure
+static int flexanet_pcmcia_configure_socket(int sock, const struct pcmcia_configure
 					   *configure)
 {
   unsigned long value, flags, mask;
 
-
-  if (configure->sock > 1)
+  if (sock > 1)
     return -1;
 
   /* Ignore the VCC level since it is 3.3V and always on */
@@ -174,7 +150,7 @@ static int flexanet_pcmcia_configure_socket(const struct pcmcia_configure
   /* Reset the slot(s) using the controls in the BCR */
   mask = 0;
 
-  switch (configure->sock)
+  switch (sock)
   {
     case 0 : mask = FHH_BCR_CF1_RST; break;
     case 1 : mask = FHH_BCR_CF2_RST; break;
@@ -222,28 +198,28 @@ static int flexanet_pcmcia_socket_suspend(int sock)
  *
  */
 static struct pcmcia_low_level flexanet_pcmcia_ops = {
+  .owner		= THIS_MODULE,
   .init			= flexanet_pcmcia_init,
   .shutdown		= flexanet_pcmcia_shutdown,
   .socket_state		= flexanet_pcmcia_socket_state,
-  .get_irq_info		= flexanet_pcmcia_get_irq_info,
   .configure_socket	= flexanet_pcmcia_configure_socket,
 
   .socket_init		= flexanet_pcmcia_socket_init,
   .socket_suspend	= flexanet_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_flexanet_init(void)
+int __init pcmcia_flexanet_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_flexanet())
-		ret = sa1100_register_pcmcia(&flexanet_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&flexanet_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_flexanet_exit(void)
+void __exit pcmcia_flexanet_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&flexanet_pcmcia_ops);
+	sa1100_unregister_pcmcia(&flexanet_pcmcia_ops, dev);
 }
 

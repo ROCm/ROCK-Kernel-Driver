@@ -86,7 +86,7 @@ static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
 }
 
 /*
- * GPIO IRQs must be acknoledged.  This is for GPIO 0 and 1.
+ * GPIO IRQs must be acknowledged.  This is for GPIO 0 and 1.
  */
 
 static void pxa_ack_low_gpio(unsigned int irq)

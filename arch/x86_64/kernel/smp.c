@@ -328,7 +328,7 @@ void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 	preempt_enable();
 }
 
-static inline void do_flush_tlb_all_local(void)
+static void do_flush_tlb_all(void* info)
 {
 	unsigned long cpu = smp_processor_id();
 
@@ -337,18 +337,9 @@ static inline void do_flush_tlb_all_local(void)
 		leave_mm(cpu);
 }
 
-static void flush_tlb_all_ipi(void* info)
-{
-	do_flush_tlb_all_local();
-}
-
 void flush_tlb_all(void)
 {
-	preempt_disable();
-	smp_call_function (flush_tlb_all_ipi,0,1,1);
-
-	do_flush_tlb_all_local();
-	preempt_enable();
+	on_each_cpu(do_flush_tlb_all, 0, 1, 1);
 }
 
 void smp_kdb_stop(void)

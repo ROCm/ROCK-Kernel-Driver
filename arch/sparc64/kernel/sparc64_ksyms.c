@@ -114,6 +114,8 @@ extern void _do_write_unlock(rwlock_t *rw);
 extern unsigned long phys_base;
 extern unsigned long pfn_base;
 
+extern unsigned int sys_call_table[];
+
 /* used by various drivers */
 #ifdef CONFIG_SMP
 #ifndef CONFIG_DEBUG_SPINLOCK
@@ -374,3 +376,6 @@ EXPORT_SYMBOL(do_BUG);
 
 /* for ns8703 */
 EXPORT_SYMBOL(ns87303_lock);
+
+/* for solaris compat module */
+EXPORT_SYMBOL_GPL(sys_call_table);

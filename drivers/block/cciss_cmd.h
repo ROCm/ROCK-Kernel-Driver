@@ -240,6 +240,7 @@ typedef struct _CommandList_struct {
   struct _CommandList_struct *next;
   struct request *	   rq;
   struct completion *waiting;
+  int	 retry_count;
 #ifdef CONFIG_CISS_SCSI_TAPE
   void * scsi_cmd;
 #endif

@@ -4,7 +4,7 @@
  * Copyright (C) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  * Author(s): Gerhard Tonn (ton@de.ibm.com)
  *
- * Seperated from binfmt_elf32.c to reduce exports for module enablement.
+ * Separated from binfmt_elf32.c to reduce exports for module enablement.
  *
  */
 

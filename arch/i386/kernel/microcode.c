@@ -183,11 +183,10 @@ static int do_microcode_update(void)
 	int i, error = 0, err;
 	struct microcode *m;
 
-	if (smp_call_function(do_update_one, NULL, 1, 1) != 0) {
+	if (on_each_cpu(do_update_one, NULL, 1, 1) != 0) {
 		printk(KERN_ERR "microcode: IPI timeout, giving up\n");
 		return -EIO;
 	}
-	do_update_one(NULL);
 
 	for (i=0; i<NR_CPUS; i++) {
 		err = update_req[i].err;

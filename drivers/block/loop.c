@@ -447,7 +447,22 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 		goto out_bh;
 	}
 
-	bio = bio_copy(rbh, GFP_NOIO, rbh->bi_rw & WRITE);
+	/*
+	 * When called on the page reclaim -> writepage path, this code can
+	 * trivially consume all memory.  So we drop PF_MEMALLOC to avoid
+	 * stealing all the page reserves and throttle to the writeout rate.
+	 * pdflush will have been woken by page reclaim.  Let it do its work.
+	 */
+	do {
+		int flags = current->flags;
+
+		current->flags &= ~PF_MEMALLOC;
+		bio = bio_copy(rbh, (GFP_ATOMIC & ~__GFP_HIGH) | __GFP_NOWARN,
+					rbh->bi_rw & WRITE);
+		current->flags = flags;
+		if (bio == NULL)
+			blk_congestion_wait(WRITE, HZ/10);
+	} while (bio == NULL);
 
 	bio->bi_end_io = loop_end_io_transfer;
 	bio->bi_private = rbh;

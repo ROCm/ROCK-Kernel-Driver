@@ -94,17 +94,13 @@ static struct ipt_match helper_match
 
 static int __init init(void)
 {
-	/* NULL if ip_conntrack not a module */
-	if (ip_conntrack_module)
-		__MOD_INC_USE_COUNT(ip_conntrack_module);
+	need_ip_conntrack();
 	return ipt_register_match(&helper_match);
 }
 
 static void __exit fini(void)
 {
 	ipt_unregister_match(&helper_match);
-	if (ip_conntrack_module)
-		__MOD_DEC_USE_COUNT(ip_conntrack_module);
 }
 
 module_init(init);

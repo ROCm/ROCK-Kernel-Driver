@@ -481,8 +481,7 @@ static void
 do_machine_quiesce(void)
 {
 	cpu_quiesce_map = cpu_online_map;
-	smp_call_function(do_load_quiesce_psw, NULL, 0, 0);
-	do_load_quiesce_psw(NULL);
+	on_each_cpu(do_load_quiesce_psw, NULL, 0, 0);
 }
 #else
 static void

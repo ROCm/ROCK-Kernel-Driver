@@ -233,8 +233,6 @@ static int suni_start(struct atm_dev *dev)
 	if (!(PRIV(dev) = kmalloc(sizeof(struct suni_priv),GFP_KERNEL)))
 		return -ENOMEM;
 
-	MOD_INC_USE_COUNT;
-
 	PRIV(dev)->dev = dev;
 	spin_lock_irqsave(&sunis_lock,flags);
 	first = !sunis;
@@ -280,7 +278,6 @@ static int suni_stop(struct atm_dev *dev)
 	spin_unlock_irqrestore(&sunis_lock,flags);
 	kfree(PRIV(dev));
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -293,7 +290,7 @@ static const struct atmphy_ops suni_ops = {
 };
 
 
-int __init suni_init(struct atm_dev *dev)
+int suni_init(struct atm_dev *dev)
 {
 	unsigned char mri;
 

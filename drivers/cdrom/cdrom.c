@@ -173,7 +173,7 @@
   -- Fixed the CDROMREADxxx ioctls.
   -- CDROMPLAYTRKIND uses the GPCMD_PLAY_AUDIO_MSF command - too few
   drives supported it. We lose the index part, however.
-  -- Small modifications to accomodate opens of /dev/hdc1, required
+  -- Small modifications to accommodate opens of /dev/hdc1, required
   for ide-cd to handle multisession discs.
   -- Export cdrom_mode_sense and cdrom_mode_select.
   -- init_cdrom_command() for setting up a cgc command.

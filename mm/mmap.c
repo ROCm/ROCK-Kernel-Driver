@@ -797,17 +797,27 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 		unsigned long pgoff, unsigned long flags)
 {
 	if (flags & MAP_FIXED) {
+		unsigned long ret;
+
 		if (addr > TASK_SIZE - len)
 			return -ENOMEM;
 		if (addr & ~PAGE_MASK)
 			return -EINVAL;
-		if (file && is_file_hugepages(file)) {
-			unsigned long ret;
-
+		if (file && is_file_hugepages(file))  {
+			/*
+			 * Make sure that addr and length are properly aligned.
+			 */
 			ret = is_aligned_hugepage_range(addr, len);
-			if (ret)
-				return ret;
+		} else {
+			/*
+			 * Ensure that a normal request is not falling in a
+			 * reserved hugepage range.  For some archs like IA-64,
+			 * there is a separate region for hugepages.
+			 */
+			ret = check_valid_hugepage_range(addr, len);
 		}
+		if (ret)
+			return ret;
 		return addr;
 	}
 

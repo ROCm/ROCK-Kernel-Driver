@@ -1,6 +1,6 @@
 /* radiotrack (radioreveal) driver for Linux radio support
  * (c) 1997 M. Kirkwood
- * Coverted to new API by Alan Cox <Alan.Cox@linux.org>
+ * Converted to new API by Alan Cox <Alan.Cox@linux.org>
  * Various bugfixes and enhancements by Russell Kroll <rkroll@exploits.org>
  *
  * History:

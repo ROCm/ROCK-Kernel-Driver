@@ -478,9 +478,9 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 	if (me->me && !(me->flags & IP_NAT_HELPER_F_STANDALONE)) {
 		struct ip_conntrack_helper *ct_helper;
 		
-		if ((ct_helper = ip_ct_find_helper(&me->tuple))
-		    && ct_helper->me) {
-			__MOD_INC_USE_COUNT(ct_helper->me);
+		if ((ct_helper = ip_ct_find_helper(&me->tuple))) {
+			if (!try_module_get(ct_helper->me))
+				return -EBUSY;
 		} else {
 			/* We are a NAT helper for protocol X.  If we need
 			 * respective conntrack helper for protoccol X, compute
@@ -498,9 +498,9 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 			sprintf(name, "ip_conntrack%s", tmp);
 #ifdef CONFIG_KMOD
 			if (!request_module(name)
-			    && (ct_helper = ip_ct_find_helper(&me->tuple))
-			    && ct_helper->me) {
-				__MOD_INC_USE_COUNT(ct_helper->me);
+			    && (ct_helper = ip_ct_find_helper(&me->tuple))) {
+				if (!try_module_get(ct_helper->me))
+					return -EBUSY;
 			} else {
 				printk("unable to load module %s\n", name);
 				return -EBUSY;
@@ -516,10 +516,8 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 	WRITE_LOCK(&ip_nat_lock);
 	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple))
 		ret = -EBUSY;
-	else {
+	else
 		list_prepend(&helpers, me);
-		MOD_INC_USE_COUNT;
-	}
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	return ret;
@@ -539,13 +537,10 @@ kill_helper(const struct ip_conntrack *i, void *helper)
 
 void ip_nat_helper_unregister(struct ip_nat_helper *me)
 {
-	int found = 0;
-	
 	WRITE_LOCK(&ip_nat_lock);
 	/* Autoloading conntrack helper might have failed */
 	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple)) {
 		LIST_DELETE(&helpers, me);
-		found = 1;
 	}
 	WRITE_UNLOCK(&ip_nat_lock);
 
@@ -562,18 +557,13 @@ void ip_nat_helper_unregister(struct ip_nat_helper *me)
 	   worse. --RR */
 	ip_ct_selective_cleanup(kill_helper, me);
 
-	if (found)
-		MOD_DEC_USE_COUNT;
-
 	/* If we are no standalone NAT helper, we need to decrement usage count
 	 * on our conntrack helper */
 	if (me->me && !(me->flags & IP_NAT_HELPER_F_STANDALONE)) {
 		struct ip_conntrack_helper *ct_helper;
 		
-		if ((ct_helper = ip_ct_find_helper(&me->tuple))
-		    && ct_helper->me) {
-			__MOD_DEC_USE_COUNT(ct_helper->me);
-		}
+		if ((ct_helper = ip_ct_find_helper(&me->tuple)))
+			module_put(ct_helper->me);
 #ifdef CONFIG_MODULES
 		else 
 			printk("%s: unable to decrement usage count"
