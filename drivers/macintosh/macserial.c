@@ -38,8 +38,10 @@
 #include <asm/irq.h>
 #include <asm/prom.h>
 #include <asm/system.h>
+#include <asm/segment.h>
 #include <asm/bitops.h>
-#include <asm/feature.h>
+#include <asm/machdep.h>
+#include <asm/pmac_feature.h>
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #ifdef CONFIG_KGDB
@@ -58,6 +60,7 @@ static struct pmu_sleep_notifier serial_sleep_notifier = {
 #endif
 
 #define SUPPORT_SERIAL_DMA
+#define MACSERIAL_VERSION	"2.0"
 
 /*
  * It would be nice to dynamically allocate everything that
@@ -181,7 +184,7 @@ static DECLARE_MUTEX(tmp_buf_sem);
 
 static inline int __pmac
 serial_paranoia_check(struct mac_serial *info,
-		      dev_t device, const char *routine)
+		      kdev_t device, const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
 	static const char badmagic[] = KERN_WARNING
@@ -190,11 +193,11 @@ serial_paranoia_check(struct mac_serial *info,
 		"Warning: null mac_serial for (%d, %d) in %s\n";
 
 	if (!info) {
-		printk(badinfo, MAJOR(device), MINOR(device), routine);
+		printk(badinfo, major(device), minor(device), routine);
 		return 1;
 	}
 	if (info->magic != SERIAL_MAGIC) {
-		printk(badmagic, MAJOR(device), MINOR(device), routine);
+		printk(badmagic, major(device), minor(device), routine);
 		return 1;
 	}
 #endif
@@ -1030,7 +1033,7 @@ static int setup_scc(struct mac_serial * info)
 {
 	unsigned long flags;
 
-	OPNDBG("setting up ttys%d SCC...\n", info->line);
+	OPNDBG("setting up ttyS%d SCC...\n", info->line);
 
 	save_flags(flags); cli(); /* Disable interrupts */
 
@@ -1178,7 +1181,7 @@ static void shutdown(struct mac_serial * info)
 	}
 
 	memset(info->curregs, 0, sizeof(info->curregs));
-	memset(info->curregs, 0, sizeof(info->pendregs));
+	memset(info->pendregs, 0, sizeof(info->pendregs));
 
 	info->flags &= ~ZILOG_INITIALIZED;
 }
@@ -1193,69 +1196,34 @@ static int set_scc_power(struct mac_serial * info, int state)
 {
 	int delay = 0;
 
-	if (feature_test(info->dev_node, FEATURE_Serial_enable) < 0)
-		return 0;	/* don't have serial power control */
-
-	/* The timings looks strange but that's the ones MacOS seems
-	   to use for the internal modem. I think we can use a lot faster
-	   ones, at least whe not using the modem, this should be tested.
-	 */
 	if (state) {
-		PWRDBG("ttyS%02d: powering up hardware\n", info->line);
-		if (feature_test(info->dev_node, FEATURE_Serial_enable) == 0) {
-			feature_set(info->dev_node, FEATURE_Serial_enable);
-			mdelay(10);
-			feature_set(info->dev_node, FEATURE_Serial_reset);
-			mdelay(15);
-			feature_clear(info->dev_node, FEATURE_Serial_reset);
-			mdelay(10);
-		}
-		if (info->zs_chan_a == info->zs_channel)
-			feature_set(info->dev_node, FEATURE_Serial_IO_A);
-		else
-			feature_set(info->dev_node, FEATURE_Serial_IO_B);
-		delay = 10;
-		if (info->is_cobalt_modem) {
-			feature_set_modem_power(info->dev_node, 1);
+		PWRDBG("ttyS%d: powering up hardware\n", info->line);
+		pmac_call_feature(
+			PMAC_FTR_SCC_ENABLE,
+			info->dev_node, info->port_type, 1);
+		if (info->is_internal_modem) {
+			pmac_call_feature(
+				PMAC_FTR_MODEM_ENABLE,
+				info->dev_node, 0, 1);
 			delay = 2500;	/* wait for 2.5s before using */
-		}
-#ifdef CONFIG_PMAC_PBOOK
-		if (info->is_irda)
-			pmu_enable_irled(1);
-#endif /* CONFIG_PMAC_PBOOK */
+		} else if (info->is_irda)
+			mdelay(50);	/* Do better here once the problems
+			                 * with blocking have been ironed out
+			                 */
 	} else {
 		/* TODO: Make that depend on a timer, don't power down
 		 * immediately
 		 */
-		PWRDBG("ttyS%02d: shutting down hardware\n", info->line);
-		if (info->is_cobalt_modem) {
-			PWRDBG("ttyS%02d: shutting down modem\n", info->line);
-			feature_set_modem_power(info->dev_node, 0);
+		PWRDBG("ttyS%d: shutting down hardware\n", info->line);
+		if (info->is_internal_modem) {
+			PWRDBG("ttyS%d: shutting down modem\n", info->line);
+			pmac_call_feature(
+				PMAC_FTR_MODEM_ENABLE,
+				info->dev_node, 0, 0);
 		}
-#ifdef CONFIG_PMAC_PBOOK
-		if (info->is_irda)
-			pmu_enable_irled(0);
-#endif /* CONFIG_PMAC_PBOOK */
-
-		if (info->zs_chan_a == info->zs_channel && !info->is_irda) {
-			PWRDBG("ttyS%02d: shutting down SCC channel A\n", info->line);
-			feature_clear(info->dev_node, FEATURE_Serial_IO_A);
-		} else if (!info->is_irda) {
-			PWRDBG("ttyS%02d: shutting down SCC channel B\n", info->line);
-			feature_clear(info->dev_node, FEATURE_Serial_IO_B);
-		}
-		/* XXX for now, shut down SCC core only on powerbooks */
-		if (is_powerbook
-		    && !(feature_test(info->dev_node, FEATURE_Serial_IO_A) ||
-			 feature_test(info->dev_node, FEATURE_Serial_IO_B))) {
-			PWRDBG("ttyS%02d: shutting down SCC core\n", info->line);
-			feature_set(info->dev_node, FEATURE_Serial_reset);
-			mdelay(15);
-			feature_clear(info->dev_node, FEATURE_Serial_reset);
-			mdelay(25);
-			feature_clear(info->dev_node, FEATURE_Serial_enable);
-			mdelay(5);
-		}
+		pmac_call_feature(
+			PMAC_FTR_SCC_ENABLE,
+			info->dev_node, info->port_type, 0);
 	}
 	return delay;
 }
@@ -1988,7 +1956,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		return;
 	}
 
-	OPNDBG("rs_close ttys%d, count = %d\n", info->line, info->count);
+	OPNDBG("rs_close ttyS%d, count = %d\n", info->line, info->count);
 	if ((tty->count == 1) && (info->count != 1)) {
 		/*
 		 * Uh, oh.  tty->count is 1, which means that the tty
@@ -2003,7 +1971,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	if (--info->count < 0) {
 		printk(KERN_ERR "rs_close: bad serial port count for "
-				"ttys%d: %d\n", info->line, info->count);
+				"ttyS%d: %d\n", info->line, info->count);
 		info->count = 0;
 	}
 	if (info->count) {
@@ -2220,7 +2188,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	retval = 0;
 	add_wait_queue(&info->open_wait, &wait);
-	OPNDBG("block_til_ready before block: ttys%d, count = %d\n",
+	OPNDBG("block_til_ready before block: ttyS%d, count = %d\n",
 	       info->line, info->count);
 	cli();
 	if (!tty_hung_up_p(filp)) 
@@ -2255,7 +2223,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 			retval = -ERESTARTSYS;
 			break;
 		}
-		OPNDBG("block_til_ready blocking: ttys%d, count = %d\n",
+		OPNDBG("block_til_ready blocking: ttyS%d, count = %d\n",
 		       info->line, info->count);
 		schedule();
 	}
@@ -2264,7 +2232,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	if (!tty_hung_up_p(filp))
 		info->count++;
 	info->blocked_open--;
-	OPNDBG("block_til_ready after blocking: ttys%d, count = %d\n",
+	OPNDBG("block_til_ready after blocking: ttyS%d, count = %d\n",
 	       info->line, info->count);
 	if (retval)
 		return retval;
@@ -2285,7 +2253,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	unsigned long		page;
 
 	MOD_INC_USE_COUNT;
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= zs_channels_found)) {
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;
@@ -2365,7 +2333,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	info->session = current->session;
 	info->pgrp = current->pgrp;
 
-	OPNDBG("rs_open ttys%d successful...\n", info->line);
+	OPNDBG("rs_open ttyS%d successful...\n", info->line);
 	return 0;
 }
 
@@ -2373,14 +2341,14 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 
 static void show_serial_version(void)
 {
-	printk(KERN_INFO "PowerMac Z8530 serial driver version 2.0\n");
+	printk(KERN_INFO "PowerMac Z8530 serial driver version " MACSERIAL_VERSION "\n");
 }
 
 /*
  * Initialize one channel, both the mac_serial and mac_zschannel
  * structs.  We use the dev_node field of the mac_serial struct.
  */
-static void
+static int
 chan_init(struct mac_serial *zss, struct mac_zschannel *zs_chan,
 	  struct mac_zschannel *zs_chan_a)
 {
@@ -2410,12 +2378,15 @@ chan_init(struct mac_serial *zss, struct mac_zschannel *zs_chan,
 
 	/* setup misc varariables */
 	zss->kgdb_channel = 0;
-	zss->is_cobalt_modem = device_is_compatible(ch, "cobalt");
 
-	/* XXX tested only with wallstreet PowerBook,
-	   should do no harm anyway */
+	/* For now, we assume you either have a slot-names property
+	 * with "Modem" in it, or your channel is compatible with
+	 * "cobalt". Might need additional fixups
+	 */
+	zss->is_internal_modem = device_is_compatible(ch, "cobalt");
 	conn = get_property(ch, "AAPL,connector", &len);
 	zss->is_irda = conn && (strcmp(conn, "infrared") == 0);
+	zss->port_type = PMAC_SCC_ASYNC;
 	/* 1999 Powerbook G3 has slot-names property instead */
 	slots = (struct slot_names_prop *)get_property(ch, "slot-names", &len);
 	if (slots && slots->count > 0) {
@@ -2424,8 +2395,29 @@ chan_init(struct mac_serial *zss, struct mac_zschannel *zs_chan,
 		else if (strcmp(slots->name, "Modem") == 0)
 			zss->is_internal_modem = 1;
 	}
+	if (zss->is_irda)
+		zss->port_type = PMAC_SCC_IRDA;
+	if (zss->is_internal_modem) {
+		struct device_node* i2c_modem = find_devices("i2c-modem");
+		if (i2c_modem) {
+			char* mid = get_property(i2c_modem, "modem-id", NULL);
+			if (mid) switch(*mid) {
+			case 0x04 :
+			case 0x05 :
+			case 0x07 :
+			case 0x08 :
+			case 0x0b :
+			case 0x0c :
+				zss->port_type = PMAC_SCC_I2S1;
+			}
+			printk(KERN_INFO "macserial: i2c-modem detected, id: %d\n",
+				mid ? (*mid) : 0);
+		} else {
+			printk(KERN_INFO "macserial: serial modem detected\n");
+		}
+	}
 
-	if (zss->has_dma) {
+	while (zss->has_dma) {
 		zss->dma_priv = NULL;
 		/* it seems that the last two addresses are the
 		   DMA controllers */
@@ -2436,11 +2428,69 @@ chan_init(struct mac_serial *zss, struct mac_zschannel *zs_chan,
 		zss->tx_dma_irq = ch->intrs[1].line;
 		zss->rx_dma_irq = ch->intrs[2].line;
 		spin_lock_init(&zss->rx_dma_lock);
+		break;
 	}
 
 	init_timer(&zss->powerup_timer);
 	zss->powerup_timer.function = powerup_done;
 	zss->powerup_timer.data = (unsigned long) zss;
+	return 0;
+}
+
+/*
+ * /proc fs routines. TODO: Add status lines & error stats
+ */
+static inline int
+line_info(char *buf, struct mac_serial *info)
+{
+	int		ret=0;
+	unsigned char* connector;
+	int lenp;
+
+	ret += sprintf(buf, "%d: port:0x%X irq:%d", info->line, info->port, info->irq);
+
+	connector = get_property(info->dev_node, "AAPL,connector", &lenp);
+	if (connector)
+		ret+=sprintf(buf+ret," con:%s ", connector);
+	if (info->is_internal_modem) {
+		if (!connector)
+			ret+=sprintf(buf+ret," con:");
+		ret+=sprintf(buf+ret,"%s", " (internal modem)");
+	}
+	if (info->is_irda) {
+		if (!connector)
+			ret+=sprintf(buf+ret," con:");
+		ret+=sprintf(buf+ret,"%s", " (IrDA)");
+	}
+	ret+=sprintf(buf+ret,"\n");
+
+	return ret;
+}
+
+int macserial_read_proc(char *page, char **start, off_t off, int count,
+		 int *eof, void *data)
+{
+	int l, len = 0;
+	off_t	begin = 0;
+	struct mac_serial *info;
+
+	len += sprintf(page, "serinfo:1.0 driver:" MACSERIAL_VERSION "\n");
+	for (info = zs_chain; info && len < 4000; info = info->zs_next) {
+		l = line_info(page + len, info);
+		len += l;
+		if (len+begin > off+count)
+			goto done;
+		if (len+begin < off) {
+			begin += len;
+			len = 0;
+		}
+	}
+	*eof = 1;
+done:
+	if (off >= len+begin)
+		return 0;
+	*start = page + (off-begin);
+	return ((count < begin+len-off) ? count : begin+len-off);
 }
 
 /* Ask the PROM how many Z8530s we have and initialize their zs_channels */
@@ -2495,13 +2545,15 @@ probe_sccs()
 			continue;
 
 		/* set up A side */
-		chan_init(&zs_soft[chip + chan_a_index], zs_chan, zs_chan);
+		if (chan_init(&zs_soft[chip + chan_a_index], zs_chan, zs_chan))
+			continue;
 		++zs_chan;
 
 		/* set up B side, if it exists */
 		if (nchan > 1)
-			chan_init(&zs_soft[chip + 1 - chan_a_index],
-				  zs_chan, zs_chan - 1);
+			if (chan_init(&zs_soft[chip + 1 - chan_a_index],
+				  zs_chan, zs_chan - 1))
+				continue;
 		++zs_chan;
 	}
 	*pp = 0;
@@ -2527,13 +2579,35 @@ int macserial_init(void)
 	if (zs_chain == 0)
 		probe_sccs();
 
-	/* XXX assume it's a powerbook if we have a via-pmu */
+	/* XXX assume it's a powerbook if we have a via-pmu
+	 * 
+	 * This is OK for core99 machines as well.
+	 */
 	is_powerbook = find_devices("via-pmu") != 0;
 
-	/* Register the interrupt handler for each one */
+	/* Register the interrupt handler for each one
+	 * We also request the OF resources here as probe_sccs()
+	 * might be called too early for that
+	 */
 	save_flags(flags); cli();
 	for (i = 0; i < zs_channels_found; ++i) {
+		struct device_node* ch = zs_soft[i].dev_node;
+		if (!request_OF_resource(ch, 0, NULL)) {
+			printk(KERN_ERR "macserial: can't request IO resource !\n");
+			return -ENODEV;
+		}
 		if (zs_soft[i].has_dma) {
+			if (!request_OF_resource(ch, ch->n_addrs - 2, " (tx dma)")) {
+				printk(KERN_ERR "macserial: can't request TX DMA resource !\n");
+				zs_soft[i].has_dma = 0;
+				goto no_dma;
+			}
+			if (!request_OF_resource(ch, ch->n_addrs - 1, " (rx dma)")) {
+				release_OF_resource(ch, ch->n_addrs - 2);
+				printk(KERN_ERR "macserial: can't request RX DMA resource !\n");
+				zs_soft[i].has_dma = 0;
+				goto no_dma;
+			}
 			if (request_irq(zs_soft[i].tx_dma_irq, rs_txdma_irq, 0,
 					"SCC-txdma", &zs_soft[i]))
 				printk(KERN_ERR "macserial: can't get irq %d\n",
@@ -2545,6 +2619,7 @@ int macserial_init(void)
 				       zs_soft[i].rx_dma_irq);
 			disable_irq(zs_soft[i].rx_dma_irq);
 		}
+no_dma:		
 		if (request_irq(zs_soft[i].irq, rs_interrupt, 0,
 				"SCC", &zs_soft[i]))
 			printk(KERN_ERR "macserial: can't get irq %d\n",
@@ -2560,6 +2635,7 @@ int macserial_init(void)
 
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
+	serial_driver.driver_name = "macserial";
 #ifdef CONFIG_DEVFS_FS
 	serial_driver.name = "tts/%d";
 #else
@@ -2596,6 +2672,7 @@ int macserial_init(void)
 	serial_driver.hangup = rs_hangup;
 	serial_driver.break_ctl = rs_break;
 	serial_driver.wait_until_sent = rs_wait_until_sent;
+	serial_driver.read_proc = macserial_read_proc;
 
 	/*
 	 * The callout device is just like normal device except for
@@ -2609,6 +2686,8 @@ int macserial_init(void)
 #endif /* CONFIG_DEVFS_FS */
 	callout_driver.major = TTYAUX_MAJOR;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
+	callout_driver.read_proc = 0;
+	callout_driver.proc_entry = 0;
 
 	if (tty_register_driver(&serial_driver))
 		panic("Couldn't register serial driver\n");
@@ -2675,21 +2754,11 @@ int macserial_init(void)
 		connector = get_property(info->dev_node, "AAPL,connector", &lenp);
 		if (connector)
 			printk(", port = %s", connector);
-		if (info->is_cobalt_modem)
-			printk(" (cobalt modem)");
-		else if (info->is_internal_modem)
+		if (info->is_internal_modem)
 			printk(" (internal modem)");
 		if (info->is_irda)
 			printk(" (IrDA)");
 		printk("\n");
-
-#ifndef CONFIG_XMON
-#ifdef CONFIG_KGDB
-		if (!info->kgdb_channel)
-#endif /* CONFIG_KGDB */
-			/* By default, disable the port */
-			set_scc_power(info, 0);
-#endif /* CONFIG_XMON */
  	}
 	tmp_buf = 0;
 
@@ -2710,6 +2779,12 @@ void macserial_cleanup(void)
 		if (zs_soft[i].has_dma) {
 			free_irq(zs_soft[i].tx_dma_irq, &zs_soft[i]);
 			free_irq(zs_soft[i].rx_dma_irq, &zs_soft[i]);
+		}
+		release_OF_resource(zs_soft[i].dev_node, 0);
+		if (zs_soft[i].has_dma) {
+			struct device_node* ch = zs_soft[i].dev_node;
+			release_OF_resource(ch, ch->n_addrs - 2);
+			release_OF_resource(ch, ch->n_addrs - 1);
 		}
 	}
 	restore_flags(flags);
@@ -2789,6 +2864,30 @@ static void serial_console_write(struct console *co, const char *s,
 	/* Restore the values in the registers. */
 	write_zsreg(info->zs_channel, R1, info->curregs[1]);
 	/* Don't disable the transmitter. */
+}
+
+/*
+ *	Receive character from the serial port
+ */
+static int serial_console_wait_key(struct console *co)
+{
+	struct mac_serial *info = zs_soft + co->index;
+	int           val;
+
+	/* Turn of interrupts and enable the transmitter. */
+	write_zsreg(info->zs_channel, R1, info->curregs[1] & ~INT_ALL_Rx);
+	write_zsreg(info->zs_channel, R3, info->curregs[3] | RxENABLE);
+
+	/* Wait for something in the receive buffer. */
+	while((read_zsreg(info->zs_channel, 0) & Rx_CH_AV) == 0)
+		eieio();
+	val = read_zsdata(info->zs_channel);
+
+	/* Restore the values in the registers. */
+	write_zsreg(info->zs_channel, R1, info->curregs[1]);
+	write_zsreg(info->zs_channel, R3, info->curregs[3]);
+
+	return val;
 }
 
 static kdev_t serial_console_device(struct console *c)
@@ -2981,6 +3080,7 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		serial_console_write,
 	device:		serial_console_device,
+	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

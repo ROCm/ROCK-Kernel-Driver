@@ -125,7 +125,7 @@ struct adb_driver via_cuda_driver = {
 #endif /* CONFIG_ADB */
 
 #ifdef CONFIG_PPC
-int
+int __init
 find_via_cuda(void)
 {
     int err;
@@ -186,10 +186,12 @@ find_via_cuda(void)
 }
 #endif /* CONFIG_PPC */
 
-int via_cuda_start(void)
+static int __init via_cuda_start(void)
 {
     if (via == NULL)
 	return -ENODEV;
+
+    request_OF_resource(vias, 0, NULL);
 
     if (request_irq(CUDA_IRQ, cuda_interrupt, 0, "ADB", cuda_interrupt)) {
 	printk(KERN_ERR "cuda_init: can't get irq %d\n", CUDA_IRQ);
@@ -201,6 +203,8 @@ int via_cuda_start(void)
     cuda_fully_inited = 1;
     return 0;
 }
+
+device_initcall(via_cuda_start);
 
 #ifdef CONFIG_ADB
 static int
@@ -217,7 +221,7 @@ cuda_probe()
     return 0;
 }
 
-static int
+static int __init
 cuda_init(void)
 {
     if (via == NULL)
