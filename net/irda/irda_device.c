@@ -529,11 +529,10 @@ int irda_device_set_mode(struct net_device* dev, int mode)
 	return ret;
 }
 
-#ifdef CONFIG_ISA
 /*
  * Function setup_dma (idev, buffer, count, mode)
  *
- *    Setup the DMA channel. Commonly used by ISA FIR drivers
+ *    Setup the DMA channel. Commonly used by LPC FIR drivers
  *
  */
 void irda_setup_dma(int channel, dma_addr_t buffer, int count, int mode)
@@ -552,4 +551,3 @@ void irda_setup_dma(int channel, dma_addr_t buffer, int count, int mode)
 	release_dma_lock(flags);
 }
 EXPORT_SYMBOL(irda_setup_dma);
-#endif

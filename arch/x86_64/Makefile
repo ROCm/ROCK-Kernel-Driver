@@ -59,6 +59,7 @@ endif
 # -funit-at-a-time shrinks the kernel .text considerably
 # unfortunately it makes reading oopses harder.
 CFLAGS += $(call check_gcc,-funit-at-a-time,)
+CFLAGS += -msoft-float
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 
@@ -77,6 +78,7 @@ boot := arch/x86_64/boot
 all: bzImage
 
 BOOTIMAGE                     := arch/x86_64/boot/bzImage
+KBUILD_IMAGE                  := $(BOOTIMAGE)
 
 bzImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)

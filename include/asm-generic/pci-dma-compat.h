@@ -5,6 +5,13 @@
 #define _ASM_GENERIC_PCI_DMA_COMPAT_H
 
 #include <linux/dma-mapping.h>
+#include <linux/config.h>
+
+#ifdef CONFIG_PREEMPT
+#define preempt_atomic() in_atomic()
+#else
+#define preempt_atomic() 1
+#endif
 
 /* note pci_set_dma_mask isn't here, since it's a public function
  * exported from drivers/pci, use dma_supported instead */
@@ -15,11 +22,12 @@ pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 	return dma_supported(hwdev == NULL ? NULL : &hwdev->dev, mask);
 }
 
+/* Would be better to move this out of line. It's already quite big. */
 static inline void *
 pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 		     dma_addr_t *dma_handle)
 {
-	return dma_alloc_coherent(hwdev == NULL ? NULL : &hwdev->dev, size, dma_handle, GFP_ATOMIC);
+	return dma_alloc_coherent(hwdev == NULL ? NULL : &hwdev->dev, size, dma_handle, preempt_atomic() ? GFP_ATOMIC : GFP_KERNEL);
 }
 
 static inline void
