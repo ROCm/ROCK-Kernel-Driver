@@ -516,6 +516,13 @@ Module parameters
 
     Module for ForteMedia FM801 based PCI soundcards.
 
+    tea575x_tuner       - Enable TEA575x tuner
+                          - 1 = MediaForte 256-PCS
+                          - 2 = MediaForte 256-PCPR
+                          - 3 = MediaForte 64-PCR  
+                          - High 16-bits are video (radio) device number + 1
+                          - example: 0x10002 (MediaForte 256-PCPR, device 1)
+
     Module supports up to 8 cards and autoprobe.
     
   Module snd-gusclassic
