@@ -468,7 +468,7 @@ exp_writelock(void)
 		return 0;
 	}
 
-	current->work.sigpending = 0;
+	clear_thread_flag(TIF_SIGPENDING);
 	want_lock++;
 	while (hash_count || hash_lock) {
 		interruptible_sleep_on(&hash_wait);

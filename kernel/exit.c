@@ -65,7 +65,7 @@ static void release_task(struct task_struct * p)
 	__restore_flags(flags);
 
 	p->pid = 0;
-	free_task_struct(p);
+	put_task_struct(p);
 }
 
 /*
@@ -529,7 +529,7 @@ fake_volatile:
 	if (current->leader)
 		disassociate_ctty(1);
 
-	put_exec_domain(tsk->exec_domain);
+	put_exec_domain(tsk->thread_info->exec_domain);
 	if (tsk->binfmt && tsk->binfmt->module)
 		__MOD_DEC_USE_COUNT(tsk->binfmt->module);
 

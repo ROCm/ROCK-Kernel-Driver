@@ -320,7 +320,7 @@ rp_sidt:
 	ret
 
 ENTRY(stack_start)
-	.long SYMBOL_NAME(init_task_union)+8192
+	.long SYMBOL_NAME(init_thread_union)+8192
 	.long __KERNEL_DS
 
 /* This is the default interrupt "handler" :-) */

@@ -28,16 +28,17 @@ extern void kernel_fpu_begin(void);
 
 
 #define unlazy_fpu( tsk ) do { \
-	if ( tsk->flags & PF_USEDFPU ) \
+	if (test_thread_flag(TIF_USEDFPU)) \
 		save_init_fpu( tsk ); \
 } while (0)
 
-#define clear_fpu( tsk ) do { \
-	if ( tsk->flags & PF_USEDFPU ) { \
-		asm volatile("fwait"); \
-		tsk->flags &= ~PF_USEDFPU; \
-		stts(); \
-	} \
+#define clear_fpu( tsk )			\
+do {						\
+	if (test_thread_flag(TIF_USEDFPU)) {	\
+		asm volatile("fwait");		\
+		clear_thread_flag(TIF_USEDFPU);	\
+		stts();				\
+	}					\
 } while (0)
 
 /*

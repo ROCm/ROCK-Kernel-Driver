@@ -43,6 +43,8 @@
 #include <linux/config.h>
 #include <linux/sys.h>
 #include <linux/linkage.h>
+#include <asm/thread_info.h>
+#include <asm/errno.h>
 #include <asm/segment.h>
 #include <asm/smp.h>
 
@@ -66,24 +68,6 @@ CF_MASK		= 0x00000001
 IF_MASK		= 0x00000200
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
-
-/*
- * these are offsets into the task-struct.
- */
-state		=  0
-flags		=  4
-work		=  8
-need_resched	= work+0
-syscall_trace	= work+1
-sigpending	= work+2
-notify_resume	= work+3
-addr_limit	= 12
-exec_domain	= 16
-tsk_ptrace	= 24
-cpu		= 32
-
-ENOSYS = 38
-
 
 #define SAVE_ALL \
 	cld; \
@@ -131,10 +115,6 @@ ENOSYS = 38
 	.long 3b,6b;	\
 .previous
 
-#define GET_CURRENT(reg) \
-	movl $-8192, reg; \
-	andl %esp, reg
-
 ENTRY(lcall7)
 	pushfl			# We get a different stack layout with call gates,
 	pushl %eax		# which has to be cleaned up later..
@@ -147,8 +127,8 @@ ENTRY(lcall7)
 	movl %ecx,CS(%esp)	#
 	movl %esp,%ebx
 	pushl %ebx
-	andl $-8192,%ebx	# GET_CURRENT
-	movl exec_domain(%ebx),%edx	# Get the execution domain
+	andl $-8192,%ebx	# GET_THREAD_INFO
+	movl TI_EXEC_DOMAIN(%ebx),%edx	# Get the execution domain
 	movl 4(%edx),%edx	# Get the lcall7 handler for the domain
 	pushl $0x7
 	call *%edx
@@ -168,8 +148,8 @@ ENTRY(lcall27)
 	movl %ecx,CS(%esp)	#
 	movl %esp,%ebx
 	pushl %ebx
-	andl $-8192,%ebx	# GET_CURRENT
-	movl exec_domain(%ebx),%edx	# Get the execution domain
+	andl $-8192,%ebx	# GET_THREAD_INFO
+	movl TI_EXEC_DOMAIN(%ebx),%edx	# Get the execution domain
 	movl 4(%edx),%edx	# Get the lcall7 handler for the domain
 	pushl $0x27
 	call *%edx
@@ -182,7 +162,7 @@ ENTRY(ret_from_fork)
 	pushl %ebx
 	call SYMBOL_NAME(schedule_tail)
 	addl $4, %esp
-	GET_CURRENT(%ebx)
+	GET_THREAD_INFO(%ebx)
 	jmp syscall_exit
 
 /*
@@ -195,17 +175,17 @@ ENTRY(ret_from_fork)
 	# userspace resumption stub bypassing syscall exit tracing
 	ALIGN
 ENTRY(ret_from_intr)
-	GET_CURRENT(%ebx)
+	GET_THREAD_INFO(%ebx)
 ret_from_exception:
 	movl EFLAGS(%esp),%eax		# mix EFLAGS and CS
 	movb CS(%esp),%al
 	testl $(VM_MASK | 3),%eax
 	jz restore_all			# returning to kernel-space or vm86-space
 ENTRY(resume_userspace)
-	cli				# make sure need_resched and sigpending don't change
-					# between sampling and the iret
-	movl work(%ebx),%ecx
-	andl $0xffff00ff,%ecx		# current->work (ignoring syscall_trace)
+ 	cli				# make sure we don't miss an interrupt setting need_resched
+ 					# or sigpending between sampling and the iret
+	movl TI_FLAGS(%ebx),%ecx
+	andl $_TIF_WORK_MASK,%ecx	# is there any work to be done on int/excp return?
 	jne work_pending
 	jmp restore_all
 
@@ -214,19 +194,19 @@ ENTRY(resume_userspace)
 ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
-	GET_CURRENT(%ebx)
+	GET_THREAD_INFO(%ebx)
 	cmpl $(NR_syscalls),%eax
 	jae syscall_badsys
-	testb $0xff,syscall_trace(%ebx)	# system call tracing in operation
+	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebx)	# system call tracing in operation
 	jnz syscall_trace_entry
-syscall_traced:
+syscall_call:
 	call *SYMBOL_NAME(sys_call_table)(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
-	cli				# make sure need_resched and sigpending don't change
-					# between sampling and the iret
-	movl work(%ebx),%ecx
-	testl %ecx,%ecx			# current->work
+ 	cli				# make sure we don't miss an interrupt setting need_resched
+ 					# or sigpending between sampling and the iret
+	movl TI_FLAGS(%ebx),%ecx
+	testw $_TIF_ALLWORK_MASK,%cx	# current->work
 	jne syscall_exit_work
 restore_all:
 	RESTORE_ALL
@@ -234,16 +214,16 @@ restore_all:
 	# perform work that needs to be done immediately before resumption
 	ALIGN
 work_pending:
-	testb %cl,%cl			# current->work.need_resched
+	testb $_TIF_NEED_RESCHED,%cl
 	jz work_notifysig
 work_resched:
 	call SYMBOL_NAME(schedule)
-	cli				# make sure need_resched and sigpending don't change
-					# between sampling and the iret
-	movl work(%ebx),%ecx
-	andl $0xffff00ff,%ecx		# ignore the syscall trace counter
+ 	cli				# make sure we don't miss an interrupt setting need_resched
+ 					# or sigpending between sampling and the iret
+	movl TI_FLAGS(%ebx),%ecx
+	andl $_TIF_WORK_MASK,%ecx	# is there any work to be done other than syscall tracing?
 	jz restore_all
-	testb %cl,%cl			# current->work.need_resched
+	testb $_TIF_NEED_RESCHED,%cl
 	jnz work_resched
 
 work_notifysig:				# deal with pending signals and notify-resume requests
@@ -273,13 +253,13 @@ syscall_trace_entry:
 	call SYMBOL_NAME(do_syscall_trace)
 	movl ORIG_EAX(%esp),%eax
 	cmpl $(NR_syscalls),%eax
-	jnae syscall_traced
+	jnae syscall_call
 	jmp syscall_exit
 
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
-	testb %ch,%ch			# current->work.syscall_trace
+	testb $_TIF_SYSCALL_TRACE,%cl
 	jz work_pending
 	sti				# could let do_syscall_trace() call schedule() instead
 	movl %esp,%eax
@@ -319,7 +299,7 @@ error_code:
 	movl $(__KERNEL_DS),%edx
 	movl %edx,%ds
 	movl %edx,%es
-	GET_CURRENT(%ebx)
+	GET_THREAD_INFO(%ebx)
 	call *%edi
 	addl $8,%esp
 	jmp ret_from_exception
@@ -337,7 +317,7 @@ ENTRY(simd_coprocessor_error)
 ENTRY(device_not_available)
 	pushl $-1		# mark this as an int
 	SAVE_ALL
-	GET_CURRENT(%ebx)
+	GET_THREAD_INFO(%ebx)
 	movl %cr0,%eax
 	testl $0x4,%eax			# EM (math emulation bit)
 	jne device_not_available_emulate

@@ -28,6 +28,8 @@
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 
+static kmem_cache_t *task_struct_cachep;
+
 /* The idle threads do not count.. */
 int nr_threads;
 
@@ -70,6 +72,14 @@ void remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 
 void __init fork_init(unsigned long mempages)
 {
+	/* create a slab on which task_structs can be allocated */
+	task_struct_cachep =
+		kmem_cache_create("task_struct",
+				  sizeof(struct task_struct),0,
+				  SLAB_HWCACHE_ALIGN, NULL, NULL);
+	if (!task_struct_cachep)
+		panic("fork_init(): cannot create task_struct SLAB cache");
+
 	/*
 	 * The default maximum number of threads is set to a safe
 	 * value: the thread structures can take up at most half
@@ -79,6 +89,35 @@ void __init fork_init(unsigned long mempages)
 
 	init_task.rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
 	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
+}
+
+struct task_struct *dup_task_struct(struct task_struct *orig)
+{
+	struct task_struct *tsk;
+	struct thread_info *ti;
+
+	ti = alloc_thread_info();
+	if (!ti) return NULL;
+
+	tsk = kmem_cache_alloc(task_struct_cachep,GFP_ATOMIC);
+	if (!tsk) {
+		free_thread_info(ti);
+		return NULL;
+	}
+
+	*ti = *orig->thread_info;
+	*tsk = *orig;
+	tsk->thread_info = ti;
+	ti->task = tsk;
+	atomic_set(&tsk->usage,1);
+
+	return tsk;
+}
+
+void __put_task_struct(struct task_struct *tsk)
+{
+	free_thread_info(tsk->thread_info);
+	kmem_cache_free(task_struct_cachep,tsk);
 }
 
 /* Protects next_safe and last_pid. */
@@ -546,7 +585,7 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 {
 	unsigned long new_flags = p->flags;
 
-	new_flags &= ~(PF_SUPERPRIV | PF_USEDFPU);
+	new_flags &= ~PF_SUPERPRIV;
 	new_flags |= PF_FORKNOEXEC;
 	if (!(clone_flags & CLONE_PTRACE))
 		p->ptrace = 0;
@@ -585,11 +624,9 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	}
 
 	retval = -ENOMEM;
-	p = alloc_task_struct();
+	p = dup_task_struct(current);
 	if (!p)
 		goto fork_out;
-
-	*p = *current;
 
 	retval = -EAGAIN;
 	if (atomic_read(&p->user->processes) >= p->rlim[RLIMIT_NPROC].rlim_cur) {
@@ -608,7 +645,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	if (nr_threads >= max_threads)
 		goto bad_fork_cleanup_count;
 	
-	get_exec_domain(p->exec_domain);
+	get_exec_domain(p->thread_info->exec_domain);
 
 	if (p->binfmt && p->binfmt->module)
 		__MOD_INC_USE_COUNT(p->binfmt->module);
@@ -631,7 +668,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	}
 	spin_lock_init(&p->alloc_lock);
 
-	p->work.sigpending = 0;
+	clear_tsk_thread_flag(p,TIF_SIGPENDING);
 	init_sigpending(&p->pending);
 
 	p->it_real_value = p->it_virt_value = p->it_prof_value = 0;
@@ -755,7 +792,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		 * Let the child process run first, to avoid most of the
 		 * COW overhead when the child exec()s afterwards.
 		 */
-		current->work.need_resched = 1;
+		set_need_resched();
 
 fork_out:
 	return retval;
@@ -771,14 +808,14 @@ bad_fork_cleanup_fs:
 bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
 bad_fork_cleanup:
-	put_exec_domain(p->exec_domain);
+	put_exec_domain(p->thread_info->exec_domain);
 	if (p->binfmt && p->binfmt->module)
 		__MOD_DEC_USE_COUNT(p->binfmt->module);
 bad_fork_cleanup_count:
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);
 bad_fork_free:
-	free_task_struct(p);
+	put_task_struct(p);
 	goto fork_out;
 }
 

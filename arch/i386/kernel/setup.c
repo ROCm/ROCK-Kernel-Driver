@@ -2817,7 +2817,7 @@ void __init cpu_init (void)
 	/*
 	 * Force FPU initialization:
 	 */
-	current->flags &= ~PF_USEDFPU;
+	clear_thread_flag(TIF_USEDFPU);
 	current->used_math = 0;
 	stts();
 }

@@ -8,6 +8,8 @@
  * return an error value in addition to the "real"
  * return value.
  */
+#include <asm/thread_info.h>
+
 
 /*
  * __get_user_X
@@ -21,15 +23,12 @@
  * as they get called from within inline assembly.
  */
 
-addr_limit = 12
-
 .text
 .align 4
 .globl __get_user_1
 __get_user_1:
-	movl %esp,%edx
-	andl $0xffffe000,%edx
-	cmpl addr_limit(%edx),%eax
+	GET_THREAD_INFO(%edx)
+	cmpl TI_ADDR_LIMIT(%edx),%eax
 	jae bad_get_user
 1:	movzbl (%eax),%edx
 	xorl %eax,%eax
@@ -39,10 +38,9 @@ __get_user_1:
 .globl __get_user_2
 __get_user_2:
 	addl $1,%eax
-	movl %esp,%edx
 	jc bad_get_user
-	andl $0xffffe000,%edx
-	cmpl addr_limit(%edx),%eax
+	GET_THREAD_INFO(%edx)
+	cmpl TI_ADDR_LIMIT(%edx),%eax
 	jae bad_get_user
 2:	movzwl -1(%eax),%edx
 	xorl %eax,%eax
@@ -52,10 +50,9 @@ __get_user_2:
 .globl __get_user_4
 __get_user_4:
 	addl $3,%eax
-	movl %esp,%edx
 	jc bad_get_user
-	andl $0xffffe000,%edx
-	cmpl addr_limit(%edx),%eax
+	GET_THREAD_INFO(%edx)
+	cmpl TI_ADDR_LIMIT(%edx),%eax
 	jae bad_get_user
 3:	movl -3(%eax),%edx
 	xorl %eax,%eax

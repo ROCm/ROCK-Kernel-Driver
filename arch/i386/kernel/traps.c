@@ -158,7 +158,7 @@ void show_trace_task(struct task_struct *tsk)
 	unsigned long esp = tsk->thread.esp;
 
 	/* User space on another CPU? */
-	if ((esp ^ (unsigned long)tsk) & (PAGE_MASK<<1))
+	if ((esp ^ (unsigned long)tsk->thread_info) & (PAGE_MASK<<1))
 		return;
 	show_trace((unsigned long *)esp);
 }
@@ -208,8 +208,8 @@ void show_registers(struct pt_regs *regs)
 		regs->esi, regs->edi, regs->ebp, esp);
 	printk("ds: %04x   es: %04x   ss: %04x\n",
 		regs->xds & 0xffff, regs->xes & 0xffff, ss);
-	printk("Process %s (pid: %d, stackpage=%08lx)",
-		current->comm, current->pid, 4096+(unsigned long)current);
+	printk("Process %s (pid: %d, threadinfo=%p task=%p)",
+		current->comm, current->pid, current_thread_info(), current);
 	/*
 	 * When in-kernel, we also print out the stack and code at the
 	 * time of the fault..
@@ -720,7 +720,7 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	} else {
 		init_fpu();
 	}
-	current->flags |= PF_USEDFPU;	/* So we fnsave on switch_to() */
+	set_thread_flag(TIF_USEDFPU);	/* So we fnsave on switch_to() */
 }
 
 #ifndef CONFIG_MATH_EMULATION

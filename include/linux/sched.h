@@ -13,6 +13,7 @@ extern unsigned long event;
 #include <linux/times.h>
 #include <linux/timex.h>
 #include <linux/rbtree.h>
+#include <linux/thread_info.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -229,37 +230,15 @@ extern struct user_struct root_user;
 
 typedef struct prio_array prio_array_t;
 
-/* this struct must occupy one 32-bit chunk so that is can be read in one go */
-struct task_work {
-	__s8	need_resched;
-	__u8	syscall_trace;	/* count of syscall interceptors */
-	__u8	sigpending;
-	__u8	notify_resume;	/* request for notification on
-				   userspace execution resumption */
-} __attribute__((packed));
-
 struct task_struct {
-	/*
-	 * offsets of these are hardcoded elsewhere - touch with care
-	 */
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+	struct thread_info *thread_info;
+	atomic_t usage;
 	unsigned long flags;	/* per process flags, defined below */
-	volatile struct task_work work;
-
-	mm_segment_t addr_limit;	/* thread address space:
-					 	0-0xBFFFFFFF for user-thead
-						0-0xFFFFFFFF for kernel-thread
-					 */
-	struct exec_domain *exec_domain;
-	long __pad;
 	unsigned long ptrace;
 
 	int lock_depth;		/* Lock depth */
 
-	/*
-	 * offset 32 begins here on 32-bit platforms.
-	 */
-	unsigned int cpu;
 	int prio;
 	long __nice;
 	list_t run_list;
@@ -368,6 +347,11 @@ struct task_struct {
 	void *journal_info;
 };
 
+extern void __put_task_struct(struct task_struct *tsk);
+#define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
+#define put_task_struct(tsk) \
+do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
+
 /*
  * Per process flags
  */
@@ -384,17 +368,14 @@ struct task_struct {
 #define PF_FREE_PAGES	0x00002000	/* per process page freeing */
 #define PF_NOIO		0x00004000	/* avoid generating further I/O */
 
-#define PF_USEDFPU	0x00100000	/* task used FPU this quantum (SMP) */
-
 /*
  * Ptrace flags
  */
 
 #define PT_PTRACED	0x00000001
-#define PT_SYSCALLTRACE	0x00000002	/* T if syscall_trace is +1 for ptrace() */
-#define PT_DTRACE	0x00000004	/* delayed trace (used on m68k, i386) */
-#define PT_TRACESYSGOOD	0x00000008
-#define PT_PTRACE_CAP	0x00000010	/* ptracer can follow suid-exec */
+#define PT_DTRACE	0x00000002	/* delayed trace (used on m68k, i386) */
+#define PT_TRACESYSGOOD	0x00000004
+#define PT_PTRACE_CAP	0x00000008	/* ptracer can follow suid-exec */
 
 /*
  * Limit the stack by to some sane default: root can always
@@ -470,16 +451,17 @@ asmlinkage long sys_sched_yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
-#ifndef INIT_TASK_SIZE
-# define INIT_TASK_SIZE	2048*sizeof(long)
+#ifndef INIT_THREAD_SIZE
+# define INIT_THREAD_SIZE	2048*sizeof(long)
 #endif
 
-union task_union {
-	struct task_struct task;
-	unsigned long stack[INIT_TASK_SIZE/sizeof(long)];
+union thread_union {
+	struct thread_info thread_info;
+	unsigned long stack[INIT_THREAD_SIZE/sizeof(long)];
 };
 
-extern union task_union init_task_union;
+extern union thread_union init_thread_union;
+extern struct task_struct init_task;
 
 extern struct   mm_struct init_mm;
 extern struct task_struct *init_tasks[NR_CPUS];
@@ -584,22 +566,6 @@ extern int kill_proc(pid_t, int, int);
 extern int do_sigaction(int, const struct k_sigaction *, struct k_sigaction *);
 extern int do_sigaltstack(const stack_t *, stack_t *, unsigned long);
 
-static inline int signal_pending(struct task_struct *p)
-{
-	return (p->work.sigpending != 0);
-}
-  
-static inline int need_resched(void)
-{
-	return unlikely(current->work.need_resched != 0);
-}
-
-static inline void cond_resched(void)
-{
-	if (need_resched())
-		schedule();
-}
-
 /*
  * Re-calculate pending state from the set of locally pending
  * signals, globally pending signals, and blocked signals.
@@ -628,15 +594,6 @@ static inline int has_pending_signals(sigset_t *signal, sigset_t *blocked)
 	case 1: ready  = signal->sig[0] &~ blocked->sig[0];
 	}
 	return ready !=	0;
-}
-
-/* Reevaluate whether the task has signals pending delivery.
-   This is required every time the blocked sigset_t changes.
-   All callers should have t->sigmask_lock.  */
-
-static inline void recalc_sigpending(struct task_struct *t)
-{
-	t->work.sigpending = has_pending_signals(&t->pending.signal, &t->blocked);
 }
 
 /* True if we are on the alternate signal stack.  */
@@ -886,6 +843,72 @@ static inline char * d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 	dput(root);
 	mntput(rootmnt);
 	return res;
+}
+
+/* set thread flags in other task's structures
+ * - see asm/thread_info.h for TIF_xxxx flags available
+ */
+static inline void set_tsk_thread_flag(struct task_struct *tsk, int flag)
+{
+	set_ti_thread_flag(tsk->thread_info,flag);
+}
+
+static inline void clear_tsk_thread_flag(struct task_struct *tsk, int flag)
+{
+	clear_ti_thread_flag(tsk->thread_info,flag);
+}
+
+static inline int test_and_set_tsk_thread_flag(struct task_struct *tsk, int flag)
+{
+	return test_and_set_ti_thread_flag(tsk->thread_info,flag);
+}
+
+static inline int test_and_clear_tsk_thread_flag(struct task_struct *tsk, int flag)
+{
+	return test_and_clear_ti_thread_flag(tsk->thread_info,flag);
+}
+
+static inline int test_tsk_thread_flag(struct task_struct *tsk, int flag)
+{
+	return test_ti_thread_flag(tsk->thread_info,flag);
+}
+
+static inline void set_tsk_need_resched(struct task_struct *tsk)
+{
+	set_tsk_thread_flag(tsk,TIF_NEED_RESCHED);
+}
+
+static inline void clear_tsk_need_resched(struct task_struct *tsk)
+{
+	clear_tsk_thread_flag(tsk,TIF_NEED_RESCHED);
+}
+
+static inline int signal_pending(struct task_struct *p)
+{
+	return unlikely(test_tsk_thread_flag(p,TIF_SIGPENDING));
+}
+  
+static inline int need_resched(void)
+{
+	return unlikely(test_thread_flag(TIF_NEED_RESCHED));
+}
+
+static inline void cond_resched(void)
+{
+	if (need_resched())
+		schedule();
+}
+
+/* Reevaluate whether the task has signals pending delivery.
+   This is required every time the blocked sigset_t changes.
+   Athread cathreaders should have t->sigmask_lock.  */
+
+static inline void recalc_sigpending(struct task_struct *t)
+{
+	if (has_pending_signals(&t->pending.signal, &t->blocked))
+		set_thread_flag(TIF_SIGPENDING);
+	else
+		clear_thread_flag(TIF_SIGPENDING);
 }
 
 #endif /* __KERNEL__ */

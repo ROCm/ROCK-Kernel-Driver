@@ -220,7 +220,7 @@ static void show(char * str)
 			continue;
 		}
 		esp &= ~(THREAD_SIZE-1);
-		esp += sizeof(struct task_struct);
+		esp += sizeof(struct thread_info);
 		show_stack((void*)esp);
  	}
 	printk("\nCPU %d:",cpu);
