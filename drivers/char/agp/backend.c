@@ -33,6 +33,7 @@
 #include <linux/miscdevice.h>
 #include <linux/pm.h>
 #include <linux/agp_backend.h>
+#include <linux/agpgart.h>
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include "agp.h"
