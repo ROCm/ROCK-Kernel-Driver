@@ -44,15 +44,6 @@ extern int xfs_ioctl(bhv_desc_t *, struct inode *, struct file *,
 			unsigned int, unsigned long);
 
 
-#ifdef XFS_RW_TRACE
-STATIC void
-xfs_ctrunc_trace(
-	int		tag,
-	xfs_inode_t	*ip);
-#else
-#define xfs_ctrunc_trace(tag, ip)
-#endif /* DEBUG */
-
 /*
  * For xfs, we check that the file isn't too big to be opened by this kernel.
  * No other open action is required for regular files.	Devices are handled
@@ -1912,35 +1903,6 @@ xfs_lookup(
 	return 0;
 }
 
-#ifdef XFS_RW_TRACE
-STATIC void
-xfs_ctrunc_trace(
-	int		tag,
-	xfs_inode_t	*ip)
-{
-	if (ip->i_rwtrace == NULL) {
-		return;
-	}
-
-	ktrace_enter(ip->i_rwtrace,
-		     (void*)((long)tag),
-		     (void*)ip,
-		     (void*)((long)private.p_cpuid),
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0,
-		     (void*)0);
-}
-#endif /* XFS_RW_TRACE */
 
 #define XFS_CREATE_NEW_MAXTRIES 10000
 
