@@ -871,7 +871,8 @@ static void destroy_serial (struct kobject *kobj)
 
 	/* the ports are cleaned up and released in port_release() */
 	for (i = 0; i < serial->num_ports; ++i)
-		device_unregister(&serial->port[i]->dev);
+		if (serial->port[i]->dev.parent != NULL)
+			device_unregister(&serial->port[i]->dev);
 
 	/* If this is a "fake" port, we have to clean it up here, as it will
 	 * not get cleaned up in port_release() as it was never registered with
