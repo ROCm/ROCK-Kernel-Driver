@@ -3170,7 +3170,7 @@ static int ali_write_proc(struct file *file, const char *buffer, unsigned long c
 		return -EINVAL;
 	if (count == 0)
 		return 0;
-	if (get_user(&c, buffer))
+	if (get_user(c, buffer))
 		return -EFAULT;
 	
 	spin_lock_irqsave(&card->lock, flags);

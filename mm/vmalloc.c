@@ -180,19 +180,13 @@ struct vm_struct * get_vm_area(unsigned long size, unsigned long flags)
 	addr = VMALLOC_START;
 	write_lock(&vmlist_lock);
 	for (p = &vmlist; (tmp = *p) ; p = &tmp->next) {
-		if ((size + addr) < addr) {
-			write_unlock(&vmlist_lock);
-			kfree(area);
-			return NULL;
-		}
+		if ((size + addr) < addr)
+			goto out;
 		if (size + addr < (unsigned long) tmp->addr)
 			break;
 		addr = tmp->size + (unsigned long) tmp->addr;
-		if (addr > VMALLOC_END-size) {
-			write_unlock(&vmlist_lock);
-			kfree(area);
-			return NULL;
-		}
+		if (addr > VMALLOC_END-size)
+			goto out;
 	}
 	area->flags = flags;
 	area->addr = (void *)addr;
@@ -201,6 +195,11 @@ struct vm_struct * get_vm_area(unsigned long size, unsigned long flags)
 	*p = area;
 	write_unlock(&vmlist_lock);
 	return area;
+
+out:
+	write_unlock(&vmlist_lock);
+	kfree(area);
+	return NULL;
 }
 
 void vfree(void * addr)

@@ -345,6 +345,13 @@ struct tulip_private {
 	spinlock_t mii_lock;
 	unsigned int cur_rx, cur_tx;	/* The next free ring entry */
 	unsigned int dirty_rx, dirty_tx;	/* The ring entries to be free()ed. */
+
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+#define RX_A_NBF_STOP 0xffffff3f /* To disable RX and RX-NOBUF ints. */
+        int fc_bit;
+        int mit_sel;
+        int mit_change; /* Signal for Interrupt Mitigtion */
+#endif
 	unsigned int full_duplex:1;	/* Full-duplex operation requested. */
 	unsigned int full_duplex_lock:1;
 	unsigned int fake_addr:1;	/* Multiport board faked address. */
@@ -397,6 +404,7 @@ int tulip_read_eeprom(long ioaddr, int location, int addr_len);
 extern unsigned int tulip_max_interrupt_work;
 extern int tulip_rx_copybreak;
 void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+int tulip_refill_rx(struct net_device *dev);
 
 /* media.c */
 int tulip_mdio_read(struct net_device *dev, int phy_id, int location);

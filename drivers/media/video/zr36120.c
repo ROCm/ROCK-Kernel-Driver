@@ -57,11 +57,15 @@
 
 static unsigned int triton1=0;			/* triton1 chipset? */
 static unsigned int cardtype[ZORAN_MAX]={ [ 0 ... ZORAN_MAX-1 ] = CARDTYPE };
+static int video_nr = -1;
+static int vbi_nr = -1;
 
 MODULE_AUTHOR("Pauline Middelink <middelin@polyware.nl>");
 MODULE_DESCRIPTION("Zoran ZR36120 based framegrabber");
 MODULE_PARM(triton1,"i");
 MODULE_PARM(cardtype,"1-" __MODULE_STRING(ZORAN_MAX) "i");
+MODULE_PARM(video_nr,"i");
+MODULE_PARM(vbi_nr,"i");
 
 static int zoran_cards;
 static struct zoran zorans[ZORAN_MAX];
@@ -1990,13 +1994,13 @@ int __init init_zoran(int card)
 	ztv->video_dev = zr36120_template;
 	strcpy(ztv->video_dev.name, ztv->i2c.name);
 	ztv->video_dev.priv = ztv;
-	if (video_register_device(&ztv->video_dev, VFL_TYPE_GRABBER) < 0)
+	if (video_register_device(&ztv->video_dev, VFL_TYPE_GRABBER, video_nr) < 0)
 		return -1;
 
 	ztv->vbi_dev = vbi_template;
 	strcpy(ztv->vbi_dev.name, ztv->i2c.name);
 	ztv->vbi_dev.priv = ztv;
-	if (video_register_device(&ztv->vbi_dev, VFL_TYPE_VBI) < 0) {
+	if (video_register_device(&ztv->vbi_dev, VFL_TYPE_VBI, vbi_nr) < 0) {
 		video_unregister_device(&ztv->video_dev);
 		return -1;
 	}

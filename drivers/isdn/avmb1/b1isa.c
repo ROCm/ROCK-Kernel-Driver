@@ -95,7 +95,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.10.6.4 $";
+static char *revision = "$Revision: 1.10.6.5 $";
 
 /* ------------------------------------------------------------- */
 

@@ -132,7 +132,7 @@ static int softdog_ioctl(struct inode *inode, struct file *file,
 	};
 	switch (cmd) {
 		default:
-			return -ENOIOCTLCMD;
+			return -ENOTTY;
 		case WDIOC_GETSUPPORT:
 			if(copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)))
 				return -EFAULT;

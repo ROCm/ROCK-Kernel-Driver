@@ -105,7 +105,7 @@
 
 MODULE_AUTHOR("Carsten Paeth <calle@calle.de>");
 
-static char *revision = "$Revision: 1.14.6.5 $";
+static char *revision = "$Revision: 1.14.6.6 $";
 
 struct capifs_ncci {
 	struct inode *inode;

@@ -69,7 +69,10 @@ is the string "usb", and it passes these environment variables:
 
 If "usbdevfs" is configured, DEVICE and DEVFS are also passed.  DEVICE is
 the pathname of the device, and is useful for devices with multiple and/or
-alternate interfaces that complicate driver selection.
+alternate interfaces that complicate driver selection.  By design, USB
+hotplugging is independent of "usbdevfs":  you can do most essential parts
+of USB device setup without using that filesystem, and without running a
+user mode daemon to detect changes in system configuration.
 
 Currently available policy agent implementations can load drivers for
 modules, and can invoke driver-specific setup scripts.  The newest ones
@@ -85,14 +88,26 @@ driver modules get loaded, either at boot time or later.
 
 See <linux/usb.h> for full information about such table entries; or look
 at existing drivers.  Each table entry describes one or more criteria to
-be used when matching a driver to a device or class of devices.
+be used when matching a driver to a device or class of devices.  The
+specific criteria are identified by bits set in "match_flags", paired
+with field values.  You can construct the criteria directly, or with
+macros such as these, and use driver_info to store more information.
+
+    USB_DEVICE (vendorId, productId)
+	... matching devices with specified vendor and product ids
+    USB_DEVICE_VER (vendorId, productId, lo, hi)
+	... like USB_DEVICE with lo <= productversion <= hi
+    USB_INTERFACE_INFO (class, subclass, protocol)
+	... matching specified interface class info
+    USB_DEVICE_INFO (class, subclass, protocol)
+	... matching specified device class info
 
 A short example, for a driver that supports several specific USB devices
 and their quirks, might have a MODULE_DEVICE_TABLE like this:
 
     static const struct usb_device_id mydriver_id_table = {
-	{ idVendor: 0x9999, idProduct 0xaaaa, driver_info: QUIRK_X },
-	{ idVendor: 0xbbbb, idProduct 0x8888, driver_info: QUIRK_Y|QUIRK_Z },
+	{ USB_DEVICE (0x9999, 0xaaaa), driver_info: QUIRK_X },
+	{ USB_DEVICE (0xbbbb, 0x8888), driver_info: QUIRK_Y|QUIRK_Z },
 	...
 	{ } /* end with an all-zeroes entry */
     }

@@ -60,8 +60,8 @@ contains:
 	remove		Pointer to a function which gets called whenever a device
 			being handled by this driver is removed (either during
 			deregistration of the driver or when it's manually pulled
-			out of a hot-pluggable slot). This function can be called
-			from interrupt context.
+			out of a hot-pluggable slot). This function always gets
+			called from process context, so it can sleep.
 	suspend,	Power management hooks -- called when the device goes to
 	resume		sleep or is resumed.
 

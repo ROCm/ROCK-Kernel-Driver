@@ -707,15 +707,13 @@ encode_entry(struct readdir_cd *cd, const char *name,
 		exp  = cd->dirfh->fh_export;
 
 		fh_init(&fh, NFS3_FHSIZE);
-		if (fh_verify(cd->rqstp, cd->dirfh, S_IFDIR, MAY_EXEC) != 0)
-			goto noexec;
 		if (isdotent(name, namlen)) {
 			dchild = dparent;
 			if (namlen == 2)
 				dchild = dchild->d_parent;
 			dchild = dget(dchild);
 		} else
-			dchild = lookup_one(name, dparent);
+			dchild = lookup_one_len(name, dparent,namlen);
 		if (IS_ERR(dchild))
 			goto noexec;
 		if (fh_compose(&fh, exp, dchild) != 0 || !dchild->d_inode)

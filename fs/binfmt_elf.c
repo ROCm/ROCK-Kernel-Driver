@@ -135,12 +135,13 @@ create_elf_tables(char *p, int argc, int envc,
 
 	/*
 	 * Force 16 byte _final_ alignment here for generality.
-	 * Leave an extra 16 bytes free so that on the PowerPC we
-	 * can move the aux table up to start on a 16-byte boundary.
 	 */
-	sp = (elf_addr_t *)((~15UL & (unsigned long)(u_platform)) - 16UL);
+	sp = (elf_addr_t *)(~15UL & (unsigned long)(u_platform));
 	csp = sp;
-	csp -= DLINFO_ITEMS*2 + (k_platform ? 2 : 0);
+	csp -= (1+DLINFO_ITEMS)*2 + (k_platform ? 2 : 0);
+#ifdef DLINFO_ARCH_ITEMS
+	csp -= DLINFO_ARCH_ITEMS*2;
+#endif
 	csp -= envc+1;
 	csp -= argc+1;
 	csp -= (!ibcs ? 3 : 1);	/* argc itself */
@@ -174,6 +175,13 @@ create_elf_tables(char *p, int argc, int envc,
 	NEW_AUX_ENT(10, AT_EUID, (elf_addr_t) current->euid);
 	NEW_AUX_ENT(11, AT_GID, (elf_addr_t) current->gid);
 	NEW_AUX_ENT(12, AT_EGID, (elf_addr_t) current->egid);
+#ifdef ARCH_DLINFO
+	/* 
+	 * ARCH_DLINFO must come last so platform specific code can enforce
+	 * special alignment requirements on the AUXV if necessary (eg. PPC).
+	 */
+	ARCH_DLINFO;
+#endif
 #undef NEW_AUX_ENT
 
 	sp -= envc+1;

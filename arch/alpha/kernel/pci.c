@@ -156,7 +156,7 @@ pcibios_align_resource(void *data, struct resource *res, unsigned long size)
 	else if	(res->flags & IORESOURCE_MEM) {
 		/* Make sure we start at our min on all hoses */
 		if (start - hose->mem_space->start < PCIBIOS_MIN_MEM)
-			start = PCIBIOS_MIN_MEM + hose->io_space->start;
+			start = PCIBIOS_MIN_MEM + hose->mem_space->start;
 
 		/*
 		 * The following holds at least for the Low Cost

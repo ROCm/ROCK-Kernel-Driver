@@ -1,4 +1,4 @@
-/* $Id: isdn.h,v 1.111.6.5 2001/04/20 02:40:48 keil Exp $
+/* $Id: isdn.h,v 1.111.6.6 2001/05/17 21:15:34 kai Exp $
 
  * Main header for the Linux ISDN subsystem (linklevel).
  *
@@ -22,54 +22,10 @@
  *
  */
 
-#ifndef isdn_h
-#define isdn_h
+#ifndef __ISDN_H__
+#define __ISDN_H__
 
-#ifdef __KERNEL__
-#include <linux/config.h>
-#endif
 #include <linux/ioctl.h>
-
-#define ISDN_TTY_MAJOR    43
-#define ISDN_TTYAUX_MAJOR 44
-#define ISDN_MAJOR        45
-
-/* The minor-devicenumbers for Channel 0 and 1 are used as arguments for
- * physical Channel-Mapping, so they MUST NOT be changed without changing
- * the correspondent code in isdn.c
- */
-
-#ifdef USE_MINIMUM_MEM
-/* Save memory */
-#define ISDN_MAX_DRIVERS    2
-#define ISDN_MAX_CHANNELS   8
-#else
-#define ISDN_MAX_DRIVERS    32
-#define ISDN_MAX_CHANNELS   64
-#endif
-#define ISDN_MINOR_B        0
-#define ISDN_MINOR_BMAX     (ISDN_MAX_CHANNELS-1)
-#define ISDN_MINOR_CTRL     64
-#define ISDN_MINOR_CTRLMAX  (64 + (ISDN_MAX_CHANNELS-1))
-#define ISDN_MINOR_PPP      128
-#define ISDN_MINOR_PPPMAX   (128 + (ISDN_MAX_CHANNELS-1))
-#define ISDN_MINOR_STATUS   255
-
-#undef CONFIG_ISDN_WITH_ABC_CALLB
-#undef CONFIG_ISDN_WITH_ABC_UDP_CHECK
-#undef CONFIG_ISDN_WITH_ABC_UDP_CHECK_HANGUP
-#undef CONFIG_ISDN_WITH_ABC_UDP_CHECK_DIAL
-#undef CONFIG_ISDN_WITH_ABC_OUTGOING_EAZ
-#undef CONFIG_ISDN_WITH_ABC_LCR_SUPPORT
-#undef CONFIG_ISDN_WITH_ABC_IPV4_TCP_KEEPALIVE
-#undef CONFIG_ISDN_WITH_ABC_IPV4_DYNADDR
-#undef CONFIG_ISDN_WITH_ABC_RCV_NO_HUPTIMER
-#undef CONFIG_ISDN_WITH_ABC_ICALL_BIND
-#undef CONFIG_ISDN_WITH_ABC_CH_EXTINUSE
-#undef CONFIG_ISDN_WITH_ABC_CONN_ERROR
-#undef CONFIG_ISDN_WITH_ABC_RAWIPCOMPRESS
-#undef CONFIG_ISDN_WITH_ABC_IPTABLES_NETFILTER
-
 
 /* New ioctl-codes */
 #define IIOCNETAIF  _IO('I',1)
@@ -122,6 +78,7 @@
 #define ISDN_NET_ENCAP_CISCOHDLCK 6 /* With SLARP and keepalive    */
 #define ISDN_NET_ENCAP_X25IFACE   7 /* Documentation/networking/x25-iface.txt*/
 #define ISDN_NET_ENCAP_MAX_ENCAP  ISDN_NET_ENCAP_X25IFACE
+
 /* Facility which currently uses an ISDN-channel */
 #define ISDN_USAGE_NONE       0
 #define ISDN_USAGE_RAW        1
@@ -148,12 +105,6 @@ typedef struct {
   char drvid[25];
   unsigned long arg;
 } isdn_ioctl_struct;
-
-typedef struct {
-  unsigned long isdndev;
-  unsigned long atmodem[ISDN_MAX_CHANNELS];
-  unsigned long info[ISDN_MAX_CHANNELS];
-} debugvar_addr;
 
 typedef struct {
   char name[10];
@@ -189,14 +140,15 @@ typedef struct {
   int  dialmode;     /* Flag: off / on / auto                 */
 } isdn_net_ioctl_cfg;
 
-#define ISDN_NET_DIALMODE_MASK 0xC0  /* bits for status                   */
-#define  ISDN_NET_DM_OFF	0x00    /* this interface is stopped      */
-#define  ISDN_NET_DM_MANUAL	0x40    /* this interface is on (manual)  */
-#define  ISDN_NET_DM_AUTO	0x80    /* this interface is autodial     */
+#define ISDN_NET_DIALMODE_MASK  0xC0    /* bits for status                */
+#define ISDN_NET_DM_OFF	        0x00    /* this interface is stopped      */
+#define ISDN_NET_DM_MANUAL	0x40    /* this interface is on (manual)  */
+#define ISDN_NET_DM_AUTO	0x80    /* this interface is autodial     */
 #define ISDN_NET_DIALMODE(x) ((&(x))->flags & ISDN_NET_DIALMODE_MASK)
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/major.h>
@@ -219,6 +171,31 @@ typedef struct {
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/tcp.h>
+
+#define ISDN_TTY_MAJOR    43
+#define ISDN_TTYAUX_MAJOR 44
+#define ISDN_MAJOR        45
+
+/* The minor-devicenumbers for Channel 0 and 1 are used as arguments for
+ * physical Channel-Mapping, so they MUST NOT be changed without changing
+ * the correspondent code in isdn.c
+ */
+
+#ifdef CONFIG_COBALT_MICRO_SERVER
+/* Save memory */
+#define ISDN_MAX_DRIVERS    2
+#define ISDN_MAX_CHANNELS   8
+#else
+#define ISDN_MAX_DRIVERS    32
+#define ISDN_MAX_CHANNELS   64
+#endif
+#define ISDN_MINOR_B        0
+#define ISDN_MINOR_BMAX     (ISDN_MAX_CHANNELS-1)
+#define ISDN_MINOR_CTRL     64
+#define ISDN_MINOR_CTRLMAX  (64 + (ISDN_MAX_CHANNELS-1))
+#define ISDN_MINOR_PPP      128
+#define ISDN_MINOR_PPPMAX   (128 + (ISDN_MAX_CHANNELS-1))
+#define ISDN_MINOR_STATUS   255
 
 #ifdef CONFIG_ISDN_PPP
 
@@ -682,4 +659,5 @@ extern isdn_dev *dev;
 #define MIN(a,b) ((a<b)?a:b)
 #define MAX(a,b) ((a>b)?a:b)
 #endif /* __KERNEL__ */
-#endif /* isdn_h */
+
+#endif /* __ISDN_H__ */

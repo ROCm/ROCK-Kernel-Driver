@@ -127,15 +127,18 @@ define_bool CONFIG_SBUS n
 # Yes MCA RS/6000s exist but Linux-PPC does not currently support any
 define_bool CONFIG_MCA n
 
-if [ "$CONFIG_APUS" = "y" -o "$CONFIG_4xx" = "y" -o \
-     "$CONFIG_8260" = "y" ]; then
+if [ "$CONFIG_4xx" = "y" -o "$CONFIG_8260" = "y" ]; then
   define_bool CONFIG_PCI n
 else
   if [ "$CONFIG_8xx" = "y" ]; then
      bool 'QSpan PCI' CONFIG_PCI_QSPAN
      define_bool CONFIG_PCI $CONFIG_PCI_QSPAN
   else
-     define_bool CONFIG_PCI y
+     if [ "$CONFIG_APUS" = "y" ]; then
+       bool 'PCI for Permedia2' CONFIG_PCI
+     else
+       define_bool CONFIG_PCI y
+     fi
   fi
 fi
 
@@ -165,7 +168,11 @@ fi
 source drivers/parport/Config.in
 
 if [ "$CONFIG_4xx" != "y" -a "$CONFIG_8xx" != "y" ]; then
-  tristate 'Support for /dev/rtc' CONFIG_PPC_RTC
+  if [ "$CONFIG_APUS" != "y" ]; then
+    tristate 'Support for /dev/rtc' CONFIG_PPC_RTC
+  else
+    bool 'Generic /dev/rtc emulation' CONFIG_GEN_RTC
+  fi
 fi
 
 if [ "$CONFIG_ALL_PPC" = "y" ]; then
@@ -186,12 +193,26 @@ if [ "$CONFIG_APUS" = "y" ]; then
   define_bool CONFIG_AMIGAMOUSE y
   define_bool CONFIG_ABSTRACT_CONSOLE y
   define_bool CONFIG_FB y
+  define_bool CONFIG_MOUSE y
+  define_bool CONFIG_BUSMOUSE y
+  define_bool CONFIG_APUS_FAST_EXCEPT y
+
+  if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+    bool 'Amiga 1200/600 PCMCIA support' CONFIG_AMIGA_PCMCIA
+  fi
+
   tristate 'Amiga builtin serial support' CONFIG_AMIGA_BUILTIN_SERIAL
-  tristate 'Parallel printer support' CONFIG_M68K_PRINTER
   tristate 'GVP IO-Extender support' CONFIG_GVPIOEXT
   dep_tristate 'GVP IO-Extender parallel printer support' CONFIG_GVPIOEXT_LP $CONFIG_GVPIOEXT
   dep_tristate 'GVP IO-Extender PLIP support' CONFIG_GVPIOEXT_PLIP $CONFIG_GVPIOEXT
   tristate 'Multiface Card III serial support' CONFIG_MULTIFACE_III_TTY
+  if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      tristate 'Commodore A2232 serial support (EXPERIMENTAL)' CONFIG_A2232
+  fi
+  if [ "$CONFIG_AMIGA_PCMCIA" = "y" ]; then
+    tristate 'Hisoft Whippet PCMCIA serial support' CONFIG_WHIPPET_SERIAL
+    tristate 'PCMCIA NE2000 support' CONFIG_APNE
+  fi
   if [ "$CONFIG_AMIGA_BUILTIN_SERIAL" = "y" -o "$CONFIG_GVPIOEXT" = "y" -o \
        "$CONFIG_MULTIFACE_III_TTY" = "y" ]; then
     bool 'Support for serial port console' CONFIG_SERIAL_CONSOLE

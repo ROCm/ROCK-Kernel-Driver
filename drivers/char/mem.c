@@ -29,9 +29,6 @@
 #ifdef CONFIG_I2C
 extern int i2c_init_all(void);
 #endif
-#ifdef CONFIG_VIDEO_DEV
-extern int videodev_init(void);
-#endif
 #ifdef CONFIG_FB
 extern void fbmem_init(void);
 #endif
@@ -647,9 +644,6 @@ int __init chr_dev_init(void)
 #endif
 #if defined(CONFIG_ADB)
 	adbdev_init();
-#endif
-#ifdef CONFIG_VIDEO_DEV
-	videodev_init();
 #endif
 	return 0;
 }

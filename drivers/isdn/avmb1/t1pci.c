@@ -94,7 +94,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.13.6.3 $";
+static char *revision = "$Revision: 1.13.6.5 $";
 
 #undef CONFIG_T1PCI_DEBUG
 #undef CONFIG_T1PCI_POLLDEBUG

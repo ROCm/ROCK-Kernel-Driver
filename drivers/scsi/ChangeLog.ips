@@ -1,5 +1,25 @@
 IBM ServeRAID driver Change Log
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        4.72.00  - Allow for a Scatter-Gather Element to exceed MAX_XFER Size     
+        
+        4.71.00  - Change all memory allocations to not use GFP_DMA flag 
+                   Code Clean-Up for 2.4.x kernel      
+        
+        4.70.15  - Fix Breakup for very large ( non-SG ) requests
+        
+        4.70.13  - Don't release HA Lock in ips_next() until SC taken off queue  
+                 - Unregister SCSI device in ips_release()                        
+                 - Don't Send CDB's if we already know the device is not present  
+                 
+        4.70.12  - Corrective actions for bad controller ( during initialization )
+        
+        4.70.09  - Use a Common ( Large Buffer ) for Flashing from the JCRM CD    
+                 - Add IPSSEND Flash Support                                      
+                 - Set Sense Data for Unknown SCSI Command                        
+                 - Use Slot Number from NVRAM Page 5 
+                 - Restore caller's DCDB Structure
+                                       
         4.20.14  - Update patch files for kernel 2.4.0-test5
 
         4.20.13  - Fix some failure cases / reset code
@@ -66,3 +86,4 @@ IBM ServeRAID driver Change Log
                 - Fixed read/write errors when the adapter is using an
                   8K stripe size.
 
+

@@ -141,48 +141,9 @@ znetboot: $(CHECKS) vmlinux
 	@$(MAKECHRPBOOT) $@
 endif
 
-.PHONY: clean_config
-clean_config:
+%_config: arch/ppc/configs/%_defconfig
 	rm -f .config arch/ppc/defconfig
-
-gemini_config: clean_config
-	cp -f arch/ppc/configs/gemini_defconfig arch/ppc/defconfig
-
-pmac_config: clean_config
-	cp -f arch/ppc/configs/pmac_defconfig arch/ppc/defconfig
-
-prep_config: clean_config
-	cp -f arch/ppc/configs/prep_defconfig arch/ppc/defconfig
-
-chrp_config: clean_config
-	cp -f arch/ppc/configs/chrp_defconfig arch/ppc/defconfig
-
-common_config: clean_config
-	cp -f arch/ppc/configs/common_defconfig arch/ppc/defconfig
-
-mbx_config: clean_config
-	cp -f arch/ppc/configs/mbx_defconfig arch/ppc/defconfig
-
-apus_config: clean_config
-	cp -f arch/ppc/configs/apus_defconfig arch/ppc/defconfig
-
-oak_config: clean_config
-	cp -f arch/ppc/configs/oak_defconfig arch/ppc/defconfig
-
-walnut_config: clean_config
-	cp -f arch/ppc/configs/walnut_defconfig arch/ppc/defconfig
-
-rpxlite_config: clean_config
-	cp -f arch/ppc/configs/rpxlite_defconfig arch/ppc/defconfig
-
-rpxcllf_config: clean_config
-	cp -f arch/ppc/configs/rpxcllf_defconfig arch/ppc/defconfig
-
-bseip_config: clean_config
-	cp -f arch/ppc/configs/bseip_defconfig arch/ppc/defconfig
-
-est8260_config: clean_config
-	cp -f arch/ppc/configs/est8260_defconfig arch/ppc/defconfig
+	cp -f arch/ppc/configs/$(@:config=defconfig) arch/ppc/defconfig
 
 archclean:
 	rm -f arch/ppc/kernel/{mk_defs,ppc_defs.h,find_name,checks}

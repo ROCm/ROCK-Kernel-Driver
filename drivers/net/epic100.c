@@ -41,7 +41,18 @@
 	* Merge becker version 1.11
 	* Move pci_enable_device before any PCI BAR len checks
 
+	LK1.1.7:
+	* { fill me in }
+
+	LK1.1.8:
+	* ethtool support (jgarzik)
+
 */
+
+#define DRV_NAME	"epic100"
+#define DRV_VERSION	"1.11+LK1.1.8"
+#define DRV_RELDATE	"May 18, 2001"
+
 
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
@@ -104,16 +115,18 @@ static int rx_copybreak;
 #include <linux/skbuff.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/ethtool.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-"epic100.c:v1.11 1/7/2001 Written by Donald Becker <becker@scyld.com>\n";
+DRV_NAME ".c:v1.11 1/7/2001 Written by Donald Becker <becker@scyld.com>\n";
 static char version2[] __devinitdata =
 "  http://www.scyld.com/network/epic100.html\n";
 static char version3[] __devinitdata =
-"  (unofficial 2.4.x kernel port, version 1.1.7, April 17, 2001)\n";
+"  (unofficial 2.4.x kernel port, version " DRV_VERSION ", " DRV_RELDATE ")\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("SMC 83c170 EPIC series Ethernet driver");
@@ -326,7 +339,7 @@ static void epic_init_ring(struct net_device *dev);
 static int epic_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int epic_rx(struct net_device *dev);
 static void epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int epic_close(struct net_device *dev);
 static struct net_device_stats *epic_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
@@ -375,7 +388,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	}
 	SET_MODULE_OWNER(dev);
 
-	if (pci_request_regions(pdev, "epic100"))
+	if (pci_request_regions(pdev, DRV_NAME))
 		goto err_out_free_netdev;
 
 #ifdef USE_IO_OPS
@@ -384,7 +397,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	ioaddr = pci_resource_start (pdev, 1);
 	ioaddr = (long) ioremap (ioaddr, pci_resource_len (pdev, 1));
 	if (!ioaddr) {
-		printk (KERN_ERR "epic100 %d: ioremap failed\n", card_idx);
+		printk (KERN_ERR DRV_NAME " %d: ioremap failed\n", card_idx);
 		goto err_out_free_res;
 	}
 #endif
@@ -435,7 +448,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 		((u16 *)dev->dev_addr)[i] = le16_to_cpu(inw(ioaddr + LAN0 + i*4));
 
 	if (debug > 2) {
-		printk(KERN_DEBUG "epic100(%s): EEPROM contents\n",
+		printk(KERN_DEBUG DRV_NAME "(%s): EEPROM contents\n",
 		       pdev->slot_name);
 		for (i = 0; i < 64; i++)
 			printk(" %4.4x%s", read_eeprom(ioaddr, i),
@@ -455,7 +468,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 			int mii_status = mdio_read(dev, phy, 1);
 			if (mii_status != 0xffff  &&  mii_status != 0x0000) {
 				ep->phys[phy_idx++] = phy;
-				printk(KERN_INFO "epic100(%s): MII transceiver #%d control "
+				printk(KERN_INFO DRV_NAME "(%s): MII transceiver #%d control "
 					   "%4.4x status %4.4x.\n",
 					   pdev->slot_name, phy, mdio_read(dev, phy, 0), mii_status);
 			}
@@ -464,11 +477,11 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 		if (phy_idx != 0) {
 			phy = ep->phys[0];
 			ep->advertising = mdio_read(dev, phy, 4);
-			printk(KERN_INFO "epic100(%s): Autonegotiation advertising %4.4x link "
+			printk(KERN_INFO DRV_NAME "(%s): Autonegotiation advertising %4.4x link "
 				   "partner %4.4x.\n",
 				   pdev->slot_name, ep->advertising, mdio_read(dev, phy, 5));
 		} else if ( ! (ep->chip_flags & NO_MII)) {
-			printk(KERN_WARNING "epic100(%s): ***WARNING***: No MII transceiver found!\n",
+			printk(KERN_WARNING DRV_NAME "(%s): ***WARNING***: No MII transceiver found!\n",
 			       pdev->slot_name);
 			/* Use the known PHY address of the EPII. */
 			ep->phys[0] = 3;
@@ -483,7 +496,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	/* The lower four bits are the media type. */
 	if (duplex) {
 		ep->duplex_lock = ep->full_duplex = 1;
-		printk(KERN_INFO "epic100(%s):  Forced full duplex operation requested.\n",
+		printk(KERN_INFO DRV_NAME "(%s):  Forced full duplex operation requested.\n",
 		       pdev->slot_name);
 	}
 	dev->if_port = ep->default_port = option;
@@ -496,7 +509,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	dev->stop = &epic_close;
 	dev->get_stats = &epic_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
-	dev->do_ioctl = &mii_ioctl;
+	dev->do_ioctl = &netdev_ioctl;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->tx_timeout = &epic_tx_timeout;
 
@@ -1331,13 +1344,39 @@ static void set_rx_mode(struct net_device *dev)
 	return;
 }
 
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	struct epic_private *np = dev->priv;
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+
+        switch (ethcmd) {
+        case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strcpy(info.driver, DRV_NAME);
+		strcpy(info.version, DRV_VERSION);
+		strcpy(info.bus_info, np->pci_dev->slot_name);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+
+        }
+	
+	return -EOPNOTSUPP;
+}
+
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct epic_private *ep = dev->priv;
 	long ioaddr = dev->base_addr;
 	u16 *data = (u16 *)&rq->ifr_data;
 
 	switch(cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
 		data[0] = ep->phys[0] & 0x1f;
 		/* Fall Through */
@@ -1432,7 +1471,7 @@ static void epic_resume (struct pci_dev *pdev)
 
 
 static struct pci_driver epic_driver = {
-	name:		"epic100",
+	name:		DRV_NAME,
 	id_table:	epic_pci_tbl,
 	probe:		epic_init_one,
 	remove:		epic_remove_one,

@@ -13,7 +13,7 @@ int eata2x_abort(Scsi_Cmnd *);
 int eata2x_reset(Scsi_Cmnd *);
 int eata2x_biosparam(Disk *, kdev_t, int *);
 
-#define EATA_VERSION "6.04.00"
+#define EATA_VERSION "6.05.00"
 
 #define EATA {                                                               \
                 name:              "EATA/DMA 2.0x rev. " EATA_VERSION " ",   \

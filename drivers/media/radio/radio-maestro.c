@@ -61,6 +61,8 @@
 
 #define BITS2FREQ(x)	((x) * FREQ_STEP - FREQ_IF)
 
+static int radio_nr = -1;
+MODULE_PARM(radio_nr, "i");
 
 
 static int radio_open(struct video_device *, int);
@@ -359,7 +361,7 @@ inline static __u16 radio_install(struct pci_dev *pcidev)
 	init_MUTEX(&radio_unit.lock);
 	
 	if(radio_power_on(&radio_unit)) {
-		if(video_register_device(&maestro_radio, VFL_TYPE_RADIO)==-1) {
+		if(video_register_device(&maestro_radio, VFL_TYPE_RADIO, radio_nr)==-1) {
 			printk("radio-maestro: can't register device!");
 			return 0;
 		}

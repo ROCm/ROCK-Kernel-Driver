@@ -34,8 +34,29 @@
 		- Clean up PCI enable (davej)
 	Version 1.0.4:
 		- Merge Donald Becker's natsemi.c version 1.07
+	Version 1.0.5:
+		- { fill me in }
+	Version 1.0.6:
+		* ethtool support (jgarzik)
+		* Proper initialization of the card (which sometimes
+		fails to occur and leaves the card in a non-functional
+		state). (uzi)
+
+		* Some documented register settings to optimize some
+		of the 100Mbit autodetection circuitry in rev C cards. (uzi)
+
+		* Polling of the PHY intr for stuff like link state
+		change and auto- negotiation to finally work properly. (uzi)
+
+		* One-liner removal of a duplicate declaration of
+		netdev_error(). (uzi)
 
 */
+
+#define DRV_NAME	"natsemi"
+#define DRV_VERSION	"1.07+LK1.0.6"
+#define DRV_RELDATE	"May 18, 2001"
+
 
 /* Updated to recommendations in pci-skeleton v2.03. */
 
@@ -92,16 +113,12 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
-#define final_version
-
 #if !defined(__OPTIMIZE__)
 #warning  You must compile this file with the correct options!
 #warning  See the last lines of the source file.
 #error You must compile this driver with "-O".
 #endif
 
-/* Include files, designed to support most kernel versions 2.0.0 and later. */
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -116,15 +133,17 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/skbuff.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/ethtool.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO "natsemi.c:v1.07 1/9/2001  Written by Donald Becker <becker@scyld.com>\n"
+KERN_INFO DRV_NAME ".c:v1.07 1/9/2001  Written by Donald Becker <becker@scyld.com>\n"
 KERN_INFO "  http://www.scyld.com/network/natsemi.html\n"
-KERN_INFO "  (unofficial 2.4.x kernel port, version 1.0.5, April 17, 2001 Jeff Garzik, Tjeerd Mulder)\n";
+KERN_INFO "  (unofficial 2.4.x kernel port, version " DRV_VERSION ", " DRV_RELDATE "  Jeff Garzik, Tjeerd Mulder)\n";
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
@@ -259,9 +278,12 @@ enum register_offsets {
 	TxRingPtr=0x20, TxConfig=0x24,
 	RxRingPtr=0x30, RxConfig=0x34, ClkRun=0x3C,
 	WOLCmd=0x40, PauseCmd=0x44, RxFilterAddr=0x48, RxFilterData=0x4C,
-	BootRomAddr=0x50, BootRomData=0x54, StatsCtrl=0x5C, StatsData=0x60,
-	RxPktErrs=0x60, RxMissed=0x68, RxCRCErrs=0x64,
-	PCIPM = 0x44,
+	BootRomAddr=0x50, BootRomData=0x54, SiliconRev=0x58, StatsCtrl=0x5C,
+	StatsData=0x60, RxPktErrs=0x60, RxMissed=0x68, RxCRCErrs=0x64,
+	PCIPM=0x44, PhyStatus=0xC0, MIntrCtrl=0xC4, MIntrStatus=0xC8,
+
+	/* These are from the spec, around page 78... on a separate table. */
+	PGSEL=0xCC, PMDCSR=0xE4, TSTDAT=0xFC, DSPCFG=0xF4, SDCFG=0x8C
 };
 
 /* Bit in ChipCmd. */
@@ -355,10 +377,9 @@ static int  start_tx(struct sk_buff *skb, struct net_device *dev);
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void netdev_error(struct net_device *dev, int intr_status);
 static int  netdev_rx(struct net_device *dev);
-static void netdev_error(struct net_device *dev, int intr_status);
 static void set_rx_mode(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  netdev_close(struct net_device *dev);
 
 
@@ -470,7 +491,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	dev->stop = &netdev_close;
 	dev->get_stats = &get_stats;
 	dev->set_multicast_list = &set_rx_mode;
-	dev->do_ioctl = &mii_ioctl;
+	dev->do_ioctl = &netdev_ioctl;
 	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
@@ -584,7 +605,26 @@ static int netdev_open(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	int i;
 
-	/* Do we need to reset the chip??? */
+	/* Reset the chip, just in case. */
+	writel(ChipReset, ioaddr + ChipCmd);
+
+	/* On page 78 of the spec, they recommend some settings for "optimum
+	   performance" to be done in sequence.  These settings optimize some
+	   of the 100Mbit autodetection circuitry.  Also, we only want to do
+	   this for rev C of the chip.
+	*/
+	if (readl(ioaddr + SiliconRev) == 0x302) {
+		writew(0x0001, ioaddr + PGSEL);
+		writew(0x189C, ioaddr + PMDCSR);
+		writew(0x0000, ioaddr + TSTDAT);
+		writew(0x5040, ioaddr + DSPCFG);
+		writew(0x008C, ioaddr + SDCFG);
+	}
+
+	/* Enable PHY Specific event based interrupts.  Link state change
+	   and Auto-Negotiation Completion are among the affected.
+	*/
+	writew(0x0002, ioaddr + MIntrCtrl);
 
 	i = request_irq(dev->irq, &intr_handler, SA_SHIRQ, dev->name, dev);
 	if (i) return i;
@@ -820,14 +860,6 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	long ioaddr;
 	int boguscnt = max_interrupt_work;
 
-#ifndef final_version			/* Can never occur. */
-	if (dev == NULL) {
-		printk (KERN_ERR "Netdev interrupt handler(): IRQ %d for unknown "
-				"device.\n", irq);
-		return;
-	}
-#endif
-
 	ioaddr = dev->base_addr;
 	np = dev->priv;
 
@@ -855,9 +887,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 				break;
 			if (np->tx_ring[entry].cmd_status & cpu_to_le32(0x08000000)) {
 				np->stats.tx_packets++;
-#if LINUX_VERSION_CODE > 0x20127
 				np->stats.tx_bytes += np->tx_skbuff[entry]->len;
-#endif
 			} else {			/* Various Tx errors */
 				int tx_status = le32_to_cpu(np->tx_ring[entry].cmd_status);
 				if (tx_status & 0x04010000) np->stats.tx_aborted_errors++;
@@ -893,18 +923,6 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	if (debug > 3)
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
 			   dev->name, (int)readl(ioaddr + IntrStatus));
-
-#ifndef final_version
-	/* Code that should never be run!  Perhaps remove after testing.. */
-	{
-		static int stopit = 10;
-		if (!netif_running(dev)  &&  --stopit < 0) {
-			printk(KERN_ERR "%s: Emergency stop, looping startup interrupt.\n",
-				   dev->name);
-			free_irq(irq, dev);
-		}
-	}
-#endif
 }
 
 /* This routine is logically part of the interrupt handler, but separated
@@ -968,27 +986,12 @@ static int netdev_rx(struct net_device *dev)
 						   skb->head, temp);
 #endif
 			}
-#ifndef final_version				/* Remove after testing. */
-			/* You will want this info for the initial debug. */
-			if (debug > 5)
-				printk(KERN_DEBUG "  Rx data %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:"
-					   "%2.2x %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x %2.2x%2.2x "
-					   "%d.%d.%d.%d.\n",
-					   skb->data[0], skb->data[1], skb->data[2], skb->data[3],
-					   skb->data[4], skb->data[5], skb->data[6], skb->data[7],
-					   skb->data[8], skb->data[9], skb->data[10],
-					   skb->data[11], skb->data[12], skb->data[13],
-					   skb->data[14], skb->data[15], skb->data[16],
-					   skb->data[17]);
-#endif
 			skb->protocol = eth_type_trans(skb, dev);
 			/* W/ hardware checksum: skb->ip_summed = CHECKSUM_UNNECESSARY; */
 			netif_rx(skb);
 			dev->last_rx = jiffies;
 			np->stats.rx_packets++;
-#if LINUX_VERSION_CODE > 0x20127
 			np->stats.rx_bytes += pkt_len;
-#endif
 		}
 		entry = (++np->cur_rx) % RX_RING_SIZE;
 		np->rx_head_desc = &np->rx_ring[entry];
@@ -1025,6 +1028,8 @@ static void netdev_error(struct net_device *dev, int intr_status)
 		printk(KERN_NOTICE "%s: Link changed: Autonegotiation advertising"
 			   " %4.4x  partner %4.4x.\n", dev->name,
 			   (int)readl(ioaddr + 0x90), (int)readl(ioaddr + 0x94));
+		/* read MII int status to clear the flag */
+		readw(ioaddr + MIntrStatus);
 		check_duplex(dev);
 	}
 	if (intr_status & StatsMax) {
@@ -1126,12 +1131,38 @@ static void set_rx_mode(struct net_device *dev)
 	np->cur_rx_mode = rx_mode;
 }
 
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	struct netdev_private *np = dev->priv;
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+
+        switch (ethcmd) {
+        case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strcpy(info.driver, DRV_NAME);
+		strcpy(info.version, DRV_VERSION);
+		strcpy(info.bus_info, np->pci_dev->slot_name);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+
+        }
+	
+	return -EOPNOTSUPP;
+}
+
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = dev->priv;
 	u16 *data = (u16 *)&rq->ifr_data;
 
 	switch(cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
 		data[0] = 1;
 		/* Fall Through */
@@ -1211,9 +1242,6 @@ static int netdev_close(struct net_device *dev)
 		np->rx_ring[i].cmd_status = 0;
 		np->rx_ring[i].addr = 0xBADF00D0; /* An invalid address. */
 		if (np->rx_skbuff[i]) {
-#if LINUX_VERSION_CODE < 0x20100
-			np->rx_skbuff[i]->free = 1;
-#endif
 			dev_kfree_skb(np->rx_skbuff[i]);
 		}
 		np->rx_skbuff[i] = 0;
@@ -1245,7 +1273,7 @@ static void __devexit natsemi_remove1 (struct pci_dev *pdev)
 }
 
 static struct pci_driver natsemi_driver = {
-	name:		"natsemi",
+	name:		DRV_NAME,
 	id_table:	natsemi_pci_tbl,
 	probe:		natsemi_probe1,
 	remove:		natsemi_remove1,

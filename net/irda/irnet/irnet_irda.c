@@ -1081,6 +1081,7 @@ irnet_status_indication(void *	instance,
 			LOCK_STATUS lock)
 {
   irnet_socket *	self = (irnet_socket *) instance;
+  LOCAL_FLOW		oldflow = self->tx_flow;
 
   DENTER(IRDA_TCB_TRACE, "(self=0x%X)\n", (unsigned int) self);
   DASSERT(self != NULL, , IRDA_CB_ERROR, "Self is NULL !!!\n");

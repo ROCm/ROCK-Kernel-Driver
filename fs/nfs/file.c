@@ -39,6 +39,7 @@ static ssize_t nfs_file_read(struct file *, char *, size_t, loff_t *);
 static ssize_t nfs_file_write(struct file *, const char *, size_t, loff_t *);
 static int  nfs_file_flush(struct file *);
 static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
+static int  nfs_file_release(struct inode *, struct file *);
 
 struct file_operations nfs_file_operations = {
 	read:		nfs_file_read,
@@ -46,7 +47,7 @@ struct file_operations nfs_file_operations = {
 	mmap:		nfs_file_mmap,
 	open:		nfs_open,
 	flush:		nfs_file_flush,
-	release:	nfs_release,
+	release:	nfs_file_release,
 	fsync:		nfs_fsync,
 	lock:		nfs_lock,
 };
@@ -85,6 +86,13 @@ nfs_file_flush(struct file *file)
 		file->f_error = 0;
 	}
 	return status;
+}
+
+static int
+nfs_file_release(struct inode *inode, struct file *file)
+{
+	filemap_fdatasync(inode->i_mapping);
+	return nfs_release(inode,file);
 }
 
 static ssize_t
@@ -283,9 +291,11 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 * Flush all pending writes before doing anything
 	 * with locks..
 	 */
-	down(&filp->f_dentry->d_inode->i_sem);
+	filemap_fdatasync(inode->i_mapping);
+	down(&inode->i_sem);
 	status = nfs_wb_all(inode);
-	up(&filp->f_dentry->d_inode->i_sem);
+	up(&inode->i_sem);
+	filemap_fdatawait(inode->i_mapping);
 	if (status < 0)
 		return status;
 
@@ -300,10 +310,12 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 */
  out_ok:
 	if ((cmd == F_SETLK || cmd == F_SETLKW) && fl->fl_type != F_UNLCK) {
-		down(&filp->f_dentry->d_inode->i_sem);
+		filemap_fdatasync(inode->i_mapping);
+		down(&inode->i_sem);
 		nfs_wb_all(inode);      /* we may have slept */
+		up(&inode->i_sem);
+		filemap_fdatawait(inode->i_mapping);
 		nfs_zap_caches(inode);
-		up(&filp->f_dentry->d_inode->i_sem);
 	}
 	return status;
 }

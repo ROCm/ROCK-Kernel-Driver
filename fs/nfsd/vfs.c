@@ -98,7 +98,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	struct dentry		*dentry;
 	int			err;
 
-	dprintk("nfsd: nfsd_lookup(fh %s, %s)\n", SVCFH_fmt(fhp), name);
+	dprintk("nfsd: nfsd_lookup(fh %s, %*.*s)\n", SVCFH_fmt(fhp), len,len,name);
 
 	/* Obtain dentry and export. */
 	err = fh_verify(rqstp, fhp, S_IFDIR, MAY_EXEC);
@@ -111,40 +111,42 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	err = nfserr_acces;
 
 	/* Lookup the name, but don't follow links */
-	if (strcmp(name, ".")==0) {
-		dentry = dget(dparent);
-	} else if (strcmp(name, "..")==0) {
-		/* checking mountpoint crossing is very different when stepping up */
-		if (dparent == exp->ex_dentry) {
-			if (!EX_CROSSMNT(exp))
-				dentry = dget(dparent); /* .. == . just like at / */
-			else
-			{
-				struct svc_export *exp2 = NULL;
-				struct dentry *dp;
-				struct vfsmount *mnt = mntget(exp->ex_mnt);
-				dentry = dget(dparent);
-				while(follow_up(&mnt, &dentry))
-					;
-				dp = dget(dentry->d_parent);
-				dput(dentry);
-				dentry = dp;
-				for ( ; exp2 == NULL && dp->d_parent != dp;
-				     dp=dp->d_parent)
-					exp2 = exp_get(exp->ex_client, dp->d_inode->i_dev, dp->d_inode->i_ino);
-				if (exp2==NULL) {
-					dput(dentry);
+	if (isdotent(name, len)) {
+		if (len==1)
+			dentry = dget(dparent);
+		else  { /* must be ".." */
+			/* checking mountpoint crossing is very different when stepping up */
+			if (dparent == exp->ex_dentry) {
+				if (!EX_CROSSMNT(exp))
+					dentry = dget(dparent); /* .. == . just like at / */
+				else
+				{
+					struct svc_export *exp2 = NULL;
+					struct dentry *dp;
+					struct vfsmount *mnt = mntget(exp->ex_mnt);
 					dentry = dget(dparent);
-				} else {
-					exp = exp2;
+					while(follow_up(&mnt, &dentry))
+						;
+					dp = dget(dentry->d_parent);
+					dput(dentry);
+					dentry = dp;
+					for ( ; exp2 == NULL && dp->d_parent != dp;
+					      dp=dp->d_parent)
+						exp2 = exp_get(exp->ex_client, dp->d_inode->i_dev, dp->d_inode->i_ino);
+					if (exp2==NULL) {
+						dput(dentry);
+						dentry = dget(dparent);
+					} else {
+						exp = exp2;
+					}
+					mntput(mnt);
 				}
-				mntput(mnt);
-			}
-		} else
-			dentry = dget(dparent->d_parent);
+			} else
+				dentry = dget(dparent->d_parent);
+		}
 	} else {
 		fh_lock(fhp);
-		dentry = lookup_one(name, dparent);
+		dentry = lookup_one_len(name, dparent, len);
 		err = PTR_ERR(dentry);
 		if (IS_ERR(dentry))
 			goto out_nfserr;
@@ -843,7 +845,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (!resfhp->fh_dentry) {
 		/* called from nfsd_proc_mkdir, or possibly nfsd3_proc_create */
 		fh_lock(fhp);
-		dchild = lookup_one(fname, dentry);
+		dchild = lookup_one_len(fname, dentry, flen);
 		err = PTR_ERR(dchild);
 		if (IS_ERR(dchild))
 			goto out_nfserr;
@@ -968,7 +970,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	/*
 	 * Compose the response file handle.
 	 */
-	dchild = lookup_one(fname, dentry);
+	dchild = lookup_one_len(fname, dentry, flen);
 	err = PTR_ERR(dchild);
 	if (IS_ERR(dchild))
 		goto out_nfserr;
@@ -1132,7 +1134,7 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		goto out;
 	fh_lock(fhp);
 	dentry = fhp->fh_dentry;
-	dnew = lookup_one(fname, dentry);
+	dnew = lookup_one_len(fname, dentry, flen);
 	err = PTR_ERR(dnew);
 	if (IS_ERR(dnew))
 		goto out_nfserr;
@@ -1197,7 +1199,7 @@ nfsd_link(struct svc_rqst *rqstp, struct svc_fh *ffhp,
 	ddir = ffhp->fh_dentry;
 	dirp = ddir->d_inode;
 
-	dnew = lookup_one(fname, ddir);
+	dnew = lookup_one_len(fname, ddir, len);
 	err = PTR_ERR(dnew);
 	if (IS_ERR(dnew))
 		goto out_nfserr;
@@ -1268,7 +1270,7 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 	fill_pre_wcc(ffhp);
 	fill_pre_wcc(tfhp);
 
-	odentry = lookup_one(fname, fdentry);
+	odentry = lookup_one_len(fname, fdentry, flen);
 	err = PTR_ERR(odentry);
 	if (IS_ERR(odentry))
 		goto out_nfserr;
@@ -1277,7 +1279,7 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 	if (!odentry->d_inode)
 		goto out_dput_old;
 
-	ndentry = lookup_one(tname, tdentry);
+	ndentry = lookup_one_len(tname, tdentry, tlen);
 	err = PTR_ERR(ndentry);
 	if (IS_ERR(ndentry))
 		goto out_dput_old;
@@ -1339,7 +1341,7 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 	dentry = fhp->fh_dentry;
 	dirp = dentry->d_inode;
 
-	rdentry = lookup_one(fname, dentry);
+	rdentry = lookup_one_len(fname, dentry, flen);
 	err = PTR_ERR(rdentry);
 	if (IS_ERR(rdentry))
 		goto out_nfserr;

@@ -136,7 +136,7 @@ static int watchdog_ioctl(struct inode *inode, struct file *file,
 	switch(cmd)
 	{
 		default:
-			return -ENOIOCTLCMD;
+			return -ENOTTY;
 		case WDIOC_GETSUPPORT:
 			i = verify_area(VERIFY_WRITE, (void*) arg, sizeof(struct watchdog_info));
 			if (i)

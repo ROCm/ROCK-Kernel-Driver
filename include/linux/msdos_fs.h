@@ -54,8 +54,7 @@
 #define SCAN_NOTANY  3  /* test name, then use SCAN_HID or SCAN_NOTHID */
 
 #define DELETED_FLAG 0xe5 /* marks file as deleted when in name[0] */
-#define IS_FREE(n) (!*(n) || *(const unsigned char *) (n) == DELETED_FLAG || \
-  *(const unsigned char *) (n) == FD_FILL_BYTE)
+#define IS_FREE(n) (!*(n) || *(const unsigned char *) (n) == DELETED_FLAG)
 
 #define MSDOS_VALID_MODE (S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO)
 	/* valid file mode bits */

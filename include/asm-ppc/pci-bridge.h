@@ -36,6 +36,7 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
  * Structure of a PCI controller (host bridge)
  */
 struct pci_controller {
+	int index;			/* used for pci_controller_num */
 	struct pci_controller *next;
         struct pci_bus *bus;
 	void *arch_data;

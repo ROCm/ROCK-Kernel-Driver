@@ -629,7 +629,8 @@ void __init ide_init_sis5513 (ide_hwif_t *hwif)
 			case PCI_DEVICE_ID_SI_5600:
 			case PCI_DEVICE_ID_SI_5597:
 			case PCI_DEVICE_ID_SI_5591:
-				hwif->autodma = 1;
+				if (!noautodma)
+					hwif->autodma = 1;
 				hwif->dmaproc = &sis5513_dmaproc;
 				break;
 #endif /* CONFIG_BLK_DEV_IDEDMA */

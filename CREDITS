@@ -221,6 +221,14 @@ S: ul. Koscielna 12a
 S: 62-300 Wrzesnia
 S: Poland
 
+N: Fred Barnes
+E: frmb2@ukc.ac.uk
+D: Various parport/ppdev hacks and fixes
+S: Computing Lab, The University
+S: Canterbury, KENT
+S: CT2 7NF
+S: England
+
 N: Paul Barton-Davis
 E: pbd@op.net
 D: Driver for WaveFront soundcards (Turtle Beach Maui, Tropez, Tropez+)
@@ -1663,6 +1671,7 @@ S: Ecole Nationale Superieure des Telecommunications, Paris
 N: Jamie Lokier
 E: jamie@imbolc.ucc.ie
 D: Reboot-through-BIOS for broken 486 motherboards
+D: Some parport fixes
 S: 11 Goodson Walk
 S: Marston
 S: Oxford
@@ -2883,7 +2892,7 @@ S: Carrollton, TX 75010
 S: USA
 
 N: Tim Waugh
-E: tim@cyberelk.demon.co.uk
+E: tim@cyberelk.net
 D: Co-architect of the parallel-port sharing system
 S: 17 Curling Vale
 S: GUILDFORD

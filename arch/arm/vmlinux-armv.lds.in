@@ -44,11 +44,12 @@ SECTIONS
 			*(.rodata)
 			*(.glue_7)
 			*(.glue_7t)
-			*(.kstrtab)
 		*(.got)			/* Global offset table		*/
 
 		_etext = .;		/* End of text section		*/
 	}
+
+	.kstrtab : { *(.kstrtab) }
 
 	. = ALIGN(16);
 	__ex_table : {			/* Exception table		*/

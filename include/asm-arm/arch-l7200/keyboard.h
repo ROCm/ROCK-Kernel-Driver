@@ -42,7 +42,7 @@ extern int l7200kbd_translate(unsigned char scancode, unsigned char *keycode,
 #define kbd_unexpected_up(kc)           (0200)
 #define kbd_leds(leds)                  do {} while (0)
 #define kbd_init_hw()                   l7200kbd_init_hw()
-#define kbd_sysrq_xlate                 do {} while (0)
+#define kbd_sysrq_xlate                 ((unsigned char *)NULL)
 #define kbd_disable_irq()               disable_irq(IRQ_GCTC2)
 #define kbd_enable_irq()                enable_irq(IRQ_GCTC2)
 

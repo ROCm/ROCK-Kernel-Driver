@@ -708,7 +708,8 @@ check_if_enabled:
 				/*
  	 			 * Set up BM-DMA capability (PnP BIOS should have done this)
  	 			 */
-				hwif->autodma = 0;	/* default DMA off if we had to configure it here */
+		    		if (!IDE_PCI_DEVID_EQ(d->devid, DEVID_CS5530)
+					hwif->autodma = 0;	/* default DMA off if we had to configure it here */
 				(void) pci_write_config_word(dev, PCI_COMMAND, pcicmd | PCI_COMMAND_MASTER);
 				if (pci_read_config_word(dev, PCI_COMMAND, &pcicmd) || !(pcicmd & PCI_COMMAND_MASTER)) {
 					printk("%s: %s error updating PCICMD\n", hwif->name, d->name);

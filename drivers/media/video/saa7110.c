@@ -19,6 +19,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -398,7 +399,7 @@ saa7110_write(decoder, 0x2A, 0xDF);
 
 /* ----------------------------------------------------------------------- */
 
-struct i2c_driver i2c_driver_saa7110 =
+static struct i2c_driver i2c_driver_saa7110 =
 {
 	"saa7110",			/* name */
 
@@ -412,18 +413,16 @@ struct i2c_driver i2c_driver_saa7110 =
 
 EXPORT_NO_SYMBOLS;
 
-#ifdef MODULE
-int init_module(void)
-#else
-int saa7110_init(void)
-#endif
+static int saa7110_init(void)
 {
 	return i2c_register_driver(&i2c_driver_saa7110);
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void saa7110_exit(void)
 {
 	i2c_unregister_driver(&i2c_driver_saa7110);
 }
-#endif
+
+
+module_init(saa7110_init);
+module_exit(saa7110_exit);

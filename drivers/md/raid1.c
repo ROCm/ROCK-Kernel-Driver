@@ -1198,7 +1198,7 @@ static void raid1d (void *data)
 				raid1_map (mddev, &bh->b_dev, bh->b_size >> 9);
 				if (bh->b_dev == dev) {
 					printk (IO_ERROR, partition_name(bh->b_dev), bh->b_blocknr);
-					md_done_sync(mddev, bh->b_size>>10, 0);
+					md_done_sync(mddev, bh->b_size>>9, 0);
 				} else {
 					printk (REDIRECT_SECTOR,
 						partition_name(bh->b_dev), bh->b_blocknr);
@@ -1305,7 +1305,7 @@ static void raid1syncd (void *data)
  * issue suitable write requests
  */
 
-static int raid1_sync_request (mddev_t *mddev, unsigned long block_nr)
+static int raid1_sync_request (mddev_t *mddev, unsigned long sector_nr)
 {
 	raid1_conf_t *conf = mddev_to_conf(mddev);
 	struct mirror_info *mirror;
@@ -1315,7 +1315,7 @@ static int raid1_sync_request (mddev_t *mddev, unsigned long block_nr)
 	int disk;
 
 	spin_lock_irq(&conf->segment_lock);
-	if (!block_nr) {
+	if (!sector_nr) {
 		/* initialize ...*/
 		int buffs;
 		conf->start_active = 0;
@@ -1335,9 +1335,9 @@ static int raid1_sync_request (mddev_t *mddev, unsigned long block_nr)
 		if (conf->cnt_ready || conf->cnt_active)
 			MD_BUG();
 	}
-	while ((block_nr<<1) >= conf->start_pending) {
+	while (sector_nr >= conf->start_pending) {
 		PRINTK("wait .. sect=%lu start_active=%d ready=%d pending=%d future=%d, cnt_done=%d active=%d ready=%d pending=%d future=%d\n",
-			block_nr<<1, conf->start_active, conf->start_ready, conf->start_pending, conf->start_future,
+			sector_nr, conf->start_active, conf->start_ready, conf->start_pending, conf->start_future,
 			conf->cnt_done, conf->cnt_active, conf->cnt_ready, conf->cnt_pending, conf->cnt_future);
 		wait_event_lock_irq(conf->wait_done,
 					!conf->cnt_active,
@@ -1383,10 +1383,10 @@ static int raid1_sync_request (mddev_t *mddev, unsigned long block_nr)
 	r1_bh->cmd = SPECIAL;
 	bh = &r1_bh->bh_req;
 
-	bh->b_blocknr = block_nr;
-	bsize = 1024;
+	bh->b_blocknr = sector_nr;
+	bsize = 512;
 	while (!(bh->b_blocknr & 1) && bsize < PAGE_SIZE
-			&& (bh->b_blocknr+2)*(bsize>>10) < mddev->sb->size) {
+			&& (bh->b_blocknr+2)*(bsize>>9) < (mddev->sb->size *2)) {
 		bh->b_blocknr >>= 1;
 		bsize <<= 1;
 	}
@@ -1403,13 +1403,13 @@ static int raid1_sync_request (mddev_t *mddev, unsigned long block_nr)
 		BUG();
 	bh->b_end_io = end_sync_read;
 	bh->b_private = r1_bh;
-	bh->b_rsector = block_nr<<1;
+	bh->b_rsector = sector_nr;
 	init_waitqueue_head(&bh->b_wait);
 
 	generic_make_request(READ, bh);
 	md_sync_acct(bh->b_dev, bh->b_size/512);
 
-	return (bsize >> 10);
+	return (bsize >> 9);
 
 nomem:
 	raid1_shrink_buffers(conf);
@@ -1444,7 +1444,7 @@ static void end_sync_write(struct buffer_head *bh, int uptodate)
 		int size = bh->b_size;
 		raid1_free_buf(r1_bh);
 		sync_request_done(sect, mddev_to_conf(mddev));
-		md_done_sync(mddev,size>>10, uptodate);
+		md_done_sync(mddev,size>>9, uptodate);
 	}
 }
 

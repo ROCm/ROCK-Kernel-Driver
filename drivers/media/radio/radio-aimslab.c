@@ -42,6 +42,7 @@
 #endif
 
 static int io = CONFIG_RADIO_RTRACK_PORT; 
+static int radio_nr = -1;
 static int users = 0;
 static struct semaphore lock;
 
@@ -345,7 +346,7 @@ static int __init rtrack_init(void)
 
 	rtrack_radio.priv=&rtrack_unit;
 	
-	if(video_register_device(&rtrack_radio, VFL_TYPE_RADIO)==-1)
+	if(video_register_device(&rtrack_radio, VFL_TYPE_RADIO, radio_nr)==-1)
 	{
 		release_region(io, 2);
 		return -EINVAL;
@@ -371,6 +372,7 @@ MODULE_AUTHOR("M.Kirkwood");
 MODULE_DESCRIPTION("A driver for the RadioTrack/RadioReveal radio card.");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the RadioTrack card (0x20f or 0x30f)");
+MODULE_PARM(radio_nr, "i");
 
 EXPORT_NO_SYMBOLS;
 

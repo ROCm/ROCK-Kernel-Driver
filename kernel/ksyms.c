@@ -146,7 +146,7 @@ EXPORT_SYMBOL(path_init);
 EXPORT_SYMBOL(path_walk);
 EXPORT_SYMBOL(path_release);
 EXPORT_SYMBOL(__user_walk);
-EXPORT_SYMBOL(lookup_one);
+EXPORT_SYMBOL(lookup_one_len);
 EXPORT_SYMBOL(lookup_hash);
 EXPORT_SYMBOL(sys_close);
 EXPORT_SYMBOL(dcache_lock);
@@ -264,6 +264,8 @@ EXPORT_SYMBOL(default_llseek);
 EXPORT_SYMBOL(dentry_open);
 EXPORT_SYMBOL(filemap_nopage);
 EXPORT_SYMBOL(filemap_sync);
+EXPORT_SYMBOL(filemap_fdatasync);
+EXPORT_SYMBOL(filemap_fdatawait);
 EXPORT_SYMBOL(lock_page);
 
 /* device registration */

@@ -75,6 +75,8 @@ static __inline__ unsigned long copy_from_user(void *to, const void *from, unsig
 {
 	if (access_ok(VERIFY_READ, from, n))
 		__do_copy_from_user(to, from, n);
+	else /* security hole - plug it */
+		memzero(to, n);
 	return n;
 }
 

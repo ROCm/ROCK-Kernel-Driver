@@ -218,11 +218,31 @@ struct mct_u232_private {
 
 #define WDR_TIMEOUT (HZ * 5 ) /* default urb timeout */
 
+static int mct_u232_calculate_baud_rate(struct usb_serial *serial, int value) {
+	if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID) {
+		switch (value) {
+			case    300: return 0x01;
+			case    600: return 0x02; /* this one not tested */
+			case   1200: return 0x03;
+			case   2400: return 0x04;
+			case   4800: return 0x06;
+			case   9600: return 0x08;
+			case  19200: return 0x09;
+			case  38400: return 0x0a;
+			case  57600: return 0x0b;
+			case 115200: return 0x0c;
+			default:     return -1; /* normally not reached */
+		}
+	}
+	else
+		return MCT_U232_BAUD_RATE(value);
+}
+
 static int mct_u232_set_baud_rate(struct usb_serial *serial, int value)
 {
 	unsigned int divisor;
         int rc;
-	divisor = MCT_U232_BAUD_RATE(value);
+	divisor = mct_u232_calculate_baud_rate(serial, value);
         rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
                              MCT_U232_SET_BAUD_RATE_REQUEST,
 			     MCT_U232_SET_REQUEST_TYPE,
@@ -230,7 +250,7 @@ static int mct_u232_set_baud_rate(struct usb_serial *serial, int value)
 			     WDR_TIMEOUT);
 	if (rc < 0)
 		err("Set BAUD RATE %d failed (error = %d)", value, rc);
-	dbg("set_baud_rate: 0x%x", divisor);
+	dbg("set_baud_rate: value: %d, divisor: 0x%x", value, divisor);
         return rc;
 } /* mct_u232_set_baud_rate */
 
@@ -366,6 +386,14 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 
 	if (!port->active) {
 		port->active = 1;
+
+		/* Compensate for a hardware bug: although the Sitecom U232-P25
+		 * device reports a maximum output packet size of 32 bytes,
+		 * it seems to be able to accept only 16 bytes (and that's what
+		 * SniffUSB says too...)
+		 */
+		if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID)
+			port->bulk_out_size = 16;
 
 		/* Do a defined restart: the normal serial device seems to 
 		 * always turn on DTR and RTS here, so do the same. I'm not

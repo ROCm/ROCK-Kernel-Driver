@@ -457,6 +457,7 @@ nfs_mark_request_dirty(struct nfs_page *req)
 	 *     spinlock since it can run flushd().
 	 */
 	inode_schedule_scan(inode, req->wb_timeout);
+	mark_inode_dirty(inode);
 }
 
 /*
@@ -489,6 +490,7 @@ nfs_mark_request_commit(struct nfs_page *req)
 	 *     spinlock since it can run flushd().
 	 */
 	inode_schedule_scan(inode, req->wb_timeout);
+	mark_inode_dirty(inode);
 }
 #endif
 
@@ -1013,7 +1015,6 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 	struct dentry	*dentry = file->f_dentry;
 	struct inode	*inode = dentry->d_inode;
 	struct nfs_page	*req;
-	int		synchronous = file->f_flags & O_SYNC;
 	int		status = 0;
 
 	dprintk("NFS:      nfs_updatepage(%s/%s %d@%Ld)\n",
@@ -1044,24 +1045,14 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 	if (status < 0)
 		goto done;
 
-	if (req->wb_bytes == PAGE_CACHE_SIZE)
-		SetPageUptodate(page);
-
 	status = 0;
-	if (synchronous) {
-		int error;
-
-		error = nfs_sync_file(inode, file, page_index(page), 1, FLUSH_SYNC|FLUSH_STABLE);
-		if (error < 0 || (error = file->f_error) < 0)
-			status = error;
-		file->f_error = 0;
-	} else {
-		/* If we wrote past the end of the page.
-		 * Call the strategy routine so it can send out a bunch
-		 * of requests.
-		 */
-		if (req->wb_offset == 0 && req->wb_bytes == PAGE_CACHE_SIZE)
-			nfs_strategy(inode);
+	/* If we wrote past the end of the page.
+	 * Call the strategy routine so it can send out a bunch
+	 * of requests.
+	 */
+	if (req->wb_offset == 0 && req->wb_bytes == PAGE_CACHE_SIZE) {
+		SetPageUptodate(page);
+		nfs_strategy(inode);
 	}
 	nfs_release_request(req);
 done:

@@ -748,26 +748,24 @@ out:
 }
 
 /* SMP-safe */
-struct dentry * lookup_one(const char * name, struct dentry * base)
+struct dentry * lookup_one_len(const char * name, struct dentry * base, int len)
 {
 	unsigned long hash;
 	struct qstr this;
 	unsigned int c;
 
 	this.name = name;
-	c = *(const unsigned char *)name;
-	if (!c)
+	this.len = len;
+	if (!len)
 		goto access;
 
 	hash = init_name_hash();
-	do {
-		name++;
-		if (c == '/')
+	while (len--) {
+		c = *(const unsigned char *)name++;
+		if (c == '/' || c == '\0')
 			goto access;
 		hash = partial_name_hash(c, hash);
-		c = *(const unsigned char *)name;
-	} while (c);
-	this.len = name - (const char *) this.name;
+	}
 	this.hash = end_name_hash(hash);
 
 	return lookup_hash(&this, base);

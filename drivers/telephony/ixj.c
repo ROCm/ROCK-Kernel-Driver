@@ -4476,7 +4476,7 @@ static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp)
 {
 	IXJ_FILTER_CADENCE *lcp;
 
-	lcp = kmalloc(sizeof(IXJ_CADENCE), GFP_KERNEL);
+	lcp = kmalloc(sizeof(IXJ_FILTER_CADENCE), GFP_KERNEL);
 	if (lcp == NULL)
 		return -ENOMEM;
 	if (copy_from_user(lcp, (char *) cp, sizeof(IXJ_FILTER_CADENCE)))

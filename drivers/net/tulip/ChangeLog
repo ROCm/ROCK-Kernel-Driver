@@ -1,3 +1,22 @@
+2001-05-18  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: Added ethtool support.
+	  ETHTOOL_GDRVINFO ioctl only, for now.
+
+2001-05-14  Robert Olsson <Robert.Olsson@data.slu.se>
+
+	* Restored HW_FLOWCONTROL from Linux 2.1 series tulip (ANK)
+	  plus Jamal's NETIF_RX_* feedback control.
+
+2001-05-14  Robert Olsson <Robert.Olsson@data.slu.se>
+
+	* Added support for 21143's Interrupt Mitigation.
+	  Jamal original instigator.
+
+2001-05-14  Robert Olsson <Robert.Olsson@data.slu.se>
+
+	* tulip_refill_rx prototype added to tulip.h
+
 2001-05-13  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* tulip_core.c: Remove HAS_PCI_MWI flag from Comet, untested.

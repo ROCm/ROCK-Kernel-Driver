@@ -132,7 +132,7 @@ union offset_union {
 
 #define get8_unaligned_check(val,addr,err)		\
 	__asm__(					\
-	"1:	ldrb	%1, [%2]\n"			\
+	"1:	ldrb	%1, [%2], #1\n"			\
 	"2:\n"						\
 	"	.section .fixup,\"ax\"\n"		\
 	"	.align	2\n"				\
@@ -148,7 +148,7 @@ union offset_union {
 
 #define get8t_unaligned_check(val,addr,err)		\
 	__asm__(					\
-	"1:	ldrbt	%1, [%2]\n"			\
+	"1:	ldrbt	%1, [%2], #1\n"			\
 	"2:\n"						\
 	"	.section .fixup,\"ax\"\n"		\
 	"	.align	2\n"				\

@@ -69,9 +69,11 @@ static struct planb planbs[PLANB_MAX];
 static volatile struct planb_registers *planb_regs;
 
 static int def_norm = PLANB_DEF_NORM;	/* default norm */
+static int video_nr = -1;
 
 MODULE_PARM(def_norm, "i");
 MODULE_PARM_DESC(def_norm, "Default startup norm (0=PAL, 1=NTSC, 2=SECAM)");
+MODULE_PARM(video_nr,"i");
 
 /* ------------------ PlanB Exported Functions ------------------ */
 static long planb_write(struct video_device *, const char *, unsigned long, int);
@@ -2168,7 +2170,7 @@ static int init_planb(struct planb *pb)
 	pb->intr_mask = PLANB_FRM_IRQ;
 	enable_irq(pb->irq);
 
-	if(video_register_device(&pb->video_dev, VFL_TYPE_GRABBER)<0)
+	if(video_register_device(&pb->video_dev, VFL_TYPE_GRABBER, video_nr)<0)
 		return -1;
 
 	return 0;

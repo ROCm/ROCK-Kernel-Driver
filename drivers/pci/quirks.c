@@ -32,7 +32,7 @@ static void __init quirk_passive_release(struct pci_dev *dev)
 	while ((d = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_0, d))) {
 		pci_read_config_byte(d, 0x82, &dlc);
 		if (!(dlc & 1<<1)) {
-			printk("PCI: PIIX3: Enabling Passive Release on %s\n", d->slot_name);
+			printk(KERN_ERR "PCI: PIIX3: Enabling Passive Release on %s\n", d->slot_name);
 			dlc |= 1<<1;
 			pci_write_config_byte(d, 0x82, dlc);
 		}
@@ -89,23 +89,44 @@ static void __init quirk_triton(struct pci_dev *dev)
  *	VIA Apollo KT133 needs PCI latency patch
  *	Made according to a windows driver based patch by George E. Breese
  *	see PCI Latency Adjust on http://www.viahardware.com/download/viatweak.shtm
+ *      Also see http://home.tiscalinet.de/au-ja/review-kt133a-1-en.html for
+ *      the info on which Mr Breese based his work.
  */
 static void __init quirk_vialatency(struct pci_dev *dev)
 {
 	u8 r70;
-
-	printk(KERN_INFO "Applying VIA PCI latency patch.\n");
-	/*
-	 *    In register 0x70, mask off bit 2 (PCI Master read caching)
-	 *    and 1 (Delay Transaction)
+	u8 rev;
+	struct pci_dev *vt82c686;
+   
+   
+	/* we want to look for a VT82C686 south bridge, and then apply the via latency
+	 * patch if we find that it's a 686B (by revision) <cpbotha@ieee.org>
 	 */
-	pci_read_config_byte(dev, 0x70, &r70);
-	r70 &= 0xf9;
-	pci_write_config_byte(dev, 0x70, r70);
-	/*
-	 *    Turn off PCI Latency timeout (set to 0 clocks)
-	 */
-	pci_write_config_byte(dev, 0x75, 0x80);
+	vt82c686 = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686, NULL);
+	if (vt82c686)   
+     	{
+		pci_read_config_byte(vt82c686, PCI_CLASS_REVISION, &rev);
+        	/* 0x40 - 0x4f == 686B, 0x10 - 0x2f == 686A; thanks Dan Hollis */
+		if (rev >= 0x40 && rev <= 0x4f)
+		{
+        		printk(KERN_INFO "Applying VIA PCI latency patch (found VT82C686B).\n");
+			/*
+	 		 *    In register 0x70, mask off bit 2 (PCI Master read caching)
+	 		 *    and 1 (Delay Transaction)
+	 		 */
+			pci_read_config_byte(dev, 0x70, &r70);
+			r70 &= 0xf9;
+			pci_write_config_byte(dev, 0x70, r70);
+			/*
+	 	 	 *    Turn off PCI Latency timeout (set to 0 clocks)
+	 	 	 */
+			pci_write_config_byte(dev, 0x75, 0x80);
+		}
+		else
+		{
+			printk(KERN_INFO "Found VT82C686A, not applying VIA latency patch.\n");
+		}
+	} /* if (vt82c686) ... */
 }
 
 /*
@@ -363,7 +384,7 @@ static void pci_do_fixups(struct pci_dev *dev, int pass, struct pci_fixup *f)
  		    (f->vendor == dev->vendor || f->vendor == (u16) PCI_ANY_ID) &&
  		    (f->device == dev->device || f->device == (u16) PCI_ANY_ID)) {
 #ifdef DEBUG
-			printk("PCI: Calling quirk %p for %s\n", f->hook, dev->slot_name);
+			printk(KERN_INFO "PCI: Calling quirk %p for %s\n", f->hook, dev->slot_name);
 #endif
 			f->hook(dev);
 		}

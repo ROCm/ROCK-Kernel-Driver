@@ -40,6 +40,7 @@
 #endif
 
 static int io = CONFIG_RADIO_AZTECH_PORT; 
+static int radio_nr = -1;
 static int radio_wait_time = 1000;
 static int users = 0;
 static struct semaphore lock;
@@ -297,7 +298,7 @@ static int __init aztech_init(void)
 	init_MUTEX(&lock);
 	aztech_radio.priv=&aztech_unit;
 	
-	if(video_register_device(&aztech_radio, VFL_TYPE_RADIO)==-1)
+	if(video_register_device(&aztech_radio, VFL_TYPE_RADIO, radio_nr)==-1)
 	{
 		release_region(io,2);
 		return -EINVAL;
@@ -312,6 +313,7 @@ static int __init aztech_init(void)
 MODULE_AUTHOR("Russell Kroll, Quay Lu, Donald Song, Jason Lewis, Scott McGrath, William McGrath");
 MODULE_DESCRIPTION("A driver for the Aztech radio card.");
 MODULE_PARM(io, "i");
+MODULE_PARM(radio_nr, "i");
 MODULE_PARM_DESC(io, "I/O address of the Aztech card (0x350 or 0x358)");
 
 EXPORT_NO_SYMBOLS;

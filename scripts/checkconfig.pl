@@ -25,6 +25,13 @@ foreach $file (@ARGV)
 	$fInComment && (s+^.*?\*/+ +o ? ($fInComment = 0) : next);
 	m+/\*+o && (s+/\*.*?\*/+ +go, (s+/\*.*$+ +o && ($fInComment = 1)));
 
+	# Pick up definitions.
+	if ( m/^\s*#/o )
+	{
+	    $iLinuxConfig      = $. if m/^\s*#\s*include\s*"linux\/config\.h"/o;
+	    $configList{uc $1} = 1  if m/^\s*#\s*include\s*"config\/(\S*)\.h"/o;
+	}
+
 	# Strip strings.
 	$fInString && (s+^.*?"+ +o ? ($fInString = 0) : next);
 	m+"+o && (s+".*?"+ +go, (s+".*$+ +o && ($fInString = 1)));
@@ -52,7 +59,7 @@ foreach $file (@ARGV)
 
     # Report superfluous includes.
     if ( $iLinuxConfig && ! $fUseConfig )
-	{ print "$file: $iLinuxConfig: <linux/config.h> not needed.\n"; }
+	{ print "$file: $iLinuxConfig: linux/config.h not needed.\n"; }
 
     close(FILE);
 }

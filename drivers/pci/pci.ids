@@ -1069,6 +1069,13 @@
 	000e  Hydra Mac I/O
 	0010  Heathrow Mac I/O
 	0017  Paddington Mac I/O
+	0018  UniNorth FireWire
+	0019  KeyLargo USB
+	001e  UniNorth PCI
+	001f  UniNorth PCI
+	0020  UniNorth AGP
+	0021  UniNorth GMAC
+	0022  KeyLargo Mac I/O
 106c  Hyundai Electronics America
 	8801  Dual Pentium ISA/PCI Motherboard
 	8802  PowerPC ISA/PCI Motherboard

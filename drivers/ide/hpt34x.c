@@ -419,7 +419,11 @@ void __init ide_init_hpt34x (ide_hwif_t *hwif)
 		unsigned short pcicmd = 0;
 
 		pci_read_config_word(hwif->pci_dev, PCI_COMMAND, &pcicmd);
-		hwif->autodma = (pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0;
+		if (!noautodma)
+			hwif->autodma = (pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0;
+		else
+			hwif->autodma = 0;
+
 		hwif->dmaproc = &hpt34x_dmaproc;
 	} else {
 		hwif->drives[0].autotune = 1;

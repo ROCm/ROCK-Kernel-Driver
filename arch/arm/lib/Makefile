@@ -48,3 +48,7 @@ ifeq ($(PROCESSOR),armo)
 endif
 
 include $(TOPDIR)/Rules.make
+
+csumpartialcopy.o: csumpartialcopygeneric.S
+csumpartialcopyuser.o: csumpartialcopygeneric.S
+

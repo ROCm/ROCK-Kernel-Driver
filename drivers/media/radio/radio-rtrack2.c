@@ -23,6 +23,7 @@
 #endif
 
 static int io = CONFIG_RADIO_RTRACK2_PORT; 
+static int radio_nr = -1;
 static int users = 0;
 static spinlock_t lock;
 
@@ -238,7 +239,7 @@ static int __init rtrack2_init(void)
 	rtrack2_radio.priv=&rtrack2_unit;
 
 	spin_lock_init(&lock);	
-	if(video_register_device(&rtrack2_radio, VFL_TYPE_RADIO)==-1)
+	if(video_register_device(&rtrack2_radio, VFL_TYPE_RADIO, radio_nr)==-1)
 	{
 		release_region(io, 4);
 		return -EINVAL;
@@ -257,6 +258,7 @@ MODULE_AUTHOR("Ben Pfaff");
 MODULE_DESCRIPTION("A driver for the RadioTrack II radio card.");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the RadioTrack card (0x20c or 0x30c)");
+MODULE_PARM(radio_nr, "i");
 
 EXPORT_NO_SYMBOLS;
 

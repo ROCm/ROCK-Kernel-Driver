@@ -347,7 +347,7 @@ function choice () {
 
 	echo -e "
 	function $firstchoice () \
-		{ l_choice '$title' \"$choices\" $current ;}" >>MCradiolists
+		{ l_choice '$title' \"$choices\" \"$current\" ;}" >>MCradiolists
 }
 
 } # END load_functions()

@@ -22,6 +22,7 @@
  */
 
 
+#include "eicon.h"
 #include "sys.h"
 #include "idi.h"
 #include "constant.h"
@@ -30,19 +31,14 @@
 #include "pr_pc.h"
 
 #include "uxio.h"
-#include <sys/types.h>
-
-#define MAX_ADDR_LEN
 
 #define DIVAS_LOAD_CMD		0x02
 #define DIVAS_START_CMD		0x03
 #define DIVAS_IRQ_RESET		0xC18
 #define DIVAS_IRQ_RESET_VAL	0xFE
 
-#define	PCI_COMMAND	0x04
-#define	PCI_STATUS	0x06
-#define	PCI_LATENCY	0x0D
-#define PCI_INTERRUPT	0x3C
+#define	PCI_LATENCY	PCI_LATENCY_TIMER
+#define PCI_INTERRUPT	PCI_INTERRUPT_LINE
 
 #define TEST_INT_DIVAS		0x11
 #define TEST_INT_DIVAS_BRI	0x12
@@ -93,7 +89,7 @@ void    DIVA_DIDD_Read( DESCRIPTOR *table, int tablelength )
         }
 
         if (tablelength > 0)
-          bcopy((caddr_t)DIDD_Table, (caddr_t)table, tablelength);
+          bcopy((void *)DIDD_Table, (void *)table, tablelength);
 
 	return;
 }
@@ -103,7 +99,7 @@ void 	DIVA_DIDD_Write(DESCRIPTOR *table, int tablelength)
         if (tablelength > sizeof(DIDD_Table))
           tablelength = sizeof(DIDD_Table);
 
-	bcopy((caddr_t)table, (caddr_t)DIDD_Table, tablelength);
+	bcopy((void *)table, (void *)DIDD_Table, tablelength);
 
 	return;
 }
@@ -573,7 +569,7 @@ int DivasCardNew(dia_card_t *card_info)
 
 		b = card->cfg.irq;
 
-		UxPciConfigWrite(card->hw, sizeof(b), PCI_INTERRUPT, &b);
+		UxPciConfigWrite(card->hw, sizeof(b), PCI_INTERRUPT_LINE, &b);
 
 		if (card_info->card_type != DIA_CARD_TYPE_DIVA_SERVER_Q)
 		{

@@ -660,6 +660,12 @@ Your cooperation is appreciated.
 
  29 char	Universal frame buffer
 		  0 = /dev/fb0		First frame buffer
+		  1 = /dev/fb1		Second frame buffer
+		    ...
+		 31 = /dev/fb31		32nd frame buffer
+
+		Backward compatibility aliases {2.6}
+
 		 32 = /dev/fb1		Second frame buffer
 		    ...
 		224 = /dev/fb7		Eighth frame buffer

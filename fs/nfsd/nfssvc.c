@@ -117,7 +117,7 @@ nfsd_svc(unsigned short port, int nrservs)
 	return error;
 }
 
-static void inline
+static inline void
 update_thread_usage(int busy_threads)
 {
 	unsigned long prev_call;
@@ -253,7 +253,7 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 		return 0;
 	case RC_REPLY:
 		return 1;
-	case RC_DOIT:
+	case RC_DOIT:;
 		/* do it */
 	}
 

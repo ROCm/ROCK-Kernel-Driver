@@ -134,7 +134,7 @@ out:
 bad_count:
 	printk(KERN_ERR "get_swap_page: bad count %hd from %p\n",
 	       count, __builtin_return_address(0));
-	goto out;
+	return entry;
 }
 
 

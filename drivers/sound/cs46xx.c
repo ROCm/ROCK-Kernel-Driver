@@ -47,6 +47,8 @@
  *	20010117-tw	2.4.0 pci cleanup, wrapper code for 2.2.16-2.4.0
  *	20010118-tw	basic PM support for 2.2.16+ and 2.4.0/2.4.2.
  *	20010228-dh	patch from David Huggins - cs_update_ptr recursion.
+ *	20010409-tw	add hercules game theatre XP amp code.
+ *	20010420-tw	cleanup powerdown/up code.
  *
  *	Status:
  *	Playback/Capture supported from 8k-48k.
@@ -56,9 +58,9 @@
  *	be enabled for 2.4.x by modifying the CS46XX_ACPI_SUPPORT macro
  *	definition.
  *
- *      Hercules Game Pro XP - the EGPIO2 pin controls the external Amp,
- *	but the static image can not modify the EGPIO pins, so we can not
- *	turn on the external amp.
+ *      Hercules Game Theatre XP - the EGPIO2 pin controls the external Amp,
+ *	so, use the drain/polarity to enable.  
+ *	hercules_egpio_disable set to 1, will force a 0 to EGPIODR.
  *
  *	VTB Santa Cruz - the GPIO7/GPIO8 on the Secondary Codec control
  *	the external amplifier for the "back" speakers, since we do not
@@ -108,6 +110,11 @@
 
 #define CS_TRUE 	1
 #define CS_FALSE 	0
+
+#define CS_INC_USE_COUNT(m) (atomic_inc(m))
+#define CS_DEC_USE_COUNT(m) (atomic_dec(m))
+#define CS_DEC_AND_TEST(m) (atomic_dec_and_test(m))
+#define CS_IN_USE(m) (atomic_read(m) != 0)
 
 #define CS_DBGBREAKPOINT {__asm__("INT $3");}
 /*
@@ -167,6 +174,8 @@ MODULE_PARM(cs_debuglevel, "i");
 static unsigned long cs_debugmask=CS_INIT | CS_ERROR;	/* use CS_DBGOUT with various mask values */
 MODULE_PARM(cs_debugmask, "i");
 #endif
+static unsigned long hercules_egpio_disable=0;  /* if non-zero set all EGPIO to 0 */
+MODULE_PARM(hercules_egpio_disable, "i");
 static unsigned long initdelay=700;  /* PM delay in millisecs */
 MODULE_PARM(initdelay, "i");
 static unsigned long powerdown=1;  /* turn on/off powerdown processing in driver */
@@ -189,7 +198,7 @@ struct cs_channel
 };
 
 #define CS46XX_MAJOR_VERSION "1"
-#define CS46XX_MINOR_VERSION "22"
+#define CS46XX_MINOR_VERSION "26"
 
 #ifdef __ia64__
 #define CS46XX_ARCH	     	"64"	//architecture key
@@ -287,6 +296,9 @@ struct cs_card {
 	   so we use a single per card lock */
 	spinlock_t lock;
 
+	/* mixer use count */
+	atomic_t mixer_use_cnt;
+
 	/* PCI device stuff */
 	struct pci_dev * pci_dev;
 	struct list_head list;
@@ -358,6 +370,7 @@ static loff_t cs_llseek(struct file *file, loff_t offset, int origin);
 static int cs_hardware_init(struct cs_card *card);
 static int cs46xx_powerup(struct cs_card *card, unsigned int type);
 static int cs461x_powerdown(struct cs_card *card, unsigned int type);
+static void cs461x_clear_serial_FIFOs(struct cs_card *card, int type);
 
 static inline unsigned ld2(unsigned int x)
 {
@@ -665,6 +678,41 @@ static void cs_set_divisor(struct dmabuf *dmabuf)
 		"cs46xx: cs_set_divisor()- %s %d\n",
 			(dmabuf->type == CS_TYPE_ADC) ? "ADC" : "DAC", 
 			dmabuf->divisor) );
+}
+
+/*
+* mute some of the more prevalent registers to avoid popping.
+*/
+static void cs_mute(struct cs_card *card, int state) 
+{
+	struct ac97_codec *dev=card->ac97_codec[0];
+
+	if(state == CS_TRUE)
+	{
+	/*
+	* fix pops when powering up on thinkpads
+	*/
+		card->pm.u32AC97_master_volume = (u32)cs_ac97_get( dev, 
+				(u8)BA0_AC97_MASTER_VOLUME); 
+		card->pm.u32AC97_headphone_volume = (u32)cs_ac97_get(dev, 
+				(u8)BA0_AC97_HEADPHONE_VOLUME); 
+		card->pm.u32AC97_master_volume_mono = (u32)cs_ac97_get(dev, 
+				(u8)BA0_AC97_MASTER_VOLUME_MONO); 
+		card->pm.u32AC97_pcm_out_volume = (u32)cs_ac97_get(dev, 
+				(u8)BA0_AC97_PCM_OUT_VOLUME);
+			
+		cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME, 0x8000);
+		cs_ac97_set(dev, (u8)BA0_AC97_HEADPHONE_VOLUME, 0x8000);
+		cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME_MONO, 0x8000);
+		cs_ac97_set(dev, (u8)BA0_AC97_PCM_OUT_VOLUME, 0x8000);
+	}
+	else
+	{
+		cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME, card->pm.u32AC97_master_volume);
+		cs_ac97_set(dev, (u8)BA0_AC97_HEADPHONE_VOLUME, card->pm.u32AC97_headphone_volume);
+		cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME_MONO, card->pm.u32AC97_master_volume_mono);
+		cs_ac97_set(dev, (u8)BA0_AC97_PCM_OUT_VOLUME, card->pm.u32AC97_pcm_out_volume);
+	}
 }
 
 /* set playback sample rate */
@@ -1386,12 +1434,17 @@ static int drain_dac(struct cs_state *state, int nonblock)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct dmabuf *dmabuf = &state->dmabuf;
+	struct cs_card *card=state->card;
 	unsigned long flags;
 	unsigned long tmo;
 	int count;
 
+	CS_DBGOUT(CS_FUNCTION, 4, printk("cs46xx: drain_dac()+ \n"));
 	if (dmabuf->mapped || !dmabuf->ready)
+	{
+		CS_DBGOUT(CS_FUNCTION, 4, printk("cs46xx: drain_dac()- 0, not ready\n"));
 		return 0;
+	}
 
 	add_wait_queue(&dmabuf->wait, &wait);
 	for (;;) {
@@ -1427,8 +1480,18 @@ static int drain_dac(struct cs_state *state, int nonblock)
 	remove_wait_queue(&dmabuf->wait, &wait);
 	current->state = TASK_RUNNING;
 	if (signal_pending(current))
+	{
+		CS_DBGOUT(CS_FUNCTION, 4, printk("cs46xx: drain_dac()- -ERESTARTSYS\n"));
+		/*
+		* set to silence and let that clear the fifos.
+		*/
+		memset(dmabuf->rawbuf, (dmabuf->fmt & CS_FMT_16BIT) ? 0 : 0x80,
+		       dmabuf->dmasize);
+		cs461x_clear_serial_FIFOs(card, CS_TYPE_DAC);
 		return -ERESTARTSYS;
+	}
 
+	CS_DBGOUT(CS_FUNCTION, 4, printk("cs46xx: drain_dac()- 0\n"));
 	return 0;
 }
 
@@ -1524,7 +1587,7 @@ static void cs_update_ptr(struct cs_card *card, int wake)
 				}
 
 				if (dmabuf->count < 0 || dmabuf->count > dmabuf->dmasize) {
-					CS_DBGOUT(CS_ERROR, 2, printk(
+					CS_DBGOUT(CS_ERROR, 2, printk(KERN_INFO
 					  "cs46xx: ERROR DAC count<0 or count > dmasize (%d)\n",
 					  	dmabuf->count));
 					/* 
@@ -1584,7 +1647,7 @@ static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct cs_state *playstate = card->channel[1].state;
 	u32 status;
 
-	CS_DBGOUT(CS_INTERRUPT, 4, printk("cs46xx: cs_interrupt()+ \n"));
+	CS_DBGOUT(CS_INTERRUPT, 9, printk("cs46xx: cs_interrupt()+ \n"));
 
 	spin_lock(&card->lock);
 
@@ -1614,7 +1677,7 @@ static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  	/* clear 'em */
 	cs461x_pokeBA0(card, BA0_HICR, HICR_CHGM|HICR_IEV);
 	spin_unlock(&card->lock);
-	CS_DBGOUT(CS_INTERRUPT, 4, printk("cs46xx: cs_interrupt()- \n"));
+	CS_DBGOUT(CS_INTERRUPT, 9, printk("cs46xx: cs_interrupt()- \n"));
 }
 
 
@@ -2298,7 +2361,7 @@ static int cs_mmap(struct file *file, struct vm_area_struct *vma)
 		if(state)
 		{
 			CS_DBGOUT(CS_OPEN, 2, printk(
-			  "cs46xx: cs_mmap() VM_WRITE - state CS_TRUE prog_dmabuf DAC\n") );
+			  "cs46xx: cs_mmap() VM_WRITE - state TRUE prog_dmabuf DAC\n") );
 			if ((ret = prog_dmabuf(state)) != 0)
 				return ret;
 		}
@@ -2307,7 +2370,7 @@ static int cs_mmap(struct file *file, struct vm_area_struct *vma)
 		if(state)
 		{
 			CS_DBGOUT(CS_OPEN, 2, printk(
-			  "cs46xx: cs_mmap() VM_READ - state CS_TRUE prog_dmabuf ADC\n") );
+			  "cs46xx: cs_mmap() VM_READ - state TRUE prog_dmabuf ADC\n") );
 			if ((ret = prog_dmabuf(state)) != 0)
 				return ret;
 		}
@@ -2955,31 +3018,36 @@ static void amp_voyetra(struct cs_card *card, int change)
 	}
 }
 
+		       
 /*
- *	For the VTB Santa Cruz card, the Secondary Codec must have the 
- *	GPIO pins 7 and 8 manipulated, not the Primary codec.
- *	Currently, only the primary codec is supported, so the following
- *	code will not function.  Additionally, slot 12 must be setup
- *	to allow proper output for 7 and 8 to occur (trw).
+ *	Game Theatre XP card - EGPIO[2] is used to enable the external amp.
  */
  
-static void amp_voyetra_4294(struct cs_card *card, int change)
+static void amp_hercules(struct cs_card *card, int change)
 {
-	struct ac97_codec *c=card->ac97_codec[0];
-	
-	card->amplifier+=change;
-
-	if(card->amplifier)
+	int old=card->amplifier;
+	if(!card)
 	{
-		/* Switch the GPIO pins 7 and 8 to open drain */
-		cs_ac97_set(c, 0x4C, cs_ac97_get(c, 0x4C) & 0xFE7F);
-		cs_ac97_set(c, 0x4E, cs_ac97_get(c, 0x4E) | 0x0180);
-		/* Now wake the AMP (this might be backwards) */
-		cs_ac97_set(c, 0x54, cs_ac97_get(c, 0x54) & ~0x0180);
+		CS_DBGOUT(CS_ERROR, 2, printk(KERN_INFO 
+			"cs46xx: amp_hercules() called before initialized.\n"));
+		return;
 	}
-	else
+	card->amplifier+=change;
+	if( (card->amplifier && !old) && !(hercules_egpio_disable))
 	{
-		cs_ac97_set(c, 0x54, cs_ac97_get(c, 0x54) | 0x0180);
+		CS_DBGOUT(CS_PARMS, 4, printk(KERN_INFO 
+			"cs46xx: amp_hercules() external amp enabled\n"));
+		cs461x_pokeBA0(card, BA0_EGPIODR, 
+			EGPIODR_GPOE2);     /* enable EGPIO2 output */
+		cs461x_pokeBA0(card, BA0_EGPIOPTR, 
+			EGPIOPTR_GPPT2);   /* open-drain on output */
+	}
+	else if(old && !card->amplifier)
+	{
+		CS_DBGOUT(CS_PARMS, 4, printk(KERN_INFO 
+			"cs46xx: amp_hercules() external amp disabled\n"));
+		cs461x_pokeBA0(card, BA0_EGPIODR, 0); /* disable */
+		cs461x_pokeBA0(card, BA0_EGPIOPTR, 0); /* disable */
 	}
 }
 
@@ -3016,7 +3084,7 @@ static void clkrun_hack(struct cs_card *card, int change)
 	/* Flip CLKRUN off while running */
 	if(!card->active && old)
 	{
-		CS_DBGOUT(CS_PARMS , 9, printk(
+		CS_DBGOUT(CS_PARMS , 9, printk( KERN_INFO
 			"cs46xx: clkrun() enable clkrun - change=%d active=%d\n",
 				change,card->active));
 		outw(control|0x2000, port+0x10);
@@ -3026,7 +3094,7 @@ static void clkrun_hack(struct cs_card *card, int change)
 	/*
 	* sometimes on a resume the bit is set, so always reset the bit.
 	*/
-		CS_DBGOUT(CS_PARMS , 9, printk(
+		CS_DBGOUT(CS_PARMS , 9, printk( KERN_INFO
 			"cs46xx: clkrun() disable clkrun - change=%d active=%d\n",
 				change,card->active));
 		outw(control&~0x2000, port+0x10);
@@ -3404,7 +3472,7 @@ void cs46xx_ac97_suspend(struct cs_card *card)
 			"cs46xx: cs46xx_ac97_suspend() failure (0x%x)\n",tmp) );
 	}
 
-	CS_DBGOUT(CS_PM, 9, printk("cs4281: cs46xx_ac97_suspend()-\n"));
+	CS_DBGOUT(CS_PM, 9, printk("cs46xx: cs46xx_ac97_suspend()-\n"));
 }
 
 /****************************************************************************
@@ -3417,7 +3485,7 @@ void cs46xx_ac97_resume(struct cs_card *card)
 	int Count,i;
 	struct ac97_codec *dev=card->ac97_codec[0];
 
-	CS_DBGOUT(CS_PM, 9, printk("cs4281: cs46xx_ac97_resume()+\n"));
+	CS_DBGOUT(CS_PM, 9, printk("cs46xx: cs46xx_ac97_resume()+\n"));
 
 /*
 * First, we restore the state of the general purpose register.  This
@@ -3458,7 +3526,7 @@ void cs46xx_ac97_resume(struct cs_card *card)
 	if(card->amp_init)
 		card->amp_init(card);
         
-	CS_DBGOUT(CS_PM, 9, printk("cs4281: cs46xx_ac97_resume()-\n"));
+	CS_DBGOUT(CS_PM, 9, printk("cs46xx: cs46xx_ac97_resume()-\n"));
 }
 
 
@@ -3521,7 +3589,7 @@ int cs46xx_suspend(struct cs_card *card)
 {
 	unsigned int tmp;
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 4, 
-		printk("cs46xx: cs46xx_suspend()+ flags=%d s=0x%x\n",
+		printk("cs46xx: cs46xx_suspend()+ flags=0x%x s=0x%x\n",
 			(unsigned)card->pm.flags,(unsigned)card));
 /*
 * check the current state, only suspend if IDLE
@@ -3604,7 +3672,7 @@ int cs46xx_suspend(struct cs_card *card)
 	printpm(card);
 
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 4, 
-		printk("cs46xx: cs46xx_suspend()- flags=%d\n",
+		printk("cs46xx: cs46xx_suspend()- flags=0x%x\n",
 			(unsigned)card->pm.flags));
 	return 0;
 }
@@ -3614,7 +3682,7 @@ int cs46xx_resume(struct cs_card *card)
 	int i;
 
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 4, 
-		printk( "cs46xx: cs46xx_resume()+ flags=%d\n",
+		printk( "cs46xx: cs46xx_resume()+ flags=0x%x\n",
 			(unsigned)card->pm.flags));
 	if(!(card->pm.flags & CS46XX_PM_SUSPENDED))
 	{
@@ -3654,7 +3722,7 @@ int cs46xx_resume(struct cs_card *card)
 
 	card->active_ctrl(card, -1);
 
-	CS_DBGOUT(CS_PM | CS_FUNCTION, 4, printk("cs46xx: cs46xx_resume()- flags=%d\n",
+	CS_DBGOUT(CS_PM | CS_FUNCTION, 4, printk("cs46xx: cs46xx_resume()- flags=0x%x\n",
 		(unsigned)card->pm.flags));
 	return 0;
 }
@@ -3919,12 +3987,17 @@ static int cs_open_mixdev(struct inode *inode, struct file *file)
 	file->private_data = card->ac97_codec[i];
 
 	card->active_ctrl(card,1);
-	if( (tmp = cs46xx_powerup(card, CS_POWER_MIXVON )) )
+	if(!CS_IN_USE(&card->mixer_use_cnt))
 	{
-		CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
-			"cs46xx: cs_open_mixdev() powerup failure (0x%x)\n",tmp) );
-		return -EIO;
+		if( (tmp = cs46xx_powerup(card, CS_POWER_MIXVON )) )
+		{
+			CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
+				"cs46xx: cs_open_mixdev() powerup failure (0x%x)\n",tmp) );
+			return -EIO;
+		}
 	}
+	card->amplifier_ctrl(card, 1);
+	CS_INC_USE_COUNT(&card->mixer_use_cnt);
 	MOD_INC_USE_COUNT;
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 4,
 		  printk(KERN_INFO "cs46xx: cs_open_mixdev()- 0\n"));
@@ -3938,8 +4011,9 @@ static int cs_release_mixdev(struct inode *inode, struct file *file)
 	struct list_head *entry;
 	int i;
 	unsigned int tmp;
-	
-	
+
+	CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 4,
+		  printk(KERN_INFO "cs46xx: cs_release_mixdev()+\n"));
 	list_for_each(entry, &cs46xx_devs)
 	{
 		card = list_entry(entry, struct cs_card, list);
@@ -3955,14 +4029,26 @@ static int cs_release_mixdev(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 match:
+	card->active_ctrl(card, -1);
+	card->amplifier_ctrl(card, -1);
+	MOD_DEC_USE_COUNT;
+	if(!CS_DEC_AND_TEST(&card->mixer_use_cnt))
+	{
+		CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 4,
+			  printk(KERN_INFO "cs46xx: cs_release_mixdev()- no powerdown, usecnt>0\n"));
+		return 0;
+	}
+/*
+* ok, no outstanding mixer opens, so powerdown.
+*/
 	if( (tmp = cs461x_powerdown(card, CS_POWER_MIXVON )) )
 	{
 		CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
 			"cs46xx: cs_release_mixdev() powerdown MIXVON failure (0x%x)\n",tmp) );
 		return -EIO;
 	}
-	card->active_ctrl(card, -1);
-	MOD_DEC_USE_COUNT;
+	CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 4,
+		  printk(KERN_INFO "cs46xx: cs_release_mixdev()- 0\n"));
 	return 0;
 }
 
@@ -4027,7 +4113,7 @@ static int cs_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 			else
 			{
 				CS_DBGOUT(CS_ERROR, 1, printk(KERN_INFO
-				    "cs4281: mixer_ioctl(): invalid APM cmd (%d)\n",
+				    "cs46xx: mixer_ioctl(): invalid APM cmd (%d)\n",
 					val));
 			}
 			return 0;
@@ -4181,9 +4267,9 @@ static void cs461x_reset(struct cs_card *card)
 	cs461x_poke(card, BA1_FRMT, 0xadf);
 }
 
-static void cs461x_clear_serial_FIFOs(struct cs_card *card)
+static void cs461x_clear_serial_FIFOs(struct cs_card *card, int type)
 {
-	int idx, loop, powerdown = 0;
+	int idx, loop, startfifo=0, endfifo=0, powerdown1 = 0;
 	unsigned int tmp;
 
 	/*
@@ -4192,7 +4278,7 @@ static void cs461x_clear_serial_FIFOs(struct cs_card *card)
 	 */
 	if (!((tmp = cs461x_peekBA0(card, BA0_CLKCR1)) & CLKCR1_SWCE)) {
 		cs461x_pokeBA0(card, BA0_CLKCR1, tmp | CLKCR1_SWCE);
-		powerdown = 1;
+		powerdown1 = 1;
 	}
 
 	/*
@@ -4203,9 +4289,25 @@ static void cs461x_clear_serial_FIFOs(struct cs_card *card)
 	cs461x_pokeBA0(card, BA0_SERBWP, 0);
 
 	/*
-	 *  Fill all 256 sample FIFO locations.
+	* Check for which FIFO locations to clear, if we are currently
+	* playing or capturing then we don't want to put in 128 bytes of
+	* "noise".
 	 */
-	for (idx = 0; idx < 256; idx++) {
+	if(type & CS_TYPE_DAC)
+	{
+		startfifo = 128;
+		endfifo = 256;
+	}
+	if(type & CS_TYPE_ADC)
+	{
+		startfifo = 0;
+		if(!endfifo)
+			endfifo = 128;
+	}
+	/*
+	 *  Fill sample FIFO locations (256 locations total).
+	 */
+	for (idx = startfifo; idx < endfifo; idx++) {
 		/*
 		 *  Make sure the previous FIFO write operation has completed.
 		 */
@@ -4215,7 +4317,7 @@ static void cs461x_clear_serial_FIFOs(struct cs_card *card)
 				break;
 		}
 		if (cs461x_peekBA0(card, BA0_SERBST) & SERBST_WBSY) {
-			if (powerdown)
+			if (powerdown1)
 				cs461x_pokeBA0(card, BA0_CLKCR1, tmp);
 		}
 		/*
@@ -4231,7 +4333,7 @@ static void cs461x_clear_serial_FIFOs(struct cs_card *card)
 	 *  Now, if we powered up the devices, then power them back down again.
 	 *  This is kinda ugly, but should never happen.
 	 */
-	if (powerdown)
+	if (powerdown1)
 		cs461x_pokeBA0(card, BA0_CLKCR1, tmp);
 }
 
@@ -4268,6 +4370,9 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 			"cs46xx: cs461x_powerdown()- 0  unable to powerdown. tmp=0x%x\n",tmp));
 		return 0;
 	}
+
+	cs_mute(card, CS_TRUE);
+
 	/*
 	 *  Power down indicated areas.
 	 */
@@ -4443,6 +4548,7 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 		}
 	}
 	tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
+	cs_mute(card, CS_FALSE);
 	CS_DBGOUT(CS_FUNCTION, 4, printk(KERN_INFO 
 		"cs46xx: cs461x_powerdown()- 0 tmp=0x%x\n",tmp));
 	return 0;
@@ -4462,6 +4568,8 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 		type |= CS_POWER_MIXVOFF;
 	if(type & (CS_POWER_DAC | CS_POWER_ADC))
 		type |= CS_POWER_MIXVON | CS_POWER_MIXVOFF;
+
+	cs_mute(card, CS_TRUE);
 	/*
 	 *  Power up indicated areas.
 	 */
@@ -4637,6 +4745,7 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 		}
 	}
 	tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
+	cs_mute(card, CS_FALSE);
 	CS_DBGOUT(CS_FUNCTION, 4, printk(KERN_INFO 
 		"cs46xx: cs46xx_powerup()- 0 tmp=0x%x\n",tmp));
 	return 0;
@@ -4741,7 +4850,6 @@ static int cs_hardware_init(struct cs_card *card)
 	*/
 	if(!(card->pm.flags & CS46XX_PM_IDLE))
 		mdelay(initdelay);
-
 	/*
 	 *  Write the selected clock control setup to the hardware.  Do not turn on
 	 *  SWCE yet (if requested), so that the devices clocked by the output of
@@ -4770,7 +4878,7 @@ static int cs_hardware_init(struct cs_card *card)
 	/*
 	 *  Fill the serial port FIFOs with silence.
 	 */
-	cs461x_clear_serial_FIFOs(card);
+	cs461x_clear_serial_FIFOs(card,CS_TYPE_DAC | CS_TYPE_ADC);
 
 	/*
 	 *  Set the serial port FIFO pointer to the first sample in the FIFO.
@@ -4951,12 +5059,25 @@ static int cs_hardware_init(struct cs_card *card)
 	 */
 	if(card->pm.flags & CS46XX_PM_IDLE)
 	{
-		if( (tmp = cs461x_powerdown(card, CS_POWER_DAC | CS_POWER_ADC |
-				CS_POWER_MIXVON )) )
+		if(!powerdown)
 		{
-			CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
-				"cs46xx: cs461x_powerdown() failure (0x%x)\n",tmp) );
-			return -EIO;
+			if( (tmp = cs46xx_powerup(card, CS_POWER_DAC | CS_POWER_ADC |
+					CS_POWER_MIXVON )) )
+			{
+				CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
+					"cs46xx: cs461x_powerup() failure (0x%x)\n",tmp) );
+				return -EIO;
+			}
+		}
+		else
+		{
+			if( (tmp = cs461x_powerdown(card, CS_POWER_DAC | CS_POWER_ADC |
+					CS_POWER_MIXVON )) )
+			{
+				CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
+					"cs46xx: cs461x_powerdown() failure (0x%x)\n",tmp) );
+				return -EIO;
+			}
 		}
 	}
 	CS_DBGOUT(CS_FUNCTION | CS_INIT, 2, printk(KERN_INFO 
@@ -4964,10 +5085,8 @@ static int cs_hardware_init(struct cs_card *card)
 	return 0;
 }
 
-
 /* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
    until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
-   
    
 /*
  *	Card subid table
@@ -4987,8 +5106,12 @@ static struct cs_card_type cards[]={
 	{0x1489, 0x7001, "Genius Soundmaker 128 value", amp_none, NULL, NULL},
 	{0x5053, 0x3357, "Voyetra", amp_voyetra, NULL, NULL},
 	{0x1071, 0x6003, "Mitac MI6020/21", amp_voyetra, NULL, NULL},
-	{0x14AF, 0x0050, "Hercules Game Theatre XP", NULL, NULL, NULL},
-	{0x1681, 0x0050, "Hercules Game Theatre XP", NULL, NULL, NULL},
+	{0x14AF, 0x0050, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
+	{0x1681, 0x0050, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
+	{0x1681, 0x0051, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
+	{0x1681, 0x0052, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
+	{0x1681, 0x0053, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
+	{0x1681, 0x0054, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
 	/* Not sure if the 570 needs the clkrun hack */
 	{PCI_VENDOR_ID_IBM, 0x0132, "Thinkpad 570", amp_none, NULL, clkrun_hack},
 	{PCI_VENDOR_ID_IBM, 0x0153, "Thinkpad 600X/A20/T20", amp_none, NULL, clkrun_hack},
@@ -5016,6 +5139,11 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 	CS_DBGOUT(CS_FUNCTION | CS_INIT, 2,
 		  printk(KERN_INFO "cs46xx: probe()+\n"));
 
+	if (pci_enable_device(pci_dev)) {
+		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
+			 "cs46xx: pci_enable_device() failed\n"));
+		return -1;
+	}
 	if (!RSRCISMEMORYREGION(pci_dev, 0) ||
 	    !RSRCISMEMORYREGION(pci_dev, 1)) {
 		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR
@@ -5042,12 +5170,6 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 		return -ENOMEM;
 	}
 	memset(card, 0, sizeof(*card));
-
-	if (pci_enable_device(pci_dev)) {
-		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
-			 "cs46xx: pci_enable_device() failed\n"));
-		goto fail2;
-	}
 	card->ba0_addr = RSRCADDRESS(pci_dev, 0);
 	card->ba1_addr = RSRCADDRESS(pci_dev, 1);
 	card->pci_dev = pci_dev;
@@ -5096,7 +5218,7 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 		card->amplifier_ctrl = amp_none;
 		card->active_ctrl = clkrun_hack;
 	}		
-		       
+
 	if (external_amp == 1)
 	{
 		printk(KERN_INFO "cs46xx: Crystal EAPD support forced on.\n");
@@ -5120,7 +5242,7 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 	card->ba1.name.reg = ioremap_nocache(card->ba1_addr + BA1_SP_REG, CS461X_BA1_REG_SIZE);
 	
 	CS_DBGOUT(CS_INIT, 4, printk(KERN_INFO 
-		"cs46xx: card->ba0=0x%.08x\n",(unsigned)card->ba0) );
+		"cs46xx: card=0x%x card->ba0=0x%.08x\n",(unsigned)card,(unsigned)card->ba0) );
 	CS_DBGOUT(CS_INIT, 4, printk(KERN_INFO 
 		"cs46xx: card->ba1=0x%.08x 0x%.08x 0x%.08x 0x%.08x\n",
 			(unsigned)card->ba1.name.data0,
@@ -5319,9 +5441,9 @@ static void __devinit cs46xx_remove(struct pci_dev *pci_dev)
 	unregister_sound_dsp(card->dev_audio);
         if(card->dev_midi)
                 unregister_sound_midi(card->dev_midi);
+	list_del(&card->list);
 	kfree(card);
 	PCI_SET_DRIVER_DATA(pci_dev,NULL);
-	list_del(&card->list);
 
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO
 		 "cs46xx: cs46xx_remove()-: remove successful\n"));
@@ -5329,8 +5451,8 @@ static void __devinit cs46xx_remove(struct pci_dev *pci_dev)
 
 enum {
 	CS46XX_4610 = 0,
-	CS46XX_4612,  	/* same as 4624 */
-	CS46XX_4615,  	/* same as 4630 */
+	CS46XX_4612,  	/* same as 4630 */
+	CS46XX_4615,  	/* same as 4624 */
 };
 
 static struct pci_device_id cs46xx_pci_tbl[] __devinitdata = {

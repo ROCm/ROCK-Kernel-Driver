@@ -455,7 +455,8 @@ void __init ide_init_amd7409 (ide_hwif_t *hwif)
 
 	if (hwif->dma_base) {
 		hwif->dmaproc = &amd7409_dmaproc;
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
 	} else {
 		hwif->autodma = 0;
 		hwif->drives[0].autotune = 1;

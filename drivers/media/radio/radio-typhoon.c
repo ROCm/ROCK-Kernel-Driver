@@ -321,10 +321,12 @@ MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the Typhoon card (0x316 or 0x336)");
 MODULE_PARM(mutefreq, "i");
 MODULE_PARM_DESC(mutefreq, "Frequency used when muting the card (in kHz)");
+MODULE_PARM(radio_nr, "i");
 
 EXPORT_NO_SYMBOLS;
 
 static int io = -1;
+static int radio_nr = -1;
 
 #ifdef MODULE
 static unsigned long mutefreq = 0;
@@ -356,7 +358,7 @@ static int __init typhoon_init(void)
 	}
 
 	typhoon_radio.priv = &typhoon_unit;
-	if (video_register_device(&typhoon_radio, VFL_TYPE_RADIO) == -1)
+	if (video_register_device(&typhoon_radio, VFL_TYPE_RADIO, radio_nr) == -1)
 	{
 		release_region(io, 8);
 		return -EINVAL;

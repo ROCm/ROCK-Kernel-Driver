@@ -760,8 +760,11 @@
     </para>
 
     <para>
-      Any atomic operation is defined to act as a memory barrier
-      (ie. as per the <function>mb()</function> macro).  Also,
+      Some atomic operations are defined to act as a memory barrier
+      (ie. as per the <function>mb()</function> macro, but if in
+      doubt, be explicit.
+      <!-- Rusty Russell 2 May 2001, 2.4.4 -->
+      Also,
       spinlock operations act as partial barriers: operations after
       gaining a spinlock will never be moved to precede the
       <function>spin_lock()</function> call, and operations before

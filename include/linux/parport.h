@@ -90,6 +90,7 @@ typedef enum {
 
 /* Flags for block transfer operations. */
 #define PARPORT_EPP_FAST		(1<<0) /* Unreliable counts. */
+#define PARPORT_W91284PIC		(1<<1) /* have a Warp9 w91284pic in the device */
 
 /* The rest is for the kernel only */
 #ifdef __KERNEL__

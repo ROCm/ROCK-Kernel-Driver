@@ -30,6 +30,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include <asm/semaphore.h>
 
 #include <linux/kmod.h>
 
@@ -394,7 +395,7 @@ static void videodev_proc_destroy_dev (struct video_device *vfd)
 		if (vfd == d->vdev) {
 			remove_proc_entry(d->name, video_dev_proc_entry);
 			list_del (&d->proc_list);
-			kfree (d);
+			kfree(d);
 			break;
 		}
 	}
@@ -406,9 +407,10 @@ extern struct file_operations video_fops;
 
 /**
  *	video_register_device - register video4linux devices
- *	@vfd: video device structure we want to register
+ *	@vfd:  video device structure we want to register
  *	@type: type of device to register
- *	FIXME: needs a semaphore on 2.3.x
+ *	@nr:   which device number (0 == /dev/video0, 1 == /dev/video1, ...
+ *             -1 == first free)
  *	
  *	The registration code assigns minor numbers based on the type
  *	requested. -ENFILE is returned in all the device slots for this
@@ -427,14 +429,17 @@ extern struct file_operations video_fops;
  *
  *	%VFL_TYPE_RADIO - A radio card	
  */
- 
-int video_register_device(struct video_device *vfd, int type)
+
+static DECLARE_MUTEX(videodev_register_lock);
+
+int video_register_device(struct video_device *vfd, int type, int nr)
 {
 	int i=0;
 	int base;
 	int err;
 	int end;
 	char *name_base;
+	char name[16];
 	
 	switch(type)
 	{
@@ -461,49 +466,58 @@ int video_register_device(struct video_device *vfd, int type)
 		default:
 			return -1;
 	}
-	
-	for(i=base;i<end;i++)
-	{
-		if(video_device[i]==NULL)
-		{
-			char name[16];
 
-			video_device[i]=vfd;
-			vfd->minor=i;
-			/* The init call may sleep so we book the slot out
-			   then call */
-			MOD_INC_USE_COUNT;
-			if(vfd->initialize)
-			{
-				err=vfd->initialize(vfd);
-				if(err<0)
-				{
-					video_device[i]=NULL;
-					MOD_DEC_USE_COUNT;
-					return err;
-				}
-			}
-			sprintf (name, "v4l/%s%d", name_base, i - base);
-			/*
-			 *	Start the device root only. Anything else
-			 *	has serious privacy issues.
-			 */
-			vfd->devfs_handle =
-			    devfs_register (NULL, name, DEVFS_FL_DEFAULT,
-					    VIDEO_MAJOR, vfd->minor,
-					    S_IFCHR | S_IRUSR | S_IWUSR,
-					    &video_fops, NULL);
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-			sprintf (name, "%s%d", name_base, i - base);
-			videodev_proc_create_dev (vfd, name);
-#endif
-			
-
-			return 0;
+	/* pick a minor number */
+	down(&videodev_register_lock);
+	if (-1 == nr) {
+		/* use first free */
+		for(i=base;i<end;i++)
+			if (NULL == video_device[i])
+				break;
+		if (i == end) {
+			up(&videodev_register_lock);
+			return -ENFILE;
+		}
+	} else {
+		/* use the one the driver asked for */
+		i = base+nr;
+		if (NULL != video_device[i]) {
+			up(&videodev_register_lock);
+			return -ENFILE;
 		}
 	}
-	return -ENFILE;
+	video_device[i]=vfd;
+	vfd->minor=i;
+	up(&videodev_register_lock);
+
+	/* The init call may sleep so we book the slot out
+	   then call */
+	MOD_INC_USE_COUNT;
+	if(vfd->initialize) {
+		err=vfd->initialize(vfd);
+		if(err<0) {
+			video_device[i]=NULL;
+			MOD_DEC_USE_COUNT;
+			return err;
+		}
+	}
+	sprintf (name, "v4l/%s%d", name_base, i - base);
+	/*
+	 *	Start the device root only. Anything else
+	 *	has serious privacy issues.
+	 */
+	vfd->devfs_handle =
+		devfs_register (NULL, name, DEVFS_FL_DEFAULT,
+				VIDEO_MAJOR, vfd->minor,
+				S_IFCHR | S_IRUSR | S_IWUSR,
+				&video_fops,
+				NULL);
+	
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+	sprintf (name, "%s%d", name_base, i - base);
+	videodev_proc_create_dev (vfd, name);
+#endif
+	return 0;
 }
 
 /**
@@ -546,7 +560,7 @@ static struct file_operations video_fops=
  *	Initialise video for linux
  */
  
-int __init videodev_init(void)
+static int __init videodev_init(void)
 {
 	struct video_init *vfli = video_init_list;
 	
@@ -573,25 +587,28 @@ int __init videodev_init(void)
 	return 0;
 }
 
+static void __exit videodev_exit(void)
+{
 #ifdef MODULE		
-int init_module(void)
-{
-	return videodev_init();
-}
-
-void cleanup_module(void)
-{
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 	videodev_proc_destroy ();
+#endif
 #endif
 	
 	devfs_unregister_chrdev(VIDEO_MAJOR, "video_capture");
 }
 
-#endif
+module_init(videodev_init)
+module_exit(videodev_exit)
 
 EXPORT_SYMBOL(video_register_device);
 EXPORT_SYMBOL(video_unregister_device);
 
 MODULE_AUTHOR("Alan Cox");
 MODULE_DESCRIPTION("Device registrar for Video4Linux drivers");
+
+/*
+ * Local variables:
+ * c-basic-offset: 8
+ * End:
+ */

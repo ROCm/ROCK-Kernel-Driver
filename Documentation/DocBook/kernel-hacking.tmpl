@@ -713,7 +713,8 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
    </para>
    <para>
    Static data structures marked as <type>__initdata</type> must be initialised
-   (as opposed to ordinary static data which is zeroed BSS).
+   (as opposed to ordinary static data which is zeroed BSS) and cannot be 
+   <type>const</type>.
    </para> 
 
   </sect1>

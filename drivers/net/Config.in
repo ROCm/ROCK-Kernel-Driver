@@ -146,7 +146,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
          tristate '    Generic DECchip & DIGITAL EtherWORKS PCI/EISA' CONFIG_DE4X5
          tristate '    Digi Intl. RightSwitch SE-X support' CONFIG_DGRS
       fi
-      dep_tristate '    DM9102 PCI Fast Ethernet Adapter support (EXPERIMENTAL)' CONFIG_DM9102 $CONFIG_PCI $CONFIG_EXPERIMENTAL
+      dep_tristate '    Davicom DM910x/DM980x support' CONFIG_DM9102 $CONFIG_PCI
       dep_tristate '    EtherExpressPro/100 support' CONFIG_EEPRO100 $CONFIG_PCI
       dep_mbool '      Enable Power Management (EXPERIMENTAL)' CONFIG_EEPRO100_PM $CONFIG_EEPRO100 $CONFIG_EXPERIMENTAL
       dep_tristate '    Mylex EISA LNE390A/B support (EXPERIMENTAL)' CONFIG_LNE390 $CONFIG_EISA $CONFIG_EXPERIMENTAL

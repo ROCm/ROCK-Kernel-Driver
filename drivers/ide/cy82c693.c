@@ -442,7 +442,8 @@ void __init ide_init_cy82c693(ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->dmaproc = &cy82c693_dmaproc;
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }

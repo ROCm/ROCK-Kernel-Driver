@@ -216,7 +216,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	if (isdotent(argp->name, argp->len))
 		goto done;
 	fh_lock(dirfhp);
-	dchild = lookup_one(argp->name, dirfhp->fh_dentry);
+	dchild = lookup_one_len(argp->name, dirfhp->fh_dentry, argp->len);
 	if (IS_ERR(dchild)) {
 		nfserr = nfserrno(PTR_ERR(dchild));
 		goto out_unlock;

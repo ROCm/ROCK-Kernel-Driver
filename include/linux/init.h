@@ -34,6 +34,8 @@
  * Don't forget to initialize data not at file scope, i.e. within a function,
  * as gcc otherwise puts the data into the bss section and not into the init
  * section.
+ * 
+ * Also note, that this data cannot be "const".
  */
 
 #ifndef MODULE

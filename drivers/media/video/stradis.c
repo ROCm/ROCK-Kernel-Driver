@@ -63,6 +63,9 @@ static struct saa7146 saa7146s[SAA7146_MAX];
 
 static int saa_num = 0;		/* number of SAA7146s in use */
 
+static int video_nr = -1;
+MODULE_PARM(video_nr,"i");
+
 #define nDebNormal	0x00480000
 #define nDebNoInc	0x00480000
 #define nDebVideo	0xd0480000
@@ -2073,7 +2076,7 @@ static int configure_saa7146(struct pci_dev *dev, int num)
 		return result;
 	}
 	pci_set_master(dev);
-	if (video_register_device(&saa->video_dev, VFL_TYPE_GRABBER) < 0) {
+	if (video_register_device(&saa->video_dev, VFL_TYPE_GRABBER, video_nr) < 0) {
 		iounmap(saa->saa7146_mem);
 		return -1;
 	}

@@ -1700,8 +1700,11 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 	set_bit (block, &page->bitmap [map]);
 	if (waitqueue_active (&pool->waitq))
 		wake_up (&pool->waitq);
-	else if (!is_page_busy (pool->blocks_per_page, page->bitmap))
-		pool_free_page (pool, page);
+	/*
+	 * Resist a temptation to do
+	 *    if (!is_page_busy(bpp, page->bitmap)) pool_free_page(pool, page);
+	 * it is not interrupt safe. Better have empty pages hang around.
+	 */
 	spin_unlock_irqrestore (&pool->lock, flags);
 }
 

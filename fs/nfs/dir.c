@@ -802,7 +802,7 @@ dentry->d_parent->d_name.name, dentry->d_name.name);
 		dfprintk(VFS, "trying to rename %s to %s\n",
 			 dentry->d_name.name, silly);
 		
-		sdentry = lookup_one(silly, dentry->d_parent);
+		sdentry = lookup_one_len(silly, dentry->d_parent, slen);
 		/*
 		 * N.B. Better to return EBUSY here ... it could be
 		 * dangerous to delete the file while it's in use.

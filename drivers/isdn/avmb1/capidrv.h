@@ -1,30 +1,9 @@
 /*
- * $Id: capidrv.h,v 1.2 1998/03/29 16:06:06 calle Exp $
+ * $Id: capidrv.h,v 1.2.8.1 2001/05/17 20:41:51 kai Exp $
  *
  * ISDN4Linux Driver, using capi20 interface (kernelcapi)
  *
  * Copyright 1997 by Carsten Paeth (calle@calle.in-berlin.de)
- *
- * $Log: capidrv.h,v $
- * Revision 1.2  1998/03/29 16:06:06  calle
- * changes from 2.0 tree merged.
- *
- * Revision 1.1.2.1  1998/03/20 14:38:28  calle
- * capidrv: prepared state machines for suspend/resume/hold
- * capidrv: fix bug in state machine if B1/T1 is out of nccis
- * b1capi: changed some errno returns.
- * b1capi: detect if you try to add same T1 to different io address.
- * b1capi: change number of nccis depending on number of channels.
- * b1lli: cosmetics
- *
- * Revision 1.1  1997/03/04 21:50:33  calle
- * Frirst version in isdn4linux
- *
- * Revision 2.2  1997/02/12 09:31:39  calle
- * new version
- *
- * Revision 1.1  1997/01/31 10:32:20  calle
- * Initial revision
  *
  */
 #ifndef __CAPIDRV_H__

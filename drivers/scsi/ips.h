@@ -69,13 +69,13 @@
 
    #define IPS_HA(x)                   ((ips_ha_t *) x->hostdata)
    #define IPS_COMMAND_ID(ha, scb)     (int) (scb - ha->scbs)
-   #define IPS_IS_TROMBONE(ha)         (((ha->device_id == IPS_COPPERHEAD_DEVICEID) && \
+   #define IPS_IS_TROMBONE(ha)         (((ha->device_id == IPS_DEVICEID_COPPERHEAD) && \
                                          (ha->revision_id >= IPS_REVID_TROMBONE32) && \
                                          (ha->revision_id <= IPS_REVID_TROMBONE64)) ? 1 : 0)
-   #define IPS_IS_CLARINET(ha)         (((ha->device_id == IPS_COPPERHEAD_DEVICEID) && \
+   #define IPS_IS_CLARINET(ha)         (((ha->device_id == IPS_DEVICEID_COPPERHEAD) && \
                                          (ha->revision_id >= IPS_REVID_CLARINETP1) && \
                                          (ha->revision_id <= IPS_REVID_CLARINETP3)) ? 1 : 0)
-   #define IPS_IS_MORPHEUS(ha)         (ha->device_id == IPS_MORPHEUS_DEVICEID)
+   #define IPS_IS_MORPHEUS(ha)         (ha->device_id == IPS_DEVICEID_MORPHEUS)
    #define IPS_USE_I2O_DELIVER(ha)     ((IPS_IS_MORPHEUS(ha) || \
                                          (IPS_IS_TROMBONE(ha) && \
                                           (ips_force_i2o))) ? 1 : 0)
@@ -99,23 +99,11 @@
    #ifndef verify_area_20
       #define verify_area_20(t,a,sz)   (0) /* success */
    #endif
-
-   #ifndef PUT_USER
-      #define PUT_USER                 put_user
-   #endif
-
-   #ifndef __PUT_USER
-      #define __PUT_USER               __put_user
-   #endif
-
-   #ifndef GET_USER
-      #define GET_USER                 get_user
-   #endif
    
-   #ifndef __GET_USER
-      #define __GET_USER               __get_user
+   #ifndef DECLARE_MUTEX_LOCKED
+      #define DECLARE_MUTEX_LOCKED(sem) struct semaphore sem = MUTEX_LOCKED;
    #endif
-   
+
    /*
     * Lock macros
     */
@@ -186,6 +174,7 @@
    #define IPS_CMD_DCDB_SG              0x84
    #define IPS_CMD_CONFIG_SYNC          0x58
    #define IPS_CMD_ERROR_TABLE          0x17
+   #define IPS_CMD_RW_BIOSFW            0x22
 
    /*
     * Adapter Equates
@@ -217,11 +206,16 @@
    #define IPS_INTR_HAL                 2
    #define IPS_ADAPTER_ID               0xF
    #define IPS_VENDORID                 0x1014
-   #define IPS_COPPERHEAD_DEVICEID      0x002E
-   #define IPS_MORPHEUS_DEVICEID        0x01BD
+   #define IPS_DEVICEID_COPPERHEAD      0x002E
+   #define IPS_DEVICEID_MORPHEUS        0x01BD
+   #define IPS_SUBDEVICEID_4M           0x01BE
+   #define IPS_SUBDEVICEID_4L           0x01BF
+   #define IPS_SUBDEVICEID_4MX          0x0208
+   #define IPS_SUBDEVICEID_4LX          0x020E
    #define IPS_IOCTL_SIZE               8192
    #define IPS_STATUS_SIZE              4
    #define IPS_STATUS_Q_SIZE            (IPS_MAX_CMDS+1) * IPS_STATUS_SIZE
+   #define IPS_IMAGE_SIZE               500 * 1024
    #define IPS_MEMMAP_SIZE              128
    #define IPS_ONE_MSEC                 1
    #define IPS_ONE_SEC                  1000
@@ -283,6 +277,21 @@
    #define IPS_REVID_CLARINETP3         0x0D
    #define IPS_REVID_TROMBONE32         0x0F
    #define IPS_REVID_TROMBONE64         0x10
+
+   /*
+    * NVRAM Page 5 Adapter Defines
+    */
+   #define IPS_ADTYPE_SERVERAID         0x01
+   #define IPS_ADTYPE_SERVERAID2        0x02
+   #define IPS_ADTYPE_NAVAJO            0x03
+   #define IPS_ADTYPE_KIOWA             0x04
+   #define IPS_ADTYPE_SERVERAID3        0x05
+   #define IPS_ADTYPE_SERVERAID3L       0x06
+   #define IPS_ADTYPE_SERVERAID4H       0x07
+   #define IPS_ADTYPE_SERVERAID4M       0x08
+   #define IPS_ADTYPE_SERVERAID4L       0x09
+   #define IPS_ADTYPE_SERVERAID4MX      0x0A
+   #define IPS_ADTYPE_SERVERAID4LX      0x0B
 
    /*
     * Adapter Command/Status Packet Definitions
@@ -538,17 +547,41 @@ typedef struct {
    u8     reserved2;
 } IPS_FFDC_CMD, *PIPS_FFDC_CMD;
 
+typedef struct {
+   u8     op_code;
+   u8     command_id;
+   u8     type;
+   u8     direction;
+   u32    count;
+   u32    buffer_addr;
+   u8     total_packets;
+   u8     packet_num;
+   u16    reserved;
+} IPS_FLASHFW_CMD, *PIPS_FLASHFW_CMD;
+
+typedef struct {
+   u8     op_code;
+   u8     command_id;
+   u8     type;
+   u8     direction;
+   u32    count;
+   u32    buffer_addr;
+   u32    offset;
+} IPS_FLASHBIOS_CMD, *PIPS_FLASHBIOS_CMD;
+
 typedef union {
-   IPS_IO_CMD        basic_io;
-   IPS_LD_CMD        logical_info;
-   IPS_IOCTL_CMD     ioctl_info;
-   IPS_DCDB_CMD      dcdb;
-   IPS_CS_CMD        config_sync;
-   IPS_US_CMD        unlock_stripe;
-   IPS_FC_CMD        flush_cache;
-   IPS_STATUS_CMD    status;
-   IPS_NVRAM_CMD     nvram;
-   IPS_FFDC_CMD      ffdc;
+   IPS_IO_CMD         basic_io;
+   IPS_LD_CMD         logical_info;
+   IPS_IOCTL_CMD      ioctl_info;
+   IPS_DCDB_CMD       dcdb;
+   IPS_CS_CMD         config_sync;
+   IPS_US_CMD         unlock_stripe;
+   IPS_FC_CMD         flush_cache;
+   IPS_STATUS_CMD     status;
+   IPS_NVRAM_CMD      nvram;
+   IPS_FFDC_CMD       ffdc;
+   IPS_FLASHFW_CMD    flashfw;
+   IPS_FLASHBIOS_CMD  flashbios;
 } IPS_HOST_COMMAND, *PIPS_HOST_COMMAND;
 
 typedef struct {
@@ -839,6 +872,19 @@ typedef struct {
    int   option_value;
 } IPS_OPTION;
 
+typedef struct {
+   void             *userbuffer;
+   u32               usersize;
+   void             *kernbuffer;
+   u32               kernsize;
+   void             *ha;
+   void             *SC;
+   void             *pt;
+   struct semaphore *sem;
+   u32               offset;
+   u32               retcode;
+} IPS_FLASH_DATA;
+
 /*
  * Status Info
  */
@@ -893,8 +939,8 @@ typedef struct {
    int  (*isintr)(struct ips_ha *);
    int  (*init)(struct ips_ha *);
    int  (*erasebios)(struct ips_ha *);
-   int  (*programbios)(struct ips_ha *, char *, int);
-   int  (*verifybios)(struct ips_ha *, char *, int);
+   int  (*programbios)(struct ips_ha *, char *, u32, u32);
+   int  (*verifybios)(struct ips_ha *, char *, u32, u32);
    u32  (*statupd)(struct ips_ha *);
    void (*statinit)(struct ips_ha *);
    void (*intr)(struct ips_ha *);
@@ -936,7 +982,11 @@ typedef struct ips_ha {
    u32                last_ffdc;          /* last time we sent ffdc info*/
    u8                 revision_id;        /* Revision level             */
    u16                device_id;          /* PCI device ID              */
-   u8                 reserved;
+   u8                 slot_num;           /* PCI Slot Number            */
+   u16                subdevice_id;       /* Subsystem device ID        */
+   u8                 ioctl_order;        /* Number of pages in ioctl   */
+   u8                 reserved2;          /* Empty                      */
+   u8                 bios_version[8];    /* BIOS Revision              */
    u32                mem_addr;           /* Memory mapped address      */
    u32                io_len;             /* Size of IO Address         */
    u32                mem_len;            /* Size of memory address     */
@@ -947,6 +997,9 @@ typedef struct ips_ha {
    spinlock_t         scb_lock;
    spinlock_t         copp_lock;
    spinlock_t         ips_lock;
+   char              *save_ioctl_data;    /* Save Area for ioctl_data   */
+   u8                 save_ioctl_order;   /* Save Area for ioctl_order  */
+   u32                save_ioctl_datasize;/* Save Area for ioctl_datasize */
 } ips_ha_t;
 
 typedef void (*ips_scb_callback) (ips_ha_t *, struct ips_scb *);
@@ -966,7 +1019,8 @@ typedef struct ips_scb {
    u32               timeout;
    u8                basic_status;
    u8                extended_status;
-   u16               breakup;
+   u8                breakup;
+   u8                sg_break;
    u32               data_len;
    u32               sg_len;
    u32               flags;

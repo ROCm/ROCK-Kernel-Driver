@@ -33,10 +33,7 @@
 #include "ibm.h"
 #include "ultrix.h"
 
-extern void device_init(void);
 extern int *blk_size[];
-extern void rd_load(void);
-extern void initrd_load(void);
 
 struct gendisk *gendisk_head;
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
@@ -438,19 +435,3 @@ void grok_partitions(struct gendisk *dev, int drive, unsigned minors, long size)
 		blk_size[dev->major] = dev->sizes;
 	}
 }
-
-int __init partition_setup(void)
-{
-	device_init();
-
-#ifdef CONFIG_BLK_DEV_RAM
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (initrd_start && mount_initrd) initrd_load();
-	else
-#endif
-	rd_load();
-#endif
-	return 0;
-}
-
-__initcall(partition_setup);

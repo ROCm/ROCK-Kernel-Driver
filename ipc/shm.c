@@ -497,14 +497,21 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		if (shp == NULL) 
 			goto out_up;
 		err = shm_checkid(shp, shmid);
-		if (err == 0) {
-			if (shp->shm_nattch){
-				shp->shm_flags |= SHM_DEST;
-				/* Do not find it any more */
-				shp->shm_perm.key = IPC_PRIVATE;
-			} else
-				shm_destroy (shp);
+		if(err)
+			goto out_unlock_up;
+		if (current->euid != shp->shm_perm.uid &&
+		    current->euid != shp->shm_perm.cuid && 
+		    !capable(CAP_SYS_ADMIN)) {
+			err=-EPERM;
+			goto out_unlock_up;
 		}
+		if (shp->shm_nattch){
+			shp->shm_flags |= SHM_DEST;
+			/* Do not find it any more */
+			shp->shm_perm.key = IPC_PRIVATE;
+		} else
+			shm_destroy (shp);
+
 		/* Unlock */
 		shm_unlock(shmid);
 		up(&shm_ids.sem);

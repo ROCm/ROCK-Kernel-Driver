@@ -223,8 +223,8 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 byte hpt366_proc = 0;
 
 extern char *ide_xfer_verbose (byte xfer_rate);
-byte hpt363_shared_irq = 0;
-byte hpt363_shared_pin = 0;
+byte hpt363_shared_irq;
+byte hpt363_shared_pin;
 
 static unsigned int pci_rev_check_hpt3xx (struct pci_dev *dev)
 {
@@ -706,7 +706,10 @@ void __init ide_init_hpt366 (ide_hwif_t *hwif)
 		} else {
 			hwif->dmaproc = &hpt366_dmaproc;
 		}
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
+		else
+			hwif->autodma = 0;
 	} else {
 		hwif->autodma = 0;
 		hwif->drives[0].autotune = 1;

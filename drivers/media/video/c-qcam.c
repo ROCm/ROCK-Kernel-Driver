@@ -69,6 +69,7 @@ struct qcam_device {
 static int parport[MAX_CAMS] = { [1 ... MAX_CAMS-1] = -1 };
 static int probe = 2;
 static int force_rgb = 0;
+static int video_nr = -1;
 
 static inline void qcam_set_ack(struct qcam_device *qcam, unsigned int i)
 {
@@ -815,7 +816,7 @@ int init_cqcam(struct parport *port)
 
 	parport_release(qcam->pdev);
 	
-	if (video_register_device(&qcam->vdev, VFL_TYPE_GRABBER)==-1)
+	if (video_register_device(&qcam->vdev, VFL_TYPE_GRABBER, video_nr)==-1)
 	{
 		printk(KERN_ERR "Unable to register Colour QuickCam on %s\n",
 		       qcam->pport->name);
@@ -881,6 +882,7 @@ force_rgb=<0|1> for RGB data format (default BGR)");
 MODULE_PARM(parport, "1-" __MODULE_STRING(MAX_CAMS) "i");
 MODULE_PARM(probe, "i");
 MODULE_PARM(force_rgb, "i");
+MODULE_PARM(video_nr,"i");
 
 module_init(cqcam_init);
 module_exit(cqcam_cleanup);

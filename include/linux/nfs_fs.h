@@ -142,7 +142,7 @@ extern int nfs_inode_is_stale(struct inode *, struct nfs_fh *,
 				struct nfs_fattr *);
 extern struct inode *nfs_fhget(struct dentry *, struct nfs_fh *,
 				struct nfs_fattr *);
-extern int nfs_refresh_inode(struct inode *, struct nfs_fattr *);
+extern int __nfs_refresh_inode(struct inode *, struct nfs_fattr *);
 extern int nfs_revalidate(struct dentry *);
 extern int nfs_permission(struct inode *, int);
 extern int nfs_open(struct inode *, struct file *);
@@ -271,6 +271,14 @@ nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	if (time_before(jiffies, NFS_READTIME(inode)+NFS_ATTRTIMEO(inode)))
 		return NFS_STALE(inode) ? -ESTALE : 0;
 	return __nfs_revalidate_inode(server, inode);
+}
+
+static inline int
+nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
+{
+	if ((fattr->valid & NFS_ATTR_FATTR) == 0)
+		return 0;
+	return __nfs_refresh_inode(inode,fattr);
 }
 
 static inline loff_t

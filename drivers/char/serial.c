@@ -565,9 +565,12 @@ static _INLINE_ void receive_chars(struct async_struct *info,
 
 	icount = &info->state->icount;
 	do {
+		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
+			tty->flip.tqueue.routine((void *) tty);
+			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
+				return;		// if TTY_DONT_FLIP is set
+		}
 		ch = serial_inp(info, UART_RX);
-		if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-			goto ignore_char;
 		*tty->flip.char_buf_ptr = ch;
 		icount->rx++;
 		

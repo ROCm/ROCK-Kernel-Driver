@@ -3,9 +3,6 @@
 #ifndef _LINUX_ISDN_PPP_H
 #define _LINUX_ISDN_PPP_H
 
-#ifdef __KERNEL__
-#include <linux/config.h>
-#endif
 
 #define CALLTYPE_INCOMING 0x1
 #define CALLTYPE_OUTGOING 0x2
@@ -46,13 +43,6 @@ struct pppcallinfo
 #define SC_LINK_DECOMP_DISCARD	0x40
 #define SC_LINK_COMP_DISCARD	0x80
 
-#define DECOMP_ERR_NOMEM	(-10)
-
-#define MP_END_FRAG    0x40
-#define MP_BEGIN_FRAG  0x80
-
-#define MP_MAX_QUEUE_LEN	16
-
 #define ISDN_PPP_COMP_MAX_OPTIONS 16
 
 #define IPPP_COMP_FLAG_XMIT 0x1
@@ -66,6 +56,17 @@ struct isdn_ppp_comp_data {
 };
 
 #ifdef __KERNEL__
+
+
+#include <linux/config.h>
+
+
+#define DECOMP_ERR_NOMEM	(-10)
+
+#define MP_END_FRAG    0x40
+#define MP_BEGIN_FRAG  0x80
+
+#define MP_MAX_QUEUE_LEN	16
 
 /*
  * We need a way for the decompressor to influence the generation of CCP

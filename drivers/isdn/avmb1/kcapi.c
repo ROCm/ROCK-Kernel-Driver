@@ -148,7 +148,7 @@
 #include <linux/b1lli.h>
 #endif
 
-static char *revision = "$Revision: 1.21.6.5 $";
+static char *revision = "$Revision: 1.21.6.6 $";
 
 /* ------------------------------------------------------------- */
 

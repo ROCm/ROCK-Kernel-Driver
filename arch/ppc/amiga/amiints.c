@@ -255,9 +255,10 @@ void amiga_free_irq(unsigned int irq, void *dev_id)
 		return;
 	}
 
-	if (irq >= IRQ_AMIGA_AUTO)
+	if (irq >= IRQ_AMIGA_AUTO) {
 		sys_free_irq(irq - IRQ_AMIGA_AUTO, dev_id);
-
+		return;
+	}
 	if (irq >= IRQ_AMIGA_CIAA) {
 		cia_free_irq(irq, dev_id);
 		return;
@@ -295,7 +296,10 @@ void amiga_enable_irq(unsigned int irq)
 		return;
 	}
 
-	if (--ami_ablecount[irq])
+	ami_ablecount[irq]--;
+	if (ami_ablecount[irq]<0)
+		ami_ablecount[irq]=0;
+	else if (ami_ablecount[irq])
 		return;
 
 	/* No action for auto-vector interrupts */
@@ -347,64 +351,16 @@ inline void amiga_do_irq(int irq, struct pt_regs *fp)
 	ami_irq_list[irq]->handler(irq, ami_irq_list[irq]->dev_id, fp);
 }
 
-void amiga_do_irq_list(int irq, struct pt_regs *fp, struct irq_server *server)
+void amiga_do_irq_list(int irq, struct pt_regs *fp)
 {
-	irq_node_t *node, *slow_nodes;
-	unsigned short intena;
-	unsigned long flags;
+	irq_node_t *node;
 
 	kstat.irqs[0][SYS_IRQS + irq]++;
-	if (server->count++)
-		server->reentrance = 1;
 
-	intena = ami_intena_vals[irq];
-	custom.intreq = intena;
+	custom.intreq = ami_intena_vals[irq];
 
-	/* serve first fast handlers - there can only be one of these */
-	node = ami_irq_list[irq];
-
-	/*
-	 * Timer interrupts show up like this
-	 */
-	if (!node) {
-		server->count--;
-		return;
-	}
-
-	if (node && (node->flags & SA_INTERRUPT)) {
-		save_flags(flags);
-		cli();
+	for (node = ami_irq_list[irq]; node; node = node->next)
 		node->handler(irq, node->dev_id, fp);
-		restore_flags(flags);
-
-		server->count--;
-		return;
-	}
-
-	/*
-	 * Disable the interrupt source in question and reenable all
-	 * other interrupts. No interrupt handler should ever touch
-	 * the intena flags directly!
-	 */
-	custom.intena = intena;
-	save_flags(flags);
-	sti();
-
-	slow_nodes = node;
-	for (;;) {
-		for (; node; node = node->next)
-			node->handler(irq, node->dev_id, fp);
-
-		if (!server->reentrance) {
-			server->count--;
-			restore_flags(flags);
-			custom.intena = IF_SETCLR | intena;
-			return;
-		}
-
-		server->reentrance = 0;
-		node = slow_nodes;
-	}
 }
 
 /*
@@ -437,7 +393,6 @@ static void ami_int1(int irq, void *dev_id, struct pt_regs *fp)
 static void ami_int3(int irq, void *dev_id, struct pt_regs *fp)
 {
 	unsigned short ints = custom.intreqr & custom.intenar;
-	static struct irq_server server = {0, 0};
 
 	/* if a blitter interrupt */
 	if (ints & IF_BLIT) {
@@ -453,7 +408,7 @@ static void ami_int3(int irq, void *dev_id, struct pt_regs *fp)
 
 	/* if a vertical blank interrupt */
 	if (ints & IF_VERTB)
-		amiga_do_irq_list(IRQ_AMIGA_VERTB, fp, &server);
+		amiga_do_irq_list(IRQ_AMIGA_VERTB, fp);
 }
 
 static void ami_int4(int irq, void *dev_id, struct pt_regs *fp)
@@ -512,7 +467,7 @@ static void ami_int7(int irq, void *dev_id, struct pt_regs *fp)
    and executes them in a loop. Having ami_badint at the end of the chain
    is a bad idea. */
 void (*amiga_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	NULL, ami_int1, NULL, NULL /* FB expects to replace ami_int3*/,
+	NULL, ami_int1, NULL, ami_int3,
 	ami_int4, ami_int5, NULL, ami_int7
 };
 #else

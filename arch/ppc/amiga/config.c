@@ -1,12 +1,5 @@
 #define m68k_debug_device debug_device
 
-#include <linux/init.h>
-
-/* machine dependent "kbd-reset" setup function */
-void (*mach_kbd_reset_setup) (char *, int) __initdata = 0;
-
-#include <asm/io.h>
-
 /*
  *  linux/arch/m68k/amiga/config.c
  *
@@ -28,6 +21,10 @@ void (*mach_kbd_reset_setup) (char *, int) __initdata = 0;
 #include <linux/kd.h>
 #include <linux/tty.h>
 #include <linux/console.h>
+#include <linux/init.h>
+#ifdef CONFIG_ZORRO
+#include <linux/zorro.h>
+#endif
 
 #include <asm/bootinfo.h>
 #include <asm/setup.h>
@@ -36,10 +33,12 @@ void (*mach_kbd_reset_setup) (char *, int) __initdata = 0;
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
 #include <asm/irq.h>
+#include <asm/keyboard.h>
 #include <asm/machdep.h>
-#include <linux/zorro.h>
+#include <asm/io.h>
 
 unsigned long powerup_PCI_present;
+unsigned long powerup_BPPCPLUS_present;
 unsigned long amiga_model;
 unsigned long amiga_eclock;
 unsigned long amiga_masterclock;
@@ -121,7 +120,7 @@ static struct console amiga_console_driver = {
 };
 
 #ifdef CONFIG_MAGIC_SYSRQ
-static char amiga_sysrq_xlate[128] =
+char amiga_sysrq_xlate[128] =
 	"\0001234567890-=\\\000\000"					/* 0x00 - 0x0f */
 	"qwertyuiop[]\000123"							/* 0x10 - 0x1f */
 	"asdfghjkl;'\000\000456"						/* 0x20 - 0x2f */
@@ -139,16 +138,18 @@ extern void (*kd_mksound)(unsigned int, unsigned int);
      *  Motherboard Resources present in all Amiga models
      */
 
-static struct resource mb_res[] = {
-    { "Ranger Memory", 0x00c00000, 0x00c7ffff },
-    { "CIA B", 0x00bfd000, 0x00bfdfff },
-    { "CIA A", 0x00bfe000, 0x00bfefff },
-    { "Custom I/O", 0x00dff000, 0x00dfffff },
-    { "Kickstart ROM", 0x00f80000, 0x00ffffff }
+static struct {
+    struct resource _ciab, _ciaa, _custom, _kickstart;
+} mb_resources = {
+//    { "Ranger Memory", 0x00c00000, 0x00c7ffff },
+    _ciab:	{ "CIA B", 0x00bfd000, 0x00bfdfff },
+    _ciaa:	{ "CIA A", 0x00bfe000, 0x00bfefff },
+    _custom:	{ "Custom I/O", 0x00dff000, 0x00dfffff },
+    _kickstart:	{ "Kickstart ROM", 0x00f80000, 0x00ffffff }
 };
 
 static struct resource rtc_resource = {
-    "A2000 RTC", 0x00dc0000, 0x00dcffff
+    NULL, 0x00dc0000, 0x00dcffff
 };
 
 static struct resource ram_resource[NUM_MEMINFO];
@@ -194,6 +195,7 @@ int amiga_parse_bootinfo(const struct bi_record *record)
 	    break;
 
 	case BI_AMIGA_AUTOCON:
+#ifdef CONFIG_ZORRO
 	    if (zorro_num_autocon < ZORRO_NUM_AUTO) {
 		const struct ConfigDev *cd = (struct ConfigDev *)data;
 		struct zorro_dev *dev = &zorro_autocon[zorro_num_autocon++];
@@ -204,10 +206,19 @@ int amiga_parse_bootinfo(const struct bi_record *record)
 		dev->resource.end = dev->resource.start+cd->cd_BoardSize-1;
 	    } else
 		printk("amiga_parse_bootinfo: too many AutoConfig devices\n");
+#endif /* CONFIG_ZORRO */
 	    break;
 
 	case BI_AMIGA_SERPER:
 	    /* serial port period: ignored here */
+	    break;
+
+	case BI_AMIGA_PUP_BRIDGE:
+	    powerup_PCI_present = *(const unsigned short *)data;
+	    break;
+
+	case BI_AMIGA_BPPC_SCSI:
+	    powerup_BPPCPLUS_present = *(const unsigned short *)data;
 	    break;
 
 	default:
@@ -392,11 +403,8 @@ void __init config_amiga(void)
 
   /* Some APUS boxes may have PCI memory, but ... */
   iomem_resource.name = "Memory";
-  request_resource(&iomem_resource, &ranger_resource);
-  request_resource(&iomem_resource, &ciab_resource);
-  request_resource(&iomem_resource, &ciaa_resource);
-  request_resource(&iomem_resource, &custom_chips_resource);
-  request_resource(&iomem_resource, &kickstart_resource);
+  for (i = 0; i < 4; i++)
+    request_resource(&iomem_resource, &((struct resource *)&mb_resources)[i]);
 
   mach_sched_init      = amiga_sched_init;
   mach_keyb_init       = amiga_keyb_init;
@@ -415,11 +423,12 @@ void __init config_amiga(void)
   mach_gettimeoffset   = amiga_gettimeoffset;
   if (AMIGAHW_PRESENT(A3000_CLK)){
     mach_gettod  = a3000_gettod;
-    rtc_resource.name[1] = '3';
+    rtc_resource.name = "A3000 RTC";
     request_resource(&iomem_resource, &rtc_resource);
   }
   else{ /* if (AMIGAHW_PRESENT(A2000_CLK)) */
     mach_gettod  = a2000_gettod;
+    rtc_resource.name = "A2000 RTC";
     request_resource(&iomem_resource, &rtc_resource);
   }
 
@@ -439,14 +448,10 @@ void __init config_amiga(void)
   mach_floppy_setup    = amiga_floppy_setup;
 #endif
   mach_reset           = amiga_reset;
+#ifdef CONFIG_DUMMY_CONSOLE
   conswitchp           = &dummy_con;
-  kd_mksound           = amiga_mksound;
-#ifdef CONFIG_MAGIC_SYSRQ
-  mach_sysrq_key = 0x5f;	     /* HELP */
-  mach_sysrq_shift_state = 0x03; /* SHIFT+ALTGR */
-  mach_sysrq_shift_mask = 0xff;  /* all modifiers except CapsLock */
-  mach_sysrq_xlate = amiga_sysrq_xlate;
 #endif
+  kd_mksound           = amiga_mksound;
 #ifdef CONFIG_HEARTBEAT
   mach_heartbeat = amiga_heartbeat;
 #endif
@@ -500,11 +505,14 @@ void __init config_amiga(void)
 static unsigned short jiffy_ticks;
 
 static void __init amiga_sched_init(void (*timer_routine)(int, void *,
-					struct pt_regs *))
+							  struct pt_regs *))
 {
+	static struct resource sched_res = {
+	    "timer", 0x00bfd400, 0x00bfd5ff,
+	};
 	jiffy_ticks = (amiga_eclock+HZ/2)/HZ;
 
-	if (!request_mem_region(CIAB_PHYSADDR+0x400, 0x200, "timer"))
+	if (request_resource(&mb_resources._ciab, &sched_res))
 	    printk("Cannot allocate ciab.ta{lo,hi}\n");
 	ciab.cra &= 0xC0;   /* turn off timer A, continuous mode, from Eclk */
 	ciab.talo = jiffy_ticks % 256;
@@ -612,6 +620,8 @@ static int amiga_hwclk(int op, struct hwclk_time *t)
 			t->wday = tod->weekday;
 			t->mon  = tod->month1  * 10 + tod->month2 - 1;
 			t->year = tod->year1   * 10 + tod->year2;
+			if (t->year <= 69)
+				t->year += 100;
 		} else {
 			tod->second1 = t->sec / 10;
 			tod->second2 = t->sec % 10;
@@ -625,6 +635,8 @@ static int amiga_hwclk(int op, struct hwclk_time *t)
 				tod->weekday = t->wday;
 			tod->month1  = (t->mon + 1) / 10;
 			tod->month2  = (t->mon + 1) % 10;
+			if (t->year >= 100)
+				t->year -= 100;
 			tod->year1   = t->year / 10;
 			tod->year2   = t->year % 10;
 		}
@@ -646,6 +658,8 @@ static int amiga_hwclk(int op, struct hwclk_time *t)
 			t->wday = tod->weekday;
 			t->mon  = tod->month1      * 10 + tod->month2 - 1;
 			t->year = tod->year1       * 10 + tod->year2;
+			if (t->year <= 69)
+				t->year += 100;
 
 			if (!(tod->cntrl3 & TOD2000_CNTRL3_24HMODE)){
 				if (!(tod->hour1 & TOD2000_HOUR1_PM) && t->hour == 12)
@@ -672,6 +686,8 @@ static int amiga_hwclk(int op, struct hwclk_time *t)
 				tod->weekday = t->wday;
 			tod->month1  = (t->mon + 1) / 10;
 			tod->month2  = (t->mon + 1) % 10;
+			if (t->year >= 100)
+				t->year -= 100;
 			tod->year1   = t->year / 10;
 			tod->year2   = t->year % 10;
 		}
@@ -796,7 +812,9 @@ static void amiga_mem_console_write(struct console *co, const char *s,
 
 static void amiga_savekmsg_init(void)
 {
-    savekmsg = (struct savekmsg *)amiga_chip_alloc(SAVEKMSG_MAXMEM, "Debug");
+    static struct resource debug_res = { "Debug" };
+
+    savekmsg = amiga_chip_alloc_res(SAVEKMSG_MAXMEM, &debug_res);
     savekmsg->magic1 = SAVEKMSG_MAGIC1;
     savekmsg->magic2 = SAVEKMSG_MAGIC2;
     savekmsg->magicptr = virt_to_phys(savekmsg);

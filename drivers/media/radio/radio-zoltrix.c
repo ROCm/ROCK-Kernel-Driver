@@ -39,6 +39,7 @@
 #endif
 
 static int io = CONFIG_RADIO_ZOLTRIX_PORT;
+static int radio_nr = -1;
 static int users = 0;
 
 struct zol_device {
@@ -365,7 +366,7 @@ static int __init zoltrix_init(void)
 		return -EBUSY;
 	}
 
-	if (video_register_device(&zoltrix_radio, VFL_TYPE_RADIO) == -1)
+	if (video_register_device(&zoltrix_radio, VFL_TYPE_RADIO, radio_nr) == -1)
 	{
 		release_region(io, 2);
 		return -EINVAL;
@@ -394,6 +395,7 @@ MODULE_AUTHOR("C.van Schaik");
 MODULE_DESCRIPTION("A driver for the Zoltrix Radio Plus.");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the Zoltrix Radio Plus (0x20c or 0x30c)");
+MODULE_PARM(radio_nr, "i");
 
 EXPORT_NO_SYMBOLS;
 

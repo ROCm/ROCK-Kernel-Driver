@@ -29,7 +29,7 @@ extern int i2o_init(void);
 extern int cpqarray_init(void);
 extern void ieee1394_init(void);
 
-void __init device_init(void)
+int __init device_init(void)
 {
 	blk_dev_init();
 	sti();
@@ -58,4 +58,7 @@ void __init device_init(void)
 #ifdef CONFIG_VT
 	console_map_init();
 #endif
+	return 0;
 }
+
+__initcall(device_init);

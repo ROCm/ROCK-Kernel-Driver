@@ -5,7 +5,7 @@
  *
  *		INET protocol dispatch tables.
  *
- * Version:	$Id: protocol.c,v 1.13 2001/04/30 01:59:55 davem Exp $
+ * Version:	$Id: protocol.c,v 1.14 2001/05/18 02:25:49 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -16,6 +16,8 @@
  *		Alan Cox	: Added new fields for init and ready for
  *				  proper fragmentation (_NO_ 4K limits!)
  *		Richard Colella	: Hang on hash collision
+ *		Vince Laviano	: Modified inet_del_protocol() to correctly
+ *				  maintain copy bit.
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -148,6 +150,10 @@ int inet_del_protocol(struct inet_protocol *prot)
 	}
 
 	p = (struct inet_protocol *) inet_protos[hash];
+
+	if (p != NULL && p->protocol == prot->protocol)
+		lp = p;
+
 	while (p) {
 		/*
 		 * We have to worry if the protocol being deleted is
@@ -159,14 +165,14 @@ int inet_del_protocol(struct inet_protocol *prot)
 			 * if we are the last one with this protocol and
 			 * there is a previous one, reset its copy bit.
 			 */
-			if (p->copy == 0 && lp != NULL) 
+			if (prot->copy == 0 && lp != NULL)
 				lp->copy = 0;
 			p->next = prot->next;
 			br_write_unlock_bh(BR_NETPROTO_LOCK);
 			return 0;
 		}
 		if (p->next != NULL && p->next->protocol == prot->protocol) 
-			lp = p;
+			lp = p->next;
 
 		p = (struct inet_protocol *) p->next;
 	}

@@ -1,30 +1,34 @@
 /* 
-   saa7185 - Philips SAA7185B video encoder driver version 0.0.3
+    saa7185 - Philips SAA7185B video encoder driver version 0.0.3
 
-   Copyright (C) 1998 Dave Perks <dperks@ibm.net>
+    Copyright (C) 1998 Dave Perks <dperks@ibm.net>
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
+    Slight changes for video timing and attachment output by
+    Wolfgang Scherr <scherr@net4you.net>
+    
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- */
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+*/
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
-#include <linux/slab.h>
+#include <linux/malloc.h>
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/signal.h>
@@ -41,9 +45,10 @@
 #include <asm/uaccess.h>
 
 #include <linux/i2c-old.h>
+
 #include <linux/video_encoder.h>
 
-#define DEBUG(x)   x		/* Debug driver */
+#define DEBUG(x)		/* Debug driver */
 
 /* ----------------------------------------------------------------------- */
 
@@ -66,11 +71,29 @@ struct saa7185 {
 
 /* ----------------------------------------------------------------------- */
 
-static int saa7185_write(struct saa7185 *dev, unsigned char subaddr, unsigned char data)
+static int saa7185_read(struct saa7185 *dev)
 {
 	int ack;
 
 	LOCK_I2C_BUS(dev->bus);
+
+	i2c_start(dev->bus);
+	i2c_sendbyte(dev->bus, dev->addr | 1, I2C_DELAY);
+	ack = i2c_readbyte(dev->bus, 1);
+	i2c_stop(dev->bus);
+	UNLOCK_I2C_BUS(dev->bus);
+	return ack;
+}
+
+static int saa7185_write(struct saa7185 *dev, unsigned char subaddr,
+			 unsigned char data)
+{
+	int ack;
+
+	DEBUG(printk
+	      (KERN_DEBUG "SAA7185: %02x set to %02x\n", subaddr, data);
+	    )
+	    LOCK_I2C_BUS(dev->bus);
 
 	i2c_start(dev->bus);
 	i2c_sendbyte(dev->bus, dev->addr, I2C_DELAY);
@@ -82,9 +105,10 @@ static int saa7185_write(struct saa7185 *dev, unsigned char subaddr, unsigned ch
 	return ack;
 }
 
-static int saa7185_write_block(struct saa7185 *dev, unsigned const char *data, unsigned int len)
+static int saa7185_write_block(struct saa7185 *dev,
+			       unsigned const char *data, unsigned int len)
 {
-	int ack = 0;
+	int ack = -1;
 	unsigned subaddr;
 
 	while (len > 1) {
@@ -107,8 +131,7 @@ static int saa7185_write_block(struct saa7185 *dev, unsigned const char *data, u
 
 /* ----------------------------------------------------------------------- */
 
-static const unsigned char init_common[] =
-{
+static const unsigned char init_common[] = {
 	0x3a, 0x0f,		/* CBENB=0, V656=0, VY2C=1, YUV2C=1, MY2C=1, MUV2C=1 */
 
 	0x42, 0x6b,		/* OVLY0=107 */
@@ -155,7 +178,7 @@ static const unsigned char init_common[] =
 	0x6c, 0x20,		/* SRCV1=0, TRCV2=1, ORCV1=0, PRCV1=0, CBLF=0, ORCV2=0, PRCV2=0 */
 	0x6d, 0x00,		/* SRCM1=0, CCEN=0 */
 
-	0x6e, 0x0e,		/* HTRIG=0x00e, approx. centered, at least for PAL */
+	0x6e, 0x0e,		/* HTRIG=0x005, approx. centered, at least for PAL */
 	0x6f, 0x00,		/* HTRIG upper bits */
 	0x70, 0x20,		/* PHRES=0, SBLN=1, VTRIG=0 */
 
@@ -182,8 +205,7 @@ static const unsigned char init_common[] =
 	0x7d, 0x20,		/* LAL=244, FAL=22 */
 };
 
-static const unsigned char init_pal[] =
-{
+static const unsigned char init_pal[] = {
 	0x61, 0x1e,		/* FISE=0, PAL=1, SCBW=1, RTCE=1, YGS=1, INPI=0, DOWN=0 */
 	0x62, 0xc8,		/* DECTYP=1, BSTA=72 */
 	0x63, 0xcb,		/* FSC0 */
@@ -192,8 +214,7 @@ static const unsigned char init_pal[] =
 	0x66, 0x2a,		/* FSC3 */
 };
 
-static const unsigned char init_ntsc[] =
-{
+static const unsigned char init_ntsc[] = {
 	0x61, 0x1d,		/* FISE=1, PAL=0, SCBW=1, RTCE=1, YGS=1, INPI=0, DOWN=0 */
 	0x62, 0xe6,		/* DECTYP=1, BSTA=102 */
 	0x63, 0x1f,		/* FSC0 */
@@ -207,11 +228,14 @@ static int saa7185_attach(struct i2c_device *device)
 	int i;
 	struct saa7185 *encoder;
 
+	MOD_INC_USE_COUNT;
+	
 	device->data = encoder = kmalloc(sizeof(struct saa7185), GFP_KERNEL);
 	if (encoder == NULL) {
+		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
-	MOD_INC_USE_COUNT;
+
 
 	memset(encoder, 0, sizeof(struct saa7185));
 	strcpy(device->name, "saa7185");
@@ -222,23 +246,33 @@ static int saa7185_attach(struct i2c_device *device)
 
 	i = saa7185_write_block(encoder, init_common, sizeof(init_common));
 	if (i >= 0) {
-		i = saa7185_write_block(encoder, init_ntsc, sizeof(init_ntsc));
+		i = saa7185_write_block(encoder, init_ntsc,
+					sizeof(init_ntsc));
 	}
 	if (i < 0) {
-		printk(KERN_ERR "%s_attach: init error %d\n", device->name, i);
+		printk(KERN_ERR "%s_attach: init error %d\n", device->name,
+		       i);
+	} else {
+		printk(KERN_INFO "%s_attach: chip version %d\n",
+		       device->name, saa7185_read(encoder) >> 5);
 	}
+
 	return 0;
 }
 
 
 static int saa7185_detach(struct i2c_device *device)
 {
-	kfree(device->data);
+	struct saa7185 *encoder = device->data;
+	saa7185_write(encoder, 0x61, (encoder->reg[0x61]) | 0x40);	/* SW: output off is active */
+	//saa7185_write(encoder, 0x3a, (encoder->reg[0x3a]) | 0x80); /* SW: color bar */
+	kfree(encoder);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
-static int saa7185_command(struct i2c_device *device, unsigned int cmd, void *arg)
+static int saa7185_command(struct i2c_device *device, unsigned int cmd,
+			   void *arg)
 {
 	struct saa7185 *encoder = device->data;
 
@@ -251,8 +285,7 @@ static int saa7185_command(struct i2c_device *device, unsigned int cmd, void *ar
 			cap->flags
 			    = VIDEO_ENCODER_PAL
 			    | VIDEO_ENCODER_NTSC
-			    | VIDEO_ENCODER_SECAM
-			    | VIDEO_ENCODER_CCIR;
+			    | VIDEO_ENCODER_SECAM | VIDEO_ENCODER_CCIR;
 			cap->inputs = 1;
 			cap->outputs = 1;
 		}
@@ -265,11 +298,13 @@ static int saa7185_command(struct i2c_device *device, unsigned int cmd, void *ar
 			switch (*iarg) {
 
 			case VIDEO_MODE_NTSC:
-				saa7185_write_block(encoder, init_ntsc, sizeof(init_ntsc));
+				saa7185_write_block(encoder, init_ntsc,
+						    sizeof(init_ntsc));
 				break;
 
 			case VIDEO_MODE_PAL:
-				saa7185_write_block(encoder, init_pal, sizeof(init_pal));
+				saa7185_write_block(encoder, init_pal,
+						    sizeof(init_pal));
 				break;
 
 			case VIDEO_MODE_SECAM:
@@ -285,12 +320,6 @@ static int saa7185_command(struct i2c_device *device, unsigned int cmd, void *ar
 		{
 			int *iarg = arg;
 
-#if 0
-			/* not much choice of inputs */
-			if (*iarg != 0) {
-				return -EINVAL;
-			}
-#else
 			/* RJ: *iarg = 0: input is from SA7111
 			   *iarg = 1: input is from ZR36060 */
 
@@ -298,19 +327,25 @@ static int saa7185_command(struct i2c_device *device, unsigned int cmd, void *ar
 
 			case 0:
 				/* Switch RTCE to 1 */
-				saa7185_write(encoder, 0x61, (encoder->reg[0x61] & 0xf7) | 0x08);
+				saa7185_write(encoder, 0x61,
+					      (encoder->
+					       reg[0x61] & 0xf7) | 0x08);
+				saa7185_write(encoder, 0x6e, 0x01);
 				break;
 
 			case 1:
 				/* Switch RTCE to 0 */
-				saa7185_write(encoder, 0x61, (encoder->reg[0x61] & 0xf7) | 0x00);
+				saa7185_write(encoder, 0x61,
+					      (encoder->
+					       reg[0x61] & 0xf7) | 0x00);
+				/* SW: a slight sync problem... */
+				saa7185_write(encoder, 0x6e, 0x00);
 				break;
 
 			default:
 				return -EINVAL;
 
 			}
-#endif
 		}
 		break;
 
@@ -330,7 +365,11 @@ static int saa7185_command(struct i2c_device *device, unsigned int cmd, void *ar
 			int *iarg = arg;
 
 			encoder->enable = !!*iarg;
-			saa7185_write(encoder, 0x61, (encoder->reg[0x61] & 0xbf) | (encoder->enable ? 0x00 : 0x40));
+			saa7185_write(encoder, 0x61,
+				      (encoder->
+				       reg[0x61] & 0xbf) | (encoder->
+							    enable ? 0x00 :
+							    0x40));
 		}
 		break;
 
@@ -343,8 +382,7 @@ static int saa7185_command(struct i2c_device *device, unsigned int cmd, void *ar
 
 /* ----------------------------------------------------------------------- */
 
-struct i2c_driver i2c_driver_saa7185 =
-{
+static struct i2c_driver i2c_driver_saa7185 = {
 	"saa7185",		/* name */
 	I2C_DRIVERID_VIDEOENCODER,	/* ID */
 	I2C_SAA7185, I2C_SAA7185 + 1,
@@ -356,22 +394,15 @@ struct i2c_driver i2c_driver_saa7185 =
 
 EXPORT_NO_SYMBOLS;
 
-#ifdef MODULE
-int init_module(void)
-#else
-int saa7185_init(void)
-#endif
+static int saa7185_init(void)
 {
 	return i2c_register_driver(&i2c_driver_saa7185);
 }
 
-
-
-#ifdef MODULE
-
-void cleanup_module(void)
+static void saa7185_exit(void)
 {
 	i2c_unregister_driver(&i2c_driver_saa7185);
 }
 
-#endif
+module_init(saa7185_init);
+module_exit(saa7185_exit);

@@ -56,6 +56,9 @@
 /* TEA5757 pin mappings */
 const int clk = 1, data = 2, wren = 4, mo_st = 8, power = 16 ;
 
+static int radio_nr = -1;
+MODULE_PARM(radio_nr, "i");
+
 
 #define FREQ_LO		 50*16000
 #define FREQ_HI		150*16000
@@ -331,7 +334,7 @@ static int __devinit maxiradio_init_one(struct pci_dev *pdev, const struct pci_d
 	init_MUTEX(&radio_unit.lock);
 	maxiradio_radio.priv = &radio_unit;
 
-	if(video_register_device(&maxiradio_radio, VFL_TYPE_RADIO)==-1) {
+	if(video_register_device(&maxiradio_radio, VFL_TYPE_RADIO, radio_nr)==-1) {
 	        printk("radio-maxiradio: can't register device!");
 	        goto err_out_free_region;
 	}

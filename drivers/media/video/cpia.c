@@ -52,7 +52,10 @@ extern int cpia_pp_init(void);
 extern int cpia_usb_init(void);
 #endif
 
+static int video_nr = -1;
+
 #ifdef MODULE
+MODULE_PARM(video_nr,"i");
 MODULE_AUTHOR("Scott J. Bertin <sbertin@mindspring.com> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <jerdfelt@valinux.com>");
 MODULE_DESCRIPTION("V4L-driver for Vision CPiA based cameras");
 MODULE_SUPPORTED_DEVICE("video");
@@ -540,6 +543,8 @@ static int cpia_read_proc(char *page, char **start, off_t off,
 static int cpia_write_proc(struct file *file, const char *buffer,
                            unsigned long count, void *data)
 {
+	return -EINVAL;
+#if 0
 	struct cam_data *cam = data;
 	struct cam_params new_params;
 	int retval, find_colon;
@@ -1250,6 +1255,7 @@ static int cpia_write_proc(struct file *file, const char *buffer,
 	up(&cam->param_lock);
 	
 	return retval;
+#endif
 }
 
 static void create_proc_cpia_cam(struct cam_data *cam)
@@ -3180,7 +3186,7 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 	camera->lowlevel_data = lowlevel;
 	
 	/* register v4l device */
-	if (video_register_device(&camera->vdev, VFL_TYPE_GRABBER) == -1) {
+	if (video_register_device(&camera->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		kfree(camera);
 		unlock_kernel();
 		printk(KERN_DEBUG "video_register_device failed\n");

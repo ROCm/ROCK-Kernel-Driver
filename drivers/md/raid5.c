@@ -886,7 +886,7 @@ static void handle_stripe(struct stripe_head *sh)
 			}
 		}
 		if (syncing) {
-			md_done_sync(conf->mddev, (sh->size>>10) - sh->sync_redone,0);
+			md_done_sync(conf->mddev, (sh->size>>9) - sh->sync_redone,0);
 			clear_bit(STRIPE_SYNCING, &sh->state);
 			syncing = 0;
 		}			
@@ -1059,7 +1059,7 @@ static void handle_stripe(struct stripe_head *sh)
 		}
 	}
 	if (syncing && locked == 0 && test_bit(STRIPE_INSYNC, &sh->state)) {
-		md_done_sync(conf->mddev, (sh->size>>10) - sh->sync_redone,1);
+		md_done_sync(conf->mddev, (sh->size>>9) - sh->sync_redone,1);
 		clear_bit(STRIPE_SYNCING, &sh->state);
 	}
 	
@@ -1153,13 +1153,13 @@ unsigned int device_bsize (kdev_t dev)
 	return correct_size;
 }
 
-static int raid5_sync_request (mddev_t *mddev, unsigned long block_nr)
+static int raid5_sync_request (mddev_t *mddev, unsigned long sector_nr)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	struct stripe_head *sh;
 	int sectors_per_chunk = conf->chunk_size >> 9;
-	unsigned long stripe = (block_nr<<1)/sectors_per_chunk;
-	int chunk_offset = (block_nr<<1) % sectors_per_chunk;
+	unsigned long stripe = sector_nr/sectors_per_chunk;
+	int chunk_offset = sector_nr % sectors_per_chunk;
 	int dd_idx, pd_idx;
 	unsigned long first_sector;
 	int raid_disks = conf->raid_disks;
@@ -1167,9 +1167,9 @@ static int raid5_sync_request (mddev_t *mddev, unsigned long block_nr)
 	int redone = 0;
 	int bufsize;
 
-	sh = get_active_stripe(conf, block_nr<<1, 0, 0);
+	sh = get_active_stripe(conf, sector_nr, 0, 0);
 	bufsize = sh->size;
-	redone = block_nr-(sh->sector>>1);
+	redone = sector_nr - sh->sector;
 	first_sector = raid5_compute_sector(stripe*data_disks*sectors_per_chunk
 		+ chunk_offset, raid_disks, data_disks, &dd_idx, &pd_idx, conf);
 	sh->pd_idx = pd_idx;
@@ -1182,7 +1182,7 @@ static int raid5_sync_request (mddev_t *mddev, unsigned long block_nr)
 	handle_stripe(sh);
 	release_stripe(sh);
 
-	return (bufsize>>10)-redone;
+	return (bufsize>>9)-redone;
 }
 
 /*

@@ -246,6 +246,10 @@ unsigned long mm_vtop(unsigned long vaddr)
 		voff -= m68k_memory[i].size;
 	} while (++i < m68k_num_memory);
 
+	/* As a special case allow `__pa(high_memory)'.  */
+	if (voff == 0)
+		return m68k_memory[i-1].addr + m68k_memory[i-1].size;
+
 	return mm_vtop_fallback(vaddr);
 }
 #endif

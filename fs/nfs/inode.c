@@ -45,6 +45,7 @@ void nfs_zap_caches(struct inode *);
 static void nfs_invalidate_inode(struct inode *);
 
 static void nfs_read_inode(struct inode *);
+static void nfs_write_inode(struct inode *,int);
 static void nfs_delete_inode(struct inode *);
 static void nfs_put_super(struct super_block *);
 static void nfs_umount_begin(struct super_block *);
@@ -52,7 +53,7 @@ static int  nfs_statfs(struct super_block *, struct statfs *);
 
 static struct super_operations nfs_sops = { 
 	read_inode:	nfs_read_inode,
-	put_inode:	force_delete,
+	write_inode:	nfs_write_inode,
 	delete_inode:	nfs_delete_inode,
 	put_super:	nfs_put_super,
 	statfs:		nfs_statfs,
@@ -113,6 +114,14 @@ nfs_read_inode(struct inode * inode)
 	NFS_CACHEINV(inode);
 	NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
 	NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
+}
+
+static void
+nfs_write_inode(struct inode *inode, int sync)
+{
+	int flags = sync ? FLUSH_WAIT : 0;
+
+	nfs_sync_file(inode, NULL, 0, 0, flags);
 }
 
 static void
@@ -887,32 +896,15 @@ out:
  * A very similar scenario holds for the dir cache.
  */
 int
-nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
+__nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 {
 	__u64		new_size, new_mtime;
 	loff_t		new_isize;
 	int		invalid = 0;
-	int		error = -EIO;
-
-	if (!inode || !fattr) {
-		printk(KERN_ERR "nfs_refresh_inode: inode or fattr is NULL\n");
-		goto out;
-	}
-	if (inode->i_mode == 0) {
-		printk(KERN_ERR "nfs_refresh_inode: empty inode\n");
-		goto out;
-	}
-
-	if ((fattr->valid & NFS_ATTR_FATTR) == 0)
-		goto out;
-
-	if (is_bad_inode(inode))
-		goto out;
 
 	dfprintk(VFS, "NFS: refresh_inode(%x/%ld ct=%d info=0x%x)\n",
 			inode->i_dev, inode->i_ino,
 			atomic_read(&inode->i_count), fattr->valid);
-
 
 	if (NFS_FSID(inode) != fattr->fsid ||
 	    NFS_FILEID(inode) != fattr->fileid) {
@@ -920,7 +912,7 @@ nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 		       "expected (0x%Lx/0x%Lx), got (0x%Lx/0x%Lx)\n",
 		       (long long)NFS_FSID(inode), (long long)NFS_FILEID(inode),
 		       (long long)fattr->fsid, (long long)fattr->fileid);
-		goto out;
+		goto out_err;
 	}
 
 	/*
@@ -932,8 +924,6 @@ nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  	new_mtime = fattr->mtime;
 	new_size = fattr->size;
  	new_isize = nfs_size_to_loff_t(fattr->size);
-
-	error = 0;
 
 	/*
 	 * Update the read time so we don't revalidate too often.
@@ -1024,11 +1014,9 @@ nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 
 	if (invalid)
 		nfs_zap_caches(inode);
+	return 0;
 
-out:
-	return error;
-
-out_changed:
+ out_changed:
 	/*
 	 * Big trouble! The inode has become a different object.
 	 */
@@ -1042,7 +1030,8 @@ out_changed:
 	 * (But we fall through to invalidate the caches.)
 	 */
 	nfs_invalidate_inode(inode);
-	goto out;
+ out_err:
+	return -EIO;
 }
 
 /*

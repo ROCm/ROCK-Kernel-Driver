@@ -96,6 +96,9 @@
 #ifndef PCI_DEVICE_ID_INTEL_ICH2
 #define PCI_DEVICE_ID_INTEL_ICH2	0x2445
 #endif
+#ifndef PCI_DEVICE_ID_INTEL_ICH3
+#define PCI_DEVICE_ID_INTEL_ICH3	0x2485
+#endif
 #ifndef PCI_DEVICE_ID_INTEL_440MX
 #define PCI_DEVICE_ID_INTEL_440MX	0x7195
 #endif
@@ -210,13 +213,15 @@ enum {
 	ICH82901AB,
 	INTEL440MX,
 	INTELICH2,
+	INTELICH3
 };
 
 static char * card_names[] = {
 	"Intel ICH 82801AA",
 	"Intel ICH 82901AB",
 	"Intel 440MX",
-	"Intel ICH2"
+	"Intel ICH2",
+	"Intel ICH3"
 };
 
 static struct pci_device_id i810_pci_tbl [] __initdata = {
@@ -228,6 +233,8 @@ static struct pci_device_id i810_pci_tbl [] __initdata = {
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTEL440MX},
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH2,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH2},
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH3,
+	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH3},
 	{0,}
 };
 

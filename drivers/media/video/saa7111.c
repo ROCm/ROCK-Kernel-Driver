@@ -1,46 +1,41 @@
 /* 
-   saa7111 - Philips SAA7111A video decoder driver version 0.0.3
+    saa7111 - Philips SAA7111A video decoder driver version 0.0.3
 
-   Copyright (C) 1998 Dave Perks <dperks@ibm.net>
+    Copyright (C) 1998 Dave Perks <dperks@ibm.net>
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
+    Slight changes for video timing and attachment output by
+    Wolfgang Scherr <scherr@net4you.net>
+    
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- */
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+*/
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
-#include <linux/slab.h>
+#include <linux/malloc.h>
 #include <linux/mm.h>
-#include <linux/pci.h>
-#include <linux/signal.h>
-#include <asm/io.h>
-#include <asm/pgtable.h>
-#include <asm/page.h>
 #include <linux/sched.h>
-#include <asm/segment.h>
-#include <linux/types.h>
-#include <linux/wrapper.h>
 
 #include <linux/videodev.h>
 #include <linux/version.h>
-#include <asm/uaccess.h>
-
 #include <linux/i2c-old.h>
+
 #include <linux/video_decoder.h>
 
 #define DEBUG(x)		/* Debug driver */
@@ -67,7 +62,8 @@ struct saa7111 {
 
 /* ----------------------------------------------------------------------- */
 
-static int saa7111_write(struct saa7111 *dev, unsigned char subaddr, unsigned char data)
+static int saa7111_write(struct saa7111 *dev, unsigned char subaddr,
+			 unsigned char data)
 {
 	int ack;
 
@@ -82,9 +78,10 @@ static int saa7111_write(struct saa7111 *dev, unsigned char subaddr, unsigned ch
 	return ack;
 }
 
-static int saa7111_write_block(struct saa7111 *dev, unsigned const char *data, unsigned int len)
+static int saa7111_write_block(struct saa7111 *dev,
+	       unsigned const char *data, unsigned int len)
 {
-	int ack = 0;
+	int ack = -1;
 	unsigned subaddr;
 
 	while (len > 1) {
@@ -96,7 +93,10 @@ static int saa7111_write_block(struct saa7111 *dev, unsigned const char *data, u
 		len -= 2;
 		while (len > 1 && *data == ++subaddr) {
 			data++;
-			ack = i2c_sendbyte(dev->bus, (dev->reg[subaddr] = *data++), I2C_DELAY);
+			ack =
+			    i2c_sendbyte(dev->bus,
+					 (dev->reg[subaddr] =
+					  *data++), I2C_DELAY);
 			len -= 2;
 		}
 		i2c_stop(dev->bus);
@@ -128,20 +128,19 @@ static int saa7111_attach(struct i2c_device *device)
 	int i;
 	struct saa7111 *decoder;
 
-	static const unsigned char init[] =
-	{
+	static const unsigned char init[] = {
 		0x00, 0x00,	/* 00 - ID byte */
 		0x01, 0x00,	/* 01 - reserved */
 
-	/*front end */
+		/*front end */
 		0x02, 0xd0,	/* 02 - FUSE=3, GUDL=2, MODE=0 */
 		0x03, 0x23,	/* 03 - HLNRS=0, VBSL=1, WPOFF=0, HOLDG=0, GAFIX=0, GAI1=256, GAI2=256 */
 		0x04, 0x00,	/* 04 - GAI1=256 */
 		0x05, 0x00,	/* 05 - GAI2=256 */
 
-	/* decoder */
-		0x06, 0xf6,	/* 06 - HSB at  13(50Hz) /  17(60Hz) pixels after end of last line */
-		0x07, 0xdd,	/* 07 - HSS at 113(50Hz) / 117(60Hz) pixels after end of last line */
+		/* decoder */
+		0x06, 0xf3,	/* 06 - HSB at  13(50Hz) /  17(60Hz) pixels after end of last line */
+		0x07, 0x13,	/* 07 - HSS at 113(50Hz) / 117(60Hz) pixels after end of last line */
 		0x08, 0xc8,	/* 08 - AUFD=1, FSEL=1, EXFIL=0, VTRC=1, HPLL=0, VNOI=0 */
 		0x09, 0x01,	/* 09 - BYPS=0, PREF=0, BPSS=0, VBLB=0, UPTCV=0, APER=1 */
 		0x0a, 0x80,	/* 0a - BRIG=128 */
@@ -160,11 +159,14 @@ static int saa7111_attach(struct i2c_device *device)
 		0x17, 0x00,	/* 17 - VBI */
 	};
 
+	MOD_INC_USE_COUNT;
+
 	device->data = decoder = kmalloc(sizeof(struct saa7111), GFP_KERNEL);
-	if (decoder == NULL) {
+	if (decoder == NULL)
+	{
+		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
-	MOD_INC_USE_COUNT;
 
 	memset(decoder, 0, sizeof(struct saa7111));
 	strcpy(device->name, "saa7111");
@@ -180,9 +182,11 @@ static int saa7111_attach(struct i2c_device *device)
 
 	i = saa7111_write_block(decoder, init, sizeof(init));
 	if (i < 0) {
-		printk(KERN_ERR "%s_attach: init status %d\n", device->name, i);
+		printk(KERN_ERR "%s_attach: init status %d\n",
+		       device->name, i);
 	} else {
-		printk(KERN_INFO "%s_attach: chip version %x\n", device->name, saa7111_read(decoder, 0x00));
+		printk(KERN_INFO "%s_attach: chip version %x\n",
+		       device->name, saa7111_read(decoder, 0x00) >> 4);
 	}
 	return 0;
 }
@@ -195,7 +199,8 @@ static int saa7111_detach(struct i2c_device *device)
 	return 0;
 }
 
-static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *arg)
+static int saa7111_command(struct i2c_device *device, unsigned int cmd,
+			   void *arg)
 {
 	struct saa7111 *decoder = device->data;
 
@@ -209,9 +214,12 @@ static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *ar
 			for (i = 0; i < 32; i += 16) {
 				int j;
 
-				printk("KERN_DEBUG %s: %03x", device->name, i);
+				printk("KERN_DEBUG %s: %03x", device->name,
+				       i);
 				for (j = 0; j < 16; ++j) {
-					printk(" %02x", saa7111_read(decoder, i + j));
+					printk(" %02x",
+					       saa7111_read(decoder,
+							    i + j));
 				}
 				printk("\n");
 			}
@@ -226,8 +234,7 @@ static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *ar
 			cap->flags
 			    = VIDEO_DECODER_PAL
 			    | VIDEO_DECODER_NTSC
-			    | VIDEO_DECODER_AUTO
-			    | VIDEO_DECODER_CCIR;
+			    | VIDEO_DECODER_AUTO | VIDEO_DECODER_CCIR;
 			cap->inputs = 8;
 			cap->outputs = 1;
 		}
@@ -274,15 +281,21 @@ static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *ar
 			switch (*iarg) {
 
 			case VIDEO_MODE_NTSC:
-				saa7111_write(decoder, 0x08, (decoder->reg[0x08] & 0x3f) | 0x40);
+				saa7111_write(decoder, 0x08,
+					      (decoder->
+					       reg[0x08] & 0x3f) | 0x40);
 				break;
 
 			case VIDEO_MODE_PAL:
-				saa7111_write(decoder, 0x08, (decoder->reg[0x08] & 0x3f) | 0x00);
+				saa7111_write(decoder, 0x08,
+					      (decoder->
+					       reg[0x08] & 0x3f) | 0x00);
 				break;
 
 			case VIDEO_MODE_AUTO:
-				saa7111_write(decoder, 0x08, (decoder->reg[0x08] & 0x3f) | 0x80);
+				saa7111_write(decoder, 0x08,
+					      (decoder->
+					       reg[0x08] & 0x3f) | 0x80);
 				break;
 
 			default:
@@ -300,12 +313,20 @@ static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *ar
 			if (*iarg < 0 || *iarg > 7) {
 				return -EINVAL;
 			}
+
 			if (decoder->input != *iarg) {
 				decoder->input = *iarg;
 				/* select mode */
-				saa7111_write(decoder, 0x02, (decoder->reg[0x02] & 0xf8) | decoder->input);
+				saa7111_write(decoder, 0x02,
+					      (decoder->
+					       reg[0x02] & 0xf8) |
+					      decoder->input);
 				/* bypass chrominance trap for modes 4..7 */
-				saa7111_write(decoder, 0x09, (decoder->reg[0x09] & 0x7f) | ((decoder->input > 3) ? 0x80 : 0));
+				saa7111_write(decoder, 0x09,
+					      (decoder->
+					       reg[0x09] & 0x7f) |
+					      ((decoder->input >
+						3) ? 0x80 : 0));
 			}
 		}
 		break;
@@ -330,19 +351,34 @@ static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *ar
 				decoder->enable = enable;
 
 // RJ: If output should be disabled (for playing videos), we also need a open PLL.
-				//     The input is set to 0 (where no input source is connected), although this
-				//     is not necessary.
-				//
-				//     If output should be enabled, we have to reverse the above.
+//     The input is set to 0 (where no input source is connected), although this
+//     is not necessary.
+//
+//     If output should be enabled, we have to reverse the above.
 
 				if (decoder->enable) {
-					saa7111_write(decoder, 0x02, (decoder->reg[0x02] & 0xf8) | decoder->input);
-					saa7111_write(decoder, 0x08, (decoder->reg[0x08] & 0xfb));
-					saa7111_write(decoder, 0x11, (decoder->reg[0x11] & 0xf3) | 0x0c);
+					saa7111_write(decoder, 0x02,
+						      (decoder->
+						       reg[0x02] & 0xf8) |
+						      decoder->input);
+					saa7111_write(decoder, 0x08,
+						      (decoder->
+						       reg[0x08] & 0xfb));
+					saa7111_write(decoder, 0x11,
+						      (decoder->
+						       reg[0x11] & 0xf3) |
+						      0x0c);
 				} else {
-					saa7111_write(decoder, 0x02, (decoder->reg[0x02] & 0xf8));
-					saa7111_write(decoder, 0x08, (decoder->reg[0x08] & 0xfb) | 0x04);
-					saa7111_write(decoder, 0x11, (decoder->reg[0x11] & 0xf3));
+					saa7111_write(decoder, 0x02,
+						      (decoder->
+						       reg[0x02] & 0xf8));
+					saa7111_write(decoder, 0x08,
+						      (decoder->
+						       reg[0x08] & 0xfb) |
+						      0x04);
+					saa7111_write(decoder, 0x11,
+						      (decoder->
+						       reg[0x11] & 0xf3));
 				}
 			}
 		}
@@ -355,22 +391,26 @@ static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *ar
 			if (decoder->bright != pic->brightness) {
 				/* We want 0 to 255 we get 0-65535 */
 				decoder->bright = pic->brightness;
-				saa7111_write(decoder, 0x0a, decoder->bright >> 8);
+				saa7111_write(decoder, 0x0a,
+					      decoder->bright >> 8);
 			}
 			if (decoder->contrast != pic->contrast) {
 				/* We want 0 to 127 we get 0-65535 */
 				decoder->contrast = pic->contrast;
-				saa7111_write(decoder, 0x0b, decoder->contrast >> 9);
+				saa7111_write(decoder, 0x0b,
+					      decoder->contrast >> 9);
 			}
 			if (decoder->sat != pic->colour) {
 				/* We want 0 to 127 we get 0-65535 */
 				decoder->sat = pic->colour;
-				saa7111_write(decoder, 0x0c, decoder->sat >> 9);
+				saa7111_write(decoder, 0x0c,
+					      decoder->sat >> 9);
 			}
 			if (decoder->hue != pic->hue) {
 				/* We want -128 to 127 we get 0-65535 */
 				decoder->hue = pic->hue;
-				saa7111_write(decoder, 0x0d, (decoder->hue - 32768) >> 8);
+				saa7111_write(decoder, 0x0d,
+					      (decoder->hue - 32768) >> 8);
 			}
 		}
 		break;
@@ -384,8 +424,7 @@ static int saa7111_command(struct i2c_device *device, unsigned int cmd, void *ar
 
 /* ----------------------------------------------------------------------- */
 
-struct i2c_driver i2c_driver_saa7111 =
-{
+static struct i2c_driver i2c_driver_saa7111 = {
 	"saa7111",		/* name */
 	I2C_DRIVERID_VIDEODECODER,	/* ID */
 	I2C_SAA7111, I2C_SAA7111 + 1,
@@ -397,22 +436,15 @@ struct i2c_driver i2c_driver_saa7111 =
 
 EXPORT_NO_SYMBOLS;
 
-#ifdef MODULE
-int init_module(void)
-#else
-int saa7111_init(void)
-#endif
+static int saa7111_init(void)
 {
 	return i2c_register_driver(&i2c_driver_saa7111);
 }
 
-
-
-#ifdef MODULE
-
-void cleanup_module(void)
+static void saa7111_exit(void)
 {
 	i2c_unregister_driver(&i2c_driver_saa7111);
 }
 
-#endif
+module_init(saa7111_init);
+module_exit(saa7111_exit);

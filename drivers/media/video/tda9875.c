@@ -80,8 +80,8 @@ static struct i2c_client client_template;
 #define TDA9875_DACOS       0x13  /*DAC i/o select (ADC) 0b0000100*/
 #define TDA9875_LOSR        0x16  /*Line output select regirter 0b0100 0001*/
 
-#define TDA9875_CH1V        0x0c  /*Chanel 1 volume (mute)*/
-#define TDA9875_CH2V        0x0d  /*Chanel 2 volume (mute)*/
+#define TDA9875_CH1V        0x0c  /*Channel 1 volume (mute)*/
+#define TDA9875_CH2V        0x0d  /*Channel 2 volume (mute)*/
 #define TDA9875_SC1         0x14  /*SCART 1 in (mono)*/
 #define TDA9875_SC2         0x15  /*SCART 2 in (mono)*/
 
@@ -182,8 +182,8 @@ static void do_tda9875_init(struct i2c_client *client)
 	tda9875_write(client, TDA9875_SC1, 0x00 );    /* SCART 1 (SC1)*/
 	tda9875_write(client, TDA9875_SC2, 0x01 );    /* SCART 2 (sc2)*/
         
-	tda9875_write(client, TDA9875_CH1V, 0x10 );  /* Chanel volume 1 mute*/
-	tda9875_write(client, TDA9875_CH2V, 0x10 );  /* Chanel volume 2 mute */
+	tda9875_write(client, TDA9875_CH1V, 0x10 );  /* Channel volume 1 mute*/
+	tda9875_write(client, TDA9875_CH2V, 0x10 );  /* Channel volume 2 mute */
 	tda9875_write(client, TDA9875_DACOS, 0x02 ); /* sig DAC i/o(in:nicam)*/
 	tda9875_write(client, TDA9875_ADCIS, 0x6f ); /* sig ADC input(in:mono)*/
 	tda9875_write(client, TDA9875_LOSR, 0x00 );  /* line out (in:mono)*/

@@ -1070,7 +1070,7 @@ static struct
 {
 	void (*stimul)(struct net_device *);
 	struct net_device *dev;
-} netdev_fc_slots[32];
+} netdev_fc_slots[BITS_PER_LONG];
 
 int netdev_register_fc(struct net_device *dev, void (*stimul)(struct net_device *dev))
 {

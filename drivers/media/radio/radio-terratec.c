@@ -50,6 +50,7 @@
 /*******************************************************************/
 
 static int io = CONFIG_RADIO_TERRATEC_PORT; 
+static int radio_nr = -1;
 static int users = 0;
 static spinlock_t lock;
 
@@ -318,7 +319,7 @@ static int __init terratec_init(void)
 	
 	spin_lock_init(&lock);
 	
-	if(video_register_device(&terratec_radio, VFL_TYPE_RADIO)==-1)
+	if(video_register_device(&terratec_radio, VFL_TYPE_RADIO, radio_nr)==-1)
 	{
 		release_region(io,2);
 		return -EINVAL;
@@ -339,6 +340,7 @@ MODULE_AUTHOR("R.OFFERMANNS & others");
 MODULE_DESCRIPTION("A driver for the TerraTec ActiveRadio Standalone radio card.");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the TerraTec ActiveRadio card (0x590 or 0x591)");
+MODULE_PARM(radio_nr, "i");
 
 EXPORT_NO_SYMBOLS;
 

@@ -1,4 +1,4 @@
-/* $Id: gpio.c,v 1.4 2001/02/27 13:52:48 bjornw Exp $
+/* $Id: gpio.c,v 1.7 2001/04/04 13:30:08 matsfg Exp $
  *
  * Etrax general port I/O device
  *
@@ -9,6 +9,15 @@
  *             Johan Adolfsson  (read/set directions)
  *
  * $Log: gpio.c,v $
+ * Revision 1.7  2001/04/04 13:30:08  matsfg
+ * Added bitset and bitclear for leds. Calls init_ioremap to set up memmapping
+ *
+ * Revision 1.6  2001/03/26 16:03:06  bjornw
+ * Needs linux/config.h
+ *
+ * Revision 1.5  2001/03/26 14:22:03  bjornw
+ * Namechange of some config options
+ *
  * Revision 1.4  2001/02/27 13:52:48  bjornw
  * malloc.h -> slab.h
  *
@@ -25,6 +34,7 @@
  */
 
 #include <linux/config.h>
+
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -78,25 +88,25 @@ static volatile unsigned char *shads[2] = {
 	&port_pa_data_shadow, &port_pb_data_shadow };
 
 /* What direction bits that are user changeable 1=changeable*/
-#ifndef CONFIG_PA_CHANGEABLE_DIR
-#define CONFIG_PA_CHANGEABLE_DIR 0x00
+#ifndef CONFIG_ETRAX_PA_CHANGEABLE_DIR
+#define CONFIG_ETRAX_PA_CHANGEABLE_DIR 0x00
 #endif
-#ifndef CONFIG_PB_CHANGEABLE_DIR
-#define CONFIG_PB_CHANGEABLE_DIR 0x00
-#endif
-
-#ifndef CONFIG_PA_CHANGEABLE_BITS
-#define CONFIG_PA_CHANGEABLE_BITS 0xFF
-#endif
-#ifndef CONFIG_PB_CHANGEABLE_BITS
-#define CONFIG_PB_CHANGEABLE_BITS 0xFF
+#ifndef CONFIG_ETRAX_PB_CHANGEABLE_DIR
+#define CONFIG_ETRAX_PB_CHANGEABLE_DIR 0x00
 #endif
 
+#ifndef CONFIG_ETRAX_PA_CHANGEABLE_BITS
+#define CONFIG_ETRAX_PA_CHANGEABLE_BITS 0xFF
+#endif
+#ifndef CONFIG_ETRAX_PB_CHANGEABLE_BITS
+#define CONFIG_ETRAX_PB_CHANGEABLE_BITS 0xFF
+#endif
 
-static unsigned char changeable_dir[2] = { CONFIG_PA_CHANGEABLE_DIR,
-                                           CONFIG_PB_CHANGEABLE_DIR };
-static unsigned char changeable_bits[2] = { CONFIG_PA_CHANGEABLE_BITS,
-                                            CONFIG_PB_CHANGEABLE_BITS };
+
+static unsigned char changeable_dir[2] = { CONFIG_ETRAX_PA_CHANGEABLE_DIR,
+                                           CONFIG_ETRAX_PB_CHANGEABLE_DIR };
+static unsigned char changeable_bits[2] = { CONFIG_ETRAX_PA_CHANGEABLE_BITS,
+                                            CONFIG_ETRAX_PB_CHANGEABLE_BITS };
 
 static volatile unsigned char *dir[2] = { R_PORT_PA_DIR, R_PORT_PB_DIR };
 
@@ -240,7 +250,7 @@ gpio_ioctl(struct inode *inode, struct file *file,
 		default:
 			if(priv->minor == LEDS)
 				return gpio_leds_ioctl(cmd, arg);
-			else
+                        else
 				return -EINVAL;
 	}
 	
@@ -252,7 +262,12 @@ gpio_leds_ioctl(unsigned int cmd, unsigned long arg)
 {
 	unsigned char green;
 	unsigned char red;
-
+        static int initialized = 0;
+        if(!initialized)
+        {
+          initialized = 1;
+          init_ioremap();
+        }
 	switch (_IOC_NR(cmd)) {
 		case IO_LEDACTIVE_SET:
 			green = ((unsigned char) arg) & 1;
@@ -260,6 +275,11 @@ gpio_leds_ioctl(unsigned int cmd, unsigned long arg)
 			LED_ACTIVE_SET_G(green);
 			LED_ACTIVE_SET_R(red);
 			break;
+                case IO_LED_SETBIT:                 
+                        LED_BIT_SET(arg);
+                       break;
+                case IO_LED_CLRBIT:
+                        LED_BIT_CLR(arg);
 		default:
 			return -EINVAL;
 	}

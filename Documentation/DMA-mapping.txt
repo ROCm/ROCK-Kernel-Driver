@@ -240,6 +240,7 @@ To unmap and free such a DMA region, you call:
 
 where dev, size are the same as in the above call and cpu_addr and
 dma_handle are the values pci_alloc_consistent returned to you.
+This function may not be called in interrupt context.
 
 If your driver needs lots of smaller memory regions, you can write
 custom code to subdivide pages returned by pci_alloc_consistent,
@@ -262,7 +263,8 @@ SLAB_POISON may help you find driver bugs.  If you call this in a non-
 sleeping context (f.e. in_interrupt is true or while holding SMP
 locks), pass SLAB_ATOMIC.  If your device has no boundary crossing
 restrictions, pass 0 for alloc; passing 4096 says memory allocated
-from this pool must not cross 4KByte boundaries.
+from this pool must not cross 4KByte boundaries (but at that time it
+may be better to go for pci_alloc_consistent directly instead).
 
 Allocate memory from a pci pool like this:
 
@@ -270,21 +272,23 @@ Allocate memory from a pci pool like this:
 
 flags are SLAB_KERNEL if blocking is permitted (not in_interrupt nor
 holding SMP locks), SLAB_ATOMIC otherwise.  Like pci_alloc_consistent,
-this returns two values, cpu_addr and dma_handle,
+this returns two values, cpu_addr and dma_handle.
 
 Free memory that was allocated from a pci_pool like this:
 
 	pci_pool_free(pool, cpu_addr, dma_handle);
 
 where pool is what you passed to pci_pool_alloc, and cpu_addr and
-dma_handle are the values pci_pool_alloc returned.
+dma_handle are the values pci_pool_alloc returned. This function
+may be called in interrupt context.
 
 Destroy a pci_pool by calling:
 
 	pci_pool_destroy(pool);
 
 Make sure you've called pci_pool_free for all memory allocated
-from a pool before you destroy the pool.
+from a pool before you destroy the pool. This function may not
+be called in interrupt context.
 
 			DMA Direction
 

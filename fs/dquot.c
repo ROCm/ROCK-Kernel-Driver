@@ -1343,13 +1343,11 @@ put_all:
 }
 
 
-void __init dquot_init_hash(void)
+static int __init dquot_init(void)
 {
 	printk(KERN_NOTICE "VFS: Diskquotas version %s initialized\n", __DQUOT_VERSION__);
-
-	memset(dquot_hash, 0, sizeof(dquot_hash));
-	memset((caddr_t)&dqstats, 0, sizeof(dqstats));
 }
+__initcall(dquot_init);
 
 /*
  * Definitions of diskquota operations.

@@ -1,3 +1,33 @@
+ 2001-05-10  Fred Barnes  <frmb2@ukc.ac.uk>
+
+       * parport_pc.c (parport_pc_epp_read_data): added support for
+       reading from a w91284pic peripheral, flag is PARPORT_W91284PIC.
+
+2001-05-07  Fred Barnes  <frmb2@ukc.ac.uk>
+ 
+ 	* parport_pc.c (parport_pc_epp_read_data,
+	parport_pc_epp_write_data, parport_pc_epp_read_addr,
+	parport_pc_epp_write_addr): support for fast reads/writes using
+	the PARPORT_EPP_FAST flag.
+ 
+ 	* ieee1284.c (parport_read, parport_write): added code to handle
+	software EPP mode (IEEE1284_MODE_EPPSWE).  Added code to allow
+	BYTE mode reverse transfers (previously always went for NIBBLE
+	mode).
+ 
+ 	* ieee1284_ops.c (parport_ieee1284_epp_read_data,
+	parport_ieee1284_epp_write_data): fixed various polarity problems.
+	Also (theoretically) fixed address versions (.._addr), but no
+	hardware to test this on.
+ 
+ 	* parport_pc.h: added parport_dump_state() function for debugging.
+ 	Needs to have DEBUG_PARPORT to be defined for it to be included.
+ 
+2001-05-03  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Fix the compile problem I introduce from the last
+	change.
+
 2001-04-20  Paul Gortmaker  <p_gortmaker@yahoo.com>
 
 	* parport_pc.c: Cut down the size quite a bit (more than 4k off

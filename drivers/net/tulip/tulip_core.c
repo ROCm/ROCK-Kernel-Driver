@@ -14,6 +14,10 @@
 
 */
 
+#define DRV_NAME	"tulip"
+#define DRV_VERSION	"0.9.15-pre2"
+#define DRV_RELDATE	"May 16, 2001"
+
 #include <linux/module.h>
 #include "tulip.h"
 #include <linux/pci.h>
@@ -21,10 +25,12 @@
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
 #include <linux/mii.h>
+#include <linux/ethtool.h>
 #include <asm/unaligned.h>
+#include <asm/uaccess.h>
 
 static char version[] __devinitdata =
-	"Linux Tulip driver version 0.9.15-pre1 (May 12, 2001)\n";
+	"Linux Tulip driver version " DRV_VERSION " (" DRV_RELDATE ")\n";
 
 
 /* A few user-configurable values. */
@@ -101,8 +107,7 @@ MODULE_PARM(csr0, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
 
-#define TULIP_MODULE_NAME "tulip"
-#define PFX TULIP_MODULE_NAME ": "
+#define PFX DRV_NAME ": "
 
 #ifdef TULIP_DEBUG
 int tulip_debug = TULIP_DEBUG;
@@ -472,10 +477,27 @@ media_picked:
 	add_timer(&tp->timer);
 }
 
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+/* Enable receiver */
+void tulip_xon(struct net_device *dev)
+{
+        struct tulip_private *tp = (struct tulip_private *)dev->priv;
+
+        clear_bit(tp->fc_bit, &netdev_fc_xoff);
+        if (netif_running(dev)){
+
+                tulip_refill_rx(dev);
+                outl(tulip_tbl[tp->chip_id].valid_intrs,  dev->base_addr+CSR7);
+        }
+}
+#endif
 
 static int
 tulip_open(struct net_device *dev)
 {
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+        struct tulip_private *tp = (struct tulip_private *)dev->priv;
+#endif
 	int retval;
 	MOD_INC_USE_COUNT;
 
@@ -487,6 +509,10 @@ tulip_open(struct net_device *dev)
 	tulip_init_ring (dev);
 
 	tulip_up (dev);
+
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+        tp->fc_bit = netdev_register_fc(dev, tulip_xon);
+#endif
 
 	netif_start_queue (dev);
 
@@ -595,6 +621,10 @@ static void tulip_tx_timeout(struct net_device *dev)
 #endif
 
 	/* Stop and restart the chip's Tx processes . */
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+        if (tp->fc_bit && test_bit(tp->fc_bit,&netdev_fc_xoff))
+                printk("BUG tx_timeout restarting rx when fc on\n");
+#endif
 	tulip_restart_rxtx(tp, tp->csr6);
 	/* Trigger an immediate transmit demand. */
 	outl(0, ioaddr + CSR1);
@@ -751,6 +781,13 @@ static int tulip_close (struct net_device *dev)
 
 	netif_stop_queue (dev);
 
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+        if (tp->fc_bit) {
+                int bit = tp->fc_bit;
+                tp->fc_bit = 0;
+                netdev_unregister_fc(bit);
+        }
+#endif
 	tulip_down (dev);
 
 	if (tulip_debug > 1)
@@ -812,6 +849,30 @@ static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 }
 
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	struct tulip_private *np = dev->priv;
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+
+        switch (ethcmd) {
+        case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strcpy(info.driver, DRV_NAME);
+		strcpy(info.version, DRV_VERSION);
+		strcpy(info.bus_info, np->pdev->slot_name);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+
+        }
+	
+	return -EOPNOTSUPP;
+}
+
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -823,6 +884,8 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	unsigned int regnum = data[1];
 
 	switch (cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 	case SIOCDEVPRIVATE:	/* Get the address of the PHY in use. */
 		if (tp->mii_cnt)
 			data[0] = phy;
@@ -1685,7 +1748,7 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_driver tulip_driver = {
-	name:		TULIP_MODULE_NAME,
+	name:		DRV_NAME,
 	id_table:	tulip_pci_tbl,
 	probe:		tulip_init_one,
 	remove:		tulip_remove_one,

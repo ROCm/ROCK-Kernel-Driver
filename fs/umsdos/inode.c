@@ -378,7 +378,7 @@ static struct dentry *check_pseudo_root(struct super_block *sb)
 	 * lookup_dentry needs a (so far non-existent) root. 
 	 */
 	printk(KERN_INFO "check_pseudo_root: mounted as root\n");
-	root = lookup_one(UMSDOS_PSDROOT_NAME, sb->s_root); 
+	root = lookup_one_len(UMSDOS_PSDROOT_NAME, sb->s_root,UMSDOS_PSDROOT_LEN); 
 	if (IS_ERR(root))
 		goto out_noroot;
 	if (!root->d_inode || !S_ISDIR(root->d_inode->i_mode))
@@ -387,12 +387,12 @@ static struct dentry *check_pseudo_root(struct super_block *sb)
 	printk(KERN_INFO "check_pseudo_root: found %s/%s\n", root->d_parent->d_name.name, root->d_name.name);
 
 	/* look for /sbin/init */
-	sbin = lookup_one("sbin", root);
+	sbin = lookup_one_len("sbin", root, 4);
 	if (IS_ERR(sbin))
 		goto out_dput;
 	if (!sbin->d_inode || !S_ISDIR(sbin->d_inode->i_mode))
 		goto out_dput_sbin;
-	init = lookup_one("init", sbin);
+	init = lookup_one_len("init", sbin, 4);
 	if (IS_ERR(init))
 		goto out_dput_sbin;
 	if (!init->d_inode)

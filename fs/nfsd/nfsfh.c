@@ -413,7 +413,7 @@ find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, 
 				d_drop(result);
 				dput(result);
 				result = tmp;
-				/* If !found, then this is really wierd, but it shouldn't hurt */
+				/* If !found, then this is really weird, but it shouldn't hurt */
 			}
 		}
 	} else {

@@ -69,6 +69,9 @@ static unsigned int irq_debug = 0;
 static unsigned int gbuffers = 2;
 static unsigned int gbufsize = BTTV_MAX_FBUF;
 static unsigned int combfilter = 0;
+static int video_nr = -1;
+static int radio_nr = -1;
+static int vbi_nr = -1;
 unsigned int bttv_debug = 0;
 unsigned int bttv_verbose = 1;
 unsigned int bttv_gpio = 0;
@@ -93,6 +96,10 @@ MODULE_PARM_DESC(gbuffers,"number of capture buffers, default is 2 (64 max)");
 MODULE_PARM(gbufsize,"i");
 MODULE_PARM_DESC(gbufsize,"size of the capture buffers, default is 0x208000");
 MODULE_PARM(combfilter,"i");
+
+MODULE_PARM(video_nr,"i");
+MODULE_PARM(radio_nr,"i");
+MODULE_PARM(vbi_nr,"i");
 
 MODULE_DESCRIPTION("bttv - v4l driver module for bt848/878 based cards");
 MODULE_AUTHOR("Ralph  Metzler & Marcus Metzler & Gerd Knorr");
@@ -2435,16 +2442,16 @@ static int __devinit init_video_dev(struct bttv *btv)
 {
 	audio(btv, AUDIO_MUTE, 1);
         
-	if(video_register_device(&btv->video_dev,VFL_TYPE_GRABBER)<0)
+	if(video_register_device(&btv->video_dev,VFL_TYPE_GRABBER,video_nr)<0)
 		return -1;
-	if(video_register_device(&btv->vbi_dev,VFL_TYPE_VBI)<0) 
+	if(video_register_device(&btv->vbi_dev,VFL_TYPE_VBI,vbi_nr)<0) 
         {
 	        video_unregister_device(&btv->video_dev);
 		return -1;
 	}
 	if (btv->has_radio)
 	{
-		if(video_register_device(&btv->radio_dev, VFL_TYPE_RADIO)<0) 
+		if(video_register_device(&btv->radio_dev, VFL_TYPE_RADIO, radio_nr)<0) 
                 {
 		        video_unregister_device(&btv->vbi_dev);
 		        video_unregister_device(&btv->video_dev);

@@ -1,4 +1,4 @@
-/* $Id: hycapi.c,v 1.8.6.1 2001/02/16 16:43:30 kai Exp $
+/* $Id: hycapi.c,v 1.8.6.2 2001/04/20 02:42:00 keil Exp $
  *
  * Linux driver for HYSDN cards, CAPI2.0-Interface.
  * written by Ulrich Albrecht (u.albrecht@hypercope.de) for Hypercope GmbH
@@ -41,7 +41,7 @@
 #include "hysdn_defs.h"
 #include <linux/kernelcapi.h>
 
-static char hycapi_revision[]="$Revision: 1.11 $";
+static char hycapi_revision[]="$Revision: 1.8.6.2 $";
 
 unsigned int hycapi_enable = 0xffffffff; 
 MODULE_PARM(hycapi_enable, "i");

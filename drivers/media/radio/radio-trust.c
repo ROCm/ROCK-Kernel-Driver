@@ -31,6 +31,7 @@
 #endif
 
 static int io = CONFIG_RADIO_TRUST_PORT; 
+static int radio_nr = -1;
 static int ioval = 0xf;
 static int users = 0;
 static __u16 curvol;
@@ -303,7 +304,7 @@ static int __init trust_init(void)
 		printk(KERN_ERR "trust: port 0x%x already in use\n", io);
 		return -EBUSY;
 	}
-	if(video_register_device(&trust_radio, VFL_TYPE_RADIO)==-1)
+	if(video_register_device(&trust_radio, VFL_TYPE_RADIO, radio_nr)==-1)
 	{
 		release_region(io, 2);
 		return -EINVAL;
@@ -332,6 +333,7 @@ MODULE_AUTHOR("Eric Lammerts, Russell Kroll, Quay Lu, Donald Song, Jason Lewis, 
 MODULE_DESCRIPTION("A driver for the Trust FM Radio card.");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the Trust FM Radio card (0x350 or 0x358)");
+MODULE_PARM(radio_nr, "i");
 
 EXPORT_NO_SYMBOLS;
 

@@ -1,4 +1,4 @@
-/* $Id: hysdn_defs.h,v 1.5.6.1 2000/11/28 12:02:47 kai Exp $
+/* $Id: hysdn_defs.h,v 1.5.6.2 2001/04/20 02:42:00 keil Exp $
 
  * Linux driver for HYSDN cards, global definitions and exported vars and functions.
  * written by Werner Cornelius (werner@titro.de) for Hypercope GmbH

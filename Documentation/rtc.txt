@@ -89,7 +89,7 @@ that will be using this driver.
 #include <unistd.h>
 #include <errno.h>
 
-void main(void) {
+int main(void) {
 
 int i, fd, retval, irqcount = 0;
 unsigned long tmp, data;
@@ -277,5 +277,6 @@ fprintf(stderr, "\nTyping \"cat /proc/interrupts\" will show %d more events on I
 								 irqcount);
 
 close(fd);
+return 0;
 
 } /* end main */

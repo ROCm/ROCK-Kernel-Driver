@@ -245,6 +245,9 @@ static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
 	struct pci_filp_private *fpriv = file->private_data;
 	int ret;
 
+	if (!capable(CAP_SYS_RAWIO))
+		return -EPERM;
+
 	ret = pci_mmap_page_range(dev, vma,
 				  fpriv->mmap_state,
 				  fpriv->write_combine);

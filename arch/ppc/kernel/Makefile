@@ -57,6 +57,9 @@ endif
 obj-$(CONFIG_MATH_EMULATION)	+= softemu8xx.o
 obj-$(CONFIG_MBX)		+= i8259.o
 obj-$(CONFIG_APUS)		+= apus_setup.o
+ifeq ($(CONFIG_APUS),y)
+obj-$(CONFIG_PCI)		+= apus_pci.o
+endif
 obj-$(CONFIG_ALL_PPC)		+= pmac_pic.o pmac_setup.o pmac_time.o prom.o \
 					feature.o pmac_pci.o chrp_setup.o \
 					chrp_time.o chrp_pci.o 	open_pic.o \

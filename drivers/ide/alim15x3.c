@@ -233,8 +233,8 @@ static int ali_get_info (char *buffer, char **addr, off_t offset, int count)
 }
 #endif  /* defined(DISPLAY_ALI_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-static byte m5229_revision	= 0;
-static byte chip_is_1543c_e	= 0;
+static byte m5229_revision;
+static byte chip_is_1543c_e;
 
 byte ali_proc = 0;
 static struct pci_dev *isa_dev;
@@ -689,7 +689,8 @@ void __init ide_init_ali15x3 (ide_hwif_t *hwif)
 		 * M1543C or newer for DMAing
 		 */
 		hwif->dmaproc = &ali15x3_dmaproc;
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
 	}
 }
 

@@ -1,6 +1,10 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *       1 May 2001 Rev. 6.05 for linux 2.4.4
+ *        + Clean up all pci related routines.
+ *        + Fix data transfer direction for opcode SEND_CUE_SHEET (0x5d)
+ *
  *      30 Jan 2001 Rev. 6.04 for linux 2.4.1
  *        + Call pci_resource_start after pci_enable_device.
  *
@@ -828,77 +832,38 @@ static inline int read_pio(unsigned long iobase, ushort *start, ushort *end) {
    return FALSE;
 }
 
-static inline void tune_pci_port(unsigned long port_base) {
-
-#if defined(CONFIG_PCI)
-
-   unsigned int addr, k;
-   struct pci_dev *dev = NULL;
-
-   if (!pci_present()) return;
-
-   for (k = 0; k < MAX_PCI; k++) {
-
-      if (!(dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) break;
-
-      if (pci_enable_device (dev)) continue;
-
-      addr = pci_resource_start (dev, 0);
-
-#if defined(DEBUG_PCI_DETECT)
-      printk("%s: tune_pci_port, bus %d, devfn 0x%x, addr 0x%x.\n",
-             driver_name, dev->bus->number, dev->devfn, addr);
-#endif
-
-      if ((addr & PCI_BASE_ADDRESS_IO_MASK) + PCI_BASE_ADDRESS_0 == port_base) {
-         pci_set_master(dev);
-         return;
-         }
-
-      }
-
-#endif /* end CONFIG_PCI */
-
-   return;
-}
-
-static inline int
-            get_pci_irq(unsigned long port_base, unsigned char *apic_irq) {
+static inline struct pci_dev *get_pci_dev(unsigned long port_base) {
 
 #if defined(CONFIG_PCI)
 
    unsigned int addr;
    struct pci_dev *dev = NULL;
 
-   if (!pci_present()) return FALSE;
+   if (!pci_present()) return NULL;
 
    while((dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) {
-
-      if (pci_read_config_dword(dev, PCI_BASE_ADDRESS_0, &addr)) continue;
+      addr = pci_resource_start (dev, 0);
 
 #if defined(DEBUG_PCI_DETECT)
-      printk("%s: get_pci_irq, bus %d, devfn 0x%x, addr 0x%x, apic_irq %u.\n",
-             driver_name, dev->bus->number, dev->devfn, addr, dev->irq);
+      printk("%s: get_pci_dev, bus %d, devfn 0x%x, addr 0x%x.\n",
+             driver_name, dev->bus->number, dev->devfn, addr);
 #endif
 
-      if ((addr & PCI_BASE_ADDRESS_IO_MASK) + PCI_BASE_ADDRESS_0 == port_base) {
-         *apic_irq = dev->irq;
-         return TRUE;
-         }
-
+      if (addr + PCI_BASE_ADDRESS_0 == port_base) return dev;
       }
 
 #endif /* end CONFIG_PCI */
 
-   return FALSE;
+   return NULL;
 }
 
 static inline int port_detect \
       (unsigned long port_base, unsigned int j, Scsi_Host_Template *tpnt) {
    unsigned char irq, dma_channel, subversion, i;
-   unsigned char protocol_rev, apic_irq;
+   unsigned char protocol_rev;
    struct eata_info info;
    char *bus_type, dma_name[16], tag_type;
+   struct pci_dev *pdev;
 
    /* Allowed DMA channels for ISA (0 indicates reserved) */
    unsigned char dma_channel_table[4] = { 5, 6, 7, 0 };
@@ -1002,9 +967,11 @@ static inline int port_detect \
       printk("%s: warning, LEVEL triggering is suggested for IRQ %u.\n",
              name, irq);
 
-   if (get_pci_irq(port_base, &apic_irq) && (irq != apic_irq)) {
-      printk("%s: IRQ %u mapped to IO-APIC IRQ %u.\n", name, irq, apic_irq);
-      irq = apic_irq;
+   pdev = get_pci_dev(port_base);
+
+   if (pdev && (irq != pdev->irq)) {
+      printk("%s: IRQ %u mapped to IO-APIC IRQ %u.\n", name, irq, pdev->irq);
+      irq = pdev->irq;
       }
 
    /* Board detected, allocate its IRQ */
@@ -1064,10 +1031,6 @@ static inline int port_detect \
    sh[j]->can_queue = (ushort) ntohs(info.queue_size);
    sh[j]->cmd_per_lun = MAX_CMD_PER_LUN;
    sh[j]->select_queue_depths = select_queue_depths;
-
-   /* Register the I/O space that we use */
-   request_region(sh[j]->io_port, sh[j]->n_io_port, driver_name);
-
    memset(HD(j), 0, sizeof(struct hostdata));
    HD(j)->subversion = subversion;
    HD(j)->protocol_rev = protocol_rev;
@@ -1185,7 +1148,8 @@ static inline int port_detect \
              info.pci, info.eisa, info.raidnum);
 #endif
 
-   tune_pci_port(sh[j]->io_port);
+   if (pdev) pci_set_master(pdev);
+
    return TRUE;
 }
 
@@ -1254,19 +1218,26 @@ static void add_pci_ports(void) {
 
       if (!(dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) break;
 
-      if (pci_read_config_dword(dev, PCI_BASE_ADDRESS_0, &addr)) continue;
+      if (pci_enable_device (dev)) {
+
+#if defined(DEBUG_PCI_DETECT)
+         printk("%s: detect, bus %d, devfn 0x%x, pci_enable_device failed.\n",
+                driver_name, dev->bus->number, dev->devfn);
+#endif
+
+         continue;
+         }
+
+      addr = pci_resource_start (dev, 0);
 
 #if defined(DEBUG_PCI_DETECT)
       printk("%s: detect, seq. %d, bus %d, devfn 0x%x, addr 0x%x.\n",
              driver_name, k, dev->bus->number, dev->devfn, addr);
 #endif
 
-      if ((addr & PCI_BASE_ADDRESS_SPACE) != PCI_BASE_ADDRESS_SPACE_IO)
-             continue;
-
       /* Order addresses according to rev_scan value */
       io_port[MAX_INT_PARAM + (rev_scan ? (MAX_PCI - k) : (1 + k))] =
-             (addr & PCI_BASE_ADDRESS_IO_MASK) + PCI_BASE_ADDRESS_0;
+             addr + PCI_BASE_ADDRESS_0;
       }
 
 #endif /* end CONFIG_PCI */
@@ -1327,7 +1298,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    static const unsigned char data_out_cmds[] = {
       0x0a, 0x2a, 0x15, 0x55, 0x04, 0x07, 0x18, 0x1d, 0x24, 0x2e,
       0x30, 0x31, 0x32, 0x38, 0x39, 0x3a, 0x3b, 0x3d, 0x3f, 0x40,
-      0x41, 0x4c, 0xaa, 0xae, 0xb0, 0xb1, 0xb2, 0xb6, 0xea, 0x1b
+      0x41, 0x4c, 0xaa, 0xae, 0xb0, 0xb1, 0xb2, 0xb6, 0xea, 0x1b, 0x5d
       };
 
    static const unsigned char data_none_cmds[] = {

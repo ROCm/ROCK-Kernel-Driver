@@ -1,93 +1,10 @@
 /*
- * $Id: capiutil.c,v 1.13.6.2 2001/03/15 15:11:24 kai Exp $
+ * $Id: capiutil.c,v 1.13.6.3 2001/05/17 20:41:51 kai Exp $
  *
  * CAPI 2.0 convert capi message to capi message struct
  *
  * From CAPI 2.0 Development Kit AVM 1995 (msg.c)
  * Rewritten for Linux 1996 by Carsten Paeth (calle@calle.in-berlin.de)
- *
- * $Log: capiutil.c,v $
- * Revision 1.13.6.2  2001/03/15 15:11:24  kai
- * *** empty log message ***
- *
- * Revision 1.13.6.1  2001/02/13 11:43:29  kai
- * more compatility changes for 2.2.19
- *
- * Revision 1.13  2000/11/23 20:45:14  kai
- * fixed module_init/exit stuff
- * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
- *
- * Revision 1.12  2000/11/01 14:05:02  calle
- * - use module_init/module_exit from linux/init.h.
- * - all static struct variables are initialized with "membername:" now.
- * - avm_cs.c, let it work with newer pcmcia-cs.
- *
- * Revision 1.11  2000/03/03 15:50:42  calle
- * - kernel CAPI:
- *   - Changed parameter "param" in capi_signal from __u32 to void *.
- *   - rewrote notifier handling in kcapi.c
- *   - new notifier NCCI_UP and NCCI_DOWN
- * - User CAPI:
- *   - /dev/capi20 is now a cloning device.
- *   - middleware extentions prepared.
- * - capidrv.c
- *   - locking of list operations and module count updates.
- *
- * Revision 1.10  1999/08/31 11:19:54  paul
- * various spelling corrections (new checksums may be needed, Karsten!)
- *
- * Revision 1.9  1999/07/09 15:05:46  keil
- * compat.h is now isdn_compat.h
- *
- * Revision 1.8  1999/07/01 15:26:37  calle
- * complete new version (I love it):
- * + new hardware independed "capi_driver" interface that will make it easy to:
- *   - support other controllers with CAPI-2.0 (i.e. USB Controller)
- *   - write a CAPI-2.0 for the passive cards
- *   - support serial link CAPI-2.0 boxes.
- * + wrote "capi_driver" for all supported cards.
- * + "capi_driver" (supported cards) now have to be configured with
- *   make menuconfig, in the past all supported cards where included
- *   at once.
- * + new and better informations in /proc/capi/
- * + new ioctl to switch trace of capi messages per controller
- *   using "avmcapictrl trace [contr] on|off|...."
- * + complete testcircle with all supported cards and also the
- *   PCMCIA cards (now patch for pcmcia-cs-3.0.13 needed) done.
- *
- * Revision 1.7  1999/07/01 08:23:01  keil
- * compatibility macros now in <linux/isdn_compat.h>
- *
- * Revision 1.6  1997/11/04 06:12:12  calle
- * capi.c: new read/write in file_ops since 2.1.60
- * capidrv.c: prepared isdnlog interface for d2-trace in newer firmware.
- * capiutil.c: needs config.h (CONFIG_ISDN_DRV_AVMB1_VERBOSE_REASON)
- * compat.h: added #define LinuxVersionCode
- *
- * Revision 1.5  1997/10/01 09:21:19  fritz
- * Removed old compatibility stuff for 2.0.X kernels.
- * From now on, this code is for 2.1.X ONLY!
- * Old stuff is still in the separate branch.
- *
- * Revision 1.4  1997/08/10 07:43:55  calle
- * forgot to export symbol capi_info2str for 2.1.x
- *
- * Revision 1.3  1997/05/18 09:24:18  calle
- * added verbose disconnect reason reporting to avmb1.
- * some fixes in capi20 interface.
- * changed info messages for B1-PCI
- *
- * Revision 1.2  1997/03/05 21:22:13  fritz
- * Fix: Symbols have to be exported unconditionally.
- *
- * Revision 1.1  1997/03/04 21:50:34  calle
- * Frirst version in isdn4linux
- *
- * Revision 2.2  1997/02/12 09:31:39  calle
- * new version
- *
- * Revision 1.1  1997/01/31 10:32:20  calle
- * Initial revision
  *
  */
 #include <linux/module.h>

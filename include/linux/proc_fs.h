@@ -127,6 +127,11 @@ extern void proc_tty_unregister_driver(struct tty_driver *driver);
  */
 extern void proc_device_tree_init(void);
 
+/*
+ * proc_rtas.c
+ */
+extern void proc_rtas_init(void);
+
 extern struct proc_dir_entry *proc_symlink(const char *,
 		struct proc_dir_entry *, const char *);
 extern struct proc_dir_entry *proc_mknod(const char *,mode_t,

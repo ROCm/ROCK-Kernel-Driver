@@ -11,6 +11,7 @@
  * 2 of the License, or (at your option) any later version.
  *
  * Added PPGETTIME/PPSETTIME, Fred Barnes, 1999
+ * Added PPGETMODES/PPGETMODE/PPGETPHASE, Fred Barnes <frmb2@ukc.ac.uk>, 03/01/2001
  */
 
 #define PP_MAJOR	99
@@ -77,5 +78,24 @@ struct ppdev_frob_struct {
 /* Set and get port timeout (struct timeval's) */
 #define PPGETTIME	_IOR(PP_IOCTL, 0x95, struct timeval)
 #define PPSETTIME	_IOW(PP_IOCTL, 0x96, struct timeval)
+
+/* Get available modes (what the hardware can do) */
+#define PPGETMODES	_IOR(PP_IOCTL, 0x97, unsigned int)
+
+/* Get the current mode and phaze */
+#define PPGETMODE	_IOR(PP_IOCTL, 0x98, int)
+#define PPGETPHASE	_IOR(PP_IOCTL, 0x99, int)
+
+/* get/set flags */
+#define PPGETFLAGS	_IOR(PP_IOCTL, 0x9a, int)
+#define PPSETFLAGS	_IOW(PP_IOCTL, 0x9b, int)
+
+/* flags visible to the world */
+#define PP_FASTWRITE	(1<<2)
+#define PP_FASTREAD	(1<<3)
+#define PP_W91284PIC	(1<<4)
+
+/* only masks user-visible flags */
+#define PP_FLAGMASK	(PP_FASTWRITE | PP_FASTREAD | PP_W91284PIC)
 
 

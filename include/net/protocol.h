@@ -67,7 +67,6 @@ extern struct inet_protocol *inet_protocol_base;
 extern struct inet_protocol *inet_protos[MAX_INET_PROTOS];
 
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-extern struct inet6_protocol *inet6_protocol_base;
 extern struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
 #endif
 

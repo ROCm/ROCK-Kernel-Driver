@@ -25,6 +25,7 @@ CONFIG_EXPERIMENTAL=y
 # CONFIG_ARCH_CLPS7500 is not set
 # CONFIG_ARCH_CO285 is not set
 # CONFIG_ARCH_EBSA110 is not set
+# CONFIG_ARCH_L7200 is not set
 # CONFIG_ARCH_FOOTBRIDGE is not set
 CONFIG_ARCH_INTEGRATOR=y
 # CONFIG_ARCH_RPC is not set
@@ -56,17 +57,27 @@ CONFIG_CPU_32=y
 #
 # Processor Type
 #
+# CONFIG_CPU_32v3 is not set
 CONFIG_CPU_32v4=y
-CONFIG_CPU_ARM720=y
-CONFIG_CPU_ARM920=y
+# CONFIG_CPU_ARM610 is not set
+# CONFIG_CPU_ARM710 is not set
+CONFIG_CPU_ARM720T=y
+CONFIG_CPU_ARM920T=y
 CONFIG_CPU_ARM920_CPU_IDLE=y
 CONFIG_CPU_ARM920_I_CACHE_ON=y
 CONFIG_CPU_ARM920_D_CACHE_ON=y
 # CONFIG_CPU_ARM920_WRITETHROUGH is not set
+# CONFIG_CPU_ARM1020 is not set
+# CONFIG_CPU_SA110 is not set
+# CONFIG_CPU_SA1100 is not set
 # CONFIG_DISCONTIGMEM is not set
 
 #
 # General setup
+#
+
+#
+# Please ensure that you have read the help on the next option
 #
 # CONFIG_ANGELBOOT is not set
 CONFIG_PCI_INTEGRATOR=y
@@ -103,23 +114,32 @@ CONFIG_ALIGNMENT_TRAP=y
 # Memory Technology Devices (MTD)
 #
 CONFIG_MTD=y
+# CONFIG_MTD_DEBUG is not set
+
+#
+# Disk-On-Chip Device Drivers
+#
 # CONFIG_MTD_DOC1000 is not set
 # CONFIG_MTD_DOC2000 is not set
 # CONFIG_MTD_DOC2001 is not set
 # CONFIG_MTD_DOCPROBE is not set
+
+#
+# RAM/ROM Device Drivers
+#
 # CONFIG_MTD_SLRAM is not set
 # CONFIG_MTD_PMC551 is not set
 # CONFIG_MTD_MTDRAM is not set
 
 #
-# MTD drivers for mapped chips
+# Linearly Mapped Flash Device Drivers
 #
 CONFIG_MTD_CFI=y
 CONFIG_MTD_CFI_INTELEXT=y
 # CONFIG_MTD_CFI_AMDSTD is not set
-# CONFIG_MTD_JEDEC is not set
 # CONFIG_MTD_RAM is not set
 # CONFIG_MTD_ROM is not set
+# CONFIG_MTD_JEDEC is not set
 # CONFIG_MTD_PHYSMAP is not set
 
 #
@@ -347,6 +367,8 @@ CONFIG_VT_CONSOLE=y
 CONFIG_SERIAL_AMBA=y
 CONFIG_SERIAL_INTEGRATOR=y
 CONFIG_SERIAL_AMBA_CONSOLE=y
+CONFIG_SERIAL_CORE=y
+CONFIG_SERIAL_CORE_CONSOLE=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_UNIX98_PTY_COUNT=256
 
@@ -403,6 +425,8 @@ CONFIG_PSMOUSE=y
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
@@ -457,8 +481,6 @@ CONFIG_LOCKD=y
 # CONFIG_NCPFS_NFS_NS is not set
 # CONFIG_NCPFS_OS2_NS is not set
 # CONFIG_NCPFS_SMALLDOS is not set
-# CONFIG_NCPFS_MOUNT_SUBDIR is not set
-# CONFIG_NCPFS_NDS_DOMAINS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
 
@@ -475,6 +497,7 @@ CONFIG_PARTITION_ADVANCED=y
 # CONFIG_SGI_PARTITION is not set
 # CONFIG_ULTRIX_PARTITION is not set
 # CONFIG_SUN_PARTITION is not set
+# CONFIG_SMB_NLS is not set
 # CONFIG_NLS is not set
 
 #
@@ -503,7 +526,7 @@ CONFIG_VGA_CONSOLE=y
 #
 # Kernel hacking
 #
-CONFIG_FRAME_POINTER=y
+# CONFIG_NO_FRAME_POINTER is not set
 CONFIG_DEBUG_ERRORS=y
 CONFIG_DEBUG_USER=y
 # CONFIG_DEBUG_INFO is not set

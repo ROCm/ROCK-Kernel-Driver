@@ -261,4 +261,4 @@ the DMA channel, and try with:
     io=0x378 irq=7 dma=3 (for DMA)
 --
 Philip.Blundell@pobox.com
-tim@cyberelk.demon.co.uk
+tim@cyberelk.net

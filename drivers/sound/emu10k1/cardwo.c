@@ -87,7 +87,8 @@ static int alloc_buffer(struct emu10k1_card *card, struct waveout_buffer *buffer
 
 			pageindex = buffer->emupageindex + pagecount * PAGE_SIZE / EMUPAGESIZE + i;
 
-			((u32 *) card->virtualpagetable.addr)[pageindex] = (busaddx * 2) | pageindex;
+			((u32 *) card->virtualpagetable.addr)[pageindex] =
+            cpu_to_le32((busaddx * 2) | pageindex);
 		}
 	}
 

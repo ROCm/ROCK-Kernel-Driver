@@ -1,4 +1,4 @@
-/* $Id: hysdn_if.h,v 1.1.8.1 2001/03/13 16:17:10 kai Exp $
+/* $Id: hysdn_if.h,v 1.1.8.2 2001/05/17 20:41:52 kai Exp $
 
  * Linux driver for HYSDN cards, ioctl definitions shared by hynetmgr and driver.
  * written by Werner Cornelius (werner@titro.de) for Hypercope GmbH
@@ -18,15 +18,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
- * $Log: hysdn_if.h,v $
- * Revision 1.1.8.1  2001/03/13 16:17:10  kai
- * spelling fixes from 2.4.3-pre
- *
- * Revision 1.1  2000/02/10 19:47:50  werner
- *
- * Initial release
- *
  *
  */
 

@@ -15,6 +15,8 @@ _start:
 1:	dcbf	0,9
 	icbi	0,9
 	addi	9,9,0x20
-	cmplwi	0,9,8
+	cmplw	0,9,8
 	blt	1b
+	sync
+	isync
 	b	start

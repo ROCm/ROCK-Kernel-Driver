@@ -2059,9 +2059,10 @@ static int ymfpci_setup_legacy(ymfpci_t *unit, struct pci_dev *pcidev)
 	}
 
 	if (mpuio >= 0 || oplio >= 0) {
-		v = 0x003e;
+		/* 0x0020: 1 - 10 bits of I/O address decoded, 0 - 16 bits. */
+		v = 0x001e;
 		pci_write_config_word(pcidev, PCIR_LEGCTRL, v);
-	
+
 		switch (pcidev->device) {
 		case PCI_DEVICE_ID_YAMAHA_724:
 		case PCI_DEVICE_ID_YAMAHA_740:

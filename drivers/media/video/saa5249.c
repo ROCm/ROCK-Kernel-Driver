@@ -205,7 +205,7 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	 *	Register it
 	 */
 
-	if((err=video_register_device(vd, VFL_TYPE_VTX))<0)
+	if((err=video_register_device(vd, VFL_TYPE_VTX,-1))<0)
 	{
 		kfree(t);
 		kfree(vd);

@@ -30,6 +30,8 @@ char * aci_radio_name;
 #include "../../sound/aci.h"
 
 static int users = 0;
+static int radio_nr = -1;
+MODULE_PARM(radio_nr, "i");
 
 struct pcm20_device
 {
@@ -258,7 +260,7 @@ static struct video_device pcm20_radio=
 
 static int __init pcm20_init(void)
 {
-	if(video_register_device(&pcm20_radio, VFL_TYPE_RADIO)==-1)
+	if(video_register_device(&pcm20_radio, VFL_TYPE_RADIO, radio_nr)==-1)
 		return -EINVAL;
 		
 	if(attach_aci_rds()<0) {

@@ -409,6 +409,12 @@ M:	mvw@planets.elm.net
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+DAVICOM FAST ETHERNET (DMFE) NETWORK DRIVER
+P:	Tobias Ringstrom
+M:	tori@unhappy.mine.nu
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
 DOUBLETALK DRIVER
 P:	James R. Van Zandt
 M:	jrv@vanzandt.mv.com
@@ -995,7 +1001,7 @@ PARALLEL PORT SUPPORT
 P:	Phil Blundell
 M:	Philip.Blundell@pobox.com
 P:	Tim Waugh
-M:	tim@cyberelk.demon.co.uk
+M:	tim@cyberelk.net
 P:	David Campbell
 M:	campbell@torque.net
 P:	Andrea Arcangeli
@@ -1006,7 +1012,7 @@ S:	Maintained
 
 PARIDE DRIVERS FOR PARALLEL PORT IDE DEVICES
 P:	Tim Waugh
-M:	tim@cyberelk.demon.co.uk
+M:	tim@cyberelk.net
 L:	linux-parport@torque.net
 W:	http://www.torque.net/linux-pp.html
 S:	Maintained

@@ -22,6 +22,42 @@
 int tulip_rx_copybreak;
 unsigned int tulip_max_interrupt_work;
 
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+
+#define MIT_SIZE 15
+unsigned int mit_table[MIT_SIZE+1] =
+{
+        /*  CRS11 21143 hardware Mitigation Control Interrupt 
+            We use only RX mitigation we other techniques for 
+            TX intr. mitigation.
+
+           31    Cycle Size (timer control)
+           30:27 TX timer in 16 * Cycle size
+           26:24 TX No pkts before Int.
+           23:20 RX timer in Cycle size
+           19:17 RX No pkts before Int.
+           16       Continues Mode (CM)
+        */
+                         
+        0x0,             /* IM disabled */
+        0x80150000,      /* RX time = 1, RX pkts = 2, CM = 1 */
+        0x80150000,
+        0x80270000,
+        0x80370000,
+        0x80490000,
+        0x80590000,
+        0x80690000,
+        0x807B0000,
+        0x808B0000,
+        0x809D0000,
+        0x80AD0000,
+        0x80BD0000,
+        0x80CF0000,
+        0x80DF0000,
+//       0x80FF0000      /* RX time = 16, RX pkts = 7, CM = 1 */
+        0x80F10000      /* RX time = 16, RX pkts = 0, CM = 1 */
+};
+#endif
 
 
 int tulip_refill_rx(struct net_device *dev)
@@ -70,6 +106,15 @@ static int tulip_rx(struct net_device *dev)
 	int rx_work_limit = tp->dirty_rx + RX_RING_SIZE - tp->cur_rx;
 	int received = 0;
 
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+        int drop = 0, mit_sel = 0;
+
+/* that one buffer is needed for mit activation; or might be a 
+   bug in the ring buffer code; check later -- JHS*/
+
+        if (rx_work_limit >=RX_RING_SIZE) rx_work_limit--;
+#endif
+
 	if (tulip_debug > 4)
 		printk(KERN_DEBUG " In tulip_rx(), entry %d %8.8x.\n", entry,
 			   tp->rx_ring[entry].status);
@@ -116,6 +161,12 @@ static int tulip_rx(struct net_device *dev)
 				tp->stats.rx_length_errors++;
 			}
 #endif
+
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+                        drop = atomic_read(&netdev_dropping);
+                        if (drop)
+                                goto throttle;
+#endif
 			/* Check if the packet is long enough to accept without copying
 			   to a minimally-sized skbuff. */
 			if (pkt_len < tulip_rx_copybreak
@@ -157,7 +208,44 @@ static int tulip_rx(struct net_device *dev)
 				tp->rx_buffers[entry].mapping = 0;
 			}
 			skb->protocol = eth_type_trans(skb, dev);
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+                        mit_sel = 
+#endif
 			netif_rx(skb);
+
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+                        switch (mit_sel) {
+                        case NET_RX_SUCCESS:
+                        case NET_RX_CN_LOW:
+                        case NET_RX_CN_MOD:
+                                break;
+
+                        case NET_RX_CN_HIGH:
+                                rx_work_limit -= NET_RX_CN_HIGH; /* additional*/
+                                break;
+                        case NET_RX_DROP:
+                                rx_work_limit = -1;
+                                break;
+                        default:
+                                printk("unknown feedback return code %d\n", mit_sel);
+                                break;
+                        }
+
+                        drop = atomic_read(&netdev_dropping);
+                        if (drop) {
+throttle:
+                                rx_work_limit = -1;
+                                mit_sel = NET_RX_DROP;
+
+                                if (tp->fc_bit) {
+                                        long ioaddr = dev->base_addr;
+
+                                        /* disable Rx & RxNoBuf ints. */
+                                        outl(tulip_tbl[tp->chip_id].valid_intrs&RX_A_NBF_STOP, ioaddr + CSR7);
+                                        set_bit(tp->fc_bit, &netdev_fc_xoff);
+                                }
+                        }
+#endif
 			dev->last_rx = jiffies;
 			tp->stats.rx_packets++;
 			tp->stats.rx_bytes += pkt_len;
@@ -165,8 +253,41 @@ static int tulip_rx(struct net_device *dev)
 		received++;
 		entry = (++tp->cur_rx) % RX_RING_SIZE;
 	}
+#ifdef CONFIG_NET_HW_FLOWCONTROL
 
+        /* We use this simplistic scheme for IM. It's proven by
+           real life installations. We can have IM enabled
+           continuesly but this would cause unnecessary latency. 
+           Unfortunely we can't use all the NET_RX_* feedback here. 
+           This would turn on IM for devices that is not contributing 
+           to backlog congestion with unnecessary latency. 
+
+           We monitor the the device RX-ring and have:
+
+           HW Interrupt Mitigation either ON or OFF.
+
+           ON:  More then 1 pkt received (per intr.) OR we are dropping 
+           OFF: Only 1 pkt received
+           
+           Note. We only use min and max (0, 15) settings from mit_table */
+
+
+        if( tp->flags &  HAS_INTR_MITIGATION) {
+                if((received > 1 || mit_sel == NET_RX_DROP) 
+                   && tp->mit_sel != 15 ) { 
+                        tp->mit_sel = 15; 
+                        tp->mit_change = 1; /* Force IM change */
+                }
+                if((received <= 1 && mit_sel != NET_RX_DROP) && tp->mit_sel != 0 ) {
+                        tp->mit_sel = 0; 
+                        tp->mit_change = 1; /* Force IM change */
+                }
+        }
+
+        return RX_RING_SIZE+1; /* maxrx+1 */      
+#else
 	return received;
+#endif
 }
 
 
@@ -205,8 +326,22 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				   dev->name, csr5, inl(dev->base_addr + CSR5));
 
 		if (csr5 & (RxIntr | RxNoBuf)) {
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+                        if (tp->fc_bit) {
+                                if (test_bit(tp->fc_bit, &netdev_fc_xoff)) {
+                                        tulip_refill_rx(dev);
+                                } else {
+                                        tulip_refill_rx(dev);
+                                        rx += tulip_rx(dev);
+                                }
+                        } else {        /* not in fc mode */
+                                rx += tulip_rx(dev);
+                                tulip_refill_rx(dev);
+                        }
+#else
 			rx += tulip_rx(dev);
 			tulip_refill_rx(dev);
+#endif
 		}
 
 		if (csr5 & (TxNoBuf | TxDied | TxIntr | TimerInt)) {
@@ -308,9 +443,17 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				}
 			}
 			if (csr5 & RxDied) {		/* Missed a Rx frame. */
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+                                if (tp->fc_bit && !test_bit(tp->fc_bit, &netdev_fc_xoff)) {
+                                        tp->stats.rx_errors++;
+                                        tulip_outl_csr(tp, tp->csr6 | csr6_st | csr6_sr, CSR6);
+                                }
+                                tp->stats.rx_missed_errors += inl(ioaddr + CSR8) & 0xffff;
+#else
 				tp->stats.rx_errors++;
 				tp->stats.rx_missed_errors += inl(ioaddr + CSR8) & 0xffff;
 				tulip_outl_csr(tp, tp->csr6 | csr6_st | csr6_sr, CSR6);
+#endif
 			}
 			/*
 			 * NB: t21142_lnk_change() does a del_timer_sync(), so be careful if this
@@ -344,6 +487,10 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			if (tulip_debug > 2)
 				printk(KERN_ERR "%s: Re-enabling interrupts, %8.8x.\n",
 					   dev->name, csr5);
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+                        if (tp->fc_bit && (test_bit(tp->fc_bit, &netdev_fc_xoff)))
+                          if (net_ratelimit()) printk("BUG!! enabling interupt when FC off (timerintr.) \n");
+#endif
 			outl(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR7);
 			tp->ttimer = 0;
 			oi++;
@@ -356,9 +503,16 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
                        /* Acknowledge all interrupt sources. */
                         outl(0x8001ffff, ioaddr + CSR5);
                         if (tp->flags & HAS_INTR_MITIGATION) {
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+                                if(tp->mit_change) {
+                                        outl(mit_table[tp->mit_sel], ioaddr + CSR11);
+                                        tp->mit_change = 0;
+                                }
+#else
                      /* Josip Loncaric at ICASE did extensive experimentation
 			to develop a good interrupt mitigation setting.*/
                                 outl(0x8b240000, ioaddr + CSR11);
+#endif
                         } else if (tp->chip_id == LC82C168) {
 				/* the LC82C168 doesn't have a hw timer.*/
 				outl(0x00, ioaddr + CSR7);
@@ -366,8 +520,10 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			} else {
                           /* Mask all interrupting sources, set timer to
 				re-enable. */
+#ifndef CONFIG_NET_HW_FLOWCONTROL
                                 outl(((~csr5) & 0x0001ebef) | AbnormalIntr | TimerInt, ioaddr + CSR7);
                                 outl(0x0012, ioaddr + CSR11);
+#endif
                         }
 			break;
 		}

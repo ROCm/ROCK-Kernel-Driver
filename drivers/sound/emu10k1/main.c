@@ -475,7 +475,8 @@ static int __devinit hw_init(struct emu10k1_card *card)
 	}
 
 	for (pagecount = 0; pagecount < MAXPAGES; pagecount++)
-		((u32 *) card->virtualpagetable.addr)[pagecount] = (card->silentpage.dma_handle * 2) | pagecount;
+		((u32 *) card->virtualpagetable.addr)[pagecount] =
+         cpu_to_le32((card->silentpage.dma_handle * 2) | pagecount);
 
 	/* Init page table & tank memory base register */
 	sblive_writeptr_tag(card, 0,
@@ -612,6 +613,10 @@ static int __devinit emu10k1_probe(struct pci_dev *pci_dev, const struct pci_dev
 {
 	struct emu10k1_card *card;
 	u32 subsysvid;
+	int ret;
+
+	if ((ret=pci_enable_device(pci_dev)))
+		return ret;
 
 	if ((card = kmalloc(sizeof(struct emu10k1_card), GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "emu10k1: out of memory\n");
@@ -621,11 +626,6 @@ static int __devinit emu10k1_probe(struct pci_dev *pci_dev, const struct pci_dev
 
 	if (pci_set_dma_mask(pci_dev, EMU10K1_DMA_MASK)) {
 		printk(KERN_ERR "emu10k1: architecture does not support 32bit PCI busmaster DMA\n");
-		kfree(card);
-		return -ENODEV;
-	}
-
-	if (pci_enable_device(pci_dev)) {
 		kfree(card);
 		return -ENODEV;
 	}

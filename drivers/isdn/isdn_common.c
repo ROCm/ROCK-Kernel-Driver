@@ -1,4 +1,4 @@
-/* $Id: isdn_common.c,v 1.114.6.10 2001/04/08 19:14:00 kai Exp $
+/* $Id: isdn_common.c,v 1.114.6.11 2001/04/20 02:41:58 keil Exp $
 
  * Linux ISDN subsystem, common used functions (linklevel).
  *
@@ -51,7 +51,7 @@
 
 isdn_dev *dev;
 
-static char *isdn_revision = "$Revision: 1.114.6.10 $";
+static char *isdn_revision = "$Revision: 1.114.6.11 $";
 
 extern char *isdn_net_revision;
 extern char *isdn_tty_revision;

@@ -30,6 +30,7 @@
 #endif
 
 static int io = CONFIG_RADIO_GEMTEK_PORT; 
+static int radio_nr = -1;
 static int users = 0;
 static spinlock_t lock;
 
@@ -272,7 +273,7 @@ static int __init gemtek_init(void)
 
 	gemtek_radio.priv=&gemtek_unit;
 	
-	if(video_register_device(&gemtek_radio, VFL_TYPE_RADIO)==-1)
+	if(video_register_device(&gemtek_radio, VFL_TYPE_RADIO, radio_nr)==-1)
 	{
 		release_region(io, 4);
 		return -EINVAL;
@@ -295,6 +296,7 @@ MODULE_AUTHOR("Jonas Munsin");
 MODULE_DESCRIPTION("A driver for the GemTek Radio Card");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the GemTek card (0x20c, 0x30c, 0x24c or 0x34c (0x20c or 0x248 have been reported to work for the combined sound/radiocard)).");
+MODULE_PARM(radio_nr, "i");
 
 EXPORT_NO_SYMBOLS;
 

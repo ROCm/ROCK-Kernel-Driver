@@ -2997,7 +2997,7 @@ static int status_resync (char * page, mddev_t * mddev)
 	int sz = 0;
 	unsigned long max_blocks, resync, res, dt, db, rt;
 
-	resync = mddev->curr_resync - atomic_read(&mddev->recovery_active);
+	resync = (mddev->curr_resync - atomic_read(&mddev->recovery_active))/2;
 	max_blocks = mddev->sb->size;
 
 	/*
@@ -3042,7 +3042,7 @@ static int status_resync (char * page, mddev_t * mddev)
 	 */
 	dt = ((jiffies - mddev->resync_mark) / HZ);
 	if (!dt) dt++;
-	db = resync - mddev->resync_mark_cnt;
+	db = resync - (mddev->resync_mark_cnt/2);
 	rt = (dt * ((max_blocks-resync) / (db/100+1)))/100;
 	
 	sz += sprintf(page + sz, " finish=%lu.%lumin", rt / 60, (rt % 60)/6);
@@ -3217,7 +3217,7 @@ MD_DECLARE_WAIT_QUEUE_HEAD(resync_wait);
 
 void md_done_sync(mddev_t *mddev, int blocks, int ok)
 {
-	/* another "blocks" (1K) blocks have been synced */
+	/* another "blocks" (512byte) blocks have been synced */
 	atomic_sub(blocks, &mddev->recovery_active);
 	wake_up(&mddev->recovery_wait);
 	if (!ok) {
@@ -3230,7 +3230,7 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 {
 	mddev_t *mddev2;
-	unsigned int max_blocks, currspeed,
+	unsigned int max_sectors, currspeed,
 		j, window, err, serialize;
 	kdev_t read_disk = mddev_to_kdev(mddev);
 	unsigned long mark[SYNC_MARKS];
@@ -3267,7 +3267,7 @@ recheck:
 
 	mddev->curr_resync = 1;
 
-	max_blocks = mddev->sb->size;
+	max_sectors = mddev->sb->size<<1;
 
 	printk(KERN_INFO "md: syncing RAID array md%d\n", mdidx(mddev));
 	printk(KERN_INFO "md: minimum _guaranteed_ reconstruction speed: %d KB/sec/disc.\n",
@@ -3291,23 +3291,23 @@ recheck:
 	/*
 	 * Tune reconstruction:
 	 */
-	window = MAX_READAHEAD*(PAGE_SIZE/1024);
-	printk(KERN_INFO "md: using %dk window, over a total of %d blocks.\n",window,max_blocks);
+	window = MAX_READAHEAD*(PAGE_SIZE/512);
+	printk(KERN_INFO "md: using %dk window, over a total of %d blocks.\n",window/2,max_sectors/2);
 
 	atomic_set(&mddev->recovery_active, 0);
 	init_waitqueue_head(&mddev->recovery_wait);
 	last_check = 0;
-	for (j = 0; j < max_blocks;) {
-		int blocks;
+	for (j = 0; j < max_sectors;) {
+		int sectors;
 
-		blocks = mddev->pers->sync_request(mddev, j);
+		sectors = mddev->pers->sync_request(mddev, j);
 
-		if (blocks < 0) {
-			err = blocks;
+		if (sectors < 0) {
+			err = sectors;
 			goto out;
 		}
-		atomic_add(blocks, &mddev->recovery_active);
-		j += blocks;
+		atomic_add(sectors, &mddev->recovery_active);
+		j += sectors;
 		mddev->curr_resync = j;
 
 		if (last_check + window > j)
@@ -3325,7 +3325,7 @@ recheck:
 			mark_cnt[next] = j - atomic_read(&mddev->recovery_active);
 			last_mark = next;
 		}
-			
+
 
 		if (md_signal_pending(current)) {
 			/*
@@ -3350,7 +3350,7 @@ repeat:
 		if (md_need_resched(current))
 			schedule();
 
-		currspeed = (j-mddev->resync_mark_cnt)/((jiffies-mddev->resync_mark)/HZ +1) +1;
+		currspeed = (j-mddev->resync_mark_cnt)/2/((jiffies-mddev->resync_mark)/HZ +1) +1;
 
 		if (currspeed > sysctl_speed_limit_min) {
 			current->nice = 19;

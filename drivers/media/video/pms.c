@@ -64,6 +64,7 @@ static int standard 		= 0;	/* 0 - auto 1 - ntsc 2 - pal 3 - secam */
 static int io_port		=	0x250;
 static int data_port		=	0x251;
 static int mem_base		=	0xC8000;
+static int video_nr             =       -1;
 
 	
 
@@ -1040,11 +1041,12 @@ static int __init init_pms_cards(void)
 	pms_device.width=320;
 	pms_swsense(75);
 	pms_resolution(320,240);
-	return video_register_device((struct video_device *)&pms_device, VFL_TYPE_GRABBER);
+	return video_register_device((struct video_device *)&pms_device, VFL_TYPE_GRABBER, video_nr);
 }
 
 MODULE_PARM(io_port,"i");
 MODULE_PARM(mem_base,"i");
+MODULE_PARM(video_nr,"i");
 
 static void __exit shutdown_mediavision(void)
 {

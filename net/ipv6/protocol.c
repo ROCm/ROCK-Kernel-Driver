@@ -5,7 +5,7 @@
  *
  *		PF_INET6 protocol dispatch tables.
  *
- * Version:	$Id: protocol.c,v 1.9 2000/10/03 07:29:01 anton Exp $
+ * Version:	$Id: protocol.c,v 1.10 2001/05/18 02:25:49 davem Exp $
  *
  * Authors:	Pedro Roque	<roque@di.fc.ul.pt>
  *
@@ -13,6 +13,14 @@
  *		modify it under the terms of the GNU General Public License
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
+ */
+
+/*
+ *      Changes:
+ *
+ *      Vince Laviano (vince@cs.stanford.edu)       16 May 2001
+ *      - Removed unused variable 'inet6_protocol_base'
+ *      - Modified inet6_del_protocol() to correctly maintain copy bit.
  */
 
 #include <linux/errno.h>
@@ -32,7 +40,6 @@
 #include <net/ipv6.h>
 #include <net/protocol.h>
 
-struct inet6_protocol *inet6_protocol_base;
 struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
 
 void inet6_add_protocol(struct inet6_protocol *prot)
@@ -80,6 +87,10 @@ int inet6_del_protocol(struct inet6_protocol *prot)
 	}
 
 	p = (struct inet6_protocol *) inet6_protos[hash];
+
+        if (p != NULL && p->protocol == prot->protocol)
+                lp = p;
+
 	while(p != NULL) {
 		/*
 		 * We have to worry if the protocol being deleted is
@@ -91,14 +102,14 @@ int inet6_del_protocol(struct inet6_protocol *prot)
 			 * if we are the last one with this protocol and
 			 * there is a previous one, reset its copy bit.
 			 */
-			if (p->copy == 0 && lp != NULL) 
+			if (prot->copy == 0 && lp != NULL)
 				lp->copy = 0;
 			p->next = prot->next;
 			br_write_unlock_bh(BR_NETPROTO_LOCK);
 			return(0);
 		}
 		if (p->next != NULL && p->next->protocol == prot->protocol) 
-			lp = p;
+			lp = p->next;
 
 		p = (struct inet6_protocol *) p->next;
 	}

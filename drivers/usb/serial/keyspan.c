@@ -1287,7 +1287,21 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 		msg.setPrescaler = 0xff;
 	}
 
-	msg.lcr = USA_DATABITS_8 | STOPBITS_5678_1;
+	msg.lcr = (p_priv->cflag & CSTOPB)? STOPBITS_678_2: STOPBITS_5678_1;
+	switch (p_priv->cflag & CSIZE) {
+	case CS5:
+		msg.lcr |= USA_DATABITS_5;
+		break;
+	case CS6:
+		msg.lcr |= USA_DATABITS_6;
+		break;
+	case CS7:
+		msg.lcr |= USA_DATABITS_7;
+		break;
+	case CS8:
+		msg.lcr |= USA_DATABITS_8;
+		break;
+	}
 	if (p_priv->cflag & PARENB) {
 		/* note USA_PARITY_NONE == 0 */
 		msg.lcr |= (p_priv->cflag & PARODD)?
@@ -1480,7 +1494,21 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 		//msg.setPrescaler = 0xff;
 	}
 
-	msg.lcr = USA_DATABITS_8 | STOPBITS_5678_1;
+	msg.lcr = (p_priv->cflag & CSTOPB)? STOPBITS_678_2: STOPBITS_5678_1;
+	switch (p_priv->cflag & CSIZE) {
+	case CS5:
+		msg.lcr |= USA_DATABITS_5;
+		break;
+	case CS6:
+		msg.lcr |= USA_DATABITS_6;
+		break;
+	case CS7:
+		msg.lcr |= USA_DATABITS_7;
+		break;
+	case CS8:
+		msg.lcr |= USA_DATABITS_8;
+		break;
+	}
 	if (p_priv->cflag & PARENB) {
 		/* note USA_PARITY_NONE == 0 */
 		msg.lcr |= (p_priv->cflag & PARODD)?

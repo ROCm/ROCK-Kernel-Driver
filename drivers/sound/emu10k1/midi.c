@@ -56,7 +56,7 @@ static int midiin_add_buffer(struct emu10k1_mididevice *midi_dev, struct midi_hd
 {
 	struct midi_hdr *midihdr;
 
-	if ((midihdr = (struct midi_hdr *) kmalloc(sizeof(struct midi_hdr *), GFP_KERNEL)) == NULL) {
+	if ((midihdr = (struct midi_hdr *) kmalloc(sizeof(struct midi_hdr), GFP_KERNEL)) == NULL) {
 		ERROR();
 		return -EINVAL;
 	}
@@ -328,7 +328,7 @@ static ssize_t emu10k1_midi_write(struct file *file, const char *buffer, size_t 
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
 
-	if ((midihdr = (struct midi_hdr *) kmalloc(sizeof(struct midi_hdr *), GFP_KERNEL)) == NULL)
+	if ((midihdr = (struct midi_hdr *) kmalloc(sizeof(struct midi_hdr), GFP_KERNEL)) == NULL)
 		return -EINVAL;
 
 	midihdr->bufferlength = count;

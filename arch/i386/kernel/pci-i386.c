@@ -350,3 +350,35 @@ void pcibios_set_master(struct pci_dev *dev)
 	printk("PCI: Setting latency timer of device %s to %d\n", dev->slot_name, lat);
 	pci_write_config_byte(dev, PCI_LATENCY_TIMER, lat);
 }
+
+int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+			enum pci_mmap_state mmap_state, int write_combine)
+{
+	unsigned long prot;
+
+	/* I/O space cannot be accessed via normal processor loads and
+	 * stores on this platform.
+	 */
+	if (mmap_state == pci_mmap_io)
+		return -EINVAL;
+
+	/* Leave vm_pgoff as-is, the PCI space address is the physical
+	 * address on this platform.
+	 */
+	vma->vm_flags |= (VM_SHM | VM_LOCKED | VM_IO);
+
+	prot = pgprot_val(vma->vm_page_prot);
+	if (boot_cpu_data.x86 > 3)
+		prot |= _PAGE_PCD | _PAGE_PWT;
+	vma->vm_page_prot = __pgprot(prot);
+
+	/* Write-combine setting is ignored, it is changed via the mtrr
+	 * interfaces on this platform.
+	 */
+	if (remap_page_range(vma->vm_start, vma->vm_pgoff << PAGE_SHIFT,
+			     vma->vm_end - vma->vm_start,
+			     vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
+}

@@ -12,6 +12,7 @@
  * DMA support - Bert De Jonghe <bert@sophis.be>
  * Many ECP bugs fixed.  Fred Barnes & Jamie Lokier, 1999
  * More PCI support now conditional on CONFIG_PCI, 03/2001, Paul G. 
+ * Various hacks, Fred Barnes, 04/2001
  */
 
 /* This driver should work with any hardware that is broadly compatible
@@ -211,6 +212,7 @@ static int get_fifo_residue (struct parport *p)
 	/* Back to PS2 mode. */
 	frob_econtrol (p, 0xe0, ECR_PS2 << 5);
 
+	DPRINTK (KERN_DEBUG "*** get_fifo_residue: done residue collecting (ecr = 0x%2.2x)\n", inb (ECONTROL (p)));
 	return residue;
 }
 #endif /* IEEE 1284 support */
@@ -367,9 +369,60 @@ static size_t parport_pc_epp_read_data (struct parport *port, void *buf,
 					size_t length, int flags)
 {
 	size_t got = 0;
+
+	if (flags & PARPORT_W91284PIC) {
+		unsigned char status;
+		size_t left = length;
+
+		/* use knowledge about data lines..:
+		 *  nFault is 0 if there is at least 1 byte in the Warp's FIFO
+		 *  pError is 1 if there are 16 bytes in the Warp's FIFO
+		 */
+		status = inb (STATUS (port));
+
+		while (!(status & 0x08) && (got < length)) {
+			if ((left >= 16) && (status & 0x20) && !(status & 0x08)) {
+				/* can grab 16 bytes from warp fifo */
+				if (!((long)buf & 0x03)) {
+					insl (EPPDATA (port), buf, 4);
+				} else {
+					insb (EPPDATA (port), buf, 16);
+				}
+				buf += 16;
+				got += 16;
+				left -= 16;
+			} else {
+				/* grab single byte from the warp fifo */
+				*((char *)buf)++ = inb (EPPDATA (port));
+				got++;
+				left--;
+			}
+			status = inb (STATUS (port));
+			if (status & 0x01) {
+				/* EPP timeout should never occur... */
+				printk (KERN_DEBUG "%s: EPP timeout occured while talking to "
+					"w91284pic (should not have done)\n", port->name);
+				clear_epp_timeout (port);
+			}
+		}
+		return got;
+	}
+	if ((flags & PARPORT_EPP_FAST) && (length > 1)) {
+		if (!(((long)buf | length) & 0x03)) {
+			insl (EPPDATA (port), buf, (length >> 2));
+		} else {
+			insb (EPPDATA (port), buf, length);
+		}
+		if (inb (STATUS (port)) & 0x01) {
+			clear_epp_timeout (port);
+			return -EIO;
+		}
+		return length;
+	}
 	for (; got < length; got++) {
 		*((char*)buf)++ = inb (EPPDATA(port));
-		if (inb (STATUS(port)) & 0x01) {
+		if (inb (STATUS (port)) & 0x01) {
+			/* EPP timeout */
 			clear_epp_timeout (port);
 			break;
 		}
@@ -382,6 +435,19 @@ static size_t parport_pc_epp_write_data (struct parport *port, const void *buf,
 					 size_t length, int flags)
 {
 	size_t written = 0;
+
+	if ((flags & PARPORT_EPP_FAST) && (length > 1)) {
+		if (!(((long)buf | length) & 0x03)) {
+			outsl (EPPDATA (port), buf, (length >> 2));
+		} else {
+			outsb (EPPDATA (port), buf, length);
+		}
+		if (inb (STATUS (port)) & 0x01) {
+			clear_epp_timeout (port);
+			return -EIO;
+		}
+		return length;
+	}
 	for (; written < length; written++) {
 		outb (*((char*)buf)++, EPPDATA(port));
 		if (inb (STATUS(port)) & 0x01) {
@@ -397,6 +463,15 @@ static size_t parport_pc_epp_read_addr (struct parport *port, void *buf,
 					size_t length, int flags)
 {
 	size_t got = 0;
+
+	if ((flags & PARPORT_EPP_FAST) && (length > 1)) {
+		insb (EPPADDR (port), buf, length);
+		if (inb (STATUS (port)) & 0x01) {
+			clear_epp_timeout (port);
+			return -EIO;
+		}
+		return length;
+	}
 	for (; got < length; got++) {
 		*((char*)buf)++ = inb (EPPADDR (port));
 		if (inb (STATUS (port)) & 0x01) {
@@ -413,6 +488,15 @@ static size_t parport_pc_epp_write_addr (struct parport *port,
 					 int flags)
 {
 	size_t written = 0;
+
+	if ((flags & PARPORT_EPP_FAST) && (length > 1)) {
+		outsb (EPPADDR (port), buf, length);
+		if (inb (STATUS (port)) & 0x01) {
+			clear_epp_timeout (port);
+			return -EIO;
+		}
+		return length;
+	}
 	for (; written < length; written++) {
 		outb (*((char*)buf)++, EPPADDR (port));
 		if (inb (STATUS (port)) & 0x01) {
@@ -500,7 +584,8 @@ static size_t parport_pc_fifo_write_block_pio (struct parport *port,
 
 	/* We don't want to be interrupted every character. */
 	parport_pc_disable_irq (port);
-	frob_econtrol (port, (1<<4), (1<<4)); /* nErrIntrEn */
+	/* set nErrIntrEn and serviceIntr */
+	frob_econtrol (port, (1<<4) | (1<<2), (1<<4) | (1<<2));
 
 	/* Forward mode. */
 	parport_pc_data_forward (port); /* Must be in PS2 mode */
@@ -575,6 +660,7 @@ static size_t parport_pc_fifo_write_block_pio (struct parport *port,
 		left--;
         }
 
+dump_parport_state ("leave fifo_write_block_dma", port);
 	return length - left;
 }
 
@@ -590,6 +676,7 @@ static size_t parport_pc_fifo_write_block_dma (struct parport *port,
 	unsigned long start = (unsigned long) buf;
 	unsigned long end = (unsigned long) buf + length - 1;
 
+dump_parport_state ("enter fifo_write_block_dma", port);
 	if (end < MAX_DMA_ADDRESS) {
 		/* If it would cross a 64k boundary, cap it at the end. */
 		if ((start ^ end) & ~0xffffUL)
@@ -608,7 +695,8 @@ static size_t parport_pc_fifo_write_block_dma (struct parport *port,
 
 	/* We don't want to be interrupted every character. */
 	parport_pc_disable_irq (port);
-	frob_econtrol (port, (1<<4), (1<<4)); /* nErrIntrEn */
+	/* set nErrIntrEn and serviceIntr */
+	frob_econtrol (port, (1<<4) | (1<<2), (1<<4) | (1<<2));
 
 	/* Forward mode. */
 	parport_pc_data_forward (port); /* Must be in PS2 mode */
@@ -698,6 +786,7 @@ static size_t parport_pc_fifo_write_block_dma (struct parport *port,
 	if (dma_handle)
 		pci_unmap_single(priv->dev, dma_handle, length, PCI_DMA_TODEVICE);
 
+dump_parport_state ("leave fifo_write_block_dma", port);
 	return length - left;
 }
 
@@ -740,10 +829,10 @@ size_t parport_pc_compat_write_block_pio (struct parport *port,
 
 		/* Adjust for the contents of the FIFO. */
 		for (written -= priv->fifo_depth; ; written++) {
-			if (inb (ECONTROL (port)) & 0x2)
+			if (inb (ECONTROL (port)) & 0x2) {
 				/* Full up. */
 				break;
-
+			}
 			outb (0, FIFO (port));
 		}
 
@@ -791,9 +880,10 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 		r = parport_wait_peripheral (port,
 					     PARPORT_STATUS_PAPEROUT,
 					     PARPORT_STATUS_PAPEROUT);
-		if (r)
+		if (r) {
 			printk (KERN_DEBUG "%s: PError timeout (%d) "
 				"in ecp_write_block_pio\n", port->name, r);
+		}
 	}
 
 	/* Set up ECP parallel port mode.*/
@@ -824,10 +914,10 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 
 		/* Adjust for the contents of the FIFO. */
 		for (written -= priv->fifo_depth; ; written++) {
-			if (inb (ECONTROL (port)) & 0x2)
+			if (inb (ECONTROL (port)) & 0x2) {
 				/* Full up. */
 				break;
-
+			}
 			outb (0, FIFO (port));
 		}
 
@@ -879,58 +969,99 @@ size_t parport_pc_ecp_read_block_pio (struct parport *port,
 	char *bufp = buf;
 
 	port = port->physport;
+DPRINTK (KERN_DEBUG "parport_pc: parport_pc_ecp_read_block_pio\n");
+dump_parport_state ("enter fcn", port);
 
 	/* Special case: a timeout of zero means we cannot call schedule(). */
 	if (!port->cad->timeout)
 		return parport_ieee1284_ecp_read_data (port, buf,
 						       length, flags);
 
-	fifofull = fifo_depth;
-	if (port->ieee1284.mode == IEEE1284_MODE_ECPRLE)
+	if (port->ieee1284.mode == IEEE1284_MODE_ECPRLE) {
 		/* If the peripheral is allowed to send RLE compressed
 		 * data, it is possible for a byte to expand to 128
 		 * bytes in the FIFO. */
 		fifofull = 128;
+	} else {
+		fifofull = fifo_depth;
+	}
 
 	/* If the caller wants less than a full FIFO's worth of data,
-	 * go through software emulation.  Otherwise we may have to through
+	 * go through software emulation.  Otherwise we may have to throw
 	 * away data. */
 	if (length < fifofull)
 		return parport_ieee1284_ecp_read_data (port, buf,
 						       length, flags);
 
-	/* Switch to reverse mode if necessary. */
-	if ((port->ieee1284.phase != IEEE1284_PH_REV_IDLE) &&
-	    (port->ieee1284.phase != IEEE1284_PH_REV_DATA)) {
-		/* Event 38: Set nAutoFd low */
+	if (port->ieee1284.phase != IEEE1284_PH_REV_IDLE) {
+		/* change to reverse-idle phase (must be in forward-idle) */
+
+		/* Event 38: Set nAutoFd low (also make sure nStrobe is high) */
 		parport_frob_control (port,
-				      PARPORT_CONTROL_AUTOFD,
+				      PARPORT_CONTROL_AUTOFD
+				      | PARPORT_CONTROL_STROBE,
 				      PARPORT_CONTROL_AUTOFD);
 		parport_pc_data_reverse (port); /* Must be in PS2 mode */
 		udelay (5);
-
 		/* Event 39: Set nInit low to initiate bus reversal */
 		parport_frob_control (port,
 				      PARPORT_CONTROL_INIT,
 				      0);
-
-		/* Event 40: PError goes low */
+		/* Event 40: Wait for  nAckReverse (PError) to go low */
 		r = parport_wait_peripheral (port, PARPORT_STATUS_PAPEROUT, 0);
-                if (r)
+                if (r) {
                         printk (KERN_DEBUG "%s: PE timeout Event 40 (%d) "
 				"in ecp_read_block_pio\n", port->name, r);
+			return 0;
+		}
 	}
 
 	/* Set up ECP FIFO mode.*/
-	parport_pc_data_reverse (port); /* Must be in PS2 mode */
-	parport_pc_frob_control (port,
+/*	parport_pc_frob_control (port,
 				 PARPORT_CONTROL_STROBE |
 				 PARPORT_CONTROL_AUTOFD,
-				 0);
+				 PARPORT_CONTROL_AUTOFD); */
 	r = change_mode (port, ECR_ECP); /* ECP FIFO */
 	if (r) printk (KERN_DEBUG "%s: Warning change_mode ECR_ECP failed\n", port->name);
+
 	port->ieee1284.phase = IEEE1284_PH_REV_DATA;
 
+	/* the first byte must be collected manually */
+dump_parport_state ("pre 43", port);
+	/* Event 43: Wait for nAck to go low */
+	r = parport_wait_peripheral (port, PARPORT_STATUS_ACK, 0);
+	if (r) {
+		/* timed out while reading -- no data */
+		printk (KERN_DEBUG "PIO read timed out (initial byte)\n");
+		goto out_no_data;
+	}
+	/* read byte */
+	*bufp++ = inb (DATA (port));
+	left--;
+dump_parport_state ("43-44", port);
+	/* Event 44: nAutoFd (HostAck) goes high to acknowledge */
+	parport_pc_frob_control (port,
+				 PARPORT_CONTROL_AUTOFD,
+				 0);
+dump_parport_state ("pre 45", port);
+	/* Event 45: Wait for nAck to go high */
+/*	r = parport_wait_peripheral (port, PARPORT_STATUS_ACK, PARPORT_STATUS_ACK); */
+dump_parport_state ("post 45", port);
+r = 0;
+	if (r) {
+		/* timed out while waiting for peripheral to respond to ack */
+		printk (KERN_DEBUG "ECP PIO read timed out (waiting for nAck)\n");
+
+		/* keep hold of the byte we've got already */
+		goto out_no_data;
+	}
+	/* Event 46: nAutoFd (HostAck) goes low to accept more data */
+	parport_pc_frob_control (port,
+				 PARPORT_CONTROL_AUTOFD,
+				 PARPORT_CONTROL_AUTOFD);
+
+
+dump_parport_state ("rev idle", port);
 	/* Do the transfer. */
 	while (left > fifofull) {
 		int ret;
@@ -949,31 +1080,35 @@ size_t parport_pc_ecp_read_block_pio (struct parport *port,
 
 		if (ecrval & 0x01) {
 			/* FIFO is empty. Wait for interrupt. */
+dump_parport_state ("FIFO empty", port);
 
 			/* Anyone else waiting for the port? */
 			if (port->waithead) {
-				printk (KERN_DEBUG
-					"Somebody wants the port\n");
+				printk (KERN_DEBUG "Somebody wants the port\n");
 				break;
 			}
 
 			/* Clear serviceIntr */
 			outb (ecrval & ~(1<<2), ECONTROL (port));
 		false_alarm:
+dump_parport_state ("waiting", port);
 			ret = parport_wait_event (port, HZ);
-			if (ret < 0) break;
+DPRINTK (KERN_DEBUG "parport_wait_event returned %d\n", ret);
+			if (ret < 0)
+				break;
 			ret = 0;
 			if (!time_before (jiffies, expire)) {
 				/* Timed out. */
+dump_parport_state ("timeout", port);
 				printk (KERN_DEBUG "PIO read timed out\n");
 				break;
 			}
 			ecrval = inb (ECONTROL (port));
 			if (!(ecrval & (1<<2))) {
 				if (current->need_resched &&
-				    time_before (jiffies, expire))
+				    time_before (jiffies, expire)) {
 					schedule ();
-
+				}
 				goto false_alarm;
 			}
 
@@ -986,11 +1121,14 @@ size_t parport_pc_ecp_read_block_pio (struct parport *port,
 
 		if (ecrval & 0x02) {
 			/* FIFO is full. */
+dump_parport_state ("FIFO full", port);
 			insb (fifo, bufp, fifo_depth);
 			bufp += fifo_depth;
 			left -= fifo_depth;
 			continue;
 		}
+
+DPRINTK (KERN_DEBUG "*** ecp_read_block_pio: reading one byte from the FIFO\n");
 
 		/* FIFO not filled.  We will cycle this loop for a while
                  * and either the peripheral will fill it faster,
@@ -999,17 +1137,29 @@ size_t parport_pc_ecp_read_block_pio (struct parport *port,
 		left--;
 	}
 
-	port->ieee1284.phase = IEEE1284_PH_REV_IDLE;
+	/* scoop up anything left in the FIFO */
+	while (left && !(inb (ECONTROL (port) & 0x01))) {
+		*bufp++ = inb (fifo);
+		left--;
+	}
 
-	/* Go to forward idle mode to shut the peripheral up. */
-	parport_frob_control (port, PARPORT_CONTROL_INIT, 0);
+	port->ieee1284.phase = IEEE1284_PH_REV_IDLE;
+dump_parport_state ("rev idle2", port);
+
+out_no_data:
+
+	/* Go to forward idle mode to shut the peripheral up (event 47). */
+	parport_frob_control (port, PARPORT_CONTROL_INIT, PARPORT_CONTROL_INIT);
+
+	/* event 49: PError goes high */
 	r = parport_wait_peripheral (port,
 				     PARPORT_STATUS_PAPEROUT,
 				     PARPORT_STATUS_PAPEROUT);
-	if (r)
+	if (r) {
 		printk (KERN_DEBUG
 			"%s: PE timeout FWDIDLE (%d) in ecp_read_block_pio\n",
 			port->name, r);
+	}
 
 	port->ieee1284.phase = IEEE1284_PH_FWD_IDLE;
 
@@ -1022,12 +1172,20 @@ size_t parport_pc_ecp_read_block_pio (struct parport *port,
 				port->name, lost);
 	}
 
+dump_parport_state ("fwd idle", port);
 	return length - left;
 }
 
 #endif /* IEEE 1284 support */
-
 #endif /* Allowed to use FIFO/DMA */
+
+
+/*
+ *	******************************************
+ *	INITIALISATION AND MODULE STUFF BELOW HERE
+ *	******************************************
+ */
+
 
 void parport_pc_inc_use_count(void)
 {
@@ -1756,17 +1914,19 @@ static int __devinit parport_EPP_supported(struct parport *pb)
 	 */
 
 	/* If EPP timeout bit clear then EPP available */
-	if (!clear_epp_timeout(pb))
+	if (!clear_epp_timeout(pb)) {
 		return 0;  /* No way to clear timeout */
+	}
 
 	/* Check for Intel bug. */
 	if (priv->ecr) {
 		unsigned char i;
 		for (i = 0x00; i < 0x80; i += 0x20) {
 			outb (i, ECONTROL (pb));
-			if (clear_epp_timeout (pb))
+			if (clear_epp_timeout (pb)) {
 				/* Phony EPP in ECP. */
 				return 0;
+			}
 		}
 	}
 
@@ -1787,8 +1947,9 @@ static int __devinit parport_ECPEPP_supported(struct parport *pb)
 	int result;
 	unsigned char oecr;
 
-	if (!priv->ecr)
+	if (!priv->ecr) {
 		return 0;
+	}
 
 	oecr = inb (ECONTROL (pb));
 	/* Search for SMC style EPP+ECP mode */
@@ -1930,10 +2091,11 @@ static int __devinit parport_irq_probe(struct parport *pb)
 		pb->irq = programmable_irq_support(pb);
 	}
 
-	if (pb->modes & PARPORT_MODE_ECP)
+	if (pb->modes & PARPORT_MODE_ECP) {
 		pb->irq = irq_probe_ECP(pb);
+	}
 
-	if (pb->irq == PARPORT_IRQ_NONE && priv->ecr &&
+	if ((pb->irq == PARPORT_IRQ_NONE) && priv->ecr &&
 	    (pb->modes & PARPORT_MODE_EPP))
 		pb->irq = irq_probe_EPP(pb);
 
@@ -1978,11 +2140,12 @@ static int __devinit parport_dma_probe (struct parport *p)
 	const struct parport_pc_private *priv = p->private_data;
 	if (priv->ecr)
 		p->dma = programmable_dma_support(p); /* ask ECP chipset first */
-	if (p->dma == PARPORT_DMA_NONE)
+	if (p->dma == PARPORT_DMA_NONE) {
 		/* ask known Super-IO chips proper, although these
 		   claim ECP compatible, some don't report their DMA
 		   conforming to ECP standards */
 		p->dma = get_superio_dma(p);
+	}
 
 	return p->dma;
 }
@@ -2092,6 +2255,8 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 		p->ops->compat_write_data = parport_pc_compat_write_block_pio;
 #ifdef CONFIG_PARPORT_1284
 		p->ops->ecp_write_data = parport_pc_ecp_write_block_pio;
+		/* currently broken, but working on it.. (FB) */
+		/* p->ops->ecp_read_data = parport_pc_ecp_read_block_pio; */
 #endif /* IEEE 1284 support */
 		if (p->dma != PARPORT_DMA_NONE) {
 			printk(", dma %d", p->dma);
@@ -2576,7 +2741,7 @@ static int __init parport_pc_init_superio (int autoirq, int autodma)
 }
 #else
 static struct pci_driver parport_pc_pci_driver;
-static int __init parport_pc_init_superio(void) {return 0;}
+static int __init parport_pc_init_superio(int autoirq, int autodma) {return 0;}
 #endif /* CONFIG_PCI */
 
 /* This is called by parport_pc_find_nonpci_ports (in asm/parport.h) */

@@ -27,13 +27,11 @@
  */
 
 
+#include "eicon.h"
 #include "sys.h"
 #include <stdarg.h>
 #undef MAX
 #undef MIN
-
-#include <sys/types.h>
-#include <sys/param.h>
 
 #include "divas.h"
 #include "divalog.h"

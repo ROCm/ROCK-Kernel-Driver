@@ -136,9 +136,9 @@ pci_setup_bridge(struct pci_bus *bus)
 	ranges.mem_end = bus->resource[1]->end;
 	pcibios_fixup_pbus_ranges(bus, &ranges);
 
-	DBGC(("PCI: Bus %d, bridge: %s\n", bus->number, bridge->name));
-	DBGC(("  IO window: %04lx-%04lx\n", ranges.io_start, ranges.io_end));
-	DBGC(("  MEM window: %08lx-%08lx\n", ranges.mem_start, ranges.mem_end));
+	DBGC((KERN_ERR "PCI: Bus %d, bridge: %s\n", bus->number, bridge->name));
+	DBGC((KERN_ERR "  IO window: %04lx-%04lx\n", ranges.io_start, ranges.io_end));
+	DBGC((KERN_ERR "  MEM window: %08lx-%08lx\n", ranges.mem_start, ranges.mem_end));
 
 	/* Set up the top and bottom of the PCI I/O segment for this bus. */
 	pci_read_config_dword(bridge, PCI_IO_BASE, &l);

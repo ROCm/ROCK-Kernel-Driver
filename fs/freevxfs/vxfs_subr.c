@@ -1,0 +1,149 @@
+/*
+ * Copyright (c) 2000-2001 Christoph Hellwig.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL").
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#ident "$Id: vxfs_subr.c,v 1.3 2001/04/24 19:28:36 hch Exp hch $"
+
+/*
+ * Veritas filesystem driver - shared subroutines.
+ */
+#include <linux/fs.h>
+#include <linux/kernel.h>
+#include <linux/slab.h>
+
+#include "vxfs_extern.h"
+
+
+static int		vxfs_readpage(struct file *, struct page *);
+static int		vxfs_bmap(struct address_space *, long);
+
+struct address_space_operations vxfs_aops = {
+	.readpage =		vxfs_readpage,
+	.bmap =			vxfs_bmap
+};
+
+
+/**
+ * vxfs_bread - read buffer for a give inode,block tuple
+ * @ip:		inode
+ * @block:	logical block
+ *
+ * Description:
+ *   The vxfs_bread function performs a bmap operation for
+ *   the given inode and block and reads the result block
+ *   into main memory.
+ *
+ * Returns:
+ *   The resulting &struct buffer_head.
+ */
+struct buffer_head *
+vxfs_bread(struct inode *ip, int block)
+{
+	struct buffer_head	*bp;
+	daddr_t			pblock;
+
+	pblock = vxfs_bmap1(ip, block);
+	bp = bread(ip->i_dev, pblock, ip->i_sb->s_blocksize);
+
+	return (bp);
+}
+
+/**
+ * vxfs_get_block - locate buffer for given inode,block tuple 
+ * @ip:		inode
+ * @iblock:	logical block
+ * @bp:		buffer skeleton
+ * @create:	%TRUE if blocks may be newly allocated.
+ *
+ * Description:
+ *   The vxfs_get_block function fills @bp with the right physical
+ *   block and device number to perform a lowlevel read/write on
+ *   it.
+ *
+ * Returns:
+ *   Zero on success, else a negativ error code (-EIO).
+ */
+static int
+vxfs_getblk(struct inode *ip, long iblock,
+	    struct buffer_head *bp, int create)
+{
+	daddr_t			pblock;
+
+	pblock = vxfs_bmap1(ip, iblock);
+	if (pblock != 0) {
+		bp->b_dev = ip->i_dev;
+		bp->b_blocknr = pblock;
+		bp->b_state |= (1UL << BH_Mapped);
+
+		return 0;
+	}
+
+	return -EIO;
+}
+
+/**
+ * vxfs_readpage - read one page synchronously into the pagecache
+ * @file:	file context (unused)
+ * @page:	page frame to fill in.
+ *
+ * Description:
+ *   The vxfs_readpage routine reads @page synchronously into the
+ *   pagecache.
+ *
+ * Returns:
+ *   Zero on success, else a negative error code.
+ *
+ * Locking status:
+ *   @page is locked and will be unlocked.
+ */
+static int
+vxfs_readpage(struct file *file, struct page *page)
+{
+	return block_read_full_page(page, vxfs_getblk);
+}
+ 
+/**
+ * vxfs_bmap - perform logical to physical block mapping
+ * @mapping:	logical to physical mapping to use
+ * @block:	logical block (relative to @mapping).
+ *
+ * Description:
+ *   Vxfs_bmap find out the corresponding phsical block to the
+ *   @mapping, @block pair.
+ *
+ * Returns:
+ *   Physical block number on success, else Zero.
+ *
+ * Locking status:
+ *   We are under the bkl.
+ */
+static int
+vxfs_bmap(struct address_space *mapping, long block)
+{
+	return generic_block_bmap(mapping, block, vxfs_getblk);
+}

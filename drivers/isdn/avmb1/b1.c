@@ -120,6 +120,7 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/capi.h>
+#include <linux/kernelcapi.h>
 #include <asm/io.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>
@@ -129,7 +130,7 @@
 #include "capicmd.h"
 #include "capiutil.h"
 
-static char *revision = "$Revision: 1.20.6.4 $";
+static char *revision = "$Revision: 1.20.6.6 $";
 
 /* ------------------------------------------------------------- */
 
@@ -374,7 +375,7 @@ int b1_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 	cli();
 	b1_setinterrupt(port, card->irq, card->cardtype);
 	b1_put_byte(port, SEND_INIT);
-	b1_put_word(port, AVM_NAPPS);
+	b1_put_word(port, CAPI_MAXAPPL);
 	b1_put_word(port, AVM_NCCI_PER_CHANNEL*2);
 	b1_put_word(port, ctrl->cnr - 1);
 	restore_flags(flags);

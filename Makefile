@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 5
-EXTRAVERSION =-pre3
+EXTRAVERSION =-pre4
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -118,11 +118,7 @@ export SVGA_MODE = -DSVGA_MODE=NORMAL_VGA
 
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 NETWORKS	=net/network.o
-DRIVERS		=drivers/block/block.o \
-		 drivers/char/char.o \
-		 drivers/misc/misc.o \
-		 drivers/net/net.o \
-		 drivers/media/media.o
+
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=kernel drivers mm fs net ipc lib
 
@@ -132,6 +128,11 @@ DRIVERS-m :=
 DRIVERS-  :=
 
 DRIVERS-$(CONFIG_PARPORT) += drivers/parport/driver.o
+DRIVERS-y += drivers/char/char.o \
+	drivers/block/block.o \
+	drivers/misc/misc.o \
+	drivers/net/net.o \
+	drivers/media/media.o
 DRIVERS-$(CONFIG_AGP) += drivers/char/agp/agp.o
 DRIVERS-$(CONFIG_DRM) += drivers/char/drm/drm.o
 DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
@@ -177,7 +178,7 @@ DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
 DRIVERS-$(CONFIG_ACPI) += drivers/acpi/acpi.o
 DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
 
-DRIVERS += $(DRIVERS-y)
+DRIVERS := $(DRIVERS-y)
 
 
 # files removed with 'make clean'

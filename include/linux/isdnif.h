@@ -1,4 +1,4 @@
-/* $Id: isdnif.h,v 1.37 2000/11/19 17:01:54 kai Exp $
+/* $Id: isdnif.h,v 1.37.6.2 2001/05/17 21:15:34 kai Exp $
 
  * Linux ISDN subsystem
  *
@@ -23,12 +23,9 @@
  *
  */
 
-#ifndef isdnif_h
-#define isdnif_h
+#ifndef __ISDNIF_H__
+#define __ISDNIF_H__
 
-#ifdef __KERNEL__
-#include <linux/config.h>
-#endif
 
 /*
  * Values for general protocol-selection
@@ -69,6 +66,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/skbuff.h>
 
 /***************************************************************************/
@@ -562,4 +560,5 @@ extern int register_isdn(isdn_if*);
 #include <asm/uaccess.h>
 
 #endif /* __KERNEL__ */
-#endif /* isdnif_h */
+
+#endif /* __ISDNIF_H__ */

@@ -35,6 +35,7 @@
 #define RDS_BUFFER 256
 
 static int io=-1;		/* default to isapnp activation */
+static int radio_nr = -1;
 static int users=0;
 static int curtuner=0;
 static int tunestat=0;
@@ -616,7 +617,7 @@ static int __init cadet_init(void)
 	}
 	if (!request_region(io,2,"cadet"))
 		return -EBUSY;
-	if(video_register_device(&cadet_radio,VFL_TYPE_RADIO)==-1) {
+	if(video_register_device(&cadet_radio,VFL_TYPE_RADIO,radio_nr)==-1) {
 		release_region(io,2);
 		return -EINVAL;
 	}
@@ -630,6 +631,7 @@ MODULE_AUTHOR("Fred Gleason, Russell Kroll, Quay Lu, Donald Song, Jason Lewis, S
 MODULE_DESCRIPTION("A driver for the ADS Cadet AM/FM/RDS radio card.");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of Cadet card (0x330,0x332,0x334,0x336,0x338,0x33a,0x33c,0x33e)");
+MODULE_PARM(radio_nr, "i");
 
 static struct isapnp_device_id id_table[] __devinitdata = {
 	{ 	ISAPNP_ANY_ID, ISAPNP_ANY_ID,

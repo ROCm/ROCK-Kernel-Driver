@@ -121,7 +121,7 @@ pci_assign_resource(struct pci_dev *dev, int i)
 		}
 	}
 
-	DBGC(("  got res[%lx:%lx] for resource %d of %s\n", res->start,
+	DBGC((KERN_ERR "  got res[%lx:%lx] for resource %d of %s\n", res->start,
 						res->end, i, dev->name));
 
 	return 0;
@@ -165,7 +165,7 @@ pdev_sort_resources(struct pci_dev *dev,
 			if (r_size > size) {
 				tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
 				if (!tmp) {
-					printk("pdev_sort_resources(): kmalloc() failed!\n");
+					printk(KERN_ERR "pdev_sort_resources(): kmalloc() failed!\n");
 					continue;
 				}
 				tmp->next = ln;
@@ -185,7 +185,7 @@ pdev_enable_device(struct pci_dev *dev)
 	u16 cmd;
 	int i;
 
-	DBGC(("PCI enable device: (%s)\n", dev->name));
+	DBGC((KERN_ERR "PCI enable device: (%s)\n", dev->name));
 
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 
@@ -230,5 +230,5 @@ pdev_enable_device(struct pci_dev *dev)
 	/* Enable the appropriate bits in the PCI command register.  */
 	pci_write_config_word(dev, PCI_COMMAND, cmd);
 
-	DBGC(("  cmd reg 0x%x\n", cmd));
+	DBGC((KERN_ERR "  cmd reg 0x%x\n", cmd));
 }

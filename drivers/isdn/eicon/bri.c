@@ -21,8 +21,7 @@
  *
  */
 
-#include <sys/types.h>
-
+#include "eicon.h"
 #include "sys.h"
 #include "idi.h"
 #include "divas.h"
@@ -33,9 +32,6 @@
 #include "adapter.h"
 #include "uxio.h"
 
-#define PCI_COMMAND	0x04
-#define PCI_STATUS	0x06
-#define PCI_LATENCY	0x0D
 #define PCI_BADDR0	0x10
 #define PCI_BADDR1	0x14
 #define PCI_BADDR2	0x18

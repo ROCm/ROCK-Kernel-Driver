@@ -101,8 +101,10 @@ static int context_thread(void *dummy)
 		if (signal_pending(curtask)) {
 			while (waitpid(-1, (unsigned int *)0, __WALL|WNOHANG) > 0)
 				;
+			spin_lock_irq(&curtask->sigmask_lock);
 			flush_signals(curtask);
 			recalc_sigpending(curtask);
+			spin_unlock_irq(&curtask->sigmask_lock);
 		}
 	}
 }

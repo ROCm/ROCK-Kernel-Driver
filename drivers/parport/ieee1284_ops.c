@@ -10,6 +10,7 @@
  *
  * Author: Tim Waugh <tim@cyberelk.demon.co.uk>
  * Fixed AUTOFD polarity in ecp_forward_to_reverse().  Fred Barnes, 1999
+ * Software emulated EPP fixes, Fred Barnes, 04/2001.
  */
 
 
@@ -18,7 +19,7 @@
 #include <linux/delay.h>
 #include <asm/uaccess.h>
 
-#define DEBUG /* undef me for production */
+#undef DEBUG /* undef me for production */
 
 #ifdef CONFIG_LP_CONSOLE
 #undef DEBUG /* Don't want a garbled console */
@@ -725,31 +726,32 @@ size_t parport_ieee1284_epp_write_data (struct parport *port,
 					const void *buffer, size_t len,
 					int flags)
 {
-	/* This is untested */
 	unsigned char *bp = (unsigned char *) buffer;
 	size_t ret = 0;
 
+	/* set EPP idle state (just to make sure) with strobe low */
 	parport_frob_control (port,
 			      PARPORT_CONTROL_STROBE |
 			      PARPORT_CONTROL_AUTOFD |
-			      PARPORT_CONTROL_SELECT,
+			      PARPORT_CONTROL_SELECT |
+			      PARPORT_CONTROL_INIT,
 			      PARPORT_CONTROL_STROBE |
-			      PARPORT_CONTROL_SELECT);
+			      PARPORT_CONTROL_INIT);
 	port->ops->data_forward (port);
 	for (; len > 0; len--, bp++) {
-		/* Event 62: Write data and strobe data */
+		/* Event 62: Write data and set autofd low */
 		parport_write_data (port, *bp);
 		parport_frob_control (port, PARPORT_CONTROL_AUTOFD,
 				      PARPORT_CONTROL_AUTOFD);
 
-		/* Event 58 */
+		/* Event 58: wait for busy (nWait) to go high */
 		if (parport_poll_peripheral (port, PARPORT_STATUS_BUSY, 0, 10))
 			break;
 
-		/* Event 63 */
+		/* Event 63: set nAutoFd (nDStrb) high */
 		parport_frob_control (port, PARPORT_CONTROL_AUTOFD, 0);
 
-		/* Event 60 */
+		/* Event 60: wait for busy (nWait) to go low */
 		if (parport_poll_peripheral (port, PARPORT_STATUS_BUSY,
 					     PARPORT_STATUS_BUSY, 5))
 			break;
@@ -757,7 +759,7 @@ size_t parport_ieee1284_epp_write_data (struct parport *port,
 		ret++;
 	}
 
-	/* Event 61 */
+	/* Event 61: set strobe (nWrite) high */
 	parport_frob_control (port, PARPORT_CONTROL_STROBE, 0);
 
 	return ret;
@@ -768,29 +770,37 @@ size_t parport_ieee1284_epp_read_data (struct parport *port,
 				       void *buffer, size_t len,
 				       int flags)
 {
-	/* This is untested. */
 	unsigned char *bp = (unsigned char *) buffer;
 	unsigned ret = 0;
 
+	/* set EPP idle state (just to make sure) with strobe high */
 	parport_frob_control (port,
 			      PARPORT_CONTROL_STROBE |
-			      PARPORT_CONTROL_SELECT, 0);
+			      PARPORT_CONTROL_AUTOFD |
+			      PARPORT_CONTROL_SELECT |
+			      PARPORT_CONTROL_INIT,
+			      PARPORT_CONTROL_INIT);
 	port->ops->data_reverse (port);
 	for (; len > 0; len--, bp++) {
-		parport_frob_control (port, PARPORT_CONTROL_AUTOFD, 0);
-
-		/* Event 58 */
-		if (parport_poll_peripheral (port, PARPORT_STATUS_BUSY,
-					     PARPORT_STATUS_BUSY, 10))
+		/* Event 67: set nAutoFd (nDStrb) low */
+		parport_frob_control (port,
+				      PARPORT_CONTROL_AUTOFD,
+				      PARPORT_CONTROL_AUTOFD);
+		/* Event 58: wait for Busy to go high */
+		if (parport_wait_peripheral (port, PARPORT_STATUS_BUSY, 0)) {
 			break;
+		}
 
 		*bp = parport_read_data (port);
 
-		parport_frob_control (port, PARPORT_CONTROL_AUTOFD,
-				      PARPORT_CONTROL_AUTOFD);
+		/* Event 63: set nAutoFd (nDStrb) high */
+		parport_frob_control (port, PARPORT_CONTROL_AUTOFD, 0);
 
-		if (parport_poll_peripheral (port, PARPORT_STATUS_BUSY, 0, 5))
+		/* Event 60: wait for Busy to go low */
+		if (parport_poll_peripheral (port, PARPORT_STATUS_BUSY,
+					     PARPORT_STATUS_BUSY, 5)) {
 			break;
+		}
 
 		ret++;
 	}
@@ -873,3 +883,5 @@ size_t parport_ieee1284_epp_read_addr (struct parport *port,
 
 	return ret;
 }
+
+

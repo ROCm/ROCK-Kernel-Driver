@@ -372,10 +372,10 @@ void __init ide_init_slc90e66 (ide_hwif_t *hwif)
 	if (!hwif->dma_base)
 		return;
 
-#ifndef CONFIG_BLK_DEV_IDEDMA
 	hwif->autodma = 0;
-#else /* CONFIG_BLK_DEV_IDEDMA */
-	hwif->autodma = 1;
+#ifdef CONFIG_BLK_DEV_IDEDMA 
+	if (!noautodma)
+		hwif->autodma = 1;
 	hwif->dmaproc = &slc90e66_dmaproc;
 	hwif->speedproc = &slc90e66_tune_chipset;
 #endif /* !CONFIG_BLK_DEV_IDEDMA */
