@@ -465,7 +465,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
  			"jp_journal_max_trans_age: \t%i\n"
 			/* incore fields */
 			"j_1st_reserved_block: \t%i\n"	  
-			"j_state: \t%i\n"			
+			"j_state: \t%li\n"			
 			"j_trans_id: \t%lu\n"
 			"j_mount_id: \t%lu\n"
 			"j_start: \t%lu\n"
