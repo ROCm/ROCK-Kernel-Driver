@@ -146,7 +146,9 @@ int ip6_output2(struct sk_buff *skb)
 
 int ip6_output(struct sk_buff *skb)
 {
-	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list))
+	if ((skb->len > dst_pmtu(skb->dst)
+	     || (skb->dst->flags & DST_FRAGHDR)
+	     || skb_shinfo(skb)->frag_list))
 		return ip6_fragment(skb, ip6_output2);
 	else
 		return ip6_output2(skb);
@@ -1125,7 +1127,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 	if (flags&MSG_CONFIRM)
 		dst_confirm(dst);
 
-	if (pktlength <= mtu) {
+	if (pktlength <= mtu && !(dst->flags & DST_FRAGHDR)) {
 		struct sk_buff *skb;
 		struct ipv6hdr *hdr;
 		struct net_device *dev = dst->dev;

@@ -1089,6 +1089,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 			struct net_device *dev, u32 pmtu)
 {
 	struct rt6_info *rt, *nrt;
+	int fraghdr_flag = 0;
 
 	if (pmtu < IPV6_MIN_MTU) {
 		if (net_ratelimit())
@@ -1098,6 +1099,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		   link MTU if the node receives a Packet Too Big message
 		   reporting next-hop MTU that is less than the IPv6 minimum MTU.
 		   */
+		fraghdr_flag = DST_FRAGHDR;
 		pmtu = IPV6_MIN_MTU;
 	}
 
@@ -1106,7 +1108,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 	if (rt == NULL)
 		return;
 
-	if (pmtu >= dst_pmtu(&rt->u.dst))
+	if (pmtu >= dst_pmtu(&rt->u.dst) && !fraghdr_flag)
 		goto out;
 
 	/* New mtu received -> path was valid.
@@ -1122,6 +1124,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 	 */
 	if (rt->rt6i_flags & RTF_CACHE) {
 		rt->u.dst.metrics[RTAX_MTU-1] = pmtu;
+		rt->u.dst.flags |= fraghdr_flag;
 		dst_set_expires(&rt->u.dst, ip6_rt_mtu_expires);
 		rt->rt6i_flags |= RTF_MODIFIED|RTF_EXPIRES;
 		goto out;
@@ -1136,6 +1139,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		nrt = rt6_cow(rt, daddr, saddr);
 		if (!nrt->u.dst.error) {
 			nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
+			nrt->u.dst.flags |= fraghdr_flag;
 			/* According to RFC 1981, detecting PMTU increase shouldn't be
 			   happened within 5 mins, the recommended timer is 10 mins.
 			   Here this route expiration time is set to ip6_rt_mtu_expires
@@ -1160,6 +1164,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 		nrt->rt6i_flags |= RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 		nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
+		nrt->u.dst.flags |= fraghdr_flag;
 		rt6_ins(nrt, NULL, NULL);
 	}
 
