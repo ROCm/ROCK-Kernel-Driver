@@ -618,53 +618,40 @@ cpu_init (void)
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
-	struct cpuinfo_ia64 *my_cpu_info;
-	void *my_cpu_data;
+	struct cpuinfo_ia64 *cpu_info;
+	void *cpu_data;
 
 #ifdef CONFIG_SMP
 	extern char __per_cpu_end[];
-	int cpu = smp_processor_id();
+	int cpu;
 
 	if (__per_cpu_end - __per_cpu_start > PAGE_SIZE)
 		panic("Per-cpu data area too big! (%Zu > %Zu)",
 		      __per_cpu_end - __per_cpu_start, PAGE_SIZE);
 
-# ifdef CONFIG_NUMA
-	{
-		static unsigned long boot_cpu_data;
 
-		/*
-		 * get_free_pages() cannot be used before cpu_init() done.  BSP allocates
-		 * "NR_CPUS" pages for all CPUs to avoid that AP calls get_zeroed_page().
-		 */
-		if (cpu == 0)
-			boot_cpu_data = (unsigned long)alloc_bootmem_pages(PAGE_SIZE * NR_CPUS);
-		my_cpu_data = (void *)(boot_cpu_data + (cpu * PAGE_SIZE));
-
-		memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
-		__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
-		my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
-
-		my_cpu_info->node_data = get_node_data_ptr();
-		my_cpu_info->nodeid = boot_get_local_nodeid();
-	}
-# else /* !CONFIG_NUMA */
 	/*
-	 * On the BSP, the page allocator isn't initialized by the time we get here.  On
-	 * the APs, the bootmem allocator is no longer available...
+	 * get_free_pages() cannot be used before cpu_init() done.  BSP allocates
+	 * "NR_CPUS" pages for all CPUs to avoid that AP calls get_zeroed_page().
 	 */
-	if (cpu == 0)
-		my_cpu_data = alloc_bootmem_pages(__per_cpu_end - __per_cpu_start);
-	else
-		my_cpu_data = (void *) get_zeroed_page(GFP_KERNEL);
-	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
-	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
-	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
-# endif /* !CONFIG_NUMA */
+	if (smp_processor_id() == 0) {
+		cpu_data = (unsigned long)alloc_bootmem_pages(PAGE_SIZE * NR_CPUS);
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
+			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
+			cpu_data += PAGE_SIZE;
+		}
+	}
+	cpu_data = __per_cpu_start + __per_cpu_offset[smp_processor_id()];
 #else /* !CONFIG_SMP */
-	my_cpu_data = __phys_per_cpu_start;
+	cpu_data = __phys_per_cpu_start;
 #endif /* !CONFIG_SMP */
-	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
+
+	cpu_info = cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
+#ifdef CONFIG_NUMA
+	cpu_info->node_data = get_node_data_ptr();
+	cpu_info->nodeid = boot_get_local_nodeid();
+#endif
 
 	/*
 	 * We can't pass "local_cpu_data" to identify_cpu() because we haven't called
@@ -672,14 +659,14 @@ cpu_init (void)
 	 * depends on the data returned by identify_cpu().  We break the dependency by
 	 * accessing cpu_data() the old way, through identity mapped space.
 	 */
-	identify_cpu(my_cpu_info);
+	identify_cpu(cpu_info);
 
 #ifdef CONFIG_MCKINLEY
 	{
 #		define FEATURE_SET 16
 		struct ia64_pal_retval iprv;
 
-		if (my_cpu_info->family == 0x1f) {
+		if (cpu_info->family == 0x1f) {
 			PAL_CALL_PHYS(iprv, PAL_PROC_GET_FEATURES, 0, FEATURE_SET, 0);
 			if ((iprv.status == 0) && (iprv.v0 & 0x80) && (iprv.v2 & 0x80))
 				PAL_CALL_PHYS(iprv, PAL_PROC_SET_FEATURES,
@@ -710,7 +697,7 @@ cpu_init (void)
 	if (current->mm)
 		BUG();
 
-	ia64_mmu_init(my_cpu_data);
+	ia64_mmu_init(cpu_data);
 
 #ifdef CONFIG_IA32_SUPPORT
 	/* initialize global ia32 state - CR0 and CR4 */
