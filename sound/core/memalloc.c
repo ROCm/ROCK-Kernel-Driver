@@ -242,11 +242,15 @@ static void *snd_malloc_dev_pages(struct device *dev, size_t size, dma_addr_t *d
 {
 	int pg;
 	void *res;
+	unsigned int gfp_flags;
 
 	snd_assert(size > 0, return NULL);
 	snd_assert(dma != NULL, return NULL);
 	pg = get_order(size);
-	res = dma_alloc_coherent(dev, PAGE_SIZE << pg, dma, GFP_KERNEL);
+	gfp_flags = GFP_KERNEL;
+	if (pg > 0)
+		gfp_flags |= __GFP_NOWARN;
+	res = dma_alloc_coherent(dev, PAGE_SIZE << pg, dma, gfp_flags);
 	if (res != NULL)
 		mark_pages(res, pg);
 
