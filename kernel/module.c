@@ -461,6 +461,28 @@ void __symbol_put(const char *symbol)
 }
 EXPORT_SYMBOL(__symbol_put);
 
+void symbol_put_addr(void *addr)
+{
+	struct kernel_symbol_group *ks;
+	unsigned long flags;
+
+	spin_lock_irqsave(&modlist_lock, flags);
+	list_for_each_entry(ks, &symbols, list) {
+ 		unsigned int i;
+
+		for (i = 0; i < ks->num_syms; i++) {
+			if (ks->syms[i].value == (unsigned long)addr) {
+				module_put(ks->owner);
+				spin_unlock_irqrestore(&modlist_lock, flags);
+				return;
+			}
+		}
+	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
+	BUG();
+}
+EXPORT_SYMBOL_GPL(symbol_put_addr);
+
 #else /* !CONFIG_MODULE_UNLOAD */
 static void print_unload_info(struct seq_file *m, struct module *mod)
 {
@@ -551,28 +573,6 @@ void *__symbol_get(const char *symbol)
 	return (void *)value;
 }
 EXPORT_SYMBOL_GPL(__symbol_get);
-
-void symbol_put_addr(void *addr)
-{
-	struct kernel_symbol_group *ks;
-	unsigned long flags;
-
-	spin_lock_irqsave(&modlist_lock, flags);
-	list_for_each_entry(ks, &symbols, list) {
- 		unsigned int i;
-
-		for (i = 0; i < ks->num_syms; i++) {
-			if (ks->syms[i].value == (unsigned long)addr) {
-				module_put(ks->owner);
-				spin_unlock_irqrestore(&modlist_lock, flags);
-				return;
-			}
-		}
-	}
-	spin_unlock_irqrestore(&modlist_lock, flags);
-	BUG();
-}
-EXPORT_SYMBOL_GPL(symbol_put_addr);
 
 /* Transfer one ELF section to the correct (init or core) area. */
 static void *copy_section(const char *name,
