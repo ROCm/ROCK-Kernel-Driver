@@ -608,7 +608,7 @@ static int uss720_probe(struct usb_interface *intf,
 	parport_announce_port(pp);
 
 	MOD_INC_USE_COUNT;
-	dev_set_drvdata (&intf->dev, pp);
+	usb_set_intfdata (intf, pp);
 	return 0;
 
 #if 0
@@ -622,10 +622,10 @@ probe_abort:
 
 static void uss720_disconnect(struct usb_interface *intf)
 {
-	struct parport *pp = dev_get_drvdata (&intf->dev);
+	struct parport *pp = usb_get_intfdata (intf);
 	struct parport_uss720_private *priv;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (pp) {
 		priv = pp->private_data;
 #if 0

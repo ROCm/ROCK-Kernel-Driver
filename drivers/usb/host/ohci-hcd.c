@@ -515,7 +515,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	usb_connect (udev);
 	udev->speed = USB_SPEED_FULL;
 	if (usb_register_root_hub (udev, ohci->hcd.controller) != 0) {
-		usb_free_dev (udev);
+		usb_put_dev (udev);
 		ohci->hcd.self.root_hub = NULL;
 		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;

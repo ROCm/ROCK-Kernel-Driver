@@ -652,7 +652,7 @@ static int acm_probe (struct usb_interface *intf,
 		tty_register_devfs(&acm_tty_driver, 0, minor);
 
 		acm_table[minor] = acm;
-		dev_set_drvdata (&intf->dev, acm);
+		usb_set_intfdata (intf, acm);
 		return 0;
 	}
 
@@ -661,7 +661,7 @@ static int acm_probe (struct usb_interface *intf,
 
 static void acm_disconnect(struct usb_interface *intf)
 {
-	struct acm *acm = dev_get_drvdata (&intf->dev);
+	struct acm *acm = usb_get_intfdata (intf);
 
 	if (!acm || !acm->dev) {
 		dbg("disconnect on nonexisting interface");
@@ -669,7 +669,7 @@ static void acm_disconnect(struct usb_interface *intf)
 	}
 
 	acm->dev = NULL;
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	usb_unlink_urb(acm->ctrlurb);
 	usb_unlink_urb(acm->readurb);

@@ -491,15 +491,15 @@ static int probe_rio(struct usb_interface *intf,
 
 	init_MUTEX(&(rio->lock));
 
-	dev_set_drvdata (&intf->dev, rio);
+	usb_set_intfdata (intf, rio);
 	return 0;
 }
 
 static void disconnect_rio(struct usb_interface *intf)
 {
-	struct rio_usb_data *rio = dev_get_drvdata (&intf->dev);
+	struct rio_usb_data *rio = usb_get_intfdata (intf);
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (rio) {
 		devfs_unregister(rio->devfs);
 		usb_deregister_dev(1, rio->minor);

@@ -133,6 +133,11 @@ static int hid_pid_erase(struct input_dev *dev, int id)
 
 	/* Find field */
 	field = (struct hid_field *) kmalloc(sizeof(struct hid_field), GFP_KERNEL);
+	if(!field) {
+		printk("Couldn't allocate field\n");
+		return -ENOMEM;
+	}
+
 	ret = hid_set_field(field, ret, pid->effects[id].device_id);
 	if(!ret) {
 		printk("Couldn't set field\n");

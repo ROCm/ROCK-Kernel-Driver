@@ -108,6 +108,7 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 	interface->act_altsetting = 0;
 	interface->num_altsetting = 0;
 	interface->max_altsetting = USB_ALTSETTINGALLOC;
+	device_initialize(&interface->dev);
 
 	interface->altsetting = kmalloc(sizeof(*interface->altsetting) * interface->max_altsetting,
 					GFP_KERNEL);

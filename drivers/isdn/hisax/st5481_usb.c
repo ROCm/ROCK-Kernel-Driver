@@ -474,7 +474,7 @@ void st5481_release_isocpipes(struct urb* urb[2])
  * called 50 times per second with 20 ISOC descriptors. 
  * Called at interrupt.
  */
-static void usb_in_complete(struct urb *urb)
+static void usb_in_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct st5481_in *in = urb->context;
 	unsigned char *ptr;

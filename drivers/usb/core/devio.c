@@ -322,7 +322,7 @@ static int driver_probe (struct usb_interface *intf,
 
 static void driver_disconnect(struct usb_interface *intf)
 {
-	struct dev_state *ps = dev_get_drvdata (&intf->dev);
+	struct dev_state *ps = usb_get_intfdata (intf);
 
 	if (!ps)
 		return;
@@ -333,7 +333,7 @@ static void driver_disconnect(struct usb_interface *intf)
 	/* prevent new I/O requests */
 	ps->dev = 0;
 	ps->ifclaimed = 0;
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	/* force async requests to complete */
 	destroy_all_async (ps);

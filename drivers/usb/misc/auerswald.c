@@ -2061,7 +2061,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	}
 
 	/* all OK */
-	dev_set_drvdata (&intf->dev, cp);
+	usb_set_intfdata (intf, cp);
 	return 0;
 
 	/* Error exit: clean up the memory */
@@ -2085,10 +2085,10 @@ pfail:	auerswald_delete (cp);
 */
 static void auerswald_disconnect (struct usb_interface *intf)
 {
-	pauerswald_t cp = dev_get_drvdata (&intf->dev);
+	pauerswald_t cp = usb_get_intfdata (intf);
 	unsigned int u;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (!cp)
 		return;
 

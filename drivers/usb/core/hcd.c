@@ -1031,19 +1031,19 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	/* lower level hcd code should use *_dma exclusively */
 	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {
 		if (usb_pipecontrol (urb->pipe))
-			urb->setup_dma = pci_map_single (
-					hcd->pdev,
+			urb->setup_dma = dma_map_single (
+					hcd->controller,
 					urb->setup_packet,
 					sizeof (struct usb_ctrlrequest),
-					PCI_DMA_TODEVICE);
+					DMA_TO_DEVICE);
 		if (urb->transfer_buffer_length != 0)
-			urb->transfer_dma = pci_map_single (
-					hcd->pdev,
+			urb->transfer_dma = dma_map_single (
+					hcd->controller,
 					urb->transfer_buffer,
 					urb->transfer_buffer_length,
 					usb_pipein (urb->pipe)
-					    ? PCI_DMA_FROMDEVICE
-					    : PCI_DMA_TODEVICE);
+					    ? DMA_FROM_DEVICE
+					    : DMA_TO_DEVICE);
 	}
 
 	status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
@@ -1265,12 +1265,6 @@ struct usb_operations usb_hcd_operations = {
 	.deallocate =		hcd_free_dev,
 	.buffer_alloc =		hcd_buffer_alloc,
 	.buffer_free =		hcd_buffer_free,
-	.buffer_map =		hcd_buffer_map,
-	.buffer_dmasync =	hcd_buffer_dmasync,
-	.buffer_unmap =		hcd_buffer_unmap,
-	.buffer_map_sg =	hcd_buffer_map_sg,
-	.buffer_dmasync_sg =	hcd_buffer_sync_sg,
-	.buffer_unmap_sg =	hcd_buffer_unmap_sg,
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 

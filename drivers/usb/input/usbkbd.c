@@ -328,15 +328,15 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 	printk(KERN_INFO "input: %s on %s\n", kbd->name, path);
 
-	dev_set_drvdata(&iface->dev, kbd);
+	usb_set_intfdata(iface, kbd);
 	return 0;
 }
 
 static void usb_kbd_disconnect(struct usb_interface *intf)
 {
-	struct usb_kbd *kbd = dev_get_drvdata(&intf->dev);
+	struct usb_kbd *kbd = usb_get_intfdata (intf);
 	
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (kbd) {
 		usb_unlink_urb(kbd->irq);
 		input_unregister_device(&kbd->dev);

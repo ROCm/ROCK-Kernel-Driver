@@ -146,6 +146,11 @@
 #endif
 #include <linux/usb.h>
 
+#include <asm/io.h>
+#include <asm/scatterlist.h>
+#include <linux/mm.h>
+#include <linux/dma-mapping.h>
+
 
 /* minidrivers _could_ be individually configured */
 #define	CONFIG_USB_AN2720
@@ -2089,8 +2094,8 @@ static void usbnet_disconnect (struct usb_interface *intf)
 	struct usbnet		*dev;
 	struct usb_device	*xdev;
 
-	dev = dev_get_drvdata (&intf->dev);
-	dev_set_drvdata (&intf->dev, NULL);
+	dev = usb_get_intfdata(intf);
+	usb_set_intfdata(intf, NULL);
 	if (!dev)
 		return;
 
@@ -2169,8 +2174,12 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	memcpy (net->dev_addr, node_id, sizeof node_id);
 
 	// point-to-point link ... we always use Ethernet headers 
-	// supports win32 interop and the bridge driver.
+	// supports win32 interop (some devices) and the bridge driver.
 	ether_setup (net);
+
+	// possible with some EHCI controllers
+	if (dma_supported (&udev->dev, 0xffffffffffffffffULL))
+		net->features |= NETIF_F_HIGHDMA;
 
 	net->change_mtu = usbnet_change_mtu;
 	net->get_stats = usbnet_get_stats;
@@ -2197,7 +2206,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 #endif
 
 	// ok, it's ready to go.
-	dev_set_drvdata (&udev->dev, dev);
+	usb_set_intfdata(udev, dev);
 	mutex_lock (&usbnet_mutex);
 	list_add (&dev->dev_list, &usbnet_list);
 	mutex_unlock (&dev->mutex);

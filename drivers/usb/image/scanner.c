@@ -321,10 +321,13 @@
  *      "Jaeger, Gerhard" <gerhard@gjaeger.de>, Ira Childress 
  *      <ichildress@mn.rr.com>, Till Kamppeter <till.kamppeter@gmx.net>,
  *      Ed Hamrick <EdHamrick@aol.com>, Oliver Schwartz
- *	<Oliver.Schwartz@gmx.de> and everyone else who sent ids.
+ *      <Oliver.Schwartz@gmx.de> and everyone else who sent ids.
  *    - Some Benq, Genius and Plustek ids are identified now.
  *    - Accept scanners with only one bulk (in) endpoint (thanks to Sergey
  *      Vlasov <vsu@mivlgu.murom.ru>).
+ *    - Accept devices with more than one interface. Only use interfaces that
+ *      look like belonging to scanners.
+ *    - Fix compilation error when debugging is enabled.
  *
  * TODO
  *    - Remove the 2/3 endpoint limitation
@@ -429,7 +432,7 @@ open_scanner(struct inode * inode, struct file * file)
 		err("open_scanner(%d): Unable to access minor data", scn_minor);
 		return -ENODEV;
 	}
-	scn = dev_get_drvdata (&intf->dev);
+	scn = usb_get_intfdata(intf);
 
 	dev = scn->scn_dev;
 
@@ -858,7 +861,6 @@ probe_scanner(struct usb_interface *intf,
 	}
 
 	dbg("probe_scanner: USB dev address:%p", dev);
-	dbg("probe_scanner: ifnum:%u", ifnum);
 
 /*
  * 1. Check Vendor/Product
@@ -907,12 +909,14 @@ probe_scanner(struct usb_interface *intf,
 		return -ENODEV;
 	}
 
-	if (dev->config[0].desc.bNumInterfaces != 1) {
-		info("probe_scanner: Only one device interface is supported.");
+	interface = intf->altsetting;
+ 
+	if (interface[0].desc.bInterfaceClass != USB_CLASS_VENDOR_SPEC &&
+	    interface[0].desc.bInterfaceClass != USB_CLASS_PER_INTERFACE &&
+	    interface[0].desc.bInterfaceClass != 16) {
+		dbg("probe_scanner: This interface doesn't look like a scanner (class=0x%x).", interface[0].desc.bInterfaceClass);
 		return -ENODEV;
 	}
-
-	interface = intf->altsetting;
 
 /*
  * Start checking for one or two bulk endpoints and an optional
@@ -1098,7 +1102,7 @@ probe_scanner(struct usb_interface *intf,
 
 	up(&scn_mutex);
 
-	dev_set_drvdata(&intf->dev, scn);
+	usb_set_intfdata(intf, scn);
 
 	/* add device id so the device works when advertised */
 	intf->kdev = mk_kdev(USB_MAJOR,scn->scn_minor);
@@ -1109,12 +1113,12 @@ probe_scanner(struct usb_interface *intf,
 static void
 disconnect_scanner(struct usb_interface *intf)
 {
-	struct scn_usb_data *scn = dev_get_drvdata(&intf->dev);
+	struct scn_usb_data *scn = usb_get_intfdata(intf);
 
 	/* remove device id to disable open() */
 	intf->kdev = NODEV;
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (scn) {
 		down (&scn_mutex);
 		down (&(scn->sem));

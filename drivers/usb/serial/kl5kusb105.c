@@ -265,13 +265,12 @@ static int klsi_105_startup (struct usb_serial *serial)
 
 	/* allocate the private data structure */
 	for (i=0; i<serial->num_ports; i++) {
-		serial->port[i].private = kmalloc(sizeof(struct klsi_105_private),
+		priv = kmalloc(sizeof(struct klsi_105_private),
 						   GFP_KERNEL);
-		if (!serial->port[i].private) {
+		if (!priv) {
 			dbg("%skmalloc for klsi_105_private failed.", __FUNCTION__);
-			return (-1); /* error */
+			return -ENOMEM;
 		}
-		priv = (struct klsi_105_private *)serial->port[i].private;
 		/* set initial values for control structures */
 		priv->cfg.pktlen    = 5;
 		priv->cfg.baudrate  = kl5kusb105a_sio_b9600;
@@ -283,6 +282,7 @@ static int klsi_105_startup (struct usb_serial *serial)
 
 		priv->bytes_in	    = 0;
 		priv->bytes_out	    = 0;
+		usb_set_serial_port_data(&serial->port[i], priv);
 
 		spin_lock_init (&priv->write_urb_pool_lock);
 		for (i=0; i<NUM_URBS; i++) {
@@ -319,8 +319,7 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		struct klsi_105_private *priv = 
-			(struct klsi_105_private*) serial->port[i].private;
+		struct klsi_105_private *priv = usb_get_serial_port_data(&serial->port[i]);
 		unsigned long flags;
 
 		if (priv) {
@@ -347,7 +346,8 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 			spin_unlock_irqrestore (&priv->write_urb_pool_lock,
 					       	flags);
 
-			kfree(serial->port[i].private);
+			kfree(priv);
+			usb_set_serial_port_data(&serial->port[i], NULL);
 		}
 	}
 } /* klsi_105_shutdown */
@@ -355,7 +355,7 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
-	struct klsi_105_private *priv = (struct klsi_105_private *)port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	int retval = 0;
 	int rc;
 	int i;
@@ -436,8 +436,7 @@ exit:
 static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial;
-	struct klsi_105_private *priv 
-		= (struct klsi_105_private *)port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	int rc;
 
 	dbg("%s port %d", __FUNCTION__, port->number);
@@ -481,8 +480,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 			   const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
-	struct klsi_105_private *priv = 
-		(struct klsi_105_private*) port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	int result, size;
 	int bytes_sent=0;
 
@@ -588,8 +586,7 @@ static int klsi_105_chars_in_buffer (struct usb_serial_port *port)
 	int chars = 0;
 	int i;
 	unsigned long flags;
-	struct klsi_105_private *priv = 
-		(struct klsi_105_private*) port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 
 	spin_lock_irqsave (&priv->write_urb_pool_lock, flags);
 
@@ -610,8 +607,7 @@ static int klsi_105_write_room (struct usb_serial_port *port)
 	unsigned long flags;
 	int i;
 	int room = 0;
-	struct klsi_105_private *priv = 
-		(struct klsi_105_private*) port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 
 	spin_lock_irqsave (&priv->write_urb_pool_lock, flags);
 	for (i = 0; i < NUM_URBS; ++i) {
@@ -632,8 +628,7 @@ static void klsi_105_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = port->serial;
-	struct klsi_105_private *priv = 
-		(struct klsi_105_private*) port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int rc;
@@ -715,7 +710,7 @@ static void klsi_105_set_termios (struct usb_serial_port *port,
 				  struct termios *old_termios)
 {
 	struct usb_serial *serial = port->serial;
-	struct klsi_105_private *priv = (struct klsi_105_private *)port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	unsigned int iflag = port->tty->termios->c_iflag;
 	unsigned int old_iflag = old_termios->c_iflag;
 	unsigned int cflag = port->tty->termios->c_cflag;
@@ -869,7 +864,7 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 			   unsigned int cmd, unsigned long arg)
 {
 	struct usb_serial *serial = port->serial;
-	struct klsi_105_private *priv = (struct klsi_105_private *)port->private;
+	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	int mask;
 	
 	dbg("%scmd=0x%x", __FUNCTION__, cmd);
