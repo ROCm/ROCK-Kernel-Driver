@@ -250,19 +250,10 @@ static int ntfs_attr_find(const ATTR_TYPE type, const ntfschar *name,
 		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
 	ATTR_RECORD *a;
-	ntfs_volume *vol;
-	ntfschar *upcase;
-	u32 upcase_len;
+	ntfs_volume *vol = ctx->ntfs_ino->vol;
+	ntfschar *upcase = vol->upcase;
+	u32 upcase_len = vol->upcase_len;
 
-	if (ic == IGNORE_CASE) {
-		vol = ctx->ntfs_ino->vol;
-		upcase = vol->upcase;
-		upcase_len = vol->upcase_len;
-	} else {
-		vol = NULL;
-		upcase = NULL;
-		upcase_len = 0;
-	}
 	/*
 	 * Iterate over attributes in mft record starting at @ctx->attr, or the
 	 * attribute following that, if @ctx->is_first is TRUE.
@@ -354,7 +345,7 @@ static int ntfs_attr_find(const ATTR_TYPE type, const ntfschar *name,
 				return -ENOENT;
 		}
 	}
-	ntfs_error(NULL, "Inode is corrupt.  Run chkdsk.");
+	ntfs_error(vol->sb, "Inode is corrupt.  Run chkdsk.");
 	NVolSetErrors(vol);
 	return -EIO;
 }
