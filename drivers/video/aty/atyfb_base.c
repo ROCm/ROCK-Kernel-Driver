@@ -1514,7 +1514,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	u8 pll_ref_div;
 
 	par->aty_cmap_regs =
-	    (struct aty_cmap_regs *) (par->ati_regbase + 0xc0);
+	    (struct aty_cmap_regs __iomem *) (par->ati_regbase + 0xc0);
 	chip_id = aty_ld_le32(CONFIG_CHIP_ID, par);
 	type = chip_id & CFG_CHIP_TYPE;
 	rev = (chip_id & CFG_CHIP_REV) >> 24;
@@ -1782,8 +1782,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		info->fix.smem_len -= GUI_RESERVE;
 
 	/* Clear the video memory */
-	fb_memset((void *) info->screen_base, 0,
-		  info->fix.smem_len);
+	fb_memset(info->screen_base, 0, info->fix.smem_len);
 
 	info->fbops = &atyfb_ops;
 	info->pseudo_palette = pseudo_palette;
@@ -2216,7 +2215,7 @@ int __init atyfb_do_init(void)
 #else				/* __sparc__ */
 
 			info->fix.mmio_start = 0x7ff000 + addr;
-			default_par->ati_regbase = (unsigned long)
+			default_par->ati_regbase = 
 			    ioremap(info->fix.mmio_start, 0x1000);
 
 			if (!default_par->ati_regbase) {
@@ -2249,8 +2248,7 @@ int __init atyfb_do_init(void)
 
 			/* Map in frame buffer */
 			info->fix.smem_start = addr;
-			info->screen_base =
-			    (char *) ioremap(addr, 0x800000);
+			info->screen_base = ioremap(addr, 0x800000);
 
 			if (!info->screen_base) {
 #ifdef __sparc__
@@ -2616,9 +2614,9 @@ void cleanup_module(void)
 
 #ifndef __sparc__
 	if (par->ati_regbase)
-		iounmap((void *) par->ati_regbase);
+		iounmap(par->ati_regbase);
 	if (info->screen_base)
-		iounmap((void *) info->screen_base);
+		iounmap(info->screen_base);
 #ifdef __BIG_ENDIAN
 	if (par->cursor && par->cursor->ram)
 		iounmap(par->cursor->ram);
