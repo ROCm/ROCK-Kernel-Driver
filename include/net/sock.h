@@ -1033,7 +1033,7 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
  *	Enable debug/info messages 
  */
 
-#if 0
+#if 1
 #define NETDEBUG(x)	do { } while (0)
 #else
 #define NETDEBUG(x)	do { x; } while (0)

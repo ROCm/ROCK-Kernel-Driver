@@ -29,7 +29,9 @@
 #include <net/ipv6.h>
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
-#define Iprintk(x...)  
+
+#define Iprintk(x...) 
+
 #define XFRM6_TUNNEL_HSIZE 1024
 /* note: we assume index of xfrm_tunnel_table[] == spi */
 static xfrm_address_t *xfrm6_tunnel_table[XFRM6_TUNNEL_HSIZE];
@@ -89,7 +91,7 @@ u32 xfrm6_tunnel_alloc_spi(xfrm_address_t *saddr)
 	spin_lock(&xfrm6_tunnel_lock);
 	for (i = index; i < XFRM6_TUNNEL_HSIZE; i++) {
 		if (xfrm6_tunnel_table[i] == NULL) {
-			printk(KERN_DEBUG "%s:new alloc:"
+			Iprintk(KERN_DEBUG "%s:new alloc:"
 				"%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
 				__FUNCTION__, NIP6(*(struct in6_addr *)saddr));
 			index_addr = kmalloc(sizeof(xfrm_address_t), GFP_ATOMIC);
@@ -305,17 +307,17 @@ static void ip6ip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		case ICMPV6_ADDR_UNREACH:
 		case ICMPV6_PORT_UNREACH:
 		default:
-			Iprintk(KERN_ERR "xfrm ip6ip6: Destination Unreach.\n");
+			NETDEBUG(printk(KERN_ERR "xfrm ip6ip6: Destination Unreach.\n"););
 			break;
 		}
 		break;
 	case ICMPV6_PKT_TOOBIG:
-			Iprintk(KERN_ERR "xfrm ip6ip6: Packet Too Big.\n");
+			NETDEBUG(printk(KERN_ERR "xfrm ip6ip6: Packet Too Big.\n"));
 		break;
 	case ICMPV6_TIME_EXCEED:
 		switch (code) {
 		case ICMPV6_EXC_HOPLIMIT:
-			Iprintk(KERN_ERR "xfrm ip6ip6: Too small Hoplimit.\n");
+			NETDEBUG(printk(KERN_ERR "xfrm ip6ip6: Too small Hoplimit.\n"));
 			break;
 		case ICMPV6_EXC_FRAGTIME:
 		default: 

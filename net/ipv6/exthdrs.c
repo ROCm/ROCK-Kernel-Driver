@@ -450,8 +450,8 @@ static int ipv6_hop_ra(struct sk_buff *skb, int optoff)
 		((struct inet6_skb_parm*)skb->cb)->ra = optoff;
 		return 1;
 	}
-	if (net_ratelimit())
-		printk(KERN_DEBUG "ipv6_hop_ra: wrong RA length %d\n", skb->nh.raw[optoff+1]);
+	NETDEBUG(if (net_ratelimit())
+		 printk(KERN_DEBUG "ipv6_hop_ra: wrong RA length %d\n", skb->nh.raw[optoff+1]));
 	kfree_skb(skb);
 	return 0;
 }
@@ -463,8 +463,8 @@ static int ipv6_hop_jumbo(struct sk_buff *skb, int optoff)
 	u32 pkt_len;
 
 	if (skb->nh.raw[optoff+1] != 4 || (optoff&3) != 2) {
-		if (net_ratelimit())
-			printk(KERN_DEBUG "ipv6_hop_jumbo: wrong jumbo opt length/alignment %d\n", skb->nh.raw[optoff+1]);
+		NETDEBUG(if (net_ratelimit())
+			 printk(KERN_DEBUG "ipv6_hop_jumbo: wrong jumbo opt length/alignment %d\n", skb->nh.raw[optoff+1]));
 		goto drop;
 	}
 

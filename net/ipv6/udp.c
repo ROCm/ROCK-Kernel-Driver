@@ -637,8 +637,8 @@ static int udpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		/* RFC 2460 section 8.1 says that we SHOULD log
 		   this error. Well, it is reasonable.
 		 */
-		if (net_ratelimit())
-			printk(KERN_INFO "IPv6: udp checksum is 0\n");
+		NETDEBUG(if (net_ratelimit())
+			printk(KERN_INFO "IPv6: udp checksum is 0\n"));
 		goto discard;
 	}
 
