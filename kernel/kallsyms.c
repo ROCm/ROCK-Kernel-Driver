@@ -190,7 +190,10 @@ static unsigned long get_ksymbol_core(struct kallsym_iter *iter)
 	off += strlen(kallsyms_names + off) + 1;
 	iter->owner = NULL;
 	iter->value = kallsyms_addresses[iter->pos];
-	iter->type = 't';
+	if (is_kernel_text(iter->value) || is_kernel_inittext(iter->value))
+		iter->type = 't';
+	else
+		iter->type = 'd';
 
 	upcase_if_global(iter);
 	return off - iter->nameoff;
