@@ -198,7 +198,7 @@ static int get_ranges (unsigned char *pst)
 
 		vid = *pst++;
 		powernow_table[j].index |= (vid << 8); /* upper 8 bits */
-		dprintk ("VID: 0x%x (%d.%dV)\n", vid,	mobile_vid_table[vid]/1000,
+		dprintk ("VID: 0x%x (%d.%03dV)\n", vid,	mobile_vid_table[vid]/1000,
 			mobile_vid_table[vid]%1000);
 	}
 	dprintk ("\n");
