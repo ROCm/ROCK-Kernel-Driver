@@ -132,16 +132,6 @@ __ext3_journal_get_write_access(const char *where,
 	return err;
 }
 
-static inline int
-__ext3_journal_dirty_data(const char *where,
-			  handle_t *handle, struct buffer_head *bh, int async)
-{
-	int err = journal_dirty_data(handle, bh, async);
-	if (err)
-		ext3_journal_abort_handle(where, __FUNCTION__, bh, handle,err);
-	return err;
-}
-
 static inline void
 ext3_journal_forget(handle_t *handle, struct buffer_head *bh)
 {
@@ -183,8 +173,6 @@ __ext3_journal_dirty_metadata(const char *where,
 	__ext3_journal_get_undo_access(__FUNCTION__, (handle), (bh))
 #define ext3_journal_get_write_access(handle, bh) \
 	__ext3_journal_get_write_access(__FUNCTION__, (handle), (bh))
-#define ext3_journal_dirty_data(handle, bh, async) \
-	__ext3_journal_dirty_data(__FUNCTION__, (handle), (bh), (async))
 #define ext3_journal_revoke(handle, blocknr, bh) \
 	__ext3_journal_revoke(__FUNCTION__, (handle), (blocknr), (bh))
 #define ext3_journal_get_create_access(handle, bh) \

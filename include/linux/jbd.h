@@ -360,13 +360,6 @@ struct transaction_s
 	 */
 	struct journal_head *	t_sync_datalist;
 	
-	/*
-	 * Doubly-linked circular list of all writepage data buffers
-	 * still to be written before this transaction can be committed.
-	 * Protected by journal_datalist_lock.
-	 */
-	struct journal_head *	t_async_datalist;
-	
 	/* Doubly-linked circular list of all forget buffers (superseded
            buffers which we can un-checkpoint once this transaction
            commits) */
@@ -654,8 +647,7 @@ extern int	 journal_extend (handle_t *, int nblocks);
 extern int	 journal_get_write_access (handle_t *, struct buffer_head *);
 extern int	 journal_get_create_access (handle_t *, struct buffer_head *);
 extern int	 journal_get_undo_access (handle_t *, struct buffer_head *);
-extern int	 journal_dirty_data (handle_t *,
-				struct buffer_head *, int async);
+extern int	 journal_dirty_data (handle_t *, struct buffer_head *);
 extern int	 journal_dirty_metadata (handle_t *, struct buffer_head *);
 extern void	 journal_release_buffer (handle_t *, struct buffer_head *);
 extern void	 journal_forget (handle_t *, struct buffer_head *);
@@ -806,14 +798,13 @@ extern int journal_blocks_per_page(struct inode *inode);
 /* journaling buffer types */
 #define BJ_None		0	/* Not journaled */
 #define BJ_SyncData	1	/* Normal data: flush before commit */
-#define BJ_AsyncData	2	/* writepage data: wait on it before commit */
-#define BJ_Metadata	3	/* Normal journaled metadata */
-#define BJ_Forget	4	/* Buffer superseded by this transaction */
-#define BJ_IO		5	/* Buffer is for temporary IO use */
-#define BJ_Shadow	6	/* Buffer contents being shadowed to the log */
-#define BJ_LogCtl	7	/* Buffer contains log descriptors */
-#define BJ_Reserved	8	/* Buffer is reserved for access by journal */
-#define BJ_Types	9
+#define BJ_Metadata	2	/* Normal journaled metadata */
+#define BJ_Forget	3	/* Buffer superseded by this transaction */
+#define BJ_IO		4	/* Buffer is for temporary IO use */
+#define BJ_Shadow	5	/* Buffer contents being shadowed to the log */
+#define BJ_LogCtl	6	/* Buffer contains log descriptors */
+#define BJ_Reserved	7	/* Buffer is reserved for access by journal */
+#define BJ_Types	8
  
 extern int jbd_blocks_per_page(struct inode *inode);
 
@@ -860,8 +851,7 @@ static inline int buffer_jdirty(struct buffer_head *bh)
 static inline int buffer_jbd_data(struct buffer_head *bh)
 {
 	return SPLICE_LOCK(buffer_jbd(bh),
-			bh2jh(bh)->b_jlist == BJ_SyncData ||
-			bh2jh(bh)->b_jlist == BJ_AsyncData);
+			bh2jh(bh)->b_jlist == BJ_SyncData);
 }
 
 #ifdef CONFIG_SMP
