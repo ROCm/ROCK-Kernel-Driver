@@ -1753,6 +1753,12 @@ L: 	selinux@tycho.nsa.gov (general discussion)
 W:	http://www.nsa.gov/selinux
 S:	Supported
 
+SGI SN-IA64 (Altix) SERIAL CONSOLE DRIVER
+P:	Pat Gefre
+M:	pfg@sgi.com
+L:	linux-ia64@vger.kernel.org
+S:	Supported
+
 SGI VISUAL WORKSTATION 320 AND 540
 P:	Andrey Panin
 M:	pazke@donpac.ru

@@ -515,8 +515,7 @@ int ip6ip6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 			read_unlock(&ip6ip6_lock);
 			goto discard;
 		}
-		secpath_put(skb->sp);
-		skb->sp = NULL;
+		secpath_reset(skb);
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = skb->data;
 		skb->protocol = htons(ETH_P_IPV6);

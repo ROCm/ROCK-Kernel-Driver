@@ -7776,6 +7776,8 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 
 	tg3_netif_stop(tp);
 
+	del_timer_sync(&tp->timer);
+
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 	tg3_disable_ints(tp);
@@ -7796,6 +7798,9 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 		spin_lock(&tp->tx_lock);
 
 		tg3_init_hw(tp);
+
+		tp->timer.expires = jiffies + tp->timer_offset;
+		add_timer(&tp->timer);
 
 		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
@@ -7826,6 +7831,10 @@ static int tg3_resume(struct pci_dev *pdev)
 	spin_lock(&tp->tx_lock);
 
 	tg3_init_hw(tp);
+
+	tp->timer.expires = jiffies + tp->timer_offset;
+	add_timer(&tp->timer);
+
 	tg3_enable_ints(tp);
 
 	spin_unlock(&tp->tx_lock);

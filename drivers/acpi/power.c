@@ -337,6 +337,9 @@ acpi_power_transition (
 	if (!device || (state < ACPI_STATE_D0) || (state > ACPI_STATE_D3))
 		return_VALUE(-EINVAL);
 
+	if ((device->power.state < ACPI_STATE_D0) || (device->power.state > ACPI_STATE_D3))
+		return_VALUE(-ENODEV);
+
 	cl = &device->power.states[device->power.state].resources;
 	tl = &device->power.states[state].resources;
 
@@ -359,8 +362,6 @@ acpi_power_transition (
 			goto end;
 	}
 
-	device->power.state = state;
-
 	/*
 	 * Then we dereference all power resources used in the current list.
 	 */
@@ -370,6 +371,8 @@ acpi_power_transition (
 			goto end;
 	}
 
+	/* We shouldn't change the state till all above operations succeed */
+	device->power.state = state;
 end:
 	if (result)
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, 

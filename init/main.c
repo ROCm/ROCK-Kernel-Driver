@@ -94,7 +94,7 @@ extern void tc_init(void);
  * Are we up and running (ie do we have all the infrastructure
  * set up)
  */
-int system_running = 0;
+int system_running;
 
 /*
  * Boot command-line arguments

@@ -1,8 +1,8 @@
 /*
  * Network checksum routines
  *
- * Copyright (C) 1999 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1999, 2003 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * Most of the code coming from arch/alpha/lib/checksum.c
  *
@@ -10,6 +10,7 @@
  * in an architecture-specific manner due to speed..
  */
 
+#include <linux/module.h>
 #include <linux/string.h>
 
 #include <asm/byteorder.h>
@@ -39,6 +40,8 @@ csum_tcpudp_magic (unsigned long saddr, unsigned long daddr, unsigned short len,
 	return ~from64to16(saddr + daddr + sum + ((unsigned long) ntohs(len) << 16) +
 			   ((unsigned long) proto << 8));
 }
+
+EXPORT_SYMBOL(csum_tcpudp_magic);
 
 unsigned int
 csum_tcpudp_nofold (unsigned long saddr, unsigned long daddr, unsigned short len,
@@ -84,6 +87,7 @@ csum_partial (const unsigned char * buff, int len, unsigned int sum)
 	return result;
 }
 
+EXPORT_SYMBOL(csum_partial);
 
 /*
  * this routine is used for miscellaneous IP-like checksums, mainly
@@ -94,3 +98,5 @@ ip_compute_csum (unsigned char * buff, int len)
 {
 	return ~do_csum(buff,len);
 }
+
+EXPORT_SYMBOL(ip_compute_csum);

@@ -14,7 +14,6 @@
 
 #include <linux/config.h>
 #include <linux/init.h>
-#ifdef CONFIG_PROC_FS
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <linux/errno.h>
@@ -273,13 +272,3 @@ void llc_proc_exit(void)
 	remove_proc_entry("core", llc_proc_dir);
 	remove_proc_entry("llc", proc_net);
 }
-#else /* CONFIG_PROC_FS */
-int __init llc_proc_init(void)
-{
-	return 0;
-}
-
-void llc_proc_exit(void)
-{
-}
-#endif /* CONFIG_PROC_FS */

@@ -50,6 +50,7 @@
  * 
  */
 #define NR_IRQS 224
+#define NR_IRQ_VECTORS NR_IRQS
 
 #define FPU_IRQ			13
 

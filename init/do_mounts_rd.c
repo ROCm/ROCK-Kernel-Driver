@@ -185,7 +185,7 @@ int __init rd_load_image(char *from)
 	else
 		devblocks >>= 1;
 
-	if (strcmp(from, "/dev/initrd") == 0)
+	if (strcmp(from, "/initrd.image") == 0)
 		devblocks = nblocks;
 
 	if (devblocks == 0) {

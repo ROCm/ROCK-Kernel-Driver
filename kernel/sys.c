@@ -78,8 +78,6 @@ EXPORT_SYMBOL(fs_overflowgid);
 int C_A_D = 1;
 int cad_pid = 1;
 
-extern int system_running;
-
 /*
  *	Notifier list for kernel code which wants to be called
  *	at shutdown. This is used to stop any idling DMA operations

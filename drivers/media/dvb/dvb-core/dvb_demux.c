@@ -105,7 +105,7 @@ void dvb_set_crc32(u8 *data, int length)
 {
 	u32 crc;
 
-	crc = crc32_le(~0, data, length);
+	crc = crc32_be(~0, data, length);
 
 	data[length]   = (crc >> 24) & 0xff;
 	data[length+1] = (crc >> 16) & 0xff;
@@ -116,7 +116,7 @@ void dvb_set_crc32(u8 *data, int length)
 
 static u32 dvb_dmx_crc32 (struct dvb_demux_feed *f, const u8 *src, size_t len)
 {
-	return (f->feed.sec.crc_val = crc32_le (f->feed.sec.crc_val, src, len));
+	return (f->feed.sec.crc_val = crc32_be (f->feed.sec.crc_val, src, len));
 }
 
 

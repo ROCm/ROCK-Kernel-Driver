@@ -109,12 +109,12 @@ int __init initrd_load(void)
 		 * in that case the ram disk is just set up here, and gets
 		 * mounted in the normal path.
 		 */
-		if (rd_load_image("/dev/initrd") && ROOT_DEV != Root_RAM0) {
-			sys_unlink("/dev/initrd");
+		if (rd_load_image("/initrd.image") && ROOT_DEV != Root_RAM0) {
+			sys_unlink("/initrd.image");
 			handle_initrd();
 			return 1;
 		}
 	}
-	sys_unlink("/dev/initrd");
+	sys_unlink("/initrd.image");
 	return 0;
 }

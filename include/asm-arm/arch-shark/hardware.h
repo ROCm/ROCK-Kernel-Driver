@@ -51,6 +51,7 @@
 
 #define PCIBIOS_MIN_IO          0x6000
 #define PCIBIOS_MIN_MEM         0x50000000
+#define PCIMEM_BASE		0xe8000000
 
 #endif
 

@@ -906,6 +906,9 @@ extern int		netdev_fastroute_obstacles;
 extern void		dev_clear_fastroute(struct net_device *dev);
 #endif
 
+#ifdef CONFIG_SYSCTL
+extern char *net_sysctl_strdup(const char *s);
+#endif
 
 #endif /* __KERNEL__ */
 

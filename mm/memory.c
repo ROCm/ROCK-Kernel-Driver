@@ -525,7 +525,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 		unsigned long end_addr, unsigned long *nr_accounted)
 {
 	unsigned long zap_bytes = ZAP_BLOCK_SIZE;
-	unsigned long tlb_start;	/* For tlb_finish_mmu */
+	unsigned long tlb_start = 0;	/* For tlb_finish_mmu */
 	int tlb_start_valid = 0;
 	int ret = 0;
 

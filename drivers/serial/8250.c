@@ -2086,6 +2086,9 @@ int register_serial(struct serial_struct *req)
 
 int __init early_serial_setup(struct uart_port *port)
 {
+	if (port->line >= ARRAY_SIZE(serial8250_ports))
+		return -ENODEV;
+
 	serial8250_isa_init_ports();
 	serial8250_ports[port->line].port	= *port;
 	serial8250_ports[port->line].port.ops	= &serial8250_pops;

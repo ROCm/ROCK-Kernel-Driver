@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifsglob.h
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -212,6 +212,7 @@ struct cifsFileInfo {
 	int endOfSearch:1;	/* we have reached end of search */
 	int closePend:1;	/* file is marked to close */
 	int emptyDir:1;
+	int invalidHandle:1;  /* file closed via session abend */
 	char * search_resume_name;
 	unsigned int resume_name_length;
 	__u32 resume_key;
@@ -294,7 +295,27 @@ struct servers_not_supported { /* @z4a */
  * following to be declared.
  */
 
-/* BB Every global should have an associated mutex for safe update BB */
+/****************************************************************************
+ *  Locking notes.  All updates to global variables and lists should be
+ *                  protected by spinlocks or semaphores.
+ *
+ *  Spinlocks
+ *  ---------
+ *  GlobalMid_Lock protects:
+ *	list operations on pending_mid_q and oplockQ
+ *      updates to XID counters, multiplex id  and SMB sequence numbers
+ *  GlobalSMBSesLock protects:
+ *	list operations on tcp and SMB session lists and tCon lists
+ *  f_owner.lock protects certain per file struct operations
+ *  mapping->page_lock protects certain per page operations
+ *
+ *  Semaphores
+ *  ----------
+ *  sesSem     operations on smb session
+ *  tconSem    operations on tree connection
+ *  i_sem      inode operations 
+ *
+ ****************************************************************************/
 
 #ifdef DECLARE_GLOBALS_HERE
 #define GLOBAL_EXTERN
@@ -327,7 +348,7 @@ GLOBAL_EXTERN struct list_head GlobalOplock_Q;
 GLOBAL_EXTERN unsigned int GlobalCurrentXid;	/* protected by GlobalMid_Sem */
 GLOBAL_EXTERN unsigned int GlobalTotalActiveXid;	/* prot by GlobalMid_Sem */
 GLOBAL_EXTERN unsigned int GlobalMaxActiveXid;	/* prot by GlobalMid_Sem */
-GLOBAL_EXTERN rwlock_t GlobalMid_Lock;  /* protects above and list operations */
+GLOBAL_EXTERN spinlock_t GlobalMid_Lock;  /* protects above and list operations */
 					/* on midQ entries */
 GLOBAL_EXTERN char Local_System_Name[15];
 

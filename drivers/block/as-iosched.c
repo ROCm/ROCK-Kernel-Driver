@@ -1718,6 +1718,7 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 	struct as_rq *arq = mempool_alloc(ad->arq_pool, gfp_mask);
 
 	if (arq) {
+		memset(arq, 0, sizeof(*arq));
 		RB_CLEAR(&arq->rb_node);
 		arq->request = rq;
 		arq->state = AS_RQ_NEW;

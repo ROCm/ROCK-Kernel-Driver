@@ -2634,9 +2634,14 @@ int register_netdevice(struct net_device *dev)
 	dev->iflink = -1;
 
 	/* Init, if this function is available */
-	ret = -EIO;
-	if (dev->init && dev->init(dev))
-		goto out_err;
+	if (dev->init) {
+		ret = dev->init(dev);
+		if (ret) {
+			if (ret > 0)
+				ret = -EIO;
+			goto out_err;
+		}
+	}
 
 	dev->ifindex = dev_new_index();
 	if (dev->iflink == -1)

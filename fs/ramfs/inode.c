@@ -95,6 +95,11 @@ ramfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	int error = -ENOSPC;
 
 	if (inode) {
+		if (dir->i_mode & S_ISGID) {
+			inode->i_gid = dir->i_gid;
+			if (S_ISDIR(mode))
+				inode->i_mode |= S_ISGID;
+		}
 		d_instantiate(dentry, inode);
 		dget(dentry);	/* Extra count - pin the dentry in core */
 		error = 0;
@@ -125,6 +130,8 @@ static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 		int l = strlen(symname)+1;
 		error = page_symlink(inode, symname, l);
 		if (!error) {
+			if (dir->i_mode & S_ISGID)
+				inode->i_gid = dir->i_gid;
 			d_instantiate(dentry, inode);
 			dget(dentry);
 		} else

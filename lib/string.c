@@ -437,14 +437,12 @@ void * memset(void * s,int c,size_t count)
  * You should not use this function to access IO space, use memcpy_toio()
  * or memcpy_fromio() instead.
  */
-char * bcopy(const char * src, char * dest, int count)
+void bcopy(const char * src, char * dest, int count)
 {
 	char *tmp = dest;
 
 	while (count--)
 		*tmp++ = *src++;
-
-	return dest;
 }
 #endif
 

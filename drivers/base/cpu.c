@@ -23,10 +23,18 @@ EXPORT_SYMBOL(cpu_sysdev_class);
  */
 int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 {
+	int error;
+
 	cpu->node_id = cpu_to_node(num);
 	cpu->sysdev.id = num;
 	cpu->sysdev.cls = &cpu_sysdev_class;
-	return sys_device_register(&cpu->sysdev);
+
+	error = sys_device_register(&cpu->sysdev);
+	if (!error && root)
+		error = sysfs_create_link(&root->sysdev.kobj,
+					  &cpu->sysdev.kobj,
+					  kobject_name(&cpu->sysdev.kobj));
+	return error;
 }
 
 

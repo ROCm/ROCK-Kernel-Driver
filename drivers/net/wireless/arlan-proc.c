@@ -1229,7 +1229,7 @@ static ctl_table arlan_root_table[] =
 //};
 
 
-
+#ifdef CONFIG_PROC_FS
 static struct ctl_table_header *arlan_device_sysctl_header;
 
 int __init init_arlan_proc(void)
@@ -1254,3 +1254,4 @@ void __exit cleanup_arlan_proc(void)
 	arlan_device_sysctl_header = NULL;
 
 }
+#endif

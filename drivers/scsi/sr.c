@@ -289,12 +289,12 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 			return 0;
 
 		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
-		if (rq_data_dir(rq) == WRITE)
-			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
-		else if (rq->data_len)
-			SCpnt->sc_data_direction = SCSI_DATA_READ;
-		else
+		if (!rq->data_len)
 			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+		else if (rq_data_dir(rq) == WRITE)
+			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		else
+			SCpnt->sc_data_direction = SCSI_DATA_READ;
 
 		this_count = rq->data_len;
 		if (rq->timeout)

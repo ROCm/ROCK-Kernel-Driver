@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/connect.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -52,6 +52,8 @@ struct smb_vol {
 	char *domainname;
 	char *UNC;
 	char *UNCip;
+	char *iocharset;  /* local code page for mapping to and from Unicode */
+	char *source_rfc1001_name; /* netbios name of client */
 	uid_t linux_uid;
 	gid_t linux_gid;
 	mode_t file_mode;
@@ -59,6 +61,7 @@ struct smb_vol {
 	int rw;
 	unsigned int rsize;
 	unsigned int wsize;
+	unsigned int sockopt;
 	unsigned short int port;
 };
 
@@ -81,7 +84,9 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	struct list_head *tmp;
 	struct cifsSesInfo *ses;
 	struct cifsTconInfo *tcon;
-
+	
+	if(server->tcpStatus == CifsExiting)
+		return rc;
 	server->tcpStatus = CifsNeedReconnect;
 	server->maxBuf = 0;
 
@@ -182,23 +187,26 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				 sizeof (struct smb_hdr) -
 				 1 /* RFC1001 header and SMB header */ ,
 				 MSG_PEEK /* flags see socket.h */ );
-		if (length < 0) {
-			if (length == -ECONNRESET) {
-				cERROR(1, ("Connection reset by peer "));
-				cifs_reconnect(server);
-				csocket = server->ssocket;
-				continue;
-			} else { /* find define for the -512 returned at unmount time */
-				cFYI(1,("Error on sock_recvmsg(peek) length = %d",
-					length)); 
-			}
+
+		if(server->tcpStatus == CifsExiting) {
 			break;
-		} else if (length == 0) {
-			cFYI(1,("Zero length peek received - dead session?"));
+		} else if (server->tcpStatus == CifsNeedReconnect) {
+			cFYI(1,("Reconnecting after server stopped responding"));
+			cifs_reconnect(server);
+			csocket = server->ssocket;
+			continue;
+		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)) {
+			schedule_timeout(1); /* minimum sleep to prevent looping
+				allowing socket to clear and app threads to set
+				tcpStatus CifsNeedReconnect if server hung */
+			continue;
+		} else if (length <= 0) {
+			cFYI(1,("Reconnecting after unexpected rcvmsg error "));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
 			continue;
 		}
+
 		pdu_length = 4 + ntohl(smb_buffer->smb_buf_length);
 		cFYI(1, ("Peek length rcvd: %d with smb length: %d", length, pdu_length));
 
@@ -222,7 +230,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				cERROR(1,
 				       ("Unknown RFC 1001 frame received not 0x00 nor 0x85"));
 				cifs_dump_mem(" Received Data is: ", temp, length);
-				break;
+				cifs_reconnect(server);
+				csocket = server->ssocket;
+				continue;
 			} else {
 				if ((length != sizeof (struct smb_hdr) - 1)
 				    || (pdu_length >
@@ -236,11 +246,12 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					    ("Invalid size or format for SMB found with length %d and pdu_lenght %d",
 						length, pdu_length));
 					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
-					/* BB fix by finding next smb signature - and reading off data until next smb ? BB */
-
-					/* BB add reconnect here */
-
-					break;
+					/* could we fix this network corruption by finding next 
+						smb header (instead of killing the session) and
+						restart reading from next valid SMB found? */
+					cifs_reconnect(server);
+					csocket = server->ssocket;
+					continue;
 				} else {	/* length ok */
 
 					length = 0;
@@ -248,19 +259,16 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					iov.iov_len = pdu_length;
 					for (total_read = 0; total_read < pdu_length; total_read += length) {	
              /* Should improve check for buffer overflow with bad pdu_length */
-						/*  iov.iov_base = smb_buffer+total_read;
-						   iov.iov_len =  pdu_length-total_read; */
 						length = sock_recvmsg(csocket, &smb_msg, 
 							pdu_length - total_read, 0);
-         /* cERROR(1,("For iovlen %d Length received: %d with total read %d",
-						   iov.iov_len, length,total_read));       */
 						if (length == 0) {
 							cERROR(1,
 							       ("Zero length receive when expecting %d ",
 								pdu_length - total_read));
-							/* BB add reconnect here */
-							break;
-						}						
+							cifs_reconnect(server);
+							csocket = server->ssocket;
+							continue;
+						}
 					}
 				}
 
@@ -272,7 +280,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				}
 
 				task_to_wake = NULL;
-				read_lock(&GlobalMid_Lock);
+				spin_lock(&GlobalMid_Lock);
 				list_for_each(tmp, &server->pending_mid_q) {
 					mid_entry = list_entry(tmp, struct
 							       mid_q_entry,
@@ -288,7 +296,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 						    MID_RESPONSE_RECEIVED;
 					}
 				}
-				read_unlock(&GlobalMid_Lock);
+				spin_unlock(&GlobalMid_Lock);
 				if (task_to_wake) {
 					smb_buffer = NULL;	/* will be freed by users thread after he is done */
 					wake_up_process(task_to_wake);
@@ -432,6 +440,20 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 				printk(KERN_WARNING "CIFS: domain name too long\n");
 				return 1;
 			}
+		} else if (strnicmp(data, "iocharset", 9) == 0) {
+			if (!value || !*value) {
+				printk(KERN_WARNING "CIFS: invalid iocharset specified\n");
+				return 1;	/* needs_arg; */
+			}
+			if (strnlen(value, 65) < 65) {
+				if(strnicmp(value,"default",7))
+					vol->iocharset = value;
+				/* if iocharset not set load_nls_default used by caller */
+				cFYI(1, ("iocharset set to %s",value));
+			} else {
+				printk(KERN_WARNING "CIFS: iocharset name too long.\n");
+				return 1;
+			}
 		} else if (strnicmp(data, "uid", 3) == 0) {
 			if (value && *value) {
 				vol->linux_uid =
@@ -466,6 +488,19 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 			if (value && *value) {
 				vol->wsize =
 					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "sockopt", 5) == 0) {
+			if (value && *value) {
+				vol->sockopt =
+					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "netbiosname", 4) == 0) {
+			if (!value || !*value) {
+				vol->source_rfc1001_name = NULL;
+			} else if (strnlen(value, 17) < 17) {
+				vol->source_rfc1001_name = value;
+			} else {
+				printk(KERN_WARNING "CIFS: netbiosname too long (more than 15)\n");
 			}
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
@@ -722,13 +757,13 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	int rc = 0;
 
 	if(*csocket == NULL) {
-	    rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
-	    if (rc < 0) {
+		rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
+		if (rc < 0) {
 			cERROR(1, ("Error %d creating socket",rc));
 			*csocket = NULL;
 			return rc;
-	    } else {
-		/* BB other socket options to set KEEPALIVE, timeouts? NODELAY? */
+		} else {
+		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			cFYI(1,("Socket created"));
 		}
 	}
@@ -763,6 +798,11 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		}
 	}
 
+	/* Eventually check for other socket options to change from 
+		the default. sock_setsockopt not used because it expects 
+		user space buffer */
+	(*csocket)->sk->sk_rcvtimeo = 8 * HZ;
+		
 	return rc;
 }
 
@@ -861,6 +901,19 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		       ("CIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
 		FreeXid(xid);
 		return -EINVAL;
+	}
+
+	/* this is needed for ASCII cp to Unicode converts */
+	if(volume_info.iocharset == NULL) {
+		cifs_sb->local_nls = load_nls_default();
+	/* load_nls_default can not return null */
+	} else {
+		cifs_sb->local_nls = load_nls(volume_info.iocharset);
+		if(cifs_sb->local_nls == NULL) {
+			cERROR(1,("CIFS mount error: iocharset %s not found",volume_info.iocharset));
+			FreeXid(xid);
+			return -ELIBACC;
+		}
 	}
 
 	existingCifsSes =
@@ -999,6 +1052,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 
 /* on error free sesinfo and tcon struct if needed */
 	if (rc) {
+		if(atomic_read(&srvTcp->socketUseCount) == 0)
+                	srvTcp->tcpStatus = CifsExiting;
 		           /* If find_unc succeeded then rc == 0 so we can not end */
 		if (tcon)  /* up here accidently freeing someone elses tcon struct */
 			tconInfoFree(tcon);

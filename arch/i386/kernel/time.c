@@ -104,6 +104,15 @@ void do_gettimeofday(struct timeval *tv)
 		lost = jiffies - wall_jiffies;
 		if (lost)
 			usec += lost * (1000000 / HZ);
+
+		/*
+		 * If time_adjust is negative then NTP is slowing the clock
+		 * so make sure not to go into next possible interval.
+		 * Better to lose some accuracy than have time go backwards..
+		 */
+		if (unlikely(time_adjust < 0) && usec > tickadj)
+			usec = tickadj;
+
 		sec = xtime.tv_sec;
 		usec += (xtime.tv_nsec / 1000);
 	} while (read_seqretry(&xtime_lock, seq));
