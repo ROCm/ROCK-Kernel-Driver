@@ -2245,6 +2245,7 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 		qc->scsicmd = NULL;
 		qc->ap = ap;
 		qc->dev = dev;
+		qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 		INIT_LIST_HEAD(&qc->node);
 		init_MUTEX_LOCKED(&qc->sem);
 
