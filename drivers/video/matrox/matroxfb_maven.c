@@ -215,6 +215,13 @@ static void DAC1064_calcclock(unsigned int freq, unsigned int fmax,
 	return;
 }
 
+static unsigned char maven_compute_deflicker (const struct maven_data* md) {
+	unsigned char df;
+	
+	df = (md->version == MGATVO_B?0x40:0x00);
+	return df;
+}
+
 static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* data) {
 	static struct mavenregs palregs = { {
 		0x2A, 0x09, 0x8A, 0xCB,	/* 00: chroma subcarrier */
@@ -321,13 +328,14 @@ static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* dat
 		0x00,	/* never written */
 	}, MATROXFB_OUTPUT_MODE_NTSC, 525, 60 };
 	MINFO_FROM(md->primary_head);
-	
+
 	if (ACCESS_FBINFO(outputs[1]).mode == MATROXFB_OUTPUT_MODE_PAL)
 		*data = palregs;
 	else
 		*data = ntscregs;
 
-	data->regs[0x93] = 0xA2;
+	/* Set deflicker */
+	data->regs[0x93] = maven_compute_deflicker(md);
 
 	/* gamma correction registers */
 	data->regs[0x83] = 0x00;
@@ -468,7 +476,7 @@ static void maven_init_TV(struct i2c_client* c, const struct mavenregs* m) {
 	LR(0xC2);
 
 	maven_get_reg(c, 0x8D);
-	maven_set_reg(c, 0x8D, 0x00);
+	maven_set_reg(c, 0x8D, 0x04);
 
 	LR(0x20);	/* saturation #1 */
 	LR(0x22);	/* saturation #2 */
@@ -493,7 +501,7 @@ static void maven_init_TV(struct i2c_client* c, const struct mavenregs* m) {
 	LR(0x8B);
 
 	val = maven_get_reg(c, 0x8D);
-	val &= 0x10;			/* 0x10 or anything ored with it */
+	val &= 0x14;			/* 0x10 or anything ored with it */
 	maven_set_reg(c, 0x8D, val);
 
 	LR(0x33);
@@ -800,7 +808,7 @@ static inline int maven_compute_timming(struct maven_data* md,
 	m->regs[0xB0] = 0x03;	/* output: monitor */
 	m->regs[0xB1] = 0xA0;	/* ??? */
 	m->regs[0x8C] = 0x20;	/* must be set... */
-	m->regs[0x8D] = 0x00;	/* defaults to 0x10: test signal */
+	m->regs[0x8D] = 0x04;	/* defaults to 0x10: test signal */
 	m->regs[0xB9] = 0x1A;	/* defaults to 0x2C: too bright */
 	m->regs[0xBF] = 0x22;	/* makes picture stable */
 

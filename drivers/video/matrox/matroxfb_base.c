@@ -80,6 +80,9 @@
  *               "Denis Zaitsev" <zzz@cd-club.ru>
  *                     Fixes
  *
+ *               "Mike Pieper" <mike@pieper-family.de>
+ *                     TVOut enhandcements.
+ *
  * (following author is not in any relation with this code, but his code
  *  is included in this driver)
  *
