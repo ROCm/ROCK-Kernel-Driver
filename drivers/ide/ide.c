@@ -869,7 +869,6 @@ void ide_unregister (unsigned int index)
 #ifndef CONFIG_BLK_DEV_IDECS
 	hwif->irq			= old_hwif.irq;
 #endif /* CONFIG_BLK_DEV_IDECS */
-	hwif->initializing		= old_hwif.initializing;
 
 	hwif->dma_base			= old_hwif.dma_base;
 	hwif->dma_master		= old_hwif.dma_master;
