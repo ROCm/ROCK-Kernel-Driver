@@ -217,6 +217,7 @@
 #include <linux/compiler.h>
 #include <linux/completion.h>
 #include <linux/dcache.h>
+#include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/fcntl.h>
 #include <linux/file.h>
@@ -2300,8 +2301,7 @@ static int halt_bulk_in_endpoint(struct fsg_dev *fsg)
 		}
 
 		/* Wait for a short time and then try again */
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout(HZ / 10) != 0)
+		if (msleep_interruptible(100) != 0)
 			return -EINTR;
 		rc = usb_ep_set_halt(fsg->bulk_in);
 	}
