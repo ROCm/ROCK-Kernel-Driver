@@ -18,10 +18,18 @@ int prof_on;
 int __init profile_setup(char * str)
 {
 	int par;
+
+	if (!strncmp(str, "schedule", 8)) {
+		prof_on = 2;
+		printk(KERN_INFO "kernel schedule profiling enabled\n");
+		if (str[7] == ',')
+			str += 8;
+	}
 	if (get_option(&str,&par)) {
 		prof_shift = par;
 		prof_on = 1;
-		printk(KERN_INFO "kernel profiling enabled\n");
+		printk(KERN_INFO "kernel profiling enabled (shift: %ld)\n",
+			prof_shift);
 	}
 	return 1;
 }
