@@ -207,16 +207,15 @@ int ide_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
-	int nents;
 
-	nents = blk_rq_map_sg(drive->queue, rq, hwif->sg_table);
-		
+	ide_map_sg(drive, rq);
+
 	if (rq_data_dir(rq) == READ)
 		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
 	else
 		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
 
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
+	return pci_map_sg(hwif->pci_dev, sg, hwif->sg_nents, hwif->sg_dma_direction);
 }
 
 EXPORT_SYMBOL_GPL(ide_build_sglist);
@@ -236,33 +235,18 @@ int ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
-	int nents = 0;
 	ide_task_t *args = rq->special;
-	u8 *virt_addr = rq->buffer;
-	int sector_count = rq->nr_sectors;
 
 	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
 		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
 	else
 		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
 
-#if 1
-	if (sector_count > 256)
-		BUG();
+	BUG_ON(rq->nr_sectors > 256);
 
-	if (sector_count > 128) {
-#else
-	while (sector_count > 128) {
-#endif
-		sg_init_one(&sg[nents], virt_addr, 128 * SECTOR_SIZE);
-		nents++;
-		virt_addr = virt_addr + (128 * SECTOR_SIZE);
-		sector_count -= 128;
-	}
-	sg_init_one(&sg[nents], virt_addr, sector_count * SECTOR_SIZE);
-	nents++;
+	ide_map_sg(drive, rq);
 
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
+	return pci_map_sg(hwif->pci_dev, sg, hwif->sg_nents, hwif->sg_dma_direction);
 }
 
 EXPORT_SYMBOL_GPL(ide_raw_build_sglist);
