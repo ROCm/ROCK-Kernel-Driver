@@ -8,6 +8,7 @@
 #define _ASM_MMZONE_H_
 
 #include <linux/config.h>
+#include <asm/smp.h>
 
 #ifdef CONFIG_DISCONTIGMEM
 
@@ -21,7 +22,6 @@ extern int numa_node_exists[];
 extern int numa_cpu_lookup_table[];
 extern int numa_memory_lookup_table[];
 
-#define MAX_NUMNODES 16
 #define MAX_MEMORY (1UL << 41)
 /* 256MB regions */
 #define MEMORY_INCREMENT_SHIFT 28
@@ -53,7 +53,6 @@ static inline int pa_to_nid(unsigned long pa)
  */
 #define NODE_DATA(nid)		(&node_data[nid])
 
-#define node_startnr(nid)	(NODE_DATA(nid)->node_start_mapnr)
 #define node_size(nid)		(NODE_DATA(nid)->node_size)
 #define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
@@ -87,6 +86,7 @@ static inline int __cpu_to_node(int cpu)
 
 #define node_mem_map(nid)	(NODE_DATA(nid)->node_mem_map)
 #define node_start_pfn(nid)	(NODE_DATA(nid)->node_start_pfn)
+#define node_end_pfn(nid)	(NODE_DATA(nid)->node_end_pfn)
 
 #define local_mapnr(kvaddr) \
 	( (__pa(kvaddr) >> PAGE_SHIFT) - node_start_pfn(kvaddr_to_nid(kvaddr)) 
@@ -111,6 +111,9 @@ static inline int __cpu_to_node(int cpu)
 	(((__tmp) - page_zone(__tmp)->zone_mem_map) + \
 	 page_zone(__tmp)->zone_start_pfn); \
 })
+
+/* XXX fix for discontiguous physical memory */
+#define discontigmem_pfn_valid(pfn)		((pfn) < num_physpages)
 
 #endif /* CONFIG_DISCONTIGMEM */
 #endif /* _ASM_MMZONE_H_ */

@@ -213,7 +213,7 @@ asmlinkage long sys32_readv(u32 fd, struct iovec32 *vector, u32 count)
 		goto bad_file;
 
 	if (file->f_op && (file->f_mode & FMODE_READ) &&
-     (file->f_op->readv || file->f_op->read))
+	    (file->f_op->readv || file->f_op->read))
 		ret = do_readv_writev32(VERIFY_WRITE, file, vector, count);
 	fput(file);
 
@@ -237,8 +237,6 @@ asmlinkage long sys32_writev(u32 fd, struct iovec32 *vector, u32 count)
 bad_file:
 	return ret;
 }
-
-
 
 static inline int get_flock(struct flock *kfl, struct flock32 *ufl)
 {
@@ -656,8 +654,8 @@ asmlinkage long sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, u32 tvp_x)
 	char *bits;
 	unsigned long nn;
 	long timeout;
-	int ret, size;
-	
+	int ret, size, max_fdset;
+
 	timeout = MAX_SCHEDULE_TIMEOUT;
 	if (tvp) {
 		time_t sec, usec;
@@ -679,8 +677,11 @@ asmlinkage long sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, u32 tvp_x)
 	ret = -EINVAL;
 	if (n < 0)
 		goto out_nofds;
-	if (n > current->files->max_fdset)
-		n = current->files->max_fdset;
+
+	/* max_fdset can increase, so grab it once to avoid race */
+	max_fdset = current->files->max_fdset;
+	if (n > max_fdset)
+		n = max_fdset;
 
 	/*
 	 * We need 6 bitmaps (in/out/ex for both incoming and outgoing),

@@ -90,7 +90,9 @@ _STATIC(__start)
 	 * between physical addresses and absolute addresses) and
 	 * to the pidhash table (also used by the debugger) */
 	.llong msChunks-KERNELBASE
+#ifdef CONFIG_PPC_ISERIES
 	.llong pidhash-KERNELBASE
+#endif
 
 	/* Offset 0x38 - Pointer to start of embedded System.map */
 	.globl	embedded_sysmap_start
