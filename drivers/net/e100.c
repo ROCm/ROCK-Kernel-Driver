@@ -287,6 +287,7 @@ enum scb_cmd_hi {
 };
 
 enum scb_cmd_lo {
+	cuc_nop        = 0x00,
 	ruc_start      = 0x01,
 	ruc_load_base  = 0x06,
 	cuc_start      = 0x10,
@@ -514,10 +515,11 @@ struct nic {
 	/* End: frequently used values: keep adjacent for cache effect */
 
 	enum {
-		ich           = (1 << 0),
-		promiscuous   = (1 << 1),
-		multicast_all = (1 << 2),
-		wol_magic     = (1 << 3),
+		ich                = (1 << 0),
+		promiscuous        = (1 << 1),
+		multicast_all      = (1 << 2),
+		wol_magic          = (1 << 3),
+		ich_10h_workaround = (1 << 4),
 	} flags					____cacheline_aligned;
 
 	enum mac mac;
@@ -1225,6 +1227,12 @@ static void e100_watchdog(unsigned long data)
 		/* Issue a multicast command to workaround a 557 lock up */
 		e100_set_multicast_list(nic->netdev);
 
+	if(nic->flags & ich && cmd.speed==SPEED_10 && cmd.duplex==DUPLEX_HALF)
+		/* Need SW workaround for ICH[x] 10Mbps/half duplex Tx hang. */
+		nic->flags |= ich_10h_workaround;
+	else
+		nic->flags &= ~ich_10h_workaround;
+
 	mod_timer(&nic->watchdog, jiffies + E100_WATCHDOG_PERIOD);
 }
 
@@ -1244,7 +1252,17 @@ static inline void e100_xmit_prepare(struct nic *nic, struct cb *cb,
 static int e100_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct nic *nic = netdev->priv;
-	int err = e100_exec_cb(nic, skb, e100_xmit_prepare);
+	int err;
+
+	if(nic->flags & ich_10h_workaround) {
+		/* SW workaround for ICH[x] 10Mbps/half duplex Tx hang.
+		   Issue a NOP command followed by a 1us delay before
+		   issuing the Tx command. */
+		e100_exec_cmd(nic, cuc_nop, 0);
+		udelay(1);
+	}
+
+	err = e100_exec_cb(nic, skb, e100_xmit_prepare);
 
 	switch(err) {
 	case -ENOSPC:
