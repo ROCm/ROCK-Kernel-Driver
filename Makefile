@@ -90,25 +90,23 @@ KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
 
 #	If we have only "make modules", don't compile built-in objects.
+#	When we're building modules with modversions, we need to consider
+#	the built-in objects during the descend as well, in order to
+#	make sure the checksums are uptodate before we record them.
 
 ifeq ($(MAKECMDGOALS),modules)
-  KBUILD_BUILTIN :=
+  KBUILD_BUILTIN := $(if $(CONFIG_MODVERSIONS),1)
 endif
 
 #	If we have "make <whatever> modules", compile modules
 #	in addition to whatever we do anyway.
-
-ifneq ($(filter modules,$(MAKECMDGOALS)),)
-  KBUILD_MODULES := 1
-endif
-
 #	Just "make" or "make all" shall build modules as well
 
-ifeq ($(MAKECMDGOALS),)
+ifneq ($(filter all modules,$(MAKECMDGOALS)),)
   KBUILD_MODULES := 1
 endif
 
-ifneq ($(filter all,$(MAKECMDGOALS)),)
+ifeq ($(MAKECMDGOALS),)
   KBUILD_MODULES := 1
 endif
 
@@ -308,18 +306,6 @@ ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
 endif
 
-#	When we're building modules with modversions, we need to consider
-#	the built-in objects during the descend as well, in order to
-#	make sure the checksums are uptodate before we record them.
-
-ifdef CONFIG_MODVERSIONS
-ifeq ($(KBUILD_MODULES),1)
-ifneq ($(KBUILD_BUILTIN),1)
-  KBUILD_BUILTIN := 1
-endif
-endif
-endif
-
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
 # images.  Uncomment if you want to place them anywhere other than root.
@@ -444,9 +430,8 @@ else
 	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
 	@echo '***          inconsistencies'
 endif
-	$(Q)mkdir -p $(MODVERDIR)
 endif
-	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
+	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
 
 #	This can be used by arch/$ARCH/Makefile to preprocess
 #	their vmlinux.lds.S file
@@ -468,9 +453,7 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 %.o: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %/:      scripts prepare FORCE
-	$(Q)$(MAKE) $(build)=$(@D)
-%.ko: scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
+	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) $(build)=$(@D)
 %.lst: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.s: %.S scripts FORCE
@@ -823,6 +806,7 @@ help:
 	@echo  '* vmlinux	  - Build the bare kernel'
 	@echo  '* modules	  - Build all modules'
 	@echo  '  modules_install - Install all modules'
+	@echo  '  dir/            - Build all files in dir and below'
 	@echo  '  dir/file.[ois]  - Build specified target only'
 	@echo  '  rpm		  - Build a kernel as an RPM package'
 	@echo  '  tags/TAGS	  - Generate tags file for editors'
