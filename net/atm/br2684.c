@@ -732,9 +732,10 @@ static int br2684_seq_show(struct seq_file *seq, void *v)
 #ifdef CONFIG_ATM_BR2684_IPFILTER
 #define b1(var, byte)	((u8 *) &brvcc->filter.var)[byte]
 #define bs(var)		b1(var, 0), b1(var, 1), b1(var, 2), b1(var, 3)
-			if (brvcc->filter.netmask != 0 && pos-- == 0)
-				return sprintf(buf, "    filter=%d.%d.%d.%d/"
-				    "%d.%d.%d.%d\n", bs(prefix), bs(netmask));
+			if (brvcc->filter.netmask != 0)
+				seq_printf(seq, "    filter=%d.%d.%d.%d/"
+						"%d.%d.%d.%d\n",
+						bs(prefix), bs(netmask));
 #undef bs
 #undef b1
 #endif /* CONFIG_ATM_BR2684_IPFILTER */
