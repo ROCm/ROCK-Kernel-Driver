@@ -841,7 +841,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 		if ((ret = checkintf(ps, ifnum)))
 			return ret;
 	}
-	if ((uurb.endpoint & ~USB_ENDPOINT_DIR_MASK) != 0)
+	if ((uurb.endpoint & USB_ENDPOINT_DIR_MASK) != 0)
 		ep = ps->dev->ep_in [uurb.endpoint & USB_ENDPOINT_NUMBER_MASK];
 	else
 		ep = ps->dev->ep_out [uurb.endpoint & USB_ENDPOINT_NUMBER_MASK];

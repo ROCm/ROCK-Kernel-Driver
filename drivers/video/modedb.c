@@ -37,7 +37,7 @@ const char *global_mode_option;
 
 #define DEFAULT_MODEDB_INDEX	0
 
-static const __init struct fb_videomode modedb[] = {
+static const struct fb_videomode modedb[] = {
     {
 	/* 640x400 @ 70 Hz, 31.5 kHz hsync */
 	NULL, 70, 640, 400, 39721, 40, 24, 39, 9, 96, 2,

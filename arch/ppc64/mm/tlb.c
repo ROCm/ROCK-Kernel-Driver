@@ -85,8 +85,12 @@ void hpte_update(pte_t *ptep, unsigned long pte, int wrprot)
 
 	ptepage = virt_to_page(ptep);
 	mm = (struct mm_struct *) ptepage->mapping;
-	addr = ptepage->index +
-		(((unsigned long)ptep & ~PAGE_MASK) * PTRS_PER_PTE);
+	addr = ptepage->index;
+	if (pte_huge(pte))
+		addr +=  ((unsigned long)ptep & ~PAGE_MASK)
+			/ sizeof(*ptep) * HPAGE_SIZE;
+	else
+		addr += ((unsigned long)ptep & ~PAGE_MASK) * PTRS_PER_PTE;
 
 	if (REGION_ID(addr) == USER_REGION_ID)
 		context = mm->context.id;

@@ -98,6 +98,7 @@ struct ipt_hashlimit_htable {
 };
 
 static DECLARE_RWLOCK(hashlimit_lock);	/* protects htables list */
+static DECLARE_MUTEX(hlimit_mutex);	/* additional checkentry protection */
 static LIST_HEAD(hashlimit_htables);
 static kmem_cache_t *hashlimit_cachep;
 
@@ -531,10 +532,19 @@ hashlimit_checkentry(const char *tablename,
 	if (!r->cfg.expire)
 		return 0;
 
+	/* This is the best we've got: We cannot release and re-grab lock,
+	 * since checkentry() is called before ip_tables.c grabs ipt_mutex.  
+	 * We also cannot grab the hashtable spinlock, since htable_create will 
+	 * call vmalloc, and that can sleep.  And we cannot just re-search
+	 * the list of htable's in htable_create(), since then we would
+	 * create duplicate proc files. -HW */
+	down(&hlimit_mutex);
 	r->hinfo = htable_find_get(r->name);
 	if (!r->hinfo && (htable_create(r) != 0)) {
+		up(&hlimit_mutex);
 		return 0;
 	}
+	up(&hlimit_mutex);
 
 	/* Ugly hack: For SMP, we only want to use one set */
 	r->u.master = r;

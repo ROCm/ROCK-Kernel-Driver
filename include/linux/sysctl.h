@@ -797,6 +797,8 @@ extern int proc_dointvec_jiffies(ctl_table *, int, struct file *,
 				 void __user *, size_t *, loff_t *);
 extern int proc_dointvec_userhz_jiffies(ctl_table *, int, struct file *,
 					void __user *, size_t *, loff_t *);
+extern int proc_dointvec_ms_jiffies(ctl_table *, int, struct file *,
+				    void __user *, size_t *, loff_t *);
 extern int proc_doulongvec_minmax(ctl_table *, int, struct file *,
 				  void __user *, size_t *, loff_t *);
 extern int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int,
@@ -814,6 +816,7 @@ extern int do_sysctl_strategy (ctl_table *table,
 extern ctl_handler sysctl_string;
 extern ctl_handler sysctl_intvec;
 extern ctl_handler sysctl_jiffies;
+extern ctl_handler sysctl_ms_jiffies;
 
 
 /*
