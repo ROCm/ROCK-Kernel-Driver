@@ -507,12 +507,9 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 
 	switch (dev->device) {
 	case PCI_DEVICE_ID_SERVERWORKS_HE:
-		agp_bridge->type = SVWRKS_HE;
-		return serverworks_setup(bridge_dev);
-
 	case PCI_DEVICE_ID_SERVERWORKS_LE:
 	case 0x0007:
-		agp_bridge->type = SVWRKS_LE;
+		agp_bridge->type = SVWRKS_GENERIC;
 		return serverworks_setup(bridge_dev);
 
 	default:
