@@ -304,6 +304,7 @@ static void __exit exit_nls_iso8859_15(void)
 
 module_init(init_nls_iso8859_15)
 module_exit(exit_nls_iso8859_15)
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

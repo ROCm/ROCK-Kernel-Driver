@@ -37,7 +37,6 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 
-#include <asm/segment.h>
 #include <asm/atarihw.h>
 #include <asm/traps.h>
 #include <asm/uaccess.h>	/* For put_user and get_user */

@@ -25,6 +25,7 @@
 #include <linux/init.h>
 #include <linux/locks.h>
 #include <linux/blkdev.h>
+#include <linux/random.h>
 #include <asm/uaccess.h>
 
 
@@ -623,6 +624,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 	sb->u.ext2_sb.s_loaded_inode_bitmaps = 0;
 	sb->u.ext2_sb.s_loaded_block_bitmaps = 0;
 	sb->u.ext2_sb.s_gdb_count = db_count;
+	get_random_bytes(&sb->u.ext2_sb.s_next_generation, sizeof(u32));
 	/*
 	 * set up enough so that it can read an inode
 	 */

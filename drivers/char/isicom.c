@@ -51,7 +51,6 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/system.h>

@@ -35,6 +35,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - AC Adapter Driver");
+MODULE_LICENSE("GPL");
 
 
 #define AC_PROC_ROOT		"ac_adapter"

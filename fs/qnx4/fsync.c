@@ -21,7 +21,6 @@
 #include <linux/fs.h>
 #include <linux/qnx4_fs.h>
 
-#include <asm/segment.h>
 #include <asm/system.h>
 
 /*

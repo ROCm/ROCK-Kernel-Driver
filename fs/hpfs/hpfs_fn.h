@@ -19,7 +19,6 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <asm/bitops.h>
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
 

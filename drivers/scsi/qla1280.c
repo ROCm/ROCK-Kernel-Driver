@@ -192,7 +192,6 @@ END OF TERMS AND CONDITIONS
 #include <stdarg.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/segment.h>
 #include <asm/byteorder.h>
 #include <linux/version.h>
 #include <linux/types.h>

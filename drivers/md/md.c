@@ -4042,4 +4042,4 @@ EXPORT_SYMBOL(md_interrupt_thread);
 EXPORT_SYMBOL(mddev_map);
 EXPORT_SYMBOL(md_check_ordering);
 EXPORT_SYMBOL(get_spare);
-
+MODULE_LICENSE("GPL");

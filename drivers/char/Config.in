@@ -16,7 +16,7 @@ if [ "$CONFIG_SERIAL" = "y" ]; then
       tristate '   Dual serial port support' CONFIG_DUALSP_SERIAL
    fi
 fi
-if [ "$CONFIG_ACPI" = "y" ]; then
+if [ "$CONFIG_ACPI" = "y" -a "$CONFIG_IA64" = "y" ]; then
    bool '  Support for serial ports defined by ACPI tables' CONFIG_SERIAL_ACPI
 fi
 dep_mbool 'Extended dumb serial driver options' CONFIG_SERIAL_EXTENDED $CONFIG_SERIAL

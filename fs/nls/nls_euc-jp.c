@@ -581,6 +581,7 @@ static void __exit exit_nls_euc_jp(void)
 
 module_init(init_nls_euc_jp)
 module_exit(exit_nls_euc_jp)
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

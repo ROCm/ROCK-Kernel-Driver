@@ -50,7 +50,6 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <asm/segment.h>
 #include <linux/init.h>
 
 #if LINUX_VERSION_CODE < 0x20155

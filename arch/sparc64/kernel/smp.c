@@ -17,6 +17,7 @@
 #include <linux/spinlock.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/cache.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>
@@ -39,17 +40,17 @@ extern int linux_num_cpus;
 extern void calibrate_delay(void);
 extern unsigned prom_cpu_nodes[];
 
-struct cpuinfo_sparc cpu_data[NR_CPUS]  __attribute__ ((aligned (64)));
+cpuinfo_sparc cpu_data[NR_CPUS];
 
-volatile int __cpu_number_map[NR_CPUS]  __attribute__ ((aligned (64)));
-volatile int __cpu_logical_map[NR_CPUS] __attribute__ ((aligned (64)));
+volatile int __cpu_number_map[NR_CPUS]  __attribute__ ((aligned (SMP_CACHE_BYTES)));
+volatile int __cpu_logical_map[NR_CPUS] __attribute__ ((aligned (SMP_CACHE_BYTES)));
 
 /* Please don't make this stuff initdata!!!  --DaveM */
 static unsigned char boot_cpu_id = 0;
 static int smp_activated = 0;
 
 /* Kernel spinlock */
-spinlock_t kernel_flag = SPIN_LOCK_UNLOCKED;
+spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 volatile int smp_processors_ready = 0;
 unsigned long cpu_present_map = 0;

@@ -12,7 +12,7 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
-#include <linux/slab.h>
+#include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/config.h>	/* Joliet? */
 

@@ -11,6 +11,7 @@
  * ------------------------------------------------------------------------- */
 
 #include <linux/kernel.h>
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/locks.h>

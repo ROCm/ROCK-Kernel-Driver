@@ -44,7 +44,6 @@
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <linux/fcntl.h>

@@ -165,12 +165,13 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 	while ((entry = entry->prev) != &q->queue_head) {
 		__rq = list_entry_rq(entry);
 
+		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
+			break;
+
 		/*
 		 * simply "aging" of requests in queue
 		 */
 		if (__rq->elevator_sequence-- <= 0)
-			break;
-		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
 			break;
 		if (!(__rq->flags & REQ_CMD))
 			continue;

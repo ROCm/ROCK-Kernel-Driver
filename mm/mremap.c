@@ -4,6 +4,7 @@
  *	(C) Copyright 1996 Linus Torvalds
  */
 
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/shm.h>

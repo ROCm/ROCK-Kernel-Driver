@@ -57,7 +57,6 @@
 #include <linux/errno.h>	/* for -EBUSY */
 #include <linux/ioport.h>	/* for check_region, request_region */
 #include <linux/delay.h>	/* for loops_per_jiffy */
-#include <asm/segment.h>	/* for put_user_byte */
 #include <asm/io.h>		/* for inb_p, outb_p, inb, outb, etc. */
 #include <asm/uaccess.h>	/* for get_user, etc. */
 #include <linux/wait.h>		/* for wait_queue */

@@ -29,7 +29,6 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
-#include <asm/segment.h>
 
 #include <linux/ftape.h>
 #if LINUX_VERSION_CODE >= KERNEL_VER(2,1,16)

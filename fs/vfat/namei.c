@@ -1040,8 +1040,8 @@ int vfat_create(struct inode *dir,struct dentry* dentry,int mode)
 		return res;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
-	inode->i_version = ++event;
-	dir->i_version = event;
+	inode->i_version++;
+	dir->i_version++;
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
 	d_instantiate(dentry,inode);
 	return 0;
@@ -1057,7 +1057,7 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 	/* remove the shortname */
 	dir->i_mtime = CURRENT_TIME;
 	dir->i_atime = CURRENT_TIME;
-	dir->i_version = ++event;
+	dir->i_version++;
 	mark_inode_dirty(dir);
 	de->name[0] = DELETED_FLAG;
 	fat_mark_buffer_dirty(sb, bh);
@@ -1138,8 +1138,8 @@ int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 		goto out;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
-	inode->i_version = ++event;
-	dir->i_version = event;
+	inode->i_version++;
+	dir->i_version++;
 	dir->i_nlink++;
 	inode->i_nlink = 2; /* no need to mark them dirty */
 	res = fat_new_dir(inode, dir, 1);
@@ -1209,7 +1209,7 @@ int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
 		if (res < 0) goto rename_done;
 	}
 
-	new_dir->i_version = ++event;
+	new_dir->i_version++;
 
 	/* releases old_bh */
 	vfat_remove_entry(old_dir,&old_sinfo,old_bh,old_de);
@@ -1218,7 +1218,7 @@ int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
 	fat_attach(old_inode, sinfo.ino);
 	mark_inode_dirty(old_inode);
 
-	old_dir->i_version = ++event;
+	old_dir->i_version++;
 	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(old_dir);
 	if (new_inode) {

@@ -71,7 +71,6 @@
 
 #include <asm/system.h>
 #include <asm/bitops.h>
-#include <asm/segment.h>
 #include <asm/byteorder.h>
 #include <asm/types.h>
 

@@ -5,6 +5,8 @@
 #ifndef __LINUX_FILE_H
 #define __LINUX_FILE_H
 
+#include <linux/sched.h>
+
 extern void FASTCALL(fput(struct file *));
 extern struct file * FASTCALL(fget(unsigned int fd));
  

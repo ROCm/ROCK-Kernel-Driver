@@ -8,6 +8,7 @@
  *  started by Ingo Molnar, Copyright (C) 2001
  */
 
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/mempool.h>

@@ -37,6 +37,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - IA32 Processor Driver");
+MODULE_LICENSE("GPL");
 
 
 #define PR_PROC_ROOT		"processor"

@@ -173,7 +173,6 @@ static int bfs_unlink(struct inode * dir, struct dentry * dentry)
 		inode->i_nlink = 1;
 	}
 	de->ino = 0;
-	dir->i_version = ++event;
 	mark_buffer_dirty(bh);
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(dir);
@@ -226,7 +225,6 @@ static int bfs_rename(struct inode * old_dir, struct dentry * old_dentry,
 	}
 	old_de->ino = 0;
 	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
-	old_dir->i_version = ++event;
 	mark_inode_dirty(old_dir);
 	if (new_inode) {
 		new_inode->i_nlink--;
@@ -279,7 +277,6 @@ static int bfs_add_entry(struct inode * dir, const char * name, int namelen, int
 				}
 				dir->i_mtime = CURRENT_TIME;
 				mark_inode_dirty(dir);
-				dir->i_version = ++event;
 				de->ino = ino;
 				for (i=0; i<BFS_NAMELEN; i++)
 					de->name[i] = (i < namelen) ? name[i] : 0;

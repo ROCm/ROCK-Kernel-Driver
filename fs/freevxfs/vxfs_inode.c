@@ -35,6 +35,7 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/pagemap.h>
 
 #include "vxfs.h"
 #include "vxfs_inode.h"

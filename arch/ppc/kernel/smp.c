@@ -23,6 +23,7 @@
 #include <linux/unistd.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/cache.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -47,7 +48,7 @@ struct cpuinfo_PPC cpu_data[NR_CPUS];
 struct klock_info_struct klock_info = { KLOCK_CLEAR, 0 };
 atomic_t ipi_recv;
 atomic_t ipi_sent;
-spinlock_t kernel_flag __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 unsigned int prof_multiplier[NR_CPUS];
 unsigned int prof_counter[NR_CPUS];
 cycles_t cacheflush_time;

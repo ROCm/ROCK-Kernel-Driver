@@ -1247,3 +1247,4 @@ static void set_rx_mode(struct net_device *dev)
     }
     restore_flags(flags);
 }
+MODULE_LICENSE("GPL");

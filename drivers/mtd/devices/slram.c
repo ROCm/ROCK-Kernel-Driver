@@ -20,7 +20,6 @@
 #include <linux/init.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/segment.h>
 #include <stdarg.h>
 
 #include <linux/mtd/mtd.h>

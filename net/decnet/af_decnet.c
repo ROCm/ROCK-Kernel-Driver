@@ -112,7 +112,6 @@ Version 0.0.6    2.1.110   07-aug-98   Eduardo Marcelo Serrat
 #include <linux/route.h>
 #include <linux/netfilter.h>
 #include <net/sock.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/ioctls.h>
 #include <linux/mm.h>

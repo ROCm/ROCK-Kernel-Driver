@@ -32,7 +32,6 @@
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 
 #include <net/irda/irda.h>

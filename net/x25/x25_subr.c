@@ -34,7 +34,6 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>

@@ -64,7 +64,6 @@
 #include <asm/pgtable.h>
 #include <asm/irq.h>
 #include <asm/system.h>
-#include <asm/segment.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/wbflush.h>

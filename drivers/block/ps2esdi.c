@@ -51,7 +51,6 @@
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/segment.h>
 #include <asm/dma.h>
 #include <asm/mca_dma.h>
 #include <asm/uaccess.h>

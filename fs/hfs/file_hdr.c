@@ -359,7 +359,6 @@ loff_t hdr_llseek(struct file *file, loff_t offset, int origin)
 		if (offset != file->f_pos) {
 			file->f_pos = offset;
 			file->f_reada = 0;
-			file->f_version = ++event;
 		}
 		retval = offset;
 	}

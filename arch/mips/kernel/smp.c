@@ -31,6 +31,7 @@
 #include <linux/timex.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/cache.h>
 
 #include <asm/atomic.h>
 #include <asm/processor.h>
@@ -52,7 +53,7 @@
 
 
 /* Ze Big Kernel Lock! */
-spinlock_t kernel_flag = SPIN_LOCK_UNLOCKED;
+spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 int smp_threads_ready;  /* Not used */
 int smp_num_cpus;    
 int global_irq_holder = NO_PROC_ID;

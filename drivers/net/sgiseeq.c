@@ -16,7 +16,6 @@
 #include <linux/delay.h>
 
 #include <asm/io.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/page.h>

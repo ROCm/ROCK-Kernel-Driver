@@ -111,7 +111,6 @@
  #include <linux/inetdevice.h>
  #include <linux/netdevice.h>
 #else
- #include <asm/segment.h>
  #include <net/route.h>          /* Adding new route entries : 2.0.X kernels */
 #endif
 

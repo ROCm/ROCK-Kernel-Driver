@@ -15,10 +15,10 @@
 #include <linux/types.h>
 #ifdef __KERNEL__
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 #include <linux/tqueue.h>
 #include <asm/unaligned.h>
 #include <linux/bitops.h>
-#include <asm/hardirq.h>
 #include <linux/proc_fs.h>
 #endif
 

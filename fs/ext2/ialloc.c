@@ -393,7 +393,7 @@ repeat:
 	if (inode->u.ext2_i.i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
 	insert_inode_hash(inode);
-	inode->i_generation = event++;
+	inode->i_generation = sb->u.ext2_sb.s_next_generation++;
 	mark_inode_dirty(inode);
 
 	unlock_super (sb);

@@ -80,7 +80,6 @@ asmlinkage long sys_shmget (key_t key, size_t size, int flag);
 asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, unsigned long *addr);
 asmlinkage long sys_shmdt (char *shmaddr);
 asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf);
-extern void shm_unuse(swp_entry_t entry, struct page *page);
 
 #endif /* __KERNEL__ */
 

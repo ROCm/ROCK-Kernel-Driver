@@ -46,7 +46,7 @@ static void page_pool_free(void *page, void *data)
 #ifdef CONFIG_HIGHMEM
 static int pkmap_count[LAST_PKMAP];
 static unsigned int last_pkmap_nr;
-static spinlock_t kmap_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t kmap_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 pte_t * pkmap_page_table;
 

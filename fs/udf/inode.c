@@ -215,7 +215,6 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 	page_cache_release(page);
 
 	mark_inode_dirty(inode);
-	inode->i_version ++;
 }
 
 struct buffer_head * udf_expand_dir_adinicb(struct inode *inode, int *block, int *err)
@@ -310,7 +309,6 @@ struct buffer_head * udf_expand_dir_adinicb(struct inode *inode, int *block, int
 	mark_buffer_dirty(sbh);
 	udf_release_data(sbh);
 	mark_inode_dirty(inode);
-	inode->i_version ++;
 	return dbh;
 }
 
@@ -1033,7 +1031,6 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 	long convtime_usec;
 	int offset, alen;
 
-	inode->i_version = ++event;
 	UDF_I_NEW_INODE(inode) = 0;
 
 	fe = (struct FileEntry *)bh->b_data;

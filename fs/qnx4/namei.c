@@ -21,7 +21,6 @@
 #include <linux/fcntl.h>
 #include <linux/errno.h>
 
-#include <asm/segment.h>
 
 /*
  * check if the filename is correct. For some obscure reason, qnx writes a

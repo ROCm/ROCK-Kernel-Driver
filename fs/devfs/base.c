@@ -517,7 +517,6 @@
     20010730   Richard Gooch <rgooch@atnf.csiro.au>
 	       Added DEVFSD_NOTIFY_DELETE event.
     20010801   Richard Gooch <rgooch@atnf.csiro.au>
-	       Removed #include <asm/segment.h>.
   v0.109
     20010807   Richard Gooch <rgooch@atnf.csiro.au>
 	       Fixed inode table races by removing it and using

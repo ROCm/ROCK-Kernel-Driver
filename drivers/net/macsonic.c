@@ -40,7 +40,6 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/pgtable.h>
-#include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/hwtest.h>
 #include <asm/dma.h>

@@ -21,7 +21,6 @@
 #ifdef CONFIG_NCPFS_EXTRAS
 
 #include <asm/uaccess.h>
-#include <asm/segment.h>
 
 #include <linux/errno.h>
 #include <linux/fs.h>

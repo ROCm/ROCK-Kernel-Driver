@@ -36,6 +36,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Embedded Controller Driver");
+MODULE_LICENSE("GPL");
 
 extern struct proc_dir_entry	*bm_proc_root;
 

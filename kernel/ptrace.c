@@ -121,119 +121,17 @@ int ptrace_detach(struct task_struct *child, unsigned int data)
 }
 
 /*
- * Access another process' address space, one page at a time.
+ * Access another process' address space.
+ * Source/target buffer must be kernel space, 
+ * Do not walk the page table directly, use get_user_pages
  */
-static int access_one_page(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long addr, void *buf, int len, int write)
-{
-	pgd_t * pgdir;
-	pmd_t * pgmiddle;
-	pte_t * pgtable;
-	char *maddr; 
-	struct page *page;
-
-repeat:
-	spin_lock(&mm->page_table_lock);
-	pgdir = pgd_offset(vma->vm_mm, addr);
-	if (pgd_none(*pgdir))
-		goto fault_in_page;
-	if (pgd_bad(*pgdir))
-		goto bad_pgd;
-	pgmiddle = pmd_offset(pgdir, addr);
-	if (pmd_none(*pgmiddle))
-		goto fault_in_page;
-	if (pmd_bad(*pgmiddle))
-		goto bad_pmd;
-	pgtable = pte_offset(pgmiddle, addr);
-	if (!pte_present(*pgtable))
-		goto fault_in_page;
-	if (write && (!pte_write(*pgtable) || !pte_dirty(*pgtable)))
-		goto fault_in_page;
-	page = pte_page(*pgtable);
-
-	/* ZERO_PAGE is special: reads from it are ok even though it's marked reserved */
-	if (page != ZERO_PAGE(addr) || write) {
-		if ((!VALID_PAGE(page)) || PageReserved(page)) {
-			spin_unlock(&mm->page_table_lock);
-			return 0;
-		}
-	}
-	get_page(page);
-	spin_unlock(&mm->page_table_lock);
-	flush_cache_page(vma, addr);
-
-	if (write) {
-		maddr = kmap(page);
-		memcpy(maddr + (addr & ~PAGE_MASK), buf, len);
-		flush_page_to_ram(page);
-		flush_icache_page(vma, page);
-		kunmap(page);
-	} else {
-		maddr = kmap(page);
-		memcpy(buf, maddr + (addr & ~PAGE_MASK), len);
-		flush_page_to_ram(page);
-		kunmap(page);
-	}
-	put_page(page);
-	return len;
-
-fault_in_page:
-	spin_unlock(&mm->page_table_lock);
-	/* -1: out of memory. 0 - unmapped page */
-	if (handle_mm_fault(mm, vma, addr, write) > 0)
-		goto repeat;
-	return 0;
-
-bad_pgd:
-	spin_unlock(&mm->page_table_lock);
-	pgd_ERROR(*pgdir);
-	return 0;
-
-bad_pmd:
-	spin_unlock(&mm->page_table_lock);
-	pmd_ERROR(*pgmiddle);
-	return 0;
-}
-
-static int access_mm(struct mm_struct *mm, struct vm_area_struct * vma, unsigned long addr, void *buf, int len, int write)
-{
-	int copied = 0;
-
-	for (;;) {
-		unsigned long offset = addr & ~PAGE_MASK;
-		int this_len = PAGE_SIZE - offset;
-		int retval;
-
-		if (this_len > len)
-			this_len = len;
-		retval = access_one_page(mm, vma, addr, buf, this_len, write);
-		copied += retval;
-		if (retval != this_len)
-			break;
-
-		len -= retval;
-		if (!len)
-			break;
-
-		addr += retval;
-		buf += retval;
-
-		if (addr < vma->vm_end)
-			continue;	
-		if (!vma->vm_next)
-			break;
-		if (vma->vm_next->vm_start != vma->vm_end)
-			break;
-	
-		vma = vma->vm_next;
-	}
-	return copied;
-}
 
 int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write)
 {
-	int copied;
 	struct mm_struct *mm;
-	struct vm_area_struct * vma;
+	struct vm_area_struct *vma;
+	struct page *page;
+	void *old_buf = buf;
 
 	/* Worry about races with exit() */
 	task_lock(tsk);
@@ -245,14 +143,41 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 		return 0;
 
 	down_read(&mm->mmap_sem);
-	vma = find_extend_vma(mm, addr);
-	copied = 0;
-	if (vma)
-		copied = access_mm(mm, vma, addr, buf, len, write);
+	/* ignore errors, just check how much was sucessfully transfered */
+	while (len) {
+		int bytes, ret, offset;
+		void *maddr;
 
+		ret = get_user_pages(current, mm, addr, 1,
+				write, 1, &page, &vma);
+		if (ret <= 0)
+			break;
+
+		bytes = len;
+		offset = addr & (PAGE_SIZE-1);
+		if (bytes > PAGE_SIZE-offset)
+			bytes = PAGE_SIZE-offset;
+
+		flush_cache_page(vma, addr);
+
+		maddr = kmap(page);
+		if (write) {
+			memcpy(maddr + offset, buf, bytes);
+			flush_page_to_ram(page);
+			flush_icache_page(vma, page);
+		} else {
+			memcpy(buf, maddr + offset, bytes);
+			flush_page_to_ram(page);
+		}
+		kunmap(page);
+		put_page(page);
+		len -= bytes;
+		buf += bytes;
+	}
 	up_read(&mm->mmap_sem);
 	mmput(mm);
-	return copied;
+	
+	return buf - old_buf;
 }
 
 int ptrace_readdata(struct task_struct *tsk, unsigned long src, char *dst, int len)

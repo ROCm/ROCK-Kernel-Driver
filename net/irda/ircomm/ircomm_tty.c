@@ -38,7 +38,6 @@
 #include <linux/tty.h>
 #include <linux/interrupt.h>
 
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 
 #include <net/irda/irda.h>

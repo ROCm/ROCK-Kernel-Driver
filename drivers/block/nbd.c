@@ -45,7 +45,6 @@
 
 #include <linux/devfs_fs_kernel.h>
 
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 #include <asm/types.h>
 

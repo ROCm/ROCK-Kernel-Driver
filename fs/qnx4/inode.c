@@ -18,8 +18,8 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/qnx4_fs.h>
 #include <linux/fs.h>
+#include <linux/qnx4_fs.h>
 #include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/highuid.h>

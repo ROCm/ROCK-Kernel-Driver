@@ -18,7 +18,6 @@
 #include <linux/qnx4_fs.h>
 #include <linux/stat.h>
 
-#include <asm/segment.h>
 
 static int qnx4_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {

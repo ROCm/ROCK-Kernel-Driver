@@ -78,7 +78,6 @@
 
 #else
 
- #include <asm/segment.h>
  #define devinet_ioctl(x,y) dev_ioctl(x,y)
  #define netdevice_t struct device 
  #define test_and_set_bit set_bit

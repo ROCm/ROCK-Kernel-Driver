@@ -65,7 +65,6 @@
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/segment.h>
 #include <asm/bitops.h>
 #include <asm/mvme16xhw.h>
 #include <asm/bootinfo.h>

@@ -39,7 +39,6 @@
 #include <linux/atm_suni.h>
 #include <asm/io.h>
 #include <asm/string.h>
-#include <asm/segment.h>
 #include <asm/page.h>
 #include <asm/irq.h>
 #include <asm/dma.h>

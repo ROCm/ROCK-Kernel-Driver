@@ -35,7 +35,6 @@
 #include <asm/page.h>
 #include <linux/sched.h>
 #include <linux/video_decoder.h>
-#include <asm/segment.h>
 
 #include <linux/version.h>
 #include <asm/uaccess.h>

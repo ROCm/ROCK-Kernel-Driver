@@ -11,7 +11,6 @@
 #include <linux/fs.h>
 #undef N_DATA   /* Because we have our own definition */
 
-#include <asm/segment.h>
 #include <asm/io.h>
 
 #include "sys.h"

@@ -8,6 +8,7 @@
 
 #ifndef _PARPORT_H_
 #define _PARPORT_H_
+#include <linux/sched.h>
 
 /* Start off with user-visible constants */
 

@@ -475,6 +475,7 @@ void get_sectorsize(int i)
 	int the_result, retries;
 	int sector_size;
 	Scsi_Request *SRpnt;
+	request_queue_t *queue;
 
 	buffer = (unsigned char *) kmalloc(512, GFP_DMA);
 	SRpnt = scsi_allocate_request(scsi_CDs[i].device);
@@ -564,8 +565,9 @@ void get_sectorsize(int i)
 		 */
 		scsi_CDs[i].needs_sector_size = 0;
 		sr_sizes[i] = scsi_CDs[i].capacity >> (BLOCK_SIZE_BITS - 9);
-	};
-	blk_queue_hardsect_size(blk_get_queue(MAJOR_NR), sector_size);
+	}
+	queue = &scsi_CDs[i].device->request_queue;
+	blk_queue_hardsect_size(queue, sector_size);
 	kfree(buffer);
 }
 

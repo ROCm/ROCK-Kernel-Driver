@@ -16,7 +16,6 @@
 #include <linux/errno.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
-#include <asm/segment.h>
 #include <linux/string.h>
 #include <asm/uaccess.h>
 

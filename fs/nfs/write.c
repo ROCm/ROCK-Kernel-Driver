@@ -49,7 +49,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/slab.h>
-#include <linux/swap.h>
+#include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
 

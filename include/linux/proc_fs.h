@@ -3,6 +3,8 @@
 
 #include <linux/config.h>
 #include <linux/slab.h>
+#include <linux/fs.h>
+#include <asm/atomic.h>
 
 /*
  * The proc filesystem constants/structures

@@ -87,7 +87,6 @@ static const char StripVersion[] = "1.3-STUART.CHESHIRE";
 #include <linux/init.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/segment.h>
 #include <asm/bitops.h>
 
 /*

@@ -12,7 +12,6 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
-#include <asm/segment.h>
 //#include <asm/smp.h>
 
 #if LINUX_VERSION_CODE < 0x20155

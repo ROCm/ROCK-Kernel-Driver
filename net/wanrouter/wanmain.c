@@ -75,7 +75,6 @@
  #include <../drivers/net/syncppp.h>
 
 #else
- #include <asm/segment.h>	/* kernel <-> user copy */
 #endif
 
 #define KMEM_SAFETYZONE 8

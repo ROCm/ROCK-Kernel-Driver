@@ -29,7 +29,7 @@ dep_tristate '    FIT TD-3000 protocol' CONFIG_PARIDE_FIT3 $CONFIG_PARIDE
 dep_tristate '    Shuttle EPAT/EPEZ protocol' CONFIG_PARIDE_EPAT $CONFIG_PARIDE
 if [ "$CONFIG_PARIDE_EPAT" != "n" ]; then
   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-    bool '     Support c7/c8 chips (EXPERIMENTAL)' CONFIG_PARIDE_EPATC8 $CONFIG_PARIDE
+    bool '     Support c7/c8 chips (EXPERIMENTAL)' CONFIG_PARIDE_EPATC8
   fi
 fi
 

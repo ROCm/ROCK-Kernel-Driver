@@ -35,6 +35,7 @@
 #include <linux/sched.h>
 #include <linux/lp.h>
 #include <linux/slab.h>
+#include <asm/ioctls.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
 #include <linux/delay.h>
@@ -46,7 +47,6 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <asm/io.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/poll.h>
 #include <asm/uaccess.h>

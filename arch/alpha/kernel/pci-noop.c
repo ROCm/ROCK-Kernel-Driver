@@ -104,21 +104,21 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
 }
 /* stubs for the routines in pci_iommu.c */
 void *
-pci_alloc_consistent(struct pci_dev *pdev, long size, dma_addr_t *dma_addrp)
+pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_addrp)
 {
 }
 void
-pci_free_consistent(struct pci_dev *pdev, long size, void *cpu_addr,
+pci_free_consistent(struct pci_dev *pdev, size_t size, void *cpu_addr,
 		    dma_addr_t dma_addr)
 {
 }
 dma_addr_t
-pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size,
+pci_map_single(struct pci_dev *pdev, void *cpu_addr, size_t size,
 	       int direction)
 {
 }
 void
-pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
+pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
 		 int direction)
 {
 }

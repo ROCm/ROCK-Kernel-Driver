@@ -27,7 +27,6 @@
  */
  
 #include <linux/config.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 #include <linux/types.h>
 #include <linux/kernel.h>

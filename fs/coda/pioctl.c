@@ -14,7 +14,6 @@
 #include <linux/stat.h>
 #include <linux/errno.h>
 #include <linux/locks.h>
-#include <asm/segment.h>
 #include <linux/string.h>
 #define __NO_VERSION__
 #include <linux/module.h>

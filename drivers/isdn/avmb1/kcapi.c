@@ -17,7 +17,6 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
-#include <asm/segment.h>
 #include <linux/proc_fs.h>
 #include <linux/skbuff.h>
 #include <linux/tqueue.h>

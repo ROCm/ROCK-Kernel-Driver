@@ -11,8 +11,8 @@
 
 typedef struct kmem_cache_s kmem_cache_t;
 
-#include	<linux/mm.h>
-#include	<linux/cache.h>
+#include	<linux/gfp.h>
+#include	<linux/types.h>
 
 /* flags for kmem_cache_alloc() */
 #define	SLAB_NOFS		GFP_NOFS
@@ -64,6 +64,7 @@ extern void kfree(const void *);
 extern int FASTCALL(kmem_cache_reap(int));
 extern int slabinfo_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data);
+struct file;
 extern int slabinfo_write_proc(struct file *file, const char *buffer,
 			   unsigned long count, void *data);
 

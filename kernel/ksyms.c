@@ -46,6 +46,7 @@
 #include <linux/tty.h>
 #include <linux/in6.h>
 #include <linux/completion.h>
+#include <linux/seq_file.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -480,6 +481,12 @@ EXPORT_SYMBOL(cap_bset);
 EXPORT_SYMBOL(reparent_to_init);
 EXPORT_SYMBOL(daemonize);
 EXPORT_SYMBOL(csum_partial); /* for networking and md */
+EXPORT_SYMBOL(seq_escape);
+EXPORT_SYMBOL(seq_printf);
+EXPORT_SYMBOL(seq_open);
+EXPORT_SYMBOL(seq_release);
+EXPORT_SYMBOL(seq_read);
+EXPORT_SYMBOL(seq_lseek);
 
 /* Program loader interfaces */
 EXPORT_SYMBOL(setup_arg_pages);

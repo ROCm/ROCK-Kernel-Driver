@@ -25,7 +25,6 @@
 
 #include <linux/fs.h>
 #include <linux/vmalloc.h>
-#include <asm/segment.h>
 
 #include <linux/coda.h>
 #include <linux/coda_linux.h>

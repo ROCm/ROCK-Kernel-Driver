@@ -897,7 +897,6 @@ static int pc_write(struct tty_struct * tty, int from_user,
 					inline void copy_from_user(void * to, const void * from,
 					                          unsigned long count);
 
-					You must include <asm/segment.h>
 					I also think (Check hackers guide) that optimization must
 					be turned ON.  (Which sounds strange to me...)
 	

@@ -572,6 +572,11 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0094.P10"),
 			NO_MATCH, NO_MATCH
                         } },
+	{ broken_pirq, "l44GX Bios", {        		/* Bad $PIR */
+			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
+			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0120.P12"),
+			NO_MATCH, NO_MATCH
+                        } },
 	{ broken_pirq, "l44GX Bios", {		/* Bad $PIR */
 			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
 			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0125.P13"),

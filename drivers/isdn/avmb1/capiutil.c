@@ -17,7 +17,6 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/init.h>
-#include <asm/segment.h>
 #include <linux/config.h>
 #include "capiutil.h"
 

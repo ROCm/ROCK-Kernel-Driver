@@ -13,7 +13,7 @@
 #include <linux/string.h>
 #include <linux/config.h>
 #include <linux/nls.h>
-#include <linux/slab.h>
+#include <linux/kernel.h>
 #include <linux/errno.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>

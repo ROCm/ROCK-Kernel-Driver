@@ -8,7 +8,7 @@
 
 #include <linux/string.h>
 #include <linux/nls.h>
-#include <linux/slab.h>
+#include <linux/mm.h>
 #include <linux/iso_fs.h>
 #include <asm/unaligned.h>
 

@@ -14,7 +14,6 @@
 #include <linux/module.h>
 
 #include <asm/system.h>
-#include <asm/segment.h>
 #include <asm/io.h>
 
 #include <linux/types.h>

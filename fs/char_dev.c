@@ -6,6 +6,7 @@
 
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/fs.h>
 #include <linux/slab.h>
 
 #define HASH_BITS	6

@@ -21,7 +21,6 @@
 #include <linux/stat.h>
 #include <linux/ctype.h>
 #include <asm/bitops.h>
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 #include <linux/utsname.h>
 #define __NO_VERSION__

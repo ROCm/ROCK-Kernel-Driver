@@ -365,7 +365,6 @@ jffs_new_inode(const struct inode * dir, struct jffs_raw_inode *raw_inode,
 	inode->i_ctime = raw_inode->ctime;
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = (inode->i_size + 511) >> 9;
-	inode->i_version = 0;
 
 	f = jffs_find_file(c, raw_inode->ino);
 
@@ -1023,7 +1022,6 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 	   from the in-memory file system structures.  */
 	jffs_insert_node(c, del_f, &raw_inode, 0, del_node);
 
-	dir->i_version = ++event;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 	inode->i_nlink--;

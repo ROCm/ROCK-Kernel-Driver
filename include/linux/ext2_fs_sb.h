@@ -56,6 +56,7 @@ struct ext2_sb_info {
 	int s_desc_per_block_bits;
 	int s_inode_size;
 	int s_first_ino;
+	u32 s_next_generation;
 };
 
 #endif	/* _LINUX_EXT2_FS_SB */

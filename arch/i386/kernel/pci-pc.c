@@ -30,7 +30,7 @@ int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32
  * This interrupt-safe spinlock protects all accesses to PCI
  * configuration space.
  */
-spinlock_t pci_config_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t pci_config_lock = SPIN_LOCK_UNLOCKED;
 
 
 /*
@@ -1109,17 +1109,15 @@ static void __devinit pci_fixup_piix4_acpi(struct pci_dev *d)
 }
 
 /*
- * Nobody seems to know what this does. Damn.
- *
- * But it does seem to fix some unspecified problem
- * with 'movntq' copies on Athlons.
+ * Addresses issues with problems in the memory write queue timer in
+ * certain VIA Northbridges.  This bugfix is per VIA's specifications.
  *
  * VIA 8363,8622,8361 Northbridges:
  *  - bits  5, 6, 7 at offset 0x55 need to be turned off
  * VIA 8367 (KT266x) Northbridges:
  *  - bits  5, 6, 7 at offset 0x95 need to be turned off
  */
-static void __init pci_fixup_via_athlon_bug(struct pci_dev *d)
+static void __init pci_fixup_via_northbridge_bug(struct pci_dev *d)
 {
 	u8 v;
 	int where = 0x55;
@@ -1131,7 +1129,7 @@ static void __init pci_fixup_via_athlon_bug(struct pci_dev *d)
 
         pci_read_config_byte(d, where, &v);
 	if (v & 0xe0) {
-		printk("Trying to stomp on Athlon bug...\n");
+		printk("Disabling broken memory write queue.\n");
 		v &= 0x1f; /* clear bits 5, 6, 7 */
 		pci_write_config_byte(d, where, v);
 	}
@@ -1146,10 +1144,10 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		pci_fixup_latency },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5598,		pci_fixup_latency },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	pci_fixup_piix4_acpi },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_via_athlon_bug },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8622,	        pci_fixup_via_athlon_bug },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8361,	        pci_fixup_via_athlon_bug },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8367_0,	pci_fixup_via_athlon_bug },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_via_northbridge_bug },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8622,	        pci_fixup_via_northbridge_bug },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8361,	        pci_fixup_via_northbridge_bug },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8367_0,	pci_fixup_via_northbridge_bug },
 	{ 0 }
 };
 

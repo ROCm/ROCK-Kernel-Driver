@@ -98,7 +98,6 @@
 #include <linux/ioctl.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/segment.h>
 #include <stdarg.h>
 #include <linux/pci.h>
 

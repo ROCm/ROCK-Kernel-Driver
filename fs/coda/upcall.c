@@ -15,7 +15,6 @@
  */
 
 #include <asm/system.h>
-#include <asm/segment.h>
 #include <asm/signal.h>
 #include <linux/signal.h>
 

@@ -25,7 +25,6 @@
 #include <linux/errno.h>
 #include <linux/version.h>
 #include <linux/fs.h>
-#include <asm/segment.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
 #include <linux/major.h>

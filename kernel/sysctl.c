@@ -19,6 +19,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/sysctl.h>
 #include <linux/swapctl.h>

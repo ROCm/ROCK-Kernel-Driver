@@ -15,6 +15,7 @@
 #include <linux/sunrpc/auth.h>
 #include <linux/sunrpc/stats.h>
 #include <linux/sunrpc/xdr.h>
+#include <asm/signal.h>
 
 /*
  * This defines an RPC port mapping

@@ -838,7 +838,6 @@ received. I hope to find some time to do this soon.
 - Split ftape-io.c into ftape-io.c and ftape-ctl.c files.
 - Corrected too high media error count after writing to
   a bad tape.
-- Added #include <asm/segment.h> again because old kernel versions
   need it.
 - Fixed fdc not being disabled when open failed because no tape
   drive was found.

@@ -27,7 +27,6 @@
 #include <linux/mm.h>
 #include <linux/ctype.h>
 #include <linux/sysctl.h>
-#include <asm/segment.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/irias_object.h>

@@ -28,7 +28,6 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
-#include <asm/segment.h>
 
 #include <linux/ftape.h>
 #include <linux/qic117.h>

@@ -38,7 +38,6 @@
 #include <asm/irq.h>
 #include <asm/prom.h>
 #include <asm/system.h>
-#include <asm/segment.h>
 #include <asm/bitops.h>
 #include <asm/feature.h>
 #include <linux/adb.h>

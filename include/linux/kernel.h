@@ -37,16 +37,6 @@
 #define	KERN_INFO	"<6>"	/* informational			*/
 #define	KERN_DEBUG	"<7>"	/* debug-level messages			*/
 
-# define NORET_TYPE    /**/
-# define ATTRIB_NORET  __attribute__((noreturn))
-# define NORET_AND     noreturn,
-
-#ifdef __i386__
-#define FASTCALL(x)	x __attribute__((regparm(3)))
-#else
-#define FASTCALL(x)	x
-#endif
-
 struct completion;
 
 extern struct notifier_block *panic_notifier_list;

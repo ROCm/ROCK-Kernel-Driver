@@ -34,7 +34,6 @@
 #include <linux/kmod.h>
 #include <asm/dma.h>
 #include <asm/io.h>
-#include <asm/segment.h>
 #include <linux/wait.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>

@@ -590,7 +590,7 @@ static int close_pad(struct inode * inode, struct file * file)
 	spin_lock_irqsave(&pc110_lock, flags);
 	if (!--active_count)
 		outb(0x30, current_params.io+2);  /* switch off digitiser */
-	spin_unlock_irqrestore(&active_lock, flags);	
+	spin_unlock_irqrestore(&pc110_lock, flags);	
 	return 0;
 }
 

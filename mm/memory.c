@@ -397,17 +397,16 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
 	spin_unlock(&mm->page_table_lock);
 }
 
-
 /*
  * Do a quick page-table lookup for a single page. 
  */
-static struct page * follow_page(unsigned long address, int write) 
+static struct page * follow_page(struct mm_struct *mm, unsigned long address, int write) 
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *ptep, pte;
 
-	pgd = pgd_offset(current->mm, address);
+	pgd = pgd_offset(mm, address);
 	if (pgd_none(*pgd) || pgd_bad(*pgd))
 		goto out;
 
@@ -443,21 +442,74 @@ static inline struct page * get_page_map(struct page *page)
 	return page;
 }
 
+int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
+		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas)
+{
+	int i = 0;
+
+	do {
+		struct vm_area_struct *	vma;
+
+		vma = find_extend_vma(mm, start);
+
+		if ( !vma ||
+		    (!force &&
+		     	((write && (!(vma->vm_flags & VM_WRITE))) ||
+		    	 (!write && (!(vma->vm_flags & VM_READ))) ) )) {
+			if (i) return i;
+			return -EFAULT;
+		}
+
+		spin_lock(&mm->page_table_lock);
+		do {
+			struct page *map;
+			while (!(map = follow_page(mm, start, write))) {
+				spin_unlock(&mm->page_table_lock);
+				switch (handle_mm_fault(mm, vma, start, write)) {
+				case 1:
+					tsk->min_flt++;
+					break;
+				case 2:
+					tsk->maj_flt++;
+					break;
+				case 0:
+					if (i) return i;
+					return -EFAULT;
+				default:
+					if (i) return i;
+					return -ENOMEM;
+				}
+				spin_lock(&mm->page_table_lock);
+			}
+			if (pages) {
+				pages[i] = get_page_map(map);
+				/* FIXME: call the correct function,
+				 * depending on the type of the found page
+				 */
+				if (pages[i])
+					page_cache_get(pages[i]);
+			}
+			if (vmas)
+				vmas[i] = vma;
+			i++;
+			start += PAGE_SIZE;
+			len--;
+		} while(len && start < vma->vm_end);
+		spin_unlock(&mm->page_table_lock);
+	} while(len);
+	return i;
+}
+
 /*
  * Force in an entire range of pages from the current process's user VA,
  * and pin them in physical memory.  
  */
-
 #define dprintk(x...)
+
 int map_user_kiobuf(int rw, struct kiobuf *iobuf, unsigned long va, size_t len)
 {
-	unsigned long		ptr, end;
-	int			err;
+	int pgcount, err;
 	struct mm_struct *	mm;
-	struct vm_area_struct *	vma = 0;
-	struct page *		map;
-	int			i;
-	int			datain = (rw == READ);
 	
 	/* Make sure the iobuf is not already mapped somewhere. */
 	if (iobuf->nr_pages)
@@ -466,79 +518,37 @@ int map_user_kiobuf(int rw, struct kiobuf *iobuf, unsigned long va, size_t len)
 	mm = current->mm;
 	dprintk ("map_user_kiobuf: begin\n");
 	
-	ptr = va & PAGE_MASK;
-	end = (va + len + PAGE_SIZE - 1) & PAGE_MASK;
-	err = expand_kiobuf(iobuf, (end - ptr) >> PAGE_SHIFT);
+	pgcount = (va + len + PAGE_SIZE - 1)/PAGE_SIZE - va/PAGE_SIZE;
+	/* mapping 0 bytes is not permitted */
+	if (!pgcount) BUG();
+	err = expand_kiobuf(iobuf, pgcount);
 	if (err)
 		return err;
 
-	down_read(&mm->mmap_sem);
-
-	err = -EFAULT;
 	iobuf->locked = 0;
-	iobuf->offset = va & ~PAGE_MASK;
+	iobuf->offset = va & (PAGE_SIZE-1);
 	iobuf->length = len;
 	
-	i = 0;
-	
-	/* 
-	 * First of all, try to fault in all of the necessary pages
-	 */
-	while (ptr < end) {
-		if (!vma || ptr >= vma->vm_end) {
-			vma = find_vma(current->mm, ptr);
-			if (!vma) 
-				goto out_unlock;
-			if (vma->vm_start > ptr) {
-				if (!(vma->vm_flags & VM_GROWSDOWN))
-					goto out_unlock;
-				if (expand_stack(vma, ptr))
-					goto out_unlock;
-			}
-			if (((datain) && (!(vma->vm_flags & VM_WRITE))) ||
-					(!(vma->vm_flags & VM_READ))) {
-				err = -EACCES;
-				goto out_unlock;
-			}
-		}
-		spin_lock(&mm->page_table_lock);
-		while (!(map = follow_page(ptr, datain))) {
-			int ret;
-
-			spin_unlock(&mm->page_table_lock);
-			ret = handle_mm_fault(current->mm, vma, ptr, datain);
-			if (ret <= 0) {
-				if (!ret)
-					goto out_unlock;
-				else {
-					err = -ENOMEM;
-					goto out_unlock;
-				}
-			}
-			spin_lock(&mm->page_table_lock);
-		}			
-		map = get_page_map(map);
-		if (map) {
-			flush_dcache_page(map);
-			page_cache_get(map);
-		} else
-			printk (KERN_INFO "Mapped page missing [%d]\n", i);
-		spin_unlock(&mm->page_table_lock);
-		iobuf->maplist[i] = map;
-		iobuf->nr_pages = ++i;
-		
-		ptr += PAGE_SIZE;
-	}
-
+	/* Try to fault in all of the necessary pages */
+	down_read(&mm->mmap_sem);
+	/* rw==READ means read from disk, write into memory area */
+	err = get_user_pages(current, mm, va, pgcount,
+			(rw==READ), 0, iobuf->maplist, NULL);
 	up_read(&mm->mmap_sem);
+	if (err < 0) {
+		unmap_kiobuf(iobuf);
+		dprintk ("map_user_kiobuf: end %d\n", err);
+		return err;
+	}
+	iobuf->nr_pages = err;
+	while (pgcount--) {
+		/* FIXME: flush superflous for rw==READ,
+		 * probably wrong function for rw==WRITE
+		 */
+		flush_dcache_page(iobuf->maplist[pgcount]);
+	}
 	dprintk ("map_user_kiobuf: end OK\n");
 	return 0;
-
- out_unlock:
-	up_read(&mm->mmap_sem);
-	unmap_kiobuf(iobuf);
-	dprintk ("map_user_kiobuf: end %d\n", err);
-	return err;
 }
 
 /*
@@ -588,6 +598,9 @@ void unmap_kiobuf (struct kiobuf *iobuf)
 		if (map) {
 			if (iobuf->locked)
 				UnlockPage(map);
+			/* FIXME: cache flush missing for rw==READ
+			 * FIXME: call the correct reference counting function
+			 */
 			page_cache_release(map);
 		}
 	}
@@ -1414,23 +1427,19 @@ out:
 	return pte_offset(pmd, address);
 }
 
-/*
- * Simplistic page force-in..
- */
 int make_pages_present(unsigned long addr, unsigned long end)
 {
-	int write;
-	struct mm_struct *mm = current->mm;
+	int ret, len, write;
 	struct vm_area_struct * vma;
 
-	vma = find_vma(mm, addr);
+	vma = find_vma(current->mm, addr);
 	write = (vma->vm_flags & VM_WRITE) != 0;
 	if (addr >= end)
 		BUG();
-	do {
-		if (handle_mm_fault(mm, vma, addr, write) < 0)
-			return -1;
-		addr += PAGE_SIZE;
-	} while (addr < end);
-	return 0;
+	if (end > vma->vm_end)
+		BUG();
+	len = (end+PAGE_SIZE-1)/PAGE_SIZE-addr/PAGE_SIZE;
+	ret = get_user_pages(current, current->mm, addr,
+			len, write, 0, NULL, NULL);
+	return ret == len ? 0 : -1;
 }

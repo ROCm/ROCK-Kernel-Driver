@@ -27,7 +27,6 @@
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <asm/segment.h>
 
 #include <linux/zftape.h>
 

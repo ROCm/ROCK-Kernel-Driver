@@ -80,6 +80,7 @@ static void __exit exit_nls_koi8_ru(void)
 
 module_init(init_nls_koi8_ru)
 module_exit(exit_nls_koi8_ru)
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

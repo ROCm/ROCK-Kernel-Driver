@@ -29,6 +29,7 @@
 #include <linux/smp_lock.h>
 
 #include <linux/delay.h>
+#include <linux/cache.h>
 
 #include <asm/sigp.h>
 #include <asm/pgalloc.h>
@@ -55,7 +56,7 @@ cycles_t         cacheflush_time=0;
 int              smp_threads_ready=0;      /* Set when the idlers are all forked. */
 static atomic_t  smp_commenced = ATOMIC_INIT(0);
 
-spinlock_t       kernel_flag = SPIN_LOCK_UNLOCKED;
+spinlock_t       kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 unsigned long	 cpu_online_map;
 

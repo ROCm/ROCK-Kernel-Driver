@@ -841,7 +841,7 @@ int idescsi_bios (Disk *disk, kdev_t dev, int *parm)
 
 static Scsi_Host_Template idescsi_template = {
 	module:		THIS_MODULE,
-	name:		"idescsi"
+	name:		"idescsi",
 	detect:		idescsi_detect,
 	release:	idescsi_release,
 	info:		idescsi_info,

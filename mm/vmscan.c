@@ -11,6 +11,7 @@
  *  Multiqueue VM started 5.8.00, Rik van Riel.
  */
 
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>

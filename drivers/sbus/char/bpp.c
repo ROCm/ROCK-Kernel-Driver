@@ -28,7 +28,6 @@
 
 #if defined(__i386__)
 # include <asm/system.h>
-# include <asm/segment.h>
 #endif
 
 #if defined(__sparc__)

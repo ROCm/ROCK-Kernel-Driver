@@ -1,5 +1,5 @@
 /*
- * i8k.h -- Linux driver for accessing the SMM BIOS on Dell I8000 laptops
+ * i8k.h -- Linux driver for accessing the SMM BIOS on Dell laptops
  *
  * Copyright (C) 2001  Massimo Dal Zotto <dz@debian.org>
  *
@@ -36,9 +36,9 @@
 #define I8K_FAN_HIGH		2
 #define I8K_FAN_MAX		I8K_FAN_HIGH
 
-#define I8K_VOL_UP		0x01
-#define I8K_VOL_DOWN		0x02
-#define I8K_VOL_MUTE		0x03
+#define I8K_VOL_UP		1
+#define I8K_VOL_DOWN		2
+#define I8K_VOL_MUTE		4
 
 #define I8K_AC			1
 #define I8K_BATTERY		0

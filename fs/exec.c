@@ -973,9 +973,7 @@ int do_coredump(long signr, struct pt_regs * regs)
 	if (do_truncate(file->f_dentry, 0) != 0)
 		goto close_fail;
 
-	down_read(&current->mm->mmap_sem);
 	retval = binfmt->core_dump(signr, regs, file);
-	up_read(&current->mm->mmap_sem);
 
 close_fail:
 	filp_close(file, NULL);

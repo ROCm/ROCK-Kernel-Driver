@@ -159,7 +159,6 @@ void cpqfcTSWorkerThread( void *host)
 #ifdef PCI_KERNEL_TRACE
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
 #endif
-  struct fs_struct *fs;
   DECLARE_MUTEX_LOCKED(fcQueReady);
   DECLARE_MUTEX_LOCKED(fcTYOBcomplete); 
   DECLARE_MUTEX_LOCKED(TachFrozen);  
@@ -168,33 +167,7 @@ void cpqfcTSWorkerThread( void *host)
   ENTER("WorkerThread");
 
   lock_kernel();
-	/*
-	 * If we were started as result of loading a module, close all of the
-	 * user space pages.  We don't need them, and if we didn't close them
-	 * they would be locked into memory.
-	 */
-  exit_mm(current);
-
-  current->session = 1;
-  current->pgrp = 1;
-	
-  /* Become as one with the init task */
-	
-  exit_fs(current);	/* current->fs->count--; */
-  fs = init_task.fs;
-  // Some kernels compiled for SMP, while actually running
-  // on a uniproc machine, will return NULL for this call
-  if( !fs)
-  {
-    printk(" cpqfcTS FATAL: fs is NULL! Is this an SMP kernel on uniproc machine?\n ");
-  }
- 
-  else
-  { 
-    current->fs = fs;
-    atomic_inc(&fs->count);
-  }
-
+  daemonize();
   siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
 
 

@@ -637,7 +637,6 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 	else
 	    old_format = 1;
     }
-    s->s_blocksize = size;
 
     s->u.reiserfs_sb.s_mount_state = SB_REISERFS_STATE(s);
     s->u.reiserfs_sb.s_mount_state = REISERFS_VALID_FS ;

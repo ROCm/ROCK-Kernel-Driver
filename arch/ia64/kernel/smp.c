@@ -30,6 +30,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/delay.h>
+#include <linux/cache.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
@@ -51,7 +52,7 @@
 #include <asm/mca.h>
 
 /* The 'big kernel lock' */
-spinlock_t kernel_flag = SPIN_LOCK_UNLOCKED;
+spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 /*
  * Structure and data for smp_call_function(). This is designed to minimise static memory

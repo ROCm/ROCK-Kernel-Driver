@@ -20,7 +20,6 @@
  */
 
 #include <asm/system.h>
-#include <asm/segment.h>
 #include <asm/signal.h>
 #include <linux/signal.h>
 
@@ -37,7 +36,6 @@
 #include <linux/string.h>
 #include <asm/uaccess.h>
 #include <linux/vmalloc.h>
-#include <asm/segment.h>
 
 #include <linux/intermezzo_fs.h>
 #include <linux/intermezzo_upcall.h>

@@ -29,7 +29,6 @@
 #include <asm/uaccess.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <asm/segment.h>
 
 #include <linux/intermezzo_fs.h>
 #include <linux/intermezzo_upcall.h>

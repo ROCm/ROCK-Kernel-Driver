@@ -67,10 +67,10 @@ static void BAD_SG_DMA(Scsi_Cmnd * SCpnt,
 		       int nseg,
 		       int badseg)
 {
-	printk(KERN_CRIT "sgpnt[%d:%d] addr %p/0x%lx length %d\n",
+	printk(KERN_CRIT "sgpnt[%d:%d] page %p/0x%lx length %d\n",
 	       badseg, nseg,
-	       sgpnt[badseg].address,
-	       SCSI_PA(sgpnt[badseg].address),
+	       page_address(sgpnt[badseg].page) + sgpnt[badseg].offset,
+	       (unsigned long)page_to_bus(sgpnt[badseg].page) + sgpnt[badseg].offset,
 	       sgpnt[badseg].length);
 
 	/*
@@ -176,7 +176,7 @@ static struct Scsi_Host *aha_host[7];	/* One for each IRQ level (9-15) */
 
 static void setup_mailboxes(int base_io, struct Scsi_Host *shpnt);
 static int aha1542_restart(struct Scsi_Host *shost);
-static void aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs);
+static void aha1542_intr_handle(struct Scsi_Host *shost, void *dev_id, struct pt_regs *regs);
 static void do_aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs);
 
 #define aha1542_intr_reset(base)  outb(IRST, CONTROL(base))
@@ -419,29 +419,29 @@ fail:
 static void do_aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
+	struct Scsi_Host *shost;
 
-	spin_lock_irqsave(&io_request_lock, flags);
-	aha1542_intr_handle(irq, dev_id, regs);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	shost = aha_host[irq - 9];
+	if (!shost)
+		panic("Splunge!");
+
+	spin_lock_irqsave(&shost->host_lock, flags);
+	aha1542_intr_handle(shost, dev_id, regs);
+	spin_unlock_irqrestore(&shost->host_lock, flags);
 }
 
 /* A "high" level interrupt handler */
-static void aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
+static void aha1542_intr_handle(struct Scsi_Host *shost, void *dev_id, struct pt_regs *regs)
 {
 	void (*my_done) (Scsi_Cmnd *) = NULL;
 	int errstatus, mbi, mbo, mbistatus;
 	int number_serviced;
 	unsigned long flags;
-	struct Scsi_Host *shost;
 	Scsi_Cmnd *SCtmp;
 	int flag;
 	int needs_restart;
 	struct mailbox *mb;
 	struct ccb *ccb;
-
-	shost = aha_host[irq - 9];
-	if (!shost)
-		panic("Splunge!");
 
 	mb = HOSTDATA(shost)->mb;
 	ccb = HOSTDATA(shost)->ccb;
@@ -542,7 +542,7 @@ static void aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		my_done = SCtmp->scsi_done;
 		if (SCtmp->host_scribble) {
-			scsi_free(SCtmp->host_scribble, 512);
+			kfree(SCtmp->host_scribble);
 			SCtmp->host_scribble = 0;
 		}
 		/* Fetch the sense data, and tuck it away, in the required slot.  The
@@ -703,18 +703,19 @@ static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 #endif
 		int i;
 		ccb[mbo].op = 2;	/* SCSI Initiator Command  w/scatter-gather */
-		SCpnt->host_scribble = (unsigned char *) scsi_malloc(512);
+		SCpnt->host_scribble = (unsigned char *) kmalloc(512, GFP_DMA);
 		sgpnt = (struct scatterlist *) SCpnt->request_buffer;
 		cptr = (struct chain *) SCpnt->host_scribble;
 		if (cptr == NULL)
 			panic("aha1542.c: unable to allocate DMA memory\n");
 		for (i = 0; i < SCpnt->use_sg; i++) {
 			if (sgpnt[i].length == 0 || SCpnt->use_sg > 16 ||
-			    (((int) sgpnt[i].address) & 1) || (sgpnt[i].length & 1)) {
+			    (((int) sgpnt[i].offset) & 1) || (sgpnt[i].length & 1)) {
 				unsigned char *ptr;
 				printk(KERN_CRIT "Bad segment list supplied to aha1542.c (%d, %d)\n", SCpnt->use_sg, i);
 				for (i = 0; i < SCpnt->use_sg; i++) {
-					printk(KERN_CRIT "%d: %p %d\n", i, sgpnt[i].address,
+					printk(KERN_CRIT "%d: %p %d\n", i,
+					       page_address(sgpnt[i].page) + sgpnt[i].offset,
 					       sgpnt[i].length);
 				};
 				printk(KERN_CRIT "cptr %x: ", (unsigned int) cptr);
@@ -723,8 +724,8 @@ static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 					printk("%02x ", ptr[i]);
 				panic("Foooooooood fight!");
 			};
-			any2scsi(cptr[i].dataptr, SCSI_PA(sgpnt[i].address));
-			if (SCSI_PA(sgpnt[i].address + sgpnt[i].length - 1) > ISA_DMA_THRESHOLD)
+			any2scsi(cptr[i].dataptr, page_to_bus(sgpnt[i].page) + sgpnt[i].offset);
+			if (page_to_bus(sgpnt[i].page) + sgpnt[i].offset + sgpnt[i].length - 1 > ISA_DMA_THRESHOLD)
 				BAD_SG_DMA(SCpnt, sgpnt, SCpnt->use_sg, i);
 			any2scsi(cptr[i].datalen, sgpnt[i].length);
 		};
@@ -1442,7 +1443,7 @@ static int aha1542_dev_reset(Scsi_Cmnd * SCpnt)
 			Scsi_Cmnd *SCtmp;
 			SCtmp = HOSTDATA(SCpnt->host)->SCint[i];
 			if (SCtmp->host_scribble) {
-				scsi_free(SCtmp->host_scribble, 512);
+				kfree(SCtmp->host_scribble);
 				SCtmp->host_scribble = NULL;
 			}
 			HOSTDATA(SCpnt->host)->SCint[i] = NULL;
@@ -1474,9 +1475,9 @@ static int aha1542_bus_reset(Scsi_Cmnd * SCpnt)
 	 * check for timeout, and if we are doing something like this
 	 * we are pretty desperate anyways.
 	 */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(&SCpnt->host->host_lock);
 	scsi_sleep(4 * HZ);
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(&SCpnt->host->host_lock);
 
 	WAIT(STATUS(SCpnt->host->io_port),
 	     STATMASK, INIT | IDLE, STST | DIAGF | INVDCMD | DF | CDF);
@@ -1505,7 +1506,7 @@ static int aha1542_bus_reset(Scsi_Cmnd * SCpnt)
 				continue;
 			}
 			if (SCtmp->host_scribble) {
-				scsi_free(SCtmp->host_scribble, 512);
+				kfree(SCtmp->host_scribble);
 				SCtmp->host_scribble = NULL;
 			}
 			HOSTDATA(SCpnt->host)->SCint[i] = NULL;
@@ -1538,9 +1539,9 @@ static int aha1542_host_reset(Scsi_Cmnd * SCpnt)
 	 * check for timeout, and if we are doing something like this
 	 * we are pretty desperate anyways.
 	 */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(&SCpnt->host->host_lock);
 	scsi_sleep(4 * HZ);
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(&SCpnt->host->host_lock);
 
 	WAIT(STATUS(SCpnt->host->io_port),
 	     STATMASK, INIT | IDLE, STST | DIAGF | INVDCMD | DF | CDF);
@@ -1574,7 +1575,7 @@ static int aha1542_host_reset(Scsi_Cmnd * SCpnt)
 				continue;
 			}
 			if (SCtmp->host_scribble) {
-				scsi_free(SCtmp->host_scribble, 512);
+				kfree(SCtmp->host_scribble);
 				SCtmp->host_scribble = NULL;
 			}
 			HOSTDATA(SCpnt->host)->SCint[i] = NULL;
@@ -1623,7 +1624,7 @@ static int aha1542_old_abort(Scsi_Cmnd * SCpnt)
 	if (mb[mbi].status) {
 		printk(KERN_ERR "Lost interrupt discovered on irq %d - attempting to recover\n",
 		       SCpnt->host->irq);
-		aha1542_intr_handle(SCpnt->host->irq, NULL);
+		aha1542_intr_handle(SCpnt->host, NULL);
 		return 0;
 	}
 	/* OK, no lost interrupt.  Try looking to see how many pending commands
@@ -1712,7 +1713,7 @@ static int aha1542_old_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 				SCtmp = HOSTDATA(SCpnt->host)->SCint[i];
 				SCtmp->result = DID_RESET << 16;
 				if (SCtmp->host_scribble) {
-					scsi_free(SCtmp->host_scribble, 512);
+					kfree(SCtmp->host_scribble);
 					SCtmp->host_scribble = NULL;
 				}
 				printk(KERN_WARNING "Sending DID_RESET for target %d\n", SCpnt->target);
@@ -1758,7 +1759,7 @@ fail:
 						SCtmp = HOSTDATA(SCpnt->host)->SCint[i];
 						SCtmp->result = DID_RESET << 16;
 						if (SCtmp->host_scribble) {
-							scsi_free(SCtmp->host_scribble, 512);
+							kfree(SCtmp->host_scribble);
 							SCtmp->host_scribble = NULL;
 						}
 						printk(KERN_WARNING "Sending DID_RESET for target %d\n", SCpnt->target);

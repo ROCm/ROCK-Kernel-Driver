@@ -268,7 +268,6 @@ static char ixj_c_revision[] = "$Revision: 4.7 $";
 #include <linux/pci.h>
 
 #include <asm/io.h>
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 
 #include <linux/isapnp.h>

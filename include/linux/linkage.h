@@ -60,4 +60,14 @@
 
 #endif
 
+# define NORET_TYPE    /**/
+# define ATTRIB_NORET  __attribute__((noreturn))
+# define NORET_AND     noreturn,
+
+#ifdef __i386__
+#define FASTCALL(x)	x __attribute__((regparm(3)))
+#else
+#define FASTCALL(x)	x
+#endif
+
 #endif

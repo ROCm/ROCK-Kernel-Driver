@@ -68,7 +68,7 @@ extern void mem_use(void);
 #define TICK_SCALE(x)	((x) << 2)
 #endif
 
-#define NICE_TO_TICKS(nice)	(TICK_SCALE(20-(nice))+1)
+#define TASK_TIMESLICE(p)	(TICK_SCALE(20-(p)->nice)+1)
 
 
 /*
@@ -94,7 +94,7 @@ rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;	/* outer */
 
 static LIST_HEAD(runqueue_head);
 
-static unsigned long rcl_curr = 0;
+static unsigned long rcl_curr;
 
 /*
  * We align per-CPU scheduling data on cacheline boundaries,
@@ -314,7 +314,8 @@ static inline void add_to_runqueue(struct task_struct * p)
 {
 	p->dyn_prio += rcl_curr - p->rcl_last;
 	p->rcl_last = rcl_curr;
-	if (p->dyn_prio > MAX_DYNPRIO) p->dyn_prio = MAX_DYNPRIO;
+	if (p->dyn_prio > MAX_DYNPRIO)
+		p->dyn_prio = MAX_DYNPRIO;
 	list_add(&p->run_list, &runqueue_head);
 	nr_running++;
 }
@@ -367,9 +368,7 @@ inline int wake_up_process(struct task_struct * p)
 
 static void process_timeout(unsigned long __data)
 {
-	struct task_struct * p = (struct task_struct *) __data;
-
-	wake_up_process(p);
+	wake_up_process((struct task_struct *)__data);
 }
 
 /**
@@ -529,20 +528,21 @@ asmlinkage void schedule_tail(struct task_struct *prev)
 
 void expire_task(struct task_struct *p)
 {
-	if (!p->time_slice)
+	if (unlikely(!p->time_slice))
+		goto need_resched;
+
+	if (!--p->time_slice) {
+		if (p->dyn_prio > 0) {
+			p->time_slice--;
+			p->dyn_prio--;
+		}
 		p->need_resched = 1;
-	else {
-		if (!--p->time_slice) {
-			if (p->dyn_prio > 0) {
-				--p->time_slice;
-				--p->dyn_prio;
-			}
-			p->need_resched = 1;
-		} else if (p->time_slice < -NICE_TO_TICKS(p->nice)) {
+	} else
+		if (p->time_slice < -TASK_TIMESLICE(p)) {
 			p->time_slice = 0;
+need_resched:
 			p->need_resched = 1;
 		}
-	}
 }
 
 /*
@@ -588,7 +588,7 @@ need_resched_back:
 	/* move an exhausted RR process to be last.. */
 	if (unlikely(prev->policy == SCHED_RR))
 		if (!prev->time_slice) {
-			prev->time_slice = NICE_TO_TICKS(prev->nice);
+			prev->time_slice = TASK_TIMESLICE(prev);
 			move_last_runqueue(prev);
 		}
 
@@ -625,10 +625,10 @@ repeat_schedule:
 
 	/* Do we need to re-calculate counters? */
 	if (unlikely(!c)) {
-		++rcl_curr;
+		rcl_curr++;
 		list_for_each(tmp, &runqueue_head) {
 			p = list_entry(tmp, struct task_struct, run_list);
-			p->time_slice = NICE_TO_TICKS(p->nice);
+			p->time_slice = TASK_TIMESLICE(p);
 			p->rcl_last = rcl_curr;
 		}
 		goto repeat_schedule;
@@ -726,21 +726,17 @@ static inline void __wake_up_common (wait_queue_head_t *q, unsigned int mode,
 	struct list_head *tmp;
 	struct task_struct *p;
 
-	CHECK_MAGIC_WQHEAD(q);
-	WQ_CHECK_LIST_HEAD(&q->task_list);
-	
 	list_for_each(tmp,&q->task_list) {
 		unsigned int state;
-                wait_queue_t *curr = list_entry(tmp, wait_queue_t, task_list);
+		wait_queue_t *curr = list_entry(tmp, wait_queue_t, task_list);
 
-		CHECK_MAGIC(curr->__magic);
 		p = curr->task;
 		state = p->state;
-		if (state & mode) {
-			WQ_NOTE_WAKER(curr);
-			if (try_to_wake_up(p, sync) && (curr->flags&WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
-				break;
-		}
+		if ((state & mode) &&
+				try_to_wake_up(p, sync) &&
+				((curr->flags & WQ_FLAG_EXCLUSIVE) &&
+					!--nr_exclusive))
+			break;
 	}
 }
 
@@ -898,11 +894,7 @@ asmlinkage long sys_nice(int increment)
 
 static inline struct task_struct *find_process_by_pid(pid_t pid)
 {
-	struct task_struct *tsk = current;
-
-	if (pid)
-		tsk = find_task_by_pid(pid);
-	return tsk;
+	return pid ? find_task_by_pid(pid) : current;
 }
 
 static int setscheduler(pid_t pid, int policy, 
@@ -1063,17 +1055,16 @@ asmlinkage long sys_sched_yield(void)
 	nr_pending--;
 #endif
 	if (nr_pending) {
-		struct task_struct *ctsk = current;
 		/*
 		 * This process can only be rescheduled by us,
 		 * so this is safe without any locking.
 		 */
-		if (ctsk->policy == SCHED_OTHER)
-			ctsk->policy |= SCHED_YIELD;
-		ctsk->need_resched = 1;
+		if (current->policy == SCHED_OTHER)
+			current->policy |= SCHED_YIELD;
+		current->need_resched = 1;
 
-		ctsk->time_slice = 0;
-		++ctsk->dyn_prio;
+		current->time_slice = 0;
+		current->dyn_prio++;
 	}
 	return 0;
 }
@@ -1122,7 +1113,7 @@ asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
 	read_lock(&tasklist_lock);
 	p = find_process_by_pid(pid);
 	if (p)
-		jiffies_to_timespec(p->policy & SCHED_FIFO ? 0 : NICE_TO_TICKS(p->nice),
+		jiffies_to_timespec(p->policy & SCHED_FIFO ? 0 : TASK_TIMESLICE(p),
 				    &t);
 	read_unlock(&tasklist_lock);
 	if (p)
@@ -1238,35 +1229,33 @@ void show_state(void)
  */
 void reparent_to_init(void)
 {
-	struct task_struct *this_task = current;
-
 	write_lock_irq(&tasklist_lock);
 
 	/* Reparent to init */
-	REMOVE_LINKS(this_task);
-	this_task->p_pptr = child_reaper;
-	this_task->p_opptr = child_reaper;
-	SET_LINKS(this_task);
+	REMOVE_LINKS(current);
+	current->p_pptr = child_reaper;
+	current->p_opptr = child_reaper;
+	SET_LINKS(current);
 
 	/* Set the exit signal to SIGCHLD so we signal init on exit */
-	this_task->exit_signal = SIGCHLD;
+	current->exit_signal = SIGCHLD;
 
 	/* We also take the runqueue_lock while altering task fields
 	 * which affect scheduling decisions */
 	spin_lock(&runqueue_lock);
 
-	this_task->ptrace = 0;
-	this_task->nice = DEF_NICE;
-	this_task->policy = SCHED_OTHER;
+	current->ptrace = 0;
+	current->nice = DEF_NICE;
+	current->policy = SCHED_OTHER;
 	/* cpus_allowed? */
 	/* rt_priority? */
 	/* signals? */
-	this_task->cap_effective = CAP_INIT_EFF_SET;
-	this_task->cap_inheritable = CAP_INIT_INH_SET;
-	this_task->cap_permitted = CAP_FULL_SET;
-	this_task->keep_capabilities = 0;
-	memcpy(this_task->rlim, init_task.rlim, sizeof(*(this_task->rlim)));
-	this_task->user = INIT_USER;
+	current->cap_effective = CAP_INIT_EFF_SET;
+	current->cap_inheritable = CAP_INIT_INH_SET;
+	current->cap_permitted = CAP_FULL_SET;
+	current->keep_capabilities = 0;
+	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
+	current->user = INIT_USER;
 
 	spin_unlock(&runqueue_lock);
 	write_unlock_irq(&tasklist_lock);

@@ -25,6 +25,7 @@
 #include <linux/string.h>
 #include <linux/seq_file.h>
 #include <linux/namespace.h>
+#include <linux/mm.h>
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.

@@ -266,7 +266,6 @@
 #include <linux/init.h>
 
 #include <asm/fcntl.h>
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 
 /* used to tell the module to turn on full debugging messages */

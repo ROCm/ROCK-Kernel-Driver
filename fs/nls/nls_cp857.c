@@ -315,4 +315,4 @@ module_exit(exit_nls_cp857)
  * c-continued-brace-offset: 0
  * End:
  */
-MODULE_LICENSE("BSD without advertising clause");
+MODULE_LICENSE("Dual BSD/GPL");

@@ -11,7 +11,6 @@
 #include <linux/module.h>
 #include <linux/bitops.h>
 #include <net/sock.h>	 /* for struct sock */
-#include <asm/segment.h> /* for get_fs_long and put_fs_long */
 
 #include "common.h"
 #include "resources.h"

@@ -212,7 +212,6 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 #include <asm/ioctl.h>
-#include <asm/segment.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_KERNELD

@@ -881,7 +881,9 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	BUG_ON(rw != READ && rw != WRITE);
 
+	spin_lock_irq(q->queue_lock);
 	rq = get_request(q, rw);
+	spin_unlock_irq(q->queue_lock);
 
 	if (!rq && (gfp_mask & __GFP_WAIT))
 		rq = get_request_wait(q, rw);
@@ -1081,7 +1083,7 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
 	int el_ret, latency = 0, rw, nr_sectors, cur_nr_sectors, barrier;
-	struct list_head *insert_here = &q->queue_head;
+	struct list_head *insert_here;
 	elevator_t *elevator = &q->elevator;
 	sector_t sector;
 
@@ -1103,15 +1105,14 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
 
 	spin_lock_irq(q->queue_lock);
+again:
+	req = NULL;
+	insert_here = q->queue_head.prev;
 
 	if (blk_queue_empty(q) || barrier) {
 		blk_plug_device(q);
 		goto get_rq;
 	}
-
-again:
-	req = NULL;
-	insert_here = q->queue_head.prev;
 
 	el_ret = elevator->elevator_merge_fn(q, &req, bio);
 	switch (el_ret) {

@@ -31,7 +31,6 @@
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
 
-#include <asm/segment.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/irmod.h>

@@ -19,7 +19,6 @@
 
 #include <linux/config.h>
 #include <linux/version.h>
-#include <asm/segment.h>
 #include <linux/init.h>
 
 #include <linux/kernel.h>

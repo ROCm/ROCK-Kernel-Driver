@@ -142,7 +142,6 @@
 // so blame them.
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,4)
-#	include <asm/segment.h>
 #	define GET_USER(error,value,addr) error = get_user(value,addr)
 #	define COPY_FROM_USER(error,dest,src,size) error = copy_from_user(dest,src,size) ? -EFAULT : 0
 #	define PUT_USER(error,value,addr) error = put_user(value,addr)

@@ -969,9 +969,9 @@ static int sd_init_onedisk(int i)
 			 */
 			int hard_sector = sector_size;
 			int sz = rscsi_disks[i].capacity * (hard_sector/256);
+			request_queue_t *queue = &rscsi_disks[i].device->request_queue;
 
-			/* There are 16 minors allocated for each major device */
-			blk_queue_hardsect_size(blk_get_queue(SD_MAJOR(i)), hard_sector);
+			blk_queue_hardsect_size(queue, hard_sector);
 			printk("SCSI device %s: "
 			       "%d %d-byte hdwr sectors (%d MB)\n",
 			       nbuff, rscsi_disks[i].capacity,

@@ -41,7 +41,6 @@ static int dir_commit_chunk(struct page *page, unsigned from, unsigned to)
 	struct inode *dir = (struct inode *)page->mapping->host;
 	int err = 0;
 
-	dir->i_version = ++event;
 	page->mapping->a_ops->commit_write(NULL, page, from, to);
 	if (IS_SYNC(dir))
 		err = waitfor_one_page(page);
@@ -111,7 +110,6 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 
 done:
 	filp->f_pos = (n << PAGE_CACHE_SHIFT) | offset;
-	filp->f_version = inode->i_version;
 	UPDATE_ATIME(inode);
 	return 0;
 }

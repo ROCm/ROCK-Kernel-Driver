@@ -44,6 +44,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Control Method Battery Driver");
+MODULE_LICENSE("GPL");
 
 
 #define BT_PROC_ROOT		"battery"

@@ -69,8 +69,8 @@ static int build_key(struct hfs_cat_key *key, struct inode *dir,
 /*
  * update_dirs_plus()
  *
- * Update the fields 'i_size', 'i_nlink', 'i_ctime', 'i_mtime' and
- * 'i_version' of the inodes associated with a directory that has
+ * Update the fields 'i_size', 'i_nlink', 'i_ctime' and 'i_mtime'
+ * of the inodes associated with a directory that has
  * had a file ('is_dir'==0) or directory ('is_dir'!=0) added to it.
  */
 static inline void update_dirs_plus(struct hfs_cat_entry *dir, int is_dir)
@@ -88,7 +88,6 @@ static inline void update_dirs_plus(struct hfs_cat_entry *dir, int is_dir)
 					++(tmp->i_nlink);
 				}
 				tmp->i_size += HFS_I(tmp)->dir_size;
-				tmp->i_version = ++event;
 			}
 			tmp->i_ctime = tmp->i_mtime = CURRENT_TIME;
 			mark_inode_dirty(tmp);
@@ -100,7 +99,7 @@ static inline void update_dirs_plus(struct hfs_cat_entry *dir, int is_dir)
  * update_dirs_minus()
  *
  * Update the fields 'i_size', 'i_nlink', 'i_ctime', 'i_mtime' and
- * 'i_version' of the inodes associated with a directory that has
+ * of the inodes associated with a directory that has
  * had a file ('is_dir'==0) or directory ('is_dir'!=0) removed.
  */
 static inline void update_dirs_minus(struct hfs_cat_entry *dir, int is_dir)
@@ -118,7 +117,6 @@ static inline void update_dirs_minus(struct hfs_cat_entry *dir, int is_dir)
 					--(tmp->i_nlink);
 				}
 				tmp->i_size -= HFS_I(tmp)->dir_size;
-				tmp->i_version = ++event;
 			}
 			tmp->i_ctime = tmp->i_mtime = CURRENT_TIME;
 			mark_inode_dirty(tmp);

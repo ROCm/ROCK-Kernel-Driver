@@ -42,6 +42,7 @@ static void __exit exit_nls_sjis(void)
 
 module_init(init_nls_sjis)
 module_exit(exit_nls_sjis)
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

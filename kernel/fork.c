@@ -589,8 +589,10 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	*p = *current;
 
 	retval = -EAGAIN;
-	if (atomic_read(&p->user->processes) >= p->rlim[RLIMIT_NPROC].rlim_cur)
-		goto bad_fork_free;
+	if (atomic_read(&p->user->processes) >= p->rlim[RLIMIT_NPROC].rlim_cur) {
+		if (!capable(CAP_SYS_ADMIN) && !capable(CAP_SYS_RESOURCE))
+			goto bad_fork_free;
+	}
 
 	atomic_inc(&p->user->__count);
 	atomic_inc(&p->user->processes);

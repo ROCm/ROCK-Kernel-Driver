@@ -595,7 +595,6 @@ udf_add_entry(struct inode *dir, struct dentry *dentry,
 		dir->i_size += nfidlen;
 		if (UDF_I_ALLOCTYPE(dir) == ICB_FLAG_AD_IN_ICB)
 			UDF_I_LENALLOC(dir) += nfidlen;
-		dir->i_version = ++event;
 		mark_inode_dirty(dir);
 		return fi;
 	}
@@ -654,7 +653,6 @@ static int udf_create(struct inode *dir, struct dentry *dentry, int mode)
 	if (UDF_I_ALLOCTYPE(dir) == ICB_FLAG_AD_IN_ICB)
 	{
 		mark_inode_dirty(dir);
-		dir->i_version = ++event;
 	}
 	if (fibh.sbh != fibh.ebh)
 		udf_release_data(fibh.ebh);
@@ -692,7 +690,6 @@ static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, int r
 	if (UDF_I_ALLOCTYPE(dir) == ICB_FLAG_AD_IN_ICB)
 	{
 		mark_inode_dirty(dir);
-		dir->i_version = ++event;
 	}
 	mark_inode_dirty(inode);
 
@@ -756,7 +753,6 @@ static int udf_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 		cpu_to_le32(UDF_I_UNIQUE(inode) & 0x00000000FFFFFFFFUL);
 	cfi.fileCharacteristics |= FILE_DIRECTORY;
 	udf_write_fi(dir, &cfi, fi, &fibh, NULL, NULL);
-	dir->i_version = ++event;
 	dir->i_nlink++;
 	mark_inode_dirty(dir);
 	d_instantiate(dentry, inode);
@@ -851,14 +847,12 @@ static int udf_rmdir(struct inode * dir, struct dentry * dentry)
 	if (!empty_dir(inode))
 		goto end_rmdir;
 	retval = udf_delete_entry(dir, fi, &fibh, &cfi);
-	dir->i_version = ++event;
 	if (retval)
 		goto end_rmdir;
 	if (inode->i_nlink != 2)
 		udf_warning(inode->i_sb, "udf_rmdir",
 			"empty directory has nlink != 2 (%d)",
 			inode->i_nlink);
-	inode->i_version = ++event;
 	inode->i_nlink = 0;
 	inode->i_size = 0;
 	mark_inode_dirty(inode);
@@ -1070,7 +1064,6 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 	if (UDF_I_ALLOCTYPE(dir) == ICB_FLAG_AD_IN_ICB)
 	{
 		mark_inode_dirty(dir);
-		dir->i_version = ++event;
 	}
 	if (fibh.sbh != fibh.ebh)
 		udf_release_data(fibh.ebh);
@@ -1123,7 +1116,6 @@ static int udf_link(struct dentry * old_dentry, struct inode * dir,
 	if (UDF_I_ALLOCTYPE(dir) == ICB_FLAG_AD_IN_ICB)
 	{
 		mark_inode_dirty(dir);
-		dir->i_version = ++event;
 	}
 	if (fibh.sbh != fibh.ebh)
 		udf_release_data(fibh.ebh);
@@ -1205,7 +1197,6 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 		if (!nfi)
 			goto end_rename;
 	}
-	new_dir->i_version = ++event;
 
 	/*
 	 * Like most other Unix systems, set the ctime for inodes on a
@@ -1227,7 +1218,6 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 	ofi = udf_find_entry(old_dir, old_dentry, &ofibh, &ocfi);
 	udf_delete_entry(old_dir, ofi, &ofibh, &ocfi);
 
-	old_dir->i_version = ++event;
 	if (new_inode)
 	{
 		new_inode->i_nlink--;
@@ -1247,7 +1237,6 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 		if (UDF_I_ALLOCTYPE(old_inode) == ICB_FLAG_AD_IN_ICB)
 		{
 			mark_inode_dirty(old_inode);
-			old_inode->i_version = ++event;
 		}
 		else
 			mark_buffer_dirty_inode(dir_bh, old_inode);
