@@ -697,8 +697,12 @@ extern int		netdev_nit;
 static inline int netif_rx_ni(struct sk_buff *skb)
 {
        int err = netif_rx(skb);
+
+       preempt_disable();
        if (softirq_pending(smp_processor_id()))
                do_softirq();
+       preempt_enable();
+
        return err;
 }
 

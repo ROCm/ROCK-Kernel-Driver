@@ -107,8 +107,8 @@ prio_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 		goto dropped;
 
 	if ((ret = qdisc->enqueue(skb, qdisc)) == NET_XMIT_SUCCESS) {
-		sch->stats.bytes += skb->len;
-		sch->stats.packets++;
+		sch->bstats.bytes += skb->len;
+		sch->bstats.packets++;
 		sch->q.qlen++;
 		return NET_XMIT_SUCCESS;
 	}
@@ -117,10 +117,10 @@ dropped:
 #ifdef CONFIG_NET_CLS_ACT
 	if (NET_XMIT_DROP == ret) {
 #endif
-		sch->stats.drops++;
+		sch->qstats.drops++;
 #ifdef CONFIG_NET_CLS_ACT
 	} else {
-		sch->stats.overlimits++; /* abuse, but noone uses it */
+		sch->qstats.overlimits++; /* abuse, but noone uses it */
 	}
 #endif
 	return ret; 
@@ -142,7 +142,7 @@ prio_requeue(struct sk_buff *skb, struct Qdisc* sch)
 		return 0;
 	}
 dropped:
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	return NET_XMIT_DROP;
 }
 
