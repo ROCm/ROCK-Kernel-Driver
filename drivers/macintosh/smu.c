@@ -31,7 +31,7 @@
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
 
-#define DEBUG_SMU 1
+#undef DEBUG_SMU
 
 #if defined(DEBUG_SMU)
 #define DPRINTK(fmt, args...) do { printk(fmt , ##args); } while (0)
