@@ -21,6 +21,24 @@ static char *HSCXVer[] __initdata =
 {"A1", "?1", "A2", "?3", "A3", "V2.1", "?6", "?7",
  "?8", "?9", "?10", "?11", "?12", "?13", "?14", "???"};
 
+static inline u8
+hscx_read_reg(struct BCState *bcs, u8 addr)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	return cs->BC_Read_Reg(cs, hscx, addr);
+}
+
+static inline void
+hscx_write_reg(struct BCState *bcs, u8 addr, u8 val)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	cs->BC_Write_Reg(cs, hscx, addr, val);
+}
+
 int __init
 HscxVersion(struct IsdnCardState *cs, char *s)
 {
@@ -47,48 +65,49 @@ modehscx(struct BCState *bcs, int mode, int bc)
 			'A' + hscx, mode, bc);
 	bcs->mode = mode;
 	bcs->channel = bc;
-	cs->BC_Write_Reg(cs, hscx, HSCX_XAD1, 0xFF);
-	cs->BC_Write_Reg(cs, hscx, HSCX_XAD2, 0xFF);
-	cs->BC_Write_Reg(cs, hscx, HSCX_RAH2, 0xFF);
-	cs->BC_Write_Reg(cs, hscx, HSCX_XBCH, 0x0);
-	cs->BC_Write_Reg(cs, hscx, HSCX_RLCR, 0x0);
-	cs->BC_Write_Reg(cs, hscx, HSCX_CCR1,
+	hscx_write_reg(bcs, HSCX_XAD1, 0xFF);
+	hscx_write_reg(bcs, HSCX_XAD2, 0xFF);
+	hscx_write_reg(bcs, HSCX_RAH2, 0xFF);
+	hscx_write_reg(bcs, HSCX_XBCH, 0x0);
+	hscx_write_reg(bcs, HSCX_RLCR, 0x0);
+	hscx_write_reg(bcs, HSCX_CCR1,
 		test_bit(HW_IPAC, &cs->HW_Flags) ? 0x82 : 0x85);
-	cs->BC_Write_Reg(cs, hscx, HSCX_CCR2, 0x30);
-	cs->BC_Write_Reg(cs, hscx, HSCX_XCCR, 7);
-	cs->BC_Write_Reg(cs, hscx, HSCX_RCCR, 7);
+	hscx_write_reg(bcs, HSCX_CCR2, 0x30);
+	hscx_write_reg(bcs, HSCX_XCCR, 7);
+	hscx_write_reg(bcs, HSCX_RCCR, 7);
 
 	/* Switch IOM 1 SSI */
 	if (test_bit(HW_IOM1, &cs->HW_Flags) && (hscx == 0))
 		bc = 1 - bc;
 
 	if (bc == 0) {
-		cs->BC_Write_Reg(cs, hscx, HSCX_TSAX,
+		hscx_write_reg(bcs, HSCX_TSAX,
 			      test_bit(HW_IOM1, &cs->HW_Flags) ? 0x7 : bcs->hw.hscx.tsaxr0);
-		cs->BC_Write_Reg(cs, hscx, HSCX_TSAR,
+		hscx_write_reg(bcs, HSCX_TSAR,
 			      test_bit(HW_IOM1, &cs->HW_Flags) ? 0x7 : bcs->hw.hscx.tsaxr0);
 	} else {
-		cs->BC_Write_Reg(cs, hscx, HSCX_TSAX, bcs->hw.hscx.tsaxr1);
-		cs->BC_Write_Reg(cs, hscx, HSCX_TSAR, bcs->hw.hscx.tsaxr1);
+		hscx_write_reg(bcs, HSCX_TSAX, bcs->hw.hscx.tsaxr1);
+		hscx_write_reg(bcs, HSCX_TSAR, bcs->hw.hscx.tsaxr1);
 	}
 	switch (mode) {
-		case (L1_MODE_NULL):
-			cs->BC_Write_Reg(cs, hscx, HSCX_TSAX, 0x1f);
-			cs->BC_Write_Reg(cs, hscx, HSCX_TSAR, 0x1f);
-			cs->BC_Write_Reg(cs, hscx, HSCX_MODE, 0x84);
-			break;
-		case (L1_MODE_TRANS):
-			cs->BC_Write_Reg(cs, hscx, HSCX_MODE, 0xe4);
-			break;
-		case (L1_MODE_HDLC):
-			cs->BC_Write_Reg(cs, hscx, HSCX_CCR1,
-				test_bit(HW_IPAC, &cs->HW_Flags) ? 0x8a : 0x8d);
-			cs->BC_Write_Reg(cs, hscx, HSCX_MODE, 0x8c);
-			break;
+	case L1_MODE_NULL:
+		hscx_write_reg(bcs, HSCX_TSAX, 0x1f);
+		hscx_write_reg(bcs, HSCX_TSAR, 0x1f);
+		hscx_write_reg(bcs, HSCX_MODE, 0x84);
+		break;
+	case L1_MODE_TRANS:
+		hscx_write_reg(bcs, HSCX_MODE, 0xe4);
+		break;
+	case L1_MODE_HDLC:
+		hscx_write_reg(bcs, HSCX_CCR1,
+			       test_bit(HW_IPAC, &cs->HW_Flags) ? 0x8a : 0x8d);
+		hscx_write_reg(bcs, HSCX_MODE, 0x8c);
+		break;
 	}
 	if (mode)
-		cs->BC_Write_Reg(cs, hscx, HSCX_CMDR, 0x41);
-	cs->BC_Write_Reg(cs, hscx, HSCX_ISTA, 0x00);
+		hscx_write_reg(bcs, HSCX_CMDR, 0x41);
+
+	hscx_write_reg(bcs, HSCX_ISTA, 0x00);
 }
 
 void
@@ -207,32 +226,32 @@ inithscx(struct IsdnCardState *cs)
 	cs->bcs[1].hw.hscx.tsaxr0 = 0x2f;
 	cs->bcs[1].hw.hscx.tsaxr1 = 3;
 
-	val = cs->BC_Read_Reg(cs, 1, HSCX_ISTA);
+	val = hscx_read_reg(&cs->bcs[1], HSCX_ISTA);
 	debugl1(cs, "HSCX B ISTA %x", val);
 	if (val & 0x01) {
-		eval = cs->BC_Read_Reg(cs, 1, HSCX_EXIR);
+		eval = hscx_read_reg(&cs->bcs[1], HSCX_EXIR);
 		debugl1(cs, "HSCX B EXIR %x", eval);
 	}
 	if (val & 0x02) {
-		eval = cs->BC_Read_Reg(cs, 0, HSCX_EXIR);
+		eval = hscx_read_reg(&cs->bcs[0], HSCX_EXIR);
 		debugl1(cs, "HSCX A EXIR %x", eval);
 	}
-	val = cs->BC_Read_Reg(cs, 0, HSCX_ISTA);
+	val = hscx_read_reg(&cs->bcs[0], HSCX_ISTA);
 	debugl1(cs, "HSCX A ISTA %x", val);
-	val = cs->BC_Read_Reg(cs, 1, HSCX_STAR);
+	val = hscx_read_reg(&cs->bcs[1], HSCX_STAR);
 	debugl1(cs, "HSCX B STAR %x", val);
-	val = cs->BC_Read_Reg(cs, 0, HSCX_STAR);
+	val = hscx_read_reg(&cs->bcs[0], HSCX_STAR);
 	debugl1(cs, "HSCX A STAR %x", val);
 	/* disable all IRQ */
-	cs->BC_Write_Reg(cs, 0, HSCX_MASK, 0xFF);
-	cs->BC_Write_Reg(cs, 1, HSCX_MASK, 0xFF);
+	hscx_write_reg(&cs->bcs[0], HSCX_MASK, 0xFF);
+	hscx_write_reg(&cs->bcs[1], HSCX_MASK, 0xFF);
 
-	modehscx(cs->bcs, 0, 0);
-	modehscx(cs->bcs + 1, 0, 0);
+	modehscx(&cs->bcs[0], 0, 0);
+	modehscx(&cs->bcs[1], 0, 0);
 
 	/* Reenable all IRQ */
-	cs->BC_Write_Reg(cs, 0, HSCX_MASK, 0);
-	cs->BC_Write_Reg(cs, 1, HSCX_MASK, 0);
+	hscx_write_reg(&cs->bcs[0], HSCX_MASK, 0x0);
+	hscx_write_reg(&cs->bcs[1], HSCX_MASK, 0x0);
 }
 
 void __init

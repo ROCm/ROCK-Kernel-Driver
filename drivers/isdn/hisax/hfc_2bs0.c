@@ -17,14 +17,26 @@
 #include "isdnl1.h"
 #include <linux/interrupt.h>
 
+static inline u8
+hfc_read_reg(struct IsdnCardState *cs, int data, u8 reg)
+{
+	return cs->BC_Read_Reg(cs, data, reg);
+}
+
+static inline void
+hfc_write_reg(struct IsdnCardState *cs, int data, u8 reg, u8 val)
+{
+	cs->BC_Write_Reg(cs, data, reg, val);
+}
+
 static inline int
 WaitForBusy(struct IsdnCardState *cs)
 {
 	int to = 130;
 	u_char val;
 
-	while (!(cs->BC_Read_Reg(cs, HFC_STATUS, 0) & HFC_BUSY) && to) {
-		val = cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F2 |
+	while (!(hfc_read_reg(cs, HFC_STATUS, 0) & HFC_BUSY) && to) {
+		val = hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F2 |
 				      (cs->hw.hfc.cip & 3));
 		udelay(1);
 		to--;
@@ -41,7 +53,7 @@ WaitNoBusy(struct IsdnCardState *cs)
 {
 	int to = 125;
 
-	while ((cs->BC_Read_Reg(cs, HFC_STATUS, 0) & HFC_BUSY) && to) {
+	while ((hfc_read_reg(cs, HFC_STATUS, 0) & HFC_BUSY) && to) {
 		udelay(1);
 		to--;
 	}
@@ -72,9 +84,9 @@ ReadZReg(struct BCState *bcs, u_char reg)
 	int val;
 
 	WaitNoBusy(bcs->cs);
-	val = 256 * bcs->cs->BC_Read_Reg(bcs->cs, HFC_DATA, reg | HFC_CIP | HFC_Z_HIGH);
+	val = 256 * hfc_read_reg(bcs->cs, HFC_DATA, reg | HFC_CIP | HFC_Z_HIGH);
 	WaitNoBusy(bcs->cs);
-	val += bcs->cs->BC_Read_Reg(bcs->cs, HFC_DATA, reg | HFC_CIP | HFC_Z_LOW);
+	val += hfc_read_reg(bcs->cs, HFC_DATA, reg | HFC_CIP | HFC_Z_LOW);
 	return (val);
 }
 
@@ -91,14 +103,14 @@ hfc_clear_fifo(struct BCState *bcs)
 
 	cip = HFC_CIP | HFC_F1 | HFC_REC | HFC_CHANNEL(bcs->channel);
 	if ((cip & 0xc3) != (cs->hw.hfc.cip & 0xc3)) {
-		cs->BC_Write_Reg(cs, HFC_STATUS, cip, cip);
+		hfc_write_reg(cs, HFC_STATUS, cip, cip);
 		WaitForBusy(cs);
 	}
 	WaitNoBusy(cs);
-	f1 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+	f1 = hfc_read_reg(cs, HFC_DATA, cip);
 	cip = HFC_CIP | HFC_F2 | HFC_REC | HFC_CHANNEL(bcs->channel);
 	WaitNoBusy(cs);
-	f2 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+	f2 = hfc_read_reg(cs, HFC_DATA, cip);
 	z1 = ReadZReg(bcs, HFC_Z1 | HFC_REC | HFC_CHANNEL(bcs->channel));
 	z2 = ReadZReg(bcs, HFC_Z2 | HFC_REC | HFC_CHANNEL(bcs->channel));
 	cnt = 32;
@@ -117,21 +129,21 @@ hfc_clear_fifo(struct BCState *bcs)
 		cip = HFC_CIP | HFC_FIFO_OUT | HFC_REC | HFC_CHANNEL(bcs->channel);
 		idx = 0;
 		while ((idx < rcnt) && WaitNoBusy(cs)) {
-			cs->BC_Read_Reg(cs, HFC_DATA_NODEB, cip);
+			hfc_read_reg(cs, HFC_DATA_NODEB, cip);
 			idx++;
 		}
 		if (f1 != f2) {
 			WaitNoBusy(cs);
-			cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
+			hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
 					HFC_CHANNEL(bcs->channel));
 			WaitForBusy(cs);
 		}
 		cip = HFC_CIP | HFC_F1 | HFC_REC | HFC_CHANNEL(bcs->channel);
 		WaitNoBusy(cs);
-		f1 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+		f1 = hfc_read_reg(cs, HFC_DATA, cip);
 		cip = HFC_CIP | HFC_F2 | HFC_REC | HFC_CHANNEL(bcs->channel);
 		WaitNoBusy(cs);
-		f2 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+		f2 = hfc_read_reg(cs, HFC_DATA, cip);
 		z1 = ReadZReg(bcs, HFC_Z1 | HFC_REC | HFC_CHANNEL(bcs->channel));
 		z2 = ReadZReg(bcs, HFC_Z2 | HFC_REC | HFC_CHANNEL(bcs->channel));
 	}
@@ -158,9 +170,9 @@ hfc_empty_fifo(struct BCState *bcs, int count)
 			debugl1(cs, "hfc_empty_fifo: incoming packet too large");
 		cip = HFC_CIP | HFC_FIFO_OUT | HFC_REC | HFC_CHANNEL(bcs->channel);
 		while ((idx++ < count) && WaitNoBusy(cs))
-			cs->BC_Read_Reg(cs, HFC_DATA_NODEB, cip);
+			hfc_read_reg(cs, HFC_DATA_NODEB, cip);
 		WaitNoBusy(cs);
-		stat = cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
+		stat = hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
 				       HFC_CHANNEL(bcs->channel));
 		WaitForBusy(cs);
 		return (NULL);
@@ -170,9 +182,9 @@ hfc_empty_fifo(struct BCState *bcs, int count)
 			debugl1(cs, "hfc_empty_fifo: incoming packet too small");
 		cip = HFC_CIP | HFC_FIFO_OUT | HFC_REC | HFC_CHANNEL(bcs->channel);
 		while ((idx++ < count) && WaitNoBusy(cs))
-			cs->BC_Read_Reg(cs, HFC_DATA_NODEB, cip);
+			hfc_read_reg(cs, HFC_DATA_NODEB, cip);
 		WaitNoBusy(cs);
-		stat = cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
+		stat = hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
 				       HFC_CHANNEL(bcs->channel));
 		WaitForBusy(cs);
 #ifdef ERROR_STATISTIC
@@ -191,7 +203,7 @@ hfc_empty_fifo(struct BCState *bcs, int count)
 		idx = 0;
 		cip = HFC_CIP | HFC_FIFO_OUT | HFC_REC | HFC_CHANNEL(bcs->channel);
 		while ((idx < count) && WaitNoBusy(cs)) {
-			*ptr++ = cs->BC_Read_Reg(cs, HFC_DATA_NODEB, cip);
+			*ptr++ = hfc_read_reg(cs, HFC_DATA_NODEB, cip);
 			idx++;
 		}
 		if (idx != count) {
@@ -200,7 +212,7 @@ hfc_empty_fifo(struct BCState *bcs, int count)
 			dev_kfree_skb_any(skb);
 			if (bcs->mode != L1_MODE_TRANS) {
 			  WaitNoBusy(cs);
-			  stat = cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
+			  stat = hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
 						 HFC_CHANNEL(bcs->channel));
 			  WaitForBusy(cs);
 			}
@@ -208,11 +220,11 @@ hfc_empty_fifo(struct BCState *bcs, int count)
 		}
 		if (bcs->mode != L1_MODE_TRANS) {
 		  WaitNoBusy(cs);
-		  chksum = (cs->BC_Read_Reg(cs, HFC_DATA, cip) << 8);
+		  chksum = (hfc_read_reg(cs, HFC_DATA, cip) << 8);
 		  WaitNoBusy(cs);
-		  chksum += cs->BC_Read_Reg(cs, HFC_DATA, cip);
+		  chksum += hfc_read_reg(cs, HFC_DATA, cip);
 		  WaitNoBusy(cs);
-		  stat = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+		  stat = hfc_read_reg(cs, HFC_DATA, cip);
 		  if (cs->debug & L1_DEB_HSCX)
 		    debugl1(cs, "hfc_empty_fifo %d chksum %x stat %x",
 			    bcs->channel, chksum, stat);
@@ -225,7 +237,7 @@ hfc_empty_fifo(struct BCState *bcs, int count)
 #endif
 		  }
 		  WaitNoBusy(cs);
-		  stat = cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
+		  stat = hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F2_INC | HFC_REC |
 					 HFC_CHANNEL(bcs->channel));
 		  WaitForBusy(cs);
 		}
@@ -249,15 +261,15 @@ hfc_fill_fifo(struct BCState *bcs)
 
 	cip = HFC_CIP | HFC_F1 | HFC_SEND | HFC_CHANNEL(bcs->channel);
 	if ((cip & 0xc3) != (cs->hw.hfc.cip & 0xc3)) {
-	  cs->BC_Write_Reg(cs, HFC_STATUS, cip, cip);
+	  hfc_write_reg(cs, HFC_STATUS, cip, cip);
 	  WaitForBusy(cs);
 	}
 	WaitNoBusy(cs);
 	if (bcs->mode != L1_MODE_TRANS) {
-	  bcs->hw.hfc.f1 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+	  bcs->hw.hfc.f1 = hfc_read_reg(cs, HFC_DATA, cip);
 	  cip = HFC_CIP | HFC_F2 | HFC_SEND | HFC_CHANNEL(bcs->channel);
 	  WaitNoBusy(cs);
-	  bcs->hw.hfc.f2 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+	  bcs->hw.hfc.f2 = hfc_read_reg(cs, HFC_DATA, cip);
 	  bcs->hw.hfc.send[bcs->hw.hfc.f1] = ReadZReg(bcs, HFC_Z1 | HFC_SEND | HFC_CHANNEL(bcs->channel));
 	  if (cs->debug & L1_DEB_HSCX)
 	    debugl1(cs, "hfc_fill_fifo %d f1(%d) f2(%d) z1(%x)",
@@ -293,7 +305,7 @@ hfc_fill_fifo(struct BCState *bcs)
 	cip = HFC_CIP | HFC_FIFO_IN | HFC_SEND | HFC_CHANNEL(bcs->channel);
 	idx = 0;
 	while ((idx < bcs->tx_skb->len) && WaitNoBusy(cs))
-		cs->BC_Write_Reg(cs, HFC_DATA_NODEB, cip, bcs->tx_skb->data[idx++]);
+		hfc_write_reg(cs, HFC_DATA_NODEB, cip, bcs->tx_skb->data[idx++]);
 	if (idx != bcs->tx_skb->len) {
 		debugl1(cs, "FIFO Send BUSY error");
 		printk(KERN_WARNING "HFC S FIFO channel %d BUSY Error\n", bcs->channel);
@@ -307,7 +319,7 @@ hfc_fill_fifo(struct BCState *bcs)
 		if (bcs->mode != L1_MODE_TRANS) {
 		  WaitForBusy(cs);
 		  WaitNoBusy(cs);
-		  cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F1_INC | HFC_SEND | HFC_CHANNEL(bcs->channel));
+		  hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F1_INC | HFC_SEND | HFC_CHANNEL(bcs->channel));
 		}
 		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	}
@@ -327,16 +339,16 @@ main_irq_hfc(struct BCState *bcs)
 	count--;
 	cip = HFC_CIP | HFC_F1 | HFC_REC | HFC_CHANNEL(bcs->channel);
 	if ((cip & 0xc3) != (cs->hw.hfc.cip & 0xc3)) {
-		cs->BC_Write_Reg(cs, HFC_STATUS, cip, cip);
+		hfc_write_reg(cs, HFC_STATUS, cip, cip);
 		WaitForBusy(cs);
 	}
 	WaitNoBusy(cs);
 	receive = 0;
 	if (bcs->mode == L1_MODE_HDLC) {
-		f1 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+		f1 = hfc_read_reg(cs, HFC_DATA, cip);
 		cip = HFC_CIP | HFC_F2 | HFC_REC | HFC_CHANNEL(bcs->channel);
 		WaitNoBusy(cs);
-		f2 = cs->BC_Read_Reg(cs, HFC_DATA, cip);
+		f2 = hfc_read_reg(cs, HFC_DATA, cip);
 		if (f1 != f2) {
 			if (cs->debug & L1_DEB_HSCX)
 				debugl1(cs, "hfc rec %d f1(%d) f2(%d)",
@@ -411,7 +423,7 @@ mode_hfc(struct BCState *bcs, int mode, int bc)
 			break;
 		case (L1_MODE_TRANS):
 		        cs->hw.hfc.ctmt &= ~(1 << bc); /* set HDLC mode */ 
-			cs->BC_Write_Reg(cs, HFC_STATUS, cs->hw.hfc.ctmt, cs->hw.hfc.ctmt);
+			hfc_write_reg(cs, HFC_STATUS, cs->hw.hfc.ctmt, cs->hw.hfc.ctmt);
 			hfc_clear_fifo(bcs); /* complete fifo clear */ 
 			if (bc) {
 				cs->hw.hfc.ctmt |= 1;
@@ -435,7 +447,7 @@ mode_hfc(struct BCState *bcs, int mode, int bc)
 			}
 			break;
 	}
-	cs->BC_Write_Reg(cs, HFC_STATUS, cs->hw.hfc.ctmt, cs->hw.hfc.ctmt);
+	hfc_write_reg(cs, HFC_STATUS, cs->hw.hfc.ctmt, cs->hw.hfc.ctmt);
 	cs->writeisac(cs, ISAC_SPCR, cs->hw.hfc.isac_spcr);
 	if (mode == L1_MODE_HDLC)
 		hfc_clear_fifo(bcs);

@@ -29,11 +29,24 @@ void isar_setup(struct IsdnCardState *cs);
 static void isar_pump_cmd(struct BCState *bcs, u_char cmd, u_char para);
 static inline void ll_deliver_faxstat(struct BCState *bcs, u_char status);
 static spinlock_t isar_lock = SPIN_LOCK_UNLOCKED;
+
+static inline u8
+isar_read_reg(struct IsdnCardState *cs, int mode, u8 addr)
+{
+	return cs->BC_Read_Reg(cs, mode, addr);
+}
+
+static inline void
+isar_write_reg(struct IsdnCardState *cs, int mode, u8 addr, u8 val)
+{
+	cs->BC_Write_Reg(cs, mode, addr, val);
+}
+
 static inline int
 waitforHIA(struct IsdnCardState *cs, int timeout)
 {
 
-	while ((cs->BC_Read_Reg(cs, 0, ISAR_HIA) & 1) && timeout) {
+	while ((isar_read_reg(cs, 0, ISAR_HIA) & 1) && timeout) {
 		udelay(1);
 		timeout--;
 	}
@@ -57,13 +70,13 @@ sendmsg(struct IsdnCardState *cs, u_char his, u_char creg, u_char len,
 		debugl1(cs, "sendmsg(%02x,%02x,%d)", his, creg, len);
 #endif
 	spin_lock_irqsave(&isar_lock, flags);
-	cs->BC_Write_Reg(cs, 0, ISAR_CTRL_H, creg);
-	cs->BC_Write_Reg(cs, 0, ISAR_CTRL_L, len);
-	cs->BC_Write_Reg(cs, 0, ISAR_WADR, 0);
+	isar_write_reg(cs, 0, ISAR_CTRL_H, creg);
+	isar_write_reg(cs, 0, ISAR_CTRL_L, len);
+	isar_write_reg(cs, 0, ISAR_WADR, 0);
 	if (msg && len) {
-		cs->BC_Write_Reg(cs, 1, ISAR_MBOX, msg[0]);
+		isar_write_reg(cs, 1, ISAR_MBOX, msg[0]);
 		for (i=1; i<len; i++)
-			cs->BC_Write_Reg(cs, 2, ISAR_MBOX, msg[i]);
+			isar_write_reg(cs, 2, ISAR_MBOX, msg[i]);
 #if DUMP_MBOXFRAME>1
 		if (cs->debug & L1_DEB_HSCX_FIFO) {
 			char tmp[256], *t;
@@ -79,7 +92,7 @@ sendmsg(struct IsdnCardState *cs, u_char his, u_char creg, u_char len,
 		}
 #endif
 	}
-	cs->BC_Write_Reg(cs, 1, ISAR_HIS, his);
+	isar_write_reg(cs, 1, ISAR_HIS, his);
 	spin_unlock_irqrestore(&isar_lock, flags);
 	waitforHIA(cs, 10000);
 	return(1);
@@ -91,11 +104,11 @@ rcv_mbox(struct IsdnCardState *cs, struct isar_reg *ireg, u_char *msg)
 {
 	int i;
 
-	cs->BC_Write_Reg(cs, 1, ISAR_RADR, 0);
+	isar_write_reg(cs, 1, ISAR_RADR, 0);
 	if (msg && ireg->clsb) {
-		msg[0] = cs->BC_Read_Reg(cs, 1, ISAR_MBOX);
+		msg[0] = isar_read_reg(cs, 1, ISAR_MBOX);
 		for (i=1; i < ireg->clsb; i++)
-			 msg[i] = cs->BC_Read_Reg(cs, 2, ISAR_MBOX);
+			 msg[i] = isar_read_reg(cs, 2, ISAR_MBOX);
 #if DUMP_MBOXFRAME>1
 		if (cs->debug & L1_DEB_HSCX_FIFO) {
 			char tmp[256], *t;
@@ -111,16 +124,16 @@ rcv_mbox(struct IsdnCardState *cs, struct isar_reg *ireg, u_char *msg)
 		}
 #endif
 	}
-	cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+	isar_write_reg(cs, 1, ISAR_IIA, 0);
 }
 
 /* Call only with IRQ disabled !!! */
 inline void
 get_irq_infos(struct IsdnCardState *cs, struct isar_reg *ireg)
 {
-	ireg->iis = cs->BC_Read_Reg(cs, 1, ISAR_IIS);
-	ireg->cmsb = cs->BC_Read_Reg(cs, 1, ISAR_CTRL_H);
-	ireg->clsb = cs->BC_Read_Reg(cs, 1, ISAR_CTRL_L);
+	ireg->iis = isar_read_reg(cs, 1, ISAR_IIS);
+	ireg->cmsb = isar_read_reg(cs, 1, ISAR_CTRL_H);
+	ireg->clsb = isar_read_reg(cs, 1, ISAR_CTRL_L);
 #if DUMP_MBOXFRAME
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "rcv_mbox(%02x,%02x,%d)", ireg->iis, ireg->cmsb,
@@ -137,7 +150,7 @@ waitrecmsg(struct IsdnCardState *cs, u_char *len,
 	struct isar_reg *ir = cs->bcs[0].hw.isar.reg;
 	
 	
-	while((!(cs->BC_Read_Reg(cs, 0, ISAR_IRQBIT) & ISAR_IRQSTA)) &&
+	while((!(isar_read_reg(cs, 0, ISAR_IRQBIT) & ISAR_IRQSTA)) &&
 		(timeout++ < maxdelay))
 		udelay(1);
 	if (timeout >= maxdelay) {
@@ -163,7 +176,7 @@ ISARVersion(struct IsdnCardState *cs, char *s)
 
 	cs->cardmsg(cs, CARD_RESET,  NULL);
 	/* disable ISAR IRQ */
-	cs->BC_Write_Reg(cs, 0, ISAR_IRQBIT, 0);
+	isar_write_reg(cs, 0, ISAR_IRQBIT, 0);
 	debug = cs->debug;
 	cs->debug &= ~(L1_DEB_HSCX | L1_DEB_HSCX_FIFO);
 	if (!sendmsg(cs, ISAR_HIS_VNR, 0, 3, msg))
@@ -223,7 +236,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 	}
 	cnt = 0;
 	/* disable ISAR IRQ */
-	cs->BC_Write_Reg(cs, 0, ISAR_IRQBIT, 0);
+	isar_write_reg(cs, 0, ISAR_IRQBIT, 0);
 	if (!(msg = kmalloc(256, GFP_KERNEL))) {
 		printk(KERN_ERR"isar_load_firmware no buffer\n");
 		return (1);
@@ -342,7 +355,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 		printk(KERN_DEBUG"isar start dsp success\n");
 	/* NORMAL mode entered */
 	/* Enable IRQs of ISAR */
-	cs->BC_Write_Reg(cs, 0, ISAR_IRQBIT, ISAR_IRQSTA);
+	isar_write_reg(cs, 0, ISAR_IRQBIT, ISAR_IRQSTA);
 	cnt = 1000; /* max 1s */
 	while ((!ireg->bstat) && cnt) {
 		udelay(1000);
@@ -413,7 +426,7 @@ reterror:
 	cs->debug = debug;
 	if (ret)
 		/* disable ISAR IRQ */
-		cs->BC_Write_Reg(cs, 0, ISAR_IRQBIT, 0);
+		isar_write_reg(cs, 0, ISAR_IRQBIT, 0);
 	kfree(msg);
 	kfree(tmpmsg);
 	return(ret);
@@ -480,7 +493,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 	
 	if (!ireg->clsb) {
 		debugl1(cs, "isar zero len frame");
-		cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+		isar_write_reg(cs, 1, ISAR_IIA, 0);
 		return;
 	}
 	switch (bcs->mode) {
@@ -489,7 +502,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 			ireg->iis, ireg->cmsb, ireg->clsb);
 		printk(KERN_WARNING"isar mode 0 spurious IIS_RDATA %x/%x/%x\n",
 			ireg->iis, ireg->cmsb, ireg->clsb);
-		cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+		isar_write_reg(cs, 1, ISAR_IIA, 0);
 		break;
 	case L1_MODE_TRANS:
 	case L1_MODE_V32:
@@ -499,14 +512,14 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 			sched_b_event(bcs, B_RCVBUFREADY);
 		} else {
 			printk(KERN_WARNING "HiSax: skb out of memory\n");
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 		}
 		break;
 	case L1_MODE_HDLC:
 		if ((bcs->hw.isar.rcvidx + ireg->clsb) > HSCX_BUFMAX) {
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "isar_rcv_frame: incoming packet too large");
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 			bcs->hw.isar.rcvidx = 0;
 		} else if (ireg->cmsb & HDLC_ERROR) {
 			if (cs->debug & L1_DEB_WARN)
@@ -519,7 +532,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 				bcs->err_crc++;
 #endif
 			bcs->hw.isar.rcvidx = 0;
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 		} else {
 			if (ireg->cmsb & HDLC_FSD)
 				bcs->hw.isar.rcvidx = 0;
@@ -547,7 +560,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 		if (bcs->hw.isar.state != STFAX_ACTIV) {
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "isar_rcv_frame: not ACTIV");
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 			bcs->hw.isar.rcvidx = 0;
 			break;
 		}
@@ -566,7 +579,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 				if (ireg->cmsb & SART_NMD) { /* ABORT */
 					if (cs->debug & L1_DEB_WARN)
 						debugl1(cs, "isar_rcv_frame: no more data");
-					cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+					isar_write_reg(cs, 1, ISAR_IIA, 0);
 					bcs->hw.isar.rcvidx = 0;
 					send_DLE_ETX(bcs);
 					sendmsg(cs, SET_DPS(bcs->hw.isar.dpath) |
@@ -577,7 +590,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 				}
 			} else {
 				printk(KERN_WARNING "HiSax: skb out of memory\n");
-				cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+				isar_write_reg(cs, 1, ISAR_IIA, 0);
 			}
 			break;
 		}
@@ -585,7 +598,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "isar_rcv_frame: unknown fax mode %x",
 					bcs->hw.isar.cmd);
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 			bcs->hw.isar.rcvidx = 0;
 			break;
 		}
@@ -593,14 +606,14 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 		if ((bcs->hw.isar.rcvidx + ireg->clsb) > HSCX_BUFMAX) {
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "isar_rcv_frame: incoming packet too large");
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 			bcs->hw.isar.rcvidx = 0;
 		} else if (ireg->cmsb & HDLC_ERROR) {
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "isar frame error %x len %d",
 					ireg->cmsb, ireg->clsb);
 			bcs->hw.isar.rcvidx = 0;
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 		} else {
 			if (ireg->cmsb & HDLC_FSD)
 				bcs->hw.isar.rcvidx = 0;
@@ -631,7 +644,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 		if (ireg->cmsb & SART_NMD) { /* ABORT */
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "isar_rcv_frame: no more data");
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 			bcs->hw.isar.rcvidx = 0;
 			send_DLE_ETX(bcs);
 			sendmsg(cs, SET_DPS(bcs->hw.isar.dpath) |
@@ -642,7 +655,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 		break;
 	default:
 		printk(KERN_ERR"isar_rcv_frame mode (%x)error\n", bcs->mode);
-		cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+		isar_write_reg(cs, 1, ISAR_IIA, 0);
 		break;
 	}
 }
@@ -1151,11 +1164,11 @@ isar_int_main(struct IsdnCardState *cs)
 			} else {
 				debugl1(cs, "isar spurious IIS_RDATA %x/%x/%x",
 					ireg->iis, ireg->cmsb, ireg->clsb);
-				cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+				isar_write_reg(cs, 1, ISAR_IIA, 0);
 			}
 			break;
 		case ISAR_IIS_GSTEV:
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 			ireg->bstat |= ireg->cmsb;
 			check_send(cs, ireg->cmsb);
 			break;
@@ -1171,7 +1184,7 @@ isar_int_main(struct IsdnCardState *cs)
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "Buffer STEV dpath%d msb(%x)",
 					ireg->iis>>6, ireg->cmsb);
-			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+			isar_write_reg(cs, 1, ISAR_IIA, 0);
 			break;
 		case ISAR_IIS_PSTEV:
 			if ((bcs = sel_bcs_isar(cs, ireg->iis >> 6))) {
@@ -1188,7 +1201,7 @@ isar_int_main(struct IsdnCardState *cs)
 			} else {
 				debugl1(cs, "isar spurious IIS_PSTEV %x/%x/%x",
 					ireg->iis, ireg->cmsb, ireg->clsb);
-				cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+				isar_write_reg(cs, 1, ISAR_IIA, 0);
 			}
 			break;
 		case ISAR_IIS_PSTRSP:
@@ -1198,7 +1211,7 @@ isar_int_main(struct IsdnCardState *cs)
 			} else {
 				debugl1(cs, "isar spurious IIS_PSTRSP %x/%x/%x",
 					ireg->iis, ireg->cmsb, ireg->clsb);
-				cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
+				isar_write_reg(cs, 1, ISAR_IIA, 0);
 			}
 			break;
 		case ISAR_IIS_DIAG:

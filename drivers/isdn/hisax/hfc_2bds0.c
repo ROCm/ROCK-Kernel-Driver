@@ -144,7 +144,7 @@ SelFiFo(struct IsdnCardState *cs, u_char FiFo)
 	}
 	cs->hw.hfcD.fifo = FiFo;
 	WaitNoBusy(cs);
-	cs->BC_Write_Reg(cs, HFCD_DATA, cip, 0);
+	WriteReg(cs, HFCD_DATA, cip, 0);
 	WaitForBusy(cs);
 	return(2);
 }
