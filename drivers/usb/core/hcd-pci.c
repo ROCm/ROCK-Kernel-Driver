@@ -38,14 +38,6 @@
 
 /*-------------------------------------------------------------------------*/
 
-static void hcd_pci_release(struct usb_bus *bus)
-{
-	struct usb_hcd *hcd = bus->hcpriv;
-
-	if (hcd)
-		hcd->driver->hcd_free(hcd);
-}
-
 /* configure so an HC device and id are always provided */
 /* always called with process context; sleeping is OK */
 
@@ -161,7 +153,7 @@ clean_2:
 
 	if ((retval = hcd_buffer_create (hcd)) != 0) {
 clean_3:
-		driver->hcd_free (hcd);
+		kfree (hcd);
 		goto clean_2;
 	}
 
@@ -195,8 +187,8 @@ clean_3:
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
-	hcd->self.release = &hcd_pci_release;
 	init_timer (&hcd->rh_timer);
 
 	INIT_LIST_HEAD (&hcd->dev_list);

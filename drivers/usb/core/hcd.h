@@ -192,7 +192,6 @@ struct hc_driver {
 
 	/* memory lifecycle */
 	struct usb_hcd	*(*hcd_alloc) (void);
-	void		(*hcd_free) (struct usb_hcd *hcd);
 
 	/* manage i/o requests, device state */
 	int	(*urb_enqueue) (struct usb_hcd *hcd, struct urb *urb,
@@ -359,6 +358,8 @@ static inline int hcd_register_root (struct usb_device *usb_dev,
 
 	return usb_register_root_hub (usb_dev, hcd->self.controller);
 }
+
+extern void usb_hcd_release (struct usb_bus *);
 
 extern void usb_set_device_state(struct usb_device *udev,
 		enum usb_device_state new_state);

@@ -1622,3 +1622,13 @@ void usb_hc_died (struct usb_hcd *hcd)
 }
 EXPORT_SYMBOL (usb_hc_died);
 
+/*-------------------------------------------------------------------------*/
+
+void usb_hcd_release(struct usb_bus *bus)
+{
+	struct usb_hcd *hcd;
+
+	hcd = container_of (bus, struct usb_hcd, self);
+	kfree(hcd);
+}
+EXPORT_SYMBOL (usb_hcd_release);
