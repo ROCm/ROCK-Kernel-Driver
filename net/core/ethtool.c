@@ -502,15 +502,15 @@ static int ethtool_get_strings(struct net_device *dev, void *useraddr)
 
 	switch (gstrings.string_set) {
 	case ETH_SS_TEST:
-		if (ops->self_test_count)
-			gstrings.len = ops->self_test_count(dev);
-		else
+		if (!ops->self_test_count)
 			return -EOPNOTSUPP;
+		gstrings.len = ops->self_test_count(dev);
+		break;
 	case ETH_SS_STATS:
-		if (ops->get_stats_count)
-			gstrings.len = ops->get_stats_count(dev);
-		else
+		if (!ops->get_stats_count)
 			return -EOPNOTSUPP;
+		gstrings.len = ops->get_stats_count(dev);
+		break;
 	default:
 		return -EINVAL;
 	}

@@ -629,8 +629,6 @@ static int __init el3_mca_probe(struct device *device) {
 			   el3_mca_adapter_names[mdev->index], slot + 1);
 
 		/* claim the slot */
-		strncpy(device->name, el3_mca_adapter_names[mdev->index],
-				sizeof(device->name));
 		mca_device_set_claim(mdev, 1);
 
 		if_port = pos4 & 0x03;

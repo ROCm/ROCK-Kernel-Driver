@@ -378,7 +378,7 @@ static int seeq8005_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
 	struct net_local *lp = (struct net_local *)dev->priv;
 	short length = skb->len;
-	unsigned char *buf = skb->data;
+	unsigned char *buf;
 
 	if (length < ETH_ZLEN) {
 		skb = skb_padto(skb, ETH_ZLEN);
@@ -386,6 +386,8 @@ static int seeq8005_send_packet(struct sk_buff *skb, struct net_device *dev)
 			return 0;
 		length = ETH_ZLEN;
 	}
+	buf = skb->data;
+
 	/* Block a timer-based transmit from overlapping */
 	netif_stop_queue(dev);
 	
