@@ -1227,17 +1227,17 @@ void fib6_run_gc(unsigned long dummy)
 
 void __init fib6_init(void)
 {
-	if (!fib6_node_kmem)
-		fib6_node_kmem = kmem_cache_create("fib6_nodes",
-						   sizeof(struct fib6_node),
-						   0, SLAB_HWCACHE_ALIGN,
-						   NULL, NULL);
+	fib6_node_kmem = kmem_cache_create("fib6_nodes",
+					   sizeof(struct fib6_node),
+					   0, SLAB_HWCACHE_ALIGN,
+					   NULL, NULL);
 }
 
 #ifdef MODULE
 void fib6_gc_cleanup(void)
 {
 	del_timer(&ip6_fib_timer);
+	kmem_cache_destroy(fib6_node_kmem);
 }
 #endif
 

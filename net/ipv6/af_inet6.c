@@ -871,6 +871,9 @@ static void inet6_exit(void)
 	ipv6_sysctl_unregister();	
 #endif
 	cleanup_ipv6_mibs();
+	kmem_cache_destroy(tcp6_sk_cachep);
+	kmem_cache_destroy(udp6_sk_cachep);
+	kmem_cache_destroy(raw6_sk_cachep);
 }
 module_exit(inet6_exit);
 #endif /* MODULE */

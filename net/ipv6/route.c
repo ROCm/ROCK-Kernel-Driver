@@ -1934,5 +1934,6 @@ void ip6_route_cleanup(void)
 	xfrm6_fini();
 	rt6_ifdown(NULL);
 	fib6_gc_cleanup();
+	kmem_cache_destroy(ip6_dst_ops.kmem_cachep);
 }
 #endif	/* MODULE */
