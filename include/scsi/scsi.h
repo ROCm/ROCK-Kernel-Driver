@@ -14,6 +14,8 @@
 
 */
 
+#include <linux/types.h> 
+
 /*
  * SCSI command lengths
  */
