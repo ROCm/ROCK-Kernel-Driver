@@ -2,13 +2,6 @@
 # Makefile for the Baget specific kernel interface routines
 # under Linux.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
-
-all: baget.a 
 
 O_TARGET := baget.a
 
@@ -18,9 +11,10 @@ obj-y			:= baget.o print.o setup.o time.o irq.o bagetIRQ.o \
 obj-$(CONFIG_SERIAL)	+= vacserial.o
 obj-$(CONFIG_VAC_RTC)	+= vacrtc.o
 
+include $(TOPDIR)/Rules.make
+
 bagetIRQ.o : bagetIRQ.S
 	$(CC) $(CFLAGS) -c -o $@ $<
-
 
 ##################### Baget Loader stuff ########################
 
@@ -61,4 +55,3 @@ balo:   balo.o dummy.o balo_supp.o print.o
 clean:
 	rm -f balo balo.h dummy.c image image.bin
 
-include $(TOPDIR)/Rules.make
