@@ -238,7 +238,7 @@ struct server_adapter {
 	struct device *dev;
 	struct vio_dev *dma_dev;
 	struct crq_queue queue;
-	struct tasklet_struct crq_tasklet;
+	struct work_struct crq_task;
 	struct tasklet_struct endio_tasklet;
 	struct iu_pool pool;
 	spinlock_t lock;
@@ -2076,7 +2076,7 @@ static void handle_crq(struct VIOSRP_CRQ *crq, struct server_adapter *adapter)
 /*
  * Task to handle CRQs and completions
  */
-static void crq_task(unsigned long data)
+static void crq_task(void *data)
 {
 	struct server_adapter *adapter = (struct server_adapter *)data;
 	struct VIOSRP_CRQ *crq;
@@ -2125,7 +2125,7 @@ static irqreturn_t handle_interrupt(int irq, void *dev_instance,
 
 	atomic_inc(&adapter->interrupts);
 
-	tasklet_schedule(&adapter->crq_tasklet);
+	kblockd_schedule_work(&adapter->crq_task);
 
 	return IRQ_HANDLED;
 }
@@ -2670,7 +2670,7 @@ static int ibmvscsis_probe(struct vio_dev *dev, const struct vio_device_id *id)
 		     dma_window_property_size);
 	}
 
-	tasklet_init(&adapter->crq_tasklet, crq_task, (unsigned long)adapter);
+	INIT_WORK(&adapter->crq_task, crq_task, adapter);
 
 	tasklet_init(&adapter->endio_tasklet,
 		     endio_task, (unsigned long)adapter);
