@@ -157,8 +157,8 @@ static struct uhci_td *uhci_alloc_td(struct uhci_hcd *uhci, struct usb_device *d
 	return td;
 }
 
-static inline void uhci_fill_td(struct uhci_td *td, __u32 status,
-		__u32 token, __u32 buffer)
+static inline void uhci_fill_td(struct uhci_td *td, u32 status,
+		u32 token, u32 buffer)
 {
 	td->status = cpu_to_le32(status);
 	td->token = cpu_to_le32(token);
@@ -184,11 +184,11 @@ static void uhci_insert_td_frame_list(struct uhci_hcd *uhci, struct uhci_td *td,
 		list_add_tail(&td->fl_list, &ftd->fl_list);
 
 		td->link = ltd->link;
-		mb();
+		wmb();
 		ltd->link = cpu_to_le32(td->dma_handle);
 	} else {
 		td->link = uhci->fl->frame[framenum];
-		mb();
+		wmb();
 		uhci->fl->frame[framenum] = cpu_to_le32(td->dma_handle);
 		uhci->fl->frame_cpu[framenum] = td;
 	}
@@ -218,7 +218,7 @@ static void uhci_remove_td(struct uhci_hcd *uhci, struct uhci_td *td)
 		ptd->link = td->link;
 	}
 
-	mb();
+	wmb();
 	td->link = UHCI_PTR_TERM;
 
 	list_del_init(&td->fl_list);
@@ -352,15 +352,15 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 	 *
 	 * The HC could see (and use!) any of these as we write them.
 	 */
+	lqh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 	if (lqh->urbp) {
 		list_for_each (tmp, &lqh->urbp->queue_list) {
 			struct urb_priv *turbp =
 				list_entry(tmp, struct urb_priv, queue_list);
 
-			turbp->qh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
+			turbp->qh->link = lqh->link;
 		}
 	}
-	lqh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 
 	list_add_tail(&urbp->qh->list, &skelqh->list);
 }
@@ -372,7 +372,7 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	struct uhci_qh *pqh;
-	__u32 newlink;
+	u32 newlink;
 
 	if (!qh)
 		return;
@@ -413,7 +413,7 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 				turbp->qh->link = newlink;
 			}
 		}
-		mb();
+		wmb();
 
 		/* Leave qh->link in case the HC is on the QH now, it will */
 		/* continue the rest of the schedule */
@@ -500,7 +500,7 @@ static void uhci_append_queued_urb(struct uhci_hcd *uhci, struct urb *eurb, stru
 	/* All qh's in the queue need to link to the next queue */
 	urbp->qh->link = eurbp->qh->link;
 
-	mb();			/* Make sure we flush everything */
+	wmb();			/* Make sure we flush everything */
 
 	lltd->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 
