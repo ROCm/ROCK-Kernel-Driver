@@ -169,7 +169,6 @@ out:
 
 static int put_compat_statfs64(struct compat_statfs64 *ubuf, struct kstatfs *kbuf)
 {
-	
 	if (sizeof ubuf->f_blocks == 4) {
 		if ((kbuf->f_blocks | kbuf->f_bfree |
 		     kbuf->f_bavail | kbuf->f_files | kbuf->f_ffree) &
@@ -192,10 +191,13 @@ static int put_compat_statfs64(struct compat_statfs64 *ubuf, struct kstatfs *kbu
 	return 0;
 }
 
-asmlinkage long compat_statfs64(const char *path, struct compat_statfs64 *buf)
+asmlinkage long compat_statfs64(const char *path, compat_size_t sz, struct compat_statfs64 *buf)
 {
 	struct nameidata nd;
 	int error;
+
+	if (sz != sizeof(*buf))
+		return -EINVAL;
 
 	error = user_path_walk(path, &nd);
 	if (!error) {
@@ -208,11 +210,14 @@ asmlinkage long compat_statfs64(const char *path, struct compat_statfs64 *buf)
 	return error;
 }
 
-asmlinkage long compat_fstatfs64(unsigned int fd, struct compat_statfs64 *buf)
+asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 *buf)
 {
 	struct file * file;
 	struct kstatfs tmp;
 	int error;
+
+	if (sz != sizeof(*buf))
+		return -EINVAL;
 
 	error = -EBADF;
 	file = fget(fd);
