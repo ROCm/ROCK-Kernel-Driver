@@ -26,24 +26,6 @@ void hpfs_unlock_creation(struct super_block *s)
 	up(&hpfs_sb(s)->hpfs_creation_de);
 }
 
-void hpfs_lock_iget(struct super_block *s, int mode)
-{
-#ifdef DEBUG_LOCKS
-	printk("lock iget\n");
-#endif
-	while (hpfs_sb(s)->sb_rd_inode) sleep_on(&hpfs_sb(s)->sb_iget_q);
-	hpfs_sb(s)->sb_rd_inode = mode;
-}
-
-void hpfs_unlock_iget(struct super_block *s)
-{
-#ifdef DEBUG_LOCKS
-	printk("unlock iget\n");
-#endif
-	hpfs_sb(s)->sb_rd_inode = 0;
-	wake_up(&hpfs_sb(s)->sb_iget_q);
-}
-
 void hpfs_lock_inode(struct inode *i)
 {
 	if (i) {

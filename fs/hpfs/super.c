@@ -211,7 +211,6 @@ static struct super_operations hpfs_sops =
 {
 	.alloc_inode	= hpfs_alloc_inode,
 	.destroy_inode	= hpfs_destroy_inode,
-        .read_inode	= hpfs_read_inode,
 	.delete_inode	= hpfs_delete_inode,
 	.put_super	= hpfs_put_super,
 	.statfs		= hpfs_statfs,
@@ -470,9 +469,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	sbi->sb_bmp_dir = NULL;
 	sbi->sb_cp_table = NULL;
 
-	sbi->sb_rd_inode = 0;
 	init_MUTEX(&sbi->hpfs_creation_de);
-	init_waitqueue_head(&sbi->sb_iget_q);
 
 	uid = current->uid;
 	gid = current->gid;
@@ -613,15 +610,12 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	brelse(bh1);
 	brelse(bh0);
 
-	hpfs_lock_iget(s, 1);
 	root = iget_locked(s, sbi->sb_root);
-	if (!root) {
-		hpfs_unlock_iget(s);
+	if (!root)
 		goto bail0;
-	}
+	hpfs_init_inode(root);
 	hpfs_read_inode(root);
 	unlock_new_inode(root);
-	hpfs_unlock_iget(s);
 	s->s_root = d_alloc_root(root);
 	if (!s->s_root) {
 		iput(root);

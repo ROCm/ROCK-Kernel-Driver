@@ -243,20 +243,28 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry, struct name
 	 * Go find or make an inode.
 	 */
 
-	hpfs_lock_iget(dir->i_sb, de->directory || (de->ea_size && hpfs_sb(dir->i_sb)->sb_eas) ? 1 : 2);
 	result = iget_locked(dir->i_sb, ino);
 	if (!result) {
-		hpfs_unlock_iget(dir->i_sb);
 		hpfs_error(dir->i_sb, "hpfs_lookup: can't get inode");
 		goto bail1;
 	}
 	if (result->i_state & I_NEW) {
-		hpfs_read_inode(result);
+		hpfs_init_inode(result);
+		if (de->directory)
+			hpfs_read_inode(result);
+		else if (de->ea_size && hpfs_sb(dir->i_sb)->sb_eas)
+			hpfs_read_inode(result);
+		else {
+			result->i_mode |= S_IFREG;
+			result->i_mode &= ~0111;
+			result->i_op = &hpfs_file_iops;
+			result->i_fop = &hpfs_file_ops;
+			result->i_nlink = 1;
+		}
 		unlock_new_inode(result);
 	}
 	hpfs_result = hpfs_i(result);
 	if (!de->directory) hpfs_result->i_parent_dir = dir->i_ino;
-	hpfs_unlock_iget(dir->i_sb);
 
 	hpfs_decide_conv(result, (char *)name, len);
 

@@ -98,18 +98,6 @@ void hpfs_read_inode(struct inode *i)
 	unsigned char *ea;
 	int ea_size;
 
-	hpfs_init_inode(i);
-
-	if (!hpfs_sb(i->i_sb)->sb_rd_inode)
-		hpfs_error(i->i_sb, "read_inode: sb_rd_inode == 0");
-	if (hpfs_sb(i->i_sb)->sb_rd_inode == 2) {
-		i->i_mode |= S_IFREG;
-		i->i_mode &= ~0111;
-		i->i_op = &hpfs_file_iops;
-		i->i_fop = &hpfs_file_ops;
-		i->i_nlink = 1;
-		return;
-	}
 	if (!(fnode = hpfs_map_fnode(sb, i->i_ino, &bh))) {
 		/*i->i_mode |= S_IFREG;
 		i->i_mode &= ~0111;
@@ -248,21 +236,19 @@ void hpfs_write_inode(struct inode *i)
 		kfree(hpfs_inode->i_rddir_off);
 		hpfs_inode->i_rddir_off = NULL;
 	}
-	hpfs_lock_iget(i->i_sb, 1);
 	parent = iget_locked(i->i_sb, hpfs_inode->i_parent_dir);
 	if (parent) {
 		hpfs_inode->i_dirty = 0;
 		if (parent->i_state & I_NEW) {
+			hpfs_init_inode(parent);
 			hpfs_read_inode(parent);
 			unlock_new_inode(parent);
 		}
-		hpfs_unlock_iget(i->i_sb);
 		hpfs_lock_inode(parent);
 		hpfs_write_inode_nolock(i);
 		hpfs_unlock_inode(parent);
 		iput(parent);
 	} else {
-		hpfs_unlock_iget(i->i_sb);
 		mark_inode_dirty(i);
 	}
 }
