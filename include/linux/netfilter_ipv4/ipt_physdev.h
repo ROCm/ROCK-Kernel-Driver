@@ -13,12 +13,12 @@
 #define IPT_PHYSDEV_OP_MASK		(0x20 - 1)
 
 struct ipt_physdev_info {
-	u_int8_t invert;
-	u_int8_t bitmask;
 	char physindev[IFNAMSIZ];
 	char in_mask[IFNAMSIZ];
 	char physoutdev[IFNAMSIZ];
 	char out_mask[IFNAMSIZ];
+	u_int8_t invert;
+	u_int8_t bitmask;
 };
 
 #endif /*_IPT_PHYSDEV_H*/
