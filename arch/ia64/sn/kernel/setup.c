@@ -224,9 +224,10 @@ static void __init sn_check_for_wars(void)
 {
 	int cnode;
 
-	for (cnode = 0; cnode < numnodes; cnode++)
+	for_each_online_node(cnode) {
 		if (is_shub_1_1(cnodeid_to_nasid(cnode)))
 			shub_1_1_found = 1;
+	}
 }
 
 /**
@@ -346,17 +347,17 @@ void __init sn_init_pdas(char **cmdline_p)
 
 	memset(pda->cnodeid_to_nasid_table, -1,
 	       sizeof(pda->cnodeid_to_nasid_table));
-	for (cnode = 0; cnode < numnodes; cnode++)
+	for_each_online_node(cnode)
 		pda->cnodeid_to_nasid_table[cnode] =
 		    pxm_to_nasid(nid_to_pxm_map[cnode]);
 
-	numionodes = numnodes;
+	numionodes = num_online_nodes();
 	scan_for_ionodes();
 
 	/*
 	 * Allocate & initalize the nodepda for each node.
 	 */
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for_each_online_node(cnode) {
 		nodepdaindr[cnode] =
 		    alloc_bootmem_node(NODE_DATA(cnode), sizeof(nodepda_t));
 		memset(nodepdaindr[cnode], 0, sizeof(nodepda_t));
@@ -367,7 +368,7 @@ void __init sn_init_pdas(char **cmdline_p)
 	/*
 	 * Allocate & initialize nodepda for TIOs.  For now, put them on node 0.
 	 */
-	for (cnode = numnodes; cnode < numionodes; cnode++) {
+	for (cnode = num_online_nodes(); cnode < numionodes; cnode++) {
 		nodepdaindr[cnode] =
 		    alloc_bootmem_node(NODE_DATA(0), sizeof(nodepda_t));
 		memset(nodepdaindr[cnode], 0, sizeof(nodepda_t));
@@ -385,7 +386,7 @@ void __init sn_init_pdas(char **cmdline_p)
 	 * The following routine actually sets up the hubinfo struct
 	 * in nodepda.
 	 */
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for_each_online_node(cnode) {
 		bte_init_node(nodepdaindr[cnode], cnode);
 	}
 
@@ -431,7 +432,7 @@ void __init sn_cpu_init(void)
 	if (ia64_sn_get_sapic_info(cpuphyid, &nasid, &subnode, &slice))
 		BUG();
 
-	for (i=0; i < NR_NODES; i++) {
+	for (i=0; i < MAX_NUMNODES; i++) {
 		if (nodepdaindr[i]) {
 			nodepdaindr[i]->phys_cpuid[cpuid].nasid = nasid;
 			nodepdaindr[i]->phys_cpuid[cpuid].slice = slice;
@@ -484,7 +485,7 @@ void __init sn_cpu_init(void)
 		int buddy_nasid;
 		buddy_nasid =
 		    cnodeid_to_nasid(numa_node_id() ==
-				     numnodes - 1 ? 0 : numa_node_id() + 1);
+				     num_online_nodes() - 1 ? 0 : numa_node_id() + 1);
 		pda->pio_shub_war_cam_addr =
 		    (volatile unsigned long *)GLOBAL_MMR_ADDR(nasid,
 							      SH_PI_CAM_CONTROL);
