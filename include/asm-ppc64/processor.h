@@ -627,7 +627,7 @@ static inline void prefetchw(const void *x)
 
 #ifdef CONFIG_SCHED_SMT
 #define ARCH_HAS_SCHED_DOMAIN
-#define ARCH_HAS_SCHED_WAKE_BALANCE
+#define ARCH_HAS_SCHED_WAKE_IDLE
 #endif
 
 #endif /* ASSEMBLY */
