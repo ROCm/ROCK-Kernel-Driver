@@ -690,7 +690,7 @@ int usb_gadget_unregister_driver (struct usb_gadget_driver *driver);
 /**
  * struct usb_string - wraps a C string and its USB id
  * @id:the (nonzero) ID for this string
- * @s:the string, in ISO-8859/1 characters
+ * @s:the string, in UTF-8 encoding
  *
  * If you're using usb_gadget_get_string(), use this to wrap a string
  * together with its ID.
