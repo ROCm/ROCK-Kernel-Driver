@@ -67,7 +67,7 @@
 #define TX_TIMEOUT		(2*HZ)
 
 /* MDIO latency delay */
-#define MDIO_DELAY		50
+#define MDIO_DELAY		250
 
 /* Power managment shift registers */
 #define IBM_CPM_EMMII	0	/* Shift value for MII */
