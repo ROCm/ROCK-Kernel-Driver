@@ -20,6 +20,7 @@
 #include <linux/time.h>		/* struct timeval */
 #include <linux/skbuff.h>
 #include <linux/bitops.h>
+#include <linux/init.h>
 #include <net/sock.h>		/* struct sock */
 
 #include <asm/uaccess.h>
