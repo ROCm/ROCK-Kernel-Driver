@@ -336,7 +336,7 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct sk_buff *skb = tp->send_head;
 
-	if (tcp_snd_test(tp, skb, cur_mss, 1)) {
+	if (tcp_snd_test(tp, skb, cur_mss, TCP_NAGLE_PUSH)) {
 		/* Send it out now. */
 		TCP_SKB_CB(skb)->when = tcp_time_stamp;
 		if (tcp_transmit_skb(sk, skb_clone(skb, sk->allocation)) == 0) {
@@ -632,7 +632,7 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 		mss_now = tcp_current_mss(sk, 1);
 
 		while((skb = tp->send_head) &&
-		      tcp_snd_test(tp, skb, mss_now, tcp_skb_is_last(sk, skb) ? nonagle : 1)) {
+		      tcp_snd_test(tp, skb, mss_now, tcp_skb_is_last(sk, skb) ? nonagle : TCP_NAGLE_PUSH)) {
 			if (skb->len > mss_now) {
 				if (tcp_fragment(sk, skb, mss_now))
 					break;
@@ -1106,7 +1106,7 @@ void tcp_send_fin(struct sock *sk)
 		TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq + 1;
 		tcp_send_skb(sk, skb, 1, mss_now);
 	}
-	__tcp_push_pending_frames(sk, tp, mss_now, 1);
+	__tcp_push_pending_frames(sk, tp, mss_now, TCP_NAGLE_OFF);
 }
 
 /* We get here when a process closes a file descriptor (either due to

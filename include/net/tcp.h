@@ -450,6 +450,11 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 #define TCP_TIME_PROBE0		3	/* Zero window probe timer */
 #define TCP_TIME_KEEPOPEN	4	/* Keepalive timer */
 
+/* Flags in tp->nonagle */
+#define TCP_NAGLE_OFF		1	/* Nagle's algo is disabled */
+#define TCP_NAGLE_CORK		2	/* Socket is corked	    */
+#define TCP_NAGLE_PUSH		4	/* Cork is overriden for already queued data */
+
 /* sysctl variables for tcp */
 extern int sysctl_max_syn_backlog;
 extern int sysctl_tcp_timestamps;
@@ -1216,7 +1221,7 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 {
 	return (skb->len < mss_now &&
 		!(TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN) &&
-		(nonagle == 2 ||
+		((nonagle&TCP_NAGLE_CORK) ||
 		 (!nonagle &&
 		  tp->packets_out &&
 		  tcp_minshall_check(tp))));
@@ -1252,7 +1257,7 @@ static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
 	/* Don't be strict about the congestion window for the
 	 * final FIN frame.  -DaveM
 	 */
-	return ((nonagle==1 || tp->urg_mode
+	return (((nonagle&TCP_NAGLE_PUSH) || tp->urg_mode
 		 || !tcp_nagle_check(tp, skb, cur_mss, nonagle)) &&
 		((tcp_packets_in_flight(tp) < tp->snd_cwnd) ||
 		 (TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN)) &&
@@ -1283,7 +1288,7 @@ static __inline__ void __tcp_push_pending_frames(struct sock *sk,
 
 	if (skb) {
 		if (!tcp_skb_is_last(sk, skb))
-			nonagle = 1;
+			nonagle = TCP_NAGLE_PUSH;
 		if (!tcp_snd_test(tp, skb, cur_mss, nonagle) ||
 		    tcp_write_xmit(sk, nonagle))
 			tcp_check_probe_timer(sk, tp);
@@ -1303,7 +1308,7 @@ static __inline__ int tcp_may_send_now(struct sock *sk, struct tcp_opt *tp)
 
 	return (skb &&
 		tcp_snd_test(tp, skb, tcp_current_mss(sk, 1),
-			     tcp_skb_is_last(sk, skb) ? 1 : tp->nonagle));
+			     tcp_skb_is_last(sk, skb) ? TCP_NAGLE_PUSH : tp->nonagle));
 }
 
 static __inline__ void tcp_init_wl(struct tcp_opt *tp, u32 ack, u32 seq)

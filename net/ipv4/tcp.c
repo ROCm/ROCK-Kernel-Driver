@@ -800,6 +800,8 @@ static inline void skb_entail(struct sock *sk, struct tcp_opt *tp,
 	tcp_charge_skb(sk, skb);
 	if (!tp->send_head)
 		tp->send_head = skb;
+	else if (tp->nonagle&TCP_NAGLE_PUSH)
+		tp->nonagle &= ~TCP_NAGLE_PUSH; 
 }
 
 static inline void tcp_mark_urg(struct tcp_opt *tp, int flags,
@@ -821,7 +823,7 @@ static inline void tcp_push(struct sock *sk, struct tcp_opt *tp, int flags,
 			tcp_mark_push(tp, skb);
 		tcp_mark_urg(tp, flags, skb);
 		__tcp_push_pending_frames(sk, tp, mss_now,
-					  (flags & MSG_MORE) ? 2 : nonagle);
+					  (flags & MSG_MORE) ? TCP_NAGLE_CORK : nonagle);
 	}
 }
 
@@ -911,7 +913,7 @@ new_segment:
 
 		if (forced_push(tp)) {
 			tcp_mark_push(tp, skb);
-			__tcp_push_pending_frames(sk, tp, mss_now, 1);
+			__tcp_push_pending_frames(sk, tp, mss_now, TCP_NAGLE_PUSH);
 		} else if (skb == tp->send_head)
 			tcp_push_one(sk, mss_now);
 		continue;
@@ -920,7 +922,7 @@ wait_for_sndbuf:
 		set_bit(SOCK_NOSPACE, &sk->socket->flags);
 wait_for_memory:
 		if (copied)
-			tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, 1);
+			tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
 
 		if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
 			goto do_error;
@@ -1199,7 +1201,7 @@ new_segment:
 
 			if (forced_push(tp)) {
 				tcp_mark_push(tp, skb);
-				__tcp_push_pending_frames(sk, tp, mss_now, 1);
+				__tcp_push_pending_frames(sk, tp, mss_now, TCP_NAGLE_PUSH);
 			} else if (skb == tp->send_head)
 				tcp_push_one(sk, mss_now);
 			continue;
@@ -1208,7 +1210,7 @@ wait_for_sndbuf:
 			set_bit(SOCK_NOSPACE, &sk->socket->flags);
 wait_for_memory:
 			if (copied)
-				tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, 1);
+				tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
 
 			if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
 				goto do_error;
@@ -2300,16 +2302,20 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 		break;
 
 	case TCP_NODELAY:
-		/* You cannot try to use this and TCP_CORK in
-		 * tandem, so let the user know.
-		 */
-		if (tp->nonagle == 2) {
-			err = -EINVAL;
-			break;
-		}
-		tp->nonagle = !val ? 0 : 1;
-		if (val)
+		if (val) {
+			/* TCP_NODELAY is weaker than TCP_CORK, so that
+			 * this option on corked socket is remembered, but
+			 * it is not activated until cork is cleared.
+			 *
+			 * However, when TCP_NODELAY is set we make
+			 * an explicit push, which overrides even TCP_CORK
+			 * for currently queued segments.
+			 */
+			tp->nonagle |= TCP_NAGLE_OFF|TCP_NAGLE_PUSH;
 			tcp_push_pending_frames(sk, tp);
+		} else {
+			tp->nonagle &= ~TCP_NAGLE_OFF;
+		}
 		break;
 
 	case TCP_CORK:
@@ -2321,18 +2327,15 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 		 * out headers with a write() call first and then use
 		 * sendfile to send out the data parts.
 		 *
-		 * You cannot try to use TCP_NODELAY and this mechanism
-		 * at the same time, so let the user know.
+		 * TCP_CORK can be set together with TCP_NODELAY and it is
+		 * stronger than TCP_NODELAY.
 		 */
-		if (tp->nonagle == 1) {
-			err = -EINVAL;
-			break;
-		}
-		if (val != 0) {
-			tp->nonagle = 2;
+		if (val) {
+			tp->nonagle |= TCP_NAGLE_CORK;
 		} else {
-			tp->nonagle = 0;
-
+			tp->nonagle &= ~TCP_NAGLE_CORK;
+			if (tp->nonagle&TCP_NAGLE_OFF)
+				tp->nonagle |= TCP_NAGLE_PUSH;
 			tcp_push_pending_frames(sk, tp);
 		}
 		break;
@@ -2455,10 +2458,10 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 			val = tp->user_mss;
 		break;
 	case TCP_NODELAY:
-		val = (tp->nonagle == 1);
+		val = !!(tp->nonagle&TCP_NAGLE_OFF);
 		break;
 	case TCP_CORK:
-		val = (tp->nonagle == 2);
+		val = !!(tp->nonagle&TCP_NAGLE_CORK);
 		break;
 	case TCP_KEEPIDLE:
 		val = (tp->keepalive_time ? : sysctl_tcp_keepalive_time) / HZ;
