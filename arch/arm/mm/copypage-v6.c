@@ -143,8 +143,8 @@ static int __init v6_userpage_init(void)
 		if (!to_pte)
 			BUG();
 
-		v6_user_fns.cpu_clear_user_page = v6_clear_user_page_aliasing;
-		v6_user_fns.cpu_copy_user_page = v6_copy_user_page_aliasing;
+		cpu_user.cpu_clear_user_page = v6_clear_user_page_aliasing;
+		cpu_user.cpu_copy_user_page = v6_copy_user_page_aliasing;
 	}
 
 	return 0;
