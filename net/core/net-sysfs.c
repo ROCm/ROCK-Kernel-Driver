@@ -1,7 +1,7 @@
 /*
  * net-sysfs.c - network device class and attributes
  *
- * Copyright (c) 2003 Stephen Hemminber <shemminger@osdl.org>
+ * Copyright (c) 2003 Stephen Hemminger <shemminger@osdl.org>
  * 
  */
 

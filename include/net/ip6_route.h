@@ -61,7 +61,11 @@ extern struct rt6_info		*rt6_lookup(struct in6_addr *daddr,
 					    struct in6_addr *saddr,
 					    int oif, int flags);
 
-extern struct rt6_info		*ip6_dst_alloc(void);
+extern struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
+					 struct neighbour *neigh,
+					 int (*output)(struct sk_buff *));
+extern int ndisc_dst_gc(int *more);
+extern void fib6_force_start_gc(void);
 
 /*
  *	support functions for ND
