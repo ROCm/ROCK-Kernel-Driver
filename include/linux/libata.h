@@ -158,7 +158,7 @@ struct ata_port;
 struct ata_queued_cmd;
 
 /* typedefs */
-typedef void (*ata_qc_cb_t) (struct ata_queued_cmd *qc, unsigned int flags);
+typedef int (*ata_qc_cb_t) (struct ata_queued_cmd *qc, u8 drv_stat);
 
 struct ata_ioports {
 	unsigned long		cmd_addr;
@@ -224,7 +224,7 @@ struct ata_queued_cmd {
 
 	struct scatterlist	*sg;
 
-	ata_qc_cb_t		callback;
+	ata_qc_cb_t		complete_fn;
 
 	struct completion	*waiting;
 

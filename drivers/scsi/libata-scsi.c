@@ -335,6 +335,24 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	return 1;
 }
 
+static int ata_scsi_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
+{
+	struct scsi_cmnd *cmd = qc->scsicmd;
+
+	if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ))) {
+		if (is_atapi_taskfile(&qc->tf))
+			cmd->result = SAM_STAT_CHECK_CONDITION;
+		else
+			ata_to_sense_error(qc);
+	} else {
+		cmd->result = SAM_STAT_GOOD;
+	}
+
+	qc->scsidone(cmd);
+
+	return 0;
+}
+
 /**
  *	ata_scsi_translate - Translate then issue SCSI command to ATA device
  *	@ap: ATA port to which the command is addressed
@@ -378,6 +396,8 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 
 		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
 	}
+
+	qc->complete_fn = ata_scsi_qc_complete;
 
 	if (xlat_func(qc, scsicmd))
 		goto err_out;

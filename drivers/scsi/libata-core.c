@@ -2293,8 +2293,8 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 {
 	struct ata_port *ap = qc->ap;
-	struct scsi_cmnd *cmd = qc->scsicmd;
 	unsigned int tag, do_clear = 0;
+	int rc;
 
 	assert(qc != NULL);	/* ata_qc_from_tag _might_ return NULL */
 	assert(qc->flags & ATA_QCFLAG_ACTIVE);
@@ -2302,18 +2302,14 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 	if (likely(qc->flags & ATA_QCFLAG_SG))
 		ata_sg_clean(qc);
 
-	if (cmd) {
-		if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ))) {
-			if (is_atapi_taskfile(&qc->tf))
-				cmd->result = SAM_STAT_CHECK_CONDITION;
-			else
-				ata_to_sense_error(qc);
-		} else {
-			cmd->result = SAM_STAT_GOOD;
-		}
+	/* call completion callback */
+	rc = qc->complete_fn(qc, drv_stat);
 
-		qc->scsidone(cmd);
-	}
+	/* if callback indicates not to complete command (non-zero),
+	 * return immediately
+	 */
+	if (rc != 0)
+		return;
 
 	qc->flags = 0;
 	tag = qc->tag;
