@@ -111,7 +111,7 @@ static int __init init_netsc520(void)
 		mymtd = do_map_probe("map_rom", &netsc520_map);
 
 	if (!mymtd) {
-		iounmap((void *)netsc520_map.virt);
+		iounmap(netsc520_map.virt);
 		return -ENXIO;
 	}
 		
@@ -127,8 +127,8 @@ static void __exit cleanup_netsc520(void)
 		map_destroy(mymtd);
 	}
 	if (netsc520_map.virt) {
-		iounmap((void *)netsc520_map.virt);
-		netsc520_map.virt = 0;
+		iounmap(netsc520_map.virt);
+		netsc520_map.virt = NULL;
 	}
 }
 
