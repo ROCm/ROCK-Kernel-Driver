@@ -143,7 +143,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.orig_gpr2 = -1;
 
 	/* Ok, create the new process.. */
-	p = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL);
+	p = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -185,6 +185,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
         frame = ((struct stack_frame *)
 		 (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
         p->thread.ksp = (unsigned long) frame;
+	p->set_child_tid = p->clear_child_tid = NULL;
         frame->childregs = *regs;
 	frame->childregs.gprs[2] = 0;	/* child returns 0 on fork. */
         frame->childregs.gprs[15] = new_stackp;
@@ -208,7 +209,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 asmlinkage int sys_fork(struct pt_regs regs)
 {
 	struct task_struct *p;
-        p = do_fork(SIGCHLD, regs.gprs[15], &regs, 0, NULL);
+        p = do_fork(SIGCHLD, regs.gprs[15], &regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -217,14 +218,16 @@ asmlinkage int sys_clone(struct pt_regs regs)
         unsigned long clone_flags;
         unsigned long newsp;
 	struct task_struct *p;
-	int *user_tid;
+	int *parent_tidptr, *child_tidptr;
 
         clone_flags = regs.gprs[3];
         newsp = regs.orig_gpr2;
-	user_tid = (int *) regs.gprs[4];
+	parent_tidptr = (int *) regs.gprs[4];
+	child_tidptr = (int *) regs.gprs[5];
         if (!newsp)
                 newsp = regs.gprs[15];
-        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, user_tid);
+        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+		    parent_tidptr, child_tidptr);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -242,7 +245,7 @@ asmlinkage int sys_vfork(struct pt_regs regs)
 {
 	struct task_struct *p;
 	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD,
-		    regs.gprs[15], &regs, 0, NULL);
+		    regs.gprs[15], &regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
