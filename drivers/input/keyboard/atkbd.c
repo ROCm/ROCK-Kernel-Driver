@@ -125,10 +125,9 @@ struct atkbd {
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
 	unsigned char set;
-	char release;
-	char ack;
-	char emul;
-	char error;
+	unsigned char release;
+	signed char ack;
+	unsigned char emul;
 	unsigned short id;
 };
 
@@ -504,7 +503,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	if (atkbd->set == 4) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE);
-		sprintf(atkbd->name, "AT Set 2 Extended keyboard\n");
+		sprintf(atkbd->name, "AT Set 2 Extended keyboard");
 	} else
 		sprintf(atkbd->name, "AT Set %d keyboard", atkbd->set);
 
