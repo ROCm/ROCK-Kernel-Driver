@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -73,19 +73,19 @@ static void sermouse_process_msc(struct sermouse *sermouse, signed char data, st
 
 		case 0:
 			if ((data & 0xf8) != 0x80) return;
-			input_report_key(dev, BTN_LEFT,   !(data & 4)); 
+			input_report_key(dev, BTN_LEFT,   !(data & 4));
 			input_report_key(dev, BTN_RIGHT,  !(data & 1));
 			input_report_key(dev, BTN_MIDDLE, !(data & 2));
 			break;
 
-		case 1: 
-		case 3: 
+		case 1:
+		case 3:
 			input_report_rel(dev, REL_X, data / 2);
 			input_report_rel(dev, REL_Y, -buf[1]);
 			buf[0] = data - data / 2;
 			break;
 
-		case 2: 
+		case 2:
 		case 4:
 			input_report_rel(dev, REL_X, buf[0]);
 			input_report_rel(dev, REL_Y, buf[1] - data);
@@ -145,7 +145,7 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data, str
 		case 3:
 
 			switch (sermouse->type) {
-			
+
 				case SERIO_MS:
 					 sermouse->type = SERIO_MP;
 
@@ -164,7 +164,7 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data, str
 					input_report_rel(dev, REL_WHEEL,  (data & 8) - (data & 7));
 					break;
 			}
-					
+
 			break;
 
 		case 4:
@@ -243,7 +243,7 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct sermouse *sermouse;
 	unsigned char c;
-	
+
 	if ((serio->type & SERIO_TYPE) != SERIO_RS232)
 		return;
 
@@ -280,6 +280,7 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 	sermouse->dev.id.vendor = sermouse->type;
 	sermouse->dev.id.product = c;
 	sermouse->dev.id.version = 0x0100;
+	sermouse->dev.dev = &serio->dev;
 
 	if (serio_open(serio, drv)) {
 		kfree(sermouse);
@@ -287,7 +288,7 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 	}
 
 	input_register_device(&sermouse->dev);
-	
+
 	printk(KERN_INFO "input: %s on %s\n", sermouse_protocols[sermouse->type], serio->phys);
 }
 

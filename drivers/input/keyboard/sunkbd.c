@@ -285,6 +285,7 @@ static void sunkbd_connect(struct serio *serio, struct serio_driver *drv)
 	sunkbd->dev.id.vendor = SERIO_SUNKBD;
 	sunkbd->dev.id.product = sunkbd->type;
 	sunkbd->dev.id.version = 0x0100;
+	sunkbd->dev.dev = &serio->dev;
 
 	input_register_device(&sunkbd->dev);
 

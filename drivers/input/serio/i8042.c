@@ -16,10 +16,7 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/config.h>
-#include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/sysdev.h>
-#include <linux/pm.h>
 #include <linux/serio.h>
 #include <linux/err.h>
 
@@ -63,6 +60,13 @@ module_param_named(noacpi, i8042_noacpi, bool, 0);
 MODULE_PARM_DESC(noacpi, "Do not use ACPI to detect controller settings");
 #endif
 
+#define DEBUG
+#ifdef DEBUG
+static int i8042_debug;
+module_param_named(debug, i8042_debug, bool, 600);
+MODULE_PARM_DESC(debug, "Turn i8042 debugging mode on and off");
+#endif
+
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
 __obsolete_setup("i8042_unlock");
@@ -70,7 +74,6 @@ __obsolete_setup("i8042_reset");
 __obsolete_setup("i8042_direct");
 __obsolete_setup("i8042_dumbkbd");
 
-#undef DEBUG
 #include "i8042.h"
 
 spinlock_t i8042_lock = SPIN_LOCK_UNLOCKED;
@@ -107,7 +110,6 @@ static unsigned char i8042_initial_ctr;
 static unsigned char i8042_ctr;
 static unsigned char i8042_mux_open;
 static unsigned char i8042_mux_present;
-static struct pm_dev *i8042_pm_dev;
 static struct timer_list i8042_timer;
 static struct platform_device *i8042_platform_device;
 
@@ -823,10 +825,12 @@ void i8042_controller_cleanup(void)
  * Here we try to restore the original BIOS settings
  */
 
-static int i8042_controller_suspend(void)
+static int i8042_suspend(struct device *dev, u32 state, u32 level)
 {
-	del_timer_sync(&i8042_timer);
-	i8042_controller_reset();
+	if (level == SUSPEND_DISABLE) {
+		del_timer_sync(&i8042_timer);
+		i8042_controller_reset();
+	}
 
 	return 0;
 }
@@ -836,9 +840,12 @@ static int i8042_controller_suspend(void)
  * Here we try to reset everything back to a state in which suspended
  */
 
-static int i8042_controller_resume(void)
+static int i8042_resume(struct device *dev, u32 level)
 {
 	int i;
+
+	if (level != RESUME_ENABLE)
+		return 0;
 
 	if (i8042_controller_init()) {
 		printk(KERN_ERR "i8042: resume failed\n");
@@ -870,41 +877,13 @@ static int i8042_controller_resume(void)
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
 	return 0;
-}
 
+}
 
 /*
  * We need to reset the 8042 back to original mode on system shutdown,
  * because otherwise BIOSes will be confused.
  */
-
-static int i8042_notify_sys(struct notifier_block *this, unsigned long code,
-        		    void *unused)
-{
-        if (code == SYS_DOWN || code == SYS_HALT)
-        	i8042_controller_cleanup();
-        return NOTIFY_DONE;
-}
-
-static struct notifier_block i8042_notifier =
-{
-        i8042_notify_sys,
-        NULL,
-        0
-};
-
-/*
- * Suspend/resume handlers for the new PM scheme (driver model)
- */
-static int i8042_suspend(struct device *dev, u32 state, u32 level)
-{
-	return level == SUSPEND_DISABLE ? i8042_controller_suspend() : 0;
-}
-
-static int i8042_resume(struct device *dev, u32 level)
-{
-	return level == RESUME_ENABLE ? i8042_controller_resume() : 0;
-}
 
 static void i8042_shutdown(struct device *dev)
 {
@@ -918,22 +897,6 @@ static struct device_driver i8042_driver = {
 	.resume		= i8042_resume,
 	.shutdown	= i8042_shutdown,
 };
-
-/*
- * Suspend/resume handler for the old PM scheme (APM)
- */
-static int i8042_pm_callback(struct pm_dev *dev, pm_request_t request, void *dummy)
-{
-	switch (request) {
-		case PM_SUSPEND:
-			return i8042_controller_suspend();
-
-		case PM_RESUME:
-			return i8042_controller_resume();
-	}
-
-	return 0;
-}
 
 static struct serio * __init i8042_allocate_kbd_port(void)
 {
@@ -1049,21 +1012,12 @@ int __init i8042_init(void)
 
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
-	i8042_pm_dev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, i8042_pm_callback);
-
-	register_reboot_notifier(&i8042_notifier);
-
 	return 0;
 }
 
 void __exit i8042_exit(void)
 {
 	int i;
-
-	unregister_reboot_notifier(&i8042_notifier);
-
-	if (i8042_pm_dev)
-		pm_unregister(i8042_pm_dev);
 
 	i8042_controller_cleanup();
 

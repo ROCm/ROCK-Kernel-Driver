@@ -699,6 +699,7 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
 	psmouse->dev.private = psmouse;
+	psmouse->dev.dev = &serio->dev;
 	psmouse_set_state(psmouse, PSMOUSE_INITIALIZING);
 
 	serio->private = psmouse;

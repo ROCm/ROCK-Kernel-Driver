@@ -143,9 +143,7 @@ static int joydev_fasync(int fd, struct file *file, int on)
 
 static void joydev_free(struct joydev *joydev)
 {
-	devfs_remove("input/js%d", joydev->minor);
 	joydev_table[joydev->minor] = NULL;
-	class_simple_device_remove(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + joydev->minor));
 	kfree(joydev);
 }
 
@@ -466,6 +464,8 @@ static void joydev_disconnect(struct input_handle *handle)
 {
 	struct joydev *joydev = handle->private;
 
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + joydev->minor));
+	devfs_remove("input/js%d", joydev->minor);
 	joydev->exist = 0;
 
 	if (joydev->open)

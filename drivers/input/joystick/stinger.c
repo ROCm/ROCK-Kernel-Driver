@@ -164,6 +164,7 @@ static void stinger_connect(struct serio *serio, struct serio_driver *drv)
 	stinger->dev.id.vendor = SERIO_STINGER;
 	stinger->dev.id.product = 0x0001;
 	stinger->dev.id.version = 0x0100;
+	stinger->dev.dev = &serio->dev;
 
 	for (i = 0; i < 2; i++) {
 		stinger->dev.absmax[ABS_X+i] =  64;

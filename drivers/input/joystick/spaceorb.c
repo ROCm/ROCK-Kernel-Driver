@@ -200,6 +200,7 @@ static void spaceorb_connect(struct serio *serio, struct serio_driver *drv)
 	spaceorb->dev.id.vendor = SERIO_SPACEORB;
 	spaceorb->dev.id.product = 0x0001;
 	spaceorb->dev.id.version = 0x0100;
+	spaceorb->dev.dev = &serio->dev;
 
 	serio->private = spaceorb;
 

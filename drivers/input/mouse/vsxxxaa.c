@@ -45,7 +45,7 @@
  *  | 4 --- 3 |
  *   \  2 1  /
  *    -------
- * 
+ *
  *	DEC socket	DE9	DB25	Note
  *	1 (GND)		5	7	-
  *	2 (RxD)		2	3	-
@@ -529,6 +529,7 @@ vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 	mouse->dev.name = mouse->name;
 	mouse->dev.phys = mouse->phys;
 	mouse->dev.id.bustype = BUS_RS232;
+	mouse->dev.dev = &serio->dev;
 	mouse->serio = serio;
 
 	if (serio_open (serio, drv)) {
