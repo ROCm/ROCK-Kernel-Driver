@@ -164,9 +164,9 @@ sgi_usemaclone_open(struct inode *inode, struct file *filp)
 }
 
 struct file_operations sgi_usemaclone_fops = {
-	poll:		sgi_usemaclone_poll,
-	ioctl:		sgi_usemaclone_ioctl,
-	open:		sgi_usemaclone_open,
+	.poll		= sgi_usemaclone_poll,
+	.ioctl		= sgi_usemaclone_ioctl,
+	.open		= sgi_usemaclone_open,
 };
 
 static struct miscdevice dev_usemaclone = {
