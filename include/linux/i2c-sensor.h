@@ -22,18 +22,6 @@
 #ifndef _LINUX_I2C_SENSOR_H
 #define _LINUX_I2C_SENSOR_H
 
-#include <linux/sysctl.h>
-
-/* The type of callback functions used in sensors_{proc,sysctl}_real */
-typedef void (*i2c_real_callback) (struct i2c_client * client,
-				       int operation, int ctl_name,
-				       int *nrels_mag, long *results);
-
-/* Values for the operation field in the above function type */
-#define SENSORS_PROC_REAL_INFO 1
-#define SENSORS_PROC_REAL_READ 2
-#define SENSORS_PROC_REAL_WRITE 3
-
 /* A structure containing detect information.
    Force variables overrule all other variables; they force a detection on
    that place. If a specific chip is given, the module blindly assumes this
@@ -350,24 +338,4 @@ static inline int SENSORS_LIMIT(long value, long low, long high)
 	else
 		return value;
 }
-
-
-/* The maximum length of the prefix */
-#define SENSORS_PREFIX_MAX 20
-
-/* Sysctl IDs */
-#ifdef DEV_HWMON
-#define DEV_SENSORS DEV_HWMON
-#else				/* ndef DEV_HWMOM */
-#define DEV_SENSORS 2		/* The id of the lm_sensors directory within the
-				   dev table */
-#endif				/* def DEV_HWMON */
-
-#define SENSORS_CHIPS 1
-struct i2c_chips_data {
-	int sysctl_id;
-	char name[SENSORS_PREFIX_MAX + 13];
-};
-
 #endif				/* def _LINUX_I2C_SENSOR_H */
-
