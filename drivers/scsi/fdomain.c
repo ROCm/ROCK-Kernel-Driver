@@ -733,17 +733,20 @@ static int fdomain_isa_detect( int *irq, int *iobase )
       printk( " %x,", base );
 #endif
 
-      for (flag = 0, i = 0; !flag && i < PORT_COUNT; i++) {
-	 if (base == ports[i])
-	       ++flag;
+      for (i = 0; i < PORT_COUNT; i++) {
+	if (base == ports[i]) {
+		if (!request_region(base, 0x10, "fdomain"))
+			break;
+		if (!fdomain_is_valid_port(base)) {
+			release_region(base, 0x10);
+			break;
+		}
+		*irq    = fdomain_get_irq( base );
+		*iobase = base;
+		return 1;
+	}
       }
 
-      if (flag && fdomain_is_valid_port( base )) {
-	 *irq    = fdomain_get_irq( base );
-	 *iobase = base;
-	 return 1;
-      }
-      
       /* This is a bad sign.  It usually means that someone patched the
 	 BIOS signature list (the signatures variable) to contain a BIOS
 	 signature for a board *OTHER THAN* the TMC-1660/TMC-1680. */
@@ -764,7 +767,7 @@ static int fdomain_isa_detect( int *irq, int *iobase )
 
    for (i = 0; i < PORT_COUNT; i++) {
       base = ports[i];
-      if (check_region( base, 0x10 )) {
+      if (!request_region(base, 0x10, "fdomain")) {
 #if DEBUG_DETECT
 	 printk( " (%x inuse),", base );
 #endif
@@ -773,7 +776,10 @@ static int fdomain_isa_detect( int *irq, int *iobase )
 #if DEBUG_DETECT
       printk( " %x,", base );
 #endif
-      if ((flag = fdomain_is_valid_port( base ))) break;
+      flag = fdomain_is_valid_port(base);
+      if (flag)
+	break;
+      release_region(base, 0x10);
    }
 
 #if DEBUG_DETECT
@@ -832,6 +838,9 @@ static int fdomain_pci_bios_detect( int *irq, int *iobase, struct pci_dev **ret_
    pci_base = pci_resource_start(pdev, 0);
    pci_irq = pdev->irq;
 
+   if (!request_region( pci_base, 0x10, "fdomain" ))
+	return 0;
+
    /* Now we have the I/O base address and interrupt from the PCI
       configuration registers. */
 
@@ -844,8 +853,9 @@ static int fdomain_pci_bios_detect( int *irq, int *iobase, struct pci_dev **ret_
 	   " IRQ = %d, I/O base = 0x%x [0x%lx]\n", *irq, *iobase, pci_base );
 #endif
 
-   if (!fdomain_is_valid_port( *iobase )) {
+   if (!fdomain_is_valid_port(pci_base)) {
       printk(KERN_ERR "scsi: <fdomain> PCI card detected, but driver not loaded (invalid port)\n" );
+      release_region(pci_base, 0x10);
       return 0;
    }
 
@@ -870,10 +880,16 @@ struct Scsi_Host *__fdomain_16x0_detect(struct scsi_host_template *tpnt )
       printk( "scsi: <fdomain> No BIOS, using port_base = 0x%x, irq = %d\n",
 	      port_base, interrupt_level );
 #endif
+      if (!request_region(port_base, 0x10, "fdomain")) {
+	 printk( "scsi: <fdomain> port 0x%x is busy\n", port_base );
+	 printk( "scsi: <fdomain> Bad LILO/INSMOD parameters?\n" );
+	 return NULL;
+      }
       if (!fdomain_is_valid_port( port_base )) {
 	 printk( "scsi: <fdomain> Cannot locate chip at port base 0x%x\n",
 		 port_base );
 	 printk( "scsi: <fdomain> Bad LILO/INSMOD parameters?\n" );
+	 release_region(port_base, 0x10);
 	 return NULL;
       }
    } else {
@@ -915,6 +931,7 @@ struct Scsi_Host *__fdomain_16x0_detect(struct scsi_host_template *tpnt )
       if (setup_called) {
 	 printk(KERN_ERR "scsi: <fdomain> Bad LILO/INSMOD parameters?\n");
       }
+      release_region(port_base, 0x10);
       return NULL;
    }
 
@@ -935,8 +952,10 @@ struct Scsi_Host *__fdomain_16x0_detect(struct scsi_host_template *tpnt )
    get resources.  */
 
    shpnt = scsi_register( tpnt, 0 );
-   if(shpnt == NULL)
+   if(shpnt == NULL) {
+	release_region(port_base, 0x10);
    	return NULL;
+   }
    shpnt->irq = interrupt_level;
    shpnt->io_port = port_base;
    scsi_set_device(shpnt, &pdev->dev);
@@ -946,6 +965,7 @@ struct Scsi_Host *__fdomain_16x0_detect(struct scsi_host_template *tpnt )
    /* Log IRQ with kernel */   
    if (!interrupt_level) {
       printk(KERN_ERR "scsi: <fdomain> Card Detected, but driver not loaded (no IRQ)\n" );
+      release_region(port_base, 0x10);
       return NULL;
    } else {
       /* Register the IRQ with the kernel */
@@ -967,13 +987,10 @@ struct Scsi_Host *__fdomain_16x0_detect(struct scsi_host_template *tpnt )
 	    printk(KERN_ERR "                Send mail to faith@acm.org\n" );
 	 }
 	 printk(KERN_ERR "scsi: <fdomain> Detected, but driver not loaded (IRQ)\n" );
+         release_region(port_base, 0x10);
 	 return NULL;
       }
    }
-
-   /* Log I/O ports with kernel */
-   request_region( port_base, 0x10, "fdomain" );
-
    return shpnt;
 }
 
