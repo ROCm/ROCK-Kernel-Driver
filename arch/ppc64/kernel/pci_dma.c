@@ -723,8 +723,8 @@ void create_tce_tables_for_busesLP(struct list_head *bus_list)
 			 */
 			busdn->bussubno = bus->number;
 			create_pci_bus_tce_table((unsigned long)busdn);
-		} else
-			create_tce_tables_for_busesLP(&bus->children);
+		}
+		create_tce_tables_for_busesLP(&bus->children);
 	}
 }
 

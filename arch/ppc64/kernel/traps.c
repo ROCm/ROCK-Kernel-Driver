@@ -55,14 +55,12 @@ void (*debugger_fault_handler)(struct pt_regs *regs);
  * Trap & Exception support
  */
 
-/* Should we panic on bad kernel exceptions or try to recover */
-#undef PANIC_ON_ERROR
-
 static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char *str, struct pt_regs *regs, long err)
 {
 	static int die_counter;
+
 	console_verbose();
 	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
@@ -71,11 +69,16 @@ void die(const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 
-#ifdef PANIC_ON_ERROR
-	panic(str);
-#else
+	if (in_interrupt())
+		panic("Fatal exception in interrupt");
+
+	if (panic_on_oops) {
+		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(5 * HZ);
+		panic("Fatal exception");
+	}
 	do_exit(SIGSEGV);
-#endif
 }
 
 static void
@@ -139,15 +142,13 @@ SystemResetException(struct pt_regs *regs)
 #ifdef CONFIG_DEBUG_KERNEL
 	if (debugger)
 		debugger(regs);
+	else
 #endif
+		panic("System Reset");
 
-#ifdef PANIC_ON_ERROR
-	panic("System Reset");
-#else
 	/* Must die if the interrupt is not recoverable */
 	if (!(regs->msr & MSR_RI))
 		panic("Unrecoverable System Reset");
-#endif
 
 	/* What should we do here? We could issue a shutdown or hard reset. */
 }

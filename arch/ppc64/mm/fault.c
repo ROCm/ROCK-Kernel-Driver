@@ -75,8 +75,8 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 #endif
 
-	/* On an SLB miss we can only check for a valid exception entry */
-	if (regs->trap == 0x380) {
+	/* On a kernel SLB miss we can only check for a valid exception entry */
+	if (!user_mode(regs) && (regs->trap == 0x380)) {
 		bad_page_fault(regs, address, SIGSEGV);
 		return;
 	}

@@ -46,8 +46,9 @@
 #include <asm/ppcdebug.h>
 #include "open_pic.h"
 #include <asm/machdep.h>
+#include <asm/xics.h>
 
-int smp_threads_ready = 0;
+int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
 /* initialised so it doesn't end up in bss */
@@ -62,18 +63,6 @@ extern unsigned char stab_array[];
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
-
-void xics_setup_cpu(void);
-void xics_cause_IPI(int cpu);
-
-/*
- * XICS only has a single IPI, so encode the messages per CPU
- */
-struct xics_ipi_struct {
-	        volatile unsigned long value;
-} ____cacheline_aligned;
-
-struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
 #define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
 
