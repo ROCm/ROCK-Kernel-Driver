@@ -654,7 +654,6 @@ gss_validate(struct rpc_task *task, u32 *p)
 	struct xdr_netobj bufin;
 	struct xdr_netobj bufout;
 	u32		flav,len;
-	int             code = 0;
 
 	dprintk("RPC: gss_validate\n");
 
@@ -675,8 +674,7 @@ gss_validate(struct rpc_task *task, u32 *p)
 	bufout.data = (u8 *) p;
 	bufout.len = len;
 
-	if ((code = gss_verify_mic(ctx->gc_gss_ctx, 
-				   &bufin, &bufout, &qop_state) < 0))
+	if (gss_verify_mic(ctx->gc_gss_ctx, &bufin, &bufout, &qop_state) != 0)
 		return NULL;
 	task->tk_auth->au_rslack = XDR_QUADLEN(len) + 2;
 	dprintk("RPC: GSS gss_validate: gss_verify_mic succeeded.\n");

@@ -28,6 +28,7 @@
 #define UNI_N_CFG_GART_INVAL		0x00000001
 #define UNI_N_CFG_GART_ENABLE		0x00000100
 #define UNI_N_CFG_GART_2xRESET		0x00010000
+#define UNI_N_CFG_GART_DISSBADET	0x00020000
 
 /* My understanding of UniNorth AGP as of UniNorth rev 1.0x,
  * revision 1.5 (x4 AGP) may need further changes.
@@ -94,6 +95,7 @@
 #define UNI_N_CLOCK_CNTL_PCI		0x00000001	/* PCI2 clock control */
 #define UNI_N_CLOCK_CNTL_GMAC		0x00000002	/* GMAC clock control */
 #define UNI_N_CLOCK_CNTL_FW		0x00000004	/* FireWire clock control */
+#define UNI_N_CLOCK_CNTL_ATA100		0x00000010	/* ATA-100 clock control (U2) */
 
 /* Power Management control */
 #define UNI_N_POWER_MGT			0x0030

@@ -48,6 +48,7 @@
 #include <linux/proc_fs.h>
 #include <linux/poll.h>
 #include <linux/pci.h>
+#include <linux/list.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -55,6 +56,7 @@
 #include <pcmcia/bulkmem.h>
 #include <pcmcia/cistpl.h>
 #include <pcmcia/ds.h>
+#include <pcmcia/ss.h>
 
 /*====================================================================*/
 
@@ -69,8 +71,6 @@ MODULE_LICENSE("Dual MPL/GPL");
 #ifdef PCMCIA_DEBUG
 INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
-static const char *version =
-"ds.c 1.112 2001/10/13 00:08:28 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -97,15 +97,18 @@ typedef struct user_info_t {
 } user_info_t;
 
 /* Socket state information */
-typedef struct socket_info_t {
-    client_handle_t	handle;
-    int			state;
-    user_info_t		*user;
-    int			req_pending, req_result;
-    wait_queue_head_t	queue, request;
-    struct timer_list	removal;
-    socket_bind_t	*bind;
-} socket_info_t;
+struct pcmcia_bus_socket {
+	client_handle_t		handle;
+	int			state;
+	user_info_t		*user;
+	int			req_pending, req_result;
+	wait_queue_head_t	queue, request;
+	struct timer_list	removal;
+	socket_bind_t		*bind;
+	struct device		*socket_dev;
+	struct list_head	socket_list;
+	unsigned int		socket_no; /* deprecated */
+};
 
 #define SOCKET_PRESENT		0x01
 #define SOCKET_BUSY		0x02
@@ -116,13 +119,13 @@ typedef struct socket_info_t {
 /* Device driver ID passed to Card Services */
 static dev_info_t dev_info = "Driver Services";
 
-static int sockets = 0, major_dev = -1;
-static socket_info_t *socket_table = NULL;
+static int major_dev = -1;
+
+/* list of all sockets registered with the pcmcia bus driver */
+static DECLARE_RWSEM(bus_socket_list_rwsem);
+static LIST_HEAD(bus_socket_list);
 
 extern struct proc_dir_entry *proc_pccard;
-
-/* We use this to distinguish in-kernel from modular drivers */
-static int init_status = 1;
 
 /*====================================================================*/
 
@@ -135,6 +138,7 @@ static void cs_error(client_handle_t handle, int func, int ret)
 /*======================================================================*/
 
 static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info);
+static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr);
 
 /**
  * pcmcia_register_driver - register a PCMCIA driver with the bus core
@@ -147,7 +151,6 @@ int pcmcia_register_driver(struct pcmcia_driver *driver)
 		return -EINVAL;
 
  	driver->use_count = 0;
- 	driver->status = init_status;
 	driver->drv.bus = &pcmcia_bus_type;
 
 	return driver_register(&driver->drv);
@@ -160,17 +163,19 @@ EXPORT_SYMBOL(pcmcia_register_driver);
 void pcmcia_unregister_driver(struct pcmcia_driver *driver)
 {
 	socket_bind_t *b;
-	int i;
+	struct pcmcia_bus_socket *bus_sock;
 
 	if (driver->use_count > 0) {
 		/* Blank out any left-over device instances */
 		driver->attach = NULL; driver->detach = NULL;
-		for (i = 0; i < sockets; i++)
-			for (b = socket_table[i].bind; b; b = b->next)
+		down_read(&bus_socket_list_rwsem);
+		list_for_each_entry(bus_sock, &bus_socket_list, socket_list) {
+			for (b = bus_sock->bind; b; b = b->next)
 				if (b->driver == driver) 
 					b->instance = NULL;
- 	}
-
+		}
+		up_read(&bus_socket_list_rwsem);
+	}
 	driver_unregister(&driver->drv);
 }
 EXPORT_SYMBOL(pcmcia_unregister_driver);
@@ -181,33 +186,21 @@ int register_pccard_driver(dev_info_t *dev_info,
 			   void (*detach)(dev_link_t *))
 {
     struct pcmcia_driver *driver;
-    socket_bind_t *b;
-    int i;
 
     DEBUG(0, "ds: register_pccard_driver('%s')\n", (char *)dev_info);
     driver = get_pcmcia_driver(dev_info);
-    if (!driver) {
-	driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
-	if (!driver) return -ENOMEM;
-	memset(driver, 0, sizeof(struct pcmcia_driver));
-	driver->drv.name = (char *)dev_info;
-	pcmcia_register_driver(driver);
-    }
+    if (driver)
+	    return -EBUSY;
+
+    driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
+    if (!driver) return -ENOMEM;
+    memset(driver, 0, sizeof(struct pcmcia_driver));
+    driver->drv.name = (char *)dev_info;
+    pcmcia_register_driver(driver);
 
     driver->attach = attach;
     driver->detach = detach;
-    if (driver->use_count == 0) return 0;
-    
-    /* Instantiate any already-bound devices */
-    for (i = 0; i < sockets; i++)
-	for (b = socket_table[i].bind; b; b = b->next) {
-	    if (b->driver != driver) continue;
-	    b->instance = driver->attach();
-	    if (b->instance == NULL)
-		printk(KERN_NOTICE "ds: unable to create instance "
-		       "of '%s'!\n", driver->drv.name);
-	}
-    
+
     return 0;
 } /* register_pccard_driver */
 
@@ -238,8 +231,7 @@ static int proc_read_drivers_callback(struct device_driver *driver, void *d)
 	struct pcmcia_driver *p_dev = container_of(driver, 
 						   struct pcmcia_driver, drv);
 
-	*p += sprintf(*p, "%-24.24s %d %d\n", driver->name, p_dev->status,
-		     p_dev->use_count);
+	*p += sprintf(*p, "%-24.24s 1 %d\n", driver->name, p_dev->use_count);
 	d = (void *) p;
 
 	return 0;
@@ -282,7 +274,7 @@ static void queue_event(user_info_t *user, event_t event)
     user->event[user->event_head] = event;
 }
 
-static void handle_event(socket_info_t *s, event_t event)
+static void handle_event(struct pcmcia_bus_socket *s, event_t event)
 {
     user_info_t *user;
     for (user = s->user; user; user = user->next)
@@ -290,7 +282,7 @@ static void handle_event(socket_info_t *s, event_t event)
     wake_up_interruptible(&s->queue);
 }
 
-static int handle_request(socket_info_t *s, event_t event)
+static int handle_request(struct pcmcia_bus_socket *s, event_t event)
 {
     if (s->req_pending != 0)
 	return CS_IN_USE;
@@ -309,7 +301,7 @@ static int handle_request(socket_info_t *s, event_t event)
 
 static void handle_removal(u_long sn)
 {
-    socket_info_t *s = &socket_table[sn];
+    struct pcmcia_bus_socket *s = get_socket_info_by_nr(sn);
     handle_event(s, CS_EVENT_CARD_REMOVAL);
     s->state &= ~SOCKET_REMOVAL_PENDING;
 }
@@ -323,13 +315,11 @@ static void handle_removal(u_long sn)
 static int ds_event(event_t event, int priority,
 		    event_callback_args_t *args)
 {
-    socket_info_t *s;
-    int i;
+    struct pcmcia_bus_socket *s;
 
     DEBUG(1, "ds: ds_event(0x%06x, %d, 0x%p)\n",
 	  event, priority, args->client_handle);
     s = args->client_data;
-    i = s - socket_table;
     
     switch (event) {
 	
@@ -366,21 +356,21 @@ static int ds_event(event_t event, int priority,
     
 ======================================================================*/
 
-static int bind_mtd(int i, mtd_info_t *mtd_info)
+static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
 {
     mtd_bind_t bind_req;
     int ret;
 
     bind_req.dev_info = &mtd_info->dev_info;
     bind_req.Attributes = mtd_info->Attributes;
-    bind_req.Socket = i;
+    bind_req.Socket = bus_sock->socket_no;
     bind_req.CardOffset = mtd_info->CardOffset;
     ret = pcmcia_bind_mtd(&bind_req);
     if (ret != CS_SUCCESS) {
 	cs_error(NULL, BindMTD, ret);
 	printk(KERN_NOTICE "ds: unable to bind MTD '%s' to socket %d"
 	       " offset 0x%x\n",
-	       (char *)bind_req.dev_info, i, bind_req.CardOffset);
+	       (char *)bind_req.dev_info, bus_sock->socket_no, bind_req.CardOffset);
 	return -ENODEV;
     }
     return 0;
@@ -395,24 +385,21 @@ static int bind_mtd(int i, mtd_info_t *mtd_info)
     
 ======================================================================*/
 
-static int bind_request(int i, bind_info_t *bind_info)
+static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
     struct pcmcia_driver *driver;
     socket_bind_t *b;
     bind_req_t bind_req;
-    socket_info_t *s = &socket_table[i];
     int ret;
 
-    DEBUG(2, "bind_request(%d, '%s')\n", i,
+    if (!s)
+	    return -EINVAL;
+
+    DEBUG(2, "bind_request(%d, '%s')\n", s->socket_no,
 	  (char *)bind_info->dev_info);
     driver = get_pcmcia_driver(&bind_info->dev_info);
-    if (driver == NULL) {
-	driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
-	if (!driver) return -ENOMEM;
-	memset(driver, 0, sizeof(struct pcmcia_driver));
-	driver->drv.name = bind_info->dev_info;
-	pcmcia_register_driver(driver);
-    }
+    if (!driver)
+	    return -EINVAL;
 
     for (b = s->bind; b; b = b->next)
 	if ((driver == b->driver) &&
@@ -423,14 +410,14 @@ static int bind_request(int i, bind_info_t *bind_info)
 	return -EBUSY;
     }
 
-    bind_req.Socket = i;
+    bind_req.Socket = s->socket_no;
     bind_req.Function = bind_info->function;
     bind_req.dev_info = (dev_info_t *) driver->drv.name;
     ret = pcmcia_bind_device(&bind_req);
     if (ret != CS_SUCCESS) {
 	cs_error(NULL, BindDevice, ret);
 	printk(KERN_NOTICE "ds: unable to bind '%s' to socket %d\n",
-	       (char *)dev_info, i);
+	       (char *)dev_info, s->socket_no);
 	return -ENODEV;
     }
 
@@ -462,9 +449,8 @@ static int bind_request(int i, bind_info_t *bind_info)
 
 /*====================================================================*/
 
-static int get_device_info(int i, bind_info_t *bind_info, int first)
+static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, int first)
 {
-    socket_info_t *s = &socket_table[i];
     socket_bind_t *b;
     dev_node_t *node;
 
@@ -532,12 +518,11 @@ static int get_device_info(int i, bind_info_t *bind_info, int first)
 
 /*====================================================================*/
 
-static int unbind_request(int i, bind_info_t *bind_info)
+static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
-    socket_info_t *s = &socket_table[i];
     socket_bind_t **b, *c;
 
-    DEBUG(2, "unbind_request(%d, '%s')\n", i,
+    DEBUG(2, "unbind_request(%d, '%s')\n", s->socket_no,
 	  (char *)bind_info->dev_info);
     for (b = &s->bind; *b; b = &(*b)->next)
 	if ((strcmp((char *)(*b)->driver->drv.name,
@@ -568,13 +553,15 @@ static int unbind_request(int i, bind_info_t *bind_info)
 static int ds_open(struct inode *inode, struct file *file)
 {
     socket_t i = minor(inode->i_rdev);
-    socket_info_t *s;
+    struct pcmcia_bus_socket *s;
     user_info_t *user;
 
     DEBUG(0, "ds_open(socket %d)\n", i);
-    if ((i >= sockets) || (sockets == 0))
-	return -ENODEV;
-    s = &socket_table[i];
+
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return -ENODEV;
+
     if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
 	if (s->state & SOCKET_BUSY)
 	    return -EBUSY;
@@ -600,13 +587,15 @@ static int ds_open(struct inode *inode, struct file *file)
 static int ds_release(struct inode *inode, struct file *file)
 {
     socket_t i = minor(inode->i_rdev);
-    socket_info_t *s;
+    struct pcmcia_bus_socket *s;
     user_info_t *user, **link;
 
     DEBUG(0, "ds_release(socket %d)\n", i);
-    if ((i >= sockets) || (sockets == 0))
-	return 0;
-    s = &socket_table[i];
+
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return 0;
+
     user = file->private_data;
     if (CHECK_USER(user))
 	goto out;
@@ -632,16 +621,18 @@ static ssize_t ds_read(struct file *file, char *buf,
 		       size_t count, loff_t *ppos)
 {
     socket_t i = minor(file->f_dentry->d_inode->i_rdev);
-    socket_info_t *s;
+    struct pcmcia_bus_socket *s;
     user_info_t *user;
 
     DEBUG(2, "ds_read(socket %d)\n", i);
     
-    if ((i >= sockets) || (sockets == 0))
-	return -ENODEV;
     if (count < 4)
 	return -EINVAL;
-    s = &socket_table[i];
+
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return -ENODEV;
+
     user = file->private_data;
     if (CHECK_USER(user))
 	return -EIO;
@@ -661,18 +652,20 @@ static ssize_t ds_write(struct file *file, const char *buf,
 			size_t count, loff_t *ppos)
 {
     socket_t i = minor(file->f_dentry->d_inode->i_rdev);
-    socket_info_t *s;
+    struct pcmcia_bus_socket *s;
     user_info_t *user;
 
     DEBUG(2, "ds_write(socket %d)\n", i);
     
-    if ((i >= sockets) || (sockets == 0))
-	return -ENODEV;
     if (count != 4)
 	return -EINVAL;
     if ((file->f_flags & O_ACCMODE) == O_RDONLY)
 	return -EBADF;
-    s = &socket_table[i];
+
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return -ENODEV;
+
     user = file->private_data;
     if (CHECK_USER(user))
 	return -EIO;
@@ -694,14 +687,15 @@ static ssize_t ds_write(struct file *file, const char *buf,
 static u_int ds_poll(struct file *file, poll_table *wait)
 {
     socket_t i = minor(file->f_dentry->d_inode->i_rdev);
-    socket_info_t *s;
+    struct pcmcia_bus_socket *s;
     user_info_t *user;
 
     DEBUG(2, "ds_poll(socket %d)\n", i);
     
-    if ((i >= sockets) || (sockets == 0))
-	return POLLERR;
-    s = &socket_table[i];
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return POLLERR;
+
     user = file->private_data;
     if (CHECK_USER(user))
 	return POLLERR;
@@ -717,16 +711,16 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
 {
     socket_t i = minor(inode->i_rdev);
-    socket_info_t *s;
+    struct pcmcia_bus_socket *s;
     u_int size;
     int ret, err;
     ds_ioctl_arg_t buf;
 
     DEBUG(2, "ds_ioctl(socket %d, %#x, %#lx)\n", i, cmd, arg);
     
-    if ((i >= sockets) || (sockets == 0))
-	return -ENODEV;
-    s = &socket_table[i];
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return -ENODEV;
     
     size = (cmd & IOCSIZE_MASK) >> IOCSIZE_SHIFT;
     if (size > sizeof(ds_ioctl_arg_t)) return -EINVAL;
@@ -827,20 +821,20 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	break;
     case DS_BIND_REQUEST:
 	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-	err = bind_request(i, &buf.bind_info);
+	err = bind_request(s, &buf.bind_info);
 	break;
     case DS_GET_DEVICE_INFO:
-	err = get_device_info(i, &buf.bind_info, 1);
+	err = get_device_info(s, &buf.bind_info, 1);
 	break;
     case DS_GET_NEXT_DEVICE:
-	err = get_device_info(i, &buf.bind_info, 0);
+	err = get_device_info(s, &buf.bind_info, 0);
 	break;
     case DS_UNBIND_REQUEST:
-	err = unbind_request(i, &buf.bind_info);
+	err = unbind_request(s, &buf.bind_info);
 	break;
     case DS_BIND_MTD:
 	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-	err = bind_mtd(i, &buf.mtd_info);
+	err = bind_mtd(s, &buf.mtd_info);
 	break;
     default:
 	err = -EINVAL;
@@ -889,140 +883,198 @@ EXPORT_SYMBOL(unregister_pccard_driver);
 
 /*====================================================================*/
 
+static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int socket_nr)
+{
+	client_reg_t client_reg;
+	bind_req_t bind;
+	struct pcmcia_bus_socket *s, *tmp_s;
+	int ret;
+	int i;
+
+	s = kmalloc(sizeof(struct pcmcia_bus_socket), GFP_KERNEL);
+	if(!s)
+		return -ENOMEM;
+	memset(s, 0, sizeof(struct pcmcia_bus_socket));
+    
+	/*
+	 * Ugly. But we want to wait for the socket threads to have started up.
+	 * We really should let the drivers themselves drive some of this..
+	 */
+	current->state = TASK_INTERRUPTIBLE;
+	schedule_timeout(HZ/4);
+
+	init_waitqueue_head(&s->queue);
+	init_waitqueue_head(&s->request);
+
+	/* find the lowest, unused socket no. Please note that this is a
+	 * temporary workaround until "struct pcmcia_socket" is introduced
+	 * into cs.c which will include this number, and which will be
+	 * accessible to ds.c directly */
+	i = 0;
+ next_try:
+	list_for_each_entry(tmp_s, &bus_socket_list, socket_list) {
+		if (tmp_s->socket_no == i) {
+			i++;
+			goto next_try;
+		}
+	}
+	s->socket_no = i;
+
+	/* initialize data */
+	s->socket_dev = dev;
+	s->removal.data = s->socket_no;
+	s->removal.function = &handle_removal;
+	init_timer(&s->removal);
+    
+	/* Set up hotline to Card Services */
+	client_reg.dev_info = bind.dev_info = &dev_info;
+
+	bind.Socket = s->socket_no;
+	bind.Function = BIND_FN_ALL;
+	ret = pcmcia_bind_device(&bind);
+	if (ret != CS_SUCCESS) {
+		cs_error(NULL, BindDevice, ret);
+		kfree(s);
+		return -EINVAL;
+	}
+
+	client_reg.Attributes = INFO_MASTER_CLIENT;
+	client_reg.EventMask =
+		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
+		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
+		CS_EVENT_EJECTION_REQUEST | CS_EVENT_INSERTION_REQUEST |
+		CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
+	client_reg.event_handler = &ds_event;
+	client_reg.Version = 0x0210;
+	client_reg.event_callback_args.client_data = s;
+	ret = pcmcia_register_client(&s->handle, &client_reg);
+	if (ret != CS_SUCCESS) {
+		cs_error(NULL, RegisterClient, ret);
+		kfree(s);
+		return -EINVAL;
+	}
+
+	list_add(&s->socket_list, &bus_socket_list);
+
+	return 0;
+}
+
+
+static int __devinit pcmcia_bus_add_socket_dev(struct device *dev)
+{
+	struct pcmcia_socket_class_data *cls_d = dev->class_data;
+	unsigned int i;
+	unsigned int ret = 0;
+
+	if (!cls_d)
+		return -ENODEV;
+
+	down_write(&bus_socket_list_rwsem);
+        for (i = 0; i < cls_d->nsock; i++)
+		ret += pcmcia_bus_add_socket(dev, i);
+	up_write(&bus_socket_list_rwsem);
+
+	return ret;
+}
+
+static int __devexit pcmcia_bus_remove_socket_dev(struct device *dev)
+{
+	struct pcmcia_socket_class_data *cls_d = dev->class_data;
+	struct list_head *list_loop;
+	struct list_head *tmp_storage;
+
+	if (!cls_d)
+		return -ENODEV;
+
+	down_write(&bus_socket_list_rwsem);
+	list_for_each_safe(list_loop, tmp_storage, &bus_socket_list) {
+		struct pcmcia_bus_socket *bus_sock = container_of(list_loop, struct pcmcia_bus_socket, socket_list);
+		if (bus_sock->socket_dev == dev) {
+			pcmcia_deregister_client(bus_sock->handle);
+			list_del(&bus_sock->socket_list);
+			kfree(bus_sock);
+		}
+	}
+	up_write(&bus_socket_list_rwsem);
+	return 0;
+}
+
+
+/* the pcmcia_bus_interface is used to handle pcmcia socket devices */
+static struct device_interface pcmcia_bus_interface = {
+	.name = "pcmcia-bus",
+	.devclass = &pcmcia_socket_class,
+	.add_device = &pcmcia_bus_add_socket_dev,
+	.remove_device = __devexit_p(&pcmcia_bus_remove_socket_dev),
+	.kset = { .subsys = &pcmcia_socket_class.subsys, },
+	.devnum = 0,
+};
+
+
 struct bus_type pcmcia_bus_type = {
 	.name = "pcmcia",
 };
 EXPORT_SYMBOL(pcmcia_bus_type);
 
+
 static int __init init_pcmcia_bus(void)
 {
+	int i;
+
 	bus_register(&pcmcia_bus_type);
+	interface_register(&pcmcia_bus_interface);
+
+	/* Set up character device for user mode clients */
+	i = register_chrdev(0, "pcmcia", &ds_fops);
+	if (i == -EBUSY)
+		printk(KERN_NOTICE "unable to find a free device # for "
+		       "Driver Services\n");
+	else
+		major_dev = i;
+
+#ifdef CONFIG_PROC_FS
+	if (proc_pccard)
+		create_proc_read_entry("drivers",0,proc_pccard,proc_read_drivers,NULL);
+#endif
+
 	return 0;
 }
+fs_initcall(init_pcmcia_bus); /* one level after subsys_initcall so that 
+			       * pcmcia_socket_class is already registered */
 
-static int __init init_pcmcia_ds(void)
+
+static void __exit exit_pcmcia_bus(void)
 {
-    client_reg_t client_reg;
-    servinfo_t serv;
-    bind_req_t bind;
-    socket_info_t *s;
-    int i, ret;
-    
-    DEBUG(0, "%s\n", version);
- 
-    /*
-     * Ugly. But we want to wait for the socket threads to have started up.
-     * We really should let the drivers themselves drive some of this..
-     */
-    current->state = TASK_INTERRUPTIBLE;
-    schedule_timeout(HZ/4);
-
-    pcmcia_get_card_services_info(&serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "ds: Card Services release does not match!\n");
-	return -1;
-    }
-    if (serv.Count == 0) {
-	printk(KERN_NOTICE "ds: no socket drivers loaded!\n");
-	return -1;
-    }
-    
-    sockets = serv.Count;
-    socket_table = kmalloc(sockets*sizeof(socket_info_t), GFP_KERNEL);
-    if (!socket_table) return -1;
-    for (i = 0, s = socket_table; i < sockets; i++, s++) {
-	s->state = 0;
-	s->user = NULL;
-	s->req_pending = 0;
-	init_waitqueue_head(&s->queue);
-	init_waitqueue_head(&s->request);
-	s->handle = NULL;
-	init_timer(&s->removal);
-	s->removal.data = i;
-	s->removal.function = &handle_removal;
-	s->bind = NULL;
-    }
-    
-    /* Set up hotline to Card Services */
-    client_reg.dev_info = bind.dev_info = &dev_info;
-    client_reg.Attributes = INFO_MASTER_CLIENT;
-    client_reg.EventMask =
-	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
-	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
-	CS_EVENT_EJECTION_REQUEST | CS_EVENT_INSERTION_REQUEST |
-        CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
-    client_reg.event_handler = &ds_event;
-    client_reg.Version = 0x0210;
-    for (i = 0; i < sockets; i++) {
-	bind.Socket = i;
-	bind.Function = BIND_FN_ALL;
-	ret = pcmcia_bind_device(&bind);
-	if (ret != CS_SUCCESS) {
-	    cs_error(NULL, BindDevice, ret);
-	    break;
-	}
-	client_reg.event_callback_args.client_data = &socket_table[i];
-	ret = pcmcia_register_client(&socket_table[i].handle,
-			   &client_reg);
-	if (ret != CS_SUCCESS) {
-	    cs_error(NULL, RegisterClient, ret);
-	    break;
-	}
-    }
-    
-    /* Set up character device for user mode clients */
-    i = register_chrdev(0, "pcmcia", &ds_fops);
-    if (i == -EBUSY)
-	printk(KERN_NOTICE "unable to find a free device # for "
-	       "Driver Services\n");
-    else
-	major_dev = i;
+	interface_unregister(&pcmcia_bus_interface);
 
 #ifdef CONFIG_PROC_FS
-    if (proc_pccard)
-	create_proc_read_entry("drivers",0,proc_pccard,proc_read_drivers,NULL);
-    init_status = 0;
+	if (proc_pccard)
+		remove_proc_entry("drivers", proc_pccard);
 #endif
-    return 0;
+	if (major_dev != -1)
+		unregister_chrdev(major_dev, "pcmcia");
+
+	bus_unregister(&pcmcia_bus_type);
 }
+module_exit(exit_pcmcia_bus);
 
-
-static void __exit exit_pcmcia_ds(void)
-{
-    int i;
-#ifdef CONFIG_PROC_FS
-    if (proc_pccard)
-	remove_proc_entry("drivers", proc_pccard);
-#endif
-    if (major_dev != -1)
-	unregister_chrdev(major_dev, "pcmcia");
-    for (i = 0; i < sockets; i++)
-	pcmcia_deregister_client(socket_table[i].handle);
-    sockets = 0;
-    kfree(socket_table);
-    bus_unregister(&pcmcia_bus_type);
-}
-
-#ifdef MODULE
-
-/* init_pcmcia_bus must be done early, init_pcmcia_ds late. If we load this 
- * as a module, we can only specify one initcall, though... 
- */
-static int __init init_pcmcia_module(void) {
-	init_pcmcia_bus();
-	return init_pcmcia_ds();
-}
-module_init(init_pcmcia_module);
-
-#else /* !MODULE */
-subsys_initcall(init_pcmcia_bus);
-late_initcall(init_pcmcia_ds);
-#endif
-
-module_exit(exit_pcmcia_ds);
 
 
 /* helpers for backwards-compatible functions */
+
+
+static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr)
+{
+	struct pcmcia_bus_socket * s;
+	down_read(&bus_socket_list_rwsem);
+	list_for_each_entry(s, &bus_socket_list, socket_list)
+		if (s->socket_no == nr) {
+			up_read(&bus_socket_list_rwsem);
+			return s;
+		}
+	up_read(&bus_socket_list_rwsem);
+	return NULL;
+}
 
 /* backwards-compatible accessing of driver --- by name! */
 

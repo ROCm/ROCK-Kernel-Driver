@@ -468,7 +468,7 @@ enum kcs_result kcs_event(struct kcs_data *kcs, long time)
 		break;
 			
 	case KCS_HOSED:
-		return KCS_SM_HOSED;
+		break;
 	}
 
 	if (kcs->state == KCS_HOSED) {

@@ -202,6 +202,8 @@ via_calibrate_decr(void)
 	printk(KERN_INFO "via_calibrate_decr: ticks per jiffy = %u (%u ticks)\n",
 	       tb_ticks_per_jiffy, dstart - dend);
 
+	iounmap((void*)via);
+	
 	return 1;
 }
 

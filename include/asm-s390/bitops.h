@@ -51,7 +51,7 @@ extern const char _sb_findmap[];
 
 #ifdef CONFIG_SMP
 /*
- * SMP save set_bit routine based on compare and swap (CS)
+ * SMP safe set_bit routine based on compare and swap (CS)
  */
 static inline void set_bit_cs(int nr, volatile unsigned long *ptr)
 {
@@ -76,7 +76,7 @@ static inline void set_bit_cs(int nr, volatile unsigned long *ptr)
 }
 
 /*
- * SMP save clear_bit routine based on compare and swap (CS)
+ * SMP safe clear_bit routine based on compare and swap (CS)
  */
 static inline void clear_bit_cs(int nr, volatile unsigned long *ptr)
 {
@@ -101,7 +101,7 @@ static inline void clear_bit_cs(int nr, volatile unsigned long *ptr)
 }
 
 /*
- * SMP save change_bit routine based on compare and swap (CS)
+ * SMP safe change_bit routine based on compare and swap (CS)
  */
 static inline void change_bit_cs(int nr, volatile unsigned long *ptr)
 {
@@ -126,7 +126,7 @@ static inline void change_bit_cs(int nr, volatile unsigned long *ptr)
 }
 
 /*
- * SMP save test_and_set_bit routine based on compare and swap (CS)
+ * SMP safe test_and_set_bit routine based on compare and swap (CS)
  */
 static inline int
 test_and_set_bit_cs(int nr, volatile unsigned long *ptr)
@@ -153,7 +153,7 @@ test_and_set_bit_cs(int nr, volatile unsigned long *ptr)
 }
 
 /*
- * SMP save test_and_clear_bit routine based on compare and swap (CS)
+ * SMP safe test_and_clear_bit routine based on compare and swap (CS)
  */
 static inline int
 test_and_clear_bit_cs(int nr, volatile unsigned long *ptr)
@@ -180,7 +180,7 @@ test_and_clear_bit_cs(int nr, volatile unsigned long *ptr)
 }
 
 /*
- * SMP save test_and_change_bit routine based on compare and swap (CS) 
+ * SMP safe test_and_change_bit routine based on compare and swap (CS) 
  */
 static inline int
 test_and_change_bit_cs(int nr, volatile unsigned long *ptr)

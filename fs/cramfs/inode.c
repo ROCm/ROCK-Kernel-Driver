@@ -43,6 +43,7 @@ static DECLARE_MUTEX(read_mutex);
 static struct inode *get_cramfs_inode(struct super_block *sb, struct cramfs_inode * cramfs_inode)
 {
 	struct inode * inode = new_inode(sb);
+	static struct timespec zerotime = { 0, 0 };
 
 	if (inode) {
 		inode->i_mode = cramfs_inode->mode;
@@ -51,7 +52,8 @@ static struct inode *get_cramfs_inode(struct super_block *sb, struct cramfs_inod
 		inode->i_blocks = (cramfs_inode->size - 1) / 512 + 1;
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_gid = cramfs_inode->gid;
-		inode->i_mtime = inode->i_atime = inode->i_ctime = 0;
+		/* Struct copy intentional */
+		inode->i_mtime = inode->i_atime = inode->i_ctime = zerotime;
 		inode->i_ino = CRAMINO(cramfs_inode);
 		/* inode->i_nlink is left 1 - arguably wrong for directories,
 		   but it's the best we can do without reading the directory

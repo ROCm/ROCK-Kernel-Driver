@@ -225,6 +225,20 @@ pmac_show_cpuinfo(struct seq_file *m)
 	return 0;
 }
 
+int __openfirmware
+pmac_show_percpuinfo(struct seq_file *m, int i)
+{
+#ifdef CONFIG_CPU_FREQ_PMAC
+	extern unsigned int pmac_get_one_cpufreq(int i);
+	unsigned int freq = pmac_get_one_cpufreq(i);
+	if (freq != 0) {
+		seq_printf(m, "clock\t\t: %dMHz\n", freq/1000);
+		return 0;
+	}
+#endif /* CONFIG_CPU_FREQ_PMAC */
+	return of_show_percpuinfo(m, i);
+}
+
 static volatile u32 *sysctrl_regs;
 
 void __init
@@ -604,7 +618,7 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.setup_arch     = pmac_setup_arch;
 	ppc_md.show_cpuinfo   = pmac_show_cpuinfo;
-	ppc_md.show_percpuinfo = of_show_percpuinfo;
+	ppc_md.show_percpuinfo = pmac_show_percpuinfo;
 	ppc_md.irq_cannonicalize = NULL;
 	ppc_md.init_IRQ       = pmac_pic_init;
 	ppc_md.get_irq        = pmac_get_irq; /* Changed later on ... */

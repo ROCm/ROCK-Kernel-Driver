@@ -152,6 +152,7 @@ extern unsigned long ioremap_bot, ioremap_base;
 
 /* Definitions for 40x embedded chips. */
 #define	_PAGE_GUARDED	0x001	/* G: page is guarded from prefetch */
+#define _PAGE_FILE	0x001	/* when !present: nonlinear file mapping */
 #define _PAGE_PRESENT	0x002	/* software: PTE contains a translation */
 #define	_PAGE_NO_CACHE	0x004	/* I: caching is inhibited */
 #define	_PAGE_WRITETHRU	0x008	/* W: caching is write-through */
@@ -172,6 +173,7 @@ extern unsigned long ioremap_bot, ioremap_base;
 #elif defined(CONFIG_8xx)
 /* Definitions for 8xx embedded chips. */
 #define _PAGE_PRESENT	0x0001	/* Page is valid */
+#define _PAGE_FILE	0x0002	/* when !present: nonlinear file mapping */
 #define _PAGE_NO_CACHE	0x0002	/* I: cache inhibit */
 #define _PAGE_SHARED	0x0004	/* No ASID (context) compare */
 
@@ -210,6 +212,7 @@ extern unsigned long ioremap_bot, ioremap_base;
 /* Definitions for 60x, 740/750, etc. */
 #define _PAGE_PRESENT	0x001	/* software: pte contains a translation */
 #define _PAGE_HASHPTE	0x002	/* hash_page has made an HPTE for this pte */
+#define _PAGE_FILE	0x004	/* when !present: nonlinear file mapping */
 #define _PAGE_USER	0x004	/* usermode access allowed */
 #define _PAGE_GUARDED	0x008	/* G: prohibit speculative access */
 #define _PAGE_COHERENT	0x010	/* M: enforce memory coherence (SMP systems) */
@@ -378,6 +381,7 @@ static inline int pte_write(pte_t pte)		{ return pte_val(pte) & _PAGE_RW; }
 static inline int pte_exec(pte_t pte)		{ return pte_val(pte) & _PAGE_EXEC; }
 static inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }
 static inline int pte_young(pte_t pte)		{ return pte_val(pte) & _PAGE_ACCESSED; }
+static inline int pte_file(pte_t pte)		{ return pte_val(pte) & _PAGE_FILE; }
 
 static inline void pte_uncache(pte_t pte)       { pte_val(pte) |= _PAGE_NO_CACHE; }
 static inline void pte_cache(pte_t pte)         { pte_val(pte) &= ~_PAGE_NO_CACHE; }
@@ -523,14 +527,19 @@ extern void add_hash_page(unsigned context, unsigned long va,
 /*
  * Encode and decode a swap entry.
  * Note that the bits we use in a PTE for representing a swap entry
- * must not include the _PAGE_PRESENT bit, or the _PAGE_HASHPTE bit
- * (if used).  -- paulus
+ * must not include the _PAGE_PRESENT bit, the _PAGE_FILE bit, or the
+ *_PAGE_HASHPTE bit (if used).  -- paulus
  */
-#define __swp_type(entry)		((entry).val & 0x3f)
-#define __swp_offset(entry)		((entry).val >> 6)
-#define __swp_entry(type, offset)	((swp_entry_t) { (type) | ((offset) << 6) })
-#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) >> 2 })
-#define __swp_entry_to_pte(x)		((pte_t) { (x).val << 2 })
+#define __swp_type(entry)		((entry).val & 0x1f)
+#define __swp_offset(entry)		((entry).val >> 5)
+#define __swp_entry(type, offset)	((swp_entry_t) { (type) | ((offset) << 5) })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) >> 3 })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val << 3 })
+
+/* Encode and decode a nonlinear file mapping entry */
+#define PTE_FILE_MAX_BITS	29
+#define pte_to_pgoff(pte)	(pte_val(pte) >> 3)
+#define pgoff_to_pte(off)	((pte_t) { ((off) << 3) | _PAGE_FILE })
 
 /* CONFIG_APUS */
 /* For virtual address to physical address conversion */

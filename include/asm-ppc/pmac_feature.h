@@ -31,10 +31,16 @@
 #ifndef __PPC_ASM_PMAC_FEATURE_H
 #define __PPC_ASM_PMAC_FEATURE_H
 
+#include <asm/macio_asic.h>
+
 /*
  * Known Mac motherboard models
  * 
  * Please, report any error here to benh@kernel.crashing.org, thanks !
+ * 
+ * Note that I don't fully maintain this list for Core99 & MacRISC2
+ * and I'm considering removing all NewWorld entries from it and
+ * entirely rely on the model string.
  */
 
 /* PowerSurge are the first generation of PCI Pmacs. This include
@@ -85,9 +91,15 @@
 #define PMAC_TYPE_QUICKSILVER		0x45	/* QuickSilver G4s */
 #define PMAC_TYPE_PISMO			0x46	/* Pismo PowerBook */
 #define PMAC_TYPE_TITANIUM		0x47	/* Titanium PowerBook */
-#define PMAC_TYPE_TITANIUM2		0x48	/* Titanium II PowerBook */
-#define PMAC_TYPE_TITANIUM3		0x49	/* Titanium III PowerBook (with L3) */
+#define PMAC_TYPE_TITANIUM2		0x48	/* Titanium II PowerBook (no L3, M6) */
+#define PMAC_TYPE_TITANIUM3		0x49	/* Titanium III PowerBook (with L3 & M7) */
+#define PMAC_TYPE_TITANIUM4		0x50	/* Titanium IV PowerBook (with L3 & M9) */
+#define PMAC_TYPE_EMAC			0x50	/* eMac */
 #define PMAC_TYPE_UNKNOWN_CORE99	0x5f
+
+/* MacRisc2 with UniNorth 2.0 */
+#define PMAC_TYPE_RACKMAC		0x80	/* XServe */
+#define PMAC_TYPE_WINDTUNNEL		0x81	
 
 /* MacRISC2 machines based on the Pangea chipset
  */
@@ -96,12 +108,18 @@
 #define PMAC_TYPE_FLAT_PANEL_IMAC	0x102	/* Flat panel iMac */
 #define PMAC_TYPE_UNKNOWN_PANGEA	0x10f
 
+/* MacRISC2 machines based on the Intrepid chipset
+ */
+#define PMAC_TYPE_UNKNOWN_INTREPID	0x11f	/* Generic */
+
 /*
  * Motherboard flags
  */
 
 #define PMAC_MB_CAN_SLEEP		0x00000001
 #define PMAC_MB_HAS_FW_POWER		0x00000002
+#define PMAC_MB_OLD_CORE99		0x00000004
+#define PMAC_MB_MOBILE			0x00000008
 
 /*
  * Feature calls supported on pmac
@@ -250,6 +268,61 @@ extern int pmac_do_feature_call(unsigned int selector, ...);
 extern void pmac_feature_init(void);
 
 #define PMAC_FTR_DEF(x) ((_MACH_Pmac << 16) | (x))
+
+
+/*
+ * The part below is for use by macio_asic.c only, do not rely
+ * on the data structures or constants below in a normal driver
+ *
+ */
+ 
+#define MAX_MACIO_CHIPS		2
+
+enum {
+	macio_unknown = 0,
+	macio_grand_central,
+	macio_ohare,
+	macio_ohareII,
+	macio_heathrow,
+	macio_gatwick,
+	macio_paddington,
+	macio_keylargo,
+	macio_pangea,
+	macio_intrepid,
+};
+
+struct macio_chip
+{
+	struct device_node	*of_node;
+	int			type;
+	const char		*name;
+	int			rev;
+	volatile u32		*base;
+	unsigned long		flags;
+
+	/* For use by macio_asic PCI driver */
+	struct macio_bus	lbus;
+};
+
+extern struct macio_chip macio_chips[MAX_MACIO_CHIPS];
+
+#define MACIO_FLAG_SCCA_ON	0x00000001
+#define MACIO_FLAG_SCCB_ON	0x00000002
+#define MACIO_FLAG_SCC_LOCKED	0x00000004
+#define MACIO_FLAG_AIRPORT_ON	0x00000010
+#define MACIO_FLAG_FW_SUPPORTED	0x00000020
+
+extern struct macio_chip* macio_find(struct device_node* child, int type);
+
+#define MACIO_FCR32(macio, r)	((macio)->base + ((r) >> 2))
+#define MACIO_FCR8(macio, r)	(((volatile u8*)((macio)->base)) + (r))
+
+#define MACIO_IN32(r)		(in_le32(MACIO_FCR32(macio,r)))
+#define MACIO_OUT32(r,v)	(out_le32(MACIO_FCR32(macio,r), (v)))
+#define MACIO_BIS(r,v)		(MACIO_OUT32((r), MACIO_IN32(r) | (v)))
+#define MACIO_BIC(r,v)		(MACIO_OUT32((r), MACIO_IN32(r) & ~(v)))
+#define MACIO_IN8(r)		(in_8(MACIO_FCR8(macio,r)))
+#define MACIO_OUT8(r,v)		(out_8(MACIO_FCR8(macio,r), (v)))
 
 #endif /* __PPC_ASM_PMAC_FEATURE_H */
 #endif /* __KERNEL__ */
