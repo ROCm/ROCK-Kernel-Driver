@@ -202,17 +202,13 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	nf_debug_ip_local_deliver(skb);
-	skb->nf_debug = 0;
 #endif /*CONFIG_NETFILTER_DEBUG*/
 
 	__skb_pull(skb, ihl);
 
-#ifdef CONFIG_NETFILTER
 	/* Free reference early: we don't need it any more, and it may
            hold ip_conntrack module loaded indefinitely. */
-	nf_conntrack_put(skb->nfct);
-	skb->nfct = NULL;
-#endif /*CONFIG_NETFILTER*/
+	nf_reset(skb);
 
         /* Point into the IP datagram, just past the header. */
         skb->h.raw = skb->data;

@@ -1731,6 +1731,15 @@ static inline int print_name(const char *i,
 	return 0;
 }
 
+static inline int print_target(const struct ipt_target *t,
+                               off_t start_offset, char *buffer, int length,
+                               off_t *pos, unsigned int *count)
+{
+	if (t == &ipt_standard_target || t == &ipt_error_target)
+		return 0;
+	return print_name((char *)t, start_offset, buffer, length, pos, count);
+}
+
 static int ipt_get_tables(char *buffer, char **start, off_t offset, int length)
 {
 	off_t pos = 0;
@@ -1757,7 +1766,7 @@ static int ipt_get_targets(char *buffer, char **start, off_t offset, int length)
 	if (down_interruptible(&ipt_mutex) != 0)
 		return 0;
 
-	LIST_FIND(&ipt_target, print_name, void *,
+	LIST_FIND(&ipt_target, print_target, struct ipt_target *,
 		  offset, buffer, length, &pos, &count);
 	
 	up(&ipt_mutex);
