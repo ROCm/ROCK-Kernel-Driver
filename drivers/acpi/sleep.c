@@ -15,6 +15,7 @@
 #include <linux/pm.h>
 #include <linux/device.h>
 #include <linux/suspend.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/acpi.h>
@@ -32,7 +33,24 @@ ACPI_MODULE_NAME		("sleep")
 #define ACPI_SYSTEM_FILE_SLEEP		"sleep"
 #define ACPI_SYSTEM_FILE_ALARM		"alarm"
 
+static int acpi_system_sleep_open_fs(struct inode *inode, struct file *file);
+static int acpi_system_alarm_open_fs(struct inode *inode, struct file *file);
+
 static u8 sleep_states[ACPI_S_STATE_COUNT];
+
+static struct file_operations acpi_system_sleep_fops = {
+	.open		= acpi_system_sleep_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_system_alarm_fops = {
+	.open		= acpi_system_alarm_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 static void
 acpi_power_off (void)
@@ -271,43 +289,26 @@ acpi_suspend (
 	return status;
 }
 
-
-static int
-acpi_system_read_sleep (
-        char                    *page,
-        char                    **start,
-        off_t                   off,
-        int                     count,
-        int                     *eof,
-        void                    *data)
+static int acpi_system_sleep_seq_show(struct seq_file *seq, void *offset)
 {
-	char			*p = page;
-	int			size;
 	int			i;
 
-	ACPI_FUNCTION_TRACE("acpi_system_read_sleep");
-
-	if (off != 0)
-		goto end;
+	ACPI_FUNCTION_TRACE("acpi_system_sleep_seq_show");
 
 	for (i = 0; i <= ACPI_STATE_S5; i++) {
 		if (sleep_states[i])
-			p += sprintf(p,"S%d ", i);
+			seq_printf(seq,"S%d ", i);
 	}
 
-	p += sprintf(p, "\n");
+	seq_puts(seq, "\n");
 
-end:
-	size = (p - page);
-	if (size <= off+count) *eof = 1;
-	*start = page + off;
-	size -= off;
-	if (size>count) size = count;
-	if (size<0) size = 0;
-
-	return_VALUE(size);
+	return 0;
 }
 
+static int acpi_system_sleep_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_system_sleep_seq_show, PDE(inode)->data);
+}
 
 static int
 acpi_system_write_sleep (
@@ -349,25 +350,12 @@ acpi_system_write_sleep (
 	return_VALUE(count);
 }
 
-
-static int
-acpi_system_read_alarm (
-	char                    *page,
-	char                    **start,
-	off_t                   off,
-	int                     count,
-	int                     *eof,
-	void                    *context)
+static int acpi_system_alarm_seq_show(struct seq_file *seq, void *offset)
 {
-	char			*p = page;
-	int			size = 0;
 	u32			sec, min, hr;
 	u32			day, mo, yr;
 
-	ACPI_FUNCTION_TRACE("acpi_system_read_alarm");
-
-	if (off != 0)
-		goto end;
+	ACPI_FUNCTION_TRACE("acpi_system_alarm_seq_show");
 
 	spin_lock(&rtc_lock);
 
@@ -427,21 +415,19 @@ acpi_system_read_alarm (
 	yr += 2000;
 #endif
 
-	p += sprintf(p,"%4.4u-", yr);
-	p += (mo > 12)  ? sprintf(p, "**-")  : sprintf(p, "%2.2u-", mo);
-	p += (day > 31) ? sprintf(p, "** ")  : sprintf(p, "%2.2u ", day);
-	p += (hr > 23)  ? sprintf(p, "**:")  : sprintf(p, "%2.2u:", hr);
-	p += (min > 59) ? sprintf(p, "**:")  : sprintf(p, "%2.2u:", min);
-	p += (sec > 59) ? sprintf(p, "**\n") : sprintf(p, "%2.2u\n", sec);
+	seq_printf(seq,"%4.4u-", yr);
+	(mo > 12)  ? seq_puts(seq, "**-")  : seq_printf(seq, "%2.2u-", mo);
+	(day > 31) ? seq_puts(seq, "** ")  : seq_printf(seq, "%2.2u ", day);
+	(hr > 23)  ? seq_puts(seq, "**:")  : seq_printf(seq, "%2.2u:", hr);
+	(min > 59) ? seq_puts(seq, "**:")  : seq_printf(seq, "%2.2u:", min);
+	(sec > 59) ? seq_puts(seq, "**\n") : seq_printf(seq, "%2.2u\n", sec);
 
- end:
-	size = p - page;
-	if (size < count) *eof = 1;
-	else if (size > count) size = count;
-	if (size < 0) size = 0;
-	*start = page;
+	return 0;
+}
 
-	return_VALUE(size);
+static int acpi_system_alarm_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_system_alarm_seq_show, PDE(inode)->data);
 }
 
 
@@ -687,7 +673,7 @@ static int __init acpi_sleep_init(void)
 			"Unable to create '%s' fs entry\n",
 			ACPI_SYSTEM_FILE_SLEEP));
 	else {
-		entry->read_proc = acpi_system_read_sleep;
+		entry->proc_fops = &acpi_system_sleep_fops;
 		entry->write_proc = acpi_system_write_sleep;
 	}
 
@@ -699,7 +685,7 @@ static int __init acpi_sleep_init(void)
 			"Unable to create '%s' fs entry\n",
 			ACPI_SYSTEM_FILE_ALARM));
 	else {
-		entry->read_proc = acpi_system_read_alarm;
+		entry->proc_fops = &acpi_system_alarm_fops;
 		entry->write_proc = acpi_system_write_alarm;
 	}
 
