@@ -104,6 +104,8 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	if (!clnt->cl_port)
 		clnt->cl_autobind = 1;
 
+	rpc_init_rtt(&clnt->cl_rtt, xprt->timeout.to_initval);
+
 	if (!rpcauth_create(flavor, clnt))
 		goto out_no_auth;
 
@@ -669,7 +671,7 @@ call_timeout(struct rpc_task *task)
 		rpc_exit(task, -EIO);
 		return;
 	}
-	if (clnt->cl_chatty && !(task->tk_flags & RPC_CALL_MAJORSEEN)) {
+	if (clnt->cl_chatty && !(task->tk_flags & RPC_CALL_MAJORSEEN) && rpc_ntimeo(&clnt->cl_rtt) > 7) {
 		task->tk_flags |= RPC_CALL_MAJORSEEN;
 		if (req)
 			printk(KERN_NOTICE "%s: server %s not responding, still trying\n",
