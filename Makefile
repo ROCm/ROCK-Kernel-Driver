@@ -255,6 +255,8 @@ prepare: .hdepend include/config/MARKER
 	@$(MAKE) -C $(@D) $(@F)
 %.o: %.c FORCE
 	@$(MAKE) -C $(@D) $(@F)
+%.lst: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
 %.s: %.S FORCE
 	@$(MAKE) -C $(@D) $(@F)
 %.o: %.S FORCE

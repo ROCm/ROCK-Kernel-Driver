@@ -100,17 +100,19 @@ first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
 # Only happens in Makefiles which override the default first_rule:
 modkern_cflags := $(CFLAGS_KERNEL)
 
-$(real-objs-y)      : modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.i): modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.s): modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y)        : modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y:.o=.i)  : modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y:.o=.s)  : modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y:.o=.lst): modkern_cflags := $(CFLAGS_KERNEL)
 
-$(real-objs-m)      : modkern_cflags := $(CFLAGS_MODULE)
-$(real-objs-m:.o=.i): modkern_cflags := $(CFLAGS_MODULE)
-$(real-objs-m:.o=.s): modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m)        : modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m:.o=.i)  : modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m:.o=.lst): modkern_cflags := $(CFLAGS_MODULE)
 
-$(export-objs)      : export_flags   := $(EXPORT_FLAGS)
-$(export-objs:.o=.i): export_flags   := $(EXPORT_FLAGS)
-$(export-objs:.o=.s): export_flags   := $(EXPORT_FLAGS)
+$(export-objs)        : export_flags   := $(EXPORT_FLAGS)
+$(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
+$(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
+$(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
 c_flags = $(CFLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
@@ -131,6 +133,12 @@ cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 
 %.o: %.c FORCE
 	$(call if_changed,cmd_cc_o_c)
+
+quiet_cmd_cc_lst_c = Generating $(RELDIR)/$@
+cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
+
+%.lst: %.c FORCE
+	$(call if_changed,cmd_cc_lst_c)
 
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
@@ -157,13 +165,6 @@ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 %.o: %.S FORCE
 	$(call if_changed,cmd_as_o_S)
-
-# FIXME
-
-%.lst: %.c
-	$(CC) $(c_flags) -g -c -o $*.o $<
-	$(TOPDIR)/scripts/makelst $* $(TOPDIR) $(OBJDUMP)
-
 
 # If a Makefile does define neither O_TARGET nor L_TARGET,
 # use a standard O_TARGET named "built-in.o"
