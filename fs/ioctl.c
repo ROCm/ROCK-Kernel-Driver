@@ -78,6 +78,10 @@ static int file_ioctl(struct file *filp, unsigned int cmd,
 }
 
 
+/*
+ * When you add any new common ioctls to the switches above and below
+ * please update compat_sys_ioctl() too.
+ */
 asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct file * filp;
