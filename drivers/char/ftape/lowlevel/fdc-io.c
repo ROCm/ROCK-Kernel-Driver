@@ -928,18 +928,6 @@ static inline void fdc_setup_dma(char mode,
 	set_dma_mode(fdc.dma, mode);
 	set_dma_addr(fdc.dma, virt_to_bus((void*)addr));
 	set_dma_count(fdc.dma, count);
-#ifdef GCC_2_4_5_BUG
-	/*  This seemingly stupid construction confuses the gcc-2.4.5
-	 *  code generator enough to create correct code.
-	 */
-	if (1) {
-		int i;
-		
-		for (i = 0; i < 1; ++i) {
-			ftape_udelay(1);
-		}
-	}
-#endif
 	enable_dma(fdc.dma);
 }
 
