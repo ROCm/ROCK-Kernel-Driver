@@ -1,5 +1,6 @@
 #include <linux/types.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svcsock.h>
@@ -411,6 +412,7 @@ svcauth_null_release(struct svc_rqst *rqstp)
 
 struct auth_ops svcauth_null = {
 	.name		= "null",
+	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_NULL,
 	.accept 	= svcauth_null_accept,
 	.release	= svcauth_null_release,
@@ -515,6 +517,7 @@ svcauth_unix_release(struct svc_rqst *rqstp)
 
 struct auth_ops svcauth_unix = {
 	.name		= "unix",
+	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_UNIX,
 	.accept 	= svcauth_unix_accept,
 	.release	= svcauth_unix_release,

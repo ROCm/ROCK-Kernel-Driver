@@ -1045,6 +1045,7 @@ svcauth_gss_domain_release(struct auth_domain *dom)
 
 struct auth_ops svcauthops_gss = {
 	.name		= "rpcsec_gss",
+	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_GSS,
 	.accept		= svcauth_gss_accept,
 	.release	= svcauth_gss_release,
@@ -1054,10 +1055,12 @@ struct auth_ops svcauthops_gss = {
 int
 gss_svc_init(void)
 {
-	cache_register(&rsc_cache);
-	cache_register(&rsi_cache);
-	svc_auth_register(RPC_AUTH_GSS, &svcauthops_gss);
-	return 0;
+	int rv = svc_auth_register(RPC_AUTH_GSS, &svcauthops_gss);
+	if (rv == 0) {
+		cache_register(&rsc_cache);
+		cache_register(&rsi_cache);
+	}
+	return rv;
 }
 
 void
@@ -1065,4 +1068,5 @@ gss_svc_shutdown(void)
 {
 	cache_unregister(&rsc_cache);
 	cache_unregister(&rsi_cache);
+	svc_auth_unregister(RPC_AUTH_GSS);
 }
