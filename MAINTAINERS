@@ -73,7 +73,7 @@ S: Status, one of the following:
 3C359 NETWORK DRIVER
 P:	Mike Phillips
 M:	mikep@linuxtr.net
-L:	linux-net@vger.rutgers.edu
+L:	linux-net@vger.kernel.org
 L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
@@ -1468,7 +1468,7 @@ ONSTREAM SCSI TAPE DRIVER
 P:	Willem Riede
 M:	osst@riede.org
 L:	osst@linux1.onstream.nl
-L:	linux-scsi@vger.rutgers.edu
+L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
 OPL3-SA2, SA3, and SAx DRIVER
