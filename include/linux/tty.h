@@ -89,7 +89,8 @@ struct screen_info {
 	unsigned short vesapm_seg;		/* 0x2e */
 	unsigned short vesapm_off;		/* 0x30 */
 	unsigned short pages;			/* 0x32 */
-						/* 0x34 -- 0x3f reserved for future expansion */
+	unsigned short vesa_attributes;		/* 0x34 */
+						/* 0x36 -- 0x3f reserved for future expansion */
 };
 
 extern struct screen_info screen_info;
