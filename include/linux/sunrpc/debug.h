@@ -35,6 +35,7 @@
 #define RPCDBG_SVCSOCK		0x0100
 #define RPCDBG_SVCDSP		0x0200
 #define RPCDBG_MISC		0x0400
+#define RPCDBG_CACHE		0x0800
 #define RPCDBG_ALL		0x7fff
 
 #ifdef __KERNEL__

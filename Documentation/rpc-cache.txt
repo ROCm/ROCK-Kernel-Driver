@@ -1,0 +1,82 @@
+This document gives a brief introduction to the caching
+mechanisms in the sunrpc layer that is used, in particular,
+for NFS authentication.
+
+CACHES
+======
+The caching replaces the old exports table and allows for
+a wide variety of values to be caches.
+
+There are a number of caches that are similar in structure though
+quite possibly very different in content and use.  There is a corpus
+of common code for managing these caches.
+
+Examples of caches that are likely to be needed are:
+  - mapping from IP address to client name
+  - mapping from client name and filesystem to export options
+  - mapping from UID to list of GIDs, to work around NFS's limitation
+    of 16 gids.
+  - mappings between local UID/GID and remote UID/GID for sites that
+    do not have uniform uid assignment
+  - mapping from network identify to public key for crypto authentication.
+
+The common code handles such things as:
+   - general cache lookup with correct locking
+   - supporting 'NEGATIVE' as well as positive entries
+   - allowing an EXPIRED time on cache items, and removing
+     items after they expire, and are no longe in-use.
+
+   Future code extensions are expect to handle
+   - making requests to user-space to fill in cache entries
+   - allowing user-space to directly set entries in the cache
+   - delaying RPC requests that depend on as-yet incomplete
+     cache entries, and replaying those requests when the cache entry
+     is complete.
+   - maintaining last-access times on cache entries
+   - clean out old entries when the caches become full
+
+The code for performing a cache lookup is also common, but in the form
+of a template.  i.e. a #define.
+Each cache defines a lookup function by using the DefineCacheLookup
+macro, or the simpler DefineSimpleCacheLookup macro
+
+Creating a Cache
+----------------
+
+1/ A cache needs a datum to cache.  This is in the form of a
+   structure definition that must contain a
+     struct cache_head
+   as an element, usually the first.
+   It will also contain a key and some content.
+   Each cache element is reference counted and contains
+   expiry and update times for use in cache management.
+2/ A cache needs a "cache_detail" structure that
+   describes the cache.  This stores the hash table, and some
+   parameters for cache management.
+3/ A cache needs a lookup function.  This is created using
+   the DefineCacheLookup macro.  This lookup function is used both
+   to find entries and to update entries.  The normal mode for
+   updating an entry is to replace the old entry with a new
+   entry.  However it is possible to allow update-in-place
+   for those caches where it makes sense (no atomicity issues
+   or indirect reference counting issue)
+4/ A cache needs to be registered using cache_register().  This
+   includes in on a list of caches that will be regularly
+   cleaned to discard old data.  For this to work, some
+   thread must periodically call cache_clean
+   
+Using a cache
+-------------
+
+To find a value in a cache, call the lookup function passing it a the
+datum which contains key, and possibly content, and a flag saying
+whether to update the cache with new data from the datum.   Depending
+on how the cache lookup function was defined, it may take an extra
+argument to identify the particular cache in question.
+
+Except in cases of kmalloc failure, the lookup function
+will return a new datum which will store the key and
+may contain valid content, or may not.
+This datum is typically passed to cache_check which determines the
+validity of the datum and may later initiate an upcall to fill
+in the data.
