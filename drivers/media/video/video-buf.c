@@ -26,11 +26,6 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
-#ifndef TryLockPage
-# include "linux/page-flags.h"
-# define TryLockPage TestSetPageLocked
-#endif
-
 #include <media/video-buf.h>
 
 static int debug = 0;
