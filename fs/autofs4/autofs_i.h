@@ -25,6 +25,8 @@
 #include <linux/string.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/mount.h>
+#include <linux/namei.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
 
@@ -160,3 +162,21 @@ enum autofs_notify
 int autofs4_wait(struct autofs_sb_info *,struct qstr *, enum autofs_notify);
 int autofs4_wait_release(struct autofs_sb_info *,autofs_wqt_t,int);
 void autofs4_catatonic_mode(struct autofs_sb_info *);
+
+static inline int simple_positive(struct dentry *dentry)
+{
+	return dentry->d_inode && !d_unhashed(dentry);
+}
+
+static inline int simple_empty_nolock(struct dentry *dentry)
+{
+	struct dentry *child;
+	int ret = 0;
+
+	list_for_each_entry(child, &dentry->d_subdirs, d_child)
+		if (simple_positive(child))
+			goto out;
+	ret = 1;
+out:
+	return ret;
+}

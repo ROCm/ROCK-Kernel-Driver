@@ -23,6 +23,10 @@
 #define AUTOFS_MIN_PROTO_VERSION	3
 #define AUTOFS_MAX_PROTO_VERSION	4
 
+/* Mask for expire behaviour */
+#define AUTOFS_EXP_IMMEDIATE		1
+#define AUTOFS_EXP_LEAVES		2
+
 /* New message type */
 #define autofs_ptype_expire_multi	2	/* Expire entry (umount request) */
 
