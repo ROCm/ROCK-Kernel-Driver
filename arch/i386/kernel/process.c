@@ -566,7 +566,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	struct_cpy(childregs, regs);
 	childregs->eax = 0;
 	childregs->esp = esp;
-	p->user_vm_lock = NULL;
+	p->user_tid = NULL;
 
 	p->thread.esp = (unsigned long) childregs;
 	p->thread.esp0 = (unsigned long) (childregs+1);
@@ -591,7 +591,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	/*
 	 * The common fastpath:
 	 */
-	if (!(clone_flags & (CLONE_SETTLS | CLONE_SETTID | CLONE_RELEASE_VM)))
+	if (!(clone_flags & (CLONE_SETTLS | CLONE_SETTID | CLONE_CLEARTID)))
 		return 0;
 	/*
 	 * Set a new TLS for the child thread?
@@ -623,10 +623,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 			return -EFAULT;
 
 	/*
-	 * Does the userspace VM want any unlock on mm_release()?
+	 * Does the userspace VM want the TID cleared on mm_release()?
 	 */
-	if (clone_flags & CLONE_RELEASE_VM)
-		p->user_vm_lock = (long *) childregs->edi;
+	if (clone_flags & CLONE_CLEARTID)
+		p->user_tid = (long *) childregs->edx;
 	return 0;
 }
 
