@@ -329,6 +329,12 @@ config X86_MCE
 
 endmenu
 
+#
+# Use the generic interrupt handling code in kernel/hardirq.c:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
 
 menu "Power management options"
 
