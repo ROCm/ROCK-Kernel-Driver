@@ -42,7 +42,7 @@
 #include <acpi/acpi_bus.h>
 #include <asm/uaccess.h>
 
-#define ASUS_ACPI_VERSION "0.28"
+#define ASUS_ACPI_VERSION "0.29"
 
 #define PROC_ASUS       "asus"	//the directory
 #define PROC_MLED       "mled"
@@ -132,7 +132,8 @@ struct asus_hotk {
 		P30,	  //Samsung P30
 		S1x,      //S1300A, but also L1400B and M2400A (L84F)
 		S2x,      //S200 (J1 reported), Victor MP-XP7210
-		xxN,      //M2400N, M3700N, M5200N, S1300N, S5200N (Centrino)
+		xxN,      //M2400N, M3700N, M5200N, S1300N, S5200N, W1OOON
+			  //(Centrino)
 		END_MODEL
 	} model;              //Models currently supported
 	u16 event_count[128]; //count for each event TODO make this better
@@ -1035,7 +1036,8 @@ static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 		 strncmp(model->string.pointer, "M5N", 3) == 0 ||
 		 strncmp(model->string.pointer, "M6N", 3) == 0 ||
 		 strncmp(model->string.pointer, "S1N", 3) == 0 ||
-		 strncmp(model->string.pointer, "S5N", 3) == 0)
+		 strncmp(model->string.pointer, "S5N", 3) == 0 ||
+                 strncmp(model->string.pointer, "W1N", 3) == 0)
 		hotk->model = xxN;
 	else if (strncmp(model->string.pointer, "M1", 2) == 0)
 		hotk->model = M1A;
@@ -1072,12 +1074,14 @@ static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 		hotk->methods->lcd_status = NULL; 
 	/* L2B is similar enough to L3C to use its settings, with this only 
 	   exception */
-	else if (strncmp(model->string.pointer, "S5N", 3) == 0)
+	else if (strncmp(model->string.pointer, "S5N", 3) == 0 ||
+		 strncmp(model->string.pointer, "M5N", 3) == 0)
 		hotk->methods->mt_mled = NULL; 
-	/* S5N has no MLED */
-	else if (strncmp(model->string.pointer, "M2N", 3) == 0)
+	/* S5N and M5N have no MLED */
+	else if (strncmp(model->string.pointer, "M2N", 3) == 0 ||
+		 strncmp(model->string.pointer, "W1N", 3) == 0)
 		hotk->methods->mt_wled = "WLED"; 
-	/* M2N has a usable WLED */
+	/* M2N and W1N have a usable WLED */
 	else if (asus_info) {
 		if (strncmp(asus_info->oem_table_id, "L1", 2) == 0)
 			hotk->methods->mled_status = NULL;
