@@ -92,6 +92,24 @@ void die(const char *str, struct pt_regs *regs, long err)
 	printk("NUMA ");
 	nl = 1;
 #endif
+	switch(systemcfg->platform) {
+		case PLATFORM_PSERIES:
+			printk("PSERIES ");
+			nl = 1;
+			break;
+		case PLATFORM_PSERIES_LPAR:
+			printk("PSERIES LPAR ");
+			nl = 1;
+			break;
+		case PLATFORM_ISERIES_LPAR:
+			printk("ISERIES LPAR ");
+			nl = 1;
+			break;
+		case PLATFORM_POWERMAC:
+			printk("POWERMAC ");
+			nl = 1;
+			break;
+	}
 	if (nl)
 		printk("\n");
 	show_regs(regs);
