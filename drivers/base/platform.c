@@ -75,5 +75,6 @@ int __init platform_bus_init(void)
 	return bus_register(&platform_bus_type);
 }
 
+EXPORT_SYMBOL(platform_bus_type);
 EXPORT_SYMBOL(platform_device_register);
 EXPORT_SYMBOL(platform_device_unregister);
