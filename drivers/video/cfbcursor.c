@@ -1,10 +1,7 @@
 /*
- * linux/drivers/video/fbgen.c -- Generic routines for frame buffer devices
+ * linux/drivers/video/cfbcursor.c -- Generic software cursor for frame buffer devices
  *
- *  Created 3 Jan 1998 by Geert Uytterhoeven
- *
- *	2001 - Documented with DocBook
- *	- Brad Douglas <brad@neruo.com>
+ *  Created 14 Nov 2002 by James Simmons 
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
@@ -61,36 +58,8 @@ int cfb_cursor(struct fb_info *info, struct fbcursor *cursor)
 	return 0;
 }
 
-int fb_blank(int blank, struct fb_info *info)
-{
-	struct fb_cmap cmap;
-	u16 black[16];
-
-	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
-		return 0;
-	if (blank) {
-		memset(black, 0, 16 * sizeof(u16));
-		cmap.red = black;
-		cmap.green = black;
-		cmap.blue = black;
-		cmap.transp = NULL;
-		cmap.start = 0;
-		cmap.len = 16;
-		fb_set_cmap(&cmap, 1, info);
-	} else {
-		if (info->cmap.len)
-			fb_set_cmap(&info->cmap, 1, info);
-		else {
-			int size =
-			    info->var.bits_per_pixel == 16 ? 64 : 256;
-			fb_set_cmap(fb_default_cmap(size), 1, info);
-		}
-	}
-	return 0;
-}
-
-/* generic frame buffer operations */
 EXPORT_SYMBOL(cfb_cursor);
-EXPORT_SYMBOL(fb_blank);
 
+MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
+MODULE_DESCRIPTION("Generic software cursor");
 MODULE_LICENSE("GPL");

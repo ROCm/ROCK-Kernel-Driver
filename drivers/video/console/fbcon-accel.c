@@ -249,42 +249,6 @@ void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 
 	if (info->fbops->fb_cursor)
 		info->fbops->fb_cursor(info, &cursor);
-	else {
-		int i, size = ((cursor.size.x + 7) / 8) * cursor.size.y;
-		struct fb_image image;
-		static char data[64];
-
-		image.bg_color = cursor.index->entry[0];
-		image.fg_color = cursor.index->entry[1];
-
-		if (cursor.enable) {
-			switch (cursor.rop) {
-			case ROP_XOR:
-				for (i = 0; i < size; i++)
-					data[i] = (cursor.image[i] &
-						   cursor.mask[i]) ^
-						   cursor.dest[i];
-					break;
-			case ROP_COPY:
-			default:
-				for (i = 0; i < size; i++)
-					data[i] = cursor.image[i] &
-						  cursor.mask[i];
-					break;
-				}
-		} else
-			memcpy(data, &cursor.dest, size);
-
-		image.dx = cursor.pos.x;
-		image.dy = cursor.pos.y;
-		image.width = cursor.size.x;
-		image.height = cursor.size.y;
-		image.depth = cursor.depth;
-		image.data = data;
-
-		if (info->fbops->fb_imageblit)
-			info->fbops->fb_imageblit(info, &image);
-	}
 }
 
 	/*

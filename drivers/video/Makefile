@@ -5,7 +5,7 @@
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs    	:= fbmem.o fbcmap.o fbgen.o fbmon.o modedb.o cfbfillrect.o \
+export-objs    	:= fbmem.o fbcmap.o fbmon.o modedb.o cfbcursor.o cfbfillrect.o \
 		   cfbcopyarea.o cfbimgblt.o cyber2000fb.o 
 
 # Each configuration option enables a list of files.
@@ -13,7 +13,7 @@ export-objs    	:= fbmem.o fbcmap.o fbgen.o fbmon.o modedb.o cfbfillrect.o \
 obj-$(CONFIG_VT)		  += console/
 
 # Add fbmon.o back into obj-$(CONFIG_FB) in 2.5.x
-obj-$(CONFIG_FB)                  += fbmem.o fbcmap.o modedb.o fbgen.o
+obj-$(CONFIG_FB)                  += fbmem.o fbcmap.o modedb.o cfbcursor.o
 # Only include macmodes.o if we have FB support and are PPC
 ifeq ($(CONFIG_FB),y)
 obj-$(CONFIG_PPC)                 += macmodes.o
