@@ -1231,7 +1231,7 @@ out:
 	return err;
 }
 
-static inline int sctp_setsockopt_disable_fragments(struct sock *sk,
+static int sctp_setsockopt_disable_fragments(struct sock *sk,
 						    char *optval, int optlen)
 {
 	int val;
@@ -1247,7 +1247,7 @@ static inline int sctp_setsockopt_disable_fragments(struct sock *sk,
 	return 0;
 }
 
-static inline int sctp_setsockopt_events(struct sock *sk, char *optval,
+static int sctp_setsockopt_events(struct sock *sk, char *optval,
 					int optlen)
 {
 	if (optlen != sizeof(struct sctp_event_subscribe))
@@ -1257,7 +1257,7 @@ static inline int sctp_setsockopt_events(struct sock *sk, char *optval,
 	return 0;
 }
 
-static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
+static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 					    int optlen)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
@@ -1274,7 +1274,7 @@ static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 	return 0;
 }
 
-static inline int sctp_setsockopt_peer_addr_params(struct sock *sk,
+static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 						   char *optval, int optlen)
 {
 	struct sctp_paddrparams params;
@@ -1333,7 +1333,7 @@ static inline int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	return 0;
 }
 
-static inline int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
+static int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
 					  int optlen)
 {
 	if (optlen != sizeof(struct sctp_initmsg))
@@ -1358,7 +1358,7 @@ static inline int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
  *   sinfo_timetolive.  The user must provide the sinfo_assoc_id field in
  *   to this call if the caller is using the UDP model.
  */
-static inline int sctp_setsockopt_default_send_param(struct sock *sk,
+static int sctp_setsockopt_default_send_param(struct sock *sk,
 						char *optval, int optlen)
 {
 	struct sctp_sndrcvinfo info;
@@ -1412,6 +1412,31 @@ static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 		return -ENOENT;
 
 	sctp_assoc_set_primary(asoc, trans);
+
+	return 0;
+}
+
+/*
+ *
+ * 7.1.5 SCTP_NODELAY
+ *
+ * Turn on/off any Nagle-like algorithm.  This means that packets are
+ * generally sent as soon as possible and no unnecessary delays are
+ * introduced, at the cost of more packets in the network.  Expects an
+ *  integer boolean flag.
+ */
+static int sctp_setsockopt_nodelay(struct sock *sk, char *optval,
+					int optlen)
+{
+	__u8 val;
+
+	if (optlen < sizeof(__u8))
+		return -EINVAL;
+
+	if (get_user(val, (__u8 *)optval))
+		return -EFAULT;
+
+	sctp_sk(sk)->nodelay = (val == 0) ? 0 : 1;
 
 	return 0;
 }
@@ -1513,6 +1538,10 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 
 	case SCTP_SET_PEER_PRIMARY_ADDR:
 		retval = sctp_setsockopt_peer_prim(sk, optval, optlen);
+		break;
+
+	case SCTP_NODELAY:
+		retval = sctp_setsockopt_nodelay(sk, optval, optlen);
 		break;
 
 	default:
@@ -1786,7 +1815,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->disable_fragments = 0;
 
 	/* Turn on/off any Nagle-like algorithm.  */
-	sp->nodelay           = 0;
+	sp->nodelay           = 1;
 
 	/* Auto-close idle associations after the configured
 	 * number of seconds.  A value of 0 disables this
@@ -1905,7 +1934,7 @@ out:
 	return (retval);
 }
 
-static inline int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
+static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 						    char *optval, int *optlen)
 {
 	int val;
@@ -1922,7 +1951,7 @@ static inline int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 	return 0;
 }
 
-static inline int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, int *optlen)
+static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, int *optlen)
 {
 	if (len != sizeof(struct sctp_event_subscribe))
 		return -EINVAL;
@@ -1931,7 +1960,7 @@ static inline int sctp_getsockopt_set_events(struct sock *sk, int len, char *opt
 	return 0;
 }
 
-static inline int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
+static int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
 {
 	/* Applicable to UDP-style socket only */
 	if (SCTP_SOCKET_TCP == sctp_sk(sk)->type)
@@ -1975,7 +2004,7 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	return err;
 }
 
-static inline int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval, int *optlen)
+static int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval, int *optlen)
 {
 	sctp_peeloff_arg_t peeloff;
 	struct socket *newsock;
@@ -2018,7 +2047,7 @@ out:
 	return retval;
 }
 
-static inline int sctp_getsockopt_peer_addr_params(struct sock *sk, int len, 
+static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len, 
 						char *optval, int *optlen)
 {
 	struct sctp_paddrparams params;
@@ -2062,7 +2091,7 @@ static inline int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	return 0;
 }
 
-static inline int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval, int *optlen)
+static int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval, int *optlen)
 {
 	if (len != sizeof(struct sctp_initmsg))
 		return -EINVAL;
@@ -2141,7 +2170,7 @@ static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
 	return 0;
 }
 
-static inline int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
+static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 						char *optval, int *optlen)
 {
 	sctp_assoc_t id;
@@ -2180,7 +2209,7 @@ static inline int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 	return 0;
 }
 
-static inline int sctp_getsockopt_local_addrs(struct sock *sk, int len,
+static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 					char *optval, int *optlen)
 {
 	sctp_bind_addr_t *bp;
@@ -2282,7 +2311,7 @@ static int sctp_getsockopt_peer_prim(struct sock *sk, int len,
  *
  *   For getsockopt, it get the default sctp_sndrcvinfo structure.
  */
-static inline int sctp_getsockopt_default_send_param(struct sock *sk,
+static int sctp_getsockopt_default_send_param(struct sock *sk,
 					int len, char *optval, int *optlen)
 {
 	struct sctp_sndrcvinfo info;
@@ -2306,6 +2335,33 @@ static inline int sctp_getsockopt_default_send_param(struct sock *sk,
 	if (copy_to_user(optval, &info, sizeof(struct sctp_sndrcvinfo)))
 		return -EFAULT;
 
+	return 0;
+}
+
+/*
+ *
+ * 7.1.5 SCTP_NODELAY
+ *
+ * Turn on/off any Nagle-like algorithm.  This means that packets are
+ * generally sent as soon as possible and no unnecessary delays are
+ * introduced, at the cost of more packets in the network.  Expects an
+ * integer boolean flag.
+ */
+
+static int sctp_getsockopt_nodelay(struct sock *sk, int len, 
+					char *optval, int *optlen)
+{
+	__u8 val;
+
+	if (len < sizeof(__u8))
+		return -EINVAL;
+
+	len = sizeof(__u8);
+	val = (sctp_sk(sk)->nodelay == 1);
+	if (put_user(len, optlen))
+		return -EFAULT;
+	if (copy_to_user(optval, &val, len))
+		return -EFAULT;
 	return 0;
 }
 
@@ -2381,6 +2437,9 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_SET_PEER_PRIMARY_ADDR:
 		retval = sctp_getsockopt_peer_prim(sk, len, optval, optlen);
+		break;
+	case SCTP_NODELAY:
+		retval = sctp_getsockopt_nodelay(sk, len, optval, optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;
@@ -2689,7 +2748,6 @@ int sctp_inet_listen(struct socket *sock, int backlog)
 	case SOCK_SEQPACKET:
 		err = sctp_seqpacket_listen(sk, backlog);
 		break;
-
 	case SOCK_STREAM:
 		err = sctp_stream_listen(sk, backlog);
 		break;
@@ -3077,7 +3135,8 @@ no_packet:
 }
 
 /* Verify that this is a valid address. */
-static int sctp_verify_addr(struct sock *sk, union sctp_addr *addr, int len)
+static inline int sctp_verify_addr(struct sock *sk, union sctp_addr *addr, 
+				   int len)
 {
 	struct sctp_af *af;
 

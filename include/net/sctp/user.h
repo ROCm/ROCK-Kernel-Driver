@@ -108,6 +108,8 @@ enum sctp_optname {
 #define SCTP_GET_LOCAL_ADDRS_NUM	SCTP_GET_LOCAL_ADDRS_NUM
 	SCTP_GET_LOCAL_ADDRS, 	/* Get all local addresss. */
 #define SCTP_GET_LOCAL_ADDRS	SCTP_GET_LOCAL_ADDRS
+	SCTP_NODELAY, 	/* Get/set nodelay option. */
+#define SCTP_NODELAY	SCTP_NODELAY
 };
 
 

@@ -256,7 +256,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	sctp_cmd_t *cmd;
 	sctp_chunk_t *new_obj;
 	sctp_chunk_t *chunk = NULL;
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	struct list_head *pos;
 	struct timer_list *timer;
 	unsigned long timeout;
