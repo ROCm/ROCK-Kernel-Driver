@@ -90,6 +90,9 @@ typedef __s64	Elf64_Sxword;
  */
 #define EM_ALPHA	0x9026
 
+/* Bogus old v850 magic number, used by old tools.  */
+#define EM_CYGNUS_V850	0x9080
+
 /*
  * This is the old interim value for S/390 architecture
  */

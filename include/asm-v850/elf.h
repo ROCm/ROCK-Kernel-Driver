@@ -22,6 +22,31 @@ typedef struct user_fpu_struct elf_fpregset_t;
 #define elf_check_arch(x)  \
   ((x)->e_machine == EM_V850 || (x)->e_machine == EM_CYGNUS_V850)
 
+
+/* v850 relocation types.  */
+#define R_V850_NONE		0
+#define R_V850_9_PCREL		1
+#define R_V850_22_PCREL		2
+#define R_V850_HI16_S		3
+#define R_V850_HI16		4
+#define R_V850_LO16		5
+#define R_V850_32		6
+#define R_V850_16		7
+#define R_V850_8		8
+#define R_V850_SDA_16_16_OFFSET	9	/* For ld.b, st.b, set1, clr1,
+					   not1, tst1, movea, movhi */
+#define R_V850_SDA_15_16_OFFSET	10	/* For ld.w, ld.h, ld.hu, st.w, st.h */
+#define R_V850_ZDA_16_16_OFFSET	11	/* For ld.b, st.b, set1, clr1,
+					   not1, tst1, movea, movhi */
+#define R_V850_ZDA_15_16_OFFSET	12	/* For ld.w, ld.h, ld.hu, st.w, st.h */
+#define R_V850_TDA_6_8_OFFSET	13	/* For sst.w, sld.w */
+#define R_V850_TDA_7_8_OFFSET	14	/* For sst.h, sld.h */
+#define R_V850_TDA_7_7_OFFSET	15	/* For sst.b, sld.b */
+#define R_V850_TDA_16_16_OFFSET	16	/* For set1, clr1, not1, tst1,
+					   movea, movhi */
+#define R_V850_NUM		17
+
+
 /*
  * These are used to set parameters in the core dumps.
  */
