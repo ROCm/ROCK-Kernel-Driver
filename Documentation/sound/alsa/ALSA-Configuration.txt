@@ -449,7 +449,8 @@ Module parameters
     pcm_substreams_c	- capture channels (1-8, default=0)
     clock		- clock (0 = auto-detection)
     use_pm		- support the power-management (0 = off, 1 = on,
-			  2 = auto)
+			  2 = auto (default))
+    enable_mpu		- enable MPU401 (0 = off, 1 = on, 2 = auto (default))
 
     Module supports up to 8 cards and autoprobe.
 
