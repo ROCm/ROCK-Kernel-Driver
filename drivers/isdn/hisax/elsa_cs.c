@@ -170,14 +170,6 @@ typedef struct local_info_t {
     int                 busy;
 } local_info_t;
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret};
-    CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
 
     elsa_cs_attach() creates an "instance" of the driver, allocatingx

@@ -314,12 +314,6 @@ static char hop_pattern_length[] = { 1,
 
 static char rcsid[] = "Raylink/WebGear wireless LAN - Corey <Thomas corey@world.std.com>";
 
-/*===========================================================================*/
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    pcmcia_report_error(handle, &err);
-}
 /*======================================================================
 
     This bit of code is used to avoid unregistering network devices

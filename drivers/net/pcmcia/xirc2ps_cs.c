@@ -403,13 +403,6 @@ flush_stale_links(void)
     }
 }
 
-static void
-cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 static int
 get_tuple_data(int fn, client_handle_t handle, tuple_t *tuple)
 {

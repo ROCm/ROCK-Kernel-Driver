@@ -106,16 +106,7 @@ MODULE_PARM(mem_type, "i");
 MODULE_PARM_DESC(mem_type, "Set Memory type (0=Flash, 1=RAM, 2=ROM, default=0)");
 
 
-
-static inline void cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-	CardServices(ReportError, handle, &err);
-}
-
-
 /* read/write{8,16} copy_{from,to} routines with window remapping to access whole card */
-
 static caddr_t remap_window(struct map_info *map, unsigned long to)
 {
 	struct pcmciamtd_dev *dev = (struct pcmciamtd_dev *)map->map_priv_1;

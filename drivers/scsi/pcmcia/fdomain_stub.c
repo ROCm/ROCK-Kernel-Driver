@@ -103,16 +103,6 @@ static dev_link_t *dev_list = NULL;
 
 static dev_info_t dev_info = "fdomain_cs";
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
-/*====================================================================*/
-
 static dev_link_t *fdomain_attach(void)
 {
     scsi_info_t *info;

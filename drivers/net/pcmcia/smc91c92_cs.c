@@ -324,14 +324,6 @@ static void flush_stale_links(void)
     }
 }
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
 
   smc91c92_attach() creates an "instance" of the driver, allocating
