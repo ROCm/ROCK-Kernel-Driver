@@ -215,17 +215,19 @@ try_dma_modes:
 		} else {
 			goto fast_ata_pio;
 		}
+#ifndef CONFIG_HPT34X_AUTODMA
+		return hwif->ide_dma_off_quietly(drive);
+#else
+		return hwif->ide_dma_on(drive);
+#endif
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
 no_dma_set:
 		hpt34x_tune_drive(drive, 255);
 		return hwif->ide_dma_off_quietly(drive);
 	}
-
-#ifndef CONFIG_HPT34X_AUTODMA
-	return hwif->ide_dma_off_quietly(drive);
-#endif /* CONFIG_HPT34X_AUTODMA */
-	return hwif->ide_dma_on(drive);
+	/* IORDY not supported */
+	return 0;
 }
 
 /*

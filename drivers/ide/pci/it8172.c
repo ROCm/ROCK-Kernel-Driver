@@ -227,13 +227,15 @@ try_dma_modes:
 		} else {
 			goto fast_ata_pio;
 		}
+		return hwif->ide_dma_on(drive);
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
 no_dma_set:
 		it8172_tune_drive(drive, 5);
 		return hwif->ide_dma_off_quietly(drive);
 	}
-	return hwif->ide_dma_on(drive);
+	/* IORDY not supported */
+	return 0;
 }
 
 static unsigned int __init init_chipset_it8172 (struct pci_dev *dev, const char *name)
