@@ -74,12 +74,12 @@ static void syntax_error( const char * msg )
 
 
 /*
- * Find index of a specyfic variable in the symbol table.
+ * Find index of a specific variable in the symbol table.
  * Create a new entry if it does not exist yet.
  */
-#define VARTABLE_SIZE 4096
-struct variable vartable[VARTABLE_SIZE];
+struct variable *vartable;
 int max_varnum = 0;
+static int vartable_size = 0;
 
 int get_varnum( char * name )
 {
@@ -88,8 +88,13 @@ int get_varnum( char * name )
     for ( i = 1; i <= max_varnum; i++ )
 	if ( strcmp( vartable[i].name, name ) == 0 )
 	    return i;
-    if (max_varnum > VARTABLE_SIZE-1)
-	syntax_error( "Too many variables defined." );
+    while (max_varnum+1 >= vartable_size) {
+	vartable = realloc(vartable, (vartable_size += 1000)*sizeof(*vartable));
+	if (!vartable) {
+	    fprintf(stderr, "tkparse realloc vartable failed\n");
+	    exit(1);
+	}
+    }
     vartable[++max_varnum].name = malloc( strlen( name )+1 );
     strcpy( vartable[max_varnum].name, name );
     return max_varnum;
@@ -818,5 +823,6 @@ int main( int argc, const char * argv [] )
     do_source        ( "-"         );
     fix_conditionals ( config_list );
     dump_tk_script   ( config_list );
+    free(vartable);
     return 0;
 }

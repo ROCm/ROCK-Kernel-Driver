@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 20
+SUBLEVEL = 21
 EXTRAVERSION =
 
 # We are using a recursive build, so we need to do a little thinking
@@ -106,21 +106,23 @@ DEPMOD		= /sbin/depmod
 PERL		= perl
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
-AFLAGS_MODULE   =
+AFLAGS_MODULE   = $(MODFLAGS)
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 EXPORT_FLAGS    =
+NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
 
-export CPPFLAGS EXPORT_FLAGS
+export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
-noconfig_targets := oldconfig xconfig menuconfig config clean mrproper \
-		    distclean
+noconfig_targets := xconfig menuconfig config oldconfig randconfig \
+		    defconfig allyesconfig allnoconfig allmodconfig \
+		    clean mrproper distclean
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -175,18 +177,14 @@ ifdef CONFIG_MODULES
 EXPORT_FLAGS := -DEXPORT_SYMTAB
 endif
 
-INIT		=init/init.o
-CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
-NETWORKS	=net/network.o
-
-LIBS		=$(TOPDIR)/lib/lib.a
-SUBDIRS		=init kernel lib drivers mm fs net ipc sound
-
-DRIVERS-y 	= drivers/built-in.o
-DRIVERS-$(CONFIG_SOUND) += sound/sound.o
-
-DRIVERS := $(DRIVERS-y)
-
+# Link components for vmlinux
+# ---------------------------------------------------------------------------
+SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+INIT		:= init/init.o
+CORE_FILES	:= kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
+LIBS		:= lib/lib.a
+DRIVERS		:= drivers/built-in.o sound/sound.o
+NETWORKS	:= net/network.o
 
 include arch/$(ARCH)/Makefile
 
@@ -281,8 +279,9 @@ include/asm:
 # 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
-	scripts/split-include include/linux/autoconf.h include/config
-	@ touch include/config/MARKER
+	@echo 'Splitting include/linux/autoconf.h -> include/config'
+	@scripts/split-include include/linux/autoconf.h include/config
+	@touch $@
 
 # 	if .config is newer than include/linux/autoconf.h, someone tinkered
 # 	with it and forgot to run make oldconfig
@@ -300,8 +299,19 @@ include/linux/autoconf.h: .config
 #	version.h changes when $(KERNELRELEASE) etc change, as defined in
 #	this Makefile
 
+uts_len := 64
+
 include/linux/version.h: Makefile
-	@scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
+	@if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
+	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
+	  exit 1; \
+	fi;
+	@echo -n 'Generating $@'
+	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
+	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
+	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
+	) > $@.tmp
+	@$(update-if-changed)
 
 # Helpers built in scripts/
 # ---------------------------------------------------------------------------
@@ -339,6 +349,7 @@ ifdef CONFIG_MODVERSIONS
 include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@rm -rf .tmp_export-objs
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+	@echo -n 'Generating $@'
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \
@@ -346,15 +357,8 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	     echo "#include <linux/$${f}>"; \
 	   done; \
 	   echo "#endif"; \
-	) > $@.tmp
-	@rm -rf .tmp_export-objs
-	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-		echo $@ was not updated; \
-		rm -f $@.tmp; \
-	else \
-		echo $@ was updated; \
-		mv -f $@.tmp $@; \
-	fi
+	) > $@.tmp; \
+	$(update-if-changed)
 
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
 	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
@@ -519,19 +523,34 @@ else # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 .PHONY: oldconfig xconfig menuconfig config \
 	make_with_config
 
-oldconfig:
-	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
-
 xconfig:
 	@$(MAKE) -C scripts kconfig.tk
 	wish -f scripts/kconfig.tk
 
 menuconfig:
-	@$(MAKE) -C scripts/lxdialog all
+	@$(MAKE) -C scripts lxdialog
 	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
 
 config:
 	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
+
+oldconfig:
+	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
+
+randconfig:
+	$(CONFIG_SHELL) scripts/Configure -r arch/$(ARCH)/config.in
+
+allyesconfig:
+	$(CONFIG_SHELL) scripts/Configure -y arch/$(ARCH)/config.in
+
+allnoconfig:
+	$(CONFIG_SHELL) scripts/Configure -n arch/$(ARCH)/config.in
+
+allmodconfig:
+	$(CONFIG_SHELL) scripts/Configure -m arch/$(ARCH)/config.in
+
+defconfig:
+	yes '' | $(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
 
 #	How we generate .config depends on which *config the
 #	user chose when calling make
@@ -576,10 +595,6 @@ CLEAN_FILES += \
 	net/khttpd/times.h \
 	submenu*
 
-# 	directories removed with 'make clean'
-CLEAN_DIRS += \
-	modules
-
 # 	files removed with 'make mrproper'
 MRPROPER_FILES += \
 	include/linux/autoconf.h include/linux/version.h \
@@ -616,8 +631,7 @@ clean:	archclean
 	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
 		   -name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
-	@rm -f $(CLEAN_FILES)
-	@rm -rf $(CLEAN_DIRS)
+	@rm -rf $(CLEAN_FILES)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
@@ -659,6 +673,16 @@ if_changed_rule = $(if $(strip $? \
 # If quiet is set, only print short version of rule
 
 cmd = @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1))
+
+define update-if-changed
+	if [ -r $@ ] && cmp -s $@ $@.tmp; then \
+		echo ' (unchanged)'; \
+		rm -f $@.tmp; \
+	else \
+		echo ' (updated)'; \
+		mv -f $@.tmp $@; \
+	fi
+endef
 
 
 FORCE:

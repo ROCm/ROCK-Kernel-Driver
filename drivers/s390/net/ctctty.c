@@ -114,7 +114,7 @@ static char *ctc_ttyname = "ctc/" CTC_TTY_NAME "%d";
 static char *ctc_ttyname = CTC_TTY_NAME;
 #endif
 
-char *ctc_tty_revision = "$Revision: 1.8 $";
+static char *ctc_tty_revision = "$Revision: 1.8 $";
 
 static __u32 ctc_tty_magic = CTC_ASYNC_MAGIC;
 static int ctc_tty_shuttingdown = 0;
@@ -358,12 +358,12 @@ ctc_tty_paranoia_check(ctc_tty_info * info, kdev_t device, const char *routine)
 #ifdef MODEM_PARANOIA_CHECK
 	if (!info) {
 		printk(KERN_WARNING "ctc_tty: null info_struct for (%d, %d) in %s\n",
-		       MAJOR(device), MINOR(device), routine);
+		       major(device), minor(device), routine);
 		return 1;
 	}
 	if (info->magic != CTC_ASYNC_MAGIC) {
 		printk(KERN_WARNING "ctc_tty: bad magic for info struct (%d, %d) in %s\n",
-		       MAJOR(device), MINOR(device), routine);
+		       major(device), minor(device), routine);
 		return 1;
 	}
 #endif
@@ -596,6 +596,7 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 	ctc_tty_info *info;
 	unsigned long flags;
 
+#warning FIXME [kj] Consider using spinlocks.
 	save_flags(flags);
 	cli();
 	if (!tty) {
@@ -906,6 +907,7 @@ ctc_tty_block_til_ready(struct tty_struct *tty, struct file *filp, ctc_tty_info 
 	if (tty_hung_up_p(filp) ||
 	    (info->flags & CTC_ASYNC_CLOSING)) {
 		if (info->flags & CTC_ASYNC_CLOSING)
+#warning: FIXME [kj] Using sleep_on derivative, is racy. consider using wait_event instead
 			interruptible_sleep_on(&info->close_wait);
 #ifdef MODEM_DO_RESTART
 		if (info->flags & CTC_ASYNC_HUP_NOTIFY)
@@ -1003,7 +1005,7 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 	int retval,
 	 line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if (line < 0 || line > CTC_TTY_MAX_DEVICES)
 		return -ENODEV;
 	info = &driver->info[line];

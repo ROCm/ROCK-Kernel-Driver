@@ -10,24 +10,32 @@ else
   echo 0 > ../.version
 fi
 
+
+UTS_VERSION="#$VERSION"
+if [ -n "$SMP" ] ; then UTS_VERSION="$UTS_VERSION SMP"; fi
+UTS_VERSION="$UTS_VERSION `LANG=C date`"
+
+# Truncate to maximum length
+
+UTS_LEN=64
+UTS_TRUNCATE="sed -e s/\(.\{1,$UTS_LEN\}\).*/\1/"
+
 # Generate a temporary compile.h
 
 ( echo /\* This file is auto generated, version $VERSION \*/
 
   echo \#define UTS_MACHINE \"$ARCH\"
 
-  echo -n \#define UTS_VERSION \"\#$VERSION
-  if [ -n "$SMP" ] ; then echo -n " SMP"; fi
-  echo ' '`date`'"'
+  echo \#define UTS_VERSION \"`echo $UTS_VERSION | $UTS_TRUNCATE`\"
 
-  echo \#define LINUX_COMPILE_TIME \"`date +%T`\"
+  echo \#define LINUX_COMPILE_TIME \"`LANG=C date +%T`\"
   echo \#define LINUX_COMPILE_BY \"`whoami`\"
-  echo \#define LINUX_COMPILE_HOST \"`hostname`\"
+  echo \#define LINUX_COMPILE_HOST \"`hostname | $UTS_TRUNCATE`\"
 
   if [ -x /bin/dnsdomainname ]; then
-    echo \#define LINUX_COMPILE_DOMAIN \"`dnsdomainname`\"
+    echo \#define LINUX_COMPILE_DOMAIN \"`dnsdomainname | $UTS_TRUNCATE`\"
   elif [ -x /bin/domainname ]; then
-    echo \#define LINUX_COMPILE_DOMAIN \"`domainname`\"
+    echo \#define LINUX_COMPILE_DOMAIN \"`domainname | $UTS_TRUNCATE`\"
   else
     echo \#define LINUX_COMPILE_DOMAIN
   fi
@@ -48,10 +56,10 @@ if [ -r $TARGET ] && \
       grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' $TARGET > .tmpver.1 && \
       grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' .tmpcompile > .tmpver.2 && \
       cmp -s .tmpver.1 .tmpver.2; then
-   echo $TARGET was not updated;
+   echo ' (unchanged)'
    rm -f .tmpcompile
 else
-   echo $TARGET was updated
+   echo ' (updated)'
    mv -f .tmpcompile $TARGET
 fi
 rm -f .tmpver.1 .tmpver.2

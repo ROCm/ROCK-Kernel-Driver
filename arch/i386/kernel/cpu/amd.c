@@ -1,5 +1,6 @@
 #include <linux/init.h>
 #include <linux/bitops.h>
+#include <linux/mm.h>
 #include <asm/io.h>
 #include <asm/processor.h>
 

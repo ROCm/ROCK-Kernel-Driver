@@ -51,270 +51,220 @@
 extern const char _oi_bitmap[];
 extern const char _ni_bitmap[];
 extern const char _zb_findmap[];
+extern const char _sb_findmap[];
 
 #ifdef CONFIG_SMP
 /*
  * SMP save set_bit routine based on compare and swap (CS)
  */
-static __inline__ void set_bit_cs(unsigned long nr, volatile void * addr)
+static inline void set_bit_cs(unsigned long nr, volatile void *ptr)
 {
-        unsigned long bits, mask;
-        __asm__ __volatile__(
+        unsigned long addr, old, new, mask;
+
+	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
-             "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
-             "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
-             "   sllg  %2,%2,3\n"
-             "   agr   %0,%2\n"        /* add alignement to bitnr */
+	addr ^= addr & 7;		/* align address to 8 */
+	nr += (addr & 7) << 3;		/* add alignment to bit number */
 #endif
-             "   lghi  %2,63\n"
-             "   nr    %2,%0\n"        /* make shift value */
-             "   xr    %0,%2\n"
-             "   srlg  %0,%0,3\n"
-             "   lghi  %3,1\n"
-             "   la    %1,0(%0,%1)\n"  /* calc. address for CS */
-             "   sllg  %3,%3,0(%2)\n"  /* make OR mask */
-             "   lg    %0,0(%1)\n"
-             "0: lgr   %2,%0\n"        /* CS loop starts here */
-             "   ogr   %2,%3\n"        /* set bit */
-             "   csg   %0,%2,0(%1)\n"
-             "   jl    0b"
-             : "+a" (nr), "+a" (addr), "=a" (bits), "=d" (mask) :
-             : "cc", "memory" );
+	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
+	mask = 1UL << (nr & 63);	/* make OR mask */
+	asm volatile(
+		"   lg   %0,0(%4)\n"
+		"0: lgr  %1,%0\n"
+		"   ogr  %1,%3\n"
+		"   csg  %0,%1,0(%4)\n"
+		"   jl   0b"
+		: "=&d" (old), "=&d" (new), "+m" (*(unsigned long *) addr)
+		: "d" (mask), "a" (addr) 
+		: "cc" );
 }
 
 /*
  * SMP save clear_bit routine based on compare and swap (CS)
  */
-static __inline__ void clear_bit_cs(unsigned long nr, volatile void * addr)
+static inline void clear_bit_cs(unsigned long nr, volatile void *ptr)
 {
-        unsigned long bits, mask;
-        __asm__ __volatile__(
+        unsigned long addr, old, new, mask;
+
+	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
-             "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
-             "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
-             "   sllg  %2,%2,3\n"
-             "   agr   %0,%2\n"        /* add alignement to bitnr */
+	addr ^= addr & 7;		/* align address to 8 */
+	nr += (addr & 7) << 3;		/* add alignment to bit number */
 #endif
-             "   lghi  %2,63\n"
-             "   nr    %2,%0\n"        /* make shift value */
-             "   xr    %0,%2\n"
-             "   srlg  %0,%0,3\n"
-             "   lghi  %3,-2\n"
-             "   la    %1,0(%0,%1)\n"  /* calc. address for CS */
-             "   lghi  %3,-2\n"
-             "   rllg  %3,%3,0(%2)\n"  /* make AND mask */
-             "   lg    %0,0(%1)\n"
-             "0: lgr   %2,%0\n"        /* CS loop starts here */
-             "   ngr   %2,%3\n"        /* clear bit */
-             "   csg   %0,%2,0(%1)\n"
-             "   jl    0b"
-             : "+a" (nr), "+a" (addr), "=a" (bits), "=d" (mask) :
-             : "cc", "memory" );
+	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
+	mask = ~(1UL << (nr & 63));	/* make AND mask */
+	asm volatile(
+		"   lg   %0,0(%4)\n"
+		"0: lgr  %1,%0\n"
+		"   ngr  %1,%3\n"
+		"   csg  %0,%1,0(%4)\n"
+		"   jl   0b"
+		: "=&d" (old), "=&d" (new), "+m" (*(unsigned long *) addr)
+		: "d" (mask), "a" (addr) 
+		: "cc" );
 }
 
 /*
  * SMP save change_bit routine based on compare and swap (CS)
  */
-static __inline__ void change_bit_cs(unsigned long nr, volatile void * addr)
+static inline void change_bit_cs(unsigned long nr, volatile void *ptr)
 {
-        unsigned long bits, mask;
-        __asm__ __volatile__(
+        unsigned long addr, old, new, mask;
+
+	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
-             "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
-             "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
-             "   sllg  %2,%2,3\n"
-             "   agr   %0,%2\n"        /* add alignement to bitnr */
+	addr ^= addr & 7;		/* align address to 8 */
+	nr += (addr & 7) << 3;		/* add alignment to bit number */
 #endif
-             "   lghi  %2,63\n"
-             "   nr    %2,%0\n"        /* make shift value */
-             "   xr    %0,%2\n"
-             "   srlg  %0,%0,3\n"
-             "   lghi  %3,1\n"
-             "   la    %1,0(%0,%1)\n"  /* calc. address for CS */
-             "   sllg  %3,%3,0(%2)\n"  /* make XR mask */
-             "   lg    %0,0(%1)\n"
-             "0: lgr   %2,%0\n"        /* CS loop starts here */
-             "   xgr   %2,%3\n"        /* change bit */
-             "   csg   %0,%2,0(%1)\n"
-             "   jl    0b"
-             : "+a" (nr), "+a" (addr), "=a" (bits), "=d" (mask) : 
-             : "cc", "memory" );
+	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
+	mask = 1UL << (nr & 63);	/* make XOR mask */
+	asm volatile(
+		"   lg   %0,0(%4)\n"
+		"0: lgr  %1,%0\n"
+		"   xgr  %1,%3\n"
+		"   csg  %0,%1,0(%4)\n"
+		"   jl   0b"
+		: "=&d" (old), "=&d" (new), "+m" (*(unsigned long *) addr)
+		: "d" (mask), "a" (addr) 
+		: "cc" );
 }
 
 /*
  * SMP save test_and_set_bit routine based on compare and swap (CS)
  */
-static __inline__ int 
-test_and_set_bit_cs(unsigned long nr, volatile void * addr)
+static inline int 
+test_and_set_bit_cs(unsigned long nr, volatile void *ptr)
 {
-        unsigned long bits, mask;
-        __asm__ __volatile__(
+        unsigned long addr, old, new, mask;
+
+	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
-             "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
-             "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
-             "   sllg  %2,%2,3\n"
-             "   agr   %0,%2\n"        /* add alignement to bitnr */
+	addr ^= addr & 7;		/* align address to 8 */
+	nr += (addr & 7) << 3;		/* add alignment to bit number */
 #endif
-             "   lghi  %2,63\n"
-             "   nr    %2,%0\n"        /* make shift value */
-             "   xr    %0,%2\n"
-             "   srlg  %0,%0,3\n"
-             "   lghi  %3,1\n"
-             "   la    %1,0(%0,%1)\n"  /* calc. address for CS */
-             "   sllg  %3,%3,0(%2)\n"  /* make OR mask */
-             "   lg    %0,0(%1)\n"
-             "0: lgr   %2,%0\n"        /* CS loop starts here */
-             "   ogr   %2,%3\n"        /* set bit */
-             "   csg   %0,%2,0(%1)\n"
-             "   jl    0b\n"
-             "   ngr   %0,%3\n"        /* isolate old bit */
-             : "+a" (nr), "+a" (addr), "=a" (bits), "=d" (mask) :
-             : "cc", "memory" );
-        return nr != 0;
+	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
+	mask = 1UL << (nr & 63);	/* make OR/test mask */
+	asm volatile(
+		"   lg   %0,0(%4)\n"
+		"0: lgr  %1,%0\n"
+		"   ogr  %1,%3\n"
+		"   csg  %0,%1,0(%4)\n"
+		"   jl   0b"
+		: "=&d" (old), "=&d" (new), "+m" (*(unsigned long *) addr)
+		: "d" (mask), "a" (addr) 
+		: "cc" );
+	return (old & mask) != 0;
 }
 
 /*
  * SMP save test_and_clear_bit routine based on compare and swap (CS)
  */
-static __inline__ int
-test_and_clear_bit_cs(unsigned long nr, volatile void * addr)
+static inline int
+test_and_clear_bit_cs(unsigned long nr, volatile void *ptr)
 {
-        unsigned long bits, mask;
-        __asm__ __volatile__(
+        unsigned long addr, old, new, mask;
+
+	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
-             "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
-             "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
-             "   sllg  %2,%2,3\n"
-             "   agr   %0,%2\n"        /* add alignement to bitnr */
+	addr ^= addr & 7;		/* align address to 8 */
+	nr += (addr & 7) << 3;		/* add alignment to bit number */
 #endif
-             "   lghi  %2,63\n"
-             "   nr    %2,%0\n"        /* make shift value */
-             "   xr    %0,%2\n"
-             "   srlg  %0,%0,3\n"
-             "   lghi  %3,-2\n"
-             "   la    %1,0(%0,%1)\n"  /* calc. address for CS */
-             "   rllg  %3,%3,0(%2)\n"  /* make AND mask */
-             "   lg    %0,0(%1)\n"
-             "0: lgr   %2,%0\n"        /* CS loop starts here */
-             "   ngr   %2,%3\n"        /* clear bit */
-             "   csg   %0,%2,0(%1)\n"
-             "   jl    0b\n"
-             "   xgr   %0,%2\n"        /* isolate old bit */
-             : "+a" (nr), "+a" (addr), "=a" (bits), "=d" (mask) :
-             : "cc", "memory" );
-        return nr != 0;
+	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
+	mask = ~(1UL << (nr & 63));	/* make AND mask */
+	asm volatile(
+		"   lg   %0,0(%4)\n"
+		"0: lgr  %1,%0\n"
+		"   ngr  %1,%3\n"
+		"   csg  %0,%1,0(%4)\n"
+		"   jl   0b"
+		: "=&d" (old), "=&d" (new), "+m" (*(unsigned long *) addr)
+		: "d" (mask), "a" (addr) 
+		: "cc" );
+	return (old ^ new) != 0;
 }
 
 /*
  * SMP save test_and_change_bit routine based on compare and swap (CS) 
  */
-static __inline__ int
-test_and_change_bit_cs(unsigned long nr, volatile void * addr)
+static inline int
+test_and_change_bit_cs(unsigned long nr, volatile void *ptr)
 {
-        unsigned long bits, mask;
-        __asm__ __volatile__(
+        unsigned long addr, old, new, mask;
+
+	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-             "   lghi  %2,7\n"         /* CS must be aligned on 4 byte b. */
-             "   ngr   %2,%1\n"        /* isolate last 2 bits of address */
-             "   xgr   %1,%2\n"        /* make addr % 4 == 0 */
-             "   sllg  %2,%2,3\n"
-             "   agr   %0,%2\n"        /* add alignement to bitnr */
+	addr ^= addr & 7;		/* align address to 8 */
+	nr += (addr & 7) << 3;		/* add alignment to bit number */
 #endif
-             "   lghi  %2,63\n"
-             "   nr    %2,%0\n"        /* make shift value */
-             "   xr    %0,%2\n"
-             "   srlg  %0,%0,3\n"
-             "   lghi  %3,1\n"
-             "   la    %1,0(%0,%1)\n"  /* calc. address for CS */
-             "   sllg  %3,%3,0(%2)\n"  /* make OR mask */
-             "   lg    %0,0(%1)\n"
-             "0: lgr   %2,%0\n"        /* CS loop starts here */
-             "   xgr   %2,%3\n"        /* change bit */
-             "   csg   %0,%2,0(%1)\n"
-             "   jl    0b\n"
-             "   ngr   %0,%3\n"        /* isolate old bit */
-             : "+a" (nr), "+a" (addr), "=a" (bits), "=d" (mask) :
-             : "cc", "memory" );
-        return nr != 0;
+	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
+	mask = 1UL << (nr & 63);	/* make XOR mask */
+	asm volatile(
+		"   lg   %0,0(%4)\n"
+		"0: lgr  %1,%0\n"
+		"   xgr  %1,%3\n"
+		"   csg  %0,%1,0(%4)\n"
+		"   jl   0b"
+		: "=&d" (old), "=&d" (new), "+m" (*(unsigned long *) addr)
+		: "d" (mask), "a" (addr) 
+		: "cc" );
+	return (old & mask) != 0;
 }
 #endif /* CONFIG_SMP */
 
 /*
  * fast, non-SMP set_bit routine
  */
-static __inline__ void __set_bit(unsigned long nr, volatile void * addr)
+static inline void __set_bit(unsigned long nr, volatile void *ptr)
 {
-        __asm__ __volatile__(
-             "   lghi  2,56\n"
-             "   lghi  1,7\n"
-             "   xgr   2,%0\n"
-             "   nr    1,%0\n"
-             "   srlg  2,2,3\n"
-             "   la    2,0(2,%1)\n"
-             "   la    1,0(1,%2)\n"
-             "   oc    0(1,2),0(1)"
-             :  : "a" (nr), "a" (addr), "a" (&_oi_bitmap)
-             : "cc", "memory", "1", "2" );
+	unsigned long addr;
+
+	addr = (unsigned long) ptr + ((nr ^ 56) >> 3);
+        asm volatile("oc 0(1,%1),0(%2)"
+		     : "+m" (*(char *) addr)
+		     : "a" (addr), "a" (_oi_bitmap + (nr & 7))
+		     : "cc" );
 }
 
-static __inline__ void 
-__constant_set_bit(const unsigned long nr, volatile void * addr)
+static inline void 
+__constant_set_bit(const unsigned long nr, volatile void *ptr)
 {
-  switch (nr&7) {
-  case 0:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x01"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7))) 
-                          : : "1", "cc", "memory");
-    break;
-  case 1:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x02"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 2:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x04"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 3:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x08"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 4:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x10"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 5:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x20"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 6:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x40"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 7:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "oi 0(1),0x80"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  }
+	unsigned long addr;
+
+	addr = ((unsigned long) ptr) + ((nr >> 3) ^ 7);
+	switch (nr&7) {
+	case 0:
+		asm volatile ("oi 0(%1),0x01"
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 1:
+		asm volatile ("oi 0(%1),0x02"
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 2:
+		asm volatile ("oi 0(%1),0x04" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 3:
+		asm volatile ("oi 0(%1),0x08" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 4:
+		asm volatile ("oi 0(%1),0x10" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 5:
+		asm volatile ("oi 0(%1),0x20" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 6:
+		asm volatile ("oi 0(%1),0x40" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 7:
+		asm volatile ("oi 0(%1),0x80" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	}
 }
 
 #define set_bit_simple(nr,addr) \
@@ -325,75 +275,58 @@ __constant_set_bit(const unsigned long nr, volatile void * addr)
 /*
  * fast, non-SMP clear_bit routine
  */
-static __inline__ void 
-__clear_bit(unsigned long nr, volatile void * addr)
+static inline void 
+__clear_bit(unsigned long nr, volatile void *ptr)
 {
-        __asm__ __volatile__(
-             "   lghi  2,56\n"
-             "   lghi  1,7\n"
-             "   xgr   2,%0\n"
-             "   nr    1,%0\n"
-             "   srlg  2,2,3\n"
-             "   la    2,0(2,%1)\n"
-             "   la    1,0(1,%2)\n"
-             "   nc    0(1,2),0(1)"
-             :  : "d" (nr), "a" (addr), "a" (&_ni_bitmap)
-             : "cc", "memory", "1", "2" );
+	unsigned long addr;
+
+	addr = (unsigned long) ptr + ((nr ^ 56) >> 3);
+        asm volatile("nc 0(1,%1),0(%2)"
+		     : "+m" (*(char *) addr)
+		     : "a" (addr), "a" (_ni_bitmap + (nr & 7))
+		     : "cc" );
 }
 
-static __inline__ void 
-__constant_clear_bit(const unsigned long nr, volatile void * addr)
+static inline void 
+__constant_clear_bit(const unsigned long nr, volatile void *ptr)
 {
-  switch (nr&7) {
-  case 0:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0xFE"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 1:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0xFD"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 2:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0xFB"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 3:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0xF7"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 4:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0xEF"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "cc", "memory" );
-    break;
-  case 5:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0xDF"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 6:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0xBF"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 7:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "ni 0(1),0x7F"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  }
+	unsigned long addr;
+
+	addr = ((unsigned long) ptr) + ((nr >> 3) ^ 7);
+	switch (nr&7) {
+	case 0:
+		asm volatile ("ni 0(%1),0xFE" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 1:
+		asm volatile ("ni 0(%1),0xFD"
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 2:
+		asm volatile ("ni 0(%1),0xFB" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 3:
+		asm volatile ("ni 0(%1),0xF7" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 4:
+		asm volatile ("ni 0(%1),0xEF" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 5:
+		asm volatile ("ni 0(%1),0xDF" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 6:
+		asm volatile ("ni 0(%1),0xBF" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 7:
+		asm volatile ("ni 0(%1),0x7F" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	}
 }
 
 #define clear_bit_simple(nr,addr) \
@@ -404,74 +337,57 @@ __constant_clear_bit(const unsigned long nr, volatile void * addr)
 /* 
  * fast, non-SMP change_bit routine 
  */
-static __inline__ void __change_bit(unsigned long nr, volatile void * addr)
+static inline void __change_bit(unsigned long nr, volatile void *ptr)
 {
-        __asm__ __volatile__(
-             "   lghi  2,56\n"
-             "   lghi  1,7\n"
-             "   xgr   2,%0\n"
-             "   nr    1,%0\n"
-             "   srlg  2,2,3\n"
-             "   la    2,0(2,%1)\n"
-             "   la    1,0(1,%2)\n"
-             "   xc    0(1,2),0(1)"
-             :  : "d" (nr), "a" (addr), "a" (&_oi_bitmap)
-             : "cc", "memory", "1", "2" );
+	unsigned long addr;
+
+	addr = (unsigned long) ptr + ((nr ^ 56) >> 3);
+        asm volatile("xc 0(1,%1),0(%2)"
+		     :  "+m" (*(char *) addr)
+		     : "a" (addr), "a" (_oi_bitmap + (nr & 7))
+		     : "cc" );
 }
 
-static __inline__ void 
-__constant_change_bit(const unsigned long nr, volatile void * addr) 
+static inline void 
+__constant_change_bit(const unsigned long nr, volatile void *ptr) 
 {
-  switch (nr&7) {
-  case 0:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x01"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "cc", "memory" );
-    break;
-  case 1:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x02"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "cc", "memory" );
-    break;
-  case 2:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x04"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "cc", "memory" );
-    break;
-  case 3:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x08"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "cc", "memory" );
-    break;
-  case 4:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x10"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "cc", "memory" );
-    break;
-  case 5:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x20"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 6:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x40"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  case 7:
-    __asm__ __volatile__ ("la 1,%0\n\t"
-                          "xi 0(1),0x80"
-                          : "=m" (*((volatile char *) addr + ((nr>>3)^7)))
-                          : : "1", "cc", "memory" );
-    break;
-  }
+	unsigned long addr;
+
+	addr = ((unsigned long) ptr) + ((nr >> 3) ^ 7);
+	switch (nr&7) {
+	case 0:
+		asm volatile ("xi 0(%1),0x01" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 1:
+		asm volatile ("xi 0(%1),0x02" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 2:
+		asm volatile ("xi 0(%1),0x04" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 3:
+		asm volatile ("xi 0(%1),0x08" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 4:
+		asm volatile ("xi 0(%1),0x10" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 5:
+		asm volatile ("xi 0(%1),0x20" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 6:
+		asm volatile ("xi 0(%1),0x40" 
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	case 7:
+		asm volatile ("xi 0(%1),0x80"
+			      : "+m" (*(char *) addr) : "a" (addr) : "cc" );
+		break;
+	}
 }
 
 #define change_bit_simple(nr,addr) \
@@ -482,74 +398,57 @@ __constant_change_bit(const unsigned long nr, volatile void * addr)
 /*
  * fast, non-SMP test_and_set_bit routine
  */
-static __inline__ int
-test_and_set_bit_simple(unsigned long nr, volatile void * addr)
+static inline int
+test_and_set_bit_simple(unsigned long nr, volatile void *ptr)
 {
-        int oldbit;
-        __asm__ __volatile__(
-             "   lghi  1,56\n"
-             "   lghi  2,7\n"
-             "   xgr   1,%1\n"
-             "   nr    2,%1\n"
-             "   srlg  1,1,3\n"
-             "   la    1,0(1,%2)\n"
-             "   ic    %0,0(1)\n"
-             "   srl   %0,0(2)\n"
-             "   la    2,0(2,%3)\n"
-             "   oc    0(1,1),0(2)"
-             : "=&d" (oldbit) : "d" (nr), "a" (addr), "a" (&_oi_bitmap)
-             : "cc", "memory", "1", "2" );
-        return oldbit & 1;
+	unsigned long addr;
+	unsigned char ch;
+
+	addr = (unsigned long) ptr + ((nr ^ 56) >> 3);
+	ch = *(unsigned char *) addr;
+        asm volatile("oc 0(1,%1),0(%2)"
+		     : "+m" (*(char *) addr)
+		     : "a" (addr), "a" (_oi_bitmap + (nr & 7))
+		     : "cc" );
+	return (ch >> (nr & 7)) & 1;
 }
 #define __test_and_set_bit(X,Y)		test_and_set_bit_simple(X,Y)
 
 /*
  * fast, non-SMP test_and_clear_bit routine
  */
-static __inline__ int
-test_and_clear_bit_simple(unsigned long nr, volatile void * addr)
+static inline int
+test_and_clear_bit_simple(unsigned long nr, volatile void *ptr)
 {
-        int oldbit;
+	unsigned long addr;
+	unsigned char ch;
 
-        __asm__ __volatile__(
-             "   lghi  1,56\n"
-             "   lghi  2,7\n"
-             "   xgr   1,%1\n"
-             "   nr    2,%1\n"
-             "   srlg  1,1,3\n"
-             "   la    1,0(1,%2)\n"
-             "   ic    %0,0(1)\n"
-             "   srl   %0,0(2)\n"
-             "   la    2,0(2,%3)\n"
-             "   nc    0(1,1),0(2)"
-             : "=&d" (oldbit) : "d" (nr), "a" (addr), "a" (&_ni_bitmap)
-             : "cc", "memory", "1", "2" );
-        return oldbit & 1;
+	addr = (unsigned long) ptr + ((nr ^ 56) >> 3);
+	ch = *(unsigned char *) addr;
+        asm volatile("nc 0(1,%1),0(%2)"
+		     : "+m" (*(char *) addr)
+		     : "a" (addr), "a" (_ni_bitmap + (nr & 7))
+		     : "cc" );
+	return (ch >> (nr & 7)) & 1;
 }
 #define __test_and_clear_bit(X,Y)	test_and_clear_bit_simple(X,Y)
 
 /*
  * fast, non-SMP test_and_change_bit routine
  */
-static __inline__ int
-test_and_change_bit_simple(unsigned long nr, volatile void * addr)
+static inline int
+test_and_change_bit_simple(unsigned long nr, volatile void *ptr)
 {
-        int oldbit;
+	unsigned long addr;
+	unsigned char ch;
 
-        __asm__ __volatile__(
-             "   lghi  1,56\n"
-             "   lghi  2,7\n"
-             "   xgr   1,%1\n"
-             "   nr    2,%1\n"
-             "   srlg  1,1,3\n"
-             "   la    1,0(1,%2)\n"
-             "   ic    %0,0(1)\n"
-             "   srl   %0,0(2)\n"
-             "   la    2,0(2,%3)\n"
-             "   xc    0(1,1),0(2)"
-             : "=&d" (oldbit) : "d" (nr), "a" (addr), "a" (&_oi_bitmap)
-             : "cc", "memory", "1", "2" );
-        return oldbit & 1;
+	addr = (unsigned long) ptr + ((nr ^ 56) >> 3);
+	ch = *(unsigned char *) addr;
+        asm volatile("xc 0(1,%1),0(%2)"
+		     : "+m" (*(char *) addr)
+		     : "a" (addr), "a" (_oi_bitmap + (nr & 7))
+		     : "cc" );
+	return (ch >> (nr & 7)) & 1;
 }
 #define __test_and_change_bit(X,Y)	test_and_change_bit_simple(X,Y)
 
@@ -574,25 +473,18 @@ test_and_change_bit_simple(unsigned long nr, volatile void * addr)
  * This routine doesn't need to be atomic.
  */
 
-static __inline__ int __test_bit(unsigned long nr, volatile void * addr)
+static inline int __test_bit(unsigned long nr, volatile void *ptr)
 {
-        int oldbit;
+	unsigned long addr;
+	unsigned char ch;
 
-        __asm__ __volatile__(
-             "   lghi  2,56\n"
-             "   lghi  1,7\n"
-             "   xgr   2,%1\n"
-             "   nr    1,%1\n"
-             "   srlg  2,2,3\n"
-             "   ic    %0,0(2,%2)\n"
-             "   srl   %0,0(1)\n"
-             : "=&d" (oldbit) : "d" (nr), "a" (addr)
-             : "cc", "1", "2" );
-        return oldbit & 1;
+	addr = (unsigned long) ptr + ((nr ^ 56) >> 3);
+	ch = *(unsigned char *) addr;
+	return (ch >> (nr & 7)) & 1;
 }
 
-static __inline__ int 
-__constant_test_bit(unsigned long nr, volatile void * addr) {
+static inline int 
+__constant_test_bit(unsigned long nr, volatile void *addr) {
     return (((volatile char *) addr)[(nr>>3)^7] & (1<<(nr&7))) != 0;
 }
 
@@ -604,53 +496,95 @@ __constant_test_bit(unsigned long nr, volatile void * addr) {
 /*
  * Find-bit routines..
  */
-static __inline__ unsigned long
+static inline unsigned long
 find_first_zero_bit(void * addr, unsigned long size)
 {
-        unsigned long res;
+        unsigned long res, cmp, count;
 
         if (!size)
                 return 0;
-        __asm__("   lghi  0,-1\n"
-                "   lgr   1,%1\n"
+        __asm__("   lghi  %1,-1\n"
+                "   lgr   %2,%3\n"
                 "   slgr  %0,%0\n"
-                "   aghi  1,63\n"
-                "   srlg  1,1,6\n"
-                "0: cg    0,0(%0,%2)\n"
+                "   aghi  %2,63\n"
+                "   srlg  %2,%2,6\n"
+                "0: cg    %1,0(%0,%4)\n"
                 "   jne   1f\n"
                 "   aghi  %0,8\n"
-                "   brct  1,0b\n"
-                "   lgr   %0,%1\n"
+                "   brct  %2,0b\n"
+                "   lgr   %0,%3\n"
                 "   j     5f\n"
-                "1: lg    1,0(%0,%2)\n"
+                "1: lg    %2,0(%0,%4)\n"
                 "   sllg  %0,%0,3\n"
-                "   clr   1,0\n"
+                "   clr   %2,%1\n"
 		"   jne   2f\n"
 		"   aghi  %0,32\n"
-                "   srlg  1,1,32\n"
-		"2: lghi  0,0xff\n"
-                "   tmll  1,0xffff\n"
+                "   srlg  %2,%2,32\n"
+		"2: lghi  %1,0xff\n"
+                "   tmll  %2,0xffff\n"
                 "   jno   3f\n"
                 "   aghi  %0,16\n"
-                "   srl   1,16\n"
-                "3: tmll  1,0x00ff\n"
+                "   srl   %2,16\n"
+                "3: tmll  %2,0x00ff\n"
                 "   jno   4f\n"
                 "   aghi  %0,8\n"
-                "   srl   1,8\n"
-                "4: ngr   1,0\n"
-                "   ic    1,0(1,%3)\n"
-                "   algr  %0,1\n"
+                "   srl   %2,8\n"
+                "4: ngr   %2,%1\n"
+                "   ic    %2,0(%2,%5)\n"
+                "   algr  %0,%2\n"
                 "5:"
-                : "=&a" (res) : "a" (size), "a" (addr), "a" (&_zb_findmap)
-                : "cc", "0", "1" );
+                : "=&a" (res), "=&d" (cmp), "=&a" (count)
+		: "a" (size), "a" (addr), "a" (&_zb_findmap) : "cc" );
         return (res < size) ? res : size;
 }
 
-static __inline__ unsigned long
+static inline unsigned long
+find_first_bit(void * addr, unsigned long size)
+{
+        unsigned long res, cmp, count;
+
+        if (!size)
+                return 0;
+        __asm__("   slgr  %1,%1\n"
+                "   lgr   %2,%3\n"
+                "   slgr  %0,%0\n"
+                "   aghi  %2,63\n"
+                "   srlg  %2,%2,6\n"
+                "0: cg    %1,0(%0,%4)\n"
+                "   jne   1f\n"
+                "   aghi  %0,8\n"
+                "   brct  %2,0b\n"
+                "   lgr   %0,%3\n"
+                "   j     5f\n"
+                "1: lg    %2,0(%0,%4)\n"
+                "   sllg  %0,%0,3\n"
+                "   clr   %2,%1\n"
+		"   jne   2f\n"
+		"   aghi  %0,32\n"
+                "   srlg  %2,%2,32\n"
+		"2: lghi  %1,0xff\n"
+                "   tmll  %2,0xffff\n"
+                "   jnz   3f\n"
+                "   aghi  %0,16\n"
+                "   srl   %2,16\n"
+                "3: tmll  %2,0x00ff\n"
+                "   jnz   4f\n"
+                "   aghi  %0,8\n"
+                "   srl   %2,8\n"
+                "4: ngr   %2,%1\n"
+                "   ic    %2,0(%2,%5)\n"
+                "   algr  %0,%2\n"
+                "5:"
+                : "=&a" (res), "=&d" (cmp), "=&a" (count)
+		: "a" (size), "a" (addr), "a" (&_sb_findmap) : "cc" );
+        return (res < size) ? res : size;
+}
+
+static inline unsigned long
 find_next_zero_bit (void * addr, unsigned long size, unsigned long offset)
 {
         unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
-        unsigned long bitvec;
+        unsigned long bitvec, reg;
         unsigned long set, bit = offset & 63, res;
 
         if (bit) {
@@ -658,28 +592,26 @@ find_next_zero_bit (void * addr, unsigned long size, unsigned long offset)
                  * Look for zero in first word
                  */
                 bitvec = (*p) >> bit;
-                __asm__("   lhi  0,-1\n"
-                        "   lgr  1,%1\n"
+                __asm__("   lhi  %2,-1\n"
                         "   slgr %0,%0\n"
-                        "   clr  1,0\n"
+                        "   clr  %1,%2\n"
                         "   jne  0f\n"
                         "   aghi %0,32\n"
-                        "   srlg 1,1,32\n"
-			"0: lghi 0,0xff\n"
-                        "   tmll 1,0xffff\n"
+                        "   srlg %1,%1,32\n"
+			"0: lghi %2,0xff\n"
+                        "   tmll %1,0xffff\n"
                         "   jno  1f\n"
                         "   aghi %0,16\n"
-                        "   srlg 1,1,16\n"
-                        "1: tmll 1,0x00ff\n"
+                        "   srlg %1,%1,16\n"
+                        "1: tmll %1,0x00ff\n"
                         "   jno  2f\n"
                         "   aghi %0,8\n"
-                        "   srlg 1,1,8\n"
-                        "2: ngr  1,0\n"
-                        "   ic   1,0(1,%2)\n"
-                        "   algr %0,1"
-                        : "=&d" (set) 
-                        : "d" (bitvec), "a" (&_zb_findmap)
-                        : "cc", "0", "1" );
+                        "   srlg %1,%1,8\n"
+                        "2: ngr  %1,%2\n"
+                        "   ic   %1,0(%1,%3)\n"
+                        "   algr %0,%1"
+                        : "=&d" (set), "+a" (bitvec), "=&d" (reg)
+                        : "a" (&_zb_findmap) : "cc" );
                 if (set < (64 - bit))
                         return set + offset;
                 offset += 64 - bit;
@@ -692,38 +624,119 @@ find_next_zero_bit (void * addr, unsigned long size, unsigned long offset)
         return (offset + res);
 }
 
+static inline unsigned long
+find_next_bit (void * addr, unsigned long size, unsigned long offset)
+{
+        unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
+        unsigned long bitvec, reg;
+        unsigned long set, bit = offset & 63, res;
+
+        if (bit) {
+                /*
+                 * Look for zero in first word
+                 */
+                bitvec = (*p) >> bit;
+                __asm__("   slgr %0,%0\n"
+                        "   ltr  %1,%1\n"
+                        "   jnz  0f\n"
+                        "   aghi %0,32\n"
+                        "   srlg %1,%1,32\n"
+			"0: lghi %2,0xff\n"
+                        "   tmll %1,0xffff\n"
+                        "   jnz  1f\n"
+                        "   aghi %0,16\n"
+                        "   srlg %1,%1,16\n"
+                        "1: tmll %1,0x00ff\n"
+                        "   jnz  2f\n"
+                        "   aghi %0,8\n"
+                        "   srlg %1,%1,8\n"
+                        "2: ngr  %1,%2\n"
+                        "   ic   %1,0(%1,%3)\n"
+                        "   algr %0,%1"
+                        : "=&d" (set), "+a" (bitvec), "=&d" (reg)
+                        : "a" (&_sb_findmap) : "cc" );
+                if (set < (64 - bit))
+                        return set + offset;
+                offset += 64 - bit;
+                p++;
+        }
+        /*
+         * No set bit yet, search remaining full words for a bit
+         */
+        res = find_first_bit (p, size - 64 * (p - (unsigned long *) addr));
+        return (offset + res);
+}
+
 /*
  * ffz = Find First Zero in word. Undefined if no zero exists,
  * so code should check against ~0UL first..
  */
-static __inline__ unsigned long ffz(unsigned long word)
+static inline unsigned long ffz(unsigned long word)
 {
-        int result;
+	unsigned long reg, result;
 
-        __asm__("   lhi  0,-1\n"
-                "   lgr  1,%1\n"
+        __asm__("   lhi  %2,-1\n"
                 "   slgr %0,%0\n"
-                "   clr  1,0\n"
+                "   clr  %1,%2\n"
                 "   jne  0f\n"
                 "   aghi %0,32\n"
-                "   srlg 1,1,32\n"
-                "0: lghi 0,0xff\n"
-                "   tmll 1,0xffff\n"
+                "   srlg %1,%1,32\n"
+                "0: lghi %2,0xff\n"
+                "   tmll %1,0xffff\n"
                 "   jno  1f\n"
                 "   aghi %0,16\n"
-                "   srlg 1,1,16\n"
-                "1: tmll 1,0x00ff\n"
+                "   srlg %1,%1,16\n"
+                "1: tmll %1,0x00ff\n"
                 "   jno  2f\n"
                 "   aghi %0,8\n"
-                "   srlg 1,1,8\n"
-                "2: ngr  1,0\n"
-                "   ic   1,0(1,%2)\n"
-                "   algr %0,1"
-                : "=&d" (result)
-                : "d" (word), "a" (&_zb_findmap)
-                : "cc", "0", "1" );
-
+                "   srlg %1,%1,8\n"
+                "2: ngr  %1,%2\n"
+                "   ic   %1,0(%1,%3)\n"
+                "   algr %0,%1"
+                : "=&d" (result), "+a" (word), "=&d" (reg)
+                : "a" (&_zb_findmap) : "cc" );
         return result;
+}
+
+/*
+ * __ffs = find first bit in word. Undefined if no bit exists,
+ * so code should check against 0UL first..
+ */
+static inline unsigned long __ffs (unsigned long word)
+{
+        unsigned long reg, result;
+
+        __asm__("   slgr %0,%0\n"
+                "   ltr  %1,%1\n"
+                "   jnz  0f\n"
+                "   aghi %0,32\n"
+                "   srlg %1,%1,32\n"
+                "0: lghi %2,0xff\n"
+                "   tmll %1,0xffff\n"
+                "   jnz  1f\n"
+                "   aghi %0,16\n"
+                "   srlg %1,%1,16\n"
+                "1: tmll %1,0x00ff\n"
+                "   jnz  2f\n"
+                "   aghi %0,8\n"
+                "   srlg %1,%1,8\n"
+                "2: ngr  %1,%2\n"
+                "   ic   %1,0(%1,%3)\n"
+                "   algr %0,%1"
+                : "=&d" (result), "+a" (word), "=&d" (reg)
+                : "a" (&_sb_findmap) : "cc" );
+        return result;
+}
+
+/*
+ * Every architecture must define this function. It's the fastest
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
+ * bits is cleared.
+ */
+static inline int sched_find_first_bit(unsigned long *b)
+{
+	return find_first_bit(b, 140);
 }
 
 /*
@@ -731,37 +744,67 @@ static __inline__ unsigned long ffz(unsigned long word)
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
-
-extern int __inline__ ffs (int x)
+extern int inline ffs (int x)
 {
-        int r;
+        int r = 1;
 
         if (x == 0)
-          return 0;
-        __asm__("    lr   1,%1\n"
-                "    slr  %0,%0\n"
-                "    tml  1,0xFFFF\n"
+		return 0;
+        __asm__("    tml  %1,0xffff\n"
                 "    jnz  0f\n"
+                "    srl  %1,16\n"
                 "    ahi  %0,16\n"
-                "    srl  1,16\n"
-                "0:  tml  1,0x00FF\n"
+                "0:  tml  %1,0x00ff\n"
                 "    jnz  1f\n"
+                "    srl  %1,8\n"
                 "    ahi  %0,8\n"
-                "    srl  1,8\n"
-                "1:  tml  1,0x000F\n"
+                "1:  tml  %1,0x000f\n"
                 "    jnz  2f\n"
+                "    srl  %1,4\n"
                 "    ahi  %0,4\n"
-                "    srl  1,4\n"
-                "2:  tml  1,0x0003\n"
+                "2:  tml  %1,0x0003\n"
                 "    jnz  3f\n"
+                "    srl  %1,2\n"
                 "    ahi  %0,2\n"
-                "    srl  1,2\n"
-                "3:  tml  1,0x0001\n"
+                "3:  tml  %1,0x0001\n"
                 "    jnz  4f\n"
                 "    ahi  %0,1\n"
                 "4:"
-                : "=&d" (r) : "d" (x) : "cc", "1" );
-        return r+1;
+                : "=&d" (r), "+d" (x) : : "cc" );
+        return r;
+}
+
+/*
+ * fls: find last bit set.
+ */
+extern __inline__ int fls(int x)
+{
+	int r = 32;
+
+	if (x == 0)
+		return 0;
+	__asm__("    tmh  %1,0xffff\n"
+		"    jz   0f\n"
+		"    sll  %1,16\n"
+		"    ahi  %0,-16\n"
+		"0:  tmh  %1,0xff00\n"
+		"    jz   1f\n"
+		"    sll  %1,8\n"
+		"    ahi  %0,-8\n"
+		"1:  tmh  %1,0xf000\n"
+		"    jz   2f\n"
+		"    sll  %1,4\n"
+		"    ahi  %0,-4\n"
+		"2:  tmh  %1,0xc000\n"
+		"    jz   3f\n"
+		"    sll  %1,2\n"
+		"    ahi  %0,-2\n"
+		"3:  tmh  %1,0x8000\n"
+		"    jz   4f\n"
+		"    ahi  %0,-1\n"
+		"4:"
+		: "+d" (r), "+d" (x) : : "cc" );
+	return r;
 }
 
 /*
@@ -789,54 +832,54 @@ extern int __inline__ ffs (int x)
 #define ext2_set_bit(nr, addr)       test_and_set_bit((nr)^56, addr)
 #define ext2_clear_bit(nr, addr)     test_and_clear_bit((nr)^56, addr)
 #define ext2_test_bit(nr, addr)      test_bit((nr)^56, addr)
-static __inline__ unsigned long
+static inline unsigned long
 ext2_find_first_zero_bit(void *vaddr, unsigned long size)
 {
-        unsigned long res;
+        unsigned long res, cmp, count;
 
         if (!size)
                 return 0;
-        __asm__("   lghi  0,-1\n"
-                "   lgr   1,%1\n"
-                "   aghi  1,63\n"
-                "   srlg  1,1,6\n"
+        __asm__("   lghi  %1,-1\n"
+                "   lgr   %2,%3\n"
+                "   aghi  %2,63\n"
+                "   srlg  %2,%2,6\n"
                 "   slgr  %0,%0\n"
-                "0: clg   0,0(%0,%2)\n"
+                "0: clg   %1,0(%0,%4)\n"
                 "   jne   1f\n"
                 "   aghi  %0,8\n"
-                "   brct  1,0b\n"
-                "   lgr   %0,%1\n"
+                "   brct  %2,0b\n"
+                "   lgr   %0,%3\n"
                 "   j     5f\n"
-                "1: cl    0,0(%0,%2)\n"
+                "1: cl    %1,0(%0,%4)\n"
 		"   jne   2f\n"
 		"   aghi  %0,4\n"
-		"2: l     1,0(%0,%2)\n"
+		"2: l     %2,0(%0,%4)\n"
                 "   sllg  %0,%0,3\n"
                 "   aghi  %0,24\n"
-                "   lghi  0,0xff\n"
-                "   tmlh  1,0xffff\n"
+                "   lghi  %1,0xff\n"
+                "   tmlh  %2,0xffff\n"
                 "   jo    3f\n"
                 "   aghi  %0,-16\n"
-                "   srl   1,16\n"
-                "3: tmll  1,0xff00\n"
+                "   srl   %2,16\n"
+                "3: tmll  %2,0xff00\n"
                 "   jo    4f\n"
                 "   aghi  %0,-8\n"
-                "   srl   1,8\n"
-                "4: ngr   1,0\n"
-                "   ic    1,0(1,%3)\n"
-                "   algr  %0,1\n"
+                "   srl   %2,8\n"
+                "4: ngr   %2,%1\n"
+                "   ic    %2,0(%2,%5)\n"
+                "   algr  %0,%2\n"
                 "5:"
-                : "=&a" (res) : "a" (size), "a" (vaddr), "a" (&_zb_findmap)
-                : "cc", "0", "1" );
+                : "=&a" (res), "=&d" (cmp), "=&a" (count)
+		: "a" (size), "a" (vaddr), "a" (&_zb_findmap) : "cc" );
         return (res < size) ? res : size;
 }
 
-static __inline__ unsigned long
+static inline unsigned long
 ext2_find_next_zero_bit(void *vaddr, unsigned long size, unsigned long offset)
 {
         unsigned long *addr = vaddr;
         unsigned long *p = addr + (offset >> 6);
-        unsigned long word;
+        unsigned long word, reg;
         unsigned long bit = offset & 63UL, res;
 
         if (offset >= size)
@@ -848,30 +891,28 @@ ext2_find_next_zero_bit(void *vaddr, unsigned long size, unsigned long offset)
                 word >>= bit;
                 res = bit;
                 /* Look for zero in first 8 byte word */
-                __asm__("   lgr  1,%1\n"
-                        "   lghi 0,0xff\n"
-			"   tmll 1,0xffff\n"
+                __asm__("   lghi %2,0xff\n"
+			"   tmll %1,0xffff\n"
 			"   jno  2f\n"
 			"   ahi  %0,16\n"
-			"   srlg 1,1,16\n"
-                	"0: tmll 1,0xffff\n"
+			"   srlg %1,%1,16\n"
+                	"0: tmll %1,0xffff\n"
                         "   jno  2f\n"
                         "   ahi  %0,16\n"
-                        "   srlg 1,1,16\n"
-                        "1: tmll 1,0xffff\n"
+                        "   srlg %1,%1,16\n"
+                        "1: tmll %1,0xffff\n"
                         "   jno  2f\n"
                         "   ahi  %0,16\n"
-                        "   srl  1,16\n"
-                        "2: tmll 1,0x00ff\n"
+                        "   srl  %1,16\n"
+                        "2: tmll %1,0x00ff\n"
                 	"   jno  3f\n"
                 	"   ahi  %0,8\n"
-                	"   srl  1,8\n"
-                	"3: ngr  1,0\n"
-                	"   ic   1,0(1,%2)\n"
-                	"   alr  %0,1"
-                	: "+&d" (res) 
-                  	: "d" (word), "a" (&_zb_findmap)
-                	: "cc", "0", "1" );
+                	"   srl  %1,8\n"
+                	"3: ngr  %1,%2\n"
+                	"   ic   %1,0(%1,%3)\n"
+                	"   alr  %0,%1"
+                	: "+&d" (res), "+a" (word), "=&d" (reg)
+                  	: "a" (&_zb_findmap) : "cc" );
                 if (res < 64)
 			return (p - addr)*64 + res;
                 p++;

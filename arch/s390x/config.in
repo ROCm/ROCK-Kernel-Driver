@@ -6,8 +6,8 @@
 define_bool CONFIG_ISA n
 define_bool CONFIG_EISA n
 define_bool CONFIG_MCA n
-define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
-define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 define_bool CONFIG_GENERIC_BUST_SPINLOCK n
 
 mainmenu_name "Linux Kernel Configuration"
@@ -15,6 +15,7 @@ define_bool CONFIG_ARCH_S390 y
 define_bool CONFIG_ARCH_S390X y
 
 source init/Config.in
+
 mainmenu_option next_comment
 comment 'Processor type and features'
 bool 'Symmetric multi-processing support' CONFIG_SMP
@@ -25,8 +26,16 @@ fi
 endmenu
 
 mainmenu_option next_comment
-comment 'General setup'
+comment 'Base setup'
 bool 'Fast IRQ handling' CONFIG_FAST_IRQ
+bool 'Process warning machine checks' CONFIG_MACHCHK_WARNING
+bool 'Use chscs for Common I/O' CONFIG_CHSC
+  
+tristate 'QDIO support' CONFIG_QDIO
+  if [ "$CONFIG_QDIO" != "n" ]; then
+    bool '   Performance statistics in /proc' CONFIG_QDIO_PERF_STATS
+  fi
+
 bool 'Builtin IPL record support' CONFIG_IPL
 if [ "$CONFIG_IPL" = "y" ]; then
   choice 'IPL method generated into head.S' \
@@ -41,6 +50,15 @@ bool 'Pseudo page fault support' CONFIG_PFAULT
 bool 'VM shared kernel support' CONFIG_SHARED_KERNEL
 endmenu
 
+mainmenu_option next_comment
+comment 'SCSI support'
+
+tristate 'SCSI support' CONFIG_SCSI
+
+if [ "$CONFIG_SCSI" != "n" ]; then
+   source drivers/scsi/Config.in
+fi
+endmenu
 
 source drivers/s390/Config.in
 
@@ -54,9 +72,9 @@ mainmenu_option next_comment
 comment 'Kernel hacking'
 
 #bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
-if [ "$CONFIG_CTC" = "y" ]; then
-  bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
-fi
+#if [ "$CONFIG_CTC" = "y" ]; then
+#  bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
+#fi
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
 endmenu
 

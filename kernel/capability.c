@@ -39,13 +39,14 @@ asmlinkage long sys_capget(cap_user_header_t header, cap_user_data_t dataptr)
      if (get_user(version, &header->version))
 	     return -EFAULT;
 
-     if (version != _LINUX_CAPABILITY_VERSION)
+     if (version != _LINUX_CAPABILITY_VERSION) {
 	     if (put_user(_LINUX_CAPABILITY_VERSION, &header->version))
 		     return -EFAULT; 
              return -EINVAL;
+     }
 
      if (get_user(pid, &header->pid))
-	     return -EFAULT; 
+	     return -EFAULT;
 
      if (pid < 0) 
              return -EINVAL;
@@ -134,10 +135,11 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
      if (get_user(version, &header->version))
 	     return -EFAULT; 
 
-     if (version != _LINUX_CAPABILITY_VERSION)
+     if (version != _LINUX_CAPABILITY_VERSION) {
 	     if (put_user(_LINUX_CAPABILITY_VERSION, &header->version))
 		     return -EFAULT; 
              return -EINVAL;
+     }
 
      if (get_user(pid, &header->pid))
 	     return -EFAULT; 

@@ -1,5 +1,6 @@
 /*
  *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by

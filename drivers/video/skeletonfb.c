@@ -298,7 +298,7 @@ static int xxxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
  *      Returns negative errno on error, or zero on success.
  *
  */
-static int xxxfb_pan_display(struct fb_var_screeninfo *var,
+static int xxxfb_pan_display(struct fb_var_screeninfo *var, int con,
 			     const struct fb_info *info)
 {
     /* ... */

@@ -20,6 +20,7 @@
 #include <linux/pagemap.h>
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
+#include <linux/binfmts.h>
 #define __NO_VERSION__
 #include <linux/module.h>
 

@@ -18,7 +18,7 @@
 #define PF11_STR "\033j"
 /* other AID-key default strings */
 
-aid_t aidtab[64] = {
+static aid_t aidtab[64] = {
 /* 00         */	{ 0, 0 },
 /* C1 = PF13  */	{ TA_DOSTRING, 0 },
 /* C2 = PF14  */	{ TA_DOSTRING, 0 },

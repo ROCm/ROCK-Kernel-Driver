@@ -16,6 +16,8 @@
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
         unsigned long phys_addr, unsigned long flags)
@@ -55,7 +57,7 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	if (address >= end)
 		BUG();
 	do {
-		pte_t * pte = pte_alloc(&init_mm, pmd, address);
+		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		remap_area_pte(pte, address, end - address, address + phys_addr, flags);

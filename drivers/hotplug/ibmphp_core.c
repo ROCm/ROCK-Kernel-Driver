@@ -44,7 +44,7 @@
 #define get_ctrl_revision(sl, rev) ibmphp_hpc_readslot (sl, READ_REVLEVEL, rev)
 #define get_hpc_options(sl, opt) ibmphp_hpc_readslot (sl, READ_HPCOPTIONS, opt)
 
-#define DRIVER_VERSION	"0.2"
+#define DRIVER_VERSION	"0.3"
 #define DRIVER_DESC	"IBM Hot Plug PCI Controller Driver"
 
 int ibmphp_debug;
@@ -106,7 +106,7 @@ static inline int slot_update (struct slot **sl)
 	return rc;
 }
 
-static int get_max_slots (void)
+static int __init get_max_slots (void)
 {
 	struct list_head * tmp;
 	int slot_count = 0;
@@ -528,7 +528,7 @@ static int get_card_bus_names (struct hotplug_slot *hotplug_slot, char * value)
  * function. It will also power off empty slots that are powered on since BIOS
  * leaves those on, albeit disconnected
  ******************************************************************************/
-static int init_ops (void)
+static int __init init_ops (void)
 {
 	struct slot *slot_cur;
 	int retval;

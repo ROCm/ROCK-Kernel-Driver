@@ -36,33 +36,12 @@
 #include <asm/dma.h>
 #include <asm/lowcore.h>
 #include <asm/tlb.h>
+#include <asm/tlbflush.h>
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
 char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
-
-int do_check_pgt_cache(int low, int high)
-{
-        int freed = 0;
-        if(pgtable_cache_size > high) {
-                do {
-                        if(pgd_quicklist) {
-                                free_pgd_slow(get_pgd_fast());
-				freed += 2;
-			}
-                        if(pmd_quicklist) {
-                                pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-                        if(pte_quicklist) {
-                                pte_free_slow(pte_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-                } while(pgtable_cache_size > low);
-        }
-        return freed;
-}
 
 void show_mem(void)
 {
@@ -86,7 +65,6 @@ void show_mem(void)
         printk("%d reserved pages\n",reserved);
         printk("%d pages shared\n",shared);
         printk("%d pages swap cached\n",cached);
-        printk("%ld pages in page table cache\n",pgtable_cache_size);
 }
 
 /* References to section boundaries */

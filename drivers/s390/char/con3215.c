@@ -59,8 +59,6 @@
 
 struct _raw3215_info;		      /* forward declaration ... */
 
-int raw3215_condevice = -1;           /* preset console device */
-
 /*
  * Request types for a 3215 device
  */
@@ -542,7 +540,7 @@ in_out:
  * Has to be called with the s390irq lock held. Can be called
  * disabled.
  */
-void raw3215_make_room(raw3215_info *raw, unsigned int length)
+static void raw3215_make_room(raw3215_info *raw, unsigned int length)
 {
 	while (RAW3215_BUFFER_SIZE - raw->count < length) {
 		/* there might be a request pending */
@@ -730,8 +728,11 @@ static void raw3215_shutdown(raw3215_info *raw)
 	    raw->queued_read != NULL) {
 		raw->flags |= RAW3215_CLOSING;
 		add_wait_queue(&raw->empty_wait, &wait);
+#warning FIXME: use set_current_state instead of current->state=
 		current->state = TASK_INTERRUPTIBLE;
                 s390irq_spin_unlock_irqrestore(raw->irq, flags);
+		/* FIXME: what if schedule is interrupted by a signal,
+		 * shouldn't we loop here? */
 		schedule();
 		s390irq_spin_lock_irqsave(raw->irq, flags);
 		remove_wait_queue(&raw->empty_wait, &wait);
@@ -752,7 +753,7 @@ raw3215_find_dev(int number)
 	irq = get_irq_first();
 	count = 0;
         while (count <= number && irq != -ENODEV) {
-                if (get_dev_info(irq, &dinfo) == -ENODEV)
+                if (get_dev_info_by_irq(irq, &dinfo) == -ENODEV)
                         break;
                 if (dinfo.devno == console_device ||
                     dinfo.sid_data.cu_type == 0x3215) {
@@ -794,16 +795,16 @@ con3215_write(struct console *co, const char *str, unsigned int count)
         }
 }
 
-kdev_t con3215_device(struct console *c)
+static kdev_t con3215_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, c->index + 64 );
+	return mk_kdev(TTY_MAJOR, c->index + 64 );
 }
 
 /*
  * panic() calls console_unblank before the system enters a
  * disabled, endless loop.
  */
-void con3215_unblank(void)
+static void con3215_unblank(void)
 {
 	raw3215_info *raw;
 	unsigned long flags;
@@ -843,7 +844,7 @@ static int tty3215_open(struct tty_struct *tty, struct file * filp)
 	raw3215_info *raw;
 	int retval, line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= NR_3215))
 		return -ENODEV;
 
@@ -1057,7 +1058,9 @@ static void tty3215_start(struct tty_struct *tty)
  */
 void __init con3215_init(void)
 {
+#ifdef CONFIG_TN3215_CONSOLE
 	raw3215_info *raw;
+#endif
 	raw3215_req *req;
 	int irq;
 	int i;

@@ -87,7 +87,13 @@
 #define ELF_PLATFORM (NULL)
 
 #ifdef __KERNEL__
-#define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
+#define SET_PERSONALITY(ex, ibcs2)			\
+do {							\
+	if (ibcs2)                                      \
+		set_personality(PER_SVR4);              \
+	else if (current->personality != PER_LINUX32)   \
+		set_personality(PER_LINUX);             \
+} while (0)
 #endif 
 
 #include "linux32.h"
@@ -108,6 +114,7 @@ typedef s390_regs32 elf_gregset_t;
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/elfcore.h>
+#include <linux/binfmts.h>
 
 int setup_arg_pages32(struct linux_binprm *bprm);
 

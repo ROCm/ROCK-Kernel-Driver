@@ -115,7 +115,7 @@ struct variable
     char	global_written;
 };
 
-extern struct variable vartable[];
+extern struct variable *vartable;
 extern int max_varnum;
 
 /*

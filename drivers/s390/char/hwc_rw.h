@@ -61,7 +61,7 @@ typedef struct {
 	ioctl_delim_t delim;
 } hwc_ioctls_t;
 
-static hwc_ioctls_t _hwc_ioctls;
+extern hwc_ioctls_t _hwc_ioctls;
 
 #define HWC_IOCTL_LETTER 'B'
 

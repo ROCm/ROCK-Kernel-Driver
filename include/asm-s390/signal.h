@@ -13,6 +13,7 @@
 
 /* Avoid too many header ordering problems.  */
 struct siginfo;
+struct pt_regs;
 
 #ifdef __KERNEL__
 /* Most things should be clean enough to redefine this at will, if care

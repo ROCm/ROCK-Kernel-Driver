@@ -6,40 +6,73 @@
  *    Copyright (C) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Authors(s): Martin Schwidefsky (schwidefsky@de.ibm.com)
  *
- *  These functions have a non-standard call interface
+ *  These functions have standard call interface
  */
 
 #include <asm/lowcore.h>
 
         .text
         .align 4
-        .globl __copy_from_user_fixup
-__copy_from_user_fixup:
-        lg    1,__LC_PGM_OLD_PSW+8
-0:      lghi  3,-4096
-        ng    3,__LC_TRANS_EXC_ADDR
-        sgr   3,4
-        bm    4(1)
-1:      mvcle 2,4,0
-        b     4(1)
+        .globl __copy_from_user_asm
+__copy_from_user_asm:
+	lgr	%r5,%r3
+	sacf	512
+0:	mvcle	%r2,%r4,0
+	jo	0b
+1:	sacf	0
+	lgr	%r2,%r5
+	br	%r14
+2:	lghi	%r3,-4096
+        ng	%r3,__LC_TRANS_EXC_ADDR
+        sgr	%r3,%r4
+        jm	1b
+	j	0b
         .section __ex_table,"a"
-        .align 8
-	.quad 1b,0b
+        .align	8
+	.quad	0b,2b
         .previous
 
         .align 4
         .text
-        .globl __copy_to_user_fixup
-__copy_to_user_fixup:
-        lg    1,__LC_PGM_OLD_PSW+8
-0:      lghi  5,-4096
-        ng    5,__LC_TRANS_EXC_ADDR
-        sgr   5,4
-        bm    4(1)
-1:      mvcle 4,2,0
-        b     4(1)
+        .globl __copy_to_user_asm
+__copy_to_user_asm:
+	lgr	%r5,%r3
+	sacf	512
+0:	mvcle	%r4,%r2,0
+	jo	0b
+1:	sacf	0
+	lgr	%r2,%r3
+	br	%r14
+2:      lghi	%r5,-4096
+        ng	%r5,__LC_TRANS_EXC_ADDR
+        sgr	%r5,%r4
+	jm	1b
+	j	0b
         .section __ex_table,"a"
-        .align 8
-        .quad 1b,0b
+        .align	8
+        .quad	0b,2b
         .previous
 
+        .align 4
+        .text
+        .globl __clear_user_asm
+__clear_user_asm:
+	lgr	%r4,%r2
+	lgr	%r5,%r3
+	sgr	%r2,%r2
+	sgr	%r3,%r3
+	sacf	512
+0:	mvcle	%r4,%r2,0
+	jo	0b
+1:	sacf	0
+	lgr	%r2,%r5
+	br	%r14
+2:      lghi	%r5,-4096
+        ng	%r5,__LC_TRANS_EXC_ADDR
+        sgr	%r5,%r4
+	jm	1b
+	j	0b
+        .section __ex_table,"a"
+        .align	8
+        .quad	0b,2b
+        .previous
