@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/major.h>
 #include <linux/ext2_fs.h>
 #include <linux/proc_fs.h>

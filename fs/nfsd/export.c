@@ -22,6 +22,7 @@
 #include <linux/seq_file.h>
 #include <linux/rwsem.h>
 #include <linux/namei.h>
+#include <linux/mount.h>
 
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
