@@ -672,7 +672,7 @@ static int __init nwflash_init(void)
 	if (machine_is_netwinder()) {
 		int id;
 
-		FLASH_BASE = __ioremap(DC21285_FLASH, KFLASH_SIZE4, 0);
+		FLASH_BASE = ioremap(DC21285_FLASH, KFLASH_SIZE4);
 		if (!FLASH_BASE)
 			goto out;
 

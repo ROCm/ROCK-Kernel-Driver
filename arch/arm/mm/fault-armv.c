@@ -243,10 +243,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 	struct page *page = pte_page(pte);
 
 	if (VALID_PAGE(page) && page->mapping) {
-		if (test_and_clear_bit(PG_dcache_dirty, &page->flags)) {
-			unsigned long kvirt = (unsigned long)page_address(page);
-			cpu_cache_clean_invalidate_range(kvirt, kvirt + PAGE_SIZE, 0);
-		}
+		if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
+			__flush_dcache_page(page);
 
 		make_coherent(vma, addr, page);
 	}

@@ -75,7 +75,6 @@ extern void (*init_arch_irq)(void);
 extern void init_FIQ(void);
 extern int show_fiq_list(struct seq_file *, void *);
 void __set_irq_handler(unsigned int irq, irq_handler_t, int);
-int setup_irq(unsigned int, struct irqaction *);
 
 /*
  * External stuff.

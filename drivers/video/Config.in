@@ -27,13 +27,23 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 fi
       fi
    fi
-   if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
-      bool '  Acorn VIDC support' CONFIG_FB_ACORN
+   if [ "$CONFIG_ARM" = "y" ]; then
+      dep_bool '  Acorn VIDC support' CONFIG_FB_ACORN $CONFIG_ARCH_ACORN
+      dep_bool '  Anakin LCD support' CONFIG_FB_ANAKIN $CONFIG_ARCH_ANAKIN
+      dep_bool '  CLPS711X LCD support' CONFIG_FB_CLPS711X $CONFIG_ARCH_CLPS711X
+      dep_bool '  SA-1100 LCD support' CONFIG_FB_SA1100 $CONFIG_ARCH_SA1100
+      if [ "$CONFIG_FB_SA1100" = "y" -a "$CONFIG_SA1100_CERF" = "y" ]; then
+         choice 'CerfBoard LCD Display Size' \
+		"3.8_Color		CONFIG_CERF_LCD_38_A \
+		 3.8_Mono		CONFIG_CERF_LCD_38_B \
+		 5.7		CONFIG_CERF_LCD_57_A \
+		 7.2		CONFIG_CERF_LCD_72_A" 5.7
+      fi
+      if [ "$CONFIG_FB_SA1100" = "y" -a "$CONFIG_SA1100_CERF_CPLD" = "y" ]; then
+         bool 'Cerfboard Backlight (CerfPDA)' CONFIG_SA1100_CERF_LCD_BACKLIGHT
+      fi
    fi
-   dep_tristate '  Cyber2000 support' CONFIG_FB_CYBER2000 $CONFIG_PCI
-   if [ "$CONFIG_ARCH_SA1100" = "y" ]; then
-      bool '  SA-1100 LCD support' CONFIG_FB_SA1100
-   fi
+   dep_tristate '  CyberPro 2000/2010/5000 support' CONFIG_FB_CYBER2000 $CONFIG_PCI
    if [ "$CONFIG_APOLLO" = "y" ]; then
       define_bool CONFIG_FB_APOLLO y
    fi

@@ -127,6 +127,8 @@ struct sa1100fb_info {
 #define C_DISABLE_CLKCHANGE	(2)
 #define C_ENABLE_CLKCHANGE	(3)
 #define C_REENABLE		(4)
+#define C_DISABLE_PM		(5)
+#define C_ENABLE_PM		(6)
 
 #define SA1100_NAME	"SA1100"
 

@@ -27,6 +27,7 @@
 
 #include <asm/atomic.h>
 #include <asm/io.h>
+#include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -335,6 +336,25 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	return regs->ARM_r0;
 }
 
+static inline void
+do_cache_op(unsigned long start, unsigned long end, int flags)
+{
+	struct vm_area_struct *vma;
+
+	if (end < start)
+		return;
+
+	vma = find_vma(current->active_mm, start);
+	if (vma && vma->vm_start < end) {
+		if (start < vma->vm_start)
+			start = vma->vm_start;
+		if (end > vma->vm_end)
+			end = vma->vm_end;
+
+		flush_cache_range(vma, start, end);
+	}
+}
+
 /*
  * Handle all unrecognised system calls.
  *  0x9f0000 - 0x9fffff are some more esoteric system calls
@@ -392,7 +412,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 	 * the specified region).
 	 */
 	case NR(cacheflush):
-		cpu_cache_clean_invalidate_range(regs->ARM_r0, regs->ARM_r1, 1);
+		do_cache_op(regs->ARM_r0, regs->ARM_r1, regs->ARM_r2);
 		return 0;
 
 	case NR(usr26):
