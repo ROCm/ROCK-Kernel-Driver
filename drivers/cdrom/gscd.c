@@ -280,7 +280,7 @@ static void __do_gscd_request(unsigned long dummy)
 		goto out;
 
 	if (CURRENT->cmd != READ) {
-		printk("GSCD: bad cmd %p\n", CURRENT->cmd);
+		printk("GSCD: bad cmd %d\n", CURRENT->cmd);
 		end_request(CURRENT, 0);
 		goto repeat;
 	}
