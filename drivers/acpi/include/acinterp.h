@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 140 $
+ *       $Revision: 141 $
  *
  *****************************************************************************/
 
@@ -377,7 +377,7 @@ acpi_ex_system_reset_event(
 acpi_status
 acpi_ex_system_wait_semaphore (
 	acpi_handle             semaphore,
-	u32                     timeout);
+	u16                     timeout);
 
 
 /*
