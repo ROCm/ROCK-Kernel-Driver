@@ -35,7 +35,7 @@ struct thread_info {
 #define free_thread_info(ti)  free_pages((unsigned long)(ti),1)
 #endif /* PAGE_SHIFT == 13 */
 
-#define init_thread_info	(init_thread_union.thread_info)
+//#define init_thread_info	(init_task.thread.info)
 #define init_stack		(init_thread_union.stack)
 
 #define current_thread_info()	(current->thread_info)
