@@ -563,16 +563,17 @@ struct fown_struct {
 struct file_ra_state {
 	unsigned long start;		/* Current window */
 	unsigned long size;
-	unsigned long next_size;	/* Next window size */
+	unsigned long flags;		/* ra flags RA_FLAG_xxx*/
+	unsigned long cache_hit;	/* cache hit count*/
 	unsigned long prev_page;	/* Cache last read() position */
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
-	unsigned long currnt_wnd_hit;	/* locality in the current window */
-	unsigned long average;		/* size of next current window */
 	unsigned long ra_pages;		/* Maximum readahead window */
 	unsigned long mmap_hit;		/* Cache hit stat for mmap accesses */
 	unsigned long mmap_miss;	/* Cache miss stat for mmap accesses */
 };
+#define RA_FLAG_MISS 0x01	/* a cache miss occured against this file */
+#define RA_FLAG_INCACHE 0x02	/* file is already in cache */
 
 struct file {
 	struct list_head	f_list;
