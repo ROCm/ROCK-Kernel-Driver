@@ -369,8 +369,6 @@ static inline long TEMP_FROM_REG10(u16 val)
    dynamically allocated, at the same time when a new via686a client is
    allocated. */
 struct via686a_data {
-	int sysctl_id;
-
 	struct semaphore update_lock;
 	char valid;		/* !=0 if following fields are valid */
 	unsigned long last_updated;	/* In jiffies */
@@ -390,8 +388,7 @@ struct via686a_data {
 static struct pci_dev *s_bridge;	/* pointer to the (only) via686a */
 
 static int via686a_attach_adapter(struct i2c_adapter *adapter);
-static int via686a_detect(struct i2c_adapter *adapter, int address,
-			  unsigned short flags, int kind);
+static int via686a_detect(struct i2c_adapter *adapter, int address, int kind);
 static int via686a_detach_client(struct i2c_client *client);
 
 static int via686a_read_value(struct i2c_client *client, u8 register);
@@ -399,18 +396,6 @@ static void via686a_write_value(struct i2c_client *client, u8 register,
 				u8 value);
 static void via686a_update_client(struct i2c_client *client);
 static void via686a_init_client(struct i2c_client *client);
-
-
-static void via686a_in(struct i2c_client *client, int operation,
-		       int ctl_name, int *nrels_mag, long *results);
-static void via686a_fan(struct i2c_client *client, int operation,
-			int ctl_name, int *nrels_mag, long *results);
-static void via686a_temp(struct i2c_client *client, int operation,
-			 int ctl_name, int *nrels_mag, long *results);
-static void via686a_alarms(struct i2c_client *client, int operation,
-			   int ctl_name, int *nrels_mag, long *results);
-static void via686a_fan_div(struct i2c_client *client, int operation,
-			    int ctl_name, int *nrels_mag, long *results);
 
 static int via686a_id = 0;
 
@@ -457,6 +442,7 @@ static struct i2c_driver via686a_driver = {
 
 /* -- SENSORS SYSCTL END -- */
 
+#if 0
 /* These files are created for each detected VIA686A. This is just a template;
    though at first sight, you might think we could use a statically
    allocated list, we need some way to get back to the parent - which
@@ -489,6 +475,7 @@ static ctl_table via686a_dir_table_template[] = {
 	 &i2c_proc_real, &i2c_sysctl_real, NULL, &via686a_alarms},
 	{0}
 };
+#endif
 
 static inline int via686a_read_value(struct i2c_client *client, u8 reg)
 {
@@ -507,15 +494,12 @@ static int via686a_attach_adapter(struct i2c_adapter *adapter)
 	return i2c_detect(adapter, &addr_data, via686a_detect);
 }
 
-int via686a_detect(struct i2c_adapter *adapter, int address,
-		   unsigned short flags, int kind)
+static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 {
-	int i;
 	struct i2c_client *new_client;
 	struct via686a_data *data;
 	int err = 0;
-	const char *type_name = "via686a";
-	const char client_name[] = "via686a chip";
+	const char *name = "via686a";
 	u16 val;
 
 	/* Make sure we are probing the ISA bus!!  */
@@ -570,7 +554,7 @@ int via686a_detect(struct i2c_adapter *adapter, int address,
 	new_client->flags = 0;
 
 	/* Fill in the remaining client fields and put into the global list */
-	snprintf(new_client->dev.name, DEVICE_NAME_SIZE, client_name);
+	snprintf(new_client->dev.name, DEVICE_NAME_SIZE, name);
 
 	new_client->id = via686a_id++;
 	data->valid = 0;
@@ -579,21 +563,10 @@ int via686a_detect(struct i2c_adapter *adapter, int address,
 	if ((err = i2c_attach_client(new_client)))
 		goto ERROR3;
 
-	/* Register a new directory entry with module sensors */
-	if ((i = i2c_register_entry((struct i2c_client *) new_client,
-					type_name,
-					via686a_dir_table_template)) < 0) {
-		err = i;
-		goto ERROR4;
-	}
-	data->sysctl_id = i;
-
 	/* Initialize the VIA686A chip */
 	via686a_init_client(new_client);
 	return 0;
 
-      ERROR4:
-	i2c_detach_client(new_client);
       ERROR3:
 	release_region(address, VIA686A_EXTENT);
 	kfree(new_client);
@@ -604,8 +577,6 @@ int via686a_detect(struct i2c_adapter *adapter, int address,
 static int via686a_detach_client(struct i2c_client *client)
 {
 	int err;
-	struct via686a_data *data = i2c_get_clientdata(client);
-	i2c_deregister_entry(data->sysctl_id);
 
 	if ((err = i2c_detach_client(client))) {
 		dev_err(&client->dev,
@@ -752,6 +723,9 @@ static void via686a_update_client(struct i2c_client *client)
    large enough (by checking the incoming value of *nrels). This is not very
    good practice, but as long as you put less than about 5 values in results,
    you can assume it is large enough. */
+/* FIXME, remove these functions, they are here to verify the sysfs conversion
+ * is correct, or not */
+__attribute__((unused))
 static void via686a_in(struct i2c_client *client, int operation, int ctl_name,
                int *nrels_mag, long *results)
 {
@@ -780,7 +754,8 @@ static void via686a_in(struct i2c_client *client, int operation, int ctl_name,
 	}
 }
 
-void via686a_fan(struct i2c_client *client, int operation, int ctl_name,
+__attribute__((unused))
+static void via686a_fan(struct i2c_client *client, int operation, int ctl_name,
 		 int *nrels_mag, long *results)
 {
 	struct via686a_data *data = i2c_get_clientdata(client);
@@ -808,7 +783,8 @@ void via686a_fan(struct i2c_client *client, int operation, int ctl_name,
 	}
 }
 
-void via686a_temp(struct i2c_client *client, int operation, int ctl_name,
+__attribute__((unused))
+static void via686a_temp(struct i2c_client *client, int operation, int ctl_name,
 		  int *nrels_mag, long *results)
 {
 	struct via686a_data *data = i2c_get_clientdata(client);
@@ -838,7 +814,8 @@ void via686a_temp(struct i2c_client *client, int operation, int ctl_name,
 	}
 }
 
-void via686a_alarms(struct i2c_client *client, int operation, int ctl_name,
+__attribute__((unused))
+static void via686a_alarms(struct i2c_client *client, int operation, int ctl_name,
 		    int *nrels_mag, long *results)
 {
 	struct via686a_data *data = i2c_get_clientdata(client);
@@ -851,7 +828,8 @@ void via686a_alarms(struct i2c_client *client, int operation, int ctl_name,
 	}
 }
 
-void via686a_fan_div(struct i2c_client *client, int operation,
+__attribute__((unused))
+static void via686a_fan_div(struct i2c_client *client, int operation,
 		     int ctl_name, int *nrels_mag, long *results)
 {
 	struct via686a_data *data = i2c_get_clientdata(client);
