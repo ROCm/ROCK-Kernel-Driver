@@ -1228,10 +1228,10 @@ static void tx_timeout(struct net_device *dev)
 		rmb();
 	}
 
-	writel((np->cur_tx - np->tx_ring)*sizeof(struct fealnx_desc) +
-		np->tx_ring_dma, ioaddr + TXLBA);
-	writel((np->cur_rx - np->rx_ring)*sizeof(struct fealnx_desc) +
-		np->rx_ring_dma, ioaddr + RXLBA);
+	writel(np->tx_ring_dma + ((char*)np->cur_tx - (char*)np->tx_ring),
+		ioaddr + TXLBA);
+	writel(np->rx_ring_dma + ((char*)np->cur_rx - (char*)np->rx_ring),
+		ioaddr + RXLBA);
 
 	writel(np->bcrvalue, ioaddr + BCR);
 
@@ -1415,7 +1415,7 @@ static void reset_rx_descriptors(struct net_device *dev)
 
 	allocate_rx_buffers(dev);
 
-	writel(np->rx_ring_dma + (np->cur_rx - np->rx_ring),
+	writel(np->rx_ring_dma + ((char*)np->cur_rx - (char*)np->rx_ring),
 		dev->base_addr + RXLBA);
 	writel(np->crvalue, dev->base_addr + TCRRCR);
 }
