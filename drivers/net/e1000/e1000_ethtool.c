@@ -1566,9 +1566,7 @@ e1000_phys_id(struct net_device *netdev, uint32_t data)
 	e1000_setup_led(&adapter->hw);
 	mod_timer(&adapter->blink_timer, jiffies);
 
-	set_current_state(TASK_INTERRUPTIBLE);
-
-	schedule_timeout(data * HZ);
+	msleep_interruptible(data * 1000);
 	del_timer_sync(&adapter->blink_timer);
 	e1000_led_off(&adapter->hw);
 	clear_bit(E1000_LED_ON, &adapter->led_status);
