@@ -606,7 +606,16 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			goto out2;
 	}
 	bdev->bd_inode->i_size = blkdev_size(dev);
-	bdev->bd_inode->i_blkbits = blksize_bits(block_size(bdev));
+	if (!bdev->bd_openers) {
+		unsigned bsize = bdev_hardsect_size(bdev);
+		while (bsize < PAGE_CACHE_SIZE) {
+			if (bdev->bd_inode->i_size & bsize)
+				break;
+			bsize <<= 1;
+		}
+		bdev->bd_block_size = bsize;
+		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+	}
 	bdev->bd_openers++;
 	unlock_kernel();
 	up(&bdev->bd_sem);
