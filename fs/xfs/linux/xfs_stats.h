@@ -128,9 +128,9 @@ struct xfsstats {
 
 extern struct xfsstats xfsstats;
 
-# define XFS_STATS_INC(count)		( (count)++ )
-# define XFS_STATS_DEC(count)		( (count)-- )
-# define XFS_STATS_ADD(count, inc)	( (count) += (inc) )
+# define XFS_STATS_INC(count)		( xfsstats.count++ )
+# define XFS_STATS_DEC(count)		( xfsstats.count-- )
+# define XFS_STATS_ADD(count, inc)	( xfsstats.count += (inc) )
 
 extern void xfs_init_procfs(void);
 extern void xfs_cleanup_procfs(void);

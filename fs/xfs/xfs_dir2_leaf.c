@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1118,10 +1118,9 @@ xfs_dir2_leaf_getdents(
 
 		p.cook = XFS_DIR2_BYTE_TO_DATAPTR(mp, curoff + length);
 
-#if XFS_BIG_FILESYSTEMS
-		p.ino = INT_GET(dep->inumber, ARCH_CONVERT) + mp->m_inoadd;
-#else
 		p.ino = INT_GET(dep->inumber, ARCH_CONVERT);
+#if XFS_BIG_INUMS
+		p.ino += mp->m_inoadd;
 #endif
 		p.name = (char *)dep->name;
 

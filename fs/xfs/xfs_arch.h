@@ -32,8 +32,8 @@
 #ifndef __XFS_ARCH_H__
 #define __XFS_ARCH_H__
 
-#ifndef XFS_BIG_FILESYSTEMS
-#error XFS_BIG_FILESYSTEMS must be defined true or false
+#ifndef XFS_BIG_INUMS
+# error XFS_BIG_INUMS must be defined true or false
 #endif
 
 #ifdef __KERNEL__
@@ -239,7 +239,7 @@
 	    (INT_GET_UNALIGNED_32_BE(pointer)) \
     )
 
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 #define DIRINO_GET_ARCH(pointer,arch) \
     ( ((arch) == ARCH_NOCONVERT) \
 	? \

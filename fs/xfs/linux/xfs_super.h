@@ -66,8 +66,12 @@
 # define XFS_REALTIME_STRING
 #endif
 
-#if XFS_BIG_FILESYSTEMS
-# define XFS_BIGFS_STRING	"big filesystems, "
+#if XFS_BIG_BLKNOS
+# if XFS_BIG_INUMS
+#  define XFS_BIGFS_STRING	"large block/inode numbers, "
+# else
+#  define XFS_BIGFS_STRING	"large block numbers, "
+# endif
 #else
 # define XFS_BIGFS_STRING
 #endif

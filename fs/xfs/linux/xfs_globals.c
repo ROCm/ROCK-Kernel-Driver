@@ -59,6 +59,9 @@ xfs_param_t xfs_params = {
 	.error_level	= {	0,	3,	11	},
 	.sync_interval	= {	HZ,	30*HZ,	60*HZ	},
 	.stats_clear	= {	0,	0,	1	},
+	.inherit_sync	= {	0,	1,	1	},
+	.inherit_nodump	= {	0,	1,	1	},
+	.inherit_noatim = {	0,	1,	1	},
 };
 
 /*

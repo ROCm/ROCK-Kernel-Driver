@@ -761,6 +761,10 @@ config PROC_FS
 	  This option will enlarge your kernel by about 67 KB. Several
 	  programs depend on this, so everyone should say Y here.
 
+config PROC_KCORE
+	bool
+	default y if !ARM
+
 config DEVFS_FS
 	bool "/dev file system support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL

@@ -596,7 +596,7 @@ static int ide_enable_queued(ide_drive_t *drive, int on)
 	 * enable block tagging
 	 */
 	if (!blk_queue_tagged(drive->queue))
-		blk_queue_init_tags(drive->queue, IDE_MAX_TAG);
+		blk_queue_init_tags(drive->queue, IDE_MAX_TAG, NULL);
 
 	/*
 	 * check auto-poll support

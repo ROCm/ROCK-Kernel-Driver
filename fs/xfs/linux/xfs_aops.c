@@ -225,7 +225,8 @@ probe_unwritten_page(
 	page_buf_bmap_t		*mp,
 	page_buf_t		*pb,
 	unsigned long		max_offset,
-	unsigned long		*fsbs)
+	unsigned long		*fsbs,
+	unsigned int            bbits)
 {
 	struct page		*page;
 
@@ -248,6 +249,7 @@ probe_unwritten_page(
 				break;
 			if (p_offset >= max_offset)
 				break;
+			map_buffer_at_offset(page, bh, p_offset, bbits, mp);
 			set_buffer_unwritten_io(bh);
 			bh->b_private = pb;
 			p_offset += bh->b_size;
@@ -455,13 +457,14 @@ map_unwritten(
 	if (bh == head) {
 		struct address_space	*mapping = inode->i_mapping;
 		unsigned long		tindex, tloff, tlast, bs;
+		unsigned int		bbits = inode->i_blkbits;
 		struct page		*page;
 
 		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
 		tloff = min(tlast, start_page->index + pb->pb_page_count - 1);
 		for (tindex = start_page->index + 1; tindex < tloff; tindex++) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
-							PAGE_CACHE_SIZE, &bs);
+						PAGE_CACHE_SIZE, &bs, bbits);
 			if (!page)
 				break;
 			nblocks += bs;
@@ -472,7 +475,7 @@ map_unwritten(
 		if (tindex == tlast &&
 		    (tloff = (i_size_read(inode) & (PAGE_CACHE_SIZE - 1)))) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
-							tloff, &bs);
+							tloff, &bs, bbits);
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
@@ -560,7 +563,8 @@ convert_page(
 		offset = i << bbits;
 		if (!(PageUptodate(page) || buffer_uptodate(bh)))
 			continue;
-		if (buffer_mapped(bh) && !buffer_delay(bh) && all_bh) {
+		if (buffer_mapped(bh) && all_bh &&
+		    !buffer_unwritten(bh) && !buffer_delay(bh)) {
 			if (startio && (offset < end)) {
 				lock_buffer(bh);
 				bh_arr[index++] = bh;
@@ -581,7 +585,7 @@ convert_page(
 			ASSERT(tmp->pbm_flags & PBMF_UNWRITTEN);
 			map_unwritten(inode, page, head, bh,
 						offset, bbits, tmp, all_bh);
-		} else {
+		} else if (! (buffer_unwritten(bh) && buffer_locked(bh))) {
 			map_buffer_at_offset(page, bh, offset, bbits, tmp);
 			if (buffer_unwritten(bh)) {
 				set_buffer_unwritten_io(bh);
