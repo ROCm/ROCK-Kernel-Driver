@@ -82,7 +82,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define dprintk(n, format, args...) \
 	{ if (pc_debug > (n)) \
-		printk(KERN_INFO "%s: " format "\n", __FUNCTION__, ##args); }
+		printk(KERN_INFO "%s: " format "\n", __FUNCTION__ , ##args); }
 #else
 #define dprintk(n, format, args...)
 #endif
