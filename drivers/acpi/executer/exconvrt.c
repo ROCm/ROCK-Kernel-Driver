@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 44 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -230,7 +230,7 @@ acpi_ex_convert_to_buffer (
 		 * Create a new Buffer object
 		 * Size will be the string length
 		 */
-		ret_desc = acpi_ut_create_buffer_object (obj_desc->string.length);
+		ret_desc = acpi_ut_create_buffer_object ((ACPI_SIZE) obj_desc->string.length);
 		if (!ret_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}

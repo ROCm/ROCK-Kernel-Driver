@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 78 $
+ *              $Revision: 80 $
  *
  *****************************************************************************/
 
@@ -356,6 +356,37 @@ acpi_ds_load1_end_op (
 		}
 	}
 
+	if (op->common.aml_opcode == AML_METHOD_OP) {
+		/*
+		 * Method_op Pkg_length Name_string Method_flags Term_list
+		 *
+		 * Note: We must create the method node/object pair as soon as we
+		 * see the method declaration.  This allows later pass1 parsing
+		 * of invocations of the method (need to know the number of
+		 * arguments.)
+		 */
+		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+			"LOADING-Method: State=%p Op=%p Named_obj=%p\n",
+			walk_state, op, op->named.node));
+
+		if (!acpi_ns_get_attached_object (op->named.node)) {
+			walk_state->operands[0] = (void *) op->named.node;
+			walk_state->num_operands = 1;
+
+			status = acpi_ds_create_operands (walk_state, op->common.value.arg);
+			if (ACPI_SUCCESS (status)) {
+				status = acpi_ex_create_method (op->named.data,
+						   op->named.length, walk_state);
+			}
+			walk_state->operands[0] = NULL;
+			walk_state->num_operands = 0;
+
+			if (ACPI_FAILURE (status)) {
+				return (status);
+			}
+		}
+	}
+
 	/* Pop the scope stack */
 
 	if (acpi_ns_opens_scope (object_type)) {
@@ -651,10 +682,9 @@ acpi_ds_load2_end_op (
 
 		status = acpi_ds_scope_stack_pop (walk_state);
 		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
+			goto cleanup;
 		}
 	}
-
 
 	/*
 	 * Named operations are as follows:
@@ -789,26 +819,6 @@ acpi_ds_load2_end_op (
 	case AML_TYPE_NAMED_COMPLEX:
 
 		switch (op->common.aml_opcode) {
-		case AML_METHOD_OP:
-			/*
-			 * Method_op Pkg_length Name_string Method_flags Term_list
-			 */
-			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-				"LOADING-Method: State=%p Op=%p Named_obj=%p\n",
-				walk_state, op, node));
-
-			if (!acpi_ns_get_attached_object (node)) {
-				status = acpi_ds_create_operands (walk_state, arg);
-				if (ACPI_FAILURE (status)) {
-					goto cleanup;
-				}
-
-				status = acpi_ex_create_method (op->named.data,
-						   op->named.length, walk_state);
-			}
-			break;
-
-
 #ifndef ACPI_NO_METHOD_EXECUTION
 		case AML_REGION_OP:
 			/*
@@ -842,6 +852,7 @@ acpi_ds_load2_end_op (
 
 		default:
 			/* All NAMED_COMPLEX opcodes must be handled above */
+			/* Note: Method objects were already created in Pass 1 */
 			break;
 		}
 		break;
@@ -890,7 +901,6 @@ acpi_ds_load2_end_op (
 	default:
 		break;
 	}
-
 
 cleanup:
 

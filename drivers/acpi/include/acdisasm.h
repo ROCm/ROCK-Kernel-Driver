@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdisasm.h - AML disassembler
- *       $Revision: 5 $
+ *       $Revision: 6 $
  *
  *****************************************************************************/
 
@@ -50,10 +50,10 @@ extern const char               *acpi_gbl_SHRdecode[2];
 extern const char               *acpi_gbl_TYPdecode[4];
 extern const char               *acpi_gbl_BMdecode[2];
 extern const char               *acpi_gbl_SIZdecode[4];
-extern const NATIVE_CHAR        *acpi_gbl_lock_rule[NUM_LOCK_RULES];
-extern const NATIVE_CHAR        *acpi_gbl_access_types[NUM_ACCESS_TYPES];
-extern const NATIVE_CHAR        *acpi_gbl_update_rules[NUM_UPDATE_RULES];
-extern const NATIVE_CHAR        *acpi_gbl_match_ops[NUM_MATCH_OPS];
+extern const NATIVE_CHAR        *acpi_gbl_lock_rule[ACPI_NUM_LOCK_RULES];
+extern const NATIVE_CHAR        *acpi_gbl_access_types[ACPI_NUM_ACCESS_TYPES];
+extern const NATIVE_CHAR        *acpi_gbl_update_rules[ACPI_NUM_UPDATE_RULES];
+extern const NATIVE_CHAR        *acpi_gbl_match_ops[ACPI_NUM_MATCH_OPS];
 
 
 typedef struct acpi_op_walk_info

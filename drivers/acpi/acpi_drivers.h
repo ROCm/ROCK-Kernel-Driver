@@ -142,7 +142,7 @@ acpi_set_debug (
 	switch (flag) {
 	case ACPI_DEBUG_LOW:
 		acpi_dbg_layer = ACPI_COMPONENT_DEFAULT | ACPI_ALL_DRIVERS;
-		acpi_dbg_level = DEBUG_DEFAULT;
+		acpi_dbg_level = ACPI_DEBUG_DEFAULT;
 		break;
 	case ACPI_DEBUG_MEDIUM:
 		acpi_dbg_layer = ACPI_COMPONENT_DEFAULT | ACPI_ALL_DRIVERS;

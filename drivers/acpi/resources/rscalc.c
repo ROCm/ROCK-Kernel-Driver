@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscalc - Calculate stream and list lengths
- *              $Revision: 44 $
+ *              $Revision: 45 $
  *
  ******************************************************************************/
 
@@ -791,10 +791,10 @@ acpi_rs_get_pci_routing_table_length (
 		if (name_found) {
 			if (ACPI_GET_OBJECT_TYPE (*sub_object_list) == ACPI_TYPE_STRING) {
 				/*
-				 * The length String.Length field includes the
-				 * terminating NULL
+				 * The length String.Length field does not include the
+				 * terminating NULL, add 1
 				 */
-				temp_size_needed += (*sub_object_list)->string.length;
+				temp_size_needed += ((*sub_object_list)->string.length + 1);
 			}
 			else {
 				temp_size_needed += acpi_ns_get_pathname_length (

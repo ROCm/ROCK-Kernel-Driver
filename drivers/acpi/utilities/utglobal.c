@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 172 $
+ *              $Revision: 176 $
  *
  *****************************************************************************/
 
@@ -126,9 +126,9 @@ unknown:
 /* Debug switch - level and trace mask */
 
 #ifdef ACPI_DEBUG_OUTPUT
-u32                         acpi_dbg_level = DEBUG_DEFAULT;
+u32                         acpi_dbg_level = ACPI_DEBUG_DEFAULT;
 #else
-u32                         acpi_dbg_level = NORMAL_DEFAULT;
+u32                         acpi_dbg_level = ACPI_NORMAL_DEFAULT;
 #endif
 
 /* Debug switch - layer (component) mask */
@@ -140,6 +140,7 @@ u32                         acpi_gbl_nesting_level = 0;
 /* Debugger globals */
 
 u8                          acpi_gbl_db_terminate_threads = FALSE;
+u8                          acpi_gbl_abort_method = FALSE;
 u8                          acpi_gbl_method_executing = FALSE;
 
 /* System flags */
@@ -152,9 +153,13 @@ u8                          acpi_gbl_shutdown = TRUE;
 
 const u8                    acpi_gbl_decode_to8bit [8] = {1,2,4,8,16,32,64,128};
 
-const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES] = {
-			  "\\_S0_","\\_S1_","\\_S2_","\\_S3_",
-			  "\\_S4_","\\_S5_","\\_S4B"};
+const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT] = {
+			  "\\_S0_",
+			  "\\_S1_",
+			  "\\_S2_",
+			  "\\_S3_",
+			  "\\_S4_",
+			  "\\_S5_"};
 
 
 /******************************************************************************
@@ -669,11 +674,11 @@ acpi_ut_init_globals (
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].object_size    = sizeof (acpi_operand_object);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].object_size       = sizeof (acpi_walk_state);
 
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].max_cache_depth  = MAX_STATE_CACHE_DEPTH;
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].max_cache_depth = MAX_PARSE_CACHE_DEPTH;
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].max_cache_depth = MAX_EXTPARSE_CACHE_DEPTH;
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].max_cache_depth = MAX_OBJECT_CACHE_DEPTH;
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].max_cache_depth   = MAX_WALK_CACHE_DEPTH;
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].max_cache_depth  = ACPI_MAX_STATE_CACHE_DEPTH;
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].max_cache_depth = ACPI_MAX_PARSE_CACHE_DEPTH;
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].max_cache_depth = ACPI_MAX_EXTPARSE_CACHE_DEPTH;
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].max_cache_depth = ACPI_MAX_OBJECT_CACHE_DEPTH;
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].max_cache_depth   = ACPI_MAX_WALK_CACHE_DEPTH;
 
 	ACPI_MEM_TRACKING (acpi_gbl_memory_lists[ACPI_MEM_LIST_GLOBAL].list_name    = "Global Memory Allocation");
 	ACPI_MEM_TRACKING (acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].list_name    = "Namespace Nodes");

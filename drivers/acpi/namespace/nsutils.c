@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 116 $
+ *              $Revision: 118 $
  *
  *****************************************************************************/
 
@@ -82,6 +82,82 @@ acpi_ns_report_error (
 
 	if (name) {
 		ACPI_MEM_FREE (name);
+	}
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ns_report_method_error
+ *
+ * PARAMETERS:  Module_name         - Caller's module name (for error output)
+ *              Line_number         - Caller's line number (for error output)
+ *              Component_id        - Caller's component ID (for error output)
+ *              Message             - Error message to use on failure
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Print warning message with full pathname
+ *
+ ******************************************************************************/
+
+void
+acpi_ns_report_method_error (
+	NATIVE_CHAR             *module_name,
+	u32                     line_number,
+	u32                     component_id,
+	char                    *message,
+	acpi_namespace_node     *prefix_node,
+	char                    *path,
+	acpi_status             method_status)
+{
+	acpi_status             status;
+	acpi_namespace_node     *node = prefix_node;
+
+
+	if (path) {
+		status = acpi_ns_get_node_by_path (path, prefix_node, ACPI_NS_NO_UPSEARCH, &node);
+		if (ACPI_FAILURE (status)) {
+			acpi_os_printf ("Report_method_error: Could not get node\n");
+			return;
+		}
+	}
+
+	acpi_os_printf ("%8s-%04d: *** Error: ", module_name, line_number);
+	acpi_ns_print_node_pathname (node, message);
+	acpi_os_printf (", %s\n", acpi_format_exception (method_status));
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ns_print_node_pathname
+ *
+ * PARAMETERS:  Node                - Object
+ *              Msg                 - Prefix message
+ *
+ * DESCRIPTION: Print an object's full namespace pathname
+ *              Manages allocation/freeing of a pathname buffer
+ *
+ ******************************************************************************/
+
+void
+acpi_ns_print_node_pathname (
+	acpi_namespace_node     *node,
+	NATIVE_CHAR             *msg)
+{
+	acpi_buffer             buffer;
+	acpi_status             status;
+
+
+	/* Convert handle to a full pathname and print it (with supplied message) */
+
+	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+
+	status = acpi_ns_handle_to_pathname (node, &buffer);
+	if (ACPI_SUCCESS (status)) {
+		acpi_os_printf ("%s [%s] (Node %p)", msg, (char *) buffer.pointer, node);
+		ACPI_MEM_FREE (buffer.pointer);
 	}
 }
 
@@ -802,15 +878,13 @@ acpi_ns_get_node_by_path (
 	ACPI_FUNCTION_TRACE_PTR ("Ns_get_node_by_path", pathname);
 
 
-	if (!pathname) {
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
-	}
+	if (pathname) {
+		/* Convert path to internal representation */
 
-	/* Convert path to internal representation */
-
-	status = acpi_ns_internalize_name (pathname, &internal_path);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		status = acpi_ns_internalize_name (pathname, &internal_path);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/* Must lock namespace during lookup */
@@ -838,7 +912,10 @@ acpi_ns_get_node_by_path (
 	/* Cleanup */
 
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-	ACPI_MEM_FREE (internal_path);
+
+	if (internal_path) {
+		ACPI_MEM_FREE (internal_path);
+	}
 	return_ACPI_STATUS (status);
 }
 

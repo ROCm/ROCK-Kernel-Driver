@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 41 $
+ *              $Revision: 42 $
  *
  *****************************************************************************/
 
@@ -35,6 +35,116 @@
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_ut_evaluate_object
+ *
+ * PARAMETERS:  Prefix_node         - Starting node
+ *              Path                - Path to object from starting node
+ *              Expected_return_types - Bitmap of allowed return types
+ *              Return_desc         - Where a return value is stored
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Evaluates a namespace object and verifies the type of the
+ *              return object.  Common code that simplifies accessing objects
+ *              that have required return objects of fixed types.
+ *
+ *              NOTE: Internal function, no parameter validation
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ut_evaluate_object (
+	acpi_namespace_node     *prefix_node,
+	NATIVE_CHAR             *path,
+	u32                     expected_return_btypes,
+	acpi_operand_object     **return_desc)
+{
+	acpi_operand_object     *obj_desc;
+	acpi_status             status;
+	u32                     return_btype;
+
+
+	ACPI_FUNCTION_TRACE ("Ut_evaluate_object");
+
+
+	/* Evaluate the object/method */
+
+	status = acpi_ns_evaluate_relative (prefix_node, path, NULL, &obj_desc);
+	if (ACPI_FAILURE (status)) {
+		if (status == AE_NOT_FOUND) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s.%s] was not found\n",
+				prefix_node->name.ascii, path));
+		}
+		else {
+			ACPI_REPORT_METHOD_ERROR ("Method execution failed",
+				prefix_node, path, status);
+		}
+
+		return_ACPI_STATUS (status);
+	}
+
+	/* Did we get a return object? */
+
+	if (!obj_desc) {
+		if (expected_return_btypes) {
+			ACPI_REPORT_METHOD_ERROR ("No object was returned from",
+				prefix_node, path, AE_NOT_EXIST);
+
+			return_ACPI_STATUS (AE_NOT_EXIST);
+		}
+
+		return_ACPI_STATUS (AE_OK);
+	}
+
+	/* Map the return object type to the bitmapped type */
+
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+	case ACPI_TYPE_INTEGER:
+		return_btype = ACPI_BTYPE_INTEGER;
+		break;
+
+	case ACPI_TYPE_BUFFER:
+		return_btype = ACPI_BTYPE_BUFFER;
+		break;
+
+	case ACPI_TYPE_STRING:
+		return_btype = ACPI_BTYPE_STRING;
+		break;
+
+	case ACPI_TYPE_PACKAGE:
+		return_btype = ACPI_BTYPE_PACKAGE;
+		break;
+
+	default:
+		return_btype = 0;
+		break;
+	}
+
+	/* Is the return object one of the expected types? */
+
+	if (!(expected_return_btypes & return_btype)) {
+		ACPI_REPORT_METHOD_ERROR ("Return object type is incorrect",
+			prefix_node, path, AE_TYPE);
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Type returned from %s was incorrect: %X\n",
+			path, ACPI_GET_OBJECT_TYPE (obj_desc)));
+
+		/* On error exit, we must delete the return object */
+
+		acpi_ut_remove_reference (obj_desc);
+		return_ACPI_STATUS (AE_TYPE);
+	}
+
+	/* Object type is OK, return it */
+
+	*return_desc = obj_desc;
+	return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_ut_evaluate_numeric_object
  *
  * PARAMETERS:  *Object_name        - Object name to be evaluated
@@ -43,8 +153,8 @@
  *
  * RETURN:      Status
  *
- * DESCRIPTION: evaluates a numeric namespace object for a selected device
- *              and stores results in *Address.
+ * DESCRIPTION: Evaluates a numeric namespace object for a selected device
+ *              and stores result in *Address.
  *
  *              NOTE: Internal function, no parameter validation
  *
@@ -63,52 +173,19 @@ acpi_ut_evaluate_numeric_object (
 	ACPI_FUNCTION_TRACE ("Ut_evaluate_numeric_object");
 
 
-	/* Execute the method */
-
-	status = acpi_ns_evaluate_relative (device_node, object_name, NULL, &obj_desc);
+	status = acpi_ut_evaluate_object (device_node, object_name,
+			 ACPI_BTYPE_INTEGER, &obj_desc);
 	if (ACPI_FAILURE (status)) {
-		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s on %4.4s was not found\n",
-				object_name, device_node->name.ascii));
-		}
-		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s on %4.4s failed with status %s\n",
-				object_name, device_node->name.ascii,
-				acpi_format_exception (status)));
-		}
-
 		return_ACPI_STATUS (status);
 	}
 
+	/* Get the returned Integer */
 
-	/* Did we get a return object? */
-
-	if (!obj_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from %s\n",
-			object_name));
-		return_ACPI_STATUS (AE_TYPE);
-	}
-
-	/* Is the return object of the correct type? */
-
-	if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) {
-		status = AE_TYPE;
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Type returned from %s was not an Integer: %X \n",
-			object_name, ACPI_GET_OBJECT_TYPE (obj_desc)));
-	}
-	else {
-		/*
-		 * Since the structure is a union, setting any field will set all
-		 * of the variables in the union
-		 */
-		*address = obj_desc->integer.value;
-	}
+	*address = obj_desc->integer.value;
 
 	/* On exit, we must delete the return object */
 
 	acpi_ut_remove_reference (obj_desc);
-
 	return_ACPI_STATUS (status);
 }
 
@@ -141,59 +218,26 @@ acpi_ut_execute_HID (
 	ACPI_FUNCTION_TRACE ("Ut_execute_HID");
 
 
-	/* Execute the method */
-
-	status = acpi_ns_evaluate_relative (device_node,
-			 METHOD_NAME__HID, NULL, &obj_desc);
+	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__HID,
+			 ACPI_BTYPE_INTEGER | ACPI_BTYPE_STRING, &obj_desc);
 	if (ACPI_FAILURE (status)) {
-		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_HID on %4.4s was not found\n",
-				device_node->name.ascii));
-		}
-		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_HID on %4.4s failed %s\n",
-				device_node->name.ascii, acpi_format_exception (status)));
-		}
-
 		return_ACPI_STATUS (status);
 	}
 
-	/* Did we get a return object? */
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
+		/* Convert the Numeric HID to string */
 
-	if (!obj_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _HID\n"));
-		return_ACPI_STATUS (AE_TYPE);
-	}
-
-	/*
-	 *  A _HID can return either a Number (32 bit compressed EISA ID) or
-	 *  a string
-	 */
-	if ((ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) &&
-		(ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_STRING)) {
-		status = AE_TYPE;
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Type returned from _HID not a number or string: %s(%X) \n",
-			acpi_ut_get_object_type_name (obj_desc),
-			ACPI_GET_OBJECT_TYPE (obj_desc)));
+		acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, hid->buffer);
 	}
 	else {
-		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
-			/* Convert the Numeric HID to string */
+		/* Copy the String HID from the returned object */
 
-			acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, hid->buffer);
-		}
-		else {
-			/* Copy the String HID from the returned object */
-
-			ACPI_STRNCPY (hid->buffer, obj_desc->string.pointer, sizeof(hid->buffer));
-		}
+		ACPI_STRNCPY (hid->buffer, obj_desc->string.pointer, sizeof(hid->buffer));
 	}
 
 	/* On exit, we must delete the return object */
 
 	acpi_ut_remove_reference (obj_desc);
-
 	return_ACPI_STATUS (status);
 }
 
@@ -225,28 +269,11 @@ acpi_ut_execute_CID (
 
 	ACPI_FUNCTION_TRACE ("Ut_execute_CID");
 
-	/* Execute the method */
 
-	status = acpi_ns_evaluate_relative (device_node,
-			 METHOD_NAME__CID, NULL, &obj_desc);
+	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__CID,
+			 ACPI_BTYPE_INTEGER | ACPI_BTYPE_STRING | ACPI_BTYPE_PACKAGE, &obj_desc);
 	if (ACPI_FAILURE (status)) {
-		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_CID on %4.4s was not found\n",
-				device_node->name.ascii));
-		}
-		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_CID on %4.4s failed %s\n",
-				device_node->name.ascii, acpi_format_exception (status)));
-		}
-
 		return_ACPI_STATUS (status);
-	}
-
-	/* Did we get a return object? */
-
-	if (!obj_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _CID\n"));
-		return_ACPI_STATUS (AE_TYPE);
 	}
 
 	/*
@@ -266,28 +293,25 @@ acpi_ut_execute_CID (
 
 		/* Copy the String CID from the returned object */
 
-		ACPI_STRNCPY (cid->buffer, obj_desc->string.pointer, sizeof(cid->buffer));
+		ACPI_STRNCPY (cid->buffer, obj_desc->string.pointer, sizeof (cid->buffer));
 		break;
 
 	case ACPI_TYPE_PACKAGE:
 
 		/* TBD: Parse package elements; need different return struct, etc. */
+
+		status = AE_SUPPORT;
 		break;
 
 	default:
 
 		status = AE_TYPE;
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Type returned from _CID not a number, string, or package: %s(%X) \n",
-			acpi_ut_get_object_type_name (obj_desc),
-			ACPI_GET_OBJECT_TYPE (obj_desc)));
 		break;
 	}
 
 	/* On exit, we must delete the return object */
 
 	acpi_ut_remove_reference (obj_desc);
-
 	return_ACPI_STATUS (status);
 }
 
@@ -317,64 +341,30 @@ acpi_ut_execute_UID (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_NAME ("Ut_execute_UID");
+	ACPI_FUNCTION_TRACE ("Ut_execute_UID");
 
 
-	/* Execute the method */
-
-	status = acpi_ns_evaluate_relative (device_node,
-			 METHOD_NAME__UID, NULL, &obj_desc);
+	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__UID,
+			 ACPI_BTYPE_INTEGER | ACPI_BTYPE_STRING, &obj_desc);
 	if (ACPI_FAILURE (status)) {
-		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_UID on %4.4s was not found\n",
-				device_node->name.ascii));
-		}
-		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"_UID on %4.4s failed %s\n",
-				device_node->name.ascii, acpi_format_exception (status)));
-		}
-
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
-	/* Did we get a return object? */
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
+		/* Convert the Numeric UID to string */
 
-	if (!obj_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _UID\n"));
-		return (AE_TYPE);
-	}
-
-	/*
-	 *  A _UID can return either a Number (32 bit compressed EISA ID) or
-	 *  a string
-	 */
-	if ((ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) &&
-		(ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_STRING)) {
-		status = AE_TYPE;
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Type returned from _UID was not a number or string: %X \n",
-			ACPI_GET_OBJECT_TYPE (obj_desc)));
+		acpi_ex_unsigned_integer_to_string (obj_desc->integer.value, uid->buffer);
 	}
 	else {
-		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
-			/* Convert the Numeric UID to string */
+		/* Copy the String UID from the returned object */
 
-			acpi_ex_unsigned_integer_to_string (obj_desc->integer.value, uid->buffer);
-		}
-		else {
-			/* Copy the String UID from the returned object */
-
-			ACPI_STRNCPY (uid->buffer, obj_desc->string.pointer, sizeof(uid->buffer));
-		}
+		ACPI_STRNCPY (uid->buffer, obj_desc->string.pointer, sizeof (uid->buffer));
 	}
-
 
 	/* On exit, we must delete the return object */
 
 	acpi_ut_remove_reference (obj_desc);
-
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -406,51 +396,27 @@ acpi_ut_execute_STA (
 	ACPI_FUNCTION_TRACE ("Ut_execute_STA");
 
 
-	/* Execute the method */
+	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__STA,
+			 ACPI_BTYPE_INTEGER, &obj_desc);
+	if (ACPI_FAILURE (status)) {
+		if (AE_NOT_FOUND == status) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+				"_STA on %4.4s was not found, assuming device is present\n",
+				device_node->name.ascii));
 
-	status = acpi_ns_evaluate_relative (device_node,
-			 METHOD_NAME__STA, NULL, &obj_desc);
-	if (AE_NOT_FOUND == status) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-			"_STA on %4.4s was not found, assuming present.\n",
-			device_node->name.ascii));
-
-		*flags = 0x0F;
-		status = AE_OK;
-	}
-
-	else if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_STA on %4.4s failed %s\n",
-			device_node->name.ascii,
-			acpi_format_exception (status)));
-	}
-
-	else /* success */ {
-		/* Did we get a return object? */
-
-		if (!obj_desc) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _STA\n"));
-			return_ACPI_STATUS (AE_TYPE);
+			*flags = 0x0F;
+			status = AE_OK;
 		}
 
-		/* Is the return object of the correct type? */
-
-		if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) {
-			status = AE_TYPE;
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Type returned from _STA was not a number: %X \n",
-				ACPI_GET_OBJECT_TYPE (obj_desc)));
-		}
-		else {
-			/* Extract the status flags */
-
-			*flags = (u32) obj_desc->integer.value;
-		}
-
-		/* On exit, we must delete the return object */
-
-		acpi_ut_remove_reference (obj_desc);
+		return_ACPI_STATUS (status);
 	}
 
+	/* Extract the status flags */
+
+	*flags = (u32) obj_desc->integer.value;
+
+	/* On exit, we must delete the return object */
+
+	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
