@@ -129,7 +129,7 @@ const static struct {
 	const char *name;
 	u8 mac_version;
 	u32 RxConfigMask;	/* Clears the bits supported by this chip */
-} rtl_chip_info[] __devinitdata = {
+} rtl_chip_info[] = {
 	_R("RTL8169",		RTL_GIGA_MAC_VER_B, 0xff7e1880),
 	_R("RTL8169s/8110s",	RTL_GIGA_MAC_VER_D, 0xff7e1880),
 	_R("RTL8169s/8110s",	RTL_GIGA_MAC_VER_E, 0xff7e1880)
