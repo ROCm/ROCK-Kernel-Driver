@@ -12,7 +12,7 @@
 const char *kallsyms_lookup(unsigned long addr,
 			    unsigned long *symbolsize,
 			    unsigned long *offset,
-			    char **modname);
+			    char **modname, char *namebuf);
 
 /* Replace "%s" in format with address, if found */
 extern void __print_symbol(const char *fmt, unsigned long address);
@@ -22,7 +22,7 @@ extern void __print_symbol(const char *fmt, unsigned long address);
 static inline const char *kallsyms_lookup(unsigned long addr,
 					  unsigned long *symbolsize,
 					  unsigned long *offset,
-					  char **modname)
+					  char **modname, char *namebuf)
 {
 	return NULL;
 }

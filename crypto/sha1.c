@@ -107,7 +107,7 @@ static void sha1_transform(u32 *state, const u8 *in)
 static void sha1_init(void *ctx)
 {
 	struct sha1_ctx *sctx = ctx;
-	const static struct sha1_ctx initstate = {
+	static const struct sha1_ctx initstate = {
 	  0,
 	  { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0 },
 	  { 0, }
@@ -144,7 +144,7 @@ static void sha1_final(void* ctx, u8 *out)
 	u32 i, j, index, padlen;
 	u64 t;
 	u8 bits[8] = { 0, };
-	const static u8 padding[64] = { 0x80, };
+	static const u8 padding[64] = { 0x80, };
 
 	t = sctx->count;
 	bits[7] = 0xff & t; t>>=8;

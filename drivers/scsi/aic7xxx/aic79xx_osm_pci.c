@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#18 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#19 $
  */
 
 #include "aic79xx_osm.h"
@@ -240,10 +240,8 @@ ahd_linux_pci_reserve_io_regions(struct ahd_softc *ahd, u_long *base,
 	if (check_region(*base, 256) != 0
 	 || check_region(*base2, 256) != 0)
 		return (ENOMEM);
-	else {
-		request_region(*base, 256, "aic79xx");
-		request_region(*base2, 256, "aic79xx");
-	}
+	request_region(*base, 256, "aic79xx");
+	request_region(*base2, 256, "aic79xx");
 #else
 	if (request_region(*base, 256, "aic79xx") == 0)
 		return (ENOMEM);

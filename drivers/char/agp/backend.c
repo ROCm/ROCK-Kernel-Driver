@@ -49,13 +49,10 @@ int agp_backend_acquire(void)
 	if (agp_bridge.type == NOT_SUPPORTED)
 		return -EINVAL;
 
-	atomic_inc(&agp_bridge.agp_in_use);
-
-	if (atomic_read(&agp_bridge.agp_in_use) != 1) {
-		atomic_dec(&agp_bridge.agp_in_use);
+	if (atomic_read(&agp_bridge.agp_in_use) != 0)
 		return -EBUSY;
-	}
-	MOD_INC_USE_COUNT;
+
+	atomic_inc(&agp_bridge.agp_in_use);
 	return 0;
 }
 
@@ -65,7 +62,6 @@ void agp_backend_release(void)
 		return;
 
 	atomic_dec(&agp_bridge.agp_in_use);
-	MOD_DEC_USE_COUNT;
 }
 
 struct agp_max_table {
@@ -73,7 +69,7 @@ struct agp_max_table {
 	int agp;
 };
 
-static struct agp_max_table maxes_table[9] __initdata =
+static struct agp_max_table maxes_table[9] =
 {
 	{0, 0},
 	{32, 4},
@@ -86,7 +82,7 @@ static struct agp_max_table maxes_table[9] __initdata =
 	{4096, 3932}
 };
 
-static int __init agp_find_max (void)
+static int agp_find_max (void)
 {
 	long memory, index, result;
 

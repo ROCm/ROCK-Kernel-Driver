@@ -326,7 +326,7 @@ static long last_rtc_update;
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-static void inline
+static inline void
 timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	volatile unsigned char dummy;

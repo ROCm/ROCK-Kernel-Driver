@@ -171,7 +171,7 @@ xdr_ressize_check(struct svc_rqst *rqstp, u32 *p)
 	return vec->iov_len <= PAGE_SIZE;
 }
 
-static int inline svc_take_page(struct svc_rqst *rqstp)
+static inline int svc_take_page(struct svc_rqst *rqstp)
 {
 	if (rqstp->rq_arghi <= rqstp->rq_argused)
 		return -ENOMEM;
@@ -180,7 +180,7 @@ static int inline svc_take_page(struct svc_rqst *rqstp)
 	return 0;
 }
 
-static void inline svc_pushback_allpages(struct svc_rqst *rqstp)
+static inline void svc_pushback_allpages(struct svc_rqst *rqstp)
 {
         while (rqstp->rq_resused) {
 		if (rqstp->rq_respages[--rqstp->rq_resused] == NULL)
@@ -191,7 +191,7 @@ static void inline svc_pushback_allpages(struct svc_rqst *rqstp)
 	}
 }
 
-static void inline svc_pushback_unused_pages(struct svc_rqst *rqstp)
+static inline void svc_pushback_unused_pages(struct svc_rqst *rqstp)
 {
         while (rqstp->rq_resused) {
 		if (rqstp->rq_respages[--rqstp->rq_resused] != NULL) {
@@ -204,7 +204,7 @@ static void inline svc_pushback_unused_pages(struct svc_rqst *rqstp)
 	}
 }
 
-static void inline svc_free_allpages(struct svc_rqst *rqstp)
+static inline void svc_free_allpages(struct svc_rqst *rqstp)
 {
         while (rqstp->rq_resused) {
 		if (rqstp->rq_respages[--rqstp->rq_resused] == NULL)

@@ -81,7 +81,7 @@ drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/i386/boot $(1)
+boot := arch/i386/boot
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper
@@ -92,20 +92,27 @@ BOOTIMAGE=arch/i386/boot/bzImage
 zImage zlilo zdisk: BOOTIMAGE=arch/i386/boot/zImage
 
 zImage bzImage: vmlinux
-	$(call makeboot,$(BOOTIMAGE))
+	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
 
 compressed: zImage
 
 zlilo bzlilo: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zlilo
 
 zdisk bzdisk: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zdisk
 
 install: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) install
 
 archclean:
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/i386/boot
+	$(Q)$(MAKE) $(clean)=arch/i386/boot
 
-archmrproper:
+define archhelp
+  echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
+  echo  '  install	- Install kernel using'
+  echo  '		   (your) ~/bin/installkernel or'
+  echo  '		   (distribution) /sbin/installkernel or'
+  echo  '		   install to $$(INSTALL_PATH) and run lilo'
+endef
+

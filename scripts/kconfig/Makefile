@@ -38,7 +38,7 @@ MOC = $(QTDIR)/bin/moc
 
 # QT needs some extra effort...
 $(obj)/.tmp_qtcheck:
-	@set -e; for d in $$QTDIR /usr/share/qt /usr/lib/qt3; do \
+	@set -e; for d in $$QTDIR /usr/share/qt /usr/lib/qt*3*; do \
 	  if [ -f $$d/include/qconfig.h ]; then DIR=$$d; break; fi; \
 	done; \
 	if [ -z "$$DIR" ]; then \

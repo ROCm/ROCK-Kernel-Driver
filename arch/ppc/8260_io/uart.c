@@ -2035,7 +2035,7 @@ static int rs_8xx_open(struct tty_struct *tty, struct file * filp)
  * /proc fs routines....
  */
 
-static int inline line_info(char *buf, struct serial_state *state)
+static inline int line_info(char *buf, struct serial_state *state)
 {
 #ifdef notdef
 	struct async_struct *info = state->info, scr_info;

@@ -244,5 +244,10 @@ endef
 
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
-
+# Usage is deprecated, because make do not see this as an invocation of make.
 descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
+
+# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=
+# Usage:
+# $(Q)$(MAKE) $(build)=dir
+build := -f scripts/Makefile.build obj

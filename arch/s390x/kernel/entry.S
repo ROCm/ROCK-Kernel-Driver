@@ -421,7 +421,7 @@ sys_call_table:
         .long  SYSCALL(sys_alarm,sys32_alarm_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old fstat syscall */
         .long  SYSCALL(sys_pause,sys32_pause)
-        .long  SYSCALL(sys_utime,sys32_utime_wrapper)           /* 30 */
+        .long  SYSCALL(sys_utime,compat_sys_utime_wrapper)           /* 30 */
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old stty syscall */
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old gtty syscall */
         .long  SYSCALL(sys_access,sys32_access_wrapper)
@@ -434,7 +434,7 @@ sys_call_table:
         .long  SYSCALL(sys_rmdir,sys32_rmdir_wrapper)           /* 40 */
         .long  SYSCALL(sys_dup,sys32_dup_wrapper)
         .long  SYSCALL(sys_pipe,sys32_pipe_wrapper)
-        .long  SYSCALL(sys_times,sys32_times_wrapper)
+        .long  SYSCALL(sys_times,compat_sys_times_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old prof syscall */
         .long  SYSCALL(sys_brk,sys32_brk_wrapper)               /* 45 */
         .long  SYSCALL(sys_ni_syscall,sys32_setgid16)   /* old setgid16 syscall*/
@@ -495,11 +495,11 @@ sys_call_table:
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
         .long  SYSCALL(sys_socketcall,sys32_socketcall_wrapper)
         .long  SYSCALL(sys_syslog,sys32_syslog_wrapper)
-        .long  SYSCALL(sys_setitimer,sys32_setitimer_wrapper)
-        .long  SYSCALL(sys_getitimer,sys32_getitimer_wrapper)   /* 105 */
-        .long  SYSCALL(sys_newstat,sys32_newstat_wrapper)
-        .long  SYSCALL(sys_newlstat,sys32_newlstat_wrapper)
-        .long  SYSCALL(sys_newfstat,sys32_newfstat_wrapper)
+        .long  SYSCALL(sys_setitimer,compat_sys_setitimer_wrapper)
+        .long  SYSCALL(sys_getitimer,compat_sys_getitimer_wrapper)   /* 105 */
+        .long  SYSCALL(sys_newstat,compat_sys_newstat_wrapper)
+        .long  SYSCALL(sys_newlstat,compat_sys_newlstat_wrapper)
+        .long  SYSCALL(sys_newfstat,compat_sys_newfstat_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old uname syscall */
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* iopl for i386 */
         .long  SYSCALL(sys_vhangup,sys_vhangup)
@@ -553,7 +553,7 @@ sys_call_table:
         .long  SYSCALL(sys_sched_get_priority_max,sys32_sched_get_priority_max_wrapper)
         .long  SYSCALL(sys_sched_get_priority_min,sys32_sched_get_priority_min_wrapper)
         .long  SYSCALL(sys_sched_rr_get_interval,sys32_sched_rr_get_interval_wrapper)
-        .long  SYSCALL(sys_nanosleep,sys32_nanosleep_wrapper)
+        .long  SYSCALL(sys_nanosleep,compat_sys_nanosleep_wrapper)
         .long  SYSCALL(sys_mremap,sys32_mremap_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys32_setresuid16_wrapper) /* old setresuid16 syscall */
         .long  SYSCALL(sys_ni_syscall,sys32_getresuid16_wrapper) /* old getresuid16 syscall */

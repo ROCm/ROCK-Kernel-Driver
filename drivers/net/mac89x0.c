@@ -141,14 +141,14 @@ static int set_mac_address(struct net_device *dev, void *addr);
 #define tx_done(dev) 1
 
 /* For reading/writing registers ISA-style */
-static int inline
+static inline int
 readreg_io(struct net_device *dev, int portno)
 {
 	nubus_writew(swab16(portno), dev->base_addr + ADD_PORT);
 	return swab16(nubus_readw(dev->base_addr + DATA_PORT));
 }
 
-static void inline
+static inline void
 writereg_io(struct net_device *dev, int portno, int value)
 {
 	nubus_writew(swab16(portno), dev->base_addr + ADD_PORT);
@@ -156,13 +156,13 @@ writereg_io(struct net_device *dev, int portno, int value)
 }
 
 /* These are for reading/writing registers in shared memory */
-static int inline
+static inline int
 readreg(struct net_device *dev, int portno)
 {
 	return swab16(nubus_readw(dev->mem_start + portno));
 }
 
-static void inline
+static inline void
 writereg(struct net_device *dev, int portno, int value)
 {
 	nubus_writew(swab16(value), dev->mem_start + portno);

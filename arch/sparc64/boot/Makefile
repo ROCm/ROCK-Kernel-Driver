@@ -24,7 +24,3 @@ $(obj)/vmlinux.aout: vmlinux FORCE
 	$(call if_changed,elftoaout)
 	@echo '  kernel: $@ is ready'
 
-archhelp:
-	@echo  '* vmlinux       - Standard sparc64 kernel'
-	@echo  '  vmlinux.aout  - a.out kernel for sparc64'
-	@echo  '  tftpboot.img  - Image prepared for tftp'

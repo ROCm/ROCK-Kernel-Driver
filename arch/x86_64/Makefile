@@ -57,32 +57,30 @@ drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 # FIXME: is drivers- right ?
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/x86_64/boot $(1)
+boot := arch/x86_64/boot
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
-		clean archclean archmrproper
+	archclean
 
 BOOTIMAGE=arch/x86_64/boot/bzImage
 zImage zlilo zdisk: BOOTIMAGE=arch/x86_64/boot/zImage
 
 zImage bzImage: vmlinux
-	$(call makeboot,$(BOOTIMAGE))
+	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
 
 compressed: zImage
 
 zlilo bzlilo: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zlilo
 
 zdisk bzdisk: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zdisk
 
 install: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) install
 
 archclean:
-	$(call makeboot,clean)
-
-archmrproper:
+	$(Q)$(MAKE) $(clean)=$(boot)
 
 prepare: include/asm-$(ARCH)/offset.h
 
@@ -98,3 +96,11 @@ include/asm-$(ARCH)/offset.h: include/asm-$(ARCH)/offset.h.tmp
 
 CLEAN_FILES += include/asm-$(ARCH)/offset.h.tmp \
 	       include/asm-$(ARCH)/offset.h
+
+define archhelp
+  echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
+  echo  '  install	- Install kernel using'
+  echo  '                  (your) ~/bin/installkernel or'
+  echo  '                  (distribution) /sbin/installkernel or'
+  echo  '        	  install to $$(INSTALL_PATH) and run lilo'
+endef

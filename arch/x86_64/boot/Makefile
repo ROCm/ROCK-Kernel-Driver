@@ -31,7 +31,7 @@ EXTRA_TARGETS	:= vmlinux.bin bootsect bootsect.o \
 CFLAGS += -m32
 
 host-progs	:= tools/build
-
+subdir-		:= compressed	#Let make clean descend in compressed/
 # ---------------------------------------------------------------------------
 
 $(obj)/zImage:  IMAGE_OFFSET := 0x1000
@@ -59,8 +59,7 @@ $(obj)/setup $(obj)/bootsect: %: %.o FORCE
 	$(call if_changed,ld)
 
 $(obj)/compressed/vmlinux: FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed \
-					IMAGE_OFFSET=$(IMAGE_OFFSET) $@
+	$(Q)$(MAKE) $(build)=$(obj)/compressed IMAGE_OFFSET=$(IMAGE_OFFSET) $@
 
 zdisk: $(BOOTIMAGE)
 	dd bs=8192 if=$(BOOTIMAGE) of=/dev/fd0
@@ -74,16 +73,3 @@ zlilo: $(BOOTIMAGE)
 
 install: $(BOOTIMAGE)
 	sh $(src)/install.sh $(KERNELRELEASE) $(BOOTIMAGE) System.map "$(INSTALL_PATH)"
-
-clean:
-	@echo 'Cleaning up (boot)'
-	@rm -f $(host-progs) $(EXTRA_TARGETS)
-	+@$(call descend,$(obj)/compressed) clean
-
-archhelp:
-	@echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
-	@echo  '  install	- Install kernel using'
-	@echo  '                  (your) ~/bin/installkernel or'
-	@echo  '                  (distribution) /sbin/installkernel or'
-	@echo  '        	  install to $$(INSTALL_PATH) and run lilo'
-

@@ -107,7 +107,7 @@ MODULE_PARM_DESC(mem_type, "Set Memory type (0=Flash, 1=RAM, 2=ROM, default=0)")
 
 
 
-static void inline cs_error(client_handle_t handle, int func, int ret)
+static inline void cs_error(client_handle_t handle, int func, int ret)
 {
 	error_info_t err = { func, ret };
 	CardServices(ReportError, handle, &err);

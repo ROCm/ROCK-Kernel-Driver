@@ -250,7 +250,7 @@ static void raid_end_bio_io(r1bio_t *r1_bio, int uptodate)
 /*
  * Update disk head position estimator based on IRQ completion info.
  */
-static void inline update_head_pos(int disk, r1bio_t *r1_bio)
+static inline void update_head_pos(int disk, r1bio_t *r1_bio)
 {
 	conf_t *conf = mddev_to_conf(r1_bio->mddev);
 

@@ -67,6 +67,7 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 
 	struct timer_list	rh_timer;	/* drives root hub */
 	struct list_head	dev_list;	/* devices on this bus */
+	struct work_struct	work;
 
 	/*
 	 * hardware info/state

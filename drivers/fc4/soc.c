@@ -104,7 +104,7 @@ static void soc_reset(fc_channel *fc)
 	soc_enable(s);
 }
 
-static void inline soc_solicited (struct soc *s)
+static inline void soc_solicited (struct soc *s)
 {
 	fc_hdr fchdr;
 	soc_rsp *hwrsp;
@@ -165,7 +165,7 @@ static void inline soc_solicited (struct soc *s)
 	}
 }
 
-static void inline soc_request (struct soc *s, u32 cmd)
+static inline void soc_request (struct soc *s, u32 cmd)
 {
 	SOC_SETIMASK(s, s->imask & ~(cmd & SOC_CMD_REQ_QALL));
 	SOD(("imask %08lx %08lx\n", s->imask, sbus_readl(s->regs + IMASK)));
@@ -184,7 +184,7 @@ static void inline soc_request (struct soc *s, u32 cmd)
 		s->curr_port ^= 1;
 }
 
-static void inline soc_unsolicited (struct soc *s)
+static inline void soc_unsolicited (struct soc *s)
 {
 	soc_rsp *hwrsp, *hwrspc;
 	soc_cq *sw_cq;

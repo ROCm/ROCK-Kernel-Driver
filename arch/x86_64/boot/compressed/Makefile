@@ -30,7 +30,3 @@ LDFLAGS_piggy.o := -r --format binary --oformat elf32-i386 -T
 
 $(obj)/piggy.o: $(obj)/vmlinux.scr $(obj)/vmlinux.bin.gz FORCE
 	$(call if_changed,ld)
-
-clean:
-	@echo 'Cleaning up (boot/compressed)'
-	@rm -f $(EXTRA_TARGETS)

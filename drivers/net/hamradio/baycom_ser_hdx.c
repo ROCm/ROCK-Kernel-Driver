@@ -143,7 +143,7 @@ struct baycom_state {
 
 /* --------------------------------------------------------------------- */
 
-static void inline baycom_int_freq(struct baycom_state *bc)
+static inline void baycom_int_freq(struct baycom_state *bc)
 {
 #ifdef BAYCOM_DEBUG
 	unsigned long cur_jiffies = jiffies;
@@ -166,7 +166,7 @@ static void inline baycom_int_freq(struct baycom_state *bc)
  * ===================== SER12 specific routines =========================
  */
 
-static void inline ser12_set_divisor(struct net_device *dev,
+static inline void ser12_set_divisor(struct net_device *dev,
 				     unsigned char divisor)
 {
 	outb(0x81, LCR(dev->base_addr));	/* DLAB = 1 */

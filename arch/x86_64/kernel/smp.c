@@ -142,7 +142,7 @@ static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
  * We cannot call mmdrop() because we are in interrupt context, 
  * instead update mm->cpu_vm_mask.
  */
-static void inline leave_mm (unsigned long cpu)
+static inline void leave_mm (unsigned long cpu)
 {
 	if (read_pda(mmu_state) == TLBSTATE_OK)
 		BUG();

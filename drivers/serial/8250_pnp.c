@@ -313,7 +313,7 @@ static const struct pnp_device_id pnp_dev_table[] = {
 
 MODULE_DEVICE_TABLE(pnp, pnp_dev_table);
 
-static void inline avoid_irq_share(struct pnp_dev *dev)
+static inline void avoid_irq_share(struct pnp_dev *dev)
 {
 	unsigned int map = 0x1FF8;
 	struct pnp_irq *irq;
@@ -360,7 +360,7 @@ static int serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 	struct pnp_resources *res = dev->res;
 	struct pnp_resources *resa;
 
-	if (!(check_name(dev->name) || check_name(dev->card->name)))
+	if (!(check_name(dev->name) || (dev->card && check_name(dev->card->name))))
 		return -ENODEV;
 
 	if (!res)
@@ -385,8 +385,11 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 {
 	struct serial_struct serial_req;
 	int ret, line, flags = dev_id->driver_data;
-	if (flags & UNKNOWN_DEV)
+	if (flags & UNKNOWN_DEV) {
 		ret = serial_pnp_guess_board(dev, &flags);
+		if (ret < 0)
+			return ret;
+	}
 	if (flags & SPCI_FL_NO_SHIRQ)
 		avoid_irq_share(dev);
 	memset(&serial_req, 0, sizeof(serial_req));

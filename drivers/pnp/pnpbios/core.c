@@ -1035,7 +1035,7 @@ static unsigned char *node_possible_resource_data_to_dev(unsigned char *p, struc
 #define CHAR(id,a) (0x40 + (((id)>>a) & 31))
 //
 
-static void inline pnpid32_to_pnpid(u32 id, char *str)
+static inline void pnpid32_to_pnpid(u32 id, char *str)
 {
 	const char *hex = "0123456789abcdef";
 
@@ -1058,6 +1058,7 @@ static void inline pnpid32_to_pnpid(u32 id, char *str)
 static void node_id_data_to_dev(unsigned char *p, struct pnp_bios_node *node, struct pnp_dev *dev)
 {
 	int len;
+	char id[8];
 	struct pnp_id *dev_id;
 
 	if ((char *)p == NULL)
@@ -1083,7 +1084,9 @@ static void node_id_data_to_dev(unsigned char *p, struct pnp_bios_node *node, st
 			dev_id =  pnpbios_kmalloc(sizeof (struct pnp_id), GFP_KERNEL);
 			if (!dev_id)
 				return;
-			pnpid32_to_pnpid(p[1] | p[2] << 8 | p[3] << 16 | p[4] << 24,dev_id->id);
+			memset(dev_id, 0, sizeof(struct pnp_id));
+			pnpid32_to_pnpid(p[1] | p[2] << 8 | p[3] << 16 | p[4] << 24,id);
+			memcpy(&dev_id->id, id, 7);
 			pnp_add_id(dev_id, dev);
 			break;
                 }
@@ -1258,7 +1261,7 @@ static int pnpbios_get_resources(struct pnp_dev *dev)
 	struct pnp_bios_node * node;
 		
 	/* just in case */
-	if(dev->driver)
+	if(pnp_dev_has_driver(dev))
 		return -EBUSY;
 	if(!pnp_is_dynamic(dev))
 		return -EPERM;
@@ -1281,7 +1284,7 @@ static int pnpbios_set_resources(struct pnp_dev *dev, struct pnp_cfg *config, ch
 	struct pnp_bios_node * node;
 
 	/* just in case */
-	if(dev->driver)
+	if(pnp_dev_has_driver(dev))
 		return -EBUSY;
 	if (flags == PNP_DYNAMIC && !pnp_is_dynamic(dev))
 		return -EPERM;
@@ -1335,7 +1338,7 @@ static int pnpbios_disable_resources(struct pnp_dev *dev)
 	if (!config)
 		return -1;
 	/* just in case */
-	if(dev->driver)
+	if(pnp_dev_has_driver(dev))
 		return -EBUSY;
 	if(dev->flags & PNP_NO_DISABLE || !pnp_is_dynamic(dev))
 		return -EPERM;
@@ -1380,7 +1383,7 @@ static struct pnp_protocol pnpbios_protocol = {
 	.disable = pnpbios_disable_resources,
 };
 
-static int inline insert_device(struct pnp_dev *dev)
+static inline int insert_device(struct pnp_dev *dev)
 {
 	struct list_head * pos;
 	struct pnp_dev * pnp_dev;
@@ -1396,7 +1399,7 @@ static int inline insert_device(struct pnp_dev *dev)
 static void __init build_devlist(void)
 {
 	u8 nodenum;
-	char id[7];
+	char id[8];
 	unsigned char *pos;
 	unsigned int nodes_got = 0;
 	unsigned int devs = 0;
@@ -1432,14 +1435,15 @@ static void __init build_devlist(void)
 			break;
 		memset(dev,0,sizeof(struct pnp_dev));
 		dev_id =  pnpbios_kmalloc(sizeof (struct pnp_id), GFP_KERNEL);
-		if (!dev_id)
+		if (!dev_id) {
+			kfree(dev);
 			break;
+		}
 		memset(dev_id,0,sizeof(struct pnp_id));
 		dev->number = thisnodenum;
-		memcpy(dev->name,"Unknown Device",13);
-		dev->name[14] = '\0';
+		strcpy(dev->name,"Unknown Device");
 		pnpid32_to_pnpid(node->eisa_id,id);
-		memcpy(dev_id->id,id,8);
+		memcpy(dev_id->id,id,7);
 		pnp_add_id(dev_id, dev);
 		pos = node_current_resource_data_to_dev(node,dev);
 		pos = node_possible_resource_data_to_dev(pos,node,dev);
@@ -1448,9 +1452,10 @@ static void __init build_devlist(void)
 
 		dev->protocol = &pnpbios_protocol;
 
-		if(insert_device(dev)<0)
+		if(insert_device(dev)<0) {
+			kfree(dev_id);
 			kfree(dev);
-		else
+		} else
 			devs++;
 		if (nodenum <= thisnodenum) {
 			printk(KERN_ERR "PnPBIOS: build_devlist: Node number 0x%x is out of sequence following node 0x%x. Aborting.\n", (unsigned int)nodenum, (unsigned int)thisnodenum);

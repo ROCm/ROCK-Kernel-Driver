@@ -9,6 +9,8 @@
  * need to be careful to avoid a name clashes.
  */
 
+#ifndef __ASSEMBLY__
+
 typedef unsigned int umode_t;
 
 /*
@@ -28,10 +30,16 @@ typedef unsigned int __u32;
 typedef __signed__ long __s64;
 typedef unsigned long __u64;
 
+#endif /* __ASSEMBLY__ */
+
 /*
  * These aren't exported outside the kernel to avoid name space clashes
  */
 #ifdef __KERNEL__
+
+#define BITS_PER_LONG 64
+
+#ifndef __ASSEMBLY__
 
 typedef signed char s8;
 typedef unsigned char u8;
@@ -45,10 +53,9 @@ typedef unsigned int u32;
 typedef signed long s64;
 typedef unsigned long u64;
 
-#define BITS_PER_LONG 64
-
 typedef u64 dma_addr_t;
 typedef u64 dma64_addr_t;
 
+#endif /* __ASSEMBLY__ */
 #endif /* __KERNEL__ */
 #endif /* _ALPHA_TYPES_H */

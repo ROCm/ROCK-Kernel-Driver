@@ -139,7 +139,7 @@ libs-y				+= arch/arm/lib/
 # Default target when executing plain make
 all: zImage
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/arm/boot $(1)
+boot := arch/arm/boot
 
 #	Update machine arch and proc symlinks if something which affects
 #	them changed.  We use .arch and .proc to indicate when they were
@@ -162,17 +162,17 @@ prepare: maketools
 .PHONY: maketools FORCE
 maketools: include/asm-arm/.arch include/asm-arm/.proc \
 	   include/asm-arm/constants.h include/linux/version.h FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/arm/tools include/asm-arm/mach-types.h
+	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
 # Convert bzImage to zImage
 bzImage: vmlinux
-	$(call makeboot,arch/arm/boot/zImage)
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
 
 zImage Image bootpImage: vmlinux
-	$(call makeboot,arch/arm/boot/$@)
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 zinstall install: vmlinux
-	$(call makeboot,$@)
+	$(Q)$(MAKE) $(build)=$(boot) $@
 
 MRPROPER_FILES	+= \
 	include/asm-arm/arch include/asm-arm/.arch \
@@ -183,14 +183,14 @@ MRPROPER_FILES	+= \
 # We use MRPROPER_FILES and CLEAN_FILES now
 archmrproper:
 archclean:
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/arm/boot
+	$(Q)$(MAKE) $(clean)=$(boot)
 
 # My testing targets (that short circuit a few dependencies)
-zImg:;	$(call makeboot, arch/arm/boot/zImage)
-Img:;	$(call makeboot, arch/arm/boot/Image)
-bp:;	$(call makeboot, arch/arm/boot/bootpImage)
-i:;	$(call makeboot, install)
-zi:;	$(call makeboot, zinstall)
+zImg:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
+Img:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/Image
+bp:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/bootpImage
+i:;	$(Q)$(MAKE) $(build)=$(boot) install
+zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
 
 #
 # Configuration targets.  Use these to select a
@@ -216,3 +216,15 @@ include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
 	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
+
+define archhelp
+  echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
+  echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+  echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+  echo  '  initrd        - Create an initial image'
+  echo  '  install       - Install uncompressed kernel'
+  echo  '  zinstall      - Install compressed kernel'
+  echo  '                  Install using (your) ~/bin/installkernel or'
+  echo  '                  (distribution) /sbin/installkernel or'
+  echo  '                  install to $$(INSTALL_PATH) and run lilo'
+endef

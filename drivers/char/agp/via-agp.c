@@ -168,7 +168,7 @@ static int __init via_kt400_setup(struct pci_dev *pdev)
 	agp_bridge.resume = agp_generic_resume;
 	agp_bridge.cant_use_aperture = 0;
 
-	pci_read_config_byte(agp_bridge.dev, VIA_AGPSEL, &reg);
+	pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
 	if ((reg & (1<<1))==1) {
 		/* AGP 2.0 compatability mode. */
 		agp_bridge.agp_enable = agp_generic_agp_enable;

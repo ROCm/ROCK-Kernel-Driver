@@ -1479,7 +1479,7 @@ static inline int ioc3_is_menet(struct pci_dev *pdev)
 	       && dev->device == PCI_DEVICE_ID_SGI_IOC3;
 }
 
-static void inline ioc3_serial_probe(struct pci_dev *pdev,
+static inline void ioc3_serial_probe(struct pci_dev *pdev,
 				struct ioc3 *ioc3)
 {
 	struct serial_struct req;

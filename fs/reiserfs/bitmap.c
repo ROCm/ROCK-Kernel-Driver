@@ -474,7 +474,7 @@ int reiserfs_parse_alloc_options(struct super_block * s, char * options)
     return 0;
 }
   
-static void inline new_hashed_relocation (reiserfs_blocknr_hint_t * hint)
+static inline void new_hashed_relocation (reiserfs_blocknr_hint_t * hint)
 {
     char * hash_in;
     if (hint->formatted_node) {
@@ -493,7 +493,7 @@ static void inline new_hashed_relocation (reiserfs_blocknr_hint_t * hint)
     hint->search_start = hint->beg + keyed_hash(hash_in, 4) % (hint->end - hint->beg);
 }
 
-static void inline get_left_neighbor(reiserfs_blocknr_hint_t *hint)
+static inline void get_left_neighbor(reiserfs_blocknr_hint_t *hint)
 {
     struct path * path;
     struct buffer_head * bh;
@@ -539,7 +539,7 @@ static void inline get_left_neighbor(reiserfs_blocknr_hint_t *hint)
    specified as number of percent with mount option device, else try to put
    on last of device.  This is not to say it is good code to do so,
    but the effect should be measured.  */
-static void inline set_border_in_hint(struct super_block *s, reiserfs_blocknr_hint_t *hint)
+static inline void set_border_in_hint(struct super_block *s, reiserfs_blocknr_hint_t *hint)
 {
     b_blocknr_t border = SB_BLOCK_COUNT(s) / REISERFS_SB(s)->s_alloc_options.border;
 
@@ -549,7 +549,7 @@ static void inline set_border_in_hint(struct super_block *s, reiserfs_blocknr_hi
 	hint->beg = border;
 }
 
-static void inline displace_large_file(reiserfs_blocknr_hint_t *hint)
+static inline void displace_large_file(reiserfs_blocknr_hint_t *hint)
 {
     if ( TEST_OPTION(displace_based_on_dirid, hint->th->t_super))
 	hint->search_start = hint->beg + keyed_hash((char *)(&INODE_PKEY(hint->inode)->k_dir_id), 4) % (hint->end - hint->beg);
@@ -557,7 +557,7 @@ static void inline displace_large_file(reiserfs_blocknr_hint_t *hint)
 	hint->search_start = hint->beg + keyed_hash((char *)(&INODE_PKEY(hint->inode)->k_objectid), 4) % (hint->end - hint->beg);
 }
 
-static void inline hash_formatted_node(reiserfs_blocknr_hint_t *hint)
+static inline void hash_formatted_node(reiserfs_blocknr_hint_t *hint)
 {
    char * hash_in;
 
@@ -571,13 +571,13 @@ static void inline hash_formatted_node(reiserfs_blocknr_hint_t *hint)
 	hint->search_start = hint->beg + keyed_hash(hash_in, 4) % (hint->end - hint->beg);
 }
 
-static int inline this_blocknr_allocation_would_make_it_a_large_file(reiserfs_blocknr_hint_t *hint)
+static inline int this_blocknr_allocation_would_make_it_a_large_file(reiserfs_blocknr_hint_t *hint)
 {
     return hint->block == REISERFS_SB(hint->th->t_super)->s_alloc_options.large_file_size;
 }
 
 #ifdef DISPLACE_NEW_PACKING_LOCALITIES
-static void inline displace_new_packing_locality (reiserfs_blocknr_hint_t *hint)
+static inline void displace_new_packing_locality (reiserfs_blocknr_hint_t *hint)
 {
     struct key * key = &hint->key;
 
@@ -586,7 +586,7 @@ static void inline displace_new_packing_locality (reiserfs_blocknr_hint_t *hint)
 }
   #endif
 
-static int inline old_hashed_relocation (reiserfs_blocknr_hint_t * hint)
+static inline int old_hashed_relocation (reiserfs_blocknr_hint_t * hint)
 {
     unsigned long border;
     unsigned long hash_in;
@@ -603,7 +603,7 @@ static int inline old_hashed_relocation (reiserfs_blocknr_hint_t * hint)
     return 1;
   }
   
-static int inline old_way (reiserfs_blocknr_hint_t * hint)
+static inline int old_way (reiserfs_blocknr_hint_t * hint)
 {
     unsigned long border;
     
@@ -618,7 +618,7 @@ static int inline old_way (reiserfs_blocknr_hint_t * hint)
     return 1;
 }
 
-static void inline hundredth_slices (reiserfs_blocknr_hint_t * hint)
+static inline void hundredth_slices (reiserfs_blocknr_hint_t * hint)
 {
     struct key * key = &hint->key;
     unsigned long slice_start;
@@ -629,7 +629,7 @@ static void inline hundredth_slices (reiserfs_blocknr_hint_t * hint)
     }
 }
   
-static void inline determine_search_start(reiserfs_blocknr_hint_t *hint,
+static inline void determine_search_start(reiserfs_blocknr_hint_t *hint,
 					  int amount_needed)
 {
     struct super_block *s = hint->th->t_super;

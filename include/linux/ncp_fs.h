@@ -248,7 +248,7 @@ int ncp_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
 /* linux/fs/ncpfs/sock.c */
 int ncp_request2(struct ncp_server *server, int function,
 	void* reply, int max_reply_size);
-static int inline ncp_request(struct ncp_server *server, int function) {
+static inline int ncp_request(struct ncp_server *server, int function) {
 	return ncp_request2(server, function, server->packet, server->packet_size);
 }
 int ncp_connect(struct ncp_server *server);

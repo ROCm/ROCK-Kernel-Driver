@@ -31,6 +31,7 @@ config AGP_GART
 
 config AGP3
 	bool "AGP 3.0 compliance (EXPERIMENTAL)"
+	depends on AGP
 
 config AGP_INTEL
 	tristate "Intel 440LX/BX/GX and I815/I820/I830M/I830MP/I840/I845/I850/I860 support"

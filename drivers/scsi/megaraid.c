@@ -1738,7 +1738,7 @@ static int mega_driver_ioctl (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	return 1;
 }
 
-static void inline set_mbox_xfer_addr (mega_host_config * megaCfg, mega_scb * pScb,
+static inline void set_mbox_xfer_addr (mega_host_config * megaCfg, mega_scb * pScb,
 		    mega_ioctl_mbox * mbox, u32 direction)
 {
 

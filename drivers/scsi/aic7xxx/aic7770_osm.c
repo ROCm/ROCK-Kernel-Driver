@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7770_osm.c#11 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7770_osm.c#12 $
  */
 
 #include "aic7xxx_osm.h"
@@ -61,8 +61,14 @@ aic7770_linux_probe(Scsi_Host_Template *template)
 		uint32_t eisa_id;
 		size_t	 id_size;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 		if (check_region(eisaBase, AHC_EISA_IOSIZE) != 0)
 			continue;
+		request_region(eisaBase, AHC_EISA_IOSIZE, "aic7xxx");
+#else
+		if (request_region(eisaBase, AHC_EISA_IOSIZE, "aic7xxx") != 0)
+			continue;
+#endif
 
 		eisa_id = 0;
 		id_size = sizeof(eisa_id);
@@ -72,6 +78,7 @@ aic7770_linux_probe(Scsi_Host_Template *template)
 			eisa_id |= inb(eisaBase + IDOFFSET + i)
 				   << ((id_size-i-1) * 8);
 		}
+		release_region(eisaBase, AHC_EISA_IOSIZE);
 		if (eisa_id & 0x80000000)
 			continue;  /* no EISA card in slot */
 
