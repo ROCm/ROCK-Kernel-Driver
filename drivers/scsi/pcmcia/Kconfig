@@ -3,22 +3,11 @@
 #
 
 menu "PCMCIA SCSI adapter support"
-	depends on SCSI!=n && HOTPLUG && PCMCIA!=n
-
-config SCSI_PCMCIA
-	bool "PCMCIA SCSI adapter support"
-	help
-	  Say Y here if you intend to attach a PCMCIA or CardBus card to your
-	  computer which acts as a SCSI host adapter. These are credit card
-	  size devices often used with laptops.
-
-	  Note that the answer to this question won't directly affect the
-	  kernel: saying N will just cause the configurator to skip all
-	  the questions PCMCIA SCSI host adapters.
+	depends on SCSI!=n && PCMCIA!=n
 
 config PCMCIA_AHA152X
 	tristate "Adaptec AHA152X PCMCIA support"
-	depends on SCSI_PCMCIA && m
+	depends on m
 	help
 	  Say Y here if you intend to attach this type of PCMCIA SCSI host
 	  adapter to your computer.
@@ -30,7 +19,7 @@ config PCMCIA_AHA152X
 
 config PCMCIA_FDOMAIN
 	tristate "Future Domain PCMCIA support"
-	depends on SCSI_PCMCIA && m
+	depends on m
 	help
 	  Say Y here if you intend to attach this type of PCMCIA SCSI host
 	  adapter to your computer.
@@ -42,7 +31,7 @@ config PCMCIA_FDOMAIN
 
 config PCMCIA_NINJA_SCSI
 	tristate "NinjaSCSI-3 / NinjaSCSI-32Bi (16bit) PCMCIA support"
-	depends on SCSI_PCMCIA && m
+	depends on m
 	help
 	  If you intend to attach this type of PCMCIA SCSI host adapter to
 	  your computer, say Y here and read
@@ -55,7 +44,7 @@ config PCMCIA_NINJA_SCSI
 
 config PCMCIA_QLOGIC
 	tristate "Qlogic PCMCIA support"
-	depends on SCSI_PCMCIA && m
+	depends on m
 	help
 	  Say Y here if you intend to attach this type of PCMCIA SCSI host
 	  adapter to your computer.
@@ -65,10 +54,4 @@ config PCMCIA_QLOGIC
 	  whenever you want).  If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
 
-config PCMCIA_SCSICARD
-	bool
-	depends on PCMCIA_QLOGIC=y || PCMCIA_AHA152X=y || PCMCIA_FDOMAIN=y || PCMCIA_NINJA_SCSI=y
-	default y
-
 endmenu
-
