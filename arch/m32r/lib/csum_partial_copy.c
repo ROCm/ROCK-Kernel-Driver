@@ -14,38 +14,34 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  *
- * $Id$
  */
-#include <net/checksum.h>
+
+#include <linux/module.h>
 #include <linux/types.h>
+
+#include <net/checksum.h>
 #include <asm/byteorder.h>
 #include <asm/string.h>
 #include <asm/uaccess.h>
 
 /*
- * copy while checksumming, otherwise like csum_partial
+ * Copy while checksumming, otherwise like csum_partial
  */
-unsigned int csum_partial_copy(const char *src, char *dst,
-                               int len, int sum)
+unsigned int csum_partial_copy_nocheck (const char *src, char *dst,
+                                        int len, unsigned int sum)
 {
-	/*
-	 * It's 2:30 am and I don't feel like doing it real ...
-	 * This is lots slower than the real thing (tm)
-	 */
 	sum = csum_partial(src, len, sum);
 	memcpy(dst, src, len);
 
 	return sum;
 }
+EXPORT_SYMBOL(csum_partial_copy_nocheck);
 
 /*
  * Copy from userspace and compute checksum.  If we catch an exception
  * then zero the rest of the buffer.
-unsigned int csum_partial_copy_from_user (const char *src, char *dst,
-                                          int len, unsigned int sum,
-                                          int *err_ptr)
  */
-unsigned int csum_partial_copy_generic_from (const char *src, char *dst,
+unsigned int csum_partial_copy_from_user (const char __user *src, char *dst,
                                           int len, unsigned int sum,
                                           int *err_ptr)
 {
@@ -59,19 +55,4 @@ unsigned int csum_partial_copy_generic_from (const char *src, char *dst,
 
 	return csum_partial(dst, len-missing, sum);
 }
-unsigned int csum_partial_copy_generic_to (const char *src, char *dst,
-                                          int len, unsigned int sum,
-                                          int *err_ptr)
-{
-	int missing;
-
-	missing = copy_to_user(dst, src, len);
-	if (missing) {
-/*
-		memset(dst + len - missing, 0, missing);
-*/
-		*err_ptr = -EFAULT;
-	}
-
-	return csum_partial(src, len-missing, sum);
-}
+EXPORT_SYMBOL(csum_partial_copy_from_user);

@@ -14,7 +14,6 @@
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
 #include <asm/io.h>
-#include <asm/hardirq.h>
 #include <asm/delay.h>
 #include <asm/irq.h>
 #include <asm/tlbflush.h>
@@ -42,7 +41,6 @@ EXPORT_SYMBOL(__up);
 EXPORT_SYMBOL(__down_trylock);
 
 /* Networking helper routines. */
-EXPORT_SYMBOL(csum_partial_copy);
 /* Delay loops */
 EXPORT_SYMBOL(__udelay);
 EXPORT_SYMBOL(__delay);

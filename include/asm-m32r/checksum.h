@@ -1,14 +1,20 @@
+#ifdef __KERNEL__
 #ifndef _ASM_M32R_CHECKSUM_H
 #define _ASM_M32R_CHECKSUM_H
 
-/* $Id$ */
-
 /*
- *  linux/include/asm-m32r/atomic.h
- *    orig : i386 2.4.10
+ * include/asm-m32r/checksum.h
  *
- *  M32R version:
+ * IP/TCP/UDP checksum routines
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
+ * Some code taken from mips and parisc architecture.
+ *
  *    Copyright (C) 2001, 2002  Hiroyuki Kondo, Hirokazu Takata
+ *    Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
 /*
@@ -23,71 +29,31 @@
  *
  * it's best to have buff aligned on a 32-bit boundary
  */
-asmlinkage unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum);
+asmlinkage unsigned int csum_partial(const unsigned char *buff, int len, unsigned int sum);
 
 /*
- * the same as csum_partial, but copies from src while it
- * checksums, and handles user-space pointer exceptions correctly, when needed.
+ * The same as csum_partial, but copies from src while it checksums.
  *
- * here even more important to align src and dst on a 32-bit (or even
+ * Here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
  */
-
-asmlinkage unsigned int csum_partial_copy_generic(const char *src, char *dst,
-		int len, int sum, int *src_err_ptr, int *dst_err_ptr);
-
-/*
- *	Note: when you get a NULL pointer exception here this means someone
- *	passed in an incorrect kernel address to one of these functions.
- *
- *	If you use these functions directly please don't forget the
- *	verify_area().
- */
-
-extern unsigned int csum_partial_copy(const char *src, char *dst,
-		int len, int sum);
-extern unsigned int csum_partial_copy_generic_from(const char *src,
-		char *dst, int len, unsigned int sum, int *err_ptr);
-extern unsigned int csum_partial_copy_generic_to (const char *src,
-		char *dst, int len, unsigned int sum, int *err_ptr);
-
-extern __inline__
-unsigned int csum_partial_copy_nocheck ( const char *src, char *dst,
-					int len, int sum)
-{
-#if 0
-	return csum_partial_copy_generic ( src, dst, len, sum, NULL, NULL);
-#else
-	return  csum_partial_copy( src, dst, len, sum);
-#endif
-}
-
-extern __inline__
-unsigned int csum_partial_copy_from_user ( const char __user *src, char *dst,
-						int len, int sum, int *err_ptr)
-{
-#if 0
-	return csum_partial_copy_generic ( src, dst, len, sum, err_ptr, NULL);
-#else
-	return csum_partial_copy_generic_from ( src, dst, len, sum, err_ptr);
-#endif
-}
+extern unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
+                                              int len, unsigned int sum);
 
 /*
- * These are the old (and unsafe) way of doing checksums, a warning message will be
- * printed if they are used and an exeption occurs.
- *
- * these functions should go away after some time.
+ * This is a new version of the above that records errors it finds in *errp,
+ * but continues and zeros thre rest of the buffer.
  */
-
-#define csum_partial_copy_fromuser csum_partial_copy
-unsigned int csum_partial_copy( const char *src, char *dst, int len, int sum);
+extern unsigned int csum_partial_copy_from_user(const char __user *src,
+                                                char *dst,
+                                                int len, unsigned int sum,
+                                                int *err_ptr);
 
 /*
  *	Fold a partial checksum
  */
 
-static __inline__ unsigned int csum_fold(unsigned int sum)
+static inline unsigned int csum_fold(unsigned int sum)
 {
 	unsigned long tmpreg;
 	__asm__(
@@ -106,13 +72,10 @@ static __inline__ unsigned int csum_fold(unsigned int sum)
 }
 
 /*
- *	This is a version of ip_compute_csum() optimized for IP headers,
- *	which always checksum on 4 octet boundaries.
- *
- *	By Jorge Cwik <jorge@laser.satlink.net>, adapted for linux by
- *	Arnt Gulbrandsen.
+ * This is a version of ip_compute_csum() optimized for IP headers,
+ * which always checksum on 4 octet boundaries.
  */
-static __inline__ unsigned short ip_fast_csum(unsigned char * iph,
+static inline unsigned short ip_fast_csum(unsigned char * iph,
 					  unsigned int ihl) {
 	unsigned long sum, tmpreg0, tmpreg1;
 
@@ -148,11 +111,11 @@ static __inline__ unsigned short ip_fast_csum(unsigned char * iph,
 	return csum_fold(sum);
 }
 
-static __inline__ unsigned long csum_tcpudp_nofold(unsigned long saddr,
-						   unsigned long daddr,
-						   unsigned short len,
-						   unsigned short proto,
-						   unsigned int sum)
+static inline unsigned long csum_tcpudp_nofold(unsigned long saddr,
+					       unsigned long daddr,
+					       unsigned short len,
+					       unsigned short proto,
+					       unsigned int sum)
 {
 #if defined(__LITTLE_ENDIAN)
 	unsigned long len_proto = (ntohs(len)<<16)+proto*256;
@@ -180,7 +143,7 @@ static __inline__ unsigned long csum_tcpudp_nofold(unsigned long saddr,
  * computes the checksum of the TCP/UDP pseudo-header
  * returns a 16-bit checksum, already complemented
  */
-static __inline__ unsigned short int csum_tcpudp_magic(unsigned long saddr,
+static inline unsigned short int csum_tcpudp_magic(unsigned long saddr,
 						   unsigned long daddr,
 						   unsigned short len,
 						   unsigned short proto,
@@ -194,16 +157,16 @@ static __inline__ unsigned short int csum_tcpudp_magic(unsigned long saddr,
  * in icmp.c
  */
 
-static __inline__ unsigned short ip_compute_csum(unsigned char * buff, int len) {
+static inline unsigned short ip_compute_csum(unsigned char * buff, int len) {
 	return csum_fold (csum_partial(buff, len, 0));
 }
 
 #define _HAVE_ARCH_IPV6_CSUM
-static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
-						     struct in6_addr *daddr,
-						     __u16 len,
-						     unsigned short proto,
-						     unsigned int sum)
+static inline unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
+						 struct in6_addr *daddr,
+						 __u16 len,
+						 unsigned short proto,
+						 unsigned int sum)
 {
 	unsigned long tmpreg0, tmpreg1, tmpreg2, tmpreg3;
 	__asm__(
@@ -237,20 +200,5 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
 	return csum_fold(sum);
 }
 
-/*
- *	Copy and checksum to user
- */
-#define HAVE_CSUM_COPY_USER
-static __inline__ unsigned int csum_and_copy_to_user (const char *src, char *dst,
-				    int len, int sum, int *err_ptr)
-{
-	if (access_ok(VERIFY_WRITE, dst, len))
-		return csum_partial_copy_generic_to(src, dst, len, sum, err_ptr);
-
-	if (len)
-		*err_ptr = -EFAULT;
-
-	return -1; /* invalid checksum */
-}
-
 #endif /* _ASM_M32R_CHECKSUM_H */
+#endif /* __KERNEL__ */
