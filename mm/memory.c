@@ -97,7 +97,7 @@ static inline void free_one_pmd(struct mmu_gather *tlb, pmd_t * dir)
 
 	if (pmd_none(*dir))
 		return;
-	if (pmd_bad(*dir)) {
+	if (unlikely(pmd_bad(*dir))) {
 		pmd_ERROR(*dir);
 		pmd_clear(dir);
 		return;
@@ -115,7 +115,7 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 
 	if (pgd_none(*dir))
 		return;
-	if (pgd_bad(*dir)) {
+	if (unlikely(pgd_bad(*dir))) {
 		pgd_ERROR(*dir);
 		pgd_clear(dir);
 		return;
@@ -232,7 +232,7 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 		
 		if (pgd_none(*src_pgd))
 			goto skip_copy_pmd_range;
-		if (pgd_bad(*src_pgd)) {
+		if (unlikely(pgd_bad(*src_pgd))) {
 			pgd_ERROR(*src_pgd);
 			pgd_clear(src_pgd);
 skip_copy_pmd_range:	address = (address + PGDIR_SIZE) & PGDIR_MASK;
@@ -253,7 +253,7 @@ skip_copy_pmd_range:	address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		
 			if (pmd_none(*src_pmd))
 				goto skip_copy_pte_range;
-			if (pmd_bad(*src_pmd)) {
+			if (unlikely(pmd_bad(*src_pmd))) {
 				pmd_ERROR(*src_pmd);
 				pmd_clear(src_pmd);
 skip_copy_pte_range:
@@ -383,7 +383,7 @@ zap_pte_range(struct mmu_gather *tlb, pmd_t * pmd,
 
 	if (pmd_none(*pmd))
 		return;
-	if (pmd_bad(*pmd)) {
+	if (unlikely(pmd_bad(*pmd))) {
 		pmd_ERROR(*pmd);
 		pmd_clear(pmd);
 		return;
@@ -426,27 +426,25 @@ zap_pte_range(struct mmu_gather *tlb, pmd_t * pmd,
 
 static void
 zap_pmd_range(struct mmu_gather *tlb, pgd_t * dir,
-		unsigned long address, unsigned long size)
+		unsigned long address, unsigned long end)
 {
 	pmd_t * pmd;
-	unsigned long end;
 
 	if (pgd_none(*dir))
 		return;
-	if (pgd_bad(*dir)) {
+	if (unlikely(pgd_bad(*dir))) {
 		pgd_ERROR(*dir);
 		pgd_clear(dir);
 		return;
 	}
 	pmd = pmd_offset(dir, address);
-	end = address + size;
 	if (end > ((address + PGDIR_SIZE) & PGDIR_MASK))
 		end = ((address + PGDIR_SIZE) & PGDIR_MASK);
 	do {
 		zap_pte_range(tlb, pmd, address, end - address);
 		address = (address + PMD_SIZE) & PMD_MASK; 
 		pmd++;
-	} while (address < end);
+	} while (address && (address < end));
 }
 
 void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
@@ -464,7 +462,7 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 	dir = pgd_offset(vma->vm_mm, address);
 	tlb_start_vma(tlb, vma);
 	do {
-		zap_pmd_range(tlb, dir, address, end - address);
+		zap_pmd_range(tlb, dir, address, end);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
@@ -634,7 +632,7 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 		goto out;
 	if (pmd_huge(*pmd))
 		return follow_huge_pmd(mm, address, pmd, write);
-	if (pmd_bad(*pmd))
+	if (unlikely(pmd_bad(*pmd)))
 		goto out;
 
 	ptep = pte_offset_map(pmd, address);

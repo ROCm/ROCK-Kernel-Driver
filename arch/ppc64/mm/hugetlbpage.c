@@ -272,7 +272,7 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 			}
 
 			pmd_clear(pmd);
-			pgtable_remove_rmap(page);
+			dec_page_state(nr_page_table_pages);
 			pte_free(page);
 		}
 	}

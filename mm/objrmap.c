@@ -19,6 +19,11 @@
  * Released under the General Public License (GPL).
  */
 
+/*
+ * nonlinear pagetable walking elaborated from mm/memory.c under
+ * Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
+ */
+
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
@@ -62,7 +67,7 @@ static inline void validate_anon_vma_find_vma(struct vm_area_struct * find_vma)
  * 
  * It is the caller's responsibility to unmap the pte if it is returned.
  */
-static inline pte_t *
+static pte_t *
 find_pte(struct vm_area_struct *vma, struct page *page, unsigned long *addr)
 {
 	struct mm_struct *mm = vma->vm_mm;
@@ -120,12 +125,19 @@ page_referenced_one(struct vm_area_struct *vma, struct page *page)
 	pte_t *pte;
 	int referenced = 0;
 
-	if (!spin_trylock(&mm->page_table_lock))
+	/*
+	 * Tracking the referenced info is too expensive
+	 * for nonlinear mappings.
+	 */
+	if (vma->vm_flags & VM_NONLINEAR)
+		goto out;
+
+	if (unlikely(!spin_trylock(&mm->page_table_lock)))
 		goto out;
 
 	pte = find_pte(vma, page, NULL);
 	if (pte) {
-		if (ptep_test_and_clear_young(pte))
+		if (pte_young(*pte) && ptep_test_and_clear_young(pte))
 			referenced++;
 		pte_unmap(pte);
 	}
@@ -158,7 +170,7 @@ page_referenced_inode(struct page *page)
 
 	BUG_ON(PageSwapCache(page));
 
-	if (down_trylock(&mapping->i_shared_sem))
+	if (unlikely(down_trylock(&mapping->i_shared_sem)))
 		goto out;
 
 	list_for_each_entry(vma, &mapping->i_mmap, shared)
@@ -212,7 +224,7 @@ int fastcall page_referenced(struct page * page)
 	BUG_ON(!page->mapping);
 
 	if (page_test_and_clear_young(page))
-		mark_page_accessed(page);
+		referenced++;
 
 	if (TestClearPageReferenced(page))
 		referenced++;
@@ -256,8 +268,6 @@ void fastcall page_add_rmap(struct page *page, struct vm_area_struct * vma,
 
 	if (PageReserved(page))
 		return;
-
-	BUG_ON(vma->vm_flags & VM_RESERVED);
 
 	page_map_lock(page);
 
@@ -327,8 +337,11 @@ void fastcall page_remove_rmap(struct page *page)
 	if (!page_mapped(page))
 		goto out_unlock;
 
-	if (!--page->mapcount)
+	if (!--page->mapcount) {
 		dec_page_state(nr_mapped);
+		if (page_test_and_clear_dirty(page))
+			set_page_dirty(page);
+	}
 
 	if (PageAnon(page))
 		anon_vma_page_unlink(page);
@@ -344,38 +357,13 @@ void fastcall page_remove_rmap(struct page *page)
   
  out_unlock:
 	page_map_unlock(page);
-	return;
 }
 
-/**
- * try_to_unmap_one - unmap a page using the object-based rmap method
- * @page: the page to unmap
- *
- * Determine whether a page is mapped in a given vma and unmap it if it's found.
- *
- * This function is strictly a helper function for try_to_unmap_inode.
- */
-static int
-try_to_unmap_one(struct vm_area_struct *vma, struct page *page)
+static void
+unmap_pte_page(struct page * page, struct vm_area_struct * vma,
+	       unsigned long address, pte_t * pte)
 {
-	struct mm_struct *mm = vma->vm_mm;
-	unsigned long address;
-	pte_t *pte;
 	pte_t pteval;
-	int ret = SWAP_AGAIN;
-
-	if (!spin_trylock(&mm->page_table_lock))
-		return ret;
-
-	pte = find_pte(vma, page, &address);
-	if (!pte)
-		goto out;
-
-	BUG_ON(vma->vm_flags & VM_RESERVED);
-	if (vma->vm_flags & VM_LOCKED) {
-		ret =  SWAP_FAIL;
-		goto out_unmap;
-	}
 
 	flush_cache_page(vma, address);
 	pteval = ptep_clear_flush(vma, address, pte);
@@ -388,9 +376,14 @@ try_to_unmap_one(struct vm_area_struct *vma, struct page *page)
 		swp_entry_t entry = { .val = page->private };
 		swap_duplicate(entry);
 		set_pte(pte, swp_entry_to_pte(entry));
+
 		BUG_ON(pte_file(*pte));
+		BUG_ON(!PageAnon(page));
+		BUG_ON(!page->mapping);
+		BUG_ON(!page->mapcount);
 	} else {
 		unsigned long pgidx;
+
 		/*
 		 * If a nonlinear mapping then store the file page offset
 		 * in the pte.
@@ -402,22 +395,173 @@ try_to_unmap_one(struct vm_area_struct *vma, struct page *page)
 			set_pte(pte, pgoff_to_pte(page->index));
 			BUG_ON(!pte_file(*pte));
 		}
+
+		BUG_ON(!page->mapping);
+		BUG_ON(!page->mapcount);
+		BUG_ON(PageAnon(page));
 	}
 
 	if (pte_dirty(pteval))
 		set_page_dirty(page);
 
-	BUG_ON(!page->mapcount);
-
-	mm->rss--;
+	vma->vm_mm->rss--;
 	if (!--page->mapcount && PageAnon(page))
 		anon_vma_page_unlink(page);
 	page_cache_release(page);
+}
 
-out_unmap:
+static void
+try_to_unmap_nonlinear_pte(struct vm_area_struct * vma,
+			   pmd_t * pmd, unsigned long address, unsigned long size)
+{
+	unsigned long offset;
+	pte_t *ptep;
+
+	if (pmd_none(*pmd))
+		return;
+	if (unlikely(pmd_bad(*pmd))) {
+		pmd_ERROR(*pmd);
+		pmd_clear(pmd);
+		return;
+	}
+	ptep = pte_offset_map(pmd, address);
+	offset = address & ~PMD_MASK;
+	if (offset + size > PMD_SIZE)
+		size = PMD_SIZE - offset;
+	size &= PAGE_MASK;
+	for (offset=0; offset < size; ptep++, offset += PAGE_SIZE) {
+		pte_t pte = *ptep;
+		if (pte_none(pte))
+			continue;
+		if (pte_present(pte)) {
+			unsigned long pfn = pte_pfn(pte);
+			struct page * page;
+
+			if (!pfn_valid(pfn))
+				continue;
+			page = pfn_to_page(pfn);
+			if (PageReserved(page))
+				continue;
+			if (pte_young(pte) && ptep_test_and_clear_young(ptep))
+				continue;
+			/*
+			 * any other page in the nonlinear mapping will not wait
+			 * on us since only one cpu can take the i_shared_sem
+			 * and reach this point.
+			 */
+			page_map_lock(page);
+			/* check that we're not in between set_pte and page_add_rmap */
+			if (page_mapped(page)) {
+				unmap_pte_page(page, vma, address + offset, ptep);
+				if (!page_mapped(page) && page_test_and_clear_dirty(page))
+					set_page_dirty(page);
+			}
+			page_map_unlock(page);
+		}
+	}
+	pte_unmap(ptep-1);
+}
+
+static void
+try_to_unmap_nonlinear_pmd(struct vm_area_struct * vma,
+			   pgd_t * dir, unsigned long address, unsigned long end)
+{
+	pmd_t * pmd;
+
+	if (pgd_none(*dir))
+		return;
+	if (unlikely(pgd_bad(*dir))) {
+		pgd_ERROR(*dir);
+		pgd_clear(dir);
+		return;
+	}
+	pmd = pmd_offset(dir, address);
+	if (end > ((address + PGDIR_SIZE) & PGDIR_MASK))
+		end = ((address + PGDIR_SIZE) & PGDIR_MASK);
+	do {
+		try_to_unmap_nonlinear_pte(vma, pmd, address, end - address);
+		address = (address + PMD_SIZE) & PMD_MASK; 
+		pmd++;
+	} while (address && (address < end));
+}
+
+static void
+try_to_unmap_nonlinear(struct vm_area_struct *vma)
+{
+	pgd_t * dir;
+	unsigned long address = vma->vm_start, end = vma->vm_end;
+
+	dir = pgd_offset(vma->vm_mm, address);
+	do {
+		try_to_unmap_nonlinear_pmd(vma, dir, address, end);
+		address = (address + PGDIR_SIZE) & PGDIR_MASK;
+		dir++;
+	} while (address && (address < end));
+}
+
+/**
+ * try_to_unmap_one - unmap a page using the object-based rmap method
+ * @page: the page to unmap
+ *
+ * Determine whether a page is mapped in a given vma and unmap it if it's found.
+ *
+ * This function is strictly a helper function for try_to_unmap_inode.
+ */
+static int
+try_to_unmap_one(struct vm_area_struct *vma, struct page *page, int * young)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	unsigned long address;
+	pte_t *pte;
+	int ret;
+
+	BUG_ON(vma->vm_flags & VM_RESERVED);
+	if (unlikely(vma->vm_flags & VM_LOCKED))
+		return SWAP_FAIL;
+
+	ret = SWAP_AGAIN;
+	if (unlikely(!spin_trylock(&mm->page_table_lock)))
+		return ret;
+
+	if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
+		/*
+		 * If this was a false positive generated by a
+		 * failed trylock in the referenced pass let's
+		 * avoid to pay the big cost of the nonlinear
+		 * swap, we'd better be sure we've to pay that
+		 * cost before running it.
+		 */
+		if (!*young) {
+			/*
+			 * All it matters is that the page won't go
+			 * away under us after we unlock.
+			 */
+			page_map_unlock(page);
+			try_to_unmap_nonlinear(vma);
+			page_map_lock(page);
+		}
+		goto out;
+	}
+
+	pte = find_pte(vma, page, &address);
+	if (!pte)
+		goto out;
+
+	/*
+	 * We use trylocks in the "reference" methods, if they fails
+	 * we let the VM to go ahead unmapping to avoid locking
+	 * congestions, so here we may be trying to unmap young
+	 * ptes, if that happens we givup trying unmapping this page
+	 * and we clear all other reference bits instead (basically
+	 * downgrading to a page_referenced pass).
+	 */
+	if ((!pte_young(*pte) || !ptep_test_and_clear_young(pte)) && !*young)
+		unmap_pte_page(page, vma, address, pte);
+	else
+		*young = 1;
+
 	pte_unmap(pte);
-
-out:
+ out:
 	spin_unlock(&mm->page_table_lock);
 	return ret;
 }
@@ -439,21 +583,21 @@ try_to_unmap_inode(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 	struct vm_area_struct *vma;
-	int ret = SWAP_AGAIN;
+	int ret = SWAP_AGAIN, young = 0;
 
 	BUG_ON(PageSwapCache(page));
 
-	if (down_trylock(&mapping->i_shared_sem))
+	if (unlikely(down_trylock(&mapping->i_shared_sem)))
 		return ret;
 	
 	list_for_each_entry(vma, &mapping->i_mmap, shared) {
-		ret = try_to_unmap_one(vma, page);
+		ret = try_to_unmap_one(vma, page, &young);
 		if (ret == SWAP_FAIL || !page->mapcount)
 			goto out;
 	}
 
 	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
-		ret = try_to_unmap_one(vma, page);
+		ret = try_to_unmap_one(vma, page, &young);
 		if (ret == SWAP_FAIL || !page->mapcount)
 			goto out;
 	}
@@ -466,7 +610,7 @@ out:
 static int
 try_to_unmap_anon(struct page * page)
 {
-	int ret = SWAP_AGAIN;
+	int ret = SWAP_AGAIN, young = 0;
 	struct vm_area_struct * vma;
 	anon_vma_t * anon_vma = (anon_vma_t *) page->mapping;
 
@@ -476,7 +620,7 @@ try_to_unmap_anon(struct page * page)
 	spin_lock(&anon_vma->anon_vma_lock);
 	BUG_ON(list_empty(&anon_vma->anon_vma_head));
 	list_for_each_entry(vma, &anon_vma->anon_vma_head, anon_vma_node) {
-		ret = try_to_unmap_one(vma, page);
+		ret = try_to_unmap_one(vma, page, &young);
 		if (ret == SWAP_FAIL || !page->mapcount)
 			break;
 	}
@@ -522,7 +666,10 @@ int fastcall try_to_unmap(struct page * page)
 	if (!page_mapped(page)) {
 		dec_page_state(nr_mapped);
 		ret = SWAP_SUCCESS;
+		if (page_test_and_clear_dirty(page))
+			set_page_dirty(page);
 	}
+
 	return ret;
 }
 

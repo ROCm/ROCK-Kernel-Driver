@@ -1,5 +1,5 @@
-#ifndef _LINUX_RMAP_H
-#define _LINUX_RMAP_H
+#ifndef _LINUX_OBJRMAP_H
+#define _LINUX_OBJRMAP_H
 /*
  * Declarations for Object Reverse Mapping functions in mm/objrmap.c
  */
@@ -75,4 +75,4 @@ int FASTCALL(page_referenced(struct page *));
 
 #endif /* CONFIG_MMU */
 
-#endif /* _LINUX_RMAP_H */
+#endif /* _LINUX_OBJRMAP_H */

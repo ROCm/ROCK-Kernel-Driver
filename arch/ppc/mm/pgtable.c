@@ -86,9 +86,14 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	extern int mem_init_done;
 	extern void *early_get_page(void);
 
-	if (mem_init_done)
+	if (mem_init_done) {
 		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
-	else
+		if (pte) {
+			struct page *ptepage = virt_to_page(pte);
+			ptepage->mapping = (void *) mm;
+			ptepage->index = address & PMD_MASK;
+		}
+	} else
 		pte = (pte_t *)early_get_page();
 	if (pte)
 		clear_page(pte);
@@ -106,8 +111,11 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 #endif
 
 	pte = alloc_pages(flags, 0);
-	if (pte)
+	if (pte) {
+		pte->mapping = (void *) mm;
+		pte->index = address & PMD_MASK;
 		clear_highpage(pte);
+	}
 	return pte;
 }
 
@@ -116,6 +124,7 @@ void pte_free_kernel(pte_t *pte)
 #ifdef CONFIG_SMP
 	hash_page_sync();
 #endif
+	virt_to_page(pte)->mapping = NULL;
 	free_page((unsigned long)pte);
 }
 

@@ -71,11 +71,11 @@
 #define PG_nosave		14	/* Used for system suspend/resume */
 #define PG_maplock		15	/* lock bit for ->as.anon_vma and ->mapcount */
 
+#define PG_swapcache		16	/* SwapCache page */
 #define PG_mappedtodisk		17	/* Has blocks allocated on-disk */
 #define PG_reclaim		18	/* To be reclaimed asap */
 #define PG_compound		19	/* Part of a compound page */
 #define PG_anon			20	/* Anonymous page */
-#define PG_swapcache		21	/* SwapCache page */
 
 
 /*
