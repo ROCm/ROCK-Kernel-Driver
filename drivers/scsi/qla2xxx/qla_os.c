@@ -2892,6 +2892,19 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			continue;
 		}
 
+		/* get consistent memory allocated for init control block */
+		ha->init_cb = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
+		    &ha->init_cb_dma);
+		if (ha->init_cb == NULL) {
+			qla_printk(KERN_WARNING, ha,
+			    "Memory Allocation failed - init_cb\n");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
+
+			continue;
+		}
+		memset(ha->init_cb, 0, sizeof(init_cb_t));
 
 		/* Get consistent memory allocated for Get Port Database cmd */
 		ha->iodesc_pd = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
@@ -2982,21 +2995,6 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			}
 			memset(ha->ct_sns, 0, sizeof(struct ct_sns_pkt));
 		}
-
-		/* Get consistent memory allocated for Get Port Database cmd */
-		ha->iodesc_pd = pci_alloc_consistent(ha->pdev,
-		    PORT_DATABASE_SIZE, &ha->iodesc_pd_dma);
-		if (ha->iodesc_pd == NULL) {
-			/* error */
-			qla_printk(KERN_WARNING, ha,
-			    "Memory Allocation failed - iodesc_pd\n");
-
-			qla2x00_mem_free(ha);
-			msleep(100);
-
-			continue;
-		}
-		memset(ha->iodesc_pd, 0, PORT_DATABASE_SIZE);
 
 		/* Done all allocations without any error. */
 		status = 0;
