@@ -158,7 +158,7 @@ struct ax8817x_info {
 };
 
 
-const struct usb_device_id ax8817x_id_table[] __devinitdata = {
+const struct usb_device_id ax8817x_id_table[] = {
 	/* Linksys USB200M */
       {USB_DEVICE(0x077b, 0x2226), driver_info:0x00130103},
 	/* Hawking UF200, TRENDnet TU2-ET100 */
@@ -1239,7 +1239,7 @@ static int ax8817x_bind(struct usb_interface *intf,
 
 	usb_fill_int_urb(ax_info->int_urb, usb, usb_rcvintpipe(usb, 1),
 			 ax_info->int_buf, 8, ax_int_callback, ax_info,
-			 100);
+			 usb->speed == USB_SPEED_HIGH? 8: 100);
 
 	ret = usb_submit_urb(ax_info->int_urb, GFP_ATOMIC);
 	if (ret < 0) {

@@ -2953,6 +2953,8 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 			if (alts->desc.bInterfaceClass != USB_CLASS_AUDIO || alts->desc.bInterfaceSubClass != 2)
 				continue;
 			if (alts->desc.bNumEndpoints < 1) {
+				/* altsetting 0 should never have iso EPs */
+				if (alts->desc.bAlternateSetting != 0)
 				printk(KERN_ERR "usbaudio: device %u interface %u altsetting %u does not have an endpoint\n", 
 				       dev->devnum, asifout, i);
 				continue;
@@ -3872,9 +3874,10 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 
 static int __init usb_audio_init(void)
 {
-	usb_register(&usb_audio_driver);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+	int result = usb_register(&usb_audio_driver);
+	if (result == 0) 
+		info(DRIVER_VERSION ":" DRIVER_DESC);
+	return result;
 }
 
 

@@ -974,7 +974,7 @@ static const struct hc_driver ehci_driver = {
 /* EHCI spec says PCI is required. */
 
 /* PCI driver selection metadata; PCI hotplugging uses this */
-static struct pci_device_id __devinitdata pci_ids [] = { {
+static struct pci_device_id pci_ids [] = { {
 
 	/* handle any USB 2.0 EHCI controller */
 

@@ -629,9 +629,10 @@ static struct usb_driver wacom_driver = {
 
 static int __init wacom_init(void)
 {
-	usb_register(&wacom_driver);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+	int result = usb_register(&wacom_driver);
+	if (result == 0)
+		info(DRIVER_VERSION ":" DRIVER_DESC);
+	return result;
 }
 
 static void __exit wacom_exit(void)
