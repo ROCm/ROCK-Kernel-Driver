@@ -8,7 +8,7 @@ struct agp_device_ids amd_k8_device_ids[] __initdata =
 	{ }, /* dummy final entry, always present */
 };
 
-struct agp_bridge_info amd_k8_agp_bridge_info[] __initdata =
+struct agp_bridge_info amd_k8_agp_bridge_info __initdata =
 {
 	.vendor_id		= PCI_VENDOR_ID_AMD,
 	.vendor_name	= "AMD",
